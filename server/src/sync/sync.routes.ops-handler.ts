@@ -1,3 +1,5 @@
+import { prisma } from '../db';
+import { authorizeInboundOperations, readInboundUploadIdentity } from '../automation/worker-identity';
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { SuperSyncUploadOpsRequestSchema } from '@heyta/shared-schema';
 import { getAuthUser } from '../middleware';
@@ -101,7 +103,7 @@ export const uploadOpsHandler = async (
         .send(createValidationErrorResponse(parseResult.error.issues));
     }
 
-    const { clientId, lastKnownServerSeq, requestId, causalFrontierToken } = parseResult.data;
+    const { clientId, lastKnownServerSeq, requestId, causalFrontierToken, inboundCommitProofs } = parseResult.data;
     let ops = parseResult.data.ops as unknown as Operation[];
     // A causal maintenance snapshot is an independent transaction. Its base
     // must describe the server prefix before that one snapshot is inserted.
@@ -140,6 +142,12 @@ export const uploadOpsHandler = async (
         surface: 'ops',
         opsCount: ops.length,
       });
+    }
+
+    const inboundIdentity = readInboundUploadIdentity(req.raw.rawHeaders, getAuthUser(req).tokenVersion);
+    if (inboundIdentity && inboundCommitProofs) inboundIdentity.commitProofs = inboundCommitProofs;
+    if (!await authorizeInboundOperations(prisma, userId, clientId, ops as unknown as Operation[], inboundIdentity)) {
+      return reply.status(403).send({ error: 'Inbound commit authorization required', errorCode: SYNC_ERROR_CODES.INBOUND_AUTH_REQUIRED });
     }
 
     const hasFrontierDelta = ops.some((op) => op.vectorClockEncoding === 'frontier-delta');
@@ -321,6 +329,7 @@ export const uploadOpsHandler = async (
           repairBase,
           false,
           lastKnownServerSeq,
+          inboundIdentity,
         );
 
         return uploadResults;

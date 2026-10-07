@@ -45,6 +45,7 @@ import type { HeytaNativeTokens } from '@heyta/design-system';
 import type { TodayProgress } from '@heyta/domain';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
 import { MotivationProgressBar } from './ProgressBar.js';
+import { StateIllustration } from '../empty-state/StateIllustration.js';
 import {
   growthHint,
   isUnplannedOnly,
@@ -103,8 +104,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       padding: tokens['space.3'],
       borderRadius: tokens['radius.lg'],
       backgroundColor: tokens['color.surface'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
     },
     head: {
       flexDirection: 'row',
@@ -120,6 +119,15 @@ function makeStyles(tokens: HeytaNativeTokens) {
       flexDirection: 'row',
       flexWrap: 'wrap',
       gap: tokens['space.3'],
+    },
+    completed: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: tokens['space.2'],
+    },
+    completedText: {
+      flexShrink: 1,
+      color: tokens['color.success-strong'],
     },
     /** 明细四项在每个数字上等宽（9→10 时整行不跳）。 */
     numeric: {
@@ -211,7 +219,10 @@ export function TodayProgressCard({
       ) : null}
 
       {progress.closed ? (
-        <Text style={[text.caption, { color: tokens['color.success'] }]}>{labels.closed}</Text>
+        <View style={styles.completed}>
+          <StateIllustration variant="complete" />
+          <Text style={[text.caption, styles.completedText]}>{labels.closed}</Text>
+        </View>
       ) : null}
     </View>
   );

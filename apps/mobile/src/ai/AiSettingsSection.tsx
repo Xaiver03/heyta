@@ -36,7 +36,7 @@ import {
 } from '@heyta/ai';
 import {
   ASSISTANT_TIER_ORDER,
-  ASSISTANT_TIER_READ_AND_PROPOSE,
+  ASSISTANT_TIER_EXECUTE,
   ASSISTANT_TIER_READ_ONLY,
   DEFAULT_ASSISTANT_TIER,
   createAssistantTierStore,
@@ -279,7 +279,7 @@ export function AiSettingsSection(): React.JSX.Element {
                   ))}
                 </HStackish>
                 <Button
-                  label={t('web.ai.settings.deleteAria')}
+                  label={t('web.ai.settings.deleteAria', { name: endpoint.label })}
                   tone="danger"
                   onPress={() => {
                     removeEndpoint(endpoint.id);
@@ -291,19 +291,31 @@ export function AiSettingsSection(): React.JSX.Element {
         )}
 
         <HStackish>
-          {AI_ENDPOINT_PRESETS.map((preset) => (
-            <Chip
-              key={preset.id}
-              label={t('web.ai.settings.presetAdd')}
-              onPress={() => {
-                addPreset(preset.id);
-              }}
-            />
-          ))}
+          {AI_ENDPOINT_PRESETS.map((preset) => {
+            const copy = PRESET_COPY_KEYS[preset.id as keyof typeof PRESET_COPY_KEYS];
+            const label = copy === undefined ? preset.label : t(copy.label);
+            return (
+              <Chip
+                key={preset.id}
+                label={t('web.ai.settings.presetAdd', { name: label })}
+                onPress={() => {
+                  addPreset(preset.id);
+                }}
+              />
+            );
+          })}
         </HStackish>
         {AI_ENDPOINT_PRESETS.map((preset) => (
           <Text key={preset.id} variant="caption" tone="subtle">
-            {preset.label}：{preset.prerequisite === undefined ? '' : String(preset.prerequisite)}
+            {(() => {
+              const copy = PRESET_COPY_KEYS[preset.id as keyof typeof PRESET_COPY_KEYS];
+              const label = copy === undefined ? preset.label : t(copy.label);
+              const prerequisite =
+                copy?.prerequisite === undefined
+                  ? preset.prerequisite ?? ''
+                  : t(copy.prerequisite);
+              return `${label}：${prerequisite}`;
+            })()}
           </Text>
         ))}
 
@@ -530,15 +542,27 @@ const VERDICT_KEY = {
   unparseable: 'web.ai.settings.endpointError.unparseable',
 } as const satisfies Record<string, MessageKey>;
 
+/** 预设的跨包展示文案必须经过 i18n，避免移动端英文界面露出中文源数据。 */
+const PRESET_COPY_KEYS = {
+  ollama: {
+    label: 'web.ai.settings.preset.ollama.label',
+    prerequisite: 'web.ai.settings.preset.ollama.prerequisite',
+  },
+  'lm-studio': {
+    label: 'web.ai.settings.preset.lmStudio.label',
+    prerequisite: 'web.ai.settings.preset.lmStudio.prerequisite',
+  },
+} as const satisfies Record<string, { readonly label: MessageKey; readonly prerequisite: MessageKey }>;
+
 // 🔴 档位这两张表用 **app-host 的常量**当键，不写字面量（AGENTS §3.5 / check:layering）。
 // 档位决定"模型这一次能不能改用户的数据"，它的词表是产品语义；壳只负责"存在哪"。
 // web 那边（`AiSettings.tsx`）已经是这个写法了，这里照同一形状，不另立一套。
 const TIER_LABEL_KEY = {
   [ASSISTANT_TIER_READ_ONLY]: 'web.ai.assistant.tier.readOnly.label',
-  [ASSISTANT_TIER_READ_AND_PROPOSE]: 'web.ai.assistant.tier.readAndPropose.label',
+  [ASSISTANT_TIER_EXECUTE]: 'web.ai.assistant.tier.readAndPropose.label',
 } as const satisfies Record<AssistantTier, MessageKey>;
 
 const TIER_NOTE_KEY = {
   [ASSISTANT_TIER_READ_ONLY]: 'web.ai.assistant.tier.readOnly.note',
-  [ASSISTANT_TIER_READ_AND_PROPOSE]: 'web.ai.assistant.tier.readAndPropose.note',
+  [ASSISTANT_TIER_EXECUTE]: 'web.ai.assistant.tier.readAndPropose.note',
 } as const satisfies Record<AssistantTier, MessageKey>;

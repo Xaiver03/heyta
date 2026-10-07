@@ -7,13 +7,13 @@
  * 共享层用 `lucide` 的数据 + `HeytaIcon`，鸿蒙/SwiftUI 壳以后各画各的。
  * 把字形名写进磁盘，等于让一次换库把用户数据改掉。
  *
- * ## 🔴 为什么是**闭集**，而且为什么这八个里没有一个"坏"的
+ * ## 🔴 为什么是**闭集**，而且为什么这些图标不替用户评判
  *
  * 与分类色同一条立场（`docs/plans/activity-categories-and-colors.md` §2）：
  * **App 永不判断某个活动健康／不健康。** 颜色靠"不给它起名"守住这条，
  * 图标守不住 —— 一个水杯就是水杯。所以这条红线只能落在**词表本身**上：
- * 这八个必须全是不带褒贬的日常动作，**不许**出现烟、酒、垃圾食品、
- * 熬夜、"刷手机"那一类。加一个字形 = 替用户判断了一件事。
+ * 这 24 个必须是中性的日常主题，**不许**出现带有价值判断的标签。加一个字形
+ * = 替用户判断了一件事。
  *
  * 闭集还有一层作用：它让"图标"这个字段**能被校验**。自由文本的话，
  * 每个壳都会遇到"这个字符串该画成什么"，而答案只能是"画不出来"。
@@ -31,8 +31,11 @@
  * （ADR-0022 同一条推论），而用户**真的选过**的那个才需要。
  */
 
-/** 可用的图标 key。**顺序稳定**：它决定 `deriveHabitIcon` 的取值，改动会让存量习惯换图标。 */
-export const HABIT_ICONS = [
+/**
+ * 旧版已落盘习惯的派生图标集合。顺序与长度都必须稳定：没有显式 icon
+ * 的历史习惯要继续显示原来的图形，即使选择器后来增加了新图标。
+ */
+const DERIVED_HABIT_ICONS = [
   'drop',
   'activity',
   'book',
@@ -41,6 +44,27 @@ export const HABIT_ICONS = [
   'pencil',
   'sun',
   'music',
+] as const;
+
+/** 可用的图标 key。前八项是历史闭集，后面的 key 只用于显式选择。 */
+export const HABIT_ICONS = [
+  ...DERIVED_HABIT_ICONS,
+  'heart',
+  'strength',
+  'meditation',
+  'tea',
+  'fruit',
+  'cycling',
+  'camera',
+  'art',
+  'code',
+  'dental',
+  'pet',
+  'savings',
+  'home',
+  'language',
+  'journal',
+  'walking',
 ] as const;
 
 export type HabitIcon = (typeof HABIT_ICONS)[number];
@@ -73,7 +97,7 @@ export function deriveHabitIcon(habitId: string): HabitIcon {
     // 丢精度的结果是不同 id 算出同一个值 —— 那正是这条哈希要避免的。
     hash = Math.imul(hash, 0x01000193) >>> 0;
   }
-  return HABIT_ICONS[hash % HABIT_ICONS.length]!;
+  return DERIVED_HABIT_ICONS[hash % DERIVED_HABIT_ICONS.length]!;
 }
 
 /**

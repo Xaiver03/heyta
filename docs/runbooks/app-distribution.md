@@ -104,3 +104,22 @@ node scripts/tools/cos-api.mjs --bucket heyta-dist-1380503169 \
   （`gh release create`）此处不展开。
 - **MSIX / deb 的常规产出**：Windows 包在远端打包机、Linux 包路径见
   [`multi-platform-build.md`](multi-platform-build.md) §6，接入 upload-dist 时按实际产物路径传参即可。
+
+## 7. 2026-10-08 多端测试批次
+
+发布标签 `v1.0.1-test.20261008.1`，源码快照 `0107fe15440aecf5775a71574ba973406d8b4c49`。批次号区分安装包，非强制改写各端内部版本；iOS 为 `1.0 (3)`，模拟器同源码验收包为 `1.0 (1)`。
+
+| 端 | 测试产物 | 签名/安装状态 |
+|---|---|---|
+| macOS | Apple Silicon arm64 DMG | Developer ID 签名，Apple 公证和 staple 验证通过，已安装 |
+| Windows | x64 ZIP：MSIX + CER + 中文安装说明 + 安装脚本 | 自签名；signtool 验证 0；已安装。首次需管理员信任公开证书，不包含私钥 |
+| Android | 发布签名 APK | 证书指纹与登记一致；当前源码已卸旧装新。曾装 Debug 签名版时须先导出数据再卸载旧版 |
+| Linux | amd64 DEB | 包内共享 UI 对账和解包启动通过；未做系统安装，验证机沙箱限制如实保留 |
+| iOS | TestFlight 1.0 (3) | Apple 处理 VALID，加入既有内部组；没有公开测试邀请链接 |
+
+- [GitHub 测试版与校验和](https://github.com/Xaiver03/heyta/releases/tag/v1.0.1-test.20261008.1)
+- [国内下载清单](https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/latest.json)
+- [TestFlight 管理入口（需相应账号权限）](https://appstoreconnect.apple.com/apps/6817635248/testflight/ios)
+- [本批产物校验记录](../../apps/web/evidence/ux-closeout/release-2026-10-08/release.json)
+
+本轮未发邀请/通知、未提交外部 Beta 审核。Web 和帮助中心已更新，真实邮箱收件及其完整验证码闭环仍待专门验证，不能由上传成功代替。

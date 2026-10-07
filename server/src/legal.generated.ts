@@ -19,7 +19,7 @@
  * ⚠️ 只有**官方托管实例**才有权写它（判定在 `src/legal-consent.ts`）：
  * 自托管机器对外发布的是运营者自己的文本，它的版本我们无法命名。
  */
-export const LEGAL_SET_VERSION = "ai-and-transfer@1.5;data-rights@1.4;minors@1.3;permissions@1.2;personal-info-list@1.4;privacy@1.7;subscription-refund@1.2;terms@1.2;third-parties@1.3";
+export const LEGAL_SET_VERSION = "ai-and-transfer@1.5;data-rights@1.5;minors@1.3;permissions@1.2;personal-info-list@1.5;privacy@1.8;subscription-refund@1.2;terms@1.2;third-parties@1.3";
 
 /**
  * 官方托管实例的域名 —— `@heyta/legal` 的 `OPERATOR.hostedDomain`。

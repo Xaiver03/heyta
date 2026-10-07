@@ -195,8 +195,7 @@ async function resetStores(): Promise<void> {
   useTaskStore.setState({ entities: currentState(), now: SEPT(28) });
   useProjectStore.setState({ projects: [], tags: [] });
   useCalendarViewStore.setState({ cursor: '2026-09-01', selected: TODAY, scope: FULL_SCOPE });
-  // 🔴 必须有一条**今天**的任务：当天清单那一块只在"这天有点"时才在 DOM 里
-  //    （没任务时渲染的是空态），而"指针在清单上滚轮不归月历"那条判据的靶子就是它。
+  // 🔴 必须有一条**今天**的任务：月格里的任务条需要一个稳定的滚轮旁证。
   await act(async () => {
     await useTaskStore.getState().addTask('周报', { dueDate: SEPT(28) });
   });
@@ -298,8 +297,10 @@ describe('滚轮翻月（接线）', () => {
     expect(monthTitles()).toEqual({ main: '2026年10月', mini: '2026年10月' });
   });
 
-  it('🔴 指针在当天清单上：滚轮不归月历（不翻、也不吃掉页面滚动）', async () => {
-    const prevented = await wheelOn('calendar-board-day-list', { deltaY: 100 });
+  it('🔴 指针在月历之外：滚轮不归月历（不翻、也不吃掉页面滚动）', async () => {
+    // Web 月档刻意不再渲染重复的选中日清单；页脚在月历卡片之外，
+    // 是页面滚动语义的稳定命中点。
+    const prevented = await wheelOn('calendar-board-footnote', { deltaY: 100 });
     expect(monthTitles()).toEqual({ main: '2026年9月', mini: '2026年9月' });
     expect(prevented, '把清单上的滚轮吃掉 = 那一块再也滚不动页面').toBe(false);
   });
@@ -324,6 +325,6 @@ describe('滚轮翻月（接线）', () => {
   it('选中的那一天不跟月份走（翻月 ≠ 翻日子）', async () => {
     await wheelOn('calendar-board-month-card', { deltaY: 100 });
     expect(useCalendarViewStore.getState().selected).toBe(TODAY);
-    expect(need('calendar-board-day-title').textContent ?? '').toContain('9月28日');
+    expect(need(`calendar-cell-${TODAY}`).getAttribute('aria-selected')).toBe('true');
   });
 });

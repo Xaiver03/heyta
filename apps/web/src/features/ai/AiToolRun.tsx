@@ -1,3 +1,4 @@
+import { AssistantIcon } from './AssistantIcon.js';
 import { ICON_SIZE } from '@heyta/design-system';
 /**
  * AI 工具调用 —— 面向用户的入口
@@ -17,18 +18,19 @@ import { ICON_SIZE } from '@heyta/design-system';
  * 命中就直接跑，**不显示披露、不弹确认** —— 因为没有数据出去，弹了反而在撒谎。
  * 只有需要模型时，才走"先披露、再发送"那一步。
  *
- * ## 🔴 写工具是"提案"，不是"执行"
+ * ## 🔴 低风险写工具可自动执行，高风险仍是"提案"
  *
- * 写工具（`create_task` / `update_task` / `complete_task`）只会产出提案，
- * 用户点「确认执行」之后才走 `confirmAiToolProposal()` → `dispatch()`。
+ * 写工具（`create_task` / `update_task` / `complete_task`）由 app-host 按风险分类：
+ * 执行档自动提交低风险意图，高风险仍由用户点「确认执行」后走
+ * `confirmAiToolProposal()` → `dispatch()`。
  * 这与四个既有 AI 面板是同一条纪律（ADR-0005 §3.1）。
  *
  * ⚠️ 本组件**自己不发请求**：网络动作全在 `requestToolCall()` 里 ——
  * 那样出境闸门才只有一条路径。
  */
 
-import { useMemo, useState } from 'react';
-import { AlertTriangle, Sparkles, X } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
+import { AlertTriangle, X } from 'lucide-react';
 
 import { useI18n, type I18nValue, type MessageKey } from '@heyta/i18n';
 import {
@@ -227,6 +229,7 @@ export function AiToolRun(props: AiToolRunProps): React.JSX.Element {
    * retry 3.1s 过）判的就是这一件事 —— retry 把它们掩盖了，缺陷没被修。
    */
   const [account] = useState(currentAccount);
+  const confirmInFlight = useRef(false);
   const ephemeral = usePanelEphemeral('tool-run', account, TOOL_RUN_EPHEMERAL);
   const { text, phase, outcome, confirmed } = ephemeral.value;
   const setText = (value: string): void => ephemeral.write(account, { text: value });
@@ -297,7 +300,13 @@ export function AiToolRun(props: AiToolRunProps): React.JSX.Element {
 
   async function confirm(): Promise<void> {
     if (outcome === undefined || !outcome.ok || outcome.result.kind !== 'proposal') return;
-    setConfirmed(await confirmAiToolProposal(host, outcome.result.proposal));
+    if (confirmInFlight.current) return;
+    confirmInFlight.current = true;
+    try {
+      setConfirmed(await confirmAiToolProposal(host, outcome.result.proposal));
+    } finally {
+      confirmInFlight.current = false;
+    }
   }
 
   return (
@@ -308,7 +317,7 @@ export function AiToolRun(props: AiToolRunProps): React.JSX.Element {
       {/* 工具调用面板的头部带一个装饰图标（`lead`）—— 与四个 AI 面板共用同一个共享头。 */}
       <AiPanelHeadHost
         title={t('web.ai.tools.title')}
-        lead={<Sparkles size={ICON_SIZE.xs} aria-hidden="true" />}
+        lead={<AssistantIcon size={ICON_SIZE.xs} aria-hidden="true" />}
       />
       <p className="ht-ai__note">{t('web.ai.tools.hint')}</p>
 
@@ -486,6 +495,12 @@ function RunResult(props: {
   const run = props.run;
 
   switch (run.kind) {
+    case 'executed':
+      return (
+        <p className="ht-ai__row ht-ai__row--success" data-testid="ai-tool-executed">
+          {t('web.ai.tools.confirmedOk')}
+        </p>
+      );
     case 'observation':
       return (
         <>

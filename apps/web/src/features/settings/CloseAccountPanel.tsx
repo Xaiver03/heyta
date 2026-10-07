@@ -43,6 +43,7 @@ import { AlertTriangle, ShieldX } from 'lucide-react';
 import { hasEngine, requireEngine } from '../../lib/oplog.js';
 import { useAuthStore } from '../auth/store.js';
 import { useSyncStore } from '../sync/store.js';
+import { SettingsAccountGate } from './SettingsAccountGate.js';
 
 /**
  * 结局 → 词条这件事**不在本文件里**。
@@ -100,8 +101,6 @@ export function CloseAccountPanel(): React.JSX.Element | null {
     };
   }, [signedIn]);
 
-  if (!signedIn) return null;
-
   const submit = async (): Promise<void> => {
     // in-flight guard（不只靠 disabled）：忙的时候重复点击直接忽略。
     if (busy || !acknowledged || typeof token !== 'string') return;
@@ -121,71 +120,81 @@ export function CloseAccountPanel(): React.JSX.Element | null {
       <h2 className="ht-settings__title ht-type-section-title">
         <ShieldX size={ICON_SIZE.sm} aria-hidden="true" /> {t('common.accountClosure.title')}
       </h2>
-      <p className="ht-settings__hint">{t('common.accountClosure.lead')}</p>
-      <p className="ht-settings__hint">{t('common.accountClosure.exportHint')}</p>
+      {!signedIn ? (
+        <SettingsAccountGate
+          messageKey="common.accountClosure.needLogin"
+          testId="close-account-needs-sign-in"
+        />
+      ) : (
+        <div className="ht-settings__danger-card">
+          <p className="ht-settings__hint">{t('common.accountClosure.lead')}</p>
+          <p className="ht-settings__hint">{t('common.accountClosure.exportHint')}</p>
 
-      {pending !== undefined && pending > 0 ? (
-        <p className="ht-settings__hint" data-testid="close-account-pending">
-          {t('common.accountClosure.pending', { count: pending })}
-        </p>
-      ) : null}
+          {pending !== undefined && pending > 0 ? (
+            <p className="ht-settings__danger" data-testid="close-account-pending">
+              <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" />
+              {t('common.accountClosure.pending', { count: pending })}
+            </p>
+          ) : null}
 
-      <label className="ht-settings__item-label" htmlFor="close-account-ack">
-        <span className="ht-settings__row">
-          <input
-            id="close-account-ack"
-            type="checkbox"
-            checked={acknowledged}
-            onChange={(e) => {
-              setAcknowledged(e.target.checked);
-              setConfirming(false);
-              setDone(null);
-            }}
-          />
-          {t('common.accountClosure.confirmLocal')}
-        </span>
-      </label>
+          <label className="ht-settings__item-label" htmlFor="close-account-ack">
+            <span className="ht-settings__row">
+              <input
+                id="close-account-ack"
+                type="checkbox"
+                checked={acknowledged}
+                onChange={(e) => {
+                  setAcknowledged(e.target.checked);
+                  setConfirming(false);
+                  setDone(null);
+                }}
+              />
+              {t('common.accountClosure.confirmLocal')}
+            </span>
+          </label>
 
-      {acknowledged && !confirming ? (
-        <div className="ht-settings__actions">
-          <button
-            type="button"
-            className="ht-btn ht-btn--outline"
-            data-testid="close-account-open"
-            onClick={() => {
-              setConfirming(true);
-            }}
-          >
-            {t('common.accountClosure.action')}
-          </button>
+          {acknowledged && !confirming ? (
+            <div className="ht-settings__actions">
+              <button
+                type="button"
+                className="ht-btn ht-btn--outline"
+                data-testid="close-account-open"
+                onClick={() => {
+                  setConfirming(true);
+                }}
+              >
+                {t('common.accountClosure.action')}
+              </button>
+            </div>
+          ) : null}
+
+          {confirming ? (
+            <div className="ht-settings__actions">
+              <button
+                type="button"
+                className="ht-btn ht-btn--danger"
+                data-testid="close-account-confirm"
+                disabled={busy}
+                onClick={() => void submit()}
+              >
+                {busy ? t('common.accountClosure.busy') : t('common.accountClosure.action')}
+              </button>
+            </div>
+          ) : null}
+
+          {done ? (
+            <p
+              className="ht-settings__hint"
+              role="status"
+              aria-live="polite"
+              data-testid="close-account-result"
+              data-disposition={done.disposition}
+            >
+              <AlertTriangle size={ICON_SIZE.sm} aria-hidden="true" /> {t(done.sentence)}
+            </p>
+          ) : null}
         </div>
-      ) : null}
-
-      {confirming ? (
-        <div className="ht-settings__actions">
-          <button
-            type="button"
-            className="ht-btn ht-btn--danger"
-            data-testid="close-account-confirm"
-            disabled={busy}
-            onClick={() => void submit()}
-          >
-            {busy ? t('common.accountClosure.busy') : t('common.accountClosure.action')}
-          </button>
-        </div>
-      ) : null}
-
-      {done ? (
-        <p
-          className="ht-settings__hint"
-          role="status"
-          aria-live="polite"
-          data-testid="close-account-result"
-          data-disposition={done.disposition}
-        >
-          <AlertTriangle size={ICON_SIZE.sm} aria-hidden="true" /> {t(done.sentence)}
-        </p>
-      ) : null}
+      )}
     </div>
   );
 }

@@ -1,0 +1,40 @@
+.ht-scope-trigger { display: none; }
+
+@media (max-width: 768px) {
+  .ht-scope-trigger { display: inline-flex; }
+  .ht-scope-drawer {
+    padding: 0;
+    margin: 0;
+    border: none;
+    inline-size: min(var(--ht-layout-sidebar-max-width), 90vw);
+    max-inline-size: 90vw;
+    block-size: 100dvh;
+    max-block-size: 100dvh;
+    color: var(--ht-color-foreground);
+    background: var(--ht-color-surface);
+  }
+  .ht-scope-drawer::backdrop { background: var(--ht-color-overlay); }
+  .ht-scope-drawer__content { display: flex; flex-direction: column; block-size: 100%; }
+  .ht-scope-drawer__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--ht-space-2);
+    padding: var(--ht-space-4);
+    border-bottom: 0;
+  }
+  .ht-scope-drawer__header h2 { margin: 0; }
+  .ht-scope-drawer .ht-sidebar {
+    display: flex;
+    flex: 1;
+    min-block-size: 0;
+    max-block-size: none;
+    border: none;
+    padding: var(--ht-space-4);
+    overflow: hidden;
+  }
+  .ht-scope-drawer .ht-sidebar__calendar-body,
+  .ht-scope-drawer .ht-sidebar__body { overflow-y: auto; max-block-size: none; }
+  .ht-scope-drawer .ht-nav { flex-direction: column; overflow: visible; }
+  .ht-scope-drawer .ht-nav__section { display: block; }
+}

@@ -20,7 +20,7 @@
  * 每一项都能在 `docs/research/dida365-feature-benchmark.md` §2 找到 ✅ 依据。
  * 反过来，「还没做的」那一节也必须**逐条对过码** —— 2026-09-30 实测发现它把
  * 提醒、子任务、搜索、Web 日历列成了"没做"，而这四件两端都有真 Action 与真 UI，
- * 于是 `/features` 与 `/help` 的两篇文章直接互相打脸。
+ * 于是 `/features` 与 `/docs` 的两篇文章直接互相打脸。
  * 当前真没做的只有：习惯的频率目标、移动端的系统通知投递、自定义筛选器、
  * 看板视图、批量操作。**改这一节前先跑一遍码，别照旧文案抄。**
  */
@@ -250,7 +250,7 @@ export const INTEGRATION_NOTES: readonly MessageKey[] = ['site.integrations.note
 /**
  * 一个问答对（词条表里就是成对写的 q/a）。
  *
- * `id` 落在 `<dt>` 上，所以 `/{locale}/help/#sync` 是一个**能落在具体问题上**
+ * `id` 落在 `<dt>` 上，所以 `/{locale}/docs/#sync` 是一个**能落在具体问题上**
  * 的地址 —— 应用里那句"同步出错了"的提示可以直接指到这里，
  * 而不是把人丢在帮助页顶部让他自己找。
  */
@@ -277,7 +277,7 @@ export interface FaqPair {
 export type HelpModuleId = 'start' | 'sync' | 'organize' | 'data' | 'trust';
 
 /**
- * `/help` 的一个**功能模块**：一段小标题 + 它下面的问答（A4-1）。
+ * `/docs` 的一个**功能模块**：一段小标题 + 它下面的问答（A4-1）。
  *
  * 🔴 组织方式是**按你在做什么**，不是按文档类型 —— 这是滴答清单帮助中心的
  * 实测结论（`docs/research/dida365-help-center-ia.md`）。所以"同步 / 口令 /
@@ -290,7 +290,7 @@ export interface HelpModule {
 }
 
 /**
- * `/help`：用户最会撞到的十个问题（依据 A4-2），按功能模块组织（A4-1）。
+ * `/docs`：用户最会撞到的十个问题（依据 A4-2），按功能模块组织（A4-1）。
  *
  * 🔴 **这里是问答清单的唯一事实源**：`HELP_QUESTIONS` 由它 `flatMap` 出来，
  * 而 `gen-entries.mjs` 的 `FAQPage` JSON-LD 与 `render.spec.tsx` 都读那一份 ——

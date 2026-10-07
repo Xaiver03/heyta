@@ -101,10 +101,7 @@ function TaskChoice({
         gap: tokens['space.2'],
         paddingHorizontal: tokens['space.3'],
         borderRadius: tokens['radius.md'],
-        // 选中态同时改**边框**与底色，不只改颜色 ——
-        // 只改颜色的话色觉障碍用户看不出选中了哪一个（UIX Pro 第 1 条）。
-        borderWidth: selected ? tokens['border-width.thick'] : tokens['border-width.thin'],
-        borderColor: selected ? tokens['color.primary'] : tokens['color.border'],
+        // 选中态用底色与图标语义表达，不给每个选项套一层框。
         backgroundColor: selected
           ? tokens['color.primary-subtle']
           : pressed

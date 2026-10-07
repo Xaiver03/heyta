@@ -801,12 +801,12 @@ test.describe('任务面单落进那一栏（§8.138）', () => {
     const sidebar = page.locator(SIDEBAR);
     await expect(sidebar, '侧栏没开 ⇒ 建不了清单/标签，后面的判据会空转').toBeVisible();
     await sidebar.getByLabel('新建清单').click();
-    await sidebar.getByLabel('新清单名称').fill(list);
-    await sidebar.getByLabel('添加清单').click();
+    await sidebar.locator('#ht-category-create-name').fill(list);
+    await sidebar.getByRole('button', { name: '创建清单' }).click();
     await expect(sidebar.locator(`[data-testid^="project-"][data-testid$="-row"]`), `侧栏里没有那条清单「${list}」`).toHaveCount(1);
     await sidebar.getByLabel('新建标签').click();
-    await sidebar.getByLabel('新标签名称').fill(tag);
-    await sidebar.getByLabel('添加标签').click();
+    await sidebar.locator('#ht-category-create-name').fill(tag);
+    await sidebar.getByRole('button', { name: '创建标签' }).click();
     await expect(sidebar.locator(`[data-testid^="tag-"][data-testid$="-row"]`), `侧栏里没有那枚标签「${tag}」`).toHaveCount(1);
   }
 

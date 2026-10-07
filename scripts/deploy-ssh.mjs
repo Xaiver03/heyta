@@ -33,12 +33,13 @@
  *   node scripts/deploy-ssh.mjs --ref <sha>              # 沙箱验指定提交
  *   node scripts/deploy-ssh.mjs --dry-run                # 只打印计划，一个字节都不写
  *   node scripts/deploy-ssh.mjs --apply --yes-production # 真发生产（要人明确授权）
- *   node scripts/deploy-ssh.mjs --rollback <tag>         # 把生产指回上一个 tag
+ *   `--rollback` 当前未实现；不要把它当作生产回滚命令使用。
  *
  * 环境变量：
  *   HEYTA_DEPLOY_HOST   默认 `ubuntu-jcli`（= finlaw）
  *   HEYTA_DEPLOY_DIR    生产目录，默认 `~/heyta`（脚本从不动它，除非 --apply）
  *   HEYTA_DEPLOY_SANDBOX_DIR 沙箱根，默认 `~/heyta-deploy-sandbox`
+ *   PRISMA_ENGINES_MIRROR  Prisma 引擎源，默认 `https://binaries.prisma.sh`
  */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -58,6 +59,7 @@ const PROD_DIR = process.env.HEYTA_DEPLOY_DIR || '~/heyta';
 const SBX = process.env.HEYTA_DEPLOY_SANDBOX_DIR || '~/heyta-deploy-sandbox';
 const APK = process.env.APK_MIRROR || 'mirrors.aliyun.com';
 const NPM = process.env.NPM_REGISTRY || 'https://registry.npmmirror.com/';
+const PRISMA = process.env.PRISMA_ENGINES_MIRROR || 'https://binaries.prisma.sh';
 const NODE_IMAGE = process.env.NODE_IMAGE || 'node:24-alpine';
 const PG_IMAGE = process.env.POSTGRES_IMAGE || 'postgres:16-alpine';
 
@@ -86,6 +88,14 @@ if (APPLY && !has('--yes-production')) {
   );
 }
 
+if (has('--rollback')) {
+  die(
+    '回滚参数',
+    '--rollback 当前未实现，已拒绝继续；它不能安全地把生产切回旧镜像。',
+    '   请由发布负责人按 runbook 的人工回滚步骤操作，不要把此参数当作已实现的生产路径。',
+  );
+}
+
 /* ── 步骤 1：打包清单从 server/image-inputs.txt 读，并与 Dockerfile 的 COPY 对账 ── */
 // 🔴 两份清单曾经差一次提交就是"跑旧镜像配新迁移"那类事故（image-inputs.txt 文件头原话）。
 //    现在不在这里抄第三份 —— 读那两份、逐字比、不等就停。
@@ -98,24 +108,105 @@ if (inputs.length === 0) die('步骤 1（清单）', 'server/image-inputs.txt �
 const missing = inputs.filter((p) => !existsSync(join(REPO, p)));
 if (missing.length) die('步骤 1（清单）', `清单里有 ${missing.length} 项在仓库里不存在：\n   - ${missing.join('\n   - ')}`, '   ⚠️ 不存在的 pathspec **不会报错，是被静默忽略**（那份清单自己的告诫）—— 所以这里必须响亮失败。');
 
-// Dockerfile 真正 COPY 的源路径（runbook §3.8 那条 awk 就是唯一写法）
+// Dockerfile 真正 COPY 的源路径。先合并反斜线续行，再只解析行首的 COPY；
+// 不能用跨行正则，否则 Dockerfile 里的长注释会被吞进源路径集合。
 const dockerfile = readFileSync(join(REPO, 'server/Dockerfile'), 'utf8');
-const dockerCopy = [
-  ...dockerfile.matchAll(/^COPY\s+(?:--from=\S+\s+)?((?:[^\s]+\s+)+)(?:\/[\w./-]+)?\s*$/gm),
-]
-  .flatMap((m) => m[1].trim().split(/\s+/))
-  .filter((t) => !t.startsWith('--') && !t.startsWith('/') && !t.includes('$'))
-  .map((t) => posix.normalize(t.replace(/\/$/, '')))
-  .filter((t) => t !== '.' && !t.startsWith('apps/') === false || !t.startsWith('apps/'));
-const copySet = new Set(dockerCopy.filter((t) => !t.startsWith('/') && !t.includes('$')));
-// 两边集合对账（只比 Dockerfile COPY 的顶层路径；image-inputs 里的 `.` 代表 server/ 自身）
-const inputsSet = new Set(inputs.map((p) => (p === 'server' || p.startsWith('server/') ? 'server' : p)));
-const onlyInDocker = [...copySet].filter((p) => !inputsSet.has(p) && !inputsSet.has(posix.dirname(p)));
-const onlyInInputs = [...inputsSet].filter((p) => p !== 'server' && !copySet.has(p) && !copySet.has(posix.dirname(p)));
-if (onlyInDocker.length || onlyInInputs.length) {
+const dockerLogicalLines = [];
+let logical = '';
+for (const physical of dockerfile.split(/\r?\n/)) {
+  const line = physical.trim();
+  if (!logical && (!line || line.startsWith('#'))) continue;
+  if (line.endsWith('\\')) {
+    logical += `${line.slice(0, -1)} `;
+  } else {
+    dockerLogicalLines.push(`${logical}${line}`.trim());
+    logical = '';
+  }
+}
+if (logical) dockerLogicalLines.push(logical.trim());
+
+const shellTokens = (source) => {
+  const tokens = [];
+  let token = '';
+  let quote = '';
+  for (let i = 0; i < source.length; i += 1) {
+    const ch = source[i];
+    if (quote) {
+      if (ch === quote) quote = '';
+      else if (ch === '\\' && quote === '"' && i + 1 < source.length) token += source[++i];
+      else token += ch;
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+    } else if (/\s/.test(ch)) {
+      if (token) {
+        tokens.push(token);
+        token = '';
+      }
+    } else if (ch === '\\' && i + 1 < source.length) {
+      token += source[++i];
+    } else {
+      token += ch;
+    }
+  }
+  if (quote) throw new Error('未闭合引号');
+  if (token) tokens.push(token);
+  return tokens;
+};
+
+const dockerCopy = [];
+for (const line of dockerLogicalLines) {
+  const match = line.match(/^COPY\s+(.+)$/i);
+  if (!match) continue;
+  const rest = match[1].trim();
+  let tokens;
+  if (rest.startsWith('[')) {
+    try {
+      tokens = JSON.parse(rest);
+    } catch (error) {
+      die('步骤 1（Dockerfile COPY）', `COPY 的 JSON 数组无法解析：${error.message}`);
+    }
+    if (!Array.isArray(tokens) || tokens.some((token) => typeof token !== 'string')) {
+      die('步骤 1（Dockerfile COPY）', 'COPY 的 JSON 数组必须全是字符串。');
+    }
+  } else {
+    try {
+      tokens = shellTokens(rest);
+    } catch (error) {
+      die('步骤 1（Dockerfile COPY）', `COPY 的 shell 形式无法解析：${error.message}`);
+    }
+  }
+
+  let optionEnd = 0;
+  let fromStage = false;
+  while (optionEnd < tokens.length && tokens[optionEnd].startsWith('--')) {
+    if (tokens[optionEnd] === '--from' || tokens[optionEnd].startsWith('--from=')) fromStage = true;
+    optionEnd += 1;
+  }
+  if (fromStage) continue;
+  const sources = tokens.slice(optionEnd, -1);
+  if (sources.length === 0) die('步骤 1（Dockerfile COPY）', `COPY 缺少源路径：${line}`);
+  dockerCopy.push(...sources);
+}
+
+const copySet = new Set(
+  dockerCopy
+    .filter((token) => !token.startsWith('/') && !token.includes('$'))
+    .map((token) => posix.normalize(token.replace(/\/$/, '')))
+    .filter(Boolean),
+);
+// 只要求 Dockerfile 的真实输入被清单覆盖。清单还包含 workflow、.dockerignore 等
+// revision 对账输入，它们不一定会被 COPY，不能反过来要求出现在 Dockerfile 中。
+const inputsSet = new Set(inputs);
+const onlyInDocker = [...copySet].filter((source) => {
+  for (const input of inputsSet) {
+    if (source === input || source.startsWith(`${input}/`)) return false;
+  }
+  return true;
+});
+if (onlyInDocker.length) {
   die(
     '步骤 1（两份清单对账）',
-    `Dockerfile COPY 的源与 image-inputs.txt 不同集合：\n   只在 Dockerfile：${onlyInDocker.join(', ') || '—'}\n   只在 image-inputs：${onlyInInputs.join(', ') || '—'}`,
+    `Dockerfile COPY 的源未被 image-inputs.txt 覆盖：\n   ${onlyInDocker.join('\n   ')}`,
     '   后果写在 image-inputs.txt 文件头：revision 标签会算出一个"看起来最新"的 commit，而镜像里其实是旧的前端。'
   );
 }
@@ -174,19 +265,25 @@ if (absent.length) {
 
 /* ── 步骤 5：建镜像（proxy build-arg 显式置空 + 国内直连源） ── */
 const IMAGE = SANDBOX ? `supersync:canary-${short}` : 'supersync:local';
-console.log(`步骤 5：构建镜像 → ${IMAGE}（VCS_REF=${short}）`);
+console.log(`步骤 5：构建镜像 → ${IMAGE}（VCS_REF=${short}，PRISMA_ENGINES_MIRROR=${PRISMA}）`);
 const proxyArgs = ['http_proxy=', 'https_proxy=', 'HTTP_PROXY=', 'HTTPS_PROXY=', 'all_proxy=', 'ALL_PROXY=']
   .map((a) => `--build-arg ${a}`)
   .join(' ');
 const build = ssh(
   `cd ${DIR}/src && docker build --network=host ${proxyArgs} \\
      --build-arg NODE_IMAGE=${NODE_IMAGE} --build-arg APK_MIRROR=${APK} \\
-     --build-arg NPM_REGISTRY=${NPM} \\
+     --build-arg NPM_REGISTRY=${NPM} --build-arg PRISMA_ENGINES_MIRROR=${PRISMA} \\
      --build-arg VCS_REF=${headSha} -f server/Dockerfile -t ${IMAGE} . 2>&1 | tail -12; \\
    docker image inspect ${IMAGE} >/dev/null 2>&1 && echo BUILD=OK || echo BUILD=FAIL`
 );
 console.log((build.stdout || '').trim().split('\n').slice(-6).map((l) => '   ' + l).join('\n'));
-if (!DRY && !/BUILD=OK/.test(build.stdout)) die('步骤 5（构建）', '镜像没建出来。读法：这一条**曾经两次**是"本地全绿但镜像建不出来"（AGENTS §7 第 75 条）。');
+if (!DRY && !/BUILD=OK/.test(build.stdout)) {
+  die(
+    '步骤 5（构建）',
+    '镜像没建出来。读法：这一条**曾经两次**是"本地全绿但镜像建不出来"（AGENTS §7 第 75 条）。',
+    `   可重试命令（国内 Prisma 镜像）：PRISMA_ENGINES_MIRROR=https://registry.npmmirror.com/-/binary/prisma node scripts/deploy-ssh.mjs${A.filter((arg) => arg !== '--dry-run').length ? ` ${A.filter((arg) => arg !== '--dry-run').join(' ')}` : ''}`,
+  );
+}
 if (!DRY) {
   const lbl = ssh(`docker image inspect -f '{{ index .Config.Labels "org.opencontainers.image.revision" }}' ${IMAGE}`);
   if ((lbl.stdout || '').trim() !== headSha) {
@@ -204,7 +301,7 @@ if (SANDBOX) {
   const setup = ssh(`
 set -e
 docker network create ${net} >/dev/null 2>&1 || true
-docker run -d --name ${db} --network ${net} \\
+docker run -d --name ${db} --network ${net} --network-alias db \\
   -e POSTGRES_USER=htsandbox -e POSTGRES_PASSWORD=htsandbox -e POSTGRES_DB=htsandbox \\
   --health-cmd='pg_isready -U htsandbox' --health-interval=2s ${PG_IMAGE} >/dev/null
 for i in $(seq 1 40); do docker exec ${db} pg_isready -U htsandbox >/dev/null 2>&1 && { echo DB=READY; exit 0; }; sleep 2; done
@@ -216,16 +313,16 @@ echo DB=NOT_READY; exit 6`);
   const DBURL = 'postgresql://htsandbox:htsandbox@db/htsandbox';
   const mig = ssh(
     `docker run --rm --network ${net} -e DATABASE_URL=${DBURL} --entrypoint sh ${IMAGE} \\
-       -ec 'echo MIGRATE=started; sh scripts/migrate-deploy.sh 2>&1 | tail -12; echo MIGRATE_RC=${'$'}?'`
+       -c 'echo MIGRATE=started; sh scripts/migrate-deploy.sh >/tmp/migrate.log 2>&1; rc=${'$'}?; tail -12 /tmp/migrate.log; echo MIGRATE_RC=${'$'}rc; exit ${'$'}rc'`
   );
   console.log((mig.stdout || '').trim().split('\n').slice(-8).map((l) => '   ' + l).join('\n'));
-  if (!DRY && !/MIGRATE_RC=0/.test(mig.stdout)) {
+  if (!DRY && (mig.status !== 0 || !/MIGRATE_RC=0/.test(mig.stdout))) {
     die('步骤 6（迁移）', 'migrate-deploy.sh 在**空库**上没跑通。这一条与生产无关，是镜像自身的迁移链坏了。');
   }
 
   const start = ssh(
     `docker run -d --name ${app} --network ${net} \\
-       -e DATABASE_URL=${DBURL} -e JWT_SECRET=htsandboxjwt -e PASSWORD_PEPPER=htsandboxpepper \\
+       -e DATABASE_URL=${DBURL} -e JWT_SECRET=htsandbox-jwt-for-isolated-tests-only-2026 -e PASSWORD_PEPPER=htsandbox-pepper-for-isolated-tests-only-2026 \\
        -e PUBLIC_URL=http://127.0.0.1:15400 -e PORT=3000 \\
        -e http_proxy= -e https_proxy= -e HTTP_PROXY= -e HTTPS_PROXY= \\
        -p 127.0.0.1:15400:3000 ${IMAGE} >/dev/null && echo APP=STARTED`
@@ -253,17 +350,55 @@ set -e
 cd ${PROD_DIR}/server
 CUR=$(docker inspect -f '{{.Image}}' supersync-server 2>/dev/null || echo none)
 echo "ROLLBACK_TARGET=${'$'}{CUR:0:19}"
-docker tag supersync:local "supersync:rollback-${stamp}" && echo ROLLBACK_TAG=supersync:rollback-${stamp}
+ROLLBACK_TAG="supersync:rollback-${stamp}"
+if docker image inspect "${'$'}CUR" >/dev/null 2>&1; then
+  docker tag "${'$'}CUR" "${'$'}ROLLBACK_TAG"
+  echo ROLLBACK_TAG=${'$'}ROLLBACK_TAG
+else
+  # Docker can retain a running container while pruning its image content store.
+  # Export the live filesystem as the rollback source in that case.
+  echo ROLLBACK_SOURCE=image-content-missing
+  SNAPSHOT_TAR=$(mktemp /tmp/heyta-rollback.XXXXXX.tar)
+  docker export supersync-server > "${'$'}SNAPSHOT_TAR"
+  ROLLBACK_BASE="${'$'}ROLLBACK_TAG-base"
+  docker import "${'$'}SNAPSHOT_TAR" "${'$'}ROLLBACK_BASE" >/dev/null
+  rm -f "${'$'}SNAPSHOT_TAR"
+  ROLLBACK_CONTAINER="heyta-rollback-${stamp}"
+  docker create --name "${'$'}ROLLBACK_CONTAINER" \
+    --entrypoint docker-entrypoint.sh --user supersync --workdir /app "${'$'}ROLLBACK_BASE" \
+    sh -c 'if [ "${'$'}{RUN_MIGRATIONS_ON_STARTUP:-false}" = "true" ]; then sh scripts/migrate-deploy.sh || exit 1; fi; exec node dist/src/index.js' >/dev/null
+  docker commit --pause=true "${'$'}ROLLBACK_CONTAINER" "${'$'}ROLLBACK_TAG" >/dev/null
+  docker rm "${'$'}ROLLBACK_CONTAINER" >/dev/null
+  docker image rm "${'$'}ROLLBACK_BASE" >/dev/null 2>&1 || true
+  echo ROLLBACK_TAG=${'$'}ROLLBACK_TAG
+fi
 # 🔴 迁移在**旧容器还在服务**的时候跑，用的还是**新镜像自带**的那份 migrate-deploy.sh
 MIGRATE_RC=0
-docker run --rm --network supersync_default --env-file .env \\
+MIGRATE_ENV=$(mktemp)
+chmod 600 "${'$'}MIGRATE_ENV"
+docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' supersync-server > "${'$'}MIGRATE_ENV"
+docker run --rm --network container:supersync-server --env-file "${'$'}MIGRATE_ENV" \\
   --entrypoint sh supersync:local -ec 'sh scripts/migrate-deploy.sh' || MIGRATE_RC=$?
+rm -f "${'$'}MIGRATE_ENV"
 echo "MIGRATE_RC=$MIGRATE_RC"
 [ "$MIGRATE_RC" = "0" ] || { echo "拒绝换容器（迁移未成功，旧容器继续服务）"; exit 8; }
-docker compose -f docker-compose.yml up -d --wait --wait-timeout 120 supersync && echo SWAPPED
+PROJECT=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' supersync-server)
+FILES=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.config_files"}}' supersync-server)
+[ -n "$PROJECT" ] && [ -n "$FILES" ] || { echo COMPOSE_IDENTITY_MISSING; exit 10; }
+set --
+OLD_IFS="$IFS"
+IFS=,
+for file in $FILES; do set -- "$@" -f "$file"; done
+IFS="$OLD_IFS"
+docker compose -p "$PROJECT" "$@" up -d --no-deps --no-build --pull never --wait --wait-timeout 120 supersync && echo SWAPPED
+EXPECTED_IMAGE=$(docker image inspect -f '{{.Id}}' supersync:local)
+ACTUAL_IMAGE=$(docker inspect -f '{{.Image}}' supersync-server)
+[ "$EXPECTED_IMAGE" = "$ACTUAL_IMAGE" ] || { echo INSTALLED_IMAGE_MISMATCH; exit 11; }
+echo INSTALLED_IMAGE=OK
 for i in $(seq 1 20); do c=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 https://$(grep -E '^DOMAIN=' .env | cut -d= -f2 | tr -d '"' | tr -d " ")/health); [ "$c" = "200" ] && { echo HEALTH=$c; exit 0; }; sleep 3; done
 echo HEALTH=$c; exit 9`;
 const pr = ssh(prod);
 console.log((pr.stdout || '').trim().split('\n').map((l) => '   ' + l).join('\n'));
+if (pr.status !== 0 && pr.stderr) console.log(pr.stderr.trim().slice(-2000));
 if (!DRY && pr.status !== 0) die('步骤 6（生产）', `rc=${pr.status} —— 回滚：在服务器上执行 docker tag supersync:rollback-${stamp} supersync:local 再 up -d`);
 console.log(`\n线上判据请随后单独取（deployment.md §3.8.1 那五条）；本脚本只证 /health=200 与产物身份。`);

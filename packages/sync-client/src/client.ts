@@ -1,3 +1,4 @@
+import { SUPER_SYNC_ERROR_CODES, SuperSyncInboundUploadAuthorizationSchema, type SuperSyncInboundUploadAuthorization } from '@heyta/shared-schema';
 /**
  * 同步客户端
  * ============
@@ -572,6 +573,11 @@ export type SyncClientOptions = SyncEncryptionOptions & {
   /** E2EE 口令。未配置时必须**拒绝同步**而不是降级成明文。 */
   getPassword: () => Promise<string | undefined>;
 
+  /** Host checks account/server/JWT/database scope before releasing local credentials. */
+  getInboundUploadAuthorization?: (scope: {
+    baseUrl: string; clientId: string; token: string; opIds: readonly string[];
+  }) => Promise<SuperSyncInboundUploadAuthorization | undefined>;
+
   /** 取待上传的本地 op（来自存储的上传状态索引，不是内存列表）。 */
   getLocalOps: () => Promise<Array<Operation<string>>>;
   /**
@@ -1004,11 +1010,31 @@ export class SyncClient {
     for (const op of pending) {
       const previous = batches.at(-1);
       if (op.opType === 'REPAIR' || previous === undefined ||
-          previous[0]?.opType === 'REPAIR' || previous.length === MAX_OPS_PER_UPLOAD) {
+          previous[0]?.opType === 'REPAIR' ||
+          previous[0]?.id.startsWith('inbound:') !== op.id.startsWith('inbound:') ||
+          previous.length === MAX_OPS_PER_UPLOAD) {
         batches.push([op]);
       } else previous.push(op);
     }
     for (const batch of batches) {
+      let inboundAuthorization: SuperSyncInboundUploadAuthorization | undefined;
+      if (batch[0]?.id.startsWith('inbound:')) {
+        let candidate: unknown;
+        try {
+          candidate = await this.options.getInboundUploadAuthorization?.({
+            baseUrl: this.options.baseUrl, clientId: this.options.clientId, token,
+            opIds: batch.map((op) => op.id),
+          });
+        } catch { candidate = undefined; }
+        const parsed = SuperSyncInboundUploadAuthorizationSchema.safeParse(candidate);
+        if (!parsed.success || batch.some((op) => !parsed.data.commitProofs[op.id])) {
+          for (const op of batch) this.transientRejects.push({ opId: op.id,
+            errorCode: SUPER_SYNC_ERROR_CODES.INBOUND_AUTH_REQUIRED, error: 'Inbound commit authorization required' });
+          continue; // Keep these ops pending; ordinary writes and download still run.
+        }
+        inboundAuthorization = { ...parsed.data,
+          commitProofs: Object.fromEntries(batch.map((op) => [op.id, parsed.data.commitProofs[op.id]!])) };
+      }
 
       /**
        * 🔴 **逐条串行加密**。这不是风格选择，是省掉一次移动端首批同步的峰值内存。
@@ -1092,8 +1118,12 @@ export class SyncClient {
         `${this.options.baseUrl}/api/sync/${compact ? 'ops/causal' : 'ops'}`,
         {
           method: 'POST',
-          headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+          ...(inboundAuthorization ? { redirect: 'error' as const } : {}),
+          headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`,
+            ...(inboundAuthorization ? { 'x-heyta-worker-token': inboundAuthorization.workerToken,
+              'x-heyta-database-epoch': inboundAuthorization.databaseEpoch } : {}) },
           body: JSON.stringify({
+            ...(inboundAuthorization ? { inboundCommitProofs: inboundAuthorization.commitProofs } : {}),
             ops: compact ? ops : ops.map((op, index) => {
               const { vectorClockEncoding: _encoding, ...full } = op;
               return { ...full, vectorClock: batch[index]!.vectorClock };
@@ -1113,7 +1143,13 @@ export class SyncClient {
       }
 
       if (!res.ok) {
-        throw await toHttpError(res);
+        const error = await toHttpError(res);
+        if (inboundAuthorization && error.status === 403 && error.code === SUPER_SYNC_ERROR_CODES.INBOUND_AUTH_REQUIRED) {
+          for (const op of batch) this.transientRejects.push({ opId: op.id,
+            errorCode: SUPER_SYNC_ERROR_CODES.INBOUND_AUTH_REQUIRED, error: 'Inbound commit authorization required' });
+          continue;
+        }
+        throw error;
       }
 
       const body = (await res.json()) as UploadResponse;
@@ -1744,9 +1780,12 @@ async function toHttpError(res: Response): Promise<SyncHttpError> {
   let detail = '';
   let code: string | undefined;
   try {
-    const body = (await res.json()) as { error?: string; message?: string; code?: string };
+    const body = (await res.json()) as { error?: string; message?: string; code?: string; errorCode?: string };
     detail = body.error ?? body.message ?? '';
-    code = body.code;
+    // Preserve the existing destructive account-closure signal contract:
+    // do not reinterpret arbitrary errorCode values as account lifecycle codes.
+    code = body.code ?? (body.errorCode === SUPER_SYNC_ERROR_CODES.INBOUND_AUTH_REQUIRED
+      ? SUPER_SYNC_ERROR_CODES.INBOUND_AUTH_REQUIRED : undefined);
   } catch {
     // 响应体不是 JSON —— 不要因为解析失败而丢掉状态码
     detail = '';

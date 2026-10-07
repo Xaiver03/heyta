@@ -56,27 +56,12 @@
  * `ProfileScreen` 的 `profile-entry-growth`（`growthOpen` → 本屏）。
  *
  * ─────────────────────────────────────────────────────────────────────────
- * 🔴 本端**没做**的三件事（逐条记账，附影响 + 卡在哪 + 最小一步）
+ * 本端的宿主差异
  *
- *   1. **没传 `activityDays`** ⇒ 没有年度活动热力图。
- *      ~~理由 ①：缺一条可用词条。~~ ✅ **那条已清**：`web.growth.year.heatmap`
- *      的 `{{count}}` 双花括号（react-activity-calendar 的语法）已在 2026-10-03
- *      统一成 i18n 的单层 `{count}`，中英两侧同形，`t(key, { count })` 直接可用。
- *      🔴 现在**只剩一条**，而且不是我能动的那类：判卷文件
- *      `apps/mobile/tests/growth-display.spec.ts:365` 断言
- *      `labels.heatmap.grid({ total: 42, days: 365 })` 必须**等于空串**，而它自己
- *      第 364 行写着「一旦有人传了 activityDays，这条会先红」。本轮判卷冻结
- *      （唯一豁免是 `reminders-notes-display.spec.ts:261`）。
- *      ⚠️ **不能绕**：传了 `activityDays` 而让 `grid` 继续回空串，等于渲染一块
- *      **没有无障碍名**的热力图 —— 屏幕阅读器念不出"这一年共多少次"，而没有任何
- *      一层会报错。那正是那条判据要拦的事，不是它拦我要做的事。→ BLOCKED.md
- *      **影响**：移动端看不到"这一年"，其余三层都在。
- *      **最小一步**：把 `:365` 的极性翻成"必须是非空、含数字"，同时本屏
- *      `activityDays={dailyActivityCountsFromState(tables, now, 365)}` +
- *      `grid: ({ total }) => t('web.growth.year.heatmap', { count: total })`，
- *      再补一次真机验收（横向滚动/尺寸）。
- *   2. ~~**没传 `share`** ⇒ 没有分享块。~~
- *      ✅ **已做完（2026-10-03，任务 4）**：复制走 **RN 核心的 `Clipboard.setString`**
+ *   1. 年度活动热力图直接接入共享事实投影
+ *      `dailyActivityCountsFromState(tables, now, 365)`，文案由
+ *      `growth-display.ts` 复用现有的中英词条。
+ *   2. 分享块走 **RN 核心的 `Clipboard.setString`**
  *      （实测 0.84.1 两端都还注册着 —— Android `MainReactPackage.kt` 四处、
  *      iOS `React/CoreModules/RCTClipboard.mm` 带 `RCT_EXPORT_MODULE`），
  *      零新依赖、零手搓原生模块；小结文本来自 `@heyta/app-host#buildShareSummary`
@@ -84,32 +69,27 @@
  *      ⚠️ **一条诚实边界**：RN 的 `setString` 是 fire-and-forget（返回 `void`，
  *      读不回），所以移动端的"已复制"说的是"已经交给系统剪贴板"，**不是**
  *      "验证过里面就是这段"。设备级读回判据（点完去粘贴框贴一次）本轮没做 → BLOCKED.md
- *   3. **没传 `onRepair` / `onFreshStart`** ⇒ 补打卡 / 重新开始**只有文字**。
- *      `onRepair` 的接法本来就现成（`createHabitActions(host).checkIn(habitId, date)`，
- *      `HabitsScreen.tsx:401` 已在用），但共享层的按钮渲染条件是
- *      `onRepair !== undefined && labels.repairAction !== undefined`
- *      （`HabitStreakList.tsx:269`），而判卷文件
- *      `apps/mobile/tests/growth-display.spec.ts:302` 断言
- *      `labels.streaks.repairAction` 必须**是 undefined**（同一批"刻意没做"的 tripwire，
- *      本轮判卷冻结）⇒ 与第 1 条同一个阻塞，见 BLOCKED.md。
- *      🔴 `onFreshStart` **不只是没接**：action 层**没有"重新开始"这个动作**
- *      （它语义上是"把这条连续的锚点挪到今天"，要么建新习惯、要么改历史，
- *      两者都不是一个 op 能表达的事）⇒ 不许顺手编一个，缺口登记在 BLOCKED.md。
+ *   3. 补打卡 / 重新开始走同一个 `createHabitActions(host).checkIn` 写入口：
+ *      补打卡使用领域层给出的日期，重新开始使用当前日期；两者都把习惯目标作为
+ *      一键完成量传入（保留 `target: 0`）。按钮沿用共享层的 busy 状态，失败显示动作层错误。
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Clipboard } from 'react-native';
 import type { AppHost, MotivationTables } from '@heyta/app-host';
 import {
   activityTotalsFromState,
   aliveRecords,
   buildShareSummary,
+  createHabitActions,
+  dailyActivityCountsFromState,
   habitGrowth,
   identityTagsFromState,
   milestonesFromState,
   todayProgressFromState,
   weeklyReviewFromState,
 } from '@heyta/app-host';
+import { toLocalDate, type LocalDate } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import { GrowthBoard, type MotivationSectionId } from '@heyta/ui';
 
@@ -117,9 +97,15 @@ import { openTaskHost } from '../db/open-host';
 import { growthBoardLabels } from '../lib/growth-display';
 import { useToday } from '../lib/use-today';
 import { useMobileSync } from '../sync/store';
-import { Screen, SectionHeader, Text } from '../ui/kit';
+import { Button, EmptyState, Screen, SectionHeader, Stack, Text } from '../ui/kit';
 
-export function GrowthScreen({ onBack }: { onBack: () => void }): React.JSX.Element {
+export function GrowthScreen({
+  onBack,
+  onOpenHabits,
+}: {
+  onBack: () => void;
+  onOpenHabits: () => void;
+}): React.JSX.Element {
   const { t } = useI18n();
   const { now } = useToday();
   /**
@@ -132,6 +118,9 @@ export function GrowthScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
   const [host, setHost] = useState<AppHost | null>(null);
   const [tables, setTables] = useState<MotivationTables | null>(null);
   const [error, setError] = useState<string | undefined>(undefined);
+  const [busyHabitId, setBusyHabitId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | undefined>(undefined);
+  const habitActionBusy = useRef(false);
 
   useEffect(() => {
     let alive = true;
@@ -157,6 +146,57 @@ export function GrowthScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
     refresh();
   }, [refresh, dataRevision]);
 
+  const actions = useMemo(() => (host === null ? null : createHabitActions(host)), [host]);
+
+  const runHabitAction = useCallback(
+    (habitId: string, start: () => Promise<unknown>): void => {
+      // State updates are asynchronous: a second tap can arrive before the
+      // first render reflects `busyHabitId`. The ref is the synchronous lock;
+      // the state remains the rendering signal for the shared buttons.
+      if (habitActionBusy.current) return;
+      habitActionBusy.current = true;
+      setBusyHabitId(habitId);
+      setActionError(undefined);
+      void start()
+        .then(() => {
+          refresh();
+        })
+        .catch((e: unknown) => {
+          setActionError(e instanceof Error ? e.message : String(e));
+        })
+        .finally(() => {
+          habitActionBusy.current = false;
+          setBusyHabitId(null);
+        });
+    },
+    [refresh],
+  );
+
+  const habitTargetForAction = useCallback(
+    (habitId: string): number => host?.getState().habits[habitId]?.target ?? 1,
+    [host],
+  );
+
+  const repairHabit = useCallback(
+    (habitId: string, date: LocalDate): void => {
+      if (actions === null) return;
+      runHabitAction(habitId, () =>
+        actions.checkIn(habitId, date, habitTargetForAction(habitId)),
+      );
+    },
+    [actions, habitTargetForAction, runHabitAction],
+  );
+
+  const freshStartHabit = useCallback(
+    (habitId: string): void => {
+      if (actions === null) return;
+      runHabitAction(habitId, () =>
+        actions.checkIn(habitId, toLocalDate(now), habitTargetForAction(habitId)),
+      );
+    },
+    [actions, habitTargetForAction, now, runHabitAction],
+  );
+
   /**
    * 六块读数一次取齐。
    *
@@ -176,12 +216,28 @@ export function GrowthScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
       today: todayProgressFromState(tables, now),
       week: weeklyReviewFromState(tables, now),
       totals: activityTotalsFromState(tables),
+      activityDays: dailyActivityCountsFromState(tables, now, 365),
       milestones: milestonesFromState(tables),
       tags: identityTagsFromState(tables, now),
       habits: aliveRecords(tables.habits),
       logs: aliveRecords(tables.habitLogs),
     };
   }, [tables, now]);
+
+  const hasNoActivity = data !== null
+    && data.habits.length === 0
+    && data.logs.length === 0
+    && data.today.total === 0
+    && data.today.done === 0
+    && data.today.focusMinutes === 0
+    && data.week.checkIns === 0
+    && data.week.tasksCompleted === 0
+    && data.week.focusMinutes === 0
+    && data.totals.checkIns === 0
+    && data.totals.focusCount === 0
+    && data.totals.focusMs === 0
+    && data.totals.tasksCompleted === 0
+    && data.totals.activeDays === 0;
 
   /**
    * 分享块（L3 出口）。文本来自 `@heyta/app-host`（与 web 同一份实现，理由见
@@ -214,8 +270,8 @@ export function GrowthScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
    * 区块标题插槽。
    *
    * 标题是**宿主的外观**（移动端用 kit 的 `SectionHeader`），共享层只给区块 id。
-   * `compareNote` 自带那句文案、不要标题；`heatmap` / `category` 本端不渲染
-   * （理由见文件头"没做的三件事"），返回 null 而不是编个标题。
+   * `compareNote` 自带那句文案、不要标题；`heatmap` / `category` 由共享层负责内容，
+   * 本端不额外添加标题。
    * `share` **现在渲染**：分享块没有标题会读成"一个孤零零的按钮"，而那两句
    * （"带走这一周" / "复制成一段纯文字，粘到哪都行。它不含你的账号、设备或任何
    * 标识。"）是这套设计的立场声明 —— 尤其"E2EE 下分享出去的文本不带标识"这条，
@@ -288,8 +344,27 @@ export function GrowthScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
           {error}
         </Text>
       ) : null}
+      {actionError !== undefined ? (
+        <Text variant="row-meta" tone="danger" selectable>
+          {actionError}
+        </Text>
+      ) : null}
 
-      {data === null ? null : (
+      {data === null ? null : hasNoActivity ? (
+        <Stack>
+          <EmptyState
+            illustration="habits"
+            title={t('mobile.growth.streak.title')}
+            hint={t('mobile.growth.streak.empty')}
+          />
+          <Button
+            label={t('mobile.habits.entry')}
+            icon="focus.streak"
+            onPress={onOpenHabits}
+            tone="primary"
+          />
+        </Stack>
+      ) : (
         /*
           🔴 整屏的区块顺序、区块开关、卡片排版**全部**在共享 `GrowthBoard` 里。
           本文件不许自己画一行 —— 一旦画了，移动端与 web 的成长屏就开始漂移，
@@ -308,11 +383,12 @@ export function GrowthScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
           growth={habitGrowth}
           /*
             🔴 这一份文本 + 这条复制路径就是本端"周小结"的出口。
-            `activityDays`（年度热力图）与 `onRepair`（补打卡按钮）**仍然没传** ——
-            不是忘了，是被两条冻结判据钉在"刻意没做"上，接线会让那块变成
-            没有无障碍名的热力图 / 让那条"按钮必须不出现"的断言红。
-            逐条取证与最小一步见本文件头"没做的三件事"第 1、3 条与 BLOCKED.md。
+            `activityDays` 与补打卡/重新开始动作都来自共享事实和动作投影。
           */
+          activityDays={data.activityDays}
+          onRepair={repairHabit}
+          onFreshStart={freshStartHabit}
+          busyHabitId={busyHabitId}
           share={share}
           labels={labels}
           renderSectionHeader={renderSectionHeader}

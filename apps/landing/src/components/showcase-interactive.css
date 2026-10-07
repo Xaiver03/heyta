@@ -1,0 +1,107 @@
+/* 展厅的交互层。产品复现本身仍由 mockup.css 保持与 Web 壳的形状契约。 */
+
+.lp-showcase-interactive {
+  padding-block: calc(var(--ht-space-16) * 1.75);
+  overflow: clip;
+}
+
+.lp-showcase-interactive__inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-8);
+}
+
+.lp-showcase-interactive__header {
+  display: block;
+}
+
+.lp-showcase-interactive__copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-3);
+  max-inline-size: var(--ht-layout-prose-max);
+}
+
+.lp-showcase-interactive__eyebrow {
+  margin: 0;
+  color: var(--ht-color-primary);
+  font-size: var(--ht-font-size-xs);
+  font-weight: var(--ht-font-weight-semibold);
+  letter-spacing: var(--ht-tracking-caption);
+  text-transform: uppercase;
+}
+
+.lp-showcase-interactive__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--ht-space-6);
+  align-items: start;
+}
+
+.lp-showcase-interactive__stage {
+  min-inline-size: 0;
+}
+
+.lp-showcase-interactive__panel {
+  min-inline-size: 0;
+  animation: lp-showcase-interactive-enter var(--ht-duration-normal) var(--ht-ease-enter);
+}
+
+.lp-showcase-interactive__detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-3);
+  min-inline-size: 0;
+  max-inline-size: var(--ht-layout-prose-max);
+}
+
+.lp-showcase-interactive__status {
+  color: var(--ht-color-primary);
+  font-size: var(--ht-font-size-xs);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.lp-showcase-interactive__detail h3,
+.lp-showcase-interactive__detail p {
+  margin: 0;
+}
+
+.lp-showcase-interactive__detail h3 {
+  font-size: var(--ht-font-size-xl);
+  font-weight: var(--ht-font-weight-semibold);
+  letter-spacing: var(--ht-tracking-title);
+  line-height: var(--ht-line-height-tight);
+}
+
+.lp-showcase-interactive__detail p {
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+}
+
+@keyframes lp-showcase-interactive-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 40rem) {
+  .lp-showcase-interactive {
+    padding-block: var(--ht-space-12);
+  }
+
+  .lp-showcase-interactive__inner {
+    gap: var(--ht-space-6);
+  }
+
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-showcase-interactive__panel {
+    animation: none;
+    transition: none;
+  }
+}

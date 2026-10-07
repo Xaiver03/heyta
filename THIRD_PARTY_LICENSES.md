@@ -115,6 +115,16 @@ MIT 许可证的合规义务：**保留版权声明与许可声明**。本仓库
 1. **许可**：允许闭源商用（MIT / Apache-2.0 / BSD / ISC / MPL-2.0 等）
 2. **可维护性**：**2021 年之后仍在持续更新**（否则排除，无论许可多宽松）
 
+### 本地密码强度估计（2026-10-07）
+
+| 依赖 | 许可与版权 | 实际维护记录 | 用途 |
+|---|---|---|---|
+| `@zxcvbn-ts/core@4.2.0` | MIT；Dan Wheeler / Dropbox / @zxcvbn-ts；包内 `LICENSE.txt` | `zxcvbn-ts/zxcvbn` 未归档，最后提交2026-08-12 | 本机估算密码可猜测性，不发密码到网络，不替代服务端策略 |
+| `@zxcvbn-ts/language-common@4.1.3` | 同上，包内 `LICENSE.txt` | 同一持续维护仓库 | 常见密码词典及键盘相邻模式 |
+| `fastest-levenshtein@1.0.16`（传递） | MIT；Kasper Unn Weihe；包内 `LICENSE.md` | `ka-weihe/fastest-levenshtein` 未归档，最后提交2024-01-28 | 估计器使用的编辑距离算法；维护频率低于上层，升级估计器时一并复核 |
+
+原始许可全文由已安装包携带并由构建许可清单收录；以上版本、许可证和仓库更新时间均实际核查，不将上层近期发布冒充每个传递依赖的近期发布。
+
 ### 逐项清单
 
 📋 **[`research/licenses-inventory.generated.md`](research/licenses-inventory.generated.md)**

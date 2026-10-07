@@ -120,7 +120,37 @@ describe('两个秘密各自绑到各自的框 —— 接错不抛异常，只�
   });
 });
 
+describe('切换服务端时清理认证边界', () => {
+  it('地址变化会清掉旧会话、两种口令、粘贴令牌与二级入口状态', () => {
+    const body = bodyOf(code, 'updateServerUrl');
+    expect(/serverUrl\.trim\(\) !== next\.trim\(\)/.test(body)).toBe(true);
+    for (const expression of [
+      "setPhase({ kind: 'idle' })",
+      'setSessionServerUrl(undefined)',
+      "setPassword('')",
+      "setLoginPassword('')",
+      "setPasted('')",
+      'setOtherWaysOpen(false)',
+    ]) {
+      expect(body, `服务端边界变化后缺少 ${expression}`).toContain(expression);
+    }
+  });
+
+  it('忘记密码使用独立 busy action，魔法链接登录显示自己的 loading', () => {
+    const forgot = bodyOf(code, 'forgotPassword');
+    expect(forgot).toContain("setPhase({ kind: 'busy', action: 'forgot-password' })");
+    expect(forgot).toMatch(/requestPasswordReset\(options, email\)/);
+    expect(code).toContain("setPhase({ kind: 'busy', action: 'magic-login' })");
+    expect(code).toMatch(/loading=\{action === \(mode === 'sign-in' \? 'magic-login' : 'magic-register'\)\}/);
+  });
+});
+
 describe('表单形状（产品负责人定的硬约束）', () => {
+  it('注册同意项只由 Checkbox 自己呈现一次，法律链接不使用下划线', () => {
+    expect(code.match(/label=\{t\('mobile\.auth\.terms\.label'\)\}/g)).toHaveLength(1);
+    expect(code).not.toContain("textDecorationLine: 'underline'");
+  });
+
   it('🔴 服务端地址是**最后一栏**，邮箱是第一栏', () => {
     const email = code.indexOf("t('mobile.auth.email.label')");
     const signIn = code.indexOf('SIGN_IN_PASSWORD_LABEL_KEY)');
@@ -137,6 +167,15 @@ describe('表单形状（产品负责人定的硬约束）', () => {
     // 顺序本身就是要钉的东西：地址在第一栏 = 用户在开始注册之前必须先回答
     // "你要连哪台机器"。
     expect(email < signIn && signIn < e2ee && e2ee < server, '四栏的先后不对').toBe(true);
+  });
+
+  it('默认认证入口不提供自托管或粘贴令牌；设置路径才允许选择服务端', () => {
+    expect(code).toMatch(/allowServerSelection = false/);
+    expect(code).toMatch(/allowServerSelection \?/);
+    expect(code).toMatch(/allowServerSelection/);
+    expect(code).toMatch(/sessionServerUrl/);
+    expect(code).toMatch(/enterSession\(/);
+    expect(code).toMatch(/sessionServerUrl !== serverUrl\.trim\(\)/);
   });
 
   it('🔴 登录密码有显隐开关，默认档取自共享层（不在壳里写死 true/false）', () => {
@@ -170,7 +209,7 @@ describe('注册的两道本地闸（顺序错了就是"已经发出去了"）',
     assertOrdered(
       body,
       /missingField\('register'\)/,
-      /registerWithEmailPassword\(/,
+      /requestEmailPasswordRegistrationCode\(/,
       '同意项没勾也发出了注册请求（服务端会回 400，但那次枚举尝试本身已经出门了）',
     );
     const missing = bodyOf(code, 'missingField');
@@ -186,7 +225,7 @@ describe('注册的两道本地闸（顺序错了就是"已经发出去了"）',
     // 与 `privacy-consent-gate.spec.ts` 那条「五个出门动作」是同一件事的两侧：
     // 那一份管已有的五条，这一条管本轮新增的两条 —— 两份都不许有人后补动作不登记。
     for (const [name, egress] of [
-      ['registerWithPassword', /registerWithEmailPassword\(/],
+      ['registerWithPassword', /requestEmailPasswordRegistrationCode\(/],
       ['loginWithPassword', /loginWithEmailPassword\(/],
     ] as Array<[string, RegExp]>) {
       assertOrdered(
@@ -200,31 +239,20 @@ describe('注册的两道本地闸（顺序错了就是"已经发出去了"）',
 
   it('🔴 注册成功后那句是**中性**的，不许断言"账号已创建"', () => {
     const body = bodyOf(code, 'registerWithPassword');
-    // 2026-10-03：那句提示改成走 `registerNoticeKey(result)` —— 服务端**亲口说**
-    // "信没发出去"时必须换一句（对着一个永远收不到的邮箱说"请查收"是把人关在门外）。
-    // 三条注册路原来各写字面键，正是"同一个判断写三遍然后漂一处"的形状。
-    // 所以这条判据钉的是两半，缺一半都挡不住回归：
-    //   ① 动作确实把结果交给了那个唯一判点（不再手写字面键）；
-    //   ② 判点本身只产出那两条中性键，谁都不含"已创建"。
+    // 2026-10-07：邮箱密码注册现在先创建验证码 challenge，成功后进入验证码阶段；
+    // 邮件发送失败仍然使用明确的失败提示。
     expect(
-      /setPhase\(\{ kind: 'notice', key: registerNoticeKey\(result\) \}\)/.test(body),
-      '注册成功没走那个唯一判点（键又被写回字面量了？）',
-    ).toBe(true);
-    const notice = bodyOf(code, 'registerNoticeKey');
-    expect(
-      /'mobile\.auth\.sent\.register'/.test(notice) &&
-        /'mobile\.auth\.sent\.mailNotSent'/.test(notice),
-      '判点产出的两条中性键少了一条',
+      /setPhase\(\{\s*kind: 'registration-code'/s.test(body),
+      '注册成功没有进入验证码阶段',
     ).toBe(true);
     // 服务端对"邮箱已属已验证账号"**故意**回成功而不写凭据（防枚举），
     // 所以任何"已创建"的措辞都是假话。
     expect(body, '注册结果读了服务端的 message').not.toMatch(/result\.message/);
-    expect(notice, '判点读了服务端的原文').not.toMatch(/\.message/);
   });
 
   it('🔴 登录产出会话后**停在 session 那一档**，不直接算完成', () => {
     const body = bodyOf(code, 'loginWithPassword');
-    expect(/setPhase\(\{ kind: 'session', session: result\.session \}\)/.test(body)).toBe(true);
+    expect(/enterSession\(result\.session\)/.test(body)).toBe(true);
     // 规范 §3.2 的第 ④ 步：登录成功 ≠ 同步可用（那是另一个秘密）。
     expect(body, '登录顺手把会话存了，等于跳过了 E2EE 口令那一步').not.toMatch(/saveAuthSession\(/);
   });
@@ -298,6 +326,13 @@ describe('词条齐备（中英两张表必须同时有）', () => {
     'common.auth.form.showPassword',
     'common.auth.form.hidePassword',
     'common.auth.form.otherWays',
+    'common.auth.form.confirmPassword',
+    'common.auth.form.passwordConfirmationRequired',
+    'common.auth.form.passwordMismatch',
+    'common.auth.form.passwordStrength.tooShort',
+    'common.auth.form.passwordStrength.weak',
+    'common.auth.form.passwordStrength.fair',
+    'common.auth.form.passwordStrength.strong',
   ]) {
     it(`${key} 在中英两张表里都有`, () => {
       expect(zh, `zh-CN 缺 ${key}`).toContain(`'${key}'`);
@@ -307,5 +342,45 @@ describe('词条齐备（中英两张表必须同时有）', () => {
 
   it('🔴 引导句说的是这条路：不再只提"邮件链接或通行密钥"', () => {
     expect(zh).toContain("'mobile.auth.intro': '用邮箱和密码注册或登录");
+  });
+});
+
+describe('注册确认密码与强度提示', () => {
+  it('确认字段仅出现在注册分支，且强度估计是本地组件', () => {
+    expect(code).toMatch(/mode === 'register'[\s\S]{0,1600}mobile-auth-password-confirmation/);
+    expect(code).toContain('<PasswordStrength');
+    expect(code).toContain('common.auth.form.passwordStrength.strong');
+  });
+
+  it('确认密码为空或不一致时不发注册请求', () => {
+    const body = bodyOf(code, 'registerWithPassword');
+    expect(body).toMatch(/confirmLoginPassword === ''/);
+    expect(body).toMatch(/confirmLoginPassword !== loginPassword/);
+    expect(body.indexOf('confirmLoginPassword !== loginPassword')).toBeLessThan(
+      body.indexOf('requestEmailPasswordRegistrationCode('),
+    );
+  });
+
+  it('确认密码不会被发送到服务端', () => {
+    const body = bodyOf(code, 'registerWithPassword');
+    expect(body).toMatch(/password:\s*loginPassword/);
+    expect(body).not.toMatch(/password:\s*confirmLoginPassword/);
+  });
+});
+
+describe('移动端认证请求代际隔离', () => {
+  it('切换服务端与卸载时会递增代际，延迟响应不能恢复旧状态', () => {
+    expect(code).toMatch(/authGeneration\.current \+= 1/);
+    expect(code).toMatch(/useEffect\(\(\) => \(\) => \{\s*authGeneration\.current \+= 1/s);
+    expect(code).toMatch(/if \(!isCurrentAuthAction\(generation\)\) return/);
+  });
+
+  it('验证码验证与重发都在代际检查之后才写回界面状态', () => {
+    const verifyBody = bodyOf(code, 'verifyRegistrationCode');
+    const resendBody = bodyOf(code, 'resendRegistrationCode');
+    expect(verifyBody).toMatch(/verifyEmailPasswordRegistrationCode\(/);
+    expect(verifyBody).toMatch(/isCurrentAuthAction\(generation\)/);
+    expect(resendBody).toMatch(/resendEmailPasswordRegistrationCode\(/);
+    expect(resendBody).toMatch(/isCurrentAuthAction\(generation\)/);
   });
 });

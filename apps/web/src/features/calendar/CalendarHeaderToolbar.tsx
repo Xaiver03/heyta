@@ -38,8 +38,10 @@
  * 那笔账记在 `docs/plans/ui-review-fill-zh-timeline.md` §9.10。
  */
 
-import { toLocalDate } from '@heyta/domain';
+import { ICON_SIZE } from '@heyta/design-system';
+import { isScopeEmpty, toLocalDate } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
+import { useMemo } from 'react';
 import {
   CALENDAR_VIEW_LABEL_KEYS,
   CALENDAR_VIEW_ORDER,
@@ -48,8 +50,10 @@ import {
 } from '@heyta/ui';
 
 import { useTaskStore } from '../tasks/store.js';
+import { useProjectStore } from '../projects/store.js';
 import { useCalendarLabels } from './useCalendarLabels.js';
 import { useCalendarViewStore } from './store.js';
+import { PanelLeft, RotateCcw } from 'lucide-react';
 
 /*
  * 档位与它们的键名**不在这里**（R17）：这里曾经写着一张 `{kind, key}[]`，
@@ -69,12 +73,16 @@ const TIMELINE_VALUE = 'timeline';
 export interface CalendarHeaderToolbarProps {
   /** 功能模块「时间线」是否开着 —— 关掉时下拉里**不出现**这一档。 */
   timelineEnabled: boolean;
+  sidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
   /** 切到时间线视图（与 rail 上那个 tab **同一条路**：`App` 的 `goToView('timeline')`）。 */
   onOpenTimeline: () => void;
 }
 
 export function CalendarHeaderToolbar({
   timelineEnabled,
+  sidebarOpen,
+  onToggleSidebar,
   onOpenTimeline,
 }: CalendarHeaderToolbarProps): React.JSX.Element {
   const view = useCalendarViewStore();
@@ -85,19 +93,80 @@ export function CalendarHeaderToolbar({
    * 界面 store 不存时钟 —— 存了就会漂（翻到 12 月再放着不动，"今天"就变了）。
    */
   const now = useTaskStore((s) => s.now);
+  const projects = useProjectStore((s) => s.projects);
+  const tags = useProjectStore((s) => s.tags);
+  const hasScope = !isScopeEmpty(view.scope);
+  const activeScopeNames = useMemo(() => {
+    const names = [
+      ...view.scope.projectIds.flatMap((id) => {
+        const project = projects.find((item) => item.id === id);
+        return project === undefined ? [] : [t('web.calendar.scope.projectSummary', { name: project.name })];
+      }),
+      ...view.scope.tagIds.flatMap((id) => {
+        const tag = tags.find((item) => item.id === id);
+        return tag === undefined ? [] : [t('web.calendar.scope.tagSummary', { name: tag.name })];
+      }),
+    ];
+    return names.length === 0
+      ? t('web.calendar.scope.activeCount', {
+          count: view.scope.projectIds.length + view.scope.tagIds.length,
+        })
+      : names.join(t('web.calendar.scope.separator'));
+  }, [projects, tags, t, view.scope.projectIds, view.scope.tagIds]);
+
+  const sidebarVisible = sidebarOpen ?? view.calendarSidebarOpen;
+  const calendarSidebarLabel = t(
+    sidebarVisible
+      ? 'web.calendar.sidebar.hide'
+      : 'web.calendar.sidebar.show',
+  );
 
   return (
-    <CalendarToolbar
-      cursor={view.cursor}
-      onCursorChange={view.setCursor}
-      onToday={() => {
-        // 与板子里那条**完全同一条路径**（`goToToday`）：选中今天 + 月份跟过去。
-        view.goToToday(toLocalDate(now));
-      }}
-      labels={labels}
-      view={view.view}
-      trailing={
+    <div className="ht-header__calendar-toolbar">
+      <CalendarToolbar
+        cursor={view.cursor}
+        onCursorChange={view.setCursor}
+        onToday={() => {
+          // 与板子里那条**完全同一条路径**（`goToToday`）：选中今天 + 月份跟过去。
+          view.goToToday(toLocalDate(now));
+        }}
+        labels={labels}
+        view={view.view}
+        trailing={
         <>
+          <div className="ht-header__calendar-tools">
+            <button
+              type="button"
+              className="ht-header__calendar-sidebar-toggle"
+              data-testid="calendar-sidebar-toggle"
+              aria-pressed={sidebarVisible}
+              aria-controls="calendar-sidebar"
+              aria-label={calendarSidebarLabel}
+              title={calendarSidebarLabel}
+              onClick={() => {
+                (onToggleSidebar ?? view.toggleCalendarSidebar)();
+              }}
+            >
+              <PanelLeft size={ICON_SIZE.sm} aria-hidden="true" />
+            </button>
+            {hasScope ? (
+              <div className="ht-header__calendar-scope" data-testid="calendar-scope-summary" role="status">
+                <span>{t('web.calendar.scope.active', { names: activeScopeNames })}</span>
+                <button
+                  type="button"
+                  className="ht-header__calendar-scope-reset"
+                  data-testid="calendar-scope-reset"
+                  aria-label={t('web.calendar.scope.reset')}
+                  onClick={() => {
+                    view.resetScope();
+                  }}
+                >
+                  <RotateCcw size={ICON_SIZE.xs} aria-hidden="true" />
+                  <span>{t('web.calendar.scope.reset')}</span>
+                </button>
+              </div>
+            ) : null}
+          </div>
           {/*
             🔴 「+」住在页头、输入框住在主区（`CalendarView`）—— 两半隔着一个组件，
             所以开关状态在 store 里（`captureOpen`），不是这里的 `useState`。
@@ -145,7 +214,8 @@ export function CalendarHeaderToolbar({
             </select>
           </label>
         </>
-      }
-    />
+        }
+      />
+    </div>
   );
 }

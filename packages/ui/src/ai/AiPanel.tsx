@@ -58,8 +58,6 @@ export function AiPanel({ label, testID, role, children }: AiPanelProps): React.
       flexDirection: 'column',
       gap: tokens['space.2'],
       padding: tokens['space.3'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
       borderRadius: tokens['radius.md'],
       backgroundColor: tokens['color.surface'],
       /**

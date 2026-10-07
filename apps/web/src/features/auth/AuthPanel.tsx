@@ -33,8 +33,8 @@
  *   2. 🔴 **第一个必填项是服务端地址**。对官方托管的用户，这意味着注册的前提是
  *      "你知道自己该连哪台服务端吗" —— 而这个问题他答不上来，也不该由他来答。
  *
- * 现在这两件事都由**共享表单**的结构解决（邮箱 → 「继续」→ 口令，一个 affordance
- * 同时管注册与登录；地址是**最后一栏**而且只在未配置时出现），而壳这边仍然承担着
+ * 现在这两件事都由**共享表单**的结构解决（邮箱 + 登录口令同屏，一个 affordance
+ * 同时管注册与登录；地址是**最后一栏**而且只在设置路径显式进入时出现），而壳这边仍然承担着
  * 拆墙的另一半：**预填**。地址由 `./auth-endpoint`（`authBaseUrl()`）给 ——
  * **已配置的 > `VITE_SYNC_URL` > 本机来源**。官方托管是"站点 `/` + 应用 `/app/` +
  * API `/api/` 同一个域名"（deployment §3.3.1），所以来源本身就是答案，不是猜一个域名。
@@ -70,7 +70,8 @@
  * 而是在下面明说"这个浏览器或设备不支持"（禁用了却不说为什么，用户只会以为界面坏了）。
  */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { AuthPlanScene } from './AuthPlanScene.js';
 import { cssVar } from '@heyta/design-system';
 import {
   INVITE_QUERY_PARAM,
@@ -79,7 +80,7 @@ import {
   normalizeInviteCode,
 } from '@heyta/domain';
 import { useI18n, type MessageKey } from '@heyta/i18n';
-import { resolveLegalLinks, type HostedAuthSession } from '@heyta/app-host';
+import { OFFICIAL_SITE_ORIGIN, resolveLegalLinks, type HostedAuthSession } from '@heyta/app-host';
 import {
   AuthForm,
   HeytaUiProvider,
@@ -91,10 +92,13 @@ import {
 import { detectPasskeyBrowser } from './passkey-browser.js';
 import { useAuthStore, type AuthBusyAction } from './store.js';
 import { authBaseUrl, isUnconfigured } from '../../lib/auth-endpoint.js';
+import './auth-dialog.css';
 
 export interface AuthPanelProps {
   /** 当前同步设置里的服务端地址 —— 认证与同步必须指向同一个服务端。 */
   baseUrl: string;
+  /** 只有从设置 → 同步显式进入时，才展示自托管 / 粘贴令牌的备用入口。 */
+  allowAdvanced?: boolean;
   onClose: () => void;
   /**
    * 登录成功。壳拿它把设置对话框里的令牌输入框也同步上 ——
@@ -123,6 +127,7 @@ const BUSY_MESSAGE_KEY: Record<AuthBusyAction, MessageKey> = {
   recovery: 'common.auth.busy.recovery',
   'password-sign-in': 'common.auth.busy.signIn',
   'password-register': 'common.auth.busy.register',
+  'registration-code': 'common.auth.busy.verify',
   'password-forgot': 'common.auth.busy.forgot',
   'password-change': 'common.auth.busy.change',
   'password-set': 'web.settings.password.setBusy',
@@ -143,17 +148,27 @@ function passwordDefaultPlatform(): 'desktop' | 'mobile' {
   return window.matchMedia?.('(pointer: coarse)').matches === true ? 'mobile' : 'desktop';
 }
 
-export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): React.JSX.Element {
+export function AuthPanel({
+  baseUrl,
+  allowAdvanced = false,
+  onClose,
+  onSignedIn,
+}: AuthPanelProps): React.JSX.Element {
   const { t, locale } = useI18n();
   const status = useAuthStore((s) => s.status);
+  const registrationChallenge = useAuthStore((s) => s.registrationChallenge);
   const sendLoginLink = useAuthStore((s) => s.sendLoginLink);
   const registerPasskey = useAuthStore((s) => s.registerPasskey);
   const loginWithPasskey = useAuthStore((s) => s.loginWithPasskey);
   const requestRecovery = useAuthStore((s) => s.requestRecovery);
   const verify = useAuthStore((s) => s.verify);
   const signInWithPassword = useAuthStore((s) => s.signInWithPassword);
-  const registerWithPassword = useAuthStore((s) => s.registerWithPassword);
+  const requestRegistrationCode = useAuthStore((s) => s.requestRegistrationCode);
+  const verifyRegistrationCode = useAuthStore((s) => s.verifyRegistrationCode);
+  const resendRegistrationCode = useAuthStore((s) => s.resendRegistrationCode);
+  const cancelRegistrationCode = useAuthStore((s) => s.cancelRegistrationCode);
   const forgotPassword = useAuthStore((s) => s.forgotPassword);
+  const invalidatePendingAuth = useAuthStore((s) => s.invalidatePendingAuth);
 
   /**
    * 服务端地址草稿。
@@ -175,10 +190,29 @@ export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): Rea
    */
   const [addressDraft, setAddressDraft] = useState(() => authBaseUrl(baseUrl));
   const [previousBaseUrl, setPreviousBaseUrl] = useState(baseUrl);
+  const baseUrlRef = useRef(baseUrl);
   if (previousBaseUrl !== baseUrl) {
     setPreviousBaseUrl(baseUrl);
     setAddressDraft(authBaseUrl(baseUrl));
   }
+  useEffect(() => {
+    if (baseUrlRef.current !== baseUrl) {
+      baseUrlRef.current = baseUrl;
+      invalidatePendingAuth();
+    }
+  }, [baseUrl, invalidatePendingAuth]);
+
+  // Closing the panel is a new authentication boundary. Invalidate only the
+  // request generation; the sync store keeps any credentials already saved by
+  // a completed login.
+  useEffect(() => () => {
+    invalidatePendingAuth();
+  }, [invalidatePendingAuth]);
+
+  const changeAddress = (next: string): void => {
+    invalidatePendingAuth();
+    setAddressDraft(next);
+  };
 
   /**
    * 这次认证真正要发去哪。
@@ -198,6 +232,9 @@ export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): Rea
    * 中键、⌘ 点击、右键复制链接、状态栏预览，一个都不能少。
    */
   const legalLinks = resolveLegalLinks(effectiveBaseUrl, locale);
+  // Reuse the shared legal host classification so a trailing slash or an
+  // equivalent official URL gets the same official/custom treatment.
+  const isOfficialService = legalLinks?.terms.startsWith(`${OFFICIAL_SITE_ORIGIN}/`) === true;
 
   // 每次渲染都重新探测。缓存成模块级常量会把**第一次**的结果永久钉住，
   // 而它在 jsdom 与真实浏览器里不同，用户中途接上安全密钥时也会变。
@@ -237,7 +274,9 @@ export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): Rea
   const waitingForPasskey =
     busy && (status.action === 'passkey-register' || status.action === 'passkey-login');
 
-  const labels: AuthFormLabels = {
+  const labels: AuthFormLabels & {
+    readonly otherWaysToggle: { readonly open: string; readonly close: string };
+  } = {
     title: t('web.auth.title'),
     titleText: t('web.auth.title'),
     close: t('web.auth.close'),
@@ -254,10 +293,36 @@ export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): Rea
     showPassword: t('common.auth.form.showPassword'),
     hidePassword: t('common.auth.form.hidePassword'),
     passwordHint: t('common.auth.form.passwordHint'),
+    confirmPassword: t('common.auth.form.confirmPassword'),
+    passwordMismatch: t('common.auth.form.passwordMismatch'),
+    passwordConfirmationRequired: t('common.auth.form.passwordConfirmationRequired'),
+    registrationCode: {
+      title: t('web.auth.registrationCode.title'),
+      sent: (email) => t('web.auth.registrationCode.sent', { email }),
+      label: t('web.auth.registrationCode.label'),
+      placeholder: t('web.auth.registrationCode.placeholder'),
+      verify: t('web.auth.registrationCode.verify'),
+      resend: t('web.auth.registrationCode.resend'),
+      resendIn: (seconds) => t('web.auth.registrationCode.resendIn', { seconds }),
+      changeEmail: t('web.auth.registrationCode.changeEmail'),
+      expired: t('web.auth.registrationCode.expired'),
+      codeLength: 6,
+    },
+    passwordStrength: {
+      tooShort: (current, minimum) => t('common.auth.form.passwordStrength.tooShort', { current, min: minimum }),
+      tooLong: (current, maximum) => t('common.auth.form.passwordStrength.tooLong', { current, max: maximum }),
+      weak: t('common.auth.form.passwordStrength.weak'),
+      fair: t('common.auth.form.passwordStrength.fair'),
+      strong: t('common.auth.form.passwordStrength.strong'),
+    },
     forgotPassword: t('common.auth.form.forgotPassword'),
     switchToRegister: t('common.auth.form.switchToRegister'),
     switchToSignIn: t('common.auth.form.switchToSignIn'),
     otherWays: t('common.auth.form.otherWays'),
+    otherWaysToggle: {
+      open: t('common.auth.form.otherWaysOpen'),
+      close: t('common.auth.form.otherWaysClose'),
+    },
     terms: t('web.auth.terms.label'),
     magicLink: t('web.auth.sendLoginLink'),
     recovery: t('web.auth.recovery.request'),
@@ -265,17 +330,17 @@ export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): Rea
     passkeyLogin: t('web.auth.passkey.login'),
     passkeyUnavailable: t('web.auth.passkey.unavailable'),
     passkeyWaiting: t('web.auth.passkey.waiting'),
-    emptyTitle: t('web.auth.empty.title'),
-    emptyBody: t('web.auth.empty.body'),
+    emptyTitle: '',
+    emptyBody: '',
     ...(busy ? { busyText: t(BUSY_MESSAGE_KEY[status.action]) } : {}),
     invite: {
       label: t('web.auth.invite.label'),
       placeholder: t('web.auth.invite.placeholder'),
       invalid: (length) => t('web.auth.invite.invalid', { length }),
     },
-    // 地址这一栏**只在未配置时给**（两个来源 = 漂移），而且给的是配好的 label ——
+    // 地址这一栏**只在同步设置显式进入且未配置时给**（两个来源 = 漂移），而且给的是配好的 label ——
     // 少一边就整栏不渲染，"只传一半"不会留下一个没有标题的空框。
-    ...(isUnconfigured(baseUrl)
+    ...(allowAdvanced && isUnconfigured(baseUrl)
       ? {
           serverUrl: {
             label: t('web.auth.server.label'),
@@ -283,26 +348,30 @@ export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): Rea
           },
         }
       : {}),
-    paste: {
-      label: t('web.auth.paste.label'),
-      placeholder: t('web.auth.paste.placeholder'),
-      verify: t('web.auth.verify'),
-    },
+    ...(allowAdvanced
+      ? {
+          paste: {
+            label: t('web.auth.paste.label'),
+            placeholder: t('web.auth.paste.placeholder'),
+            verify: t('web.auth.verify'),
+          },
+        }
+      : {}),
     /*
       🔴 两条逃生门各给一个展开入口（2026-10-02）。不给的话共享表单会**常驻**渲染
       它们 —— 那正是产品负责人判掉的那个默认屏：「为什么还是默认就是要什么粘贴
       服务器地址和令牌之类的东西？……这不是把那些普通用户给拒之门外了吗？」
-      折叠只发生在**视觉层**：地址与令牌输入仍在 DOM 里，键盘与读屏照样能到 ——
-      与「通行密钥 / 邮件登录链接」降到二级链用的是同一条口径。
+      折叠发生在**渐进披露层**：展开入口本身可键盘聚焦、可被读屏发现，展开后地址与令牌
+      输入完整挂载；与「通行密钥 / 邮件登录链接」降到二级链用的是同一条口径。
     */
-    selfHostToggle: {
-      open: t('web.auth.selfHost.open'),
-      close: t('web.auth.selfHost.close'),
-    },
-    haveTokenToggle: {
-      open: t('web.auth.haveToken.open'),
-      close: t('web.auth.haveToken.close'),
-    },
+    ...(allowAdvanced
+      ? {
+          advancedToggle: {
+            open: t('web.auth.advanced.open'),
+            close: t('web.auth.advanced.close'),
+          },
+        }
+      : {}),
     ...(legalLinks === null
       ? {}
       : {
@@ -340,6 +409,7 @@ export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): Rea
     switch (status.kind) {
       case 'signed-out':
       case 'busy':
+      case 'registration-code':
         return null;
       case 'link-sent':
         return { tone: 'info', message: t('web.auth.sent.login') };
@@ -392,34 +462,14 @@ export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): Rea
 
   return (
     <div
+      className="ht-sheet__auth"
       role="dialog"
       aria-modal="true"
       aria-label={t('web.auth.title')}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        display: 'grid',
-        placeItems: 'center',
-        background: cssVar('color.overlay'),
-        zIndex: cssVar('z.modal'),
-      }}
     >
-      <div
-        style={{
-          width: '90vw',
-          maxWidth: cssVar('layout.prose-max'),
-          maxHeight: '85vh',
-          overflowY: 'auto',
-          background: cssVar('color.surface-raised'),
-          borderRadius: cssVar('radius.lg'),
-          boxShadow: cssVar('shadow.lg'),
-          padding: cssVar('space.6'),
-          display: 'flex',
-          flexDirection: 'column',
-          gap: cssVar('space.3'),
-          color: cssVar('color.foreground'),
-        }}
-      >
+      <div className="ht-sheet__auth-dialog">
+        <AuthPlanScene />
+        <div className="ht-sheet__auth-form">
         {/*
           `HeytaUiProvider` 必须挂在共享组件外面：它从 context 取 token 与文本样式，
           缺了它共享组件会**主动抛错**而不是静默降级。`check:ui-provider` 钉的就是
@@ -438,8 +488,8 @@ export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): Rea
             onInviteCodeChange={setInviteMirror}
             inviteCodeLength={INVITE_CODE_LENGTH}
             inviteInvalid={inviteInvalid}
-            {...(isUnconfigured(baseUrl)
-              ? { serverUrl: { value: addressDraft, onChange: setAddressDraft } }
+            {...(allowAdvanced && isUnconfigured(baseUrl)
+              ? { serverUrl: { value: addressDraft, onChange: changeAddress } }
               : {})}
             onSignIn={({ email, password }) => {
               // 🔴 口令**原样**交出：不在这里 trim / normalize / 改大小写。
@@ -449,7 +499,7 @@ export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): Rea
               });
             }}
             onRegister={({ email, password, termsAccepted, inviteCode }) => {
-              void registerWithPassword(
+              void requestRegistrationCode(
                 effectiveBaseUrl,
                 email,
                 password,
@@ -457,6 +507,24 @@ export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): Rea
                 inviteCode === undefined ? undefined : { inviteCode },
               );
             }}
+            {...(registrationChallenge !== undefined
+              ? {
+                  registrationChallenge: {
+                    email: registrationChallenge.email,
+                    expiresAt: registrationChallenge.expiresAt,
+                    resendAvailableAt: registrationChallenge.resendAvailableAt,
+                    onVerify: (code: string) => {
+                      void verifyRegistrationCode(effectiveBaseUrl, registrationChallenge.challengeId, code).then((session) => {
+                        if (session !== undefined) onSignedIn?.(session);
+                      });
+                    },
+                    onResend: () => {
+                      void resendRegistrationCode(effectiveBaseUrl, registrationChallenge.challengeId);
+                    },
+                    onChangeEmail: cancelRegistrationCode,
+                  },
+                }
+              : {})}
             onMagicLink={(email) => {
               void sendLoginLink(effectiveBaseUrl, email);
             }}
@@ -488,22 +556,25 @@ export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): Rea
             testID="auth-form"
           />
         </HeytaUiProvider>
+        </div>
 
         {/*
           透明性：这一次认证真的发去哪台服务端。它挂在**壳这一层**而不是表单里，
           因为自建与官方托管并存时，这一行是唯一能核对的地方 —— 而且它必须
           **不随地址栏给不给、折叠与否而消失**。
         */}
-        <p style={noteStyle}>{t('web.auth.server.at', { baseUrl: effectiveBaseUrl })}</p>
-        {isUnconfigured(baseUrl) ? (
-          <p style={noteStyle}>{t('web.auth.server.prefilled')}</p>
+        {!isOfficialService ? (
+          <div className="ht-sheet__auth-notes">
+            <p style={noteStyle}>{t('web.auth.server.custom')}</p>
+            <p style={noteStyle}>{t('web.auth.server.address', { baseUrl: effectiveBaseUrl })}</p>
+          </div>
         ) : null}
       </div>
     </div>
   );
 }
 
-/** 壳级补充说明句（去哪台服务端、预填不是让你填）。 */
+/** 壳级补充说明句（服务类型与可核对地址）。 */
 const noteStyle: React.CSSProperties = {
   margin: 0,
   fontSize: cssVar('font-size.2xs'),

@@ -66,8 +66,9 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { HeytaIcon } from '../icon/Icon.js';
-import { useHeytaText, useHeytaTokens } from '../theme.js';
+import { useHeytaText, useHeytaTokens, useHeytaUiLocale } from '../theme.js';
 import { toEmptyStateViewModel, type EmptyStateSlots } from './model.js';
+import { StateIllustration } from './StateIllustration.js';
 
 export type {
   EmptyStateDetailTone,
@@ -99,7 +100,8 @@ export function EmptyState(props: EmptyStateProps): React.JSX.Element {
   //    442 条用例全绿（它们测的是模型），而真机截图上那行"还没有通行密钥"被撑成
   //    居中的一大块。"props → 模型"这条缝只有实际渲染能判，所以这里从设计上
   //    把它消掉：加新槽位时不可能再漏传。
-  const view = toEmptyStateViewModel(props);
+  const inheritedLocale = useHeytaUiLocale();
+  const view = toEmptyStateViewModel({ ...props, locale: props.locale ?? inheritedLocale });
 
   const styles = useMemo(
     () =>
@@ -121,9 +123,10 @@ export function EmptyState(props: EmptyStateProps): React.JSX.Element {
         //    所以根节点除了行间距什么都没有 —— 沿用页面档的 `paddingVertical: space.16`
         //    会把设置页撑出一大块空白，那是视觉回归，不是统一。
         rootSection: { gap: tokens['space.2'] },
-        // 区块档的标题用 `row-meta` + subtle（调用方原来就是这个形状），
-        // 页面档用 `section-title` + muted。
-        titleSection: { color: tokens['color.foreground-subtle'] },
+        // 区块档的标题必须和下一步提示拉开层级：标题是事实，提示是行动。
+        // 使用语义 `row-title`（base + semibold）并配 foreground，避免空态退化成
+        // 两行同权重的灰色说明文字；页面档仍使用 section-title + muted。
+        titleSection: { color: tokens['color.foreground'] },
       }),
     [tokens],
   );
@@ -144,10 +147,19 @@ export function EmptyState(props: EmptyStateProps): React.JSX.Element {
         />
       )}
 
+      {view.illustration === undefined ? null : (
+        <StateIllustration
+          variant={view.illustration}
+          locale={view.locale}
+          motion={view.illustrationMotion}
+          testID={testID === undefined ? undefined : `${testID}-illustration`}
+        />
+      )}
+
       <Text
         style={
           section
-            ? [text['row-meta'], styles.titleSection]
+            ? [text['row-title'], styles.titleSection]
             : [text['section-title'], styles.centered, styles.title]
         }
       >

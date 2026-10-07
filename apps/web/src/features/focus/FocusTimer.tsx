@@ -94,28 +94,20 @@ function DurationSettings() {
   }
 
   return (
-    <fieldset
-      disabled={locked}
-      style={{
-        border: `${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
-        borderRadius: cssVar('radius.md'),
-        padding: cssVar('space.3'),
-        margin: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: cssVar('space.2'),
-        minWidth: cssVar('layout.sidebar-width'),
-      }}
-    >
-      <legend
-        style={{
-          fontSize: cssVar('font-size.2xs'),
-          color: cssVar('color.foreground-muted'),
-          padding: `0 ${cssVar('space.1')}`,
-        }}
+    <details className="ht-app__focus-settings" data-testid="focus-config">
+      <summary className="ht-app__focus-settings-toggle" data-testid="focus-config-toggle">
+        <span>{t('web.focus.config.title')}</span>
+        <span className="ht-app__focus-settings-summary" aria-hidden="true">
+          {t('web.focus.config.minutes', { minutes: current.workMinutes })}
+        </span>
+      </summary>
+      <fieldset
+        disabled={locked}
+        className="ht-app__focus-settings-fields"
       >
-        {t('web.focus.config.title')}
-      </legend>
+        <legend className="ht-app__focus-settings-legend">
+          {t('web.focus.config.title')}
+        </legend>
 
       {fields.map((f) => {
         const bounds = FOCUS_CONFIG_BOUNDS[f.key];
@@ -154,7 +146,7 @@ function DurationSettings() {
                 commit(f.key, e.target.value);
               }}
               style={{
-                width: '5rem',
+                width: cssVar('layout.sidebar-min-width'),
                 minHeight: cssVar('touch-target.min'),
                 padding: `0 ${cssVar('space.2')}`,
                 borderRadius: cssVar('radius.md'),
@@ -183,7 +175,8 @@ function DurationSettings() {
           {t('web.focus.config.locked')}
         </p>
       )}
-    </fieldset>
+      </fieldset>
+    </details>
   );
 }
 
@@ -192,6 +185,12 @@ export function FocusTimer() {
   const focus = useFocusStore();
   const tasks = useTaskStore();
   const [now, setNow] = useState(() => Date.now());
+  // 关联任务是开始前的草稿选择。选择本身不应启动计时；只有点击共享面板的
+  // 开始按钮时，才把这份选择交给领域状态机。中止/完成后也保留它，方便用户
+  // 连续记录同一个任务。
+  const [selectedTaskId, setSelectedTaskId] = useState<string | undefined>(
+    () => focus.state.taskId,
+  );
 
   // 本地重绘节拍。**不参与计时计算** —— 剩余量永远由领域层重算。
   useEffect(() => {
@@ -229,12 +228,15 @@ export function FocusTimer() {
 
   return (
     <div
+      className="ht-app__focus"
       style={{
         padding: cssVar('space.6'),
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         gap: cssVar('space.4'),
+        width: '100%',
+        boxSizing: 'border-box',
       }}
     >
       <FocusPanel
@@ -264,7 +266,7 @@ export function FocusTimer() {
             : { error: t(saveFailedKey, { reason: focus.error.reason }) }),
         }}
         onStart={() => {
-          focus.start(focus.state.taskId);
+          focus.start(selectedTaskId);
           setNow(Date.now());
         }}
         onPause={focus.pause}
@@ -274,21 +276,23 @@ export function FocusTimer() {
         }}
       >
         <label
+          className="ht-app__focus-task"
           style={{
             display: 'flex',
             flexDirection: 'column',
             gap: cssVar('space.1'),
             fontSize: cssVar('font-size.2xs'),
             color: cssVar('color.foreground-muted'),
-            minWidth: cssVar('layout.sidebar-width'),
+            width: '100%',
+            maxWidth: cssVar('layout.sidebar-width'),
           }}
         >
           {t('web.focus.task.label')}
           <select
-            value={focus.state.taskId ?? ''}
+            value={selectedTaskId ?? ''}
+            disabled={focus.state.phase !== 'idle'}
             onChange={(e) => {
-              focus.start(e.target.value === '' ? undefined : e.target.value);
-              setNow(Date.now());
+              setSelectedTaskId(e.target.value === '' ? undefined : e.target.value);
             }}
             style={{
               minHeight: cssVar('touch-target.min'),

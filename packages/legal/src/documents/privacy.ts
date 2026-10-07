@@ -401,7 +401,7 @@ const zh = [
           [
             '账号本身（邮箱、口令散列、通行密钥、语言、昵称、头像密文、条款接受时刻）',
             '到你注销账号为止。',
-            '🔴 注销是**真删除**：账号行连同名下的同步事件、同步状态、设备记录、通行密钥（含未完成的通行密钥注册）、订阅、订单、优惠码核销、邀请码与邀请关系、通知、昵称与头像、条款接受记录、墓碑、推送订阅、加密密钥包、密钥迁移记录、撤销设备记录、托管 AI 用量计数，按数据库外键级联删除（共 20 处级联，覆盖 19 张表），**没有冷静期，也没有回收站**。🔴 两件事不在这条范围里，我们照实写：**（一）你其它设备上的本地明文数据。** 注销删的是服务端，而"本地优先"意味着每台设备自己就有一份可读的库：你点下注销的那台**当场**清掉本机明文，其它设备在**下一次同步拿到"账号已注销"这个信号**时各自清掉自己那一份。所以这一条既不写成"你的所有数据立即彻底销毁"，也不写成"你在所有设备上的数据都会被删除" —— 一台从此不再上线、也不再登录的设备，我们没有远程擦除它的能力。**（二）整库备份里的副本要等那份备份自己过期**，见下面"数据库备份"那一行。',
+            '🔴 注销是**真删除**：账号行连同名下的同步事件、同步状态、设备记录、通行密钥（含未完成的通行密钥注册）、订阅、订单、优惠码核销、邀请码与邀请关系、通知、昵称与头像、条款接受记录、墓碑、推送订阅、加密密钥包、密钥迁移记录、撤销设备记录、托管 AI 用量计数、自动收集执行身份、自动收集提交许可、邮箱注册验证码挑战，按数据库外键级联删除（共 23 处级联，覆盖 22 张表），**没有冷静期，也没有回收站**。🔴 两件事不在这条范围里，我们照实写：**（一）你其它设备上的本地明文数据。** 注销删的是服务端，而"本地优先"意味着每台设备自己就有一份可读的库：你点下注销的那台**当场**清掉本机明文，其它设备在**下一次同步拿到"账号已注销"这个信号**时各自清掉自己那一份。所以这一条既不写成"你的所有数据立即彻底销毁"，也不写成"你在所有设备上的数据都会被删除" —— 一台从此不再上线、也不再登录的设备，我们没有远程擦除它的能力。**（二）整库备份里的副本要等那份备份自己过期**，见下面"数据库备份"那一行。',
           ],
           [
             '订阅、订单与优惠码核销记录',
@@ -652,6 +652,7 @@ const zh = [
         kind: 'table',
         head: ['版本', '日期与变更摘要'],
         rows: [
+          ['1.8', "`2026-10-07` 增补自动收集执行身份与提交许可的类别、用途、保留及注销边界；明确功能尚未开放。按当前迁移重算注销范围，并补列邮箱注册验证码挑战。中英同步，仍为待审核草案。"],
           ['1.7', '`2026-10-05` 这一版补的是**托管 AI 的保留裁决**（ADR-0054 §3、§4、§5），而不是上一版那张表：第 7 条的期限表为"那一次调用的内容"与"留下的运维元数据"各加一行 —— 内容那一行说的是它从来没被写过盘（因此没有"到期怎么处理"这一步），元数据那一行的期限**定为 45 天**并写明推导（一个计费周期加出账缓冲，不是任何法律要求的数）。🔴 两处刻意没写成执行承诺：到期删除的作业本轮没有实现，而第 8 条那句"今天仍然不是打得开的功能"一字不动。第 7 条那段"45 天的诚实边界"从两条改成三条，第三条专门把**两个不同的 45 天**分开 —— 一个是同步流水的清理窗口，一个是调用元数据的期限，同值不等于同物。第 8 条同时补一句：托管档的目的地由境内供应商白名单推导、保存与发送两个点各校验一次，并点名这句与"不维护服务商清单"讲的是两条路。中英两栏同步。**状态：草案，尚未经法务复核、尚未生效。**'],
           ['1.6', '`2026-10-05` 改的原因不是措辞，是**服务端库结构变了**：ADR-0054 §2 把托管 AI 那条路径的保留裁决落成一张只装计数的表 `ai_usage_counters`（账号、计费周期锚点、次数、更新时间四列），它带 `user_id → users` 的 `ON DELETE CASCADE`，因此注销的级联范围多一类。第 7 条那一格的级联数量按迁移真源重算，第 3 条的账号元数据行与第 7 条的期限表各补这一类，写明它是**次数而不是内容**、以及它的证据是列集合而不是措辞。中英两栏同步。⚠️ 这一版**没有**把托管 AI 写成已经在提供的功能：第 8 条那句"它今天还打不开"仍然成立，开放顺序见 ADR-0054 §6。本行刻意不复述那两个数字 —— 数字的真源是判据现量，在变更日志里再抄一份就是给它多加一个会漂的副本。**状态：草案，尚未经法务复核、尚未生效。**'],
           ['1.5', '`2026-10-04` 新增第十五节《欧盟 GDPR 口径》：把这份政策与 GDPR 的条文逐格摆开，写明哪几格顶得上、哪几格顶不上，并指向《你的数据权利》里那张逐条对照表（本文件不抄第二份）。这一节里最要紧的一格是**第 33 条**：泄露通知今天只有人、没有程序。具体口径只写在那一节的正文里，本行不复述 —— 复述就会漂。**状态：草案，尚未经法务复核、尚未生效。**'],
@@ -670,6 +671,7 @@ const zh = [
       },
     ],
   },
+  { id: "automation-metadata", title: "自动收集元数据与注册挑战", blocks: [{ kind: "p", text: "自动收集尚未开放。服务端预留两类明文元数据：自动收集执行身份（账号、设备标识、本地数据库实例标识、随机凭据的 SHA-256、创建及撤销时间），用于确认哪台设备有权提交；自动收集提交许可（不透明事件与规则标识、规则和解析版本、执行身份、固定操作标识、结果摘要、条数及创建时间），用于防止重复创建。这些记录不含任务标题、正文或随机凭据原文。执行身份保留至账号注销；提交许可的规则删除清理必须在功能开放前完成，许可一旦发出不因租约到期而转交另一设备。注销账号时两类记录随账号级联删除，不能据此远程擦除离线设备的本地副本。另有邮箱注册验证码挑战：保存待验证身份、验证码摘要、有效期、尝试次数和待激活的口令散列，用于完成邮箱验证，不保存验证码原文；关联账号的挑战也随注销删除。" }] },
 ] as const;
 
 const en = [
@@ -992,7 +994,7 @@ const en = [
           [
             'The account itself (email address, password hash, passkeys, language, nickname, avatar ciphertext, moment of accepting the terms)',
             'Until you close the account.',
-            '🔴 Closure is a **genuine hard delete**: the account row and, by database foreign-key cascade, everything under it — sync events, sync state, device records, passkeys (including pending passkey registrations), subscriptions, checkout orders, coupon redemptions, invite codes and referral relationships, notifications, nickname and avatar, consent records, tombstones, push subscriptions, wrapped key packages, key migration records, revoked device records and managed-AI usage counters — are deleted (20 cascades in total, across 19 tables). **There is no cooling-off period and no trash bin.** 🔴 Two things fall outside that scope, and we say so plainly. **(1) Local plaintext data on your other devices.** Closing an account deletes on the server, while "local-first" means every device keeps its own readable database: the device you press it on wipes its local plaintext **on the spot**, and every other device wipes its own copy **the next time it synchronises and receives the "account closed" signal**. So we write neither "all your data is destroyed immediately" nor "your data is gone from every device" — a device that never connects or signs in again is one we cannot wipe remotely. **(2) Copies inside whole-database backups survive until that backup expires of itself** — see the "Database backups" row below.',
+            '🔴 Closure is a **genuine hard delete**: the account row and, by database foreign-key cascade, everything under it — sync events, sync state, device records, passkeys (including pending passkey registrations), subscriptions, checkout orders, coupon redemptions, invite codes and referral relationships, notifications, nickname and avatar, consent records, tombstones, push subscriptions, wrapped key packages, key migration records, revoked device records and managed-AI usage counters, automation worker identities, automation commit permits and email registration challenges — are deleted (23 cascades in total, across 22 tables). **There is no cooling-off period and no trash bin.** 🔴 Two things fall outside that scope, and we say so plainly. **(1) Local plaintext data on your other devices.** Closing an account deletes on the server, while "local-first" means every device keeps its own readable database: the device you press it on wipes its local plaintext **on the spot**, and every other device wipes its own copy **the next time it synchronises and receives the "account closed" signal**. So we write neither "all your data is destroyed immediately" nor "your data is gone from every device" — a device that never connects or signs in again is one we cannot wipe remotely. **(2) Copies inside whole-database backups survive until that backup expires of itself** — see the "Database backups" row below.',
           ],
           [
             'Subscriptions, orders and coupon redemptions',
@@ -1243,6 +1245,7 @@ const en = [
         kind: 'table',
         head: ['Version', 'Date and summary of changes'],
         rows: [
+          ['1.8', "`2026-10-07` Adds automation worker identities and commit permits, their purpose, retention and account-closure boundaries; the feature is not yet available. Recomputes closure scope from current migrations and includes email registration challenges. Both languages updated; remains a draft awaiting review."],
           ['1.7', '`2026-10-05` This revision adds the **managed-AI retention ruling** (ADR-0054 §3, §4, §5) rather than the table the previous version added: the period table in section 7 gains one row for "the content of one such call" and one for "the operational metadata that is kept". The content row says it is never persisted, so there is no expiry step to describe; the metadata row states a period **set at 45 days** together with its derivation (one billing period plus a reconciliation buffer - not a number any law asks for). 🔴 Two places deliberately stop short of an undertaking: the delete-at-expiry job is not implemented in this round, and the sentence in section 8 about this tier not being switchable on is untouched. The “45 days” boundary note in section 7 goes from two items to three, the third separating the **two different 45-day windows** - one is the pruning window for the sync stream, the other the period for call metadata; equal values are not the same knob. Section 8 also states that on the managed tier the destination is derived from a whitelist of domestic providers and validated at both the save point and the send point, and names that as a different path from "we maintain no provider list". Both language columns updated together. **Status: draft, not yet reviewed by counsel or in effect.**'],
           ['1.6', '`2026-10-05` What changed is not the wording — **the server schema changed**: ADR-0054 §2 turns the retention ruling for the managed-AI path into a table that can only hold counts, `ai_usage_counters` (account, billing-period anchor, request count, last updated), carrying an `ON DELETE CASCADE` from `user_id` to `users`, so account closure now cascades one more category. The cascade count in that cell of section 7 is recomputed from the migrations; the account-metadata row in section 3 and the retention table in section 7 each gain this category, stated as a **count rather than content**, with its evidence named as the column set rather than our phrasing. Both language columns updated together. ⚠️ This revision does **not** present managed AI as something we already provide: the sentence in section 8 about that form still holds, and the order of gates is in ADR-0054 §6. The row deliberately does not restate those two numbers — their source of truth is the measurement, and copying them into a changelog is how a second drifting copy gets made. **Status: draft, not yet reviewed by counsel or in effect.**'],
           ['1.5', '`2026-10-04` Added section 15, *The EU GDPR view*: it lays this policy against the GDPR articles cell by cell, states which ones it reaches and which it does not, and points at the article-by-article table in *Your Data Rights* rather than copying it here. The most consequential cell in that section is **Article 33**: breach notification rests on people today, with no written procedure. The substance lives in that section alone — restating it in a changelog row is exactly how a second copy starts to drift. **Status: draft, not yet reviewed by counsel or in effect.**'],
@@ -1261,6 +1264,7 @@ const en = [
       },
     ],
   },
+  { id: "automation-metadata", title: "Automation metadata and registration challenges", blocks: [{ kind: "p", text: "Automatic capture is not yet available. Two categories of plaintext metadata are reserved on the server: automation worker identities (account, device and local database identifiers, SHA-256 of a random credential, creation and revocation times), to authenticate the submitting device; and automation commit permits (opaque event and rule identifiers, rule and parse versions, worker identity, fixed operation identifier, result digest, item count and creation time), to prevent duplicate creation. Neither contains task titles, body content or the original credential. Worker identities remain until account closure. Rule-deletion cleanup of permits must be implemented before launch; an issued permit is not reassigned when a lease expires. Both categories cascade on account closure, which cannot remotely erase local copies on offline devices. Email registration challenges also store pending identity, a verification-code digest, expiry, attempt counts and a pending password hash to verify the email address; they do not store the original code. Challenges associated with an account cascade on closure." }] },
 ] as const;
 
 export const privacy: LegalDocument = {
@@ -1270,9 +1274,9 @@ export const privacy: LegalDocument = {
   // 45 天必须分开写，否则第 7 条那段限定会被读成也管着托管那一档。
   // 版本号进同意指纹（`legalSetVersion()` 把每张文档拼成 `id@version`），
   // 改了对外承诺而不 bump，等于让旧那枚同意去覆盖一段它没见过的话。
-  version: '1.7',
+  version: '1.8',
   status: 'draft',
-  updatedDate: '2026-10-05',
+  updatedDate: '2026-10-07',
   title: {
     'zh-CN': '隐私政策',
     en: 'Privacy Policy',

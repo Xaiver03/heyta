@@ -6,16 +6,15 @@
  * 最后一环，也是最需要写清边界的一环。
  *
  * ─────────────────────────────────────────────────────────────────────────
- * 🔴🔴 全案最重要的一条：**写工具在这里永远不会被执行**
+ * 🔴🔴 全案最重要的一条：**工具解析本身永远不会直接执行写入**
  *
- * 本文件里 `host.submit` 只出现在 `confirmAiToolProposal()` 里，
- * 而那个函数**只能由用户确认之后调用**。`runSelectedTool()` 对写工具的唯一动作是
+ * 本文件里真正的 `host.submit` 只出现在最终提交函数里。
+ * `runSelectedTool()` 对写工具的唯一动作是
  * 用 `toWriteIntent()` 造一个**提案**（`LocalApiWriteIntent`）然后返回 ——
- * 它和 op 之间还隔着"用户看见、改过、点确认"这三步。
+ * 它和 op 之间还隔着执行档的风险判断，或用户看见、改过、点确认这一步。
  *
- * 这是 ADR-0005 §3.1 在工具层的落地：**AI 只产出建议，写入必须过
- * `dispatch()` + 用户确认。** 有人要在这里加一行"顺手 submit 一下"，
- * 那就是把"模型可以自己改用户的数据"这件事放进了产品。
+ * 这是 ADR-0005 §3.1 在工具层的落地：**AI 先产出封闭写意图，写入必须过
+ * app-host 的最终提交闸门。** 高风险意图还必须保留用户确认。
  *
  * ⚠️ `ai-tool-run.spec.ts` 有一条测试**数 `submit` 被调了几次**：
  * 跑完所有只读与提案路径后必须是 **0**。不是看返回值，是数调用 ——
@@ -82,16 +81,110 @@ export interface AiToolProposal {
   intent: LocalApiWriteIntent;
 }
 
+/** 执行档自动落地前必须保留确认的破坏性动作。 */
+export function aiToolProposalRequiresConfirmation(proposal: AiToolProposal): boolean {
+  switch (proposal.intent.action) {
+    case 'complete-tasks':
+      return true;
+    case 'set-task-tags':
+      return proposal.intent.tagIds.length === 0;
+    case 'update-note':
+    case 'update-event':
+      return true;
+    case 'update-task': {
+      const fields = proposal.intent.fields;
+      const keys = Object.keys(fields);
+      return (
+        keys.length === 0 ||
+        keys.some(
+          (key) =>
+            !['title', 'completed', 'dueDate', 'priority'].includes(key) ||
+            fields[key] === null ||
+            fields[key] === undefined,
+        )
+      );
+    }
+    default:
+      return false;
+  }
+}
+
+type AutoExecutionRecord = {
+  readonly fingerprint: string;
+  readonly result: Promise<LocalApiWriteResult>;
+};
+
+const autoExecutionRecords = new WeakMap<object, Map<string, AutoExecutionRecord>>();
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (typeof value === 'object' && value !== null) {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableJson(record[key])}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+}
+
+/**
+ * 执行档的低风险自动写入收口。相同执行标识在当前宿主生命周期内只提交一次，
+ * 避免 UI 重放生成重复 op；它不是跨进程或跨设备的持久幂等协议。
+ * 不同用户发送必须使用不同标识，即使 intent 相同也仍是两次真实意图。
+ */
+export async function executeAiToolProposal(
+  host: LocalApiHost,
+  proposal: AiToolProposal,
+  executionId: string,
+): Promise<LocalApiWriteResult> {
+  if (aiToolProposalRequiresConfirmation(proposal)) {
+    return { ok: false, reason: 'invalid', message: '这项改动需要先确认。' };
+  }
+  const id = executionId.trim();
+  if (id === '') return { ok: false, reason: 'invalid', message: '执行标识不能为空。' };
+
+  const fingerprint = stableJson(proposal.intent);
+  let records = autoExecutionRecords.get(host);
+  if (records === undefined) {
+    records = new Map();
+    autoExecutionRecords.set(host, records);
+  }
+  const existing = records.get(id);
+  if (existing !== undefined) {
+    if (existing.fingerprint !== fingerprint) {
+      return { ok: false, reason: 'invalid', message: '同一执行标识对应了不同的改动。' };
+    }
+    return existing.result;
+  }
+
+  // 低风险自动执行与显式确认共享同一个最终提交闸门；所有写入仍只有一条
+  // app-host → op-log 路径，静态门禁也可以穷举这个写入口。
+  const result = confirmAiToolProposal(host, proposal);
+  records.set(id, { fingerprint, result });
+  if (records.size > 128) {
+    const oldest = records.keys().next().value;
+    if (typeof oldest === 'string') records.delete(oldest);
+  }
+  return result;
+}
+
 export type AiToolRunOutcome =
   /** 只读工具执行成功。`data` 已按 Bear 范式投影过。 */
   | { kind: 'observation'; ruleId: string; tool: string; data: unknown }
-  /** 写工具**只产出提案**，没有落库。 */
+  /** 写工具只产出提案；由执行档或确认动作决定是否提交。 */
+  | { kind: 'executed'; proposal: AiToolProposal; result: LocalApiWriteResult }
   | { kind: 'proposal'; proposal: AiToolProposal }
   | { kind: 'ambiguous'; candidates: readonly ToolCandidate[] }
   | { kind: 'none'; reason: ToolSelectionNoneReason }
   /** 用户没授权这个工具。**执行前复查**抓到的。 */
   | { kind: 'denied'; tool: string; message: string }
-  | { kind: 'failed'; tool: string; reason: 'unknown-tool' | 'invalid-args' | 'not-readable'; message: string };
+  | {
+      kind: 'failed';
+      tool: string;
+      reason: 'unknown-tool' | 'invalid-args' | 'not-readable' | 'write-failed';
+      message: string;
+    };
 
 export interface AiToolRunnerDeps {
   /** 工具宿主。复用 `createLocalApiHost()`（壳侧），这里是进程内端口。 */
@@ -181,10 +274,11 @@ export async function runSelectedTool(
 }
 
 /**
- * 用户确认之后，才把提案落地。
+ * 把提案提交到宿主的最终写入闸门。
  *
- * 🔴 这是本模块**唯一**调用 `host.submit` 的地方，也是"AI 不能自己改数据"
- * 这条约束的执行点。它必须是**显式的一步**，不能藏在执行函数里。
+ * 🔴 这是本模块**唯一**调用 `host.submit` 的地方，也是所有 AI 写入进入 op-log
+ * 的唯一执行点。显式确认会调用它；执行档的低风险动作也会复用它，差别只在于
+ * 高风险提案必须先经过用户确认。
  * ⚠️ `check:ai-tools` 静态钉住"`RUN_FILE` 里 `.submit(` 恰好 1 次且在本函数内"，
  * 所以这里不是靠注释守着的。
  */

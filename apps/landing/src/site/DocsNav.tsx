@@ -83,10 +83,10 @@ export function DocsNav({
           <div key={module.id} className="lp-docs__group">
             <div className="lp-docs__group-head">
               {category === undefined ? (
-                <p className="lp-docs__group-title">{t(module.titleKey)}</p>
+                <p className="lp-docs__group-title ht-type-headline">{t(module.titleKey)}</p>
               ) : (
                 <a
-                  className="lp-docs__group-link"
+                  className="lp-docs__group-link ht-type-headline"
                   href={siteHref(category.page, locale)}
                   {...(category.page.id === page.id ? { 'aria-current': 'true' as const } : {})}
                 >

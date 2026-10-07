@@ -55,6 +55,11 @@ import {
 
 import { growthBoardLabels } from '../src/lib/growth-display';
 
+const growthScreenSource = readFileSync(
+  new URL('../src/screens/GrowthScreen.tsx', import.meta.url),
+  'utf8',
+);
+
 /** 与界面同一条路：走真的词条表（缺 key 会**抛**，不是返回空串）。 */
 const zh = (key: MessageKey, vars?: Record<string, string | number>): string =>
   translate('zh-CN', key, vars);
@@ -297,11 +302,13 @@ describe('growthBoardLabels：移动壳与共享 GrowthBoard 的**唯一接缝**
     expect(fresh).toContain('都还在');
   });
 
-  it('🔴 移动端刻意不给 `freeze` / 两个 Action 按钮：退回纯文字（与迁移前一致）', () => {
+  it('连续性提示与两个 Action 按钮都提供真实的中英文案', () => {
     const labels = growthBoardLabels(zh);
     expect(labels.streaks.freeze).toBeUndefined();
-    expect(labels.streaks.repairAction).toBeUndefined();
-    expect(labels.streaks.freshStartAction).toBeUndefined();
+    expect(labels.streaks.repairAction).toBe('补上');
+    expect(labels.streaks.repairA11y?.({ date: '2026-09-26', name: '喝水' })).toContain('喝水');
+    expect(labels.streaks.freshStartAction).toBe('今天重新开始');
+    expect(labels.streaks.freshStartA11y?.('喝水')).toContain('喝水');
   });
 
   it('🔴 `a11yHabit` 只拿得到 name（共享层只给这个）—— 与 RN 默认行为等价', () => {
@@ -360,11 +367,10 @@ describe('growthBoardLabels：移动壳与共享 GrowthBoard 的**唯一接缝**
     expect(labels.heatmap.month(0)).toBe('1月');
   });
 
-  it('🔴 热力图 / 分享块是类型要求的**死字段**：本轮不传 activityDays / share', () => {
+  it('热力图 / 分享块提供可访问文案与复制文案', () => {
     const labels = growthBoardLabels(zh);
-    // 空串而不是编一句错的话；一旦有人传了 activityDays，这条会先红。
-    expect(labels.heatmap.grid({ total: 42, days: 365 })).toBe('');
-    // 分享块借的是 web 的真词条（本端不渲染，但文案不能是假的）。
+    expect(labels.heatmap.grid({ total: 42, days: 365 })).toBe('最近一年共 42 次记录');
+    // 分享块借的是 web 的真词条，移动端会实际渲染并支持复制。
     expect(labels.share.copy).not.toBe('');
     expect(labels.share.copied).not.toBe('');
     expect(labels.share.failed).not.toBe('');
@@ -455,6 +461,20 @@ describe('移动壳里不许再有第二份展示实现', () => {
     ]) {
       expect(source, `共享层找不到 ${name} —— 判据锚点已失效`).toContain(`export function ${name}`);
     }
+  });
+});
+
+describe('成长动作接线', () => {
+  it('补打卡和重新开始都显式传入目标量，并保留 target=0', () => {
+    expect(growthScreenSource).toContain(
+      'actions.checkIn(habitId, date, habitTargetForAction(habitId))',
+    );
+    expect(growthScreenSource).toContain(
+      'actions.checkIn(habitId, toLocalDate(now), habitTargetForAction(habitId))',
+    );
+    expect(growthScreenSource).toContain(
+      'host?.getState().habits[habitId]?.target ?? 1',
+    );
   });
 });
 

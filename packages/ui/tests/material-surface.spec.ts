@@ -84,12 +84,13 @@ describe('materialSurface：按档位与 blur 能力分支', () => {
     }
   });
 
-  it('A2. 有 blur ⇒ rim 是边缘高光（光），不是普通分隔线', () => {
-    for (const [theme, tokens] of TABLES) {
-      const surface = materialSurface(tokens, 'panel', true);
-      expect(surface.borderColor, `${theme}：玻璃 rim 应为 edge-highlight`).toBe(
-        tokens['material.edge-highlight'],
-      );
+  it('A2. 各端材质不画装饰外框，层级由表面底色表达', () => {
+    for (const [, tokens] of TABLES) {
+      for (const tier of TIERS) {
+        for (const blur of [true, false]) {
+          expect(materialSurface(tokens, tier, blur).borderWidth).toBe(0);
+        }
+      }
     }
   });
 
@@ -120,9 +121,9 @@ describe('materialSurface：按档位与 blur 能力分支', () => {
     }
   });
 
-  it('C. SearchPanel 真的调用它，档位是 chrome、并把 blur 能力交出（函数没人用会红）', () => {
+  it('C. SearchPanel uses the opaque material fallback on every host for readable results', () => {
     const panel = stripComments(source('search/SearchPanel.tsx'));
-    expect(panel).toMatch(/materialSurface\(\s*tokens\s*,\s*'chrome'\s*,\s*Platform\.OS === 'web'\s*\)/);
+    expect(panel).toMatch(/materialSurface\(\s*tokens\s*,\s*'chrome'\s*,\s*false\s*\)/);
     // 底色不许再无条件写死成 tint —— 那正是 Android 缺陷的形状。
     expect(panel).not.toMatch(/backgroundColor:\s*tokens\['material\.(chrome|panel|sheet)-tint'\]/);
     // 谓词来自渲染目标（CSS 才有 backdrop-filter），不是猜某个产品端。

@@ -314,7 +314,7 @@ const zh = [
           ['第 13、14 条 透明度', '处理目的、类别、保留、接收方逐项告知', '这一套对外文本本身就是告知载体：数据清单、保留与备份、第三方、权限逐项列开', '本套文本没有公布数据保护专员或欧盟代表（第 27、37 条）的联系方式；受理渠道只有邮箱'],
           ['第 15 条 访问', '告知并复制其个人数据', '导出是**自助**的，而且只有你解得开：服务端存的是端到端加密的事件，我们没有口令就还原不出明文', '正因为你给的从来不是明文，我们无法替你查出"你的任务标题是什么"——这一条由你的设备行使，不由我们代查'],
           ['第 16 条 更正', '在不合理延迟内更正', '在界面里直接改，改完经同步到达你的其他设备', '**邮箱改不了**：服务端没有换绑邮箱的路由，所以"账号标识本身写错了"这一类更正今天只能重新注册并请我们注销旧账号'],
-          ['第 17 条 删除', '在不合理延迟内删除', '应用内删除与回收站里的"彻底删除"标记 + 账号级联硬删（现量：引用 `users` 且 CASCADE 的外键 20 条、覆盖 19 张表）+ 点下注销的那台设备当场清本机明文，其它设备在下次同步收到注销信号时各自清', '两个"不承诺"：从此不再上线的设备上的本地副本无法远程清除；整库备份里没有单点删除，随备份保留期自然结束'],
+          ['第 17 条 删除', '在不合理延迟内删除', '应用内删除与回收站里的"彻底删除"标记 + 账号级联硬删（现量：引用 `users` 且 CASCADE 的外键 23 条、覆盖 22 张表）+ 点下注销的那台设备当场清本机明文，其它设备在下次同步收到注销信号时各自清', '两个"不承诺"：从此不再上线的设备上的本地副本无法远程清除；整库备份里没有单点删除，随备份保留期自然结束'],
           ['第 18 条 限制处理', '暂停处理但保留数据', '实际能用的是撤回同意：关掉某项开关后该项出站动作立即停止、已建立的实时连接当场关掉', '没有"整号冻结但数据保留"这一档（产品里没有这个状态），要停就走到注销'],
           ['第 20 条 数据可携带', '以结构化、通用、机器可读格式取得并转移', '导出文件是明文 JSON，含**墓碑**与完整操作日志，另带可核对的 counts（丢掉墓碑的备份在回放时会让已删数据复活）', '我们没有替你把这份文件搬进别家服务的通道；转换由你自己完成'],
           ['第 21、22 条 反对与自动化决策', '反对特定处理；不受仅凭自动化产生法律效果的决策约束', 'AI 在这套代码里**类型上产生不了写入**：读操作即时执行，写操作只产出提案，确认之后才真的落到你的数据里；出境还要过逐功能授权', '撤回同意后已同步到其它设备的既有数据不会自动回滚，那要你自己删'],
@@ -358,6 +358,7 @@ const zh = [
         kind: 'table',
         head: ['版本', '日期', '变化'],
         rows: [
+          ['1.5', '2026-10-07', "增补自动收集执行身份与提交许可的类别、用途、保留及注销边界；明确功能尚未开放。按当前迁移重算注销范围，并补列邮箱注册验证码挑战。中英同步，仍为待审核草案。"],
           ['1.0', '2026-10-01', '首版草案（尚未生效）：八项权利逐条对照实际代码写成，其中"注销账号"与"邮箱更正"承诺渠道而非自助。'],
           [
             '1.1',
@@ -383,6 +384,7 @@ const zh = [
       },
     ],
   },
+  { id: "automation-metadata", title: "自动收集元数据与注册挑战", blocks: [{ kind: "p", text: "自动收集尚未开放。服务端预留两类明文元数据：自动收集执行身份（账号、设备标识、本地数据库实例标识、随机凭据的 SHA-256、创建及撤销时间），用于确认哪台设备有权提交；自动收集提交许可（不透明事件与规则标识、规则和解析版本、执行身份、固定操作标识、结果摘要、条数及创建时间），用于防止重复创建。这些记录不含任务标题、正文或随机凭据原文。执行身份保留至账号注销；提交许可的规则删除清理必须在功能开放前完成，许可一旦发出不因租约到期而转交另一设备。注销账号时两类记录随账号级联删除，不能据此远程擦除离线设备的本地副本。另有邮箱注册验证码挑战：保存待验证身份、验证码摘要、有效期、尝试次数和待激活的口令散列，用于完成邮箱验证，不保存验证码原文；关联账号的挑战也随注销删除。" }] },
 ] as const;
 
 const en = [
@@ -648,7 +650,7 @@ const en = [
           ['Arts. 13, 14 transparency', 'Purposes, categories, retention and recipients disclosed item by item', 'This set of documents **is** the disclosure vehicle: the data inventory, retention and backups, third parties and permissions are each listed out', 'These texts publish no data-protection-officer or EU-representative contact (Arts. 27, 37); the only channel is the mailbox'],
           ['Art. 15 access', 'Inform and provide a copy of the personal data', 'Export is **self-service**, and only you can open it: the server stores end-to-end-encrypted events, which cannot be turned back into plaintext without your passphrase', 'Precisely because what you hold is never our plaintext, we cannot look up "what your task titles are" on your behalf — this right is exercised by your device, not by us querying for you'],
           ['Art. 16 rectification', 'Correct without undue delay', 'Edit it in the interface; the change reaches your other devices through sync', '**The e-mail address cannot be corrected**: there is no rebinding route on the server, so an account identifier written wrong can only be handled by registering the right one and asking us to close the wrong one'],
-          ['Art. 17 erasure', 'Delete without undue delay', 'In-app deletion plus the "purge" marker in Trash plus the account-level cascade hard delete (measured: 20 foreign keys referencing `users` with CASCADE, covering 19 tables) + the device you press closure on wipes its local plaintext on the spot, and every other device wipes its own on the next sync that receives the closure signal', 'Two things not promised: a device that never comes back online cannot be erased remotely, and a whole-database snapshot offers no targeted removal — it goes away when that backup ages out'],
+          ['Art. 17 erasure', 'Delete without undue delay', 'In-app deletion plus the "purge" marker in Trash plus the account-level cascade hard delete (measured: 23 foreign keys referencing `users` with CASCADE, covering 22 tables) + the device you press closure on wipes its local plaintext on the spot, and every other device wipes its own on the next sync that receives the closure signal', 'Two things not promised: a device that never comes back online cannot be erased remotely, and a whole-database snapshot offers no targeted removal — it goes away when that backup ages out'],
           ['Art. 18 restriction', 'Suspend processing while keeping the data', 'What actually exists is withdrawal of consent: switch an item off and every outbound action for it stops immediately, and a realtime connection already open is closed on the spot', 'There is no "freeze the whole account but keep the data" state (the product has no such state); stopping everything means closing the account'],
           ['Art. 20 portability', 'Structured, commonly used, machine-readable data, transmitted to another controller', 'The export file is plaintext JSON containing the **tombstones** and the complete operation log, with verifiable counts (a backup that drops tombstones resurrects deleted data on replay)', 'We offer no channel that moves that file into somebody else’s service for you; the conversion is yours'],
           ['Arts. 21, 22 objection and automated decisions', 'Object to specific processing; not be subject to a decision taken solely on automated processing', 'In this code base AI **cannot produce a write at the type level**: reads execute immediately, writes only produce a proposal, and nothing is written into your data until you confirm; leaving the device additionally requires per-feature authorisation', 'Withdrawing consent does not roll back data already synced to your other devices — that part you delete yourself'],
@@ -692,6 +694,7 @@ const en = [
         kind: 'table',
         head: ['Version', 'Date', 'Change'],
         rows: [
+          ['1.5', '2026-10-07', "Adds automation worker identities and commit permits, their purpose, retention and account-closure boundaries; the feature is not yet available. Recomputes closure scope from current migrations and includes email registration challenges. Both languages updated; remains a draft awaiting review."],
           ['1.0', '2026-10-01', 'First draft (not yet in force): eight rights checked against the actual code, with account closure and email correction committed as a channel rather than as self-service.'],
           [
             '1.1',
@@ -717,6 +720,7 @@ const en = [
       },
     ],
   },
+  { id: "automation-metadata", title: "Automation metadata and registration challenges", blocks: [{ kind: "p", text: "Automatic capture is not yet available. Two categories of plaintext metadata are reserved on the server: automation worker identities (account, device and local database identifiers, SHA-256 of a random credential, creation and revocation times), to authenticate the submitting device; and automation commit permits (opaque event and rule identifiers, rule and parse versions, worker identity, fixed operation identifier, result digest, item count and creation time), to prevent duplicate creation. Neither contains task titles, body content or the original credential. Worker identities remain until account closure. Rule-deletion cleanup of permits must be implemented before launch; an issued permit is not reassigned when a lease expires. Both categories cascade on account closure, which cannot remotely erase local copies on offline devices. Email registration challenges also store pending identity, a verification-code digest, expiry, attempt counts and a pending password hash to verify the email address; they do not store the original code. Challenges associated with an account cascade on closure." }] },
 ] as const;
 
 export const dataRights: LegalDocument = {
@@ -725,9 +729,9 @@ export const dataRights: LegalDocument = {
   // 三处表述同批改），并把"保留期调整"这条限定到**具体哪一个 45 天** —— ADR-0054 之后
   // 期限表里有两个同值的 45 天，不限定就会让下一次改窗口改错那一格。
   // 版本号进同意指纹（`legalSetVersion()`）。
-  version: '1.4',
+  version: '1.5',
   status: 'draft',
-  updatedDate: '2026-10-05',
+  updatedDate: '2026-10-07',
   title: {
     'zh-CN': '个人权利行使与请求响应',
     en: 'Exercising Your Rights: Requests and Responses',

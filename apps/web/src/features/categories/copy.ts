@@ -88,6 +88,8 @@ export function categoryReportLabels(t: I18nValue['t']): CategoryReportLabels {
   return {
     note: t('web.categories.note'),
     empty: t('web.categories.empty'),
+    emptyTitle: t('web.categories.empty.title'),
+    emptyHint: t('web.categories.empty.hint'),
     range: (start, end) => t('web.categories.range', { start, end }),
     unassigned: (duration) => t('web.categories.unassigned', { duration }),
     hintUnset: t('web.categories.hint.unset'),

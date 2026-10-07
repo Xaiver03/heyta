@@ -9,7 +9,7 @@ import { ICON_SIZE } from '@heyta/design-system';
  *
  *   1. 文案（`web.projects.*` / `web.tags.*`）；
  *   2. 数据从哪来（`useProjectStore` / `useTaskStore`）；
- *   3. 平台特有物：DOM `<form><input>` + `<ColorSlotPicker>`；
+ *   3. 平台特有物：创建对话框 + `<ColorSlotPicker>`；
  *   4. 点一行之后要做什么 —— **必须经由 `onFilterWith`，不能直接 `tasks.setFilter`**。
  *
  * ─────────────────────────────────────────────────────────────────────────
@@ -47,11 +47,11 @@ import { ICON_SIZE } from '@heyta/design-system';
  * 同一条规则）。迁移前空清单上会常驻一个 `0` —— 这是**可见的行为变化**。
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { cssVar } from '@heyta/design-system';
 import { useI18n, type MessageKey } from '@heyta/i18n';
 import { folderTargetsFor, parseCategorySlot } from '@heyta/domain';
-import { Archive, Check, Folder, Plus, Tag as TagIcon } from 'lucide-react';
+import { Archive, Folder, Plus, Tag as TagIcon } from 'lucide-react';
 import {
   archivedProjects,
   FolderPicker,
@@ -67,6 +67,7 @@ import {
 } from '@heyta/ui';
 
 import { ColorSlotPicker } from '../categories/ColorSlotPicker.js';
+import { CategoryCreateDialog, type CategoryCreateKind } from '../categories/CategoryCreateDialog.js';
 import { useTaskStore, type TaskFilter } from '../tasks/store.js';
 import { useProjectStore } from './store.js';
 
@@ -79,18 +80,13 @@ export function ProjectsPanel({
   const { t } = useI18n();
   const projects = useProjectStore();
   const tasks = useTaskStore();
-  const [draft, setDraft] = useState('');
+  const [createKind, setCreateKind] = useState<CategoryCreateKind | null>(null);
   /**
    * 「移入文件夹」被领域层拒绝时那一句人话（候选集本来就按同一条规则筛过，
    * 走到这里通常是**另一端刚改了这棵树**）。
    * 🔴 不许吞：吞掉的后果是"点了没反应"，而数据什么都没变。
    */
   const [folderError, setFolderError] = useState('');
-  const [tagDraft, setTagDraft] = useState('');
-  // 输入框**默认不出现**（点标题右侧的 + 才展开）。与草稿分开存：
-  // 收起不清草稿，重新点开还能接着打 —— 只有 Esc 才明确丢弃。
-  const [addingProject, setAddingProject] = useState(false);
-  const [addingTag, setAddingTag] = useState(false);
   /**
    * 「显示已归档」。默认关 —— 与迁移前那个选择器逐字一致（归档 = 从列表里消失）。
    *
@@ -101,34 +97,6 @@ export function ProjectsPanel({
    *    是"这按钮是不是坏了"那种噪音。
    */
   const [showArchived, setShowArchived] = useState(false);
-  const asideRef = useRef<HTMLElement>(null);
-
-  /*
-     🔴 收起挂在**面板外的 pointerdown**上：不是 `blur`（会和标题 `+` 打架 ——
-     点按钮时 `blur` 先收起，`click` 又把 toggle 判成"重新展开"，症状是
-     "再点一次关不掉"），也**不是"另一个区块"**。
-     后者是本轮 e2e 抓出来的真缺陷：两个区块上下排着，点「标签」的 + 时，
-     "清单区块外 ⇒ 收起"在 `pointerdown` 就删掉了上面那 52px，标题整块**往上跳**，
-     `mouseup` 落在别处 ⇒ `click` 根本不派发给那个按钮。用户看到的是
-     "清单输入框消失了，标签输入框没出来" —— 第一下点击白点。
-     所以区块之间的互斥放进各自的 onClick（同一个事件里批量更新，点击已经成立了），
-     这里只管"点到面板以外"。
-   */
-  useEffect(() => {
-    if (!addingProject && !addingTag) return;
-    function onPointerDown(event: PointerEvent) {
-      const target = event.target as Node | null;
-      if (target === null) return;
-      if (asideRef.current?.contains(target)) return;
-      setAddingProject(false);
-      setAddingTag(false);
-    }
-    // 捕获：共享层里若有控件在冒泡阶段 `stopPropagation`（§7 第 80 条同源），
-    // 冒泡监听会收不到，症状又是"点了没反应"。
-    document.addEventListener('pointerdown', onPointerDown, true);
-    return () => document.removeEventListener('pointerdown', onPointerDown, true);
-  }, [addingProject, addingTag]);
-
   // 层级与计数口径都在共享层（`toOrganizerTree` / `openTaskCounts`）。
   const archivedCount = useMemo(
     () => archivedProjects(projects.projects).length,
@@ -196,7 +164,7 @@ export function ProjectsPanel({
 
   return (
     <HeytaUiProvider>
-      <aside ref={asideRef} aria-label={t('web.projects.ariaLabel')} style={asideStyle}>
+      <aside aria-label={t('web.projects.ariaLabel')} style={asideStyle}>
         <section>
           <div className="ht-sidebar__organizer-heading">
             <h2 className="ht-nav__section ht-type-group-label">{t('web.projects.heading')}</h2>
@@ -219,48 +187,14 @@ export function ProjectsPanel({
               type="button"
               className="ht-sidebar__organizer-add"
               aria-label={t('web.projects.addNew')}
-              aria-expanded={addingProject}
+              aria-expanded={createKind === 'project'}
               onClick={() => {
-                // 互斥放在**这里**而不是 pointerdown 的收起逻辑里：同一个 click
-                // 事件内批量更新，点击已经成立，不会把下一区块的标题顶走。
-                const next = !addingProject;
-                setAddingProject(next);
-                if (next) setAddingTag(false);
+                setCreateKind((current) => (current === 'project' ? null : 'project'));
               }}
             >
               <Plus size={ICON_SIZE.sm} aria-hidden="true" />
             </button>
           </div>
-          {addingProject ? (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                void projects.addProject(draft);
-                setDraft('');
-                // 建完**不收起**：连建几条清单是常态，收起会逼用户每建一条
-                // 就重新点一次开。收起只有两条路：Esc（连草稿一起丢）或点到面板外（留着草稿）。
-              }}
-              style={formStyle}
-            >
-              <input
-                autoFocus
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') {
-                    setDraft('');
-                    setAddingProject(false);
-                  }
-                }}
-                placeholder={t('web.projects.newPlaceholder')}
-                aria-label={t('web.projects.newLabel')}
-                style={inputStyle}
-              />
-              <button type="submit" aria-label={t('web.projects.add')} style={iconButtonStyle}>
-                <Check size={ICON_SIZE.sm} aria-hidden="true" />
-              </button>
-            </form>
-          ) : null}
 
           <OrganizerList
             kind="project"
@@ -360,44 +294,14 @@ export function ProjectsPanel({
               type="button"
               className="ht-sidebar__organizer-add"
               aria-label={t('web.tags.addNew')}
-              aria-expanded={addingTag}
+              aria-expanded={createKind === 'tag'}
               onClick={() => {
-                const next = !addingTag;
-                setAddingTag(next);
-                if (next) setAddingProject(false);
+                setCreateKind((current) => (current === 'tag' ? null : 'tag'));
               }}
             >
               <Plus size={ICON_SIZE.sm} aria-hidden="true" />
             </button>
           </div>
-          {addingTag ? (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                void projects.addTag(tagDraft);
-                setTagDraft('');
-              }}
-              style={formStyle}
-            >
-              <input
-                autoFocus
-                value={tagDraft}
-                onChange={(e) => setTagDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') {
-                    setTagDraft('');
-                    setAddingTag(false);
-                  }
-                }}
-                placeholder={t('web.tags.newPlaceholder')}
-                aria-label={t('web.tags.newLabel')}
-                style={inputStyle}
-              />
-              <button type="submit" aria-label={t('web.tags.add')} style={iconButtonStyle}>
-                <Check size={ICON_SIZE.sm} aria-hidden="true" />
-              </button>
-            </form>
-          ) : null}
 
           {/*
             🔴 标签名此前是一个**不可点的 `<span>`** —— 于是 `TaskFilter` 的
@@ -444,6 +348,23 @@ export function ProjectsPanel({
             testID="tags-list"
           />
         </section>
+
+        <CategoryCreateDialog
+          open={createKind !== null}
+          kind={createKind ?? 'project'}
+          existingNames={createKind === 'tag' ? projects.tags.map((item) => item.name) : projects.projects.map((item) => item.name)}
+          supportsColor={createKind === 'project'}
+          onClose={() => setCreateKind(null)}
+          onCreate={async ({ name, color }) => {
+            if (createKind === 'project') {
+              const id = await projects.addProject(name, undefined, color);
+              if (id !== undefined) onFilterWith({ kind: 'project', projectId: id });
+            } else {
+              const id = await projects.addTag(name);
+              if (id !== undefined) onFilterWith({ kind: 'tag', tagId: id });
+            }
+          }}
+        />
       </aside>
     </HeytaUiProvider>
   );
@@ -462,36 +383,4 @@ const asideStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: cssVar('space.4'),
-};
-
-const formStyle: React.CSSProperties = {
-  display: 'flex',
-  gap: cssVar('space.1'),
-  marginBottom: cssVar('space.2'),
-};
-
-const inputStyle: React.CSSProperties = {
-  flex: 1,
-  minHeight: cssVar('touch-target.min'),
-  padding: `0 ${cssVar('space.2')}`,
-  borderRadius: cssVar('radius.md'),
-  border: `${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
-  background: cssVar('color.background'),
-  color: cssVar('color.foreground'),
-  // ≥16px，否则 iOS 聚焦时自动放大页面
-  fontSize: cssVar('font-size.base'),
-  fontFamily: cssVar('font.sans'),
-  minWidth: 0,
-};
-
-const iconButtonStyle: React.CSSProperties = {
-  minWidth: cssVar('touch-target.min'),
-  minHeight: cssVar('touch-target.min'),
-  display: 'grid',
-  placeItems: 'center',
-  cursor: 'pointer',
-  border: 'none',
-  background: 'transparent',
-  color: cssVar('color.foreground-muted'),
-  borderRadius: cssVar('radius.md'),
 };

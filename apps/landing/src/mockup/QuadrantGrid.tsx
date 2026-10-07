@@ -38,14 +38,24 @@ import { useMemo } from 'react';
 import { useI18n } from '@heyta/i18n/provider';
 
 import { MOCK_QUADRANT_KEYS, MOCK_QUADRANT_SHAPE } from './quadrant-shape.js';
-import { showcaseTasksByQuadrant } from './showcase-data.js';
+import { SHOWCASE_TASKS, showcaseTasksByQuadrant } from './showcase-data.js';
 
-export function QuadrantGrid(): React.JSX.Element {
+export function QuadrantGrid({
+  completedIds,
+}: {
+  completedIds?: ReadonlySet<string>;
+}): React.JSX.Element {
   const { t } = useI18n();
 
   // 数据挪进组件内是文案迁移的硬要求（模块级拿不到 `t`）。取舍见 `Landing.tsx` 文件头。
   const quadrants = useMemo(() => {
-    const buckets = showcaseTasksByQuadrant();
+    const buckets = showcaseTasksByQuadrant(
+      completedIds === undefined
+        ? SHOWCASE_TASKS
+        : SHOWCASE_TASKS.map((task) =>
+            completedIds.has(task.id) ? { ...task, done: true } : task,
+          ),
+    );
     // 顺序与每个槽位的文案取登记处 —— 成员与格内顺序由 `showcase-data.ts` 派生。
     return MOCK_QUADRANT_SHAPE.map((shape) => {
       const title = t(shape.titleKey);
@@ -61,7 +71,7 @@ export function QuadrantGrid(): React.JSX.Element {
         cards: buckets[shape.quadrant].map((task) => t(task.titleKey)),
       };
     });
-  }, [t]);
+  }, [completedIds, t]);
 
   return (
     <div className="mk-quadrant">
@@ -97,13 +107,6 @@ export function QuadrantGrid(): React.JSX.Element {
         ))}
       </div>
 
-      {/*
-        🔴 底部注释。真应用 `QuadrantBoard.tsx` 的四宫格下面有这一条
-        （`web.quadrant.footnote`，讲"拖拽同时会改截止时间"），复刻原来没有。
-        它不只是装饰：**它解释了这张界面的核心不变量** ——
-        紧急度不是手选的，是从截止时间推导的。少了它，四象限看起来就只是个普通看板。
-      */}
-      <p className="mk-quadrant__footnote">{t(MOCK_QUADRANT_KEYS.footnote)}</p>
     </div>
   );
 }

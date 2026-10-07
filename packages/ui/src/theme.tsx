@@ -260,7 +260,15 @@ export function resolveHeytaUiTheme(options?: {
   };
 }
 
+const UiLocaleContext = createContext<'zh-CN' | 'en'>('zh-CN');
+
+/** 装饰素材继承宿主语言；共享 UI 不依赖 i18n 包。 */
+export function useHeytaUiLocale(): 'zh-CN' | 'en' {
+  return useContext(UiLocaleContext);
+}
+
 export interface HeytaUiProviderProps {
+  readonly locale?: 'zh-CN' | 'en';
   /** 宿主自己解析好的主题值（有应用级主题开关的端才需要传）。省略则自动解析。 */
   readonly value?: HeytaUiTheme;
   /** 宿主已打包的字体名清单，透传给 `native.fontSans` / `native.fontMono`。 */
@@ -269,6 +277,7 @@ export interface HeytaUiProviderProps {
 }
 
 export function HeytaUiProvider({
+  locale,
   value,
   packagedFonts,
   children,
@@ -286,6 +295,7 @@ export function HeytaUiProvider({
   // ⚠️ `packagedFonts` 也参与判断：它是宿主级差异，显式给了就说明这一层
   //    想说的是"我打包了字体"，此时不能拿外层的值糊过去（那是静默吞掉一个 prop）。
   const inherited = useContext(ThemeContext);
+  const inheritedLocale = useContext(UiLocaleContext);
   // hooks 必须无条件调用，所以即使传了 `value` 也照常订阅 ——
   // 代价是宿主传值时这里多订阅一次；换来的是**调用顺序不会随 props 变化**，
   // 而条件式 hook 是 React 里最典型的一类"有时才崩"。
@@ -295,7 +305,11 @@ export function HeytaUiProvider({
   );
   const resolved =
     value ?? (packagedFonts === undefined && inherited !== null ? inherited : fallback);
-  return <ThemeContext.Provider value={resolved}>{children}</ThemeContext.Provider>;
+  return (
+    <UiLocaleContext.Provider value={locale ?? inheritedLocale}>
+      <ThemeContext.Provider value={resolved}>{children}</ThemeContext.Provider>
+    </UiLocaleContext.Provider>
+  );
 }
 
 export function useHeytaUiTheme(): HeytaUiTheme {

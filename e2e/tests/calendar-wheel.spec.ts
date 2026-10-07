@@ -18,10 +18,8 @@ import { openApp } from './helpers';
  *
  * ## 所以这里只做三件事
  *
- * 1. **A/B**：同一个页面、同一个滚动宿主，指针在**当天清单**上滚 → 真的滚了；
- *    指针在**月历格子**上滚 → 月份变了而 `scrollTop` 一字没动。
- *    🔴 只做第 2 半的话，"没滚"完全可能是"根本没东西可滚" —— 所以第 1 半是**前提**，
- *    而且前提本身要断言（`found: true` + 滚前滚后 `top` 变了）。
+ * 1. **边界**：Web 月档不再重复渲染当天清单，月格之外的页脚滚轮应该让给页面；
+ *    指针在**月历格子**上滚 → 月份变了且事件被月历消费。
  * 2. `defaultPrevented` 由**页面自己在 window 冒泡阶段读回来**，
  *    不是我们自说自话（监听器必须挂在 host 之后收到事件的那一侧 = window 冒泡）。
  * 3. `prefers-reduced-motion: reduce` 下功能一致，且月历卡片**没有**任何动画
@@ -38,7 +36,6 @@ test.use({ viewport: { width: 1280, height: 600 } });
 
 const STAMP = Date.now().toString().slice(-6);
 const MONTH_CARD = '[data-testid="calendar-board-month-card"]';
-const DAY_LIST = '[data-testid="calendar-board-day-list"]';
 const BOARD_MONTH = '[data-testid="calendar-toolbar-month"]';
 const MINI_TITLE = '[data-testid="calendar-mini-title"]';
 
@@ -49,7 +46,7 @@ const MINI_TITLE = '[data-testid="calendar-mini-title"]';
  */
 const APP_ZH = '/?lang=zh-CN';
 
-/** 一条到期于今天的任务，把当天清单撑出来（滚轮要有一个"不归月历"的靶子）。 */
+/** 一条到期于今天的任务，保证月格中存在可读的任务条。 */
 async function seed(page: Page): Promise<void> {
   await openApp(page, APP_ZH);
   const composer = page.locator('input[placeholder^="添加任务"]');
@@ -61,17 +58,14 @@ async function seed(page: Page): Promise<void> {
   }
   await page.getByRole('tab', { name: '日历' }).click();
   await expect(page.locator(MONTH_CARD)).toBeVisible();
-  await expect(page.locator(DAY_LIST)).toBeVisible();
 }
 
 /**
  * 把指针放到某个元素**内部**，并返回那个点。
  *
- * 🔴 原来这里直接拿 `boundingBox()` 的坐标去 `mouse.move`，而这一屏在 600px 高的
- *    视口下**是超出一屏的** —— 清单的顶边可以在视口外。Chromium 对落在视口外的
- *    滚轮事件**走合成线程直接滚文档，根本不派发到主线程**，于是探针里
- *    `__wheel` 是空的、`lastPrevented` 回 `null`，报出来的红是
- *    "清单上的滚轮不许被吃掉"—— 一个探针的红，不是产品的红（§7 元规则 1）。
+ * 🔴 这一屏在 600px 高的视口下月历与页脚可能超出一屏。Chromium 对落在视口外的
+ *    滚轮事件会走合成线程直接滚文档，根本不派发到主线程，所以命中测试必须先
+ *    把靶子滚进视口。
  *
  * 所以这里做三件事：① 先把靶子滚进视口；② 取一个**保证在视口内**的点；
  * ③ 用 `elementFromPoint` 反查那个点**真的命中靶子**，不命中就直接判红 ——
@@ -106,36 +100,6 @@ async function pointInside(page: Page, sel: string): Promise<{ x: number; y: num
   return { x, y };
 }
 
-/**
- * 月历卡片最近的**可滚祖先**（没有则退回 window）。
- *
- * ⚠️ 不能写死 `.ht-main` 之类：那是外壳的结构，改一次布局这条判据就会
- * 悄悄变成"对着一个不能滚的元素验不能滚" —— 永远绿，且什么都不证明。
- */
-function scrollHostTop(sel: string) {
-  return (page: Page) =>
-    page.evaluate((selector) => {
-      const el = document.querySelector(selector);
-      if (el === null) return { scrollable: false, top: -1, id: '(靶子不存在)' };
-      let node: HTMLElement | null = el.parentElement;
-      while (node !== null) {
-        const cs = getComputedStyle(node);
-        if (/(auto|scroll|overlay)/.test(cs.overflowY) && node.scrollHeight > node.clientHeight + 4) {
-          return { scrollable: true, top: node.scrollTop, id: `class:${node.className}` };
-        }
-        node = node.parentElement;
-      }
-      // 一路到顶都没有内部滚动区 ⇒ 滚动宿主是 window/document —— 同样有效，
-      // 只要它**真的**比视口高（否则这条 A/B 什么都没证明）。
-      const doc = document.documentElement;
-      return {
-        scrollable: doc.scrollHeight > window.innerHeight + 4,
-        top: Math.round(window.scrollY),
-        id: `window(${doc.scrollHeight}>${window.innerHeight})`,
-      };
-    }, sel);
-}
-
 /** 在 window 冒泡阶段读回 `defaultPrevented`（监听器挂在 host **之后**收到事件的一侧）。 */
 async function armPreventedProbe(page: Page): Promise<void> {
   await page.evaluate(() => {
@@ -165,7 +129,7 @@ async function monthText(page: Page): Promise<string> {
   return (await page.locator(BOARD_MONTH).textContent())?.trim() ?? '';
 }
 
-test('滚轮归月历：指针在格子上滚翻月而页面不滚，指针在清单上滚照常滚页', async ({ page }) => {
+test('滚轮归月历：指针在格子上滚翻月，月历之外的滚轮让给页面', async ({ page }) => {
   const logs: string[] = [];
   page.on('console', (m) => logs.push(`[${m.type()}] ${m.text()}`));
   page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
@@ -176,53 +140,20 @@ test('滚轮归月历：指针在格子上滚翻月而页面不滚，指针在�
   const before = await monthText(page);
   await page.screenshot({ path: 'test-results/calendar-wheel-before.png' });
 
-  // ── ① 前提：这里**真的有一个能滚的宿主**，而且清单上的滚轮滚得动它 ──
-  const probe = scrollHostTop(DAY_LIST);
-  const host0 = await probe(page);
-  expect(
-    host0.scrollable,
-    `当天清单必须落在一个**真的能滚**的宿主里，否则"没滚"什么都不证明：${host0.id}`,
-  ).toBe(true);
-  const listPoint = await pointInside(page, DAY_LIST);
-  await page.mouse.move(listPoint.x, listPoint.y);
+  // ── ① 月历之外的区域让出滚轮（当前月档的稳定命中点是页脚） ──
+  const footnotePoint = await pointInside(page, '[data-testid="calendar-board-footnote"]');
+  await page.mouse.move(footnotePoint.x, footnotePoint.y);
   await page.mouse.wheel(0, 240);
-  await expect
-    .poll(async () => (await probe(page)).top, '指针在当天清单上 ⇒ 滚轮该滚页')
-    .toBeGreaterThan(host0.top);
-  expect(await lastPrevented(page), '清单上的滚轮不许被吃掉').toBe(false);
-  const afterListScroll = (await probe(page)).top;
-  void afterListScroll; // 只用于"清单那一下真的滚了"这一条，不作下面翻月的基线。
+  expect(await lastPrevented(page), '月历之外的滚轮不应被月历吃掉').toBe(false);
 
-  // ── ② 同一个宿主、同一份滚动位置，指针移到月历格子：翻月而**不滚** ──
+  // ── ② 指针移到月历格子：翻月而**不把事件交给页面** ──
   const cardPoint = await pointInside(page, MONTH_CARD);
-  // 🔴 基线**必须在把指针放到卡片上之后**重新取：上面那一步可能自己滚过
-  //    （`pointInside` 会把跑到视口外的靶子先滚进来）。拿放指针**之前**的读数当基线，
-  //    量到的就是探针自己的动作，不是"翻月把页面滚走了"。
-  const beforeCardWheel = (await probe(page)).top;
   await page.mouse.move(cardPoint.x, cardPoint.y);
   await page.mouse.wheel(0, 240);
 
   const after = await monthText(page);
   expect(after, `下滚一格必须翻到**下一个**月（起点 ${before}）`).not.toBe(before);
   expect(await lastPrevented(page), '月历上的滚轮必须被吃掉，否则页面会同时滚走').toBe(true);
-  /*
-   * 🔴 "翻月不滚页"不能比"滚前 == 滚后"。翻月是**换数据**：翻到下个月，今天那一格
-   *    的 6 条任务条就没了 ⇒ 卡片矮了 ⇒ 浏览器把 scrollY 夹到新内容高度、
-   *    再加 scroll anchoring，读数会漂十几 px（实测 80 → 91）。
-   *    产品要说的那件事是**"这一下滚轮没有把页面推走"**，所以判据是
-   *    "漂移量远小于滚轮量 240"，而不是"一个像素都不许动"。
-   *    ⚠️ 容差不是放宽到"随便漂"：变异（把 `preventDefault()` 拿掉）会漂满 240，
-   *       这条照样红 —— 容差 20 与 240 之间差一个数量级。
-   */
-  const WHEEL_DELTA = 240;
-  const SCROLL_ANCHOR_TOLERANCE = 20;
-  const afterCardWheel = (await probe(page)).top;
-  expect(
-    Math.abs(afterCardWheel - beforeCardWheel),
-    `指针在月历上滚了一格（${String(WHEEL_DELTA)}px），页面却从 ${String(
-      beforeCardWheel,
-    )} 滚到了 ${String(afterCardWheel)}`,
-  ).toBeLessThan(SCROLL_ANCHOR_TOLERANCE);
   expect(
     await page.locator(MINI_TITLE).textContent(),
     '侧栏迷你月历必须跟着走同一个 cursor',

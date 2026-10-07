@@ -407,9 +407,6 @@
 
 .lp-hero__stage {
   position: relative;
-  /* 透视放在**父级**，子级才有 3D 纵深；放在自身只影响自己的旋转 */
-  perspective: 90rem;
-  perspective-origin: 60% 40%;
 }
 
 .lp-hero__glow {
@@ -435,16 +432,6 @@
 .lp-hero__card {
   position: relative;
   z-index: var(--ht-z-base);
-  transform-style: preserve-3d;
-}
-
-/* will-change 只给**能触发倾斜**的设备（AUDIT §5：无差别/永久的 will-change
-   会常驻提升图层、吃掉 GPU 内存，而触摸设备根本不会倾斜 —— 倾斜只由
-   pointermove 驱动，只在 hover + 精确指针下才可能发生）。 */
-@media (hover: hover) and (pointer: fine) {
-  .lp-hero__card {
-    will-change: transform;
-  }
 }
 
 /* 浮在应用窗口之上的一层"状态浮片" —— 3D 纵深靠它读出来 */
@@ -719,152 +706,6 @@
 /* 迷你进度环 */
 .lp-mini-ring {
   flex: none;
-}
-
-/* ════════════════════════════════════════════════════════════
-   展厅：滚动固定 + 3D 换位
-   ════════════════════════════════════════════════════════════ */
-
-.lp-showcase {
-  position: relative;
-  /* 300vh 的滚动跨度换来三次换位 —— 平均每次一屏，
-     低于这个值会换得太快，像被"甩"过去而不是"移"过去。 */
-  min-block-size: 300vh;
-}
-
-.lp-showcase__inner {
-  position: sticky;
-  inset-block-start: 0;
-  display: grid;
-  align-items: center;
-  min-block-size: 100dvh;
-  padding-block: var(--ht-layout-header-height);
-}
-
-.lp-showcase__grid {
-  display: grid;
-  grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
-  gap: var(--ht-space-10);
-  align-items: center;
-}
-
-.lp-showcase__aside {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ht-space-4);
-}
-
-.lp-showcase__list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ht-space-2);
-  margin-block-start: var(--ht-space-4);
-}
-
-/* li 只做布局容器，真正的盒子是里面的 button —— 这样**整行**都是可点区域。
-   只让 1/2/3 那个 24px 的圆点可点的话，命中区域太小，触屏上很难按准。 */
-.lp-showcase__item {
-  display: flex;
-}
-
-.lp-showcase__item-btn {
-  display: flex;
-  gap: var(--ht-space-3);
-  inline-size: 100%;
-  padding: var(--ht-space-4);
-  text-align: start;
-  border: var(--ht-border-width-thin) solid transparent;
-  border-radius: var(--ht-radius-lg);
-  background: none;
-  color: inherit;
-  /* button 不继承字体，必须显式要回来，否则这一行的排版会退回浏览器默认值。 */
-  font: inherit;
-  cursor: pointer;
-  opacity: 0.45;
-  transition: opacity var(--ht-duration-normal) var(--ht-ease-standard),
-    background-color var(--ht-duration-normal) var(--ht-ease-standard),
-    border-color var(--ht-duration-normal) var(--ht-ease-standard);
-}
-
-/* 悬停要有"可点"的预反馈：非当前项平时是 0.45 不透明度，
-   不提示的话用户未必看得出它可以点。
-   `:focus-visible` 不用自己写 —— reset.css 有全局规则。 */
-.lp-showcase__item-btn:hover {
-  opacity: 0.78;
-  background: var(--ht-color-surface-sunken);
-}
-
-.lp-showcase__item--active .lp-showcase__item-btn {
-  opacity: 1;
-  background: var(--ht-color-surface);
-  border-color: var(--ht-color-border);
-}
-
-/* 当前项悬停时保持已选中的底色，否则鼠标移上去会"掉回"未选中态。 */
-.lp-showcase__item--active .lp-showcase__item-btn:hover {
-  background: var(--ht-color-surface);
-}
-
-.lp-showcase__index {
-  display: grid;
-  place-items: center;
-  inline-size: var(--ht-icon-lg);
-  block-size: var(--ht-icon-lg);
-  flex: none;
-  border-radius: var(--ht-radius-full);
-  background: var(--ht-color-surface-sunken);
-  font-size: var(--ht-font-size-2xs);
-  font-weight: var(--ht-font-weight-semibold);
-  font-variant-numeric: tabular-nums;
-  color: var(--ht-color-foreground-muted);
-  /* 与所在行同时序（.lp-showcase__item 用 --ht-duration-normal + ease-standard）。
-     没有它，当前屏切换时徽章底色会**跳变**，而行是渐变的。 */
-  transition: background-color var(--ht-duration-normal) var(--ht-ease-standard),
-    color var(--ht-duration-normal) var(--ht-ease-standard);
-}
-
-.lp-showcase__item--active .lp-showcase__index {
-  background: var(--ht-color-primary);
-  color: var(--ht-color-on-primary);
-}
-
-.lp-showcase__item-label {
-  display: block;
-  font-size: var(--ht-font-size-base);
-  font-weight: var(--ht-font-weight-semibold);
-}
-
-.lp-showcase__item-body {
-  display: block;
-  margin-block-start: var(--ht-space-1);
-  font-size: var(--ht-font-size-sm);
-  line-height: var(--ht-line-height-normal);
-  color: var(--ht-color-foreground-muted);
-}
-
-.lp-showcase__hint {
-  font-size: var(--ht-font-size-xs);
-  color: var(--ht-color-foreground-subtle);
-}
-
-.lp-showcase__stage {
-  position: relative;
-  aspect-ratio: 16 / 10;
-  perspective: 90rem;
-  transform-style: preserve-3d;
-}
-
-.lp-showcase__win {
-  position: absolute;
-  inset: 0;
-}
-
-/* will-change 只在展厅**进入视口**时才加（AUDIT §5：它必须窄而临时）。
-   三块窗口是 inset:0 的整屏元素、内部各有 backdrop-filter 材质，
-   永久提升三层大图层会常驻吃掉 GPU 内存，而这套变换只在滚过这一节时发生。
-   data-active 由 Showcase.tsx 里的 IntersectionObserver 维护。 */
-.lp-showcase[data-active='true'] .lp-showcase__win {
-  will-change: transform, opacity;
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -1406,17 +1247,6 @@
     grid-row: span 1;
   }
 
-  .lp-showcase {
-    min-block-size: auto;
-  }
-
-  .lp-showcase__inner {
-    position: static;
-    min-block-size: auto;
-    padding-block: calc(var(--ht-space-16) * 1.75);
-  }
-
-  .lp-showcase__grid,
   .lp-selfhost__grid,
   .lp-footer__grid {
     grid-template-columns: minmax(0, 1fr);
@@ -1426,10 +1256,6 @@
      一栏会让"三档对比"这件事在平板尺寸上彻底消失。 */
   .lp-pricing__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .lp-showcase__stage {
-    aspect-ratio: 16 / 10;
   }
 
   .lp-privacy__panels {
@@ -1461,20 +1287,6 @@
 
   .lp-sync__holder {
     block-size: 50vh;
-  }
-}
-
-/* 减少动效：展厅的 3D 换位在窄屏/减动效下退化成"一次显示一块"。
-   这里只处理 CSS 侧；Motion 驱动的部分由 useMotionPreset 负责。 */
-@media (prefers-reduced-motion: reduce) {
-  .lp-showcase {
-    min-block-size: auto;
-  }
-
-  .lp-showcase__inner {
-    position: static;
-    min-block-size: auto;
-    padding-block: calc(var(--ht-space-16) * 1.75);
   }
 }
 
@@ -2049,10 +1861,6 @@
 }
 
 .lp-docs__group-title {
-  font-size: var(--ht-font-size-2xs);
-  font-weight: var(--ht-font-weight-semibold);
-  letter-spacing: var(--ht-letter-spacing-wide);
-  text-transform: uppercase;
   color: var(--ht-color-foreground-muted);
 }
 
@@ -2071,6 +1879,7 @@
   font-size: var(--ht-font-size-sm);
   line-height: var(--ht-line-height-normal);
   color: var(--ht-color-foreground-muted);
+  font-weight: var(--ht-font-weight-regular);
   text-decoration: none;
   transition:
     color var(--ht-duration-fast) var(--ht-ease-standard),
@@ -2088,7 +1897,7 @@
 .lp-docs__link[aria-current='page'] {
   color: var(--ht-color-primary);
   background: var(--ht-color-primary-subtle);
-  font-weight: var(--ht-font-weight-medium);
+  font-weight: var(--ht-font-weight-regular);
 }
 
 /* 文章正文那一列：页内目录 + 分区。`min-inline-size: 0` 是必须的 ——
@@ -2113,10 +1922,6 @@
    `.lp-docs__group-title` 同格 —— 侧栏的层级靠"大小写 + 字距"表达，
    不靠能不能点。当前分类这一组用主色，与文章条的 `aria-current` 同一套语言。 */
 .lp-docs__group-link {
-  font-size: var(--ht-font-size-2xs);
-  font-weight: var(--ht-font-weight-semibold);
-  letter-spacing: var(--ht-letter-spacing-wide);
-  text-transform: uppercase;
   color: var(--ht-color-foreground-muted);
   text-decoration: none;
 }
@@ -2482,11 +2287,28 @@
   color: var(--ht-color-foreground-muted);
 }
 
+.lp-docs-topnav__home {
+  flex: none;
+  padding-block: var(--ht-space-2);
+  padding-inline: var(--ht-space-2);
+  border-radius: var(--ht-radius-md);
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+  white-space: nowrap;
+}
+
+.lp-docs-topnav__home:hover {
+  color: var(--ht-color-foreground);
+  background: var(--ht-color-hover);
+}
+
 /* 搜索占 topnav 的余量；结果从"往下推内容"改成"浮层下拉"——
    topnav 是 sticky 的，把内容推下去会把整站推抖。 */
 .lp-docs-topnav .lp-docs__search {
   position: relative;
   flex: 1 1 auto;
+  min-inline-size: 0;
   margin-block: var(--ht-space-2);
   inline-size: auto;
   max-inline-size: 26rem;
@@ -2663,7 +2485,9 @@
 }
 
 .lp-legal__toc a:hover {
-  text-decoration: underline;
+  color: var(--ht-color-primary-hover);
+  background: var(--ht-color-primary-subtle);
+  text-decoration: none;
 }
 
 /* 每一条锚点都要能被跳到 —— 吸顶导航的高度必须从滚动落点里扣掉。

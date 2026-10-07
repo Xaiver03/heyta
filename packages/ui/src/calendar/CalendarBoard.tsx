@@ -24,7 +24,7 @@
  * 文案全部由宿主的 `labels` 注入（理由见 `model.ts` 文件头）。
  */
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { HeytaNativeTokens } from '@heyta/design-system';
@@ -54,10 +54,10 @@ import {
   calendarDayTone,
   MAX_CALENDAR_BARS,
   MAX_WEEK_CALENDAR_BARS,
-  groupTasksByDueDate,
   groupEventsByOccurrence,
   yearRangeOf,
   calendarDayMarkerView,
+  groupTasksByCalendarDate,
   type CalendarDayMarker,
   type CalendarEventBarLabels,
   type CalendarBoardLabels,
@@ -140,6 +140,10 @@ export interface CalendarBoardProps {
    *    这里不预先替宿主决定"那一格放什么"，共享层不认识同步、也不认识宿主的面包屑。
    */
   readonly toolbarTrailing?: React.ReactNode;
+  /** 月/周档是否隐藏重复的选中日清单（Web 使用格内任务条，移动端保留清单）。 */
+  readonly showSelectedDayList?: boolean | undefined;
+  /** 月档是否填满宿主传下来的可用高度。 */
+  readonly fillMonth?: boolean | undefined;
   /**
    * 公共事实的"休 / 班"标记（W4b，ADR-0052 §2.6 点名的那条缝）。
    *
@@ -201,6 +205,7 @@ function DayCell({
   dayMarker,
   dayMarkerLabels,
   onPress,
+  fitHeight,
 }: {
   date: LocalDate;
   day: number;
@@ -214,6 +219,7 @@ function DayCell({
   dayMarker: CalendarBoardProps['dayMarker'];
   dayMarkerLabels: CalendarBoardProps['dayMarkerLabels'];
   onPress: (date: LocalDate) => void;
+  fitHeight: boolean;
 }): React.JSX.Element {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
@@ -225,7 +231,7 @@ function DayCell({
    * 后者在 3 条任务条都画出来之后反而更准：一格里有红条也有黑条时，
    * 点色说不清这一天整体是什么状态，数字色说的清。
    */
-  const numberColor = isSelected
+  const numberColor = isSelected || isToday
     ? tokens['color.on-primary']
     : tone === 'danger'
       ? tokens['color.danger']
@@ -246,10 +252,23 @@ function DayCell({
   // 有分支的逻辑不进组件）。宿主没接 `dayMarker` 时这里恒为 `undefined`
   // ⇒ 下面一个节点都不画，格子与改动前逐字一样。
   const markerView = calendarDayMarkerView(dayMarker?.(date), dayMarkerLabels);
+  const [cellHeight, setCellHeight] = useState<number | null>(null);
+  // 只在铺满月历时按真实格高分配行数；内容高度模式不反向限制自身。
+  const rowHeight = text['row-meta'].lineHeight + tokens['space.1'];
+  const availableHeight = cellHeight === null ? null : cellHeight
+    - tokens['space.1'] * 2 - tokens['border-width.thin'] - text['numeric-body'].lineHeight;
+  const slots = !fitHeight
+    ? bars.length + (hidden > 0 ? 1 : 0)
+    : availableHeight === null ? MAX_CALENDAR_BARS : Math.max(1, Math.floor(availableHeight / rowHeight));
+  const visibleCount = Math.min(bars.length, Math.max(0, slots - (barCount > slots ? 1 : 0)));
+  const visibleBars = bars.slice(0, visibleCount);
+  const hiddenCount = barCount - visibleCount;
+
 
   return (
     <Pressable
       onPress={() => onPress(date)}
+      onLayout={fitHeight ? (event) => setCellHeight(event.nativeEvent.layout.height) : undefined}
       accessibilityRole="button"
       /* 格子的稳定锚点（R11 批一的判据要按日期取格子；索引会随月份错位而变）。 */
       testID={testIDOf(date)}
@@ -269,27 +288,33 @@ function DayCell({
         {
           minHeight: tokens['touch-target.min'],
           gap: tokens['space.1'],
-          borderRadius: tokens['radius.md'],
-          borderWidth:
-            isToday && !isSelected ? tokens['border-width.thick'] : tokens['border-width.thin'],
-          borderColor: isSelected
-            ? tokens['color.primary']
-            : isToday
-              ? tokens['color.primary']
-              : 'transparent',
-          backgroundColor: isSelected ? tokens['color.primary'] : 'transparent',
+          borderTopWidth: tokens['border-width.thin'],
+          borderStartWidth: tokens['border-width.thin'],
+          borderColor: tokens['color.border'],
+          backgroundColor: isSelected ? tokens['color.primary-subtle'] : 'transparent',
         },
       ]}
     >
-      <Text style={[text['numeric-body'], { color: numberColor }]}>{day}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.1'], flexShrink: 0 }}>
+      <Text style={[text['numeric-body'], {
+        color: numberColor,
+        alignSelf: 'flex-start',
+        textAlign: 'center',
+        minWidth: tokens['space.6'],
+        paddingHorizontal: tokens['space.1'],
+        borderRadius: tokens['radius.full'],
+        backgroundColor: isSelected || isToday ? tokens['color.primary'] : 'transparent',
+      }]}>{day}</Text>
       {markerView === undefined ? null : (
         <Text
           testID={`calendar-day-marker-${date}`}
-          style={[text['row-meta'], { color: tokens[markerView.colorToken] }]}
+          numberOfLines={1}
+          style={[text.caption, { flex: 1, color: tokens[markerView.colorToken] }]}
         >
           {markerView.text}
         </Text>
       )}
+      </View>
       {/*
         任务条（R11 批一）。原来是 4px 圆点，**格子里没有一个字可读**。
         每条 = 一根 3px 的状态色条 + 标题一行。三处刻意的选择：
@@ -302,7 +327,7 @@ function DayCell({
         · **`+N` 只在真的有隐藏条时出现**：`hidden` 由 `calendarCellBars` 从数据算，
           所以"3 条 + +0"这种废话在结构上写不出来。
       */}
-      {bars.map((bar) => (
+      {visibleBars.map((bar) => (
         <View
           key={bar.id}
           /* 🔴 倒数日那条**换名字**（`-event` 而不是 `-bar`）：判据要能单独问
@@ -310,7 +335,28 @@ function DayCell({
              会被"任务条画出来了"读成通过 —— 那条"默认值等于原行为的可选 prop
              会把没接伪装成做完了"的教训（§9.1）就是这么个形状。 */
           testID={`${testIDOf(date)}-${bar.event === true ? 'event' : 'bar'}`}
-          style={[styles.bar, { gap: tokens['space.1'] }]}
+          style={[
+            styles.bar,
+            {
+              gap: tokens['space.1'],
+              // 选中格已经使用 primary-subtle；任务条需要独立的 surface 层，
+              // 否则选中日期里的任务条会与格子背景融合，只剩状态色条和文字。
+              backgroundColor: isSelected ? tokens['color.surface'] : tokens['color.primary-subtle'],
+              borderRadius: tokens['radius.sm'],
+              marginLeft:
+                bar.span === 'middle' || bar.span === 'end' ? -tokens['space.1'] : undefined,
+              marginRight:
+                bar.span === 'middle' || bar.span === 'start' ? -tokens['space.1'] : undefined,
+              borderTopLeftRadius:
+                bar.span === 'middle' || bar.span === 'end' ? 0 : tokens['radius.sm'],
+              borderBottomLeftRadius:
+                bar.span === 'middle' || bar.span === 'end' ? 0 : tokens['radius.sm'],
+              borderTopRightRadius:
+                bar.span === 'middle' || bar.span === 'start' ? 0 : tokens['radius.sm'],
+              borderBottomRightRadius:
+                bar.span === 'middle' || bar.span === 'start' ? 0 : tokens['radius.sm'],
+            },
+          ]}
         >
           <View
             style={{
@@ -318,14 +364,8 @@ function DayCell({
               alignSelf: 'stretch',
               borderRadius: tokens['radius.full'],
               backgroundColor: bar.overdue
-                ? isSelected
-                  ? tokens['color.on-primary']
-                  : tokens['color.danger']
-                : bar.done
-                  ? tokens['color.foreground-subtle']
-                  : isSelected
-                    ? tokens['color.on-primary']
-                    : tokens['color.primary'],
+                ? tokens['color.danger']
+                : bar.done ? tokens['color.foreground-subtle'] : tokens['color.primary'],
             }}
           />
           <Text
@@ -338,11 +378,7 @@ function DayCell({
               text['row-meta'],
               styles.barTitle,
               {
-                color: isSelected
-                  ? tokens['color.on-primary']
-                  : bar.done
-                    ? tokens['color.foreground-subtle']
-                    : tokens['color.foreground'],
+                color: bar.done ? tokens['color.foreground-subtle'] : tokens['color.foreground'],
               },
             ]}
           >
@@ -350,17 +386,17 @@ function DayCell({
           </Text>
         </View>
       ))}
-      {hidden > 0 ? (
+      {hiddenCount > 0 ? (
         <Text
           numberOfLines={1}
-          accessibilityLabel={labels.moreTasks === undefined ? undefined : labels.moreTasks(hidden)}
+          accessibilityLabel={labels.moreTasks === undefined ? undefined : labels.moreTasks(hiddenCount)}
           testID={`${testIDOf(date)}-more`}
           style={[
             text['row-meta'],
-            { color: isSelected ? tokens['color.on-primary'] : tokens['color.foreground-muted'] },
+            { color: tokens['color.foreground-muted'] },
           ]}
         >
-          {`+${hidden}`}
+          {`+${hiddenCount}`}
         </Text>
       ) : null}
     </Pressable>
@@ -388,6 +424,8 @@ export function CalendarBoard({
   view = 'month',
   now,
   toolbarTrailing,
+  showSelectedDayList = true,
+  fillMonth = false,
   dayMarker,
   dayMarkerLabels,
   events,
@@ -397,13 +435,19 @@ export function CalendarBoard({
   const text = useHeytaText();
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
 
-  const byDate = useMemo(() => groupTasksByDueDate(tasks), [tasks]);
   // 🔴 周视图是**一行**，不是"把六行里的一行挑出来"：`weekGrid` 的 `inMonth`
   //    跟着锚点日走，而 `monthGrid` 的跟着显示月走（两者理由见 `@heyta/domain`）。
   const weeks = useMemo<MonthGridCell[][]>(
     () => (view === 'week' ? [weekGrid(cursor)] : monthGrid(cursor)),
     [cursor, view],
   );
+  const calendarTasksByDate = useMemo(() => {
+    const first = weeks[0]?.[0]?.date;
+    const lastWeek = weeks[weeks.length - 1];
+    const last = lastWeek?.[lastWeek.length - 1]?.date;
+    if (first === undefined || last === undefined) return new Map<LocalDate, Task[]>();
+    return groupTasksByCalendarDate(tasks, first, last);
+  }, [tasks, weeks]);
   /** 周次列只在月视图有意义：那一列就是"第几周"，而周视图整屏只有**一个**周。 */
   const showWeekNumber = view === 'month' && labels.weekNumber !== undefined;
 
@@ -425,7 +469,7 @@ export function CalendarBoard({
     if (first === undefined || last === undefined) return undefined;
     return groupEventsByOccurrence(events, today, first, last);
   }, [events, today, weeks]);
-  const dayTasks = byDate.get(selected) ?? [];
+  const dayTasks = calendarTasksByDate.get(selected) ?? [];
   /**
    * 选中那天的倒数日（W6）。
    *
@@ -543,7 +587,10 @@ export function CalendarBoard({
               🔴 这张卡片有**自己的 testID**：宿主需要区分"指针在月历网格上"与
               "在下面那份当天清单上"。Web 的滚轮翻月只在卡片内接管滚轮，
               清单那一块仍要能正常滚页（见 `apps/web/.../useWheelMonthNav.ts`）。 */}
-          <View testID={`${testID}-month-card`} style={[styles.monthCard, styles.card]}>
+          <View
+            testID={`${testID}-month-card`}
+            style={[styles.monthCard, fillMonth ? styles.monthCardFill : null]}
+          >
         {/*
           工具栏（`‹ 2026年10月 ›  今天`）。**同一份组件、两种摆位**：
           默认画在卡片里（移动端没有页头插槽），Web 传 `toolbar="external"`
@@ -585,7 +632,10 @@ export function CalendarBoard({
         </View>
 
         {weeks.map((week) => (
-          <View key={week[0]!.date} style={[styles.weekRow, styles.weekRowBody]}>
+          <View
+            key={week[0]!.date}
+            style={[styles.weekRow, styles.weekRowBody, fillMonth ? styles.weekRowFill : null]}
+          >
             {/* 周次列（滴答式"31周"）：宿主给格式化，周一是网格开头，
                 同一行任何一天的 ISO 周数都相同 —— 取第一天的即可。 */}
             {showWeekNumber ? (
@@ -601,13 +651,15 @@ export function CalendarBoard({
               </View>
             ) : null}
             {week.map((cell) => {
-              const cellTasks = byDate.get(cell.date) ?? [];
+              const cellTasks = calendarTasksByDate.get(cell.date) ?? [];
               const { bars, hidden } = calendarCellBars(
                 cellTasks,
                 today,
                 cell.date,
                 // 档位决定"这一格画得下几条"（理由见常量本身）。
-                view === 'week' ? MAX_WEEK_CALENDAR_BARS : MAX_CALENDAR_BARS,
+                fillMonth
+                  ? cellTasks.length + (eventsByDate?.get(cell.date)?.length ?? 0)
+                  : view === 'week' ? MAX_WEEK_CALENDAR_BARS : MAX_CALENDAR_BARS,
                 eventsByDate?.get(cell.date),
                 eventLabels,
               );
@@ -622,6 +674,7 @@ export function CalendarBoard({
                   tone={calendarDayTone(cellTasks, today, cell.date)}
                   bars={bars}
                   hidden={hidden}
+                  fitHeight={fillMonth}
                   labels={labels}
                   dayMarker={dayMarker}
                   dayMarkerLabels={dayMarkerLabels}
@@ -633,7 +686,9 @@ export function CalendarBoard({
         ))}
       </View>
 
-      {/* ── 选中那天的清单 ─────────────────────────────────── */}
+      {showSelectedDayList ? (
+        <>
+          {/* ── 选中那天的清单（移动端兼容段） ───────────────────── */}
       <View style={styles.dayHeader}>
         <HeytaIcon data={CalendarDays} size={tokens['icon.sm']} color={tokens['color.foreground-muted']} />
         <Text style={[text['section-title'], styles.dayTitle]} testID={`${testID}-day-title`}>
@@ -688,6 +743,8 @@ export function CalendarBoard({
           </>
         )}
       </View>
+        </>
+      ) : null}
         </>
       )}
 
@@ -782,7 +839,15 @@ function makeStyles(tokens: HeytaNativeTokens) {
      */
     monthCard: {
       flexShrink: 0,
-      gap: tokens['space.2'],
+      gap: 0,
+      borderBottomWidth: tokens['border-width.thin'],
+      borderEndWidth: tokens['border-width.thin'],
+      borderColor: tokens['color.border'],
+    },
+    monthCardFill: {
+      flexGrow: 1,
+      flexShrink: 1,
+      minHeight: 0,
     },
     /*
      * 卡片的外壳（内边距 / 圆角 / 边框 / 底色）**只写这一次**。
@@ -828,6 +893,12 @@ function makeStyles(tokens: HeytaNativeTokens) {
      *    网格变高只是把空拉开。
      */
     weekRowBody: { flexShrink: 0 },
+    weekRowFill: {
+      flexGrow: 1,
+      flexShrink: 1,
+      flexBasis: 0,
+      minHeight: 0,
+    },
     /* 当天那一格是**唯一吃剩余空间的**：它变高 = 能多看几条；网格变高 = 只是把空拉开。 */
     daySection: { flexGrow: 1, flexShrink: 0, flexBasis: 'auto' },
     weekCell: { flex: 1, alignItems: 'center' },
@@ -839,9 +910,9 @@ function makeStyles(tokens: HeytaNativeTokens) {
       alignItems: 'stretch',
       justifyContent: 'flex-start',
       paddingHorizontal: tokens['space.1'],
-      paddingBottom: tokens['space.1'],
+      paddingVertical: tokens['space.1'],
     },
-    bar: { flexDirection: 'row', alignItems: 'center' },
+    bar: { flexDirection: 'row', alignItems: 'center', flexShrink: 0 },
     barTitle: { flex: 1, minWidth: 0 },
     dayHeader: { flexDirection: 'row', alignItems: 'center', gap: tokens['space.2'] },
     dayTitle: { flex: 1 },

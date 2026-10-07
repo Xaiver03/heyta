@@ -348,6 +348,16 @@ export async function openApp(
   await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible();
   await decidePrivacyConsent(page, consent);
   await waitForBootSplashGone(page);
+  // Hosted sign-in is now the next step after first networking consent. Generic
+  // feature journeys explicitly dismiss it; auth journeys exercise the prompt
+  // directly through decidePrivacyConsent instead.
+  if (consent === 'accepted') {
+    const auth = page.getByRole('dialog', { name: '登录 / 注册', exact: true });
+    if (await auth.isVisible()) {
+      await auth.getByRole('button', { name: '关闭', exact: true }).click();
+      await expect(auth).not.toBeVisible();
+    }
+  }
 }
 
 /** 切换顶部视图 tab。 */
@@ -372,6 +382,24 @@ export async function closeSettingsSheet(page: Page): Promise<void> {
 }
 
 /**
+ * 在设置浮层里显式选择一个分类。
+ *
+ * 设置现在是「左侧分类 + 右侧内容」的 IA；打开浮层只负责打开设置，不能偷偷
+ * 改变分类。调用方必须声明自己要操作哪一组，这样 `switchView('设置')`、主题
+ * 切换、AI 配置不会互相污染当前分类。
+ */
+export async function selectSettingsSection(
+  page: Page,
+  section: 'profile' | 'appearance' | 'sync' | 'ai' | 'data' | 'account' | 'help',
+): Promise<void> {
+  const button = page.locator(`button[aria-controls="settings-group-${section}"]`);
+  await expect(button, `设置分类 ${section} 必须存在`).toHaveCount(1);
+  await button.click();
+  await expect(button).toHaveAttribute('aria-current', 'page');
+  await expect(page.locator(`#settings-group-${section}`)).toBeVisible();
+}
+
+/**
  * 走**真开关**切主题：设置 → 显示 里那枚（2026-10-06 之前它在页头那一排）。
  *
  * 🔴 为什么不许改成"往 localStorage 塞 `heyta.theme`"或 `emulateMedia`：
@@ -388,6 +416,7 @@ export async function closeSettingsSheet(page: Page): Promise<void> {
  */
 export async function switchTheme(page: Page, target: 'dark' | 'light'): Promise<void> {
   await openSettingsSheet(page);
+  await selectSettingsSection(page, 'appearance');
   await page.getByTestId('theme-toggle').click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', target);
   await closeSettingsSheet(page);
@@ -629,6 +658,7 @@ export interface EndpointSetup {
  */
 export async function configureEndpoint(page: Page, setup: EndpointSetup): Promise<void> {
   await switchView(page, '设置');
+  await selectSettingsSection(page, 'ai');
   await expect(page.locator('[data-testid="ai-settings"]')).toBeVisible();
 
   // ── 闸 1、闸 2 ──────────────────────────────────────────────────────
@@ -678,6 +708,7 @@ export async function configureEndpoint(page: Page, setup: EndpointSetup): Promi
 /** 配好之后再把总开关关掉 —— 用来验"网络层闸门真的拦住了"。 */
 export async function disableAiMasterSwitch(page: Page): Promise<void> {
   await switchView(page, '设置');
+  await selectSettingsSection(page, 'ai');
   await page.locator('#ai-enabled').uncheck();
   // 关掉之后端点那段应当整体消失（界面上不残留"可用"的错觉）。
   await expect(page.locator('#ai-allow-remote')).toHaveCount(0);

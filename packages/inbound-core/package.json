@@ -1,0 +1,31 @@
+{
+  "name": "@heyta/inbound-core",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "Portable inbound envelope and request primitives shared by the receiver and authorized clients; no operation or database access.",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "require": "./dist/index.cjs" }
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit -p tsconfig.spec.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@heyta/shared-schema": "workspace:*",
+    "@heyta/sync-core": "workspace:*",
+    "@noble/curves": "2.4.0",
+    "@noble/hashes": "2.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.1"
+  }
+}

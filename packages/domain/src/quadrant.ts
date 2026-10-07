@@ -167,8 +167,9 @@ export const QUADRANT_META: Record<
  */
 export const DROP_URGENT_LEAD_MS = 60 * 60 * 1000;
 
-export interface QuadrantDropPlan {
-  important: boolean;
+/** 一次移动或撤销的原子字段改动；null 恢复重要性由优先级推导的状态。 */
+export interface QuadrantTaskPatch {
+  important: boolean | null;
   /**
    * 截止时间的改动：
    *   - `undefined` = 不用改
@@ -176,6 +177,10 @@ export interface QuadrantDropPlan {
    *   - `number` = 设为该值
    */
   dueDate?: number | null;
+}
+
+export interface QuadrantDropPlan extends QuadrantTaskPatch {
+  important: boolean;
   /**
    * 这次投放**动到了用户的截止时间**。
    *
@@ -184,6 +189,14 @@ export interface QuadrantDropPlan {
    * UI 拿到这个字段就必须说明。
    */
   dueDateChange?: 'pushed' | 'cleared';
+}
+
+/** 只还原本次移动触及的字段，保留原先未显式指定重要性的语义。 */
+export function planQuadrantDropUndo(task: Task, drop: QuadrantDropPlan): QuadrantTaskPatch {
+  return {
+    important: task.important ?? null,
+    ...(drop.dueDate === undefined ? {} : { dueDate: task.dueDate ?? null }),
+  };
 }
 
 /**

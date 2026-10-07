@@ -1,3 +1,4 @@
+import { AssistantIcon } from './features/ai/AssistantIcon.js';
 import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 应用外壳。
@@ -13,8 +14,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useShallow } from 'zustand/react/shallow';
 import {
   ArrowLeft,
-  CircleHelp,
   MoreHorizontal,
+  PanelLeft,
   Moon,
   PanelRightClose,
   PanelRightOpen,
@@ -104,13 +105,15 @@ import { PrivacyConsentSheet } from './features/privacy/PrivacyConsentSheet.js';
 import { LegalReconfirmSheet } from './features/legal-recheck/LegalReconfirmSheet.js';
 import { shouldAskOnFirstLaunch, usePrivacyStore } from './features/privacy/store.js';
 import { CalendarSidebar } from './features/calendar/CalendarSidebar.js';
+import { useNarrowLayout } from './features/shell/useNarrowLayout.js';
+import { ScopeDrawer } from './features/shell/ScopeDrawer.js';
+import { useCalendarViewStore } from './features/calendar/store.js';
 import { CalendarHeaderToolbar } from './features/calendar/CalendarHeaderToolbar.js';
 import { CalendarView } from './features/calendar/CalendarView.js';
 import { useNoteStore } from './features/notes/store.js';
 import { ReminderNotifyPanel } from './features/reminders/ReminderNotifyPanel.js';
 import { useReminderNotifications } from './features/reminders/use-reminder-notifications.js';
-import { AccountMenu } from './features/shell/AccountMenu.js';
-import { InboxBell } from './features/inbox/InboxBell.js';
+import { RailNavigation } from './features/shell/RailNavigation.js';
 /**
  * 搜索面板的**机制**来自共享层，宿主只提供内容与键盘。
  *
@@ -138,7 +141,6 @@ import {
   type ShellModuleKey,
 } from './features/shell/modules.js';
 import { DetailColumnResizer, SidebarResizer } from './features/shell/ColumnResizer.js';
-import { SyncBar } from './features/sync/SyncBar.js';
 import { useSyncStore } from './features/sync/store.js';
 import { SubscriptionNotice } from './features/subscription/SubscriptionNotice.js';
 import { RenewPanel } from './features/subscription/RenewPanel.js';
@@ -158,20 +160,18 @@ import { TimelinePanel } from './features/timeline/TimelinePanel.js';
 import { AiBreakdown } from './features/ai/AiBreakdown.js';
 import { AiPrioritize } from './features/ai/AiPrioritize.js';
 import { AiDuration } from './features/ai/AiDuration.js';
-import { AiToolRun } from './features/ai/AiToolRun.js';
 import { AssistantPanel } from './features/ai/AssistantPanel.js';
 import { AiSettingsNavigationContext } from './features/ai/ai-settings-navigation.js';
 import { PanelEphemeralProvider } from './features/ai/panel-ephemeral.js';
 import type { SettingsTarget } from './features/ai/route-explanation.js';
 import { AiSettings } from './features/settings/AiSettings.js';
-import { AdminPanel } from './features/admin/AdminPanel.js';
-import { ExportPanel } from './features/settings/ExportPanel.js';
 import { HelpPanel } from './features/settings/HelpPanel.js';
-import { ImportPanel } from './features/settings/ImportPanel.js';
 import { MemoryPanel } from './features/settings/MemoryPanel.js';
 // 通行密钥自助管理（列 / 删）—— 服务端早就有端点，此前界面没有任何入口。
 import { PasskeyPanel } from './features/settings/PasskeyPanel.js';
 import { CloseAccountPanel } from './features/settings/CloseAccountPanel.js';
+import { DataSettingsPanel } from './features/settings/DataSettingsPanel.js';
+import { SettingsAccountGate } from './features/settings/SettingsAccountGate.js';
 // 个人信息（R10）：昵称与头像的增删改查。入口在头像菜单的「编辑个人信息」，
 // 面板本体开在设置浮层第一段 —— 它需要令牌，而令牌就住在同步设置里。
 import { ProfilePanel } from './features/settings/ProfilePanel.js';
@@ -183,7 +183,6 @@ import { PrivacyPanel } from './features/settings/PrivacyPanel.js';
 // 缺的就是这张表（在此之前那条动作**全仓库零调用点**）。见 PasswordPanel 文件头。
 import { PasswordPanel } from './features/settings/PasswordPanel.js';
 // 从滴答清单导入（B2-1）—— 逻辑层早就做完了，这是它的界面入口。
-import { TickTickImportPanel } from './features/settings/TickTickImportPanel.js';
 import { WidgetJourneyPanel } from './features/settings/WidgetJourneyPanel.js';
 import { WidgetPushPanel } from './features/settings/WidgetPushPanel.js';
 import {
@@ -209,8 +208,6 @@ import {
   SORT_LABEL,
   TOOL_VIEW_TABS,
   VIEW_TABS,
-  anchorRailLabel,
-  splitRailTabs,
   type ViewKey,
 } from './features/shell/view-tabs.js';
 import { NavButton } from './features/shell/NavButton.js';
@@ -228,21 +225,31 @@ const SETTINGS_NAV_ITEMS = [
   { id: 'settings-group-help', labelKey: 'web.settings.nav.help' },
 ] as const satisfies readonly { id: string; labelKey: MessageKey }[];
 
-function SettingsSectionNav(): React.JSX.Element {
+type SettingsSectionId = (typeof SETTINGS_NAV_ITEMS)[number]['id'];
+
+function SettingsSectionNav({ active, onSelect }: {
+  active: SettingsSectionId;
+  onSelect: (id: SettingsSectionId) => void;
+}): React.JSX.Element {
   const { t } = useI18n();
   return (
     <nav className="ht-settings__nav" aria-label={t('web.shell.views.settings')}>
       {SETTINGS_NAV_ITEMS.map((item) => (
-        <a key={item.id} className="ht-settings__nav-link" href={`#${item.id}`}>
+        <button key={item.id} type="button" className="ht-settings__nav-link"
+          aria-current={active === item.id ? 'page' : undefined}
+          aria-controls={item.id} onClick={(event) => {
+            onSelect(item.id);
+            event.currentTarget.scrollIntoView({ block: 'nearest', inline: 'center' });
+          }}>
           {t(item.labelKey)}
-        </a>
+        </button>
       ))}
     </nav>
   );
 }
 
 export function App(): React.JSX.Element {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [theme, setTheme] = useState<Theme>(resolveInitialTheme);
   const store = useTaskStore();
   const projects = useProjectStore();
@@ -307,6 +314,10 @@ export function App(): React.JSX.Element {
    * 注册/登录的紧凑入口。
    */
   const syncNeedsSignIn = useSyncStore(useShallow((s) => s.token === undefined));
+  /** 账号组统一门槛：四个账号能力共享一个登录入口，避免未登录时重复渲染四张卡。 */
+  const accountNeedsSignIn = useSyncStore(
+    useShallow((s) => typeof s.token !== 'string' || s.token.trim() === ''),
+  );
 
   /**
    * 范围列的**计数**（滴答同款：今天 13 / 收集箱 17）。
@@ -464,6 +475,9 @@ export function App(): React.JSX.Element {
    * 消费点见下面的 effect。
    */
   const [settingsAnchor, setSettingsAnchor] = useState<SettingsAnchor | undefined>(undefined);
+  const [settingsSection, setSettingsSection] = useState<SettingsSectionId>('settings-group-appearance');
+  const activeSettingsSection: SettingsSectionId = settingsAnchor
+    ? `settings-group-${settingsAnchor}` : settingsSection;
   /** 设置 surface 的内容模式；个人中心与设置共用同一层，不再各造一套浮层。 */
   const [secondaryAccountSurface, setSecondaryAccountSurface] = useState<'settings' | 'profile'>('settings');
   /** 从个人中心进入设置时，保留一条回到个人中心的路径。 */
@@ -679,6 +693,7 @@ export function App(): React.JSX.Element {
    */
   useEffect(() => {
     if (settingsAnchor === undefined || view !== 'settings') return;
+    setSettingsSection(`settings-group-${settingsAnchor}`);
     const anchor = SETTINGS_ANCHORS[settingsAnchor];
     document.getElementById(anchor.id)?.scrollIntoView({ block: 'start' });
     if (anchor.focus !== undefined) {
@@ -712,7 +727,10 @@ export function App(): React.JSX.Element {
    * 勾哪几个决定格子里有没有点）。把多选塞进 `TaskFilter` 会改动四个端共用的
    * 筛选契约，换来的只是"少一个文件"。
    */
-  const withSidebar = view === 'tasks' || view === 'calendar';
+  const calendarSidebarOpen = useCalendarViewStore((state) => state.calendarSidebarOpen);
+  const [scopeDrawerOpen, setScopeDrawerOpen] = useState(false);
+  const narrowLayout = useNarrowLayout();
+  const withSidebar = view === 'tasks' || (view === 'calendar' && !narrowLayout && calendarSidebarOpen);
 
   const [settingsFocus, setSettingsFocus] = useState<SettingsTarget | undefined>(undefined);
   /**
@@ -726,6 +744,8 @@ export function App(): React.JSX.Element {
   const openAiSettings = useCallback((target: SettingsTarget) => {
     setSecondaryAccountSurface('settings');
     setSettingsReturnSurface(undefined);
+    setSettingsAnchor(undefined);
+    setSettingsSection('settings-group-ai');
     setSettingsFocus(target);
     setView('settings');
   }, []);
@@ -772,6 +792,7 @@ export function App(): React.JSX.Element {
    */
   const goToFilter = useCallback(
     (filter: TaskFilter) => {
+      setScopeDrawerOpen(false);
       setSettingsFocus(undefined);
       setView('tasks');
       useTaskStore.getState().setFilter(filter);
@@ -942,6 +963,35 @@ export function App(): React.JSX.Element {
    * 界面什么都不说，数据却已经进模型。所以看不见时编辑卡回到便签板上方。
    */
   const detailColumnShown = useDetailColumnShown(detailPane === 'collapsed');
+  const [compactAssistantOpen, setCompactAssistantOpen] = useState(false);
+  const [assistantExpanded, setAssistantExpanded] = useState(false);
+  const assistantWorkspace = assistantExpanded && view === 'tasks';
+  const assistantTriggerRef = useRef<HTMLButtonElement>(null);
+  const assistantOverlay = !assistantWorkspace && compactAssistantOpen && !detailColumnShown && contentView === 'tasks' && view !== 'settings';
+  useEffect(() => {
+    if (detailColumnShown || contentView !== 'tasks' || view === 'settings') setCompactAssistantOpen(false);
+  }, [detailColumnShown, contentView, view]);
+  useEffect(() => {
+    if (!assistantOverlay) return;
+    const pane = detailRef.current;
+    const focusable = () => [...(pane?.querySelectorAll<HTMLElement>('button:not([disabled]), textarea, select, input:not([disabled]), a[href]') ?? [])].filter((el) => el.getClientRects().length > 0);
+    const previous = document.activeElement;
+    pane?.querySelector<HTMLTextAreaElement>('textarea')?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); setCompactAssistantOpen(false); }
+      if (event.key !== 'Tab') return;
+      const items = focusable();
+      const first = items[0]; const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => {
+      window.removeEventListener('keydown', onKey, true);
+      if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
+    };
+  }, [assistantOverlay]);
+
   /**
    * 任务面单**此刻真的画在详情列里**的那个条件 —— 栏在画（几何 + 没被收起）、
    * 当前是任务那一族的视图（列表 / 四象限 / 时间线：同一批任务行、同一个 `'task'` 选中态），
@@ -960,6 +1010,12 @@ export function App(): React.JSX.Element {
    * 未选中的宽档就是"行尾让了位、栏里没人接"，而钉这件事的正是
    * `apps/web/tests/task-detail-card.spec.tsx` 那条"同一枚布尔"的源码形状门禁。
    */
+  // Only expose a pane control when this destination can actually render a pane.
+  // Do not depend on detailColumnShown: a collapsed pane still needs its opener.
+  const canToggleDetailPane = view !== 'settings' && (
+    assistantWorkspace || ['tasks', 'focus', 'notes', 'habits'].includes(contentView) ||
+    (selectedTaskId !== null && ['quadrant', 'timeline'].includes(contentView))
+  );
   const taskPaneInColumn =
     detailColumnShown &&
     selectedTaskId !== null &&
@@ -1193,25 +1249,35 @@ export function App(): React.JSX.Element {
     (row: SharedTaskRow): React.ReactNode => {
       const task = row.source;
       return (
-        // 🔴 `flexWrap` 不是装饰：这一坨常驻控件在 1440 视口下要 517px（整行的 48%），
-        // 视口到 900 时要 496px，而行的可用宽只有 548 —— 不换行就会把共享行的标题
-        // 挤到 0 宽（实测"标题整条消失"）。配合 `TaskRow` 里 body 的百分比下限，
-        // 窄窗口下行尾自己折行，标题与控件都还在。三档 A/B 见台账 G9。
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            alignContent: 'center',
-            justifyContent: 'flex-end',
-            flexWrap: 'wrap',
-            gap: 'var(--ht-space-2)',
-            // 选择框是行级选择的主控件，放到共享完成框和标题之前，
-            // 让选择态从左到右先读到「选中」再读到任务内容。
-            order: bulkSelecting ? -1 : 0,
-          }}
-        >
-          {bulkSelecting ? null : (
-            <>
+        <details className="ht-task-actions">
+          <summary
+            className="ht-task-actions__trigger"
+            aria-label={t('web.shell.tasks.more', { title: task.title })}
+            data-testid={`task-actions-summary-${task.id}`}
+          >
+            <MoreHorizontal size={ICON_SIZE.sm} aria-hidden="true" />
+            <span>{t('web.shell.tasks.moreLabel')}</span>
+          </summary>
+          <div className="ht-task-actions__panel ht-material">
+            {/*
+             * 这些是渐进披露的次级编辑入口：默认行只保留勾选、标题与元信息，
+             * 打开「更多操作」后仍复用原来的控件与 action 回调，不减少能力。
+             */}
+            {bulkSelecting ? null : (
+              <div
+                className="ht-task-actions__items"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  alignContent: 'center',
+                  justifyContent: 'flex-end',
+                  flexWrap: 'wrap',
+                  gap: 'var(--ht-space-2)',
+                  // 选择框是行级选择的主控件，放到共享完成框和标题之前，
+                  // 让选择态从左到右先读到「选中」再读到任务内容。
+                  order: bulkSelecting ? -1 : 0,
+                }}
+              >
           {/* 备注。🔴 在它之前 Web 上**没有备注输入框** ——
               `Task.note` 与 `setNote` 都在，但唯一调用点是 AI 拆解与 AI 估时，
               于是"我自己能不能在任务上写点东西"的答案是"不能"。
@@ -1420,9 +1486,10 @@ export function App(): React.JSX.Element {
           >
             <Trash2 size={ICON_SIZE.sm} aria-hidden="true" />
           </button>
-            </>
-          )}
-        </div>
+              </div>
+            )}
+          </div>
+        </details>
       );
     },
     [
@@ -1553,22 +1620,6 @@ export function App(): React.JSX.Element {
       ),
     [enabledModules],
   );
-  const railTabs = useMemo(() => splitRailTabs(visibleMainTabs, view), [visibleMainTabs, view]);
-  const [moreOpen, setMoreOpen] = useState(false);
-  const moreButtonRef = useRef<HTMLButtonElement>(null);
-  const moreContainerRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    setMoreOpen(false);
-  }, [view]);
-  useEffect(() => {
-    // 打开即聚焦第一项（APG menu 惯例）：键盘用户的路径是 Tab 到「更多」→ Enter →
-    // 直接 ↓/Tab 在菜单项之间走，而不是再按一次 Tab 从按钮重新出发。
-    if (!moreOpen) return;
-    moreContainerRef.current
-      ?.querySelector<HTMLButtonElement>('[role="menuitem"]')
-      ?.focus();
-  }, [moreOpen]);
-
   /**
    * 切到一个视图（rail 的 tab、搜索里的「快速跳转」共用）。
    *
@@ -1920,73 +1971,44 @@ export function App(): React.JSX.Element {
 
 
   /**
-   * AI 面：**单步工具 + 对话助手**（原样两段接线，一处定义）。
+   * AI 面：**一个 Agent，一个聊天入口**。
    *
-   * 🔴 2026-10-04 产品负责人把它们搬到最右那一栏（「把那个 AI 的功能移到右边那个区
-   * …无状态的时候就可以默认显示 AI Chatbot」）。这一份 JSX 同时是右栏的内容与
-   * 窄屏时的回退内容，所以**挂载点有两个、实现只有一个**。
-   * 搬之前这里的注释写着「没有选中态时往槽里塞装饰」被主计划 §5.4 否决 ——
-   * 那条现在由产品负责人推翻了，留痕在 `docs/plans/multi-end-unified-strategy.md`。
+   * 工具调用是 Agent 的内部执行过程，不再作为与会话并列的产品面板展示。
+   * 这样用户只需要理解「我想让助手做什么」，而不是先判断「应该打开工具还是会话」。
+   * 写入仍然遵守提案 → 用户确认的安全边界，工具目录与授权继续留在设置里。
+   * 这一份 JSX 同时是右栏内容与窄屏回退内容，挂载点不变，未决披露状态也不丢。
    *
-   * ⚠️ `AiPrioritize` **不在这里**：它是批量的（「哪件事更重要」只在互相比较时成立），
-   * 只能待在列表上方。
+   * ⚠️ `AiPrioritize` **不在这里**：它是批量比较建议，仍留在任务列表上方。
    */
   const aiPanels = (
     contentView === 'tasks' ? (
-      <details className="ht-ai-drawer" data-testid="ai-drawer">
-        <summary className="ht-ai-drawer__summary ht-type-section-title">
-          {t('web.ai.tools.title')}
-        </summary>
-        <div className="ht-ai-drawer__body">
-      {/* AI 工具调用（功能 ⑤）。
-          🔴 它不新增路由/页面：作为任务视图里的一个面板挂在**右栏**
-          （≤1023px 与用户收起那两档退回中间列 —— 判据是 `detailColumnShown`，见下面任务列末尾）。
-          规则命中时**一个字节都不发**（面板会明说）；只有规则处理不了时才披露 + 发送。
-          写工具只产出提案，必须用户再点「确认执行」才落库。 */}
-      <AiToolRun
-          routing={aiSettings.routing}
-          consents={aiSettings.consents}
-          // 🔴 工具授权复用设置里那份 `localApi.grants` —— 不另建一套权限。
-          grants={aiSettings.localApi.grants}
-          secrets={aiSecrets}
-          healthSnapshot={aiSettings.health}
-          onHealth={(health) => {
-            setAiSettings((previous) => {
-              const next = {
-                ...previous,
-                health: toHealthSnapshot(health, Date.now()),
-              };
+      <section className="ht-ai-agent-surface" data-testid="ai-agent-surface">
+        <AssistantPanel
+            expanded={assistantWorkspace}
+            onToggleExpanded={() => { setCompactAssistantOpen(false); setAssistantExpanded((value) => !value); }}
+            onClose={assistantOverlay ? () => setCompactAssistantOpen(false) : undefined}
+            routing={aiSettings.routing}
+            consents={aiSettings.consents}
+            tier={aiSettings.assistantTier}
+            onTierChange={(assistantTier) => setAiSettings((previous) => {
+              const next = { ...previous, assistantTier };
               saveAiSettings(next);
               return next;
-            });
-          }}
-      />
-
-      {/* 对话式助手（W12 / ADR-0045）。
-          🔴 它的工具范围来自 `assistantTier`（设置里的**第二个授权前端**），
-          **不是** `localApi.grants` —— 那张表管的是外部程序（MCP）能不能调工具。
-          两档最后都汇到同一个 `isToolGranted()` 判据，授权仍只有一份。
-          ⚠️ 与上面单步面板**并存**是刻意的：单步那条有"规则命中零出境"的短路，
-          多轮循环还没有（缺口按编号登记在 `docs/plans/ai-assistant-closure.md` §7.2 第 4 条）。 */}
-      <AssistantPanel
-          routing={aiSettings.routing}
-          consents={aiSettings.consents}
-          tier={aiSettings.assistantTier}
-          secrets={aiSecrets}
-          healthSnapshot={aiSettings.health}
-          onHealth={(health) => {
-            setAiSettings((previous) => {
-              const next = {
-                ...previous,
-                health: toHealthSnapshot(health, Date.now()),
-              };
-              saveAiSettings(next);
-              return next;
-            });
-          }}
-      />
-        </div>
-      </details>
+            })}
+            secrets={aiSecrets}
+            healthSnapshot={aiSettings.health}
+            onHealth={(health) => {
+              setAiSettings((previous) => {
+                const next = {
+                  ...previous,
+                  health: toHealthSnapshot(health, Date.now()),
+                };
+                saveAiSettings(next);
+                return next;
+              });
+            }}
+        />
+      </section>
     ) : null
   );
 
@@ -2004,7 +2026,7 @@ export function App(): React.JSX.Element {
       用 context 让**唯一的新接入点**留在 `App.tsx`（视图切换本来就在这里），
       而不是为一个导航参数去改别的功能。
     */
-    <HeytaUiProvider value={uiTheme}>
+    <HeytaUiProvider value={uiTheme} locale={locale}>
       {/*
         🔴 助手面那份**未决状态**必须住在两个挂载点的**共同祖先**下，
         所以 Provider 只能开在这里（`panel-ephemeral.tsx` 文件头写了为什么：
@@ -2018,6 +2040,8 @@ export function App(): React.JSX.Element {
         // 🔴 详情列的**用户选择**（不是几何判断）落在这里，CSS 按它把轨道归零 +
         // 不渲染那一列（`styles/app/base.css`）。两条各管一件事，见上面那段注释。
         data-detail={detailPane}
+        data-assistant-workspace={assistantWorkspace ? '' : undefined}
+        data-detail-agent={contentView === 'tasks' && selectedTaskId === null ? '' : undefined}
         // 🔴 而这一条管的是"这一栏此刻有没有要画的东西"（与"用户收没收"是两回事，
         // 理由与算法见上面 `detailHasContent` 那段）。零内容的列不许占位。
         data-detail-empty={detailHasContent ? undefined : ''}
@@ -2068,241 +2092,55 @@ export function App(): React.JSX.Element {
       */}
       {/* `onPointerOver` / `onFocus` 在 React 里都会冒泡 ⇒ 挂在 nav 上就覆盖了
           全部 rail 按钮（视图 tab、工具、铃铛、帮助），不必给每个按钮加 props。
-          见 `anchorRailLabel()`：它只写一个 CSS 自定义属性，不产生 state。 */}
-      <nav
-        className="ht-rail"
-        aria-label={t('web.shell.nav.aria')}
-        onPointerOver={anchorRailLabel}
-        onFocus={anchorRailLabel}
-      >
-        {/*
-          🔴 顶部是**头像**（点开才是 设置 / 统计 / 退出登录）。
-          照滴答：rail 是每天点几十次的地方，而"设置"是低频的 ——
-          它占着每一屏，换来的只是每次扫读时多一个要跳过的词。
-        */}
-        <div className="ht-rail__top">
-          <AccountMenu
-            email={syncEmail}
-            showSignIn={syncNeedsSignIn}
-            onSignIn={() => {
-              useSyncStore.getState().openSignIn();
-            }}
-            onOpenSettings={() => {
-              setSecondaryAccountSurface('settings');
-              setSettingsReturnSurface(undefined);
-              setSettingsFocus(undefined);
-              setView('settings');
-            }}
-            // 「编辑个人信息」= 设置浮层里的**第一节**，所以它开的是同一个表面，
-            // 只是额外要求"落在这一节"（见上面的 `settingsAnchor`）。
-            // 个人中心对本机用户也开放：本地回顾不要求先登录；资料编辑入口
-            // 仍由菜单按登录状态隐藏，避免出现可点但不会写入的表单。
-            onOpenProfile={() => {
-              setSecondaryAccountSurface('settings');
-              setSettingsReturnSurface(undefined);
-              setSettingsFocus(undefined);
-              setSettingsAnchor('profile');
-              setView('settings');
-            }}
-            onOpenProfileCenter={() => {
-              setSecondaryAccountSurface('profile');
-              setSettingsReturnSurface(undefined);
-              setSettingsFocus(undefined);
-              setSettingsAnchor(undefined);
-              setView('settings');
-            }}
-            onOpenGrowth={() => {
-              setSettingsFocus(undefined);
-              setView('growth');
-            }}
-            // 「成长」是**可关的模块**（rail 那条已按开关过滤）—— 菜单这条同理。
-            growthEnabled={enabledModules.has('growth')}
-            onSignOut={() => {
-              useSyncStore.getState().clearCredentials();
-            }}
-          />
-          {/* 品牌名**不在这里了**：rail 收成纯图标（48px 内容宽放不下「heyta」），
-              滴答的 rail 顶部也只有头像。品牌仍然出现在落地页、设置里的 AI 文案、
-              系统通知标题与移动端欢迎页 —— 不要因为"界面里找不到名字"把它加回来。 */}
-        </div>
-
-        {/*
-          视图切换。用 role=tablist 让屏幕阅读器理解这是一组互斥选项。
-
-          🔴 **按钮数由「功能模块」开关决定**（产品负责人：「左边的侧边栏那个按钮
-          应该尽可能地减少」+「就是这样子的自定义也可以」）。结构照滴答的 rail：
-
-          ```
-          上段「去哪看」  任务 + **已启用的模块**（默认：四象限 / 习惯 / 时间线）
-          下段「工具」    回收站 / 设置   —— 贴底
-          ```
-
-          ⇒ **主段最多 5 个按钮**（四个高频目的地 +「更多」），而用户可以继续关；
-          低频目的地通过「更多」保持可达，关闭的模块不进入 DOM。
-          ⚠️ 关掉的模块**不在 DOM 里**，不是"渲染了但隐藏"（那两者的差别是
-          屏幕阅读器还念不念它、Tab 键还停不停在它上面）。
-        */}
-        <div role="tablist" aria-label={t('web.shell.views.aria')} className="ht-rail__tabs">
-          {railTabs.primary.map((v) => (
-            <button
-              key={v.key}
-              type="button"
-              role="tab"
-              aria-selected={view === v.key}
-              className={`ht-rail__tab${view === v.key ? ' ht-rail__tab--active' : ''}`}
-              onClick={() => {
-                // 用户自己导航 = 不定位。见 `settingsFocus` 的说明。
-                setSettingsFocus(undefined);
-                /*
-                  🔴 「任务」这一格**同时是收集箱的入口**（2026-10-04 产品负责人删掉了
-                  侧栏里那行重复的「收集箱」，理由见 `PRIMARY_NAV` 文件头）。
-
-                  ⚠️ 但它**不能无条件重置筛选** —— 那会推翻 R9（2026-10-02 同一位
-                  产品负责人的实测："回到任务视图应当看到他离开时停着的那一格，
-                  那是他的位置，不是垃圾"）。两条要求靠**点的时机**分开：
-                  · 人在别的视图 ⇒ 这一格是"回我的任务视图"，位置保留；
-                  · 人已经在任务视图 ⇒ 再点一次是明确的"回收集箱"手势
-                   （与移动端点当前 tab 回到顶部同一类），这是删掉侧栏那一行之后
-                    唯一回到收集箱的路径，判据在 `tests/app-mount.spec.tsx`。
-                */
-                if (v.key === 'tasks' && view === 'tasks') {
-                  useTaskStore.getState().setFilter({ kind: 'all' });
-                  return;
-                }
-                setView(v.key);
-              }}
-            >
-              <v.Icon size={ICON_SIZE.sm} aria-hidden="true" />
-              {/* 名字必须留在 DOM 里：它就是这个 tab 的 accessible name。
-                  显示规则见 `app.css` 的 `.ht-rail__label`。 */}
-              <span className="ht-rail__label ht-type-caption">{t(v.labelKey)}</span>
-            </button>
-          ))}
-
-          {railTabs.overflow.length > 0 ? (
-            <div
-              className="ht-rail__more"
-              ref={moreContainerRef}
-              // Esc 关闭 + 焦点还给「更多」按钮（W1 判据）。挂在容器上：
-              // 焦点无论在按钮还是菜单项上，keydown 都会冒到这里。
-              onKeyDown={(event) => {
-                if (event.key === 'Escape' && moreOpen) {
-                  event.stopPropagation();
-                  setMoreOpen(false);
-                  moreButtonRef.current?.focus();
-                }
-              }}
-            >
-              <button
-                ref={moreButtonRef}
-                type="button"
-                className={`ht-rail__tab${moreOpen ? ' ht-rail__tab--active' : ''}`}
-                aria-haspopup="menu"
-                aria-expanded={moreOpen}
-                onClick={() => setMoreOpen((open) => !open)}
-              >
-                <MoreHorizontal size={ICON_SIZE.sm} aria-hidden="true" />
-                <span className="ht-rail__label ht-type-caption">{t('web.shell.views.groupMore')}</span>
-              </button>
-              {moreOpen ? (
-                <div className="ht-rail__more-menu" role="menu" aria-label={t('web.shell.views.groupMore')}>
-                  {railTabs.overflow.map((v) => (
-                    <button
-                      key={v.key}
-                      type="button"
-                      role="menuitem"
-                      className="ht-rail__more-item"
-                      onClick={() => {
-                        setSettingsFocus(undefined);
-                        setView(v.key);
-                        setMoreOpen(false);
-                      }}
-                    >
-                      <v.Icon size={ICON_SIZE.sm} aria-hidden="true" />
-                      <span>{t(v.labelKey)}</span>
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-
-
-        {/*
-          工具段：**贴底**。滴答的 rail 也是这个结构（上段"去哪看"、下段"工具"，
-            中间留白分开）。回收站是"找回来"，设置是低频配置 —— 都不属于每天要看的视图。
-
-            🔴 **视图与工具仍在同一个 `role="tablist"` 里**：`role="tab"` 出现在
-            `tablist` **外面**是无效的 a11y 结构；而它们都是**互斥的目的地**
-            （点一个就切过去）—— 中间那条留白是**视觉**分组，不是语义分组。
-            贴底用 `margin-top: auto` 实现，不再插一个 spacer 元素。
-            ⚠️ 而「帮助」是**动作**（它切到设置页），所以它在 tablist **外面**（见下）。
-          */}
-          {visibleToolTabs.map((v, i) => (
-            <button
-              key={v.key}
-              type="button"
-              role="tab"
-              aria-selected={view === v.key}
-              className={`ht-rail__tab ht-rail__tab--tool${i === 0 ? ' ht-rail__tab--tool-start' : ''}${view === v.key ? ' ht-rail__tab--active' : ''}`}
-              onClick={() => {
-                setSettingsFocus(undefined);
-                setView(v.key);
-              }}
-            >
-              <v.Icon size={ICON_SIZE.sm} aria-hidden="true" />
-              {/* 名字必须留在 DOM 里：它就是这个 tab 的 accessible name。
-                  显示规则见 `app.css` 的 `.ht-rail__label`。 */}
-              <span className="ht-rail__label ht-type-caption">{t(v.labelKey)}</span>
-            </button>
-          ))}
-
-        </div>
-
-        {/*
-          通知中心 / 活动。
-          🔴 **刻意是 `nav.ht-rail` 的直接子按钮、且在「帮助」之前**：
-          贴底靠的是 `.ht-rail__tab--tool:first-of-type { margin-top: auto }`，
-          而 `:first-of-type` 选的是父元素里第一个 `<button>`。给铃铛包一层 div
-          会让它拿不到那条规则 —— 铃铛会留在列表正下方、与帮助之间裂开一大块空白
-          （`InboxBell.tsx` 里有同一段说明）。
-          ⚠️ 它**不是** `role="tab"`（它是动作：打开一个面板，不切视图），
-          所以 `smoke.spec.ts` / `motivation.spec.ts` 数 tab 的断言不受影响。
-        */}
-        <InboxBell />
-
-        {/*
-          「帮助」——🔴 **刻意在 `role="tablist"` 外面**。
-          它不是视图（点了会切到设置页并滚到帮助那一段），
-          而 `role="tab"` 的元素**必须**是"切视图"那一类：把一个动作塞进 tablist
-          会让屏幕阅读器把它念成"另一个视图"。它与顶部的头像是同一类 —— **动作**。
-          ⚠️ **不做成第三个设置入口**：顶部头像里已经有一个「设置」，
-          再来一个会让人以为两个不一样。
-        */}
-        <button
-          type="button"
-          data-testid="rail-help"
-          className="ht-rail__tab ht-rail__tab--tool"
-          onClick={() => {
-            setSecondaryAccountSurface('settings');
-            setSettingsReturnSurface(undefined);
-            setSettingsFocus(undefined);
-            setView('settings');
-            setSettingsAnchor('help');
-          }}
-        >
-          <CircleHelp size={ICON_SIZE.sm} aria-hidden="true" />
-          <span className="ht-rail__label ht-type-caption">{t('web.shell.nav.help')}</span>
-        </button>
-
-        {/*
-          同步（工单 H9，2026-10-06 从页头搬下来）。**在「帮助」之后 = rail 最底下一组**，
-          与滴答左下角那一枚同位。它自己是一枚 `<div>` 包着的两三个按钮，
-          所以不会抢走 `.ht-rail__tab--tool:first-of-type { margin-top: auto }` 那条贴底规则
-          （`SyncBar.tsx` 里写着为什么必须是 `<div>`）。
-        */}
-        <SyncBar />
-      </nav>
+          见 `RailNavigation` 中的 `anchorLabel()`：它只写 CSS 自定义属性，不产生 state。 */}
+      <RailNavigation
+        view={view}
+        visibleMainTabs={visibleMainTabs}
+        visibleToolTabs={visibleToolTabs}
+        syncEmail={syncEmail}
+        syncNeedsSignIn={syncNeedsSignIn}
+        growthEnabled={enabledModules.has('growth')}
+        assistantActive={assistantWorkspace}
+        onOpenAssistant={() => { setSettingsFocus(undefined); setView('tasks'); setCompactAssistantOpen(false); setAssistantExpanded(true); }}
+        onNavigate={(key) => {
+          setAssistantExpanded(false);
+          setSettingsFocus(undefined);
+          setView(key);
+        }}
+        onResetTasks={() => useTaskStore.getState().setFilter({ kind: 'all' })}
+        onSignIn={() => useSyncStore.getState().openSignIn()}
+        onOpenSettings={() => {
+          setSecondaryAccountSurface('settings');
+          setSettingsReturnSurface(undefined);
+          setSettingsFocus(undefined);
+          setView('settings');
+        }}
+        onOpenProfile={() => {
+          setSecondaryAccountSurface('settings');
+          setSettingsReturnSurface(undefined);
+          setSettingsFocus(undefined);
+          setSettingsAnchor('profile');
+          setView('settings');
+        }}
+        onOpenProfileCenter={() => {
+          setSecondaryAccountSurface('profile');
+          setSettingsReturnSurface(undefined);
+          setSettingsAnchor(undefined);
+          setView('settings');
+        }}
+        onOpenGrowth={() => {
+          setSettingsFocus(undefined);
+          setView('growth');
+        }}
+        onSignOut={() => useSyncStore.getState().clearCredentials()}
+        onOpenHelp={() => {
+          setSecondaryAccountSurface('settings');
+          setSettingsReturnSurface(undefined);
+          setSettingsFocus(undefined);
+          setView('settings');
+          setSettingsAnchor('help');
+        }}
+      />
 
       {/*
         sidebar **只在有范围的视图里出现**，而且每个视图渲染**自己那一列**：
@@ -2311,6 +2149,7 @@ export function App(): React.JSX.Element {
         其余视图（四象限 / 习惯 / 时间线 / 便签 / 回收站 / 设置…）没有范围，主区吃满。
       */}
       {view === 'tasks' ? (
+        <ScopeDrawer open={scopeDrawerOpen} onClose={() => setScopeDrawerOpen(false)}>
         <nav className="ht-sidebar" aria-label={t('web.shell.nav.scopeAria')}>
           {/*
             🔴 这一层 `.ht-sidebar__body` 是**这一列唯一的滚动区**，而右边缘那枚
@@ -2373,15 +2212,27 @@ export function App(): React.JSX.Element {
           {/* 右边缘的拖拽手柄（绝对定位在这一列上，不占布局）。 */}
           <SidebarResizer />
         </nav>
+        </ScopeDrawer>
       ) : null}
 
       {/* 日历那一列自己带 `SidebarResizer`（同一份宽度状态，所以两端拖哪边都一样）。 */}
-      {view === 'calendar' ? <CalendarSidebar /> : null}
+      {view === 'calendar' && (narrowLayout || calendarSidebarOpen) ? (
+        <ScopeDrawer open={scopeDrawerOpen} onClose={() => setScopeDrawerOpen(false)}>
+          <CalendarSidebar />
+        </ScopeDrawer>
+      ) : null}
 
       <main className="ht-main">
         <header className="ht-header">
-          <span className="ht-header__brand ht-type-caption" aria-label={t('common.brand')}>{t('common.brand')}</span>
+          {view === 'tasks' ? (
+            <button type="button" className="ht-btn ht-btn--ghost ht-scope-trigger"
+              aria-label={t('web.shell.nav.scopeAria')} aria-haspopup="dialog" aria-expanded={scopeDrawerOpen}
+              onClick={() => setScopeDrawerOpen(true)} data-testid="task-scope-toggle">
+              <PanelLeft size={ICON_SIZE.md} aria-hidden="true" />
+            </button>
+          ) : null}
           <h1 className="ht-header__title">{title}</h1>
+          {view === 'habits' ? <div className="ht-header__habits-slot" data-habits-header-slot /> : null}
 
           {/*
             🔴 2026-10-01：**这里原来有一个搜索输入框，已删**（产品负责人：
@@ -2402,7 +2253,7 @@ export function App(): React.JSX.Element {
             **不要把它搬回来。**
           */}
           <div className="ht-header__actions">
-            {contentView === 'tasks' && visible.length > 0 ? (
+            {view === 'tasks' && visible.length > 0 ? (
               <div
                 style={{ display: 'flex', alignItems: 'center', gap: cssVar('space.2'), flexWrap: 'wrap' }}
                 data-testid="bulk-toolbar"
@@ -2511,7 +2362,7 @@ export function App(): React.JSX.Element {
               落盘走设备本地存储（`features/tasks/sort-pref.ts`），刷新后仍在、
               另一台设备各按各的。
             */}
-            {contentView === 'tasks' && visible.length > 0 && (
+            {view === 'tasks' && visible.length > 0 && (
               <label
                 data-testid="task-sort"
                 style={{
@@ -2565,6 +2416,11 @@ export function App(): React.JSX.Element {
             */}
             {view === 'calendar' ? (
               <CalendarHeaderToolbar
+                sidebarOpen={narrowLayout ? scopeDrawerOpen : calendarSidebarOpen}
+                onToggleSidebar={() => {
+                  if (narrowLayout) setScopeDrawerOpen((open) => !open);
+                  else useCalendarViewStore.getState().toggleCalendarSidebar();
+                }}
                 // 🔴 与 `visibleMainTabs` 同一个来源，不是"再问一遍开关"：
                 // 下拉里出现「时间线」而模块是关的 ⇒ 这条下拉就成了
                 // 绕过功能模块开关的第二条入口（`contentView` 只看 `view`）。
@@ -2603,7 +2459,15 @@ export function App(): React.JSX.Element {
               `aria-pressed` 报的是"这一栏现在在不在"，与名字互为对照 ——
               读屏用户不需要看见图标就能知道自己刚按下会收还是会展。
             */}
-            <button
+            {view === 'tasks' && !detailColumnShown ? (
+              <button ref={assistantTriggerRef} type="button" className="ht-btn ht-btn--ghost"
+                data-testid="assistant-open" aria-label={t('web.ai.assistant.title')}
+                aria-expanded={assistantOverlay} aria-controls="assistant-detail"
+                onClick={() => setCompactAssistantOpen(true)}>
+                <AssistantIcon size={ICON_SIZE.md} aria-hidden="true" />
+              </button>
+            ) : null}
+            {canToggleDetailPane ? <button
               type="button"
               className="ht-btn ht-btn--ghost ht-app__detail-toggle"
               data-testid="detail-pane-toggle"
@@ -2620,7 +2484,7 @@ export function App(): React.JSX.Element {
               ) : (
                 <PanelRightClose size={ICON_SIZE.md} aria-hidden="true" />
               )}
-            </button>
+            </button> : null}
           </div>
         </header>
 
@@ -2735,13 +2599,13 @@ export function App(): React.JSX.Element {
 
 
           {/*
-            AI 面（单步工具 + 对话助手）在**右栏不画**时才退回这里（≤1023px、用户收起）。
-            两个挂载点共用下面 `aiPanels` 那一份 JSX —— 不抄第二份。
+            AI Agent 在**右栏不画**时才退回这里（≤1023px、用户收起）。
+            右栏与中间列共用下面 `aiPanels` 那一份 JSX —— 不抄第二份。
             🔴 决定它是"栏在不在画"（`detailColumnShown` = 几何 + 用户选择），**不是**
             "栏里有没有东西"：后者取决于 AI 挂哪，用它就成了自己决定自己的循环
             （2026-10-06 第一刀那版正是这样把 AI 面永远锁在中间列的）。
           */}
-          {detailColumnShown ? null : aiPanels}
+
 
           {/*
             任务列表。**一行只有一个实现** —— 就是 `@heyta/ui` 的 `TaskList`
@@ -3013,7 +2877,7 @@ export function App(): React.JSX.Element {
               tabIndex={-1}
             >
 
-            <header className="ht-settings__header">
+            <header className={`ht-settings__header${secondaryAccountSurface === 'settings' && settingsReturnSurface !== 'profile' ? ' ht-settings__header--compact' : ''}`}>
               <div>
                 {secondaryAccountSurface === 'settings' && settingsReturnSurface === 'profile' ? (
                   <button
@@ -3030,12 +2894,13 @@ export function App(): React.JSX.Element {
                     {t('web.profile.overview.back')}
                   </button>
                 ) : null}
-                <p className="ht-settings__eyebrow ht-type-caption">{t('common.brand')}</p>
-                <h1 className="ht-settings__page-title ht-type-screen-title">
-                  {secondaryAccountSurface === 'profile'
-                    ? t('web.profile.overview.title')
-                    : t('web.shell.views.settings')}
-                </h1>
+                {secondaryAccountSurface === 'profile' ? (
+                  <>
+                    <h1 className="ht-settings__page-title ht-type-screen-title">
+                      {t('web.profile.overview.title')}
+                    </h1>
+                  </>
+                ) : null}
                 {secondaryAccountSurface === 'profile' ? (
                   <p className="ht-settings__lead">{t('web.profile.overview.lead')}</p>
                 ) : null}
@@ -3065,6 +2930,8 @@ export function App(): React.JSX.Element {
                   setSettingsAnchor('profile');
                 }}
                 onOpenSettings={() => {
+                  setSettingsFocus(undefined);
+                  setSettingsAnchor(undefined);
                   setSecondaryAccountSurface('settings');
                   setSettingsReturnSurface('profile');
                 }}
@@ -3075,7 +2942,12 @@ export function App(): React.JSX.Element {
               />
             ) : (
             <div className="ht-settings__layout">
-              <SettingsSectionNav />
+              <SettingsSectionNav active={activeSettingsSection} onSelect={(id) => {
+                setSettingsAnchor(undefined);
+                setSettingsFocus(undefined);
+                setSettingsSection(id);
+                document.querySelector('.ht-sheet')?.scrollTo({ top: 0 });
+              }} />
               <div className="ht-settings__content">
 
             {/*
@@ -3088,15 +2960,15 @@ export function App(): React.JSX.Element {
               它不带 `ht-*` 前缀，因为 `check:row-single-source` 只许 `ht-*` 前缀族
               **下降**，新造一族（哪怕只包一层）是要被拒的。
             */}
-            <section className="ht-settings__group" id="settings-group-profile" aria-labelledby="settings-group-profile-title">
+            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-profile'} id="settings-group-profile" aria-labelledby="settings-group-profile-title">
               <h2 className="ht-settings__group-title ht-type-section-title" id="settings-group-profile-title">
                 {t('web.settings.nav.profile')}
               </h2>
               <div id="settings-profile" data-testid="profile-section-anchor">
-                <ProfilePanel />
+                <ProfilePanel active={activeSettingsSection === 'settings-group-profile'} />
               </div>
             </section>
-            <section className="ht-settings__group" id="settings-group-appearance" aria-labelledby="settings-group-appearance-title">
+            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-appearance'} id="settings-group-appearance" aria-labelledby="settings-group-appearance-title">
               <h2 className="ht-settings__group-title ht-type-section-title" id="settings-group-appearance-title">
                 {t('web.settings.nav.appearance')}
               </h2>
@@ -3108,7 +2980,8 @@ export function App(): React.JSX.Element {
             */}
             <section className="ht-settings" data-testid="display-pref-panel">
               <h2 className="ht-settings__title ht-type-section-title">{t('web.settings.display.title')}</h2>
-              <p className="ht-settings__hint">{t('web.settings.display.dueNote')}</p>
+              <div className="ht-settings__preference-row">
+              <h3 className="ht-settings__h3 ht-type-headline">{t('web.shell.dueMode.aria')}</h3>
               <div
                 role="radiogroup"
                 aria-label={t('web.shell.dueMode.aria')}
@@ -3132,17 +3005,13 @@ export function App(): React.JSX.Element {
                   </label>
                 ))}
               </div>
-              {/*
-                详情列的常驻/收起（工单 W4 ②的第二条路径）。
-                🔴 与上面那组**同一个 section、同一条说明纪律**（2026-09-30 那条教训：
-                页头上光秃秃的「日期 | 倒计时」没人知道是什么）。这里必须带一句
-                说明，而且那句话要把"**什么时候这一项不起作用**"写进去 ——
-                窗口太窄或太矮时这一栏由几何直接不出现，此时选"常驻"也画不出来；
-                不写清这句，用户会把它当成一个坏掉的开关。
-                ⚠️ 用 `radio` 而不是 `checkbox`：两个档是**互斥的词表**（`open`/`collapsed`），
-                与设备本地存储里那两个值一一对应，不是一个布尔的两面。
-              */}
+              </div>
+              {/* 窄窗会自动收起辅助栏；说明只解释这一项非直觉的行为。 */}
+              <div className="ht-settings__preference-row">
+                <div className="ht-settings__preference-label">
+              <h3 className="ht-settings__h3 ht-type-headline">{t('web.settings.display.detail.title')}</h3>
               <p className="ht-settings__hint">{t('web.settings.display.detailNote')}</p>
+                </div>
               <div
                 role="radiogroup"
                 aria-label={t('web.settings.display.detail.title')}
@@ -3169,25 +3038,17 @@ export function App(): React.JSX.Element {
                   </label>
                 ))}
               </div>
-              {/*
-                🔴 **界面语言**（H9 第三刀，2026-10-06 从页头搬进来）。
-                它自带可见标签「语言」（`aria-labelledby` 指向那个标签），所以这里
-                **不再补一行标题** —— 两个标题会被读成两格设置。
-                搬走的代价与兜法写进 `LanguageSwitcher.tsx` 文件头。
-              */}
-              <p className="ht-settings__hint">{t('web.settings.display.langNote')}</p>
-              <LanguageSwitcher />
-              {/*
-                **主题**（与语言同一刀搬进来，两者原来就是并列的一对"显示偏好"）。
-                页头那一枚是**纯图标 + aria-label**，那是页头的规矩（那一排全是图标）；
-                在设置里同一枚控件必须**把字写在脸上** —— 所以这里没有 `aria-label`，
-                可访问名就是可见文字（`common.a11y.toDarkTheme` 那两条措辞本来就写着
-                "点下去会怎样"，直接当文案用）。
-              */}
-              <p className="ht-settings__hint">{t('web.settings.display.themeNote')}</p>
+              </div>
+              <div className="ht-settings__preference-row">
+                <h3 className="ht-settings__h3 ht-type-headline">{t('web.shell.lang.label')}</h3>
+                <LanguageSwitcher />
+              </div>
+              <div className="ht-settings__preference-row">
+                <h3 className="ht-settings__h3 ht-type-headline">{t('web.settings.display.themeTitle')}</h3>
               <button
                 type="button"
-                className="ht-btn ht-btn--ghost ht-settings__theme-toggle"
+                className="ht-settings__theme-toggle ht-type-row-title"
+                aria-label={theme === 'light' ? t('common.a11y.toDarkTheme') : t('common.a11y.toLightTheme')}
                 data-testid="theme-toggle"
                 onClick={() => {
                   const next: Theme = theme === 'light' ? 'dark' : 'light';
@@ -3198,11 +3059,12 @@ export function App(): React.JSX.Element {
                   setTheme(next);
                 }}
               >
-                {theme === 'light' ? <Moon size={ICON_SIZE.md} /> : <Sun size={ICON_SIZE.md} />}
+                {theme === 'light' ? <Sun size={ICON_SIZE.md} aria-hidden="true" /> : <Moon size={ICON_SIZE.md} aria-hidden="true" />}
                 <span>
-                  {theme === 'light' ? t('common.a11y.toDarkTheme') : t('common.a11y.toLightTheme')}
+                  {theme === 'light' ? t('web.settings.display.themeLight') : t('web.settings.display.themeDark')}
                 </span>
               </button>
+              </div>
             </section>
               {/*
                 🔴 **功能模块放在设置页最前**：它决定的不是某一项配置，而是
@@ -3212,8 +3074,23 @@ export function App(): React.JSX.Element {
               */}
               <FeatureModulesPanel enabled={enabledModules} onToggle={onToggleModule} />
               <ReminderNotifyPanel />
+              {/*
+                Windows 小组件的后台刷新（Web Push）。
+                🔴 **能力不可用时这个面板自己不画** —— http:// 上、没配 VAPID 的
+                自托管实例上、权限被拒之后，它都是一个点了必然失败的开关。
+                判断逻辑在 `WidgetPushPanel` 里（`probeWidgetPush`），
+                **不在这里** —— 调用点判断条件会被漏掉，而组件自己判断不会。
+              */}
+              {/*
+                卡片从哪来 —— 这一段必须在推送开关**之前**。
+                🔴 顺序是有意的：Windows 的卡片**只来自已安装的 PWA**，
+                用户不先把 heyta 装成应用，推送开关对他毫无意义
+                （卡片还不存在，刷新谁？）。
+              */}
+              <WidgetJourneyPanel />
+              <WidgetPushPanel active={activeSettingsSection === 'settings-group-appearance'} />
             </section>
-            <section className="ht-settings__group" id="settings-group-sync" aria-labelledby="settings-group-sync-title">
+            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-sync'} id="settings-group-sync" aria-labelledby="settings-group-sync-title">
               <h2 className="ht-settings__group-title ht-type-section-title" id="settings-group-sync-title">
                 {t('web.settings.nav.syncPrivacy')}
               </h2>
@@ -3230,7 +3107,7 @@ export function App(): React.JSX.Element {
                 决定的是"准不准出门" —— 地址是它们的前提，反过来排会让人在一个
                 永远不可能生效的开关上花时间（同一条理由见下面 `PrivacyPanel` 那段）。
               */}
-              <SyncSettingsPanel />
+              <SyncSettingsPanel active={activeSettingsSection === 'settings-group-sync'} />
               {/*
                 🔴 **隐私同意排在 AI 出境开关之前**：那三道闸（总开关 / 允许远程 /
                 逐功能授权）回答的是"哪一类数据可以出境"，而本面板回答的是
@@ -3238,9 +3115,9 @@ export function App(): React.JSX.Element {
                 在一个永远不可能生效的开关上花时间。
                 它同时是 PIPL 第 15 条要求的**撤回入口**（同意只在首启弹一次）。
               */}
-              <PrivacyPanel />
+              <PrivacyPanel active={activeSettingsSection === 'settings-group-sync'} />
             </section>
-            <section className="ht-settings__group" id="settings-group-ai" aria-labelledby="settings-group-ai-title">
+            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-ai'} id="settings-group-ai" aria-labelledby="settings-group-ai-title">
               <h2 className="ht-settings__group-title ht-type-section-title" id="settings-group-ai-title">
                 {t('web.settings.nav.aiIntegrations')}
               </h2>
@@ -3272,29 +3149,23 @@ export function App(): React.JSX.Element {
                 }}
               />
             </section>
-            <section className="ht-settings__group" id="settings-group-data" aria-labelledby="settings-group-data-title">
+            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-data'} id="settings-group-data" aria-labelledby="settings-group-data-title">
               <h2 className="ht-settings__group-title ht-type-section-title" id="settings-group-data-title">
                 {t('web.settings.nav.data')}
               </h2>
-              {/* 导出入口与 AI 设置并列在同一个设置页 —— 见 ExportPanel 文件头。 */}
-              <ExportPanel />
-              {/*
-                运营管理后台（ADR-0038）。**对非管理员什么都不渲染** ——
-                它自己探测一次 `/api/admin/overview`，403 就返回 null，
-                普通用户在设置页里看不到任何多出来的东西。
-                ⚠️ 这是 UX 而不是安全：授权由服务端的 `requireAdmin` 承担。
-              */}
-              <AdminPanel />
-              {/* 导入 / 还原是导出的另一半 —— 只支持还原到空库，见 ImportPanel 文件头。 */}
-              <ImportPanel />
-              {/* 从滴答清单迁进来（B2-1）—— 与上面的"还原自己的导出"是两件事，
-                  走普通 op、可与既有数据共存。见 TickTickImportPanel 文件头。 */}
-              <TickTickImportPanel />
+              <DataSettingsPanel active={activeSettingsSection === 'settings-group-data'} />
             </section>
-            <section className="ht-settings__group" id="settings-group-account" aria-labelledby="settings-group-account-title">
+            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-account'} id="settings-group-account" aria-labelledby="settings-group-account-title">
               <h2 className="ht-settings__group-title ht-type-section-title" id="settings-group-account-title">
                 {t('web.settings.nav.account')}
               </h2>
+              {accountNeedsSignIn ? (
+                <SettingsAccountGate
+                  messageKey="web.settings.accountSignIn"
+                  testId="settings-account-needs-sign-in"
+                />
+              ) : (
+                <>
               {/*
                 托管同步续费（临时方案：再下一单 = 在当前到期日之后叠 30 天）。
                 它排在"数据进出"之后、"账号安全"之前：这一档买的是**服务**，
@@ -3304,33 +3175,21 @@ export function App(): React.JSX.Element {
               */}
               <RenewPanel />
               {/* 账号安全：管理自己的通行密钥（列 / 删）。见 PasskeyPanel 文件头。 */}
-              <PasskeyPanel />
+              <PasskeyPanel active={activeSettingsSection === 'settings-group-account'} />
               {/* 账号安全：改登录密码（`/api/password/change` 的唯一界面入口）。 */}
               <PasswordPanel />
               {/*
                 账号安全：注销账号（批次 E3）。服务端 `DELETE /api/account` 一直在，
                 缺的是调用点 —— 而 E2 那条"收到注销信号就清本机"的反应也等在这里
                 被主动触发一次，不然它只能靠下一次同步的回声。
-                🔴 未登录时这个面板自己返回 null（没有令牌就没有"哪个账号"可注销）。
+                🔴 未登录时账号组由上面的统一登录入口承接；面板自身仍保留
+                独立 guard，单独挂载时不会误显示注销控件。
               */}
               <CloseAccountPanel />
-              {/*
-                Windows 小组件的后台刷新（Web Push）。
-                🔴 **能力不可用时这个面板自己不画** —— http:// 上、没配 VAPID 的
-                自托管实例上、权限被拒之后，它都是一个点了必然失败的开关。
-                判断逻辑在 `WidgetPushPanel` 里（`probeWidgetPush`），
-                **不在这里** —— 调用点判断条件会被漏掉，而组件自己判断不会。
-              */}
-              {/*
-                卡片从哪来 —— 这一段必须在推送开关**之前**。
-                🔴 顺序是有意的：Windows 的卡片**只来自已安装的 PWA**，
-                用户不先把 heyta 装成应用，推送开关对他毫无意义
-                （卡片还不存在，刷新谁？）。
-              */}
-              <WidgetJourneyPanel />
-              <WidgetPushPanel />
+                </>
+              )}
             </section>
-            <section className="ht-settings__group" id="settings-group-help" aria-labelledby="settings-group-help-title">
+            <section className="ht-settings__group" hidden={activeSettingsSection !== 'settings-group-help'} id="settings-group-help" aria-labelledby="settings-group-help-title">
               <h2 className="ht-settings__group-title ht-type-section-title" id="settings-group-help-title">
                 {t('web.settings.nav.help')}
               </h2>
@@ -3362,7 +3221,7 @@ export function App(): React.JSX.Element {
           "能点、能聚焦、拖了没反应"是这一仓明令禁止的形状（见 `narrow.css` 里
           `.ht-sidebar__resizer { display: none }` 那一段的同一条理由）。
         */}
-        <DetailColumnResizer />
+        {canToggleDetailPane ? <DetailColumnResizer /> : null}
       </main>
       {/*
        * 🔴 详情列（工单 W2）：`.ht-app` 的**直接子项**，与 `<main>` 平级。
@@ -3379,7 +3238,7 @@ export function App(): React.JSX.Element {
        *   · 习惯 = 选中一条习惯 ⇒ 同一格出板子（§8.133；板子始终一枚是 `motivation.spec`
        *     白屏检测的前提，未选中时它说的是"选一条习惯…"，见 `HabitDetailCard` 文件头）
        *   · 任务 / 四象限 / 时间线 = 选中一条任务 ⇒ 同一格出面单（§8.138 起字段逐格搬进来）
-       *   · 其余（含上述各面的未选中态）= AI 面 `aiPanels`
+       *   · 其余（含上述各面的未选中态）= AI Agent 面 `aiPanels`
        *
        * ⚠️ 它**曾经**是空的，而且那是设计不是半成品：产品负责人当时的原话是
        * "即使没东西也空在那里，一旦选中任何东西右边就出详细的面单"，被主计划 §5.4
@@ -3388,7 +3247,7 @@ export function App(): React.JSX.Element {
        * 便签/习惯/任务三面按的是**正条**：选中才换面单，不另开第三处。
        *
        * ⚠️ 窄屏（≤1023px）这一列不出现，规则与算过的账在 `styles/app/narrow.css`。
-       * AI 面在那几档**退回中间列**（`{detailColumnShown ? null : aiPanels}`，见上面任务列末尾），
+       * AI Agent 在那几档**退回中间列**（`{detailColumnShown ? null : aiPanels}`，见上面任务列末尾），
        * 不跟着这一栏一起消失。
        * 🔴 落点只看"栏在不在画"（几何 + 用户选择），**不看**"栏里有没有东西"：
        * 栏里有没有东西恰恰取决于 AI 挂哪。2026-10-06 第一刀那版写成
@@ -3400,7 +3259,13 @@ export function App(): React.JSX.Element {
        * ⚠️ 这一栏仍然**没有无障碍名**。"因为里面没内容"那句理由已经不成立（五面都在住），
        * 留着的是另一条：定名字就要新词条、中英必须成对，不在合流这一笔里顺手定。
        */}
+      {assistantOverlay ? <div className="ht-app__assistant-backdrop" onClick={() => setCompactAssistantOpen(false)} /> : null}
       <aside
+        id="assistant-detail"
+        role={assistantOverlay ? 'dialog' : undefined}
+        aria-modal={assistantOverlay ? true : undefined}
+        aria-label={assistantOverlay ? t('web.ai.assistant.title') : undefined}
+        data-assistant-overlay={assistantOverlay ? '' : undefined}
         ref={detailRef}
         className="ht-app__detail"
         data-testid="detail-column"
@@ -3409,7 +3274,7 @@ export function App(): React.JSX.Element {
            `detailHasContent` 冻结在卸载前的值（effect 依赖是 `[]`）。 */
         hidden={view === 'settings'}
       >
-        {contentView === 'focus' ? (
+        {assistantWorkspace ? aiPanels : contentView === 'focus' ? (
           <FocusDetailPane />
         ) : contentView === 'notes' && detailColumnShown ? (
           /* 那一栏本身没有内边距（`.ht-app__detail` 只有 `border-left`）：每一面自己给 inset。
@@ -3430,7 +3295,7 @@ export function App(): React.JSX.Element {
              🔴 备注编辑器的落点在**这一格**，所以行尾那颗备注 chip 在这一支成立时不渲染
              （`renderTaskTrailing` 里的 `noteInColumn`）—— 同一字段任何时刻只有一个所有者。 */
           <TaskDetailCard />
-        ) : detailColumnShown ? (
+        ) : contentView === 'tasks' ? (
           /* 兜底那一格是 AI 面（2026-10-04 拍板：无选中时默认显示 Chatbot；
              2026-10-06 第二刀才真的兑现它，判据 = `ai-row-layout.spec.ts` 的落点那一支）。
              🔴 它排在**最后**：上面四面任一成立时这一栏已被占，AI 面不叠第二处。

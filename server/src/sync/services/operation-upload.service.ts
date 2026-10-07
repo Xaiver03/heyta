@@ -1,3 +1,4 @@
+import { authorizeInboundOperations, type InboundUploadIdentity } from '../../automation/worker-identity';
 import { Prisma } from '@prisma/client';
 import { Logger } from '../../logger';
 import {
@@ -228,6 +229,7 @@ export class OperationUploadService {
     prevalidatedResult?: ValidationResult,
     wasOccupiedAtRequestStart?: boolean,
     firstRequestOperation?: { op: Operation; originalTimestamp: number },
+    inboundIdentity?: InboundUploadIdentity,
   ): Promise<ProcessOperationResult> {
     // Rejected ops have no storage cost; the caller only reads storageBytes when
     // result.accepted is true.
@@ -236,6 +238,12 @@ export class OperationUploadService {
       storageBytes: 0,
       fallback: false,
     });
+
+    // This also guards internal upload callers and exact duplicate returns.
+    if (!await authorizeInboundOperations(tx, userId, clientId, [op], inboundIdentity)) {
+      return reject({ opId: op.id, accepted: false, error: 'Inbound commit authorization required',
+        errorCode: SYNC_ERROR_CODES.INBOUND_AUTH_REQUIRED });
+    }
 
     // Clamp future timestamps instead of rejecting them (prevents silent data
     // loss).

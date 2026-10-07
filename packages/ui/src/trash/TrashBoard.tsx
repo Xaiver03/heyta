@@ -181,8 +181,6 @@ export function TrashBoard({
                       minHeight: tokens['touch-target.min'],
                       paddingHorizontal: tokens['space.3'],
                       borderRadius: tokens['radius.sm'],
-                      borderWidth: tokens['border-width.thin'],
-                      borderColor: tokens['color.border'],
                     },
                   ]}
                   testID={`${testID}-restore-${item.id}`}
@@ -212,8 +210,7 @@ export function TrashBoard({
                       minHeight: tokens['touch-target.min'],
                       paddingHorizontal: tokens['space.3'],
                       borderRadius: tokens['radius.sm'],
-                      borderWidth: tokens['border-width.thin'],
-                      borderColor: tokens['color.danger'],
+                      backgroundColor: tokens['color.danger-subtle'],
                     },
                   ]}
                   testID={`${testID}-purge-${item.id}`}

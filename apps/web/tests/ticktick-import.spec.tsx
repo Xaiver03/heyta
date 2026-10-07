@@ -4,7 +4,7 @@
  *
  * 这个文件守四件事：
  *
- *   1. **界面诚实**：只认滴答清单（Todoist 的解析不存在），且说清它与
+ *   1. **界面诚实**：只认滴答清单（其他应用格式暂不支持），且说清它与
  *      "还原自己的导出"是两件不同的事。
  *   2. **先预览、不写库**：选完文件只出现预览，op-log 一条都不许动。
  *   3. **确认后真的写**：任务落进 op-log（不是只改本地态），且报告里的
@@ -122,13 +122,14 @@ afterEach(() => {
 });
 
 describe('TickTickImportPanel', () => {
-  it('🔴 界面只说它认的那一种来源，且与"还原"分开说', () => {
+  it('🔴 界面使用当前用户文案，只认滴答清单且与"还原"分开说', () => {
     const el = render();
     expect(el.querySelector('[data-testid="ticktick-import-panel"]')).not.toBeNull();
 
     const only = el.querySelector('[data-testid="ticktick-ticktick-only"]')?.textContent ?? '';
-    expect(only).toContain('只认滴答清单');
-    expect(only).toContain('Todoist');
+    expect(only).toContain('请选择从滴答清单导出的 CSV 文件');
+    expect(only).toContain('暂不支持其他应用的备份格式');
+    expect(only).not.toContain('Todoist');
 
     const coexist = el.querySelector('[data-testid="ticktick-coexist"]')?.textContent ?? '';
     expect(coexist).toContain('可以与现有数据共存');

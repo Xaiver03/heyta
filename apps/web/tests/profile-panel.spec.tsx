@@ -256,8 +256,9 @@ describe('个人信息面板（R10）', () => {
       await mount();
       expect(calls, '未登录却发了请求').toEqual([]);
 
-      await setInput(find<HTMLInputElement>('profile-nickname-input')!, '想改的昵称');
-      await click(find<HTMLElement>('profile-nickname-save'));
+      expect(find<HTMLInputElement>('profile-nickname-input')).toBeNull();
+      await click(find<HTMLElement>('profile-signin-required-action'));
+      expect(useSyncStore.getState().signInOpen).toBe(true);
       expect(calls, '没有令牌也要发请求 = 拿 401 当作用户反馈').toEqual([]);
     } finally {
       process.off('unhandledRejection', onError);

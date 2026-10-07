@@ -756,15 +756,16 @@ describe('应用 → 站点：孤岛的另一半', () => {
       paths,
       '设置页里缺少指向站点的入口 —— 应用与站点仍然是两个孤岛',
     ).toEqual([
-      `${window.location.origin}/help`,
-      `${window.location.origin}/changelog`,
-      `${window.location.origin}/pricing`,
+      'https://heyta.waytofuture.cn/docs',
+      'https://heyta.waytofuture.cn/changelog',
+      'https://heyta.waytofuture.cn/pricing',
     ]);
 
     // 外链一律带 noopener：`noopener` 防被打开页面反向操纵本页，
     // `noreferrer` 一起带上是因为 Referer 会泄露用户**在应用的哪一页**。
     for (const link of links) {
       expect(link.getAttribute('rel')).toBe('noopener noreferrer');
+      expect(link.getAttribute('target')).toBe('_blank');
     }
   });
 
@@ -870,7 +871,8 @@ describe('信息架构：rail / sidebar / header 的分工', () => {
     // 把期望写死在这里，是成本最低、又能真正盖住"有人在 rail 上顺手加了个按钮"
     // 这一失效模式的做法。
     //
-    // 默认主段 = 4 个高频目的地（任务/日历/习惯/搜索）+ 下段工具「回收站」。
+    // 默认主段 = 4 个高频目的地（任务/日历/习惯/搜索）+ 单一 AI Agent 入口；
+    // 下段工具是「回收站」。Agent 是统一聊天入口，不再拆成工具/会话多个目的地。
     // 低频的四象限 / 时间线进入「更多」，但仍必须保持可达。
     const railLabels = [...rail!.querySelectorAll('button[role="tab"]')].map((b) =>
       (b.textContent ?? '').trim(),
@@ -880,6 +882,7 @@ describe('信息架构：rail / sidebar / header 的分工', () => {
       '日历',
       '习惯',
       '搜索',
+      '对话助手',
       '回收站',
     ]);
 
@@ -890,7 +893,7 @@ describe('信息架构：rail / sidebar / header 的分工', () => {
     await act(async () => {
       more?.click();
     });
-    const overflowLabels = [...rail!.querySelectorAll('[role="menuitem"]')].map((button) =>
+    const overflowLabels = [...document.querySelectorAll('[role="menu"] [role="menuitem"]')].map((button) =>
       (button.textContent ?? '').trim(),
     );
     expect(overflowLabels, '低频视图必须在「更多」里可达').toEqual(['四象限', '时间线']);
@@ -903,11 +906,11 @@ describe('信息架构：rail / sidebar / header 的分工', () => {
     ).toBe(0);
   });
 
-  it('🔴 「任务」视图有 sidebar（收集箱/今天/已完成…）', async () => {
+  it('🔴 「任务」视图有 sidebar（今天/最近 7 天/已完成…）', async () => {
     const { container } = await mountApp();
     const sidebar = container.querySelector('.ht-sidebar');
     expect(sidebar, '任务视图应当有范围列').not.toBeNull();
-    expect(sidebar!.textContent ?? '').toContain('收集箱');
+    expect(sidebar!.textContent ?? '').toContain('今天');
   });
 
   it('🔴 没有范围的视图（设置）**不画 sidebar**', async () => {
@@ -950,15 +953,16 @@ describe('信息架构：rail / sidebar / header 的分工', () => {
  */
 describe('功能模块：关掉的模块从 rail 消失', () => {
   const railTabLabels = (el: HTMLElement): string[] =>
-    [...el.querySelectorAll('.ht-rail button[role="tab"], .ht-rail [role="menuitem"]')].map(
-      (b) => b.textContent?.trim() ?? '',
-    );
+    [
+      ...el.querySelectorAll('.ht-rail button[role="tab"], .ht-rail [role="menuitem"]'),
+      ...document.querySelectorAll('[role="menu"] [role="menuitem"]'),
+    ].map((b) => b.textContent?.trim() ?? '');
 
   async function openMoreIfPresent(el: HTMLElement): Promise<void> {
     const more = [...el.querySelectorAll('.ht-rail button')].find(
       (button) => (button.textContent ?? '').trim() === '更多',
     ) as HTMLButtonElement | undefined;
-    if (more !== undefined && el.querySelector('[role="menu"]') === null) {
+    if (more !== undefined && document.querySelector('[role="menu"]') === null) {
       await act(async () => {
         more.click();
       });

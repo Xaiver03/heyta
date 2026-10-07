@@ -110,7 +110,7 @@ export const MOCK_QUADRANT_SHAPE: readonly MockQuadrantShape[] = [
 
 /**
  * 面板上与象限无关的三条文案 key。对应 `features/quadrant/copy.ts` 的
- * `cellA11y` / `empty` / `footnote`。
+ * `cellA11y` / `empty`。
  *
  * 🔴 `cellA11y` 是**整格给屏幕阅读器的一句话**（模板 `象限：{title}，{hint}`）——
  * 复刻原来**完全没有**这一层，于是"格叫什么"只有肉眼可得。判据会逐格比对。
@@ -118,7 +118,6 @@ export const MOCK_QUADRANT_SHAPE: readonly MockQuadrantShape[] = [
 export const MOCK_QUADRANT_KEYS = {
   cellA11y: 'web.quadrant.a11y.cell',
   empty: 'web.quadrant.dropHere',
-  footnote: 'web.quadrant.footnote',
 } as const satisfies Record<string, MessageKey>;
 
 /**

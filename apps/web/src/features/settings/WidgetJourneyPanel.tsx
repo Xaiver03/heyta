@@ -10,7 +10,7 @@ import { ICON_SIZE } from '@heyta/design-system';
  * ## 分层（AGENTS.md §3.5）
  *
  * 这里**没有一行平台知识**：平台三分支、步骤表、"要不要教怎么装"全在
- * `../pwa/widget-install.js`（纯逻辑、14 条测试）。本文件只把状态渲染成句子。
+ * `../pwa/widget-install.js`（纯逻辑，测试覆盖宿主与平台分支）。本文件只把状态渲染成句子。
  *
  * ## 🔴 两个界面决定
  *
@@ -62,9 +62,9 @@ import {
 import {
   installSteps,
   isRunningStandalone,
-  resolveInstallPlatform,
-  shouldShowInstallGuide,
+  resolveWidgetJourneyHost,
 } from '../../pwa/widget-install.js';
+import { resolveStorageBackend } from '../../lib/oplog.js';
 
 /** 取当前平台名。⚠️ `userAgentData` 在部分浏览器没有，回落到 `platform`。 */
 function currentPlatformName(): string {
@@ -75,6 +75,8 @@ function currentPlatformName(): string {
 export function WidgetJourneyPanel(): React.JSX.Element {
   const { t } = useI18n();
   const [standalone, setStandalone] = useState(false);
+  // 原生壳通过真实端口注入能力；不要用 UA 把原生窗口当成浏览器标签页。
+  const nativeShell = resolveStorageBackend() === 'shell';
 
   useEffect(() => {
     // ⚠️ 放进 effect 而不是渲染期：`matchMedia` 在 SSR / 无 DOM 环境下不存在，
@@ -82,8 +84,29 @@ export function WidgetJourneyPanel(): React.JSX.Element {
     setStandalone(isRunningStandalone((q) => window.matchMedia(q).matches));
   }, []);
 
-  const steps = installSteps(resolveInstallPlatform(currentPlatformName()));
-  const showInstall = shouldShowInstallGuide(standalone);
+  const hostState = resolveWidgetJourneyHost(currentPlatformName(), standalone, nativeShell);
+  const steps = installSteps(hostState.platform);
+  // 网页小组件目前只有 Windows PWA 这条宿主链路。原生桌面窗口已经安装，
+  // 但“应用已安装”与“系统小组件可用”是两个独立事实，不能混成一个状态。
+  const showInstall = hostState.showInstallGuide;
+  const statusKey =
+    hostState.host === 'native-shell'
+      ? 'web.widgetJourney.status.native'
+      : hostState.host === 'windows-pwa' || hostState.host === 'standalone'
+        ? 'web.widgetJourney.status.standalone'
+        : 'web.widgetJourney.status.browser';
+  const introKey =
+    hostState.host === 'native-shell'
+      ? 'web.widgetJourney.intro.native'
+      : hostState.provider !== 'none'
+        ? 'web.widgetJourney.intro'
+        : 'web.widgetJourney.intro.unsupported';
+  const noteKey =
+    hostState.host === 'native-shell'
+      ? 'web.widgetJourney.note.nativeShell'
+      : hostState.provider !== 'none'
+        ? 'web.widgetJourney.note.widgetSource'
+        : 'web.widgetJourney.note.unsupportedPlatform';
 
   /**
    * 整段内容 → 共享的类型化行（与 mobile 的「我的」屏同一份骨架）。
@@ -97,9 +120,7 @@ export function WidgetJourneyPanel(): React.JSX.Element {
       kind: 'note',
       testID: 'widget-journey-status',
       leading: <MonitorCheck aria-hidden="true" size={ICON_SIZE.xs} />,
-      text: standalone
-        ? t('web.widgetJourney.status.standalone')
-        : t('web.widgetJourney.status.browser'),
+      text: t(statusKey),
     },
     ...(showInstall
       ? ([
@@ -116,8 +137,13 @@ export function WidgetJourneyPanel(): React.JSX.Element {
           })),
         ] as const)
       : []),
-    // 🔴 这句是这一屏最该被读到的一句 —— 见文件头（2）。
-    { kind: 'note', text: t('web.widgetJourney.note.widgetSource'), divider: true },
+    // 原生壳与非 Windows 浏览器不共用 Windows PWA 的能力边界。
+    {
+      kind: 'note',
+      testID: 'widget-journey-capability',
+      text: t(noteKey),
+      divider: true,
+    },
   ];
 
   return (
@@ -125,7 +151,7 @@ export function WidgetJourneyPanel(): React.JSX.Element {
       <SettingsSection
         testID="widget-journey-panel"
         title={t('web.widgetJourney.sectionTitle')}
-        note={t('web.widgetJourney.intro')}
+        note={t(introKey)}
         leading={<LayoutGrid aria-hidden="true" size={ICON_SIZE.md} />}
         rows={rows}
       />

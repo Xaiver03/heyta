@@ -70,6 +70,20 @@ describe('移动端个人中心与设置的 IA 接线', () => {
     expect(settings).toContain('rows={securityActions}');
   });
 
+  it('同步默认走 heyta 登录；自托管字段只在高级路径显示', () => {
+    expect(settings).toContain('onOpenAuth');
+    expect(settings).toContain("t('mobile.profile.sync.officialTitle')");
+    expect(settings).toContain("t('mobile.profile.sync.advancedOpen')");
+    expect(settings).toContain("t('mobile.profile.sync.advancedTitle')");
+    expect(settings).toContain('advancedSync ?');
+    expect(settings).toContain('form.token.trim() !== \'\'');
+    expect(settings).toContain('form.setServerUrl(DEFAULT_SERVER_URL)');
+    expect(profile).toContain('onOpenAuth={openAuth}');
+    expect(profile).toContain('if (!allowServerSelection)');
+    expect(settings).toContain('onOpenAuth(true)');
+    expect(profile).toContain('onUseOfficialSync={onClearCredentials}');
+  });
+
   it('清单、标签、便签是 profile 栈的二级管理页，并沿同一条返回路径', () => {
     for (const key of ['lists', 'tags', 'notes']) {
       expect(profile).toContain(`navigation.push('profile:${key}');`);
@@ -80,7 +94,9 @@ describe('移动端个人中心与设置的 IA 接线', () => {
 
   it('设置 Modal 只在 profile tab 显示，关闭和 Android 返回都 pop 当前栈', () => {
     expect(profile).toContain("visible={navigation.tab === 'profile' && settingsOpen}");
-    expect(profile).toContain('onClose={() => {\n          navigation.pop();\n        }}');
+    expect(profile).toContain('setSettingsSection(undefined);');
+    expect(profile).toContain('onClose={() => {');
+    expect(profile).toContain('navigation.pop();');
     expect(settings).toContain('onRequestClose={onClose}');
   });
 });

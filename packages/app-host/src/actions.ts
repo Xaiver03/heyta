@@ -46,7 +46,7 @@ import {
   toLocalDate,
   today,
   validateParentChange,
-  type QuadrantDropPlan,
+  type QuadrantTaskPatch,
   type Task,
 } from '@heyta/domain';
 import type { MaterializedState, OpIntent } from '@heyta/op-log';
@@ -220,7 +220,7 @@ export interface TaskActions {
    * 投放计划由领域层的纯函数 `planQuadrantDrop` 算出来 —— 那是产品语义，
    * 有穷举测试（4 象限 × 3 种截止时间状态）。这里只负责**原子地写下去**。
    */
-  setQuadrantDrop(entityId: string, plan: QuadrantDropPlan): Promise<void>;
+  setQuadrantDrop(entityId: string, plan: QuadrantTaskPatch): Promise<void>;
   /** 传 `undefined` 表示清除截止时间（会写成 `null`，见文件头第 2 条）。 */
   setDueDate(entityId: string, dueDate: number | undefined): Promise<void>;
   /**

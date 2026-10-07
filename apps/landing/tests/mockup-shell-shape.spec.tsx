@@ -337,9 +337,9 @@ describe('#4 标签区：登记处 ⟷ 真应用 `ProjectsPanel`', () => {
   it('真应用的清单区与标签区都还在（两块同形区块）', () => {
     const panel = projectsPanelSource();
     expect(panel).toContain("t('web.projects.heading')");
-    expect(panel).toContain("t('web.projects.newPlaceholder')");
+    expect(panel).toContain("t('web.projects.addNew')");
     expect(panel).toContain("t('web.tags.heading')");
-    expect(panel).toContain("t('web.tags.newPlaceholder')");
+    expect(panel).toContain("t('web.tags.addNew')");
   });
 
   it('登记的两块区块与 `ProjectsPanel` 逐项同 key', () => {
@@ -347,21 +347,20 @@ describe('#4 标签区：登记处 ⟷ 真应用 `ProjectsPanel`', () => {
       'web.projects.heading',
       'web.tags.heading',
     ]);
-    expect(SHELL_PANEL_SECTIONS.map((section) => section.newPlaceholderKey)).toEqual([
-      'web.projects.newPlaceholder',
-      'web.tags.newPlaceholder',
+    expect(SHELL_PANEL_SECTIONS.map((section) => section.createLabelKey)).toEqual([
+      'web.projects.addNew',
+      'web.tags.addNew',
     ]);
   });
 
-  it('渲染出的侧栏有「清单 + 标签」两块，且都是「输入框 + 加号」形态', () => {
+  it('渲染出的侧栏有「清单 + 标签」两块，且使用行列表 + 标题级创建入口', () => {
     const view = renderMockup();
     const sidebarText = view.querySelector('.mk-sidebar')?.textContent ?? '';
     expect(sidebarText).toContain(zhCN['web.projects.heading']);
     expect(sidebarText).toContain(zhCN['web.tags.heading']);
-    const boxes = [...view.querySelectorAll('.mk-field__box')].map((el) => el.textContent?.trim());
-    expect(boxes).toEqual([
-      zhCN['web.projects.newPlaceholder'],
-      zhCN['web.tags.newPlaceholder'],
+    const rows = [...view.querySelectorAll('.mk-projects__row')].map((el) => el.textContent?.trim());
+    expect(rows).toEqual([
+      ...SHELL_PANEL_SECTIONS.flatMap((section) => section.sampleNameKeys.map((key) => zhCN[key])),
     ]);
     expect(view.querySelectorAll('.mk-field__add')).toHaveLength(SHELL_PANEL_SECTIONS.length);
   });
@@ -414,15 +413,20 @@ describe('#5 视图 tab：登记处 ⟷ 真应用 `VIEW_TABS`', () => {
   });
 
   it('渲染出的默认 rail 是 7 项，标签逐字等于应用词条', () => {
-    const view = renderMockup();
-    const bar = view.querySelectorAll('.mk-header .mk-viewtabs')[0];
-    const labels = [...(bar?.querySelectorAll('.mk-viewtab') ?? [])].map(
+    const view = renderMockup('tasks');
+    const labels = [...view.querySelectorAll('.mk-rail__tab[data-view-key]')].map(
       (el) => el.textContent?.trim() ?? '',
     );
-    expect(labels).toHaveLength(7);
+    expect(labels).toHaveLength(5);
     // ⚠️ `web.shell.nav.quadrant`（视图 tab）与 `web.shell.nav.quadrantSection`（侧栏分区）
     // 中文逐字相同 —— 所以只比渲染出的文本抓不到"抄错 key"。文本相等 + key 对账两条一起才够。
-    expect(labels).toEqual(SHELL_VIEW_TABS.map((tab) => zhCN[tab.labelKey]));
+    expect(labels).toEqual([
+      zhCN['web.shell.nav.tasks'],
+      zhCN['web.calendar.title'],
+      zhCN['web.shell.views.habits'],
+      zhCN['web.search.title'],
+      zhCN['web.trash.nav'],
+    ]);
     expect(SHELL_VIEW_TABS.map((tab) => zhCN[tab.labelKey])).toEqual(
       appDefaultRail().labelKeys.map((key) => zhCN[key as keyof typeof zhCN]),
     );
@@ -505,7 +509,16 @@ describe('#7 页头右侧：登记处 ⟷ 真应用 `.ht-header__actions`', () =
   }
 
   it('解析器读得出东西（阳性对照：挡"改名/挪走之后恒返回空集，于是双向都绿"）', () => {
-    expect(webTestids()).toEqual(['task-sort', 'task-sort-select', 'detail-pane-toggle']);
+    expect(webTestids()).toEqual([
+      'bulk-toolbar',
+      'bulk-complete',
+      'bulk-repeat-warning',
+      'bulk-undo',
+      'task-sort',
+      'task-sort-select',
+      'assistant-open',
+      'detail-pane-toggle',
+    ]);
   });
 
   it('登记处的锚点与产品页头实际出现的 testid 是同一批（双向等集，不是子集）', () => {
@@ -535,7 +548,9 @@ describe('#7 页头右侧：登记处 ⟷ 真应用 `.ht-header__actions`', () =
       (el) => el.getAttribute('aria-label') ?? '',
     );
     const text = actions?.textContent ?? '';
-    const shown = SHELL_HEADER_ACTIONS.filter((a) => a.onlyForView === undefined || a.onlyForView === 'tasks');
+    const shown = SHELL_HEADER_ACTIONS.filter(
+      (a) => a.mockedInLanding !== false && (a.onlyForView === undefined || a.onlyForView === 'tasks'),
+    );
     expect(actions?.children.length).toBe(shown.length);
     for (const action of shown) {
       const label = zhCN[action.labelKey];
@@ -549,8 +564,9 @@ describe('#7 页头右侧：登记处 ⟷ 真应用 `.ht-header__actions`', () =
   it('非任务视图里那一枚按产品的条件消失，详情开关仍在（条件不许抄错）', () => {
     const view = renderMockup('quadrant');
     const actions = view.querySelector('.mk-header__actions');
-    const conditional = SHELL_HEADER_ACTIONS.filter((a) => a.onlyForView !== undefined);
-    const unconditional = SHELL_HEADER_ACTIONS.length - conditional.length;
+    const renderedActions = SHELL_HEADER_ACTIONS.filter((a) => a.mockedInLanding !== false);
+    const conditional = renderedActions.filter((a) => a.onlyForView !== undefined);
+    const unconditional = renderedActions.length - conditional.length;
     expect(
       actions?.children.length,
       `条件件数 ${String(conditional.length)} 在未命中视图里没被滤掉（实际 ${String(actions?.children.length)}）`,
@@ -584,4 +600,3 @@ describe('#7 页头右侧：登记处 ⟷ 真应用 `.ht-header__actions`', () =
     expect(app).toContain("'web.shell.dueMode.date'");
   });
 });
-

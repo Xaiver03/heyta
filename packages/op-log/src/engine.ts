@@ -18,6 +18,7 @@
  */
 
 import type { EntityType } from '@heyta/shared-schema';
+import { hasTaskBatchMarker, parseTaskBatchOperation, taskBatchOperationId, type HeytaTaskBatchPayload } from '@heyta/shared-schema';
 import type { Operation, VectorClock } from '@heyta/sync-core';
 import {
   OpType,
@@ -386,19 +387,50 @@ export class OpLogEngine {
     return this.serialize(() => this.dispatchLocked(intent));
   }
 
-  private async dispatchLocked(intent: OpIntent): Promise<DispatchResult> {
+  /** Host-owned local preconditions run under the same serialization as writes.
+   * Recovery of an already committed intent does not rerun creation preconditions.
+   */
+  dispatchValidated(intent: OpIntent, validate: (state: MaterializedState) => void): Promise<DispatchResult> {
+    return this.serialize(() => this.dispatchLocked(intent, validate));
+  }
+
+  private async dispatchLocked(intent: OpIntent, validate?: (state: MaterializedState) => void): Promise<DispatchResult> {
+    const batch = hasTaskBatchMarker(intent.payload)
+      ? parseTaskBatchOperation({ ...intent, payload: intent.payload })
+      : undefined;
+    // Do not retain caller-owned arrays/objects across the indexed lookup await.
+    if (batch !== undefined) intent = {
+      entityType: 'TASK', opType: OpType.Batch, entityId: batch.tasks[0]!.id,
+      entityIds: batch.tasks.slice(1).map((task) => task.id), payload: batch,
+    };
+    const fixedId = batch === undefined ? undefined : taskBatchOperationId(batch.source.eventId);
+    if (batch !== undefined && fixedId !== undefined) {
+      const recovered = await this.recoverTaskBatchDispatch(fixedId, batch);
+      if (recovered !== undefined) return recovered;
+      // A snapshot can contain a receipt without the original local log row.
+      // Absence of the row does not authorize recreating a completed event.
+      if (this.appliedOpIds.has(fixedId) || batch.tasks.some((task) => this.state.tasks[task.id] !== undefined)) {
+        throw new Error('Task batch needs original operation reconciliation');
+      }
+    }
     // 先算出**本次写入之后**的时钟；op 与本地时钟用同一个值。
     const clock = this.trimClock({
       ...this.clock,
       [this.options.clientId]: (this.clock[this.options.clientId] ?? 0) + 1,
     });
-    const op = this.buildOp(intent, clock);
+    const op = this.buildOp(intent, clock, fixedId);
     // Validate pure reduction before persisting; an unsupported snapshot must
     // not poison every subsequent recovery of this log.
     const nextState = applyOperation(this.state, op);
+    validate?.(this.state);
 
     // 1. 落盘（原子、单调 seq）
     const seqs = await this.options.store.appendLocal([op]);
+    if (seqs.length === 0 && batch !== undefined && fixedId !== undefined) {
+      // A second host instance may have won the database unique-index race.
+      const recovered = await this.recoverTaskBatchDispatch(fixedId, batch);
+      if (recovered !== undefined) return recovered;
+    }
     if (seqs.length !== 1) {
       throw new Error(
         `本地 op 写入失败：期望 1 个 seq，实际 ${seqs.length} 个。` +
@@ -419,13 +451,24 @@ export class OpLogEngine {
     return { ops: [op], seqs };
   }
 
+  private async recoverTaskBatchDispatch(id: string, batch: HeytaTaskBatchPayload): Promise<DispatchResult | undefined> {
+    const stored = await this.options.store.getOpById(id);
+    if (stored === undefined) return undefined;
+    if (stored.op.clientId !== this.options.clientId ||
+        JSON.stringify(parseTaskBatchOperation(stored.op)) !== JSON.stringify(batch)) {
+      throw new Error('Task batch submission identity conflict');
+    }
+    if (!this.appliedOpIds.has(id)) await this.recoverLocked();
+    return { ops: [stored.op], seqs: [stored.seq] };
+  }
+
   /** 构造 op。向量时钟在这里 snapshot —— 之后不再变。 */
-  private buildOp(intent: OpIntent, vectorClock: VectorClock): Operation<string> {
+  private buildOp(intent: OpIntent, vectorClock: VectorClock, fixedId?: string): Operation<string> {
     this.opCounter += 1;
     const timestamp = (this.options.now ?? Date.now)();
-    const id = this.options.nextOpId
+    const id = fixedId ?? (this.options.nextOpId
       ? this.options.nextOpId()
-      : `${this.options.clientId}-${String(timestamp)}-${String(this.opCounter)}`;
+      : `${this.options.clientId}-${String(timestamp)}-${String(this.opCounter)}`);
 
     // 🔴 op 的时钟包含本次写入自己的递增 —— 由 dispatch 算好后传进来。
     //
@@ -476,7 +519,7 @@ export class OpLogEngine {
   private async applyRemoteLocked(ops: Operation<string>[]): Promise<RemoteApplyResult> {
     if (ops.length === 0) return { applied: [], skipped: 0, overwritten: [] };
     for (const op of ops) {
-      if (isFullStateOperation(op)) applyOperation(emptyState(), op);
+      if (isFullStateOperation(op) || hasTaskBatchMarker(op.payload)) applyOperation(emptyState(), op);
     }
 
     // 1. 落盘（幂等：重复 op 会被跳过）
@@ -555,7 +598,7 @@ export class OpLogEngine {
     // Imported snapshots follow the same pre-persistence validation as remote
     // snapshots. Otherwise a bad backup poisons every subsequent cold start.
     for (const op of ops) {
-      if (isFullStateOperation(op)) applyOperation(emptyState(), op);
+      if (isFullStateOperation(op) || hasTaskBatchMarker(op.payload)) applyOperation(emptyState(), op);
     }
 
     const result = await this.options.store.appendImported([...ops]);

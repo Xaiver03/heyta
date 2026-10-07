@@ -79,12 +79,12 @@ function byText(text: string): HTMLElement | undefined {
   const more = [...(container?.querySelectorAll('.ht-rail button') ?? [])].find(
     (button) => (button.textContent ?? '').trim() === '更多',
   ) as HTMLElement | undefined;
-  if (more !== undefined && container?.querySelector('[role="menu"]') === null) {
+  if (more !== undefined && document.querySelector('[role="menu"]') === null) {
     act(() => {
       more.click();
     });
   }
-  return [...(container?.querySelectorAll('[role="menuitem"]') ?? [])].find((b) =>
+  return [...document.querySelectorAll('[role="menuitem"]')].find((b) =>
     b.textContent?.includes(text),
   ) as HTMLElement | undefined;
 }
@@ -245,6 +245,33 @@ describe('成长视图（L3）真的能点到', () => {
     */
     const cells = container?.querySelectorAll('[data-testid^="activity-cell-"]') ?? [];
     expect(cells).toHaveLength(365);
+  });
+
+  it('年度热力图用一个键盘焦点承载方向键，并支持触屏点选日期', async () => {
+    click(byText('成长'));
+    await flush();
+
+    const heatmap = container?.querySelector('[data-testid="growth-heatmap"]');
+    const scroll = container?.querySelector('[data-testid="growth-heatmap-scroll"]') as HTMLElement | null;
+    const cells = [...(container?.querySelectorAll('[data-testid^="activity-cell-"]') ?? [])] as HTMLElement[];
+    expect(scroll?.getAttribute('tabindex')).toBe('0');
+    expect(heatmap?.querySelectorAll('[tabindex="0"]')).toHaveLength(1);
+    expect(cells.every((cell) => cell.getAttribute('tabindex') === '-1')).toBe(true);
+
+    cells[8]?.click();
+    await flush();
+    const selection = container?.querySelector('[data-testid="growth-heatmap-selection"]');
+    expect(selection?.textContent).toContain(cells[8]?.getAttribute('data-testid')?.replace('activity-cell-', ''));
+
+    scroll?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+    await flush();
+    // 周列是横轴，因此左右移动跨一整周（7 天）。
+    expect(selection?.textContent).toContain(cells[1]?.getAttribute('data-testid')?.replace('activity-cell-', ''));
+
+    scroll?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    await flush();
+    // 同一周列的上下移动只跨一天。
+    expect(selection?.textContent).toContain(cells[0]?.getAttribute('data-testid')?.replace('activity-cell-', ''));
   });
 
   it('🔴 热力图文案必须是中文 —— 旧日历库的默认值是英文，会直接画到界面上', async () => {

@@ -6,15 +6,16 @@
  *
  * 🔴 这里**不引入那个库**，而是用纯 CSS Grid 画格子 ——
  * 落地页只需要一个静态复现，为它装一个日历库是把依赖成本花在展示品上。
- * 代价是：**真实视图的交互（点格子改记录）这里没有**，这是刻意的。
+ * 交互只放在每条习惯的一枚「打卡」按钮上；26×7 格子本身保持静态，避免制造
+ * 几百个不可用的小触点。
  *
  * 🔴 配色规则必须复现：**深浅即数值，不靠色相区分**（`color.heat-0..4`）。
  * 用五种颜色表示五档强度对色盲用户是不可读的；单色阶的深浅才是。
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
-import { useI18n } from '@heyta/i18n/provider';
+import { useI18n, type I18nValue } from '@heyta/i18n/provider';
 
 import {
   MOCK_HABIT_HEAT_LEVELS,
@@ -76,7 +77,7 @@ export function levelFor(habit: Habit, week: number, day: number): 0 | 1 | 2 | 3
   return 0;
 }
 
-function Heatmap({ habit }: { habit: Habit }): React.JSX.Element {
+function Heatmap({ habit, checkedIn }: { habit: Habit; checkedIn: boolean }): React.JSX.Element {
   const weeks = Array.from({ length: WEEKS }, (_, w) => w);
   const days = Array.from({ length: 7 }, (_, d) => d);
 
@@ -84,7 +85,8 @@ function Heatmap({ habit }: { habit: Habit }): React.JSX.Element {
     <div className="mk-heat">
       {weeks.map((week) =>
         days.map((day) => {
-          const level = levelFor(habit, week, day);
+          const isToday = week === WEEKS - 1 && day === 6;
+          const level = isToday && checkedIn ? 4 : levelFor(habit, week, day);
           return (
             <span
               key={`${String(week)}-${String(day)}`}
@@ -98,7 +100,7 @@ function Heatmap({ habit }: { habit: Habit }): React.JSX.Element {
   );
 }
 
-export function HabitHeatmap(): React.JSX.Element {
+export function HabitHeatmap({ interactive = false }: { interactive?: boolean }): React.JSX.Element {
   const { t } = useI18n();
 
   // 数据挪进组件内是文案迁移的硬要求（模块级拿不到 `t`）。取舍见 `Landing.tsx` 文件头。
@@ -129,26 +131,53 @@ export function HabitHeatmap(): React.JSX.Element {
   return (
     <div className="mk-habits">
       {habits.map((habit) => (
-        <section key={habit.name} className="mk-habit">
-          <div className="mk-habit__head">
-            <span className="mk-habit__name">{habit.name}</span>
-            <span className="mk-habit__streak">{habit.streak}</span>
-          </div>
-          <Heatmap habit={habit} />
-          <div className="mk-heat__legend">
-            <span>{t(MOCK_HABIT_KEYS.less)}</span>
-            {/*
-              🔴 图例的格数由**登记处**推导（`MOCK_HABIT_HEAT_LEVELS`），
-              不是手抄 5 个 <span>：手抄的那一版漏一档/多一档都不会报错，
-              图例仍然"看起来像一个图例"（与 `quadrant-shape.ts` 同一个理由）。
-            */}
-            {MOCK_HABIT_HEAT_LEVELS.map((level) => (
-              <span key={level} className={mockHeatCellClass(level)} />
-            ))}
-            <span>{t(MOCK_HABIT_KEYS.more)}</span>
-          </div>
-        </section>
+        <HabitCard key={habit.name} habit={habit} interactive={interactive} t={t} />
       ))}
     </div>
+  );
+}
+
+function HabitCard({
+  habit,
+  interactive,
+  t,
+}: {
+  habit: Habit;
+  interactive: boolean;
+  t: I18nValue['t'];
+}): React.JSX.Element {
+  const [checkedIn, setCheckedIn] = useState(false);
+
+  return (
+    <section className="mk-habit">
+      <div className="mk-habit__head">
+        <span className="mk-habit__name">{habit.name}</span>
+        <span className="mk-habit__streak">{habit.streak}</span>
+      </div>
+      <Heatmap habit={habit} checkedIn={checkedIn} />
+      {interactive ? (
+        <button
+          type="button"
+          className="mk-habit__check-in"
+          aria-label={t('web.habits.a11y.checkIn', { name: habit.name })}
+          aria-pressed={checkedIn}
+          onClick={() => setCheckedIn((current) => !current)}
+        >
+          {t(checkedIn ? 'web.habits.checkedIn' : 'web.habits.checkIn')}
+        </button>
+      ) : null}
+      <div className="mk-heat__legend">
+        <span>{t(MOCK_HABIT_KEYS.less)}</span>
+        {/*
+          🔴 图例的格数由**登记处**推导（`MOCK_HABIT_HEAT_LEVELS`），
+          不是手抄 5 个 <span>：手抄的那一版漏一档/多一档都不会报错，
+          图例仍然"看起来像一个图例"（与 `quadrant-shape.ts` 同一个理由）。
+        */}
+        {MOCK_HABIT_HEAT_LEVELS.map((level) => (
+          <span key={level} className={mockHeatCellClass(level)} />
+        ))}
+        <span>{t(MOCK_HABIT_KEYS.more)}</span>
+      </div>
+    </section>
   );
 }

@@ -50,12 +50,12 @@ function byText(text: string): HTMLElement | undefined {
   const more = [...(container?.querySelectorAll('.ht-rail button') ?? [])].find(
     (button) => (button.textContent ?? '').trim() === '更多',
   ) as HTMLElement | undefined;
-  if (more !== undefined && container?.querySelector('[role="menu"]') === null) {
+  if (more !== undefined && document.querySelector('[role="menu"]') === null) {
     act(() => {
       more.click();
     });
   }
-  return [...(container?.querySelectorAll('[role="menuitem"]') ?? [])].find((b) =>
+  return [...document.querySelectorAll('[role="menuitem"]')].find((b) =>
     b.textContent?.includes(text),
   ) as HTMLElement | undefined;
 }

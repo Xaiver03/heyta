@@ -31,7 +31,6 @@ import {
   switchView,
 } from './helpers';
 
-const ADD_PLACEHOLDER = '新习惯，例如「喝水」';
 
 /**
  * 🔴 必须带 `?lang=zh-CN`：placeholder 与视图标签都是中文定位符，而 2026-10-01
@@ -39,11 +38,12 @@ const ADD_PLACEHOLDER = '新习惯，例如「喝水」';
  */
 const APP_ZH = '/?lang=zh-CN';
 
-/** 加一条习惯（输入 → 回车提交表单），等它出现在左列。 */
+/** 加一条习惯（页头「＋」→ 添加面板 → 确认），等它出现在左列。 */
 async function createHabit(page: import('@playwright/test').Page, name: string): Promise<string> {
-  const input = page.getByPlaceholder(ADD_PLACEHOLDER);
-  await input.fill(name);
-  await input.press('Enter');
+  await page.getByTestId('habits-add-open').click();
+  const dialog = page.getByTestId('habit-create-dialog');
+  await dialog.getByLabel('新习惯名称', { exact: true }).fill(name);
+  await dialog.getByRole('button', { name: '添加习惯', exact: true }).click();
   const row = page.locator(`[data-testid^="habit-row-"]`).filter({ hasText: name }).first();
   await expect(row).toBeVisible();
   const testId = (await row.getAttribute('data-testid'))!;

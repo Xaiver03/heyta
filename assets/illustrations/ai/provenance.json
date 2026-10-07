@@ -1,0 +1,95 @@
+{
+  "generatedAt": "2026-10-07",
+  "model": "gpt-image-2",
+  "route": "通过本机已配置的图像服务生成；凭据不进入仓库",
+  "requestedSize": "1024x1024",
+  "quality": "medium",
+  "workflow": "复用图像生成技能；首张确认后，其余五张并发数为2，每项最多尝试1次",
+  "processing": "由 scripts/prepare-state-artwork.py 去除连通白底、裁切、缩小为128像素并压缩；通过生成的JSON离线内嵌",
+  "files": [
+    {
+      "variant": "tasks",
+      "prompt": "tasks.prompt.txt",
+      "original": "tasks-original.png",
+      "originalSize": [
+        1254,
+        1254
+      ],
+      "originalSha256": "7c6f320f1bf81d9581c497601859ecad94c39b8f005e298a32fbd6a09b1ff07b",
+      "runtime": "tasks.png",
+      "runtimeSha256": "cb24c3cced6d68adde1b193dc4601e7213bd75292a01b55794de65ae8b85faad",
+      "runtimeBytes": 7825,
+      "promptZh": "tasks.prompt.zh-CN.txt"
+    },
+    {
+      "variant": "notes",
+      "prompt": "notes.prompt.txt",
+      "original": "notes-original.png",
+      "originalSize": [
+        1254,
+        1254
+      ],
+      "originalSha256": "ef7c20ee877ec5b433ebddcb2ac57509d5d1507005ce45d398da5732c6e339dd",
+      "runtime": "notes.png",
+      "runtimeSha256": "eb3313ea08cca91720a2ce85c8901ba3ade7eaeb66bd217b0a737b0b8ca55734",
+      "runtimeBytes": 5513,
+      "promptZh": "notes.prompt.zh-CN.txt"
+    },
+    {
+      "variant": "habits",
+      "prompt": "habits.prompt.txt",
+      "original": "habits-original.png",
+      "originalSize": [
+        1254,
+        1254
+      ],
+      "originalSha256": "6efc1a9846f3b4d6f1c484dc5a32fb90d4410f560d9a4f3f1dbeb1ea17179428",
+      "runtime": "habits.png",
+      "runtimeSha256": "936b04d87db5ff3f2c312831ab8e073e7b1d1fd711b47990abaaa87c61fb73e5",
+      "runtimeBytes": 11995,
+      "promptZh": "habits.prompt.zh-CN.txt"
+    },
+    {
+      "variant": "calendar",
+      "prompt": "calendar.prompt.txt",
+      "original": "calendar-original.png",
+      "originalSize": [
+        1254,
+        1254
+      ],
+      "originalSha256": "9a697535f74be1840fe908d97a8f90526fbb0e00f6168ced4c69eb7e329dba74",
+      "runtime": "calendar.png",
+      "runtimeSha256": "9ad09a44690e9d0b3421e74d69e2f5aca9e58e6d628f09a0ed8e3520ffce354e",
+      "runtimeBytes": 7730,
+      "promptZh": "calendar.prompt.zh-CN.txt"
+    },
+    {
+      "variant": "search",
+      "prompt": "search.prompt.txt",
+      "original": "search-original.png",
+      "originalSize": [
+        1254,
+        1254
+      ],
+      "originalSha256": "ee0bfcfb50e3abcdb259ba59b527a6cccf513674bd344895dc95188bcb412db7",
+      "runtime": "search.png",
+      "runtimeSha256": "5530b0cef6b0f7a7a23e49c447f3f23c73b1a763b089e7bdce6afb4ba1196bb1",
+      "runtimeBytes": 12439,
+      "promptZh": "search.prompt.zh-CN.txt"
+    },
+    {
+      "variant": "complete",
+      "prompt": "complete.prompt.txt",
+      "original": "complete-original.png",
+      "originalSize": [
+        1254,
+        1254
+      ],
+      "originalSha256": "ab250ee14930c5fcf55c9e5e20581ba9917ed45cf6a86e94ee1302bae4a3448b",
+      "runtime": "complete.png",
+      "runtimeSha256": "07646fcde029db28c34596d6e7c755e4e7b956e698a2a2cda80f0f3331ed7a23",
+      "runtimeBytes": 6813,
+      "promptZh": "complete.prompt.zh-CN.txt"
+    }
+  ]
+}

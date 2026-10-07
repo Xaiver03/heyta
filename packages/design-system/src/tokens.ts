@@ -55,6 +55,8 @@ export const TOKEN_GROUPS = {
     'info',
     'info-strong',
     'info-subtle',
+    'calendar-day-off',
+    'calendar-day-work',
     'quadrant-1',
     'quadrant-1-subtle',
     'quadrant-2',
@@ -137,6 +139,7 @@ export const TOKEN_GROUPS = {
     /* 中间那一列的上限。⚠️ 2026-10-03（W2）它的**语义**从"整个内容区上限"改成
        "中间列上限"，值没动 —— 第四列出现后"内容区"已经不指原来那个东西了。 */
     'content-max',
+    'report-max',
     /* 详情列（第四列）。2026-10-03 加（详情面工单 W2）：它是 `.ht-app` 的直接子项，
        所以宽度必须是 token —— 挂在 `.ht-content` 里面就永远贴不到窗口右边缘，
        读起来不是三栏而是"中间一坨里再分两栏"（理由与判据见 detail-pane-alignment.md）。 */
@@ -427,10 +430,13 @@ export const AA_PAIRS: ReadonlyArray<{
   { fg: 'color.primary', bg: 'color.background', min: 4.5, why: '蓝色文字（页面底）' },
   { fg: 'color.primary', bg: 'color.surface-raised', min: 4.5, why: '链接（浮层）' },
   // 状态色作为**文字**使用时必须达标
+  { fg: 'color.danger', bg: 'color.surface', min: 4.5, why: '错误文字（基础档）' },
   { fg: 'color.danger-strong', bg: 'color.surface', min: 4.5, why: '错误文字' },
   { fg: 'color.success-strong', bg: 'color.surface', min: 4.5, why: '成功文字' },
   { fg: 'color.warning-strong', bg: 'color.surface', min: 4.5, why: '警告文字' },
   { fg: 'color.info-strong', bg: 'color.surface', min: 4.5, why: '信息文字' },
+  { fg: 'color.calendar-day-off', bg: 'color.surface', min: 4.5, why: '休息日标记' },
+  { fg: 'color.calendar-day-work', bg: 'color.surface', min: 4.5, why: '调休工作日标记' },
   // 四象限色要作为标签文字用
   { fg: 'color.quadrant-1', bg: 'color.surface', min: 4.5, why: 'Q1 标签' },
   { fg: 'color.quadrant-2', bg: 'color.surface', min: 4.5, why: 'Q2 标签' },

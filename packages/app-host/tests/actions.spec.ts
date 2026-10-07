@@ -12,7 +12,7 @@
  *   3. 列表顺序依赖存储返回顺序 → 同一份数据在两台设备上顺序不同
  */
 
-import { Priority, startOfDay } from '@heyta/domain';
+import { Priority, Quadrant, isImportant, planQuadrantDrop, planQuadrantDropUndo, startOfDay } from '@heyta/domain';
 import { OpLogEngine } from '@heyta/op-log';
 import { DbOpLogStore, INDEXEDDB_SCHEMA, SqliteAdapter } from '@heyta/storage';
 import { NodeSqliteDriver } from '@heyta/storage/sqlite/node';
@@ -324,6 +324,47 @@ describe('listPendingTasks（未完成）', () => {
     expect(actions.listPendingTasks()).toHaveLength(0);
     await actions.setCompleted(a, false);
     expect(actions.listPendingTasks().map((x) => x.id)).toEqual([a]);
+  });
+});
+
+describe('四象限移动撤销', () => {
+  it.each([undefined, false, true])('保留 important=%s 的原始语义，移动和撤销各写一条 op', async (important) => {
+    const id = await actions.create('优先级驱动的重要任务');
+    await actions.setPriority(id, Priority.High);
+    await actions.setDueDate(id, now() + 60_000);
+    if (important !== undefined) await actions.setImportant(id, important);
+    const before = actions.findTask(id)!;
+    const drop = planQuadrantDrop(before, Quadrant.Neither, { now: now() });
+    const undo = planQuadrantDropUndo(before, drop);
+    const beforeCount = (await opsOf(id)).length;
+    await actions.setQuadrantDrop(id, drop);
+    expect(actions.findTask(id)!.dueDate).toBeUndefined();
+    await actions.setQuadrantDrop(id, undo);
+    const ops = await opsOf(id);
+    expect(ops.length).toBe(beforeCount + 2);
+    expect(JSON.parse(JSON.stringify(ops.at(-1)!.payload))).toEqual({
+      important: important ?? null,
+      dueDate: before.dueDate,
+    });
+    await engine.recover();
+    expect(actions.findTask(id)!.important).toBe(important);
+    expect(actions.findTask(id)!.dueDate).toBe(before.dueDate);
+    // 撤销后再改优先级：隐式重要性仍跟随优先级，显式选择保持不变。
+    await actions.setPriority(id, Priority.Low);
+    expect(isImportant(actions.findTask(id)!)).toBe(important ?? false);
+  });
+
+  it('移动未改截止时间时，撤销不会覆盖之后的日期编辑', async () => {
+    const id = await actions.create('无日期任务');
+    const before = actions.findTask(id)!;
+    const drop = planQuadrantDrop(before, Quadrant.ImportantNotUrgent, { now: now() });
+    const undo = planQuadrantDropUndo(before, drop);
+    expect(undo).not.toHaveProperty('dueDate');
+    await actions.setQuadrantDrop(id, drop);
+    await actions.setDueDate(id, now() + 60_000);
+    await actions.setQuadrantDrop(id, undo);
+    expect(actions.findTask(id)!.dueDate).toBe(now() + 60_000);
+    expect(actions.findTask(id)!.important).toBeUndefined();
   });
 });
 

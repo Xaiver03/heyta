@@ -1,57 +1,9 @@
-/** 🔴 官方公共服务器的唯一常量（住在 app-host，与法务链接同一份，不抄第二份）。 */
+/** Authentication uses the saved endpoint, an explicit deployment override, or heyta hosted.
+ * A local WebView or a development origin is never inferred to be a sync server.
+ * Resolving an endpoint neither grants network consent nor creates a session.
+ */
 import { OFFICIAL_SITE_ORIGIN } from '@heyta/app-host';
 
-/**
- * 「这次认证要发给哪台服务端」的唯一判据
- * =======================================
- *
- * ## 它修的是什么（产品负责人原话）
- *
- * > 「绝对不允许什么用自己正在用的域名才能够注册，不可能是这样子的。」
- *
- * 在这之前，一个刚打开应用的访客点顶栏「登录 / 注册」，看到的是**第一个必填项
- * 就是服务端地址**（`AuthPanel.tsx` 里 `baseUrl === ''` 那个分支）。也就是说
- * **产品把"你知道自己的同步服务端域名吗"当成了注册的前置条件** —— 而 99% 的用户
- * 是来用官方托管的，他不需要知道任何域名。
- *
- * ## 为什么默认值可以是"应用自己所在的这个来源"
- *
- * 不是猜，是一个已部署的事实：`docs/runbooks/deployment.md` §3.3.1 定下的是
- * **唯一域名**形态 —— 站点在根 `/`、应用在 `/app/`、同步 API 在 `/api/`，
- * **三者同一个 origin**。所以"这个页面是从哪台服务端来的"就回答了"该把凭据发给谁"。
- *
- * 这与 `apps/web/src/lib/site-url.ts` 的 `siteRoot()` 是同一条推理、同一个形状：
- * **构建期变量优先，没配就取自身来源**。
- *
- * `VITE_SYNC_URL` 是给别的形态留的口子（应用与同步服务端分域部署的自建场景）。
- *
- * ## 🔴 这条默认值**只**用在这里，不许蔓延
- *
- * 它回答的是「**此刻没有已知地址**时该发给谁」，不是「任何令牌都该向哪台服务端校验」。
- * 两个地方**明确不能**换成它：
- *
- *   - `pending-login.ts` 消费回跳会话时用的 `loginBaseUrl` —— 那是**签发这枚令牌的那台
- *     服务端**自己报的地址。应用可能与它不同域（反代、自建、`VITE_SYNC_URL` 覆盖），
- *     拿来源顶替会把令牌发到错的地方（那边的注释写着同一条理由）。
- *   - 同步配置里"用户是否已配置服务端"这件事（见下一节）。
- *
- * ## ⚠️ 预填 ≠ 已配置
- *
- * 空的 `baseUrl` 在 `packages/app-host/src/host.ts` 里是**纯本地模式**（§3.5 那条
- * "本地优先"的落点），不是错误状态。所以这个默认值**不能**写进 `useSyncStore.baseUrl`：
- * 那会让一个从未碰过同步的用户被当成"已配置服务端"，同步栏从此开始报错。
- * 它只在**用户主动发起一次认证动作**的那一刻生效 —— 而那次动作成功之后，
- * `applyAuthSession` 才会真的把地址写进同步配置（那才是"用户选择了云端"的时刻）。
- */
-
-/**
- * 读到并校验构建期的 `VITE_SYNC_URL`。
- *
- * 每次调用都重新读 `import.meta.env`（不在模块顶层读一次）：顶层读会把它固化下来，
- * 测试就覆盖不到"配了 / 没配"两种状态，而这两种都是真实部署形态。
- *
- * @returns 去掉末尾斜杠的绝对地址；未配置、为空串、协议不是 http/https 时 `null`。
- */
 function configuredSyncUrl(): string | null {
   const raw: unknown = import.meta.env.VITE_SYNC_URL;
   if (typeof raw !== 'string') return null;
@@ -68,62 +20,13 @@ function configuredSyncUrl(): string | null {
   return trimmed;
 }
 
-/**
- * 认证动作的目标服务端地址（**不带尾斜杠**）。
- *
- * 优先级：`VITE_SYNC_URL` → 已保存的同步地址 → 当前来源 → **官方公共服务**。
- *
- * @param configuredBaseUrl `useSyncStore.baseUrl`（用户已配置的那台）。空串表示没配过。
- *
- * 🔴 最后那一档是 2026-10-02 补的，因为它在**原生壳里是坏的**。产品负责人对着
- * macOS 壳的截图问：「为什么还是默认就是要什么粘贴服务器地址和令牌之类的东西？
- * 一定是默认是我们提供公共服务的。」截图里那一栏预填的是 `heyta-local://app` ——
- * 那不是"我们提供公共服务"，那是**一个发不出请求的地址**：
- * 壳的 WebView 从自定义 scheme 加载共享 UI，`window.location.origin` 就是那个 scheme。
- * 旧注释说"来源本身就是答案，不是猜一个域名"，这句话在 web 上成立
- * （官方部署是站点 `/` + 应用 `/app/` + API `/api/` 同一个 origin），
- * 在壳里恰好相反：**来源根本不是服务端**。
- *
- * ⇒ 判据从"取来源"改成"**取一个真的是服务端的来源**"：协议不是 http/https 时
- * 回落到 `OFFICIAL_SITE_ORIGIN`。那个常量住在 `@heyta/app-host`，
- * 与法务链接判定官方实例用的是**同一个**（不在这里抄第二份）。
- *
- * ⚠️ 这一档**不改变**自建部署的形态：自建者跑的是 web（http/https 来源），
- * 走的还是"来源就是答案"那条；而他们真的要在壳里自建时，
- * 入口是表单里那条「我自己部署」（不是默认屏）。
- */
+/** Keep existing sessions bound to their issuer; only new sessions use the default. */
 export function authBaseUrl(configuredBaseUrl = ''): string {
   const configured = configuredBaseUrl.trim().replace(/\/+$/, '');
   if (configured !== '') return configured;
-  const fromBuild = configuredSyncUrl();
-  if (fromBuild !== null) return fromBuild;
-  return httpOriginOrOfficial();
+  return configuredSyncUrl() ?? OFFICIAL_SITE_ORIGIN;
 }
 
-/**
- * 当前来源只有在"它真的是一台可以用 HTTP 访问的服务端"时才算答案。
- *
- * ⚠️ 每次调用都重新读 `window.location.origin`：模块顶层读一次会把**第一次**的
- * 结果永久钉住，而 jsdom 与真浏览器、壳与 web 的 origin 各不相同，
- * 测试就覆盖不到三种部署形态。
- */
-function httpOriginOrOfficial(): string {
-  const origin = typeof window === 'undefined' ? '' : window.location.origin;
-  try {
-    const { protocol } = new URL(origin);
-    if (protocol === 'https:' || protocol === 'http:') return origin;
-  } catch {
-    // 不是绝对 URL（例如 `null` origin 或 about:blank）—— 直接走公共服务。
-  }
-  return OFFICIAL_SITE_ORIGIN;
-}
-
-/**
- * `baseUrl` 是不是"没配"的状态（用于判断要不要显示「这台服务端」那句说明）。
- *
- * 单独一个函数是为了让面板里不出现 `baseUrl === ''` 这种**裸比较** ——
- * 它曾经同时承担"未配置"和"应该显示地址输入框"两个意思，而后者正是那道墙。
- */
 export function isUnconfigured(baseUrl: string): boolean {
   return baseUrl.trim() === '';
 }

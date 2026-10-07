@@ -33,6 +33,7 @@ import { describe, expect, it } from 'vitest';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCREEN = resolve(HERE, '../src/screens/CalendarScreen.tsx');
+const BOARD = resolve(HERE, '../../../packages/ui/src/calendar/CalendarBoard.tsx');
 const LOCALES = resolve(HERE, '../../../packages/i18n/src/locales');
 
 function codeOf(path: string): string {
@@ -45,8 +46,14 @@ function codeOf(path: string): string {
 }
 
 const screen = codeOf(SCREEN);
+const board = codeOf(BOARD);
 
 describe('移动端日历的档位入口', () => {
+  it('🔴 选中日清单消费与格子相同的跨日任务投影', () => {
+    expect(board).toMatch(/const\s+dayTasks\s*=\s*calendarTasksByDate\.get\(selected\)/);
+    expect(board).not.toMatch(/const\s+dayTasks\s*=\s*byDate\.get\(selected\)/);
+  });
+
   it('🔴 把 `view` 真的传给了共享板（不传 = 板子永远按月档渲染，切换器点了也没反应）', () => {
     expect(screen).toMatch(/<CalendarBoard[\s\S]*?view=\{view\}/);
   });
