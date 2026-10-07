@@ -12,6 +12,8 @@
 |---|---|---|
 | **本轮 goal：全量落账 + 分支合并 + 代码质量审计** | [`goal-landing-and-quality-audit.md`](goal-landing-and-quality-audit.md) | ✅ 已完成（2026-10-03）。82 个提交推送远端、`feat/countdown-anniversary` 合并进 main（四处冲突的产品裁决 + 陷阱编号重排 #137–140→#161–164）、验证矩阵全实跑（隔离 worktree build/typecheck/九道门禁/单测）。含 2 处已修类型潜伤、3 条登记发现，与本轮自己两次「管道吞退出码」假绿的照实记录 |
 | **当前状态 / 下一步做什么** | [`multi-end-unified-strategy.md`](multi-end-unified-strategy.md) | 🔴 **唯一权威主计划**。它同时取代了 roadmap §5 与 4 份多端计划的路线部分 |
+| **本轮 goal：产品 UI / UX / IA / 审美优化** | [`product-ux-optimization.md`](product-ux-optimization.md) | ✅ **已完成（2026-10-06）**。依据 [`../research/product-level-ia-ux-audit.md`](../research/product-level-ia-ux-audit.md) 的合并裁决稿；已完成主路径、导航层级、窄屏导航、详情面、行为规范、性能基线与当前代码截图验收 |
+| **个人中心 / Profile 优化** | [`profile-center-optimization.md`](profile-center-optimization.md) | 🔄 **进行中（2026-10-07）**。头像菜单、个人中心、个人资料设置与成长视图的融合实施计划 |
 | **本轮 goal：A–E 架构阶段收口** | A/E/D 的实现与证据见 [`../research/aed-implementation-evidence.md`](../research/aed-implementation-evidence.md)；B 见 [`../adr/0050-e2ee-key-lifecycle-and-recovery.md`](../adr/0050-e2ee-key-lifecycle-and-recovery.md)，C 见 [`goal-multi-end-coverage.md`](goal-multi-end-coverage.md) / [`../adr/0051-mobile-reminder-delivery.md`](../adr/0051-mobile-reminder-delivery.md) | 🔴 **进行中**：A/E/D 已按各自证据入口闭合；B 仍缺 iOS legacy payload migration、移动端完整撤销→本地清理→重新认证→可信设备 rotation 旅程及实体设备 Keychain 语义；C 仍缺 iOS 权限拒绝/重启补算、不确定 receipt UI、原生跨设备 fired/新 occurrence、64 条系统窗口和当前产物收尾。不要用 A/E/D 或 Web/Android 证据替代 B/C。 |
 | **本轮 goal：设置的 IA（移动端优先 + 电脑端验证）** | [`goal-settings-ia.md`](goal-settings-ia.md) | ✅ 已完成。§7.1e 的执行 goal。主战场排序由产品负责人拍板：**移动端 + 电脑端，web 不是**；apps/web 的改动算电脑端的（macOS 壳加载共享 UI，`HeytaMacApp.swift:270`） |
 | **本轮 goal：逐页排版对齐设计系统** | [`goal-layout-audit.md`](goal-layout-audit.md) | 🔴 进行中（2026-09-29 产品负责人重启）。四象限改 2×2 十字坐标系、AI 工具行重叠、macOS 标题条融入壳；逐页立**布局判据**（此前门禁只管"值从哪来"，不管"排版怎么排"） |
@@ -118,6 +120,7 @@
 | [`brand-icon-and-splash.md`](brand-icon-and-splash.md) | ✅ 图标与首屏帧已落到 web/Android/iOS（2026-10-04）。**状态与剩余边界只在那份文件里维护**（§7 列 7 条，其中设备端取证与 RN 内容层动效未做），本行只是入口 |
 | [`trash-and-archive.md`](trash-and-archive.md) | 🔄 进行中（2026-10-04）。**状态只在那份文件里维护**（逐项账在 §8.4 与 §10.x 各节），本行只是入口 |
 | [`trash-and-archive-execution-brief.md`](trash-and-archive-execution-brief.md) | 🤝 上面那份计划的任务书；进度同样以计划本体为准 |
+| [`linux-adaptation.md`](linux-adaptation.md) | 🐧 Linux 端适配（2026-10-06 立项，两批口径：工程侧 / 产品侧）。**状态只在那份文件里维护**（逐条工单台账在其 §3，跨线归属项在 §4.1），本行只是入口 |
 | [`countdown-anniversary.md`](countdown-anniversary.md) | ⚠️ **本行原来把同一个文件的状态又登记了一遍**（"规划中 → 可开工" + 两道前置闸门），而其中"bundle 体积实测"那道闸门已于 2026-10-03 闭合、批次一已落地 ⇒ 这句成了假话。按"改一处必 sweep 全仓"的规矩，两处登记只留一份：**进度看上面那张表的同名行，落地记录看该文 §3.5**。（保留这行是为了让人看见"状态写两遍"是怎么漂的。） |
 
 ---

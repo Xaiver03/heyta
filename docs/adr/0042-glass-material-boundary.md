@@ -67,3 +67,29 @@
   blur 评估是后续独立 spike，不在本决策的落地范围内。
 - 本 ADR 不改变 ADR-0036（UI 单源）与 ADR-0037（桌面退 WebView）的任何结论；
   MaterialSurface 抽象恰恰是对 ADR-0036 的保护。
+
+## 6. 后续读数（2026-10-07，Linux 适配批二）：§3 第 5 条那句**理由**的主语换了
+
+🔴 **本 ADR 的六条结论一条都没改**，这一节只做一件事：记下第 5 条那句
+"Linux（GTK4）放弃玻璃（无 backdrop blur 能力）" 的**前提**今天不再描述 Linux 内容面所在的那一层。
+
+- 现状变了：Linux 壳自批二 P2 起走 [ADR-0037](0037-desktop-ui-falls-back-to-webview.md) 定的 M2 路线
+  （原生 GTK4 壳 + 壳内 **WebKitGTK 6.0** WebView 加载共享 `web-dist`）⇒ Linux 上的玻璃候选
+  落在 WebKit 那一层，不在 GTK 那一层。
+- 实测（载体 Ubuntu 24.04.5 / webkitgtk-6.0-4 = WebKit 2.52.6，装置
+  `apps/desktop-linux/src/webview-load-probe.c` 的 `PROBE_BACKDROP=1`，取数时刻 07 05:1x）：
+  `{"bf":true,"webkitBf":true,"ua":"…AppleWebKit/605.1.15…"}`
+  ⇒ `CSS.supports('backdrop-filter', 'blur(20px)')` 与带前缀那一版**都为真**。
+- ⚠️ 这条读数的射程到此为止，两格**没取证**、不许读成"Linux 上玻璃可用"：
+  ① `CSS.supports` 答"认不认这个属性"，不答"会不会真糊"—— 载体是 Xvfb + 无 GPU，
+    GTK4 会从 ngl 退回 cairo 软件合成，真合成行为没测；
+  ② 没按 §4 那条要求实测过「tint 合成在最坏背景上 ≥4.5:1」，也没做
+    `prefers-reduced-transparency` 的降级验证。
+- 另外三条否决项**与本读数无关，仍然成立**：可读性（文字透叠有 88% 事故前科）、
+  滚动列表上的合成开销、以及"端能力协商只许住在 `MaterialSurface` 抽象内部"。
+  ⇒ 即便 ① ② 补齐，第 1–4 条与第 6 条的边界也不受影响。
+- **要在 Linux 内容面上开玻璃 = 新写一份 ADR 承接本 ADR**，不是在这里改第 5 条。
+  那份 ADR 至少要带：真合成的取证（GPU 与非 GPU 两档）、最坏背景的对比度实算、
+  降级路径，以及它如何落在 `MaterialSurface` 里而不是散写平台分叉。
+- 过程账与复现命令：[`docs/runbooks/linux-dev-box.md`](../runbooks/linux-dev-box.md) §5.10，
+  计划行：[`docs/plans/linux-adaptation.md`](../plans/linux-adaptation.md) 的 P5。

@@ -55,7 +55,7 @@ import {
   type NewTaskFields,
   type RestoreExportResult,
 } from '@heyta/app-host';
-import type { AssistantTurn, Note, Project, Tag, Task, TrashItem } from '@heyta/domain';
+import type { AssistantTurn, Habit, Note, Project, Tag, Task, TrashItem } from '@heyta/domain';
 import { toTrashItems } from '@heyta/domain';
 import type { OpIntent } from '@heyta/op-log';
 import type { EntityType } from '@heyta/shared-schema';
@@ -111,8 +111,10 @@ export interface NodeHost {
    *
    * 只能对**已软删除**的条目用（`purge` 自己拒绝活着的任务）。它**不**抹掉
    * op-log 里的历史载荷 —— 判据只能落在视图上，不能落在"日志里 grep 不到"上。
+   *
+   * `false` = 它已经被彻底删过，这一次没有写 op（G-8：四类同一个形状）。
    */
-  purgeTask(entityId: string): Promise<void>;
+  purgeTask(entityId: string): Promise<boolean>;
   /** 未删除的任务，按创建时间排序。 */
   listTasks(): Task[];
   /**
@@ -133,6 +135,37 @@ export interface NodeHost {
    */
   trashRows(): TrashItem[];
   /**
+   * 回收站的**还原与彻底删除**，四类各有一条。
+   *
+   * 🔴 这一组补的是 CLI 的读宽写窄：`trashRows()` 能把四路都列出来，
+   * 但原来只有任务能 purge、四类都不能 restore —— 于是 W6 的判据 ③
+   * （"还原之后另一台设备读到它还活着"）在这个宿主上**只能读、不能验**，
+   * 而这恰好是本壳存在的理由（把界面之外的宿主真的敲一遍）。
+   * 语义（还原发哪种 op、purge 为何必须先软删除）全在 `@heyta/app-host`，
+   * 这里一行都不判断（AGENTS §3.5）。
+   *
+   * 🔴 八个方法**一律 `Promise<boolean>`**：`false` = 这一次没有写 op（要还原的
+   * 本来就在回收站外面、要 purge 的早就已经彻底删过）。四类四种形状（任务原来
+   * 是 `void`）时，宿主只能在"命令跑完了"和"事情真的发生了"之间任选一个说，
+   * 而 CLI 选了后者 —— 见 G-8。
+   */
+  restoreTask(entityId: string): Promise<boolean>;
+  restoreNote(entityId: string): Promise<boolean>;
+  restoreProject(entityId: string): Promise<boolean>;
+  restoreHabit(entityId: string): Promise<boolean>;
+  purgeNote(entityId: string): Promise<boolean>;
+  purgeProject(entityId: string): Promise<boolean>;
+  purgeHabit(entityId: string): Promise<boolean>;
+  /**
+   * 归档 / 取消归档一条清单。
+   *
+   * 🔴 原来这个壳**读得到** `archived` 那个字段，却没有任何一条命令写得了它 ——
+   * 于是 W3/W9 那批归档出口在这台非 Web 宿主上只能被"验证读"，不能被"验证写"。
+   * 归档的语义（归档清单不进任何出口、和软删除是两件事）全在
+   * `@heyta/app-host#archiveProject`，这里不判断（AGENTS §3.5）。
+   */
+  archiveProject(entityId: string, archived?: boolean): Promise<void>;
+  /**
    * 未删除的便签。
    *
    * 🔴 存在理由与 `listProjects()` 同一条：W6 的判据要读"手机上删掉的那条便签，
@@ -150,6 +183,15 @@ export interface NodeHost {
    * 而没法断言的字段正是最可能在半路上丢掉的（同 `dueDate` 当初的处境）。
    */
   listProjects(): Project[];
+  /**
+   * 未删除的习惯。
+   *
+   * 🔴 补这一条不是为了多一个子命令，是因为**三态判据缺了它就退化成两态**：
+   * 原来 `habits` 只有回收站那一路读通道，于是"purge 之后列表里读不到它"这一腿
+   * 对习惯**永远不可判**（第一次跑的时候我把没通道当成"活着"，那条负向断言就恒不可能成立，
+   * 整包当场撞红）。存在理由与 `listNotes()` / `listProjects()` 同一条（AGENTS §3.5：只直通）。
+   */
+  listHabits(): Habit[];
 
   /**
    * 未删除的标签，顺序同 `listProjects()`。
@@ -306,8 +348,17 @@ export async function openNodeHost(options: NodeHostOptions): Promise<NodeHost> 
         projects: projectActions.listTrashedProjects(),
         habits: habitActions.listTrashedHabits(),
       }),
+    restoreTask: (entityId) => actions.restore(entityId),
+    restoreNote: (entityId) => noteActions.restoreNote(entityId),
+    restoreProject: (entityId) => projectActions.restoreProject(entityId),
+    restoreHabit: (entityId) => habitActions.restoreHabit(entityId),
+    purgeNote: (entityId) => noteActions.purgeNote(entityId),
+    purgeProject: (entityId) => projectActions.purgeProject(entityId),
+    purgeHabit: (entityId) => habitActions.purgeHabit(entityId),
+    archiveProject: (entityId, archived) => projectActions.archiveProject(entityId, archived),
     listNotes: () => noteActions.listNotes(),
     listProjects: () => projectActions.listProjects(),
+    listHabits: () => habitActions.listHabits(),
     listTags: () => projectActions.listTags(),
 
     createNote: (content) => noteActions.createNote(content),

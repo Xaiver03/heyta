@@ -5744,6 +5744,25 @@ git commit --only -m '…' -- docs/reference/environment-traps.md      # 🔴 �
 📌 可迁移的一条：**"这条判据现在绿"和"这条判据的阴性对照现在跑"是两件事**。
 G5 挂了 20 多天没人发现，正是因为红的是**别的臂**，而那台子整体 exit 1 又被读成"在等窗口"。
 
+## B90（2026-10-06 06:0x，回收线）：`check:ai-e2e` 在当前 HEAD 上红 **9 枚**，其中 4 枚的根因是详情面 §8.138 那支三元链把 AI 面挤掉了 —— 挡住整条 `pnpm check`
+
+**这条不是我线能解的**，但它决定 ⑦ 那一格能不能绿，所以按规矩登在这儿而不是只躺在我自己的计划里。
+`pnpm check` 的脚本串里**含** `check:ai-e2e`（现量：`node -e 'console.log(/ai-e2e/.test(require("./package.json").scripts.check))'` ⇒ `true`），
+所以只要下面第一格那处装配还在，**`pnpm check` 在任何装了当前 `apps/web/src/App.tsx` 的载体上都不可能 rc=0** ——
+它不是环境无效，也不是抖动，重装与重跑都不改变它。
+
+| 红集 | 现量证据 | 归属与边界 |
+|---|---|---|
+| **4 枚 AI 面**：`ai-assistant.spec.ts:65`、`ai-row-layout.spec.ts:115`、`ai-tool-run.spec.ts:103`、`ai-tool-run.spec.ts:155` | 全部是 `element(s) not found` / `waiting for getByTestId('ai-tool-input')`。一枚阶段化探针把这一档钉死（`tmp/p12-readings/probe-face.json`，nonce `pf37155-1791236626`，`PROBE_RC=0`）：`afterBoot / afterConfigure / afterAddTask` **三档里 `ai-assistant`、`ai-tool-run`、`ai-tool-input` 的 `inDom` 全是 0**，同时 `taskRowsAfterSeed=1`、`consoleErrorCount=0` ⇒ 界面正常渲染、控制台零错，**面板结构上到不了 DOM**。落点：`App.tsx:2816-2839` 那条三元链里 `taskPaneInColumn ? <TaskDetailCard/>`（`:2828`）排在 `detailHasRoom ? aiPanels`（`:2835`）**之前**，而 `taskPaneInColumn`（`:753-755`）**不含"选中了哪条任务"**，`TaskDetailCard.tsx:98` 又是 `if (task === undefined) return null` ⇒ 宽屏 + 任务视图 + 未选中 = 那一格什么都不画，而链已截断，AI 面不再渲染；窄档兜底那一支（`:2315`）在宽屏恒 `null` | 🔴 **归详情面线**：时序现量 —— AI 面搬进右栏是 `78cdff67`（10-04 14:51），把 `taskPaneInColumn` 插进链的是 `0ecb4995`（§8.138，10-05 14:49），后者在前者**之后** ⇒ 那三族 AI 判据无从预见。而 `App.tsx:2794` 那行注释自己写着"其余（**含上述各面的未选中态**）= AI 面 `aiPanels`"，所以是实现与它上方声明的契约不一致，不是契约没定。**不代改**：修法要在"栏里出空态 / 未选中时链继续走到 AI / AI 面挪出这一格"三选一，那是 IA 决定，跨线三条件（一子可删／运行时形状逐字段等于改前／一条命令可回退）一条都不成立 |
+| 5 枚他人线：`calendar-sidebar.spec.ts:111` 与 `:226`、`glass-materials.spec.ts:158` 的 light 与 dark（同一条参数化用例的两个 title ⇒ 2 枚而非 1 枚缺陷）、`keyboard-cursor.spec.ts:581` K9 | 两棵隔离/主检出树红集对照：隔离载体 9 红 233 过 / 主检出 10 红 246 过，**差集恰 1 枚 = K9**，只出现在主检出（习惯线未跟踪文件在飞）⇒ 前 9 枚**两树共载**，不是载体形状造成的 | 登记不代改。K9 那一枚另有一条边界：**我这轮单条跑 `task-organize` 时，习惯线正以 pid 60928 在同一棵树上跑 `habit-year/habit-month/keyboard-cursor`** —— 各自带锁、各跑 1 条，不构成互相污染的证据，但也别把 K9 的归因读成我这轮取的 |
+| （本轮已解掉 1 枚）`task-organize.spec.ts:56` | **配对到手**：同一命令改前 `1 failed`（红在 `spec:92` 的 `.click()`，`INNER_RC=1`）、改后 `1 passed (6.1s)`（`TO_AFTER_RC=0`），用例名逐字相同、`Running 1 test using 1 worker`。改的只是它跑在哪一档：补一行 `setViewportSize({width:900,height:600})`，**断言逐字未动**；模式是 `ebfebeb8` 自己在同文件"取消归属"那一支确立并写了注释的（它漏了第一支）。回退：`git checkout -- e2e/tests/task-organize.spec.ts` | ✅ **本线，工作树里未提交**（等用户明示才提交）。⚠️ `e2e/` 没有 `tsconfig.json`（只有 `tsconfig.detail-pane.json`）⇒ 这枚 spec 的**类型检查一格在本仓当前形状下取不到读数**，不写成"已类型检查通过" |
+
+**复跑取现量**：`cd e2e && NO_COLOR=1 npx playwright test --reporter=line`（红集按文件分：
+`grep -E '^\s+✘' <那趟日志> | grep -v retry | awk '{print $3}' | sort | uniq -c`）。
+📌 我在这条上先犯了错才写下来的：一开始按**失败文案形状**分簇，把 `task-organize` 估成 5 枚红，按 spec 文件现量是 **1** 枚。
+那个形状只反映 Playwright 的等待方式（可见性断言 15s 报 not found，`click`/`fill` 等到 60s 超时），**与谁拥有这枚用例无关**；
+已入 `docs/reference/environment-traps.md` 的「分簇的轴必须等于你要问的那个问题的轴」那一条。
+
 **日历线那三把取证台第一次进 `pnpm check`（`4fa7a05a`），我在合流树上逐把跑过**：
 `calendar-line-commit-only-arms.sh` **`== 合计 pass=36 fail=0 ==`**、
 `r17-reshoot-arms.sh` **`pass=16 fail=0`**、`r17-reshoot-stale.sh --selftest` **RC=0**。
@@ -5758,6 +5777,41 @@ G5 挂了 20 多天没人发现，正是因为红的是**别的臂**，而那台
 ⚠️ **本轮没做**（别把上面那三行绿读成整链绿）：`pnpm -r typecheck` 此刻 **RC=2**，
 报错**全部**在回收线在飞未提交的 `apps/node-host/src/host.ts`（5 条 TS2322，非 node-host 报错现量 **0**）；
 `pnpm -r test` 全量、`check:ai-e2e` 一族、`pnpm reinstall:all` 四端当前产物 —— **都还没跑**。
+
+### 06:43 更新（同一位回收线，整链读数到手后对本条的三处更正）
+
+1. **上面那句"`pnpm -r typecheck` 此刻 RC=2"已被取代**：06:07 起的那趟整条 `pnpm check` 里
+   `$ pnpm -r typecheck` 跑过了，全份日志 `grep -c 'error TS'` = **0** ——
+   host.ts 那 5 条 TS2322 与习惯线那 2 枚 TS18047 都不在了。状态声明要带取数时刻，这条就是样本。
+2. **红集从 9 枚变 8 枚，且分簇轴要改**：`check:ai-e2e` 在整链第 78 段红，`8 failed / 2 skipped / 254 passed (25.8m)`。
+   🔴 上面把日历 2 枚 + 玻璃 2 枚列成"他人线各自缺陷"**不够准**：整链原文显示这 4 枚等的全是同一枚
+   `[data-testid="task-organize-summary"]`（`calendar-sidebar.spec.ts:100`、`glass-materials.spec.ts:86` 的
+   `organize-dropdown` 描述符），而**同一趟里 ✓ 的 `detail-pane-task.spec.ts`** 在 `:819-820` 断言宽档行尾
+   "一只触发器都不许有"、在 `:885-889` 断言窄档"必须有" ⇒ 这是 §8.147 那次搬家的**消费侧落后**，不是四处独立缺陷；
+   每处一行的候选改法与 `ebfebeb8` 先例相同（改视口或改走栏里那格），**仍归各自所有者，我不代改判据口径**。
+   所以本条的准确说法是：**8 枚 = 同一枚 `taskPaneInColumn`（`App.tsx:753-755`）的两条侧**（AI 侧 4 = 装配次序缺陷，organize 侧 4 = 消费侧落后）。
+3. **K9 那一枚这次没红**（`grep -cE '✘.*keyboard-cursor'` = 0，5 条用例逐条 ✓）⇒ 它是一枚**间歇红**，
+   上面"两树差集恰 1 枚 = K9"仍然对，但那 1 枚的归因不能钉死成"主检出特有"；别按这条排队去做产品改动。
+4. **链停在这里 ⇒ 后面 17 段没有读数**（含 `android-gradle-remote`、`apk-freshness`、`screenshot:verify`、`pnpm -r test`）：
+   它们的现有读数只来自隔离载体那趟，别把这两趟混成一趟。
+   全部逐格读数在 `docs/plans/trash-and-archive.md` §10.259。
+
+### 07:1x 更新（仍是 B90 这一条，四格被后面两节改了）
+
+1. **我那句"别人的未提交 diff"是装置自己写死的错话，已改**。它只能判"是不是本臂那发针脚"，
+   判不出归属 —— 而那次挡我的其实是**本线自己**未提交的 G-8 批次。现在的 die3 只声明针脚不匹配，
+   并把取归属的命令交出去（`git diff -- <文件>`）。**别再把旧措辞抄进任何台账**；自检已从五臂变六臂
+   并把这一条钉住（`ARMS=6 FAILS=0`，牙齿读数与成因见计划 §10.260，另入 traps #342）。
+2. 🔴 **本条上面那句"设备那一格本轮全绿"作废** —— 那一格是**间歇**，不是状态：
+   06:40 空 / 06:54 命中 1 / 06:59 命中 0 / **07:06 命中 2**（pid 84908/84909，
+   `heyta-wt-merge` 那棵检出在跑 `scripts/verify-mobile-ai.sh`，占的是同一台 `emulator-5554`）。
+   ⇒ 谁要开 ③ 的六臂，**先看这一格现量**，别看台账（`ps -eo command | grep -E 'verify-mobile-[a-z]+'`）。
+3. **一处对所有会话成立的状态更正**：`docs/adr/0055-account-tombstones-and-restore-gate.md`
+   不是"staged 未提交" —— 它以 `A` 被习惯线那笔 `fce8468a`（10-06 01:19，110 行）带进了 HEAD，
+   我此后加的第三板草稿（63+/12-）在工作树里。索引现量 0 枚。
+4. 我这趟没抢窗口：`/tmp/tfa-test.lock` 由 pid `98874`（`bash tmp/h7-readings/serial-final.sh`）持有，
+   所以 5 份 e2e 的重跑排在它后面跑（`research/tools/with-test-lock.sh`，budget 1500s，等不到就 rc=3 判"没跑成"）。
+
 ## B91（2026-10-06 06:1x，习惯线 H4/H5/H7 收口）：这一批落完了，但**四格读数没取到、两格归属是代收的**
 
 批次本身：H4（月历 + 可点补打卡）、H5（`frequency` 写入口）、H7（年视图 12 张月卡 + 详情面那枚
@@ -5926,6 +5980,23 @@ SSH `-T git@github.com` → `Connection closed by 198.18.0.245 port 22`（fake-i
 `git rev-list --count origin/main..HEAD` = **18**。⇒ 通道一恢复，`git push origin main` 一条命令收平，
 **不带 `--force`**；动网络环境仍是明令禁止。
 
+## B92（2026-10-06 07:3x，回收线）：我在 07:23 与 07:25 **两趟**把 14 段静态门禁并发跑了进去 —— 那两分钟窗口里任何计时敏感读数都要复量
+
+给谁看：**任何在 07:22–07:27 之间取过 e2e / 计时敏感读数的人**（含我自己那条线）。
+
+| 格 | 现量 |
+|---|---|
+| 发生了什么 | `research/tools/chain-tail-gates.sh` 那 14 段静态门禁被真跑了两趟：`START=10-06 07:23:23 load1=6.01 lock=free` 与 `07:25:47 load1=5.91 lock=free`；每段逐段 rc 在 `tmp/tfa-readings/chain-tail-14-real-0727-noisy.log`（md5 `a1b8578b…`） |
+| 为什么它显示 `lock=free` | 我给这装置做自检时把脚本拷进沙盒，脚本用**固定层数**算仓库根 ⇒ `R` 落到拷贝的中间目录，`LOCK` 跟着搬家，真锁（`/tmp/tfa-test.lock`）没被看见。**装置自己的闸门被装置的拷贝绕掉了** |
+| 当时锁主是谁 | `pid=29134` = 我自己排队的 ⑦ 复量（`pnpm exec playwright test ai-assistant / ai-row-layout / ai-tool-run / calendar-sidebar / glass-materials`）。所以**被污染的读数是回收线自己的**；如果你在 07:22–07:27 有过别的测试窗口，请把它当**有噪声**复核 |
+| 我这条线的后果 | 那 5 份 spec 的红集仍然到手且**与旧树逐条相同**（8 failed / 2 passed / `INNER_RC=1`）⇒ 结论没翻，但这一趟**不许**充当"最终载体上各取一次 rc"那一格 |
+| 已封堵（三处，各自有臂） | ① 仓库根改成**按标记上溯**并断言（找不到 `pnpm-workspace.yaml` 就 `TAIL=ENV-INVALID` rc=3）；② 日志写不动 ⇒ rc=3 且打印"一段都没记，别当读数"；③ 新增 `HEYTA_TAIL_DRY=1`，自检每一臂的 PATH 上**只放假 pnpm** 并数它被调几次 |
+| 封堵的臂读数 | A：`RC=3`+`TAIL=ENV-INVALID`，被调 0；B：`RC=3`+`TAIL=NOT_RUN reason=锁被持有`，日志 0 字节 / `STEP[` 0 行，被调 0；C（DRY）：`TAIL=DONE steps=14`、14 行 `RC=DRY`、被调 0；D（去掉 DRY，阳性对照）：被调 **14** ⇒ 证明 C 那个 0 来自闸门而不是循环没跑 |
+| 顺带一处真红（属回收线自己） | `check:shell-unicode` 第 81 段判红，抓的是我这批 5 枚装置里 **25 处** `$var` 紧跟全角的写法（值在 UTF-8 locale 下整段丢）。已用仓库自带的 `fix-shell-unicode-vars.py --write` 修完：门禁 `UNICODE_RC=0`（扫 153 个 `.sh`），五枚文件 `bash -n` 全过，`w6-dry-run-arms.sh` 重跑 `ARMS=6 FAILS=0` |
+| 我这趟没做的事 | 没提交、没 `git add`、没 kill 任何不是我 spawn 的进程、没动网络/代理 |
+
+细节与取证表在 `docs/plans/trash-and-archive.md` §10.264。
+
 ### 9. 🔴 ~~`habit-icon-picker.spec.ts` 的 I2 / I4 是**抖的**~~ ⇒ **08:5x 现量否证：不是抖动，是 1/8 概率的前提失败**，根因与修法见 §14
 
 现量（两趟整台跑 + 一趟配对实验，全部 `tmp/h7-readings/`）：
@@ -5998,6 +6069,56 @@ SSH `-T git@github.com` → `Connection closed by 198.18.0.245 port 22`（fake-i
 左边界阈值取错了而不是判据有牙；N5 ⇒ `Q6` 一条红；N1/N2/N3/N4 逐臂红集不变
 （07:4x 那趟已逐臂读到 `T2,T3,T7` / `T2,T3,T7` / `T5` / `I6`，且**复原复跑 `passed=20 failed=0`**
 —— 比 07:3x 那趟多出来的那条 `I4` 没有复现，进一步支持 §9 的"抖动"判断）。
+
+## B93（2026-10-06 07:4x–07:5x，回收线）：`pnpm -r test` 里 `apps/web` 那 3 枚红**全是 `Test timed out in 5000ms`** —— 安静窗口单跑否证了产品成因；另附我这枚装置自己漏的三处
+
+### ① 给其他会话的一条现成判别（省掉一次误判）
+
+95 段（链尾 `pnpm -r test`）在 `apps/web` 报 3 枚红：
+
+| 文件 | 用例 | 声明行 | 整链用时 |
+|---|---|---|---|
+| `apps/web/tests/calendar-sidebar.spec.tsx` | 🔴 迷你月历的格子与 `monthGrid` 逐格对齐… | `:231` | 5951 ms |
+| `apps/web/tests/calendar-sidebar.spec.tsx` | 🔴 侧栏与主区共用同一份月与日… | `:278` | 5319 ms |
+| `apps/web/tests/nav-next7-days.spec.tsx` | 🔴 点侧栏那一行：列表只剩窗口内的两条… | `:110` | 5096 ms |
+
+报错原文三枚都是 `Error: Test timed out in 5000ms.`，**没有一条是断言不匹配**；
+同一次运行里同一文件**过了的**用例在 3.1–4.3 s（最大 4251 ms）⇒ 这两族平时就吃掉默认预算的 70–85%。
+
+**判别趟**（`research/tools/web-two-specs-solo.sh`，`load1=6.00`、同一棵工作树、零改动）：
+`Test Files 2 passed (2)` / `Tests 18 passed (18)` / `LEG_A RC=0`，
+同三枚单跑用时 **599 / 521 / 542 ms**（对整链里的 5951/5319/5096 ⇒ 约 10 倍差）。
+
+⇒ **谁在整链里看到这三枚红，别按产品缺陷归因**；这否证只对"这三枚、这一趟"成立。
+🔴 留给那两条线（日历侧栏 / 侧栏「最近 7 天」，现量 `git log -1 --format='%h %ad' -- <spec>` = `ab13c22e 2026-10-03` / `893601a1 2026-10-01`）的事实是：
+**默认 5 s 预算只剩 0.8–1.9 s 余量**，负载一高必翻。我不代改它们的超时口径（判据口径不代改）。
+
+同一趟顺带两格对账：`RTEST-UNHANDLED-01` **没复现**（五个标记各自命中 0：`Unhandled`/`unhandled`/`Rolldown`/`Substitution`/`Node.js v`；登记不撤销），
+且"有 `test` 脚本的包数 == 打了 `Tests` 汇总行的包数"两边都是 **19**（AGENTS §6 那条收尾对账）。
+
+### ② 我这枚装置第一趟就产出的三条自反事实（都已改，各带阳性对照）
+
+1. 中途 `cd apps/web` 之后 LOG 还是**相对路径** ⇒ 重定向失败，vitest **一个字都没跑**，而打印是 `LEG_A RC=1`。
+   差点把一条**不存在的**产品结论写进台账。对照臂：把 `pnpm` 摘出 PATH ⇒ 现在印
+   `SOLO=ENV-INVALID … RC_A=127 不许当判据`、rc=3。**"命令报了 rc" ≠ "命令跑了"**。
+2. `sysctl` 取不到时 `load1` 是**空串**，而 `awk -v a=""` 把它当 **0** ⇒ 负载闸门**自己放行**（假绿）。
+   对照臂：同一趟现在**先**印 `load1 读不出来（空值不等于低负载，不放行）`，且日志里 `START=` 行数 = 0。
+3. `exit 3` 在 `echo $$ > /tmp/tfa-test.lock` 之后 ⇒ ENV-INVALID 那条路**不退锁**，会把共享锁留成死锁。
+   改成 `trap … EXIT` + 只在 `锁内容 == 自己的 pid` 时删；对照读数：`lock=已释放(我拿的那把)` →
+   二次触发印 `lock=不是我的，未动` → 独立复核 `lock_now=free`。拒跑那趟日志 `grep -c .` = **0**。
+
+### ③ 我这轮的提交态（照实写，不美化）
+
+**没有提交、没有 `git add`**（等用户明示）。🔴 顺带更正我自己三分钟前写进 §10.266 的一句假披露：
+摘要给我的「`0055-account-closure-targeted-deletion.md` 仍是 staged」两处都不对 —— 真身是
+`docs/adr/0055-account-tombstones-and-restore-gate.md`（已被 `fce8468a` 提交，当前 `M` 未暂存），
+且索引里 staged 条目 = **0**（`git diff --cached --name-only | wc -l`）。成因：把"上一轮摘要"当成了现量。
+
+### ④ 窗口占用（别人已经在排）
+
+07:51:48 起 `research/tools/chain-full-with-lock.sh`（pid **34361**，起跑 `load1=5.73`、锁 free）
+**全程持锁**跑整条 `pnpm check`（95 段，取 ⑦ 欠的那一次整链 rc）。
+习惯线已经在 BLOCKED.md 里把自己排在我后面（见上一条 §9 末尾那句），这是这把锁第一次被用作长链的排队依据。
 
 ### 11. §7 第 347 条那个"只量右边界"的洞在同族又找到一处，另一处**现量判它不存在**
 
@@ -6320,6 +6441,7 @@ ASIDE h 351->299  →  SECTION h 130->78（−52）  →  里面 DIV h 44->0 + F
 | 图 | `apps/web/evidence/shell-sidebar-height/{before-first-click,after-first-click,resizer-hit-box}.png`，**三张都打开看过**。`after-first-click` 读到的就是结果本身：表单收起、那一行一格没动、编辑器开在行尾 |
 | 夹具的两处自纠 | ① 第一版只加 1 条任务 ⇒ 页面不滚 ⇒ **坏形态里"第一下点击"仍然绿**（是臂台照出来的，不是看出来的）；现在触发条件本身写成断言（文档比视口高、`scrollY` 停在最大值、表单 `aria-expanded=true`）。② 快照必须在 down 与 up **之间**取：松开之后编辑器自己会撑高，那时再比"文档高度没变"就把两种效应混成一格。③ §3 末的归因更正（收起挂在**面板外捕获 `pointerdown`**，不是失焦）。入档 traps **#355** |
 | 看图时顺手记下的 | 最靠下那一行的编辑器**朝下弹**，底边掉到折叠线以下（图里"清单"那一格被切了一半）。不是够不着（外壳仍整页滚，滚一下就在），但它是 §9.4 第 1 条"外壳不滚"之后**会变成够不着**的那一类 ⇒ 登记给那条，不另开单 |
+
 ## B95（2026-10-06 12:0x–12:4x，本会话 H9 第三刀）：语言 + 主题从页头搬进「设置 → 显示」落完了，但**它照出一条只在"浮层开着"时才成立的 DOM 事实**
 
 产品负责人第 3 条：「中文语言不应该在设置里面弄吗？」这一刀做完 §9.2 第 4 步（清单在原计划 §9.4 第 3 条，
@@ -6367,6 +6489,7 @@ e2e 类型载体 RC=0；e2e 第一批 `language-first-launch` 5 passed、第二�
 2. **§9.2 第 3 步**（同步设置搬进 设置 → 同步、rail 齿轮随之删除）仍未动 —— 它和 §9.4 第 1 条剩下的
    "外壳不滚"那一半、以及 H10 的把手，是同一批要一起想的。
 3. 本单**没有**在四端当前产物上验（`pnpm reinstall:all` 未跑）；`FULLCHECK-01` 那一档仍开着。
+
 ## B96（2026-10-06 13:0x–15:3x，本会话 H10 两刀）：详情列"没东西就不画"+ 左边缘可拖落完了，而它把 **B90 那 8 枚红一次清掉**
 
 产品负责人第 5、6 条：「数据侧边栏和那个侧边栏，哪有这么排版的？」+「右边那一栏…中间那条线应该是可以
@@ -6475,6 +6598,17 @@ e2e 类型载体 RC=0；臂台四臂 `A→D1`、`B→D3,D6`、`C→D4`、`D→D5
 3. 🔴 **第一版那张 `settings-sync-section.png` 拍的是浮层顶部**（`toBeVisible()` 不要求
    在视口内），判据全绿而图是错的，人看图才发现。→ 加了"顶边必须在视口内"的几何判据，
    臂 E1 证明它会红。陷阱 **#362**。
+4. 🔴 **迁定位符时照出第二种死法：名字没被删，是被别人加了条件渲染**（17:3x 补）。
+   `getByLabel('端到端加密口令')` 今天仍在产品里（`web.sync.password.label`），但长在
+   `SyncSettingsPanel.tsx` 的 `!vaultMode` 那一块，而 `b3397cda`（2026-10-03 23:58，ADR-0050）
+   起托管登录会写 `sync.accountId` ⇒ `e2e/auth-journey/helpers.ts` 那条"登录后补口令"
+   从那天起等的就是一个不再渲染的字段，**安静了三天**（那套没有载体）。
+   ✅ 已改成按界面当下真的在哪一档分流（legacy / 解锁档走 testid + 点「解锁」+ 断"已解锁"），
+   三档都不认识就点名报错；**创建档没有接** —— 它要把界面显示的恢复码读回来再确认发布，
+   那一档会抛"这套还没接，登记为验收未闭合，不记成产品缺陷"。
+   `e2e/multi-end/helpers.ts` 那一处**故意不动**并写明理由：它从不走托管登录，
+   `accountId` 恒空 ⇒ legacy 那块确实在屏上，"顺手统一"反而等一个不出现的表单。
+   陷阱 **#361** 已把这一面目并进原条（含"绿灯证据的日期要早于被引那笔提交就不能支持现在"）。
 
 ### 读数
 

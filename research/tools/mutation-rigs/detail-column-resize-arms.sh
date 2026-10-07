@@ -68,7 +68,7 @@ PY
   # 不先筛 `✘` 会把通过项也算进红集（那等于每条臂都"红了全部判据"，读数毫无意义）。
   red="$(printf '%s\n' "$out" | grep '✘' | grep -oE '› D[0-9]+' | grep -oE 'D[0-9]+' | sort -u | tr '\n' ',' | sed 's/,$//')"
   if [ "$red" = "$expect" ]; then
-    echo "ARM_RED_OK=$name（红在 $red）"
+    echo "ARM_RED_OK=${name}（红在 ${red}）"
   else
     echo "ARM_WRONG=$name 期望红在 [$expect]，实际 [$red]"
     printf '%s\n' "$out" | grep -E '✘|Error:' | head -6
