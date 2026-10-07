@@ -205,6 +205,38 @@ describe('C 这一栏只在专注面出现（其他视图不许借它的位置�
 });
 
 /**
+ * 按看得见的文字点 rail 上的目的地（W1 之后 rail 上段 = 主段 ≤4 + 「更多」菜单）。
+ *
+ * 🔴 低频视图（番茄钟/时间线/成长/便签/倒数日）现在住在「更多」菜单里，而菜单
+ * 只在点开「更多」后才进 DOM —— 所以主段找不到时先点 `.ht-rail__more button`
+ * 再在 `[role="menuitem"]` 里找、点它。判据语义不变："用户点的是写着 X 的那颗"
+ * —— 菜单项也是写着 X 的那颗。
+ */
+async function clickRailDestination(el: HTMLElement, label: string): Promise<void> {
+  const mainTab = [...el.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find((b) =>
+    (b.textContent ?? '').includes(label),
+  );
+  if (mainTab !== undefined) {
+    await act(async () => {
+      mainTab.click();
+    });
+    return;
+  }
+  const more = el.querySelector<HTMLButtonElement>('.ht-rail__more button');
+  expect(more, `rail 主段没有「${label}」、也没有「更多」入口（模块开关没生效？）`).not.toBeNull();
+  await act(async () => {
+    more!.click();
+  });
+  const item = [...el.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find((b) =>
+    (b.textContent ?? '').includes(label),
+  );
+  expect(item, `「更多」菜单里没有「${label}」`).not.toBeUndefined();
+  await act(async () => {
+    item!.click();
+  });
+}
+
+/**
  * 挂整棵 `App` 的那两条用例用的挂载。
  *
  * ⚠️ 必须走 App：判据是"这一栏在**哪个视图**里出现"，而那个条件写在 `App.tsx`。
@@ -226,13 +258,8 @@ async function mountApp(focusView: boolean): Promise<HTMLDivElement> {
   if (focusView) {
     // 按**看得见的文字**定位，不按 testid：rail 上那一排没有逐颗 testid，
     // 而"用户点的是写着番茄钟的那颗"本身就是这条判据的一部分。
-    const tab = [...container.querySelectorAll('button')].find(
-      (b) => (b.textContent ?? '').includes('番茄钟'),
-    );
-    expect(tab, 'rail 上没有「番茄钟」入口（模块开关没生效？）').not.toBeUndefined();
-    await act(async () => {
-      (tab as HTMLButtonElement).click();
-    });
+    // （W1 后番茄钟落在「更多」菜单里 —— 开菜单再点的适配在 helper 里。）
+    await clickRailDestination(container!, '番茄钟');
   }
   return container;
 }

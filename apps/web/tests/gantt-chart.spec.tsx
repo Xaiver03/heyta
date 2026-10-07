@@ -668,6 +668,39 @@ describe('🔴🔴 ChecklistPlanPreview（任务内部坐标系，已标明）',
  * 所以这里挂**真的 `App`**（不是单独挂 `TimelinePanel`），点真的导航按钮。
  * 一旦有人把 `App.tsx` 里的 `'timeline'` 分支或导航项删掉，这一组立刻红。
  */
+
+/**
+ * 按看得见的文字点 rail 上的目的地（W1 之后 rail 上段 = 主段 ≤4 + 「更多」菜单）。
+ *
+ * 🔴 低频视图（番茄钟/时间线/成长/便签/倒数日）现在住在「更多」菜单里，而菜单
+ * 只在点开「更多」后才进 DOM —— 所以主段找不到时先点 `.ht-rail__more button`
+ * 再在 `[role="menuitem"]` 里找、点它。这一组测的正是"时间线真的能点到"：
+ * 菜单项也是写着时间线的那颗，点它仍然证"挂载 + 接线"，判据没放松。
+ */
+async function clickRailDestination(el: HTMLElement, label: string): Promise<void> {
+  const mainTab = [...el.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find((b) =>
+    (b.textContent ?? '').includes(label),
+  );
+  if (mainTab !== undefined) {
+    await act(async () => {
+      mainTab.click();
+    });
+    return;
+  }
+  const more = el.querySelector<HTMLButtonElement>('.ht-rail__more button');
+  expect(more, `rail 主段没有「${label}」、也没有「更多」入口`).not.toBeNull();
+  await act(async () => {
+    more!.click();
+  });
+  const item = [...el.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find((b) =>
+    (b.textContent ?? '').includes(label),
+  );
+  expect(item, `「更多」菜单里没有「${label}」`).not.toBeUndefined();
+  await act(async () => {
+    item!.click();
+  });
+}
+
 describe('🔴🔴 时间线真的能点到（不是"写好了没人挂载"）', () => {
   beforeEach(async () => {
     (globalThis as unknown as { indexedDB: IDBFactory }).indexedDB = new IDBFactory();
@@ -676,7 +709,7 @@ describe('🔴🔴 时间线真的能点到（不是"写好了没人挂载"）',
     await initOpLog();
   });
 
-  it('🔴 App 的视图切换里有「时间线」，点了能看到时间线视图', () => {
+  it('🔴 App 的视图切换里有「时间线」，点了能看到时间线视图', async () => {
     // 🔴 必须包 `LocaleHost`：外壳里现在挂了语言切换器，而
     // `useLocalePreference()` 在 Provider 之外**刻意抛错**（"点了没反应"更难查）。
     // 包法与线上 `main.tsx` 完全一致 —— 这正是把 LocaleHost 抽出来的原因。
@@ -686,13 +719,7 @@ describe('🔴🔴 时间线真的能点到（不是"写好了没人挂载"）',
       </LocaleHost>,
     );
 
-    const tabs = Array.from(el.querySelectorAll('[role="tab"]'));
-    const timelineTab = tabs.find((tab) => (tab.textContent ?? '').includes('时间线'));
-    expect(timelineTab).toBeTruthy();
-
-    act(() => {
-      (timelineTab as HTMLElement).click();
-    });
+    await clickRailDestination(el, '时间线');
 
     expect(el.querySelector('[data-testid="timeline-view"]')).toBeTruthy();
   });
