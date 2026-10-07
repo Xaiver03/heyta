@@ -466,7 +466,15 @@ if printf '%s' "$WANT" | grep -q "ios"; then
     #    一崩，树不是那个变量。⚠️ 它当时另一条否证（"换一棵新克隆就好了"）依然成立，只是
     #    解释力更弱：新克隆也一样可能崩，只是没撞上。
     #
-    #    ⇒ 这里的处置是**有界重试**（每趟 ~10 s，最多 3 趟，逐趟落日志与 RC），
+    #    🔴 2026-10-07 现量把上界从 3 抬到 6：载体 `b081811c` 那一轮 11:28 **三趟全崩**
+    #    （`/tmp/heyta-reinstall-pod-{1,2,3}.log` 同一句 `ArgumentError - path name contains null byte`），
+    #    而同一台机 11:35 与 11:39 两趟各自**一次就成**、11:44 又是崩崩成 —— 逐趟非确定性
+    #    的形状与上面四臂记录一致，只是 3 这一发不够用。判据一个字没放松：
+    #    仍然要求 `Manifest.lock == Podfile.lock`，六趟全崩照常判红。
+    #    同一轮还否证了一条假设：`[ReactNativeDependencies] Source:` 打**空值**是源码构建的
+    #    正常输出（`rndependencies.rb:69` 在 `RCT_USE_RN_DEP != 1` 时按设计返回空），
+    #    不是 NUL 的来源 —— 报错里那个路径本身两次探针都读得出**不含 NUL**。
+    #    ⇒ 这里的处置是**有界重试**（每趟 ~10 s，最多 6 趟，逐趟落日志与 RC），
     #      而不是改 env。判据没放松：仍然要求 `Manifest.lock == Podfile.lock`，
     #      三趟全崩就照常判红。
     #
@@ -501,7 +509,7 @@ if printf '%s' "$WANT" | grep -q "ios"; then
       #    构建是好的（与 `afe7ff7a`/`d924853e` 那两发同形：**红的那一句把原因说反了**）。
       #    这不是降级判据：三趟都失败仍然整腿判红，每一趟的日志都留着。
       POD_OK=0
-      for POD_TRI in 1 2 3; do
+      for POD_TRI in 1 2 3 4 5 6; do
         POD_LOG="/tmp/heyta-reinstall-pod-$POD_TRI.log"
         if (cd "$IOS_IOS_DIR" && env -u NODE_USE_ENV_PROXY LANG=en_US.UTF-8 \
             RCT_USE_PREBUILT_RNCORE=0 RCT_USE_RN_DEP=0 pod install) \
