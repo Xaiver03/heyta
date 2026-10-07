@@ -49,6 +49,9 @@ export function notesBoardLabels(t: I18nValue['t']): NotesBoardLabels {
     emptyHint: t('notes.empty.hint'),
     composerPlaceholder: t('notes.composer.placeholder'),
     add: t('notes.add'),
+    // 🔴 提交失败那句（W8b）：共享层挂在 composer 下方（alert 语义）。
+    // 必填字段 —— 漏了编译期就红（陷阱 #195：可选 prop 会把"宿主没接"伪装成"做完了"）。
+    saveFailed: t('notes.error.saveFailed'),
     pin: t('notes.pin'),
     unpin: t('notes.unpin'),
     remove: t('notes.remove'),
@@ -102,7 +105,10 @@ export function NotesView({ editorInColumn }: { editorInColumn: boolean }): Reac
       <NotesBoard
         notes={notes}
         onAdd={(content) => {
-          void addNote(content);
+          // 🔴 返回 Promise，不做 `void` fire-and-forget（W8b）：store 的 addNote
+          // 失败会 reject，共享层 `runNoteSubmit` 靠它判定"没存上"（保草稿 +
+          // 亮 `labels.saveFailed`）。`void` 掉 = 失败断在这里，共享层只看得到成功。
+          return addNote(content);
         }}
         onRemove={(entityId) => {
           void removeNote(entityId);

@@ -36,6 +36,10 @@ export function notesBoardLabels(t: Translate): NotesBoardLabels {
     emptyHint: t('notes.empty.hint'),
     composerPlaceholder: t('notes.composer.placeholder'),
     add: t('notes.add'),
+    // 🔴 提交失败那句（W8b）：共享层挂在 composer 下方（alert 语义）。
+    // 必填字段 —— 漏了编译期就红（陷阱 #195：可选 prop 会把"宿主没接线"
+    // 伪装成"做完了"；契约测试见 tests/reminders-notes-display.spec.ts）。
+    saveFailed: t('notes.error.saveFailed'),
     // 「钉选」与「取消钉选」是**两条不同的词条**，不是前缀拼接：
     // 共享组件用 `row.isPinned` 二选一，这里照给，不许自己 `'取消' + labels.pin`。
     pin: t('notes.pin'),
