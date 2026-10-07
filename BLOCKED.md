@@ -6809,3 +6809,90 @@ e2e 类型载体 RC=0；臂台四臂 `A→D1`、`B→D3,D6`、`C→D4`、`D→D5
 当场用反向 Edit 复原，并补了一条判据：**改完要把目标区间与 `HEAD` 那份逐字 diff 一次**
 （`diff <(git show HEAD:BLOCKED.md \| sed "起,末p") <(sed "起,末p" BLOCKED.md)`），
 只看"编辑成功"不算复核 —— 编辑工具的成功回执只说明它匹配上了，不说明它只加没删。
+
+## B101
+
+**07 09:4x–10:0x 收尾核对**（用户指令：把当前所有更改按逻辑分组提交并 push，触发多端构建、检查、更新全部产物）。
+本节只记**核对结果**与**代收拢没覆盖到的那一半**，不重复别人已落的东西。
+
+| 格 | 读数 | 归属 |
+|---|---|---|
+| 分组提交 + push | `git log --oneline cdcc3415..HEAD` ⇒ **19 笔**（`feat(i18n)` / `feat(共享 UI)` / `feat(app-host)` / 三刀 web / `feat(注销与墓碑线)` / `feat(linux 线)` / `feat(selfhost/CI 线)` / 两笔 `chore(代收拢)` …）；`git ls-remote origin refs/heads/main` = `8b564f48fe8f1c8aea118f01ec710be1fb72a426`，与 `git rev-parse HEAD` **逐字相同**，`origin/main..HEAD` 为空 ⇒ 已推 | **代收拢由另一条会话做完**，我核对 |
+| 覆盖完整性 | 动手前现量的未提交集：`{ git diff --name-only; git diff --cached --name-only; git ls-files --others --exclude-standard } \| sort -u` = **500 枚**，逐枚归组（13 组）；19 笔的合计覆盖该清单 ⇒ 没有"我这一版分组里独一的落点"需要补交 | 同上 |
+| 提交那一刻仍在飞的 | `git status --porcelain` 现量 **14 枚**：`apps/mobile/src/screens/{Settings,TaskDetail,Tasks}Screen.tsx`、`apps/web/src/features/shell/ColumnResizer.tsx`、`apps/web/evidence/quadrant-fill/*.png`、`docs/plans/product-ux-optimization.md`、两枚未跟踪的跨端 UX 文档、`.agents/context/`。mtime `09:35:05–09:36:33` = **我取数的那一分钟还在写**；同一分钟进程表 pid 62334 在跑 `@playwright/test/cli.js test tests/quadrant-layout.spec.ts tests/quadrant-fill.spec.ts` ⇒ 活的写者在场。按 AGENTS §8.9 与"不替别人的半成品发通行证"，**这 14 枚我没有代提交** | P0/象限线 |
+
+🔴 **格 1（未闭合，要人拍）：落地页复刻的对账红 3 枚 —— 产品侧那半已入库，复刻那半没有。**
+复现（单跑就红，与并发无关）：
+`pnpm --filter @heyta/landing exec vitest run tests/mockup-shell-shape.spec.tsx tests/mockup-quadrant-shape.spec.tsx` ⇒ **`3 failed | 33 passed (36)`**
+- `mockup-quadrant-shape` 的 `footnote` 那条：产品侧 `apps/web/src/features/quadrant/copy.ts`（`9e771c35`）把说明收进「帮助」折叠，而复刻还在画 `.mk-quadrant__footnote`。**红字自己点名了三处落点**（`AppWindow.tsx` 的节点、`mockup.css` 的规则、`mockup-fidelity.spec.tsx` 里"四象限底部有 footnote"那一条）。
+- `mockup-shell-shape` 的 `#7` 两条：`webTestids()` 读 `.ht-header__actions` 那一段，现量该段的 testid 全集 = `bulk-toolbar, bulk-complete, bulk-repeat-warning, bulk-undo, task-sort, task-sort-select, detail-pane-toggle`（现量命令：`awk '/<div className="ht-header__actions">/,/<div className="ht-content">/' apps/web/src/App.tsx \| grep -oE 'data-testid="[^"]+"' …`），而登记处 `SHELL_HEADER_ACTIONS` 只有 `task-sort` / `detail-pane-toggle` 两件，**阳性对照那一条还把旧的三枚集合钉成了期望值**。
+  🔴 **这一处我没有代改**，理由要写清：这一族是"登记处 ⟷ 产品"**双向等集**，补登记要求复刻**真的画出**批量选择态（营销页那一屏静态图要不要展示选中态 = 产品决定，不是我来定）；而把它塞进 `SHELL_HEADER_MOVED_OUT` 是**造假** —— 那条反向判据的含义是"产品已经搬走的控件"，而这些 testid 在产品源码里就在那一段里。把判据放宽或改期望值同样不许（§8 第 3 条）。
+  ⚠️ 两类的口径不同，别混成一次"顺手修绿"：`footnote` 那一处是**可以**照红字机械撤掉的三处；`#7` 那两处需要一页决定。
+
+**格 2（已归因，不是产品失败）：`pnpm -r test` 里 `apps/web` 那 3 份是命令形状。**
+`NO_COLOR=1 pnpm -r --no-bail --filter '!@heyta/sync-server' test` ⇒ `RTEST_RC=1`；失败包两枚 = `apps/landing`（见格 1）与 `apps/web`（`3 failed \| 155 passed \| 2 skipped (160)`，红在 `quadrant-empty-state` / `quadrant-row-parity` / `shell-more-and-settings`，原文 `Error: [@heyta/i18n] 词条不存在：zh-CN / web.quadrant.a11y.handle`）。
+决定性三发：① 该 key **HEAD 与工作树都在**（`git show HEAD:packages/i18n/src/locales/zh-CN.ts \| grep -n 'quadrant.a11y.handle'` 命中，工作树同）；② 单跑那三份 ⇒ **`3 passed (3)` / `Tests 22 passed (22)`**；③ `packages/i18n/dist` 的 mtime 正好落在那趟递归运行的窗口里 ⇒ 是多枚 tsup 同时重建同一棵 dist（§7"段 85 归因落到命令形状"那一族的新一例）。
+条数对账（AGENTS §6 那条"有 `test` 脚本的包数 == 打了 `Tests` 汇总行的包数"）：现量 **20** 枚包有 `test` 脚本；本轮跑 **19**（`@heyta/sync-server` 排除在外）；**17** 枚打了 `Tests N passed`，另 2 枚红的打的是 `Test Files … failed` 行 ⇒ 跑到的 19/19 都有读数，没有整层没跑过。
+🔴 顺带又中一次 AGENTS §6 点名的假绿形状：`pnpm --filter @heyta/server test` ⇒ 打 `No projects matched the filters` 然后**退 0**（真名带 `sync-` 前缀）。按真名在包目录里跑 ⇒ `cd server && pnpm test` = **`134 files / 2443 passed \| 1 skipped (2444)`，rc=0**，且这一趟 `prisma generate` **没有 EPERM** —— §6 里那句"沙箱里跑不了 `@heyta/sync-server`"绑的是当时的现场，下一位请现量，别照它跳过。
+
+**格 3（未闭合，要人拍）：`environment-traps.md` 的 `#342` 在 HEAD 里是两枚。**
+现量：`git show HEAD:docs/reference/environment-traps.md \| grep -cE '^342\. '` ⇒ **2**；全文重号一趟：`git show HEAD:docs/reference/environment-traps.md \| grep -oE '^[0-9]+\. ' \| sed 's/[. ]//g' \| sort -n \| uniq -d`。
+两枚是：`7972` 的"多臂自检只假化了被测命令…（w6-dry-run-arms）"与 `8005` 的"移动端 lib 从共享包 barrel 取值会把 `react-native` 拉进 node"。
+🔴 关键是**两处入站引用指向不同的那一枚**：`docs/plans/trash-and-archive.md:17843` 与 `:17945` 说的是装置那一枚，而同一文件 `#344` 正文里写的"`#342：barrel 会把 react-native 拖进 node 侧 bundle`"说的是另一枚 ⇒ "引用 #342" 有两种读法，正是 `check:adr-numbering` 为 ADR 拦的那件事，traps 这一本没有对应的闸。
+**处置留给两条线各自拍**（改哪一枚、新号取多少、引用跟着改），我不代改：编号是谁取的、由谁引的，只有那两条线知道；而给它加一道"重号即红"的门禁本身要先有人认领它管哪一本。
+
+**格 4（四端已闭合，第五端与逐段 rc 在路上）：多端构建与产物更新。**
+已取的读数：`pnpm -r build`（主检出，工作树含 P0 那 14 枚在飞）**rc=0**；载体 `heyta-reinstall-1006` 已重钉到 `8b564f48`（重钉前把 33 枚遗留逐字节核过 = 与 HEAD 同内容，留底在 `~/.heyta-evidence/carrier-reset-20261007-093935/`；`pnpm-lock.yaml` 与主检出 sha256 逐字相同 ⇒ 不必重装依赖；`apps/mobile/ios/Pods` 与 `Heyta.xcworkspace` 在位）。
+
+🔴 **四端重装 `INNER_EXIT=0`**（07 09:43:04–09:54:26，跑在**载体**上而不是主检出 —— 主检出此刻有别的会话未提交的源码，固定收尾的不变量是"工作树里没有别人未提交的源码"）。
+载体首尾同一枚 `8b564f48`，`reinstall-all.sh` blob = `6e4a9345c11b47248f7eaf3e461ea4364c88c3d2`（现量命令：`git -C <载体> rev-parse HEAD:scripts/reinstall-all.sh`）。逐端：
+
+| 端 | 判据读数 |
+|---|---|
+| mac | `.app` + `.dmg` 重打并装进 `/Applications`；**包内 `web-dist` 与本机 `apps/web/dist` 是同一次构建（9 个 chunk）**；安装副本自截屏 `内容占比 71.4% / 主蓝命中 1127`（主蓝数的是 `…-mac-installed.png.webview.png`，窗口那张本机常态 0.0% 不据此判红） |
+| windows | 源码包 96M / 清单 3975 条，**tar sha256 `e926be2b72e1a8f7…` 与远端逐字相同**；远端新鲜度对账 `web-dist/index.html=f9c1b85615f63e4e…` + `bridge=2985cfc0f124d5e3…` + `assets/*.js` 7 枚一致；远端取证 **5 条判据全在位** |
+| android | 远端 gradle `BUILD SUCCESSFUL in 2m42s`（`--no-build-cache` 那笔 `c6777860` 生效）→ `size=67,139,344 B / sha256=8476c294121622bb…` → scp 回**消费者期望的路径** → `emulator-5554` 全新安装；前台窗口 `mCurrentFocus=…com.heyta/com.heytamobile.MainActivity`（monkey 之后前台不是 com.heyta 时脚本自己改用 `am start -W` 重验）；`1080x2400 / 内容占比 56.7% / 主蓝命中 4001` |
+| ios | `pod install` 把 `Podfile.lock` 改了 2 行（"验收流程本身是写者"那一族的既有形状，见 §7）→ 沙盒同步 → `xcodebuild Release` → 全新安装 → **已装的包比源码新**；`1206x2622 / 内容占比 99.8% / 主蓝命中 4153` |
+
+五枚证据图的归属三条齐（**腿绿 + mtime 新 + md5 变**，基线→本轮两列在 `~/.heyta-evidence/closeout-1007-094202/shots-{before,after}.txt`），且**四张人都打开看过**：mac 是共享 UI 的收集箱 + 首启同意卡（rail 已带「更多」的 `…`、页头带 `heyta` 品牌前缀）；android / ios 是首启同意卡（ios 是暗面）；**windows 那张开着头像菜单，里面逐字是「登录 / 注册 / 个人中心 / 设置」** ⇒ 装进去的确实是今天这批（个人中心是 `6d868af0` 才落的）。
+⚠️ 载体收尾时有 3 枚 tracked 脏（`Heyta/Info.plist`、`HeytaWidgetExtension/Info.plist`、`Podfile.lock`）—— 是构建期版本戳与 pod 同步写出来的，不是本批源码；`check:native-deps` 一类比对的读数因此要注明"量的是载体那份"。
+
+还没落的两格（**不包装成完成**）：
+① **逐段 rc**：`pnpm check` 现读 **97 段**，其中非浏览器 **93 段**正在载体上逐段跑（`~/.heyta-window-rigs/heyta-closeout-gates-1007.sh`，读数 `dist/linux-gate-segments/segments.tsv` 已抄进 `~/.heyta-evidence/closeout-gates-<时刻>/`）。同一趟里把 `apps/landing` 与 `apps/web` 两枚包**单独**再跑一次 —— 这一发才是"格 1 的红是不是 HEAD 级"的判据（主检出那 14 枚在飞改动进不了载体）。
+② **第五端（Linux `.deb`）**：`pnpm build:linux <目标机|local>` 排在①之后（串行，不抢 CPU）。它**不在** `reinstall:all` 的四端里（`docs/reference/build-matrix.md` 那行明写"未接：`reinstall-all.sh` 的第五端（计划 E7）"），所以"四端全绿"这句**不覆盖** Linux —— 别读成五端。
+
+**格 5（已闭合）：93 段逐段 rc 与两枚红包的配对腿**（载体 `8b564f48`，纯提交态；`segments.tsv` 留底 `~/.heyta-evidence/closeout-gates-095728/`）。
+分母现读 **97 段**，逐段跑了非浏览器的 **93** 段（排除 `check:ai-e2e` / `check:privacy-consent-e2e` / `check:landing-e2e` / `pnpm -r test` 四段），**93/93 都有日志与 rc**，红 **4** 段：
+
+| 段 | 红在哪 | 归属与为什么不代改 |
+|---|---|---|
+| `check:shell-unicode` | `scripts/h12-shot-set-arms.sh` 2 处 + `scripts/verify-mobile-habits.sh` 18 处 `$var（` | ✅ **本会话当场修掉**（`a2e07380`）：用的就是这道门禁自带的 `research/tools/fix-shell-unicode-vars.py`，`$var`→`${var}` 在会展开处逐字等价；复跑 `check:shell-unicode` + 钉脚本文本的四道（`verify-script-copy` / `script-snapshot` / `integration-coverage` / `journey-coverage`）各 rc=0 |
+| `check:row-single-source` 断言 B | `.ht-*` 前缀族 **29 > 基线 28**，净增那一枚是 `.ht-profile` | Profile 中心线（`6d868af0` 带的 `profile.css`）。门禁自己写了处置："先消掉净增，再改这个常量" ⇒ 要么收编进既有族、要么按裁决涨基线，**这是它的口径决定**，不是我该替它拍的 |
+| `check:l4` | `style={{…}}` 总数超基线（点名 `apps/mobile/src/screens/*` 与 web 批量工具条那几处） | P0 体验线。红字明写 ⚠️"不要为了变绿把 baseline 调高，先确认是不是迁移中间态" ⇒ 要动的是界面代码 + §6.2 那套截图复核，不是门禁 |
+| `check:linux-shell` | shell 可移植性对账 3 处不一致：`w6-dry-run-arms.sh` 的 `md5_bsd` 0→11、`scripts/lib/apk-freshness.sh` 的 `stat_f_bsd` 2→4、`server/scripts/backup.sh` 0→1 | Linux 线（E10 那枚守卫）。⚠️ 这一格有个**要它自己拍的形状问题**：`apk-freshness.sh` 那 2→4 是 Linux 线**为跨平台而加的双端分支**（合法的净增），而这道门禁的账本语义是"只许减不许增" ⇒ 双端兼容 helper 与"只减"在这里互相打不到，缺一档"显式豁免 + 理由"。登记不代改 |
+
+配对腿（同一棵载体树，逐字提交态）：`pnpm --filter @heyta/landing test` ⇒ **rc=1**（格 1 那 3 枚是 **HEAD 级**，与主检出那 14 枚在飞改动无关）；`pnpm --filter @heyta/web test` ⇒ **rc=0**（格 2 的归因坐实：那 3 份在提交态与单跑两侧都绿）。
+
+**格 6（已闭合，但过程里照出一枚假绿）：Linux 第五端的 `.deb` 产物。**
+`reinstall:all` 不管这一端，所以按 `pnpm build:linux <别名>` 那条入口单独跑，跑在**载体**上（发起方 = 载体，`PKG_INDEX_SHA=f9c1b85615f63e4e…` 与它自己那份 `apps/web/dist/index.html` 逐字相同）。三笔才打通：
+
+| 笔 | 症状 → 成因 |
+|---|---|
+| `8f5a12fa` | `make: pkg-config: 没有那个文件或目录` → 那台机上 `pkg-config` 与头文件只活在 `scripts/linux/provision-user-prefix.sh` 写的 `~/heyta-linux-prefix/env.sh` 里，而入口是 `ssh … bash -s` 起的**非登录** shell（现量：`/usr/bin/pkg-config` 不存在、rc 文件里没有 source 行）。改成**有则 source、无则照旧**，并把 `LINUX_ENV=sourced …` / `=none` 逐字打印 |
+| `6eeff0d3` | 🔴 **上一笔把 `< <(...)` 写成 `<(…)`** ⇒ `/dev/fd/63` 被当**参数**递给远端，正文一行没跑，而 ② 照样从远端取回**上一轮**的 `.deb` 与快照、③ 照样打 `PKG_RESULT=OK / PKG_BLUE_HITS=3987`（与上一轮逐字相同），日志里零编译输出。⇒ 记一条一般形状：**入口脚本对"取回的产物是不是本轮打的"没有判据**（① 那三条只钉 `web-dist` 指纹），所以"跑一次 `.deb`"这句话在旧树残留的载体上可以凭空成立。这一格留给 Linux 线补判据（建议：`dpkg-deb -f` 取 `Package/Version` + 与本轮 `sha256sum` 对账，或跑前响亮清 `dist/linux`） |
+| `77ad1d2e` | `make: *** 没有规则可制作目标 ../../packages/design-system/generated/heyta-tokens.h` → 那枚头文件**是被跟踪的**（`git ls-files packages/design-system/generated` = 7 枚），Makefile 第 40/49 行需求它，而入口的 rsync 白名单只发了 `apps/desktop-linux` + `bridge-bundle` + `apps/web/{dist,public/icons}` ⇒ **干净的远端树上永远没有它**。⇒ 前两笔修的是"这台机上跑不起来"，这一笔修完才轮到判据本身；合起来说明 `.deb` 入口此前只在"远端恰好留着一棵旧树"时才打得通 |
+
+打通后的读数（跑前先 `rm -rf` 远端 `/tmp/heyta-linux-pkg/dist/linux` 作阳性对照，让"取回旧包"当场走不通）：
+`LINUX_ENV=sourced` → `-Werror` 编译 → `PKG_FRESHNESS=OK files=26` / `PKG_FRESHNESS_INPACKAGE=OK` → `PKG_SANDBOX=off` `PKG_RUN_RC=0` `PKG_SHELL_UI=web-dist` `PKG_SETTLED=OK` `PKG_SNAPSHOT_TAKEN=OK` → `PKG_PIXELS=OK PKG_BLUE_HITS=3987 PKG_SNAPSHOT=900x523` → **`PKG_RESULT=OK`**，`heyta_1.0.0_amd64.deb` **1,297,960 B / 10:19**（与那枚被误取的旧包 1,297,534 B 字节数不同 ⇒ 本轮产物）。解包态真窗口那张**人打开看过**：共享 UI（rail 带「更多」的 `…`、页头 `heyta 收集箱`、首启同意卡、主蓝按钮）。
+⚠️ 边界：`dpkg -i` 装进系统那一档仍未做（取证走免 root 解包态，脚本明写不再 `dpkg -i`）；`reinstall-all.sh` 的第五端（计划 E7）没接，所以"四端全绿"那句**不覆盖** Linux。
+
+**格 7（把"等窗口"换成实测阻塞）：自托管落地链 `feat/self-host-distribution` → `main`。**
+本节动手前，那一头的落地还挂在两句"等主检出干净 + 等负载窗口"上。现在两句都可以重量了，而**实测结论是它不再由环境挡着**：
+- 分母现量：分支独有 **17 笔** / **21 枚文件**（`git rev-list --count main..feat/self-host-distribution`、`git diff --name-only main...feat/self-host-distribution`），merge-base = `82e0ee6b`。
+- 合流预检（不碰任何树）：`git merge-tree --write-tree --name-only main feat/self-host-distribution` ⇒ **rc=1**，冲突只有两族：**4 枚 `e2e/selfhost-stack-results/s{1,2,3}*.png`**（两侧各自重打过，二进制不可并）与 **`package.json`**（两侧都往同一条 `check` 串里插段：分支插 `check:app-version`、main 插 `check:backup-retention` / `build:linux` ⇒ 机械并集即可，**不需要谁拍板**）。
+- 🔴 真正拦着它的是**格 1 与格 5 那三枚段落红**：落地装置 `research/tools/selfhost-land-main.mjs` 的 `--confirm` 要求载体上**整条 `pnpm check`** 绿（红 ⇒ rc=4 不落地），而 `apps/landing test` 与那三段现在就是红的。⇒ 这一格的等待条件从"环境"改写成"**等 P0 线补复刻那半 + 等那三段各自的归属线收口**"。落地链自己的默认源分支那一格（`b146bbd5` / `6234be49` 已入档，G-75 是它欠的判据）不在本节范围。
+- 本节**没有**替它合流：合流要选 4 枚证据图取哪一侧、而正确处置是合流后重打一轮自建栈取证再换图（那要动远端 docker 栈），那是那条线的现场，不是收尾顺手能做的。
+
+
+
+
