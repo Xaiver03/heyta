@@ -6930,7 +6930,7 @@ macOS zip 装上打不开（§7 第 82 条那一族），它匿名 200 也不该
 | 端 | 状态 | 读数 |
 |---|---|---|
 | macOS | ✅ **已发布** | `heyta-1.0.0-macos.dmg` 2,362,276 B，sha256 `15ae5583…26fe12`，匿名 Range 实取 `206 / bytes 0-0/2362276`。只有 arm64（`lipo -archs`）⇒ Intel 那一行写的是缺口不是文案 |
-| iOS | 🔄 TestFlight 腿在跑 | 载体 `f97013de` 的 Release 已重打并装上（`BUILD SUCCEEDED`、主蓝命中 4153）；签名身份与两枚 profile 就绪，只差真 archive |
+| iOS | ✅ **已进 TestFlight 内测** | build 2（`CFBundleShortVersionString 1.0` / `CFBundleVersion 2`）：archive → export（IPA 13,799,274 B，sha256 `de84b207…c2861`）→ `asc builds upload --wait` `uploaded:true` → `processingState VALID` → `add-groups` 成功 → **`internalBuildState: IN_BETA_TESTING`**。**但还没有访客能点开的入口**（见格 5）；`asc builds next-build-number` 现量 `nextBuildNumber=2`，所以 `CURRENT_PROJECT_VERSION 1→2` 四行已入库（`CFBundleVersion` 必须等于**已上传那一枚**，否则下一发撞号）|
 | Android | 🔴 不可发布 | 当前 APK `apksigner` 读出 `CN=Android Debug`。直链会让换正式签名时必须卸载 ⇒ 连本地数据一起清。腿在查"不移动密钥"的通道 |
 | Windows | 🔴 不可发布 | MSIX 由 `New-SelfSignedCertificate` 签，访客要先信任证书。腿在查便携形态是否 unpackaged 可跑 |
 | Linux | 🔄 在载体机上直接构建 | 缺的那格是 `dpkg -i`（今天以前只有 `dpkg-deb -x`）。腿在 `linux-dev-lan` 上原生构建 + 验装 |
@@ -6959,3 +6959,37 @@ macOS zip 装上打不开（§7 第 82 条那一族），它匿名 200 也不该
 MSIX `1.0.0.0`、`package-desktop.mjs` 写 `0.0.0`）—— 批次号统一不等于产物统一；
 ② `feat/self-host-distribution` 上那枚 `check:app-version` 与本格 ① 是同一件事，**不要各建一套**；
 ③ 主检出那 34 枚在飞路径仍未动（另一会话正在写）；④ `landing` 那 3 条 mockup 红（B101 格 1）仍是原归属。
+
+### 格 6 — iOS 的访客入口不存在，而且**不是我们没做**：Apple 直接拒了
+
+`channels.ios` 要放的那串 `testflight.apple.com/join/…` 只在**外部测试组**上才有；
+账号里唯一存在的组是内部组，开公开链接被服务端原话挡回：
+
+```
+Public link cannot be enabled for internal group   （asc rc=5）
+```
+
+⇒ 下载页的 iOS 那一格现在按 ADR-0058 走 `guide`，**没有按钮**，这是设计而不是遗漏
+（清单里没有的出口不许变成可点的东西）。要它变成按钮只有一条路：**新建外部组 + 提交
+beta 审核**（还要先补 `betaAppReviewDetails` 的联系邮箱），而那是对外动作 —— 没有指令不做。
+另外 asc 无处返回 join token（`groups edit` 只有开关、`asc web` 无 testflight 子命令）
+⇒ 事后那串只能从 ASC 网页读，域名已在 `OFFICIAL_STORE_HOSTS` 白名单里，形状不是问题。
+
+### 格 7 — `pod install` 会改脏 `Podfile.lock`，变量是 reinstall-all 自己带的那两个 env
+
+载体上那一趟（用 §6.1.1 脚本的 env）把 `hermes-engine` 从提交态 `208b0dcd…` 改成 `29d18419…`。
+现量到的分母：
+
+| 事实 | 读数 |
+|---|---|
+| 提交态 lock（主检出 == 载体 HEAD） | 两枚树都是 `208b0dcd96feb98e38846908f00249a932833276` |
+| `react-native` 版本 | 两枚树都 `0.84.1` |
+| `hermes-engine.podspec` 源码 | 两枚树 **逐字节相同**（`diff` rc=0）⇒ 不是"树不一样" |
+| 唯一的变量 | `scripts/reinstall-all.sh:514` 那趟带 `RCT_USE_PREBUILT_RNCORE=0 RCT_USE_RN_DEP=0` |
+
+**这条只写成假设，没写成结论**：对照跑（不带那两个 env 再 `pod install` 一次，看 lock 是否落回
+`208b0dcd`）我没有做 —— 它会改脏沙盒，而两个仍在跑的腿正用这枚载体。若假设成立，那么
+`reinstall-all.sh` 里那句注释（"提交态的 lock 能不能复现由 `check:native-deps` 管，traps #150 已实测**是**可复现的"）
+与它自己每次跑完都打印 `⚠️ pod install 改动了 Podfile.lock` 是**同一件事的两面**：
+可复现性取决于跑它时带不带 env，而脚本从来只警告、不判红、也不还原。
+**归属**：那两行 env 与 #150 属于 ios/原生那条线，我不代改判据；这里只把变量收窄到一枚。
