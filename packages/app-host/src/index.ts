@@ -79,6 +79,12 @@ export {
   type HabitActionsOptions,
   type NewHabitFields,
 } from './habit-actions.js';
+export {
+  buildHabitExportRows,
+  renderHabitCsv,
+  type HabitExportRow,
+  type HabitCsvColumns,
+} from './habit-export.js';
 
 /**
  * 提醒动作（B1-1 的写路径）。
@@ -349,6 +355,9 @@ export {
   passkeyPath,
   planDisplayNameWrite,
   registerWithEmailPassword,
+  requestEmailPasswordRegistrationCode,
+  verifyEmailPasswordRegistrationCode,
+  resendEmailPasswordRegistrationCode,
   registerWithMagicLink,
   renamePasskey,
   requestMagicLink,
@@ -376,6 +385,7 @@ export {
   type HostedPasskeyOptions,
   type HostedPasskeySummary,
   type HostedPasswordPolicyCode,
+  type HostedRegistrationChallengeResult,
   type LegalConsentReason,
   type LegalConsentStatus,
 } from './hosted-auth.js';
@@ -524,6 +534,7 @@ export {
 } from './ai-assistant.js';
 export {
   ASSISTANT_TIER_ORDER,
+  ASSISTANT_TIER_EXECUTE,
   ASSISTANT_TIER_READ_AND_PROPOSE,
   ASSISTANT_TIER_READ_ONLY,
   DEFAULT_ASSISTANT_TIER,
@@ -556,7 +567,9 @@ export {
 } from './calendar-anchor.js';
 
 export {
+  aiToolProposalRequiresConfirmation,
   confirmAiToolProposal,
+  executeAiToolProposal,
   runSelectedTool,
   type AiToolProposal,
   type AiToolRunOutcome,
@@ -845,3 +858,5 @@ export {
   type AssistantSessionActionsOptions,
   type NewAssistantTurn,
 } from './assistant-session-actions.js';
+
+export { prepareTaskBatchIntent, createTaskBatch, type TaskBatchAuthorization, type TaskBatchContext } from './task-batch-actions.js';

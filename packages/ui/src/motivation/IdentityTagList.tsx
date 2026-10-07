@@ -105,8 +105,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       padding: tokens['space.3'],
       borderRadius: tokens['radius.lg'],
       backgroundColor: tokens['color.surface'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
     },
     reachedWrap: {
       flexDirection: 'row',

@@ -18,8 +18,7 @@
  *      只有 `aria-pressed={selected}` 这种平铺写法落到 DOM 上（§7 里 RNW 吞属性那一族）。
  *   2. **属性必须住在可点的那颗上**：挂在里层 `View` 上时视觉照常、读屏不知道是哪一条，
  *      所以没有任何一条行为测试会红 —— 这正是"承重的无障碍通道"该由源码级判据守着的原因。
- *   3. **两条线索同源于一个谓词**：只改边框不改底色（或反过来）在截图上很难看出来，
- *      而"选中"这件事在色觉差异下要靠两条线索同时说话。
+ *   3. **单层高亮同源于一个谓词**：选中态使用语义底色，不再在列表行外套边框。
  */
 
 import { readFileSync } from 'node:fs';
@@ -64,20 +63,20 @@ describe('HabitProgressList —— 选中痕迹的无障碍通道确实在', () 
   });
 });
 
-describe('HabitProgressList —— 两条视觉线索同源于一个谓词', () => {
+describe('HabitProgressList —— 单层高亮同源于一个谓词', () => {
   it('选中判据是**这一行的 id 相等**，不许按位置（列表一排序选中就跟着错行）', () => {
     expect(code).toMatch(/const selected = habit\.id === selectedId;/);
   });
 
-  it('描边与底色都挂在**同一个** `selected` 上（改一条漏一条在截图上看不出来）', () => {
+  it('高亮底色挂在**同一个** `selected` 上', () => {
     expect(code).toMatch(/style=\{selected \? \[styles\.row, styles\.rowSelected\] : styles\.row\}/);
   });
 
-  it('🔴 `rowSelected` 同时给 `borderColor: color.primary` 与 `backgroundColor: color.primary-subtle`', () => {
+  it('🔴 `rowSelected` 只用 `backgroundColor: color.primary-subtle`，不再套选中边框', () => {
     const block = code.slice(code.indexOf('rowSelected: {'));
     const body = block.slice(0, block.indexOf('}'));
-    expect(body, '选中态没有描边线索').toMatch(/borderColor: tokens\['color\.primary'\]/);
     expect(body, '选中态没有底色线索').toMatch(/backgroundColor: tokens\['color\.primary-subtle'\]/);
+    expect(body, '选中态仍然使用描边').not.toMatch(/border(Color|Width)\s*:/);
   });
 });
 

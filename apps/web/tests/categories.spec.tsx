@@ -27,7 +27,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 (globalThis as unknown as { indexedDB: IDBFactory }).indexedDB = new IDBFactory();
 (globalThis as unknown as { IDBKeyRange: typeof IDBKeyRange }).IDBKeyRange = IDBKeyRange;
 
-import { I18nProvider } from '@heyta/i18n';
+import { I18nProvider, zhCN } from '@heyta/i18n';
 import { DEFAULT_CATEGORY_WEEKS } from '@heyta/domain';
 import type { FocusSession, Habit, HabitLog, Project, Task } from '@heyta/domain';
 import { emptyState, type MaterializedState } from '@heyta/op-log';
@@ -306,7 +306,8 @@ describe('CategoryBreakdown（真实渲染）', () => {
   it('完全没有记录时是空状态，且不出现任何一行数字', () => {
     const el = render(<CategoryBreakdown />);
     const text = el.textContent ?? '';
-    expect(text).toContain('还没有可以归类的时间记录');
+    expect(text).toContain(zhCN['web.categories.empty.title']);
+    expect(text).toContain(zhCN['web.categories.empty.hint']);
     expect(el.querySelectorAll('[data-testid="category-lane"]')).toHaveLength(0);
   });
 

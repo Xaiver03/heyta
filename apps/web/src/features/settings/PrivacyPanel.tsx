@@ -1,4 +1,3 @@
-import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 设置页的「隐私同意」面板 —— **撤回同意的那个入口**
  * ====================================================
@@ -24,15 +23,15 @@ import { ICON_SIZE } from '@heyta/design-system';
  */
 
 import { useEffect, useState } from 'react';
-import { ShieldCheck, ShieldX } from 'lucide-react';
-
 import { useI18n } from '@heyta/i18n';
 import { formatPrivacyDecisionTime, type PrivacyConsentRecord } from '@heyta/app-host';
 
 import { privacyConsent, privacyConsentActions, subscribePrivacyConsent } from '../privacy/consent-gate.js';
 import { usePrivacyStore } from '../privacy/store.js';
+import { SettingsNotice } from './SettingsNotice.js';
+import './privacy-settings.css';
 
-export function PrivacyPanel(): React.JSX.Element {
+export function PrivacyPanel({ active = true }: { active?: boolean }): React.JSX.Element {
   const { t } = useI18n();
 
   /**
@@ -45,7 +44,10 @@ export function PrivacyPanel(): React.JSX.Element {
   const [record, setRecord] = useState<PrivacyConsentRecord | null>(() => privacyConsent.current());
   const [revokeNotPersisted, setRevokeNotPersisted] = useState(false);
 
-  useEffect(() => subscribePrivacyConsent(() => setRecord(privacyConsent.current())), []);
+  useEffect(() => {
+    if (!active) return undefined;
+    return subscribePrivacyConsent(() => setRecord(privacyConsent.current()));
+  }, [active]);
 
   const stateKey =
     record === null
@@ -55,58 +57,58 @@ export function PrivacyPanel(): React.JSX.Element {
         : 'common.privacy.settings.localOnly';
 
   return (
-    <div className="ht-settings" data-testid="privacy-panel">
-      <h2 className="ht-settings__title ht-type-section-title">{t('common.privacy.settings.title')}</h2>
+    <section className="ht-settings privacy-settings" data-testid="privacy-panel" aria-labelledby="privacy-settings-title">
+      <h2 id="privacy-settings-title" className="ht-settings__title ht-type-section-title">{t('common.privacy.settings.title')}</h2>
 
-      <p className="ht-settings__hint" data-testid="privacy-state">
-        {record === null ? (
-          <ShieldX size={ICON_SIZE.xs} aria-hidden="true" />
-        ) : (
-          <ShieldCheck size={ICON_SIZE.xs} aria-hidden="true" />
-        )}{' '}
-        {t(stateKey)}
-        {record === null ? null : `（${t('common.privacy.settings.decidedAt', {
-          time: formatPrivacyDecisionTime(record.decidedAt),
-        })}）`}
-      </p>
+      <fieldset className="privacy-settings__fieldset" aria-labelledby="privacy-status-title">
+        <legend id="privacy-status-title" className="privacy-settings__legend">{t('common.privacy.settings.statusTitle')}</legend>
+        <p className="privacy-settings__hint">{t('common.privacy.settings.statusHint')}</p>
+        <SettingsNotice
+          title={t(stateKey)}
+          tone={record === null ? 'warning' : record.decision === 'accepted' ? 'success' : 'info'}
+          testId="privacy-state"
+        >
+          {record === null ? null : t('common.privacy.settings.decidedAt', {
+            time: formatPrivacyDecisionTime(record.decidedAt),
+          })}
+        </SettingsNotice>
+      </fieldset>
 
-      <p className="ht-settings__hint">{t('common.privacy.settings.revokeHint')}</p>
+      <fieldset className="privacy-settings__fieldset" aria-labelledby="privacy-action-title">
+        <legend id="privacy-action-title" className="privacy-settings__legend">{t('common.privacy.settings.actionTitle')}</legend>
+        <p className="privacy-settings__hint">{t('common.privacy.settings.revokeHint')}</p>
+        <div className="privacy-settings__actions">
+          {record === null ? (
+            // 没决定过（首次装、或刚撤回）：把同意面板再打开一次。
+            // ⚠️ 这里开的是**同一张**面板，不是第二份"同意界面"（AGENTS §3.5）。
+            <button
+              type="button"
+              className="ht-btn ht-btn--primary"
+              data-testid="privacy-choose-again"
+              onClick={() => usePrivacyStore.getState().openSheet('revoked')}
+            >
+              {t('common.privacy.settings.chooseAgain')}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="ht-btn ht-btn--ghost"
+              data-testid="privacy-revoke"
+              onClick={() => {
+                const { persisted } = privacyConsentActions.revoke();
+                setRevokeNotPersisted(!persisted);
+              }}
+            >
+              {t('common.privacy.settings.revoke')}
+            </button>
+          )}
+        </div>
 
-      <div className="ht-settings__actions">
-        {record === null ? (
-          // 没决定过（首次装、或刚撤回）：把同意面板再打开一次。
-          // ⚠️ 这里开的是**同一张**面板，不是第二份"同意界面"（AGENTS §3.5）。
-          <button
-            type="button"
-            className="ht-btn ht-btn--primary"
-            data-testid="privacy-choose-again"
-            onClick={() => usePrivacyStore.getState().openSheet('revoked')}
-          >
-            {t('common.privacy.settings.chooseAgain')}
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="ht-btn ht-btn--ghost"
-            data-testid="privacy-revoke"
-            onClick={() => {
-              const { persisted } = privacyConsentActions.revoke();
-              setRevokeNotPersisted(!persisted);
-            }}
-          >
-            {t('common.privacy.settings.revoke')}
-          </button>
-        )}
-      </div>
-
-      {/* 撤回没能落盘时**必须说出口**（与同意面板那条同一纪律）：
-          本次会话里闸门确实关了，但下次冷启动磁盘上还是旧决定 ——
-          不说这一句，用户以为撤回是永久的。 */}
-      {revokeNotPersisted ? (
-        <p className="ht-settings__hint" role="status" data-testid="privacy-revoke-not-persisted">
-          {t('common.privacy.consent.notPersisted')}
-        </p>
-      ) : null}
-    </div>
+        {/* 撤回没能落盘时必须说出口：会话闸门已关，但下次冷启动仍会再问。 */}
+        {revokeNotPersisted ? (
+          <SettingsNotice tone="warning" live testId="privacy-revoke-not-persisted" title={t('common.privacy.consent.notPersisted')} />
+        ) : null}
+      </fieldset>
+    </section>
   );
 }

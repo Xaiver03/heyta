@@ -24,9 +24,8 @@
  *   - `panel`：菜单 / 下拉 / 小浮层 —— 比 chrome 厚一点（承载密集文字）。
  *   - `sheet`：底部面板 / 表单 —— 最厚。
  *
- * 顶边高光（`material.edge-highlight`）是配方的一部分：亮色下它是
- * 「光打在材料上」，没有它半透明面像「没画完」。无 blur 端退化为普通
- * 边框色（`color.border`）—— 不透明面需要的是分隔线，不是光。
+ * 2026-10-07 无描边裁决：表面通过底色与留白形成层级，不再画 rim。
+ * blur 能力只影响透明度，不影响是否出现边框。
  *
  * web 的另一半（blur + 饱和度提升 + 全边框 rim）在宿主 CSS：
  * `apps/web/src/styles/app.css` 的 `.ht-material`（两个渲染世界、同一配方）。
@@ -40,7 +39,7 @@ export type MaterialTier = 'chrome' | 'panel' | 'sheet';
 /** 一个材质表面的全部视觉决定（RN View 可直接展开）。 */
 export interface MaterialSurfaceStyle {
   readonly backgroundColor: string;
-  /** 发丝级 rim：web 玻璃 = 边缘高光（光打在材料上）；无 blur 端 = 分隔线。 */
+  /** 无描边表面；保留形状供 RN 样式直接消费。 */
   readonly borderWidth: number;
   readonly borderColor: string;
 }
@@ -79,13 +78,13 @@ export function materialSurface(
   if (hasBackdropBlur) {
     return {
       backgroundColor: tokens[TINT_OF[tier]] as string,
-      borderWidth: tokens['border-width.thin'],
+      borderWidth: 0,
       borderColor: tokens['material.edge-highlight'],
     };
   }
   return {
     backgroundColor: tokens['color.surface-raised'],
-    borderWidth: tokens['border-width.thin'],
+    borderWidth: 0,
     borderColor: tokens['color.border'],
   };
 }

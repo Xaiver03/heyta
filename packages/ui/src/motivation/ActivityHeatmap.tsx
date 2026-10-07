@@ -41,8 +41,8 @@
  * 🔴 只用 RN 原语（`View` / `Text` / `StyleSheet`）
  */
 
-import React, { useMemo } from 'react';
-import { StyleSheet, Text, View, type ViewProps } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View, type ViewProps } from 'react-native';
 import type { HeytaNativeTokens } from '@heyta/design-system';
 import type { LocalDate } from '@heyta/domain';
 import { heatmapLevelToken, toHeatmapWeeks } from '../habits/model.js';
@@ -75,6 +75,8 @@ export interface ActivityHeatmapLabels {
   /** 图例两端的字。**两项都给**才渲染图例整行。 */
   readonly less?: string;
   readonly more?: string;
+  /** 窄容器中提示用户横向滚动，并作为滚动区域的无障碍提示。 */
+  readonly scrollHint?: string;
 }
 
 export interface ActivityHeatmapProps {
@@ -95,8 +97,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       padding: tokens['space.3'],
       borderRadius: tokens['radius.lg'],
       backgroundColor: tokens['color.surface'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
     },
     months: {
       flexDirection: 'row',
@@ -118,6 +118,9 @@ function makeStyles(tokens: HeytaNativeTokens) {
       height: tokens['icon.xs'],
       borderRadius: tokens['radius.sm'],
     },
+    cellSelected: {
+      backgroundColor: tokens['color.primary-subtle'],
+    },
     legend: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -128,8 +131,42 @@ function makeStyles(tokens: HeytaNativeTokens) {
       height: tokens['space.3'],
       borderRadius: tokens['radius.sm'],
     },
+    scrollContent: {
+      flexDirection: 'column',
+      alignItems: 'flex-start',
+      gap: tokens['space.1'],
+    },
+    scrollHint: {
+      color: tokens['color.foreground-subtle'],
+    },
+    selection: {
+      color: tokens['color.foreground-muted'],
+    },
   });
 }
+
+type HeatmapKeyEvent = {
+  readonly key: string;
+  readonly preventDefault: () => void;
+};
+
+/** `onKeyDown` is a web-only enhancement; native hosts ignore the cast prop. */
+function keyboardProps(onKeyDown: (event: HeatmapKeyEvent) => void): ViewProps {
+  return { onKeyDown } as unknown as ViewProps;
+}
+
+/** `onWheel` is a web-only enhancement; native hosts ignore the cast prop. */
+function wheelProps(onWheel: () => void): ViewProps {
+  return { onWheel } as unknown as ViewProps;
+}
+
+type HeatmapLayoutEvent = {
+  readonly nativeEvent: {
+    readonly layout: {
+      readonly width: number;
+    };
+  };
+};
 
 export function ActivityHeatmap({
   days,
@@ -144,56 +181,184 @@ export function ActivityHeatmap({
   const mapped = useMemo(() => toActivityHeatmapDays(days), [days]);
   const weeks = useMemo(() => toHeatmapWeeks(mapped), [mapped]);
   const total = activityHeatmapTotal(mapped);
-  const { less, more } = labels;
+  const { less, more, scrollHint } = labels;
+  const scrollRef = useRef<ScrollView>(null);
+  const [selectedDate, setSelectedDate] = useState<LocalDate | null>(null);
+  const [isHorizontallyScrollable, setIsHorizontallyScrollable] = useState(false);
+  const viewportWidth = useRef(0);
+  const contentWidth = useRef(0);
+  const initialPositioned = useRef(false);
+  const manualNavigation = useRef(false);
+
+  const updateOverflowAndInitialPosition = useCallback(() => {
+    const nextScrollable = contentWidth.current > viewportWidth.current;
+    setIsHorizontallyScrollable((current) => (current === nextScrollable ? current : nextScrollable));
+
+    // The source is ordered oldest → newest. Keep the latest weeks discoverable
+    // after both dimensions are known, exactly once. Later responsive layout
+    // changes must not pull the user back to the end of the year.
+    if (
+      initialPositioned.current ||
+      manualNavigation.current ||
+      viewportWidth.current <= 0 ||
+      contentWidth.current <= 0 ||
+      scrollRef.current === null
+    ) return;
+    initialPositioned.current = true;
+    scrollRef.current.scrollToEnd({ animated: false });
+  }, []);
+
+  const disableAutomaticPositioning = useCallback(() => {
+    manualNavigation.current = true;
+  }, []);
+
+  const handleLayout = useCallback((event: HeatmapLayoutEvent) => {
+    viewportWidth.current = event.nativeEvent.layout.width;
+    updateOverflowAndInitialPosition();
+  }, [updateOverflowAndInitialPosition]);
+
+  const handleContentSizeChange = useCallback((width: number) => {
+    contentWidth.current = width;
+    updateOverflowAndInitialPosition();
+  }, [updateOverflowAndInitialPosition]);
+
+  useEffect(() => {
+    if (selectedDate !== null && mapped.some((day) => day.date === selectedDate)) return;
+    setSelectedDate(null);
+  }, [mapped, selectedDate]);
+
+  const selectDateAt = useCallback(
+    (index: number) => {
+      const day = mapped[index];
+      if (day === undefined) return;
+      disableAutomaticPositioning();
+      setSelectedDate(day.date);
+      const weekIndex = weeks.findIndex((week) => week.days.some((candidate) => candidate?.date === day.date));
+      if (weekIndex >= 0) {
+        scrollRef.current?.scrollTo({
+          x: weekIndex * (Number(tokens['icon.xs']) + Number(tokens['space.1'])),
+          animated: false,
+        });
+      }
+    },
+    [disableAutomaticPositioning, mapped, weeks, tokens],
+  );
+
+  const onHeatmapKeyDown = useCallback(
+    (event: HeatmapKeyEvent) => {
+      if (mapped.length === 0) return;
+      const current = selectedDate === null ? mapped.length - 1 : mapped.findIndex((day) => day.date === selectedDate);
+      const index = current < 0 ? mapped.length - 1 : current;
+      // Weeks are columns and days are rows: horizontal movement crosses one
+      // full week, while vertical movement crosses one day in the same column.
+      const delta = event.key === 'ArrowLeft' ? -7 : event.key === 'ArrowRight' ? 7 : event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0;
+      const target = event.key === 'Home' ? 0 : event.key === 'End' ? mapped.length - 1 : Math.max(0, Math.min(mapped.length - 1, index + delta));
+      if (delta === 0 && event.key !== 'Home' && event.key !== 'End') return;
+      event.preventDefault();
+      selectDateAt(target);
+    },
+    [mapped, selectedDate, selectDateAt],
+  );
+
+  const selectedDay = selectedDate === null ? undefined : mapped.find((day) => day.date === selectedDate);
 
   return (
     <View style={styles.wrap} testID={testID}>
-      {/* 月份标签与格子**同一套列宽**，否则标签会与它标注的那一列错开。 */}
-      <View
-        style={styles.months}
-        accessible
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        showsHorizontalScrollIndicator
+        contentContainerStyle={styles.scrollContent}
+        role="region"
+        tabIndex={0}
         accessibilityLabel={labels.grid({ total, days: mapped.length })}
+        accessibilityHint={isHorizontallyScrollable ? scrollHint : undefined}
+        {...keyboardProps(onHeatmapKeyDown)}
+        {...wheelProps(disableAutomaticPositioning)}
+        onLayout={handleLayout}
+        onContentSizeChange={handleContentSizeChange}
+        onScrollBeginDrag={disableAutomaticPositioning}
+        testID={testID === undefined ? undefined : `${testID}-scroll`}
       >
-        {weeks.map((week, index) => (
-          <View key={`m-${String(index)}`} style={styles.monthCell}>
-            {week.month === undefined ? null : (
-              <Text style={[text.caption, { color: tokens['color.foreground-muted'] }]}>
-                {labels.month(week.month)}
-              </Text>
-            )}
+        <View>
+          {/* 月份标签与格子**同一套列宽**，否则标签会与它标注的那一列错开。 */}
+          <View style={styles.months} accessible={false}>
+            {weeks.map((week, index) => (
+              <View key={`m-${String(index)}`} style={styles.monthCell}>
+                {week.month === undefined ? null : (
+                  <Text
+                    numberOfLines={1}
+                    testID="growth-heatmap-month"
+                    style={[text.caption, {
+                      color: tokens['color.foreground-muted'],
+                      width: tokens['space.8'],
+                      minWidth: tokens['space.8'],
+                      marginLeft: Math.min(0,
+                        (weeks.length - index) * (Number(tokens['icon.xs']) + Number(tokens['space.1']))
+                        - Number(tokens['space.1']) - Number(tokens['space.8'])),
+                    }]}
+                  >
+                    {labels.month(week.month)}
+                  </Text>
+                )}
+              </View>
+            ))}
           </View>
-        ))}
-      </View>
 
-      <View style={styles.grid}>
-        {weeks.map((week, weekIndex) => (
-          <View key={`w-${String(weekIndex)}`} style={styles.week}>
-            {week.days.map((day, dayIndex) =>
-              day === null ? (
-                // 补齐的空位：它不是"那天活动为 0"，是"那一格不属于这个窗口"。
-                <View key={`e-${String(dayIndex)}`} style={styles.cell} />
-              ) : (
-                <View
-                  key={day.date}
-                  style={[
-                    styles.cell,
-                    { backgroundColor: tokens[heatmapLevelToken(day.level)] },
-                  ]}
-                  // 格子本身对读屏是装饰性的：整块有一句总述，
-                  // 365 个格子的逐条读数只会把信息埋掉。
-                  accessible={false}
-                  testID={`activity-cell-${day.date}`}
-                  {...dataCellTitle(
-                    labels.cellTooltip === undefined
-                      ? undefined
-                      : labels.cellTooltip({ date: day.date, count: day.count }),
-                  )}
-                />
-              ),
-            )}
+          <View style={styles.grid}>
+            {weeks.map((week, weekIndex) => (
+              <View key={`w-${String(weekIndex)}`} style={styles.week}>
+                {week.days.map((day, dayIndex) =>
+                  day === null ? (
+                    // 补齐的空位：它不是"那天活动为 0"，是"那一格不属于这个窗口"。
+                    <View key={`e-${String(dayIndex)}`} style={styles.cell} />
+                  ) : (
+                    <Pressable
+                      key={day.date}
+                      style={[
+                        styles.cell,
+                        day.date === selectedDate ? styles.cellSelected : null,
+                        { backgroundColor: tokens[heatmapLevelToken(day.level)] },
+                      ]}
+                      // The region owns the single keyboard stop. Cells stay
+                      // touchable without adding 365 tab stops on web.
+                      accessible={false}
+                      focusable={false}
+                      tabIndex={-1}
+                      onPress={() => {
+                        disableAutomaticPositioning();
+                        setSelectedDate(day.date);
+                      }}
+                      testID={`activity-cell-${day.date}`}
+                      {...dataCellTitle(
+                        labels.cellTooltip === undefined
+                          ? undefined
+                          : labels.cellTooltip({ date: day.date, count: day.count }),
+                      )}
+                    />
+                  ),
+                )}
+              </View>
+            ))}
           </View>
-        ))}
-      </View>
+        </View>
+      </ScrollView>
+
+      {selectedDay === undefined || labels.cellTooltip === undefined ? null : (
+        <Text
+          style={[text.caption, styles.selection]}
+          accessibilityLiveRegion="polite"
+          testID={testID === undefined ? undefined : `${testID}-selection`}
+        >
+          {labels.cellTooltip({ date: selectedDay.date, count: selectedDay.count })}
+        </Text>
+      )}
+
+      {!isHorizontallyScrollable || scrollHint === undefined ? null : (
+        <Text style={[text.caption, styles.scrollHint]} testID="growth-heatmap-scroll-hint">
+          {scrollHint}
+        </Text>
+      )}
 
       {/*
         图例（少 → 多）。🔴 它与格子用**同一个**「档位 → heat token」映射，

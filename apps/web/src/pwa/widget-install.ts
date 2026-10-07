@@ -21,6 +21,29 @@
 /** 引导要分平台。`other` 是**真实分支**，不是兜底 —— 理由见文件头。 */
 export type InstallPlatform = 'windows' | 'macos' | 'other';
 
+/**
+ * 小组件旅程所在的宿主状态。
+ *
+ * `nativeShell` 只说明当前页面被原生壳托管；它不等于原生壳已经提供了
+ * Windows WidgetKit / Widget Provider。把“应用已安装”和“系统小组件可用”
+ * 分成两个字段，避免设置页把原生窗口误报成已有桌面小组件。
+ */
+export type WidgetHostKind = 'native-shell' | 'windows-pwa' | 'standalone' | 'browser';
+
+/**
+ * `windows-pwa-candidate` 只表示当前平台有一条可能的 PWA 入口；它不证明
+ * manifest 已注册、Edge 已安装或 Widget Board 已经能读到卡片。
+ */
+export type WidgetProviderKind = 'windows-pwa' | 'windows-pwa-candidate' | 'none';
+
+export interface WidgetJourneyHostState {
+  readonly platform: InstallPlatform;
+  readonly host: WidgetHostKind;
+  readonly provider: WidgetProviderKind;
+  readonly standalone: boolean;
+  readonly showInstallGuide: boolean;
+}
+
 /** 三个分支各自的词条 key。先后顺序就是用户该做的顺序。 */
 export type InstallStepKey =
   | 'web.widgetJourney.windows.step1'
@@ -44,6 +67,59 @@ export function resolveInstallPlatform(platform: string | null | undefined): Ins
   if (p.includes('win')) return 'windows';
   if (p.includes('mac')) return 'macos';
   return 'other';
+}
+
+/**
+ * 解析设置页应该告诉用户的真实宿主能力。
+ *
+ * 目前只有 Windows PWA 提供桌面 Widget 这条链路；原生桌面壳已经是安装态，
+ * 但不能因此宣称它有系统 Widget。macOS / Linux / 其它浏览器也保持明确的
+ * `provider: 'none'`，不显示一条用户无法完成的 Windows 安装步骤。
+ */
+export function resolveWidgetJourneyHost(
+  platformName: string | null | undefined,
+  standalone: boolean,
+  nativeShell: boolean,
+): WidgetJourneyHostState {
+  const platform = resolveInstallPlatform(platformName);
+
+  if (nativeShell) {
+    return {
+      platform,
+      host: 'native-shell',
+      provider: 'none',
+      standalone: true,
+      showInstallGuide: false,
+    };
+  }
+
+  if (standalone && platform === 'windows') {
+    return {
+      platform,
+      host: 'windows-pwa',
+      provider: 'windows-pwa',
+      standalone: true,
+      showInstallGuide: false,
+    };
+  }
+
+  if (standalone) {
+    return {
+      platform,
+      host: 'standalone',
+      provider: 'none',
+      standalone: true,
+      showInstallGuide: false,
+    };
+  }
+
+  return {
+    platform,
+    host: 'browser',
+    provider: platform === 'windows' ? 'windows-pwa-candidate' : 'none',
+    standalone: false,
+    showInstallGuide: platform === 'windows',
+  };
 }
 
 /**

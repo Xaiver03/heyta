@@ -24,7 +24,7 @@ export interface SettingsAnchorTarget {
 }
 
 export const SETTINGS_ANCHORS: Record<SettingsAnchor, SettingsAnchorTarget> = {
-  profile: { id: 'settings-profile', focus: '#profile-nickname' },
-  sync: { id: 'settings-sync', focus: '[data-testid="sync-server-url"]' },
+  profile: { id: 'settings-profile', focus: '#profile-nickname, [data-testid="profile-signin-required-action"]' },
+  sync: { id: 'settings-sync', focus: '[data-testid="sync-signin-required-action"], [data-testid="sync-unlock-and-sync"]' },
   help: { id: 'settings-help' },
 };

@@ -198,8 +198,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       minHeight: tokens['touch-target.min'],
       paddingHorizontal: tokens['size.field-padding-x'],
       borderRadius: tokens['radius.md'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
       backgroundColor: tokens['color.surface'],
       color: tokens['color.foreground'],
     },
@@ -236,9 +234,7 @@ function makeStyles(tokens: HeytaNativeTokens) {
       minHeight: tokens['size.chip-height'],
       paddingHorizontal: tokens['size.chip-padding-x'],
       borderRadius: tokens['radius.full'],
-      borderWidth: tokens['border-width.thin'],
       backgroundColor: tokens['color.primary-subtle'],
-      borderColor: tokens['color.border-subtle'],
     },
     /**
      * 未被采纳 / 已忽略：用**虚线边框 + 弱化色**。
@@ -247,7 +243,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
      */
     chipOff: {
       backgroundColor: 'transparent',
-      borderStyle: 'dashed',
     },
     chipRaw: {
       color: tokens['color.foreground'],

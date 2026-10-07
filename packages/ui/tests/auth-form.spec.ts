@@ -209,3 +209,24 @@ describe('AuthForm —— 服务端地址不许当注册的前置条件', () => 
     expect(serverAt, '服务端地址栏又跑回邮箱上面了 —— 那道墙就还在').toBeGreaterThan(emailAt);
   });
 });
+
+describe('AuthForm —— 注册确认密码与强度反馈', () => {
+  it('只在注册分支渲染确认字段和本地强度估计', () => {
+    expect(code).toContain('testID={`${testID}-password-confirmation`}');
+    expect(code).toContain('<PasswordStrength');
+    expect(code).toMatch(/passwordStrength/);
+  });
+
+  it('提交前要求确认密码匹配，并把焦点移到确认字段', () => {
+    expect(code).toMatch(/confirmPassword === ''/);
+    expect(code).toMatch(/confirmPassword !== password/);
+    expect(code).toMatch(/confirmPasswordInput\.current\?\.focus\(\)/);
+    expect(code).toMatch(/onRegister\(\{[\s\S]{0,220}password,[\s\S]{0,120}termsAccepted/);
+  });
+
+  it('确认字段使用新密码 autofill，并有独立无障碍错误落点', () => {
+    expect(code).toMatch(/testID=\{`\$\{testID\}-password-confirmation`\}/);
+    expect(code).toMatch(/autoComplete=\{passwordAutocomplete\(mode\)\}/);
+    expect(code).toMatch(/aria-invalid=\{invalidFor\('passwordConfirmation'\)\}/);
+  });
+});

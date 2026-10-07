@@ -18,7 +18,7 @@
  *
  * | 原来钉的 | 现在钉的 | 为什么这样才对 |
  * |---|---|---|
- * | `ht-btn--primary` 类名里只有一个注册 | identify 阶段**只有「继续」一个主按钮**，且此时**没有口令栏** | 主路现在是一次问一件事；视觉权重是共享层的实现，类名不该由 web 判据钉住 |
+ * | `ht-btn--primary` 类名里只有一个注册 | 默认档**只有一个主提交按钮**，且邮箱与登录口令同屏 | 主路同时支持登录与注册；视觉权重是共享层的实现，类名不该由 web 判据钉住 |
  * | 「发送登录链接」是文字链（`className` 不含 `ht-btn`） | 它**仍在 DOM 里**且排在口令之后 | "降级"的实质是**次序与发现成本**，不是某个 CSS 类 |
  * | 通行密钥**三条**都在 | 一个 passkey 入口（随档位说"注册/登录"）+ 找回 + 邮件链接都在 | FIDO 的结论就是一个 affordance 管两档，见 §5 第 1 条 |
  * | 「高级」是原生 `<details>`、默认折叠 | 地址/粘贴**在展开之后完整存在**，地址是**最后一栏** | 见下面那条 🔴：2026-10-02 这一行**又换了一次写法** |
@@ -49,12 +49,19 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider, translate, type Locale, type MessageKey } from '@heyta/i18n';
+import { OFFICIAL_SITE_ORIGIN } from '@heyta/app-host';
 
 import { AuthPanel } from '../src/features/auth/AuthPanel.js';
 import { __resetAuthForTests, useAuthStore } from '../src/features/auth/store.js';
 import { useSyncStore } from '../src/features/sync/store.js';
 
 const BASE_URL = 'https://sync.example.com';
+const REGISTRATION_CHALLENGE = {
+  challengeId: 'journey-challenge',
+  expiresAt: Date.now() + 600_000,
+  resendAvailableAt: Date.now(),
+  emailDelivered: true,
+};
 
 let root: Root | undefined;
 let container: HTMLDivElement | undefined;
@@ -63,11 +70,13 @@ let calls: { url: string; method: string }[];
 function stubFetch(): void {
   calls = [];
   const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
-    calls.push({ url: String(input), method: String(init?.method ?? 'GET') });
+    const url = String(input);
+    calls.push({ url, method: String(init?.method ?? 'GET') });
+    const body = url.endsWith('/register/email-password/request') ? REGISTRATION_CHALLENGE : { message: 'ok' };
     return Promise.resolve({
       status: 200,
       ok: true,
-      json: () => Promise.resolve({ message: 'ok' }),
+      json: () => Promise.resolve(body),
     } as unknown as Response);
   });
   vi.stubGlobal('fetch', fetchMock);
@@ -76,6 +85,7 @@ function stubFetch(): void {
 async function renderPanelAtBaseUrl(
   baseUrl: string,
   locale: Locale = 'zh-CN',
+  allowAdvanced = false,
 ): Promise<HTMLDivElement> {
   // 一条用例里会连开两三个面板（已配置 / 未配置 / 英文各一轮），先收掉上一个：
   // 光靠 afterEach 只能收最后一个，剩下的会挂在 document.body 上互相看不见，
@@ -90,7 +100,7 @@ async function renderPanelAtBaseUrl(
   await act(async () => {
     root!.render(
       <I18nProvider locale={locale}>
-        <AuthPanel baseUrl={baseUrl} onClose={() => undefined} />
+        <AuthPanel baseUrl={baseUrl} allowAdvanced={allowAdvanced} onClose={() => undefined} />
       </I18nProvider>,
     );
     await Promise.resolve();
@@ -127,16 +137,16 @@ async function typeById(el: HTMLElement, testId: string, value: string): Promise
 /**
  * 走到"注册档 + 已填好一切"的状态。
  *
- * ⚠️ 每一步都是**用户真要做的那一下**：邮箱 → 「继续」→ 切到创建账号 → 勾同意项 →
+ * ⚠️ 每一步都是**用户真要做的那一下**：邮箱 → 切到创建账号 → 勾同意项 →
  * 填口令 → 提交。这里不许有"直接改 store 跳过表单"的捷径 —— 那等于用测试替界面
  * 撒谎，而这一组判据要钉的恰恰是"这条路真的走得通"。
  */
 async function toRegisterAndSubmit(el: HTMLElement, email: string, password: string): Promise<void> {
   await typeById(el, 'auth-form-email', email);
-  await tap(el, 'auth-form-continue');
   await tap(el, 'auth-form-switch-mode');
   await tap(el, 'auth-form-terms');
   await typeById(el, 'auth-form-password', password);
+  await typeById(el, 'auth-form-password-confirmation', password);
   await tap(el, 'auth-form-submit');
 }
 
@@ -168,16 +178,15 @@ describe('墙一：注册不许依赖"你知道自己的同步域名吗"', () =>
     await toRegisterAndSubmit(el, 'me@example.com', 'correct horse battery');
 
     // 主路是邮箱 + 口令，不是"先发一封魔法链接"（那已经降级成二级链）。
-    expect(calls.map((c) => c.url)).toContain(`${window.location.origin}/api/register/email-password`);
+    expect(calls.map((c) => c.url)).toContain(`${OFFICIAL_SITE_ORIGIN}/api/register/email-password/request`);
     // 而且**不是**以 `unconfigured` 收场 —— 那正是旧代码的形态。
-    expect(useAuthStore.getState().status.kind).toBe('registered');
+    expect(useAuthStore.getState().status.kind).toBe('registration-code');
   });
 
   it('🔴 地址是**最后一栏**，不是第一栏（那句原话最直接的钉法）', async () => {
-    const el = await renderPanelAtBaseUrl('');
-    // 默认收起（2026-10-02 晚）：先展开，再判它在哪一栏 —— 顺序判据与折叠无关，
-    // 但"它得先在场"才能量出顺序。收起本身由 `auth-entry-default.spec.tsx` 钉。
-    await tap(el, 'auth-form-self-host-toggle');
+    const el = await renderPanelAtBaseUrl('', 'zh-CN', true);
+    // 自托管入口只由同步设置显式打开；展开后再判它在哪一栏。
+    await tap(el, 'auth-form-advanced-toggle');
     const inputs = [...el.querySelectorAll('input')] as HTMLInputElement[];
     const indexes = new Map(inputs.map((i, n) => [i.getAttribute('data-testid'), n]));
 
@@ -190,48 +199,50 @@ describe('墙一：注册不许依赖"你知道自己的同步域名吗"', () =>
 
     const address = byTestId(el, 'auth-form-server-url') as HTMLInputElement;
     // 预填与空框是两种产品：少了值，这一栏就重新变成"你先写出域名"。
-    expect(address.value).toBe(window.location.origin);
-    // 那句"不用你写"必须在：少了它，一个预填好的框读起来仍然是"这里要我核对域名"。
-    expect(el.textContent ?? '').toContain(translate('zh-CN', 'web.auth.server.prefilled'));
+    expect(address.value).toBe(OFFICIAL_SITE_ORIGIN);
   });
 
-  it('已配置时**不给第二个地址来源**，但"这次会连到哪"仍然看得见', async () => {
+  it('默认登录不展示自托管 / 粘贴令牌入口', async () => {
+    const el = await renderPanelAtBaseUrl('');
+    expect(el.querySelector('[data-testid="auth-form-advanced-toggle"]')).toBeNull();
+    expect(el.querySelector('[data-testid="auth-form-server-url"]')).toBeNull();
+    expect(el.querySelector('[data-testid="auth-form-paste"]')).toBeNull();
+  });
+
+  it('已配置时**不给第二个地址来源**，但当前服务端仍然看得见', async () => {
     const el = await renderPanelAtBaseUrl(BASE_URL);
 
     expect(el.querySelector('[data-testid="auth-form-server-url"]')).toBeNull();
+    expect(el.textContent ?? '').toContain(translate('zh-CN', 'web.auth.server.custom'));
     expect(el.textContent ?? '').toContain(
-      translate('zh-CN', 'web.auth.server.at', { baseUrl: BASE_URL }),
+      translate('zh-CN', 'web.auth.server.address', { baseUrl: BASE_URL }),
     );
   });
 
   it('改过地址之后，注册就发往改后的那台（自建部署是一条真的走得通的路）', async () => {
-    const el = await renderPanelAtBaseUrl('');
-    // 自建这条路现在藏在展开之后 —— 但走通它的成本仍然只有"点开 + 敲字"。
-    await tap(el, 'auth-form-self-host-toggle');
+    const el = await renderPanelAtBaseUrl('', 'zh-CN', true);
+    // 自建这条路必须先从同步设置显式进入，再展开备用入口。
+    await tap(el, 'auth-form-advanced-toggle');
     await typeById(el, 'auth-form-server-url', `${BASE_URL}/`);
     await toRegisterAndSubmit(el, 'me@example.com', 'correct horse battery');
 
     // 尾斜杠被归一掉了：`https://x//api/...` 与 `https://x/api/...` 在网关与缓存那里是两个地址。
-    expect(calls.map((c) => c.url)).toContain(`${BASE_URL}/api/register/email-password`);
+    expect(calls.map((c) => c.url)).toContain(`${BASE_URL}/api/register/email-password/request`);
   });
 });
 
 describe('墙二：六个并列按钮 → 一条主路', () => {
-  it('第一步**只问一件事**：一个主按钮（「继续」），而这一屏没有口令栏', async () => {
+  it('默认主路同屏提供邮箱 + 登录口令，并只有一个主提交按钮', async () => {
     const el = await renderPanelAtBaseUrl(BASE_URL);
 
-    expect(el.querySelector('[data-testid="auth-form-continue"]')).not.toBeNull();
-    expect(el.querySelector('[data-testid="auth-form-password"]')).toBeNull();
-    // 「一次只问一件事」的另一半：这一屏**没有提交入口** —— 口令那一档的按钮要过了「继续」才出现。
-    // ⚠️ 这里刻意不数 `auth-form-verify`：那是"粘贴兜底"的按钮，它一直住在 DOM 里
-    // （由另一条"降级不是藏起来"钉着），把它算进主路等于用判据假装它不存在。
-    expect(el.querySelector('[data-testid="auth-form-submit"]')).toBeNull();
+    expect(el.querySelector('[data-testid="auth-form-email"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="auth-form-password"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="auth-form-submit"]')).not.toBeNull();
   });
 
   it('🔴 一个 affordance 同时管注册与登录：切档之后同意项才出现', async () => {
     const el = await renderPanelAtBaseUrl(BASE_URL);
     await typeById(el, 'auth-form-email', 'me@example.com');
-    await tap(el, 'auth-form-continue');
 
     // 默认档是登录（口令一填就能进）；注册是**同一张表**的另一档，不是第二个表单。
     expect(el.textContent ?? '').toContain(translate('zh-CN', 'common.auth.form.signIn'));
@@ -247,7 +258,7 @@ describe('墙二：六个并列按钮 → 一条主路', () => {
   it('邮件登录链接、通行密钥、找回**降级但一条都不许掉**', async () => {
     const el = await renderPanelAtBaseUrl(BASE_URL);
     await typeById(el, 'auth-form-email', 'me@example.com');
-    await tap(el, 'auth-form-continue');
+    await tap(el, 'auth-form-other-ways-toggle');
 
     // 三条都在，而且都在口令**之后**（autofill 成功率最高，专用 passkey 按钮反而没人发现）。
     const order = [...el.querySelectorAll('[data-testid]')].map((n) =>
@@ -260,20 +271,17 @@ describe('墙二：六个并列按钮 → 一条主路', () => {
       order.indexOf('auth-form-password'),
     );
     // 那一组的标题句在：没有它，三个文字链读起来像散落的链接。
-    expect(el.textContent ?? '').toContain(translate('zh-CN', 'common.auth.form.otherWays'));
+    expect(el.textContent ?? '').toContain(translate('zh-CN', 'common.auth.form.otherWaysClose'));
   });
 
   it('粘贴兜底**展开之后完整可用**（降级不是删掉 —— 2026-10-02 晚改的判断标准）', async () => {
-    const el = await renderPanelAtBaseUrl(BASE_URL);
+    const el = await renderPanelAtBaseUrl(BASE_URL, 'zh-CN', true);
 
-    // 原来这条钉的是"节点一直挂在 DOM 上"。产品负责人把两栏收进展开入口之后，
+    // 这条只在同步设置显式打开备用入口时成立；默认登录不展示这条路径。
     // 那个写法已经不再是"没藏起来"的定义 —— 现在钉的是**能力还在**：
     // 输入框与「完成登录」在展开后都在，而且用的是界面上那一个入口，不是 store。
-    expect(
-      el.querySelector('[data-testid="auth-form-have-token-toggle"]'),
-      '没有展开入口 = 这条路真的没了',
-    ).not.toBeNull();
-    await tap(el, 'auth-form-have-token-toggle');
+    expect(el.querySelector('[data-testid="auth-form-advanced-toggle"]')).not.toBeNull();
+    await tap(el, 'auth-form-advanced-toggle');
     expect(el.querySelector('[data-testid="auth-form-paste"]')).not.toBeNull();
     expect(el.querySelector('[data-testid="auth-form-verify"]')).not.toBeNull();
     expect(el.textContent ?? '').toContain(translate('zh-CN', 'web.auth.paste.label'));
@@ -282,8 +290,7 @@ describe('墙二：六个并列按钮 → 一条主路', () => {
   it('没勾同意项时注册**不发出去**（同意是用户的动作，界面不许替他做）', async () => {
     const el = await renderPanelAtBaseUrl(BASE_URL);
     await typeById(el, 'auth-form-email', 'me@example.com');
-    await tap(el, 'auth-form-continue');
-    await tap(el, 'auth-form-switch-mode');
+      await tap(el, 'auth-form-switch-mode');
     await typeById(el, 'auth-form-password', 'correct horse battery');
     await tap(el, 'auth-form-submit');
 
@@ -294,17 +301,18 @@ describe('墙二：六个并列按钮 → 一条主路', () => {
 
 describe('这一组句子两种语言都真的翻了', () => {
   const KEYS = [
-    'common.auth.form.continue',
+    'common.auth.form.signIn',
     'common.auth.form.switchToRegister',
     'common.auth.form.otherWays',
     'common.auth.signInPassword.label',
-    'web.auth.server.prefilled',
-    'web.auth.server.at',
+    'web.auth.server.official',
+    'web.auth.server.custom',
+    'web.auth.server.address',
   ] as const satisfies readonly MessageKey[];
 
   it('英文界面下不出现汉字，中文界面下不是英文漏过来', async () => {
     // 两半分开判："翻译存在"与"这一屏出现"是两件事。
-    // `server.prefilled` 按设计只在未配置时出现，`otherWays` 与口令栏要过了「继续」才有。
+    // `server.*` 状态和地址在首屏出现，邮箱 + 口令主路也在首屏。
     for (const key of KEYS) {
       expect(translate('en', key).length, `${key} 缺英文`).toBeGreaterThan(0);
       expect(translate('zh-CN', key).length, `${key} 缺中文`).toBeGreaterThan(0);
@@ -316,14 +324,12 @@ describe('这一组句子两种语言都真的翻了', () => {
 
     const zh = await renderPanelAtBaseUrl(BASE_URL, 'zh-CN');
     // 带参数的词条要**渲染后**再比：拿裸模板比等于永远不相等（`{baseUrl}` 不会自己消失）。
-    expect(zh.textContent ?? '').toContain(translate('zh-CN', 'common.auth.form.continue'));
+    expect(zh.textContent ?? '').toContain(translate('zh-CN', 'common.auth.form.signIn'));
     expect(zh.textContent ?? '').toContain(
-      translate('zh-CN', 'web.auth.server.at', { baseUrl: BASE_URL }),
+      translate('zh-CN', 'web.auth.server.address', { baseUrl: BASE_URL }),
     );
 
-    const zhUnconfigured = await renderPanelAtBaseUrl('', 'zh-CN');
-    expect(zhUnconfigured.textContent ?? '').toContain(
-      translate('zh-CN', 'web.auth.server.prefilled'),
-    );
+    const zhUnconfigured = await renderPanelAtBaseUrl('');
+    expect(zhUnconfigured.textContent ?? '').not.toContain(translate('zh-CN', 'web.auth.server.custom'));
   });
 });

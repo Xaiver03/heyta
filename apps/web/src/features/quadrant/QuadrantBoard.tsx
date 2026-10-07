@@ -89,6 +89,8 @@ import { dragHandleLabel, quadrantBoardLabels, quadrantCountA11y } from './copy.
  * `event.over.id` 的类型是 `UniqueIdentifier`（`string | number`），
  * 强转会掩盖"拖到了非象限目标"（比如列表外），那样会静默产生一条无意义的 op。
  */
+const QUADRANTS = [Quadrant.UrgentImportant, Quadrant.ImportantNotUrgent, Quadrant.UrgentNotImportant, Quadrant.Neither] as const;
+
 function isQuadrant(value: unknown): value is Quadrant {
   switch (value) {
     case Quadrant.UrgentImportant:
@@ -287,10 +289,6 @@ export function QuadrantBoard({ onOpenTask, activeTaskId }: QuadrantBoardProps =
     useSensor(KeyboardSensor),
   );
 
-  const renderTrailing = useCallback(
-    (row: TaskRow) => <DragHandle taskId={row.id} label={handleLabel} />,
-    [handleLabel],
-  );
   const renderCellOverlay = useCallback(
     (card: QuadrantCardModel) => <CellDropZone quadrant={card.quadrant} />,
     [],
@@ -316,7 +314,10 @@ export function QuadrantBoard({ onOpenTask, activeTaskId }: QuadrantBoardProps =
     const over = event.over?.id;
     if (over === undefined || !isQuadrant(over)) return;
 
-    const taskId = String(event.active.id);
+    await moveTask(String(event.active.id), over);
+  }
+
+  async function moveTask(taskId: string, over: Quadrant): Promise<void> {
     const task = store.entities.tasks[taskId];
     if (task === undefined) return;
 
@@ -353,6 +354,35 @@ export function QuadrantBoard({ onOpenTask, activeTaskId }: QuadrantBoardProps =
       setDropNotice(t('web.quadrant.drop.error'));
     }
   }
+
+  const renderTrailing = (row: TaskRow) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: cssVar('space.1') }}>
+      <select
+        className="ht-type-caption"
+        aria-label={t('web.quadrant.moveTask', { title: row.title })}
+        data-testid={`quadrant-move-${row.id}`}
+        value=""
+        onClick={(event) => event.stopPropagation()}
+        onChange={(event) => {
+          const target = QUADRANTS.find((quadrant) => String(quadrant) === event.currentTarget.value);
+          if (target !== undefined) void moveTask(row.id, target);
+        }}
+        style={{
+          minHeight: cssVar('size.field-height'),
+          border: `${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
+          borderRadius: cssVar('radius.sm'),
+          background: cssVar('color.surface'),
+          color: cssVar('color.foreground-muted'),
+        }}
+      >
+        <option value="" disabled>{t('web.quadrant.move')}</option>
+        {QUADRANTS.map((quadrant) => (
+          <option key={quadrant} value={quadrant}>{labels.title(quadrant)}</option>
+        ))}
+      </select>
+      <DragHandle taskId={row.id} label={handleLabel} />
+    </div>
+  );
 
   const undoLastDrop = useCallback(() => {
     if (undoDrop === null) return;
@@ -417,7 +447,7 @@ export function QuadrantBoard({ onOpenTask, activeTaskId }: QuadrantBoardProps =
           className="ht-type-caption"
           style={{ cursor: 'pointer', color: cssVar('color.foreground-muted') }}
         >
-          {t('web.shell.nav.help')}
+          {t('web.quadrant.interactionHelp')}
         </summary>
         <p
           className="ht-type-caption"

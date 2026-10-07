@@ -15,10 +15,11 @@
         //    而 service worker 要凭它写一条意图。少一个字段 = 点击被丢掉，
         //    且**没有任何错误**（事件照常触发，只是什么都做不了）。
         verb: "toggle",
+        title: "${actionText}",
         data: { taskId: "${id}", targetIsDone: "${targetIsDone}" }
       },
       columns: [
-        { type: "Column", width: "auto", items: [{ type: "TextBlock", text: "\xB7", size: "Medium" }] },
+        { type: "Column", width: "auto", items: [textBlock("${statusText}", { size: "Small", color: "${style}", isSubtle: "${done}" })] },
         {
           type: "Column",
           width: "stretch",
@@ -27,8 +28,9 @@
               type: "TextBlock",
               text: "${title}",
               wrap: true,
+              maxLines: 2,
               color: "${style}",
-              strikethrough: "${strikethrough}"
+              isSubtle: "${done}"
             }
           ]
         }
@@ -37,6 +39,32 @@
   }
   function textBlock(text, extra = {}) {
     return { type: "TextBlock", text, wrap: true, ...extra };
+  }
+  function cardHeader(showCount = false) {
+    return {
+      type: "ColumnSet",
+      spacing: "None",
+      columns: [
+        { type: "Column", width: "stretch", items: [textBlock("${titleText}", { weight: "Bolder", size: "Medium", maxLines: 1 })] },
+        ...showCount ? [{ type: "Column", width: "auto", items: [textBlock("${countText}", { isSubtle: true, size: "Small" })] }] : []
+      ]
+    };
+  }
+  function overflowNote() {
+    return textBlock("${overflowText}", { size: "Small", isSubtle: true, spacing: "Small", isVisible: "${overflowText != ''}" });
+  }
+  function quadrantColumn(index) {
+    return {
+      type: "Column",
+      width: "stretch",
+      $data: "${slots[" + String(index) + "]}",
+      items: [
+        textBlock("${heading}", { weight: "Bolder", maxLines: 2, spacing: "None" }),
+        textBlock("${hint}", { isSubtle: true, size: "Small", isVisible: "${isEmpty}", maxLines: 2 }),
+        { type: "Container", $data: "${previewRows}", items: [taskRowTemplate()] },
+        overflowNote()
+      ]
+    };
   }
   function withPlaceholderGate(realContent) {
     return [
@@ -50,10 +78,10 @@
       type: "AdaptiveCard",
       version: ADAPTIVE_CARD_VERSION,
       body: withPlaceholderGate([
-        textBlock("${titleText}", { weight: "Bolder", size: "Medium" }),
-        textBlock("${countText}", { isSubtle: true, spacing: "None" }),
+        cardHeader(true),
         textBlock("${emptyText}", { isSubtle: true, isVisible: "${isEmpty}" }),
-        { type: "Container", $data: "${rows}", items: [taskRowTemplate()] }
+        { type: "Container", $data: "${previewRows}", items: [taskRowTemplate()] },
+        overflowNote()
       ])
     },
     quadrant: {
@@ -61,16 +89,9 @@
       type: "AdaptiveCard",
       version: ADAPTIVE_CARD_VERSION,
       body: withPlaceholderGate([
-        textBlock("${titleText}", { weight: "Bolder", size: "Medium" }),
-        {
-          type: "Container",
-          $data: "${slots}",
-          items: [
-            textBlock("${heading}", { weight: "Bolder", spacing: "Medium" }),
-            textBlock("${hint}", { isSubtle: true, spacing: "None" }),
-            { type: "Container", $data: "${rows}", items: [taskRowTemplate()] }
-          ]
-        }
+        cardHeader(),
+        { type: "ColumnSet", spacing: "Medium", columns: [quadrantColumn(0), quadrantColumn(1)] },
+        { type: "ColumnSet", spacing: "Medium", separator: true, columns: [quadrantColumn(2), quadrantColumn(3)] }
       ])
     },
     habits: {
@@ -78,11 +99,11 @@
       type: "AdaptiveCard",
       version: ADAPTIVE_CARD_VERSION,
       body: withPlaceholderGate([
-        textBlock("${titleText}", { weight: "Bolder", size: "Medium" }),
+        cardHeader(),
         textBlock("${emptyText}", { isSubtle: true, isVisible: "${isEmpty}" }),
         {
           type: "Container",
-          $data: "${rows}",
+          $data: "${previewRows}",
           items: [
             {
               type: "ColumnSet",
@@ -91,18 +112,19 @@
                 {
                   type: "Column",
                   width: "stretch",
-                  items: [textBlock("${title}")]
+                  items: [textBlock("${title}", { maxLines: 2 })]
                 },
                 {
                   type: "Column",
                   width: "auto",
-                  items: [textBlock("${doneLabel}", { color: "good" })]
+                  items: [textBlock("${doneLabel}", { color: "good", size: "Small", maxLines: 2 })]
                 }
               ]
             },
             textBlock("${streakLabel}", { isSubtle: true, size: "Small", spacing: "None" })
           ]
-        }
+        },
+        overflowNote()
       ])
     },
     focus: {
@@ -110,6 +132,7 @@
       type: "AdaptiveCard",
       version: ADAPTIVE_CARD_VERSION,
       body: withPlaceholderGate([
+        cardHeader(),
         // ⚠️ 这四句是**互斥**的四种状态，不是四条并列的提示。
         //    用一个 `state` 字段而不是四个布尔量，是为了让"同时显示两句"
         //    在数据层面就**不可能**构造出来。
@@ -117,6 +140,8 @@
         textBlock("${idleText}", { isSubtle: true, isVisible: "${state == 'idle'}" }),
         textBlock("${sessionTitle}", {
           weight: "Bolder",
+          size: "Large",
+          maxLines: 2,
           isVisible: "${state == 'active'}"
         }),
         textBlock("${targetLabel}", {

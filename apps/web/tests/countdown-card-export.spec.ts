@@ -29,7 +29,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { resolveTextStyle, tokensForTheme } from '@heyta/design-system';
+import { resolveAllTextStyles, resolveTextStyle, tokensForTheme } from '@heyta/design-system';
 import {
   EXPORT_CARD_FILE_STEM_MAX_CODE_POINTS,
   EXPORT_CARD_SCALE,
@@ -94,20 +94,7 @@ function layoutOf(card: EventCard, words: EventCardTexts, dark = false, rasterSc
     texts: words,
     theme: {
       tokens,
-      text: {
-        'screen-title': resolveTextStyle('screen-title', tokens),
-        'section-title': resolveTextStyle('section-title', tokens),
-        headline: resolveTextStyle('headline', tokens),
-        'row-title': resolveTextStyle('row-title', tokens),
-        'row-meta': resolveTextStyle('row-meta', tokens),
-        caption: resolveTextStyle('caption', tokens),
-        'group-label': resolveTextStyle('group-label', tokens),
-        'tab-label': resolveTextStyle('tab-label', tokens),
-        'panel-title': resolveTextStyle('panel-title', tokens),
-        badge: resolveTextStyle('badge', tokens),
-        'numeric-display': resolveTextStyle('numeric-display', tokens),
-        'numeric-body': resolveTextStyle('numeric-body', tokens),
-      },
+      text: resolveAllTextStyles(tokens),
     },
     accentColor: tokens['color.primary'],
     dateStem: words.date,

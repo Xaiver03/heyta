@@ -54,7 +54,7 @@
  */
 
 import React, { useMemo } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { Note, Task } from '@heyta/domain';
 import { CornerDownRight, Folder, Search, StickyNote, Tag } from 'lucide';
@@ -169,27 +169,9 @@ export function SearchPanel({
         styles.panel,
         {
           borderRadius: tokens['radius.lg'],
-          /**
-           * 🔴 **玻璃 = 半透明底色 + 背景模糊**，两半缺一不可。
-           *
-           * 材质（档位 + 端能力协商）由共享层 `materialSurface` 统一解析：
-           * web 拿 chrome 档玻璃 tint + 边缘高光 rim；RN 原生没有 blur，
-           * 拿**不透明**的 `surface-raised`（「宁可诚实不透明，不要假装半透明」——
-           * 假半透明的实测症状：顶栏图标与大号日期**穿过卡片**印在前景上，
-           * 见 `material-surface.ts` 文件头）。
-           *
-           * 为什么底色放在共享层而不由宿主覆盖：RN-web 把 `backgroundColor` 编译成
-           * 它自己注入的原子类，宿主的样式表**未必赢得了注入顺序** —— 把材质做在
-           * 组件消费的那个 token 上，四个端拿到的才是同一个材质。
-           * 为什么模糊放在宿主：`backdrop-filter` 只在 CSS 里合法，RN 没有这个属性
-           * （与 `native-values.ts` 里 shadow / cubic-bezier 同一类划分）。
-           *
-           * ⚠️ 设计系统的材质规则第 2 条写着"禁止把亮色半透明面叠在另一个半透明面上"。
-           * web 这一支**是**叠在 scrim 上，靠的就是那层模糊：模糊把底下的文字抹成
-           * 匀质色板，于是前景对比不再取决于"下面恰好有什么字" —— 这正是 Apple 材质
-           * 把 tint 与 blur 配成一对的原因。
-           */
-          ...materialSurface(tokens, 'chrome', Platform.OS === 'web'),
+          // Search is a reading surface: opaque on every host so underlying
+          // task titles never compete with results or the query.
+          ...materialSurface(tokens, 'chrome', false),
         },
       ]}
       testID={testID}
@@ -230,7 +212,7 @@ export function SearchPanel({
           {labels.prompt}
         </Text>
       ) : total === 0 ? (
-        <EmptyState title={labels.noResults} testID={`${testID}-empty`} />
+        <EmptyState illustration="search" illustrationMotion="none" title={labels.noResults} testID={`${testID}-empty`} />
       ) : (
         <ScrollView style={styles.results} testID={`${testID}-results`}>
           {tasks.length > 0 ? (
@@ -358,12 +340,10 @@ function makeStyles(tokens: HeytaNativeTokens) {
       minHeight: tokens['touch-target.min'],
       paddingHorizontal: tokens['space.4'],
       paddingVertical: tokens['space.2'],
-      borderBottomWidth: tokens['border-width.thin'],
-      borderBottomColor: tokens['color.border-subtle'],
     },
     input: {
       flex: 1,
-      // 🔴 无边框、无底色：分隔由 `field` 那条发丝线承担。
+      // 无边框、无底色：输入与结果通过留白分组。
       borderWidth: 0,
       outlineWidth: 0,
       color: tokens['color.foreground'],
@@ -403,8 +383,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       gap: tokens['space.2'],
       paddingHorizontal: tokens['space.4'],
       paddingTop: tokens['space.2'],
-      borderTopWidth: tokens['border-width.thin'],
-      borderTopColor: tokens['color.border-subtle'],
     },
     keyChip: { color: tokens['color.foreground-subtle'] },
   });

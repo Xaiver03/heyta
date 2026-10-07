@@ -32,6 +32,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { emptyState } from '@heyta/op-log';
 import { __resetOpLogForTests, initOpLog } from '../src/lib/oplog.js';
 import { openSettingsViaAvatar } from './open-settings-via-avatar.js';
+import { translate } from '@heyta/i18n';
 import { LocaleHost } from '../src/lib/locale-host.js';
 import { loadDetailPane, saveDetailPane } from '../src/features/shell/detail-pane-pref.js';
 import { useTaskStore } from '../src/features/tasks/store.js';
@@ -203,16 +204,18 @@ describe('C. 设置里那一项（恢复路径②）', () => {
     expect(localStorage.getItem(STORAGE_KEY)).toBe('"collapsed"');
   });
 
-  it('🔴 说明句必须写出"什么时候这一项不起作用"（窗口太窄/太矮时它自己不出现）', async () => {
+  it('🔴 说明句与当前显示策略一致，并给出页头恢复入口', async () => {
     const el = await mountApp();
     await openSettingsViaAvatar(el);
     const note = el
       .querySelector('[data-testid="detail-pane-pref"]')!
-      .previousElementSibling!.textContent!.trim();
-    expect(note).toContain('太窄');
-    expect(note).toContain('太矮');
-    // 那条教训（2026-09-30 裸 chip）的正面要求：开关要说清自己能被什么替代。
-    expect(note, '说明里必须给出恢复路径，否则用户收起后找不到回来的门').toContain('快捷键');
+      .previousElementSibling!
+      .querySelector('.ht-settings__hint')!
+      .textContent!
+      .trim();
+    expect(note).toBe(translate('zh-CN', 'web.settings.display.detailNote'));
+    expect(note).toContain('窄窗');
+    expect(note, '说明里必须给出恢复路径，否则用户收起后找不到回来的门').toContain('页头');
   });
 });
 

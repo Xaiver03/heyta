@@ -227,8 +227,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       minWidth: tokens['touch-target.min'],
       paddingHorizontal: tokens['space.2'],
       borderRadius: tokens['radius.md'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
       backgroundColor: 'transparent',
     },
     actionText: {

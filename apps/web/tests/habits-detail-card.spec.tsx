@@ -173,7 +173,7 @@ describe('Q. 落点：面单要么在栏里，要么在列表右边，不会两�
     expect(text).not.toContain('还没有习惯');
   });
 
-  it('列表**真的空了**时那句换成「还没有习惯」（两条空态各归各）', async () => {
+  it('列表真的空了时，详情面不渲染第二份空态', async () => {
     for (const name of ['喝水', '阅读']) {
       await act(async () => {
         await useHabitStore.getState().deleteHabit(habitIdOf(name));
@@ -181,10 +181,9 @@ describe('Q. 落点：面单要么在栏里，要么在列表右边，不会两�
     }
     await until('两条习惯都落墓碑', () => useHabitStore.getState().habits.length === 0);
     const view = await mount(<HabitDetailCard inset />);
-    const text = view.textContent ?? '';
-    expect(text).toContain('还没有习惯');
-    expect(text).not.toContain('选一条习惯');
-    expect(inRoot('[data-testid="habit-board"]', view)).toHaveLength(1);
+    expect(view.textContent ?? '').not.toContain('还没有习惯');
+    expect(inRoot('[data-testid="habit-pane"]', view)).toHaveLength(0);
+    expect(inRoot('[data-testid="habit-board"]', view)).toHaveLength(0);
   });
 
   it('🔴 inset 只有栏里那一支拿到，而且两支是**同一枚元素**换类名，不是多一层壳', async () => {

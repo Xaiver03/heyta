@@ -121,7 +121,7 @@ describe('J1：注册/登录在冷启动后可达，且身份入口唯一', () =
     const avatar = el.querySelector('[data-testid="account-menu-avatar"]');
     expect(avatar).not.toBeNull();
     // 菜单关着 ⇒ 里面那项不在 DOM 里；首屏**没有**别的常驻登录入口。
-    expect(el.querySelector('[data-testid="sync-signin-entry"]')).toBeNull();
+    expect(document.querySelector('[data-testid="sync-signin-entry"]')).toBeNull();
   });
 
   it('🔴 一次点击打开身份菜单，「登录 / 注册」是**第一项**且带可见文案', async () => {
@@ -129,7 +129,7 @@ describe('J1：注册/登录在冷启动后可达，且身份入口唯一', () =
 
     openAccountMenu(el);
 
-    const items = Array.from(el.querySelectorAll('[role="menuitem"]'));
+    const items = Array.from(document.querySelectorAll('[role="menuitem"]'));
     expect(items.length, '菜单里必须至少有一项').toBeGreaterThan(0);
     const first = items[0]!;
     expect(first.getAttribute('data-testid')).toBe('sync-signin-entry');
@@ -146,7 +146,7 @@ describe('J1：注册/登录在冷启动后可达，且身份入口唯一', () =
     expect(el.querySelector('[role="dialog"]')).toBeNull();
 
     openAccountMenu(el);
-    click(el.querySelector('[data-testid="sync-signin-entry"]')!);
+    click(document.querySelector('[data-testid="sync-signin-entry"]')!);
 
     // 🔴 必须**直接**出现认证面板。改动前这里会失败：
     // 那时唯一入口是齿轮，点它只会打开「同步设置」，认证还要再点一次。
@@ -162,7 +162,7 @@ describe('J1：注册/登录在冷启动后可达，且身份入口唯一', () =
 
     openAccountMenu(el);
 
-    expect(el.querySelector('[data-testid="account-menu-signout"]')).toBeNull();
+    expect(document.querySelector('[data-testid="account-menu-signout"]')).toBeNull();
   });
 
   it('已登录时不再显示登录入口，但「退出登录」出现且在最底', async () => {
@@ -171,8 +171,8 @@ describe('J1：注册/登录在冷启动后可达，且身份入口唯一', () =
 
     openAccountMenu(el);
 
-    expect(el.querySelector('[data-testid="sync-signin-entry"]')).toBeNull();
-    const items = Array.from(el.querySelectorAll('[role="menuitem"]'));
+    expect(document.querySelector('[data-testid="sync-signin-entry"]')).toBeNull();
+    const items = Array.from(document.querySelectorAll('[role="menuitem"]'));
     const last = items[items.length - 1]!;
     expect(last.getAttribute('data-testid')).toBe('account-menu-signout');
     // 危险动作：颜色要说清这件事（见 app.css 的 `--danger` 规则）
@@ -185,14 +185,14 @@ describe('J1：注册/登录在冷启动后可达，且身份入口唯一', () =
     const avatar = el.querySelector<HTMLButtonElement>('[data-testid="account-menu-avatar"]')!;
     keydown(avatar, 'ArrowDown');
 
-    const first = el.querySelector<HTMLButtonElement>('[data-testid="sync-signin-entry"]');
+    const first = document.querySelector<HTMLButtonElement>('[data-testid="sync-signin-entry"]');
     expect(first, '↓ 应当打开菜单').not.toBeNull();
     expect(document.activeElement).toBe(first);
 
     // Esc 挂在菜单上（焦点在菜单里）—— 关掉之后焦点要回到触发器，
     // 否则键盘用户被丢在 document.body 上，下一次 Tab 从页首开始。
     keydown(first!, 'Escape');
-    expect(el.querySelector('[data-testid="sync-signin-entry"]')).toBeNull();
+    expect(document.querySelector('[data-testid="sync-signin-entry"]')).toBeNull();
     expect(document.activeElement).toBe(avatar);
   });
 
@@ -211,23 +211,16 @@ describe('J1：注册/登录在冷启动后可达，且身份入口唯一', () =
     expect(document.activeElement?.getAttribute('data-testid')).toBe('account-menu-profile-center');
   });
 
-  it('未配置服务端时，认证面板自己提供地址输入（两次点击仍然够）', async () => {
+  it('默认认证入口不展示自托管地址（自托管从设置同步的显式入口进入）', async () => {
     const el = await render();
     expect(useSyncStore.getState().baseUrl).toBe('');
 
     openAccountMenu(el);
-    click(el.querySelector('[data-testid="sync-signin-entry"]')!);
+    click(document.querySelector('[data-testid="sync-signin-entry"]')!);
 
-    // 面板里必须有一个地址输入，否则用户在点开之后无处可填服务端，
-    // "前置"就变成了"前置到一个走不通的表单"。
-    // 🔴 2026-10-02 晚：地址栏改成**默认收起**（产品负责人：第一屏不该是服务器地址
-    // 与粘贴令牌），所以这条判的是「一次展开之内到得了」—— 而不是"节点必须一直挂着"。
-    // 原来那两句（"无处可填服务端"）的理由**完全没变**，变的只是到达它的成本。
-    const toggle = el.querySelector('[data-testid="auth-form-self-host-toggle"]');
-    expect(toggle, '既没有常驻的地址栏，也没有展开入口 = 这条路真的没了').not.toBeNull();
-    click(toggle!);
-    const inputs = Array.from(el.querySelectorAll('input'));
-    expect(inputs.some((i) => i.getAttribute('type') === 'url')).toBe(true);
+    expect(el.querySelector('[data-testid="auth-form-server-url"]')).toBeNull();
+    expect(el.querySelector('[data-testid="auth-form-paste"]')).toBeNull();
+    expect(el.querySelector('[data-testid="auth-form-advanced-toggle"]')).toBeNull();
   });
 
   it('已配置服务端时，认证面板**不**再多要一次地址（不制造第二个地址来源）', async () => {
@@ -235,7 +228,7 @@ describe('J1：注册/登录在冷启动后可达，且身份入口唯一', () =
     const el = await render();
 
     openAccountMenu(el);
-    click(el.querySelector('[data-testid="sync-signin-entry"]')!);
+    click(document.querySelector('[data-testid="sync-signin-entry"]')!);
 
     const inputs = Array.from(el.querySelectorAll('input'));
     expect(inputs.some((i) => i.getAttribute('type') === 'url')).toBe(false);

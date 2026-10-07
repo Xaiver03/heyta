@@ -317,6 +317,7 @@ export function createWorkerOpLogSession<TOperation extends Operation<string> = 
       call('getOpsSince', [sinceSeq, limit, excludeClient]) as ReturnType<
         OpLogStore<TOperation>['getOpsSince']
       >,
+    getOpById: (opId) => call('getOpById', [opId]) as ReturnType<OpLogStore<TOperation>['getOpById']>,
     getOpsForEntity: (entityType, entityId) =>
       call('getOpsForEntity', [entityType, entityId]) as ReturnType<
         OpLogStore<TOperation>['getOpsForEntity']

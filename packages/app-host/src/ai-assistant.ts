@@ -1,5 +1,5 @@
 /**
- * 对话式 AI 助手（多轮 · 多步 · **以一次写提案收尾**）
+ * 对话式 AI 助手（多轮 · 多步 · **以一次写意图收尾**）
  * ===================================================
  *
  * ADR-0045 §2.1 的落地。这是 heyta 第一个**能在一次用户轮次里连续走几步**的 AI 入口，
@@ -9,8 +9,9 @@
  * ─────────────────────────────────────────────────────────────────────────
  * 🔴🔴 三条不许动摇的形状
  *
- * 1. **循环放开的是读，写仍然一次一个、一次确认。**
- *    本文件里出现 `proposal` 的那一刻就是**返回**，不再进第二轮模型调用。
+ * 1. **循环放开的是读，写仍然一次一个。**
+ *    本文件里出现 `proposal` 的那一刻就停止模型循环；执行档会对低风险意图自动
+ *    提交，高风险意图仍返回确认提案。
  *    理由（ADR-0045 §2.1）：一次对话里连续落 5 个 op，等于让模型替用户做了
  *    5 次"要不要改"的判断；而"AI 改错了"这种失败模式**只在写入上不可逆**。
  *    ⚠️ 这不等于"不能建多条任务" —— 那是**一个**提案内含多条（§2.5），
@@ -75,11 +76,17 @@ import {
   findTool,
   type LocalApiConfig,
   type LocalApiHost,
+  type LocalApiWriteResult,
 } from '@heyta/local-api';
 
 import { MAX_TOOL_CALL_TEXT_LENGTH, parseToolArguments, toToolDescriptors } from './ai-tool-call.js';
 import { resolveToolSelection, type ToolSelection, type ToolSelectionRule } from './ai-tool-selection.js';
-import { runSelectedTool, type AiToolProposal } from './ai-tool-run.js';
+import {
+  aiToolProposalRequiresConfirmation,
+  executeAiToolProposal,
+  runSelectedTool,
+  type AiToolProposal,
+} from './ai-tool-run.js';
 import {
   CALENDAR_ANCHOR_RULES,
   calendarAnchor,
@@ -105,8 +112,9 @@ export const ASSISTANT_BASE_EGRESS_FIELDS = ['text', 'today', 'tools', ...TOOL_E
 /**
  * 助手的能力档位（第二个授权前端的唯一旋钮）。
  *
- * 🔴 默认必须是 **`read-only`**。理由与 ADR-0014 那条"必填且默认关闭（fail-closed）"
- * 同源：让模型能改数据这件事，得是用户**明确选过**的状态，而不是出厂状态。
+ * 🔴 当前产品默认是**执行**：低风险写意图自动提交，高风险写意图产出待确认提案。
+ * `AssistantTier` 的默认值由 `assistant-tier-settings.ts` 统一提供；本文件只消费
+ * 调用方传入的档位，确保只读仍然完全没有写工具授权。
  * ⚠️ 持久化不在本文件：`tier` 由调用方（壳 / 设置存储）传进来。
  */
 export type AssistantTier = 'read-only' | 'read-and-propose';
@@ -194,6 +202,8 @@ export type AssistantFailureReason =
   | 'multiple-tool-calls'
   /** 模型给的参数读不出来。回问，不猜。 */
   | 'arguments-malformed'
+  /** 自动执行的低风险写入被宿主拒绝。 */
+  | 'write-failed'
   /** 🔴 某一步要发**披露集合外**的字段 ⇒ 停，不发那一步。 */
   | 'egress-outside-disclosed-set';
 
@@ -218,9 +228,21 @@ export type AssistantOutcome =
       readonly health: HealthMap;
       readonly destination?: EgressDestination;
       /**
-       * 本层的结论：**写提案之后循环就结束**，模型不会再看到它被批准。
-       * 界面对象是"确认卡片"，不是"继续聊天"。
+       * 本层的结论：**写意图之后循环就结束**，模型不会再看到它被批准。
+       * 低风险意图已落地；高风险意图由界面展示确认卡片。
        */
+      readonly stopsHere: true;
+    }
+  | {
+      ok: true;
+      kind: 'executed';
+      readonly text: string;
+      readonly proposal: AiToolProposal;
+      readonly result: LocalApiWriteResult;
+      readonly steps: readonly AssistantStep[];
+      readonly appended: readonly AssistantMessage[];
+      readonly health: HealthMap;
+      readonly destination?: EgressDestination;
       readonly stopsHere: true;
     }
   | {
@@ -251,6 +273,8 @@ export interface AssistantTurnDeps {
   /** 能力档位 —— 第二授权前端的输入，**不是** `localApi.grants`。 */
   readonly tier: AssistantTier;
   readonly host: LocalApiHost;
+  /** 一次用户发送的稳定标识；执行档以此防止重放产生重复 op。 */
+  readonly executionId?: string;
   /** 已有历史（由壳持久化）。出境的只有这次实际带上消息数组。 */
   readonly history?: readonly AssistantMessage[];
   readonly policy?: AiRoutingPolicy;
@@ -281,7 +305,7 @@ export interface AssistantTurnDeps {
 const ASSISTANT_SYSTEM_PROMPT = [
   '你是 heyta 任务管理器里的助手，用户可以让你读和改他自己的工作数据。',
   '你可以多次调用只读工具来了解情况，然后再回答或提出一个改动。',
-  '需要改动时**一次只提一个**：调用一个写工具，应用会把它作为待确认的提案交给用户。',
+  '需要改动时**一次只提一个**：调用一个写工具，应用会按风险自动执行或交给用户确认。',
   '不要编造工具名，不要把没有对应工具的事情说成能做到。',
   '如果用户的需求在产品里有、但你没有对应工具，就明确说"我这边没有这个能力，但应用里可以做"，并说明在应用里怎么做。',
 ].join('\n');
@@ -388,7 +412,7 @@ function budgetModelName(routing: AiRoutingConfig, override: string | undefined)
 }
 
 /**
- * 走一轮：**（必要时）连续读几步 → 一次回答，或以一个写提案收尾**。
+ * 走一轮：**（必要时）连续读几步 → 一次回答，或以一个写意图收尾**。
  *
  * 失败一律返回可展示的原因，绝不抛错给 UI（与其余五个入口同一纪律）。
  *
@@ -514,6 +538,8 @@ export function assistantNeedsEgressDisclosure(
   return assistantLocalSelection(text, opts).kind !== 'tool';
 }
 
+let anonymousExecutionCounter = 0;
+
 export async function requestAssistantTurn(
   source: { text: string },
   deps: AssistantTurnDeps,
@@ -549,6 +575,53 @@ export async function requestAssistantTurn(
   const disclosedPlain = [...disclosed].map((field) => field.split('.')[1] ?? field);
   const runnerDeps = { host: deps.host, grants };
   const anchorNow = deps.now ?? Date.now();
+  const executionId =
+    deps.executionId?.trim() || `assistant-anonymous-${String(++anonymousExecutionCounter)}`;
+  const finishWrite = async (
+    proposal: AiToolProposal,
+    note: string,
+    steps: readonly AssistantStep[],
+    health: HealthMap,
+    destination: EgressDestination | undefined,
+  ): Promise<AssistantOutcome> => {
+    if (deps.tier === 'read-and-propose' && !aiToolProposalRequiresConfirmation(proposal)) {
+      const result = await executeAiToolProposal(deps.host, proposal, executionId);
+      if (!result.ok) {
+        return { ok: false, reason: 'write-failed', message: result.message, steps, health };
+      }
+      const textForUser = note === '' ? '已执行。' : note;
+      return {
+        ok: true,
+        kind: 'executed',
+        text: textForUser,
+        proposal,
+        result,
+        steps,
+        appended: [
+          { role: 'user', text },
+          { role: 'assistant', text: textForUser },
+        ],
+        health,
+        destination,
+        stopsHere: true,
+      };
+    }
+    const textForUser = note === '' ? '我已经准备好这个改动了，等你确认。' : note;
+    return {
+      ok: true,
+      kind: 'proposal',
+      text: textForUser,
+      proposal,
+      steps,
+      appended: [
+        { role: 'user', text },
+        { role: 'assistant', text: textForUser },
+      ],
+      health,
+      destination,
+      stopsHere: true,
+    };
+  };
 
   // ── 规则先跑：这一句本机就能答 ⇒ **一个请求都不发** ─────────────────────
   //
@@ -570,22 +643,13 @@ export async function requestAssistantTurn(
     const run = await runSelectedTool(local, runnerDeps);
 
     if (run.kind === 'proposal') {
-      // 写：与模型路径同一个收场 —— 提案 + `stopsHere`，确认才落库。
-      // 差别只有一个：**这一步零出境**（`destination: 'none'`，端点从未被碰过）。
-      return {
-        ok: true,
-        kind: 'proposal',
-        text: '我已经准备好这个改动了，等你确认。',
-        proposal: run.proposal,
-        steps: [{ tool: run.proposal.tool, kind: 'write', ok: true }],
-        appended: [
-          { role: 'user', text },
-          { role: 'assistant', text: '我已经准备好这个改动了，等你确认。' },
-        ],
-        health: {},
-        destination: 'none',
-        stopsHere: true,
-      };
+      return finishWrite(
+        run.proposal,
+        '',
+        [{ tool: run.proposal.tool, kind: 'write', ok: true }],
+        {},
+        'none',
+      );
     }
 
     if (run.kind === 'observation') {
@@ -750,23 +814,9 @@ export async function requestAssistantTurn(
     );
 
     if (run.kind === 'proposal') {
-      // 🔴🔴 写：产出提案并**立刻返回**。本文件没有任何路径会二次进入这里。
       steps.push({ tool: run.proposal.tool, kind: 'write', ok: true });
       const note = lastText.trim();
-      return {
-        ok: true,
-        kind: 'proposal',
-        text: note,
-        proposal: run.proposal,
-        steps,
-        appended: [
-          { role: 'user', text },
-          { role: 'assistant', text: note === '' ? '我已经准备好这个改动了，等你确认。' : note },
-        ],
-        health,
-        destination,
-        stopsHere: true,
-      };
+      return finishWrite(run.proposal, note, steps, health, destination);
     }
 
     if (run.kind === 'observation') {

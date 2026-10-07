@@ -197,7 +197,7 @@ describe('W5 四象限空态减重', () => {
       // 🔴 jsdom 没有布局，"正文不可见"的 DOM 代理是 `open` 属性：
       // 浏览器对无 `open` 的 details 不渲染非 summary 子节点（平台行为）。
       expect(details?.hasAttribute('open'), '说明默认应该是折叠的').toBe(false);
-      expect(details?.querySelector('summary')?.textContent).toBe('帮助');
+      expect(details?.querySelector('summary')?.textContent).toBe('拖动手柄或使用「移动」调整象限');
     });
 
     it('正文沿用原文案与原 key（收进折叠 ≠ 删除），展开后 open 属性出现', () => {

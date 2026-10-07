@@ -189,8 +189,17 @@ describe('语义文字样式：清单卫生', () => {
   });
 
   it('样式数量受控 —— 每多一个就多一处"该用哪个"的模糊', () => {
-    // 这不是硬性上限，是一个提醒：要突破它，先问是不是真的有两种排版意图。
-    expect(STYLE_NAMES.length).toBeLessThanOrEqual(12);
+    // 概览指标新增一个层级：正文数字不足以引导扫读，计时器数字又过大。
+    expect(STYLE_NAMES.length).toBeLessThanOrEqual(13);
+  });
+
+  it('概览数字介于行内值和计时器之间，保留等宽数字', () => {
+    const body = resolveTextStyle('numeric-body', lightTokens);
+    const summary = resolveTextStyle('numeric-summary', lightTokens);
+    const display = resolveTextStyle('numeric-display', lightTokens);
+    expect(summary.fontSize).toBeGreaterThan(body.fontSize);
+    expect(summary.fontSize).toBeLessThan(display.fontSize);
+    expect(summary.fontVariant).toEqual(['tabular-nums']);
   });
 
   it('resolveAllTextStyles 覆盖每一个样式名', () => {

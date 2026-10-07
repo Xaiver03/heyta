@@ -198,7 +198,7 @@ export function GrowthBoard({
 
   /** 每个区块的标题（宿主给了才有）+ 内容。抽出来只为让下面那段 JSX 短。 */
   const section = (id: MotivationSectionId, node: React.ReactNode): React.ReactNode => (
-    <View key={id}>
+    <View key={id} testID={`growth-section-${id}`}>
       {renderSectionHeader === undefined ? null : renderSectionHeader(id)}
       {node}
     </View>
@@ -230,7 +230,10 @@ export function GrowthBoard({
         : null}
 
       {showWeek
-        ? section('week', <WeeklyReviewCard review={weeklyReview} labels={labels.week} />)
+        ? section(
+            'week',
+            <WeeklyReviewCard review={weeklyReview} labels={labels.week} testID="growth-week" />,
+          )
         : null}
 
       {showStreaks
@@ -253,7 +256,7 @@ export function GrowthBoard({
         ? null
         : section(
             'heatmap',
-            <ActivityHeatmap days={activityDays} labels={labels.heatmap} />,
+            <ActivityHeatmap days={activityDays} labels={labels.heatmap} testID="growth-heatmap" />,
           )}
 
       {renderCategoryBreakdown === undefined
@@ -261,11 +264,14 @@ export function GrowthBoard({
         : section('category', renderCategoryBreakdown())}
 
       {showMilestones
-        ? section('milestones', <MilestoneMap milestones={milestones} labels={labels.milestones} />)
+        ? section(
+            'milestones',
+            <MilestoneMap milestones={milestones} labels={labels.milestones} testID="growth-milestones" />,
+          )
         : null}
 
       {showTags
-        ? section('tags', <IdentityTagList tags={identityTags} labels={labels.tags} />)
+        ? section('tags', <IdentityTagList tags={identityTags} labels={labels.tags} testID="growth-tags" />)
         : null}
 
       {share === undefined
@@ -276,6 +282,7 @@ export function GrowthBoard({
               summary={share.summary}
               onCopy={share.onCopy}
               labels={labels.share}
+              testID="growth-share"
             />,
           )}
     </View>

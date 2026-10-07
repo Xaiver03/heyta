@@ -278,8 +278,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       minHeight: tokens['touch-target.min'],
       paddingHorizontal: tokens['size.field-padding-x'],
       borderRadius: tokens['radius.md'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
       backgroundColor: tokens['color.surface'],
       color: tokens['color.foreground'],
     },

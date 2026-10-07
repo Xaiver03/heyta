@@ -1,3 +1,4 @@
+import { AssistantIcon } from './AssistantIcon.js';
 import { ICON_SIZE } from '@heyta/design-system';
 /**
  * AI 优先级排序 —— 面向用户的入口
@@ -31,7 +32,7 @@ import { ICON_SIZE } from '@heyta/design-system';
  */
 
 import { useState } from 'react';
-import { AlertTriangle, Sparkles, X } from 'lucide-react';
+import { AlertTriangle, X } from 'lucide-react';
 
 import { useI18n } from '@heyta/i18n';
 
@@ -305,7 +306,7 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
             setPhase('disclosing');
           }}
         >
-          <Sparkles size={ICON_SIZE.xs} aria-hidden="true" />
+          <AssistantIcon size={ICON_SIZE.xs} aria-hidden="true" />
           {t('web.ai.prioritize.button')}
         </button>
         {applied && (

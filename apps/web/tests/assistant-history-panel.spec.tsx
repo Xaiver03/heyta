@@ -151,9 +151,10 @@ function text(el: Element): string {
 }
 
 async function type(el: HTMLDivElement, value: string): Promise<void> {
-  const input = el.querySelector<HTMLInputElement>('[data-testid="ai-assistant-input"]');
+  const input = el.querySelector<HTMLInputElement | HTMLTextAreaElement>('[data-testid="ai-assistant-input"]');
   if (input === null) throw new Error('找不到输入框');
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+  const prototype = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  const setter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
   await act(async () => {
     setter?.call(input, value);
     input.dispatchEvent(new Event('input', { bubbles: true }));

@@ -350,7 +350,7 @@ export function authFailureMessage(failure: {
  * 这里说的是**屏幕上此刻有几个字段**。把两者合成一个枚举，就会出现在
  * "阶段=credential"时以为"已经登录好了"的那类错觉 —— 而那正是 §10.1 要防的漂移。
  */
-export type AuthFormStage = 'identify' | 'credential';
+export type AuthFormStage = 'identify' | 'credential' | 'registration-code';
 
 /** 表单此刻在做什么。**一个 affordance 同时管注册与登录**（FIDO 2023 UX Guidelines）。 */
 export type AuthFormMode = 'sign-in' | 'register';
@@ -406,7 +406,14 @@ export function defaultPasswordRevealed(platform: 'desktop' | 'mobile'): boolean
 }
 
 /** 表单上的字段（错误落点与焦点去向用同一个词表，不用字符串到处飞）。 */
-export type AuthFormField = 'baseUrl' | 'email' | 'password' | 'terms' | 'invite' | 'token';
+export type AuthFormField =
+  | 'baseUrl'
+  | 'email'
+  | 'password'
+  | 'passwordConfirmation'
+  | 'terms'
+  | 'invite'
+  | 'token';
 
 /**
  * 第一个出错的字段 —— 界面据此把焦点移过去（GOV.UK 的校验模式）并标 `aria-invalid`。

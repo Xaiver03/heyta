@@ -38,6 +38,8 @@
  */
 
 import type { HeytaIconData } from '../icon/Icon.js';
+import type { StateIllustrationLocale } from './artwork.js';
+import type { StateIllustrationMotion, StateIllustrationVariant } from './StateIllustration.js';
 
 /**
  * `detail` 槽位的语义色。
@@ -90,6 +92,12 @@ export interface EmptyStateSlots {
   readonly detailTone?: EmptyStateDetailTone | undefined;
   /** 这块空态有多大。省略 = `page`（现有站点的形状，一个像素都不变）。 */
   readonly size?: EmptyStateSize | undefined;
+  /** 页面级空态的紧凑语义微场景；区块档会明确隐藏它。 */
+  readonly illustration?: StateIllustrationVariant | undefined;
+  /** 宿主当前 i18n locale，传给共享插画资源选择器。 */
+  readonly locale?: StateIllustrationLocale | undefined;
+  /** 高频空态可关闭一次性入场动效，默认进入动效。 */
+  readonly illustrationMotion?: StateIllustrationMotion | undefined;
 }
 
 /** `EmptyState.tsx` 要摆到屏幕上的全部内容。没有分支可判 —— 判断都在这里做完了。 */
@@ -112,6 +120,9 @@ export interface EmptyStateViewModel {
    * 归一后的尺寸档（省略 = `page`）。组件只按它挑样式，不再自己判断。
    */
   readonly size: EmptyStateSize;
+  readonly illustration: StateIllustrationVariant | undefined;
+  readonly illustrationMotion: StateIllustrationMotion;
+  readonly locale: StateIllustrationLocale;
   /**
    * 根节点的无障碍 role。
    *
@@ -160,13 +171,18 @@ export function toEmptyStateViewModel(slots: EmptyStateSlots): EmptyStateViewMod
     slots.icon !== undefined && slots.icon.length > 0 ? slots.icon : undefined;
 
   const size: EmptyStateSize = slots.size ?? 'page';
+  const locale = slots.locale ?? 'zh-CN';
 
   // 🔴 `section` 档**不放图标**，这条判断做在这里而不是组件里写 `if`：
   //    区块级空态住在卡片内部，卡片自己已经有一行标题；再摆一个 `icon.xl`(32)
   //    的字形会和区块标题争视觉重心 —— 而调用方传了 `icon` 却什么都没画，
   //    是最难归因的那类"参数被静默丢弃"。所以这里把它明确成 `undefined`，
   //    组件只负责"有图标就画、没有就不画"。
-  const visibleIcon = size === 'section' ? undefined : icon;
+  // 语义微场景已经包含自己的 Lucide 主图形，不能再把旧的通用 icon
+  // 叠在上面；否则一个空态会出现两个视觉重心。没有 illustration 时才保留
+  // 旧 icon，保证既有调用方的页面形状不变。
+  const visibleIcon = size === 'section' || slots.illustration !== undefined ? undefined : icon;
+  const illustration = size === 'section' ? undefined : slots.illustration;
 
   const hint = nonBlank(slots.hint);
   const detail = nonBlank(slots.detail);
@@ -179,6 +195,9 @@ export function toEmptyStateViewModel(slots: EmptyStateSlots): EmptyStateViewMod
     detail,
     detailTone,
     size,
+    illustration,
+    illustrationMotion: slots.illustrationMotion ?? 'enter',
+    locale,
     // `detail` 不存在时 role 必须是 undefined —— 否则会在一个不渲染的节点上
     // 声明 alert（tone 的默认值不该"借"到这个不存在的节点上）。
     detailRole: detail !== undefined && detailTone === 'danger' ? 'alert' : undefined,

@@ -255,7 +255,7 @@ describe('提醒投递的接线（真 App）', () => {
     await act(async () => {
       avatar!.click();
     });
-    const item = container!.querySelector<HTMLButtonElement>('[data-testid="account-menu-settings"]');
+    const item = document.querySelector<HTMLButtonElement>('[data-testid="account-menu-settings"]');
     await act(async () => {
       item!.click();
     });
@@ -281,7 +281,7 @@ describe('提醒投递的接线（真 App）', () => {
     await act(async () => {
       avatar!.click();
     });
-    const item = container!.querySelector<HTMLButtonElement>('[data-testid="account-menu-settings"]');
+    const item = document.querySelector<HTMLButtonElement>('[data-testid="account-menu-settings"]');
     await act(async () => {
       item!.click();
     });

@@ -1,3 +1,4 @@
+import { AssistantIcon } from './AssistantIcon.js';
 import { ICON_SIZE } from '@heyta/design-system';
 /**
  * AI 一句话捕获 —— 面向用户的入口
@@ -38,7 +39,7 @@ import { ICON_SIZE } from '@heyta/design-system';
  */
 
 import { useState } from 'react';
-import { AlertTriangle, Sparkles, X } from 'lucide-react';
+import { AlertTriangle, X } from 'lucide-react';
 
 import { useI18n, type I18nValue, type Locale } from '@heyta/i18n';
 
@@ -433,7 +434,7 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
           disabled={text.trim() === ''}
           onClick={start}
         >
-          <Sparkles size={ICON_SIZE.xs} aria-hidden="true" />
+          <AssistantIcon size={ICON_SIZE.xs} aria-hidden="true" />
           {t('web.ai.capture.button')}
         </button>
         {applied && (

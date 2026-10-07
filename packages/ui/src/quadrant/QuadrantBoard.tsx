@@ -262,14 +262,10 @@ function makeStyles(tokens: HeytaNativeTokens) {
       padding: tokens['space.3'],
       borderRadius: tokens['radius.lg'],
       backgroundColor: tokens['color.surface'],
-      // 用**边框**表达层次与拖拽悬停，不用位移或阴影 ——
-      // 阴影只给真正的浮层（这里是平面内容）。
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
     },
-    /** 拖拽悬停：只换边框色，不动几何（动几何会让整格抖一下）。 */
+    /** 拖拽悬停：换语义底色，不动几何（动几何会让整格抖一下）。 */
     cellHighlighted: {
-      borderColor: tokens['color.primary'],
+      backgroundColor: tokens['color.primary-subtle'],
     },
     /**
      * 🔴 **空格铺满是正确形态**（2026-10-06 产品负责人看过 W5 实装后拍板，

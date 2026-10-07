@@ -36,8 +36,7 @@ import {
   type HabitIcon,
 } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
-
-import { HABIT_GLYPHS, HABIT_ICON_LABEL_KEYS } from './habit-glyphs.js';
+import { HabitArtwork, HABIT_ICON_LABEL_KEYS } from '@heyta/ui';
 
 interface HabitIconPickerProps {
   habit: Habit;
@@ -49,11 +48,10 @@ export function HabitIconPicker({ habit, onChange }: HabitIconPickerProps) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   // 🔴 磁盘上的值先过解析器再当类型用：`habit.icon` 是 `string`，
-  //    直接 `as HabitIcon` 会让一个不认识的历史值（改名前的 key）穿透到
-  //    `HABIT_GLYPHS[...]`，拿到 `undefined` 组件 —— 渲染时才炸。
+  //    直接 `as HabitIcon` 会让一个不认识的历史值穿透到图形组件，
+  //    渲染时才炸。
   const value = parseHabitIcon(habit.icon);
   const effective = habitIconOf(habit);
-  const EffectiveGlyph = HABIT_GLYPHS[effective];
 
   return (
     <span className="ht-habit__icon-picker">
@@ -66,7 +64,7 @@ export function HabitIconPicker({ habit, onChange }: HabitIconPickerProps) {
           setOpen((was) => !was);
         }}
       >
-        <EffectiveGlyph size={ICON_SIZE.sm} aria-hidden="true" />
+        <HabitArtwork icon={effective} size={ICON_SIZE.lg} />
         <span className="ht-habit__icon-word">{t('web.habits.icon.toggle')}</span>
       </button>
 
@@ -80,7 +78,6 @@ export function HabitIconPicker({ habit, onChange }: HabitIconPickerProps) {
           }}
         >
           {HABIT_ICONS.map((icon) => {
-            const Glyph = HABIT_GLYPHS[icon];
             return (
               <button
                 type="button"
@@ -94,7 +91,7 @@ export function HabitIconPicker({ habit, onChange }: HabitIconPickerProps) {
                   setOpen(false);
                 }}
               >
-                <Glyph size={ICON_SIZE.sm} aria-hidden="true" />
+                <HabitArtwork icon={icon} size={ICON_SIZE.lg} />
               </button>
             );
           })}

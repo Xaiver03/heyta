@@ -12,8 +12,29 @@
     },
     {
       "type": "Container",
+      "$when": "${!showPlaceholder}",
       "isVisible": "${!showPlaceholder}",
       "items": [
+        {
+          "type": "ColumnSet",
+          "spacing": "None",
+          "columns": [
+            {
+              "type": "Column",
+              "width": "stretch",
+              "items": [
+                {
+                  "type": "TextBlock",
+                  "text": "${titleText}",
+                  "wrap": true,
+                  "weight": "Bolder",
+                  "size": "Medium",
+                  "maxLines": 1
+                }
+              ]
+            }
+          ]
+        },
         {
           "type": "TextBlock",
           "text": "${staleText}",
@@ -33,6 +54,8 @@
           "text": "${sessionTitle}",
           "wrap": true,
           "weight": "Bolder",
+          "size": "Large",
+          "maxLines": 2,
           "isVisible": "${state == 'active'}"
         },
         {

@@ -1,0 +1,52 @@
+/** 产品负责人 2026-10-07：无描边交互。
+ * 输入靠光标；按钮/菜单靠文字与底色表达焦点。日历格的数据分隔线不是按钮描边。
+ * important 用于覆盖 RN-web 生成的内联边框，以及分散在功能 CSS 中的旧焦点框。
+ */
+:is(button, [role='button'], [role='tab'], [role='menuitem']):not([data-testid^='calendar-cell-']) {
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+:is(input:not([type='checkbox']):not([type='radio']), textarea, select, [contenteditable='true']) {
+  border-color: transparent !important;
+  box-shadow: none !important;
+  caret-color: var(--ht-color-primary);
+}
+:is(input:not([type='checkbox']):not([type='radio']), textarea, [contenteditable='true']):focus {
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+:is(button, [role='button'], [role='tab'], [role='menuitem'], select, summary, a[href], [role='separator']):focus-visible {
+  outline: 0 !important;
+  background-color: var(--ht-color-primary-subtle) !important;
+  color: var(--ht-color-primary) !important;
+}
+:is(button, [role='button'], [role='tab'], [role='menuitem']):focus-visible svg {
+  color: var(--ht-color-primary);
+}
+/* 复合输入与浮层由内容、底色及投影组织，不加第二层装饰框。 */
+.ht-ai__composer,
+.ht-ai-agent-surface,
+.ht-search-overlay > *,
+.ht-profile-overview__identity,
+.ht-profile-overview__achievement,
+.ht-inbox__card,
+.ht-rail__more-menu,
+.ht-category-create-dialog__dialog,
+.ht-sheet,
+.ht-input,
+.ht-settings__scope-badge,
+[role='menu'],
+[role='dialog'] {
+  border-color: transparent !important;
+}
+/* RN-web 的 Text 自带显式颜色，焦点换底色时须同步，否则会白字浅底。 */
+:is(button, [role='button'], [role='tab'], [role='menuitem']):focus-visible :is(span, div) {
+  color: inherit !important;
+}
+@media (forced-colors: active) {
+  :is(button, [role='button'], [role='tab'], [role='menuitem'], select, summary, a[href], [role='separator']):focus-visible {
+    forced-color-adjust: none;
+    background-color: Highlight !important;
+    color: HighlightText !important;
+  }
+}

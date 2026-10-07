@@ -135,8 +135,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
     /** 卡片形态：靠边框与底色分段（mobile 的 `Card` 是这一档的参照）。 */
     card: {
       padding: tokens['space.4'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
       borderRadius: tokens['radius.lg'],
       backgroundColor: tokens['color.surface'],
     },
@@ -179,7 +177,7 @@ function makeStyles(tokens: HeytaNativeTokens) {
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: tokens['radius.sm'],
-      borderWidth: tokens['border-width.thin'],
+      backgroundColor: tokens['color.surface-sunken'],
     },
     /** 动作行：标签（+ 可选的记号）与说明，两者左对齐。 */
     action: {
@@ -456,7 +454,6 @@ function ToggleLine({
           style={[
             styles.marker,
             {
-              borderColor: row.checked ? tokens['color.primary'] : tokens['color.border'],
               backgroundColor: row.checked ? tokens['color.primary'] : 'transparent',
             },
           ]}

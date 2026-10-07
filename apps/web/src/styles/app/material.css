@@ -17,7 +17,7 @@
   background: var(--ht-material-panel-tint);
   backdrop-filter: blur(var(--ht-blur-chrome)) saturate(180%);
   -webkit-backdrop-filter: blur(var(--ht-blur-chrome)) saturate(180%);
-  border: var(--ht-border-width-thin) solid var(--ht-material-edge-highlight);
+  border: 0;
   animation: ht-material-in var(--ht-duration-normal) var(--ht-ease-enter);
 }
 
@@ -69,7 +69,7 @@
   flex-direction: column;
   gap: var(--ht-space-3);
   padding: var(--ht-space-3);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border: 0;
   border-radius: var(--ht-radius-lg);
   box-shadow: var(--ht-shadow-lg);
 }

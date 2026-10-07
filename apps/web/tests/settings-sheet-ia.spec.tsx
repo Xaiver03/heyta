@@ -71,7 +71,7 @@ async function openSettings(el: HTMLElement): Promise<void> {
     avatar?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
     avatar?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
-  const item = el.querySelector('[data-testid="account-menu-settings"]');
+  const item = document.querySelector('[data-testid="account-menu-settings"]');
   expect(item, '头像菜单里必须有「设置」').not.toBeNull();
   await act(async () => {
     item?.dispatchEvent(new MouseEvent('click', { bubbles: true }));

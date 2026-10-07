@@ -31,6 +31,11 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
+/* 没有任何习惯时，空态属于左侧列表区域；详情面不应留下第二列空白。 */
+.ht-habit[data-empty] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .ht-habit__side {
   display: flex;
   flex-direction: column;
@@ -43,18 +48,324 @@
   container-type: inline-size;
 }
 
-/* 新建习惯：一行「输入框 + 图标按钮」。这两件以前是行内样式，
-   挪进 CSS 是因为窄屏塌缩要改它们的排布（行内样式改不动）。 */
+/* 习惯页的工具只属于习惯页：由页头插槽承载，新增不会再挤占清单内容。 */
+.ht-header__habits-slot {
+  display: contents;
+}
+
+.ht-habits-header-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+}
+
+.ht-habits-header-controls__menu-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.ht-habits-header-menu {
+  position: absolute;
+  z-index: var(--ht-z-popover);
+  inset-block-start: calc(100% + var(--ht-space-2));
+  inset-inline-end: 0;
+  min-inline-size: 12rem;
+  padding: var(--ht-space-1);
+  border: 0;
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface-raised);
+  box-shadow: var(--ht-shadow-lg);
+}
+
+.ht-habits-header-menu button {
+  display: flex;
+  align-items: center;
+  inline-size: 100%;
+  gap: var(--ht-space-2);
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-2);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+  background: transparent;
+  color: var(--ht-color-foreground);
+  text-align: start;
+  font: inherit;
+}
+
+.ht-habits-header-menu button:hover,
+.ht-habits-header-menu button:focus-visible {
+  background: var(--ht-color-hover);
+  outline: none;
+}
+
+.ht-habit-create-dialog {
+  position: fixed;
+  /* The mobile rail is a contained bottom navigation.  Its labels are part of
+     a separate painted layer, so the create surface must sit above the
+     application's modal tier to keep those labels from bleeding through the
+     sheet while it is open. */
+  z-index: var(--ht-z-splash);
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--ht-space-6);
+  background: var(--ht-color-overlay);
+}
+
+.ht-habit-create-dialog__dialog {
+  inline-size: min(100%, 38rem);
+  max-block-size: min(90dvh, 48rem);
+  overflow: auto;
+  border: 0;
+  border-radius: var(--ht-radius-xl);
+  background: var(--ht-color-surface-raised);
+  box-shadow: var(--ht-shadow-xl);
+}
+
+.ht-habit-create-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-4);
+  padding: var(--ht-space-5) var(--ht-space-6) var(--ht-space-3);
+}
+
+.ht-habit-create-dialog__close {
+  display: grid;
+  place-items: center;
+  inline-size: var(--ht-touch-target-min);
+  block-size: var(--ht-touch-target-min);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+  background: transparent;
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-habit-create-dialog__close:hover,
+.ht-habit-create-dialog__close:focus-visible {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+  outline: none;
+}
+
+.ht-habit-create-dialog__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-4);
+  padding: var(--ht-space-3) var(--ht-space-6) var(--ht-space-6);
+}
+
+.ht-habit-create-dialog__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  min-inline-size: 0;
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-sm);
+}
+
+.ht-habit-create-dialog__field > input,
+.ht-habit-create-dialog__field > select {
+  min-block-size: var(--ht-touch-target-min);
+  inline-size: 100%;
+  padding-inline: var(--ht-space-3);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-background);
+  color: var(--ht-color-foreground);
+  font: inherit;
+}
+
+.ht-habit-create-dialog__field > input:focus-visible,
+.ht-habit-create-dialog__field > select:focus-visible {
+  outline: none;
+  background: var(--ht-color-hover);
+  box-shadow: var(--ht-shadow-focus);
+}
+
+.ht-habit-create-dialog__field small {
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-habit-create-dialog__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ht-space-3);
+}
+
+.ht-habit-create-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--ht-space-2);
+  padding-block-start: var(--ht-space-2);
+}
+
+@container (max-width: 30rem) {
+  .ht-habit-create-dialog__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 36rem) {
+  .ht-habit-create-dialog {
+    align-items: end;
+    padding: var(--ht-space-2);
+  }
+
+  .ht-habit-create-dialog__dialog {
+    max-block-size: 92dvh;
+    border-radius: var(--ht-radius-lg);
+  }
+}
+
+/* 新建习惯：主输入保持紧凑，附加设置按需展开。样式集中在 CSS，
+   这样窄屏可以改变字段和图标网格的排布。 */
 .ht-habit__add {
   display: flex;
+  flex-direction: column;
   gap: var(--ht-space-2);
+}
+
+.ht-habit__add-main {
+  display: flex;
+  gap: var(--ht-space-2);
+  min-width: 0;
+}
+
+.ht-habit__add-main button {
+  min-width: var(--ht-touch-target-min);
+  min-height: var(--ht-touch-target-min);
+}
+
+.ht-habit__add button.ht-habit__add-more {
+  align-self: flex-start;
+  min-height: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-2);
+  border: 0;
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground-muted);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-habit__add-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--ht-space-3);
+  min-width: 0;
+  padding: var(--ht-space-3);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-background);
+}
+
+.ht-habit__add-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  min-width: 0;
+}
+
+.ht-habit__add-label {
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-xs);
+  font-weight: var(--ht-font-weight-medium);
+}
+
+.ht-habit__add-field input,
+.ht-habit__add-field select {
+  inline-size: 100%;
+  min-height: var(--ht-touch-target-min);
+  min-width: 0;
+  padding: 0 var(--ht-space-2);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-sm);
+}
+
+.ht-habit__add-field input:focus-visible,
+.ht-habit__add-field select:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+.ht-habit__add-field--icons,
+.ht-habit__add-field--weekdays {
+  grid-column: 1 / -1;
+}
+
+.ht-habit__add-icons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--ht-touch-target-min), 1fr));
+  gap: var(--ht-space-1);
+}
+
+.ht-habit__add button.ht-habit__add-icon,
+.ht-habit__add button.ht-habit__add-weekday,
+.ht-habit-create-dialog button.ht-habit__add-icon,
+.ht-habit-create-dialog button.ht-habit__add-weekday {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--ht-touch-target-min);
+  min-height: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-2);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground);
+}
+
+.ht-habit__add button.ht-habit__add-icon[aria-pressed='true'],
+.ht-habit__add button.ht-habit__add-weekday[aria-pressed='true'],
+.ht-habit-create-dialog button.ht-habit__add-icon[aria-pressed='true'],
+.ht-habit-create-dialog button.ht-habit__add-weekday[aria-pressed='true'] {
+  border-color: var(--ht-color-primary);
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+}
+
+.ht-habit__add-icon:focus-visible,
+.ht-habit__add-weekday:focus-visible,
+.ht-habit__add-more:focus-visible,
+.ht-habit-create-dialog .ht-habit__add-icon:focus-visible,
+.ht-habit-create-dialog .ht-habit__add-weekday:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+.ht-habit__add-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--ht-space-1);
+}
+
+.ht-habit__add-hint,
+.ht-habit__add-error {
+  margin: 0;
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-habit__add-error {
+  color: var(--ht-color-danger);
+}
+
+@container (min-width: 33rem) {
+  .ht-habit__add-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .ht-habit__add input {
   flex: 1;
   min-width: 0;
   padding: 0 var(--ht-space-3);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border: 0;
   border-radius: var(--ht-radius-md);
   background: var(--ht-color-surface);
   color: var(--ht-color-foreground);
@@ -144,7 +455,7 @@
   font-family: var(--ht-font-sans);
   color: var(--ht-color-foreground);
   background: var(--ht-color-surface);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border: 0;
   border-radius: var(--ht-radius-lg);
 }
 
@@ -213,7 +524,7 @@
 .ht-habit__dot {
   inline-size: var(--ht-space-2);
   block-size: var(--ht-space-2);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border: 0;
   border-radius: var(--ht-radius-full);
 }
 
@@ -242,6 +553,7 @@
 
 .ht-habit__pane {
   min-width: 0;
+  container: habit-detail / inline-size;
 }
 
 /*
@@ -266,16 +578,19 @@
   居中对齐会让标题看起来飘在按钮上方半个身位。
 */
 .ht-habit__pane-head {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   align-items: baseline;
-  justify-content: space-between;
-  gap: var(--ht-space-2);
+  column-gap: var(--ht-space-2);
+  row-gap: var(--ht-space-2);
   min-width: 0;
 }
 
 /* 整条消费 `section-title`（lg + semibold + tight + tracking.title，AGENTS §5 文字层级）。
    超长名字必须省略号而不是把三颗工具挤出栏外 —— 习惯名是用户写的，长度不可知。 */
 .ht-habit__pane-title {
+  grid-column: 1;
+  grid-row: 1;
   min-width: 0;
   margin: 0;
   overflow: hidden;
@@ -287,22 +602,25 @@
   letter-spacing: var(--ht-tracking-title);
 }
 
-/* `flex: none`：工具那一坨不许被标题挤扁（图标选择器展开时是一整排字形）。 */
+/* 让标题行的图标、改名、删除直接成为同一枚 grid 的子项；展开网格才能跨满整行。 */
 .ht-habit__pane-tools {
-  display: flex;
-  align-items: center;
-  gap: var(--ht-space-2);
-  flex: none;
+  display: contents;
+}
+
+.ht-habit__pane-tools > button:first-of-type {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.ht-habit__pane-tools > button:last-of-type {
+  grid-column: 4;
+  grid-row: 1;
 }
 
 /* 图标选择器：与 `.ht-slot-picker` 同一形状（展开式，不是浮层）。
    差别只有一件 —— 槽位是「色块 + 编号」，这里本来就是字形，不需要编号。 */
 .ht-habit__icon-picker {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: var(--ht-space-1);
-  flex: none;
+  display: contents;
 }
 .ht-habit__icon-toggle {
   display: inline-flex;
@@ -311,12 +629,14 @@
   min-height: var(--ht-touch-target-min);
   padding: 0 var(--ht-space-2);
   cursor: pointer;
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border: 0;
   border-radius: var(--ht-radius-md);
   background: var(--ht-color-surface);
   color: var(--ht-color-foreground-muted);
   font-family: var(--ht-font-sans);
   font-size: var(--ht-font-size-xs);
+  grid-column: 2;
+  grid-row: 1;
 }
 
 .ht-habit__icon-word {
@@ -332,14 +652,18 @@
  * 完全看不见**。而 `toBeVisible()` 五条判据全绿：它只验"有非空 bounding box"，
  * 不验"在视口里"。看不见「默认」= 用户挑过就退不回去，正是那一格存在的唯一理由。
  *
- * 定成 4 列网格：宽度 = 4 × `touch-target.min` + 3 × `space.1`，
- * 从被约束的常量推导，不写像素字面量；「默认」那一格独占一行（`grid-column: 1 / -1`）。
+ * 用 `auto-fit` 让可用宽度决定列数：详情栏的既有最小宽度可以放下 6 个
+ * `touch-target.min`，再窄时自动减少列数；不写像素字面量。
+ * 「默认」那一格独占一行（`grid-column: 1 / -1`）。
  */
 .ht-habit__icon-options {
   display: grid;
-  grid-template-columns: repeat(4, var(--ht-touch-target-min));
+  grid-column: 1 / -1;
+  grid-row: 2;
+  grid-template-columns: repeat(auto-fit, minmax(var(--ht-touch-target-min), 1fr));
   gap: var(--ht-space-1);
-  justify-content: end;
+  inline-size: 100%;
+  min-width: 0;
 }
 
 /* 「默认」那一格铺满整行：它不是第 9 个字形，挤在同一排会让人以为它是候选之一。 */
@@ -363,15 +687,46 @@
   font-size: var(--ht-font-size-xs);
 }
 
-/* 选中态走边框，不靠颜色深浅 —— 八个字形本来就要用户挑。 */
+/* 选中态用浅色底和图形强调；边框保持透明，避免蓝色描边框抢视觉。 */
 .ht-habit__icon-option[aria-pressed='true'] {
-  border-color: var(--ht-color-primary);
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
 }
 
 .ht-habit__icon-toggle:focus-visible,
 .ht-habit__icon-option:focus-visible {
   outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
   outline-offset: var(--ht-space-1);
+}
+
+/* 窄详情栏优先完整呈现习惯名，操作成组换行，不把名字挤成一两个字。 */
+@container habit-detail (max-width: 26rem) {
+  .ht-habit__pane-head {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    padding-block-end: var(--ht-space-3);
+  }
+  .ht-habit__pane-title {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .ht-habit__icon-toggle {
+    grid-column: 1;
+    grid-row: 2;
+    justify-self: start;
+  }
+  .ht-habit__pane-tools > button:first-of-type {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .ht-habit__pane-tools > button:last-of-type {
+    grid-column: 3;
+    grid-row: 2;
+  }
+  .ht-habit__icon-options {
+    grid-row: 3;
+  }
 }
 
 /*
@@ -397,7 +752,7 @@
   min-height: var(--ht-touch-target-min);
   padding: 0 var(--ht-space-2);
   cursor: pointer;
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border: 0;
   border-radius: var(--ht-radius-md);
   background: var(--ht-color-surface);
   color: var(--ht-color-foreground-muted);
@@ -414,7 +769,7 @@
   flex-direction: column;
   gap: var(--ht-space-2);
   padding: var(--ht-space-2);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border: 0;
   border-radius: var(--ht-radius-md);
   background: var(--ht-color-surface);
 }
@@ -434,7 +789,7 @@
   min-height: var(--ht-touch-target-min);
   padding: 0 var(--ht-space-2);
   cursor: pointer;
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border: 0;
   border-radius: var(--ht-radius-md);
   background: var(--ht-color-surface);
   color: var(--ht-color-foreground);
@@ -461,7 +816,7 @@
   inline-size: calc(var(--ht-space-8) * 2);
   min-block-size: var(--ht-touch-target-min);
   padding: 0 var(--ht-space-2);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border: 0;
   border-radius: var(--ht-radius-md);
   background: var(--ht-color-background);
   color: var(--ht-color-foreground);

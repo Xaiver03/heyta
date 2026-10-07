@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '@heyta/i18n';
 import {
   HostedDeviceManagementError,
@@ -12,6 +12,7 @@ import {
 } from '@heyta/app-host';
 import { cancelWebVaultRootRotation, confirmWebVaultRootRotation, getWebVaultRemote, getWebVaultSession } from '../../lib/vault-session.js';
 import { useSyncStore } from './store.js';
+import { SettingsNotice } from '../settings/SettingsNotice.js';
 
 type PendingAction = 'create' | 'change' | 'rotate';
 
@@ -72,7 +73,7 @@ function errorKey(error: unknown): string {
   }
 }
 
-export function VaultSettingsPanel() {
+export function VaultSettingsPanel({ active = true }: { active?: boolean }): React.JSX.Element {
   const { t } = useI18n();
   const sync = useSyncStore();
   const [session, setSession] = useState<VaultKeySession>();
@@ -93,9 +94,16 @@ export function VaultSettingsPanel() {
   const [deviceError, setDeviceError] = useState<string>();
   const [deviceBusy, setDeviceBusy] = useState<string>();
   const [deviceNotice, setDeviceNotice] = useState<string>();
+  const activeRef = useRef(active);
+  activeRef.current = active;
 
   useEffect(() => {
     let cancelled = false;
+    if (!active) {
+      return () => {
+        cancelled = true;
+      };
+    }
     setSession(undefined);
     setPending(undefined);
     setPendingAction(undefined);
@@ -126,10 +134,15 @@ export function VaultSettingsPanel() {
     return () => {
       cancelled = true;
     };
-  }, [sync.accountId, sync.baseUrl, sync.token]);
+  }, [active, sync.accountId, sync.baseUrl, sync.token]);
 
   useEffect(() => {
     let cancelled = false;
+    if (!active) {
+      return () => {
+        cancelled = true;
+      };
+    }
     setDevices([]);
     setDeviceError(undefined);
     if (sync.accountId === undefined || sync.accountId === '' || sync.baseUrl === '' || sync.token === undefined) {
@@ -157,10 +170,10 @@ export function VaultSettingsPanel() {
     return () => {
       cancelled = true;
     };
-  }, [sync.accountId, sync.baseUrl, sync.token]);
+  }, [active, sync.accountId, sync.baseUrl, sync.token]);
 
   const revokeDevice = (clientId: string): void => {
-    if (deviceBusy !== undefined) return;
+    if (!activeRef.current || deviceBusy !== undefined) return;
     const currentBeforeConfirm = useSyncStore.getState();
     if (currentBeforeConfirm.accountId === undefined || currentBeforeConfirm.accountId.trim() === '' ||
         currentBeforeConfirm.baseUrl.trim() === '' || currentBeforeConfirm.token === undefined) {
@@ -191,6 +204,7 @@ export function VaultSettingsPanel() {
       },
     })
       .then((outcome) => {
+        if (!activeRef.current) return;
         setDeviceNotice(outcome.status === 'ambiguous'
           ? 'web.sync.devices.revocationUncertain'
           : 'web.sync.devices.revoked');
@@ -200,6 +214,7 @@ export function VaultSettingsPanel() {
         }
       })
       .catch((caught: unknown) => {
+        if (!activeRef.current) return;
         setDeviceError(caught instanceof HostedDeviceManagementError
           ? caught.code === 'unauthorized'
             ? 'web.sync.devices.unauthorized'
@@ -208,20 +223,27 @@ export function VaultSettingsPanel() {
               : 'web.sync.devices.error'
           : 'web.sync.devices.error');
       })
-      .finally(() => setDeviceBusy(undefined));
+      .finally(() => {
+        if (activeRef.current) setDeviceBusy(undefined);
+      });
   };
 
   const run = async (action: () => Promise<void>, fallbackError?: string): Promise<void> => {
+    if (!activeRef.current) return;
     setBusy(true);
     setError(undefined);
     try {
       await action();
-      setRevision((value) => value + 1);
-      void sync.syncNow();
+      if (activeRef.current) {
+        setRevision((value) => value + 1);
+        void sync.syncNow();
+      }
     } catch (caught) {
-      setError(caught instanceof VaultSessionError ? errorKey(caught) : (fallbackError ?? 'web.sync.vault.error'));
+      if (activeRef.current) {
+        setError(caught instanceof VaultSessionError ? errorKey(caught) : (fallbackError ?? 'web.sync.vault.error'));
+      }
     } finally {
-      setBusy(false);
+      if (activeRef.current) setBusy(false);
     }
   };
 
@@ -248,13 +270,27 @@ export function VaultSettingsPanel() {
 
       {loading ? <p data-testid="vault-loading">{t('web.sync.vault.busy')}</p> : null}
       {sync.accountId === undefined || sync.accountId === '' ? (
-        <p data-testid="vault-account-required">{t('web.sync.vault.accountRequired')}</p>
+        <SettingsNotice
+          title={t('web.sync.vault.accountRequired')}
+          tone="info"
+          testId="vault-account-required"
+        />
       ) : null}
       {error !== undefined ? (
-        <p role="alert" data-testid="vault-error" className="ht-settings__danger">{t(error as never)}</p>
+        <SettingsNotice
+          title={t(error as never)}
+          tone="danger"
+          live
+          testId="vault-error"
+        />
       ) : null}
       {deviceNotice !== undefined ? (
-        <p role="status" data-testid="vault-device-notice" className="ht-settings__hint">{t(deviceNotice as never)}</p>
+        <SettingsNotice
+          title={t(deviceNotice as never)}
+          tone={deviceNotice === 'web.sync.devices.revocationUncertain' ? 'warning' : 'success'}
+          live
+          testId="vault-device-notice"
+        />
       ) : null}
 
       {sync.accountId !== undefined && sync.accountId !== '' && sync.baseUrl !== '' && sync.token !== undefined ? (
@@ -262,7 +298,7 @@ export function VaultSettingsPanel() {
           <strong>{t('web.sync.devices.title')}</strong>
           <p className="ht-settings__hint">{t('web.sync.devices.description')}</p>
           {devicesLoading ? <p className="ht-settings__hint">{t('web.sync.devices.loading')}</p> : null}
-          {deviceError !== undefined ? <p role="alert" className="ht-settings__danger">{t(deviceError as never)}</p> : null}
+          {deviceError !== undefined ? <SettingsNotice title={t(deviceError as never)} tone="danger" live /> : null}
           {!devicesLoading && deviceError === undefined && devices.length === 0 ? (
             <p className="ht-settings__hint">{t('web.sync.devices.empty')}</p>
           ) : null}

@@ -1,3 +1,5 @@
+import { prisma } from '../db';
+import { authorizeInboundOperations, readInboundUploadIdentity } from '../automation/worker-identity';
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { SuperSyncUploadOpsRequestSchema } from '@heyta/shared-schema';
 import { getAuthUser } from '../middleware';
@@ -140,6 +142,11 @@ export const uploadOpsHandler = async (
         surface: 'ops',
         opsCount: ops.length,
       });
+    }
+
+    const inboundIdentity = readInboundUploadIdentity(req.raw.rawHeaders, getAuthUser(req).tokenVersion);
+    if (!await authorizeInboundOperations(prisma, userId, clientId, ops as unknown as Operation[], inboundIdentity)) {
+      return reply.status(403).send({ error: 'Inbound commit authorization required', errorCode: 'INBOUND_AUTH_REQUIRED' });
     }
 
     const hasFrontierDelta = ops.some((op) => op.vectorClockEncoding === 'frontier-delta');
@@ -321,6 +328,7 @@ export const uploadOpsHandler = async (
           repairBase,
           false,
           lastKnownServerSeq,
+          inboundIdentity,
         );
 
         return uploadResults;

@@ -1,0 +1,99 @@
+/* 账号 / 安全设置的状态层级。
+   这些规则只描述状态组件，不把登录、支付或注销逻辑复制到样式里。 */
+.ht-settings__account-gate {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-4);
+  padding: var(--ht-space-4);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-sunken);
+}
+
+.ht-settings__account-gate-content {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ht-space-3);
+  min-inline-size: 0;
+}
+
+.ht-settings__account-gate-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: var(--ht-touch-target-min);
+  height: var(--ht-touch-target-min);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-primary);
+}
+
+.ht-settings__account-gate-title {
+  margin: 0 0 var(--ht-space-1);
+  color: var(--ht-color-foreground);
+  font-size: var(--ht-font-size-base);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.ht-settings__credential {
+  gap: var(--ht-space-4);
+}
+
+.ht-settings__credential-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  min-inline-size: 0;
+}
+
+.ht-settings__credential-meta {
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-2xs);
+}
+
+.ht-settings__field {
+  max-inline-size: 42rem;
+}
+
+.ht-settings__order-card,
+.ht-settings__danger-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-3);
+  padding: var(--ht-space-4);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+}
+
+.ht-settings__danger-card {
+  border-color: var(--ht-color-danger);
+  background: var(--ht-color-surface-sunken);
+}
+
+.ht-settings__order-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ht-space-2) var(--ht-space-4);
+  margin: 0;
+}
+
+.ht-settings__order-summary p {
+  margin: 0;
+  color: var(--ht-color-foreground);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+}
+
+@media (max-width: 40rem) {
+  .ht-settings__account-gate {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ht-settings__account-gate .ht-btn {
+    align-self: flex-start;
+  }
+}

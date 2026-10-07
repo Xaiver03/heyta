@@ -24,7 +24,7 @@ import { ICON_SIZE } from '@heyta/design-system';
  * 会拦下任何试图在这里直接 fetch 模型的代码。
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   AI_ENDPOINT_PRESETS,
   classifyDestination,
@@ -92,14 +92,23 @@ function featuresNeeding(capability: AiCapability, t: I18nValue['t'], locale: Lo
 import { LOCAL_API_TOOLS, validateLocalApiConfig } from '@heyta/local-api';
 import {
   ASSISTANT_TIER_ORDER,
-  ASSISTANT_TIER_READ_AND_PROPOSE,
+  ASSISTANT_TIER_EXECUTE,
   ASSISTANT_TIER_READ_ONLY,
   destinationForFeature,
   planAssistantEgress,
   recomputeConsents,
   type AssistantTier,
 } from '@heyta/app-host';
-import { AlertTriangle, Check, Lock, Plus, ShieldCheck, Trash2 } from 'lucide-react';
+import {
+  AlertTriangle,
+  Check,
+  Eye,
+  EyeOff,
+  Lock,
+  Plus,
+  ShieldCheck,
+  Trash2,
+} from 'lucide-react';
 
 import { useI18n, type I18nValue, type Locale } from '@heyta/i18n';
 
@@ -112,6 +121,7 @@ import {
   type PersistedAiSettings,
   type SessionSecretStore,
 } from './aiStore.js';
+import './ai-settings.css';
 
 /**
  * 某个功能在**当前路由里**缺哪些能力。
@@ -179,14 +189,14 @@ const FEATURE_ORDER: readonly AiFeature[] = [
 function tierLabels(t: I18nValue['t']): Readonly<Record<AssistantTier, string>> {
   return {
     [ASSISTANT_TIER_READ_ONLY]: t('web.ai.assistant.tier.readOnly.label'),
-    [ASSISTANT_TIER_READ_AND_PROPOSE]: t('web.ai.assistant.tier.readAndPropose.label'),
+    [ASSISTANT_TIER_EXECUTE]: t('web.ai.assistant.tier.readAndPropose.label'),
   };
 }
 
 function tierNotes(t: I18nValue['t']): Readonly<Record<AssistantTier, string>> {
   return {
     [ASSISTANT_TIER_READ_ONLY]: t('web.ai.assistant.tier.readOnly.note'),
-    [ASSISTANT_TIER_READ_AND_PROPOSE]: t('web.ai.assistant.tier.readAndPropose.note'),
+    [ASSISTANT_TIER_EXECUTE]: t('web.ai.assistant.tier.readAndPropose.note'),
   };
 }
 
@@ -248,6 +258,42 @@ function endpointRejectionText(
 }
 
 /**
+ * 本机 API 的目录名是给集成工具看的技术协议；设置页先显示用户能理解的动作，
+ * 再把协议名放进每项的渐进披露里。这里按工具名收口，避免把协议文案散落在 JSX。
+ */
+function localApiToolLabel(name: string, t: I18nValue['t']): string {
+  switch (name) {
+    case 'list_tasks': return t('web.ai.settings.localApi.tool.listTasks');
+    case 'get_task': return t('web.ai.settings.localApi.tool.getTask');
+    case 'list_projects': return t('web.ai.settings.localApi.tool.listProjects');
+    case 'list_habits': return t('web.ai.settings.localApi.tool.listHabits');
+    case 'list_tags': return t('web.ai.settings.localApi.tool.listTags');
+    case 'list_notes': return t('web.ai.settings.localApi.tool.listNotes');
+    case 'get_note': return t('web.ai.settings.localApi.tool.getNote');
+    case 'list_checkins': return t('web.ai.settings.localApi.tool.listCheckins');
+    case 'list_focuses': return t('web.ai.settings.localApi.tool.listFocuses');
+    case 'list_reminders': return t('web.ai.settings.localApi.tool.listReminders');
+    case 'list_events': return t('web.ai.settings.localApi.tool.listEvents');
+    case 'get_event': return t('web.ai.settings.localApi.tool.getEvent');
+    case 'create_task': return t('web.ai.settings.localApi.tool.createTask');
+    case 'update_task': return t('web.ai.settings.localApi.tool.updateTask');
+    case 'complete_task': return t('web.ai.settings.localApi.tool.completeTask');
+    case 'create_project': return t('web.ai.settings.localApi.tool.createProject');
+    case 'create_habit': return t('web.ai.settings.localApi.tool.createHabit');
+    case 'create_tag': return t('web.ai.settings.localApi.tool.createTag');
+    case 'set_task_tags': return t('web.ai.settings.localApi.tool.setTaskTags');
+    case 'create_note': return t('web.ai.settings.localApi.tool.createNote');
+    case 'update_note': return t('web.ai.settings.localApi.tool.updateNote');
+    case 'record_checkin': return t('web.ai.settings.localApi.tool.recordCheckin');
+    case 'log_focus': return t('web.ai.settings.localApi.tool.logFocus');
+    case 'create_reminder': return t('web.ai.settings.localApi.tool.createReminder');
+    case 'create_event': return t('web.ai.settings.localApi.tool.createEvent');
+    case 'update_event': return t('web.ai.settings.localApi.tool.updateEvent');
+    default: return name;
+  }
+}
+
+/**
  * 预设的展示文案（名字 + 前置条件）。
  *
  * 🔴 原值在 `@heyta/ai` 的 `AI_ENDPOINT_PRESETS` 里 —— 跨包、且是中文。
@@ -301,7 +347,7 @@ export interface AiSettingsProps {
    * 本组件只负责"AI 配置"，不该知道偏好推断长什么样。
    * 谁持有 `preferenceSet` 谁负责组装，这里只留位置。
    */
-  memorySlot?: React.ReactNode;
+  memorySlot?: ReactNode;
   /**
    * 从 AI 面板的"去设置"跳进来时，**该落在哪一块**。
    *
@@ -318,6 +364,8 @@ export interface AiSettingsProps {
 export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget }: AiSettingsProps) {
   const [settings, setSettings] = useState<PersistedAiSettings>(initial);
   const [keyDraft, setKeyDraft] = useState<Record<string, string>>({});
+  const [localTokenVisible, setLocalTokenVisible] = useState(false);
+  const [localTokenCopied, setLocalTokenCopied] = useState(false);
   /** 被拒绝的端点地址及其原因 —— 必须显示，不能静默丢弃。 */
   const [rejected, setRejected] = useState<
     readonly { endpoint: string; reason: EndpointRejectionReason }[]
@@ -554,7 +602,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget
   const assistantPlan = planAssistantEgress(settings.assistantTier);
 
   return (
-    <div className="ht-settings" data-testid="ai-settings">
+    <div className="ht-settings ht-ai-settings" data-testid="ai-settings">
       <h2 className="ht-settings__title ht-type-section-title">{t('web.ai.settings.title')}</h2>
 
       {/* ── 闸 1：总开关 ─────────────────────────────────────────── */}
@@ -1036,24 +1084,45 @@ export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget
       )}
 
       {/* ── 闸 3（入站）：本机 API ───────────────────────────────── */}
-      <section className="ht-settings__section">
-        <h3 className="ht-settings__h3 ht-type-headline">{t('web.ai.settings.localApi.title')}</h3>
-        <p className="ht-settings__hint">
-          {t('web.ai.settings.localApi.hintLead')}<strong>{t('web.ai.settings.localApi.hintStrong')}</strong>
-        </p>
+      <section className="ht-settings__section" aria-labelledby="local-api-heading">
+        <div className="ht-ai-settings__section-head">
+          <div>
+            <h3 className="ht-settings__h3 ht-type-headline" id="local-api-heading">
+              {t('web.ai.settings.localApi.title')}
+            </h3>
+            <p className="ht-settings__hint">
+              {t('web.ai.settings.localApi.hintLead')}<strong>{t('web.ai.settings.localApi.hintStrong')}</strong>
+            </p>
+          </div>
+          <span className="ht-ai-settings__scope-badge">
+            <ShieldCheck size={ICON_SIZE.xs} aria-hidden="true" />
+            {t('web.ai.settings.localApi.browserOnly')}
+          </span>
+        </div>
 
-        {/* 🔴🔴 **这一段是诚实的必要部分，不是说明文字。**
-            这里配的东西存在**浏览器**里，而真正跑起来的 MCP 服务读的是
-            `~/.heyta/local-api.json`。两边**不会自动同步**。
-            不写清楚的话，用户会以为"我在这里打开了，它就生效了" ——
-            而实际上什么都不会发生，也不会有任何报错。 */}
-        <p className="ht-settings__warn" data-testid="local-api-source-note">
-          <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" />
-          {t('web.ai.settings.localApi.source.part1')}
-          <code>{t('web.ai.settings.localApi.source.file')}</code>{t('web.ai.settings.localApi.source.part2')}
-          <code>{t('web.ai.settings.localApi.source.command')}</code>
-          {t('web.ai.settings.localApi.source.part3')}
-        </p>
+        <div className="ht-ai-settings__setup-card" data-testid="local-api-source-note">
+          <div className="ht-ai-settings__setup-card-head">
+            <span className="ht-ai-settings__status-icon" aria-hidden="true">
+              <AlertTriangle size={ICON_SIZE.xs} />
+            </span>
+            <div>
+              <strong>{t('web.ai.settings.localApi.source.title')}</strong>
+              <p className="ht-settings__hint">{t('web.ai.settings.localApi.source.summary')}</p>
+            </div>
+          </div>
+          <details className="ht-ai-settings__technical">
+            <summary>{t('web.ai.settings.localApi.source.details')}</summary>
+            <p className="ht-settings__hint">
+              {t('web.ai.settings.localApi.source.part1')}
+              <strong>{t('web.ai.settings.localApi.source.browser')}</strong>
+              {t('web.ai.settings.localApi.source.part2')}
+              <code>{t('web.ai.settings.localApi.source.file')}</code>
+              {t('web.ai.settings.localApi.source.part3')}
+              <code>{t('web.ai.settings.localApi.source.command')}</code>
+              {t('web.ai.settings.localApi.source.part4')}
+            </p>
+          </details>
+        </div>
 
         <Toggle
           id="local-api-enabled"
@@ -1065,18 +1134,67 @@ export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget
 
         {localApi.enabled && (
           <>
-            <label className="ht-settings__field">
-              <span>{t('web.ai.settings.localApi.token.label')}</span>
-              <input
-                type="text"
-                aria-label={t('web.ai.settings.localApi.token.aria')}
-                value={localApi.token ?? ''}
-                onChange={(e) => update({ ...settings, localApi: { ...localApi, token: e.target.value } })}
-              />
-            </label>
-            <p className="ht-settings__hint">
-              {t('web.ai.settings.localApi.token.hint')}
-            </p>
+            <div className="ht-ai-settings__token-card">
+              <div className="ht-ai-settings__token-head">
+                <div>
+                  <label className="ht-ai-settings__field-label" htmlFor="local-api-token">
+                    <Lock size={ICON_SIZE.xs} aria-hidden="true" />
+                    {t('web.ai.settings.localApi.token.label')}
+                  </label>
+                  <p className="ht-settings__hint">{t('web.ai.settings.localApi.token.hint')}</p>
+                </div>
+                <span className="ht-ai-settings__token-state">
+                  {localApi.token !== undefined && localApi.token !== ''
+                    ? t('web.ai.settings.localApi.token.set')
+                    : t('web.ai.settings.localApi.token.unset')}
+                </span>
+              </div>
+              <div className="ht-ai-settings__token-control">
+                <input
+                  id="local-api-token"
+                  type={localTokenVisible ? 'text' : 'password'}
+                  autoComplete="off"
+                  aria-label={t('web.ai.settings.localApi.token.aria')}
+                  value={localApi.token ?? ''}
+                  onChange={(e) => {
+                    setLocalTokenCopied(false);
+                    update({ ...settings, localApi: { ...localApi, token: e.target.value } });
+                  }}
+                />
+                <button
+                  type="button"
+                  className="ht-btn ht-btn--ghost ht-ai-settings__icon-button"
+                  aria-label={localTokenVisible
+                    ? t('web.ai.settings.localApi.token.hide')
+                    : t('web.ai.settings.localApi.token.show')}
+                  aria-pressed={localTokenVisible}
+                  title={localTokenVisible
+                    ? t('web.ai.settings.localApi.token.hide')
+                    : t('web.ai.settings.localApi.token.show')}
+                  onClick={() => setLocalTokenVisible((visible) => !visible)}
+                >
+                  {localTokenVisible
+                    ? <EyeOff size={ICON_SIZE.xs} aria-hidden="true" />
+                    : <Eye size={ICON_SIZE.xs} aria-hidden="true" />}
+                </button>
+                <button
+                  type="button"
+                  className="ht-btn ht-btn--ghost"
+                  disabled={!localApi.token}
+                  onClick={() => {
+                    if (!localApi.token || navigator.clipboard === undefined) return;
+                    void navigator.clipboard.writeText(localApi.token).then(
+                      () => setLocalTokenCopied(true),
+                      () => setLocalTokenCopied(false),
+                    );
+                  }}
+                >
+                  {localTokenCopied
+                    ? t('web.ai.settings.localApi.token.copied')
+                    : t('web.ai.settings.localApi.token.copy')}
+                </button>
+              </div>
+            </div>
 
             {!localApiVerdict.ok && (
               <p className="ht-settings__danger" role="alert" data-testid="local-api-error">
@@ -1085,34 +1203,50 @@ export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget
               </p>
             )}
 
-            <div className="ht-settings__tools">
-              {LOCAL_API_TOOLS.map((tool) => {
-                const on = localApi.grants?.[tool.name] === true;
+            <div className="ht-ai-settings__tool-groups" data-testid="local-api-tool-groups">
+              {(['read', 'write'] as const).map((kind) => {
+                const tools = LOCAL_API_TOOLS.filter((tool) => tool.kind === kind);
                 return (
-                  <label key={tool.name} className="ht-settings__tool">
-                    <input
-                      type="checkbox"
-                      checked={on}
-                      aria-label={tool.name}
-                      onChange={(e) =>
-                        update({
-                          ...settings,
-                          localApi: {
-                            ...localApi,
-                            grants: { ...localApi.grants, [tool.name]: e.target.checked },
-                          },
-                        })
-                      }
-                    />
-                    <span>
-                      {tool.name}
-                      <em className="ht-settings__tool-kind">
-                        {tool.kind === 'write'
-                          ? t('web.ai.settings.localApi.kind.write')
-                          : t('web.ai.settings.localApi.kind.read')}
-                      </em>
-                    </span>
-                  </label>
+                  <fieldset key={kind} className="ht-ai-settings__tool-group">
+                    <legend>
+                      <span>{kind === 'write'
+                        ? t('web.ai.settings.localApi.kind.write')
+                        : t('web.ai.settings.localApi.kind.read')}</span>
+                      <span className="ht-ai-settings__tool-count">{tools.length}</span>
+                    </legend>
+                    <div className="ht-ai-settings__tool-list">
+                      {tools.map((tool) => {
+                        const on = localApi.grants?.[tool.name] === true;
+                        return (
+                          <div key={tool.name} className="ht-settings__tool ht-ai-settings__tool-row">
+                            <label>
+                              <input
+                                type="checkbox"
+                                checked={on}
+                                aria-label={tool.name}
+                                aria-description={localApiToolLabel(tool.name, t)}
+                                onChange={(e) =>
+                                  update({
+                                    ...settings,
+                                    localApi: {
+                                      ...localApi,
+                                      grants: { ...localApi.grants, [tool.name]: e.target.checked },
+                                    },
+                                  })
+                                }
+                              />
+                              <span className="ht-ai-settings__tool-label">{localApiToolLabel(tool.name, t)}</span>
+                            </label>
+                            <details className="ht-ai-settings__tool-technical">
+                              <summary aria-label={t('web.ai.settings.localApi.toolTechnical', { name: tool.name })}>
+                                <code>{tool.name}</code>
+                              </summary>
+                            </details>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </fieldset>
                 );
               })}
             </div>
