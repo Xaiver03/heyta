@@ -98,6 +98,7 @@ heyta 的核心闭环（任务 / 清单 / 标签 / 四象限 / 习惯 / 专注 /
 | 2.8 | 已完成 / 垃圾箱 | ✅ | 🟡 | 垃圾箱可达（web `TrashView.tsx`、mobile `TrashScreen.tsx`）。已完成：filter 类型存在（`store.ts:56`）、空态文案在（`App.tsx:862-864`） | 🔴 **没有任何 UI 能把 filter 设成 completed**（`setFilter` 调用点只有 all / today / quadrant / project）→ **web 上看不到已完成任务** |
 | 2.9 | 时间线 / 甘特 | ✅ | ✅（web，个人范围） | `apps/web/src/features/timeline/{TimelineView,GanttChart,buildTimeline}` | 仅 web；非团队甘特；无依赖编辑；数据来自 note 里的 checklist + AI 估时 |
 | 2.10 | 搜索 | ✅ | ❌ | 全仓无搜索 UI / 索引；`storage` / `op-log` 无 FTS | 滴答 2026-06 更新还专门升级了搜索 |
+| 2.11 | 清单创建对话框（结构化建单：名称 / 清单颜色 / 视图类型（列表·看板·日历）/ 文件夹 / 清单类型 / 「在智能清单显示」+ 右侧实时预览） | ✅ | 🟡 | 滴答侧：2026-10-06 产品负责人提供桌面端「添加清单」对话框截图**口述**（截图未入库，控件形态以当前截图为准）。heyta 侧：`createProject(name, parentId)` 只收名字与父清单 — `packages/app-host/src/project-actions.ts:71,235`；web 新建入口是**只有一个名字输入框的内联表单** — `apps/web/src/features/projects/ProjectsPanel.tsx:235-261`；颜色是**事后**单独动作（`setProjectColor`，`project-actions.ts:86`，存 1–8 槽位非 hex）且**移动端没有清单取色入口**（`ProjectsPanel.tsx:42-43`） | （2026-10-06 补，产品负责人裁决纳入）建议 **P2**，其中**「名字 + 颜色」半步可提前**：色板复用既有 1–8 色槽、含义用户自赋（`packages/domain/src/activity-categories.ts:38-70`），颜色管道已按 `{light,dark}` 解析传递（[../adr/0025-widget-snapshot-confidentiality.md](../adr/0025-widget-snapshot-confidentiality.md) §2.4）。**视图类型与「在智能清单显示」依赖 IA 拍板，不是独立 UX 工单** —— heyta 的四象限/时间线是全局 rail 视图、非清单级属性（[ADR-0015](../adr/0015-four-quadrant-as-derived-view.md)），过滤器实体尚不存在（同表 2.7 / P1-2）；拍板项登记在 [product-level-ia-ux-audit.md](product-level-ia-ux-audit.md) §3.3 第三条。实时预览 = 纯打磨，P3 |
 
 ### 2.3 习惯打卡
 
@@ -369,6 +370,7 @@ heyta 的核心闭环（任务 / 清单 / 标签 / 四象限 / 习惯 / 专注 /
 | P2-10 | 清单共享 / 指派 / 评论 |
 | P2-11 | 鸿蒙应用接入（把 RN 接进 `Index.ets`） |
 | P2-12 | 农历重复 |
+| P2-13 | 清单创建「名字 + 颜色」半步（2026-10-06 补；整对话框结构化建单见 §2.2 #2.11 —— 视图类型 / 智能清单可见性两问依赖 IA 拍板（[product-level-ia-ux-audit.md](product-level-ia-ux-audit.md) §3.3 ③），不随本条立项） |
 
 ### 6.5 文档修复（与功能并行，成本低、收益高）
 
