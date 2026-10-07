@@ -38,6 +38,11 @@ char *heyta_host_call(HeytaHost *host, const char *fn, const char *arg_json,
 /* 供 API 层解析结果用（借同一个引擎做 JSON.parse，避免在 C 里手写解析）。 */
 JSContextRef heyta_host_context(HeytaHost *host);
 
+/* 把 C 字符串嵌成 JS **字符串字面量**（引号/反斜杠/换行/控制字符都转义，UTF-8 原样透传）。
+ * 导出给 UI 层用：壳往 WebView 回推 TS 决定的响应时要走同一份转义，
+ * **不许在第二处再手写一遍**（同一形状的第二份就是漂移的开始）。 */
+char *heyta_js_string_literal(const char *text);
+
 void heyta_host_destroy(HeytaHost *host);
 
 #endif /* HEYTA_HOST_H */

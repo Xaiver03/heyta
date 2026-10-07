@@ -37,8 +37,10 @@ static char *js_value_to_c(JSContextRef ctx, JSValueRef value) {
 }
 
 /* 把 C 字符串嵌成 JS **字符串字面量**：用 JSON 编码（JSON 字符串正好是合法 JS 字面量），
- * 这样引号、反斜杠、换行、非 ASCII 都不会把脚本拼坏。 */
-static char *js_string_literal(const char *text) {
+ * 这样引号、反斜杠、换行、非 ASCII 都不会把脚本拼坏。
+ * 非 ASCII 可打印字节原样透传（UTF-8 本身是合法 JS 源码），< 0x20 的控制字符转 \uXXXX。
+ * 这一份是**唯一**的转义实现：UI 层往 WebView 回推响应时用它，别再抄第二份。 */
+char *heyta_js_string_literal(const char *text) {
     /* 借引擎做：先构造一个 JS 字符串值，再用 JS_QuoteString？—— 直接用 JSON.stringify。 */
     size_t need = strlen(text) * 6 + 8;
     char *out = malloc(need);
@@ -154,7 +156,7 @@ JSContextRef heyta_host_context(HeytaHost *host) { return host->ctx; }
 
 char *heyta_host_call(HeytaHost *host, const char *fn, const char *arg_json,
                       char *errbuf, size_t errlen) {
-    char *literal = js_string_literal(arg_json != NULL ? arg_json : "{}");
+    char *literal = heyta_js_string_literal(arg_json != NULL ? arg_json : "{}");
 
     size_t need = strlen(fn) + strlen(literal) + 512;
     char *script = malloc(need);

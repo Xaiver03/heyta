@@ -10,6 +10,7 @@
  */
 
 #include "heyta_api.h"
+#include "heyta_web.h"
 /* 设计系统 token（P0-7）：GTK CSS 的内嵌形态（packages/design-system 生成，
  * Makefile 用 -I 指到 generated/）。此前这个壳零 token 接入 —— 界面外观
  * 完全跟随 Adwaita 系统主题，与 heyta 的设计语言无关。 */
@@ -23,6 +24,7 @@
 
 typedef struct {
     HeytaApi *api;
+    HeytaWeb *web; /* NULL = 这一轮走的是回退那一屏 */
     GtkWidget *window;
     GtkWidget *entry;
     GtkWidget *list;
@@ -33,7 +35,22 @@ typedef struct {
 static const char *bundle_path(void) {
     const char *from_env = getenv("HEYTA_BRIDGE_BUNDLE");
     if (from_env != NULL && from_env[0] != '\0') return from_env;
-    return "native-bridge.js"; /* 与 exe 同目录（构建时拷过去）；也可用环境变量覆盖 */
+    /* 🔴 默认必须是「**可执行文件同目录**」，不是「当前工作目录」。
+     *    旧实现在这里直接返回裸名 `native-bridge.js` —— 那吃的是 cwd，而注释写着"与 exe 同目录"。
+     *    它一直没被发现，因为**每一次真跑都恰好设了 `HEYTA_BRIDGE_BUNDLE`**（门禁、冒烟、
+     *    旧打包脚本的 wrapper 都设）：装成 `.deb` 之后用户在自家目录里敲 `heyta`，
+     *    cwd 是 `/home/<user>` ⇒ 直接得到"找不到 bundle"。
+     *    07 04:3x 用 `dpkg-deb -x` 解开包内那棵树、并且**故意不带任何环境变量**跑时才现形。 */
+    static char joined[2048 + 32];
+    char exe[2048];
+    ssize_t n = readlink("/proc/self/exe", exe, sizeof exe - 1);
+    if (n <= 0) return "native-bridge.js";
+    exe[n] = '\0';
+    char *slash = strrchr(exe, '/');
+    if (slash == NULL) return "native-bridge.js";
+    *slash = '\0';
+    snprintf(joined, sizeof joined, "%s/native-bridge.js", exe);
+    return joined;
 }
 
 static char *database_path(void) {
@@ -150,8 +167,7 @@ static void on_entry_activate(GtkEntry *entry, gpointer user_data) {
     on_add(NULL, user_data);
 }
 
-static gboolean report_window_evidence(gpointer user_data) {
-    Shell *shell = user_data;
+static gboolean report_window_evidence(gpointer user_data) {    Shell *shell = user_data;
     printf("WINDOW_TITLE=%s\n", gtk_window_get_title(GTK_WINDOW(shell->window)));
     printf("WINDOW_SIZE=%dx%d\n", gtk_widget_get_width(shell->window),
            gtk_widget_get_height(shell->window));
@@ -161,6 +177,15 @@ static gboolean report_window_evidence(gpointer user_data) {
 
 static gboolean quit_cb(gpointer user_data) {
     gtk_window_close(GTK_WINDOW(user_data));
+    return G_SOURCE_REMOVE;
+}
+
+/* M2 的证据要**等页面真的挂上**再取：present 那一刻 DOM 还是空的，
+ * 探针会读到一个"backend 为空 + mounted=0"的合法答案 —— 那是假的失败。
+ * 探针内部自己会再排一次快照。 */
+static gboolean probe_web_later(gpointer user_data) {
+    Shell *shell = user_data;
+    heyta_web_probe(shell->web);
     return G_SOURCE_REMOVE;
 }
 
@@ -182,16 +207,15 @@ static void load_design_tokens(void) {
     g_object_unref(provider);
 }
 
-static void activate(GtkApplication *app, gpointer user_data) {
-    Shell *shell = user_data;
-
-    load_design_tokens();
-
-    shell->window = gtk_application_window_new(app);
-    gtk_widget_add_css_class(shell->window, "heyta-window");
-    gtk_window_set_title(GTK_WINDOW(shell->window), "heyta");
-    gtk_window_set_default_size(GTK_WINDOW(shell->window), 900, 560);
-
+/* 回退那一屏：手写的 GTK4 任务界面。
+ *
+ * 🔴 它**不是**产品形态，是"共享 UI 产物不在或宿主兑现不了"时的一条可见退路 ——
+ *    既定决策（multi-end-unified-strategy §4.3 / §6.3-T3 第 1 条）把这类手写业务 UI
+ *    列为要删的对象。留着它的唯一理由是：**没有它，M2 失败就变成白屏**，
+ *    而白屏在取证里最难归因（§7 第 82 条那一族）。走没走它由 `SHELL_UI=` 那行说出来。
+ *
+ * 一行业务规则都不在这里：列表、完成态、删除全是 TS 门面的返回。 */
+static void build_fallback_ui(Shell *shell, const char *db, const char *create_err) {
     GtkWidget *root = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
     gtk_widget_set_margin_top(root, 24);
     gtk_widget_set_margin_bottom(root, 24);
@@ -244,13 +268,10 @@ static void activate(GtkApplication *app, gpointer user_data) {
     /* ── 初始化：失败必须显示出来（空白窗口是最难排查的失败形态）── */
     char err[2048] = {0};
     char client_id[128] = {0};
-    const char *bundle = bundle_path();
-    char *db = database_path();
 
-    shell->api = heyta_api_create(bundle, db, err, sizeof err);
     if (shell->api == NULL) {
         char message[2400];
-        snprintf(message, sizeof message, "初始化失败：%s", err);
+        snprintf(message, sizeof message, "初始化失败：%s", create_err);
         gtk_label_set_text(GTK_LABEL(shell->status), message);
         gtk_widget_set_sensitive(shell->entry, FALSE);
         gtk_widget_set_sensitive(add, FALSE);
@@ -264,14 +285,78 @@ static void activate(GtkApplication *app, gpointer user_data) {
         gtk_label_set_text(GTK_LABEL(shell->footer), footer);
         refresh(shell);
     }
+}
+
+static void activate(GtkApplication *app, gpointer user_data) {
+    Shell *shell = user_data;
+
+    load_design_tokens();
+
+    shell->window = gtk_application_window_new(app);
+    gtk_widget_add_css_class(shell->window, "heyta-window");
+    gtk_window_set_title(GTK_WINDOW(shell->window), "heyta");
+    gtk_window_set_default_size(GTK_WINDOW(shell->window), 900, 560);
+
+    char err[2048] = {0};
+    char *db = database_path();
+
+    /* ── UI 分流：M2（载共享 UI 产物）优先，兑现不了才退回手写那一屏 ──
+     *
+     * 🔴 这里的"退回"必须**带着原因**打印出来：否则下一次有人问
+     *    "Linux 装的是不是同一个 heyta"，答案是看不出来的。
+     *    `HEYTA_SHELL_UI=gtk` 是显式逃生门（取证时想专门拍回退屏用它），不是兜底。
+     *
+     * 🔴 **创建顺序是实测承重的，不是风格**：WebView 必须在 TS 门面（它会建一个 JSC
+     *    上下文）**之前**建好，加载更要在两者之后。反过来时，WebKitGTK 6.0 在这台
+     *    载体上一次加载信号都不发（helper 进程起来了、`get_uri()` 也返回目标 URI，
+     *    但文档永不启动、`evaluate_javascript` 一次都不回调）——
+     *    最小复现装置 `src/webview-load-probe.c`，读数在 runbook 的 M2 那一节。 */
+    char why[1200] = {0};
+    const char *web_root = heyta_web_resolve_root(why, sizeof why);
+    const char *forced = getenv("HEYTA_SHELL_UI");
+    GtkWidget *child = NULL;
+
+    if (forced != NULL && !strcmp(forced, "gtk")) {
+        printf("SHELL_UI=fallback（HEYTA_SHELL_UI=gtk 显式指定）\n");
+    } else if (web_root == NULL) {
+        printf("SHELL_UI=fallback（%s）\n", why);
+    } else {
+        char weberr[2048] = {0};
+        shell->web = heyta_web_new(web_root, &child, weberr, sizeof weberr);
+        if (shell->web == NULL) {
+            printf("SHELL_UI=fallback（WebView 没建起来：%s）\n", weberr);
+            child = NULL;
+        }
+    }
+
+    shell->api = heyta_api_create(bundle_path(), db, err, sizeof err);
+    if (shell->api == NULL) printf("API_CREATE=FAIL %s\n", err);
+
+    if (shell->web != NULL && shell->api == NULL) {
+        /* 承诺了端口却兑现不了 ⇒ 应用永久卡在启动，所以这一格只能收回 WebView 落回手写屏。 */
+        printf("SHELL_UI=fallback（TS 门面没起来：%s）\n", err);
+        heyta_web_free(shell->web);
+        shell->web = NULL;
+        child = NULL;
+    } else if (shell->web != NULL) {
+        heyta_web_set_api(shell->web, shell->api);
+        printf("SHELL_UI=web-dist（M2：与其他端同一个 heyta）\n");
+        gtk_window_set_child(GTK_WINDOW(shell->window), child);
+    }
+    fflush(stdout);
+
+    if (child == NULL) build_fallback_ui(shell, db, err);
     free(db);
 
     gtk_window_present(GTK_WINDOW(shell->window));
+    /* 加载排在 present 之后：与另两端同一个取证形状（窗口先存在，页面再填它）。 */
+    if (shell->web != NULL) heyta_web_load(shell->web);
 
     /* 证据：窗口尺寸要**等它真的被分配之后**再取 —— 刚 `present` 完拿到的是 0x0。
      * （第一版就是立刻打印，结果证据行写着 `WINDOW_SIZE=0x0`；
      *   截图明明是好的，但那行"证据"是假的 —— 宁可不打印，也不打印一个假值。） */
     g_timeout_add(600, report_window_evidence, shell);
+    if (shell->web != NULL) g_timeout_add(900, probe_web_later, shell);
 
     const char *exit_after = getenv("HEYTA_EXIT_AFTER_MS");
     if (exit_after != NULL && exit_after[0] != '\0') {
@@ -296,6 +381,7 @@ int main(int argc, char **argv) {
     g_signal_connect(app, "activate", G_CALLBACK(activate), &shell);
     int status = g_application_run(G_APPLICATION(app), argc, argv);
 
+    if (shell.web != NULL) heyta_web_free(shell.web);
     if (shell.api != NULL) heyta_api_destroy(shell.api);
     g_object_unref(app);
     return status;

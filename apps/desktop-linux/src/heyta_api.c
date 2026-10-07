@@ -54,24 +54,14 @@ static char *field_string(HeytaApi *api, JSValueRef object, const char *key) {
 }
 
 /* 拼一个只含一个字符串字段的参数对象，例如 {"title":"..."}。
- * 用 JSON 编码字符串 —— 与 host 里的 js_string_literal 同源思路。 */
+ * 转义**只有 heyta_js_string_literal 一份** —— 这里以前自己抄了一遍，
+ * 而且抄漏了 < 0x20 的控制字符（标题里真有控制字符时拼出的是**非法 JSON**）。 */
 static char *arg_with_string(const char *key, const char *value) {
-    size_t need = strlen(key) + strlen(value) * 6 + 32;
+    char *literal = heyta_js_string_literal(value);
+    size_t need = strlen(key) + strlen(literal) + 16;
     char *out = malloc(need);
-    size_t k = (size_t)snprintf(out, need, "{\"%s\":\"", key);
-    for (const unsigned char *p = (const unsigned char *)value; *p != '\0'; ++p) {
-        switch (*p) {
-        case '"':  out[k++] = '\\'; out[k++] = '"';  break;
-        case '\\': out[k++] = '\\'; out[k++] = '\\'; break;
-        case '\n': out[k++] = '\\'; out[k++] = 'n';  break;
-        case '\r': out[k++] = '\\'; out[k++] = 'r';  break;
-        case '\t': out[k++] = '\\'; out[k++] = 't';  break;
-        default:   out[k++] = (char)*p;
-        }
-    }
-    out[k++] = '"';
-    out[k++] = '}';
-    out[k] = '\0';
+    snprintf(out, need, "{\"%s\":%s}", key, literal);
+    free(literal);
     return out;
 }
 
@@ -198,6 +188,52 @@ bool heyta_api_remove_task(HeytaApi *api, const char *id, char *errbuf, size_t e
     char *result = heyta_host_call(api->host, "removeTask", arg, errbuf, errlen);
     free(arg);
     if (result == NULL) return false;
+    free(result);
+    return true;
+}
+
+/* ── M2：把壳变成**页侧真应用**的存储宿主 ─────────────────────────────
+ *
+ * 与 macOS 的 `ShellStorageHost` / Windows 的 `AppStorageHost` 同一形状，
+ * 也只守那三条：只开 store 不建引擎、**不解析任何协议字段**、失败要说出来。
+ */
+
+/* `HeytaApp.openOpLog()`：打开库但**不建引擎**（引擎归页侧；两个引擎同库会各自为政）。
+ * 幂等由 TS 保证。返回库自己那个 clientId（它是 LWW 的决胜依据，不许壳另算一个）。 */
+bool heyta_api_open_store(HeytaApi *api, char *out, size_t out_len,
+                          char *errbuf, size_t errlen) {
+    char *result = heyta_host_call(api->host, "openOpLog", "{}", errbuf, errlen);
+    if (result == NULL) return false;
+    bool ok = false;
+    JSValueRef parsed = parse_json(api, result);
+    char *client_id = field_string(api, parsed, "clientId");
+    if (client_id != NULL) {
+        snprintf(out, out_len, "%s", client_id);
+        ok = true;
+    } else {
+        snprintf(errbuf, errlen, "openOpLog 返回了但没有 clientId：%s", result);
+    }
+    free(client_id);
+    free(result);
+    return ok;
+}
+
+/* 把页侧经宿主边界发来的一条消息原样交给 TS，并把 TS 决定要回推的那些串
+ * **原样**取回（`{"outboundJson":[...]}` 这段文本，壳不拆它）。
+ * 壳若在 C 里拆 `outboundJson` 里的每一条，就等于在第三语言再实现一遍协议。 */
+bool heyta_api_handle_host_message(HeytaApi *api, const char *message_json,
+                                   char *out, size_t out_len,
+                                   char *errbuf, size_t errlen) {
+    char *arg = arg_with_string("messageJson", message_json);
+    char *result = heyta_host_call(api->host, "handleHostMessage", arg, errbuf, errlen);
+    free(arg);
+    if (result == NULL) return false;
+    if (strlen(result) + 1 > out_len) {
+        snprintf(errbuf, errlen, "回推内容超出缓冲（%zu 字节 > %zu）", strlen(result), out_len);
+        free(result);
+        return false;
+    }
+    snprintf(out, out_len, "%s", result);
     free(result);
     return true;
 }

@@ -1,9 +1,25 @@
 #!/bin/bash
 # Linux（GTK4）原生壳的窗口取证：同步 → 构建 → 冒烟 → Xvfb 起窗口 → 裁出窗口 → 落 evidence。
 #
-#   bash apps/desktop-linux/scripts/capture-window.sh [远端主机]
+#   bash apps/desktop-linux/scripts/capture-window.sh <目标机>
 #
-# 默认远端 `sanjiaozhou`（那里有 gtk4 4.14.5 + javascriptcoregtk-4.1 2.52.6 + sqlite3）。
+# 目标机的取法：位置参数 > `HEYTA_LINUX_HOST=<ssh 别名>` > 响亮拒绝。
+# 🔴 **没有 `local` 这一档，也没有默认远端。** `local` 要的是"整套远端命令在本地跑"的第二条实现，
+#    而本脚本一条都没跑过它 —— 加一个从没执行过的分支正是 §5.9 那两条缺陷的形状，所以宁可不加：
+#    在 Linux 载体上取证请直接跑 `pnpm build:linux local`（`package-deb.sh` 有本地模式，
+#    它连包内窗口一起证）或 `check:linux-shell` 的 M2 那一档。
+# 🔴 这里**不再有"默认远端 `sanjiaozhou`"**那一档。两个理由，都是一手读数：
+#   ① 那是生产机（Caddy 在线上、postgres、几十个容器），而本脚本第二行就是 `rsync --delete`；
+#   ② 那条路在 `docs/runbooks/linux-dev-box.md` §5.6 / 陷阱 #374 里被实测否证 —— 那台机上
+#      打包 TS 门面那步就缺工作区，本脚本从没走到 `make`。
+#
+# 🔴 **本脚本采的是 M2 之前的原生壳那一屏**（它不同步 `apps/web/dist`，所以壳渲染的是
+#    C 侧原生列表，不是共享 web UI）。在当前树上重跑它会落到回退屏，而下面的校验
+#    **会判红** —— 这是 07 04:5x 特意加上主蓝判据之后的**预期行为**，不是新缺陷：
+#    现量 `window-first-run.png`（旧原生屏）主蓝命中 **0**，
+#    而两张 M2 图（`linux-m2-webdist.png` / `linux-deb-packaged-first-run.png`）都是 **3987**。
+#    把它重定向到 M2 那条路 = 换采集方式，要连 `scripts/screenshots/targets.mjs` 的
+#    `methods` 与既有证据的归属一起改，排在计划 E7（Linux 进 reinstall 第五端）一起做。
 #
 # ── 为什么要"裁到窗口" ───────────────────────────────────────────────────
 #
@@ -20,7 +36,13 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 LINUX_DIR="$(cd "$HERE/.." && pwd)"
 REPO="$(cd "$LINUX_DIR/../.." && pwd)"
-HOST="${1:-sanjiaozhou}"
+HOST="${1:-${HEYTA_LINUX_HOST:-}}"
+if [ -z "$HOST" ]; then
+  echo "🔴 没定目标机。这个脚本会先 rsync --delete 再远端构建，所以目标机必须是显式的："
+  echo "   bash apps/desktop-linux/scripts/capture-window.sh <ssh 别名>     （或 HEYTA_LINUX_HOST=<别名>）"
+  echo "   Linux 载体上请改走 pnpm build:linux local 或 check:linux-shell 的 M2 那一档（见文件头）。"
+  exit 2
+fi
 REMOTE_DIR="/tmp/heyta-linux"
 WIN_W=900
 WIN_H=560
@@ -76,23 +98,39 @@ echo ""
 echo "=== 校验 ==="
 cd "$REPO"
 node - "$LINUX_DIR/evidence/window-first-run.png" <<'JS'
-import { inspectPng, looksBlank, looksSmeared } from './scripts/screenshots/png-stats.mjs';
+import { inspectPng, looksBlank, looksSmeared, countBrandBlue } from './scripts/screenshots/png-stats.mjs';
 const st = inspectPng(process.argv[2]);
 console.log(`  ${st.width}x${st.height}  内容 ${(st.contentRatio * 100).toFixed(1)}%  色阶 ${st.colorSpan}`);
 console.log(`  内容占比(相对主色) ${(st.contentOnModalRatio * 100).toFixed(1)}%  边缘密度 ${st.edgeOnContent.toFixed(3)}`);
+// 🔴 「非空白」回答的是"有没有东西"，回答不了"是不是这个界面"（AGENTS §7 第 82 条）。
+//    这一档以前只有 looksBlank，所以回退屏（有标题有正文）永远算通过。
+//    现量：旧原生屏主蓝命中 0，两张 M2 图都是 3987 ⇒ 这条判据有阳性对照，不是恒真断言。
+const blue = countBrandBlue(process.argv[2]);
+console.log(`  主蓝(#2563EB)命中 ${blue}`);
 let bad = false;
 if (st.hasTransparency) { console.error('  🔴 含实际透明像素'); bad = true; }
 if (looksBlank(st)) { console.error('  🔴 疑似空白'); bad = true; }
 if (looksSmeared(st)) { console.error('  🔴 疑似渲染坏了'); bad = true; }
+if (blue === 0) {
+  console.error('  🔴 没有一处 heyta 主蓝 ⇒ 画的不是我们的界面（回退屏/空白屏/原生旧屏都会落在这里）');
+  bad = true;
+}
 if (bad) process.exit(1);
 console.log('  ✅ 通过');
 JS
 
 cat > "$LINUX_DIR/evidence/window-first-run.txt" <<EOF
-# Linux（GTK4）原生壳窗口取证记录
+# Linux（GTK4）原生壳窗口取证记录 —— ⚠️ **这一张是 M2 之前的原生壳那一屏**
 #
 # 采集命令（可复现）：
-#   bash apps/desktop-linux/scripts/capture-window.sh sanjiaozhou
+#   bash apps/desktop-linux/scripts/capture-window.sh ${HOST}
+#
+# 🔴 它画的**不是**共享 web UI（本脚本不同步 apps/web/dist ⇒ 壳走原生列表那一支）。
+#    当前产物那两张 M2 证据在：
+#      apps/desktop-linux/evidence/linux-m2-webdist.png            （开发树，check:linux-shell 的 M2 档）
+#      apps/desktop-linux/evidence/linux-deb-packaged-first-run.png （装出来的 .deb，package-deb.sh）
+#    判据现量：本张主蓝命中 0，那两张都是 3987 ⇒ 07 04:5x 给本脚本加上主蓝判据后，
+#    重跑它会**判红**（预期行为，见脚本文件头）。
 #
 # 目标机：${HOST}（Ubuntu，x86_64）
 # 工具链：gtk4 4.14.5 · javascriptcoregtk-4.1 2.52.6 · sqlite3 3.45.1

@@ -45,6 +45,19 @@ bool heyta_api_set_task_done(HeytaApi *api, const char *id, bool done,
 
 bool heyta_api_remove_task(HeytaApi *api, const char *id, char *errbuf, size_t errlen);
 
+/* M2 存储宿主（与 macOS `ShellStorageHost` / Windows 那份同一形状）：
+ * 只开 store、不建引擎 —— 引擎归页侧的真应用，两个引擎同库会各自为政。
+ * out 拿回来的是**库里那个** clientId（LWW 的决胜依据，不许壳自己算一个）。 */
+bool heyta_api_open_store(HeytaApi *api, char *out, size_t out_len,
+                          char *errbuf, size_t errlen);
+
+/* 页侧经宿主边界发来一条消息 ⇒ 交给 TS ⇒ 把 TS 决定要回推的那些串**原样**取回。
+ * out 是 `{"outboundJson":[...]}` 这段文本：壳不拆它、不认 `hello`/`ready`，
+ * 因为"协议只在 TS 一份实现"是本仓的既定边界（apps/desktop-windows/README §1）。 */
+bool heyta_api_handle_host_message(HeytaApi *api, const char *message_json,
+                                   char *out, size_t out_len,
+                                   char *errbuf, size_t errlen);
+
 void heyta_task_list_free(HeytaTaskList *list);
 void heyta_api_destroy(HeytaApi *api);
 

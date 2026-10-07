@@ -1,9 +1,15 @@
 # `apps/desktop-linux` —— Linux 原生壳（GTK4 / C）
 
-> 状态：**已可构建、已可运行**。核心冒烟 **12/12**；窗口已在无头 Linux 上启动并截图
-> —— 见 [`evidence/`](evidence/)。
+> 状态：**已可构建、已可运行**。跨语言冒烟的条数**由冒烟自己报**（本文件此前写死一个数字，六天就漂了）：
+> `./heyta-smoke` 成功时打印 `HEYTA_LINUX_SMOKE=OK n/n`，`check:linux-shell` 读的就是这一行，
+> 并把 `0/0` 与"缺这一行"都判红。
+> ⚠️ **别拿 `grep -c 'check(' src/smoke.c` 当条数**（我今天就这么错过一次：那个数现量 22，实跑 13）——
+> 每条判据的成功分支旁边都配了一条 `check(false, …)` 的失败分支，两者互斥，源码计数是**两倍上界**。
+> 窗口已在无头 Linux 上启动并截图 —— 见 [`evidence/`](evidence/)。
 > 决策依据：[ADR-0034](../../docs/adr/0034-windows-native-winui3-not-rnw.md)（"`packages/ui` 对原生壳归零"）、
-> 计划：[多端原生构建计划](../../docs/plans/desktop-native-migration.md) §4。
+> 计划：[Linux 端适配计划](../../docs/plans/linux-adaptation.md)（本端的工单状态与待拍点）
+> 与 [多端原生构建计划](../../docs/plans/desktop-native-migration.md) §4；
+> 载体操作：[Linux 载体操作手册](../../docs/runbooks/linux-dev-box.md)。
 
 ⚠️ **UI 的适配与统一不在这里**（那是另一条线在做）。这个壳只负责：
 把窗口搭起来、把事件转成 `heyta_api` 调用、把错误显示出来。
@@ -44,14 +50,14 @@ iOS / Android（React Native + 原生小组件）、鸿蒙（RNOH + ArkTS）、W
 ## 2. 怎么构建、怎么跑
 
 ```bash
-# 前置（Ubuntu/Debian）
-sudo apt-get install -y build-essential pkg-config \
-    libgtk-4-dev libjavascriptcoregtk-4.1-dev libsqlite3-dev
+# 前置（Ubuntu/Debian）—— 一条幂等的脚本，缺哪格点名哪格
+bash ../../scripts/linux/setup-build-host.sh --step verify
+sudo bash ../../scripts/linux/setup-build-host.sh --step gtk
 
 # ① 打包 TS 门面（在**仓库根**跑；与另两个壳共用同一个产物）
 node packages/app-host/scripts/build-native-bridge.mjs
 
-# ② 跨语言那一层：无头冒烟（12/12，**不需要 X**）
+# ② 跨语言那一层：无头冒烟（**不需要 X**；条数以现量为准，见文件头）
 cd apps/desktop-linux && make
 HEYTA_BRIDGE_BUNDLE=../../packages/app-host/bridge-bundle/native-bridge.js ./heyta-smoke
 
@@ -102,10 +108,11 @@ sleep 5 && import -window root window.png
 
 | 缺口 | 说明 |
 |---|---|
-| **打包 / 分发** | 未做。目前只能 `make` 出可执行文件；没有 .deb / AppImage / Flatpak |
-| **系统集成** | 未做（.desktop 入口、图标主题、MIME、单实例） |
-| **同步未接线** | 门面故意不传 `serverUrl` ⇒ 不建同步客户端 |
-| **界面只有任务列表** | 象限 / 清单 / 标签 / 重复 / 备注编辑 / 设置都还没有门面 |
+| ~~没走 M2（曾是本端最大的缺口）~~ **已走 M2（07 03:4x 运行取证 / 07 04:4x 包内取证）** | 本端现在与 mac、Windows 同构：原生 GTK4 壳 + 壳内 **WebKitGTK 6.0** WebView 加载**与其它端同一份** `apps/web/dist`（路线出处 `docs/plans/multi-end-unified-strategy.md` §4.3）。🔴 下面那份手写的 GTK 界面**不再是产品**，它现在只有一个身份：**找不到共享 UI 产物时的回退屏**（`heyta_web.c` 四处候选都落空才渲染它）。判据与读数：`check:linux-shell` 的 M2 那一档 + runbook §5.7–§5.9；台账那一格已翻 `reachable` |
+| **打包 / 分发** | `.deb` 由 `scripts/package-deb.sh` 产出，入口 `pnpm build:linux <目标机>\|local`（在那台 Ubuntu 载体上跑，布局 FHS：包内 `/usr/share/heyta/web-dist` = 与其它端同一份共享 UI；取证与读数见 [runbook §5.9](../../docs/runbooks/linux-dev-box.md)）。**未做**：没有签名/更新渠道、产物没有进每轮固定收尾（`reinstall-all.sh` 的 Linux 第五端 = 计划 E7）、装进系统（`dpkg -i`）那一档（脚本默认不解包安装，取证走 `dpkg-deb -x`） |
+| **系统集成** | `.desktop` 入口与图标随 `.deb` 落；MIME 关联、单实例**未做** |
+| **同步未接线**（🔴 M2 **没有**关掉这一格 —— 07 05:2x 现量更正） | 共享门面 `packages/app-host/src/native-bridge.ts:38` 明写"目前不接同步：不传 `serverUrl` ⇒ `openAppHost` 不建同步客户端"。M2 换的是**界面那一层**（壳内 WebView 载共享 UI），业务接线仍然全部来自门面，所以这一格与 mac 壳同档、**不是** Linux 特有缺陷，也不该在手写壳里补。原先这行写的"M2 之后这一条随共享 UI 一起消失"是没读门面就下的结论 |
+| ~~界面只有任务列表~~ **界面 = 与其它端同一份共享 UI** | M2 之后象限 / 日历 / 清单 / 标签 / 设置这些面**由 `apps/web/dist` 带进来**，不再需要逐个补原生门面（那正是 §6.3 要删手写界面的理由）。⚠️ 它们出现与否仍由**共享层的功能模块开关**决定，与 web 端同口径；壳侧的取证只证到"首屏 + 同意卡"那一屏（runbook §5.9 那张图），逐面的可达性由 `check:shell-surfaces` 的 D1–D4 管 |
 | **只在 Ubuntu 24.04 上验过** | 22.04 上 GTK4 是 4.6.9，本壳用到的是稳定 API，但**没实测** |
-| **不在 JS/TS 门禁里** | `check:design` 等扫描器看不到 C |
-| **`check:linux-shell` 只在 Linux 上跑** | 非 Linux 显式跳过（GTK4 装不上） |
+| **门禁覆盖**（本行此前写的是"不在 JS/TS 门禁里"，只对了一半） | `check:native-bare-values.mjs` **已经把 `.c/.h` 纳入射程**（含本目录）；`check:design` 那份 JS 扫描器确实看不到 C |
+| **`check:linux-shell` 只在 Linux 上跑** | 非 Linux 显式跳过（GTK4 装不上）。🔴 严格档 `HEYTA_REQUIRE_LINUX_SHELL=1`：把"跳过"一律判红 —— 这枚门禁此前在 mac 与 CI 载体上**一次都没真执行过**，那就是一枚不会失败的判据 |
