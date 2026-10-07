@@ -6896,3 +6896,66 @@ e2e 类型载体 RC=0；臂台四臂 `A→D1`、`B→D3,D6`、`C→D4`、`D→D5
 
 
 
+
+## B102 · 2026-10-07 11:0x–12:0x：下载面落地、macOS 第一次真发布、iOS 那枚假报错
+
+归属：本条由"替三条线收尾"那一会话写（产品负责人随后追加：五端都要发布 + web 部署 + 下载界面）。
+
+### 格 1 — `/download` 已经上线，而它推翻的是**依据**不是纪律
+
+`site-ia-and-landing-audit.md` §3.2 第 3 行当年判"不叫下载、做成平台状态页"，依据是
+"没有可发布的包"。今天现量：macOS 那枚 dmg 里 `codesign` 读到 Developer ID、
+`spctl -a -t install` 判 `accepted / source=Notarized Developer ID`、`stapler validate` 通过，
+而分发桶自 09-30 起就匿名可读。裁决与边界写进 **ADR-0058**（`f97013de`）。
+
+分界：`/download` = 行动面（进导航，「平台」那一格让给它，项数不变），`/platforms` = 状态面
+（退到页脚，仍被正文链住 ⇒ 不是孤岛）。**双向都不许越界**：状态徽标只有一份
+（`render.spec.tsx` 那条既有不变量继续成立），直链只有一处（`/platforms` 上没有下载链接）。
+
+### 格 2 — 出口只由清单决定，而清单第一次真的抓到人
+
+`release-manifest.json` 是桶里 `latest.json` 的逐字快照（唯一写者 `gen-downloads.mjs`），
+组件只消费 `resolveRows(清单)`。带预发布后缀的字节**不算产物** —— 桶里那枚 09-30 的
+macOS zip 装上打不开（§7 第 82 条那一族），它匿名 200 也不该成为按钮。
+
+两处被抓（都不是我提前想到的）：
+1. `check-downloads.mjs` 臂 D：合并进来的旧 android 条目缺 `version`，会被本轮批次号盖成
+   `1.0.0` ⇒ 版本号只能从它自己的文件名取（`upload-dist.sh` 的 `backfill` +
+   `gen-downloads.mjs` 的规范化各一处）。
+2. `render.spec.tsx` 的"外链必须带 rel"在**清单为空时永远测不到** —— 它要等一个真的字节
+   上线才第一次命中。判据要有人跑，也要有真的东西可跑。
+
+### 格 3 — 已发布 / 未发布，逐端读数
+
+| 端 | 状态 | 读数 |
+|---|---|---|
+| macOS | ✅ **已发布** | `heyta-1.0.0-macos.dmg` 2,362,276 B，sha256 `15ae5583…26fe12`，匿名 Range 实取 `206 / bytes 0-0/2362276`。只有 arm64（`lipo -archs`）⇒ Intel 那一行写的是缺口不是文案 |
+| iOS | 🔄 TestFlight 腿在跑 | 载体 `f97013de` 的 Release 已重打并装上（`BUILD SUCCEEDED`、主蓝命中 4153）；签名身份与两枚 profile 就绪，只差真 archive |
+| Android | 🔴 不可发布 | 当前 APK `apksigner` 读出 `CN=Android Debug`。直链会让换正式签名时必须卸载 ⇒ 连本地数据一起清。腿在查"不移动密钥"的通道 |
+| Windows | 🔴 不可发布 | MSIX 由 `New-SelfSignedCertificate` 签，访客要先信任证书。腿在查便携形态是否 unpackaged 可跑 |
+| Linux | 🔄 在载体机上直接构建 | 缺的那格是 `dpkg -i`（今天以前只有 `dpkg-deb -x`）。腿在 `linux-dev-lan` 上原生构建 + 验装 |
+| 鸿蒙 | 🔴 结构上没有出口 | 能出 HAP、跑不起来（镜像 + 签名不在我们手里） |
+
+⚠️ 桶里 09-30 那两枚 `0.0.0-dev` 对象**我没有删**（那是别人传的对象），页面也不引用它们。
+
+### 格 4 — iOS 那枚 `path name contains null byte` 是**假报错**
+
+三趟全崩（`/tmp/heyta-reinstall-pod-{1,2,3}.log`）⇒ 上界 3 不够，抬到 6（`fc48599d`），
+判据一个字没放松。两条否证：
+· `[ReactNativeDependencies] Source:` 打空值是源码构建的**正常输出**
+  （`rndependencies.rb:69` 在 `RCT_USE_RN_DEP != 1` 时按设计返回空）—— 我原先把它当 NUL 来源，错了；
+· 崩点涉及的路径两次全量探针都**不含 NUL**，且两次崩在**不同** pod 根 ⇒ NUL 是 CRuby
+  `realdirpath` 解析中途自产。traps #154 那句"未定位到"至少推进到这里。
+
+⚠️ 副作用：`pod install` 会把两枚 `Info.plist` 改脏（**删掉手写 XML 注释**，键本身存活，
+含 `ITSAppUsesNonExemptEncryption=false`）⇒ 别把纪律写进 `Info.plist`。载体那三份已 `git checkout --` 还原。
+
+### 格 5 — 部署与仍未闭合的
+
+`publish-public-sites.mjs --confirm` 九步全过 + live-site **30 passed**（读的是公开域名上的产物）。
+第二次被它自己的守卫挡下（入口 HTML 脏 ⇒ 拒发），修完发第三次 —— 这条守卫是有效能的，别绕。
+
+未闭合：① 各端产物**自己声明的版本号**仍不一致（APK `1.0`、mac `1.0.0`、deb `1.0.0`、
+MSIX `1.0.0.0`、`package-desktop.mjs` 写 `0.0.0`）—— 批次号统一不等于产物统一；
+② `feat/self-host-distribution` 上那枚 `check:app-version` 与本格 ① 是同一件事，**不要各建一套**；
+③ 主检出那 34 枚在飞路径仍未动（另一会话正在写）；④ `landing` 那 3 条 mockup 红（B101 格 1）仍是原归属。
