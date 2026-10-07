@@ -192,7 +192,7 @@ has_rid() {  # <testID> —— "这一面真的渲染了那个带 id 的节点"�
   grep -q "resource-id=\"$1\"" "$UI_XML" && echo 1 || echo 0; }
 
 shot() {  # <名字> —— 落一张带序号前缀的 PNG，并且**必须**是非空白的
-  # ⚠️ 两条 `local` 分开写：macOS 的 bash 3.2 在**同一条** `local a=1 b="…$a…"` 里
+  # ⚠️ 两条 `local` 分开写：macOS 的 bash 3.2 在**同一条** `local a=1 b="…${a}…"` 里
   #    求值 `b` 时 `a` 还没赋值，配上 `set -u` 直接 "unbound variable"（实测撞过）。
   local name=$1
   local out="$EVIDENCE/android-habits-$name.png"
@@ -223,7 +223,7 @@ img_stats() {  # <路径> [对照路径] —— 打印 "modalLuminance blue blan
 # 一条图判据：非空白、数得出主蓝。暗色那一档还要"主色亮度比亮色档低"。
 judge_shot() {  # <标签> <路径> [暗色对照路径]
   local label=$1 path=$2 ref=${3:-} s blank blue modal refkv refmodal=""
-  s=$(img_stats "$path" ${ref:+"$ref"}); [ -n "$s" ] || { bad "$label：png-stats 没读数（探针坏了，不算产品失败）"; return 1; }
+  s=$(img_stats "$path" ${ref:+"$ref"}); [ -n "$s" ] || { bad "${label}：png-stats 没读数（探针坏了，不算产品失败）"; return 1; }
   read -r modal blue blank refkv <<< "$s"
   # 🔴 对照那一段必须**解析成数**再比较。上一版把 `img_stats` 原样打印的
   #    `refModal=252` 直接塞进 `python3 -c "print(1 if $modal < $refmodal - 40…)"`，
@@ -234,18 +234,18 @@ judge_shot() {  # <标签> <路径> [暗色对照路径]
   if [ -n "$ref" ]; then
     case "$refkv" in
       refModal=*) refmodal=${refkv#refModal=} ;;
-      *) bad "$label：要了暗色对照，png-stats 却没给出对照读数（多出来的字段是「${refkv:-空}」）—— 判据没跑，不算产品失败"; return 1 ;;
+      *) bad "${label}：要了暗色对照，png-stats 却没给出对照读数（多出来的字段是「${refkv:-空}」）—— 判据没跑，不算产品失败"; return 1 ;;
     esac
     if [ "$modal" -ge "$((refmodal - 40))" ]; then
-      bad "$label：暗色档主色亮度 $modal 没比亮色档 $refmodal 暗 40 以上 ⇒ 主题没真的翻面"; return 1
+      bad "${label}：暗色档主色亮度 $modal 没比亮色档 $refmodal 暗 40 以上 ⇒ 主题没真的翻面"; return 1
     fi
   fi
-  if [ "$blank" = "1" ]; then bad "$label：截图是空白的"; return 1; fi
-  if [ "${blue:-0}" -lt 1 ]; then bad "$label：数不出 heyta 主蓝（$blue）—— 装出来的不是我们的界面"; return 1; fi
+  if [ "$blank" = "1" ]; then bad "${label}：截图是空白的"; return 1; fi
+  if [ "${blue:-0}" -lt 1 ]; then bad "${label}：数不出 heyta 主蓝（${blue}）—— 装出来的不是我们的界面"; return 1; fi
   if [ -n "$refmodal" ]; then
-    ok "$label：非空白 · 主蓝 $blue · 暗色亮度 $modal < 亮色 $refmodal − 40（翻面成立）"
+    ok "${label}：非空白 · 主蓝 $blue · 暗色亮度 $modal < 亮色 $refmodal − 40（翻面成立）"
   else
-    ok "$label：非空白 · 主蓝 $blue"
+    ok "${label}：非空白 · 主蓝 $blue"
   fi
 }
 
@@ -292,7 +292,7 @@ print("N=%d UNIQ=%d DUPES=%s EQUIV=%s" % (len(paths), len(names), ",".join(dupes
     bad "$n 张证据图只对应 $uniq 个不同内容 ⇒ 有重复交的证据：$dupes"
     return 1
   fi
-  ok "$n 张证据图里没有重复采集（内容哈希 $uniq/$n；按设计同屏的那一对 $SHOT_EQUIV_A↔$SHOT_EQUIV_B：$equiv）"
+  ok "$n 张证据图里没有重复采集（内容哈希 $uniq/${n}；按设计同屏的那一对 ${SHOT_EQUIV_A}↔${SHOT_EQUIV_B}：${equiv}）"
 }
 
 apk_install_identity() {  # 设备上 com.heyta 的**安装身份**（两次时间戳）
@@ -418,7 +418,7 @@ if XY=$(tap_label "立即同步"); then
     handle_privacy_consent "${CONSENT_GATE_PREFERRED:-同意并联网}" "只用本机"
     if [ "${CONSENT_GATE_SEEN:-0}" = "1" ]; then
       if [ -n "${CONSENT_GATE_CHOSEN:-}" ]; then
-        echo "     第 $seg 段被首启隐私同意面板挡住 ⇒ 已点「$CONSENT_GATE_CHOSEN」，继续等"
+        echo "     第 $seg 段被首启隐私同意面板挡住 ⇒ 已点「${CONSENT_GATE_CHOSEN}」，继续等"
       else
         echo "     第 $seg 段：面板在但**没点到任何候选** ⇒ 这一段的等待等于白等，把界面打出来给人看"
         screen_txt
@@ -467,7 +467,7 @@ clear_and_type "$HABIT_NAME" "新习惯名称"
 #    没有这一步，"标题没输进去"会以"HABIT/ADD = 0"的面目出现，而那条读数
 #    指向的是应用，真正坏的是探针（§7 元规则一：先怀疑探针）。
 GOT=$(edit_value "新习惯名称" 2>/dev/null)
-if [ "$GOT" = "$HABIT_NAME" ]; then ok "标题已进输入框：$HABIT_NAME"; else bad "输入框里是「${GOT:-空}」，不是「$HABIT_NAME」"; screen_txt; exit 1; fi
+if [ "$GOT" = "$HABIT_NAME" ]; then ok "标题已进输入框：$HABIT_NAME"; else bad "输入框里是「${GOT:-空}」，不是「${HABIT_NAME}」"; screen_txt; exit 1; fi
 XY=$(scroll_to_desc "添加习惯")
 [ -n "$XY" ] || { bad "「添加习惯」按钮滚不进可点区域"; screen_txt; exit 1; }
 $ADB shell input tap $XY; sleep 3
@@ -528,8 +528,8 @@ fi
 shot 3-detail && judge_shot "⑤ 详情图" "$EVIDENCE/android-habits-3-detail.png"
 # 打卡前那一下的 aria 必须是"为它打卡"（不是"撤销…"）—— 这一条把"界面上这个圆点
 # 是未打卡态"钉在文字上，而不是只看它有没有颜色。
-[ "$(xy_desc "为「$HABIT_NAME」打卡")" != "" ] && ok "打卡按钮此刻说的是「为「…」打卡」（未打卡态）" \
-  || bad "打卡按钮的 aria 不是「为「$HABIT_NAME」打卡」"
+[ "$(xy_desc "为「${HABIT_NAME}」打卡")" != "" ] && ok "打卡按钮此刻说的是「为「…」打卡」（未打卡态）" \
+  || bad "打卡按钮的 aria 不是「为「${HABIT_NAME}」打卡」"
 XY=$(scroll_to_rid "habit-checkin-$HID")
 [ -n "$XY" ] || { bad "打卡按钮滚不进可点区域"; exit 1; }
 $ADB shell input tap $XY; sleep 3
@@ -599,7 +599,7 @@ $ADB shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; $ADB shell cat /sdca
 # 🔴 **同一颗按钮，两句 aria**：打过卡之后它必须说「撤销「…」今日打卡」。
 #    这条不是装饰 —— 它证明界面读到的是"今天已经有记录"这个事实；如果 aria 还停在
 #    「为「…」打卡」，那说明界面根本没收下那次写入，后面点下去就是**第二次打卡**。
-[ "$(xy_desc "撤销「$HABIT_NAME」今日打卡")" != "" ] && ok "按钮已改口成「撤销「…」今日打卡」" \
+[ "$(xy_desc "撤销「${HABIT_NAME}」今日打卡")" != "" ] && ok "按钮已改口成「撤销「…」今日打卡」" \
   || { bad "按钮没改口（详情读到的还是「未打卡」那一档）"; exit 1; }
 XY=$(scroll_to_rid "habit-checkin-$HID")
 [ -n "$XY" ] || { bad "撤销那一下找不到按钮（habit-checkin-$HID 滚不进可点区域）"; exit 1; }
