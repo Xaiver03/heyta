@@ -161,6 +161,28 @@
 }
 
 /*
+ * 🔴 设置浮层开着时，详情列**整根退场**（Goal W2，审计 §4.2：
+ * `evidence/detail-pane-overlay/settings-sheet.png` 实测"设置 ~60% + 任务面单 ~30%
+ * 并排、无遮罩无主次"）。这是第三条归零规则 —— 与上面两条**不许合成**：
+ * `[data-detail='collapsed']` 是用户的选择（他选了就一直收），
+ * `[data-detail-empty]` 是"这一屏此刻没内容"（选中一条就回来），
+ * 这条是"有内容也要给浮层让位"（关掉浮层就回来）。
+ * 三条各自把同一个轨道归零，走的是同一条 `--ht-detail-track`，仍然没有第三份 clamp。
+ *
+ * `[hidden]` 是同一件事的另一半：React 的 `hidden` 属性让这一栏出 a11y 树、
+ * 不可聚焦。`.ht-app__detail` 自身今天不写 `display`（UA 的 `[hidden]` 规则
+ * 已经够用），这条显式声明是防将来有人给它加 `display` —— 那种回归会把
+ * `hidden` 静默压掉，而截图上几乎看不出来。
+ */
+.ht-app[data-detail-suppressed] {
+  --ht-detail-track: 0;
+}
+
+.ht-app__detail[hidden] {
+  display: none;
+}
+
+/*
  * 详情列左边缘的拖拽条（`DetailColumnResizer`）。
  *
  * 它住在 `.ht-main` 那一层、骑在两条轨道的交界上 —— 为什么不挂在被拖的那一列里，

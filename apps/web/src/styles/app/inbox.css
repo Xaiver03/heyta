@@ -549,6 +549,50 @@
   border-color: var(--ht-color-border);
 }
 
+/* 低频目的地的唯一入口。菜单脱离 rail 的裁剪层，避免窄 rail 把选项切掉。 */
+.ht-rail__more {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.ht-rail__more-menu {
+  position: fixed;
+  inset-inline-start: calc(var(--ht-layout-rail-width) + var(--ht-space-2));
+  inset-block-end: var(--ht-space-3);
+  z-index: var(--ht-z-popover);
+  display: grid;
+  min-inline-size: calc(var(--ht-touch-target-min) * 4);
+  gap: var(--ht-space-1);
+  padding: var(--ht-space-2);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+}
+
+.ht-rail__more-item {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  min-block-size: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-2);
+  border: var(--ht-border-width-thin) solid transparent;
+  border-radius: var(--ht-radius-sm);
+  background: transparent;
+  color: var(--ht-color-foreground);
+  white-space: nowrap;
+  text-align: start;
+}
+
+.ht-rail__more-item:hover,
+.ht-rail__more-item:focus-visible {
+  background: var(--ht-color-surface-sunken);
+}
+
+.ht-rail__more-item:focus-visible {
+  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
 /* 焦点环必须可见 —— 抹掉它是最常见的可访问性回归 */
 .ht-rail__tab:focus-visible {
   outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);

@@ -12,7 +12,9 @@ import { ICON_SIZE } from '@heyta/design-system';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import {
+  ArrowLeft,
   CircleHelp,
+  MoreHorizontal,
   Moon,
   PanelRightClose,
   PanelRightOpen,
@@ -141,6 +143,7 @@ import { useSyncStore } from './features/sync/store.js';
 import { SubscriptionNotice } from './features/subscription/SubscriptionNotice.js';
 import { RenewPanel } from './features/subscription/RenewPanel.js';
 import { ProjectsPanel } from './features/projects/ProjectsPanel.js';
+import { loadProjectTaskSort, saveProjectTaskSort } from './features/projects/project-sort-pref.js';
 import { QuadrantBoard } from './features/quadrant/QuadrantBoard.js';
 import { HabitDetailCard } from './features/habits/HabitDetailCard.js';
 import { HabitsView } from './features/habits/HabitsView.js';
@@ -172,6 +175,7 @@ import { CloseAccountPanel } from './features/settings/CloseAccountPanel.js';
 // 个人信息（R10）：昵称与头像的增删改查。入口在头像菜单的「编辑个人信息」，
 // 面板本体开在设置浮层第一段 —— 它需要令牌，而令牌就住在同步设置里。
 import { ProfilePanel } from './features/settings/ProfilePanel.js';
+import { ProfileOverview } from './features/settings/ProfileOverview.js';
 // 隐私同意的**撤回**入口（PIPL 第 15 条：撤回要比同意更容易做到）。
 // 同意面板只在首启弹一次，之后用户要改只能从这里改 —— 没有它，一次点击就成了永久决定。
 import { PrivacyPanel } from './features/settings/PrivacyPanel.js';
@@ -206,6 +210,7 @@ import {
   TOOL_VIEW_TABS,
   VIEW_TABS,
   anchorRailLabel,
+  splitRailTabs,
   type ViewKey,
 } from './features/shell/view-tabs.js';
 import { NavButton } from './features/shell/NavButton.js';
@@ -213,6 +218,28 @@ import { EmptyState, isActive } from './features/shell/EmptyState.js';
 import { SETTINGS_ANCHORS, type SettingsAnchor } from './features/shell/settings-anchors.js';
 import { SyncSettingsPanel } from './features/sync/SyncSettingsPanel.js';
 
+const SETTINGS_NAV_ITEMS = [
+  { id: 'settings-group-profile', labelKey: 'web.settings.nav.profile' },
+  { id: 'settings-group-appearance', labelKey: 'web.settings.nav.appearance' },
+  { id: 'settings-group-sync', labelKey: 'web.settings.nav.syncPrivacy' },
+  { id: 'settings-group-ai', labelKey: 'web.settings.nav.aiIntegrations' },
+  { id: 'settings-group-data', labelKey: 'web.settings.nav.data' },
+  { id: 'settings-group-account', labelKey: 'web.settings.nav.account' },
+  { id: 'settings-group-help', labelKey: 'web.settings.nav.help' },
+] as const satisfies readonly { id: string; labelKey: MessageKey }[];
+
+function SettingsSectionNav(): React.JSX.Element {
+  const { t } = useI18n();
+  return (
+    <nav className="ht-settings__nav" aria-label={t('web.shell.views.settings')}>
+      {SETTINGS_NAV_ITEMS.map((item) => (
+        <a key={item.id} className="ht-settings__nav-link" href={`#${item.id}`}>
+          {t(item.labelKey)}
+        </a>
+      ))}
+    </nav>
+  );
+}
 
 export function App(): React.JSX.Element {
   const { t } = useI18n();
@@ -341,6 +368,94 @@ export function App(): React.JSX.Element {
   );
 
   /**
+   * 任务批量选择是一个短暂的视图态：不进 op-log、不跨设备同步。
+   * 真正的批量写入由 app-host 生成一条 BATCH op，列表这里只负责选择与反馈。
+   */
+  const [bulkSelecting, setBulkSelecting] = useState(false);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const selectedHasRepeat = useMemo(
+    () => [...selectedTaskIds].some((id) => store.entities.tasks[id]?.repeatRule !== undefined),
+    [selectedTaskIds, store.entities.tasks],
+  );
+  const [bulkError, setBulkError] = useState<string | undefined>(undefined);
+  const [undoAction, setUndoAction] = useState<
+    { readonly label: string; readonly run: () => Promise<void> } | undefined
+  >(undefined);
+
+  useEffect(() => {
+    if (undoAction === undefined) return;
+    const timer = window.setTimeout(() => setUndoAction(undefined), 5000);
+    return () => window.clearTimeout(timer);
+  }, [undoAction]);
+
+  useEffect(() => {
+    const alive = new Set(
+      Object.values(store.entities.tasks)
+        .filter((task) => task.deletedAt === undefined)
+        .map((task) => task.id),
+    );
+    setSelectedTaskIds((previous) => {
+      const next = new Set([...previous].filter((id) => alive.has(id)));
+      return next.size === previous.size ? previous : next;
+    });
+  }, [store.entities.tasks]);
+
+  const toggleBulkSelection = useCallback((taskId: string) => {
+    setSelectedTaskIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  }, []);
+
+  const clearBulkSelection = useCallback(() => {
+    setSelectedTaskIds(new Set());
+    setBulkSelecting(false);
+    setBulkError(undefined);
+  }, []);
+
+  // 选择态是一个短暂的编辑模式。Esc 必须是全局可预测的退出路径，
+  // 即使焦点当前在批量工具栏的 select 或按钮上也能收起它。
+  useEffect(() => {
+    if (!bulkSelecting) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      clearBulkSelection();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [bulkSelecting, clearBulkSelection]);
+
+  const runBulkAction = useCallback(
+    async (kind: 'complete' | 'delete' | 'move', projectId?: string) => {
+      const ids = [...selectedTaskIds];
+      if (ids.length === 0) return;
+      setBulkError(undefined);
+      try {
+        if (kind === 'complete') {
+          await useTaskStore.getState().bulkSetCompleted(ids, true);
+        } else if (kind === 'delete') {
+          await useTaskStore.getState().bulkDeleteTask(ids);
+          setUndoAction({
+            label: t('web.shell.bulk.undo'),
+            run: () => useTaskStore.getState().bulkRestoreTask(ids),
+          });
+        } else {
+          await useTaskStore.getState().bulkMoveToProject(ids, projectId);
+        }
+        clearBulkSelection();
+      } catch (error) {
+        setBulkError(error instanceof Error ? error.message : String(error));
+      }
+    },
+    [clearBulkSelection, selectedTaskIds, t],
+  );
+
+  /**
    * 设置浮层要**落在哪一节**（`help` / `profile` / `sync`），`undefined` = 不定位。
    *
    * 🔴 2026-10-06（H9 第 3 刀）把 `scrollToHelp`、`scrollToProfile` 两枚 boolean
@@ -349,6 +464,10 @@ export function App(): React.JSX.Element {
    * 消费点见下面的 effect。
    */
   const [settingsAnchor, setSettingsAnchor] = useState<SettingsAnchor | undefined>(undefined);
+  /** 设置 surface 的内容模式；个人中心与设置共用同一层，不再各造一套浮层。 */
+  const [secondaryAccountSurface, setSecondaryAccountSurface] = useState<'settings' | 'profile'>('settings');
+  /** 从个人中心进入设置时，保留一条回到个人中心的路径。 */
+  const [settingsReturnSurface, setSettingsReturnSurface] = useState<'profile' | undefined>(undefined);
 
   /**
    * 组头折叠：**哪些组现在被收起**。
@@ -378,9 +497,21 @@ export function App(): React.JSX.Element {
    * —— mobile 与 web 会排出两个不同的顺序（AGENTS §3.5）。
    */
   const [taskSort, setTaskSort] = useState<TaskSortKey>(loadTaskSort);
+  const [projectSortRevision, setProjectSortRevision] = useState(0);
+  const projectSortId = store.filter.kind === 'project' ? store.filter.projectId : undefined;
+  const effectiveTaskSort = useMemo(
+    () => (projectSortId === undefined ? taskSort : loadProjectTaskSort(projectSortId) ?? taskSort),
+    [projectSortId, projectSortRevision, taskSort],
+  );
   const changeTaskSort = useCallback((next: TaskSortKey) => {
-    setTaskSort(next);
-    saveTaskSort(next);
+    const currentFilter = useTaskStore.getState().filter;
+    if (currentFilter.kind === 'project') {
+      saveProjectTaskSort(currentFilter.projectId, next);
+      setProjectSortRevision((value) => value + 1);
+    } else {
+      setTaskSort(next);
+      saveTaskSort(next);
+    }
   }, []);
 
   /**
@@ -527,7 +658,7 @@ export function App(): React.JSX.Element {
         active instanceof HTMLElement && active !== document.body ? active : null;
     }
     if (view === 'settings') sheetRef.current?.focus();
-  }, [view]);
+  }, [secondaryAccountSurface, view]);
   /**
    * 设置浮层落位：**等 `view` 真的变成 `settings` 之后**再滚、再聚焦，然后清掉请求。
    *
@@ -554,7 +685,7 @@ export function App(): React.JSX.Element {
       (document.querySelector<HTMLElement>(anchor.focus) ?? undefined)?.focus();
     }
     setSettingsAnchor(undefined);
-  }, [settingsAnchor, view]);
+  }, [secondaryAccountSurface, settingsAnchor, view]);
   /**
    * 内容区按它渲染：开着次级表面（设置/搜索）时仍是**下层那个视图**
    * （浮层之下"下层可见"，§11.5）。
@@ -593,6 +724,8 @@ export function App(): React.JSX.Element {
    * 会让四个面板连带重渲染。
    */
   const openAiSettings = useCallback((target: SettingsTarget) => {
+    setSecondaryAccountSurface('settings');
+    setSettingsReturnSurface(undefined);
     setSettingsFocus(target);
     setView('settings');
   }, []);
@@ -613,6 +746,8 @@ export function App(): React.JSX.Element {
   const syncSettingsRequested = useSyncStore((s) => s.syncSettingsRequested);
   useEffect(() => {
     if (!syncSettingsRequested) return;
+    setSecondaryAccountSurface('settings');
+    setSettingsReturnSurface(undefined);
     setSettingsFocus(undefined);
     setView('settings');
     setSettingsAnchor('sync');
@@ -1070,8 +1205,13 @@ export function App(): React.JSX.Element {
             justifyContent: 'flex-end',
             flexWrap: 'wrap',
             gap: 'var(--ht-space-2)',
+            // 选择框是行级选择的主控件，放到共享完成框和标题之前，
+            // 让选择态从左到右先读到「选中」再读到任务内容。
+            order: bulkSelecting ? -1 : 0,
           }}
         >
+          {bulkSelecting ? null : (
+            <>
           {/* 备注。🔴 在它之前 Web 上**没有备注输入框** ——
               `Task.note` 与 `setNote` 都在，但唯一调用点是 AI 拆解与 AI 估时，
               于是"我自己能不能在任务上写点东西"的答案是"不能"。
@@ -1280,10 +1420,22 @@ export function App(): React.JSX.Element {
           >
             <Trash2 size={ICON_SIZE.sm} aria-hidden="true" />
           </button>
+            </>
+          )}
         </div>
       );
     },
-    [aiSecrets, aiSettings, memory.preferenceSet, store, t, taskPaneInColumn],
+    [
+      aiSecrets,
+      aiSettings,
+      bulkSelecting,
+      memory.preferenceSet,
+      selectedTaskIds,
+      store,
+      t,
+      taskPaneInColumn,
+      toggleBulkSelection,
+    ],
   );
 
   /** 行级无障碍文案。**每一项都是一整句**，不要用前缀拼标题。 */
@@ -1291,11 +1443,16 @@ export function App(): React.JSX.Element {
     () => ({
       toggleOn: (row: SharedTaskRow) => t('web.shell.tasks.complete', { title: row.title }),
       toggleOff: (row: SharedTaskRow) => t('web.shell.tasks.uncomplete', { title: row.title }),
+      selectOn: (row: SharedTaskRow) => t('web.shell.tasks.unselect', { title: row.title }),
+      selectOff: (row: SharedTaskRow) => t('web.shell.tasks.select', { title: row.title }),
     }),
     [t],
   );
 
   const title = useMemo(() => {
+    if (view === 'settings' && secondaryAccountSurface === 'profile') {
+      return t('web.profile.overview.title');
+    }
     const f = store.filter;
     /**
      * 🔴 标题由**当前视图**裁决；`store.filter` 只在任务视图里才有发言权。
@@ -1342,7 +1499,7 @@ export function App(): React.JSX.Element {
     // `projects.projects` 同理 —— 清单改名后标题不该还是旧名字。
     const tab = VIEW_TABS.find((v) => v.key === view);
     return tab === undefined ? t('web.shell.nav.tasks') : t(tab.labelKey);
-  }, [store.filter, projects.projects, view, t]);
+  }, [store.filter, projects.projects, view, secondaryAccountSurface, t]);
 
   /**
    * 快速捕获的**落点**：筛选真的停在某个清单时，新任务就留在那个清单。
@@ -1396,6 +1553,21 @@ export function App(): React.JSX.Element {
       ),
     [enabledModules],
   );
+  const railTabs = useMemo(() => splitRailTabs(visibleMainTabs, view), [visibleMainTabs, view]);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
+  const moreContainerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    setMoreOpen(false);
+  }, [view]);
+  useEffect(() => {
+    // 打开即聚焦第一项（APG menu 惯例）：键盘用户的路径是 Tab 到「更多」→ Enter →
+    // 直接 ↓/Tab 在菜单项之间走，而不是再按一次 Tab 从按钮重新出发。
+    if (!moreOpen) return;
+    moreContainerRef.current
+      ?.querySelector<HTMLButtonElement>('[role="menuitem"]')
+      ?.focus();
+  }, [moreOpen]);
 
   /**
    * 切到一个视图（rail 的 tab、搜索里的「快速跳转」共用）。
@@ -1760,14 +1932,18 @@ export function App(): React.JSX.Element {
    * 只能待在列表上方。
    */
   const aiPanels = (
-    <>
+    contentView === 'tasks' ? (
+      <details className="ht-ai-drawer" data-testid="ai-drawer">
+        <summary className="ht-ai-drawer__summary ht-type-section-title">
+          {t('web.ai.tools.title')}
+        </summary>
+        <div className="ht-ai-drawer__body">
       {/* AI 工具调用（功能 ⑤）。
           🔴 它不新增路由/页面：作为任务视图里的一个面板挂在**右栏**
           （≤1023px 与用户收起那两档退回中间列 —— 判据是 `detailColumnShown`，见下面任务列末尾）。
           规则命中时**一个字节都不发**（面板会明说）；只有规则处理不了时才披露 + 发送。
           写工具只产出提案，必须用户再点「确认执行」才落库。 */}
-      {contentView === 'tasks' && (
-        <AiToolRun
+      <AiToolRun
           routing={aiSettings.routing}
           consents={aiSettings.consents}
           // 🔴 工具授权复用设置里那份 `localApi.grants` —— 不另建一套权限。
@@ -1784,8 +1960,7 @@ export function App(): React.JSX.Element {
               return next;
             });
           }}
-        />
-      )}
+      />
 
       {/* 对话式助手（W12 / ADR-0045）。
           🔴 它的工具范围来自 `assistantTier`（设置里的**第二个授权前端**），
@@ -1793,8 +1968,7 @@ export function App(): React.JSX.Element {
           两档最后都汇到同一个 `isToolGranted()` 判据，授权仍只有一份。
           ⚠️ 与上面单步面板**并存**是刻意的：单步那条有"规则命中零出境"的短路，
           多轮循环还没有（缺口按编号登记在 `docs/plans/ai-assistant-closure.md` §7.2 第 4 条）。 */}
-      {contentView === 'tasks' && (
-        <AssistantPanel
+      <AssistantPanel
           routing={aiSettings.routing}
           consents={aiSettings.consents}
           tier={aiSettings.assistantTier}
@@ -1810,9 +1984,10 @@ export function App(): React.JSX.Element {
               return next;
             });
           }}
-        />
-      )}
-    </>
+      />
+        </div>
+      </details>
+    ) : null
   );
 
 
@@ -1846,6 +2021,13 @@ export function App(): React.JSX.Element {
         // 🔴 而这一条管的是"这一栏此刻有没有要画的东西"（与"用户收没收"是两回事，
         // 理由与算法见上面 `detailHasContent` 那段）。零内容的列不许占位。
         data-detail-empty={detailHasContent ? undefined : ''}
+        // 🔴 W2（审计 §4.2）：设置浮层是独占注意力的主表面，不能跟详情列同屏抢空间
+        // （`evidence/detail-pane-overlay/settings-sheet.png` 那张"设置 ~60% + 任务面单
+        // ~30% 并排、无遮罩无主次"的实测图）。浮层开着 ⇒ 这一栏整根退场
+        // （`hidden` 出 a11y 树 + `[data-detail-suppressed]` 把轨道归零，规则在 base.css）；
+        // 关掉后选中态天然恢复 —— 选中住在 store 里，从未被清。它与 `data-detail-empty`
+        // 是**两条规则**：那条说"没内容"，这条说"有内容也要让位给浮层"。
+        data-detail-suppressed={view === 'settings' ? '' : undefined}
       >
       {/*
         ═══════════════════════════════════════════════════════════════════════
@@ -1906,16 +2088,27 @@ export function App(): React.JSX.Element {
               useSyncStore.getState().openSignIn();
             }}
             onOpenSettings={() => {
+              setSecondaryAccountSurface('settings');
+              setSettingsReturnSurface(undefined);
               setSettingsFocus(undefined);
               setView('settings');
             }}
             // 「编辑个人信息」= 设置浮层里的**第一节**，所以它开的是同一个表面，
             // 只是额外要求"落在这一节"（见上面的 `settingsAnchor`）。
-            // ⚠️ 未登录时**不出现**这一项（AccountMenu 内部按 showSignIn 过滤）：
-            //    昵称与头像属于账号，没有账号就没有可写的那一行。
+            // 个人中心对本机用户也开放：本地回顾不要求先登录；资料编辑入口
+            // 仍由菜单按登录状态隐藏，避免出现可点但不会写入的表单。
             onOpenProfile={() => {
+              setSecondaryAccountSurface('settings');
+              setSettingsReturnSurface(undefined);
               setSettingsFocus(undefined);
               setSettingsAnchor('profile');
+              setView('settings');
+            }}
+            onOpenProfileCenter={() => {
+              setSecondaryAccountSurface('profile');
+              setSettingsReturnSurface(undefined);
+              setSettingsFocus(undefined);
+              setSettingsAnchor(undefined);
               setView('settings');
             }}
             onOpenGrowth={() => {
@@ -1944,12 +2137,13 @@ export function App(): React.JSX.Element {
           下段「工具」    回收站 / 设置   —— 贴底
           ```
 
-          ⇒ **默认 6 个按钮**，而用户可以继续关 —— 全关掉只剩「任务 + 回收站 + 设置」。
+          ⇒ **主段最多 5 个按钮**（四个高频目的地 +「更多」），而用户可以继续关；
+          低频目的地通过「更多」保持可达，关闭的模块不进入 DOM。
           ⚠️ 关掉的模块**不在 DOM 里**，不是"渲染了但隐藏"（那两者的差别是
           屏幕阅读器还念不念它、Tab 键还停不停在它上面）。
         */}
         <div role="tablist" aria-label={t('web.shell.views.aria')} className="ht-rail__tabs">
-          {visibleMainTabs.map((v) => (
+          {railTabs.primary.map((v) => (
             <button
               key={v.key}
               type="button"
@@ -1984,6 +2178,54 @@ export function App(): React.JSX.Element {
               <span className="ht-rail__label ht-type-caption">{t(v.labelKey)}</span>
             </button>
           ))}
+
+          {railTabs.overflow.length > 0 ? (
+            <div
+              className="ht-rail__more"
+              ref={moreContainerRef}
+              // Esc 关闭 + 焦点还给「更多」按钮（W1 判据）。挂在容器上：
+              // 焦点无论在按钮还是菜单项上，keydown 都会冒到这里。
+              onKeyDown={(event) => {
+                if (event.key === 'Escape' && moreOpen) {
+                  event.stopPropagation();
+                  setMoreOpen(false);
+                  moreButtonRef.current?.focus();
+                }
+              }}
+            >
+              <button
+                ref={moreButtonRef}
+                type="button"
+                className={`ht-rail__tab${moreOpen ? ' ht-rail__tab--active' : ''}`}
+                aria-haspopup="menu"
+                aria-expanded={moreOpen}
+                onClick={() => setMoreOpen((open) => !open)}
+              >
+                <MoreHorizontal size={ICON_SIZE.sm} aria-hidden="true" />
+                <span className="ht-rail__label ht-type-caption">{t('web.shell.views.groupMore')}</span>
+              </button>
+              {moreOpen ? (
+                <div className="ht-rail__more-menu" role="menu" aria-label={t('web.shell.views.groupMore')}>
+                  {railTabs.overflow.map((v) => (
+                    <button
+                      key={v.key}
+                      type="button"
+                      role="menuitem"
+                      className="ht-rail__more-item"
+                      onClick={() => {
+                        setSettingsFocus(undefined);
+                        setView(v.key);
+                        setMoreOpen(false);
+                      }}
+                    >
+                      <v.Icon size={ICON_SIZE.sm} aria-hidden="true" />
+                      <span>{t(v.labelKey)}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
 
 
         {/*
@@ -2042,6 +2284,8 @@ export function App(): React.JSX.Element {
           data-testid="rail-help"
           className="ht-rail__tab ht-rail__tab--tool"
           onClick={() => {
+            setSecondaryAccountSurface('settings');
+            setSettingsReturnSurface(undefined);
             setSettingsFocus(undefined);
             setView('settings');
             setSettingsAnchor('help');
@@ -2136,6 +2380,7 @@ export function App(): React.JSX.Element {
 
       <main className="ht-main">
         <header className="ht-header">
+          <span className="ht-header__brand ht-type-caption" aria-label={t('common.brand')}>{t('common.brand')}</span>
           <h1 className="ht-header__title">{title}</h1>
 
           {/*
@@ -2157,6 +2402,101 @@ export function App(): React.JSX.Element {
             **不要把它搬回来。**
           */}
           <div className="ht-header__actions">
+            {contentView === 'tasks' && visible.length > 0 ? (
+              <div
+                style={{ display: 'flex', alignItems: 'center', gap: cssVar('space.2'), flexWrap: 'wrap' }}
+                data-testid="bulk-toolbar"
+              >
+                <button
+                  type="button"
+                  className="ht-btn ht-btn--ghost"
+                  aria-pressed={bulkSelecting}
+                  onClick={() => {
+                    if (bulkSelecting) clearBulkSelection();
+                    else setBulkSelecting(true);
+                  }}
+                >
+                  {bulkSelecting ? t('web.shell.bulk.cancel') : t('web.shell.bulk.select')}
+                </button>
+                {bulkSelecting ? (
+                  <>
+                    <span className="ht-type-caption" role="status">
+                      {t('web.shell.bulk.selected', { count: selectedTaskIds.size })}
+                    </span>
+                    <button
+                      type="button"
+                      className="ht-btn ht-btn--ghost"
+                      disabled={selectedTaskIds.size === 0 || selectedHasRepeat}
+                      data-testid="bulk-complete"
+                      aria-describedby={selectedHasRepeat ? 'bulk-repeat-warning' : undefined}
+                      onClick={() => void runBulkAction('complete')}
+                    >
+                      {t('web.shell.bulk.complete')}
+                    </button>
+                    {selectedHasRepeat ? (
+                      <span
+                        id="bulk-repeat-warning"
+                        className="ht-type-caption ht-settings__hint"
+                        role="status"
+                        data-testid="bulk-repeat-warning"
+                      >
+                        {t('web.shell.bulk.repeatNotice')}
+                      </span>
+                    ) : null}
+                    <select
+                      aria-label={t('web.shell.bulk.move')}
+                      disabled={selectedTaskIds.size === 0}
+                      defaultValue=""
+                      onChange={(event) => {
+                        if (event.target.value === '') return;
+                        void runBulkAction('move', event.target.value === '__inbox__' ? undefined : event.target.value);
+                        event.currentTarget.value = '';
+                      }}
+                      style={{
+                        minHeight: cssVar('touch-target.min'),
+                        paddingInline: cssVar('space.2'),
+                        borderRadius: cssVar('radius.md'),
+                        border: `${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
+                        background: cssVar('color.background'),
+                        color: cssVar('color.foreground'),
+                        fontSize: cssVar('font-size.sm'),
+                      }}
+                    >
+                      <option value="">{t('web.shell.bulk.move')}</option>
+                      <option value="__inbox__">{t('web.shell.bulk.moveInbox')}</option>
+                      {projects.projects.map((project) => (
+                        <option key={project.id} value={project.id}>{project.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="ht-btn ht-btn--danger"
+                      disabled={selectedTaskIds.size === 0}
+                      onClick={() => void runBulkAction('delete')}
+                    >
+                      {t('web.shell.bulk.delete')}
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
+            {bulkError === undefined ? null : (
+              <span className="ht-settings__danger" role="alert">{t('web.shell.bulk.error', { message: bulkError })}</span>
+            )}
+            {undoAction === undefined ? null : (
+              <button
+                type="button"
+                className="ht-btn ht-btn--ghost"
+                onClick={() => {
+                  const action = undoAction;
+                  setUndoAction(undefined);
+                  void action.run();
+                }}
+                data-testid="bulk-undo"
+              >
+                {undoAction.label}
+              </button>
+            )}
             {/*
               🔴 排序档位（2026-10-01，#10(d)）。位置按滴答参照图：**页头右端**
               （页头 = 标题 + 排序 + ⋯），不是列表上方另起一条 —— 列表上方那条
@@ -2186,7 +2526,7 @@ export function App(): React.JSX.Element {
                 <select
                   data-testid="task-sort-select"
                   aria-label={t('web.shell.sort.aria')}
-                  value={taskSort}
+                  value={effectiveTaskSort}
                   onChange={(event) => {
                     changeTaskSort(event.target.value as TaskSortKey);
                   }}
@@ -2439,11 +2779,17 @@ export function App(): React.JSX.Element {
             <HeytaUiProvider>
               <TaskList
                 tasks={visible}
-                sort={taskSort}
+                sort={effectiveTaskSort}
                 onOpenTask={openTask}
                 activeTaskId={selectedTaskId}
+                selectedTaskIds={bulkSelecting ? selectedTaskIds : undefined}
+                selectionMode={bulkSelecting}
                 onToggleTask={(taskId) => {
-                  void store.toggleComplete(taskId);
+                  if (bulkSelecting) {
+                    toggleBulkSelection(taskId);
+                  } else {
+                    void store.toggleComplete(taskId);
+                  }
                 }}
                 labels={taskRowLabels}
                 renderMeta={renderTaskMeta}
@@ -2505,11 +2851,17 @@ export function App(): React.JSX.Element {
                       {!collapsedGroups.has(key) && (
                         <TaskList
                           tasks={group.tasks}
-                          sort={taskSort}
+                          sort={effectiveTaskSort}
                           onOpenTask={openTask}
                           activeTaskId={selectedTaskId}
+                          selectedTaskIds={bulkSelecting ? selectedTaskIds : undefined}
+                          selectionMode={bulkSelecting}
                           onToggleTask={(taskId) => {
-                            void store.toggleComplete(taskId);
+                            if (bulkSelecting) {
+                              toggleBulkSelection(taskId);
+                            } else {
+                              void store.toggleComplete(taskId);
+                            }
                           }}
                           labels={taskRowLabels}
                           renderMeta={renderTaskMeta}
@@ -2649,12 +3001,82 @@ export function App(): React.JSX.Element {
               className="ht-sheet"
               role="dialog"
               aria-modal="false"
-              aria-label={t('web.shell.views.settings')}
+              aria-label={
+                secondaryAccountSurface === 'profile'
+                  ? t('web.profile.overview.title')
+                  : t('web.shell.views.settings')
+              }
               data-testid="settings-sheet"
+              data-account-surface={secondaryAccountSurface}
               ref={sheetRef}
               // 对话框的键盘起点：打开时焦点进容器（见上面的 effect）。
               tabIndex={-1}
             >
+
+            <header className="ht-settings__header">
+              <div>
+                {secondaryAccountSurface === 'settings' && settingsReturnSurface === 'profile' ? (
+                  <button
+                    type="button"
+                    className="ht-btn ht-btn--ghost"
+                    data-testid="settings-back-to-profile"
+                    onClick={() => {
+                      setSecondaryAccountSurface('profile');
+                      setSettingsReturnSurface(undefined);
+                      setSettingsAnchor(undefined);
+                    }}
+                  >
+                    <ArrowLeft size={ICON_SIZE.sm} aria-hidden="true" />
+                    {t('web.profile.overview.back')}
+                  </button>
+                ) : null}
+                <p className="ht-settings__eyebrow ht-type-caption">{t('common.brand')}</p>
+                <h1 className="ht-settings__page-title ht-type-screen-title">
+                  {secondaryAccountSurface === 'profile'
+                    ? t('web.profile.overview.title')
+                    : t('web.shell.views.settings')}
+                </h1>
+                {secondaryAccountSurface === 'profile' ? (
+                  <p className="ht-settings__lead">{t('web.profile.overview.lead')}</p>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                className="ht-sheet__close"
+                data-testid="settings-sheet-close"
+                aria-label={
+                  secondaryAccountSurface === 'profile'
+                    ? t('web.shell.profile.close')
+                    : t('web.shell.settings.close')
+                }
+                onClick={() => {
+                  closeSecondarySurface();
+                }}
+              >
+                <X size={ICON_SIZE.sm} aria-hidden="true" />
+              </button>
+            </header>
+            {secondaryAccountSurface === 'profile' ? (
+              <ProfileOverview
+                growthEnabled={enabledModules.has('growth')}
+                onEditProfile={() => {
+                  setSecondaryAccountSurface('settings');
+                  setSettingsReturnSurface('profile');
+                  setSettingsAnchor('profile');
+                }}
+                onOpenSettings={() => {
+                  setSecondaryAccountSurface('settings');
+                  setSettingsReturnSurface('profile');
+                }}
+                onOpenGrowth={() => {
+                  closeSecondarySurface();
+                  setView('growth');
+                }}
+              />
+            ) : (
+            <div className="ht-settings__layout">
+              <SettingsSectionNav />
+              <div className="ht-settings__content">
 
             {/*
               🔴 **个人信息**（R10，2026-10-03）放在设置浮层**第一段**。
@@ -2666,9 +3088,18 @@ export function App(): React.JSX.Element {
               它不带 `ht-*` 前缀，因为 `check:row-single-source` 只许 `ht-*` 前缀族
               **下降**，新造一族（哪怕只包一层）是要被拒的。
             */}
-            <div id="settings-profile" data-testid="profile-section-anchor">
-              <ProfilePanel />
-            </div>
+            <section className="ht-settings__group" id="settings-group-profile" aria-labelledby="settings-group-profile-title">
+              <h2 className="ht-settings__group-title ht-type-section-title" id="settings-group-profile-title">
+                {t('web.settings.nav.profile')}
+              </h2>
+              <div id="settings-profile" data-testid="profile-section-anchor">
+                <ProfilePanel />
+              </div>
+            </section>
+            <section className="ht-settings__group" id="settings-group-appearance" aria-labelledby="settings-group-appearance-title">
+              <h2 className="ht-settings__group-title ht-type-section-title" id="settings-group-appearance-title">
+                {t('web.settings.nav.appearance')}
+              </h2>
             {/*
               🔴 **显示偏好**（2026-09-30 从任务页头搬进来）：「日期 | 倒计时」
               两个词悬在页头上，用户不知道它是什么、影响什么 —— 它其实是
@@ -2773,25 +3204,6 @@ export function App(): React.JSX.Element {
                 </span>
               </button>
             </section>
-            {/*
-              🔴 **看得见的退出口**（2026-09-30 补）。此前这个浮层**没有任何出口**：
-              没有 Esc、没有 ✕、点 scrim 也不关（它盖满内容区，点哪儿都是它自己）
-              —— 唯一的出路是去点 rail 上的另一个视图。那对键盘与读屏用户就是
-              "进得去出不来"，对鼠标用户是"得先猜到点别处"。
-              浮层的标准出口是**两个都要有**：Esc（快捷）+ ✕（看得见）。
-            */}
-            <button
-              type="button"
-              className="ht-sheet__close"
-              data-testid="settings-sheet-close"
-              aria-label={t('web.shell.settings.close')}
-              onClick={() => {
-                closeSecondarySurface();
-              }}
-            >
-              <X size={ICON_SIZE.sm} aria-hidden="true" />
-            </button>
-            <>
               {/*
                 🔴 **功能模块放在设置页最前**：它决定的不是某一项配置，而是
                 **这个应用长什么样**（关掉的模块从左侧导航消失）。
@@ -2799,6 +3211,12 @@ export function App(): React.JSX.Element {
                 用户想减负时第一个看到的东西。
               */}
               <FeatureModulesPanel enabled={enabledModules} onToggle={onToggleModule} />
+              <ReminderNotifyPanel />
+            </section>
+            <section className="ht-settings__group" id="settings-group-sync" aria-labelledby="settings-group-sync-title">
+              <h2 className="ht-settings__group-title ht-type-section-title" id="settings-group-sync-title">
+                {t('web.settings.nav.syncPrivacy')}
+              </h2>
               {/*
                 🔴 **同步**（工单 H9 第 3 刀，2026-10-06）：地址 / 令牌 / 口令 / 密钥库
                 这一组原来是一个**同级浮层**（rail 那颗齿轮点开它）。产品负责人第 2 条
@@ -2813,8 +3231,6 @@ export function App(): React.JSX.Element {
                 永远不可能生效的开关上花时间（同一条理由见下面 `PrivacyPanel` 那段）。
               */}
               <SyncSettingsPanel />
-              {/* 提醒通知（#2）：权限只能由用户手势申请，所以它必须有个按钮。 */}
-              <ReminderNotifyPanel />
               {/*
                 🔴 **隐私同意排在 AI 出境开关之前**：那三道闸（总开关 / 允许远程 /
                 逐功能授权）回答的是"哪一类数据可以出境"，而本面板回答的是
@@ -2823,6 +3239,11 @@ export function App(): React.JSX.Element {
                 它同时是 PIPL 第 15 条要求的**撤回入口**（同意只在首启弹一次）。
               */}
               <PrivacyPanel />
+            </section>
+            <section className="ht-settings__group" id="settings-group-ai" aria-labelledby="settings-group-ai-title">
+              <h2 className="ht-settings__group-title ht-type-section-title" id="settings-group-ai-title">
+                {t('web.settings.nav.aiIntegrations')}
+              </h2>
               <AiSettings
                 initial={aiSettings}
                 secrets={aiSecrets}
@@ -2850,6 +3271,11 @@ export function App(): React.JSX.Element {
                   saveAiSettings(next);
                 }}
               />
+            </section>
+            <section className="ht-settings__group" id="settings-group-data" aria-labelledby="settings-group-data-title">
+              <h2 className="ht-settings__group-title ht-type-section-title" id="settings-group-data-title">
+                {t('web.settings.nav.data')}
+              </h2>
               {/* 导出入口与 AI 设置并列在同一个设置页 —— 见 ExportPanel 文件头。 */}
               <ExportPanel />
               {/*
@@ -2864,6 +3290,11 @@ export function App(): React.JSX.Element {
               {/* 从滴答清单迁进来（B2-1）—— 与上面的"还原自己的导出"是两件事，
                   走普通 op、可与既有数据共存。见 TickTickImportPanel 文件头。 */}
               <TickTickImportPanel />
+            </section>
+            <section className="ht-settings__group" id="settings-group-account" aria-labelledby="settings-group-account-title">
+              <h2 className="ht-settings__group-title ht-type-section-title" id="settings-group-account-title">
+                {t('web.settings.nav.account')}
+              </h2>
               {/*
                 托管同步续费（临时方案：再下一单 = 在当前到期日之后叠 30 天）。
                 它排在"数据进出"之后、"账号安全"之前：这一档买的是**服务**，
@@ -2898,6 +3329,11 @@ export function App(): React.JSX.Element {
               */}
               <WidgetJourneyPanel />
               <WidgetPushPanel />
+            </section>
+            <section className="ht-settings__group" id="settings-group-help" aria-labelledby="settings-group-help-title">
+              <h2 className="ht-settings__group-title ht-type-section-title" id="settings-group-help-title">
+                {t('web.settings.nav.help')}
+              </h2>
               {/*
                 🔴 「帮助与关于」是**产品孤岛的另一半**：在此之前，应用里
                 没有任何一处能到达站点的帮助 / 价格 / 更新动态。
@@ -2908,7 +3344,10 @@ export function App(): React.JSX.Element {
               <div id="settings-help">
                 <HelpPanel />
               </div>
-            </>
+            </section>
+              </div>
+            </div>
+            )}
             </div>
           )}
         </div>
@@ -2965,6 +3404,10 @@ export function App(): React.JSX.Element {
         ref={detailRef}
         className="ht-app__detail"
         data-testid="detail-column"
+        /* W2：浮层开着这一栏不可见、不可聚焦、出 a11y 树。节点保持挂载 ——
+           `detailRef` 上那枚 MutationObserver 是挂在节点上的，卸载再重挂会让
+           `detailHasContent` 冻结在卸载前的值（effect 依赖是 `[]`）。 */
+        hidden={view === 'settings'}
       >
         {contentView === 'focus' ? (
           <FocusDetailPane />
