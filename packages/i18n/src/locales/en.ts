@@ -401,6 +401,16 @@ export const en = {
   'web.shell.sort.display': 'Default (due date)',
   'web.shell.sort.addedAt': 'Date added',
   'web.shell.sort.priority': 'Priority',
+  'web.shell.bulk.select': 'Select tasks',
+  'web.shell.bulk.cancel': 'Exit selection',
+  'web.shell.bulk.selected': '{count} selected',
+  'web.shell.bulk.complete': 'Complete selected',
+  'web.shell.bulk.repeatNotice': 'Recurring tasks must be completed one at a time',
+  'web.shell.bulk.delete': 'Delete selected',
+  'web.shell.bulk.move': 'Move to list',
+  'web.shell.bulk.moveInbox': 'Inbox',
+  'web.shell.bulk.undo': 'Undo this batch action',
+  'web.shell.bulk.error': 'Batch action did not finish: {message}',
   'web.shell.search.placeholder': 'Search tasks',
   'web.shell.search.aria': 'Search tasks (title and note)',
   'web.shell.search.clear': 'Clear search',
@@ -425,6 +435,7 @@ export const en = {
   // R10: after the identity block, before Settings. The same shape all six
   // competitors use — avatar → menu → second-level surface, never a resident tab.
   'web.shell.account.profile': 'Edit profile',
+  'web.shell.account.profileCenter': 'Profile',
   'web.shell.account.settings': 'Settings',
   'web.shell.account.signOut': 'Sign out',
   'web.shell.nav.help': 'Help',
@@ -487,7 +498,33 @@ export const en = {
   'web.shell.views.growth': 'Growth',
   'web.shell.views.notes': 'Sticky notes',
   'web.shell.views.settings': 'Settings',
+  'web.shell.profile.close': 'Close profile',
   'web.shell.settings.close': 'Close settings',
+  'web.settings.nav.profile': 'Profile',
+  'web.settings.nav.appearance': 'Tasks and display',
+  'web.settings.nav.syncPrivacy': 'Sync and privacy',
+  'web.settings.nav.aiIntegrations': 'AI and integrations',
+  'web.settings.nav.data': 'Data management',
+  'web.settings.nav.account': 'Account and security',
+  'web.settings.nav.help': 'About and help',
+  'web.profile.overview.title': 'Profile',
+  'web.profile.overview.back': 'Back to profile',
+  'web.profile.overview.lead': 'See who you are, what you have done lately, and what is next.',
+  'web.profile.overview.identity': 'Your identity',
+  'web.profile.overview.localOnly': 'Data stays on this device first; the server only syncs encrypted content.',
+  'web.profile.overview.signedIn': 'Sync account connected',
+  'web.profile.overview.local': 'Using this device only',
+  'web.profile.overview.edit': 'Edit profile',
+  'web.profile.overview.settings': 'Open settings',
+  'web.profile.overview.growth': 'View full growth',
+  'web.profile.overview.recent': 'Recent activity',
+  'web.profile.overview.tasks': 'Tasks completed this week',
+  'web.profile.overview.focus': 'Focus minutes this week',
+  'web.profile.overview.checkIns': 'Habit check-ins this week',
+  'web.profile.overview.achievements': 'Achievement progress',
+  'web.profile.overview.achievementsHint': 'Compare yourself with your past; progress never disappears because a streak paused.',
+  'web.profile.overview.identityLoading': 'Loading your profile…',
+  'web.profile.overview.identityUnavailable': 'Your profile is unavailable right now; local activity is still available.',
   'web.shell.dueMode.aria': 'Due date display',
   'web.shell.dueMode.date': 'Date',
 
@@ -519,6 +556,7 @@ export const en = {
   'common.profile.avatar.undecryptable': 'This device cannot decrypt your avatar — the end-to-end encryption passphrase does not match. Enter it once under Sync settings.',
   'common.profile.avatar.unreadable': 'The avatar could not be read right now. Please try again later.',
   'common.profile.loadFailed': 'Your profile could not be loaded. Please try again later.',
+  'common.profile.signInToEdit': 'Sign in to edit your name and avatar. Local tasks and activity stay available without an account.',
   'common.profile.email.label': 'Email',
   // A read-only field needs a reason, or it reads as a broken input.
   'common.profile.email.hint': 'Your email address is your sign-in identifier and the only way to recover the account. It cannot be changed here.',
@@ -542,6 +580,8 @@ export const en = {
   // screen reader reads out a run of indistinguishable "button"s.
   'web.shell.tasks.complete': 'Complete: {title}',
   'web.shell.tasks.uncomplete': 'Mark incomplete: {title}',
+  'web.shell.tasks.select': 'Select: {title}',
+  'web.shell.tasks.unselect': 'Unselect: {title}',
   'web.shell.tasks.delete': 'Delete: {title}',
 
   // Task-list date group headers (Dida-style). Ordering/bucketing lives in
@@ -553,6 +593,19 @@ export const en = {
   'web.tasks.group.undated': 'No due date',
   'web.tasks.group.postpone': 'Postpone',
   'web.tasks.group.postponeAria': 'Postpone these {count} overdue tasks to today',
+
+  // Task detail column's four fixed groups (audit §4.6: "the detail column does
+  // everything, with no hierarchy"). Basic (title/note) → Time (due/reminders) →
+  // Organize (list/tags/subtasks/priority) → Automation (repeat). The header
+  // style follows the detail card's existing section-header tier.
+  'web.tasks.detail.section.basic': 'Basic',
+  'web.tasks.detail.section.time': 'Time',
+  'web.tasks.detail.section.organize': 'Organize',
+  'web.tasks.detail.section.automation': 'Automation',
+  // The summary that collapses the raw custom RRULE input inside the repeat
+  // field (audit §4.6: show natural-language presets first, tuck the raw RRULE
+  // under "Advanced"). Same word as the auth panel's "Advanced" disclosure.
+  'web.tasks.detail.advanced': 'Advanced',
 
   // ── Task notes ──
   // 🔴 Before this there was no note input anywhere on the web: `Task.note` and
@@ -1439,6 +1492,11 @@ export const en = {
   'web.quadrant.a11y.cell': 'Quadrant: {title}, {hint}',
   'web.quadrant.dropHere': 'Drag a task here',
   'web.quadrant.dragging': 'Dragging a task',
+  'web.quadrant.a11y.handle': 'Move task to another quadrant',
+  'web.quadrant.drop.success': 'Task moved to “{quadrant}”',
+  'web.quadrant.drop.changedDue': 'Task moved to “{quadrant}”; due time adjusted',
+  'web.quadrant.drop.error': 'Task could not be moved. Try again.',
+  'web.quadrant.drop.undo': 'Undo move',
   'web.quadrant.footnote': 'Urgency is derived from the due date. To make a task actually land in the cell you drop it on, dragging also adjusts the due date beyond setting "important": dropping into an urgent cell pushes it to within an hour; dropping into a non-urgent cell clears it.',
 
   // ── Web · timeline ────────────────────────────────────────
@@ -2727,14 +2785,27 @@ export const en = {
   'common.auth.error.termsRequired': 'Check the agreement before registering - that acceptance has to come from you, not from us.',
 
   // ── Mobile · profile screen ───────────────────────────────
+  'mobile.profile.tools': 'Organize and capture',
+  'mobile.profile.edit': 'Edit profile',
+  'mobile.profile.loading': 'Loading profile…',
+  'mobile.profile.localOnly': 'This device is in local-only mode. Allow network access in Sync and privacy to edit your profile.',
+  'mobile.profile.retry': 'Reload profile',
   'mobile.profile.title': 'Profile',
   // 🔴 Settings is a standalone second-layer surface (RN Modal), not a section of
   //    the Profile scroll — see INTERFACE-NOTES §11.5 (secondary surfaces get their
   //    own face). The entry row lives on Profile; the content lives in the sheet.
+  'mobile.settings.section.profile': 'Profile',
+  'mobile.settings.section.general': 'General',
+  'mobile.settings.section.sync': 'Sync and privacy',
+  'mobile.settings.section.ai': 'AI and integrations',
+  'mobile.settings.section.data': 'Data management',
+  'mobile.settings.section.security': 'Account security',
+  'mobile.settings.directory.title': 'Preferences and account',
+  'mobile.settings.directory.hint': 'Choose what to adjust.',
   'mobile.settings.title': 'Settings',
   'mobile.settings.close': 'Close',
   'mobile.profile.entry.settings': 'Settings',
-  'mobile.profile.entry.settings.hint': 'Sync credentials, widgets and language',
+  'mobile.profile.entry.settings.hint': 'Profile, preferences, sync and security',
   'mobile.profile.section.sync': 'Sync',
   'mobile.profile.section.status': 'Status',
   // Mirrors the zh side: shown only when the server **explicitly** says entitled / denied.
@@ -2744,7 +2815,14 @@ export const en = {
   // The auth entry sits in the top card of this screen so it is one tap away;
   // the bottom bar stays at five tabs (spec §2-A8).
   'mobile.profile.section.account': 'Account',
+  'mobile.profile.section.progress': 'Recent activity',
+  'mobile.profile.progress.tasks': 'Tasks completed this week',
+  'mobile.profile.progress.focus': 'Focus minutes this week',
+  'mobile.profile.progress.achievements': 'Achievements reached',
+  'mobile.profile.progress.openGrowth': 'View full growth',
+  'mobile.profile.progress.openGrowthHint': 'See milestones, habit streaks, and yearly trends.',
   'mobile.profile.account.signIn': 'Sign in or register',
+  'mobile.profile.account.switchAccount': 'Switch account',
   'mobile.profile.account.signInHint': 'Sign in with an email link or a passkey; sync is wired up for you so you never copy a token by hand.',
   'mobile.profile.account.signedInLabel': 'Current account',
   'mobile.profile.account.signedInHint': 'An access token is already in place. Sign in again to switch accounts or add another credential.',
@@ -2753,7 +2831,7 @@ export const en = {
   'mobile.profile.account.offline': 'Not signed in',
   // The form moved into the Settings sheet: pointing "below" would send the user
   // hunting through Profile for something that is no longer there.
-  'mobile.profile.account.offlineHint': 'You can keep using the app without signing in; the manual credential fallback lives in Settings.',
+  'mobile.profile.account.offlineHint': 'Use tasks, focus and local activity without an account.',
   'mobile.profile.sync.manualHint': 'The fields below are the manual fallback: you only need them when you already have a token (for example copied from another device).',
   // Stated plainly: a choice that silently resets on restart looks like a bug.
   'mobile.profile.language.hint': 'This choice lasts for the current session only; reopening the app returns to the device language.',
@@ -3912,6 +3990,10 @@ export const en = {
   'notes.a11y.pin': 'Pin the note "{excerpt}" to today',
   'notes.a11y.unpin': 'Unpin the note "{excerpt}"',
   'notes.error.empty': 'A note cannot be empty',
+  // Shown by the shared NotesBoard under the composer when a submit fails (W8a keeps
+  // the draft, W8b wires hosts). The load-bearing promise is "still in the box" —
+  // the shared layer preserves the draft on failure; the copy must not lie about that.
+  'notes.error.saveFailed': 'Couldn\'t save — your note is still in the box, try again',
   // Note editor screen (multi-end batch two). The no-change gate lives in app-host updateNoteContent.
   'notes.edit.title': 'Edit note',
   'notes.save': 'Save',
