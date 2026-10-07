@@ -48,6 +48,48 @@ file_size() { # <file> -> 字节数
   printf '%s' "$v"
 }
 
+# ---- Android：签名身份是**外向承诺**，不是构建细节 --------------------------
+# 为什么这一条住在这里而不是 `check:downloads`：臂 A–D 全是**离线结构**门禁，
+# 而"这一枚 APK 是谁签的"只能读字节本身。落地页给不给按钮由清单决定，
+# 清单由这一支脚本写 —— 所以"不许把调试签名的包发到公网"这件事只有在这一刻拦得住。
+#
+# 为什么必须拦：`build.gradle` 在四个发布 keystore 键任一缺失时，把 release 变体
+# 挂到 `signingConfigs.debug` 上（AGENTS §6.1 那条注记）。也就是说
+# **`pnpm build:android` 成功、产物合法、能装能跑，而它是调试签名的**。
+# 直链一旦发出去，换正式签名时访客必须先卸载 —— 对本地优先的应用那等于丢数据。
+find_apksigner() {
+  local c
+  c=$(command -v apksigner 2>/dev/null) && { printf '%s' "$c"; return 0; }
+  for c in "${ANDROID_HOME:-/nonexistent}"/build-tools/*/apksigner \
+           "$HOME/Library/Android/sdk"/build-tools/*/apksigner \
+           /opt/homebrew/share/android-commandlinetools/build-tools/*/apksigner; do
+    [ -x "$c" ] && { printf '%s' "$c"; return 0; }
+  done
+  return 1
+}
+
+assert_android_release_signature() { # <apk> —— 读不出签名就拒绝，不静默放行
+  local apk="$1" bin dn
+  if ! bin=$(find_apksigner); then
+    echo "🔴 要发 android 产物，但这台机上找不到 apksigner —— **拒绝发布**这一枚。"
+    echo "   （找不到工具 = 读不出签名 = 证明不了它是正式签名。装 SDK build-tools 或设 ANDROID_HOME）"
+    exit 1
+  fi
+  dn=$("$bin" verify --print-certs "$apk" 2>&1 | grep -m1 'certificate DN' || true)
+  if [ -z "$dn" ]; then
+    echo "🔴 apksigner 读不出 $apk 的签名（未签名或工具报错）—— 拒绝发布"
+    exit 1
+  fi
+  if printf '%s' "$dn" | grep -q 'Android Debug'; then
+    echo "🔴 这一枚是**调试签名**：$dn"
+    echo "   直链发出去之后，换正式签名时访客必须先卸载 —— 本地优先的应用那等于丢数据。"
+    echo "   补签（密钥不出机）：apksigner sign --ks <发布库> --ks-key-alias <别名> --out <目标> $apk"
+    echo "   见 docs/runbooks/app-distribution.md §3.1"
+    exit 1
+  fi
+  echo "  ✅ android 签名身份：${dn#*: }"
+}
+
 for entry in "${FILES[@]}"; do
   platform="${entry%%=*}"
   src="${entry#*=}"
@@ -57,6 +99,10 @@ for entry in "${FILES[@]}"; do
     *.msix) ext=msix ;; *.msixbundle) ext=msixbundle ;; *.deb) ext=deb ;;
     *) echo "🔴 不认识的产物类型（只收 zip/dmg/apk/msix/msixbundle/deb）：$src"; exit 2 ;;
   esac
+  # 只有 android 走这一道；其它端不碰 apksigner（这台机可能根本没装 SDK）。
+  if [ "$platform" = android ] && [ "$ext" = apk ]; then
+    assert_android_release_signature "$src"
+  fi
   name="heyta-${VERSION}-${platform}.${ext}"
   cp "$src" "$STAGE/$name"
   sha=$(shasum -a 256 "$STAGE/$name" | awk '{print $1}')
