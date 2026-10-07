@@ -3586,7 +3586,7 @@ export const zhCN = {
   'site.download.row.selfhost.name': '自己架一套',
 'site.download.row.selfhost.body': '把同步服务与网页版跑在自己的机器上，数据不出门。每一步都有指南。',
   'site.platforms.seo.title': '平台状态 —— heyta',
-  'site.platforms.seo.description': 'heyta 各平台的真实进度：Web 已上线；Android 实机可用；iOS 到模拟器级；桌面可打包但未签名；鸿蒙能出包但还跑不起来。',
+  'site.platforms.seo.description': 'heyta 各平台的真实进度：Web 已上线；Android 实机可用；iOS 到模拟器级；桌面里 macOS 已签名并公证（只有 Apple Silicon），Windows 与 Linux 还不能直接装；鸿蒙能出包但还跑不起来。',
   'site.platforms.title': '平台状态',
   'site.platforms.lede': '每个平台现在到哪了，如实说：能用就说能用，没好就说没好。',
   'site.platforms.status.available': '可用',
@@ -3602,12 +3602,12 @@ export const zhCN = {
   'site.platforms.ios.name': 'iOS',
   'site.platforms.ios.body': '在模拟器上完整跑通：安装、建库、同步到另一台设备。还差真机测试与开发者签名。',
   'site.platforms.desktop.name': '桌面（Windows / macOS / Linux）',
-  'site.platforms.desktop.body': '三个平台都能打包出应用。尚未签名与公证 —— macOS 上首次打开需要右键，界面也还在打磨。',
+  'site.platforms.desktop.body': '三个平台都能打包出应用。macOS 那份已经用 Developer ID 签名并通过 Apple 公证，双击即可打开（只有 Apple Silicon 构建）；Windows 签的是自签名证书，Linux 的 .deb 还没验过装进系统。界面也还在打磨。',
   'site.platforms.harmony.name': '鸿蒙',
   'site.platforms.harmony.body': '构建链已经打通，能打出安装包，但应用还跑不起来 —— 卡在模拟器镜像与签名。',
   'site.platforms.selfhost.name': '自建服务器',
   'site.platforms.selfhost.body': '一条 docker compose 把全套服务跑在你自己的机器上。密钥与数据库口令要自己配 —— 不是零思考的一键安装，但每一步都有指南。',
-  'site.platforms.note': '⚠️ 「未签名」为什么值得单独说：macOS 上未签名、未公证的应用**双击会被系统拦下**，需要右键打开。把这句省掉，用户会以为包坏了。',
+  'site.platforms.note': '⚠️ 「签名」为什么值得单独说：macOS 上未签名、未公证的应用**双击会被系统拦下**，需要右键打开 —— 把这句省掉，用户会以为包坏了。今天 macOS 那份已经过了公证，但 Windows 与 Linux 仍各自有装不上的理由，而这一页不把没验过的东西说成能用。',
 
   // ── 价格 ──
   'site.pricing.seo.title': '价格 —— heyta',

@@ -3343,7 +3343,7 @@ export const en = {
   'site.download.row.selfhost.name': 'Self-hosted',
 'site.download.row.selfhost.body': 'Run the sync service and the web app on your own machine, so your data never leaves it. Every step is written down.',
   'site.platforms.seo.title': 'Platform status — heyta',
-  'site.platforms.seo.description': 'Where heyta really stands: web is live, Android works on a real device, iOS is simulator-level, desktop builds but is unsigned, HarmonyOS builds but does not run yet.',
+  'site.platforms.seo.description': 'Where heyta really stands: web is live, Android works on a real device, iOS is simulator-level, on desktop macOS is signed and notarised (Apple Silicon only) while Windows and Linux are not yet installable, HarmonyOS builds but does not run yet.',
   'site.platforms.title': 'Platform status',
   'site.platforms.lede': 'Where each platform really stands, stated plainly: working is working, not ready is not ready.',
   'site.platforms.status.available': 'Available',
@@ -3359,12 +3359,12 @@ export const en = {
   'site.platforms.ios.name': 'iOS',
   'site.platforms.ios.body': 'Fully working in the simulator: install, create the local database, sync to another device. Real-device testing and a developer signature are still missing.',
   'site.platforms.desktop.name': 'Desktop (Windows / macOS / Linux)',
-  'site.platforms.desktop.body': 'Builds on all three desktop platforms. Not yet signed or notarized — on macOS the first open needs a right-click — and the interface is still being polished.',
+  'site.platforms.desktop.body': 'Builds on all three desktop platforms. The macOS one is signed with a Developer ID and notarised by Apple, so it opens on a double-click (Apple Silicon builds only); the Windows package is self-signed, and the Linux .deb has not been verified installed into the system. The interface is still being polished.',
   'site.platforms.harmony.name': 'HarmonyOS',
   'site.platforms.harmony.body': 'The build chain works and produces an installer package, but the app does not run yet — blocked on an emulator image and signing.',
   'site.platforms.selfhost.name': 'Self-hosting',
   'site.platforms.selfhost.body': 'One docker compose file runs the whole stack on your own machine. You configure your own secrets and database password — not a zero-thought installer, but every step is documented.',
-  'site.platforms.note': '⚠️ Why "unsigned" deserves its own line: on macOS an unsigned, unnotarised app **is refused on double-click**, and has to be opened via the context menu. Leave that out and people think the download is broken.',
+  'site.platforms.note': '⚠️ Why signing deserves its own line: on macOS an unsigned, unnotarised app **is refused on double-click**, and has to be opened via the context menu. Leave that out and people think the download is broken. The macOS build has been notarised since 2026-10-07, but Windows and Linux each still have their own reason not to install — and this page does not call something untested usable.',
 
   // ── Pricing ──
   'site.pricing.seo.title': 'Pricing — heyta',
