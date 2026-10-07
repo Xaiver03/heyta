@@ -133,19 +133,47 @@ test.describe('激励体系：真浏览器契约', () => {
   test('九个视图标签齐全，顺序与文案逐字一致（全功能配置）', async ({ page }) => {
     await openApp(page);
 
-    const tabs = page.getByRole('tab');
-    // 🔴 **11 而不是 12**：十二个入口里「设置」收在**头像菜单**（它是低频配置，
-    // 不是"去哪看"），所以它不在 tablist 里。其余 11 个都在。
-    await expect(tabs).toHaveCount(11);
-
-    const labels = (await tabs.allTextContents()).map((t) => t.trim());
-    expect(labels, '标签的顺序与文案都必须与 VIEW_TABS 逐字一致（少了「设置」）').toEqual([
-      ...TABS.filter((t) => t !== '设置'),
+    // W1（2026-10-06，审计 §3.2-1）：rail 从"启用模块平铺"收敛为「主段 ≤4 + 更多」。
+    // 旧契约（11 枚 tab 平铺）改为：主段 = 钉住的四枚（任务/日历/习惯/搜索，
+    // 见 `view-tabs.ts` `splitRailTabs` 的 `pinned`）+ 菜单按声明序收其余。
+    // 🔴 不变的承诺是：**全部目的地仍然可达、每个文案逐字一致** —— 改的是
+    // "在哪一级"，不是"有哪些"。
+    const primary = page.locator(
+      '.ht-rail__tabs button[role="tab"]:not(.ht-rail__tab--tool)',
+    );
+    await expect(primary).toHaveCount(4);
+    const primaryLabels = (await primary.allTextContents()).map((t) => t.trim());
+    expect(primaryLabels, '主段四枚 = splitRailTabs 钉住的高频目的地').toEqual([
+      '任务',
+      '日历',
+      '习惯',
+      '搜索',
     ]);
+
+    await page.locator('.ht-rail__more button').click();
+    const items = page.locator('[role="menu"] .ht-rail__more-item');
+    await expect(items).toHaveCount(6);
+    const menuLabels = (await items.allTextContents()).map((t) => t.trim());
+    expect(menuLabels, '菜单按声明序收其余六枚，文案逐字一致').toEqual([
+      '四象限',
+      '时间线',
+      '番茄钟',
+      '成长',
+      '便签',
+      '倒数纪念日',
+    ]);
+    await page.keyboard.press('Escape');
+
+    // 工具段照旧是 tab（回收站）；「设置」照旧收在头像菜单，不在 tablist。
+    const allTabs = (await page.getByRole('tab').allTextContents()).map((t) => t.trim());
+    expect(allTabs).toContain('回收站');
+    expect(allTabs).not.toContain('设置');
   });
 
   /**
-   * 🔴 **默认 rail 只有 6 个** —— 这是 2026-09-29「功能模块」开关的核心承诺。
+   * 🔴 **默认 rail = 「主段 4 + 更多」+ 工具段** —— 两代承诺的合流：
+   * 2026-09-29「功能模块」开关承诺"默认不塞满"（保持不变），
+   * 2026-10-06 W1（审计 §3.2-1）承诺"已启用的也不平铺"（四象限/时间线进「更多」）。
    *
    * ⚠️ 它**必须单独一条、且不走 `openApp`**：`openApp` 会打开全部模块，
    * 于是"默认几个"这件事在那套配置下**永远测不到**。
@@ -154,9 +182,9 @@ test.describe('激励体系：真浏览器契约', () => {
    * ⚠️ 但"不走共享入口"**不等于**"不修探针"：下面仍然要钉中文（那些标签是
    * 中文文案，浏览器默认 en-US 会让整片变英文）并做完首启隐私同意
    * （`role="presentation"` 的整屏遮罩）。这两件事都**不碰模块默认值**，
-   * 所以"默认 7 个 tab"这条判据测的还是新装用户那一屏。
+   * 所以这条判据测的还是新装用户那一屏。
    */
-  test('🔴 默认 rail 只有 7 个 tab（6 个视图 + 回收站）', async ({ page }) => {
+  test('🔴 默认 rail = 主段 4（任务/日历/习惯/搜索）+「更多」+ 回收站', async ({ page }) => {
     await installMissingProducerShims(page);
     await pinChineseUi(page);
     await page.goto('/');
@@ -164,23 +192,36 @@ test.describe('激励体系：真浏览器契约', () => {
     await decidePrivacyConsent(page);
 
     const labels = (await page.getByRole('tab').allTextContents()).map((t) => t.trim());
-    // 默认：6 个视图（任务/日历/四象限/习惯/时间线/**搜索**）+ 1 个工具 tab（回收站）。
+    // 主段 = `splitRailTabs` 钉住的四枚；四象限/时间线在「更多」里；回收站是工具 tab。
     // ⚠️ 「设置」在头像菜单里、「帮助」是动作（不在 tablist）—— 两个都不是 tab。
-    expect(labels, '默认应当是 5 个视图 + 搜索 + 1 个工具').toEqual([
+    expect(labels, '默认 = 主段四枚 + 回收站（工具段）').toEqual([
       '任务',
       '日历',
-      '四象限',
       '习惯',
-      '时间线',
       '搜索',
       '回收站',
     ]);
 
-    // 反面：默认关掉的那三个**不该在 DOM 里**（不是"渲染了但看不见"）。
+    // 「更多」在场且恰好收默认启用的两枚低频视图（W1：两步可达，不是不可达）。
+    await page.locator('.ht-rail__more button').click();
+    const menuLabels = (
+      await page
+        .locator('[role="menu"] .ht-rail__more-item')
+        .allTextContents()
+    ).map((t) => t.trim());
+    expect(menuLabels).toEqual(['四象限', '时间线']);
+    await page.keyboard.press('Escape');
+
+    // 反面：默认关掉的那三个**不该在 DOM 里**（不是"渲染了但看不见"）——
+    // tab 与菜单两处都查。
     for (const off of ['番茄钟', '成长', '便签']) {
       await expect(
         page.getByRole('tab', { name: off }),
         `${off} 默认是关的，不该出现在导航里`,
+      ).toHaveCount(0);
+      await expect(
+        page.locator('[role="menuitem"]', { hasText: off }),
+        `${off} 默认是关的，也不该出现在「更多」菜单里`,
       ).toHaveCount(0);
     }
   });

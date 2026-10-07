@@ -47,7 +47,10 @@ test.describe('时间线 P2 · 排期手势（桌面载荷）', () => {
     await addTaskViaComposer(page, '明天16:00 写时间线的验收报告');
     await addTaskViaComposer(page, '后天12:00 整理 P2 的判据清单');
 
-    await page.getByRole('tab', { name: '时间线' }).click();
+    // W1（2026-10-06）：时间线收进「更多」菜单，不再是一级 tab ——
+    // 本文件是自包含 spec（本地 openApp），就地走菜单这条真路径。
+    await page.locator('.ht-rail__more button').click();
+    await page.getByRole('menuitem', { name: '时间线' }).click();
     await page.waitForSelector('[data-testid="timeline-view"]', { timeout: 15_000 });
     await page.waitForTimeout(600);
 
