@@ -167,27 +167,33 @@ export interface ViewTab {
  *
  * 那是 8 个视图时的数字；现在有 9 个，**更挤**。
  *
- * ## 做法：搬进侧栏 + 分两组，而**不是**把低频的藏进「更多」菜单
+ * ## 🔴 现行裁决（唯一一代，2026-10-06 收敛）：上段「4 + 1（更多）」
  *
- * 调研 §4.4 的建议是「全局导航 4–5 个 + 更多」，并注明"这是**唯一动到肌肉记忆**的
- * 一步，需要产品负责人拍板"。这里**采纳目标、微调手段**，理由写清楚：
+ * > **历史注记**：2026-09-29 那一代裁决曾写过"**而不是**把低频的藏进「更多」菜单
+ * > （藏起来是为顶栏宽度付的代价，侧栏没这个约束，藏就只剩成本）"。它被
+ * > 2026-09-29 当天稍晚的同一位产品负责人那句「左边的侧边栏那个按钮应该尽可能地
+ * > 减少」推翻：竖排确实不溢出，但**按钮多到要扫读**本身仍是成本（滴答 rail 实测
+ * > 上段只有 5 个）。此后两代裁决在本文件并存到 2026-10-06（审计
+ * > `product-level-ia-ux-audit.md` §3.2-1 抓的就是这个），本注释即收敛后的唯一一份。
  *
- * | | 调研建议 | 这里做的 | 为什么 |
- * |---|---|---|---|
- * | 位置 | rail / 侧栏 | **侧栏**（竖排） | 竖排**天然不溢出** —— 顶栏宽度才是真约束 |
- * | 低频视图 | 藏进「更多」 | **保留可见**，只分组 | 藏起来是**为顶栏宽度付的代价**；侧栏没这个约束，藏就只剩成本（用户多点一次） |
- * | 切视图 vs 切筛选 | 分成两列 | **同一个侧栏的上下两段** | 原来的问题正是"两者混在一个水平条里"，竖排分段就分开了 |
+ * 现行规则（实现见 `splitRailTabs`，判据在 `tests/rail-more-menu.spec.tsx`）：
+ *
+ * · rail 上段 = **主段（声明序前 4）+ 1 个「更多」**；目的地 ≤ 5 时连「更多」
+ *   也不渲染（全放得下就没有藏的必要）。
+ * · **当前激活视图落在「更多」里时，把它提升进主段**（替换主段最后一项）——
+ *   "你在哪、哪就在台面上"，否则切到一个低频视图后高亮会消失在弹出层里。
+ * · 弹出层与 `visibleMainTabs` **同源派生**（`App.tsx`）：关掉功能模块 ⇒ 下次
+ *   打开不再出现。
  *
  * ⚠️ **分组会改变 DOM 顺序**，而 `e2e/tests/motivation.spec.ts` 的 `TABS` 锁死了顺序
  * —— 那份文件自己写着"加视图时**先改这里**，再改 App.tsx"，所以两处必须一起改。
- * 数量仍是 9，所以 `smoke.spec.ts` 的 `toHaveCount(9)` 不用动。
  */
 export const ALWAYS_ON_VIEW_TABS: readonly ViewTab[] = [
   { key: 'tasks', labelKey: 'web.shell.nav.tasks', Icon: Inbox },
 ];
 
 /**
- * 低频视图 —— **收进「更多」，默认折叠**。
+ * 可开关的功能模块视图。
  *
  * 🔴 2026-09-29 产品负责人：「**左边的侧边栏那个按钮应该尽可能地减少**」。
  * 这条要求有实测依据 —— `dida-capture/INTERFACE-NOTES.md` §1 记着滴答 rail 的完整清单：
@@ -198,17 +204,11 @@ export const ALWAYS_ON_VIEW_TABS: readonly ViewTab[] = [
  *                 —— rail 上**不存在**番茄钟 / 成长 / 便签 / 回收站 / 设置
  * ```
  *
- * ⇒ 而 heyta 的 rail 有 **9 个视图按钮**。现在收到 **4 + 1（更多） + 1（设置·贴底）**：
+ * ⇒ 而 heyta 此前把所有已启用模块平铺在 rail 上。哪些进主段、哪些落「更多」，
+ * **规则只有一份**（见 `ALWAYS_ON_VIEW_TABS` 上方的现行裁决与 `splitRailTabs`）：
+ * 主段优先保留任务、日历、习惯和搜索，其余模块进入「更多」。
  *
- * | | 之前 | 之后 |
- * |---|---|---|
- * | 上段（去哪看） | 9 | **4**（任务/四象限/习惯/时间线）+ **1 个「更多」** |
- * | 下段（工具，贴底） | — | **1**（设置） |
- *
- * ⚠️ **「设置」不放上段**：滴答的分法是"上段是**去哪看**、下段贴底是**工具**"，
- * 设置属于工具 —— 顺带把它从"每天要看的视图"里摘出来。
- *
- * ⚠️ 时间线留在上段：它占的是滴答 rail 里**「日历」**那一格（heyta 没有日历视图）。
+ * ⚠️ 本数组的**声明顺序因此是产品语义**：排在前面的模块默认出现在 rail 台面上。
  *
  * 🔴 `countdown` 的图标取 `Hourglass`（沙漏），判据是**16px 下读得出形状** ——
  * 与上面「四象限为什么是 `Move` 不是 `ChartScatter`」同一条 R12 纪律，
@@ -304,6 +304,36 @@ export const VIEW_TABS: readonly ViewTab[] = [
   SETTINGS_VIEW_TAB,
 ];
 
+export interface RailTabSplit {
+  readonly primary: readonly ViewTab[];
+  readonly overflow: readonly ViewTab[];
+}
+
+/**
+ * 将已启用的目的地压缩成可扫描的 rail：最多四个主入口，剩余入口进入“更多”。
+ * 当前所在的低频视图会被临时提升到主入口，避免用户切换后失去位置感。
+ * 这是纯函数，桌面 Web 与测试共享同一条导航裁决；窄屏由宿主再决定如何呈现。
+ */
+export function splitRailTabs(tabs: readonly ViewTab[], active: ViewKey): RailTabSplit {
+  if (tabs.length <= 5) return { primary: tabs, overflow: [] };
+  // 搜索是高频恢复入口，即使它在登记表后段也必须留在台面上。
+  const pinned: readonly ViewKey[] = ['tasks', 'calendar', 'habits', 'search'];
+  const primary = tabs
+    .filter((tab) => pinned.includes(tab.key))
+    .slice(0, 4)
+    .concat(tabs.filter((tab) => !pinned.includes(tab.key)).slice(0, 4))
+    .slice(0, 4);
+  const primaryKeys = new Set(primary.map((tab) => tab.key));
+  const overflow = tabs.filter((tab) => !primaryKeys.has(tab.key));
+  if (!overflow.some((tab) => tab.key === active)) return { primary, overflow };
+  const promoted = overflow.find((tab) => tab.key === active);
+  if (promoted === undefined) return { primary, overflow };
+  return {
+    primary: [...primary.slice(0, -1), promoted],
+    overflow: [...primary.slice(-1), ...overflow.filter((tab) => tab.key !== active)],
+  };
+}
+
 
 /**
  * 🔴 这里**曾经**有一张 `VIEW_TITLED_BY_TAB` 白名单，列出"标题跟着 tab 走"的视图，
@@ -348,4 +378,3 @@ export function anchorRailLabel(event: SyntheticEvent<HTMLElement>): void {
   const rect = tab.getBoundingClientRect();
   tab.style.setProperty('--ht-rail-label-top', `${Math.round(rect.top + rect.height / 2)}px`);
 }
-

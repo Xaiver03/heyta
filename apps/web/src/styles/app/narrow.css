@@ -3,60 +3,118 @@
  * 2026-09-30：塌缩规则曾写在文件前部，被后面的基础规则整块覆盖
  *（"grid 塌了、rail 没塌"），且一个多余的 `}` 让 sidebar 规则逃出媒体块
  * 变成全局 —— 都是这次逐页排版审计（goal-layout-audit 页 4）修掉的。
+ *
+ * ═══ 布局模型（工单 W4，2026-10-06：窄屏底部导航重构 · 纯 CSS / DOM 不动）═══
+ *
+ *   ┌──────────────────────────────┐
+ *   │ main（1fr，内部滚动）          │ row 1
+ *   ├──────────────────────────────┤
+ *   │ sidebar = 范围筛选区（高度封顶）│ row 2  ← order 2
+ *   │   · 智能清单 chip 行（单行横滑）│
+ *   │   · 四象限色点 chip 行（单行横滑）│
+ *   │   · 清单/标签面板（内部纵滚）    │
+ *   ├──────────────────────────────┤
+ *   │ rail = 底部导航（单行横滑）     │ row 3  ← order 3
+ *   └──────────────────────────────┘
+ *
+ * · **底栏放什么**：只有 rail 的**目的地 tab**（视图 + 回收站/设置）与 rail
+ *   的常驻动作（头像 / 铃铛 / 帮助 / 同步 —— 它们是 `nav.ht-rail` 的直接
+ *   子元素，DOM 不动就只能在栏内，属于本方案的已知边界）。目的地超过 5 个时
+ *   整条横滑，不折叠、不省略。sidebar 的范围筛选**整体搬出底栏**
+ *   （审计 `product-level-ia-ux-audit.md` §4-1："不再合并整条 sidebar"）。
+ * · **筛选区放什么**：sidebar 变成底栏上方的"范围筛选区"。能变成 chip 的
+ *   （今天/最近 7 天/已完成、四象限色点）是两条**单行 nowrap 横滑行**；
+ *   清单/标签分组（含"新清单/新标签"输入与空态文案）在 chip 行下方，
+ *   高度封顶、内部纵滚 —— 它做不成 chip 行：`OrganizerList` 是共享层 RN
+ *   组件，行方向 / minWidth 全是 inline style，样式表压不过。这是"DOM 不动"
+ *   下对产品最诚实的形状（审计 §4-1 自己给的另一选项就是 sheet）。
+ * · **为什么不竖排**：中文标签逐字竖排的根因是"flex 子项被压到内容宽以下
+ *   + 没有 nowrap"（`rail.css` 文件头记过同一件事，MW01 截图里"重要且紧急"
+ *   五字竖列正是 sidebar 的 `.ht-nav__item` 被这么挤的）。本块里每一条标签
+ *   都 `white-space: nowrap` + `flex: 0 0 auto`：放不下交给**横滑**，
+ *   不交给换行。
+ * · 日历视图的 sidebar（迷你月历 + 显示范围）走同一个"封顶面板"形状，
+ *   由 `.ht-sidebar` 这一条统一覆盖 —— 它 base 的 `sticky` / `100dvh`
+ *   在这一档同样要收回；级联上 narrow.css 恒排在 sidebar.css 之后，
+ *   不需要再写一份 `.ht-sidebar--calendar` 的重复真源。
  */
 @media (max-width: 768px) {
-  /* 单列：main 在上（1fr），底部导航在下（auto）。
+  /* 单列三行：main（1fr）/ 筛选区（auto，封顶）/ 底栏（auto）。
      🔴 高度必须**钉死**在视口（不是 min-height）：`min-height` 之下，
      内容一长整页就往下长，底部导航被推到文档末尾 —— 日历/四象限这种
      高页面要滚到最底才能切视图（塌缩态扫描实测，页4 只验过短内容没暴露）。
-     钉死之后改为 **main 内部滚动**，导航常驻贴底。 */
+     钉死之后改为 **main 内部滚动**，导航与筛选区常驻贴底。
+     行数写足三行（无 sidebar 的视图第三行空置为 0 高）：
+     `minmax(0, 1fr)` 保证 main 这一层永远能被压缩出滚动而不是顶穿。 */
   .ht-app,
   .ht-app--with-sidebar {
     grid-template-columns: 1fr;
-    grid-template-rows: 1fr auto;
+    grid-template-rows: minmax(0, 1fr) auto auto;
     height: 100dvh;
+    overflow-x: clip;
   }
 
-  /* 滚动发生在 main（含页头一起滚）—— rail / sidebar 两条导航不动。 */
+  /* Grid 子项默认按 min-content 保留最小宽度。底栏和范围 chip 行本来就
+     依靠内部横向滚动承载长中文；不把外层 min-inline-size 收回，390px
+     视口会被内容撑成 462px，右侧出现一块无法解释的空白。 */
+  .ht-main,
+  .ht-sidebar,
+  .ht-rail {
+    min-inline-size: 0;
+  }
+
+  /* 滚动发生在 main（含页头一起滚）—— 底部导航 / 筛选区不动。 */
   .ht-main {
     overflow-y: auto;
   }
 
-  /* rail + sidebar 合成同一条底部导航：rail 视图（order 2）、sidebar 范围（order 3） */
+  /* ══ rail：底部导航（最底一行）══
+     🔴 桌面态那两条（`block-size: 100dvh` + `overflow: hidden`，工单 H9）在
+     这一档收回高度那条：塌缩态 rail 是网格的最后一行，高度由内容定，留着
+     `100dvh` 会把导航撑满整屏。裁切方向反过来**要用**：横条放不下就整条横滚。 */
   .ht-rail {
-    order: 2;
+    order: 3;
     flex-direction: row;
     align-items: center;
-    /* 🔴 桌面态那两条（`block-size: 100dvh` + `overflow: hidden`，工单 H9）在这一档收回高度那条：
-       塌缩态 rail 是网格 `1fr auto` 的第二行，高度本来就由内容定，
-       留着 `100dvh` 会把底部导航撑满整屏、把 main 挤没。
-       `overflow` 那两条不用收 —— 上面已经写了 `overflow-x: auto / overflow-y: hidden`，
-       横条底部导航正是"内容放不下就横向滚"。 */
     block-size: auto;
     gap: var(--ht-space-2);
     padding: var(--ht-space-1) var(--ht-space-2);
+    /* 刘海屏安全区跟着最底下这一行走（旧塌缩写在 sidebar 上 —— 那时它才在最底）。 */
+    padding-block-end: max(var(--ht-space-2), env(safe-area-inset-bottom));
     border-right: none;
     border-top: var(--ht-border-width-thin) solid var(--ht-color-border);
     overflow-x: auto;
     overflow-y: hidden;
+    /* 滚动条隐藏（做法与理由同 `.ht-viewtabs` / `.ht-nav`）：classic 滚动条
+       会占掉导航的高度，行高随是否溢出跳一下（CLS）；键盘聚焦时浏览器自动
+       把聚焦项滚进视野，不需要滑块。 */
+    scrollbar-width: none;
   }
 
-  /* 头像行横排（品牌名在桌面态就已经撤掉了，见 `.ht-rail__top` 上方） */
+  .ht-rail::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* 头像行横排（品牌名在桌面态就已经撤掉了，见 `.ht-rail__top` 上方）。
+     `flex: 0 0 auto`：它是横条里唯一非 tab 的常驻项，不许被压窄。 */
   .ht-rail__top {
     flex-direction: row;
     align-items: center;
     gap: var(--ht-space-2);
     padding: 0;
+    flex: 0 0 auto;
   }
 
   .ht-rail__tabs {
     flex-direction: row;
-    flex: 1;
-    overflow-x: auto;
-    /* 桌面态这一段是**纵向**滚动区（工单 H9：放不下的是视图列表，下段动作常驻）。
-       塌缩成横条底部导航后纵向没有可滚的内容，必须显式关掉 ——
-       留着 `auto` 会在一条固定高度的导航里长出横向滚动条。 */
-    overflow-y: hidden;
+    /* 🔴 这一档**不再自己滚**：滚的是外层 `.ht-rail`。旧塌缩里两层同轴
+       （rail `overflow-x:auto` + tabs `overflow-x:auto`）是嵌套横滚 ——
+       手指划在 tab 上只带动内层、划到头像/铃铛才带动外层，"这段滚不动、
+       那段能滚"的错觉就是这么来的。收掉内层，整条底栏一个滚动手势；
+       base 的纵向滚动（工单 H9）在横条里没有可滚的内容，一并关掉。 */
+    flex: 0 0 auto;
+    min-inline-size: 0;
+    overflow: visible;
   }
 
   .ht-rail__tab {
@@ -64,6 +122,18 @@
     /* 图标与名字**都**在流里了（见下面 `.ht-rail__label`），需要间距。
        桌面态这条 gap 是不生效的 —— 那里名字是 fixed、徽标是 absolute。 */
     gap: var(--ht-space-2);
+    /* 🔴 块头那条硬约束的主战场：标签单行、tab 不被压窄。base
+       `.ht-rail__tab` 已有这两条，这里显式重申 —— 防的是有人在基础层
+       "顺手优化"时弄丢它们，而竖排/折行在这一档就是回归。 */
+    white-space: nowrap;
+    flex: 0 0 auto;
+  }
+
+  /* 同步组在桌面 rail 是"贴底一列"（自带 padding-bottom 与 column 排布）；
+     横条里它只是普通一项，纵向 padding 会让它比邻居矮一截，且能被压窄。 */
+  .ht-rail__sync {
+    flex: 0 0 auto;
+    padding-block-end: 0;
   }
 
   /* 🔴 「只显示 icon，hover 显示真名」是**桌面**形态 —— 触屏没有 hover，
@@ -85,69 +155,94 @@
     margin-top: 0;
   }
 
-  /* sidebar（范围列）并入底部导航 */
+  /* ══ sidebar：范围筛选区（底栏上方那一区，order 2）══
+     它不再是底部导航的第二节。高度封顶（面板上限与六成视口取小）、
+     内部纵滚：清单/标签可以很长，不封顶会把 main 挤成一条缝（旧塌缩正是
+     这么把整条 sidebar 压进底栏、再一起被推出屏幕的）。
+     🔴 桌面态那三条"钉住 + 一屏封顶 + 内部滚动"（`sidebar.css`）里：
+     `position: sticky` 在这一档没有语义（它垫在 main 下面、不会滚走）；
+     `max-block-size: 100dvh` 换成面板上限；内部滚动（`.ht-sidebar__body`
+     base 的 `overflow-y: auto` + `min-block-size: 0`）**原样成立** ——
+     所以这一档不再需要窄屏覆盖 body，base 就是正确形状。 */
   .ht-sidebar {
-    order: 3;
-    flex-direction: row;
-    justify-content: space-around;
-    border-right: none;
-    border-top: var(--ht-border-width-thin) solid var(--ht-color-border);
-    /* 🔴 桌面态那三条"有界 + 钉住"（工单 H9 第二刀，理由见 `sidebar.css`）在这里全部收回：
-       塌缩态这一列是网格 `1fr auto` 的**第二行**，横向一条底部导航，
-       留着 `sticky` 没有意义（它已经在文档末尾、不会滚走），
-       而 `max-block-size: 100dvh` 会让一条本该按内容长的横条被视口高度限制住。
-       内层 `.ht-sidebar__body` 的纵向滚动同理要改回不滚。 */
+    order: 2;
     position: static;
-    max-block-size: none;
-    /* 刘海屏安全区 */
-    padding-block-end: max(var(--ht-space-2), env(safe-area-inset-bottom));
+    max-block-size: min(var(--ht-layout-panel-max-height), 60dvh);
+    border-right: none;
+    /* 分隔线画在**上沿**（旧塌缩里它排在底栏之下，线在下沿 —— 顺序换了，
+       线跟着换；它与底栏之间那条由 `.ht-rail` 的 border-top 负责）。 */
+    border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+    padding: var(--ht-space-1) var(--ht-space-2);
   }
 
-  /* 塌缩态这一列是横着的一条，里面那一层跟着横排；它没有"纵向滚"这件事。 */
-  .ht-sidebar__body {
-    flex-direction: row;
-    overflow-y: visible;
-  }
-
-  /* 🔴 塌缩态里侧栏已经是**横着的一条底部导航**，"拖它的右边缘"没有语义。
+  /* 🔴 塌缩态里筛选区是横着的一区，"拖它的右边缘"没有语义。
      手柄仍挂在 DOM 上（任务页与日历页各有一条侧栏，都带它），所以必须显式关掉，
-     否则它会在底部条的右端留一条能点、能聚焦、拖了没反应的竖线。 */
+     否则它会在筛选区右端留一条能点、能聚焦、拖了没反应的竖线。 */
   .ht-sidebar__resizer {
     display: none;
   }
 
-  /* 桌面那条列的"钉住 + 一屏封顶 + 内部滚动"三条在底部条里都没有语义：
-     横条不该粘在视口顶部，也不该被一屏高度卡住自己的内容。 */
-  .ht-sidebar--calendar {
-    position: static;
-    max-block-size: none;
+  /* ══ 筛选 chip 行：智能清单一行、四象限色点一行 ══
+     🔴 两条不并成一条：两个 `.ht-nav` 是 `.ht-sidebar__body` 的兄弟节点，
+     DOM 不动就没有能同时滚它们的容器（外层 body 是封顶面板的**纵**滚区）。
+     375px 下第一条（今天/最近 7 天/已完成）整行可见；四象限那四枚放不下
+     就自己横滑 —— 两条各自满足"单行、nowrap、可横滑"。 */
+  .ht-nav {
+    flex-direction: row;
+    gap: var(--ht-space-2);
+    overflow-x: auto;
+    overflow-y: hidden;
+    /* 滚动条隐藏：同 `.ht-viewtabs` 的做法与理由（滚动条占行高 = CLS；
+       键盘聚焦自动滚进视野）。 */
+    scrollbar-width: none;
   }
 
-  .ht-sidebar__calendar-body {
-    overflow-y: visible;
+  .ht-nav::-webkit-scrollbar {
+    display: none;
   }
 
+  /* 🔴 "重要且紧急"五字竖列的病灶就在这一条：旧塌缩把它写成
+     `flex-direction: column` 且没有 nowrap —— 子项被 `space-around` 压到
+     内容宽以下，中文就逐字折行竖排。行内 chip（图标/色点与名字同一行）
+     + nowrap + 不收缩，三件一起才成立。 */
+  .ht-nav__item {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--ht-space-2);
+    padding: 0 var(--ht-space-2);
+    white-space: nowrap;
+    flex: 0 0 auto;
+    /* chip 形（胶囊，与 `.ht-inbox__tab` 那一族筛选 tab 同语汇）；
+     44px 触控下限来自 base 的 `min-block-size`，不动。 */
+    border-radius: var(--ht-radius-full);
+  }
+
+  /* 品牌不在 DOM（见 `rail.css` 那条记录）；计数在 chip 里只吃宽度 ——
+     旧塌缩就把它藏了，维持（要找回它得先回答"chip 行放不放得下"）。 */
   .ht-brand,
-  .ht-nav__section,
   .ht-nav__count {
     display: none;
   }
 
-  .ht-nav {
-    flex-direction: row;
-    inline-size: 100%;
-    justify-content: space-around;
-  }
-
-  .ht-nav__item {
-    flex-direction: column;
-    gap: var(--ht-space-1);
-    font-size: var(--ht-font-size-2xs);
-    padding: 0 var(--ht-space-2);
+  /* 只藏**独立**的「四象限」分组头（`.ht-sidebar__body` 的直接子节点）：
+     chip 行里没有它的位置，四枚色点 chip 自带语义。
+     清单/标签面板（`.ht-sidebar__organizer-heading` 内）与日历范围面板
+     （`.ht-sidebar__scope-heading` 内）的分组头**恢复显示** —— 它们回到了
+     真正的面板语境，藏掉反而让 + 按钮没有名字（旧塌缩的 blanket 藏法
+     是"底栏塞不下"时代的权宜）。 */
+  .ht-sidebar__body > .ht-nav__section {
+    display: none;
   }
 
   .ht-content {
     padding: var(--ht-space-4);
+  }
+
+  /* 批量工具在窄屏单独占一行，内层控件才会从左到右换行，
+     不会和标题、排序控件争夺一条不可收缩的横向空间。 */
+  .ht-header__actions > [data-testid="bulk-toolbar"] {
+    flex-basis: 100%;
+    justify-content: flex-start;
   }
 
   /* 详情列（W2 的槽位）在塌缩态里没有位置：单列 + 底部导航里再插一根竖列

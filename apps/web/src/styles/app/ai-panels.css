@@ -638,6 +638,54 @@ input[type="radio"] {
   margin-block-start: var(--ht-space-4);
 }
 
+/* AI 是高级工具，不与新建任务竞争首屏主动作；默认由 details 收起。 */
+.ht-ai-drawer {
+  display: grid;
+  gap: var(--ht-space-3);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  padding-block-start: var(--ht-space-2);
+}
+
+.ht-ai-drawer__summary {
+  display: flex;
+  align-items: center;
+  min-block-size: var(--ht-touch-target-min);
+  cursor: pointer;
+  color: var(--ht-color-foreground-muted);
+  list-style: none;
+}
+
+.ht-ai-drawer__summary::-webkit-details-marker {
+  display: none;
+}
+
+.ht-ai-drawer__summary::before {
+  content: '';
+  display: inline-block;
+  inline-size: var(--ht-space-2);
+  block-size: var(--ht-space-2);
+  margin-inline: var(--ht-space-1) var(--ht-space-2);
+  border-inline-end: var(--ht-border-width-thin) solid var(--ht-color-primary);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-primary);
+  transform: rotate(45deg);
+  color: var(--ht-color-primary);
+  transition: transform var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.ht-ai-drawer[open] .ht-ai-drawer__summary::before {
+  transform: rotate(90deg);
+}
+
+.ht-ai-drawer__summary:focus-visible {
+  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+.ht-ai-drawer__body {
+  display: grid;
+  gap: var(--ht-space-4);
+}
+
 /* 输入框吃弹性宽度，但收到 `layout.input-min` 为止 —— 到限就换行。
    `min-width: 0` 是必须的：没有它 flex 项不肯收缩到内容宽度以下。 */
 .ht-ai__actions .ht-input {
