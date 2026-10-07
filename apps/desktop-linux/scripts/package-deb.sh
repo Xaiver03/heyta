@@ -356,10 +356,16 @@ else
   #    在 `linux-dev-lan` 上从来没打出过包，而 `check:linux-shell` 那侧的读数是**人先 source 再跑**
   #    拿到的 —— 那条手递手没有写进这里，就成了"入口存在但打不出产物"）。
   #    有则用、没有就照旧走系统 PATH，且把用没用**打印出来**：不静默改任何一台机的环境。
+  # 🔴 前置那行走的是 **stdin**：`< <(...)`，`<` 与 `<(` 中间那个空格**不能省**。省掉就变成
+  #    `ssh host cmd /dev/fd/63` —— 远端那句 `bash -s` 从 ssh 通道读到的是**空**，正文一行都没跑，
+  #    而 ② 照样把上一轮留在远端的 `.deb` 与快照取回来、③ 照样打印 `PKG_RESULT=OK`。
+  #    07 10:1x 这一面是**我自己写错时实测到的**：那一趟 `PKG_BLUE_HITS=3987` 与上一轮逐字相同，
+  #    日志里连一行编译输出都没有。⇒ 本脚本对"取回的产物是本轮打的"没有一条判据（① 那三条
+  #    只钉 `web-dist` 的指纹），这一格已登记给 Linux 线（BLOCKED B101 格 5）。
   ENV_PRELUDE='if [ -f "${HOME}/heyta-linux-prefix/env.sh" ]; then . "${HOME}/heyta-linux-prefix/env.sh"; echo "LINUX_ENV=sourced ${HOME}/heyta-linux-prefix/env.sh"; else echo "LINUX_ENV=none（用系统 PATH 里的 pkg-config）"; fi'
   ssh "$TARGET" \
     "RD='${REMOTE_DIR}' EXPECTED_DIST_SHA='${EXPECTED_DIST_SHA}' VERSION='${VERSION}' DO_INSTALL='${DO_INSTALL}' SKIP_WINDOW='${SKIP_WINDOW}' bash -s" \
-    <(printf '%s\n' "$ENV_PRELUDE"; cat "$BODY") >"$LOG" 2>&1 || rc=$?
+    < <(printf '%s\n' "$ENV_PRELUDE"; cat "$BODY") >"$LOG" 2>&1 || rc=$?
 fi
 cat "$LOG"
 if [ "$rc" -ne 0 ]; then
