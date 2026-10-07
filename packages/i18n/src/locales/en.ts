@@ -3324,7 +3324,7 @@ export const en = {
 'site.download.row.macos.gap': 'The package is built and notarised — the only step left is putting it into public downloads.',
   'site.download.row.ios.name': 'iOS',
   'site.download.row.ios.body': 'Joins through TestFlight rather than a direct download link.',
-'site.download.row.ios.gap': 'The beta channel is being opened: the app works down to the interface, real-device distribution is what is missing. This row becomes a join button once it is open.',
+'site.download.row.ios.gap': 'The external TestFlight group and its public join link both exist already, but Apple has not approved the beta review — opening that link today shows "This beta isn\'t accepting any new testers right now." A button that leads to a dead end is not something we put up; once the review passes, this row becomes a join button on its own.',
   'site.download.row.android.name': 'Android',
   'site.download.row.android.body': 'The full client on your phone, with data on the device.',
   'site.download.row.android.arch': 'Universal (arm64 and arm)',

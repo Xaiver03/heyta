@@ -3567,7 +3567,7 @@ export const zhCN = {
   'site.download.row.macos.gap': '包已经打好、也过了公证，只差把它放进公开下载的那一步。',
   'site.download.row.ios.name': 'iOS',
   'site.download.row.ios.body': '通过 TestFlight 加入内测，不走网页直链。',
-'site.download.row.ios.gap': '内测通道还在开通：功能已经跑通到界面级，缺的是真机分发。开通后这一行会变成加入入口。',
+'site.download.row.ios.gap': 'TestFlight 的外部测试组与公开加入链接都已经建好了，但 Apple 的外部测试审核还没通过 —— 那个链接现在点进去会写着「暂不接收新测试者」。一个点了是死路的按钮我们不放，审核过了这一行自己会变成加入入口。',
   'site.download.row.android.name': 'Android',
   'site.download.row.android.body': '装在手机上的完整客户端，数据存在设备上。',
   'site.download.row.android.arch': '通用包（arm64 与 arm）',

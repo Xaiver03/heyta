@@ -6930,7 +6930,7 @@ macOS zip 装上打不开（§7 第 82 条那一族），它匿名 200 也不该
 | 端 | 状态 | 读数 |
 |---|---|---|
 | macOS | ✅ **已发布** | `heyta-1.0.0-macos.dmg` 2,362,276 B，sha256 `15ae5583…26fe12`，匿名 Range 实取 `206 / bytes 0-0/2362276`。只有 arm64（`lipo -archs`）⇒ Intel 那一行写的是缺口不是文案 |
-| iOS | ✅ **已进 TestFlight 内测** | build 2（`CFBundleShortVersionString 1.0` / `CFBundleVersion 2`）：archive → export（IPA 13,799,274 B，sha256 `de84b207…c2861`）→ `asc builds upload --wait` `uploaded:true` → `processingState VALID` → `add-groups` 成功 → **`internalBuildState: IN_BETA_TESTING`**。**但还没有访客能点开的入口**（见格 5）；`asc builds next-build-number` 现量 `nextBuildNumber=2`，所以 `CURRENT_PROJECT_VERSION 1→2` 四行已入库（`CFBundleVersion` 必须等于**已上传那一枚**，否则下一发撞号）|
+| iOS | ✅ **已进 TestFlight 内测** | build 2（`CFBundleShortVersionString 1.0` / `CFBundleVersion 2`）：archive → export（IPA 13,799,274 B，sha256 `de84b207…c2861`）→ `asc builds upload --wait` `uploaded:true` → `processingState VALID` → `add-groups` 成功 → **`internalBuildState: IN_BETA_TESTING`**。**但还没有访客能点开的入口**（见格 5）；`asc builds next-build-number` 现量 `nextBuildNumber=2`，所以 `CURRENT_PROJECT_VERSION 1→2` 四行已入库（`CFBundleVersion` 必须等于**已上传那一枚**，否则下一发撞号。**外部组「公开内测」已建**（id `2e98d782…`，`isInternalGroup:false`）、build 2 已挂上（回读 `/betaGroups/…/builds` = `[ce1f0017…, 2]`）、**公开链接已存在** `https://testflight.apple.com/join/hmMPsDdc`（HTTP 200）—— 但访客现在点进去服务端渲染的第一句是 `This beta isn't accepting any new testers right now.` ⇒ 见格 6 |
 | Android | ✅ **已发布** | 远端 gradle 出包（`run-gradle.mjs` 收口点，回传 `app-release.apk` 67,149,560 B，现量签名 `CN=Android Debug`）⇒ **Mac 本地 `apksigner` 重签**（密钥不出机）→ `heyta-1.0.0-android.apk` 67,196,357 B / sha256 `f8c2b40b…`，`Signer #1 DN: CN=heyta, OU=Mobile, O=Xiaoli …`、v2+v3 过、`zipalign -c` 过、非 debuggable。**设备腿**：`adb uninstall` 调试那枚 → 装这一枚 `Success` → `am start -W` 起 `com.heytamobile.MainActivity` → 前台窗口确认 → 截图内容 56.8%、主蓝 4001，人打开看过 = 首屏联网同意卡 |
 | Windows | ✅ **已发布（便携形态）** | `HeytaWindows.csproj:24` `WindowsPackageType=None` + `:32` `WindowsAppSDKSelfContained=true` ⇒ 从纯 publish 目录 `RESULT=OK`（`cdp_browser=Edg/154…`、`target_heyta_local=True`）。`heyta-1.0.0-windows.zip` 96,659,883 B / sha256 `f024c228…`，651 条目里 `coreclr.dll` + `Microsoft.WindowsAppRuntime.dll` + `Bootstrap.dll` + `Microsoft.WinUI.dll` + `WebView2Loader.dll` 都在。**两格没证**：没在"没装过框架包"的干净机器上跑过；exe 无 Authenticode ⇒ SmartScreen 第一次会拦（已写进访客看得见的 caveat） |
 | Linux | ✅ **已发布**（`sudo dpkg -i` 那一格仍开） | 盒子本机（Ubuntu 24.04.5）原生打出 `heyta_1.0.0_amd64.deb` 1,300,282 B / sha256 `0d9335ee…`，两侧字节逐字相同；`HEYTA_LINUX_SMOKE=OK 13/13`、解包态真窗口 `SHELL_UI=web-dist` 900x523 主蓝 3987。**`dpkg -i` 需要密码，这台机没有免密 root**（`sudo -n` rc=1、`pkexec` 无认证代理），于是把那一格里**能在无 root 下证的全证了**：① 控制包只有 `control` ⇒ **没有 maintainer 脚本**，装的动作就是解 32 个路径；② `Depends` 六枚逐条 `dpkg-query -W` 都装着（`libgtk-4-1 4.14.5`、`libwebkitgtk-6.0-4 2.52.6`…）；③ 32 条路径逐条 `dpkg -S` **零冲突**，阳性对照 `/usr/bin/ls → coreutils` 证明探针认得出所有者 ⇒ 剩下的只是事务本身 |
@@ -6960,20 +6960,47 @@ MSIX `1.0.0.0`、`package-desktop.mjs` 写 `0.0.0`）—— 批次号统一不�
 ② `feat/self-host-distribution` 上那枚 `check:app-version` 与本格 ① 是同一件事，**不要各建一套**；
 ③ 主检出那 34 枚在飞路径仍未动（另一会话正在写）；④ `landing` 那 3 条 mockup 红（B101 格 1）仍是原归属。
 
-### 格 6 — iOS 的访客入口不存在，而且**不是我们没做**：Apple 直接拒了
+### 格 6 — 上一轮那句"公开链接结构上不存在"**被推翻了**，而且推翻它只要一个字段
 
-`channels.ios` 要放的那串 `testflight.apple.com/join/…` 只在**外部测试组**上才有；
-账号里唯一存在的组是内部组，开公开链接被服务端原话挡回：
+07 11:5x 那一轮记的是：内部组开公开链接被 Apple 拒（`Public link cannot be enabled for internal group`），
+并且"asc 无处返回 join token（`groups edit` 只有开关、`asc web` 无 testflight 子命令）⇒ 事后只能从 ASC 网页读"。
+**前半句一直是对的**（它打在了内部组上），**后半句是错的**：`BetaGroup` 的可读字段里就有
+`publicLink` / `publicLinkId`，开关一开 API 原样返回 ——
 
 ```
-Public link cannot be enabled for internal group   （asc rc=5）
+asc testflight groups edit --id 2e98d782-943b-4da8-9f51-04b2d4a60b2d --public-link-enabled
+→ "publicLinkEnabled": true, "publicLink": "https://testflight.apple.com/join/hmMPsDdc"
 ```
 
-⇒ 下载页的 iOS 那一格现在按 ADR-0058 走 `guide`，**没有按钮**，这是设计而不是遗漏
-（清单里没有的出口不许变成可点的东西）。要它变成按钮只有一条路：**新建外部组 + 提交
-beta 审核**（还要先补 `betaAppReviewDetails` 的联系邮箱），而那是对外动作 —— 没有指令不做。
-另外 asc 无处返回 join token（`groups edit` 只有开关、`asc web` 无 testflight 子命令）
-⇒ 事后那串只能从 ASC 网页读，域名已在 `OFFICIAL_STORE_HOSTS` 白名单里，形状不是问题。
+📌 教训：**"某件事做不到"的结论要连着它的前提一起记**。那轮真正的观察是"内部组不能开公开链接"，
+我把它写成了"公开链接这件事没有出口"—— 多出来的那一半把下一轮引向了"得开浏览器去网页读"，
+而它根本不需要。**外部组 + 一个开关 = API 直接给。**
+
+**现在真正差的那一格只有一个**：Apple 的外部测试审核**没提交成**，因为
+`betaAppReviewDetails` 的 PATCH 必填集是 `contactPhone` + `contactFirstName` + `contactLastName`，
+而**电话号码我们结构上没有** —— 条款里三处（`terms.ts:309`、`minors.ts:214`、`data-rights.ts:273`，中英各一遍）
+明文承诺「我们**没有**电话」，全仓 `docs/` + `packages/legal` 也搜不到任何 11 位号码，
+同账号另外三枚 app 的 `betaAppReviewDetail` 电话字段全是 `null`。
+**没有编号码、没有用占位串** —— 那等于把审核员唯一的升级路径接到空号上。
+联系邮箱不是编的：`packages/legal/src/index.ts:68` 的 `contactEmail: 'heyta@waytofuture.cn'`
+（`terms.ts:309` / `data-rights.ts:273` 对外也只有这一个）。
+
+Beta App Description 已在服务端（`zh-Hans`，id `b95ac97d-2545-46c7-af04-2d247b7039e1`，
+feedbackEmail 同一个地址；文本如实写明开发阶段、连的是自建测试服务端不承诺留存、移动端通行密钥未接入）。
+⚠️ 一条可迁移读数：**Beta 文本里出现 `🔴` 会被判 `Text contains invalid characters/formats`**，
+去掉表情同一条命令就过。
+
+拿到一个能接通的电话之后，**两条命令收口**（描述已在服务端，不必重写）：
+
+```bash
+asc testflight review edit --id 6817635248 --contact-email "heyta@waytofuture.cn" \
+  --contact-first-name "湘雷" --contact-last-name "邓" --contact-phone "<真实号码>" --notes "<同 Beta 描述>"
+asc testflight review submit --build-id ce1f0017-c3e6-4c3c-b66e-e9409fe0e63c --confirm
+```
+
+**过审之前那一行不许变成按钮**：链接活着但服务端写着"暂不接收新测试者"，
+放个按钮上去就是"点了是死路"那一类，正是 ADR-0058 拦的东西。
+过审后不需要任何开关动作，把 `channels.ios` 写进快照 + 刷新 + 重发落地页即可。
 
 ### 格 7 — `pod install` 会改脏 `Podfile.lock`，变量是 reinstall-all 自己带的那两个 env
 
