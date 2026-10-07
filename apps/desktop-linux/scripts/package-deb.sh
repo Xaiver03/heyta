@@ -350,9 +350,16 @@ else
     --include='/apps/web/dist/***' \
     --exclude='*' \
     "$REPO/" "${TARGET}:${REMOTE_DIR}/"
+  # 🔴 **免 sudo 那台载体上，pkg-config 与头文件只活在 provisioning 写出的那份 env 里**，
+  #    而 ssh 管道起的是**非登录** shell —— 不 source 就得到
+  #    `make: pkg-config: 没有那个文件或目录`（07 10:1x 实测：`pnpm build:linux <别名>` 这一档
+  #    在 `linux-dev-lan` 上从来没打出过包，而 `check:linux-shell` 那侧的读数是**人先 source 再跑**
+  #    拿到的 —— 那条手递手没有写进这里，就成了"入口存在但打不出产物"）。
+  #    有则用、没有就照旧走系统 PATH，且把用没用**打印出来**：不静默改任何一台机的环境。
+  ENV_PRELUDE='if [ -f "${HOME}/heyta-linux-prefix/env.sh" ]; then . "${HOME}/heyta-linux-prefix/env.sh"; echo "LINUX_ENV=sourced ${HOME}/heyta-linux-prefix/env.sh"; else echo "LINUX_ENV=none（用系统 PATH 里的 pkg-config）"; fi'
   ssh "$TARGET" \
     "RD='${REMOTE_DIR}' EXPECTED_DIST_SHA='${EXPECTED_DIST_SHA}' VERSION='${VERSION}' DO_INSTALL='${DO_INSTALL}' SKIP_WINDOW='${SKIP_WINDOW}' bash -s" \
-    <"$BODY" >"$LOG" 2>&1 || rc=$?
+    <(printf '%s\n' "$ENV_PRELUDE"; cat "$BODY") >"$LOG" 2>&1 || rc=$?
 fi
 cat "$LOG"
 if [ "$rc" -ne 0 ]; then
