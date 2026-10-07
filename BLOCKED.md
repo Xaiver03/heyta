@@ -6931,9 +6931,9 @@ macOS zip 装上打不开（§7 第 82 条那一族），它匿名 200 也不该
 |---|---|---|
 | macOS | ✅ **已发布** | `heyta-1.0.0-macos.dmg` 2,362,276 B，sha256 `15ae5583…26fe12`，匿名 Range 实取 `206 / bytes 0-0/2362276`。只有 arm64（`lipo -archs`）⇒ Intel 那一行写的是缺口不是文案 |
 | iOS | ✅ **已进 TestFlight 内测** | build 2（`CFBundleShortVersionString 1.0` / `CFBundleVersion 2`）：archive → export（IPA 13,799,274 B，sha256 `de84b207…c2861`）→ `asc builds upload --wait` `uploaded:true` → `processingState VALID` → `add-groups` 成功 → **`internalBuildState: IN_BETA_TESTING`**。**但还没有访客能点开的入口**（见格 5）；`asc builds next-build-number` 现量 `nextBuildNumber=2`，所以 `CURRENT_PROJECT_VERSION 1→2` 四行已入库（`CFBundleVersion` 必须等于**已上传那一枚**，否则下一发撞号）|
-| Android | 🔴 不可发布 | 当前 APK `apksigner` 读出 `CN=Android Debug`。直链会让换正式签名时必须卸载 ⇒ 连本地数据一起清。腿在查"不移动密钥"的通道 |
-| Windows | 🔴 不可发布 | MSIX 由 `New-SelfSignedCertificate` 签，访客要先信任证书。腿在查便携形态是否 unpackaged 可跑 |
-| Linux | 🔄 在载体机上直接构建 | 缺的那格是 `dpkg -i`（今天以前只有 `dpkg-deb -x`）。腿在 `linux-dev-lan` 上原生构建 + 验装 |
+| Android | ✅ **已发布** | 远端 gradle 出包（`run-gradle.mjs` 收口点，回传 `app-release.apk` 67,149,560 B，现量签名 `CN=Android Debug`）⇒ **Mac 本地 `apksigner` 重签**（密钥不出机）→ `heyta-1.0.0-android.apk` 67,196,357 B / sha256 `f8c2b40b…`，`Signer #1 DN: CN=heyta, OU=Mobile, O=Xiaoli …`、v2+v3 过、`zipalign -c` 过、非 debuggable。**设备腿**：`adb uninstall` 调试那枚 → 装这一枚 `Success` → `am start -W` 起 `com.heytamobile.MainActivity` → 前台窗口确认 → 截图内容 56.8%、主蓝 4001，人打开看过 = 首屏联网同意卡 |
+| Windows | ✅ **已发布（便携形态）** | `HeytaWindows.csproj:24` `WindowsPackageType=None` + `:32` `WindowsAppSDKSelfContained=true` ⇒ 从纯 publish 目录 `RESULT=OK`（`cdp_browser=Edg/154…`、`target_heyta_local=True`）。`heyta-1.0.0-windows.zip` 96,659,883 B / sha256 `f024c228…`，651 条目里 `coreclr.dll` + `Microsoft.WindowsAppRuntime.dll` + `Bootstrap.dll` + `Microsoft.WinUI.dll` + `WebView2Loader.dll` 都在。**两格没证**：没在"没装过框架包"的干净机器上跑过；exe 无 Authenticode ⇒ SmartScreen 第一次会拦（已写进访客看得见的 caveat） |
+| Linux | ✅ **已发布**（`sudo dpkg -i` 那一格仍开） | 盒子本机（Ubuntu 24.04.5）原生打出 `heyta_1.0.0_amd64.deb` 1,300,282 B / sha256 `0d9335ee…`，两侧字节逐字相同；`HEYTA_LINUX_SMOKE=OK 13/13`、解包态真窗口 `SHELL_UI=web-dist` 900x523 主蓝 3987。**`dpkg -i` 需要密码，这台机没有免密 root**（`sudo -n` rc=1、`pkexec` 无认证代理），于是把那一格里**能在无 root 下证的全证了**：① 控制包只有 `control` ⇒ **没有 maintainer 脚本**，装的动作就是解 32 个路径；② `Depends` 六枚逐条 `dpkg-query -W` 都装着（`libgtk-4-1 4.14.5`、`libwebkitgtk-6.0-4 2.52.6`…）；③ 32 条路径逐条 `dpkg -S` **零冲突**，阳性对照 `/usr/bin/ls → coreutils` 证明探针认得出所有者 ⇒ 剩下的只是事务本身 |
 | 鸿蒙 | 🔴 结构上没有出口 | 能出 HAP、跑不起来（镜像 + 签名不在我们手里） |
 
 ⚠️ 桶里 09-30 那两枚 `0.0.0-dev` 对象**我没有删**（那是别人传的对象），页面也不引用它们。
@@ -6956,7 +6956,7 @@ macOS zip 装上打不开（§7 第 82 条那一族），它匿名 200 也不该
 第二次被它自己的守卫挡下（入口 HTML 脏 ⇒ 拒发），修完发第三次 —— 这条守卫是有效能的，别绕。
 
 未闭合：① 各端产物**自己声明的版本号**仍不一致（APK `1.0`、mac `1.0.0`、deb `1.0.0`、
-MSIX `1.0.0.0`、`package-desktop.mjs` 写 `0.0.0`）—— 批次号统一不等于产物统一；
+MSIX `1.0.0.0`、`package-desktop.mjs` 写 `0.0.0`）—— 批次号统一不等于产物统一；**读数与撞车点在格 8**；
 ② `feat/self-host-distribution` 上那枚 `check:app-version` 与本格 ① 是同一件事，**不要各建一套**；
 ③ 主检出那 34 枚在飞路径仍未动（另一会话正在写）；④ `landing` 那 3 条 mockup 红（B101 格 1）仍是原归属。
 
@@ -6993,3 +6993,30 @@ beta 审核**（还要先补 `betaAppReviewDetails` 的联系邮箱），而那�
 与它自己每次跑完都打印 `⚠️ pod install 改动了 Podfile.lock` 是**同一件事的两面**：
 可复现性取决于跑它时带不带 env，而脚本从来只警告、不判红、也不还原。
 **归属**：那两行 env 与 #150 属于 ios/原生那条线，我不代改判据；这里只把变量收窄到一枚。
+
+### 格 8 — 批次号 `1.0.0` 已经公开，它就变成了一个**不能被后面那批选小的**数
+
+今天以 `--version 1.0.0` 发了四端（mac / android / windows / linux），桶里 `latest.json` 的批次号与
+`latest/` 那一档都写死了 `1.0.0`。而现量的版本号是**三套**：
+
+| 位置 | 值 | 谁定的 |
+|---|---|---|
+| 各端产物自己声明的 | APK `versionName "1.0"`（`apps/mobile/android/app/build.gradle:140`）、mac `1.0.0`、deb `1.0.0`、MSIX `1.0.0.0`（`package-msix.ps1:43`）、iOS `1.0` | 每枚脚本各写一份字面量 |
+| 根 `package.json`（main） | `0.0.0` | 占位值 |
+| 根 `package.json`（`feat/self-host-distribution`） | `0.1.0` | G-44b 把它定成**客户端版本号唯一真源** + `check:app-version` 拦 `0.0.0` |
+
+🔴 **给那条线的撞车点**：`0.1.0 < 1.0.0`。它落 main 之后，如果下一批按 root 取批次号，就会发出一个
+**比公开在外的号更小**的版本 —— `latest.json` 的 `version` 会倒退，而下载页只认文件自己的版本，
+不会报这个错（它没有"批次号必须递增"这条判据）。要么 root 抬到 `>= 1.0.0`，要么下一批直接用 `1.0.1`/`1.1.0`。
+**这一格归 self-host 那条线**（同一件事，本格不另建 `check:app-version`），这里只把数摆出来。
+
+### 格 9 — 我自己写了一遍**已经被记录过的**假绿探针
+
+装机判据我第一趟没走 `reinstall-all.sh`，而是手敲了 monkey + 截图 + `png-stats`，得到
+`contentRatio=86.97% 主蓝=1416 RESULT=OK` —— 打开图一看是 **launcher 的 All apps 页**。
+而 `scripts/reinstall-all.sh:362` 那段注释写的正是同一件事（2026-10-03，同一枚 AVD：monkey 之后
+`mCurrentFocus` 仍是 launcher，两条像素判据全过）。第二趟照脚本的顺序跑（前台窗口不是 `com.heyta`
+就 `am start -W` 重拉，**确认前台之后才打分**）才拿到真读数。
+
+📌 复述一遍元规则：**先怀疑探针，而"怀疑探针"的第一动作是去读仓库里已有的那枚探针** ——
+判据已经在树里写着，我绕过它自己写了一份更弱的。新写验收脚本前先 grep 同名动作的实现。

@@ -75,6 +75,46 @@ https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/l
 `upload-dist.sh` 是它**之后**的独立一步，刻意不并进去 —— 分发是外向动作，不该被
 "装好了"顺手触发（早期开发阶段传一堆 0.0.x 到公网没有意义，想传的时候显式传）。
 
+### 3.1 第一批真发布（2026-10-07，四端）里三件只有做过才知道的事
+
+**① Android 的正式签名可以在**发起机**上做，密钥不用出境。**
+远端打包机（`run-gradle.mjs` 收口点）出来的 `app-release.apk` 在缺四个 keystore 键时会被
+`build.gradle` 挂到 `signingConfigs.debug` 上（现量 `CN=Android Debug`）。补签的做法是
+把**那一份 APK** 传回持有发布密钥的机器，用 `apksigner sign` 重签 —— 密钥一个字节都不出境：
+
+```bash
+# 远端出包 → 回传 → 本地重签（zipalign 已由 AGP 做过，仍要 -c 复核）
+apksigner sign --ks <发布库> --ks-key-alias <别名> --out heyta-<v>-android.apk app-release.apk
+apksigner verify --print-certs heyta-<v>-android.apk   # 期望 DN 里有 CN=heyta，不是 CN=Android Debug
+zipalign -c 4 heyta-<v>-android.apk
+```
+
+🔴 **这条路径目前没有脚本、也没有门禁**：仓里没有任何地方执行 `apksigner`，"期望的 Signer DN"
+也没钉住 —— 也就是说下一轮谁忘了重签就直接上传，页面会照样给一个调试签名的按钮（臂 D 只核版本号，
+不核签名）。**要补的是判据，不是这段文字**（登记在 `BLOCKED.md` 本轮那条）。
+
+**② `.dmg` 不是可复现容器。** 同一份源码，上午那批与下午重装各打出一枚，
+字节数不同（2,362,276 vs 2,367,142）。所以"发布的是哪一枚"只能由 **sha256** 回答，
+不能由"源码同一个 commit"回答 —— 桶里那条 `files.macos.sha256` 对的是**上传的那一枚**。
+
+**③ 装进系统那一格，能在无 root 下证的部分比想象中多。**
+盒子（Ubuntu 24.04.5）没有免密 root，`dpkg -i` 跑不了；但 `dpkg -i` 会失败的三种原因里三种都能提前查：
+
+| 会失败的原因 | 无 root 的查法 | 今天的读数 |
+|---|---|---|
+| 装的时候跑任意脚本（postinst 崩） | `dpkg-deb -e <deb> /tmp/x && ls /tmp/x` | 只有 `control` ⇒ **没有 maintainer 脚本** |
+| 依赖名对不上 Ubuntu 的包名 | 逐条 `dpkg-query -W -f='${Version}' <名>` | 六枚全装着（`libgtk-4-1 4.14.5`…） |
+| 与别的包抢同一个路径 | 逐条 `dpkg -S <路径>`，**先拿 `/usr/bin/ls → coreutils` 做阳性对照** | 32 条路径 0 冲突 |
+
+剩下没证的只是 dpkg 那次事务本身。**这一格开在访客看得见的地方**：`/download` 的 Linux 那一行
+caveat 写的就是"我们验过解包后能起真界面，还没有人在自己机器上装过 —— 装不上请告诉我们"，
+而不是把它包装成已验。要闭合只需在有 root 的机器上跑一次
+`sudo dpkg -i heyta_1.0.0_amd64.deb && dpkg -L heyta | head`。
+
+⚠️ 批次号一旦公开就变成下界：这批以 `1.0.0` 发出后，下一批的号**不能比它小**
+（`latest.json` 的 `version` 会倒退，而下载页只认各文件自己的 `version`，没有任何一层会报）。
+现量冲突见 `BLOCKED.md` 本轮格 8（root `package.json` 在 main 是 `0.0.0`、在 self-host 那条线是 `0.1.0`）。
+
 ## 4. 成本与省流量
 
 - 外网下行 ≈ **¥0.5/GB**：63MB APK ≈ 3 分/次下载，1000 次 ≈ ¥30。存储 ≈ ¥0.1/GB·月（IA 减半），可忽略。
