@@ -17,7 +17,7 @@
  *      "每两周""每月最后一个工作日"这类规则只能靠它。
  *
  * ─────────────────────────────────────────────────────────────────────────
- * 三个刻意的决定
+ * 四个刻意的决定
  *
  * 1. **当前规则常驻可见（chip），编辑控件收进 `<details>`** —— 与 `TaskOrganizer`
  *    同一条理由：扫一眼列表要能看出哪些任务是重复的。
@@ -25,6 +25,17 @@
  *    上去像"这条任务不重复"，而用户一点「每天」就把那条规则悄悄换掉了。
  * 3. **校验在调用前做，错误就地显示**。`setRepeat` 对非法规则会**抛**，
  *    但我们不该让用户靠一次失败来发现"这个串不合法"。
+ * 4. **原始 RRULE 输入收进「高级」（W6，审计 §4.6）**：默认只显示预设与当前
+ *    规则（预设那一组单选里「自定义：{rule}」那一项就是规则描述），
+ *    自定义 RRULE 的文本框放进一枚**默认折叠**的 `<details>`（summary「高级」）。
+ *    "每两周""每月最后一个工作日"这类规则是**少数人**的进阶能力，让它常驻
+ *    等于把一串 `FREQ=WEEKLY;INTERVAL=2;BYDAY=MO` 摆在大多数用户眼前。
+ *    展开后的校验行为与收进之前**逐字不变**（同一只输入框、同一枚应用按钮、
+ *    同一条就地报错）。
+ *    ⚠️ 这枚 `<details>` 属于**编辑本体**而不是行尾浮层外壳：`RepeatField` 的
+ *    两个落点（行尾浮层 `TaskRepeat` 与栏里那一格 `TaskDetailCard`）**一致生效** ——
+ *    刻意不做"行尾展开、栏里常驻"的分叉，两处同一只控件折叠态不同，
+ *    用户会把"这边找不到输入框"读成"功能丢了"。
  *
  * 🔴 本文件里**没有一行业务逻辑**：预设有哪几个、锚点怎么钉、非法规则怎么判、
  * 缺截止日时要不要顺手补一个 —— 全在 `@heyta/app-host` / `@heyta/domain`。
@@ -93,6 +104,25 @@ const chipStyle: React.CSSProperties = {
   fontSize: cssVar('font-size.xs'),
   color: cssVar('color.foreground-muted'),
   whiteSpace: 'nowrap',
+};
+
+/*
+ * 「高级」折叠区（W6，审计 §4.6）的两枚样式 —— 模块级常量而不是 JSX 里的
+ * `style={{…}}` 字面量：后者会被 `scripts/check-l4-no-style.mjs` 计进棘轮。
+ * summary **保留**浏览器自带的展开三角：这是行内折叠机关（不是行尾那颗
+ * 纯图标 chip 触发器），三角本身就是"这里能展开"的提示，藏掉它就要另画一个。
+ */
+const advancedSummaryStyle: React.CSSProperties = {
+  cursor: 'pointer',
+  fontSize: cssVar('font-size.xs'),
+  color: cssVar('color.foreground-muted'),
+};
+
+const advancedBodyStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: cssVar('space.2'),
+  marginTop: cssVar('space.1'),
 };
 
 /**
@@ -242,46 +272,56 @@ export function RepeatField({
         })()}
       </fieldset>
 
-      {/* ── 自定义 RRULE ─────────────────────────────────────────── */}
-      <label style={{ display: 'flex', flexDirection: 'column', gap: cssVar('space.1') }}>
-        <span
-          style={{ fontSize: cssVar('font-size.xs'), color: cssVar('color.foreground-muted') }}
-        >
-          {t('web.repeat.customLabel')}
-        </span>
-        <input
-          type="text"
-          value={draft}
-          placeholder={t('web.repeat.customPlaceholder')}
-          aria-label={t('web.repeat.customAria', { title: task.title })}
-          data-testid="task-repeat-custom-input"
-          onChange={(event) => {
-            setDraft(event.target.value);
-            // 用户一开始改输入就把上一次的报错清掉 —— 让错误信息跟着输入走。
-            setError(undefined);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') {
-              event.preventDefault();
-              applyCustom();
-            }
-          }}
-        />
-      </label>
-      <div style={{ display: 'flex', alignItems: 'center', gap: cssVar('space.2') }}>
-        <button type="button" data-testid="task-repeat-custom-apply" onClick={applyCustom}>
-          {t('web.repeat.apply')}
-        </button>
-        {error !== undefined && (
-          <span
-            role="alert"
-            data-testid="task-repeat-error"
-            style={{ fontSize: cssVar('font-size.xs'), color: cssVar('color.danger') }}
-          >
-            {t(CUSTOM_ERROR_KEYS[error])}
-          </span>
-        )}
-      </div>
+      {/* ── 自定义 RRULE（收进「高级」，W6 / 审计 §4.6）──────────────────
+          🔴 默认**折叠**：预设单选（含「自定义：{rule}」那一项）常驻可见，
+          原始 RRULE 文本框只有展开后才出现。展开后的校验/应用/报错与收进之前
+          逐字同一条路 —— 这里只挪了**住址**，没动**行为**。
+          这枚 `<details>` 不带 `open` 属性 = 默认收起；`data-testid` 供判据
+          钉"默认不可见、展开后可见"这一档。 */}
+      <details data-testid="task-repeat-advanced">
+        <summary style={advancedSummaryStyle}>{t('web.tasks.detail.advanced')}</summary>
+        <div style={advancedBodyStyle}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: cssVar('space.1') }}>
+            <span
+              style={{ fontSize: cssVar('font-size.xs'), color: cssVar('color.foreground-muted') }}
+            >
+              {t('web.repeat.customLabel')}
+            </span>
+            <input
+              type="text"
+              value={draft}
+              placeholder={t('web.repeat.customPlaceholder')}
+              aria-label={t('web.repeat.customAria', { title: task.title })}
+              data-testid="task-repeat-custom-input"
+              onChange={(event) => {
+                setDraft(event.target.value);
+                // 用户一开始改输入就把上一次的报错清掉 —— 让错误信息跟着输入走。
+                setError(undefined);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  applyCustom();
+                }
+              }}
+            />
+          </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: cssVar('space.2') }}>
+            <button type="button" data-testid="task-repeat-custom-apply" onClick={applyCustom}>
+              {t('web.repeat.apply')}
+            </button>
+            {error !== undefined && (
+              <span
+                role="alert"
+                data-testid="task-repeat-error"
+                style={{ fontSize: cssVar('font-size.xs'), color: cssVar('color.danger') }}
+              >
+                {t(CUSTOM_ERROR_KEYS[error])}
+              </span>
+            )}
+          </div>
+        </div>
+      </details>
     </>
   );
 }
