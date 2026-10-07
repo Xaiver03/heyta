@@ -54,6 +54,10 @@ const organizerRow = (page: Page, name: string) =>
 
 test.describe('任务整理：清单归属 + 标签', () => {
   test('建清单与标签 → 挂到任务上 → 刷新后仍在（证明走了 op-log）', async ({ page }) => {
+    // 这一支钉的是"挂上去刷新后仍在 = 走了 op-log"，落点在哪一档不是它的主题；
+    // 而 §8.147 起宽档行尾只画只读 `TagChips`，`task-organize-summary` 整块不画。
+    // 同理由见下面"取消归属"那一支。
+    await page.setViewportSize({ width: 900, height: 600 });
     await openApp(page);
     await addTask(page, TITLE);
 
