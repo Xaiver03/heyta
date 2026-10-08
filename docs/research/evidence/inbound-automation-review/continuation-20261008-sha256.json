@@ -1,0 +1,20 @@
+{
+  "packages/app-host/src/inbound-worker-loop.ts": "648fc2dcf9ae85aba02c72f5311e6cc438d3f9f35b515acd5062f3b1453315cd",
+  "packages/app-host/src/inbound-worker.ts": "3dc0cfab7ebf7923b1232109a126d6d8be5b990ca4f17b67b6778025491b4f0a",
+  "packages/app-host/src/inbound-runner.ts": "b7aa23de995eb8a2863c9228fc08ee25c267ee57b341413ad66a7e2af99c82b8",
+  "packages/app-host/src/inbound-process.ts": "c3d9c109491cda2b6eaa4b1a63a02117a1ad2ce899cf681e0a59c09734de1530",
+  "packages/inbound-core/src/parser.ts": "a43b1ad6bcb964a0edcb85c369d65c4de5884b9f76cc18f890ac933b07d66879",
+  "server/src/automation/events.ts": "cc8cb8c4f90a81a1a803d91ab5d593c4c074861077db2c7324c77b2e155c3098",
+  "server/src/automation/rules.ts": "93756740aeef165d1f0d8e2b9de7e19b8784a4c13897b1a953a170a01f589209",
+  "server/src/automation/worker-identity.ts": "ba042a226b982b60d24ab644ddaa0cfcf6b7a80c88f8ae716d873032afdbea70",
+  "server/src/sync/services/operation-upload.service.ts": "ed065f02a16cead70ec8ecd74645229f8b5da9e35a72a9256143d53a8a1618f6",
+  "server/tests/integration/inbound-worker-identity.integration.spec.ts": "5bea7f3acd1166d6551e06fca1832d2aa60608df7eae0388da43ed5945c2b9a1",
+  "apps/web/src/features/settings/InboundAutomationSettings.tsx": "17c6785499aaf18c98e4d6ddd17b1889668e0d3de3140845fbef5eea0fe88bab",
+  "apps/node-host/src/host.ts": "ff8879163adf4cc986d8b45a36aa670712e4152045999eff18e20598b26ec095",
+  "packages/app-host/src/host.ts": "030a7c65bd9e89e51f8bdd127508fbf6bf12b307c6b97e5b05b90ac01457cb11",
+  "apps/web/src/features/settings/inbound-runtime.ts": "c008f502d7920d4593a8923bd3a9cc32f1086d684ad79fa237b2d162b4fc5619",
+  "apps/web/src/features/sync/store.ts": "64fbb143b7ac30e24c691b8ccfdaae2bf4e9440b37803f714e8808a89d8d7d55",
+  "apps/node-host/tests/host.spec.ts": "a931350b2f6d7eb92e41f8d6bf4cdd4f98c6de5c041fc9c450feda9ab16d943f",
+  "apps/web/tests/inbound-upload-authorization.spec.ts": "ddb5b1ce72bab5ffa7963a85b5fb461e32feb6f890325e96b862e3cf72442cee",
+  "docs/research/evidence/inbound-automation-review/continuation-20261008.txt": "6018e3b1d623b921df0c942a4c87887d1a5d3be5023533ddd5c599f161f21aa4"
+}

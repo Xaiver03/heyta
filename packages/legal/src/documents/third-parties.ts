@@ -43,7 +43,7 @@ import type { LegalDocument } from '../types.js';
 const zh = [
   {
     id: 's1',
-    title: '这份清单怎么看：数据离开我们有四种身份',
+    title: '这份清单怎么看：数据离开我们有五种身份',
     blocks: [
       {
         kind: 'p',
@@ -51,7 +51,7 @@ const zh = [
       },
       {
         kind: 'p',
-        text: '法律上「共享」不是一件事，而是几件不同的事，判据是**对方是否自己决定处理目的**（《个人信息保护法》第二十一条与第二十三条的分界）。监管模板要求至少区分三种：委托处理、你直接发送给第三方、你指示的转移。我们在此基础上单列第四种，因为它才是本节表里两行的正确定性，而这一字之差决定**要不要你的单独同意**。',
+        text: '法律上「共享」不是一件事，而是几件不同的事，判据是**对方是否自己决定处理目的**（《个人信息保护法》第二十一条与第二十三条的分界）。监管模板要求至少区分三种：委托处理、你直接发送给第三方、你指示的转移。我们在此基础上单列第四种，因为它才是本节表里两行的正确定性，而这一字之差决定**要不要你的单独同意**。2026-10-08 起再列第五种：**你与其他用户之间的共享** —— 它不在监管模板的三种里，却同样落在「要不要单独同意」的问题上；逐项披露见 s4b 节。',
       },
       {
         kind: 'table',
@@ -76,6 +76,11 @@ const zh = [
             '你指示的转移',
             '数据本就在你手上，按你的主动操作交给别人',
             '导出文件经系统分享面板、本机其他程序经本机 API 读取',
+          ],
+          [
+            '你与其他用户共享',
+            '你主动把某一份清单披露给你指定的其他用户；对方以自己的账号身份读取使用，既不是受托处理，也不只是技术通道',
+            '共享清单（功能尚未开放，数据层已就位——逐项披露见 s4b 节）',
           ],
         ],
       },
@@ -254,6 +259,54 @@ const zh = [
     ],
   },
   {
+    id: 's4b',
+    title: '你与其他用户的共享：把一份清单披露给你指定的人',
+    blocks: [
+      {
+        kind: 'p',
+        text: '这是唯一一种**由你点名接收方**的数据披露：你把某一份清单设为共享，你指定的人以他们自己的账号加入，此后那份清单对你的设备与他们的设备是同一份内容。这项功能尚未开放；但它的数据层（共享关系、成员资格、邀请、共享操作日志四张表）已在 2026-10-08 部署。按「先披露、后上线」的纪律，类别先列进来，措辞与上线时的实际行为对齐。',
+      },
+      {
+        kind: 'table',
+        head: ['项目', '内容', '谁能看到'],
+        rows: [
+          [
+            '清单内容',
+            '你设为共享的**那一份清单**里的任务标题、备注、日期与清单名',
+            '仅该清单成员——在你与成员的设备上经清单密钥解密；服务端只存密文，没有钥匙',
+          ],
+          [
+            '明文元数据',
+            '共享关系本身（谁与谁共享哪份清单）、成员角色（可编辑 / 可评论 / 只读）、成员的封装公钥、共享操作日志的实体类型与时间',
+            '服务端与该清单的全体成员',
+          ],
+          [
+            '不受影响的',
+            '你的其它清单、偏好设置、提醒、专注与统计',
+            '不进共享，维持原有可见范围',
+          ],
+        ],
+      },
+      {
+        kind: 'p',
+        text: '单独同意：把一份清单设为共享是一个**明示动作**，不是任何默认状态。开启之前，产品会向你确认一次——列明上表的可见范围与元数据类别——并记录这次确认；被邀请的成员在接受邀请时，也会看到那份清单来自谁。我们按《个人信息保护法》第二十三条的最严口径处理这一步。',
+      },
+      {
+        kind: 'p',
+        text: '撤回与边界：你移除一名成员，那份清单的密钥随即更换、历史全部重加密，被移除者此后读不到新内容；但其设备上已缓存的本地副本，与《隐私政策》"其它设备"那一条是同一条边界——我们同样没有远程擦除它的通道。你注销账号时，共享关系与共享操作日志随账号一并删除；成员侧那份清单如何处置（转让或解散），在功能上线时一并明确。',
+      },
+      {
+        kind: 'p',
+        text: '还有一条边界不因共享而移动：成员之间分发的是**密文**，不是可统计的明文。排行榜、联赛、组队这类需要服务端读取明文做跨用户聚合的形态，在结构上仍然不做——共享改变的是「谁能读」，不是「我们能算」。',
+      },
+      {
+        kind: 'docRef',
+        docId: 'privacy',
+        text: '处理的总口径、你的权利与我们的义务见《隐私政策》。共享不改变其中的任何承诺，只新增本节披露的类别。',
+      },
+    ],
+  },
+  {
     id: 's5',
     title: '谁对这些数据负责，怎么找到我们',
     blocks: [
@@ -373,7 +426,7 @@ const zh = [
 const en = [
   {
     id: 's1',
-    title: 'How to read this list: the four capacities in which data leaves us',
+    title: 'How to read this list: the five capacities in which data leaves us',
     blocks: [
       {
         kind: 'p',
@@ -381,7 +434,7 @@ const en = [
       },
       {
         kind: 'p',
-        text: 'Legally, "sharing" is not one thing but several, and the test is **whether the other party decides the purpose itself** (the line drawn between Articles 21 and 23 of PIPL). The regulatory template asks us to distinguish at least three: processing on our behalf, data you send to a third party directly, and transfers made at your instruction. We add a fourth, because it is the correct characterisation of two rows in Section 2 — and that single word decides **whether your separate consent is required**.',
+        text: 'Legally, "sharing" is not one thing but several, and the test is **whether the other party decides the purpose itself** (the line drawn between Articles 21 and 23 of PIPL). The regulatory template asks us to distinguish at least three: processing on our behalf, data you send to a third party directly, and transfers made at your instruction. We add a fourth, because it is the correct characterisation of two rows in Section 2 — and that single word decides **whether your separate consent is required**. Since 2026-10-08 we also list a fifth: **sharing between you and other heyta users** — absent from the regulatory template\'s three, it still turns on the same question of separate consent; see section s4b for the item-by-item disclosure.',
       },
       {
         kind: 'table',
@@ -406,6 +459,11 @@ const en = [
             'Transferred at your instruction',
             'The data was already in your hands and leaves because of an action you took',
             'The export file via the system share sheet, other local programs reading through the local API',
+          ],
+          [
+            'Shared with other users',
+            'You actively disclose one list to specific other users; they read and use it under their own accounts — neither entrusted processing nor a mere technical conduit',
+            'Shared lists (not yet launched; the data layer is in place — see section s4b)',
           ],
         ],
       },
@@ -584,6 +642,54 @@ const en = [
     ],
   },
   {
+    id: 's4b',
+    title: 'Sharing with other heyta users: disclosing one list to the people you choose',
+    blocks: [
+      {
+        kind: 'p',
+        text: 'This is the only disclosure here **where you name the recipients**: you turn one list into a shared list, the people you choose join under their own accounts, and from then on that list is one and the same content on your devices and theirs. The feature is not launched yet; its data layer — four tables for share records, memberships, invitations and the shared operation log — was deployed on 2026-10-08. Following the discipline of "disclose first, launch later", the category is listed now, in wording that matches the behaviour at launch.',
+      },
+      {
+        kind: 'table',
+        head: ['Item', 'What it is', 'Who can see it'],
+        rows: [
+          [
+            'List content',
+            'The task titles, notes, dates and the list name inside **the one list** you set to shared',
+            'Members of that list only — decrypted by the list key on your device and theirs; the server stores ciphertext only and holds no key',
+          ],
+          [
+            'Cleartext metadata',
+            'The sharing relationship itself (who shares which list with whom), member roles (editor / commenter / viewer), each member\'s wrapping public key, and the entity types and timestamps in the shared operation log',
+            'The server and every member of that list',
+          ],
+          [
+            'Not affected',
+            'Your other lists, preferences, reminders, focus sessions and statistics',
+            'Not shared; visibility unchanged',
+          ],
+        ],
+      },
+      {
+        kind: 'p',
+        text: 'Separate consent: turning a list into a shared list is an **explicit act**, never a default state. Before it is switched on, the product asks you to confirm once — spelling out the visibility scope and the metadata categories in the table above — and records that confirmation; an invited member also sees who the list came from when accepting. We handle this step under the strictest reading of Article 23 of PIPL.',
+      },
+      {
+        kind: 'p',
+        text: 'Revocation and boundaries: when you remove a member, that list\'s key is replaced immediately and the history is re-encrypted, so the removed member can no longer read new content; but the copy already cached on their device sits behind the same boundary as the "your other devices" line in the Privacy Policy — we likewise have no channel to wipe it remotely. When you close your account, the sharing relationships and the shared operation log are deleted together with it; what happens to the list on the member side (transfer or dissolution) will be settled when the feature launches.',
+      },
+      {
+        kind: 'p',
+        text: 'One boundary does not move because of sharing: what circulates between members is **ciphertext**, not countable plaintext. Leaderboards, leagues and co-op features — anything that needs the server to read cleartext for cross-user aggregation — remain structurally out of reach. Sharing changes who can read; it does not change what we can compute.',
+      },
+      {
+        kind: 'docRef',
+        docId: 'privacy',
+        text: 'The overall approach to processing, your rights and our duties are set out in the Privacy Policy. Sharing changes none of those commitments; it only adds the categories disclosed in this section.',
+      },
+    ],
+  },
+  {
     id: 's5',
     title: 'Who is accountable for this data, and how to reach us',
     blocks: [
@@ -702,9 +808,9 @@ const en = [
 
 export const thirdParties: LegalDocument = {
   id: 'third-parties',
-  version: '1.3',
+  version: '1.4',
   status: 'draft',
-  updatedDate: '2026-10-04',
+  updatedDate: '2026-10-08',
   title: {
     'zh-CN': '第三方与共享清单',
     en: 'Third Parties and Data Sharing Inventory',

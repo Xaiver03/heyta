@@ -247,3 +247,33 @@ export type {
   CreatedVaultKeyPackage,
   EncryptedVaultRecord,
 } from './key-lifecycle';
+
+// Shared-list key distribution (ADR-0062): identity keys, member envelopes,
+// rekey planning and idempotent history re-encryption. Pure functions only.
+export {
+  SHARE_KEYS_FORMAT_VERSION,
+  SHARE_IDENTITY_SEED_LENGTH,
+  SHARE_LIST_KEY_LENGTH,
+  generateShareIdentitySeed,
+  generateShareListKey,
+  deriveShareIdentityKeyPair,
+  deriveShareOperationKey,
+  shareKeyFingerprint,
+  sealListKeyForRecipient,
+  openListKeyEnvelope,
+  planShareRekey,
+  encryptShareRecord,
+  decryptShareRecord,
+  reencryptShareRecord,
+  buildShareOpSignatureMessage,
+  signShareOperation,
+  verifyShareOperationSignature,
+  assertShareMemberKeyEnvelope,
+  assertShareEncryptedRecord,
+} from './share-keys';
+export type {
+  ShareIdentityKeyPair,
+  ShareMemberKeyEnvelope,
+  ShareEncryptedRecord,
+  ShareRekeyPlan,
+} from './share-keys';

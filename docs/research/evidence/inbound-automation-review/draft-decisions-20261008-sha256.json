@@ -1,0 +1,14 @@
+{
+  "scope": "Stage only: encrypted draft backend and shared transport; no complete AC acceptance.",
+  "postgresEvidence": "26 passed before final CAS/read-expiry adjustments; subsequent runs refused by memory guard. Latest sweep race test unexecuted.",
+  "sha256": {
+    "packages/shared-schema/src/inbound-draft-contract.ts": "22239fd3ed3144e78b2db2a9b5eb7877fa18ac11303de2e05456eb1cc99bdff2",
+    "packages/shared-schema/src/index.ts": "e95babcadbb33b4dfc135d478b0ebd5d54c96084b09b9e77c6215b04ee674662",
+    "server/src/automation/events.ts": "85c1d1b07944ec149c03744cc368cae49d1ca0be8b310816262cdc069f6e5091",
+    "server/src/api.ts": "7a63b5e3cdde9645c6b1580ff246c5b38aa85687ee76bb8c906e35c89f26a5cd",
+    "packages/app-host/src/inbound-rules-remote.ts": "f6a634bbeafb2d3db647cbe2ad4c7e2e82bc3e88ce3cafcbed51f6a4174eb17a",
+    "server/tests/automation-drafts.spec.ts": "bdb4e3fc5b6571fea648bb67834146d2b3ef55dba7085f088fac501878b34d61",
+    "packages/app-host/tests/inbound-rules-remote.spec.ts": "88ff687efe4a202119f728b38226447401320029658add08d885e0c8934c5d14",
+    "server/tests/integration/inbound-worker-identity.integration.spec.ts": "5563c51c4c2138aed068e0cc31d4307277521599536318d6e20aadc8eaba2319"
+  }
+}

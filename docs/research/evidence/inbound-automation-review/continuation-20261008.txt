@@ -1,0 +1,34 @@
+2026-10-08 continuation verification (local development tree; not release acceptance)
+
+Real HTTP + disposable PostgreSQL 17:
+  python3 research/tools/verify-inbound-worker-identity.py --pg-bin /opt/homebrew/opt/postgresql@17/bin --log /tmp/heyta-inbound-completion.log
+  1 file / 20 tests passed. All repository SQL migrations applied to a new loopback-only database.
+  Covered: exact retries and identity rejection; completed event update in upload transaction;
+  injected completion UPDATE failure rolls back op; uncached duplicate repairs receipt;
+  expiry removes ciphertext while preserving completed; rule deletion erases ledger and
+  signed owner receipt still authorizes late upload; expired sent attempt is not transferred
+  into a second physical model request; claim receivedAt equals persisted creation time.
+
+Targeted tests:
+  inbound-core: 3 files / 40 tests passed (includes strict output and fixed rule target).
+  app-host inbound-* + task-batch-actions: 9 files / 41 tests passed.
+  server automation-* + inbound route: 5 files / 22 tests passed.
+  Web worker lifecycle + persisted upload authorization: 2 files / 2 tests passed.
+  Node host: 1 file / 10 tests passed, including real SQLite close/reopen and normal
+  sync sending the persisted worker credential + journal receipt and clearing pending op.
+
+Scope limitations:
+  These are focused HTTP, database and host tests, not the dual-process kill matrix.
+  No four-platform reinstall, full repository check, production rollout or UI visual
+  acceptance is claimed. A transient memory gate rejection was retried after builds
+  finished; it is not counted as a test result.
+
+Checks: inbound-core/app-host/i18n builds passed; app-host/Web/Node and server TypeScript
+passed. UI-language check passed. Global layering check failed at existing mobile
+chat-controller.ts:215,228,309 assistant-tier literals (outside this slice); no full
+repository green result is claimed.
+Documentation link gate: 52 links point to existing but untracked files in the
+parallel UX/distribution work. New continuation evidence files are tracked.
+Goal tool at turn end returned blocked; create_goal rejected the user-requested
+replacement because the prior goal remains unfinished. No update_goal(blocked)
+was called in this continuation, and completion is not claimed.

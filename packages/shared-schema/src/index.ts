@@ -1,4 +1,32 @@
 // Schema version constants
+export {
+  INBOUND_MAX_PLAINTEXT_BYTES,
+  inboundKeyScopeSchema, inboundEnvelopeContextSchema,
+  inboundEnvelopeSchema, inboundWrappedKeySchema,
+  type InboundKeyScope, type InboundEnvelopeContext, type InboundEnvelope, type InboundWrappedKey,
+} from './inbound-crypto-contract';
+export {
+  TASK_MIN_DURATION_MINUTES, TASK_MAX_DURATION_MINUTES,
+  TASK_BATCH_MAX_ITEMS, TASK_BATCH_MAX_TITLE_LENGTH, TASK_BATCH_MAX_NOTE_LENGTH,
+  taskAutomationSourceSchema, taskBatchItemSchema, heytaTaskBatchPayloadSchema,
+  hasTaskBatchMarker, parseTaskBatchOperation,
+  taskBatchOperationId, taskBatchItemId,
+  type TaskAutomationSource, type TaskBatchItem, type HeytaTaskBatchPayload,
+} from './task-batch-contract';
+export {
+  taskPriorityBatchItemSchema, heytaTaskPriorityBatchPayloadSchema,
+  hasTaskPriorityBatchMarker, parseTaskPriorityBatchOperation,
+  type TaskPriorityBatchItem, type HeytaTaskPriorityBatchPayload,
+} from './task-priority-batch-contract';
+export {
+  heytaTaskRepeatCompletionPayloadSchema,
+  hasTaskRepeatCompletionMarker,
+  parseTaskRepeatCompletionOperation,
+  type TaskRepeatCompletionTaskPatch,
+  type TaskRepeatCompletionReminderPatch,
+  type HeytaTaskRepeatCompletionPayload,
+} from './task-repeat-completion-contract';
+export { reminderOwnerFromId, validateReminderOwnerOperation } from './reminder-owner-contract';
 export { isHeytaFullStatePayload, type HeytaFullStatePayload } from './full-state-payload';
 export {
   CURRENT_SCHEMA_VERSION,
@@ -46,7 +74,10 @@ export {
   SuperSyncCausalFrontierSchema,
   SuperSyncClientIdSchema,
   SuperSyncOperationSchema,
+  SuperSyncUploadOperationSchema,
   SuperSyncUploadOpsRequestSchema,
+  SuperSyncInboundCommitProofsSchema,
+  SuperSyncInboundUploadAuthorizationSchema,
   SuperSyncDownloadOpsQuerySchema,
   SuperSyncUploadSnapshotRequestSchema,
   SuperSyncOperationResponseSchema,
@@ -74,6 +105,7 @@ export type {
   SuperSyncErrorCode,
   SuperSyncOperation,
   SuperSyncUploadOpsRequest,
+  SuperSyncInboundUploadAuthorization,
   SuperSyncDownloadOpsQuery,
   SuperSyncUploadSnapshotRequest,
   SuperSyncServerOperation,
@@ -101,10 +133,17 @@ export {
   PASSWORD_POLICY_CODES,
   AUTH_PASSWORD_MIN_CODE_POINTS,
   AUTH_PASSWORD_MAX_CODE_POINTS,
+  EMAIL_PASSWORD_REGISTRATION_ERROR_CODES,
+  EMAIL_PASSWORD_REGISTRATION_CODE_LENGTH,
+  EMAIL_PASSWORD_REGISTRATION_CODE_TTL_MS,
+  EMAIL_PASSWORD_REGISTRATION_RESEND_COOLDOWN_MS,
 } from './auth-http-contract';
 export type {
   PasswordAuthErrorCode,
   PasswordPolicyCode,
+  EmailPasswordRegistrationErrorCode,
+  EmailPasswordRegistrationChallengeResponse,
+  EmailPasswordRegistrationVerifyRequest,
 } from './auth-http-contract';
 
 // 账号资料（R10）：昵称 + 头像的路径 / 长度界限 / 响应形状。

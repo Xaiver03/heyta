@@ -1,0 +1,44 @@
+heyta inbound recovery / retention / session review, 2026-10-08
+This is a curated record of observed command results, not raw output for every command.
+Raw PostgreSQL output is in the adjacent -postgres.txt file.
+
+PASS: real HTTP + disposable PostgreSQL 17 integration: 1 file / 24 tests.
+Command: python3 research/tools/verify-inbound-worker-identity.py --pg-bin /opt/homebrew/opt/postgresql@17/bin --log /tmp/heyta-inbound-retention.log
+Includes: frozen recovery ownership; unknown model explicit retry CAS; retention before cleanup;
+lease/attempt/parse-version/rule sending gates; required publication count/version;
+first permit entitlement after an observed real account-row lock wait; exact owner retry after expiry.
+Other existing tests include completion-trigger rollback, worker revocation and delayed owner proof uploads.
+These are NOT two independent SQLite process termination tests.
+
+PASS: @heyta/inbound-core: 3 files / 40 tests.
+PASS: @heyta/app-host inbound-* and task-batch-actions: 9 files / 46 tests.
+Includes content digest tamper, recovery/permit/serialized-dispatch session invalidation.
+PASS: @heyta/node-host tests/host.spec.ts: 1 file / 10 tests (real SQLite).
+PASS: server automation-events, automation-ai-metering, automation-commit-proof, automation-rules: 4 files / 15 tests.
+PASS: Web inbound-event-retry, inbound-worker-lifecycle, inbound-upload-authorization: 3 files / 4 tests.
+Lifecycle file rerun after adding token-change/unmount fence assertions: 1 file / 1 test.
+PASS: Chromium: playwright.inbound.config.ts: 2 tests, at 1280 and 390 widths,
+light/dark screenshots, cancel causes zero retries, confirm causes one retry.
+Browser uses HTTP fixtures. It is UI evidence, not a real provider/backend E2E claim.
+Looked at rendered screenshots: retry-390-dark, retry-1280-dark, form-1280-light, form-390-light.
+Before screenshots retained; field widths / checkbox heights / status heights asserted.
+
+PASS: inbound-core and app-host builds; app-host and Web typechecks; server tsc --noEmit.
+PASS: check:design; check:ui-language; git diff --check (at invocation).
+FAIL: check:layering: existing mobile chat-controller.ts tier literals at lines 215, 228, 309.
+FAIL: check:docs: 53 existing untracked targets in parallel UX/distribution documents and Windows README.
+No inbound review links reported. Source/evidence manifest recheck: 34 entries, zero mismatches.
+No full repository green claim, no AC completion, no cross-platform install claim.
+
+Intermediate failures (resolved, not counted as product passes):
+- Memory gate denied launching tests; sequential retry later passed. Gate was not bypassed.
+- Making itemCount required caught a missing transport-test fixture argument; updated and typecheck passed.
+- Adding the entitlement import caused the integration fixture's JWT configuration to load too late;
+  23/24 tests failed authentication. Setting test JWT configuration with vi.hoisted before module imports
+  restored the real HTTP test configuration; subsequent full integration run passed 24/24.
+
+Still open: date-only persisted semantics, BYO/local/managed quota separation, editable encrypted drafts,
+self-hosted signed entitlement, sender credential issuance, all host lifecycle integrations,
+protocol heartbeat/timeout alignment, dual-process crash matrix, all-platform current-artifact install.
+
+Follow-up billing alignment: direct/local attempts now return billingSource=direct and periodAnchor=null without changing ai_usage_counters; managed attempts remain quota-metered. app-host inbound process/runner 14 tests passed after 20s heartbeat and 45s provider timeout alignment. Migration checker passed 64 files.

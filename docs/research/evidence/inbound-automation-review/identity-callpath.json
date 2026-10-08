@@ -1,0 +1,9 @@
+{
+  "date": "2026-10-07",
+  "files": {
+    "server/src/middleware.ts": "b52bdf1af9f9c632809d2baca95f99006445d63634c25fff3ede7aa539c0ab87",
+    "server/src/sync/sync.routes.ops-handler.ts": "4e7cd198f1610df9465e1733b5d0eab409d36dc2d2f22723fcccc501ba944326",
+    "server/src/sync/services/operation-upload.service.ts": "3c6ef72ed454354ebd111f806e13d99088c03196e69dbd4f113b41f5954fad04",
+    "server/src/sync/services/validation.service.ts": "89978255895256e47a43b152fce9f85de6adf11da71409d66677c5a47da38a54"
+  }
+}

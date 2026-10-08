@@ -1,0 +1,629 @@
+/** Real HTTP + PostgreSQL, including the public worker registration route. */
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import Fastify from 'fastify';
+import { PrismaClient } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
+import * as jwt from 'jsonwebtoken';
+import { signCommitProof } from '../../src/automation/commit-proof';
+import { generateWorkerCredential } from '../../src/automation/worker-identity';
+import { generateInboundKeyPair, openInbound, signWebhook } from '@heyta/inbound-core';
+
+// auth reads its signing configuration during import, including imports reached
+// through worker entitlement checks. Set the fixture before loading modules.
+const originalJwtSecret = vi.hoisted(() => {
+  const previous = process.env.JWT_SECRET;
+  process.env.JWT_SECRET = 'inbound-identity-test-secret-at-least-32';
+  return previous;
+});
+
+const DATABASE_URL = process.env.DATABASE_URL;
+describe.skipIf(!DATABASE_URL)('inbound identity through ordinary sync HTTP', () => {
+  const db = new PrismaClient();
+  const app = Fastify();
+  const workerA = generateWorkerCredential();
+  const workerB = generateWorkerCredential();
+  const epoch = randomUUID();
+  const clientA = `a-${randomUUID()}`;
+  const clientB = `b-${randomUUID()}`;
+  const eventId = randomUUID();
+  const ruleId = randomUUID();
+  const webhookEventId = `webhook-${randomUUID()}`;
+  const webhookRuleId = randomUUID();
+  const recipient = generateInboundKeyPair();
+  const oldSecret = originalJwtSecret;
+  const oldCommitKeys = process.env.AUTOMATION_COMMIT_KEYS;
+  const oldWebhookKeys = process.env.AUTOMATION_WEBHOOK_KEYS;
+  const signing = { instanceId: '6ff03f66-5bdb-48ab-a8e7-3606f38b7bf3', activeKeyId: 'test', keys: { test: '11'.repeat(32) } };
+  let userId: number;
+  let otherId: number;
+  let base: string;
+  let token: string;
+  let otherToken: string;
+  const op = {
+    id: `inbound:${eventId}`, clientId: clientA, entityType: 'TASK', opType: 'BATCH',
+    actionType: 'BATCH', entityId: `inbound:${eventId}:0`, entityIds: [`inbound:${eventId}:1`],
+    payload: Buffer.alloc(44, 7).toString('base64'), isPayloadEncrypted: true,
+    vectorClock: { [clientA]: 1 }, timestamp: Date.now(), schemaVersion: 1,
+  };
+  const upload = async (workerToken: string | undefined, overrides: {
+    requestId?: string; epoch?: string; token?: string; op?: Record<string, unknown>; path?: string; proofs?: Record<string, string>;
+  } = {}) => fetch(`${base}/api/sync/${overrides.path ?? 'ops'}`, {
+    method: 'POST', headers: { authorization: overrides.token ?? token, 'content-type': 'application/json',
+      ...(workerToken ? { 'x-heyta-worker-token': workerToken } : {}),
+      'x-heyta-database-epoch': overrides.epoch ?? epoch },
+    body: JSON.stringify({ clientId: clientA, requestId: overrides.requestId ?? 'inbound-identity-retry', ops: [overrides.op ?? op], inboundCommitProofs: overrides.proofs }),
+  });
+  beforeAll(async () => {
+    process.env.JWT_SECRET = 'inbound-identity-test-secret-at-least-32';
+    process.env.AUTOMATION_COMMIT_KEYS = JSON.stringify(signing);
+    process.env.AUTOMATION_WEBHOOK_KEYS = JSON.stringify({ keys: { 'inbound-v1': '22'.repeat(32) } });
+    const { initSyncService } = await import('../../src/sync/sync.service');
+    const { syncRoutes } = await import('../../src/sync/sync.routes');
+    const { apiRoutes } = await import('../../src/api');
+    const { inboundAutomationRoutes } = await import('../../src/automation/inbound.routes');
+    initSyncService();
+    const user = await db.user.create({ data: { email: `inbound-${randomUUID()}@test.local`, isVerified: 1 } });
+    const other = await db.user.create({ data: { email: `inbound-${randomUUID()}@test.local`, isVerified: 1 } });
+    userId = user.id; otherId = other.id;
+    await db.subscription.create({ data: { userId, status: 'active', grants: ['ai', 'automation'], currentPeriodEnd: BigInt(Date.now() + 86400000) } });
+    await db.automationEvent.create({ data: { userId, ruleId, eventId, ruleVersion: 1, dedupeDigest: 'a'.repeat(64),
+      status: 'prepared', payloadCiphertext: 'sealed-input', resultCiphertext: 'sealed-result', parseVersion: 1, resultDigest: 'a'.repeat(64), resultItemCount: 2, expiresAt: new Date(Date.now() + 86400000) } });
+    const sign = (id: number, email: string) => `Bearer ${jwt.sign({ userId: id, email, tokenVersion: 0 }, process.env.JWT_SECRET!)}`;
+    token = sign(user.id, user.email); otherToken = sign(other.id, other.email);
+    for (const [worker, client] of [[workerA, clientA], [workerB, clientB]] as const) {
+      await db.automationWorker.create({ data: { id: worker.workerId, userId,
+        credentialHash: worker.credentialHash, syncClientId: client, databaseEpoch: epoch } });
+    }
+    await db.automationCommitPermit.create({ data: { eventId, userId, workerId: workerA.workerId,
+      opId: op.id, ruleId, ruleVersion: 1, parseVersion: 1, resultDigest: 'a'.repeat(64), itemCount: 2 } });
+    await db.automationRule.create({ data: { id: webhookRuleId, userId, enabled: true, keyId: 'inbound-v1' } });
+    await app.register(apiRoutes, { prefix: '/api', requireTermsConsent: false });
+    await app.register(inboundAutomationRoutes, { prefix: '/api', serverOrigin: 'http://127.0.0.1' });
+    await app.register(syncRoutes, { prefix: '/api/sync' });
+    base = await app.listen({ host: '127.0.0.1', port: 0 });
+  }, 30000);
+  afterAll(async () => {
+    await app.close();
+    if (userId) await db.user.delete({ where: { id: userId } });
+    if (otherId) await db.user.delete({ where: { id: otherId } });
+    await db.$disconnect();
+    const { disconnectDb } = await import('../../src/db'); await disconnectDb();
+    if (oldCommitKeys === undefined) delete process.env.AUTOMATION_COMMIT_KEYS; else process.env.AUTOMATION_COMMIT_KEYS = oldCommitKeys;
+    if (oldWebhookKeys === undefined) delete process.env.AUTOMATION_WEBHOOK_KEYS; else process.env.AUTOMATION_WEBHOOK_KEYS = oldWebhookKeys;
+    if (oldSecret === undefined) delete process.env.JWT_SECRET; else process.env.JWT_SECRET = oldSecret;
+  });
+  it('rejects missing credentials without writing', async () => {
+    expect((await upload(undefined)).status).toBe(403);
+    expect(await db.operation.count({ where: { id: op.id } })).toBe(0);
+  });
+  it('registers a worker through authenticated HTTP and stores only a hash', async () => {
+    const response = await fetch(`${base}/api/automation/worker/register`, {
+      method: 'POST',
+      headers: { authorization: token, 'content-type': 'application/json' },
+      body: JSON.stringify({ clientId: `register-${randomUUID()}`, databaseEpoch: epoch }),
+    });
+    expect(response.status).toBe(201);
+    const body = await response.json() as { workerId: string; workerToken: string; databaseEpoch: string };
+    expect(body.workerToken).toMatch(/^[0-9a-f]{64}$/);
+    expect(body.databaseEpoch).toBe(epoch);
+    const row = await db.automationWorker.findUniqueOrThrow({ where: { id: body.workerId } });
+    expect(row.credentialHash).toHaveLength(64);
+    expect(row.credentialHash).not.toBe(body.workerToken);
+  });
+  it('discovers frozen results only for the durable owner and never returns confirmation drafts', async () => {
+    const recover = (workerToken: string, clientId: string, event?: string) => fetch(`${base}/api/automation/events/${event ? `${event}/result` : 'recover'}?clientId=${clientId}`, {
+      headers: { authorization: token, 'x-heyta-worker-token': workerToken, 'x-heyta-database-epoch': epoch },
+    });
+    const owned = await recover(workerA.token, clientA);
+    expect(owned.status).toBe(200);
+    expect(await owned.json()).toMatchObject({ eventId, resultCiphertext: 'sealed-result', state: 'prepared' });
+    expect(await (await recover(workerB.token, clientB)).json()).toEqual({ state: 'empty' });
+    expect((await recover(workerB.token, clientB, eventId)).status).toBe(404);
+
+    const unowned = randomUUID();
+    const recoveryRule = randomUUID();
+    await db.automationRule.create({ data: { id: recoveryRule, userId, enabled: true, keyId: 'inbound-v1' } });
+    await db.automationEvent.create({ data: { userId, ruleId: recoveryRule, eventId: unowned, ruleVersion: 1,
+      dedupeDigest: 'd'.repeat(64), status: 'prepared', parseVersion: 1, resultDigest: 'd'.repeat(64),
+      resultItemCount: 1, resultCiphertext: 'sealed-prepared', expiresAt: new Date(Date.now() + 86400000) } });
+    expect(await (await recover(workerB.token, clientB)).json()).toMatchObject({ eventId: unowned });
+    await db.automationRule.update({ where: { id: recoveryRule }, data: { enabled: false } });
+    expect(await (await recover(workerB.token, clientB)).json()).toEqual({ state: 'empty' });
+    await db.automationRule.update({ where: { id: recoveryRule }, data: { enabled: true } });
+    await db.automationEvent.updateMany({ where: { userId, eventId: unowned }, data: { status: 'needs-confirmation' } });
+    expect(await (await recover(workerB.token, clientB)).json()).toEqual({ state: 'empty' });
+    expect((await recover(workerB.token, clientB, unowned)).status).toBe(404);
+    await db.automationEvent.updateMany({ where: { userId, eventId: unowned }, data: { status: 'prepared', expiresAt: new Date(1) } });
+    expect(await (await recover(workerB.token, clientB)).json()).toEqual({ state: 'empty' });
+    await db.automationEvent.deleteMany({ where: { userId, ruleId: recoveryRule } });
+  });
+
+  it('issues one durable permit and an owner-held proof, with exact retry only', async () => {
+    const client = `permit-${randomUUID()}`;
+    const registration = await fetch(`${base}/api/automation/worker/register`, {
+      method: 'POST', headers: { authorization: token, 'content-type': 'application/json' },
+      body: JSON.stringify({ clientId: client, databaseEpoch: epoch }),
+    });
+    const worker = await registration.json() as { workerToken: string };
+    const event = randomUUID();
+    const body = { clientId: client, databaseEpoch: epoch, eventId: event, opId: `inbound:${event}`,
+      ruleId: randomUUID(), ruleVersion: 1, parseVersion: 1, resultDigest: 'd'.repeat(64), itemCount: 2 };
+    await db.automationRule.create({ data: { id: body.ruleId, userId, enabled: true, keyId: 'inbound-v1' } });
+    await db.automationEvent.create({ data: { userId, ruleId: body.ruleId, eventId: event, ruleVersion: 1,
+      dedupeDigest: 'd'.repeat(64), status: 'prepared', parseVersion: 1, resultDigest: body.resultDigest,
+      resultItemCount: 2, resultCiphertext: 'sealed-result', expiresAt: new Date(Date.now() + 86400000) } });
+    const permit = await fetch(`${base}/api/automation/commit-permit`, {
+      method: 'POST', headers: { authorization: token, 'content-type': 'application/json',
+        'x-heyta-worker-token': worker.workerToken, 'x-heyta-database-epoch': epoch }, body: JSON.stringify(body),
+    });
+    expect(permit.status).toBe(201);
+    const issued = await permit.json() as { proof: string };
+    expect(issued.proof).toContain('.');
+    expect(await db.automationCommitPermit.count({ where: { eventId: event } })).toBe(1);
+    const retry = await fetch(`${base}/api/automation/commit-permit`, {
+      method: 'POST', headers: { authorization: token, 'content-type': 'application/json',
+        'x-heyta-worker-token': worker.workerToken, 'x-heyta-database-epoch': epoch }, body: JSON.stringify(body),
+    });
+    expect(retry.status).toBe(201);
+    const conflict = await fetch(`${base}/api/automation/commit-permit`, {
+      method: 'POST', headers: { authorization: token, 'content-type': 'application/json',
+        'x-heyta-worker-token': worker.workerToken, 'x-heyta-database-epoch': epoch },
+      body: JSON.stringify({ ...body, resultDigest: 'e'.repeat(64) }),
+    });
+    expect(conflict.status).toBe(403);
+  });
+  it('rechecks entitlement after waiting for the account lock while preserving exact owner retries', async () => {
+    const freshEvent = randomUUID(); const freshRule = randomUUID();
+    await db.automationRule.create({ data: { id: freshRule, userId, enabled: true, keyId: 'inbound-v1' } });
+    await db.automationEvent.create({ data: { userId, ruleId: freshRule, eventId: freshEvent, ruleVersion: 1,
+      dedupeDigest: 'd'.repeat(64), status: 'prepared', resultCiphertext: 'sealed', resultDigest: 'd'.repeat(64),
+      resultItemCount: 1, parseVersion: 1, expiresAt: new Date(Date.now() + 86400000) } });
+    const subscriptions = await db.subscription.findMany({ where: { userId } });
+    const post = (body: object) => fetch(`${base}/api/automation/commit-permit`, {
+      method: 'POST', headers: { authorization: token, 'content-type': 'application/json',
+        'x-heyta-worker-token': workerA.token, 'x-heyta-database-epoch': epoch }, body: JSON.stringify(body),
+    });
+    const fresh = { clientId: clientA, databaseEpoch: epoch, eventId: freshEvent, opId: `inbound:${freshEvent}`,
+      ruleId: freshRule, ruleVersion: 1, parseVersion: 1, resultDigest: 'd'.repeat(64), itemCount: 1 };
+    let unlock!: () => void; let ready!: () => void;
+    const barrier = new Promise<void>((resolve) => { unlock = resolve; });
+    const locked = new Promise<void>((resolve) => { ready = resolve; });
+    const holder = db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+      ready(); await barrier;
+    }, { timeout: 15000 });
+    await locked;
+    let pending: Promise<Response> | undefined;
+    try {
+      try {
+        pending = post(fresh);
+        let waiting = false;
+        for (let i = 0; i < 500; i++) {
+          const rows = await db.$queryRaw<Array<{ count: bigint }>>`
+            SELECT count(*) FROM pg_stat_activity WHERE datname = current_database()
+              AND wait_event_type = 'Lock' AND query ILIKE '%SELECT id FROM users%'
+              AND pid <> pg_backend_pid()
+          `;
+          if (Number(rows[0].count) > 0) { waiting = true; break; }
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        }
+        expect(waiting).toBe(true);
+        await db.subscription.updateMany({ where: { userId }, data: { currentPeriodEnd: 1n } });
+      } finally { unlock(); await holder; }
+      expect((await pending!).status).toBe(403);
+      expect(await db.automationCommitPermit.count({ where: { userId, eventId: freshEvent } })).toBe(0);
+      const original = { clientId: clientA, databaseEpoch: epoch, eventId, opId: op.id,
+        ruleId, ruleVersion: 1, parseVersion: 1, resultDigest: 'a'.repeat(64), itemCount: 2 };
+      expect((await post(original)).status).toBe(201);
+      expect((await post({ ...original, itemCount: 1 })).status).toBe(403);
+    } finally {
+      await pending?.catch(() => undefined);
+      for (const subscription of subscriptions) await db.subscription.update({ where: { id: subscription.id },
+        data: { currentPeriodEnd: subscription.currentPeriodEnd } });
+      await db.automationEvent.deleteMany({ where: { userId, eventId: freshEvent } });
+    }
+  }, 20000);
+
+  it('accepts a signed webhook into an encrypted event and exposes only opaque status', async () => {
+    await db.automationRecipientKey.upsert({ where: { userId }, create: { userId, keyEpoch: 1,
+      publicKey: Buffer.from(recipient.publicKey, 'base64').toString('base64url'), packageVersion: 3 }, update: {
+      keyEpoch: 1, publicKey: Buffer.from(recipient.publicKey, 'base64').toString('base64url'), packageVersion: 3,
+    } });
+    const body = Buffer.from('{"title":"postgres-secret"}', 'utf8');
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const path = `/api/automation/v1/hooks/${webhookRuleId}`;
+    const secret = Buffer.from('22'.repeat(32), 'hex');
+    const signature = signWebhook(secret, { method: 'POST', path, ruleId: webhookRuleId, keyId: 'inbound-v1', timestamp,
+      eventId: webhookEventId, contentType: 'application/json', body });
+    const response = await fetch(`${base}${path}`, { method: 'POST', body, headers: {
+      'content-type': 'application/json', 'x-heyta-key-id': 'inbound-v1', 'x-heyta-timestamp': timestamp,
+      'x-heyta-event-id': webhookEventId, 'x-heyta-signature': signature,
+    } });
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({ eventId: webhookEventId, state: 'queued' });
+    const stored = await db.automationEvent.findFirstOrThrow({ where: { eventId: webhookEventId, userId, ruleId: webhookRuleId } });
+    expect(stored.payloadCiphertext).not.toContain('postgres-secret');
+    const opened = await openInbound(JSON.parse(stored.payloadCiphertext), recipient.privateKey, {
+      accountId: `user-${userId}`, serverOrigin: 'http://127.0.0.1', ruleId: webhookRuleId,
+      eventId: webhookEventId, purpose: 'input', keyEpoch: 1,
+    });
+    expect(Buffer.from(opened).equals(body)).toBe(true);
+    const different = Buffer.from('{"title":"different"}', 'utf8');
+    const conflictTimestamp = String(Math.floor(Date.now() / 1000));
+    const conflictSignature = signWebhook(secret, { method: 'POST', path, ruleId: webhookRuleId, keyId: 'inbound-v1', timestamp: conflictTimestamp,
+      eventId: webhookEventId, contentType: 'application/json', body: different });
+    expect((await fetch(`${base}${path}`, { method: 'POST', body: different, headers: {
+      'content-type': 'application/json', 'x-heyta-key-id': 'inbound-v1', 'x-heyta-timestamp': conflictTimestamp,
+      'x-heyta-event-id': webhookEventId, 'x-heyta-signature': conflictSignature,
+    } })).status).toBe(409);
+    const claim = await fetch(`${base}/api/automation/events/claim`, { method: 'POST', headers: {
+      authorization: token, 'content-type': 'application/json', 'x-heyta-worker-token': workerA.token,
+      'x-heyta-database-epoch': epoch,
+    }, body: JSON.stringify({ clientId: clientA, eventId: webhookEventId }) });
+    expect(claim.status).toBe(200);
+    const claimed = await claim.json() as { eventId: string; leaseGeneration: number; payloadCiphertext: string; receivedAt: number };
+    expect(claimed.eventId).toBe(webhookEventId);
+    expect(claimed.receivedAt).toBe(stored.createdAt.getTime());
+    const renewed = await fetch(`${base}/api/automation/events/${webhookEventId}/renew`, { method: 'POST', headers: {
+      authorization: token, 'content-type': 'application/json', 'x-heyta-worker-token': workerA.token,
+      'x-heyta-database-epoch': epoch,
+    }, body: JSON.stringify({ clientId: clientA, leaseGeneration: claimed.leaseGeneration }) });
+    expect(renewed.status).toBe(200);
+    const invalidPublish = (overrides: object) => fetch(`${base}/api/automation/events/${webhookEventId}/result`, {
+      method: 'POST', headers: { authorization: token, 'content-type': 'application/json',
+        'x-heyta-worker-token': workerA.token, 'x-heyta-database-epoch': epoch },
+      body: JSON.stringify({ clientId: clientA, leaseGeneration: claimed.leaseGeneration, parseVersion: 1,
+        itemCount: 1, resultDigest: 'c'.repeat(64), resultCiphertext: claimed.payloadCiphertext, ...overrides }),
+    });
+    expect((await invalidPublish({ itemCount: undefined })).status).toBe(400);
+    expect((await invalidPublish({ parseVersion: 2 })).status).toBe(409);
+    expect(await db.automationEvent.findFirstOrThrow({ where: { userId, eventId: webhookEventId } }))
+      .toMatchObject({ status: 'leased', resultCiphertext: null });
+    const result = await fetch(`${base}/api/automation/events/${webhookEventId}/result`, { method: 'POST', headers: {
+      authorization: token, 'content-type': 'application/json', 'x-heyta-worker-token': workerA.token,
+      'x-heyta-database-epoch': epoch,
+    }, body: JSON.stringify({ clientId: clientA, leaseGeneration: claimed.leaseGeneration, parseVersion: 1, itemCount: 1,
+      resultDigest: 'c'.repeat(64), resultCiphertext: claimed.payloadCiphertext }) });
+    expect(result.status).toBe(200);
+    expect(await result.json()).toEqual({ eventId: webhookEventId, state: 'prepared', parseVersion: 1 });
+    const resultRetry = await fetch(`${base}/api/automation/events/${webhookEventId}/result`, { method: 'POST', headers: {
+      authorization: token, 'content-type': 'application/json', 'x-heyta-worker-token': workerA.token,
+      'x-heyta-database-epoch': epoch,
+    }, body: JSON.stringify({ clientId: clientA, leaseGeneration: claimed.leaseGeneration, parseVersion: 1, itemCount: 1,
+      resultDigest: 'c'.repeat(64), resultCiphertext: claimed.payloadCiphertext }) });
+    expect(resultRetry.status).toBe(200);
+  });
+  it('enforces retention before cleanup for renewal, publication and first permit', async () => {
+    const expiredId = randomUUID();
+    const expiredRuleId = randomUUID();
+    const expiresAt = new Date(Date.now() - 1_000);
+    const leaseExpiresAt = new Date(Date.now() + 60_000);
+    const sealed = JSON.stringify({ version: 1, keyEpoch: 1,
+      ephemeralPublicKey: Buffer.alloc(32, 1).toString('base64'),
+      nonce: Buffer.alloc(12, 2).toString('base64'), ciphertext: Buffer.alloc(24, 3).toString('base64') });
+    await db.automationRule.create({ data: { id: expiredRuleId, userId, enabled: true, keyId: 'inbound-v1' } });
+    await db.automationEvent.create({ data: { userId, ruleId: expiredRuleId, eventId: expiredId, ruleVersion: 1,
+      dedupeDigest: 'e'.repeat(64), status: 'leased', payloadCiphertext: sealed, leaseWorkerId: workerA.workerId,
+      leaseGeneration: 1, attempt: 1, leaseExpiresAt, expiresAt } });
+    const post = (path: string, body: unknown) => fetch(`${base}/api/automation/${path}`, {
+      method: 'POST', headers: { authorization: token, 'content-type': 'application/json',
+        'x-heyta-worker-token': workerA.token, 'x-heyta-database-epoch': epoch }, body: JSON.stringify(body),
+    });
+    const result = { clientId: clientA, leaseGeneration: 1, parseVersion: 1,
+      resultDigest: 'e'.repeat(64), resultCiphertext: sealed, itemCount: 1 };
+    expect((await post(`events/${expiredId}/renew`, { clientId: clientA, leaseGeneration: 1 })).status).toBe(409);
+    expect((await post(`events/${expiredId}/result`, result)).status).toBe(409);
+    expect(await db.automationEvent.findFirstOrThrow({ where: { userId, eventId: expiredId } }))
+      .toMatchObject({ status: 'leased', leaseExpiresAt, resultCiphertext: null });
+    // Even an exact publication retry must not serve or revive an expired draft.
+    await db.automationEvent.updateMany({ where: { userId, eventId: expiredId }, data: {
+      status: 'prepared', resultCiphertext: sealed, resultDigest: result.resultDigest, parseVersion: 1, resultItemCount: 1,
+    } });
+    expect((await post(`events/${expiredId}/result`, result)).status).toBe(409);
+    expect((await post('commit-permit', { clientId: clientA, databaseEpoch: epoch, eventId: expiredId,
+      opId: `inbound:${expiredId}`, ruleId: expiredRuleId, ruleVersion: 1, parseVersion: 1,
+      resultDigest: result.resultDigest, itemCount: 1 })).status).toBe(403);
+    expect(await db.automationCommitPermit.count({ where: { userId, eventId: expiredId } })).toBe(0);
+    await db.automationEvent.deleteMany({ where: { userId, eventId: expiredId } });
+  });
+
+  it('fences model reservations and sends by current rule, attempt and retention', async () => {
+    const event = randomUUID(); const rule = randomUUID();
+    const future = new Date(Date.now() + 86_400_000);
+    await db.automationRule.create({ data: { id: rule, userId, enabled: true, keyId: 'inbound-v1', parseVersion: 2 } });
+    await db.automationEvent.create({ data: { userId, ruleId: rule, eventId: event, ruleVersion: 1,
+      dedupeDigest: 'f'.repeat(64), status: 'leased', payloadCiphertext: 'sealed', leaseWorkerId: workerA.workerId,
+      leaseGeneration: 1, attempt: 3, leaseExpiresAt: future, expiresAt: future } });
+    const body = { clientId: clientA, ruleId: rule, parseVersion: 2, attempt: 3, leaseGeneration: 1 };
+    const post = (action: string, overrides: object = {}) => fetch(`${base}/api/automation/events/${event}/ai-attempt/${action}`, {
+      method: 'POST', headers: { authorization: token, 'content-type': 'application/json',
+        'x-heyta-worker-token': workerA.token, 'x-heyta-database-epoch': epoch }, body: JSON.stringify({ ...body, ...overrides }),
+    });
+    expect((await post('reserve', { attempt: 2 })).status).toBe(409);
+    expect((await post('reserve', { parseVersion: 1 })).status).toBe(409);
+    await db.automationEvent.updateMany({ where: { userId, eventId: event }, data: { expiresAt: new Date(1) } });
+    expect((await post('reserve')).status).toBe(409);
+    await db.automationEvent.updateMany({ where: { userId, eventId: event }, data: { expiresAt: future } });
+    await db.automationRule.update({ where: { id: rule }, data: { enabled: false } });
+    expect((await post('reserve')).status).toBe(409);
+    expect(await db.automationAiAttempt.count({ where: { userId, eventId: event } })).toBe(0);
+    await db.automationRule.update({ where: { id: rule }, data: { enabled: true } });
+    const usedBefore = await db.aiUsageCounter.findMany({ where: { userId } });
+    expect(await (await post('reserve')).json()).toMatchObject({ billingSource: 'direct', periodAnchor: null, state: 'reserved' });
+    expect(await (await post('reserve')).json()).toMatchObject({ billingSource: 'direct', periodAnchor: null, state: 'reserved' });
+    expect(await db.automationAiAttempt.count({ where: { userId, eventId: event } })).toBe(1);
+    expect(await db.aiUsageCounter.findMany({ where: { userId } })).toEqual(usedBefore);
+    const transition = { from: 'reserved', to: 'sent' };
+    await db.automationEvent.updateMany({ where: { userId, eventId: event }, data: { expiresAt: new Date(1) } });
+    expect((await post('state', transition)).status).toBe(409);
+    await db.automationEvent.updateMany({ where: { userId, eventId: event }, data: { expiresAt: future } });
+    await db.automationRule.update({ where: { id: rule }, data: { version: 2 } });
+    expect((await post('state', transition)).status).toBe(409);
+    await db.automationRule.update({ where: { id: rule }, data: { version: 1 } });
+    expect(await (await post('state', transition)).json()).toEqual({ changed: true });
+    expect(await (await post('state', transition)).json()).toEqual({ changed: false });
+    // Once sent, a late response can settle the ledger without authorizing a new call.
+    await db.automationEvent.updateMany({ where: { userId, eventId: event }, data: { expiresAt: new Date(1) } });
+    expect(await (await post('state', { from: 'sent', to: 'consumed' })).json()).toEqual({ changed: true });
+    await db.automationAiAttempt.deleteMany({ where: { userId, eventId: event } });
+    await db.automationEvent.deleteMany({ where: { userId, eventId: event } });
+  });
+
+  it('requires reconciliation instead of buying another attempt after a sent lease expires', async () => {
+    const pending = randomUUID();
+    const pendingRule = randomUUID();
+    await db.automationRule.create({ data: { id: pendingRule, userId, enabled: true, keyId: 'inbound-v1' } });
+    await db.automationEvent.create({ data: { userId, ruleId: pendingRule, eventId: pending, ruleVersion: 1,
+      dedupeDigest: 'e'.repeat(64), status: 'leased', payloadCiphertext: 'sealed', leaseWorkerId: workerA.workerId,
+      leaseGeneration: 1, attempt: 1, leaseExpiresAt: new Date(1), expiresAt: new Date(Date.now() + 86400000) } });
+    await db.automationAiAttempt.create({ data: { userId, ruleId: pendingRule, eventId: pending, parseVersion: 1, attempt: 1, periodAnchor: 1n, state: 'sent' } });
+    const response = await fetch(`${base}/api/automation/events/claim`, { method: 'POST', headers: {
+      authorization: token, 'content-type': 'application/json', 'x-heyta-worker-token': workerB.token,
+      'x-heyta-database-epoch': epoch,
+    }, body: JSON.stringify({ clientId: clientB, eventId: pending }) });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ state: 'empty' });
+    expect(await db.automationEvent.findFirst({ where: { userId, eventId: pending } })).toMatchObject({
+      status: 'needs-confirmation', reasonCode: 'model-result-uncertain', attempt: 1, leaseGeneration: 1,
+    });
+    expect(await db.automationAiAttempt.count({ where: { userId, eventId: pending } })).toBe(1);
+    const eventsResponse = await fetch(`${base}/api/automation/events`, { headers: { authorization: token } });
+    expect(eventsResponse.status).toBe(200);
+    const summary = ((await eventsResponse.json()) as { events: Array<Record<string, unknown>> }).events.find((e) => e.eventId === pending)!;
+    expect(Object.keys(summary).sort()).toEqual(['attempt', 'eventId', 'reasonCode', 'receivedAt', 'ruleId', 'ruleVersion', 'status']);
+    const foreignEvents = await fetch(`${base}/api/automation/events`, { headers: { authorization: otherToken } });
+    expect(await foreignEvents.json()).toEqual({ events: [] });
+    const retry = (attempt: number, auth = token) => fetch(`${base}/api/automation/events/${pending}/retry`, {
+      method: 'POST', headers: { authorization: auth, 'content-type': 'application/json' },
+      body: JSON.stringify({ expectedAttempt: attempt, expectedRuleVersion: 1 }),
+    });
+    // Unknown/cross-account identities and stale forms cannot authorize another call.
+    expect((await retry(1, otherToken)).status).not.toBe(200);
+    expect((await retry(2)).status).toBe(409);
+    await db.automationRule.update({ where: { id: pendingRule }, data: { version: 2 } });
+    expect((await retry(1)).status).toBe(409);
+    await db.automationRule.update({ where: { id: pendingRule }, data: { version: 1 } });
+    expect((await retry(1)).status).toBe(200);
+    expect((await retry(1)).status).toBe(409);
+    const staleRenewal = await fetch(`${base}/api/automation/events/${pending}/renew`, { method: 'POST', headers: {
+      authorization: token, 'content-type': 'application/json', 'x-heyta-worker-token': workerA.token,
+      'x-heyta-database-epoch': epoch,
+    }, body: JSON.stringify({ clientId: clientA, leaseGeneration: 1 }) });
+    expect(staleRenewal.status).toBe(409);
+    const next = await fetch(`${base}/api/automation/events/claim`, { method: 'POST', headers: {
+      authorization: token, 'content-type': 'application/json', 'x-heyta-worker-token': workerB.token,
+      'x-heyta-database-epoch': epoch,
+    }, body: JSON.stringify({ clientId: clientB, eventId: pending }) });
+    expect(next.status).toBe(200);
+    expect(await next.json()).toMatchObject({ eventId: pending, attempt: 2, leaseGeneration: 3 });
+    // Confirmation does not refund or erase the previous possibly charged attempt.
+    expect(await db.automationAiAttempt.count({ where: { userId, eventId: pending } })).toBe(1);
+
+  });
+  it('keeps rule UUIDs as tombstones and gates enablement through the same API', async () => {
+    const created = await fetch(`${base}/api/automation/rules`, {
+      method: 'POST', headers: { authorization: token, 'content-type': 'application/json' },
+      body: JSON.stringify({ keyId: 'inbound-v1' }),
+    });
+    expect(created.status).toBe(201);
+    const rule = await created.json() as { id: string; enabled: boolean; version: number };
+    expect(rule.enabled).toBe(false);
+    const enabled = await fetch(`${base}/api/automation/rules/${rule.id}/enabled`, {
+      method: 'PUT', headers: { authorization: token, 'content-type': 'application/json' }, body: JSON.stringify({ enabled: true }),
+    });
+    expect(enabled.status).toBe(200);
+    expect((await enabled.json() as any).enabled).toBe(true);
+    const deleted = await fetch(`${base}/api/automation/rules/${rule.id}`, { method: 'DELETE', headers: { authorization: token } });
+    expect(deleted.status).toBe(200);
+    const tombstone = await deleted.json() as { id: string; enabled: boolean; deletedAt: string | null };
+    expect(tombstone.id).toBe(rule.id); expect(tombstone.enabled).toBe(false); expect(tombstone.deletedAt).not.toBeNull();
+    const listed = await fetch(`${base}/api/automation/rules`, { headers: { authorization: token } });
+    expect((await listed.json() as any).rules.some((item: any) => item.id === rule.id && item.deletedAt !== null)).toBe(true);
+  });
+  it('publishes recipient keys with an account-locked CAS epoch', async () => {
+    await db.automationRecipientKey.deleteMany({ where: { userId } });
+    const keyA = Buffer.alloc(32, 1).toString('base64url');
+    const first = await fetch(`${base}/api/automation/recipient-key`, {
+      method: 'PUT', headers: { authorization: token, 'content-type': 'application/json' },
+      body: JSON.stringify({ keyEpoch: 1, publicKey: keyA, packageVersion: 1, expectedPackageVersion: null }),
+    });
+    expect(first.status).toBe(200);
+    const stale = await fetch(`${base}/api/automation/recipient-key`, {
+      method: 'PUT', headers: { authorization: token, 'content-type': 'application/json' },
+      body: JSON.stringify({ keyEpoch: 1, publicKey: keyA, packageVersion: 2, expectedPackageVersion: 0 }),
+    });
+    expect(stale.status).toBe(409);
+    const keyB = Buffer.alloc(32, 2).toString('base64url');
+    const rotated = await fetch(`${base}/api/automation/recipient-key`, {
+      method: 'PUT', headers: { authorization: token, 'content-type': 'application/json' },
+      body: JSON.stringify({ keyEpoch: 2, publicKey: keyB, packageVersion: 2, expectedPackageVersion: 1 }),
+    });
+    expect(rotated.status).toBe(200);
+    expect((await (await fetch(`${base}/api/automation/recipient-key`, { headers: { authorization: token } })).json() as any).keyEpoch).toBe(2);
+  });
+  it('rejects B even when BOTH clientId claims are A, on both upload paths', async () => {
+    for (const path of ['ops', 'ops/causal']) expect((await upload(workerB.token, { path })).status).toBe(403);
+    expect(await db.operation.count({ where: { id: op.id } })).toBe(0);
+  });
+  it('rejects wrong account, database epoch and scope', async () => {
+    expect((await upload(workerA.token, { token: otherToken })).status).toBe(403);
+    expect((await upload(workerA.token, { epoch: 'different-db' })).status).toBe(403);
+    expect((await upload(workerA.token, { op: { ...op, entityIds: ['arbitrary-task'] } })).status).toBe(403);
+    expect((await upload(workerA.token, { op: { ...op, opType: 'CRT' } })).status).toBe(403);
+  });
+  it('rolls back the operation when completion persistence fails', async () => {
+    await db.$executeRaw`CREATE FUNCTION fail_inbound_completion() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN RAISE EXCEPTION 'injected completion failure'; END; $$`;
+    await db.$executeRaw`CREATE TRIGGER fail_inbound_completion BEFORE UPDATE ON automation_events
+      FOR EACH ROW WHEN (NEW.status = 'completed') EXECUTE FUNCTION fail_inbound_completion()`;
+    try {
+      const response = await upload(workerA.token, { requestId: 'completion-failure' });
+      expect(response.status).toBe(200);
+      expect((await response.json() as any).results[0].accepted).toBe(false);
+      expect(await db.operation.count({ where: { id: op.id } })).toBe(0);
+      expect(await db.automationEvent.findFirst({ where: { userId, eventId } })).toMatchObject({ status: 'prepared' });
+    } finally {
+      await db.$executeRaw`DROP TRIGGER fail_inbound_completion ON automation_events`;
+      await db.$executeRaw`DROP FUNCTION fail_inbound_completion()`;
+    }
+  });
+  it('accepts owner and exact retry once, but the populated request cache cannot authorize B', async () => {
+    const first = await upload(workerA.token); expect(first.status).toBe(200);
+    const body = await first.json() as any; expect(body.results[0].accepted).toBe(true);
+    expect(await db.automationEvent.findFirst({ where: { userId, eventId } })).toMatchObject({ status: 'completed' });
+    const retry = await upload(workerA.token); expect(retry.status).toBe(200);
+    expect((await retry.json() as any).deduplicated).toBe(true);
+    expect((await upload(workerB.token)).status).toBe(403);
+    expect((await upload(undefined)).status).toBe(403);
+    expect(await db.operation.count({ where: { id: op.id } })).toBe(1);
+  });
+  it('repairs completion on an exact persisted retry outside the HTTP cache', async () => {
+    await db.automationEvent.updateMany({ where: { userId, eventId }, data: { status: 'prepared' } });
+    const response = await upload(workerA.token, { requestId: 'completion-retry-uncached' });
+    expect(response.status).toBe(200);
+    expect((await response.json() as any).results[0].accepted).toBe(true);
+    expect(await db.operation.count({ where: { id: op.id } })).toBe(1);
+    expect(await db.automationEvent.findFirst({ where: { userId, eventId } })).toMatchObject({ status: 'completed' });
+  });
+  it('erases expired ciphertext without losing completion, and expires unprocessed drafts', async () => {
+    const { purgeExpiredAutomationEvents } = await import('../../src/automation/rules');
+    const expiry = new Date(Date.now() - 1);
+    await db.automationEvent.updateMany({ where: { userId, eventId }, data: { expiresAt: expiry } });
+    const pendingEvent = randomUUID();
+    await db.automationEvent.create({ data: { userId, ruleId, eventId: pendingEvent, ruleVersion: 1,
+      dedupeDigest: 'f'.repeat(64), status: 'prepared', resultCiphertext: 'draft-only', expiresAt: expiry } });
+    expect(await purgeExpiredAutomationEvents()).toBe(2);
+    expect(await db.automationEvent.findFirst({ where: { userId, eventId } })).toMatchObject({ status: 'completed', payloadCiphertext: null, resultCiphertext: null, reasonCode: null });
+    expect(await db.automationEvent.findFirst({ where: { userId, eventId: pendingEvent } })).toMatchObject({ status: 'expired', resultCiphertext: null, reasonCode: 'retention-expired' });
+    expect(await purgeExpiredAutomationEvents()).toBe(0);
+  });
+  it('internal upload callers cannot bypass identity checks for an exact persisted duplicate', async () => {
+    const { getSyncService } = await import('../../src/sync/sync.service');
+    const result = await getSyncService().uploadOps(userId, clientA, [structuredClone(op)] as never);
+    expect(result[0].accepted).toBe(false);
+    expect(await db.operation.count({ where: { id: op.id } })).toBe(1);
+  });
+  it('rechecks the authenticated JWT version against durable account state', async () => {
+    const { authorizeInboundOperations, readInboundUploadIdentity } = await import('../../src/automation/worker-identity');
+    const identity = readInboundUploadIdentity(['x-heyta-worker-token', workerA.token, 'x-heyta-database-epoch', epoch], 0);
+    await db.user.update({ where: { id: userId }, data: { tokenVersion: 1 } });
+    expect(await authorizeInboundOperations(db, userId, clientA, [op] as never, identity)).toBe(false);
+    const user = await db.user.findUniqueOrThrow({ where: { id: userId } });
+    token = `Bearer ${jwt.sign({ userId, email: user.email, tokenVersion: 1 }, process.env.JWT_SECRET!)}`;
+    expect((await upload(workerA.token)).status).toBe(200);
+  });
+  it('rejects revoked owner before cached response', async () => {
+    const { DeviceService } = await import('../../src/sync/services/device.service');
+    await new DeviceService().revokeDevice(userId, clientA);
+    expect((await upload(workerA.token)).status).toBe(403);
+  });
+  it('cannot reuse the reserved identity through snapshot cache or persistence', async () => {
+    const response = await fetch(`${base}/api/sync/snapshot`, {
+      method: 'POST', headers: { authorization: token, 'content-type': 'application/json' },
+      body: JSON.stringify({ clientId: clientA, opId: op.id, requestId: 'snapshot-forgery',
+        state: op.payload, isPayloadEncrypted: true, vectorClock: {}, schemaVersion: 1, reason: 'initial' }),
+    });
+    // Existing snapshot contract requires UUID opIds and rejects before cache.
+    expect(response.status).toBe(400);
+  });
+  it('rechecks revocation after HTTP preflight while upload waits on its transaction lock', async () => {
+    const worker = generateWorkerCredential();
+    const event = randomUUID();
+    const raceOp = { ...op, id: `inbound:${event}`, entityId: `inbound:${event}:0`,
+      entityIds: [`inbound:${event}:1`], vectorClock: { [clientA]: 2 } };
+    await db.automationWorker.create({ data: { id: worker.workerId, userId,
+      credentialHash: worker.credentialHash, syncClientId: clientA, databaseEpoch: epoch } });
+    await db.automationCommitPermit.create({ data: { eventId: event, userId, workerId: worker.workerId,
+      opId: raceOp.id, ruleId: randomUUID(), ruleVersion: 1, parseVersion: 1, resultDigest: 'b'.repeat(64), itemCount: 2 } });
+    let unlock!: () => void;
+    let locked!: () => void;
+    const barrier = new Promise<void>((resolve) => { unlock = resolve; });
+    const ready = new Promise<void>((resolve) => { locked = resolve; });
+    const holder = db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT user_id FROM user_sync_state WHERE user_id = ${userId} FOR UPDATE`;
+      locked(); await barrier;
+    }, { timeout: 15000 });
+    await ready;
+    let pending: Promise<Response> | undefined;
+    try {
+      pending = upload(worker.token, { op: raceOp });
+      // The real backend reports the upload blocked after HTTP authorization.
+      let waiting = false;
+      for (let i = 0; i < 500; i++) {
+        const rows = await db.$queryRaw<Array<{ count: bigint }>>`
+          SELECT count(*) FROM pg_stat_activity
+          WHERE datname = current_database() AND wait_event_type = 'Lock'
+            AND query ILIKE '%user_sync_state%' AND pid <> pg_backend_pid()
+        `;
+        if (Number(rows[0].count) > 0) { waiting = true; break; }
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      expect(waiting).toBe(true);
+      const { DeviceService } = await import('../../src/sync/services/device.service');
+      await new DeviceService().revokeDevice(userId, clientA);
+    } finally { unlock(); await holder; }
+    const response = await pending!;
+    expect(response.status).toBe(200);
+    expect((await response.json() as any).results[0].accepted).toBe(false);
+    expect(await db.operation.count({ where: { id: raceOp.id } })).toBe(0);
+  }, 20000);
+  it('owner-held receipt permits late sync after erasing the server permit and digest', async () => {
+    const worker = generateWorkerCredential();
+    const event = randomUUID();
+    const deletedRule = randomUUID();
+    await db.automationRule.create({ data: { id: deletedRule, userId, enabled: true, keyId: 'inbound-v1' } });
+    await db.automationEvent.create({ data: { userId, ruleId: deletedRule, eventId: event, ruleVersion: 1,
+      dedupeDigest: 'c'.repeat(64), status: 'prepared', payloadCiphertext: 'sealed', expiresAt: new Date(Date.now() + 86400000) } });
+    const lateOp = { ...op, id: `inbound:${event}`, entityId: `inbound:${event}:0`,
+      entityIds: [`inbound:${event}:1`], vectorClock: { [clientA]: 3 } };
+    await db.automationWorker.create({ data: { id: worker.workerId, userId,
+      credentialHash: worker.credentialHash, syncClientId: clientA, databaseEpoch: epoch } });
+    await db.automationCommitPermit.create({ data: { eventId: event, userId, workerId: worker.workerId,
+      opId: lateOp.id, ruleId: deletedRule, ruleVersion: 1, parseVersion: 1, resultDigest: 'c'.repeat(64), itemCount: 2 } });
+    const proof = signCommitProof({ userId, workerId: worker.workerId, syncClientId: clientA,
+      databaseEpoch: epoch, eventId: event, itemCount: 2 }, signing);
+    const { deleteAutomationRule } = await import('../../src/automation/rules');
+    await deleteAutomationRule(userId, deletedRule);
+    expect(await db.automationEvent.count({ where: { userId, ruleId: deletedRule } })).toBe(0);
+    expect((await db.automationRule.findUniqueOrThrow({ where: { id: deletedRule } })).deletedAt).not.toBeNull();
+    expect(await db.automationCommitPermit.findFirst({ where: { userId, eventId: event } })).toBeNull();
+    expect((await upload(worker.token, { op: lateOp })).status).toBe(403);
+    expect((await upload(worker.token, { op: lateOp, proofs: { [lateOp.id]: proof + 'x' } })).status).toBe(403);
+    const proofs = { [lateOp.id]: proof };
+    expect((await upload(workerB.token, { op: lateOp, proofs })).status).toBe(403);
+    const first = await upload(worker.token, { op: lateOp, proofs });
+    expect(first.status).toBe(200); expect((await first.json() as any).results[0].accepted).toBe(true);
+    const retry = await upload(worker.token, { op: lateOp, proofs });
+    expect((await retry.json() as any).results[0].accepted).toBe(true);
+    expect(await db.operation.count({ where: { id: lateOp.id } })).toBe(1);
+    const { DeviceService } = await import('../../src/sync/services/device.service');
+    await new DeviceService().revokeDevice(userId, clientA);
+    expect((await upload(worker.token, { op: lateOp, proofs })).status).toBe(403);
+  });
+  it('account deletion cascades both tables despite the composite worker ownership FK', async () => {
+    await db.user.delete({ where: { id: userId } });
+    expect(await db.automationWorker.count({ where: { userId } })).toBe(0);
+    expect(await db.automationCommitPermit.count({ where: { userId } })).toBe(0);
+    userId = 0;
+  });
+});

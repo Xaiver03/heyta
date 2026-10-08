@@ -1,0 +1,328 @@
+The files belonging to this database system will be owned by user "rocalight".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are disabled.
+
+creating directory /var/folders/5n/zvn6lsb5265d19khvqwp6fsc0000gn/T/heyta-inbound-pg-nxt1zj4e/data ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default max_connections ... 100
+selecting default shared_buffers ... 128MB
+selecting default time zone ... Asia/Shanghai
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+Success. You can now start the database server using:
+
+    '/opt/homebrew/opt/postgresql@14/bin/pg_ctl' -D /var/folders/5n/zvn6lsb5265d19khvqwp6fsc0000gn/T/heyta-inbound-pg-nxt1zj4e/data -l logfile start
+
+waiting for server to start.... done
+server started
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+DROP TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+CREATE INDEX
+ALTER TABLE
+CREATE INDEX
+psql:/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/server/prisma/migrations/20260512000000_add_full_state_sequence_index_drop_redundant_indexes/migration.sql:5: NOTICE:  index "operations_user_id_full_state_server_seq_idx" does not exist, skipping
+DROP INDEX
+CREATE INDEX
+DROP INDEX
+DROP INDEX
+DROP INDEX
+ALTER TABLE
+psql:/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/server/prisma/migrations/20260514000000_add_encrypted_ops_partial_index/migration.sql:1: NOTICE:  index "operations_user_id_server_seq_encrypted_idx" does not exist, skipping
+DROP INDEX
+CREATE INDEX
+ALTER TABLE
+psql:/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/server/prisma/migrations/20260514000002_add_payload_bytes_unbackfilled_index/migration.sql:11: NOTICE:  index "operations_payload_bytes_unbackfilled_idx" does not exist, skipping
+DROP INDEX
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+ALTER TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+INSERT 0 0
+DELETE 0
+ALTER TABLE
+SET
+ALTER INDEX
+SET
+ gin_clean_pending_list 
+------------------------
+                      0
+(1 row)
+
+ALTER TABLE
+DROP INDEX
+psql:/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/server/prisma/migrations/20260828000001_add_received_at_covering_index/migration.sql:22: NOTICE:  index "operations_user_id_received_at_server_seq_idx" does not exist, skipping
+DROP INDEX
+CREATE INDEX
+DROP INDEX
+ALTER TABLE
+psql:/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/server/prisma/migrations/20260829000000_add_causal_full_state_index/migration.sql:120: NOTICE:  index "operations_user_id_causal_full_state_server_seq_idx" does not exist, skipping
+DROP INDEX
+CREATE INDEX
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+UPDATE 0
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+UPDATE 0
+DELETE 0
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+UPDATE 0
+UPDATE 0
+ALTER TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+ALTER TABLE
+DROP INDEX
+CREATE INDEX
+ALTER TABLE
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+内存闸门拒绝启动：立即可用 347MB < 这一档要求的 384MB（改这一维是 TFA_LIGHT_NEED_MB）
+这不是产品红；是这台机器此刻不该再多起一趟测试。
+waiting for server to shut down.... done
+server stopped
+
+--- Disposable PostgreSQL server log ---
+2026-10-08 19:13:00.917 CST [75934] LOG:  starting PostgreSQL 14.18 (Homebrew) on aarch64-apple-darwin24.4.0, compiled by Apple clang version 17.0.0 (clang-1700.0.13.3), 64-bit
+2026-10-08 19:13:00.918 CST [75934] LOG:  listening on IPv4 address "127.0.0.1", port 55880
+2026-10-08 19:13:00.919 CST [75934] LOG:  listening on Unix socket "/var/folders/5n/zvn6lsb5265d19khvqwp6fsc0000gn/T/heyta-inbound-pg-nxt1zj4e/.s.PGSQL.55880"
+2026-10-08 19:13:00.924 CST [75935] LOG:  database system was shut down at 2026-10-08 19:13:00 CST
+2026-10-08 19:13:00.930 CST [75934] LOG:  database system is ready to accept connections
+2026-10-08 19:13:03.841 CST [75934] LOG:  received fast shutdown request
+2026-10-08 19:13:03.841 CST [75934] LOG:  aborting any active transactions
+2026-10-08 19:13:03.843 CST [75934] LOG:  background worker "logical replication launcher" (PID 75942) exited with exit code 1
+2026-10-08 19:13:03.843 CST [75936] LOG:  shutting down
+2026-10-08 19:13:03.865 CST [75934] LOG:  database system is shut down

@@ -1,0 +1,22 @@
+{
+  "recordedAt": "2026-10-07T15:52:21.194082+00:00",
+  "head": "b081811c691a17ff57ed0379a005d1a175fe393d",
+  "scope": "W3 identity gate only; shared dirty working tree, not final isolated delivery baseline",
+  "command": "python3 research/tools/verify-inbound-worker-identity.py --log /tmp/heyta-inbound-worker-identity.log",
+  "passed": 10,
+  "database": "Disposable PostgreSQL 14.18; actual SQL + HTTP; not Linux deploy-script validation",
+  "files": {
+    "research/tools/verify-inbound-worker-identity.py": "64eb58c167a6423b7081f4b60336dbef004f7d5fb3c87294c1cac0327228d038",
+    "server/src/automation/worker-identity.ts": "9124b589d10c91b506f7a4dc27f56198e5ab7a7e31ce9a7b014f215f69b355e3",
+    "server/src/auth.ts": "911847b710706a4421260f4f5b392514f738aeaf9a70eaae5e4d26666ce534c0",
+    "server/src/middleware.ts": "6c09fd46d571a36546e5112f7964f2ce08a83ebc10ab09e363d1be06b0994d17",
+    "server/src/sync/sync.routes.ops-handler.ts": "f3a82977d01934559be220d1f3213343f7d92980a815b1f0ac6bb8abc70f8cd0",
+    "server/src/sync/services/operation-upload.service.ts": "1685bf5d2d0e50543cfdaaac0b758728238fbf73ba6a38be267ac1a99d6d7845",
+    "server/src/sync/services/device.service.ts": "44db2ec3ac73f9d865adac42782acff8d7e6cc7dede5f37053169357564ecde0",
+    "server/src/sync/sync.service.ts": "6d3cc1d28d96090932a3649ac66b826ce4b45876361e966d31a8695e3cbe457d",
+    "server/prisma/migrations/20261017000000_add_automation_worker_identity/migration.sql": "d99a7ca391750ef6cfd2b9b479ff835289c7d089a3c32fae36c5aaa2da6031b6",
+    "server/tests/integration/inbound-worker-identity.integration.spec.ts": "6c04517823d391817a75a1822f66f46846049d4c74b3280d7a9da5ef9e5bc0d2",
+    "server/tests/inbound-worker-identity.spec.ts": "330deadddab65bdc3cbd013e73b00880fa04dd286a18eeb98bebe1f30fe2c588"
+  },
+  "transcriptSha256": "83ebbcb1542f0ca89070834dd25dc13ae0c725159cbe10806225b4f90fe63c9a"
+}

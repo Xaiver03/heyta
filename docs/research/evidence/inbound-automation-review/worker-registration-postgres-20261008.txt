@@ -1,0 +1,293 @@
+The files belonging to this database system will be owned by user "rocalight".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are disabled.
+
+creating directory /var/folders/5n/zvn6lsb5265d19khvqwp6fsc0000gn/T/heyta-inbound-pg-q5fkc6ei/data ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default max_connections ... 100
+selecting default shared_buffers ... 128MB
+selecting default time zone ... Asia/Shanghai
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+Success. You can now start the database server using:
+
+    '/opt/homebrew/opt/postgresql@14/bin/pg_ctl' -D /var/folders/5n/zvn6lsb5265d19khvqwp6fsc0000gn/T/heyta-inbound-pg-q5fkc6ei/data -l logfile start
+
+waiting for server to start.... done
+server started
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+DROP TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+CREATE INDEX
+ALTER TABLE
+CREATE INDEX
+psql:/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/server/prisma/migrations/20260512000000_add_full_state_sequence_index_drop_redundant_indexes/migration.sql:5: NOTICE:  index "operations_user_id_full_state_server_seq_idx" does not exist, skipping
+DROP INDEX
+CREATE INDEX
+DROP INDEX
+DROP INDEX
+DROP INDEX
+ALTER TABLE
+psql:/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/server/prisma/migrations/20260514000000_add_encrypted_ops_partial_index/migration.sql:1: NOTICE:  index "operations_user_id_server_seq_encrypted_idx" does not exist, skipping
+DROP INDEX
+CREATE INDEX
+ALTER TABLE
+psql:/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/server/prisma/migrations/20260514000002_add_payload_bytes_unbackfilled_index/migration.sql:11: NOTICE:  index "operations_payload_bytes_unbackfilled_idx" does not exist, skipping
+DROP INDEX
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+ALTER TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+INSERT 0 0
+DELETE 0
+ALTER TABLE
+SET
+ALTER INDEX
+SET
+ gin_clean_pending_list 
+------------------------
+                      0
+(1 row)
+
+ALTER TABLE
+DROP INDEX
+psql:/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/server/prisma/migrations/20260828000001_add_received_at_covering_index/migration.sql:22: NOTICE:  index "operations_user_id_received_at_server_seq_idx" does not exist, skipping
+DROP INDEX
+CREATE INDEX
+DROP INDEX
+ALTER TABLE
+psql:/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/server/prisma/migrations/20260829000000_add_causal_full_state_index/migration.sql:120: NOTICE:  index "operations_user_id_causal_full_state_server_seq_idx" does not exist, skipping
+DROP INDEX
+CREATE INDEX
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+UPDATE 0
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+UPDATE 0
+DELETE 0
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+UPDATE 0
+UPDATE 0
+ALTER TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.integration.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/server
+
+
+ Test Files  1 passed (1)
+      Tests  15 passed (15)
+   Start at  06:44:11
+   Duration  1.31s (transform 328ms, setup 0ms, import 510ms, tests 719ms, environment 0ms)
+
+waiting for server to shut down.... done
+server stopped
+
+--- Disposable PostgreSQL server log ---
+2026-10-08 06:44:09.993 CST [26838] LOG:  starting PostgreSQL 14.18 (Homebrew) on aarch64-apple-darwin24.4.0, compiled by Apple clang version 17.0.0 (clang-1700.0.13.3), 64-bit
+2026-10-08 06:44:09.994 CST [26838] LOG:  listening on IPv4 address "127.0.0.1", port 49395
+2026-10-08 06:44:09.995 CST [26838] LOG:  listening on Unix socket "/var/folders/5n/zvn6lsb5265d19khvqwp6fsc0000gn/T/heyta-inbound-pg-q5fkc6ei/.s.PGSQL.49395"
+2026-10-08 06:44:09.999 CST [26839] LOG:  database system was shut down at 2026-10-08 06:44:09 CST
+2026-10-08 06:44:10.003 CST [26838] LOG:  database system is ready to accept connections
+2026-10-08 06:44:13.283 CST [26838] LOG:  received fast shutdown request
+2026-10-08 06:44:13.283 CST [26838] LOG:  aborting any active transactions
+2026-10-08 06:44:13.285 CST [26838] LOG:  background worker "logical replication launcher" (PID 26845) exited with exit code 1
+2026-10-08 06:44:13.285 CST [26840] LOG:  shutting down
+2026-10-08 06:44:13.299 CST [26838] LOG:  database system is shut down

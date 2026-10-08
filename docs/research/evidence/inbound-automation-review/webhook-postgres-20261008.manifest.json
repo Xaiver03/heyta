@@ -1,0 +1,11 @@
+{
+  "kind": "inbound-automation-webhook-postgres",
+  "date": "2026-10-08",
+  "command": "python3 research/tools/verify-inbound-worker-identity.py --pg-bin /opt/homebrew/opt/postgresql@14/bin --log /tmp/heyta-inbound-worker-webhook-20261008e.log",
+  "tests": "server/tests/integration/inbound-worker-identity.integration.spec.ts",
+  "result": "16 passed",
+  "database": "disposable PostgreSQL 14.18 on loopback; all current Prisma migrations applied",
+  "transcript": "webhook-postgres-20261008.txt",
+  "transcriptSha256": "ca49c89148cf9d8a8988a39181b3134c8ae730a4a980e8d81b5e2a724d3131e0",
+  "secrets": "synthetic only; no credentials or plaintext payloads recorded"
+}

@@ -1,0 +1,17 @@
+{
+  "head": "b081811c691a17ff57ed0379a005d1a175fe393d",
+  "scope": "Billing-source and timeout alignment working-tree snapshot",
+  "sha256": {
+    "server/prisma/migrations/20261018110000_separate_direct_automation_ai_attempts/migration.sql": "c7c3f86bf5a95c3e9adb7636bcd6a1cfb29becd1e1d8eb3e036df0798f626d08",
+    "server/prisma/schema.prisma": "e94c1c07e43ca42a28123bf930b1c0bf61550ebfd0f9038a47dd8424bd0b8d94",
+    "server/src/automation/ai-metering.ts": "a4ccf8e22caece730fbd9b2d76d4cd1ef00f163f859b2d4ee27237a607b2031f",
+    "packages/app-host/src/inbound-worker.ts": "eeb3514845b2f00a9a3a9173d802489663e0c4b927eb593dc7a9baaef22363ff",
+    "packages/app-host/src/inbound-process.ts": "c7403e849f51d5d219ee7994b9fdef18bfd8f1d05c374a6ac189784b767d60c2",
+    "packages/app-host/src/inbound-runner.ts": "79db8567cf16ea3342cb469f50a6c78491a28e041c3abeb58ad5aa05e919c629",
+    "server/tests/automation-ai-metering.spec.ts": "559a54232ba193da90827b0c6cd1d1773a0f77e83d45dfaa8cc9513545033873",
+    "server/tests/integration/inbound-worker-identity.integration.spec.ts": "c639fc30b26dc6750c16712e3486f9fde33dae20a4af7852393acbfd5d7a9a37",
+    "docs/reference/inbound-automation-protocol.md": "9c72f3e07da57f55a51ecbaf66eaa23af72d007a257d4be1f340c6b444621acd",
+    "docs/plans/inbound-automation.md": "206bfff0ec11578ebe9c6ce81fd219be52eecfe8363d11c7f9bf165c1c4c6c96",
+    "docs/research/inbound-automation-review.md": "8c187df3ba233311e512b76dca907ba5bd75146ec3141295f80abc3ad0059f35"
+  }
+}

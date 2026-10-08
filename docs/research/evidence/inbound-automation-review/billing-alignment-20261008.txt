@@ -1,0 +1,10 @@
+计量与超时复审记录（2026-10-08）
+
+- direct/local 自动收集尝试：automation_ai_attempts.billing_source=direct，period_anchor=NULL；不写 ai_usage_counters。
+- managed 自动收集尝试：billing_source=managed，保留已有 consumeManagedAiRequest 周期额度语义。
+- 同一事件 attempt/source CAS 冲突会拒绝，避免 direct/managed 变更覆盖旧账目。
+- 真 PostgreSQL identity integration：24 tests passed；包括 direct reservation 两次幂等且 usage counter 不变。
+- @heyta/app-host inbound process/runner：14 tests passed；build/typecheck passed。
+- migration checker：64 migrations passed。
+- worker lease 60s，宿主续租 20s，provider timeout 45s。
+- date-only 持久化全天语义、双宿主进程终止、跨端安装仍未完成。
