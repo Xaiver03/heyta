@@ -41,11 +41,16 @@ const labels = (): string => stripComments(readFileSync(LABELS, 'utf8'));
  */
 const pickerBlock = (valueProp: string): string => {
   const src = screen();
-  const start = src.indexOf(`<DatePicker\n                value={${valueProp}}`);
-  expect(start, `源码里找不到 value={${valueProp}} 那张 DatePicker`).toBeGreaterThan(-1);
-  const end = src.indexOf('\n              />', start);
-  expect(end, `${valueProp} 那张 DatePicker 没有找到闭合`).toBeGreaterThan(start);
-  return src.slice(start, end);
+  // 两张选择器所在的 JSX 层级不同，不能把某一档缩进当成结构契约。
+  // 仍按精确 value prop 选中目标，并要求它是一个自闭合 DatePicker 节点。
+  const opening = new RegExp(`<DatePicker\\s+value=\\{${valueProp}\\}`).exec(src);
+  expect(opening, `源码里找不到 value={${valueProp}} 那张 DatePicker`).not.toBeNull();
+  if (opening === null) return '';
+  const start = opening.index;
+  const closing = /\n\s*\/>/.exec(src.slice(start));
+  expect(closing, `${valueProp} 那张 DatePicker 没有找到自闭合标签`).not.toBeNull();
+  if (closing === null) return '';
+  return src.slice(start, start + closing.index);
 };
 
 /** `datePickerTimeLabels` 的函数体。 */

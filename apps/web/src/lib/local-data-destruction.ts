@@ -15,6 +15,7 @@
  *
  * 四类存储（清单由 `tests/local-data-destruction.spec.ts` 与真源对账钉住）：
  *   1. IndexedDB：`heyta`（活体数据）、`heyta-vault`（**密钥材料**）、
+ *      `heyta-inbound`（自动收集 worker/收件密钥与回执）、
  *      `heyta-widget`（Service Worker 写的今日小组件数据）
  *   2. OPFS：SAH Pool 的 `.heyta-web` 目录（`heyta.sqlite` 的字节住在这儿）
  *   3. `localStorage`：所有 `heyta*` 键（前缀扫，不点名 —— 见下面那条理由）
@@ -42,10 +43,10 @@ import { destroyLiveStorage, releaseStorageWorker } from './oplog.js';
  * `lib/vault-session.ts` 的 `DB_NAME`、`pwa/sw.ts` 的 `DB_NAME`）。
  * 这里是一份**抄件**，所以判据必须去比对真源 —— 见
  * `apps/web/tests/local-data-destruction.spec.ts` 的「逐条与真源对账」那一节。
- * 抄件本身是必要的：销毁动作必须能在**不 import** 那三个模块的情况下跑完
+ * 抄件本身是必要的：销毁动作必须能在**不 import** 那四个模块的情况下跑完
  * （`pwa/sw.ts` 是 Service Worker 的入口，import 进主线程会把它整个带进来）。
  */
-export const WEB_DATABASE_NAMES = ['heyta', 'heyta-vault', 'heyta-widget'] as const;
+export const WEB_DATABASE_NAMES = ['heyta', 'heyta-vault', 'heyta-inbound', 'heyta-widget'] as const;
 
 /** `localStorage` / `sessionStorage` 里属于本应用的前缀。 */
 export const WEB_STORAGE_PREFIX = 'heyta';

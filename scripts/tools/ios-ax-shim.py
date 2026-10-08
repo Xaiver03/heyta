@@ -187,7 +187,7 @@ def is_field(n):
     """是文本输入控件吗。role_description / type 在不同 RN 版本上写法不一，放宽匹配。"""
     hay = ((n.get("type") or "") + " " + (n.get("role_description") or "")).lower()
     hay = hay.replace("_", "").replace(" ", "")
-    return "textfield" in hay or "searchfield" in hay
+    return "textfield" in hay or "searchfield" in hay or "textarea" in hay
 
 
 def label_of(n):

@@ -1,0 +1,25 @@
+{
+  "stage": "after",
+  "capturedAt": "2026-10-07T23:30:46.2286271Z",
+  "foreground": {
+    "isBrowser": true,
+    "process": "chrome",
+    "processId": 23168,
+    "hwnd": 5898850,
+    "title": "�������� ���� heyta - Google Chrome",
+    "url": "https://heyta.waytofuture.cn/docs/",
+    "tabCount": 15
+  },
+  "browsers": [
+    {
+      "isBrowser": true,
+      "process": "chrome",
+      "processId": 23168,
+      "hwnd": 5898850,
+      "title": "�������� ���� heyta - Google Chrome",
+      "url": "https://heyta.waytofuture.cn/docs/",
+      "tabCount": 15
+    }
+  ],
+  "evidence": "Windows UI Automation foreground browser address-bar value"
+}

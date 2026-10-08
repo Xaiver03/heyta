@@ -1,0 +1,64 @@
+{
+  "date": "2026-10-08",
+  "device": "FE195661-B021-4A71-AAD1-1F2F7AE3A102",
+  "platform": "iOS simulator 27.0",
+  "viewport": [
+    402,
+    874
+  ],
+  "releaseConfiguration": true,
+  "incrementalInstall": true,
+  "published": false,
+  "testflightCurrentBuild": "5",
+  "nextTestflightBuild": "6",
+  "installedBundleSha256": "1cfde667af31d393012cfe3f36f9d825b56d6c52a3a4c7bd0a4e5745aa764e45",
+  "builtBundleSha256": "1cfde667af31d393012cfe3f36f9d825b56d6c52a3a4c7bd0a4e5745aa764e45",
+  "sourceSha256": {
+    "apps/mobile/src/ai/AssistantScreen.tsx": "efe369bc0d70ed3abcda6aa57132fd0146d1650ac683eb8facb8190aa6b7cc15",
+    "apps/mobile/src/ai/chat-controller.ts": "0514907ef58a2e704c2b82f26dd3b14ebf0000ac0b5ba3ec436c431d056fd0d9",
+    "apps/mobile/src/ai/chat-composer.tsx": "6386a14edd4cc521325bb42cee57ed6128c68be1b0d09593e3bb8492e4c78185",
+    "apps/mobile/src/ai/chat-transcript.tsx": "6c47e4ea44ac3fe0bcfcab8e38774730256e1588d28b0660f66e65bbe04bd257",
+    "apps/mobile/src/ui/kit.tsx": "e8d4962a128a5ca86b2418a9f5a712d0e4c316046ba40e67bdf3f35d880b4f89",
+    "apps/mobile/src/screens/ProfileScreen.tsx": "8086a885a2a189f44175769f0bda4676f5e2641c162396376830db4ae6b985ae",
+    "packages/app-host/src/assistant-local-history.ts": "e842d8343122b407ef508383493c7cf067a92ac02508dab3fbd034bbc6b0521d",
+    "packages/app-host/src/index.ts": "d9adadc33ff368e098f17d57e140a775ea1ccac5f176ed1e97e5bfb5d6fca5c6"
+  },
+  "checks": {
+    "sharedAccountHistoryTests": 4,
+    "mobileTests": 871,
+    "mobileTestFiles": 67,
+    "typecheck": true,
+    "designTokens": true,
+    "uiLanguage": true,
+    "localReadWithoutEndpoint": true,
+    "settingsReturnPreservesDraft": true,
+    "cancelRestoresDraft": true,
+    "keyboardComposerVisibleDarkAndLight": true,
+    "disclosureNotFalselyBusy": true
+  },
+  "keyboardGeometry": {
+    "composerBottom": 503,
+    "keyboardTop": 546,
+    "units": "logical points"
+  },
+  "screenshots": {
+    "05-keyboard-fixed-dark.png": "c9ed2b1bb39f2e77ec9f967cf81bab8aad2829e7ec74183aa930caa20a51d65f",
+    "02-compact-dark.png": "1586a84dff5fd649c010cfcabcd1e6fdebd55c19bd09783bcaaa07ab20dbe75c",
+    "01-open-dark.png": "53fc4cf6090f358b1f2c25a9bc2def81a705bb4e874c703f161c988d893fdf07",
+    "07-settings-return.png": "dd896793ba51e6938b176c7c05888eebd9e74461de3e322fbf3c0e79c83ad13c",
+    "04-keyboard-dark.png": "6e7c2e6db5116724e9c2e6a6986dc295708ae5bb9d7e5da4ce3421237adf64e9",
+    "10-disclosure-light.png": "ce8acdfa62895a9149765b973fb11698d54d7e46c91d316dc022ceb9465af8cb",
+    "08-keyboard-light.png": "cbf0cc34bbb210448887f1c77fc01a491f01357e9efc5ffc0a93366b83870a57",
+    "03-local-read.png": "bbfcafb94acd5d0c40c9f0c370606f4d3ada9a6f9255f1cac996ce96301af136"
+  },
+  "evidenceBoundary": [
+    "01 and 04 are real failing screenshots kept for comparison.",
+    "02-09 are intermediate builds used to verify individual fixes; 10 is the final installed build of this round.",
+    "04 shows keyboard occlusion; 05 and 08 show the fix in dark/light.",
+    "06 set-value failed through AX; actual draft entered with idb ui text and confirmed by enabled send button.",
+    "English Draft 20261008 is disposable test content, not product copy.",
+    "No real model endpoint configured or contacted in this native journey.",
+    "No claim of Android or final four-platform installation for round5.",
+    "Legacy structured capture/breakdown/prioritize/duration parity remains open."
+  ]
+}

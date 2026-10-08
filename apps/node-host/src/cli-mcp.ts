@@ -107,10 +107,15 @@ async function main(): Promise<void> {
   const host = await openNodeHost({ dbPath });
   const actions = createTaskActions({
     dispatch: host.dispatch,
+    dispatchChecked: host.engine.dispatchChecked.bind(host.engine),
     getState: () => host.engine.getState(),
   });
   const apiHost = createLocalApiHost(
-    { dispatch: host.dispatch, getState: () => host.engine.getState() },
+    {
+      dispatch: host.dispatch,
+      dispatchChecked: host.engine.dispatchChecked.bind(host.engine),
+      getState: () => host.engine.getState(),
+    },
     actions,
     {
       // 🔴 **显式传，而不是靠默认值。**

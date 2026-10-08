@@ -144,6 +144,23 @@ export interface LocalApiFocusSession {
 }
 
 /**
+ * 给任务估时助手的专用上下文。
+ *
+ * 这是一个窄的、只读的协议形状，不把 `Task` 或领域层偏好类型带进
+ * local-api。正文、历史与偏好都由 app-host 按自己的隐私判定组装；
+ * `readable: false` 时它们必须缺席。
+ */
+export interface LocalApiTaskEstimateContext {
+  taskId: string;
+  title: string;
+  readable: boolean;
+  body?: string;
+  currentMinutes?: number;
+  history?: readonly { plannedMs: number; actualMs: number }[];
+  preferences?: readonly { id: string; text: string }[];
+}
+
+/**
  * 一条提醒。四个时间戳只出 `triggerAt` 与一个**派生的** `phase`：
  * `firedAt` / `snoozedUntil` / `dismissedAt` 是"这条提醒走到哪一步"的三个原始证据，
  * 而领域层已经把三者合成了一个封闭词表（`ReminderPhase`）。
@@ -214,6 +231,11 @@ export interface LocalApiHost {
   listTasks(args: ListTasksQuery): Promise<readonly LocalApiItem[]>;
   /** 取单条任务。取不到返回 `undefined`（不是抛错）。 */
   getTask(taskId: string): Promise<LocalApiItem | undefined>;
+  /**
+   * 取任务估时专用上下文。宿主可以不接这条能力；工具会返回明确的能力错误。
+   * 与 `getTask` 分开是刻意的：估时上下文有独立的历史/记忆出境闸门。
+   */
+  getTaskEstimateContext?: (taskId: string) => Promise<LocalApiTaskEstimateContext | undefined>;
   /** 列清单。 */
   listProjects(): Promise<readonly LocalApiProject[]>;
   /**

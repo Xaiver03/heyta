@@ -1,0 +1,94 @@
+{
+  "recordedAt": "2026-10-08",
+  "device": {
+    "serial": "emulator-5554",
+    "android": "16",
+    "viewport": [1080, 2400],
+    "density": 420
+  },
+  "artifact": {
+    "buildCommand": "pnpm build:android",
+    "buildHost": "windows-pc",
+    "task": "assembleRelease",
+    "installCommand": "adb install -r apps/mobile/android/app/build/outputs/apk/release/app-release.apk",
+    "installResult": "Success",
+    "sizeBytes": 68225308,
+    "sha256": "2ee4f9c3501037fa1639bfa51e705fd62b7858b4cfc504ded4d76cfff8f35fdf",
+    "firstInstallTimeBeforeAndAfter": "2026-10-08 07:05:08",
+    "lastUpdateTimeAfter": "2026-10-08 09:00:24",
+    "dataCleared": false,
+    "uninstalled": false
+  },
+  "checks": {
+    "keyboardRootCause": {
+      "activitySoftInputMode": "adjustResize",
+      "androidWindowFlags": "EDGE_TO_EDGE_ENFORCED",
+      "imeObservation": "The activity frame stayed [0,0][1080,2400] with visible insets [0,0][0,0] while the IME was visible.",
+      "fix": "Use KeyboardAvoidingView behavior=height on Android; retain iOS behavior=padding and measured offset."
+    },
+    "chatbotEntry": {
+      "passed": true,
+      "ax": "01-chat-open.ax.xml",
+      "screenshot": "01-chat-open.png"
+    },
+    "localReadWithoutEndpoint": {
+      "passed": true,
+      "input": "看看今天有什么任务",
+      "result": "没有符合条件的内容。",
+      "toolSteps": 1,
+      "endpointConfigured": false,
+      "ax": "02-local-read.ax.xml",
+      "screenshot": "02-local-read.png"
+    },
+    "assistantTierToggle": {
+      "passed": true,
+      "initiallySelected": "执行",
+      "afterToggleSelected": "只读",
+      "ax": "03-read-only.ax.xml",
+      "screenshot": "03-read-only.png"
+    },
+    "keyboardComposer": {
+      "preFix": {
+        "passed": false,
+        "draft": "android_draft",
+        "inputFocused": true,
+        "failure": "Android soft keyboard covers the composer; the input remains at its pre-keyboard bounds and the composer is not visible above the keyboard.",
+        "ax": "04-keyboard-draft.ax.xml",
+        "screenshot": "04-keyboard-draft.png"
+      },
+      "postFix": {
+        "passed": true,
+        "draft": "android_fix_draft",
+        "inputFocused": true,
+        "composerBounds": {
+          "input": [42, 1417, 902, 1533],
+          "send": [923, 1417, 1038, 1532]
+        },
+        "ax": "12-keyboard-after-fix.ax.xml",
+        "screenshot": "12-keyboard-after-fix.png"
+      }
+    },
+    "settingsReturnPreservesDraft": {
+      "passed": true,
+      "draft": "android_draft",
+      "screenshot": "08-settings-return-draft.png",
+      "ax": "08-settings-return-draft.ax.xml"
+    },
+    "darkTheme": {
+      "passed": true,
+      "screenshot": "09-dark-theme.png",
+      "ax": "09-dark-theme.ax.xml"
+    },
+    "lightTheme": {
+      "passed": true,
+      "screenshot": "10-light-theme.png",
+      "ax": "10-light-theme.ax.xml"
+    }
+  },
+  "scope": [
+    "This is intermediate Android Chatbot QA for the current release APK.",
+    "No model endpoint was configured or contacted.",
+    "The APK was installed over the existing package without uninstalling or clearing data.",
+    "The keyboard occlusion was reproduced and then fixed in AssistantScreen by using Android KeyboardAvoidingView height behavior under edge-to-edge; iOS padding behavior was preserved."
+  ]
+}

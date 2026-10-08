@@ -29,11 +29,12 @@ export class InboundRequestError extends Error {
 }
 
 const reject = (code: InboundRequestError['code']): never => { throw new InboundRequestError(code); };
-const idPattern = /^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$/;
+const scopedIdPattern = /^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$/;
+const eventIdPattern = /^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$/;
 const encoder = (): TextEncoder => new TextEncoder();
 
 function checkInput(input: WebhookSignatureInput): void {
-  if (!idPattern.test(input.ruleId) || !idPattern.test(input.keyId) || !idPattern.test(input.eventId) ||
+  if (!scopedIdPattern.test(input.ruleId) || !scopedIdPattern.test(input.keyId) || !eventIdPattern.test(input.eventId) ||
       !/^(0|[1-9][0-9]{0,12})$/.test(input.timestamp) ||
       !Number.isSafeInteger(Number(input.timestamp)) ||
       (input.contentType !== 'application/json' && input.contentType !== 'text/plain') ||

@@ -209,3 +209,118 @@ node scripts/check-migrations.mjs
 
 这些结果只证明现有测试与静态约束通过，不能消除 F1–F5，也不改变本轮“服务端维持
 `3880bdd`、不进入发布”的边界。
+
+## 7. F1–F5 修复复审（2026-10-08）
+
+后续实现已收紧上述五项边界：
+
+- **F1**：`issueAutomationCommitPermit` 在写许可的同一事务内锁定并核对
+  `(userId, ruleId, eventId)` 事件，要求规则仍启用、版本一致、事件状态为
+  `prepared`、解析版本/摘要/条数与冻结结果完全一致，且存在结果密文；不存在冻结事件时不能自造许可。
+- **F2**：Webhook keyring 的生产形状改为 `{ userId, secret }` 的账号作用域条目；
+  规则启用和接收/状态验签均按规则所属账号取钥匙。旧的纯字符串条目只在测试进程兼容，
+  生产进程会拒绝，避免跨租户复用部署全局密钥。
+- **F3**：七天清理现在只把输入/结果密文置空并标记 `expired`，保留事件身份、摘要、状态和
+  争议所需元数据；规则删除只取消未完成队列，保留事件身份与已经签发的 permit，避免本地已写
+  但 ACK 丢失的任务因规则删除永久失去补传资格。
+- **F4**：公网验签、claim、续租、结果发布与提交 permit 统一使用 64 字符事件 ID 上限，
+  不再出现“已接收但永远无法提交”的长度区间。
+- **F5**：事件 ID 明确为账号级全局身份，新增 `(userId,eventId)` 唯一约束；提交许可改为
+  `(userId,ruleId,eventId)` 主键并在账号内约束 `opId` 唯一，claim/permit 不会跨规则取错事件。
+
+对应迁移为 `20261018080000_harden_automation_identity_retention`，未修改已应用迁移；
+`node scripts/check-migrations.mjs` 与服务端 TypeScript 已通过。此节只证明缺口修复已落到
+代码和 schema，尚不等于客户端 worker、批任务提交、计量和跨端验收完成。
+
+## 8. 严格复审（2026-10-08，Goal 继续 active）
+
+本轮复审重新检查了新增代码的持久化、状态机和错误路径，而不是只复读上一轮报告：
+
+- **规则契约**：新增迁移 `20261018100000_add_automation_rule_contract` 后，创建/更新入口会校验
+  白名单字段、IANA 时区、解析版本和 1–50 输出上限；更新先停用并递增规则/授权版本，旧租约和旧
+  结果不会套用新配置。
+- **删除窗口**：原实现会 `deleteMany` 事件与 permit，导致“本地 op 已落盘、响应丢失、规则随后删除”
+  无法补传。现改为保留账本和已有 permit，只把未完成状态标为 `cancelled/rule-deleted`；permit
+  重试先查已有授权，再要求规则仍启用，避免已授权意图被删除竞态抹掉。
+- **worker 真实链路**：`processInboundAutomationEvent` 将 claim、续租、计量 `reserved/sent/consumed/unknown`、
+  结果冻结、permit、proof journal 和单一 batch dispatch 串为正常路径；`sent/consumed/unknown` 重试会进入
+  reconciliation，而不是再次调用模型。新增认证的加密结果读取可恢复“结果已发布、permit 请求前进程终止”
+  的窗口，但 permit 与结果仍是两个中心事务，必须由 AC-3 真进程矩阵证明。当前仍没有把该管道接入各宿主的
+  真实生命周期和 secure store，因此不能把共享函数称为跨端上线。
+- **协议文字一致性**：发现协议文档仍写 `inbound-capture` 和“删除即清许可”，已改为代码真实的
+  `inbound-automation` 与 owner receipt 语义。
+
+本轮静态/阶段证据：`pnpm --filter @heyta/inbound-core build`、`pnpm --filter @heyta/app-host typecheck`、
+`pnpm --filter @heyta/app-host test`（78/1561）、`pnpm --filter @heyta/sync-server build`、
+`node scripts/check-migrations.mjs` 均通过；服务端全套仍存在并行会话的既有失败，详见唯一计划，不能
+被包装成自动收集功能已通过。AC-1～AC-8 继续保持未勾选。
+
+## 9. Node 宿主接缝复审（2026-10-08）
+
+本轮将共享 worker 管道接入第一个真实宿主并重新审计边界：`AppHost` 只负责协议、Vault 包裹
+存储和 op-log 批提交；`apps/node-host` 只注入真实 SQLite 驱动。真实 SQLite 测试证明了
+worker 注册响应写入、收件私钥包裹写入、关闭重开后的私钥恢复，以及重开后用持久 worker 凭据
+进入 claim 空队列路径。Vault 锁定时无法读取凭据或私钥，符合 fail-closed 要求。
+
+共享 process 也有一条正向闭环测试：合成加密事件经过 claim、AI provider（使用宿主注入的
+fetch）、结果加密发布、opaque permit journal，最后只落一条异构 task-batch op；字段投影
+断言确认未授权字段没有进入 provider 请求。
+
+日期复审发现此前 parser 默认把 date-only 固定为 UTC，和任务领域的本地零点契约不一致；现已
+让规则时区进入冻结解析，date-only 以 IANA 时区本地零点换算，instant 仍要求显式 offset，并
+加入跨时区与非法时区测试。日历、时间线和编辑往返尚未在真实宿主矩阵中验收，AC-4 仍不能勾选。
+
+同时检查了 root rotation：新 root 安装后会重包 worker token 与收件私钥，旧 wrapper 不被继续
+接受。该路径已有类型与回归覆盖，但尚未有两个独立进程在真实服务端上完成轮换中断矩阵，因此
+只能记为阶段接缝证据，不能提升 AC-3/AC-4/AC-8。
+
+剩余高风险仍是：AI provider 的真实授权/unknown 对账、结果发布与 permit 之间的进程终止、
+跨设备 key epoch 恢复、date-only 全视图语义、Web/mobile/原生宿主生命周期、规则 UI 与四端
+当前产物重装。当前 Goal 继续 active，不能宣称上线。
+
+## 10. 2026-10-08 严格复审补充
+
+本轮复审没有把“共享 worker 已通过单元测试”升级成跨端完成。沿服务端公网接收 → 收件 envelope AAD → host Vault scope → 本地私钥 epoch → 结果恢复链逐段复核，发现并修复一项真实生命周期缺口：原本地收件私钥只有单一 epoch，轮换后会覆盖旧队列仍需的私钥。现在 meta 记录 v2 按账号、服务端 origin、key epoch 保存多枚 root-wrapped 私钥；旧 v1 形状可读，重包按当前账号/origin 做快照 CAS。
+
+复核还发现必须固定一个以前未写清的绑定规则：服务端 envelope AAD 使用 `user-<numeric user id>`，Vault 包装 scope 继续使用认证返回的数字账号字符串。host 入口现在按这个规则归一化，避免真实 HTTP 收到的密文在 Node 或 Web 恢复时因 AAD 不同而无法打开。新增远端客户端只做认证的 recipient-key GET/PUT/CAS 及规则 CRUD；已有远端公钥而本机没有同 epoch 私钥时会 fail closed，绝不自动覆盖在途队列。
+
+负向检查：旧 epoch 缺失、并发保存、CAS 冲突、错误公钥、未认证请求和 malformed rule response 均有测试；DST 的 America/New_York date-only 两个边界也有测试。未完成项仍是各宿主真实 worker/UI、双真实 SQLite 进程终止矩阵和四端当前产物重装对账，AC-1～AC-8 仍未闭合。
+
+### 10.1 线协议复核追加：认证头形状
+
+复查服务端 `authenticate` 后发现它只接受 `Authorization: Bearer <JWT>`；共享 inbound worker、recipient-key 及规则客户端此前有调用点直接放原始 token，单元 mock 未暴露该问题，真实 HTTP 会在注册/领取前返回 401。现已统一在所有宿主无关客户端边界补上 `Bearer ` 前缀，并添加请求头负向/正向断言。该修复属于 AC-2/AC-3 的真实可达性前置，不改变 worker token 或 HMAC 的独立凭据边界。
+
+### 10.2 权益与首次密钥发布复核
+
+再审公网接收线时发现两个竞态/边界问题：
+
+- 受保护 API 经过权益守卫，但无 JWT 的公网 webhook 原先没有在接收事务内核验 `automation` grant；自托管默认关闭权益总闸时也会误放行。现在自动收集能力无论部署方式都要求 `evaluateCapabilityAcross` 的有效 `automation` grant；接收事务在账号行锁内再次核验，过期或无权益返回 402 且不建事件。
+- 首次公钥发布若“服务端已提交、PUT 响应丢失”，客户端若删除本地私钥会让已排队密文永久不可解。现在 ensure 流程在 Vault 中先保存候选私钥，PUT 失败只对 CAS 冲突做 GET 对账；若远端公钥相同则视为发布成功并复用候选，其他不确定状态保留候选并报错，禁止自动覆盖或删除。
+
+这两点都已写入共享 host 代码/测试边界；真实 PostgreSQL 与进程终止证据仍是 AC-1/AC-2/AC-3 的必要条件。
+
+## 11. Web 宿主接缝复审（2026-10-08）
+
+本轮对新增 Web 代码做了“存储真源 → Vault root → 认证头 → worker 身份 → op-log 写入口”的逐段复核：自动收集的凭据和回执不进入 `heyta` 业务 op-log，而是落在独立 `heyta-inbound` IndexedDB；本地销毁器已把该库加入清单，测试用真 IndexedDB 逐库清除并对账。收件私钥按 `user-<numeric id>` AAD 绑定、按 epoch 保存，worker token 仍只以 root-wrapped 形式落盘；所有规则/收件/worker 请求使用 `Authorization: Bearer`。
+
+Web 前台 worker 调用的是共享 `processInboundAutomationEvent`，因此 claim、lease、字段投影、AI 计量状态、结果加密、permit journal 和单一 batch dispatch 没有在 Web 壳复制。focus/30 秒调度以页面可见性、Vault 解锁、worker 凭据、收件 epoch 与 AI 路由为门槛；失败只显示结构化状态并保留服务器事件，不回传正文。
+
+复审仍发现并记录边界：当前 Web 规则界面没有接入真实发送方/公网签名试发向导，移动与三个原生壳尚未接入同一 worker 生命周期；浏览器前台定时器不是全天候运行器，后台/关闭页面时必须显示等待可执行设备。未执行双真实 SQLite 进程终止矩阵、跨端时区/日历往返和四端当前产物验收，因此 AC-6/AC-8 与 Goal 均未完成。
+
+### 12. 2026-10-08 严格复审追加：轮换恢复、权益门禁与规则 UI
+
+本轮沿“准备结果 → 收件密钥 epoch → 本地恢复 → 单 op 提交”重跑负向审计，发现并修复三处真实缺口：
+
+1. **轮换后的旧结果恢复**：结果密文自身携带 key epoch，但恢复路径原先总用当前 epoch 解密；轮换后旧队列会永久失败。共享 `processInboundAutomationEvent` 现在先解析结果 envelope，按其 epoch 调用宿主提供的 retained-key loader，并在使用后清零临时私钥。新增旧 epoch 恢复测试覆盖“结果已发布、轮换、permit 前进程终止”。
+2. **首次密钥 API 权益边界**：recipient-key PUT/GET 原先只有 JWT，没有 `automation` capability gate；现在与 worker/claim/permit 同样要求有效自动收集权益。同步保留自托管普通同步的既有免费语义。公钥 CAS 还拒绝“同 epoch 换公钥”，同 epoch 仅允许同公钥重发，换钥必须递增 epoch，避免排队密文失去解密钥匙。
+3. **规则 UI 状态**：Web 设置页现在有编辑/保存/取消流程；已删除规则显示为仅保留去重记录且不再提供启停/删除按钮；前台 worker 会显示登录、收件密钥、处理设备、AI 路由/出境同意和可执行就绪原因。自动领取使用服务端 claim 的规则快照，不把页面上第一条规则误当成事件归属。
+
+验证：`@heyta/app-host` 定向恢复测试 2/2 通过；app-host 与 i18n 构建、Web 类型检查和 `check:ui-language` 通过。一次带全包脚本仍暴露并行会话已有的 `local-api-host.spec.ts` 失败（完成态批处理期望与当前工作树不一致），未把它归因于本轮自动收集变更。移动与三种原生壳生命周期、真实双宿主故障矩阵、发送方试发向导、跨时区往返、四端重装及 AC-1～AC-8 仍未闭合，公网功能继续不得开放。
+
+### 2026-10-08 新 Goal 复审记录
+
+本轮新增的严格边界检查已落地：worker secret 的读取、清除和 root rotation 都按账号 + client + origin 绑定；回执 journal 在单一 meta 事务内合并更新，避免并发事件的提交证明丢失。旧 epoch 结果恢复和客户端绑定负向测试已通过。该切片仍不勾选 AC-1～AC-8，公网接收和售卖继续关闭。
+
+### 2026-10-08 调度复审
+
+Web 原先把 30 秒定时器、focus 监听和不可重入判断写在设置组件内，后续宿主若各自复制会产生漂移。现抽为 `packages/app-host/src/inbound-worker-loop.ts`：每个 tick 重新检查 `isRunnable`，同一时间只允许一个处理调用，停止函数会清理 timer；Web 与 Node 使用同一实现。定向测试覆盖后台门槛、并行阻止和停止后的唤醒，不能据此宣称移动或原生壳已完成。

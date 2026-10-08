@@ -409,6 +409,9 @@ importers:
       '@heyta/domain':
         specifier: workspace:*
         version: link:../domain
+      '@heyta/inbound-core':
+        specifier: workspace:*
+        version: link:../inbound-core
       '@heyta/local-api':
         specifier: workspace:*
         version: link:../local-api
@@ -753,6 +756,9 @@ importers:
       '@heyta/domain':
         specifier: '*'
         version: link:../packages/domain
+      '@heyta/inbound-core':
+        specifier: workspace:*
+        version: link:../packages/inbound-core
       '@heyta/shared-schema':
         specifier: '*'
         version: link:../packages/shared-schema

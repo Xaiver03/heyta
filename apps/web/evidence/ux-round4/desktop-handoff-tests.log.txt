@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web
+
+
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+   Start at  07:34:34
+   Duration  453ms (environment 49%, transform 38%, import 7%, tests 4%, setup 2%, worker 1%)
+

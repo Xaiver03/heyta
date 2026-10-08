@@ -58,6 +58,7 @@ export const AI_FEATURE_LABEL_KEY: Record<AiFeature, MessageKey> = {
   prioritize: 'web.ai.feature.prioritize',
   'duration-estimate': 'web.ai.feature.duration',
   'tool-calling': 'web.ai.feature.toolCalling',
+  'inbound-automation': 'web.ai.feature.inboundAutomation',
 };
 
 /** "这个功能压根没配路由"那一句（与"配了但全被排除"必须分开）。 */
@@ -67,6 +68,7 @@ export const AI_NO_TARGET_KEY: Record<AiFeature, MessageKey> = {
   prioritize: 'web.ai.noTarget.prioritize',
   'duration-estimate': 'web.ai.noTarget.duration',
   'tool-calling': 'web.ai.noTarget.toolCalling',
+  'inbound-automation': 'web.ai.noTarget.inboundAutomation',
 };
 
 /** 候选全被排除 → 词条。穷尽 `CandidateExclusionReason` 加两档兜底。 */

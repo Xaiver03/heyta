@@ -14,7 +14,7 @@
 | 工具化创建任务 | 已有 create_task 等工具契约与宿主 submit 写入口 | `packages/local-api/src/tools/task.ts`、`server.ts` |
 | 本机 HTTP / MCP | Node 宿主有监听/stdio 接线；浏览器开关本身不启动服务器 | `apps/node-host/src/local-api-server.ts`、`mcp-stdio-server.ts` |
 | 对话 AI | 已有解析、授权与工具执行，不能当作无人值守的回调接收服务 | `packages/app-host/src/ai-assistant.ts` |
-| 公网自动收集回调 | 尚无接收、持久队列、解析、跨设备领取和结果查询路径 | 服务端现有 webhook 是支付用途 |
+| 公网自动收集回调 | 已有签名接收、密文事件账本、认证 worker 领取/续租/结果发布最小路径；解析、计量、跨端执行与故障验收未闭合 | `server/src/automation/inbound.routes.ts`、`server/src/automation/events.ts` |
 | 付费判断 | 有服务端权益和托管 AI 计量，需新增能力并复用既有判断 | `server/src/entitlement.ts`、`server/src/ai/metering.ts` |
 
 现有入口复核：2026-10-07 运行 Node 宿主的 `local-api-server.spec.ts` 与 `mcp-stdio-e2e.spec.ts`，两文件共 40 项通过，包含真实 HTTP 和 MCP 传输。这个结果只证明现有入口，不证明尚未实现的公网 AI 回调。
@@ -127,11 +127,11 @@
 
 阶段验证：shared-schema 新契约 14 项、op-log 新批/恢复 16 项、app-host 新动作 9 项通过；storage 全包 419 项、op-log 全包 133 项通过，五个改动包类型检查通过。上述测试是当前工作树的阶段证据，**不是最终隔离基线的全仓验收**。shared-schema 全包目前 160 通过/1 失败，失败是并行认证变更将 `AUTH_PASSWORD_PATHS` 从 6 项扩为 9 项而原测试仍断言 6（`auth-http-contract.spec.ts:83`）；本轮未改该生产文件或测试。文档死链仍有并行产品 UX 的 14 处，本任务新增文档链路无报错；ADR 编号检查通过。
 
-尚未闭合：真实中心提交许可、worker 调度与授权版本、账号/本地库实例绑定、请求和解析摘要的生产计算、清单授权与中心许可的版本绑定、跨设备十个故障窗口、真进程终止（当前是可控失败/真实文件重开）、密码学/时区/商业接线、UI、全仓及当前产物重装。AC-3/AC-5 仍保持未勾选，Goal 保持 active。
+尚未闭合：各宿主真实生命周期接入、账号/本地库实例绑定的最终验收、清单授权与中心许可的跨版本证据、跨设备十个故障窗口、真进程终止（当前是可控失败/真实文件重开）、根密钥轮换、密码学/时区/商业接线、UI、全仓及当前产物重装。AC-3/AC-5 仍保持未勾选，Goal 保持 active。
 
 ### 身份边界勘误与 W2 基础进度
 
-深入 HTTP 调用链后发现现有 clientId 来自请求正文，不能当作认证设备。第二轮审计 R2 已追加显式勘误；[ADR-0059](../adr/0059-inbound-worker-authenticated-identity.md)规定新增独立 worker 凭据、不可自报的 owner/数据库 epoch，以及正常同步保存路径的 `inbound:` 前缀门禁。该项为 W3/W4 前置；同步身份门禁切片已实施，注册/签发仍待接线，详见下节。
+深入 HTTP 调用链后发现现有 clientId 来自请求正文，不能当作认证设备。第二轮审计 R2 已追加显式勘误；[ADR-0059](../adr/0059-inbound-worker-authenticated-identity.md)规定新增独立 worker 凭据、不可自报的 owner/数据库 epoch，以及正常同步保存路径的 `inbound:` 前缀门禁。该项为 W3/W4 前置；同步身份门禁切片已实施，注册接线已在 2026-10-08 补齐，许可签发仍待接线，详见下节。
 
 已新增 `@heyta/inbound-core` 共享密码学/请求原语，避免接收端和客户端各实现一份协议：X25519 + HKDF + 既有 AES-GCM、Vault root 包装、原始字节 HMAC、重复 header 拒绝、严格 UTF-8/重复 JSON key/复杂度界限。新增 @noble/curves 2.4.0 的维护性及 MIT LICENSE 已核验，实际依赖树许可证门禁通过，生成登记表已更新。两套 AES 后端及独立 Node 双向互通、签名与输入负向边界共 29 项测试通过；这是原语证据，**不代表真实 HTTP 接线、账号公钥注册、密钥迁移或 Hermes 真机已完成**。
 
@@ -142,9 +142,120 @@
 
 阶段证据：真 HTTP + 独立 PostgreSQL 14 临时实例的 10 项通过，含同账号 B 同时伪造两处 clientId、缺凭据/错账号/错 epoch/错批范围、A 重试单行、缓存旁路拒绝、预检后撤销并发、账号级联删除。补充的内部重复和 tokenVersion 两项已实测通过；中途内存闸门拒绝的运行不计入通过。相关单元/路由 40 项、认证/校验回归 97 项通过，服务端 TypeScript 通过。新增两表与当前并行注册挑战表均纳入隐私文本的中英类别和注销范围对账；补充修订历史后 66 项复跑通过，legal 类型检查、注销真实性/GDPR 门禁和服务端生成快照对账通过。
 
-临时 PostgreSQL 用原迁移 SQL 构建空库；macOS 上项目部署脚本被 Linux 专属 `client_connection_check_interval` 拒绝，因此这不是部署脚本验收。生产环境未迁移。worker 注册/许可签发的公开接口尚未开放，测试许可是显式数据库夹具，不宣称已完成授权状态机。接下来仍需权益、注册/领取/冻结/许可签发、真实 worker、密钥生命周期、日期语义、UI 与各端交付。Goal 继续 active。
+临时 PostgreSQL 用原迁移 SQL 构建空库；macOS 上项目部署脚本被 Linux 专属 `client_connection_check_interval` 拒绝，因此这不是部署脚本验收。生产环境未迁移。此前测试许可是显式数据库夹具，不宣称已完成跨端授权状态机；注册、领取/冻结/许可签发和共享 worker 正常路径已接线，但密钥生命周期、日期语义、UI 与各端交付仍未闭合。Goal 继续 active。
 
 
-身份切片复跑入口：`python3 research/tools/verify-inbound-worker-identity.py`（需 PostgreSQL 工具，可用 `--pg-bin` 指定）；它只创建 loopback 临时测试库，结束停止并清理。待补的删除窗口：规则删除清去重摘要与许可后合法迟到同步必须同时成立，不能简单删许可导致已创建任务永久传不上，也不能偷偷延长摘要期限。该窗口归 AC-3，尚未验收。
+身份切片复跑入口：`python3 research/tools/verify-inbound-worker-identity.py`（需 PostgreSQL 工具，可用 `--pg-bin` 指定）；它只创建 loopback 临时测试库，结束停止并清理。删除窗口的代码边界已修正为“保留事件身份与已签发 permit、取消未完成队列”，但两个独立宿主的真实进程中断验收仍归 AC-3，尚未验收。
 
 本切片的[真库输出](../research/evidence/inbound-automation-review/worker-identity-postgres.txt)与[源码摘要](../research/evidence/inbound-automation-review/worker-identity-manifest.json)另存，不覆盖复审前的基线摘要。
+
+### W3 注册接线（2026-10-08，阶段完成，仍非完整自动收集）
+
+新增 `POST /api/automation/worker/register` 与 `POST /api/automation/worker/revoke`：先验证 JWT，再验证独立 `automation` 权益；注册在账号行锁内撤销同一 client/epoch 的旧 worker、生成新的 256 位 token，仅保存 SHA-256，明文只在 201 响应返回一次。撤销同样在账号锁内执行，和上传路径共享撤销语义。`hosted-ai-monthly` 现在明确包含 `automation` 授权，数据库由新迁移扩展 grants CHECK；自托管默认关闭权益闸门，启用闸门时也走同一 capability。
+
+阶段证据：服务端 TypeScript、价格一致性门禁、迁移形状门禁和 89 项价格/结算回归通过。`POST /api/automation/commit-permit` 也已接线：同一事件/内容重试复用原授权并重签不透明回执，异内容与错误 worker 拒绝；回执不含规则或任务正文。规则元数据与七天到期的密文事件账本表已建，规则删除保留 tombstone、取消未完成队列并保留已签发 permit，启用前要求独立 webhook key ring 中存在对应 key。账号收件 X25519 公钥注册/读取走版本 CAS，旧包不能覆盖新包。真 HTTP/PostgreSQL 证据为 15 项，归档于 [`worker-registration-postgres-20261008.txt`](../research/evidence/inbound-automation-review/worker-registration-postgres-20261008.txt)，清单与哈希见 [`worker-registration-manifest.json`](../research/evidence/inbound-automation-review/worker-registration-manifest.json)。客户端尚未接入真实注册调用和平台持久 worker secret / journal-before-dispatch，公网回调接收、加密队列实际写入、领取/解析、根密钥迁移、UI 和跨端安装仍未闭合。
+
+### W3 公网接收切片（2026-10-08，已接线，仍非完整自动收集）
+
+新增独立 Fastify 插件 `server/src/automation/inbound.routes.ts`，注册
+`POST /api/automation/v1/hooks/:ruleId`。入口使用 `parseAs: 'buffer'` 保留原始字节，
+复用 `@heyta/inbound-core` 的重复 header、Content-Type、时间窗、HMAC、UTF-8、JSON
+重复键/深度/字段数校验；规则必须启用且 keyId 匹配，账号收件公钥存在后才用
+X25519 envelope 加密原始输入，并将七天事件密文与最小元数据写入 `AutomationEvent`。
+响应只返回不透明 `eventId/state`；同 eventId 同字节与类型幂等，异字节或异类型返回
+`409 EVENT_CONTENT_CONFLICT`。补充迁移记录 canonical Content-Type，并移除错误的
+`(userId,dedupeDigest)` 唯一约束：相同内容但不同来源 ID 是两个明确意图，不能被
+内容摘要锁死。base64url 公钥在服务端边界规范化为 envelope 的 canonical base64。
+
+阶段证据：`server/tests/inbound-automation.routes.spec.ts` 真 Fastify HTTP 4 项通过，
+覆盖密文落库与解密、重复 JSON key、精确重试/异内容冲突、过期签名；服务端
+TypeScript 与迁移形状检查通过。此切片**不等于**队列领取、租约 fencing、AI 解析/计量、
+提交许可、Vault 私钥迁移、客户端注册、UI 或跨端验收；公网入口在这些依赖闭合前仍不对外开启。
+
+真库补证：一次性 PostgreSQL 14.18 应用当前全部迁移后，注册/许可/规则/CAS 与公网 webhook 同一集成套件 **16/16** 通过；新增 webhook 断言实际密文落库后可由收件私钥回读、精确重试幂等、异内容冲突，认证 worker 领取/续租/generation fencing/结果发布幂等。输出归档于 [`webhook-postgres-20261008.txt`](../research/evidence/inbound-automation-review/webhook-postgres-20261008.txt)，不含合成秘密以外的凭据或正文；这仍不是 AC-2～AC-8 的完整验收。
+
+客户端接缝补充：`packages/app-host/src/inbound-worker.ts` 现在提供 claim/lease-renew/result-publish 的共享 HTTP 传输，所有请求只从注入的 worker secret store 取凭据，结果与输入保持 opaque ciphertext；新增 7 项宿主测试通过。各 Web/mobile/desktop 实际 secret store、Vault 解密、AI 解析和 UI 尚未接入，不能把共享接缝当成跨端 worker 已完成。
+
+### W3/W4 复审修复与解析基础（2026-10-08，阶段证据，仍不开放）
+
+针对复审 F1–F5 已追加迁移 `20261018080000_harden_automation_identity_retention`：事件 ID 在账号内唯一；提交许可改为事件复合身份，并在同一事务核对已启用规则、`prepared` 状态、规则/解析版本、冻结摘要和条数；事件 ID 在公网接收、claim、续租、结果和 permit 全链路统一为 64 字符；七天 sweep 只清输入/结果密文并保留事件账本。生产 keyring 条目必须带 `userId`，验签按规则所属账号取钥匙；纯字符串旧形状仅在测试进程兼容。
+
+新增 `automation_ai_attempts` 元数据账本及 `reserveAutomationAiAttempt`：预留、现有 AI 周期额度占用和事件级 `(event, parseVersion, attempt)` 记录在同一事务内；重复预留幂等，不写正文/模型输出。共享 worker 已接入 reserve 与 `sent/consumed/unknown` 状态，仍需各宿主真实调度、供应商失败/unknown/release 对账和两宿主故障注入。
+
+新增 `@heyta/inbound-core` 受限字段投影与冻结解析器：规则白名单决定出境字段；模型结果严格映射到 `heytaTaskBatch: 1`，任务 ID/op ID 稳定，date-only 按 UTC 日历日、instant 必须带显式 offset，拒绝执行设备本地时区推断。规则配置/授权版本已经进入服务端模型和配置 API；`app-host` 新增 claim → 解密 → `inbound-automation` 出境授权路由 → 冻结 → 收件公钥加密结果的共享 runner，以及 Vault root 包装的本地收件私钥存储。当前仍缺各宿主实际接入、UI、根轮换迁移和 AC-3/AC-8 验收；Goal 保持 active。
+
+### 严格复审补充与本轮实现（2026-10-08）
+
+本轮再次按“计划条款 → 运行时代码 → 持久化边界 → 负向测试”复审，确认两处真实缺口并已修复：
+
+1. **规则授权契约已进入持久化模型**：`AutomationRule` 新增可选字段白名单、目标清单、规则时区、解析版本、授权版本和输出上限；创建与配置更新均校验字段闭集、IANA 时区和 1–50 条上限，配置更新会停用规则并递增版本，领取/许可仍以版本匹配为门槛。新增迁移 `20261018100000_add_automation_rule_contract`，未修改已应用迁移。
+2. **规则删除不再抹掉迟到同步所需证据**：删除保留事件身份和已签发提交许可，只将尚未完成的队列状态标为 `cancelled/rule-deleted`；因此本地已落盘但 ACK 丢失的任务仍可凭原 permit/owner receipt 上传，新的接收、领取和许可仍被墓碑拦截。
+3. **共享 worker 已具备正常路径与准备结果恢复管道**：`processInboundAutomationEvent()` 现在负责 claim、租约续期、受限字段投影、AI 计量状态 `reserved → sent → consumed/unknown`、结果冻结、permit 请求、journal-before-dispatch 和单一异构 task-batch dispatch；新增认证的加密结果读取可恢复“结果已发布、permit 请求前进程终止”的窗口。permit 签发与结果发布仍是两个中心事务，真实进程中断矩阵仍需验收；它是宿主接线的共享管道，不等同于 Web/mobile/desktop 已启用。各宿主的 secure store、规则 UI、根密钥迁移和真进程中断仍未闭合。
+4. **公网队列边界已在线性化点执行**：接收事务在账号行锁内按未终结事件数和密文总字节数检查 1,000 条 / 64 MiB 上限，超过时返回不含正文的明确拒绝码；Fastify 速率限制仍是外围防线，AC-2 仍需独立 PostgreSQL 并发与上限/上限+1 证据。
+
+本轮证据：`@heyta/inbound-core` 32 项、`@heyta/app-host` 78 文件/1561 项、服务端构建和迁移形状检查通过。服务端全套仍有并行会话引入的既有测试红灯（账号 tokenVersion、压缩同步 mock、计量夹具），不把它们计入自动收集成功；Goal 继续 active，AC-1～AC-8 不勾选。
+
+### Node 宿主真实接缝（2026-10-08，阶段证据，仍不开放）
+
+`packages/app-host` 现提供宿主无关的 `registerInboundWorker`、收件私钥保存/读取和
+`processInboundAutomation` 入口；worker token、提交回执日志和收件私钥均落在同一真实 SQLite
+meta store，token/私钥只以 Vault root 包裹形态持久化。`apps/node-host` 只注入 Node SQLite
+驱动并暴露同一入口，没有重写业务管道。Vault root 轮换会在新 root 安装后重包 worker token
+与收件私钥；Vault 锁定时读取和处理明确 fail closed。
+
+阶段证据：Node 宿主真实 SQLite 测试覆盖注册响应、收件私钥保存、关闭重开后恢复，以及重开后
+从持久 worker 凭据进入 claim 空队列路径；`@heyta/app-host` typecheck/test 和
+`@heyta/node-host` typecheck/test 通过（当前 app-host 81 文件/1565 项、Node 宿主 195 项）。这只证明一个真实宿主的
+持久接缝和正常空队列路径，尚不证明 AI provider、结果/permit 中断矩阵、根轮换真迁移、其他
+宿主、规则 UI 或 AC-1～AC-8；因此 AC-3/AC-4/AC-6/AC-8 仍不勾选。
+
+解析器的 date-only 语义也已收紧：规则时区（可选，缺省 UTC）用于把日期落在该 IANA 时区的
+本地零点；带时间的值仍必须显式携带 offset。Asia/Shanghai 与非法时区的正负测试已加入
+`@heyta/inbound-core`，避免执行设备本地时区改变任务日期。完整日历/时间线/编辑往返仍需
+跨端验收，不能把解析器测试当成 AC-4 完成。
+
+### 严格复审与收件密钥轮换补强（2026-10-08，阶段证据，仍不开放）
+
+本轮按“服务端产生的 AAD → 宿主持有的账号绑定 → 本地密钥 epoch → 规则/事件版本”重新走了一遍真实调用链，发现原实现有一处会在真实轮换后丢失恢复能力的缺口：本地收件私钥记录只有一个 epoch。root rotation 虽然会重包该记录，但新收件 epoch 会覆盖旧记录；旧队列仍以旧 epoch 加密时，设备无法解密它们。该缺口已修复为可选的 v2 多 epoch meta 记录：旧 v1 记录可继续 hydration，写入时惰性升级；每个账号/服务端/epoch 独立保存，重包只处理当前账号与 origin，变更采用快照 CAS，失败不会写半份结果。Node/内存适配器测试覆盖 v1 升级、并发保存、账号隔离和轮换失败。
+
+同时补上宿主无关的收件密钥注册客户端（认证 GET、首次 PUT、CAS 冲突）和规则 CRUD 客户端。首次确保密钥时先写 Vault 包装的本地私钥，再以 `expectedPackageVersion=null` 发布公钥；已有远端公钥但本机没有对应 epoch 私钥时明确进入“需要恢复”，不会自动生成新密钥覆盖在途队列。显式轮换递增 epoch/packageVersion，保留旧 epoch 私钥，CAS 冲突会清理新 epoch 的本地暂存。协议 AAD 的账号标识统一为 `user-<numeric user id>`；Vault 的账号 scope 仍使用认证层的数字字符串，两者不再混用。
+
+本轮新增验证：`@heyta/inbound-core` 34 项、收件密钥/规则远端/密钥存储相关 `@heyta/app-host` 11 项均通过；app-host 生产构建与 node-host 独立 typecheck 通过。严格复审仍判定以下门槛未闭合：Web/mobile/macOS/Windows/Linux 尚未接入真实 worker，规则 UI 尚未完成，双真实宿主进程终止矩阵与四端清旧包/重装/产物对账尚未执行；因此 AC-1～AC-8 继续不勾选，公网接收仍不得开放。
+
+本轮线协议复核又发现一个会令真实链路直接失效的形状问题：服务端认证中间件只接受 `Authorization: Bearer <JWT>`，而共享 inbound 客户端原先在 worker 注册、领取、结果/许可及规则/收件密钥请求中把原始 token 直接放进头部；测试 mock 没有模拟认证中间件。现已在宿主无关边界统一补上 Bearer 前缀，并加入请求头断言。该问题已闭合为代码缺陷，但 AC-2/AC-3 仍需真 HTTP、真数据库和故障注入证据，不因 mock 通过而勾选。
+
+严格复审补充：无 JWT 的公网 webhook 也必须在账号锁内执行同一 `automation` grant 判定；现在自托管默认权益总闸关闭时，hosting/同步仍保持既有语义，但自动收集不会因此免费放行。首次收件公钥发布按“先保存本地候选私钥、再 CAS 发布、响应丢失后对账复用”处理，避免把服务端已接受而客户端未收到响应误判为失败并删掉唯一解密钥匙。
+
+### 2026-10-08 严格复审后续：Web 宿主接缝（仍不开放）
+
+本轮把 Web 设置与持久化边界接上，但没有把阶段证据误写成上线完成：
+
+- 新增“设置 → AI 与集成 → 自动收集规则”界面，规则创建/读取/暂停/启用/删除均调用认证的 `Bearer` API；字段白名单、目标清单、IANA 时区、解析版本和 1–50 条上限由服务端再次校验。界面同时明确公网回调先在服务端接收，发送方只看到不透明事件状态。
+- Web 新增独立 IndexedDB `heyta-inbound`，使用 Vault root 包装 worker token、收件私钥和提交回执；收件密钥首次注册与显式轮换沿用多 epoch/CAS 协议，旧 epoch 不会被覆盖。注销清单与真源对账已加入该库。
+- Web 处理设备注册和 foreground worker 已接入共享 `processInboundAutomationEvent`：focus/30 秒周期仅在页面前台、Vault 解锁、worker 凭据、收件密钥和 AI 路由可用时尝试领取；出境同意、provider 选择、计量账本、结果密文、permit journal 和单一异构 batch op 仍由共享层负责。没有可执行条件时不静默切换到远端或明文。
+
+阶段验证：`@heyta/web` 类型检查、`check:ui-language`、Web 全量测试（2091 项通过、13 项跳过）、`@heyta/app-host` 构建、`@heyta/node-host` 真实 SQLite 测试（197 项）通过。Web 运行时目前只覆盖浏览器宿主；移动端、macOS、Windows、Linux 的 worker 调度与密钥库仍未接入，双真实宿主进程终止矩阵、AC-3 十三个故障窗口、四端清旧包/重打/重装和全仓门禁仍未闭合。AC-1～AC-8 继续不勾选，公网接收不得开启。
+
+### 2026-10-08 严格复审追加：轮换恢复与 Web 规则接缝
+
+本轮把复审发现的三个可执行缺口纳入计划：
+
+- 结果恢复按 envelope 自带的 key epoch 读取保留私钥；宿主必须提供 retained-key loader，旧队列在轮换后仍可恢复，临时私钥使用后清零。
+- recipient-key PUT/GET 纳入 `automation` capability gate；同 epoch 只允许同公钥幂等重发，换公钥必须递增 epoch。该规则加入 AC-1/AC-3 的负向证据。
+- Web 规则 UI 已补编辑/保存/取消、删除墓碑展示和可执行原因状态；自动领取只依赖服务端 claim 快照，不按列表第一条规则推断事件归属。
+
+本轮新增阶段证据：app-host 旧 epoch 结果恢复测试 2/2；app-host/i18n 构建、Web 类型检查与界面文案门禁通过。该证据不勾选任何 AC。仍待：发送方签名试发向导、移动与 macOS/Windows/Linux worker 生命周期、两个独立真实宿主进程终止矩阵、跨端日期视图往返、四端当前产物重装和全仓门禁。公网接收与售卖继续关闭。
+
+### 2026-10-08 新 Goal 复审：worker 身份与回执并发
+
+严格复核发现两个本地持久化边界并已修复：
+
+- worker 凭据读取现在同时绑定账号、`clientId` 和服务端 origin；仅知道账号和 origin 的另一设备不能恢复该 worker token。
+- worker 凭据清除改为事务内按绑定条件删除，避免“先读后删”误删并发保存的新凭据；root rotation 对 worker wrapper 增加快照 CAS。
+- commit journal 的读改写改为同一 meta-store 事务，并拒绝非字符串/数组形状，两个并发事件的 opaque receipt 不再互相覆盖。
+
+阶段证据：app-host build；worker 身份、并发回执和旧 epoch 恢复定向测试 5/5。AC-3 仍需两个独立真实宿主、真实服务端进程终止和完整故障窗口矩阵。
+
+### 2026-10-08 新 Goal 调度切片
+
+新增宿主无关 `startInboundWorkerLoop`：每次唤醒重新检查可执行门槛，禁止并行 claim/process，停止后不再启动新尝试；Web 前台设置页和 Node 宿主均接入该原语。7 项调度/密钥/恢复测试与 Web、Node 类型检查通过。移动及 macOS/Windows/Linux 原生调度仍需接入各自前台与安全存储生命周期。

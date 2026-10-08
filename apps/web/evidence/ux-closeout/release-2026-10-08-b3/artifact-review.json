@@ -1,0 +1,92 @@
+{
+  "reviewedAt": "2026-10-08T07:15:20+08:00",
+  "source": {
+    "publishStage": "/tmp/heyta-goal-b3-publish-stage",
+    "iosIpa": "/tmp/heyta-goal-b5/Heyta.ipa"
+  },
+  "publishStage": {
+    "sha256SumsFile": "SHA256SUMS.txt",
+    "sha256SumsCheck": {
+      "passed": true,
+      "files": [
+        {
+          "file": "heyta-1.0.1-test.20261008.3-android.apk",
+          "sha256": "e20072576f5c79bccac8e58fd26e5219cba6566bce7331e4add73af245a2e180",
+          "sizeBytes": 68002344
+        },
+        {
+          "file": "heyta-1.0.1-test.20261008.3-linux.deb",
+          "sha256": "6e804176bb366d0e9ed9e6acd50e7107158c2d72e48e34d198fd3e1a6cf8036d",
+          "sizeBytes": 1763348
+        },
+        {
+          "file": "heyta-1.0.1-test.20261008.3-macos.dmg",
+          "sha256": "6b4cfc26f34c78138ec5f7216c18e274538e4af0ff00bb4c6b48ff409a04c694",
+          "sizeBytes": 2737725
+        },
+        {
+          "file": "heyta-1.0.1-test.20261008.3-windows.zip",
+          "sha256": "80b85042c8acb31e54989156677acdc8674fef6c3df7c56f053039a5e8c077b4",
+          "sizeBytes": 98549331
+        }
+      ]
+    },
+    "androidApk": {
+      "file": "heyta-1.0.1-test.20261008.3-android.apk",
+      "sha256": "e20072576f5c79bccac8e58fd26e5219cba6566bce7331e4add73af245a2e180",
+      "sizeBytes": 68002344,
+      "signatureVerified": true,
+      "certificateDn": "CN=heyta, OU=Mobile, O=Xiaoli Creativity Culture Industry, L=Hangzhou, ST=Zhejiang, C=CN",
+      "certificateSha256": "c46d0386179c3cef12582d1347ed2f871eb03a64aaa2bff96511c1cb76062556",
+      "matchesPreviousReleaseCertificate": true,
+      "matchesRegisteredCertificate": true
+    },
+    "windowsZip": {
+      "contents": [
+        "heyta.msix",
+        "heyta-selfsigned.cer",
+        "Install-Heyta.ps1",
+        "安装说明-中文.md"
+      ],
+      "contentsMatchExpected": true,
+      "privateKeyFilesPresent": false,
+      "certificate": {
+        "subject": "CN=heyta local build",
+        "issuer": "CN=heyta local build",
+        "actualSha256Fingerprint": "224838098D563DD84FA6B4D314C9D5B3962F521BCD8FDF901230798EB4D22925",
+        "actualSha1Thumbprint": "86B996BAFBBA2074428A1048478D7D7497F2EAF9",
+        "installerExpectedThumbprint": "86B996BAFBBA2074428A1048478D7D7497F2EAF9",
+        "readmeExpectedThumbprint": "86B996BAFBBA2074428A1048478D7D7497F2EAF9",
+        "thumbprintMatchesInstallerAndReadme": true,
+        "windowsX509Certificate2ThumbprintMatches": true
+      },
+      "msix": {
+        "sha256": "628e096ee269aa20114b89b409971567d0ce0316aa7aa58ff44d369ac6dcb03c",
+        "sizeBytes": 99253089,
+        "installerExpectedSha256": "628E096EE269AA20114B89B409971567D0CE0316AA7AA58FF44D369AC6DCB03C",
+        "readmeExpectedSha256": "628e096ee269aa20114b89b409971567d0ce0316aa7aa58ff44d369ac6dcb03c",
+        "readmeExpectedSizeBytes": 99253089,
+        "hashMatchesInstallerAndReadme": true,
+        "sizeMatchesReadme": true
+      }
+    }
+  },
+  "iosIpa": {
+    "sha256": "9837649b6db1c21867c8bd35977cdfc99a82f18f983888078aaaed8b3138b155",
+    "sizeBytes": 14355636,
+    "app": {
+      "bundleIdentifier": "com.heyta",
+      "shortVersion": "1.0",
+      "build": "5"
+    },
+    "widgetExtension": {
+      "bundleIdentifier": "com.heyta.WidgetExtension",
+      "shortVersion": "1.0",
+      "build": "5"
+    },
+    "appAndWidgetVersionMatch": true
+  },
+  "overallPassed": true,
+  "blockingFinding": null,
+  "note": "Windows 安装器比较 X509Certificate2.Thumbprint（SHA-1），不是证书 SHA-256 指纹；actualSha1Thumbprint 与安装脚本、中文说明一致。"
+}

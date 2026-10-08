@@ -1,0 +1,57 @@
+{
+  "date": "2026-10-08",
+  "mode": "installed Windows shell, read-only Playwright CDP probe",
+  "cdp": {
+    "browser": "Edg/154.0.4258.62",
+    "page": "https://heyta.local/index.html",
+    "backend": "shell"
+  },
+  "settingsGroups": [
+    "个人资料",
+    "任务与显示",
+    "同步与隐私",
+    "AI 与集成",
+    "数据管理",
+    "账号与安全",
+    "关于与帮助"
+  ],
+  "syncPrivacy": {
+    "visible": true,
+    "testids": [
+      "sync-settings-panel",
+      "sync-signin-required-gate",
+      "sync-signin-required",
+      "sync-signin-required-action",
+      "sync-advanced",
+      "sync-server-url",
+      "sync-save-and-sync",
+      "privacy-panel",
+      "privacy-state",
+      "privacy-choose-again"
+    ],
+    "readout": "官方登录默认路径、自托管高级展开、服务端地址/令牌字段、保存并同步、隐私状态与重新选择入口均可见。"
+  },
+  "dataManagement": {
+    "visible": true,
+    "testids": [
+      "data-settings-panel",
+      "data-backup-card",
+      "export-panel",
+      "export-json",
+      "export-markdown",
+      "export-not-restore-point",
+      "import-panel",
+      "import-file",
+      "import-run",
+      "import-empty-only",
+      "import-local-only",
+      "data-migration-card",
+      "ticktick-import-panel",
+      "ticktick-file",
+      "ticktick-ticktick-only",
+      "ticktick-coexist"
+    ],
+    "readout": "JSON/Markdown 导出、仅空库还原、非空库拒绝且不覆盖现有数据、仅本机还原、滴答迁移入口均可见。"
+  },
+  "scope": "UI/readiness evidence only; no export, import, restore, login, token, or server request was performed."
+}

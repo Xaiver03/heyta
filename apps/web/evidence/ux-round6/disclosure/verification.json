@@ -1,0 +1,24 @@
+{
+  "time": "2026-10-08T01:34:46.877951+00:00",
+  "sourceSha256": {
+    "apps/web/src/features/ai/AssistantPanel.tsx": "3c7ea31416148e8abea073b3d18e8be017f01ca134f74549ef81aede7fde1570",
+    "packages/ui/src/ai/AiDisclosure.tsx": "05db1deea0904922a530e67d0101af38309872015a9082e7c0abef2754d2f2c1",
+    "e2e/tests/ai-assistant.spec.ts": "a51079544c34935455a122b99b66ae3380d17225ef692cab9e3add0ac02ca8b4"
+  },
+  "environment": "real Chromium, actual IndexedDB/op-log, controlled model HTTP fixture",
+  "checks": {
+    "browserJourneysPassed": 2,
+    "headingAndCloseVisible": true,
+    "sendFullyVisible": true,
+    "inactiveComposerHiddenDuringDisclosure": true,
+    "zeroEgressBeforeConsent": true,
+    "defaultExecutionSingleCreate": true,
+    "reloadDoesNotDuplicate": true,
+    "settingsReturnAndDarkTheme": true
+  },
+  "limits": [
+    "Not installed native shell acceptance",
+    "Not a live model",
+    "Later locale separator change affects proposal text only, not disclosure layout"
+  ]
+}

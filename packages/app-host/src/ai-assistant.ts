@@ -85,6 +85,7 @@ import {
   aiToolProposalRequiresConfirmation,
   executeAiToolProposal,
   runSelectedTool,
+  type AiToolAuthorization,
   type AiToolProposal,
 } from './ai-tool-run.js';
 import {
@@ -286,6 +287,8 @@ export interface AssistantTurnDeps {
   /** 能力档位 —— 第二授权前端的输入，**不是** `localApi.grants`。 */
   readonly tier: AssistantTier;
   readonly host: LocalApiHost;
+  /** 最终写入前读取当前助手授权；默认按本轮 tier 生成。 */
+  readonly getGrants?: () => LocalApiConfig['grants'];
   /** 本机规则命中后的用户可见句子，由宿主按当前界面语言取唯一词条表。 */
   readonly localize: LocalObservationTranslate;
   /** 一次用户发送的稳定标识；执行档以此防止重放产生重复 op。 */
@@ -594,7 +597,8 @@ export async function requestAssistantTurn(
 
   const disclosed = new Set(assistantEgressFields(deps.tier));
   const disclosedPlain = [...disclosed].map((field) => field.split('.')[1] ?? field);
-  const runnerDeps = { host: deps.host, grants };
+  const getGrants = deps.getGrants ?? (() => assistantGrants(deps.tier));
+  const runnerDeps = { host: deps.host, grants, getGrants };
   const anchorNow = deps.now ?? Date.now();
   const executionId =
     deps.executionId?.trim() || `assistant-anonymous-${String(++anonymousExecutionCounter)}`;
@@ -606,7 +610,8 @@ export async function requestAssistantTurn(
     destination: EgressDestination | undefined,
   ): Promise<AssistantOutcome> => {
     if (deps.tier === 'read-and-propose' && !aiToolProposalRequiresConfirmation(proposal)) {
-      const result = await executeAiToolProposal(deps.host, proposal, executionId);
+      const authorization: AiToolAuthorization = { getGrants };
+      const result = await executeAiToolProposal(deps.host, proposal, executionId, authorization);
       if (!result.ok) {
         return { ok: false, reason: 'write-failed', message: result.message, steps, health };
       }

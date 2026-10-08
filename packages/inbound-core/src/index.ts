@@ -5,3 +5,6 @@ export {
   readWebhookHeaders, decodeInboundUtf8, parseInboundJson,
   type InboundContentType, type WebhookSignatureInput,
 } from './webhook.js';
+export { buildInboundModelInput, freezeInboundTaskBatch, INBOUND_AUTOMATION_FIELDS, type InboundAutomationField } from './parser.js';
+export { inboundPublicKey } from './envelope.js';
+export type { InboundWrappedKey } from '@heyta/shared-schema';

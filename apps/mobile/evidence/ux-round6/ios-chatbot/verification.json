@@ -1,0 +1,28 @@
+{
+  "kind": "installed iOS simulator, controlled HTTP model fixture; not live model intelligence",
+  "installedBundleSha256": "1cfde667af31d393012cfe3f36f9d825b56d6c52a3a4c7bd0a4e5745aa764e45",
+  "baseline": "round5 installed bundle, prior to round6 source changes",
+  "checks": {
+    "httpRequest": true,
+    "defaultExecutionCreatesTaskOp": true,
+    "batchConfirmationRequired": true,
+    "confirmationCreatesOnlyRemainingCompletion": true,
+    "readonlyCatalogueOmitsWrites": true,
+    "injectedWriteDeniedNoNewOp": true
+  },
+  "opCount": 4,
+  "readOnlyRequests": 6,
+  "findings": [
+    "local-only permission blocked request before fixture received any HTTP; raw internal error required manual settings navigation",
+    "disclosure rendered large untranslated field list",
+    "batch completion host used per-task loop; source now being repaired",
+    "AX keyboard heuristic misclassified composer as keyboard; send used actual observed frame above native KeyboardKey at y545",
+    "idb text input was composed by Chinese IME; repeated QA text included stale composition, not a reliable general text-input verdict",
+    "New privacy action initially routed to account security; native AX caught mismatch. Corrected Profile callback from security to sync; final retest pending."
+  ],
+  "limits": [
+    "No live external model",
+    "No physical iPhone",
+    "Final source reinstallation pending"
+  ]
+}

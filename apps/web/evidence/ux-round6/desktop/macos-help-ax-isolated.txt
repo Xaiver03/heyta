@@ -1,0 +1,40 @@
+# macOS 安装态帮助外链复核（隔离 profile）
+
+日期：2026-10-08（本机 macOS）。本次直接运行 `/Applications/Heyta.app`，通过
+`HEYTA_SHELL_DB_DIR=<临时目录>` 与 `HEYTA_WEBKIT_EPHEMERAL=1` 隔离壳库和 WebKit
+存储；没有读取或修改用户真实库，没有使用账号凭据，也没有重装或构建。
+
+## 环境读数
+
+```text
+IOConsoleLocked=No
+kCGSSessionOnConsoleKey=Yes
+kCGSessionLoginDoneKey=Yes
+HeytaMac=launched (temporary shell DB)
+```
+
+锁屏/登录会话不是本轮阻塞原因。
+
+## AX 读数
+
+```text
+AX_PROCESS=present
+AX_WINDOWS=1
+AX_WINDOW_TITLE=heyta
+AX exposed nodes: native window chrome only (group/close/minimize/full screen)
+```
+
+WebView 的设置分组、帮助链接和 `AXWebArea/AXURL` 没有暴露。现有
+`scripts/qa/macos-installed-widget-help.sh` 在同一隔离进程上运行，等待 15 秒后返回：
+
+```text
+PROBE=UNAVAILABLE
+REASON=Accessibility tree or browser URL could not be read
+RESULT=UNVERIFIED
+exit=4
+```
+
+结论：macOS 原生小组件识别已有安装态 AX 读数（见
+`apps/web/evidence/ux-final-release/macos-widget-help-native-20261007.txt`），但帮助
+外链“点击 → 系统浏览器新标签 → 壳 WebView URL 不变”的安装态证据仍未成立。下一步应
+改进增量 AX 查找或使用受控人工点击；不能把本次 `UNVERIFIED` 当作产品失败或通过。

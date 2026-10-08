@@ -18,6 +18,8 @@ export type { NavigationEntry, NavigationStacks } from './navigation-state';
 interface NavigationValue {
   readonly tab: TabKey;
   readonly setTab: (tab: TabKey) => void;
+  /** All tab stacks; a hidden tab remains mounted and keeps its route state. */
+  readonly stacks: NavigationStacks;
   readonly stack: readonly NavigationEntry[];
   readonly push: (key: string) => void;
   readonly pop: () => boolean;
@@ -62,6 +64,7 @@ export function NavigationProvider({ children }: { children: React.ReactNode }):
     () => ({
       tab,
       setTab,
+      stacks,
       stack,
       push,
       pop,
@@ -70,7 +73,7 @@ export function NavigationProvider({ children }: { children: React.ReactNode }):
         backHandlerRef.current = handler;
       },
     }),
-    [tab, stack],
+    [tab, stack, stacks],
   );
   return <NavigationContext.Provider value={value}>{children}</NavigationContext.Provider>;
 }

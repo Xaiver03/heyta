@@ -1,0 +1,36 @@
+{
+  "status": "failed",
+  "serial": "emulator-5554",
+  "error": "timed out waiting for resource assistant-screen; visible=['专注', '进度 0%', '25:00', '准备好了就开始', '本轮 25 分钟', '开始专注', '开始专注', '专注', '专注', '短休息', '短休息', '长休息', '长休息', '关联任务', '还没有待办任务。去「任务」页建一个，就能把它和专注关联起来。', '今天', '完成专注', '0 个', '专注时长', '0 分钟', '任务', '3 项', '3', '任务', '日历', '日历', '专注', '专注', '分类', '分类', '我的', '我的']",
+  "steps": [
+    {
+      "name": "first-use-before",
+      "status": "passed",
+      "at": 1791426798.327788
+    },
+    {
+      "name": "first-use-after-consent",
+      "status": "passed",
+      "at": 1791426802.444803
+    },
+    {
+      "name": "capture-created",
+      "status": "passed",
+      "at": 1791426836.301056,
+      "taskA": "AndroidAtomicA1791426810",
+      "taskB": "AndroidAtomicB1791426810",
+      "taskC": "AndroidAtomicC1791426810",
+      "taskAId": "task-muyx9u0m-1-00l0um5d",
+      "taskBId": "task-muyxa0ka-2-240faj3q",
+      "taskCId": "task-muyxa78j-3-vsq4aw5s"
+    }
+  ],
+  "apk": {
+    "path": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/mobile/android/app/build/outputs/apk/release/app-release.apk",
+    "size": 68246980,
+    "sha256": "1be30293234b47cc546d78d907112df1c7d3789476bf4018f2d8306e2448a74c",
+    "apksignerExitCode": 0,
+    "certificateSha256": "c46d0386179c3cef12582d1347ed2f871eb03a64aaa2bff96511c1cb76062556",
+    "certificateSubject": "CN=heyta, OU=Mobile, O=Xiaoli Creativity Culture Industry, L=Hangzhou, ST=Zhejiang, C=CN"
+  }
+}

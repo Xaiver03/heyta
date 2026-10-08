@@ -248,8 +248,11 @@ export function renderChecklist(items: readonly string[]): string {
  */
 export function mergeChecklistIntoNote(existingNote: string | undefined, items: readonly string[]): string {
   const checklist = renderChecklist(items);
-  const existing = existingNote?.trim() ?? '';
-  if (existing === '') return checklist;
+  const existing = existingNote ?? '';
+  if (existing.trim() === '') return checklist;
+  // Replaying the same confirmation must not append a second identical block.
+  // Keep the original note byte-for-byte when it already ends with this block.
+  if (existing === checklist || existing.endsWith(`\n\n${checklist}`)) return existing;
   return `${existing}\n\n${checklist}`;
 }
 

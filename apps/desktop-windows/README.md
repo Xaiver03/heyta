@@ -75,6 +75,65 @@ dotnet build apps/desktop-windows/HeytaWindows/HeytaWindows.csproj -c Release -p
 
 ⚠️ ① 必须在仓库根跑：门面要解析 `@heyta/*`，而那需要 workspace 的 `node_modules`。
 
+### 2.1 QA 数据动作的隔离入口
+
+Windows 壳的默认数据目录保持不变：`%LOCALAPPDATA%\heyta\heyta.sqlite`。
+需要做导出、空库还原、拒绝非空库或失败保留等数据动作时，必须显式设置
+`HEYTA_QA_DATA_DIR` 为一个**绝对路径目录**。壳会把该目录用于
+`heyta.sqlite`（以及 SQLite 的旁挂文件）。壳会拒绝把它直接指向默认的
+`%LOCALAPPDATA%\heyta`，并且在 QA 路径校验失败时不会启动 WebView2。
+变量未设置时，默认路径和默认 WebView2 行为不变。
+
+WinAppSDK 的 C# WebView2 投影只提供无参环境工厂；`WEBVIEW2_USER_DATA_FOLDER`
+和 `--user-data-dir` 都不能可靠地改变 WebView2 的实际 profile。Windows QA 因此必须
+使用仓库内的复制运行器 [`scripts/windows/launch-data-transfer-qa.ps1`](../../scripts/windows/launch-data-transfer-qa.ps1)：
+它把 Debug 产物复制到临时 QA 目录后从该目录启动，使 WebView2 的默认
+`<exe>.WebView2` profile 也落在 QA 目录内，并读取 `CoreWebView2.Environment.UserDataFolder`
+做运行时断言。不要用裸 `HEYTA_QA_DATA_DIR` 启动 QA 界面。
+
+运行器分成两个明确阶段。初次启动只创建一个全新的 QA 根目录、复制 Debug 产物、
+启动交互壳，并写入 `lifecycle: running` 的 JSON manifest；此时 manifest 还没有
+结束后的默认目录快照。验收脚本应只读写 manifest 中的 QA 路径。
+
+```powershell
+# 路径必须不存在；运行器会拒绝默认目录、其祖先/后代、盘符根目录和 reparse-point 祖先
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\launch-data-transfer-qa.ps1 `
+  -Repo C:\src\heyta -QaRoot C:\Users\41478\heyta-data-transfer-qa-<new-id> -CdpPort 9231
+
+# 在上面的 QA 界面中完成数据导出/还原旅程后，再结束这一轮
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\launch-data-transfer-qa.ps1 `
+  -Finalize -QaRoot C:\Users\41478\heyta-data-transfer-qa-<new-id> `
+  -Manifest C:\Users\41478\heyta-data-transfer-qa-<new-id>\data-transfer-qa-manifest.json
+```
+
+`-Finalize` 只会验证并停止初次启动阶段记录的那个 `HeytaWindows.exe` PID；PID
+复用或可执行文件路径不匹配时会拒绝停止进程。随后它递归快照默认
+`%LOCALAPPDATA%\heyta` 的全部文件（相对路径、长度、sha256、UTC 修改时间），
+快照 QA 目录中的 SQLite 文件，并把逐文件前后对账写回 manifest。默认目录任何新增、
+删除、字节或修改时间变化都会使 finalize 失败，但 manifest 仍会保留
+`lifecycle: finalized` 和差异。运行器从不递归删除或复用用户传入的目录；可以先用
+`-ValidateOnly` 只做路径检查而不启动 QA：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\launch-data-transfer-qa.ps1 `
+  -ValidateOnly -QaRoot C:\Users\41478\heyta-data-transfer-qa-<new-id>
+```
+
+结束该轮后可清掉当前 PowerShell 会话的覆盖：
+
+```powershell
+Remove-Item Env:HEYTA_QA_DATA_DIR -ErrorAction SilentlyContinue
+```
+
+这条入口只负责运行时隔离；它不构建、不发布 Windows 包。源码改动后的 Core 冒烟
+仍在任意 OS 执行：
+
+```bash
+node packages/app-host/scripts/build-native-bridge.mjs
+HEYTA_BRIDGE_BUNDLE="$PWD/packages/app-host/bridge-bundle/native-bridge.js" \
+  dotnet run -c Release --project apps/desktop-windows/smoke/Smoke.csproj
+```
+
 ## 3. 为什么门面住在 `packages/app-host` 而不是这里
 
 试过放在 `apps/desktop-windows/bridge/`，**行不通**：它要 `import '@heyta/app-host'`，
@@ -197,4 +256,3 @@ Jint → `app-host` → `SQLite` 之后返回的空列表被渲染出来。**所
   14 个 `WindowsAppRuntime*`）。用错文件名会把"已经自包含"误判成"没自包含"。
 - **日志编码**：PS 5.1 的 `Add-Content` 默认按 ANSI(GBK) 写，中文会变乱码。
   留档时按 GBK 解码再转 UTF-8，否则证据读不出来。
-

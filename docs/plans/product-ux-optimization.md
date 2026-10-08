@@ -1,7 +1,7 @@
 # 产品 UI / UX / IA 优化计划
 
-> 状态：**当前修订已四端重建安装，Web 与官网已部署；UX-S9-82—84 已完成安装态与 WebKit 验收。整体计划仍有真人读屏、部分原生外链等未验边界。**（2026-10-07）
-> 当前产物与验收状态以文末“最新交付事实”为准；此前各批次的“待重装”描述保留为历史记录，不代表当前尚未安装。
+> 状态：**第三批测试发布已完成；B3 四端重建安装完成，Web 与官网已部署。活动 Goal 仍有跨端交互矩阵、原生通知投递、Widget Gallery/Board 添加、桌面外链、真人读屏和 UX-S9-106 等未验边界。**（2026-10-08）
+> 当前产物与验收状态以文末“当前行动表（B3）”和 [`release-2026-10-08-b3/release.json`](../../apps/web/evidence/ux-closeout/release-2026-10-08-b3/release.json) 为准；此前各批次的“待重装”描述均为历史记录，不代表当前尚未安装。
 > 依据：[`../research/product-level-ia-ux-audit.md`](../research/product-level-ia-ux-audit.md)（合并裁决稿）；补充基线：[`../research/product-ux-ia-aesthetic-audit.md`](../research/product-ux-ia-aesthetic-audit.md)  
 > 目标：把产品从“功能面过宽的精致后台”收敛成“本地优先、执行优先的任务工作台”。
 
@@ -65,7 +65,7 @@ WEB-2、WEB-3、DS-1。完成后再处理材质、动效和图标细节。
 
 CORE-1、PERF-1。没有排序和父子任务语义，继续增加复杂编辑器会放大返工。
 
-### 批次 D：证据与交付（代码与 Web 证据完成，四端安装待收口）
+### 批次 D：证据与交付（代码与 Web 证据完成，B3 四端重建安装完成）
 
 EVIDENCE-1，并对所有已完成项做截图、交互、测试和文档回读。
 
@@ -118,7 +118,9 @@ EVIDENCE-1，并对所有已完成项做截图、交互、测试和文档回读�
 - 截图流水线现在会：先清首启遮罩；默认关闭的模块通过设置页开关启用；低频视图从真实「更多」菜单进入；窄屏先把横向滚动中的入口滚入视口；点击后仍回读 `aria-selected`，不接受“命名对但视图没切”的假证据。
 - 性能基线已记录在 [`../reference/product-ux-performance-baseline.md`](../reference/product-ux-performance-baseline.md)，设计行为契约已记录在 [`../reference/design-system-behavior.md`](../reference/design-system-behavior.md)。
 
-## 7. 第二阶段执行批次（2026-10-07，代码与 Web 证据阶段性完成，四端重装进行中）
+## 7. 历史批次记录（2026-10-07 至 2026-10-08）
+
+本节保留各批次的实施过程和原始判断。批次中的“待重装”“尚未发布”等文字只描述当时截面；当前状态以文末 B3 行动表为准。
 
 开放项已由 [`../research/product-decision-record.md`](../research/product-decision-record.md) 裁决：
 
@@ -130,10 +132,10 @@ EVIDENCE-1，并对所有已完成项做截图、交互、测试和文档回读�
 | UNDO-1 | 批量删除短时 undo toast | Web shell | 删除后 5 秒内可撤销，过期自动消失 | 完成 |
 | LIST-1 | 清单级设备本地排序偏好 | `project-sort-pref.ts`、任务页 | 按清单记忆，不进 op-log | 完成 |
 | MOBILE-2 | 移动端 push/pop 二级导航栈 | `apps/mobile/src/nav`、`App.tsx` | 返回优先 pop，tab 状态保留 | 完成（原生实机仍需安装当前产物） |
-| SETTINGS-1 | 设置页分类导航与渐进披露 | `App.tsx`、`sheets.css`、i18n | 桌面目录 + 窄屏横向目录；关闭出口在首屏；内容不透字；保留上次分类位置 | **代码已落地：分类高亮、只显示当前分组、显示选项/功能卡片、同步/隐私状态卡与数据三卡已合流；最终多端验收待完成** |
-| RELEASE-1 | 四端重装验收 | `pnpm reinstall:all` 分端证据 | 四端当前产物均安装并启动 | **待验收：代码与验证材料已准备，必须在生产源码冻结后重新执行四端重建、重装和启动核验** |
+| SETTINGS-1 | 设置页分类导航与渐进披露 | `App.tsx`、`sheets.css`、i18n | 桌面目录 + 窄屏横向目录；关闭出口在首屏；内容不透字；保留上次分类位置 | **代码已落地；iOS 设置旅程通过，Android 最近一次 Profile/Settings 旅程通过；完整四端入口、返回和状态矩阵仍待补齐** |
+| RELEASE-1 | 四端重装验收 | `pnpm reinstall:all` 分端证据 | 四端当前产物均安装并启动 | **B3 已完成：`fourPlatformReinstall: true`；交互专项仍按各 Goal 的独立边界验收** |
 
-当前工作树中已有阶段性安装和截图材料，但它们不能自动证明“最后一轮源码”已经进入四端产物。最终收口必须从源码冻结点重新执行 `pnpm reinstall:all`；构建期间不得再有生产代码变更，并以新的汇总报告和各端产物哈希为准。
+以下平台表是 2026-10-07 的历史截面；其中“待重装”只描述当时状态。B3 已完成四端重建安装，但各 Goal 的交互证据仍以文末当前行动表为准。
 
 | 端 | 当前产物证据 | 安装/启动与交互证据 | 状态 |
 |---|---|---|---|
@@ -144,7 +146,9 @@ EVIDENCE-1，并对所有已完成项做截图、交互、测试和文档回读�
 
 交付边界：Android 使用现有 debug 签名回退，是内测安装包；iOS 本次安装目标是模拟器，不代表真机签名或上架产物。移动端未配置 AI 时继续隐藏助手入口；本轮没有为了截图开启外部模型或工具权限。
 
-## 8. 设置页 UX 专项复审（2026-10-07）
+## 8. 历史设置页 UX 专项复审（2026-10-07）
+
+本节记录当日复审截面；其中的“最终多端验收待完成”等文字不覆盖文末 B3 当前行动表。
 
 这次复审只接受“用户能看懂当前在哪、当前状态是什么、下一步能做什么”的证据，不把类型检查或静态门禁当作产品 UX 完成证明。
 
@@ -211,7 +215,9 @@ EVIDENCE-1，并对所有已完成项做截图、交互、测试和文档回读�
 
 所以，当前结论不是机械要求所有隐藏组件都接收 `active`：会读取远端或同步状态的主要面板已经门控；Reminder 与 Widget 的本地只读监听/探测按设计保留，以便返回页面时反映真实系统能力。
 
-## 9. 截图驱动整改清单（2026-10-07，主工作区与 AI 结构复审）
+## 9. 历史截图驱动整改清单（2026-10-07，主工作区与 AI 结构复审）
+
+本节是逐项原始台账，保留问题、验收要求和历史证据。活动 Goal 的当前分类与下一步以文末 B3 当前行动表为准。
 
 本节记录截图复审发现的实际产品问题，作为下一轮实现的逐项收口清单。它不替代 §7 的批次状态，也不把中间版四端安装证据写成最终验收。每一行都必须经过“实现 → 当前源码截图 → 交互验收 → 四端产物复验”四步，才可以把状态改为 `完成`。
 
@@ -223,24 +229,24 @@ EVIDENCE-1，并对所有已完成项做截图、交互、测试和文档回读�
 |---|---|---|---|---|---|---|
 | UX-S9-01 | 侧栏、任务列表、详情栏、AI 右栏同时占宽，主任务区被挤成“能用但不舒服”的窄列 | 保留右栏默认 Chatbot；主任务区优先级最高，给 rail/sidebar、任务区、详情/AI 设明确最小宽度、弹性比例与收缩顺序 | 主布局 agent | `apps/web/src/styles/app/base.css`、`assistant-layout.css`、`narrow.css` 与 `App.tsx` 统一 rail/sidebar/main/detail 轨道；详情轨道使用 token + `clamp()`，AI 窄面进入 overlay，主任务区保持可读宽度 | `e2e/tests/ux-viewport-matrix.spec.ts` 真实矩阵覆盖 768–1440 及矮窗口；`apps/web/evidence/settings-finish/viewport-metrics.json` 记录应用填满视口、主操作在视口内、详情按空间退场；`apps/web/evidence/ux-final/assistant-*.png` 提供栏比例截图 | **代码完成；Web 视口矩阵与 AI 栏比例证据已生成；父级视觉复核与四端最终重装待验收** |
 | UX-S9-02 | 窄窗口仍尝试把所有栏塞进同一横向布局，内容被压缩或产生横向滚动 | 窄屏将详情/AI 变为按需 overlay/sheet；任务内容仍是唯一主层 | 主布局 agent | `App.tsx` 的 `assistantOverlay` / `assistantWorkspace` 与 `apps/web/src/styles/app/assistant-layout.css`、`narrow.css` 实现按可用宽度切换；`assistant-expanded-ux.spec.ts` 保留草稿、展开/收起与焦点路径 | `e2e/tests/ux-viewport-matrix.spec.ts` 断言 document 无横向溢出和详情退场；`e2e/tests/assistant-expanded-ux.spec.ts` 覆盖 1440/1280/390；`apps/web/evidence/ux-final/` 有亮暗窄屏展开截图 | **代码完成；Web overlay/viewport 浏览器证据通过；原生壳与最终四端安装态仍待验收** |
-| UX-S9-03 | AI 建议卡内容随机换行，空态占据巨大面积，用户不知道下一步能问什么 | 空态固定为紧凑、可扫描的建议顺序：查任务 → 新建 → 修改 → 总结/安排；建议是短句按钮而不是大段随机文本 | sync agent | `AssistantPanel.tsx` 已落地固定空态、建议按钮与 composer；`ai-panels.css` 已统一空态间距、最大行宽和底部输入布局；建议点击只填入 composer，不直接写库 | `e2e/tests/ai-assistant.spec.ts`、`e2e/tests/assistant-hosted-ux.spec.ts` 与 `apps/web/evidence/assistant/` 已提供 DOM/交互和真实截图证据；移动端与父级整合 surface 仍待最终验收 | **代码完成；DOM/建议交互已有测试与 assistant 证据；移动端/父级整合截图仍待最终验收** |
-| UX-S9-04 | AI header、messages、composer 没有形成明确三段结构，上下留白失衡，输入框像页面顶部表单而不是对话底部 | AI 面板采用固定三段：header（身份/新会话/权限状态）、messages（可滚动内容）、composer（底部贴边输入）；composer 不随消息数量漂移 | sync agent | `AssistantPanel.tsx` 与 `ai-panels.css` 已落地 header / messages / composer 三段结构；消息区使用可收缩滚动布局，composer 固定在底部；长回复只滚消息区 | `e2e/tests/assistant-hosted-ux.spec.ts` 提供布局判据，`apps/web/evidence/assistant/` 保留 assistant 证据；该 hosted 浏览器探针需重跑确认最终通过，移动端与父级整合 surface 仍待验收 | **代码完成；composer 底部布局已落地，hosted 浏览器探针与移动/父级整合仍待最终验收** |
-| UX-S9-05 | AI 权限档位默认偏保守且切换路径像设置项，已授权能力还需重复进入设置，执行感弱 | AI 面板允许直接切换权限档位；默认使用可执行档位，但**写操作永远只生成提案，必须经用户确认才落库** | sync agent | `AssistantPanel.tsx` header 已提供 `ai-assistant-tier-select`；档位说明、出境披露和工具目录状态在同一 Chatbot；`aiStore` 仍是设置持久化事实源 | `e2e/tests/ai-assistant.spec.ts` 覆盖默认 `read-and-propose`、切换后刷新持久化、提案确认前不创建/确认后只创建一次；`apps/web/evidence/assistant/3-settings-tier.png`、`proposal-*.png` 可核查 | **代码完成；Web 浏览器旅程与提案确认证据通过；移动/原生壳最终验收待收口** |
-| UX-S9-06 | “新会话”按钮位于内容区，和标题/会话身份分离，用户需要回到顶部寻找 | 新会话上移到 AI header，与助手标题、当前档位和收起按钮同一层 | sync agent | `AssistantPanel.tsx` 的 header 渲染 `ai-assistant-new-session`、档位选择和展开/关闭动作；清空当前 transcript 但保留档位偏好，焦点回到 composer | `e2e/tests/ai-assistant.spec.ts` 断言新会话清空消息并重新触发一次性披露；`e2e/tests/assistant-expanded-ux.spec.ts` 断言展开/收起后草稿保留；`apps/web/evidence/ux-final/` 有 header/composer 截图 | **代码完成；Web 新会话、草稿与展开路径证据通过；移动/原生壳最终验收待收口** |
+| UX-S9-03 | AI 建议卡内容随机换行，空态占据巨大面积，用户不知道下一步能问什么 | 空态固定为紧凑、可扫描的建议顺序：查任务 → 新建 → 修改 → 总结/安排；建议是短句按钮而不是大段随机文本 | sync agent | `AssistantPanel.tsx` 已落地固定空态、建议按钮与 composer；`ai-panels.css` 已统一空态间距、最大行宽和底部输入布局；建议点击只填入 composer，不直接写库 | `e2e/tests/ai-assistant.spec.ts`、`e2e/tests/assistant-hosted-ux.spec.ts` 与 `apps/web/evidence/assistant/` 已提供 DOM/交互和真实截图证据；移动端与父级整合 surface 仍待最终验收 | **代码完成；Web DOM/建议交互通过，B3 已包含修订；移动端/原生父级整合仍待验收** |
+| UX-S9-04 | AI header、messages、composer 没有形成明确三段结构，上下留白失衡，输入框像页面顶部表单而不是对话底部 | AI 面板采用固定三段：header（身份/新会话/权限状态）、messages（可滚动内容）、composer（底部贴边输入）；composer 不随消息数量漂移 | sync agent | `AssistantPanel.tsx` 与 `ai-panels.css` 已落地 header / messages / composer 三段结构；消息区使用可收缩滚动布局，composer 固定在底部；长回复只滚消息区 | `e2e/tests/assistant-hosted-ux.spec.ts` 与 B3 `release.json` 的 `webAssistantProviderJourney: 2` 已覆盖 Web/provider 旅程；移动端与原生壳完整 AI 交互矩阵仍待验收 | **代码与 Web/provider 旅程已通过；移动/原生壳完整矩阵待验收** |
+| UX-S9-05 | AI 权限档位默认偏保守且切换路径像设置项，已授权能力还需重复进入设置，执行感弱 | AI 面板允许直接切换权限档位；默认使用可执行档位，但**写操作永远只生成提案，必须经用户确认才落库** | sync agent | `AssistantPanel.tsx` header 已提供 `ai-assistant-tier-select`；档位说明、出境披露和工具目录状态在同一 Chatbot；`aiStore` 仍是设置持久化事实源 | `e2e/tests/ai-assistant.spec.ts` 覆盖默认 `read-and-propose`、切换后刷新持久化、提案确认前不创建/确认后只创建一次；`apps/web/evidence/assistant/3-settings-tier.png`、`proposal-*.png` 可核查 | **代码完成；Web 浏览器旅程与提案确认通过，B3 已包含修订；移动/原生壳完整矩阵待验** |
+| UX-S9-06 | “新会话”按钮位于内容区，和标题/会话身份分离，用户需要回到顶部寻找 | 新会话上移到 AI header，与助手标题、当前档位和收起按钮同一层 | sync agent | `AssistantPanel.tsx` 的 header 渲染 `ai-assistant-new-session`、档位选择和展开/关闭动作；清空当前 transcript 但保留档位偏好，焦点回到 composer | `e2e/tests/ai-assistant.spec.ts` 断言新会话清空消息并重新触发一次性披露；`e2e/tests/assistant-expanded-ux.spec.ts` 断言展开/收起后草稿保留；`apps/web/evidence/ux-final/` 有 header/composer 截图 | **代码完成；Web 新会话、草稿与展开路径通过，B3 已包含修订；移动/原生壳完整矩阵待验** |
 | UX-S9-07 | sidebar 空态文案冗长，创建过程中列表跳动，导航层级不清楚 | 空态只说明“这里还没有内容”并给唯一创建动作；创建中使用固定行骨架/inline pending，不重排整个导航；一级目的地、范围、清单、标签分层呈现 | 主布局 agent | `apps/web/src/features/shell/EmptyState.tsx` 与共享 `@heyta/ui` `OrganizerList` 已组件化任务/清单/标签空态；`ProjectsPanel.tsx` 统一标题、计数和创建入口 | `e2e/tests/category-dialog-ux.spec.ts` 7/7：375/768/1440 深浅主题、390px受控等待/失败/重试，重试走真实IndexedDB/op-log并刷新保留；截图见 `apps/web/evidence/category-dialog-ux/`。写入等待不插入临时侧栏行，不重排导航 | **Web交互完成**；同帧防重复与失败保留名称/颜色已验，原生壳随最终产物复验 |
 | UX-S9-08 | 侧栏创建清单/标签时复用行内文字输入，名称、颜色、取消和错误状态没有完整交互边界 | 清单和标签使用独立创建 dialog；字段、颜色、取消、创建、焦点、键盘提交/取消、重复名/空名错误均在 dialog 内完成 | data agent | `CategoryCreateDialog` 统一清单 / 标签创建；清单名称必填并支持 1–8 色槽；标签复用同一 dialog 但不伪造颜色写入；成功后回到当前筛选；375px 层级穿透已修复并完成 6/6 验证与重拍；移除“整理你的工作”眉标和技术颜色编号，保留色圆选中勾，每个颜色选项保持 44px 命中区 | 打开后焦点进入名称；Enter 创建、Esc 取消；取消不改列表；重复/空名显示字段级错误；清单颜色在列表中可辨认；窄屏弹层不穿透、不裁切，颜色选项可触达 | **代码完成，浏览器/窄屏证据待父级复核** |
-| UX-S9-09 | 清单/标签与任务导航的层级关系靠文字排版猜，设置、个人资料、帮助入口互相孤立 | 一级导航只放任务目的地；账户菜单进入 Profile；设置承载偏好/权限/数据；帮助是全局支持入口，设置内只保留直达链接 | 主布局 agent | `view-tabs.ts`、`AccountMenu.tsx`、`settings-anchors.ts`、`HelpPanel.tsx` 已统一目的地/账户/设置/帮助分层；菜单只保留登录（未登录）、个人中心、设置，帮助从设置与全局入口进入 | `e2e/tests/account-menu.spec.ts`、`pages-sweep.spec.ts`、`help-entry-ux.spec.ts` 与 `apps/web/evidence/account-menu-ia/`、`profile-center/` 可核查入口与返回；深链和四端容器仍需最终回归 | **代码完成；Web IA 入口与返回证据已生成；四端容器复验待收口** |
+| UX-S9-09 | 清单/标签与任务导航的层级关系靠文字排版猜，设置、个人资料、帮助入口互相孤立 | 一级导航只放任务目的地；账户菜单进入 Profile；设置承载偏好/权限/数据；帮助是全局支持入口，设置内只保留直达链接 | 主布局 agent | `view-tabs.ts`、`AccountMenu.tsx`、`settings-anchors.ts`、`HelpPanel.tsx` 已统一目的地/账户/设置/帮助分层；菜单只保留登录（未登录）、个人中心、设置，帮助从设置与全局入口进入 | `e2e/tests/account-menu.spec.ts`、`pages-sweep.spec.ts`、`help-entry-ux.spec.ts` 与 `apps/web/evidence/account-menu-ia/`、`profile-center/` 可核查入口与返回；深链和四端容器仍需最终回归 | **代码完成；Web IA 入口与返回证据已生成；iOS/Android 局部旅程通过，完整四端容器矩阵待验** |
 | UX-S9-22 | More 按钮的宽度/命中区与 rail 其它图标不齐，浮层固定在屏幕底部，触发器与菜单产生空间断裂 | More 必须是 rail 中同一尺寸的导航项；菜单必须锚定触发器并在可用空间内翻转/夹取，不再使用固定底部坐标 | rail agent | `RailNavigation.tsx` 与 `placeAnchoredPanel` 已统一 More 触发器、portal 浮层、外部点击/Escape/焦点恢复和窄屏翻转；`rail.css` 统一命中区与 focus ring | `apps/web/evidence/rail-customization/desktop-more-anchored.png`、`narrow-more.png`、`short-more.png` 及 `readout.json` 记录触发器/菜单几何；`e2e/tests/rail-trash-anchor.spec.ts` 与 rail 相关浏览器证据可核查 | **代码完成；Web 锚定/翻转证据已生成；原生壳最终视觉复验待收口** |
 | UX-S9-23 | 低频目的地被自动提升或随机重排，用户无法把常用项固定到 rail，也无法把项移回 More | 参考 Adobe Photoshop 官方“Customize Toolbar”模式：用户可拖拽排序、在主栏与 More 之间移动；所有动作都有键盘/点击替代；固定任务、搜索等必要入口不可移除 | rail agent | `rail-pref.ts`、`RailNavigation.tsx` 和共享 `OrganizerList` 已落地设备本地 rail preference、主栏/More 拖移、键盘上移下移、恢复默认及必要入口保护；不写 op-log | `apps/web/evidence/rail-customization/desktop-default.png`、`desktop-drag-to-more.png`、`desktop-drag-back.png`、`desktop-keyboard-order.png`、`readout.json` 提供拖拽/键盘/持久化证据；四端原生容器仍待验收 | **代码完成；Web 拖拽、键盘、持久化证据已通过；四端最终验收待收口** |
-| UX-S9-24 | 首次同意联网后仍把用户引向手填服务端地址/自托管路径，官方托管登录不是默认主路径 | 已确认官方托管地址为 `https://heyta.waytofuture.cn`；健康检查实测返回 `200 {"status":"ok","db":"connected"}`。默认路径改为“同意联网 → 官方服务 → 登录/注册 → 同步”；自托管作为“我自托管”的高级展开入口 | sync/profile agent | `apps/web/src/lib/site-url.ts`、认证/同步 gating 与 `SyncBar.tsx` 使用官方 origin；`assistant-hosted-ux.spec.ts` 及认证旅程将自托管高级 disclosure 与官方登录分开 | `e2e/tests/assistant-hosted-ux.spec.ts` 断言未登录设置默认不显示服务器地址、展开后才显示；`apps/web/evidence/auth-journey/` 和 `auth-dialog-ux-final/` 提供默认官方认证路径/失败可见证据；四端网络旅程仍待验收 | **代码完成；Web 官方托管默认路径与高级自托管证据通过；四端登录旅程待收口** |
+| UX-S9-24 | 首次同意联网后仍把用户引向手填服务端地址/自托管路径，官方托管登录不是默认主路径 | 已确认官方托管地址为 `https://heyta.waytofuture.cn`；健康检查实测返回 `200 {"status":"ok","db":"connected"}`。默认路径改为“同意联网 → 官方服务 → 登录/注册 → 同步”；自托管作为“我自托管”的高级展开入口 | sync/profile agent | `apps/web/src/lib/site-url.ts`、认证/同步 gating 与 `SyncBar.tsx` 使用官方 origin；`assistant-hosted-ux.spec.ts` 及认证旅程将自托管高级 disclosure 与官方登录分开 | `e2e/tests/assistant-hosted-ux.spec.ts` 断言未登录设置默认不显示服务器地址、展开后才显示；`apps/web/evidence/auth-journey/` 和 `auth-dialog-ux-final/` 提供默认官方认证路径/失败可见证据；Android 官方默认/自托管显式入口旅程通过，iOS 离线隐私/设置旅程通过 | **代码完成；Web/Android/iOS 局部证据已有；完整四端网络旅程仍待验** |
 
 ### 9.2 Profile、设置与信息层级
 
 | ID | 截图中的问题 | 决策 | Owner | 实现 | 验收 | 状态 |
 |---|---|---|---|---|---|---|
-| UX-S9-10 | 头像菜单、个人资料、个人中心、设置之间的关系不够清晰，用户不知道“看资料”和“改偏好”去哪 | 头像菜单是账户入口；Profile 是身份摘要、成就和账户状态；设置是行为偏好、同步、AI、数据与安全。设置可显示 Profile 摘要卡，但不复制完整 Profile 页面 | 主布局 agent | `AccountMenu.tsx` 只提供账户入口；未登录菜单实际顺序为“登录账号 → 个人中心 → 应用设置”，已登录为身份区 → 个人中心 → 应用设置 → 退出登录；`ProfileOverview.tsx` 内再进入资料编辑/设置 | `e2e/tests/account-menu.spec.ts` 断言未登录登录项为第一项、已登录退出为末项且危险态；`apps/web/evidence/account-menu-ia/`、`profile-center/journeys.json` 覆盖桌面/窄屏返回；四端容器仍待最终回归 | **代码完成；Web 入口、返回与 Profile 证据已生成；四端容器复验待收口** |
-| UX-S9-11 | Profile 只展示资料，成就、使用进展和可编辑状态没有稳定信息架构 | Profile 采用“身份摘要 → 当前目标/连续进展 → 成就 → 账户动作”顺序；成就用卡片/徽章组件，不靠一串文字排版 | 主布局 agent | `ProfileOverview.tsx` 已实现身份摘要、近期任务/专注/打卡 metric、成就进度与成长/设置动作；`profile.css` 使用 stats/achievement surface；`GrowthView.tsx` 保留完整成长页，不复制统计事实源 | `apps/web/evidence/profile-center/desktop-light.png`、`desktop-dark.png`、`narrow-*.png`、`journeys.json` 覆盖资料编辑、设置返回、关闭恢复工作区与成长关闭态；未登录/本地态由组件分支呈现 | **代码完成；Web Profile/成就浏览器证据通过；移动/原生壳最终验收待收口** |
-| UX-S9-12 | 设置页的信息层级仍有部分依赖文字和长段落，卡片、状态、动作边界不统一 | 每个设置项固定四槽位：名称、作用、当前状态、动作；风险/限制进入独立 callout；选中态使用填充高亮，不使用下划线作为主状态 | sync agent（AI/同步/隐私） + data agent（数据/清单） | `App.tsx`、`sheets.css`、`sync-settings.css`、`privacy-settings.css`、`DataSettingsPanel.tsx` 和 `SettingsNotice.tsx` 已完成分类高亮、渐进披露、同步/隐私四卡、数据三卡及状态 callout | `e2e/tests/settings-category-ux.spec.ts`、`settings-exit.spec.ts`、`ai-assistant.spec.ts` 与 `apps/web/evidence/settings-finish/` 的 1440/375 亮暗截图可核查当前层级；最终多端安装态仍待验收，不能以 Web 证据代替原生端复核 | **代码已落地；Web/源码结构审查已通过，最终多端验收待完成** |
+| UX-S9-10 | 头像菜单、个人资料、个人中心、设置之间的关系不够清晰，用户不知道“看资料”和“改偏好”去哪 | 头像菜单是账户入口；Profile 是身份摘要、成就和账户状态；设置是行为偏好、同步、AI、数据与安全。设置可显示 Profile 摘要卡，但不复制完整 Profile 页面 | 主布局 agent | `AccountMenu.tsx` 只提供账户入口；未登录菜单实际顺序为“登录账号 → 个人中心 → 应用设置”，已登录为身份区 → 个人中心 → 应用设置 → 退出登录；`ProfileOverview.tsx` 内再进入资料编辑/设置 | `e2e/tests/account-menu.spec.ts` 断言未登录登录项为第一项、已登录退出为末项且危险态；`apps/web/evidence/account-menu-ia/`、`profile-center/journeys.json` 覆盖桌面/窄屏返回；四端容器仍待最终回归 | **代码完成；Web 入口/返回与 Profile 证据已生成；iOS/Android 局部旅程通过，完整四端容器矩阵待验** |
+| UX-S9-11 | Profile 只展示资料，成就、使用进展和可编辑状态没有稳定信息架构 | Profile 采用“身份摘要 → 当前目标/连续进展 → 成就 → 账户动作”顺序；成就用卡片/徽章组件，不靠一串文字排版 | 主布局 agent | `ProfileOverview.tsx` 已实现身份摘要、近期任务/专注/打卡 metric、成就进度与成长/设置动作；`profile.css` 使用 stats/achievement surface；`GrowthView.tsx` 保留完整成长页，不复制统计事实源 | `apps/web/evidence/profile-center/desktop-light.png`、`desktop-dark.png`、`narrow-*.png`、`journeys.json` 覆盖资料编辑、设置返回、关闭恢复工作区与成长关闭态；未登录/本地态由组件分支呈现 | **代码完成；Web Profile/成就浏览器证据通过；iOS/Android 局部 Profile 证据已有，完整矩阵待验** |
+| UX-S9-12 | 设置页的信息层级仍有部分依赖文字和长段落，卡片、状态、动作边界不统一 | 每个设置项固定四槽位：名称、作用、当前状态、动作；风险/限制进入独立 callout；选中态使用填充高亮，不使用下划线作为主状态 | sync agent（AI/同步/隐私） + data agent（数据/清单） | `App.tsx`、`sheets.css`、`sync-settings.css`、`privacy-settings.css`、`DataSettingsPanel.tsx` 和 `SettingsNotice.tsx` 已完成分类高亮、渐进披露、同步/隐私四卡、数据三卡及状态 callout | `e2e/tests/settings-category-ux.spec.ts`、`settings-exit.spec.ts`、`ai-assistant.spec.ts` 与 `apps/web/evidence/settings-finish/` 的 1440/375 亮暗截图可核查当前层级；iOS 设置旅程、Android 最近 Profile/Settings 旅程和 B3 四端重装已有证据，不能由此推导完整四端矩阵 | **代码已落地；Web/iOS/Android 局部运行证据已有；完整四端交互矩阵待验** |
 | UX-S9-13 | Profile、设置与帮助在四端容易出现不同入口、不同返回和不同状态表达 | Profile/Settings/Help 采用同一 IA 词汇和状态模型，平台只改变容器（sheet/page/navigation stack） | 四端 UX owner | 把共享信息模型下沉到 `packages/i18n`/共享 UI 契约；Web、macOS、Windows、Android/iOS 分别绑定原生返回和容器 | 四端矩阵逐项确认入口、返回、选中态、空态、错误态；同一状态文案中英同步；不允许某端重新出现独立工具页 | 待验收 |
 
 ### 9.3 跨端交互与视口
@@ -260,9 +266,9 @@ EVIDENCE-1，并对所有已完成项做截图、交互、测试和文档回读�
 | UX-S9-19 | Landing 的 DOM mock 与真实产品结构/比例不一致，展示会培养错误心智模型 | Landing 展示真实产品 IA 的精简镜像：rail、任务区、四象限、详情栏的关系必须与当前应用一致；mock 数据只改变内容，不改变结构 | landing agent + 主布局 agent | rail 由 `SHELL_VIEW_TABS` 分栏；清单/标签按标题级 `+` + 静态行镜像 Web；右栏展示真实任务详情分组。真实存在但 Landing 默认不可见的 `assistant-open` 保留登记，不画无行为的 AI 假面板 | 结构对账、语义 DOM 与当前 Web 源码一致；375/768/1440 的列比例与窄屏行为再做浏览器验收；不出现工具目录或虚假 Chatbot 控件 | **已完成本轮 Web/Landing 验收**：结构与浏览器路径已验证；残留的 `mockup-capture-shape` 已按无描边契约修正，2026-10-08 定向16/16通过 |
 | UX-S9-20 | Landing IA、帮助中心入口、搜索、文章层级和动效节奏仍需作为一个产品路径验收 | Landing 一级导航明确产品、功能、帮助、定价；帮助中心采用分类 → 文章两层；动效只解释状态变化，不阻塞阅读 | landing agent | 保持帮助搜索、分类侧栏、文章目录、双语 canonical；补 reduced-motion、暗色、窄屏和错误/空结果状态；动效统一时长和 easing token | 帮助入口在 Landing 首屏与页脚可达；搜索命中当前语言；窄屏单列；reduced-motion 直接呈现内容；动画不影响首个 CTA 和键盘焦点 | **已完成本轮 Web/Landing 验收**：帮助中心、首页、窄屏/暗色/reduced-motion 共26项通过；2026-10-08原残留组件断言所在套件16/16通过；线上帮助返回主页和文章跳转亦通过 |
 | UX-S9-21 | 动效过度会增加心理负担，AI/隐私演示与真实应用反馈没有共同规则 | 动效服务于进入、状态变化和反馈；不做持续漂浮、无目的 parallax 或 hover 位移；尊重 `prefers-reduced-motion` | landing agent + 设计系统 owner | 统一 motion token；加载/成功/错误/展开/拖拽分别定义短反馈；内容面不使用装饰性位移 | 普通模式动效完成时间可感知但不拖慢；reduced-motion 无关键内容隐藏；键盘/屏幕阅读器不依赖动画才知道状态 | **已完成本轮 Web/Landing 验收**：375/768/1440、亮暗主题及reduced-motion通过；原残留组件断言所在套件已16/16通过，无该项阻塞 |
-| UX-S9-43 | 应用设置里的“帮助与关于”曾是标题、长说明和三条普通链接堆在一起，和设置其它区块的视觉语言不一致 | HelpPanel 只负责把用户送到官网文档、更新动态和价格；三条入口采用同一动作卡结构，图标、标题、说明和外链提示形成固定层级 | 主布局 agent | `HelpPanel.tsx` 已改为三条组件化外链；帮助入口指向 `/docs`；说明降为面板底部辅助文案；共享 shell 负责统一外链动作语义 | 设置首屏能区分帮助、更新动态、价格；没有重复大标题或长文案墙；三条链接均为真实可访问 `<a>` | **代码完成；原生壳外链与窄屏截图待验收** |
+| UX-S9-43 | 应用设置里的“帮助与关于”曾是标题、长说明和三条普通链接堆在一起，和设置其它区块的视觉语言不一致 | HelpPanel 只负责把用户送到官网文档、更新动态和价格；三条入口采用同一动作卡结构，图标、标题、说明和外链提示形成固定层级 | 主布局 agent | `HelpPanel.tsx` 已改为三条组件化外链；帮助入口指向 `/docs`；说明降为面板底部辅助文案；共享 shell 负责统一外链动作语义 | 设置首屏能区分帮助、更新动态、价格；没有重复大标题或长文案墙；三条链接均为真实可访问 `<a>` | **Web/官网帮助路径已验；原生壳外链点击与窄屏截图仍待验收** |
 | UX-S9-44 | 应用 HelpPanel 的入口宽度与设置内容面不受约束时，会在桌面被拉满，在窄屏挤压标题和说明 | HelpPanel 采用受控内容列，入口卡片按可读宽度排列；窄屏单列并保持完整命中区 | 主布局 agent | `help-settings.css` / shared settings shell 统一列宽、gap、换行和 44px 命中区；不让外链行撑出设置 sheet | 375/768/1440 视口无横向溢出；长标题自然换行；图标、文本和外链提示不互相覆盖 | **代码完成；窄屏/暗色证据待验收** |
-| UX-S9-45 | 应用 HelpPanel 的蓝色下划线长链接和默认浏览器样式造成视觉噪声，当前项和可操作行没有组件状态 | 外链入口使用填充 surface、边框和 hover/focus 状态；正文下划线规则只属于官网正文，不带回应用设置 | 主布局 agent + shell agent | HelpPanel 已改为 `.ht-settings__help-link` 组件状态；原生壳接管 `target="_blank"` 与普通导航；保留 `rel="noopener noreferrer"` | 默认态无下划线堆叠；键盘焦点清晰；点击后工作区不被替换；仅 `http(s)` 进入系统浏览器 | **代码完成；macOS/Windows/Linux 真机点击待验收** |
+| UX-S9-45 | 应用 HelpPanel 的蓝色下划线长链接和默认浏览器样式造成视觉噪声，当前项和可操作行没有组件状态 | 外链入口使用填充 surface、边框和 hover/focus 状态；正文下划线规则只属于官网正文，不带回应用设置 | 主布局 agent + shell agent | HelpPanel 已改为 `.ht-settings__help-link` 组件状态；原生壳接管 `target="_blank"` 与普通导航；保留 `rel="noopener noreferrer"` | 默认态无下划线堆叠；键盘焦点清晰；点击后工作区不被替换；仅 `http(s)` 进入系统浏览器 | **Web/官网路径已验；macOS/Windows/Linux 真机点击仍待验收** |
 | UX-S9-46 | 应用设置不应暴露帮助站点的技术实现细节，用户需要先理解端点/构建语境才知道去哪 | 应用只展示任务导向入口；服务端、token、构建与协议说明留在官网文档的高级路径 | 主布局 agent + landing agent | HelpPanel 已删除技术化长说明；官网 `/docs` 保留面向自建用户的完整文章，应用端不复制内容 | 设置里 10 秒内能找到帮助入口；应用端不出现内部路径/命令；官网高级文档仍可达 | **代码完成；官网文案审计另按 Landing/Docs 清单验收** |
 | UX-S9-59 | Landing 与应用空态、插画和 AI/隐私演示需要更有产品感，但持续漂浮、颜色闪烁和装饰性动效会增加心理负担，也可能让主要信息被延迟呈现 | 动画插画只表达进入、加载、成功或下一步反馈；主信息与行动在无动画时立即可见；颜色只使用对应语义 token；禁止用分类色、优先级色或热力图色伪造状态；统一支持 `prefers-reduced-motion` | landing agent + 设计系统 owner | 已拆为 `UX-S9-59-A`（共享代码组件与运行时回退）、`UX-S9-59-B`（AI 生成位图素材）和 `UX-S9-59-C`（图像生成 skill / 模型复用链路）；保持内容面克制，动画不改变布局尺寸 | 亮暗主题、375/1440 视口及 reduced-motion 仍需截图；关闭动效后标题/说明/主要 CTA 仍可见可用；无颜色闪烁、持续漂浮或横向滚动；位图需完成来源、产物、接入与跨端对账 | **进行中；Web 五种空态 20 图浏览器验收、UI 33 项与 Web 53 项已通过，线上回归 30 项通过；complete 共享反馈路径、移动端与四端产物仍待完成** |
 | UX-S9-59-A | 空态与状态反馈需要统一的可复用视觉组件，不能每个页面自行拼图形和动效 | 使用共享 `StateIllustration`，六种 variant 为 `tasks`、`notes`、`habits`、`calendar`、`search`、`complete`；支持 `enter` / `none` 动效模式，关闭动效后仍保留完整信息 | design-system owner + Web/mobile UI owner | `packages/ui/src/empty-state/StateIllustration.tsx` 已实现并导出；`EmptyState`、`TodayProgressCard`、`TimelineBoard` 与移动端 `kit` 已接入真实组件。生成的小图已内嵌到 `state-artwork.generated.json`；图片加载失败回退代码绘制场景，现有 token、短入场和 reduced-motion 仍保留。GrowthView 按产品决定使用 `showToday={false}`，不为了展示 complete 恢复今日进度卡 | 真实 Web 空态只覆盖 `tasks`、`habits`、`notes`、`calendar`、`search` 五种场景，共 20 图；最新浏览器 1 项通过，包含真实 `Image` 加载与 0 pageerror；UI 33 项、Web 53 项定向测试通过。`complete` 作为共享 `TodayProgressCard` 闭合路径的可复用素材单独验收，不记为 GrowthView 页面场景；移动端与四端产物视觉验收仍待补 | **代码与素材已接入；Web 五种空态 20 图浏览器/UI/Web 验收通过，complete 共享反馈路径、移动端与四端产物视觉验收待补** |
@@ -353,7 +359,7 @@ EVIDENCE-1，并对所有已完成项做截图、交互、测试和文档回读�
 | UX-S9-50 | 整个产品按 Taste 提升，不能只列文字或堆框 | 统一内容宽度、标题数量、可操作组件、选中/焦点/错误状态与文案。工作台遵循紧凑蓝白风格，注册可有表现力；不把宣传页的随机布局/重动效套进设置 | **进行中**；HelpPanel 已移除重复标题、技术解释与下划线堆叠；帮助中心法律目录 hover 已改为颜色/底色反馈；Landing 26 项浏览器验收通过；此前失败的 `mockup-capture-shape` 已定向16/16通过。注册新版已通过亮暗/窄屏/reduced-motion与生产390/1440字段验收；本轮新增移动页面密度问题按95—100继续收口 |
 | UX-S9-51 | 每项登记，全部保留，尽可能并行 | 总清单为唯一进度表；按文件所有权并行，最终统一源码冻结、视觉复审和四端重装。新增要求不能覆盖之前 AI、Profile、设置、日历、拖拽、移动交互、Landing 与帮助要求 | **持续执行**；最终收尾前逐项核查状态与证据 |
 | UX-S9-52 | 头像菜单同时并列个人中心、编辑资料、设置、成长和退出，入口过多且文字长度失衡；设置与个人资料关系被重复入口稀释 | 未登录实际顺序为“登录账号 → 个人中心 → 应用设置”；已登录为身份区 → 个人中心 → 应用设置 → 退出登录。编辑资料只从“个人中心 → 设置资料”进入；成长留在主导航/个人中心，不兼任账号菜单动作；退出登录独立置底并使用危险色 | Web `AccountMenu` 统一菜单顺序、portal 定位、键盘方向键与 `focus-visible`；macOS/Windows 原生壳继续复用同一 WebView DOM，不另造视觉菜单；移动端维持个人中心 → 设置资料路径 | `e2e/tests/account-menu.spec.ts` 正向/负向断言登录第一项、已登录身份区和退出末项；`apps/web/evidence/account-menu-ia/`、`profile-center/journeys.json` 覆盖中文亮暗/窄屏、设置和个人中心返回路径；原生壳探针继续核对 settings/signout | **代码完成；Web 菜单顺序与 Profile 返回证据已通过；原生壳最终视觉复核待收口** |
-| UX-S9-53 | AI 入口仍像工具面板：历史、新会话、空态问候和输入区没有形成一个低负担的 Chatbot 工作区；窄右栏放不下二级历史列，移动端也不应一直占用历史空间 | 单一 Chatbot 内部采用“历史列 → 对话主区”层级；历史只展示真实的本机会话，新会话固定在历史列；空态居中问候、三枚紧凑建议和 composer；短视口减少垂直留白但保留 composer；窄容器/移动端收起历史为 header toggle，不新增独立工具入口；档位切换、出境披露与写提案确认逻辑保持原状 | `AssistantPanel.tsx` 增加 Chatbot history rail、today 分组、empty greeting、三枚建议与移动端历史 toggle；`ai-panels.css` 增加容器查询：宽面显示二级历史列，窄面转 overlay；`App.tsx` 与 rail assistant entry 已接通展开/收起；文案加入中英文词条，不新增独立工具入口 | Web 1440×640 亮/暗色截图、窄容器截图、390px 移动端历史收起；DOM 断言历史、问候、composer、三枚建议；已有披露、提案确认与历史落盘测试继续通过 | **代码完成；1440×640 亮/暗色与相关 assistant 证据已生成，移动真机与父级整合 surface 待验收** |
+| UX-S9-53 | AI 入口仍像工具面板：历史、新会话、空态问候和输入区没有形成一个低负担的 Chatbot 工作区；窄右栏放不下二级历史列，移动端也不应一直占用历史空间 | 单一 Chatbot 内部采用“历史列 → 对话主区”层级；历史只展示真实的本机会话，新会话固定在历史列；空态居中问候、三枚紧凑建议和 composer；短视口减少垂直留白但保留 composer；窄容器/移动端收起历史为 header toggle，不新增独立工具入口；档位切换、出境披露与写提案确认逻辑保持原状 | `AssistantPanel.tsx` 增加 Chatbot history rail、today 分组、empty greeting、三枚建议与移动端历史 toggle；`ai-panels.css` 增加容器查询：宽面显示二级历史列，窄面转 overlay；`App.tsx` 与 rail assistant entry 已接通展开/收起；文案加入中英文词条，不新增独立工具入口 | Web 1440×640 亮/暗色截图、窄容器截图、390px 移动端历史收起；DOM 断言历史、问候、composer、三枚建议；已有披露、提案确认与历史落盘测试继续通过 | **代码完成；Web 1440×640 亮/暗色与 assistant 证据已生成，B3 已包含修订；移动真机与原生父级整合待验收** |
 | UX-S9-54 | 帮助中心仍缺少明确的“返回首页”出口；侧栏分组字号小于条目、标题层级倒置；正文与导航链接依赖下划线表达状态，破坏统一视觉语言 | 顶栏保留品牌返回帮助中心首页，同时增加显式“返回首页”链接，按当前语言落到官网 `/` 或 `/en/`；帮助中心所有链接默认、hover、active、focus 均取消下划线，改用颜色、surface 背景和 `focus-visible` 环；导航分组使用 `headline`（base + semibold），文章条目使用 `row-meta`（sm + regular）；分类模块与文章分区统一 `section-title`（lg + semibold），页面 h1 保持 `screen-title` | `DocsShell` 增加本地化首页入口；`DocsNav` 使用语义组标题；`DocsModule` 与文档正文 CSS 统一标题层级；`docs-layout.css` 对 DocsShell 内所有链接收口无下划线和键盘焦点；中英文词条同步 | 1440/390 亮暗主题检查首页入口可见、中文/英文目标正确、所有 Docs 链接计算样式无 underline；Tab 聚焦有可见 ring；分组 16px/600 明确大于条目 14px/400；无正文遮挡，移动端目录按钮保留安全区 | **代码完成；官网线上首篇文章真实验证通过：1440/390 亮暗四态、返回首页实际到 `/`、1 个 h1、分组 16px/600 大于条目 14px/400、计算样式下划线 0、无横向溢出；证据见 `apps/landing/evidence/docs-release/live-readout.json` 与 `docs-live-first-run-*`；当前源码截图矩阵与最终四端重装待收口** |
 | UX-S9-55 | 专注页主路径被时长设置、关联任务和厚重概览分散；Landing mock 曾用巨大 Zap 图标侵入计时环，窄视口下操作按钮折行 | 突出计时器与单一主操作“开始”；关联任务保留为紧凑次级控件；四项时长设置默认收起；右侧统计使用轻量 metric grid；Landing 与 Web 同源结构，不增加工具入口 | `apps/web/src/features/focus/FocusTimer.tsx` 使用默认收起的时长 disclosure、设置摘要与响应式主路径；`apps/web/src/styles/app/base.css` 调整 disclosure、统计网格和窄视口样式；`apps/landing/src/mockup/FocusRing.tsx` / `mockup.css` 对齐空闲态开始路径、真实任务与设置摘要并修复按钮折行；`apps/web/tests/focus-timer-config.spec.tsx` 补默认收起/展开断言 | Web `apps/web/evidence/focus-ux/` 与 Landing `apps/landing/evidence/focus-ux/` 覆盖 1440、1280×640、390 亮/暗主题；Web focus config 5/5、Focus detail 6/6、Landing Focus 对账 8/8；`pnpm check:design` 与 `git diff --check` 通过 | **代码完成；Web/Landing 当前源码浏览器矩阵通过；四端最终重装待验收** |
 | UX-S9-57 | 成长页周报的标签与数字被两端拉开，年度热力图会撑宽视口，分类、里程碑和身份区块使用同等边框，长周期信息层级不清 | 成长页按“短周期指标 → 年度活动 → 分类泳道 → 长周期里程碑/身份 → 分享出口”分层；周报使用紧凑 metric grid；热力图在自己的可滚动容器内；里程碑按维度分组，身份用标签组件，空态只保留事实与下一步 | `GrowthBoard` 为各区块提供稳定语义锚点；Web 宿主 CSS 负责 metric grid、热力图宽度、月份不换行、分类泳道分隔和长周期层级；共享组件继续消费真实投影，不新增持久化字段 | 1440 / 1024 / 390 亮暗矩阵、`scrollLeft=630 / max=630`、分类独立容器和英文月份完整显示均已复验；Windows 与 iOS 当前 Growth 安装态已查看；剩余是移动端真实交互与最终产物收口 | **代码与 Web 视觉复核完成；端侧 Growth 已查看；移动端最终交互/重装仍待验收** |
@@ -438,10 +444,10 @@ iOS 第一趟输入框探针误点同名静态“标题”文字，已修复探�
 | ID | 用户问题与产品决定 | 实施范围 | 验收标准 | 状态 |
 |---|---|---|---|---|
 | UX-S9-63 | 保留中文、英文空态插画，随界面语言切换 | 共享 StateIllustration、资源映射和中英文预览；原始素材保留 | 切换语言无需重启；资源加载、失败回退、文案均正确；无文字素材可复用同一图 | 代码与语言切换渲染回归通过；中英无文字插画共用资源，带文案的空态随 locale 切换；待本轮四端安装复验 |
-| UX-S9-64 | AI 只保留“只读 / 执行”，默认执行 | Web、移动端、共享授权路径；取消用户可见的三档术语 | 初次使用默认执行；只读不写；执行走真实 op 路径；既有只读偏好不被强制覆盖 | Web/移动端两档已接线，单条创建与完成自动执行、批量完成确认、只读不写；app-host 70 项与 Web 面板 21 项定向通过，待最终安装复验 |
-| UX-S9-65 | AI 不再使用星星图标 | rail、紧凑入口、对话标题，统一会话助手图标 | 图标在亮暗、小尺寸可辨认，所有入口一致且有可访问名称 | 会话助手图标已统一；全局深浅主题截图已回看，待最终安装复验 |
+| UX-S9-64 | AI 只保留“只读 / 执行”，默认执行 | Web、移动端、共享授权路径；取消用户可见的三档术语 | 初次使用默认执行；只读不写；执行走真实 op 路径；既有只读偏好不被强制覆盖 | Web/移动端两档已接线，单条创建与完成自动执行、批量完成确认、只读不写；app-host 70 项与 Web 面板 21 项定向通过；B3 已包含修订，移动/原生完整旅程仍待补 |
+| UX-S9-65 | AI 不再使用星星图标 | rail、紧凑入口、对话标题，统一会话助手图标 | 图标在亮暗、小尺寸可辨认，所有入口一致且有可访问名称 | 会话助手图标已统一；全局深浅主题截图已回看，B3 已包含修订；移动/原生完整入口矩阵仍待补 |
 | UX-S9-66 | 侧边栏上下按钮中轴不齐 | 主导航、更多、回收站、通知、帮助和同步 | 相同点击盒尺寸，SVG 几何中心共线；拖动顺序后不漂移 | 全局 230 状态几何扫描 rail 中轴偏移为 0；统一点击盒，待最终安装复验 |
-| UX-S9-67 | 对话输入框蓝色框中框突兀 | 助手输入区 | 只保留外层容器；输入有光标；键盘焦点在单一外层边界表达 | 单层输入焦点已落地；助手深浅主题连续拖动 84 采样点通过，待最终安装复验 |
+| UX-S9-67 | 对话输入框蓝色框中框突兀 | 助手输入区 | 只保留外层容器；输入有光标；键盘焦点在单一外层边界表达 | 单层输入焦点已落地；助手深浅主题连续拖动 84 采样点通过，B3 已包含修订；移动/原生完整旅程仍待补 |
 | UX-S9-68 | 拖窄侧栏变形，必须全局逐页响应式 | 任务、日历、四象限、习惯、专注、时间线、成长、便签、倒数纪念日、回收站、搜索、个人中心、设置各分类、AI；左右栏分别检查 | 连续拖动及窄窗口下内容重排、按钮可达、浮层锚定、滚动归属正确；不以隐藏溢出掩盖裁切；逐页记录发现与修复 | 全局 230 状态扫描与左右栏 42 状态复验完成；已修 rail 中轴、设置窄屏目录及习惯详情，安装态复验待本轮重打 |
 
 本轮复用现有设计系统，不新建孤立视觉样式。拖栏测试必须检查容器内部几何，不能只看整页是否横向滚动。时间线等语义上需要横向滚动的内容，检查滚动容器和操作可达性，不强行压缩数据。
@@ -450,10 +456,10 @@ iOS 第一趟输入框探针误点同名静态“标题”文字，已修复探�
 
 | ID | 问题 | 产品决定 | 状态 |
 |---|---|---|---|
-| UX-S9-69 | 邮箱继续后才看到密码，账号密码入口不明确 | 登录与注册直接展示邮箱、密码，注册/忘记密码作为简短入口 | 邮箱与密码同屏已实现；最新认证定向 139 项通过，待最终安装复验 |
-| UX-S9-70 | 默认摊开多种认证方式、密码长说明、链接/令牌输入 | 默认一条账号密码主路；其他方式按需展开；密码规则只在注册或错误时提示；普通账号页面不出现令牌粘贴 | 普通入口不挂载服务器地址或令牌；其他方式按需展开，认证回归通过，待最终安装复验 |
+| UX-S9-69 | 邮箱继续后才看到密码，账号密码入口不明确 | 登录与注册直接展示邮箱、密码，注册/忘记密码作为简短入口 | 邮箱与密码同屏已实现；最新认证定向 139 项通过；B3 Windows 安装态与 iOS 安装截图已核对，完整四端登录旅程仍待补 |
+| UX-S9-70 | 默认摊开多种认证方式、密码长说明、链接/令牌输入 | 默认一条账号密码主路；其他方式按需展开；密码规则只在注册或错误时提示；普通账号页面不出现令牌粘贴 | 普通入口不挂载服务器地址或令牌；其他方式按需展开，认证回归通过；B3 已包含修订，完整四端认证矩阵仍待补 |
 | UX-S9-71 | 我的计划侧面空泛、缺乏层次与动态 | 左侧展示紧凑的三步计划示意，一次性进入与完成反馈；不遮挡表单；减少动态效果时直接显示终态 | 三步计划示意、入场与勾选反馈已实现；桌面/移动深浅主题与 reduced-motion 已截图复核，待最终安装复验 |
-| UX-S9-72 | 默认用户不应理解自托管才会注册 | 默认官方服务→账号密码登录/注册→日常使用；设置→同步服务中主动开启自托管→配置地址→连接检查→该实例账号认证；官方与自建凭据不混用，本地数据切换边界明确 | 官方优先、自托管从设置开启已实现；切地址清敏感字段，Web 增加异步请求代际隔离并通过延迟旧响应回归；待最终安装复验 |
+| UX-S9-72 | 默认用户不应理解自托管才会注册 | 默认官方服务→账号密码登录/注册→日常使用；设置→同步服务中主动开启自托管→配置地址→连接检查→该实例账号认证；官方与自建凭据不混用，本地数据切换边界明确 | 官方优先、自托管从设置开启已实现；Web 增加异步请求代际隔离并通过延迟旧响应回归；Android 最近安装态路径通过，iOS 设置旅程通过，完整四端网络登录仍待补 |
 
 自托管属于主动选择的高级服务模式，不再是每次官方登录时都会遇到的表单分支。已有高级按钮与主操作应归为同一操作行；进入官方默认模式后不再保留无用途的高级按钮。自托管实例账号不等于官方账号，不能自动把官方密码或令牌发送给自建地址。
 
@@ -477,9 +483,9 @@ iOS 第一趟输入框探针误点同名静态“标题”文字，已修复探�
 
 | 编号 | 用户反馈 | 实施与验收要求 | 当前状态 |
 |---|---|---|---|
-| UX-S9-76 | 桌面小组件识别与本体需适配最新 UI/UX | 分别识别原生壳、独立 PWA、浏览器与组件能力；今日/四象限/习惯/专注统一层级、紧凑预览、长标题与深浅主题；当前安装态取证 | Windows Adaptive Card 四模板代码已改，195 项单测通过；微软模板引擎与实际 renderer 已验证中英、亮暗、280/340 宽度及四种数据状态共 128 个组合（`apps/web/evidence/widget-cards-final/`）；该证据不等于 Windows Board 注册或安装。最新四端安装态仍待核验 |
+| UX-S9-76 | 桌面小组件识别与本体需适配最新 UI/UX | 分别识别原生壳、独立 PWA、浏览器与组件能力；今日/四象限/习惯/专注统一层级、紧凑预览、长标题与深浅主题；当前安装态取证 | Windows Adaptive Card 四模板代码已改，195 项单测通过；iOS B3 前安装态已由 chronod 枚举 4 个 enabled descriptor；第五轮人工复看截图确认 Gallery 已显示 Heyta，旧“搜索不到”结论是 AX 漏读可见 provider 行造成的误判，已撤回。第五轮已通过系统面板实际添加“今日任务”小组件并退出编辑态；点击和数据刷新仍单独验收。证据：`apps/mobile/evidence/ux-s9-95/widget-chronod-descriptors-20261008.json`、`widget-gallery-idb-20261008.json`。Windows Board、macOS/Linux Widget 交互仍缺 |
 | UX-S9-77 | 头像中轴仍偏、选中套框、更多弹层杂乱 | 头像和全部 rail 控件共轴；选中仅图标高亮，无底框；更多统一图标/文字列及行高，保留拖拽和自定义入口、正确锚点 | Web 源码已落地：头像/rail 共轴、选中态去底框、More 使用锚定浮层并保留拖拽/键盘自定义；Web 几何与交互证据已生成，最新四端安装态仍待重装核验 |
-| UX-S9-78 | 当前安装仍显示邮箱→继续，而非账号密码 | 新安装必须邮箱密码同屏；普通入口无地址与令牌；助手仅只读/执行；安装包身份与最终源码对账 | 源码已修与回归，尚未装进用户当前窗口；重装前额外修复关闭/切地址后的旧认证响应回流 |
+| UX-S9-78 | 当前安装仍显示邮箱→继续，而非账号密码 | 新安装必须邮箱密码同屏；普通入口无地址与令牌；助手仅只读/执行；安装包身份与最终源码对账 | B3 已包含账号密码与助手入口修订并完成四端重建安装；Windows 安装态和 iOS 安装截图已核对。完整四端登录/账号状态矩阵仍缺 |
 | UX-S9-79 | 习惯的新建/编辑能力与实体模型边界容易被误读为“全量习惯管理” | 只把已有真实能力做成可达入口；新建、改名、删除、图标、颜色、目标、频率、打卡、补卡/重新开始和月/年详情必须走真实 action；开始日期、独立坚持天数、分组、习惯提醒若模型/动作层没有所有者，不能用假按钮或本地状态冒充 | 当前 Web 已真实接通名称新建、改名/删除、图标/颜色、目标与频率编辑，以及打卡、补卡/重新开始、热力图/月/年详情；本轮已补新建目标、单位、口径、频率、周几与补卡范围入口；Habit schema/actions 当前没有 `startDate`、独立“坚持天数”、分组或习惯提醒字段/写入口，故这些能力明确保持未实施。新增/编辑仍是列表入口 + 详情控件，不宣称统一设置对话框 | `apps/web/tests/habit-goal-editor.spec.tsx`、`habit-frequency-editor.spec.tsx`、`habits-detail-card.spec.tsx`、`habits-list-pane.spec.tsx` 与 `e2e/tests/detail-pane-habit.spec.ts`、`habit-counted-amount.spec.ts`、`habit-month.spec.ts`、`habit-year.spec.ts` 覆盖已接通路径；需在 `4358` 隔离端口用当前源码重跑真实 Web 旅程，安装态仍待最终四端收尾 |
 | UX-S9-80 | 习惯图标数量少且统计图标借用通用库，视觉身份弱 | 习惯图标扩展为 24 项闭集，保留旧 key 的稳定派生；习惯图形由共享原创 `HabitArtwork` 渲染；详情统计使用 8 个 token 控色的原创微图标（month/total/rate/streak/best/target/calendar/journal） | 24 张原创习惯图已生成、裁切为 128px 透明离线素材，domain/i18n/共享 UI/Web/移动端接线完成；8 枚原创 SVG 微图标已接入统计。PNG 实际解码校验、UI 与移动类型检查通过；选择器已放大到 24px 图形及 44px 触控区域，展开独占整行。真实交互与最新四端安装态继续单独验收，不能用旧包证明新图标已交付 |
 | UX-S9-81 | Landing 预览必须让访客直接理解并操作产品，而不是只能看截图或先点编号 | 预览上方去掉 1～5；用户可直接点击预览 DOM 侧栏自由切换视图；可点击任务详情并勾选任务；说明文字与预览状态联动；手机端同样可点击 | 已去掉编号导航，侧栏直接切换五视图、任务详情与完成状态联动、习惯支持演示打卡；桌面全宽、说明移至下方，手机重新排版并在主区下方打开详情。生产构建的 390/1440 × 亮暗四组合交互与几何验证通过（无横向裁切、无 pageerror），Landing 1350 项回归通过；线上部署另记录实际版本与验收证据 |
@@ -586,7 +592,7 @@ Android 的“快捷开始”及 AI 设置分组前省略号属于分组动作�
 
 这次扫描没有把“测试文件已存在”升级为“生产已上线”，也没有把上一批安装包的通过结果外推到本批新增源码。生产 SMTP、当前源码四端安装、Widget/外链原生交接和真人 VoiceOver/TalkBack 仍分别保留为开放边界。
 
-### 2026-10-08 多端测试发布收口（持续更新，不覆盖未完成项）
+### 历史发布记录：2026-10-08 多端测试发布收口（B1/B2）
 
 本节是本轮最新事实。此前“本批尚未发布/安装”的文字属于阶段记录，以此处的平台逐项记录为准；安装成功不自动关闭未做过的交互验收。
 
@@ -597,7 +603,7 @@ Android 的“快捷开始”及 AI 设置分组前省略号属于分组动作�
 | macOS | 当前源码重新打包并安装；包内 web-dist 对账通过；安装副本截图为共享 UI；Developer ID、公证、stapler 验证通过 | 不以首屏截图代替帮助外链和全部交互验收 |
 | Windows | 当前源码重新打包并安装，全部 26 个 Web 资源逐字节一致；MSIX 签名验证 0；测试 ZIP 含公开 CER 与中文安装说明 | 自签名测试证书，首次安装需要管理员信任；不含私钥 |
 | Android | 当前源码发布签名 APK 已重打、重装，证书指纹与登记一致；任务主流程13项通过 | Profile独立复验通过；脚本改按可见AX节点和稳定资源ID识别路由，未减少范围。视觉问题继续独立登记 |
-| iOS | `com.heyta` 1.0 (3) 已归档、签名、上传；Apple 处理 VALID，已加入现有“内部测试”组；Widget/App Group/图标均验过 | 最终模拟器已重装（内部版本 1.0 (1)，同一源码）；任务旅程12项、Profile/设置23项通过；无公开 TestFlight 邀请链接 |
+| iOS | 该历史批次的 `com.heyta` 1.0 (3) 已归档、签名、上传；Apple 处理 VALID，已加入现有“内部测试”组；包级 Widget/App Group/图标检查通过，但不等于 Widget Gallery 已添加 | 该历史批次模拟器已重装；任务旅程12项、Profile/设置23项通过；无公开 TestFlight 邀请链接 |
 | Linux | 新 DEB 已打包，包内共享 UI hash 与当前 Web 相同；解包启动与截图通过 | 验证机限制 user namespace，采用无沙箱档；未做系统级安装 |
 | 测试分发 | 标签 `v1.0.1-test.20261008.1`，快照 `0107fe15440aecf5775a71574ba973406d8b4c49`；GitHub 草稿与包已准备 | GitHub已公开，5个资产SHA-256与本机相同；匿名API与校验和可读；COS四端上传和匿名HEAD通过，latest.json已切换本批 |
 
@@ -671,5 +677,139 @@ TestFlight build3 已新增 `zh-Hans` 测试说明；内部组已有1名测试�
 - UX-S9-101：第一次仅添加 flex 属性仍显示“1…”，该尝试不算修复；第二次给 TabBar 角标明确测量宽度并让数字徽标按内容增长后，iOS Release 增量构建、保留测试数据安装、截图均完成。真实截图显示 12（不是文件名里的14），尚未扩大为其他计数档位或最终四端发布通过。
 - 助手本机查询改用中英文词条，显示结果内容，技术工具名留在过程信息中。当前浏览器验证普通任务创建在出境同意前不落任务、同意后直接执行一次、刷新不重复；不再用“每次写入确认”的旧预期验收默认执行模式。
 - 助手历史面板窄栏覆盖关闭入口已复现：新增面板内关闭按钮、Escape 返回焦点，新会话收起历史并聚焦输入框。浏览器真实点击通过。独立审查发现的披露/执行状态跨挂载点可见性回归现已修复；取消披露恢复草稿且移除未发送消息。最新三个助手单测文件合计44项通过，真实模型端点替身旅程2/2、长对话及设置浏览器3/3通过，仍不代替原生四端验收。
-- 小组件系统层最新 chronod 读数为四个 widget descriptor，均 enabled=YES，另有一个 control 和一个 activity；见 `apps/mobile/evidence/ux-s9-95/widget-chronod-descriptors-20261008.json`。旧“没有 descriptor”结论已被新安装读数推翻；系统组件库实际添加仍需验收。
-- Apple API 回读确认 TestFlight 1.0 (4) 为 VALID，现有开发者账号和签名通道可用。devicectl 当前仅见模拟器，没有可用的已连接实体 iPhone；不能写成已完成真机安装。下一份归档使用 build 5，归档不等于上传或分发完成。
+- 小组件系统层最新 chronod 读数为四个 widget descriptor，均 enabled=YES，另有一个 control 和一个 activity；见 `apps/mobile/evidence/ux-s9-95/widget-chronod-descriptors-20261008.json`。随后用 IDB AX 在同一模拟器刷新 chronod 与 SpringBoard，Widget Gallery 仍无 Heyta provider，`widgetAdded: false`；见 `widget-gallery-idb-20261008.json`。当前准确结论是“extension/descriptor 已注册，但 Gallery 搜索/添加失败”。
+- Apple API 回读确认该历史批次 TestFlight 1.0 (4) 为 VALID；devicectl 当时仅见模拟器，没有可用的已连接实体 iPhone。B3 的当前 TestFlight build 5 状态以文末 release.json 为准。
+
+### 本轮新增问题逐项登记（第三批测试）
+
+| 编号 | 问题 | 当前结果与验收边界 |
+|---|---|---|
+| UX-S9-102 | 助手长会话消息被裁切、覆盖输入区 | 已修复；消息、披露和等待状态共用滚动区，输入区固定。线上深浅主题与1280/1078/375/900宽度（含400高矮窗口）通过 |
+| UX-S9-103 | 窄侧栏会话历史挡住关闭按钮，新建后仍遮挡输入区 | 已修复；浮层内关闭、Escape返回触发器、新建收起并聚焦输入框，真实点击通过 |
+| UX-S9-104 | 跨挂载点后披露/等待状态不可见，取消披露保留假已发送消息 | 已修复；按会话阶段决定可见性，取消恢复草稿并移除未发送消息；助手相关44项单测通过 |
+| UX-S9-105 | 开启通知按钮暗色对比度不足、桌面被拉成整行 | 已修复；使用主动作样式并置于操作区，当前截图尺寸88×44；两种主题、390/1440宽度已验收 |
+| UX-S9-106 | 原生首启联网说明中的协议入口仍显示下划线，与全局无下划线要求不一致 | **源码已修，未纳入新发布**；同时移除原生补签和桌面回跳链接下划线，原生链接有真实最小触摸高度、焦点/按下反馈和打开失败可见提示。原生协议相关 64 项、Web 回跳 8 项测试通过；待更新包实际查看，不以源码搜索关闭此项 |
+| UX-S9-107 | 助手重复提交、请求运行时新会话可能隐藏仍在执行的任务 | Web 已加同步阶段锁和运行中新会话禁用，延迟写入单测通过；移动发送/采纳/确认统一防重入、系统返回及异常恢复已修并通过复审，最终安装态仍待验 |
+| UX-S9-108 | 移动 AI 仍是旧的功能模式表单，与单一 Chatbot 产品决策不一致 | **单一 Chatbot 源码已落，iOS 本地读实际通过，尚未发布**；Profile → AssistantScreen 已接共享 requestAssistantTurn、默认执行/只读、披露、消息、提案和历史。旧结构化四功能的完整替代仍缺，不以视觉替换关闭能力核对；键盘与设置返回正在安装态复验 |
+| UX-S9-109 | Windows 帮助入口是否真正交给系统浏览器，原生小组件页是否误导安装 PWA | B3 安装态已通过；UIA 读取系统浏览器帮助中心地址及新增标签，壳内地址保持 heyta.local；小组件页正确说明原生能力。见 [本轮证据](../../apps/web/evidence/ux-round4/windows-help/windows-widget-help.json)。此项不代表 Windows Board 已支持添加 |
+| UX-S9-110 | 移动端切换底部 tab 会卸载助手子树，回到个人页丢失草稿、提案与执行结果 | **源码已修、待安装态交互复核**；按 profile 自己的导航栈保留助手，隐藏页面解除返回键监听。并发/导航 13 项测试通过；仍须在实际安装包中验证运行中切 tab 与返回后的结果 |
+
+第三批四端重打重装已全部通过，iOS TestFlight 1.0 (5) 为VALID且加入既有内部测试组；第五轮已经用真实截图确认“今日任务”小组件实际添加并退出编辑态，仍缺其余模板、点击回应用、数据刷新、实体 iPhone、真人读屏和生产邮件收件等边界。源码快照与包验收详见 `apps/web/evidence/ux-closeout/release-2026-10-08-b3/release.json`。未部署另一任务的入站自动化服务端。
+
+## 当前行动表（B3，2026-10-08）
+
+本表只覆盖本轮活动 Goal：同步/隐私、数据管理、提醒、原生 Widget、Profile/账号、AI、帮助交互。B3 发布事实为：`status: published`、服务端快照 `3880bdd1fd5e8fe3710bd19c5f753947ea89c468`、TestFlight build `5` 为 `VALID` 且已关联内部测试组、`fourPlatformReinstall: true`。四端重装证明产物进入安装态，不自动证明每个交互矩阵已经在 B3 逐项重跑。
+
+| Goal 范围 | 当前准确状态 | 分类 | 证据 | 下一步 / 阻塞 |
+|---|---|---|---|---|
+| 同步 / 隐私 | 代码已实施；Android 官方同步默认、自托管主动展开与返回路径通过；iOS 离线隐私选择、Profile → 设置 → 同步与隐私旅程通过。两端均未提交服务器凭据；完整四端网络、登录和状态矩阵仍缺。 | 已实现，缺完整运行证据 | [`ux-s9-100/android/journey.json`](../../apps/mobile/evidence/ux-s9-100/android/journey.json)；[`profile-center/ios-current-light/settings-ia-journey.json`](../../apps/mobile/evidence/profile-center/ios-current-light/settings-ia-journey.json)；B3 [`release.json`](../../apps/web/evidence/ux-closeout/release-2026-10-08-b3/release.json) | 在 B3 产物上补 macOS、Windows、Linux 及移动端官方登录/自托管连接、错误和返回矩阵；不要把 UI-only 路径写成真实同步闭环。 |
+| 数据管理 | 导出、空库还原、非空库拒绝、失败上下文保留和取消选择等代码与 Web 真实 Chromium 证据已完成；Android 最近一次 Profile/Settings 旅程包含导出/还原路径并通过，iOS 设置旅程也通过。完整四端数据管理矩阵仍缺。 | 已实现，局部端已通过 | [`reminders-data-responsive/report.json`](../../apps/web/evidence/reminders-data-responsive/report.json)；[`ux-s9-95/android-final/profile/journey.json`](../../apps/mobile/evidence/ux-s9-95/android-final/profile/journey.json)；[`profile-center/ios-current-light/settings-ia-journey.json`](../../apps/mobile/evidence/profile-center/ios-current-light/settings-ia-journey.json) | 用 B3 当前 APK/各原生包补四端导出、还原、拒绝和失败保留状态；不要用安装成功替代数据动作验收。 |
+| 提醒 | Web Chromium 已覆盖 default、granted、denied、unsupported、error 五种权限状态，亮暗 × 390/1440 通过；历史原生证据已存在：ADR-0051 记录 2026-10-03 Android Release 的系统通知与回执，以及 2026-10-04 iOS 模拟器的系统可见通知与 `firedAt` 回执。上述原生证据不是 B3 当前产物复验。 | Web 与历史原生证据已通过，B3 原生产物待复验 | [`reminders-data-responsive/report.json`](../../apps/web/evidence/reminders-data-responsive/report.json)；[`ADR-0051`](../adr/0051-mobile-reminder-delivery.md)；[`android-reminder-ring.png`](../../apps/mobile/evidence/android-reminder-ring.png)；[`ios-reminder-notification-center.png`](../../apps/mobile/evidence/ios-reminder-notification-center.png) | 在 B3 当前 Android/iOS 产物上复验系统通知授权、拒绝、恢复和实际投递；桌面通知按目标壳补证。生产 SMTP 不替代提醒投递证据。 |
+| 原生 Widget 识别 | iOS extension 已安装注册，chronod 枚举出 4 个 enabled descriptor；第五轮复核可见截图确认 Gallery 已显示 Heyta。旧 AX 未读到 provider 行不能证明搜索无结果；“今日任务”小组件已实际添加至主屏并退出编辑态，截图和 AX frame 均确认存在。Windows Board、macOS/Linux Widget 添加与交互仍缺。 | 今日小组件已添加，其余模板及交互续验 | [`widget-chronod-descriptors-20261008.json`](../../apps/mobile/evidence/ux-s9-95/widget-chronod-descriptors-20261008.json)；[`widget-gallery-idb-20261008.json`](../../apps/mobile/evidence/ux-s9-95/widget-gallery-idb-20261008.json) | 已完成今日小组件添加，补启动与数据更新、其余三模板、Windows Board 和桌面壳能力识别/外链交互。 |
+| Profile / 账号 | iOS Profile/Settings IA 旅程通过；Android 最新可用的 UX-S9-95 Profile 证据通过（artifact `983023e5…`），较早的 `profile-center/android-current-final-5` 失败记录保留为历史定位器失败。B3 已安装，但完整 Profile/账号登录、返回和状态矩阵尚未在四端全部重跑。 | 代码已实施，移动局部通过 | [`ux-s9-95/android-final/profile/journey.json`](../../apps/mobile/evidence/ux-s9-95/android-final/profile/journey.json)；[`profile-center/ios-current-light/settings-ia-journey.json`](../../apps/mobile/evidence/profile-center/ios-current-light/settings-ia-journey.json)；B3 [`release.json`](../../apps/web/evidence/ux-closeout/release-2026-10-08-b3/release.json) | 在 B3 产物上补四端未登录/已登录 Profile、账号密码、编辑资料、退出和返回路径；保留真人读屏缺口。 |
+| AI | B3 已包含当前 AI 修订；Web assistant 单测 44 项、provider journey 2 项及长对话/提案确认等证据通过。移动端和原生桌面壳的完整 AI 交互、权限和出境矩阵仍缺。 | Web/共享层已通过，跨端证据不足 | B3 [`release.json`](../../apps/web/evidence/ux-closeout/release-2026-10-08-b3/release.json)；[`goal-settings-final/`](../../apps/web/evidence/goal-settings-final/)；本文件 UX-S9-102—104 | 在 B3 各端补单一 Agent 入口、权限档位、出境披露、提案确认、历史/新会话和窄屏路径；不能把 Web provider journey 外推为原生通过。 |
+| 帮助交互 | 官网/Web 帮助中心返回首页、文章导航、亮暗/窄屏和无下划线规则已通过；Windows 已有真实 UIA 证据证明帮助外链打开系统浏览器且壳页面保持不变。macOS/Linux 外链的完整人工点击/AX 交接仍缺。UX-S9-106 在 B3 包中仍有下划线，当前源码已修并通过相关测试，等待新包可视验收。 | Web/官网与 Windows 已通过，其他原生外链与 UX-S9-106 未完成 | [`live-readout.json`](../../apps/landing/evidence/docs-release/live-readout.json)；[`windows-widget-help.json`](../../apps/web/evidence/ux-round4/windows-help/windows-widget-help.json)；B3 [`release.json`](../../apps/web/evidence/ux-closeout/release-2026-10-08-b3/release.json)；本文件 UX-S9-106 | 移除 Android/iOS 首启协议入口下划线但保留可点击、键盘和读屏语义；补 macOS/Linux 外链打开、返回和失败状态证据。 |
+
+### 本轮续验（尚未发布新包）
+
+[本轮验证记录](../../apps/web/evidence/ux-round4/verification.json)记录本轮源码哈希、检查输出和发布边界。当前下载包仍为第三批；本轮源码不能冒称已经进入 TestFlight build 5。
+
+iOS 新构建的提醒专项得到 26 通过 / 1 失败：App 在 trigger 前终止，系统真实显示本轮唯一任务标题的通知横幅，恢复后 SQLite 回读同 occurrence 的 firedAt 与精确 firedForTriggerAt，取消边界通过。唯一失败是 AX 未读到通知标题；[截图](../../apps/mobile/evidence/ux-round4/ios-reminders/notification-center.png)已人工核对，画面实际为 SpringBoard 加系统横幅，不能按文件名称为展开的通知中心。本专项构建早于最后的助手修复，不代表最终四端验收。
+
+
+### 第五轮续验（源码仍在实施，未发布）
+
+- **账号与发布**：本机 Apple Developer 签名与上传链路已经实证可用；当时记录的下一包目标为 build 6，但第六轮没有发布新包，当前发布仍为 B3 / TestFlight 1.0 (5)，Apple `VALID`。没有实体 iPhone 安装证据，不能把模拟器安装称为本机 iPhone 已装。
+- **Widget 勘误**：[只读复核](../../apps/mobile/evidence/ux-round5/widget-gallery/round5-readonly-findings.json)确认此前截图里已经有 Heyta provider；AX 树没有暴露该行。当前模拟器实际 runtime 为 iOS 27.0，安装包使用 27.1 SDK；两者不得混写。
+- **移动单一 Chatbot**：UX-S9-108 正在实施。Profile 助手入口始终可见并采用原创新图标，端点未配置时仍可走本地只读；会话、披露、只读/执行、提案确认与设置返回统一在单一对话界面。Web 与移动本地历史的解析、账号隔离及过期提案语义抽到 app-host，由各端注入存储。共享提取后 Web 历史 26 项通过；这些不是移动安装态验收。
+- **不能漏掉的能力核对**：移动旧表单有结构化收集、拆解、排序和估时入口。共享 Chatbot 工具目录能读任务与提交部分任务写意图，但这不证明其完整替代原来的四个 request 入口，尤其拆解/估时的结构化采纳。`check-ai-coverage` 暂不放宽或豁免；需补齐对话/任务上下文入口及行为证据后，才可声称能力无损。
+
+- **Widget 实际添加**：[第五轮添加记录](../../apps/mobile/evidence/ux-round5/widget-gallery/add-journey.json)及[主屏截图](../../apps/mobile/evidence/ux-round5/widget-gallery/16-widget-home.png)确认“今日任务”小组件已添加且退出编辑态；其余模板、点击回应用、数据刷新与实体 iPhone 尚未由此证明。
+
+
+| 续验登记 | 实测问题 | 处理与边界 |
+|---|---|---|
+| UX-S9-111 | Chatbot singleton 先于类初始化，原生导入会抛 TDZ | 已调整初始化次序；controller 测试与实际 iOS 打开助手通过 |
+| UX-S9-112 | 单槽聊天历史被另一账号输入草稿清除或发送覆盖 | app-host 提供账号分槽适配；身份含服务器与稳定 accountId，同邮箱不同服务器分离。旧单槽仅同账号回退；共享行为测试4项、移动切换账号测试通过 |
+| UX-S9-113 | 从设置换端点/权限后复用旧披露，熔断冷却跨时导致展示与实际目标不一致 | fingerprint绑定路由、档位和字段，首次恢复重新披露；披露/请求共用冻结 routeTime 和 healthSeed。移动回归通过，真实远端旅程待补 |
+| UX-S9-114 | 安装态 AI 未配置提示占据大卡片，输入区双重底部预留产生空白 | 提示改紧凑说明与“配置 AI”；权限/建议改轻量高亮；非滚动 Screen 明确铺满，助手取消重复88逻辑点底部预留。前后安装截图已保存 |
+| UX-S9-115 | iOS/Android 键盘弹起后 composer 被遮住 | iOS 安装态真实复现并已修；测量窗口原点后 composer 底部503逻辑点、键盘顶部546，两者不重叠。第六轮 Android 先复现遮挡，再以 `KeyboardAvoidingView behavior=height` 修复并在当前 APK 复验通过；两端完整当前源码重装矩阵仍按第六轮边界保留 |
+
+第五轮移动全量回归 67 个文件、871 项通过；共享账号历史4项通过。`check:ai-coverage` 仍明确报告移动旧四功能入口缺失与controller间接接线不能被旧扫描识别，另含其他任务所有的inbound检查两项；未扩大豁免。文档链接检查仍因现存未跟踪证据文件失败，未为通过检查改动用户Git索引。
+
+第五轮 [iOS安装态记录](../../apps/mobile/evidence/ux-round5/chatbot-ios/verification.json)绑定源码与安装main.jsbundle哈希。本地读、设置返回草稿、取消恢复、深浅主题键盘避让通过；等待用户披露确认不再伪装为端点请求运行中，返回按钮可取消披露。远端模型/高风险写入、Android当前源码、旧四功能能力替代与最终多端重打上传仍未完成。未配置端点时的披露引导文案仍有重复、需继续压缩。
+
+### 第六轮续验（2026-10-08，未发布新包）
+
+本轮没有改变发布边界：当前发布仍是 B3 / TestFlight 1.0 (5) `VALID`。以下把真实安装态确证、已经落到源码的修正和仍未验证/正在修复的问题分开登记；第六轮证据不能外推为完整四端网络、登录、同步、数据管理或真人读屏矩阵通过。
+
+#### 已确证的安装态证据
+
+- **Android 键盘：先失败、后修复。** 当前 release APK 在 `emulator-5554`（Android 16，1080×2400）上先真实复现了软键盘覆盖 composer：输入保持键盘前的 bounds，composer 不在键盘上方可见。随后用 Android `KeyboardAvoidingView behavior=height` 修复，输入框最终为 `[42,1417][902,1533]`、发送按钮为 `[923,1417][1038,1532]`，键盘可见时通过；iOS 原有 `padding` 行为保留。证据为 [`android-chat/verification.json`](../../apps/mobile/evidence/ux-round6/android-chat/verification.json)、修复前 [`04-keyboard-draft.png`](../../apps/mobile/evidence/ux-round6/android-chat/04-keyboard-draft.png) 和修复后 [`12-keyboard-after-fix.png`](../../apps/mobile/evidence/ux-round6/android-chat/12-keyboard-after-fix.png)。该 APK 是 Windows 远程构建后覆盖安装，未卸载或清空数据；无模型端点请求。
+- **iOS 受控 HTTP fixture 与本地 op。** iOS 模拟器通过控制 HTTP 模型端点验证：普通创建请求、提案确认、批量完成和只读目录；创建和确认在 SQLite/op-log 中产生真实本地 op，确认前的三条 op 与确认后的第四条完成 op分别见 [`03-ops-before-confirm.json`](../../apps/mobile/evidence/ux-round6/ios-chatbot/03-ops-before-confirm.json) 与 [`04-ops-after-confirm.json`](../../apps/mobile/evidence/ux-round6/ios-chatbot/04-ops-after-confirm.json)。只读请求后 op 数保持不变，见 [`05-ops-after-readonly.json`](../../apps/mobile/evidence/ux-round6/ios-chatbot/05-ops-after-readonly.json)；总计 `opCount: 4`、`readOnlyRequests: 6`。这是真实本地写入口与只读不落 op 的证据，不是实时外部模型智能或实体 iPhone 证据。
+- **发送前披露。** root 新发送前的披露分组和详细字段展开已有真实截图 [`06-disclosure-compact.png`](../../apps/mobile/evidence/ux-round6/ios-chatbot/06-disclosure-compact.png) 与 [`07-fields-expanded.png`](../../apps/mobile/evidence/ux-round6/ios-chatbot/07-fields-expanded.png)。它只证明截图中的安装态呈现，不关闭字段文案和跨端披露矩阵。
+
+#### 已落到源码、但需重新安装复验的修正
+
+- 隐私错误态的恢复入口在截图 [`08-privacy-recovery.png`](../../apps/mobile/evidence/ux-round6/ios-chatbot/08-privacy-recovery.png) 中曾错误跳到“账号安全”；原生 AX 进一步记录了错误目的地（[`09-privacy-destination.ax.json`](../../apps/mobile/evidence/ux-round6/ios-chatbot/09-privacy-destination.ax.json)）。Profile callback 已由账号安全改回“同步与隐私 / sync”；最终安装态实际复验仍待 root 完成。
+- iOS 第六轮记录明确指出批量完成宿主当前按任务循环；源码正在修正为符合“一次用户意图、一次 op”的路径。现有 fixture 证明了批量确认门槛和剩余完成结果，不能把它升级为逐条 op 问题已解决。
+
+#### 新登记的问题与未验证边界
+
+| 编号 | 第六轮发现 | 当前边界 |
+|---|---|---|
+| UX-S9-116 | Android 键盘遮挡 composer | 修复前失败、修复后安装态通过；仍需把该结果并入当前源码的完整 Android/iOS 交互矩阵。 |
+| UX-S9-117 | 移动披露仍出现大块、未翻译的原字段墙 | 06/07 已有真实截图；需压缩分组与字段文案，并在当前源码包和两端复验，不能以“有披露截图”关闭。 |
+| UX-S9-118 | 隐私错误缺少正确的恢复目的地 | 已修并在本轮新安装 iOS Release 上实际点击复验：进入“同步与隐私”，显示官方同步与本机隐私状态，不再进入账号安全。证据 `ios-chatbot/privacy-recheck.json`；后续估时增量仍需最终重包。 |
+| UX-S9-119 | `complete-tasks` 批量完成仍按任务逐条处理，可能产生与用户意图不匹配的 op 形状 | 共享源码已改为预检后单次 `bulkSetCompleted`，重复任务整批拒绝、已完成项跳过；定向回归通过，当前安装态原子批量证据仍待补。 |
+| UX-S9-120 | checklist 并发覆盖不足 | 共享源码已用 `dispatchChecked` 串行读取/合并/写入；同机并发追加、重复零 op、删除优先与失败重试测试通过。跨设备仍遵循备注 LWW，不声称合并；审查新增外部数组快照问题继续修复。 |
+| UX-S9-121 | 确认前授权复检与幂等边界不足 | 确认前读取最新 grants 并核对账号 epoch，同一 host/proposal 成功确认只提交一次、失败可重试；撤权、过期账号、并发确认和失败重试定向测试通过，跨端最终安装态待验。 |
+| UX-S9-122 | Web 批量 AI 优先级原先从 `onApply` 调用 `setPriority`，一次用户意图会产生多 op | `TaskActions.bulkSetPriorities` 已独立 marker 为一次 `BATCH`；shared-schema 3、op-log 136、app-host 1593 项测试通过。单一 Chatbot 的 `set_task_priorities` 接线与中英预览已完成：local-api 178 项、app-host 定向159项、Web预览6项通过；独立审查新增严格未知字段拒绝项仍在修复，当前包端到端待验。 |
+| UX-S9-123 | 手工 token 没有 `accountId` 时历史曾共用 `unidentified`，存在跨会话混用 | root 已改为非秘密临时 session scope；任何缺少 identity 的请求直接拒绝，官方稳定 `accountId` 仍可持久恢复。模块级 resolver 在同一运行会话的 remount 保留同服务器/同 token 的随机 scope；换 token/服务器或退出会隔离，不把秘密写入持久键。共享历史6项测试通过；冷启动无已核验身份不承诺恢复。 |
+| UX-S9-124 | `update-task` 多字段更新仍拆成多个 op | 已新增共享 `patchDetails`，所有字段先校验后单次 UPDATE；普通多字段一 op、非法日期零写入、重复任务复合操作拒绝及单独完成顺延，定向112项通过。当前安装态待验。 |
+| UX-S9-125 | Web 披露后的自动滚到底布局已调整，但现有一次真实浏览器旅程发生在 scroll 改动之前 | 真实 Chromium 再验发现滚到底会裁掉披露标题；改为从标题显示，等待确认隐藏闲置输入框，ResizeObserver恢复设置返回后的定位。两条真实旅程通过，亮暗截图中关闭与发送均可见；证据 `ux-round6/disclosure/verification.json`。 |
+| UX-S9-126 | Windows 桌面数据导出/还原缺少隔离运行入口和动作证据 | 已用复制的原生 Debug 壳与独立 SQLite/profile 完成 JSON/Markdown 导出、取消、坏 JSON、非空拒绝、空库还原及重载保留。默认库前后哈希不变。最终运行器另行验证真实 WebView2 profile 归属；未冒称最终运行器重跑了完整旅程。证据 `apps/web/evidence/data-transfer-windows-qa/verification.json`。 |
+
+本轮 iOS 证据的原始限制仍有效：使用受控 HTTP fixture、无实时外部模型、无实体 iPhone；安装 bundle 仍对应第六轮最终源码重新安装前的基线，因此源码修正不能冒称已经进入 B3/TestFlight 5。其他完整矩阵（四端官方登录/自托管连接、同步错误与返回、数据导出/还原、Widget/桌面外链、VoiceOver/TalkBack）继续保留为未完成项。Windows 隔离数据动作随后已补齐，见 UX-S9-126；它使用复制 Debug 壳，不能等同于所有平台或最终 MSIX 包的完整数据旅程。
+
+第六轮补充：`dispatchChecked` 已把追加清单的读取、合并与写入放进同一引擎队列，app-host 全套 1596 项与 op-log 136 项通过。这里的“并发追加都保留”仅指同一客户端的本地队列；跨设备同时修改备注仍遵循现有 op-log / LWW 规则，不承诺 CRDT 式文本合并。手工凭据会话历史隔离行为测试已补，账号历史共 5 项通过；补充 resolver 后，共享历史现为6项通过，同一运行会话允许跨页面重挂载恢复；无已核验 accountId 的临时会话不承诺冷启动恢复。移动会话控制与本地历史定向回归 18 项通过。
+
+第六轮独立复审新增登记：
+
+| 编号 | 问题 | 处理与验收边界 |
+|---|---|---|
+| UX-S9-127 | 排队前仍引用调用方可变 payload / checklist items，外部修改可能污染 op 或物化状态 | 已对入队intent、远端/import、reducer/store/返回值做完整JSON快照，保留__proto__为own data key，覆盖payload、vectorClock外部改动；定向5项通过，op-log类型检查与构建通过。 |
+| UX-S9-128 | 工具 schema 的 additionalProperties:false 未实际执行，部分错误可选类型被静默忽略 | set_task_priorities顶层/entry未知字段及create_task可选字段错误类型均严格拒绝；local-api定向5项、app-host动作/host92项通过，最终安装态待验。 |
+| UX-S9-129 | 单一 Chatbot 的估时能力尚未保持旧功能的历史依据、偏好和时长限制 | 共享工具已补齐读取上下文与写估时：历史最多20条、记忆关闭不读偏好、5–480分钟、确认前规范化预览、最新备注原子合并。app-host1618项通过，真实浏览器确认写入1条op、重复0条；最终移动安装态续验。 |
+
+第六轮 Web 最新全套回归：162 文件通过、2 文件跳过；2094 项通过、13 项跳过。随后自动定位细节的两个定向文件28项通过，最新亮暗/设置返回的真实 Chromium 旅程2项通过。该读数不覆盖后续估时工具增量，也不替代原生安装态。
+
+
+### 第六轮后续实测：同步入口与小组件写入
+
+| 编号 | 问题 | 修复与边界 |
+|---|---|---|
+| UX-S9-130 | 未登录同步设置先展示巨大禁用同步按钮与状态，登录说明重复、隐私日期挤在标题 | 未配置且未进入自托管时优先显示官方登录；配置后保留真实状态。时间独立辅助行、按钮按内容宽度，IA8项/同步状态26项通过；当前iOS安装截图 `15-sync-simplified-dark.png` 已人工确认官方登录优先、完整内容无需滚动。 |
+| UX-S9-131 | iOS Widget桌面勾选仅乐观显示，回App后任务仍未完成 | 真机载体为模拟器：原始2条op没有完成；定位iOS producer时间戳小数被共享整数契约拒绝。修为整数毫秒，Swift104项通过；重包实点后新增1条completedAt UPDATE，再次回前台无重复op。证据 `apps/mobile/evidence/ux-round6/widget-refresh/verification.json`，仅关闭今日模板的刷新/勾选闭环，不代替其余模板/实体iPhone。 |
+| UX-S9-132 | 中英提案清单分隔符硬编码中文顿号 | 移动全套发现单源回归，已让Web/移动提案按当前locale消费既有分隔符表；移动完整67文件/873项及Web定向28项通过，等待纳入最终分发包。 |
+
+估时工具已实施并经独立复审：历史最多20条有效样本、记忆关闭不读取偏好、正文读取性闸门、整数分钟与5–480限制、确认后按最新备注原子更新、幂等无额外op。app-host1616项、local-api181项通过；默认实体工具预算仍7，仅TASK显式9。同一目录供Chatbot/MCP共用，没有另设助手专用目录。旧覆盖扫描仍有7项UI接线缺口，未为全绿扩大豁免。当前iOS模拟器已安装包含工具与Widget修复的本轮包；它仍不是已经上传的TestFlight build5。
+
+估时复审补充：确认预览曾显示模型原始900分钟而action夹为480，现已在共享提案生成前统一夹取，900→480、1→5的预览与写入一致测试通过；app-host现为85文件/1618项通过。真实Chromium工具旅程已证明追加清单/两任务批量优先级/估时各1条op、重复估时0条op，并保留原备注；证据 `apps/web/evidence/ux-round6/tool-journey/journey.json`。
+
+
+### 第七轮发布与验收接续（进行中）
+
+本机 Apple Developer 账号已经实测可用。iOS `1.0 (6)` 已完成归档、签名导出和上传，Apple `VALID`，既有内部测试组关联已回读确认。最终源码四端重打重装全部成功；Linux DEB 字节对账与解包启动通过。此时桌面/Android/Linux公开下载仍是 B3，B4分发正在准备，不能写成所有端均已发布。实体 iPhone 尚未连接，TestFlight 上传不等于真机已安装。
+
+Windows 数据隔离验收补齐：共享 SQLite 路径 override 不再假称能设置 WebView2 profile；运行器复制可执行产物到 QA 根目录，并回读 `CoreWebView2.Environment.UserDataFolder`。完整数据旅程与最终运行器启动验收分别记录在 [Windows 验收记录](../../apps/web/evidence/data-transfer-windows-qa/verification.json)，默认数据库及 WAL/SHM 前后字节哈希一致。
+
+
+| 新增登记 | 发现 | 处理与验收边界 |
+|---|---|---|
+| UX-S9-133 | 线上落地页未配置应用地址，导航进入应用/登录退回站内路径 | 首轮线上26项通过、4项失败后定位为构建配置遗漏；显式提供 `VITE_APP_URL` 重建并备份部署，待4条中英文入口复验。没有把它当成仅测试定位问题关闭。 |
+| UX-S9-134 | Windows QA运行器可递归删除用户指定目录，且证据路径未隔离 | 独立复审发现后改为只接收全新安全路径、拒绝危险祖先/后代和reparse点，不再删除输入目录；独立设置证据路径并增加Finalize全目录前后哈希核对。远端危险路径5/5拒绝；全新QA启动与Finalize通过，默认目录1274文件前后无变化、M2证据落QA目录。未修改产品默认路径。 |
+
+iOS最终安装包首启补验：协议链接无下划线、AX角色为Link、44点触摸高度；实际点击服务条款进入Safari并回读完整 `/legal/terms/` 地址。见 `apps/mobile/evidence/ux-round7/ios-first-run/verification.json`。键盘焦点和真人读屏仍未由这些证据覆盖。
+
+iOS最终包的底栏返回补验通过：助手输入 `QADraftB4`，切换任务页后再回“我的”，自动恢复助手页面且草稿逐字一致。证据 `apps/mobile/evidence/ux-round7/ios-tab-return/verification.json`；此项只补草稿路径，不代替待确认提案/运行中请求矩阵。

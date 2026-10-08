@@ -22,6 +22,7 @@ export {
   materializedState,
   type AppHost,
   type AppHostOptions,
+  type InboundAutomationHostOptions,
   type SyncConfig,
   type VaultRootRotationOptions,
 } from './host.js';
@@ -31,6 +32,7 @@ export {
   type ActionContext,
   type TaskActions,
   type NewTaskFields,
+  type TaskDetailsPatch,
 } from './actions.js';
 
 /**
@@ -175,6 +177,9 @@ export {
   claimAutomationEvent,
   journalCommitProofBeforeDispatch,
   publishAutomationResult,
+  readAutomationPreparedResult,
+  reserveAutomationAiAttempt,
+  advanceAutomationAiAttempt,
   registerAutomationWorker,
   renewAutomationLease,
   requestCommitPermitAndJournal,
@@ -590,6 +595,7 @@ export {
   confirmAiToolProposal,
   executeAiToolProposal,
   runSelectedTool,
+  type AiToolAuthorization,
   type AiToolProposal,
   type AiToolRunOutcome,
   type AiToolRunnerDeps,
@@ -879,3 +885,25 @@ export {
 } from './assistant-session-actions.js';
 
 export { prepareTaskBatchIntent, createTaskBatch, type TaskBatchAuthorization, type TaskBatchContext } from './task-batch-actions.js';
+export { runInboundAutomationEvent, type InboundAutomationRunOptions } from './inbound-runner.js';
+export { processInboundAutomationEvent, type ProcessInboundAutomationOptions } from './inbound-process.js';
+export { startInboundWorkerLoop, type InboundWorkerLoopOptions, type InboundWorkerLoop } from './inbound-worker-loop.js';
+export { createInboundRecipientKeyStore, type InboundRecipientKeyScope } from './inbound-key-store.js';
+export { createVaultWrappedAutomationWorkerStore, createInboundCommitJournal } from './inbound-secret-store.js';
+export { generateInboundKeyPair, inboundPublicKey } from '@heyta/inbound-core';
+
+/** 跨端本地会话历史：宿主只注入存储，不另造恢复与账号隔离规则。 */
+export type { ChatItem, WithoutId } from './assistant-local-transcript.js';
+export {
+  ASSISTANT_HISTORY_STORAGE_KEY, ASSISTANT_HISTORY_VERSION, MAX_PERSISTED_ITEMS,
+  truncateForPersistence, saveAssistantHistory, loadAssistantHistory, clearAssistantHistory,
+  scopeAssistantHistoryStorage, assistantHistoryAccount, createAssistantHistoryAccountResolver,
+  type HistoryStorage, type StoredChatItem, type PersistedAssistantHistory,
+} from './assistant-local-history.js';
+
+export {
+  createInboundRecipientRemote,
+  InboundRecipientRemoteError,
+  type InboundRecipientRegistration,
+} from './inbound-recipient-remote.js';
+export { createInboundRulesRemote, InboundRulesRemoteError, type InboundAutomationRule, type InboundAutomationRuleConfig, type InboundAutomationField } from './inbound-rules-remote.js';

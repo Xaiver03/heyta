@@ -60,6 +60,8 @@ const FEATURE_ORDER = [
   'prioritize',
   'duration-estimate',
   'tool-calling',
+  // Inbound automation is configured here, not exposed as a Chatbot mode.
+  'inbound-automation',
 ] as const satisfies readonly AiFeature[];
 
 /**

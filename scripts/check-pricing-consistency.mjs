@@ -78,7 +78,7 @@ const LEGAL_FILES = ['server/legal/terms-of-service.heyta.md', 'server/legal/ter
  * 加第三个之前先想清楚：你打算收的那个东西，**用户是不是本来就有**？
  * 如果是，那它就是"功能"，而功能永久免费 —— 收了就是虚假宣传。
  */
-const ALLOWED_GRANTS = new Set(['hosting', 'ai']);
+const ALLOWED_GRANTS = new Set(['hosting', 'ai', 'automation']);
 
 /** ADR-0020 §3.1：**两个**付费项，只两个。 */
 const EXPECTED_SKU_COUNT = 2;

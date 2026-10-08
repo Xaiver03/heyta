@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { claimAutomationEvent, createInboundUploadAuthorization, journalCommitProofBeforeDispatch, publishAutomationResult, registerAutomationWorker, renewAutomationLease, requestCommitPermitAndJournal } from '../src/inbound-worker';
+import { claimAutomationEvent, createInboundUploadAuthorization, journalCommitProofBeforeDispatch, publishAutomationResult, readAutomationPreparedResult, registerAutomationWorker, renewAutomationLease, requestCommitPermitAndJournal } from '../src/inbound-worker';
 
 const credential = {
   workerId: '11111111-1111-4111-8111-111111111111', workerToken: 'a'.repeat(64), userId: 'u',
@@ -40,6 +40,7 @@ describe('inbound worker host wiring', () => {
       clientId: 'client', databaseEpoch: 'epoch', secrets: { load: vi.fn(), save, clear: vi.fn() }, fetchImpl });
     expect(result.serverOrigin).toBe('https://example.test');
     expect(save).toHaveBeenCalledWith(result);
+    expect((fetchImpl.mock.calls[0]?.[1] as RequestInit).headers).toMatchObject({ authorization: 'Bearer jwt' });
   });
 
   it('journals the signed permit returned by HTTP', async () => {
@@ -52,6 +53,7 @@ describe('inbound worker host wiring', () => {
     expect(save).toHaveBeenCalledWith('event', 'body.sig');
     const init = fetchImpl.mock.calls[0]?.[1] as RequestInit;
     expect((init.headers as Record<string, string>)['x-heyta-worker-token']).toBe('a'.repeat(64));
+    expect((init.headers as Record<string, string>).authorization).toBe('Bearer jwt');
   });
 
   it('claims and renews opaque events without exposing worker secrets to the body', async () => {
@@ -75,5 +77,14 @@ describe('inbound worker host wiring', () => {
     await expect(publishAutomationResult({ baseUrl: 'https://example.test', token: 'jwt', worker: credential,
       eventId: 'event', leaseGeneration: 2, parseVersion: 1, resultDigest: 'b'.repeat(64), resultCiphertext: '{}' , fetchImpl }))
       .resolves.toEqual({ eventId: 'event', state: 'prepared', parseVersion: 1 });
+  });
+
+  it('recovers an encrypted prepared result without returning task plaintext', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(new Response(JSON.stringify({ eventId: 'event', ruleId: 'rule', ruleVersion: 2,
+      parseVersion: 3, resultDigest: 'b'.repeat(64), resultItemCount: 1, resultCiphertext: 'opaque', state: 'prepared' }), { status: 200 }));
+    const result = await readAutomationPreparedResult({ baseUrl: 'https://example.test', token: 'jwt', worker: credential, eventId: 'event', fetchImpl });
+    expect(result.resultCiphertext).toBe('opaque');
+    const url = String(fetchImpl.mock.calls[0]?.[0]);
+    expect(url).toContain('clientId=client');
   });
 });

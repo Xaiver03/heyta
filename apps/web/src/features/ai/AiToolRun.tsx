@@ -32,7 +32,8 @@ import { ICON_SIZE } from '@heyta/design-system';
 import { useMemo, useRef, useState } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 
-import { useI18n, type I18nValue, type MessageKey } from '@heyta/i18n';
+import { useI18n, type I18nValue, type MessageKey, type Locale } from '@heyta/i18n';
+import { LIST_SEPARATOR } from './locale-punctuation.js';
 import {
   buildDisclosure,
   fromHealthSnapshot,
@@ -72,6 +73,8 @@ export interface AiToolRunProps {
   consents: readonly EgressConsent[];
   /** 已授权工具范围（AI 设置里那份 `localApi.grants`）。 */
   grants: LocalApiConfig['grants'];
+  /** 确认与执行前读取当前授权；测试可省略并使用 `grants` 快照。 */
+  getGrants?: () => LocalApiConfig['grants'];
   secrets: SecretStore;
   healthSnapshot?: AiHealthSnapshot;
   onHealth?: (health: HealthMap) => void;
@@ -100,6 +103,7 @@ interface ToolRunEphemeralShape {
   phase: Phase;
   outcome: ToolCallOutcome | undefined;
   confirmed: LocalApiWriteResult | undefined;
+  confirmationError: string | undefined;
 }
 
 const TOOL_RUN_EPHEMERAL: ToolRunEphemeralShape = {
@@ -107,6 +111,7 @@ const TOOL_RUN_EPHEMERAL: ToolRunEphemeralShape = {
   phase: 'idle',
   outcome: undefined,
   confirmed: undefined,
+  confirmationError: undefined,
 };
 
 /**
@@ -117,7 +122,7 @@ const TOOL_RUN_EPHEMERAL: ToolRunEphemeralShape = {
  * 判据：`apps/web/tests/ai-assistant-panel.spec.tsx` 里那条与 `AiToolRun`
  * 逐字对照的断言。
  */
-export function intentText(intent: LocalApiWriteIntent, t: I18nValue['t']): string {
+export function intentText(intent: LocalApiWriteIntent, t: I18nValue['t'], locale: Locale = 'zh-CN'): string {
   switch (intent.action) {
     case 'create-task':
       return t('web.ai.tools.intentCreate', { title: intent.title });
@@ -129,6 +134,11 @@ export function intentText(intent: LocalApiWriteIntent, t: I18nValue['t']): stri
       // 说**条数**不说 id：一屏 20 串 id 用户读不动，而"这是一次批量"正是必须看清的那件事
       // （同 `set-task-tags` 只写数量的那条理由）。
       return t('web.ai.tools.intentCompleteBatch', { count: String(intent.taskIds.length) });
+    case 'append-task-checklist':
+      return t('web.ai.tools.intentAppendTaskChecklist', {
+        id: intent.taskId,
+        items: intent.items.join(LIST_SEPARATOR[locale]),
+      });
     // 🔴 每条**新写的**意图都要在这里有一句人话。这里没有 `default`：
     // 加了写入动作而不改这里就编译不过 —— 而漏改的症状是"提案卡上一片空白"，
     // 用户点确认时看不见将要发生什么（那才是这套确认机制唯一起作用的地方）。
@@ -146,6 +156,23 @@ export function intentText(intent: LocalApiWriteIntent, t: I18nValue['t']): stri
         id: intent.taskId,
         count: String(intent.tagIds.length),
       });
+    case 'set-task-priorities': {
+      const priorityKeys: Readonly<Record<string, MessageKey | undefined>> = {
+        none: 'web.ai.prioritize.priority.none',
+        low: 'web.ai.prioritize.priority.low',
+        medium: 'web.ai.prioritize.priority.medium',
+        high: 'web.ai.prioritize.priority.high',
+      };
+      const items = intent.entries
+        .map(({ taskId, priority }) => {
+          const key = priorityKeys[priority.trim().toLowerCase()];
+          return `${taskId} → ${key === undefined ? priority : t(key)}`;
+        })
+        .join(LIST_SEPARATOR[locale]);
+      return t('web.ai.tools.intentSetTaskPriorities', { items });
+    }
+    case 'set-task-estimate':
+      return t('web.ai.tools.intentSetTaskEstimate', { id: intent.taskId, minutes: intent.minutes });
     case 'create-note':
       return t('web.ai.tools.intentCreateNote', { content: intent.content });
     case 'update-note':
@@ -230,8 +257,14 @@ export function AiToolRun(props: AiToolRunProps): React.JSX.Element {
    */
   const [account] = useState(currentAccount);
   const confirmInFlight = useRef(false);
+  const grantsRef = useRef(props.grants);
+  grantsRef.current = props.grants;
+  const getGrantsRef = useRef(props.getGrants);
+  getGrantsRef.current = props.getGrants;
+  const getCurrentGrants = (): LocalApiConfig['grants'] =>
+    currentAccount() === account ? getGrantsRef.current?.() ?? grantsRef.current : {};
   const ephemeral = usePanelEphemeral('tool-run', account, TOOL_RUN_EPHEMERAL);
-  const { text, phase, outcome, confirmed } = ephemeral.value;
+  const { text, phase, outcome, confirmed, confirmationError } = ephemeral.value;
   const setText = (value: string): void => ephemeral.write(account, { text: value });
   const setPhase = (value: Phase): void => ephemeral.write(account, { phase: value });
   const setOutcome = (value: ToolCallOutcome | undefined): void =>
@@ -267,6 +300,7 @@ export function AiToolRun(props: AiToolRunProps): React.JSX.Element {
         routing: props.routing,
         consents: props.consents,
         grants: props.grants,
+        getGrants: getCurrentGrants,
         host,
         routed: {
           secretStore: props.secrets,
@@ -287,10 +321,11 @@ export function AiToolRun(props: AiToolRunProps): React.JSX.Element {
     if (trimmed === '') return;
     setConfirmed(undefined);
     setOutcome(undefined);
+    ephemeral.write(account, { confirmationError: undefined });
 
     // 🔴 先按规则试一次（本机、纯函数、零出境）。
     // 命中就直接跑：没有数据出去，就不该弹披露。
-    const local = resolveToolSelection(trimmed, { grants: props.grants });
+    const local = resolveToolSelection(trimmed, { grants: getCurrentGrants() });
     if (local.kind === 'tool') {
       void execute();
       return;
@@ -303,7 +338,15 @@ export function AiToolRun(props: AiToolRunProps): React.JSX.Element {
     if (confirmInFlight.current) return;
     confirmInFlight.current = true;
     try {
-      setConfirmed(await confirmAiToolProposal(host, outcome.result.proposal));
+      const result = await confirmAiToolProposal(host, outcome.result.proposal, {
+        getGrants: getCurrentGrants,
+      });
+      if (result.ok) {
+        setConfirmed(result);
+        ephemeral.write(account, { confirmationError: undefined });
+      } else {
+        ephemeral.write(account, { confirmationError: result.message });
+      }
     } finally {
       confirmInFlight.current = false;
     }
@@ -400,6 +443,7 @@ export function AiToolRun(props: AiToolRunProps): React.JSX.Element {
         <ToolResult
           outcome={outcome}
           confirmed={confirmed}
+          confirmationError={confirmationError}
           onConfirm={() => void confirm()}
           onOpenSettings={onOpenSettings}
         />
@@ -412,6 +456,7 @@ export function AiToolRun(props: AiToolRunProps): React.JSX.Element {
 function ToolResult(props: {
   outcome: ToolCallOutcome;
   confirmed: LocalApiWriteResult | undefined;
+  confirmationError: string | undefined;
   onConfirm: () => void;
   onOpenSettings?: ((target: SettingsTarget) => void) | undefined;
 }): React.JSX.Element {
@@ -481,7 +526,12 @@ function ToolResult(props: {
       <p className="ht-ai__note" data-testid="ai-tool-via">
         {outcome.via === 'rule' ? t('web.ai.tools.viaRule') : t('web.ai.tools.viaModel')}
       </p>
-      <RunResult run={outcome.result} confirmed={props.confirmed} onConfirm={props.onConfirm} />
+      <RunResult
+        run={outcome.result}
+        confirmed={props.confirmed}
+        confirmationError={props.confirmationError}
+        onConfirm={props.onConfirm}
+      />
         </AiPanelHost>
   );
 }
@@ -489,9 +539,10 @@ function ToolResult(props: {
 function RunResult(props: {
   run: AiToolRunOutcome;
   confirmed: LocalApiWriteResult | undefined;
+  confirmationError: string | undefined;
   onConfirm: () => void;
 }): React.JSX.Element {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const run = props.run;
 
   switch (run.kind) {
@@ -519,8 +570,13 @@ function RunResult(props: {
         <>
           <p className="ht-ai__row">{t('web.ai.tools.proposalLead')}</p>
           <p className="ht-ai__item" data-testid="ai-tool-proposal">
-            {intentText(run.proposal.intent, t)}
+            {intentText(run.proposal.intent, t, locale)}
           </p>
+          {props.confirmationError !== undefined && (
+            <p className="ht-ai__done" data-testid="ai-tool-confirmation-error">
+              {props.confirmationError}
+            </p>
+          )}
           {props.confirmed === undefined ? (
             <div className="ht-ai__actions">
               <button

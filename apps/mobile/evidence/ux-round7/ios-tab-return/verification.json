@@ -1,0 +1,16 @@
+{
+  "installedBundleSha256": "e548b39df20e10a72a1afc7c2e3f91b965b10b49a372720a11bddebacaef1847",
+  "draft": "QADraftB4",
+  "journey": [
+    "助手输入草稿",
+    "点击对话区收起键盘",
+    "切到底部任务页",
+    "切回我的页",
+    "助手输入框保留原草稿"
+  ],
+  "draftPreserved": true,
+  "limits": [
+    "未在此旅程验证运行中请求或待确认提案",
+    "模拟器非实体iPhone"
+  ]
+}

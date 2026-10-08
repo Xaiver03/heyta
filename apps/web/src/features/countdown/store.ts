@@ -24,7 +24,7 @@ import type { CountdownEvent, LocalDate } from '@heyta/domain';
 import type { EventEditPatch } from '@heyta/ui';
 import { create } from 'zustand';
 
-import { currentState, dispatchIntent, onEngineChange } from '../../lib/oplog.js';
+import { currentState, dispatchIntent, dispatchChecked, onEngineChange } from '../../lib/oplog.js';
 
 interface CountdownState {
   /** 未删未归档（动作层给的顺序）。 */
@@ -56,6 +56,7 @@ interface CountdownState {
 /** 与任务 / 习惯 / 便签 store 同一个形状：只含两个函数引用，不含任何判断。 */
 const actionContext: ActionContext = {
   dispatch: dispatchIntent,
+  dispatchChecked,
   getState: currentState,
 };
 

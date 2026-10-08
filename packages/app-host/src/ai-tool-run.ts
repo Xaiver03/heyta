@@ -66,6 +66,7 @@ import {
   type ToolSelectionNoneReason,
   type ToolSelectionRule,
 } from './ai-tool-selection.js';
+import { clampDurationMinutes } from './ai-duration.js';
 
 /**
  * 一条**待确认的**写入提案。
@@ -85,6 +86,12 @@ export interface AiToolProposal {
 export function aiToolProposalRequiresConfirmation(proposal: AiToolProposal): boolean {
   switch (proposal.intent.action) {
     case 'complete-tasks':
+      return true;
+    case 'append-task-checklist':
+      return true;
+    case 'set-task-priorities':
+      return true;
+    case 'set-task-estimate':
       return true;
     case 'set-task-tags':
       return proposal.intent.tagIds.length === 0;
@@ -115,6 +122,13 @@ type AutoExecutionRecord = {
 };
 
 const autoExecutionRecords = new WeakMap<object, Map<string, AutoExecutionRecord>>();
+type AiToolConfirmationRecord = { readonly result: Promise<LocalApiWriteResult> };
+const confirmationRecords = new WeakMap<object, WeakMap<object, AiToolConfirmationRecord>>();
+
+/** 授权必须在最终提交前读取；不能把提案生成时的 grants 快照当成确认时授权。 */
+export interface AiToolAuthorization {
+  readonly getGrants: () => LocalApiConfig['grants'];
+}
 
 function stableJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
@@ -129,6 +143,18 @@ function stableJson(value: unknown): string {
 }
 
 /**
+ * 让提案里展示的值与最终动作使用同一份规范化结果。
+ *
+ * local-api 只负责校验输入形状，真正的估时范围属于 app-host 的产品语义。
+ * 在提案边界先规范化，确认卡就不会展示一个随后被 action 夹掉的数字；action
+ * 仍保留自己的防御性夹取，避免绕过提案的其它宿主调用方写入越界值。
+ */
+function normalizeWriteIntent(intent: LocalApiWriteIntent): LocalApiWriteIntent {
+  if (intent.action !== 'set-task-estimate') return intent;
+  return { ...intent, minutes: clampDurationMinutes(intent.minutes) };
+}
+
+/**
  * 执行档的低风险自动写入收口。相同执行标识在当前宿主生命周期内只提交一次，
  * 避免 UI 重放生成重复 op；它不是跨进程或跨设备的持久幂等协议。
  * 不同用户发送必须使用不同标识，即使 intent 相同也仍是两次真实意图。
@@ -137,6 +163,7 @@ export async function executeAiToolProposal(
   host: LocalApiHost,
   proposal: AiToolProposal,
   executionId: string,
+  authorization: AiToolAuthorization,
 ): Promise<LocalApiWriteResult> {
   if (aiToolProposalRequiresConfirmation(proposal)) {
     return { ok: false, reason: 'invalid', message: '这项改动需要先确认。' };
@@ -160,8 +187,14 @@ export async function executeAiToolProposal(
 
   // 低风险自动执行与显式确认共享同一个最终提交闸门；所有写入仍只有一条
   // app-host → op-log 路径，静态门禁也可以穷举这个写入口。
-  const result = confirmAiToolProposal(host, proposal);
+  const result = confirmAiToolProposal(host, proposal, authorization);
   records.set(id, { fingerprint, result });
+  const executionRecords = records;
+  void result.then((write) => {
+    if (!write.ok && executionRecords.get(id)?.result === result) executionRecords.delete(id);
+  }, () => {
+    if (executionRecords.get(id)?.result === result) executionRecords.delete(id);
+  });
   if (records.size > 128) {
     const oldest = records.keys().next().value;
     if (typeof oldest === 'string') records.delete(oldest);
@@ -191,6 +224,8 @@ export interface AiToolRunnerDeps {
   readonly host: LocalApiHost;
   /** 已授权的工具范围。**就是 AI 设置里那份 `localApi.grants`**。 */
   readonly grants: LocalApiConfig['grants'];
+  /** 最终执行前读取当前授权；省略时仅兼容旧的静态测试调用方。 */
+  readonly getGrants?: () => LocalApiConfig['grants'];
   /** 规则集。默认只读（见 `ai-tool-selection.ts`）。 */
   readonly rules?: readonly ToolSelectionRule[];
   /** 时间源。默认 `Date.now`。 */
@@ -248,7 +283,8 @@ export async function runSelectedTool(
   }
 
   // 🔴 执行前复查：选择到执行之间用户可能撤销了授权。
-  if (!isToolGranted(deps.grants, tool)) {
+  const currentGrants = deps.getGrants?.() ?? deps.grants;
+  if (!isToolGranted(currentGrants, tool)) {
     return {
       kind: 'denied',
       tool,
@@ -270,7 +306,10 @@ export async function runSelectedTool(
   if (!write.ok) {
     return { kind: 'failed', tool, reason: 'invalid-args', message: write.message };
   }
-  return { kind: 'proposal', proposal: { ruleId, tool, intent: write.intent } };
+  return {
+    kind: 'proposal',
+    proposal: { ruleId, tool, intent: normalizeWriteIntent(write.intent) },
+  };
 }
 
 /**
@@ -285,8 +324,31 @@ export async function runSelectedTool(
 export async function confirmAiToolProposal(
   host: LocalApiHost,
   proposal: AiToolProposal,
+  authorization: AiToolAuthorization,
 ): Promise<LocalApiWriteResult> {
-  return host.submit(proposal.intent);
+  let proposals = confirmationRecords.get(host);
+  if (proposals === undefined) {
+    proposals = new WeakMap();
+    confirmationRecords.set(host, proposals);
+  }
+  const existing = proposals.get(proposal);
+  if (existing !== undefined) return existing.result;
+
+  const result = (async (): Promise<LocalApiWriteResult> => {
+    if (!isToolGranted(authorization.getGrants(), proposal.tool)) {
+      return {
+        ok: false,
+        reason: 'rejected',
+        message: `工具「${proposal.tool}」的授权已撤销。`,
+      };
+    }
+    return host.submit(proposal.intent);
+  })();
+  proposals.set(proposal, { result });
+  void result.then((write) => {
+    if (!write.ok) proposals?.delete(proposal);
+  }, () => proposals?.delete(proposal));
+  return result;
 }
 
 /** 类型再导出，省得调用方两处 import。 */

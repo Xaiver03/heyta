@@ -1,0 +1,47 @@
+{
+  "recordedAt": "2026-10-07T23:43:10.834212+00:00",
+  "status": "source-fixes-reviewed-not-published",
+  "publishedBaseline": "v1.0.1-test.20261008.3",
+  "testFlight": {
+    "version": "1.0",
+    "build": "5",
+    "processingState": "VALID",
+    "linkedToInternalGroup": true,
+    "internalTesterCount": 1,
+    "physicalIPhoneConnected": false
+  },
+  "checks": {
+    "workspaceBuild": "passed before final mobile-only source edits",
+    "mobileTypes": "passed",
+    "webTypes": "passed",
+    "mobileAiAndNavigationTests": 13,
+    "mobileLegalTests": 64,
+    "desktopHandoffTests": 8,
+    "designTokens": "passed",
+    "uiLanguage": "passed"
+  },
+  "windowsHelp": "windows-help/windows-widget-help.json",
+  "iosReminders": {
+    "summary": "26 passed, 1 failed: AX notification title not found",
+    "visibleNotificationBannerManuallyConfirmed": true,
+    "exactSQLiteReceiptConfirmed": true,
+    "evidence": "../../../mobile/evidence/ux-round4/ios-reminders"
+  },
+  "sourceSha256": {
+    "apps/mobile/src/screens/PrivacyConsentSheet.tsx": "9497260cc7e4d2d6247f7cf7a4212f49703db39910aa64d719aad5982086f6d6",
+    "apps/mobile/src/screens/LegalReconfirmSheet.tsx": "f1c96bac4b0d9166cdb491412522049aa9ac0f493fa4de291226633e271c18f6",
+    "apps/mobile/src/ai/AssistantScreen.tsx": "e7236730e2c1b7f9d9a8ff028ee4736a499b0b00cb6a35a4ed323119402dde9f",
+    "apps/mobile/src/ai/execution-gate.ts": "db7936cedeafefa564867ffb48df74a7aaa15931c8e131292a062feb59c883f8",
+    "apps/mobile/src/nav/navigation.tsx": "0fb2a11fedef6131b95008aa7bb1a06f289c33775d203b642bffed760ec895d3",
+    "apps/mobile/src/screens/ProfileScreen.tsx": "ea16beb2c334c405a7786096e577c08000f0889d69e48d576f3f2374f617dc1c",
+    "apps/web/src/features/ai/AssistantPanel.tsx": "3e54575d993b1eaa0464ac8da37abf6781f830619690c8ffee7697c625792e59",
+    "apps/web/src/features/auth/desktop-handoff.ts": "aef1bebe44c1e21f92f76d6fb7a5ed9a189f2f6367e7d93b05aaa342b00ea020"
+  },
+  "remaining": [
+    "Mobile single chatbot IA (UX-S9-108)",
+    "Native widget gallery addition",
+    "Final-source four-platform rebuild/install and TestFlight build 6",
+    "Final installed legal-link visuals",
+    "Other cross-platform checklist entries remain in product plan"
+  ]
+}

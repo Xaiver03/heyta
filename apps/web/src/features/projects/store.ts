@@ -31,7 +31,7 @@ import type { CategorySlot, Project, Tag } from '@heyta/domain';
 import { childProjects, topLevelProjects } from '@heyta/ui';
 import { createProjectActions, type ActionContext } from '@heyta/app-host';
 
-import { currentState, dispatchIntent, onEngineChange } from '../../lib/oplog.js';
+import { currentState, dispatchIntent, dispatchChecked, onEngineChange } from '../../lib/oplog.js';
 
 interface ProjectState {
   projects: Project[];
@@ -77,6 +77,7 @@ interface ProjectState {
 /** 与任务 / 专注 store 同一个形状。只含两个函数引用，不含任何判断。 */
 const actionContext: ActionContext = {
   dispatch: dispatchIntent,
+  dispatchChecked,
   getState: currentState,
 };
 

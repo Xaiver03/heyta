@@ -135,6 +135,8 @@ export interface AppBarAction {
   icon: IconName;
   label: string;
   onPress: () => void;
+  /** 请求仍在执行时，顶栏动作必须显式进入禁用态，而不是静默吞掉点击。 */
+  disabled?: boolean;
   /** 设备级验收（真模拟器 AX 探针）按它定位控件。 */
   testID?: string;
 }
@@ -190,6 +192,7 @@ export function AppBar({
             label={a.label}
             testID={a.testID}
             onPress={a.onPress}
+            disabled={a.disabled}
           />
         ))}
       </View>
@@ -204,12 +207,14 @@ export function IconButton({
   onPress,
   color,
   testID,
+  disabled,
 }: {
   icon: IconName;
   label: string;
   onPress: () => void;
   color?: string;
   testID?: string;
+  disabled?: boolean;
 }): React.JSX.Element {
   const t = useTokens();
   const { reducedMotion } = useTheme();
@@ -217,8 +222,10 @@ export function IconButton({
     <Pressable
       onPress={onPress}
       testID={testID}
+      disabled={disabled === true}
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ disabled: disabled === true }}
       style={({ pressed }) => ({
         width: t['touch-target.min'],
         height: t['touch-target.min'],
@@ -226,7 +233,8 @@ export function IconButton({
         justifyContent: 'center',
         borderRadius: t['radius.full'],
         // 按下即反馈（Apple：反馈必须在 pointer-down 上出现）。
-        backgroundColor: pressed && !reducedMotion ? t['color.hover'] : 'transparent',
+        backgroundColor: pressed && !reducedMotion && disabled !== true ? t['color.hover'] : 'transparent',
+        opacity: disabled === true ? t['state.disabled-opacity'] : 1,
       })}
     >
       <Icon name={icon} size="md" color={color ?? t['color.foreground']} />
@@ -251,6 +259,7 @@ export function Screen({
   children,
   scroll = true,
   fixedControls,
+  bottomInset = true,
 }: {
   title: string;
   actions?: ReadonlyArray<AppBarAction>;
@@ -259,6 +268,8 @@ export function Screen({
   scroll?: boolean;
   /** Contextual controls remain reachable while the content scrolls. */
   fixedControls?: React.ReactNode;
+  /** 固定输入区由调用方管理底部留白，避免重复预留滚动空间。 */
+  bottomInset?: boolean;
 }): React.JSX.Element {
   const t = useTokens();
   const body = (
@@ -275,9 +286,9 @@ export function Screen({
      * 最后一个子节点之后（`justifyContent` 默认 `flex-start`）—— 所以这不是
      * "给所有屏加了一条高度约束"，只是把"母层给不给确定高度"这一环补上。
      */
-    <View style={{ paddingHorizontal: t['screen.gutter'], gap: t['space.4'], flexGrow: 1 }}>
+    <View style={{ paddingHorizontal: t['screen.gutter'], gap: t['space.4'], flexGrow: 1, ...(scroll ? {} : { flex: 1, minHeight: 0 }) }}>
       {children}
-      <View style={{ height: t['screen.bottom-inset'] }} />
+      {bottomInset ? <View style={{ height: t['screen.bottom-inset'] }} /> : null}
     </View>
   );
 
@@ -1051,16 +1062,18 @@ export function Chip({
   onPress,
   icon,
   color,
+  tone = 'filled',
 }: {
   label: string;
   selected?: boolean;
   onPress: () => void;
   icon?: IconName;
   color?: string;
+  tone?: 'filled' | 'quiet';
 }): React.JSX.Element {
   const t = useTokens();
 
-  const fg = selected ? t['color.on-primary'] : t['color.foreground'];
+  const fg = selected ? t[tone === 'quiet' ? 'color.primary' : 'color.on-primary'] : t['color.foreground'];
 
   return (
     <Pressable
@@ -1077,7 +1090,9 @@ export function Chip({
         paddingHorizontal: t['space.3'],
         borderRadius: t['radius.full'],
         borderWidth: 0,
-        backgroundColor: selected
+        backgroundColor: tone === 'quiet'
+          ? (pressed ? t['color.surface-sunken'] : 'transparent')
+          : selected
           ? t['color.primary']
           : pressed
             ? t['color.surface-sunken']

@@ -136,7 +136,9 @@ test('中文落地页 →「立即使用」→ 应用：全程新域名，且无
    *    **落地页带来的 `?lang=` 真的压过了系统语言**，而不是"这台机器恰好是中文"。
    *    少了这个参数，整条用例会红在那句等待上（2026-10-04 实测就是这个形状）。
    */
-  const cta = page.locator('a.lp-btn--primary').first();
+  // The hero's first primary button is the showcase anchor. The deployed
+  // "立即使用" action is the navigation CTA, which is the link under test.
+  const cta = page.locator('a.lp-nav__cta');
   await expect(cta).toHaveAttribute('href', `${ORIGIN}/app?lang=zh-CN`);
 
   await cta.click();
@@ -173,7 +175,9 @@ test('英文落地页的入口带 ?lang=en（否则英文访客进应用看到�
   console.log(`📷 英文落地页：${SHOT_DIR}/live-landing-en.png`);
 
   // 同 ZH：不带尾斜杠，英文页额外带 `?lang=en`（否则英文访客进应用看到中文）。
-  const cta = page.locator('a.lp-btn--primary').first();
+  // The hero's first primary button is the showcase anchor. The deployed
+  // "Use it now" action is the navigation CTA, which is the link under test.
+  const cta = page.locator('a.lp-nav__cta');
   await expect(cta).toHaveAttribute('href', `${ORIGIN}/app?lang=en`);
 
   const hard = hardErrors(logs);

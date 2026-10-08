@@ -1,0 +1,51 @@
+[
+  {
+    "id": "muyr63mt-1-0ixbgy9w-1791423701939-1",
+    "opType": "CRT",
+    "actionType": "CRT_TASK",
+    "entityType": "TASK",
+    "entityId": "task-muyvf2y8-1-yctmtiyh",
+    "payload": {
+      "title": "QAWidget20261008",
+      "priority": 0
+    },
+    "clientId": "muyr63mt-1-0ixbgy9w",
+    "vectorClock": {
+      "muyr63mt-1-0ixbgy9w": 5
+    },
+    "timestamp": 1791423701939,
+    "schemaVersion": 1
+  },
+  {
+    "id": "muyr63mt-1-0ixbgy9w-1791423781346-2",
+    "opType": "UPD",
+    "actionType": "UPD_TASK",
+    "entityType": "TASK",
+    "entityId": "task-muyvf2y8-1-yctmtiyh",
+    "payload": {
+      "dueDate": 1791388800000
+    },
+    "clientId": "muyr63mt-1-0ixbgy9w",
+    "vectorClock": {
+      "muyr63mt-1-0ixbgy9w": 6
+    },
+    "timestamp": 1791423781346,
+    "schemaVersion": 1
+  },
+  {
+    "id": "muyr63mt-1-0ixbgy9w-1791424739751-1",
+    "opType": "UPD",
+    "actionType": "UPD_TASK",
+    "entityType": "TASK",
+    "entityId": "task-muyvf2y8-1-yctmtiyh",
+    "payload": {
+      "completedAt": 1791424739751
+    },
+    "clientId": "muyr63mt-1-0ixbgy9w",
+    "vectorClock": {
+      "muyr63mt-1-0ixbgy9w": 7
+    },
+    "timestamp": 1791424739751,
+    "schemaVersion": 1
+  }
+]

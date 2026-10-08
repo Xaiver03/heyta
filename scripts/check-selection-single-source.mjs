@@ -503,13 +503,6 @@ const ROW_ID_EXEMPT = [
   ['apps/web/src/features/admin/AdminPanel.tsx', 'pendingApproveId', 'confirm-gate'],
   ['apps/web/src/features/trash/TrashView.tsx', 'busyId', 'in-flight'],
   ['apps/web/src/features/trash/TrashView.tsx', 'confirmingId', 'confirm-gate'],
-  // 🔴 这一行是第五档 `form-draft` 的**唯一住户**，也是那一档存在的理由：
-  // AI 面板（拆解 / 设时长）里那个"这条提案作用在哪条任务上"，提交时冻进 `frozen.taskId`，
-  // 面板卸载即消失。它**不能**接进共享的 `'task'` 槽 —— 现量：`TasksScreen.tsx` 把
-  // `detailTaskId = useSelected('task')` 直接喂给一枚 `visible={detailTaskId !== null}` 的详情 Modal，
-  // 接进去的后果是"在 AI 面板里点一条任务 ⇒ 任务详情弹出来"。
-  // 钉住这个边界的判据在 `apps/mobile/tests/ai-panel-local-selection.spec.ts`。
-  ['apps/mobile/src/ai/AssistantScreen.tsx', 'targetTaskId', 'form-draft'],
   ['apps/mobile/src/screens/CalendarScreen.tsx', 'busyId', 'in-flight'],
   ['apps/mobile/src/screens/HabitsScreen.tsx', 'busyId', 'in-flight'],
   ['apps/mobile/src/screens/HabitsScreen.tsx', 'renamingId', 'inline-rename'],

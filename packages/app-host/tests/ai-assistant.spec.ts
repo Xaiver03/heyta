@@ -455,7 +455,7 @@ describe('🔴 出境披露：循环前一次算完，越界就停', () => {
     // ⚠️ 12 = 目录**当前**的读工具条数（上面那 10 条 + W10 的 `list_events` /
     // `get_event`，2026-10-03 合流进 pack 目录之后）。
     // 写成 `LOCAL_API_TOOLS.filter(…)` 的长度就是拿被验的那份推导去当期望值 —— 一条永真判据。
-    expect(plan.tools.length).toBe(12);
+    expect(plan.tools.length).toBe(13);
     // 🔴 这句以前写的是 `toBe(3)` —— 一个**手抄的**读工具数。W10 给目录加了
     // `list_events` / `get_event`，那条硬编码会红，而红的原因不是缺陷。
     // 正确形状与这条用例的标题同义：**从常量推导**，即"读-only 档 = 目录里全部读工具"。
@@ -562,12 +562,13 @@ describe('🔴 三个硬上界：触顶要明说，不许静默截断', () => {
 describe('授权前端有两个，判断只有一个', () => {
   it('`assistantGrants` 由**目录**推导，不是一份手写的名单', () => {
     const grants = assistantGrants('read-only');
-    // ⚠️ 下面这 26 个名字是**目录当前的内容**（2026-10-03 合流：W11 补齐五实体 + W10 的
-    // EVENT 四条进 pack 目录），不是一份"允许清单"：
+    // ⚠️ 下面这 27 个名字是**目录当前的内容**（W11 补齐任务清单工具 + W10 的 EVENT
+    // 四条进 pack 目录），不是一份"允许清单"：
     // 判据是"键集合 == 目录"，所以目录扩了就必须跟着列全 ——
     // 把它换成 `LOCAL_API_TOOLS.map(...)` 会让这条断言变成自己比自己的**永真判据**。
     expect(Object.keys(grants).sort()).toEqual(
       [
+        'append_task_checklist',
         'complete_task',
         'create_habit',
         'create_note',
@@ -579,6 +580,7 @@ describe('授权前端有两个，判断只有一个', () => {
         'get_event',
         'get_note',
         'get_task',
+        'get_task_estimate_context',
         'list_checkins',
         'list_events',
         'list_focuses',
@@ -590,7 +592,9 @@ describe('授权前端有两个，判断只有一个', () => {
         'list_tasks',
         'log_focus',
         'record_checkin',
+        'set_task_estimate',
         'set_task_tags',
+        'set_task_priorities',
         'update_event',
         'update_note',
         'update_task',

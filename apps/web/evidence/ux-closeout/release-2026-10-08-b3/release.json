@@ -1,6 +1,6 @@
 {
   "release": "1.0.1-test.20261008.3",
-  "status": "installed; distribution pending",
+  "status": "published",
   "serverSnapshot": "3880bdd1fd5e8fe3710bd19c5f753947ea89c468",
   "webIndexSha256": "5e638f030a6cf8173bddb2a348fa0c2fb053d3b462ab5a6ac55091df29272c05",
   "desktopWebIndexSha256": "f61e6d478669d278a78addfa450da31ba2a4559f1727f7961e392b059c7693b4",
@@ -52,5 +52,10 @@
     "physicalIphoneInstall": false,
     "widgetGalleryAdd": false,
     "fourPlatformReinstall": true
-  }
+  },
+  "sourceSnapshot": "8a7332c365250d1c8136eb8ef7b9d4d31c1839e9",
+  "githubUrl": "https://github.com/Xaiver03/heyta/releases/tag/v1.0.1-test.20261008.3",
+  "publicAssetsVerified": true,
+  "cosLatestVerified": true,
+  "sourceLockfileVerified": true
 }

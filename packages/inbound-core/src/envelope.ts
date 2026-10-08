@@ -45,6 +45,12 @@ export function generateInboundKeyPair(): { privateKey: Uint8Array; publicKey: s
   catch { privateKey.fill(0); return fail(); }
 }
 
+/** Derive the canonical recipient key for sealing a worker's frozen result. */
+export function inboundPublicKey(privateKey: Uint8Array): string {
+  checkKey(privateKey);
+  try { return encodeBase64(x25519.getPublicKey(privateKey)); } catch { return fail(); }
+}
+
 /** Public-key encryption is shared by the receiver and client result publisher. */
 export async function sealInbound(
   plaintext: Uint8Array, recipientPublicKey: string, context: InboundEnvelopeContext,

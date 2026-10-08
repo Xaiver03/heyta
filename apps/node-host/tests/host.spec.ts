@@ -32,6 +32,25 @@ afterEach(() => {
 });
 
 describe('Node 宿主：真实 SQLite 文件', () => {
+  it('stops worker timers on close and rejects restarting a closed host', async () => {
+    const host = await openNodeHost({ dbPath: tempDbPath() });
+    opened.push(host);
+    vi.useFakeTimers();
+    try {
+      const runnable = vi.fn(() => false);
+      const options = { userId: '1', keyEpoch: 1, allowedFields: ['title'] as const,
+        routing: { enabled: false, allowRemote: false, endpoints: [], routes: {} },
+        consents: [], systemPrompt: '', parseVersion: 1, intervalMs: 10, isRunnable: runnable };
+      host.startInboundWorker(options);
+      expect(runnable).toHaveBeenCalledTimes(1);
+      host.close();
+      await vi.advanceTimersByTimeAsync(100);
+      expect(runnable).toHaveBeenCalledTimes(1);
+      expect(vi.getTimerCount()).toBe(0);
+      expect(() => host.startInboundWorker(options)).toThrow('Host is closed');
+    } finally { vi.useRealTimers(); }
+  });
+
   it.each([
     ['远端 Vault refresh 失败', async () => new Response('upstream unavailable', { status: 503 })],
     ['Vault 解锁失败', async () => {
@@ -144,6 +163,151 @@ describe('Node 宿主：真实 SQLite 文件', () => {
 
     // 离线写入必须仍在待上传队列里，不能因为同步失败丢了
     expect(await host.pendingUploadCount()).toBe(1);
+  });
+
+  it('收件私钥与 worker 凭据只在 Vault 解锁时可用，并跨真实 SQLite 重启恢复', async () => {
+    const previousArgon2 = getArgon2Params();
+    setArgon2ParamsForTesting({ parallelism: 1, memorySize: 8, iterations: 1 });
+    try {
+      const dbPath = tempDbPath();
+      const created = await createVaultKeyPackage('node-passphrase');
+      let registeredClientId: string | undefined;
+      const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const path = new URL(String(input)).pathname;
+        if (path === '/api/sync/key-package') {
+          return new Response(JSON.stringify({ package: created.package, payloadKeyVersion: 1 }), {
+            status: 200, headers: { 'content-type': 'application/json' },
+          });
+        }
+        if (path === '/api/automation/worker/register') {
+          return new Response(JSON.stringify({ workerId: '11111111-1111-4111-8111-111111111111',
+            workerToken: 'a'.repeat(64), syncClientId: registeredClientId ?? 'missing-client', databaseEpoch: 'epoch-1' }), { status: 201 });
+        }
+        if (path === '/api/automation/events/claim' && init?.method === 'POST') {
+          return new Response(JSON.stringify({ state: 'empty' }), { status: 200 });
+        }
+        return new Response('offline', { status: 503 });
+      }) as unknown as typeof fetch;
+      const options = {
+        dbPath,
+        serverUrl: 'https://sync.example.test',
+        token: 'account-token',
+        accountId: 'account-1',
+        password: 'node-passphrase',
+        fetchImpl,
+      };
+      const first = await openNodeHost(options);
+      opened.push(first);
+      registeredClientId = first.clientId;
+      expect((await first.sync()).kind).toBe('error');
+      // A deterministic 32-byte X25519 private key is sufficient here; the
+      // app-host key store validates and derives its public key on wrap.
+      const pair = { privateKey: new Uint8Array(32).fill(7) };
+      const scope = { accountId: 'account-1', serverOrigin: 'https://sync.example.test', keyEpoch: 1 };
+      await first.saveInboundRecipientKey(scope, pair.privateKey);
+      const loaded = await first.loadInboundRecipientKey(scope);
+      expect(Buffer.from(loaded ?? []).equals(Buffer.from(pair.privateKey))).toBe(true);
+      const registered = await first.registerInboundWorker({ userId: 'account-1', databaseEpoch: 'epoch-1' });
+      expect(registered.workerToken).toHaveLength(64);
+      first.close();
+
+      const second = await openNodeHost(options);
+      opened.push(second);
+      expect((await second.sync()).kind).toBe('error');
+      const loadedAfterRestart = await second.loadInboundRecipientKey(scope);
+      expect(Buffer.from(loadedAfterRestart ?? []).equals(Buffer.from(pair.privateKey))).toBe(true);
+      const processed = await second.processInboundAutomation({
+        userId: 'account-1', keyEpoch: 1, allowedFields: ['title'],
+        routing: { enabled: false, allowRemote: false, endpoints: [], routes: {} },
+        consents: [], systemPrompt: 'test', parseVersion: 1, privateKey: pair.privateKey,
+      });
+      expect(processed).toEqual({ state: 'empty' });
+      pair.privateKey.fill(0);
+      loaded?.fill(0);
+      loadedAfterRestart?.fill(0);
+    } finally {
+      setArgon2ParamsForTesting(previousArgon2);
+    }
+  });
+
+  it('recovers recipient publication after a lost response using the same persisted private key', async () => {
+    const params = getArgon2Params();
+    setArgon2ParamsForTesting({ parallelism: 1, memorySize: 8, iterations: 1 });
+    try {
+      const created = await createVaultKeyPackage('recipient-passphrase');
+      let remote: { keyEpoch: number; packageVersion: number; publicKey: string } | undefined;
+      let publications = 0;
+      const fetchImpl: typeof fetch = async (input, init) => {
+        const path = new URL(String(input)).pathname;
+        if (path === '/api/sync/key-package') return new Response(JSON.stringify({ package: created.package, payloadKeyVersion: 1 }));
+        if (path === '/api/automation/recipient-key') {
+          expect(new Headers(init?.headers).get('authorization')).toBe('Bearer account-token');
+          if (init?.method === 'PUT') {
+            const body = JSON.parse(String(init.body));
+            remote = { keyEpoch: body.keyEpoch, packageVersion: body.packageVersion, publicKey: body.publicKey };
+            publications += 1;
+            throw new Error('response lost after server commit');
+          }
+          return new Response(JSON.stringify(remote ?? {}), { status: remote ? 200 : 404 });
+        }
+        return new Response('', { status: 503 });
+      };
+      const options = { dbPath: tempDbPath(), serverUrl: 'https://sync.example.test', token: 'account-token', accountId: '7', password: 'recipient-passphrase', fetchImpl };
+      const first = await openNodeHost(options); opened.push(first);
+      await expect(first.ensureInboundRecipientKey()).rejects.toMatchObject({ code: 'transport' });
+      const scope = { accountId: '7', serverOrigin: options.serverUrl, keyEpoch: 1 };
+      const candidate = await first.loadInboundRecipientKey(scope);
+      expect(candidate).toHaveLength(32);
+      first.close();
+      const reopened = await openNodeHost(options); opened.push(reopened);
+      expect(await reopened.ensureInboundRecipientKey()).toEqual(remote);
+      const recovered = await reopened.loadInboundRecipientKey(scope);
+      expect(recovered).toEqual(candidate);
+      expect(publications).toBe(1);
+      const fresh = await openNodeHost({ ...options, dbPath: tempDbPath() }); opened.push(fresh);
+      await expect(fresh.ensureInboundRecipientKey()).rejects.toThrow('recovery is required');
+      expect(publications).toBe(1);
+      candidate?.fill(0); recovered?.fill(0);
+    } finally { setArgon2ParamsForTesting(params); }
+  });
+
+  it('rotates recipient epochs with CAS and retains the old key for queued events', async () => {
+    const params = getArgon2Params();
+    setArgon2ParamsForTesting({ parallelism: 1, memorySize: 8, iterations: 1 });
+    try {
+      const created = await createVaultKeyPackage('rotate-passphrase');
+      let remote: { keyEpoch: number; packageVersion: number; publicKey: string } | undefined;
+      let putCount = 0;
+      const fetchImpl: typeof fetch = async (input, init) => {
+        const path = new URL(String(input)).pathname;
+        if (path === '/api/sync/key-package') return new Response(JSON.stringify({ package: created.package, payloadKeyVersion: 1 }));
+        if (path === '/api/automation/recipient-key') {
+          expect(new Headers(init?.headers).get('authorization')).toBe('Bearer rotate-token');
+          if (init?.method === 'PUT') {
+            const body = JSON.parse(String(init.body)) as { keyEpoch: number; packageVersion: number; publicKey: string; expectedPackageVersion: number | null };
+            expect(body.expectedPackageVersion).toBe(remote?.packageVersion ?? null);
+            putCount += 1;
+            remote = { keyEpoch: body.keyEpoch, packageVersion: body.packageVersion, publicKey: body.publicKey };
+            return new Response(JSON.stringify(remote));
+          }
+          return remote === undefined ? new Response('', { status: 404 }) : new Response(JSON.stringify(remote));
+        }
+        return new Response('', { status: 503 });
+      };
+      const options = { dbPath: tempDbPath(), serverUrl: 'https://sync.example.test', token: 'rotate-token', accountId: '9', password: 'rotate-passphrase', fetchImpl };
+      const host = await openNodeHost(options); opened.push(host);
+      await host.sync();
+      expect(await host.ensureInboundRecipientKey()).toEqual(remote);
+      const rotated = await host.rotateInboundRecipientKey();
+      expect(rotated).toEqual(remote);
+      expect(rotated.keyEpoch).toBe(2);
+      expect(putCount).toBe(2);
+      const old = await host.loadInboundRecipientKey({ accountId: '9', serverOrigin: options.serverUrl, keyEpoch: 1 });
+      const next = await host.loadInboundRecipientKey({ accountId: '9', serverOrigin: options.serverUrl, keyEpoch: 2 });
+      expect(old).toHaveLength(32);
+      expect(next).toHaveLength(32);
+      old?.fill(0); next?.fill(0);
+    } finally { setArgon2ParamsForTesting(params); }
   });
 
   it('空标题不建任务（抛错而不是静默忽略）', async () => {

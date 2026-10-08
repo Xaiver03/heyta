@@ -348,21 +348,33 @@ export function SettingsScreen({
         <Stack>
           <Text variant="row-title">
             {t(consentStateKey)}
-            {consentRecord === null
-              ? null
-              : ` · ${t('common.privacy.settings.decidedAt', {
-                  time: formatPrivacyDecisionTime(consentRecord.decidedAt),
-                })}`}
           </Text>
+          {consentRecord === null ? null : (
+            <Text variant="caption" tone="subtle">
+              {t('common.privacy.settings.decidedAt', {
+                time: formatPrivacyDecisionTime(consentRecord.decidedAt),
+              })}
+            </Text>
+          )}
           <Text variant="caption" tone="subtle">
             {t('common.privacy.settings.revokeHint')}
           </Text>
         </Stack>
       </Card>
       {consentRecord === null ? (
-        <Button label={t('common.privacy.settings.chooseAgain')} onPress={chooseAgain} tone="primary" />
+        <Button
+          label={t('common.privacy.settings.chooseAgain')}
+          onPress={chooseAgain}
+          tone="primary"
+          style={{ alignSelf: 'flex-start' }}
+        />
       ) : (
-        <Button label={t('common.privacy.settings.revoke')} onPress={revokeConsent} tone="secondary" />
+        <Button
+          label={t('common.privacy.settings.revoke')}
+          onPress={revokeConsent}
+          tone="secondary"
+          style={{ alignSelf: 'flex-start' }}
+        />
       )}
       {revokeNotPersisted ? (
         <Text variant="caption" tone="warning">
@@ -372,10 +384,8 @@ export function SettingsScreen({
     </Stack>
   );
 
-  const renderSync = (): React.JSX.Element => (
+  const renderSyncConfiguration = (): React.JSX.Element => (
     <>
-      {syncStatus}
-      {renderPrivacy()}
       <SectionHeader icon="action.sync" title={t('mobile.profile.section.sync')} />
       <Card>
         {advancedSync ? (
@@ -422,6 +432,7 @@ export function SettingsScreen({
                 label={form.configured ? t('mobile.profile.account.switchAccount') : t('mobile.profile.account.signIn')}
                 tone="primary"
                 onPress={() => onOpenAuth(true)}
+                style={{ alignSelf: 'flex-start' }}
               />
             ) : null}
             <Button
@@ -432,6 +443,7 @@ export function SettingsScreen({
                 form.setServerUrl(DEFAULT_SERVER_URL);
                 setAdvancedSync(false);
               }}
+              style={{ alignSelf: 'flex-start' }}
             />
           </View>
         ) : (
@@ -440,26 +452,32 @@ export function SettingsScreen({
             <Text variant="caption" tone="subtle">
               {t('mobile.profile.sync.officialHint')}
             </Text>
-            <Text variant="caption" tone="subtle">
-              {form.configured
-                ? t('mobile.profile.account.signedInHint')
-                : t('mobile.profile.account.signInHint')}
-            </Text>
             {onOpenAuth !== undefined ? (
               <Button
                 label={form.configured ? t('mobile.profile.account.switchAccount') : t('mobile.profile.account.signIn')}
                 tone="primary"
                 onPress={() => onOpenAuth()}
+                style={{ alignSelf: 'flex-start' }}
               />
             ) : null}
             <Button
               label={t('mobile.profile.sync.advancedOpen')}
               tone="ghost"
               onPress={() => setAdvancedSync(true)}
+              style={{ alignSelf: 'flex-start' }}
             />
           </Stack>
         )}
       </Card>
+    </>
+  );
+
+  const syncStatusVisible = form.configured || advancedSync;
+  const renderSync = (): React.JSX.Element => (
+    <>
+      {syncStatusVisible ? syncStatus : renderSyncConfiguration()}
+      {syncStatusVisible ? renderPrivacy() : null}
+      {syncStatusVisible ? renderSyncConfiguration() : renderPrivacy()}
     </>
   );
 

@@ -138,12 +138,14 @@ node scripts/tools/cos-api.mjs --bucket heyta-dist-1380503169 \
 
 [国内下载清单](https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/latest.json) 已切换 `1.0.1-test.20261008.2`，四端文件匿名可读，大小及清单 SHA-256 与本机一致。[GitHub 第二批测试版](https://github.com/Xaiver03/heyta/releases/tag/v1.0.1-test.20261008.2) 已公开，五个资产 SHA-256 与本机一致。完整校验读数见 [第二批分发证据](../../apps/web/evidence/ux-closeout/release-2026-10-08-b2/release.json)。
 
-## 9. 2026-10-08 第三批测试（分发中）
+## 9. 2026-10-08 第三批测试（当前）
 
 本批修复助手长对话滚动、历史面板关闭、取消披露恢复草稿、跨布局披露/等待状态、提醒按钮暗色与宽度，以及移动端任务角标截断。macOS、Windows、Android、iOS 模拟器已完成当前源码重打重装；Web 已部署并通过深浅主题/多视口助手与设置2条真实浏览器旅程。
 
-iOS **1.0 (5)** 已上传 TestFlight，Apple 状态 VALID，既有内部测试组关联已 API 回读确认，附中文测试说明。没有创建公开邀请链接，也没有实体 iPhone 安装证据。其余平台的第三批下载包正在上传，上传完成前公共下载入口仍以第二批为准。
+iOS **1.0 (5)** 已上传 TestFlight，Apple 状态 VALID，既有内部测试组关联已 API 回读确认，附中文测试说明。没有创建公开邀请链接，也没有实体 iPhone 安装证据。其余四个平台的第三批下载包已上传，GitHub五个资产的大小及SHA-256均与本机一致，COS latest清单已切换第三批且逐项对账通过。源码快照 `8a7332c365250d1c8136eb8ef7b9d4d31c1839e9` 的22个workspace依赖清单已通过离线冻结锁文件校验；快照修正未覆盖工作树中的服务端开发改动，也未改动用户Git索引或HEAD。
 
-本批不部署服务端，仍保留 `3880bdd1fd5e8fe3710bd19c5f753947ea89c468`。另一任务的 inbound automation 服务端修改不纳入本次客户端发布；共享包中的可选 worker 接线不表示公网回调功能已交付。小组件 descriptor 已注册，但系统组件库添加尚未成功。
+[下载第三批测试版](https://github.com/Xaiver03/heyta/releases/tag/v1.0.1-test.20261008.3) · [国内下载清单](https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/latest.json)。
+
+本批不部署服务端，仍保留 `3880bdd1fd5e8fe3710bd19c5f753947ea89c468`。另一任务的 inbound automation 服务端修改不纳入本次客户端发布；共享包中的可选 worker 接线不表示公网回调功能已交付。该批发布时仅证实小组件 descriptor 注册；后续第五轮已通过 iOS 系统面板添加“今日任务”小组件，见产品 UX 计划的续验证据，尚不代表全部模板与实时刷新通过。
 
 [第三批构建与分发证据](../../apps/web/evidence/ux-closeout/release-2026-10-08-b3/release.json)。

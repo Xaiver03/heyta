@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+  isProfileAssistantVisible,
   popNavigationEntry,
   pushNavigationEntry,
   type NavigationStacks,
@@ -49,6 +50,25 @@ describe('移动端二级导航栈', () => {
 
     expect(withFeature.tasks).toEqual([{ key: 'task-detail' }]);
     expect(withFeature.profile).toEqual([{ key: 'feature:growth' }]);
+  });
+
+  it('助手跨 tab 保留 profile 栈，但隐藏时不应视为可见页面或拦截返回', () => {
+    const withAssistant = pushNavigationEntry(emptyStacks, 'profile', 'profile:assistant');
+
+    expect(isProfileAssistantVisible('profile', withAssistant)).toBe(true);
+    expect(isProfileAssistantVisible('tasks', withAssistant)).toBe(false);
+    // The route remains in the profile stack while tasks is active; the
+    // AssistantScreen receives visible=false and therefore owns no Back handler.
+    expect(withAssistant.profile).toEqual([{ key: 'profile:assistant' }]);
+  });
+
+  it('助手隐藏时的可见性判断只由 active tab 改变，不能破坏草稿所在的 profile 栈', () => {
+    const withAssistant = pushNavigationEntry(emptyStacks, 'profile', 'profile:assistant');
+    const whileOnTasks = { ...withAssistant, tasks: [{ key: 'task-detail' }] };
+
+    expect(isProfileAssistantVisible('tasks', whileOnTasks)).toBe(false);
+    expect(whileOnTasks.profile).toEqual([{ key: 'profile:assistant' }]);
+    expect(isProfileAssistantVisible('profile', whileOnTasks)).toBe(true);
   });
 
   it('ProfileScreen 的功能域入口和摘要入口都写入 profile 栈', () => {

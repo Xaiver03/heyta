@@ -1,0 +1,4 @@
+PROBE=UNAVAILABLE
+REASON=Accessibility tree or browser URL could not be read
+REASON=macOS Accessibility probe timed out; result is unverified
+RESULT=UNVERIFIED

@@ -74,7 +74,7 @@ export const TOOL_ENVELOPE_EGRESS_FIELDS = ['tool.error'] as const;
  * 一个实体在目录里**至多**能有几个工具。
  *
  * 🔴 这个数字不是拍的，是从界面动作词表推出来的 —— 一个实体在四个端上能被用户
- * 做出来的事只有这五档：
+ * 做出来的事只有这七档：
  *
  * | 档 | 例 |
  * |---|---|
@@ -82,11 +82,15 @@ export const TOOL_ENVELOPE_EGRESS_FIELDS = ['tool.error'] as const;
  * | 单条读（带正文那一档） | `get_task` |
  * | 新建 | `create_task` |
  * | 修改 | `update_task` |
+ * | 追加清单 | `append_task_checklist` |
  * | 该实体专属的那一个动作 | `complete_task` |
+ * | 批量改优先级 | `set_task_priorities` |
+ * | 估时上下文读 | `get_task_estimate_context` |
+ * | 写入估时 | `set_task_estimate` |
  *
- * TASK 就是 5 的满额。**要第 6 个，先回答它属于哪一档** —— 答不出"哪一档"通常意味着
- * 它属于另一个实体（那该另开一个 pack），或者它是第 7 个"读法变体"（那应该做成参数，
- * 不是做成工具：参数不进"逐工具默认关"那张清单，而那张清单的长度就是用户要理解的负担）。
+ * TASK 单独是 9 的预算。估时上下文与通用 `get_task` 的正文读取有不同的
+ * 历史/记忆出境闸门，写入估时也必须单独强制确认，因此不能做成两个可选参数：
+ * 那会把两个不同的授权与风险动作伪装成一个工具。
  *
  * ⚠️ 这条取代了原来的 `LOCAL_API_TOOLS.length <= 10`。那句的理由写的是
  * "超过 10 个就先问『真的需要吗』"，而它把**八个实体**逼进同一个 10 席里：
@@ -94,7 +98,25 @@ export const TOOL_ENVELOPE_EGRESS_FIELDS = ['tool.error'] as const;
  * 挡在门外，而那正是"问都不问就拒绝"。总量现在由 `每实体上限 × 覆盖分母` 承接
  * （见 `scripts/check-ai-coverage.mjs` §10），分母扩一席、目录才多一席的预算。
  */
-export const MAX_TOOLS_PER_ENTITY = 5;
+export const MAX_TOOLS_PER_ENTITY = 7;
+
+/**
+ * 少数实体可以在默认容量之外登记额外工具；没有登记的实体一律回到默认值。
+ *
+ * 🔴 这是目录容量的唯一例外表。目录测试与覆盖面门禁都从这个 typed lookup
+ * 取数，不能各自再写一份 `TASK → 9` 的判断。
+ */
+export const MAX_TOOLS_PER_ENTITY_BY_TYPE = {
+  TASK: 9,
+} as const satisfies Readonly<Partial<Record<string, number>>>;
+
+export type ToolBudgetEntityType = keyof typeof MAX_TOOLS_PER_ENTITY_BY_TYPE;
+
+/** 返回实体的工具预算；未知实体按默认预算处理。 */
+export function maxToolsPerEntity(entityType: string): number {
+  const override = MAX_TOOLS_PER_ENTITY_BY_TYPE[entityType as ToolBudgetEntityType];
+  return override ?? MAX_TOOLS_PER_ENTITY;
+}
 
 /**
  * 列表类读工具一次最多回多少条。**默认值只有一份**（原来 `50` 这个字面量
@@ -149,6 +171,13 @@ export const LIST_TASKS_MAX_DUE_SPAN_DAYS = 14;
  * 数字取 20：与竞品的 `complete_tasks_in_project` 单次上限同档（见 gap 分析 AI-G7）。
  */
 export const MAX_TASKS_PER_BATCH_COMPLETE = 20;
+
+/** A priority batch is one confirmation card; keep its explicit entries readable. */
+export const MAX_TASKS_PER_BATCH_PRIORITY = 20;
+
+/** A checklist append is one user intent; keep the confirmation card readable. */
+export const MAX_TASK_CHECKLIST_ITEMS = 20;
+export const MAX_TASK_CHECKLIST_ITEM_LENGTH = 200;
 
 /** `YYYY-MM-DD`：四位数年 + **补零**的月/日。规范形只有一份，所以必须补零。 */
 const CALENDAR_DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -517,7 +546,14 @@ export interface LocalApiWritePort {
 export type LocalApiWriteIntent =
   | { action: 'create-task'; title: string; dueDate?: string; priority?: string; projectId?: string }
   | { action: 'update-task'; taskId: string; fields: Readonly<Record<string, unknown>> }
+  | { action: 'append-task-checklist'; taskId: string; items: readonly string[] }
   | { action: 'complete-task'; taskId: string }
+  | {
+      action: 'set-task-priorities';
+      entries: readonly { taskId: string; priority: string }[];
+    }
+  /** 估时写入备注里的可替换行；分钟必须是整数，夹取由 app-host 统一执行。 */
+  | { action: 'set-task-estimate'; taskId: string; minutes: number }
   /**
    * 批量完成（W11 / ADR-0045 §2.5）：**一个提案内含多条**，不是一提案一确认地 fan-out。
    *

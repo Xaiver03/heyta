@@ -1,0 +1,69 @@
+{
+  "capturedAt": "2026-10-08",
+  "scope": "read-only WidgetKit Gallery/ATX investigation; no app reinstall, uninstall, erase, or service restart",
+  "simulator": {
+    "udid": "FE195661-B021-4A71-AAD1-1F2F7AE3A102",
+    "device": "heyta-iphone-17pro",
+    "simctlRuntimeGroup": "iOS 27.0",
+    "installedApp": "com.heyta",
+    "installedExtension": "com.heyta.WidgetExtension"
+  },
+  "changedJudgment": {
+    "previousClaim": "AX evidence was interpreted as Gallery search exposing no Heyta provider row.",
+    "newObservation": [
+      "ios/widget-gallery-idb-heyta-after-election.png visibly contains the blue h icon and provider row labelled heyta.",
+      "ios/widget-gallery-idb-heyta-query-after-refresh.png shows the same heyta provider row after the prior chronod/SpringBoard refresh.",
+      "The matching AX JSON exposes the search field, clear/close controls, and keyboard but omits the visible provider row; this is an AX projection/focus limitation, not proof that the row is absent.",
+      "The screenshot therefore proves that Gallery search can present Heyta on this simulator; the earlier no-result conclusion is withdrawn."
+    ],
+    "remainingGap": "No evidence was taken here that tapping the visible provider row and adding a widget completes successfully."
+  },
+  "atxAndChronod": {
+    "atxCache": {
+      "path": "~/Library/Developer/CoreSimulator/Devices/FE195661-B021-4A71-AAD1-1F2F7AE3A102/data/Library/DuetExpertCenter/WidgetDescriptorsWithInstallDates",
+      "format": "NSKeyedArchiver binary plist",
+      "observed": [
+        "plutil -p contains four descriptor records with extensionBundleId=com.heyta.WidgetExtension and kinds HeytaTodayWidget, HeytaQuadrantWidget, HeytaHabitsWidget, HeytaFocusWidget.",
+        "The cache contains a container record with containerBundleId=com.heyta; hasAccessoryWidgetFamiliesOnly=false and hasHomeScreenWidgetFamiliesOnly=false.",
+        "The cache also contains Apple providers, so this is an active ATX descriptor cache rather than an empty/uninitialized index."
+      ]
+    },
+    "chronodSql": {
+      "path": "~/Library/Developer/CoreSimulator/Devices/FE195661-B021-4A71-AAD1-1F2F7AE3A102/data/Library/chronod/chrono.sql",
+      "observed": [
+        "ExtensionMetadata has com.heyta.WidgetExtension version 1-1-(2026-10-07T23:37:10Z), ingestedByVersion 24A434.",
+        "Descriptors has three com.heyta.WidgetExtension rows, all reloadRequired=0, descriptorType 0/2/1; descriptor blobs contain the four Heyta kinds and extension/container identifiers.",
+        "No pending reload row was present for the Heyta bundle."
+      ]
+    }
+  },
+  "metadataChecks": {
+    "installedAppeX": {
+      "NSExtensionPointIdentifier": "com.apple.widgetkit-extension",
+      "CFBundleDisplayName": "Heyta",
+      "CFBundleSupportedPlatforms": ["iPhoneSimulator"],
+      "UIDeviceFamily": [1, 2],
+      "MinimumOSVersion": "17.0"
+    },
+    "source": "HeytaWidgetBundle.swift declares @main and all four Widget types; source Info.plist supplies the standard WidgetKit extension point. No missing Gallery-specific key was found.",
+    "hostVisibility": "simctl listapps reports com.heyta as ApplicationType=User, IsDeveloperApp=1, IsFirstParty=0, IsHidden=0, IsRemovable=1, CFBundleDisplayName=heyta."
+  },
+  "providerControl": {
+    "nonAppleWidgetKitPlugins": ["com.heyta.WidgetExtension(1.0)"],
+    "nonAppleInstalledApps": ["com.heyta"],
+    "meaning": "This simulator has no installed third-party WidgetKit provider to serve as a behavioral control. Apple providers (including Safari and Reminders) are registered, but they do not isolate a third-party-vs-Apple Gallery policy."
+  },
+  "runtimeMismatch": {
+    "currentDeviceListing": "The booted UDID is grouped under iOS 27.0 (24A434).",
+    "installedBuildFields": "The installed app/appex report DTPlatformVersion/DTSDKName 27.1 while MinimumOSVersion is 17.0.",
+    "priorEvidenceConflict": "ux-s9-95/widget-chronod-descriptors-20261008.json labels this simulator iOS 27.1; that label does not match current simctl device/runtime listing.",
+    "risk": "This is an environment/version variable worth recording, but it is not a source-level root cause: ATX, chronod, PlugInKit, and visual Gallery search all accept/present the provider."
+  },
+  "commands": [
+    "xcrun simctl list devices",
+    "xcrun simctl spawn FE195661-B021-4A71-AAD1-1F2F7AE3A102 pluginkit -m -p com.apple.widgetkit-extension -v",
+    "plutil -p .../Library/DuetExpertCenter/WidgetDescriptorsWithInstallDates",
+    "sqlite3 .../Library/chronod/chrono.sql queries of ExtensionMetadata, Descriptors, ReloadState",
+    "plutil -p installed Heyta.app/PlugIns/HeytaWidgetExtension.appex/Info.plist"
+  ]
+}

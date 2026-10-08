@@ -1,0 +1,40 @@
+{
+  "cdp": "http://127.0.0.1:9287",
+  "browser": "Edg/154.0.4258.62",
+  "shellBefore": "https://heyta.local/index.html",
+  "shellAfter": "https://heyta.local/index.html",
+  "widget": {
+    "statusCount": 1,
+    "statusText": "正在原生桌面应用中运行",
+    "capabilityText": "当前桌面应用暂不支持系统小组件。你仍可在应用内查看任务、习惯与专注进度。",
+    "installStepCount": 0,
+    "backend": "shell",
+    "panelText": "桌面小组件查看此桌面应用的小组件支持情况。正在原生桌面应用中运行当前桌面应用暂不支持系统小组件。你仍可在应用内查看任务、习惯与专注进度。"
+  },
+  "external": {
+    "expected": "https://heyta.waytofuture.cn/docs",
+    "before": {
+      "isBrowser": true,
+      "process": "chrome",
+      "processId": 23168,
+      "hwnd": 5898850,
+      "title": "�������� ���� heyta - Google Chrome",
+      "url": "https://heyta.waytofuture.cn/docs/",
+      "tabCount": 14
+    },
+    "after": {
+      "isBrowser": true,
+      "process": "chrome",
+      "processId": 23168,
+      "hwnd": 5898850,
+      "title": "�������� ���� heyta - Google Chrome",
+      "url": "https://heyta.waytofuture.cn/docs/",
+      "tabCount": 15
+    },
+    "evidence": "Windows UI Automation foreground browser address-bar value"
+  },
+  "screenshots": [
+    "windows-widget-native.png",
+    "windows-help-shell-unchanged.png"
+  ]
+}

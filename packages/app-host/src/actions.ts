@@ -54,6 +54,8 @@ import type { EntityType } from '@heyta/shared-schema';
 import { OpType } from '@heyta/sync-core';
 
 import { newTaskId } from './ids.js';
+import { clampDurationMinutes } from './ai-duration.js';
+import { writeDurationIntoNote } from './duration-note.js';
 /**
  * 🔴 任务完成一个**重复**任务时，它的提醒要跟着新的截止走
  * （见 `reminder-actions.ts` 里那个函数的文件头）。
@@ -62,6 +64,7 @@ import { newTaskId } from './ids.js';
  * `import type`（编译后被抹掉），所以运行时只有一条边 `actions → reminder-actions`。
  */
 import { rescheduleRemindersForRepeat } from './reminder-actions.js';
+import { mergeChecklistIntoNote } from './ai-breakdown.js';
 
 /**
  * 动作层需要引擎能力的最小面。
@@ -72,6 +75,10 @@ import { rescheduleRemindersForRepeat } from './reminder-actions.js';
  */
 export interface ActionContext {
   dispatch(intent: OpIntent): Promise<unknown>;
+  /** Run a synchronous state-dependent decision inside the op-log queue. */
+  dispatchChecked?<T>(
+    build: (state: MaterializedState) => { intent?: OpIntent; value: T },
+  ): Promise<T>;
   getState(): MaterializedState;
 }
 
@@ -102,6 +109,15 @@ export interface NewTaskFields {
    * 的落点：既有建任务 op **带上日期字段**，一次 CRT 完成、不 fan-out。
    */
   startDate?: number;
+}
+
+/** Fields accepted by the local API's single-task detail patch. */
+export interface TaskDetailsPatch {
+  title?: string;
+  priority?: Priority;
+  /** Presence means set/clear dueDate; omission leaves it unchanged. */
+  dueDate?: number;
+  completed?: boolean;
 }
 
 export interface TaskActionsOptions {
@@ -202,8 +218,12 @@ export interface TaskActions {
    */
   purge(entityId: string): Promise<boolean>;
   setPriority(entityId: string, priority: Priority): Promise<void>;
+  /** 一次 AI 取舍 = 一条 BATCH op；每条任务可以有不同优先级。 */
+  bulkSetPriorities(entries: readonly { id: string; priority: Priority }[]): Promise<void>;
   /** 四象限的"重要"维度。 */
   setImportant(entityId: string, important: boolean): Promise<void>;
+  /** Validate and write task details as one UPDATE op. */
+  patchDetails(entityId: string, patch: TaskDetailsPatch): Promise<void>;
   /**
    * **一次拖放 = 一条 op。**
    *
@@ -281,6 +301,10 @@ export interface TaskActions {
    * 数据同步到了每台设备却没有任何视图读得到）。
    */
   setNote(entityId: string, note: string | undefined): Promise<void>;
+  /** Set the replaceable AI estimate line using the latest queued note snapshot. */
+  setTaskEstimate(entityId: string, minutes: number): Promise<'updated' | 'unchanged' | 'not-found'>;
+  /** Read, merge, and append a checklist under one serialized write decision. */
+  appendChecklist(entityId: string, items: readonly string[]): Promise<'appended' | 'unchanged' | 'not-found'>;
   /** 传 `undefined` 表示移出项目（会写成 `null`）。 */
   moveToProject(entityId: string, projectId: string | undefined): Promise<void>;
   /** 批量移动到清单：一个用户意图、一个 BATCH op。 */
@@ -603,6 +627,73 @@ export function createTaskActions(
       return update(entityId, { priority });
     },
 
+    async patchDetails(entityId, patch) {
+      const task = taskOf(entityId);
+      if (task === undefined) throw new Error(`找不到任务「${entityId}」`);
+
+      // Validate every named field before constructing or dispatching anything.
+      if ('title' in patch && (typeof patch.title !== 'string' || patch.title.trim() === '')) {
+        throw new Error('任务标题不能为空');
+      }
+      if ('priority' in patch && ![Priority.None, Priority.Low, Priority.Medium, Priority.High].includes(patch.priority!)) {
+        throw new Error(`任务「${entityId}」的优先级无效`);
+      }
+      if ('dueDate' in patch && patch.dueDate !== undefined &&
+          (typeof patch.dueDate !== 'number' || !Number.isFinite(patch.dueDate))) {
+        throw new Error(`任务「${entityId}」的截止日期无效`);
+      }
+      if ('completed' in patch && typeof patch.completed !== 'boolean') {
+        throw new Error(`任务「${entityId}」的完成状态无效`);
+      }
+
+      const completed = patch.completed;
+      const repeat = repeatOf(task);
+      if (completed === true && repeat !== undefined) {
+        // Repeating completion advances the occurrence and reschedules reminders;
+        // folding it into a generic patch would silently lose that semantic.
+        if (Object.keys(patch).some((key) => key !== 'completed')) {
+          throw new Error('重复任务不能与其他字段一起完成');
+        }
+        await completeTask(entityId, task);
+        return;
+      }
+
+      const payload: Record<string, unknown> = {};
+      if ('title' in patch) payload.title = patch.title!.trim();
+      if ('priority' in patch) payload.priority = patch.priority;
+      if ('dueDate' in patch) payload.dueDate = patch.dueDate ?? null;
+      if ('completed' in patch) payload.completedAt = completed === true ? now() : null;
+      if (Object.keys(payload).length > 0) await update(entityId, payload);
+    },
+
+    async bulkSetPriorities(entries) {
+      if (entries.length === 0) return;
+      const seen = new Set<string>();
+      for (const entry of entries) {
+        if (typeof entry.id !== 'string' || entry.id === '') {
+          throw new Error('批量优先级包含空任务 id');
+        }
+        if (seen.has(entry.id)) throw new Error(`批量优先级包含重复任务「${entry.id}」`);
+        seen.add(entry.id);
+        if (![Priority.None, Priority.Low, Priority.Medium, Priority.High].includes(entry.priority)) {
+          throw new Error(`任务「${entry.id}」的优先级无效`);
+        }
+        if (taskOf(entry.id) === undefined) throw new Error(`找不到任务「${entry.id}」`);
+      }
+      const [first, ...rest] = entries;
+      if (first === undefined) return;
+      await ctx.dispatch({
+        entityType: 'TASK' as EntityType,
+        entityId: first.id,
+        ...(rest.length > 0 ? { entityIds: rest.map((entry) => entry.id) } : {}),
+        opType: OpType.Batch,
+        payload: {
+          heytaTaskPriorityBatch: 1,
+          items: entries.map((entry) => ({ id: entry.id, priority: entry.priority })),
+        },
+      });
+    },
+
     setImportant(entityId, important) {
       return update(entityId, { important });
     },
@@ -676,6 +767,66 @@ export function createTaskActions(
     setNote(entityId, note) {
       // undefined → null：与 setDueDate 同一个理由，null 能穿过 JSON 表达"清除"。
       return update(entityId, { note: note ?? null });
+    },
+
+    setTaskEstimate(entityId, minutes) {
+      if (ctx.dispatchChecked === undefined) {
+        throw new Error('任务估时需要串行状态写入能力');
+      }
+      if (!Number.isInteger(minutes) || !Number.isFinite(minutes) || minutes < 0) {
+        throw new Error('任务估时必须是非负整数分钟');
+      }
+      // Capture the caller-owned scalar before entering the serialized queue.
+      // The note itself is deliberately read inside the queue so a concurrent
+      // edit cannot be overwritten by a stale snapshot.
+      const snapshot = clampDurationMinutes(minutes);
+      return ctx.dispatchChecked((state) => {
+        const task = state.tasks[entityId];
+        if (task === undefined || task.deletedAt !== undefined) {
+          return { value: 'not-found' as const };
+        }
+        const nextNote = writeDurationIntoNote(task.note, snapshot);
+        if (nextNote === task.note) return { value: 'unchanged' as const };
+        return {
+          value: 'updated' as const,
+          intent: {
+            entityType: 'TASK' as EntityType,
+            entityId,
+            opType: OpType.Update,
+            payload: { note: nextNote },
+          },
+        };
+      });
+    },
+
+    async appendChecklist(entityId, items) {
+      if (ctx.dispatchChecked === undefined) {
+        throw new Error('清单追加需要串行状态写入能力');
+      }
+      if (!Array.isArray(items) || items.some((item) => typeof item !== 'string')) {
+        throw new Error('清单条目必须是字符串数组');
+      }
+      // dispatchChecked may wait behind another write. Capture the caller-owned
+      // array before entering that queue so a later caller mutation cannot
+      // change the checklist selected by the serialized builder.
+      const snapshot = [...items];
+      return ctx.dispatchChecked((state) => {
+        const task = state.tasks[entityId];
+        if (task === undefined || task.deletedAt !== undefined) {
+          return { value: 'not-found' as const };
+        }
+        const nextNote = mergeChecklistIntoNote(task.note, snapshot);
+        if (nextNote === task.note) return { value: 'unchanged' as const };
+        return {
+          value: 'appended' as const,
+          intent: {
+            entityType: 'TASK' as EntityType,
+            entityId,
+            opType: OpType.Update,
+            payload: { note: nextNote },
+          },
+        };
+      });
     },
 
     // 🔴 **必须是 `async`**：校验失败时 `throw` 要变成一个被拒绝的 Promise，

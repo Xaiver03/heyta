@@ -85,6 +85,7 @@ function host(): LocalApiHost {
   return {
     listTasks: () => Promise.resolve(items),
     getTask: (taskId: string) => Promise.resolve(items.find((x) => x.id === taskId)),
+    getTaskEstimateContext: (taskId: string) => Promise.resolve({ taskId, title: ITEM.title, readable: true, body: ITEM.body, currentMinutes: 30, history: [{ plannedMs: 1_500_000, actualMs: 1_440_000 }], preferences: [{ id: 'estimate-bias', text: '按历史偏差校正' }] }),
     listProjects: () => Promise.resolve(projects),
     listHabits: () => Promise.resolve(habits),
     listTags: () => Promise.resolve([TAG]),
@@ -171,9 +172,18 @@ describe('目录里每个工具都必须真的能被处理', () => {
 });
 
 describe('目录顺序是**不变量**（不是聚合的巧合）', () => {
-  const ORDER = ['list_tasks', 'get_task', 'list_projects', 'create_task', 'update_task', 'complete_task'];
+  const ORDER = [
+    'list_tasks',
+    'get_task',
+    'list_projects',
+    'create_task',
+    'update_task',
+    'append_task_checklist',
+    'complete_task',
+    'set_task_priorities',
+  ];
 
-  it('既有的六个工具保持既有的相对顺序（新工具只能追加，不能插到它们中间）', () => {
+  it('既有工具保持既有的相对顺序（新工具只能追加，不能插到它们中间）', () => {
     const names = LOCAL_API_TOOLS.map((t) => t.name);
     let cursor = 0;
     for (const name of ORDER) {

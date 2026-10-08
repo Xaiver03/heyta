@@ -155,3 +155,11 @@
     display: none;
   }
 }
+
+.ht-ai__technical > summary {
+  min-block-size: var(--ht-touch-target-min);
+  display: flex;
+  align-items: center;
+  color: var(--ht-color-primary);
+  cursor: pointer;
+}

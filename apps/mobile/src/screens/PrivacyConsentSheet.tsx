@@ -50,7 +50,7 @@
  *   打开失败再如实说出来。
  */
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { useI18n } from '@heyta/i18n';
@@ -125,10 +125,16 @@ function makeStyles(tokens: HeytaNativeTokens) {
     },
     linksRow: {
       flexDirection: 'row',
+      flexWrap: 'wrap',
       gap: tokens['space.4'],
     },
-    linkText: {
-      textDecorationLine: 'underline',
+    link: {
+      minHeight: tokens['touch-target.min'],
+      justifyContent: 'center',
+      borderRadius: tokens['radius.sm'],
+    },
+    linkActive: {
+      backgroundColor: tokens['color.primary-subtle'],
     },
     actionsRow: {
       flexDirection: 'row',
@@ -163,6 +169,17 @@ export function PrivacyConsentSheet({
   const { open, reason, notPersisted } = usePrivacySheet();
 
   const links = resolveLegalLinks(serverUrl, locale);
+  const [linkFailed, setLinkFailed] = useState(false);
+  const [focusedLink, setFocusedLink] = useState<string | null>(null);
+  const linkRequest = useRef(0);
+  useEffect(() => {
+    if (!open) {
+      linkRequest.current += 1;
+      setFocusedLink(null);
+      setLinkFailed(false);
+    }
+    return () => { linkRequest.current += 1; };
+  }, [open]);
 
   /**
    * 「required-for-action」时多说一句**为什么现在又弹一次**：
@@ -176,11 +193,10 @@ export function PrivacyConsentSheet({
         : null;
 
   const openLegalLink = (href: string): void => {
-    Linking.openURL(href).catch(() => {
-      // 与 `AuthScreen` 同一个兜底句：这里没有本地错误状态可写，
-      // 而读屏 / 无障碍层能收到的最诚实的反馈就是系统什么都没打开。
-      // ⚠️ 不静默 —— 静默的「点了没反应」是本仓库反复记过的那类失效。
-      console.warn('[privacy] 打不开条款链接：', href);
+    const request = ++linkRequest.current;
+    setLinkFailed(false);
+    void Linking.openURL(href).catch(() => {
+      if (request === linkRequest.current) setLinkFailed(true);
     });
   };
 
@@ -244,23 +260,27 @@ export function PrivacyConsentSheet({
                 <View style={styles.linksRow}>
                   <Pressable
                     accessibilityRole="link"
-                    hitSlop={tokens['gesture.hit-slop']}
+                    style={({ pressed }) => [styles.link, (pressed || focusedLink === 'terms') && styles.linkActive]}
+                    onFocus={() => setFocusedLink('terms')}
+                    onBlur={() => setFocusedLink(null)}
                     onPress={() => {
                       openLegalLink(links.terms);
                     }}
                   >
-                    <Text variant="caption" tone="primary" style={styles.linkText}>
+                    <Text variant="caption" tone="primary">
                       {t('common.privacy.consent.termsLink')}
                     </Text>
                   </Pressable>
                   <Pressable
                     accessibilityRole="link"
-                    hitSlop={tokens['gesture.hit-slop']}
+                    style={({ pressed }) => [styles.link, (pressed || focusedLink === 'privacy') && styles.linkActive]}
+                    onFocus={() => setFocusedLink('privacy')}
+                    onBlur={() => setFocusedLink(null)}
                     onPress={() => {
                       openLegalLink(links.privacy);
                     }}
                   >
-                    <Text variant="caption" tone="primary" style={styles.linkText}>
+                    <Text variant="caption" tone="primary">
                       {t('common.privacy.consent.privacyLink')}
                     </Text>
                   </Pressable>
@@ -273,6 +293,11 @@ export function PrivacyConsentSheet({
                 {t('common.privacy.consent.notPersisted')}
               </Text>
             ) : null}
+            {linkFailed && (
+              <View accessible accessibilityRole="alert" accessibilityLiveRegion="polite">
+                <Text variant="caption" tone="warning">{t('mobile.auth.link.unopenable')}</Text>
+              </View>
+            )}
           </ScrollView>
 
           {notPersisted ? (

@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/mobile
+
+
+ Test Files  2 passed (2)
+      Tests  13 passed (13)
+   Start at  07:42:16
+   Duration  102ms (transform 68%, import 20%, tests 7%, worker 5%)
+

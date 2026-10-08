@@ -37,6 +37,7 @@ import {
   inferFeedbackPreferences,
   inferPreferences,
   presentPreferenceIds,
+  renderPreferenceHints,
   Quadrant,
   suppressedPreferenceIds,
   toLocalDate,
@@ -1133,6 +1134,12 @@ export function App(): React.JSX.Element {
     };
   }, [aiSettings.memoryEnabled, store.entities, opWindow]);
 
+  const getDurationPreferenceHints = useCallback(
+    () => renderPreferenceHints(memory.preferenceSet, 'duration-estimate')
+      .map(({ id, text }) => ({ id, text })),
+    [memory.preferenceSet],
+  );
+
   /**
    * 把最近一段 op 事件流读进 state（`computeFocusGaps` 推算推迟次数必需）。
    *
@@ -1996,6 +2003,8 @@ export function App(): React.JSX.Element {
               return next;
             })}
             secrets={aiSecrets}
+            memoryEnabled={aiSettings.memoryEnabled}
+            getDurationPreferenceHints={getDurationPreferenceHints}
             healthSnapshot={aiSettings.health}
             onHealth={(health) => {
               setAiSettings((previous) => {
@@ -2570,17 +2579,12 @@ export function App(): React.JSX.Element {
               // 🔴 记忆偏好。开关关着时这里是空集 —— 界面拿不到任何偏好。
               preferenceSet={memory.preferenceSet}
               /**
-               * 🔴 逐条写回，但**只写用户勾选保留的那些**（`decisions` 已经是
-               * 取舍后的结果）。走 `store.setPriority` —— 那条路走 op-log，
-               * 所以它能同步到别的设备，也能被撤销。
-               *
-               * 一条一个 intent：这里刻意不合并成一个批量 op，
-               * 因为用户可能只采纳其中三条（见 AGENTS.md §3.4）。
-               */
+               * 🔴 只写用户勾选保留的那些（`decisions` 已经是取舍后的结果），
+               * 并把整批交给一个动作层意图：一条 BATCH op 同时携带每条任务各自的优先级。
+               * 这样它能同步到别的设备，也不会留下半批已写、半批未写的中间态。
+              */
               onApply={async (decisions) => {
-                for (const d of decisions) {
-                  await store.setPriority(d.id, d.priority);
-                }
+                await store.bulkSetPriorities(decisions);
               }}
               onHealth={(health) => {
                 // 🔴 熔断状态落盘。**不进 op-log** —— 它是本机状态，

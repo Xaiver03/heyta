@@ -74,7 +74,7 @@ public struct ToggleTaskIntent: AppIntent {
             WidgetIntent(
                 taskId: taskId,
                 targetIsDone: targetIsDone,
-                at: Date().timeIntervalSince1970 * 1000
+                at: widgetIntentEpochMilliseconds()
             )
         )
 

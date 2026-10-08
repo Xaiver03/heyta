@@ -5,9 +5,9 @@
  * 这里只测 `toWriteIntent('complete_task', …)` 这一个纯函数**为什么**要这么判：
  *
  * 1. 🔴 **批量是一个参数，不是一个新工具**。`packages/local-api/src/tools/shared.ts`
- *    的 `MAX_TOOLS_PER_ENTITY = 5` 把 TASK 席位占满了（2 读 + 3 写），而那个文件自己的出路
+ *    的 TASK 专属 9 席预算给清单追加与批量优先级工具，而那个文件自己的出路
  *    写得很清楚："第 7 个读法变体应该做成参数，不是做成工具 —— 参数不进逐工具默认关那张清单"。
- *    所以本文件第一条判据是**目录形状**：批量落地之后 TASK 仍然是 5 个工具、
+ *    所以本文件第一条判据是**目录形状**：批量落地之后 TASK 是 7 个工具、
  *    `complete_task` 的 `egressFields` 仍然是空（写工具的结果不回送模型）。
  *    这条不是为了好看：新开一个 `complete_tasks` 工具会让授权清单、能力清单、
  *    覆盖面台账三处同时说谎（用户以为自己开的是两个不同的权限）。
@@ -22,7 +22,14 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { LOCAL_API_TOOLS, MAX_TASKS_PER_BATCH_COMPLETE, toWriteIntent } from '../src/index.js';
+import {
+  hasInputSchemaFor,
+  LOCAL_API_TOOLS,
+  MAX_TASK_CHECKLIST_ITEM_LENGTH,
+  MAX_TASK_CHECKLIST_ITEMS,
+  MAX_TASKS_PER_BATCH_COMPLETE,
+  toWriteIntent,
+} from '../src/index.js';
 
 const ids = (n: number, prefix = 't'): string[] =>
   Array.from({ length: n }, (_, i) => `${prefix}${String(i + 1)}`);
@@ -43,13 +50,25 @@ function rejection(args: Record<string, unknown>): string {
 }
 
 describe('目录形状：批量是参数，不是第二个工具', () => {
-  it('🔴 TASK 仍然是 5 个工具，且没有多出 complete_tasks', () => {
-    const taskTools = LOCAL_API_TOOLS.filter((tool) => tool.name.endsWith('_task') || tool.name.endsWith('_tasks'));
+  it('🔴 TASK 是 7 个工具，且没有多出 complete_tasks', () => {
+    const taskTools = LOCAL_API_TOOLS.filter((tool) =>
+      [
+        'list_tasks',
+        'get_task',
+        'create_task',
+        'update_task',
+        'append_task_checklist',
+        'complete_task',
+        'set_task_priorities',
+      ].includes(tool.name),
+    );
     expect(taskTools.map((tool) => tool.name).sort()).toEqual([
+      'append_task_checklist',
       'complete_task',
       'create_task',
       'get_task',
       'list_tasks',
+      'set_task_priorities',
       'update_task',
     ]);
     expect(
@@ -134,5 +153,56 @@ describe('上限按去重后的条数算', () => {
     expect(intent.action).toBe('complete-tasks');
     if (intent.action !== 'complete-tasks') return;
     expect(intent.taskIds).toHaveLength(MAX_TASKS_PER_BATCH_COMPLETE);
+  });
+});
+
+describe('追加任务清单：参数与目录契约', () => {
+  it('登记为独立的写工具，且参数 schema 已暴露', () => {
+    const tool = LOCAL_API_TOOLS.find((entry) => entry.name === 'append_task_checklist');
+    expect(tool).toMatchObject({ kind: 'write', defaultEnabled: false, egressFields: [] });
+    expect(hasInputSchemaFor('append_task_checklist')).toBe(true);
+  });
+
+  it('会裁剪任务 id 与条目两端空白，并保留条目顺序', () => {
+    expect(
+      toWriteIntent('append_task_checklist', {
+        taskId: ' task-1 ',
+        items: ['  第一项 ', '第二项'],
+      }),
+    ).toEqual({
+      ok: true,
+      intent: { action: 'append-task-checklist', taskId: 'task-1', items: ['第一项', '第二项'] },
+    });
+  });
+
+  it('拒绝空范围、非字符串、空白条目与超限输入', () => {
+    const rejected = [
+      { taskId: 't1', items: [] },
+      { taskId: 't1', items: ['   '] },
+      { taskId: 't1', items: ['ok', 1] },
+      { taskId: '   ', items: ['ok'] },
+      { taskId: 't1', items: ['ok'], extra: true },
+      { taskId: 't1', items: Array.from({ length: MAX_TASK_CHECKLIST_ITEMS + 1 }, () => 'x') },
+      { taskId: 't1', items: ['x'.repeat(MAX_TASK_CHECKLIST_ITEM_LENGTH + 1)] },
+    ];
+    for (const args of rejected) expect(toWriteIntent('append_task_checklist', args).ok).toBe(false);
+    expect(
+      toWriteIntent('append_task_checklist', {
+        taskId: 't1',
+        items: Array.from({ length: MAX_TASK_CHECKLIST_ITEMS }, () => 'x'),
+      }).ok,
+    ).toBe(true);
+  });
+
+  it('拒绝 schema 之外的字段并指出字段名', () => {
+    const result = toWriteIntent('append_task_checklist', {
+      taskId: 't1',
+      items: ['ok'],
+      note: '不支持',
+    });
+    expect(result).toEqual({
+      ok: false,
+      message: 'append_task_checklist 不支持这些参数：note。',
+    });
   });
 });

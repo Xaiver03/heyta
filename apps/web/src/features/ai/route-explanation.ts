@@ -104,6 +104,7 @@ const NO_TARGET_KEY: Record<AiFeature, MessageKey> = {
   prioritize: 'web.ai.noTarget.prioritize',
   'duration-estimate': 'web.ai.noTarget.duration',
   'tool-calling': 'web.ai.noTarget.toolCalling',
+  'inbound-automation': 'web.ai.noTarget.inboundAutomation',
 };
 
 /**

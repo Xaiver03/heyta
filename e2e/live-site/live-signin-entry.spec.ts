@@ -77,7 +77,10 @@ test('线上「登录」：点一次就到登录界面，中途不落在那段�
   await expect(signin).toBeVisible();
   const href = await signin.getAttribute('href');
   expect(href, '线上导航里没有「登录」的 href —— 落地页多半是**不带 VITE_APP_URL** 构建的').not.toBeNull();
-  const target = new URL(href!);
+  // The fallback landing build may expose a same-origin relative URL. Resolve
+  // it before checking the contract so a deployment problem is reported by
+  // the semantic assertions below rather than as `Invalid URL`.
+  const target = new URL(href!, page.url());
   expect(target.origin).toBe(ORIGIN);
   // 🔴 参数名从**这一页自己的另一条应用链接**推不出来（那条不带参数），
   // 所以这里只断言"有且仅有一个查询参数，名字叫 signin"这件事的可读形式：
@@ -110,8 +113,9 @@ test('线上「登录」：点一次就到登录界面，中途不落在那段�
   await page.waitForTimeout(600);
   await page.screenshot({ path: `${SHOT_DIR}/live-2b-signin-panel.png` });
 
-  // 面板不是空壳：第二步要能真的往下走 —— 「继续」这颗在，表单才是活的。
-  await expect(page.locator('[data-testid="auth-form-continue"]').first()).toBeVisible();
+  // 邮箱、密码与登录提交按钮必须真实可见，排除空壳或隐藏表单。
+  await expect(page.locator('[data-testid="auth-form-password"]').first()).toBeVisible();
+  await expect(page.locator('[data-testid="auth-form-submit"]').first()).toBeVisible();
 
   // 地址此刻仍然带着那个参数（说明这不是"跳错了地方恰好有个表单"）。
   expect(new URL(page.url()).searchParams.has('signin')).toBe(true);
@@ -130,7 +134,9 @@ test('线上英文页同一条路（语言参数不能把 signin 挤掉）', asy
   const signin = page.locator('a.lp-nav__signin').first();
   const href = await signin.getAttribute('href');
   expect(href).not.toBeNull();
-  const target = new URL(href!);
+  // Keep the same semantic check for the English page while accepting the
+  // browser's valid same-origin relative URL representation.
+  const target = new URL(href!, page.url());
   expect([...target.searchParams.keys()]).toEqual(expect.arrayContaining(['lang', 'signin']));
   expect(target.searchParams.get('lang')).toBe('en');
 
