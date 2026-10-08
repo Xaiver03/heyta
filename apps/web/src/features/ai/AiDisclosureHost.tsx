@@ -33,7 +33,7 @@
 
 import React from 'react';
 
-import { AiDisclosure, HeytaUiProvider, type AiDisclosureLabels } from '@heyta/ui';
+import { AI_DISCLOSURE_FIELD_GROUPS, AiDisclosure, HeytaUiProvider, type AiDisclosureLabels } from '@heyta/ui';
 import type { RetentionDisclosure } from '@heyta/ai';
 import { useI18n } from '@heyta/i18n';
 
@@ -72,6 +72,9 @@ export function AiDisclosureHost({
     retentionDisclosure === undefined ? undefined : retentionMessage(retentionDisclosure);
 
   const labels: AiDisclosureLabels = {
+    showFields: t('web.ai.disclosure.showFields'),
+    hideFields: t('web.ai.disclosure.hideFields'),
+    fieldGroups: Object.fromEntries(AI_DISCLOSURE_FIELD_GROUPS.map((group) => [group, t(`web.ai.disclosure.group.${group}`)])),
     destinationLead: t('web.ai.disclosure.destinationLead'),
     local: t('web.ai.disclosure.local'),
     remote: t('web.ai.disclosure.remote'),

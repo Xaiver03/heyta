@@ -211,6 +211,27 @@ describe('repeatOf：坏规则在读取侧退化成"不重复"', () => {
 });
 
 describe('🔴 完成一个重复任务：推进到期日，而不是标记完成', () => {
+  it('复合 patch 不吞掉重复完成语义，并在拒绝时零 op', async () => {
+    const id = await actions.create('复合重复任务', { dueDate: parseLocalDate(MONDAY).getTime() });
+    await actions.setRepeat(id, EVERY_MONDAY);
+    const before = await opsOf(id);
+
+    await expect(actions.patchDetails(id, { title: '不应写入', completed: true }))
+      .rejects.toThrow('重复任务不能与其他字段一起完成');
+    expect(await opsOf(id)).toHaveLength(before.length);
+    expect(actions.findTask(id)?.title).toBe('复合重复任务');
+  });
+
+  it('单独 patch 完成重复任务仍推进下一次，而不是写 completedAt', async () => {
+    const id = await actions.create('单字段重复任务', { dueDate: parseLocalDate(MONDAY).getTime() });
+    await actions.setRepeat(id, EVERY_MONDAY);
+
+    await actions.patchDetails(id, { completed: true });
+
+    expect(toLocalDate(actions.findTask(id)!.dueDate!)).toBe(NEXT_MONDAY);
+    expect(actions.findTask(id)!.completedAt).toBeUndefined();
+  });
+
   it('到期日推进到下一次，且 **completedAt 仍然不存在**', async () => {
     const id = await actions.create('每周一交周报', { dueDate: parseLocalDate(MONDAY).getTime() });
     await actions.setRepeat(id, EVERY_MONDAY);

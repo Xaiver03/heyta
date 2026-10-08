@@ -28,7 +28,7 @@
  * 收起来就等于"点了没反应"。
  */
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { useI18n } from '@heyta/i18n';
@@ -82,10 +82,16 @@ function makeStyles(tokens: HeytaNativeTokens) {
     },
     linksRow: {
       flexDirection: 'row',
+      flexWrap: 'wrap',
       gap: tokens['space.4'],
     },
-    linkText: {
-      textDecorationLine: 'underline',
+    link: {
+      minHeight: tokens['touch-target.min'],
+      justifyContent: 'center',
+      borderRadius: tokens['radius.sm'],
+    },
+    linkActive: {
+      backgroundColor: tokens['color.primary-subtle'],
     },
     /**
      * 🔴 主按钮**独占一行**、从属的那条在它下面：这不是排版偏好，是两种语义
@@ -119,12 +125,23 @@ export function LegalReconfirmSheet(): React.JSX.Element | null {
   );
 
   const links = resolveLegalLinks(serverUrl, locale);
+  const [linkFailed, setLinkFailed] = useState(false);
+  const [focusedLink, setFocusedLink] = useState<string | null>(null);
+  const linkRequest = useRef(0);
+  useEffect(() => {
+    if (!open) {
+      linkRequest.current += 1;
+      setFocusedLink(null);
+      setLinkFailed(false);
+    }
+    return () => { linkRequest.current += 1; };
+  }, [open]);
 
   const openLegalLink = (href: string): void => {
-    Linking.openURL(href).catch(() => {
-      // 与隐私面板同一条口径：**不用** `canOpenURL()` 预检（iOS 未登记 scheme 时它恒
-      // false，会把真链接判死），打开失败就如实打出来，不静默。
-      console.warn('[legal-recheck] 打不开条款链接：', href);
+    const request = ++linkRequest.current;
+    setLinkFailed(false);
+    void Linking.openURL(href).catch(() => {
+      if (request === linkRequest.current) setLinkFailed(true);
     });
   };
 
@@ -181,23 +198,27 @@ export function LegalReconfirmSheet(): React.JSX.Element | null {
                 <View style={styles.linksRow}>
                   <Pressable
                     accessibilityRole="link"
-                    hitSlop={tokens['gesture.hit-slop']}
+                    style={({ pressed }) => [styles.link, (pressed || focusedLink === 'terms') && styles.linkActive]}
+                    onFocus={() => setFocusedLink('terms')}
+                    onBlur={() => setFocusedLink(null)}
                     onPress={() => {
                       openLegalLink(links.terms);
                     }}
                   >
-                    <Text variant="caption" tone="primary" style={styles.linkText}>
+                    <Text variant="caption" tone="primary">
                       {t('common.privacy.consent.termsLink')}
                     </Text>
                   </Pressable>
                   <Pressable
                     accessibilityRole="link"
-                    hitSlop={tokens['gesture.hit-slop']}
+                    style={({ pressed }) => [styles.link, (pressed || focusedLink === 'privacy') && styles.linkActive]}
+                    onFocus={() => setFocusedLink('privacy')}
+                    onBlur={() => setFocusedLink(null)}
                     onPress={() => {
                       openLegalLink(links.privacy);
                     }}
                   >
-                    <Text variant="caption" tone="primary" style={styles.linkText}>
+                    <Text variant="caption" tone="primary">
                       {t('common.privacy.consent.privacyLink')}
                     </Text>
                   </Pressable>
@@ -209,6 +230,11 @@ export function LegalReconfirmSheet(): React.JSX.Element | null {
               <Text variant="caption" tone="warning">
                 {failureLine}
               </Text>
+            )}
+            {linkFailed && (
+              <View accessible accessibilityRole="alert" accessibilityLiveRegion="polite">
+                <Text variant="caption" tone="warning">{t('mobile.auth.link.unopenable')}</Text>
+              </View>
             )}
           </ScrollView>
 

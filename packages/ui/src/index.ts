@@ -319,6 +319,7 @@ export {
 } from './ai/AiPanel.js';
 export {
   AiDisclosure,
+  AI_DISCLOSURE_FIELD_GROUPS,
   type AiDisclosureInput as AiDisclosureRouteInput,
   type AiDisclosureLabels,
   type AiDisclosureProps,

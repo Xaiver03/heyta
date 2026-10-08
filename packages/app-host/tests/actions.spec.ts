@@ -389,6 +389,61 @@ describe('其余字段', () => {
   });
 });
 
+describe('bulkSetPriorities', () => {
+  it('不同优先级一次写一条 BATCH op，并物化到每条任务', async () => {
+    const low = await actions.create('低优先级');
+    const high = await actions.create('高优先级');
+    const before = await engine.getAllOps();
+
+    await actions.bulkSetPriorities([
+      { id: low, priority: Priority.Low },
+      { id: high, priority: Priority.High },
+    ]);
+
+    const after = await engine.getAllOps();
+    expect(after).toHaveLength(before.length + 1);
+    expect(after.at(-1)?.opType).toBe(OpType.Batch);
+    expect(after.at(-1)?.entityIds).toEqual([high]);
+    expect(payloadOf(after.at(-1)!)).toEqual({
+      heytaTaskPriorityBatch: 1,
+      items: [
+        { id: low, priority: Priority.Low },
+        { id: high, priority: Priority.High },
+      ],
+    });
+    expect(actions.findTask(low)?.priority).toBe(Priority.Low);
+    expect(actions.findTask(high)?.priority).toBe(Priority.High);
+  });
+
+  it('全量预校验失败时不写任何任务', async () => {
+    const first = await actions.create('第一条');
+    const before = await engine.getAllOps();
+    await expect(
+      actions.bulkSetPriorities([
+        { id: first, priority: Priority.High },
+        { id: 'missing-task', priority: Priority.Low },
+      ]),
+    ).rejects.toThrow('找不到任务');
+    expect(await engine.getAllOps()).toHaveLength(before.length);
+    expect(actions.findTask(first)?.priority).toBe(Priority.None);
+  });
+
+  it('重复 id 与非法优先级在 dispatch 前拒绝', async () => {
+    const id = await actions.create('任务');
+    const before = await engine.getAllOps();
+    await expect(
+      actions.bulkSetPriorities([
+        { id, priority: Priority.High },
+        { id, priority: Priority.Low },
+      ]),
+    ).rejects.toThrow('重复');
+    await expect(
+      actions.bulkSetPriorities([{ id, priority: 99 as Priority }]),
+    ).rejects.toThrow('优先级无效');
+    expect(await engine.getAllOps()).toHaveLength(before.length);
+  });
+});
+
 /**
  * `setNote` —— 备注的写入路径
  *

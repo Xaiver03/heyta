@@ -1031,42 +1031,54 @@ if (!exists(GEN)) {
     // 这一段的存在理由很具体：`local-api.spec.ts` 原来写着 `LOCAL_API_TOOLS.length <= 10`，
     // 而第 9 段要求"每个实体读写都有工具" ⇒ 分母 8 个实体、下限 16 席，两道各自合理、
     // 合起来**互相封死**（`docs/plans/ai-event-tool-contract.md` §5.2 记着这次算术）。
-    // 现在按实体那一列判（每个 pack 至多 `MAX_TOOLS_PER_ENTITY` 个工具），
+    // 现在按实体那一列判（默认每个 pack 至多 `MAX_TOOLS_PER_ENTITY` 个工具，
+    // 例外从 shared.ts 的 typed lookup 取），
     // 于是总量随覆盖面**一起**长大：多一个进分母的实体就多一席预算，而不是多一个障碍。
-    const perEntityCap = upstream.maxToolsPerEntity;
-    if (typeof perEntityCap !== 'number' || !(perEntityCap > 0)) {
+    const defaultPerEntityCap = upstream.maxToolsPerEntity;
+    const perEntityCaps = upstream.maxToolsPerEntityByType;
+    if (typeof defaultPerEntityCap !== 'number' || !(defaultPerEntityCap > 0)) {
       fail(
         '读不到 `MAX_TOOLS_PER_ENTITY`（当前：' +
-          JSON.stringify(perEntityCap) +
+          JSON.stringify(defaultPerEntityCap) +
           '）—— 每实体容量无法核对。\n' +
           '     它的所有者是 `packages/local-api/src/tools/shared.ts`；这一段只从产物里取，不在这里抄一个数。',
       );
+    } else if (typeof perEntityCaps !== 'object' || perEntityCaps === null || Array.isArray(perEntityCaps)) {
+      fail(
+        '读不到实体工具预算 lookup（当前：' +
+          JSON.stringify(perEntityCaps) +
+          '）—— 实体例外容量无法核对。\n' +
+          '     它的所有者是 `packages/local-api/src/tools/shared.ts`；这一段只从产物里取，不在这里抄一个数。',
+      );
     } else {
-      const budget = perEntityCap * denominator.length;
+      const capForEntity = (entityType) => {
+        const override = perEntityCaps[entityType];
+        return typeof override === 'number' && override > 0 ? override : defaultPerEntityCap;
+      };
+      const budget = denominator.reduce((sum, entityType) => sum + capForEntity(entityType), 0);
       const total = manifest.tools.length;
       if (total > budget) {
         fail(
-          `目录有 ${String(total)} 个工具，超过每实体 ${String(perEntityCap)} × 分母 ` +
-            `${String(denominator.length)} = ${String(budget)} 的预算。\n` +
-            '     要抬这个上限，先回答"多出来那几个工具属于哪一档"（`shared.ts` 的那五行档位表）——\n' +
+          `目录有 ${String(total)} 个工具，超过按实体预算合计 ${String(budget)}。\n` +
+            '     要抬某个实体的上限，先在 `shared.ts` 的 typed lookup 中登记它，并回答"多出来那几个工具属于哪一档"——\n' +
             '     而不是直接改这里的数字：改这里等于让覆盖面门禁自己去放宽它检查的那个约束。',
         );
       } else {
         notes.push(
-          `目录 ${String(total)} 个工具 ≤ 每实体 ${String(perEntityCap)} × 分母 ` +
-            `${String(denominator.length)} = ${String(budget)} 席` +
+          `目录 ${String(total)} 个工具 ≤ 按实体预算 ${String(budget)} 席` +
             `（已用 ${String(total)}，剩 ${String(budget - total)}）。`,
         );
       }
       // 反向那条腿：某个实体自己超额，也要在这里点出来（总量对得上不代表分布对得上）。
       for (const entity of manifest.entities) {
         const n = entity.readToolNames.length + entity.writeToolNames.length;
-        if (n > perEntityCap) {
+        const cap = capForEntity(entity.entityType);
+        if (n > cap) {
           fail(
-            `实体 \`${entity.entityType}\` 有 ${String(n)} 个工具（${[
+            `实体 \`${entity.entityType}\` 有 ${String(n)} 个工具，超过该实体预算 ${String(cap)}（${[
               ...entity.readToolNames,
               ...entity.writeToolNames,
-            ].join('、')}），超过每实体 ${String(perEntityCap)} 的上限。`,
+            ].join('、')}）。`,
           );
         }
       }

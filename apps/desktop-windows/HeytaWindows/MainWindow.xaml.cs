@@ -20,6 +20,7 @@ public sealed partial class MainWindow : Window
     private readonly ObservableCollection<TaskItem> _tasks = new();
     private AppApi? _api;
     private string _dbPath = string.Empty;
+    private WindowsDataPaths? _dataPaths;
 
     public MainWindow()
     {
@@ -155,7 +156,31 @@ public sealed partial class MainWindow : Window
     {
         try
         {
-            await SharedUi.EnsureCoreWebView2Async();
+            if (_dataPaths is null)
+            {
+                // TryInitialize already surfaced the path validation error.
+                // Do not let WebView2 fall back to its default profile after a
+                // failed QA-path setup: that would mix a QA run with user data.
+                return;
+            }
+
+            if (_dataPaths.IsQaOverride)
+            {
+                var webViewEnvironment = await CoreWebView2Environment.CreateAsync();
+                await SharedUi.EnsureCoreWebView2Async(webViewEnvironment);
+                // The WinAppSDK projection only exposes the parameterless
+                // factory. Record the profile WebView2 actually selected so
+                // the QA runner can reject a fallback to the user's profile.
+                File.WriteAllText(
+                    Path.Combine(_dataPaths.DataDirectory, "qa-webview2-user-data-folder.txt"),
+                    webViewEnvironment.UserDataFolder);
+            }
+            else
+            {
+                // Preserve the product's existing WebView2 profile resolution
+                // when no QA override is requested.
+                await SharedUi.EnsureCoreWebView2Async();
+            }
 
             // Public help, pricing and changelog pages belong in the system
             // browser. Keep the workspace mounted in this window and only
@@ -708,11 +733,10 @@ public sealed partial class MainWindow : Window
         try
         {
             var bundle = Path.Combine(AppContext.BaseDirectory, "native-bridge.js");
-            _dbPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "heyta",
-                "heyta.sqlite");
-            Directory.CreateDirectory(Path.GetDirectoryName(_dbPath)!);
+            _dataPaths = WindowsDataPaths.Resolve(
+                Environment.GetEnvironmentVariable("HEYTA_QA_DATA_DIR"));
+            Directory.CreateDirectory(_dataPaths.DataDirectory);
+            _dbPath = _dataPaths.DatabasePath;
 
             _api = new AppApi(bundle, _dbPath);
 

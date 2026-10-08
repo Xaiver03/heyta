@@ -348,16 +348,18 @@ describe('🔴🔴 写操作：只经 host.submit', () => {
     expect(submitted).toHaveLength(0);
   });
 
-  it('写入的动作集合是封闭的三种', async () => {
+  it('写入的动作集合是封闭的四种', async () => {
     const { handle, submitted } = handler();
     for (const [name, args] of [
       ['create_task', { title: 'a' }],
       ['update_task', { taskId: 't', fields: {} }],
+      ['append_task_checklist', { taskId: 't', items: ['准备说明'] }],
       ['complete_task', { taskId: 't' }],
     ] as const) {
       expectResponse(await handle(req('tools/call', { name, arguments: args }), TOKEN));
     }
     expect([...new Set(submitted.map((i) => i.action))].sort()).toEqual([
+      'append-task-checklist',
       'complete-task',
       'create-task',
       'update-task',

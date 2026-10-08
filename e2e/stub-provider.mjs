@@ -93,6 +93,39 @@ function respond(feature, userContent) {
 }
 
 /**
+ * Deterministic tool calls for browser journeys that need a specific write.
+ *
+ * The sentinel is deliberately carried in the user message so the test still
+ * exercises the real browser -> routed provider -> assistant parser path. It
+ * is only a fixture selector; the app remains responsible for validating the
+ * arguments, producing a proposal, and requiring confirmation.
+ *
+ * Shape: `QA_TOOL:{"name":"...","arguments":{...}}` (one line).
+ */
+function qaToolCall(userContent) {
+  const matches = [...userContent.matchAll(/QA_TOOL\s*:\s*(\{[^\n]+\})/gu)];
+  const last = matches.at(-1)?.[1];
+  if (last === undefined) return undefined;
+  try {
+    const parsed = JSON.parse(last);
+    if (
+      parsed === null ||
+      typeof parsed !== 'object' ||
+      typeof parsed.name !== 'string' ||
+      parsed.name.trim() === '' ||
+      parsed.arguments === null ||
+      typeof parsed.arguments !== 'object' ||
+      Array.isArray(parsed.arguments)
+    ) {
+      return undefined;
+    }
+    return { name: parsed.name, arguments: JSON.stringify(parsed.arguments) };
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * CORS 头 —— 给**真浏览器**放行。
  *
  * 🔴 这一段是接真浏览器时补的，值得记下为什么：假端点跑在
@@ -254,6 +287,7 @@ const server = createServer((req, res) => {
     // ⚠️ **不能锚 `^`**：出境的用户文本带着前缀（`ai-tool-call.ts` 的
     // `user: \`用户这句话：${source.text}\``），整串并不以"新建任务"开头。
     const createTitle = /新建任务[：:]([^\r\n]+)$/u.exec(user.trim());
+    const qaCall = feature === 'assistant' ? qaToolCall(user) : undefined;
     const message =
       feature === 'tool-calling'
         ? {
@@ -281,7 +315,13 @@ const server = createServer((req, res) => {
             role: 'assistant',
             content: null,
             tool_calls: [
-              createTitle
+              qaCall
+                ? {
+                    id: 'stub-qa-tool',
+                    type: 'function',
+                    function: qaCall,
+                  }
+                : createTitle
                 ? {
                     id: 'stub-assistant-write', type: 'function',
                     function: { name: 'create_task', arguments: JSON.stringify({ title: createTitle[1].trim() }) },

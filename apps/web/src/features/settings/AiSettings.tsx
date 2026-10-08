@@ -82,6 +82,7 @@ function featuresNeeding(capability: AiCapability, t: I18nValue['t'], locale: Lo
     prioritize: t('web.ai.needs.prioritize'),
     'duration-estimate': t('web.ai.needs.duration'),
     'tool-calling': t('web.ai.needs.toolCalling'),
+    'inbound-automation': t('web.ai.needs.inboundAutomation'),
   };
   const hit: string[] = [];
   for (const [feature, label] of Object.entries(names)) {
@@ -122,6 +123,7 @@ import {
   type SessionSecretStore,
 } from './aiStore.js';
 import './ai-settings.css';
+import { InboundAutomationSettings } from './InboundAutomationSettings.js';
 
 /**
  * 某个功能在**当前路由里**缺哪些能力。
@@ -166,6 +168,7 @@ function featureLabels(t: I18nValue['t']): Readonly<Record<AiFeature, string>> {
     prioritize: t('web.ai.feature.prioritize'),
     'duration-estimate': t('web.ai.feature.duration'),
     'tool-calling': t('web.ai.feature.toolCalling'),
+    'inbound-automation': t('web.ai.feature.inboundAutomation'),
   };
 }
 
@@ -175,6 +178,8 @@ const FEATURE_ORDER: readonly AiFeature[] = [
   'prioritize',
   'duration-estimate',
   'tool-calling',
+  // Inbound automation is configured here, not exposed as a Chatbot mode.
+  'inbound-automation',
 ];
 
 /**
@@ -1253,6 +1258,8 @@ export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget
           </>
         )}
       </section>
+
+      <InboundAutomationSettings routing={settings.routing} consents={settings.consents} />
 
       <p className="ht-settings__notice" data-testid="key-notice">
         <Lock size={ICON_SIZE.xs} aria-hidden="true" />

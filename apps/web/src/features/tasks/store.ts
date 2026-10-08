@@ -48,6 +48,7 @@ import {
   createTaskActions,
   type ActionContext,
   type AiFeedbackInput,
+  type LocalApiHostOptions,
   type NewTaskFields,
   type WidgetDrainTasks,
 } from '@heyta/app-host';
@@ -57,6 +58,7 @@ import {
   __resetOpLogForTests as resetEngine,
   currentState,
   dispatchIntent,
+  dispatchChecked,
   initOpLog as initShared,
   onEngineChange,
 } from '../../lib/oplog.js';
@@ -99,6 +101,7 @@ interface TaskState {
    */
   renameTask: (id: string, title: string) => Promise<void>;
   setPriority: (id: string, priority: Priority) => Promise<void>;
+  bulkSetPriorities: (entries: readonly { id: string; priority: Priority }[]) => Promise<void>;
   setImportant: (id: string, important: boolean) => Promise<void>;
   /**
    * 一次拖放 = 一条 op。计划来自领域层的 `planQuadrantDrop`。
@@ -195,6 +198,7 @@ export function __resetOpLogForTests(): void {
  */
 const actionContext: ActionContext = {
   dispatch: dispatchIntent,
+  dispatchChecked,
   getState: currentState,
 };
 
@@ -226,8 +230,13 @@ export const widgetDrainTasks: WidgetDrainTasks = {
  * （ADR-0011 §6.1 与 `ai-open-decisions.md` 决策 1：先不做）。
  * 将来接解密失败那条路径时，只需要改这一处。
  */
-export function createAiToolHost(): LocalApiHost {
-  return createLocalApiHost(actionContext, taskActions, { isReadable: () => true });
+export function createAiToolHost(
+  options: Pick<LocalApiHostOptions, 'memoryEnabled' | 'getDurationPreferenceHints'> = {},
+): LocalApiHost {
+  return createLocalApiHost(actionContext, taskActions, {
+    isReadable: () => true,
+    ...options,
+  });
 }
 /**
  * 反馈动作。**与任务动作分开**：它写的不是用户内容，而是"用户怎么用 AI"。
@@ -301,6 +310,10 @@ export const useTaskStore = create<TaskState>((set) => ({
 
   setPriority: async (id, priority) => {
     await taskActions.setPriority(id, priority);
+  },
+
+  bulkSetPriorities: async (entries) => {
+    await taskActions.bulkSetPriorities(entries);
   },
 
   setImportant: async (id, important) => {

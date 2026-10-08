@@ -153,15 +153,17 @@ describe('E2 —— 清单与真源逐字对账（抄件一定会漂）', () => 
     return found[1];
   }
 
-  it('三个库名与各自的真源**逐字相同**', () => {
+  it('四个库名与各自的真源**逐字相同**', () => {
     const oplog = readFileSync(join(WEB_SRC, 'lib/oplog.ts'), 'utf8');
     const vault = readFileSync(join(WEB_SRC, 'lib/vault-session.ts'), 'utf8');
+    const inbound = readFileSync(join(WEB_SRC, 'features/settings/inbound-runtime.ts'), 'utf8');
     const sw = readFileSync(join(WEB_SRC, 'pwa/sw.ts'), 'utf8');
 
     expect([...WEB_DATABASE_NAMES].sort()).toEqual(
       [
         literal(oplog, /export function initOpLog\(dbName = '([^']+)'\)/),
         literal(vault, /const DB_NAME = '([^']+)'/),
+        literal(inbound, /const DB_NAME = '([^']+)'/),
         literal(sw, /const DB_NAME = '([^']+)'/),
       ].sort(),
     );
@@ -290,7 +292,7 @@ function resolveName(arg: string, source: string): string | undefined {
 }
 
 describe('E2 —— 逐类真的清掉', () => {
-  it('🔴 三个库 + heyta* 键 + 令牌四键 + OPFS + CacheStorage 一起没', async () => {
+  it('🔴 四个库 + heyta* 键 + 令牌四键 + OPFS + CacheStorage 一起没', async () => {
     for (const name of WEB_DATABASE_NAMES) {
       const adapter = new IndexedDbAdapter(name);
       await adapter.init();
@@ -311,7 +313,7 @@ describe('E2 —— 逐类真的清掉', () => {
 
     const reports = await eraseWebLocalData();
 
-    expect(reports.length, `报告 ${String(reports.length)} 条 ⇒ 有代码没跑到`).toBe(8);
+    expect(reports.length, `报告 ${String(reports.length)} 条 ⇒ 有代码没跑到`).toBe(9);
     for (const name of WEB_DATABASE_NAMES) {
       expect(await opsCount(name), `「${name}」里还有东西`).toBe(0);
     }
@@ -344,7 +346,7 @@ describe('E2 —— 逐类真的清掉', () => {
 
     const reports = await eraseWebLocalData();
 
-    expect(reports).toHaveLength(8);
+    expect(reports).toHaveLength(9);
     expect(reports[0]?.containerRemoved).toBe(false);
     expect(reports[0]?.reason).toContain('别的标签页');
     // 后面几类真的做了，不是被 catch 顺手跳过的。
@@ -392,7 +394,7 @@ describe('E2 —— 逐类真的清掉', () => {
     installServiceWorkerLayer();
 
     const reports = await eraseWebLocalData();
-    expect(reports).toHaveLength(8);
+    expect(reports).toHaveLength(9);
     expect(reports.filter((r) => !r.containerRemoved).map((r) => r.target)).toEqual([
       'sessionStorage',
       'sessionStorage:令牌键',

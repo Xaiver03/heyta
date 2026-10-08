@@ -39,7 +39,7 @@ import {
   type TickTickParseFailure,
 } from '@heyta/domain';
 
-import { currentState, dispatchIntent } from '../../lib/oplog.js';
+import { currentState, dispatchIntent, dispatchChecked } from '../../lib/oplog.js';
 
 /**
  * 动作层的宿主上下文。
@@ -49,6 +49,7 @@ import { currentState, dispatchIntent } from '../../lib/oplog.js';
  */
 const actionContext: ActionContext = {
   dispatch: dispatchIntent,
+  dispatchChecked,
   getState: currentState,
 };
 

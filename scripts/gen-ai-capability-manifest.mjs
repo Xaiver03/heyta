@@ -831,7 +831,7 @@ function missingDistMessage(file) {
   );
 }
 
-/** @returns {Promise<{protocolEntityTypes: string[], modeledEntityTypes: string[], tools: object[], warnings: string[]}>} */
+/** @returns {Promise<{protocolEntityTypes: string[], modeledEntityTypes: string[], tools: object[], warnings: string[], maxToolsPerEntity: number, maxToolsPerEntityByType: object}>} */
 export async function readUpstream() {
   const problems = [];
   for (const file of [LOCAL_API_DIST, DOMAIN_DIST, SHARED_SCHEMA_DIST]) {
@@ -978,6 +978,7 @@ export async function readUpstream() {
      * 而两条路径对同一个常量各拿一份值时，其中一份是旧的这件事没有任何信号。
      */
     maxToolsPerEntity: localApi.MAX_TOOLS_PER_ENTITY,
+    maxToolsPerEntityByType: localApi.MAX_TOOLS_PER_ENTITY_BY_TYPE,
   };
 }
 

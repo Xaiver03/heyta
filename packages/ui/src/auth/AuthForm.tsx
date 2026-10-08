@@ -658,7 +658,7 @@ export function AuthForm({
             onPress={guard(onSubmit)}
             testID={`${testID}-registration-code-submit`}
             disabled={busy || registrationExpired || registrationCode.length !== registrationCodeLabel.codeLength}
-            accessibilityState={{ disabled: busy || registrationExpired || registrationCode.length !== registrationCodeLabel.codeLength }}
+            aria-disabled={busy || registrationExpired || registrationCode.length !== registrationCodeLabel.codeLength}
             style={({ pressed }) => [styles.primary, pressed ? styles.primaryPressed : null,
               busy || registrationExpired || registrationCode.length !== registrationCodeLabel.codeLength
                 ? { opacity: tokens['state.disabled-opacity'] } : null]}

@@ -110,6 +110,22 @@ test.describe('对话助手：真浏览器端到端旅程', () => {
     await expect(page.locator('[data-testid="ai-assistant-destination"]')).toContainText(
       STUB_ENDPOINT,
     );
+    await expect(page.getByTestId('ai-assistant-field-summary')).toContainText('任务内容（含备注）');
+    await expect(page.getByTestId('ai-assistant-field-list')).toHaveCount(0);
+    await expect(page.getByTestId('ai-assistant-disclosure-tools')).not.toBeVisible();
+    const disclosureBounds = await disclosure.boundingBox();
+    const conversationBounds = await page.getByTestId('ai-assistant-conversation').boundingBox();
+    expect(disclosureBounds!.y).toBeGreaterThanOrEqual(conversationBounds!.y - 1);
+    await expect(page.getByTestId('ai-assistant-disclosure-close')).toBeInViewport();
+    await expect(page.getByTestId('ai-assistant-send')).toBeInViewport({ ratio: 1 });
+    await expect(page.getByTestId('ai-assistant-input')).toHaveCount(0);
+    await page.screenshot({ path: path.resolve(EVIDENCE, '../ux-round6/disclosure/web-summary.png') });
+    await switchTheme(page, 'dark');
+    await expect(page.getByTestId('ai-assistant-send')).toBeInViewport({ ratio: 1 });
+    await page.screenshot({ path: path.resolve(EVIDENCE, '../ux-round6/disclosure/web-summary-dark.png') });
+    await switchTheme(page, 'light');
+    await page.getByTestId('ai-assistant-fields-toggle').click();
+    await page.getByTestId('ai-assistant-technical-details').locator('summary').click();
     // 披露必须把**并集**说出来（含正文与信封字段），不是只说"这句话 + 工具名"。
     const fields = await page.locator('[data-testid="ai-assistant-field-list"]').textContent();
     expect(fields, `披露里的字段集合：${String(fields)}`).toContain('task.body');
@@ -120,6 +136,9 @@ test.describe('对话助手：真浏览器端到端旅程', () => {
     await expect(page.locator('[data-testid="ai-assistant-disclosure-limits"]')).toContainText('7');
     // 🔴 这一步是可失败检查：披露只算不发。
     await expectNoStubCall(request);
+
+    await page.getByTestId('ai-assistant-fields-toggle').click();
+    await page.getByTestId('ai-assistant-technical-details').locator('summary').click();
 
     await page.screenshot({ path: `${EVIDENCE}/1-disclosure.png`, fullPage: true });
 

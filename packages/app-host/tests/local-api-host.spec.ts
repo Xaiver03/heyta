@@ -16,7 +16,7 @@
 
 import { readFileSync } from 'node:fs';
 
-import { dueDateToEpoch, localTimeOf, Priority } from '@heyta/domain';
+import { dueDateToEpoch, localTimeOf, Priority, type FocusSession } from '@heyta/domain';
 import { OpLogEngine } from '@heyta/op-log';
 import { DbOpLogStore, INDEXEDDB_SCHEMA, SqliteAdapter } from '@heyta/storage';
 import { NodeSqliteDriver } from '@heyta/storage/sqlite/node';
@@ -24,6 +24,7 @@ import { OpType, type Operation } from '@heyta/sync-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createTaskActions, type TaskActions } from '../src/actions.js';
+import { createFocusActions } from '../src/focus-actions.js';
 import { createProjectActions } from '../src/project-actions.js';
 import {
   createLocalApiHost,
@@ -308,6 +309,104 @@ describe('🔴🔴 不可读任务连 body 字段都不存在', () => {
   });
 });
 
+describe('任务估时上下文', () => {
+  it('可读任务返回当前估时、最近 20 条有效历史与正文', async () => {
+    const taskId = await actions.create('估时任务', { note: '补充说明\n预计耗时：30 分钟' });
+    const focus = createFocusActions(engine, { newFocusId: (() => {
+      let n = 0;
+      return () => `focus-${String(++n)}`;
+    })() });
+    for (let i = 0; i < 25; i += 1) {
+      clock += 1_000;
+      const session: FocusSession = {
+        id: `input-${String(i)}`,
+        kind: 'work',
+        taskId,
+        plannedMs: (i + 1) * 60_000,
+        actualMs: (i + 2) * 60_000,
+        completed: true,
+        createdAt: clock,
+        updatedAt: clock,
+      };
+      await focus.log(session);
+    }
+
+    const context = await makeHost().getTaskEstimateContext?.(taskId);
+    expect(context).toMatchObject({
+      taskId,
+      title: '估时任务',
+      readable: true,
+      body: '补充说明\n预计耗时：30 分钟',
+      currentMinutes: 30,
+    });
+    expect(context?.history).toHaveLength(20);
+    expect(context?.history?.[0]).toEqual({ plannedMs: 6 * 60_000, actualMs: 7 * 60_000 });
+    expect(context?.history?.at(-1)).toEqual({ plannedMs: 25 * 60_000, actualMs: 26 * 60_000 });
+  });
+
+  it('默认关闭记忆：不调用偏好来源，也不返回 preferences', async () => {
+    const taskId = await actions.create('无偏好任务');
+    let reads = 0;
+    const host = makeHost({
+      isReadable: () => true,
+      getDurationPreferenceHints: () => {
+        reads += 1;
+        return [{ id: 'estimate-bias', text: '不应被读取' }];
+      },
+    });
+
+    const context = await host.getTaskEstimateContext?.(taskId);
+    expect(context?.preferences).toBeUndefined();
+    expect(reads).toBe(0);
+  });
+
+  it('记忆开启时才返回宿主提供的最小偏好提示', async () => {
+    const taskId = await actions.create('有偏好任务');
+    const host = makeHost({
+      isReadable: () => true,
+      memoryEnabled: true,
+      getDurationPreferenceHints: () => [{ id: 'estimate-bias', text: '按历史偏差校正' }],
+    });
+
+    const context = await host.getTaskEstimateContext?.(taskId);
+    expect(context?.preferences).toEqual([{ id: 'estimate-bias', text: '按历史偏差校正' }]);
+  });
+
+  it('不可读任务不泄露正文、历史或偏好', async () => {
+    const taskId = await actions.create('私密估时任务', { note: '秘密\n预计耗时：90 分钟' });
+    let reads = 0;
+    const host = makeHost({
+      isReadable: () => false,
+      memoryEnabled: true,
+      getDurationPreferenceHints: () => {
+        reads += 1;
+        return [{ id: 'estimate-bias', text: '不应被读取' }];
+      },
+    });
+
+    const context = await host.getTaskEstimateContext?.(taskId);
+    expect(context).toEqual({ taskId, title: '私密估时任务', readable: false });
+    expect(reads).toBe(0);
+  });
+
+  it('写入估时使用队列中的最新备注，重复值不产生额外 op', async () => {
+    const taskId = await actions.create('写入估时', { note: '旧正文' });
+    const host = makeHost();
+
+    // 先排入备注更新，再排入估时：估时必须在自己的队列回调里读取这份最新正文。
+    await Promise.all([
+      actions.setNote(taskId, '最新正文'),
+      actions.setTaskEstimate(taskId, 45),
+    ]);
+    expect(actions.findTask(taskId)?.note).toBe('最新正文\n预计耗时：45 分钟');
+
+    const before = (await engine.getAllOps()).length;
+    const result = await host.submit({ action: 'set-task-estimate', taskId, minutes: 45 });
+    expect(result).toEqual({ ok: true, taskId });
+    expect((await engine.getAllOps()).length).toBe(before);
+  });
+});
+
 // ─────────────────────────────────────────────────────────────────────────
 // 读
 // ─────────────────────────────────────────────────────────────────────────
@@ -455,6 +554,39 @@ describe('🔴🔴 写操作真的经 dispatch 产出 op', () => {
     expect((await makeHost().getTask(created.taskId))?.title).toBe('新标题');
   });
 
+  it('update-task 多字段一次只落一条 UPDATE op', async () => {
+    const created = await makeHost().submit({ action: 'create-task', title: '旧标题' });
+    if (!created.ok) throw new Error('创建失败');
+    const before = await opsOf(created.taskId);
+    const updated = await makeHost().submit({
+      action: 'update-task',
+      taskId: created.taskId,
+      fields: { title: '新标题', priority: 'high', dueDate: '2026-03-15', completed: true },
+    });
+    expect(updated.ok).toBe(true);
+    const ops = await opsOf(created.taskId);
+    expect(ops).toHaveLength(before.length + 1);
+    expect(ops.at(-1)?.opType).toBe(OpType.Update);
+    expect(ops.at(-1)?.payload).toMatchObject({
+      title: '新标题', priority: Priority.High, dueDate: fromLocalDateString('2026-03-15'),
+    });
+    expect((await makeHost().getTask(created.taskId))?.completed).toBe(true);
+  });
+
+  it('update-task 后字段非法时不留下前字段的半写入', async () => {
+    const created = await makeHost().submit({ action: 'create-task', title: '旧标题' });
+    if (!created.ok) throw new Error('创建失败');
+    const before = await opsOf(created.taskId);
+    const updated = await makeHost().submit({
+      action: 'update-task',
+      taskId: created.taskId,
+      fields: { title: '不应写入', priority: 'high', dueDate: '2026-02-31' },
+    });
+    expect(updated.ok).toBe(false);
+    expect(await opsOf(created.taskId)).toHaveLength(before.length);
+    expect((await makeHost().getTask(created.taskId))?.title).toBe('旧标题');
+  });
+
   it('🔴 不认识的字段被**拒绝**，不是静默忽略', async () => {
     const created = await makeHost().submit({ action: 'create-task', title: 'x' });
     if (!created.ok) throw new Error('创建失败');
@@ -523,6 +655,105 @@ describe('🔴🔴 写操作真的经 dispatch 产出 op', () => {
   });
 });
 
+describe('append-task-checklist（追加清单）', () => {
+  it('保留原备注，并用一条 setNote op 追加未完成条目', async () => {
+    const id = await actions.create('发布版本', { note: '原有备注' });
+    const before = await opsOf(id);
+    const result = await makeHost().submit({
+      action: 'append-task-checklist',
+      taskId: id,
+      items: ['准备说明', '通知团队'],
+    });
+
+    expect(result).toEqual({ ok: true, taskId: id });
+    expect(actions.findTask(id)?.note).toBe('原有备注\n\n- [ ] 准备说明\n- [ ] 通知团队');
+    const after = await opsOf(id);
+    expect(after).toHaveLength(before.length + 1);
+    expect(after.at(-1)?.opType).toBe(OpType.Update);
+    expect((after.at(-1)?.payload as Record<string, unknown>)['note']).toBe(
+      '原有备注\n\n- [ ] 准备说明\n- [ ] 通知团队',
+    );
+  });
+
+  it('重复确认保持同一备注且不再写 op', async () => {
+    const id = await actions.create('发布版本', { note: '原有备注' });
+    const intent = { action: 'append-task-checklist', taskId: id, items: ['准备说明'] } as const;
+    expect((await makeHost().submit(intent)).ok).toBe(true);
+    const before = await opsOf(id);
+    expect((await makeHost().submit(intent)).ok).toBe(true);
+    expect(await opsOf(id)).toHaveLength(before.length);
+    expect(actions.findTask(id)?.note).toBe('原有备注\n\n- [ ] 准备说明');
+  });
+
+  it('任务不存在时拒绝且不写 op', async () => {
+    const before = await engine.getAllOps();
+    const result = await makeHost().submit({
+      action: 'append-task-checklist',
+      taskId: 'missing-task',
+      items: ['准备说明'],
+    });
+    expect(result).toMatchObject({ ok: false, reason: 'not-found' });
+    expect(await engine.getAllOps()).toHaveLength(before.length);
+  });
+
+  it('两个并发追加都基于队列内最新备注并保留', async () => {
+    const id = await actions.create('并发清单');
+    const before = await opsOf(id);
+    const [first, second] = await Promise.all([
+      actions.appendChecklist(id, ['第一项']),
+      actions.appendChecklist(id, ['第二项']),
+    ]);
+
+    expect(first).toBe('appended');
+    expect(second).toBe('appended');
+    expect(actions.findTask(id)?.note).toBe('- [ ] 第一项\n\n- [ ] 第二项');
+    expect(await opsOf(id)).toHaveLength(before.length + 2);
+  });
+
+  it('排队后调用方修改 items 不会污染已经选定的清单', async () => {
+    const id = await actions.create('清单快照');
+    const items = ['原始条目'];
+    const rename = actions.rename(id, '清单快照（排队）');
+    const append = actions.appendChecklist(id, items);
+    items[0] = '被篡改的条目';
+
+    await Promise.all([rename, append]);
+    expect(actions.findTask(id)?.note).toBe('- [ ] 原始条目');
+  });
+
+  it('删除已排队时，后续清单追加不落 op', async () => {
+    const id = await actions.create('先删后加');
+    const before = await opsOf(id);
+    const [, append] = await Promise.all([
+      actions.remove(id),
+      actions.appendChecklist(id, ['不应写入']),
+    ]);
+
+    expect(append).toBe('not-found');
+    expect(await opsOf(id)).toHaveLength(before.length + 1);
+  });
+
+  it('一次提交失败后可重试追加', async () => {
+    let fail = true;
+    const retryable = createTaskActions({
+      dispatch: engine.dispatch.bind(engine),
+      dispatchChecked: async <T>(build: (state: ReturnType<typeof engine.getState>) => { intent?: import('@heyta/op-log').OpIntent; value: T }) => {
+        if (fail) {
+          fail = false;
+          throw new Error('模拟落盘失败');
+        }
+        return engine.dispatchChecked(build);
+      },
+      getState: () => engine.getState(),
+    });
+    const id = await actions.create('可重试');
+
+    await expect(retryable.appendChecklist(id, ['重试项'])).rejects.toThrow('模拟落盘失败');
+    expect(await retryable.appendChecklist(id, ['重试项'])).toBe('appended');
+    expect(actions.findTask(id)?.note).toBe('- [ ] 重试项');
+  });
+});
+
 /**
  * W11 批量完成的落库侧。参数层的判据在
  * `packages/local-api/tests/tool-batch-complete.spec.ts`，这里只测**只有真引擎能回答**的事：
@@ -544,13 +775,13 @@ describe('complete-tasks（批量完成）', () => {
     return (await engine.getAllOps()).length;
   }
 
-  it('🔴 建 5 条再批量完成：op 增量**恰好 5**（不是"至少 1"）', async () => {
+  it('🔴 建 5 条再批量完成：op 增量**恰好 1 条 BATCH op**', async () => {
     const created = await createTasks(['a', 'b', 'c', 'd', 'e']);
     const before = await opCount();
     const result = await makeHost().submit({ action: 'complete-tasks', taskIds: created });
 
     expect(result.ok).toBe(true);
-    expect(await opCount() - before, '一条批量写了不止 5 条 ⇒ 有一步偷偷多发了 op').toBe(5);
+    expect(await opCount() - before, '一条批量必须只写一条 BATCH op').toBe(1);
     const host = makeHost();
     for (const id of created) {
       expect((await host.getTask(id))?.completed, `${id} 没被真的完成`).toBe(true);
@@ -592,7 +823,7 @@ describe('complete-tasks（批量完成）', () => {
     const result = await makeHost().submit({ action: 'complete-tasks', taskIds: created });
     if (!result.ok) throw new Error(`批量失败：${result.message}`);
 
-    expect(await opCount() - before, '给已完成的任务又写了一条 op').toBe(3);
+    expect(await opCount() - before, '未完成任务应由一条 BATCH op 一次完成').toBe(1);
     expect(result.taskIds).toEqual(created.slice(1));
   });
 
@@ -616,5 +847,60 @@ describe('complete-tasks（批量完成）', () => {
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error('期望被拒');
     expect(result.reason).toBe('invalid');
+  });
+
+  it('重复任务混入批量时先拒绝，且一条 op 都不写', async () => {
+    const repeat = await actions.create('每周复盘');
+    await actions.setRepeat(repeat, 'FREQ=WEEKLY');
+    const normal = await actions.create('普通任务');
+    const before = await opCount();
+
+    const result = await makeHost().submit({ action: 'complete-tasks', taskIds: [normal, repeat] });
+    expect(result).toMatchObject({ ok: false, reason: 'invalid' });
+    if (!result.ok) expect(result.message).toContain('重复任务请逐条完成');
+    expect(await opCount()).toBe(before);
+    expect(actions.findTask(normal)?.completedAt).toBeUndefined();
+  });
+});
+
+describe('set-task-priorities（批量改优先级）', () => {
+  it('预检整批后只调用一次 bulkSetPriorities，并返回全部 taskIds', async () => {
+    const first = await actions.create('第一条');
+    const second = await actions.create('第二条');
+    const before = await engine.getAllOps();
+
+    const result = await makeHost().submit({
+      action: 'set-task-priorities',
+      entries: [
+        { taskId: first, priority: 'high' },
+        { taskId: second, priority: 'low' },
+      ],
+    });
+
+    expect(result).toEqual({ ok: true, taskId: first, taskIds: [first, second] });
+    expect((await engine.getAllOps()).length - before.length).toBe(1);
+    expect(actions.findTask(first)?.priority).toBe(Priority.High);
+    expect(actions.findTask(second)?.priority).toBe(Priority.Low);
+  });
+
+  it('任务不存在或优先级非法时整批拒绝且不写 op', async () => {
+    const first = await actions.create('第一条');
+    const before = await engine.getAllOps();
+    const missing = await makeHost().submit({
+      action: 'set-task-priorities',
+      entries: [
+        { taskId: first, priority: 'high' },
+        { taskId: 'missing', priority: 'low' },
+      ],
+    });
+    expect(missing).toMatchObject({ ok: false, reason: 'not-found' });
+    expect((await engine.getAllOps()).length).toBe(before.length);
+
+    const invalid = await makeHost().submit({
+      action: 'set-task-priorities',
+      entries: [{ taskId: first, priority: 'urgent' }],
+    });
+    expect(invalid).toMatchObject({ ok: false, reason: 'invalid' });
+    expect((await engine.getAllOps()).length).toBe(before.length);
   });
 });

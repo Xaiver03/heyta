@@ -160,6 +160,7 @@ export const DEFAULT_FEATURE_CAPABILITIES: Readonly<
   // 🔴 这一条是 `tool_calling` 能力**第一个真实消费者** ——
   // 在此之前它只是词表里的一个成员，勾上没有任何效果（见 `AiCapability` 注释）。
   'tool-calling': ['tool_calling'],
+  'inbound-automation': ['structured_output'],
 };
 
 /** 端点未声明能力时的默认值 —— 只有基线，不含视觉/工具/长上下文。 */

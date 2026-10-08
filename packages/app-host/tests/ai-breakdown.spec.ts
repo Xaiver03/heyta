@@ -399,6 +399,11 @@ describe('🔴 mergeChecklistIntoNote', () => {
     expect(merged).toBe('这是我自己写的。\n\n- [ ] 甲\n- [ ] 乙');
     expect(merged.startsWith('这是我自己写的。')).toBe(true);
   });
+
+  it('重放同一批清单时保持备注不变', () => {
+    const existing = '原有备注  \n\n- [ ] 甲\n- [ ] 乙';
+    expect(mergeChecklistIntoNote(existing, ['甲', '乙'])).toBe(existing);
+  });
 });
 
 describe('manualChecklistSkeleton', () => {

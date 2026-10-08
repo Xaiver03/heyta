@@ -186,6 +186,7 @@ assert(widgetFacts.backend === 'shell', `页侧存储后端不是 native shell�
 assert(/原生桌面|native desktop/i.test(widgetFacts.statusText), `状态行没有识别为原生桌面：${widgetFacts.statusText}`);
 assert(widgetFacts.capabilityText.length > 0, '原生壳没有渲染小组件能力边界说明');
 assert(widgetFacts.installStepCount === 0, `原生壳不应显示 PWA 安装步骤，实际 ${String(widgetFacts.installStepCount)} 条`);
+await widget.scrollIntoViewIfNeeded();
 await page.screenshot({ path: resolve(OUT, 'windows-widget-native.png'), fullPage: false });
 
 const shellBefore = page.url();
@@ -250,3 +251,4 @@ const result = {
 writeFileSync(resolve(OUT, 'windows-widget-help.json'), `${JSON.stringify(result, null, 2)}\n`);
 console.log(`✅ Windows 安装态 Widget + 帮助外链验收通过：${resolve(OUT)}`);
 console.log(JSON.stringify(result, null, 2));
+await browser.close();

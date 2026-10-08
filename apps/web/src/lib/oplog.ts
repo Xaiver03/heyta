@@ -12,7 +12,7 @@
  * 它是 D4 在本仓库的落点：任何绕过它的实体写入都不会进 op-log。
  */
 
-import { OpLogEngine, type MaterializedState, type OpIntent } from '@heyta/op-log';
+import { OpLogEngine, type MaterializedState, type OpIntent, type CheckedDispatchBuilder } from '@heyta/op-log';
 import {
   createOpLogWirePort,
   createWorkerOpLogSession,
@@ -562,6 +562,13 @@ export async function readRecentOps(
 export async function dispatchIntent(intent: OpIntent): Promise<void> {
   await requireEngine().dispatch(intent);
   notify();
+}
+
+/** Serialize a state-dependent action decision with the shared engine queue. */
+export async function dispatchChecked<T>(build: CheckedDispatchBuilder<T>): Promise<T> {
+  const value = await requireEngine().dispatchChecked(build);
+  notify();
+  return value;
 }
 
 /** 应用一批远程 op（3.3 同步客户端会调用）。 */

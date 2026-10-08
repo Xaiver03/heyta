@@ -54,8 +54,8 @@
  *    而"模型：{model}"这条模板的插值只能在有 i18n 的那一侧做。
  */
 
-import React, { useMemo } from 'react';
-import { StyleSheet, Text, View, type TextStyle } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Pressable, StyleSheet, Text, View, type TextStyle } from 'react-native';
 import { Cloud, HardDrive, TriangleAlert } from 'lucide';
 
 import { HeytaIcon, type HeytaIconData } from '../icon/Icon.js';
@@ -67,6 +67,12 @@ import {
 } from './model.js';
 
 export type { AiDisclosureInput, AiDisclosureTarget } from './model.js';
+
+/** Known data families. Unknown fields remain visible verbatim instead of disappearing. */
+export const AI_DISCLOSURE_FIELD_GROUPS = [
+  'task', 'project', 'tag', 'note', 'habit', 'habit_log', 'focus_session',
+  'reminder', 'event', 'text', 'today', 'tools', 'tool',
+] as const;
 
 /**
  * 宿主注入的文案。**每一项都是一整句**（或已经插值好的整句），
@@ -85,6 +91,9 @@ export interface AiDisclosureLabels {
   readonly fieldsLead: string;
   readonly e2eeLead: string;
   readonly e2eeStrong: string;
+  readonly showFields?: string;
+  readonly hideFields?: string;
+  readonly fieldGroups?: Readonly<Record<string, string>>;
 }
 
 export interface AiDisclosureProps extends AiDisclosureInput {
@@ -133,9 +142,14 @@ export function AiDisclosure({
 }: AiDisclosureProps): React.JSX.Element {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
+  const [fieldsExpanded, setFieldsExpanded] = useState(false);
 
   const ids = aiDisclosureTestIds(testIdPrefix);
   const view = toAiDisclosureViewModel({ target, fields, retentionText, separator });
+  const summarizedFields = [...new Set(fields.map((field) => labels.fieldGroups?.[field.split('.')[0] ?? field] ?? field))].join(separator);
+  // Short feature-specific lists stay inline; the assistant's broad data
+  // catalogue needs progressive disclosure to keep its action reachable.
+  const canCollapse = fields.length > 8 && labels.showFields !== undefined && labels.hideFields !== undefined && summarizedFields !== view.fieldsText;
 
   /**
    * token 里的字重是**数字**（`600`），而 RN 的 `fontWeight` 只接受字符串联合。
@@ -159,6 +173,9 @@ export function AiDisclosure({
         subtle: { color: tokens['color.foreground-subtle'] },
         strong: { fontWeight: strongWeight },
         tag: { color: tokens['color.foreground-muted'] },
+        content: { flex: 1, minWidth: 0, gap: tokens['space.1'] },
+        disclosure: { minHeight: tokens['touch-target.min'], justifyContent: 'center', alignSelf: 'flex-start' },
+        action: { color: tokens['color.primary'] },
       }),
     [tokens],
   );
@@ -171,15 +188,14 @@ export function AiDisclosure({
           data={view.isLocal ? GLYPHS.local : GLYPHS.remote}
           color={tokens['color.foreground-muted']}
         />
-        <Text style={text['row-meta']}>
-          {labels.destinationLead}
-          <Text style={styles.strong}>{view.label}</Text>
-          <Text style={styles.subtle}>{view.endpoint}</Text>
-          <Text>{labels.model}</Text>
-          <Text style={styles.tag} testID={ids.destinationKind}>
+        <View style={styles.content}>
+          <Text style={text['row-title']}>{labels.destinationLead}{view.label}</Text>
+          <Text style={[text['row-meta'], styles.subtle]}>{view.endpoint}</Text>
+          <Text style={text['row-meta']}>{labels.model}</Text>
+          <Text style={[text['row-meta'], styles.tag]} testID={ids.destinationKind}>
             {view.isLocal ? labels.local : labels.remote}
           </Text>
-        </Text>
+        </View>
       </View>
 
       {/* ② 🔴 回退链必须披露 —— 首选失败时会自动换一个端点，而那是**另一家公司**，
@@ -187,7 +203,7 @@ export function AiDisclosure({
       {view.fallbacks.length === 0 ? null : (
         <View style={styles.row} testID={ids.fallbacks}>
           <DecorativeIcon data={GLYPHS.warn} color={tokens['color.danger']} />
-          <Text style={[text['row-meta'], styles.warn]}>
+          <Text style={[text['row-meta'], styles.warn, styles.content]}>
             {labels.fallbackLead}
             <Text style={styles.strong} testID={ids.fallbackList}>
               {view.fallbackText}
@@ -209,13 +225,21 @@ export function AiDisclosure({
       )}
 
       {/* ④ 发什么 —— 逐项列出，不许 `['*']`（ai-architecture §4.5 / 判据 8）。 */}
-      <View style={styles.row} testID={ids.fields}>
+      <View testID={ids.fields}>
         <Text style={text['row-meta']}>
           {labels.fieldsLead}
-          <Text style={styles.strong} testID={ids.fieldList}>
-            {view.fieldsText}
+          <Text style={styles.strong} testID={canCollapse ? `${testIdPrefix}field-summary` : ids.fieldList}>
+            {canCollapse ? summarizedFields : view.fieldsText}
           </Text>
         </Text>
+        {canCollapse ? <>
+          <Pressable accessibilityRole="button" aria-expanded={fieldsExpanded}
+            testID={`${testIdPrefix}fields-toggle`} style={styles.disclosure}
+            onPress={() => setFieldsExpanded((expanded) => !expanded)}>
+            <Text style={[text['row-meta'], styles.action]}>{fieldsExpanded ? labels.hideFields : labels.showFields}</Text>
+          </Pressable>
+          {fieldsExpanded ? <Text style={[text['row-meta'], styles.subtle]} testID={ids.fieldList}>{view.fieldsText}</Text> : null}
+        </> : null}
       </View>
 
       {/* ⑤ 面板专有的一行（count / 估时依据）。不开分支，用插槽。 */}
@@ -225,7 +249,7 @@ export function AiDisclosure({
       {view.isLocal ? null : (
         <View style={styles.row} testID={ids.e2eeWarning}>
           <DecorativeIcon data={GLYPHS.warn} color={tokens['color.danger']} />
-          <Text style={[text['row-meta'], styles.warn]}>
+          <Text style={[text['row-meta'], styles.warn, styles.content]}>
             {labels.e2eeLead}
             <Text style={styles.strong}>{labels.e2eeStrong}</Text>
           </Text>

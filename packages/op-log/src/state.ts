@@ -35,7 +35,15 @@ import type {
   Task,
 } from '@heyta/domain';
 import { OpType, compareVectorClocks } from '@heyta/sync-core';
-import { SUPER_SYNC_SNAPSHOT_OP_TYPES, isHeytaFullStatePayload, hasTaskBatchMarker, parseTaskBatchOperation, type HeytaFullStatePayload } from '@heyta/shared-schema';
+import {
+  SUPER_SYNC_SNAPSHOT_OP_TYPES,
+  isHeytaFullStatePayload,
+  hasTaskBatchMarker,
+  parseTaskBatchOperation,
+  hasTaskPriorityBatchMarker,
+  parseTaskPriorityBatchOperation,
+  type HeytaFullStatePayload,
+} from '@heyta/shared-schema';
 import type { Operation, VectorClock } from '@heyta/sync-core';
 
 /** 物化状态。所有实体按 id 索引。 */
@@ -594,6 +602,15 @@ export function applyOperation(
         payload: { ...fields, automationSource: { ...batch.source, itemIndex } },
       }, id);
     }, state);
+  }
+  if (hasTaskPriorityBatchMarker(op.payload)) {
+    const batch = parseTaskPriorityBatchOperation(op);
+    return batch.items.reduce((next, item) =>
+      applyOperationToEntity(next, {
+        ...op,
+        opType: OpType.Update,
+        payload: { priority: item.priority },
+      }, item.id), state);
   }
   if (isFullStateOperation(op)) return applyFullState(state, op);
   if (!isModeled(op.entityType)) return state;

@@ -67,6 +67,7 @@ import {
   displayNameCodePoints,
 } from '@heyta/shared-schema';
 import {
+  AssistantMark,
   SettingsRow,
   resolvePendingUploadPresentation,
   shouldRenderSettingsRow,
@@ -77,7 +78,6 @@ import { Button, Card, Divider, HStack, Screen, SectionHeader, Stack, Text, Text
 import { Icon, type IconName } from '../ui/icons';
 import { MOBILE_FEATURE_ENTRIES, type MobileFeatureEntryKey } from '../nav/feature-entries';
 import { AssistantScreen } from '../ai/AssistantScreen';
-import { isAiConfiguredOnThisDevice, useAiSettings } from '../ai/settings-store';
 import { AvatarBadge } from '../ui/avatar';
 import { prepareAvatarFromUri, type AvatarPrepareError } from '../lib/avatar-prepare';
 import { AccountClosureScreen } from './AccountClosureScreen';
@@ -113,6 +113,7 @@ import {
 } from '../lib/vault-secure-storage';
 import { clearMobileVaultSession } from '../lib/vault-session-cleanup';
 import { useMobileNavigation } from '../nav/navigation';
+import { isProfileAssistantVisible } from '../nav/navigation-state';
 
 export function ProfileScreen(): React.JSX.Element {
   const { status, lastSyncedAt, pendingUpload, busy } = useMobileSync();
@@ -321,14 +322,16 @@ export function ProfileScreen(): React.JSX.Element {
     else navigation.pop();
   };
   /**
-   * AI 助手那一屏（五个功能共用一个入口，见 `ai/AssistantScreen.tsx` 的文件头）。
+   * 单一对话助手，与个人中心共用已有导航栈。
    *
    * 🔴 它是**第二层屏**，不是第 6 个标签 —— 与成长 / 回收站 / 导出同一条纪律。
-   * 🔴 入口行**按本机开关决定是否进树**（`aiEntryVisible`）：
-   * 关掉的功能留在树上、点进去五个面板都发不出去，正是本仓反复记过的那类
-   * "界面在说谎"；而设置那一面**不受它影响** —— 闸就住在那里，看不见就无法打开。
+   * 入口常驻，与 Web 的单一助手一致。未配置远端时仍可执行本地读取，
+   * 需要模型的请求由共享层返回设置提示；可见入口本身不授予出境权限。
    */
-  const assistantOpen = navigation.tab === 'profile' && navigation.stack.at(-1)?.key === 'profile:assistant';
+  // Keep the assistant mounted while another root tab is visible so an in-flight
+  // proposal/draft survives tab switching.  Visibility is separate: the hidden
+  // instance must not register an Android Back handler (see AssistantScreen).
+  const assistantOpen = navigation.stacks.profile.at(-1)?.key === 'profile:assistant';
   const setAssistantOpen = (open: boolean): void => {
     if (open) navigation.push('profile:assistant');
     else navigation.pop();
@@ -700,8 +703,6 @@ export function ProfileScreen(): React.JSX.Element {
    * 就是本仓反复登记过的那个形状（"设置里能授权、授权了什么都不发生"）。
    * 而"关掉的功能不进树"是本壳模块开关的既有口径。
    */
-  const aiSettings = useAiSettings();
-  const aiEntryVisible = isAiConfiguredOnThisDevice(aiSettings);
 
   /**
    * 功能域那几行**由注册表生成**（`nav/feature-entries.ts`）。
@@ -782,20 +783,14 @@ export function ProfileScreen(): React.JSX.Element {
       },
     },
     ...featureRows,
-    ...(aiEntryVisible
-      ? [
-          {
-            kind: 'action' as const,
-            testID: 'profile-entry-assistant',
-            label: t('mobile.ai.entry'),
-            hint: t('mobile.ai.entry.hint'),
-            leading: <Icon name="action.more" size="sm" color={tokens['color.foreground-muted']} />,
-            onPress: () => {
-              setAssistantOpen(true);
-            },
-          },
-        ]
-      : []),
+    {
+      kind: 'action',
+      testID: 'profile-entry-assistant',
+      label: t('mobile.ai.entry'),
+      hint: t('mobile.ai.entry.hint'),
+      leading: <AssistantMark size={tokens['icon.sm']} color={tokens['color.foreground-muted']} />,
+      onPress: () => setAssistantOpen(true),
+    },
     {
       kind: 'action',
       testID: 'profile-entry-trash',
@@ -881,6 +876,15 @@ export function ProfileScreen(): React.JSX.Element {
   if (assistantOpen) {
     return (
       <AssistantScreen
+        onOpenPrivacy={() => {
+          setSettingsSection('sync');
+          navigation.push('settings');
+        }}
+        onOpenSettings={() => {
+          setSettingsSection('ai');
+          navigation.push('settings');
+        }}
+        visible={isProfileAssistantVisible(navigation.tab, navigation.stacks)}
         onBack={() => {
           setAssistantOpen(false);
         }}
@@ -995,6 +999,7 @@ export function ProfileScreen(): React.JSX.Element {
         icon="action.sync"
         disabled={!form.configured}
         loading={busy}
+        style={{ alignSelf: 'flex-start' }}
       />
       {!form.configured ? (
         <Text variant="caption" tone="subtle" style={{ textAlign: 'center' }}>

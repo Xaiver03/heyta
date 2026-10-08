@@ -13,6 +13,11 @@ export {
   taskBatchOperationId, taskBatchItemId,
   type TaskAutomationSource, type TaskBatchItem, type HeytaTaskBatchPayload,
 } from './task-batch-contract';
+export {
+  taskPriorityBatchItemSchema, heytaTaskPriorityBatchPayloadSchema,
+  hasTaskPriorityBatchMarker, parseTaskPriorityBatchOperation,
+  type TaskPriorityBatchItem, type HeytaTaskPriorityBatchPayload,
+} from './task-priority-batch-contract';
 export { isHeytaFullStatePayload, type HeytaFullStatePayload } from './full-state-payload';
 export {
   CURRENT_SCHEMA_VERSION,

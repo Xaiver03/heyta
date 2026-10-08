@@ -756,9 +756,9 @@ export function TaskDetailSheet({
                 icon="task.due"
                 label={t('mobile.detail.field.schedule')}
                 tone={scheduleOpen ? 'secondary' : 'ghost'}
-                accessibilityLabel={t(
-                  scheduleOpen ? 'mobile.detail.schedule.close' : 'mobile.detail.schedule.open',
-                )}
+                accessibilityLabel={scheduleOpen
+                  ? t('mobile.detail.schedule.close')
+                  : t('mobile.detail.schedule.open')}
                 onPress={() => setScheduleOpen((open) => !open)}
               />
               {scheduleOpen ? (

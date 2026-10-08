@@ -3,7 +3,7 @@
  * ================
  *
  * 任务的读工具（`list_tasks` / `get_task`）与写工具（`create_task` / `update_task` /
- * `complete_task`）的**全部**落点：目录条目、给模型看的参数 schema、读分支、写分支。
+ * `append_task_checklist` / `complete_task` / `set_task_priorities`）的**全部**落点：目录条目、给模型看的参数 schema、读分支、写分支。
  * 以前这四件事散在 `tools.ts` / `mcp.ts` / `server.ts` 三个文件里，
  * 加一个工具要同时改对它们，漏一处的症状统一是"这个工具不存在"。
  *
@@ -13,9 +13,17 @@
  */
 
 import type { McpToolDefinition } from '../mcp.js';
-import type { LocalApiHost, ToolReadOutcome, ToolWriteIntentOutcome } from '../server.js';
+import type {
+  LocalApiHost,
+  ToolReadOutcome,
+  ToolWriteIntentOutcome,
+  LocalApiTaskEstimateContext,
+} from '../server.js';
 import {
+  MAX_TASK_CHECKLIST_ITEM_LENGTH,
+  MAX_TASK_CHECKLIST_ITEMS,
   MAX_TASKS_PER_BATCH_COMPLETE,
+  MAX_TASKS_PER_BATCH_PRIORITY,
   projectListForTool,
   readItemForTool,
   readListTasksDueArgs,
@@ -44,6 +52,26 @@ const TOOLS: readonly LocalApiTool[] = [
     defaultEnabled: false,
   },
   {
+    name: 'get_task_estimate_context',
+    egressFields: [
+      'task.id',
+      'task.taskId',
+      'task.title',
+      'task.readable',
+      'task.body',
+      'task.currentMinutes',
+      'task.history',
+      'task.plannedMs',
+      'task.actualMs',
+      'task.preferences',
+      'task.text',
+    ],
+    description:
+      '读取一条任务的估时上下文：标题、可读时的备注、最近至多 20 条有效专注历史和已授权的估时偏好。',
+    kind: 'read',
+    defaultEnabled: false,
+  },
+  {
     name: 'create_task',
     // 写工具只产出提案、结果不回送模型 ⇒ 出境面是**提案里那几个字段**。
     // 写工具的结果**不回送模型**（循环在提案那一刻就停了），所以它不贡献出境字段。
@@ -64,6 +92,13 @@ const TOOLS: readonly LocalApiTool[] = [
     defaultEnabled: false,
   },
   {
+    name: 'append_task_checklist',
+    egressFields: [],
+    description: '把一组未完成清单追加到任务备注末尾，保留已有备注。一次最多 20 条。',
+    kind: 'write',
+    defaultEnabled: false,
+  },
+  {
     name: 'complete_task',
     egressFields: [],
     // ⚠️ 这个数字来自 `MAX_TASKS_PER_BATCH_COMPLETE`，不是抄的：描述会出境给模型，
@@ -71,6 +106,20 @@ const TOOLS: readonly LocalApiTool[] = [
     description:
       '把任务标记为完成。单条给 taskId；要一次完成多条给 taskIds' +
       `（一次最多 ${String(MAX_TASKS_PER_BATCH_COMPLETE)} 条，按去重后的条数算）。`,
+    kind: 'write',
+    defaultEnabled: false,
+  },
+  {
+    name: 'set_task_priorities',
+    egressFields: [],
+    description: `一次给多条任务设置优先级。每条都要给 taskId 与 priority（none / low / medium / high），最多 ${String(MAX_TASKS_PER_BATCH_PRIORITY)} 条。`,
+    kind: 'write',
+    defaultEnabled: false,
+  },
+  {
+    name: 'set_task_estimate',
+    egressFields: [],
+    description: '设置任务的预计耗时（整数分钟，5–480；超出范围会夹到边界）。这项改动必须确认。',
     kind: 'write',
     defaultEnabled: false,
   },
@@ -119,6 +168,14 @@ const SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> = {
     required: ['taskId'],
     additionalProperties: false,
   },
+  get_task_estimate_context: {
+    type: 'object',
+    properties: {
+      taskId: { type: 'string', description: '任务 id。' },
+    },
+    required: ['taskId'],
+    additionalProperties: false,
+  },
   create_task: {
     type: 'object',
     properties: {
@@ -142,6 +199,19 @@ const SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> = {
     required: ['taskId', 'fields'],
     additionalProperties: false,
   },
+  append_task_checklist: {
+    type: 'object',
+    properties: {
+      taskId: { type: 'string', description: '要追加清单的任务 id。' },
+      items: {
+        type: 'array',
+        items: { type: 'string' },
+        description: `要追加的清单条目，每条最多 ${String(MAX_TASK_CHECKLIST_ITEM_LENGTH)} 个字符，最多 ${String(MAX_TASK_CHECKLIST_ITEMS)} 条。`,
+      },
+    },
+    required: ['taskId', 'items'],
+    additionalProperties: false,
+  },
   complete_task: {
     type: 'object',
     properties: {
@@ -157,6 +227,38 @@ const SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> = {
     // ⚠️ 这里刻意**没有** `required`：单条与批量是同一件事的两种范围，
     // "两个都没给"由 `toWriteIntent` 判（判据在那里，症状是一条说得出原因的报错，
     // 不是模型收到一个协议层的 schema 拒绝）。
+    additionalProperties: false,
+  },
+  set_task_priorities: {
+    type: 'object',
+    properties: {
+      entries: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            taskId: { type: 'string', description: '要改优先级的任务 id。' },
+            priority: { type: 'string', description: '优先级：none / low / medium / high。' },
+          },
+          required: ['taskId', 'priority'],
+          additionalProperties: false,
+        },
+        description: `要设置的任务优先级，最多 ${String(MAX_TASKS_PER_BATCH_PRIORITY)} 条。`,
+      },
+    },
+    required: ['entries'],
+    additionalProperties: false,
+  },
+  set_task_estimate: {
+    type: 'object',
+    properties: {
+      taskId: { type: 'string', description: '要设置预计耗时的任务 id。' },
+      minutes: {
+        type: 'number',
+        description: '整数分钟。5–480；低于 5 夹到 5，高于 480 夹到 480。',
+      },
+    },
+    required: ['taskId', 'minutes'],
     additionalProperties: false,
   },
 };
@@ -217,6 +319,22 @@ async function runRead(
       return { ok: true, payload: read.item };
     }
 
+    case 'get_task_estimate_context': {
+      if (typeof a['taskId'] !== 'string' || a['taskId'].trim() === '') {
+        return { ok: false, kind: 'invalid-args', message: 'get_task_estimate_context 需要 taskId。' };
+      }
+      if (host.getTaskEstimateContext === undefined) {
+        return {
+          ok: false,
+          kind: 'invalid-args',
+          message: '这个宿主没有接任务估时上下文，因此没有读取任何任务内容。',
+        };
+      }
+      const context = await host.getTaskEstimateContext(a['taskId'].trim());
+      if (context === undefined) return { ok: true, payload: { error: '没有找到这个任务。' } };
+      return { ok: true, payload: context satisfies LocalApiTaskEstimateContext };
+    }
+
     default:
       // 不是 TASK 的工具名 —— 交给别的 pack，不是"读失败"。
       return undefined;
@@ -233,8 +351,18 @@ async function runRead(
 function toIntent(name: string, a: Record<string, unknown>): ToolWriteIntentOutcome | undefined {
   switch (name) {
     case 'create_task': {
+      const allowed = new Set(['title', 'dueDate', 'priority', 'projectId']);
+      const unknown = Object.keys(a).filter((key) => !allowed.has(key));
+      if (unknown.length > 0) {
+        return { ok: false, message: `create_task 不支持这些参数：${unknown.join('、')}。` };
+      }
       if (typeof a['title'] !== 'string' || a['title'].trim() === '') {
         return { ok: false, message: 'create_task 需要 title。' };
+      }
+      for (const key of ['dueDate', 'priority', 'projectId'] as const) {
+        if (key in a && typeof a[key] !== 'string') {
+          return { ok: false, message: `create_task 的 ${key} 必须是字符串。` };
+        }
       }
       return {
         ok: true,
@@ -260,6 +388,44 @@ function toIntent(name: string, a: Record<string, unknown>): ToolWriteIntentOutc
           fields: a['fields'] as Record<string, unknown>,
         },
       };
+    }
+
+    case 'append_task_checklist': {
+      const unknown = Object.keys(a).filter((key) => key !== 'taskId' && key !== 'items');
+      if (unknown.length > 0) {
+        return { ok: false, message: `append_task_checklist 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['taskId'] !== 'string' || a['taskId'].trim() === '') {
+        return { ok: false, message: 'append_task_checklist 需要 taskId。' };
+      }
+      const rawItems = a['items'];
+      if (!Array.isArray(rawItems) || rawItems.length === 0) {
+        return { ok: false, message: 'append_task_checklist 需要至少一条 items。' };
+      }
+      if (rawItems.length > MAX_TASK_CHECKLIST_ITEMS) {
+        return {
+          ok: false,
+          message: `append_task_checklist 一次最多 ${String(MAX_TASK_CHECKLIST_ITEMS)} 条。`,
+        };
+      }
+      const items: string[] = [];
+      for (const raw of rawItems) {
+        if (typeof raw !== 'string') {
+          return { ok: false, message: 'append_task_checklist 的 items 必须全是字符串。' };
+        }
+        const item = raw.trim();
+        if (item === '') {
+          return { ok: false, message: 'append_task_checklist 的清单条目不能为空。' };
+        }
+        if (item.length > MAX_TASK_CHECKLIST_ITEM_LENGTH) {
+          return {
+            ok: false,
+            message: `append_task_checklist 的单条清单最多 ${String(MAX_TASK_CHECKLIST_ITEM_LENGTH)} 个字符。`,
+          };
+        }
+        items.push(item);
+      }
+      return { ok: true, intent: { action: 'append-task-checklist', taskId: a['taskId'].trim(), items } };
     }
 
     case 'complete_task': {
@@ -306,6 +472,81 @@ function toIntent(name: string, a: Record<string, unknown>): ToolWriteIntentOutc
         return { ok: true, intent: { action: 'complete-task', taskId: only } };
       }
       return { ok: true, intent: { action: 'complete-tasks', taskIds: ids } };
+    }
+
+    case 'set_task_priorities': {
+      const rawEntries = a['entries'];
+      const unknown = Object.keys(a).filter((key) => key !== 'entries');
+      if (unknown.length > 0) {
+        return { ok: false, message: `set_task_priorities 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (!Array.isArray(rawEntries) || rawEntries.length === 0) {
+        return { ok: false, message: 'set_task_priorities 需要至少一条 entries。' };
+      }
+      if (rawEntries.length > MAX_TASKS_PER_BATCH_PRIORITY) {
+        return {
+          ok: false,
+          message: `set_task_priorities 一次最多 ${String(MAX_TASKS_PER_BATCH_PRIORITY)} 条。`,
+        };
+      }
+      const entries: { taskId: string; priority: string }[] = [];
+      const seen = new Set<string>();
+      for (const raw of rawEntries) {
+        if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+          return { ok: false, message: 'set_task_priorities 的 entries 必须全是对象。' };
+        }
+        const entry = raw as Record<string, unknown>;
+        const entryUnknown = Object.keys(entry).filter((key) => key !== 'taskId' && key !== 'priority');
+        if (entryUnknown.length > 0) {
+          return { ok: false, message: `set_task_priorities 的条目不支持这些参数：${entryUnknown.join('、')}。` };
+        }
+        if (!('taskId' in entry) || !('priority' in entry)) {
+          return { ok: false, message: 'set_task_priorities 的每个条目都需要 taskId 与 priority。' };
+        }
+        if (typeof entry['taskId'] !== 'string' || entry['taskId'].trim() === '') {
+          return { ok: false, message: 'set_task_priorities 的 taskId 必须是非空字符串。' };
+        }
+        const taskId = entry['taskId'].trim();
+        if (seen.has(taskId)) {
+          return { ok: false, message: `set_task_priorities 不能重复 taskId「${taskId}」。` };
+        }
+        if (typeof entry['priority'] !== 'string') {
+          return { ok: false, message: 'set_task_priorities 的 priority 必须是字符串。' };
+        }
+        const priority = entry['priority'].trim().toLowerCase();
+        if (!['none', 'low', 'medium', 'high'].includes(priority)) {
+          return {
+            ok: false,
+            message: `优先级应为 none / low / medium / high，收到「${entry['priority']}」。`,
+          };
+        }
+        seen.add(taskId);
+        entries.push({ taskId, priority });
+      }
+      return { ok: true, intent: { action: 'set-task-priorities', entries } };
+    }
+
+    case 'set_task_estimate': {
+      const unknown = Object.keys(a).filter((key) => key !== 'taskId' && key !== 'minutes');
+      if (unknown.length > 0) {
+        return { ok: false, message: `set_task_estimate 不支持这些参数：${unknown.join('、')}。` };
+      }
+      if (typeof a['taskId'] !== 'string' || a['taskId'].trim() === '') {
+        return { ok: false, message: 'set_task_estimate 需要 taskId。' };
+      }
+      if (typeof a['minutes'] !== 'number' || !Number.isFinite(a['minutes']) || !Number.isInteger(a['minutes'])) {
+        return { ok: false, message: 'set_task_estimate 的 minutes 必须是有限整数。' };
+      }
+      if (a['minutes'] < 0) {
+        return { ok: false, message: 'set_task_estimate 的 minutes 不能是负数。' };
+      }
+      // The app-host action owns the canonical clamp implementation. Keeping the
+      // raw integer here lets it reuse that function before the proposal is
+      // submitted, while the contract still rejects fractional input locally.
+      return {
+        ok: true,
+        intent: { action: 'set-task-estimate', taskId: a['taskId'].trim(), minutes: a['minutes'] },
+      };
     }
 
     default:

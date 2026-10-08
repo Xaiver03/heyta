@@ -67,6 +67,7 @@ import {
   ASSISTANT_TIER_EXECUTE,
   assistantEgressFields,
   assistantNeedsEgressDisclosure,
+  assistantGrants,
   confirmAiToolProposal,
   planAssistantEgress,
   requestAssistantTurn,
@@ -119,6 +120,10 @@ export interface AssistantPanelProps {
   onHealth?: (health: HealthMap) => void;
   /** 工具宿主。默认 `createAiToolHost()`；可注入**只为测试**。 */
   host?: LocalApiHost;
+  /** 本机记忆总开关；关闭时工具宿主不得读取偏好来源。 */
+  memoryEnabled?: boolean;
+  /** 估时工具需要的最小偏好提示，由外壳按当前语言与授权派生。 */
+  getDurationPreferenceHints?: () => readonly { id: string; text: string }[];
   /** 网络实现。可注入**只为测试**（与五个既有面板同一约定）。 */
   fetchImpl?: typeof fetch;
   /** 「去设置」的导航。注入缝，只为测试。 */
@@ -147,12 +152,14 @@ interface AssistantEphemeralShape {
   draft: string;
   pending: string | undefined;
   phase: AssistantPhase;
+  confirmationErrors: Readonly<Record<number, string>>;
 }
 
 const ASSISTANT_EPHEMERAL: AssistantEphemeralShape = {
   draft: '',
   pending: undefined,
   phase: 'idle',
+  confirmationErrors: {},
 };
 
 export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
@@ -183,13 +190,48 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
    * 账号绑定（读写两侧都查）也在那一层，两个面板共用同一份实现。
    */
   const ephemeral = usePanelEphemeral('assistant', session.account, ASSISTANT_EPHEMERAL);
-  const { draft, phase } = ephemeral.value;
+  const { draft, phase, confirmationErrors = {} } = ephemeral.value;
+  /**
+   * 事件处理器可能在同一轮 React flush 内被连续触发（快速双击、回车），
+   * 不能只读 render 时捕获的 `phase`。这个 ref 让发送入口在状态提交前也有
+   * 同步的阶段闸门；同一枚闸门也挡住披露确认的重复点击。
+   */
+  const phaseRef = useRef<AssistantPhase>(phase);
+  phaseRef.current = phase;
+  /** 新会话递增；旧请求仍可自然完成，但结果不再有资格写入新会话。 */
+  const requestEpochRef = useRef(0);
   /** Chat 内的选择只影响当前会话；父级可选地把它写回自己的设置事实源。 */
   const [selectedTier, setSelectedTier] = useState<AssistantTier>(props.tier);
+  const selectedTierRef = useRef(selectedTier);
+  selectedTierRef.current = selectedTier;
   const [historyOpen, setHistoryOpen] = useState(false);
   const historyToggleRef = useRef<HTMLButtonElement>(null);
   const historyCloseRef = useRef<HTMLButtonElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  const conversationRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const conversation = conversationRef.current;
+    if (conversation === null) return;
+    const disclosure = phase === 'disclose'
+      ? conversation.querySelector<HTMLElement>('[data-testid="ai-assistant-disclosure"]')
+      : null;
+    // Begin a consent request at its heading, rather than clipping the heading
+    // and close control by jumping to the bottom of a tall disclosure.
+    const revealLatest = (): void => {
+      if (conversation.clientHeight === 0) return;
+      conversation.scrollTop = disclosure === null
+        ? conversation.scrollHeight
+        : conversation.scrollTop + disclosure.getBoundingClientRect().top - conversation.getBoundingClientRect().top;
+    };
+    revealLatest();
+    disclosure?.querySelector<HTMLButtonElement>('[data-testid="ai-assistant-disclosure-close"]')?.focus({ preventScroll: true });
+    // Settings temporarily hide this surface. Re-establish the disclosure's
+    // position when it becomes measurable again, including after a resize.
+    if (disclosure === null || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(revealLatest);
+    observer.observe(conversation);
+    return () => observer.disconnect();
+  }, [items.length, phase]);
   useEffect(() => {
     if (historyOpen) historyCloseRef.current?.focus();
   }, [historyOpen]);
@@ -216,16 +258,26 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
    * `send()` 的"草稿清空但披露没弹出来"就是它的症状。
    */
   const setDraft = (value: string): void => ephemeral.write(session.account, { draft: value });
-  const setPhase = (value: AssistantPhase): void =>
+  const setPhase = (value: AssistantPhase): void => {
+    phaseRef.current = value;
     ephemeral.write(session.account, { phase: value });
+  };
   const setPending = (value: string | undefined): void =>
     ephemeral.write(session.account, { pending: value });
+  const setConfirmationErrors = (value: Readonly<Record<number, string>>): void =>
+    ephemeral.write(session.account, { confirmationErrors: value });
   // 恢复出来的条目占用了 1..n（见 `assistant-history.ts` 的重新编号），
   // 计数器必须从 n 之后接着走，否则第一条新消息会和恢复出来的一条撞 key。
   const idRef = useRef(restored?.items.length ?? 0);
   const confirmInFlight = useRef(false);
 
-  const host = useMemo(() => props.host ?? createAiToolHost(), [props.host]);
+  const host = useMemo(
+    () => props.host ?? createAiToolHost({
+      memoryEnabled: props.memoryEnabled,
+      getDurationPreferenceHints: props.getDurationPreferenceHints,
+    }),
+    [props.getDurationPreferenceHints, props.host, props.memoryEnabled],
+  );
   const settingsNavigation = useAiSettingsNavigation();
   const onOpenSettings = props.onOpenSettings ?? settingsNavigation;
 
@@ -276,7 +328,8 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
     setItems((previous) => [...previous, { ...item, id: idRef.current } as ChatItem]);
   }
 
-  async function turn(text: string): Promise<void> {
+  async function turn(text: string, epoch = requestEpochRef.current): Promise<void> {
+    if (epoch !== requestEpochRef.current) return;
     setPhase('running');
     const outcome = await requestAssistantTurn(
       { text },
@@ -285,6 +338,10 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
         consents: props.consents,
         tier: selectedTier,
         host,
+        getGrants: () =>
+          epoch === requestEpochRef.current && currentAccount() === session.account
+            ? assistantGrants(selectedTierRef.current)
+            : {},
         localize: (key, vars) => t(key as MessageKey, vars),
         executionId: `web:${session.account}:${String(idRef.current)}`,
         history,
@@ -294,6 +351,9 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
         },
       },
     );
+    // 请求可能跨过了「新会话」才回包；它不能结束新会话的运行态，
+    // 也不能把旧回答追加到新会话。
+    if (epoch !== requestEpochRef.current) return;
     // 🔴 熔断状态回写：失败那一次通常正是计数器刚 +1 的时候。
     if (outcome.health !== undefined && props.onHealth !== undefined) props.onHealth(outcome.health);
     setPhase('idle');
@@ -322,6 +382,9 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
   }
 
   function send(): void {
+    // 发送按钮的 disabled 只覆盖真实点击；Enter 和同一轮的重复事件也必须
+    // 经过同一阶段闸门。披露阶段同样不能再追加第二条待发送消息。
+    if (phaseRef.current !== 'idle') return;
     const text = draft.trim();
     if (text === '') return;
     append({ role: 'user', text });
@@ -362,28 +425,47 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
 
   /** 用户在披露块上按「发送」。写"已披露"这件事只在这里发生。 */
   function confirmDisclosure(): void {
+    if (phaseRef.current !== 'disclose') return;
     const text = pending ?? '';
     setDisclosed(true);
     setPending(undefined);
-    setPhase('idle');
-    if (text !== '') void turn(text);
+    if (text !== '') {
+      void turn(text, requestEpochRef.current);
+    } else {
+      setPhase('idle');
+    }
   }
 
   async function confirm(item: ChatItem & { role: 'proposal' }): Promise<void> {
     if (confirmInFlight.current) return;
     confirmInFlight.current = true;
     try {
-      const result = await confirmAiToolProposal(host, item.proposal);
-      setItems((previous) => previous.map((x) => (x === item ? { ...x, confirmed: result } : x)));
+      const result = await confirmAiToolProposal(host, item.proposal, {
+        getGrants: () =>
+          currentAccount() === session.account ? assistantGrants(selectedTierRef.current) : {},
+      });
+      if (result.ok) {
+        setItems((previous) => previous.map((x) => (x === item ? { ...x, confirmed: result } : x)));
+        const next = { ...confirmationErrors };
+        delete next[item.id];
+        setConfirmationErrors(next);
+      } else {
+        setConfirmationErrors({ ...confirmationErrors, [item.id]: result.message });
+      }
     } finally {
       confirmInFlight.current = false;
     }
   }
 
   function newSession(): void {
+    // `requestAssistantTurn` 没有贯穿整个 app-host 管道的取消协议；运行中切走
+    // 只会隐藏旧结果，不能阻止低风险写入落库。因此必须等这一轮结束后再开新会话。
+    if (phaseRef.current === 'running') return;
+    requestEpochRef.current += 1;
     setHistoryOpen(false);
     requestAnimationFrame(() => composerRef.current?.focus());
     setItems([]);
+    setConfirmationErrors({});
     setDisclosed(false);
     setPending(undefined);
     setPhase('idle');
@@ -445,6 +527,7 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
               className="ht-btn ht-btn--ghost ht-ai__history-new"
               data-testid="ai-assistant-new-session"
               onClick={newSession}
+              disabled={phase === 'running'}
             >
               {t('web.ai.chat.newSession')}
             </button>
@@ -568,7 +651,7 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
         </div>
       </div>}
 
-      {hasConversation && <div className="ht-ai__conversation" data-testid="ai-assistant-conversation">
+      {hasConversation && <div ref={conversationRef} className="ht-ai__conversation" data-testid="ai-assistant-conversation">
         <ul
           className="ht-ai__items ht-ai__items--chat"
           data-testid="ai-assistant-transcript"
@@ -595,6 +678,7 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
                 <ProposalCard
                   item={item}
                   onConfirm={() => void confirm(item)}
+                  confirmationError={confirmationErrors[item.id]}
                 />
               )}
 
@@ -634,7 +718,8 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
                 fields={disclosure?.fields ?? []}
                 retentionDisclosure={disclosure?.retentionDisclosure}
               >
-                {/* 工具名与三个上界：这一段是助手**特有**的，共享披露组件不知道它。 */}
+                <details className="ht-ai__technical" data-testid="ai-assistant-technical-details">
+                <summary>{t('web.ai.disclosure.technicalDetails')}</summary>
                 <p className="ht-ai__note" data-testid="ai-assistant-disclosure-tools">
                   {t('web.ai.assistant.toolsTitle')} {plan.tools.join(LIST_SEPARATOR[locale])}
                 </p>
@@ -645,6 +730,7 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
                     bytes: plan.maxBytesPerRequest,
                   })}
                 </p>
+                </details>
               </AiDisclosureHost>
               <div className="ht-ai__actions">
                 <button
@@ -672,7 +758,7 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
 
       </div>}
 
-      {hasConversation && composer}
+      {hasConversation && phase !== 'disclose' && composer}
       </div>
 
       <div className="ht-ai__footer">
@@ -730,15 +816,16 @@ function ChatTrace(props: {
 function ProposalCard(props: {
   item: ChatItem & { role: 'proposal' };
   onConfirm: () => void;
+  confirmationError?: string;
 }): React.JSX.Element {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { item } = props;
   return (
     <>
       {item.text !== '' && <p className="ht-ai__note">{item.text}</p>}
       <p className="ht-ai__row" data-testid="ai-chat-proposal">
         {t('web.ai.tools.proposalLead')}
-        <strong>{intentText(item.proposal.intent, t)}</strong>
+        <strong>{intentText(item.proposal.intent, t, locale)}</strong>
       </p>
       {item.expired === true ? (
         // 🔴 恢复出来的未确认提案：卡片留着（对话断在这儿要看得懂为什么），
@@ -747,6 +834,12 @@ function ProposalCard(props: {
           {t('web.ai.chat.expiredProposal')}
         </p>
       ) : item.confirmed === undefined ? (
+        <>
+        {props.confirmationError !== undefined && (
+          <p className="ht-ai__done" data-testid="ai-chat-confirmation-error">
+            {props.confirmationError}
+          </p>
+        )}
         <div className="ht-ai__actions">
           <button
             type="button"
@@ -758,6 +851,7 @@ function ProposalCard(props: {
             {t('web.ai.tools.confirm')}
           </button>
         </div>
+        </>
       ) : (
         <p className="ht-ai__done" data-testid="ai-chat-confirmed">
           {item.confirmed.ok
