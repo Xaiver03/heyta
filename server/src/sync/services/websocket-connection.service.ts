@@ -391,6 +391,37 @@ export class WebSocketConnectionService {
     }, WebSocketConnectionService.NOTIFY_DEBOUNCE_MS);
   }
 
+  /**
+   * Share-op 信号（ADR-0062）：share 域的 `new_ops` 等价物。
+   *
+   * 与 `notifyNewOps` 同一条安全契约：只说「这个 share 有新 op」与最新序号，
+   * **永远不带任何 op 内容**（服务端本来也只有密文）。v1 不去抖 —— share
+   * 上传频率远低于个人同步，逐条直发足够；去抖属于有读数依据的优化。
+   * 成员名单是调用方（share 路由）的责任，这里只管按 userId 扇出。
+   */
+  notifyShareOps(
+    userIds: number[],
+    shareId: string,
+    excludeClientId: string | null,
+    latestSeq: number,
+  ): void {
+    if (userIds.length === 0) return;
+    const message = {
+      type: 'new_share_ops',
+      shareId,
+      latestSeq,
+      timestamp: Date.now(),
+    };
+    for (const userId of userIds) {
+      const userSet = this.connections.get(userId);
+      if (!userSet) continue;
+      for (const client of userSet) {
+        if (excludeClientId !== null && client.clientId === excludeClientId) continue;
+        this._sendMessage(client.ws, message);
+      }
+    }
+  }
+
   private _sendNewOpsNotification(
     userId: number,
     excludeClientId: string | null,

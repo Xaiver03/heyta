@@ -1,0 +1,5 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`share identity keys > different seeds give different keys (fixed-seed known answer) 1`] = `"182f6c0fa58fed17dc83359d1f390658ca324ff4b93ce646460d07d3de479195"`;
+
+exports[`share identity keys > different seeds give different keys (fixed-seed known answer) 2`] = `"8868119defffdc750f63c4084da10633c4fa7d06448b5a208d9e2333d32dbd47"`;

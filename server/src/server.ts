@@ -35,10 +35,12 @@ import {
 } from './sync/services/websocket-connection.service';
 import { testRoutes } from './test-routes';
 import { activityRoutes } from './activity/activity.routes';
+import { shareRoutes } from './shares/share.routes';
 import { accountProfileRoutes } from './account/account-profile.routes';
 import { holidayAdjustmentRoutes } from './holidays/holiday-adjustment.routes';
 import { adminRoutes } from './admin/admin.routes';
 import { managedAiProxyRoutes } from './ai/managed-proxy.routes';
+import { inboundAutomationRoutes } from './automation/inbound.routes';
 
 // HTML escape to prevent XSS in generated HTML
 export const escapeHtml = (unsafe: string): string => {
@@ -440,6 +442,8 @@ export const createServer = (
             'X-Expected-Rev',
             'X-Force-Overwrite',
             'X-Requested-With',
+            'X-Heyta-Worker-Token',
+            'X-Heyta-Database-Epoch',
           ],
           exposedHeaders: ['X-Rev', 'X-Updated-At'],
           credentials: true,
@@ -497,6 +501,14 @@ export const createServer = (
       await fastifyServer.register(apiRoutes, {
         prefix: '/api',
         requireTermsConsent: isConsentRequired(fullConfig),
+      });
+
+      // Public inbound automation receiver. It is deliberately separate from the
+      // authenticated API and receives only raw, signed bytes; the route seals them
+      // to the account recipient key before writing the event ledger.
+      await fastifyServer.register(inboundAutomationRoutes, {
+        prefix: '/api',
+        serverOrigin: fullConfig.publicUrl,
       });
 
       // Sync Routes (operation-based sync)
@@ -564,6 +576,10 @@ export const createServer = (
       //    "有人用我的邀请码激活了" —— 那是他的账号事实，不是付费能力。
       //    把通知也放到闸门后面，会让一个到期的人连"我为什么被降级"都看不到。
       await fastifyServer.register(activityRoutes, { prefix: '/api' });
+
+      // 共享清单（多人协作，ADR-0062）。role 硬门在路由内部逐 op 裁决；
+      // entitlement 闸门只挂创建/邀请两端（owner 付费、成员免费）。
+      await fastifyServer.register(shareRoutes, { prefix: '/api' });
 
       // 账号资料（R10：昵称 + 密文头像）。它**不在** `apiRoutes` 里，理由和
       // `activityRoutes` 一样：那一个文件已经 1868 行，而这几条路由与认证/同步
