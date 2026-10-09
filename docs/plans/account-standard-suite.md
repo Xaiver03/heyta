@@ -2456,6 +2456,64 @@ node scripts/check-ui-language.mjs; echo rc=$?
 (cd apps/landing && node scripts/gen-entries.mjs --check); echo rc=$?
 ```
 
+### 6.49 移动端「忘记密码」那一格换了个说法（不是"等别人"，是"那一格有人在做完了"），并记下一种会骗人的读数姿势（10-10 01:1x 现量）
+
+**先复取外部前提：一件都没解除。** main tip 从 `47afe367` 走到 `e0aae83a`（中间那两笔是产品体验线的
+test/docs，不碰本线），而：
+
+- 十封那三枚仍 `??`（`server/src/password/registration-otp.ts`、它的 integration spec、
+  迁移 `20261016000000_add_email_password_registration_challenges`）⇒ 第 17 项任务照旧不动；
+- `apps/landing/src/site/content.ts`、`apps/mobile/src/screens/AuthScreen.tsx`、
+  `packages/i18n/src/locales/zh-CN.ts` 仍 ` M`。
+
+**那一格换了说法，靠的是把「只能等别人」换成三条可跑的判据（§6.41 那三条）**：
+`git diff -- apps/mobile/src/screens/AuthScreen.tsx` 的 `+` 行里已经躺着**整条**忘记密码入口 ——
+phase 词表加了 `| 'forgot-password'`、`const forgotPassword = async () => {…}`、
+`await requestPasswordReset(options, email)`、通知态 `common.auth.sent.reset`、
+以及一行真的挂上去的 `<Pressable … onPress={() => { void forgotPassword(); }}>`。
+它骑在一枚 HEAD 上不存在的**本地**代际守卫上（`beginAuthAction`，`git grep -c beginAuthAction HEAD -- apps/mobile` = 0）。
+⇒ 判据②（我的 hunk 引用的符号在 HEAD 有没有）不过；而判据①在这里是**反向形状** ——
+不是"我的行是他们版本的子集"，是**他们那版已经把这一格做完了**，我落一份 = 在同一处落第二份、并把他们的盖掉。
+所以这一格登记的不是"我的活被挡住"，是"**这一格有主，且主人在飞**"。
+
+📌 反过来，本线欠他们的那半格这次验了：**他们引用的中文针在 HEAD 就在** ——
+`common.auth.sent.reset` 在中英两张词表里各命中（共 2 枚文件），`requestPasswordReset` 在 HEAD 已由
+`apps/mobile/src/screens/SecurityScreen.tsx`（本线 ⑰⑱ 那笔落的那枚）与 web 在用。
+⇒ 他们那笔落地**不会缺针**，也不需要本线补词条。这条是"我这条线会不会让别人落地时红"的一格，之前没查过。
+
+**环境现量（它决定后面两趟读数什么时候能起）**：`vm.loadavg` 当刻 `{44.27 29.36 28.27}`，
+`pnpm --filter @heyta/app-host test` 在干净载体上被**仓库自己的内存闸门**拒绝启动，原话：
+`内存闸门拒绝启动：立即可用 123MB < 这一档要求的 384MB（改这一档要求的量是 TFA_LIGHT_NEED_MB）`，rc=1。
+这一条按既有纪律记成**载体无效**，不记产品失败；iOS 设备腿与真浏览器腿在这一档不可能起。
+
+**HEAD 上不占内存就能重取的读数，这一轮补了四把**：`node research/tools/parse-sweep-ts.mjs $(git rev-parse HEAD)`
+= 扫 1834 枚 tracked `.ts/.tsx` ⇒ **parse-broken = 0**（§6.42 那笔"HEAD 里一枚文件 parse 不过"的形状在新 tip 上没复发）；
+`check:migrations`、`check:adr-numbering`、`check:md-tables` 三道 rc=0。
+构建输入那一格照旧：**9 条相对 import 解析不到**（`packages/ui/src/index.ts` 引 `./ai/AssistantMark.js` 等，归并行会话在飞），
+⇒ 任何"干净检出打得出包"的读数还不能起。
+
+🔴 **一条本轮自己犯的读数姿势错，值得入档（它比看起来更阴）**：Bash 工具的工作目录**在命令之间残留**，
+我上一批 `git status` 是在隔离载体 `.worktrees/iosacct` 里跑的。那棵载体 `git checkout --force` 过，所以它报
+"content.ts / AuthScreen.tsx 干净"，而主检出是 ` M`。更骗人的是同一批里 `git rev-parse refs/heads/main` 给出的是
+**正确的同一个 tip** —— refs 在 worktree 之间是共享的，于是那批读数**只有"未提交状态"那一维是错的**，
+其余全对，没有任何一行输出会提示我在另一棵树上。
+⇒ 跨 worktree 取"脏/干净/未跟踪"这类读数，命令里必须自带 `pwd` 或显式 `git -C <主检出>`；
+**`rev-parse` 对得上不能当作"我在哪棵树"的证据**。
+
+复取这一节：
+
+```bash
+cd "<主检出>" && pwd && git rev-parse --short refs/heads/main
+git status --porcelain -- apps/landing/src/site/content.ts apps/mobile/src/screens/AuthScreen.tsx packages/i18n/src/locales/zh-CN.ts
+for f in server/src/password/registration-otp.ts server/tests/integration/registration-otp.integration.spec.ts \
+         server/prisma/migrations/20261016000000_add_email_password_registration_challenges/migration.sql; do
+  printf "%s HEAD=%s wt=%s\n" "$f" "$(git cat-file -e HEAD:$f 2>/dev/null && echo 1 || echo 0)" "$([ -e "$f" ] && echo 1 || echo 0)"; done
+git grep -c beginAuthAction HEAD -- apps/mobile
+git grep -l common.auth.sent.reset HEAD -- packages/i18n/src/locales | wc -l   # = 2 才算不缺针
+node research/tools/parse-sweep-ts.mjs $(git rev-parse HEAD)
+node scripts/check-imports-resolve.mjs --sources-only
+```
+
 
 
 
