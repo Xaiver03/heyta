@@ -2775,6 +2775,69 @@ PY
 run; R $S; git diff --quiet -- $S && echo CLEAN
 ```
 
+### 6.55 同一型在**服务端那一层**也照出来一处：生产入口的注册那两行没人守（已补判据 + 两臂证明会红，10-10 01:47 现量）
+
+§6.54 那条移动端缺口不是孤例。这轮把同一把尺搬到服务端：**"路由写好了、`server.ts` 少注册一行"会不会有任何一层响？**
+答案是不会 —— 三条现量：
+
+- `server/src/server.ts:39/40` 是两枚 import，`:589/:592` 是两枚 `register(… { prefix: '/api' })`；
+- 那份 HTTP 判据（`server/tests/account-security.routes.spec.ts`）里**每一组用例都是自己起一个 Fastify**
+  再 `app.register(accountSecurityRoutes)`（`:223`），它验的是路由本身的行为，不验生产入口挂没挂；
+- 集成那份（`server/tests/integration/email-change-and-sessions.integration.spec.ts:92`）虽然也自注册，
+  但它**没有 `DATABASE_URL` 时整组 `describe.skip`**（那文件头第 24 行自己写着），所以它不在 `pnpm check` 的守卫面里。
+  ⇒ 症状会是"点了没反应、服务端零日志（404）"，而单测与门禁全绿。
+
+**已补并落地**（`73ea01db`，只改测试文件，`+25/−0`）：一条 `接线` describe 把 import 与注册**一起**钉，
+并连 `prefix: '/api'` 一起钉（路由自身路径是 `/account/…`，前缀换掉等于换一条对外契约）。
+两臂在纯 HEAD 载体实测，各**恰好红自己那一条**（`1 failed | 29 passed (30)`）：
+
+- 臂① 删掉 `await fastifyServer.register(accountSecurityRoutes, { prefix: '/api' });`
+  ⇒ 红 `accountSecurityRoutes：import 与注册都在生产入口里（换绑邮箱 + 逐枚会话撤销）`；
+- 臂② 把 profile 那族前缀改成 `/api2` ⇒ 红另一条同名判据。
+- 基线（带新判据）`30 passed`。⚠️ 别拿文件里的 `it(` 数当条数：静态数是 18 → 19，
+  而运行时是 28 → 30 —— 新写的那一枚在 `for` 里，一枚生成**两条**用例（这正是"正文不存会漂的值"那条纪律的形状）。
+
+⚠️ **这一趟的载体前置，得按实说**：载体的 `server/node_modules/@heyta/inbound-core` 那枚链接**不存在**，
+`vitest` 连文件都加载不了（`Cannot find package '@heyta/inbound-core' imported from server/src/entitlement.ts`，
+`Test Files 1 failed / Tests no tests`）。根因现量：`server/package.json` 里**没登记**这枚工作区包
+（只有 `app-host/domain/shared-schema/storage/sync-client/sync-core/sync-server`），
+而 `pnpm-lock.yaml` 的 `server:` importer **有**它（`link:../packages/inbound-core`）。
+⇒ 后果不是红：`pnpm install --frozen-lockfile` 在载体里 rc=0，干净安装按 lockfile 建链，CI 与主检出都跑得动
+（主检出那枚链接确实在）。**登记面与现实不一致**这一格归 inbound/协作那一线（6 枚 `server/src/**` 文件 import 它），
+本线不代改 —— 补登记要同时改 `server/package.json` 与共享 `pnpm-lock.yaml`，那是别人的在飞面。
+本轮为了让判据跑起来，在**载体**里手工补了那枚 symlink（`ln -sfn ../../../packages/inbound-core …`）；
+上面所有读数都读的是"HEAD + 这枚按 lockfile 本该存在的链接"，不是"HEAD 裸态"。
+
+📌 一条做法值得留：**等内存闸门时变异不留在盘上等**。
+这两臂最初两次都被拒（`立即可用 356MB < 这一档要求的 384MB`），当时脚本已经把变异写进 `server.ts`。
+正确的形状是"变异 → 有界重试（这次 6 次 × 35s）→ `finally` 无条件从 HEAD 还原 → `git diff --quiet` 复验"，
+而不是"变异好再慢慢等人让位"——被拒的每一分钟里，那棵树上躺着的都是**故意改坏的代码**。
+实测：两次被拒的臂都还原成 `CLEAN`，第 3、4 次拿到额度后读数如上。
+
+复取这两臂：
+
+```bash
+cd .worktrees/<载体> && git checkout --force $(git rev-parse refs/heads/main)
+ln -sfn ../../../packages/inbound-core server/node_modules/@heyta/inbound-core   # 见上面那段前置
+python3 - <<'PY'   # 臂①
+import subprocess, io, re, time
+p='server/src/server.ts'
+def head(): open(p,'wb').write(subprocess.run(['git','show',f'HEAD:{p}'],capture_output=True).stdout)
+head(); s=io.open(p,encoding='utf8').read()
+r="      await fastifyServer.register(accountSecurityRoutes, { prefix: '/api' });\n"
+assert s.count(r)==1; io.open(p,'w',encoding='utf8').write(s.replace(r,''))
+try:
+    for _ in range(6):
+        x=subprocess.run(['pnpm','--filter','@heyta/sync-server','exec','vitest','run','tests/account-security.routes.spec.ts'],capture_output=True,text=True)
+        o=re.sub(r'\x1b\[[0-9;]*m','',x.stdout+x.stderr)
+        if '内存闸门' not in o:
+            print([l.strip() for l in o.split('\n') if re.search(r'Test Files|Tests  |× ',l)]); break
+        time.sleep(35)
+finally:
+    head(); print('还原:', 'CLEAN' if subprocess.run(['git','diff','--quiet','--',p]).returncode==0 else 'DIRTY')
+PY
+```
+
 
 
 
