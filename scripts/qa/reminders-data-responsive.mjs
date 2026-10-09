@@ -291,17 +291,36 @@ async function themeLayerFacts(page, scopeSelector) {
     const title = root.querySelector('.ht-settings__group-title')
       ?? root.querySelector('.ht-settings__title')
       ?? document.querySelector('.ht-settings__group-title, .ht-settings__title');
-    const shared = [...root.querySelectorAll('[style]')].find((el) => {
+    const literalColorNodes = [...root.querySelectorAll('[style]')].filter((el) => {
       const s = el.getAttribute('style') ?? '';
       return /(^|;)\s*color\s*:/.test(s) && !s.includes('var(');
-    }) ?? null;
+    });
+    // 🔴 这一枚"作用域内第一枚带字面 color 的节点"**不保证与 CSS 层量到的是同一角色**。
+    // 2026-10-10 02:0x 两趟读数把这件事钉死了：主检出那棵树量到 30/30 且两枚节点恰好同色
+    // （02:2x 再确认：那 30 格里 `sharedLayerSameRoleAsTitle` **全是 false** —— 量到的是「桌面小组件」这类卡片标题，
+    //  CSS 层量的是分组标题，所以"同色"是同一枚 token 撞出来的，不是同一角色）；
+    // 只含已提交内容那棵树（长页面 + 锚点 IA）在「同步与隐私」那一组量到的第一枚是**状态字**（muted 档），
+    // 于是"两层不同色"比的是分组标题 vs 状态字（亮 15,23,42 vs 71,85,105；暗 241,245,249 vs 203,213,225 —— 两侧各自都跟着档位变了）。
+    // 我试过改成"只认与 CSS 层同文字的那一枚"，**那一改是明确的退步，两趟读数各证一半**：
+    // 主检出那棵树量到 0/30、只含已提交内容那棵树量到 0/24 ⇒ `darkTierReachesBothThemeLayers` 在**两棵树上都变成恒真**
+    // （它对"没量到"的格子是 `!found || 同色`，空样本集恒过 —— AGENTS §7 元规则二那种最坏形状），
+    // 同时把兄弟判据 `themeLayerRulerSwitchesWithTier` 饿死（它要求亮暗各至少一格量得到）。
+    // 也就是说那一改没有把尺修准，只是把一条有牙的判据（r14 那臂量过）换成装饰。
+    // ⇒ 选择规则退回原样，但**把角色信息随读数一起交出去**（`sharedLayerNodeText` / `sharedLayerSameRoleAsTitle` /
+    // `sharedLayerCandidateCount`），让"这条红是尺挑错了节点"与"这条红是界面半暗"在报告里就分得开。
+    const shared = literalColorNodes[0] ?? null;
+    const titleText = title ? (title.textContent ?? '').trim() : '';
     return {
       scope: scope ?? '(document)',
       datasetTheme: document.documentElement.dataset.theme ?? '(unset)',
       storedTheme: localStorage.getItem('heyta.theme') ?? '(unset)',
       cssLayerColor: title ? getComputedStyle(title).color : '(css title not found)',
+      cssLayerTitleText: titleText || '(css title empty)',
       sharedLayerColor: shared ? getComputedStyle(shared).color : '(shared node not found)',
+      sharedLayerNodeText: shared ? (shared.textContent ?? '').trim().slice(0, 60) : '(shared node not found)',
+      sharedLayerSameRoleAsTitle: Boolean(shared && titleText && (shared.textContent ?? '').trim() === titleText),
       sharedLayerFound: Boolean(shared),
+      sharedLayerCandidateCount: literalColorNodes.length,
     };
   }, scopeSelector ?? null);
 }
@@ -1077,6 +1096,11 @@ const report = {
     // ── 暗色档必须两层都暗（2026-10-10：载体以前只搬得动 CSS 那一层，共享层没跟着换）──
     // 产品的暗色由同一个状态喂两层（`applyTheme(theme)` + `resolveHeytaUiTheme({ scheme: theme })`），
     // 所以"两层不同色"只可能是载体没走那条路。实测见 `scripts/qa/probe-theme-layer.mjs`。
+    // 🔴 这条断言的**真实谓词比它的名字弱一档**（02:2x 两趟读数钉的）：它比的是"作用域内第一枚带字面色的
+    // 共享层节点"与"分组标题"在**同一档下是否同一个色值**，而这两枚在两棵树上都不是同一角色
+    // （主检出 30/30 格 `sharedLayerSameRoleAsTitle` 全 false，量到的是卡片小标题；载体那棵是状态字）。
+    // 它仍然抓得住半暗 —— 半暗时两侧色值必然分开（r14 那臂就是这么打红的）—— 但**不许读成"同一角色的两层一致"**。
+    // 键名不改：改了会把 r14 那臂与台账引用搬断。角色信息随读数一起给（`sharedLayerNodeText` 等四枚）。
     darkTierReachesBothThemeLayers: themeRulerCells.length > 0
       && themeRulerCells.every((x) => !x.sharedLayerFound
         || x.sharedLayerColor === x.cssLayerColor),
