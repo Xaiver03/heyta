@@ -2430,5 +2430,32 @@ node -e 'const m=require("child_process").execSync("vm_stat").toString();const p
 cmp -s apps/landing/docs/account/index.html .worktrees/<载体>/apps/landing/docs/account/index.html && echo 同一份
 ```
 
+### 6.48 HEAD 上现在红着哪几道门禁、各归谁（一张可复取的快照，10-10 01:0x 现量）
+
+本线自己那一格已经关了（② 那笔把红了六天的 `check:legal-copy` 打到 rc=0）。
+在干净载体（`git checkout --force <HEAD>`，不借主检出的工作树）上逐道重取，剩下红的是这四道，
+**没有一道在本线**：
+
+| 那道红 | 命中 | 归谁、为什么不由本线动 |
+|---|---|---|
+| `check:entries` | 32 枚已跟踪 HTML 与生成物不一致 | 并行会话正在落的那批**就是**修法（§6.47③ 用 `cmp` 逐字节证过）；落第二份 = 覆盖他们 |
+| `check:ui-language` | ① 价格 SSOT：`server/src/billing/price-book.ts` 的 `SKU_GRANTS` = `[ai, hosting]`，`docs/reference/pricing-and-entitlements.md` = `[ai, automation, hosting]`（那档 `automation` 由 `7350e309` 写进价格表）；② `web.ai.settings.localApi.source.file` / `.command` 两条中文表里没有汉字 | ①判的是"对外承诺哪组能力"，要负责人或那条线拍；②归 AI 那条线的 `UNTRANSLATABLE_KEYS` 登记表 |
+| `check:layering` | `apps/web/src/features/share/share-key-store.ts:56` 在 `apps/*` 里就地拼 op | 那枚文件不在本线射程，修法要把 op 构造收进 `@heyta/app-host` 的动作层 = 改 web 那一线的写路径 |
+| `check:gate-wiring` | `package.json` 里 `check:tokens` 指着 `scripts/gen-android-widget-colors.mjs`，而那枚文件**在盘上、从未入库**（`git status` = `??`，`git log --all -- <那枚>` 空）；带这行的是 `e6058120`（10-09 14:35） | 是别人那枚没跟着 `package.json` 一起提交的实现文件。本线代落 = 提交一份自己没验过的别人的实现（§6.42 / 第 400 条那一型的"引用在册、实现不在册"） |
+
+📌 值得记下的一点：最后那道红是 `check:gate-wiring` **自己抓出来的** —— 它第 4 条就是在防
+"链里有定义、实现文件不在树上"这种 `merge-tree` 与逐条门禁都看不见的断点。
+上一轮（§6.38 / 第 400 条）栽在同类形状上时没有任何一层会响，这次有一层响了。
+
+复取这四道（都在干净载体上，别在主检出跑 —— 那里工作树是别人的）：
+
+```bash
+node scripts/check-gate-wiring.mjs; echo rc=$?
+node scripts/check-layering.mjs; echo rc=$?
+node scripts/check-ui-language.mjs; echo rc=$?
+(cd apps/landing && node scripts/gen-entries.mjs --check); echo rc=$?
+```
+
+
 
 
