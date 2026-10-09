@@ -237,7 +237,7 @@ Paddle 支持中国大陆卖家**只有政策文本**，**实操放行未验证*
     {
       "priceId": "hosted-ai-monthly",
       "period": "month",
-      "grants": ["hosting", "ai"],
+      "grants": ["hosting", "ai", "automation"],
       "catalogKey": "landing.pricing.hostedAi",
       "cny": { "amountMinor": 1200, "display": "¥12 / 月" },
       "usd": { "amountMinor": 1200, "display": "$12 / 月" }
@@ -246,8 +246,8 @@ Paddle 支持中国大陆卖家**只有政策文本**，**实操放行未验证*
 }
 ```
 
-`grants` 是**授权白名单**，合法值只有 `hosting`（我们替你运维服务器）与 `ai`
-（我们的云端 AI）。**功能名不允许出现在这里** —— 「非 AI 能力永久免费」这条承诺
+`grants` 是**授权白名单**，合法值包括 `hosting`（我们替你运维服务器）、`ai`
+（我们的云端 AI）和 `automation`（自动收集，随 AI 档提供）。**功能名不允许出现在这里** —— 「非 AI 能力永久免费」这条承诺
 在代码里唯一可执行的形式就是"收费清单上没有功能"。见
 [ADR-0020](../adr/0020-ai-subscription-two-tiers.md) §3.2、§3.4。
 

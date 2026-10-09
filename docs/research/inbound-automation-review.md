@@ -356,9 +356,119 @@ Web 原先把 30 秒定时器、focus 监听和不可重入判断写在设置组
 
 **尚未闭合的承重缺口：**
 
-1. `parser.ts` 仍把 date-only 转规则时区午夜 epoch，没有持久化全天日历日语义，跨区视图/编辑往返不合格。
+1. `parser.ts` 已在 epoch 兼容投影外新增 `dueDateLocal/startDateLocal` 原日历日，领域筛选、日历、倒计时、象限、排序、时间线及 Web/mobile 编辑器已优先读取；提醒与真实跨端安装产物往返仍未验收，AC-4 尚不能勾选。
 2. 计量现按 `billingSource` 区分 direct 与 managed：direct/local 只保留事件账本，managed 才消费托管周期额度；仍需补 managed 与 direct 的并发额度对账证据。
 3. 其他确认草稿、正式自托管签名授权、发送方凭据发放与试发、各端真实 worker 生命周期仍未完成。
 4. 共享处理器已采用 20 秒续租心跳与 45 秒 provider 超时；双独立 SQLite 进程终止矩阵、跨区全视图与四端当前源码安装及 Linux 验收仍未执行。
 
 不据本轮阶段测试勾选任何 AC，不宣称全仓通过或完整功能交付。
+
+### 2026-10-08 续轮补充：确认状态未穿透模型与 date-only 时长投影
+
+沿模型结果 → 冻结器 → 密文发布 → 许可 → op 逐段复核，发现原冻结器只允许顶层 `tasks`，因此服务端 `needs-confirmation` 没有正常路径可达。现允许布尔确认标志并在客户端许可前截断；服务端要求幂等发布的确认状态也一致。parser、app-host、server 定向测试证明标志可达、零 permit/零 batch op，以及不能通过精确重试翻转状态。仍缺对非法/歧义日期生成可编辑加密草稿的独立数据契约与用户确认/取消 CAS；当前修复不能宣称草稿流程完成。
+
+另发现 `calendarTaskSpan` 对 date-only 开始 + 时长仍用规则时区的 epoch 算范围。已改用持久原日历日的当前设备投影；上海与洛杉矶各 31 项日历定向测试通过。提醒与真实多端往返仍未验收，AC-4 保持未完成。最后新增的 local API 跨区断言已随 57 项定向测试通过；相关包类型检查通过。
+
+全仓 `pnpm check` 本轮两次进入门禁链，均未跑到末尾：先被未接入链的重复 Android widget 色彩脚本与移动助手档位字面量拦下，已分别消除重复定义、改用共享常量并单独验证门禁；后续复跑曾进入主题门禁，两个并行测试引用第二份主题建表/原始表，已改用共享 `resolveHeytaUiTheme` 并单独通过。最新一轮全仓构建、各包类型检查与前段门禁通过后，在 op-log 变异基线被内存护栏拒绝启动（读数 365 MB，小于 384 MB），属于**未执行**而非通过；没有调低护栏伪造全绿。当前机器同时有 Android 模拟器等并行进程，未擅自终止。Web 自动收集相关 72 项、移动日期 22 项、server 事件 8 项及跨区日历定向均通过；全仓与跨端安装仍未闭合。
+
+### 2026-10-08 草稿决策后端与到期清理竞态
+
+结论仍为**不可上线**。新 Goal 已成功创建并为 active，覆盖原计划全部实现与验收；本切片不结束 Goal。
+
+严格复核半成品草稿代码后补齐四道边界：共享严格契约拒绝未知 decision、明文和取消时附加结果字段；读/决策在账号锁内重新校验 JWT tokenVersion；确认在账号锁后共享锁定订阅并按当前时刻复核权益，取消不受订阅到期阻挡；最终状态/尝试/版本/旧摘要/期限 CAS 防止独立 sweep 清理后的草稿被重写为 prepared。确认同时核对规则启用/解析版本、条数上限、当前收件 key epoch 与无提交许可。读取返回密文快照且禁止缓存，确认仅进入 prepared，不另造 permit 或任务写入口。
+
+已归档的[定向测试与类型检查](evidence/inbound-automation-review/draft-decisions-20261008-tests.txt)证明 server 27 项、共享传输 3 项及两包类型检查通过；[真 HTTP/PostgreSQL 首轮](evidence/inbound-automation-review/draft-decisions-20261008-postgres-before-final-cas.txt)为 26 项，覆盖确认/取消真实并发仅一个成功、跨账号/过期读取拒绝、密文回读、观察到账号锁等待后订阅到期拒绝、到期账号仍可取消。首轮发生在最终 CAS 和读取后期限复核修正之前，**不能替代最终源码的真库复跑**。
+
+最终源码真库复跑两次被内存护栏拒绝启动，读数分别 347 MB、208 MB，门槛 384 MB：[第一次记录](evidence/inbound-automation-review/draft-decisions-20261008-postgres-memory-guard.txt)、[新增清理竞态用例后的记录](evidence/inbound-automation-review/draft-decisions-20261008-postgres-cas-memory-guard.txt)。临时数据库正常关闭/清除，没有降低护栏或终止并行进程。新增真实事件行锁屏障用例验证“读到草稿后，独立清理先提交，再返回确认 CAS”尚未执行；mock CAS 拒绝的两例不能冒充该真库证据。[当前源码哈希](evidence/inbound-automation-review/draft-decisions-20261008-sha256.json)明确区分首轮证据与当前源码。
+
+仍待：客户端解密后的来源/完整摘要校验、规则时区编辑与稳定 ID、重封装和会话/Vault fencing；非法或歧义日期的独立草稿契约及 UI；其余全部 AC 与跨端产物验收。公网自动收集继续不开放。
+
+### 2026-10-08 客户端加密草稿审核接缝
+
+本轮将确认草稿从“只返回 needs-confirmation 状态”推进到宿主无关审核器与 Web 设置 UI：
+
+- `inboundDraftPayload` 是独立的加密审核文档，保留非法/歧义日期原值，不进入 `heytaTaskBatch`，因此不会创建无日期或错误日期的占位任务。
+- `createInboundDraftReviewer` 在客户端解密后重算完整任务摘要，重新查规则版本/目标清单，拒绝篡改事件 ID、任务 ID、目标清单或服务器摘要；修正后的内容用当前收件 epoch 公钥重封装，再调用严格 confirm/cancel CAS。临时私钥和明文缓冲区均清零，网络响应前后检查会话 fence。
+- Web UI 提供查看、编辑、确认创建、取消事件和关闭草稿；账号切换、token 变化、Vault 锁定会清除已渲染草稿。草稿确认不绕过既有 permit/journal/单 batch op 路径。
+
+阶段证据：[客户端定向测试](evidence/inbound-automation-review/draft-review-client-20261008-tests.txt)显示 app-host 43 项、inbound-core 29 项、Web 7 项通过；shared-schema、app-host 与 Web 类型检查通过。证据验证了 mock/共享接缝和浏览器组件，但不替代最终真 HTTP/PostgreSQL CAS 复跑，也不覆盖移动/原生壳。`@heyta/ui` 的并行会话导出缺口仍使独立 Web 全量 typecheck 在另一轮中失败，未归因于本切片。
+
+当前仍未闭合：最终源码的真库清理竞态复跑（最近受内存护栏拒绝）、发送方签名试发与自托管授权、移动/原生 worker 生命周期、managed/direct 并发计量、双宿主故障矩阵、提醒跨时区往返、全仓门禁和四端安装验收。
+
+## 2026-10-08 发送方凭据严格复审
+
+本轮复审从签发、持久化、轮换、撤销到公网验签逐条走读并补跑定向测试。结论：**凭据生命周期阶段已形成可接线协议，但不能据此宣称自动收集上线。**
+
+- secret 由服务端随机生成且仅响应一次；数据库只保存独立部署 KEK 包裹密文，AES-GCM AAD 绑定账号/规则/keyId；篡改、错误作用域或缺 KEK 会失败。
+- 迁移允许同 keyId 的历史撤销行并仅限制活动行唯一，修复了“先撤销再插入仍撞全局唯一键”的轮换缺陷。规则删除仍由既有删除边界清理关联凭据，rule UUID 永久停用。
+- 入站路由和状态查询使用托管凭据优先策略。托管记录存在但被撤销或无法解密时不会回退环境 keyring；无托管记录的旧规则才可使用账号作用域 legacy 条目。规则启用也要求两者之一。
+- Web 管理仅显示元数据和一次性 secret，关闭后清除本地显示；没有把密钥写入规则或同步数据。
+
+验证：服务端 sender/inbound route 11 项、app-host remote 4 项、Web worker 生命周期定向 7 项通过；服务端/Web/app-host 类型检查、Prisma generate 和 `check-migrations` 通过。尚未完成签名试发、真实最终源码 PostgreSQL 复跑、正式自托管签名授权、managed/direct 并发计量、双独立真实宿主故障矩阵、原生端生命周期、全仓门禁和四端当前产物安装验收。AC-1～AC-8 保持未勾选，Goal 继续 active。
+
+### 2026-10-08 发送方签名试发接线（阶段证据）
+
+Web 规则界面现在可在一次性 secret 仍位于内存时发送最小测试 payload。客户端复用同一 `@heyta/inbound-core` 签名串（方法、路径、keyId、时间戳、eventId、Content-Type、原始字节摘要），直接调用公网 webhook；响应严格限制为不透明 `eventId/state`，不会把测试任务内容回传到发送方界面。secret 关闭或会话刷新后不再可试发。
+
+app-host 传输测试覆盖签名头、事件 ID 回显和非 202/恶意响应拒绝；Web 类型检查与 worker 生命周期测试通过。该切片仍未提供正式自托管签名授权或真实 HTTP/PostgreSQL 最终源码证据，也未证明测试事件已被处理设备解析/提交；因此只能作为 AC-6 的阶段接缝，AC-1～AC-8 继续不勾选。
+
+### 2026-10-08 凭据撤销竞态复审
+
+对“验签通过后撤销”窗口重新走读后补上两道边界：撤销按账号行锁更新；入队事务在相同账号锁内重新读取最新托管凭据身份，若密钥已撤销、已轮换或托管记录在初次解析后出现，则拒绝写入密文队列。验签后使用的托管 secret 在请求路径结束时清零。规则删除同步清理凭据密文，保留永久停用的规则墓碑。
+
+服务端 sender、规则和公网接收定向测试 13 项及类型检查通过；这仍不是并发 PostgreSQL 故障注入证据，AC-2/AC-3 需在最终真库矩阵中验证。
+
+### 2026-10-08 移动端前台 worker 接缝
+
+`apps/mobile` 已接入共享 `startInboundWorkerLoop`。应用回到前台或每 20 秒只在前台尝试一次；首次使用不会自动创建收件密钥、不会静默打开 AI 或出境同意。worker 注册使用本地 SQLite 的稳定 `clientId` 派生 database epoch，Vault/收件密钥/规则/AI 路由/出境同意任一不可用时保持队列等待；宿主重新读取 worker secret 和旧 epoch 私钥，提交仍走共享 permit/journal/单批 op 路径。
+
+移动端 72 个测试文件/901 项与类型检查通过。本接缝只证明代码路径接入和前台门槛，尚未在 Android/iOS 当前安装产物上跑真实服务端队列、模型、进程终止或跨端结果；AC-3/AC-4/AC-8 仍未闭合。
+
+### 2026-10-08 严格复审：计量来源接线与门禁现量
+
+本轮按协议 §4 从调用点、HTTP schema、数据库 CHECK 和真库行为逐项复核，发现并修复一处会造成真实计量错账的接线缺口：共享 runner 已根据首个实际候选端点识别 `local/direct/managed`，但服务端 reserve handler 未把 `billingSource` 传入；同时 state transition schema 继承了 reserve 字段，导致客户端状态推进契约错误。修复后 reserve 才冻结来源，state 只接受状态机字段；同一尝试重试来源改变会拒绝，`managed` 才写周期锚点并消费托管额度，`local/direct` 强制 `periodAnchor = null`。
+
+新增迁移没有修改已应用文件，而是先在一条锁定事务中替换旧 CHECK，允许 `local` 并保留三种来源与周期锚点的互斥关系。证据：服务端 TypeScript、计量/入站定向 12 项、app-host 定向 1705 项、迁移形状检查通过；临时 PostgreSQL 14.18 应用当前全部迁移并运行 worker identity 真 HTTP 集成 30 项通过（原始输出保存在 `/private/tmp/heyta-inbound-worker-identity-20261008.log`，仅作本机复核，不作为仓库证据）。
+
+复审仍判定不可上线：自托管在线官方授权尚未接线，managed 真实供给与并发额度矩阵尚未完成，双独立 SQLite 宿主的进程终止/ACK 丢失/租约 fencing 故障窗口、提醒跨时区往返、移动/原生当前安装产物、全仓 `pnpm check` 均未闭合。`pnpm check:docs` 当前还报告一处并行会话的错误章节号和 69 处未跟踪取证链接；本任务新增文档链路未产生死链。AC-1～AC-8 继续保持未勾选，不能把阶段测试写成最终交付。
+
+## 2026-10-09 自托管在线权益票据阶段复审
+
+针对 P1-3 的剩余缺口新增了服务端阶段接线：`entitlement-ticket.ts` 使用 Ed25519 公钥环验证官方原始 claims，强制 `automation` capability、`installationId`、`officialSubject`、`localAccountUuid`、可信时间和不超过 30 秒的有效期；账号锁内以唯一 nonce 表消费票据，再保存最小绑定与到期时间。自动收集权益守卫先复用现有托管订阅判定，订阅不满足时才接受该短期绑定，因此普通自托管同步仍不受影响。新增 API 只返回不透明状态与过期时间，不回传票据正文。
+
+定向证据：`server/tests/automation-entitlement-ticket.spec.ts` 3/3，连同计量与公网接收定向测试共 15/15；`pnpm --dir server exec tsc --noEmit`、`node scripts/check-migrations.mjs` 通过。该阶段**不等于**官方 issuer 已部署：官方签发/吊销版本在线同步、真实 PostgreSQL 同 nonce 并发、客户端轮询续票据及离线/时钟回拨 UI 仍未完成；AC-1、AC-3、AC-6 和 AC-8 继续保持未勾选。
+
+> ⚠️ 上面“先复用现有托管订阅判定，订阅不满足时才接受该短期绑定”与这组“3/3 / 15/15”读数都已被同日更晚的定案取代（模式二选一、按操作一次性票据，判据重写）。**这批定向复跑当时漏了 `automation-drafts.spec.ts`** —— 而它恰好是被那次 reader 抽象打断的那一份（9 红，症状是 `Cannot read properties of undefined (reading 'findMany')`）。教训：**"这一族我跑了几个文件"不等于"这一族跑全了"**，收尾要按“有该 script 的文件数 == 打了汇总行的文件数”对一次数。
+
+## 2026-10-09 客户端在线权益传输接缝
+
+宿主无关层新增 `verifyAutomationEntitlementTicket`，统一使用 `Authorization: Bearer`，只发送官方不透明票据和本地账号 UUID，严格校验 `active` 状态与可解析过期时间；没有把票据放入业务 op-log、worker secret 或日志。`@heyta/app-host` 类型检查通过，新增传输测试 2/2 通过。客户端尚未取得官方 issuer 票据、未实现每 30 秒续票据和失联 `waiting-entitlement` UI，因此该接缝不提升任何 AC。
+
+## 2026-10-09 权益来源统一复审
+
+继续沿“官方订阅 / 自托管在线绑定 → 公网接收 → worker → permit”追踪后发现，若只改 authenticated preHandler，公网 webhook 和事务内 permit 仍会只查 `subscriptions`，自托管票据会在入口与提交之间被拒绝。现抽出统一的判定入口，公网接收事务、草稿确认和首次 commit permit 均复用它，普通 hosting gate 未改变。服务端类型检查通过；由于本机并行进程占用内存，新增真库 nonce 并发复跑尚未执行，不能把这次接线升级为 AC-1 证据。
+
+> 🔴 本段的**判定形状已被同日更晚的一轮推翻**（两处）：① “订阅不满足时才接受短期绑定”这种两来源并集，等于让自托管实例上的本机订阅行放行自动收集 —— 权益来源必须由 `AUTOMATION_ENTITLEMENT_MODE` 显式二选一；② 抽象成通用 reader 时，锁内那次订阅读丢了 `FOR SHARE`，而账号行锁挡不住计费/邀请对订阅行的写入。裁决与读数见下一段与本计划 §「2026-10-09 权益判定定案」。留本段是为了让后来者认出这个形状：**把两处都能放行当成统一判定**，与**把判定路径抽成通用接口**，都可能在抽取时把防线一起抽走。
+
+## 2026-10-09 权益判定定案（本轮严格复审）
+
+按“计划条款 → 运行时代码 → 持久化边界 → 负向测试”重走自动收集的授权链，本轮发现的问题与处置：
+
+| # | 发现（不是印象，是调用链上的形状） | 处置与判据 |
+|---|---|---|
+| R1 | 上一轮交下来时 `tests/automation-drafts.spec.ts` **9 条是红的**，症状 `Cannot read properties of undefined (reading 'findMany')` —— 服务层把事务客户端当通用 reader 传，测试 double 没有 `subscription` 模型。红的不是断言，是**生产签名** | 判定改走具名来源（`AutomationEntitlementSource` / 锁内 `lockedAutomationEntitlementSource`），19/19 复绿 |
+| R2 | 自托管在线模式下**本机订阅行仍放行自动收集**（订阅优先、绑定兜底的并集） | 部署模式二选一（`AUTOMATION_ENTITLEMENT_MODE`，严格解析、未配置即拒）；`selfhost-online` 完全不读 `subscriptions`。负向判据：真库里给一条 `grants:['automation']` 的活跃订阅，公网接收仍 402 且零事件落库 |
+| R3 | 一枚票据换成 30 秒通用通行证：`action` 是常量，绑定行被任何后续操作复用 | 封闭 action 词表 + 每动作自己的 rule/event 作用域，逐字比对才消费；只有 `session` 写绑定。变异：去掉 action/作用域比对 ⇒ 那条判据红 |
+| R4 | 过期在**拿账号锁之前**判，持过期票据可以排队等锁后落库；且判定接受调用方传入的绝对 `now` | 锁后读 `clock_timestamp()` 再判一次；生产入口不再收绝对时间，测试只能注入一个取时间的函数。变异：把锁后那次判定短路 ⇒ 该条红 |
+| R5 | 绑定判定只看 `expiresAt`：换实例、换 keyring、调高吊销下限对已存在的绑定**完全无效** | `isAutomationEntitlementBindingUsable` 同时校验 issuer/instanceId 与 `minRevocationVersion`；三条独立判据各红一次 |
+| R6 | 时钟回拨没有任何状态可依 | 新增按安装实例的高水位表 + 迁移；回拨即拒绝并留下稳定码。真库判据一条 |
+| R7 | 抽象成通用 reader 时，锁内那次订阅读丢了 `FOR SHARE`；账号行的 `FOR UPDATE` 挡不住 `billing/webhook.routes.ts` 与 `activity/invite.ts` 对订阅行的写入（两处都不取账号锁） | 恢复 `... FROM subscriptions ... FOR SHARE`；新增故障窗口 11 前半的真库判据：把撤销提交排在请求的订阅读之后 ⇒ 请求确实卡在 `FROM subscriptions` 的锁等待上、许可不落。变异：摘掉 `FOR SHARE` ⇒ 该条红 |
+| R8 | 生产默认绑定读取里写着“模型不存在就当没有绑定”（为最小测试 double 加的可选链），加上判定接口的 `args?: any` | 两处都删；来源类型取 Prisma 生成类型。受影响的测试改为**声明自己建模哪一种部署**，而不是让生产迁就 double |
+| R9 | 草稿确认路径同一次请求判定两次（一次 preHandler、一次锁内），一次性票据会被烧掉两张 | HTTP 层那次去掉，只保留写事务内那一次 |
+| R10 | 文档口径比证据强（“已接入短期绑定”读起来像 P1-3 闭合） | 协议 §4 与计划 P1-3 逐段改到证据支持的范围，并单列**未闭合**清单 |
+
+证据（全部为本机一次性 PostgreSQL 14.18 + 真 HTTP + 零 mock，读数见计划同日期那节）：自托管在线段在真库上多 8 条判据（含同 nonce 并发两路 ⇒ 恰好一路 200 一路 403，DB 日志自己打出 `automation_entitlement_ticket_uses_pkey` 唯一冲突）；真库套件 **38/38**；改写后的票据套件 20/20；公网接收 8/8；定向 7 文件 38/38；服务端 TypeScript 与迁移形状检查通过。变异共 8 臂，各红自己那一条，全部从 `.mut-bak` 还原后复跑为绿。
+
+一处方法论上的自纠：第一版“锁后新鲜度”变异写成 `if (false && A || B || C)`，运算符优先级把 B/C 留在判定里，套件仍全绿 —— **臂是假的**。存活读数在归因成“判据没牙”之前，必须先证明变异真的进了产物。
+
+仍未闭合（不包装）：官方签发端与 `officialSubject ↔ installation ↔ 本地账号` 的链接握手（`session` 的 `localAccountUuid` 现由客户端声明，服务端只能要求后续票据与首次记录一致 —— 首次绑定那一步仍可由持票人 + 任意有效 JWT 组合定绑给谁）；吊销版本在线刷新；各宿主续票据与 `waiting-entitlement` 展示；app-host 侧 `X-Heyta-Entitlement-Ticket` 还没有供给方；除草稿确认与首次许可外，其余动作的一次性票据在 HTTP 闸门自己的事务里消费，不在业务写事务里；故障窗口 11 的后半（许可先落盘、撤销后到）没有新增判据。因此 **AC-1 继续不勾选**，公网接收与售卖继续关闭。
