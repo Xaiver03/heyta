@@ -16,8 +16,11 @@ import { resolveSenderCredential } from './sender-credentials';
 import { evaluateAutomationEntitlementForUser, lockedAutomationEntitlementSource, ENTITLEMENT_ERROR_CODE } from '../entitlement';
 
 const RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
-const MAX_QUEUE_EVENTS = 1_000;
-const MAX_QUEUE_BYTES = 64 * 1024 * 1024;
+// 🔴 Exported so the receiver's tests can put the boundary **exactly on** these two
+// numbers instead of copying them. A test that hardcodes 1_000 stays green when someone
+// raises the constant; a test that imports it goes red the moment the two disagree.
+export const MAX_QUEUE_EVENTS = 1_000;
+export const MAX_QUEUE_BYTES = 64 * 1024 * 1024;
 class InboundEntitlementError extends Error {}
 class InboundQueueLimitError extends Error { constructor(public readonly kind: 'events' | 'bytes') { super('Inbound queue limit reached'); } }
 

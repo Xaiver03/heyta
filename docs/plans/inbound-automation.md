@@ -690,6 +690,11 @@ AC-6/AC-7/AC-8 各缺的不是工时而是**判据的载体**。
 那半，仍在 B112 的未提交里" —— 那句话说的是"**这把尺在干净 HEAD 上编不出来**"（编译层），
 它当时**根本没有尺**这件事我没写出来：唯一的落点是一枚按禁字串写的 `not.toContain`，
 而那句承诺是封闭集合。现在它有闭合键集的尺了，B112 仍只挡"能不能在 HEAD 上跑"。两种读法不要混。
+🔴 03:5x 复审再照出 **AC-2 那格里没写出来的另一半**：上面"AC-1 / AC-2 / AC-4 / AC-5 基本有尺"这句里，
+AC-2 的「并发限额」「持久化失败不返回 accepted」「重放不重复占额度」三句当时**同样没有尺**
+（队列上限两段判定在测试侧命中 0），已当场补上并做了六臂反向验证 —— 读数与装置见文末
+「AC-2 接着对尺」那一节。同一轮还量出对外协议文档那 7 项上限里**三条在代码里根本没有落点**、
+一条拦的不是它声称的那个维度，那句已改成逐标状态的表（不是"补测试"能解决的，是**说明写在了实现前面**）。
 
 ### 一把尺的反向验证：对外承诺里「授予」那一列**根本不在任何尺的分母里**
 
@@ -783,4 +788,62 @@ expect(requestBody.messages.at(-1).content).not.toContain('must-not-leave');
 
 ⚠️ 与 B112 的关系要说准：B112 那四枚未提交成员挡的是"**这把尺在只含 HEAD 的干净检出上编不出 app-host**"
 （编译层），它不改变"这句话现在**有**尺了"。上面三条读数取自**工作树**，与这一节其余尺同源。
+
+### AC-2 接着对尺，量出两类"文档/代码各说一半"：队列上限有实现没尺，对外那 7 项里有 3 项根本没落点
+
+沿 AC-4 那把尺的手法回到 AC-2 逐句读，第一枪就打在自己线上：
+`server/src/automation/inbound.routes.ts` 的队列裁决（`MAX_QUEUE_EVENTS = 1_000` /
+`MAX_QUEUE_BYTES = 64 MiB`，429 `QUEUE_EVENTS_LIMIT` / 413 `QUEUE_BYTES_LIMIT`）**代码在、判据零条** ——
+改前的现量（钉在 `331f563c` 那一份上复跑，不写"HEAD"——本笔之后 HEAD 就含着新用例了）：
+`git show 331f563c:server/tests/inbound-automation.routes.spec.ts | grep -c 'InboundQueueLimitError\|QUEUE_EVENTS_LIMIT\|QUEUE_BYTES_LIMIT'` = **0**。
+也就是谁把 1_000 改成 1_000_000、或把那两个 `throw` 整段删掉，全套测试一声不响。
+补了四把尺（阈值**从被约束的常量 import**，不抄数字；`prisma.$transaction` 调用次数当"额度事务"的代理量）：
+
+| 句子 | 用例 | 边界怎么摆的 |
+|---|---|---|
+| 队列 1,000 条 | `accepts up to the queue event cap and refuses one past it without writing` | `MAX_QUEUE_EVENTS-1` ⇒ 202；`MAX_QUEUE_EVENTS` ⇒ 429 且 `create` 一次没调 |
+| 队列 64 MiB | `counts the sealed envelope against the byte cap and the boundary is exclusive, not inclusive` | 用第一枚真信封的**密文长度**凑边界：`MAX-len` ⇒ 仍 202（源码是 `>` 不是 `>=`）、`MAX-len+1` ⇒ 413；另钉 `envelopeBytes > 明文长度` ⇒ 这一档算的确实是**含加密膨胀的密文** |
+| 写失败不报 accepted | `does not report accepted when the enqueue write itself fails` | `create` 抛非 P2002 ⇒ 500，且响应体里 `queued` 出现 0 次 |
+| 插入竞态 | `re-reads the winner on an insert race: same bytes return it, different bytes conflict` | 前置查找返 `null`、`create` 抛 P2002，赢家那枚 `dedupeDigest` 由**生产代码自己落的那一行**提供（测试不复制摘要算法）：同字节 ⇒ 202 原样回赢家状态、`create` 只多那两次失败尝试；异字节 ⇒ 409 |
+| 重放不占额度 | 既有的 `returns the existing opaque state…` 里**只加不断** | 重放那一次 `prisma.$transaction` 调用次数**不增加**（额度裁决整个住在事务里，短路挪到事务之后就必红） |
+
+读数：`cd server && npx --no-install vitest run --maxWorkers=1 tests/inbound-automation.routes.spec.ts`
+⇒ `Test Files 1 passed (1)` / `Tests 12 passed (12)`，rc=**0**（该文件原基线 8 条，只增不减）。
+同 11 份文件那一整片：`Test Files 11 passed (11)` / `Tests 103 passed (103)`，rc=**0**（原 99 ⇒ +4）。
+`npx --no-install tsc -p tsconfig.json --noEmit`（src）rc=**0**；那枚 spec 单文件 tsc rc=**0**。
+
+反向验证收成常驻装置 `research/tools/verify-inbound-queue-teeth.py`（六臂，含静止对照；
+`--self-test` 是一枚失配负面对照）：
+
+```text
+全部臂　目标=server/src/automation/inbound.routes.ts　开局 sha256=97ef6d29273348e4　备份=/private/tmp/…
+  队列条数上限: 成立　rc=1 命中用例=True
+  队列字节上限: 成立　rc=1 命中用例=True
+  写失败仍报 accepted: 成立　rc=1 命中用例=True
+  插入竞态不重读赢家（直接漏 500）: 成立　rc=1 命中用例=True
+  插入竞态不比内容（赢家照单收下）: 成立　rc=1 命中用例=True
+  静止对照：注释改动不许让任何用例变红: 成立　rc=0 红=0（静止臂要求 rc=0 且 0 红）
+臂数=6　不成立=0　末次 sha256=97ef6d29273348e4（须等于开局那枚）
+```
+
+`--self-test` rc=**0**：给一枚源码里不存在的模式，装置报 `PATTERN_MISS(命中 0 处，要求恰好 1 处)`
+并非零退出 —— 否则将来裁决换了形状，这台装置会在"一臂都没变异成功"的状态下报绿。
+
+第二枪打在**对外说明**上。`docs/reference/inbound-automation-protocol.md` 那句"技术防滥用上限"
+是个封闭清单（7 项），逐枚去代码里找裁决点，量出三条没有落点、一条拦错了东西：
+
+| 文档那 7 项 | 代码现量 |
+|---|---|
+| 原始 body 64 KiB | ✅ `INBOUND_MAX_REQUEST_BYTES`（`webhook.ts` 两查 + 路由 `bodyLimit`） |
+| 队列 1,000 条 / 64 MiB | ✅ 本轮起有尺（上面那两把） |
+| 每事件 ≤ 50 输出 | ✅ 规则配置与解析结果两侧都判 |
+| 每规则每分钟 30 次 | ❌ **无落点**：`grep -rnE 'ruleRate\|perRule\|RATE_PER_RULE\|30 *[,/].*(min\|分钟)' server/src/automation/` 命中 **0** |
+| 账号同时解析 2 个事件 | ❌ **无落点**：领取是 `LIMIT 1 FOR UPDATE SKIP LOCKED`（`events.ts` 一枚），只保证一次领一枚，不判账号在途并发 |
+| 结果明文 ≤ 512 KiB | ❌ **无落点**：`grep -rnE '512 \* 1024\|MAX_RESULT\|RESULT_MAX_BYTES\|RESULT_BYTES' server/src/automation packages/inbound-core/src packages/app-host/src/inbound-*.ts` 命中 **0**；`packages/inbound-core/src/` 导出的上限常量逐枚数过（`webhook.ts` 那 4 枚 + `parser.ts` 的字段表），**没有**结果字节上限；`INBOUND_JSON_MAX_KEYS = 512` 是**键数**，不是 KiB |
+| 账号每分钟 120 次 | ⚠️ 拦的**不是账号**：两条路由的 `rateLimit { max: 120 / 1 min }`，@fastify/rate-limit 默认按 `req.ip`、存**进程内存** ⇒ 与同一段那句"不能用每进程计数器"自相矛盾 |
+
+顺带量出代码里有、清单里没有的三条（签名时间窗 300 s、JSON 深度 ≤ 8、键数 ≤ 512）。
+改法按 AC-7 自己定的规则"未上线能力继续标规划中"：那一句改成**逐标状态的表**，
+三条标"规划中"、120/分那格写明"名义有、拦的不是账号"，并把"加密膨胀计入队列字节数"挪到裁决点那一格。
+要做成真正的账号级/共享存储级限流需要新增依赖，**不属本轮授权**，登记为 B122。
 
