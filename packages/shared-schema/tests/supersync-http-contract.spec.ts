@@ -40,6 +40,16 @@ describe('SuperSync HTTP contract schemas', () => {
     expect(SUPER_SYNC_MAX_OPS_PER_UPLOAD).toBe(100);
   });
 
+  it('bounds owner-held commit proofs without putting them in an operation', () => {
+    const base = { ops: [createValidOperation()], clientId: 'client_1' };
+    expect(SuperSyncUploadOpsRequestSchema.parse({ ...base, inboundCommitProofs: { 'inbound:event': 'proof' } }).inboundCommitProofs)
+      .toEqual({ 'inbound:event': 'proof' });
+    for (const proofs of [
+      { 'normal-op': 'proof' }, { 'inbound:event': 'x'.repeat(2049) },
+      Object.fromEntries(Array.from({ length: SUPER_SYNC_MAX_OPS_PER_UPLOAD + 1 }, (_, i) => [`inbound:event${i}`, 'proof'])),
+    ]) expect(SuperSyncUploadOpsRequestSchema.safeParse({ ...base, inboundCommitProofs: proofs }).success).toBe(false);
+  });
+
   it('preserves server request behavior by stripping unknown upload fields', () => {
     const parsed = SuperSyncUploadOpsRequestSchema.parse({
       ops: [{ ...createValidOperation(), extraOpField: true }],
