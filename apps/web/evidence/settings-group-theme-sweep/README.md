@@ -137,6 +137,25 @@ plan-only + 未跟踪落点 **rc=0**（`trackedEvidenceFiles:0`）、未知腿 *
    当前 HEAD 既装不上也打不出包（台账 `product-ux-optimization.md` 里 `fee83a90` 与 `9fa53ab9` 那两格红的正是这个），
    所以这条证据支持"锚点臂在**能建的已提交树**上跑得通"，**不支持**"当日 HEAD 可用"。
 
+## 2026-10-10 02:2x：用**当前**装置在同一棵已提交树上重跑了一遍（上面那条 08:2x 读数的装置版本已被今晚换掉）
+
+今晚装置改了三次（载体走 `localStorage['heyta.theme']`、视口口径 4 档 → 6 档、加两层对账判据），
+所以"锚点臂在已提交树上跑得通"那句的旧读数按 §7 的规矩不能盖新形状。重跑落在
+`apps/web/evidence/sync-privacy-leg-1009-r21-carrier/`（`legs=groups,help,sync`，`R21_RC=1`），五条假逐条对上事实：
+
+| 判据 | 这一趟判假的真正对象 |
+|---|---|
+| `groupSweepNoHorizontalOverflow` / `helpLongTitleNoHorizontalOverflow` | **这棵 IA 的文档本身横向溢出**（375 档 `scrollWidth=742`、1440 档 `1444`，768 档不溢）—— 与上面那张表同一读数，今晚是复现不是新缺陷 |
+| `helpWrapFourRowsMeasured` | 这棵树上的「关于与帮助」**没有那四行外链行**（HEAD 里那两条词条命中 0） |
+| `helpLongTitleBadArmsFlipTheJudgment` | 上一行的**下游**：基线已假 ⇒ 坏臂翻不出红，这条假说的是"这一趟不可判" |
+| `darkTierReachesBothThemeLayers` | **尺挑错了节点**，不是界面半暗：那一组里唯一带字面 `color` 的节点是状态字「未同步」（muted 档），CSS 层量的是分组标题 |
+
+⇒ 第 4 行那条以后在 `report.json` 里自己就能分开：每格现在带 `cssLayerTitleText` / `sharedLayerNodeText` /
+`sharedLayerSameRoleAsTitle` / `sharedLayerCandidateCount`（对照读数 `-r24-rolecheck-revert` 主检出 30/30 全真、
+`-r25-carrier-revert` 载体 12/24 量到）。⚠️ 同一批读数也钉住这条判据的**真实谓词比名字弱一档**：
+主检出那 30 格里 `sharedLayerSameRoleAsTitle` **全是 false**（量到的是卡片小标题，与分组标题同色是因为两者都吃 `color.foreground`）。
+它抓得住半暗（色值必然分开），但**不许读成"同一角色的两层一致"**。
+
 ## 「长标题自然换行」那一趟（`light-{375,768,1440}-help-long-title.png` + `help-long-title-report.json`）
 
 补的是台账 `UX-S9-44` 验收列欠的第三条：给「关于与帮助」那四条外链行各喂一枚 **72 字**的中文标题
