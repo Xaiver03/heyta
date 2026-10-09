@@ -1278,6 +1278,11 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
 - [ ] 🔴 **复量那两格红的时候顺手照出一条更影响"证据还能不能叫证据"的事：整族 `check:ai-e2e` 会就地改写仓库里已跟踪的截图证据**（12:0x 现量，逐枚清单与四条判据在 [`apps/web/evidence/e2e-family-isolated-b081811c/`](../../apps/web/evidence/e2e-family-isolated-b081811c/README.md) 最后一节，机读清单 `carrier-evidence-churn.txt`）
     读数：载体（基线 `b081811c`，起跑前 `git status` 为 0）跑完整族之后 `git status --porcelain -- apps/web/evidence` = **152 枚 ` M`**、字节合计 +173,725；写图的 spec 有 **20+ 枚**（`grep -rln "apps/web/evidence" e2e/tests/*.ts`），跨 calendar / detail-pane / habits / admin / countdown / assistant 好几条线；**主检出此刻是 330 枚**，mtime 14:21–14:30 落在本线那趟之前 ⇒ 那是别线运行留下的。
     为什么这一格值得单开：**证据一旦被"最近一次运行"覆盖，它就不再指认任何一棵树**。这个覆盖没有归属、没有门禁、不需要任何人同意，而下一次宽 `git add` 会把这几百枚截图连同别人的改动一起提交，提交信息里不会提这件事。与 §7 第 83 条同型，只是被探针改变的不是应用状态而是仓库里的证据。⚠️ **本线自己也在名单里** —— 这一份当天就修了（见下面那一格），其余 20+ 枚 spec 的写图行为没变，本仓这一格仍然开着。
+    - 🔴 **13:4x 复量：这条缺陷此刻在主检出上就是活的，而本线这一趟一点没碰它**。`git status --porcelain -- apps/web/evidence | grep -c '^ M'` 现读 **117 枚**
+      （比上面那格的 330 少，说明中间有人提交或 `git restore` 掉一部分 —— 这正是"证据只指认最近一次运行"的形状），
+      最新 mtime 14:30 仍落在本线那趟载体运行**之前**；本线自己那三处证据目录
+      （`e2e-family-isolated-b081811c` / `help-entry` / `settings-group-theme-sweep`）现读 **0 枚 ` M`**。
+      ⇒ 这一桶**一枚都不动**（不是本线造的、也不清楚哪一枚还被人当在制品读），本格继续开着。
     处置边界：载体侧已 `git restore -- apps/web/evidence` 回到 0 枚（那是我这一趟造脏的、我自己建的载体）；**主检出那 330 枚一枚没动** —— 那是别线的运行产物与在飞状态。修法三条方向写在证据 README（运行期只落未跟踪目录 / 给每条 spec 一个 `--evidence-dir` 旋钮 / 加一条"跑完整族后 `git status -- apps/web/evidence` 必须为空"的能红的门，152 与 330 是它的基线，只应减不应增），但**改谁的 spec、证据要不要由运行自动覆盖，属判据口径，不由本线代改**。
 - [x] ✅ **把 `check:locator-labels` 从"只验写了什么"补成"也验少了什么、还验自己看不看得见"**（`scripts/qa/check-locator-labels.py`，五臂变异验证）
     三条现量说明这枚门原来有**两格是空的**：① 它文件头写着要拦"只写一种语态"，实现里配对检查只在**两语态齐**时才有输入 ⇒ 那一档**永远不会红**（AGENTS §7 元规则二：一条永远通过的判据比没有判据更糟）；
