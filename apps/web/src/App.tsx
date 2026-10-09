@@ -182,6 +182,9 @@ import { PrivacyPanel } from './features/settings/PrivacyPanel.js';
 // 改登录密码 —— `/api/password/change` 与 `useAuthStore.changePassword` 都在，
 // 缺的就是这张表（在此之前那条动作**全仓库零调用点**）。见 PasswordPanel 文件头。
 import { PasswordPanel } from './features/settings/PasswordPanel.js';
+// 登录设备清单与逐个撤销（`jti` 会话）。它管的不是能不能登录，
+// 而是**已经登录着的那些**还在不在。见 SessionsPanel 文件头。
+import { SessionsPanel } from './features/settings/SessionsPanel.js';
 // 从滴答清单导入（B2-1）—— 逻辑层早就做完了，这是它的界面入口。
 import { TickTickImportPanel } from './features/settings/TickTickImportPanel.js';
 import { WidgetJourneyPanel } from './features/settings/WidgetJourneyPanel.js';
@@ -3307,6 +3310,12 @@ export function App(): React.JSX.Element {
               <PasskeyPanel />
               {/* 账号安全：改登录密码（`/api/password/change` 的唯一界面入口）。 */}
               <PasswordPanel />
+              {/*
+                账号安全：谁现在还能用这个账号登录（列 / 逐个撤销 / 退出这台 / 退出所有）。
+                排在两种登录方式之后、注销账号之前：注销删的是账号，这一面板删的是**会话**。
+                见 SessionsPanel 文件头。
+              */}
+              <SessionsPanel />
               {/*
                 账号安全：注销账号（批次 E3）。服务端 `DELETE /api/account` 一直在，
                 缺的是调用点 —— 而 E2 那条"收到注销信号就清本机"的反应也等在这里
