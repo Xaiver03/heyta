@@ -1,6 +1,6 @@
-# 设置分组 × 明暗 × 三档视口 取证（个人资料 / 账号与安全 / 同步与隐私 / AI 与集成）
+# 设置分组 × 明暗 × 三档视口 取证（个人资料 / 账号与安全 / 同步与隐私 / AI 与集成 + 关于与帮助的长标题）
 
-**产出者**：`scripts/qa/reminders-data-responsive.mjs` 里的 `captureGroup` 那一趟。
+**产出者**：`scripts/qa/reminders-data-responsive.mjs` 里的 `captureGroup` 与 `captureHelpWrap` 两趟。
 
 ```bash
 # 另起一台 vite（本线用 4379，与 e2e 套件的 4318/4319 不撞）
@@ -24,7 +24,9 @@ HEYTA_RESPONSIVE_HEADED=0 \
 ## 这 24 格（4 组 × 明暗 × 375/768/1440）证明什么
 
 逐格记了导航文案、组标题、可交互控件枚数、`data-theme` 读数与几何。五条判据全 true
-（`sweep-report.json`；整趟 `SWEEP_RC=0`、装置全部 11 条断言 true）：
+（`sweep-report.json`；那一趟 `SWEEP_RC=0`、装置打印 11 条断言 true。加上下面「长标题」那一趟之后
+同一装置现在打印 18 条 —— **条数别抄，现读**：跑完看 stdout 那个 JSON 的键数，或
+`node -e 'const r=require("<OUT>/report.json");console.log(Object.keys(r.assertions).length)'`）：
 
 - `everyCaseCoversEverySweepGroup` —— 6 档主题/视口 × 4 组一个都没漏（`.every` 对空集合是真，所以覆盖要单独钉）。
 - `groupSweepTitleMatchesNav` —— 导航上那一档写的名字，与进去之后那组的标题**逐字相同**。
@@ -54,7 +56,37 @@ HEYTA_RESPONSIVE_HEADED=0 \
    且由账号面那条线在写。（`同步与隐私` 与 `AI 与集成` 两组不依赖登录：未登录态本身就有 6 枚与 4 枚可交互控件。）
 3. **导航形状跟着工作树**：`openGroup` 现在两种形状都认（`button[aria-controls]` 与 `a[href="#…"]`），
    两臂各配过一发合成对照（只给 button ⇒ 1、只给锚点 ⇒ 1、两枚都给 ⇒ 2 正好触发「不为 1 就响亮失败」），
-   但**锚点那一臂在真实 HEAD 那棵树上还没跑过**，要在干净检出上跑一次才算闭合。
+   并且**按构造对得上 HEAD**：`git show HEAD:apps/web/src/App.tsx` 里导航逐字是
+   `<a className="ht-settings__nav-link" href={'#' + item.id}>`（该串命中 1 处）而 `aria-controls` 命中 **0**
+   ⇒ 在只含 HEAD 那棵树上每档恰好 1 枚、不会触发响亮失败。⚠️ 但这是**读源码证到的**，
+   **锚点那一臂在真实 HEAD 那棵树上还没真跑过**，要在干净检出上跑一次才算闭合。
 
-`UX-S9-44` 验收列的三条里，这一趟覆盖了两条（三档视口无横向溢出、桌面不被拉满）；
-**「长标题自然换行」目前没有任何一层在判** —— 要闭合得先造一条"给一组塞超长标题再量行盒"的判据。
+## 「长标题自然换行」那一趟（`light-{375,768,1440}-help-long-title.png` + `help-long-title-report.json`）
+
+补的是台账 `UX-S9-44` 验收列欠的第三条：给「关于与帮助」那四条外链行各喂一枚 **72 字**的中文标题
+（`帮助与问题反馈的超长中文标题换行实测` ×4），量行盒、量列宽、量行右缘，然后拍图。
+🔴 **换行的尺**是「标题盒高度 ÷ 它自己的 `line-height`（24px）」，**不是** `getClientRects().length` ——
+`.ht-type-row-title` 是块级，块级元素的 client rects 只有它自己那一枚盒子，五行的标题也报 1；
+第一版照后者量，读数会是"界面不换行"，那条**假缺陷**差点被登记进台账。
+
+| 视口 | 行盒（四行） | 文字列宽 | 行右缘 | 文档横向溢出 |
+|---|---|---|---|---|
+| 375 | 5 / 5 / 5 / 5 | 243（第 4 行无箭头 ⇒ 275） | 359 | 无（375/375） |
+| 768 | 3 / 3 / 3 / 2 | 555（587） | 679 | 无（768/768） |
+| 1440 | 3 / 3 / 3 / 2 | 555（587） | 1079 | 无（1440/1440） |
+
+**牙打在三条运行时注入的坏形状上**（元素自己的 `style`，没改共享工作树里的 `help-settings.css`）：
+`nowrap` 与 `ellipsis` 各把文字列从 243 撑到 **1103**、行右缘冲到 **1219**（视口只有 375），
+两条一起打翻 `wraps + copyFitsColumn + rowInsideViewport`；`fixedWidth`（文字列钉死 100px）只打翻
+`rowInsideViewport`。⇒ 三条谓词各自至少被一条坏臂打翻过，而这件事由
+`helpLongTitleBadArmsFlipTheJudgment` **常驻钉住**：它转红说的是"上面那几条已经变成恒真的装饰"，不是界面坏了。
+
+⚠️ **有一格故意只记读数不记判据**：验收列那句「图标、文本和外链提示不互相覆盖」量到了 ——
+文本与尾部 ↗ 的水平间隙在**五种状态（含三条坏臂）下恒为 16px**（逐行 `gapToArrow` 在册）——
+但它**没有可达的坏形状**：这套 flex 布局里箭头跟着行走，`fixedWidth` 那臂就是专门为造出"压住"挑的，
+造不出来（它的坏法是"把行推出视口"，那已经有判据了）。把一条永远不会假的断言写进 `assertions`
+比不写更坏，所以这一句只说到"量过、当前成立"。
+
+⚠️ 这一趟只在 **light** 拍图（换行由盒模型决定，与主题无关；暗色那两档由上面 24 格与
+`e2e/tests/help-entry-ux.spec.ts` 各自覆盖），且拍的仍是**未登录门禁态**下也能进的那一组
+（「关于与帮助」不依赖登录）。
