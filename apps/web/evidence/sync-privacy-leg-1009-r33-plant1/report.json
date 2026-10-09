@@ -1,0 +1,3095 @@
+{
+  "origin": "http://127.0.0.1:4435",
+  "carrier": {
+    "headless": true,
+    "tree": {
+      "headSha": "331f563c56ee706beec029cd38229ac9d06b6ac7",
+      "root": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta",
+      "provenanceScope": "rig 的检出（ROOT），不是 ORIGIN 那棵被服务的树",
+      "rigFile": "scripts/qa/reminders-data-responsive.mjs",
+      "rigSha256Prefix": "35a2eea3e8ed",
+      "rigWorktreeMatchesHead": false,
+      "dirtyFiles": {
+        "apps/web/src": 122,
+        "packages/ui/src": 53
+      },
+      "at": "2026-10-09T19:46:18.171Z"
+    },
+    "legs": [
+      "reminders",
+      "groups"
+    ],
+    "skippedLegs": [
+      "data",
+      "help",
+      "sync"
+    ],
+    "legCells": {
+      "reminders": 30,
+      "data": 0,
+      "groups": 24,
+      "help": 0,
+      "sync": 0
+    },
+    "expectedLegCells": {
+      "reminders": 30,
+      "data": 6,
+      "groups": 24,
+      "help": 3,
+      "sync": 3
+    },
+    "reminderModes": [
+      "denied",
+      "unsupported",
+      "error",
+      "default",
+      "granted"
+    ],
+    "injectedReminderModes": [
+      "default",
+      "granted"
+    ],
+    "themeCarrier": "localStorage['heyta.theme']（= 产品自己那条开关）",
+    "themeRulerMeasuredCells": 30,
+    "themeRulerSampleCells": 54,
+    "themeLayerRulerPairedCells": 4,
+    "plantedStuckTierIndex": 1,
+    "realPermissionModes": [
+      "denied"
+    ],
+    "injectionReason": "default 与 granted 在无头 Chromium 里都会退化成 denied（2026-10-09 实测，2026-10-10 又按五条通道各测一遍），而无头是不抢前台的唯一一档（AGENTS §6.2 规定二）⇒ 这两态的**卡片渲染**由注入覆盖，**真权限管道**只有有头那一档算数"
+  },
+  "cases": [
+    {
+      "theme": "light",
+      "width": 375,
+      "height": 812
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "height": 812
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "height": 960
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "height": 960
+    }
+  ],
+  "reminders": [
+    {
+      "theme": "light",
+      "width": 375,
+      "mode": "denied",
+      "permissionSource": "browser",
+      "statuses": {
+        "granted": false,
+        "denied": true,
+        "unsupported": false,
+        "failed": false,
+        "request": false,
+        "permission": "denied"
+      },
+      "facts": {
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "panel": {
+          "x": 16,
+          "y": 373.5,
+          "width": 343,
+          "height": 186.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 375,
+          "height": 696,
+          "scrollHeight": 1692,
+          "clientHeight": 696
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "sharedLayerCandidates": [
+          {
+            "text": "桌面小组件",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "在桌面或主屏幕快速查看任务与进度。",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "正在浏览器标签页里运行",
+            "color": "rgb(71, 85, 105)"
+          },
+          {
+            "text": "浏览器页面不能直接添加系统小组件。请安装对应平台的 heyta 客户端，再从系统小组件列表添加。",
+            "color": "rgb(71, 85, 105)"
+          }
+        ],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(15, 23, 42)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r33-plant1/light-375-reminder-denied.png"
+    },
+    {
+      "theme": "light",
+      "width": 375,
+      "mode": "unsupported",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": true,
+        "failed": false,
+        "request": false,
+        "permission": "unsupported"
+      },
+      "facts": {
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "panel": {
+          "x": 16,
+          "y": 393.5,
+          "width": 343,
+          "height": 166.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 375,
+          "height": 696,
+          "scrollHeight": 1672,
+          "clientHeight": 696
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "sharedLayerCandidates": [
+          {
+            "text": "桌面小组件",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "在桌面或主屏幕快速查看任务与进度。",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "正在浏览器标签页里运行",
+            "color": "rgb(71, 85, 105)"
+          },
+          {
+            "text": "浏览器页面不能直接添加系统小组件。请安装对应平台的 heyta 客户端，再从系统小组件列表添加。",
+            "color": "rgb(71, 85, 105)"
+          }
+        ],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(15, 23, 42)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r33-plant1/light-375-reminder-unsupported.png"
+    },
+    {
+      "theme": "light",
+      "width": 375,
+      "mode": "error",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": false,
+        "failed": true,
+        "request": true,
+        "permission": "default"
+      },
+      "facts": {
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "panel": {
+          "x": 16,
+          "y": 359.5,
+          "width": 343,
+          "height": 200.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 375,
+          "height": 696,
+          "scrollHeight": 1706,
+          "clientHeight": 696
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "sharedLayerCandidates": [
+          {
+            "text": "桌面小组件",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "在桌面或主屏幕快速查看任务与进度。",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "正在浏览器标签页里运行",
+            "color": "rgb(71, 85, 105)"
+          },
+          {
+            "text": "浏览器页面不能直接添加系统小组件。请安装对应平台的 heyta 客户端，再从系统小组件列表添加。",
+            "color": "rgb(71, 85, 105)"
+          }
+        ],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(15, 23, 42)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r33-plant1/light-375-reminder-error.png"
+    },
+    {
+      "theme": "light",
+      "width": 375,
+      "mode": "default",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": false,
+        "failed": false,
+        "request": true,
+        "permission": "default"
+      },
+      "facts": {
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "panel": {
+          "x": 16,
+          "y": 359.5,
+          "width": 343,
+          "height": 200.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 375,
+          "height": 696,
+          "scrollHeight": 1706,
+          "clientHeight": 696
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "sharedLayerCandidates": [
+          {
+            "text": "桌面小组件",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "在桌面或主屏幕快速查看任务与进度。",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "正在浏览器标签页里运行",
+            "color": "rgb(71, 85, 105)"
+          },
+          {
+            "text": "浏览器页面不能直接添加系统小组件。请安装对应平台的 heyta 客户端，再从系统小组件列表添加。",
+            "color": "rgb(71, 85, 105)"
+          }
+        ],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(15, 23, 42)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r33-plant1/light-375-reminder-default.png"
+    },
+    {
+      "theme": "light",
+      "width": 375,
+      "mode": "granted",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": true,
+        "denied": false,
+        "unsupported": false,
+        "failed": false,
+        "request": false,
+        "permission": "granted"
+      },
+      "facts": {
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "panel": {
+          "x": 16,
+          "y": 393.5,
+          "width": 343,
+          "height": 166.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 375,
+          "height": 696,
+          "scrollHeight": 1672,
+          "clientHeight": 696
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "sharedLayerCandidates": [
+          {
+            "text": "桌面小组件",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "在桌面或主屏幕快速查看任务与进度。",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "正在浏览器标签页里运行",
+            "color": "rgb(71, 85, 105)"
+          },
+          {
+            "text": "浏览器页面不能直接添加系统小组件。请安装对应平台的 heyta 客户端，再从系统小组件列表添加。",
+            "color": "rgb(71, 85, 105)"
+          }
+        ],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(15, 23, 42)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r33-plant1/light-375-reminder-granted.png"
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "mode": "denied",
+      "permissionSource": "browser",
+      "statuses": {
+        "granted": false,
+        "denied": true,
+        "unsupported": false,
+        "failed": false,
+        "request": false,
+        "permission": "denied"
+      },
+      "facts": {
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "panel": {
+          "x": 16,
+          "y": 373.5,
+          "width": 343,
+          "height": 186.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 375,
+          "height": 696,
+          "scrollHeight": 1692,
+          "clientHeight": 696
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "sharedLayerCandidates": [
+          {
+            "text": "桌面小组件",
+            "color": "rgb(241, 245, 249)"
+          },
+          {
+            "text": "在桌面或主屏幕快速查看任务与进度。",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "正在浏览器标签页里运行",
+            "color": "rgb(203, 213, 225)"
+          },
+          {
+            "text": "浏览器页面不能直接添加系统小组件。请安装对应平台的 heyta 客户端，再从系统小组件列表添加。",
+            "color": "rgb(203, 213, 225)"
+          }
+        ],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(241, 245, 249)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r33-plant1/dark-375-reminder-denied.png"
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "mode": "unsupported",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": true,
+        "failed": false,
+        "request": false,
+        "permission": "unsupported"
+      },
+      "facts": {
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "panel": {
+          "x": 16,
+          "y": 393.5,
+          "width": 343,
+          "height": 166.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 375,
+          "height": 696,
+          "scrollHeight": 1672,
+          "clientHeight": 696
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "sharedLayerCandidates": [
+          {
+            "text": "桌面小组件",
+            "color": "rgb(241, 245, 249)"
+          },
+          {
+            "text": "在桌面或主屏幕快速查看任务与进度。",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "正在浏览器标签页里运行",
+            "color": "rgb(203, 213, 225)"
+          },
+          {
+            "text": "浏览器页面不能直接添加系统小组件。请安装对应平台的 heyta 客户端，再从系统小组件列表添加。",
+            "color": "rgb(203, 213, 225)"
+          }
+        ],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(241, 245, 249)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r33-plant1/dark-375-reminder-unsupported.png"
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "mode": "error",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": false,
+        "failed": true,
+        "request": true,
+        "permission": "default"
+      },
+      "facts": {
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "panel": {
+          "x": 16,
+          "y": 359.5,
+          "width": 343,
+          "height": 200.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 375,
+          "height": 696,
+          "scrollHeight": 1706,
+          "clientHeight": 696
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "sharedLayerCandidates": [
+          {
+            "text": "桌面小组件",
+            "color": "rgb(241, 245, 249)"
+          },
+          {
+            "text": "在桌面或主屏幕快速查看任务与进度。",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "正在浏览器标签页里运行",
+            "color": "rgb(203, 213, 225)"
+          },
+          {
+            "text": "浏览器页面不能直接添加系统小组件。请安装对应平台的 heyta 客户端，再从系统小组件列表添加。",
+            "color": "rgb(203, 213, 225)"
+          }
+        ],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(241, 245, 249)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r33-plant1/dark-375-reminder-error.png"
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "mode": "default",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": false,
+        "failed": false,
+        "request": true,
+        "permission": "default"
+      },
+      "facts": {
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "panel": {
+          "x": 16,
+          "y": 359.5,
+          "width": 343,
+          "height": 200.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 375,
+          "height": 696,
+          "scrollHeight": 1706,
+          "clientHeight": 696
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "sharedLayerCandidates": [
+          {
+            "text": "桌面小组件",
+            "color": "rgb(241, 245, 249)"
+          },
+          {
+            "text": "在桌面或主屏幕快速查看任务与进度。",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "正在浏览器标签页里运行",
+            "color": "rgb(203, 213, 225)"
+          },
+          {
+            "text": "浏览器页面不能直接添加系统小组件。请安装对应平台的 heyta 客户端，再从系统小组件列表添加。",
+            "color": "rgb(203, 213, 225)"
+          }
+        ],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(241, 245, 249)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r33-plant1/dark-375-reminder-default.png"
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "mode": "granted",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": true,
+        "denied": false,
+        "unsupported": false,
+        "failed": false,
+        "request": false,
+        "permission": "granted"
+      },
+      "facts": {
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "panel": {
+          "x": 16,
+          "y": 393.5,
+          "width": 343,
+          "height": 166.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 375,
+          "height": 696,
+          "scrollHeight": 1672,
+          "clientHeight": 696
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "sharedLayerCandidates": [
+          {
+            "text": "桌面小组件",
+            "color": "rgb(241, 245, 249)"
+          },
+          {
+            "text": "在桌面或主屏幕快速查看任务与进度。",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "正在浏览器标签页里运行",
+            "color": "rgb(203, 213, 225)"
+          },
+          {
+            "text": "浏览器页面不能直接添加系统小组件。请安装对应平台的 heyta 客户端，再从系统小组件列表添加。",
+            "color": "rgb(203, 213, 225)"
+          }
+        ],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(241, 245, 249)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r33-plant1/dark-375-reminder-granted.png"
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "mode": "denied",
+      "permissionSource": "browser",
+      "statuses": {
+        "granted": false,
+        "denied": true,
+        "unsupported": false,
+        "failed": false,
+        "request": false,
+        "permission": "denied"
+      },
+      "facts": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 405.5,
+          "width": 358,
+          "height": 186.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 728,
+          "scrollHeight": 1656,
+          "clientHeight": 728
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "sharedLayerCandidates": [
+          {
+            "text": "桌面小组件",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "在桌面或主屏幕快速查看任务与进度。",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "正在浏览器标签页里运行",
+            "color": "rgb(71, 85, 105)"
+          },
+          {
+            "text": "浏览器页面不能直接添加系统小组件。请安装对应平台的 heyta 客户端，再从系统小组件列表添加。",
+            "color": "rgb(71, 85, 105)"
+          }
+        ],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(15, 23, 42)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r33-plant1/light-390-reminder-denied.png"
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "mode": "unsupported",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": true,
+        "failed": false,
+        "request": false,
+        "permission": "unsupported"
+      },
+      "facts": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 425.5,
+          "width": 358,
+          "height": 166.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 728,
+          "scrollHeight": 1636,
+          "clientHeight": 728
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "sharedLayerCandidates": [
+          {
+            "text": "桌面小组件",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "在桌面或主屏幕快速查看任务与进度。",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "正在浏览器标签页里运行",
+            "color": "rgb(71, 85, 105)"
+          },
+          {
+            "text": "浏览器页面不能直接添加系统小组件。请安装对应平台的 heyta 客户端，再从系统小组件列表添加。",
+            "color": "rgb(71, 85, 105)"
+          }
+        ],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(15, 23, 42)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r33-plant1/light-390-reminder-unsupported.png"
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "mode": "error",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": false,
+        "failed": true,
+        "request": true,
+        "permission": "default"
+      },
+      "facts": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 391.5,
+          "width": 358,
+          "height": 200.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 728,
+          "scrollHeight": 1670,
+          "clientHeight": 728
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "sharedLayerCandidates": [
+          {
+            "text": "桌面小组件",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "在桌面或主屏幕快速查看任务与进度。",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "正在浏览器标签页里运行",
+            "color": "rgb(71, 85, 105)"
+          },
+          {
+            "text": "浏览器页面不能直接添加系统小组件。请安装对应平台的 heyta 客户端，再从系统小组件列表添加。",
+            "color": "rgb(71, 85, 105)"
+          }
+        ],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(15, 23, 42)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r33-plant1/light-390-reminder-error.png"
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "mode": "default",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": false,
+        "failed": false,
+        "request": true,
+        "permission": "default"
+      },
+      "facts": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 391.5,
+          "width": 358,
+          "height": 200.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 728,
+          "scrollHeight": 1670,
+          "clientHeight": 728
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "sharedLayerCandidates": [
+          {
+            "text": "桌面小组件",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "在桌面或主屏幕快速查看任务与进度。",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "正在浏览器标签页里运行",
+            "color": "rgb(71, 85, 105)"
+          },
+          {
+            "text": "浏览器页面不能直接添加系统小组件。请安装对应平台的 heyta 客户端，再从系统小组件列表添加。",
+            "color": "rgb(71, 85, 105)"
+          }
+        ],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(15, 23, 42)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r33-plant1/light-390-reminder-default.png"
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "mode": "granted",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": true,
+        "denied": false,
+        "unsupported": false,
+        "failed": false,
+        "request": false,
+        "permission": "granted"
+      },
+      "facts": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 425.5,
+          "width": 358,
+          "height": 166.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 728,
+          "scrollHeight": 1636,
+          "clientHeight": 728
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "sharedLayerCandidates": [
+          {
+            "text": "桌面小组件",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "在桌面或主屏幕快速查看任务与进度。",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "正在浏览器标签页里运行",
+            "color": "rgb(71, 85, 105)"
+          },
+          {
+            "text": "浏览器页面不能直接添加系统小组件。请安装对应平台的 heyta 客户端，再从系统小组件列表添加。",
+            "color": "rgb(71, 85, 105)"
+          }
+        ],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(15, 23, 42)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r33-plant1/light-390-reminder-granted.png"
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "mode": "denied",
+      "permissionSource": "browser",
+      "statuses": {
+        "granted": false,
+        "denied": true,
+        "unsupported": false,
+        "failed": false,
+        "request": false,
+        "permission": "denied"
+      },
+      "facts": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 405.5,
+          "width": 358,
+          "height": 186.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 728,
+          "scrollHeight": 1656,
+          "clientHeight": 728
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "sharedLayerCandidates": [
+          {
+            "text": "桌面小组件",
+            "color": "rgb(241, 245, 249)"
+          },
+          {
+            "text": "在桌面或主屏幕快速查看任务与进度。",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "正在浏览器标签页里运行",
+            "color": "rgb(203, 213, 225)"
+          },
+          {
+            "text": "浏览器页面不能直接添加系统小组件。请安装对应平台的 heyta 客户端，再从系统小组件列表添加。",
+            "color": "rgb(203, 213, 225)"
+          }
+        ],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(241, 245, 249)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r33-plant1/dark-390-reminder-denied.png"
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "mode": "unsupported",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": true,
+        "failed": false,
+        "request": false,
+        "permission": "unsupported"
+      },
+      "facts": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 425.5,
+          "width": 358,
+          "height": 166.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 728,
+          "scrollHeight": 1636,
+          "clientHeight": 728
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "sharedLayerCandidates": [
+          {
+            "text": "桌面小组件",
+            "color": "rgb(241, 245, 249)"
+          },
+          {
+            "text": "在桌面或主屏幕快速查看任务与进度。",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "正在浏览器标签页里运行",
+            "color": "rgb(203, 213, 225)"
+          },
+          {
+            "text": "浏览器页面不能直接添加系统小组件。请安装对应平台的 heyta 客户端，再从系统小组件列表添加。",
+            "color": "rgb(203, 213, 225)"
+          }
+        ],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(241, 245, 249)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r33-plant1/dark-390-reminder-unsupported.png"
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "mode": "error",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": false,
+        "failed": true,
+        "request": true,
+        "permission": "default"
+      },
+      "facts": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 391.5,
+          "width": 358,
+          "height": 200.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 728,
+          "scrollHeight": 1670,
+          "clientHeight": 728
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "sharedLayerCandidates": [
+          {
+            "text": "桌面小组件",
+            "color": "rgb(241, 245, 249)"
+          },
+          {
+            "text": "在桌面或主屏幕快速查看任务与进度。",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "正在浏览器标签页里运行",
+            "color": "rgb(203, 213, 225)"
+          },
+          {
+            "text": "浏览器页面不能直接添加系统小组件。请安装对应平台的 heyta 客户端，再从系统小组件列表添加。",
+            "color": "rgb(203, 213, 225)"
+          }
+        ],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(241, 245, 249)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r33-plant1/dark-390-reminder-error.png"
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "mode": "default",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": false,
+        "failed": false,
+        "request": true,
+        "permission": "default"
+      },
+      "facts": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 391.5,
+          "width": 358,
+          "height": 200.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 728,
+          "scrollHeight": 1670,
+          "clientHeight": 728
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "sharedLayerCandidates": [
+          {
+            "text": "桌面小组件",
+            "color": "rgb(241, 245, 249)"
+          },
+          {
+            "text": "在桌面或主屏幕快速查看任务与进度。",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "正在浏览器标签页里运行",
+            "color": "rgb(203, 213, 225)"
+          },
+          {
+            "text": "浏览器页面不能直接添加系统小组件。请安装对应平台的 heyta 客户端，再从系统小组件列表添加。",
+            "color": "rgb(203, 213, 225)"
+          }
+        ],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(241, 245, 249)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r33-plant1/dark-390-reminder-default.png"
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "mode": "granted",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": true,
+        "denied": false,
+        "unsupported": false,
+        "failed": false,
+        "request": false,
+        "permission": "granted"
+      },
+      "facts": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 425.5,
+          "width": 358,
+          "height": 166.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 728,
+          "scrollHeight": 1636,
+          "clientHeight": 728
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "sharedLayerCandidates": [
+          {
+            "text": "桌面小组件",
+            "color": "rgb(241, 245, 249)"
+          },
+          {
+            "text": "在桌面或主屏幕快速查看任务与进度。",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "正在浏览器标签页里运行",
+            "color": "rgb(203, 213, 225)"
+          },
+          {
+            "text": "浏览器页面不能直接添加系统小组件。请安装对应平台的 heyta 客户端，再从系统小组件列表添加。",
+            "color": "rgb(203, 213, 225)"
+          }
+        ],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(241, 245, 249)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r33-plant1/dark-390-reminder-granted.png"
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "mode": "denied",
+      "permissionSource": "browser",
+      "statuses": {
+        "granted": false,
+        "denied": true,
+        "unsupported": false,
+        "failed": false,
+        "request": false,
+        "permission": "denied"
+      },
+      "facts": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 811.5,
+          "width": 655.078125,
+          "height": 148.5
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1206,
+          "clientHeight": 904
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "sharedLayerCandidates": [
+          {
+            "text": "桌面小组件",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "在桌面或主屏幕快速查看任务与进度。",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "正在浏览器标签页里运行",
+            "color": "rgb(71, 85, 105)"
+          },
+          {
+            "text": "浏览器页面不能直接添加系统小组件。请安装对应平台的 heyta 客户端，再从系统小组件列表添加。",
+            "color": "rgb(71, 85, 105)"
+          }
+        ],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(15, 23, 42)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r33-plant1/light-1440-reminder-denied.png"
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "mode": "unsupported",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": true,
+        "failed": false,
+        "request": false,
+        "permission": "unsupported"
+      },
+      "facts": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 811.5,
+          "width": 655.078125,
+          "height": 148.5
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1206,
+          "clientHeight": 904
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "sharedLayerCandidates": [
+          {
+            "text": "桌面小组件",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "在桌面或主屏幕快速查看任务与进度。",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "正在浏览器标签页里运行",
+            "color": "rgb(71, 85, 105)"
+          },
+          {
+            "text": "浏览器页面不能直接添加系统小组件。请安装对应平台的 heyta 客户端，再从系统小组件列表添加。",
+            "color": "rgb(71, 85, 105)"
+          }
+        ],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(15, 23, 42)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r33-plant1/light-1440-reminder-unsupported.png"
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "mode": "error",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": false,
+        "failed": true,
+        "request": true,
+        "permission": "default"
+      },
+      "facts": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 777.5,
+          "width": 655.078125,
+          "height": 182.5
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1240,
+          "clientHeight": 904
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "sharedLayerCandidates": [
+          {
+            "text": "桌面小组件",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "在桌面或主屏幕快速查看任务与进度。",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "正在浏览器标签页里运行",
+            "color": "rgb(71, 85, 105)"
+          },
+          {
+            "text": "浏览器页面不能直接添加系统小组件。请安装对应平台的 heyta 客户端，再从系统小组件列表添加。",
+            "color": "rgb(71, 85, 105)"
+          }
+        ],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(15, 23, 42)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r33-plant1/light-1440-reminder-error.png"
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "mode": "default",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": false,
+        "failed": false,
+        "request": true,
+        "permission": "default"
+      },
+      "facts": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 777.5,
+          "width": 655.078125,
+          "height": 182.5
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1240,
+          "clientHeight": 904
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "sharedLayerCandidates": [
+          {
+            "text": "桌面小组件",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "在桌面或主屏幕快速查看任务与进度。",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "正在浏览器标签页里运行",
+            "color": "rgb(71, 85, 105)"
+          },
+          {
+            "text": "浏览器页面不能直接添加系统小组件。请安装对应平台的 heyta 客户端，再从系统小组件列表添加。",
+            "color": "rgb(71, 85, 105)"
+          }
+        ],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(15, 23, 42)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r33-plant1/light-1440-reminder-default.png"
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "mode": "granted",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": true,
+        "denied": false,
+        "unsupported": false,
+        "failed": false,
+        "request": false,
+        "permission": "granted"
+      },
+      "facts": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 811.5,
+          "width": 655.078125,
+          "height": 148.5
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1206,
+          "clientHeight": 904
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "sharedLayerCandidates": [
+          {
+            "text": "桌面小组件",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "在桌面或主屏幕快速查看任务与进度。",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "正在浏览器标签页里运行",
+            "color": "rgb(71, 85, 105)"
+          },
+          {
+            "text": "浏览器页面不能直接添加系统小组件。请安装对应平台的 heyta 客户端，再从系统小组件列表添加。",
+            "color": "rgb(71, 85, 105)"
+          }
+        ],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(15, 23, 42)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r33-plant1/light-1440-reminder-granted.png"
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "mode": "denied",
+      "permissionSource": "browser",
+      "statuses": {
+        "granted": false,
+        "denied": true,
+        "unsupported": false,
+        "failed": false,
+        "request": false,
+        "permission": "denied"
+      },
+      "facts": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 811.5,
+          "width": 655.078125,
+          "height": 148.5
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1206,
+          "clientHeight": 904
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "sharedLayerCandidates": [
+          {
+            "text": "桌面小组件",
+            "color": "rgb(241, 245, 249)"
+          },
+          {
+            "text": "在桌面或主屏幕快速查看任务与进度。",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "正在浏览器标签页里运行",
+            "color": "rgb(203, 213, 225)"
+          },
+          {
+            "text": "浏览器页面不能直接添加系统小组件。请安装对应平台的 heyta 客户端，再从系统小组件列表添加。",
+            "color": "rgb(203, 213, 225)"
+          }
+        ],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(241, 245, 249)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r33-plant1/dark-1440-reminder-denied.png"
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "mode": "unsupported",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": true,
+        "failed": false,
+        "request": false,
+        "permission": "unsupported"
+      },
+      "facts": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 811.5,
+          "width": 655.078125,
+          "height": 148.5
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1206,
+          "clientHeight": 904
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "sharedLayerCandidates": [
+          {
+            "text": "桌面小组件",
+            "color": "rgb(241, 245, 249)"
+          },
+          {
+            "text": "在桌面或主屏幕快速查看任务与进度。",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "正在浏览器标签页里运行",
+            "color": "rgb(203, 213, 225)"
+          },
+          {
+            "text": "浏览器页面不能直接添加系统小组件。请安装对应平台的 heyta 客户端，再从系统小组件列表添加。",
+            "color": "rgb(203, 213, 225)"
+          }
+        ],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(241, 245, 249)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r33-plant1/dark-1440-reminder-unsupported.png"
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "mode": "error",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": false,
+        "failed": true,
+        "request": true,
+        "permission": "default"
+      },
+      "facts": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 777.5,
+          "width": 655.078125,
+          "height": 182.5
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1240,
+          "clientHeight": 904
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "sharedLayerCandidates": [
+          {
+            "text": "桌面小组件",
+            "color": "rgb(241, 245, 249)"
+          },
+          {
+            "text": "在桌面或主屏幕快速查看任务与进度。",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "正在浏览器标签页里运行",
+            "color": "rgb(203, 213, 225)"
+          },
+          {
+            "text": "浏览器页面不能直接添加系统小组件。请安装对应平台的 heyta 客户端，再从系统小组件列表添加。",
+            "color": "rgb(203, 213, 225)"
+          }
+        ],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(241, 245, 249)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r33-plant1/dark-1440-reminder-error.png"
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "mode": "default",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": false,
+        "failed": false,
+        "request": true,
+        "permission": "default"
+      },
+      "facts": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 777.5,
+          "width": 655.078125,
+          "height": 182.5
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1240,
+          "clientHeight": 904
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "sharedLayerCandidates": [
+          {
+            "text": "桌面小组件",
+            "color": "rgb(241, 245, 249)"
+          },
+          {
+            "text": "在桌面或主屏幕快速查看任务与进度。",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "正在浏览器标签页里运行",
+            "color": "rgb(203, 213, 225)"
+          },
+          {
+            "text": "浏览器页面不能直接添加系统小组件。请安装对应平台的 heyta 客户端，再从系统小组件列表添加。",
+            "color": "rgb(203, 213, 225)"
+          }
+        ],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(241, 245, 249)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r33-plant1/dark-1440-reminder-default.png"
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "mode": "granted",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": true,
+        "denied": false,
+        "unsupported": false,
+        "failed": false,
+        "request": false,
+        "permission": "granted"
+      },
+      "facts": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 811.5,
+          "width": 655.078125,
+          "height": 148.5
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1206,
+          "clientHeight": 904
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "sharedLayerCandidates": [
+          {
+            "text": "桌面小组件",
+            "color": "rgb(241, 245, 249)"
+          },
+          {
+            "text": "在桌面或主屏幕快速查看任务与进度。",
+            "color": "rgb(15, 23, 42)"
+          },
+          {
+            "text": "正在浏览器标签页里运行",
+            "color": "rgb(203, 213, 225)"
+          },
+          {
+            "text": "浏览器页面不能直接添加系统小组件。请安装对应平台的 heyta 客户端，再从系统小组件列表添加。",
+            "color": "rgb(203, 213, 225)"
+          }
+        ],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(241, 245, 249)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r33-plant1/dark-1440-reminder-granted.png"
+    }
+  ],
+  "data": [],
+  "sweepGroups": [
+    "profile",
+    "account",
+    "sync",
+    "ai"
+  ],
+  "sweepCases": [
+    {
+      "theme": "light",
+      "width": 375,
+      "height": 812
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "height": 812
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "height": 900
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "height": 900
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "height": 900
+    }
+  ],
+  "groups": [
+    {
+      "theme": "light",
+      "width": 375,
+      "group": "profile",
+      "navLabel": "个人资料",
+      "facts": {
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "theme": "light",
+        "title": "个人资料",
+        "box": {
+          "x": 16,
+          "y": 132,
+          "width": 343,
+          "height": 273
+        },
+        "textLength": 44,
+        "interactive": 1,
+        "offViewportWholeScreen": 5,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-profile",
+        "sharedLayerCandidates": [],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "个人资料",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 375,
+      "group": "account",
+      "navLabel": "账号与安全",
+      "facts": {
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "theme": "light",
+        "title": "账号与安全",
+        "box": {
+          "x": 16,
+          "y": 132,
+          "width": 343,
+          "height": 185
+        },
+        "textLength": 33,
+        "interactive": 1,
+        "offViewportWholeScreen": 1,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-account",
+        "sharedLayerCandidates": [],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "账号与安全",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 375,
+      "group": "sync",
+      "navLabel": "同步与隐私",
+      "facts": {
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "theme": "light",
+        "title": "同步与隐私",
+        "box": {
+          "x": 16,
+          "y": 132,
+          "width": 343,
+          "height": 778
+        },
+        "textLength": 261,
+        "interactive": 6,
+        "offViewportWholeScreen": 3,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-sync",
+        "sharedLayerCandidates": [],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "同步与隐私",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 375,
+      "group": "ai",
+      "navLabel": "AI 与集成",
+      "facts": {
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "theme": "light",
+        "title": "AI 与集成",
+        "box": {
+          "x": 16,
+          "y": 132,
+          "width": 343,
+          "height": 878
+        },
+        "textLength": 496,
+        "interactive": 4,
+        "offViewportWholeScreen": 2,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-ai",
+        "sharedLayerCandidates": [],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "AI 与集成",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "group": "profile",
+      "navLabel": "个人资料",
+      "facts": {
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "theme": "dark",
+        "title": "个人资料",
+        "box": {
+          "x": 16,
+          "y": 132,
+          "width": 343,
+          "height": 273
+        },
+        "textLength": 44,
+        "interactive": 1,
+        "offViewportWholeScreen": 5,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-profile",
+        "sharedLayerCandidates": [],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "个人资料",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "group": "account",
+      "navLabel": "账号与安全",
+      "facts": {
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "theme": "dark",
+        "title": "账号与安全",
+        "box": {
+          "x": 16,
+          "y": 132,
+          "width": 343,
+          "height": 185
+        },
+        "textLength": 33,
+        "interactive": 1,
+        "offViewportWholeScreen": 1,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-account",
+        "sharedLayerCandidates": [],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "账号与安全",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "group": "sync",
+      "navLabel": "同步与隐私",
+      "facts": {
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "theme": "dark",
+        "title": "同步与隐私",
+        "box": {
+          "x": 16,
+          "y": 132,
+          "width": 343,
+          "height": 778
+        },
+        "textLength": 261,
+        "interactive": 6,
+        "offViewportWholeScreen": 3,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-sync",
+        "sharedLayerCandidates": [],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "同步与隐私",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "group": "ai",
+      "navLabel": "AI 与集成",
+      "facts": {
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "theme": "dark",
+        "title": "AI 与集成",
+        "box": {
+          "x": 16,
+          "y": 132,
+          "width": 343,
+          "height": 878
+        },
+        "textLength": 496,
+        "interactive": 4,
+        "offViewportWholeScreen": 2,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-ai",
+        "sharedLayerCandidates": [],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "AI 与集成",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "group": "profile",
+      "navLabel": "个人资料",
+      "facts": {
+        "documentScrollWidth": 768,
+        "documentClientWidth": 768,
+        "theme": "light",
+        "title": "个人资料",
+        "box": {
+          "x": 24,
+          "y": 140,
+          "width": 655,
+          "height": 195
+        },
+        "textLength": 44,
+        "interactive": 1,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-profile",
+        "sharedLayerCandidates": [],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "个人资料",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "group": "account",
+      "navLabel": "账号与安全",
+      "facts": {
+        "documentScrollWidth": 768,
+        "documentClientWidth": 768,
+        "theme": "light",
+        "title": "账号与安全",
+        "box": {
+          "x": 24,
+          "y": 140,
+          "width": 655,
+          "height": 125
+        },
+        "textLength": 33,
+        "interactive": 1,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-account",
+        "sharedLayerCandidates": [],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "账号与安全",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "group": "sync",
+      "navLabel": "同步与隐私",
+      "facts": {
+        "documentScrollWidth": 768,
+        "documentClientWidth": 768,
+        "theme": "light",
+        "title": "同步与隐私",
+        "box": {
+          "x": 24,
+          "y": 140,
+          "width": 655,
+          "height": 640
+        },
+        "textLength": 261,
+        "interactive": 6,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-sync",
+        "sharedLayerCandidates": [],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "同步与隐私",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "group": "ai",
+      "navLabel": "AI 与集成",
+      "facts": {
+        "documentScrollWidth": 768,
+        "documentClientWidth": 768,
+        "theme": "light",
+        "title": "AI 与集成",
+        "box": {
+          "x": 24,
+          "y": 140,
+          "width": 655,
+          "height": 776
+        },
+        "textLength": 496,
+        "interactive": 4,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-ai",
+        "sharedLayerCandidates": [],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "AI 与集成",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "group": "profile",
+      "navLabel": "个人资料",
+      "facts": {
+        "documentScrollWidth": 768,
+        "documentClientWidth": 768,
+        "theme": "dark",
+        "title": "个人资料",
+        "box": {
+          "x": 24,
+          "y": 140,
+          "width": 655,
+          "height": 195
+        },
+        "textLength": 44,
+        "interactive": 1,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-profile",
+        "sharedLayerCandidates": [],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "个人资料",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "group": "account",
+      "navLabel": "账号与安全",
+      "facts": {
+        "documentScrollWidth": 768,
+        "documentClientWidth": 768,
+        "theme": "dark",
+        "title": "账号与安全",
+        "box": {
+          "x": 24,
+          "y": 140,
+          "width": 655,
+          "height": 125
+        },
+        "textLength": 33,
+        "interactive": 1,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-account",
+        "sharedLayerCandidates": [],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "账号与安全",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "group": "sync",
+      "navLabel": "同步与隐私",
+      "facts": {
+        "documentScrollWidth": 768,
+        "documentClientWidth": 768,
+        "theme": "dark",
+        "title": "同步与隐私",
+        "box": {
+          "x": 24,
+          "y": 140,
+          "width": 655,
+          "height": 640
+        },
+        "textLength": 261,
+        "interactive": 6,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-sync",
+        "sharedLayerCandidates": [],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "同步与隐私",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "group": "ai",
+      "navLabel": "AI 与集成",
+      "facts": {
+        "documentScrollWidth": 768,
+        "documentClientWidth": 768,
+        "theme": "dark",
+        "title": "AI 与集成",
+        "box": {
+          "x": 24,
+          "y": 140,
+          "width": 655,
+          "height": 776
+        },
+        "textLength": 496,
+        "interactive": 4,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-ai",
+        "sharedLayerCandidates": [],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "AI 与集成",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "group": "profile",
+      "navLabel": "个人资料",
+      "facts": {
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "theme": "light",
+        "title": "个人资料",
+        "box": {
+          "x": 424,
+          "y": 80,
+          "width": 655,
+          "height": 195
+        },
+        "textLength": 44,
+        "interactive": 1,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-profile",
+        "sharedLayerCandidates": [],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "个人资料",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "group": "account",
+      "navLabel": "账号与安全",
+      "facts": {
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "theme": "light",
+        "title": "账号与安全",
+        "box": {
+          "x": 424,
+          "y": 80,
+          "width": 655,
+          "height": 125
+        },
+        "textLength": 33,
+        "interactive": 1,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-account",
+        "sharedLayerCandidates": [],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "账号与安全",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "group": "sync",
+      "navLabel": "同步与隐私",
+      "facts": {
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "theme": "light",
+        "title": "同步与隐私",
+        "box": {
+          "x": 424,
+          "y": 80,
+          "width": 655,
+          "height": 640
+        },
+        "textLength": 261,
+        "interactive": 6,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-sync",
+        "sharedLayerCandidates": [],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "同步与隐私",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "group": "ai",
+      "navLabel": "AI 与集成",
+      "facts": {
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "theme": "light",
+        "title": "AI 与集成",
+        "box": {
+          "x": 424,
+          "y": 80,
+          "width": 655,
+          "height": 758
+        },
+        "textLength": 496,
+        "interactive": 4,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-ai",
+        "sharedLayerCandidates": [],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "AI 与集成",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "group": "profile",
+      "navLabel": "个人资料",
+      "facts": {
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "theme": "dark",
+        "title": "个人资料",
+        "box": {
+          "x": 424,
+          "y": 80,
+          "width": 655,
+          "height": 195
+        },
+        "textLength": 44,
+        "interactive": 1,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-profile",
+        "sharedLayerCandidates": [],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "个人资料",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "group": "account",
+      "navLabel": "账号与安全",
+      "facts": {
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "theme": "dark",
+        "title": "账号与安全",
+        "box": {
+          "x": 424,
+          "y": 80,
+          "width": 655,
+          "height": 125
+        },
+        "textLength": 33,
+        "interactive": 1,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-account",
+        "sharedLayerCandidates": [],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "账号与安全",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "group": "sync",
+      "navLabel": "同步与隐私",
+      "facts": {
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "theme": "dark",
+        "title": "同步与隐私",
+        "box": {
+          "x": 424,
+          "y": 80,
+          "width": 655,
+          "height": 640
+        },
+        "textLength": 261,
+        "interactive": 6,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-sync",
+        "sharedLayerCandidates": [],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "同步与隐私",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "group": "ai",
+      "navLabel": "AI 与集成",
+      "facts": {
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "theme": "dark",
+        "title": "AI 与集成",
+        "box": {
+          "x": 424,
+          "y": 80,
+          "width": 655,
+          "height": 758
+        },
+        "textLength": 496,
+        "interactive": 4,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-ai",
+        "sharedLayerCandidates": [],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "AI 与集成",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    }
+  ],
+  "helpWrapWidths": [
+    375,
+    768,
+    1440
+  ],
+  "helpWrap": [],
+  "syncCases": [
+    {
+      "theme": "light",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "theme": "light",
+      "width": 375,
+      "height": 812
+    }
+  ],
+  "syncPrivacy": [],
+  "assertions": {
+    "everySelectedLegProducedItsCells": true,
+    "unselectedLegsReportEmpty": true,
+    "noHorizontalOverflow": true,
+    "allPermissionStatesRendered": true,
+    "dataFailurePreserved": true,
+    "existingDataRefusedWithoutLoss": true,
+    "cancelPreserved": true,
+    "everyCaseCoversEverySelectedMode": true,
+    "reminderPermissionProvenanceIsLabeled": true,
+    "darkTierReachesBothThemeLayers": true,
+    "themeLayerRulerSwitchesWithTier": false,
+    "plantedThemeSampleTookEffect": true,
+    "everyCaseCoversEverySweepGroup": true,
+    "groupSweepThemeApplied": true,
+    "groupSweepTitleMatchesNav": true,
+    "groupSweepActionable": true,
+    "groupSweepNoHorizontalOverflow": true,
+    "groupSweepNothingPushedOffViewport": true,
+    "groupSweepOffViewportRulerHasTeeth": true,
+    "helpWrapFourRowsMeasured": true,
+    "helpWrapInjectionTookEffect": true,
+    "helpLongTitleWraps": true,
+    "helpLongTitleStaysInContentColumn": true,
+    "helpLongTitleRowInsideViewport": true,
+    "helpLongTitleNoHorizontalOverflow": true,
+    "helpLongTitleBadArmsFlipTheJudgment": true,
+    "syncPrivacyThreeStatesReached": true,
+    "syncPrivacyPanelVisibleAndThemeApplied": true,
+    "syncPrivacyExactlyOneActionPerState": true,
+    "syncPrivacyAcceptedShowsOnlyRevoke": true,
+    "syncPrivacyRevokeReturnsToChooseAgain": true,
+    "syncPrivacyReopenUsesOneAndOnlyOneDialog": true,
+    "syncPrivacyEveryStateSettled": true,
+    "syncPrivacyConsentDialogUnmountedAfterDecide": true,
+    "syncPrivacyDecisionButtonsPointerReachable": true,
+    "syncPrivacyBadArmsFlipTheRuler": true
+  },
+  "notJudged": [
+    "dataFailurePreserved",
+    "existingDataRefusedWithoutLoss",
+    "cancelPreserved",
+    "helpWrapFourRowsMeasured",
+    "helpWrapInjectionTookEffect",
+    "helpLongTitleWraps",
+    "helpLongTitleStaysInContentColumn",
+    "helpLongTitleRowInsideViewport",
+    "helpLongTitleNoHorizontalOverflow",
+    "helpLongTitleBadArmsFlipTheJudgment",
+    "syncPrivacyThreeStatesReached",
+    "syncPrivacyPanelVisibleAndThemeApplied",
+    "syncPrivacyExactlyOneActionPerState",
+    "syncPrivacyAcceptedShowsOnlyRevoke",
+    "syncPrivacyRevokeReturnsToChooseAgain",
+    "syncPrivacyReopenUsesOneAndOnlyOneDialog",
+    "syncPrivacyEveryStateSettled",
+    "syncPrivacyConsentDialogUnmountedAfterDecide",
+    "syncPrivacyDecisionButtonsPointerReachable",
+    "syncPrivacyBadArmsFlipTheRuler"
+  ]
+}
