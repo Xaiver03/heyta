@@ -4387,7 +4387,7 @@ export const en = {
   'common.share.consent.scope.notAffected': 'Your other lists are not affected',
   'common.share.consent.accept': 'Confirm sharing',
   'common.share.consent.cancel': 'Cancel',
-  'common.share.consent.dontAskAgain': "Don't ask again",
+  'common.share.consent.dontAskAgain': 'Don\'t ask again',
   'common.share.notif.sectionTitle': 'Shared-list notifications',
   'common.share.notif.activitiesTitle': 'Activity notifications',
   'common.share.notif.activityCompleted': 'Task completed/uncompleted',
