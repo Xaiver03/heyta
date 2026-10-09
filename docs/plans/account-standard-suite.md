@@ -2946,6 +2946,53 @@ pnpm --filter '@heyta/app-host...' build; echo $?                               
 `4408ec692c7549c3 packages/ui/src/auth/LegalDocumentSheet.tsx`、`728ba7b330d89c73 packages/ui/src/ai/AssistantMark.tsx`、
 `a334dca4aaec4ace packages/ui/src/ai/AiGeneratedLabel.tsx`。
 
+### 6.58 那三条"HEAD 上的红"是**载体没生成 Prisma 客户端**，不是产品红；补一条五秒前置判据，并把两臂重取成干净读数（10-10 02:16 现量，载体已复原）
+
+上一轮在本线核心那枚 spec 上读到 `3 failed | 33 passed`，而主检出同一棵 HEAD 内容 `36 passed`，
+我把它记成"纯 HEAD 上本线有 3 条红"。**这句是错的**，根因在载体：
+
+- 三条红的共同形状是 `err.code` 为 `undefined`（不是加载失败、不是断言值差一位）。
+  把 `capture()` 里那句 `catch` 加一行诊断打出来，收到的实际是
+  `TypeError: Right-hand side of 'instanceof' is not an object` ——
+  生产侧 `email-change.ts:226/:386` 写的是 `err instanceof Prisma.PrismaClientKnownRequestError`，
+  而在那棵 worktree 里 `typeof Prisma.PrismaClientKnownRequestError` 是 **`undefined`**：
+  **它从来没跑过 `prisma generate`**（生成物住在 `node_modules/.pnpm/@prisma+client@*/node_modules/.prisma`，
+  主检出有、载体没有 ⇒ 同一个 `import { Prisma } from '@prisma/client'` 在两边给的不是同一套成员）。
+- 所以凡是**走唯一索引那条 P2002 映射**的判据在载体里恒红。这三条恰好全是这一族
+  （`email_taken` 两轨 + `invalid_change_link` 反枚举那一族）。
+- `cd server && npx prisma generate` 在载体里 rc=0 就补上了。AGENTS §6 那句"沙箱里跑不了 `@heyta/sync-server`"
+  指的是**安装生命周期**里的 `prisma generate` EPERM，不是这条命令本身。
+
+补完生成物后，本线服务端那六枚 spec 在**纯 main tip** 上一趟读干净（`167 passed (167)`，6 个文件）：
+`email-change` / `email-change-page` / `account-security.routes` / `access-sessions` / `password-recovery` / `account-profile`。
+⇒ **"HEAD 上有 3 条产品红"否证**；本线的服务端判据在 HEAD 上是绿的。
+
+两臂因此在干净基线上重取一次（基线 `36 passed`，各**恰好红 1 条**、红的是本就该红的那条）：
+
+| 臂 | 变异 | 唯一那条红 |
+|---|---|---|
+| C | 删掉生效那一步的 `await revokeAllDeviceSessions(after.userId);` | 🔴 生效必须关掉全部实时通道并删掉会话行（计数器只管得住下一次 HTTP 请求） |
+| D | 把"只点一边"那条分支的 `applied: false` 改成 `true` | 🔴 J-W1a 只点一边 ⇒ `users.email` 一字不变、计数器不动、applied:false |
+
+⇒ §6.56 那两臂 A/B 的读数**不受这件事影响**：`account-security.routes.spec.ts` 不碰 P2002，
+而那里基线是全绿（两臂各 `1 failed | 29 passed`，红的都是本条边界那一句）。
+
+前置判据（以后在任何隔离 worktree 里取服务端读数之前先跑这一条，五秒）：
+
+```bash
+( cd server && node -e "const {Prisma}=require('@prisma/client');console.log(typeof Prisma.PrismaClientKnownRequestError)" )
+# 期望 function。读到 undefined 就在这棵载体里 npx prisma generate，别把由此产生的红写进台账。
+```
+
+⚠️ 顺带一条载体卫生，同一个坑的两半：在载体里 `pnpm --filter … exec` **会重写 `pnpm-lock.yaml`**
+（实测 −101/+9，因为那棵树里没有别人未提交的包）。所以
+1. 复验"变异已还原"要用**带 pathspec** 的 `git diff --quiet -- <文件>`，不带 pathspec 会被那枚锁文件永久判脏；
+2. 收尾要 `git checkout -- pnpm-lock.yaml`，否则下一位在载体里读到"不干净"会以为是我留的。
+
+可迁移的形状：**"红在 `err.code === undefined`"这一族要当成一类读**。它不是"某个码写错了"，
+而是**那条映射分支整条没跑到**——`instanceof` 右侧 undefined、模块双实例、桩少了成员，三种成因在输出上长得一样，
+而三种里只有"产品真的漏了映射"那一种该记进台账。
+
 
 
 
