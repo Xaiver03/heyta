@@ -1,0 +1,18 @@
+{
+  "kind": "uncaughtException",
+  "message": "page.goto: net::ERR_UNSAFE_PORT at http://127.0.0.1:1/?lang=zh-CN\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:1/?lang=zh-CN\", waiting until \"load\"\u001b[22m\n",
+  "stack": "page.goto: net::ERR_UNSAFE_PORT at http://127.0.0.1:1/?lang=zh-CN\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:1/?lang=zh-CN\", waiting until \"load\"\u001b[22m\n\n    at dataJourney (/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/scripts/qa/reminders-data-responsive.mjs:402:14)\n    at async file:///Users/rocalight/Desktop/All%20in%20one%20Data/01_PROJECTS/heyta/scripts/qa/reminders-data-responsive.mjs:639:39",
+  "origin": "http://127.0.0.1:1",
+  "legs": [
+    "data"
+  ],
+  "cellsSoFar": {
+    "reminders": 0,
+    "data": 0,
+    "groups": 0,
+    "help": 0,
+    "sync": 0
+  },
+  "evidenceDir": "/tmp/rig-fail-arm",
+  "at": "2026-10-09T17:54:47.743Z"
+}

@@ -73,6 +73,58 @@ if (process.env.HEYTA_RESPONSIVE_PLAN_ONLY === '1') {
   process.exit(0);
 }
 
+// 五条腿的格子容器。**提前到这里声明**只有一个理由：下面那枚"抛异常也留一份机读状态"的兜底
+// 要能读到它们，而兜底必须注册在第一条腿开跑之前。
+const reminders = [];
+const data = [];
+const groups = [];
+const helpWrap = [];
+const syncPrivacy = [];
+
+/**
+ * 🔴 2026-10-10 01:3x 实测到的一个自身缺陷：那一趟跑到分组腿后半段抛了异常，结果是
+ * **89 张 PNG + 零机读状态**（没有 `report.json`，当时的启动命令又没留住 stderr）。
+ * 于是"判据红"（装置会写报告再退 1）与"根本没跑完"在磁盘上长得一模一样，
+ * 下一位只能重跑一遍才知道 —— 而重跑那一趟（01:5x，`-r18`）是 rc=0 全真，异常没复现。
+ * 兜底口径：任何未捕获异常都写 `report-failure.json`（炸在哪条腿、已经收到几格、错误原文），
+ * 再退 1。**这条兜底不改判据，只让失败的形状可核对。**
+ */
+let failureWritten = false;
+const writeFailure = async (kind, err) => {
+  if (failureWritten) return;
+  failureWritten = true;
+  const message = String(err?.message ?? err).slice(0, 2000);
+  const partial = {
+    kind,
+    message,
+    stack: String(err?.stack ?? '').split('\n').slice(0, 6).join('\n'),
+    origin: ORIGIN,
+    legs: LEGS,
+    cellsSoFar: {
+      reminders: reminders.length,
+      data: data.length,
+      groups: groups.length,
+      help: helpWrap.length,
+      sync: syncPrivacy.length,
+    },
+    evidenceDir: OUT_LABEL,
+    at: new Date().toISOString(),
+  };
+  try {
+    await mkdir(OUT, { recursive: true });
+    await writeFile(`${OUT}/report-failure.json`, `${JSON.stringify(partial, null, 2)}\n`);
+  } catch {
+    // 落点本身写不了就没辙；这里不许把原始错误盖掉
+  }
+  console.error(`RESPONSIVE_FAILURE ${kind}: ${message}`);
+};
+process.on('uncaughtException', (err) => {
+  writeFailure('uncaughtException', err).finally(() => process.exit(1));
+});
+process.on('unhandledRejection', (err) => {
+  writeFailure('unhandledRejection', err).finally(() => process.exit(1));
+});
+
 // 真实的 `default` **与 `granted`** 两态只存在于有头 Chromium。原先这里只写了 `default`，
 // 2026-10-09 无头那一趟把它照出来了：`granted` 档设完权限后回读 `Notification.permission`
 // 得到的是 `denied`（`report.json` 里 `mode:'granted'` 那 4 格 `permission:'denied'`、
@@ -578,13 +630,11 @@ async function captureHelpWrap(browser, width) {
 // Headed Chromium is required for the real `default` notification state; headless
 // Chromium coerces notifications to `denied` even after Browser.setPermission.
 const browser = await chromium.launch({ headless: !HEADED });
-const reminders = [];
 if (LEGS.includes('reminders')) {
   for (const spec of cases) {
     for (const mode of reminderModes) reminders.push(await captureReminder(browser, spec, mode));
   }
 }
-const data = [];
 if (LEGS.includes('data')) {
   for (const spec of cases) data.push(await dataJourney(browser, spec));
 }
@@ -882,14 +932,12 @@ const sweepCases = [
   { theme: 'light', width: 1440, height: 900 },
   { theme: 'dark', width: 1440, height: 900 },
 ];
-const groups = [];
 if (LEGS.includes('groups')) {
   for (const spec of sweepCases) for (const group of sweepGroups) groups.push(await captureGroup(browser, spec, group));
 }
 // UX-S9-44 验收列的视口口径：375/768/1440。这一趟只量几何（换行与列宽），
 // 主题不影响盒模型，暗色那一档由上面 24 格与 help-entry-ux 各自覆盖。
 const helpWrapWidths = [375, 768, 1440];
-const helpWrap = [];
 if (LEGS.includes('help')) {
   for (const width of helpWrapWidths) helpWrap.push(await captureHelpWrap(browser, width));
 }
@@ -900,7 +948,6 @@ const syncCases = [
   { theme: 'dark', width: 1440, height: 900 },
   { theme: 'light', width: 375, height: 812 },
 ];
-const syncPrivacy = [];
 if (LEGS.includes('sync')) {
   for (const spec of syncCases) syncPrivacy.push(await syncPrivacyJourney(browser, spec));
 }
