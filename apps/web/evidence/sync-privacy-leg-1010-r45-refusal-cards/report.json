@@ -1,0 +1,611 @@
+{
+  "origin": "http://127.0.0.1:49448",
+  "carrier": {
+    "headless": true,
+    "tree": {
+      "headSha": "c42a675f9a2e03af114be67bcc5f5d2ee9f96df5",
+      "root": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta",
+      "provenanceScope": "rig 的检出（ROOT），不是 ORIGIN 那棵被服务的树",
+      "rigFile": "scripts/qa/reminders-data-responsive.mjs",
+      "rigSha256Prefix": "34a8c361e5a4",
+      "rigWorktreeMatchesHead": false,
+      "dirtyFiles": {
+        "apps/web/src": 122,
+        "packages/ui/src": 53
+      },
+      "at": "2026-10-09T22:12:36.924Z"
+    },
+    "legs": [
+      "data"
+    ],
+    "skippedLegs": [
+      "reminders",
+      "groups",
+      "help",
+      "sync"
+    ],
+    "legCells": {
+      "reminders": 0,
+      "data": 6,
+      "groups": 0,
+      "help": 0,
+      "sync": 0
+    },
+    "expectedLegCells": {
+      "reminders": 30,
+      "data": 6,
+      "groups": 24,
+      "help": 3,
+      "sync": 3
+    },
+    "reminderModes": [
+      "denied",
+      "unsupported",
+      "error",
+      "default",
+      "granted"
+    ],
+    "injectedReminderModes": [
+      "default",
+      "granted"
+    ],
+    "themeCarrier": "localStorage['heyta.theme']（= 产品自己那条开关）",
+    "themeRulerMeasuredCells": 0,
+    "themeRulerSampleCells": 0,
+    "themeLayerRulerPairedCells": 0,
+    "themeRulerPairSampleCells": 6,
+    "themeRulerPairMeasuredCells": 0,
+    "plantedStuckTierIndex": -1,
+    "realPermissionModes": [
+      "denied"
+    ],
+    "injectionReason": "default 与 granted 在无头 Chromium 里都会退化成 denied（2026-10-09 实测，2026-10-10 又按五条通道各测一遍），而无头是不抢前台的唯一一档（AGENTS §6.2 规定二）⇒ 这两态的**卡片渲染**由注入覆盖，**真权限管道**只有有头那一档算数"
+  },
+  "cases": [
+    {
+      "theme": "light",
+      "width": 375,
+      "height": 812
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "height": 812
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "height": 960
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "height": 960
+    }
+  ],
+  "reminders": [],
+  "data": [
+    {
+      "theme": "light",
+      "width": 375,
+      "before": {
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "panel": {
+          "x": 16,
+          "y": 178.5,
+          "width": 343,
+          "height": 1252
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 375,
+          "height": 696,
+          "scrollHeight": 1423,
+          "clientHeight": 696
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-data",
+        "scopeMatched": true,
+        "sharedLayerCandidates": [],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "数据管理",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      },
+      "exports": {
+        "json": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1010-r45-refusal-cards/light-375-backup.json",
+        "markdown": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1010-r45-refusal-cards/light-375-tasks.md",
+        "jsonEntities": 0,
+        "opCount": 1
+      },
+      "failurePreserved": {
+        "summaryVisible": true,
+        "refusalVisible": true,
+        "panelVisible": true
+      },
+      "refusedExisting": "本机已经有数据 —— 还原只支持空库，现有数据一个字节都没动。",
+      "existingTaskStillVisible": true,
+      "cancelPreserved": true,
+      "refusalCards": {
+        "invalidText": "这个文件不是合法 JSON。",
+        "existingText": "本机已经有数据 —— 还原只支持空库，现有数据一个字节都没动。",
+        "reasonsDiffer": true,
+        "invalidInViewport": true,
+        "existingInViewport": true,
+        "invalidShot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1010-r45-refusal-cards/light-375-data-refusal-invalid.png",
+        "existingShot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1010-r45-refusal-cards/light-375-data-refusal-existing.png"
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "before": {
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "panel": {
+          "x": 16,
+          "y": 178.5,
+          "width": 343,
+          "height": 1252
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 375,
+          "height": 696,
+          "scrollHeight": 1423,
+          "clientHeight": 696
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-data",
+        "scopeMatched": true,
+        "sharedLayerCandidates": [],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "数据管理",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      },
+      "exports": {
+        "json": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1010-r45-refusal-cards/dark-375-backup.json",
+        "markdown": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1010-r45-refusal-cards/dark-375-tasks.md",
+        "jsonEntities": 0,
+        "opCount": 1
+      },
+      "failurePreserved": {
+        "summaryVisible": true,
+        "refusalVisible": true,
+        "panelVisible": true
+      },
+      "refusedExisting": "本机已经有数据 —— 还原只支持空库，现有数据一个字节都没动。",
+      "existingTaskStillVisible": true,
+      "cancelPreserved": true,
+      "refusalCards": {
+        "invalidText": "这个文件不是合法 JSON。",
+        "existingText": "本机已经有数据 —— 还原只支持空库，现有数据一个字节都没动。",
+        "reasonsDiffer": true,
+        "invalidInViewport": true,
+        "existingInViewport": true,
+        "invalidShot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1010-r45-refusal-cards/dark-375-data-refusal-invalid.png",
+        "existingShot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1010-r45-refusal-cards/dark-375-data-refusal-existing.png"
+      }
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "before": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 178.5,
+          "width": 358,
+          "height": 1210
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 728,
+          "scrollHeight": 1381,
+          "clientHeight": 728
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-data",
+        "scopeMatched": true,
+        "sharedLayerCandidates": [],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "数据管理",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      },
+      "exports": {
+        "json": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1010-r45-refusal-cards/light-390-backup.json",
+        "markdown": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1010-r45-refusal-cards/light-390-tasks.md",
+        "jsonEntities": 0,
+        "opCount": 1
+      },
+      "failurePreserved": {
+        "summaryVisible": true,
+        "refusalVisible": true,
+        "panelVisible": true
+      },
+      "refusedExisting": "本机已经有数据 —— 还原只支持空库，现有数据一个字节都没动。",
+      "existingTaskStillVisible": true,
+      "cancelPreserved": true,
+      "refusalCards": {
+        "invalidText": "这个文件不是合法 JSON。",
+        "existingText": "本机已经有数据 —— 还原只支持空库，现有数据一个字节都没动。",
+        "reasonsDiffer": true,
+        "invalidInViewport": false,
+        "existingInViewport": false,
+        "invalidShot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1010-r45-refusal-cards/light-390-data-refusal-invalid.png",
+        "existingShot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1010-r45-refusal-cards/light-390-data-refusal-existing.png"
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "before": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 178.5,
+          "width": 358,
+          "height": 1210
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 728,
+          "scrollHeight": 1381,
+          "clientHeight": 728
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-data",
+        "scopeMatched": true,
+        "sharedLayerCandidates": [],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "数据管理",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      },
+      "exports": {
+        "json": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1010-r45-refusal-cards/dark-390-backup.json",
+        "markdown": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1010-r45-refusal-cards/dark-390-tasks.md",
+        "jsonEntities": 0,
+        "opCount": 1
+      },
+      "failurePreserved": {
+        "summaryVisible": true,
+        "refusalVisible": true,
+        "panelVisible": true
+      },
+      "refusedExisting": "本机已经有数据 —— 还原只支持空库，现有数据一个字节都没动。",
+      "existingTaskStillVisible": true,
+      "cancelPreserved": true,
+      "refusalCards": {
+        "invalidText": "这个文件不是合法 JSON。",
+        "existingText": "本机已经有数据 —— 还原只支持空库，现有数据一个字节都没动。",
+        "reasonsDiffer": true,
+        "invalidInViewport": false,
+        "existingInViewport": false,
+        "invalidShot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1010-r45-refusal-cards/dark-390-data-refusal-invalid.png",
+        "existingShot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1010-r45-refusal-cards/dark-390-data-refusal-existing.png"
+      }
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "before": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 126.5,
+          "width": 655.078125,
+          "height": 1045
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1172,
+          "clientHeight": 904
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-data",
+        "scopeMatched": true,
+        "sharedLayerCandidates": [],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "数据管理",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      },
+      "exports": {
+        "json": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1010-r45-refusal-cards/light-1440-backup.json",
+        "markdown": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1010-r45-refusal-cards/light-1440-tasks.md",
+        "jsonEntities": 0,
+        "opCount": 1
+      },
+      "failurePreserved": {
+        "summaryVisible": true,
+        "refusalVisible": true,
+        "panelVisible": true
+      },
+      "refusedExisting": "本机已经有数据 —— 还原只支持空库，现有数据一个字节都没动。",
+      "existingTaskStillVisible": true,
+      "cancelPreserved": true,
+      "refusalCards": {
+        "invalidText": "这个文件不是合法 JSON。",
+        "existingText": "本机已经有数据 —— 还原只支持空库，现有数据一个字节都没动。",
+        "reasonsDiffer": true,
+        "invalidInViewport": true,
+        "existingInViewport": true,
+        "invalidShot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1010-r45-refusal-cards/light-1440-data-refusal-invalid.png",
+        "existingShot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1010-r45-refusal-cards/light-1440-data-refusal-existing.png"
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "before": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 126.5,
+          "width": 655.078125,
+          "height": 1045
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1172,
+          "clientHeight": 904
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-data",
+        "scopeMatched": true,
+        "sharedLayerCandidates": [],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "数据管理",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      },
+      "exports": {
+        "json": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1010-r45-refusal-cards/dark-1440-backup.json",
+        "markdown": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1010-r45-refusal-cards/dark-1440-tasks.md",
+        "jsonEntities": 0,
+        "opCount": 1
+      },
+      "failurePreserved": {
+        "summaryVisible": true,
+        "refusalVisible": true,
+        "panelVisible": true
+      },
+      "refusedExisting": "本机已经有数据 —— 还原只支持空库，现有数据一个字节都没动。",
+      "existingTaskStillVisible": true,
+      "cancelPreserved": true,
+      "refusalCards": {
+        "invalidText": "这个文件不是合法 JSON。",
+        "existingText": "本机已经有数据 —— 还原只支持空库，现有数据一个字节都没动。",
+        "reasonsDiffer": true,
+        "invalidInViewport": true,
+        "existingInViewport": true,
+        "invalidShot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1010-r45-refusal-cards/dark-1440-data-refusal-invalid.png",
+        "existingShot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1010-r45-refusal-cards/dark-1440-data-refusal-existing.png"
+      }
+    }
+  ],
+  "sweepGroups": [
+    "profile",
+    "account",
+    "sync",
+    "ai"
+  ],
+  "sweepCases": [
+    {
+      "theme": "light",
+      "width": 375,
+      "height": 812
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "height": 812
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "height": 900
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "height": 900
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "height": 900
+    }
+  ],
+  "groups": [],
+  "helpWrapWidths": [
+    375,
+    768,
+    1440
+  ],
+  "helpWrap": [],
+  "syncCases": [
+    {
+      "theme": "light",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "theme": "light",
+      "width": 375,
+      "height": 812
+    }
+  ],
+  "syncPrivacy": [],
+  "assertions": {
+    "everySelectedLegProducedItsCells": true,
+    "unselectedLegsReportEmpty": true,
+    "noHorizontalOverflow": true,
+    "allPermissionStatesRendered": true,
+    "dataFailurePreserved": true,
+    "dataRefusalCardsCaptured": true,
+    "existingDataRefusedWithoutLoss": true,
+    "cancelPreserved": true,
+    "everyCaseCoversEverySelectedMode": false,
+    "reminderPermissionProvenanceIsLabeled": false,
+    "darkTierReachesBothThemeLayers": false,
+    "themeLayerRulerSwitchesWithTier": false,
+    "plantedThemeSampleTookEffect": true,
+    "themeRulerScopesAllMatched": true,
+    "everyCaseCoversEverySweepGroup": false,
+    "groupSweepThemeApplied": true,
+    "groupSweepTitleMatchesNav": true,
+    "groupSweepActionable": true,
+    "groupSweepNoHorizontalOverflow": true,
+    "groupSweepNothingPushedOffViewport": true,
+    "groupSweepOffViewportRulerHasTeeth": true,
+    "helpWrapFourRowsMeasured": true,
+    "helpWrapInjectionTookEffect": true,
+    "helpLongTitleWraps": true,
+    "helpLongTitleStaysInContentColumn": true,
+    "helpLongTitleRowInsideViewport": true,
+    "helpLongTitleNoHorizontalOverflow": true,
+    "helpLongTitleBadArmsFlipTheJudgment": true,
+    "syncPrivacyThreeStatesReached": true,
+    "syncPrivacyPanelVisibleAndThemeApplied": true,
+    "syncPrivacyExactlyOneActionPerState": true,
+    "syncPrivacyAcceptedShowsOnlyRevoke": true,
+    "syncPrivacyRevokeReturnsToChooseAgain": true,
+    "syncPrivacyReopenUsesOneAndOnlyOneDialog": true,
+    "syncPrivacyEveryStateSettled": true,
+    "syncPrivacyConsentDialogUnmountedAfterDecide": true,
+    "syncPrivacyDecisionButtonsPointerReachable": true,
+    "syncPrivacyBadArmsFlipTheRuler": true
+  },
+  "notJudged": [
+    "allPermissionStatesRendered",
+    "everyCaseCoversEverySelectedMode",
+    "reminderPermissionProvenanceIsLabeled",
+    "darkTierReachesBothThemeLayers",
+    "plantedThemeSampleTookEffect",
+    "everyCaseCoversEverySweepGroup",
+    "groupSweepThemeApplied",
+    "groupSweepTitleMatchesNav",
+    "groupSweepActionable",
+    "groupSweepNoHorizontalOverflow",
+    "groupSweepNothingPushedOffViewport",
+    "groupSweepOffViewportRulerHasTeeth",
+    "helpWrapFourRowsMeasured",
+    "helpWrapInjectionTookEffect",
+    "helpLongTitleWraps",
+    "helpLongTitleStaysInContentColumn",
+    "helpLongTitleRowInsideViewport",
+    "helpLongTitleNoHorizontalOverflow",
+    "helpLongTitleBadArmsFlipTheJudgment",
+    "syncPrivacyThreeStatesReached",
+    "syncPrivacyPanelVisibleAndThemeApplied",
+    "syncPrivacyExactlyOneActionPerState",
+    "syncPrivacyAcceptedShowsOnlyRevoke",
+    "syncPrivacyRevokeReturnsToChooseAgain",
+    "syncPrivacyReopenUsesOneAndOnlyOneDialog",
+    "syncPrivacyEveryStateSettled",
+    "syncPrivacyConsentDialogUnmountedAfterDecide",
+    "syncPrivacyDecisionButtonsPointerReachable",
+    "syncPrivacyBadArmsFlipTheRuler"
+  ]
+}
