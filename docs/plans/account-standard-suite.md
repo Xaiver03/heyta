@@ -2514,6 +2514,56 @@ node research/tools/parse-sweep-ts.mjs $(git rev-parse HEAD)
 node scripts/check-imports-resolve.mjs --sources-only
 ```
 
+### 6.50 「写好了没人挂」那一型的收尾点名：本线在 HEAD 上已经没有这种格子（10-10 01:1x 现量，纯只读）
+
+这台机器现在起不了测试腿（§6.49 那条内存闸门），所以把**不占内存也能证**的一格补掉：
+逐枚点名本线全部共享动作与四块面板在 HEAD 上有没有消费者 —— 这一型过去三次骗过我们
+（web 两块面板、移动端 `SecurityScreen` 都是"代码齐了、没人挂"，而所有静态门禁全绿）。
+
+**先记一条我自己犯的探针错**（它比结论更值得留）：我第一版点名名单写的是
+`requestEmailRebind / confirmEmailRebind / EmailRebindPanel`，跑出来**三枚都是 0 消费者**，
+看起来像"换绑那一整块从来没挂上"。现量否证：`git grep -inE "(function|const|class) [A-Za-z]*[Rr]ebind" HEAD`
+**整个仓库 0 命中**（只有 ADR 那枚文件名带 `rebinding`）—— 真词表是 `email-change`：
+`packages/app-host/src/account-security.ts` 的 `requestEmailChange` / `getEmailChangeStatus` /
+`cancelEmailChange` / `emailChangeStage`，`server/src/account/email-change.ts`，
+`apps/web/src/features/settings/EmailChangePanel.tsx`，`apps/mobile/src/screens/EmailChangeSection.tsx`。
+⇒ **"0 消费者"这一类红，先问"这个名字是不是我从记忆里编的"**；名单必须来自
+`git grep` 的**声明点**，不是台账里的口语词。（本台账自己就一直用"换绑"两个字，而代码里没有一个 rebind。）
+
+**用真名重取，每一枚都有消费者，四块面板的挂载链在 HEAD 上是完整的**（排除测试与证据目录后逐枚数）：
+
+- `requestEmailChange` 6 枚、`confirmEmailChange` 3 枚、`requestPasswordReset` 8 枚、
+  `resetPasswordWithToken` 5 枚、`changePassword` 9 枚、`revokeSession` 2 枚、
+  `revokeAllDeviceSessions` 5 枚、`signOutCurrentDevice` 3 枚、`retryServerRevocation` 2 枚、
+  `beginPasskeyEnrollment` 4 枚、`requestPasskeyRecovery` 6 枚 ⇒ **没有一枚是 0**。
+- 挂载面逐条对上：`EmailChangePanel` ← `ProfilePanel.tsx`；`SessionsPanel` ← `App.tsx`；
+  `EmailChangeSection` ← `ProfileScreen.tsx`；`SessionsSection` ← `SecurityScreen.tsx` ← `ProfileScreen.tsx`。
+  四条链每枚都恰好是"面板自身 + 宿主 + 判据"三枚文件。
+
+顺带把我自己落的那两节帮助文档也照同一把尺照了一次（它引用一批中文针）：
+`git grep -oE "'site\.docs\.account\.s[67][a-z0-9]*'"` 取出 **11 枚 key**，
+逐枚查 `packages/i18n/src/locales/{zh-CN,en}.ts` ⇒ **缺针 0 条**，中英两边都是成文的句子（抽查 `s6i1` 逐字看过）。
+这一格以前只在"我写的词条在不在"上查过，没在"我引用的词条在不在"上查过。
+
+**结论（不包装）**：本线的代码侧在 HEAD 上**已经没有"写好了没挂上"那一型**的缺口；
+还开着的三类分别是 ① 设备腿与真浏览器腿的**读数**（载体内存/负载 + 9 条构建输入，§6.49），
+② 排在别人那批重生成之后的 `content.ts` 两行问答（§6.47③），
+③ 有主且主人在飞的两格（移动端忘记密码入口、十封那三枚未入库实现）。
+
+复取这一节：
+
+```bash
+git grep -inE "export (async )?function [A-Za-z]*[Ee]mailChange|export const [A-Za-z]*[Ee]mailChange" HEAD -- packages server/src
+for s in requestEmailChange confirmEmailChange requestPasswordReset resetPasswordWithToken changePassword \
+         revokeSession revokeAllDeviceSessions signOutCurrentDevice retryServerRevocation \
+         beginPasskeyEnrollment requestPasskeyRecovery EmailChangePanel EmailChangeSection SessionsPanel SessionsSection; do
+  printf "%-26s files=%s\n" "$s" "$(git grep -l "$s" HEAD -- apps packages server/src 2>/dev/null | grep -vE '/(tests?|evidence)/|\.test\.|\.spec\.' | wc -l | tr -d ' ')"; done
+for k in $(git grep -h -oE "'site\.docs\.account\.s[67][a-z0-9]*'" HEAD -- apps/landing/src/site/docs.ts | tr -d "'" | sort -u); do
+  printf "%s zh=%s en=%s\n" "$k" \
+    "$(git grep -c "'$k'" HEAD -- packages/i18n/src/locales/zh-CN.ts | cut -d: -f3)" \
+    "$(git grep -c "'$k'" HEAD -- packages/i18n/src/locales/en.ts | cut -d: -f3)"; done   # 两列都必须 = 1
+```
+
 
 
 
