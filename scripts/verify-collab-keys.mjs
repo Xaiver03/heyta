@@ -94,13 +94,15 @@ stepOk('owner→alice/bob 信封各解出同一把钥匙；mallory 被拒');
 step = 2;
 const opRecord = (id, plaintext, kEpoch) => core.encryptShareRecord({
   id, plaintext: new TextEncoder().encode(plaintext), shareId: SHARE, listKey: listKeyV1, keyEpoch: kEpoch,
+  identity: { clientId: 'device-verify', actionType: 'add task', opType: 'CRT', entityType: 'TASK', entityId: id, timestamp: 1_700_000_000_000, schemaVersion: 1 },
 });
 const legacyOps = [];
 for (const [id, text] of [['op-1', 'bob 在移除前写的任务'], ['op-2', 'second record'], ['op-3', 'third record']]) {
   legacyOps.push(await opRecord(id, text, 1));
 }
-const readBack = async (record, key, epoch) => new TextDecoder().decode(await core.decryptShareRecord({
+const readBack = async (record, key, epoch, identity) => new TextDecoder().decode(await core.decryptShareRecord({
   record, shareId: SHARE, listKey: key,
+  identity: identity ?? { clientId: 'device-verify', actionType: 'add task', opType: 'CRT', entityType: 'TASK', entityId: record.id, timestamp: 1_700_000_000_000, schemaVersion: 1 },
 }));
 if ((await readBack(legacyOps[0], listKeyV1, 1)) !== 'bob 在移除前写的任务') fail('epoch1 记录读不回原文');
 stepOk('epoch1 三条记录以旧钥可读');
@@ -118,10 +120,11 @@ if (hex(aliceNewKey) === hex(listKeyV1)) fail('rekey 后的新钥匙与旧钥匙
 const newOp = await core.encryptShareRecord({
   id: 'op-4', plaintext: new TextEncoder().encode('移除之后的新任务'),
   shareId: SHARE, listKey: rekey.newListKey, keyEpoch: 2,
+  identity: { clientId: 'device-verify', actionType: 'add task', opType: 'CRT', entityType: 'TASK', entityId: 'op-4', timestamp: 1_700_000_100_000, schemaVersion: 1 },
 });
 let oldKeyRejected = false;
 try {
-  await readBack(newOp, listKeyV1, 1);
+  await readBack(newOp, listKeyV1, 1, { clientId: 'device-verify', actionType: 'add task', opType: 'CRT', entityType: 'TASK', entityId: 'op-4', timestamp: 1_700_000_100_000, schemaVersion: 1 });
 } catch {
   oldKeyRejected = true;
 }
@@ -147,6 +150,7 @@ const migrateAll = async (records) => {
   for (const record of records) {
     out.push(await core.reencryptShareRecord({
       record, shareId: SHARE, fromListKey: listKeyV1, toListKey: rekey.newListKey, toEpoch,
+      identity: { clientId: 'device-verify', actionType: 'add task', opType: 'CRT', entityType: 'TASK', entityId: record.id, timestamp: 1_700_000_000_000, schemaVersion: 1 },
     }));
   }
   return out;
@@ -164,6 +168,7 @@ for (let i = 0; i < instanceA.length; i += 1) {
 const resumed = [
   await core.reencryptShareRecord({
     record: legacyOps[0], shareId: SHARE, fromListKey: listKeyV1, toListKey: rekey.newListKey, toEpoch,
+    identity: { clientId: 'device-verify', actionType: 'add task', opType: 'CRT', entityType: 'TASK', entityId: legacyOps[0].id, timestamp: 1_700_000_000_000, schemaVersion: 1 },
   }),
   ...(await migrateAll(legacyOps.slice(1))),
 ];

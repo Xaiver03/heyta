@@ -184,6 +184,30 @@ describe('🔴 role 硬门（POST /shares/:id/ops）', () => {
     expect(res.json().rejected[0].code).toBe('SHARE_ROLE_FORBIDDEN');
   });
 
+  it('commenter 写 COMMENT 被接受（W3 起 ENTITY_TYPES 已认，commenter 唯一可写实体）', async () => {
+    mocks.share.findFirst.mockResolvedValue(activeShare);
+    mocks.shareMember.findFirst.mockResolvedValue(memberAs('commenter'));
+    mocks.share.update.mockResolvedValue({ lastServerSeq: 6 });
+    mocks.shareMember.findMany.mockResolvedValue([]);
+    const res = await app.inject({
+      method: 'POST', url: '/api/shares/share-1/ops', headers: AUTH,
+      payload: { ops: [{ ...taskOp, id: 'op-comment', entityType: 'COMMENT', entityId: 'comment-1' }] },
+    });
+    const body = res.json();
+    expect(body.accepted).toHaveLength(1);
+    expect(body.rejected).toHaveLength(0);
+  });
+
+  it('viewer 写 COMMENT 仍被拒——role 门，不是实体门', async () => {
+    mocks.share.findFirst.mockResolvedValue(activeShare);
+    mocks.shareMember.findFirst.mockResolvedValue(memberAs('viewer'));
+    const res = await app.inject({
+      method: 'POST', url: '/api/shares/share-1/ops', headers: AUTH,
+      payload: { ops: [{ ...taskOp, id: 'op-comment-2', entityType: 'COMMENT', entityId: 'comment-2' }] },
+    });
+    expect(res.json().rejected[0].code).toBe('SHARE_ROLE_FORBIDDEN');
+  });
+
   it('editor 写个人域实体（REMINDER）被拒 —— 提醒是每成员自己的', async () => {
     mocks.share.findFirst.mockResolvedValue(activeShare);
     mocks.shareMember.findFirst.mockResolvedValue(memberAs('editor'));

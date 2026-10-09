@@ -200,30 +200,45 @@ stepOk('共享建立，双方持 epoch1 清单密钥');
 // ── 3. 基线：移除前 bob 正常读写 ────────────────────────────────────────────
 step = 3;
 // 🔴 本脚本全程使用 **sync-core 的 record 格式**（`encryptShareRecord` 信封）——
-// 因为第 5 步的迁移机器 `reencryptShareRecord` 消费的正是它。sync-client 的
-// magic wire 信封与它是两种格式（见 goal 文档「格式统一」待决项）；在客户端
-// 引擎落地、格式统一拍板之前，本验收钉住的是迁移机器实际消费的那一份。
-const encryptRecord = (id, plaintext, kEpoch = 1) => core.encryptShareRecord({
-  id, plaintext: new TextEncoder().encode(plaintext), shareId, listKey: listKeyV1, keyEpoch: kEpoch,
+// 2026-10-09 格式统一后它就是唯一格式（magic wire 层退役），迁移机器与线上格式合一。
+// 🔴 **身份单一来源**：加密的 AAD 身份与线上 op 字段共用**同一个对象**——
+// 两处各取 Date.now()/各写 opType，GCM 当场拒绝（本脚本实测踩过，
+// 报错只有一句 Cipher job failed，没有任何指向性）。
+const wireOp = (id) => ({
+  id, clientId: 'device-shared', actionType: 'add task', opType: 'CRT', entityType: 'TASK',
+  entityId: id, timestamp: Date.now(), schemaVersion: 1,
+});
+const encryptRecord = (opIdentity, plaintext, kEpoch = 1, listKey = listKeyV1) => core.encryptShareRecord({
+  id: opIdentity.id, plaintext: new TextEncoder().encode(plaintext), shareId,
+  listKey, keyEpoch: kEpoch, identity: opIdentity,
 });
 const BOB_TITLE = 'bob 移除前写的任务';
 const OWNER_TITLE = 'owner 的任务';
-const bobRecord = await encryptRecord(`revoke-bob-op-${runId}`, BOB_TITLE);
-const ownerRecord = await encryptRecord(`revoke-owner-op-${runId}`, OWNER_TITLE);
-const mkOp = (id, ciphertext) => ({
-  id, clientId: 'device-shared', actionType: 'add task', opType: 'CRT', entityType: 'TASK',
-  entityId: id, payload: ciphertext, vectorClock: { 'device-shared': 1 },
-  timestamp: Date.now(), schemaVersion: 1, isPayloadEncrypted: true,
+const bobWireOp = wireOp(`revoke-bob-op-${runId}`);
+const ownerWireOp = wireOp(`revoke-owner-op-${runId}`);
+const bobRecord = await encryptRecord(bobWireOp, BOB_TITLE);
+const ownerRecord = await encryptRecord(ownerWireOp, OWNER_TITLE);
+const mkOp = (opIdentity, ciphertext) => ({
+  ...opIdentity, payload: ciphertext, vectorClock: { 'device-shared': 1 },
+  isPayloadEncrypted: true,
 });
-const bobUp = await api('POST', `/api/shares/${shareId}/ops`, tokenBob, { ops: [mkOp(bobRecord.id, bobRecord.ciphertext)] });
+const bobUp = await api('POST', `/api/shares/${shareId}/ops`, tokenBob, { ops: [mkOp(bobWireOp, bobRecord.ciphertext)] });
 if (bobUp.status !== 200 || bobUp.json?.accepted?.length !== 1) fail(`bob 基线上传失败：${JSON.stringify(bobUp.json)?.slice(0, 200)}`);
-const ownerUp = await api('POST', `/api/shares/${shareId}/ops`, tokenOwner, { ops: [mkOp(ownerRecord.id, ownerRecord.ciphertext)] });
+const ownerUp = await api('POST', `/api/shares/${shareId}/ops`, tokenOwner, { ops: [mkOp(ownerWireOp, ownerRecord.ciphertext)] });
 if (ownerUp.status !== 200 || ownerUp.json?.accepted?.length !== 1) fail(`owner 基线上传失败：${JSON.stringify(ownerUp.json)?.slice(0, 200)}`);
 const bobDownload = await api('GET', `/api/shares/${shareId}/ops/causal?after=0`, tokenBob);
 if (bobDownload.json?.ops?.length !== 2) fail(`bob 基线下载应 2 条，实际 ${bobDownload.json?.ops?.length}`);
-const readRecord = async (op, key) => new TextDecoder().decode(await core.decryptShareRecord({
-  record: { id: op.id, keyEpoch: 1, ciphertext: op.payload }, shareId, listKey: key,
-}));
+const readRecord = async (op, key) => {
+  const identity = { clientId: op.clientId, actionType: op.actionType, opType: op.opType, entityType: op.entityType, entityId: op.entityId, timestamp: Number(op.clientTimestamp), schemaVersion: op.schemaVersion };
+  try {
+    return await core.decryptShareRecord({
+      record: { id: op.id, keyEpoch: 1, ciphertext: op.payload }, shareId, listKey: key, identity,
+    }).then((plain) => new TextDecoder().decode(plain));
+  } catch (err) {
+    console.error('[debug readRecord] id:', op.id, 'identity:', JSON.stringify(identity), 'err:', err.message);
+    throw err;
+  }
+};
 const titles = [
   await readRecord(bobDownload.json.ops[0], listKeyV1),
   await readRecord(bobDownload.json.ops[1], listKeyV1),
@@ -237,8 +252,9 @@ stepOk('移除前：双方各一条 op（record 格式），bob 下载并读回�
 step = 4;
 const removeRes = await api('DELETE', `/api/shares/${shareId}/members/${bobMemberId}`, tokenOwner);
 if (removeRes.status !== 200) fail(`移除失败：${JSON.stringify(removeRes.json)?.slice(0, 200)}`);
+const bobRetryWireOp = wireOp(`revoke-bob-op2-${runId}`);
 const bobUpAfter = await api('POST', `/api/shares/${shareId}/ops`, tokenBob, {
-  ops: [mkOp(`revoke-bob-op2-${runId}`, (await encryptRecord(`revoke-bob-op2-${runId}`, '移除后的重试')).ciphertext)],
+  ops: [mkOp(bobRetryWireOp, (await encryptRecord(bobRetryWireOp, '移除后的重试')).ciphertext)],
 });
 if (bobUpAfter.status !== 404) fail(`被移除者上传应 404，实际 ${bobUpAfter.status}`);
 const bobDownloadAfter = await api('GET', `/api/shares/${shareId}/ops/causal?after=0`, tokenBob);
@@ -257,22 +273,35 @@ if (historyOps.length !== 2) fail(`owner 下载历史应 2 条，实际 ${histor
 const migrated = [];
 for (let i = 0; i < historyOps.length; i += 1) {
   const source = historyOps[i];
+  const sourceIdentity = {
+    clientId: source.clientId, actionType: source.actionType, opType: source.opType,
+    entityType: source.entityType, entityId: source.entityId,
+    timestamp: Number(source.clientTimestamp), schemaVersion: source.schemaVersion,
+  };
   const plaintext = await readRecord(source, listKeyV1);
   const migratedRecord = await core.reencryptShareRecord({
     record: { id: source.id, keyEpoch: 1, ciphertext: source.payload },
     shareId, fromListKey: listKeyV1, toListKey: rekey.newListKey, toEpoch: rekey.toEpoch,
+    identity: sourceIdentity,
   });
-  const newId = `migrated-${i}-${runId}`;
-  const rewrapped = await core.encryptShareRecord({
-    id: newId, plaintext: new TextEncoder().encode(plaintext), shareId,
-    listKey: rekey.newListKey, keyEpoch: rekey.toEpoch,
+  // 迁移副本 = 新 op（新 id）+ 迁移身份；**身份单一来源**：上传的线 op 与
+  // 第 6 步的解密对账共用同一个对象。
+  const migrateIdentity = {
+    id: `migrated-${i}-${runId}`, clientId: 'device-A1', actionType: 'migrate history',
+    opType: 'UPD', entityType: source.entityType, entityId: source.entityId,
+    timestamp: Date.now(), schemaVersion: 1,
+  };
+  const rewrapped = await encryptRecord(migrateIdentity, plaintext, rekey.toEpoch, rekey.newListKey);
+  migrated.push({
+    id: migrateIdentity.id, record: rewrapped,
+    sourceCiphertext: source.payload, plaintext,
+    identity: migrateIdentity, sourceIdentity,
   });
-  migrated.push({ id: newId, record: rewrapped, sourceCiphertext: source.payload, plaintext });
   const up = await api('POST', `/api/shares/${shareId}/ops`, tokenOwner, {
-    ops: [mkOp(newId, rewrapped.ciphertext)],
+    ops: [mkOp(migrateIdentity, rewrapped.ciphertext)],
   });
   if (up.status !== 200 || up.json?.accepted?.length !== 1) {
-    fail(`迁移副本上行失败（${newId}）：${JSON.stringify(up.json)?.slice(0, 200)}`);
+    fail(`迁移副本上行失败（${migrateIdentity.id}）：${JSON.stringify(up.json)?.slice(0, 200)}`);
   }
 }
 stepOk('2 条历史全部迁到 epoch2，迁移副本作为新 op 上行');
@@ -285,12 +314,13 @@ for (const entry of migrated) {
   const asRecord = { id: entry.record.id, keyEpoch: rekey.toEpoch, ciphertext: entry.record.ciphertext };
   let bobStillReads = false;
   try {
-    await core.decryptShareRecord({ record: asRecord, shareId, listKey: listKeyV1 });
+    // bob 用旧钥 + 他手里的**源行身份**试解（迁移前后身份同源）。
+    await core.decryptShareRecord({ record: asRecord, shareId, listKey: listKeyV1, identity: entry.sourceIdentity });
     bobStillReads = true;
   } catch { /* 应当失败 */ }
   if (bobStillReads) fail(`迁移副本 ${entry.record.id} 竟被 bob 的旧钥解开——rekey 无效`);
   const ownerReads = new TextDecoder().decode(
-    await core.decryptShareRecord({ record: asRecord, shareId, listKey: rekey.newListKey }),
+    await core.decryptShareRecord({ record: asRecord, shareId, listKey: rekey.newListKey, identity: entry.identity }),
   );
   if (ownerReads !== entry.plaintext) {
     fail(`迁移副本 ${entry.record.id} owner 新钥读不回原文`);

@@ -19,6 +19,11 @@ import {
 
 const SHARE_A = 'share-aaa';
 const SHARE_B = 'share-bbb';
+// record 三件套（encrypt/decrypt/reencrypt）的全身份 AAD 所需的线上身份。
+const mkIdentity = (id: string) => ({
+  clientId: 'device-shared', actionType: 'edit task', opType: 'UPD',
+  entityType: 'TASK', entityId: id, timestamp: 1_700_000_000_000, schemaVersion: 1,
+});
 
 const hex = (bytes: Uint8Array): string =>
   Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
@@ -194,6 +199,7 @@ describe('history re-encryption', () => {
       shareId: SHARE_A,
       listKey,
       keyEpoch: epoch,
+      identity: mkIdentity(id),
     });
 
   it('re-encrypts to the new epoch and the old key stops reading it', async () => {
@@ -206,6 +212,7 @@ describe('history re-encryption', () => {
       fromListKey: oldListKey,
       toListKey: newListKey,
       toEpoch: 2,
+      identity: mkIdentity('op-1'),
     });
     expect(migrated.keyEpoch).toBe(2);
     expect(migrated.ciphertext).not.toBe(record.ciphertext);
@@ -213,6 +220,7 @@ describe('history re-encryption', () => {
       record: migrated,
       shareId: SHARE_A,
       listKey: newListKey,
+      identity: mkIdentity('op-1'),
     }));
     expect(opened).toBe('task payload 中文');
     // Old list key must not read new-epoch data.
@@ -220,6 +228,7 @@ describe('history re-encryption', () => {
       record: migrated,
       shareId: SHARE_A,
       listKey: oldListKey,
+      identity: mkIdentity('op-1'),
     })).rejects.toThrow();
     // Wrong share binding must fail too.
     await expect(decryptShareRecord({
@@ -235,20 +244,24 @@ describe('history re-encryption', () => {
     const record = await makeRecord(oldListKey, 'op-2', 1);
     const first = await reencryptShareRecord({
       record, shareId: SHARE_A, fromListKey: oldListKey, toListKey: newListKey, toEpoch: 2,
+      identity: mkIdentity('op-2'),
     });
     const second = await reencryptShareRecord({
       record, shareId: SHARE_A, fromListKey: oldListKey, toListKey: newListKey, toEpoch: 2,
+      identity: mkIdentity('op-2'),
     });
     expect(second.ciphertext).toBe(first.ciphertext);
     // Re-running on an already-migrated record is a no-op.
     const third = await reencryptShareRecord({
       record: first, shareId: SHARE_A, fromListKey: oldListKey, toListKey: newListKey, toEpoch: 2,
+      identity: mkIdentity('op-2'),
     });
     expect(third.ciphertext).toBe(first.ciphertext);
     // Interrupted-migration resume: different record ids still diverge (unique IVs).
     const other = await makeRecord(oldListKey, 'op-3', 1);
     const migratedOther = await reencryptShareRecord({
       record: other, shareId: SHARE_A, fromListKey: oldListKey, toListKey: newListKey, toEpoch: 2,
+      identity: mkIdentity('op-3'),
     });
     expect(migratedOther.ciphertext).not.toBe(first.ciphertext);
   });
@@ -259,6 +272,7 @@ describe('history re-encryption', () => {
     const record = await makeRecord(listKey, 'op-4', 1);
     await expect(reencryptShareRecord({
       record, shareId: SHARE_A, fromListKey: wrongKey, toListKey: generateShareListKey(), toEpoch: 2,
+      identity: mkIdentity('op-4'),
     })).rejects.toThrow();
   });
 });

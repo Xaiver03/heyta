@@ -1,54 +1,27 @@
 import {
-  aesDecrypt,
-  aesEncrypt,
-  decodeBase64,
-  deriveShareOperationKey,
-  encodeBase64,
-  getRandomBytes,
+  decryptShareRecord,
+  encryptShareRecord,
+  reencryptShareRecord,
+  shareRecordEpoch,
+  type ShareEncryptedRecord,
 } from '@heyta/sync-core';
 
 import type { SyncPayloadIdentity } from './payload-cipher';
 
 /**
- * Share op 载荷信封（ADR-0062 W3 的纯函数切片）。
- * =====================================================
+ * Share op 载荷信封（ADR-0062 W3）——**薄委托层**。
+ * =====================================================================
  *
- * 与 `payload-cipher.ts` 的 vault codec **同一条安全契约，另一个密钥域**：
- * vault 用「账号 root key 的 sync purpose 子钥」，这里用「清单密钥的
- * share op 子钥」（`deriveShareOperationKey(listKey, shareId, keyEpoch)`，
- * sync-core W1 的纯函数）。服务端两种信封都只有密文。
+ * 🔴 2026-10-09 格式统一：share op 载荷只有**一种格式**——sync-core
+ * `encryptShareRecord` 的 record 信封（version byte + keyEpoch(float64) +
+ * IV + AES-GCM body，全 op 身份 AAD）。本层不再有自己的 magic 包装——
+ * 那曾经造成两种不可互操作的格式（迁移机器只吃 record，线上是 magic），
+ * 被 `verify-collab-revoke` 当场逼出。世代自描述在信封头里，
+ * rekey 过渡期的混合世代下载页由世代选钥自然处理。
  *
- * ## 信封形状
- *
- * ```base64( 'heyta-share-op/' | FORMAT_VERSION(1B) | keyEpoch(float64 BE) | AES-GCM body )```
- *
- * 与 vault 信封同构（magic + 版本字节 + float64 密钥世代），差别只有：
- * 世代的语义是 **rekey 世代**（移除成员时 +1），不是密钥包版本——
- * rekey 之后历史重加密完成前，下载页里会同时存在新旧世代的 op，
- * 所以 decrypt 接受 `previous` 世代表（照 vault 的 `previous` 形状）。
- *
- * ## AAD 绑定
- *
- * 整条 op 身份（含 shareId）进 AAD——与 vault 的 `identityAAD` 同一姿势。
- * 理由也一样：所有成员都持有清单密钥，**没有 AAD 绑定的话，一张密文可以
- * 被改名为另一条 op 重放**。改这里的绑定字段 = 改变防重放承诺，需要变异
- * 测试与评审，不许顺手。
- *
- * 🔴 跨包 zod 的教训（W2）在这里同款成立：sync-core 导出的**纯函数**随便调
- * （`deriveShareOperationKey` / `aesEncrypt`），但不要把两个包的 zod schema
- * 互相组合。
+ * 密码学全部在 sync-core（单一所有者）；本层只做 API 适配
+ * （`SyncPayloadIdentity` → record 调用形状）与世代→钥的选路。
  */
-
-const MAGIC = Uint8Array.from('heyta-share-op/', (char) => char.charCodeAt(0));
-const FORMAT_VERSION = 1;
-const HEADER_LENGTH = MAGIC.length + 1 + 8;
-const hasShareMarker = (bytes: Uint8Array): boolean =>
-  bytes.length >= MAGIC.length && MAGIC.every((byte, index) => bytes[index] === byte);
-
-/** 可加密的最小 GCM 体：IV(12) + tag(16) + 至少 1 字节明文。 */
-const MIN_BODY_LENGTH = 12 + 16 + 1;
-/** 清单密钥长度。与 vault codec 同款字面量（sync-core 的 `KEY_LENGTH` 不在导出面上）。 */
-const LIST_KEY_LENGTH = 32;
 
 export interface ShareSyncKey {
   shareId: string;
@@ -59,17 +32,17 @@ export interface ShareSyncKey {
 export interface SharePayloadCipher {
   encrypt(payload: string, identity: SyncPayloadIdentity): Promise<string>;
   decrypt(payload: string, identity: SyncPayloadIdentity): Promise<string>;
+  /**
+   * rekey 迁移：把一条旧世代 op 重加密到 `to` 世代。**确定性 IV**——
+   * 同输入逐字节同输出（幂等可续传，AGENTS 规则 16）。产出的是一条
+   * **新 op**（新 id），由调用方上传。
+   */
+  reencrypt(payload: string, from: SyncPayloadIdentity, to: {
+    identity: SyncPayloadIdentity;
+    toListKey: Uint8Array;
+    toEpoch: number;
+  }): Promise<string>;
 }
-
-const shareIdentityAAD = (shareId: string, op: SyncPayloadIdentity): string => JSON.stringify([
-  'heyta:share-op',
-  FORMAT_VERSION,
-  shareId,
-  op.id, op.clientId, op.actionType, op.opType, op.entityType,
-  // 与 vault 的 identityAAD 同一条规范化：HTTP 下载面会省略空 entityIds，
-  // 绑定用同一份规范形，空列表与非空列表不会互相冒充。
-  op.entityId ?? null, op.entityIds?.length ? op.entityIds : null, op.timestamp, op.schemaVersion,
-]);
 
 const assertShareSyncKey = (entry: ShareSyncKey): void => {
   if (typeof entry.shareId !== 'string' || entry.shareId.length === 0 || entry.shareId.length > 256) {
@@ -78,84 +51,85 @@ const assertShareSyncKey = (entry: ShareSyncKey): void => {
   if (!Number.isSafeInteger(entry.keyEpoch) || entry.keyEpoch <= 0) {
     throw new Error('Invalid share key epoch');
   }
-  if (entry.listKey.length !== LIST_KEY_LENGTH) throw new Error('Invalid share list key');
+  // 清单密钥 32 字节；长度错误会在 sync-core 的 assert 处响亮失败。
+  if (entry.listKey.length !== 32) throw new Error('Invalid share list key');
 };
 
-/**
- * 新世代写入 + 显式世代表读取。调用方必须先拿到清单密钥（成员信封解出），
- * 这里不持久化任何密钥、也不做历史重加密——重加密是 W1 `reencryptShareRecord`
- * 的迁移批次职责。
- */
-export function createSharePayloadCipher(options: {
+/** 世代 → 钥。current + previous 的世代必须互不重复。 */
+const keyByEpoch = (options: {
   current: ShareSyncKey;
-  /** rekey 过渡期还能读到旧世代的 op；世代必须互不重复。 */
   previous?: readonly ShareSyncKey[];
-}): SharePayloadCipher {
-  const keys = new Map<number, { shareId: string; key: Uint8Array }>();
+}): Map<number, ShareSyncKey> => {
+  const keys = new Map<number, ShareSyncKey>();
   for (const entry of [...(options.previous ?? []), options.current]) {
     assertShareSyncKey(entry);
     if (keys.has(entry.keyEpoch)) throw new Error('Duplicate share key epoch');
     // 会话内快照：调用方改自己的 buffer 不能把一半批次加密换钥。
-    keys.set(entry.keyEpoch, { shareId: entry.shareId, key: entry.listKey.slice() });
+    keys.set(entry.keyEpoch, { ...entry, listKey: entry.listKey.slice() });
   }
-  const currentEpoch = options.current.keyEpoch;
-  const current = keys.get(currentEpoch)!;
+  return keys;
+};
+
+const toWireIdentity = (identity: SyncPayloadIdentity) => ({
+  clientId: identity.clientId,
+  actionType: identity.actionType,
+  opType: identity.opType,
+  entityType: identity.entityType,
+  entityId: identity.entityId,
+  entityIds: identity.entityIds,
+  timestamp: identity.timestamp,
+  schemaVersion: identity.schemaVersion,
+});
+
+export function createSharePayloadCipher(options: {
+  current: ShareSyncKey;
+  previous?: readonly ShareSyncKey[];
+}): SharePayloadCipher {
+  const keys = keyByEpoch(options);
+  const current = keys.get(options.current.keyEpoch)!;
   return {
     async encrypt(payload, identity) {
-      const opKey = deriveShareOperationKey(current.key, current.shareId, currentEpoch);
-      const iv = getRandomBytes(12);
-      const body = await aesEncrypt(
-        opKey,
-        iv,
-        new TextEncoder().encode(payload),
-        new TextEncoder().encode(shareIdentityAAD(current.shareId, identity)),
-      );
-      // 🔴 `aesEncrypt` 返回的是 **ct+tag，不含 IV**（与 vault codec 内部走
-      // `encryptVaultRecord` 不同——那一条的 IV 打在 record 信封里）。IV 必须
-      // 由本层显式写进信封，否则解密方无从取 IV——第一版漏了它，单测当场抓红。
-      const bytes = new Uint8Array(HEADER_LENGTH + 12 + body.length);
-      bytes.set(MAGIC);
-      bytes[MAGIC.length] = FORMAT_VERSION;
-      new DataView(bytes.buffer).setFloat64(MAGIC.length + 1, currentEpoch, false);
-      bytes.set(iv, HEADER_LENGTH);
-      bytes.set(body, HEADER_LENGTH + 12);
-      return encodeBase64(bytes);
+      const record = await encryptShareRecord({
+        id: identity.id,
+        plaintext: new TextEncoder().encode(payload),
+        shareId: current.shareId,
+        listKey: current.listKey,
+        keyEpoch: current.keyEpoch,
+        identity: toWireIdentity(identity),
+      });
+      return record.ciphertext;
     },
     async decrypt(payload, identity) {
-      let bytes: Uint8Array;
-      try {
-        bytes = new Uint8Array(decodeBase64(payload));
-      } catch {
-        throw new Error('Invalid encrypted operation');
-      }
-      if (!hasShareMarker(bytes)) throw new Error('Not a share operation envelope');
-      if (bytes.length < HEADER_LENGTH + MIN_BODY_LENGTH || bytes[MAGIC.length] !== FORMAT_VERSION) {
-        throw new Error('Invalid share operation envelope');
-      }
-      const epoch = new DataView(
-        bytes.buffer, bytes.byteOffset, bytes.byteLength,
-      ).getFloat64(MAGIC.length + 1, false);
-      if (!Number.isSafeInteger(epoch) || epoch <= 0) throw new Error('Invalid share key epoch');
+      // 世代从信封头自描述地取，再按世代选钥（rekey 过渡期混合世代下载页）。
+      const epoch = shareRecordEpoch(payload);
       const entry = keys.get(epoch);
       if (!entry) throw new Error('Share key epoch unavailable');
-      const opKey = deriveShareOperationKey(entry.key, entry.shareId, epoch);
-      const plaintext = await aesDecrypt(
-        opKey,
-        bytes.slice(HEADER_LENGTH, HEADER_LENGTH + 12),
-        bytes.slice(HEADER_LENGTH + 12),
-        new TextEncoder().encode(shareIdentityAAD(entry.shareId, identity)),
-      );
+      const plaintext = await decryptShareRecord({
+        record: { id: identity.id, keyEpoch: epoch, ciphertext: payload },
+        shareId: entry.shareId,
+        listKey: entry.listKey,
+        identity: toWireIdentity(identity),
+      });
       return new TextDecoder().decode(plaintext);
+    },
+    async reencrypt(payload, from, to) {
+      const record: ShareEncryptedRecord = {
+        id: from.id,
+        keyEpoch: shareRecordEpoch(payload),
+        ciphertext: payload,
+      };
+      const migrated = await reencryptShareRecord({
+        record,
+        shareId: current.shareId,
+        fromListKey: keys.get(record.keyEpoch)!.listKey,
+        toListKey: to.toListKey,
+        toEpoch: to.toEpoch,
+        identity: toWireIdentity(from),
+      });
+      return migrated.ciphertext;
     },
   };
 }
 
-/** 传输层形状嗅探：给下载路径判断「这条 op 是否带 share 信封」（不做密码学校验）。 */
-export const isSharePayloadTransportShape = (payload: string): boolean => {
-  if (typeof payload !== 'string' || payload.length === 0) return false;
-  try {
-    return hasShareMarker(new Uint8Array(decodeBase64(payload)));
-  } catch {
-    return false;
-  }
-};
+/** 传输层世代嗅探：给下载路径判断「这条载荷是哪个世代」（不做密码学校验）。 */
+export const sharePayloadEpoch = (payload: string): number => shareRecordEpoch(payload);

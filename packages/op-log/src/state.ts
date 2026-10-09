@@ -23,6 +23,7 @@
 import type {
   AiFeedback,
   AssistantTurn,
+  Comment,
   CountdownEvent,
   FocusSession,
   PreferenceCorrection,
@@ -35,7 +36,18 @@ import type {
   Task,
 } from '@heyta/domain';
 import { OpType, compareVectorClocks } from '@heyta/sync-core';
-import { SUPER_SYNC_SNAPSHOT_OP_TYPES, isHeytaFullStatePayload, type HeytaFullStatePayload } from '@heyta/shared-schema';
+import {
+  SUPER_SYNC_SNAPSHOT_OP_TYPES,
+  isHeytaFullStatePayload,
+  hasTaskBatchMarker,
+  parseTaskBatchOperation,
+  hasTaskPriorityBatchMarker,
+  parseTaskPriorityBatchOperation,
+  hasTaskRepeatCompletionMarker,
+  parseTaskRepeatCompletionOperation,
+  reminderOwnerFromId,
+  type HeytaFullStatePayload,
+} from '@heyta/shared-schema';
 import type { Operation, VectorClock } from '@heyta/sync-core';
 
 /** 物化状态。所有实体按 id 索引。 */
@@ -83,6 +95,11 @@ export interface MaterializedState {
    * 否则合并后的历史里分不出本机答案与云端答案。
    */
   assistantTurns: Record<string, AssistantTurn>;
+  /**
+   * 共享清单的任务评论（ADR-0062 W3）。只来自 share op-log 的重放——
+   * 个人 op-log 里不会有 COMMENT op（白名单 + role 门都在服务端）。
+   */
+  comments: Record<string, Comment>;
 }
 
 export function emptyState(): MaterializedState {
@@ -99,6 +116,7 @@ export function emptyState(): MaterializedState {
     reminders: {},
     events: {},
     assistantTurns: {},
+    comments: {},
   };
 }
 
@@ -116,6 +134,7 @@ const BUCKET_BY_ENTITY = {
   REMINDER: 'reminders',
   EVENT: 'events',
   ASSISTANT_TURN: 'assistantTurns',
+  COMMENT: 'comments',
 } as const;
 
 type ModeledEntity = keyof typeof BUCKET_BY_ENTITY;
@@ -299,12 +318,14 @@ function materializeVersions(
   entityId: string,
   entityVersions: OperationMeta[],
   fieldVersions: Record<string, FieldVersion[]>,
+  immutableOwner?: string,
 ): InternalEntity {
   const next: InternalEntity = { id: entityId };
   for (const [key, versions] of Object.entries(fieldVersions)) {
     const winner = selectVersion(versions);
     if (winner !== undefined && !winner.deleted) next[key] = winner.value;
   }
+  if (immutableOwner !== undefined) next.taskId = immutableOwner;
   const winner = selectVersion(entityVersions.map((meta) => ({ meta })));
   if (winner !== undefined) {
     next.updatedAt = winner.meta.timestamp;
@@ -353,7 +374,12 @@ function applyFullState(state: MaterializedState, op: Operation<string>): Materi
           addUnique(existing, candidate);
         }
       }
-      target[id] = materializeVersions(id, versions, fields);
+      target[id] = materializeVersions(
+        id,
+        versions,
+        fields,
+        bucketName === 'reminders' ? reminderOwnerFromId(id) : undefined,
+      );
     }
     (merged as unknown as Record<string, unknown>)[bucketName] = target;
   }
@@ -433,6 +459,15 @@ export function deserializeMaterializedState(value: unknown): MaterializedState 
       }
       const entity = { ...(record.data as Record<string, unknown>) } as InternalEntity;
       entity.id = entityId;
+      // A checkpoint may have been produced by an older writer that accepted
+      // a canonical reminder id with the wrong taskId.  Normalize the visible
+      // owner while retaining the version frontier for deterministic future
+      // merges; hydration must never turn that historical row into a restart
+      // poison pill.
+      if (entityType === 'REMINDER') {
+        const owner = reminderOwnerFromId(entityId);
+        if (owner !== undefined) entity.taskId = owner;
+      }
       attachMetadata(
         entity,
         record.entityVersions.map((meta) => ({ ...meta, clock: { ...meta.clock } })),
@@ -563,7 +598,12 @@ function applyOperationToEntity(
   // Soft deletion changes visibility via deletedAt, never removes content.
   // Keep fields for trash, restore and export, including when their operations
   // arrive after the tombstone. Older field writes cannot clear deletedAt.
-  const materialized = materializeVersions(entityId, entityVersions, fieldVersions);
+  const materialized = materializeVersions(
+    entityId,
+    entityVersions,
+    fieldVersions,
+    op.entityType === 'REMINDER' ? reminderOwnerFromId(entityId) : undefined,
+  );
 
   return {
     ...state,
@@ -583,6 +623,52 @@ export function applyOperation(
   state: MaterializedState,
   op: Operation<string>,
 ): MaterializedState {
+  if (hasTaskRepeatCompletionMarker(op.payload)) {
+    const completion = parseTaskRepeatCompletionOperation(op);
+    const taskId = op.entityId;
+    if (taskId === undefined) throw new Error('Task repeat completion missing task scope');
+    let next = applyOperationToEntity(
+      state,
+      { ...op, payload: completion.task },
+      taskId,
+    );
+    for (const reminder of completion.reminders) {
+      const { id, ...fields } = reminder;
+      next = applyOperationToEntity(
+        next,
+        {
+          ...op,
+          entityType: 'REMINDER',
+          entityId: id,
+          opType: OpType.Update,
+          payload: { taskId, ...fields },
+        },
+        id,
+      );
+    }
+    return next;
+  }
+  if (hasTaskBatchMarker(op.payload)) {
+    // Validate every member and the complete scope before changing any state.
+    // Synthetic per-member views preserve the one original operation's metadata.
+    const batch = parseTaskBatchOperation(op);
+    return batch.tasks.reduce((next, item, itemIndex) => {
+      const { id, ...fields } = item;
+      return applyOperationToEntity(next, {
+        ...op, opType: OpType.Create,
+        payload: { ...fields, automationSource: { ...batch.source, itemIndex } },
+      }, id);
+    }, state);
+  }
+  if (hasTaskPriorityBatchMarker(op.payload)) {
+    const batch = parseTaskPriorityBatchOperation(op);
+    return batch.items.reduce((next, item) =>
+      applyOperationToEntity(next, {
+        ...op,
+        opType: OpType.Update,
+        payload: { priority: item.priority },
+      }, item.id), state);
+  }
   if (isFullStateOperation(op)) return applyFullState(state, op);
   if (!isModeled(op.entityType)) return state;
   const ids = Array.from(

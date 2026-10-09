@@ -13,7 +13,7 @@
  *   3. **视图不建实体**：四象限、今日视图都是 TASK 的派生结果。
  */
 
-import type { EntityType } from '@heyta/shared-schema';
+import type { EntityType, TaskAutomationSource } from '@heyta/shared-schema';
 
 import type { CategorySlot } from './activity-categories.js';
 import type { LocalDate } from './date.js';
@@ -207,6 +207,8 @@ export interface Task extends EntityBase {
   title: string;
   /** 备注（Markdown）。可选 —— 老数据可能没有。 */
   note?: string;
+  /** Absent on ordinary/older tasks; persisted with the atomic creation op. */
+  automationSource?: TaskAutomationSource & { itemIndex: number };
   /** 所属清单。未归类时为 undefined（收集箱）。 */
   projectId?: string;
   /**
@@ -233,13 +235,37 @@ export interface Task extends EntityBase {
    */
   parentId?: string;
   tagIds?: string[];
+  /**
+   * 被指派人（ADR-0062，落地计划 W3）——**只对共享清单内的任务有意义**；
+   * 值 = 指派成员的账号 id（服务端 users.id 的客户端可见形态）。个人任务缺席。
+   *
+   * ⚠️ 它在加密 payload 里：服务端与未持有清单密钥的人都读不到
+   * （「盲推 + 本地过滤」的通知路由依赖这一点）。缺席 = 未指派。
+   */
+  assigneeUserId?: string;
   priority?: Priority;
   /** 是否标记为重要（象限的第 1 个轴）。 */
   important?: boolean;
   /** 截止时间（epoch ms）。象限的第 2 个轴由它推导紧迫性。 */
   dueDate?: number;
+  /**
+   * Date-only due date, preserved as the rule's `YYYY-MM-DD` value.
+   * `dueDate` remains as a compatibility/ordering projection; readers must
+   * prefer this field when present so a device timezone cannot move the day.
+   */
+  dueDateLocal?: LocalDate;
   /** 完成时间。存在即表示已完成（不另设 completed 布尔，避免两者不一致）。 */
   completedAt?: number;
+  /**
+   * 已经由系统小组件消费过的完成意图 receipt。
+   *
+   * 这是一个可选的、可同步的幂等记录，不是完成状态的第二个来源。
+   * 小组件的消费发生在独立进程里：如果任务 op 已落盘、队列确认删除前应用被杀，
+   * 下一次启动会再次领取同一意图。普通任务可以靠 `completedAt` 避免重复，
+   * 但重复任务完成后仍是未完成态，必须把 receipt 与顺延放在同一枚 TASK op 里。
+   * 旧数据没有它时按空数组处理；不需要 schema bump。
+   */
+  widgetCompletionReceipts?: string[];
   /**
    * 排期起点（epoch ms）。可选；**运行时默认 `undefined` = 未排期起点**
    * （AGENTS.md §3.3：已落盘的数据没有这个字段，hydration 不得炸）。
@@ -252,6 +278,8 @@ export interface Task extends EntityBase {
    * `startDate` 是"什么时候开始做"（时间线排期的语义）。两者独立、互不推导。
    */
   startDate?: number;
+  /** Date-only schedule start, with the same timezone-independent semantics as dueDateLocal. */
+  startDateLocal?: LocalDate;
   /**
    * 排期时长（**分钟**，正整数）。可选；`undefined` = 时长未知。
    *
@@ -312,6 +340,14 @@ export interface Project extends EntityBase {
   color?: string;
   /** 是否归档（隐藏但保留数据）。 */
   archived?: boolean;
+  /**
+   * 共享域 id（ADR-0062 W2 的 `shares.id`）。缺席 = 个人清单；
+   * 在册 ⇒ 本清单内的任务/标签/便签/评论的 op 走 **share op-log**
+   * （`packages/app-host` 的写入路由裁决，apps/* 不许自行判断）。
+   * ⚠️ 关联本身对服务端可见（明文元数据「共享关系」已在隐私政策 1.9 登记），
+   * 但清单**内容**仍在清单密钥之后。
+   */
+  shareId?: string;
 }
 
 export interface Tag extends EntityBase {
@@ -774,10 +810,33 @@ export interface AssistantTurn extends EntityBase {
 }
 
 /**
+ * 共享清单里的任务评论（ADR-0062，W3）。
+ *
+ * 🔴 **一条评论 = 一个实体**（与 `AssistantTurn` 同一条推理）：LWW 在数组上
+ * 是覆盖语义，"一个任务带 comments 数组"会让并发追加互相吞掉；一条一实体时
+ * 写入只追加新 id，"只增不减"是结构给的。
+ *
+ * 🔴 只存在于共享清单（`Project.shareId` 在册）——个人清单没有评论。
+ * 不可变字段只有 id/createdAt/authorUserId；正文编辑走 `body` 的 LWW
+ * （最后写入胜出，与任务标题同语义）。删除 = 软删（`deletedAt`，四态语义
+ * 见 ADR-0048）。
+ */
+export interface Comment extends EntityBase {
+  /** 被评论的任务 id（同 share 内的任务）。 */
+  taskId: string;
+  /** 作者的账号 id（**自报**，与 `AssistantTurn.originClientId` 同一威胁模型：
+   *  拦的是"另一台设备误认"，不是攻击者——真正的身份证明在 op 的 Ed25519 签名）。 */
+  authorUserId: string;
+  /** 评论正文（Markdown）。编辑 = 同 id 的新 Update op，LWW 覆盖。 */
+  body: string;
+}
+
+/**
  * 实体类型 → 领域模型 的映射。
  * 用于 op-log 的 apply 阶段做类型收窄。
  */
 export interface EntityModelMap {
+  COMMENT: Comment;
   TASK: Task;
   PROJECT: Project;
   TAG: Tag;
@@ -819,6 +878,7 @@ export const MODELED_ENTITY_TYPES = [
   'REMINDER',
   'EVENT',
   'ASSISTANT_TURN',
+  'COMMENT',
 ] as const satisfies readonly ModeledEntityType[];
 
 /** 编译期兜底：清单漏掉 `EntityModelMap` 的任何一个键都会让这里类型错误。 */

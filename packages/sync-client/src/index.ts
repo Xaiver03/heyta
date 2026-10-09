@@ -20,3 +20,4 @@ export * from './server-url.js';
 
 export * from './payload-cipher.js';
 export * from './share-payload-cipher.js';
+export * from './share-api-client.js';
