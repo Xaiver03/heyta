@@ -92,7 +92,14 @@ const reminderModes = HEADED
   ? ['default', 'granted', 'denied', 'unsupported', 'error']
   : ['denied', 'unsupported', 'error', 'default', 'granted'];
 const isSimulatedMode = (mode) => !HEADED && SIMULATED_WHEN_HEADLESS.includes(mode);
+// 🔴 视口口径要对着**台账声称的那句话**量，不是对着方便：主表 UX-S9-31/32 两行写的是
+// 「Web 1440/375 亮暗浏览器验收通过」，而这一腿从 10-08 那批起只有 390/1440 ——
+// 375 那一档以前只由 `groups` 腿覆盖，而它走的是另外四组，**不含「任务与显示」**
+// （显示选项 / 语言组 / 暗色切换 / 提醒状态卡都住在这一组里）。
+// ⇒ 10-10 01:3x 把 375 补进来，让那句话有它自己的读数；分组走查腿的 375/768/1440 不动。
 const cases = [
+  { theme: 'light', width: 375, height: 812 },
+  { theme: 'dark', width: 375, height: 812 },
   { theme: 'light', width: 390, height: 844 },
   { theme: 'dark', width: 390, height: 844 },
   { theme: 'light', width: 1440, height: 960 },
