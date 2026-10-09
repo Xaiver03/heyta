@@ -1865,28 +1865,44 @@ pin 未动、被跟踪脏 = 0，全程不改主检出）：
 - 可逆性：`git revert 209f7997` 一条命令回到现状态；提交信息里逐枚写了来源与 mtime，归属没有改写。
 
 🔴 **还剩的一件事（本线不代拍，但记在这里）**：这一类"一句 docs 提交扫进整片工作树"已经不止一次
-（§6.10、§6.26、本条）。仓库里**没有任何一层**会因为它而失败 —— `pnpm check` 不含 `pnpm -r build`，
-而死链检查只看可点的 markdown 链接。候选修法是一条静态尺：
-`packages/*/src/**` 与 `apps/*/src/**` 里每一个相对 import，都必须解析到 `git ls-files` 里的文件；
-它能当场抓住本条这一型（引用在册、实现不在册 = 干净检出必红）。
-把它做成门禁要先回答"注入违规会不会红"，属判据口径，交负责人拍；现量复跑：
+（§6.10、§6.26、本条）。而这一维**不是没有层判** —— `pnpm check` 里就有 `pnpm build`
+（= `pnpm -r build`）和 `pnpm typecheck` 两步（现量命令只写在 §6.38 一处，免得抄两份漂一份）。
+它十六小时一次没响的唯一理由是**每一次 `pnpm check` 都跑在那棵脏树上**：
+在脏检出上"构建那一维"等于没判，而这比"缺一道门禁"更难防 —— 门禁在场、还全绿。
+所以补的不是"再加一道构建"，而是**能把判据对准某一枚 ref** 的那把尺（见 §6.38）；
+现量这型缺陷的范围（不依赖尺）：
 
 ```bash
 git ls-files --others --exclude-standard -- packages | grep -E '\.ts$'   # 未跟踪的源码
 git grep -hoE "from '\.[^']*'" HEAD -- packages | sort -u                # HEAD 引用了哪些相对模块
 ```
 
-设备腿 r5 已按修好的 pin 重投（`~/.heyta-evidence/ios-account-email-1009-212606-r5/`），
-载体 = `209f7997` 且被跟踪脏 = 0，三枚闸门脚本与主 HEAD 逐枚同 blob。
-它第 4 步的窗口门第一趟报 `REDS=load` —— 那是负载门在正常工作，不是缺陷。
+设备腿 r5（载体 pin = `209f7997`、被跟踪脏 = 0、三枚闸门脚本与主 HEAD 逐枚同 blob）
+停在了第 4 步的窗口门：21:27–21:53 连续 14 趟全是 `REDS=load`（阈值 ≤12，那趟实测 17–27），
+一次都没过，我把它停了。🔴 但**停它不只是因为负载** —— 那一枚 pin 本身就打不出包：
+现量 `node scripts/check-imports-resolve.mjs --tree 209f7997 --sources-only` = **9 条构建输入缺失**，
+而 `reinstall-all.sh --only ios` 的第 0 步正是 `pnpm -r build`。
+⇒ r5 就算等到负载落下来也会在重装那一步红，而**那口红不是设备缺陷**，会被读成设备缺陷。
+所以 r6 没有沿用 `209f7997`，改成对准 §6.39 那枚声明过的叠（`f1edde47`，同一问法读数 0 条）。
+
+这 9 条的归属（现量，不是我推的）：它们全在 `packages/ui`、`apps/web`、`packages/app-host`，
+其中 `./auth/PasswordStrength.js` 那一行是 `e6058120`（`docs(产品体验线 台账 §UX-S9-153)`，
+10-09 14:35）加进 `packages/ui/src/index.ts` 的，而那两枚实现文件
+`git merge-base --is-ancestor` 对 HEAD = **NO**、`git branch -a --contains` 列不出任何分支
+⇒ **同一型第二次**，而且落笔的是**另一条线**、标题同样是 `docs(...)`。
+复取：`git log --oneline -1 -S "'./auth/PasswordStrength.js'" -- packages/ui/src/index.ts`。
 
 
 ### 6.38 把这型缺陷变成一枚尺：`scripts/check-imports-resolve.mjs`（含它现在量到的 9 + 12 条红）
 
-§6.36 那一型（引用进了 HEAD、实现留在工作树）能藏十六小时，是因为**没有一层判它**：
-`pnpm check` 不含 `pnpm -r build`（AGENTS §6.1 明确说构建要单独跑），
-死链检查只看 markdown 里可点的链接，`check:docs` 判的是链接目标存不存在。
-补的尺是纯静态一条：某一枚 ref 里每个源码文件的每个相对 import，都必须解析到**同一枚 ref 里存在的文件**。
+§6.36 那一型（引用进了 HEAD、实现留在工作树）能藏十六小时，不是因为**没有层判它**：
+`pnpm check` 里就有 `pnpm build`（= `pnpm -r build`）与 `pnpm typecheck` 两步，都判这一维，
+但它们**每一次都跑在那棵脏树上**，于是每一次都绿。
+死链检查只看 markdown 里可点的链接，`check:docs` 判的是链接目标存不存在 —— 那两把是真不判。
+补的尺因此是"**能对准某一枚 ref** 的静态一条"：某一枚 ref 里每个源码文件的每个相对 import，
+都必须解析到**同一枚 ref 里存在的文件**。
+（现量：`git show HEAD:package.json | grep -o '"check": "[^"]*"' | grep -oE 'pnpm (build|typecheck|-r test)'`
+⇒ 三个都命中，即构建与类型检查**都在 `check` 里**）
 
 ```bash
 node scripts/check-imports-resolve.mjs                    # 默认 --tree HEAD
