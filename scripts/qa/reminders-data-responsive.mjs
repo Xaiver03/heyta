@@ -19,6 +19,26 @@ const ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const OUT = resolve(process.env.HEYTA_RESPONSIVE_EVIDENCE ?? `${ROOT}/apps/web/evidence/reminders-data-responsive`);
 
 /**
+ * 「种一枚不跟档的共享层节点」的臂号（默认 -1 = 不种）。
+ * 为什么要这颗旋钮：`themeLayerRulerSwitchesWithTier` 03:4x 起把作用域内**每一枚**带字面
+ * `color` 的节点都配对（不再只看第一枚）。要证明"扩样真的换来了敏感度"，唯一的证法是造出
+ * **只有第 2..n 枚坏掉**的界面状态 —— 改前那把尺的样本恰好只有第 0 枚，对它结构上盲。
+ * 🔴 种下去的读数必须自己带身份：`carrier.plantedStuckTierIndex` 入册，
+ * 另有 `plantedThemeSampleTookEffect` 钉"种的东西确实落了"（同一族见 `groupSweepOffViewportRulerHasTeeth`
+ * 与 `helpWrapInjectionTookEffect`）—— 没有那条，"臂红了"与"臂什么都没种上"在输出上长一样。
+ */
+const PLANT_STUCK_TIER_INDEX = Number(process.env.HEYTA_RESPONSIVE_PLANT_STUCK_TIER ?? '-1');
+const PLANTED_STUCK_TIER_COLOR = 'rgb(15, 23, 42)';
+if (!Number.isInteger(PLANT_STUCK_TIER_INDEX)) {
+  throw new Error(`HEYTA_RESPONSIVE_PLANT_STUCK_TIER 必须是整数臂号，读到的原文：${process.env.HEYTA_RESPONSIVE_PLANT_STUCK_TIER}`);
+}
+// 只许种在**第 2 枚及以后**：index 0 会连 `sharedLayerColor` 一起改到，那条 `darkTierReachesBothThemeLayers`
+// 跟着变红，这一臂就再也证不了"只有配对判据看得见这个坏值"。上限对着 `slice(0, 8)` 那一步。
+if (PLANT_STUCK_TIER_INDEX === 0 || PLANT_STUCK_TIER_INDEX > 7) {
+  throw new Error(`HEYTA_RESPONSIVE_PLANT_STUCK_TIER 只能是 -1（不种）或 1..7；读到 ${PLANT_STUCK_TIER_INDEX}`);
+}
+
+/**
  * 跑哪几腿（默认全跑）。加这颗旋钮的理由不是"方便"，是**这装置在干净检出上跑不动**：
  * 提醒那一腿等的 `reminder-notify-request-failed` 只活在未提交的 `ReminderNotifyPanel.tsx` 里
  * （现量：`git grep -c reminder-notify-request-failed HEAD -- apps/web` 无输出），
@@ -332,7 +352,7 @@ const seedStorage = (page, theme) => page.addInitScript((t) => {
  * @param {string} [scopeSelector] 作用域；不传就在整棵 document 里找
  */
 async function themeLayerFacts(page, scopeSelector) {
-  return page.evaluate((scope) => {
+  return page.evaluate(({ scope, plantIndex, plantColor }) => {
     const root = (scope ? document.querySelector(scope) : null) ?? document;
     const title = root.querySelector('.ht-settings__group-title')
       ?? root.querySelector('.ht-settings__title')
@@ -358,6 +378,15 @@ async function themeLayerFacts(page, scopeSelector) {
     const titleText = title ? (title.textContent ?? '').trim() : '';
     return {
       scope: scope ?? '(document)',
+      // 03:3x 补：把作用域内**每一枚**带字面 `color` 的节点一起交出去（至多 8 枚），
+      // 好让"跟档"那条判据的样本不再只压在"第一枚"上 —— 第一枚在 30 格里都是同一枚卡片标题，
+      // 于是配对数恒等于 1。配对是按节点文字认身份的，多几枚就多几对。
+      // ⚠️ 下面那条 `shared*` 单节点字段**保留不动**：`darkTierReachesBothThemeLayers` 与 r14 那臂认的是它。
+      sharedLayerCandidates: literalColorNodes.slice(0, 8).map((el, i) => ({
+        text: (el.textContent ?? '').trim().slice(0, 60),
+        // 种臂：这一枚的色值被装置钉住，不是界面交出去的（`carrier.plantedStuckTierIndex` 为证）
+        color: i === plantIndex ? plantColor : getComputedStyle(el).color,
+      })),
       datasetTheme: document.documentElement.dataset.theme ?? '(unset)',
       storedTheme: localStorage.getItem('heyta.theme') ?? '(unset)',
       cssLayerColor: title ? getComputedStyle(title).color : '(css title not found)',
@@ -368,7 +397,7 @@ async function themeLayerFacts(page, scopeSelector) {
       sharedLayerFound: Boolean(shared),
       sharedLayerCandidateCount: literalColorNodes.length,
     };
-  }, scopeSelector ?? null);
+  }, { scope: scopeSelector ?? null, plantIndex: PLANT_STUCK_TIER_INDEX, plantColor: PLANTED_STUCK_TIER_COLOR });
 }
 
 async function captureReminder(browser, spec, mode) {
@@ -1028,6 +1057,7 @@ const assertionOwner = {
   reminderPermissionProvenanceIsLabeled: ['reminders'],
   darkTierReachesBothThemeLayers: ['reminders', 'groups'],
   themeLayerRulerSwitchesWithTier: ['reminders', 'groups'],
+  plantedThemeSampleTookEffect: ['reminders', 'groups'],
   dataFailurePreserved: ['data'],
   existingDataRefusedWithoutLoss: ['data'],
   cancelPreserved: ['data'],
@@ -1082,10 +1112,18 @@ const themeRulerCells = [
 // 而"同一枚节点在两档之间色值必须变"与角色无关 —— 半暗那种坏法恰好就是它不变。
 const themeRulerPairIndex = new Map();
 for (const cell of themeRulerCells.filter((x) => x.sharedLayerFound)) {
-  const key = `${cell.leg}|${cell.group ?? ''}|${cell.scope}|${cell.sharedLayerNodeText}`;
-  const row = themeRulerPairIndex.get(key) ?? {};
-  row[cell.theme] = cell;
-  themeRulerPairIndex.set(key, row);
+  // 03:3x 起：样本从"每格第一枚"扩到"每格每一枚"（`sharedLayerCandidates`）。
+  // 节点身份仍按**文字**认（同一作用域内同一文字的节点在亮暗两档各量到一次才算一对），
+  // 没有这枚字段的格子退回单节点字段，所以这条扩样不会把已有配对清零。
+  const samples = (cell.sharedLayerCandidates ?? []).length > 0
+    ? cell.sharedLayerCandidates
+    : [{ text: cell.sharedLayerNodeText, color: cell.sharedLayerColor }];
+  for (const sample of samples) {
+    const key = `${cell.leg}|${cell.group ?? ''}|${cell.scope}|${sample.text}`;
+    const row = themeRulerPairIndex.get(key) ?? {};
+    row[cell.theme] = { shared: sample.color, css: cell.cssLayerColor };
+    themeRulerPairIndex.set(key, row);
+  }
 }
 const themeRulerPairs = [...themeRulerPairIndex.values()].filter((row) => row.light && row.dark);
 
@@ -1111,7 +1149,10 @@ const report = {
     themeRulerMeasuredCells: themeRulerCells.filter((x) => x.sharedLayerFound).length,
     themeRulerSampleCells: themeRulerCells.length,
     // 配对上的"同一枚节点 × 亮暗两档"有几对：`themeLayerRulerSwitchesWithTier` 只在它 > 0 时才在判事。
+    // ⚠️ 03:4x 起这一枚的口径是**配对到的节点数**，不是格子数（一格最多交 8 枚候选，同文字会并成一条键）。
     themeLayerRulerPairedCells: themeRulerPairs.length,
+    // 种臂的身份：-1 = 这趟的每枚色值都来自界面本身；≥0 = 该臂号那枚共享层候选被装置钉住了（见那条判据）。
+    plantedStuckTierIndex: PLANT_STUCK_TIER_INDEX,
     realPermissionModes: HEADED
       ? ['default', 'granted', 'denied']
       : ['denied'],
@@ -1168,13 +1209,19 @@ const report = {
       && themeRulerCells.every((x) => !x.sharedLayerFound
         || x.sharedLayerColor === x.cssLayerColor),
     // 上一条对"共享层节点没量到"是放过的 ⇒ 尺子自己要有一条不空转的对账。
-    // 02:3x 起这条**按节点配对**（不再只比第一格）：至少要有 1 对"同一枚节点在亮暗两档各量到一次"，
-    // 且每一对的**两层色值都必须跨档变过**。少了配对这一层，跨 IA 时它只看了样本集的第一格；
+    // 02:3x 起这条**按节点身份配对**（不再只比样本集第一格）：键 = `腿|组|作用域|节点文字`；
+    // 03:4x 起样本再厚一档 —— 每格交出**每一枚**带字面 `color` 的节点（至多 8 枚），不再只有第一枚。
+    // 判的是：至少 1 对，且**每一对的两层色值都跨档变过**（0 对判假，不放行）。
     // 而"半暗"那种坏法（只写 `dataset.theme`）恰好被它抓到：那时两层各自内部一致、
     // 只是暗档的共享层色**等于亮档**，配对之后那一格就再也混不过去。（AGENTS §7 元规则二）
     themeLayerRulerSwitchesWithTier: themeRulerPairs.length > 0
-      && themeRulerPairs.every((row) => row.light.sharedLayerColor !== row.dark.sharedLayerColor
-        && row.light.cssLayerColor !== row.dark.cssLayerColor),
+      && themeRulerPairs.every((row) => row.light.shared !== row.dark.shared
+        && row.light.css !== row.dark.css),
+    // 种臂（`carrier.plantedStuckTierIndex`）的自证：种了就必须真的钉住 ≥1 枚候选。
+    // 没有这条，"这一臂把配对判据打红了"与"这一臂什么都没种上、红是别处来的"在输出上长一样。
+    plantedThemeSampleTookEffect: PLANT_STUCK_TIER_INDEX < 0
+      || themeRulerCells.some((cell) => (cell.sharedLayerCandidates ?? [])
+        .some((c, i) => i === PLANT_STUCK_TIER_INDEX && c.color === PLANTED_STUCK_TIER_COLOR)),
     // ── 明暗 × 视口下「个人资料 / 账号与安全」两组（补 account-suite 零暗色那个洞）──
     everyCaseCoversEverySweepGroup: sweepCases.every((spec) =>
       sweepGroups.every((group) =>
