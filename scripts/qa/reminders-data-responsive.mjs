@@ -688,12 +688,14 @@ const HELP_LONG_TITLE = '帮助与问题反馈的超长中文标题换行实测'
  * `.ht-type-row-title` 是块级，块级元素的 client rects 就是它那**一枚**盒子，
  * 五行的标题也报 1 —— 第一版就是照它量的，把真在换行的界面读成"没换行"。
  */
-async function captureHelpWrap(browser, width) {
+async function captureHelpWrap(browser, spec) {
+  const { width } = spec;
   const context = await browser.newContext({ viewport: { width, height: 900 }, locale: 'zh-CN' });
   const page = await context.newPage();
-  // 这一腿只有亮色一档，但**显式**写：不写就变成"依赖 Playwright 上下文的默认配色"，
-  // 那是第三个会悄悄变的东西（同一族见 `seedStorage` 上面那段）。
-  await seedStorage(page, 'light');
+  // 档位**显式**写：不写就变成"依赖 Playwright 上下文的默认配色"，那是第三个会悄悄变的东西
+  // （同一族见 `seedStorage` 上面那段）。这一腿此前只拍亮档一档 —— 10-10 22:3x 起两档都拍，
+  // 成因与那条"四面 × 两档都看过"的射程更正见台账 `帮助腿补上暗档那一维` 那格。
+  await seedStorage(page, spec.theme);
   await page.goto(`${ORIGIN}/?lang=zh-CN`);
   await decidePrivacy(page);
   await openGroup(page, 'help');
@@ -740,7 +742,7 @@ async function captureHelpWrap(browser, width) {
 
   const baseline = await measure('baseline');
   const wrap = await measure('wrap');
-  await page.screenshot({ path: `${OUT}/light-${width}-help-long-title.png` });
+  await page.screenshot({ path: `${OUT}/${spec.theme}-${width}-help-long-title.png` });
   const nowrap = await measure('nowrap');
   const ellipsis = await measure('ellipsis');
   const fixedWidth = await measure('fixedWidth');
@@ -748,6 +750,7 @@ async function captureHelpWrap(browser, width) {
 
   const badArms = { nowrap, ellipsis, fixedWidth };
   return {
+    theme: spec.theme,
     width,
     baseline,
     wrap,
@@ -1073,8 +1076,11 @@ if (LEGS.includes('groups')) {
 // UX-S9-44 验收列的视口口径：375/768/1440。这一趟只量几何（换行与列宽），
 // 主题不影响盒模型，暗色那一档由上面 24 格与 help-entry-ux 各自覆盖。
 const helpWrapWidths = [375, 768, 1440];
+// 🔴 这一腿的分母是**两维**：宽度 × 档位。此前它只有一维（`helpWrapWidths.length` 三格全亮档），
+// 于是"四面里帮助面只有单档证据"这件事在输出上没有任何一层会说 —— tracking 判据跟着改到 6 才拦得住。
+const helpCases = ['light', 'dark'].flatMap((theme) => helpWrapWidths.map((width) => ({ theme, width })));
 if (LEGS.includes('help')) {
-  for (const width of helpWrapWidths) helpWrap.push(await captureHelpWrap(browser, width));
+  for (const spec of helpCases) helpWrap.push(await captureHelpWrap(browser, spec));
 }
 // 「同步与隐私」决定态那一腿的格子：三张（明 1440 / 暗 1440 / 明 375），每张走完整三态。
 // 视口跟着这一腿自己要答的问题：桌面那一档看整屏，375 那一档看窄屏下按钮与提示会不会挤。
@@ -1138,7 +1144,7 @@ const expectedLegCells = {
   reminders: cases.length * reminderModes.length,
   data: cases.length,
   groups: sweepCases.length * sweepGroups.length,
-  help: helpWrapWidths.length,
+  help: helpCases.length,
   sync: syncCases.length,
 };
 
@@ -1224,6 +1230,7 @@ const report = {
   sweepCases,
   groups,
   helpWrapWidths,
+  helpCases,
   helpWrap,
   syncCases,
   syncPrivacy,
