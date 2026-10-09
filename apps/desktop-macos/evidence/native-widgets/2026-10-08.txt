@@ -1,0 +1,48 @@
+Native macOS WidgetKit implementation evidence (2026-10-08)
+
+SwiftPM host Release build: passed (13.85s); no warnings in the final Release log.
+Shared HeytaWidgetCore: 104 XCTest tests passed, 0 failures.
+Xcode HeytaMacWidget Release: BUILD SUCCEEDED.
+AppIntents metadata: Contents/Resources/Metadata.appintents/extract.actionsdata exists.
+Nested extension: Contents/PlugIns/HeytaMacWidget.appex, CFBundleSupportedPlatforms=MacOSX.
+Host and extension signed independently with Developer ID Application.
+Both contain a matching MAC_APP_DIRECT profile and application/team/keychain entitlements.
+codesign --verify --deep --strict: passed.
+
+Runtime probe in signed, isolated host, observed through native accessibility:
+{"sealed":"AES-GCM-256","write":true,"privacy":null}
+Shared Group Container has widget-snapshot.json (2186 bytes, encrypted envelope).
+pluginkit -m -v -i cloud.finlaw.heyta.desktop.widgets: 1 plug-in.
+Registered path: ~/Applications/HeytaWidgetQA.app/Contents/PlugIns/HeytaMacWidget.appex.
+
+Important discovered failure, corrected:
+Signing keychain-access-groups without a profile passes codesign verification but AMFI
+kills the executable (exit 137, "Code has restricted entitlements"). Embedding matching
+MAC_APP_DIRECT profiles and application/team identifiers makes the same host run.
+
+Not yet proved by this evidence file:
+System Widget Gallery discovery/addition; widget rendering outside the Gallery preview;
+clicking a real system widget button. The following proves the actual shared intent
+implementation and app-host consumer, but is not a system UI click.
+
+Real host data / cross-process AppIntent verification (12:10–12:15 local):
+- Latest apps/web/dist loaded by signed QA host with isolated SQLite and ephemeral WebKit.
+- Created task 原生小组件闭环20261008 through host UI journey; set due date to Today via CUA.
+- Signed independent process using the extension bundle identity, sandbox entitlements,
+  and its MAC_APP_DIRECT profile linked the real HeytaWidgetCore and HeytaWidgetKit.
+- Shared WidgetSnapshotReader + WidgetDeviceKey returned STATE=ready, DONE=false.
+- It invoked the actual ToggleTaskIntent(taskId:..., targetIsDone:true).perform().
+- The intent queue and payload-free notification reached the running host; shared Web
+  lifecycle drained through app-host. No direct task DB writes were used by the probe.
+- SQLite op count before = 2 (create + due date); after = 3 (one UPD_TASK completedAt).
+- A second identical intent returned DONE=true and op count remained 3 (idempotent).
+- CUA inspected Completed view: checkbox “取消完成：原生小组件闭环20261008”, Value=1;
+  sidebar “已完成 1”; task title visibly struck through with checked blue box.
+- CUA screenshots were emitted in this agent session on 2026-10-08; the screenshot API
+  does not expose a file export path. The current QA window remains on Completed for
+  the parent to capture/export alongside system Gallery evidence.
+
+Temporary reproduction material retained:
+/tmp/heyta-widget-runtime-probe (SwiftPM probe source and signed Probe.app)
+/tmp/heyta-mac-widget-db/heyta.sqlite (isolated QA database, 3 ops)
+~/Applications/HeytaWidgetQA.app (registered native extension, real host still running)

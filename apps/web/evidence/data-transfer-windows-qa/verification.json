@@ -1,0 +1,113 @@
+{
+  "verificationDateUtc": "2026-10-08T02:31:48Z",
+  "platform": "windows-pc",
+  "manifest": "data-transfer-qa-manifest.json",
+  "defaultDataBoundary": {
+    "directory": "C:\\Users\\41478\\AppData\\Local\\heyta",
+    "comparison": "unchanged before and after the QA runs",
+    "files": [
+      {
+        "name": "heyta.sqlite",
+        "length": 4096,
+        "sha256": "52a371445ce0812ca930aea418e7d7e9d6459f1778a6e14cb56592f08f5a08af",
+        "lastWriteUtc": "2026-09-30T09:32:44.3164820Z"
+      },
+      {
+        "name": "heyta.sqlite-shm",
+        "length": 32768,
+        "sha256": "f41ec1de7a0ee6630f485056e25108659e9b5d029b62d031aec705dcabd948e3",
+        "lastWriteUtc": "2026-10-08T00:56:14.9602253Z"
+      },
+      {
+        "name": "heyta.sqlite-wal",
+        "length": 168952,
+        "sha256": "599748b77572b13d2dd073f788ac585ae701c04a0b3835119cf115ada906973a",
+        "lastWriteUtc": "2026-09-30T09:33:26.8334774Z"
+      }
+    ]
+  },
+  "dataJourney": {
+    "status": "passed",
+    "qaRoot": "C:\\Users\\41478\\heyta-qa-s9-126-copy",
+    "profile": "C:\\Users\\41478\\heyta-qa-s9-126-copy\\app\\HeytaWindows.exe.WebView2\\EBWebView",
+    "steps": [
+      {
+        "id": "seed-and-export",
+        "result": "passed",
+        "details": "Created a Windows QA task and exported JSON and Markdown from the data-management panel.",
+        "evidence": ["export-json.json", "export-markdown.md", "current-light.png"]
+      },
+      {
+        "id": "cancel-file-selection",
+        "result": "passed",
+        "details": "Cleared the file input; the restore action remained disabled and no data changed."
+      },
+      {
+        "id": "bad-json",
+        "result": "passed",
+        "details": "Selected malformed JSON and received the visible error context: 这个文件不是合法 JSON。"
+      },
+      {
+        "id": "nonempty-refusal",
+        "result": "passed",
+        "details": "Selected a valid backup on the populated QA database; restore was refused with the existing-data message and the task remained present.",
+        "evidence": ["current-nonempty-refused.png"]
+      },
+      {
+        "id": "empty-restore",
+        "result": "passed",
+        "details": "Launched a fresh empty QA data root, imported the valid backup, observed the success message, reloaded, and observed the restored task.",
+        "evidence": ["empty-import-success.png"]
+      },
+      {
+        "id": "dark-theme",
+        "result": "passed",
+        "details": "Captured the data-management UI in dark theme after the journey.",
+        "evidence": ["current-dark.png"]
+      }
+    ]
+  },
+  "finalRunner": {
+    "status": "passed-startup-finalize",
+    "qaRoot": "C:\\Users\\41478\\heyta-data-transfer-qa-s9-126-finalize-20261008d",
+    "cdpPort": 9258,
+    "lifecycle": "finalized",
+    "processId": 20980,
+    "processStop": "stopped exact recorded HeytaWindows.exe PID",
+    "webviewUserDataFolder": "C:\\Users\\41478\\heyta-data-transfer-qa-s9-126-finalize-20261008d\\app\\HeytaWindows.exe.WebView2",
+    "defaultComparison": {
+      "unchanged": true,
+      "differences": [],
+      "fileCountBefore": 1274,
+      "fileCountAfter": 1274
+    },
+    "m2Evidence": "m2-evidence.txt",
+    "details": "The runner copied the Debug output, launched the interactive shell, recorded the actual CoreWebView2.Environment.UserDataFolder under the copied QA app root, wrote M2-D evidence under the QA data directory, then finalized by stopping only the recorded executable PID and comparing all default-directory files and hashes.",
+    "runner": "scripts/windows/launch-data-transfer-qa.ps1",
+    "manifest": "data-transfer-qa-manifest.json"
+  },
+  "isolationValidation": {
+    "status": "passed",
+    "mode": "ValidateOnly",
+    "allRejected": true,
+    "pathsUnchanged": true,
+    "cases": [
+      "default directory",
+      "default directory ancestor",
+      "default directory descendant",
+      "existing directory",
+      "drive root"
+    ]
+  },
+  "artifacts": [
+    "data-transfer-qa-manifest.json",
+    "m2-evidence.txt",
+    "validation-matrix.json",
+    "export-json.json",
+    "export-markdown.md",
+    "current-light.png",
+    "current-dark.png",
+    "current-nonempty-refused.png",
+    "empty-import-success.png"
+  ]
+}

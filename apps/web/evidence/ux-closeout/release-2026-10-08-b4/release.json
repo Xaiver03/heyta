@@ -1,0 +1,71 @@
+{
+  "release": "1.0.1-test.20261008.4",
+  "status": "published",
+  "sourceSnapshot": "dc02732830dca4e04170860b075bf8d434fb4397",
+  "sourceSnapshotRole": "Post-build implementation snapshot; see source-provenance.json for concurrent inbound work and per-platform input boundaries",
+  "sameFrozenSourceAcrossPlatforms": false,
+  "serverDeployedByThisBatch": false,
+  "lastRecordedServerSnapshot": "3880bdd1fd5e8fe3710bd19c5f753947ea89c468",
+  "webIndexSha256": "b756e299315fdfdc49dbd9051bc68023c606b80c8078f9d8edbcd49711600ced",
+  "desktopWebIndexSha256": "28a29ac69abbc165bdd93dd5743dc44cab13ce326d6f24cdaba8c89a8c83d2c1",
+  "landingIndexSha256": "6f321403e771b5092ec67ef5a11a5b099aa508ecfc32e2b6c36a06a5f6c9b164",
+  "testflight": {
+    "buildId": "a6ba3110-5460-42d7-b75c-45eb6c70b220",
+    "version": "1.0",
+    "buildNumber": "6",
+    "processingState": "VALID",
+    "internalGroupReadback": true,
+    "publicInvitation": false,
+    "physicalIphoneInstall": false,
+    "ipaSha256": "d19404a37fe4c170f63ac28de52c16ba25b54814f360e786087e156f3f483eb3",
+    "existingInternalTesterCount": 1
+  },
+  "packages": {
+    "macos": {
+      "name": "heyta-1.0.1-test.20261008.4-macos.dmg",
+      "url": "https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/heyta-1.0.1-test.20261008.4-macos.dmg",
+      "versionedUrl": "https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/1.0.1-test.20261008.4/heyta-1.0.1-test.20261008.4-macos.dmg",
+      "sha256": "7279145bf9971fe8e0b40b73cf9cec4308a917861558020f066d28aaf1e09f6c",
+      "size": 2958227
+    },
+    "windows": {
+      "name": "heyta-1.0.1-test.20261008.4-windows.zip",
+      "url": "https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/heyta-1.0.1-test.20261008.4-windows.zip",
+      "versionedUrl": "https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/1.0.1-test.20261008.4/heyta-1.0.1-test.20261008.4-windows.zip",
+      "sha256": "bf98da09892c9bd8ea1ab7d1fe56c2de185bb05804a80ee8795f18a95a58b25a",
+      "size": 98614495
+    },
+    "android": {
+      "name": "heyta-1.0.1-test.20261008.4-android.apk",
+      "url": "https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/heyta-1.0.1-test.20261008.4-android.apk",
+      "versionedUrl": "https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/1.0.1-test.20261008.4/heyta-1.0.1-test.20261008.4-android.apk",
+      "sha256": "1be30293234b47cc546d78d907112df1c7d3789476bf4018f2d8306e2448a74c",
+      "size": 68246980
+    },
+    "linux": {
+      "name": "heyta-1.0.1-test.20261008.4-linux.deb",
+      "url": "https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/heyta-1.0.1-test.20261008.4-linux.deb",
+      "versionedUrl": "https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/1.0.1-test.20261008.4/heyta-1.0.1-test.20261008.4-linux.deb",
+      "sha256": "e47cfaa83887ca4c0139cfd2cdbad4a4ef175ce22cdbfbf89e46383beafc7c88",
+      "size": 1812880
+    }
+  },
+  "validation": {
+    "fourPlatformReinstall": true,
+    "linuxUnpackedLaunch": true,
+    "linuxSystemInstall": false,
+    "physicalIphoneInstall": false,
+    "liveSuiteInitialPassed": 26,
+    "liveSuiteInitialFailed": 4,
+    "liveEntryAfterDeploymentRepairPassed": 4,
+    "liveFocusedAssistantAndSettingsPassed": 2,
+    "sourceLockfileVerified": true,
+    "cosLatestVerified": true,
+    "iosLegalLinkOpensSafari": true,
+    "iosDraftSurvivesTabSwitch": true,
+    "fullCrossPlatformInteractionMatrixComplete": false
+  },
+  "githubUrl": "https://github.com/Xaiver03/heyta/releases/tag/v1.0.1-test.20261008.4",
+  "githubAssetsVerified": true,
+  "githubAssetCount": 5
+}

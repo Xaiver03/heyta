@@ -1,0 +1,66 @@
+{
+  "capturedAt": "2026-10-08T07:01:00+08:00",
+  "capturedBy": "idb AX accessibility automation + simctl screenshots",
+  "simulator": {
+    "udid": "FE195661-B021-4A71-AAD1-1F2F7AE3A102",
+    "runtime": "iOS 27.1",
+    "appBundle": "com.heyta",
+    "extensionBundleId": "com.heyta.WidgetExtension"
+  },
+  "path": {
+    "home": "idb ui button HOME",
+    "edit": "idb ui tap 200 400 --duration 1.5 --api hid; idb ui tap 编辑",
+    "gallery": "idb ui tap 添加小组件",
+    "ax": "scripts/tools/ios-ax-shim.py with idb companion"
+  },
+  "beforeRefresh": {
+    "emptyQuery": {
+      "result": "built-in provider rows visible (地图, 电池, 环境音乐, 建议, 健康, 快捷指令, 联系人, 屏幕时间, 钱包, 日历); no Heyta row",
+      "axEvidence": "ios/widget-gallery-idb-empty-before-refresh.ax.json",
+      "screenshot": "ios/widget-gallery-idb-empty-before-refresh.png"
+    },
+    "todayTaskQuery": {
+      "setValue": "今日任务",
+      "setRc": 0,
+      "axResult": "search field retained 今日任务; no provider/widget row exposed",
+      "axEvidence": "ios/widget-gallery-idb-today-query.ax.json",
+      "screenshot": "ios/widget-gallery-idb-today-query.png"
+    },
+    "heytaQuery": {
+      "setValue": "heyta",
+      "setRc": 0,
+      "axResult": "search field retained heyta; no provider/widget row exposed",
+      "screenshot": "ios/widget-gallery-idb-heyta-query.png"
+    }
+  },
+  "refreshAttempt": {
+    "commands": [
+      "xcrun simctl spawn FE195661-B021-4A71-AAD1-1F2F7AE3A102 launchctl kickstart -k user/501/com.apple.chronod",
+      "xcrun simctl spawn FE195661-B021-4A71-AAD1-1F2F7AE3A102 launchctl kickstart -k user/501/com.apple.SpringBoard"
+    ],
+    "result": "both returned rc=0; services returned to running state (chronod pid 60611, SpringBoard pid 60622)",
+    "note": "the original Unix-socket companion retained the pre-refresh SpringBoard pid; a foreground TCP companion on localhost:11982 restored AX reads without changing the installed app"
+  },
+  "afterRefresh": {
+    "emptyQuery": {
+      "result": "built-in provider rows visible; no Heyta row",
+      "axEvidence": "ios/widget-gallery-idb-empty-after-refresh.ax.json",
+      "screenshot": "ios/widget-gallery-idb-empty-after-refresh.png"
+    },
+    "todayTaskQuery": "not repeated after refresh because the empty gallery already remained unchanged and the provider-specific query was repeated below",
+    "heytaQuery": {
+      "setValue": "heyta",
+      "setRc": 0,
+      "axResult": "search field retained heyta; no provider/widget row exposed",
+      "axEvidence": "ios/widget-gallery-idb-heyta-query-after-refresh.ax.json",
+      "screenshot": "ios/widget-gallery-idb-heyta-query-after-refresh.png"
+    }
+  },
+  "chronodCorrelation": {
+    "descriptorEvidence": "../widget-chronod-descriptors-20261008.json",
+    "finding": "chronod previously enumerated four enabled Heyta descriptors, while the same simulator gallery search exposed no Heyta provider before or after service refresh",
+    "interpretation": "the observed gap remains between descriptor enumeration and SpringBoard widget-gallery/search presentation; appex registration and descriptor enumeration are not the failing layer"
+  },
+  "widgetAdded": false,
+  "sourceChanged": false
+}

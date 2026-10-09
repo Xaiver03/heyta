@@ -1,0 +1,70 @@
+[
+  {
+    "op": {
+      "id": "muyr63mt-1-0ixbgy9w-1791420637485-1",
+      "opType": "CRT",
+      "actionType": "CRT_TASK",
+      "entityType": "TASK",
+      "entityId": "task-muytleel-1-xrx35wjo",
+      "payload": {
+        "title": "QA-CHAT-20261008-NATIVE",
+        "priority": 0
+      },
+      "clientId": "muyr63mt-1-0ixbgy9w",
+      "vectorClock": {
+        "muyr63mt-1-0ixbgy9w": 1
+      },
+      "timestamp": 1791420637485,
+      "schemaVersion": 1
+    },
+    "source": "local",
+    "applyStatus": "applied",
+    "uploadStatus": "pending",
+    "seq": 1
+  },
+  {
+    "op": {
+      "id": "muyr63mt-1-0ixbgy9w-1791420685019-2",
+      "opType": "UPD",
+      "actionType": "UPD_TASK",
+      "entityType": "TASK",
+      "entityId": "task-muytleel-1-xrx35wjo",
+      "payload": {
+        "completedAt": 1791420685019
+      },
+      "clientId": "muyr63mt-1-0ixbgy9w",
+      "vectorClock": {
+        "muyr63mt-1-0ixbgy9w": 2
+      },
+      "timestamp": 1791420685019,
+      "schemaVersion": 1
+    },
+    "source": "local",
+    "applyStatus": "applied",
+    "uploadStatus": "pending",
+    "seq": 2
+  },
+  {
+    "op": {
+      "id": "muyr63mt-1-0ixbgy9w-1791420775334-3",
+      "opType": "CRT",
+      "actionType": "CRT_TASK",
+      "entityType": "TASK",
+      "entityId": "task-muytocrq-2-xapq68p8",
+      "payload": {
+        "title": "QA-CHAT-20261008-NATIVE-2",
+        "priority": 0
+      },
+      "clientId": "muyr63mt-1-0ixbgy9w",
+      "vectorClock": {
+        "muyr63mt-1-0ixbgy9w": 3
+      },
+      "timestamp": 1791420775334,
+      "schemaVersion": 1
+    },
+    "source": "local",
+    "applyStatus": "applied",
+    "uploadStatus": "pending",
+    "seq": 3
+  }
+]

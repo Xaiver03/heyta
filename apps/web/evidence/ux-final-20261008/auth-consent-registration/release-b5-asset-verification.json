@@ -1,0 +1,22 @@
+[
+  {
+    "name": "heyta-1.0.1-test.20261008.5-macos.dmg",
+    "sizeMatches": true,
+    "digestMatches": true
+  },
+  {
+    "name": "heyta-1.0.1-test.20261008.5-android.apk",
+    "sizeMatches": true,
+    "digestMatches": true
+  },
+  {
+    "name": "verification.json",
+    "sizeMatches": true,
+    "digestMatches": true
+  },
+  {
+    "name": "heyta-1.0.1-test.20261008.5-windows.zip",
+    "sizeMatches": true,
+    "digestMatches": true
+  }
+]

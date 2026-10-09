@@ -1,0 +1,87 @@
+heyta UX-S9 closeout verification log
+Date: 2026-10-07 (Asia/Shanghai)
+Scope: current shared working tree; no credentials or production secrets
+
+Commands that passed
+---------------------
+pnpm typecheck
+  workspace typecheck: exit 0
+pnpm -r build
+  workspace build: exit 0
+pnpm --filter @heyta/mobile test
+  62 files / 832 tests passed
+pnpm --filter @heyta/ui test
+  35 files / 591 tests passed
+pnpm --filter @heyta/landing test
+  23 files / 1322 tests passed
+pnpm --filter @heyta/web exec vitest run tests/calendar-capture.spec.tsx
+  7 tests passed
+pnpm --filter @heyta/ui exec vitest run tests/calendar-cell-bars.spec.ts
+  18 tests passed
+pnpm --filter @heyta/web exec vitest run tests/subscription-notice.spec.tsx
+  13 tests passed
+pnpm check:design
+  no hardcoded design variables
+pnpm check:ui-language
+  exit 0
+pnpm check:reachability
+  exit 0
+pnpm check:tokens
+  8 generated files / 210 tokens consistent
+pnpm check:doc-citations
+  exit 0
+pnpm check:adr-numbering
+  exit 0
+pnpm check:md-tables
+  exit 0
+
+Real browser runs (direct Playwright binary, workers=1)
+---------------------------------------------------------
+tests/help-entry-ux.spec.ts
+  4 passed: 375/1440 x light/dark
+tests/quadrant-move-ux.spec.ts
+  2 passed: 1280/375
+tests/settings-category-ux.spec.ts
+  2 passed: 1440/375
+tests/category-dialog-ux.spec.ts
+  6 passed: 375/768/1440 x light/dark
+tests/ux-viewport-matrix.spec.ts
+  1 passed
+tests/calendar-capture.spec.ts
+  3 passed (previous closeout reading; screenshots are in apps/web/evidence/calendar-capture/)
+
+Current red or inconclusive readings
+-------------------------------------
+pnpm --filter @heyta/web test
+  2054 passed / 13 skipped / 11 failed in the current mixed tree.
+  The 10 calendar failures assert the old bottom day-list/title surface while
+  CalendarView now intentionally uses showSelectedDayList=false. One pricing
+  assertion was stale after siteRoot() switched to the official site origin;
+  it was updated and its 13-test file now passes.
+AI hosted browser UX probe
+  assistant-hosted-ux.spec.ts was started twice but the tfa pnpm wrapper left a
+  child process waiting after the first test; no pass is claimed from that run.
+pnpm check:docs
+  7 links point to files that exist in this working tree but are not yet tracked.
+  This is a repository staging state, not a broken target path.
+
+Durable evidence paths
+----------------------
+apps/desktop-macos/evidence/wkwebview-origin-probe-2026-10-07.txt
+  Real WKWebView custom-scheme probe: Origin=heyta-local://app for OPTIONS and POST.
+apps/web/evidence/profile-center/journeys.json
+  Web profile/settings/edit/return journeys at 1440 and 390, light/dark.
+apps/web/evidence/profile-center/
+  Profile screenshots and README for the route and limits.
+apps/web/evidence/settings-finish/viewport-metrics.json
+  Historical settings viewport readings; contains stale sync-rail offenders and
+  must not be read as proof that every narrow viewport is clean.
+apps/web/evidence/settings-release/mac-chatbot-ax.txt
+  macOS installed WebView accessibility tree showing one Chatbot surface.
+apps/web/evidence/settings-finish-release/mac/chatbot-ax.txt
+  macOS release accessibility tree, same single-assistant reading.
+apps/web/evidence/settings-finish-release/windows/windows-dom.json
+  Windows packaged WebView2 DOM reading: one assistant panel, zero independent tool tabs.
+apps/web/evidence/settings-release/release-summary.json
+  Historical four-end reinstall summary; it explicitly records the final-source,
+  post-freeze limitation and must be superseded by the next frozen-source run.

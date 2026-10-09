@@ -1,0 +1,1672 @@
+[
+  {
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "docWidth": 1440,
+    "viewportWidth": 1440,
+    "appWidth": 1440,
+    "contentWidth": 784,
+    "contentScrollHeight": 1077,
+    "contentHeight": 940,
+    "detailVisible": true,
+    "primaryInViewport": true,
+    "offenders": []
+  },
+  {
+    "viewport": {
+      "width": 768,
+      "height": 400
+    },
+    "docWidth": 768,
+    "viewportWidth": 768,
+    "appWidth": 768,
+    "contentWidth": 768,
+    "contentScrollHeight": 1061,
+    "contentHeight": 1061,
+    "detailVisible": false,
+    "primaryInViewport": true,
+    "offenders": [
+      {
+        "tag": "DIV",
+        "className": "ht-rail__sync",
+        "testId": "sync-rail",
+        "left": 806,
+        "right": 918,
+        "width": 112
+      },
+      {
+        "tag": "BUTTON",
+        "className": "ht-rail__tab ht-rail__sync__action",
+        "testId": "sync-rail-action",
+        "left": 806,
+        "right": 918,
+        "width": 112
+      },
+      {
+        "tag": "SPAN",
+        "className": "ht-rail__label ht-type-caption",
+        "testId": null,
+        "left": 839,
+        "right": 909,
+        "width": 70
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 737,
+        "right": 909,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 737,
+        "right": 909,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 737,
+        "right": 909,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 737,
+        "right": 909,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 737,
+        "right": 909,
+        "width": 172
+      }
+    ]
+  },
+  {
+    "viewport": {
+      "width": 768,
+      "height": 479
+    },
+    "docWidth": 768,
+    "viewportWidth": 768,
+    "appWidth": 768,
+    "contentWidth": 768,
+    "contentScrollHeight": 1061,
+    "contentHeight": 1061,
+    "detailVisible": false,
+    "primaryInViewport": true,
+    "offenders": [
+      {
+        "tag": "DIV",
+        "className": "ht-rail__sync",
+        "testId": "sync-rail",
+        "left": 806,
+        "right": 918,
+        "width": 112
+      },
+      {
+        "tag": "BUTTON",
+        "className": "ht-rail__tab ht-rail__sync__action",
+        "testId": "sync-rail-action",
+        "left": 806,
+        "right": 918,
+        "width": 112
+      },
+      {
+        "tag": "SPAN",
+        "className": "ht-rail__label ht-type-caption",
+        "testId": null,
+        "left": 839,
+        "right": 909,
+        "width": 70
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 737,
+        "right": 909,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 737,
+        "right": 909,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 737,
+        "right": 909,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 737,
+        "right": 909,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 737,
+        "right": 909,
+        "width": 172
+      }
+    ]
+  },
+  {
+    "viewport": {
+      "width": 768,
+      "height": 480
+    },
+    "docWidth": 768,
+    "viewportWidth": 768,
+    "appWidth": 768,
+    "contentWidth": 768,
+    "contentScrollHeight": 1061,
+    "contentHeight": 1061,
+    "detailVisible": false,
+    "primaryInViewport": true,
+    "offenders": [
+      {
+        "tag": "DIV",
+        "className": "ht-rail__sync",
+        "testId": "sync-rail",
+        "left": 806,
+        "right": 918,
+        "width": 112
+      },
+      {
+        "tag": "BUTTON",
+        "className": "ht-rail__tab ht-rail__sync__action",
+        "testId": "sync-rail-action",
+        "left": 806,
+        "right": 918,
+        "width": 112
+      },
+      {
+        "tag": "SPAN",
+        "className": "ht-rail__label ht-type-caption",
+        "testId": null,
+        "left": 839,
+        "right": 909,
+        "width": 70
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 737,
+        "right": 909,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 737,
+        "right": 909,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 737,
+        "right": 909,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 737,
+        "right": 909,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 737,
+        "right": 909,
+        "width": 172
+      }
+    ]
+  },
+  {
+    "viewport": {
+      "width": 768,
+      "height": 600
+    },
+    "docWidth": 768,
+    "viewportWidth": 768,
+    "appWidth": 768,
+    "contentWidth": 768,
+    "contentScrollHeight": 1061,
+    "contentHeight": 1061,
+    "detailVisible": false,
+    "primaryInViewport": true,
+    "offenders": [
+      {
+        "tag": "DIV",
+        "className": "ht-rail__sync",
+        "testId": "sync-rail",
+        "left": 806,
+        "right": 918,
+        "width": 112
+      },
+      {
+        "tag": "BUTTON",
+        "className": "ht-rail__tab ht-rail__sync__action",
+        "testId": "sync-rail-action",
+        "left": 806,
+        "right": 918,
+        "width": 112
+      },
+      {
+        "tag": "SPAN",
+        "className": "ht-rail__label ht-type-caption",
+        "testId": null,
+        "left": 839,
+        "right": 909,
+        "width": 70
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 737,
+        "right": 909,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 737,
+        "right": 909,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 737,
+        "right": 909,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 737,
+        "right": 909,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 737,
+        "right": 909,
+        "width": 172
+      }
+    ]
+  },
+  {
+    "viewport": {
+      "width": 768,
+      "height": 720
+    },
+    "docWidth": 768,
+    "viewportWidth": 768,
+    "appWidth": 768,
+    "contentWidth": 768,
+    "contentScrollHeight": 1061,
+    "contentHeight": 1061,
+    "detailVisible": false,
+    "primaryInViewport": true,
+    "offenders": [
+      {
+        "tag": "DIV",
+        "className": "ht-rail__sync",
+        "testId": "sync-rail",
+        "left": 806,
+        "right": 918,
+        "width": 112
+      },
+      {
+        "tag": "BUTTON",
+        "className": "ht-rail__tab ht-rail__sync__action",
+        "testId": "sync-rail-action",
+        "left": 806,
+        "right": 918,
+        "width": 112
+      },
+      {
+        "tag": "SPAN",
+        "className": "ht-rail__label ht-type-caption",
+        "testId": null,
+        "left": 839,
+        "right": 909,
+        "width": 70
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 737,
+        "right": 909,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 737,
+        "right": 909,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 737,
+        "right": 909,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 737,
+        "right": 909,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 737,
+        "right": 909,
+        "width": 172
+      }
+    ]
+  },
+  {
+    "viewport": {
+      "width": 900,
+      "height": 400
+    },
+    "docWidth": 900,
+    "viewportWidth": 900,
+    "appWidth": 900,
+    "contentWidth": 596,
+    "contentScrollHeight": 1077,
+    "contentHeight": 340,
+    "detailVisible": false,
+    "primaryInViewport": true,
+    "offenders": [
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      }
+    ]
+  },
+  {
+    "viewport": {
+      "width": 900,
+      "height": 479
+    },
+    "docWidth": 900,
+    "viewportWidth": 900,
+    "appWidth": 900,
+    "contentWidth": 596,
+    "contentScrollHeight": 1077,
+    "contentHeight": 419,
+    "detailVisible": false,
+    "primaryInViewport": true,
+    "offenders": [
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      }
+    ]
+  },
+  {
+    "viewport": {
+      "width": 900,
+      "height": 480
+    },
+    "docWidth": 900,
+    "viewportWidth": 900,
+    "appWidth": 900,
+    "contentWidth": 596,
+    "contentScrollHeight": 1077,
+    "contentHeight": 420,
+    "detailVisible": false,
+    "primaryInViewport": true,
+    "offenders": [
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      }
+    ]
+  },
+  {
+    "viewport": {
+      "width": 900,
+      "height": 600
+    },
+    "docWidth": 900,
+    "viewportWidth": 900,
+    "appWidth": 900,
+    "contentWidth": 596,
+    "contentScrollHeight": 1077,
+    "contentHeight": 540,
+    "detailVisible": false,
+    "primaryInViewport": true,
+    "offenders": [
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      }
+    ]
+  },
+  {
+    "viewport": {
+      "width": 900,
+      "height": 720
+    },
+    "docWidth": 900,
+    "viewportWidth": 900,
+    "appWidth": 900,
+    "contentWidth": 596,
+    "contentScrollHeight": 1077,
+    "contentHeight": 660,
+    "detailVisible": false,
+    "primaryInViewport": true,
+    "offenders": [
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      }
+    ]
+  },
+  {
+    "viewport": {
+      "width": 1024,
+      "height": 400
+    },
+    "docWidth": 1024,
+    "viewportWidth": 1024,
+    "appWidth": 1024,
+    "contentWidth": 720,
+    "contentScrollHeight": 1077,
+    "contentHeight": 340,
+    "detailVisible": false,
+    "primaryInViewport": true,
+    "offenders": [
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 985,
+        "right": 1157,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 985,
+        "right": 1157,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 985,
+        "right": 1157,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 985,
+        "right": 1157,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 985,
+        "right": 1157,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 985,
+        "right": 1157,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 985,
+        "right": 1157,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 985,
+        "right": 1157,
+        "width": 172
+      }
+    ]
+  },
+  {
+    "viewport": {
+      "width": 1024,
+      "height": 479
+    },
+    "docWidth": 1024,
+    "viewportWidth": 1024,
+    "appWidth": 1024,
+    "contentWidth": 720,
+    "contentScrollHeight": 1077,
+    "contentHeight": 419,
+    "detailVisible": false,
+    "primaryInViewport": true,
+    "offenders": [
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 985,
+        "right": 1157,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 985,
+        "right": 1157,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 985,
+        "right": 1157,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 985,
+        "right": 1157,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 985,
+        "right": 1157,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 985,
+        "right": 1157,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 985,
+        "right": 1157,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 985,
+        "right": 1157,
+        "width": 172
+      }
+    ]
+  },
+  {
+    "viewport": {
+      "width": 1024,
+      "height": 480
+    },
+    "docWidth": 1024,
+    "viewportWidth": 1024,
+    "appWidth": 1024,
+    "contentWidth": 368,
+    "contentScrollHeight": 1077,
+    "contentHeight": 331,
+    "detailVisible": true,
+    "primaryInViewport": true,
+    "offenders": []
+  },
+  {
+    "viewport": {
+      "width": 1024,
+      "height": 600
+    },
+    "docWidth": 1024,
+    "viewportWidth": 1024,
+    "appWidth": 1024,
+    "contentWidth": 368,
+    "contentScrollHeight": 1077,
+    "contentHeight": 451,
+    "detailVisible": true,
+    "primaryInViewport": true,
+    "offenders": []
+  },
+  {
+    "viewport": {
+      "width": 1024,
+      "height": 720
+    },
+    "docWidth": 1024,
+    "viewportWidth": 1024,
+    "appWidth": 1024,
+    "contentWidth": 368,
+    "contentScrollHeight": 1077,
+    "contentHeight": 571,
+    "detailVisible": true,
+    "primaryInViewport": true,
+    "offenders": []
+  },
+  {
+    "viewport": {
+      "width": 1280,
+      "height": 400
+    },
+    "docWidth": 1280,
+    "viewportWidth": 1280,
+    "appWidth": 1280,
+    "contentWidth": 976,
+    "contentScrollHeight": 1077,
+    "contentHeight": 340,
+    "detailVisible": false,
+    "primaryInViewport": true,
+    "offenders": [
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 1241,
+        "right": 1413,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 1241,
+        "right": 1413,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 1241,
+        "right": 1413,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 1241,
+        "right": 1413,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 1241,
+        "right": 1413,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 1241,
+        "right": 1413,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 1241,
+        "right": 1413,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 1241,
+        "right": 1413,
+        "width": 172
+      }
+    ]
+  },
+  {
+    "viewport": {
+      "width": 1280,
+      "height": 479
+    },
+    "docWidth": 1280,
+    "viewportWidth": 1280,
+    "appWidth": 1280,
+    "contentWidth": 976,
+    "contentScrollHeight": 1077,
+    "contentHeight": 419,
+    "detailVisible": false,
+    "primaryInViewport": true,
+    "offenders": [
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 1241,
+        "right": 1413,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 1241,
+        "right": 1413,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 1241,
+        "right": 1413,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 1241,
+        "right": 1413,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 1241,
+        "right": 1413,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 1241,
+        "right": 1413,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 1241,
+        "right": 1413,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 1241,
+        "right": 1413,
+        "width": 172
+      }
+    ]
+  },
+  {
+    "viewport": {
+      "width": 1280,
+      "height": 480
+    },
+    "docWidth": 1280,
+    "viewportWidth": 1280,
+    "appWidth": 1280,
+    "contentWidth": 624,
+    "contentScrollHeight": 1077,
+    "contentHeight": 420,
+    "detailVisible": true,
+    "primaryInViewport": true,
+    "offenders": []
+  },
+  {
+    "viewport": {
+      "width": 1280,
+      "height": 600
+    },
+    "docWidth": 1280,
+    "viewportWidth": 1280,
+    "appWidth": 1280,
+    "contentWidth": 624,
+    "contentScrollHeight": 1077,
+    "contentHeight": 540,
+    "detailVisible": true,
+    "primaryInViewport": true,
+    "offenders": []
+  },
+  {
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "docWidth": 1280,
+    "viewportWidth": 1280,
+    "appWidth": 1280,
+    "contentWidth": 624,
+    "contentScrollHeight": 1077,
+    "contentHeight": 660,
+    "detailVisible": true,
+    "primaryInViewport": true,
+    "offenders": []
+  },
+  {
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "docWidth": 1280,
+    "viewportWidth": 1280,
+    "appWidth": 1280,
+    "contentWidth": 624,
+    "contentScrollHeight": 1077,
+    "contentHeight": 740,
+    "detailVisible": true,
+    "primaryInViewport": true,
+    "offenders": []
+  },
+  {
+    "viewport": {
+      "width": 1024,
+      "height": 768
+    },
+    "docWidth": 1024,
+    "viewportWidth": 1024,
+    "appWidth": 1024,
+    "contentWidth": 368,
+    "contentScrollHeight": 1077,
+    "contentHeight": 619,
+    "detailVisible": true,
+    "primaryInViewport": true,
+    "offenders": []
+  },
+  {
+    "viewport": {
+      "width": 1024,
+      "height": 480
+    },
+    "docWidth": 1024,
+    "viewportWidth": 1024,
+    "appWidth": 1024,
+    "contentWidth": 368,
+    "contentScrollHeight": 1077,
+    "contentHeight": 331,
+    "detailVisible": true,
+    "primaryInViewport": true,
+    "offenders": []
+  },
+  {
+    "viewport": {
+      "width": 900,
+      "height": 700
+    },
+    "docWidth": 900,
+    "viewportWidth": 900,
+    "appWidth": 900,
+    "contentWidth": 596,
+    "contentScrollHeight": 1077,
+    "contentHeight": 640,
+    "detailVisible": false,
+    "primaryInViewport": true,
+    "offenders": [
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 861,
+        "right": 1033,
+        "width": 172
+      }
+    ]
+  },
+  {
+    "viewport": {
+      "width": 768,
+      "height": 844
+    },
+    "docWidth": 768,
+    "viewportWidth": 768,
+    "appWidth": 768,
+    "contentWidth": 768,
+    "contentScrollHeight": 1061,
+    "contentHeight": 1061,
+    "detailVisible": false,
+    "primaryInViewport": true,
+    "offenders": [
+      {
+        "tag": "DIV",
+        "className": "ht-rail__sync",
+        "testId": "sync-rail",
+        "left": 806,
+        "right": 918,
+        "width": 112
+      },
+      {
+        "tag": "BUTTON",
+        "className": "ht-rail__tab ht-rail__sync__action",
+        "testId": "sync-rail-action",
+        "left": 806,
+        "right": 918,
+        "width": 112
+      },
+      {
+        "tag": "SPAN",
+        "className": "ht-rail__label ht-type-caption",
+        "testId": null,
+        "left": 839,
+        "right": 909,
+        "width": 70
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 737,
+        "right": 909,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 737,
+        "right": 909,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 737,
+        "right": 909,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 737,
+        "right": 909,
+        "width": 172
+      },
+      {
+        "tag": "INPUT",
+        "className": "css-textinput-11aywtz r-placeholderTextColor-6taxm2",
+        "testId": "date-picker-time-input",
+        "left": 737,
+        "right": 909,
+        "width": 172
+      }
+    ]
+  },
+  {
+    "viewport": {
+      "width": 600,
+      "height": 800
+    },
+    "docWidth": 600,
+    "viewportWidth": 600,
+    "appWidth": 600,
+    "contentWidth": 600,
+    "contentScrollHeight": 1061,
+    "contentHeight": 1061,
+    "detailVisible": false,
+    "primaryInViewport": true,
+    "offenders": [
+      {
+        "tag": "DIV",
+        "className": "ht-rail__sync",
+        "testId": "sync-rail",
+        "left": 806,
+        "right": 918,
+        "width": 112
+      },
+      {
+        "tag": "BUTTON",
+        "className": "ht-rail__tab ht-rail__sync__action",
+        "testId": "sync-rail-action",
+        "left": 806,
+        "right": 918,
+        "width": 112
+      },
+      {
+        "tag": "SPAN",
+        "className": "ht-rail__label ht-type-caption",
+        "testId": null,
+        "left": 839,
+        "right": 909,
+        "width": 70
+      },
+      {
+        "tag": "SPAN",
+        "className": "ht-rail__sync__status",
+        "testId": null,
+        "left": 862,
+        "right": 863,
+        "width": 1
+      },
+      {
+        "tag": "SPAN",
+        "className": "ht-rail__sync__dot ht-rail__sync__dot--neutral",
+        "testId": "sync-status-dot",
+        "left": 829,
+        "right": 833,
+        "width": 4
+      },
+      {
+        "tag": "SPAN",
+        "className": "ht-rail__sync__icon",
+        "testId": null,
+        "left": 815,
+        "right": 831,
+        "width": 16
+      },
+      {
+        "tag": "svg",
+        "className": "",
+        "testId": null,
+        "left": 815,
+        "right": 831,
+        "width": 16
+      },
+      {
+        "tag": "path",
+        "className": "",
+        "testId": null,
+        "left": 821,
+        "right": 829,
+        "width": 8
+      }
+    ]
+  },
+  {
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "docWidth": 390,
+    "viewportWidth": 390,
+    "appWidth": 390,
+    "contentWidth": 390,
+    "contentScrollHeight": 1061,
+    "contentHeight": 1061,
+    "detailVisible": false,
+    "primaryInViewport": true,
+    "offenders": [
+      {
+        "tag": "DIV",
+        "className": "ht-rail__sync",
+        "testId": "sync-rail",
+        "left": 806,
+        "right": 918,
+        "width": 112
+      },
+      {
+        "tag": "BUTTON",
+        "className": "ht-rail__tab ht-rail__sync__action",
+        "testId": "sync-rail-action",
+        "left": 806,
+        "right": 918,
+        "width": 112
+      },
+      {
+        "tag": "SPAN",
+        "className": "ht-rail__label ht-type-caption",
+        "testId": null,
+        "left": 839,
+        "right": 909,
+        "width": 70
+      },
+      {
+        "tag": "SPAN",
+        "className": "ht-rail__sync__status",
+        "testId": null,
+        "left": 862,
+        "right": 863,
+        "width": 1
+      },
+      {
+        "tag": "SPAN",
+        "className": "ht-rail__sync__dot ht-rail__sync__dot--neutral",
+        "testId": "sync-status-dot",
+        "left": 829,
+        "right": 833,
+        "width": 4
+      },
+      {
+        "tag": "SPAN",
+        "className": "ht-rail__sync__icon",
+        "testId": null,
+        "left": 815,
+        "right": 831,
+        "width": 16
+      },
+      {
+        "tag": "svg",
+        "className": "",
+        "testId": null,
+        "left": 815,
+        "right": 831,
+        "width": 16
+      },
+      {
+        "tag": "path",
+        "className": "",
+        "testId": null,
+        "left": 821,
+        "right": 829,
+        "width": 8
+      }
+    ]
+  },
+  {
+    "viewport": {
+      "width": 375,
+      "height": 667
+    },
+    "docWidth": 375,
+    "viewportWidth": 375,
+    "appWidth": 375,
+    "contentWidth": 375,
+    "contentScrollHeight": 1061,
+    "contentHeight": 1061,
+    "detailVisible": false,
+    "primaryInViewport": true,
+    "offenders": [
+      {
+        "tag": "DIV",
+        "className": "ht-rail__sync",
+        "testId": "sync-rail",
+        "left": 806,
+        "right": 918,
+        "width": 112
+      },
+      {
+        "tag": "BUTTON",
+        "className": "ht-rail__tab ht-rail__sync__action",
+        "testId": "sync-rail-action",
+        "left": 806,
+        "right": 918,
+        "width": 112
+      },
+      {
+        "tag": "SPAN",
+        "className": "ht-rail__label ht-type-caption",
+        "testId": null,
+        "left": 839,
+        "right": 909,
+        "width": 70
+      },
+      {
+        "tag": "SPAN",
+        "className": "ht-rail__sync__status",
+        "testId": null,
+        "left": 862,
+        "right": 863,
+        "width": 1
+      },
+      {
+        "tag": "SPAN",
+        "className": "ht-rail__sync__dot ht-rail__sync__dot--neutral",
+        "testId": "sync-status-dot",
+        "left": 829,
+        "right": 833,
+        "width": 4
+      },
+      {
+        "tag": "SPAN",
+        "className": "ht-rail__sync__icon",
+        "testId": null,
+        "left": 815,
+        "right": 831,
+        "width": 16
+      },
+      {
+        "tag": "svg",
+        "className": "",
+        "testId": null,
+        "left": 815,
+        "right": 831,
+        "width": 16
+      },
+      {
+        "tag": "path",
+        "className": "",
+        "testId": null,
+        "left": 821,
+        "right": 829,
+        "width": 8
+      }
+    ]
+  }
+]

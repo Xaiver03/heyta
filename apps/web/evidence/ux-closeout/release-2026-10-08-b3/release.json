@@ -1,0 +1,61 @@
+{
+  "release": "1.0.1-test.20261008.3",
+  "status": "published",
+  "serverSnapshot": "3880bdd1fd5e8fe3710bd19c5f753947ea89c468",
+  "webIndexSha256": "5e638f030a6cf8173bddb2a348fa0c2fb053d3b462ab5a6ac55091df29272c05",
+  "desktopWebIndexSha256": "f61e6d478669d278a78addfa450da31ba2a4559f1727f7961e392b059c7693b4",
+  "testflight": {
+    "bundleId": "com.heyta",
+    "version": "1.0",
+    "build": "5",
+    "appId": "6817635248",
+    "buildId": "cc25007e-cf3d-4d89-8170-cae86f8841ba",
+    "processingState": "VALID",
+    "groupAssociationReadback": true,
+    "publicInvitation": false
+  },
+  "packages": {
+    "android": {
+      "name": "heyta-1.0.1-test.20261008.3-android.apk",
+      "size": 68002344,
+      "sha256": "e20072576f5c79bccac8e58fd26e5219cba6566bce7331e4add73af245a2e180"
+    },
+    "linux": {
+      "name": "heyta-1.0.1-test.20261008.3-linux.deb",
+      "size": 1763348,
+      "sha256": "6e804176bb366d0e9ed9e6acd50e7107158c2d72e48e34d198fd3e1a6cf8036d"
+    },
+    "macos": {
+      "name": "heyta-1.0.1-test.20261008.3-macos.dmg",
+      "size": 2737725,
+      "sha256": "6b4cfc26f34c78138ec5f7216c18e274538e4af0ff00bb4c6b48ff409a04c694"
+    },
+    "windows": {
+      "name": "heyta-1.0.1-test.20261008.3-windows.zip",
+      "size": 98549331,
+      "sha256": "80b85042c8acb31e54989156677acdc8674fef6c3df7c56f053039a5e8c077b4"
+    },
+    "ios": {
+      "name": "Heyta.ipa",
+      "size": 14355636,
+      "sha256": "9837649b6db1c21867c8bd35977cdfc99a82f18f983888078aaaed8b3138b155",
+      "distribution": "TestFlight only"
+    }
+  },
+  "validation": {
+    "webAssistantUnit": 44,
+    "webAssistantProviderJourney": 2,
+    "webLayoutSettingsLocal": 3,
+    "webLayoutSettingsProduction": 2,
+    "linuxUnpackedLaunch": true,
+    "linuxSystemInstall": false,
+    "physicalIphoneInstall": false,
+    "widgetGalleryAdd": false,
+    "fourPlatformReinstall": true
+  },
+  "sourceSnapshot": "8a7332c365250d1c8136eb8ef7b9d4d31c1839e9",
+  "githubUrl": "https://github.com/Xaiver03/heyta/releases/tag/v1.0.1-test.20261008.3",
+  "publicAssetsVerified": true,
+  "cosLatestVerified": true,
+  "sourceLockfileVerified": true
+}

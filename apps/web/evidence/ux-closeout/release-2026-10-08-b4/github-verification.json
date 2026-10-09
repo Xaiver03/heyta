@@ -1,0 +1,38 @@
+{
+  "url": "https://github.com/Xaiver03/heyta/releases/tag/v1.0.1-test.20261008.4",
+  "draft": false,
+  "prerelease": true,
+  "assets": [
+    {
+      "name": "heyta-1.0.1-test.20261008.4-android.apk",
+      "size": 68246980,
+      "digest": "sha256:1be30293234b47cc546d78d907112df1c7d3789476bf4018f2d8306e2448a74c",
+      "state": "uploaded"
+    },
+    {
+      "name": "heyta-1.0.1-test.20261008.4-linux.deb",
+      "size": 1812880,
+      "digest": "sha256:e47cfaa83887ca4c0139cfd2cdbad4a4ef175ce22cdbfbf89e46383beafc7c88",
+      "state": "uploaded"
+    },
+    {
+      "name": "heyta-1.0.1-test.20261008.4-macos.dmg",
+      "size": 2958227,
+      "digest": "sha256:7279145bf9971fe8e0b40b73cf9cec4308a917861558020f066d28aaf1e09f6c",
+      "state": "uploaded"
+    },
+    {
+      "name": "heyta-1.0.1-test.20261008.4-windows.zip",
+      "size": 98614495,
+      "digest": "sha256:bf98da09892c9bd8ea1ab7d1fe56c2de185bb05804a80ee8795f18a95a58b25a",
+      "state": "uploaded"
+    },
+    {
+      "name": "SHA256SUMS.txt",
+      "size": 420,
+      "digest": "sha256:16832e443f36b011c61c8e6ef8fcf7210f73c4c024c490d4252b4738701cedfd",
+      "state": "uploaded"
+    }
+  ],
+  "allMatchLocal": true
+}
