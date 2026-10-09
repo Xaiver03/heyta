@@ -11,6 +11,17 @@ HEYTA_RESPONSIVE_HEADED=0 \
   node scripts/qa/reminders-data-responsive.mjs
 ```
 
+### 只想跑其中几条腿（`HEYTA_RESPONSIVE_LEGS`）
+
+默认 `reminders,data,groups,help` 全跑。这颗旋钮存在的理由不是方便，是**这装置在只含已提交内容的树上跑不动**：
+提醒那一腿等的 `reminder-notify-request-failed` 只活在未提交的 `ReminderNotifyPanel.tsx` 里
+（`git grep -c reminder-notify-request-failed HEAD -- apps/web` 无输出），拿它去量一棵干净树，
+第一腿就死、后面的分组腿一次也到不了。⇒ 量干净树用 `HEYTA_RESPONSIVE_LEGS=groups`。
+
+⚠️ 选腿**不许把覆盖面一起选没**：`everySelectedLegProducedItsCells`（选了的腿必须交出应得格子数）与
+`unselectedLegsReportEmpty`（没选的必须是 0）两条专门钉这件事，而报告里的 `notJudged` 会逐条点名
+"这些断言这一趟值为 true 只是因为 `.every` 对空集合为真，不是判过"。
+
 ## 为什么补这一趟
 
 覆盖表实测出来的洞，不是推测：`apps/web/evidence/account-suite/` 那 11 张里带 `dark` 命名的 **0 张**，

@@ -15,6 +15,26 @@ const ORIGIN = process.env.HEYTA_RESPONSIVE_ORIGIN ?? 'http://127.0.0.1:4379';
 const ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const OUT = resolve(process.env.HEYTA_RESPONSIVE_EVIDENCE ?? `${ROOT}/apps/web/evidence/reminders-data-responsive`);
 
+/**
+ * 跑哪几腿（默认全跑）。加这颗旋钮的理由不是"方便"，是**这装置在干净检出上跑不动**：
+ * 提醒那一腿等的 `reminder-notify-request-failed` 只活在未提交的 `ReminderNotifyPanel.tsx` 里
+ * （现量：`git grep -c reminder-notify-request-failed HEAD -- apps/web` 无输出），
+ * 所以拿它去量一棵只含已提交内容的树，第一腿就死，后面的分组腿一次也到不了。
+ * ⚠️ 选腿不许把覆盖面一起选没：`everySelectedLegProducedCells` 与
+ * `unselectedLegsReportEmpty` 两条专门钉这件事（见文件末尾）。
+ */
+const ALL_LEGS = ['reminders', 'data', 'groups', 'help'];
+const LEGS = (process.env.HEYTA_RESPONSIVE_LEGS ?? ALL_LEGS.join(','))
+  .split(',').map((x) => x.trim()).filter(Boolean);
+for (const leg of LEGS) {
+  if (!ALL_LEGS.includes(leg)) {
+    throw new Error(`HEYTA_RESPONSIVE_LEGS 里有不认识的腿「${leg}」，认识的是：${ALL_LEGS.join(' / ')}`);
+  }
+}
+if (LEGS.length === 0) {
+  throw new Error('HEYTA_RESPONSIVE_LEGS 选了零条腿 —— 那这趟什么都没判，别让它退 0');
+}
+
 // 真实的 `default` **与 `granted`** 两态只存在于有头 Chromium。原先这里只写了 `default`，
 // 2026-10-09 无头那一趟把它照出来了：`granted` 档设完权限后回读 `Notification.permission`
 // 得到的是 `denied`（`report.json` 里 `mode:'granted'` 那 4 格 `permission:'denied'`、
@@ -171,7 +191,17 @@ async function captureReminder(browser, spec, mode) {
   }));
   if (mode === 'error') {
     await page.getByTestId('reminder-notify-request').click();
-    await page.getByTestId('reminder-notify-request-failed').waitFor();
+    // 超时不许裸等 30 秒再抛一个 TimeoutError —— 那会把"这棵树没有取证口"与
+    // "取证口在场但这一态没渲染"两种相反的成因压成同一条红。
+    const appeared = await page.getByTestId('reminder-notify-request-failed')
+      .waitFor({ timeout: 8_000 }).then(() => true).catch(() => false);
+    if (!appeared) {
+      const family = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="reminder-notify-"]')]
+        .map((el) => el.getAttribute('data-testid')));
+      throw new Error(family.length === 0
+        ? `提醒面板在这棵树上没有任何 reminder-notify-* 取证口（同族读到 0 枚），这一腿对它不适用 —— 不是产品缺陷。载体：${ORIGIN}`
+        : `reminder-notify-request-failed 没出现，而同族取证口在场（${family.join(', ')}）⇒ 「请求失败」这一态确实没渲染`);
+    }
     statuses.failed = true;
   }
   const screenshot = `${OUT}/${spec.theme}-${spec.width}-reminder-${mode}.png`;
@@ -380,11 +410,15 @@ async function captureHelpWrap(browser, width) {
 // Chromium coerces notifications to `denied` even after Browser.setPermission.
 const browser = await chromium.launch({ headless: !HEADED });
 const reminders = [];
-for (const spec of cases) {
-  for (const mode of reminderModes) reminders.push(await captureReminder(browser, spec, mode));
+if (LEGS.includes('reminders')) {
+  for (const spec of cases) {
+    for (const mode of reminderModes) reminders.push(await captureReminder(browser, spec, mode));
+  }
 }
 const data = [];
-for (const spec of cases) data.push(await dataJourney(browser, spec));
+if (LEGS.includes('data')) {
+  for (const spec of cases) data.push(await dataJourney(browser, spec));
+}
 const sweepGroups = ['profile', 'account', 'sync', 'ai'];
 // 视口口径跟着台账 UX-S9-44 那一行的**验收列原文**（375/768/1440 无横向溢出），
 // 不跟着上面 `cases` 的 390 —— 差 15px 也算两套口径。
@@ -397,18 +431,58 @@ const sweepCases = [
   { theme: 'dark', width: 1440, height: 900 },
 ];
 const groups = [];
-for (const spec of sweepCases) for (const group of sweepGroups) groups.push(await captureGroup(browser, spec, group));
+if (LEGS.includes('groups')) {
+  for (const spec of sweepCases) for (const group of sweepGroups) groups.push(await captureGroup(browser, spec, group));
+}
 // UX-S9-44 验收列的视口口径：375/768/1440。这一趟只量几何（换行与列宽），
 // 主题不影响盒模型，暗色那一档由上面 24 格与 help-entry-ux 各自覆盖。
 const helpWrapWidths = [375, 768, 1440];
 const helpWrap = [];
-for (const width of helpWrapWidths) helpWrap.push(await captureHelpWrap(browser, width));
+if (LEGS.includes('help')) {
+  for (const width of helpWrapWidths) helpWrap.push(await captureHelpWrap(browser, width));
+}
 await browser.close();
+
+// 每根断言属于哪条腿。**这张表本身就是分母自检的对象**：新加一条断言而忘了登记归属，
+// 下面那次 `unmapped` 检查会直接抛（否则它会以"恒真的空集合判定"混进 notJudged 之外，
+// 让人误读成"这一趟判过了"）。
+const assertionOwner = {
+  noHorizontalOverflow: ['reminders', 'data'],
+  allPermissionStatesRendered: ['reminders'],
+  everyCaseCoversEverySelectedMode: ['reminders'],
+  dataFailurePreserved: ['data'],
+  existingDataRefusedWithoutLoss: ['data'],
+  cancelPreserved: ['data'],
+  everyCaseCoversEverySweepGroup: ['groups'],
+  groupSweepThemeApplied: ['groups'],
+  groupSweepTitleMatchesNav: ['groups'],
+  groupSweepActionable: ['groups'],
+  groupSweepNoHorizontalOverflow: ['groups'],
+  helpWrapFourRowsMeasured: ['help'],
+  helpWrapInjectionTookEffect: ['help'],
+  helpLongTitleWraps: ['help'],
+  helpLongTitleStaysInContentColumn: ['help'],
+  helpLongTitleRowInsideViewport: ['help'],
+  helpLongTitleNoHorizontalOverflow: ['help'],
+  helpLongTitleBadArmsFlipTheJudgment: ['help'],
+};
+const TRACKING_ASSERTIONS = ['everySelectedLegProducedItsCells', 'unselectedLegsReportEmpty'];
+const legCells = { reminders: reminders.length, data: data.length, groups: groups.length, help: helpWrap.length };
+const expectedLegCells = {
+  reminders: cases.length * reminderModes.length,
+  data: cases.length,
+  groups: sweepCases.length * sweepGroups.length,
+  help: helpWrapWidths.length,
+};
 
 const report = {
   origin: ORIGIN,
   carrier: {
     headless: !HEADED,
+    legs: LEGS,
+    skippedLegs: ALL_LEGS.filter((l) => !LEGS.includes(l)),
+    legCells,
+    expectedLegCells,
     reminderModes,
     skippedReminderModes: HEADED ? [] : HEADLESS_SKIPPED,
     skipReason: HEADED
@@ -424,6 +498,10 @@ const report = {
   helpWrapWidths,
   helpWrap,
   assertions: {
+    // ── 选腿旋钮自己的 tracking 腿：选了的必须交出应得格子数，没选的必须是空的 ──
+    // 少了这两条，"只跑 groups 那一趟"就能靠 `.every` 对空集合为真把另外三条腿报成通过。
+    everySelectedLegProducedItsCells: LEGS.every((leg) => legCells[leg] === expectedLegCells[leg]),
+    unselectedLegsReportEmpty: ALL_LEGS.filter((l) => !LEGS.includes(l)).every((leg) => legCells[leg] === 0),
     noHorizontalOverflow: [...reminders.map((x) => x.facts), ...data.map((x) => x.before)].every((x) => x.documentScrollWidth <= x.documentClientWidth + 1),
     allPermissionStatesRendered: reminders.every((x) => x.mode === 'default' ? x.statuses.request : x.mode === 'granted' ? x.statuses.granted : x.mode === 'denied' ? x.statuses.denied : x.mode === 'unsupported' ? x.statuses.unsupported : x.statuses.failed),
     dataFailurePreserved: data.every((x) => x.failurePreserved.summaryVisible && x.failurePreserved.refusalVisible && x.failurePreserved.panelVisible),
@@ -463,6 +541,21 @@ const report = {
         !j.wraps || !j.copyFitsColumn || !j.rowInsideViewport || !j.noHorizontalOverflow)),
   },
 };
+// 分母自检：这张归属表必须覆盖每一条断言。漏登记不是"少一行注释"——那条断言会既不进
+// `notJudged` 也不被认成"这一趟判过的"，读报告的人就分不清"判过"与"那腿根本没选"。
+const unmapped = Object.keys(report.assertions)
+  .filter((k) => !assertionOwner[k] && !TRACKING_ASSERTIONS.includes(k));
+if (unmapped.length > 0) {
+  throw new Error(`这些断言没在 assertionOwner 里登记属于哪条腿：${unmapped.join(', ')}`);
+}
+report.notJudged = Object.entries(assertionOwner)
+  .filter(([, owners]) => !owners.some((o) => LEGS.includes(o)))
+  .map(([k]) => k);
+const judged = Object.entries(report.assertions)
+  .filter(([k]) => TRACKING_ASSERTIONS.includes(k) || (assertionOwner[k] ?? []).some((o) => LEGS.includes(o)));
+if (judged.length === 0) {
+  throw new Error(`这一趟一条断言都没判（legs=${LEGS.join(',')}）—— 别让它退 0`);
+}
 await writeFile(`${OUT}/report.json`, `${JSON.stringify(report, null, 2)}\n`);
-console.log(JSON.stringify(report.assertions, null, 2));
-if (!Object.values(report.assertions).every(Boolean)) process.exitCode = 1;
+console.log(JSON.stringify({ legs: LEGS, skippedLegs: report.carrier.skippedLegs, assertions: report.assertions, notJudged: report.notJudged }, null, 2));
+if (judged.some(([, value]) => !value)) process.exitCode = 1;
