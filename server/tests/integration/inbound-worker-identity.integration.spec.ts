@@ -466,6 +466,9 @@ describe.skipIf(!DATABASE_URL)('inbound identity through ordinary sync HTTP', ()
     expect(await response.json()).toEqual({ eventId: webhookEventId, state: 'queued' });
     const stored = await db.automationEvent.findFirstOrThrow({ where: { eventId: webhookEventId, userId, ruleId: webhookRuleId } });
     expect(stored.payloadCiphertext).not.toContain('postgres-secret');
+    // `payloadCiphertext` 在 schema 里是可空列：先把它钉成字符串再解密。留 `!` 会让"队列入库但
+    // 密文为空"这一种真故障在断言里悄悄走过去。
+    if (typeof stored.payloadCiphertext !== 'string') throw new Error('queued event carries no ciphertext');
     const opened = await openInbound(JSON.parse(stored.payloadCiphertext), recipient.privateKey, {
       accountId: `user-${userId}`, serverOrigin: 'http://127.0.0.1', ruleId: webhookRuleId,
       eventId: webhookEventId, purpose: 'input', keyEpoch: 1,
