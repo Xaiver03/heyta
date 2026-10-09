@@ -279,6 +279,103 @@ async function captureGroup(browser, spec, group) {
   return { theme: spec.theme, width: spec.width, group, navLabel, facts };
 }
 
+/** 那四条外链行的判定。**唯一一份**：好态与三条坏臂都走这里（手搭一份对照谓词
+ * 证的只是夹具，不是这把尺 —— 仓里同一族前科见 environment-traps #86）。 */
+function helpRowJudgment(arm, viewportWidth) {
+  return {
+    wraps: arm.rows.every((x) => x.lineCount !== null && x.lineCount >= 2),
+    copyFitsColumn: arm.rows.every((x) => x.copyWidth !== null && x.copyWidth <= arm.linksWidth + 1),
+    rowInsideViewport: arm.rows.every((x) => x.rowRight <= viewportWidth + 1),
+    noTextOverlappingArrow: arm.rows.every((x) => x.overlapsArrow !== true),
+    noHorizontalOverflow: arm.doc.scrollWidth <= arm.doc.clientWidth + 1,
+  };
+}
+
+const HELP_LONG_TITLE = '帮助与问题反馈的超长中文标题换行实测';
+
+/**
+ * 「关于与帮助」那四条外链行的**长标题**取证（补 UX-S9-44 验收列欠的那一句）。
+ *
+ * 台账要求的是"喂一枚超出容器宽度的标题再量行盒/换行"，而不是给组标题写一条恒真的
+ * 断言（组标题是 i18n 词条，长度受门禁约束，永远不会因用户数据变长 —— 那条判据不会有人撞到）。
+ *
+ * 四态各量一次，坏态是**运行时注入在元素自己的 style 上**的，没有改共享工作树里的 CSS：
+ * `wrap`（真 CSS）· `nowrap`（单行不折）· `ellipsis`（截断省略号 —— "换行"那句最现实的
+ * 第二种反面）· `fixedWidth`（把文字列钉死成比内容窄，这是"文本压住图标"唯一的可达坏形）。
+ *
+ * 🔴 换行的尺是 `高度 / 元素自己的 line-height`，**不是** `getClientRects().length`：
+ * `.ht-type-row-title` 是块级，块级元素的 client rects 就是它那**一枚**盒子，
+ * 五行的标题也报 1 —— 第一版就是照它量的，把真在换行的界面读成"没换行"。
+ */
+async function captureHelpWrap(browser, width) {
+  const context = await browser.newContext({ viewport: { width, height: 900 }, locale: 'zh-CN' });
+  const page = await context.newPage();
+  await page.addInitScript(() => localStorage.setItem('heyta.locale', 'zh-CN'));
+  await page.goto(`${ORIGIN}/?lang=zh-CN`);
+  await decidePrivacy(page);
+  await openGroup(page, 'help');
+
+  const measure = (arm) => page.evaluate(({ longText, arm }) => {
+    const links = document.querySelector('.ht-settings__help-links');
+    const rows = [...document.querySelectorAll('.ht-settings__help-links .ht-settings__help-link')];
+    return {
+      arm,
+      linksWidth: links ? Math.round(links.getBoundingClientRect().width * 100) / 100 : null,
+      doc: {
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+      },
+      rows: rows.map((row, index) => {
+        const title = row.querySelector('.ht-type-row-title');
+        const copy = row.querySelector('.ht-settings__help-copy');
+        const iconBox = row.querySelector('.ht-settings__help-icon');
+        const arrow = [...row.querySelectorAll('svg')].find((s) => s !== iconBox?.querySelector('svg')) ?? null;
+        if (!title) return { index, missing: true, lineCount: null, copyWidth: null, rowRight: Infinity, overlapsArrow: false };
+        if (arm !== 'baseline') title.textContent = longText.repeat(4);
+        title.style.whiteSpace = arm === 'nowrap' || arm === 'ellipsis' ? 'nowrap' : '';
+        title.style.overflow = arm === 'ellipsis' ? 'hidden' : '';
+        title.style.textOverflow = arm === 'ellipsis' ? 'ellipsis' : '';
+        if (copy) copy.style.flex = arm === 'fixedWidth' ? '0 0 100px' : '';
+        const lineHeight = Number.parseFloat(getComputedStyle(title).lineHeight) || null;
+        const tr = title.getBoundingClientRect();
+        const rr = row.getBoundingClientRect();
+        const ar = arrow?.getBoundingClientRect() ?? null;
+        return {
+          index,
+          textLength: title.textContent.length,
+          lineHeight,
+          lineCount: lineHeight ? Math.round((tr.height / lineHeight) * 100) / 100 : null,
+          copyWidth: Math.round((copy?.getBoundingClientRect().width ?? 0) * 100) / 100,
+          rowRight: Math.round(rr.right * 100) / 100,
+          // 文本与尾部外链箭头之间的水平间隙（负数=压住了）。
+          gapToArrow: ar ? Math.round((ar.left - tr.right) * 100) / 100 : null,
+          overlapsArrow: ar ? tr.right > ar.left : false,
+        };
+      }),
+    };
+  }, { longText: HELP_LONG_TITLE, arm });
+
+  const baseline = await measure('baseline');
+  const wrap = await measure('wrap');
+  await page.screenshot({ path: `${OUT}/light-${width}-help-long-title.png` });
+  const nowrap = await measure('nowrap');
+  const ellipsis = await measure('ellipsis');
+  const fixedWidth = await measure('fixedWidth');
+  await context.close();
+
+  const badArms = { nowrap, ellipsis, fixedWidth };
+  return {
+    width,
+    baseline,
+    wrap,
+    badArms,
+    judgment: helpRowJudgment(wrap, width),
+    badJudgments: Object.fromEntries(
+      Object.entries(badArms).map(([name, arm]) => [name, helpRowJudgment(arm, width)]),
+    ),
+  };
+}
+
 // Headed Chromium is required for the real `default` notification state; headless
 // Chromium coerces notifications to `denied` even after Browser.setPermission.
 const browser = await chromium.launch({ headless: !HEADED });
@@ -301,6 +398,11 @@ const sweepCases = [
 ];
 const groups = [];
 for (const spec of sweepCases) for (const group of sweepGroups) groups.push(await captureGroup(browser, spec, group));
+// UX-S9-44 验收列的视口口径：375/768/1440。这一趟只量几何（换行与列宽），
+// 主题不影响盒模型，暗色那一档由上面 24 格与 help-entry-ux 各自覆盖。
+const helpWrapWidths = [375, 768, 1440];
+const helpWrap = [];
+for (const width of helpWrapWidths) helpWrap.push(await captureHelpWrap(browser, width));
 await browser.close();
 
 const report = {
@@ -319,6 +421,8 @@ const report = {
   sweepGroups,
   sweepCases,
   groups,
+  helpWrapWidths,
+  helpWrap,
   assertions: {
     noHorizontalOverflow: [...reminders.map((x) => x.facts), ...data.map((x) => x.before)].every((x) => x.documentScrollWidth <= x.documentClientWidth + 1),
     allPermissionStatesRendered: reminders.every((x) => x.mode === 'default' ? x.statuses.request : x.mode === 'granted' ? x.statuses.granted : x.mode === 'denied' ? x.statuses.denied : x.mode === 'unsupported' ? x.statuses.unsupported : x.statuses.failed),
@@ -337,6 +441,26 @@ const report = {
     groupSweepTitleMatchesNav: groups.every((x) => Boolean(x.facts.title) && x.facts.title === x.navLabel),
     groupSweepActionable: groups.every((x) => x.facts.interactive >= 1),
     groupSweepNoHorizontalOverflow: groups.every((x) => x.facts.documentScrollWidth <= x.facts.documentClientWidth + 1),
+    // ── UX-S9-44 验收列欠的那句「长标题自然换行」（关于与帮助的四条外链行）──
+    // 分母自检：`.every` 对空集合是真，所以"四行都量到了"必须先钉住。
+    helpWrapFourRowsMeasured: helpWrap.every((x) =>
+      [x.baseline, x.wrap, ...Object.values(x.badArms)].every((arm) =>
+        arm.rows.length === 4 && arm.rows.every((r) => !r.missing && r.lineCount !== null))),
+    // 前提断言：注入的那枚长标题真的进了界面（否则下面每条都是对着短标题量的）。
+    helpWrapInjectionTookEffect: helpWrap.every((x) =>
+      x.wrap.rows.every((r, i) => r.textLength > x.baseline.rows[i].textLength)),
+    helpLongTitleWraps: helpWrap.every((x) => x.judgment.wraps),
+    helpLongTitleStaysInContentColumn: helpWrap.every((x) => x.judgment.copyFitsColumn),
+    helpLongTitleRowInsideViewport: helpWrap.every((x) => x.judgment.rowInsideViewport),
+    helpLongTitleNoHorizontalOverflow: helpWrap.every((x) => x.judgment.noHorizontalOverflow),
+    // 🔴 牙齿：三条注入的坏臂必须**各自**打翻至少一条谓词。哪一天这四条行的布局改了
+    // 以致坏臂再也打不翻，这条转红说的是"上面那几条已经变成恒真的装饰"，不是界面坏了。
+    // 「文本压住箭头」那一格不在这里：`fixedWidth` 那条坏臂就是为它造的，量到四种状态下
+    // 间隙恒 16px —— 这套 flex 布局里箭头跟着行走，压住不可达。它记为**读数**（`gapToArrow`），
+    // 不记为判据；把一条永远不会假的断言写进 assertions 比不写更坏（AGENTS §7 元规则二）。
+    helpLongTitleBadArmsFlipTheJudgment: helpWrap.every((x) =>
+      Object.values(x.badJudgments).every((j) =>
+        !j.wraps || !j.copyFitsColumn || !j.rowInsideViewport || !j.noHorizontalOverflow)),
   },
 };
 await writeFile(`${OUT}/report.json`, `${JSON.stringify(report, null, 2)}\n`);
