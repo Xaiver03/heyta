@@ -1812,3 +1812,50 @@ OS 通知投递通过。原 [多端计划](docs/plans/goal-multi-end-coverage.md
 4. 任务 0 已逐条亲手复跑（本机 16:52–16:54）：`python3 research/tools/verify-inbound-worker-identity.py` **38/38** 且 rc=0；`server` 票据+草稿+公网接收三文件 **47/47**；`node scripts/check-migrations.mjs` rc=0；`node scripts/check-docs-voice.mjs` rc=0；`node research/tools/license-inventory.mjs` rc=0；`node research/tools/docs-link-check.mjs` rc=1，唯一一条不是本线（`apps/desktop-windows/README.md:89`）；`grep -c '^- \[ \] \*\*AC-' docs/plans/inbound-automation.md` = 8、已勾 0。
 5. 发现**任务书自己写错了两条判据**，已记 `BLOCKED.md` B102 并在那里给出改用版本：窗口数不许按行号数（行号区间里坐着别人的实施顺序），完成条件第 2 条那种"与开工快照枚数相同"在并行提交下量的不是我的动作。
 6. 界面层的挡路条件已解除：`packages/i18n` 进了 HEAD，界面用到的 72 个词条键中英两侧都齐（现量见 B102 与计划里那条更正），计划里那句旧断言就地改写，不留两套状态。
+
+### T1 签发端与账号绑定握手（2026-10-09 17:3x–17:5x）
+
+- **持久层**：两枚新迁移 `20261018180000_add_automation_entitlement_issuance`
+  （subjects / activations / links）与 `20261018190000_add_automation_entitlement_revocations`，
+  `node scripts/check-migrations.mjs` rc=0；`prisma validate` 通过、`prisma generate` 通过。
+  🔴 **一次性真库装置里这两枚 SQL 在 PostgreSQL 14.18 上逐条应用成功**（日志见下条，装置在测试腿之前被载体挡住）。
+- **为什么主键这么长**：`activations` 用 `@@id([userId, installationId])` ⇒ "一台实例同时最多一张活码"
+  是表的形状而不是一个要维护的标志位；`links` 用 `installationId` 做主键 ⇒ 一台实例只有一个当前绑定，
+  **换主体必须先撤销**（否则一枚新码就能顶掉别人在这台实例上的绑定）。
+- **绑实的那一格**：`session` 票据的 `officialSubject / installationId / localAccountUuid`
+  三个 claims 全部取自 `links` 行，请求体一个字都不参与；此前"客户端自报本地账号"那一格
+  由兑换激活码这一步把它钉成服务端记录的事实。
+- **吊销在线刷新**：下限落 `automation_entitlement_revocations`（官方侧存运营者抬上去的值，
+  自托管侧存**上一次验过签**的清单值），判定用的下限 = 环境变量与库里那一个的**较大值**
+  （`withAutomationRevocationFloor`，接在 `evaluateAutomationEntitlementForUser` 与
+  `authorizeAutomationOperation` 两处，不改已入库的票据内核）。清单由客户端**转述**，
+  但只认用本部署公钥环验过签的那个数，且合并只升不降。
+- **判据**：新增 `server/tests/automation-entitlement-issuer.spec.ts` **12 条**，与既有票据
+  套件 20 条同跑 **32/32 绿、0 跳过**；`npx tsc --noEmit -p tsconfig.json`（server 全项目）**0 错**。
+  任务书要求的三条各有一条红的落点：错实例（`ACTIVATION_INVALID`）、错主体
+  （`LINK_CONFLICT`）、吊销落后（`REVOKED_VERSION` 走闸门 + `AUTOMATION_REVOCATION_STALE` 走票据）。
+- ✅ **真库那一腿读数已取到**（18:06，一次性 PostgreSQL 14.18 + 真 HTTP + 真 Ed25519，零 mock）：
+  `python3 research/tools/verify-inbound-worker-identity.py` → **`Tests 43 passed (43)`、`Test Files 1 passed (1)`、PY_RC=0**
+  （本线基线 38 条 + 这一段新增 5 条）。⚠️ 中间三次被本机内存闸门挡下（`立即可用 138/185MB < 384MB`，
+  占载体的是并行会话的 e2e，pid=90222）—— **不降那个阈值、不改装置**，等台账放开才跑出来的。
+- 🔴 **臂 5 抓出一条真缺陷（不是测试写法坏了）**：`createEntitlementGuard` 组装的 `source` 只有
+  `readSubscriptions` + `readBinding`，所以"在线刷新的吊销下限"**从没被 HTTP 闸门读过** —— 写进库之后
+  只挡住了 `/verify` 那一处显式核验，`PUT /automation/recipient-key` 与逐次 action 票据照旧放行。
+  修在闸门两处（无 action 分支补 `readRevocationFloor`；有 action 分支把 `source` 换成
+  `lockedAutomationEntitlementSource(tx)`，下限在**同一把事务**里读），并新增注入点
+  `loadAutomationRevocationFloor`。反向验证两条各恰好 1 红：
+  臂 5（摘掉 action 分支的下限读）→ `expected 'AUTOMATION_SUBJECT_CONFLICT' to be 'AUTOMATION_REVOCATION_STALE'`；
+  臂 6（摘掉无 action 分支的下限读）→ `expected 200 to be 402`。两臂还原后 `cmp` 逐字一致。
+  📌 可迁移的那条：**同一份下限要按"谁消费它"枚举**，只在一处接线等于没接。
+- 集成段修掉两处我自己写错的测试（都不是产品判定）：`installationId` 简写引用了不存在的变量
+  （那个 describe 里叫 `installation`）；"旧下限"票据曾去取一条本场景从未创建的绑定行，现在三元组
+  取自 `links` 行；`recipient-key` 的请求体改成按库里当前 `packageVersion` 递推，否则路由自己的 409
+  会抢在闸门的 402 前面，红的是别的账。
+- ⚠️ **还欠的那格**：还原两臂之后再跑一次装置时被内存闸门拒了启动（同上那条，18:07 那趟）。
+  43/43 对应的是 `cmp` 逐字相同的那一份源码，但**合并态整仓重跑**（`pnpm -r test` / `pnpm check`）
+  仍欠着 → `BLOCKED.md` B104。
+- 文档回写：`docs/plans/inbound-automation.md` 文末新增「2026-10-09 T1 签发端与账号绑定握手」一节，
+  P1-3 那条与两处"仍然没闭合的"旧断言都指向它（不留两套状态）；`docs/reference/inbound-automation-protocol.md`
+  §4 把握手与在线刷新的**机制**写实（活码域分隔、明文只出一次、`session` 三字段取自 `links`、下限取 max），
+  未闭合清单只剩续票据/展示、票据供给方、票据消费所在事务三格。门禁：`check-docs-voice` rc=0、
+  `check-migrations` rc=0、`docs-link-check` rc=1 且唯一一条仍是那条非本线的（`apps/desktop-windows/README.md:89`）。

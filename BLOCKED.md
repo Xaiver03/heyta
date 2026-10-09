@@ -6923,3 +6923,29 @@ e2e 类型载体 RC=0；臂台四臂 `A→D1`、`B→D3,D6`、`C→D4`、`D→D5
 
 🔴 为什么这条要立案而不是"反正不是我红的"就过去：T7 的关闭判据是 `pnpm check` 在隔离副本上 exit 0，而 `check` 里含 web 的 typecheck ⇒ **这 16 条不修，T7 结构性地跑不到绿**。修法归那两条线自己（`Storage` 的 double 少实现 `length/clear/key`，以及三处 `Object is possibly 'undefined'`），本线不代改别人的判据文件（越界一次就等于替别人决定"什么算对"）。
 本线的处置：T7 先跑不受它挡的那几道（`check:migrations`、`license-inventory`、`check:docs`、`check:layering`、各包单测），到 `pnpm check` 整链时**记环境无效、不记本线通过**，并在这节等它自己落。
+
+## B104（2026-10-09 18:0x，本会话 · 入站自动收集 Goal T1）：这台机器的测试内存闸门把"还原后的复跑"挡在门外，合并态整仓重跑仍欠着
+
+T1 的真库腿**已经取到读数**（`python3 research/tools/verify-inbound-worker-identity.py` → `Tests 43 passed (43)`，PY_RC=0，18:06）。欠的是**变异还原之后那一次复跑**：18:07 那趟在测试腿之前被本机 tfa-shield 的轻量档拒绝启动 ——
+
+```
+内存闸门拒绝启动：立即可用 185MB < 这一档要求的 384MB（改这一维是 TFA_LIGHT_NEED_MB）
+（浏览器那一趟在跑：pid=90222 etime=40:06 cpu=0:00.01 它是：/bin/sh /Users/rocalight/.tfa-shield/bin/pnpm --dir e2e run test）
+```
+
+**这不是产品红，也不是本线可以绕过的格子**：`TFA_LIGHT_NEED_MB` / `TFA_LIGHT_MAX` 是这台机器"此刻不该再多起一趟测试"的那道闸，调低它等于让下一次 OOM 由别人承担；pid=90222 是**并行会话的 e2e**，按只动自己创建的对象那条规矩不 kill。
+
+本线的处置与它留下的边界（写清楚，别被读成"已验证"）：
+
+- 两处变异还原后 `cmp -s /tmp/entitlement.ts.mut-bak src/entitlement.ts` 逐字一致 ⇒ **43/43 那次读数描述的字节 == 现在工作树里的字节**，所以这一格不是"没证据"，是"没有第二次证据"。
+- 现量命令（等台账空出后一条就能闭合）：`pgrep -f 'pnpm --dir e2e run test' || echo 载体空` → 空了就 `python3 research/tools/verify-inbound-worker-identity.py --log /tmp/…log`，判据仍是 `Tests 43 passed (43)` + PY_RC=0。
+- 🔴 **不受它挡、也不归它解释的那一大格**：`pnpm check` / `pnpm -r test` / `pnpm reinstall:all` 在**隔离副本**上整条跑（T7），那一步另有 B103 那 16 条别人的类型错挡着。两件事不要混读成同一个"环境无效"。
+
+## B105（2026-10-09 18:1x，本会话 · 顺手活登记，没有动手）：`docs/plans/inbound-automation.md` 里有一整节被复制了两遍
+
+现量（这两条命令跑出来都是 **2**，即同一段落各出现两次）：`grep -c '^仍然没闭合的（不包装成完成' docs/plans/inbound-automation.md`、`grep -c '代价\*\*，不是 bug' docs/plans/inbound-automation.md` —— 也就是 **2026-10-09「分笔落地」那一节把上一节的两段原样带进来了**。⚠️ 别用整行精确匹配去数：本线刚给那两行各加了"前两格已闭合"的指向，全串匹配现在数不到东西。
+
+本轮我只做了**必须做的那一半**：给这两处各加了一句"前两格已闭合，见文末 T1 一节"的指向（否则文档里会同时存在两套当前状态）。去重属结构性整理：
+
+- 为什么不当场删：那两节的措辞是并行会话在飞的落点，删一份等于替对方决定哪一份是权威；而且 `docs-link-check` 的章节引用检查是按标题计数的，动结构要连带重跑文档门禁，那是另一条线的收尾。
+- 谁来判：计划文档的作者（本线）在 T6 那一步统一收口时顺手做最合适 —— 那时要重写对外说明段落，正好一次对齐。
