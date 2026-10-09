@@ -17,7 +17,6 @@ import {
   signAutomationEntitlementSessionTicket,
   signAutomationRevocationManifest,
   type AutomationEntitlementIssuer,
-  type AutomationEntitlementKeyring,
   type IssuerDatabase,
 } from '../src/automation/entitlement-issuer';
 import {
@@ -25,6 +24,7 @@ import {
   AUTOMATION_ENTITLEMENT_SCOPES,
   inspectAutomationEntitlementTicket,
   type AutomationEntitlementAction,
+  type AutomationEntitlementKeyring,
 } from '../src/automation/entitlement-ticket';
 import { evaluateAutomationEntitlementForUser, type AutomationEntitlementSource } from '../src/entitlement';
 
@@ -82,7 +82,9 @@ function database(seed: { links?: Record<string, unknown>[]; revocation?: { revo
         return activations.get(compound(c.userId, c.installationId)) ?? null;
       },
       create: async ({ data }: { data: Record<string, unknown> }) => {
-        const row = { ...data, createdAt: new Date() };
+        // 显式标注而不是让 TS 去推：`{ ...Record<string, unknown>, createdAt }` 推出来只剩
+        // `{ createdAt: Date }`，下面那两枚属性读会成类型错（运行时没事，因为测试文件不参与类型检查）。
+        const row: Record<string, unknown> & { createdAt: Date } = { ...data, createdAt: new Date() };
         activations.set(compound(row.userId as number, String(row.installationId)), row);
         return row;
       },
