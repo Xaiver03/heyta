@@ -3073,7 +3073,7 @@ AGENTS §6.1.1 那套 `pnpm reinstall:all` 固定收尾在干净检出上同样�
 | 臂E（`revokeSession` 不关那一枚 = 改前行为） | `1 failed`，红的是"撤销 A 关掉 A"，**5 s 内没有任何 close** |
 | 臂F（逐枚去关整个账号） | `1 failed`，同一条红，received 是 `{4003,'Token revoked'}` |
 | 臂G（upgrade 没记 session id，即接线半漏） | `1 failed`，同一条红，5 s 无 close |
-| 单元/HTTP 层基线 | 五枚 spec `134 passed (134)` |
+| 单元/HTTP 层基线 | 五枚 spec `134 passed (134)`。<br>⚠️ 10-10 03:2x 标注：这一行没写取数的那棵树，而它若含 `password-auth-routes.spec.ts`，**就不可能是纯 HEAD 的读数** —— 那枚 spec 的 W10 两条在补接线之前于纯 `2647f768` 上是红的（A/B 与归因在 §6.66）。数值保留，层级按 §6.66 读 |
 | `check:session-revocation` | rc=0（`bump=6 违规=0 豁免命中=1 计数逐字相符`）—— 新增这句不抬计数器，所以那道结构门禁没有被迫改口径 |
 
 🔴 **这轮最值钱的一条是判据自己的形状**（不是产品）：第一版运行时判据我只比 close 的 **code**，
@@ -3157,8 +3157,11 @@ cd .worktrees/<载体> && git checkout --force $(git rev-parse refs/heads/main)
 载体跑完已把链接撤掉、锁文件复原、`git status --porcelain` 逐字为空。
 
 ⚠️ 这一格回答的问题有边界，别读多：它只说"**服务端那一层**在本线的文件上是绿的"。
+🔴 10-10 03:2x 补一条它当时没说出口的边界：这 `18 passed` 本身是**载体纯 tip** 的读数，成立且今天重取仍是 18；
+但同一层里另有两条本线的 🔴 判据（工单 W10 的 UA）在纯 HEAD 上是**红的**，本线当时没看见 —— 见 §6.66 的 A/B。
+⇒ "**服务端那一层**在本线的文件上是绿的"这句要收窄成"**这两枚集成套件**在纯 HEAD 上是绿的"。
 运行时腿（iOS 设备、真浏览器）仍然等 §6.59 那一格（`packages/ui` 的 barrel 已入库、它引用的 11 枚来源没入库），
-而默认通道 `pnpm check` 里本线的红也不在这层：见 §6.17 / §6.20 / §6.21 / §6.59 / §6.61 各自归属。
+而默认通道 `pnpm check` 里本线的红也不在这层：见 §6.17 / §6.20 / §6.21 / §6.59 / §6.61 / **§6.66** 各自归属。
 
 ### 6.63 默认通道那条 `expected 18 to be 17` 是一台"只会因为自己过期而红"的机器（10-10 02:57 现量，归 产品体验线，本线不代改）
 
@@ -3307,6 +3310,70 @@ cd packages/legal && NO_COLOR=1 npx vitest run tests/structure.spec.ts
 而同一笔用 `git show --numstat` 全路径读是 **6 枚**。`--stat` 会把长路径中段缩成 `...`（这笔的输出里就有
 `.../inbound-recovery/…png` 那种形状），所以"我这笔没带迁移"这个**否结论**差一点就从一条 grep 上写出去了。
 判"某笔提交带没带某类路径"要用 `--numstat` / `--name-status`，`--stat` 只配给人看形状。（同一族：负结论也要枚举分母。）
+
+### 6.66 本线自己那两片接线一直没入库：两道在 `pnpm check` 链里的门禁与两枚 🔴 判据在纯 HEAD 上是红的（10-10 03:2x 现量并修完，`d0ea794d`）
+
+起因只是取一格读数（"整包 server 单测在纯 HEAD 上是多少"）。读数是 `5 failed / 2728 passed`，
+逐条归因之后发现**其中两枚红是本线的**，而根因不是别人：
+`703cafc8`（本线 10-09 16:31 服务端那一笔）把**判据、helper、函数签名都入库了，唯独调用点没入库** ——
+那些调用点全在 `server/src/api.ts` 里，而这枚文件同时被另外两线在写，所以整枚文件不能代提交，
+于是它一直躺在共享检出里，本线此前每一次"绿"都是在含有它的树上取的。
+
+HEAD 上的实际后果（都在 `pnpm check` 链里，不是登记在册的边缘）：
+
+| 那一格 | 现量（载体纯 tip） | 它意味着什么 |
+|---|---|---|
+| `check:token-minting` | rc=1：`文件=116 签名=2 import=2 调用=6` | 通行密钥登录里那份裸 `jwt.sign` 签出的令牌**没有 `jti`** ⇒ "退出登录"在**主力登录路**上什么都撤销不了（ADR-0063 §4 第 1 条那条边界被扩大到一条正常路径上） |
+| `check:email-normalization` | rc=1：`违规=1`（`api.ts:localeForEmail` 自己拼 `email.toLowerCase()`） | `users.email` 与 `pending_email` 两张唯一约束按两套标准裁决同一个地址（工单 W8 原话的那种形状） |
+| `password-auth-routes.spec.ts` 两枚 🔴 | 会话行的 `user-agent` 收 `null` | 工单 W10 那句"「登录设备」列表里唯一认得出来源的一列"在 HEAD 上是空的 |
+
+补的就是那**十处接线**，一行不越界：`import { sessionMetaFromRequest }` + `import { normalizeEmail }` + `issueSession` 进 `./auth` 的 import 名单，
+六处调用带元数据（`/replace-token`、通行密钥登录（连带换成 `issueSession`）、两条确认邮箱链接的路由、`/login/email-password`、`/password/change`），
+以及 `localeForEmail` 那处换成 `normalizeEmail(email)`。
+🔴 **残差核对**（这一步才是"没替别人落东西"的证明）：把补完的文件与共享检出那一份 `diff -u`，剩下的差异逐条都是别人的 ——
+注册验证码那三条路由与两枚 schema、`localeFromRequest` 抽到 `./request-locale.js`、权益票据作用域那段注释。
+
+读数（载体 `.worktrees/iosacct` 纯 `refs/heads/main` + 只换这一枚文件）：
+`check:token-minting` rc=0（`签名=1 import=1 调用=7 全带元数据`）、`check:email-normalization` rc=0（`违规=0`）、
+`password-auth-routes + account-security.routes + access-sessions + email-change` 四枚 spec `141 passed (141)`、
+整包 server 单测 `5 failed / 2728 passed` ⇒ **`3 failed / 2730 passed`**（少的两条正是本线那两枚），
+本线那两枚集成套件 `18 passed (18)` 同趟仍绿。
+变异：把口令登录那一处的 `sessionMetaFromRequest(req)` 摘掉 ⇒ 恰好 `1 failed / 46 passed`，红的就是那条 UA 判据。
+
+入库方式与它带出来的一个坑（这条对本仓所有并行会话都成立）：
+`server/src/api.ts` 在共享检出里正被别人写着（` M`，133 增 / 33 删），所以**不能**用 `git commit -- <path>` —— 那会把别人的 133 行一起提交。
+走独立索引：`git hash-object -w` 造 blob → `GIT_INDEX_FILE=/tmp/… git read-tree refs/heads/main` → `update-index --cacheinfo` → `write-tree` → `commit-tree` → `update-ref`，
+并用 `git diff-tree -r <旧 tree> <新 tree>` 证明**这一笔只动了一枚文件**。
+🔴 **副作用（本线没预料到，已就地抹平并留形）**：推进 `refs/heads/main` 之后，共享索引里那枚 `api.ts` 条目还停在**旧 HEAD 的 blob**，
+于是那枚文件在 `git status` 里从 ` M` 变成 **`MM`** —— 看起来像"别人 staged 了旧内容"。
+若有人此时跑一次**不带 pathspec 的 `git commit`**，提交的就是索引里那枚旧 blob ⇒ **本线这一笔被无声退回去**（工作树里别人的在飞内容不受影响，但判据会重新红）。
+归一化：`git restore --staged -- server/src/api.ts`（只把索引刷新到新 HEAD，**不动工作树**），
+动前动后各取一次 `git hash-object` 证明那枚文件逐字未变（`727a8cbe` → 同一个值）。
+⇒ **凡用 plumbing 推进共享分支，收尾都要对这些路径各做一次 `git ls-files -s` 与 `git status` 对账**，
+否则留下的是一颗"谁的提交都会回退我"的索引。
+
+剩余三枚 HEAD 红逐条归属（都不是本线的，且本线不代改）：
+① `migration-sql.spec.ts` 那条 `@map` 列对账（6 枚列没有对应迁移）—— 注册验证码那一族的 `schema.prisma` 已入库而 `20261016000000_…` 那枚迁移还没入库；
+② `password-contract.spec.ts` 那条"六条路由都要以常量注册"—— 同一族：`AUTH_PASSWORD_PATHS.registerRequest/Verify/Resend` 三枚常量已在 HEAD（`209f7997`），
+   而注册它们的路由还没入库；
+③ `validation.service.spec.ts` 的 `expected 18 to be 17` —— 见 §6.63。
+⚠️ 顺带补一条**载体前置**（与 §6.58 / §6.62 那三件并列）：`packages/*/dist` 在载体里没构建时，
+`recover-artifact-envelope.spec.ts` 会在**加载期**就失败（`Failed to resolve entry for package "@heyta/app-host"`），
+整枚文件的用例一条都不跑，而汇总行只是"少一枚文件"，不写这件事。
+
+🔴 **同时更正本线先前读数的适用层级**（AGENTS §8 第 8 条：新证据改变结论要改正文，不能只在文末追加）：
+A/B 是同一枚 spec 在两棵树上的对照 —— 纯 `2647f768`（补之前那枚尖）`2 failed / 45 passed`，纯 `d0ea794d`（补之后）`47 passed`，
+两条红的都是工单 W10 那两枚 UA 判据。
+⇒ 凡**包含 `password-auth-routes.spec.ts`** 的那几行"绿"都不可能来自纯 HEAD，只能是共享检出上的绿。
+本线受影响的是 §6.60 表里"单元/HTTP 层基线 五枚 spec `134 passed`"那一行（它没写取数的树，分母也没留文件名）；
+§6.62 那 `18 passed` 是载体纯 tip 取的，**不受这条更正影响**，两趟同值。
+两行都已在原处标注。此后本线取判据读数的口径：**写清哪棵树；在共享检出取的每一行都要标"这一行含未入库内容"**。
+
+可迁移的形状：**"判据入库了、实现在没入库的那枚共享文件里"与 §6.65 是同一族的镜像** ——
+§6.65 是"表建好了、能读到它的那句话不存在"，这一格是"**断言写好了、被断言的那次调用不存在**"。
+两者都不是"别人没提交"，而是**在同一枚被多人共写的文件上，本线只落了能被单独提交的那一半**。
+防法不是"以后小心点"：接线落不下的那一笔，提交信息里就要写明"这枚文件还剩哪几处没落、落在谁的工作树里"，
+并且**在纯 HEAD 的载体上取一次整包读数**——主检出的绿在这条路上没有任何预警价值。
 
 
 
