@@ -81,7 +81,7 @@ describe('WebSocketConnectionService', () => {
     it('should track a connection and send "connected" message', () => {
       const ws = createMockWs();
 
-      service.addConnection(1, 'client-a', ws as any);
+      service.addConnection(1, 'client-a', ws as any, null);
 
       expect(service.getConnectionCount()).toBe(1);
       const messages = parseSendCalls(ws);
@@ -93,13 +93,13 @@ describe('WebSocketConnectionService', () => {
       for (let i = 0; i < 10; i++) {
         const ws = createMockWs();
         sockets.push(ws);
-        service.addConnection(1, `client-${i}`, ws as any);
+        service.addConnection(1, `client-${i}`, ws as any, null);
       }
 
       expect(service.getConnectionCount()).toBe(10);
 
       const eleventhWs = createMockWs();
-      service.addConnection(1, 'client-10', eleventhWs as any);
+      service.addConnection(1, 'client-10', eleventhWs as any, null);
 
       expect(eleventhWs.close).toHaveBeenCalledWith(4008, 'Too many connections');
       expect(service.getConnectionCount()).toBe(10);
@@ -107,7 +107,7 @@ describe('WebSocketConnectionService', () => {
 
     it('should register close handler that removes connection', () => {
       const ws = createMockWs();
-      service.addConnection(1, 'client-a', ws as any);
+      service.addConnection(1, 'client-a', ws as any, null);
 
       expect(service.getConnectionCount()).toBe(1);
 
@@ -118,7 +118,7 @@ describe('WebSocketConnectionService', () => {
 
     it('should replace a stale connection from the same clientId after the reconnect cooldown', () => {
       const stale = createMockWs();
-      service.addConnection(1, 'client-a', stale as any);
+      service.addConnection(1, 'client-a', stale as any, null);
       expect(service.getConnectionCount()).toBe(1);
 
       // Past the cooldown: a reconnect is treated as genuine and evicts the
@@ -126,7 +126,7 @@ describe('WebSocketConnectionService', () => {
       vi.advanceTimersByTime(5_000);
 
       const fresh = createMockWs();
-      service.addConnection(1, 'client-a', fresh as any);
+      service.addConnection(1, 'client-a', fresh as any, null);
 
       // Stale socket was evicted with the "replaced" close code.
       expect(stale.close).toHaveBeenCalledWith(4009, 'Replaced by newer connection');
@@ -144,12 +144,12 @@ describe('WebSocketConnectionService', () => {
 
     it('should refuse a challenger that reconnects within the cooldown and keep the incumbent', () => {
       const incumbent = createMockWs();
-      service.addConnection(1, 'client-a', incumbent as any);
+      service.addConnection(1, 'client-a', incumbent as any, null);
       expect(service.getConnectionCount()).toBe(1);
 
       // Same clientId reconnects immediately (the shared-clientId storm).
       const challenger = createMockWs();
-      service.addConnection(1, 'client-a', challenger as any);
+      service.addConnection(1, 'client-a', challenger as any, null);
 
       // Challenger is refused; incumbent is NOT evicted (no 4009 emitted).
       expect(challenger.close).toHaveBeenCalledWith(4008, 'Reconnecting too fast');
@@ -169,14 +169,14 @@ describe('WebSocketConnectionService', () => {
 
     it('should replace a dead incumbent even within the cooldown', () => {
       const stale = createMockWs();
-      service.addConnection(1, 'client-a', stale as any);
+      service.addConnection(1, 'client-a', stale as any, null);
 
       // Incumbent socket is dead at the OS level: a genuine reconnect must
       // recover immediately, not wait out the cooldown behind a dead socket.
       stale.readyState = WS_CLOSED;
 
       const fresh = createMockWs();
-      service.addConnection(1, 'client-a', fresh as any);
+      service.addConnection(1, 'client-a', fresh as any, null);
 
       // Fresh socket accepted (not refused with 4008), dead incumbent replaced.
       expect(fresh.close).not.toHaveBeenCalled();
@@ -185,7 +185,7 @@ describe('WebSocketConnectionService', () => {
 
     it('should not call close() on the evicted socket when it is already CLOSED', () => {
       const stale = createMockWs();
-      service.addConnection(1, 'client-a', stale as any);
+      service.addConnection(1, 'client-a', stale as any, null);
 
       // Simulate the stale socket already being closed at the OS level
       // (e.g. removeConnection's gate must skip ws.close to avoid double-close).
@@ -193,7 +193,7 @@ describe('WebSocketConnectionService', () => {
       const closeCallsBefore = stale.close.mock.calls.length;
 
       const fresh = createMockWs();
-      service.addConnection(1, 'client-a', fresh as any);
+      service.addConnection(1, 'client-a', fresh as any, null);
 
       // Dedup took effect (only the fresh entry remains) but ws.close was not
       // re-invoked on the already-closed stale socket.
@@ -204,12 +204,12 @@ describe('WebSocketConnectionService', () => {
     it('should not exceed the per-user cap when same clientId reconnects repeatedly', () => {
       // 9 unique clientIds use 9 slots; clientId 'A' takes the remaining slot.
       for (let i = 0; i < 9; i++) {
-        service.addConnection(1, `unique-${i}`, createMockWs() as any);
+        service.addConnection(1, `unique-${i}`, createMockWs() as any, null);
       }
 
       // First 'A' is accepted into the last slot.
       const incumbent = createMockWs();
-      service.addConnection(1, 'A', incumbent as any);
+      service.addConnection(1, 'A', incumbent as any, null);
       expect(incumbent.close).not.toHaveBeenCalled();
 
       // Rapid 'A' reconnects within the cooldown are refused (4008); the
@@ -217,7 +217,7 @@ describe('WebSocketConnectionService', () => {
       // reconnect storm cannot consume slots.
       for (let i = 0; i < 4; i++) {
         const ws = createMockWs();
-        service.addConnection(1, 'A', ws as any);
+        service.addConnection(1, 'A', ws as any, null);
         expect(ws.close).toHaveBeenCalledWith(4008, 'Reconnecting too fast');
       }
       expect(incumbent.close).not.toHaveBeenCalled();
@@ -227,7 +227,7 @@ describe('WebSocketConnectionService', () => {
       // the slot — still capped at 10.
       vi.advanceTimersByTime(5_000);
       const successor = createMockWs();
-      service.addConnection(1, 'A', successor as any);
+      service.addConnection(1, 'A', successor as any, null);
       expect(incumbent.close).toHaveBeenCalledWith(4009, 'Replaced by newer connection');
       expect(successor.close).not.toHaveBeenCalled();
       expect(service.getConnectionCount()).toBe(10);
@@ -235,7 +235,7 @@ describe('WebSocketConnectionService', () => {
 
     it('should slide the cooldown forward on each refused challenger so a sustained storm cannot tick into an eviction', () => {
       const incumbent = createMockWs();
-      service.addConnection(1, 'client-a', incumbent as any);
+      service.addConnection(1, 'client-a', incumbent as any, null);
 
       // Storm: a challenger every 1s for 10s. Without sliding, after 5s the
       // gate would expire and the next challenger would evict the incumbent.
@@ -243,7 +243,7 @@ describe('WebSocketConnectionService', () => {
       for (let i = 0; i < 10; i++) {
         vi.advanceTimersByTime(1_000);
         const challenger = createMockWs();
-        service.addConnection(1, 'client-a', challenger as any);
+        service.addConnection(1, 'client-a', challenger as any, null);
         expect(challenger.close).toHaveBeenCalledWith(4008, 'Reconnecting too fast');
       }
 
@@ -255,21 +255,21 @@ describe('WebSocketConnectionService', () => {
       // is treated as genuine and evicts the incumbent — recovery path intact.
       vi.advanceTimersByTime(5_000);
       const successor = createMockWs();
-      service.addConnection(1, 'client-a', successor as any);
+      service.addConnection(1, 'client-a', successor as any, null);
       expect(incumbent.close).toHaveBeenCalledWith(4009, 'Replaced by newer connection');
       expect(successor.close).not.toHaveBeenCalled();
     });
 
     it('should warn only once per incumbent storm and summarize on removal', () => {
       const incumbent = createMockWs();
-      service.addConnection(1, 'client-a', incumbent as any);
+      service.addConnection(1, 'client-a', incumbent as any, null);
       vi.mocked(Logger.warn).mockClear();
       vi.mocked(Logger.info).mockClear();
 
       // 25 refused challengers — only the first should emit a WARN.
       for (let i = 0; i < 25; i++) {
         const challenger = createMockWs();
-        service.addConnection(1, 'client-a', challenger as any);
+        service.addConnection(1, 'client-a', challenger as any, null);
         expect(challenger.close).toHaveBeenCalledWith(4008, 'Reconnecting too fast');
         // Keep sliding the gate but stay inside it.
         vi.advanceTimersByTime(100);
@@ -297,12 +297,12 @@ describe('WebSocketConnectionService', () => {
       // 'close' event handler, which re-enters removeConnection. Without
       // zeroing refusedChallengers, the summary INFO logged twice.
       const incumbent = createMockWs();
-      service.addConnection(1, 'client-a', incumbent as any);
+      service.addConnection(1, 'client-a', incumbent as any, null);
 
       // Refuse a few challengers so refusedChallengers > 0 on this incumbent.
       for (let i = 0; i < 3; i++) {
         const challenger = createMockWs();
-        service.addConnection(1, 'client-a', challenger as any);
+        service.addConnection(1, 'client-a', challenger as any, null);
       }
       vi.mocked(Logger.info).mockClear();
 
@@ -313,7 +313,7 @@ describe('WebSocketConnectionService', () => {
       // followed by the incumbent socket's own 'close' event re-entering
       // removeConnection. Both passes share the same ConnectedClient.
       const successor = createMockWs();
-      service.addConnection(1, 'client-a', successor as any);
+      service.addConnection(1, 'client-a', successor as any, null);
       incumbent._emitClose();
 
       const summaryCalls = vi
@@ -329,11 +329,11 @@ describe('WebSocketConnectionService', () => {
       // removeConnection -> ws.close -> 'close' event -> removeConnection
       // re-entry. summaryLogged must dedupe that path too.
       const incumbent = createMockWs();
-      service.addConnection(1, 'client-a', incumbent as any);
+      service.addConnection(1, 'client-a', incumbent as any, null);
 
       for (let i = 0; i < 4; i++) {
         const challenger = createMockWs();
-        service.addConnection(1, 'client-a', challenger as any);
+        service.addConnection(1, 'client-a', challenger as any, null);
       }
       vi.mocked(Logger.info).mockClear();
 
@@ -355,7 +355,7 @@ describe('WebSocketConnectionService', () => {
 
     it('should not emit a storm summary when no challengers were refused', () => {
       const ws = createMockWs();
-      service.addConnection(1, 'client-a', ws as any);
+      service.addConnection(1, 'client-a', ws as any, null);
       vi.mocked(Logger.info).mockClear();
 
       ws._emitClose();
@@ -368,11 +368,11 @@ describe('WebSocketConnectionService', () => {
 
     it('should still enforce the cap across distinct clientIds', () => {
       for (let i = 0; i < 10; i++) {
-        service.addConnection(1, `client-${i}`, createMockWs() as any);
+        service.addConnection(1, `client-${i}`, createMockWs() as any, null);
       }
 
       const eleventh = createMockWs();
-      service.addConnection(1, 'client-10', eleventh as any);
+      service.addConnection(1, 'client-10', eleventh as any, null);
 
       expect(eleventh.close).toHaveBeenCalledWith(4008, 'Too many connections');
       expect(service.getConnectionCount()).toBe(10);
@@ -382,7 +382,7 @@ describe('WebSocketConnectionService', () => {
   describe('removeConnection', () => {
     it('should clean up empty user sets', () => {
       const ws = createMockWs();
-      service.addConnection(1, 'client-a', ws as any);
+      service.addConnection(1, 'client-a', ws as any, null);
 
       expect(service.getConnectionCount()).toBe(1);
 
@@ -393,7 +393,7 @@ describe('WebSocketConnectionService', () => {
 
     it('should not call close() on already-closed WebSocket', () => {
       const ws = createMockWs();
-      service.addConnection(1, 'client-a', ws as any);
+      service.addConnection(1, 'client-a', ws as any, null);
 
       // Reset call count after addConnection (which may have called send, but not close)
       const closeCallsBefore = ws.close.mock.calls.length;
@@ -414,9 +414,9 @@ describe('WebSocketConnectionService', () => {
       const wsA = createMockWs();
       const wsB = createMockWs();
       const wsOther = createMockWs();
-      service.addConnection(1, 'client-a', wsA as any);
-      service.addConnection(1, 'client-b', wsB as any);
-      service.addConnection(2, 'client-c', wsOther as any);
+      service.addConnection(1, 'client-a', wsA as any, null);
+      service.addConnection(1, 'client-b', wsB as any, null);
+      service.addConnection(2, 'client-c', wsOther as any, null);
 
       service.closeForUser(1);
 
@@ -433,8 +433,8 @@ describe('WebSocketConnectionService', () => {
     it('should close the revoking caller too — a clientId is self-declared, sparing it would be spoofable', () => {
       const wsCaller = createMockWs();
       const wsOtherDevice = createMockWs();
-      service.addConnection(1, 'client-caller', wsCaller as any);
-      service.addConnection(1, 'client-other', wsOtherDevice as any);
+      service.addConnection(1, 'client-caller', wsCaller as any, null);
+      service.addConnection(1, 'client-other', wsOtherDevice as any, null);
 
       service.closeForUser(1);
 
@@ -444,12 +444,56 @@ describe('WebSocketConnectionService', () => {
     });
   });
 
+  describe('closeForSession', () => {
+    it('closes exactly the socket of that session and leaves the sibling session of the same user open', () => {
+      const wsTarget = createMockWs();
+      const wsSibling = createMockWs();
+      service.addConnection(1, 'client-target', wsTarget as any, 'session-a');
+      service.addConnection(1, 'client-sibling', wsSibling as any, 'session-b');
+
+      service.closeForSession(1, 'session-a');
+
+      expect(wsTarget.close).toHaveBeenCalledWith(4003, 'Session revoked');
+      expect(wsSibling.close).not.toHaveBeenCalled();
+      expect(service.getConnectionCount()).toBe(1);
+    });
+
+    it('🔴 never closes a pre-jti connection (sessionId null) — matching on "no session" would sign out every old device', () => {
+      const wsLegacy = createMockWs();
+      service.addConnection(1, 'client-legacy', wsLegacy as any, null);
+
+      service.closeForSession(1, 'session-a');
+      service.closeForSession(1, '');
+
+      expect(wsLegacy.close).not.toHaveBeenCalled();
+      expect(service.getConnectionCount()).toBe(1);
+    });
+
+    it('is scoped to that user: another user holding the same session id is untouched', () => {
+      const wsOther = createMockWs();
+      service.addConnection(2, 'client-other', wsOther as any, 'session-a');
+
+      service.closeForSession(1, 'session-a');
+
+      expect(wsOther.close).not.toHaveBeenCalled();
+    });
+
+    it('no-ops for an unknown session and for a user with no connections', () => {
+      const ws = createMockWs();
+      service.addConnection(1, 'client-a', ws as any, 'session-a');
+
+      expect(() => service.closeForSession(1, 'no-such-session')).not.toThrow();
+      expect(() => service.closeForSession(99, 'session-a')).not.toThrow();
+      expect(ws.close).not.toHaveBeenCalled();
+    });
+  });
+
   describe('notifyNewOps', () => {
     it('should send to other clients and exclude sender', () => {
       const wsA = createMockWs();
       const wsB = createMockWs();
-      service.addConnection(1, 'A', wsA as any);
-      service.addConnection(1, 'B', wsB as any);
+      service.addConnection(1, 'A', wsA as any, null);
+      service.addConnection(1, 'B', wsB as any, null);
 
       // Reset send mocks after the "connected" messages
       wsA.send.mockClear();
@@ -469,7 +513,7 @@ describe('WebSocketConnectionService', () => {
 
     it('should debounce rapid calls (latest-seq-wins)', () => {
       const wsB = createMockWs();
-      service.addConnection(1, 'B', wsB as any);
+      service.addConnection(1, 'B', wsB as any, null);
       wsB.send.mockClear();
 
       service.notifyNewOps(1, 'A', 3);
@@ -488,9 +532,9 @@ describe('WebSocketConnectionService', () => {
       const wsA = createMockWs();
       const wsB = createMockWs();
       const wsC = createMockWs();
-      service.addConnection(1, 'A', wsA as any);
-      service.addConnection(1, 'B', wsB as any);
-      service.addConnection(1, 'C', wsC as any);
+      service.addConnection(1, 'A', wsA as any, null);
+      service.addConnection(1, 'B', wsB as any, null);
+      service.addConnection(1, 'C', wsC as any, null);
 
       wsA.send.mockClear();
       wsB.send.mockClear();
@@ -511,7 +555,7 @@ describe('WebSocketConnectionService', () => {
 
     it('retains the highest sequence when upload responses finish out of order', () => {
       const wsB = createMockWs();
-      service.addConnection(1, 'B', wsB as unknown as WebSocket);
+      service.addConnection(1, 'B', wsB as unknown as WebSocket, null);
       wsB.send.mockClear();
 
       service.notifyNewOps(1, 'A', 7);
@@ -533,7 +577,7 @@ describe('WebSocketConnectionService', () => {
     it('touches the device row of a live socket, throttled to the shared interval', () => {
       const touch = vi.fn();
       const ws = createMockWs();
-      service.addConnection(1, 'client-a', ws as any);
+      service.addConnection(1, 'client-a', ws as any, null);
 
       service.startHeartbeat(touch);
 
@@ -562,7 +606,7 @@ describe('WebSocketConnectionService', () => {
 
     it('keeps pinging when no touch fn is injected', () => {
       const ws = createMockWs();
-      service.addConnection(1, 'client-a', ws as any);
+      service.addConnection(1, 'client-a', ws as any, null);
       ws.send.mockClear();
 
       service.startHeartbeat();
@@ -575,7 +619,7 @@ describe('WebSocketConnectionService', () => {
 
     it('should send ping at interval', () => {
       const ws = createMockWs();
-      service.addConnection(1, 'client-a', ws as any);
+      service.addConnection(1, 'client-a', ws as any, null);
       ws.send.mockClear();
 
       service.startHeartbeat();
@@ -588,7 +632,7 @@ describe('WebSocketConnectionService', () => {
 
     it('should remove dead connections when no pong response', () => {
       const ws = createMockWs();
-      service.addConnection(1, 'client-a', ws as any);
+      service.addConnection(1, 'client-a', ws as any, null);
 
       service.startHeartbeat();
 
@@ -607,7 +651,7 @@ describe('WebSocketConnectionService', () => {
       service.startHeartbeat();
 
       const ws = createMockWs();
-      service.addConnection(1, 'client-a', ws as any);
+      service.addConnection(1, 'client-a', ws as any, null);
       ws.send.mockClear();
 
       vi.advanceTimersByTime(30_000);
@@ -621,8 +665,8 @@ describe('WebSocketConnectionService', () => {
     it('should close all connections with code 1001', () => {
       const ws1 = createMockWs();
       const ws2 = createMockWs();
-      service.addConnection(1, 'client-a', ws1 as any);
-      service.addConnection(2, 'client-b', ws2 as any);
+      service.addConnection(1, 'client-a', ws1 as any, null);
+      service.addConnection(2, 'client-b', ws2 as any, null);
 
       expect(service.getConnectionCount()).toBe(2);
 

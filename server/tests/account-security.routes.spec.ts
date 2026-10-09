@@ -160,7 +160,11 @@ vi.mock('../src/account/email-change', async (importOriginal) => {
   };
 });
 
-const wsSpies = vi.hoisted(() => ({ closeForUser: vi.fn(), closeForClient: vi.fn() }));
+const wsSpies = vi.hoisted(() => ({
+  closeForUser: vi.fn(),
+  closeForClient: vi.fn(),
+  closeForSession: vi.fn(),
+}));
 vi.mock('../src/sync/services/websocket-connection.service', () => ({
   getWsConnectionService: () => wsSpies,
 }));
@@ -324,7 +328,22 @@ describe('🔴 J-W2a：撤销一枚 ⇒ 那一枚立刻 401，而别的枚仍然
     const b = await signIn();
     await app.inject({ method: 'DELETE', url: `/api/auth/sessions/${a.sessionId}`, headers: auth(b.token) });
     expect(wsSpies.closeForUser).not.toHaveBeenCalled();
-    void a;
+    // 🔴 另一半：那一枚自己的通道必须当场关掉。只断言"没关别人的"是挡不住"谁都没关"的 ——
+    // 而那正是这一格原来的样子：删了行、扫了缓存，界面上说"已退出"，那台开着的页面继续收 op。
+    expect(wsSpies.closeForSession).toHaveBeenCalledTimes(1);
+    expect(wsSpies.closeForSession).toHaveBeenCalledWith(USER_ID, a.sessionId);
+    expect(wsSpies.closeForClient).not.toHaveBeenCalled();
+  });
+
+  it('撤不动的那一枚**一个通道都不许关**（`unknown_session` 不是"悄悄关掉别人的"）', async () => {
+    const victim = await signIn(OTHER_ID);
+    const attacker = await signIn(USER_ID);
+    await app.inject({
+      method: 'DELETE',
+      url: `/api/auth/sessions/${victim.sessionId}`,
+      headers: auth(attacker.token),
+    });
+    expect(wsSpies.closeForSession).not.toHaveBeenCalled();
   });
 
   it('撤别人的那一枚撤不动：400 `unknown_session`，而那行还在', async () => {
