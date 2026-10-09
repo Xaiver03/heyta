@@ -371,3 +371,36 @@ Chromium、IndexedDB、React 树、store、词条渲染、点击与焦点。
 **起跑基线**（2026-10-08 21:2x，动手前取）：工作树有 1054 个未提交路径，正被并行会话写
 （`server/src/api.ts` 21:08、`packages/i18n/src/locales/*` 21:13 为热文件 ⇒ 只做**增量 Edit**，不整文件重写）。
 负载 `load1=41.5 / 16 核`，重验证排队跑。已知红：**D4**（`check:server-legal`）。
+
+### 6.6 落笔的四笔提交，与**为什么代码那一笔现在不能落**
+
+10-09 10:37 按用户指令分笔提交，四笔都走 `git commit -- <我的路径>`（带 pathspec）：
+
+| 笔 | 内容 | 文件数 |
+|---|---|---|
+| `feat(账号面 门禁)` | `check:token-minting` + `check:email-normalization` + 共用的 `scripts/lib/strip-ts-comments.mjs` | 3 |
+| `test(账号面)` | e2e 真浏览器套件 + 七张图 + `check-journey-coverage.mjs` 的登记 | 9 |
+| `docs(陷阱 #389 #390)` | 两条可迁移教训 | 1 |
+| `docs(账号面 台账)` | §6.4 / §6.5 / §3 / §5 + ADR-0063 三处更正 | 2 |
+
+🔴 **代码那一笔（服务端 + 共享层 + 两端界面 + 词条 + 法务）刻意没落**，三条都是现量、不是借口：
+
+1. **注册点文件里我的行和别人的行在**同一行**上**：`server/package.json` 的
+   `test:integration:postgres` 那一行同时含本线的 `email-change-and-sessions`、
+   别人的 `inbound-worker-identity` 与 `registration-otp`，另有别人的 `"@heyta/inbound-core": "workspace:*"`
+   —— 把这一枚提走 = 在 HEAD 上留一条指向**未入库包名**的 workspace 依赖 ⇒ `pnpm install` 当场坏。
+   同一形状的还有 `packages/shared-schema/src/index.ts`（+32 行里本线只占 4 行）、
+   `packages/app-host/src/index.ts`（+92）、`server/src/api.ts`（+596）、`apps/web/src/App.tsx`（+365/−470）。
+2. **词条表此刻正被并行会话写**：`packages/i18n/src/locales/{zh-CN,en}.ts` 的 mtime 是
+   提交前 **6 分钟**（10:27），而本线全部 `common.emailChange.*` / `common.sessions.*` 词条
+   和他们的协作词条**混在同一个 blob 里**（现量：staged blob 里 `common.emailChange.` 命中 37 处，
+   HEAD 里 0 处）。此时提交 = 把别人未完成的措辞署在我的提交信息下；不提交 = 面板引用的 key 不在 HEAD。
+3. **索引里有别人预 staged 的 32 枚**（`git diff --cached --name-only | wc -l`，且从 21 涨到 32 ⇒ 正在写）。
+   带 pathspec 提交不会带走它们（四笔之后复量仍是 32 ✓），但**他们**随后不带 pathspec 一提交，
+   就会把本线的词条提到他们的信息下 —— 那是 §7 第 82 条那一族，归属由他们那笔决定，不由我。
+
+⇒ 正确的落笔时机是**并行那几笔先入库**（协作线 + 入站线），之后本线剩下的一笔
+（服务端 + 共享层 + 两端界面 + 词条 + 法务 + 迁移）就能干净自成一组。
+现取命令：`git status --porcelain -- packages/i18n server/package.json packages/shared-schema/src/index.ts`
+＋ `git diff --cached --name-only | wc -l`。
+⚠️ 这条边界与 §5 第 11 条不是一回事：那条讲**装出来的产物**，这条讲**历史里的代码**。
