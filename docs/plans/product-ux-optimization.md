@@ -1155,6 +1155,20 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
     - ❌ **假的那条：「设置浮层透出下层收集箱空态、文字压文字」**。落定之后（600 ms + 两帧）在空态中心做 `elementFromPoint`，命中的是 `span.ht-type-row-title` 且 `insideEmpty=false` ⇒ 浮层画在空态**上面**，没有透出。真相是**我这枚 spec 把截图拍在入场动画中途**：`ht-sheet-in` 把整块 `opacity` 从 0 跑到 1，那一帧下层以接近同等的浓度叠上来。🔴 **仓里早就记着这件事** —— `waitForOverlaySettled` 的注释原文是「第一轮的 `3-settings-tier.png` 就是这样拍坏的 —— 人已看图，但看的是过渡帧」，而我新写的 `help-entry-ux.spec.ts` 没用它，四张帮助证据图**全是过渡帧**。已补 `await waitForOverlaySettled(page, 'settings-sheet')`（它取元素自己的 `getAnimations()`，`prefers-reduced-motion` 下集合为空即返回，不是睡 300 ms），四张图重取后人又打开看过：`apps/web/evidence/help-entry/help-{375,1440}-{light,dark}.png` 里那层水印没了，文件小 20–30%。⚠️ 这四张**不入库**：它们拍的是尚未提交的帮助面 UI，跟着下面那条一起落 —— 仓库里不留「验收依据指向不存在的源码」的图。**同一族顺手核了本线另一枚取证脚本** `scripts/qa/reminders-data-responsive.mjs`：它每次截图之前都有 ≥5 个往返（`panel.waitFor()` → `scrollIntoViewIfNeeded()` → 两次 `evaluate` → 状态读数），落定之后才拍，**没有同一族问题**。
     - 🔴 **同时撤回我自己看图得出的另一句：「✕ 压在窄屏导航行上」**。量到 `navCloseOverlap = null` —— 导航右边界 x=315、关闭钮左边界 x=315，**正好相邻、零相交**。那是眼睛把「同一行」读成了「重叠」。
     - ✅ **真的那条（窄屏 375）：从 rail 的「帮助」进设置时，当前分类在导航可视窗口外 316 px**。读数：`.ht-settings__nav` `clientWidth=315`、`scrollWidth=805`、`scrollLeft=0`，而带 `aria-current="page"` 的「关于与帮助」落在文档 x `631..737` ⇒ 完全看不见，选中态那条 primary-subtle 底色等于白给；1440 那一档是纵向列，七项全可见、`inView=true`。机制在代码里一眼看得到：`scrollIntoView({block:'nearest', inline:'center'})` **只挂在导航按钮自己的 `onClick` 上**，而 rail「帮助」/ 设置锚点 / `openAiSettings` 这三条**程序化选档**的路径都不经过它 —— 重取后的 `help-entry/help-375-dark.png` 里就是这件事：内容面写着「关于与帮助」，导航那一行只到「同步与隐私」。⚠️ **归属既不在本线也不在 HEAD**：HEAD 的导航是七枚 `<a href="#settings-group-*">`（长页面 + 锚点跳转，根本没有「当前分类」这回事），把它改成「一次只显示一组 + `aria-current`」的正是那笔未提交的两栏 IA（工作树 `App.tsx:236-254`）。**本线不代改**，修法形状记在这里：`activeSettingsSection` 变化时把 `[aria-current="page"]` 滚进可视窗口（复用同一条 `inline:'center'`），并给窄屏那条横向滚动条一个可见的截断提示。
+- [x] ✅ **同一把尺的第二批：4 张图 + 1 份机读读数入库，另外两枚"点名的量具"经查**是刻意不入库**的，这条把它写进正文而不是留成撞空**（12:1x）
+    入库的：`growth-ux/growth-390x844-dark-en.png`、`rail-customization/desktop-default.png`、`rail-customization/desktop-more-anchored.png`、
+    `settings-finish/settings-375-light-sync.png`、`ux-round6/tool-journey/journey.json`。前四枚按同一道遮敏口径处理：
+    那枚 JSON 先扫凭据形状（**0 命中**），名字带风险的两张人打开看过 ——
+    `settings-375-light-sync.png` 是**未登录态**的窄栏「同步与隐私」（无令牌、无邮箱、无服务器地址，且它是 375 档 tab 条那一版，
+    与两栏版 `ux-final/sync-default.png` 不是同一张）；`rail-customization/desktop-more-anchored.png` 是空收集箱 + 展开的「更多」
+    （这张顺带给上面那格 sweep 漂移当了一回**看得见的证据**：溢出那六项确实只在 `moreOpen` 时以菜单项存在）。
+    🔴 另一类要分清：**台账点名的不都是判据**。`e2e/_probe/who-overflows-narrow.mjs` 与 `settings-narrow-nav-overlap.mjs`
+    两枚文件头自己写着「一次性量具（不入库）」—— 它们不是"该入库而漏了"，是**刻意只活在本机**。
+    这一格之前读起来像前者，任何人在干净检出上按路径去找会以为丢了一道门；现在这句话在正文里，撞空的人至少知道自己在撞什么。
+    ⚠️ 口径补一句：`research/tools/docs-link-check.mjs` 只解析 markdown 链接，**反引号里的裸路径它看不见**，
+    所以这类"点名未入库文件"没有任何门禁会报 —— 判据仍然是那两条 `for` 循环（`git cat-file -e HEAD:<路径>`），
+    而它数的是"这篇文档出现过的文件名"，正文自己会污染分母（上面那格写过）。
+
 - [x] ✅ **上一条里那 4 张图当天就入库了，而且入库的是"带树限定"的那一份**（`apps/web/evidence/help-entry/`，README + 4 张 PNG，`git show --name-only` = 5 枚）**
     为什么单独记一笔：那四张此前是"本机有、仓库里没有"，而主表那一行既说"证据已生成"又得靠一句 ⚠️ 说明它们不在仓库里 —— 两套状态。
     现在图进仓了，**进仓的前提是那句限定跟着进**：画面里的第四条「投诉与举报」在 HEAD 命中 0（工作树命中 1），
