@@ -3083,10 +3083,12 @@ AGENTS §6.1.1 那套 `pnpm reinstall:all` 固定收尾在干净检出上同样�
    那句 `Invalid token` 是**又一次 upgrade 尝试**被拒时发的（行已删 ⇒ 验签过不了），
    不影响红/绿（两种读数都不是 `Session revoked`），但说明这一层还混着一条"重连即拒"的既有路径，
    别把它读成"改前也在关连接"。
-3. 单元/HTTP 层的两臂（E、G）**未取**：那趟被本机内存闸门按**余量**那一维拒了（`立即可用 109MB < 384MB`），
-   不是产品红。要补的是一条命令：`cd server && npx vitest run tests/websocket-connection.service.spec.ts tests/websocket.routes.spec.ts tests/account-security.routes.spec.ts`
-   在两种变异下各跑一次（盘上快照还原用内存里的内容，别用 `io.open(p,'w')` 之后再读 bak —— 这一趟就是这么把
-   `access-sessions.ts` 截成 0 字节的：Python 先求值 `io.open(p,'w')` 那半**已经把文件清空**，随后读 `.mut-bak` 才抛异常）。
+3. 单元/HTTP 层的两臂**随后取到了**（10-10 02:49，当时被本机内存闸门按余量那一维拒了一趟：`立即可用 109MB < 384MB`，
+   不是产品红）—— 而臂G 在那一层**活了**，那一格单独记成 §6.61 并当场补了判据。
+   复取命令：`cd server && npx vitest run tests/websocket-connection.service.spec.ts tests/websocket.routes.spec.ts tests/account-security.routes.spec.ts`
+   ⚠️ 变异还原的经验：`io.open(p,'w')` 求值时**文件已经被清空**，之后再去读 `.mut-bak` 抛异常就会把源码留在 0 字节
+   （本轮真遇上一次，靠 `git show HEAD:<路径>` 重建 + 只重放自己那一处 hunk 恢复，`git diff` 复核过）。
+   要留快照就用**内存里的字符串**，别用"先落盘 bak 再读回来"。
 
 顺带三条**别的线的红**，本轮现量到、归属写清楚，不记在本线账上：
 - `pnpm --filter @heyta/sync-server test` 在主检出是 `6 failed | 2738 passed`。其中 `sync-compressed-body.routes.spec.ts` 那 5 条
@@ -3095,6 +3097,36 @@ AGENTS §6.1.1 那套 `pnpm reinstall:all` 固定收尾在干净检出上同样�
   **在纯 HEAD 上就红** ⇒ HEAD 级红，跨层词表漂移，与 §6.20/§6.21 同族；归共享 schema 那条线，不在本线文件上。
 - 在载体里跑 `pnpm -r build` 会**改写被跟踪的** `apps/landing/docs/**/index.html`（本轮 30 枚 `M`）⇒
   构建写跟踪产物，读"载体干不干净"之前要先 `git checkout --` 它们，否则下一位会以为是别人在飞。已复原并复核为空。
+
+### 6.61 那条"接线判据"其实是**镜像**：把生产里第四枚参数摘掉，整组 31 条照样全绿（10-10 02:49 现量，已补一条按源码读的）
+
+§6.60 收尾时留了一条"单元/HTTP 层两臂未取（闸门拒）"。补取之后它不是"补个读数"，而是照出一件判据本身的事：
+
+| 臂 | 单元/HTTP 层（`websocket-connection.service` + `websocket.routes` + `account-security.routes`，基线 `94 passed`） | 运行时层 |
+|---|---|---|
+| E：`revokeSession` 不关那一枚 | `1 failed` —— 红的正是本线那条正向断言（`closeForSession` 恰好一次、带那一枚的 id） | `1 failed`（5 s 无 close） |
+| G：`upgrade` 没把 `result.sessionId` 记进连接 | 🔴 **`94 passed` —— 活了** | `1 failed`（5 s 无 close） |
+
+原因在 `websocket.routes.spec.ts`：它整组跑的是文件里自己重写的 `simulateWsHandler`
+（文件头明写着 "mirrors the exact validation flow"），**不是** `src/sync/websocket.routes.ts` 那枚处理函数。
+所以它对生产漂移天生是瞎的 —— 我在镜像里加的那条"第四枚参数等于服务端验出的 session id"也确实会红，
+但它红的是**镜像自己被改**，不是产品被改。⇒ 与 §6.55（路由写好了没人挂）、§6.50（面板写了没挂载）同族，
+只是这一型更阴：**判据看起来在测那条路由，实际在测它自己的副本**，而且副本还通过了全部 31 条。
+
+补法照 §6.55 的形状：新增一条**读生产源码**的接线判据（`addConnection` 调用点必须带 `result.sessionId`），
+外加一条阳性对照（不许把客户端自报的 `clientId` 当会话凭据 —— 那条冒认得起）。读数：
+
+- 基线 `31 passed (31)`；
+- 臂G ⇒ `1 failed`，红的正是新加那条接线判据；
+- 臂H（把第四枚参数换成 `clientId`）⇒ `2 failed`，两条各红一次 ⇒ 阳性对照证明第二条款**真的会红**，不是装饰。
+
+⇒ 现在这一半接线的覆盖形状是：**默认通道里有一条静态对账**（会红，但不验行为）+
+**一条真连接运行时判据**（验行为，但要本地库、走 `test:integration:postgres`，不在 `pnpm check` 链里）。
+两边都缺一边都会漏：只有静态 ⇒ 传对了值但连接簿记没用它也不知道；只有运行时 ⇒ 那一趟没人跑就等于没有。
+
+可迁移的一条：**看到"某文件的 spec 全绿"之前，先问这个 spec 调的是生产导出还是文件里的镜像函数**。
+判据是 `grep -n "async function simulate\|function mock_\|mirrors" <那枚 spec>` ——
+命中就说明那一组在测副本。镜像本身不一定错（有些分支用真 HTTP 造不出来），但它**不能算成接线证据**。
 
 
 
