@@ -201,6 +201,9 @@ W1 先落、W7 后落 ⇒ 中间任何一次 `pnpm check` 都会红。**这不�
     🔴 **没有一趟红在移动壳的代码上，所以这一腿的证据仍然等于零**，不是"验过没验好"。
     它带回来的唯一一条产品缺陷在**服务端**（`authCache` 按用户分格 ⇒ 撤掉的那一枚仍被接受），
     三层证据与逐层变异读数、续跑配方都在 §6.7。
+    🔴 **12:1x 现量更正了这一格的等待条件**（§6.8）：iOS 模拟器上**已装**的产物里就含本线那两节、
+    系统语言就是中文 ⇒ **不需要重新构建**，缺的是一份 iOS 侧 AX 驱动脚本与一个**没被另一条会话的
+    `idb_companion` 占着的窗口**。等待条件是"别人跑完"，不是"载体坏了"。
     ⚠️ 移动侧那 30 条 RN 测试树照旧存在，它证的是共享层接线，**不替代**真机界面。
 11. 🔴 **本轮没有跑 `pnpm reinstall:all`** ⇒ 现在装在四个端上的产物**不含**这一批
     （AGENTS §6.1.1 的固定收尾；与 §7 第 27/82 条、traps #178 同一条理由："测试全绿 ≠ 这是当前产物"）。
@@ -221,6 +224,9 @@ W1 先落、W7 后落 ⇒ 中间任何一次 `pnpm check` 都会红。**这不�
     改的是那句被证伪的实现事实。⚠️ 单测与集成当时**全是绿的** ——
     "撤一枚不动另一枚"这条断言写在了错误的顺序上（先探被撤的那一枚就永远照不出焐热路径），
     这条是 traps **#392**。
+    ⚠️ 换签名之后 `tests/` 里还有**两处旧调用点**是本线自己的，而**没有一档编译期检查看得见它们**
+    （§6.9，并入 traps #210 的第三种面目：`tsconfig` 不含 tests、这一包没有 `typecheck`）——
+    那一格是随后那趟**全量单测**替本线抓出来的，不是构建也不是 typecheck。
 
 ---
 
@@ -549,3 +555,95 @@ node scripts/check-verify-script-copy.mjs scripts/verify-mobile-account-email-se
 
 ⚠️ 旅程账本 `scripts/check-journey-coverage.mjs` 那一格**要写"已登记缺口"而不是"已验证"** ——
 设备层一次都没跑完过；这条区分本身就是那枚门禁唯一判得动的事，写反了就是拿装置给自己发绿。
+
+### 6.8 补记：iOS 那一腿其实**已经就绪**，缺的是窗口而不是产物
+
+12:1x 现量（`heyta-iphone-17pro`，UDID `FE195661-B021-4A71-AAD1-1F2F7AE3A102`）：
+
+| 事实 | 读数 |
+|---|---|
+| 模拟器 | `Booted`（iOS 27.0） |
+| 系统语言 | `zh-Hans-CN` ⇒ **趟 2 那一族（traps #391）在这一侧不成立**，脚本可以按中文 needle 写 |
+| 已装产物 | `Heyta.app/main.jsbundle` mtime **10-09 01:43**、Hermes 魔数 `c61fbc03`、10 195 120 B |
+| 🔴 里面有没有本线那两节 | UTF-16LE 命中 `更换登录邮箱 3 / 发起更换 1 / 退出所有设备 4 / 退出这一台 5 / 登录设备 7`，UTF-8 全 0（同一把尺见 §6.7 那段命令） |
+
+⇒ **设备腿不需要重新构建**，`xcodebuild` 那一格早在本轮之前就装过了；缺的只有一份 **iOS 侧驱动脚本**
+（Android 那份是 adb 的，逐条点不了 AX）与一个**没人占用的窗口**。
+
+🔴 **此刻不能上，两条都是现量**：
+
+1. 那台模拟器上挂着一枚 `idb_companion`（pid 27352，起于 **10-08 08:19**，父进程是**另一条会话**的
+   `codex app-server`，监听 `*:11983`）—— 不是我的装置。AGENTS §8 工作流第 9 条
+   （同一模拟器不得并行覆盖）与"只对自己创建的对象动手"两条都挡在这里。
+2. 同一时刻（12:09 起）有会话在跑**整族** `check:ai-e2e`
+   （`sh -c node scripts/check-ai-e2e-preflight.mjs && pnpm --dir e2e run test` + 4 枚 chromium headless）——
+   这就是 §6.7 那个 load 342 与趟 3 那台模拟器死亡的来源。
+
+⚠️ 所以这一格的准确措辞是 **"窗口不属于我"，不是"载体坏了"** ——
+两者在台账里长得一样，但只有前者的等待条件是"别人跑完"，后者会诱使下一个人去重起模拟器。
+
+**能上时的现量判据（两条，先跑这两条再决定要不要动手）**：
+
+```bash
+xcrun simctl list devices booted
+ps aux | grep -E '[i]db_companion' | grep -c FE195661        # >0 就还不是我的窗口
+ps aux | grep -E '[c]heck-ai-e2e|[p]laywright' | wc -l        # >0 就别抢（负载 + SIGKILL 专用端口）
+```
+
+**驱动脚本的形状**（留给下一位，本轮**没有**写它 —— 写了也跑不了，而一份跑不了的验收脚本
+就是一条会腐烂的判据）：复用 `verify-mobile-ios.sh` 的 TCP companion 用法（trap #263：
+可执行文件路径与 `HOST:PORT` 必须分开传，只能给 `--companion`）与
+`scripts/tools/ios-ax-shim.test.py` 的几何安全检查（trap #25：AX 报 `success` 只代表 HID tap 被设备接受）。
+判据只要 §6.7 那 31 条里**界面半边**的那几条：两节渲染出来 → 发起更换后状态区读到"还在等两个邮箱各点一次" →
+会话列表里 `current` 只有一枚 → 撤"这一台"之外的那一枚 → 手上这枚仍 200。
+
+### 6.9 换缓存键之后跑的那一层全量单测：它抓到的是**本线自己的两处旧调用点**
+
+改的是 `src/auth-cache.ts` 的**函数签名**（`get(userId)` → `get(userId, sessionId)`），
+而**没有任何编译期的一档会拦下 `tests/` 里的旧调用点**（这一族并入 traps **#210** 的第三种面目）。
+三条都是结构性事实，现量命令附在后面：`server/tsconfig.json` 的 `include` 不含 `tests`、
+`server/package.json` 的 scripts 里**没有 `typecheck`**（所以 `pnpm -r typecheck` 对这一包**根本没有这一步**）、
+vitest 用 esbuild 只做转译 ⇒ arity 错**不报错**，只是拿到 `undefined` 参数、读到空的缓存格。
+⇒ 服务端构建 RC=0 而两份 spec 已经坏掉，这**不是矛盾**；唯一的可见层是把那一包的 vitest 整包跑一遍。
+
+```bash
+node -e "const p=require('./server/package.json');console.log('typecheck' in p.scripts)"   # false
+node -e "console.log(require('./server/tsconfig.json').include)"                            # [ 'src/**/*', 'scripts/**/*' ]
+```
+
+10-09 12:1x 那一趟（载体 load 342）：`Test Files 2 failed | 150 passed (152)`、
+`Tests 6 failed | 2683 passed | 1 skipped (2690)`。逐条归属：
+
+| 红的那几条 | 现量证据 | 归属 |
+|---|---|---|
+| 5 条 `sync-compressed-body.routes.spec.ts` | 断言的是 `uploadOps` **调用参数形状**多出一枚实参；出处 = 未提交的 `server/src/sync/sync.types.ts` 新增 `inboundCommitProofs?: Record<string, string>`（`git diff -- server/src/sync/sync.types.ts`） | 入站那条线。本线**一枚 `server/src/sync/**` 都没碰**（本线服务端改动只有 `auth.ts`/`auth-cache.ts`/`api.ts`/`account/*`/`password/*`/`routes/*`） |
+| 1 条 `validation.service.spec.ts` | 它断言 `ALLOWED_ENTITY_TYPES.size === HEYTA_ENTITY_TYPES.length`，两侧现在不等；出处 = **别人 staged 的** `packages/shared-schema/src/entity-types.ts` 新增 `TASK_COMMENT`（ADR-0062 协作线，`git diff --cached -- …/entity-types.ts`） | 与 §6.5 第 1 道 `check:reachability` **同一根因** |
+
+🔴 而这一层**为**本线抓到的两条（两条都红在 `expected null not to be null`）：
+
+1. `tests/account-security.routes.spec.ts` 里"撤销前先把两枚都焐热"那一句用的是 `authCache.get(USER_ID)`。
+   修法不是把断言改窄：换成**逐枚验两格**（`get(USER_ID, a.sessionId)` + `get(USER_ID, b.sessionId)`），
+   因为 `invalidate(userId)` 的语义本来就是"扫掉这个用户的全部格"—— 探针比原来更贴那条不变量。
+2. `tests/access-sessions.spec.ts` 那条"🔴 特征：缓存命中时这一层整段跳过"**整段描述的是已经被修掉的行为**
+   （它把"另一枚焐热 ⇒ 被撤那枚仍 `valid: true`"当成**已知空窗的形状**钉住）。
+   按 AGENTS §8 第 8 条改写正文而不是删掉它：**invalidate 那一档保留**（同格空窗仍然真实，
+   删掉 `invalidate` 这件事仍要在**两个文件**里都红），另**加一臂**"另一枚刚被焐热，不能替这一枚做判断"
+   —— 上面四条在两种键形状下都绿，只有这一臂能区分。
+
+修后读数（12:17）：`tests/access-sessions.spec.ts` + `tests/auth-cache.spec.ts` +
+`tests/account-security.routes.spec.ts` 三份一起 `Tests 61 passed (61)`，RC=0。
+
+变异（把 `keyOf` 退化成按 `userId`，**保留** `no-jti` 那一支，好让变异只打"会话分格"这一维）：
+`Tests 2 failed | 59 passed (61)`，红的**恰好**是
+`access-sessions.spec.ts > 🔴 特征…` 与 `auth-cache.spec.ts > a warm entry for one session…` 两条新臂。
+⚠️ 如实记一条**不算判据**的观察：`account-security.routes.spec.ts` 在两种键形状下**都绿**
+（退化时两枚写进同一格，`get(USER_ID, a.sessionId)` 仍然非空）—— 它验的是"撤销前缓存确实有东西"，
+不承担区分键形状这件事；别把它读成"这一层已经覆盖了那个缺陷"。
+还原：`cp src/auth-cache.ts.mut-bak src/auth-cache.ts` + `cmp -s` 通过（`RESTORE=ok`），
+`grep -c MUT` = 0，只从 `.mut-bak` 还原、没走 git。
+
+⚠️ **有一处注释刻意保持原样**：迁移文件 `20261018140000_add_email_change_and_access_sessions` 第 63 行
+那句"撤销时当场 `authCache.invalidate(userId)`"没有改 —— AGENTS §4「永不修改已应用的迁移」
+（它已在验收库 `heyta_account_w9` 上应用过，改注释会造成 checksum 漂移）。
+更正写在四处：`server/prisma/schema.prisma`（那三行补了前提）、`server/src/account/access-sessions.ts`
+规则 3、`server/src/auth.ts` 的 ⚠️ 段，以及 ADR-0063 §2.5。

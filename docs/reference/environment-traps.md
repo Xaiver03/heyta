@@ -5192,6 +5192,18 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     **不含 `tests`** ⇒ 在 `server/` 里跑 `tsc --noEmit` 拿到 exit 0，**不能当成"测试文件也没类型问题"**。
     判据：写 spec 之前先看它落不落在 tsconfig 的 `include` 里，不在就单独说明。
 
+    🔴 **2026-10-09 现量补上同族的第三种面目，而且它比前两种贵得多**：改 `src` 里一个函数的**签名**
+    （`authCache.get(userId)` → `get(userId, sessionId)`），`tests/` 里的旧调用点**没有任何编译期的一档会拦**：
+    `tsc` 看不见 tests（就是上面那句），`@heyta/sync-server` **没有 `typecheck` 脚本**（`pnpm -r typecheck`
+    对它根本没有这一步），而 `server` 的 spec 是 vitest 用 esbuild 转译跑的 —— ** arity 错在运行时不报错**，
+    只是那个调用得到 `undefined` 参数、读到一个空的缓存格。当场形状是：
+    `expect(authCache.get(USER_ID)).not.toBeNull()` 变成 `expected null not to be null`，
+    而**服务端构建 RC=0、`pnpm -r typecheck` 全绿**。
+    ⇒ 唯一的可见层是**把那一包的 vitest 整包跑一遍**（本轮读数：两份 spec 各红一条，
+    `2 failed | 53 passed (55)`；跑单文件能抓到，跑"只与本线相关的那三份"也能抓到，
+    跑构建/typecheck 抓不到）。配套判据：**改签名之后先按"谁引用了它"逐点过一遍**（traps #167 那条在这里的
+    具体形态），并且要包括 `tests/` —— 这一族的错不是"没写测试"，是"测试不在类型系统的射程里"。
+
 211. 🔴 **一个文件如果 `import` 就等于"跑一遍"，它就永远测不到** —— 而"某条路径零测试"的表面理由，往往不是没人想写。
 
     `server/scripts/recover-user.ts` 头上挂着 `Status: UNVERIFIED against real encrypted data`，
