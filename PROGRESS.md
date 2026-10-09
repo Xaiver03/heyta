@@ -1917,3 +1917,41 @@ OS 通知投递通过。原 [多端计划](docs/plans/goal-multi-end-coverage.md
 - T2 还欠三格（都在本线地界内，下一轮做）：宿主每 30 秒续票据、`X-Heyta-Entitlement-Ticket`
   的供给方（app-host 里还没有生产者）、`waiting-entitlement` 展示。
   `automation_entitlement_clocks` 的退役清扫登记成 `BLOCKED.md` **B106**（落点越界 + 判据口径要人拍）。
+
+## 2026-10-10 00:2x–00:4x · T2 续：逐次动作的取票通道（服务端这一半闭合）+ 顺手把本线测试的类型错清掉
+
+- 做了什么：闸门那五处逐次放行动作要的 `X-Heyta-Entitlement-Ticket` **第一次有了供给方** —— 官方实例上
+  `POST /automation/entitlement/ticket`（`server/src/api.ts`）按绑定行签发 8 枚非 `session` 动作的票据，
+  作用域照 `AUTOMATION_ENTITLEMENT_SCOPES` 走（带 rule / 带 event / 都不带，三档互斥），
+  主体、实例、本地账号三枚字段**只从 `automation_entitlement_links` 读回**，请求体一个字都不参与。
+  `server/src/automation/entitlement-issuer.ts` 新增 `signAutomationEntitlementActionTicket`；
+  `session` 明确拒（`AUTOMATION_ISSUER_ACTION_UNKNOWN`）—— 混用会让一次登录换到一张通用通行证。
+- 🔴 边界（这条通道判什么、不判什么）：官方那侧只判"主体 X 可不可以对这个作用域做动作 Y"，
+  **不判**这条 rule／event 是不是真属于那个本地账号 —— 归属只有客户实例知道（它看不到用户的 E2EE 数据）。
+  写进了计划与协议两份文档，别被读成"官方帮着校验归属"。
+- 判据：`server/tests/automation-entitlement-issuer.spec.ts` 12 → **17**（新增那 5 条含一枚分母自检
+  `expect(actions).toHaveLength(8)`，动作词表加一项而作用域没登记 ⇒ 那条先红）；
+  `server/tests/integration/inbound-worker-identity.integration.spec.ts` 45 → **46**。
+- 读数（都在对话里贴过）：`Tests 17 passed (17)` · 八文件腿 `Test Files 8 passed (8) / Tests 83 passed (83)` ·
+  真库装置 `Tests 46 passed (46)` + `PY_RC=0` · `npx tsc --noEmit` rc=0。
+  反向验证两臂：臂 1 摘掉 `session` 那道拒 ⇒ `Tests 1 failed | 16 passed (17)`；
+  臂 2 把作用域判定改成"带不带都行" ⇒ 同样 `1 failed | 16 passed (17)`；两臂都 `cmp -s` 证过逐字还原。
+- ✅ 已入库三笔（只本地、未 push）：`0b7ff357` 签发端与 HTTP 通道（2 文件 +98/−2）·
+  `ad7112e0` 判据两腿（2 文件 +135）· `ec58db71` 入库装置 `research/tools/verify-inbound-api-slice.py`（1 文件 +156）。
+  `api.ts` 是混合文件，走"HEAD + 只带本线那两段"的切片配方；切片的三条不变量（每段只允许一枚顶层声明、
+  锚点必须命中一次、删掉的行必须恰好等于那一行 import）都写进装置并有 `--self-test` 三臂。
+  ⚠️ 第一版切片用"第一个裸 `);`"当结束标记，**把别人那 531 行吞进来**（打印 `+584`），是这套不变量逼出来的形状。
+- 顺手抓到并当场修完的一类（B107）：本线那两枚**测试文件**里有 4 处类型错（不存在的类型名、替身行推导丢了
+  索引签名、可空列直接进 `JSON.parse`）—— `server/tsconfig.json` 的 `include` 不含 `tests/**`，
+  所以它们**不参与任何类型检查**，只有真跑那一条腿才现形。修法都不动断言；复量本线 4→0、全仓 224→220、
+  `tsc` 仍 rc=0、两文件 `Tests 37 passed (37)`。**正式把 tests 纳入类型检查会一次亮 220 片别人线的红**，
+  那是全仓判卷口径 ⇒ 记 B107 等负责人拍，本线不代改构建配置。
+- 环境事实（本线的命令要照它写）：**vitest 对点名的不存在文件不报错**，只跑存在的那几枚还报 rc=0
+  —— 我那条"八文件腿"的第一次尝试实际只跑了两枚。点名枚数必须自己数、再和 `Test Files` 那行对账。
+  另一条：这台机器的测试内存闸门在 00:3x–00:4x 连拒三次（291MB、105MB < 384MB），
+  按"不动别人 pid、不调低阈值"处置为换下一项 ⇒ B104 那一格（还原后的装置复跑）**仍开着**。
+- 🔴 本轮自己造的一个错，如实记着：那两笔（`426d4eff`、`6d06bae4`）**是空提交** —— 当轮重写的列交函数把路径参数也 `shift` 掉了，
+  树与父逐字相同而 `commit-tree`/`update-ref` 一律成功，`--oneline` 里看不出任何异样。是"读回 `--stat` 的枚数"这条规矩把它抓出来的。
+  真笔已重落，两枚空笔留在历史里（并行会话已把它们当父，不改写别人的历史），全过程与三道闸在 **B108**。
+
+- T2 还欠：宿主每 30 秒续票据、`waiting-entitlement` 展示、app-host 侧真的去调这枚取票通道并把票据附到每次写入。

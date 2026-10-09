@@ -6941,6 +6941,14 @@ T1 的真库腿**已经取到读数**（`python3 research/tools/verify-inbound-w
 - 现量命令（等台账空出后一条就能闭合）：`pgrep -f 'pnpm --dir e2e run test' || echo 载体空` → 空了就 `python3 research/tools/verify-inbound-worker-identity.py --log /tmp/…log`，判据仍是 `Tests 43 passed (43)` + PY_RC=0。
 - 🔴 **不受它挡、也不归它解释的那一大格**：`pnpm check` / `pnpm -r test` / `pnpm reinstall:all` 在**隔离副本**上整条跑（T7），那一步另有 B103 那 16 条别人的类型错挡着。两件事不要混读成同一个"环境无效"。
 - ⚠️ 2026-10-09 22:1x 部分收窄（T2 那一趟）：本线**同一载体**上把变异还原后的复跑取到了，但取的是 vitest 那两条腿（六文件 `Tests 51 passed (51)` rc=0 + 真库 `tests/integration/inbound-worker-identity.integration.spec.ts` `Tests 45 passed (45)` `REAL_RC=0`），**不是**上面那条 Python 装置。**这一格仍然开着**：`verify-inbound-worker-identity.py` 那 43 条对应的那一次"还原后复跑"没做过，闭合命令不变。
+- ⚠️ 2026-10-10 00:3x 现量：这一格的**基线数已经从 43 涨到 46**（T2 取票通道那条新集成用例进了同一份文件），所以闭合判据写 `Tests 46 passed (46)` + `PY_RC=0`，不再写 43。
+- 🔴 同一趟**又被闸门挡了第二次**（这是这一格的第 2 次失败，不是产品红）：`python3 research/tools/verify-inbound-worker-identity.py --log /tmp/heyta-inbound-b104-rerun.log` ⇒ 一次性 PG 起来又收掉，测试腿之前被拒 ——
+
+  ```
+  内存闸门拒绝启动：立即可用 291MB < 这一档要求的 384MB（改这一维是 TFA_LIGHT_NEED_MB）
+  ```
+
+  两次读数（185MB / 291MB）都低于同一档 384MB，说明**此刻这台机器确实余量不足**，不是抖动；按"不动别人的 pid、不调低阈值"两条规矩，本线的处置是换下一项，这一格留给载体空出来之后。**已取到的那条 46/46 不能拿来充数**：它发生在这一节那两个变异臂**之前**（00:2x 读到 46/46 ⇒ 00:27 起臂 1 ⇒ 00:28 还原 + vitest 8 文件 83 条复跑为绿），所以"还原后的 Python 复跑"仍只有一次都没做成。还原是逐字节证过的（两处 `cmp -s` 都打 `RESTORED-IDENTICAL`，且 `git show HEAD:…entitlement-issuer.ts` 与工作树 `cmp` 一致 ⇒ `ISSUER==HEAD`），这一格的性质仍是"没有第二次证据"，不是"字节不明"。
 
 ## B105（2026-10-09 18:1x，本会话 · 顺手活登记，没有动手）：`docs/plans/inbound-automation.md` 里有一整节被复制了两遍
 
@@ -6964,3 +6972,78 @@ T1 的真库腿**已经取到读数**（`python3 research/tools/verify-inbound-w
 2. ⚠️ **判据口径要人拍**。这一格真正的产品问题不是"能不能删"，而是"**什么条件下算退役**"：按 `installationId` 最近一次票据活动时间？按绑定行过期时间？还是保留一个观察窗口？三种都会让这台实例的**时钟高水位丢失**，而高水位唯一的用途就是拦时钟回拨 —— 清掉等于把回拨防护清零。⚠️ 这是判据口径，按规矩不代拍。
 
 不受影响的三格照做：每 30 秒续票据、`waiting-entitlement` 展示、`X-Heyta-Entitlement-Ticket` 的供给方在 app-host 侧（都在本线地界内），本轮没轮到它们。
+
+## B107（2026-10-10 00:4x，本会话 · 入站自动收集 Goal T2）：`server` 的**测试文件不参与任何类型检查** —— 同类拼写错只有真跑那一条腿会抓到
+
+现量（配置本身）：`grep -n '"include"' -A1 server/tsconfig.json` ⇒
+
+```
+12:  "include": ["src/**/*", "scripts/**/*"]
+```
+
+也就是说 `server/tests/**` 里任何类型错都不进 `pnpm -r typecheck`，而 `npx tsc --noEmit` 的 rc=0 **不覆盖测试文件**。
+
+现场（本线自己踩的，两次同一类）：给 `server/tests/automation-entitlement-issuer.spec.ts` 加取票通道那批用例时，两处写了 `installationId`，而那枚作用域里它叫 `installation`。同一份工作树、同一分钟：
+
+| 命令 | 读数 |
+|---|---|
+| `cd server && npx tsc --noEmit` | **rc=0** |
+| `cd server && NO_COLOR=1 npx vitest run tests/automation-entitlement-issuer.spec.ts` | `ReferenceError: installationId is not defined` |
+
+**判"这类还有没有别的"用的底数**（不碰仓库配置，把 include 拓到临时文件里量）：
+
+```
+cat > /tmp/tsconfig.tests-probe.json   # extends 真 tsconfig，include 多加 "…/tests/**/*"
+cd server && NO_COLOR=1 npx tsc --noEmit -p /tmp/tsconfig.tests-probe.json
+```
+
+⇒ **224 条**（`grep -cE "error TS"`，rc=2），按目录：`tests/managed-proxy` 38、`tests/duplicate-operation-precheck` 33、`tests/integration` 19、`tests/holiday-admin-routes` 11、`tests/password-auth-routes` 9、`tests/admin-routes` 8、`tests/websocket` 7、`tests/email-locale-wire` 6、`tests/legal-recheck` 5、`tests/billing-webhook-settlement` 5，其余零散。
+
+**其中 4 条是本线的文件，本线已经修完**（`server/tests/` 在我地界内，且没动任何断言）：
+
+| 位置 | 原状 | 修法 |
+|---|---|---|
+| `tests/automation-entitlement-issuer.spec.ts:20` | 从 `entitlement-issuer` 导入 `type AutomationEntitlementKeyring` —— 那个类型只在 `entitlement-ticket` 导出，issuer 只是内部 import 不 re-export ⇒ 类型名根本不存在，运行时靠 esbuild 把纯类型导入抹掉才没炸 | 把这枚 `type` 挪进 `../src/automation/entitlement-ticket` 那枚 import 块 |
+| 同文件 `:86` | 替身库里 `const row = { ...data, createdAt }`（`data: Record<string, unknown>`）TS 推出来只剩 `{ createdAt: Date }`，下面 `row.userId` / `row.installationId` 两处读是类型错 | 显式标注 `Record<string, unknown> & { createdAt: Date }` |
+| `tests/integration/inbound-worker-identity.integration.spec.ts:469` | `JSON.parse(stored.payloadCiphertext)`，而 `payloadCiphertext` 是**可空列** ⇒ `string \| null` 传进 `JSON.parse(text: string)` | 在使用前钉一条 `if (typeof … !== 'string') throw`，让"队列入库但密文为空"响亮失败而不是拿 `null` 往下走 |
+
+复量：同一把尺下本线两枚文件的错数 **4 → 0**、全仓 **224 → 220**；`cd server && npx tsc --noEmit` 仍 rc=0；`NO_COLOR=1 npx vitest run tests/automation-entitlement-issuer.spec.ts tests/automation-entitlement-ticket.spec.ts` ⇒ `Test Files 2 passed (2) / Tests 37 passed (37)`（17 + 20，行为没变）。⚠️ 那枚集成文件改后**还没重跑真库腿**：这台机器的内存闸门在 00:3x–00:4x 连拒三次（291MB → 105MB < 384MB，见 B104），按规矩换下一项；那一格与 B104 同一把闭合命令。
+
+**为什么这一格不代拍**：把 `tests/**` 加进 `include` 不是一行配置的事 —— 它一次性点亮 **220 条别人那条线的红**，而 `pnpm check` 会因此整片失败。这是**全仓验收口径**，按"改判卷口径要人拍"登记，不由本线替别的线决定。
+
+两条候选修法（负责人拍其一）：
+1. 直接拓 include 并逐线清那 220 条（改动面最大，但一次之后测试文件就和 `src` 同等受检）。
+2. 另建 `server/tsconfig.test.json` + 一枚独立门禁（例如 `check:server-test-types`），**先只打印清单不判红**，按目录逐段收紧 —— 与本仓库既有的"登记册先对账、再收紧"的做法同形。本线建议这一条。
+
+📌 顺手量到的两条**工具形状**事实，写在这里是因为它们都会让"我以为跑了 11 个文件"变成"实际跑了 2 个"：
+
+- **vitest 对点名的不存在文件不报错**：`npx vitest run A.spec.ts B.spec.ts NOPE.spec.ts` 只跑前两枚并报 `Test Files 2 passed (2)`、rc=0。⇒ 点名枚数必须自己数一遍再和 `Test Files` 那行对（本线那条"八文件腿"的第一次尝试就栽在这里，实际读数当时只有 2 文件）。
+- **zsh 不对未加引号的变量做词分割**（这条是红的，不是假绿）：`FILES=$(ls …); npx vitest run $FILES` 把 11 行当成**一个**参数 ⇒ `No test files found, exiting with code 1`。要么直接写通配过滤，要么 `${(f)FILES}` / `print -l` 配 `xargs`。
+
+## B108（2026-10-10 00:4x，本会话 · 入站自动收集 Goal T2）：我自己落了两枚**空提交**，`--stat` 读回来才发现 —— 历史里有它们，内容在后续那两笔里
+
+现场：按点名字段组树那套 plumbing 配方我这次是**当轮重写**的（没有复用已经跑过四笔的那份），重写时函数注释写 `$3=message`，代码却取 `msg="$2"; shift 2` —— 于是 `shift` 把**路径参数也一并 shift 掉**，`for p in "$@"` 循环体一次都没执行。`read-tree HEAD` + `write-tree` 得到与父完全相同的树，`commit-tree` 照样成功、`update-ref` 照样快进、`git log` 里两笔**带完整信息的提交**赫然在列：
+
+```
+6d06bae4 docs(自动收集 T2 取票通道): …
+426d4eff test(自动收集 取票通道 判据): …
+```
+
+现量证明它们是空的（**这条命令是本格唯一的判据，别看 `git log --oneline`**）：
+
+```
+git rev-parse 313b0dc8^{tree} 426d4eff^{tree} 6d06bae4^{tree}
+# 三行逐字相同 = 2c2a3c26f6b37a4e0bd17e3851951223800bd94a
+git show --numstat --format='' 6d06bae4   # 空输出
+```
+
+**为什么这两枚是仓库里最坏的一种形状**：`--oneline` 里它们和真笔**完全一样**，信息写得越详细越像已完成。按"某条线已入库几笔"去数 `git log --oneline --grep='自动收集'` 的人会把我这条线读成"T2 的文档与判据已落"，而树里一个字都没有。这正是 §7 那条"一条永远通过的判据比没有判据更糟"在**提交流程**上的同一件事。
+
+处置与边界：
+
+- ✅ 真正的两笔已在 00:4x 之后重新落好（`git diff-tree -r --name-only` 逐笔数过枚数），内容以那两笔为准；本条只说明**历史上多两枚空笔**。
+- 🔴 **不把这两枚空笔从历史里抹掉**：并行会话已经把它们当父提交接着往上写了（`e76d6269` 的父就是 `6d06bae4`），drop/rebase 会连带改写别人那笔 —— 按"不改写已有人依赖的历史"，留着并在此登记。
+- ✅ 修的是**流程**：改用一份带三道闸的列交脚本（`/tmp/heyta-commit-named.sh`，本轮重写）——① 没有点名路径就拒绝；② 逐枚证"新树里那枚 blob == 工作树 blob"，对不上就拒绝；③ 统计"相对父真的变了几枚"，为 0 就拒绝移动 ref。
+  两臂反向验证都红过（`docs/plans/roadmap.md` 单枚点名 ⇒ `点名枚数=1 实际变动=0 / REFUSE`，rc=1；不带路径 ⇒ `REFUSE: 没有点名任何路径`，rc=1），且两臂之后 `git rev-parse HEAD` 逐字未动。
+  ⚠️ 那道"逐枚 blob 对账"的闸**没有独立的红臂**（要它红得先制造一次树与工作树不一致，本轮没造）——它是防"shift 类笔误"的第二道保险，不是已证能红的判据。
+- 📌 可迁移的规律：**写完的 plumbing 配方要复用，不要当轮重写**；而任何"提交成功"的判据必须是**枚数**（`diff-tree -r --name-only | wc -l`），不是退出码、不是 `--oneline` 里那一行。

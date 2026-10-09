@@ -452,3 +452,38 @@ Web 设置页已接入生成/轮换、一次性展示与复制、活动凭据元
 第一条臂的教训同样入档：本段的臂 2 第一次是**假臂**（改动把授权塞回原位，跑不跑都绿），当时又被本机测试内存闸门（`立即可用 266MB < 这一档要求的 384MB`）挡住而没暴露 —— 存活读数之前必须先确认「变异真的进了产物」，做法是 `sed -n` 把改动后的那几行打出来看一眼。
 
 T2 剩下未闭合的（不包装成完成）：宿主侧每 30 秒续票据与 `X-Heyta-Entitlement-Ticket` 的供给方（app-host 里还没有生产者）、`waiting-entitlement` 展示、`automation_entitlement_clocks` 的实例退役清扫（落点 `server/src/sync/cleanup.ts` **在本线白名单之外** ⇒ 只登记接线需求，不代改）。AC-1～AC-8 继续不勾选，公网接收与售卖继续关闭。
+
+### 2026-10-10 T2 续：逐次动作的取票通道（服务端这一半闭合，客户端仍欠）
+
+上一节末尾那句「app-host 里还没有生产者」当时是**整条链的实情**，也是一格真缺陷：闸门改成「这五个动作各要一枚自己的票据」之后，签发端只有 `session` 一条通道 —— 自托管实例取不到逐次票据，只能永久停在「等权益」。本节补的是**服务端那一半**。
+
+新增两件事，都不改判定内核：
+
+| 落点 | 内容 |
+|---|---|
+| `server/src/automation/entitlement-issuer.ts` | `signAutomationEntitlementActionTicket`：作用域取自判定核那份封闭词表 `AUTOMATION_ENTITLEMENT_SCOPES`，缺 id / 多 id / 串台三种写法各拒一次；`session` 明确**不走这条**（它是唯一能建/续绑定的动作，混用等于发一张 30 秒通用通行证）；三个绑定 claims 全部取自 `links` 行，请求体一个字不参与 |
+| `server/src/api.ts` | `POST /automation/entitlement/ticket`：需登录、`Cache-Control: no-store`、限流 60/分；请求体形状**逐字抄判定核**（`ruleId` 是 UUID、`eventId` 那条 128 上限的正则、`strict`）—— 形状宽一分，请求就能过路由再在 `claimsSchema.parse` 里抛 `ZodError`，把 403 变成 500 |
+
+🔴 **「这条票据归谁」判在哪一侧，是这一格里最容易写错的东西**：官方实例只回答「这个主体能不能在这个 `ruleId`/`eventId` 上做这一个动作」，**不校验该规则或事件是否真属于那个本地账号** —— 客户实例的库是端到端加密的，官方侧看不到也不该看。所以作用域归属由客户端在消费那一步判，本线在代码注释与协议文档里都写明了这条边界，避免后来者把它读成漏写。
+
+限流那个数不是拍的：worker 默认 30 s 一跳（`inbound-worker-loop.ts` 的 `intervalMs ?? 30_000`）⇒ 稳态 ≤ 2 跳/分，一跳最多 5 枚（领取、预留、发布、提交许可、草稿确认）⇒ 合法上限 10 枚/分，60 是 6 倍余量，同时把「无限制索取 Ed25519 签名」这条路堵掉。
+
+现量读数（还原两臂之后复跑，两条腿都是零 mock）：
+
+| 判据 | 读数 |
+|---|---|
+| `tests/automation-entitlement-issuer.spec.ts`（含本节新增 5 条） | **Tests 17 passed (17)**，rc=0 |
+| 本线八文件合跑（单元那一条腿） | **Test Files 8 passed (8) / Tests 83 passed (83)** |
+| `tests/integration/inbound-worker-identity.integration.spec.ts`（真库 + 真 HTTP，含本节新增 1 条） | **Tests 46 passed (46)**，`PY_RC=0`（`python3 research/tools/verify-inbound-worker-identity.py`，一次性库 `heyta_inbound`） |
+| `npx tsc --noEmit`（server） | rc=0 |
+
+反向验证两臂（都先 `sed -n` 证明变异进了产物，再从 `/tmp/entitlement-issuer.ts.mut-bak` 用 `cp` + `cmp` 还原，还原后逐字一致）：
+
+- **臂 1**｜摘掉 `input.action === 'session'` 那半个条件 ⇒ 「session 不许走取票通道」**恰好 1 红 / 16 绿**。
+- **臂 2**｜把 event 那一半作用域判成永远通过 ⇒ 「作用域与动作不符一律不签」**恰好 1 红 / 16 绿**。
+
+⚠️ **本节顺手暴露的一件仓库级事实（记进 `BLOCKED.md` **B107**，构建配置那一半不在本线修）**：`server/tsconfig.json` 第 12 行的 `include` 只有 `src/**/*` 与 `scripts/**/*`，**测试文件不参与任何类型检查** —— 本节的集成测试两次写出 `installationId` 简写引用（那个作用域里的常量叫 `installation`），`tsc` 全绿而只有真库腿报 `ReferenceError`。
+
+把尺拓到临时配置上量过一次（`extends` 真 tsconfig、include 多加 `tests/**/*`）：全仓 **224 条**类型错，其中**本线那两枚文件占 4 条，已经修完**（一枚不存在的类型名从 `entitlement-issuer` 改成从 `entitlement-ticket` 导入、替身库的 `row` 加了显式标注、集成测试里那枚可空列 `payloadCiphertext` 在使用前钉成字符串）⇒ 同一把尺下本线 4→0、全仓 224→220，`tsc --noEmit` 仍 rc=0，两文件单测腿 `Tests 37 passed (37)`。剩下那 200 多条是别人那条线的，**把 `tests/**` 正式纳入类型检查会让 `pnpm check` 一次亮 220 片红**，那是全仓判卷口径，不代拍 —— 两条候选修法与本线建议都在 B107。
+
+仍未闭合（不包装成完成）：app-host 侧的取票生产者与 `X-Heyta-Entitlement-Ticket` 逐次附着、每 30 秒续 `session`、`waiting-entitlement` 展示、`automation_entitlement_clocks` 的退役清扫（见 B106）。AC-1～AC-8 继续不勾选，公网接收与售卖继续关闭。
