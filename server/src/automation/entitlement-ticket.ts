@@ -13,37 +13,19 @@ const CLOCK_SKEW_SECONDS = 5;
 const REPLAY_RETENTION_MS = 5 * 60 * 1000;
 
 /**
- * 🔴 票据的**封闭动作词表**。`session` 是唯一能建立/续期短期绑定的动作；其余每一项
- * 都必须在它自己要保护的那次写事务里一次性消费。否则一枚票据就成了一张 30 秒通用
- * 通行证，与[协议 §4](../../../docs/reference/inbound-automation-protocol.md) 要求的
+ * 🔴 票据的**封闭动作词表与作用域档**只有一份，在 `@heyta/inbound-core`（签发侧与宿主侧
+ * 共用）；这里原样转出，服务端各调用点保持既有导入路径。`session` 是唯一能建立/续期短期
+ * 绑定的动作，其余每一项都必须在它自己要保护的那次写事务里一次性消费 —— 否则一枚票据就成了
+ * 一张 30 秒通用通行证，与[协议 §4](../../../docs/reference/inbound-automation-protocol.md) 要求的
  * "票据绑定 action、实例、账号、rule/event、nonce、版本和 expiry，最多 30 秒且一次使用"不符。
  */
-export const AUTOMATION_ENTITLEMENT_ACTIONS = [
-  'session',
-  'rule-enable',
-  'sender-credential-issue',
-  'worker-register',
-  'event-claim',
-  'ai-reserve',
-  'result-publish',
-  'commit-permit',
-  'draft-confirm',
-] as const;
+import {
+  AUTOMATION_ENTITLEMENT_ACTIONS,
+  automationEntitlementScopeMismatch,
+  type AutomationEntitlementAction,
+} from '@heyta/inbound-core';
 
-export type AutomationEntitlementAction = (typeof AUTOMATION_ENTITLEMENT_ACTIONS)[number];
-
-/** 每个动作要求的作用域。票据 claims 与实际操作必须逐字一致。 */
-export const AUTOMATION_ENTITLEMENT_SCOPES: Record<AutomationEntitlementAction, 'none' | 'rule' | 'event'> = {
-  session: 'none',
-  'rule-enable': 'rule',
-  'sender-credential-issue': 'rule',
-  'worker-register': 'none',
-  'event-claim': 'none',
-  'ai-reserve': 'event',
-  'result-publish': 'event',
-  'commit-permit': 'event',
-  'draft-confirm': 'event',
-};
+export { AUTOMATION_ENTITLEMENT_ACTIONS, AUTOMATION_ENTITLEMENT_SCOPES, type AutomationEntitlementAction } from '@heyta/inbound-core';
 
 const claimsSchema = z.object({
   version: z.literal(1),
@@ -64,14 +46,14 @@ const claimsSchema = z.object({
   if (value.expiresAt <= value.issuedAt || value.expiresAt - value.issuedAt > MAX_TICKET_SECONDS) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Ticket lifetime must be at most 30 seconds' });
   }
-  const scope = AUTOMATION_ENTITLEMENT_SCOPES[value.action];
-  if (scope === 'rule' && (value.ruleId === undefined || value.eventId !== undefined)) {
+  const mismatch = automationEntitlementScopeMismatch(value.action, value.ruleId, value.eventId);
+  if (mismatch === 'RULE_SCOPE_MISSING') {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Ticket scope must bind exactly the rule for this action' });
   }
-  if (scope === 'event' && (value.eventId === undefined || value.ruleId !== undefined)) {
+  if (mismatch === 'EVENT_SCOPE_MISSING') {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Ticket scope must bind exactly the event for this action' });
   }
-  if (scope === 'none' && (value.ruleId !== undefined || value.eventId !== undefined)) {
+  if (mismatch === 'SCOPE_NOT_ALLOWED') {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'This action must not carry a rule or event scope' });
   }
 });

@@ -15,6 +15,7 @@
  */
 import { FastifyReply, FastifyRequest } from 'fastify';
 import type { Prisma } from '@prisma/client';
+import { AUTOMATION_ENTITLEMENT_TICKET_HEADER } from '@heyta/inbound-core';
 import { loadConfigFromEnv } from './config';
 import { prisma } from './db';
 import { getAuthUser } from './middleware';
@@ -607,7 +608,7 @@ export interface EntitlementGuardOptions {
 export const readAutomationEntitlementTicketHeader = (rawHeaders: readonly string[]): string | undefined => {
   let found: string | undefined;
   for (let i = 0; i < rawHeaders.length; i += 2) {
-    if (rawHeaders[i].toLowerCase() !== 'x-heyta-entitlement-ticket') continue;
+    if (rawHeaders[i].toLowerCase() !== AUTOMATION_ENTITLEMENT_TICKET_HEADER) continue;
     if (found !== undefined) return undefined;
     found = rawHeaders[i + 1];
   }
