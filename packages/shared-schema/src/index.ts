@@ -179,6 +179,31 @@ export {
   accountAvatarUpdateSchema,
 } from './account-profile-contract';
 
+// 换绑登录邮箱（ADR-0063 §2.1–§2.4）与登录会话（§2.5）：路径 / 稳定码 / 时限 / 响应形状。
+// ⚠️ 与 `AUTH_PASSWORD_PATHS`、`ACCOUNT_PROFILE_PATHS` 同一档理由 —— **只放必须跨端逐字相同的东西**，
+// zod 请求体留在服务端（`auth-http-contract.ts` 文件头写了为什么不搬）。
+export {
+  EMAIL_CHANGE_PATHS,
+  EMAIL_CHANGE_ERROR_CODES,
+  EMAIL_CHANGE_TOKEN_TTL_MS,
+  EMAIL_CHANGE_RESEND_COOLDOWN_MS,
+} from './email-change-contract';
+export type {
+  EmailChangeErrorCode,
+  EmailChangeStatusResponse,
+  EmailChangeConfirmResponse,
+} from './email-change-contract';
+export {
+  SESSION_PATHS,
+  SESSION_ERROR_CODES,
+  sessionRevokePath,
+} from './session-contract';
+export type {
+  SessionErrorCode,
+  SessionSummary,
+  SessionListResponse,
+} from './session-contract';
+
 // Opaque E2EE key-package transport. Root keys and recovery codes never cross
 // this boundary; the service may persist only the wrapped package.
 export {
