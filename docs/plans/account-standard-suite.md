@@ -3866,6 +3866,9 @@ SMTP mock 只多一枚 `sendEmailChangedEmail`（在**本文件已有**的那份
 载体收尾：`git status --porcelain` 只剩那枚预期未提交的 spec，`.mut-bak*` 残留 0 枚。
 
 ⇒ **§6.73 那张表现在四格全 ✅**，这一层（真库 + 真 Fastify + 真 WebSocket）没有欠项了。
+**两枚集成套件同趟**（`email-change-and-sessions` + `session-revoke-websocket`，`--maxWorkers=1`）：
+`2 passed (2) / Tests 28 passed (28)` rc=0，`Duration 5.88s` —— 这一行才是 §6.73 那格
+`2 failed / 24 passed (26)` 那个分母今天的对应值（26 → 28 是本轮加的两条真 socket 用例）。
 本线仍然开着的格都不在这一层：iOS 设备腿与四端重装（等 `packages/ui` 那批入库）、
 法务「十封」联合提交、帮助中心两行、§5 第 18 条那一半（对外文案 + 判据口径，等负责人拍）。
 
