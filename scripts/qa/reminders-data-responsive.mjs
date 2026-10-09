@@ -14,6 +14,15 @@ import { chromium } from '../../e2e/node_modules/@playwright/test/index.mjs';
 const ORIGIN = process.env.HEYTA_RESPONSIVE_ORIGIN ?? 'http://127.0.0.1:4379';
 const ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const OUT = resolve(process.env.HEYTA_RESPONSIVE_EVIDENCE ?? `${ROOT}/apps/web/evidence/reminders-data-responsive`);
+
+// 真实的 `default` 通知态只存在于**有头** Chromium：无头下即便 `Browser.setPermission`
+// 也会被折成 `denied`（下面那条注释就是那次实测）。而有头=开一个会抢前台的窗口，
+// AGENTS §6.2 规定二不许在无人应窗的时候开。所以 `default` 这一档改成显式 opt-in：
+// 无头那一趟取四态，并把跳过的那一态如实写进 report，而不是假装五态齐。
+const HEADED = process.env.HEYTA_RESPONSIVE_HEADED !== '0';
+const reminderModes = HEADED
+  ? ['default', 'granted', 'denied', 'unsupported', 'error']
+  : ['granted', 'denied', 'unsupported', 'error'];
 const cases = [
   { theme: 'light', width: 390, height: 844 },
   { theme: 'dark', width: 390, height: 844 },
@@ -202,10 +211,10 @@ async function dataJourney(browser, spec) {
 
 // Headed Chromium is required for the real `default` notification state; headless
 // Chromium coerces notifications to `denied` even after Browser.setPermission.
-const browser = await chromium.launch({ headless: false });
+const browser = await chromium.launch({ headless: !HEADED });
 const reminders = [];
 for (const spec of cases) {
-  for (const mode of ['default', 'granted', 'denied', 'unsupported', 'error']) reminders.push(await captureReminder(browser, spec, mode));
+  for (const mode of reminderModes) reminders.push(await captureReminder(browser, spec, mode));
 }
 const data = [];
 for (const spec of cases) data.push(await dataJourney(browser, spec));
@@ -213,6 +222,14 @@ await browser.close();
 
 const report = {
   origin: ORIGIN,
+  carrier: {
+    headless: !HEADED,
+    reminderModes,
+    skippedReminderModes: HEADED ? [] : ['default'],
+    skipReason: HEADED
+      ? null
+      : '真实的 default 通知态在无头 Chromium 会被折成 denied，而无头是不抢前台的唯一一档（AGENTS §6.2 规定二）',
+  },
   cases,
   reminders,
   data,
@@ -222,6 +239,10 @@ const report = {
     dataFailurePreserved: data.every((x) => x.failurePreserved.summaryVisible && x.failurePreserved.refusalVisible && x.failurePreserved.panelVisible),
     existingDataRefusedWithoutLoss: data.every((x) => x.existingTaskStillVisible && x.refusedExisting.length > 0),
     cancelPreserved: data.every((x) => x.cancelPreserved),
+    // 漏跑一态/一个视口不会让上面任何一条变红（`.every` 对空集合是真），所以覆盖本身要单独钉。
+    everyCaseCoversEverySelectedMode: cases.every((spec) =>
+      reminderModes.every((mode) =>
+        reminders.some((x) => x.theme === spec.theme && x.width === spec.width && x.mode === mode))),
   },
 };
 await writeFile(`${OUT}/report.json`, `${JSON.stringify(report, null, 2)}\n`);
