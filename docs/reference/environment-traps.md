@@ -9177,3 +9177,48 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     关联：第 27 条（APK 里是旧 JS bundle —— 同维"产物 ≠ 源码"的产物侧）、第 57 条（这条曾经说 `check` 不跑单元测试，
     **那是真缺一步**，而这一条是**有这一步但它不判**；57 的"根本不跑"已过期，见那里的 ⚠️ 标注）、
     第 394 条（`git diff -- <file>` 对已 staged 的文件给空串）。
+
+399. 🔴 **按正则扫"源码里的 import"的判据，会把"别人写在字符串里的那句 import"扫成一条 import。**
+    这类误报不响、不报错，只把你送去**补一批根本不缺的文件**。
+
+    2026-10-09 22:0x 实测：新写的 `scripts/check-imports-resolve.mjs`（判"某一枚 ref 里每个相对 import
+    是否解析到同一枚 ref 里存在的文件"）第一版在 HEAD 上报 **12 条**"测试文件 import 了没入库的主体"。
+    逐条去读到的是：
+
+    ```ts
+    expect(source).not.toContain("from './account/email-change'");   // server/tests/email-change-page.spec.ts:82
+    expect(EMAIL).toContain("from '../auth/session'");               // apps/mobile/tests/account-security-wiring.spec.ts:213
+    ```
+
+    ——**一条都不是语句**。它们是**源码文本型判据**：测试读自己的源码、断言里面有没有某一行。
+    尺的 `SPEC_RE` 只认 `from '…'` 这个**形状**，认不出**语境**；而这类 needle 偏偏就是把 import
+    当字符串写下来的，外层 `"…"` 里嵌 `'…'` 恒命中。
+    12 条里 12 条是这个形状 ⇒ 修完 HEAD 报 **0 条测试**（复取：
+    `node scripts/check-imports-resolve.mjs --tree HEAD`）。
+
+    这个面在本仓库不是角落（现量，两条都要自己跑，别抄数）：
+
+    ```bash
+    grep -rl "readFileSync" --include="*.spec.ts" --include="*.spec.tsx" --include="*.test.ts" server/tests apps packages | wc -l
+    grep -rlE "toContain\\(\"(import|export|from) " --include="*.spec.ts" --include="*.spec.tsx" --include="*.test.ts" --include="*.mjs" . | grep -v node_modules | wc -l
+    ```
+
+    22:4x 读数 **147** 与 **40**：也就是说任何一把"扫源码形状"的尺（分层、依赖方向、i18n、门禁自检）
+    都随时可能踩到同一个坑，而踩到的表现是**报出一堆看起来很像真问题的东西**。
+
+    ✅ 修法（尺本身，不在调用方补 `if`）：命中处到行首之间**未转义引号的个数为奇数** ⇒ 落在字符串字面量里 ⇒ 不算 import。
+    🔴 但这个修法自己会造**第二种病 —— 漏报**：行尾注释里一个撇号（`import x from './y'; // it's real`）
+    会让配对判据把真 import 误吞。⇒ 同时把行尾 `//` 剥掉（只剥前面不邻 `:` 的那处，`https://` 不动），
+    并且**两向各钉一臂**：臂"判据字符串"期望绿、臂"真 import + 撇号注释"与"真 import + URL 注释"期望仍红。
+    只钉前者的话，这条修的是假红，换来的是一条**永远通不过不了也没人知道的假绿**。
+
+    📌 三条一般规律：
+    1. **"扫源码形状"的判据必须两类臂都有**：不该算的形状（判据字符串、fixture、快照）期望绿；
+       该算但上下文脏的（注释 / URL / 撇号 / 模板串）期望红。一头钉死只会把尺换成另一头钝的。
+    2. **误报真正的代价不是噪音，是引导**：我这趟若照那 12 条动手，就会给已经存在的 spec 补已经存在的文件，
+       而每一次"修"都让台账离真实现场更远（与 §7 元规则 1「先怀疑探针」同一条，面目是**探针报了真的、假的东西**）。
+    3. **新写的尺，第一批读数要逐条点开看原文**，不能只数条数。12 条假红里只要点开一条就能全部否证 ——
+       我省下那一次点开，代价是把假读数写进了台账（另一条会话随后要照着它找不存在的缺口）。
+
+    关联：第 **398** 条（同一天、同一枚尺的另一半：那条讲"门禁跑在错的树上"，本条讲"门禁认错了语句"）、
+    第 46 条（没复现 ≠ 路径没执行）、第 50 条（"状态对"在"没生效"时也绿）、第 397 条（工具自报的成功行是它自己的断言）。
