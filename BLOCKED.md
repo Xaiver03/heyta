@@ -7390,3 +7390,42 @@ T8 给 AC-7 收证时撞出来的，且它正好是任务书说的那种「坏�
 
 本线的取舍：**继续用现装置 + 把窗口压在两枚文件的臂数降到最低**（本轮 6 真臂 + 1 静止臂），并把这一格登记在这里。
 不代别的线改，也不擅自 `git add` 别人正在写的那份。
+
+## B125（2026-10-10 04:3x，本会话 · 这笔提交落完当场撞上的）：plumbing 提交会把**共享索引**甩在 HEAD 后面，而刷索引这一步自己会造出一个暂存删除
+
+`git commit-tree` + `git update-ref` 只动 `refs/heads/main`，**不动索引**。别的会话之前没有 staged 内容
+（现量：提交前 `git diff --cached --name-only | wc -l` = 0），所以 HEAD 一移动，索引里那 10 枚路径就变成
+"索引 ≠ HEAD"——`git status` 里显示成 `MM`。**后果不是难看，是会被静默回退**：任何一条线随后
+`git add server/src/entitlement.ts` + commit，写入索引的是**旧 blob**，那一笔就把我这笔的该文件整个撤掉，
+而它自己的 diff 看起来完全正常。
+
+刷回 HEAD 时踩到第二枚：`git update-index --cacheinfo 100644,<blob>,<path>` 对**新文件**（索引里还没有这条路径）
+会报 `missing --add option?` 并 `fatal` 退出，而**同一批里已经刷成功的路径已经写进去了**。本轮就是这样留下
+两枚 `D`（暂存删除）——那如果别人这时提交，会把我新写的装置与 spec **删掉**。补 `--add` 之后
+`git diff --cached --name-only | wc -l` = 0 才算收平。
+
+⇒ 可迁移的形状：**"我提交完了"和"共享索引与 HEAD 一致"是两件事**；plumbing 路线必须在收尾时逐路径把索引刷成
+HEAD，且**新路径必须带 `--add`**，刷完要用"`git diff --cached` 为空"来验收，不能只看 `git show --stat`。
+落点：这是仓库级流程，不是本线的代码。建议把它写进 `docs/reference/environment-traps.md`（§7 那一族，与 #88
+"plumbing 半个文件的索引尾巴"同族）并考虑把 B117 那枚"切片提交工具"补上这一步 —— 两份文件都在白名单外，
+**登记等负责人给地界**，本线不动别人的文档账本。
+
+## B126（2026-10-10 04:3x，本会话 · 在隔离副本上验提交态时量出的）：干净 HEAD 上 `server` 有 2 枚类型红，红因全在白名单外
+
+现量方法（可复跑）：`git worktree add --detach <临时目录> <提交>` + 软链 `node_modules` 与 `server/node_modules`，
+在该目录里 `npx --no-install tsc -p tsconfig.json --noEmit`，再退回**父提交**跑同一根尺对表：
+
+| 树 | 结果 |
+|---|---|
+| 本笔提交 `eaa6d5be` | 2 条错：`src/automation/ai-metering.ts:116,85`（`SqlRunner` 缺 `transaction`）、`src/email.ts:314,60`（期望 2 参给了 3） |
+| 父提交 `008f67a9` | **同样 2 条**，同两处（行号是 98 与 314 —— 差的那 18 行正是本笔新增的注释与用例） |
+| 主检出工作树 | `TSC_RC=0` |
+
+⇒ 结论：这 2 条**不是本笔带进去的**（父子同错），也不是本线能修的：工作树之所以绿，是因为**别人未提交的那半**
+在这里 —— `server/src/ai/metering.ts` 把三处 `readonly sql?: SqlExecutor` 改成了 `SqlRunner`（现量：
+`grep -n "readonly sql?" server/src/ai/metering.ts` 工作树 = `SqlRunner`，`git show HEAD:` 同一行 = `SqlExecutor`），
+`server/src/email.ts` 的调用点同理。**两枚文件都在本线白名单外**（`server/src/ai/`、`server/src/email.ts`），
+所以本线只登记不代改（AGENTS §8 第 8 条：别线的红由它的所有者提交）。
+⚠️ 这一格与 B112 是同一族的**新增一发**：B112 那四处缝在 app-host，这两处在 server。
+⇒ 对完成条件第 1 条的影响要如实说：**T7 那条"`pnpm check` 在隔离副本 exit 0"今天仍不可能**，
+且挡住它的除 B112 之外还多了这两条。等那两条线各自提交，这把尺才可能绿。

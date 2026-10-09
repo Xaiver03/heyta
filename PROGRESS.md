@@ -2327,3 +2327,18 @@ AC-1 继续不勾选（这一格只补了六枚拒绝里的一枚）。AC 现量
 ⚠️ 本线 `api.ts` 的未提交 hunk 与并行那条线（注册 OTP / locale 重构）混在同一份文件里，本轮只带我三处
 （两条 import + 那一格 catch），其余仍留在工作树不动 —— 逐文件现量：`git diff HEAD -- server/src/api.ts` 在提交后
 应只剩他们那些 hunk。
+
+### 04:3x 补三格（同一项的收尾读数，不另起一节）
+
+1. **提交态在隔离副本上验过**：`git worktree add --detach` 到 `eaa6d5be` + 软链 `node_modules`，
+   跑那三份 spec → `Test Files 3 passed (3)` / `Tests 24 passed (24)` / **RC=0**（17+3+4）。
+   这一步是必要的：工作树那份 `api.ts` 叠着别人未提交的 hunk，"工作树绿"不证明"提交里那份字节绿"。
+2. **但同一份隔离副本上 `server` 的 tsc 有 2 枚红**，退回父提交重量**同样 2 枚**（只是行号差 18）⇒
+   不是本笔带的；红因是别人未提交的 `server/src/ai/metering.ts` 与 `server/src/email.ts`（白名单外）⇒ 登记 **B126**，
+   它同时把"T7 三条命令在隔离副本 exit 0"这件事又推远一格（除 B112 外新增这两条）。
+3. **plumbing 提交的收尾坑**（登记 **B125**）：`update-ref` 不动共享索引，HEAD 一移动，那 10 枚路径在索引里
+   就成了"落后于 HEAD"的暂存态；而 `git update-index --cacheinfo` 刷**新路径**时不带 `--add` 会 fatal，
+   本轮就是这样先留下两枚 `D`（别人若此时提交会**删掉**我的新装置与 spec）。补 `--add` 后
+   `git diff --cached --name-only | wc -l` = 0 才算收平，最终只剩 ` M server/src/api.ts`（那是别人的 hunk）。
+4. 逐笔范围对账：`python3 research/tools/verify-inbound-commit-scope.py` → `本线笔数=38 涉及路径=50 越界=0`，**RC=0**。
+AC 现量：**未勾 8 / 已勾 0**。
