@@ -2993,6 +2993,49 @@ pnpm --filter '@heyta/app-host...' build; echo $?                               
 而是**那条映射分支整条没跑到**——`instanceof` 右侧 undefined、模块双实例、桩少了成员，三种成因在输出上长得一样，
 而三种里只有"产品真的漏了映射"那一种该记进台账。
 
+### 6.59 `pnpm -r build` 在**纯 main tip** 上就是红的：`packages/ui` 的 barrel 已入库、它导出的那 11 枚来源没入库（本线两趟运行时腿真正等的是这一格，10-10 02:25 现量）
+
+§6.57 把两趟运行时腿的等待条件写成"别人一整片在飞实现"。这一轮把那片量成了两个数，
+并且**结论比"在飞"更硬**：那 11 枚还没入库，而引用它们的 `packages/ui/src/index.ts` **已经在 main 上了**。
+
+载体：`.worktrees/iosacct`，`git checkout --force` 到当时的 `refs/heads/main`，`git status --porcelain` 空，
+Prisma 客户端已生成（§6.58 那一格修好之后）——所以这两条读数不再混着载体的账。
+
+- `pnpm -r build` ⇒ rc=1，第一枚红的是 `@heyta/ui`（`tsup`：esbuild 阶段 `Could not resolve` + dts 阶段一批 TS 错）。
+- `pnpm --filter '@heyta/mobile...' build` ⇒ 同样 rc=1（`apps/mobile` 的 `@heyta/*` 依赖清单里有 `@heyta/ui`）。
+  ⇒ **iOS 设备腿与 web 运行时腿不是等负载、也不是等模拟器窗口，是等这一格**：从干净检出打不出当前源码的产物。
+
+两类缺口逐枚列（每条都带现量命令，别抄这里的数）：
+
+| 类 | 内容 | 现量 |
+|---|---|---|
+| A **实现文件从未入库**（工作树 `??`） | `packages/ui` 下 `empty-state/StateIllustration.tsx`、`habits/HabitArtwork.tsx`、`habits/HabitMetricIcon.tsx`、`auth/PasswordStrength.tsx`、`auth/LegalDocumentSheet.tsx`、`ai/AssistantMark.tsx`、`ai/AiGeneratedLabel.tsx`（另有它们各自依赖的 `empty-state/artwork.ts`、`auth/password-strength-model.ts`、生成物 `habits/habit-artwork.generated.json`） | `git cat-file -e HEAD:<路径>` 失败而 `test -e <路径>` 成立；`git log --diff-filter=A -- <路径>`（**不带 `--all`**）为空 = 本历史从没新增过它 |
+| B **成员只在工作树版里**（文件是入库的，那一行是 `M`） | `calendar/model.ts` 的 `calendarTaskSpan` / `groupTasksByCalendarDate` / `CalendarTaskSpan`、`theme.tsx` 的 `useHeytaUiLocale`、`ai/AiDisclosure.tsx` 的 `AI_DISCLOSURE_FIELD_GROUPS` | `git grep -c <符号> HEAD -- <文件>` 为空 + `grep -c <符号> <文件>` ≥1 + `git status --porcelain -- <文件>` 报 `M` |
+
+⚠️ 取"从未入库"这句话的时候别用 `--all`：本线自己就留过三笔**验证用的候选提交**
+（`74d39be4`、`845e81c9`、`f1edde47`，标题都写着"不进 main"），带上 `--all` 会把它们读成"入库过 5 次"。
+判"在不在 main"用**当前分支历史**，判"在不在这一棵提交树"用 `git cat-file -e HEAD:<路径>`。
+
+**归属**：把那些 `export` 行带进 main 的是 `e6058120`（标题写作 `docs(产品体验线 台账 §UX-S9-153)`，
+而它改 `packages/ui/src/index.ts` **+57/−15** —— 一笔"台账"标题的提交里带着共享层的 barrel）。
+`git merge-base --is-ancestor e6058120 refs/heads/main` = 是。
+⇒ **归 产品体验线**（它的落点与那份台账都在 `docs/plans/product-ux-optimization.md` 那条线），本线不代改：
+那 11 枚来源在别人工作树里正被写，删 `index.ts` 那些行会让他们的界面整片消失，
+补提交它们又等于替别人决定入库时机 —— 两半都不是本线的资产。
+
+🔴 **一条比"我的腿被挡住"更要紧的读数，交给负责人**：`pnpm check` 的第**二**步就是 `pnpm build`
+（`check → check:gate-wiring && build && …`），而**主检出里这一道现在是绿的**——绿的原因是工作树里躺着那 11 枚未入库文件。
+也就是说"门禁全绿"目前**依赖没进仓库的代码**：干净检出（CI 的唯一形态，也是任何一台新机器）会在第 2 步就红，
+AGENTS §6.1.1 那套 `pnpm reinstall:all` 固定收尾在干净检出上同样走不通。
+仓里**没有任何一道门禁**在守这一格：`scripts/check-imports-resolve.mjs` 存在，但它**不在 `pnpm check` 链里**
+（现量：`python3 -c "import json;print([k for k,v in json.load(open('package.json'))['scripts'].items() if 'imports-resolve' in v])"` = `[]`）。
+⇒ 这一格要补的判据形状与 §6.55 那条"写了没人挂"完全同型：**一道能红的构建输入对账**（把 `index.ts` 引用的
+每一枚 `./x.js` 与 HEAD 的文件清单对账），而不是再多一份说明。要不要现在立这道门属于**判据口径**，归负责人拍。
+
+可迁移的形状：**"共享层的 `index.ts` 提交了、实现文件没提交"这一型，任何按文件看的静态门禁都看不见**——
+每枚文件单独看都合法，只有"引用必须解析到已提交对象"这一条能抓住它。这与 §6.55（路由写了没挂）、
+§6.50（面板写了没 mount）是同一族的第三种面目：前两种是"写了没人消费"，这一种是"**消费的东西不在仓库里**"。
+
 
 
 
