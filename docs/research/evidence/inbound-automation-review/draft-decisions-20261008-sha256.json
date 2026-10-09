@@ -2,13 +2,22 @@
   "scope": "Stage only: encrypted draft backend and shared transport; no complete AC acceptance.",
   "postgresEvidence": "26 passed before final CAS/read-expiry adjustments; subsequent runs refused by memory guard. Latest sweep race test unexecuted.",
   "sha256": {
-    "packages/shared-schema/src/inbound-draft-contract.ts": "22239fd3ed3144e78b2db2a9b5eb7877fa18ac11303de2e05456eb1cc99bdff2",
+    "packages/shared-schema/src/inbound-draft-contract.ts": "93f03c68ee34bbfa4d678cd60cb56838e523f203407a4aff140d278d6b175ac9",
     "packages/shared-schema/src/index.ts": "e95babcadbb33b4dfc135d478b0ebd5d54c96084b09b9e77c6215b04ee674662",
     "server/src/automation/events.ts": "85c1d1b07944ec149c03744cc368cae49d1ca0be8b310816262cdc069f6e5091",
     "server/src/api.ts": "7a63b5e3cdde9645c6b1580ff246c5b38aa85687ee76bb8c906e35c89f26a5cd",
     "packages/app-host/src/inbound-rules-remote.ts": "f6a634bbeafb2d3db647cbe2ad4c7e2e82bc3e88ce3cafcbed51f6a4174eb17a",
     "server/tests/automation-drafts.spec.ts": "bdb4e3fc5b6571fea648bb67834146d2b3ef55dba7085f088fac501878b34d61",
     "packages/app-host/tests/inbound-rules-remote.spec.ts": "88ff687efe4a202119f728b38226447401320029658add08d885e0c8934c5d14",
-    "server/tests/integration/inbound-worker-identity.integration.spec.ts": "5563c51c4c2138aed068e0cc31d4307277521599536318d6e20aadc8eaba2319"
-  }
+    "server/tests/integration/inbound-worker-identity.integration.spec.ts": "5563c51c4c2138aed068e0cc31d4307277521599536318d6e20aadc8eaba2319",
+    "packages/app-host/src/inbound-draft-review.ts": "4cdfa2dab9634a5d2db0deb9fc348eb5fb6b5e97a87e89771c6f006be212578b",
+    "packages/app-host/src/vault-session.ts": "a771634ee05ddab2d18201605e6938e7f9508ca98bd13517457b933fc45e0017",
+    "packages/app-host/tests/inbound-draft-review.spec.ts": "3d8578504f41aa1e2b6860150506cf5774c80c9439ac6d628cf1bba8cbb45eab",
+    "packages/app-host/tests/vault-session.spec.ts": "8f44973e1d7dc0fd7b4ccbbf93cd2245e16bc89e0b7ad8a53a84685ecf03e7e6",
+    "packages/inbound-core/src/parser.ts": "698705443bc4d2a537dcd110c11e2efe70c4c251508053147808f0e12cef7b99",
+    "packages/inbound-core/tests/parser.spec.ts": "b731557beafb6138d5a684689fc4a2f89cbb733755b9546311bf86d7c9e86d7a",
+    "apps/web/src/features/settings/InboundAutomationSettings.tsx": "3f22732e03e32d9027d3fb6f3fe7e8666567e509208c65851bcd26899ccf31fe",
+    "apps/web/tests/inbound-draft-review.spec.tsx": "62402c62dcdb07a9764d7f4ceb62346c31803ff585af602d34bab26ec477b965"
+  },
+  "clientEvidence": "draft-review-client-20261008-tests.txt: app-host 43, inbound-core 29, Web 7 passed; shared-schema tsc and app-host/Web tsc passed."
 }

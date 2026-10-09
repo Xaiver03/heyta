@@ -1,0 +1,45 @@
+
+ RUN  v5.0.1 /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/app-host
+
+
+ Test Files  6 passed (6)
+      Tests  43 passed (43)
+   Start at  19:41:24
+   Duration  5.22s (transform 71%, import 18%, tests 11%, worker 1%)
+
+  Transform  transforming modules took 7.90s · 71% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
+
+ RUN  v5.0.1 /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/inbound-core
+
+
+ Test Files  2 passed (2)
+      Tests  29 passed (29)
+   Start at  19:41:30
+   Duration  2.17s (transform 46%, tests 32%, import 22%)
+
+
+ RUN  v5.0.1 /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web
+
+
+ Test Files  3 passed (3)
+      Tests  7 passed (7)
+   Start at  19:41:33
+   Duration  4.61s (transform 43%, environment 38%, import 13%, tests 4%, setup 2%)
+
+  Transform  transforming modules took 5.41s · 43% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
+Stage evidence only; does not close AC-1..AC-8.
+
+app-host $ ./node_modules/.bin/vitest run tests/inbound-draft-review.spec.ts tests/inbound-rules-remote.spec.ts tests/inbound-process.spec.ts tests/inbound-runner.spec.ts tests/vault-session.spec.ts tests/inbound-worker-loop.spec.ts
+exit_code=0
+
+inbound-core $ ./node_modules/.bin/vitest run tests/parser.spec.ts tests/envelope.spec.ts
+exit_code=0
+
+web $ ./node_modules/.bin/vitest run tests/inbound-draft-review.spec.tsx tests/inbound-event-retry.spec.tsx tests/inbound-worker-lifecycle.spec.tsx
+exit_code=0

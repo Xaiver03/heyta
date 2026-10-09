@@ -1,0 +1,34 @@
+{
+  "recordedAt": "2026-10-09T11:36:00+08:00",
+  "head": "60be821277edb8371fcf9e109bbb01fb77c5e685",
+  "scope": "P1-3 权益判定定案：部署模式二选一、封闭 action 词表的一次性票据、账号锁后数据库时钟、实例时钟高水位、订阅行 FOR SHARE；一次性 loopback PostgreSQL 14.18 + 真 HTTP；共享脏工作树，不是最终隔离基线的全仓验收",
+  "command": "python3 research/tools/verify-inbound-worker-identity.py --pg-bin /opt/homebrew/opt/postgresql@14/bin --log /tmp/heyta-inbound-selfhost-20261009-final.log",
+  "passed": 38,
+  "database": "Disposable loopback PostgreSQL 14.18; actual migration SQL + Fastify HTTP; not Linux deployment-script validation",
+  "mutationArms": [
+    "锁后新鲜度判定",
+    "票据 action/作用域逐字匹配",
+    "只有 session 写绑定",
+    "未配置模式必须拒绝",
+    "自托管不看本机订阅",
+    "实例时钟回拨停止授权",
+    "nonce 一次性消费",
+    "FOR SHARE 订阅行锁（真库）"
+  ],
+  "files": {
+    "server/src/automation/entitlement-ticket.ts": "702517a8e367e99f19693ada822609f32d283ef0b94bf4fde42818b2341256db",
+    "server/src/entitlement.ts": "3f29ebd67a3eb2bebf842fe6b621b9ede30d6f5439e2d363439f484720af3c97",
+    "server/src/automation/events.ts": "a6365edb457f292419415c86ea578cc16486ec67699d0b900a6cbeb2ed6339b1",
+    "server/src/automation/worker-identity.ts": "dfa9f49f1bc0a992e896cecb319ee3cd9a4cf33570d6817ea0b818b62eb08022",
+    "server/src/automation/inbound.routes.ts": "eab09e201702466f2fae47c86c4d0d907e98aed6531f2f8330b7fb3d6de2b75f",
+    "server/src/api.ts": "ec1ae8ec6e567aa970559d8d407be20fa1df951b60a7e62d7b11fe16c3c1ea41",
+    "server/prisma/schema.prisma": "bd9d0f1c404025793f4a56d1fe2af4f9bcd88e5658055d44f208f3f454db8139",
+    "server/prisma/migrations/20261018170000_harden_automation_entitlement_ticket_scope/migration.sql": "5c54cdede99b7d224639db38f5c652d1cc37e21724b824b0df7d5ed4ea2c2d50",
+    "server/tests/automation-entitlement-ticket.spec.ts": "8344eb8e790c214cfa196e1ec1633b0c848ec89a30f706fe42fe15b4041dcb9b",
+    "server/tests/integration/inbound-worker-identity.integration.spec.ts": "7b13e91ccbf24084d37142619fbca717ba2d1dc2f9abffb7ede365a8178f04fa",
+    "docs/reference/inbound-automation-protocol.md": "545d64d1a185fffa15ef98ee28b8c87048c7cd86f67d1b7db25f0968718b1841",
+    "docs/plans/inbound-automation.md": "0713b6316760aa157f22698e8dd4eb3cfc44d24f7bb366e18c45ca2765ebe30e"
+  },
+  "transcriptSha256": "ed9a04c2161271150270641c12e6447847e990dbc9c370491a6e9455b90be3cf",
+  "secretScan": "clean; redacted 0 64-hex and 0 long-token matches before write"
+}

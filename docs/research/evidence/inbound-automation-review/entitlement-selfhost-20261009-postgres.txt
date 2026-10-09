@@ -1,0 +1,10 @@
+✓ tests/integration/inbound-worker-identity.integration.spec.ts (38 tests) 6107ms
+✓ discovers frozen results only for the durable owner and never returns confirmation drafts  304ms
+✓ accepts a signed webhook into an encrypted event and exposes only opaque status  313ms
+✓ fences model reservations and sends by current rule, attempt and retention  404ms
+✓ reserves concurrent local retries once and freezes their billing source  320ms
+✓ requires reconciliation instead of buying another attempt after a sent lease expires  349ms
+Test Files  1 passed (1)
+Tests  38 passed (38)
+2026-10-09 11:33:12.508 CST [26646] ERROR:  duplicate key value violates unique constraint "automation_entitlement_ticket_uses_pkey"
+2026-10-09 11:33:12.552 CST [26672] ERROR:  duplicate key value violates unique constraint "automation_entitlement_ticket_uses_pkey"
