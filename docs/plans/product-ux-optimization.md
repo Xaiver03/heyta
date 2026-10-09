@@ -1081,7 +1081,10 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
 🔴 **这一格仍未取到的读数，不记作通过**：
 - [ ] **Android 整条 Profile/Settings 旅程本轮没跑成，三趟都死于载体**：① dump 拿到安卓桌面（判据已补，见上）；② `am force-stop` 超 25 s 超时（旋钮已补）；③ 设备上的 `com.heyta` 被并行会话**卸载**，随后包管理服务不可用 —— `adb install -r` 两次报 `cmd: Can't find service: package`，而 `pm list packages | grep heyta` 为空。设备面判据**一条都没取到**，这是环境结论，不是产品缺陷。⚠️ **09 13:1x 现量：载体已经退到更早的一格 —— 模拟器本身没了**：`adb devices` 返回空列表（`emulator-5554` not found），所以那一趟连 `pm` 都问不到，不是包管理服务坏了没恢复。取现量：`adb devices`；`ls -l apps/mobile/android/app/build/outputs/apk/release/app-release.apk`（当前这份是 09 01:52 打的）。起模拟器要吃 3.6G+ 常驻与近满 CPU，按 AGENTS §6.1 那条新规 Android **构建**已改走 `windows-pc`，但**设备侧验收仍在这台 Mac** ⇒ 这一趟要负责人给一个明确窗口，不是我该擅自起的。
 - [ ] **共享设备证据**：同一台 `emulator-5554` 上 11:00:26 与 11:12:54 两次 `pm_clear_app_data_caller`（uid 1000 = adb）；同时在跑的还有另一条线的 `scripts/verify-mobile-account-email-sessions.sh` 与 Playwright `tests/ai-assistant.spec.ts`。整机 1 分钟负载在 **73 ↔ 622** 之间震荡（阈值 12），内存 62G/63G 占满。按 AGENTS §8.9，这一段要的是**独占窗口**，不是重试。
-- [ ] **`pnpm --filter @heyta/web typecheck` rc=2，红点不在本线**：13 条 `error TS` 全部落在 `apps/web/tests/share-key-store.spec.ts`（`git status` 为 `A`、从未提交、mock 的 `Storage` 缺 `length/clear/key`），本线三个文件零错误。该文件属另一条在册的线，**不代改**。取现量：`grep -cE 'error TS' <该命令日志>`。
+- [x] ✅ **`pnpm --filter @heyta/web typecheck` rc=2，红点不在本线**：13 条 `error TS` 全部落在 `apps/web/tests/share-key-store.spec.ts`（`git status` 为 `A`、从未提交、mock 的 `Storage` 缺 `length/clear/key`），本线三个文件零错误。该文件属另一条在册的线，**不代改**。取现量：`grep -cE 'error TS' <该命令日志>`。
+    ⇒ **这一格作为待办已被下面 08:5x 那格的复量取代**（那枚测试文件此刻已在 HEAD 里，"从未提交"那句不再成立），
+    活着的债与它的分文件计数记在那一格。13:4x 复量：红一条没少、`git show HEAD:e2e/tests/helpers.ts | grep -c selectSettingsSection` = **0**
+    ⇒ 打勾说的是"本格不再是一个独立待办"，**不是**"typecheck 已经干净"。
 - [ ] 🔴 **同一格复量：红点从"未提交的测试文件"变成了"已提交但打不干净的测试文件"，条数还多了 3 条**（2026-10-09 08:57 现跑，`NO_COLOR=1 pnpm --filter @heyta/web typecheck` ⇒ **rc=2**，起跑 `load1=25.74`、收尾 `24.96`）。拆开看落在两枚文件、两类成因：① `apps/web/tests/share-key-store.spec.ts` **13 条**（`grep -E 'error TS' | sed -E 's/\(.*//' | sort | uniq -c` 取的分文件计数）—— **这一枚现在已经提交进 HEAD 了**（`git cat-file -e HEAD:apps/web/tests/share-key-store.spec.ts` 成立、`git status --porcelain -- 该文件` 为空），而被它测的那枚生产模块也干净（`apps/web/src/features/share/share-key-store.ts` 状态为空）⇒ 上一句"从未提交、属另一条线在写的文件"已经过期，现在它钉的是**仓库门禁本身**：`pnpm check` 的 typecheck 那一步谁跑都红。② `apps/web/tests/app-mount.spec.tsx` **新增 3 条** `TS2532: Object is possibly 'undefined'`（第 796/801/803 行），该文件是 ` M`（另一条线正在改）。⇒ 成因与本线无关，而且**当场查明本线不代改的形状有两种，都不是"顺手"**：那 13 条里 12 条是 mock 的 `Storage` 缺 `length/clear/key`（生产侧只读 `getItem`/`setItem`，`grep -E '\.length|\.key\(|\.clear\(' 在那枚模块里命中的三处全是 `Uint8Array`/字符串的 `.length`，⇒ **补那三个成员对被测代码是行为中性的**，这条判断是给属主线省一次查证，不是本线动手的理由）；但剩下的 `TS2532`（`store.entries[0].keyEpoch`，第 56 行）要改的是**他们那条断言的写法**，按既有纪律「判据口径永不代改」停手。⚠️ 证据强度写清楚：这句成立靠的是"涉事两枚文件都干净"，**不是**"在只含 HEAD 的检出上单独复现过"——`tsc` 还会吃到 `apps/web` 里那 131 枚 ` M` 与 workspace 其他包，而 HEAD 现在也打不出包（上面那两格红的）。取现量：`NO_COLOR=1 pnpm --filter @heyta/web typecheck`（红条计数必须先 `NO_COLOR=1`，见 §7 第 163 条那一族）。
 - [x] **真壳（Windows 安装态 WebView2）里那段面板的实际读数早就取过，而且就在上一批**：[`apps/web/evidence/desktop-widget-help/windows/windows-widget-help.json`](../../apps/web/evidence/desktop-widget-help/windows/windows-widget-help.json) 与 [`apps/web/evidence/ux-round4/windows-help/windows-widget-help.json`](../../apps/web/evidence/ux-round4/windows-help/windows-widget-help.json)（`2026-10-08` 两趟，`browser: Edg/154.0.4258.62`、页面 `https://heyta.local/index.html`）逐字记录 `statusText=正在原生桌面应用中运行`、`installStepCount=0`、`capabilityText` 非空、`backend=shell`，同一趟里帮助外链另有 Windows UIA 地址栏证据（点击前后 + 新增标签）。上一行那句"真壳内的读数仍未取"**是错的，已改掉**；上面那张 `native-shell-storage-host-off.png` 证的仍然只是页侧分类与文案，不是这两趟。
 - [ ] **但这两趟没有走到本轮改的那条分支**：包里 `backend=shell` 说明存储宿主端口是开着的，旧判据（只看端口）在端口开着时同样判 native ⇒ 它证的是"默认配置下真壳画面对"，**不证**"逃生门 `HEYTA_SHELL_STORAGE=0` 关掉后也认得壳"。要让真壳那一趟能证到后者，得先有四端重装后的新包，而本轮按指令不动重装。装置侧先把这一格变成可测的：[`scripts/qa/windows-installed-widget-help.mjs`](../../scripts/qa/windows-installed-widget-help.mjs) 现在除了 `backend` 还单独记录并断言 `isNativeShellHost()` 实际读的三条信号（`storagePort` / `webview2Host` / `shellMessageHandlers`），下次真壳跑会留下壳**注入了什么**的读数，而不只是"页面说自己是壳"。取现量：`node --check scripts/qa/windows-installed-widget-help.mjs` 通过后 `HEYTA_WIN_CDP=http://127.0.0.1:9287 node scripts/qa/windows-installed-widget-help.mjs`（先按 `docs/plans/desktop-storage-host-handoff.md` 那两行起壳 + 建隧道）。
@@ -1089,7 +1092,7 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
 - [x] **macOS 那一趟本轮真跑过，死于载体而不是产品**：装的 `/Applications/Heyta.app/Contents/MacOS/HeytaMac` 进程在跑（`lstart` 现量 10-08 16:19），但 AX 回读 `count of windows` = **0** —— macOS 关掉最后一个窗口后进程照样活着，探针对着空窗口列表什么也读不到。辅助功能权限这一格是先通过的（`System Events` 能列出可见进程），所以排除权限原因。
 - [x] **装置里那条"探针坏会伪装成产品没做"的形状已修掉**：原先这种失败会一路走到 15 秒超时，只留下一行 `RESULT=UNVERIFIED`，把"载体没有窗口"、"WebView 不暴露 DOM"、"权限没给"三种原因压成同一行输出。现在 `macos-installed-widget-help.sh` 先做一次**有界窗口数回读**（拿不到数字或为 0 都响亮退 4 并写出原因），并把 AppleScript 的 error 文本原样印成 `AX_ERROR=`。现量：改后跑同一台在跑但没窗口的壳，**0.2 秒**报出 `REASON=HeytaMac 在跑但一个窗口都没有（count of windows = 0）`。取现量：`bash scripts/qa/macos-installed-widget-help.sh`。
 - [ ] **这一格闭合要的是屏幕上有窗口**，两条路都要人点头，本轮按"不动用户屏幕"的口径都没做：① 负责人自己点开 Heyta 窗口后跑一次；② 由我带 `HEYTA_NO_FOCUS=1` 起一个后台窗口跑完再关 —— 但那条会**点用户 app 里的控件**并在默认浏览器开一个 docs 标签页，属于用户可见的副作用，不是我能无人值守替他做的。
-- [ ] **查出一条同类边界，但按产品裁决**不**改**：Electron 过渡壳（`apps/desktop`）里那段面板同样会走浏览器分支 —— 它的 preload 经 `contextBridge` 注入的是 `window.heytaDesktop`（`DESKTOP_BRIDGE_KEY`），而 `isNativeShellHost()` 只认存储端口 / `chrome.webview` / `heyta*` handler 三条，所以 Electron 窗口里会对着一个已经装好的桌面应用教"怎么把 heyta 装成应用"。现量：`grep -n "DESKTOP_BRIDGE_KEY" apps/desktop/src/preload.ts`。不改的理由是这个壳按 AGENTS §2 的定位是**待退役的自动化门禁载体、不是交付端**，为它加第四条信号等于给过渡壳续一段产品语义；判据边界已写进 `widget-install.ts` 的注释，产品负责人若要交付 Electron 形态，加一条 `desktopBridge` 信号 + 一条单测即可。
+- [x] ✅ **查出一条同类边界，但按产品裁决**不**改**：Electron 过渡壳（`apps/desktop`）里那段面板同样会走浏览器分支 —— 它的 preload 经 `contextBridge` 注入的是 `window.heytaDesktop`（`DESKTOP_BRIDGE_KEY`），而 `isNativeShellHost()` 只认存储端口 / `chrome.webview` / `heyta*` handler 三条，所以 Electron 窗口里会对着一个已经装好的桌面应用教"怎么把 heyta 装成应用"。现量：`grep -n "DESKTOP_BRIDGE_KEY" apps/desktop/src/preload.ts`。不改的理由是这个壳按 AGENTS §2 的定位是**待退役的自动化门禁载体、不是交付端**，为它加第四条信号等于给过渡壳续一段产品语义；判据边界已写进 `widget-install.ts` 的注释，产品负责人若要交付 Electron 形态，加一条 `desktopBridge` 信号 + 一条单测即可。
 - [x] **提醒「五态」那一格查出的是设计冲突，不是漏跑**：[`scripts/qa/reminders-data-responsive.mjs`](../../scripts/qa/reminders-data-responsive.mjs) 一直写死 `headless: false`，理由写在它自己的注释里 —— 真实 `default` 通知态在无头 Chromium 会被折成 `denied`（即使先 `Browser.setPermission`）。而无头恰恰是 AGENTS §6.2 规定二（不得抢前台）唯一允许的档 ⇒ **谁跑这条脚本谁就得开一个会抢走输入的窗口**，所以它从来没有自动消费者：`grep -rn "reminders-data-responsive" scripts/check-journey-coverage.mjs package.json` 命中 0 处，仓库里的 `report.json` 是 10-08 手动那一趟的产物。本轮把载体改成显式旋钮 `HEYTA_RESPONSIVE_HEADED=0`：无头那一趟取 **四态**，并把跳过的大一态如实写进 `report.json` 的 `carrier.skippedReminderModes`，而不是让五档 `.every` 假装齐了；另补一条**分母对账**（`everyCaseCoversEverySelectedMode`）—— 原先漏跑某一态或某个视口时 `.every` 对空集合判真，一条都不会红。取现量：`node --check scripts/qa/reminders-data-responsive.mjs`。⚠️ 新加的 `everyCaseCoversEverySelectedMode` **还没做过变异验证**（要整套取证跑完才看得见它红），按 AGENTS §8 记作**待验证**，不读成"有牙"。
 - [x] ✅ **这一格的两条理由当天各有了新状态，读法换成下面那格**（原句留在文末，别按它行动）。理由①「载体不是冻结源码」**已消**：这一趟跑的是只含已提交内容、`git status --porcelain` 为空的隔离副本 `b081811c`。理由②「负载」**形状变了但没有消失**：途中现量到过 `load1=36.94`，可这次拿到的是 **21 条唯一用例、42 个红标记、0 条 flaky** 的分布—— 每条首跑与 retry 双红不是负载抖动会长的形状（抖动是一红一绿）。⇒ 这一格从"整族读数不可用"改成"读数可用，但红集需要按结构成因逐族归因"，明细见下面那格。
     - 原句（留形）：**整族 `pnpm check:ai-e2e` 这一趟只能当"失败清单"，不能当验收读数 —— 两个独立理由，缺一条都会误读它**：① **载体不是冻结源码**：起跑时主检出上有 **731 条未提交改动 + 42 条别人已暂存**（`git diff --name-only | wc -l`；其中 `apps/web` 274 条、`e2e/tests` 23 条），本线自己的文件全干净（逐条 `git status --porcelain -- <那五枚>` 空）。所以它测的是**别的会话此刻正在写的树**，红的可能是别人半改的界面，绿的也可能是 —— 按 AGENTS §8.9，这种全量验收要固定到隔离副本并记基线与哈希。② **负载**：跑法是先等负载再跑（起跑门槛 `load1<120`，实测 `WAIT_DONE load1=102.33`），途中 1 分钟负载在 **511 ↔ 15** 之间摆（逐分钟轨迹 `/tmp/ux-e2e-load-trace.log`），越靠后越干净，但同一趟里两种载体都存在。到第 214 条为止的去重读数：**20 枚 spec 有红**，其中 **5 枚 spec 文件自己就在未提交集合里**（`ai-breakdown`、`calendar-sidebar`、`categories`、`detail-pane-habit`、`detail-pane-task` ⇒ 那条线正在改它），另 15 枚 spec 文件干净、但被测面（`apps/web`）在被改。取现量：`grep -c '^  ✘' /tmp/ux-e2e-family.log`、`git diff --name-only -- e2e/tests | wc -l`。
@@ -1287,6 +1290,51 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
     这枚门从这一笔起把它们**逐趟报出来**（以前是静默 ✅）。闭合判据现成：改完之后那行 ⚠️ 自己消失，
     或该线主动把它的 `CJK_GROUP_FLOOR` 抬上去（抬基线要连着改脚本，这是刻意的成本）。
 
-- [ ] **磁盘那条"隔离副本装不下"是我自己写的假阻塞，现量已否证**（2026-10-09 07:4x）：我一度准备登记「只剩 14Gi 而 node_modules 要 1.5–2G ⇒ 建不了隔离检出」。真读数：`df -h /System/Volumes/Data` ⇒ **可用 13Gi / 99% 满**（⚠️ 别拿 `df -h /` 判余量，那颗是只读系统快照卷，它报的 17Gi 是快照自己的占用）；`du -sh node_modules` = **2.8G**、`du -sh e2e/node_modules` = 18M、`du -sh .git` = 884M。⇒ 13Gi 装得下 2.8G，**磁盘不是拦路的那一格**。（这一格原先还写着"省空间可以把 node_modules 用 `cp -al` 硬链进副本"——**那句当天就被上面那格否证了**，硬链的载体装的是"工具会自作主张改写的那批文件"，别照它做。）
+- [x] ✅ **磁盘那条"隔离副本装不下"是我自己写的假阻塞，现量已否证**（2026-10-09 07:4x）：我一度准备登记「只剩 14Gi 而 node_modules 要 1.5–2G ⇒ 建不了隔离检出」。真读数：`df -h /System/Volumes/Data` ⇒ **可用 13Gi / 99% 满**（⚠️ 别拿 `df -h /` 判余量，那颗是只读系统快照卷，它报的 17Gi 是快照自己的占用）；`du -sh node_modules` = **2.8G**、`du -sh e2e/node_modules` = 18M、`du -sh .git` = 884M。⇒ 13Gi 装得下 2.8G，**磁盘不是拦路的那一格**。（这一格原先还写着"省空间可以把 node_modules 用 `cp -al` 硬链进副本"——**那句当天就被上面那格否证了**，硬链的载体装的是"工具会自作主张改写的那批文件"，别照它做。）
   🔴 **"e2e 前置会打死别人的 dev server"那一格也已经不是理由了**，读的是本体不是印象：`scripts/check-ai-e2e-preflight.mjs` 从 2026-10-05 起**收窄过** —— 它只杀 `belongsToThisRepo(pid)` 成立的在场进程（args 或 cwd 落在这棵树里），拿不到归属证据的一律记进 `foreign` 并**退 2 拒绝起跑**，文件里明写着"不要在这里加 `--force`：那等于把这条判断又关掉"。现量端口：4318 / 4319 **无人监听**，`5173` 挂着另一枚会话的 vite（pid 36917，不是本线的，不动），`4379` 是本线自己起的那颗（pid 59513）。
   ⇒ 所以真正剩下的拦路只有一格，而且不是磁盘：**现有那枚 Codex 载体 `/Users/rocalight/.codex/worktrees/ux-final-verification/heyta`（detached `dc027328`）里有 211 枚未提交文件**，是别人正在写的东西，不能拿来当隔离副本。闭合动作（属于 §8.9 的共享资源独占验收，不是一趟顺手能做完的）：新建一棵 `git worktree` 钉到现读 `main` 的 tip、基线与复制文件的哈希入册、node_modules 走 `cp -al`、**只在 4318/4319 现量为空的那一刻起**，跑前跑后各取一次端口归属；退出码 2 要当成"没跑成"独立一档，不许折进"这一族没红"。
+  ✅ **13:4x 收口：那一格闭合动作今天整条做完了，而且两处偏离原句都要记**（不是"照它做成了"，是"照它做 + 两处必须改"）：
+  ① **钉不到 `main` 的 tip** —— 现量 HEAD `056fa5f8` 仍装不上也打不出包（`pnpm install --frozen-lockfile` 红在 `apps/web` 的 lockfile 里有 `zxcvbn` 而 `package.json` 没有；`pnpm -r build` 红在四枚 `??` 的 shared-schema 模块），
+  所以载体钉的是**最近一棵能装能建的已提交树 `b081811c`**，两趟读数都带"哪一棵树"的限定（这正是上面那格"设备腿读数要带限定"的同一条纪律）。
+  ② **`cp -al` 那一省法已被上面那格否证**，载体走的是真 `pnpm install` + 真 `pnpm -r build`。
+  做完的两趟：整族 `check:ai-e2e`（52.6 分钟，21 条失败逐条带错误类型，见上面那格）与那六枚未入库用例（`17 failed / 0 passed`，见 `six-untracked-specs-run.md`）。
+  端口与负载都是**起跑那一刻**现取（4318/4319 各 0 监听、`PREFLIGHT_RC=0`、load1 11.31 < 阈值 12），跑完载体 `git status --porcelain | wc -l` = **0** 且 `HEAD` 仍是 `b081811c`。
+
+- [x] ✅ **本轮逐项收口：台账里剩下的每一条"没打勾"都说清了它卡在谁那里**（2026-10-09 13:4x）。
+    **先给一把不会漂的尺**（本格故意不写条数）：`grep -n '^- \[ \]' docs/plans/product-ux-optimization.md`，
+    分母自检 `grep -c '^- \[' <这份文件>`。**收口判据是覆盖，不是条数**：下面三桶按身份点名，
+    任何一条未打勾的落在三桶之外就是这格没做完（本线交这一格时逐条对过，见每桶末尾点到的那几枚）。
+    同一格只进一桶。
+
+    **桶一 · 负责人明确暂停的那一类（设备 / 其它端 / 四端重装），本线不推进也不当已完成**：
+    原生系统小组件那一族八格（Android 重打 APK 后四组件明暗复验、macOS Gallery 真点、iOS 其余模板与实体 iPhone、
+    Windows 原生 Provider 接线与系统 Widgets host、跨进程崩溃恢复的新包、Apple 共享 Keychain group、
+    清理后小组件不展示旧任务、最终冻结源码四端重建重装与上传）+ UX-S9-141/142/143/144 各那格"最终安装产物实测"（四格）
+    + UX-S9-147/148 的 Mac 本机安装/解锁与生产邮件收取（两格）+ UX-S9-152 那格"完整四端交互矩阵"
+    + Android 那两格（整条 Profile/Settings 旅程、共享设备被清空那两次）与"下一趟的固定顺序"那格
+    + Windows 真壳那格（要的是四端重装后的新包）+ macOS 壳那格 + "闭合要的是屏幕上有窗口"那格（按"不动用户屏幕"的口径都没做）。
+    🔴 **这一桶里今天前进了一格的只有一件**：`profile-settings-android.py` 的中英同义定位**静态半边已由门验过**（56 处 `T()` 全对得上同一个键），
+    欠的只剩那趟旅程本身 —— 见上面防作弊那一格。
+
+    **桶二 · 卡在别的线（本线不代改代码、不代改判据口径）**：
+    `pnpm --filter @heyta/web typecheck` 那 16 条（13:4x 复量：一条没少，红在那两枚测试文件，其中一枚已在 HEAD 里）；
+    `check:layering` 那处 `SHARE_KEY`（13:4x 复量 **rc=1 仍在**，红的那处仍是密文 AAD 不是 op）；
+    两枚全局 sweep 用例与「主段最多 5 个」的收纳漂移；`e2e/tests/helpers.ts` 缺 `selectSettingsSection`
+    （13:4x 复量 `git show HEAD:e2e/tests/helpers.ts | grep -c selectSettingsSection` = **0**，仍在）；
+    帮助面那一批（`HelpPanel.tsx` + 两份词条 + 那张 spec 要同一方落）；提醒状态那半（13:4x 现量：
+    `ReminderNotifyPanel.tsx` / `notify.ts` / `store.ts` / `lib/oplog.ts` **四枚仍 ` M`**，`dispatchChecked` 仍不在 HEAD）；
+    `check:docs` 那一处死链（13:4x 复量：**从 6 处降到 1 处**，本线那 5 处随本笔提交消失，剩下唯一一处仍是
+    `apps/desktop-windows/README.md:89` → 那枚未跟踪的 `.ps1`）；HEAD 装不上/打不出包那三格；三条单语定位欠项
+    （13:4x 现量 **21 / 3 / 10 条一条没少**：`tasks-ux-android.py` 21、`tasks-ux-ios.py` 3、`ai-assistant-atomic-android.py` 10，
+    门现在逐趟 ⚠️ 报出来而不是静默 ✅）。
+
+    **桶三 · 要负责人拍板，本线不代答**：法务那两格（协议正式审阅与生效批准，本轮只改措辞与排版，草案没标成已生效）；
+    归属违规那格的甲/乙（本线默认取**甲**：保留现状、由协作线在后续提交里说明归属；乙要改写本地历史，只在明说之后做）；
+    以及"整族跑验收会就地改写已入库截图"那一格 —— 它登记的事实与阳性对照已齐，
+    **卡住的是"证据该不该由运行自动覆盖"这个判据口径**（三个候选修法都动它），不是没人会改。
+
+    **本桶之外，本轮已收口的**（打勾的 110 余格里含今天这批）：同步与隐私、数据管理、提醒五态、个人资料/账号/AI/帮助
+    四面在**当前源码**上的深浅主题与交互回归已全部取过浏览器读数并入库；原生壳小组件安装说明的**环境识别**已闭合；
+    那六枚未入库用例的**为什么不能只提交用例**已用一趟真跑证清并改写了闭合条件。
+    🔴 **仍然开着的最大一格不是本线的**：目标要求的"从最终源码四端构建重装"整条没做（按指令暂停），
+    而它的前提是 HEAD 先能装能建 —— 那一格在桶二，卡在别人那四枚 `??` 模块与那枚 lockfile/清单不一致上。
