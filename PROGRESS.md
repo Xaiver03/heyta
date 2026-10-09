@@ -2074,3 +2074,58 @@ AC 现量（同轮）：`grep -c '^- \[ \] \*\*AC-' docs/plans/inbound-automatio
 `grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` = **0** —— 一条都没勾，公网接收与售卖继续关闭。
 下一格：T2 剩余里唯一不受 B109/B112 挡的那半 —— 每 30 秒续 `session` 票据（`waiting-entitlement` 展示被 B110 的词条地界挡着，
 clocks 退役清扫被 B106 挡着）。
+
+## 2026-10-10 02:4x · T2 那半格：`session` 心跳的消费者（机制与判据入库，消费者仍是零个）
+
+上一节末尾指的"下一格"就是这一格，它做完的部分只依赖 `packages/app-host/` 自己，不受 B109/B110/B112 挡。
+
+**量出来的形状还是"零件都在、没人接"**：`verifyAutomationEntitlementTicket` 有实现有测试而**一个消费者都没有**，
+服务端 `/api/automation/entitlement/session` 在 app-host 侧**连客户端函数都不存在**。绑定行的寿命等于票据寿命，
+票据窗口 ≤30 秒 ⇒ 宿主不续期，一次收信之后最多 30 秒公网接收就**静默**变成"这台实例没有权益"。
+新文件 `packages/app-host/src/inbound-session-keepalive.ts`（236 行）补的就是那一条心跳。
+
+三条不是"看起来对"的判定：
+
+1. **排期从服务端答复推，不拍墙上时钟**：下一次 = `expiresAt - 剩余寿命/3`（夹 ≥1 秒防热循环）。
+   用比例而不是毫秒数，因为它说出含义——一个窗口里最多还容得下两次失败续期；退避档位同样从寿命推
+   （`寿命 × 2^(连败-1)`，上限 `30 × 寿命`，上限只为"签发器不可达时别热循环"存在，不是对外承诺的数字）。
+2. **三族失败各有归宿**：`waiting-entitlement` 与 `retrying` 都**继续退避重试**（订阅到账后用户不必重开应用）；
+   签发侧说"这个请求本身不对"（作用域不符/绑定冲突/寿命越界）判 `error` 并**不再排下一次** ——
+   把 bug 说成订阅问题是说谎，对着签发器猛敲是二次伤害。
+3. **票据正文只在那一次往返里活着**：状态对象里没有 `ticket`、没有 `localAccountUuid`，只有稳定码；
+   新增的 `AutomationEntitlementVerifyError` 只带稳定码，**不回显响应里的自由文本 `error`**。
+
+| 项 | 现量读数 |
+|---|---|
+| `packages/app-host` `npx --no-install tsc --noEmit -p tsconfig.spec.json` | **rc=0，0 条错** |
+| `vitest run tests/inbound-session-keepalive.spec.ts tests/inbound-entitlement-remote.spec.ts` | `Test Files 2 passed (2)` / `Tests 14 passed (14)`，跳过 0 |
+| 本线 inbound 全族（`ls tests/inbound-*.spec.ts \| xargs vitest run`） | `Test Files 13 passed (13)` / `Tests 103 passed (103)` —— 上一轮同尺 12/91 ⇒ 净 +1 文件/+12 条，没有一条变少 |
+| `npx tsup`（app-host 产物） | rc=0 |
+| 四臂反向验证 | A 排期改固定 20s ⇒ 1 红；B 去单飞 ⇒ 1 红；C `retrying` 判成 `error` ⇒ 1 红；D 票据塞进状态 ⇒ 2 红 |
+| 还原 | 源码哈希 `7678c7cc5a028ab1` 与改前逐字相同，复跑 `Tests 12 passed (12)`；`.mut-bak` 已删，共享工作树没留变异 |
+| 入库 | `de18b73002f72f34c99df94a3b5fec63058ae6fc`，`点名枚数=4 实际变动=4`，`4 files changed, 491 insertions(+), 4 deletions(-)`；提交后 `git read-tree HEAD`，`staged_after=0` |
+
+🔴 **A 臂是这四臂里最有价值的一条**：它证明"排期由服务端答复推导"不是注释而是判据。写死的常数恰好在 30s 窗口下等于 20_000，
+所以只给一个窗口的那条用例挡不住它 —— 用例**同时**给了 30s 与 12s 两个窗口（20_000 与 8_000），一个数字守不住两条。
+
+**切片账（共享检出里的第二次手工切片，登记 B117）**：`packages/app-host/src/index.ts` 相对 HEAD 只有 1 处差异
+（替换第 902 行那枚 export，+7/−1），而工作树里另有 **13 处不属于本笔的未提交差异**（B112 那四处接缝正被别人写），
+一行都没被带走。判据用 `difflib` 的真实 opcode（`len(ops)==1` + base 切片逐字等于旧行 + 新切片逐字等于我给的行），
+第一次那版用"行集合差"数新增行数：`export {` 在文件里别处也存在 ⇒ 把 7 行数成 6，断言当场失败 —— 已换成 opcode 判定。
+
+仍然不包装成完成：
+1. **`startAutomationSessionKeepalive` 已导出、已进 HEAD，但没有一处在宿主里 start 它** ⇒ 消费者数量现量是 0。
+   前置就是 B109（签发方 URL 从哪来 + 绑定握手的调用方在哪），登记 **B116**。
+2. `waiting-entitlement` 的界面文案等 B110（`packages/i18n` 地界）；`automation_entitlement_clocks` 的退役清扫等 B106。
+3. 这一格没有真机/真宿主读数 —— 心跳的两跳打到真服务端要等 B109 落地后由 T3 那套双真 SQLite 宿主一起取。
+
+AC 现量（同轮）：`grep -c '^- \[ \] \*\*AC-' docs/plans/inbound-automation.md` = **8**、
+`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` = **0**。
+下一格：T6 对外说明。**起手就量到一条改变任务形状的事实**（登记 B118）：任务书那句"新写一枚 ADR 限定取代 ADR-0017/0020"
+已经被 [ADR-0060](docs/adr/0060-automation-entitlement-and-retention.md) 占着 —— 它 §2 逐字就是"本决定仅针对自动收集，
+限定取代 ADR-0017 与 ADR-0020 中'自托管的所有功能都不校验付费资格'的适用范围"，状态是**已接受（2026-10-07 负责人裁决）**，
+而计划 §W0 那句"商业限定见 ADR-0060"早就链着它 ⇒ 再写一枚同号不同文的 ADR 是制造两套裁决，`docs/adr/` 也在白名单外。
+⇒ T6 能在白名单内做的只剩 `docs/reference/` 那两份（协议 + 定价事实源）；
+"中英条款、帮助"两半的落点在 `packages/legal/src/documents/` 与词条/帮助页，全在白名单外，
+而 `pnpm check` 里那六枚 `check:legal-*` + `check:ai-quota` 会把生成物与真源逐字对账 —— 只改 `docs/reference/` 那一层
+会不会把某把尺改红，要在动笔前现量，不能猜。

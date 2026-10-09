@@ -7201,3 +7201,61 @@ C) 先不接消费者，等 T6 的对外措辞定了一起做。**推荐 A**（�
 同样地，这 6 条红本线不顺手修 —— 它们属于另一条线，且改断言就是改判卷口径。
 ⇒ **要有人收**：`pnpm --filter @heyta/server test` 在合流之前不会自己绿，T7 那条 `pnpm -r test` 会撞上它。
 谁的地界：`validation.service` 与 `sync-compressed-body.routes` 的属主。
+
+## B116（2026-10-10 02:4x，本会话 · T2 心跳入库后）：`startAutomationSessionKeepalive` 已进 HEAD，但**消费者数量现量是 0**
+
+`packages/app-host/src/inbound-session-keepalive.ts`（`de18b730`）把"每 30 秒续 `session`"这半落完了：
+取票、消费、排期、退避、单飞、世代作废、三族失败处置，加上 12 条判据与四臂反向验证。
+但**没有任何一处在宿主里 start 它** —— 白名单内的候选落点都要求先有那两个输入：
+
+| 缺的输入 | 为什么本线不能自己补 |
+|---|---|
+| 签发方 URL 从哪来 | 就是 **B109** 那三条候选修法（内置常量 / 服务端下发 / 用户手填），它连着一次新的出境 ⇒ 判据口径，不代拍 |
+| 绑定握手的调用方（激活码兑换） | 兑换要在**宿主**里发起，宿主接线在 `apps/web` 与 `apps/mobile` 的地界；本线白名单里那三枚 web 文件正被 B112 那四处接缝牵着，现在 start 会让 HEAD 更红 |
+
+⇒ 现状是**机制与判据已在 HEAD、运行时一次都不会跑**，公网接收那条绑定行仍然只能靠测试写。
+这一格不进 T8 的"已闭合"清单，读法与 B109 绑定：B109 拍定之后，接 consumer 是本线能做的（白名单内），
+不需要新裁决。**要负责人做的只有一件事**：拍 B109 的 A/B/C。
+
+## B117（2026-10-10 02:4x，本会话 · 切片配方第二次手工做）：共享检出里"只带我那一枚 export"该收成仓库工具
+
+本线已经在同一枚 `packages/app-host/src/index.ts` 上**两次**手工切片（第一次 `verify-inbound-host-options-slice.py`，
+第二次 `de18b730` 用一次性脚本），而 AGENTS.md §3.5 那条"抽取的收尾动作是删掉旧的那份并加门禁"说明这个形状会长期存在。
+配方本身已经踩出三条必须钉住的点，第二次仍然要靠人记：
+
+1. 判"只动了一处"要用 `difflib` 的**真实 opcode**（`len(ops)==1` + base 切片逐字等于旧行 + 新切片逐字等于给定的行）。
+   第一次那版用"行集合差"数新增行数：`export {` 在文件里别处也存在 ⇒ 把 7 行数成 6，断言当场失败。
+2. 切片对象必须相对 **HEAD** 而不是相对工作树；工作树里那些不属于本笔的差异（上一轮实测 13 处）要**打印处数、只作信息、不作判据**。
+3. 落盘后必须 `git read-tree HEAD` 复位共享索引，并读回 `staged_after=0`。
+
+**要有人收**：把它做成 `research/tools/commit-slice.mjs`（或同名 `.py`），入参 `--base-ref --path --old-line --new-lines`，
+自报臂数并带 `--self-test`（照 `verify-inbound-host-options-slice.py` 那枚三臂拒绝的形状）。
+归属：本线 Goal 白名单里只有 `research/tools/verify-inbound-*.py` 这个命名段，新工具名不在其中 ⇒ 要么扩白名单，
+要么由仓库治理那条线收。**本线不代拍**，第三次出现前不再做第三次手工切片。
+
+## B118（2026-10-10 02:4x，本会话 · T6 起手现量）：任务书那句"新写一枚 ADR"已被 ADR-0060 占着，而 T6 剩下的落点大半在白名单外
+
+现量（`head -40 docs/adr/0060-automation-entitlement-and-retention.md`）：
+状态**已接受（2026-10-07 负责人裁决；功能尚未开放）**，其 §2 逐字就是任务书要的那句话 ——
+"本决定仅针对自动收集，限定取代 [ADR-0017] 与 [ADR-0020] 中'自托管的所有功能都不校验付费资格'的适用范围"；
+而计划 §W0（本文件第 115 行那格）早就写着"商业限定见 ADR-0060"。⇒ 再写一枚同号或近号的 ADR 是**制造两套裁决**，
+且 `docs/adr/` 整目录不在本线白名单里。所以 T6 的第一半不是"要写"，是"已存在、本线只需按它核对下游文案"。
+
+剩下的两半落在哪里，逐枚现量：
+
+| T6 要同步的对外面 | 真身文件 | 白名单？ |
+|---|---|---|
+| 定价事实源 | `docs/reference/pricing-and-entitlements.md` | ✅ 在 |
+| 协议说明 | `docs/reference/inbound-automation-protocol.md` | ✅ 在 |
+| 中英条款 | `packages/legal/src/documents/*` | ❌ 不在 |
+| 帮助中心 / 界面文案 | `packages/i18n`（任务书明令不许动）与 web 帮助页 | ❌ 不在 |
+
+⚠️ 真正的风险不是"改不到"，是**只改能改的那两份会把尺改红或把口径改成分叉**：
+`pnpm check` 里有 `check:pricing`、`check:ai-quota`、`check:legal-copy`、`check:legal-tools`、
+`check:legal-closure-truth`、`check:legal-gdpr`、`check:server-legal`、`check:egress-wording`
+（⚠️ **这张名单不许当封闭集合用** —— 到 T6 动笔那天要从 `check` 链现量重取：
+`node -e "console.log(require('./package.json').scripts.check.split(' && ').filter(s=>/legal|pricing|quota|wording|language|docs/.test(s)).join('\n'))"`。
+本条只列名字、不列条数，因为条数会随别人往链里加尺而漂）。它们把"生成物 ↔ 真源 ↔ 对外承诺"绑成一体。
+⇒ 本线在动笔前先跑一次"只改 `docs/reference/` 那两份，然后逐枚复跑上面现量重取的那批尺"的现量，
+把结果（谁红、红在哪句）写进 PROGRESS；如果有哪把尺只能靠改白名单外的文件才能平，
+那 T6 就从"本线能做"变成"要负责人给的接缝"，届时补记本条的后半。**现在不预设它一定绿，也不预设它一定红。**
