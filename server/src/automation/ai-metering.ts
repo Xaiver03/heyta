@@ -28,7 +28,7 @@ export interface AutomationAiReservationAuth {
 
 export interface ReservedAutomationAiAttempt extends AutomationAiAttemptKey {
   periodAnchor: number | null;
-  billingSource: 'direct' | 'managed';
+  billingSource: 'local' | 'direct' | 'managed';
   state: AutomationAiAttemptState;
 }
 
@@ -52,7 +52,7 @@ export async function reserveAutomationAiAttempt(
   limit?: number,
   sql?: SqlExecutor,
   auth?: AutomationAiReservationAuth,
-  billingSource: 'direct' | 'managed' = 'direct',
+  billingSource: 'local' | 'direct' | 'managed' = 'direct',
 ): Promise<ReservedAutomationAiAttempt> {
   assertKey(key);
   const executor = sql ?? createPrismaSqlExecutor(prisma);
@@ -90,9 +90,9 @@ export async function reserveAutomationAiAttempt(
         billingSource, state: row.state as AutomationAiAttemptState };
     }
 
-    // The current inbound router calls user-configured endpoints directly.
-    // It must not consume the managed counter; that counter belongs to the
-    // managed proxy's physical request. Preserve an event attempt either way.
+    // Only a physical managed-cloud request consumes the hosted counter. Local
+    // and BYO endpoint calls still get a durable attempt row so retries and
+    // unknown outcomes remain auditable without charging the hosted quota.
     let periodAnchor: number | null = null;
     if (billingSource === 'managed') {
       const quota = await consumeManagedAiRequest({ userId: key.userId, now, limit, sql: tx });

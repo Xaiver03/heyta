@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { AUTH_PASSWORD_PATHS } from '@heyta/shared-schema';
+import { AUTH_PASSWORD_PATHS, SuperSyncClientIdSchema, inboundDraftEventIdSchema, inboundDraftDecisionSchema } from '@heyta/shared-schema';
 import { isEmailAllowed } from './email-allowlist';
 import * as jwt from 'jsonwebtoken';
 import {
@@ -63,6 +63,13 @@ import { asServerLocale, resolveLocale } from './design-html.js';
 import { SERVER_LOCALES, type ServerLocale } from './copy.generated.js';
 import { authCache } from './auth-cache';
 import { getWsConnectionService } from './sync/services/websocket-connection.service';
+import { createEntitlementGuard, readAutomationEntitlementTicketHeader } from './entitlement';
+import { issueAutomationCommitPermit, readInboundUploadIdentity, registerAutomationWorker, revokeAutomationWorker } from './automation/worker-identity';
+import { createAutomationRule, deleteAutomationRule, listAutomationRules, setAutomationRuleEnabled, updateAutomationRuleConfig } from './automation/rules';
+import { claimAutomationEvent, listAutomationEvents, publishAutomationResult, readAutomationPreparedResult, renewAutomationLease, retryUncertainAutomationEvent, readAutomationDraft, decideAutomationDraft } from './automation/events';
+import { advanceAutomationAiAttempt, reserveAutomationAiAttempt } from './automation/ai-metering';
+import { issueSenderCredential, listSenderCredentials, revokeSenderCredential } from './automation/sender-credentials';
+import { AutomationEntitlementError, redeemAutomationEntitlementTicket } from './automation/entitlement-ticket';
 
 // Zod Schemas
 const VerifyEmailSchema = z.object({
@@ -73,6 +80,76 @@ const VerifyEmailSchema = z.object({
 // privacy policy, in which case the consent label reads "I agree to the Privacy Policy"
 // and naming a document that is not served would be wrong.
 const TERMS_REQUIRED_MESSAGE = 'You must accept the linked legal documents to register';
+
+const AutomationWorkerRegisterSchema = z.object({
+  clientId: SuperSyncClientIdSchema,
+  databaseEpoch: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/),
+}).strict();
+const AutomationEntitlementTicketSchema = z.object({
+  ticket: z.string().min(1).max(8192),
+  localAccountUuid: z.string().uuid(),
+}).strict();
+const AutomationWorkerRevokeSchema = z.object({ workerId: z.string().uuid() }).strict();
+const AutomationCommitPermitSchema = z.object({
+  clientId: SuperSyncClientIdSchema,
+  databaseEpoch: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/),
+  eventId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$/),
+  opId: z.string().regex(/^inbound:[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$/),
+  ruleId: z.string().uuid(),
+  ruleVersion: z.number().int().min(1),
+  parseVersion: z.number().int().min(1),
+  resultDigest: z.string().regex(/^[0-9a-f]{64}$/),
+  itemCount: z.number().int().min(1).max(50),
+}).strict();
+const AutomationRuleFieldsSchema = z.array(z.enum(['title', 'note', 'priority', 'projectId', 'dueDate', 'startDate', 'durationMinutes'])).min(1).max(7);
+const AutomationRuleConfigSchema = z.object({
+  allowedFields: AutomationRuleFieldsSchema.optional(),
+  targetProjectId: z.string().max(128).nullable().optional(),
+  timezone: z.string().max(128).nullable().optional(),
+  parseVersion: z.number().int().min(1).optional(),
+  maxItems: z.number().int().min(1).max(50).optional(),
+}).strict();
+const AutomationRuleCreateSchema = z.object({ keyId: z.string().regex(/^[A-Za-z0-9_-]{1,32}$/), ...AutomationRuleConfigSchema.shape }).strict();
+const AutomationRuleEnabledSchema = z.object({ enabled: z.boolean() }).strict();
+const AutomationRuleConfigUpdateSchema = AutomationRuleConfigSchema;
+const AutomationRuleParamsSchema = z.object({ ruleId: z.string().uuid() }).strict();
+const AutomationSenderCredentialSchema = z.object({ keyId: z.string().regex(/^[A-Za-z0-9_-]{1,32}$/) }).strict();
+const AutomationSenderRevokeSchema = z.object({ credentialId: z.string().uuid() }).strict();
+const AutomationRecipientKeySchema = z.object({
+  keyEpoch: z.number().int().min(1),
+  publicKey: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+  packageVersion: z.number().int().min(1),
+  expectedPackageVersion: z.number().int().min(0).nullable(),
+}).strict();
+const AutomationClaimSchema = z.object({
+  clientId: SuperSyncClientIdSchema,
+  eventId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$/).optional(),
+}).strict();
+const AutomationLeaseSchema = z.object({
+  clientId: SuperSyncClientIdSchema,
+  leaseGeneration: z.number().int().min(1),
+}).strict();
+const AutomationResultSchema = AutomationLeaseSchema.extend({
+  parseVersion: z.number().int().min(1),
+  itemCount: z.number().int().min(1).max(50),
+  resultDigest: z.string().regex(/^[0-9a-f]{64}$/),
+  resultCiphertext: z.string().min(1).max(1_000_000),
+  needsConfirmation: z.boolean().optional(),
+}).strict();
+const AutomationAiAttemptBaseSchema = z.object({
+  clientId: SuperSyncClientIdSchema,
+  ruleId: z.string().uuid(),
+  parseVersion: z.number().int().min(1),
+  attempt: z.number().int().min(1),
+  leaseGeneration: z.number().int().min(1),
+}).strict();
+const AutomationAiReserveSchema = AutomationAiAttemptBaseSchema.extend({
+  billingSource: z.enum(['local', 'direct', 'managed']),
+}).strict();
+const AutomationAiStateSchema = AutomationAiAttemptBaseSchema.extend({
+  from: z.enum(['reserved', 'sent', 'consumed', 'released', 'unknown']),
+  to: z.enum(['reserved', 'sent', 'consumed', 'released', 'unknown']),
+}).strict();
 
 /**
  * 注册请求体的**共同字段** —— 通行密钥、魔法链接、邮箱+口令三条路共用一份，
@@ -502,6 +579,407 @@ export const apiRoutes = async (
 ): Promise<void> => {
   const PasskeyRegisterOptionsSchema = buildRegisterBodySchema(opts.requireTermsConsent);
   const MagicLinkRegisterSchema = PasskeyRegisterOptionsSchema;
+  const RegistrationChallengeRequestSchema = z.object({
+    ...buildRegisterBodyShape(opts.requireTermsConsent),
+    password: PasswordSchema,
+  });
+
+  // Self-hosted automation has no implicit free path. An official issuer
+  // ticket is short-lived and one-time; consuming it binds the authenticated
+  // local account to this installation before any automation gate can pass.
+  fastify.post<{ Body: z.infer<typeof AutomationEntitlementTicketSchema> }>(
+    '/automation/entitlement/verify',
+    { preHandler: authenticate },
+    async (req, reply) => {
+      const parsed = AutomationEntitlementTicketSchema.safeParse(req.body);
+      if (!parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      try {
+        // `session` 是唯一能建立/续期短期绑定的动作，也就是公网接收那一格
+        // "至多 30 秒已签发窗口"的来源；其它动作的票据只放行它自己那一次操作。
+        const consumed = await prisma.$transaction((tx) => redeemAutomationEntitlementTicket({
+          client: tx,
+          userId: getAuthUser(req).userId,
+          action: 'session',
+          token: parsed.data.ticket,
+          localAccountUuid: parsed.data.localAccountUuid,
+        }));
+        return reply.header('Cache-Control', 'no-store').send({ state: 'active', expiresAt: consumed.expiresAt.toISOString() });
+      } catch (error) {
+        // 只回稳定码；票据正文、官方主体与本地账号 UUID 都不出这道门。
+        const code = error instanceof AutomationEntitlementError ? error.code : 'AUTOMATION_TICKET_INVALID';
+        Logger.audit({ event: 'AUTOMATION_ENTITLEMENT_DENIED', userId: getAuthUser(req).userId, errorCode: code, capability: 'automation' });
+        return reply.status(403).send({ error: 'Automation entitlement verification failed', errorCode: code });
+      }
+    },
+  );
+
+  // The worker secret is returned once, persisted only as a hash, and never
+  // enters op-log, logs, or a user-visible error.
+  fastify.post<{ Body: z.infer<typeof AutomationWorkerRegisterSchema> }>(
+    '/automation/worker/register',
+    { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation', action: 'worker-register' })] },
+    async (req, reply) => {
+      const parsed = AutomationWorkerRegisterSchema.safeParse(req.body);
+      if (!parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      try {
+        const user = getAuthUser(req);
+        return reply.status(201).send(await registerAutomationWorker(
+          user.userId, parsed.data.clientId, parsed.data.databaseEpoch,
+        ));
+      } catch (error) {
+        Logger.warn(`Automation worker registration rejected: ${error instanceof Error ? error.message : 'unknown'}`);
+        return reply.status(400).send({ error: 'Automation worker registration failed' });
+      }
+    },
+  );
+
+  fastify.post<{ Body: z.infer<typeof AutomationWorkerRevokeSchema> }>(
+    '/automation/worker/revoke',
+    { preHandler: authenticate },
+    async (req, reply) => {
+      const parsed = AutomationWorkerRevokeSchema.safeParse(req.body);
+      if (!parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      const revoked = await revokeAutomationWorker(getAuthUser(req).userId, parsed.data.workerId);
+      return reply.send({ revoked });
+    },
+  );
+
+  fastify.post<{ Body: z.infer<typeof AutomationCommitPermitSchema> }>(
+    '/automation/commit-permit',
+    // The service checks entitlement in the first-permit transaction. Exact
+    // owner retries remain reachable after expiry for an already granted intent.
+    { preHandler: authenticate },
+    async (req, reply) => {
+      const parsed = AutomationCommitPermitSchema.safeParse(req.body);
+      if (!parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      const user = getAuthUser(req);
+      const identity = readInboundUploadIdentity(req.raw.rawHeaders, user.tokenVersion);
+      if (!identity) return reply.status(403).send({ error: 'Automation worker authorization required' });
+      const workerToken = req.raw.rawHeaders.find((_value, index, headers) => index % 2 === 0 && headers[index].toLowerCase() === 'x-heyta-worker-token')
+        ? req.raw.rawHeaders[req.raw.rawHeaders.findIndex((_value, index, headers) => index % 2 === 0 && headers[index].toLowerCase() === 'x-heyta-worker-token') + 1]
+        : undefined;
+      if (workerToken === undefined) return reply.status(403).send({ error: 'Automation worker authorization required' });
+      try {
+        const data = parsed.data;
+        if (data.opId !== `inbound:${data.eventId}`) return reply.status(400).send({ error: 'Validation failed' });
+        const ticket = readAutomationEntitlementTicketHeader(req.raw.rawHeaders);
+        return reply.status(201).send(await issueAutomationCommitPermit({
+          userId: user.userId, tokenVersion: user.tokenVersion ?? -1, clientId: data.clientId,
+          workerToken, databaseEpoch: data.databaseEpoch, eventId: data.eventId, opId: data.opId,
+          ruleId: data.ruleId, ruleVersion: data.ruleVersion, parseVersion: data.parseVersion,
+          resultDigest: data.resultDigest, itemCount: data.itemCount,
+          ...(ticket === undefined ? {} : { ticket }),
+        }));
+      } catch (error) {
+        Logger.warn(`Automation permit rejected: ${error instanceof Error ? error.message : 'unknown'}`);
+        return reply.status(403).send({ error: 'Automation commit authorization failed' });
+      }
+    },
+  );
+
+  fastify.get('/automation/rules', { preHandler: authenticate }, async (req, reply) => {
+    return reply.send({ rules: await listAutomationRules(getAuthUser(req).userId) });
+  });
+
+  fastify.post<{ Body: z.infer<typeof AutomationRuleCreateSchema> }>(
+    '/automation/rules',
+    { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation' })] },
+    async (req, reply) => {
+      const parsed = AutomationRuleCreateSchema.safeParse(req.body);
+      if (!parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      try {
+        const { keyId, ...config } = parsed.data;
+        return reply.status(201).send(await createAutomationRule(getAuthUser(req).userId, keyId, config));
+      }
+      catch { return reply.status(400).send({ error: 'Automation rule creation failed' }); }
+    },
+  );
+
+  fastify.put<{ Params: unknown; Body: z.infer<typeof AutomationRuleConfigUpdateSchema> }>(
+    '/automation/rules/:ruleId/config',
+    { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation' })] },
+    async (req, reply) => {
+      const params = AutomationRuleParamsSchema.safeParse(req.params);
+      const body = AutomationRuleConfigUpdateSchema.safeParse(req.body);
+      if (!params.success || !body.success) return reply.status(400).send({ error: 'Validation failed' });
+      try { return reply.send(await updateAutomationRuleConfig(getAuthUser(req).userId, params.data.ruleId, body.data)); }
+      catch { return reply.status(404).send({ error: 'Automation rule not found' }); }
+    },
+  );
+
+  fastify.put<{ Params: unknown; Body: z.infer<typeof AutomationRuleEnabledSchema> }>(
+    '/automation/rules/:ruleId/enabled',
+    // 关闭规则不要求付费（协议 §4），只有启用才消费 rule-enable 票据。
+    { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation', action: 'rule-enable',
+      when: (req) => (req.body as { enabled?: unknown } | undefined)?.enabled === true,
+      scope: (req) => ({ ruleId: String((req.params as { ruleId?: unknown }).ruleId ?? '') }) })] },
+    async (req, reply) => {
+      const params = AutomationRuleParamsSchema.safeParse(req.params);
+      const body = AutomationRuleEnabledSchema.safeParse(req.body);
+      if (!params.success || !body.success) return reply.status(400).send({ error: 'Validation failed' });
+      try { return reply.send(await setAutomationRuleEnabled(getAuthUser(req).userId, params.data.ruleId, body.data.enabled)); }
+      catch { return reply.status(404).send({ error: 'Automation rule not found' }); }
+    },
+  );
+
+  fastify.delete<{ Params: unknown }>(
+    '/automation/rules/:ruleId',
+    { preHandler: authenticate },
+    async (req, reply) => {
+      const params = AutomationRuleParamsSchema.safeParse(req.params);
+      if (!params.success) return reply.status(400).send({ error: 'Validation failed' });
+      try { return reply.send(await deleteAutomationRule(getAuthUser(req).userId, params.data.ruleId)); }
+      catch { return reply.status(404).send({ error: 'Automation rule not found' }); }
+    },
+  );
+
+  // Sender secrets are returned once. The database stores only deployment-KEK
+  // wrapped ciphertext; issuing the same keyId rotates and revokes its prior key.
+  fastify.post<{ Params: unknown; Body: z.infer<typeof AutomationSenderCredentialSchema> }>(
+    '/automation/rules/:ruleId/sender-credentials',
+    { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation', action: 'sender-credential-issue',
+      scope: (req) => ({ ruleId: String((req.params as { ruleId?: unknown }).ruleId ?? '') }) })]},
+    async (req, reply) => {
+      const params = AutomationRuleParamsSchema.safeParse(req.params); const body = AutomationSenderCredentialSchema.safeParse(req.body);
+      if (!params.success || !body.success) return reply.status(400).send({ error: 'Validation failed' });
+      try { return reply.status(201).send(await issueSenderCredential(getAuthUser(req).userId, params.data.ruleId, body.data.keyId)); }
+      catch { return reply.status(409).send({ error: 'Sender credential could not be issued' }); }
+    },
+  );
+  fastify.get<{ Params: unknown }>(
+    '/automation/rules/:ruleId/sender-credentials', { preHandler: authenticate }, async (req, reply) => {
+      const params = AutomationRuleParamsSchema.safeParse(req.params);
+      if (!params.success) return reply.status(400).send({ error: 'Validation failed' });
+      try { return reply.send({ credentials: await listSenderCredentials(getAuthUser(req).userId, params.data.ruleId) }); }
+      catch { return reply.status(404).send({ error: 'Sender credentials not found' }); }
+    },
+  );
+  fastify.post<{ Body: z.infer<typeof AutomationSenderRevokeSchema> }>(
+    '/automation/sender-credentials/revoke', { preHandler: authenticate }, async (req, reply) => {
+      const body = AutomationSenderRevokeSchema.safeParse(req.body); if (!body.success) return reply.status(400).send({ error: 'Validation failed' });
+      return reply.send({ revoked: await revokeSenderCredential(getAuthUser(req).userId, body.data.credentialId) });
+    },
+  );
+
+  // Account-level X25519 recipient key registration. CAS is the publish fence:
+  // a stale device cannot silently replace a newer key package.
+  fastify.put<{ Body: z.infer<typeof AutomationRecipientKeySchema> }>(
+    '/automation/recipient-key',
+    { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation' })] },
+    async (req, reply) => {
+      const parsed = AutomationRecipientKeySchema.safeParse(req.body);
+      if (!parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      const userId = getAuthUser(req).userId;
+      const data = parsed.data;
+      const bytes = Buffer.from(data.publicKey.replace(/-/g, '+').replace(/_/g, '/') + '==', 'base64');
+      if (bytes.length !== 32) return reply.status(400).send({ error: 'Validation failed' });
+      try {
+        const result = await prisma.$transaction(async (tx) => {
+          await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+          const current = await tx.automationRecipientKey.findUnique({ where: { userId } });
+          if (current === null) {
+            if (data.expectedPackageVersion !== null) throw new Error('Recipient key version conflict');
+            return tx.automationRecipientKey.create({ data: { userId, keyEpoch: data.keyEpoch, publicKey: data.publicKey, packageVersion: data.packageVersion } });
+          }
+          // An epoch identifies the private key, so the same epoch may only
+          // be republished byte-for-byte. A changed public key must advance
+          // the epoch; otherwise queued ciphertext becomes undecryptable.
+          if (data.expectedPackageVersion !== current.packageVersion || data.packageVersion <= current.packageVersion ||
+              data.keyEpoch < current.keyEpoch || (data.keyEpoch === current.keyEpoch && data.publicKey !== current.publicKey)) {
+            throw new Error('Recipient key version conflict');
+          }
+          return tx.automationRecipientKey.update({ where: { userId }, data: { keyEpoch: data.keyEpoch, publicKey: data.publicKey, packageVersion: data.packageVersion } });
+        });
+        return reply.send({ keyEpoch: result.keyEpoch, publicKey: result.publicKey, packageVersion: result.packageVersion });
+      } catch { return reply.status(409).send({ error: 'Recipient key version conflict' }); }
+    },
+  );
+  fastify.get('/automation/recipient-key', { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation' })] }, async (req, reply) => {
+    const row = await prisma.automationRecipientKey.findUnique({ where: { userId: getAuthUser(req).userId } });
+    if (row === null) return reply.status(404).send({ error: 'Recipient key is not registered' });
+    return reply.send({ keyEpoch: row.keyEpoch, publicKey: row.publicKey, packageVersion: row.packageVersion });
+  });
+
+  // Authenticated worker queue protocol. The worker token is read only from
+  // duplicate-rejecting headers; no body field can select another worker.
+  fastify.post<{ Params: { eventId: string } }>(
+    '/automation/events/:eventId/retry',
+    { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation' })] },
+    async (req, reply) => {
+      const eventId = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$/).safeParse(req.params.eventId);
+      const body = z.object({ expectedAttempt: z.number().int().positive(), expectedRuleVersion: z.number().int().positive() }).strict().safeParse(req.body);
+      if (!eventId.success || !body.success) return reply.status(400).send({ error: 'Validation failed' });
+      try {
+        return reply.send(await retryUncertainAutomationEvent({ userId: getAuthUser(req).userId, eventId: eventId.data, ...body.data }));
+      } catch { return reply.status(409).send({ error: 'Automation event cannot be retried' }); }
+    },
+  );
+
+  fastify.get<{ Params: { eventId: string } }>(
+    '/automation/events/:eventId/draft', { preHandler: [authenticate] }, async (req, reply) => {
+      const eventId = inboundDraftEventIdSchema.safeParse(req.params.eventId);
+      if (!eventId.success) return reply.status(400).send({ error: 'Validation failed' });
+      const user = getAuthUser(req);
+      if (user.tokenVersion === undefined) return reply.status(403).send({ error: 'Authentication required' });
+      try {
+        return reply.header('Cache-Control', 'no-store').send(await readAutomationDraft({ userId: user.userId, tokenVersion: user.tokenVersion, eventId: eventId.data }));
+      } catch { return reply.status(404).send({ error: 'Automation draft is not available' }); }
+    },
+  );
+  fastify.post<{ Params: { eventId: string } }>(
+    '/automation/events/:eventId/draft/decision', { preHandler: [authenticate] }, async (req, reply) => {
+      const eventId = inboundDraftEventIdSchema.safeParse(req.params.eventId);
+      const body = inboundDraftDecisionSchema.safeParse(req.body);
+      if (!eventId.success || !body.success) return reply.status(400).send({ error: 'Validation failed' });
+      const user = getAuthUser(req);
+      if (user.tokenVersion === undefined) return reply.status(403).send({ error: 'Authentication required' });
+      // 确认那一侧的权益判定**只在写事务里做一次**：官方模式看共享锁定的订阅行，
+      // 自托管在线模式消费一张绑定本事件的 action 票据。HTTP 层再判一次会把同一张
+      // 票据烧掉两次，而闸门那层拦不住"订阅在等锁期间到期"这一格。
+      const ticket = body.data.decision === 'confirm' ? readAutomationEntitlementTicketHeader(req.raw.rawHeaders) : undefined;
+      try {
+        return reply.send(await decideAutomationDraft({ userId: user.userId, tokenVersion: user.tokenVersion,
+          eventId: eventId.data, ...body.data, ...(ticket === undefined ? {} : { ticket }) }));
+      } catch { return reply.status(409).send({ error: 'Automation draft decision could not be applied' }); }
+    },
+  );
+
+  fastify.post<{ Body: z.infer<typeof AutomationClaimSchema> }>(
+    '/automation/events/claim',
+    { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation', action: 'event-claim' })]},
+    async (req, reply) => {
+      const parsed = AutomationClaimSchema.safeParse(req.body);
+      if (!parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      const user = getAuthUser(req);
+      const identity = readInboundUploadIdentity(req.raw.rawHeaders, user.tokenVersion);
+      if (!identity) return reply.status(403).send({ error: 'Automation worker authorization required' });
+      try {
+        const claimed = await claimAutomationEvent(user.userId, parsed.data.clientId, identity, new Date(), parsed.data.eventId);
+        return reply.send(claimed ?? { state: 'empty' });
+      } catch { return reply.status(403).send({ error: 'Automation worker authorization failed' }); }
+    },
+  );
+
+  fastify.post<{ Params: { eventId: string }; Body: z.infer<typeof AutomationLeaseSchema> }>(
+    '/automation/events/:eventId/renew',
+    { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation' })] },
+    async (req, reply) => {
+      const params = z.object({ eventId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$/) }).safeParse(req.params);
+      const parsed = AutomationLeaseSchema.safeParse(req.body);
+      if (!params.success || !parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      const user = getAuthUser(req);
+      const identity = readInboundUploadIdentity(req.raw.rawHeaders, user.tokenVersion);
+      if (!identity) return reply.status(403).send({ error: 'Automation worker authorization required' });
+      try { return reply.send(await renewAutomationLease(user.userId, parsed.data.clientId, identity, params.data.eventId, parsed.data.leaseGeneration)); }
+      catch { return reply.status(409).send({ error: 'Automation lease is no longer valid' }); }
+    },
+  );
+
+  fastify.post<{ Params: { eventId: string }; Body: z.infer<typeof AutomationResultSchema> }>(
+    '/automation/events/:eventId/result',
+    { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation', action: 'result-publish',
+      scope: (req) => ({ eventId: String((req.params as { eventId?: unknown }).eventId ?? '') }) })]},
+    async (req, reply) => {
+      const params = z.object({ eventId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$/) }).safeParse(req.params);
+      const parsed = AutomationResultSchema.safeParse(req.body);
+      if (!params.success || !parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      const user = getAuthUser(req);
+      const identity = readInboundUploadIdentity(req.raw.rawHeaders, user.tokenVersion);
+      if (!identity) return reply.status(403).send({ error: 'Automation worker authorization required' });
+      try {
+        return reply.send(await publishAutomationResult({ userId: user.userId, clientId: parsed.data.clientId,
+          identity, eventId: params.data.eventId, leaseGeneration: parsed.data.leaseGeneration,
+          parseVersion: parsed.data.parseVersion, resultDigest: parsed.data.resultDigest,
+          resultCiphertext: parsed.data.resultCiphertext, itemCount: parsed.data.itemCount, needsConfirmation: parsed.data.needsConfirmation }));
+      } catch { return reply.status(409).send({ error: 'Automation lease or result is no longer valid' }); }
+    },
+  );
+
+  fastify.get<{ Querystring: { clientId?: string } }>(
+    '/automation/events/recover',
+    // Already-authorized local intents can recover after subscription expiry.
+    // New commit permits still pass the independent entitlement gate.
+    { preHandler: authenticate },
+    async (req, reply) => {
+      const user = getAuthUser(req);
+      const clientId = SuperSyncClientIdSchema.safeParse(req.query.clientId);
+      if (!clientId.success) return reply.status(400).send({ error: 'Validation failed' });
+      const identity = readInboundUploadIdentity(req.raw.rawHeaders, user.tokenVersion);
+      if (!identity) return reply.status(403).send({ error: 'Automation worker authorization required' });
+      try {
+        const result = await readAutomationPreparedResult(user.userId, clientId.data, identity);
+        return reply.send(result ?? { state: 'empty' });
+      } catch { return reply.status(403).send({ error: 'Automation worker authorization failed' }); }
+    },
+  );
+
+  fastify.get<{ Params: { eventId: string }; Querystring: { clientId?: string } }>(
+    '/automation/events/:eventId/result',
+    // Recovery reads an already-frozen ciphertext. It must remain available
+    // to the authenticated owner after entitlement expiry; issuing a new
+    // permit is still gated separately.
+    { preHandler: authenticate },
+    async (req, reply) => {
+      const params = z.object({ eventId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$/) }).safeParse(req.params);
+      if (!params.success) return reply.status(400).send({ error: 'Validation failed' });
+      const user = getAuthUser(req);
+      const clientId = SuperSyncClientIdSchema.safeParse(req.query.clientId);
+      if (!clientId.success) return reply.status(400).send({ error: 'Validation failed' });
+      const identity = readInboundUploadIdentity(req.raw.rawHeaders, user.tokenVersion);
+      if (!identity) return reply.status(403).send({ error: 'Automation worker authorization required' });
+      try {
+        const result = await readAutomationPreparedResult(user.userId, clientId.data, identity, params.data.eventId);
+        if (!result) return reply.status(404).send({ error: 'Automation result is not available' });
+        return reply.send(result);
+      } catch { return reply.status(403).send({ error: 'Automation worker authorization failed' }); }
+    },
+  );
+
+  fastify.post<{ Params: { eventId: string }; Body: z.infer<typeof AutomationAiReserveSchema> }>(
+    '/automation/events/:eventId/ai-attempt/reserve',
+    { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation', action: 'ai-reserve',
+      scope: (req) => ({ eventId: String((req.params as { eventId?: unknown }).eventId ?? '') }) })]},
+    async (req, reply) => {
+      const params = z.object({ eventId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$/) }).safeParse(req.params);
+      const parsed = AutomationAiReserveSchema.safeParse(req.body);
+      if (!params.success || !parsed.success || params.data.eventId.length > 64) return reply.status(400).send({ error: 'Validation failed' });
+      const user = getAuthUser(req);
+      const identity = readInboundUploadIdentity(req.raw.rawHeaders, user.tokenVersion);
+      if (!identity) return reply.status(403).send({ error: 'Automation worker authorization required' });
+      try {
+        return reply.send(await reserveAutomationAiAttempt({ userId: user.userId, ruleId: parsed.data.ruleId,
+          eventId: params.data.eventId, parseVersion: parsed.data.parseVersion, attempt: parsed.data.attempt }, Date.now(), undefined,
+          undefined, { clientId: parsed.data.clientId, credentialHash: identity.credentialHash,
+            databaseEpoch: identity.databaseEpoch, tokenVersion: identity.tokenVersion, leaseGeneration: parsed.data.leaseGeneration },
+          parsed.data.billingSource));
+      } catch { return reply.status(409).send({ error: 'Automation AI attempt could not be reserved' }); }
+    },
+  );
+
+  fastify.post<{ Params: { eventId: string }; Body: z.infer<typeof AutomationAiStateSchema> }>(
+    '/automation/events/:eventId/ai-attempt/state',
+    { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation' })] },
+    async (req, reply) => {
+      const params = z.object({ eventId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$/) }).safeParse(req.params);
+      const parsed = AutomationAiStateSchema.safeParse(req.body);
+      if (!params.success || !parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      const user = getAuthUser(req);
+      const identity = readInboundUploadIdentity(req.raw.rawHeaders, user.tokenVersion);
+      if (!identity) return reply.status(403).send({ error: 'Automation worker authorization required' });
+      try {
+        const changed = await advanceAutomationAiAttempt({ userId: user.userId, ruleId: parsed.data.ruleId,
+          eventId: params.data.eventId, parseVersion: parsed.data.parseVersion, attempt: parsed.data.attempt },
+          parsed.data.from, parsed.data.to, undefined, { clientId: parsed.data.clientId, credentialHash: identity.credentialHash,
+            databaseEpoch: identity.databaseEpoch, tokenVersion: identity.tokenVersion, leaseGeneration: parsed.data.leaseGeneration });
+        return reply.send({ changed });
+      } catch { return reply.status(409).send({ error: 'Automation AI attempt state transition failed' }); }
+    },
+  );
+
+  fastify.get('/automation/events', { preHandler: authenticate }, async (req, reply) => {
+    return reply.send({ events: await listAutomationEvents(getAuthUser(req).userId) });
+  });
+
 
   // Moderate rate limiting for email verification (20 attempts per 15 minutes)
   fastify.post<{ Body: VerifyEmailBody }>(
