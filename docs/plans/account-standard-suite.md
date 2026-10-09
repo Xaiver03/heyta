@@ -3583,6 +3583,8 @@ cd .worktrees/<载体> && git checkout --force $(git rev-parse refs/heads/main)
 ① 重置那一路的**实时通道**那一半（`revokeAllDeviceSessions` 里 `closeForUser` 那半）—— 链路 9 不建 socket，
    所以它只声称"会话行当场删掉"；通道那一半的证据仍是 §5 第 16 条那趟（改前 `37 过 / 2 红` ⇒ 改后 `39 过 / 0 红`）与 §6.60。
    这一格能补，但要动 `session-revoke-websocket` 那枚夹具（socket 建两条 + 走真重置口），不是零新装置。
+   ✅ **改密那一路这一半已补**（10-10 04:2x，§6.72：走的就是那枚夹具，臂 W1 恰好红这一条、其余 24 条全绿）。
+   **重置那一路仍未补**（同一型，只是这一批没排）。
 ② `legacy 那路 /login/magic-link/verify` 与 `/auth/passkey/verify`（§6.68 那张表的剩下两行）。
 
 复取：与 §6.69 同一条命令（同一枚文件），期望从 `16 passed` 变成 `17 passed`；
@@ -3658,6 +3660,56 @@ cd .worktrees/<载体> && git checkout --force $(git rev-parse refs/heads/main)
   npx vitest run --config vitest.integration.config.ts --maxWorkers=1 \
   tests/integration/email-change-and-sessions.integration.spec.ts )   # 期望 20 passed
 ```
+
+### 6.72 改密那一路"关掉已经开着的页面"补上了通道层的判据，而它顺带修掉**这枚夹具自己的两处抢跑**（10-10 04:2x 现量，载体 `.worktrees/iosacct` 纯 tip）
+
+§6.70 留的那一格（改密/重置那两路的 `closeForUser` 那一半）用的就是 §6.60 那枚 WS 夹具。
+新那条**自带**两条连接（两个 `issueSession` + 两个真 socket），走真 `/password/change`，断言：
+两条 socket 都以 `4003 / Token revoked` 当场断、库里只剩换发给当前设备那一行、
+而响应里那枚**新令牌能重新连上**（"改个密码把自己的这个标签页也踢出去"就是最后这句没兑现时的形状）。
+
+| 那一格 | 现量 |
+|---|---|
+| 全文件 + 另一枚集成套件同趟（默认 5 s 预算） | `2 passed / 25 passed (25)` rc=0 |
+| 只跑新那条（`-t "真改口令"`，默认预算） | `1 passed / 4 skipped` rc=0 |
+| 🔴 臂 W1：`revokeAllDeviceSessions` 里摘掉 `getWsConnectionService().closeForUser(userId)`（只删行、不关通道） | **恰好 1 红 = 新那条**，其余 `24 passed` |
+
+第三行是本节的全部要点：**改密那一路的通道那一半，此前只有这一层看得见** ——
+那一臂下 HTTP 层照旧全绿（链路 8 的"旧令牌 401"与"库里只剩 1 行"两条都不依赖连接簿记），
+这是 §6.13 那一族（"判据四层里只有真运行时那一层能红"）在本线的**第三次**实证。
+⚠️ 那一臂的红形状是 `Test timed out in 5000ms` 而不是 `AssertionError` ——
+因为监听等满 `waitForClose` 的 5 s 而 vitest 默认预算也是 5 s（§5 第 13 条那一格的两半）。
+**别把它读成载体抖动**：判据成立的证据是"未变异那两趟 `25 passed` 与 `1 passed`"。
+
+🔴 而这一格里最值钱的其实是**修掉的这两处夹具抢跑**（第一条旧用例在 HEAD 上突然红就是这个）：
+
+1. `openSocket` 只等客户端的 `open`，而服务端 `websocket.routes.ts` 是
+   `await verifyToken(token)` **之后**才 `addConnection`（那一次 `verifyToken` 里有一次库查）。
+   ⇒ "前提"可以在服务端一条都没登记时就成立，随后那句撤销找不到该关的连接，
+   而那枚令牌自己的 `verifyToken` 晚一步回来时 socket 收到的是升级期那条通用拒绝
+   `4003 / Invalid token`，本套件钉的 `Session revoked` 根本不会发生。
+   补了一条 `waitForConnectionCount(target)`（读 `getWsConnectionService().getConnectionCount()`，
+   有界 5 s，等不到就抛"前提不成立"）用在四处：前提、幽灵那条（按**增量**等，不写死绝对值）、新那条的两处。
+2. `waitForClose` 原本挂在 HTTP 响应**之后**，而 close 帧与响应是两条通道、谁先到没有保证。
+   ⇒ 新那条改成先挂监听再发请求，并**同样改掉已有的"撤销 A"那一条**（那是本线 §6.60 的判据，不是别人的文件）。
+
+现量证明第 1 点不是产品回归：`git log 331f563c..HEAD -- server/src/sync` **为空**，
+而 HEAD 那版夹具（不含我的任何改动）单独重跑同样红在 `expected { code: 4003, reason: 'Invalid token' } to deeply equal …`。
+⇒ **又一例"先怀疑探针"**（AGENTS §7 元规则第 1 条）：同一枚文件昨天绿今天红，第一问应当是
+"这一层今天有没有别的东西改了时序（负载、别的套件的库状态）"，而不是"产品坏了"。
+🔴 也要如实记一句：**这条抢跑一直在，只是没人看见** —— 而 §6.62 那次 `18 passed` 的**负载读数没有留档**
+（那一趟没记），所以只能说"当时没撞到"，不能说"当时是稳的"。这正是要把负载/预算一起写进读数的理由。
+判据不稳的判据比没有判据更危险（AGENTS §7 元规则第 2 条）。
+
+仍然开着的：
+① **重置那一路**（`/password/reset`）的通道那一半仍未在这层验（同一型，只是这一批没排；
+  它比改密那条更简单——不发会话，要的是"两条 socket 全断 + 库里 0 行"）；
+② §5 第 13 条那格（默认 5 s 预算属于判据口径，由负责人拍）今天有了**第二个具体例子**：
+  新那条在"未变异 + 负载高"时贴着预算，读数以 `--maxWorkers=1` 取。
+
+复取（同 §6.71 那条命令，把文件名换成 `session-revoke-websocket`，期望 `5 passed`；
+臂 W1 的摘除句是 `access-sessions.ts` 里 `revokeAllSessions(userId)` 后面那一整行，
+还原按 §6.69 那三条硬规矩：`git checkout -- <path>` + `git diff --quiet -- <path>` + 抄红句原文）。
 
 
 
