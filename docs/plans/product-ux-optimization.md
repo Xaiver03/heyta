@@ -1022,7 +1022,7 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
 - 头像端到端浏览器旅程已补齐真实的 Profile → Sync → Profile 路径，并为同一设置壳内新增的入站自动化、邮箱换绑状态读取补充合法空响应夹具；`profile-avatar-e2ee.spec.ts` 通过 1/1，视口、设置分类、帮助入口 7/7 通过。
 - 入站自动化宿主新增统一 `requestInboundAutomation` 入口，并在偏好最小化表中显式声明空偏好集合；未把它误记为用户直接点击的第二个 AI 产品入口。
 - `pnpm build` 通过；`pnpm check:ai-coverage` 已通过：Web 的入站自动化按“设置管理 → 宿主 worker 消费”登记为无直接模型请求入口；移动端按产品裁决只保留一个 Assistant/Chatbot，capture、breakdown、prioritize、duration-estimate 与 inbound automation 不再复制成独立页面；tool-calling 的真实挂载组件为 `AssistantScreen`。这不是降低实现覆盖要求，Web 的可用能力仍需由真实组件接线，移动端只验证单一 Chatbot 入口，门禁输出已明确区分“直接 UI 入口”和“宿主内部能力”。
-- `@heyta/app-host` 定向测试 90 个文件、1708 项通过；`@heyta/domain` 本轮单测因机器立即可用内存 339MB 低于 384MB 启动闸门而未运行，类型检查已通过，不将其记作测试通过。
+- `@heyta/app-host` 定向测试 90 个文件、1708 项通过；`@heyta/domain` 本轮单测因机器立即可用内存 339MB 低于 384MB 启动闸门而未运行，类型检查已通过，不将其记作测试通过。⚠️ **这一条已被 UX-S9-153 补跑否证**：闸门放行后跑出了读数（1020 通过 / 3 失败，逐条归因见该节），不要再照本行读成"没跑"。
 
 ### UX-S9-151：服务条款去竞品声明与合同文本正式化（2026-10-09）
 
@@ -1058,8 +1058,11 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
 - [x] **页侧分类的真浏览器取证（新装置 [`e2e/tests/widget-journey-host.spec.ts`](../../e2e/tests/widget-journey-host.spec.ts)）**：同一个 Windows 平台名，两态各拍一张元素图 —— 浏览器标签页态画着「如何装成应用」三步（[`browser-windows-tab.png`](../../apps/web/evidence/ux-final-20261009/widget-journey-host/browser-windows-tab.png)），把存储宿主逃生门关掉的 WebView2 态只剩"正在原生桌面应用中运行"+"当前桌面应用暂不支持系统小组件"（[`native-shell-storage-host-off.png`](../../apps/web/evidence/ux-final-20261009/widget-journey-host/native-shell-storage-host-off.png)）。两张图**人都打开看过**。2 passed。🔴 **这条判据能红**：把 `isNativeShellHost` 退回"只看存储端口"的旧语义再跑同一份套件 ⇒ **恰好 1 红**（壳那一态），改完恢复 2 passed，源文件还原后与备份逐字节相同。取现量：`cd e2e && npx playwright test tests/widget-journey-host.spec.ts`。
 - [x] **本线自 10-07 起从未入库的证据与 QA 装置已收进仓库**：`check:docs` 当场报出 74 处"本机有、仓库里没有"的死链，其中 59 个指向这条线一直在写、却从没 `git add` 的证据（`ux-round4/5/6/8`、`ux-final-20261008/09`、`ux-closeout/release-2026-10-08*`、`settings-finish`、`reminders-data-responsive`、`macos/evidence/native-widgets` 等）与两枚 `scripts/qa/*.mjs` 装置。收完现量剩 **4 处**，逐条核对后**都不属于本线**：`docs/plans/inbound-automation.md`(2) 与 `docs/research/inbound-automation-review.md`(1) 指向入站自动化那条线自己的证据，`apps/desktop-windows/README.md`(1) 指向 `scripts/windows/launch-data-transfer-qa.ps1`。取现量：`node research/tools/docs-link-check.mjs`。那四处由对应线自己收，本线不代改。
 
-🔴 **这一格仍未取到的读数，不记作通过**：
+- [x] **`@heyta/domain` 那格"因内存闸门未运行"已补跑**（内存空闲 57% 时闸门放行）：**1020 通过 / 3 失败**，三条逐条归因，既不打包成"抖动"也不打包成"产品失败"—— 取现量：`cd packages/domain && NO_COLOR=1 npx vitest run`。
+  - `habit-backfill.spec.ts > B8 窗口判定只有一处所有者` 与 `lunar.spec.ts > 逐日往返 1901→2100` 是 **5000 ms 超时**，当刻整机 1 分钟负载 282；单独重跑 **53/53 通过**（lunar 自身 2580 ms，离上限本来就近）。**记成载体，不记成产品。**
+  - 🔴 `subscription.spec.ts > contract with server/src/entitlement.ts` 是**真红、单跑 554 ms 复现**：服务端 `entitlement.ts`（工作树里 ` M`，属密钥撤销那条线在册的改动）新增 `NO_BINDING`（`entitlement.ts:389`）与 `REVOKED_VERSION`（`:392`）两个拒绝原因，而 `packages/domain` 那侧的镜像封闭词表没跟着长 —— 这条契约测试判的正是"两侧一模一样、且不许有多余"。**本线不代改**：往镜像词表补两项是那条线对"客户端要不要认识这两个拒绝"的语义决定，不是消红手段。归属与位置写在这里，等对应线收。
 
+🔴 **这一格仍未取到的读数，不记作通过**：
 - [ ] **Android 整条 Profile/Settings 旅程本轮没跑成，三趟都死于载体**：① dump 拿到安卓桌面（判据已补，见上）；② `am force-stop` 超 25 s 超时（旋钮已补）；③ 设备上的 `com.heyta` 被并行会话**卸载**，随后包管理服务不可用 —— `adb install -r` 两次报 `cmd: Can't find service: package`，而 `pm list packages | grep heyta` 为空。设备面判据**一条都没取到**，这是环境结论，不是产品缺陷。
 - [ ] **共享设备证据**：同一台 `emulator-5554` 上 11:00:26 与 11:12:54 两次 `pm_clear_app_data_caller`（uid 1000 = adb）；同时在跑的还有另一条线的 `scripts/verify-mobile-account-email-sessions.sh` 与 Playwright `tests/ai-assistant.spec.ts`。整机 1 分钟负载在 **73 ↔ 622** 之间震荡（阈值 12），内存 62G/63G 占满。按 AGENTS §8.9，这一段要的是**独占窗口**，不是重试。
 - [ ] **`pnpm --filter @heyta/web typecheck` rc=2，红点不在本线**：13 条 `error TS` 全部落在 `apps/web/tests/share-key-store.spec.ts`（`git status` 为 `A`、从未提交、mock 的 `Storage` 缺 `length/clear/key`），本线三个文件零错误。该文件属另一条在册的线，**不代改**。取现量：`grep -cE 'error TS' <该命令日志>`。
