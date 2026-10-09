@@ -16,7 +16,9 @@
   },
   "sweepGroups": [
     "profile",
-    "account"
+    "account",
+    "sync",
+    "ai"
   ],
   "assertions": {
     "everyCaseCoversEverySweepGroup": true,
@@ -67,6 +69,46 @@
       }
     },
     {
+      "theme": "light",
+      "width": 390,
+      "group": "sync",
+      "navLabel": "同步与隐私",
+      "facts": {
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "theme": "light",
+        "title": "同步与隐私",
+        "box": {
+          "x": 16,
+          "y": 132,
+          "width": 358,
+          "height": 778
+        },
+        "textLength": 261,
+        "interactive": 6
+      }
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "group": "ai",
+      "navLabel": "AI 与集成",
+      "facts": {
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "theme": "light",
+        "title": "AI 与集成",
+        "box": {
+          "x": 16,
+          "y": 132,
+          "width": 358,
+          "height": 878
+        },
+        "textLength": 496,
+        "interactive": 4
+      }
+    },
+    {
       "theme": "dark",
       "width": 390,
       "group": "profile",
@@ -107,6 +149,46 @@
       }
     },
     {
+      "theme": "dark",
+      "width": 390,
+      "group": "sync",
+      "navLabel": "同步与隐私",
+      "facts": {
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "theme": "dark",
+        "title": "同步与隐私",
+        "box": {
+          "x": 16,
+          "y": 132,
+          "width": 358,
+          "height": 778
+        },
+        "textLength": 261,
+        "interactive": 6
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "group": "ai",
+      "navLabel": "AI 与集成",
+      "facts": {
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "theme": "dark",
+        "title": "AI 与集成",
+        "box": {
+          "x": 16,
+          "y": 132,
+          "width": 358,
+          "height": 878
+        },
+        "textLength": 496,
+        "interactive": 4
+      }
+    },
+    {
       "theme": "light",
       "width": 1440,
       "group": "profile",
@@ -147,6 +229,46 @@
       }
     },
     {
+      "theme": "light",
+      "width": 1440,
+      "group": "sync",
+      "navLabel": "同步与隐私",
+      "facts": {
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "theme": "light",
+        "title": "同步与隐私",
+        "box": {
+          "x": 424,
+          "y": 80,
+          "width": 655,
+          "height": 640
+        },
+        "textLength": 261,
+        "interactive": 6
+      }
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "group": "ai",
+      "navLabel": "AI 与集成",
+      "facts": {
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "theme": "light",
+        "title": "AI 与集成",
+        "box": {
+          "x": 424,
+          "y": 80,
+          "width": 655,
+          "height": 758
+        },
+        "textLength": 496,
+        "interactive": 4
+      }
+    },
+    {
       "theme": "dark",
       "width": 1440,
       "group": "profile",
@@ -184,6 +306,46 @@
         },
         "textLength": 33,
         "interactive": 1
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "group": "sync",
+      "navLabel": "同步与隐私",
+      "facts": {
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "theme": "dark",
+        "title": "同步与隐私",
+        "box": {
+          "x": 424,
+          "y": 80,
+          "width": 655,
+          "height": 640
+        },
+        "textLength": 261,
+        "interactive": 6
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "group": "ai",
+      "navLabel": "AI 与集成",
+      "facts": {
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "theme": "dark",
+        "title": "AI 与集成",
+        "box": {
+          "x": 424,
+          "y": 80,
+          "width": 655,
+          "height": 758
+        },
+        "textLength": 496,
+        "interactive": 4
       }
     }
   ]
