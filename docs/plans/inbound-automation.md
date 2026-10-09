@@ -355,3 +355,28 @@ Web 设置页已接入生成/轮换、一次性展示与复制、活动凭据元
 两条这一改动带来的**代价**，不是 bug，但下一轮必须按它们设计：① 声明了 `action` 的闸门在官方模式下也开始在事务里以 `FOR SHARE` 读订阅行，于是领取这类高频调用会与计费写入排队（量级取决于计费写入频率）；② “每动作一枚一次性票据 + 首版只支持在线核验”意味着设备每 20 秒一轮的 worker 循环要额外产生票据往返 —— 签发端与续票据节奏要和票据一起定，不能事后靠放宽票据复用次数来补。
 
 一处已知的运维卫生缺口：`sync/cleanup.ts` 扫过期 nonce 行，但**不扫** `automation_entitlement_clocks`（只含安装 ID 与一个时间戳，不含账号数据，因此不在注销范围对账里）。要清它得先有一条“实例退役”的判据，本轮没有拍。
+
+### 2026-10-09 分笔落地：每笔带走哪一层，以及界面层为什么不在里面
+
+分笔不写 SHA（写进正文就开始漂）。现量：`git log --oneline --grep='自动收集' -8`。
+
+| 笔 | 带走什么 |
+|---|---|
+| 契约与入站解析核 | `packages/inbound-core/`（新包）、`shared-schema` 的收件封装与草稿契约、上传契约里 commit proof 那条判据、`pnpm-lock.yaml` |
+| 服务端 | 权益判定与票据（`entitlement.ts`、`automation/entitlement-ticket.ts`）、收件/规则/事件/worker/发送方凭据/提交证明、12 枚自动收集迁移 |
+| 服务端判据 | 7 份新 spec + 2 份改（含真库 38 条与新增的自托管段）、`research/tools/verify-inbound-worker-identity.py` |
+| 客户端接线 | `app-host` 的 worker 循环、收件密钥封装、草稿复核、Vault 包装凭据存储与其 9 份测试；`domain` 的本地时区判据；`sync-client` 的上传授权判据 |
+| 文档 | 本计划、协议、复审、`pricing-and-entitlements.md` 的 `grants` 词表 |
+| 证据 | 真库读数与自证清单（顺带解掉 `check:docs` 那条“本机有但没跟踪”） |
+
+🔴 **界面层刻意没跟着走** —— `apps/web` 的自动收集设置面、`apps/mobile/src/inbound/`、`e2e` 那两份。理由不是没做完：它的中文词条住在 `packages/i18n/src/locales/{zh-CN,en}.ts`，而分笔那一刻那两枚文件**已经被并行会话 staged**（现量：`git diff --cached -- packages/i18n/src/locales/zh-CN.ts | grep -cE '^\+.*(自动收集|automation)'` 有数，`git diff` 同一判据为 **0** ⇒ 词条全在索引里，不在工作树差量里）。把它们从别人的索引里拆出来等于替别人决定提交边界；先落 i18n 的那一笔会把这些词条一起带走，归属用 `git log -S` 追，不打算别人的提交。⇒ 这一界闭合的判据很具体：HEAD 上 `pnpm --filter @heyta/web typecheck` 通过，且 `check:ui-language` 不报缺词条。
+
+一条别读成“干净检出就能构建”的实测后果：HEAD 上现在有 **6 枚跨线 dangling relative import**（现量：对 `git ls-tree -r --name-only HEAD` 里 `packages/{shared-schema,app-host}/src/*.ts(x)` 与 `server/src/*.ts` 逐个解 `from './…'`，目标不在 HEAD 树里即计入）。其中 **1 枚属于本线**：`inbound-draft-contract.ts → ./task-batch-contract`（草稿契约复用了批量编辑线尚未提交的那份常量表）；其余 5 枚是并行会话提交了 `shared-schema/src/index.ts` 与 `app-host/src/inbound-process.ts`、却没提交对应契约文件留下的。这批分笔**修掉了原先两枚本线自己的** dangling（`server/src/server.ts → ./automation/inbound.routes`、`index.ts → ./inbound-crypto-contract`）—— 前几轮“api 接线先留在工作树”造成的就是这一种形状：**抽取的收尾动作是把文件提交掉并让 HEAD 自洽，不是把更好的新版本留在工作树里**。
+
+判据复跑边界：这批提交没有改动工作树任何一个字节（现量：`git diff --stat HEAD -- <这 86 枚路径>` 只剩 4 枚混合文件的差量，而那差量正是别人的 hunk），所以上一节那张读数表描述的还是同一批源码。把整套判据对着新 HEAD 重跑（`pnpm -r test`、完整 `pnpm check`、`pnpm reinstall:all` 四端重装）**仍然欠着** —— 起跑那一刻共享载体上有并行写入者且负载高，按 §8 第 9 条那格要在隔离副本上做，不能拿这趟的工作树读数冒充。
+
+仍然没闭合的（不包装成完成）：官方签发端与 `officialSubject ↔ installation ↔ 本地账号` 的链接握手（现在没有 issuer，自托管这一档在真机上**拿不到票据**，因此也只能在测试签发者下取证）；吊销版本在线刷新；各宿主每 30 秒续票据与 `waiting-entitlement` UI；`X-Heyta-Entitlement-Ticket` 在 app-host 客户端侧还没有供给方；其余动作（领取/预留/发布/注册/启用规则/签发凭据）的一次性票据目前在 HTTP 闸门自己的事务里消费，不在业务写事务里；故障窗口 11 只做了前半（撤销先赢），后半“许可先落盘、撤销后到”仍按既有许可语义取证。AC-1～AC-8 继续不勾选，公网接收与售卖继续关闭。
+
+两条这一改动带来的**代价**，不是 bug，但下一轮必须按它们设计：① 声明了 `action` 的闸门在官方模式下也开始在事务里以 `FOR SHARE` 读订阅行，于是领取这类高频调用会与计费写入排队（量级取决于计费写入频率）；② “每动作一枚一次性票据 + 首版只支持在线核验”意味着设备每 20 秒一轮的 worker 循环要额外产生票据往返 —— 签发端与续票据节奏要和票据一起定，不能事后靠放宽票据复用次数来补。
+
+一处已知的运维卫生缺口：`sync/cleanup.ts` 扫过期 nonce 行，但**不扫** `automation_entitlement_clocks`（只含安装 ID 与一个时间戳，不含账号数据，因此不在注销范围对账里）。要清它得先有一条“实例退役”的判据，本轮没有拍。
