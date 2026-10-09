@@ -252,24 +252,23 @@ W1 先落、W7 后落 ⇒ 中间任何一次 `pnpm check` 都会红。**这不�
     判据四层里只有**真运行时那一层**能红（改前产物 `37 过 / 2 红`，改后 `39 过 / 0 红`）：
     单元与 HTTP 层对一个"只写计数器"的实现全绿，因为它们数的是请求与响应，
     缺的那一半是一条**已经建立的连接**。
-17. ⚠️ **逐枚撤销不关那一枚的实时通道**（10-10 00:5x 现量登记，§6.46）：这是第 16 条那一族的
-    **另一半分界**，不是它的回归。`DELETE /sessions/:id` 删的是那一行的会话与 30 s 鉴权缓存，
+17. ✅ **逐枚撤销不关那一枚的实时通道** —— **这一格已关**（10-10 02:45，`be4e41b4` + `0c7e7476`，读数与三臂在 §6.60）。
+    原文留着，因为它记的三件前置正是落地时做的三件：upgrade 鉴权时把 `jti` 的 SHA-256 记进连接、
+    加 `closeForSession(userId, sessionId)`、再补一条**真运行时**的 WS 判据。
+    它是第 16 条那一族的**另一半分界**，不是它的回归。`DELETE /sessions/:id` 删的是那一行的会话与 30 s 鉴权缓存，
     而那台设备**已经开着的页面**还会继续收 op 通知，直到它自己重连。
     它**不是**"界面在说谎"：`common.sessions.intro` 说的是"退出哪一台，它的**下一次请求**就要重新登录"
-    —— 那句话与实现逐字对齐，没有多承诺一分。也没法顺手修：连接簿记
-    （`server/src/sync/services/websocket-connection.service.ts:79-80`）是
-    `Map<userId, Set<ConnectedClient>>`，而 `ConnectedClient` 只带 `ws / clientId / userId / lastPong / connectedAt`
-    —— **没有 jti**，所以服务端此刻认不出"那一枚会话对应哪一条 socket"，想关也关不准。
-    关闭它需要三件一起做：upgrade 鉴权时把 jti 记进连接、加 `closeForSession(jtiHash)`、
-    以及一条**真运行时**的 WS 判据。
+    —— 那句话与实现逐字对齐，没有多承诺一分，所以关掉它**不需要**动任何对外文案。
+    当时"想关也关不准"的原因也记在这里：连接簿记是 `Map<userId, Set<ConnectedClient>>`，
+    而 `ConnectedClient` 只带 `ws / clientId / userId / lastPong / connectedAt` —— 没有 jti。
     ⚠️ 这一条原先写的是"现存的 pglite 与 HTTP 层判据都看不见已经开着的连接，所以逐枚那条**只有注释里那句解释**"——
-    后半句已被现量否证（§6.56 臂B）：HTTP 层**有**一条负向判据
-    `单枚撤销**不**关掉整个账号的实时通道（那是 revoke-all 的语义）`，往逐枚那条路径里塞一句
+    后半句已被现量否证（§6.56 臂B）：HTTP 层**有**一条负向判据，往逐枚那条路径里塞一句
     `closeForUser(user.userId)` 就会让它红。
-    ⇒ 还缺的准确说是**另一半**：没有任何一层看得见"那台设备已经开着的连接"的实际后果
-    （要一条真 WS 运行时判据），而不是"这条边界没人守"。
-    复取：`git grep -n "closeForUser" HEAD -- server/tests` ⇒ 正向 1 条（`toHaveBeenCalledWith`）+ 负向 2 条（`not.toHaveBeenCalled`）；
-    两臂读数见 §6.56。
+    🔴 **关掉之后仍然开着的那一小格**：本轮之前签的、没有 `jti` 的令牌，服务端认不出对应哪条连接，
+    那一档还是只能等它自己重连（ADR-0063 §4 第 1 条原样）。运行时层造不出这种组合，
+    它由单元层"`sessionId` 为 `null` 的连接不许被误关"那条**反向**钉住 —— 反向，不是正向。
+    复取：`git grep -n "closeForUser\|closeForSession" HEAD -- server/src` ⇒ 逐枚那条现在是**真调用**，不是注释；
+    `git grep -n "closeForUser" HEAD -- server/tests` ⇒ 正向 1 条 + 负向 2 条；两臂读数见 §6.56。
 
 ---
 
@@ -2382,7 +2381,7 @@ node -e 'const m=require("child_process").execSync("vm_stat").toString();const p
 | 登出所有设备 | `account/account-security.routes.ts:213-214` | 走 `revokeAllTokens`（`auth.ts:215` 那一处 bump）+ `revokeAllDeviceSessions` ⇒ **bump 与关通道分在两个文件里**，这正是门禁把 `auth.ts` 列进豁免、并且**连豁免处的 bump 计数一起钉住**的理由（`node scripts/check-session-revocation.mjs` 那句"豁免 1 枚且计数逐字相符"） |
 | 后台强制登出 | `admin/admin.routes.ts:548-550` | 同一类分法，表上写明"删行 + 关通道是一个助手" |
 | **账号注销** | `api.ts` 里 `DELETE /account`：`prisma.$transaction((tx) => deleteAccountWithTombstone(tx, userId))` 之后 `authCache.invalidate` 与 `closeForUser` 各一句 | ✅ **没有缺口**：会话行由 `AccessSession.user` 上的 `onDelete: Cascade` 带走（`server/prisma/schema.prisma` 那枚模型），通道单独关、注释还写明"删完之后关，否则重连会再铸一条孤儿 socket" ⇒ 这一路**不需要** `revokeAllDeviceSessions`，不是漏调 |
-| **逐枚撤销** | `account-security.routes.ts` 里 `DELETE /sessions/:id` 那一支 | ⚠️ 四件里三件有主人（删那一行、`authCache.invalidate`、审计日志），**关通道那件没有**，而且是**明知故漏**：那里的注释自己写着 `closeForUser(userId)` 会把这个账号**全部**设备踢下线。根因在服务端认不出"那一枚会话是哪一条 socket"：`sync/services/websocket-connection.service.ts:79-80` 的簿记是 `Map<userId, Set<ConnectedClient>>`，而 `ConnectedClient` 只带 `ws / clientId / userId / lastPong / connectedAt`，**没有 jti**。⇒ 登记成 §5 第 17 条，含关闭它需要的三件事 |
+| **逐枚撤销** | `account-security.routes.ts` 里 `DELETE /sessions/:id` 那一支 | ✅ **这一格已关（§6.60，10-10 02:45）** —— 下面这段是当时的现状读数，保留原文：⚠️ 四件里三件有主人（删那一行、`authCache.invalidate`、审计日志），**关通道那件没有**，而且是**明知故漏**：那里的注释自己写着 `closeForUser(userId)` 会把这个账号**全部**设备踢下线。根因在服务端认不出"那一枚会话是哪一条 socket"：`sync/services/websocket-connection.service.ts:79-80` 的簿记是 `Map<userId, Set<ConnectedClient>>`，而 `ConnectedClient` 只带 `ws / clientId / userId / lastPong / connectedAt`，**没有 jti**。⇒ 登记成 §5 第 17 条，含关闭它需要的三件事 |
 
 **这条边界为什么不算"界面在说谎"**：`common.sessions.intro` 的原话是"退出哪一台，它的
 **下一次请求**就要重新登录" —— 与实现逐字对齐。多承诺一分的那句（"它立刻什么都收不到"）界面没说，
@@ -3035,6 +3034,67 @@ AGENTS §6.1.1 那套 `pnpm reinstall:all` 固定收尾在干净检出上同样�
 可迁移的形状：**"共享层的 `index.ts` 提交了、实现文件没提交"这一型，任何按文件看的静态门禁都看不见**——
 每枚文件单独看都合法，只有"引用必须解析到已提交对象"这一条能抓住它。这与 §6.55（路由写了没挂）、
 §6.50（面板写了没 mount）是同一族的第三种面目：前两种是"写了没人消费"，这一种是"**消费的东西不在仓库里**"。
+
+### 6.60 §5 第 17 条那一半缺口关掉了：撤销那一枚现在当场断掉那一枚的通道（判据在无 mock 的运行时层，三臂各红；10-10 02:45 现量）
+
+改前三层里有两层**结构上看不见**这件事：单元层用假 prisma、HTTP 层用 `app.inject`，
+两者都把 `websocket-connection.service` 整个 mock 掉 ⇒ 把 `revokeSession` 里那句 `closeForSession` 整行删掉，
+那两层照样全绿。这正是第 17 条写的"缺的那一半是一条已经建立的连接"，所以这一格**必须**落在一趟真连接上。
+
+产品侧的形状（`be4e41b4`）：
+- upgrade 时把**服务端自己验出来的** `sessionId`（= `jti` 的 SHA-256，`auth.ts:338` 已经算好了，只是没人往下传）
+  记进连接簿记，撤销那一行真删掉时 `closeForSession(userId, sessionId)` 只关那一枚。
+- 🔴 **不按 `clientId` 关**：那是查询串里客户端自报的值，冒认别台的 id 就能让自己的连接免关
+  （`closeForClient` 自己的注释也这么写，而它**一个调用点都没有** —— 死代码，别读成"已经有这一半"）。
+- `addConnection` 的第四枚参数**必填、不给默认值**：给了默认值 = 把"宿主没接"伪装成"做完了"（traps #195 那一型）。
+- 修在收口处：close 挂在 `revokeSession` 里，所以「退出登录」那条走同一枚助手的**一并生效**，没有第二份实现。
+
+判据（`0c7e7476`）分两层，都在**默认通道**里有人跑：
+- 单元/HTTP 层：服务级四条（只关那一枚／`sessionId` 为 `null` 的旧令牌那档不许被误关／按用户分域／未知 id 不炸）
+  + 路由级"恰好一次且带那一枚的 id" + "撤不动的那一枚一个通道都不许关"。
+- 运行时层：`server/tests/integration/session-revoke-websocket.integration.spec.ts`
+  （真 PostgreSQL + 真 Fastify + 真 `ws` 客户端；形状照仓内既有的 `websocket-storm` 那枚，没另造一套夹具）。
+  四条 = 前提两条连接真 up、撤销 A 关掉 A、B 那台不许被牵连、撤不存在的 id 谁都不许多关。
+  已进 `test:integration:postgres` 点名清单，`check:integration-coverage` rc=0（盘上 34 枚逐一对上）。
+
+读数（载体 `.worktrees/iosacct` 纯 `refs/heads/main` + 主检出，逐趟 NO_COLOR）：
+
+| 趟 | 读数 |
+|---|---|
+| 运行时基线 | `4 passed (4)`，其中 A 的 close 在 **1 ms** 内到达，`{code:4003, reason:'Session revoked'}` |
+| 臂E（`revokeSession` 不关那一枚 = 改前行为） | `1 failed`，红的是"撤销 A 关掉 A"，**5 s 内没有任何 close** |
+| 臂F（逐枚去关整个账号） | `1 failed`，同一条红，received 是 `{4003,'Token revoked'}` |
+| 臂G（upgrade 没记 session id，即接线半漏） | `1 failed`，同一条红，5 s 无 close |
+| 单元/HTTP 层基线 | 五枚 spec `134 passed (134)` |
+| `check:session-revocation` | rc=0（`bump=6 违规=0 豁免命中=1 计数逐字相符`）—— 新增这句不抬计数器，所以那道结构门禁没有被迫改口径 |
+
+🔴 **这轮最值钱的一条是判据自己的形状**（不是产品）：第一版运行时判据我只比 close 的 **code**，
+于是臂E 与臂F **两臂都活着**（`4 passed`）—— 4003 那一档两种实现都发，"精确关掉那一枚"和"整个账号一起关"
+在它眼里长得一样，而后者正是这一族最危险的错法。加上 `reason` 逐字对之后三臂各红自己该红的那条。
+⇒ **一条断言只比"状态码/枚举值"而不比"是谁、为什么"时，它会同时放过两种相反的错法**；
+补一条对照（臂F 那种"越界实现"）比多写几条正向用例更能回答"这判据能不能红"。
+复取：`cd server && DATABASE_URL=postgresql://$(whoami)@127.0.0.1:5432/heyta_account_w9?schema=public npx vitest run --config vitest.integration.config.ts --maxWorkers=1 tests/integration/session-revoke-websocket.integration.spec.ts`
+
+⚠️ **两条没包装的边界**：
+1. 本轮之前签的、没有 `jti` 的令牌仍然认不出对应哪条连接 ⇒ 那一档还是等它自己重连（ADR-0063 §4 第 1 条原样）。
+   运行时层对此**没有**判据可写（要一条旧令牌 + 一条连接的组合，而那枚令牌在新库里造不出来），
+   它由单元层"`sessionId` 为 `null` 的连接不许被误关"那条反向钉住 —— 反向，不是正向。
+2. 臂E 有一趟观察到的是 `{4003,'Invalid token'}` 而不是"无 close"（另一趟是 5 s 无 close）。
+   那句 `Invalid token` 是**又一次 upgrade 尝试**被拒时发的（行已删 ⇒ 验签过不了），
+   不影响红/绿（两种读数都不是 `Session revoked`），但说明这一层还混着一条"重连即拒"的既有路径，
+   别把它读成"改前也在关连接"。
+3. 单元/HTTP 层的两臂（E、G）**未取**：那趟被本机内存闸门按**余量**那一维拒了（`立即可用 109MB < 384MB`），
+   不是产品红。要补的是一条命令：`cd server && npx vitest run tests/websocket-connection.service.spec.ts tests/websocket.routes.spec.ts tests/account-security.routes.spec.ts`
+   在两种变异下各跑一次（盘上快照还原用内存里的内容，别用 `io.open(p,'w')` 之后再读 bak —— 这一趟就是这么把
+   `access-sessions.ts` 截成 0 字节的：Python 先求值 `io.open(p,'w')` 那半**已经把文件清空**，随后读 `.mut-bak` 才抛异常）。
+
+顺带三条**别的线的红**，本轮现量到、归属写清楚，不记在本线账上：
+- `pnpm --filter @heyta/sync-server test` 在主检出是 `6 failed | 2738 passed`。其中 `sync-compressed-body.routes.spec.ts` 那 5 条
+  在**纯 main tip 的载体里全绿** ⇒ 红在主检出那几枚 `M` 的 `server/src/sync/*`（同步那条线在飞）。
+- `validation.service.spec.ts:667` 的 `expected 18 to be 17`（`ALLOWED_ENTITY_TYPES.size` vs `HEYTA_ENTITY_TYPES.length`）
+  **在纯 HEAD 上就红** ⇒ HEAD 级红，跨层词表漂移，与 §6.20/§6.21 同族；归共享 schema 那条线，不在本线文件上。
+- 在载体里跑 `pnpm -r build` 会**改写被跟踪的** `apps/landing/docs/**/index.html`（本轮 30 枚 `M`）⇒
+  构建写跟踪产物，读"载体干不干净"之前要先 `git checkout --` 它们，否则下一位会以为是别人在飞。已复原并复核为空。
 
 
 
