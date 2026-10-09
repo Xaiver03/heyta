@@ -1,4 +1,4 @@
-import { FastifyInstance, FastifyReply } from 'fastify';
+import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { AUTH_PASSWORD_PATHS, SuperSyncClientIdSchema, inboundDraftEventIdSchema, inboundDraftDecisionSchema } from '@heyta/shared-schema';
 import { isEmailAllowed } from './email-allowlist';
@@ -63,7 +63,7 @@ import { asServerLocale, resolveLocale } from './design-html.js';
 import { SERVER_LOCALES, type ServerLocale } from './copy.generated.js';
 import { authCache } from './auth-cache';
 import { getWsConnectionService } from './sync/services/websocket-connection.service';
-import { createEntitlementGuard, readAutomationEntitlementTicketHeader, resolveAutomationEntitlementMode } from './entitlement';
+import { AutomationWriteAuthorizationError, createEntitlementGuard, readAutomationEntitlementTicketHeader, replyAutomationRejection, resolveAutomationEntitlementMode } from './entitlement';
 import { issueAutomationCommitPermit, readInboundUploadIdentity, registerAutomationWorker, revokeAutomationWorker } from './automation/worker-identity';
 import { createAutomationRule, deleteAutomationRule, listAutomationRules, setAutomationRuleEnabled, updateAutomationRuleConfig } from './automation/rules';
 import { claimAutomationEvent, listAutomationEvents, publishAutomationResult, readAutomationPreparedResult, renewAutomationLease, retryUncertainAutomationEvent, readAutomationDraft, decideAutomationDraft } from './automation/events';
@@ -651,6 +651,14 @@ export const apiRoutes = async (
     return issuer ? { issuer } : { code: 'AUTOMATION_ISSUER_NOT_CONFIGURED' };
   };
 
+  // 逐次放行的一次性动作共用**同一条**取票据的通道（只认出现一次的头，重复即当作没带）。
+  // 闸门用它是为了离线预检，路由用它是为了在写事务里消费 —— 两处必须读到同一枚票据，
+  // 所以这里只有一处解析，不在各路由里各写一遍。
+  const automationTicket = (req: FastifyRequest): string | undefined => {
+    const rawHeaders = req.raw?.rawHeaders;
+    return Array.isArray(rawHeaders) ? readAutomationEntitlementTicketHeader(rawHeaders) : undefined;
+  };
+
   fastify.post<{ Body: z.infer<typeof AutomationInstallationSchema> }>(
     '/automation/entitlement/subject',
     { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation' })] },
@@ -799,16 +807,17 @@ export const apiRoutes = async (
   // enters op-log, logs, or a user-visible error.
   fastify.post<{ Body: z.infer<typeof AutomationWorkerRegisterSchema> }>(
     '/automation/worker/register',
-    { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation', action: 'worker-register' })] },
+    { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation', action: 'worker-register', precheckOnly: true })] },
     async (req, reply) => {
       const parsed = AutomationWorkerRegisterSchema.safeParse(req.body);
       if (!parsed.success) return reply.status(400).send({ error: 'Validation failed' });
       try {
         const user = getAuthUser(req);
         return reply.status(201).send(await registerAutomationWorker(
-          user.userId, parsed.data.clientId, parsed.data.databaseEpoch,
+          user.userId, parsed.data.clientId, parsed.data.databaseEpoch, automationTicket(req),
         ));
       } catch (error) {
+        if (error instanceof AutomationWriteAuthorizationError) return replyAutomationRejection(req, reply, error.decision, 'automation');
         Logger.warn(`Automation worker registration rejected: ${error instanceof Error ? error.message : 'unknown'}`);
         return reply.status(400).send({ error: 'Automation worker registration failed' });
       }
@@ -893,14 +902,18 @@ export const apiRoutes = async (
     '/automation/rules/:ruleId/enabled',
     // 关闭规则不要求付费（协议 §4），只有启用才消费 rule-enable 票据。
     { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation', action: 'rule-enable',
+      precheckOnly: true,
       when: (req) => (req.body as { enabled?: unknown } | undefined)?.enabled === true,
       scope: (req) => ({ ruleId: String((req.params as { ruleId?: unknown }).ruleId ?? '') }) })] },
     async (req, reply) => {
       const params = AutomationRuleParamsSchema.safeParse(req.params);
       const body = AutomationRuleEnabledSchema.safeParse(req.body);
       if (!params.success || !body.success) return reply.status(400).send({ error: 'Validation failed' });
-      try { return reply.send(await setAutomationRuleEnabled(getAuthUser(req).userId, params.data.ruleId, body.data.enabled)); }
-      catch { return reply.status(404).send({ error: 'Automation rule not found' }); }
+      try { return reply.send(await setAutomationRuleEnabled(getAuthUser(req).userId, params.data.ruleId, body.data.enabled, automationTicket(req))); }
+      catch (error) {
+        if (error instanceof AutomationWriteAuthorizationError) return replyAutomationRejection(req, reply, error.decision, 'automation');
+        return reply.status(404).send({ error: 'Automation rule not found' });
+      }
     },
   );
 
@@ -920,12 +933,16 @@ export const apiRoutes = async (
   fastify.post<{ Params: unknown; Body: z.infer<typeof AutomationSenderCredentialSchema> }>(
     '/automation/rules/:ruleId/sender-credentials',
     { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation', action: 'sender-credential-issue',
+      precheckOnly: true,
       scope: (req) => ({ ruleId: String((req.params as { ruleId?: unknown }).ruleId ?? '') }) })]},
     async (req, reply) => {
       const params = AutomationRuleParamsSchema.safeParse(req.params); const body = AutomationSenderCredentialSchema.safeParse(req.body);
       if (!params.success || !body.success) return reply.status(400).send({ error: 'Validation failed' });
-      try { return reply.status(201).send(await issueSenderCredential(getAuthUser(req).userId, params.data.ruleId, body.data.keyId)); }
-      catch { return reply.status(409).send({ error: 'Sender credential could not be issued' }); }
+      try { return reply.status(201).send(await issueSenderCredential(getAuthUser(req).userId, params.data.ruleId, body.data.keyId, automationTicket(req))); }
+      catch (error) {
+        if (error instanceof AutomationWriteAuthorizationError) return replyAutomationRejection(req, reply, error.decision, 'automation');
+        return reply.status(409).send({ error: 'Sender credential could not be issued' });
+      }
     },
   );
   fastify.get<{ Params: unknown }>(
@@ -1028,7 +1045,7 @@ export const apiRoutes = async (
 
   fastify.post<{ Body: z.infer<typeof AutomationClaimSchema> }>(
     '/automation/events/claim',
-    { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation', action: 'event-claim' })]},
+    { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation', action: 'event-claim', precheckOnly: true })]},
     async (req, reply) => {
       const parsed = AutomationClaimSchema.safeParse(req.body);
       if (!parsed.success) return reply.status(400).send({ error: 'Validation failed' });
@@ -1036,9 +1053,12 @@ export const apiRoutes = async (
       const identity = readInboundUploadIdentity(req.raw.rawHeaders, user.tokenVersion);
       if (!identity) return reply.status(403).send({ error: 'Automation worker authorization required' });
       try {
-        const claimed = await claimAutomationEvent(user.userId, parsed.data.clientId, identity, new Date(), parsed.data.eventId);
+        const claimed = await claimAutomationEvent(user.userId, parsed.data.clientId, identity, new Date(), parsed.data.eventId, automationTicket(req));
         return reply.send(claimed ?? { state: 'empty' });
-      } catch { return reply.status(403).send({ error: 'Automation worker authorization failed' }); }
+      } catch (error) {
+        if (error instanceof AutomationWriteAuthorizationError) return replyAutomationRejection(req, reply, error.decision, 'automation');
+        return reply.status(403).send({ error: 'Automation worker authorization failed' });
+      }
     },
   );
 
@@ -1060,6 +1080,7 @@ export const apiRoutes = async (
   fastify.post<{ Params: { eventId: string }; Body: z.infer<typeof AutomationResultSchema> }>(
     '/automation/events/:eventId/result',
     { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation', action: 'result-publish',
+      precheckOnly: true,
       scope: (req) => ({ eventId: String((req.params as { eventId?: unknown }).eventId ?? '') }) })]},
     async (req, reply) => {
       const params = z.object({ eventId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$/) }).safeParse(req.params);
@@ -1072,8 +1093,12 @@ export const apiRoutes = async (
         return reply.send(await publishAutomationResult({ userId: user.userId, clientId: parsed.data.clientId,
           identity, eventId: params.data.eventId, leaseGeneration: parsed.data.leaseGeneration,
           parseVersion: parsed.data.parseVersion, resultDigest: parsed.data.resultDigest,
-          resultCiphertext: parsed.data.resultCiphertext, itemCount: parsed.data.itemCount, needsConfirmation: parsed.data.needsConfirmation }));
-      } catch { return reply.status(409).send({ error: 'Automation lease or result is no longer valid' }); }
+          resultCiphertext: parsed.data.resultCiphertext, itemCount: parsed.data.itemCount, needsConfirmation: parsed.data.needsConfirmation,
+          ticket: automationTicket(req) }));
+      } catch (error) {
+        if (error instanceof AutomationWriteAuthorizationError) return replyAutomationRejection(req, reply, error.decision, 'automation');
+        return reply.status(409).send({ error: 'Automation lease or result is no longer valid' });
+      }
     },
   );
 
@@ -1119,6 +1144,11 @@ export const apiRoutes = async (
 
   fastify.post<{ Params: { eventId: string }; Body: z.infer<typeof AutomationAiReserveSchema> }>(
     '/automation/events/:eventId/ai-attempt/reserve',
+    // ⚠️ 这一格**没有**改成 `precheckOnly`：reserve 的写事务走 `automation/ai-metering.ts`
+    // 的 SqlRunner 端口（位置参数 `$1`），而票据消费需要 Prisma 事务客户端的具名成员
+    // （绑定行、nonce 表、时钟表）。把它挪进同一个事务要么复制一份判定（正是本仓库
+    // "同一个判断写三遍"那个漂移源头），要么改端口形状（牵连托管额度那一路）。
+    // 记在计划 T2 那节的边界表里，不冒充已完成。
     { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation', action: 'ai-reserve',
       scope: (req) => ({ eventId: String((req.params as { eventId?: unknown }).eventId ?? '') }) })]},
     async (req, reply) => {
