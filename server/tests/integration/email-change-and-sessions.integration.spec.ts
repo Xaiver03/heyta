@@ -515,6 +515,107 @@ describeWithDb('换绑邮箱与会话撤销（真 PostgreSQL + 真 Prisma + 真 
     expect(sent.passwordChanged[0]?.[0]).toBe(email);
   });
 
+  /**
+   * 🔴 **工单 W1"忘记密码"那一路的运行时半边**，与链路 8 同一型：
+   * `resetPasswordWithToken` 抬 `tokenVersion` 之外还要删会话行（J13 的第二半）。
+   * 只抬计数器的实现在"旧令牌 401"上全绿，分辨得了的是**库里那一行在不在**。
+   * 顺带把这一路独有的三件事钉住：成功**不发会话**（J14）、那两列当场清空（一枚链接只用一次）、
+   * 锁与失败计数一并解掉（否则"先输错五次锁住、再走重置"就能把人挡在自己账号外面）。
+   */
+  it('链路 9：真 HTTP 重置口令 ⇒ 其余设备那行当场删掉、不换发会话、令牌消费即失效、旧口令不再能登录', async () => {
+    const email = `w9-reset-${Date.now()}@example.test`;
+    const userId = await makeUser(email);
+    const oldPassword = `W9-chain9-old-${Date.now()}-${process.pid}-Pass!`;
+    const newPassword = `W9-chain9-new-${Date.now()}-${process.pid}-Pass!`;
+    await observer.user.update({ where: { id: userId }, data: { passwordHash: await hashFor(oldPassword) } });
+
+    const victim = await app.inject({
+      method: 'POST',
+      url: `/api${AUTH_PASSWORD_PATHS.login}`,
+      headers: { 'user-agent': 'W9-Chain9-Other-Device' },
+      payload: { email, password: oldPassword },
+    });
+    expect(victim.statusCode, victim.body).toBe(200);
+    const tokenVictim = (JSON.parse(victim.body) as { token: string }).token;
+
+    // 重置令牌按这一套既有手法直接写库（哈希 + 到期），链路 9 要验的是**消费那一步**，不是那封信。
+    const linkToken = `reset-${Date.now()}-${process.pid}`;
+    await observer.user.update({
+      where: { id: userId },
+      data: { resetPasswordToken: hashToken(linkToken), resetPasswordTokenExpiresAt: BigInt(Date.now() + 60_000) },
+    });
+
+    const reset = await app.inject({
+      method: 'POST',
+      url: `/api${AUTH_PASSWORD_PATHS.reset}`,
+      headers: { 'user-agent': 'W9-Chain9-Recover-Device' },
+      payload: { token: linkToken, password: newPassword },
+    });
+    expect(reset.statusCode, reset.body).toBe(200);
+    // 🔴 J14：这条路**不发会话**。发了就等于"点开一封重置邮件"变成一次登录，
+    // 而点开那封信只证明有人能收到那个收件箱。
+    const resetBody = JSON.parse(reset.body) as { message?: string; token?: string };
+    expect(resetBody.token, '重置口令换出了一枚会话').toBeUndefined();
+    expect(typeof resetBody.message).toBe('string');
+
+    // 🔴 撤销的第二半：重置不换发新令牌，所以库里应当**一行都不剩**。
+    expect(await observer.accessSession.count({ where: { userId } })).toBe(0);
+    const stale = await app.inject({
+      method: 'GET',
+      url: `/api/${SESSION_PATHS.list}`,
+      headers: bearer(tokenVictim),
+    });
+    expect(stale.statusCode, '重置后那台设备还在用').toBe(401);
+
+    // 那两列当场清空 + 第二次点同一枚与"从没有过这枚链接"回同一句。
+    const row = await observer.user.findUniqueOrThrow({ where: { id: userId } });
+    expect(row.resetPasswordToken).toBeNull();
+    expect(row.resetPasswordTokenExpiresAt).toBeNull();
+    const replay = await app.inject({
+      method: 'POST',
+      url: `/api${AUTH_PASSWORD_PATHS.reset}`,
+      payload: { token: linkToken, password: `W9-chain9-replay-${Date.now()}-Pass!` },
+    });
+    // 🔴 这一档是 **400 不是 401**：查不到链接不是"你是谁"的问题（单元层就钉着这一句 ——
+    // `password-auth-routes.spec.ts` 的"查不到这枚令牌 ⇒ 400 + code=invalid_reset_link"）。
+    // 而 400 有两种来源（口令策略不过 / 链接无效），所以这里按 `code` 断言，不只看状态码。
+    expect(replay.statusCode, '一枚重置链接可以反复用').toBe(400);
+    expect((JSON.parse(replay.body) as { code?: string }).code).toBe('invalid_reset_link');
+    const never = await app.inject({
+      method: 'POST',
+      url: `/api${AUTH_PASSWORD_PATHS.reset}`,
+      payload: { token: `never-${Date.now()}-${process.pid}`, password: newPassword },
+    });
+    expect(never.statusCode).toBe(400);
+    // 逐字相同：状态码与那句话都要一样（"这枚链接有效过"本身就是账号存在性证据）。
+    expect(never.body).toBe(replay.body);
+
+    // 一次成功的重置 = 这个人拿回了收件箱 ⇒ 口令爆破留下的锁与计数一并解掉。
+    // 🔴 这几句必须排在下面那两次登录**之前**：拿旧口令去试那一次会走 `recordFailedAttempt`，
+    //    把刚解开的计数又顶上去，那时读到的就不是"重置解掉锁"这件事了。
+    const after = await observer.user.findUniqueOrThrow({ where: { id: userId } });
+    expect(after.lockedUntil).toBeNull();
+    expect(after.failedLoginAttempts).toBe(0);
+    expect(after.tokenVersion).toBe(1);
+    // 告知信：与改密同一条立场（只在成功时发一封）。
+    expect(sent.passwordChanged).toHaveLength(1);
+    expect(sent.passwordChanged[0]?.[0]).toBe(email);
+
+    // 口令**真的**换了：旧的不太行，新的行。
+    const withOld = await app.inject({
+      method: 'POST',
+      url: `/api${AUTH_PASSWORD_PATHS.login}`,
+      payload: { email, password: oldPassword },
+    });
+    expect(withOld.statusCode, '重置之后旧口令还能登录').toBe(401);
+    const withNew = await app.inject({
+      method: 'POST',
+      url: `/api${AUTH_PASSWORD_PATHS.login}`,
+      payload: { email, password: newPassword },
+    });
+    expect(withNew.statusCode, withNew.body).toBe(200);
+  });
+
   // ── D1（工单 §1 量出来的那条"全仓零 HTTP 判据"）─────────────────────────
   // `POST /api/auth/email/verify` 是三类令牌的**唯一**分流口（ADR-0039 §2.1）。
   // 它此前只在 service 层被测：那里的"返回一枚会话"是假的，而线上症状是
