@@ -2083,10 +2083,25 @@ bash ~/.heyta-window-rigs/heyta-ios-account-chain.sh ~/.heyta-evidence/<新戳>-
 
 ⚠️ 三条边界，不包装成完成：
 1. **图先于这笔**：那 6 张截图是 14:2x 在主检出的工作树上取的（那时那三处 hunk 还没入库），
-   所以图里的设置面 IA 是并行会话那一版（rail 里"账号与安全"那一格）。挂载**落点**与入库那份逐字相同，
-   但"在干净检出上重跑一趟 e2e"这一格没做，前置是隔离载体里装得起 `e2e/` 那份独立 lockfile（registry 通道被本机代理额度挡着）。
+   所以图里的设置面 IA 是并行会话那一版（rail 里"账号与安全"那一格）。挂载**落点**与入库那份相同
+   （两处各两行：`import` 与 JSX；注释的措辞他们压过一行 —— §6.41 末那条撤回写清了）。
+   🔴 "在干净检出上重跑一趟这一族 e2e"这一格**没做**，而且挡它的原因**不是**"装不起 `e2e/` 的依赖"
+   （现量否证：`test -d e2e/node_modules` 成立，`e2e/node_modules/.bin/playwright` 在）。
+   真正的三条前置，逐条都是现量而不是印象：
+   ① 那枚 spec 把图写进 `apps/web/evidence/account-suite/`（`const EVIDENCE = …account-suite`，
+      现量：`grep -n EVIDENCE e2e/tests/account-email-change-and-sessions.spec.ts`）——
+      也就是**重跑会改写刚提交的 11 枚受版本控制的图**，这正是产品体验线那条还开着的
+      "整族 e2e 会改写已跟踪证据"；跑之前要先定"图落哪、要不要把改写后的入库"。
+   ② 它的 `webServer` 是 `vite --port 4318 --strictPort` + `stub-provider.mjs`（4319），
+      而 `check:ai-e2e` 的 preflight 按这两个端口 SIGKILL。现量：4318/4319 此刻空闲，
+      但本机有**别人会话**起了 7–8 小时的 vite dev（pid 55973 在 4383、pid 59513 在主检出，在 4379）
+      —— 那一族用的是槽位端口，下一次槽位轮到我的窗口就会撞上他们的清理。
+      按 §8.9"共享资源独占验收"，不协调好不开跑。
+   ③ 读数只能是"HEAD + 那叠在飞代码"，不是干净 HEAD —— 主检出的 `App.tsx` / `ProfilePanel.tsx`
+      仍是 ` M`（现量：`git status --porcelain -- apps/web/src/App.tsx`）。
 2. `main` 这一笔之后**仍然打不出包**，因为别人那 13 枚构建输入还没落（§6.38 现量命令）——它没让它变好也没让它变坏；
-   候选树之所以能构建，是因为它叠了那 13 枚。
+   候选树之所以能构建，是因为它叠了那 13 枚。⚠️ 这一格产品体验线正在做（`41d10423` / `61126d7d` / `0f74c0c2`
+   三笔都在同一格上），**归属在他们那边**，本线只留现量命令不重复修。
 3. `SessionsPanel` / `EmailChangePanel` 那条 `active` 属性在这一笔里**没有传**（HEAD 还没有分组目录那个变量），
    默认值 `true` 等于"总是活跃"。别人那笔一落就会带上 `active={…}` —— 这是 §7 第 195 条那种
    "默认值会把宿主没接伪装成做完了"，所以写在这里而不是藏在代码注释里。
