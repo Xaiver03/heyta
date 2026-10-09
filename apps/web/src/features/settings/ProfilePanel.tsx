@@ -70,6 +70,9 @@ import {
 import { useSyncStore } from '../sync/store.js';
 import { loadAvatarImage, type AvatarFileError } from './avatar-encode.js';
 import { notifyAccountIdentityChanged } from './useAccountIdentity.js';
+// 换绑登录邮箱（ADR-0063 双侧确认）—— 服务端路由与 `@heyta/app-host` 的编排都在册，
+// 缺的是界面入口。见 EmailChangePanel 文件头。
+import { EmailChangePanel } from './EmailChangePanel.js';
 
 /** 一次写请求的结果，只用于决定底部那一行字。 */
 type Notice =
@@ -412,6 +415,14 @@ export function ProfilePanel(): React.JSX.Element {
           <p className="ht-settings__hint">{t('common.profile.email.hint')}</p>
         </div>
       )}
+
+      {/*
+        换绑登录邮箱（ADR-0063）。它挂在**邮箱那一行的正下面**而不是另开一节：
+        「这个地址能换」这件事，用户只在看见当前地址的那一刻会想到 ——
+        放在设置页别处就是让他先读到一句"邮箱是登录标识"，再去别的地方找那个按钮。
+        面板自己带未登录 guard。
+      */}
+      <EmailChangePanel />
     </section>
   );
 }
