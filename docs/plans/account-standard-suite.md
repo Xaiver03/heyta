@@ -261,9 +261,15 @@ W1 先落、W7 后落 ⇒ 中间任何一次 `pnpm check` 都会红。**这不�
     `Map<userId, Set<ConnectedClient>>`，而 `ConnectedClient` 只带 `ws / clientId / userId / lastPong / connectedAt`
     —— **没有 jti**，所以服务端此刻认不出"那一枚会话对应哪一条 socket"，想关也关不准。
     关闭它需要三件一起做：upgrade 鉴权时把 jti 记进连接、加 `closeForSession(jtiHash)`、
-    以及一条**真运行时**的 WS 判据（现存的 pglite 与 HTTP 层判据都看不见"已经开着的连接"，
-    正是第 16 条那句"缺的那一半是一条已经建立的连接"换了个入口）。
-    复取：`git grep -n "closeForUser\|closeForSession" HEAD -- server/src` ⇒ 逐枚那条只有注释里那句解释。
+    以及一条**真运行时**的 WS 判据。
+    ⚠️ 这一条原先写的是"现存的 pglite 与 HTTP 层判据都看不见已经开着的连接，所以逐枚那条**只有注释里那句解释**"——
+    后半句已被现量否证（§6.56 臂B）：HTTP 层**有**一条负向判据
+    `单枚撤销**不**关掉整个账号的实时通道（那是 revoke-all 的语义）`，往逐枚那条路径里塞一句
+    `closeForUser(user.userId)` 就会让它红。
+    ⇒ 还缺的准确说是**另一半**：没有任何一层看得见"那台设备已经开着的连接"的实际后果
+    （要一条真 WS 运行时判据），而不是"这条边界没人守"。
+    复取：`git grep -n "closeForUser" HEAD -- server/tests` ⇒ 正向 1 条（`toHaveBeenCalledWith`）+ 负向 2 条（`not.toHaveBeenCalled`）；
+    两臂读数见 §6.56。
 
 ---
 
@@ -2836,6 +2842,64 @@ try:
 finally:
     head(); print('还原:', 'CLEAN' if subprocess.run(['git','diff','--quiet','--',p]).returncode==0 else 'DIRTY')
 PY
+```
+
+### 6.56 撤销那"四件事"里通道那一件的判据牙已证，而它顺手否证了 §5 第 17 条的半句话（10-10 01:53 现量）
+
+第 17 条那格原先写着"逐枚那条**只有注释里那句解释**"。这一轮往那两条断言上各打一臂，结论是：
+
+- **正向**（`臂A`）：从 `revokeAllDeviceSessions()` 里删掉 `getWsConnectionService().closeForUser(userId);`
+  ⇒ `1 failed | 29 passed`，红的正是 `` `revoke-all` ⇒ 每一枚都 401（含没有 `jti` 的旧令牌），且关掉整个账号的通道 ``。
+- **负向对照**（`臂B`）：在**逐枚撤销**那条 handler 里（`authCache.invalidate` 之后）塞一句
+  `getWsConnectionService().closeForUser(user.userId);`（并补一行 import，否则 esbuild 之后运行时 `undefined` 会 500 ——
+  那也是红，但红得没有说明力，所以要把"红"钉在断言上而不是钉在崩溃上）
+  ⇒ `1 failed | 29 passed`，红的正是 `单枚撤销**不**关掉整个账号的实时通道（那是 revoke-all 的语义）`。
+
+⇒ 这条边界**有人守**：本线那三条断言在 `account-security.routes.spec.ts:326/:368/:396`
+（正向 `toHaveBeenCalledWith` 1 条 + 负向 `not.toHaveBeenCalled` 2 条）。
+同一次 `git grep -n "closeForUser" HEAD -- server/tests` 还会命中别的行，逐条读过来历只有两处：
+`admin-routes.spec.ts:420` 是后台强制登出**另一条**正向断言，
+而 `account-closed-signal.spec.ts:34/55` **只是 mock 定义**（那份注销信号的判据不断言"关没关通道"）。
+⇒ 不要把命中行数读成守卫条数，也不要反过来读成"账号注销那条线也守住了这一件"。第 17 条已就地更正：还缺的准确说是
+**"没有任何一层看得见那台设备已经开着的连接的实际后果"**（要一条真 WS 运行时判据），
+不是"这条边界没人守"。原句留在上面一行，标成已被否证。
+
+⚠️ 载体前置与 §6.55 同一件：`server/node_modules/@heyta/inbound-core` 那枚链接在载体里不存在
+（`server/package.json` 没登记它、lockfile 有 ⇒ 干净安装建得出链，CI 不受影响），
+本轮两臂都是"HEAD + 手工补上那枚按 lockfile 本该存在的链接"下读的，跑完已把链接撤掉、载体 `checkout --force` 回复干净。
+
+复取（两臂各自 `finally` 从 HEAD 还原并 `git diff --quiet` 复验；被闸门拒时**别让变异留在盘上**这一条
+按 §6.55 那个形状写进循环里）：
+
+```bash
+cd .worktrees/<载体> && git checkout --force $(git rev-parse refs/heads/main)
+ln -sfn ../../../packages/inbound-core server/node_modules/@heyta/inbound-core
+# 臂A：删 revoke-all 那侧的通道关闭
+python3 - <<'PY'
+import subprocess, io
+p='server/src/account/access-sessions.ts'
+open(p,'wb').write(subprocess.run(['git','show',f'HEAD:{p}'],capture_output=True).stdout)
+s=io.open(p,encoding='utf8').read(); c='  getWsConnectionService().closeForUser(userId);\n'
+assert s.count(c)==1; io.open(p,'w',encoding='utf8').write(s.replace(c,''))
+PY
+pnpm --filter @heyta/sync-server exec vitest run tests/account-security.routes.spec.ts 2>&1 | grep -E "Test Files|Tests  |× "
+git checkout -- server/src/account/access-sessions.ts
+# 臂B：让逐枚撤销也去关整个账号的通道（锚点要取"那一处"，authCache.invalidate 在文件里有两处）
+python3 - <<'PY'
+import subprocess, io
+p='server/src/account/account-security.routes.ts'
+open(p,'wb').write(subprocess.run(['git','show',f'HEAD:{p}'],capture_output=True).stdout)
+s=io.open(p,encoding='utf8').read()
+imp="import { listSessions, revokeAllDeviceSessions, revokeSession } from './access-sessions';\n"
+anchor="      authCache.invalidate(user.userId);\n      if (!revoked) {"
+assert s.count(imp)==1 and s.count(anchor)==1
+io.open(p,'w',encoding='utf8').write(
+    s.replace(imp, imp + "import { getWsConnectionService } from '../sync/services/websocket-connection.service';\n")
+     .replace(anchor, "      authCache.invalidate(user.userId);\n      getWsConnectionService().closeForUser(user.userId);\n" + anchor.split('\n',1)[1]))
+PY
+pnpm --filter @heyta/sync-server exec vitest run tests/account-security.routes.spec.ts 2>&1 | grep -E "Test Files|Tests  |× "
+git checkout -- server/src/account/account-security.routes.ts
+rm -f server/node_modules/@heyta/inbound-core; git status --porcelain | grep -v pnpm-lock   # 期望空
 ```
 
 
