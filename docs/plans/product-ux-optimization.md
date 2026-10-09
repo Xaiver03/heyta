@@ -298,7 +298,7 @@ EVIDENCE-1，并对所有已完成项做截图、交互、测试和文档回读�
 | ID | 对标问题 / 用户要求 | 当前代码证据 | 决策与实现 | 状态 |
 |---|---|---|---|---|
 | UX-S9-25 | 迷你月历中辅助信息的层级仍不够弱化，日期应该是唯一主信息；对标 TickTick，节日/状态字应更小、更轻，不应和日期数字竞争 | `apps/web/src/features/calendar/CalendarSidebar.tsx` 的 `MiniDay` 已增加 `.ht-sidebar__day-aux` 辅助行；完整名称保留在 `aria-label`，窄栏视觉上使用省略 | 日期数字保持主层级；节日/休班只作极弱辅助层，使用 muted/subtle 色与紧凑字号；窄栏视觉省略但不截断无障碍名称 | `e2e/tests/calendar-sidebar.spec.ts` 已验证真实七列、点与侧栏几何；`apps/web/evidence/calendar-sidebar*` 与 `countdown-calendar/calendar-sidebar-mini.png` 有截图，仍需父级视觉确认辅助文字权重 | **代码完成；Web 几何/交互证据已通过，辅助文字视觉与四端复验待收口** |
-| UX-S9-26 | 迷你月历应显示节日名称，并与现有公共事实/农历计算融合 | `CalendarSidebar.tsx` 复用领域层 `festivalsOn(date)`，`FestivalId` 通过 `FESTIVAL_MESSAGE_KEYS` 走中英 i18n；没有另造节日表 | 复用 `festivalsOn` 事实源，节日名称只进入日期辅助层，不改变任务日期归属；覆盖缺失年份时不猜测 | `e2e/tests/calendar-sidebar.spec.ts` 真实翻月/选日旅程与 `CalendarSidebar.tsx` 的 `aria-label` 组合可核查；`apps/web/evidence/calendar-sidebar-mini.png`、`countdown-calendar/calendar-sidebar-mini.png` 提供视觉材料 | **代码完成；Web 事实源与翻月证据已通过，节日文字视觉/四端复验待收口** |
+| UX-S9-26 | 迷你月历应显示节日名称，并与现有公共事实/农历计算融合 | `CalendarSidebar.tsx` 复用领域层 `festivalsOn(date)`，`FestivalId` 通过 `FESTIVAL_MESSAGE_KEYS` 走中英 i18n；没有另造节日表 | 复用 `festivalsOn` 事实源，节日名称只进入日期辅助层，不改变任务日期归属；覆盖缺失年份时不猜测 | `e2e/tests/calendar-sidebar.spec.ts` 真实翻月/选日旅程与 `CalendarSidebar.tsx` 的 `aria-label` 组合可核查；`apps/web/evidence/countdown-calendar/calendar-sidebar-mini.png` 与同目录的 `calendar-sidebar.png` 提供视觉材料 | **代码完成；Web 事实源与翻月证据已通过，节日文字视觉/四端复验待收口** |
 | UX-S9-27 | 有排程任务的日期需要稳定的蓝点提示；不能用优先级/逾期红色点让用户误解为另一种语义 | `MiniDay` 已移除 `calendarDayTone` / `DOT_TOKEN`，任务与倒数日共用 `hasContent` 判据，点统一消费 `color.primary` | 迷你侧栏点只表达“该日期有排程/日历内容”，逾期与完成保留在主日历/详情状态中；倒数日与任务共用“有内容”判据 | `e2e/tests/calendar-sidebar.spec.ts` 真实断言点的几何与 computed 主蓝色，并验证范围筛选后点同步消失；证据见 `apps/web/evidence/countdown-calendar/calendar-sidebar.png` 与 `calendar-sidebar-mini.png` | **代码完成；Web 蓝点和范围联动证据通过；四端最终复验待收口** |
 | UX-S9-28 | 日历页需要顶层侧边栏开关；展开后提供迷你月历和范围标签选择，收起后不能让用户误以为任务消失 | `CalendarHeaderToolbar.tsx` 提供 toggle、`aria-controls`、活跃筛选摘要和清除入口；`App.tsx` 按 `calendarSidebarOpen` 挂载侧栏，store 保留 scope | 收起只隐藏容器，不清空 `view.scope`；页头保留筛选摘要与恢复入口，保持清单/标签多选过滤 | `e2e/tests/calendar-sidebar.spec.ts` 验证清单/标签筛选、全量复位、刷新语义和侧栏把手；`apps/web/evidence/calendar-ux-*.png`、`calendar-sidebar*.png` 提供亮暗/窄屏材料 | **代码完成；Web App 接线与侧栏/范围证据已通过；四端最终复验待收口** |
 | UX-S9-33 | 月历主区不能以固定内容高度逼用户先拖大窗口，整月应铺满当前可用视口 | `CalendarView.tsx` 使用共享 `CalendarBoard`；`main-area.css` 与日历宿主 flex/grid 轨道传递剩余高度，内容超出由滚动所有者承载 | 月历铺满剩余视口；窗口变化实时重排；1024×600、1280×720、1440×900 与窄屏均不要求拖大窗口 | `e2e/tests/calendar-cells.spec.ts` 的空日历/高视口与 `e2e/tests/quadrant-fill.spec.ts` 的视口链证据；`apps/web/evidence/calendar-cells/calendar-tall-viewport.png`、`calendar-cells-empty.png` 可核查 | **代码完成；Web 高度/滚动浏览器证据通过；四端最终复验待收口** |
@@ -889,7 +889,11 @@ Android 队列修复原生验证已补：恢复官方 SDK 后，Windows `:app:te
 
 UX-S9-138 安装身份与验收边界更新（2026-10-08 下午）：
 
-- Android 当前 Release 已由 Windows 完成构建（14分12秒），回传与远端逐字对账。已保留数据升级现有 emulator-5554，设备内 APK 与候选包 SHA-256 相同：`381203459ba9da1c85d4d5215fba8a32ce1b63992d87ef915a3e53de82c34ba3`；发布证书主体 CN=heyta，四个既有系统组件实例保留。新截图确认专注空状态卡片已呈深色；四模板逐个切换主题/非空数据/点击矩阵仍未完成。证据：`apps/desktop-macos/evidence/widget-qa-20261008-android.txt`（历史存放位置）。
+- Android 当前 Release 已由 Windows 完成构建（14分12秒），回传与远端逐字对账。已保留数据升级现有 emulator-5554，设备内 APK 与候选包 SHA-256 相同：`381203459ba9da1c85d4d5215fba8a32ce1b63992d87ef915a3e53de82c34ba3`；发布证书主体 CN=heyta，四个既有系统组件实例保留。新截图确认专注空状态卡片已呈深色；四模板逐个切换主题/非空数据/点击矩阵仍未完成。证据：[`apps/mobile/evidence/ux-round8/android-widgets/RESULT.md`](../../apps/mobile/evidence/ux-round8/android-widgets/RESULT.md)。
+⚠️ 这一格原先写的落点是 `apps/desktop-macos/evidence/widget-qa-20261008-android.txt`（标了"历史存放位置"），
+14:2x 现量：**那个名字既不在盘上也不在 HEAD 里**（`git cat-file -e HEAD:<那个路径>` 报不存在），
+同目录只有 `widget-qa-20261008-build.txt` 与 `…-isolated-smoke.png` 两代产物 —— 也就是说那句话指向的是一份**从没存在过的文件名**。
+现改成真在仓库里的那份，Android 那趟的逐模板读数以它为准。
 - iOS 最新候选 Release 已安装到既有模拟器，未清除数据；宿主可执行文件、扩展可执行文件、main.jsbundle 均与候选逐字相同。证据：`apps/mobile/evidence/ux-round8/widget-ack-cleanup/ios-candidate-install.json`。安装身份通过不代表其余三个模板系统验收通过，也不代表实体 iPhone 已验。
 - mobile 全量回归的 5 个 unhandled rejection 已定位为 Node 测试意外加载 RN Flow 入口。测试隔离修正后 68 文件/879 项通过、Errors 0；产品代码没有为了测试吞错。
 - Windows 官方 Web Experience Pack 安装器已取到并验证 Microsoft Corporation 有效签名，Mac/Windows SHA 一致。真实执行退出1612，Store/WU连接报0x80072EFD，系统仍无 Widgets host。未降低证书校验；证据 `apps/desktop-windows/evidence/ux-round8/windows-widgets/install-attempt.log`。不能把这一格勾为完成。
@@ -1163,7 +1167,7 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
 - [x] **权限专项也重跑了一遍**：`pnpm --dir e2e exec playwright test --config playwright.reminder-permission.config.ts` **5/5 通过（23.8 s）**。⚠️ 那份配置写的是 `headless: false`（它自己的注释说明无头拿不到真权限态）⇒ **这一趟在负责人屏幕上开过可见 Chromium 窗口**，是装置的设计要求，但跑之前没先打招呼，记在这里。
 - [x] **两条已提交的 spec 的红：根因取到了，不再是「apps/web 有 274 条未提交改动」那种模糊账**（那句由本条取代）。读数 `RC=1`、**2 failed / 3 passed（1.3 分钟）**，两枚断在**同一句** `toBeVisible()`（`shell-sync-rail.spec.ts:165` 的 S3、`vault-settings.spec.ts:169` 的 `openSyncSection`），`Received: hidden`，原始趟与 retry #1 逐字相同 ⇒ 确定性，既不是竞态也不是超时。链条三步都能用 git 直接验，不靠推断：
     ① 工作树的 `apps/web/src/App.tsx` 给设置浮层那七枚 `<section class="ht-settings__group">` 逐个加上 `hidden={activeSettingsSection !== 'settings-group-…'}`，并把默认档设成 `settings-group-appearance`（`:486`）⇒ 打开设置只露「显示」，同步那一节**留在 DOM 里但被 `hidden` 挡着**，正是失败读数里那句 `34 × locator resolved … - unexpected value "hidden"`；
-    ② **HEAD 上这七枚一个 `hidden=` 都没有**（取现量：`git show HEAD:apps/web/src/App.tsx | grep -c 'ht-settings__group" hidden='` = 0）⇒ 这两份 spec 在 HEAD 上不可能被这一条挡住，红只存在于工作树那笔未提交的两栏 IA 改动里；
+    ② **HEAD 上这七枚一个 `hidden=` 都没有**（取现量：`git show HEAD:apps/web/src/App.tsx | grep -c 'ht-settings__group" hidden='` = 0；🔴 这条没有锚，本账 14:2x 补一次现量并钉住：**HEAD `c93405ad` 上读数仍是 0**，也就是说这条在那一刻成立，而它会不会随下一笔变，只有重跑这句话知道）⇒ 这两份 spec 在 HEAD 上不可能被这一条挡住，红只存在于工作树那笔未提交的两栏 IA 改动里；
     ③ 那笔迁移自带的旋钮 `selectSettingsSection()` **只活在未提交的 `e2e/tests/helpers.ts` 里**，而调用它的 12 份 spec（`e2e/tests/` 10 份 + `e2e/_probe/` 2 份）在工作树里全是未提交态。这两枚**已提交、且会走进设置分组**的 spec 是唯一没跟着迁的 —— 两份文件本身 `git status` 干净。
     ⇒ **修法每份一行**：`openSettingsSheet` 之后补 `await selectSettingsSection(page, 'sync')`。**本线不代改**：进入路径与默认档属于「两栏设置 IA」那条线正在写的产品结构，由它决定谁迁、默认开哪一组。取现量：`NO_COLOR=1 pnpm --dir e2e test tests/shell-sync-rail.spec.ts tests/vault-settings.spec.ts --reporter=line`。
 - [ ] **上一格逼出一条 HEAD 里（不是工作树里）的坏状态**：`c04e34e4` 提交的 `e2e/tests/account-email-change-and-sessions.spec.ts` 在第 25 行 import、并在 4 处调用 `selectSettingsSection`，而 **HEAD 的 `helpers.ts` 里没有这枚 export**（取现量：`git show HEAD:e2e/tests/helpers.ts | grep -c 'function selectSettingsSection'` = 0，对照 `git show HEAD:e2e/tests/account-email-change-and-sessions.spec.ts | grep -n selectSettingsSection`）⇒ **干净检出上这份套件必红**：Playwright 只转译不做类型检查，取到 `undefined` 就 `... is not a function`，红在没有那笔未提交 IA 的机器上，而不是红在开发机上。整类枚举过一遍：工作树 helpers 新增的 export 只有 `setStubBarrier` 与 `selectSettingsSection` 两枚，前者在 HEAD **没有任何已提交使用者**（`git grep -ln setStubBarrier HEAD -- e2e` 空），所以这一类目前就一枚成员。归属是那笔账号面提交与两栏 IA 那笔未提交改动之间的接缝 —— **要由其中一方把 spec 与 helper 一起提交**，本线不代改别人的提交集。
@@ -1350,3 +1354,30 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
     那六枚未入库用例的**为什么不能只提交用例**已用一趟真跑证清并改写了闭合条件。
     🔴 **仍然开着的最大一格不是本线的**：目标要求的"从最终源码四端构建重装"整条没做（按指令暂停），
     而它的前提是 HEAD 先能装能建 —— 那一格在桶二，卡在别人那四枚 `??` 模块与那枚 lockfile/清单不一致上。
+
+- [x] ✅ **把"文档以判据名义点名的路径必须真存在"这把尺第一次打到这份台账自己身上：9 条命中，其中 3 条是真死引用、已修；4 条是尺子看不见句子极性/形状，已登记给它的主人**（2026-10-09 14:2x）。
+    起因是收口时想确认"台账里那些'证据：某文件'还指不指得到东西"，现量命令：
+    `node scripts/check-doc-citations.mjs --doc docs/plans/product-ux-optimization.md` ⇒ **rc=1，9 条引用问题**。
+    🔴 **先记一条更该知道的：这把尺的默认射程里没有这份台账**——同一条命令不带 `--doc` 时它只查性能热路径审计那一份（现读"文档 1 份"），
+    而 `check:doc-citations` 已在 `pnpm check` 链里 ⇒ **门禁绿与这份文档的引用是否成立，两件事从来没连上过**。
+    这与上面那格"文档引用的是反引号裸路径、`check:docs` 只解析 markdown 链接"是同一族盲区的第二种面目：**盲区不在判据有没有牙，在它被喂了哪份文档**。
+    **三条真死引用，逐条改掉而不是加豁免**：
+    ① UX-S9-26 那格写 `apps/web/evidence/calendar-sidebar-mini.png` —— 真文件在同目录的 `countdown-calendar/` 下（`find apps/web/evidence -name 'calendar-sidebar*'` 现读两枚都在），
+    那句把目录前缀丢了 ⇒ 改成完整路径，并补上同目录那张全尺寸的。
+    ② 小组件那格写"证据：`apps/desktop-macos/evidence/widget-qa-20261008-android.txt`（历史存放位置）" —— 现量**那个名字盘上和 HEAD 里都没有**，
+    同目录只有 `-build.txt` 与 `-isolated-smoke.png` 两代产物 ⇒ 那句指向的是一份**从没存在过的文件名**，改成真在仓库里的
+    [`apps/mobile/evidence/ux-round8/android-widgets/RESULT.md`](../../apps/mobile/evidence/ux-round8/android-widgets/RESULT.md)（`git cat-file -e HEAD:` 成立）。
+    ③ 上面那格"取现量：`git show HEAD:apps/web/src/App.tsx | grep -c …`" **没有锚** —— 这正是那把尺文件头点名的形状（`git show HEAD:` 只在那一刻为真）。
+    14:2x 补一次现量并把 `HEAD c93405ad` 钉进那句话，读数仍是 **0**（这条判断没变，变的是它现在可被下一个人复核）。
+    🔴 **那三条之外剩下的 7 条（写下本格之后是 11 条，原因见本格末尾）本线一条都不"修"，因为坏的不是文档而是尺子的三处形状盲区**（改文档去喂尺子＝把说真话的句子改差，那把尺的主人自己判）：
+    ① 它把 `` `HEAD:<路径>` `` 这种**带提交前缀的取证串**当普通路径查存在性 ⇒ 两条命中（`HEAD:apps/web/evidence/settings-group-theme-sweep/README.md`、
+    `HEAD:packages/ui/package.json`）**在 HEAD 里逐字都存在**（现量 `git cat-file -e HEAD:<各自路径>` 都成立）。
+    ② 它不看**句子的极性** ⇒ "这个文件在本仓库里**不存在**"那种诚实陈述照样算死引用（`widget-help-ax.txt` 那格从写下起就是这个意思，本格新写的那条同理）。
+    ③ 它不认**刻意不入库的形状** ⇒ `apps/web/node_modules`（盘上有、按设计不进 git）与 `ubuntu-jcli:/var/www/…`（那是 ssh 主机上的绝对路径，不是本机路径）各一条。
+    复跑口径与逐条命中行号：`node scripts/check-doc-citations.mjs --doc docs/plans/product-ux-optimization.md`。
+    🔴 **读数要说全，因为它自己就是那处盲区的第二次实证**：修之前 **9 条** → 三条改完 **7 条** → **写下本格之后 11 条**。
+    多出来的 4 条全是这一格**为了说明"那些路径不存在/不入库"而把它们逐字引出来**造成的 ——
+    也就是说这把尺下，"这个证据文件从没存在过"与"这个证据文件在这里"两种句子**长得完全一样**。
+    这不改判据结论（真死引用仍是那三条、已修完），但意味着**这条尺现在不能当收敛判据用**：
+    一份诚实记录死引用的文档在它眼里只会越来越红。⇒ 交给那把尺的主人时，这一格就是它的第 ② 条盲区的可复现样本（9→7→11 三个数都在这一格里）。
+    ⚠️ **本线没有动那把尺**（它是性能审计那条线的资产），也没有往它的豁免表里加条目——**用豁免消别人的红正是本账反复批评的那件事**。
