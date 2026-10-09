@@ -1,7 +1,7 @@
 import { createHash, createPrivateKey, createPublicKey, randomBytes, sign as cryptoSign, verify as cryptoVerify, randomUUID, type KeyObject } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
-import { loadAutomationEntitlementKeyring, signAutomationEntitlementTicket, type AutomationEntitlementKeyring } from './entitlement-ticket';
+import { AUTOMATION_ENTITLEMENT_ACTIONS, AUTOMATION_ENTITLEMENT_SCOPES, loadAutomationEntitlementKeyring, signAutomationEntitlementTicket, type AutomationEntitlementAction, type AutomationEntitlementKeyring } from './entitlement-ticket';
 
 /**
  * 🔴 自动收集权益的**签发端**。判定内核（`entitlement-ticket.ts`）只管"这枚票据是不是
@@ -40,6 +40,8 @@ export const AUTOMATION_ISSUER_DENIALS = {
   SUBJECT_MISMATCH: 'AUTOMATION_SUBJECT_MISMATCH',
   MANIFEST_INVALID: 'AUTOMATION_REVOCATION_MANIFEST_INVALID',
   REVOCATION_NOT_INCREASING: 'AUTOMATION_REVOCATION_NOT_INCREASING',
+  ACTION_UNKNOWN: 'AUTOMATION_ISSUER_ACTION_UNKNOWN',
+  SCOPE_MISMATCH: 'AUTOMATION_ISSUER_SCOPE_MISMATCH',
 } as const;
 
 export type AutomationIssuerDenial = (typeof AUTOMATION_ISSUER_DENIALS)[keyof typeof AUTOMATION_ISSUER_DENIALS];
@@ -291,6 +293,60 @@ export async function signAutomationEntitlementSessionTicket(input: {
     revocationVersion: input.revocationVersion,
   }, automationIssuerPrivateKey(input.issuer.privateKeySeed));
   return { token, expiresAt: new Date((nowSeconds + lifetime) * 1000), subject: link.subject };
+}
+
+/**
+ * 签一枚**逐次放行**的动作票据。宿主侧原来只有 `session` 一条取票通道，其余动作
+ * （启用规则、签发凭据、注册 worker、领取、发布结果、预留、提交许可、草稿确认）在
+ * 自托管模式下**没有任何供给方** —— 闸门判"要票据"，却没人能给它票据。
+ *
+ * 🔴 这里签的是"这个主体可以在这个作用域上做这一个动作"，不是"这个 rule/event 真的存在"：
+ * 官方实例手里只有 `links` 与订阅，客户实例上的规则与事件它看不到，也不该看到（E2EE）。
+ * "作用域属于这个本地账号"由**自托管那一侧**判定 —— 它读的是自己库里的 `automation_rules`
+ * / `automation_events`。两侧各管各的事实，不在这里合成。
+ */
+export async function signAutomationEntitlementActionTicket(input: {
+  client: IssuerDatabase;
+  userId: number;
+  installationId: string;
+  action: AutomationEntitlementAction;
+  ruleId?: string;
+  eventId?: string;
+  issuer: AutomationEntitlementIssuer;
+  revocationVersion: number;
+  lifetimeSeconds?: number;
+  now?: number;
+}): Promise<{ token: string; expiresAt: Date; subject: string; action: AutomationEntitlementAction }> {
+  // `session` 走它自己那条：那条同时是"建立绑定"的凭证，作用域要求也不同（它要带
+  // 绑定三字段里的 localAccountUuid 语义），混用会让一次登录换到一张通用通行证。
+  if (input.action === 'session' || !(AUTOMATION_ENTITLEMENT_ACTIONS as readonly string[]).includes(input.action)) {
+    throw new AutomationIssuerError(AUTOMATION_ISSUER_DENIALS.ACTION_UNKNOWN);
+  }
+  const scope = AUTOMATION_ENTITLEMENT_SCOPES[input.action];
+  const ruleMatches = scope === 'rule' ? input.ruleId !== undefined : input.ruleId === undefined;
+  const eventMatches = scope === 'event' ? input.eventId !== undefined : input.eventId === undefined;
+  if (!ruleMatches || !eventMatches) throw new AutomationIssuerError(AUTOMATION_ISSUER_DENIALS.SCOPE_MISMATCH);
+  const nowSeconds = Math.floor((input.now ?? Date.now()) / 1000);
+  const link = await input.client.automationEntitlementLink.findUnique({ where: { installationId: input.installationId } });
+  if (!link || link.revokedAt !== null) throw new AutomationIssuerError(AUTOMATION_ISSUER_DENIALS.LINK_NOT_BOUND);
+  if (link.userId !== input.userId) throw new AutomationIssuerError(AUTOMATION_ISSUER_DENIALS.SUBJECT_MISMATCH);
+  const lifetime = input.lifetimeSeconds ?? 30;
+  const token = signAutomationEntitlementTicket({
+    issuer: input.issuer.issuer,
+    keyId: input.issuer.keyId,
+    action: input.action,
+    capability: 'automation',
+    officialSubject: link.subject,
+    installationId: link.installationId,
+    localAccountUuid: link.localAccountUuid,
+    ...(input.ruleId === undefined ? {} : { ruleId: input.ruleId }),
+    ...(input.eventId === undefined ? {} : { eventId: input.eventId }),
+    nonce: randomUUID(),
+    issuedAt: nowSeconds,
+    expiresAt: nowSeconds + lifetime,
+    revocationVersion: input.revocationVersion,
+  }, automationIssuerPrivateKey(input.issuer.privateKeySeed));
+  return { token, expiresAt: new Date((nowSeconds + lifetime) * 1000), subject: link.subject, action: input.action };
 }
 
 const publicKeyRawFor = (keyring: AutomationEntitlementKeyring, keyId: string): Buffer => {
