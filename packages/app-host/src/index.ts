@@ -22,6 +22,7 @@ export {
   materializedState,
   type AppHost,
   type AppHostOptions,
+  type InboundAutomationHostOptions,
   type SyncConfig,
   type VaultRootRotationOptions,
 } from './host.js';
@@ -163,6 +164,26 @@ export {
   type RealtimeWiringOptions,
   type SyncWiringOptions,
 } from './sync-wiring.js';
+
+export {
+  createInboundUploadAuthorization,
+  claimAutomationEvent,
+  journalCommitProofBeforeDispatch,
+  publishAutomationResult,
+  readAutomationPreparedResult,
+  reserveAutomationAiAttempt,
+  advanceAutomationAiAttempt,
+  registerAutomationWorker,
+  renewAutomationLease,
+  requestCommitPermitAndJournal,
+  type AutomationCommitJournal,
+  type AutomationWorkerCredential,
+  type AutomationWorkerSecretStore,
+  type InboundWorkerAuthorizationOptions,
+  type CommitPermitRequest,
+  type ClaimedAutomationEvent,
+  type RegisterAutomationWorkerOptions,
+} from './inbound-worker.js';
 
 export { newTaskId, randomId, usingRandomIdFallback } from './ids.js';
 
@@ -845,3 +866,18 @@ export {
   type AssistantSessionActionsOptions,
   type NewAssistantTurn,
 } from './assistant-session-actions.js';
+export { requestInboundAutomation, runInboundAutomationEvent, type InboundAutomationRunOptions } from './inbound-runner.js';
+export { processInboundAutomationEvent, type ProcessInboundAutomationOptions } from './inbound-process.js';
+export { startInboundWorkerLoop, type InboundWorkerLoopOptions, type InboundWorkerLoop } from './inbound-worker-loop.js';
+export { verifyAutomationEntitlementTicket, type AutomationEntitlementStatus } from './inbound-entitlement-remote.js';
+export { createInboundRecipientKeyStore, type InboundRecipientKeyScope } from './inbound-key-store.js';
+export { createVaultWrappedAutomationWorkerStore, createInboundCommitJournal } from './inbound-secret-store.js';
+export { generateInboundKeyPair, inboundPublicKey } from '@heyta/inbound-core';
+export {
+  createInboundRecipientRemote,
+  InboundRecipientRemoteError,
+  type InboundRecipientRegistration,
+} from './inbound-recipient-remote.js';
+export { createInboundRulesRemote, InboundRulesRemoteError, type InboundAutomationRule, type InboundAutomationRuleConfig, type InboundAutomationField, type InboundAutomationEventSummary, type InboundSenderCredential } from './inbound-rules-remote.js';
+export { createInboundDraftReviewer, type InboundDraftReviewOptions, type InboundDraftReview } from './inbound-draft-review.js';
+export type { InboundDraftTask } from '@heyta/shared-schema';

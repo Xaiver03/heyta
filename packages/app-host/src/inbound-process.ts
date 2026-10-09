@@ -49,7 +49,7 @@ export interface ProcessInboundAutomationOptions {
  * and the stable event/task identities.
  */
 export async function processInboundAutomationEvent(options: ProcessInboundAutomationOptions): Promise<{
-  state: 'empty' | 'submitted'; eventId?: string; itemCount?: number;
+  state: 'empty' | 'submitted' | 'needs-confirmation'; eventId?: string; itemCount?: number;
 }> {
   const assertActive = (): void => { options.assertActive?.(); };
   const fetchImpl: typeof fetch = async (input, init) => {
@@ -67,7 +67,7 @@ export async function processInboundAutomationEvent(options: ProcessInboundAutom
   assertActive();
   if (!recovered && !claimed) return { state: 'empty' };
 
-  let frozen: { itemCount: number; resultDigest: string; payload: ReturnType<typeof heytaTaskBatchPayloadSchema.parse> } | undefined = undefined;
+  let frozen: Awaited<ReturnType<typeof runInboundAutomationEvent>> | undefined = undefined;
   if (recovered) {
     const envelope = inboundEnvelopeSchema.parse(JSON.parse(recovered.resultCiphertext));
     const recoveryKey = envelope.keyEpoch === options.keyEpoch
@@ -93,7 +93,7 @@ export async function processInboundAutomationEvent(options: ProcessInboundAutom
         inboundTaskDigest(payload.tasks) !== recovered.resultDigest) {
       throw new Error('Recovered automation result does not match its server receipt');
     }
-    frozen = { payload, itemCount: recovered.resultItemCount, resultDigest: recovered.resultDigest };
+    frozen = { payload, itemCount: recovered.resultItemCount, resultDigest: recovered.resultDigest, needsConfirmation: false };
   }
   const transport: InboundAutomationRunOptions | undefined = claimed === undefined ? undefined : {
     claimed, privateKey: options.privateKey, loadPrivateKey: options.loadPrivateKey, accountId: options.accountId,
@@ -128,6 +128,12 @@ export async function processInboundAutomationEvent(options: ProcessInboundAutom
   const completed = frozen;
   if (!completed) throw new Error('Inbound automation result was not produced');
   const eventId = recovered?.eventId ?? claimed!.eventId;
+  if (completed.needsConfirmation) {
+    // The result is encrypted and frozen on the server, but no commit permit
+    // or local op may be created until the user explicitly resolves it.
+    return { state: 'needs-confirmation', eventId, itemCount: completed.itemCount };
+  }
+  const payload = heytaTaskBatchPayloadSchema.parse(completed.payload);
   const ruleId = recovered?.ruleId ?? claimed!.ruleId;
   const ruleVersion = recovered?.ruleVersion ?? claimed!.ruleVersion;
   const opId = `inbound:${eventId}`;
@@ -148,8 +154,8 @@ export async function processInboundAutomationEvent(options: ProcessInboundAutom
     // This runs inside the engine's serialized dispatch, after queued writes.
     assertActive();
     validate(state);
-  }) }, completed.payload, {
-    source: completed.payload.source,
+  }) }, payload, {
+    source: payload.source,
     targetProjectId,
   });
   return { state: 'submitted', eventId, itemCount: completed.itemCount };

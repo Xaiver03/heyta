@@ -6,7 +6,7 @@ import { OpType, type Operation } from '@heyta/sync-core';
 import { processInboundAutomationEvent } from '../src/inbound-process.js';
 
 describe('inbound automation process', () => {
-  it('runs claim → AI → encrypted result → permit → one batch op', async () => {
+  it.each([false, true])('runs claim → AI → encrypted result; confirmation=%s fences permit and op', async (needsConfirmation) => {
     const pair = generateInboundKeyPair();
     const inputEnvelope = await sealInbound(
       new TextEncoder().encode(JSON.stringify({ title: 'From webhook', secret: 'excluded' })),
@@ -22,10 +22,13 @@ describe('inbound automation process', () => {
         return new Response(JSON.stringify({ eventId: 'event', ruleId: 'rule', ruleVersion: 1, contentType: 'application/json',
           targetProjectId: 'project', payloadCiphertext: JSON.stringify(inputEnvelope), receivedAt: 1_700_000_000_000, leaseGeneration: 1, leaseExpiresAt: '2030-01-01T00:00:00.000Z', attempt: 1 }), { status: 200 });
       }
-      if (url.pathname.endsWith('/ai-attempt/reserve')) return new Response(JSON.stringify({ periodAnchor: null, billingSource: 'direct', state: 'reserved' }), { status: 200 });
+      if (url.pathname.endsWith('/ai-attempt/reserve')) {
+        expect(JSON.parse(String(init?.body)).billingSource).toBe('local');
+        return new Response(JSON.stringify({ periodAnchor: null, billingSource: 'local', state: 'reserved' }), { status: 200 });
+      }
       if (url.pathname.endsWith('/ai-attempt/state')) return new Response(JSON.stringify({ changed: true }), { status: 200 });
-      if (url.pathname === '/v1/chat/completions') return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ tasks: [{ title: 'From webhook', priority: 2 }] }) } }] }), { status: 200 });
-      if (url.pathname.endsWith('/result')) return new Response(JSON.stringify({ eventId: 'event', state: 'prepared', parseVersion: 1 }), { status: 200 });
+      if (url.pathname === '/v1/chat/completions') return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ tasks: [{ title: 'From webhook', priority: 2 }], needsConfirmation }) } }] }), { status: 200 });
+      if (url.pathname.endsWith('/result')) return new Response(JSON.stringify({ eventId: 'event', state: needsConfirmation ? 'needs-confirmation' : 'prepared', parseVersion: 1 }), { status: 200 });
       if (url.pathname === '/api/automation/commit-permit') return new Response(JSON.stringify({ eventId: 'event', opId: 'inbound:event', proof: 'opaque-proof' }), { status: 201 });
       void init;
       return new Response('unexpected', { status: 500 });
@@ -43,10 +46,11 @@ describe('inbound automation process', () => {
           routes: { 'inbound-automation': [{ endpointId: 'local' }] },
         }, consents: [], systemPrompt: 'Return tasks JSON', parseVersion: 1, taskBatch: { dispatchValidated: engine.dispatchValidated.bind(engine) }, fetchImpl: fetchMock,
       });
-      expect(result).toEqual({ state: 'submitted', eventId: 'event', itemCount: 1 });
-      expect(engine.getState().tasks['inbound:event:0']).toMatchObject({ title: 'From webhook', priority: 2, projectId: 'project' });
-      expect((await store.getAllOps()).filter((row) => row.op.opType === OpType.Batch)).toHaveLength(1);
-      expect(journal.get('event')).toBe('opaque-proof');
+      expect(result).toEqual({ state: needsConfirmation ? 'needs-confirmation' : 'submitted', eventId: 'event', itemCount: 1 });
+      if (!needsConfirmation) expect(engine.getState().tasks['inbound:event:0']).toMatchObject({ title: 'From webhook', priority: 2, projectId: 'project' });
+      expect((await store.getAllOps()).filter((row) => row.op.opType === OpType.Batch)).toHaveLength(needsConfirmation ? 0 : 1);
+      expect(journal.get('event')).toBe(needsConfirmation ? undefined : 'opaque-proof');
+      expect(fetchMock.mock.calls.some(([request]) => new URL(String(request)).pathname === '/api/automation/commit-permit')).toBe(!needsConfirmation);
       expect(fetchMock).toHaveBeenCalled();
     } finally { pair.privateKey.fill(0); db.close(); }
   });
