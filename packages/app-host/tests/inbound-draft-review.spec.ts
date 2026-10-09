@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { generateInboundKeyPair, openInbound, prepareInboundAutomationResult, sealInbound, inboundTaskDigest } from '@heyta/inbound-core';
+import { generateInboundKeyPair, openInbound, prepareInboundAutomationResult, sealInbound, inboundTaskDigest,
+  AUTOMATION_ENTITLEMENT_TICKET_HEADER } from '@heyta/inbound-core';
 import { heytaTaskBatchPayloadSchema } from '@heyta/shared-schema';
 import { createInboundDraftReviewer } from '../src/inbound-draft-review.js';
+import { AutomationTicketError, type AutomationTicketRequest } from '../src/inbound-entitlement-tickets.js';
 
-async function fixture() {
+async function fixture(input: { ticket?: (request: AutomationTicketRequest) => Promise<string> } = {}) {
   const old = generateInboundKeyPair();
   const current = generateInboundKeyPair();
   const scope = { eventId: 'event', ruleId: '11111111-1111-4111-8111-111111111111', ruleVersion: 1, parseVersion: 1 };
@@ -15,6 +17,8 @@ async function fixture() {
   let active = true;
   const keyCopies: Uint8Array[] = [];
   const decisions: Record<string, unknown>[] = [];
+  const decisionHeaders: Record<string, string>[] = [];
+  const ticketRequests: AutomationTicketRequest[] = [];
   const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = new URL(String(input)).pathname;
     if (path.endsWith('/draft')) return Response.json(snapshot);
@@ -25,6 +29,7 @@ async function fixture() {
       publicKey: current.publicKey.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') });
     if (path.endsWith('/decision')) {
       const body = JSON.parse(String(init?.body)); decisions.push(body);
+      decisionHeaders.push(init?.headers as Record<string, string>);
       return Response.json({ eventId: 'event', state: body.decision === 'confirm' ? 'prepared' : 'cancelled' });
     }
     return new Response('', { status: 404 });
@@ -34,8 +39,11 @@ async function fixture() {
     const copy = old.privateKey.slice(); keyCopies.push(copy); return copy;
   });
   const reviewer = createInboundDraftReviewer({ accountId: 'account', baseUrl: 'https://sync.test', getToken: async () => 'jwt',
-    loadPrivateKey, assertActive: () => { if (!active) throw new Error('session changed'); }, fetchImpl: fetch });
-  return { reviewer, old, current, context, snapshot, decisions, keyCopies, loadPrivateKey, fetch,
+    loadPrivateKey, assertActive: () => { if (!active) throw new Error('session changed'); }, fetchImpl: fetch,
+    ...(input.ticket === undefined ? {} : { getEntitlementTicket: async (request: AutomationTicketRequest) => {
+      ticketRequests.push(request); return await (input.ticket as (value: AutomationTicketRequest) => Promise<string>)(request);
+    } }) });
+  return { reviewer, old, current, context, snapshot, decisions, decisionHeaders, keyCopies, loadPrivateKey, fetch, ticketRequests,
     invalidate: () => { active = false; }, dispose: () => { old.privateKey.fill(0); current.privateKey.fill(0); } };
 }
 describe('encrypted draft review authority', () => {
@@ -94,6 +102,49 @@ describe('encrypted draft review authority', () => {
       await expect(review.confirm(review.tasks.map((t) => ({ ...t, dueDate: '2026-10-08' })))).rejects.toThrow('session changed');
       await expect(review.cancel()).rejects.toThrow('session changed');
       expect(f.fetch).toHaveBeenCalledTimes(calls);
+    } finally { f.dispose(); }
+  });
+});
+
+describe('draft-confirm entitlement ticket', () => {
+  it('takes its own ticket scoped to this event, and never puts it in the body', async () => {
+    const f = await fixture({ ticket: async () => 'draft-confirm-ticket' });
+    try {
+      const review = await f.reviewer.open('event');
+      await review.confirm(review.tasks.map((task) => ({ ...task, dueDate: '2026-10-08' })));
+      expect(f.ticketRequests).toEqual([{ action: 'draft-confirm', eventId: 'event' }]);
+      expect(f.decisions).toHaveLength(1);
+      expect(f.decisionHeaders[0]?.[AUTOMATION_ENTITLEMENT_TICKET_HEADER]).toBe('draft-confirm-ticket');
+      expect(JSON.stringify(f.decisions[0])).not.toContain('draft-confirm-ticket');
+    } finally { f.dispose(); }
+  });
+
+  it('does not ask for a ticket when cancelling, because cancellation needs no subscription', async () => {
+    const f = await fixture({ ticket: async () => 'unused' });
+    try {
+      await f.reviewer.cancel('event');
+      expect(f.ticketRequests).toEqual([]);
+      expect(f.decisions).toHaveLength(1);
+      expect(Object.keys(f.decisionHeaders[0] ?? {}).includes(AUTOMATION_ENTITLEMENT_TICKET_HEADER)).toBe(false);
+    } finally { f.dispose(); }
+  });
+
+  it('sends the decision without the header at all when the host supplied no ticket source', async () => {
+    const f = await fixture();
+    try {
+      const review = await f.reviewer.open('event');
+      await review.confirm(review.tasks.map((task) => ({ ...task, dueDate: '2026-10-08' })));
+      expect(f.decisions).toHaveLength(1);
+      expect(Object.keys(f.decisionHeaders[0] ?? {}).includes(AUTOMATION_ENTITLEMENT_TICKET_HEADER)).toBe(false);
+    } finally { f.dispose(); }
+  });
+
+  it('lets a ticket denial surface as itself and makes no decision request at all', async () => {
+    const f = await fixture({ ticket: async () => { throw new AutomationTicketError('AUTOMATION_LINK_NOT_BOUND', true); } });
+    try {
+      const review = await f.reviewer.open('event');
+      await expect(review.confirm(review.tasks.map((task) => ({ ...task, dueDate: '2026-10-08' })))).rejects.toBeInstanceOf(AutomationTicketError);
+      expect(f.decisions).toHaveLength(0);
     } finally { f.dispose(); }
   });
 });
