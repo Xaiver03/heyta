@@ -25,8 +25,27 @@ if ! pgrep -x "$APP_PROCESS" >/dev/null 2>&1; then
   exit 4
 fi
 
+# 🔴 进程在 ≠ 窗口在。macOS 关掉最后一个窗口后 app 进程照样活着，而下面那趟 AX 遍历
+# 对着空窗口列表会一路走到 15s 超时，把"载体没有窗口"读成"探针没验到东西"（2026-10-09 实测
+# 就是这个形状：装的 HeytaMac 在跑，`count of windows` = 0，输出只有 UNVERIFIED）。
+# 所以先做一次有界的窗口数回读，失败原因要印出来，不能让它伪装成产品结论。
+WINDOWS=$(osascript -e "tell application \"System Events\" to tell process \"$APP_PROCESS\" to count of windows" 2>&1)
+case "$WINDOWS" in
+  '' | *[!0-9]*)
+    echo "PROBE=UNAVAILABLE"
+    echo "REASON=AX 读不到窗口数：$WINDOWS"
+    exit 4
+    ;;
+esac
+if [ "$WINDOWS" -eq 0 ]; then
+  echo "PROBE=UNAVAILABLE"
+  echo "REASON=$APP_PROCESS 在跑但一个窗口都没有（count of windows = 0）；先把窗口打开再跑本探针"
+  exit 4
+fi
+
+ERRLOG=$(mktemp -t heyta-mac-widget-help-ax)
 set +e
-osascript - "$APP_PROCESS" "$EXPECTED" "$OUT" <<'APPLESCRIPT' &
+osascript - "$APP_PROCESS" "$EXPECTED" "$OUT" >"$ERRLOG" 2>&1 <<'APPLESCRIPT' &
 on run argv
   set appProcess to item 1 of argv
   set expectedUrl to item 2 of argv
@@ -291,7 +310,14 @@ if [ "$status" -ne 0 ]; then
   if [ "$status" -eq 124 ]; then
     echo "REASON=macOS Accessibility probe timed out; result is unverified"
   fi
+  # AppleScript 的 error 文本是这一步唯一的归因通道 —— 没有它，"壳没暴露 DOM"和
+  # "壳没有窗口"和"权限没给"在输出上长得一模一样。
+  if [ -s "$ERRLOG" ]; then
+    echo "AX_ERROR=$(head -5 "$ERRLOG" | tr '\n' ' ')"
+  fi
+  rm -f "$ERRLOG"
   echo "RESULT=UNVERIFIED"
   exit 4
 fi
+rm -f "$ERRLOG"
 echo "RESULT=OK"
