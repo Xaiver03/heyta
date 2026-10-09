@@ -49,6 +49,7 @@ import { accountSecurityRoutes } from '../../src/account/account-security.routes
 import { wsRoutes } from '../../src/sync/websocket.routes';
 import { issueSession } from '../../src/auth';
 import { sessionIdOf } from '../../src/account/access-sessions';
+import { hashToken } from '../../src/auth-tokens';
 import { getWsConnectionService } from '../../src/sync/services/websocket-connection.service';
 import { hashFor } from '../../src/password/service';
 import { AUTH_PASSWORD_PATHS } from '@heyta/shared-schema';
@@ -271,5 +272,46 @@ describeWithDb('逐枚撤销会话 ⇒ 那一枚的实时通道当场断（真 P
     sockets.push(revived);
     await waitForConnectionCount(1);
     expect(revived.readyState).toBe(WebSocket.OPEN);
+  });
+
+  /**
+   * 🔴 **三条撤销路径的最后一格**：重置口令（忘记密码）那一路的通道那一半。
+   * 它与改密那条共用 `revokeAllDeviceSessions()`，但它**不换发会话**（J14），
+   * 所以这一路要的是"两条全断 + 库里一条不剩"。
+   * ⚠️ 这一路补上之后，§5 第 16 条那三条路里**改密与重置**两条有真 socket 读数了；
+   * **换绑生效**那一路仍只有 spy 层那一条（`account-security.routes.spec.ts` 断的是"调用了 `closeForUser`"，
+   * 不是"那条连接真的断了"）—— 要在这一层补它，得把那两封信的装置重铺进本套件，理由与取舍写在计划 §6.73。
+   */
+  it('🔴 真重置口令 ⇒ 已经开着的页面当场断，而库里一条会话都不剩（这条路不换发会话）', async () => {
+    const newPassword = `ws-suite-reset-${Date.now()}-${process.pid}-Pass!`;
+    const tokenE = await issueSession({ id: userId }, { deviceName: 'device-e' });
+    const tokenF = await issueSession({ id: userId }, { deviceName: 'device-f' });
+    const registeredBefore = getWsConnectionService().getConnectionCount();
+    const wsE = await openSocket(wsBase, tokenE, 'client-reset-e');
+    const wsF = await openSocket(wsBase, tokenF, 'client-reset-f');
+    sockets.push(wsE, wsF);
+    await waitForConnectionCount(registeredBefore + 2);
+
+    // 🔴 监听排在请求之前（与上面两条同一型抢跑，见 `waitForClose` 上面那段）。
+    const closingE = waitForClose(wsE);
+    const closingF = waitForClose(wsF);
+
+    const linkToken = `ws-reset-${Date.now()}-${process.pid}`;
+    await observer.user.update({
+      where: { id: userId },
+      data: { resetPasswordToken: hashToken(linkToken), resetPasswordTokenExpiresAt: BigInt(Date.now() + 60_000) },
+    });
+    const reset = await app.inject({
+      method: 'POST',
+      url: `/api${AUTH_PASSWORD_PATHS.reset}`,
+      payload: { token: linkToken, password: newPassword },
+    });
+    expect(reset.statusCode, reset.body).toBe(200);
+    expect((JSON.parse(reset.body) as { token?: string }).token, '重置口令换出了一枚会话').toBeUndefined();
+
+    expect(await closingE).toEqual({ code: 4003, reason: 'Token revoked' });
+    expect(await closingF).toEqual({ code: 4003, reason: 'Token revoked' });
+    // 这条路不换发新令牌 ⇒ 全部删干净，库里应当**零行**。
+    expect(await observer.accessSession.count({ where: { userId } })).toBe(0);
   });
 });
