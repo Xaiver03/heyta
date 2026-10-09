@@ -1764,3 +1764,37 @@ git grep -q 'sendEmailPasswordRegistrationCodeEmail' HEAD -- server/src/email.ts
   && git diff --quiet -- packages/legal && echo CLOSEABLE || echo "still open"
 ```
 
+
+### 6.35 移动端与 web 那几格产品面：**代码都写好了，卡在"文件正被别人整片重写"** —— 一张总账（13:0x 现量）
+
+这一轮把所有"界面点不到"的格逐格现量了一遍。结论不是"还缺一堆实现"，而是
+**六格里只有一格需要新写代码，其余五格是已写好却没入库的改动**，而它们的共享前置是同一条：
+并行会话把那几枚文件提交（`apps/mobile/src` 418 枚脏、`apps/web/src` 567 枚脏，
+`AuthScreen.tsx` 单枚 381 插入 / 108 删除、`SecurityScreen.tsx` 432 行改动 —— 都是**别人的活**，
+从里面挑我那几行就是造一棵谁都不有的树，见 §6.28）。
+
+| 格 | HEAD 上到底有没有 | 代码在哪 | 谁关 |
+|---|---|---|---|
+| 移动端「更换登录邮箱」挂载 | ✅ **有**（`git grep -c EmailChangeSection HEAD -- apps/mobile/src/screens/ProfileScreen.tsx` = 2） | 已入库 `76944386` | 已关，见 §6.28 |
+| 移动端「登录设备 / 逐枚撤销 / 退出这台 / 退出所有」挂载 | ❌ 没有（`onSignOutCurrentDevice` 在 HEAD 的 `SecurityScreen.tsx` 里 0 次） | 写好在那枚文件**未提交**的那 432 行里 | 等 `SecurityScreen.tsx` 落地 |
+| 移动端「丢失了通行密钥？发一封找回链接」 | ❌ 没有，但**词条在 HEAD**：`mobile.security.passkeys.recover` / `.recoverHint` 都在表里 ⇒ 又是一枚孤儿词条 | 写好在同一枚未提交的 `SecurityScreen.tsx`（`requestPasskeyRecovery` 3 处） | 同上；复取：`git grep -c "security-recover-submit" HEAD -- apps/mobile` |
+| 移动端「忘记密码？」入口 | ❌ 没有（`git grep -c forgotPassword HEAD -- apps/mobile` = 0） | 写好在**未提交**的 `AuthScreen.tsx`（`requestPasswordReset` 导入 + `forgotPassword` 那个 handler） | 等 `AuthScreen.tsx` 落地 |
+| web 三块面板（换绑 / 会话 / 登出这台与所有） | ❌ 组件与 jsdom 判据都**未跟踪**，挂载点在别人在飞的 `App.tsx` / `main.tsx` | 已写好（工作树里） | 等那两枚落地，见 §6.31 |
+| 法务「十封」政策文本 + `email-catalog` 对账判据 | ❌ 文本改动在未提交的 5 份 legal 文档里，判据未跟踪 | 已写好 | 与实现同一批，见 §6.34 |
+| 移动端「改登录密码」 | ✅ **有**（`changePassword` 在 HEAD 的 `SecurityScreen.tsx` 里 4 处） | 早已入库 | 本线没有欠项，这一格只是设备腿还没在干净载体上证过 |
+
+⇒ **这一轮之后真正"没写"的产品面只剩一条**：鸿蒙端没有壳（§5 第 6 条，平台级，不在本线射程内）。
+其余每一格都只需要一次提交 + 一次复跑。
+
+🔴 一条给下一位的操作提醒：这些格子**互不相同的闭合条件**别读成同一个。
+`SecurityScreen.tsx` 落地会同时关掉上面两格（会话 + 通行密钥找回），
+`AuthScreen.tsx` 落地只关"忘记密码"那一格，`App.tsx` / `main.tsx` 只关 web 那一格，
+而 legal 那一格还需要 `server/src/email.ts` 的第十枚 sender。
+每格都带了一条现量命令，别按印象合并。
+
+**它们落地之后必须复跑的两件**（否则"入库"不等于"能用"）：
+① 设备腿 `bash scripts/verify-mobile-ios-account-email-sessions.sh` 的步骤 11–14（会话那一块在 HEAD 上不可能过）。
+   🔴 这是一条**预期**不是读数：那一趟共 17 步（复取 `grep -cE '^[[:space:]]*step\b' scripts/verify-mobile-ios-account-email-sessions.sh`），步骤 15 是改登录密码（HEAD 上挂好了）、16–17 是收尾判据，
+   11–14 需要会话挂载 ⇒ 本轮载体读数的**上限**就是"除 11–14 外全绿"。真实读数落在下一节，别看这段倒推。
+② web 那一族真浏览器判据 `e2e/tests/account-email-change-and-sessions.spec.ts` —— §6.31 说了它现在是必红。
+
