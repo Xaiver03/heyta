@@ -1841,3 +1841,42 @@ git grep -c "EMAIL_PASSWORD_REGISTRATION" HEAD -- packages/shared-schema/src/aut
 本线剩下的 iOS 设备腿因此**无法由干净载体取证** —— `CHAIN_RC=1` 既不是产品失败也不是探针失败，
 是 HEAD 本身不可构建。修复与预演在 §6.37。
 
+
+### 6.37 修 HEAD 的构建：为什么最终是我来提那五枚文件，以及提完之后还剩什么（13:2x 现量）
+
+§6.36 报出红之后，先在纯 HEAD 的隔离载体上做了预演（把候选文件复制进 `.worktrees/iosacct`，
+pin 未动、被跟踪脏 = 0，全程不改主检出）：
+
+| 预演 | 命令（载体里，绕开 pnpm 的自动装依赖 —— 它会把整趟拖进 registry 重试：本机代理流量额度已停 CI，`ECONNRESET` / `error 23` 反复出现） | 读数 |
+|---|---|---|
+| 类型层 | `node_modules/.bin/tsc -p tsconfig.json --noEmit`（`packages/shared-schema`） | **rc=0** |
+| 产物层 | `node_modules/.bin/tsup` 同包 | **rc=0**，ESM + DTS 都成（`dist/index.d.ts 80.70 KB`） |
+| 负对照 | 同一载体**不加**那五枚时 `pnpm -r build` | 第一枚包就 TS2307/TS2305 红（就是 §6.36 那一趟） |
+
+于是落成 `209f7997`。为什么这一笔**是**本线该做的，而 §6.28 / §6.31 / §6.34 那些笔**不是**：
+
+- 那些格子等的是"别人的**产品语义**还没落地"；这一格等的是"HEAD 自己引用了不存在的东西"——
+  它不是别人没写完的功能，是**本线 `9fa53ab9` 造成的不自洽**（引用与消费方都进了 HEAD，实现留在工作树）。
+  修自己造的裂口不在"别代拍别人"的那条线上。
+- 另一头的理由也要写清：`packages/op-log/src/state.ts` 在 HEAD 上就已经是消费方，
+  所以**回退方向**（把 index.ts 那些块摘掉）会删掉别人已入库的产品代码 —— 那不是更小的一步，是更坏的一步。
+- 边界照旧守住：那三枚 `packages/shared-schema/tests/task-*.spec.ts` **没有**带进来（不是构建前提，
+  留给作者按自己的节奏入库）；`auth-http-contract.ts` 只带 HEAD 缺的那 32 行（`git diff --stat` 逐枚对齐）。
+- 可逆性：`git revert 209f7997` 一条命令回到现状态；提交信息里逐枚写了来源与 mtime，归属没有改写。
+
+🔴 **还剩的一件事（本线不代拍，但记在这里）**：这一类"一句 docs 提交扫进整片工作树"已经不止一次
+（§6.10、§6.26、本条）。仓库里**没有任何一层**会因为它而失败 —— `pnpm check` 不含 `pnpm -r build`，
+而死链检查只看可点的 markdown 链接。候选修法是一条静态尺：
+`packages/*/src/**` 与 `apps/*/src/**` 里每一个相对 import，都必须解析到 `git ls-files` 里的文件；
+它能当场抓住本条这一型（引用在册、实现不在册 = 干净检出必红）。
+把它做成门禁要先回答"注入违规会不会红"，属判据口径，交负责人拍；现量复跑：
+
+```bash
+git ls-files --others --exclude-standard -- packages | grep -E '\.ts$'   # 未跟踪的源码
+git grep -hoE "from '\.[^']*'" HEAD -- packages | sort -u                # HEAD 引用了哪些相对模块
+```
+
+设备腿 r5 已按修好的 pin 重投（`~/.heyta-evidence/ios-account-email-1009-212606-r5/`），
+载体 = `209f7997` 且被跟踪脏 = 0，三枚闸门脚本与主 HEAD 逐枚同 blob。
+它第 4 步的窗口门第一趟报 `REDS=load` —— 那是负载门在正常工作，不是缺陷。
+
