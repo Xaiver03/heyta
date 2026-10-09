@@ -2336,7 +2336,7 @@ node scripts/check-ui-language.mjs     # rc=1，指向价格 SSOT 那条
 
 | 格 | 现量 | 为什么这一轮没做 |
 |---|---|---|
-| 帮助中心那六枚孤儿键（`site.docs.account.s6`/`.s7`、`site.help.q/a.rebind`、`site.help.q/a.sessions`） | HEAD 中英两侧**都在**（逐枚 `git show HEAD:packages/i18n/src/locales/zh-CN.ts \| grep -c` = 1）；注册表命中 **0**（`git grep -c <键> HEAD -- apps/landing/src/site` 全 0）⇒ 词条在册、页面渲染不到 | 挂载本身写好且极薄（`content.ts` 两行问答对 + `docs.ts` 两节），但**落它必须同时重跑 `gen:entries`**：`apps/landing/scripts/gen-entries.mjs:178` 把 `HELP_QUESTIONS` 灌进 `/help` 页的 `FAQPage` JSON-LD，而生成物是**已跟踪**的 `apps/landing/**/index.html` —— 眼下这 30 枚正躺在别人的未提交重生成里（`git status --porcelain -- apps/landing/docs apps/landing/en/docs` = 30）。我那一节进去就是把他们的产物覆盖成一棵谁都不有的树 ⇒ 序列：等他们那批落地，我这四行 + 一次 `gen:entries` 一起落 |
+| 帮助中心那六枚孤儿键（`site.docs.account.s6`/`.s7`、`site.help.q/a.rebind`、`site.help.q/a.sessions`） | HEAD 中英两侧**都在**（逐枚 `git show HEAD:packages/i18n/src/locales/zh-CN.ts \| grep -c` = 1）；注册表命中 **0**（`git grep -c <键> HEAD -- apps/landing/src/site` 全 0）⇒ 词条在册、页面渲染不到 | ⚠️ **这一格在同一轮里被拆开并落了一半**（下面这段是当时的形状，留着是为了看清判据怎么换的）：挂载确实极薄（`content.ts` 两行问答对 + `docs.ts` 两节），但 `gen-entries.mjs:178` 会把 `HELP_QUESTIONS` 灌进 `/help` 页的 `FAQPage` JSON-LD。**先量哪一半改生成物**：`docs.ts` 那两节**不改**（两臂各跑一次生成器，中英全部产物 `diff -rq` 逐字节相同）⇒ 已落 `da5c7f52`；`content.ts` 那两行**会改**，而现量证明那 30 枚 HTML 里的一枚与"从 HEAD 真源重生成"的结果 `cmp` **逐字节相同** ⇒ 并行会话正在落的那批**就是** `check:entries` 的修法本身，我不落第二份。四格全过程与逐条读数在 §6.47 |
 | 移动端「忘记密码？」入口 | HEAD 的 `apps/mobile` 里 `forgotPassword` 命中 **0**；工作树版本有（`requestPasswordReset` 导入 + handler + 那条 `Pressable`，共 8 行） | 那 8 行**不是自洽的**：它调 `beginAuthAction` / `isCurrentAuthAction` / `enterSession`，三枚 helper 只在未提交版本里定义（`AuthScreen.tsx:242-250`），HEAD 命中 **0**。手挑我这半 ⇒ 发的是一份**没有竞态守卫**的弱版本；把 helper 抬过去 ⇒ 抬的是别人的活。两条都是 §6.28 那棵"谁都不有的树"，本线刚为同一型写过教训（§6.42 / 第 400 条）。他们那笔一落，我这半自动跟着落 |
 | `pnpm check` 在 HEAD 上不全绿：`check:entries` | 干净载体上 `node apps/landing/scripts/gen-entries.mjs --check` ⇒ **rc=1，32 枚已跟踪 HTML 不一致（130 插 / 130 删）**。性质：`-` 侧（已入库的 HTML）是**新话**，`+` 侧（从 HEAD 真源生成）是**旧话** —— 例如 account 页入库的是"…那同步要用的访问令牌是从哪来的"，而 HEAD 的 `site.docs.account.sum` 是"注册账号，选择登录方式，管理访问凭据。" | 🔴 **这条不在本线**：那句长的 SEO 描述**本来就在真源里**（`ed9ee2d0` 09-30 进 `packages/i18n`），是 `e6058120`（10-09 14:35，产品体验线那笔，`zh-CN.ts` 864 行）把它换成了短的那句，**却没重跑生成器** —— 而 HTML 里那句长描述是 `f82ace65`（10-02）生成的（`git log -S"<长句>" -- apps/landing/docs/account/index.html` 只命中那一笔），换话之后没人再生成 ⇒ HTML 留的是换话**之前**的句子。⇒ 修法是一条命令（`pnpm --filter @heyta/landing gen:entries` 再提交），但那改的是**对外 SEO 文案**且他们那批已在飞（上面那 30 枚 ` M`），按"对外口径不代改"只登记 |
 | 浏览器腿 / 设备腿 | 现量：1 分钟负载 **26.9** / 16 核（§6.40 那条阈值是 ≤12），`vm_stat` 的 free+speculative **0.3 G** / 64 G；`check-imports-resolve --sources-only` 仍报 `packages/ui/src/index.ts` 那批构建输入解析不到；载体里 `e2e/node_modules` 不存在 | 两个**环境**挡着（负载与内存），不是产品也不是判据 —— 在这种余量上起 Chromium + vite dev 只会同时得到掺假的读数和一次内存弹窗。`e2e` 那份 lockfile 要单独装（它刻意不在根工作区内），装它要 registry 通道。复取：见下面那三条命令，任一条回到阈值内就重起那一趟 |
@@ -2388,5 +2388,47 @@ node -e 'const m=require("child_process").execSync("vm_stat").toString();const p
 （不是撤销路径）⇒ 那一档盲区此刻没有活的漏法。
 复取：`git grep -nE "tokenVersion: *[0-9]" HEAD -- server/src packages`；
 逐路命中：`git grep -n "revokeAllDeviceSessions\|closeForUser" HEAD -- server/src`。
+
+### 6.47 两笔落进去了（帮助文档那两节 + 一道红了两天的法务文案门禁），另一格用字节对账确认"不该我落"
+
+**① `da5c7f52`：文档中心「注册与登录」那一篇补两节。** `site.docs.account.s6` / `s7` 的词条
+（标题、正文、四/三条要点）早在 HEAD 的中英两份表里，而注册表只列到 `s5` ⇒ 页面渲染不到，
+用户读不到"换绑是可以的"与"逐台退出怎么用"。这一格能现在就落，靠的是先量了一件事实：
+**这一处挂载不改生成物** —— `gen-entries.mjs` 只把 `pages.ts` 的 head/lede 与 `content.ts` 的问答清单
+灌进已跟踪的静态 HTML，文章内的小节是运行时从注册表渲染的。两臂各跑一次生成器，
+中英全部产物 `diff -rq` 逐字节相同 ⇒ 不需要碰那 32 枚正被别人重生成的 HTML。
+四条读数：候选那枚引用 291 枚键，zh 缺 0 / en 缺 0；两臂生成器都 rc=0 且产物相同；
+`pnpm --filter @heyta/landing typecheck` 基线 44 条 / 候选 44 条且 `comm` 双向差集为空
+（两臂落在 `site/docs.ts` 上的错误都是 0 条 —— 顺带记下 **HEAD 上 `typecheck` 也是红的**，
+红在缺 dist 的那几枚包，不只是"打不出包"）；本笔新增 23 行逐字都在并行会话那枚未提交的 `docs.ts` 里
+（23/23，缺失 0）⇒ 他们落地是盖在同一批行上。
+⚠️ 那条"子集"测量是在提交**之后**才跑成的（命令里那半段先崩了一次 `subprocess.run(...).read()`）——
+读数成立，顺序不对；下次把这条挪到落地之前，别把"事后补上"读成"事前验过"。
+
+**② `47552d43`：`check:legal-copy` 那格红从 10-04 起，本笔关掉。**
+`packages/legal/src/documents/terms.ts` 的摘要在 `fcff5bbb`（10-04 10:11，注销批次 E3）换了新话，
+但没人重跑 `gen-site-copy.mjs` ⇒ 站点词条里 `site.legal.terms.lede` / `.seo.description` 两条一直是旧话，
+两臂同尺在干净载体上 rc=1 红了六天。落的是**生成器自己的输出**（4 行，全在生成区里），
+不是一句新写的法律表述。复验：`check:legal-copy` 转 rc=0；相邻 `legal-permissions` / `legal-tools` /
+`legal-host` 三道各自 rc=0 没被带动；生成器幂等（再跑 `git diff` 为空）。
+同一轮 `@heyta/i18n` 那包有一条红（`中文表每一条都含汉字` 点名 `web.ai.settings.localApi.source.file`
+与 `.command`），**与本笔无关**：那是路径与命令值，本笔只动 `site.legal.terms.*`，而同样两条早在干净 HEAD 上
+被 `check:ui-language` 点过名（§6.44 的两臂逐字相同读数）。归属：AI 那条线的 `UNTRANSLATABLE_KEYS`，不代拍。
+基线臂当刻没跑成（`内存闸门拒绝启动：轻量档已有 2 趟在跑`，那是仓里的并发闸门，不是产品红），
+所以这条归属用的是内容级对账 + 那道门禁的既有读数，不是"两臂各跑一次"—— 写清，别读成后者。
+
+**③ 那 32 枚 landing HTML 的红不该由我再落一份 —— 字节对账给的证据。**
+把主检出里那枚未提交的 `apps/landing/docs/account/index.html` 与"从 HEAD 真源重生成"的结果 `cmp`
+⇒ **逐字节相同**。也就是说并行会话正在落的那一批**就是** `check:entries` 的修法本身。
+⇒ §6.45 那张表里"帮助中心挂载"这一格现在拆成两半并已量准：文档中心那两节**已落**（上面①），
+`content.ts` 那两行问答对**仍排在他们那批之后**（`gen-entries.mjs:178` 读 `HELP_QUESTIONS`
+写 `FAQPage` JSON-LD，落它会改正在被别人重生成的 HTML）。复取这条排序判断：
+
+```bash
+# 他们那批 == 从 HEAD 重生成？（是 ⇒ 别落第二份）
+(cd .worktrees/<载体> && git checkout --force <HEAD> && cd apps/landing && node scripts/gen-entries.mjs >/dev/null)
+cmp -s apps/landing/docs/account/index.html .worktrees/<载体>/apps/landing/docs/account/index.html && echo 同一份
+```
+
 
 
