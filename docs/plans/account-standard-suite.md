@@ -278,6 +278,18 @@ W1 先落、W7 后落 ⇒ 中间任何一次 `pnpm check` 都会红。**这不�
     复取：`git grep -n "closeForUser\|closeForSession" HEAD -- server/src` ⇒ 逐枚那条现在是**真调用**，不是注释；
     `git grep -n "closeForUser" HEAD -- server/tests` ⇒ 正向 1 条 + 负向 2 条；两臂读数见 §6.56。
 
+18. 🔴 **两条邮件链接路由的"兜底句"不一样，而 `api.ts` 里那段注释承诺的正是"必须一致"** ——
+    这一格**已修**（10-10 04:1x，读数与修法在 §6.71），原文留着记它是怎么被照出来的：
+    新增的链路 10b 第一次把两条路放在一起比字节，当场红 —— legacy 那路回
+    `{"error":"Invalid or expired login link"}`，唯一入口回 `{"error":"Invalid or expired link"}`。
+    现量（行号会漂，只给命令）：`git grep -n "Invalid or expired" HEAD -- server/src/api.ts server/src/auth.ts`。
+    🔴 **仍然开着的那一半，不由本线代拍**：`SAFE_ERROR_MESSAGES` 那张表认得出
+    `verifyLoginMagicLink` 抛的 `'Invalid or expired login link'`，**认不出** `auth.ts` 里
+    「查不到这个人」那句 `'Invalid or expired link'` ⇒ 后者永远被兜底句顶掉。
+    现在两条路的兜底句对齐了，所以用户读不出差别；但**结构上**这件事仍只由链路 10b 一条运行时判据守着，
+    没有静态尺。要把它做成封闭词表的一部分（进 allowlist，或改由 `copy.generated.ts` 下发中英两句），
+    那是**对外可见文案 + 判据口径**，与 §5 第 7 条同一条立场，等负责人拍。
+
 ---
 
 ## 6. 台账（逐批带读数，**不许写"基本完成"**）
@@ -3577,6 +3589,75 @@ cd .worktrees/<载体> && git checkout --force $(git rev-parse refs/heads/main)
 三臂的摘除锚点各是一条整句，逐字抄在本节表中，改哪一句就应当红哪一条 —— 除 R2 以外。
 载体收尾：`git status --porcelain` 只剩那枚预期新增的 spec，无 `.mut-bak` 残留（§6.69 那三条硬规矩这一趟全程执行：
 还原走 `git checkout --`、每臂跑完 `git diff --quiet -- <path>` 复验、红句逐条抄原文）。
+
+### 6.71 链路 10 把两条邮件链接路由**放在一起比**，当场照出一条真缺陷并修完（10-10 04:1x 现量，载体 `.worktrees/iosacct` 纯 tip）
+
+§6.68 那张表里最后一行本线能自己补的（legacy 那路 `/login/magic-link/verify`）不是一条新判据，
+而是**第一次把两条路放在一起比**。理由写在那枚路由自己的注释里：
+"这里保留它是因为已经发出去的邮件指向它 —— 但**行为必须与新的那个端点一致**，否则同一封邮件走两条路会得到两种结果"。
+这句承诺此前没有任何一层守过：两条路各自都有判据，没有一条把它们对比。
+
+新增三条（同一枚集成套件，真库 + 真 HTTP）：
+
+| 那条 | 钉住的五项里哪几项 |
+|---|---|
+| 链路 10a | 同一类登录令牌走两条路 ⇒ 判别式 `kind` 一致、各自换出的令牌**真能过鉴权**、那一行带着**各自那一次点击**的 UA、两条路都把 `loginToken` 那两列清空 |
+| 链路 10b | 同一状态下两条路都 401、每条路内部"过期"与"从没有过"**逐字同一句**、响应里不许出现邮箱或令牌，🔴 且**跨那两条路也逐字同一句** |
+| 链路 10c | 通行密钥注册那一格在 legacy 那路必须是 **409 一句明白话**，而不是"200 但没有令牌"（那段 `if (result.kind !== 'session')` 是这条路由独有的一段，摘掉就退化成注释里明说的那种形状），且这一路**不许换出会话**、而验证那一步确实生效 |
+
+读数（载体 = 纯 `refs/heads/main` + 本地隔离库 `heyta_account_w9`）：
+
+| 那一格 | 现量 |
+|---|---|
+| 基线（10a/10b/10c 加完，未改产品） | `20 passed (20)` —— 10a/10c 一次过 |
+| 10b  strengthened 那一趟（跨路比句子，**修前**） | `1 failed / 19 passed`：`expected '{"error":"Invalid or expired login li…' to be '{"error":"Invalid or expired link"}'` |
+| 修完那一趟 | `20 passed (20)` |
+| 臂 L1：legacy 那处的 `sessionMetaFromRequest(req)` 摘掉 | 恰好 1 红（10a）：`expected [ 'W9-Chain10-Canonical', null ] to deeply equal [ 'W9-Chain10-Canonical', …(1) ]` |
+| 臂 L2：legacy 那段 `if (result.kind !== 'session')` 整块摘掉 | 恰好 1 红（10c）：`{"kind":"verified-only",…}: expected 200 to be 409` |
+
+🔴 **修的那一行**：legacy 那路 catch 里的兜底字面量 `'Invalid or expired login link'` ⇒ `'Invalid or expired link'`
+（与 §2.1 那个唯一入口逐字同一句，并在原地写下为什么是这一句）。根因不在这两枚字面量本身，在它下面一层：
+`SAFE_ERROR_MESSAGES` 认得出 `verifyLoginMagicLink` 抛的那句、**认不出** `auth.ts` 里「查不到这个人」那句
+`'Invalid or expired link'` ⇒ 走不到白名单时用户看到的就是**各条路自己那份兜底**。
+这正是 AGENTS §3.5 那句"同一件事的第二份实现"的又一副面目：一个概念（"这枚链接没用"）两句字面量，
+而两句分别藏在两个 `catch` 里，构建与 typecheck 都不会说 anything。
+
+⚠️ **这条不是"顺手改文案"的两个前置**（都现量过才动的手）：
+① legacy 那路是**活路径** —— `packages/app-host/src/hosted-auth.ts` 的 `magicLinkVerify` 在调它，
+  服务端渲染的 `/magic-login` 那页那颗按钮也在调它（`server/src/pages.ts` 文件头那段两跳流程的注释），
+  所以两句话都是用户真能读到的，不是"内部字符串"；
+② **别人手里的判据一条没代改** —— 先前我怕的那两枚钉句（`magic-link-registration.spec.ts`）钉的是
+  **函数抛出**的那句（`verifyLoginMagicLink`），不经过路由，所以修兜底碰不到它们。
+  同趟证明：`npx vitest run tests/magic-link-registration.spec.ts tests/api.routes.spec.ts` = `23 passed`。
+  🔴 我先前把这两枚钉读成"改那句就要连别人那两枚断言一起动"，那是**没现量就下的判断**，已就地否证并写回 §5 第 18 条。
+
+入库方式（与 §6.66 同一套，因为是同一枚共写文件）：`server/src/api.ts` 在共享检出里正被别人写着
+（现量 `M`，132 增 / 22 删），所以不能 `git commit -- server/src/api.ts`。
+走 plumbing：blob 取自载体里那棵**纯 HEAD + 本线这一处**的文件（不是主检出的工作树版），
+`hash-object -w` → `read-tree refs/heads/main` → `update-index --cacheinfo` → `write-tree` → `commit-tree` → `update-ref`，
+再用 `git diff-tree -r` 证明这一笔只动一枚文件；随后 `git restore --staged -- server/src/api.ts` 把共享索引那格刷到新 HEAD
+（§6.66 那条"谁的提交都会回退我"的索引副作用，这次**先做**而不是事后补）。
+主检出的工作树版**同样打上这一处**，这样别线整枚提交时不会把它退回去。
+
+⚠️ 载体环境读数（不记产品、也不记"已验证"）：这一格里 vitest 被**内存闸门**拒了三次
+（立即可用 264 / 104 / 201 MB < 那一档要求的 384 MB），成因是另一条会话正在跑 Playwright
+（几枚 `chrome-headless-shell`，按"只对自己创建的对象动手"不动它们）。
+最后一次是先有界等到 `FREE=1695MB` 才起跑，那一趟就是上面的 `20 passed`。
+🔴 顺带把这条写成判据的姿势：**闸门拒绝启动时那条输出里没有被测命令的 rc**，
+所以包装命令的 `exit 0` 完全可能是"没跑"（仓内 traps #164/#179 那一族）。本线这一趟每次都在日志里留了
+`CHAIN10_BASE_RC=` / `ARM_*_RC=` 那一行才敢读数。
+
+仍然开着的：见 §5 第 18 条那"仍然开着的那一半"（allowlist 认不出那句 ⇒ 这件事结构上只由链路 10b 一条运行时判据守着，
+没有静态尺；做成词表的一部分要拍）。
+
+复取（一条命令，前置 = §6.62 那三件 + §6.58 那条 Prisma 判据 + §6.69 那条内存余量）：
+```bash
+cd .worktrees/<载体> && git checkout --force $(git rev-parse refs/heads/main)
+( cd server && node -e "const {Prisma}=require('@prisma/client');console.log(typeof Prisma.PrismaClientKnownRequestError)" )
+( cd server && NO_COLOR=1 DATABASE_URL="postgresql://$(whoami)@127.0.0.1:5432/heyta_account_w9?schema=public" \
+  npx vitest run --config vitest.integration.config.ts --maxWorkers=1 \
+  tests/integration/email-change-and-sessions.integration.spec.ts )   # 期望 20 passed
+```
 
 
 

@@ -616,6 +616,152 @@ describeWithDb('换绑邮箱与会话撤销（真 PostgreSQL + 真 Prisma + 真 
     expect(withNew.statusCode, withNew.body).toBe(200);
   });
 
+  /**
+   * 🔴 **工单 W1/§3 那两条邮件链接路由的对账（ADR-0039 §3.2）**：
+   * `/api/auth/email/verify` 是**唯一入口**，而 `/api/login/magic-link/verify` 被留着
+   * 是因为**已经发出去的邮件**指向它。那句注释写的承诺是"行为必须与新的那个端点一致，
+   * 否则同一封邮件走两条路会得到两种结果"—— 这条承诺此前**没有任何一层在守**：
+   * 两条路各自都有判据，但没有任何一条把两条放在一起比。
+   */
+  it('链路 10a：同一类登录令牌走两条路由 ⇒ 换出的会话形状、可用性、那一行的元数据、消费即失效 四项一致', async () => {
+    const canonical = `w9-chain10-canonical-${Date.now()}@example.test`;
+    const legacy = `w9-chain10-legacy-${Date.now()}@example.test`;
+    const idCanonical = await makeUser(canonical);
+    const idLegacy = await makeUser(legacy);
+    const tokenCanonical = `c10-canonical-${Date.now()}-${process.pid}`;
+    const tokenLegacy = `c10-legacy-${Date.now()}-${process.pid}`;
+    for (const [id, t] of [
+      [idCanonical, tokenCanonical],
+      [idLegacy, tokenLegacy],
+    ] as const) {
+      await observer.user.update({
+        where: { id },
+        data: { loginToken: hashToken(t), loginTokenExpiresAt: BigInt(Date.now() + 60_000) },
+      });
+    }
+
+    const hits = [
+      await app.inject({
+        method: 'POST',
+        url: '/api/auth/email/verify',
+        headers: { 'user-agent': 'W9-Chain10-Canonical' },
+        payload: { token: tokenCanonical },
+      }),
+      await app.inject({
+        method: 'POST',
+        url: '/api/login/magic-link/verify',
+        headers: { 'user-agent': 'W9-Chain10-Legacy' },
+        payload: { token: tokenLegacy },
+      }),
+    ];
+    for (const hit of hits) expect(hit.statusCode, hit.body).toBe(200);
+    const parsed = hits.map((h) => JSON.parse(h.body) as { kind?: string; token?: string; user?: { id?: number } });
+
+    // ① 判别式形状一致（legacy 那路就是把 `verifyEmailLink` 的返回原样发出，不许自己造第二种形状）
+    expect(parsed.map((p) => p.kind)).toEqual(['session', 'session']);
+    for (const p of parsed) expect(typeof p.token).toBe('string');
+    // ② 那一行带着**各自那一次点击**的 UA（legacy 那处调用点没接线 ⇒ 这里读 null）
+    const rows = await observer.accessSession.findMany({
+      where: { userId: { in: [idCanonical, idLegacy] } },
+      select: { userId: true, userAgent: true },
+      orderBy: { userId: 'asc' },
+    });
+    expect(rows.map((r) => r.userAgent).sort()).toEqual(['W9-Chain10-Canonical', 'W9-Chain10-Legacy']);
+    // ③ 换回来的那枚令牌**真的能过鉴权**（两条路都要能，这是"200 但下一发 401"那一型）
+    for (const p of parsed) {
+      const probe = await app.inject({
+        method: 'GET',
+        url: `/api/${SESSION_PATHS.list}`,
+        headers: bearer(p.token ?? ''),
+      });
+      expect(probe.statusCode, probe.body).toBe(200);
+    }
+    // ④ 消费即失效：两条路都把那两列清空
+    for (const id of [idCanonical, idLegacy]) {
+      const row = await observer.user.findUniqueOrThrow({ where: { id } });
+      expect(row.loginToken).toBeNull();
+      expect(row.loginTokenExpiresAt).toBeNull();
+    }
+  });
+
+  it('链路 10b：两条路由上"过期"与"从没有过这枚链接"各自回**同一句**，且状态码同为 401、句子里不许出现邮箱或令牌', async () => {
+    const email = `w9-chain10-dead-${Date.now()}@example.test`;
+    const userId = await makeUser(email);
+    const dead = `c10-dead-${Date.now()}-${process.pid}`;
+    await observer.user.update({
+      where: { id: userId },
+      data: { loginToken: hashToken(dead), loginTokenExpiresAt: BigInt(Date.now() - 1000) },
+    });
+    const never = `c10-never-${Date.now()}-${process.pid}`;
+    const urls = ['/api/auth/email/verify', '/api/login/magic-link/verify'];
+
+    const shapeOf = async (url: string, token: string) => {
+      const res = await app.inject({ method: 'POST', url, payload: { token } });
+      return { status: res.statusCode, body: res.body };
+    };
+    const read = {
+      canonicalExpired: await shapeOf(urls[0]!, dead),
+      canonicalNever: await shapeOf(urls[0]!, never),
+      legacyExpired: await shapeOf(urls[1]!, dead),
+      legacyNever: await shapeOf(urls[1]!, never),
+    };
+    for (const value of Object.values(read)) {
+      expect(value.status).toBe(401);
+      // 🔴 探测器防护：同一条路上"过期"与"根本没发过"必须**逐字同一句**（这一句本身是账号存在性证据）。
+      expect(value.body).not.toContain(email);
+      expect(value.body).not.toContain(dead);
+      expect(value.body).not.toContain(never);
+    }
+    expect(read.canonicalNever.body).toBe(read.canonicalExpired.body);
+    expect(read.legacyNever.body).toBe(read.legacyExpired.body);
+
+    // 🔴 跨那两条路也要**逐字同一句**：一封邮件里只有一个链接，它落在哪条路上取决于那封信是哪一年发的，
+    // 不该因此读出两种结果。这一句在改前**不成立**（两条路由各有各的兜底字面量），
+    // 照出来与修完的读数都在计划 §6.71。
+    expect(read.legacyExpired.body).toBe(read.canonicalExpired.body);
+    expect(read.legacyNever.body).toBe(read.canonicalNever.body);
+  });
+
+  /**
+   * 🔴 同一封"通行密钥注册确认"邮件走两条路的那一格：新入口的产品语义是
+   * **验证成功但不发会话**（`kind: 'verified-only'`），legacy 那路把它翻译成 409 一句明白话。
+   * 那条 `if (result.kind !== 'session')` 是这条路由**独有**的一段 —— 摘掉它，这里收到的
+   * 就是一枚 200 却没有 `token`（调用方读成"登录成功了但没有令牌"，正是那段注释挡的形状）。
+   */
+  it('链路 10c：通行密钥注册那一格在 legacy 那路必须是 409 一句明白话，而不是"200 但没有令牌"', async () => {
+    const email = `w9-chain10-pk-${Date.now()}@example.test`;
+    const userId = await makeUser(email);
+    await observer.user.update({ where: { id: userId }, data: { isVerified: 0 } });
+    const linkToken = `c10-pk-${Date.now()}-${process.pid}`;
+    const hash = hashToken(linkToken);
+    await observer.user.update({
+      where: { id: userId },
+      data: { verificationToken: hash, verificationTokenExpiresAt: BigInt(Date.now() + 60_000) },
+    });
+    await observer.pendingPasskeyRegistration.create({
+      data: {
+        verificationToken: hash,
+        verificationTokenExpiresAt: BigInt(Date.now() + 60_000),
+        credentialId: Buffer.from(`c10-cred-${linkToken}`),
+        publicKey: Buffer.from('pk-mock-material'),
+        userId,
+      },
+    });
+
+    const legacy = await app.inject({
+      method: 'POST',
+      url: '/api/login/magic-link/verify',
+      payload: { token: linkToken },
+    });
+    expect(legacy.statusCode, legacy.body).toBe(409);
+    // 不许换出会话：点开一封注册确认邮件不等于一次登录。
+    expect((JSON.parse(legacy.body) as { token?: string }).token).toBeUndefined();
+    expect(await observer.accessSession.count({ where: { userId } })).toBe(0);
+    // 而验证那一步**确实**生效了（409 不是"整个没做"）。
+    const after = await observer.user.findUniqueOrThrow({ where: { id: userId } });
+    expect(after.isVerified).toBe(1);
+  });
+
   // ── D1（工单 §1 量出来的那条"全仓零 HTTP 判据"）─────────────────────────
   // `POST /api/auth/email/verify` 是三类令牌的**唯一**分流口（ADR-0039 §2.1）。
   // 它此前只在 service 层被测：那里的"返回一枚会话"是假的，而线上症状是
