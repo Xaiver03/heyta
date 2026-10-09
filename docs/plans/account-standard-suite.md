@@ -2666,6 +2666,50 @@ PY
 git checkout --force HEAD    # 载体收干净
 ```
 
+### 6.53 共享层第一次拿到纯 HEAD 的整包读数：86 份里本线那 6 份全过，残留的 7 份只有一个根因（10-10 01:3x 现量）
+
+§6.49 那一趟被内存闸门拒绝，这次闸门放行，于是在干净载体（`checkout --force refs/heads/main`，tip `d971a73f`）
+把 `pnpm --filter @heyta/app-host test` 整包跑完：
+
+- **`Test Files 14 failed | 72 passed (86)`**，其中**本线那六份全部通过**：
+  `account-security` / `hosted-account-profile` / `account-closure` / `hosted-password-auth` /
+  `device-revocation-controller` / `assistant-session-actions` —— 这是这条线的共享层编排
+  第一次在**纯 HEAD**（不借主检出工作树）上取到通过读数。
+
+- 🔴 **那 14 枚一开始不能当产品红读**：本仓 vitest 走 `package.json` exports ⇒ 兄弟包解析到的是**它的 dist**，
+  而载体里除我补编过的那几枚之外都是旧 dist。补编 `@heyta/design-system` → `@heyta/widget-core` → `@heyta/inbound-core`
+  （各 rc=0）后**同一批 14 份**再跑 ⇒ `4 passed / 10 failed (14)`：
+  `widget-actions`、`inbound-draft-review`、`inbound-recipient-remote`、`inbound-rules-remote` 四枚**直接转绿**
+  —— 它们先前那份红整个是旧 dist 造成的，不是行为红。
+
+- 残留 **10 份失败 / 15 条用例红**，两种根因，**没有一种在本线**：
+  ① **7 份整枚加载不到**：`packages/app-host/src/inbound-process.ts:6` 引 `./task-batch-actions.js`，
+  而那枚文件**在 HEAD 里不存在**（`check-imports-resolve --sources-only` 当刻报 9 条，测试文件 0 条）。
+  它同时把 `src/index.ts` 的整条入口带塌，所以 `ai-egress-legal-parity` / `assistant-egress-disclosure` /
+  `calendar-anchor` / `vault-key-package-store` / `vault-migration` / `vault-session` 这六枚是**被连坐**的，
+  不是各自的红。决定性的一条：**`pnpm --filter '@heyta/app-host...' build` 自己就 rc=1**
+  （`Could not resolve "./task-batch-actions.js"` + `src/index.ts(25,8) TS2305 没有导出成员 'InboundAutomation…'`）
+  ⇒ 共享层这个包在 HEAD 上**打不出来**，归 inbound/协作那一族（"引用在册、实现不在册"，
+  与 §6.48 里 `check:gate-wiring` 那道红同型）。**本线不代落**：那枚文件不是本线写的，
+  代提交 = 替别人给一份自己没验过的实现发通行证。
+  ② **3 份是用例级真红**（补齐依赖后仍在）：`inbound-key-store` 与 `inbound-secret-store` 都报
+  `Error: store「meta」的 put 缺少主键`，`inbound-runner` 报
+  `TypeError: Cannot read properties of undefined (reading 'every')` —— 同一族，本线 0 份。
+  这 15 条用例红登记给别人，不动本线判据、也不拿它当"共享层没验"的理由（本线那六份是过了的）。
+
+复取（顺序不能换 —— 先补依赖再跑，否则拿到的是一张掺假的账面）：
+
+```bash
+cd .worktrees/<载体> && git checkout --force $(git rev-parse refs/heads/main)
+pnpm --filter @heyta/app-host test    # 臂 A（不动 dist）：期望 14 failed | 72 passed
+pnpm --filter @heyta/design-system build && pnpm --filter @heyta/widget-core build && pnpm --filter @heyta/inbound-core build
+pnpm --filter @heyta/app-host exec vitest run <那 14 份>   # 臂 B（补齐依赖）实测：10 failed | 4 passed (14)
+# ⚠️ 整包 86 份在补依赖后的账面**没有实测**（当刻内存闸门按并发维拒绝：轻量档已有 2 趟在跑），
+#    10 failed | 76 passed 那个数是 72+4 推出来的，只作预期参考，别当读数引用。
+pnpm --filter '@heyta/app-host...' build; echo rc=$?     # 期望 rc=1，报 task-batch-actions.js
+node scripts/check-imports-resolve.mjs --sources-only
+```
+
 
 
 
