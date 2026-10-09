@@ -3704,12 +3704,41 @@ cd .worktrees/<载体> && git checkout --force $(git rev-parse refs/heads/main)
 仍然开着的：
 ① **重置那一路**（`/password/reset`）的通道那一半仍未在这层验（同一型，只是这一批没排；
   它比改密那条更简单——不发会话，要的是"两条 socket 全断 + 库里 0 行"）；
+  ✅ **同批就补了**（§6.73：`6 passed`，臂 W1 重取一次同时打红改密与重置那两条）。
 ② §5 第 13 条那格（默认 5 s 预算属于判据口径，由负责人拍）今天有了**第二个具体例子**：
   新那条在"未变异 + 负载高"时贴着预算，读数以 `--maxWorkers=1` 取。
 
 复取（同 §6.71 那条命令，把文件名换成 `session-revoke-websocket`，期望 `5 passed`；
 臂 W1 的摘除句是 `access-sessions.ts` 里 `revokeAllSessions(userId)` 后面那一整行，
 还原按 §6.69 那三条硬规矩：`git checkout -- <path>` + `git diff --quiet -- <path>` + 抄红句原文）。
+
+### 6.73 三条撤销路径在真运行时这一层的现状表（重置那一路补上后重取了臂 W1，10-10 04:2x 现量，载体纯 tip）
+
+§6.72 留下的那一格（重置那一路的通道那一半）用同一枚夹具补上了：
+自带两条连接（`device-e` / `device-f`），把重置令牌按这套既有手法写库，走真 `/password/reset`，
+断言"两条都以 `4003 / Token revoked` 当场断 + 库里**零行** + 响应里没有 `token`（J14）"。
+
+| 那一格 | 现量 |
+|---|---|
+| 本文件（默认 5 s 预算） | `6 passed (6)` rc=0 |
+| 同一枚命令**再跑两趟**（验证 §6.72 那两处抢跑真的修完了） | 各 `6 passed (6)`，rc 均 0；取数时负载 6.8（16 核）/ 余量 1400 MB |
+| 🔴 臂 W1 **重取**（还是摘 `revokeAllDeviceSessions` 里 `closeForUser` 那一行，但现在两条通道判据都在） | `2 failed / 24 passed (26)` —— 红的恰好是改密与重置那两条，其余（§6.60 那四条真 socket 判据 + 另一枚集成套件那 20 条）逐条照旧绿 |
+
+⇒ **§5 第 16 条那三条路在这一层的现状**（这一张表是这一节的产出，比"又补了一条"有用）：
+
+| 那条路 | 真 socket 读数 | 只有 spy 的那一条 |
+|---|---|---|
+| 改口令 `/password/change` | ✅ §6.72 | 同左 |
+| 重置口令 `/password/reset` | ✅ 本节 | 同左 |
+| 换绑生效（`EMAIL_CHANGE_PATHS.confirm` 那一步） | ❌ **仍未补** | `account-security.routes.spec.ts` 断的是"调用了 `closeForUser`"，不是"那条连接真的断了" |
+
+🔴 为什么这一格**登记而不顺手补**：同一枚共用收口函数（`revokeAllDeviceSessions`）已经在**两个调用方**上
+取到"真的把连接断了"的读数，臂 W1 一次同时打红这两条；而要在这一层补换绑那一路，
+得把另一枚套件的那两封信装置（`sent.authorize/confirm/changed` 那份 mock）重铺进 WS 套件 ——
+那会让两枚套件共享一份夹具，此后任何一侧动它都会红在另一侧。这一格留成欠项，不包装成完成。
+
+复取：与 §6.72 同一条命令（文件名 `session-revoke-websocket`），期望从 `5 passed` 变成 **`6 passed`**；
+臂 W1 那一行的摘除与还原照 §6.69 那三条硬规矩，重取时预期 `2 failed / 24 passed`。
 
 
 
