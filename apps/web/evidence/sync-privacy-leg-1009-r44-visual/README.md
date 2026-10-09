@@ -15,6 +15,11 @@
 | `dark-1440-data-refused-existing.png` | 同一张状态卡的暗档版，在框内 |
 | `README.md` | 就是本文件 |
 
+🔴 **"87 张逐张看完"与"本目录入库 7 枚"是两件事，别把前者读成后者**（现量：`ls apps/web/evidence/sync-privacy-leg-1009-r44-visual/*.png | grep -c .` = **87**，而 `git ls-files` 里这目录只有 **5** 枚 `.png` + README + `report.json` = 7 枚在册）。
+入库的取舍口径是**"这张承担台账里哪一句独立主张"**（见上表最后一列），另外那 82 枚是同批其它格子的像素副本、在本账里没有各自的主张 ⇒ 刻意不落库。
+⇒ 直接后果要说清：**"整批看完"那一句在干净检出上不可复核** —— 下一位要重看只能重跑那一趟（装置 `scripts/qa/reminders-data-responsive.mjs`，`HEYTA_RESPONSIVE_LEGS=reminders,data,groups,help,sync`），
+而**不许**拿这 5 张当"87 张的代表"去交那条主张；能复核的部分只有 `report.json` 里那 37 条机读判据与上表那 5 张各自的那一句。
+
 🔴 **那四个"行数"是一把聚合尺，不是一句"节点↔色已绑定"**：按行取极值只回答
 「机读报的那个色**有没有被画到屏上**、有多少行的极值是它」，它**不**证明那个色恰好来自那枚标题节点
 （同一屏里别的文字可能同色）。"节点↔色"那一半由 `report.json` 里的 DOM 计算色承担，
