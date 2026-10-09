@@ -1704,3 +1704,63 @@ web 侧对应的是 `App.tsx` / `main.tsx` 落地）。
   门自己警告 `--confirm` 默认取列表第一台 ⇒ 链是**显式**传 `IOS_DEVICE_NAME=heyta-iphone-17pro` 的，
   没有依赖顺序。闸门与验收脚本的 blob 与主 HEAD 逐枚同枚（三枚都 `blob 同枚`）。
 
+
+### 6.33 🔴 HEAD 上那句「只发五封功能邮件」是假的：代码实际发九封，其中四封就是本批那四封（13:0x 现量）
+
+做 §6.30 那条普查时，ADR-0063 也过了同一把尺，它指着 `packages/legal/tests/email-catalog.spec.ts`
+—— **本线 W7 那枚"邮件封闭词表回到代码对账"的判据，写完就没入库**。
+把它现量了一遍，结论比"少一份文件"重：
+
+| 问法 | 读数 |
+|---|---|
+| HEAD 的政策数了几封 | **五封**：`privacy.ts:201/296/315` 与 `third-parties.ts:130/152`（另有一处文件头注释也写着"五封邮件"） |
+| HEAD 的代码真发几封 | **九封**（`^export const send*Email` 的条数） |
+| 这九封是不是摆设 | 九枚**全有调用点**（`auth.ts` / `passkey.ts` / `password/recovery.ts` / `account/email-change.ts` / `account/authenticator-notice.ts`） |
+| 多出来那四封是谁的 | 换绑-新邮箱确认、换绑-旧邮箱授权、换绑完成通知、新增认证器告知 ⇒ **本批那四封** |
+
+上面四条的现量命令（"几封"那种数法要对着代码数，不能抄文案）：
+
+```bash
+git grep -nE '(十|九|五) ?封' HEAD -- packages/legal                       # 政策侧的每一个数
+git show HEAD:server/src/email.ts | grep -cE '^export const send.*Email'   # 实现侧的真值
+for f in $(git show HEAD:server/src/email.ts | grep -oE '^export const send[A-Za-z]+Email' | sed 's/export const //'); do
+  printf '%s <- %s\n' "$f" "$(git grep -l "$f" HEAD -- server/src | grep -v 'email.ts' | tr '\n' ' ')"
+done                                                                        # 逐枚证明不是摆设
+```
+
+`privacy.ts:296` 那句是**封闭句式**（"只有第 3 条列过的那五封"），按本仓已经吃过一次的规矩
+（AGENTS §7 那条"凡是封闭句式，它指的集合必须有一条对账门禁"），它现在就是一句没人守的对外承诺，
+而且方向是**少承诺**：用户读到"只有五封"，实际会收到九封，其中"换绑完成"与"新增认证器告知"两封是安全通知。
+
+🔴 **为什么没有任何一层会失败**：法务那一族五道门在 HEAD 上是绿的（§6.17 / §6.23 的读数），
+因为它们对账的是**生成物 ↔ 真源文本一致**，不是"代码里到底有几封"。
+把这句话钉回代码的那把尺就是那枚未入库的 spec。
+
+### 6.34 那枚判据为什么不能单独入库，以及"联合那一笔"的完整清单
+
+它**在主树里是绿的**（`npx vitest run tests/email-catalog.spec.ts` ⇒ 5 判据通过），但那个绿是
+「HEAD + 别人在飞的改动」的属性，不是提交属性 —— 现量三条：
+
+| 命令 | 读数 | 含义 |
+|---|---|---|
+| `git grep -c sendEmailPasswordRegistrationCodeEmail HEAD -- server/src/email.ts` | **HEAD 里没有**（`git diff` 里它是 `+` 行） | 第十封（注册验证码）属另一条会话，未提交 |
+| `grep -cE '^export const send.*Email' server/src/email.ts` | 工作树 **10**，HEAD **9** | 该 spec 的登记表是 **10** 行 ⇒ 拿 HEAD 那棵树跑必红"登记表多于实现" |
+| `git diff --stat -- packages/legal` | 7 枚文件 366 插入 / 308 删除 | 「十封」那句改写与 `automation-metadata` 那一节**同处这些文件** |
+
+⇒ 单独入库 = 在 HEAD 上造第二道本线必红（§6.31 已经有一道了），而且会把别人未提交的注册验证码那封信
+挂到我的提交信息下。**这一格只能由"实现与文本同一批"那一笔关闭**，清单就地写清：
+
+1. `server/src/email.ts` 那第十枚 sender 与它的调用点（**注册验证码那条线**）；
+2. 本线已写好、仍未入库的政策改写：`packages/legal/src/documents/{privacy,third-parties,data-rights,personal-info-list,terms}.ts`
+   与 `src/index.ts`（五封 → 十封、换绑在途那枚明文例外、一次性凭据时长表补两档、注销级联按迁移终态重算、中英同步）；
+3. `packages/legal/tests/structure.spec.ts` 里跟着级联数字变的那批断言；
+4. `server/src/legal.generated.ts` 重新生成（`check:server-copy` / `check:legal-copy` 的前置）；
+5. `packages/legal/tests/email-catalog.spec.ts` 本体入库 + ADR-0063 那条引用随之成立。
+
+复取这一格还开着的判据（输出 `CLOSEABLE` = 可以闭）：
+
+```bash
+git grep -q 'sendEmailPasswordRegistrationCodeEmail' HEAD -- server/src/email.ts \
+  && git diff --quiet -- packages/legal && echo CLOSEABLE || echo "still open"
+```
+
