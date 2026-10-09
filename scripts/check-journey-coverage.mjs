@@ -79,9 +79,15 @@ const ENDPOINTS = [
       //    理由写在 `e2e/playwright.password-web.config.ts` 文件头），刻意不进 `pnpm check`。
       'e2e/password-web/password-journey.spec.ts',
       'scripts/verify-password-web-journey.mjs',
+      // 换绑邮箱 + 登录设备这两段**账号面**旅程的真浏览器腿（发起 → 状态区说"还等哪一边" →
+      // 撤销回到表单；列表 → 只撤那一枚 → 这台还在）。与上面三条的分工：那些走"拿到令牌 /
+      // 走完注册"，这一条走"已经登录着的人改自己的账号"。假只有 HTTP 响应体，
+      // 服务端那一半在 `server/tests/integration/email-change-and-sessions.integration.spec.ts`（真 PG）。
+      // ⚠️ 它**在** `pnpm check` 里（`check:ai-e2e` 跑整个 `e2e/tests/`），不像上面三条各有独立驱动。
+      'e2e/tests/account-email-change-and-sessions.spec.ts',
     ],
     shellSpecs: [],
-    covers: 'J1–J7 全覆盖（jsdom 逻辑层）+ 真浏览器整条旅程（e2e/auth-journey，verify:web-auth）',
+    covers: 'J1–J7 全覆盖（jsdom 逻辑层）+ 真浏览器整条旅程（e2e/auth-journey，verify:web-auth）+ 账号面两段旅程（换绑 / 登录设备，在 check:ai-e2e 里）',
   },
   {
     end: 'mobile',
