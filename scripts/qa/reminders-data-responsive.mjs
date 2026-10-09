@@ -76,14 +76,22 @@ if (process.env.HEYTA_RESPONSIVE_PLAN_ONLY === '1') {
 // 真实的 `default` **与 `granted`** 两态只存在于有头 Chromium。原先这里只写了 `default`，
 // 2026-10-09 无头那一趟把它照出来了：`granted` 档设完权限后回读 `Notification.permission`
 // 得到的是 `denied`（`report.json` 里 `mode:'granted'` 那 4 格 `permission:'denied'`、
-// granted 卡 0 张），`allPermissionStatesRendered` 因此判假红。⇒ 无头那一档取三态，
-// 跳过的两态如实写进 report，而不是让五档 `.every` 对着空集合假装齐了。
-// 有头 = 会开一个抢前台的窗口（AGENTS §6.2 规定二），所以它必须是显式 opt-in。
+// granted 卡 0 张），`allPermissionStatesRendered` 因此判假红。
+// 2026-10-10 00:3x 把"无头到底能不能拿到 granted"按五条通道各测一遍，全部回 `denied`：
+// ① `context.grantPermissions(['notifications'])`；② CDP `Browser.setPermission setting:'granted'`
+// （带 `browserContextId`，就是下面 denied 档那套）；③ 页面里真调一次 `Notification.requestPermission()`
+// 再回读；④ 启动参数 `--headless=new`；⑤ `--disable-features=…NotificationsBlocked… --enable-features=Notifications`。
+// ⇒ 这是载体限制，不是探针没做对。原来的处置是**整档跳过**（五档变三档），代价是这两态的界面形状
+// 在无头那一趟完全没被看过。现在改成：**注入** `window.Notification` 的那两态（与 `unsupported` /
+// `error` 两档同一族做法，它们本来就在注入），并把来源逐格写进 `permissionSource`，
+// 另有一条判据钉住"注入的必须标成注入"—— 免得哪天把注入读成了真权限管道。
+// 有头 = 会开一个抢前台的窗口（AGENTS §6.2 规定二），所以它必须是显式 opt-in；真权限管道只有那一档算数。
 const HEADED = process.env.HEYTA_RESPONSIVE_HEADED !== '0';
-const HEADLESS_SKIPPED = ['default', 'granted'];
+const SIMULATED_WHEN_HEADLESS = ['default', 'granted'];
 const reminderModes = HEADED
   ? ['default', 'granted', 'denied', 'unsupported', 'error']
-  : ['denied', 'unsupported', 'error'];
+  : ['denied', 'unsupported', 'error', 'default', 'granted'];
+const isSimulatedMode = (mode) => !HEADED && SIMULATED_WHEN_HEADLESS.includes(mode);
 const cases = [
   { theme: 'light', width: 390, height: 844 },
   { theme: 'dark', width: 390, height: 844 },
@@ -189,7 +197,19 @@ async function captureReminder(browser, spec, mode) {
       Object.defineProperty(window, 'Notification', { configurable: true, value: SimulatedNotification });
     });
   }
-  if (mode === 'granted' || mode === 'denied') {
+  if (isSimulatedMode(mode)) {
+    // 无头拿不到这两态（上面那五条通道的实测），所以注入 `window.Notification`，
+    // 与 unsupported / error 两档同一族做法。来源逐格写进 permissionSource，
+    // 另有一条判据钉住"注入的必须标成注入"。真权限管道只有有头那一档算数。
+    await page.addInitScript((perm) => {
+      class SimulatedNotification {
+        static permission = perm;
+        static requestPermission() { return Promise.resolve(perm); }
+      }
+      Object.defineProperty(window, 'Notification', { configurable: true, value: SimulatedNotification });
+    }, mode);
+    await page.goto(`${ORIGIN}/?lang=zh-CN`);
+  } else if (mode === 'granted' || mode === 'denied') {
     await setBrowserPermission(page, mode);
     await page.reload();
     // Re-apply after the app's first boot. Chromium keeps the context-level
@@ -245,7 +265,13 @@ async function captureReminder(browser, spec, mode) {
   const screenshot = `${OUT}/${spec.theme}-${spec.width}-reminder-${mode}.png`;
   await page.screenshot({ path: screenshot, fullPage: true });
   await context.close();
-  return { theme: spec.theme, width: spec.width, mode, statuses, facts, screenshot };
+  // `browser` = 这一态是 Chromium 自己的权限决定；`injected` = 页面里的 `window.Notification`
+  // 是本装置注入的（unsupported / error 一直是注入，default 与 granted 在无头下也只能注入）。
+  // 这条字段存在的理由：不许让"注入出来的卡片"被读成"真权限管道验过了"。
+  const permissionSource = mode === 'denied' || (HEADED && (mode === 'default' || mode === 'granted'))
+    ? 'browser'
+    : 'injected';
+  return { theme: spec.theme, width: spec.width, mode, permissionSource, statuses, facts, screenshot };
 }
 
 async function dataJourney(browser, spec) {
@@ -812,6 +838,7 @@ const assertionOwner = {
   noHorizontalOverflow: ['reminders', 'data'],
   allPermissionStatesRendered: ['reminders'],
   everyCaseCoversEverySelectedMode: ['reminders'],
+  reminderPermissionProvenanceIsLabeled: ['reminders'],
   dataFailurePreserved: ['data'],
   existingDataRefusedWithoutLoss: ['data'],
   cancelPreserved: ['data'],
@@ -862,10 +889,16 @@ const report = {
     legCells,
     expectedLegCells,
     reminderModes,
-    skippedReminderModes: HEADED ? [] : HEADLESS_SKIPPED,
-    skipReason: HEADED
+    // 这两态在无头里**拿不到真权限决定**，改成注入（注入的格在 `permissionSource` 里逐格标出）。
+    // 实测过五条通道都回 `denied`：`grantPermissions`、CDP `Browser.setPermission('granted')`、
+    // 页面里真调 `requestPermission()`、`--headless=new`、`--disable-features/--enable-features` 组合。
+    injectedReminderModes: HEADED ? [] : SIMULATED_WHEN_HEADLESS,
+    realPermissionModes: HEADED
+      ? ['default', 'granted', 'denied']
+      : ['denied'],
+    injectionReason: HEADED
       ? null
-      : 'default 与 granted 两态在无头 Chromium 里都会退化成 denied（granted 那一格是 2026-10-09 无头趟实测出来的），而无头是不抢前台的唯一一档（AGENTS §6.2 规定二）',
+      : 'default 与 granted 在无头 Chromium 里都会退化成 denied（2026-10-09 实测，2026-10-10 又按五条通道各测一遍），而无头是不抢前台的唯一一档（AGENTS §6.2 规定二）⇒ 这两态的**卡片渲染**由注入覆盖，**真权限管道**只有有头那一档算数',
   },
   cases,
   reminders,
@@ -891,6 +924,19 @@ const report = {
     everyCaseCoversEverySelectedMode: cases.every((spec) =>
       reminderModes.every((mode) =>
         reminders.some((x) => x.theme === spec.theme && x.width === spec.width && x.mode === mode))),
+    // ── 注入的必须标成注入（2026-10-10：无头拿不到 default/granted 的真权限决定，改成注入渲染）──
+    // 这条钉的不是界面，是**这份读数的身份**：哪一格来自 Chromium 的权限决定、哪一格来自装置注入。
+    // 它的坏形状很具体 —— 哪天有人把 `permissionSource` 写死成 'browser'，或把 denied 也改成注入，
+    // 上面所有判据照样全绿，而报告会把"注入出来的卡片"写成"真权限管道验过了"。
+    reminderPermissionProvenanceIsLabeled: reminders.length > 0
+      && reminders.every((x) => {
+        const expected = x.mode === 'denied' || (HEADED && (x.mode === 'default' || x.mode === 'granted'))
+          ? 'browser' : 'injected';
+        return x.permissionSource === expected
+          // 注入那几格还必须真的读到注入值，否则"标了 injected 其实什么都没注入"也是一格假读数
+          && (x.permissionSource === 'browser' || x.statuses.permission === x.mode || x.mode === 'error' || x.mode === 'unsupported');
+      })
+      && reminders.filter((x) => x.permissionSource === 'browser').every((x) => x.statuses.permission === x.mode),
     // ── 明暗 × 视口下「个人资料 / 账号与安全」两组（补 account-suite 零暗色那个洞）──
     everyCaseCoversEverySweepGroup: sweepCases.every((spec) =>
       sweepGroups.every((group) =>
