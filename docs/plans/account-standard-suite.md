@@ -252,6 +252,18 @@ W1 先落、W7 后落 ⇒ 中间任何一次 `pnpm check` 都会红。**这不�
     判据四层里只有**真运行时那一层**能红（改前产物 `37 过 / 2 红`，改后 `39 过 / 0 红`）：
     单元与 HTTP 层对一个"只写计数器"的实现全绿，因为它们数的是请求与响应，
     缺的那一半是一条**已经建立的连接**。
+17. ⚠️ **逐枚撤销不关那一枚的实时通道**（10-10 00:5x 现量登记，§6.46）：这是第 16 条那一族的
+    **另一半分界**，不是它的回归。`DELETE /sessions/:id` 删的是那一行的会话与 30 s 鉴权缓存，
+    而那台设备**已经开着的页面**还会继续收 op 通知，直到它自己重连。
+    它**不是**"界面在说谎"：`common.sessions.intro` 说的是"退出哪一台，它的**下一次请求**就要重新登录"
+    —— 那句话与实现逐字对齐，没有多承诺一分。也没法顺手修：连接簿记
+    （`server/src/sync/services/websocket-connection.service.ts:79-80`）是
+    `Map<userId, Set<ConnectedClient>>`，而 `ConnectedClient` 只带 `ws / clientId / userId / lastPong / connectedAt`
+    —— **没有 jti**，所以服务端此刻认不出"那一枚会话对应哪一条 socket"，想关也关不准。
+    关闭它需要三件一起做：upgrade 鉴权时把 jti 记进连接、加 `closeForSession(jtiHash)`、
+    以及一条**真运行时**的 WS 判据（现存的 pglite 与 HTTP 层判据都看不见"已经开着的连接"，
+    正是第 16 条那句"缺的那一半是一条已经建立的连接"换了个入口）。
+    复取：`git grep -n "closeForUser\|closeForSession" HEAD -- server/src` ⇒ 逐枚那条只有注释里那句解释。
 
 ---
 
@@ -2349,4 +2361,32 @@ node -e 'const m=require("child_process").execSync("vm_stat").toString();const p
 没关的只剩"设备与浏览器那两趟读数"（环境档）、"帮助中心挂载"与"忘记密码那一格"
 （两格都等别人那批落地才能不带副作用地落）、以及"法务十封"（等那三枚未跟踪的服务端文件，
 现量见 §6.34，本轮重取仍是 `HEAD=0 工作树=存在`）。
+
+### 6.46 「撤销的四件事」逐路对账：一处确认没缺口、一处登记成第 17 条边界（10-10 00:5x，纯读盘）
+
+§5 第 16 条那把尺是**两个动作集合做减法**。这一轮把同一把尺换到"会话族"的每一条路上重跑一遍，
+四件事各查：**抬计数器 / 删会话行 / 关实时通道 / 失效鉴权缓存**。全部现量，没有一条靠印象。
+
+| 那条路 | 代码在哪 | 四件事 |
+|---|---|---|
+| 改登录密码 | `server/src/password/recovery.ts:257`（bump）与 `:276` | 四件都有主人：`revokeAllDeviceSessions` = 删行 + `closeForUser` |
+| 重置口令 | `password/recovery.ts:381` | 同上（同一枚助手） |
+| 换绑生效 | `account/email-change.ts:371`（bump）与 `:419` | 同上 |
+| 通行密钥恢复 | `passkey.ts:909` | 那一枚文件自己就写着 `closeForUser(` ⇒ 关得到 |
+| 登出所有设备 | `account/account-security.routes.ts:213-214` | 走 `revokeAllTokens`（`auth.ts:215` 那一处 bump）+ `revokeAllDeviceSessions` ⇒ **bump 与关通道分在两个文件里**，这正是门禁把 `auth.ts` 列进豁免、并且**连豁免处的 bump 计数一起钉住**的理由（`node scripts/check-session-revocation.mjs` 那句"豁免 1 枚且计数逐字相符"） |
+| 后台强制登出 | `admin/admin.routes.ts:548-550` | 同一类分法，表上写明"删行 + 关通道是一个助手" |
+| **账号注销** | `api.ts` 里 `DELETE /account`：`prisma.$transaction((tx) => deleteAccountWithTombstone(tx, userId))` 之后 `authCache.invalidate` 与 `closeForUser` 各一句 | ✅ **没有缺口**：会话行由 `AccessSession.user` 上的 `onDelete: Cascade` 带走（`server/prisma/schema.prisma` 那枚模型），通道单独关、注释还写明"删完之后关，否则重连会再铸一条孤儿 socket" ⇒ 这一路**不需要** `revokeAllDeviceSessions`，不是漏调 |
+| **逐枚撤销** | `account-security.routes.ts` 里 `DELETE /sessions/:id` 那一支 | ⚠️ 四件里三件有主人（删那一行、`authCache.invalidate`、审计日志），**关通道那件没有**，而且是**明知故漏**：那里的注释自己写着 `closeForUser(userId)` 会把这个账号**全部**设备踢下线。根因在服务端认不出"那一枚会话是哪一条 socket"：`sync/services/websocket-connection.service.ts:79-80` 的簿记是 `Map<userId, Set<ConnectedClient>>`，而 `ConnectedClient` 只带 `ws / clientId / userId / lastPong / connectedAt`，**没有 jti**。⇒ 登记成 §5 第 17 条，含关闭它需要的三件事 |
+
+**这条边界为什么不算"界面在说谎"**：`common.sessions.intro` 的原话是"退出哪一台，它的
+**下一次请求**就要重新登录" —— 与实现逐字对齐。多承诺一分的那句（"它立刻什么都收不到"）界面没说，
+所以这不是文案回归，是一条**语义上真实存在的窄口子**，而按第 16 条同一条理由，它只有真运行时判据抓得住。
+
+顺带把门禁自己登记的那条口径**量了一次**（不替别人改门禁，只把"现在有没有"从断言变成读数）：
+`check-session-revocation` 只认 `tokenVersion: { increment }`；直接赋值那一形状全仓现在**只有一处**
+—— `server/src/test-routes.ts:100` 的 `tokenVersion: 0`，而它在 `prisma.user.create` 的**建号**分支里
+（不是撤销路径）⇒ 那一档盲区此刻没有活的漏法。
+复取：`git grep -nE "tokenVersion: *[0-9]" HEAD -- server/src packages`；
+逐路命中：`git grep -n "revokeAllDeviceSessions\|closeForUser" HEAD -- server/src`。
+
 
