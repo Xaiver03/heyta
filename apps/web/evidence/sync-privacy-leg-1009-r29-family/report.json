@@ -1,0 +1,3982 @@
+{
+  "origin": "http://127.0.0.1:4432",
+  "carrier": {
+    "headless": true,
+    "legs": [
+      "reminders",
+      "data",
+      "groups",
+      "help",
+      "sync"
+    ],
+    "skippedLegs": [],
+    "legCells": {
+      "reminders": 30,
+      "data": 6,
+      "groups": 24,
+      "help": 3,
+      "sync": 3
+    },
+    "expectedLegCells": {
+      "reminders": 30,
+      "data": 6,
+      "groups": 24,
+      "help": 3,
+      "sync": 3
+    },
+    "reminderModes": [
+      "denied",
+      "unsupported",
+      "error",
+      "default",
+      "granted"
+    ],
+    "injectedReminderModes": [
+      "default",
+      "granted"
+    ],
+    "themeCarrier": "localStorage['heyta.theme']（= 产品自己那条开关）",
+    "themeRulerMeasuredCells": 30,
+    "themeRulerSampleCells": 54,
+    "themeLayerRulerPairedCells": 1,
+    "realPermissionModes": [
+      "denied"
+    ],
+    "injectionReason": "default 与 granted 在无头 Chromium 里都会退化成 denied（2026-10-09 实测，2026-10-10 又按五条通道各测一遍），而无头是不抢前台的唯一一档（AGENTS §6.2 规定二）⇒ 这两态的**卡片渲染**由注入覆盖，**真权限管道**只有有头那一档算数"
+  },
+  "cases": [
+    {
+      "theme": "light",
+      "width": 375,
+      "height": 812
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "height": 812
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "height": 960
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "height": 960
+    }
+  ],
+  "reminders": [
+    {
+      "theme": "light",
+      "width": 375,
+      "mode": "denied",
+      "permissionSource": "browser",
+      "statuses": {
+        "granted": false,
+        "denied": true,
+        "unsupported": false,
+        "failed": false,
+        "request": false,
+        "permission": "denied"
+      },
+      "facts": {
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "panel": {
+          "x": 16,
+          "y": 373.5,
+          "width": 343,
+          "height": 186.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 375,
+          "height": 696,
+          "scrollHeight": 1692,
+          "clientHeight": 696
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(15, 23, 42)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/light-375-reminder-denied.png"
+    },
+    {
+      "theme": "light",
+      "width": 375,
+      "mode": "unsupported",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": true,
+        "failed": false,
+        "request": false,
+        "permission": "unsupported"
+      },
+      "facts": {
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "panel": {
+          "x": 16,
+          "y": 393.5,
+          "width": 343,
+          "height": 166.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 375,
+          "height": 696,
+          "scrollHeight": 1672,
+          "clientHeight": 696
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(15, 23, 42)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/light-375-reminder-unsupported.png"
+    },
+    {
+      "theme": "light",
+      "width": 375,
+      "mode": "error",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": false,
+        "failed": true,
+        "request": true,
+        "permission": "default"
+      },
+      "facts": {
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "panel": {
+          "x": 16,
+          "y": 359.5,
+          "width": 343,
+          "height": 200.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 375,
+          "height": 696,
+          "scrollHeight": 1706,
+          "clientHeight": 696
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(15, 23, 42)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/light-375-reminder-error.png"
+    },
+    {
+      "theme": "light",
+      "width": 375,
+      "mode": "default",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": false,
+        "failed": false,
+        "request": true,
+        "permission": "default"
+      },
+      "facts": {
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "panel": {
+          "x": 16,
+          "y": 359.5,
+          "width": 343,
+          "height": 200.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 375,
+          "height": 696,
+          "scrollHeight": 1706,
+          "clientHeight": 696
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(15, 23, 42)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/light-375-reminder-default.png"
+    },
+    {
+      "theme": "light",
+      "width": 375,
+      "mode": "granted",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": true,
+        "denied": false,
+        "unsupported": false,
+        "failed": false,
+        "request": false,
+        "permission": "granted"
+      },
+      "facts": {
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "panel": {
+          "x": 16,
+          "y": 393.5,
+          "width": 343,
+          "height": 166.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 375,
+          "height": 696,
+          "scrollHeight": 1672,
+          "clientHeight": 696
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(15, 23, 42)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/light-375-reminder-granted.png"
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "mode": "denied",
+      "permissionSource": "browser",
+      "statuses": {
+        "granted": false,
+        "denied": true,
+        "unsupported": false,
+        "failed": false,
+        "request": false,
+        "permission": "denied"
+      },
+      "facts": {
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "panel": {
+          "x": 16,
+          "y": 373.5,
+          "width": 343,
+          "height": 186.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 375,
+          "height": 696,
+          "scrollHeight": 1692,
+          "clientHeight": 696
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(241, 245, 249)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/dark-375-reminder-denied.png"
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "mode": "unsupported",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": true,
+        "failed": false,
+        "request": false,
+        "permission": "unsupported"
+      },
+      "facts": {
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "panel": {
+          "x": 16,
+          "y": 393.5,
+          "width": 343,
+          "height": 166.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 375,
+          "height": 696,
+          "scrollHeight": 1672,
+          "clientHeight": 696
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(241, 245, 249)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/dark-375-reminder-unsupported.png"
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "mode": "error",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": false,
+        "failed": true,
+        "request": true,
+        "permission": "default"
+      },
+      "facts": {
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "panel": {
+          "x": 16,
+          "y": 359.5,
+          "width": 343,
+          "height": 200.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 375,
+          "height": 696,
+          "scrollHeight": 1706,
+          "clientHeight": 696
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(241, 245, 249)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/dark-375-reminder-error.png"
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "mode": "default",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": false,
+        "failed": false,
+        "request": true,
+        "permission": "default"
+      },
+      "facts": {
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "panel": {
+          "x": 16,
+          "y": 359.5,
+          "width": 343,
+          "height": 200.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 375,
+          "height": 696,
+          "scrollHeight": 1706,
+          "clientHeight": 696
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(241, 245, 249)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/dark-375-reminder-default.png"
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "mode": "granted",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": true,
+        "denied": false,
+        "unsupported": false,
+        "failed": false,
+        "request": false,
+        "permission": "granted"
+      },
+      "facts": {
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "panel": {
+          "x": 16,
+          "y": 393.5,
+          "width": 343,
+          "height": 166.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 375,
+          "height": 696,
+          "scrollHeight": 1672,
+          "clientHeight": 696
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(241, 245, 249)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/dark-375-reminder-granted.png"
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "mode": "denied",
+      "permissionSource": "browser",
+      "statuses": {
+        "granted": false,
+        "denied": true,
+        "unsupported": false,
+        "failed": false,
+        "request": false,
+        "permission": "denied"
+      },
+      "facts": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 405.5,
+          "width": 358,
+          "height": 186.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 728,
+          "scrollHeight": 1656,
+          "clientHeight": 728
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(15, 23, 42)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/light-390-reminder-denied.png"
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "mode": "unsupported",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": true,
+        "failed": false,
+        "request": false,
+        "permission": "unsupported"
+      },
+      "facts": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 425.5,
+          "width": 358,
+          "height": 166.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 728,
+          "scrollHeight": 1636,
+          "clientHeight": 728
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(15, 23, 42)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/light-390-reminder-unsupported.png"
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "mode": "error",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": false,
+        "failed": true,
+        "request": true,
+        "permission": "default"
+      },
+      "facts": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 391.5,
+          "width": 358,
+          "height": 200.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 728,
+          "scrollHeight": 1670,
+          "clientHeight": 728
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(15, 23, 42)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/light-390-reminder-error.png"
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "mode": "default",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": false,
+        "failed": false,
+        "request": true,
+        "permission": "default"
+      },
+      "facts": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 391.5,
+          "width": 358,
+          "height": 200.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 728,
+          "scrollHeight": 1670,
+          "clientHeight": 728
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(15, 23, 42)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/light-390-reminder-default.png"
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "mode": "granted",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": true,
+        "denied": false,
+        "unsupported": false,
+        "failed": false,
+        "request": false,
+        "permission": "granted"
+      },
+      "facts": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 425.5,
+          "width": 358,
+          "height": 166.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 728,
+          "scrollHeight": 1636,
+          "clientHeight": 728
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(15, 23, 42)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/light-390-reminder-granted.png"
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "mode": "denied",
+      "permissionSource": "browser",
+      "statuses": {
+        "granted": false,
+        "denied": true,
+        "unsupported": false,
+        "failed": false,
+        "request": false,
+        "permission": "denied"
+      },
+      "facts": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 405.5,
+          "width": 358,
+          "height": 186.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 728,
+          "scrollHeight": 1656,
+          "clientHeight": 728
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(241, 245, 249)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/dark-390-reminder-denied.png"
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "mode": "unsupported",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": true,
+        "failed": false,
+        "request": false,
+        "permission": "unsupported"
+      },
+      "facts": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 425.5,
+          "width": 358,
+          "height": 166.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 728,
+          "scrollHeight": 1636,
+          "clientHeight": 728
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(241, 245, 249)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/dark-390-reminder-unsupported.png"
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "mode": "error",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": false,
+        "failed": true,
+        "request": true,
+        "permission": "default"
+      },
+      "facts": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 391.5,
+          "width": 358,
+          "height": 200.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 728,
+          "scrollHeight": 1670,
+          "clientHeight": 728
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(241, 245, 249)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/dark-390-reminder-error.png"
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "mode": "default",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": false,
+        "failed": false,
+        "request": true,
+        "permission": "default"
+      },
+      "facts": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 391.5,
+          "width": 358,
+          "height": 200.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 728,
+          "scrollHeight": 1670,
+          "clientHeight": 728
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(241, 245, 249)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/dark-390-reminder-default.png"
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "mode": "granted",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": true,
+        "denied": false,
+        "unsupported": false,
+        "failed": false,
+        "request": false,
+        "permission": "granted"
+      },
+      "facts": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 425.5,
+          "width": 358,
+          "height": 166.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 728,
+          "scrollHeight": 1636,
+          "clientHeight": 728
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(241, 245, 249)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/dark-390-reminder-granted.png"
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "mode": "denied",
+      "permissionSource": "browser",
+      "statuses": {
+        "granted": false,
+        "denied": true,
+        "unsupported": false,
+        "failed": false,
+        "request": false,
+        "permission": "denied"
+      },
+      "facts": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 811.5,
+          "width": 655.078125,
+          "height": 148.5
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1206,
+          "clientHeight": 904
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(15, 23, 42)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/light-1440-reminder-denied.png"
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "mode": "unsupported",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": true,
+        "failed": false,
+        "request": false,
+        "permission": "unsupported"
+      },
+      "facts": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 811.5,
+          "width": 655.078125,
+          "height": 148.5
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1206,
+          "clientHeight": 904
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(15, 23, 42)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/light-1440-reminder-unsupported.png"
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "mode": "error",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": false,
+        "failed": true,
+        "request": true,
+        "permission": "default"
+      },
+      "facts": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 777.5,
+          "width": 655.078125,
+          "height": 182.5
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1240,
+          "clientHeight": 904
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(15, 23, 42)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/light-1440-reminder-error.png"
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "mode": "default",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": false,
+        "failed": false,
+        "request": true,
+        "permission": "default"
+      },
+      "facts": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 777.5,
+          "width": 655.078125,
+          "height": 182.5
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1240,
+          "clientHeight": 904
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(15, 23, 42)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/light-1440-reminder-default.png"
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "mode": "granted",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": true,
+        "denied": false,
+        "unsupported": false,
+        "failed": false,
+        "request": false,
+        "permission": "granted"
+      },
+      "facts": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 811.5,
+          "width": 655.078125,
+          "height": 148.5
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1206,
+          "clientHeight": 904
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(15, 23, 42)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/light-1440-reminder-granted.png"
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "mode": "denied",
+      "permissionSource": "browser",
+      "statuses": {
+        "granted": false,
+        "denied": true,
+        "unsupported": false,
+        "failed": false,
+        "request": false,
+        "permission": "denied"
+      },
+      "facts": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 811.5,
+          "width": 655.078125,
+          "height": 148.5
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1206,
+          "clientHeight": 904
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(241, 245, 249)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/dark-1440-reminder-denied.png"
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "mode": "unsupported",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": true,
+        "failed": false,
+        "request": false,
+        "permission": "unsupported"
+      },
+      "facts": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 811.5,
+          "width": 655.078125,
+          "height": 148.5
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1206,
+          "clientHeight": 904
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(241, 245, 249)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/dark-1440-reminder-unsupported.png"
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "mode": "error",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": false,
+        "failed": true,
+        "request": true,
+        "permission": "default"
+      },
+      "facts": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 777.5,
+          "width": 655.078125,
+          "height": 182.5
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1240,
+          "clientHeight": 904
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(241, 245, 249)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/dark-1440-reminder-error.png"
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "mode": "default",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": false,
+        "failed": false,
+        "request": true,
+        "permission": "default"
+      },
+      "facts": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 777.5,
+          "width": 655.078125,
+          "height": 182.5
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1240,
+          "clientHeight": 904
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(241, 245, 249)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/dark-1440-reminder-default.png"
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "mode": "granted",
+      "permissionSource": "injected",
+      "statuses": {
+        "granted": true,
+        "denied": false,
+        "unsupported": false,
+        "failed": false,
+        "request": false,
+        "permission": "granted"
+      },
+      "facts": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 811.5,
+          "width": 655.078125,
+          "height": 148.5
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1206,
+          "clientHeight": 904
+        }
+      },
+      "themeLayers": {
+        "scope": "#settings-group-appearance",
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "任务与显示",
+        "sharedLayerColor": "rgb(241, 245, 249)",
+        "sharedLayerNodeText": "桌面小组件",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": true,
+        "sharedLayerCandidateCount": 4
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/dark-1440-reminder-granted.png"
+    }
+  ],
+  "data": [
+    {
+      "theme": "light",
+      "width": 375,
+      "before": {
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "panel": {
+          "x": 16,
+          "y": 178.5,
+          "width": 343,
+          "height": 1252
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 375,
+          "height": 696,
+          "scrollHeight": 1423,
+          "clientHeight": 696
+        }
+      },
+      "exports": {
+        "json": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/light-375-backup.json",
+        "markdown": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/light-375-tasks.md",
+        "jsonEntities": 0,
+        "opCount": 1
+      },
+      "failurePreserved": {
+        "summaryVisible": true,
+        "refusalVisible": true,
+        "panelVisible": true
+      },
+      "refusedExisting": "本机已经有数据 —— 还原只支持空库，现有数据一个字节都没动。",
+      "existingTaskStillVisible": true,
+      "cancelPreserved": true
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "before": {
+        "viewport": {
+          "width": 375,
+          "height": 812
+        },
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "panel": {
+          "x": 16,
+          "y": 178.5,
+          "width": 343,
+          "height": 1252
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 375,
+          "height": 696,
+          "scrollHeight": 1423,
+          "clientHeight": 696
+        }
+      },
+      "exports": {
+        "json": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/dark-375-backup.json",
+        "markdown": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/dark-375-tasks.md",
+        "jsonEntities": 0,
+        "opCount": 1
+      },
+      "failurePreserved": {
+        "summaryVisible": true,
+        "refusalVisible": true,
+        "panelVisible": true
+      },
+      "refusedExisting": "本机已经有数据 —— 还原只支持空库，现有数据一个字节都没动。",
+      "existingTaskStillVisible": true,
+      "cancelPreserved": true
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "before": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 178.5,
+          "width": 358,
+          "height": 1210
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 728,
+          "scrollHeight": 1381,
+          "clientHeight": 728
+        }
+      },
+      "exports": {
+        "json": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/light-390-backup.json",
+        "markdown": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/light-390-tasks.md",
+        "jsonEntities": 0,
+        "opCount": 1
+      },
+      "failurePreserved": {
+        "summaryVisible": true,
+        "refusalVisible": true,
+        "panelVisible": true
+      },
+      "refusedExisting": "本机已经有数据 —— 还原只支持空库，现有数据一个字节都没动。",
+      "existingTaskStillVisible": true,
+      "cancelPreserved": true
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "before": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 178.5,
+          "width": 358,
+          "height": 1210
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 728,
+          "scrollHeight": 1381,
+          "clientHeight": 728
+        }
+      },
+      "exports": {
+        "json": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/dark-390-backup.json",
+        "markdown": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/dark-390-tasks.md",
+        "jsonEntities": 0,
+        "opCount": 1
+      },
+      "failurePreserved": {
+        "summaryVisible": true,
+        "refusalVisible": true,
+        "panelVisible": true
+      },
+      "refusedExisting": "本机已经有数据 —— 还原只支持空库，现有数据一个字节都没动。",
+      "existingTaskStillVisible": true,
+      "cancelPreserved": true
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "before": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 126.5,
+          "width": 655.078125,
+          "height": 1045
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1172,
+          "clientHeight": 904
+        }
+      },
+      "exports": {
+        "json": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/light-1440-backup.json",
+        "markdown": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/light-1440-tasks.md",
+        "jsonEntities": 0,
+        "opCount": 1
+      },
+      "failurePreserved": {
+        "summaryVisible": true,
+        "refusalVisible": true,
+        "panelVisible": true
+      },
+      "refusedExisting": "本机已经有数据 —— 还原只支持空库，现有数据一个字节都没动。",
+      "existingTaskStillVisible": true,
+      "cancelPreserved": true
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "before": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 126.5,
+          "width": 655.078125,
+          "height": 1045
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1172,
+          "clientHeight": 904
+        }
+      },
+      "exports": {
+        "json": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/dark-1440-backup.json",
+        "markdown": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/sync-privacy-leg-1009-r29-family/dark-1440-tasks.md",
+        "jsonEntities": 0,
+        "opCount": 1
+      },
+      "failurePreserved": {
+        "summaryVisible": true,
+        "refusalVisible": true,
+        "panelVisible": true
+      },
+      "refusedExisting": "本机已经有数据 —— 还原只支持空库，现有数据一个字节都没动。",
+      "existingTaskStillVisible": true,
+      "cancelPreserved": true
+    }
+  ],
+  "sweepGroups": [
+    "profile",
+    "account",
+    "sync",
+    "ai"
+  ],
+  "sweepCases": [
+    {
+      "theme": "light",
+      "width": 375,
+      "height": 812
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "height": 812
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "height": 900
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "height": 900
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "height": 900
+    }
+  ],
+  "groups": [
+    {
+      "theme": "light",
+      "width": 375,
+      "group": "profile",
+      "navLabel": "个人资料",
+      "facts": {
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "theme": "light",
+        "title": "个人资料",
+        "box": {
+          "x": 16,
+          "y": 132,
+          "width": 343,
+          "height": 273
+        },
+        "textLength": 44,
+        "interactive": 1,
+        "offViewportWholeScreen": 5,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-profile",
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "个人资料",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 375,
+      "group": "account",
+      "navLabel": "账号与安全",
+      "facts": {
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "theme": "light",
+        "title": "账号与安全",
+        "box": {
+          "x": 16,
+          "y": 132,
+          "width": 343,
+          "height": 185
+        },
+        "textLength": 33,
+        "interactive": 1,
+        "offViewportWholeScreen": 1,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-account",
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "账号与安全",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 375,
+      "group": "sync",
+      "navLabel": "同步与隐私",
+      "facts": {
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "theme": "light",
+        "title": "同步与隐私",
+        "box": {
+          "x": 16,
+          "y": 132,
+          "width": 343,
+          "height": 778
+        },
+        "textLength": 261,
+        "interactive": 6,
+        "offViewportWholeScreen": 3,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-sync",
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "同步与隐私",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 375,
+      "group": "ai",
+      "navLabel": "AI 与集成",
+      "facts": {
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "theme": "light",
+        "title": "AI 与集成",
+        "box": {
+          "x": 16,
+          "y": 132,
+          "width": 343,
+          "height": 878
+        },
+        "textLength": 496,
+        "interactive": 4,
+        "offViewportWholeScreen": 2,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-ai",
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "AI 与集成",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "group": "profile",
+      "navLabel": "个人资料",
+      "facts": {
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "theme": "dark",
+        "title": "个人资料",
+        "box": {
+          "x": 16,
+          "y": 132,
+          "width": 343,
+          "height": 273
+        },
+        "textLength": 44,
+        "interactive": 1,
+        "offViewportWholeScreen": 5,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-profile",
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "个人资料",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "group": "account",
+      "navLabel": "账号与安全",
+      "facts": {
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "theme": "dark",
+        "title": "账号与安全",
+        "box": {
+          "x": 16,
+          "y": 132,
+          "width": 343,
+          "height": 185
+        },
+        "textLength": 33,
+        "interactive": 1,
+        "offViewportWholeScreen": 1,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-account",
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "账号与安全",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "group": "sync",
+      "navLabel": "同步与隐私",
+      "facts": {
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "theme": "dark",
+        "title": "同步与隐私",
+        "box": {
+          "x": 16,
+          "y": 132,
+          "width": 343,
+          "height": 778
+        },
+        "textLength": 261,
+        "interactive": 6,
+        "offViewportWholeScreen": 3,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-sync",
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "同步与隐私",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "group": "ai",
+      "navLabel": "AI 与集成",
+      "facts": {
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "theme": "dark",
+        "title": "AI 与集成",
+        "box": {
+          "x": 16,
+          "y": 132,
+          "width": 343,
+          "height": 878
+        },
+        "textLength": 496,
+        "interactive": 4,
+        "offViewportWholeScreen": 2,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-ai",
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "AI 与集成",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "group": "profile",
+      "navLabel": "个人资料",
+      "facts": {
+        "documentScrollWidth": 768,
+        "documentClientWidth": 768,
+        "theme": "light",
+        "title": "个人资料",
+        "box": {
+          "x": 24,
+          "y": 140,
+          "width": 655,
+          "height": 195
+        },
+        "textLength": 44,
+        "interactive": 1,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-profile",
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "个人资料",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "group": "account",
+      "navLabel": "账号与安全",
+      "facts": {
+        "documentScrollWidth": 768,
+        "documentClientWidth": 768,
+        "theme": "light",
+        "title": "账号与安全",
+        "box": {
+          "x": 24,
+          "y": 140,
+          "width": 655,
+          "height": 125
+        },
+        "textLength": 33,
+        "interactive": 1,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-account",
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "账号与安全",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "group": "sync",
+      "navLabel": "同步与隐私",
+      "facts": {
+        "documentScrollWidth": 768,
+        "documentClientWidth": 768,
+        "theme": "light",
+        "title": "同步与隐私",
+        "box": {
+          "x": 24,
+          "y": 140,
+          "width": 655,
+          "height": 640
+        },
+        "textLength": 261,
+        "interactive": 6,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-sync",
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "同步与隐私",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "group": "ai",
+      "navLabel": "AI 与集成",
+      "facts": {
+        "documentScrollWidth": 768,
+        "documentClientWidth": 768,
+        "theme": "light",
+        "title": "AI 与集成",
+        "box": {
+          "x": 24,
+          "y": 140,
+          "width": 655,
+          "height": 776
+        },
+        "textLength": 496,
+        "interactive": 4,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-ai",
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "AI 与集成",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "group": "profile",
+      "navLabel": "个人资料",
+      "facts": {
+        "documentScrollWidth": 768,
+        "documentClientWidth": 768,
+        "theme": "dark",
+        "title": "个人资料",
+        "box": {
+          "x": 24,
+          "y": 140,
+          "width": 655,
+          "height": 195
+        },
+        "textLength": 44,
+        "interactive": 1,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-profile",
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "个人资料",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "group": "account",
+      "navLabel": "账号与安全",
+      "facts": {
+        "documentScrollWidth": 768,
+        "documentClientWidth": 768,
+        "theme": "dark",
+        "title": "账号与安全",
+        "box": {
+          "x": 24,
+          "y": 140,
+          "width": 655,
+          "height": 125
+        },
+        "textLength": 33,
+        "interactive": 1,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-account",
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "账号与安全",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "group": "sync",
+      "navLabel": "同步与隐私",
+      "facts": {
+        "documentScrollWidth": 768,
+        "documentClientWidth": 768,
+        "theme": "dark",
+        "title": "同步与隐私",
+        "box": {
+          "x": 24,
+          "y": 140,
+          "width": 655,
+          "height": 640
+        },
+        "textLength": 261,
+        "interactive": 6,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-sync",
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "同步与隐私",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "group": "ai",
+      "navLabel": "AI 与集成",
+      "facts": {
+        "documentScrollWidth": 768,
+        "documentClientWidth": 768,
+        "theme": "dark",
+        "title": "AI 与集成",
+        "box": {
+          "x": 24,
+          "y": 140,
+          "width": 655,
+          "height": 776
+        },
+        "textLength": 496,
+        "interactive": 4,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-ai",
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "AI 与集成",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "group": "profile",
+      "navLabel": "个人资料",
+      "facts": {
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "theme": "light",
+        "title": "个人资料",
+        "box": {
+          "x": 424,
+          "y": 80,
+          "width": 655,
+          "height": 195
+        },
+        "textLength": 44,
+        "interactive": 1,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-profile",
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "个人资料",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "group": "account",
+      "navLabel": "账号与安全",
+      "facts": {
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "theme": "light",
+        "title": "账号与安全",
+        "box": {
+          "x": 424,
+          "y": 80,
+          "width": 655,
+          "height": 125
+        },
+        "textLength": 33,
+        "interactive": 1,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-account",
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "账号与安全",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "group": "sync",
+      "navLabel": "同步与隐私",
+      "facts": {
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "theme": "light",
+        "title": "同步与隐私",
+        "box": {
+          "x": 424,
+          "y": 80,
+          "width": 655,
+          "height": 640
+        },
+        "textLength": 261,
+        "interactive": 6,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-sync",
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "同步与隐私",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "group": "ai",
+      "navLabel": "AI 与集成",
+      "facts": {
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "theme": "light",
+        "title": "AI 与集成",
+        "box": {
+          "x": 424,
+          "y": 80,
+          "width": 655,
+          "height": 758
+        },
+        "textLength": 496,
+        "interactive": 4,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-ai",
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "AI 与集成",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "group": "profile",
+      "navLabel": "个人资料",
+      "facts": {
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "theme": "dark",
+        "title": "个人资料",
+        "box": {
+          "x": 424,
+          "y": 80,
+          "width": 655,
+          "height": 195
+        },
+        "textLength": 44,
+        "interactive": 1,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-profile",
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "个人资料",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "group": "account",
+      "navLabel": "账号与安全",
+      "facts": {
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "theme": "dark",
+        "title": "账号与安全",
+        "box": {
+          "x": 424,
+          "y": 80,
+          "width": 655,
+          "height": 125
+        },
+        "textLength": 33,
+        "interactive": 1,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-account",
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "账号与安全",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "group": "sync",
+      "navLabel": "同步与隐私",
+      "facts": {
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "theme": "dark",
+        "title": "同步与隐私",
+        "box": {
+          "x": 424,
+          "y": 80,
+          "width": 655,
+          "height": 640
+        },
+        "textLength": 261,
+        "interactive": 6,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-sync",
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "同步与隐私",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "group": "ai",
+      "navLabel": "AI 与集成",
+      "facts": {
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "theme": "dark",
+        "title": "AI 与集成",
+        "box": {
+          "x": 424,
+          "y": 80,
+          "width": 655,
+          "height": 758
+        },
+        "textLength": 496,
+        "interactive": 4,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-ai",
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "AI 与集成",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    }
+  ],
+  "helpWrapWidths": [
+    375,
+    768,
+    1440
+  ],
+  "helpWrap": [
+    {
+      "width": 375,
+      "baseline": {
+        "arm": "baseline",
+        "linksWidth": 343,
+        "doc": {
+          "scrollWidth": 375,
+          "clientWidth": 375
+        },
+        "rows": [
+          {
+            "index": 0,
+            "textLength": 4,
+            "lineHeight": 24,
+            "lineCount": 1,
+            "copyWidth": 243,
+            "rowRight": 359,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 1,
+            "textLength": 4,
+            "lineHeight": 24,
+            "lineCount": 1,
+            "copyWidth": 243,
+            "rowRight": 359,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 2,
+            "textLength": 5,
+            "lineHeight": 24,
+            "lineCount": 1,
+            "copyWidth": 243,
+            "rowRight": 359,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 3,
+            "textLength": 5,
+            "lineHeight": 24,
+            "lineCount": 1,
+            "copyWidth": 275,
+            "rowRight": 359,
+            "gapToArrow": null,
+            "overlapsArrow": false
+          }
+        ]
+      },
+      "wrap": {
+        "arm": "wrap",
+        "linksWidth": 343,
+        "doc": {
+          "scrollWidth": 375,
+          "clientWidth": 375
+        },
+        "rows": [
+          {
+            "index": 0,
+            "textLength": 72,
+            "lineHeight": 24,
+            "lineCount": 5,
+            "copyWidth": 243,
+            "rowRight": 359,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 1,
+            "textLength": 72,
+            "lineHeight": 24,
+            "lineCount": 5,
+            "copyWidth": 243,
+            "rowRight": 359,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 2,
+            "textLength": 72,
+            "lineHeight": 24,
+            "lineCount": 5,
+            "copyWidth": 243,
+            "rowRight": 359,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 3,
+            "textLength": 72,
+            "lineHeight": 24,
+            "lineCount": 5,
+            "copyWidth": 275,
+            "rowRight": 359,
+            "gapToArrow": null,
+            "overlapsArrow": false
+          }
+        ]
+      },
+      "badArms": {
+        "nowrap": {
+          "arm": "nowrap",
+          "linksWidth": 343,
+          "doc": {
+            "scrollWidth": 375,
+            "clientWidth": 375
+          },
+          "rows": [
+            {
+              "index": 0,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1219.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 1,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1219.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 2,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1219.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 3,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1135.34,
+              "rowRight": 1219.34,
+              "gapToArrow": null,
+              "overlapsArrow": false
+            }
+          ]
+        },
+        "ellipsis": {
+          "arm": "ellipsis",
+          "linksWidth": 343,
+          "doc": {
+            "scrollWidth": 375,
+            "clientWidth": 375
+          },
+          "rows": [
+            {
+              "index": 0,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1219.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 1,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1219.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 2,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1219.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 3,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1135.34,
+              "rowRight": 1219.34,
+              "gapToArrow": null,
+              "overlapsArrow": false
+            }
+          ]
+        },
+        "fixedWidth": {
+          "arm": "fixedWidth",
+          "linksWidth": 343,
+          "doc": {
+            "scrollWidth": 375,
+            "clientWidth": 375
+          },
+          "rows": [
+            {
+              "index": 0,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 12,
+              "copyWidth": 100,
+              "rowRight": 1219.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 1,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 12,
+              "copyWidth": 100,
+              "rowRight": 1219.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 2,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 12,
+              "copyWidth": 100,
+              "rowRight": 1203.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 3,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 12,
+              "copyWidth": 100,
+              "rowRight": 359,
+              "gapToArrow": null,
+              "overlapsArrow": false
+            }
+          ]
+        }
+      },
+      "judgment": {
+        "wraps": true,
+        "copyFitsColumn": true,
+        "rowInsideViewport": true,
+        "noTextOverlappingArrow": true,
+        "noHorizontalOverflow": true
+      },
+      "badJudgments": {
+        "nowrap": {
+          "wraps": false,
+          "copyFitsColumn": false,
+          "rowInsideViewport": false,
+          "noTextOverlappingArrow": true,
+          "noHorizontalOverflow": true
+        },
+        "ellipsis": {
+          "wraps": false,
+          "copyFitsColumn": false,
+          "rowInsideViewport": false,
+          "noTextOverlappingArrow": true,
+          "noHorizontalOverflow": true
+        },
+        "fixedWidth": {
+          "wraps": true,
+          "copyFitsColumn": true,
+          "rowInsideViewport": false,
+          "noTextOverlappingArrow": true,
+          "noHorizontalOverflow": true
+        }
+      }
+    },
+    {
+      "width": 768,
+      "baseline": {
+        "arm": "baseline",
+        "linksWidth": 655.08,
+        "doc": {
+          "scrollWidth": 768,
+          "clientWidth": 768
+        },
+        "rows": [
+          {
+            "index": 0,
+            "textLength": 4,
+            "lineHeight": 24,
+            "lineCount": 1,
+            "copyWidth": 555.08,
+            "rowRight": 679.08,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 1,
+            "textLength": 4,
+            "lineHeight": 24,
+            "lineCount": 1,
+            "copyWidth": 555.08,
+            "rowRight": 679.08,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 2,
+            "textLength": 5,
+            "lineHeight": 24,
+            "lineCount": 1,
+            "copyWidth": 555.08,
+            "rowRight": 679.08,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 3,
+            "textLength": 5,
+            "lineHeight": 24,
+            "lineCount": 1,
+            "copyWidth": 587.08,
+            "rowRight": 679.08,
+            "gapToArrow": null,
+            "overlapsArrow": false
+          }
+        ]
+      },
+      "wrap": {
+        "arm": "wrap",
+        "linksWidth": 655.08,
+        "doc": {
+          "scrollWidth": 768,
+          "clientWidth": 768
+        },
+        "rows": [
+          {
+            "index": 0,
+            "textLength": 72,
+            "lineHeight": 24,
+            "lineCount": 3,
+            "copyWidth": 555.08,
+            "rowRight": 679.08,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 1,
+            "textLength": 72,
+            "lineHeight": 24,
+            "lineCount": 3,
+            "copyWidth": 555.08,
+            "rowRight": 679.08,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 2,
+            "textLength": 72,
+            "lineHeight": 24,
+            "lineCount": 3,
+            "copyWidth": 555.08,
+            "rowRight": 679.08,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 3,
+            "textLength": 72,
+            "lineHeight": 24,
+            "lineCount": 2,
+            "copyWidth": 587.08,
+            "rowRight": 679.08,
+            "gapToArrow": null,
+            "overlapsArrow": false
+          }
+        ]
+      },
+      "badArms": {
+        "nowrap": {
+          "arm": "nowrap",
+          "linksWidth": 655.08,
+          "doc": {
+            "scrollWidth": 768,
+            "clientWidth": 768
+          },
+          "rows": [
+            {
+              "index": 0,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1227.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 1,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1227.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 2,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1227.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 3,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1135.34,
+              "rowRight": 1227.34,
+              "gapToArrow": null,
+              "overlapsArrow": false
+            }
+          ]
+        },
+        "ellipsis": {
+          "arm": "ellipsis",
+          "linksWidth": 655.08,
+          "doc": {
+            "scrollWidth": 768,
+            "clientWidth": 768
+          },
+          "rows": [
+            {
+              "index": 0,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1227.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 1,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1227.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 2,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1227.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 3,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1135.34,
+              "rowRight": 1227.34,
+              "gapToArrow": null,
+              "overlapsArrow": false
+            }
+          ]
+        },
+        "fixedWidth": {
+          "arm": "fixedWidth",
+          "linksWidth": 655.08,
+          "doc": {
+            "scrollWidth": 768,
+            "clientWidth": 768
+          },
+          "rows": [
+            {
+              "index": 0,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 12,
+              "copyWidth": 100,
+              "rowRight": 1227.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 1,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 12,
+              "copyWidth": 100,
+              "rowRight": 1227.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 2,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 12,
+              "copyWidth": 100,
+              "rowRight": 1211.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 3,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 12,
+              "copyWidth": 100,
+              "rowRight": 679.08,
+              "gapToArrow": null,
+              "overlapsArrow": false
+            }
+          ]
+        }
+      },
+      "judgment": {
+        "wraps": true,
+        "copyFitsColumn": true,
+        "rowInsideViewport": true,
+        "noTextOverlappingArrow": true,
+        "noHorizontalOverflow": true
+      },
+      "badJudgments": {
+        "nowrap": {
+          "wraps": false,
+          "copyFitsColumn": false,
+          "rowInsideViewport": false,
+          "noTextOverlappingArrow": true,
+          "noHorizontalOverflow": true
+        },
+        "ellipsis": {
+          "wraps": false,
+          "copyFitsColumn": false,
+          "rowInsideViewport": false,
+          "noTextOverlappingArrow": true,
+          "noHorizontalOverflow": true
+        },
+        "fixedWidth": {
+          "wraps": true,
+          "copyFitsColumn": true,
+          "rowInsideViewport": false,
+          "noTextOverlappingArrow": true,
+          "noHorizontalOverflow": true
+        }
+      }
+    },
+    {
+      "width": 1440,
+      "baseline": {
+        "arm": "baseline",
+        "linksWidth": 655.08,
+        "doc": {
+          "scrollWidth": 1440,
+          "clientWidth": 1440
+        },
+        "rows": [
+          {
+            "index": 0,
+            "textLength": 4,
+            "lineHeight": 24,
+            "lineCount": 1,
+            "copyWidth": 555.08,
+            "rowRight": 1079.08,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 1,
+            "textLength": 4,
+            "lineHeight": 24,
+            "lineCount": 1,
+            "copyWidth": 555.08,
+            "rowRight": 1079.08,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 2,
+            "textLength": 5,
+            "lineHeight": 24,
+            "lineCount": 1,
+            "copyWidth": 555.08,
+            "rowRight": 1079.08,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 3,
+            "textLength": 5,
+            "lineHeight": 24,
+            "lineCount": 1,
+            "copyWidth": 587.08,
+            "rowRight": 1079.08,
+            "gapToArrow": null,
+            "overlapsArrow": false
+          }
+        ]
+      },
+      "wrap": {
+        "arm": "wrap",
+        "linksWidth": 655.08,
+        "doc": {
+          "scrollWidth": 1440,
+          "clientWidth": 1440
+        },
+        "rows": [
+          {
+            "index": 0,
+            "textLength": 72,
+            "lineHeight": 24,
+            "lineCount": 3,
+            "copyWidth": 555.08,
+            "rowRight": 1079.08,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 1,
+            "textLength": 72,
+            "lineHeight": 24,
+            "lineCount": 3,
+            "copyWidth": 555.08,
+            "rowRight": 1079.08,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 2,
+            "textLength": 72,
+            "lineHeight": 24,
+            "lineCount": 3,
+            "copyWidth": 555.08,
+            "rowRight": 1079.08,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 3,
+            "textLength": 72,
+            "lineHeight": 24,
+            "lineCount": 2,
+            "copyWidth": 587.08,
+            "rowRight": 1079.08,
+            "gapToArrow": null,
+            "overlapsArrow": false
+          }
+        ]
+      },
+      "badArms": {
+        "nowrap": {
+          "arm": "nowrap",
+          "linksWidth": 655.08,
+          "doc": {
+            "scrollWidth": 1440,
+            "clientWidth": 1440
+          },
+          "rows": [
+            {
+              "index": 0,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1627.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 1,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1627.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 2,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1627.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 3,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1135.34,
+              "rowRight": 1627.34,
+              "gapToArrow": null,
+              "overlapsArrow": false
+            }
+          ]
+        },
+        "ellipsis": {
+          "arm": "ellipsis",
+          "linksWidth": 655.08,
+          "doc": {
+            "scrollWidth": 1440,
+            "clientWidth": 1440
+          },
+          "rows": [
+            {
+              "index": 0,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1627.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 1,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1627.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 2,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1627.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 3,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1135.34,
+              "rowRight": 1627.34,
+              "gapToArrow": null,
+              "overlapsArrow": false
+            }
+          ]
+        },
+        "fixedWidth": {
+          "arm": "fixedWidth",
+          "linksWidth": 655.08,
+          "doc": {
+            "scrollWidth": 1440,
+            "clientWidth": 1440
+          },
+          "rows": [
+            {
+              "index": 0,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 12,
+              "copyWidth": 100,
+              "rowRight": 1627.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 1,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 12,
+              "copyWidth": 100,
+              "rowRight": 1627.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 2,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 12,
+              "copyWidth": 100,
+              "rowRight": 1611.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 3,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 12,
+              "copyWidth": 100,
+              "rowRight": 1079.08,
+              "gapToArrow": null,
+              "overlapsArrow": false
+            }
+          ]
+        }
+      },
+      "judgment": {
+        "wraps": true,
+        "copyFitsColumn": true,
+        "rowInsideViewport": true,
+        "noTextOverlappingArrow": true,
+        "noHorizontalOverflow": true
+      },
+      "badJudgments": {
+        "nowrap": {
+          "wraps": false,
+          "copyFitsColumn": false,
+          "rowInsideViewport": false,
+          "noTextOverlappingArrow": true,
+          "noHorizontalOverflow": true
+        },
+        "ellipsis": {
+          "wraps": false,
+          "copyFitsColumn": false,
+          "rowInsideViewport": false,
+          "noTextOverlappingArrow": true,
+          "noHorizontalOverflow": true
+        },
+        "fixedWidth": {
+          "wraps": true,
+          "copyFitsColumn": true,
+          "rowInsideViewport": false,
+          "noTextOverlappingArrow": true,
+          "noHorizontalOverflow": true
+        }
+      }
+    }
+  ],
+  "syncCases": [
+    {
+      "theme": "light",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "theme": "light",
+      "width": 375,
+      "height": 812
+    }
+  ],
+  "syncPrivacy": [
+    {
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "states": [
+        {
+          "reached": "accepted",
+          "theme": "light",
+          "panelVisible": true,
+          "panelInstances": 1,
+          "chooseAgain": 0,
+          "revoke": 1,
+          "chooseLabel": null,
+          "revokeLabel": "撤回同意",
+          "stateText": "已同意与服务器通信决定于 2026-10-09 18:48（UTC）",
+          "hints": [
+            "这项选择只控制本机是否允许 heyta 与服务器通信，不会删除或改变本地数据。",
+            "撤回后这台设备立刻停止对外请求（包括已经建立的实时连接），并重新询问一次。本地数据不受影响。"
+          ],
+          "consentDialogs": 0,
+          "notPersistedNotice": 0,
+          "settledMs": 1,
+          "settled": true,
+          "signInAfterAccept": {
+            "appeared": true,
+            "closedBy": "auth-form-close"
+          }
+        },
+        {
+          "reached": "undecided",
+          "theme": "light",
+          "panelVisible": true,
+          "panelInstances": 1,
+          "chooseAgain": 1,
+          "revoke": 0,
+          "chooseLabel": "重新作出选择",
+          "revokeLabel": null,
+          "stateText": "还没有作出选择",
+          "hints": [
+            "这项选择只控制本机是否允许 heyta 与服务器通信，不会删除或改变本地数据。",
+            "需要同步或登录时，可以在这里重新选择是否联网。打开选择面板不会改变当前权限。"
+          ],
+          "consentDialogs": 0,
+          "notPersistedNotice": 0,
+          "settledMs": 1,
+          "settled": true
+        },
+        {
+          "reached": "local-only",
+          "theme": "light",
+          "panelVisible": true,
+          "panelInstances": 1,
+          "chooseAgain": 1,
+          "revoke": 0,
+          "chooseLabel": "重新作出选择",
+          "revokeLabel": null,
+          "stateText": "只用本机（未同意联网）决定于 2026-10-09 18:48（UTC）",
+          "hints": [
+            "这项选择只控制本机是否允许 heyta 与服务器通信，不会删除或改变本地数据。",
+            "需要同步或登录时，可以在这里重新选择是否联网。打开选择面板不会改变当前权限。"
+          ],
+          "consentDialogs": 0,
+          "notPersistedNotice": 0,
+          "settledMs": 0,
+          "settled": true
+        }
+      ],
+      "screenshots": [
+        "sync-privacy-1-accepted-light-1440.png",
+        "sync-privacy-2-undecided-light-1440.png",
+        "sync-privacy-3-reopen-dialog-light-1440.png",
+        "sync-privacy-4-local-only-light-1440.png"
+      ],
+      "clicks": [
+        {
+          "testId": "privacy-revoke",
+          "present": true,
+          "reachable": true,
+          "onScreen": true,
+          "topInsidePanel": true,
+          "top": "button.ht-btn[privacy-revoke]",
+          "ownLabel": "button.ht-btn[privacy-revoke]",
+          "rect": {
+            "x": 440,
+            "y": 681,
+            "w": 88,
+            "h": 44
+          },
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "via": "pointer",
+          "note": null
+        },
+        {
+          "testId": "privacy-choose-again",
+          "present": true,
+          "reachable": true,
+          "onScreen": true,
+          "topInsidePanel": true,
+          "top": "button.ht-btn[privacy-choose-again]",
+          "ownLabel": "button.ht-btn[privacy-choose-again]",
+          "rect": {
+            "x": 440,
+            "y": 635,
+            "w": 116,
+            "h": 44
+          },
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "via": "pointer",
+          "note": null
+        }
+      ],
+      "reopen": {
+        "reopenedFromChooseAgain": true,
+        "dialogsWhileOpen": 1
+      },
+      "renavigations": 0,
+      "planted": {
+        "actionBefore": 1,
+        "actionAfter": 0,
+        "dialogsBefore": 0,
+        "dialogsAfter": 1
+      },
+      "pageErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "states": [
+        {
+          "reached": "accepted",
+          "theme": "dark",
+          "panelVisible": true,
+          "panelInstances": 1,
+          "chooseAgain": 0,
+          "revoke": 1,
+          "chooseLabel": null,
+          "revokeLabel": "撤回同意",
+          "stateText": "已同意与服务器通信决定于 2026-10-09 18:48（UTC）",
+          "hints": [
+            "这项选择只控制本机是否允许 heyta 与服务器通信，不会删除或改变本地数据。",
+            "撤回后这台设备立刻停止对外请求（包括已经建立的实时连接），并重新询问一次。本地数据不受影响。"
+          ],
+          "consentDialogs": 0,
+          "notPersistedNotice": 0,
+          "settledMs": 1,
+          "settled": true,
+          "signInAfterAccept": {
+            "appeared": true,
+            "closedBy": "auth-form-close"
+          }
+        },
+        {
+          "reached": "undecided",
+          "theme": "dark",
+          "panelVisible": true,
+          "panelInstances": 1,
+          "chooseAgain": 1,
+          "revoke": 0,
+          "chooseLabel": "重新作出选择",
+          "revokeLabel": null,
+          "stateText": "还没有作出选择",
+          "hints": [
+            "这项选择只控制本机是否允许 heyta 与服务器通信，不会删除或改变本地数据。",
+            "需要同步或登录时，可以在这里重新选择是否联网。打开选择面板不会改变当前权限。"
+          ],
+          "consentDialogs": 0,
+          "notPersistedNotice": 0,
+          "settledMs": 1,
+          "settled": true
+        },
+        {
+          "reached": "local-only",
+          "theme": "dark",
+          "panelVisible": true,
+          "panelInstances": 1,
+          "chooseAgain": 1,
+          "revoke": 0,
+          "chooseLabel": "重新作出选择",
+          "revokeLabel": null,
+          "stateText": "只用本机（未同意联网）决定于 2026-10-09 18:48（UTC）",
+          "hints": [
+            "这项选择只控制本机是否允许 heyta 与服务器通信，不会删除或改变本地数据。",
+            "需要同步或登录时，可以在这里重新选择是否联网。打开选择面板不会改变当前权限。"
+          ],
+          "consentDialogs": 0,
+          "notPersistedNotice": 0,
+          "settledMs": 0,
+          "settled": true
+        }
+      ],
+      "screenshots": [
+        "sync-privacy-1-accepted-dark-1440.png",
+        "sync-privacy-2-undecided-dark-1440.png",
+        "sync-privacy-3-reopen-dialog-dark-1440.png",
+        "sync-privacy-4-local-only-dark-1440.png"
+      ],
+      "clicks": [
+        {
+          "testId": "privacy-revoke",
+          "present": true,
+          "reachable": true,
+          "onScreen": true,
+          "topInsidePanel": true,
+          "top": "button.ht-btn[privacy-revoke]",
+          "ownLabel": "button.ht-btn[privacy-revoke]",
+          "rect": {
+            "x": 440,
+            "y": 681,
+            "w": 88,
+            "h": 44
+          },
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "via": "pointer",
+          "note": null
+        },
+        {
+          "testId": "privacy-choose-again",
+          "present": true,
+          "reachable": true,
+          "onScreen": true,
+          "topInsidePanel": true,
+          "top": "button.ht-btn[privacy-choose-again]",
+          "ownLabel": "button.ht-btn[privacy-choose-again]",
+          "rect": {
+            "x": 440,
+            "y": 635,
+            "w": 116,
+            "h": 44
+          },
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "via": "pointer",
+          "note": null
+        }
+      ],
+      "reopen": {
+        "reopenedFromChooseAgain": true,
+        "dialogsWhileOpen": 1
+      },
+      "renavigations": 0,
+      "planted": {
+        "actionBefore": 1,
+        "actionAfter": 0,
+        "dialogsBefore": 0,
+        "dialogsAfter": 1
+      },
+      "pageErrors": []
+    },
+    {
+      "theme": "light",
+      "width": 375,
+      "height": 812,
+      "states": [
+        {
+          "reached": "accepted",
+          "theme": "light",
+          "panelVisible": true,
+          "panelInstances": 1,
+          "chooseAgain": 0,
+          "revoke": 1,
+          "chooseLabel": null,
+          "revokeLabel": "撤回同意",
+          "stateText": "已同意与服务器通信决定于 2026-10-09 18:48（UTC）",
+          "hints": [
+            "这项选择只控制本机是否允许 heyta 与服务器通信，不会删除或改变本地数据。",
+            "撤回后这台设备立刻停止对外请求（包括已经建立的实时连接），并重新询问一次。本地数据不受影响。"
+          ],
+          "consentDialogs": 0,
+          "notPersistedNotice": 0,
+          "settledMs": 1,
+          "settled": true,
+          "signInAfterAccept": {
+            "appeared": true,
+            "closedBy": "auth-form-close"
+          }
+        },
+        {
+          "reached": "undecided",
+          "theme": "light",
+          "panelVisible": true,
+          "panelInstances": 1,
+          "chooseAgain": 1,
+          "revoke": 0,
+          "chooseLabel": "重新作出选择",
+          "revokeLabel": null,
+          "stateText": "还没有作出选择",
+          "hints": [
+            "这项选择只控制本机是否允许 heyta 与服务器通信，不会删除或改变本地数据。",
+            "需要同步或登录时，可以在这里重新选择是否联网。打开选择面板不会改变当前权限。"
+          ],
+          "consentDialogs": 0,
+          "notPersistedNotice": 0,
+          "settledMs": 0,
+          "settled": true
+        },
+        {
+          "reached": "local-only",
+          "theme": "light",
+          "panelVisible": true,
+          "panelInstances": 1,
+          "chooseAgain": 1,
+          "revoke": 0,
+          "chooseLabel": "重新作出选择",
+          "revokeLabel": null,
+          "stateText": "只用本机（未同意联网）决定于 2026-10-09 18:48（UTC）",
+          "hints": [
+            "这项选择只控制本机是否允许 heyta 与服务器通信，不会删除或改变本地数据。",
+            "需要同步或登录时，可以在这里重新选择是否联网。打开选择面板不会改变当前权限。"
+          ],
+          "consentDialogs": 0,
+          "notPersistedNotice": 0,
+          "settledMs": 0,
+          "settled": true
+        }
+      ],
+      "screenshots": [
+        "sync-privacy-1-accepted-light-375.png",
+        "sync-privacy-2-undecided-light-375.png",
+        "sync-privacy-3-reopen-dialog-light-375.png",
+        "sync-privacy-4-local-only-light-375.png"
+      ],
+      "clicks": [
+        {
+          "testId": "privacy-revoke",
+          "present": true,
+          "reachable": true,
+          "onScreen": true,
+          "topInsidePanel": true,
+          "top": "button.ht-btn[privacy-revoke]",
+          "ownLabel": "button.ht-btn[privacy-revoke]",
+          "rect": {
+            "x": 32,
+            "y": 644,
+            "w": 311,
+            "h": 44
+          },
+          "viewport": {
+            "width": 375,
+            "height": 812
+          },
+          "via": "pointer",
+          "note": null
+        },
+        {
+          "testId": "privacy-choose-again",
+          "present": true,
+          "reachable": true,
+          "onScreen": true,
+          "topInsidePanel": true,
+          "top": "button.ht-btn[privacy-choose-again]",
+          "ownLabel": "button.ht-btn[privacy-choose-again]",
+          "rect": {
+            "x": 32,
+            "y": 644,
+            "w": 311,
+            "h": 44
+          },
+          "viewport": {
+            "width": 375,
+            "height": 812
+          },
+          "via": "pointer",
+          "note": null
+        }
+      ],
+      "reopen": {
+        "reopenedFromChooseAgain": true,
+        "dialogsWhileOpen": 1
+      },
+      "renavigations": 0,
+      "planted": {
+        "actionBefore": 1,
+        "actionAfter": 0,
+        "dialogsBefore": 0,
+        "dialogsAfter": 1
+      },
+      "pageErrors": []
+    }
+  ],
+  "assertions": {
+    "everySelectedLegProducedItsCells": true,
+    "unselectedLegsReportEmpty": true,
+    "noHorizontalOverflow": true,
+    "allPermissionStatesRendered": true,
+    "dataFailurePreserved": true,
+    "existingDataRefusedWithoutLoss": true,
+    "cancelPreserved": true,
+    "everyCaseCoversEverySelectedMode": true,
+    "reminderPermissionProvenanceIsLabeled": true,
+    "darkTierReachesBothThemeLayers": true,
+    "themeLayerRulerSwitchesWithTier": true,
+    "everyCaseCoversEverySweepGroup": true,
+    "groupSweepThemeApplied": true,
+    "groupSweepTitleMatchesNav": true,
+    "groupSweepActionable": true,
+    "groupSweepNoHorizontalOverflow": true,
+    "groupSweepNothingPushedOffViewport": true,
+    "groupSweepOffViewportRulerHasTeeth": true,
+    "helpWrapFourRowsMeasured": true,
+    "helpWrapInjectionTookEffect": true,
+    "helpLongTitleWraps": true,
+    "helpLongTitleStaysInContentColumn": true,
+    "helpLongTitleRowInsideViewport": true,
+    "helpLongTitleNoHorizontalOverflow": true,
+    "helpLongTitleBadArmsFlipTheJudgment": true,
+    "syncPrivacyThreeStatesReached": true,
+    "syncPrivacyPanelVisibleAndThemeApplied": true,
+    "syncPrivacyExactlyOneActionPerState": true,
+    "syncPrivacyAcceptedShowsOnlyRevoke": true,
+    "syncPrivacyRevokeReturnsToChooseAgain": true,
+    "syncPrivacyReopenUsesOneAndOnlyOneDialog": true,
+    "syncPrivacyEveryStateSettled": true,
+    "syncPrivacyConsentDialogUnmountedAfterDecide": true,
+    "syncPrivacyDecisionButtonsPointerReachable": true,
+    "syncPrivacyBadArmsFlipTheRuler": true
+  },
+  "notJudged": []
+}
