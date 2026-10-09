@@ -56,6 +56,9 @@ const rejectionReason = async (response: Response): Promise<string> => {
   return typeof raw.reason === 'string' ? raw.reason : `HTTP_${response.status}`;
 };
 
+/** 规则面（`inbound-rules-remote.ts`）判 402 时用的是同一份读法，不另写一条。 */
+export { rejectionReason as automationRejectionReason };
+
 /**
  * 逐次放行的那一次动作各带**自己**的一枚票据。没给就不发这个头 —— 官方模式下没有它，
  * 而"带了别的动作的票"和"没带票"在服务端是两种不同的拒法，宿主必须能把它分开。
