@@ -44,9 +44,16 @@ def load(locale: str) -> dict[str, str]:
 PLACEHOLDER = re.compile(r"\{[A-Za-z0-9_.]+\}")
 
 
-def entry_to_pattern(entry: str) -> str:
+def entry_to_pattern(entry: str) -> str | None:
     """词条里的 `{count}` 这类占位符 → 通配。手工切段再逐段 escape，
-    不用 `re.sub(re.escape(...))` —— 那种写法在转义后的空格/大括号上会静默配不中。"""
+    不用 `re.sub(re.escape(...))` —— 那种写法在转义后的空格/大括号上会静默配不中。
+
+    🔴 **整条值就是光一个占位符**的词条（`web.search.count` =「{count}」、`common.date.yearTitle`
+    =「{year}」、`mobile.recurrence.yearDay.n` =「{n}」…）返回 `None`，**不参与通配**：
+    它拼出来是 `^.+$`，任何字符串都算"合法渲染结果"。这种通配条目不会报错，只会让
+    每一处调用**无声地放行一切** —— 而"这个标签在真源里不存在"正是这道检查唯一在回答的问题。
+    实测 6 枚（en 侧），把它们算进来时 `site.*` 里每一个引号段都能"配对成功"。
+    """
     out: list[str] = []
     pos = 0
     for match in PLACEHOLDER.finditer(entry):
@@ -54,7 +61,10 @@ def entry_to_pattern(entry: str) -> str:
         out.append(r".+")
         pos = match.end()
     out.append(re.escape(entry[pos:]))
-    return "^" + "".join(out) + "$"
+    pattern = "".join(out)
+    if r"\A" not in pattern and re.fullmatch(r"(?:\.\+)+", pattern):
+        return None
+    return "^" + pattern + "$"
 
 
 def template_matches(value: str, table: dict[str, str]) -> list[str]:
@@ -65,7 +75,10 @@ def template_matches(value: str, table: dict[str, str]) -> list[str]:
     for key, entry in table.items():
         if "{" not in entry:
             continue
-        if re.fullmatch(entry_to_pattern(entry), value):
+        pattern = entry_to_pattern(entry)
+        if pattern is None:
+            continue
+        if re.fullmatch(pattern, value):
             hits.append(key)
     return hits
 
