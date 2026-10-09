@@ -29,22 +29,15 @@ export const REVOCATION_MANIFEST_DOMAIN = 'heyta-automation-revocation-v1.';
 export const AUTOMATION_REVOCATION_SCOPE = 'global';
 const MAX_MANIFEST_MS = 24 * 60 * 60 * 1000;
 
-/** 签发端自己的失败码。与票据消费那九条拒绝码分开：那些讲"票据坏"，这些讲"不该签"。 */
-export const AUTOMATION_ISSUER_DENIALS = {
-  ISSUER_NOT_CONFIGURED: 'AUTOMATION_ISSUER_NOT_CONFIGURED',
-  ACTIVATION_INVALID: 'AUTOMATION_ACTIVATION_INVALID',
-  ACTIVATION_RATE_LIMITED: 'AUTOMATION_ACTIVATION_RATE_LIMITED',
-  ACTIVATION_RESEND_EXHAUSTED: 'AUTOMATION_ACTIVATION_RESEND_EXHAUSTED',
-  LINK_CONFLICT: 'AUTOMATION_LINK_CONFLICT',
-  LINK_NOT_BOUND: 'AUTOMATION_LINK_NOT_BOUND',
-  SUBJECT_MISMATCH: 'AUTOMATION_SUBJECT_MISMATCH',
-  MANIFEST_INVALID: 'AUTOMATION_REVOCATION_MANIFEST_INVALID',
-  REVOCATION_NOT_INCREASING: 'AUTOMATION_REVOCATION_NOT_INCREASING',
-  ACTION_UNKNOWN: 'AUTOMATION_ISSUER_ACTION_UNKNOWN',
-  SCOPE_MISMATCH: 'AUTOMATION_ISSUER_SCOPE_MISMATCH',
-} as const;
+/**
+ * 签发端自己的失败码。与票据消费那九条拒绝码分开：那些讲"票据坏"，这些讲"不该签"。
+ * 🔴 字面量住在 `@heyta/inbound-core`（`AUTOMATION_ENTITLEMENT_ACTIONS` 同一个理由）：
+ * 宿主要靠其中三枚判"该显示等待权益"，两端各抄一遍时漂移的症状是宿主把该停的重试
+ * 当成可重试。这里原样转出，服务端各调用点保持既有导入路径。
+ */
+import { AUTOMATION_ISSUER_DENIALS, type AutomationIssuerDenial } from '@heyta/inbound-core';
 
-export type AutomationIssuerDenial = (typeof AUTOMATION_ISSUER_DENIALS)[keyof typeof AUTOMATION_ISSUER_DENIALS];
+export { AUTOMATION_ISSUER_DENIALS, type AutomationIssuerDenial } from '@heyta/inbound-core';
 
 export class AutomationIssuerError extends Error {
   readonly code: AutomationIssuerDenial;

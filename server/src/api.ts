@@ -72,6 +72,7 @@ import { issueSenderCredential, listSenderCredentials, revokeSenderCredential } 
 import { AUTOMATION_ENTITLEMENT_ACTIONS, AutomationEntitlementError, redeemAutomationEntitlementTicket } from './automation/entitlement-ticket';
 import {
   AutomationIssuerError,
+  AUTOMATION_ISSUER_DENIALS,
   bumpAutomationRevocationFloor,
   applyAutomationRevocationManifest,
   ensureAutomationEntitlementSubject,
@@ -653,9 +654,9 @@ export const apiRoutes = async (
   // （`AUTOMATION_OFFICIAL_PRIVATE_KEY` + issuer + keyId）。自托管实例配了公钥环
   // 也签不出任何东西。
   const automationIssuerSide = (): { issuer: AutomationEntitlementIssuer } | { code: string } => {
-    if (resolveAutomationEntitlementMode() !== 'official') return { code: 'AUTOMATION_ISSUER_NOT_ON_THIS_INSTANCE' };
+    if (resolveAutomationEntitlementMode() !== 'official') return { code: AUTOMATION_ISSUER_DENIALS.NOT_ON_THIS_INSTANCE };
     const issuer = loadAutomationEntitlementIssuer();
-    return issuer ? { issuer } : { code: 'AUTOMATION_ISSUER_NOT_CONFIGURED' };
+    return issuer ? { issuer } : { code: AUTOMATION_ISSUER_DENIALS.ISSUER_NOT_CONFIGURED };
   };
 
   // 逐次放行的一次性动作共用**同一条**取票据的通道（只认出现一次的头，重复即当作没带）。
@@ -693,7 +694,7 @@ export const apiRoutes = async (
         }));
         return reply.header('Cache-Control', 'no-store').send({ code: issued.code, expiresAt: issued.expiresAt.toISOString(), subject: issued.subject });
       } catch (error) {
-        const code = error instanceof AutomationIssuerError ? error.code : 'AUTOMATION_ACTIVATION_INVALID';
+        const code = error instanceof AutomationIssuerError ? error.code : AUTOMATION_ISSUER_DENIALS.ACTIVATION_INVALID;
         Logger.audit({ event: 'AUTOMATION_ENTITLEMENT_DENIED', userId: getAuthUser(req).userId, errorCode: code, capability: 'automation' });
         return reply.status(403).send({ error: 'Automation entitlement issuance rejected', errorCode: code });
       }
@@ -716,7 +717,7 @@ export const apiRoutes = async (
         }));
         return reply.header('Cache-Control', 'no-store').send({ subject: link.subject, installationId: link.installationId, boundAt: link.boundAt.toISOString() });
       } catch (error) {
-        const code = error instanceof AutomationIssuerError ? error.code : 'AUTOMATION_ACTIVATION_INVALID';
+        const code = error instanceof AutomationIssuerError ? error.code : AUTOMATION_ISSUER_DENIALS.ACTIVATION_INVALID;
         Logger.audit({ event: 'AUTOMATION_ENTITLEMENT_DENIED', userId: getAuthUser(req).userId, errorCode: code, capability: 'automation' });
         return reply.status(403).send({ error: 'Automation entitlement binding rejected', errorCode: code });
       }
@@ -756,7 +757,7 @@ export const apiRoutes = async (
         }));
         return reply.header('Cache-Control', 'no-store').send({ ticket: signed.token, expiresAt: signed.expiresAt.toISOString() });
       } catch (error) {
-        const code = error instanceof AutomationIssuerError ? error.code : 'AUTOMATION_LINK_NOT_BOUND';
+        const code = error instanceof AutomationIssuerError ? error.code : AUTOMATION_ISSUER_DENIALS.LINK_NOT_BOUND;
         Logger.audit({ event: 'AUTOMATION_ENTITLEMENT_DENIED', userId: getAuthUser(req).userId, errorCode: code, capability: 'automation' });
         return reply.status(403).send({ error: 'Automation entitlement issuance rejected', errorCode: code });
       }
@@ -789,7 +790,7 @@ export const apiRoutes = async (
         }));
         return reply.header('Cache-Control', 'no-store').send({ ticket: signed.token, expiresAt: signed.expiresAt.toISOString(), action: signed.action });
       } catch (error) {
-        const code = error instanceof AutomationIssuerError ? error.code : 'AUTOMATION_LINK_NOT_BOUND';
+        const code = error instanceof AutomationIssuerError ? error.code : AUTOMATION_ISSUER_DENIALS.LINK_NOT_BOUND;
         Logger.audit({ event: 'AUTOMATION_ENTITLEMENT_DENIED', userId: getAuthUser(req).userId, errorCode: code, capability: 'automation' });
         return reply.status(403).send({ error: 'Automation entitlement issuance rejected', errorCode: code });
       }
@@ -818,7 +819,7 @@ export const apiRoutes = async (
         Logger.audit({ event: 'AUTOMATION_ENTITLEMENT_REVOKED', userId: getAuthUser(req).userId, revocationVersion: version, capability: 'automation' });
         return reply.header('Cache-Control', 'no-store').send({ revocationVersion: version });
       } catch (error) {
-        const code = error instanceof AutomationIssuerError ? error.code : 'AUTOMATION_REVOCATION_NOT_INCREASING';
+        const code = error instanceof AutomationIssuerError ? error.code : AUTOMATION_ISSUER_DENIALS.REVOCATION_NOT_INCREASING;
         return reply.status(403).send({ error: 'Automation revocation update rejected', errorCode: code });
       }
     },
@@ -836,7 +837,7 @@ export const apiRoutes = async (
         const applied = await applyAutomationRevocationManifest({ client: prisma, manifest: parsed.data.manifest });
         return reply.header('Cache-Control', 'no-store').send({ revocationVersion: applied.revocationVersion, refreshed: applied.refreshed });
       } catch (error) {
-        const code = error instanceof AutomationIssuerError ? error.code : 'AUTOMATION_REVOCATION_MANIFEST_INVALID';
+        const code = error instanceof AutomationIssuerError ? error.code : AUTOMATION_ISSUER_DENIALS.MANIFEST_INVALID;
         Logger.audit({ event: 'AUTOMATION_ENTITLEMENT_DENIED', userId: getAuthUser(req).userId, errorCode: code, capability: 'automation' });
         return reply.status(403).send({ error: 'Automation revocation manifest rejected', errorCode: code });
       }
