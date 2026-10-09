@@ -2,7 +2,7 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { AUTH_PASSWORD_PATHS, SuperSyncClientIdSchema, inboundDraftEventIdSchema, inboundDraftDecisionSchema } from '@heyta/shared-schema';
 import { isEmailAllowed } from './email-allowlist';
-import * as jwt from 'jsonwebtoken';
+import { normalizeEmail } from './account/email-normalize';
 import {
   verifyEmail,
   replaceToken,
@@ -10,6 +10,7 @@ import {
   verifyLoginMagicLink,
   verifyEmailLink,
   registerWithMagicLink,
+  issueSession,
   getJwtSecret,
   JWT_EXPIRY,
 } from './auth';
@@ -32,6 +33,7 @@ import {
 import { authenticate, getAuthUser } from './middleware';
 import { withAccountProfile } from './account/account-profile.store';
 import { deleteAccountWithTombstone } from './account/account-tombstones';
+import { sessionMetaFromRequest } from './account/access-sessions';
 import { evaluateLegalRecheck, recordLegalReconfirm } from './legal-recheck';
 import {
   loginWithEmailPassword,
@@ -327,7 +329,7 @@ const localeForEmail = async (
     return body.locale as ServerLocale;
   }
   const account = await prisma.user.findUnique({
-    where: { email: email.toLowerCase() },
+    where: { email: normalizeEmail(email) },
     select: { locale: true },
   });
   const fromAccount = asServerLocale(account?.locale);
@@ -1284,7 +1286,7 @@ export const apiRoutes = async (
     async (req, reply) => {
       try {
         const user = getAuthUser(req);
-        const result = await replaceToken(user.userId, user.email);
+        const result = await replaceToken(user.userId, user.email, sessionMetaFromRequest(req));
         // Sockets authenticate only at upgrade, so revoked tokens would keep
         // receiving op notifications through already-open connections — close
         // them all, the caller's own socket included: a socket's clientId is
@@ -1642,19 +1644,18 @@ export const apiRoutes = async (
 
         const userInfo = await verifyAuthentication(email, credential as any);
 
-        // Get token version for JWT
+        // Get the account row for the response (locale only — the signing point reads
+        // `email`/`tokenVersion` itself now, see `issueSession`).
         const user = await prisma.user.findUnique({
           where: { id: userInfo.userId },
-          select: { tokenVersion: true, locale: true },
+          select: { locale: true },
         });
-        const tokenVersion = user?.tokenVersion ?? 0;
 
-        // Sign JWT (same format as password login)
-        const token = jwt.sign(
-          { userId: userInfo.userId, email: userInfo.email, tokenVersion },
-          getJwtSecret(),
-          { expiresIn: JWT_EXPIRY },
-        );
+        // 🔴 签名走 `issueSession`。这一处原来是全仓**第三份**裸 `jwt.sign`，注释还写着
+        // "same format as password login" —— 一句"格式相同"的注释不能代替共用一个函数：
+        // 它签出来的令牌没有 `jti`，而通行密钥登录恰恰是主力登录路，于是"退出登录"
+        // 在这条路上什么都撤销不了。`auth.ts` 的文件头当时还声称"只有这一处"。
+        const token = await issueSession({ id: userInfo.userId }, sessionMetaFromRequest(req));
 
         return reply.send({
           token,
@@ -2184,7 +2185,7 @@ export const apiRoutes = async (
          * 这里保留它是因为**已经发出去的邮件**指向它 —— 但行为必须与新的
          * 那个端点一致，否则同一封邮件走两条路会得到两种结果。
          */
-        const result = await verifyEmailLink(token);
+        const result = await verifyEmailLink(token, sessionMetaFromRequest(req));
         if (result.kind !== 'session') {
           // 通行密钥注册那条链接：验证成功但**不该**在这里换会话（产品语义如此）。
           // 明确说出来，而不是返回一个缺少 token 的 200 —— 后者会让调用方
@@ -2311,7 +2312,7 @@ export const apiRoutes = async (
       const { email, password } = parseResult.data;
 
       try {
-        return reply.send(await loginWithEmailPassword(email, password));
+        return reply.send(await loginWithEmailPassword(email, password, sessionMetaFromRequest(req)));
       } catch (err) {
         const pwErr = toPasswordAuthError(err);
         if (pwErr) {
@@ -2493,6 +2494,7 @@ export const apiRoutes = async (
             currentPassword,
             newPassword,
             localeFromRequest(req),
+            sessionMetaFromRequest(req),
           ),
         );
       } catch (err) {
@@ -2593,7 +2595,7 @@ export const apiRoutes = async (
         if (token === '') {
           return reply.status(400).send({ error: 'Validation failed' });
         }
-        return reply.send(await verifyEmailLink(token));
+        return reply.send(await verifyEmailLink(token, sessionMetaFromRequest(req)));
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Email link verify error: ${errMsg}`);
