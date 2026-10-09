@@ -909,10 +909,27 @@ Windows 最新候选 MSIX 已签名安装，SHA-256 `c1cad48eb0aaf1ca2221a5c8429
 
 | 编号 | 实际发现 | 修复与当前验收边界 |
 |---|---|---|
-| UX-S9-139 | 只用本机却显示“撤回同意”；主动重选冒充已撤回；成功新选择后旧保存失败提示残留；UTC收据无时区说明；弹窗Shift+Tab落到背后、Escape同时关闭设置 | 两端只对accepted展示撤回，其余展示重新选择；settings reason不改决定；界面读取最后一次真实保存回执，隐藏/重挂载不吞掉失败，新保存成功才清除旧警告；收据标明UTC。Web弹窗圈定键盘焦点，底层设置/搜索/助手让出事件，关闭回到触发按钮。真实浏览器亮/暗、390×844窄屏、取消不变local-only、Tab循环和Escape只关一层已验证；3文件32项Web回归、37项移动闸门回归及两端类型检查通过。移动原生UI与最终安装包仍待本次源码重建验收。 |
+| UX-S9-139 | 只用本机却显示“撤回同意”；主动重选冒充已撤回；成功新选择后旧保存失败提示残留；UTC收据无时区说明；弹窗Shift+Tab落到背后、Escape同时关闭设置 | 两端只对accepted展示撤回，其余展示重新选择；settings reason不改决定；界面读取最后一次真实保存回执，隐藏/重挂载不吞掉失败，新保存成功才清除旧警告；收据标明UTC。Web弹窗圈定键盘焦点，底层设置/搜索/助手让出事件，关闭回到触发按钮。真实浏览器亮/暗、390×844窄屏、取消不变local-only、Tab循环和Escape只关一层已验证；3文件32项Web回归、37项移动闸门回归及两端类型检查通过。移动原生UI与最终安装包仍待本次源码重建验收。 🔴 **10-09 15:0x 现量更正：这一行右侧那串「已验证」里有四条没进 `HEAD`，见下面那条现量表 —— 四条缺的都在 `apps/web/src/features/settings/` 那片未提交的改动里。** |
 | UX-S9-140 | AI运行中任务→日历→任务，等待仍在但回包丢失；长连续消息向左溢出气泡 | 共享会话保留请求结果与等待阶段，文本按容器换行；Provider身份代际阻止同slot换号、ABA旧回包与迟回确认串入新会话，默认按账号持久化并让危险提案刷新失效。最终复审新增身份真源/自托管路径/手填凭据问题也已修复，见UX-S9-144；Web最终6文件80项、共享历史7项、真实浏览器9项无重试、类型检查通过。原生新包跨端矩阵仍待验。 |
 
 UX-S9-139 证据：[verification.json](../../apps/web/evidence/ux-final-20261008/privacy-choice/verification.json)、[亮色](../../apps/web/evidence/ux-final-20261008/privacy-choice/light-local-only.jpg)、[暗色](../../apps/web/evidence/ux-final-20261008/privacy-choice/dark-local-only.jpg)、[窄屏弹窗](../../apps/web/evidence/ux-final-20261008/privacy-choice/dark-narrow-dialog.jpg)。已逐文件/词条镜像主树，App.tsx仅合入两处键盘处理及注释，保留主树独立的dueDateLocal变更，没有覆盖他人的后端或入站自动化工作。
+
+> 🔴 **10-09 15:0x 逐条对 `git show HEAD:` 的现量：上面那行「已验证」的四分之三，代码还在那条会话的工作树里。**
+>
+> | UX-S9-139 的那半裁决 | `HEAD` 里有吗 | 现量命令与读数 |
+> |---|---|---|
+> | 「只用本机」那一档给「重新选择」，不再给「撤回同意」 | ❌ 没有 | `git show HEAD:apps/web/src/features/settings/PrivacyPanel.tsx` 里分叉条件是 `record === null`（4 处命中，行 51/62/68/76）⇒ 只要有过任何决定，含明确「只用本机」，给的都是「撤回同意」。**这一格就是它自己列在缺陷栏第一项那个问题，原样躺在 `HEAD` 上。** |
+> | 主动重选不冒充「已撤回」（给重选新开一档 reason） | ❌ 没有 | `git show HEAD:apps/web/src/features/privacy/store.ts` 的 `PrivacySheetReason` 只有三档（first-launch / revoked / required-for-action），没有重选那一档；而面板那里写的是 `openSheet('revoked')`。 |
+> | 界面读取最后一次真实保存回执；新保存成功才清除旧警告 | ❌ 没有 | `git grep -c readPrivacyConsentPersistence HEAD -- apps/web` 无输出；`HEAD` 那份面板只有一个本地 `useState(false)`。 |
+> | 弹窗把键盘焦点圈在里面（Shift+Tab 不许逃到背后那页） | ❌ 没有 | `git show HEAD:apps/web/src/features/privacy/PrivacyConsentSheet.tsx` 里 `shiftKey` 命中 0 处，只有一句 `dialogRef.current?.focus()` —— 把焦点送进去，没有把它圈住。 |
+> | 收据标明 UTC | ✅ 在 | `git show HEAD:packages/i18n/src/locales/zh-CN.ts`：`'common.privacy.settings.decidedAt': '决定于 {time}（UTC）'`。 |
+> | Escape 只关一层 | ✅ 在（只证到「同意面板自己不往下传」这一句） | `HEAD` 那份 sheet 里 `stopPropagation` 命中 1 处。 |
+>
+> ⇒ 三条后果，逐条写给下一个人：
+>
+> 1. **台账这一行不能读成「Web 侧已闭合」**。它原来的边界句只说了「移动原生 UI 与最终安装包仍待本次源码重建验收」，那半是对的、但太小：Web 那半同样还没入库。归属是**另一条会话正在写的两栏设置 IA**（现量 `git status --porcelain -- apps/web/src/features/settings/ apps/web/src/features/privacy/`：18 枚 ` M` + 18 枚 `??`，其中 `SettingsNotice.tsx` 与 `privacy-settings.css` 在 `HEAD` 里**根本不存在**（`git cat-file -e HEAD:…` 双双 rc≠0）⇒ 那版面板一提交就带着新文件，本线不代提交、也不代改它的判据口径。
+> 2. **干净检出上是「有图、没代码」**：`git ls-files apps/web/evidence/ux-final-20261008/privacy-choice/` = 4 枚**已入库**（`verification.json` + 亮/暗/窄屏三张），而那 4 枚是对着工作树那版拍的。这一族的名字叫**取证口先行**，本文件早就给自己立过规矩：「已补」只有配上「在 HEAD 里」才算补。
+> 3. **本线的常驻消费者已经写进装置，但这一趟还没跑成**：`scripts/qa/reminders-data-responsive.mjs` 新加了一条 `sync` 腿，把「已同意只给撤回／撤回之后回到重新选择／重选开的是同一张面板（全文档恰好一枚 `privacy-consent-dialog`）」钉成判据，走查**按界面上在场的那枚按钮走**，所以 `HEAD` 形状与工作树形状都走得完三态；两棵树对「只用本机」该给哪枚按钮的分歧**只入读数、不作判据**（理由见上一条：那是别人在飞的契约）。深浅主题各一格（明 1440／暗 1440／明 375），每态一张图。⚠️ 09 15:0x 现量：起浏览器前那台载体 1 分钟负载 **64.35**（本线自设门槛 12，5 分钟 154.54，16 核）⇒ 这一腿的**读数还没取**，判据写完 ≠ 界面验过；跑成之后读数补在这一条下面。
 
 数据管理补验：原“清理报告应有10条”的猜测不成立。原生小组件只有失败才追加报告；原测试模拟数据库模块遗漏原生生命周期接口，导致额外一条失败报告。现针对平台桥建成功/拒绝夹具，保留成功9类、验证先停止组件再销毁数据库且失败仍清其余数据，2文件20项通过。提醒到点用例单独复跑通过；全套负载下的一次失败尚未充分归因，不标为完整提醒矩阵通过。
 
