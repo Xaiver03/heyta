@@ -18,6 +18,7 @@
  */
 
 import { prisma } from '../db';
+import { normalizeEmail } from '../account/email-normalize';
 
 /** 管理员的公开投影。🔴 **白名单** —— 不含 `passwordHash`、任何 token、`isAdmin` 以外的账号内部字段。 */
 export interface AdminSummary {
@@ -41,11 +42,12 @@ export type RevokeAdminResult =
  *
  * 🔴 必须与注册路径用**同一个**口径，否则 CLI 会对着一个"看起来一样"的邮箱报
  * "用户不存在"，而那个人其实在库里（大小写或首尾空格不同）。
- * 这里用 `trim().toLowerCase()` —— 与 `server/src/auth.ts` 的查找口径一致。
- * ⚠️ 如果哪天注册改成不 lowercase，这里要跟着改，否则两者会静默分叉。
+ * 口径现在**不是这里的一份实现**，是 `account/email-normalize.ts` 的 `normalizeEmail`：
+ * 上面那句“哪天注册改了这里要跟着改”的担心，正是它该被消掉的理由 ——
+ * 一份实现没有“跟着改”这件事，它只有“本来就是同一份”。
  */
 export function normalizeAdminEmail(raw: string): string {
-  return raw.trim().toLowerCase();
+  return normalizeEmail(raw);
 }
 
 const toEpochMillis = (value: Date | null): number | null =>

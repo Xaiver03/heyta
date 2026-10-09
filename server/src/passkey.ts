@@ -24,9 +24,11 @@ import {
   verifyEmail,
 } from './auth';
 import { authCache } from './auth-cache';
+import { notifyAuthenticatorAdded } from './account/authenticator-notice';
 import { getDefaultStorageQuotaBytes } from './sync/services/storage-quota.service';
 import { attachInviteOnRegister } from './activity/invite';
 import { hashToken } from './auth-tokens';
+import { isSameNormalizedEmail, normalizeEmail } from './account/email-normalize';
 import { consentedLegalSetVersion } from './legal-consent';
 
 // Constants
@@ -277,7 +279,7 @@ export const verifyRegistration = async (
   try {
     // Check if unverified user exists (re-registration attempt)
     const existingUser = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
+      where: { email: normalizeEmail(email) },
     });
 
     if (existingUser) {
@@ -309,7 +311,7 @@ export const verifyRegistration = async (
       } else {
         const createdUser = await tx.user.create({
           data: {
-            email: email.toLowerCase(),
+            email: normalizeEmail(email),
             passwordHash: null,
             termsAcceptedAt: acceptedAt,
             // 同 `auth.ts` 的那处：时刻落了，版本就必须跟着判（null 是合法答案，
@@ -546,6 +548,13 @@ export const completeUserPasskeyRegistration = async (
 
   Logger.audit({ event: 'PASSKEY_ADDED', userId, entityId: created.id });
 
+  // 🔴 ADR-0063 §2.6：**已登录**加一条通行密钥 = 多开一扇门，门的另一面必须有人知道。
+  // 这一封只在写入成功之后发，且它自己不会让一次本来成功的添加变成失败
+  // （纪律与 `notifyPasswordChanged` 同一条，写在 `account/authenticator-notice.ts` 文件头）。
+  // 另外两处 `passkey.create` **不发**这封信是有意的：注册期那一处由验证邮件本身授权，
+  // 恢复那一处是**换掉全部**旧凭据（换钥匙，不是多开门），而且那封恢复链接就是记录。
+  await notifyAuthenticatorAdded(userId, 'passkey');
+
   return { id: created.id, message: 'Passkey added successfully.' };
 };
 
@@ -558,7 +567,7 @@ export const generateAuthenticationOptions = async (
   const { rpID } = getWebAuthnConfig();
 
   const user = await prisma.user.findUnique({
-    where: { email: email.toLowerCase() },
+    where: { email: normalizeEmail(email) },
     include: { passkeys: true },
   });
 
@@ -633,7 +642,7 @@ export const verifyAuthentication = async (
   }
 
   // Log if the email doesn't match (user selected a different account's passkey)
-  if (user.email.toLowerCase() !== email.toLowerCase()) {
+  if (!isSameNormalizedEmail(user.email, email)) {
     Logger.info(
       `User authenticated with passkey for a different account (userId: ${user.id})`,
     );
@@ -692,7 +701,7 @@ export const requestPasskeyRecovery = async (
   };
 
   const user = await prisma.user.findUnique({
-    where: { email: email.toLowerCase() },
+    where: { email: normalizeEmail(email) },
     include: { passkeys: true },
   });
 

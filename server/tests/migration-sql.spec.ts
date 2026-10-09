@@ -686,11 +686,38 @@ describe('auth token hashing cleanup migration', () => {
   const schema = readFileSync(join(currentDir, '../prisma/schema.prisma'), 'utf8');
   const sql = readMigration(MIGRATION);
 
-  /** 从 schema 里找出所有 `*_token` 列（不含 `*_token_expires_at`）及其所在表。 */
-  const tokenColumns = (): Array<{ table: string; column: string; nullable: boolean }> => {
+  /**
+   * 从 schema 里找出所有 `*_token` 列（不含 `*_token_expires_at`）及其所在表。
+   *
+   * 🔴 分母**限定在这条迁移动过的表上**（2026-10-08，因为 `email_change_requests` 那两张
+   * 新表带的 `old_token` / `new_token` 撞上了这个正则）。原句"新增一个令牌列、不配清理就红"
+   * 对**这条迁移之后才建起来的表**在逻辑上不成立：那一年的 SQL 里没有那一行，
+   * 而新表建出来时零行 —— 没有存量可作废。把它硬塞进 `updateFor()` 只会得到一句假话
+   * （"清理过了"），而那条迁移并没有、也不可能清理它。
+   *
+   * 少了一条真判据吗？没有。这一族列真正要防的是"一枚能直接使用的凭证以**可用**的形状躺在库里与备份里"，
+   * 所以下面那条 `new token columns are only ever written hashed` 接手了这一半：
+   * 落在本次迁移范围之外的新令牌列，必须**只**经 `hashToken()` 写进去。
+   * 范围收窄的是"谁该被这条 UPDATE 清"，不是"谁该被证明是哈希"。
+   */
+  const migratedTables = (): Set<string> => {
+    const tables = new Set<string>();
+    for (const match of sql.matchAll(/UPDATE\s+"([^"]+)"|DELETE FROM\s+"([^"]+)"/gi)) {
+      const name = match[1] ?? match[2];
+      if (name) tables.add(name);
+    }
+    return tables;
+  };
+
+  const tokenColumns = (
+    { scope = true } = {},
+  ): Array<{ table: string; column: string; nullable: boolean }> => {
+    const tables = migratedTables();
     const found: Array<{ table: string; column: string; nullable: boolean }> = [];
     for (const block of schema.split(/^model\s+/m).slice(1)) {
       const tableName = block.match(/@@map\("([^"]+)"\)/)?.[1] ?? block.split('{')[0].trim();
+      // `scope === true` 只留这条迁能动得到的表；`false` 只留**它动不到**的那些（下面那条判据用）。
+      if (scope === !tables.has(tableName)) continue;
       for (const line of block.split('\n')) {
         const mapped = line.match(/@map\("([^"]+_token)"\)/);
         if (!mapped) continue;
@@ -737,6 +764,38 @@ describe('auth token hashing cleanup migration', () => {
       // 过期时间一起清：留着它会让"有令牌"的判读（`loginToken && expires > now`）
       // 变成对着一个 NULL 令牌做时间比较。
       expect(statement).toMatch(new RegExp(`"${column}_expires_at"\\s*=\\s*NULL`, 'i'));
+    }
+  });
+
+  /**
+   * 🔴 上面那条把分母收窄到"这条迁移能动的表"，这一条把**没收进来**的那一半接住。
+   *
+   * 这一族列真正要防的是"一枚能直接使用的凭证以可用的形状躺在库里，而库每晚进备份"。
+   * 那条 UPDATE 治的是**存量明文**；对新表来说没有存量，但**"只能写哈希"这条纪律一样成立**。
+   * 所以范围外的每一列都必须只经 `hashToken()` 落库 —— 少了这一条，收窄分母就是在放宽判据。
+   *
+   * 形状检查分不出明文和哈希（两者都是 64 个 `[0-9a-f]`），所以这里钉的是**写入表达式**，
+   * 与 `password-recovery.spec.ts` 那两个出口对照是同一条立场的两半。
+   */
+  it('every token column created after that migration is only ever written through hashToken()', () => {
+    const scope = migratedTables();
+    const outside = tokenColumns({ scope: false });
+    // 前提断言：这一族确实存在，否则这条会"零违规"地通过（AGENTS §7 那条元规则）。
+    expect(outside.length, 'schema 里应该有本迁移范围之外的令牌列').toBeGreaterThan(0);
+
+    for (const { table, column } of outside) {
+      // 列名 → schema 里的字段名（`old_token` → `oldToken`）。
+      const field = column.replace(/_([a-z])/g, (_m, c: string) => c.toUpperCase());
+      const source = readFileSync(join(currentDir, '../src/account/email-change.ts'), 'utf8');
+      // 抓到 `oldToken: <表达式>` 里那个表达式名。
+      const assigned = source.match(new RegExp(`${field}:\\s*([A-Za-z_$][\\w$]*)\\s*,`));
+      expect(assigned, `${table}.${column} 没有写入口`).not.toBeNull();
+      // 🔴 那个表达式必须是**当场由 `hashToken()` 算出来的那一个**。
+      // 只查"文件里出现过 hashToken"是不够的：明文写进去、旁边另算一份哈希，照样绿。
+      expect(
+        source,
+        `${table}.${column} 被明文写进了库（${assigned![1]} 不是 hashToken() 的结果）`,
+      ).toMatch(new RegExp(`const ${assigned![1]} = hashToken\\(`));
     }
   });
 

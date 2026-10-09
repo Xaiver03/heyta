@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { Prisma } from '@prisma/client';
+import { normalizeEmail } from './email-normalize';
 
 /**
  * 账号硬删 + 墓碑（P-12 / ADR-0055）。
@@ -9,9 +10,16 @@ import { Prisma } from '@prisma/client';
  * 而"恢复不得把已注销的账号复活"是这次变更唯一要兑现的承诺。
  */
 
-/** 与 `server/src/admin/admins.ts` 的查找口径一致（trim + 小写），不是新的一套归一化。 */
+/**
+ * 墓碑的邮箱哈希输入口径 = `account/email-normalize.ts` 的 `normalizeEmail`。
+ *
+ * 🔴 这一行是**对外承诺的一部分**（ADR-0055 §2.2 把它与一条 `CHECK (email_hash ~ '^[0-9a-f]{64}$')`
+ * 绑在一起，而那个口径已经写进隐私政策）。它以前自己写了一份 `trim().toLowerCase()`，
+ * 与注册那五份各漂各的 —— 于是“同一个邮箱”在注销面和登录面可以是两个字符串，
+ * 而恢复备份时那道“不许复活已注销账号”的闸门就会认出另一个人。
+ */
 export function hashAccountEmail(email: string): string {
-  return createHash('sha256').update(email.trim().toLowerCase(), 'utf8').digest('hex');
+  return createHash('sha256').update(normalizeEmail(email), 'utf8').digest('hex');
 }
 
 export interface AccountClosureRecord {

@@ -29,7 +29,16 @@ vi.hoisted(() => {
 });
 
 const mocks = vi.hoisted(() => ({
-  user: { findUnique: vi.fn(), findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+  user: {
+    findUnique: vi.fn(),
+    findFirst: vi.fn(),
+    /** ADR-0063：`issueSession()` 签名前回读 `email` / `tokenVersion`（不接受调用方传值）。 */
+    findUniqueOrThrow: vi.fn(),
+    update: vi.fn(),
+    updateMany: vi.fn(),
+  },
+  /** 一枚令牌 = `access_sessions` 里的一行（`recordSession`：先插行、后签名）。 */
+  accessSession: { create: vi.fn(), deleteMany: vi.fn() },
 }));
 
 const hashSpies = vi.hoisted(() => ({
@@ -53,6 +62,14 @@ const emailSpies = vi.hoisted(() => ({
  */
 const cacheSpies = vi.hoisted(() => ({ invalidate: vi.fn() }));
 
+/**
+ * 实时通道的间谍。和 `authCache` 那一个同一条理由 —— **它本身就是一组判据**：
+ * 通道只在 WebSocket **upgrade** 时鉴权，之后靠心跳维持，所以只 bump 计数器时
+ * 旧设备**已经开着的那个页面**会继续收 op 通知（`closeForUser` 上的原话）。
+ * 那个动作在界面上完全不可见，所以它必须有人盯着。
+ */
+const wsSpies = vi.hoisted(() => ({ closeForUser: vi.fn(), notifyNewOps: vi.fn() }));
+
 const spiedLogger = vi.hoisted(() => ({ warn: vi.fn(), info: vi.fn(), error: vi.fn() }));
 
 vi.mock('../src/db', () => ({ prisma: mocks }));
@@ -64,6 +81,9 @@ vi.mock('../src/password/policy', async (importOriginal) => {
   return { ...actual, ...policySpies };
 });
 vi.mock('../src/email', () => emailSpies);
+vi.mock('../src/sync/services/websocket-connection.service', () => ({
+  getWsConnectionService: () => wsSpies,
+}));
 
 /**
  * 🔴 把真实 `../src/auth` 取回来。`tests/setup.ts` 全局把它 mock 成了一个**闭合工厂**
@@ -143,6 +163,14 @@ beforeEach(() => {
   // 读回新版本的（不是 `旧值 + 1` 算出来的），所以 mock 必须给这一格。
   mocks.user.update.mockResolvedValue({ tokenVersion: 4 });
   mocks.user.updateMany.mockResolvedValue({ count: 1 });
+  // 🔴 ADR-0063：`issueSession` 在签名**之前**回读账号行的 `email` / `tokenVersion`。
+  // 默认值取**上面那次 `update` 写回的那一格**（4）—— 真库里"bump 提交之后再读"读到的
+  // 就是它，所以这两格在夹具里也必须同源。要断言别的版本，用例自己覆盖（见下面改密那条）。
+  mocks.user.findUniqueOrThrow.mockResolvedValue({ email: EMAIL, tokenVersion: 4 });
+  // 会话行：`create` 是 `issueSession` 插的那一行，`deleteMany` 是"全设备登出"删的那些。
+  // 返回值要有 `count` —— `revokeAllSessions` 读它，给 `undefined` 会当场抛。
+  mocks.accessSession.create.mockResolvedValue({});
+  mocks.accessSession.deleteMany.mockResolvedValue({ count: 3 });
   hashSpies.hashPassword.mockResolvedValue(PHC);
   hashSpies.verifyPassword.mockResolvedValue(true);
   hashSpies.dummyVerify.mockResolvedValue(undefined);
@@ -303,7 +331,8 @@ describe('POST /password/reset：一次性链接换口令', () => {
     expect(dataOf(consume).passwordHash).toBe(PHC);
     expect(dataOf(consume).resetPasswordToken).toBeNull();
     expect(dataOf(consume).resetPasswordTokenExpiresAt).toBeNull();
-    // 🔴 J13：全设备登出的**唯一**落地方式就是这个计数器 +1。
+    // 🔴 J13 的第一半：全设备登出的**计数器**这一半 —— 它只管得住下一次的 HTTP 请求。
+    // 缓存那一半在下面的 describe，通道与会话行那一半在文件末尾那个 describe（J13 的第三半）。
     expect(dataOf(consume).tokenVersion).toEqual({ increment: 1 });
     // 攻击者不能"先输错五次锁住、再走重置"把人挡在自己账号外面 —— 重置顺手解掉锁。
     expect(dataOf(consume).failedLoginAttempts).toBe(0);
@@ -442,6 +471,10 @@ describe('POST /password/change：当前设备不掉线，其余全部掉线', (
     // 取 5 而不是 4 是为了让这条判据**能失败** —— 两边都是 4 的话，算术与读回两种写法
     // 都满足断言，等于没测。
     mocks.user.update.mockResolvedValue({ tokenVersion: 5 });
+    // 🔴 回读那一格 = **这次 UPDATE 写回之后的值**（`issueSession` 读的就是 bump 提交后的
+    // 同一行）。写 5 而不是 3：夹具替实现"预先知道结果"没有意义，而写 3 会把下面那条
+    // `tokenVersion: 5` 的判据变成"要求实现去读旧值"。算术版（`3 + 1 = 4`）在这里仍然红。
+    mocks.user.findUniqueOrThrow.mockResolvedValue({ email: EMAIL, tokenVersion: 5 });
 
     const result = await changePassword(7, 'old one', NEW_PASSWORD);
 
@@ -591,6 +624,75 @@ describe('🔴 J13 的第二半：`tokenVersion` +1 之后必须把认证缓存�
     hashSpies.verifyPassword.mockResolvedValue(false);
     await capture(changePassword(7, 'wrong', NEW_PASSWORD));
     expect(cacheSpies.invalidate).not.toHaveBeenCalled();
+  });
+});
+
+describe('🔴 J13 的第三半：计数器 +1 只管得住下一次 HTTP 请求，实时通道与会话行要各自撤', () => {
+  /**
+   * 这一组钉的是"全设备登出"里**最不可见**的那一半。三条既有事实叠在一起：
+   *
+   * 1. `auth.ts` 里 `TOKEN_REVOKED` 的注释把"改密 / 换绑 / 管理员强制登出 / passkey 恢复"
+   *    **都**算作撤销事件 —— 也就是这个仓库自己承认这些是撤销。
+   * 2. WebSocket 通道只在 **upgrade** 时鉴权，之后靠心跳维持（`closeForUser` 上的原话：
+   *    "without this a revoked device would keep receiving op notifications indefinitely"）。
+   * 3. 计数器 +1 对**已经开着**的通道一个字都不做。
+   *
+   * ⇒ 只写计数器的实现，症状是：旧设备每次 HTTP 都 401，界面上写着"已登出"，
+   * 而那个页面**继续实时收这个账号的 op**。对端到端加密的产品，这是"把别人踢下线"没做成。
+   *
+   * ⚠️ 会话行那一半（`deleteMany`）不是第二个功能的装饰：`listSessions` 已经按
+   * `tokenVersion` 过滤，所以**列表不会说谎**；删行是把"当场已知死掉"的身份元数据
+   * 从 365 天的留存里拿出来（`credential-sweep` 的 `SESSION_ROW_RETENTION_MS`）。
+   */
+  const closedFor = () => wsSpies.closeForUser.mock.calls.map((c) => c[0] as number);
+  const deletedWhere = () => whereOf(mocks.accessSession.deleteMany.mock.calls[0]?.[0]);
+
+  /** `deleteMany`（撤旧行）与 `create`（铸当前设备那一行）谁先发生。 */
+  const deleteBeforeCreate = () =>
+    mocks.accessSession.deleteMany.mock.invocationCallOrder[0] <
+    mocks.accessSession.create.mock.invocationCallOrder[0];
+
+  it('重置成功 ⇒ 关掉全部实时通道，并把这个人所有会话行删掉', async () => {
+    mocks.user.findFirst.mockResolvedValue({
+      id: 7,
+      email: EMAIL,
+      resetPasswordTokenExpiresAt: BigInt(Date.now() + 60_000),
+    });
+    await resetPasswordWithToken({ token: LIVE_TOKEN, password: NEW_PASSWORD });
+
+    expect(closedFor()).toEqual([7]);
+    // 🔴 删的是**这个人的全部**，不是按 `jtiHash` 删一枚 —— 按一枚删是"退出这一台"的动作。
+    expect(deletedWhere()).toEqual({ userId: 7 });
+  });
+
+  it('改密成功 ⇒ 同样撤通道与行，且删行排在铸新行**之前**', async () => {
+    mocks.user.findUnique.mockResolvedValue(passwordRow());
+    await changePassword(7, 'old one', NEW_PASSWORD);
+
+    expect(closedFor()).toEqual([7]);
+    expect(deletedWhere()).toEqual({ userId: 7 });
+    // 🔴 顺序判据：这一句排到 `issueSession` 后面，就会把刚发给当前设备的那一行一起删掉，
+    // 于是"当前设备不掉线"变成"当前设备从「登录设备」列表里消失"。
+    // 两种写法的功能断言（撤了几枚、关没关）全都能过 —— 只有顺序看得出这一刀。
+    expect(mocks.accessSession.create).toHaveBeenCalled();
+    expect(deleteBeforeCreate()).toBe(true);
+  });
+
+  it('🔴 链接无效 ⇒ 不关通道、不删行（一条死链接不该是一次远程断线）', async () => {
+    mocks.user.findFirst.mockResolvedValue(null);
+    await capture(resetPasswordWithToken({ token: LIVE_TOKEN, password: NEW_PASSWORD }));
+
+    expect(wsSpies.closeForUser).not.toHaveBeenCalled();
+    expect(mocks.accessSession.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('🔴 当前口令错 ⇒ 不关通道、不删行（那次 bump 没发生，替攻击者断线就是替他做事）', async () => {
+    mocks.user.findUnique.mockResolvedValue(passwordRow());
+    hashSpies.verifyPassword.mockResolvedValue(false);
+    await capture(changePassword(7, 'wrong', NEW_PASSWORD));
+
+    expect(wsSpies.closeForUser).not.toHaveBeenCalled();
+    expect(mocks.accessSession.deleteMany).not.toHaveBeenCalled();
   });
 });
 

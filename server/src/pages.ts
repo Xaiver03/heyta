@@ -26,6 +26,11 @@ interface ResetPasswordQuery {
   lang?: string;
 }
 
+interface ChangeEmailQuery {
+  token?: string;
+  lang?: string;
+}
+
 /**
  * 成功的小对勾。
  *
@@ -39,7 +44,7 @@ const OK_ICON =
 
 export async function pageRoutes(fastify: FastifyInstance) {
   /**
-   * 🔴 四张页面都从**同一个**地方取语言：URL 里的 `?lang=`，没有就**中文**。
+   * 🔴 每张凭据页都从**同一个**地方取语言：URL 里的 `?lang=`，没有就**中文**。
    *
    * 邮件在发信时就把 `lang` 写进了链接，所以点进来的人看到的
    * 就是收信那一刻该看到的语言（见 `email.ts` 的 `withLocale`）。
@@ -247,7 +252,7 @@ export async function pageRoutes(fastify: FastifyInstance) {
   );
 
   /**
-   * 第四张凭据页：**用重置链接设一个新密码**。
+   * 凭据页：**用重置链接设一个新密码**。
    *
    * 🔴 GET **不消费令牌** —— 与另外三张同一条纪律（`/verify-email` 那次改的就是它）：
    * 邮件客户端的链接预取会在用户点之前就把一枚一次性令牌烧掉。令牌什么时候被烧，
@@ -352,6 +357,82 @@ export async function pageRoutes(fastify: FastifyInstance) {
         body: t(locale, 'server.page.reset.body'),
         formHtml,
         scripts: ['/reset-password.js'],
+      });
+
+      return reply
+        .type('text/html')
+        .send(page.replace('<body>', `<body ${bodyAttrs}>`));
+    },
+  );
+
+  /**
+   * 凭据页：**换绑登录邮箱的其中一边**。
+   *
+   * 🔴 GET 仍然**不消费令牌**（与其余各张同一条纪律）：预取会在人点之前把那一侧的确认打掉，
+   * 而这一条流程要**两边各一次** —— 一边被预取烧掉的话，这个换绑永远凑不齐，
+   * 用户看到的是一句"还在等另一边"而他手上那封信已经点不出东西了。
+   *
+   * 🔴 这一页**不区分新旧哪一边**，也不需要：令牌本身就在库里写着它属于哪一侧
+   * （`email_change.ts` 按哈希查那一行），所以同一张页两封信共用。少一个分支就少一处
+   * "两封信长得一样但走不通"的可能。
+   *
+   * 🔴 成功后**不发会话**（ADR-0063 §2.2）：能点开这封信只证明他持有那个收件箱。
+   * 两边都点齐时这一页要说的是"已经改好了，请用新地址登录"，不是"你已经登录了"。
+   */
+  fastify.get<{ Querystring: ChangeEmailQuery }>(
+    '/change-email',
+    {
+      config: {
+        rateLimit: {
+          max: 50,
+          timeWindow: '15 minutes',
+        },
+      },
+    },
+    async (req, reply) => {
+      const locale = localeOf(req);
+      const { token } = req.query;
+      if (!token) {
+        return reply.status(400).type('text/html').send(
+          renderPage(locale, {
+            title: t(locale, 'server.page.changeEmail.title'),
+            heading: t(locale, 'server.page.changeEmail.heading'),
+            body: t(locale, 'server.page.tokenRequired'),
+          }),
+        );
+      }
+
+      // 🔴 状态文案经 `data-*` 下发（与其余各页同一理由：静态脚本取不到词条表）。
+      const bodyAttrs = [
+        `data-token="${escapeHtml(token)}"`,
+        `data-msg-busy="${escapeHtml(t(locale, 'server.page.changeEmail.busy'))}"`,
+        // 「这一边确认了」与「整个换绑生效了」是两句不同的话 —— 合成一句会让人
+        // 在只点了一边时以为已经改成了，于是另一边永远不会去点。
+        `data-msg-awaiting-other="${escapeHtml(t(locale, 'server.page.changeEmail.awaitingOther'))}"`,
+        `data-msg-applied="${escapeHtml(t(locale, 'server.page.changeEmail.applied'))}"`,
+        `data-msg-invalid-link="${escapeHtml(t(locale, 'server.page.changeEmail.invalidLink'))}"`,
+        `data-msg-unknown="${escapeHtml(t(locale, 'server.page.error.unknown'))}"`,
+      ].join(' ');
+
+      const formHtml = [
+        '<form id="change-email-form">',
+        '<button type="submit" class="btn btn--primary" id="confirmBtn">' +
+          `${escapeHtml(t(locale, 'server.page.changeEmail.button'))}</button>`,
+        '</form>',
+        '<p class="status status--err" id="error" role="alert" hidden></p>',
+        '<p class="status status--ok" id="success" role="status" hidden></p>',
+        // 只有**整个换绑生效**时才给"去登录"这一步 —— 还在等另一边时给一个登录入口，
+        // 用户会去用旧地址登录，然后困惑于"为什么还没改"。
+        '<a class="btn btn--primary" id="goLogin" href="/app/" hidden>' +
+          `${escapeHtml(t(locale, 'server.page.changeEmail.goLogin'))}</a>`,
+      ].join('\n    ');
+
+      const page = renderPage(locale, {
+        title: t(locale, 'server.page.changeEmail.title'),
+        heading: t(locale, 'server.page.changeEmail.heading'),
+        body: t(locale, 'server.page.changeEmail.body'),
+        formHtml,
+        scripts: ['/change-email.js'],
       });
 
       return reply

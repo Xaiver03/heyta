@@ -390,7 +390,47 @@ vi.mock('../src/db', () => {
     user: {
       findUnique: vi.fn(),
       update: vi.fn(),
+      // 🔴 ADR-0063：`issueSession()` 现在在签名**之前**回读账号行的 `email` /
+      // `tokenVersion`（不再接受调用方传值），所以凡能走到"换会话"的用例都会打这一格。
+      // 数据源与本文件事务那侧的 `user.findUnique` 相同（同一张 `testData.users`），
+      // 而**查不到就抛** —— 这正是 Prisma `...OrThrow` 的语义，也是一个宽容默认给不了的：
+      // 把"没有这一行"回成 `{}` 会让签名拿到 `undefined`，症状看起来像产品缺陷。
+      // 绝大多数 spec 用不到这张内存表（它们本来就在 mock `user`），它们显式
+      // `vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({ email, tokenVersion })`。
+      findUniqueOrThrow: vi.fn().mockImplementation(async (args: any) => {
+        const row = testData.users.get(args?.where?.id);
+        if (!row) {
+          throw new Error(
+            `P2025 (test shim): no user row for id=${args?.where?.id} ` +
+              `— seed testData.users or mock prisma.user.findUniqueOrThrow explicitly`,
+          );
+        }
+        return applySelect(row, args?.select) || row;
+      }),
     },
+    // 🔴 ADR-0063 的会话面。**只**登记这一对，而且刻意没有"宽容默认"：
+    // `create` 落进同一张内存表、`findFirst` 从里面读 —— 因为"这一枚会话还活着吗"
+    // 的判据就是**那一行的存在**（撤销 = 删行）。把 `findFirst` 桩成 `null` 会把
+    // 每一枚带 `jti` 的令牌都判成 `TOKEN_REVOKED`，那是伪装成产品失败的夹具故障
+    // （同本文件 `$queryRaw` 的立场：未知的就抛）。
+    // `findMany` / `update` / `deleteMany` 这里没有：现在没有用例经过它们，
+    // 需要时按同样的手法补，而不是让一个 no-op 默认替实现做判断。
+    accessSession: (() => {
+      const rows = new Map<string, any>();
+      return {
+        create: vi.fn().mockImplementation(async (args: any) => {
+          rows.set(args.data.jtiHash, { ...args.data });
+          return args.data;
+        }),
+        findFirst: vi.fn().mockImplementation(async (args: any) => {
+          const row = rows.get(args?.where?.jtiHash);
+          if (!row || (args?.where?.userId !== undefined && row.userId !== args.where.userId)) {
+            return null;
+          }
+          return applySelect(row, args?.select) || row;
+        }),
+      };
+    })(),
     vaultKeyMigration: {
       aggregate: vi.fn().mockResolvedValue({ _sum: { reservedStorageBytes: 0n } }),
     },

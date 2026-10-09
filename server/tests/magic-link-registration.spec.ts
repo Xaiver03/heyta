@@ -19,11 +19,20 @@ vi.mock('../src/db', () => {
     user: {
       findUnique: vi.fn(),
       findFirst: vi.fn(),
+      /**
+       * ADR-0063：`issueSession()` 在签名**之前**回读账号行的 `email` / `tokenVersion`
+       * （不再接受调用方传进来的值），所以凡是能走到"换会话"那一步的用例都会打这一格。
+       */
+      findUniqueOrThrow: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       updateMany: vi.fn(),
       delete: vi.fn(),
       deleteMany: vi.fn(),
+    },
+    /** 一枚令牌 = `access_sessions` 里的一行（`recordSession`，必须先插行后签名）。 */
+    accessSession: {
+      create: vi.fn(),
     },
     passkey: {
       create: vi.fn(),
@@ -110,11 +119,15 @@ describe('Magic Link Registration', () => {
     user: {
       findUnique: Mock;
       findFirst: Mock;
+      findUniqueOrThrow: Mock;
       create: Mock;
       update: Mock;
       updateMany: Mock;
       delete: Mock;
       deleteMany: Mock;
+    };
+    accessSession: {
+      create: Mock;
     };
     passkey: {
       create: Mock;
@@ -139,6 +152,9 @@ describe('Magic Link Registration', () => {
     mockPrisma.user.updateMany.mockResolvedValue({ count: 1 });
     mockPrisma.pendingPasskeyRegistration.findUnique.mockResolvedValue(null);
     mockPrisma.referral.findUnique.mockResolvedValue(null);
+    // 一枚会话 = 一行 `access_sessions`（`recordSession` 先插行、再签名）。
+    // 这里没有读回它的需求，所以写成 no-op 是忠实的；缺席会让**每次**换会话当场抛。
+    mockPrisma.accessSession.create.mockResolvedValue({});
     mockPrisma.$transaction.mockImplementation(
       async (callback: (tx: typeof mockPrisma) => Promise<unknown>) =>
         callback(mockPrisma),
@@ -530,6 +546,14 @@ describe('Magic Link Registration', () => {
         locale: null,
       });
       mockPrisma.user.updateMany.mockResolvedValue({ count: 1 });
+      // 🔴 `issueSession` 现在自己回读账号行来签名（ADR-0063）：喂给它的必须是**上面那同一行**
+      // （`email: testEmail` / `tokenVersion: 0`）。签名值 = 库里那一格 = 会话行那一格，
+      // 夹具里也必须保持这个等式，否则"令牌带的是库里那个 tokenVersion"这条判据
+      // 会被夹具自己造歪。
+      mockPrisma.user.findUniqueOrThrow.mockResolvedValue({
+        email: testEmail,
+        tokenVersion: 0,
+      });
 
       const result = await verifyLoginMagicLink(loginToken);
 
@@ -575,6 +599,10 @@ describe('Magic Link Registration', () => {
           where: { loginToken: string };
         }).where.loginToken,
       ).toBe(hashToken(loginToken));
+      // 🔴 ADR-0063：换到会话的那一刻必须**真的落了那一行**（先插行、后签名）。
+      // 少了这一条，"能登录但没有会话行"的形状 = 签出来的令牌被自己的
+      // `sessionIsLive` 拒掉，而界面上的症状只是"下一次请求 401"。
+      expect(mockPrisma.accessSession.create).toHaveBeenCalledTimes(1);
     });
 
     it('should reject a login token already consumed by another request', async () => {

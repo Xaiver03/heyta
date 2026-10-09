@@ -28,7 +28,11 @@ const mocks = vi.hoisted(() => ({
     findMany: vi.fn(),
     count: vi.fn(),
     update: vi.fn(),
+    /** `POST /users/:id/logout` 抬完版本后回读那一行做响应。 */
+    findUniqueOrThrow: vi.fn(),
   },
+  /** ADR-0063：强制登出要连 `access_sessions` 的行一起清掉。 */
+  accessSession: { deleteMany: vi.fn() },
   subscription: { groupBy: vi.fn(), count: vi.fn(), findMany: vi.fn() },
   checkoutOrder: { groupBy: vi.fn(), count: vi.fn(), findMany: vi.fn() },
   coupon: { count: vi.fn(), findMany: vi.fn() },
@@ -38,6 +42,39 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../src/db', () => ({ prisma: mocks }));
+
+/**
+ * 实时通道：这一组只关心"有没有去关"，不关心关掉几条连接。
+ * 不 mock 它就会去碰真的 `getWsConnectionService()` 单例（跨测试文件共享的进程内状态）。
+ */
+const wsSpies = vi.hoisted(() => ({ closeForUser: vi.fn() }));
+vi.mock('../src/sync/services/websocket-connection.service', () => ({
+  getWsConnectionService: () => wsSpies,
+}));
+
+/**
+ * 🔴 这一枚 mock 是**逐键重写**全局 `tests/setup.ts` 那一份，不是展开真模块。
+ *
+ * 为什么不用 `importOriginal()`：`../src/auth` 在**模块顶层**读 `JWT_SECRET`
+ * （`auth.ts` 的既有形状），真模块被 import 进来时这枚 spec 没有那枚环境变量 ⇒
+ * 工厂抛错 ⇒ `verifyToken` 那个桩根本没装上，于是 18 条一起 401，
+ * 而红的原因和后台无关（这种红最费时间：它让人去查权限逻辑）。
+ *
+ * 保留 setup 的四键形状 + 加上后台现在依赖的 `revokeAllTokens`：
+ * 强制登出这条路由**应当**走那枚收口函数（抬版本 + 抬前抬后各失效一次缓存），
+ * 而不是自己再抄一遍 `user.update`。它自身的两条 invalidate 由
+ * `tests/auth-cache.spec.ts` 钉，这一组只钉"后台有没有把这件事委托给它"。
+ */
+const authSpies = vi.hoisted(() => ({ revokeAllTokens: vi.fn().mockResolvedValue(undefined) }));
+vi.mock('../src/auth', () => ({
+  verifyToken: vi
+    .fn()
+    .mockResolvedValue({ valid: true, userId: 1, email: 'test@test.com' }),
+  VERIFICATION_TOKEN_EXPIRY_MS: 24 * 60 * 60 * 1000,
+  MAX_VERIFICATION_RESEND_COUNT: 20,
+  verifyEmail: vi.fn().mockResolvedValue(true),
+  revokeAllTokens: authSpies.revokeAllTokens,
+}));
 
 import { adminRoutes } from '../src/admin/admin.routes';
 
@@ -70,6 +107,8 @@ beforeEach(async () => {
   mocks.referral.findMany.mockResolvedValue([]);
   mocks.user.count.mockResolvedValue(0);
   mocks.user.findMany.mockResolvedValue([]);
+  mocks.user.findUniqueOrThrow.mockResolvedValue({ id: 1, email: 'a@example.test', tokenVersion: 4 });
+  mocks.accessSession.deleteMany.mockResolvedValue({ count: 2 });
 
   app = Fastify();
   await app.register(adminRoutes, { prefix: '/api/admin' });
@@ -357,9 +396,8 @@ describe('三个支持动作', () => {
     );
   });
 
-  it('强制登出走 tokenVersion 自增（而不是"删令牌"，JWT 是无状态的）', async () => {
+  it('🔴 强制登出：委托给收口函数抬版本 + 删会话行 + 关实时通道', async () => {
     setAdmin(true);
-    mocks.user.update.mockResolvedValue({ id: 1, email: 'a@example.test', tokenVersion: 4 });
 
     const res = await app.inject({
       method: 'POST',
@@ -368,9 +406,18 @@ describe('三个支持动作', () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(mocks.user.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { tokenVersion: { increment: 1 } } }),
-    );
+    // 🔴 判据钉的是"后台**不再自己抄一份** `user.update({tokenVersion:{increment}})`"。
+    // 这条路由原来就是那一份手抄：它抬了库里那一格，却没动 `authCache`，
+    // 而 `verifyToken` 命中缓存时**整段跳过 DB 读**、只比令牌里的版本与缓存里那一格
+    // （两边都是旧值）⇒ 一台正在同步的设备能让这次强制登出永远不生效
+    // （`get()` 每次命中还把有效期往后推）。抬版本 + 前后各 invalidate 的那对组合
+    // 由 `tests/auth-cache.spec.ts` 对着**真**函数钉，这一组钉委托关系本身。
+    expect(authSpies.revokeAllTokens).toHaveBeenCalledWith(1);
+    expect(mocks.user.update).not.toHaveBeenCalled();
+    // 会话行：界面上那些"还活着的登录"必须一起没掉。
+    expect(mocks.accessSession.deleteMany).toHaveBeenCalledWith({ where: { userId: 1 } });
+    // 实时通道只在升级时鉴权 ⇒ 不关掉，旧令牌继续收 op 通知。
+    expect(wsSpies.closeForUser).toHaveBeenCalledWith(1);
   });
 
   it('配额：拒绝 0（那会制造一个用户看不懂的"神秘同步失败"）', async () => {

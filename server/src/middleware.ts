@@ -5,6 +5,14 @@ import { verifyToken } from './auth';
 export interface AuthUser {
   userId: number;
   email: string;
+  tokenVersion?: number;
+  /**
+   * 手上这一枚令牌在 `access_sessions` 里那一行的主键；`null` = 这一枚是本轮之前签的、没有 `jti`。
+   *
+   * 🔴 「退出登录」要撤销的就是**这一次调用所用的那枚**，所以它必须由服务端从**自己验过的**
+   * payload 里带下来。信客户端传来的『我是哪一台』= 用户会在别的设备上把退出点成撤销自己的。
+   */
+  sessionId?: string | null;
 }
 
 // Extend FastifyRequest to include optional user (before auth)
@@ -56,5 +64,10 @@ export const authenticate = async (
       .send({ error: result.reason, code: result.code });
   }
 
-  req.user = { userId: result.userId, email: result.email };
+  req.user = {
+    userId: result.userId,
+    email: result.email,
+    tokenVersion: result.tokenVersion,
+    sessionId: result.sessionId,
+  };
 };

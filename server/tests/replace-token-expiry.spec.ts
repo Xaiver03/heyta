@@ -77,6 +77,15 @@ describe('replaceToken', () => {
         return cb(tx);
       },
     );
+
+    // 🔴 ADR-0063：`replaceToken` 现在把签名交给 `issueSession`，而它**回读账号行**
+    // （`select: { email, tokenVersion }`）—— 事务里 bump 之后读到的那一格，就是默认那
+    // 一笔 `update` 写回的 5。下面每条用例把它和自己那一次 `update` 的返回值对齐：
+    // 两格各写各的数字也能绿，但那样"令牌带的是库里那一格"就不再是判据了。
+    vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({
+      email: 'user@example.com',
+      tokenVersion: 5,
+    } as any);
   });
 
   it('should use JWT_EXPIRY (365d)', async () => {
@@ -99,6 +108,11 @@ describe('replaceToken', () => {
         return cb(tx);
       },
     );
+    // 回读那一格 = 上面 bump 之后的那一格（同一次提交后的同一行）。
+    vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({
+      email: 'user@example.com',
+      tokenVersion: 42,
+    } as any);
 
     await replaceToken(1, 'user@example.com');
 
@@ -114,6 +128,13 @@ describe('replaceToken', () => {
   });
 
   it('should return the correct user info and token', async () => {
+    // 这一条查的是 id 7 那一行：回读到的 email 与调用方传进来的**同一个**，
+    // 否则夹具内部就自相矛盾了（断言看不见，但下一位读者会）。
+    vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({
+      email: 'test@test.com',
+      tokenVersion: 5,
+    } as any);
+
     const result = await replaceToken(7, 'test@test.com');
 
     expect(result).toEqual({
@@ -137,6 +158,11 @@ describe('replaceToken', () => {
         return cb(tx);
       },
     );
+    // 与上面那次 `update` 写回的值同源（10）—— 回读发生在 bump 提交之后。
+    vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({
+      email: 'user@example.com',
+      tokenVersion: 10,
+    } as any);
 
     await replaceToken(3, 'user@example.com');
 

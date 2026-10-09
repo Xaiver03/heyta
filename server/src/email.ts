@@ -256,3 +256,136 @@ export const sendPasswordChangedEmail = async (
     },
   });
 };
+
+/**
+ * 第 6 封：**换绑请求 · 发给新邮箱**（确认这个收件箱归你管）。
+ *
+ * 它是双侧确认的两半之一（`account/email-change.ts` 文件头写了为什么"新邮箱确认 +
+ * 旧邮箱只通知"那种常见形状在这里不够）。有效期 24 h，与"验证邮箱"同一条理由：
+ * 这一半做的**就是**证明收件箱可控，所以它继承同一个窗口，而不是新拍一个数。
+ */
+export const sendEmailChangeConfirmEmail = async (
+  to: string,
+  token: string,
+  locale: ServerLocale = DEFAULT_SERVER_LOCALE,
+): Promise<boolean> => {
+  const config = loadConfigFromEnv();
+  const url = withLocale(`${config.publicUrl}/change-email?token=${token}`, locale);
+
+  return deliver({
+    to,
+    locale,
+    subjectKey: 'server.email.changeConfirm.subject',
+    logLabel: 'Email change confirm email',
+    content: {
+      heading: t(locale, 'server.email.changeConfirm.title'),
+      body: t(locale, 'server.email.changeConfirm.body'),
+      buttonLabel: t(locale, 'server.email.changeConfirm.button'),
+      url,
+      note: t(locale, 'server.email.changeConfirm.expiry'),
+    },
+  });
+};
+
+/**
+ * 第 7 封：**换绑请求 · 发给当前邮箱**（授权这一次变更）。
+ *
+ * 🔴 正文里必须带上**要换成哪个地址**（`{email}` 插值）。一句"有人请求换绑你的账号"
+ * 而不说换成什么，等于让人在看不见内容的情况下签一张授权 —— 那一半确认就没有意义了。
+ * 这个值来自用户输入，而 `renderEmail` 对 `body` 整串 `escapeHtml` ⇒ 注入面在渲染层被关掉；
+ * **不要**绕过那两个函数把它拼进 HTML。
+ */
+export const sendEmailChangeAuthorizeEmail = async (
+  to: string,
+  token: string,
+  newEmail: string,
+  locale: ServerLocale = DEFAULT_SERVER_LOCALE,
+): Promise<boolean> => {
+  const config = loadConfigFromEnv();
+  const url = withLocale(`${config.publicUrl}/change-email?token=${token}`, locale);
+
+  return deliver({
+    to,
+    locale,
+    subjectKey: 'server.email.changeAuthorize.subject',
+    logLabel: 'Email change authorize email',
+    content: {
+      heading: t(locale, 'server.email.changeAuthorize.title'),
+      body: t(locale, 'server.email.changeAuthorize.body', { email: newEmail }),
+      buttonLabel: t(locale, 'server.email.changeAuthorize.button'),
+      url,
+      note: t(locale, 'server.email.changeAuthorize.warning'),
+    },
+  });
+};
+
+/**
+ * 第 8 封：**换绑已完成**（发给旧地址与新地址各一封）。
+ *
+ * 它与 `passwordChanged` 同一族：只在**已经改完之后**发、失败**不抛出**（改都改了，
+ * 因为一封通知发不出去把成功报成失败，会让人再发起一次、然后撞上冷却窗口）。
+ * 旧地址那一封是这里面更要紧的：**如果那不是本人，那是他唯一能知道的方式。**
+ */
+export const sendEmailChangedEmail = async (
+  to: string,
+  locale: ServerLocale = DEFAULT_SERVER_LOCALE,
+): Promise<boolean> => {
+  const config = loadConfigFromEnv();
+  const url = withLocale(`${config.publicUrl}/app/`, locale);
+
+  return deliver({
+    to,
+    locale,
+    subjectKey: 'server.email.changed.subject',
+    logLabel: 'Email changed notice',
+    content: {
+      heading: t(locale, 'server.email.changed.title'),
+      body: t(locale, 'server.email.changed.body'),
+      buttonLabel: t(locale, 'server.email.changed.button'),
+      url,
+      note: t(locale, 'server.email.changed.notYou'),
+    },
+  });
+};
+
+/**
+ * 第 9 封：**账号新增了一种登录方式**（工单 W6，兑现 `email-password-auth.md` 缺口 13）。
+ *
+ * 🔴 这一封存在的理由是那条缺口原文：拿到一枚有效会话的人可以先给账号加一个**他自己知道的**
+ * 口令作为持久入口，而原主**一个字都收不到**。"加一个认证器"不是换一把钥匙，它是**多开一扇门**，
+ * 而多开一扇门这件事，门的另一面必须有人知道。
+ *
+ * 两个调用点：`/password/set`（加上第一个口令）与 `/passkeys/registration/complete`（加一条通行密钥）。
+ * 与 `passwordChanged` 同一条纪律：只在成功之后发、失败不抛出、不承诺收件人可以"撤回"这次添加
+ * （撤回得回到应用里做，一封邮件里的按钮不该有那个权力）。
+ */
+export const sendAuthenticatorAddedEmail = async (
+  to: string,
+  kind: 'password' | 'passkey',
+  locale: ServerLocale = DEFAULT_SERVER_LOCALE,
+): Promise<boolean> => {
+  const config = loadConfigFromEnv();
+  const url = withLocale(`${config.publicUrl}/app/`, locale);
+
+  return deliver({
+    to,
+    locale,
+    subjectKey:
+      kind === 'password'
+        ? 'server.email.authenticatorAdded.password.subject'
+        : 'server.email.authenticatorAdded.passkey.subject',
+    logLabel: `Authenticator-added notice (${kind})`,
+    content: {
+      heading: t(locale, 'server.email.authenticatorAdded.title'),
+      body: t(
+        locale,
+        kind === 'password'
+          ? 'server.email.authenticatorAdded.password.body'
+          : 'server.email.authenticatorAdded.passkey.body',
+      ),
+      buttonLabel: t(locale, 'server.email.authenticatorAdded.button'),
+      url,
+      note: t(locale, 'server.email.authenticatorAdded.notYou'),
+    },
+  });
+};

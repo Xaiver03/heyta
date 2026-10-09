@@ -14,6 +14,28 @@ export type ServerLocale = (typeof SERVER_LOCALES)[number];
 
 /** 服务端可用词条的 key 联合类型（拼错是编译期错误）。 */
 export type ServerCopyKey =
+  | "server.email.authenticatorAdded.button"
+  | "server.email.authenticatorAdded.notYou"
+  | "server.email.authenticatorAdded.passkey.body"
+  | "server.email.authenticatorAdded.passkey.subject"
+  | "server.email.authenticatorAdded.password.body"
+  | "server.email.authenticatorAdded.password.subject"
+  | "server.email.authenticatorAdded.title"
+  | "server.email.changeAuthorize.body"
+  | "server.email.changeAuthorize.button"
+  | "server.email.changeAuthorize.subject"
+  | "server.email.changeAuthorize.title"
+  | "server.email.changeAuthorize.warning"
+  | "server.email.changeConfirm.body"
+  | "server.email.changeConfirm.button"
+  | "server.email.changeConfirm.expiry"
+  | "server.email.changeConfirm.subject"
+  | "server.email.changeConfirm.title"
+  | "server.email.changed.body"
+  | "server.email.changed.button"
+  | "server.email.changed.notYou"
+  | "server.email.changed.subject"
+  | "server.email.changed.title"
   | "server.email.common.autoNote"
   | "server.email.common.fallbackIntro"
   | "server.email.common.tagline"
@@ -34,6 +56,12 @@ export type ServerCopyKey =
   | "server.email.recover.ignore"
   | "server.email.recover.subject"
   | "server.email.recover.title"
+  | "server.email.registerCode.body"
+  | "server.email.registerCode.codeLabel"
+  | "server.email.registerCode.expiry"
+  | "server.email.registerCode.ignore"
+  | "server.email.registerCode.subject"
+  | "server.email.registerCode.title"
   | "server.email.reset.body"
   | "server.email.reset.button"
   | "server.email.reset.expiry"
@@ -45,6 +73,15 @@ export type ServerCopyKey =
   | "server.email.verify.expiry"
   | "server.email.verify.subject"
   | "server.email.verify.title"
+  | "server.page.changeEmail.applied"
+  | "server.page.changeEmail.awaitingOther"
+  | "server.page.changeEmail.body"
+  | "server.page.changeEmail.busy"
+  | "server.page.changeEmail.button"
+  | "server.page.changeEmail.goLogin"
+  | "server.page.changeEmail.heading"
+  | "server.page.changeEmail.invalidLink"
+  | "server.page.changeEmail.title"
   | "server.page.confirm.body"
   | "server.page.confirm.button"
   | "server.page.confirm.heading"
@@ -100,6 +137,28 @@ export type ServerCopyKey =
 /** 按语言分开的词条表。 */
 export const SERVER_COPY: Record<ServerLocale, Record<ServerCopyKey, string>> = {
   "zh-CN": {
+    "server.email.authenticatorAdded.button": "打开 heyta",
+    "server.email.authenticatorAdded.notYou": "如果这不是你本人添加的，请到设置里的「登录方式」把它删掉，并修改你的登录密码。",
+    "server.email.authenticatorAdded.passkey.body": "你的 heyta 账号刚刚添加了一条通行密钥。多一条登录方式意味着多一个能进到这个账号的入口。",
+    "server.email.authenticatorAdded.passkey.subject": "你的 heyta 账号新增了一条通行密钥",
+    "server.email.authenticatorAdded.password.body": "你的 heyta 账号刚刚设置了一个登录密码。在此之前它只能靠通行密钥或邮件链接登录。",
+    "server.email.authenticatorAdded.password.subject": "你的 heyta 账号设置了登录密码",
+    "server.email.authenticatorAdded.title": "你的 heyta 账号多了一种登录方式",
+    "server.email.changeAuthorize.body": "你的 heyta 账号请求把登录邮箱改成 {email}。登录邮箱是你找回这个账号的唯一凭据，所以需要你在这一封信里也点一次。",
+    "server.email.changeAuthorize.button": "同意这次更改",
+    "server.email.changeAuthorize.subject": "有人请求更改你 heyta 账号的登录邮箱",
+    "server.email.changeAuthorize.title": "要换成这个邮箱吗",
+    "server.email.changeAuthorize.warning": "如果你没有发起过这次更改，请不要点上面的链接，并立刻修改你的登录密码。",
+    "server.email.changeConfirm.body": "有人正在把这个邮箱设为 heyta 账号的登录标识。只有你本人点了这里的链接，这一步才算完成。",
+    "server.email.changeConfirm.button": "确认这个邮箱",
+    "server.email.changeConfirm.expiry": "这个链接 24 小时后失效。如果你没有发起过这件事，不用理会这封信。",
+    "server.email.changeConfirm.subject": "确认这个邮箱要成为你的 heyta 登录标识",
+    "server.email.changeConfirm.title": "确认新的登录邮箱",
+    "server.email.changed.body": "你的 heyta 账号现在用这个邮箱登录。其他设备上的登录都已失效，要用新的邮箱重新登录一次。",
+    "server.email.changed.button": "打开 heyta",
+    "server.email.changed.notYou": "如果这不是你本人操作的，说明有人同时读到了你的两个邮箱，请立刻用「忘记密码」拿回账号。",
+    "server.email.changed.subject": "你的 heyta 登录邮箱已经更改",
+    "server.email.changed.title": "登录邮箱已更改",
     "server.email.common.autoNote": "这封邮件由系统自动发送，请勿直接回复。",
     "server.email.common.fallbackIntro": "如果按钮点不动，请把下面的链接复制到浏览器打开：",
     "server.email.common.tagline": "本地优先的任务与习惯管理",
@@ -120,6 +179,12 @@ export const SERVER_COPY: Record<ServerLocale, Record<ServerCopyKey, string>> = 
     "server.email.recover.ignore": "如果这不是你本人发起的，忽略这封邮件即可，你的账号不会有任何变化。",
     "server.email.recover.subject": "恢复你的 heyta 通行密钥",
     "server.email.recover.title": "通行密钥恢复",
+    "server.email.registerCode.body": "请输入下面的验证码，完成邮箱验证并激活你的账号。",
+    "server.email.registerCode.codeLabel": "注册验证码",
+    "server.email.registerCode.expiry": "验证码 10 分钟内有效，最多可尝试 5 次。",
+    "server.email.registerCode.ignore": "如果这不是你本人发起的，忽略这封邮件即可。",
+    "server.email.registerCode.subject": "你的 heyta 注册验证码",
+    "server.email.registerCode.title": "完成 heyta 注册",
     "server.email.reset.body": "你申请了重置登录密码。点击下面的按钮设置一个新密码 —— 设置成功后，其他设备上的登录都会失效。",
     "server.email.reset.button": "设置新密码",
     "server.email.reset.expiry": "这个链接 15 分钟内有效，且只能使用一次。",
@@ -131,6 +196,15 @@ export const SERVER_COPY: Record<ServerLocale, Record<ServerCopyKey, string>> = 
     "server.email.verify.expiry": "这个链接 24 小时内有效。",
     "server.email.verify.subject": "验证你的 heyta 账号",
     "server.email.verify.title": "欢迎使用 heyta",
+    "server.page.changeEmail.applied": "登录邮箱已经换成新地址。请用新地址重新登录。",
+    "server.page.changeEmail.awaitingOther": "这一边已经确认，还在等另一个邮箱也点一次。",
+    "server.page.changeEmail.body": "这次更换需要新旧两个邮箱各点一次，都点完之后登录邮箱才会改过去。你正在确认其中一边。",
+    "server.page.changeEmail.busy": "正在确认…",
+    "server.page.changeEmail.button": "确认这个邮箱地址",
+    "server.page.changeEmail.goLogin": "去登录",
+    "server.page.changeEmail.heading": "确认更换登录邮箱",
+    "server.page.changeEmail.invalidLink": "这个链接无效、已过期，或者已经被用过了。请回到应用重新发起一次。",
+    "server.page.changeEmail.title": "确认更换登录邮箱",
     "server.page.confirm.body": "点击下面的按钮完成验证。",
     "server.page.confirm.button": "完成验证",
     "server.page.confirm.heading": "完成邮箱验证",
@@ -183,6 +257,28 @@ export const SERVER_COPY: Record<ServerLocale, Record<ServerCopyKey, string>> = 
     "server.page.verify.title": "邮箱已验证",
   },
   "en": {
+    "server.email.authenticatorAdded.button": "Open heyta",
+    "server.email.authenticatorAdded.notYou": "If you didn’t add this, remove it under “Sign-in methods” in Settings and change your sign-in password.",
+    "server.email.authenticatorAdded.passkey.body": "A passkey was just added to your heyta account. Another way in means another way for someone else in too.",
+    "server.email.authenticatorAdded.passkey.subject": "A new passkey was added to your heyta account",
+    "server.email.authenticatorAdded.password.body": "A sign-in password was just set on your heyta account. Before this it could only be opened with a passkey or an email link.",
+    "server.email.authenticatorAdded.password.subject": "A sign-in password was set on your heyta account",
+    "server.email.authenticatorAdded.title": "A new sign-in method was added to your heyta account",
+    "server.email.changeAuthorize.body": "Your heyta account asked to change its sign-in email to {email}. That email is the only way back into this account, so this message has to be opened too.",
+    "server.email.changeAuthorize.button": "Approve this change",
+    "server.email.changeAuthorize.subject": "Someone asked to change the sign-in email on your heyta account",
+    "server.email.changeAuthorize.title": "Change it to this address?",
+    "server.email.changeAuthorize.warning": "If you didn’t start this, don’t open the link above — change your sign-in password right away.",
+    "server.email.changeConfirm.body": "Someone is setting this address as the sign-in email for a heyta account. This step is only done once you open the link below yourself.",
+    "server.email.changeConfirm.button": "Confirm this address",
+    "server.email.changeConfirm.expiry": "This link expires after 24 hours. If you didn’t start this, you can ignore this message.",
+    "server.email.changeConfirm.subject": "Confirm this address as your heyta sign-in email",
+    "server.email.changeConfirm.title": "Confirm the new sign-in email",
+    "server.email.changed.body": "Your heyta account now signs in with this address. Every other device has been signed out and needs the new address to sign in again.",
+    "server.email.changed.button": "Open heyta",
+    "server.email.changed.notYou": "If this wasn’t you, someone can read both of these mailboxes — take your account back with “Forgot password” right away.",
+    "server.email.changed.subject": "Your heyta sign-in email was changed",
+    "server.email.changed.title": "Sign-in email changed",
     "server.email.common.autoNote": "This email was sent automatically. Please do not reply.",
     "server.email.common.fallbackIntro": "If the button does not work, copy this link into your browser:",
     "server.email.common.tagline": "Local-first tasks and habits",
@@ -203,6 +299,12 @@ export const SERVER_COPY: Record<ServerLocale, Record<ServerCopyKey, string>> = 
     "server.email.recover.ignore": "If you did not request this, just ignore this email — nothing about your account will change.",
     "server.email.recover.subject": "Recover your heyta passkey",
     "server.email.recover.title": "Passkey recovery",
+    "server.email.registerCode.body": "Enter the code below to verify your email and activate your account.",
+    "server.email.registerCode.codeLabel": "Registration code",
+    "server.email.registerCode.expiry": "This code is valid for 10 minutes and can be tried up to 5 times.",
+    "server.email.registerCode.ignore": "If you did not start this registration, just ignore this email.",
+    "server.email.registerCode.subject": "Your heyta registration code",
+    "server.email.registerCode.title": "Finish creating your heyta account",
     "server.email.reset.body": "You asked to reset your sign-in password. Click the button below to choose a new one — once that succeeds, every other device will be signed out.",
     "server.email.reset.button": "Choose a new password",
     "server.email.reset.expiry": "This link is valid for 15 minutes and can be used once.",
@@ -214,6 +316,15 @@ export const SERVER_COPY: Record<ServerLocale, Record<ServerCopyKey, string>> = 
     "server.email.verify.expiry": "This link is valid for 24 hours.",
     "server.email.verify.subject": "Verify your heyta account",
     "server.email.verify.title": "Welcome to heyta",
+    "server.page.changeEmail.applied": "Your sign-in email has been changed. Sign in again with the new address.",
+    "server.page.changeEmail.awaitingOther": "This side is confirmed. The other address still needs one click.",
+    "server.page.changeEmail.body": "This change needs a click from both the current and the new address, and only takes effect once both have arrived. You are confirming one side.",
+    "server.page.changeEmail.busy": "Confirming…",
+    "server.page.changeEmail.button": "Confirm this email address",
+    "server.page.changeEmail.goLogin": "Sign in",
+    "server.page.changeEmail.heading": "Confirm the new sign-in email",
+    "server.page.changeEmail.invalidLink": "This link is invalid, expired, or has already been used. Start the change again from the app.",
+    "server.page.changeEmail.title": "Confirm the new sign-in email",
     "server.page.confirm.body": "Click the button below to confirm.",
     "server.page.confirm.button": "Confirm",
     "server.page.confirm.heading": "Confirm your email",

@@ -28,6 +28,9 @@ vi.mock('../src/sync/services/websocket-connection.service', () => ({
 vi.mock('../src/email', () => ({
   sendVerificationEmail: vi.fn().mockResolvedValue(true),
   sendPasskeyRecoveryEmail: vi.fn().mockResolvedValue(true),
+  // ADR-0063 §2.6：已登录新增认证器的那封告知信。不 mock 它就会让这 20 条用例
+  // 依赖 SMTP（没凭据的机器上永远红），而"这封信到底发没发"又必须能被断言。
+  sendAuthenticatorAddedEmail: vi.fn().mockResolvedValue(true),
 }));
 
 /**
@@ -49,7 +52,7 @@ const dbState = vi.hoisted(() => ({
     lastUsedAt: Date | null;
   }>,
   nextId: 1,
-  users: new Map<number, { id: number; email: string }>(),
+  users: new Map<number, { id: number; email: string; locale?: string | null }>(),
 }));
 
 vi.mock('../src/db', () => {
@@ -113,7 +116,10 @@ vi.mock('@simplewebauthn/server', () => ({
 
 import { apiRoutes } from '../src/api';
 import { prisma } from '../src/db';
+import { sendAuthenticatorAddedEmail } from '../src/email';
 import * as simplewebauthn from '@simplewebauthn/server';
+
+const mockNotice = sendAuthenticatorAddedEmail as Mock;
 
 const mockPrisma = prisma as unknown as {
   user: { findUnique: Mock };
@@ -372,10 +378,19 @@ describe('通行密钥「已认证再加一条」', () => {
       });
 
       expect(res.statusCode).toBe(200);
-      // `verifyRegistration` 会 `prisma.user.findUnique` 并按 isVerified 提前
-      // 返回成功（不写库）。完成路径既不查 user，也不碰 pending 表 ——
-      // 所以那个分支在结构上就够不着。
-      expect(mockPrisma.user.findUnique).not.toHaveBeenCalled();
+      // 🔴 判据钉的是**那一次查询的形状**，不是"`user.findUnique` 有没有被调过"。
+      // `verifyRegistration` 的特征是 `findUnique({ where: { email } })` 然后按
+      // `isVerified` 提前返回成功（不写库）；完成阶段只要不出现"按 email 找账号"，
+      // 那条分支在结构上就够不着。
+      //
+      // 为什么不能继续用"一次都没调"这条更粗的代理：ADR-0063 §2.6 那封"新增认证器"
+      // 的告知信会在**写入之后**按 `id` 回读 `email`/`locale`。粗代理会把一个合法的
+      // 读也判成"走了那条分支"，而它想防的那件事反而被后来的实现挤掉了。
+      const emailLookups = mockPrisma.user.findUnique.mock.calls.filter(
+        ([args]) =>
+          'email' in ((args as { where?: Record<string, unknown> })?.where ?? {}),
+      );
+      expect(emailLookups).toEqual([]);
       expect(mockPrisma.pendingPasskeyRegistration.create).not.toHaveBeenCalled();
       // 而"返回成功"确实伴随真实写入。
       expect(mockPrisma.passkey.create).toHaveBeenCalledTimes(1);
@@ -414,6 +429,131 @@ describe('通行密钥「已认证再加一条」', () => {
       expect(res.json().code).toBe('passkey_already_registered');
       expect(res.json().success).not.toBe(true);
       expect(dbState.passkeys).toHaveLength(0);
+    });
+
+    /**
+     * ADR-0063 §2.6：已登录新增认证器 = **多开一扇门**，必须发一封告知信。
+     *
+     * 这四条各挡一种真实的坏法：
+     * - 不发 ⇒ 拿别人遗失会话的人可以静给自己加一条持久入口（缺口 13 的原始伤害）。
+     * - 收件地址取请求体 ⇒ 同一处变成"指着别人的邮箱发信"的通道。
+     * - 失败路径也发 ⇒ 该接口成了骚扰按钮，并顺带承认账号存在。
+     * - 发信失败翻转成 5xx ⇒ 用户以为没加上，再点一次（比少一封信糟得多）。
+     */
+    describe('告知信（ADR-0063 §2.6）', () => {
+      it('🔴 成功 ⇒ 发一封 passkey 信，收件地址是**令牌主人**的邮箱', async () => {
+        await beginEnrollment(app);
+
+        const res = await app.inject({
+          method: 'POST',
+          url: '/api/passkeys/registration/complete',
+          headers: AUTH,
+          // 攻击载荷：想把这封信发到别人的地址。
+          payload: { credential, email: 'victim@example.com' },
+        });
+
+        expect(res.statusCode).toBe(200);
+        expect(mockNotice).toHaveBeenCalledTimes(1);
+        expect(mockNotice.mock.calls[0]![0]).toBe('owner@example.com');
+        expect(mockNotice.mock.calls[0]![1]).toBe('passkey');
+      });
+
+      it('🔴 写入没发生（验签失败 / 重复登记）⇒ 一封都不发', async () => {
+        await beginEnrollment(app);
+        mockVerifyRegistration.mockRejectedValueOnce(new Error('bad attestation'));
+        expect(
+          (
+            await app.inject({
+              method: 'POST',
+              url: '/api/passkeys/registration/complete',
+              headers: AUTH,
+              payload: { credential },
+            })
+          ).statusCode,
+        ).toBe(400);
+
+        await beginEnrollment(app);
+        mockPrisma.passkey.create.mockRejectedValueOnce(p2002());
+        expect(
+          (
+            await app.inject({
+              method: 'POST',
+              url: '/api/passkeys/registration/complete',
+              headers: AUTH,
+              payload: { credential },
+            })
+          ).statusCode,
+        ).toBe(409);
+
+        expect(mockNotice).not.toHaveBeenCalled();
+      });
+
+      it('未认证 ⇒ 401 且一封都不发（连账号那一行都不读）', async () => {
+        const res = await app.inject({
+          method: 'POST',
+          url: '/api/passkeys/registration/complete',
+          payload: { credential },
+        });
+
+        expect(res.statusCode).toBe(401);
+        expect(mockNotice).not.toHaveBeenCalled();
+      });
+
+      it('🔴 信发不出去 ⇒ **仍然是 200**：添加已经成功了', async () => {
+        await beginEnrollment(app);
+        mockNotice.mockResolvedValueOnce(false);
+
+        const res = await app.inject({
+          method: 'POST',
+          url: '/api/passkeys/registration/complete',
+          headers: AUTH,
+          payload: { credential },
+        });
+
+        expect(res.statusCode).toBe(200);
+        expect(dbState.passkeys).toHaveLength(1);
+      });
+
+      it('🔴 发信那一步**抛错**（SMTP 崩、回读账号那一行也炸）⇒ 仍然 200', async () => {
+        await beginEnrollment(app);
+        mockNotice.mockRejectedValueOnce(new Error('smtp exploded'));
+
+        const res = await app.inject({
+          method: 'POST',
+          url: '/api/passkeys/registration/complete',
+          headers: AUTH,
+          payload: { credential },
+        });
+
+        // 这条与上一条分开写，因为实现里的两个 swallow 不是同一个：
+        // `deliver()` 返回 false（内部已 catch）与 `notifyAuthenticatorAdded` 自己抛出。
+        // 只测前一条，摘掉外层 try 也照样绿。
+        expect(res.statusCode).toBe(200);
+        expect(dbState.passkeys).toHaveLength(1);
+      });
+
+      it('语言取**账号上的** locale；没有值时走默认中文，不跟着请求体的任何东西走', async () => {
+        dbState.users.set(1, { id: 1, email: 'owner@example.com', locale: 'en' });
+        await beginEnrollment(app);
+        await app.inject({
+          method: 'POST',
+          url: '/api/passkeys/registration/complete',
+          headers: AUTH,
+          payload: { credential },
+        });
+        expect(mockNotice.mock.calls[0]![2]).toBe('en');
+
+        mockNotice.mockClear();
+        dbState.users.set(1, { id: 1, email: 'owner@example.com', locale: null });
+        await beginEnrollment(app);
+        await app.inject({
+          method: 'POST',
+          url: '/api/passkeys/registration/complete',
+          headers: AUTH,
+          payload: { credential, locale: 'en' },
+        });
+        expect(mockNotice.mock.calls[0]![2]).toBe('zh-CN');
+      });
     });
   });
 });

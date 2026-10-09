@@ -19,7 +19,14 @@ import * as jwt from 'jsonwebtoken';
  */
 
 const mocks = vi.hoisted(() => ({
-  user: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+  user: {
+    findUnique: vi.fn(),
+    findUniqueOrThrow: vi.fn(),
+    update: vi.fn(),
+    updateMany: vi.fn(),
+  },
+  // 一枚令牌 = `access_sessions` 里的一行（`recordSession`，先插行再签名，ADR-0063）。
+  accessSession: { create: vi.fn() },
 }));
 
 const hashSpies = vi.hoisted(() => ({
@@ -97,7 +104,16 @@ const row = (overrides: RowOverrides = {}): Record<string, unknown> => ({
 });
 
 const findUnique = (overrides: RowOverrides = {}): void => {
-  mocks.user.findUnique.mockResolvedValue(row(overrides));
+  const accountRow = row(overrides);
+  mocks.user.findUnique.mockResolvedValue(accountRow);
+  // 🔴 ADR-0063：`issueSession` 签名前自己回读账号行的 `email` / `tokenVersion`
+  // （不接受调用方传值）。夹具里这两格必须来自**同一行**，否则下面那条
+  // "签出来的令牌带的是库里那一格 tokenVersion"的判据会被夹具自己造歪 ——
+  // 手工再写一遍数字也能绿，但实现真读错列时它不会红。
+  mocks.user.findUniqueOrThrow.mockResolvedValue({
+    email: accountRow.email,
+    tokenVersion: accountRow.tokenVersion,
+  });
 };
 
 const expectAuthError = (
@@ -129,6 +145,8 @@ beforeEach(() => {
   mocks.user.findUnique.mockResolvedValue(null);
   mocks.user.update.mockResolvedValue(row());
   mocks.user.updateMany.mockResolvedValue({ count: 1 });
+  // 会话行的写入在这组里没有人读回，no-op 就是忠实的桩；缺席则每次成功登录当场抛。
+  mocks.accessSession.create.mockResolvedValue({});
   // 默认：口令**不对**、不需要重算、哑校验成功。
   hashSpies.verifyPassword.mockResolvedValue(false);
   hashSpies.needsRehash.mockReturnValue(false);
@@ -291,6 +309,11 @@ describe('J10 锁定：5 次失败锁 15 分钟，锁的是口令这条路', () 
     const claims = jwt.verify(result.token, SECRET!) as jwt.JwtPayload & { tokenVersion: number };
     expect(claims.userId).toBe(7);
     expect(claims.tokenVersion).toBe(3);
+    // 🔴 ADR-0063 的两半：**这一枚**要能被单独撤销，前提是令牌里有 `jti`、库里有那一行。
+    // 少了 `jti` 的令牌只能靠全局 `tokenVersion++` 整体作废，而"退出登录"对它无事可做；
+    // 少了那一行，`verifyToken` 的会话检查会把它自己刚签出来的令牌拒成 401。
+    expect(typeof claims.jti).toBe('string');
+    expect(mocks.accessSession.create).toHaveBeenCalledTimes(1);
   });
 
   it('成功的登录**不**因为重算失败而变红（策略落后是性能问题，不是"没验过"）', async () => {
