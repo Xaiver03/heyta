@@ -24,6 +24,7 @@ import {
   currentSignedInEmail,
   forgetSignedInUser,
   saveAuthSession,
+  setSignedInEmailFromServer,
 } from '../src/auth/session';
 import { readSyncConfig, clearSyncConfig, writeSyncConfig } from '../src/sync/config';
 import {
@@ -129,6 +130,28 @@ describe('redeemPastedAuthToken', () => {
       'nope',
     );
     expect(outcome).toEqual({ kind: 'failed', reason: 'unauthorized' });
+  });
+});
+
+describe('setSignedInEmailFromServer（换绑之后，界面上那个地址的唯一更新通道）', () => {
+  it('🔴 覆盖登录那一刻记下的地址 —— 不覆盖，用户刚换完邮箱看到的还是**旧**地址', () => {
+    saveAuthSession({ serverUrl: 'http://x', token: 'tok', password: 'pw', email: 'old@example.test' });
+    expect(currentSignedInEmail()).toBe('old@example.test');
+    setSignedInEmailFromServer('new@example.test');
+    expect(currentSignedInEmail()).toBe('new@example.test');
+  });
+
+  it('两侧空白都写不进去：空串回到 `undefined`，而不是一个能显示的空值', () => {
+    saveAuthSession({ serverUrl: 'http://x', token: 'tok', password: 'pw', email: 'a@example.test' });
+    setSignedInEmailFromServer('   ');
+    expect(currentSignedInEmail()).toBeUndefined();
+  });
+
+  it('它**不碰凭据**：换绑只是地址变了，令牌/地址/口令必须原样留着', () => {
+    saveAuthSession({ serverUrl: 'http://x', token: 'tok', password: 'pw', email: 'a@example.test' });
+    const before = readSyncConfig();
+    setSignedInEmailFromServer('b@example.test');
+    expect(readSyncConfig()).toEqual(before);
   });
 });
 

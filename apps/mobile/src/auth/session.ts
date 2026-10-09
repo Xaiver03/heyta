@@ -98,6 +98,22 @@ export function currentSignedInEmail(): string | undefined {
   return signedInEmail;
 }
 
+/**
+ * 用**服务端读回来的**账号邮箱覆盖它。
+ *
+ * 🔴 为什么登录之外还需要一个写入点：换绑是在**邮件里的两条链接**上生效的，
+ * 这台设备不会被告知第二次，而 `signedInEmail` 记的是"登录那一刻用的地址"。
+ * 不覆盖的话，用户刚把邮箱换完，界面上六处"当前账号"仍全是旧地址 —— 界面在说谎
+ * （真设备验收第 11 趟步骤 10 实测到的，见 `docs/plans/account-standard-suite.md` §6.16）。
+ *
+ * ⚠️ 调用方**只能**是"从服务端账号事实读出来的值"（现在是换绑状态那一次读）。
+ * 不许拿它当通用的 setter：任何本地输入框的值灌进这里，就把"这是服务端事实"这条不变量拆了。
+ */
+export function setSignedInEmailFromServer(email: string): void {
+  const next = email.trim();
+  signedInEmail = next === '' ? undefined : next;
+}
+
 /** 清除本机凭据时一并忘掉账号（与 `clearSyncConfig` 成对）。 */
 export function forgetSignedInUser(): void {
   signedInEmail = undefined;

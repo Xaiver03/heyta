@@ -236,6 +236,36 @@ describe('2xx 但响应不像话 ⇒ 绝不当成功', () => {
     expect(result).toMatchObject({ ok: false, reason: 'malformed-response' });
   });
 
+  it('🔴 这一层的解析是**白名单**，所以 `currentEmail` 必须活着穿过去', async () => {
+    // 它丢掉一切不点名的键。服务端加了字段而这里不点名 ⇒ 症状是"响应里明明有，
+    // 界面还是旧的"，而那一格只有真设备验收才看得见（第 11 趟步骤 10 就是这么红的）。
+    const result = await getEmailChangeStatus(
+      ok({ pending: true, awaitingOld: true, awaitingNew: false, pendingEmail: 'n@e.test', currentEmail: 'o@e.test', expiresAt: 1, resendAvailableAt: 2 }),
+      TOKEN,
+    );
+    expect(result).toMatchObject({ ok: true, currentEmail: 'o@e.test' });
+  });
+
+  it('🔴 `pending: false` 那一支**也要**把地址带回去 —— 生效之后最需要它的那一刻', async () => {
+    // 换绑生效 = 活请求被删掉。若把 `currentEmail` 和 `pending` 一起门控，
+    // 界面在"刚换完"这一格恰好读不到真值，而其余四格都读得到 —— 一条只在最该生效时失效的判据。
+    const result = await getEmailChangeStatus(
+      ok({ pending: false, awaitingOld: false, awaitingNew: false, currentEmail: 'new@e.test' }),
+      TOKEN,
+    );
+    expect(result).toMatchObject({ ok: true, pending: false, currentEmail: 'new@e.test' });
+  });
+
+  it('空串按"服务端没给"处理，不当成一个能显示的邮箱（也不报错）', async () => {
+    const result = await getEmailChangeStatus(
+      ok({ pending: false, awaitingOld: false, awaitingNew: false, currentEmail: '' }),
+      TOKEN,
+    );
+    expect(result).toMatchObject({ ok: true });
+    if (result.ok !== true) throw new Error('前提不成立');
+    expect('currentEmail' in result).toBe(false);
+  });
+
   it('🔴 会话列表里**少一个字段**就整份判 malformed —— 少一行是"看不见那台还登录着的设备"', async () => {
     const result = await listHostedSessions(
       ok({ sessions: [{ sessionId: SESSION_ID, createdAt: 1, lastSeenAt: 2, deviceName: null, userAgent: null }] }),

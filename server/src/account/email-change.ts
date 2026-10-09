@@ -440,28 +440,45 @@ export const confirmEmailChange = async (
   return { message: EMAIL_CHANGE_APPLIED_MESSAGE, applied: true };
 };
 
-/** 已登录读到"这张活请求还等哪一边"。界面上那句实话来自这里。 */
+/**
+ * 已登录读到"这张活请求还等哪一边"。界面上那句实话来自这里。
+ *
+ * 🔴 响应里**必须带账号当前的邮箱**（`currentEmail`），理由不是"顺手多给一个字段"：
+ * 换绑是在**邮件里的两个链接**上生效的，App 从头到尾没有被通知过一次，
+ * 而它界面上那六处"当前账号"读的是**登录那一刻**记下的地址
+ * （`apps/mobile/src/auth/session.ts` 里 `signedInEmail` 唯一的写入点就是登录）。
+ * ⇒ 换绑成功后不刷新，界面会继续显示**旧**地址，也就是在用户刚做完这件事的那一刻
+ * 说一句假话。这一趟真设备验收把它照出来了（`docs/plans/account-standard-suite.md` §6.16 步骤 10）。
+ * 为什么挂在这个响应上而不是新端点：它是**这张界面本来就会读**的那一次请求，
+ * 且 `pending: false` 那一支同样要回地址（生效之后活请求就没了）。
+ */
 export const getEmailChangeStatus = async (
   userId: number,
 ): Promise<EmailChangeStatusResponse> => {
-  const request = await prisma.emailChangeRequest.findUnique({
-    where: { userId },
-    select: {
-      pendingEmail: true,
-      oldConfirmedAt: true,
-      newConfirmedAt: true,
-      oldExpiresAt: true,
-      newExpiresAt: true,
-      requestedAt: true,
-    },
-  });
-  if (!request) return { pending: false, awaitingOld: false, awaitingNew: false };
+  const [account, request] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, select: { email: true } }),
+    prisma.emailChangeRequest.findUnique({
+      where: { userId },
+      select: {
+        pendingEmail: true,
+        oldConfirmedAt: true,
+        newConfirmedAt: true,
+        oldExpiresAt: true,
+        newExpiresAt: true,
+        requestedAt: true,
+      },
+    }),
+  ]);
+  // 账号读不到 = 这枚令牌指向的主体已经没了；路由层的鉴权挡在前面，这里只兜形状。
+  const currentEmail = account?.email;
+  if (!request) return { pending: false, awaitingOld: false, awaitingNew: false, ...(currentEmail === undefined ? {} : { currentEmail }) };
 
   return {
     pending: true,
     awaitingOld: request.oldConfirmedAt === null,
     awaitingNew: request.newConfirmedAt === null,
     pendingEmail: request.pendingEmail,
+    ...(currentEmail === undefined ? {} : { currentEmail }),
     expiresAt: Number(request.oldExpiresAt ?? request.newExpiresAt ?? 0),
     resendAvailableAt: Number(request.requestedAt) + EMAIL_CHANGE_TTL_MS,
   };

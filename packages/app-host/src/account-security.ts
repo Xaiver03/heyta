@@ -136,12 +136,19 @@ export const getEmailChangeStatus = async (
   const pendingEmail = asString(body.pendingEmail);
   const expiresAt = asFiniteNumber(body.expiresAt);
   const resendAvailableAt = asFiniteNumber(body.resendAvailableAt);
+  // 🔴 这个白名单解析器**会丢掉它不认识的键**，所以新字段必须在这里点名，
+  //    否则服务端给了也到不了界面（症状是"界面还是旧地址，而响应里明明有"）。
+  // ⚠️ 它**不能**和 `pending` 一起门控：换绑生效之后 `pending` 是 false，
+  //    而那正是界面最需要读到真地址的一刻。空串按"没给"处理（不给界面留一个能显示的空值）。
+  const currentEmailRaw = asString(body.currentEmail);
+  const currentEmail = currentEmailRaw === undefined || currentEmailRaw === '' ? undefined : currentEmailRaw;
   return {
     ok: true,
     pending,
     awaitingOld,
     awaitingNew,
     ...(pending === true && pendingEmail !== undefined ? { pendingEmail } : {}),
+    ...(currentEmail !== undefined ? { currentEmail } : {}),
     ...(pending === true && expiresAt !== undefined ? { expiresAt } : {}),
     ...(pending === true && resendAvailableAt !== undefined ? { resendAvailableAt } : {}),
   };

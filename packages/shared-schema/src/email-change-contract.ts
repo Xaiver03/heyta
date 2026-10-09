@@ -94,6 +94,13 @@ export interface EmailChangeStatusResponse {
   awaitingNew: boolean;
   /** 待绑的地址（本人刚输入的值，Bearer 归属 ⇒ 原样回显，不做假脱敏）。 */
   pendingEmail?: string;
+  /**
+   * 账号**当前**的邮箱（服务端事实）。`pendingEmail` 是"等着换上的那个"，两个不是一回事：
+   * 活请求存在时它们不同，生效之后 `pending` 变 false、只剩这一个。
+   * 🔴 界面不许拿"登录那一刻记下的地址"当它 —— 换绑是在邮件链接上生效的，
+   * App 不会被告知第二次，所以这是它唯一能读回真值的通道。
+   */
+  currentEmail?: string;
   expiresAt?: number;
   resendAvailableAt?: number;
 }
