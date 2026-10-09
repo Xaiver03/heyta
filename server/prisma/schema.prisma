@@ -92,6 +92,7 @@ model User {
   automationWorkers                   AutomationWorker[]
   automationCommitPermits             AutomationCommitPermit[]
   automationRules                      AutomationRule[]
+  automationSenderCredentials          AutomationSenderCredential[]
   automationEvents                     AutomationEvent[]
   automationRecipientKey               AutomationRecipientKey?
   operations                          Operation[]
@@ -114,6 +115,8 @@ model User {
   avatar                              UserAvatar?
   aiUsageCounters                     AiUsageCounter[]
   automationAiAttempts               AutomationAiAttempt[]
+  automationEntitlementBinding       AutomationEntitlementBinding?
+  automationEntitlementTicketUses    AutomationEntitlementTicketUse[]
   emailPasswordRegistrationChallenges EmailPasswordRegistrationChallenge[]
   sharesOwned                        Share[]               @relation("ShareOwner")
   shareMemberships                   ShareMember[]
@@ -1555,8 +1558,29 @@ model AutomationRule {
   createdAt  DateTime @default(now()) @map("created_at")
   deletedAt  BigInt?  @map("deleted_at")
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  senderCredentials AutomationSenderCredential[]
   @@index([userId, enabled])
   @@map("automation_rules")
+}
+
+// HMAC sender credentials are encrypted with a deployment-only KEK. The raw
+// secret is returned once at issuance and is never stored or returned again.
+model AutomationSenderCredential {
+  id                 String   @id
+  userId             Int      @map("user_id")
+  ruleId             String   @map("rule_id")
+  keyId              String   @map("key_id")
+  secretCiphertext   String   @map("secret_ciphertext")
+  createdAt          DateTime @default(now()) @map("created_at")
+  revokedAt          BigInt?  @map("revoked_at")
+  rotatedAt          BigInt?  @map("rotated_at")
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  rule               AutomationRule @relation(fields: [ruleId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  // A keyId may be rotated. The migration enforces uniqueness only among
+  // active credentials, while revoked rows remain as an audit trail.
+  @@index([userId, ruleId, keyId])
+  @@index([userId, ruleId, revokedAt])
+  @@map("automation_sender_credentials")
 }
 
 // Minimal event ledger and encrypted queue envelope. Plaintext is never a
@@ -1613,7 +1637,7 @@ model AutomationAiAttempt {
   parseVersion Int      @map("parse_version")
   attempt      Int
   // Existing metered rows are backfilled as managed by the additive migration.
-  // Direct BYO/local calls keep a ledger row without consuming hosted quota.
+  // Direct BYO and local calls have distinct sources without consuming hosted quota.
   periodAnchor BigInt?  @map("period_anchor")
   billingSource String  @default("managed") @map("billing_source")
   state        String
@@ -1624,4 +1648,56 @@ model AutomationAiAttempt {
   @@id([userId, ruleId, eventId, parseVersion, attempt])
   @@index([userId, periodAnchor])
   @@map("automation_ai_attempts")
+}
+
+// A self-hosted automation entitlement is an online, short-lived binding. The
+// signed ticket is consumed once; only its minimum binding and expiry remain.
+// It is deliberately separate from hosted Subscription rows so turning off
+// the ordinary self-host gate cannot accidentally make automation free.
+model AutomationEntitlementBinding {
+  userId            Int      @id @map("user_id")
+  officialSubject   String   @map("official_subject")
+  installationId    String   @map("installation_id")
+  localAccountUuid  String   @map("local_account_uuid")
+  issuer            String
+  keyId             String   @map("key_id")
+  revocationVersion Int      @map("revocation_version")
+  expiresAt         DateTime @map("expires_at")
+  checkedAt         DateTime @map("checked_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  @@index([expiresAt])
+  @@map("automation_entitlement_bindings")
+}
+
+// Nonces are retained until ticket expiry plus a small replay buffer. The
+// unique nonce is the durable one-time-use fence; an in-memory cache is not
+// sufficient when multiple server processes receive the same ticket.
+// `action` + scope columns are what makes a ticket single-purpose: the row is
+// the evidence that *this* operation consumed it, so the same token cannot also
+// authorize a different action, rule, or event.
+model AutomationEntitlementTicketUse {
+  nonce          String   @id
+  userId         Int      @map("user_id")
+  action         String
+  ruleId         String?  @map("rule_id")
+  eventId        String?  @map("event_id")
+  installationId String   @map("installation_id")
+  expiresAt      DateTime @map("expires_at")
+  usedAt         DateTime @default(now()) @map("used_at")
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  @@index([expiresAt])
+  @@index([userId, action])
+  @@map("automation_entitlement_ticket_uses")
+}
+
+// The trusted clock high-water belongs to the *installation*, not to an account:
+// a rollback is a property of this deployment's clock, and it must stop issuing
+// authorizations for every account on it, not only for the one that noticed.
+model AutomationEntitlementClock {
+  installationId String   @id @map("installation_id")
+  maxSeenAtMs    BigInt   @map("max_seen_at_ms")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  @@map("automation_entitlement_clocks")
 }

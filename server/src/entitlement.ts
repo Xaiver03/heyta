@@ -14,10 +14,21 @@
  * （`AGENTS.md §3.4`）。
  */
 import { FastifyReply, FastifyRequest } from 'fastify';
+import type { Prisma } from '@prisma/client';
 import { loadConfigFromEnv } from './config';
 import { prisma } from './db';
 import { getAuthUser } from './middleware';
 import { Logger } from './logger';
+import {
+  AutomationEntitlementError,
+  isAutomationEntitlementBindingUsable,
+  loadAutomationEntitlementKeyring,
+  redeemAutomationEntitlementTicket,
+  type AutomationEntitlementAction,
+  type AutomationEntitlementBindingRecord,
+  type AutomationEntitlementKeyring,
+  type EntitlementDatabase,
+} from './automation/entitlement-ticket';
 
 /** 审计事件名。复用既有 `Logger.audit`，不新造一套日志。 */
 export const ENTITLEMENT_AUDIT_EVENTS = {
@@ -49,7 +60,7 @@ const ENTITLEMENT_ERROR_MESSAGE =
  * 理由很具体：词表是权益判定的基础，**拼错一个字母**（`aI` / `A1`）会让判定
  * 静默拒绝一个已经付过钱的用户 —— 那是这类故障里最难查的一种。
  */
-export const ENTITLEMENT_CAPABILITIES = ['hosting', 'ai'] as const;
+export const ENTITLEMENT_CAPABILITIES = ['hosting', 'ai', 'automation'] as const;
 
 export type EntitlementCapability = (typeof ENTITLEMENT_CAPABILITIES)[number];
 
@@ -94,11 +105,27 @@ export type EntitlementDenialReason =
   | 'PERIOD_ENDED'
   | 'INVALID_NOW'
   | 'MISSING_GRANTS'
-  | 'GRANT_NOT_INCLUDED';
+  | 'GRANT_NOT_INCLUDED'
+  /** 自托管在线核验：部署没声明判定来源，自动收集不可用。 */
+  | 'ENTITLEMENT_MODE_UNCONFIGURED'
+  /** 自托管在线核验：本部署没有官方验签钥匙环。 */
+  | 'ISSUER_NOT_CONFIGURED'
+  /** 自托管在线核验：还没有任何有效的官方绑定。 */
+  | 'NO_BINDING'
+  /** 自托管在线核验：绑定已过 30 秒窗口，需要新票据。 */
+  | 'BINDING_EXPIRED'
+  /** 自托管在线核验：绑定记录的签发者/实例不是当前部署的那一个。 */
+  | 'DEPLOYMENT_MISMATCH'
+  /** 自托管在线核验：绑定的吊销版本低于运营者设定的下限。 */
+  | 'REVOKED_VERSION'
+  /** 自托管在线核验：这次操作必须自带一次性票据。 */
+  | 'ENTITLEMENT_TICKET_REQUIRED'
+  /** 一次性票据被拒；稳定子码见 `code`。 */
+  | 'ENTITLEMENT_TICKET_REJECTED';
 
 export type EntitlementDecision =
   | { allowed: true }
-  | { allowed: false; reason: EntitlementDenialReason };
+  | { allowed: false; reason: EntitlementDenialReason; code?: string };
 
 /**
  * 把订阅里的时间戳归一成 epoch 毫秒，非法值返回 `undefined`（**不抛异常**）。
@@ -277,6 +304,137 @@ export const evaluateCapabilityAcross = (
   return fallback;
 };
 
+/**
+ * 🔴 自动收集权益的**判定来源**由部署模式决定，两模式互斥：
+ *
+ * - `official`：官方托管实例，付费事实源是本机 `subscriptions` 的 `automation` grant。
+ * - `selfhost-online`：用户自己的实例。本机订阅行**不是**自动收集的权益来源 ——
+ *   负责人 2026-10-07 的裁决是"自托管同档授权"，即权益来自**官方账号**，
+ *   而本机唯一能证明它的是官方签发的在线票据（协议 §4：首版在线核验、不承诺离线宽限）。
+ *   让本地订阅放行等于"在自己的库里给自己发货"。
+ *
+ * 为什么必须显式配置、不给默认：代码里没有任何"这是官方实例"的程序化标志
+ * （见 `config.ts` 的 `entitlements` 注释），猜一次就会在自托管者身上误伤。
+ * 未配置 = 自动收集不可用（响的拒绝），而不是静默落到某一边。
+ */
+export const AUTOMATION_ENTITLEMENT_MODES = ['official', 'selfhost-online'] as const;
+export type AutomationEntitlementMode = (typeof AUTOMATION_ENTITLEMENT_MODES)[number];
+
+export const resolveAutomationEntitlementMode = (
+  raw = process.env.AUTOMATION_ENTITLEMENT_MODE,
+): AutomationEntitlementMode | undefined => {
+  if (raw === undefined || raw.trim() === '') return undefined;
+  const value = raw.trim().toLowerCase();
+  if (value === 'official' || value === 'selfhost-online') return value;
+  throw new Error(`Invalid AUTOMATION_ENTITLEMENT_MODE: ${raw}. Use 'official' or 'selfhost-online'.`);
+};
+
+/** 权益读取的最小形状：判定只认这两份来源，不认整个 Prisma 客户端。 */
+export interface AutomationEntitlementSource {
+  readSubscriptions(userId: number): PromiseLike<readonly EntitlementSubscription[]>;
+  readBinding(userId: number): PromiseLike<AutomationEntitlementBindingRecord | null>;
+}
+
+/** 事务客户端在此只需要原始查询与绑定读取；类型直接取 Prisma 生成的那个。 */
+type AutomationEntitlementTransaction = Pick<Prisma.TransactionClient, '$queryRaw' | 'automationEntitlementBinding'>;
+
+/**
+ * 账号锁内使用的来源。
+ *
+ * 🔴 订阅行**必须共享锁定**（`FOR SHARE`）：权益撤销与提交许可的授予是两条并发事务，
+ * 只读不锁会让"读到的权益快照"在提交前被改写，而账号行的 `FOR UPDATE` 挡不住
+ * `subscriptions` 上的写入（`billing/webhook.routes.ts` 与 `activity/invite.ts`
+ * 都不取账号锁）。协议 §2 把提交许可的原子落盘定为线性化点，前提就是这一把锁。
+ */
+export const lockedAutomationEntitlementSource = (tx: AutomationEntitlementTransaction): AutomationEntitlementSource => ({
+  readSubscriptions: async (userId) => {
+    const rows = await tx.$queryRaw`SELECT status, current_period_end AS "currentPeriodEnd", grants FROM subscriptions WHERE user_id = ${userId} FOR SHARE`;
+    return (Array.isArray(rows) ? rows : []) as readonly EntitlementSubscription[];
+  },
+  readBinding: (userId) => tx.automationEntitlementBinding.findUnique({ where: { userId } }),
+});
+
+/** 不在事务内（HTTP preHandler）使用的来源：读快照、不锁行，也不是任何判定的最终依据。 */
+export const prismaAutomationEntitlementSource = (): AutomationEntitlementSource => ({
+  readSubscriptions: (userId) => prisma.subscription.findMany({ where: { userId }, orderBy: { id: 'desc' } }),
+  readBinding: (userId) => prisma.automationEntitlementBinding.findUnique({ where: { userId } }),
+});
+
+/**
+ * 自动收集的权益判定：先按部署模式选来源，再判定。
+ *
+ * 官方模式只看订阅；自托管在线模式只看**当前部署配置的那个签发者/实例**下
+ * 仍然有效、且不低于吊销下限的短期绑定 —— 只看 `expiresAt` 会让"换实例、换钥、
+ * 调高吊销版本"对已存在的绑定完全无效。订阅行在这一模式下不参与判定。
+ */
+export async function evaluateAutomationEntitlementForUser(input: {
+  userId: number;
+  now?: number;
+  source?: AutomationEntitlementSource;
+  policy?: EntitlementPolicy;
+  mode?: AutomationEntitlementMode | undefined;
+  keyring?: AutomationEntitlementKeyring | undefined;
+}): Promise<EntitlementDecision> {
+  const mode = input.mode === undefined ? resolveAutomationEntitlementMode() : input.mode;
+  const now = input.now ?? Date.now();
+  if (mode === undefined) return { allowed: false, reason: 'ENTITLEMENT_MODE_UNCONFIGURED' };
+  const source = input.source ?? prismaAutomationEntitlementSource();
+  const policy = input.policy ?? DEFAULT_ENTITLEMENT_POLICY;
+  if (mode === 'official') {
+    return evaluateCapabilityAcross(await source.readSubscriptions(input.userId), 'automation', now, policy);
+  }
+  const keyring = input.keyring === undefined ? loadAutomationEntitlementKeyring() : input.keyring;
+  if (!keyring) return { allowed: false, reason: 'ISSUER_NOT_CONFIGURED' };
+  const binding = await source.readBinding(input.userId);
+  if (binding === null) return { allowed: false, reason: 'NO_BINDING' };
+  if (!isAutomationEntitlementBindingUsable(binding, keyring, now)) {
+    if (binding.issuer !== keyring.issuer || binding.installationId !== keyring.instanceId) return { allowed: false, reason: 'DEPLOYMENT_MISMATCH' };
+    if (binding.revocationVersion < (keyring.minRevocationVersion ?? 0)) return { allowed: false, reason: 'REVOKED_VERSION' };
+    return { allowed: false, reason: 'BINDING_EXPIRED' };
+  }
+  return { allowed: true };
+}
+
+/**
+ * 🔴 在写事务内为**这一次操作**授权。自托管在线模式下这必须是消费一枚 action/作用域
+ * 相符的一次性票据（调用方已持有账号锁），而不是复用 30 秒绑定 —— 绑定只用于
+ * 无法逐次出示票据的公网接收路径（协议 §4 披露的那个窗口）。
+ */
+export async function authorizeAutomationOperation(input: {
+  client: EntitlementDatabase;
+  userId: number;
+  action: AutomationEntitlementAction;
+  ruleId?: string;
+  eventId?: string;
+  ticket?: string;
+  now?: number;
+  source?: AutomationEntitlementSource;
+  policy?: EntitlementPolicy;
+  mode?: AutomationEntitlementMode | undefined;
+  keyring?: AutomationEntitlementKeyring | undefined;
+}): Promise<EntitlementDecision> {
+  const mode = input.mode === undefined ? resolveAutomationEntitlementMode() : input.mode;
+  const now = input.now ?? Date.now();
+  if (mode === undefined) return { allowed: false, reason: 'ENTITLEMENT_MODE_UNCONFIGURED' };
+  if (mode === 'official') {
+    return evaluateAutomationEntitlementForUser({ userId: input.userId, now, source: input.source ?? lockedAutomationEntitlementSource(input.client), policy: input.policy, mode, keyring: input.keyring });
+  }
+  if (input.ticket === undefined) return { allowed: false, reason: 'ENTITLEMENT_TICKET_REQUIRED' };
+  try {
+    await redeemAutomationEntitlementTicket({
+      client: input.client, userId: input.userId, action: input.action,
+      ...(input.ruleId !== undefined ? { ruleId: input.ruleId } : {}),
+      ...(input.eventId !== undefined ? { eventId: input.eventId } : {}),
+      token: input.ticket,
+      keyring: input.keyring === undefined ? loadAutomationEntitlementKeyring() : input.keyring,
+    });
+    return { allowed: true };
+  } catch (error) {
+    if (error instanceof AutomationEntitlementError) return { allowed: false, reason: 'ENTITLEMENT_TICKET_REJECTED', code: error.code };
+    throw error;
+  }
+}
+
 /** 守卫读到的开关形状（`ServerConfig['entitlements']` 的子集）。 */
 export interface EntitlementGateConfig {
   enabled: boolean;
@@ -302,7 +460,43 @@ export interface EntitlementGuardOptions {
    * 单数形状会在下一次加来源时被误用成"最新一行说了算"。
    */
   loadSubscriptions?: (userId: number) => Promise<EntitlementSubscription[]>;
+  /**
+   * 自托管在线核验读到的短期绑定（**整条记录**，不是只取两个字段）：
+   * 判定要看签发者/实例/吊销版本，只回 `expiresAt` 会把这些防线在读数里就抹掉。
+   */
+  loadAutomationBinding?: (userId: number) => Promise<AutomationEntitlementBindingRecord | null>;
+  /** 部署模式与官方钥匙环；省略时读显式 env，不猜。 */
+  automationMode?: AutomationEntitlementMode | undefined;
+  automationKeyring?: AutomationEntitlementKeyring | undefined;
+  /**
+   * 这道闸门是否**为这一次请求**消费一张 action 票据。
+   *
+   * 声明了 `action` 的路由在自托管在线模式下必须带一张与该 action/作用域逐字相符的
+   * 一次性票据；官方托管模式下 `action` 不改变判定（仍看订阅），所以给既有路由补上
+   * action 不会改变那一路的行为。
+   */
+  action?: AutomationEntitlementAction;
+  /** 从请求里取本次操作的作用域（路由参数或正文）。 */
+  scope?: (req: FastifyRequest) => { ruleId?: string; eventId?: string };
+  /** 只在部分请求上判定（例如"关闭规则不要求付费"）。返回 false 时整道闸门跳过。 */
+  when?: (req: FastifyRequest) => boolean;
 }
+
+/**
+ * 只认**出现一次**的 `X-Heyta-Entitlement-Ticket`。
+ *
+ * 与 `readInboundUploadIdentity` 同一个理由：框架会把重复头合并成 `a, b`，
+ * 那样一张坏票据就能盖住一张好票据。取原始头、重复即当作没带。
+ */
+export const readAutomationEntitlementTicketHeader = (rawHeaders: readonly string[]): string | undefined => {
+  let found: string | undefined;
+  for (let i = 0; i < rawHeaders.length; i += 2) {
+    if (rawHeaders[i].toLowerCase() !== 'x-heyta-entitlement-ticket') continue;
+    if (found !== undefined) return undefined;
+    found = rawHeaders[i + 1];
+  }
+  return found !== undefined && found.length > 0 && found.length <= 8192 && /^[A-Za-z0-9_.~-]+$/.test(found) ? found : undefined;
+};
 
 export type EntitlementGuard = (
   req: FastifyRequest,
@@ -327,6 +521,11 @@ const defaultLoadSubscriptions = async (
     orderBy: { id: 'desc' },
   });
 
+const defaultLoadAutomationBinding = async (
+  userId: number,
+): Promise<AutomationEntitlementBindingRecord | null> =>
+  prisma.automationEntitlementBinding.findUnique({ where: { userId } });
+
 /**
  * preHandler 守卫。
  *
@@ -345,19 +544,47 @@ export const createEntitlementGuard = (
   const capability = options.capability ?? 'hosting';
   const now = options.now ?? Date.now;
   const loadSubscriptions = options.loadSubscriptions ?? defaultLoadSubscriptions;
+  const loadAutomationBinding = options.loadAutomationBinding ?? defaultLoadAutomationBinding;
 
   return async (req, reply) => {
-    if (!gate.enabled) {
-      // 🔴 默认关的闸门在这里结束：没有身份读取、没有数据库查询。
+    if (options.when && !options.when(req)) return;
+    if (!gate.enabled && capability !== 'automation') {
+      // Free self-hosted sync remains ungated; automation always requires its paid grant.
       return;
     }
 
     const user = getAuthUser(req);
-    const subscriptions = await loadSubscriptions(user.userId);
-    // 🔴 走 `evaluateCapabilityAcross` 而不是单行版：只有它会把
-    // "付费行 + 邀请行"当成**两个独立的权益来源**取并集。
-    // 用单行版（或"最新一行"）会让邀请行把付费时长盖掉 —— 见该函数的头注释。
-    const decision = evaluateCapabilityAcross(subscriptions, capability, now(), policy);
+    const action = options.action;
+    let decision: EntitlementDecision;
+    if (capability !== 'automation') {
+      decision = evaluateCapabilityAcross(await loadSubscriptions(user.userId), capability, now(), policy);
+    } else if (action === undefined) {
+      decision = await evaluateAutomationEntitlementForUser({
+        userId: user.userId,
+        now: now(),
+        policy,
+        source: { readSubscriptions: () => loadSubscriptions(user.userId), readBinding: () => loadAutomationBinding(user.userId) },
+        ...(options.automationMode !== undefined ? { mode: options.automationMode } : {}),
+        ...(options.automationKeyring !== undefined ? { keyring: options.automationKeyring } : {}),
+      });
+    } else {
+      const rawHeaders = req.raw?.rawHeaders;
+      const ticket = Array.isArray(rawHeaders) ? readAutomationEntitlementTicketHeader(rawHeaders) : undefined;
+      decision = await prisma.$transaction((tx) => authorizeAutomationOperation({
+        // 🔴 声明了 action 的闸门在**自己的事务**里消费票据：票据的一次性与它放行的
+        // 那次写操作同生共死，回滚不烧 nonce。写事务内的授权（草稿确认、首次许可）
+        // 在各自的事务里另判，不经过这里。
+        client: tx,
+        userId: user.userId,
+        action,
+        ...(options.scope ? options.scope(req) : {}),
+        ...(ticket === undefined ? {} : { ticket }),
+        now: now(),
+        policy,
+        ...(options.automationMode !== undefined ? { mode: options.automationMode } : {}),
+        ...(options.automationKeyring !== undefined ? { keyring: options.automationKeyring } : {}),
+      }));
+    }
     if (decision.allowed) {
       return;
     }
@@ -370,6 +597,9 @@ export const createEntitlementGuard = (
       // 把"守的是哪一项能力"一起记下来：同一个 402 在 hosting 与 ai 上的
       // 含义完全不同，而响应体里的 reason 不足以区分（运维要查日志）。
       capability,
+      // 票据被拒时子码只此一处有值：运维要区分"过期"和"作用域不符"，
+      // 而这两个都叫 402。绝不记票据正文。
+      ...(decision.code === undefined ? {} : { ticketCode: decision.code }),
       ip: req.ip,
     });
 
@@ -377,6 +607,7 @@ export const createEntitlementGuard = (
       error: ENTITLEMENT_ERROR_MESSAGE,
       errorCode: ENTITLEMENT_ERROR_CODE,
       reason: decision.reason,
+      ...(decision.code === undefined ? {} : { ticketCode: decision.code }),
     });
   };
 };
