@@ -272,6 +272,29 @@ const DOCS_ENTRIES: Record<DocsArticleId, DocsEntry> = {
         titleKey: 'site.docs.account.s5',
         bodyKeys: ['site.docs.account.s5p1'],
       },
+      {
+        // 工单 W4：换绑邮箱此前在帮助中心与政策里都写着"不能换"。
+        // 这一节的存在本身是那句旧话的反证 —— 所以它与法务同批落地。
+        id: 'rebinding-email',
+        titleKey: 'site.docs.account.s6',
+        bodyKeys: ['site.docs.account.s6p1'],
+        itemKeys: [
+          'site.docs.account.s6i1',
+          'site.docs.account.s6i2',
+          'site.docs.account.s6i3',
+          'site.docs.account.s6i4',
+        ],
+      },
+      {
+        id: 'sign-in-sessions',
+        titleKey: 'site.docs.account.s7',
+        bodyKeys: ['site.docs.account.s7p1'],
+        itemKeys: [
+          'site.docs.account.s7i1',
+          'site.docs.account.s7i2',
+          'site.docs.account.s7i3',
+        ],
+      },
     ],
   },
   passphrase: {
