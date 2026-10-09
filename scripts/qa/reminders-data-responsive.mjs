@@ -535,6 +535,17 @@ async function dataJourney(browser, spec) {
     refusalVisible: await page.getByTestId('import-refused').isVisible(),
     panelVisible: await panel.isVisible(),
   };
+  // 🔴 这两张整页图**拍不到拒绝卡**，成因在探针不在产品：设置浮层的内容滚在**内层容器**里，
+  // 所以 `fullPage` 对它是空操作（图高恒等于视口高）。按行极值/整页图都只能证明"屏上有的东西"。
+  // 这一格改按节点截卡本身，并记下截的那一刻它在不在视口内（`isVisible()` 只答"渲染了没有"）。
+  const invalidCard = page.getByTestId('import-refused');
+  const invalidRefusalText = await invalidCard.innerText();
+  const invalidCardBox = await invalidCard.boundingBox();
+  const invalidRefusalInViewport = invalidCardBox !== null
+    && invalidCardBox.y >= 0
+    && invalidCardBox.y + invalidCardBox.height <= spec.height;
+  const invalidRefusalShot = `${OUT}/${spec.theme}-${spec.width}-data-refusal-invalid.png`;
+  await invalidCard.screenshot({ path: invalidRefusalShot });
   await page.screenshot({ path: `${OUT}/${spec.theme}-${spec.width}-data-failure-preserved.png`, fullPage: true });
 
   // 选择已存在任务的备份必须拒绝，且不能清空现有任务。
@@ -548,12 +559,31 @@ async function dataJourney(browser, spec) {
   const beforeCancelName = await page.getByTestId('import-file-summary').innerText();
   await page.getByTestId('import-file').evaluate((input) => input.dispatchEvent(new Event('cancel', { bubbles: true })));
   const cancelPreserved = (await page.getByTestId('import-file-summary').innerText()) === beforeCancelName;
+  const existingCard = page.getByTestId('import-refused');
+  const existingCardBox = await existingCard.boundingBox();
+  const existingRefusalInViewport = existingCardBox !== null
+    && existingCardBox.y >= 0
+    && existingCardBox.y + existingCardBox.height <= spec.height;
+  const existingRefusalShot = `${OUT}/${spec.theme}-${spec.width}-data-refusal-existing.png`;
+  await existingCard.screenshot({ path: existingRefusalShot });
   await page.screenshot({ path: `${OUT}/${spec.theme}-${spec.width}-data-refused-existing.png`, fullPage: true });
   await context.close();
   return {
     theme: spec.theme, width: spec.width, before, themeLayers,
     exports: { json: backup, markdown: markdownPath, jsonEntities: backupBody.entities?.length ?? 0, opCount: backupBody.opLog?.length ?? 0 },
     failurePreserved, refusedExisting, existingTaskStillVisible, cancelPreserved,
+    // 两种拒绝理由的卡各有一张节点图；`reasonsDiffer` 是这一格自己的牙 ——
+    // 整页图在 390 那一档对两种理由**长得一样**（差异只有按钮行那 124×44 的位置），
+    // 所以"这两条腿真的是两条不同的拒绝"必须由卡的文本对账来判。
+    refusalCards: {
+      invalidText: invalidRefusalText.trim(),
+      existingText: refusedExisting.trim(),
+      reasonsDiffer: invalidRefusalText.trim() !== refusedExisting.trim(),
+      invalidInViewport: invalidRefusalInViewport,
+      existingInViewport: existingRefusalInViewport,
+      invalidShot: invalidRefusalShot,
+      existingShot: existingRefusalShot,
+    },
   };
 }
 
@@ -1071,6 +1101,7 @@ const assertionOwner = {
   plantedThemeSampleTookEffect: ['reminders', 'groups'],
   themeRulerScopesAllMatched: ['reminders', 'groups', 'data', 'sync'],
   dataFailurePreserved: ['data'],
+  dataRefusalCardsCaptured: ['data'],
   existingDataRefusedWithoutLoss: ['data'],
   cancelPreserved: ['data'],
   everyCaseCoversEverySweepGroup: ['groups'],
@@ -1204,6 +1235,13 @@ const report = {
     noHorizontalOverflow: [...reminders.map((x) => x.facts), ...data.map((x) => x.before)].every((x) => x.documentScrollWidth <= x.documentClientWidth + 1),
     allPermissionStatesRendered: reminders.every((x) => x.mode === 'default' ? x.statuses.request : x.mode === 'granted' ? x.statuses.granted : x.mode === 'denied' ? x.statuses.denied : x.mode === 'unsupported' ? x.statuses.unsupported : x.statuses.failed),
     dataFailurePreserved: data.every((x) => x.failurePreserved.summaryVisible && x.failurePreserved.refusalVisible && x.failurePreserved.panelVisible),
+    // 🔴 这条不是"又拍了一张图"，它判的是上面那条 `refusalVisible` **判不到的那件事**：
+    // `isVisible()` 只答"渲染了没有"，而整页图在内层滚动容器下拍不到卡 ——
+    // 于是"两种拒绝理由"在 390 那一档的图上**长得一模一样**（差异只有按钮行 124×44 的位置）。
+    // 这条要求每一格都交出两张节点图、两段非空文本，并且**两段文本必须互不相同**。
+    // 牙：把两条腿喂成同一个坏文件 ⇒ `reasonsDiffer` 为假；节点截图失败 ⇒ 直接抛。
+    dataRefusalCardsCaptured: data.length > 0 && data.every((x) => x.refusalCards.reasonsDiffer
+      && x.refusalCards.invalidText.length > 0 && x.refusalCards.existingText.length > 0),
     existingDataRefusedWithoutLoss: data.every((x) => x.existingTaskStillVisible && x.refusedExisting.length > 0),
     cancelPreserved: data.every((x) => x.cancelPreserved),
     // 漏跑一态/一个视口不会让上面任何一条变红（`.every` 对空集合是真），所以覆盖本身要单独钉。
