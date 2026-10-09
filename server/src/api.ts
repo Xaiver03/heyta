@@ -2199,7 +2199,11 @@ export const apiRoutes = async (
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Magic link verify error: ${errMsg}`);
         return reply.status(401).send({
-          error: getSafeErrorMessage(err, 'Invalid or expired login link'),
+          // 兜底句必须与 `/auth/email/verify`（ADR-0039 §2.1 的唯一入口）逐字同一句：同一封邮件里
+          // 只有一个链接，它落在哪条路上取决于那封信是哪一年发的。深层成因：`SAFE_ERROR_MESSAGES`
+          // 认得出 verifyLoginMagicLink 抛的那句，认不出 auth.ts 里「查不到这个人」那句，
+          // 所以走到兜底时两条路各说各的。
+          error: getSafeErrorMessage(err, 'Invalid or expired link'),
         });
       }
     },
