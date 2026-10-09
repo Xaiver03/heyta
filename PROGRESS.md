@@ -2162,3 +2162,49 @@ AC 现量（同轮）：`grep -c '^- \[ \] \*\*AC-' docs/plans/inbound-automatio
 仍未闭合（不包装成完成）：中英条款与帮助页同步（白名单外，B118）、`unknown` 那一句要不要写进对外文案（B114 裁决）、
 每周期 300 次那句要不要说明跨周期退款那一格（B114/本批同族）、`waiting-entitlement` 界面文案（B110）。
 AC 现量：未勾 8 / 已勾 0。
+
+## 2026-10-10 03:1x · T6 第二批：定价事实源与 §6 的 `grants` 对上了，并把 B118 要求的那批尺逐枚跑了一遍
+
+上一节按 B118 只做了"该不该动笔"的判断，这一节是动笔的那半 —— 全在白名单内的那枚
+`docs/reference/pricing-and-entitlements.md`。**先量后写**，动笔前发现一处同一份文档内的自相矛盾：
+
+- §1 那张表的「授予」列两行写 `hosting` + `ai`；
+- §6 的 `pricing-ssot` 块写 `grants: ["hosting","ai","automation"]`（门禁 `check:pricing` 只比 JSON 块与价目表代码，**比不出表格 prose**）
+  ⇒ 这句话以前没有任何一层在守，而它是对外承诺的正文。ADR-0060 §1 已裁决 `automation` 随 AI 档授予，
+  所以**表是错的、JSON 是对的**，按裁决把表补齐并加限定，不改 JSON、不动价格与 SKU 数。
+
+改了四处，每处都指到裁决或代码：
+
+| 落点 | 改法 | 依据 |
+|---|---|---|
+| §1 表两行 | 授予列补 `automation`，并在"现在能买吗"那格写清 **解除禁售 ≠ 自动收集可用** | ADR-0060 §1；§2.2 的六条未闭合 |
+| §1 「自建自托管永久免费、不校验」 | 加限定：普通同步仍然免费不校验；自动收集在自建实例只看官方签发票据，**这条限定取代 ADR-0017/0020 那句的适用范围** | ADR-0060 §2 逐字 |
+| §1 「没有任何功能是被钱锁住的」 | 读成"收费清单上没有功能，只有服务"：`automation` 在 grants 里是因为它必须借云端 AI 那台服务器代发，**不新增 SKU、不改售价周期、不按事件另收费** | ADR-0060 §1 |
+| §2 权益对照 | 新增自动收集那一行（三档各说各的：自建要绑官方付费主体 / ¥5 不含 / ¥12 授予但未到可交付） | 协议 §4 |
+
+新增 **§2.2**：五句对外必须说清的口径（一次物理调用=一次额度、从未发出的那次退回、已发出与 `unknown` 照计、
+**额度是共用的不是另给一份**、删规则不退已消耗的、7 天与摘要留到规则删除、撤销有至多 30 秒窗口必须披露、
+走云端 AI 那一段**不是端到端加密**），每条带锚点；再加"为什么现在不许卖"的六条具名缺口
+（B109/B110/B112/B106 系 + T3/T5/B113），末尾留现量命令而不是抄数。
+
+**B118 要求的那次"逐枚复跑"做了**（尺名按 `check` 链现量重取，不靠记忆）：20 枚对外承诺类门禁里
+**16 枚 rc=0**：`check:pricing`、`check:ai-quota`、`check:ui-language`、`check:legal-copy`、`check:legal-permissions`、
+`check:legal-host`、`check:legal-closure-truth`、`check:legal-gdpr`、`check:egress-wording`、`check:docs-voice`、
+`check:claims`、`check:detail-pane-c1-coverage`、`check:journey-coverage`、`check:integration-coverage`、
+`check:payment-entry`、`check:ai-coverage`。⇒ **本批没有把任何一把对外尺改红**，
+"只改能改的那两份会把尺改红或把口径改成分叉"那个担心被现量否证。
+
+**4 枚红，逐条归属到别线**（都不是本批造成的，且落点全在白名单外，登记 **B120**）：
+
+| 尺 | 它报的 | 归因 |
+|---|---|---|
+| `check:legal-tools` | 本机接口工具目录 30 条里有 4 条（`append_task_checklist`、`get_task_estimate_context`、`set_task_estimate`、`set_task_priorities`）没进法务中英表 | 别的线加的工具；要补的表在 `packages/legal/src/documents/`（白名单外）。**这正是 AGENTS 那条"封闭句式必须对账"的门禁在自己起作用** |
+| `check:server-legal` | `server/src/legal.generated.ts` 与 `@heyta/legal` 版本指纹不一致（`privacy@1.9;personal-info-list@1.6;…`） | 有人改了对外文本版本号没重生成；生成的那枚文件不在白名单，重生成命令它自己给出来了 —— 属那条线的一键活 |
+| `check:reachability` | 「已建模 ≠ 可达」红在 `COMMENT` 那一族 | 与本线实体无关（本线 13 枚实体登记齐全的那一段它自己打了 ✅） |
+| `check:docs` | 开工快照里那条未跟踪 `.ps1` | 同一条，别线 |
+
+⚠️ 这四枚 + `server` 全套那 6 条红（B115）会一起挡在 T7 的 `pnpm check` 上；本线不顺手修、不代改判卷口径，
+只把它们在同一张表里列全，好让负责人一眼看出"合流之前 `pnpm check` 不会自己绿"。
+
+表格结构尺的载体复现（同 B119 那把尺，清单换成含本批这枚的**五份**）：`5 个文件 … 都一致`，rc=0。
+AC 现量：未勾 8 / 已勾 0（同轮跑的两条 grep，见上一条目）。

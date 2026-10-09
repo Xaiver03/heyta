@@ -7275,3 +7275,18 @@ C) 先不接消费者，等 T6 的对外措辞定了一起做。**推荐 A**（�
 为什么不本线自己改：`scripts/` 整目录不在 Goal 白名单里，而一张登记表加不加文件属于**那把尺的覆盖口径**
 （与 B107 把 `tests/**` 纳入类型检查是同一族：改法本身会让 `pnpm check` 多拦别人那条线的既有形状）。
 ⇒ 在并进去之前，本线每次给这两份加表都要自己带一次上面的现量，不许拿 `check:md-tables rc=0` 当证据。
+
+## B120（2026-10-10 03:1x，本会话 · T6 第二批逐枚复跑对外尺时量出的四枚既有红）：合流之前 `pnpm check` 不会自己绿
+
+现量方式：按根 `package.json` 的 `check` 链**现量重取**对外承诺类尺名（不是照记忆列），
+20 枚逐条跑 ⇒ 16 枚 rc=0、4 枚红。四条红的落点**全部在本线白名单之外**，本线一律不代改：
+
+| 尺 | 命令（现量到的原命令） | 它报什么 | 谁的地界 / 一句话修法 |
+|---|---|---|---|
+| `check:legal-tools` | `node scripts/check-legal-tool-catalog.mjs` | 目录 30 条工具里 4 条没进法务中英表（中文表 187 行、英文表 549 行）：`append_task_checklist`、`get_task_estimate_context`、`set_task_estimate`、`set_task_priorities` | 加那四个工具的那条线；补 `packages/legal/src/documents/*` 里那两张表（条款把那张表当**授权面**，见 AGENTS 的封闭句式那条） |
+| `check:server-legal` | `node server/scripts/gen-server-legal.mjs --check` | `server/src/legal.generated.ts` 与 `@heyta/legal` 版本指纹不一致（当前指纹 `ai-and-transfer@1.5;data-rights@1.6;minors@1.3;permissions@1.2;personal-info-list@1.6;privacy@1.9;subscription-refund@1.2;terms@1.5;third-parties@1.5`） | 改对外文本版本号的同一条线；它自己给了修法 `node server/scripts/gen-server-legal.mjs`。生成物 `server/src/legal.generated.ts` 不在本线白名单 ⇒ 不代跑 |
+| `check:reachability` | `node scripts/check-reachability.mjs` | 「已建模 ≠ 可达」，红在 `COMMENT` 那一族（本线实体那一组它自己打了 ✅：`EntityModelMap` 13 / `BUCKET_BY_ENTITY` 13） | `COMMENT` 那条线的"最后一米"；它输出里已明写**不许**用删实体/补 ACTION_FAMILIES/拿测试当调用点这三种手法修绿 |
+| `check:docs` | `node research/tools/docs-link-check.mjs` | `apps/desktop-windows/README.md:89` 指向未跟踪的 `scripts/windows/launch-data-transfer-qa.ps1` | 开工快照里就是这一条（本机有、git 没跟踪），同会话里两次读数一次 0 一次 1 —— 随 HEAD 与索引摆动 |
+
+⇒ **要有人收**：T7 那三条命令里的 `pnpm check` 会同时撞上这四枚 + `server` 全套那 6 条既有红（**B115**），
+其中没有任何一条能在本线白名单内修掉。本线不顺手修、不代改判卷口径，也不把它们记成"环境无效"。
