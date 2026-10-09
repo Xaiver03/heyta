@@ -933,3 +933,85 @@ AC-1 的拒绝词表里**「额度耗尽」这一枚在自动收集预留那一�
 - `ai-reserve` 的票据**仍在闸门事务里消费**（协议 §4 那句 ⚠️ 原样成立，本层没动它）。
 - AC-1 整体**继续不勾选**：这一格补的是"额度耗尽"那一枚拒绝，免费/过期/错主体/错实例/坏签名那五枚的尺在 03:1x 那张表里，
   而宿主每 30 秒续票据的消费者那一格仍被 B109 挡着。
+
+## 2026-10-10 04:5x · AC-1 票据那一半：拒绝码到线协议那一段原先没有任何一层在守
+
+04:2x 那节补的是**额度**那一枚拒绝。接着对尺把**票据**那一半量了一遍，结论是：
+每一枚拒绝码在单测层都有人判，但"判定结果怎么变成宿主收到的那几个字节"这一层是空的。
+
+### 分母（每条命令都可复跑，读数取于本笔入库前）
+
+| 尺（命令） | 读数 | 它说明什么 |
+|---|---|---|
+| `git grep -l ENTITLEMENT_TICKET_REJECTED HEAD -- server/tests` | **0 个文件** | 这一句 reason 从来没被任何测试断过 |
+| `git grep -l ticketCode HEAD -- server/tests` | **1 个文件** | 唯一那处是 `tests/integration/inbound-worker-identity.integration.spec.ts`，整份被 `DATABASE_URL` 门控 ⇒ 默认 `pnpm -r test` 里一跑都不跑 |
+| 逐枚数 `for c in AUTOMATION_TICKET_INVALID …; do grep -rl "$c" server/tests \| wc -l; done` | 九枚里 **8 枚 ≥ 1**，只有"组装那一层"是 0 | 拒绝**码**有人判、拒绝**形状**没人判 —— 缺的不是判定而是线协议 |
+| `git grep -n "ENTITLEMENT_TICKET_REJECTED" HEAD -- server/src` | `entitlement.ts:127/468/774` | 产出点是**两个不同分支**：468 在闸门自己的事务里消费、774 在 `precheckOnly` 的离线预检里 |
+
+### 落的尺：`server/tests/inbound-ticket-rejection-route.spec.ts`（15 条，不需要 `DATABASE_URL`）
+
+判的四件事，各自对应一种真实伤害：
+
+1. **终态必须是 402**：409 在宿主里读作"这次传输失败了"，于是 worker 会对一枚永远不可能变合法的
+   票据退避重试；`ai-reserve` 那一路此前和租约故障共用一个"任何异常都算 409"的 `catch`。
+2. **必须带 `ticketCode`**：只有 `reason` 时界面分不清"票过期（再取一枚就好）"与
+   "主体冲突（要先重新绑定）"—— 前者该自愈、后者必须找人。
+3. **拒绝不许烧掉 nonce**：除重放那一枚，其余每一枚都必须在写消费记录**之前**判掉；
+   拒了还落消费记录 = 把下一枚合法票据的配额提前花掉（AC-1"不产生业务效果"在票据侧的反向）。
+4. **响应与审计都不回显**票据正文 / `officialSubject` / `localAccountUuid` / `nonce`。
+
+闸门那**两条分支各自都测**（`precheckOnly` 档用 `worker/register` 与 `rules/:ruleId/enabled`，
+消费档用 `events/:eventId/ai-attempt/reserve`）—— 它们是两个分支共用一个响应装配，
+只测一条的话另一条漏掉 `ticketCode` 也不会有任何东西失败。
+`when` 那一半（关闭规则不要求付费）也钉了一条：不带票关规则不许变 402。
+
+读数：`cd server && npx --no-install vitest run --maxWorkers=1 tests/inbound-ticket-rejection-route.spec.ts`
+→ `Test Files 1 passed (1)` / `Tests 15 passed (15)`，`RC=0`；跳过 0。
+邻档同跑（票据单测 / 签发端 / 写事务 / 额度路由 共 5 份）→ `Tests 65 passed (65)`，`BASE_RC=0`。
+`npx --no-install tsc --noEmit --strict --target ES2022 --module esnext --moduleResolution bundler --skipLibCheck --esModuleInterop --types node,vitest/globals tests/inbound-ticket-rejection-route.spec.ts` → `TSC_SPEC_RC=0`。
+
+### 八臂反向验证：`python3 research/tools/verify-inbound-ticket-teeth.py`
+
+`臂数=8　不成立=0`，两枚目标末次 sha256 等于开局（`api.ts 4e15ad3302b864c1`、
+`entitlement.ts c2e345026a924651` —— 逐字读数见装置输出），静止臂 `rc=0 红=0`。
+七臂各摘掉一句能红的话：402→409、响应丢 `ticketCode`、预检分支丢上游码、消费分支丢上游码、
+审计丢码、把票据正文写进响应、`when` 失效（关闭规则也要票）。
+`--self-test` 两臂：模式不存在必须报 `PATTERN_MISS` 并非零退出；**并行写入保险丝必须真的会触发**。
+
+### 三条当场改掉自己的错（写下来是为了让后来者认出形状）
+
+1. 🔴 **那根保险丝上一笔就写坏了，而且是"永远不报"那种坏**：`restore()` 里
+   `expected = sha256(path)` 与 `current = sha256(path)` 取的是**同一个文件的同一个哈希**再自比 ⇒
+   恒等、永不触发，"别人在我变异窗口里写过 api.ts"这件事今天不会有人喊。
+   改成 `apply()` 记下本臂写入那份字节的哈希、`restore()` 与它比。
+   光修不证不行，所以补了 `--self-test` 的第二臂：改完字节后手动往文件里追加一行外来内容，
+   这一臂要求 `restore` **必须**报 `RESTORE_GUARD` —— 判据自己也得能红。
+2. 🔴 修完第一版又造出一处**假警报**：收尾那一遍 `finally` 会对每个目标再 `restore` 一次，
+   此时 `mutated` 里还是上一臂的哈希，于是每次运行末尾都刷两行 `RESTORE_GUARD`，
+   而真相是"文件已经是开局那份"。改成 `pop`（预期只用一次）。
+   第二跑读数里那两行没了 —— 这条改动的证据就是它自己。
+3. 🔴 第一版 spec 从服务端 import `MAX_TICKET_SECONDS`，而**那枚导出坐在别人一条未提交的 hunk 里**
+   （`server/src/automation/entitlement-ticket.ts`，mtime 03:59，`PROGRESS.md`/`BLOCKED.md`/本台账都没提它，
+   HEAD 里那一行还是 `const MAX_TICKET_SECONDS = 30`）⇒ 本档在干净 HEAD 上编不出来，
+   而那正是上一笔刚记过的"工作树绿 ≠ 提交绿"。改成从 `@heyta/inbound-core` 的
+   `AUTOMATION_ENTITLEMENT_MAX_TICKET_LIFETIME_MS` 自推（HEAD 已有），既不进别人的 hunk，
+   也和宿主判的那个值是同一枚常量。
+
+### 提交态现量（不是工作树态）
+
+- 三枚提交路径 `git show HEAD:<路径> | shasum -a 256` 与工作树逐字节相同 ⇒ 上面那串绿读数描述的就是提交内容。
+- 本笔**只含测试与验证装置**：`server/src/entitlement.ts` 在工作树里无未提交改动（`git status --porcelain` 对它返回空），
+  它依赖的三处闸门注册在 HEAD 与工作树里逐字相同（`api.ts` 只有行号偏移 853/855、949/951、1195/1197）。
+- 隔离副本复跑（`git worktree add --detach <仓库外> HEAD` + 只把 `node_modules` 符号链接回主检出）：
+  `Test Files 1 passed (1) / Tests 15 passed (15)`，`WT_RC=0`；跑完 `git worktree remove --force`，`git worktree list` 里已无该路径。
+
+### 仍然没闭合的（不包装成完成）
+
+- `ai-reserve` 的票据**仍在闸门自己的事务里消费**（协议 §4 那句 ⚠️ 原样成立）—— 这一档验的是形状，
+  没有替那一步"挪进业务写事务"作证。
+- 绑定行、nonce 唯一约束、时钟高水位这三件**要靠真库**，仍只在被 `DATABASE_URL` 门控的集成档与
+  `verify-inbound-worker-identity.py` 里；本档的数据库是一台按 SQL 文本回行的假机器。
+- `ENTITLEMENT_TICKET_REQUIRED` 与 `ISSUER_NOT_CONFIGURED` 两枚**没有** `ticketCode`（本来就没有码可给），
+  界面文案只能按 `reason` 分派 —— 这一格归 T5。
+- AC-1 整体**继续不勾选**：现在"额度耗尽"和"票据六枚拒绝"两枚各有尺，免费/过期那两句与
+  宿主每 30 秒续票据的消费者那一格仍分别被 B109/B116 挡着。

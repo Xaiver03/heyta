@@ -2342,3 +2342,32 @@ AC-1 继续不勾选（这一格只补了六枚拒绝里的一枚）。AC 现量
    `git diff --cached --name-only | wc -l` = 0 才算收平，最终只剩 ` M server/src/api.ts`（那是别人的 hunk）。
 4. 逐笔范围对账：`python3 research/tools/verify-inbound-commit-scope.py` → `本线笔数=38 涉及路径=50 越界=0`，**RC=0**。
 AC 现量：**未勾 8 / 已勾 0**。
+
+## 2026-10-10 04:5x · AC-1 票据那一半：线协议形状补尺（第 39 笔本线提交）
+
+上一节补的是"额度耗尽"那一枚拒绝。这一节把**票据那一半**量了一遍并补上尺。
+
+1. 现量（补尺之前）：`git grep -l ENTITLEMENT_TICKET_REJECTED HEAD -- server/tests` → **0 个文件**；
+   `git grep -l ticketCode HEAD -- server/tests` → 1 个文件且被 `DATABASE_URL` 门控（默认 `pnpm -r test` 一跑都不跑）；
+   九枚拒绝码逐枚数 tests 命中 → 8 枚 ≥ 1，**只有"组装成 HTTP 那一层"是 0**。
+   ⇒ 判定有人判、形状没人守：402 变 409 会害宿主空转重试一整窗口，缺 `ticketCode` 让界面分不清
+   "票过期（可自愈）"与"主体冲突（要重新绑定）"。
+2. 落的尺：`server/tests/inbound-ticket-rejection-route.spec.ts` **15 条**，不需要 `DATABASE_URL`，
+   闸门**两条分支各测**（消费档 `ai-attempt/reserve` + 预检档 `worker/register`、`rules/:ruleId/enabled`，
+   它们是两个分支共用一个响应装配）、正向对照（合法票真消费一次 nonce）、拒绝不烧 nonce、
+   关闭规则不带票不许变 402、响应与审计两侧都不回显票据正文/主体/账号 UUID/nonce。
+   读数：`Tests 15 passed (15)` RC=0；邻档同跑 5 份 `Tests 65 passed (65)` BASE_RC=0；单文件 tsc `TSC_SPEC_RC=0`。
+3. 反向验证：`research/tools/verify-inbound-ticket-teeth.py` → **臂数=8 不成立=0**，静止臂 rc=0 红=0，
+   两枚目标末次 sha256 等于开局；`--self-test` 两臂都成立（失配被拒 + 保险丝会触发）。
+4. 🔴 顺手把自己上一笔写坏的东西修了：那根"并行写入保险丝"是**恒等自比、永不触发**的，
+   修完又造出一处反向的坏（收尾那一遍假报 `RESTORE_GUARD`）——两处都已改，
+   并给保险丝补了一臂**能红**的自测。B124 里那句"本轮读数两枚文件末次=开局逐字相等"当时
+   只证明了还原对、没证明窗口里没人写过，已就地更正。
+5. 🔴 撞见白名单**里面**坐着别人一枚未提交的导出（`MAX_TICKET_SECONDS`），归属不明 → 登记 **B127**，
+   本线处置是不依赖它（改从 `@heyta/inbound-core` 的毫秒常量自推），不代提交也不回退。
+6. 提交态现量（不是工作树态）：三枚路径 `git show HEAD:<路径>` 与工作树逐字节相同；
+   `server/src/entitlement.ts` 无未提交改动；它依赖的三处闸门注册在 HEAD 与工作树逐字相同（只有行号偏移）；
+   隔离副本（worktree at HEAD + `node_modules` 符号链接回主检出）跑本档 `WT_RC=0 / 15 passed`，跑完已 `worktree remove`。
+7. 文档门禁四条：`check-md-table-rows` / `check-docs-voice` / `check-doc-citations` / `docs-link-check` **四条 rc=0**
+   （0 点那条 `apps/desktop-windows/README.md:89` 已被它自己的线修掉）。
+   AC 现量：**未勾 8 / 已勾 0**。仍不闭合：`ai-reserve` 仍在闸门事务里消费、真库那三件、T5 的文案分派、B109/B116。
