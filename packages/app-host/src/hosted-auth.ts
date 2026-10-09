@@ -473,7 +473,9 @@ export interface HostedAuthOptions {
   signal?: AbortSignal;
 }
 
+export type PostResult = { ok: true; body: unknown } | HostedAuthFailure;
 
+export const failure = (
   reason: HostedAuthFailureReason,
   status?: number,
   message?: string,
@@ -673,6 +675,7 @@ function classifyStatus(status: number): HostedAuthFailureReason {
  * `token` 是**访问令牌**（服务端发的是 Bearer，不是 cookie）。带上它时
  * 请求就是"以某个已登录用户的名义"发的 —— 列 / 删自己的凭据走这条。
  */
+export async function sendJson(
   options: HostedAuthOptions,
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   path: string,
