@@ -1,16 +1,17 @@
 {
   "origin": "http://127.0.0.1:4379",
   "carrier": {
-    "headless": false,
+    "headless": true,
     "reminderModes": [
-      "default",
-      "granted",
       "denied",
       "unsupported",
       "error"
     ],
-    "skippedReminderModes": [],
-    "skipReason": null
+    "skippedReminderModes": [
+      "default",
+      "granted"
+    ],
+    "skipReason": "default 与 granted 两态在无头 Chromium 里都会退化成 denied（granted 那一格是 2026-10-09 无头趟实测出来的），而无头是不抢前台的唯一一档（AGENTS §6.2 规定二）"
   },
   "cases": [
     {
@@ -38,78 +39,6 @@
     {
       "theme": "light",
       "width": 390,
-      "mode": "default",
-      "statuses": {
-        "granted": false,
-        "denied": false,
-        "unsupported": false,
-        "failed": false,
-        "request": true,
-        "permission": "default"
-      },
-      "facts": {
-        "viewport": {
-          "width": 390,
-          "height": 844
-        },
-        "documentScrollWidth": 390,
-        "documentClientWidth": 390,
-        "panel": {
-          "x": 16,
-          "y": 395.5,
-          "width": 358,
-          "height": 200.5
-        },
-        "sheet": {
-          "x": 0,
-          "y": 56,
-          "width": 390,
-          "height": 732,
-          "scrollHeight": 1670,
-          "clientHeight": 732
-        }
-      },
-      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/light-390-reminder-default.png"
-    },
-    {
-      "theme": "light",
-      "width": 390,
-      "mode": "granted",
-      "statuses": {
-        "granted": true,
-        "denied": false,
-        "unsupported": false,
-        "failed": false,
-        "request": false,
-        "permission": "granted"
-      },
-      "facts": {
-        "viewport": {
-          "width": 390,
-          "height": 844
-        },
-        "documentScrollWidth": 390,
-        "documentClientWidth": 390,
-        "panel": {
-          "x": 16,
-          "y": 429.5,
-          "width": 358,
-          "height": 166.5
-        },
-        "sheet": {
-          "x": 0,
-          "y": 56,
-          "width": 390,
-          "height": 732,
-          "scrollHeight": 1636,
-          "clientHeight": 732
-        }
-      },
-      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/light-390-reminder-granted.png"
-    },
-    {
-      "theme": "light",
-      "width": 390,
       "mode": "denied",
       "statuses": {
         "granted": false,
@@ -141,7 +70,7 @@
           "clientHeight": 732
         }
       },
-      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/light-390-reminder-denied.png"
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/ux-final-20261009/reminders-data-headless/light-390-reminder-denied.png"
     },
     {
       "theme": "light",
@@ -177,7 +106,7 @@
           "clientHeight": 732
         }
       },
-      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/light-390-reminder-unsupported.png"
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/ux-final-20261009/reminders-data-headless/light-390-reminder-unsupported.png"
     },
     {
       "theme": "light",
@@ -213,79 +142,7 @@
           "clientHeight": 732
         }
       },
-      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/light-390-reminder-error.png"
-    },
-    {
-      "theme": "dark",
-      "width": 390,
-      "mode": "default",
-      "statuses": {
-        "granted": false,
-        "denied": false,
-        "unsupported": false,
-        "failed": false,
-        "request": true,
-        "permission": "default"
-      },
-      "facts": {
-        "viewport": {
-          "width": 390,
-          "height": 844
-        },
-        "documentScrollWidth": 390,
-        "documentClientWidth": 390,
-        "panel": {
-          "x": 16,
-          "y": 395.5,
-          "width": 358,
-          "height": 200.5
-        },
-        "sheet": {
-          "x": 0,
-          "y": 56,
-          "width": 390,
-          "height": 732,
-          "scrollHeight": 1670,
-          "clientHeight": 732
-        }
-      },
-      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/dark-390-reminder-default.png"
-    },
-    {
-      "theme": "dark",
-      "width": 390,
-      "mode": "granted",
-      "statuses": {
-        "granted": true,
-        "denied": false,
-        "unsupported": false,
-        "failed": false,
-        "request": false,
-        "permission": "granted"
-      },
-      "facts": {
-        "viewport": {
-          "width": 390,
-          "height": 844
-        },
-        "documentScrollWidth": 390,
-        "documentClientWidth": 390,
-        "panel": {
-          "x": 16,
-          "y": 429.5,
-          "width": 358,
-          "height": 166.5
-        },
-        "sheet": {
-          "x": 0,
-          "y": 56,
-          "width": 390,
-          "height": 732,
-          "scrollHeight": 1636,
-          "clientHeight": 732
-        }
-      },
-      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/dark-390-reminder-granted.png"
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/ux-final-20261009/reminders-data-headless/light-390-reminder-error.png"
     },
     {
       "theme": "dark",
@@ -321,7 +178,7 @@
           "clientHeight": 732
         }
       },
-      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/dark-390-reminder-denied.png"
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/ux-final-20261009/reminders-data-headless/dark-390-reminder-denied.png"
     },
     {
       "theme": "dark",
@@ -357,7 +214,7 @@
           "clientHeight": 732
         }
       },
-      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/dark-390-reminder-unsupported.png"
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/ux-final-20261009/reminders-data-headless/dark-390-reminder-unsupported.png"
     },
     {
       "theme": "dark",
@@ -393,79 +250,7 @@
           "clientHeight": 732
         }
       },
-      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/dark-390-reminder-error.png"
-    },
-    {
-      "theme": "light",
-      "width": 1440,
-      "mode": "default",
-      "statuses": {
-        "granted": false,
-        "denied": false,
-        "unsupported": false,
-        "failed": false,
-        "request": true,
-        "permission": "default"
-      },
-      "facts": {
-        "viewport": {
-          "width": 1440,
-          "height": 960
-        },
-        "documentScrollWidth": 1440,
-        "documentClientWidth": 1440,
-        "panel": {
-          "x": 424,
-          "y": 777.5,
-          "width": 655.078125,
-          "height": 182.5
-        },
-        "sheet": {
-          "x": 152,
-          "y": 56,
-          "width": 1200,
-          "height": 904,
-          "scrollHeight": 1240,
-          "clientHeight": 904
-        }
-      },
-      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/light-1440-reminder-default.png"
-    },
-    {
-      "theme": "light",
-      "width": 1440,
-      "mode": "granted",
-      "statuses": {
-        "granted": true,
-        "denied": false,
-        "unsupported": false,
-        "failed": false,
-        "request": false,
-        "permission": "granted"
-      },
-      "facts": {
-        "viewport": {
-          "width": 1440,
-          "height": 960
-        },
-        "documentScrollWidth": 1440,
-        "documentClientWidth": 1440,
-        "panel": {
-          "x": 424,
-          "y": 811.5,
-          "width": 655.078125,
-          "height": 148.5
-        },
-        "sheet": {
-          "x": 152,
-          "y": 56,
-          "width": 1200,
-          "height": 904,
-          "scrollHeight": 1206,
-          "clientHeight": 904
-        }
-      },
-      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/light-1440-reminder-granted.png"
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/ux-final-20261009/reminders-data-headless/dark-390-reminder-error.png"
     },
     {
       "theme": "light",
@@ -501,7 +286,7 @@
           "clientHeight": 904
         }
       },
-      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/light-1440-reminder-denied.png"
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/ux-final-20261009/reminders-data-headless/light-1440-reminder-denied.png"
     },
     {
       "theme": "light",
@@ -537,7 +322,7 @@
           "clientHeight": 904
         }
       },
-      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/light-1440-reminder-unsupported.png"
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/ux-final-20261009/reminders-data-headless/light-1440-reminder-unsupported.png"
     },
     {
       "theme": "light",
@@ -573,79 +358,7 @@
           "clientHeight": 904
         }
       },
-      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/light-1440-reminder-error.png"
-    },
-    {
-      "theme": "dark",
-      "width": 1440,
-      "mode": "default",
-      "statuses": {
-        "granted": false,
-        "denied": false,
-        "unsupported": false,
-        "failed": false,
-        "request": true,
-        "permission": "default"
-      },
-      "facts": {
-        "viewport": {
-          "width": 1440,
-          "height": 960
-        },
-        "documentScrollWidth": 1440,
-        "documentClientWidth": 1440,
-        "panel": {
-          "x": 424,
-          "y": 777.5,
-          "width": 655.078125,
-          "height": 182.5
-        },
-        "sheet": {
-          "x": 152,
-          "y": 56,
-          "width": 1200,
-          "height": 904,
-          "scrollHeight": 1240,
-          "clientHeight": 904
-        }
-      },
-      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/dark-1440-reminder-default.png"
-    },
-    {
-      "theme": "dark",
-      "width": 1440,
-      "mode": "granted",
-      "statuses": {
-        "granted": true,
-        "denied": false,
-        "unsupported": false,
-        "failed": false,
-        "request": false,
-        "permission": "granted"
-      },
-      "facts": {
-        "viewport": {
-          "width": 1440,
-          "height": 960
-        },
-        "documentScrollWidth": 1440,
-        "documentClientWidth": 1440,
-        "panel": {
-          "x": 424,
-          "y": 811.5,
-          "width": 655.078125,
-          "height": 148.5
-        },
-        "sheet": {
-          "x": 152,
-          "y": 56,
-          "width": 1200,
-          "height": 904,
-          "scrollHeight": 1206,
-          "clientHeight": 904
-        }
-      },
-      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/dark-1440-reminder-granted.png"
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/ux-final-20261009/reminders-data-headless/light-1440-reminder-error.png"
     },
     {
       "theme": "dark",
@@ -681,7 +394,7 @@
           "clientHeight": 904
         }
       },
-      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/dark-1440-reminder-denied.png"
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/ux-final-20261009/reminders-data-headless/dark-1440-reminder-denied.png"
     },
     {
       "theme": "dark",
@@ -717,7 +430,7 @@
           "clientHeight": 904
         }
       },
-      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/dark-1440-reminder-unsupported.png"
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/ux-final-20261009/reminders-data-headless/dark-1440-reminder-unsupported.png"
     },
     {
       "theme": "dark",
@@ -753,7 +466,7 @@
           "clientHeight": 904
         }
       },
-      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/dark-1440-reminder-error.png"
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/ux-final-20261009/reminders-data-headless/dark-1440-reminder-error.png"
     }
   ],
   "data": [
@@ -783,8 +496,8 @@
         }
       },
       "exports": {
-        "json": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/light-390-backup.json",
-        "markdown": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/light-390-tasks.md",
+        "json": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/ux-final-20261009/reminders-data-headless/light-390-backup.json",
+        "markdown": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/ux-final-20261009/reminders-data-headless/light-390-tasks.md",
         "jsonEntities": 0,
         "opCount": 1
       },
@@ -823,8 +536,8 @@
         }
       },
       "exports": {
-        "json": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/dark-390-backup.json",
-        "markdown": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/dark-390-tasks.md",
+        "json": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/ux-final-20261009/reminders-data-headless/dark-390-backup.json",
+        "markdown": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/ux-final-20261009/reminders-data-headless/dark-390-tasks.md",
         "jsonEntities": 0,
         "opCount": 1
       },
@@ -863,8 +576,8 @@
         }
       },
       "exports": {
-        "json": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/light-1440-backup.json",
-        "markdown": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/light-1440-tasks.md",
+        "json": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/ux-final-20261009/reminders-data-headless/light-1440-backup.json",
+        "markdown": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/ux-final-20261009/reminders-data-headless/light-1440-tasks.md",
         "jsonEntities": 0,
         "opCount": 1
       },
@@ -903,8 +616,8 @@
         }
       },
       "exports": {
-        "json": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/dark-1440-backup.json",
-        "markdown": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/dark-1440-tasks.md",
+        "json": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/ux-final-20261009/reminders-data-headless/dark-1440-backup.json",
+        "markdown": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/ux-final-20261009/reminders-data-headless/dark-1440-tasks.md",
         "jsonEntities": 0,
         "opCount": 1
       },

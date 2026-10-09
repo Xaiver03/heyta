@@ -1,0 +1,118 @@
+{
+  "app": {
+    "host": "web",
+    "name": "heyta"
+  },
+  "counts": {
+    "entities": {
+      "AI_FEEDBACK": {
+        "deleted": 0,
+        "total": 0
+      },
+      "ASSISTANT_TURN": {
+        "deleted": 0,
+        "total": 0
+      },
+      "COMMENT": {
+        "deleted": 0,
+        "total": 0
+      },
+      "EVENT": {
+        "deleted": 0,
+        "total": 0
+      },
+      "FOCUS_SESSION": {
+        "deleted": 0,
+        "total": 0
+      },
+      "HABIT": {
+        "deleted": 0,
+        "total": 0
+      },
+      "HABIT_LOG": {
+        "deleted": 0,
+        "total": 0
+      },
+      "NOTE": {
+        "deleted": 0,
+        "total": 0
+      },
+      "PREFERENCE_CORRECTION": {
+        "deleted": 0,
+        "total": 0
+      },
+      "PROJECT": {
+        "deleted": 0,
+        "total": 0
+      },
+      "REMINDER": {
+        "deleted": 0,
+        "total": 0
+      },
+      "TAG": {
+        "deleted": 0,
+        "total": 0
+      },
+      "TASK": {
+        "deleted": 0,
+        "total": 1
+      }
+    },
+    "opsByEntityType": {
+      "TASK": 1
+    },
+    "totalDeleted": 0,
+    "totalEntities": 1,
+    "totalOps": 1
+  },
+  "entities": {
+    "AI_FEEDBACK": [],
+    "ASSISTANT_TURN": [],
+    "COMMENT": [],
+    "EVENT": [],
+    "FOCUS_SESSION": [],
+    "HABIT": [],
+    "HABIT_LOG": [],
+    "NOTE": [],
+    "PREFERENCE_CORRECTION": [],
+    "PROJECT": [],
+    "REMINDER": [],
+    "TAG": [],
+    "TASK": [
+      {
+        "_lastClientId": "5115eb9b-f9cd-4f83-8797-51053ea15093",
+        "_lastClock": {
+          "5115eb9b-f9cd-4f83-8797-51053ea15093": 1
+        },
+        "_lastOpId": "5115eb9b-f9cd-4f83-8797-51053ea15093-1791526145838-1",
+        "createdAt": 1791526145838,
+        "id": "task-3a11ebd4-8eee-4bcb-89bf-f71e3d134cb1",
+        "priority": 0,
+        "title": "数据管理响应式验收 light 390",
+        "updatedAt": 1791526145838
+      }
+    ]
+  },
+  "exportedAt": "2026-10-09T06:09:11.728Z",
+  "formatVersion": 1,
+  "opLog": [
+    {
+      "actionType": "CRT_TASK",
+      "clientId": "5115eb9b-f9cd-4f83-8797-51053ea15093",
+      "entityId": "task-3a11ebd4-8eee-4bcb-89bf-f71e3d134cb1",
+      "entityType": "TASK",
+      "id": "5115eb9b-f9cd-4f83-8797-51053ea15093-1791526145838-1",
+      "opType": "CRT",
+      "payload": {
+        "priority": 0,
+        "title": "数据管理响应式验收 light 390"
+      },
+      "schemaVersion": 1,
+      "timestamp": 1791526145838,
+      "vectorClock": {
+        "5115eb9b-f9cd-4f83-8797-51053ea15093": 1
+      }
+    }
+  ],
+  "schemaVersion": 1
+}
