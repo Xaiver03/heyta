@@ -1,5 +1,7 @@
 import type { InboundAutomationField } from '@heyta/inbound-core';
-import { signWebhook } from '@heyta/inbound-core';
+import { AUTOMATION_ENTITLEMENT_TICKET_HEADER, signWebhook } from '@heyta/inbound-core';
+import { AutomationEntitlementRequiredError, automationRejectionReason } from './inbound-worker.js';
+import type { AutomationTicketRequest } from './inbound-entitlement-tickets.js';
 import { inboundDraftSnapshotSchema, inboundDraftEventIdSchema, inboundDraftDecisionSchema, inboundDraftDecisionResponseSchema,
   type InboundDraftSnapshot, type InboundDraftDecision, type InboundDraftDecisionResponse } from '@heyta/shared-schema';
 export type { InboundAutomationField } from '@heyta/inbound-core';
@@ -48,15 +50,30 @@ const valid = (value: unknown): value is InboundAutomationRule => {
 export class InboundRulesRemoteError extends Error {
   constructor(readonly code: 'authentication' | 'forbidden' | 'validation' | 'not-found' | 'conflict' | 'transport') { super(`Inbound rules request failed: ${code}`); }
 }
-export function createInboundRulesRemote(options: { baseUrl: string; getToken: () => Promise<string | undefined>; fetchImpl?: typeof fetch }) {
-  const request = async (path: string, method: string, body?: unknown): Promise<Response> => {
+export function createInboundRulesRemote(options: {
+  baseUrl: string;
+  getToken: () => Promise<string | undefined>;
+  fetchImpl?: typeof fetch;
+  /**
+   * 两个受权益闸门的写（启用规则、签发发送凭据）各自在**发请求之前**取一枚只放行它自己的票。
+   * 不给就等于这一路不带票 —— 服务端按部署模式决定是放行还是 402，宿主不许假装知道。
+   */
+  getEntitlementTicket?: (request: AutomationTicketRequest) => Promise<string>;
+}) {
+  const request = async (path: string, method: string, body?: unknown, ticketRequest?: AutomationTicketRequest): Promise<Response> => {
     const token = await options.getToken();
     if (!token) throw new InboundRulesRemoteError('authentication');
+    // 取票排在 try 之前：票据源抛的错（作用域不符、签发方没配…）不能被下面那层
+    // "任何异常都算传输失败"吞掉 —— 那正是宿主显示"等待权益"和"网络坏了"的分界。
+    const ticketHeaders: Record<string, string> = options.getEntitlementTicket === undefined || ticketRequest === undefined
+      ? {}
+      : { [AUTOMATION_ENTITLEMENT_TICKET_HEADER]: await options.getEntitlementTicket(ticketRequest) };
     try {
       const response = await (options.fetchImpl ?? globalThis.fetch)(new URL(`/api/automation${path}`, options.baseUrl), {
-        method, redirect: 'error', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        method, redirect: 'error', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', ...ticketHeaders },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
+      if (response.status === 402) throw new AutomationEntitlementRequiredError(await automationRejectionReason(response));
       if (response.status === 401) throw new InboundRulesRemoteError('authentication');
       if (response.status === 403) throw new InboundRulesRemoteError('forbidden');
       if (response.status === 404) throw new InboundRulesRemoteError('not-found');
@@ -64,7 +81,10 @@ export function createInboundRulesRemote(options: { baseUrl: string; getToken: (
       if (response.status === 409) throw new InboundRulesRemoteError('conflict');
       if (!response.ok) throw new InboundRulesRemoteError('transport');
       return response;
-    } catch (error) { if (error instanceof InboundRulesRemoteError) throw error; throw new InboundRulesRemoteError('transport'); }
+    } catch (error) {
+      if (error instanceof InboundRulesRemoteError || error instanceof AutomationEntitlementRequiredError) throw error;
+      throw new InboundRulesRemoteError('transport');
+    }
   };
   const one = async (response: Response): Promise<InboundAutomationRule> => {
     try { const value = await response.json(); if (!valid(value)) throw new Error(); return value; }
@@ -82,7 +102,7 @@ export function createInboundRulesRemote(options: { baseUrl: string; getToken: (
       return body.credentials as InboundSenderCredential[];
     },
     async issueSenderCredential(ruleId: string, keyId: string): Promise<{ credentialId: string; keyId: string; secret: string; ruleId: string }> {
-      const response = await request(`/rules/${encodeURIComponent(ruleId)}/sender-credentials`, 'POST', { keyId });
+      const response = await request(`/rules/${encodeURIComponent(ruleId)}/sender-credentials`, 'POST', { keyId }, { action: 'sender-credential-issue', ruleId });
       const body = await response.json() as Record<string, unknown>;
       if (typeof body.credentialId !== 'string' || typeof body.keyId !== 'string' || typeof body.secret !== 'string' || body.ruleId !== ruleId) throw new InboundRulesRemoteError('transport');
       return body as { credentialId: string; keyId: string; secret: string; ruleId: string };
@@ -152,7 +172,9 @@ export function createInboundRulesRemote(options: { baseUrl: string; getToken: (
       return one(await request(`/rules/${encodeURIComponent(ruleId)}/config`, 'PUT', config));
     },
     async setEnabled(ruleId: string, enabled: boolean): Promise<InboundAutomationRule> {
-      return one(await request(`/rules/${encodeURIComponent(ruleId)}/enabled`, 'PUT', { enabled }));
+      // 关掉一条规则不要求权益，只有启用才要票 —— 服务端那一格带 `when`，宿主这边不带第二份判断。
+      return one(await request(`/rules/${encodeURIComponent(ruleId)}/enabled`, 'PUT', { enabled },
+        enabled ? { action: 'rule-enable', ruleId } : undefined));
     },
     async remove(ruleId: string): Promise<InboundAutomationRule> {
       return one(await request(`/rules/${encodeURIComponent(ruleId)}`, 'DELETE'));
