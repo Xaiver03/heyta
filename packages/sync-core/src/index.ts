@@ -265,6 +265,7 @@ export {
   encryptShareRecord,
   decryptShareRecord,
   reencryptShareRecord,
+  shareRecordEpoch,
   buildShareOpSignatureMessage,
   signShareOperation,
   verifyShareOperationSignature,
@@ -272,6 +273,7 @@ export {
   assertShareEncryptedRecord,
 } from './share-keys';
 export type {
+  ShareRecordIdentity,
   ShareIdentityKeyPair,
   ShareMemberKeyEnvelope,
   ShareEncryptedRecord,

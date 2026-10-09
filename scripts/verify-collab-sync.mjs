@@ -290,11 +290,19 @@ const dbPayloads = dump.out;
 if (dbPayloads.includes(OWNER_TITLE) || dbPayloads.includes(BOB_TITLE)) {
   fail('服务端库里出现了任务标题明文——零明文承诺被打破');
 }
-// 信封前缀 'heyta-share-op/' 在 base64 文本里是**编码后的常量前缀**——
-// ASCII 魔数本身不会出现在 base64 里（第一版断言写成了 ASCII，被真库抓了个正着）。
-if (!dbPayloads.includes('aGV5dGEtc2hhcmUtb3Av')) {
-  fail('库里没有 share 信封的 base64 前缀——载荷形状与预期不符');
+// 格式统一后载荷 = record 信封（version 字节 0x01 开头，base64 文本里
+// 不会出现 ASCII 魔数）——逐行解码验版本字节与世代，而不是找字符串前缀。
+let shapeChecked = 0;
+for (const line of dbPayloads.split('\n')) {
+  const b64 = line.trim().replace(/^"|"$/g, '');
+  if (!b64) continue;
+  const raw = Buffer.from(b64, 'base64');
+  if (raw[0] !== 1) fail(`载荷版本字节异常：${raw[0]}`);
+  const epoch = new DataView(raw.buffer, raw.byteOffset, raw.byteLength).getFloat64(1, false);
+  if (!Number.isSafeInteger(epoch) || epoch <= 0) fail(`载荷世代异常：${epoch}`);
+  shapeChecked += 1;
 }
+if (shapeChecked === 0) fail('share_operations 里没有可校验的载荷');
 stepOk('share_operations 全表只有信封密文，无标题明文');
 
 // ── 8. 🔴 移除传播 ─────────────────────────────────────────────────────────

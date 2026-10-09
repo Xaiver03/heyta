@@ -66,9 +66,26 @@ export interface ShareMemberKeyEnvelope {
 
 export interface ShareEncryptedRecord {
   id: string;
+  /**
+   * 写入时的清单密钥世代。🔴 世代**同时**编码在信封头里（自描述）：
+   * 解密方从信封头取世代选钥，本字段用于调用方显式对账
+   * （例如成员端断言"我拿到的信封世代 = share 当前世代"）。
+   */
   keyEpoch: number;
-  /** base64 envelope: version byte + IV + AES-GCM body (same shape as vault records). */
+  /** base64 envelope: version byte + keyEpoch(float64 BE) + IV + AES-GCM body。 */
   ciphertext: string;
+}
+
+/** 线上 op 身份（除 op id 外的全部字段）——record 迁移与 wire 层共用的那一份。 */
+export interface ShareRecordIdentity {
+  clientId: string;
+  actionType: string;
+  opType: string;
+  entityType: string;
+  entityId?: string;
+  entityIds?: string[];
+  timestamp: number;
+  schemaVersion: number;
 }
 
 export interface ShareRekeyPlan {
@@ -152,14 +169,26 @@ const envelopeInfo = (
 
 const envelopeAad = envelopeInfo;
 
-const opRecordAad = (shareId: string, keyEpoch: number, recordId: string): Uint8Array =>
+const opRecordAad = (
+  shareId: string,
+  keyEpoch: number,
+  recordId: string,
+  identity: ShareRecordIdentity,
+): Uint8Array =>
   getTextEncoder().encode(JSON.stringify([
     'heyta:share-op-record',
     SHARE_KEYS_FORMAT_VERSION,
     shareId,
     keyEpoch,
     recordId,
+    identity.clientId, identity.actionType, identity.opType, identity.entityType,
+    identity.entityId ?? null,
+    identity.entityIds?.length ? identity.entityIds : null,
+    identity.timestamp, identity.schemaVersion,
   ]));
+// 🔴 绑定字段清单与 wire 层（sync-client share AAD）保持同一份规范化。
+// 所有成员都持清单密钥——没有身份绑定，一张密文可以改名成另一条 op 重放。
+// 改这份字段清单 = 改防重放承诺，需要变异测试与评审。
 
 /**
  * Identity sub-seeds are HKDF-separated from the master seed: Ed25519 keys
@@ -373,18 +402,32 @@ export const assertShareEncryptedRecord: (value: unknown) => asserts value is Sh
       throw new Error('Invalid share encrypted record');
     }
     assertSafeEpoch(value.keyEpoch);
+    // 信封 = version(1) + keyEpoch(float64) + IV(12) + GCM body(ct + 16B tag)。
     const envelope = decodeStrictBase64(value.ciphertext, 'share record ciphertext');
-    if (envelope.length < 1 + IV_LENGTH + 16 || envelope[0] !== SHARE_KEYS_FORMAT_VERSION) {
+    if (envelope.length < 1 + 8 + IV_LENGTH + 16 || envelope[0] !== SHARE_KEYS_FORMAT_VERSION) {
       throw new Error('Invalid share record envelope');
     }
   };
 
-const encodeRecordEnvelope = (iv: Uint8Array, body: Uint8Array): string => {
-  const out = new Uint8Array(1 + iv.length + body.length);
+const encodeRecordEnvelope = (keyEpoch: number, iv: Uint8Array, body: Uint8Array): string => {
+  const out = new Uint8Array(1 + 8 + iv.length + body.length);
   out[0] = SHARE_KEYS_FORMAT_VERSION;
-  out.set(iv, 1);
-  out.set(body, 1 + iv.length);
+  new DataView(out.buffer).setFloat64(1, keyEpoch, false);
+  out.set(iv, 1 + 8);
+  out.set(body, 1 + 8 + iv.length);
   return encodeBase64(out);
+};
+
+/** 从信封头取世代（自描述）——解密方据此选钥，不需要调用方记得。 */
+export const shareRecordEpoch = (ciphertext: string): number => {
+  const envelope = decodeStrictBase64(ciphertext, 'share record ciphertext');
+  if (envelope.length < 1 + 8 || envelope[0] !== SHARE_KEYS_FORMAT_VERSION) {
+    throw new Error('Invalid share record envelope');
+  }
+  const epoch = new DataView(envelope.buffer, envelope.byteOffset, envelope.byteLength)
+    .getFloat64(1, false);
+  if (!Number.isSafeInteger(epoch) || epoch <= 0) throw new Error('Invalid share record epoch');
+  return epoch;
 };
 
 /** Encrypt one share record (an op payload) under the share's operation key. */
@@ -394,8 +437,10 @@ export const encryptShareRecord = async (args: {
   shareId: string;
   listKey: Uint8Array;
   keyEpoch: number;
+  /** 线上 op 身份（除 id 外）；进 AAD——没有它，密文可以改名成另一条 op 重放。 */
+  identity: ShareRecordIdentity;
 }): Promise<ShareEncryptedRecord> => {
-  const { id, plaintext, shareId, listKey, keyEpoch } = args;
+  const { id, plaintext, shareId, listKey, keyEpoch, identity } = args;
   if (typeof id !== 'string' || id.length === 0) throw new Error('Invalid share record id');
   if (plaintext.length === 0) throw new Error('Invalid share record plaintext');
   assertShareId(shareId);
@@ -403,27 +448,31 @@ export const encryptShareRecord = async (args: {
   assertSafeEpoch(keyEpoch);
   const key = deriveShareOperationKey(listKey, shareId, keyEpoch);
   const iv = getRandomBytes(IV_LENGTH);
-  const body = await aesEncrypt(key, iv, plaintext, opRecordAad(shareId, keyEpoch, id));
-  return { id, keyEpoch, ciphertext: encodeRecordEnvelope(iv, body) };
+  const body = await aesEncrypt(key, iv, plaintext, opRecordAad(shareId, keyEpoch, id, identity));
+  return { id, keyEpoch, ciphertext: encodeRecordEnvelope(keyEpoch, iv, body) };
 };
 
-/** Decrypt one share record. Fails on wrong share/epoch/key or tampering. */
+/** Decrypt one share record. 世代从信封头取；fails on wrong share/epoch/key or tampering. */
 export const decryptShareRecord = async (args: {
   record: ShareEncryptedRecord;
   shareId: string;
   listKey: Uint8Array;
+  /** 与加密时相同的线上 op 身份——AAD 精确匹配才能解（防改名重放）。 */
+  identity: ShareRecordIdentity;
 }): Promise<Uint8Array> => {
-  const { record, shareId, listKey } = args;
+  const { record, shareId, listKey, identity } = args;
   assertShareEncryptedRecord(record);
   assertShareId(shareId);
   assertListKey(listKey);
   const raw = new Uint8Array(decodeBase64(record.ciphertext));
-  const key = deriveShareOperationKey(listKey, shareId, record.keyEpoch);
+  const epoch = new DataView(raw.buffer, raw.byteOffset, raw.byteLength).getFloat64(1, false);
+  if (!Number.isSafeInteger(epoch) || epoch <= 0) throw new Error('Invalid share record epoch');
+  const key = deriveShareOperationKey(listKey, shareId, epoch);
   return aesDecrypt(
     key,
-    raw.slice(1, 1 + IV_LENGTH),
-    raw.slice(1 + IV_LENGTH),
-    opRecordAad(shareId, record.keyEpoch, record.id),
+    raw.slice(1 + 8, 1 + 8 + IV_LENGTH),
+    raw.slice(1 + 8 + IV_LENGTH),
+    opRecordAad(shareId, epoch, record.id, identity),
   );
 };
 
@@ -439,8 +488,10 @@ export const reencryptShareRecord = async (args: {
   fromListKey: Uint8Array;
   toListKey: Uint8Array;
   toEpoch: number;
+  /** 该 op 的线上身份（除 id 外）——新旧两代密文的 AAD 都要它。 */
+  identity: ShareRecordIdentity;
 }): Promise<ShareEncryptedRecord> => {
-  const { record, shareId, fromListKey, toListKey, toEpoch } = args;
+  const { record, shareId, fromListKey, toListKey, toEpoch, identity } = args;
   assertShareEncryptedRecord(record);
   assertShareId(shareId);
   assertSafeEpoch(toEpoch);
@@ -448,17 +499,19 @@ export const reencryptShareRecord = async (args: {
   assertListKey(toListKey);
   if (record.keyEpoch === toEpoch) return record; // already migrated — idempotent no-op
   const raw = new Uint8Array(decodeBase64(record.ciphertext));
-  const fromKey = deriveShareOperationKey(fromListKey, shareId, record.keyEpoch);
+  const fromEpoch = new DataView(raw.buffer, raw.byteOffset, raw.byteLength).getFloat64(1, false);
+  if (!Number.isSafeInteger(fromEpoch) || fromEpoch <= 0) throw new Error('Invalid share record epoch');
+  const fromKey = deriveShareOperationKey(fromListKey, shareId, fromEpoch);
   const plaintext = await aesDecrypt(
     fromKey,
-    raw.slice(1, 1 + IV_LENGTH),
-    raw.slice(1 + IV_LENGTH),
-    opRecordAad(shareId, record.keyEpoch, record.id),
+    raw.slice(1 + 8, 1 + 8 + IV_LENGTH),
+    raw.slice(1 + 8 + IV_LENGTH),
+    opRecordAad(shareId, fromEpoch, record.id, identity),
   );
   const toKey = deriveShareOperationKey(toListKey, shareId, toEpoch);
   const iv = rekeyIv(toKey, record.id);
-  const body = await aesEncrypt(toKey, iv, plaintext, opRecordAad(shareId, toEpoch, record.id));
-  return { id: record.id, keyEpoch: toEpoch, ciphertext: encodeRecordEnvelope(iv, body) };
+  const body = await aesEncrypt(toKey, iv, plaintext, opRecordAad(shareId, toEpoch, record.id, identity));
+  return { id: record.id, keyEpoch: toEpoch, ciphertext: encodeRecordEnvelope(toEpoch, iv, body) };
 };
 
 /** Canonical op-signature message: binds the op identity to its ciphertext. */

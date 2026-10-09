@@ -197,7 +197,14 @@ AI 侧不会有任何东西提醒我们」。**这句已被同日稍后的口头
 | `FOCUS_SESSION` | 2 | 读 `list_focuses` / 写 `log_focus` |
 | `REMINDER` | 2 | 读 `list_reminders` / 写 `create_reminder` |
 
-🔴 `ENTITY_COVERAGE_DEBT`（`check-ai-coverage.mjs` 里那本缺口台账）**现在是空的** ——
+🔴 `ENTITY_COVERAGE_DEBT`（`check-ai-coverage.mjs` 里那本缺口台账）**现在是空的** —
+
+> ⚠️ **2026-10-08 更新：台账不再为空** —— 共享清单的任务评论 `COMMENT`（ADR-0062）进
+> `EntityModelMap`，分母 9 → 10，而其读/写工具**刻意不在同批落地**（登记 `AI-COV-8`）：
+> 评论的可读性依赖 share 域上下文（成员身份 + 清单密钥解密后的任务视图），单做目录工具
+> 会造出 AI 碰不到的假功能。工具随协作客户端引擎（W3/W4，
+> [collaboration-shared-lists.md](collaboration-shared-lists.md) §3）落地，落地即按第二条
+> 牙齿清账。—
 它是唯一一条豁免通道，所以"零条豁免在生效"本身就是门禁结论的一部分，而不是"门禁没内容"。
 台账非空时每一条都必须带 `AI-COV-<n>` 工单号（§5.3 注入 C 验的就是这条牙齿）。
 

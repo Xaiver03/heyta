@@ -158,3 +158,115 @@
 **本段逼出的一个真设计决策（登记为 W3 第一项，待与产品负责人/引擎接线一起拍）**：**share op 载荷存在两种不可互操作的格式**——sync-client 的 magic wire 信封（全身份 AAD，collab-sync 在用）与 sync-core 的迁移 record 信封（record-id AAD，`reencryptShareRecord` 只吃它，collab-revoke 在用）。两个 verify 脚本各钉一种格式是**诚实的现状**，但客户端引擎落地前必须统一（推荐：统一到 record 格式 + 全身份 AAD——sync-core 的 record 函数改为接 identity，sync-client 的 magic 层退役或变薄壳）。这不是本轮能顺手拍的：它动 AAD 语义，配得上一次显式评审。
 
 **边界如实记**：①「WS 已断」一格未覆盖（W2 移除路由不摘 WS 连接，realtime 接线被撞车面挡住；本脚本无 WS 客户端可断）——接线落地后补；②同 collab-sync：真实原语 + 原始 HTTP 站位客户端引擎。
+
+## W3 验收切片（2026-10-08 第八段）：verify:collab-conflict ✅ + COMMENT 链收口确认
+
+**读数**：`verify:collab-conflict` **首跑即 `RESULT=OK steps=6`**。①双账号+共享建立（同前形状）；②🔴 **同一条任务被两台设备并发编辑**（owner「A 版本」T、bob「B 版本」T+2s）——share op-log 追加式，**两条都接受**（服务端不裁决内容）；③🔴 **收敛判据的强形状**：双方各自下载全量历史、解密、用**真实 op-log reducer**（`replayOperations`，字段级版本账）独立重放——**两种到达顺序（A→B / B→A）+ 双方独立重放，全部物化出同一胜者「B 版本」**（LWW 后写者胜，到达顺序不影响结果）；④历史保留 2 条（被覆盖版本没有消失——可恢复的前提）；⑤🔴 恢复：owner 以更晚时间戳写回「A 版本（已恢复）」⇒ 3 条历史、两种顺序重放一致收敛到恢复版；⑥冲突场景下库里仍零明文。
+
+**变异臂**：op-log LWW 选择反转为"最早者胜" ⇒ **恰好 `RESULT=FAIL step=3 reason=…物化「A 版本」…期望都是「B 版本」`**；还原复绿 6 步，entity-coverage 6/6 无残留。
+
+**COMMENT 链收口**：四包测试终态全绿（op-log coverage 6、ui 28、i18n 14、mobile conflict-keys 17、shared-schema 173、server share 36）——三处 dist（shared-schema / op-log / i18n）按依赖序重建后全链一致。
+
+**五个 verify 的进度**：keys ✅ / sync ✅ / revoke ✅ / **conflict ✅** / journey ⏸（等 W4 UI——范围顺序，非撞车面）。
+
+## W4 UI 模型层（2026-10-09 凌晨续）：三件套 + 组件薄壳 ✅（apps/web 接线待其落地）
+
+| 项 | 结果 |
+|---|---|
+| `packages/ui/src/sync/share-model.ts` | ✅ 成员投影（owner 优先/按加入时间/isSelf 精确判）、管理与邀请判定（owner-only）、名额（30 含 owner）、角色变更裁决纯函数（NOT_OWNER/TARGET_IS_OWNER/INVALID_ROLE/ROLE_UNCHANGED 四拒）、兜底名（不显裸数字） |
+| `share-consent-model.ts`（PIPL 方案 a） | ✅ fail-closed（无记录必弹；半条记录也弹）；**勾选语义精确化**：勾了不再提示=永不再弹，没勾=下次共享还会弹（复选框的价值所在）；取消不留确认记录。变异臂：恒不弹 ⇒ 恰好 4 红/还原 6 绿 |
+| `comments-model.ts` | ✅ 线程投影（任务过滤/软删排除/时间排序+id 兜底）、草稿校验（空/超 2000）、作者兜底 key+参数（不显裸数字） |
+| 双语词条 | ✅ `common.share.*` 块（成员角色×4/名额/等待授权/评论×3/同意×7）追加进 zh-CN/en（只许追加表；i18n catalog **14/14**） |
+| 组件薄壳 | ✅ `SharePanel.tsx`（成员列表/邀请/角色/移除，回调交回宿主走 /api/shares/*，零网络零权限判定）+ `ShareConsentModal.tsx`（方案 a 模态；applyShareConsent 落盘走宿主）。t() 由宿主解析传入（不 import i18n——AuthForm 同一条纪律）；aria 平铺（rn-aria 纪律） |
+| 测试与类型 | ✅ 三份模型 spec **24/24**；ui 全包 tsc 仅剩**并行会话的 2 处既有错误**（empty-state/habits 生成 JSON 未列进 tsconfig，非我方）；模型+sync-model **52/52** |
+| 仍待 | SharePanel/ConsentModal 接进 apps/web（132 文件撞车面）+ Playwright journey + reinstall；**方案 a 模态的视觉追认**（W4 验收人看图时请产品负责人过目，Goal 停止点转待追认）；W5 通知、W6 链接 |
+
+## W5 模型层（2026-10-09 早）：通知路由本地过滤 ✅
+
+`packages/ui/src/sync/notification-model.ts`（新文件）+ `tests/notification-model.spec.ts`（8 条）。
+
+| 项 | 判据 |
+|---|---|
+| 活动三类（完成/新增/删除） | 默认全关（防通知风暴）；开一类只响一类 |
+| 任务提醒四档 | 所有 / 所有（指派给他人的除外）/ 指派给我的 / 不提醒；默认「指派给我的」；🔴 **自我操作守卫**：自己改自己的任务任何档位都不响——变异臂抹掉守卫 ⇒ 恰好 1 红/还原 8 绿 |
+| 自动接受已知合作者 | 默认关；开了后**精确 id 相等**才自动接受（不存在模糊的「认识」），名单外拒绝 |
+
+撞车面第五次确认：apps/web 135 / app-host 37 / legal 8 全部仍被占——W4 入口接线与 journey 继续如实等待。
+
+## W4 评论线程组件（2026-10-09 早续二）：CommentThread ✅
+
+`packages/ui/src/sync/CommentThread.tsx`（新文件）——线程渲染 + 编辑器薄壳，消费 `comments-model.ts` 的排序/过滤/校验。**没有 maxLength**（NIST 禁止静默截断；超长由模型校验给出文字错误，`aria-live` 播报）；作者走兜底名（不显裸数字 id）；错误是文字非红框。已进 ui index 导出 + build 绿。ui tsc 剩 2 错 = 并行会话既有（empty-state/habits 生成 JSON）。
+
+## W5 包内收尾（2026-10-09 早续二）：i18n 12 键×2 + ui index 导出 + 组件类型修正 ✅
+
+NotificationPrefsPanel 的词条（`common.share.notif.*` 12 键×2）追加进 zh-CN/en（catalog **14/14**）；`ui/index.ts` 导出 NotificationPrefsPanel/share-link（增量行）。**类型修正 3 处**：MATCHERS 的 prefs 类型标错（ShareActivityPrefs ≠ ShareNotificationPrefs）→ 面板 `prefs.activities[kind]` 键名不匹配（completed ≠ onCompleted）→ **isActivityEnabled 收进模型层做唯一映射**（组件不许自己拼键名——与 sync-model 的字面量联合同一纪律）。ui tsc 剩 2 错 = 并行会话的 empty-state/habits 生成 JSON 既有问题（非我方）；ui build 绿。通知模型 **8/8** 无残留。
+
+## W5 组件壳 + W6 链接骨架（2026-10-09 早续）
+
+| 项 | 结果 |
+|---|---|
+| `NotificationPrefsPanel.tsx`（W5 组件壳） | ✅ 三类活动开关（checkbox 平铺 aria-checked）+ 四档任务提醒（radiogroup + ◉/○ 视觉态）+ 自动接受开关**视觉分层**（安全决策单独一块）；判定全部在模型层、组件只传 prefs；labels 宿主 t() 传入 |
+| `share-link.ts`（W6 链接模型骨架） | ✅ `buildShareJoinLink`（尾斜杠容忍 + encodeURIComponent）+ `parseShareJoinLink`（异路径/无 token ⇒ undefined；容忍裸 token 由宿主分流）。🔴 链接只有一次性凭证 token，**密钥永不进 URL**（ADR-0062 拒绝的方案第 3 条） |
+| 测试 | ✅ 通知 8/8（前段）+ 链接 3/3；**变异臂**：抹掉异路径校验 ⇒ 恰好 1 红/还原 3 绿 |
+| 仍待（全部等撞车面或停止点） | 入口接线 + journey（apps/web）；通知偏好面板挂进设置页（同）；**方案 a 视觉追认**（停止点）；GDPR terms 红格（并行在途） |
+
+## W4 传输层（2026-10-09 早）：ShareApiClient ✅
+
+### 下一增量（W4 接线的设计决定，2026-10-09，已按最稳妥选项实施方向记录）
+
+**web 端清单密钥存储**：share op 载荷与成员信封的密钥（listKey 族）不能以明文落
+localStorage（等于把 E2EE 的钥匙贴在门上），也不可只存会话内存（刷新即失钥 ⇒ 共享
+清单不可用）。方向：**用 vault sync 子钥包裹 listKeys 后落 localStorage**（复用
+ADR-0050 的包裹机器；vault 未解锁 ⇒ 共享面板如实显示"需要解锁"），解锁会话内解包
+使用。该设计是 ADR-0062「share 密钥是 vault 旁的新层」的直接推论，不与任何在册
+裁决冲突；实施时进 `apps/web/src/features/share/share-key-store.ts`（新文件）。
+
+✅ **已实施**（2026-10-09）：`apps/web/src/features/share/share-key-store.ts` +
+`tests/share-key-store.spec.ts`（5 条，**真实口令信封**往返——不是 mock 的
+encrypt/decrypt 对）：wrap→unwrap 往返还原；落盘密文搜不到 listKey base64；
+rekey=同 shareId 覆盖；错误口令（vault 未解锁形状）⇒ undefined；坏 JSON/坏版本
+按空存储。
+
+**web 宿主壳**：`apps/web/src/features/share/SharePanelHost.tsx`（新文件）——SharePanel（ui）+ ShareApiClient（传输）+ key-store（密钥）三线汇合的容器：加载详情与成员表、面板回调直通 API（移除/改角色）、listKey 经 `getPayloadCipher`（vault 会话）解包，未解锁 ⇒「需要解锁」如实显示。apps/web tsc：share 两文件零错误（全树剩 3 错全在并行会话 10:44 仍活跃的 features/ai，键 `common.ai.generatedLabel` 类型不匹配——他们的在途 WIP）。
+
+**待接线（等 apps/web 撞车面）**：入口（清单详情的「共享」按钮 ⇒ ShareConsentModal ⇒ createShare ⇒ Project.shareId 回写 + SharePanelHost 挂载）+ Playwright journey（真浏览器走邀请→接受→指派→评论全流程 + 截图人看）。
+
+`packages/sync-client/src/share-api-client.ts`（新文件）：`/api/shares/*` 全部 14 端点的类型化客户端——`ShareApiClient`（`fetchImpl` 注入、Bearer JWT、非 2xx 归一 `ShareApiError`（稳定错误码镜像）、网络异常归 `network`）；**纯传输**——载荷信封与信封密文原样透传，密码学在 sync-core/薄层（单一所有者）。规格 8 条（URL/方法/头/体形状、错误码镜像、network 归类、密文透传）+ **变异臂**：丢鉴权头 ⇒ 恰好 2 红（401 遍历 + 带令牌调用）；sync-client 全量 **155/155**。已导出（index.ts）。
+
+## W3 主体（2026-10-09 凌晨）：域模型 + 物化桶 + AI 债务登记 ✅
+
+| 项 | 结果 |
+|---|---|
+| `domain/entities.ts` | ✅ `Comment` 接口（一条一实体，ASSISTANT_TURN 模板）+ `EntityModelMap.COMMENT` + `Task.assigneeUserId?` + `Project.shareId?`（全部可选、不 bump schema）；`MODELED_ENTITY_TYPES` 枚举补 COMMENT（编译期兜底 `AllModeledAreListed` 先红后绿——门禁在工作） |
+| `op-log/state.ts` 物化 | ✅ `comments` 桶 + `BUCKET_BY_ENTITY.COMMENT` + `emptyState()` + import；UNMODELED 移除 COMMENT（清单文件头："移除登记 = 物化已实现"）。**reducer 零改动**——通用桶机制直接物化 COMMENT 的字段账 |
+| AI 覆盖债务 | ✅ `ENTITY_COVERAGE_DEBT` 登记 `COMMENT=AI-COV-8`（分母 9→10，9/10 + 已登记缺口 1）；台账文档 `ai-event-tool-contract.md` §5.1 同步。⚠️ 该门禁另有 **7 处红全部属于并行会话的 inbound-automation 在途批**（数量与本轮前一致，非本链引入） |
+| 回归纵队 | ✅ domain **1023/1023**、op-log **147/147**、shared-schema 173/173（前段）、四个 verify 脚本（5/9/7/6 步）在模型变更后**全部复绿**、conflict 补接线实测 OK |
+| 仍待 | W3 引擎接线（share 分区重放走真实引擎——payload-cipher 解密后进 `comments` 桶的通路在 sync-client/app-host，等撞车面）；W4 UI 全量 + journey + PIPL 形态；W5/W6；GDPR terms 红格（并行在途） |
+
+## W4 前置决策（2026-10-09，AskUserQuestion 未获答复 ⇒ 按推荐项继续，标注待追认）
+
+| 决策 | 采纳（推荐项） | 状态 |
+|---|---|---|
+| PIPL 23 同意界面形态 | **方案 a：首次「共享此清单」模态确认**（列明可见范围与元数据类别）+ 「不再提示」勾选（默认不勾）；后续共享不再打扰 | 🔴 停止点**转待追认**：W4 验收人看图时必须请产品负责人过目；如否决，改 form 只动一个组件 |
+| share 载荷格式统一 | **统一到 record 格式 + 全身份 AAD**：sync-core record 函数升级为绑全 op 身份（AAD = shareId + 全部身份字段），sync-client magic 层退役；`reencryptShareRecord`（确定性 IV 幂等）直接消费线上格式 | W3 引擎接线的**前置**，接下来立即实施 |
+
+## 法务收口 + COMMENT 链落地（2026-10-08 晚，产品负责人指令「做完，不要停」后转激进模式）
+
+**撞车面性质复核（mtime 实证，替代一刀切的"被占即等待"）**：legal 四文件 21:57-58 活跃 ⇒ 不碰；op-log state/engine 与 domain/entities 已稳定 8-9 小时（并行会话的**成品未提交**）⇒ 按「增量、远 hunk、不扰动」原则直接在其上落针。
+
+| 项 | 结果 |
+|---|---|
+| 🔴 法务合流 | ✅ **由并行会话自行完成**（21:57-58 那轮）：privacy 1.9 草稿条目补齐 share 三类（分享记录/分享成员/分享邀请）+ automation 四类 + 计数重算 33 处/32 张表 + spec CATEGORY_NAMES 七行——`structure.spec` **62/62 全绿**（此前的 2 红已消）。closure-truth ✅ / permissions ✅ / backup-retention ✅ / legal-copy ✅（dist 重建后）。`legalSetVersion` 指纹自动含 privacy@1.8 草稿（他们的约定：待审核草案原地修订条目，不升号）——**无需我方再动**。⚠️ `check:legal-gdpr` 当前红一格：**terms 1.3 在途回归**（并行会话自己的活跃批次，非我方改动），登记不代修 |
+| 🔴 COMMENT 实体进 `ENTITY_TYPES` | ✅ **八步表第 1/2/6 步全落**：`entity-types.ts` 扩项（ASSISTANT_TURN 模板注释）→ `op-log/state.ts` `UNMODELED_ENTITY_TYPES` 登记（share 域专用，物化随引擎接线）→ ui `EntityLabelKey`/`ENTITY_LABEL_KEYS` → i18n zh/en 词条（『评论』/『Comment』，只许追加表的设计用法）→ 全链测试绿：op-log coverage **6/6**、ui sync-model **28/28**、i18n catalog **14/14**、mobile conflict-keys **17/17**（共享 schema/ui/i18n 三处 dist 重建后）、shared-schema 全量 **173/173** |
+| server 侧 COMMENT role 门 | ✅ 两条新测试：commenter 写 COMMENT 被接受（词表激活）、viewer 写 COMMENT 仍被拒（role 门非实体门）——share 路由+schema **36/36** |
+| 第三段落过的 | `verify:collab-keys/sync/revoke` 三脚本接线进根 package.json（package.json 已稳定 8 小时，增量落针）并实测：**5/9/7 步各自 RESULT=OK** |
+| 仍待 | W3 引擎接线细节（COMMENT 物化桶 + share 引擎——engine.ts 现量稳定可落，下一轮）；**格式统一**（W3 第一项设计决策）；verify:collab-conflict（不被占，下一轮）；journey（等 W4 UI）；**GDPR terms 红格**（并行会话在途）；PIPL 同意界面形态（W4 停止点） |
+
+## 格式统一实施 + 四脚本全绿（2026-10-09 凌晨续）
+
+| 项 | 结果 |
+|---|---|
+| 🔴 格式统一**已实施**（按推荐项） | ✅ `sync-core/share-keys.ts`：record 三件套（encrypt/decrypt/reencryptShareRecord）**升全身份 AAD**（与 wire 层同一份规范化字段清单）+ **信封自描述世代**（version + keyEpoch float64 + IV + body）+ `shareRecordEpoch` 导出；`sync-client/share-payload-cipher.ts` 重写为**薄委托层**（magic 信封退役；世代→钥选路；新增 `reencrypt` 薄方法，确定性 IV 幂等保留）。**share op 载荷从此只有一种格式** |
+| 回归 | ✅ sync-core **318/318**（share-keys 15 条更新后全绿）、sync-client **147/147**（share spec 重写 8 条）、四个 verify 脚本 **5/9/7/6 步全 OK** |
+| 本段事故（如实） | ① python 补丁的 stray `write(src)` 先截断文件再抛 NameError ⇒ **share-keys.ts 被清空**——从 git 暂存区 `git show :path` 恢复 W1 完整版后重放全部改动（暂存区第二次救场）；② 恢复版测试照跑才发现脚本还有多处旧调用——**恢复后必须全量重跑而不是只跑改动点**；③ 变异还原的 cp 备份纪律再次生效（checkout 事故后未再犯） |
+| 五个 verify 进度 | keys ✅ / sync ✅ / revoke ✅ / conflict ✅ / journey ⏸（等 W4 UI）|

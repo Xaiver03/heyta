@@ -95,6 +95,23 @@ export const ENTITY_TYPES = [
    * 后果见 `docs/plans/countdown-anniversary.md` §2.1 与 §7 第 34/41 条那两个 P0）。
    */
   'ASSISTANT_TURN',
+  /**
+   * 共享清单里的任务评论（ADR-0062；落地计划 `docs/plans/collaboration-shared-lists.md` W3）。
+   *
+   * 🔴 **粒度与 `ASSISTANT_TURN` 同一条推理：一条评论 = 一个实体**，不是"一个任务
+   * 带 comments 数组"—— LWW 在数组上是覆盖语义，两台设备各追加一条，胜出的会把
+   * 对端的整条吞掉。"只增不减"要结构给，不靠约定守。
+   *
+   * 🔴 **只活在 share op-log**（`share_operations`）：个人清单没有评论。role 硬门
+   * （`server/src/shares/share.membership.ts`）里它是 `commenter` 角色**唯一**可写的
+   * 实体；owner/editor 也能写。
+   *
+   * ⚠️ 可加性变更，不 bump `CURRENT_SCHEMA_VERSION`；老客户端读到它的 op 当未知
+   * 实体优雅跳过。🔴 **服务端白名单（从本数组派生）已先行认识它**——客户端域模型
+   * 与物化随后跟进。⚠️ 进 `EntityModelMap` 那天 `check:ai-coverage` 分母 +1，
+   * 记得先登记 `ENTITY_COVERAGE_DEBT` 或同批补评论读写工具。
+   */
+  'COMMENT',
 
   // ── 系统（同步基础设施，不可删） ───────────────────────────
   'GLOBAL_CONFIG',

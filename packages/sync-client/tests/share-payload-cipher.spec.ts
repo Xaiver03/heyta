@@ -1,15 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  createSharePayloadCipher,
-  isSharePayloadTransportShape,
-  type ShareSyncKey,
-} from '../src/share-payload-cipher';
+import { createSharePayloadCipher, type ShareSyncKey } from '../src/share-payload-cipher';
 import type { SyncPayloadIdentity } from '../src/payload-cipher';
 
 const SHARE_A = 'share-aaa';
+const SHARE_B = 'share-bbb';
 const listKey = (fill: number): Uint8Array => new Uint8Array(32).fill(fill);
-
 const keyAt = (epoch: number, fill: number): ShareSyncKey => ({
   shareId: SHARE_A,
   keyEpoch: epoch,
@@ -18,9 +14,9 @@ const keyAt = (epoch: number, fill: number): ShareSyncKey => ({
 
 const identity = (overrides: Partial<SyncPayloadIdentity> = {}): SyncPayloadIdentity => ({
   id: 'op-1',
-  clientId: 'client-a',
-  actionType: 'add task',
-  opType: 'CRT',
+  clientId: 'device-A1',
+  actionType: 'edit task',
+  opType: 'UPD',
   entityType: 'TASK',
   entityId: 'task-1',
   timestamp: 1_700_000_000_000,
@@ -28,64 +24,77 @@ const identity = (overrides: Partial<SyncPayloadIdentity> = {}): SyncPayloadIden
   ...overrides,
 });
 
-describe('share payload cipher', () => {
+describe('share payload cipher（薄委托层，格式 = sync-core record 信封）', () => {
   it('round-trips: encrypt with the current epoch, decrypt back the same payload', async () => {
     const cipher = createSharePayloadCipher({ current: keyAt(1, 7) });
     const payload = JSON.stringify({ title: 'hello 中文' });
-    const envelope = await cipher.encrypt(payload, identity());
-    expect(await cipher.decrypt(envelope, identity())).toBe(payload);
+    const stored = await cipher.encrypt(payload, identity());
+    expect(await cipher.decrypt(stored, identity())).toBe(payload);
   });
 
-  it('envelope carries the share marker and the epoch in the clear header', async () => {
+  it('载荷即 record 信封：version 字节 + 明文世代头（自描述，rekey 过渡期选钥靠它）', async () => {
     const cipher = createSharePayloadCipher({ current: keyAt(3, 7) });
-    const envelope = await cipher.encrypt('x', identity());
-    expect(isSharePayloadTransportShape(envelope)).toBe(true);
-    const raw = Buffer.from(envelope, 'base64');
-    expect(raw.subarray(0, 15).toString('latin1')).toBe('heyta-share-op/');
-    expect(raw[15]).toBe(1);
-    // keyEpoch float64 BE at offset 16
-    expect(new DataView(raw.buffer).getFloat64(16, false)).toBe(3);
-    expect(isSharePayloadTransportShape('not-base64-!!!')).toBe(false);
-    expect(isSharePayloadTransportShape(Buffer.from('heyta-vault-op/x').toString('base64'))).toBe(false);
+    const stored = await cipher.encrypt('x', identity());
+    const raw = Buffer.from(stored, 'base64');
+    expect(raw[0]).toBe(1); // SHARE_KEYS_FORMAT_VERSION
+    expect(new DataView(raw.buffer, raw.byteOffset, raw.byteLength).getFloat64(1, false)).toBe(3);
   });
 
   it('AAD binding: the same ciphertext decrypts only under the exact op identity', async () => {
     const cipher = createSharePayloadCipher({ current: keyAt(1, 7) });
-    const envelope = await cipher.encrypt('secret', identity());
-    await expect(cipher.decrypt(envelope, identity({ id: 'op-2' }))).rejects.toThrow();
-    await expect(cipher.decrypt(envelope, identity({ entityType: 'NOTE' }))).rejects.toThrow();
-    await expect(cipher.decrypt(envelope, identity({ timestamp: 1 }))).rejects.toThrow();
-    // 篡改一个密文字节同样必炸（GCM 认证）。
-    const raw = Buffer.from(envelope, 'base64');
+    const stored = await cipher.encrypt('secret', identity());
+    await expect(cipher.decrypt(stored, identity({ id: 'op-2' }))).rejects.toThrow();
+    await expect(cipher.decrypt(stored, identity({ entityType: 'NOTE' }))).rejects.toThrow();
+    await expect(cipher.decrypt(stored, identity({ timestamp: 1 }))).rejects.toThrow();
+    const raw = Buffer.from(stored, 'base64');
     raw[raw.length - 1] ^= 0x01;
     await expect(cipher.decrypt(raw.toString('base64'), identity())).rejects.toThrow();
   });
 
   it('key domain: another list key or another share cannot read it', async () => {
     const cipher = createSharePayloadCipher({ current: keyAt(1, 7) });
-    const envelope = await cipher.encrypt('secret', identity());
+    const stored = await cipher.encrypt('secret', identity());
     const otherList = createSharePayloadCipher({ current: keyAt(1, 8) });
-    await expect(otherList.decrypt(envelope, identity())).rejects.toThrow();
+    await expect(otherList.decrypt(stored, identity())).rejects.toThrow();
     const otherShare = createSharePayloadCipher({
-      current: { shareId: 'share-bbb', keyEpoch: 1, listKey: listKey(7) },
+      current: { shareId: SHARE_B, keyEpoch: 1, listKey: listKey(7) },
     });
-    await expect(otherShare.decrypt(envelope, identity())).rejects.toThrow();
+    await expect(otherShare.decrypt(stored, identity())).rejects.toThrow();
   });
 
   it('rekey transition: old-epoch ops read via `previous`; without it the epoch is unavailable', async () => {
     const oldCipher = createSharePayloadCipher({ current: keyAt(1, 7) });
-    const legacyEnvelope = await oldCipher.encrypt('before rekey', identity());
+    const legacyStored = await oldCipher.encrypt('before rekey', identity());
     const newCipher = createSharePayloadCipher({
       current: keyAt(2, 8),
       previous: [keyAt(1, 7)],
     });
-    expect(await newCipher.decrypt(legacyEnvelope, identity())).toBe('before rekey');
-    // 新写入用新世代，旧 cipher 读不了。
-    const newEnvelope = await newCipher.encrypt('after rekey', identity());
-    await expect(oldCipher.decrypt(newEnvelope, identity())).rejects.toThrow();
-    // 不带 previous 的纯新世代 cipher：旧信封报世代不可用。
+    expect(await newCipher.decrypt(legacyStored, identity())).toBe('before rekey');
+    const newStored = await newCipher.encrypt('after rekey', identity());
+    await expect(oldCipher.decrypt(newStored, identity())).rejects.toThrow();
     const freshOnly = createSharePayloadCipher({ current: keyAt(2, 8) });
-    await expect(freshOnly.decrypt(legacyEnvelope, identity())).rejects.toThrow('Share key epoch unavailable');
+    await expect(freshOnly.decrypt(legacyStored, identity())).rejects.toThrow('Share key epoch unavailable');
+  });
+
+  it('reencrypt: 迁移到新世代后新钥可读、旧钥不可读，且逐字节幂等', async () => {
+    const oldCipher = createSharePayloadCipher({ current: keyAt(1, 7) });
+    const from = identity({ id: 'op-m-1' });
+    const stored = await oldCipher.encrypt('要迁移的内容', from);
+    // 🔴 reencrypt 的 toListKey 必须就是新世代 cipher 的那把钥——第一版给了
+    // 另一把随机钥，迁移副本连"自己的 cipher"都解不开（夹具自相矛盾）。
+    const toKey = listKey(9);
+    const newCipher = createSharePayloadCipher({
+      current: { shareId: SHARE_A, keyEpoch: 2, listKey: toKey },
+      previous: [keyAt(1, 7)],
+    });
+    const to = { identity: identity({ id: 'op-m-1' }), toListKey: toKey, toEpoch: 2 };
+    const migrated1 = await newCipher.reencrypt(stored, from, to);
+    const migrated2 = await newCipher.reencrypt(stored, from, to);
+    // 确定性 IV：同输入逐字节相同（幂等可续传，AGENTS 规则 16）。
+    expect(migrated2).toBe(migrated1);
+    const opened = await newCipher.decrypt(migrated1, identity({ id: 'op-m-1' }));
+    expect(opened).toBe('要迁移的内容');
+    await expect(oldCipher.decrypt(migrated1, identity({ id: 'op-m-1' }))).rejects.toThrow();
   });
 
   it('configuration fails closed: duplicate epochs, bad key length, bad share id, bad epoch', () => {
@@ -103,12 +112,9 @@ describe('share payload cipher', () => {
     })).toThrow('Invalid share key epoch');
   });
 
-  it('non-share envelopes are refused, not mis-decoded', async () => {
+  it('垃圾 base64 被拒（record 版本字节校验）', async () => {
     const cipher = createSharePayloadCipher({ current: keyAt(1, 7) });
     await expect(cipher.decrypt(Buffer.from('garbage').toString('base64'), identity()))
-      .rejects.toThrow('Not a share operation envelope');
-    // vault 信封也不是 share 信封。
-    await expect(cipher.decrypt(Buffer.from('heyta-vault-op/abcdefgh').toString('base64'), identity()))
-      .rejects.toThrow('Not a share operation envelope');
+      .rejects.toThrow();
   });
 });
