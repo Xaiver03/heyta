@@ -2029,3 +2029,48 @@ T3 要在两个真 SQLite 宿主上跑故障窗口，而宿主跑的是 `@heyta/
 3. B109（票由哪个 URL 签发）与 B110（waiting 词条）仍然开着；B112 是第三条拦路的，且它挡的是 T3/T5/T7 三格。
 
 下一格（不受 B109/B110/B112 挡）：T4 的事件级计量账本 —— 全在 `server/src/automation/` + `server/tests/` 地界内，`pnpm --filter @heyta/server test` 自己就能判，不依赖 app-host 的 dist。
+
+## 2026-10-10 02:2x · T4（P1-4）事件级计量账本：落了两处语义缺口，并第一次把"冻结解析结果"逐条现量
+
+（上一节写的"下一格"就是这一格。它确实在 `server/src/automation/` + `server/tests/` 地界内做完，零外部前提。）
+
+**量出来的不是缺表，是缺语义**：账本形状（复合主键 + `billing_source`/`period_anchor` 的库层 CHECK）在三枚迁移里早就立着。
+本轮补的是两处：① `reserved → released`（预留了却没发出去）不退托管额度 ⇒ 用户在一次没打到供应商的尝试上付费，重试还要再扣；
+② 没有逐事件/逐周期的对账读路径 ⇒ "额度少了一次"这类账当时没人能判是不是自动收集造成的。
+
+**退款实现挂在 CAS 命中那一侧**，不是另加"已退过"标志位：状态转移那条 `UPDATE … WHERE state = $6` 本身只可能命中一次，
+退款与它同事务，所以"重复释放不退第二次"由库保证。`sent → released` 与任何 `→ unknown` **不退**（前者供应商真的花了一次，
+后者不知道 —— 两种选择都有一种是错的，而不退是"少白送一次"那一侧）。重试是新 `attempt`、重新扣：一次物理调用一次额度，这是刻意的。
+
+**对账口径诚实处理共用计数器**：`ai_usage_counters` 是账号级的，人工托管对话与自动收集共用同一行，而人工侧刻意不留逐请求记录
+（ADR-0054 §2 那张表四列）。所以只有 `counter < charged` 一个方向算缺陷；多出来的部分原样披露成 `unexplainedByAutomation`，
+**不判成缺陷** —— 把它判成缺陷等于宣称这个账号除了自动收集不该用托管 AI，那不是这段代码知道的，也不是对外承诺过的。
+
+| 项 | 现量读数 |
+|---|---|
+| `cd server && npx --no-install tsc --noEmit -p tsconfig.json` | **rc=0**，0 条错，本线文件 0 条 |
+| `npx --no-install vitest run tests/automation-ai-metering.spec.ts tests/automation-ai-metering.pglite.spec.ts` | `Test Files 2 passed (2)` / `Tests 16 passed (16)`，跳过 0（既有桩式那 4 条未动仍绿） |
+| 新那 12 条的载体 | 真 PGlite；DDL 从**发布中的迁移文件**按后缀推导目录读，锚点缺失就抛（不静默建半张表） |
+| 四臂反向验证 | 拿掉退款 ⇒ 3 红；去掉 `requests > 0` 守卫 ⇒ 1 红；让 `sent → released` 也退 ⇒ 1 红；把人工用量当缺陷 ⇒ 2 红。逐臂还原后源码哈希 `432e423772f9a5a0`，复跑 12/12 |
+| 全套 `server` | `Test Files 2 failed \| 153 passed (155)` / `Tests 6 failed \| 2733 passed \| 1 skipped (2740)` —— **6 红 + 1 跳都不是本线**：换入 HEAD 版 `ai-metering.ts` 复跑同两文件，红集逐字相同（6 failed / 97 passed）。归属与那枚 HEAD 上就有的 `it.skip` 登记 **B115** |
+| 入库 | `0788432dc5788b881f7b57503defd6d86d1183b3`，点名列回 `点名枚数=2 实际变动=2`（`server/src/automation/ai-metering.ts`、`server/tests/automation-ai-metering.pglite.spec.ts`），提交前 `git diff --cached --name-only \| wc -l` = 0 |
+
+**「冻结已取得的解析结果」这一格是本轮才逐条现量的**（此前只写在计划里，从没量过 —— 这正是 §7 那条"能力已实现 ≠ 机制在位"的形状）：
+`packages/app-host/src/inbound-process.ts:92` 先读冻结回执 → 94 行那个三元让 claim 只在没有冻结结果时发生 → 129 行不给 `transport`
+→ 157 行 `if (transport)` 跳过整个解析与预留，**恢复路径上一次模型调用都不发**；恢复出的密文要 121-126 行逐字段对上服务端回执（含对任务列表重算一次摘要）；
+服务端 `events.ts:296-300` 只在 `(parseVersion, digest, ciphertext, itemCount)` 全等时幂等成功。钉住它的是既有断言
+`packages/app-host/tests/inbound-process.spec.ts:124`（断言的是**请求路径序列** `[recover, commit-permit]`，多一次 claim 就多一次解析与预留，当场红）。
+反向验证：把 `inbound-process.ts:94` 的 `recovered === undefined` 改成恒真 ⇒ `Tests 5 failed \| 9 passed (14)`；
+从 `.mut-bak` 还原后哈希 `ded53859a863242c` 与改前逐字相同、`git status` 该文件干净，复跑 `Tests 14 passed (14)`。共享工作树没留变异。
+
+**T4 做完的与没做的，逐条对上 P1-4 那句话**：
+按事件/解析版本/尝试归属 ✅（账本形状既有 + 本轮的对账读路径）｜reserve/consume/release/unknown ✅（状态机既有）｜
+退款 ✅｜冻结已取得的解析结果 ✅（本轮现量，机制在位）｜managed 额度与自动收集能逐事件对账 ✅（口径边界见上）。
+**没做的三格不包装成完成**：① 对账函数**没有消费者**（两个落点都在白名单外，A/B/C 与推荐登记 **B113**）；
+② `unknown` 不退这一句要不要写进对外说明是 T6 的事，而"按供应商回执二次判定"与 ADR-0054 那张四列表不能同时要，登记 **B114**；
+③ 跨周期退款退的是那枚尝试行自己记的锚（真库腿 256 行那条用例钉着），售卖文案要不要提它 → T6。
+
+AC 现量（同轮）：`grep -c '^- \[ \] \*\*AC-' docs/plans/inbound-automation.md` = **8**、
+`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` = **0** —— 一条都没勾，公网接收与售卖继续关闭。
+下一格：T2 剩余里唯一不受 B109/B112 挡的那半 —— 每 30 秒续 `session` 票据（`waiting-entitlement` 展示被 B110 的词条地界挡着，
+clocks 退役清扫被 B106 挡着）。

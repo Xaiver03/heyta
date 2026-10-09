@@ -7151,3 +7151,53 @@ git show --numstat --format='' 6d06bae4   # 空输出
 - **C（不建议）**：本线绕着未提交的东西写 —— 自持三枚 META 键、自己再实现一条 `dispatchValidated`、把上传授权从类型上摘掉。这能骗过 typecheck，但会把"唯一登记表"和"唯一写入入口"两条既有立场拆掉，属于把判据做绿而把产品做坏。
 
 反向验证的边界：本轮没有把这枚切片放进真编译器里复跑一次 HEAD 级的 dts（那需要一个带 node_modules 的干净检出，现成的分离检出不是本会话创建的，不动别人的载体）。按那条错文的构造（同包内 `./host.js` 的 re-export 指向一枚 HEAD 不存在的符号）这一格是关掉了，但**下一条会话要真复跑一次**：起一棵自己的隔离副本（`git worktree add` + `pnpm install --offline`），在新 HEAD 上跑 `pnpm exec tsup`，预期 **不再出现 TS2305 那一行**，而仍会看到 `META_KEYS.INBOUND_*` 那 24 条 —— 那 24 条在 dts 里不一定现形（外包是按各自 dist 的 `.d.ts` 解析的，分离检出的 dist 可能比源码新），所以**判 HEAD 用 tsc 那条尺，别用 dts 那条**。
+
+## B113（2026-10-10 02:2x，本会话 · T4 收尾）：`reconcileAutomationAiMetering` 落进了库，但**没有任何消费者**
+
+`server/src/automation/ai-metering.ts:226` 那枚只读对账函数已经进了 HEAD（`0788432d`，真库判据 12 条），
+它的输出是给运营者看的（逐周期净额、`short` 判定、逐事件明细、多出来的人工用量），而**它的两个可能落点都不在本线白名单里**：
+
+| 落点 | 文件 | 白名单？ |
+|---|---|---|
+| 管理后台一页（运营者主动查） | `server/src/admin/admin.routes.ts` + `apps/web/src/features/admin/` | ❌ 都不在 |
+| 用户自己的设置面（"本周期已用几次"旁边） | `apps/web/src/features/settings/AiSettings.tsx` | ❌ 不在（白名单只有 `InboundAutomationSettings.tsx` 等三枚） |
+
+⇒ 现在的状态是**函数存在、判据存在、没人调用**，也就是"额度少了一次"这类投诉目前仍然只能靠手写 SQL 排查。
+本线不硬塞：往 `api.ts` 挂一条路由是能做的（它在白名单里），但那条路由要给谁、返回体算不算对外承诺的口径，
+是判据口径的事 —— 尤其 `unexplainedByAutomation` 那一格**绝不能**原样进用户界面（它读起来像"你的额度被别人用了"）。
+
+**要负责人拍的**：A) 只挂管理后台（`server/src/admin/*` 临时并入白名单，我一笔落完，含 401/403 与投影判据）；
+B) 挂 `api.ts` 的一条账号级只读路由，但返回体只带 `short` 与两个数字，不带逐事件明细；
+C) 先不接消费者，等 T6 的对外措辞定了一起做。**推荐 A**（运营者是最先需要它的人，而它不需要新的对外承诺）。
+
+## B114（2026-10-10 02:2x，本会话 · T4 的口径边界）：`unknown` 不退额度 —— 这一句将来要出现在对外说明里
+
+代码决定已经落着（`server/src/automation/ai-metering.ts:135` 只对 `reserved → released` 退款），
+判据也落了（真库腿那条"已发出过的那一枚（sent→released）不退"）。但它连着两条**不是代码能定的**事：
+
+1. 对用户怎么描述：现在的语义是"没打到供应商的那次不计费；打了而结果不知道的那次**照计**"。
+   这句话在定价页/条款里目前没有对应文案，写与不写都改变对外承诺 ⇒ 归 T6，本线不代拍。
+2. 若要改成"按供应商回执二次判定后再决定退不退"，托管代理那层必须留一条可核对的调用凭据，
+   而 ADR-0054 §2 把那张表的列集合钉成四列（多一列就红）。**这两件事不能同时要**，
+   改哪一边都是判据口径 ⇒ 记在这里等裁决，不在本线动那条表，也不动那条判据。
+
+## B115（2026-10-10 02:2x，本会话 · T4 全套复验时撞见的既有红）：`server` 全套 6 条红 + 一枚 `it.skip`，都不是本线
+
+现量（`cd server && npx --no-install vitest run --no-color`）：`Test Files 2 failed | 153 passed (155)` /
+`Tests 6 failed | 2733 passed | 1 skipped (2740)`。本线那两文件 16 条全绿，所以这 6 红 + 1 跳都在别处。
+
+**归属做法**（不是"看起来不像我"）：把 HEAD 版 `server/src/automation/ai-metering.ts` 换进工作树复跑同两个测试文件
+⇒ 红集**逐字相同**（`Tests 6 failed | 97 passed (103)`），换回后源码哈希 `432e423772f9a5a0` 一致。
+⇒ 这 6 条在本线动手之前就是红的。
+
+| 红/跳 | 在哪 | 形状 |
+|---|---|---|
+| 1 条 | `tests/validation.service.spec.ts` | `expected 18 to be 17`（实体计数断言） |
+| 5 条 | `tests/sync-compressed-body.routes.spec.ts` | mock 调用参数不匹配 |
+| 1 跳 | `tests/migration-sql.spec.ts:338` 的 `it.skip` | HEAD 上就有，不是本线加的 |
+
+⚠️ 那条 `it.skip` 与本线 Goal 的"跳过数 0"这条判卷口径**不是同一件事**：Goal 说的是本线交付不许留跳过，
+而这一枚是别人那条线的既有状态；把它摘掉会改变既有判卷口径（§"不许改判卷口径"），所以只登记不代改。
+同样地，这 6 条红本线不顺手修 —— 它们属于另一条线，且改断言就是改判卷口径。
+⇒ **要有人收**：`pnpm --filter @heyta/server test` 在合流之前不会自己绿，T7 那条 `pnpm -r test` 会撞上它。
+谁的地界：`validation.service` 与 `sync-compressed-body.routes` 的属主。

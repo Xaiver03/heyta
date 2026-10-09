@@ -509,3 +509,68 @@ T2 剩下未闭合的（不包装成完成）：宿主侧每 30 秒续票据与 
 ⇒ `Test Files 12 passed (12) / Tests 91 passed (91)`；`npx --no-install tsc --noEmit -p tsconfig.spec.json` rc=0。
 反向验证 4 臂各红一次后逐字还原（身份可被覆盖／坏值按空处理／确认不带票／取消也去取票），
 臂的写法与还原判据逐字照 `PROGRESS.md` 当日那节，四臂的失败条数分别是 1/1/2/1。
+
+## T4（P1-4）这一段：没发出去的那次要退额度，托管额度与自动收集要能逐事件对账（2026-10-10）
+
+P1-4 要求的是"按事件/解析版本/尝试标识归属的持久账本 + 冻结已取得的解析结果 + 能逐事件对账"。
+账本的**形状**早就立着了（迁移 `20261018090000_add_automation_ai_attempts` /
+`20261018110000_separate_direct_automation_ai_attempts` / `20261018150000_allow_local_automation_ai_attempts`
++ 复合主键 `(userId, ruleId, eventId, parseVersion, attempt)`，`billing_source` 与 `period_anchor`
+的空/非空由库的 CHECK 绑死）。本轮量出来的是两处**语义**缺口，不是缺表：
+
+| 缺口 | 机制 | 改之前的后果 |
+|---|---|---|
+| 预留了但没发出去的那次 | `reserved → released` 不退 `ai_usage_counters` | 用户在一次根本没打到供应商的尝试上付费，重试还要再扣一次 |
+| 没有对账读路径 | 计数器只有 `(user_id, period_anchor)`，不带事件维度 | "额度少了一次"这种账没人能判是不是自动收集造成的 |
+
+**退款挂在哪儿**：`advanceAutomationAiAttempt` 的 CAS 命中那一侧（`server/src/automation/ai-metering.ts:135`
+判 `refundable`、174 行减一），**不是**另加一枚"已退过"标志位 —— 状态转移那条 `UPDATE … WHERE state = $6`
+本身只可能命中一次，退款与它同事务，后半段炸了就一起回滚（这条有专门的用例）。
+`sent → released` 与任何 `→ unknown` **不退**：前者供应商侧真的产生了一次物理调用，后者不知道发生没发生，
+两种选择都有一种是错的，而不退是"少给用户白送一次"的那一种。重试是新 `attempt`、重新预留、重新扣 ——
+这是刻意的：一次物理调用一次额度，而账本里那两行分得开。
+
+**对账的口径边界比函数本身重要**：`ai_usage_counters` 是**账号级**的，人工托管对话与自动收集共用同一行，
+而人工侧刻意不留逐请求记录（ADR-0054 §2 那张表只有四列）。所以 `reconcileAutomationAiMetering`
+（同文 226 行）只有一个方向能算缺陷：
+
+| 读数 | 判定 |
+|---|---|
+| `counterRequests < chargedAttempts` | 计不回来 ⇒ `short`，缺陷 |
+| `counterRequests > chargedAttempts` | 多出来的可能是人工用量，原样披露成 `unexplainedByAutomation`，**不判成缺陷** |
+
+把后者也判成缺陷，等于宣称"这个账号除了自动收集不该用托管 AI"，那不是这段代码知道的事，更不是对外承诺过的话。
+
+**判据读数**（当日现量）：`cd server && npx --no-install tsc --noEmit -p tsconfig.json` ⇒ rc=0；
+`npx --no-install vitest run tests/automation-ai-metering.spec.ts tests/automation-ai-metering.pglite.spec.ts`
+⇒ `Test Files 2 passed (2) / Tests 16 passed (16)`。新那 12 条跑在真 PGlite 上，DDL 从**发布中的迁移文件**
+按后缀推导目录读（锚点缺失就抛，不静默建半张表）。四臂反向验证（逐臂还原后源码哈希 `432e423772f9a5a0`、复跑 12/12）：
+拿掉退款 ⇒ 3 红；去掉 `requests > 0` 守卫 ⇒ 1 红；让 `sent → released` 也退 ⇒ 1 红；把人工用量当缺陷 ⇒ 2 红。
+
+**「冻结已取得的解析结果」这一格本轮才逐条现量**（此前只写在计划里，没量过）：
+
+- 宿主侧 `packages/app-host/src/inbound-process.ts:92` 先读冻结回执，读到才有 `recovered`；94 行那个三元
+  让 claim 只在**没有**冻结结果时发生，于是 129 行不给 `transport`，157 行的 `if (transport)` 跳过整个解析与预留
+  —— 恢复路径上一次模型调用都不发。这是"提交失败不得重新解析计费"的机制本体，不是一句注释。
+- 恢复出的密文要逐字段对上服务端那张回执（同文 121-126：`eventId/ruleId/ruleVersion/parseVersion/digest/itemCount`
+  外加对任务列表重算一次摘要），任一项不符抛 `Recovered automation result does not match its server receipt`。
+- 服务端侧 `server/src/automation/events.ts:296-300`：同一事件重发结果只在
+  `(parseVersion, digest, ciphertext, itemCount)` 全等时幂等成功，否则 `Automation result conflicts with frozen result`。
+- 钉住它的是既有断言 `packages/app-host/tests/inbound-process.spec.ts:124` —— 断言的是**请求路径序列**逐字等于
+  `[recover, commit-permit]`，序列里多一次 claim 就多一次解析与预留，当场红。
+- 本轮补的反向验证：把 `inbound-process.ts:94` 的 `recovered === undefined` 改成恒真（= 恢复路径也去 claim、也重跑解析）
+  ⇒ `Tests 5 failed | 9 passed (14)`；从 `.mut-bak` 还原后哈希 `ded53859a863242c` 与改前逐字相同，复跑 `Tests 14 passed (14)`。
+
+**仍未闭合（不包装成完成）**：
+
+1. `reconcileAutomationAiMetering` **没有消费者**：管理后台那条路（`server/src/admin/*`）不在本线白名单，
+   所以这轮只落函数与它的真库判据，不落路由、不落界面。登记 **B113**。
+2. `unknown` 到底退不退是**对外承诺**而不是代码判断。现在的"不退"是保守的一侧；要改成按供应商回执二次判定，
+   得让托管代理那层留一条可核对的调用凭据 —— 与 ADR-0054 §2 那张四列表直接冲突，属于判据口径，不代拍。登记 **B114**。
+3. 跨周期的口径只在**读侧与退款侧同一行**成立：退款 `WHERE user_id AND period_anchor` 取的是那枚尝试行
+   自己记的锚，所以"上一期预留、这一期释放"退的是上一期那一行（真库腿 256 行那条用例钉的就是这个形状）。
+   售卖文案里那句"每周期 300 次"要不要说明它，归 T6。
+4. P1-4 那句"原子绑定额度裁决与事件状态"只覆盖 `managed`；`local`/`direct` 的尝试账本**不占**任何额度
+   （库的 CHECK 逼着它们 `period_anchor IS NULL`），这是设计而不是缺口。
+
+AC-1～AC-8 继续不勾选，公网接收与售卖继续关闭。
