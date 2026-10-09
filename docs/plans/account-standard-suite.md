@@ -2611,6 +2611,61 @@ PY
 # 再用 git show HEAD:apps/mobile/tests/account-security-wiring.spec.ts | sed -n '86,90p' 确认它是 not.toContain 且上一行有正向对照
 ```
 
+### 6.52 门禁快照重取：§6.48 那四道红现在只剩一道，而那一道的 30 枚差异**逐枚**都不是本线（10-10 01:2x 现量）
+
+载体（`.worktrees/iosacct`，`checkout --force refs/heads/main`）上重跑 §6.48 那四条命令，tip 走到 `d971a73f`：
+
+- `check-gate-wiring.mjs` **rc=0**（原红：`scripts/gen-android-widget-colors.mjs` 在盘上没入库）
+- `check-layering.mjs` **rc=0**（原红：`share-key-store.ts:56` 在 `apps/*` 里就地拼 op）
+- `check-ui-language.mjs` **rc=0**（原红：价格 SSOT 的 `automation` 那档 + 两条无汉字词条）
+- `gen-entries.mjs --check` **仍 rc=1** —— 30 枚已跟踪 HTML 与生成物不一致
+
+三道是它们的 owner 自己落的（不是本线代改）。剩那道红本线**不代落**的理由与 §6.47③ 相同
+（`cmp` 证过他们工作树那 30 枚就是修法），但这一轮把"不是我的"从**推断**升级成**逐枚归因**：
+
+> 做法：在载体里真跑一次生成器 ⇒ `git diff --name-only` = 30 枚；对每一枚取**一条新增文案**，
+> 回指"哪笔提交把这句词条改成现在这样"：
+> `git log --oneline -S"<那条新增文案>" -- packages/i18n/src/locales`。
+> 读数：**30 枚全部落在同一笔 `e6058120`**（`docs(产品体验线 台账 §UX-S9-153)`）——
+> 它改了 `site.docs.*.sum` 与 FAQ 答案（中英各 15 枚），没有重跑 `gen:entries`。
+> 同一笔也正是 §6.48 里 `check:gate-wiring` 那道红的引入者，同一个习惯的第二次。
+> ⇒ 本线在这道红里 **0 枚**。
+
+⚠️ 这把尺自己坏过一次，值得留：**第一版只认单引号 key**，于是法务那族（生成进表里是**双引号**）
+整批报成"引用了不存在的 key" —— 72 条假阳性，其中还包括 `site.legal.terms.title` 这种明显在表里的。
+两种引号都认之后：**4316 个引用点 / 真缺 0 条**，且中英两张表**键集合差 0/0**（3888 枚）。
+
+🔴 顺带证伪了本线自己的一个"要不要补装置"的判断：本来看上去缺一道
+**"代码/文档引用的词条 key 必须在两张表里都存在"** 的门禁（现有 `check:ui-language` 只比表↔表）。
+实量否证 —— 这一轴**编译器已经钉住**：`translate(locale, key: MessageKey)` 的入参是联合类型，
+`en` 声明成 `Record<MessageKey, string>`（少一条就编译不过），而 landing 那些数据表里的
+`titleKey/questionKey/bodyKeys` 全部声明为 `MessageKey`（`docs.ts:864`、`content.ts:259/288/422`、`pages.ts:167`）。
+⇒ §6.51 那把尺量到 0 缺是**结构性**的，不是运气；再写一道同样的门禁就是重复装置。
+（这条也说明了为什么"缺针"类怀疑该先去 `typecheck`，而不是先建门禁。）
+
+📌 还补上了一条**正向对照**：§6.47 那句"文档中心的小节是运行时渲染 ⇒ HTML-neutral"当时只有
+"我的内容没出现在差异里"这一半。现在两半都有：`git show HEAD:apps/landing/docs/account/index.html`
+里 `rebinding-email` 命中 **0**，重生成后仍 **0**，而源码侧 `docs.ts` 命中 **1**。
+
+复取这一节（都在干净载体上）：
+
+```bash
+cd .worktrees/<载体> && git checkout --force $(git rev-parse refs/heads/main)
+node scripts/check-gate-wiring.mjs; node scripts/check-layering.mjs; node scripts/check-ui-language.mjs
+node apps/landing/scripts/gen-entries.mjs            # 然后逐枚归因
+python3 - <<'PY'   # 30 枚各取一条新增文案，回指是哪笔提交改的这句词条
+import subprocess, re
+sh=lambda *a: subprocess.run(a,capture_output=True,text=True).stdout
+for f in [x for x in sh('git','diff','--name-only').split('\n') if x.strip()]:
+    d=sh('git','diff','-U0','--',f)
+    s=(re.findall(r'^\+.*?content="([^"]{12,120})"',d,re.M) or
+       re.findall(r'^\+.*?>([^<]{12,120})<',d,re.M) or
+       re.findall(r'^\+\s*"text":\s*"([^"]{12,120})',d,re.M) or ['<无>'])[0]
+    print(f.split('/')[-2], '←', sh('git','log','--oneline','-S',s,'--','packages/i18n/src/locales').split('\n')[0][:9])
+PY
+git checkout --force HEAD    # 载体收干净
+```
+
 
 
 
