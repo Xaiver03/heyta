@@ -87,6 +87,12 @@ HEYTA_RESPONSIVE_HEADED=0 \
 3. 375 档两棵树的整屏栏都非零（6–10 / 5–9），与上面 `.ht-rail__tabs` 右缘 535 / 549 同向 ——
    尺换了、结论没换，这是那两条读数互相独立成立的证据。
 
+📌 上面那张表不是手抄进正文的：**48 格的逐格原始读数两份都在本目录里** ——
+`worktree-groups-report.json`（`origin=127.0.0.1:4379`，当前工作树那棵）与
+`carrier-b081811c-groups-report.json`（`origin=127.0.0.1:4383`，只含已提交内容那棵），
+每份 24 格 × `offViewportWholeScreen` / `offViewportInsideGroup` / `planted` / `documentScrollWidth` 全量，
+`carrier.headless=true`、`legs=["groups"]`。要复核表里任何一格，直接读这两份 JSON，别照本段散文。
+
 三条新判据各种过一棵坏，**其中一发是空变异**：第一趟挑的格子本来就是 `light`，"把暗色档改成 light"
 什么都没改却照样报 true —— 换成真的 dark 格子（第 2/6 格）才翻红。⇒ 种坏之前必须先确认那一格
 **当前读数**与要改成的值不同，否则"能红"是假的。

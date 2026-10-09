@@ -1,0 +1,697 @@
+{
+  "origin": "http://127.0.0.1:4383",
+  "carrier": {
+    "headless": true,
+    "legs": [
+      "groups"
+    ],
+    "skippedLegs": [
+      "reminders",
+      "data",
+      "help"
+    ],
+    "legCells": {
+      "reminders": 0,
+      "data": 0,
+      "groups": 24,
+      "help": 0
+    },
+    "expectedLegCells": {
+      "reminders": 12,
+      "data": 4,
+      "groups": 24,
+      "help": 3
+    },
+    "reminderModes": [
+      "denied",
+      "unsupported",
+      "error"
+    ],
+    "skippedReminderModes": [
+      "default",
+      "granted"
+    ],
+    "skipReason": "default 与 granted 两态在无头 Chromium 里都会退化成 denied（granted 那一格是 2026-10-09 无头趟实测出来的），而无头是不抢前台的唯一一档（AGENTS §6.2 规定二）"
+  },
+  "cases": [
+    {
+      "theme": "light",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "height": 960
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "height": 960
+    }
+  ],
+  "reminders": [],
+  "data": [],
+  "sweepGroups": [
+    "profile",
+    "account",
+    "sync",
+    "ai"
+  ],
+  "sweepCases": [
+    {
+      "theme": "light",
+      "width": 375,
+      "height": 812
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "height": 812
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "height": 900
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "height": 900
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "height": 900
+    }
+  ],
+  "groups": [
+    {
+      "theme": "light",
+      "width": 375,
+      "group": "profile",
+      "navLabel": "个人资料",
+      "facts": {
+        "documentScrollWidth": 742,
+        "documentClientWidth": 375,
+        "theme": "light",
+        "title": "个人资料",
+        "box": {
+          "x": 16,
+          "y": 72,
+          "width": 343,
+          "height": 596
+        },
+        "textLength": 149,
+        "interactive": 4,
+        "offViewportWholeScreen": 9,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true
+    },
+    {
+      "theme": "light",
+      "width": 375,
+      "group": "account",
+      "navLabel": "账号与安全",
+      "facts": {
+        "documentScrollWidth": 742,
+        "documentClientWidth": 375,
+        "theme": "light",
+        "title": "账号与安全",
+        "box": {
+          "x": 0,
+          "y": 72,
+          "width": 343,
+          "height": 812
+        },
+        "textLength": 363,
+        "interactive": 2,
+        "offViewportWholeScreen": 5,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true
+    },
+    {
+      "theme": "light",
+      "width": 375,
+      "group": "sync",
+      "navLabel": "同步与隐私",
+      "facts": {
+        "documentScrollWidth": 742,
+        "documentClientWidth": 375,
+        "theme": "light",
+        "title": "同步与隐私",
+        "box": {
+          "x": 16,
+          "y": 72,
+          "width": 343,
+          "height": 1072
+        },
+        "textLength": 393,
+        "interactive": 6,
+        "offViewportWholeScreen": 7,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true
+    },
+    {
+      "theme": "light",
+      "width": 375,
+      "group": "ai",
+      "navLabel": "AI 与集成",
+      "facts": {
+        "documentScrollWidth": 742,
+        "documentClientWidth": 375,
+        "theme": "light",
+        "title": "AI 与集成",
+        "box": {
+          "x": 16,
+          "y": 72,
+          "width": 343,
+          "height": 806
+        },
+        "textLength": 483,
+        "interactive": 4,
+        "offViewportWholeScreen": 6,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "group": "profile",
+      "navLabel": "个人资料",
+      "facts": {
+        "documentScrollWidth": 742,
+        "documentClientWidth": 375,
+        "theme": "dark",
+        "title": "个人资料",
+        "box": {
+          "x": 16,
+          "y": 72,
+          "width": 343,
+          "height": 596
+        },
+        "textLength": 149,
+        "interactive": 4,
+        "offViewportWholeScreen": 9,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "group": "account",
+      "navLabel": "账号与安全",
+      "facts": {
+        "documentScrollWidth": 742,
+        "documentClientWidth": 375,
+        "theme": "dark",
+        "title": "账号与安全",
+        "box": {
+          "x": 0,
+          "y": 72,
+          "width": 343,
+          "height": 812
+        },
+        "textLength": 363,
+        "interactive": 2,
+        "offViewportWholeScreen": 5,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "group": "sync",
+      "navLabel": "同步与隐私",
+      "facts": {
+        "documentScrollWidth": 742,
+        "documentClientWidth": 375,
+        "theme": "dark",
+        "title": "同步与隐私",
+        "box": {
+          "x": 16,
+          "y": 72,
+          "width": 343,
+          "height": 1072
+        },
+        "textLength": 393,
+        "interactive": 6,
+        "offViewportWholeScreen": 7,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "group": "ai",
+      "navLabel": "AI 与集成",
+      "facts": {
+        "documentScrollWidth": 742,
+        "documentClientWidth": 375,
+        "theme": "dark",
+        "title": "AI 与集成",
+        "box": {
+          "x": 16,
+          "y": 72,
+          "width": 343,
+          "height": 806
+        },
+        "textLength": 483,
+        "interactive": 4,
+        "offViewportWholeScreen": 6,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "group": "profile",
+      "navLabel": "个人资料",
+      "facts": {
+        "documentScrollWidth": 768,
+        "documentClientWidth": 768,
+        "theme": "light",
+        "title": "个人资料",
+        "box": {
+          "x": 24,
+          "y": 72,
+          "width": 720,
+          "height": 542
+        },
+        "textLength": 149,
+        "interactive": 4,
+        "offViewportWholeScreen": 1,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "group": "account",
+      "navLabel": "账号与安全",
+      "facts": {
+        "documentScrollWidth": 768,
+        "documentClientWidth": 768,
+        "theme": "light",
+        "title": "账号与安全",
+        "box": {
+          "x": 24,
+          "y": 72,
+          "width": 720,
+          "height": 704
+        },
+        "textLength": 363,
+        "interactive": 2,
+        "offViewportWholeScreen": 1,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "group": "sync",
+      "navLabel": "同步与隐私",
+      "facts": {
+        "documentScrollWidth": 768,
+        "documentClientWidth": 768,
+        "theme": "light",
+        "title": "同步与隐私",
+        "box": {
+          "x": 24,
+          "y": 72,
+          "width": 720,
+          "height": 945
+        },
+        "textLength": 393,
+        "interactive": 6,
+        "offViewportWholeScreen": 1,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "group": "ai",
+      "navLabel": "AI 与集成",
+      "facts": {
+        "documentScrollWidth": 768,
+        "documentClientWidth": 768,
+        "theme": "light",
+        "title": "AI 与集成",
+        "box": {
+          "x": 24,
+          "y": 72,
+          "width": 720,
+          "height": 615
+        },
+        "textLength": 483,
+        "interactive": 4,
+        "offViewportWholeScreen": 1,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "group": "profile",
+      "navLabel": "个人资料",
+      "facts": {
+        "documentScrollWidth": 768,
+        "documentClientWidth": 768,
+        "theme": "dark",
+        "title": "个人资料",
+        "box": {
+          "x": 24,
+          "y": 72,
+          "width": 720,
+          "height": 542
+        },
+        "textLength": 149,
+        "interactive": 4,
+        "offViewportWholeScreen": 1,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "group": "account",
+      "navLabel": "账号与安全",
+      "facts": {
+        "documentScrollWidth": 768,
+        "documentClientWidth": 768,
+        "theme": "dark",
+        "title": "账号与安全",
+        "box": {
+          "x": 24,
+          "y": 72,
+          "width": 720,
+          "height": 704
+        },
+        "textLength": 363,
+        "interactive": 2,
+        "offViewportWholeScreen": 1,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "group": "sync",
+      "navLabel": "同步与隐私",
+      "facts": {
+        "documentScrollWidth": 768,
+        "documentClientWidth": 768,
+        "theme": "dark",
+        "title": "同步与隐私",
+        "box": {
+          "x": 24,
+          "y": 72,
+          "width": 720,
+          "height": 945
+        },
+        "textLength": 393,
+        "interactive": 6,
+        "offViewportWholeScreen": 1,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "group": "ai",
+      "navLabel": "AI 与集成",
+      "facts": {
+        "documentScrollWidth": 768,
+        "documentClientWidth": 768,
+        "theme": "dark",
+        "title": "AI 与集成",
+        "box": {
+          "x": 24,
+          "y": 72,
+          "width": 720,
+          "height": 615
+        },
+        "textLength": 483,
+        "interactive": 4,
+        "offViewportWholeScreen": 1,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "group": "profile",
+      "navLabel": "个人资料",
+      "facts": {
+        "documentScrollWidth": 1444,
+        "documentClientWidth": 1440,
+        "theme": "light",
+        "title": "个人资料",
+        "box": {
+          "x": 420,
+          "y": 77,
+          "width": 904,
+          "height": 542
+        },
+        "textLength": 149,
+        "interactive": 4,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "group": "account",
+      "navLabel": "账号与安全",
+      "facts": {
+        "documentScrollWidth": 1444,
+        "documentClientWidth": 1440,
+        "theme": "light",
+        "title": "账号与安全",
+        "box": {
+          "x": 420,
+          "y": 77,
+          "width": 904,
+          "height": 704
+        },
+        "textLength": 363,
+        "interactive": 2,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "group": "sync",
+      "navLabel": "同步与隐私",
+      "facts": {
+        "documentScrollWidth": 1444,
+        "documentClientWidth": 1440,
+        "theme": "light",
+        "title": "同步与隐私",
+        "box": {
+          "x": 420,
+          "y": 77,
+          "width": 904,
+          "height": 945
+        },
+        "textLength": 393,
+        "interactive": 6,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "group": "ai",
+      "navLabel": "AI 与集成",
+      "facts": {
+        "documentScrollWidth": 1444,
+        "documentClientWidth": 1440,
+        "theme": "light",
+        "title": "AI 与集成",
+        "box": {
+          "x": 420,
+          "y": 77,
+          "width": 904,
+          "height": 573
+        },
+        "textLength": 483,
+        "interactive": 4,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "group": "profile",
+      "navLabel": "个人资料",
+      "facts": {
+        "documentScrollWidth": 1444,
+        "documentClientWidth": 1440,
+        "theme": "dark",
+        "title": "个人资料",
+        "box": {
+          "x": 420,
+          "y": 77,
+          "width": 904,
+          "height": 542
+        },
+        "textLength": 149,
+        "interactive": 4,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "group": "account",
+      "navLabel": "账号与安全",
+      "facts": {
+        "documentScrollWidth": 1444,
+        "documentClientWidth": 1440,
+        "theme": "dark",
+        "title": "账号与安全",
+        "box": {
+          "x": 420,
+          "y": 77,
+          "width": 904,
+          "height": 704
+        },
+        "textLength": 363,
+        "interactive": 2,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "group": "sync",
+      "navLabel": "同步与隐私",
+      "facts": {
+        "documentScrollWidth": 1444,
+        "documentClientWidth": 1440,
+        "theme": "dark",
+        "title": "同步与隐私",
+        "box": {
+          "x": 420,
+          "y": 77,
+          "width": 904,
+          "height": 945
+        },
+        "textLength": 393,
+        "interactive": 6,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "group": "ai",
+      "navLabel": "AI 与集成",
+      "facts": {
+        "documentScrollWidth": 1444,
+        "documentClientWidth": 1440,
+        "theme": "dark",
+        "title": "AI 与集成",
+        "box": {
+          "x": 420,
+          "y": 77,
+          "width": 904,
+          "height": 573
+        },
+        "textLength": 483,
+        "interactive": 4,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true
+    }
+  ],
+  "helpWrapWidths": [
+    375,
+    768,
+    1440
+  ],
+  "helpWrap": [],
+  "assertions": {
+    "everySelectedLegProducedItsCells": true,
+    "unselectedLegsReportEmpty": true,
+    "noHorizontalOverflow": true,
+    "allPermissionStatesRendered": true,
+    "dataFailurePreserved": true,
+    "existingDataRefusedWithoutLoss": true,
+    "cancelPreserved": true,
+    "everyCaseCoversEverySelectedMode": false,
+    "everyCaseCoversEverySweepGroup": true,
+    "groupSweepThemeApplied": true,
+    "groupSweepTitleMatchesNav": true,
+    "groupSweepActionable": true,
+    "groupSweepNoHorizontalOverflow": false,
+    "groupSweepNothingPushedOffViewport": true,
+    "groupSweepOffViewportRulerHasTeeth": true,
+    "helpWrapFourRowsMeasured": true,
+    "helpWrapInjectionTookEffect": true,
+    "helpLongTitleWraps": true,
+    "helpLongTitleStaysInContentColumn": true,
+    "helpLongTitleRowInsideViewport": true,
+    "helpLongTitleNoHorizontalOverflow": true,
+    "helpLongTitleBadArmsFlipTheJudgment": true
+  },
+  "notJudged": [
+    "noHorizontalOverflow",
+    "allPermissionStatesRendered",
+    "everyCaseCoversEverySelectedMode",
+    "dataFailurePreserved",
+    "existingDataRefusedWithoutLoss",
+    "cancelPreserved",
+    "helpWrapFourRowsMeasured",
+    "helpWrapInjectionTookEffect",
+    "helpLongTitleWraps",
+    "helpLongTitleStaysInContentColumn",
+    "helpLongTitleRowInsideViewport",
+    "helpLongTitleNoHorizontalOverflow",
+    "helpLongTitleBadArmsFlipTheJudgment"
+  ]
+}
