@@ -105,6 +105,7 @@ import { readSyncConfig, writeSyncConfig } from '../sync/config';
 import { describeSyncStatus, statusTone } from '../sync/status-text';
 import { useMobileSync, refreshPendingUpload } from '../sync/store';
 import { currentSignedInEmail, forgetSignedInUser } from '../auth/session';
+import { retryServerRevocation, signOutCurrentDevice } from '../auth/sign-out-flow';
 import { privacyConsent, subscribePrivacyConsent } from '../privacy/consent-gate';
 import { wipeCredentialsAndWidgets } from '../widgets/credential-wipe';
 import { clearWidgetState } from '../widgets/widget-bridge';
@@ -301,6 +302,66 @@ export function ProfileScreen(): React.JSX.Element {
     if (open) navigation.push('profile:security');
     else navigation.pop();
   };
+
+  /**
+   * 「退出登录」= **撤销手上这一枚** + 一定清本机。
+   *
+   * 🔴 在这一笔之前移动端没有"退出登录"这个动作，只有设置面里那颗
+   * 「清除本机保存的凭据」—— 它**什么都不撤销**，而那枚访问令牌在服务端
+   * 还能用一整年（`packages/shared-schema/src/session-contract.ts` 文件头记的就是
+   * 这件事）。在共享电脑上，那枚令牌加上"我已经退出了"这句界面就是一句谎。
+   *
+   * 状态为什么挂在**本屏**而不是挂在 `SecurityScreen`：
+   *   · 退出之后「账号与安全」那屏要关掉（它已经没有凭据可管），
+   *     而那句"服务器上那一枚还没撤成"必须**活过**这次关闭 ——
+   *     放在子屏里就是随它一起卸载，正好把唯一需要被看见的东西藏起来。
+   *   · 重试要用**发起时那枚**令牌与地址；本屏清完凭据后 `readSyncConfig()`
+   *     已经是空的，从那里读会拼出一个"对着空地址重试"的死循环。
+   */
+  const [pendingRevocation, setPendingRevocation] = useState<
+    { baseUrl: string; token: string } | null
+  >(null);
+  const [signedOutEverywhere, setSignedOutEverywhere] = useState(false);
+
+  const runSignOut = useCallback(async (): Promise<void> => {
+    const baseUrl = form.serverUrl;
+    const currentToken = form.token;
+    // 🔴 `onClearCredentials` 在**请求回来之后**被调用，而且两条分支都会调用一次
+    //    （成功、失败都算）。判据在 `tests/sign-out-flow.spec.ts`。
+    const plan = await signOutCurrentDevice({
+      options: { baseUrl },
+      token: currentToken,
+      clearLocal: onClearCredentials,
+    });
+    setSignedOutEverywhere(false);
+    setPendingRevocation(plan.serverRevocationPending ? { baseUrl, token: currentToken } : null);
+    setSecurityOpen(false);
+  }, [form.serverUrl, form.token, onClearCredentials, setSecurityOpen]);
+
+  const retryRevocation = useCallback(async (): Promise<void> => {
+    const pending = pendingRevocation;
+    if (pending === null) return;
+    const stillPending = await retryServerRevocation({
+      options: { baseUrl: pending.baseUrl },
+      token: pending.token,
+    });
+    // 🔴 只有服务端**不再认这枚令牌**（`unauthorized`）或撤销成功才算摘掉；
+    // 网络类失败继续挂着，否则这句实话会在一次没做成的重试之后自己消失。
+    if (!stillPending) setPendingRevocation(null);
+  }, [pendingRevocation]);
+
+  /**
+   * 「退出所有设备」成功之后：服务端已经删掉全部会话行并 bump 了 `tokenVersion`，
+   * **手上这一枚一起死了** ⇒ 走与「退出登录」同一条本机清理路径，
+   * 只是不再有"服务器还没撤成"这句话可说。
+   */
+  const runSignOutEverywhere = useCallback((): void => {
+    onClearCredentials();
+    setPendingRevocation(null);
+    setSignedOutEverywhere(true);
+    setSecurityOpen(false);
+  }, [onClearCredentials, setSecurityOpen]);
+
   /**
    * AI 助手那一屏（五个功能共用一个入口，见 `ai/AssistantScreen.tsx` 的文件头）。
    *
@@ -821,6 +882,8 @@ export function ProfileScreen(): React.JSX.Element {
   if (securityOpen) {
     return (
       <SecurityScreen
+        baseUrl={form.serverUrl}
+        token={form.token}
         onBack={() => {
           setSecurityOpen(false);
         }}
@@ -831,6 +894,13 @@ export function ProfileScreen(): React.JSX.Element {
           form.setToken(newToken);
           form.submit();
         }}
+        // 🔴 退出登录的两条出口都在**本屏**编排（清本机那一大套顺序在
+        // `onClearCredentials` 里，只有这里够得到）。判据：失败也清一次、
+        // 成功也清一次，见 `tests/sign-out-flow.spec.ts`。
+        onSignOutCurrentDevice={() => {
+          void runSignOut();
+        }}
+        onSignedOutEverywhere={runSignOutEverywhere}
       />
     );
   }
@@ -1152,6 +1222,39 @@ export function ProfileScreen(): React.JSX.Element {
         }}
         tone={accountHasCredential ? 'secondary' : 'primary'}
       />
+      {/*
+        🔴 这两条实话**必须**由常驻的本屏来说，而不是由「账号与安全」那屏：
+        退出之后那屏就关掉了，而"服务器上那一枚还没撤成"恰恰是在那之后
+        才需要被看见的一句话。放在子屏里就是随它一起卸载。
+        （顺序：待撤销排在"已退出所有设备"之前 —— 后者是一次成功的说明，
+        前者是一次**没做完**的说明，冲突时先说没做完的那件。）
+      */}
+      {pendingRevocation === null ? null : (
+        <Card gap="loose">
+          <Stack gap="tight" testID="sign-out-pending">
+            <Text variant="row-meta" tone="danger" selectable>
+              {t('common.signOut.pending')}
+            </Text>
+            <Button
+              label={t('common.signOut.retry')}
+              onPress={() => {
+                void retryRevocation();
+              }}
+              tone="secondary"
+              testID="sign-out-retry"
+            />
+          </Stack>
+        </Card>
+      )}
+      {!signedOutEverywhere ? null : (
+        <Card>
+          <Stack testID="sign-out-all-done">
+            <Text variant="row-meta" tone="default">
+              {t('common.sessions.logoutAllDone')}
+            </Text>
+          </Stack>
+        </Card>
+      )}
       <SettingsRow row={settingsRow} />
       <ProfileProgressSummary
         onOpenGrowth={() => {
