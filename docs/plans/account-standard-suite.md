@@ -1777,6 +1777,15 @@ git grep -q 'sendEmailPasswordRegistrationCodeEmail' HEAD -- server/src/email.ts
   && git diff --quiet -- packages/legal && echo CLOSEABLE || echo "still open"
 ```
 
+📌 **09 23:5x 复取：`still open`，而且挡路的那三枚现在有名字了**（逐条 `git ls-files --error-unmatch`，
+全部报 not tracked）：`server/src/password/registration-otp.ts`、
+`server/prisma/migrations/20261016000000_add_email_password_registration_challenges/migration.sql`、
+`server/tests/integration/registration-otp.integration.spec.ts`。
+同批两条读数没变：`grep -cE '^export const send.*Email' server/src/email.ts` 工作树 **10** / HEAD **9**，
+`git status --porcelain -- packages/legal` 仍是 7 枚 ` M` + 3 枚 `??`。
+⇒ 这一格的**唯一**外部前提就是那三枚落地（它们属注册验证码那条会话，不是本线能代拍的：
+迁移是不可逆层，而"十封"是一句对外法律表征）。它们落地后本线的动作是清单上第 2–5 项一次做完。
+
 
 ### 6.35 移动端与 web 那几格产品面：**代码都写好了，卡在"文件正被别人整片重写"** —— 一张总账（13:0x 现量）
 
@@ -2139,8 +2148,10 @@ export async function sendJson(   ← 同一笔带进来的 account-security.ts 
 
 | 判据 | 命令 | 读数 |
 |---|---|---|
-| 整棵 HEAD 有没有第二枚这样的文件 | 一次性 sweep：拿 esbuild 的 `transform` API 逐文件 parse `git ls-tree -r --name-only HEAD` 里全部 `.ts/.tsx` | **扫 1823 枚，parse-broken = 1**，就是这一枚。这条 sweep 同时是它自己的阳性对照（它抓到的正是已知那一枚），装置在 `/tmp` 一次性用完即弃，**没有**升成门禁（升不升见下面那条边界） |
+| 整棵 HEAD 有没有第二枚这样的文件 | `node research/tools/parse-sweep-ts.mjs d1704811`（在隔离副本里 checkout 到那枚再跑） | **扫 1823 枚，parse-broken = 1**，就是这一枚。这条 sweep 同时是它自己的阳性对照（它抓到的正是已知那一枚） |
 | 补完能不能 parse | `git show HEAD:packages/app-host/src/hosted-auth.ts \| apps/web/node_modules/.bin/esbuild --loader=ts` | 修前 `✘ Unexpected ":"` rc=1 → 修后 **rc=0** |
+| 🔴 **这一枚修好的是不是真判据**（前后各一趟，同一份 spec、同一台载体） | `packages/app-host` 里 `vitest run tests/account-security.spec.ts` | 修前那棵树（`d1704811`）⇒ **`Transform failed … [PARSE_ERROR] Unexpected token`，1 file failed，`no tests`，rc=1** —— 一个用例都没跑到；修后那棵树（`845e81c9`）⇒ **49 passed (49)**，rc=0。⇒ 症状不是"某条断言红"，是**那 49 条判据整枚不存在** |
+| 整包在修后的形状 | `packages/app-host` 里 `vitest run` | **1506 passed / 0 failed**，另有 **14 枚文件加载不了** —— 逐枚看原因全是 `Failed to resolve entry for package "@heyta/widget-core"` / `"@heyta/inbound-core"`（两枚不在这棵树上的包，注册自动化与小组件那两条线的在飞件）与 vault/calendar/ai 那几枚同源缺口。**这 14 枚不是本线欠项**，复取：`grep -E '^ FAIL' <那份 log>` |
 | 有没有动别人在这枚文件上的在飞改动 | `git hash-object <工作树那份>` 落地前后各一次 | 两次同一个 sha（`11eaea7b…`），`git status` 从 `MM` 回到 ` M` ⇒ 他们那 40 行改动逐字节还在，**没有**被我的 blob 顶掉 |
 | 落地只 staged 我自己 | `git diff --cached --name-only`（提交前后各一次） | 恰好 1 枚路径，`--numstat` = `3 0` |
 
