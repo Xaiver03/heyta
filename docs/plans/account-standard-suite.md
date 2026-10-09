@@ -1893,7 +1893,7 @@ git grep -hoE "from '\.[^']*'" HEAD -- packages | sort -u                # HEAD 
 复取：`git log --oneline -1 -S "'./auth/PasswordStrength.js'" -- packages/ui/src/index.ts`。
 
 
-### 6.38 把这型缺陷变成一枚尺：`scripts/check-imports-resolve.mjs`（含它现在量到的 9 + 12 条红）
+### 6.38 把这型缺陷变成一枚尺：`scripts/check-imports-resolve.mjs`（它现在量到多少条，只给现量命令）
 
 §6.36 那一型（引用进了 HEAD、实现留在工作树）能藏十六小时，不是因为**没有层判它**：
 `pnpm check` 里就有 `pnpm build`（= `pnpm -r build`）与 `pnpm typecheck` 两步，都判这一维，
@@ -1915,7 +1915,7 @@ node scripts/check-imports-resolve.mjs --tree 9fa53ab9 --sources-only   # 事故
 
 | 证明 | 读数 |
 |---|---|
-| `--self-test` 三臂（内存夹具，不碰仓库）：引用未入库的实现 / 引用不存在的模块 / 合规形状（`.js` 后缀的 NodeNext 写法 + 目录 index） | 期望红/红/绿 ⇒ **实得红/红/绿** |
+| `--self-test` 多臂（内存夹具，不碰仓库；**臂数由它自己打印**）：引用未入库的实现 / 引用不存在的模块 / 合规形状（`.js` 后缀的 NodeNext 写法 + 目录 index）/ **判据字符串里那句 `from '…'`** / 真 import 但行尾注释带撇号 / 真 import 但行尾注释带 URL | 期望 红 / 红 / 绿 / **绿** / **红** / **红** ⇒ 10-09 22:3x 实得六臂全按期望（第 4 臂是下面那条假红的回归护栏，第 5、6 臂是它的反面 —— 挡"修过头把真 import 也吞掉"） |
 | 事故本体当阳性对照：`--tree 9fa53ab9 --sources-only` | 🔴 7 条，其中 `packages/shared-schema/src/index.ts` 的四枚契约文件全在里面，**还多抓出两条我肉眼没找到的**（`./inbound-crypto-contract`、`server/src/automation/inbound.routes`） |
 
 🔴 探针第一版有假红，形状很典型：注释里的示例（`apps/landing/src/site/pages.ts` 那段讲 Node ESM 解析的散文里
@@ -1923,8 +1923,8 @@ node scripts/check-imports-resolve.mjs --tree 9fa53ab9 --sources-only   # 事故
 ⇒ 加了"剥块注释与整行 `//`、`*` 注释"与"`spec` 里含 `dist/` 就不算"两条，行数在剥注释后仍逐行对齐
 （块注释按字符换成空格、保留换行），否则报出来的行号会指错地方。
 
-**HEAD 现在的读数**（这一轮现量）：`21 条解析不到` = **构建输入 9 条** + **测试文件 12 条**。
-构建输入那九条是：`packages/ui/src/index.ts` 引七枚组件（`StateIllustration`、`HabitArtwork`、
+**HEAD 现在的读数**（2026-10-09 22:4x 现量，命令 `node scripts/check-imports-resolve.mjs --tree HEAD`）：
+**构建输入 9 条 + 测试文件 0 条**。构建输入那九条是：`packages/ui/src/index.ts` 引七枚组件（`StateIllustration`、`HabitArtwork`、
 `HabitMetricIcon`、`PasswordStrength`、`LegalDocumentSheet`、`AssistantMark`、`AiGeneratedLabel`）、
 `packages/app-host/src/inbound-process.ts` 引 `./task-batch-actions`、
 `apps/web/src/features/settings/WidgetJourneyPanel.tsx` 引 `../../lib/native-widgets` ——
@@ -1934,6 +1934,27 @@ node scripts/check-imports-resolve.mjs --tree 9fa53ab9 --sources-only   # 事故
 那七枚是 UI 那条线的、`task-batch-actions` 是入站那条线的、`native-widgets` 是 widget 那条线的。
 **本线不代提这些**（§6.37 代提的是自己 `9fa53ab9` 造成的裂口；这三条是别人正在写的产品语义，
 其中 `AiGeneratedLabel.tsx` 的 mtime 是今天 10:43）。各位的闭合动作是同一条：把自己的实现 `git add` 进来。
+
+🔴 **上面那句"构建输入 9 条 + 测试 0 条"是对**上一笔提交里我写的那句的更正，而错因在**探针自己**：
+第一版尺在 HEAD 上报的是 `9 + 12`，那 12 条"测试文件 import 了没入库的主体"**一条都不是 import** ——
+它们是**源码文本型判据**，长这样：
+
+```ts
+expect(source).not.toContain("from './account/email-change'");   // server/tests/email-change-page.spec.ts:82
+expect(EMAIL).toContain("from '../auth/session'");               // apps/mobile/tests/account-security-wiring.spec.ts:213
+```
+
+`SPEC_RE` 只认 `from '…'` 这个形状，分不出"这是一条 import"还是"这是一句被当字符串写下来的 import"。
+后果不只是难看：那 12 条被我当成"HEAD 的 `pnpm -r test` 必红"写进了台账，
+**如果我照它去"修"，就会去给别人的 spec 补根本不缺的文件**。
+⇒ 修法在尺本身：命中处到行首之间的**未转义引号个数为奇数** ⇒ 它落在字符串字面量里 ⇒ 不算 import。
+顺带把行尾 `//` 也剥掉（只剥前面不邻 `:` 的那两处，否则 `https://` 会被吃），
+因为撇号（`// it's fine`）会让上面的配对判据把**真 import** 误杀 —— 这是**漏报**，比假红危险。
+两半各有一臂钉住（上面那张表第 4 臂 / 第 5、6 臂）。
+🟢 反面对照同时复量了一次：`--tree 9fa53ab9` 修后 = **构建 7 + 测试 2**，而那 2 条是**真的**
+（`server/tests/integration/inbound-worker-identity.integration.spec.ts` 引 `../../src/automation/commit-proof`
+与 `../../src/automation/inbound.routes`）⇒ 修过滤**没有把这一族病一起洗掉**。
+（那两条属入站那条线、且住 `*.integration.spec.ts`，按 §5 第 8 条它本来就不在 `pnpm -r test` 的默认通道里。）
 
 **为什么这枚尺先不接进 `pnpm check`**：接进去 = 立刻让别人那九条红挂在本线的提交上，
 而本线没有办法替他们把它们变绿（§6.22 那条"扩射程会造出一屏假红"是同一件事）。
