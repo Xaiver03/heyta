@@ -38,6 +38,15 @@ describe('inbound automation runner', () => {
     const requestBody = JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body));
     expect(requestBody.messages.at(-1).content).not.toContain('must-not-leave');
     expect(JSON.parse(requestBody.messages.at(-1).content).context.receivedAt).toBe(new Date(claimed.receivedAt).toISOString());
+    // 🔴 上面那两行只回答"这一枚字符串没出去"，回答不了"出去的就是披露的那几项"。
+    // 对外说明写的是"只把规则允许的那几个字段交给模型"——那是个**封闭集合**的承诺，
+    // 所以判据必须是键集合逐字相等：多发一枚没有 `must-not-leave` 的字段（例如 `projectId`）
+    // 前两行一个字都不会红。
+    const outgoing = JSON.parse(requestBody.messages.at(-1).content) as { source: Record<string, unknown>; context: Record<string, unknown> };
+    expect(Object.keys(outgoing).sort()).toEqual(['context', 'source']);
+    expect(Object.keys(outgoing.source)).toEqual(['title']);
+    expect(outgoing.source).toEqual({ title: 'Inbox' });
+    expect(Object.keys(outgoing.context).sort()).toEqual(['receivedAt', 'timezone']);
     expect(result.payload.tasks[0]).toMatchObject({ id: 'inbound:event-1:0', title: 'Inbox', priority: 1 });
     expect(publish).toHaveBeenCalledWith(expect.objectContaining({ eventId: 'event-1', itemCount: 1 }));
     pair.privateKey.fill(0);
