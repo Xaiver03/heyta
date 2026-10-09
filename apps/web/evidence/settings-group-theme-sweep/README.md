@@ -46,8 +46,12 @@ HEYTA_RESPONSIVE_HEADED=0 \
   而不是「文件名写着 dark 的亮色图」。
 - `groupSweepNoHorizontalOverflow` —— 三档视口都量 `documentElement.scrollWidth ≤ clientWidth + 1`。
 
-可交互控件数逐组不同（未登录态）：`profile` 1、`account` 1、`sync` 6、`ai` 4；文本量 44 / 33 / 261 / 496 字。
+可交互控件数逐组不同（未登录态，**工作树那一棵**）：`profile` 1、`account` 1、`sync` 6、`ai` 4；文本量 44 / 33 / 261 / 496 字。
 ⇒ `groupSweepActionable` 的下界 1 是被 `profile`/`account` 那两格**顶着过的**，不是随手写的大阈值。
+⚠️ 这组数是**跟着 IA 的**：同一枚装置打在只含已提交内容的那棵树（长页面 + 锚点，七个分组同时在 DOM 里）上读出
+`profile` 4、`account` 2、`sync` 6、`ai` 4，文本量 149 / 363 / 393 / 483（逐格在
+`carrier-b081811c-groups-report.json`）。⇒ "下界 1 是顶着过的"这句只在**工作树那一棵**成立；
+载体那棵的最小值是 2，读这句话要连着它那一棵一起读。
 
 内容列宽度读数：375 ⇒ **343px**，768 与 1440 都停在 **655px**（`--ht-layout-prose-max` 的上界）。
 ⇒ `UX-S9-44` 那句「桌面被拉满」是**量出来否掉的**，不是看图觉得还行。
