@@ -1954,4 +1954,49 @@ OS 通知投递通过。原 [多端计划](docs/plans/goal-multi-end-coverage.md
   树与父逐字相同而 `commit-tree`/`update-ref` 一律成功，`--oneline` 里看不出任何异样。是"读回 `--stat` 的枚数"这条规矩把它抓出来的。
   真笔已重落，两枚空笔留在历史里（并行会话已把它们当父，不改写别人的历史），全过程与三道闸在 **B108**。
 
-- T2 还欠：宿主每 30 秒续票据、`waiting-entitlement` 展示、app-host 侧真的去调这枚取票通道并把票据附到每次写入。
+- T2 宿主生命周期（app-host 那一半 ✅ 已入库 `a9ca6464`，7 文件）：新增 `inbound-entitlement-tickets.ts`
+  （按动作取票 + 安装身份），`inbound-worker.ts` 五个闸门调用可附 `x-heyta-entitlement-ticket`、
+  402 回类型化的 `AutomationEntitlementRequiredError`（带服务端 `reason`），`inbound-process.ts`
+  在 claim / ai-reserve / result-publish / commit-permit 四处**各取各的一枚**，权益不足回
+  `waiting-entitlement` 状态而不是回一条报错。判据读数每次现量：
+  `ls packages/app-host/tests/inbound-*.spec.ts | xargs npx --no-install vitest run --no-color`
+  （点名枚数必须等于 `Test Files` 那行；本轮实测基线 11 文件 65 测试 → 加完这批 11 文件 76 测试，
+  新增那 13 条住在 `inbound-entitlement-tickets.spec.ts`。条数每次重新取，别抄这里的数）。
+  反向验证 6 臂（票据头永不附 / 永远附 / 摘掉 claim 的 402 分支 / 摘掉某一处取票展开 /
+  把等待族放宽成"所有取票错误" / 摘掉 402 那一层捕获）各红且只红对应那条，逐臂 `diff -q` 证还原。
+  ⚠️ 臂本身也会骗人：第一次写"永远附票"那枚时把箭头函数改成了块体，vitest 报的是
+  `Transform failed` + `Tests no tests` —— **编译不过的红不是行为红**，重写成 `=> ({…})` 才拿到真读数。
+  还欠两格（都在宿主外壳那侧，不在 app-host）：**每 30 秒续 `session` 票据**、`waiting-entitlement` 的界面展示。
+
+## 2026-10-10 17:5x：宿主侧落两格，另量出一道拦路的前置（**这是接着做的人要先看的一段**）
+
+`70f1dcd0`（点名列回 `6 files changed, 188 insertions(+), 8 deletions(-)`；`index.ts` 走混合切片配方，
+切片 = HEAD + 只我那一行：922→923，外来标识符 `habit-export` 在切片里 0 次而工作树 1 次）落的两格：
+
+1. **草稿确认取自己那一枚票**：`createInboundDraftReviewer` → `decideDraft(..., {action:'draft-confirm', eventId})`；
+   取消不取票（服务端允许无订阅取消）。app-host 侧新增 4 条判据 + 3 条负向对照。
+2. **安装身份的落盘**：`packages/app-host/src/inbound-installation-store.ts`（只写一次 / 坏值不覆盖 / 退登不清），
+   7 条判据。住在 app-host 而非各壳：web 与 node-host 共用同一个 `DbAdapter` 端口（AGENTS §3.5）。
+
+读数（当日现量，别抄）：`ls packages/app-host/tests/inbound-*.spec.ts | xargs npx --no-install vitest run --no-color`
+⇒ `Test Files 12 passed (12)` / `Tests 91 passed (91)`，跳过 0；
+`npx --no-install tsc --noEmit -p tsconfig.spec.json` rc=0；`npx --no-install tsup` rc=0
+（`createAutomationInstallationMetaStore` 在 `dist/index.js`/`.d.ts` 各命中 2 次）。
+反向验证 4 臂：身份可被覆盖 1 红 / 坏值按空 1 红 / 确认不带票 2 红 / 取消也去取票 1 红，
+逐臂还原后与变异前**全文逐字相等**（比对方式是读回原文比较，不是只看"跑绿了"）。
+
+🔴 **web 侧故意没接取票源**，因为量到一条会让接线变成回退的事实：
+票只在 `official` 模式的实例上签得出（`server/src/api.ts:660-664`），签票又要求这台 `installationId`
+已有绑定行（`server/src/automation/entitlement-issuer.ts:323-324`），而客户端既没有"签发方 URL"这个概念、
+也没有绑定握手的调用方（`packages/app-host/src/inbound-entitlement-remote.ts` 只有 `verify` 一个出口）。
+⇒ 无条件取票会把官方实例上**已订阅、本来能用**的用户读成"等待权益"。三条候选修法与代价登记成 **B109**，
+那一格连着一次新的数据出境（自托管实例的用户要把 installationId + 账号 JWT 送到官方域名），**不代拍**。
+
+`waiting-entitlement` 的界面展示也量到了硬边界：**词条不存在**（`zh-CN.ts:5261-5265` 只有四条状态），
+而 `packages/i18n` 正被并行会话写着（`git status --porcelain -- packages/i18n` = 3 条脏）。
+挪用 `failed` 那条会把"没买到资格"说成"处理失败"，是任务书点名要消除的那类错，所以登记成 **B110** 并写好一次成对的
+中英追加；词条进去后我这边的收尾是两行（`useState` 联合 + 返回类型换成 `InboundAutomationCycleResult`）。
+顺手记 **B111**：安装身份的 META 键按仓库惯例该进 `packages/storage` 的 `META_KEYS`，那个文件不在本线白名单。
+
+下一格（不受 B109/B110 挡）：**T3 的双真 SQLite 宿主 13 个故障窗口装置** —— 照
+`research/tools/verify-inbound-worker-identity.py` 的形状新建 `verify-inbound-*.py`，自报 n/n 且拒绝 0/0。

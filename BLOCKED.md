@@ -7047,3 +7047,75 @@ git show --numstat --format='' 6d06bae4   # 空输出
   两臂反向验证都红过（`docs/plans/roadmap.md` 单枚点名 ⇒ `点名枚数=1 实际变动=0 / REFUSE`，rc=1；不带路径 ⇒ `REFUSE: 没有点名任何路径`，rc=1），且两臂之后 `git rev-parse HEAD` 逐字未动。
   ⚠️ 那道"逐枚 blob 对账"的闸**没有独立的红臂**（要它红得先制造一次树与工作树不一致，本轮没造）——它是防"shift 类笔误"的第二道保险，不是已证能红的判据。
 - 📌 可迁移的规律：**写完的 plumbing 配方要复用，不要当轮重写**；而任何"提交成功"的判据必须是**枚数**（`diff-tree -r --name-only | wc -l`），不是退出码、不是 `--oneline` 里那一行。
+
+## B109 逐次放行的票**由哪个 URL 签发**没定 —— 这一格挡着 T2 的宿主接线与 T3 的双宿主故障窗口
+
+**现量（2026-10-10，本仓 HEAD）**：
+
+- `server/src/api.ts:660-664` —— `automationIssuerSide()` 第一行就是
+  `if (resolveAutomationEntitlementMode() !== 'official') return { code: AUTOMATION_ISSUER_NOT_ON_THIS_INSTANCE }`。
+  ⇒ **`selfhost-online` 实例自己签不出任何票**（它配的是公钥环，只验不签，`api.ts:656-659` 那句注释写明了）。
+- `server/src/automation/entitlement-issuer.ts:323-324` —— 逐次动作票要求 `automationEntitlementLink` 里
+  已有这台 installation 的绑定行，缺或已吊销一律 `AUTOMATION_LINK_NOT_BOUND`。
+- `server/src/api.ts:674-684` —— `/automation/entitlement/subject` 只回主体，**不建绑定行**；建绑定行的是
+  激活码那条（`/activations` 发码 → 兑换写 link 行），而**客户端至今没有这两路的调用方**
+  （`packages/app-host/src/inbound-entitlement-remote.ts` 里只有 `verify` 一个出口）。
+
+**后果，两种读法都错**：宿主（web/node/移动）现在无条件向**自己那台实例**取票 ——
+`official` 实例上未兑换过安装身份的用户会拿到 `LINK_NOT_BOUND`，把**已订阅、本来能用**的人读成"等待权益"；
+`selfhost-online` 实例则永远拿到 `NOT_ON_THIS_INSTANCE`，自动收集整个不可用（那是自托管唯一的营收路径）。
+本轮因此**故意没有**把取票源接进 `apps/web/src/features/settings/inbound-runtime.ts`，
+接线代码与判据都已备好（见 `PROGRESS.md` 那一节），只等这一格拍定。
+
+**要拍的（三选一，都能签出票，区别在数据出境与信任边界）**：
+
+1. **宿主直连官方实例取票**：`createAutomationTicketSource` 多一个 `issuerBaseUrl`（默认取 `baseUrl`）。
+   代价：自托管实例的用户会把 `installationId` + 账号 JWT 送到官方域名 —— 这是一次**新的出境**，
+   要改进出境披露与隐私条款（属对外承诺，不能我自己写完就当定了）。
+2. **客户实例转述取票**：由自托管服务端代理向官方要票（宿主仍只连自己实例）。
+   代价：客户运营者的服务器成为链路一环，官方看到的是**实例**而非设备，绑定与限流的粒度都要重定。
+3. **`selfhost-online` 实例自持签发私钥**：只改配置读取。
+   代价：**推翻**"不看本机订阅行、只看官方签发票据"这条已定案语义（协议 §"权益来源由部署模式决定"），
+   等于自托管侧自己给自己发货 —— 与本线立项理由冲突，我不建议。
+
+拍定后要做的两件（都不必再问）：宿主侧补上"首次绑定握手"（发码→兑换，把 installation 绑实），
+以及把取票 URL 从 `baseUrl` 里分出来；两边的判据本轮已备好形状，照 `tests/inbound-entitlement-tickets.spec.ts` 加。
+
+## B110 `waiting-entitlement` 的界面文案缺词条，而 `packages/i18n` 正被并行会话写着
+
+**现量**：`packages/i18n/src/locales/zh-CN.ts:5261-5265` 只有 `submitted/empty/needs-confirmation/failed` 四条
+（`en.ts:4994-4998` 同），**没有** `web.ai.inbound.process.waiting-entitlement`；
+`git status --porcelain -- packages/i18n` 当前 **3 条脏**。任务书死规矩："不许动 `packages/i18n` 与任何别人在写的文件"。
+
+**为什么不绕**：界面那句 `t(\`web.ai.inbound.process.${processState}\`)`（`InboundAutomationSettings.tsx:404`）
+是按状态拼键的。硬编码文案会撞 `check:ui-language`（AGENTS §1：i18n 是唯一文案事实源）；
+挪用 `failed` 那条会把"这台实例还没买到资格"说成"处理失败，事件会保留在服务端等待恢复" ——
+**把订阅问题说成故障**正是任务书要求消除的那一类错。
+
+**给词条所有者的一次成对追加（中英同批，别只落一侧）**：
+
+```ts
+'web.ai.inbound.process.waiting-entitlement': '自动收集正在等待权益生效，本条事件没有丢。',
+// en.ts
+'web.ai.inbound.process.waiting-entitlement': 'Automation is waiting for entitlement to take effect; this event has not been lost.',
+```
+
+词条进去之后我这边的收尾是一行状态联合（`InboundAutomationSettings.tsx:56` 的 `useState` 联合加
+`'waiting-entitlement'`）+ 把 `processWebInboundOnce` 的返回类型换成 app-host 已导出的
+`InboundAutomationCycleResult`，两处都在白名单内，可在同一批做完。
+
+## B111 安装身份的 META 键没进 `packages/storage` 的登记表
+
+`packages/app-host/src/inbound-installation-store.ts` 自持常量 `automationInstallationIdV1`，
+而仓库惯例是每个 META 键都登记在 `packages/storage/src/stores.ts` 的 `META_KEYS`
+（`INBOUND_RECIPIENT_KEY` / `INBOUND_WORKER_CREDENTIAL` / `INBOUND_COMMIT_JOURNAL` 三枚都在那张表里）。
+`packages/storage` 不在本线白名单，所以**没改**。登记=一行：
+
+```ts
+  /** Stable per-installation identity used as the entitlement binding key. */
+  AUTOMATION_INSTALLATION_ID: 'automationInstallationIdV1',
+```
+
+风险边界（为什么不紧急）：`scripts/check-layering.mjs` 那条"游标键名只能有一份"的判据针对的是
+**存储层与宿主各读一遍**的键（`lastServerSeq`），而这个键只有本模块读写，所以"改键名时有一端静默读到旧值"
+那个事故形状在这里不成立。登记表所有者顺手把它收进去即可，不需要新判据。

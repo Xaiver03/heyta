@@ -486,4 +486,26 @@ T2 剩下未闭合的（不包装成完成）：宿主侧每 30 秒续票据与 
 
 把尺拓到临时配置上量过一次（`extends` 真 tsconfig、include 多加 `tests/**/*`）：全仓 **224 条**类型错，其中**本线那两枚文件占 4 条，已经修完**（一枚不存在的类型名从 `entitlement-issuer` 改成从 `entitlement-ticket` 导入、替身库的 `row` 加了显式标注、集成测试里那枚可空列 `payloadCiphertext` 在使用前钉成字符串）⇒ 同一把尺下本线 4→0、全仓 224→220，`tsc --noEmit` 仍 rc=0，两文件单测腿 `Tests 37 passed (37)`。剩下那 200 多条是别人那条线的，**把 `tests/**` 正式纳入类型检查会让 `pnpm check` 一次亮 220 片红**，那是全仓判卷口径，不代拍 —— 两条候选修法与本线建议都在 B107。
 
-仍未闭合（不包装成完成）：app-host 侧的取票生产者与 `X-Heyta-Entitlement-Ticket` 逐次附着、每 30 秒续 `session`、`waiting-entitlement` 展示、`automation_entitlement_clocks` 的退役清扫（见 B106）。AC-1～AC-8 继续不勾选，公网接收与售卖继续关闭。
+仍未闭合（不包装成完成）：每 30 秒续 `session`、`waiting-entitlement` 展示、`automation_entitlement_clocks` 的退役清扫（见 B106）。~~app-host 侧的取票生产者与 `X-Heyta-Entitlement-Ticket` 逐次附着~~ —— 这半在 2026-10-10 分两段闭合：取票生产者与四个闸门动作的逐次附着已于 `a9ca6464` 落地，草稿确认那一枚票与安装身份的持久化于同日 `70f1dcd0` 落地（判据见下一节）。🔴 但**宿主真的开始取票**这一格被一道新量出的前置挡住：票只在 `official` 实例签得出，且签票要求这台安装已有绑定行，而客户端既没有签发方 URL 也没有绑定握手的调用方 —— 三条候选修法与各自代价登记在 **B109**，本线不代拍（它连着一次新的出境）。AC-1～AC-8 继续不勾选，公网接收与售卖继续关闭。
+
+## 宿主侧这一段的两格读数（2026-10-10）
+
+`70f1dcd0`（点名列回 `6 files changed, 188 insertions(+), 8 deletions(-)`）落了与部署模式无关的那两格，并且**故意没落**第三格：
+
+1. **草稿确认自己那一枚票**。`createInboundDraftReviewer` 原先一张票都不取，而服务端 `decideAutomationDraft`
+   把 `draft-confirm` 的授权放在账号锁之后、业务写事务之内（`server/src/automation/events.ts:124`）——
+   宿主一接上取票链，这一路必然被拒。取消**不取票**：那条明确允许无订阅进行
+   （同文 118-121 行的注释），给取消取票只是多一次注定被拒的签发往返。`decideDraft` 因此多一个
+   可选的票据作用域参数，取票仍排在 `try` 之外（票据源的错不许被"任何异常都算传输失败"吞掉）。
+2. **安装身份的落盘**（`packages/app-host/src/inbound-installation-store.ts`）。三条语义各自有一条判据：
+   只写一次（换身份＝换一台设备，旧 worker 会被 `databaseEpoch` 一起作废）、坏值不覆盖
+   （按空处理会把一次数据损坏读成"换了新设备"）、退出登录不清（它标识安装、不标识账号，也不是秘密）。
+   它住在 app-host 而不是各壳：`apps/web` 与 `apps/node-host` 拿同一个 `DbAdapter` 端口就能共用，
+   这是 AGENTS §3.5 那条"接线只有一份"的同一件事。
+3. **没落的那格**＝web 的取票接线。现量理由与三条候选修法在 **B109**；接线代码本身与它的判据形状
+   都已备好（照 `tests/inbound-entitlement-tickets.spec.ts` 那批扩），拍定后是一笔小改。
+
+判据读数（都是当日现量，别抄数）：`ls tests/inbound-*.spec.ts | xargs npx --no-install vitest run --no-color`
+⇒ `Test Files 12 passed (12) / Tests 91 passed (91)`；`npx --no-install tsc --noEmit -p tsconfig.spec.json` rc=0。
+反向验证 4 臂各红一次后逐字还原（身份可被覆盖／坏值按空处理／确认不带票／取消也去取票），
+臂的写法与还原判据逐字照 `PROGRESS.md` 当日那节，四臂的失败条数分别是 1/1/2/1。
