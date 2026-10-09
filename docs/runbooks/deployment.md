@@ -52,7 +52,7 @@
 | 机器 | SSH 别名 | IP | 跑什么 | 对外地址 | 状态 |
 |---|---|---|---|---|---|
 | **腾讯云 ubuntu-jcli** | `ubuntu-jcli`（别名 `finlaw`） | `124.223.13.226` | ✅ **heyta 公网部署**（supersync）；另有 xiaoli-* 等约 34 个容器、宿主机 nginx、mihomo | `https://heyta.waytofuture.cn`（**当前产品入口**，2026-09-30 迁来，见 §3.7.2；`heyta.finlaw.cloud` 只留作回滚路径） | ✅ 在线，容器 healthy |
-| **腾讯云轻量 12km（=OPP）** | `12km` / `12kmroot` | `121.4.24.238` | Caddy + Dokploy + Litopia 生产/预发 + Mailu 邮件 + cloudflared 等 32 个容器 | `mail.litopia.space`（**唯一还指向它的 litopia 域名**） | 🔴 **实例已过期**（2026-09-25 21:32 到期），仍在跑 |
+| **腾讯云轻量 12km（=OPP）🔴 已退役** | ~~`12km` / `12kmroot`~~（别名已从 `~/.ssh/config` 移除） | `121.4.24.238` | 2026-09-27 停服；下列读数都是当时事实。Caddy + Dokploy + Litopia 生产/预发 + Mailu 邮件 + cloudflared 等 32 个容器 | `mail.litopia.space`（**唯一还指向它的 litopia 域名**） | 🔴 **实例已过期**（2026-09-25 21:32 到期），仍在跑 |
 | **腾讯云 sanjiaozhou** | `sanjiaozhou` | `101.34.250.109` | **mihomo 故障切换代理**；Caddy（80/443）+ 大量项目（Litopia 站点、SSOS、Mailu、CMS 等） | `litopia.space`、`api` / `docs` / `studio` / `staging`、`openpenpal.com`、`finlaw.cloud` 等 | ✅ 在线，负载正常 |
 | **华为云 wunoos** | `wunoos` | `119.8.167.61` | ⚪ 未核实（用户明确交代**不要用**） | `climming.*` / `huagong.finlaw.cloud` 等指向它 | 仅确认 SSH 可达 |
 | **阿里云 lingchuang** | `lingchuang` | `39.107.226.94` | ⚪ 未核实（用户明确交代**太小，不用**） | — | 仅确认 SSH 可达 |
@@ -113,7 +113,7 @@
 - ✅ heyta 相关容器只有两个：`supersync-server`、`supersync-postgres`。
 - ✅ 还有若干直接跑在宿主机上的 node/next 服务（`/var/www/s…`、`/opt/home/…`、`/opt/x-cre…`），端口 3000 / 3004 / 3007 / 3010 / 4000 / 4010 —— ⚪ **这些属于其他项目**，本次未逐一定位归属。
 
-#### 12km / OPP（`121.4.24.238`）
+#### 12km / OPP（`121.4.24.238`）🔴 已退役 —— 下面的 ✅ 都是停服前的实测留档，现在连不上，别照做
 
 - ✅ **对外 80/443 由 Caddy 提供**（`caddy.service` active），**不是 nginx**。
   `/etc/nginx` 里那套配置**存在但没在跑**：`nginx.service` 是 `inactive` + `disabled`。
@@ -334,7 +334,7 @@
 |---|---|---|
 | `NODE_ENV` | `production` | ✅ |
 | `PUBLIC_URL` | `https://heyta.waytofuture.cn` | ✅ 2026-09-30 起（§3.7.2） |
-| `CORS_ORIGINS` | `https://heyta.waytofuture.cn` | ✅ 与 `PUBLIC_URL` 同源 |
+| `CORS_ORIGINS` | `https://heyta.waytofuture.cn,heyta-local://app,https://heyta.local` | ✅ 官方站点 + 原生 macOS / Windows 壳 origin |
 | `DOMAIN` | `heyta.waytofuture.cn` | ✅ 供 compose 的 caddy 服务用（当前没起，nginx 直接反代 1900） |
 | `RUN_MIGRATIONS_ON_STARTUP` | `false` | ✅ 迁移由 `deploy.sh` / `migrate-deploy.sh` 显式跑 |
 | `TEST_MODE` | ~~`true`~~ **已于 2026-09-27 删除** | ✅ **服务端从来不在测试模式**：生产 compose 不转发它，容器里是空的，线上 `/api/test/*` 全是 404。见 §7.4 |
@@ -571,7 +571,7 @@ cd apps/web && VITE_SITE_URL=https://site.example.com pnpm exec tsc -b && \
 #### 🔴 站点已经是多页站点：`try_files` 里的 `$uri/` **不能删**
 
 落地页从 2026-09-28 起不再是一页：`/features/`、`/platforms/`、`/pricing/`、
-`/help/`、`/changelog/`、`/signin/` 各自是一个**目录 + `index.html`**
+`/docs/`、`/changelog/`、`/signin/` 各自是一个**目录 + `index.html`**
 （中英双份，共 14 份入口，由 `apps/landing/scripts/gen-entries.mjs` 生成）。
 
 §3.3.1 里那条 `try_files $uri $uri/ /index.html` 的 **`$uri/` 正是它们能打开的原因**。
@@ -1357,7 +1357,7 @@ node scripts/deploy-ssh.mjs                       # 沙箱验 HEAD（安全，�
 node scripts/deploy-ssh.mjs --ref <sha>           # 沙箱验指定提交
 node scripts/deploy-ssh.mjs --dry-run             # 只打印计划
 node scripts/deploy-ssh.mjs --apply --yes-production   # 🔴 真换生产（两个旗标都要给）
-node scripts/deploy-ssh.mjs --rollback <tag>      # 生产指回上一个 tag
+# 当前脚本拒绝 --rollback：尚未实现。回退须按下方说明核对 Compose 身份后执行。
 ```
 
 | 步 | 动作 | 🔴 判据（不对就停，不降级） |
@@ -1375,8 +1375,7 @@ PostgreSQL 禁止在事务块内 `CREATE INDEX CONCURRENTLY`，而 `deploy` 会�
 以 `P3018 / SQLSTATE 25001` 失败）。用的就是镜像内那份 `server/scripts/migrate-deploy.sh`，
 它的权威规范在 [`../../server/prisma/migrations/README.md`](../../server/prisma/migrations/README.md)。
 
-**回退**：`--rollback <tag>` 或直接
-`ssh ubuntu-jcli 'cd ~/heyta/server && docker tag supersync:rollback-<日期> supersync:local && docker compose -f docker-compose.yml up -d --wait supersync'`。
+**回退**：`--rollback` 尚未实现，脚本会明确拒绝。先读取当前容器的 `com.docker.compose.project` 与 `com.docker.compose.project.config_files` 标签；核对本轮保留的 rollback 镜像后，重新打 `supersync:local` 标签，并以同一 project、同一组配置文件运行 `up -d --no-deps --no-build --pull never --wait supersync`。不要只使用默认 `docker-compose.yml`，以免丢失现有部署覆盖配置。
 
 **换完仍然要重取 §3.8.1 那五条线上判据** —— 本脚本只证 `sha256 对账` / `镜像 revision 标签` /
 `/health=200` 这三格，**它不证明用户那条旅程通了**。
@@ -2429,3 +2428,12 @@ Docker 会拒绝删有子镜像的父镜像。别把它当"无引用镜像"。
 最容易误判的 `172.30.33.14:8080`（aistudy）实测是 `learning-preview-gateway`
 在 ingress 网络上的**静态绑定 IP**（`IPAMConfig`），经 nginx 实测返回 200；
 宿主直连超时只是因为 Caddy 不认 `Host: <IP>`。
+
+### 2026-10-08 测试版生产部署记录
+
+- 服务端部署源码快照：`3880bdd1fd5e8fe3710bd19c5f753947ea89c468`。隔离索引生成，未改工作分支与用户暂存区。
+- 真实沙箱完成构建、全部迁移、健康检查，再运行生产迁移和切换；读数为 `MIGRATE_RC=0`、`SWAPPED`、`INSTALLED_IMAGE=OK`、`HEALTH=200`。
+- 网页应用单独以 `HEYTA_WEB_BASE=/app/` 构建、部署至 `/var/www/heyta-app`；公共 `/app/` 返回内容与本机产物逐字节一致，index SHA-256 为 `4622eeb422e927dddf8968aeb1962cbd6269ae2c68dba72914b4d2c477cd2f54`，引用 JS/CSS 均返回 200。
+- 帮助中心 `/docs/` 返回 200；其部署保留 `VITE_APP_URL=https://heyta.waytofuture.cn/app/`。
+- 本轮注册主路径已改为 `/api/register/email-password/request` → `/verify`，冷却后可 `/resend`；上方 §3.8.1 中旧的 `/register/email-password` 是兼容路径，不能代替验证码旅程验收。
+- 尚未证明生产 SMTP 的真实收件及验证码完整注册闭环；健康检查、模拟响应和数据库测试都不替代该证据。
