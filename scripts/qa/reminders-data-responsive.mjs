@@ -291,6 +291,16 @@ async function captureGroup(browser, spec, group) {
     const el = document.getElementById(id);
     const title = el?.querySelector('.ht-settings__group-title, h2, h3') ?? null;
     const r = el?.getBoundingClientRect();
+    // 「有没有内容被推出可视区」必须由这把尺回答，不能拿 `documentElement.scrollWidth` 顶：
+    // 外壳 rail 自带横向滚动容器，溢出被它吞掉之后文档账上是干净的（2026-10-09 两棵树各量一次：
+    // 旧树 scrollWidth=742 而 .ht-rail__tabs 右缘 535；当前树 scrollWidth=375 而同一枚右缘 549
+    // —— 内容出界两棵树都还在，只有前一种被记成"溢出"）。
+    const vw = document.documentElement.clientWidth;
+    const interactive = [...document.querySelectorAll('button, a[href], input')];
+    const outOfViewport = (list) => list.filter((node) => {
+      const b = node.getBoundingClientRect();
+      return b.width > 0 && b.height > 0 && b.right > vw + 1;
+    }).length;
     return {
       documentScrollWidth: document.documentElement.scrollWidth,
       documentClientWidth: document.documentElement.clientWidth,
@@ -302,15 +312,35 @@ async function captureGroup(browser, spec, group) {
       // 未登录时「账号与安全」整组只有一句门禁文案（实测 33 字），任何字面阈值都会把
       // **正常的一屏**判成缺陷，而那才是这条判据该回答的问题（这一组能不能被操作）。
       interactive: el ? el.querySelectorAll('button, a[href], input').length : 0,
+      // 出界读数**分两栏**：整屏的（含外壳 rail，那一栏今天非零、归属不在本线）与这一组自己的
+      // （那一栏才是本线四组设置面的判据对象）。混成一个数，外壳的旧账就会挂到设置面头上。
+      offViewportWholeScreen: outOfViewport(interactive),
+      offViewportInsideGroup: el ? outOfViewport([...el.querySelectorAll('button, a[href], input')]) : 0,
     };
+  }, `settings-group-${group}`);
+  // 牙：往这一组里种一枚必定出界的控件，上面那把尺必须数得到它。数不到就是尺坏了，
+  // 而 `offViewportInsideGroup === 0` 那条绿会变成装饰（同一族前科：不能失败的检查没有价值）。
+  const planted = await page.evaluate((id) => {
+    const el = document.getElementById(id);
+    if (!el) return null;
+    const vw = document.documentElement.clientWidth;
+    const probe = document.createElement('button');
+    probe.type = 'button';
+    probe.textContent = 'heyta-off-viewport-probe';
+    probe.style.cssText = `position:absolute;top:0;left:${vw + 200}px;width:120px;height:24px;`;
+    el.appendChild(probe);
+    const b = probe.getBoundingClientRect();
+    const counted = b.right > vw + 1;
+    probe.remove();
+    return counted;
   }, `settings-group-${group}`);
   await page.screenshot({ path: `${OUT}/${spec.theme}-${spec.width}-${group}.png`, fullPage: true });
   await context.close();
-  return { theme: spec.theme, width: spec.width, group, navLabel, facts };
+  return { theme: spec.theme, width: spec.width, group, navLabel, facts, planted };
 }
 
-/** 那四条外链行的判定。**唯一一份**：好态与三条坏臂都走这里（手搭一份对照谓词
- * 证的只是夹具，不是这把尺 —— 仓里同一族前科见 environment-traps #86）。 */
+/** 那四条外链行的判定。**唯一一份**：好态与三条坏臂都走这里 —— 对照臂里再手写一遍谓词，
+ * 证的只是那份手写夹具，不是这把尺本身。 */
 function helpRowJudgment(arm, viewportWidth) {
   return {
     wraps: arm.rows.every((x) => x.lineCount !== null && x.lineCount >= 2),
@@ -458,6 +488,8 @@ const assertionOwner = {
   groupSweepTitleMatchesNav: ['groups'],
   groupSweepActionable: ['groups'],
   groupSweepNoHorizontalOverflow: ['groups'],
+  groupSweepNothingPushedOffViewport: ['groups'],
+  groupSweepOffViewportRulerHasTeeth: ['groups'],
   helpWrapFourRowsMeasured: ['help'],
   helpWrapInjectionTookEffect: ['help'],
   helpLongTitleWraps: ['help'],
@@ -519,6 +551,11 @@ const report = {
     groupSweepTitleMatchesNav: groups.every((x) => Boolean(x.facts.title) && x.facts.title === x.navLabel),
     groupSweepActionable: groups.every((x) => x.facts.interactive >= 1),
     groupSweepNoHorizontalOverflow: groups.every((x) => x.facts.documentScrollWidth <= x.facts.documentClientWidth + 1),
+    // 出界这一格分两条：一条判设置面自己（本线的地盘），一条判这把尺能不能数到种下去的坏值。
+    // 整屏那一栏（`offViewportWholeScreen`）**只入读数不入门禁** —— 它今天非零，成因是外壳 rail
+    // 在 375 档把导航项排出可视区，那是外壳那一面的账，不由本线代改、也不许拿它凑成"我没判"。
+    groupSweepNothingPushedOffViewport: groups.every((x) => x.facts.offViewportInsideGroup === 0),
+    groupSweepOffViewportRulerHasTeeth: groups.every((x) => x.planted === true),
     // ── UX-S9-44 验收列欠的那句「长标题自然换行」（关于与帮助的四条外链行）──
     // 分母自检：`.every` 对空集合是真，所以"四行都量到了"必须先钉住。
     helpWrapFourRowsMeasured: helpWrap.every((x) =>
