@@ -7,7 +7,8 @@
  */
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '../../e2e/node_modules/@playwright/test/index.mjs';
 
@@ -33,6 +34,43 @@ for (const leg of LEGS) {
 }
 if (LEGS.length === 0) {
   throw new Error('HEYTA_RESPONSIVE_LEGS 选了零条腿 —— 那这趟什么都没判，别让它退 0');
+}
+
+/**
+ * 证据落点的闸门（2026-10-09 加，先修自己）。理由不是整洁：同日复量整族 `check:ai-e2e` 时现量到
+ * **跑一趟会把已跟踪的截图就地改写**（那棵隔离载体 152 枚、主检出 330 枚），覆盖没有归属、没有门禁 ——
+ * 证据一旦变成"最近一次跑出来的图"，它就不再指认任何一棵树。本装置默认落的正是已跟踪目录
+ * （`git ls-files -- apps/web/evidence/reminders-data-responsive` = 47 枚），所以它是写图者之一。
+ * 口径：目标目录里有已跟踪文件 ⇒ 起跑前响亮拒绝；两条出路写在报错里。
+ */
+const OUT_REL = relative(ROOT, OUT).split(sep).join('/');
+const OUT_LABEL = OUT_REL.startsWith('..') ? OUT : OUT_REL;
+const trackedInEvidenceDir = (() => {
+  if (!OUT_REL || OUT_REL.startsWith('..')) return 0;
+  try {
+    return execFileSync('git', ['ls-files', '--', OUT_REL], { cwd: ROOT, encoding: 'utf8' })
+      .split('\n').filter(Boolean).length;
+  } catch {
+    return 0;
+  }
+})();
+const ALLOW_TRACKED_OVERWRITE = process.env.HEYTA_ALLOW_TRACKED_EVIDENCE === '1';
+if (trackedInEvidenceDir > 0 && !ALLOW_TRACKED_OVERWRITE) {
+  throw new Error(
+    `证据目录 ${OUT_LABEL} 里有 ${trackedInEvidenceDir} 枚**已跟踪**文件，这一趟会把它们就地覆盖掉。` +
+      '两条出路：① 换个未跟踪的落点 `HEYTA_RESPONSIVE_EVIDENCE=<临时目录>`（例行复跑走这条）；' +
+      '② 确实要刷新入库的那批证据，显式加 `HEYTA_ALLOW_TRACKED_EVIDENCE=1`，并在提交信息里写明是哪一趟、哪棵树。',
+  );
+}
+if (process.env.HEYTA_RESPONSIVE_PLAN_ONLY === '1') {
+  console.log(JSON.stringify({
+    legs: LEGS,
+    evidenceDir: OUT_LABEL,
+    trackedEvidenceFiles: trackedInEvidenceDir,
+    allowedTrackedOverwrite: ALLOW_TRACKED_OVERWRITE,
+    browserLaunched: false,
+  }));
+  process.exit(0);
 }
 
 // 真实的 `default` **与 `granted`** 两态只存在于有头 Chromium。原先这里只写了 `default`，
