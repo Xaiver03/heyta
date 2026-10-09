@@ -2301,3 +2301,29 @@ AC-2 的「账号级速率」这一格只能做到"对外说明写明它现在�
 AC-3 双宿主装置、
 AC-6 旅程与真浏览器复跑（会改写白名单外 16 枚已跟踪 PNG）、AC-7 中英条款与帮助（B118）、AC-8 矩阵产物、
 T2 心跳消费者（B109）。AC 现量：**未勾 8 / 已勾 0**（未勾 `grep -c '^- \[ \] \*\*AC-' docs/plans/inbound-automation.md`、已勾把 `[ \]` 换成 `[x]`）。
+
+## 2026-10-10 04:3x · AC-1「额度耗尽」补尺 + 七臂反向验证
+
+做完的：AC-1 六枚拒绝情形里**额度耗尽那一枚在自动收集预留那一路原本零尺**，且它当时对外报的是
+**409（可重试）**。现在：类型化拒绝 `AutomationAiMeteringDeniedError`（带 `reason/used/limit`）→
+`server/src/entitlement.ts` 新增 `replyAutomationMeteringRejection` 收口成 **402**（响应形状与闸门那一路
+共用同一个装配函数，词表各自锁在产出处，**没有**去动 `packages/domain` 的封闭词表守卫）；其余异常仍 409。
+三层尺补齐：真库 17 条（原 12 + 新 5）、HTTP 收口 3 条（新文件 `server/tests/inbound-ai-quota-route.spec.ts`）、
+合起来复跑 `Test Files 4 / Tests 34 / RC=0`。反向验证装置 `research/tools/verify-inbound-quota-teeth.py`
+**臂数=7 不成立=0**，静止臂 rc=0 且 0 红，两枚目标末次 sha256 逐字等于开局，`--self-test` 的失配臂被拒。
+
+自己在这条上翻了自己两次（都当场重量改掉，留形在计划那一节）：
+1. **把 `| head` 截断的读数当成分母** —— 台账第一版写"本仓已有 8 份 spec 省略 `requireTermsConsent`"，
+   逐文件计数后真值是 **15 处调用 / 6 份文件**（`password-auth-routes` 一份就占 9 处）。
+2. **把"这个词没人测"写大了** —— `QUOTA_EXCEEDED` 在 HEAD 有 6 份测试档命中，尺全在**通用托管计量/代理**那一路；
+   缺的确实是"自动收集预留那一路"，但那句话必须限定到**哪一路**才成立。同样的错话一度写进了 pglite spec 的文件头，已按四条实测改掉。
+
+新登记的：B124（源码变异装置在别人也在写的 `api.ts` 上有窗口 —— 装置能检测"窗口里有人写过"并另存，
+但**检测不到"别人在那一刻提交走变异字节"**，三条出路都要负责人拍）；B123 补了一条具体红（那 15 处）。
+
+仍然没闭合：界面拿 `used`/`limit` 出文案等 T5 与 B110/B109；`ai-reserve` 的票据仍在闸门事务里消费；
+AC-1 继续不勾选（这一格只补了六枚拒绝里的一枚）。AC 现量：**未勾 8 / 已勾 0**。
+`verify-inbound-doc-tables.py` rc=0、`check-docs-voice.mjs` rc=0、`docs-link-check.mjs` 仍只有那条别线死链。
+⚠️ 本线 `api.ts` 的未提交 hunk 与并行那条线（注册 OTP / locale 重构）混在同一份文件里，本轮只带我三处
+（两条 import + 那一格 catch），其余仍留在工作树不动 —— 逐文件现量：`git diff HEAD -- server/src/api.ts` 在提交后
+应只剩他们那些 hunk。

@@ -510,6 +510,22 @@ export const authorizeAutomationWrite = async (input: {
 };
 
 /**
+ * 402 响应体的**唯一**装配点。
+ *
+ * 🔴 闸门那一路与计量那一路必须回逐字相同的形状：客户端按 `reason` 决定"停止重试"
+ * 还是"显示等待权益"，两处各写一遍就会在某一处漏字段。
+ * `reason` 在这里是 `string` 而不是封闭词表 —— 这一层只做装配，不裁决；
+ * 两路的词表仍各自锁在**产出它的那一处**（闸门：`EntitlementDenialReason`；
+ * 计量：`AiMeteringDenialReason`）。放宽裁决层的类型才会造成漂移，放宽这里不会。
+ */
+const automationRejectionBody = (reason: string, code?: string): Record<string, unknown> => ({
+  error: ENTITLEMENT_ERROR_MESSAGE,
+  errorCode: ENTITLEMENT_ERROR_CODE,
+  reason,
+  ...(code === undefined ? {} : { ticketCode: code }),
+});
+
+/**
  * 权益被拒时的响应与审计（**唯一一份**）。
  *
  * 闸门那一路与写事务那一路必须回**逐字相同**的形状：客户端按 `reason`/`ticketCode`
@@ -530,12 +546,36 @@ export const replyAutomationRejection = (
     ...(decision.code === undefined ? {} : { ticketCode: decision.code }),
     ip: req.ip,
   });
-  return reply.status(402).send({
-    error: ENTITLEMENT_ERROR_MESSAGE,
+  return reply.status(402).send(automationRejectionBody(decision.reason, decision.code));
+};
+
+/**
+ * 🔴 **托管额度**那一路的 402 收口（`AutomationAiMeteringDeniedError` → 响应）。
+ *
+ * 它为什么不并进 `replyAutomationRejection`：那一枚的 `reason` 词表是
+ * `EntitlementDenialReason`（订阅行裁决），而 `QUOTA_EXCEEDED` 是**计数器**裁决出来的，
+ * 不在那张封闭表里 —— 把它塞进去会同时打断 `packages/domain` 那条读两份源文件的
+ * 漂移守卫（那是别人的判据，不该由本线放宽）。共用的是**响应形状**，不是词表。
+ *
+ * `used` / `limit` 进响应体：界面要说的是"本月 300 次用完了"，不是"出错了"。
+ * 没有这两个数，宿主只能再发一次请求去猜，而那一发本身就是又一次裁决。
+ */
+export const replyAutomationMeteringRejection = (
+  req: FastifyRequest,
+  reply: FastifyReply,
+  denial: { reason: string; used: number; limit: number },
+): FastifyReply => {
+  Logger.audit({
+    event: ENTITLEMENT_AUDIT_EVENTS.DENIED,
+    userId: getAuthUser(req).userId,
     errorCode: ENTITLEMENT_ERROR_CODE,
-    reason: decision.reason,
-    ...(decision.code === undefined ? {} : { ticketCode: decision.code }),
+    reason: denial.reason,
+    capability: 'automation',
+    used: denial.used,
+    limit: denial.limit,
+    ip: req.ip,
   });
+  return reply.status(402).send({ ...automationRejectionBody(denial.reason), used: denial.used, limit: denial.limit });
 };
 
 /** 守卫读到的开关形状（`ServerConfig['entitlements']` 的子集）。 */

@@ -847,3 +847,89 @@ expect(requestBody.messages.at(-1).content).not.toContain('must-not-leave');
 三条标"规划中"、120/分那格写明"名义有、拦的不是账号"，并把"加密膨胀计入队列字节数"挪到裁决点那一格。
 要做成真正的账号级/共享存储级限流需要新增依赖，**不属本轮授权**，登记为 B122。
 
+
+## 2026-10-10 04:2x · AC-1 那句「额度耗尽拒绝且不产生业务效果」补尺
+
+这一格是 03:1x 那张复审表的**第三批翻案**（前两批是 AC-4 的出境键集、AC-2 的并发限额，见上面
+「逐格结论」下面那两条 🔴）。03:1x 那句"AC-1 / AC-2 / AC-4 / AC-5 的句子基本有尺"对 AC-1 也只说对了一半：
+AC-1 的拒绝词表里**「额度耗尽」这一枚在自动收集预留那一路没有任何一层在守**。四条分母（全部
+`git show HEAD:` / `git grep … HEAD` 当场数，别对着工作树数——工作树里已经有本轮补的尺了）：
+
+| 查的东西 | 命令 | 当日读数 |
+|---|---|---|
+| 有谁会走到自动收集预留那一步 | `git grep -l reserveAutomationAiAttempt HEAD -- server/tests` | **只有两份**：`automation-ai-metering.spec.ts`、`automation-ai-metering.pglite.spec.ts` |
+| 这两份里有没有超额码 | `for f in …; do git show "HEAD:$f" \| grep -c QUOTA_EXCEEDED; done` | **0 / 0** |
+| 单元档传没传限额 | `git show HEAD:server/tests/automation-ai-metering.spec.ts \| grep -n "reserveAutomationAiAttempt(key, 100, 3"` | 传了 `limit = 3`，**但**假事务里 `ai_usage_counters` 的 INSERT 分支恒回 `[{requests: 1}]`（同文件 17 行）⇒ 永远判 allowed，`!quota.allowed` 那支从来没被走到 |
+| 真库档传没传限额 | `git show HEAD:server/tests/automation-ai-metering.pglite.spec.ts \| grep -c "NOW, undefined, executor"` | **14**（= 该档全部调用）—— 连"有限额"这个前提都没构造过 |
+
+🔴 **本节第一版把这张表写歪了两次，当场被自己的复跑否证，留形**：① 第一版说"单元档 mock 了
+`consumeManagedAiRequest`" —— `git show HEAD:` 里那两份档**根本没有这个名字**（它是假 SQL 分支，不是 mock）；
+② 第一版说"真 HTTP 集成档里出现的拒绝码一个 `QUOTA` 都没有" —— `git grep -c QUOTA_EXCEEDED HEAD -- server/tests`
+实际命中 **6 份档**（含 `integration/ai-metering-race`、`managed-proxy.routes`）。真相是：
+**`QUOTA_EXCEEDED` 这个词有主、也有尺，只不过尺全在通用托管计量/代理那一路**，自动收集预留那一路当时
+既没有类型化的拒绝、也没有码。"没有任何一层在守"这句要限定到**哪一路**才成立 —— 写成"这个词没人测"
+就成了一句更大的假话。同样的错话一度还写进了 pglite spec 的文件头，已按这四行一起改掉。
+
+### 修的是什么（不是补测试，是三条真缺陷）
+
+1. **拒绝没有类型**。`ai-metering.ts` 里额度被拒时抛的是裸 `new Error('Managed AI request quota exceeded')`，
+   而路由那个 `catch` 是"任何异常都算 409"。于是**额度耗尽对外报的是 409（可重试）**——宿主读成"这次传输失败了"，
+   会退避重试直到这个用不完的周期结束，而界面只会一直显示报错。
+2. **`used` / `limit` 到不了客户端**。那两个数是设置页那句"本月 300 次用完了"唯一的来源（额度 SSOT 是
+   `docs/reference/pricing-and-entitlements.md` 的 `MANAGED_AI_REQUESTS_PER_PERIOD`，代码里不许再写一遍 300）。
+3. **拒绝与"不产生业务效果"没有对账**。`automation_ai_attempts` 那一行如果先落再判额度，被拒的尝试会**留在账本里**，
+   下一趟重放就被"已有行短路"当成已经预留过而放行 —— 用户没发生的物理调用被记了账。
+
+改后：`AutomationAiMeteringDeniedError`（带 `{reason, used, limit}`）由 `server/src/entitlement.ts` 里
+新加的 `replyAutomationMeteringRejection` 收口成 **402**，body 与权益闸门那一路逐字同形、只多 `used`/`limit`；
+`api.ts` 的 `catch` 只对**这一个类型**发 402，其余异常**仍然** 409（反向那一半同样有断言：`limit ≤ 0` 抛
+`RangeError`，如果它也变成 402 就是把"部署配错了"说成"你额度用完了"）。审计事件同形，多带两个数。
+`QUOTA_EXCEEDED` **没有**并进 `EntitlementDenialReason` 那个封闭词表 —— 它由计量层判、不由权益闸门判，
+且那个词表被 `packages/domain/src/subscription.ts` 的漂移守卫钉着（白名单外），所以按"新增 reason 单列"处理，
+口径边界写进协议文档 §4。
+
+### 补的三层尺与读数
+
+| 尺 | 命令 | 当日读数 |
+|---|---|---|
+| 真库层（PGlite，DDL 从迁移文件读，不手抄） | `cd server && npx --no-install vitest run --maxWorkers=1 tests/automation-ai-metering.pglite.spec.ts` | `Tests 17 passed (17)`（原 12 + 新 5：超额拒且**数得出行数没多**、计数器不抬过上限、满额度时同键重放仍拿回原预留、`local`/`direct` 不被托管额度挡、退款腾出额度后被拒那枚能重预留且对账 `short:false`、`limit=0` 抛 `RangeError` 且**不是**这一族） |
+| HTTP 收口层（真 `apiRoutes` 挂在裸 Fastify 上，`inject` 走一次真路由） | `cd server && npx --no-install vitest run --maxWorkers=1 tests/inbound-ai-quota-route.spec.ts` | `Tests 3 passed (3)`：超额 → **402** + `errorCode=SUBSCRIPTION_REQUIRED` + `reason=QUOTA_EXCEEDED` + `used:1` + `limit:MANAGED_AI_REQUESTS_PER_PERIOD` + **事务执行器一次都没被调**（= 没有业务效果）；DB 故障 → **409 且 body 里没有 `reason`**（不许被一并变成"停止重试"）；额度够 → 200 且事务执行器被调（正向对照，挡"永远 402"那种假绿） |
+| 合起来复跑（含 T2 那格写事务消费） | `cd server && npx --no-install vitest run --maxWorkers=1 tests/automation-ai-metering.pglite.spec.ts tests/inbound-ai-quota-route.spec.ts tests/automation-ai-metering.spec.ts tests/inbound-entitlement-write-tx.spec.ts` | `Test Files 4 passed (4)` / `Tests 34 passed (34)`，**`RC=0`**（不经管道取；第一次取成 1 是我的 `${PIPESTATUS[0] [0]}` 在 zsh 里 bad substitution —— §7 #184 那一族的第五种面目） |
+| 类型 | `cd server && npx --no-install tsc -p tsconfig.json --noEmit` → `TSC_RC=0`；两份 spec 另按 B123 手喂：`npx --no-install tsc --noEmit --strict --target ES2022 --module esnext --moduleResolution bundler …` → `TSC_SPEC_RC=0` | 手喂那一跑**当场照出真缺陷**：`app.register(apiRoutes, { prefix: '/api' })` 少传 `ApiRoutesOptions` 的**必填**项 `requireTermsConsent`（`src/api.ts:609`）。分母现量（`cd server`）： `grep -rn "register(apiRoutes" tests/ \| grep -vc requireTermsConsent` = **15 处调用省略**，分布在 6 份文件 （`password-auth-routes` 9/10、`api.routes` 2/2、`legal-recheck.routes`、`account-locale`、`email-locale-wire`、`registration-api` 各 1）—— 因为它们从来不在任何类型门禁里（B123）。🔴 本节第一版在这里写的是"8 份 spec 这么写"，那枚读数是 `grep … \| head` **截断后**的条数被当成了全集（本仓反复点名的那一类）；已按逐文件计数改掉。 新那份按线上形状显式给值并在文件头写明为什么补，**没有**去改别人那 15 处（它们会在新门下一起红，属别线的红）。 |
+
+### 反向验证：把这六句裁决逐句摘掉
+
+装置：`python3 research/tools/verify-inbound-quota-teeth.py`（照 `verify-inbound-queue-teeth.py` 的形状，
+但它要动**两枚**文件：`ai-metering.ts`（计量层）与 `api.ts`（收口层），所以开局哈希、`.mut-bak`、还原核对都按文件各存一份。
+`entitlement.ts` **只读不改** —— 402 的收口由第五臂在调用点摘掉就够了，同一条承诺动两处会让"哪一处是承重的"读不出来）。
+
+```
+全部臂　目标=2 枚：server/src/api.ts、server/src/automation/ai-metering.ts
+  server/src/api.ts　开局 sha256=4e15ad3302b864c1
+  server/src/automation/ai-metering.ts　开局 sha256=44855caf55534f65
+  额度裁决整句摘掉（超额照单收下）: 成立　rc=1 命中用例=True
+  拒绝时把 used/limit 抹成 0（界面说不出用了多少）: 成立　rc=1 命中用例=True
+  类型化拒绝退化成普通 Error（路由认不出 ⇒ 402 变 409）: 成立　rc=1 命中用例=True
+  已有行短路失效（同一枚重放二次收费）: 成立　rc=1 命中用例=True
+  路由的 402 收口摘掉（终态被说成可重试）: 成立　rc=1 命中用例=True
+  额度判定挪到 managed 分支之前（本机/自带端点也被拦）: 成立　rc=1 命中用例=True
+  静止对照：注释改动不许让任何用例变红: 成立　rc=0 红=0（静止臂要求 rc=0 且 0 红）
+  末次 sha256 server/src/api.ts = 4e15ad3302b864c1（须等于开局那枚）
+  末次 sha256 server/src/automation/ai-metering.ts = 44855caf55534f65（须等于开局那枚）
+臂数=7　不成立=0
+```
+
+`python3 research/tools/verify-inbound-quota-teeth.py --self-test` → `臂数=1　不成立=1` +
+`SELF_TEST=OK`（模式在源码里不存在时报 `PATTERN_MISS` 并非零退出，且不落笔）。
+
+🔴 两枚目标的**开局快照取的是工作树字节、不是 `git show HEAD:`**，因为 `api.ts` 此刻带着并行那条线
+（注册 OTP / locale）未提交的 hunk；还原只从 `.mut-bak`，且还原前先核"当前字节 == 本臂写入的那份变异字节"，
+不一致就说明窗口里有别的写入者 —— 那时先把意外字节另存到仓库外、再落回开局那份、并以 exit 3 报出三枚哈希，
+**绝不静默覆盖别人的未提交改动**。上面那两行"末次 = 开局"就是这条保险丝今日成立的证据。
+
+### 仍然没闭合的（不包装成完成）
+
+- **界面拿 `used`/`limit` 出文案**那一格仍等 T5 与 B110/B109 —— 今天这两个数只在 HTTP 响应里，没有消费者。
+- `ai-reserve` 的票据**仍在闸门事务里消费**（协议 §4 那句 ⚠️ 原样成立，本层没动它）。
+- AC-1 整体**继续不勾选**：这一格补的是"额度耗尽"那一枚拒绝，免费/过期/错主体/错实例/坏签名那五枚的尺在 03:1x 那张表里，
+  而宿主每 30 秒续票据的消费者那一格仍被 B109 挡着。

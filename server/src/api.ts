@@ -65,11 +65,11 @@ import { asServerLocale, resolveLocale } from './design-html.js';
 import { SERVER_LOCALES, type ServerLocale } from './copy.generated.js';
 import { authCache } from './auth-cache';
 import { getWsConnectionService } from './sync/services/websocket-connection.service';
-import { AutomationWriteAuthorizationError, createEntitlementGuard, readAutomationEntitlementTicketHeader, replyAutomationRejection, resolveAutomationEntitlementMode } from './entitlement';
+import { AutomationWriteAuthorizationError, createEntitlementGuard, readAutomationEntitlementTicketHeader, replyAutomationMeteringRejection, replyAutomationRejection, resolveAutomationEntitlementMode } from './entitlement';
 import { issueAutomationCommitPermit, readInboundUploadIdentity, registerAutomationWorker, revokeAutomationWorker } from './automation/worker-identity';
 import { createAutomationRule, deleteAutomationRule, listAutomationRules, setAutomationRuleEnabled, updateAutomationRuleConfig } from './automation/rules';
 import { claimAutomationEvent, listAutomationEvents, publishAutomationResult, readAutomationPreparedResult, renewAutomationLease, retryUncertainAutomationEvent, readAutomationDraft, decideAutomationDraft } from './automation/events';
-import { advanceAutomationAiAttempt, reserveAutomationAiAttempt } from './automation/ai-metering';
+import { advanceAutomationAiAttempt, AutomationAiMeteringDeniedError, reserveAutomationAiAttempt } from './automation/ai-metering';
 import { issueSenderCredential, listSenderCredentials, revokeSenderCredential } from './automation/sender-credentials';
 import { AUTOMATION_ENTITLEMENT_ACTIONS, AutomationEntitlementError, redeemAutomationEntitlementTicket } from './automation/entitlement-ticket';
 import {
@@ -1207,7 +1207,15 @@ export const apiRoutes = async (
           undefined, { clientId: parsed.data.clientId, credentialHash: identity.credentialHash,
             databaseEpoch: identity.databaseEpoch, tokenVersion: identity.tokenVersion, leaseGeneration: parsed.data.leaseGeneration },
           parsed.data.billingSource));
-      } catch { return reply.status(409).send({ error: 'Automation AI attempt could not be reserved' }); }
+      } catch (error) {
+        // 🔴 额度/权益计量拒掉的那一次是**终态**（这一个周期不会再放行），必须收口成 402。
+        // 让它落进下面那一格 409，宿主的读法是"这次传输失败了"⇒ 退避重试一直打到一个
+        // 用不完的周期为止，而用户界面永远只显示报错、不显示"本月 300 次已用完"。
+        // 其余异常（租约掉了、并发 CAS 没命中、限额配错）**仍然**是 409 —— 把它们也变成
+        // 402 会让宿主停止重试一件本该重试的事，那是反向的错。
+        if (error instanceof AutomationAiMeteringDeniedError) return replyAutomationMeteringRejection(req, reply, error.denial);
+        return reply.status(409).send({ error: 'Automation AI attempt could not be reserved' });
+      }
     },
   );
 

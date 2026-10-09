@@ -7362,3 +7362,31 @@ T8 给 AC-7 收证时撞出来的，且它正好是任务书说的那种「坏�
 也不是本轮能修的：落点是 `server/tsconfig.json` / 新建 `server/tsconfig.spec.json` / 根 `package.json` 的脚本与 `pnpm check` 链 —— **三处都在白名单外**。
 ⇒ 登记，等负责人给地界或另起一条会话处理。修法建议（不在本轮做）：加一份 `tsconfig.spec.json`（`include: ["tests/**/*"]`，
 继承主配置）+ 一枚 `typecheck:tests` 脚本并进 `pnpm check`；先确认那 100+ 份现存 spec 在新门下是不是立刻一批红 —— 那属于**别线的红**（B115 同族）。
+
+⚠️ **2026-10-10 04:2x 现量：这一格不只"可能有红"，是已经量到一枚具体的红**。本轮新写的
+`server/tests/inbound-ai-quota-route.spec.ts` 第一次手工 `tsc --noEmit`（`--module esnext --moduleResolution bundler`）时报
+`TS2769`：`app.register(apiRoutes, { prefix })` 少传 `ApiRoutesOptions` 的**必填**项 `requireTermsConsent`
+（`server/src/api.ts:609`）。运行时它悄悄是 `undefined` ⇒ `buildRegisterBodySchema(undefined)`，用例照样绿。
+分母现量（`cd server`）：`grep -rn "register(apiRoutes" tests/ \| grep -vc requireTermsConsent` = **15 处调用省略**，
+分布在 **6 份文件**：`password-auth-routes`(9/10)、`api.routes`(2/2)、`legal-recheck.routes`(1)、`account-locale`(1)、
+`email-locale-wire`(1)、`registration-api`(1)；其余 12 处（11 份文件）都显式给了值。
+**新门一上这 15 处会一起红**，那属于别线的红、本轮不代改（只把自己那一份按线上形状补上值并在文件头写明为什么补）。
+
+## B124（2026-10-10 04:2x，本会话 · 第二枚变异装置上线后量出的共享检出风险）：源码变异装置在**别人也在写的文件**上跑，窗口内有被整笔提交走的风险
+
+`research/tools/verify-inbound-quota-teeth.py` 按 AC-1 那格的需要要动**两枚**源文件，其中 `server/src/api.ts`
+此刻正带着并行那条线（注册 OTP / locale）**未提交的 hunk**。装置自己做了三道防护（开局快照取工作树字节而非
+`git show HEAD:`、`.mut-bak` 在仓库外、还原前先核"当前字节 == 本臂写入的变异字节"，不一致则把意外字节另存后
+落回开局并以 exit 3 报出三枚哈希），本轮读数两枚文件"末次 = 开局"逐字相等。
+
+🔴 **但防护挡不住这一种**：某臂的窗口里（每臂一次 vitest 跑，整轮 ~7 分钟）另一条线如果**正好 `git commit` 了 `api.ts`**，
+它提交走的就是**变异后的字节**，而装置对此毫无感知 —— 它的比对只在"我还原之前"发生，不看索引也不看别人的提交。
+这不是假设：本会话开工时的现量就是 `api.ts` 处在 `M`，且**并行那条线正在里面写**（注册 OTP 与 locale 两枚 hunk）。
+
+三条出路，**要负责人拍**（本线白名单内做不到任何一条）：
+① 变异装置一律在**隔离副本**（worktree/克隆）上跑 —— 与 T7 那三条命令的处置同一个决定，也同一个代价（产物与主检出漂移）；
+② 跑之前先与并行会话**约定窗口**（AGENTS §8 第 9 条"共享资源独占验收"就是这个意思，但今天没有协调机制，只有台账上的一句话）；
+③ 接受风险并要求每条线提交前跑一次 `git diff --cached` 人审（把防护放到**写入端**，代价是每次提交都要人看）。
+
+本线的取舍：**继续用现装置 + 把窗口压在两枚文件的臂数降到最低**（本轮 6 真臂 + 1 静止臂），并把这一格登记在这里。
+不代别的线改，也不擅自 `git add` 别人正在写的那份。

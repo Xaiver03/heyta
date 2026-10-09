@@ -7,6 +7,7 @@ import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   advanceAutomationAiAttempt,
+  AutomationAiMeteringDeniedError,
   reconcileAutomationAiMetering,
   reserveAutomationAiAttempt,
 } from '../src/automation/ai-metering';
@@ -289,5 +290,113 @@ describe('automation AI metering — 逐事件与逐周期对账（真库）', (
        VALUES ($1, $2, 'ev-check', 1, 1, NULL, 'managed', 'reserved', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
       [userId, RULE],
     )).rejects.toThrow(/automation_ai_attempts_billing_source_known|check|constraint/i);
+  });
+});
+
+/**
+ * 🔴 AC-1 六枚拒绝情形里的**额度耗尽**那一枚。
+ *
+ * 这一格此前在**自动收集预留那一路**上零尺。四条分母都是当场 `git show HEAD:` 数出来的，
+ * 别再改写成"额度这一枚完全没人测过"——那不是真的：
+ * ① `git grep -l reserveAutomationAiAttempt HEAD -- server/tests` 只有两份档；
+ * ② 那两份里 `QUOTA_EXCEEDED` 命中 **0 / 0**；
+ * ③ 单元档**传了** `limit = 3`，但它那枚假事务的 `ai_usage_counters` INSERT 恒回 `[{requests: 1}]`
+ *    ⇒ `consumeManagedAiRequest` 永远判 allowed，`!quota.allowed` 那支从来没被走到；
+ * ④ 本档（真库）HEAD 那版 14 枚调用**全部**把 `limit` 传成 `undefined`
+ *    （`grep -c "NOW, undefined, executor" = 14`）—— 连"有限额"这个前提都没构造过。
+ * ⇒ `QUOTA_EXCEEDED` 这个词在**通用托管计量 / 代理**那一路有尺（HEAD 命中 6 份档），缺的是自动收集这一路：
+ *    它的拒绝当时没有类型，被路由那个"任何异常都算 409"的 `catch` 吞掉，所以对外报的是**可重试**。
+ *
+ * 判的三件事各自对应一种真实伤害：
+ * ① 拒了**且不落账行** —— 落了就是"为用户没发生的物理调用记账"，
+ *    而且下一趟重放会被那条已有行**当成已经预留过**而放行；
+ * ② 计数器**不许 +1** —— 超额还加就把 300 次用成了 301 次，账永久对不上；
+ * ③ 本机 / 自带端点**不许被托管额度挡住** —— 那是 ADR-0010 的隐私立场，
+ *    谁"顺手"把额度判定提到 `billingSource` 分支之前，这里就红。
+ */
+describe('automation AI metering — 额度耗尽（真库，AC-1 那一枚拒绝）', () => {
+  /** 该账号在账本里究竟有几行 —— "不产生业务效果"只能靠数行数，不能靠状态码。 */
+  const attemptRowCount = async (userId: number): Promise<number> => {
+    const res = await db.query<{ n: number }>('SELECT COUNT(*)::int AS n FROM automation_ai_attempts WHERE user_id = $1', [userId]);
+    return Number(res.rows[0]!.n);
+  };
+
+  it('额度用尽时预留被拒，且既不落账行也不把计数器抬过上限', async () => {
+    const userId = await makeAccount(PERIOD_END);
+    const first = { userId, ruleId: RULE, eventId: 'ev-q1', parseVersion: 1, attempt: 1 };
+    await reserveAutomationAiAttempt(first, NOW, 1, executor, undefined, 'managed');
+    expect(await counterRequests(userId, PERIOD_END)).toBe(1);
+
+    const second = { userId, ruleId: RULE, eventId: 'ev-q2', parseVersion: 1, attempt: 1 };
+    const thrown = await reserveAutomationAiAttempt(second, NOW, 1, executor, undefined, 'managed')
+      .then(() => undefined, (error: unknown) => error);
+    expect(thrown).toBeInstanceOf(AutomationAiMeteringDeniedError);
+    expect((thrown as InstanceType<typeof AutomationAiMeteringDeniedError>).denial).toMatchObject({ reason: 'QUOTA_EXCEEDED', used: 1, limit: 1 });
+    // 🔴 反向那一半：这一次**没有**业务效果。第一枚还在，第二枚一行都没有。
+    expect(await attemptRowCount(userId)).toBe(1);
+    const leaked = await db.query('SELECT 1 FROM automation_ai_attempts WHERE event_id = $1', ['ev-q2']);
+    expect(leaked.rows).toHaveLength(0);
+    // 计数器仍等于上限：超额不消耗是靠那条 `WHERE requests < $4` 的 UPSERT 本身，
+    // 不是"先加再回滚"—— 回滚的形状在这里读不出来，读得出的是它没抬上去。
+    expect(await counterRequests(userId, PERIOD_END)).toBe(1);
+  });
+
+  it('同一枚尝试的重放不因额度耗尽被拒（断链重试不能二次收费）', async () => {
+    const userId = await makeAccount(PERIOD_END);
+    const key = { userId, ruleId: RULE, eventId: 'ev-q-retry', parseVersion: 1, attempt: 1 };
+    const reserved = await reserveAutomationAiAttempt(key, NOW, 1, executor, undefined, 'managed');
+    // 上限就是 1，此刻额度已经满了。宿主没收到响应而重发**同一个 attempt**，
+    // 必须拿回同一笔预留；若这一路先判额度再查已有行，用户就凭空少了一次机会。
+    const replay = await reserveAutomationAiAttempt(key, NOW + 1_000, 1, executor, undefined, 'managed');
+    expect(replay).toEqual(reserved);
+    expect(await counterRequests(userId, PERIOD_END)).toBe(1);
+    expect(await attemptRowCount(userId)).toBe(1);
+  });
+
+  it('额度耗尽挡不住本机与自带端点（隐私立场不由托管额度裁决）', async () => {
+    const userId = await makeAccount(PERIOD_END);
+    await reserveAutomationAiAttempt({ userId, ruleId: RULE, eventId: 'ev-q-full', parseVersion: 1, attempt: 1 }, NOW, 1, executor, undefined, 'managed');
+    expect(await counterRequests(userId, PERIOD_END)).toBe(1);
+    for (const source of ['local', 'direct'] as const) {
+      const key = { userId, ruleId: RULE, eventId: `ev-q-${source}`, parseVersion: 1, attempt: 1 };
+      const reserved = await reserveAutomationAiAttempt(key, NOW, 1, executor, undefined, source);
+      expect(reserved.state).toBe('reserved');
+      expect(reserved.periodAnchor).toBeNull();
+    }
+    // 两枚都落了账行，而托管计数器一格没动 —— 本机调用不占这一档的账。
+    expect(await attemptRowCount(userId)).toBe(3);
+    expect(await counterRequests(userId, PERIOD_END)).toBe(1);
+  });
+
+  it('退款腾出一次额度后，被拒过的那一枚能重新预留且只占一次', async () => {
+    const userId = await makeAccount(PERIOD_END);
+    const held = { userId, ruleId: RULE, eventId: 'ev-q-hold', parseVersion: 1, attempt: 1 };
+    const blocked = { userId, ruleId: RULE, eventId: 'ev-q-blocked', parseVersion: 1, attempt: 1 };
+    await reserveAutomationAiAttempt(held, NOW, 1, executor, undefined, 'managed');
+    await expect(reserveAutomationAiAttempt(blocked, NOW, 1, executor, undefined, 'managed'))
+      .rejects.toBeInstanceOf(AutomationAiMeteringDeniedError);
+    // 那一次预留根本没发出去 ⇒ 释放必须把额度退回来（P1-4）。
+    expect(await advanceAutomationAiAttempt(held, 'reserved', 'released', executor)).toBe(true);
+    expect(await counterRequests(userId, PERIOD_END)).toBe(0);
+    const retried = await reserveAutomationAiAttempt(blocked, NOW, 1, executor, undefined, 'managed');
+    expect(retried.state).toBe('reserved');
+    expect(await counterRequests(userId, PERIOD_END)).toBe(1);
+    // 账本里现在只有 ev-q-hold(released) 与 ev-q-blocked(reserved) 两行：
+    // 被拒的那一次没有留下任何行，所以逐事件对账不会多出一枚"没发生过的尝试"。
+    expect(await attemptRowCount(userId)).toBe(2);
+    const reading = await reconcileAutomationAiMetering({ userId, sql: executor });
+    expect(reading.periods[0]).toMatchObject({ chargedAttempts: 1, refundedAttempts: 1, counterRequests: 1, short: false });
+  });
+
+  it('限额配错不是"额度耗尽"：抛的是 RangeError，不许被收口成 402', async () => {
+    const userId = await makeAccount(PERIOD_END);
+    const key = { userId, ruleId: RULE, eventId: 'ev-q-misconfig', parseVersion: 1, attempt: 1 };
+    // `limit = 0` 的真相是"部署配错了"，回给用户"你额度用完了"是一句假话；
+    // 而这一枚如果也是 AutomationAiMeteringDeniedError，路由就会把它发成 402（停止重试）。
+    const thrown = await reserveAutomationAiAttempt(key, NOW, 0, executor, undefined, 'managed')
+      .then(() => undefined, (error: unknown) => error);
+    expect(thrown).toBeInstanceOf(RangeError);
+    expect(thrown).not.toBeInstanceOf(AutomationAiMeteringDeniedError);
+    expect(await attemptRowCount(userId)).toBe(0);
   });
 });

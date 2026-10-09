@@ -105,6 +105,18 @@ date-only 与 instant 是两种不同语义：date-only 由 `*DateLocal` 字段�
 
 事件模型账本唯一键 `(eventId, parseVersion, attempt)`，状态 `reserved/sent/consumed/released/unknown`；计量来源在 reserve 时冻结为 `local`、`direct` 或 `managed`，并写入同一账本。`managed` 才消费托管 AI 周期额度并带 `periodAnchor`；本地模型和用户自有端点不消费托管额度，二者的 `periodAnchor` 必须为 `null`。同一尝试重试时来源不允许改变，来源错配必须拒绝。额度判定与 reserve 在同一个数据库事务中，旧的周期计数器不能被另一路无条件加一。明确未发送的失败才 release；已发出后丢失响应记 unknown，默认不自动重新调用。取得结果后只保存客户端加密结果；重试提交不再调用模型。
 
+**额度用尽那一次拒绝的形状**是 AC-1 那句"拒绝且不产生业务效果"里此前没有任何一层在守的一半（2026-10-10 补）。
+`managed` 预留被额度拒掉时抛**类型化**的 `AutomationAiMeteringDeniedError`，路由把它收口成 **402**，
+响应带 `errorCode=SUBSCRIPTION_REQUIRED`、`reason=QUOTA_EXCEEDED` 以及 `used` 与 `limit` 两个数 ——
+形状与权益闸门那一路逐字同形，只多这两个数（设置页那句"本月 300 次用完了"靠它们，而不是再发一次请求去猜）。
+其余异常（租约失效、状态 CAS 没命中、限额配错）**仍然**是 409：把可重试的事发成 402 会让宿主一整期不再尝试，
+把终态发成 409 会让它对着一个用不完的周期退避空转 —— 两个方向都是缺陷，所以分类判的是"这个条件会不会自己变好"，
+不是 HTTP 码好不好看。`limit ≤ 0` 抛 `RangeError` 而**不是**这一族，正因为那句话的真相是"部署配错了"，
+回给用户"你额度用完了"是一句假话。拒绝那一次**不写账本行**、周期计数器**不 +1**；而同一枚
+`(eventId, parseVersion, attempt)` 的重放在额度已满时仍拿回原来那笔预留 —— 已有行的短路排在额度判定**之前**，
+否则宿主只要丢一次响应就凭空少掉一次机会。`QUOTA_EXCEEDED` 不属于 `EntitlementDenialReason` 那个封闭词表
+（它由计量层判，不由权益闸门判），界面若要为它单出文案，得按这一个 reason 判，不能并进"等待权益"那一句。
+
 **哪些尝试把额度还回去，是这句的下一半，2026-10-10 起已定且落库**：
 
 | 转移 | 周期计数器 | 为什么 |

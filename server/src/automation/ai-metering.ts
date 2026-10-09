@@ -1,6 +1,6 @@
 import { prisma } from '../db';
 import { createPrismaSqlExecutor, createPrismaSqlRunner, type SqlExecutor, type SqlRunner } from '../billing/pricing-store';
-import { consumeManagedAiRequest } from '../ai/metering';
+import { consumeManagedAiRequest, type AiMeteringDenialReason } from '../ai/metering';
 
 export const AUTOMATION_AI_ATTEMPT_STATES = ['reserved', 'sent', 'consumed', 'released', 'unknown'] as const;
 export type AutomationAiAttemptState = (typeof AUTOMATION_AI_ATTEMPT_STATES)[number];
@@ -40,6 +40,24 @@ const assertKey = (key: AutomationAiAttemptKey): void => {
     throw new Error('Invalid automation AI attempt');
   }
 };
+
+/**
+ * 🔴 托管额度/权益计量**拒了这一次物理调用**时抛它，路由必须把它收口成 **402**
+ * （`replyAutomationMeteringRejection`），不许落进"任何异常都算 409"的那个 `catch`。
+ *
+ * 理由与写事务授权那一路同一条：402 是宿主唯一会拿去"停止重试并显示等待权益"的信号。
+ * 额度耗尽对宿主来说是**终态**（这个周期不会再放行），而 409 在宿主里读起来是
+ * "这次传输失败了"⇒ 一次退避重试循环，用户界面只显示报错，永远看不到"本月 300 次用完了"。
+ *
+ * `used` / `limit` 原样带出去：设置页那两个数字与"额度用尽"那句文案要靠它们，
+ * 而不是让界面再发一次请求去猜。
+ */
+export class AutomationAiMeteringDeniedError extends Error {
+  constructor(readonly denial: { reason: AiMeteringDenialReason; used: number; limit: number }) {
+    super(`Automation AI metering denied: ${denial.reason}`);
+    this.name = 'AutomationAiMeteringDeniedError';
+  }
+}
 
 /**
  * Reserve one model attempt and consume the normal AI-period quota in one
@@ -96,7 +114,7 @@ export async function reserveAutomationAiAttempt(
     let periodAnchor: number | null = null;
     if (billingSource === 'managed') {
       const quota = await consumeManagedAiRequest({ userId: key.userId, now, limit, sql: tx });
-      if (!quota.allowed) throw new Error(`Automation AI quota denied: ${quota.reason}`);
+      if (!quota.allowed) throw new AutomationAiMeteringDeniedError({ reason: quota.reason, used: quota.used, limit: quota.limit });
       periodAnchor = quota.periodAnchor;
     }
     await tx.execute(
