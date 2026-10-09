@@ -48,6 +48,8 @@ import {
 import { useI18n } from '@heyta/i18n';
 import { authFailureMessage, SettingsRow } from '@heyta/ui';
 
+import { setSignedInEmailFromServer } from '../auth/session';
+
 import { Button, Card, Stack, Text, TextField } from '../ui/kit';
 import {
   cooldownSecondsLeft,
@@ -90,6 +92,23 @@ export function EmailChangeSection({
   const [now, setNow] = useState(() => Date.now());
 
   const hasSession = baseUrl.trim() !== '' && token.trim() !== '';
+
+  /**
+   * 🔴 「当前邮箱」这一行的权威值是**服务端读回来的那一个**（`status.currentEmail`），
+   * 父层给的 `currentEmail` 只是"还没读到"时的回落。
+   * 理由不是洁癖：换绑是在邮件里的两条链接上生效的，这台设备不会被通知第二次，
+   * 而父层那一个是**登录那一刻**记下的地址 ⇒ 不换掉它，用户刚换完邮箱，
+   * 界面上那一行还是旧地址（真设备验收第 11 趟步骤 10 实测到，§6.16）。
+   */
+  const accountEmail = status?.currentEmail ?? currentEmail;
+
+  // 同一趟读到的真值要顺手写回会话，否则「我的」页那五处"当前账号"仍然说旧地址。
+  // ⚠️ 只写服务端事实，不写输入框（`setSignedInEmailFromServer` 的契约）。
+  useEffect(() => {
+    const observed = status?.currentEmail;
+    if (observed === undefined) return;
+    setSignedInEmailFromServer(observed);
+  }, [status]);
 
   const loadStatus = useCallback(async (): Promise<void> => {
     // 未登录 ⇒ **一个请求都不发**（与 `account-security.ts` 的 bearer 闸同一条）。
@@ -186,8 +205,8 @@ export function EmailChangeSection({
           label: t('common.emailChange.currentLabel'),
           // 🔴 读不到登录邮箱时说"还没登录"那句，不说空串 ——
           // 空值会被读成"这个账号的邮箱是空的"，而那件事在这个系统里不存在。
-          value: currentEmail ?? t('mobile.profile.account.offline'),
-          tone: currentEmail === undefined ? 'subtle' : 'default',
+          value: accountEmail ?? t('mobile.profile.account.offline'),
+          tone: accountEmail === undefined ? 'subtle' : 'default',
           testID: 'email-change-current-row',
         }}
       />
