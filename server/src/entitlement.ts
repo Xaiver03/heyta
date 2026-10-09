@@ -21,6 +21,7 @@ import { getAuthUser } from './middleware';
 import { Logger } from './logger';
 import {
   AutomationEntitlementError,
+  inspectAutomationEntitlementTicket,
   isAutomationEntitlementBindingUsable,
   loadAutomationEntitlementKeyring,
   redeemAutomationEntitlementTicket,
@@ -376,13 +377,6 @@ export const readAutomationRevocationFloorValue = (rows: unknown): number => {
     : typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : 0;
 };
 
-/** 手配的签发者配置；没配就抛 —— "没配" 的判定在调用方（`ISSUER_NOT_CONFIGURED`）。 */
-const configuredAutomationKeyring = (): AutomationEntitlementKeyring => {
-  const keyring = loadAutomationEntitlementKeyring();
-  if (!keyring) throw new Error('Automation entitlement issuer is not configured');
-  return keyring;
-};
-
 /** 把在线刷新到的吊销下限并进签发者配置；下限只升不降，读不到就用手配的那一个。 */
 export const withAutomationRevocationFloor = async (
   keyring: AutomationEntitlementKeyring,
@@ -455,14 +449,18 @@ export async function authorizeAutomationOperation(input: {
     return evaluateAutomationEntitlementForUser({ userId: input.userId, now, source: input.source ?? lockedAutomationEntitlementSource(input.client), policy: input.policy, mode, keyring: input.keyring });
   }
   if (input.ticket === undefined) return { allowed: false, reason: 'ENTITLEMENT_TICKET_REQUIRED' };
+  // 🔴 配了 `selfhost-online` 却没配公钥环，是一台**没有判定能力**的部署：这里必须回
+  // 拒，而不是抛出去变成 500 —— 500 会被客户端当成"服务端坏了，重试"，而正确的信号是
+  // "停止重试，这台实例没连上签发方"。与 `evaluateAutomationEntitlementForUser` 同一口径。
+  const presentedKeyring = input.keyring ?? loadAutomationEntitlementKeyring();
+  if (!presentedKeyring) return { allowed: false, reason: 'ISSUER_NOT_CONFIGURED' };
   try {
     await redeemAutomationEntitlementTicket({
       client: input.client, userId: input.userId, action: input.action,
       ...(input.ruleId !== undefined ? { ruleId: input.ruleId } : {}),
       ...(input.eventId !== undefined ? { eventId: input.eventId } : {}),
       token: input.ticket,
-      keyring: input.keyring !== undefined ? await withAutomationRevocationFloor(input.keyring, input.source)
-        : await withAutomationRevocationFloor(configuredAutomationKeyring(), input.source),
+      keyring: await withAutomationRevocationFloor(presentedKeyring, input.source),
     });
     return { allowed: true };
   } catch (error) {
@@ -471,11 +469,78 @@ export async function authorizeAutomationOperation(input: {
   }
 }
 
+/**
+ * 写事务内的授权被拒时抛它。路由必须把它收口成 **402**（`replyAutomationRejection`），
+ * 而不是落进那个"任何异常都算 400/404/409"的 `catch` —— 同一个字符串在不同能力上
+ * 含义不同，而 402 是客户端唯一会拿去"停止重试并显示等待权益"的信号。
+ */
+export class AutomationWriteAuthorizationError extends Error {
+  constructor(readonly decision: Extract<EntitlementDecision, { allowed: false }>) {
+    super('Automation entitlement authorization failed');
+  }
+}
+
+/**
+ * 🔴 在**业务写事务**里消费那枚一次性票据 —— 烧 nonce 与写入同一个提交边界。
+ *
+ * 为什么不能由 preHandler 烧：闸门的事务与写事务是两个提交边界，回滚的那一次写入
+ * 照样把 nonce 烧掉了。任务书 AC-1 那句"拒绝且**不产生业务效果**"要的是反向也成立 ——
+ * 票据烧掉当且仅当那一次业务效果提交。放在**写入之前**的最后一行，同时满足
+ * `redeemAutomationEntitlementTicket` 的前提（调用方已持有该账号的 `FOR UPDATE` 锁）。
+ *
+ * 🔴 这一步的射程只到"**有没有一次性东西要烧**"：没出示票据（官方模式，或自托管模式
+ * 下闸门已经因为 `ENTITLEMENT_TICKET_REQUIRED` 拒了）就直接返回 —— 权益本身由 preHandler
+ * 对着同一份订阅源判过，这里没有可消耗的凭据，把它写成"再判一次订阅"会让官方模式的
+ * 每一次内部调用都去读订阅行，而那正是官方模式不需要票据的理由。
+ */
+export const authorizeAutomationWrite = async (input: {
+  client: EntitlementDatabase;
+  userId: number;
+  action: AutomationEntitlementAction;
+  ruleId?: string;
+  eventId?: string;
+  ticket?: string;
+  now?: number;
+}): Promise<void> => {
+  if (input.ticket === undefined) return;
+  const decision = await authorizeAutomationOperation(input);
+  if (decision.allowed) return;
+  throw new AutomationWriteAuthorizationError(decision);
+};
+
+/**
+ * 权益被拒时的响应与审计（**唯一一份**）。
+ *
+ * 闸门那一路与写事务那一路必须回**逐字相同**的形状：客户端按 `reason`/`ticketCode`
+ * 决定"停止重试"还是"显示等待权益"，两处各写一遍就会在某一处漏掉 `ticketCode`。
+ */
+export const replyAutomationRejection = (
+  req: FastifyRequest,
+  reply: FastifyReply,
+  decision: Extract<EntitlementDecision, { allowed: false }>,
+  capability: EntitlementCapability,
+): FastifyReply => {
+  Logger.audit({
+    event: ENTITLEMENT_AUDIT_EVENTS.DENIED,
+    userId: getAuthUser(req).userId,
+    errorCode: ENTITLEMENT_ERROR_CODE,
+    reason: decision.reason,
+    capability,
+    ...(decision.code === undefined ? {} : { ticketCode: decision.code }),
+    ip: req.ip,
+  });
+  return reply.status(402).send({
+    error: ENTITLEMENT_ERROR_MESSAGE,
+    errorCode: ENTITLEMENT_ERROR_CODE,
+    reason: decision.reason,
+    ...(decision.code === undefined ? {} : { ticketCode: decision.code }),
+  });
+};
+
 /** 守卫读到的开关形状（`ServerConfig['entitlements']` 的子集）。 */
 export interface EntitlementGateConfig {
   enabled: boolean;
 }
-
 export interface EntitlementGuardOptions {
   /** 闸门开关。省略时读环境（`loadConfigFromEnv().entitlements`），默认关。 */
   gate?: EntitlementGateConfig;
@@ -521,6 +586,16 @@ export interface EntitlementGuardOptions {
   scope?: (req: FastifyRequest) => { ruleId?: string; eventId?: string };
   /** 只在部分请求上判定（例如"关闭规则不要求付费"）。返回 false 时整道闸门跳过。 */
   when?: (req: FastifyRequest) => boolean;
+  /**
+   * 闸门**只做离线预检**，不消费那枚一次性票据。
+   *
+   * 逐次放行的一次性动作必须让"票据烧掉"与"业务效果提交"落在同一个事务里，
+   * 所以声明了 `action` 的路由把消费交给写事务里的 `authorizeAutomationWrite`
+   * （AC-1 那句"拒绝且不产生业务效果"的反向形式）。闸门留在这里是为了让
+   * 伪造、错作用域、错实例、低于吊销下限、没带票据这五类在**任何写之前**就 402。
+   * 配 `precheckOnly` 的路由必须把 `AutomationWriteAuthorizationError` 收口成 402。
+   */
+  precheckOnly?: boolean;
 }
 
 /**
@@ -624,13 +699,47 @@ export const createEntitlementGuard = (
         ...(options.automationMode !== undefined ? { mode: options.automationMode } : {}),
         ...(options.automationKeyring !== undefined ? { keyring: options.automationKeyring } : {}),
       });
+    } else if (options.precheckOnly) {
+      // 🔴 闸门这一路**一个字节都不写库**：只做与时刻无关的那一半判定（编码、签名、
+      // 词表、action 与作用域逐字相符、不低于**在线刷新到的**吊销下限）。nonce 与
+      // 新鲜度留给业务写事务里的 `authorizeAutomationWrite` —— 在那之前烧掉 nonce，
+      // 等于"业务没做成、票据没了"，重试要么再签一枚，要么被算成两次操作。
+      const gateSource: AutomationEntitlementSource = {
+        readSubscriptions: () => loadSubscriptions(user.userId),
+        readBinding: () => loadAutomationBinding(user.userId),
+        readRevocationFloor: () => loadAutomationRevocationFloor(),
+      };
+      const rawHeader = req.raw?.rawHeaders;
+      const presented = Array.isArray(rawHeader) ? readAutomationEntitlementTicketHeader(rawHeader) : undefined;
+      const gateMode = options.automationMode ?? resolveAutomationEntitlementMode();
+      if (gateMode !== 'selfhost-online') {
+        // 官方模式与"模式没配"那一档沿用订阅判定，行为与既有闸门逐字相同。
+        decision = await evaluateAutomationEntitlementForUser({
+          userId: user.userId, now: now(), policy, source: gateSource,
+          ...(options.automationMode === undefined ? {} : { mode: options.automationMode }),
+          ...(options.automationKeyring === undefined ? {} : { keyring: options.automationKeyring }),
+        });
+      } else if (presented === undefined) {
+        decision = { allowed: false, reason: 'ENTITLEMENT_TICKET_REQUIRED' };
+      } else {
+        const configured = options.automationKeyring ?? loadAutomationEntitlementKeyring();
+        // 🔴 配了 `selfhost-online` 却没配公钥环 = 这台实例没有判定能力：闸门必须响亮
+        // 拒绝，而不是让抛错穿出 preHandler 变成 500 —— 500 在客户端读成"可重试"，
+        // 而正确信号是"停止重试，这台实例没连上签发方"。
+        if (!configured) decision = { allowed: false, reason: 'ISSUER_NOT_CONFIGURED' };
+        else {
+          const keyring = await withAutomationRevocationFloor(configured, gateSource);
+          const inspected = inspectAutomationEntitlementTicket(presented, keyring, { action, ...(options.scope ? options.scope(req) : {}) });
+          decision = inspected.ok ? { allowed: true } : { allowed: false, reason: 'ENTITLEMENT_TICKET_REJECTED', code: inspected.code };
+        }
+      }
     } else {
       const rawHeaders = req.raw?.rawHeaders;
       const ticket = Array.isArray(rawHeaders) ? readAutomationEntitlementTicketHeader(rawHeaders) : undefined;
       decision = await prisma.$transaction((tx) => authorizeAutomationOperation({
-        // 🔴 声明了 action 的闸门在**自己的事务**里消费票据：票据的一次性与它放行的
-        // 那次写操作同生共死，回滚不烧 nonce。写事务内的授权（草稿确认、首次许可）
-        // 在各自的事务里另判，不经过这里。
+        // ⚠️ 这一路在**闸门自己的事务**里消费票据，与路由的业务写事务是两个提交边界 ——
+        // 回滚的那一次写入照样把 nonce 烧掉了。逐次放行的一次性动作用 `precheckOnly`
+        // 把消费挪进写事务；留在这里的是尚未那样接的路由（见计划 T2 那节的边界表）。
         client: tx,
         userId: user.userId,
         action,
@@ -652,25 +761,8 @@ export const createEntitlementGuard = (
       return;
     }
 
-    Logger.audit({
-      event: ENTITLEMENT_AUDIT_EVENTS.DENIED,
-      userId: user.userId,
-      errorCode: ENTITLEMENT_ERROR_CODE,
-      reason: decision.reason,
-      // 把"守的是哪一项能力"一起记下来：同一个 402 在 hosting 与 ai 上的
-      // 含义完全不同，而响应体里的 reason 不足以区分（运维要查日志）。
-      capability,
-      // 票据被拒时子码只此一处有值：运维要区分"过期"和"作用域不符"，
-      // 而这两个都叫 402。绝不记票据正文。
-      ...(decision.code === undefined ? {} : { ticketCode: decision.code }),
-      ip: req.ip,
-    });
-
-    return reply.status(402).send({
-      error: ENTITLEMENT_ERROR_MESSAGE,
-      errorCode: ENTITLEMENT_ERROR_CODE,
-      reason: decision.reason,
-      ...(decision.code === undefined ? {} : { ticketCode: decision.code }),
-    });
+    // 审计与响应体的构造在 `replyAutomationRejection` 里，闸门这一路与写事务那一路
+    // 回的是逐字相同的形状 —— 两处各写一遍就会有一处漏掉 `ticketCode`。
+    return replyAutomationRejection(req, reply, decision, capability);
   };
 };

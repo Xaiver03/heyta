@@ -1,6 +1,6 @@
 import { inboundEnvelopeSchema, inboundDraftEventIdSchema, inboundDraftSnapshotSchema, inboundDraftDecisionSchema,
   type InboundDraftDecision, type InboundDraftSnapshot } from '@heyta/shared-schema';
-import { authorizeAutomationOperation } from '../entitlement';
+import { authorizeAutomationOperation, authorizeAutomationWrite } from '../entitlement';
 import { INBOUND_AUTOMATION_FIELDS, type InboundAutomationField } from '@heyta/inbound-core';
 import { prisma } from '../db';
 
@@ -186,7 +186,7 @@ const toClaim = (row: any, rule?: any): ClaimedAutomationEvent => ({
 
 /** Claim one queued event with an account lock and a monotonic lease generation. */
 export async function claimAutomationEvent(
-  userId: number, clientId: string, identity: AutomationWorkerIdentity, at?: Date, requestedEventId?: string,
+  userId: number, clientId: string, identity: AutomationWorkerIdentity, at?: Date, requestedEventId?: string, ticket?: string,
 ): Promise<ClaimedAutomationEvent | undefined> {
   assertUser(userId);
   if (!EVENT_ID.test(clientId) || (requestedEventId !== undefined && !EVENT_ID.test(requestedEventId))) throw new Error('Invalid automation claim');
@@ -228,6 +228,12 @@ export async function claimAutomationEvent(
       await tx.automationEvent.update({ where: { userId_ruleId_eventId: { userId, ruleId: current.rule_id, eventId: current.event_id } }, data: { status: 'cancelled', reasonCode: 'rule-disabled' } });
       return undefined;
     }
+    // 🔴 授权只挡"**发活**"那一笔：上面三条提前 return 的分支确实也写库，但写的都是
+    // **只减不增**的终态（保留期到点抹掉密文、模型结果不明转待确认、规则已停用转取消）——
+    // 它们不给这台 worker 任何新工作，反而多数是保留/合规义务要求的动作，所以不该由
+    // 权益来决定做不做。真正需要票据的是下面把事件置成 `leased` 并递增 generation 那一笔。
+    // 放在这里还有一个理由：空轮询（没有候选事件）一次都不该烧 nonce。
+    await authorizeAutomationWrite({ client: tx, userId, action: 'event-claim', ...(ticket === undefined ? {} : { ticket }) });
     const next = await tx.automationEvent.update({ where: { userId_ruleId_eventId: { userId, ruleId: current.rule_id, eventId: current.event_id } }, data: {
       status: 'leased', leaseWorkerId: worker.id, leaseGeneration: { increment: 1 },
       leaseExpiresAt: new Date(now.getTime() + LEASE_MS), attempt: { increment: 1 },
@@ -266,7 +272,7 @@ export async function renewAutomationLease(
 export async function publishAutomationResult(input: {
   userId: number; clientId: string; identity: AutomationWorkerIdentity; eventId: string;
   leaseGeneration: number; parseVersion: number; resultDigest: string; resultCiphertext: string; itemCount: number;
-  needsConfirmation?: boolean; now?: Date;
+  needsConfirmation?: boolean; now?: Date; ticket?: string;
 }): Promise<{ eventId: string; state: string; parseVersion: number }> {
   assertUser(input.userId);
   if (!EVENT_ID.test(input.eventId) || !Number.isInteger(input.leaseGeneration) || input.leaseGeneration < 1 ||
@@ -303,6 +309,10 @@ export async function publishAutomationResult(input: {
     if (!recipient || parsedEnvelope.keyEpoch !== recipient.keyEpoch) throw new Error('Automation result key epoch is stale');
     const state = input.needsConfirmation ? 'needs-confirmation' : 'prepared';
     if (input.itemCount > rule.maxItems) throw new Error('Invalid automation result');
+    // 重放同一份已冻结的结果在上面那条就原样返回了，不会走到这里 —— 所以这一格
+    // 授权只对"真的落下一份新结果"的那一次请求烧 nonce。
+    await authorizeAutomationWrite({ client: tx, userId: input.userId, action: 'result-publish', eventId: input.eventId,
+      ...(input.ticket === undefined ? {} : { ticket: input.ticket }) });
     const updated = await tx.automationEvent.update({ where: { userId_ruleId_eventId: { userId: input.userId, ruleId: current.ruleId, eventId: input.eventId } }, data: {
       status: state, parseVersion: input.parseVersion, resultDigest: input.resultDigest,
       resultCiphertext: input.resultCiphertext, reasonCode: input.needsConfirmation ? 'needs-confirmation' : null,

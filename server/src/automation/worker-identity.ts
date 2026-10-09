@@ -3,7 +3,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
 import type { Operation } from '../sync/sync.types';
 import { prisma } from '../db';
-import { authorizeAutomationOperation } from '../entitlement';
+import { authorizeAutomationOperation, authorizeAutomationWrite } from '../entitlement';
 
 export interface InboundUploadIdentity {
   credentialHash: string;
@@ -56,6 +56,7 @@ export async function registerAutomationWorker(
   userId: number,
   syncClientId: string,
   databaseEpoch: string,
+  ticket?: string,
 ): Promise<RegisteredAutomationWorker> {
   if (!Number.isSafeInteger(userId) || userId < 1 || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,254}$/.test(syncClientId) || !EPOCH.test(databaseEpoch)) {
     throw new Error('Invalid automation worker registration');
@@ -63,6 +64,10 @@ export async function registerAutomationWorker(
   const generated = generateWorkerCredential();
   await prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+    // 授权放在**第一次写入之前**：注册会把同 client/epoch 的旧 worker 一起吊销，
+    // 那是不可逆的业务效果。票据必须在它之前判完，回滚时才不会出现"旧 worker 已吊销
+    // 而 nonce 也烧了"和"票据烧了却什么都没写"两种各半的状态。
+    await authorizeAutomationWrite({ client: tx, userId, action: 'worker-register', ...(ticket === undefined ? {} : { ticket }) });
     await tx.automationWorker.updateMany({
       where: { userId, syncClientId, databaseEpoch, revokedAt: null },
       data: { revokedAt: BigInt(Date.now()) },
