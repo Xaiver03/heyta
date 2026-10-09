@@ -24,7 +24,7 @@ const OUT = resolve(process.env.HEYTA_RESPONSIVE_EVIDENCE ?? `${ROOT}/apps/web/e
  * ⚠️ 选腿不许把覆盖面一起选没：`everySelectedLegProducedCells` 与
  * `unselectedLegsReportEmpty` 两条专门钉这件事（见文件末尾）。
  */
-const ALL_LEGS = ['reminders', 'data', 'groups', 'help'];
+const ALL_LEGS = ['reminders', 'data', 'groups', 'help', 'sync'];
 const LEGS = (process.env.HEYTA_RESPONSIVE_LEGS ?? ALL_LEGS.join(','))
   .split(',').map((x) => x.trim()).filter(Boolean);
 for (const leg of LEGS) {
@@ -487,6 +487,149 @@ const data = [];
 if (LEGS.includes('data')) {
   for (const spec of cases) data.push(await dataJourney(browser, spec));
 }
+/**
+ * 「同步与隐私」那一组的**决定态**交互回归（UX-S9-139 那条裁决的常驻消费者）。
+ *
+ * 那两条裁决（🔴 「已同意」只给「撤回」、「还没选择」只给「重新选择」；以及「重新选择」开的是
+ * **同一张**同意面板而不是第二份同意界面）以前只在写它的那天被手工点过，
+ * **仓里没有任何一层在守**（`grep -rn privacy-revoke e2e/tests apps/web/tests` 现量 0 处），
+ * 所以一次改文案就能把它悄悄反过来，而界面看起来仍然"有个按钮能点"。
+ *
+ * 🔴 **「只用本机」那一档该显示哪枚按钮，两棵树不一样**（10-09 15:0x 现量，别当成契约）：
+ * `git show HEAD:apps/web/src/features/settings/PrivacyPanel.tsx` 的分叉条件是
+ * `record === null` ⇒ 只要有过任何决定（含"只用本机"）就给「撤回」；
+ * 工作树那版给的是 `record?.decision !== 'accepted'` ⇒ "只用本机"落到「重新选择」。
+ * 后者**没有入库**：它依赖的 `SettingsNotice.tsx` 与 `privacy-settings.css` 在 HEAD 里不存在
+ * （`git cat-file -e HEAD:…` 双双 rc≠0），属别人在飞的那半。
+ * ⇒ 这一格**只入读数、不作判据**；下面的走查按界面上实际在场的那枚按钮走，两种形状都走得完。
+ *
+ * 一趟走完三态：**只用本机 / 已同意 / 还没选择**，每态各读一次 DOM 并各拍一张图。
+ * 🔴 三态都要**真到达**：只测当前那一态的话，「已同意只给撤回」「没选择只给重新选择」这两条
+ * 判据就是在对它们根本没见过的状态打分 —— 而这两态恰恰是按钮最容易长反的一对。
+ */
+async function privacyReadState(page) {
+  return page.evaluate(() => {
+    const group = document.getElementById('settings-group-sync');
+    const panel = group?.querySelector('[data-testid="privacy-panel"]') ?? null;
+    const count = (id) => (panel?.querySelectorAll(`[data-testid="${id}"]`) ?? []).length;
+    const text = (id) => panel?.querySelector(`[data-testid="${id}"]`)?.textContent?.trim() ?? null;
+    return {
+      theme: document.documentElement.dataset.theme ?? 'light',
+      panelVisible: Boolean(panel) && panel.getBoundingClientRect().height > 0,
+      chooseAgain: count('privacy-choose-again'),
+      revoke: count('privacy-revoke'),
+      chooseLabel: text('privacy-choose-again'),
+      revokeLabel: text('privacy-revoke'),
+      // 决定态那句话在两棵树里挂在不同结构上（HEAD 是 `p.ht-settings__hint[data-testid=privacy-state]`，
+      // 未提交那版把它换成了 `SettingsNotice`）—— testid 两边都在，所以只认 testid。
+      stateText: text('privacy-state'),
+      // 提示语**只入读数**：HEAD 那份是一句固定的 `revokeHint`，未提交那版才按决定态切换。
+      // 把"提示语跟着状态走"写成判据，等于把别人在飞的那半源码当成已入库的契约。
+      hints: [...(panel?.querySelectorAll('p[class*="__hint"]') ?? [])].map((p) => p.textContent?.trim() ?? ''),
+      // 全文档只许有一张同意面板：第二份就是"另建一套同意界面"，那条纪律的机器尺。
+      consentDialogs: document.querySelectorAll('[data-testid="privacy-consent-dialog"]').length,
+      notPersistedNotice: count('privacy-revoke-not-persisted'),
+    };
+  });
+}
+
+async function syncPrivacyJourney(browser, spec) {
+  const context = await browser.newContext({ viewport: { width: spec.width, height: spec.height }, locale: 'zh-CN' });
+  const page = await context.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await page.addInitScript(() => localStorage.setItem('heyta.locale', 'zh-CN'));
+  await page.goto(`${ORIGIN}/?lang=zh-CN`);
+  if (spec.theme === 'dark') await page.evaluate(() => { document.documentElement.dataset.theme = 'dark'; });
+
+  // 起点：首启那张同意面板必须真的在场（不在场就说明这棵树没有同意闸，下面的读数全部作废）。
+  const dialog = page.getByTestId('privacy-consent-dialog');
+  const dialogSeen = await dialog.waitFor({ state: 'visible', timeout: 8_000 }).then(() => true).catch(() => false);
+  if (!dialogSeen) {
+    await context.close();
+    throw new Error(`首启同意面板没出现 —— 这一趟没有"决定"可测，别把下面的读数当通过（载体 ${spec.theme}/${spec.width}）`);
+  }
+  await page.getByTestId('privacy-consent-local-only').click();
+  await dialog.waitFor({ state: 'detached' });
+
+  await openGroup(page, 'sync');
+  const states = [];
+  const screenshots = [];
+  const shot = async (name) => {
+    const path = `${OUT}/sync-privacy-${name}-${spec.theme}-${spec.width}.png`;
+    await page.screenshot({ path });
+    screenshots.push(path.split('/').pop());
+  };
+  // 🔴 三态之间只有两枚按钮，而两棵树给「只用本机」那档挂的按钮不一样（见上面那段现量）。
+  // 所以走查**不写死顺序，按界面上在场的那枚按钮走**，两种形状都必须把三态走全 ——
+  // 写死任何一种，另一棵树上这一腿就死在第一枚定位器上（同一族前科：本文件 `openGroup` 那段）。
+  const reopenConsent = async () => {
+    await page.getByTestId('privacy-choose-again').click();
+    const reopened = await dialog.waitFor({ state: 'visible', timeout: 8_000 }).then(() => true).catch(() => false);
+    const whileOpen = await privacyReadState(page);
+    await shot('reopen-dialog');
+    await page.getByTestId('privacy-consent-accept').click();
+    await dialog.waitFor({ state: 'detached' });
+    await page.waitForTimeout(250);
+    return { reopenedFromChooseAgain: reopened, dialogsWhileOpen: whileOpen.consentDialogs };
+  };
+  const revoke = async () => {
+    await page.getByTestId('privacy-revoke').click();
+    await page.waitForTimeout(250);
+  };
+
+  const local = await privacyReadState(page);
+  states.push({ reached: 'local-only', ...local });
+  await shot('1-local-only');
+
+  if (local.revoke === 1) {
+    // HEAD 形状：有过任何决定就给「撤回」⇒ 先撤回拿到「还没选择」，再重新选择并同意。
+    await revoke();
+    states.push({ reached: 'undecided', ...(await privacyReadState(page)) });
+    await shot('2-undecided');
+    states.push({ reached: 'accepted', ...(await privacyReadState(page)), ...(await reopenConsent()) });
+    await shot('3-accepted');
+    await revoke();
+    states.push({ reached: 'revoked', ...(await privacyReadState(page)) });
+    await shot('4-revoked');
+  } else {
+    // 未提交那版形状：非 accepted 一律给「重新选择」⇒ 先同意拿到「已同意」，再撤回。
+    states.push({ reached: 'accepted', ...(await privacyReadState(page)), ...(await reopenConsent()) });
+    await shot('2-accepted');
+    await revoke();
+    states.push({ reached: 'undecided', ...(await privacyReadState(page)) });
+    await shot('3-undecided');
+  }
+
+  // 🔴 牙：往运行时 DOM 里种两枚坏，上面那把尺必须都数得到。数不到就说明
+  // `privacyReadState` 的计数是恒 0 的装饰（同一族前科：不能失败的检查没有价值）。
+  const planted = await page.evaluate(() => {
+    const panel = document.querySelector('[data-testid="privacy-panel"]');
+    const actionSel = '[data-testid="privacy-choose-again"], [data-testid="privacy-revoke"]';
+    const actionBefore = panel.querySelectorAll(actionSel).length;
+    panel.querySelector(actionSel)?.remove();
+    const actionAfter = panel.querySelectorAll(actionSel).length;
+    const dialogsBefore = document.querySelectorAll('[data-testid="privacy-consent-dialog"]').length;
+    const fake = document.createElement('div');
+    fake.setAttribute('data-testid', 'privacy-consent-dialog');
+    document.body.append(fake);
+    const dialogsAfter = document.querySelectorAll('[data-testid="privacy-consent-dialog"]').length;
+    fake.remove();
+    return { actionBefore, actionAfter, dialogsBefore, dialogsAfter };
+  });
+
+  await context.close();
+  return {
+    theme: spec.theme,
+    width: spec.width,
+    height: spec.height,
+    states,
+    screenshots,
+    planted,
+    pageErrors: errors,
+  };
+}
+
 const sweepGroups = ['profile', 'account', 'sync', 'ai'];
 // 视口口径跟着台账 UX-S9-44 那一行的**验收列原文**（375/768/1440 无横向溢出），
 // 不跟着上面 `cases` 的 390 —— 差 15px 也算两套口径。
@@ -508,6 +651,17 @@ const helpWrapWidths = [375, 768, 1440];
 const helpWrap = [];
 if (LEGS.includes('help')) {
   for (const width of helpWrapWidths) helpWrap.push(await captureHelpWrap(browser, width));
+}
+// 「同步与隐私」决定态那一腿的格子：三张（明 1440 / 暗 1440 / 明 375），每张走完整三态。
+// 视口跟着这一腿自己要答的问题：桌面那一档看整屏，375 那一档看窄屏下按钮与提示会不会挤。
+const syncCases = [
+  { theme: 'light', width: 1440, height: 900 },
+  { theme: 'dark', width: 1440, height: 900 },
+  { theme: 'light', width: 375, height: 812 },
+];
+const syncPrivacy = [];
+if (LEGS.includes('sync')) {
+  for (const spec of syncCases) syncPrivacy.push(await syncPrivacyJourney(browser, spec));
 }
 await browser.close();
 
@@ -535,14 +689,26 @@ const assertionOwner = {
   helpLongTitleRowInsideViewport: ['help'],
   helpLongTitleNoHorizontalOverflow: ['help'],
   helpLongTitleBadArmsFlipTheJudgment: ['help'],
+  syncPrivacyThreeStatesReached: ['sync'],
+  syncPrivacyPanelVisibleAndThemeApplied: ['sync'],
+  syncPrivacyExactlyOneActionPerState: ['sync'],
+  syncPrivacyAcceptedShowsOnlyRevoke: ['sync'],
+  syncPrivacyRevokeReturnsToChooseAgain: ['sync'],
+  syncPrivacyReopenUsesOneAndOnlyOneDialog: ['sync'],
+  syncPrivacyConsentDialogUnmountedAfterDecide: ['sync'],
+  syncPrivacyBadArmsFlipTheRuler: ['sync'],
 };
 const TRACKING_ASSERTIONS = ['everySelectedLegProducedItsCells', 'unselectedLegsReportEmpty'];
-const legCells = { reminders: reminders.length, data: data.length, groups: groups.length, help: helpWrap.length };
+// 按"怎么到达"取那一态的读数（不是按界面文案取 —— 文案是词条表的账，改一个字就该红的是词条对账，
+// 不是这条交互判据）。两棵树的走查顺序不同，但三态都真到达过，所以按到达方式取是稳的。
+const privacyRole = (cell, name) => cell.states.find((s) => s.reached === name) ?? null;
+const legCells = { reminders: reminders.length, data: data.length, groups: groups.length, help: helpWrap.length, sync: syncPrivacy.length };
 const expectedLegCells = {
   reminders: cases.length * reminderModes.length,
   data: cases.length,
   groups: sweepCases.length * sweepGroups.length,
   help: helpWrapWidths.length,
+  sync: syncCases.length,
 };
 
 const report = {
@@ -567,6 +733,8 @@ const report = {
   groups,
   helpWrapWidths,
   helpWrap,
+  syncCases,
+  syncPrivacy,
   assertions: {
     // ── 选腿旋钮自己的 tracking 腿：选了的必须交出应得格子数，没选的必须是空的 ──
     // 少了这两条，"只跑 groups 那一趟"就能靠 `.every` 对空集合为真把另外三条腿报成通过。
@@ -614,6 +782,40 @@ const report = {
     helpLongTitleBadArmsFlipTheJudgment: helpWrap.every((x) =>
       Object.values(x.badJudgments).every((j) =>
         !j.wraps || !j.copyFitsColumn || !j.rowInsideViewport || !j.noHorizontalOverflow)),
+    // ── 「同步与隐私」决定态（UX-S9-139 那条裁决的常驻消费者；此前仓里零层在守）──
+    // 分母自检同 help 那族：`.every` 对空集合是真，所以"三态真到达了"必须先钉住，
+    // 否则后面每一条都在对没见过的状态打分（这一族最典型的假绿形状）。
+    syncPrivacyThreeStatesReached: syncPrivacy.every((x) =>
+      ['local-only', 'undecided', 'accepted'].every((r) => privacyRole(x, r) !== null) &&
+      // 三态那句话必须互不相同：如果"已同意"与"还没选择"渲染成同一句，界面上就没有决定可言，
+      // 而按钮判据仍然可以全绿（它只看两枚 testid 的枚数）。
+      new Set(['local-only', 'undecided', 'accepted'].map((r) => privacyRole(x, r).stateText)).size === 3),
+    syncPrivacyPanelVisibleAndThemeApplied: syncPrivacy.every((x) =>
+      x.states.every((s) => s.panelVisible && s.theme === x.theme)),
+    // 每一态**恰好一枚**决定动作：两枚都在=用户看见两个出口，一枚都不在=死胡同（撤回变成永久决定）。
+    syncPrivacyExactlyOneActionPerState: syncPrivacy.every((x) =>
+      x.states.every((s) => s.chooseAgain + s.revoke === 1)),
+    syncPrivacyAcceptedShowsOnlyRevoke: syncPrivacy.every((x) => {
+      const a = privacyRole(x, 'accepted');
+      return a !== null && a.revoke === 1 && a.chooseAgain === 0 && Boolean(a.revokeLabel);
+    }),
+    // 撤回之后必须回到「重新选择」那一档 —— 这是 PIPL 第 15 条"便捷的撤回方式"的**后半句**：
+    // 改主意的入口也得在。两棵树里 `undecided` 这一态都是撤回之后读到的，所以这条不绑在别人未提交的那半。
+    syncPrivacyRevokeReturnsToChooseAgain: syncPrivacy.every((x) => {
+      const u = privacyRole(x, 'undecided');
+      return u !== null && u.chooseAgain === 1 && u.revoke === 0 && Boolean(u.chooseLabel);
+    }),
+    syncPrivacyReopenUsesOneAndOnlyOneDialog: syncPrivacy.every((x) => {
+      const a = privacyRole(x, 'accepted');
+      return a !== null && a.reopenedFromChooseAgain === true && a.dialogsWhileOpen === 1;
+    }),
+    syncPrivacyConsentDialogUnmountedAfterDecide: syncPrivacy.every((x) =>
+      x.states.every((s) => s.consentDialogs === 0)),
+    // 🔴 牙：种进运行时 DOM 的两枚坏必须都数得到。这条转红说的是"上面那几条 counting 已经变成恒 0 的装饰"，
+    // 不是界面坏了 —— 和 `groupSweepOffViewportRulerHasTeeth` 同一个用途。
+    syncPrivacyBadArmsFlipTheRuler: syncPrivacy.every((x) =>
+      x.planted.actionBefore === 1 && x.planted.actionAfter === 0 &&
+      x.planted.dialogsAfter === x.planted.dialogsBefore + 1),
   },
 };
 // 分母自检：这张归属表必须覆盖每一条断言。漏登记不是"少一行注释"——那条断言会既不进
