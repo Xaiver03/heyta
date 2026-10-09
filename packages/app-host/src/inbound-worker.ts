@@ -248,18 +248,20 @@ export async function readAutomationPreparedResult(options: {
 
 export async function reserveAutomationAiAttempt(options: {
   baseUrl: string; token: string; worker: AutomationWorkerCredential; eventId: string;
-  ruleId: string; parseVersion: number; attempt: number; leaseGeneration: number; fetchImpl?: typeof fetch;
-}): Promise<{ periodAnchor: number | null; billingSource: 'direct' | 'managed'; state: string }> {
+  ruleId: string; parseVersion: number; attempt: number; leaseGeneration: number;
+  billingSource: 'local' | 'direct' | 'managed'; fetchImpl?: typeof fetch;
+}): Promise<{ periodAnchor: number | null; billingSource: 'local' | 'direct' | 'managed'; state: string }> {
   const response = await (options.fetchImpl ?? globalThis.fetch)(new URL(reserveAiAttemptPath(options.eventId), options.baseUrl), {
     method: 'POST', redirect: 'error', headers: { ...workerHeaders(options.token, options.worker), ...jsonHeaders },
     body: JSON.stringify({ clientId: options.worker.clientId, ruleId: options.ruleId, parseVersion: options.parseVersion,
-      attempt: options.attempt, leaseGeneration: options.leaseGeneration }),
+      attempt: options.attempt, leaseGeneration: options.leaseGeneration, billingSource: options.billingSource }),
   });
   if (!response.ok) throw new Error('Automation AI attempt reservation failed');
   const raw = await response.json() as Record<string, unknown>;
   if ((raw.periodAnchor !== null && typeof raw.periodAnchor !== 'number') ||
-      (raw.billingSource !== 'direct' && raw.billingSource !== 'managed') ||
-      (raw.billingSource === 'direct' && raw.periodAnchor !== null) ||
+      (raw.billingSource !== 'local' && raw.billingSource !== 'direct' && raw.billingSource !== 'managed') ||
+      raw.billingSource !== options.billingSource ||
+      ((raw.billingSource === 'local' || raw.billingSource === 'direct') && raw.periodAnchor !== null) ||
       (raw.billingSource === 'managed' && typeof raw.periodAnchor !== 'number') ||
       typeof raw.state !== 'string') throw new Error('Invalid automation AI reservation response');
   return { periodAnchor: raw.periodAnchor, billingSource: raw.billingSource, state: raw.state };
