@@ -93,6 +93,11 @@ const TREE = (() => {
   } catch {}
   return {
     headSha: head ? head.trim() : '(git unavailable)',
+    // 🔴 **射程标签**：下面这几枚全部是**跑装置的这棵检出**（`ROOT`）的事实，
+    // **不是** `ORIGIN` 那棵树的事实。载体跑（主检出的装置打隔离载体那棵树）时两者不同一棵，
+    // 混读会把"主检出 HEAD"当成被界面的那一棵 —— 被服务的那棵树只能由调用方在台账里另记（现量：`cd <载体> && git rev-parse --short HEAD`）。
+    root: ROOT,
+    provenanceScope: 'rig 的检出（ROOT），不是 ORIGIN 那棵被服务的树',
     rigFile: RIG_REL,
     rigSha256Prefix: rigSha,
     rigWorktreeMatchesHead: dirtyCount(RIG_REL) === 0,
