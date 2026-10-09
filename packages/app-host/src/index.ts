@@ -899,7 +899,13 @@ export {
   type ProcessInboundAutomationOptions,
 } from './inbound-process.js';
 export { startInboundWorkerLoop, type InboundWorkerLoopOptions, type InboundWorkerLoop } from './inbound-worker-loop.js';
-export { verifyAutomationEntitlementTicket, type AutomationEntitlementStatus } from './inbound-entitlement-remote.js';
+export { verifyAutomationEntitlementTicket, AutomationEntitlementVerifyError, type AutomationEntitlementStatus } from './inbound-entitlement-remote.js';
+export {
+  requestAutomationSessionTicket,
+  startAutomationSessionKeepalive,
+  type AutomationSessionKeepalive,
+  type AutomationSessionState,
+} from './inbound-session-keepalive.js';
 export {
   AutomationTicketError,
   createAutomationTicketSource,
