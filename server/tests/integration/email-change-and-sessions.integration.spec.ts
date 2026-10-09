@@ -51,13 +51,17 @@ import { apiRoutes } from '../../src/api';
 import { accountSecurityRoutes } from '../../src/account/account-security.routes';
 import { issueSession } from '../../src/auth';
 import { hashToken } from '../../src/auth-tokens';
-import { EMAIL_CHANGE_PATHS, SESSION_PATHS } from '@heyta/shared-schema';
+import { hashFor } from '../../src/password/service';
+import { AUTH_PASSWORD_PATHS, EMAIL_CHANGE_PATHS, SESSION_PATHS } from '@heyta/shared-schema';
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const describeWithDb = DATABASE_URL ? describe : describe.skip;
 
 vi.hoisted(() => {
   process.env.JWT_SECRET ??= 'account-suite-integration-secret-at-least-32-characters';
+  // 合成值，只为让 `password/hash.ts` 那道"至少要 32 字符"的前置成立（链路 7 要真加一次口令）。
+  // 这一套的口径是"除 SMTP 之外零 mock"，所以这里给的是假值而不是把哈希函数 mock 掉。
+  process.env.PASSWORD_PEPPER ??= 'account-suite-integration-pepper-not-a-real-secret';
   delete process.env.TEST_MODE;
   delete process.env.TEST_MODE_CONFIRM;
 });
@@ -367,6 +371,59 @@ describeWithDb('换绑邮箱与会话撤销（真 PostgreSQL + 真 Prisma + 真 
 
     expect(await observer.accessSession.count({ where: { userId } })).toBe(0);
     expect(await observer.emailChangeRequest.count({ where: { userId } })).toBe(0);
+  });
+
+  /**
+   * 🔴 **工单 W10 的运行时半边。**
+   *
+   * 上面那六条全都用 `issueSession()` **自己铸会话**，所以它们对"登录路由有没有把请求头的
+   * 元数据交给铸造口"这句话**是瞎的** —— 10-10 那次本线漏入库的正是那一句（§6.66）：
+   * helper、签名出口、单元判据都在仓库里，而 `api.ts` 里那一处调用点没在，
+   * 于是这一整套真库判据逐字照旧绿。这一条走**真 HTTP 登录口**，读的是**观察者的库**，
+   * 不是被测代码自报的形状。
+   */
+  it('链路 7：真 HTTP 口令登录 ⇒ `access_sessions` 那一行带着请求头原文，且这一枚可被单独撤销', async () => {
+    const email = `w9-w10-${Date.now()}@example.test`;
+    const userId = await makeUser(email);
+    const password = 'W9-W10-Login-Password-2026!';
+    await observer.user.update({ where: { id: userId }, data: { passwordHash: await hashFor(password) } });
+
+    const login = await app.inject({
+      method: 'POST',
+      url: `/api${AUTH_PASSWORD_PATHS.login}`,
+      headers: { 'user-agent': 'W9-W10-Agent/7.7' },
+      payload: { email, password },
+    });
+    expect(login.statusCode, login.body).toBe(200);
+    const issued = JSON.parse(login.body) as { token: string };
+
+    const list = await app.inject({
+      method: 'GET',
+      url: `/api/${SESSION_PATHS.list}`,
+      headers: bearer(issued.token),
+    });
+    expect(list.statusCode, list.body).toBe(200);
+    const body = JSON.parse(list.body) as {
+      sessions: Array<{ sessionId: string; current: boolean; userAgent: string | null }>;
+    };
+    expect(body.sessions).toHaveLength(1);
+    // 🔴 这一行是本格的全部要点：`userAgent` 是**服务端从请求头取的**，客户端自报的 clientId 不算来源。
+    // 摘掉登录路由那一处的 `sessionMetaFromRequest(req)` ⇒ 这里收到 `null`（变异读数在计划 §6.68）。
+    expect(body.sessions[0]?.userAgent).toBe('W9-W10-Agent/7.7');
+
+    const mine = body.sessions[0]!;
+    const row = await observer.accessSession.findUnique({ where: { jtiHash: mine.sessionId } });
+    expect(row?.userId, '列表里那一枚在库里对不上号').toBe(userId);
+    expect(row?.userAgent).toBe('W9-W10-Agent/7.7');
+
+    const revoke = await app.inject({
+      method: 'DELETE',
+      url: `/api/${SESSION_PATHS.list}/${mine.sessionId}`,
+      headers: bearer(issued.token),
+    });
+    expect(revoke.statusCode, revoke.body).toBe(200);
+    const after = await app.inject({ method: 'GET', url: `/api/${SESSION_PATHS.list}`, headers: bearer(issued.token) });
+    expect(after.statusCode, '撤掉的那一枚还在用 —— 撤销没当场失效').toBe(401);
   });
 
   // ── D1（工单 §1 量出来的那条"全仓零 HTTP 判据"）─────────────────────────
