@@ -59,6 +59,7 @@
 - **P1-1 事件状态机与提交唯一性**（AC-3 前置）。租约不能独自防止跨设备重复创建：A 落盘任务 T1 后断网未 ACK，租约过期 B 领取再生成 T2，两个 op 都会上传。必须定：`accountId + ruleId + eventId` 唯一约束、载荷摘要、冻结的规则版本/解析结果版本、执行设备认证身份、单调 lease generation 与 fencing（必须约束**业务提交**，不能只约束队列表），以及续租/结果发布/提交声明/ACK 的 CAS 条件；“本地已写、中心未知”要选一种完整协议（持久化提交身份与恢复证据后再授权唯一提交；无法证明原 worker 未落盘时进 `commit-uncertain` 并对账，不盲目转派新建）。现有 `executeAiToolProposal` 的宿主内 WeakMap 去重明确**不是**持久协议。
 - **P1-2 批创建语义是新增能力，不是既有接线**（AC-5 前置）。审计基线的 `OpType.Batch` 对多个 `entityIds` 只施加**同一** payload；导入路径是循环 `dispatch`。必须新增“内容各异的一批新任务”的 intent/reducer/线形状：批大小、零/一/多项、每项稳定身份、共享来源 receipt、整批校验失败是否全拒；覆盖本地原子落盘、远端回放、重复与乱序、checkpoint 恢复、三套存储实现；不允许“先 create 后补备注/排期/来源”形成多个 op。新字段可选并有运行时默认。
 - **P1-3 自托管可验证授权契约**〔裁决〕。新 capability 名、套餐包含关系、官方签发者/验证公钥及轮换、签名载荷版本、**官方购买主体与实例/本地账号的绑定**（不能只用 `userId=1` 这类实例内数字）、有效期/续费/吊销、可信时钟与回拨处理、离线核验与宽限策略（首版若只支持在线验证须明写，不暗示已有离线授权）。列出管理/签发/接收/领取/提交各自的校验点与错误码，定义“已接收后到期”“解析中到期”如何终止或等待。
+  - 2026-10-09 判定侧定案（**覆盖**此前那版“订阅不满足时才接受短期绑定”的两来源并集写法）：权益来源由**显式部署模式**二选一 —— `official` 只看本机订阅的 `automation` grant；`selfhost-online` **不看本机订阅行**（在自己的库里给自己发货不算买到了），只看官方签发的票据；未配置即响的拒绝。票据按**封闭 action 词表 + 该动作自己的 rule/event 作用域**逐字匹配，在同一把账号锁内用数据库时钟判新鲜度、检查该实例的时钟高水位（回拨即停止授权）、在唯一约束下消费 nonce；只有 `session` 动作写绑定行，其余动作留下的是一次性消费证据。公网接收是唯一只能按 `session` 短期绑定判定的位置，也就是对外必须披露的那个 ≤30 秒窗口。仍缺：官方签发端与账号链接握手（`session` 的 `localAccountUuid` 目前仍由客户端声明，服务端只能要求后续票据与首次记录一致）、吊销版本在线刷新、各宿主每 30 秒续票据与 `waiting-entitlement` 展示，故 **AC-1 继续不勾选**。
 - **P1-4 事件级计量账本**〔裁决〕。现有 `consumeManagedAiRequest` 按 `(user_id, period)` 计数、无事件 ID、发送前失败已消耗且不退——事件重试会重复扣数。必须新增按事件/解析版本/尝试标识归属的持久结算或预留账本（reserve/consume/release/unknown 状态与周期跨越口径），原子绑定额度裁决与事件状态；冻结已取得的解析结果，提交失败不得重新解析计费；区分“用户不被重复扣功能额度”与“供应商物理调用绝不重复”，不承诺后者。
 - **P1-5 请求与签名线协议**。独立凭据（身份）与 HMAC（完整性）是两层，不是等价选项。定：版本化签名串（method、规范化路径/规则标识、keyId、时间戳格式与允许偏差、来源事件 ID/幂等键、Content-Type、原始字节摘要）、固定算法/编码/常量时间比较、重复 header 与压缩请求策略；**同键异体必须冲突**，不能被旧成功掩盖；凭据权限分离（接收/用户管理/设备领取/结果查询），账号身份不得由正文自报；总字节、解压后大小（或拒绝压缩）、JSON 深度、字段长度、解析输出数、每账号/规则速率、队列条数/字节与并发预算的边界及拒绝码；ACK 只在队列持久化后返回成功；结果查询验证权限，不接受可猜事件 ID。
 - **P1-6 收件密钥生命周期与回执披露**。现有 Vault 契约没有入站公钥字段，`vaultKeyPackageSchema` 是口令/恢复码包装的对称根密钥——不能当作现成能力。定：账号收件密钥或多接收设备 envelope 的生成端、算法及 AEAD 封装版本、keyId、以账号/规则/事件为 AAD 的绑定；私钥如何由 Vault 包装、跨设备同步、恢复与存储，公钥如何经认证发布及 CAS 换代；新增设备、最后一台设备丢失、Vault 锁定、改口令、root rotation、设备撤销时，已排队密文与在途 worker 的状态及重新封装责任（新事件用新 key epoch，旧队列迁移/等待/过期策略）。回执与状态查询**默认只含**不透明事件 ID、状态、错误码、允许披露的计数——**不得回传解析出的任务标题/备注给发送方**；任务 ID 是否向发送方暴露也须明示。
@@ -182,7 +183,7 @@ TypeScript 与迁移形状检查通过。此切片**不等于**队列领取、�
 
 新增 `automation_ai_attempts` 元数据账本及 `reserveAutomationAiAttempt`：预留、现有 AI 周期额度占用和事件级 `(event, parseVersion, attempt)` 记录在同一事务内；重复预留幂等，不写正文/模型输出。共享 worker 已接入 reserve 与 `sent/consumed/unknown` 状态，仍需各宿主真实调度、供应商失败/unknown/release 对账和两宿主故障注入。
 
-新增 `@heyta/inbound-core` 受限字段投影与冻结解析器：规则白名单决定出境字段；模型结果严格映射到 `heytaTaskBatch: 1`，任务 ID/op ID 稳定，date-only 按 UTC 日历日、instant 必须带显式 offset，拒绝执行设备本地时区推断。规则配置/授权版本已经进入服务端模型和配置 API；`app-host` 新增 claim → 解密 → `inbound-automation` 出境授权路由 → 冻结 → 收件公钥加密结果的共享 runner，以及 Vault root 包装的本地收件私钥存储。当前仍缺各宿主实际接入、UI、根轮换迁移和 AC-3/AC-8 验收；Goal 保持 active。
+新增 `@heyta/inbound-core` 受限字段投影与冻结解析器：规则白名单决定出境字段；模型结果严格映射到 `heytaTaskBatch: 1`，任务 ID/op ID 稳定，date-only 保留原日历日并生成规则时区兼容投影、instant 必须带显式 offset，拒绝执行设备本地时区推断。规则配置/授权版本已经进入服务端模型和配置 API；`app-host` 新增 claim → 解密 → `inbound-automation` 出境授权路由 → 冻结 → 收件公钥加密结果的共享 runner，以及 Vault root 包装的本地收件私钥存储。当前仍缺各宿主实际接入、UI、根轮换迁移和 AC-3/AC-8 验收；Goal 保持 active。
 
 ### 严格复审补充与本轮实现（2026-10-08）
 
@@ -209,10 +210,10 @@ meta store，token/私钥只以 Vault root 包裹形态持久化。`apps/node-ho
 持久接缝和正常空队列路径，尚不证明 AI provider、结果/permit 中断矩阵、根轮换真迁移、其他
 宿主、规则 UI 或 AC-1～AC-8；因此 AC-3/AC-4/AC-6/AC-8 仍不勾选。
 
-解析器的 date-only 语义也已收紧：规则时区（可选，缺省 UTC）用于把日期落在该 IANA 时区的
-本地零点；带时间的值仍必须显式携带 offset。Asia/Shanghai 与非法时区的正负测试已加入
-`@heyta/inbound-core`，避免执行设备本地时区改变任务日期。完整日历/时间线/编辑往返仍需
-跨端验收，不能把解析器测试当成 AC-4 完成。
+解析器的 date-only 语义已收紧：规则时区（可选，缺省 UTC）用于生成兼容 epoch 投影，
+`dueDateLocal/startDateLocal` 另存原始 `YYYY-MM-DD`，读取侧优先采用原日历日；带时间的值仍必须
+显式携带 offset。领域筛选、日历、倒计时、象限、排序及 Web/mobile 编辑器已接入，上海、
+纽约和 DST 的定向测试通过。时间线、提醒、真实跨端显示与编辑往返仍需验收，不能据此勾选 AC-4。
 
 ### 严格复审与收件密钥轮换补强（2026-10-08，阶段证据，仍不开放）
 
@@ -268,8 +269,89 @@ Web 与共享宿主普通同步的 worker/receipt 接线已补齐，并验证真
 
 调度状态备注：本次工具读回旧 Goal 为 blocked，新建请求被“已有未完成目标”拒绝；这不表示产品完成或工作无法推进。继续保存既有完整目标和实施进展，不以虚假 complete 换取新 Goal。
 
+2026-10-08 状态更新：用户已删除旧 Goal，本轮已成功创建覆盖严格复审至完整验收的新 Goal；上段仅保留为当时历史记录，不再代表当前工具状态。
+
 ### 2026-10-08 恢复、保留期限与会话复审
 
 本次补上 prepared 自动发现、同 owner 恢复、模型结果不确定时的两阶段确认重试。Web 表单与事件行改为纵向结构，修复复用横向选项卡导致文字竖排和整块蓝底的问题，保留修复前后截图。共享恢复器重新计算任务内容摘要；续租/发布/首次 permit 不再等待定时清理才执行七天到期限制；模型 reserve/sent 核对规则/解析版本、attempt、generation、期限；结果发布强制 itemCount。首次 permit 在账号锁后共享锁定订阅行并复核权益，精确 owner 重试保持可达；真实锁等待/到期注入验证新许可拒绝。Web 与共享 host 在会话失效后阻止在途响应引发新的请求和本地 op。
 
 阶段验证与尚存缺口见[本次复审](../research/inbound-automation-review.md#2026-10-08-恢复保留期限与会话复审)。真实 HTTP/PostgreSQL、共享内核、Node SQLite 和浏览器 UI 分别验证，UI 的 HTTP fixture 不冒充真实端到端。AC-1～AC-8 均维持未勾选，公网功能仍不开放。
+
+### 2026-10-08 新 Goal 续轮：确认门禁与 date-only 日历投影
+
+严格复审发现，服务端虽有 `needs-confirmation` 状态，模型结果冻结器原先却不接受该标志，共享 worker 因而无法把加密草稿停在许可前。本轮允许受限模型结果显式给出布尔 `needsConfirmation`，将它与密文结果一同发布；处理器在确认态不申请提交许可、不写 op，服务端同一冻结结果的幂等重发不允许把确认状态翻成 `prepared`。这只闭合**确认门禁**，并未完成草稿编辑/确认/取消；模型错误日期仍可能使冻结失败，不能把它误报为完整歧义草稿流程。
+
+日历 `calendarTaskSpan` 的 date-only 开始 + 时长此前仍从规则时区兼容 epoch 计算跨度，在异区设备上会提前或延后一天；现在用原始本地日历日投影区间端点。上海与洛杉矶定向测试均通过。后续须把提醒触发、全视图和真跨端编辑往返纳入 AC-4；AC-1～AC-8 继续未勾选。
+
+### 2026-10-08 完整范围 Goal 与草稿决策后端
+
+Goal 服务当前仍残留旧目标的 `blocked` 状态，创建新 Goal 被后端拒绝；本计划继续保留完整范围，覆盖严格复审、方案/计划、全部生产链路、AC-1～AC-8、双真实宿主故障矩阵、额度对账、全仓门禁、四端当前源码重打重装及 Linux 交付验收。不得因 Goal 元数据残留而缩小范围，也不得伪造旧目标完成。既有商业裁决全部保留。
+
+本轮新增共享严格草稿契约及认证读取/确认/取消 API：确认在账号锁内复核当前会话、锁定订阅权益、规则与解析版本、收件 epoch、条数和无许可；读取/取消不额外要求付费。决策最终写入使用状态/尝试/旧摘要/版本/期限 CAS，防止独立到期清理与决策竞争时复活密文。接口只接收封装后的结果，不接收明文；确认进入 prepared，仍由原恢复与单 op 提交路径执行。
+
+阶段证据与执行边界见[草稿决策复审](../research/inbound-automation-review.md#2026-10-08-草稿决策后端与到期清理竞态)。客户端编辑/加密/会话 fence 和非法日期草稿仍待实现；最新追加的真库清理竞态测试尚受内存护栏拦截，不能当成已通过。继续沿本 Goal 推进，不勾选任何 AC。
+
+### 2026-10-08 发送方凭据生命周期与 Web 管理接线（阶段证据，仍不开放）
+
+本轮严格复审补齐了自托管发送方凭据的真实生命周期：新增 `AutomationSenderCredential` 与迁移，使用独立部署 KEK 包裹 HMAC secret；签发在账号锁内轮换同 keyId 的旧活动凭据，撤销记录保留，活动唯一性使用部分唯一索引。服务端公网接收/状态查询和规则启用均按“托管凭据优先、托管记录存在即禁止 legacy fallback”执行，避免撤销后旧环境密钥继续可用。新增认证 API 仅返回一次 secret，列表接口只返回元数据。
+
+Web 设置页已接入生成/轮换、一次性展示与复制、活动凭据元数据和撤销。相关服务端 sender/inbound route 测试 11 项、app-host 规则远端测试 4 项、Web 自动收集生命周期定向测试 7 项、服务端与 Web/app-host 类型检查和迁移门禁通过。此证据不等于签名试发成功，也不覆盖自托管官方授权、真实 HTTP/PostgreSQL 最终源码重跑、managed/direct 并发计量、双真实宿主故障矩阵或原生端生命周期；AC-1～AC-8 继续不勾选，公网接收与售卖继续关闭。
+
+下一切片为签名试发：新增最小测试 payload 的可审计发送入口，验证一次性凭据、同键异体冲突、状态查询只返回 opaque 状态，以及试发不绕过规则授权、计量和保留期。完成后再进入正式自托管签名授权和跨端 worker 验收。
+
+凭据撤销的线性化点已与入队共用账号锁：验签只证明请求在某一时刻有效，最终写队列前必须重新确认托管 credential ID 仍为活动状态；撤销/轮换胜出则不产生事件。secret 在验签路径结束后清零。签名试发受理状态单独展示为 opaque 状态，不复用“任务已提交”文案；它可能进入真实队列并消耗既有自动收集模型额度，用户需按规则/权益/设备状态理解后续处理。
+
+### 2026-10-08 移动端前台 worker 阶段接线
+
+移动壳现在复用共享 worker loop：前台 focus 与 20 秒 tick 触发，后台停止新 claim；本地 SQLite `clientId` 派生 database epoch 并持久 worker 注册，收件 key/Vault/AI route/egress consent 缺一则等待，不自动创建密钥或绕过授权。Android/iOS 仍需当前产物上的真服务端验证、模型供给、故障注入与跨端往返，不能据此勾选 AC-3/AC-4/AC-8。
+
+### 2026-10-08 计量来源冻结与数据库约束（阶段证据，仍不开放）
+
+严格复审发现共享 worker 已能在实际路由解析后识别 `local/direct/managed`，但服务端 reserve handler 尚未接收并冻结该来源，且 state transition schema 错误地要求每次状态变更重复提交来源。现已修正为：reserve 才提交来源；state 只携带状态机字段；服务端把来源写入尝试账本并在重试时做不可变性校验。新增迁移放行 `local`，并保持 `local/direct` 的 `period_anchor IS NULL`、`managed` 必须有周期锚点的 CHECK。
+
+阶段证据：服务端类型检查、计量/入站路由 12 项、app-host 定向 1705 项、迁移形状检查通过；一次性 PostgreSQL 14.18 真库应用全部迁移并运行 worker identity HTTP 集成 30 项通过。新增并发来源对账用例已接入，但完整跨进程故障注入、托管模型真实供给、自托管在线授权、各端当前产物验收仍未闭合，AC-1～AC-8 继续不勾选，公网接收与售卖继续关闭。
+
+### 2026-10-09 自托管在线权益票据阶段接线
+
+服务端新增 `AutomationEntitlementBinding` 与一次性 nonce 表及迁移。`entitlement-ticket.ts` 验证官方 Ed25519 票据的原始 claims，固定绑定官方主体、安装实例、本地账号 UUID、吊销版本与最多 30 秒有效期；在账号锁内消费 nonce，重复票据、过期、错主体/实例/账号和旧吊销版本均拒绝。`POST /api/automation/entitlement/verify` 只返回状态和过期时间，自动收集权益守卫在订阅不满足时接受有效短期绑定，普通自托管同步仍保持原语义。
+
+定向票据测试 3/3，连同计量与公网接收测试 15/15；服务端 TypeScript、Prisma 生成与迁移形状检查通过。官方签发端/吊销在线刷新、真实 PostgreSQL nonce 并发、客户端续票据生命周期、时钟回拨 UI 尚未完成，AC-1～AC-8 继续不勾选，公网接收与售卖继续关闭。
+
+宿主传输层同步增加 `verifyAutomationEntitlementTicket`，统一 Bearer 认证、票据与本地账号 UUID 的请求形状和过期响应校验；app-host 类型检查与 2 项负向/正向测试通过。它只完成客户端接缝，官方票据获取、定时续票据和 waiting-entitlement 展示仍未实现，AC 继续不勾选。
+
+补充复审发现自托管绑定必须穿过无 JWT 的公网接收和账号锁内首次 permit，不能只挂在 API preHandler；现已抽出统一的 `evaluateAutomationEntitlementForUser` 并接入接收事务、草稿确认和 permit。仍需真实 PostgreSQL nonce/绑定并发与撤销版本复跑，AC-1 不勾选。
+
+> 🔴 上面这段的判定形状已被同日晚些的「部署模式二选一」定案**取代**：`evaluateAutomationEntitlementForUser` 不再把订阅与短期绑定当同一判定的两个来源，而是先按 `AUTOMATION_ENTITLEMENT_MODE` 选来源。留原句是为了让后来者看清它错在哪一次：把“两处都能放行”当成“统一了判定”，实际是把自托管的权益来源交回给本机的订阅行。
+
+### 2026-10-09 权益判定定案：部署模式二选一 + 按操作一次性票据（阶段证据，仍不开放）
+
+上一轮留下的三处会在真实链路上出事的形状已改掉，并补了两处此前没有任何一层在守的边界：
+
+1. **一台实例只有一个权益来源**。新增严格读取的 `AUTOMATION_ENTITLEMENT_MODE`（只接受 `official` / `selfhost-online`，写错**报错**，未配置则自动收集不可用 —— 响的拒绝，不静默落到任何一边，与本仓库 `ENTITLEMENT_GATE_ENABLED` 同一条纪律）。`selfhost-online` 下 `evaluateAutomationEntitlementForUser` **不再读 `subscriptions`**：本机订阅行放行自动收集等于“在自己的库里给自己发货”。
+2. **一枚票据只放行它那一个动作**。`action` 改成封闭词表（`session`/`rule-enable`/`sender-credential-issue`/`worker-register`/`event-claim`/`ai-reserve`/`result-publish`/`commit-permit`/`draft-confirm`），每个动作按词表要求带**恰好**它自己的 rule/event 作用域，矛盾组合在签发侧就签不出来；消费记录新增 `action/rule_id/event_id/installation_id` 列（迁移 `20261018170000_harden_automation_entitlement_ticket_scope`，未改任何已应用文件）。只有 `session` 写绑定行 —— 原来那张“30 秒内可放行任意次操作”的通行证不存在了。声明了 `action` 的闸门在自己的事务里消费票据（回滚不烧 nonce）；草稿确认与首次提交许可仍在**各自写事务内**消费，且草稿那侧去掉了 HTTP 层的重复判定（同一次请求烧两张票据是错的）。
+3. **可信时钟只有一个来源，且在锁后读**。票据的时间判定不再接受调用方传入的绝对时间：账号锁之后读 `clock_timestamp()`，过期即拒；新增按**安装实例**记录的高水位表，时钟回拨后本机所有账号都停止获得新授权。`session` 建立绑定时的 `localAccountUuid` 仍来自客户端声明 —— 这一格是真的未闭合，见文末。
+4. **恢复被替换掉的订阅行锁**。抽象成通用 reader 时，锁内那次订阅读退化成普通 `SELECT`；账号行的 `FOR UPDATE` 挡不住 `billing/webhook.routes.ts` 与 `activity/invite.ts` 对订阅行的写入（这两处都不取账号锁），于是“读到的权益快照”可以在提交前被撤销。现在锁内那次读显式 `... FROM subscriptions ... FOR SHARE`。
+5. **生产路径不再为测试桩降级**：默认绑定读取里那句“模型不存在就当没有绑定”的可选链已删；判定用的 reader 换成具名类型（`AutomationEntitlementSource` / `EntitlementDatabase` 取 Prisma 生成类型），不再出现 `any`。受影响的两份测试改为**声明自己建模哪一种部署**（`automation-drafts.spec.ts` 与公网接收套件 = `official`），而不是让生产代码去迁就最小 double。
+
+现量读数（本机一次性 PostgreSQL 14.18 + 真 HTTP，零 mock）：
+
+| 判据 | 读数 |
+|---|---|
+| `tests/automation-entitlement-ticket.spec.ts`（改写后） | **20/20** |
+| `tests/automation-drafts.spec.ts` | **19/19**（上一轮交下来时是 **9 红**：`Cannot read properties of undefined (reading 'findMany')`） |
+| `tests/inbound-automation.routes.spec.ts` | **8/8** |
+| `tests/{automation-events,automation-rules,automation-sender-credentials,automation-ai-metering,inbound-worker-identity,automation-commit-proof,entitlement-across}` 定向 7 文件 | **38/38** |
+| `research/tools/verify-inbound-worker-identity.py`（真库集成，含新增自托管段） | **38/38**，其中新增 8 条自托管在线判据 |
+| `pnpm --dir server exec tsc --noEmit` / `node scripts/check-migrations.mjs` | 通过（70 个迁移文件） |
+
+真库那 38 条的输出与清单已入库：[逐条通过名](../research/evidence/inbound-automation-review/entitlement-selfhost-20261009-postgres.txt)（写盘前做过 64-hex/长 token 脱敏扫描，命中 0）与[源码摘要](../research/evidence/inbound-automation-review/entitlement-selfhost-20261009-manifest.json)（含被验文件 sha256、命令、变异臂清单）。归档时**不含**完整 SQL 参数与时间戳噪声，因此它不是可复跑的装置，只是那一趟的读数。
+
+真库里拿到手的三类硬证据：同 nonce 并发两路 `verify` ⇒ **恰好一路 200、一路 403**，PostgreSQL 日志自己打出 `duplicate key ... automation_entitlement_ticket_uses_pkey`；`selfhost-online` 下即便订阅行写着 `grants: ['automation']`，公网接收仍回 **402** 且零事件落库；把订阅行的撤销提交排在许可请求的订阅读之后 ⇒ 请求**确实卡在 `FROM subscriptions` 的锁等待上**，撤销胜出、许可不落。
+
+变异验证（每臂只打红它那一条，全部从 `.mut-bak` 还原后复跑为绿）：锁后新鲜度判定、票据 action/作用域逐字匹配、只有 `session` 写绑定、未配置模式必须拒绝、自托管不看本机订阅、实例时钟回拨停止授权、nonce 一次性消费 ⇒ 各红 1 条；摘掉 `FOR SHARE` ⇒ 红真库那条锁串行判据。**一条臂的教训已入档**：第一版“锁后新鲜度”变异写成 `if (false && A || B || C)`，`||` 把 B/C 留在判定里，测试仍全绿 —— 臂是假的；存活读数必须先确认变异真的进了产物。
+
+仍然没闭合的（不包装成完成）：官方签发端与 `officialSubject ↔ installation ↔ 本地账号` 的链接握手（现在没有 issuer，自托管这一档在真机上**拿不到票据**，因此也只能在测试签发者下取证）；吊销版本在线刷新；各宿主每 30 秒续票据与 `waiting-entitlement` UI；`X-Heyta-Entitlement-Ticket` 在 app-host 客户端侧还没有供给方；其余动作（领取/预留/发布/注册/启用规则/签发凭据）的一次性票据目前在 HTTP 闸门自己的事务里消费，不在业务写事务里；故障窗口 11 只做了前半（撤销先赢），后半“许可先落盘、撤销后到”仍按既有许可语义取证。AC-1～AC-8 继续不勾选，公网接收与售卖继续关闭。
+
+两条这一改动带来的**代价**，不是 bug，但下一轮必须按它们设计：① 声明了 `action` 的闸门在官方模式下也开始在事务里以 `FOR SHARE` 读订阅行，于是领取这类高频调用会与计费写入排队（量级取决于计费写入频率）；② “每动作一枚一次性票据 + 首版只支持在线核验”意味着设备每 20 秒一轮的 worker 循环要额外产生票据往返 —— 签发端与续票据节奏要和票据一起定，不能事后靠放宽票据复用次数来补。
+
+一处已知的运维卫生缺口：`sync/cleanup.ts` 扫过期 nonce 行，但**不扫** `automation_entitlement_clocks`（只含安装 ID 与一个时间戳，不含账号数据，因此不在注销范围对账里）。要清它得先有一条“实例退役”的判据，本轮没有拍。

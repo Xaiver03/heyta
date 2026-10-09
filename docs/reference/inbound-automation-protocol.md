@@ -37,7 +37,7 @@
 
 结果已发布但 worker 在 permit 请求前终止时，同账号认证设备可自动发现仍处于 `prepared` 的结果 envelope；有持久许可后仅原 owner 可恢复（含暂停后标为 `cancelled` 的已授权事件）。`needs-confirmation` 不进入自动恢复。读取只返回密文和摘要/条数，不返回正文；七天到期即拒绝读取，不等待清理任务。解密后必须再次校验 source 与条数，并从完整 tasks 重算规范化摘要，再走同一 permit/journal/dispatch 路径。权益过期不阻挡仍在保留期内的冻结结果读取，但不会因此放行新的解析或许可。
 
-结果发布必须携带 `itemCount`，且 `parseVersion` 与当前规则一致。续租、发布、首次授予许可以及 reserve/sent 分别核对事件保留期限；已有精确许可不因正文到期撤销。首次许可在账号锁后读取并共享锁定订阅行，使用当前时间再次判定权益；HTTP preHandler 不作为这项授权的最终依据，原 owner 的精确重试仍可到达服务层。`model-result-uncertain` 只允许账号用户明确同意可能再次计费后，通过 attempt + ruleVersion CAS 重新排队；旧账目不清除，重复确认不再次生效。其他待确认草稿仍需独立的编辑/确认协议，不复用这个重试按钮。
+结果发布必须携带 `itemCount`，且 `parseVersion` 与当前规则一致。续租、发布、首次授予许可以及 reserve/sent 分别核对事件保留期限；已有精确许可不因正文到期撤销。首次许可在账号锁后读取并共享锁定订阅行，使用当前时间再次判定权益；HTTP preHandler 不作为这项授权的最终依据，原 owner 的精确重试仍可到达服务层。`model-result-uncertain` 只允许账号用户明确同意可能再次计费后，通过 attempt + ruleVersion CAS 重新排队；旧账目不清除，重复确认不再次生效。受限模型结果可显式携带布尔 `needsConfirmation`，发布时冻结此状态；精确重试不可翻转确认状态，确认态不签发 permit、不写业务 op。**这只是安全停点**：其他待确认草稿仍需独立的密文读取、编辑、确认、取消与 CAS 协议，不复用这个重试按钮，也不能把当前停点宣传成已可操作的草稿流程。
 
 宿主会话约束独立于服务端许可：账号/token/origin、Vault 或执行上下文变化后，在途响应不得驱动新的网络请求或本地提交。共享处理器接受同步宿主检查，并在网络请求前后与 engine 串行提交校验内执行；已发出的外部模型请求不承诺撤回，已保存回执留待原身份恢复。
 
@@ -47,19 +47,27 @@
 
 **规则删除与迟到同步：** 按 [ADR-0061](../adr/0061-owner-held-inbound-commit-receipt.md)，许可返回时附服务端签名提交回执；原设备必须先在本地持久保存，再派发 op。回执只含实例/账号/worker/数据库 epoch/事件/条数，不含正文或摘要。删除规则会保留事件身份和已签发许可；即使后续清理许可，原设备也可通过上传信封的 `inboundCommitProofs` 继续证明同一提交身份；仍须有效 JWT 和未撤销 worker。回执不随 op 同步给别人。缺回执或授权被拒保持待上传，不使用会永久丢弃待上传资格的校验错误码。独立部署签名密钥的轮换必须保留旧验证键。
 
+### 2.1 用户草稿决策线协议
+
+`GET /api/automation/events/:eventId/draft` 仅返回未过期的确认草稿密文与 `eventId/ruleId/ruleVersion/parseVersion/attempt/resultDigest/resultItemCount`，响应 `Cache-Control: no-store`。读取和取消不要求仍有付费权益；账号 JWT 的 tokenVersion 在账号锁内复核。正文只能在解锁的客户端解密。
+
+`POST /api/automation/events/:eventId/draft/decision` 的共享严格契约为 `expectedAttempt/expectedRuleVersion/expectedDigest/decision`；`decision=confirm` 必须另带 `resultDigest/resultItemCount/resultCiphertext`，`cancel` 不允许这些字段，任何额外字段（包括明文标题）拒绝。确认在账号锁内共享锁定订阅并复核 `automation` 权益、规则/解析版本、条数上限、当前收件 epoch 和无提交许可；最终写入还以状态、尝试、规则版本、旧摘要与期限 CAS，不能复活到期清理已置空的草稿。取消清除输入/结果密文且保留去重身份。成功响应只含 `eventId/state`，确认进入 `prepared` 后沿既有恢复/许可/journal/单 batch op 路径执行，决策接口本身不创建任务或许可。
+
+实施边界：上述后端与共享传输已接线；客户端必须补上完整来源/内容摘要校验、稳定任务 ID、规则时区编辑、当前公钥重封装及会话/Vault fence，不能直接相信服务器返回的摘要。非法或歧义日期的独立草稿契约及其 UI 仍待实现，现有确认标志只覆盖能够成功冻结的 batch。
+
 ## 3. 批创建（P1-2，首个可独立实施切片）
 
 新增 `BATCH / TASK` 的 payload marker `heytaTaskBatch: 1`，不 bump schema。形状为 `{ heytaTaskBatch: 1, source, tasks }`，严格拒绝未知字段。
 
 - `source`：`{ version: 1, eventId, ruleId, ruleVersion, parseVersion, digest }`。digest 为冻结规范任务列表的 SHA-256（包含清单、字段与顺序），不代替入口原始字节摘要。账号/服务地址不以明文塞进业务来源字段；其隔离由 host scope 和中心记录保证。
-- `tasks`：1–50 项，字段为 `id/title/priority` 和可选 `note/projectId/dueDate/startDate/durationMinutes`。标题非空且最多 500 字符，备注最多 10,000 字符；ID 最多 128 ASCII 字符且批内不重复。priority 为 0–3。时间必须为合法整数 epoch；时长沿用领域层 5–480 分钟范围，不静默夹取。
+- `tasks`：1–50 项，字段为 `id/title/priority` 和可选 `note/projectId/dueDate/dueDateLocal/startDate/startDateLocal/durationMinutes`。标题非空且最多 500 字符，备注最多 10,000 字符；ID 最多 128 ASCII 字符且批内不重复。priority 为 0–3。`dueDate`/`startDate` 是兼容投影；存在 date-only 时必须同时保留 `dueDateLocal`/`startDateLocal` 的合法 `YYYY-MM-DD` 原值。时长沿用领域层 5–480 分钟范围，不静默夹取。
 - 一次批创建只有一个目标清单（无 projectId 表示收集箱）；授权不允许输入或模型决定另一个清单。清单不存在、删除或失去授权时整批等待修正规则，不能静默改投收集箱。
 - 任务 ID 固定为 `inbound:<eventId>:<itemIndex>`（eventId 最多 64 字节），op ID 固定为 `inbound:<eventId>`。op 的 `entityId` 为首项 ID，`entityIds` 是剩余项，范围与任务 ID 列表完全一致。每项独立 payload，共享 op 元数据；`createdAt` 从该 op 的时间戳导出。零项在 worker 结束，不能构造空 batch。
 - 整批先校验后纯 reducer 物化，任何一项无效均不落盘、不改变内存。reducer 不检查当时的清单可见性以免乱序丢事件，授权/存在性由创建入口验证；远端回放不会再调用动作或产生副作用。
 - Task 新增可选 `automationSource`（source + itemIndex）。旧数据默认无来源。来源本身不是全局分布式锁；删除任务不能清中心去重身份。重复/乱序/先删后到/后续编辑/REPAIR/checkpoint 都须收敛。
 - 识别到未知 marker 版本必须响亮拒绝，不能按普通任务 payload 写入。暂不支持的设备不得注册为 worker；对新 payload 的读侧支持必须先随所有端发布，再开放回调。
 
-日期语义扩展是后续切片，未完成前批入口只接收已明确的 instant，不将 date-only 伪装成午夜 epoch。
+date-only 与 instant 是两种不同语义：date-only 由 `*DateLocal` 字段保存原日历日，epoch 仅作为旧消费者兼容投影；instant 必须带显式 offset。读取侧优先使用 `*DateLocal`，所以规则时区不会被执行设备时区改写。
 
 ## 4. 权益与计量（P1-3 / P1-4）
 
@@ -67,11 +75,17 @@
 
 [ADR-0060](../adr/0060-automation-entitlement-and-retention.md)记录 2026-10-07 负责人确认的商业基线：现有 AI 付费档包含 automation，不新增 SKU；自托管绑定官方付费主体；不另收事件费；托管模型沿用既有额度，BYO 成本由用户端点承担。**实现与验收未闭合前不开放自动收集购买承诺。**
 
-自托管首版采用在线核验，不承诺离线宽限。绑定 `(officialSubject, installationId, localAccountUuid)`，不使用本地数字 userId 跨实例认同一主体。首次绑定需要官方账号登录授权和本地账号认证，签发凭据不能借给客户端 worker。官方 issuer、Ed25519 keyId/公钥、实例私钥及吊销版本分别管理；部署者不能从客户端参数替换验证公钥。
+自托管首版采用在线核验，不承诺离线宽限。绑定 `(officialSubject, installationId, localAccountUuid)`，不使用本地数字 userId 跨实例认同一主体。首次绑定需要官方账号登录授权和本地账号认证，签发凭据不能借给客户端 worker。官方 issuer、Ed25519 keyId/公钥及吊销版本分别管理；部署者不能从客户端参数替换验证公钥。
 
-在线核验票据绑定 action、实例、账号、rule/event、nonce、版本和 expiry，最多 30 秒且一次使用。只有服务端可信时间判断；发现时钟回拨则停止新授权。官方不可达显示 `waiting-entitlement`，不静默免费。撤销对未签发票据即时生效，对已签发票据最多有 30 秒传播窗口，必须披露；不能宣称跨数据库瞬时撤销。最终本地提交仍以第 2 节许可为边界。
+**权益来源由部署模式决定，两模式互斥**（`AUTOMATION_ENTITLEMENT_MODE`，只接受 `official` / `selfhost-online`，写错在读取时**报错**）：`official` 只看本机 `subscriptions` 的 `automation` grant；`selfhost-online` **不看本机订阅行**（在自己的库里给自己发货不算买到了），只看官方签发的票据。未配置 = 自动收集不可用（响的拒绝），代码不猜"这是不是官方实例"。自托管仍可免费同步，`hosting` 判定不受影响。
 
-事件模型账本唯一键 `(eventId, parseVersion, attempt)`，状态 `reserved/sent/consumed/released/unknown`；周期归属在 reserve 时冻结。额度判定与 reserve 在同一个数据库事务中，旧的周期计数器不能被另一路无条件加一。明确未发送的失败才 release；已发出后丢失响应记 unknown，默认不自动重新调用。取得结果后只保存客户端加密结果；重试提交不再调用模型。
+票据形状为 `base64url(JSON claims).base64url(Ed25519 signature)`，签名域 `heyta-automation-entitlement-v1.` + 原始 claims 字节；claims 固定含 `version=1/action/capability=automation/issuer/keyId/officialSubject/installationId/localAccountUuid/ruleId?/eventId?/nonce/issuedAt/expiresAt/revocationVersion`，`expiresAt-issuedAt` 最多 30 秒。`action` 是封闭词表：`session`、`rule-enable`、`sender-credential-issue`、`worker-register`、`event-claim`、`ai-reserve`、`result-publish`、`commit-permit`、`draft-confirm`；每个动作按词表要求带**恰好**它自己的作用域（`rule-enable`/`sender-credential-issue` 带 ruleId，`ai-reserve`/`result-publish`/`commit-permit`/`draft-confirm` 带 eventId，其余不带），矛盾的组合签不出来。
+
+**一枚票据只放行它那一个动作。** 每次授权在同一把账号锁内：读数据库时钟 → 判新鲜度 → 检查该实例的时钟高水位（回拨即停止签发新授权）→ 在唯一约束下消费 nonce → 记录 action 与作用域。只有 `session` 写绑定行；其余动作留下的是消费证据，不是可复用的权益。撤销对已签发 `session` 票据至多有 30 秒窗口，必须披露；不能宣称跨数据库瞬时撤销。**公网接收是唯一例外**：发送方不是账号、拿不到票据，只能按 `session` 建立的短期绑定判定，这一格就是上面那个 30 秒窗口。最终本地提交仍以第 2 节许可为边界。
+
+已闭合的部分到此为止；下列仍是**未闭合门槛**，不得读成已实现：官方签发端（含 `officialSubject` ↔ 实例 ↔ 本地账号的链接握手，目前 `session` 的 `localAccountUuid` 由客户端声明，服务端只能要求后续票据与首次记录一致）、吊销版本的在线刷新、各宿主每 30 秒续票据与 `waiting-entitlement` 展示。
+
+事件模型账本唯一键 `(eventId, parseVersion, attempt)`，状态 `reserved/sent/consumed/released/unknown`；计量来源在 reserve 时冻结为 `local`、`direct` 或 `managed`，并写入同一账本。`managed` 才消费托管 AI 周期额度并带 `periodAnchor`；本地模型和用户自有端点不消费托管额度，二者的 `periodAnchor` 必须为 `null`。同一尝试重试时来源不允许改变，来源错配必须拒绝。额度判定与 reserve 在同一个数据库事务中，旧的周期计数器不能被另一路无条件加一。明确未发送的失败才 release；已发出后丢失响应记 unknown，默认不自动重新调用。取得结果后只保存客户端加密结果；重试提交不再调用模型。
 
 无功能事件费不等于模型免费；人为再次解析属于明确的新模型尝试且必须重新确认其额度消耗。代理不持久缓存模型正文。新增 ADR 须同时限定 ADR-0054 的事件元数据例外，保留其“代理正文不持久化”边界。
 
@@ -138,3 +152,13 @@ Web、macOS/Windows/Linux 共享 Web UI、Android/iOS 均需管理入口；worke
 ## 9. 实施验证
 
 按唯一计划 AC-3 的十个故障窗口逐项记录中心、两本地库、同步日志和账本；新增第 11 项为许可授予与撤销的双向顺序，第 12 项为旧 keyId 重放/新 keyId 同事件重放，第 13 项为日期在不同端/视图的显示与编辑往返。所有边界测上限/上限加一；安全防线要有拒绝样例。纯函数测试不替代真 HTTP、真数据库、进程终止和当前安装产物。
+
+## 10. 发送方凭据生命周期（2026-10-08）
+
+发送方身份凭据与 HMAC 完整性密钥由服务端按账号、规则和 `keyId` 作用域管理。`POST /api/automation/rules/:ruleId/sender-credentials` 只在签发响应中返回一次 32 字节随机 secret；数据库仅保存使用独立 `AUTOMATION_SENDER_KEK`（64 位 hex）AES-256-GCM 包裹的密文，AAD 绑定 `userId/ruleId/keyId`。没有部署 KEK 时不能签发或解密凭据。
+
+同一规则可以用同一 `keyId` 轮换：旧活动行先在账号锁内标记 `revokedAt/rotatedAt`，再写入新的活动行。数据库只允许同一账号、规则、keyId 存在一行未撤销凭据；历史撤销行保留到规则删除，便于审计。凭据列表只返回不透明 ID、keyId 和时间元数据，绝不返回 secret。撤销按账号与凭据 ID 条件更新，跨账号或重复撤销没有效果。
+
+公网接收和不透明状态查询优先解析托管凭据。只要该账号/规则/keyId 存在托管记录，解析失败、撤销或部署密钥不可用都直接拒绝，不得回退 `AUTOMATION_WEBHOOK_KEYS`；只有完全没有托管记录的 legacy 规则才可使用账号作用域的旧 keyring。规则启用同时要求活动托管凭据或合法 legacy 条目。轮换不会改变事件去重身份；旧 secret 的新请求立即失效，已受理事件沿既有事件状态和保留期限处理。
+
+Web 管理界面只在用户明确点击生成/轮换后展示 secret，并提供一次复制动作；关闭后本地状态清除。界面不把 secret 写入规则、日志、同步 payload 或服务端元数据。签名试发仍是后续切片，未完成前不得把凭据生成宣传为端到端链路已验收。
