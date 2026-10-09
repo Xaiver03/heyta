@@ -1079,7 +1079,14 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
   - 🔴 `subscription.spec.ts > contract with server/src/entitlement.ts` 是**真红、单跑 554 ms 复现**：服务端 `entitlement.ts`（工作树里 ` M`，属密钥撤销那条线在册的改动）新增 `NO_BINDING`（`entitlement.ts:389`）与 `REVOKED_VERSION`（`:392`）两个拒绝原因，而 `packages/domain` 那侧的镜像封闭词表没跟着长 —— 这条契约测试判的正是"两侧一模一样、且不许有多余"。**本线不代改**：往镜像词表补两项是那条线对"客户端要不要认识这两个拒绝"的语义决定，不是消红手段。归属与位置写在这里，等对应线收。
 
 🔴 **这一格仍未取到的读数，不记作通过**：
-- [ ] **Android 整条 Profile/Settings 旅程本轮没跑成，三趟都死于载体**：① dump 拿到安卓桌面（判据已补，见上）；② `am force-stop` 超 25 s 超时（旋钮已补）；③ 设备上的 `com.heyta` 被并行会话**卸载**，随后包管理服务不可用 —— `adb install -r` 两次报 `cmd: Can't find service: package`，而 `pm list packages | grep heyta` 为空。设备面判据**一条都没取到**，这是环境结论，不是产品缺陷。⚠️ **09 13:1x 现量：载体已经退到更早的一格 —— 模拟器本身没了**：`adb devices` 返回空列表（`emulator-5554` not found），所以那一趟连 `pm` 都问不到，不是包管理服务坏了没恢复。取现量：`adb devices`；`ls -l apps/mobile/android/app/build/outputs/apk/release/app-release.apk`（当前这份是 09 01:52 打的）。起模拟器要吃 3.6G+ 常驻与近满 CPU，按 AGENTS §6.1 那条新规 Android **构建**已改走 `windows-pc`，但**设备侧验收仍在这台 Mac** ⇒ 这一趟要负责人给一个明确窗口，不是我该擅自起的。
+- [ ] **Android 整条 Profile/Settings 旅程本轮没跑成，三趟都死于载体**：① dump 拿到安卓桌面（判据已补，见上）；② `am force-stop` 超 25 s 超时（旋钮已补）；③ 设备上的 `com.heyta` 被并行会话**卸载**，随后包管理服务不可用 —— `adb install -r` 两次报 `cmd: Can't find service: package`，而 `pm list packages | grep heyta` 为空。设备面判据**一条都没取到**，这是环境结论，不是产品缺陷。
+    🔴 **而那句"判据已补"当时是假的 —— 不是判断错，是那 6 行从没进过仓库**（13:5x 现量：`git status --porcelain -- scripts/qa/profile-settings-android.py` 报 ` M`，
+    `git show HEAD:` 那份仍是 `english = find(r,'Profile') is not None`）。首启弹的是联网同意面板，底部标签这时候还不存在 ⇒
+    旧判据两种语态下都会把语言读错，而语言读错之后每一条 `T('中','En')` 定位都拿错的那一版去点，**症状会是"界面上没这个功能"而不是"语言判错了"**。
+    现已落笔（`fix(产品体验线 Android 装置)`：同时认三种首启面 + 点完同意重新取树，`python3 -m py_compile` rc=0、
+    `check:locator-labels` 对该脚本 rc=0 且它已在 `pnpm check` 链里）。⇒ 这条给本账补一句口径：
+    **"已补"只有配上"在 HEAD 里"才算补**，装置类改动写完不落笔，台账那句话就是在给下一个人在一棵不存在的树上标路径。
+    ⚠️ 本格仍然不打勾：旅程本身没跑（模拟器此刻不在，`adb devices` 空列表），这一笔改的是"下次那趟能正确判语言"。⚠️ **09 13:1x 现量：载体已经退到更早的一格 —— 模拟器本身没了**：`adb devices` 返回空列表（`emulator-5554` not found），所以那一趟连 `pm` 都问不到，不是包管理服务坏了没恢复。取现量：`adb devices`；`ls -l apps/mobile/android/app/build/outputs/apk/release/app-release.apk`（当前这份是 09 01:52 打的）。起模拟器要吃 3.6G+ 常驻与近满 CPU，按 AGENTS §6.1 那条新规 Android **构建**已改走 `windows-pc`，但**设备侧验收仍在这台 Mac** ⇒ 这一趟要负责人给一个明确窗口，不是我该擅自起的。
 - [ ] **共享设备证据**：同一台 `emulator-5554` 上 11:00:26 与 11:12:54 两次 `pm_clear_app_data_caller`（uid 1000 = adb）；同时在跑的还有另一条线的 `scripts/verify-mobile-account-email-sessions.sh` 与 Playwright `tests/ai-assistant.spec.ts`。整机 1 分钟负载在 **73 ↔ 622** 之间震荡（阈值 12），内存 62G/63G 占满。按 AGENTS §8.9，这一段要的是**独占窗口**，不是重试。
 - [x] ✅ **`pnpm --filter @heyta/web typecheck` rc=2，红点不在本线**：13 条 `error TS` 全部落在 `apps/web/tests/share-key-store.spec.ts`（`git status` 为 `A`、从未提交、mock 的 `Storage` 缺 `length/clear/key`），本线三个文件零错误。该文件属另一条在册的线，**不代改**。取现量：`grep -cE 'error TS' <该命令日志>`。
     ⇒ **这一格作为待办已被下面 08:5x 那格的复量取代**（那枚测试文件此刻已在 HEAD 里，"从未提交"那句不再成立），
