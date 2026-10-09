@@ -185,10 +185,72 @@ async function layoutFacts(page, testId) {
   }, testId);
 }
 
+/**
+ * 🔴 主题必须走应用自己的那条（`heyta.theme` 那一键），**不要**直接写 `dataset.theme`。
+ *
+ * 这条以前只在 `sync` 腿兑现（它的注释第 1 条就是这件事），其余三条腿一直在硬写属性，
+ * 于是那三腿的"暗色档"是**半暗**的：
+ *   - CSS 层跟着动 —— `tokens.css` 的暗色覆盖挂在 `<html data-theme>` 上；
+ *   - 共享层不动 —— `packages/ui` 的 RN 组件吃的是 `<HeytaUiProvider value=…>` 里那份
+ *     JS token（`apps/web/src/App.tsx` 用 `resolveHeytaUiTheme({ scheme: theme })` 解析），
+ *     它**根本不读这个 DOM 属性**。
+ * 实测（`scripts/qa/probe-theme-layer.mjs`，10-10 00:5x，390×844）：只写属性时同一屏上
+ * web 标题是 `rgb(241,245,249)`、共享层 `SettingsSection` 的标题仍是 `rgb(15,23,42)`
+ * —— 深底压深字；写 `heyta.theme` 时两层都是 `rgb(241,245,249)`。
+ * ⇒ 那是**载体的缺陷**，不是产品的：产品里 `applyTheme(theme)` 与 `uiTheme` 由同一个状态驱动。
+ * 亮色档也一并显式写，不再依赖 Playwright 上下文的默认配色。
+ */
+const seedStorage = (page, theme) => page.addInitScript((t) => {
+  localStorage.setItem('heyta.locale', 'zh-CN');
+  localStorage.setItem('heyta.theme', t);
+}, theme);
+
+/**
+ * 量"这一档暗色到底暗了几层"。
+ *
+ * 取的是**同一屏上两个已知分属两层的节点**：
+ *   - CSS 层：当前那一组的区块标题（`ht-settings__group-title` / `ht-settings__title`，web DOM，吃 CSS 变量）；
+ *   - 共享层：作用域内**第一个带字面 `color:` 内联样式**的节点。
+ *
+ * 🔴 为什么"字面值"这个筛法是成立的、而不是图省事：web 侧的内联颜色一律写成
+ * `cssVar('color.foreground')`（AGENTS §5 规则一禁裸值，`check:design` 拦），
+ * 那种会跟着 CSS 变量走 —— 拿它当共享层，"两层同色"就**永远真**。
+ * 只有 RNW 把 JS token 解析成字面色值写进 `style`，所以"字面 color ⇒ 共享层"是有规则背书的判据，
+ * 不是碰运气。这条前提要现量，而且**命令本身要能筛掉 `var(`** —— 直接搜 `color: '` 会命中一堆
+ * `color: 'var(--ht-color-…)'`（那些是 web 侧写的，会跟着 CSS 变量走，正是本判据要排除的形状）：
+ *   `grep -rnE "color:[[:space:]]*['\\\"]" apps/web/src --include='*.tsx' | grep -v "var("`
+ * ⇒ 渲染路径上应当**为空**（`check:design` 禁的就是组件里的裸色值）。写注释时别把两次的读数混起来。
+ *
+ * `sharedLayerFound` 必须入册：找不到就说明这一格量不到共享层，
+ * 那是"一条没跑"而不是"跑过了且成立"（§7 第 227 条那一族）。
+ * @param {any} page Playwright 页
+ * @param {string} [scopeSelector] 作用域；不传就在整棵 document 里找
+ */
+async function themeLayerFacts(page, scopeSelector) {
+  return page.evaluate((scope) => {
+    const root = (scope ? document.querySelector(scope) : null) ?? document;
+    const title = root.querySelector('.ht-settings__group-title')
+      ?? root.querySelector('.ht-settings__title')
+      ?? document.querySelector('.ht-settings__group-title, .ht-settings__title');
+    const shared = [...root.querySelectorAll('[style]')].find((el) => {
+      const s = el.getAttribute('style') ?? '';
+      return /(^|;)\s*color\s*:/.test(s) && !s.includes('var(');
+    }) ?? null;
+    return {
+      scope: scope ?? '(document)',
+      datasetTheme: document.documentElement.dataset.theme ?? '(unset)',
+      storedTheme: localStorage.getItem('heyta.theme') ?? '(unset)',
+      cssLayerColor: title ? getComputedStyle(title).color : '(css title not found)',
+      sharedLayerColor: shared ? getComputedStyle(shared).color : '(shared node not found)',
+      sharedLayerFound: Boolean(shared),
+    };
+  }, scopeSelector ?? null);
+}
+
 async function captureReminder(browser, spec, mode) {
   const context = await browser.newContext({ viewport: { width: spec.width, height: spec.height }, locale: 'zh-CN' });
   const page = await context.newPage();
-  await page.addInitScript((theme) => localStorage.setItem('heyta.locale', 'zh-CN'), spec.theme);
+  await seedStorage(page, spec.theme);
   if (mode === 'unsupported') {
     await page.addInitScript(() => Object.defineProperty(window, 'Notification', { configurable: true, value: undefined }));
   } else if (mode === 'error') {
@@ -229,7 +291,6 @@ async function captureReminder(browser, spec, mode) {
     await setBrowserPermission(page, 'prompt');
   } else await page.goto(`${ORIGIN}/?lang=zh-CN`);
   await decidePrivacy(page);
-  if (spec.theme === 'dark') await page.evaluate(() => document.documentElement.dataset.theme = 'dark');
   await openGroup(page, 'appearance');
   const panel = page.getByTestId('reminder-notify-panel');
   await panel.waitFor();
@@ -239,6 +300,7 @@ async function captureReminder(browser, spec, mode) {
   // this check below the fold.
   await panel.scrollIntoViewIfNeeded();
   const facts = await layoutFacts(page, 'reminder-notify-panel');
+  const themeLayers = await themeLayerFacts(page, '#settings-group-appearance');
   const statuses = await page.evaluate(() => ({
     granted: Boolean(document.querySelector('[data-testid="reminder-notify-granted"]')),
     denied: Boolean(document.querySelector('[data-testid="reminder-notify-denied"]')),
@@ -271,16 +333,15 @@ async function captureReminder(browser, spec, mode) {
   const permissionSource = mode === 'denied' || (HEADED && (mode === 'default' || mode === 'granted'))
     ? 'browser'
     : 'injected';
-  return { theme: spec.theme, width: spec.width, mode, permissionSource, statuses, facts, screenshot };
+  return { theme: spec.theme, width: spec.width, mode, permissionSource, statuses, facts, themeLayers, screenshot };
 }
 
 async function dataJourney(browser, spec) {
   const context = await browser.newContext({ viewport: { width: spec.width, height: spec.height }, locale: 'zh-CN', acceptDownloads: true });
   const page = await context.newPage();
-  await page.addInitScript(() => localStorage.setItem('heyta.locale', 'zh-CN'));
+  await seedStorage(page, spec.theme);
   await page.goto(`${ORIGIN}/?lang=zh-CN`);
   await decidePrivacy(page);
-  if (spec.theme === 'dark') await page.evaluate(() => document.documentElement.dataset.theme = 'dark');
   const input = page.locator('input[placeholder^="添加任务"]');
   await input.fill(`数据管理响应式验收 ${spec.theme} ${spec.width}`);
   await page.getByTestId('capture-submit').click();
@@ -346,10 +407,9 @@ async function dataJourney(browser, spec) {
 async function captureGroup(browser, spec, group) {
   const context = await browser.newContext({ viewport: { width: spec.width, height: spec.height }, locale: 'zh-CN' });
   const page = await context.newPage();
-  await page.addInitScript(() => localStorage.setItem('heyta.locale', 'zh-CN'));
+  await seedStorage(page, spec.theme);
   await page.goto(`${ORIGIN}/?lang=zh-CN`);
   await decidePrivacy(page);
-  if (spec.theme === 'dark') await page.evaluate(() => { document.documentElement.dataset.theme = 'dark'; });
   const navLabel = await openGroup(page, group);
   const facts = await page.evaluate((id) => {
     const el = document.getElementById(id);
@@ -398,9 +458,15 @@ async function captureGroup(browser, spec, group) {
     probe.remove();
     return counted;
   }, `settings-group-${group}`);
+  // 截图之前量：拍的就是被判据打分的那一屏。作用域收到当前这一组，是为了让"哪几组量得到"
+  // 这件事**由读数回答**而不是由 import 猜：r13 实测这四组 24 格逐格 `sharedLayerFound=false`
+  // （未登录态下 `PasswordPanel`/`SessionsPanel` 那些面板不渲染带字面内联色的节点），
+  // 全装置只有「任务与显示」那一组量得到共享层（`themeRulerMeasuredCells` = 20 / 44）。
+  // ⇒ 这两条判据守得住的就是那一格；别把它读成"每个设置组的暗色都两层对过账"。
+  const themeLayers = await themeLayerFacts(page, `#settings-group-${group}`);
   await page.screenshot({ path: `${OUT}/${spec.theme}-${spec.width}-${group}.png`, fullPage: true });
   await context.close();
-  return { theme: spec.theme, width: spec.width, group, navLabel, facts, planted };
+  return { theme: spec.theme, width: spec.width, group, navLabel, facts, planted, themeLayers };
 }
 
 /** 那四条外链行的判定。**唯一一份**：好态与三条坏臂都走这里 —— 对照臂里再手写一遍谓词，
@@ -434,7 +500,9 @@ const HELP_LONG_TITLE = '帮助与问题反馈的超长中文标题换行实测'
 async function captureHelpWrap(browser, width) {
   const context = await browser.newContext({ viewport: { width, height: 900 }, locale: 'zh-CN' });
   const page = await context.newPage();
-  await page.addInitScript(() => localStorage.setItem('heyta.locale', 'zh-CN'));
+  // 这一腿只有亮色一档，但**显式**写：不写就变成"依赖 Playwright 上下文的默认配色"，
+  // 那是第三个会悄悄变的东西（同一族见 `seedStorage` 上面那段）。
+  await seedStorage(page, 'light');
   await page.goto(`${ORIGIN}/?lang=zh-CN`);
   await decidePrivacy(page);
   await openGroup(page, 'help');
@@ -839,6 +907,8 @@ const assertionOwner = {
   allPermissionStatesRendered: ['reminders'],
   everyCaseCoversEverySelectedMode: ['reminders'],
   reminderPermissionProvenanceIsLabeled: ['reminders'],
+  darkTierReachesBothThemeLayers: ['reminders', 'groups'],
+  themeLayerRulerSwitchesWithTier: ['reminders', 'groups'],
   dataFailurePreserved: ['data'],
   existingDataRefusedWithoutLoss: ['data'],
   cancelPreserved: ['data'],
@@ -880,6 +950,13 @@ const expectedLegCells = {
   sync: syncCases.length,
 };
 
+// 两层对账尺子的样本：提醒腿（任务与显示组）与分组走查腿（四组）都各交一份。
+// 两条判据合起来才是完整的：只量得到几组，看 `themeRulerMeasuredCells`。
+const themeRulerCells = [
+  ...reminders.map((x) => ({ ...x.themeLayers, theme: x.theme, leg: 'reminders' })),
+  ...groups.map((x) => ({ ...x.themeLayers, theme: x.theme, leg: 'groups', group: x.group })),
+];
+
 const report = {
   origin: ORIGIN,
   carrier: {
@@ -893,6 +970,12 @@ const report = {
     // 实测过五条通道都回 `denied`：`grantPermissions`、CDP `Browser.setPermission('granted')`、
     // 页面里真调 `requestPermission()`、`--headless=new`、`--disable-features/--enable-features` 组合。
     injectedReminderModes: HEADED ? [] : SIMULATED_WHEN_HEADLESS,
+    // 暗/亮两档怎么驱动的：走应用自己那条（`localStorage['heyta.theme']`），
+    // **不是**直接写 `<html data-theme>` —— 后者只搬得动 CSS 那一层，共享层组件不读它。
+    themeCarrier: "localStorage['heyta.theme']（= 产品自己那条开关）",
+    // 这把尺子实际量到共享层节点的格数（读数，不是判据）：0 就说明两条判据都在空转。
+    themeRulerMeasuredCells: themeRulerCells.filter((x) => x.sharedLayerFound).length,
+    themeRulerSampleCells: themeRulerCells.length,
     realPermissionModes: HEADED
       ? ['default', 'granted', 'denied']
       : ['denied'],
@@ -937,6 +1020,25 @@ const report = {
           && (x.permissionSource === 'browser' || x.statuses.permission === x.mode || x.mode === 'error' || x.mode === 'unsupported');
       })
       && reminders.filter((x) => x.permissionSource === 'browser').every((x) => x.statuses.permission === x.mode),
+    // ── 暗色档必须两层都暗（2026-10-10：载体以前只搬得动 CSS 那一层，共享层没跟着换）──
+    // 产品的暗色由同一个状态喂两层（`applyTheme(theme)` + `resolveHeytaUiTheme({ scheme: theme })`），
+    // 所以"两层不同色"只可能是载体没走那条路。实测见 `scripts/qa/probe-theme-layer.mjs`。
+    darkTierReachesBothThemeLayers: themeRulerCells.length > 0
+      && themeRulerCells.every((x) => !x.sharedLayerFound
+        || x.sharedLayerColor === x.cssLayerColor),
+    // 上一条对"共享层节点没量到"是放过的 ⇒ 尺子自己要有一条不空转的对账：
+    // 亮、暗两档各至少量到一格，且**两层的色值在亮暗之间都要真的变过**。
+    // 少了这条，把 `themeLayerFacts` 的选择器写坏（永远 found=false）会让上一条恒真 ——
+    // 而"半暗"那种坏法（只写 dataset.theme）恰好只被这一条抓到，因为那时两层各自内部一致、
+    // 只是暗档的共享层色**等于亮档**。（AGENTS §7 元规则二）
+    themeLayerRulerSwitchesWithTier: (() => {
+      const measured = themeRulerCells.filter((x) => x.sharedLayerFound);
+      const light = measured.filter((x) => x.theme === 'light');
+      const dark = measured.filter((x) => x.theme === 'dark');
+      if (light.length === 0 || dark.length === 0) return false;
+      return light[0].cssLayerColor !== dark[0].cssLayerColor
+        && light[0].sharedLayerColor !== dark[0].sharedLayerColor;
+    })(),
     // ── 明暗 × 视口下「个人资料 / 账号与安全」两组（补 account-suite 零暗色那个洞）──
     everyCaseCoversEverySweepGroup: sweepCases.every((spec) =>
       sweepGroups.every((group) =>
