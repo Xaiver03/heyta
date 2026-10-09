@@ -7,6 +7,7 @@ import * as jwt from 'jsonwebtoken';
 import { signCommitProof } from '../../src/automation/commit-proof';
 import { generateWorkerCredential } from '../../src/automation/worker-identity';
 import { signAutomationEntitlementTicket } from '../../src/automation/entitlement-ticket';
+import { automationActivationCodeHash, inspectAutomationRevocationManifest, signAutomationRevocationManifest } from '../../src/automation/entitlement-issuer';
 import { generateInboundKeyPair, openInbound, sealInbound, signWebhook } from '@heyta/inbound-core';
 
 // auth reads its signing configuration during import, including imports reached
@@ -1020,6 +1021,215 @@ describe.skipIf(!DATABASE_URL)('inbound identity through ordinary sync HTTP', ()
       expect(await db.automationCommitPermit.count({ where: { userId, eventId: secondEvent } })).toBe(0);
       await db.automationEvent.deleteMany({ where: { userId, ruleId: permitRule } });
       await db.automationRule.deleteMany({ where: { id: permitRule } });
+    });
+  });
+
+  // 🔴 签发端与账号绑定握手（official 模式、真库、真 HTTP）：
+  // 主体 → 一次性激活码 → 绑定 → 只按绑定行签发的 session 票据 → 吊销下限在线生效。
+  describe('official issuance and account binding handshake', () => {
+    const officialKey = generateKeyPairSync('ed25519');
+    const rawPublic = officialKey.publicKey.export({ format: 'der', type: 'spki' }).subarray(-32).toString('base64url');
+    const rawSeed = officialKey.privateKey.export({ format: 'der', type: 'pkcs8' }).subarray(-32).toString('base64url');
+    const ISSUER_URL = 'https://official.test/entitlements';
+    const installation = randomUUID();
+    const localAccount = randomUUID();
+    const savedEnv: Record<string, string | undefined> = {};
+    const post = (path: string, body: unknown, auth = token) => fetch(`${base}/api${path}`, {
+      method: 'POST', headers: { authorization: auth, 'content-type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const errorCode = async (response: Response) => (await response.json() as { errorCode?: string }).errorCode;
+    let lastCode: string;
+
+    beforeAll(async () => {
+      for (const name of ['AUTOMATION_ENTITLEMENT_MODE', 'AUTOMATION_OFFICIAL_KEYS', 'AUTOMATION_OFFICIAL_ISSUER',
+        'AUTOMATION_OFFICIAL_KEY_ID', 'AUTOMATION_OFFICIAL_PRIVATE_KEY'] as const) {
+        savedEnv[name] = process.env[name];
+      }
+      process.env.AUTOMATION_ENTITLEMENT_MODE = 'official';
+      process.env.AUTOMATION_OFFICIAL_ISSUER = ISSUER_URL;
+      process.env.AUTOMATION_OFFICIAL_KEY_ID = 'k1';
+      process.env.AUTOMATION_OFFICIAL_PRIVATE_KEY = rawSeed;
+      process.env.AUTOMATION_OFFICIAL_KEYS = JSON.stringify({ issuer: ISSUER_URL, instanceId: installation, keys: { k1: rawPublic } });
+      // 上一段自托管取证留下的绑定会与本段的三元组冲突；这里是干净首绑的取证，先清场。
+      await db.automationEntitlementBinding.deleteMany({ where: { userId } });
+      await db.automationEntitlementTicketUse.deleteMany({ where: { userId } });
+      await db.automationEntitlementClock.deleteMany({});
+      await db.subscription.create({ data: { userId: otherId, status: 'active', grants: ['automation'], currentPeriodEnd: BigInt(Date.now() + 86400000) } });
+      await db.user.update({ where: { id: userId }, data: { isAdmin: true } });
+    });
+    afterAll(async () => {
+      for (const [name, value] of Object.entries(savedEnv)) {
+        if (value === undefined) delete process.env[name]; else process.env[name] = value;
+      }
+      await db.user.update({ where: { id: userId }, data: { isAdmin: false } });
+      await db.subscription.deleteMany({ where: { userId: otherId } });
+      await db.automationEntitlementActivation.deleteMany({});
+      await db.automationEntitlementLink.deleteMany({});
+      await db.automationEntitlementSubject.deleteMany({});
+      await db.automationEntitlementRevocation.deleteMany({});
+      await db.automationEntitlementBinding.deleteMany({ where: { userId } });
+      await db.automationEntitlementTicketUse.deleteMany({ where: { userId } });
+      await db.automationEntitlementClock.deleteMany({});
+    });
+
+    it('issues a stable subject and a one-time code that is stored only as a hash', async () => {
+      const subject = await post('/automation/entitlement/subject', {});
+      expect(subject.status).toBe(200);
+      const first = (await subject.json() as { subject: string }).subject;
+      expect(first).toMatch(/^htsub_[0-9a-f]{32}$/);
+      const again = await post('/automation/entitlement/subject', {});
+      expect((await again.json() as { subject: string }).subject).toBe(first);
+
+      const activation = await post('/automation/entitlement/activations', { installationId: installation });
+      expect(activation.status).toBe(200);
+      const issued = await activation.json() as { code: string; subject: string };
+      lastCode = issued.code;
+      expect(issued.subject).toBe(first);
+      expect(issued.code.length).toBeGreaterThanOrEqual(20);
+      const row = await db.automationEntitlementActivation.findUniqueOrThrow({
+        where: { userId_installationId: { userId, installationId: installation } },
+      });
+      expect(row.codeHash).toBe(automationActivationCodeHash(issued.code));
+      expect(JSON.stringify(row, (_key, value) => typeof value === 'bigint' ? String(value) : value)).not.toContain(issued.code);
+    });
+
+    it('refuses to bind a code that was issued for a different installation', async () => {
+      const wrong = await post('/automation/entitlement/activations/redeem',
+        { code: lastCode, installationId: randomUUID(), localAccountUuid: localAccount });
+      expect(wrong.status).toBe(403);
+      expect(await errorCode(wrong)).toBe('AUTOMATION_ACTIVATION_INVALID');
+      expect(await db.automationEntitlementLink.count({ where: { userId } })).toBe(0);
+      // 拒签不消耗码：给它的那台实例仍然能兑换。
+      const right = await post('/automation/entitlement/activations/redeem',
+        { code: lastCode, installationId: installation, localAccountUuid: localAccount });
+      expect(right.status).toBe(200);
+      expect(await db.automationEntitlementActivation.count({ where: { userId } })).toBe(0);
+    });
+
+    it('signs session tickets only from the recorded binding, never from what the client declares', async () => {
+      const unbound = await post('/automation/entitlement/session', { installationId: randomUUID() });
+      expect(unbound.status).toBe(403);
+      expect(await errorCode(unbound)).toBe('AUTOMATION_LINK_NOT_BOUND');
+
+      const signed = await post('/automation/entitlement/session', { installationId: installation });
+      expect(signed.status).toBe(200);
+      const { ticket } = await signed.json() as { ticket: string };
+      const claims = JSON.parse(Buffer.from(ticket.split('.')[0]!, 'base64url').toString('utf8')) as Record<string, unknown>;
+      const link = await db.automationEntitlementLink.findUniqueOrThrow({ where: { installationId: installation } });
+      // 票据里的三个绑定字段逐字等于库里那一行 —— 请求体没有参与任何一个。
+      expect(claims).toMatchObject({ action: 'session', officialSubject: link.subject, installationId: installation, localAccountUuid: link.localAccountUuid });
+      expect(Number(claims.expiresAt) - Number(claims.issuedAt)).toBeLessThanOrEqual(30);
+
+      // 自报另一个本地账号：票据不跟着变，消费侧按票据与请求体的不符直接拒。
+      const lying = await post('/automation/entitlement/verify', { ticket, localAccountUuid: randomUUID() });
+      expect(lying.status).toBe(403);
+      expect(await errorCode(lying)).toBe('AUTOMATION_LOCAL_ACCOUNT_MISMATCH');
+
+      const honest = await post('/automation/entitlement/verify', { ticket, localAccountUuid: link.localAccountUuid });
+      expect(honest.status).toBe(200);
+      const binding = await db.automationEntitlementBinding.findUniqueOrThrow({ where: { userId } });
+      expect(binding).toMatchObject({ officialSubject: link.subject, installationId: installation, localAccountUuid: link.localAccountUuid });
+    });
+
+    it('换主体必须先撤销：一枚新码顶不掉别人在这台实例上的绑定', async () => {
+      const otherActivation = await post('/automation/entitlement/activations', { installationId: installation }, otherToken);
+      expect(otherActivation.status).toBe(200);
+      const { code } = await otherActivation.json() as { code: string };
+      const conflict = await post('/automation/entitlement/activations/redeem',
+        { code, installationId: installation, localAccountUuid: randomUUID() }, otherToken);
+      expect(conflict.status).toBe(403);
+      expect(await errorCode(conflict)).toBe('AUTOMATION_LINK_CONFLICT');
+      expect((await db.automationEntitlementLink.findUniqueOrThrow({ where: { installationId: installation } })).userId).toBe(userId);
+
+      const revoked = await post('/automation/entitlement/activations/revoke', { installationId: installation });
+      expect(revoked.status).toBe(200);
+      expect((await revoked.json() as { revoked: boolean }).revoked).toBe(true);
+      const rebound = await post('/automation/entitlement/activations/redeem',
+        { code, installationId: installation, localAccountUuid: randomUUID() }, otherToken);
+      expect(rebound.status).toBe(200);
+      expect((await db.automationEntitlementLink.findUniqueOrThrow({ where: { installationId: installation } })).userId).toBe(otherId);
+    });
+
+    it('吊销下限在线抬上去之后，落后的票据与已存在的短期绑定都判拒', async () => {
+      const before = await fetch(`${base}/api/automation/entitlement/revocations`);
+      expect(before.status).toBe(200);
+      const { manifest } = await before.json() as { manifest: string };
+      expect(inspectAutomationRevocationManifest(manifest, {
+        issuer: ISSUER_URL, instanceId: installation, keys: { k1: rawPublic },
+      })).toMatchObject({ ok: true, claims: { revocationVersion: 0 } });
+
+      const notAdmin = await post('/automation/entitlement/revocations', { revocationVersion: 4 }, otherToken);
+      expect(notAdmin.status).toBe(403);
+      const bumped = await post('/automation/entitlement/revocations', { revocationVersion: 4 });
+      expect(bumped.status).toBe(200);
+      // 只升不降：把下限往回抬必须被拒，而不是悄悄放行旧票据。
+      expect((await post('/automation/entitlement/revocations', { revocationVersion: 3 })).status).toBe(403);
+      expect(await db.automationEntitlementRevocation.findUniqueOrThrow({ where: { scope: 'global' } })).toMatchObject({ revocationVersion: 4 });
+
+      // 一枚"旧下限"的票据（由同一个合法签发者签，revocationVersion=1）现在必须被拒。
+      // 三元组取自库里那一行绑定 —— 吊销这一档在查绑定之前就先判，所以不需要那条绑定的存在。
+      const staleLink = await db.automationEntitlementLink.findUniqueOrThrow({ where: { installationId: installation } });
+      const stale = signAutomationEntitlementTicket({
+        issuer: ISSUER_URL, keyId: 'k1', action: 'session', capability: 'automation',
+        officialSubject: staleLink.subject,
+        installationId: installation, localAccountUuid: staleLink.localAccountUuid, nonce: randomUUID(),
+        issuedAt: Math.floor(Date.now() / 1000), expiresAt: Math.floor(Date.now() / 1000) + 20, revocationVersion: 1,
+      }, officialKey.privateKey);
+      const refused = await post('/automation/entitlement/verify', { ticket: stale, localAccountUuid: staleLink.localAccountUuid }, otherToken);
+      expect(refused.status).toBe(403);
+      expect(await errorCode(refused)).toBe('AUTOMATION_REVOCATION_STALE');
+
+      // 闸门这一侧：绑定行停在 version 4 以下时，抬到 9 之后连"能不能建收件密钥"都要变红。
+      await db.automationEntitlementRevocation.deleteMany({});
+      await db.user.update({ where: { id: userId }, data: { isAdmin: false } });
+      const keyring = JSON.stringify({ issuer: ISSUER_URL, instanceId: installation, keys: { k1: rawPublic } });
+      process.env.AUTOMATION_ENTITLEMENT_MODE = 'selfhost-online';
+      process.env.AUTOMATION_OFFICIAL_KEYS = keyring;
+      try {
+        const fresh = await post('/automation/entitlement/session', { installationId: installation });
+        // 绑定行属于别的账号了，这里改为直接种一条当前下限下的绑定来单独测闸门。
+        expect(fresh.status).toBe(403);
+        await db.automationEntitlementBinding.upsert({ where: { userId }, create: { userId, officialSubject: 'acct-gate',
+          installationId: installation, localAccountUuid: localAccount, issuer: ISSUER_URL, keyId: 'k1',
+          revocationVersion: 4, expiresAt: new Date(Date.now() + 600_000), checkedAt: new Date() },
+          update: { revocationVersion: 4, expiresAt: new Date(Date.now() + 600_000), installationId: installation } });
+        // 这一档只测闸门：请求体本身必须是合法的（同 epoch 逐字节重发、版本号往前推），
+        // 否则路由自己的 409 会抢在闸门前面，红的是别的账。
+        const existingKey = await db.automationRecipientKey.findUnique({ where: { userId } });
+        const republish = (packageVersion: number, expectedPackageVersion: number | null) => ({
+          keyEpoch: existingKey?.keyEpoch ?? 1,
+          publicKey: existingKey?.publicKey ?? Buffer.from(recipient.publicKey, 'base64').toString('base64url'),
+          packageVersion,
+          expectedPackageVersion,
+        });
+        const nextPackage = (existingKey?.packageVersion ?? 0) + 1;
+        const gateBefore = await fetch(`${base}/api/automation/recipient-key`, { method: 'PUT', headers: { authorization: token, 'content-type': 'application/json' }, body: JSON.stringify(republish(nextPackage, existingKey?.packageVersion ?? null)) });
+        expect(gateBefore.status).toBe(200);
+        const relayed = await post('/automation/entitlement/revocations/refresh', { manifest: signAutomationRevocationManifest({
+          issuer: { issuer: ISSUER_URL, keyId: 'k1', privateKeySeed: rawSeed }, revocationVersion: 9,
+        }) });
+        expect(relayed.status).toBe(200);
+        expect(await relayed.json() as object).toMatchObject({ revocationVersion: 9, refreshed: true });
+        const gateAfter = await fetch(`${base}/api/automation/recipient-key`, { method: 'PUT', headers: { authorization: token, 'content-type': 'application/json' }, body: JSON.stringify(republish(nextPackage + 1, nextPackage)) });
+        expect(gateAfter.status).toBe(402);
+        // 🔴 逐次放行的 action 闸门也要对着**同一个**下限判。票据本身合法（同一签发者、
+        // 同一把钥、没过期、nonce 没用过），只是停在线下刷新后的下限之下。
+        const staleClaim = signAutomationEntitlementTicket({
+          issuer: ISSUER_URL, keyId: 'k1', action: 'event-claim', capability: 'automation',
+          officialSubject: staleLink.subject, installationId: installation, localAccountUuid: localAccount,
+          nonce: randomUUID(), issuedAt: Math.floor(Date.now() / 1000), expiresAt: Math.floor(Date.now() / 1000) + 20,
+          revocationVersion: 5,
+        }, officialKey.privateKey);
+        const claimRefused = await fetch(`${base}/api/automation/events/claim`, { method: 'POST', headers: {
+          authorization: token, 'content-type': 'application/json', 'x-heyta-entitlement-ticket': staleClaim },
+          body: JSON.stringify({ clientId: randomUUID(), eventId: randomUUID() }) });
+        expect(claimRefused.status).toBe(402);
+        expect((await claimRefused.json() as { ticketCode?: string }).ticketCode).toBe('AUTOMATION_REVOCATION_STALE');
+      } finally {
+        process.env.AUTOMATION_ENTITLEMENT_MODE = 'official';
+        await db.automationEntitlementBinding.deleteMany({ where: { userId } });
+        await db.automationEntitlementRevocation.deleteMany({});
+      }
     });
   });
 
