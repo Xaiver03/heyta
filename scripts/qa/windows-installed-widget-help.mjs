@@ -179,6 +179,15 @@ const widgetFacts = await widget.evaluate((panel) => ({
   capabilityText: panel.querySelector('[data-testid="widget-journey-capability"]')?.textContent?.trim() ?? '',
   installStepCount: panel.querySelectorAll('[data-testid^="web.widgetJourney."][data-testid*=".step"]').length,
   backend: (globalThis.__heytaStorage ?? {}).backend ?? '',
+  // `isNativeShellHost()` reads these three, not `backend`. Recording them separately is
+  // what makes this run evidence about the *shell environment*: an installed build whose
+  // storage port is closed still has to expose at least one of them, or the panel would
+  // fall back to the browser branch.
+  shellSignals: {
+    storagePort: '__heytaHostStoragePort' in globalThis,
+    webview2Host: Boolean(globalThis.chrome?.webview),
+    shellMessageHandlers: Object.keys(globalThis.webkit?.messageHandlers ?? {}),
+  },
   panelText: panel.textContent?.trim() ?? '',
 }));
 assert(widgetFacts.statusCount === 1, `Widget Journey 状态行应恰好 1 条，实际 ${String(widgetFacts.statusCount)}`);
@@ -186,6 +195,11 @@ assert(widgetFacts.backend === 'shell', `页侧存储后端不是 native shell�
 assert(/原生桌面|native desktop/i.test(widgetFacts.statusText), `状态行没有识别为原生桌面：${widgetFacts.statusText}`);
 assert(widgetFacts.capabilityText.length > 0, '原生壳没有渲染小组件能力边界说明');
 assert(widgetFacts.installStepCount === 0, `原生壳不应显示 PWA 安装步骤，实际 ${String(widgetFacts.installStepCount)} 条`);
+const { storagePort, webview2Host, shellMessageHandlers } = widgetFacts.shellSignals;
+assert(
+  storagePort || webview2Host || shellMessageHandlers.length > 0,
+  `壳没有注入任何一条原生信号（storagePort=${String(storagePort)} webview2Host=${String(webview2Host)} handlers=${JSON.stringify(shellMessageHandlers)}），页侧只能把它当浏览器`,
+);
 await widget.scrollIntoViewIfNeeded();
 await page.screenshot({ path: resolve(OUT, 'windows-widget-native.png'), fullPage: false });
 
