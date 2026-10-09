@@ -260,6 +260,10 @@ W1 先落、W7 后落 ⇒ 中间任何一次 `pnpm check` 都会红。**这不�
     判据四层里只有**真运行时那一层**能红（改前产物 `37 过 / 2 红`，改后 `39 过 / 0 红`）：
     单元与 HTTP 层对一个"只写计数器"的实现全绿，因为它们数的是请求与响应，
     缺的那一半是一条**已经建立的连接**。
+    🔴 **这一条的"哪几条路已在运行时层验过"已有独立状态表**（§6.73，第四格注销补在 §6.74）：
+    改密 ✅ / 重置 ✅ / **换绑生效 ❌**（只有 spy）/ 注销 ✅（它的 `closeForUser` 不经过收口函数，
+    红在另一枚臂，§6.74 那两条臂互不重叠）。这一条本文原样保留 —— 它记的是**发现方式**（两个动作集合做减法），
+    而那张表记的是**现在的覆盖**，两码事，别拿后者去删前者。
 17. ✅ **逐枚撤销不关那一枚的实时通道** —— **这一格已关**（10-10 02:45，`be4e41b4` + `0c7e7476`，读数与三臂在 §6.60）。
     原文留着，因为它记的三件前置正是落地时做的三件：upgrade 鉴权时把 `jti` 的 SHA-256 记进连接、
     加 `closeForSession(userId, sessionId)`、再补一条**真运行时**的 WS 判据。
@@ -3731,6 +3735,7 @@ cd .worktrees/<载体> && git checkout --force $(git rev-parse refs/heads/main)
 | 改口令 `/password/change` | ✅ §6.72 | 同左 |
 | 重置口令 `/password/reset` | ✅ 本节 | 同左 |
 | 换绑生效（`EMAIL_CHANGE_PATHS.confirm` 那一步） | ❌ **仍未补** | `account-security.routes.spec.ts` 断的是"调用了 `closeForUser`"，不是"那条连接真的断了" |
+| 注销账号 `DELETE /api/account` | ✅ §6.74（**第四格，本节原来没有它**） | `delete-account.routes.spec.ts` 断的是"调用了 `closeForUser`"＋"调用排在删除**之后**"，同样不是"那条连接真的断了" |
 
 🔴 为什么这一格**登记而不顺手补**：同一枚共用收口函数（`revokeAllDeviceSessions`）已经在**两个调用方**上
 取到"真的把连接断了"的读数，臂 W1 一次同时打红这两条；而要在这一层补换绑那一路，
@@ -3739,6 +3744,66 @@ cd .worktrees/<载体> && git checkout --force $(git rev-parse refs/heads/main)
 
 复取：与 §6.72 同一条命令（文件名 `session-revoke-websocket`），期望从 `5 passed` 变成 **`6 passed`**；
 臂 W1 那一行的摘除与还原照 §6.69 那三条硬规矩，重取时预期 `2 failed / 24 passed`。
+⚠️ 上面这张表与这两条期望**已被本节第四格过期**：那条用例补进来之后本文件是 `7 passed`，
+臂 W1 单跑这一枚文件是 `2 failed / 5 passed (7)`，注销那一格红在**另一枚臂**（§6.74）。
+分母也要认账：`2 failed / 24 passed (26)` 那一趟是**两枚集成套件同跑**，§6.74 那两趟只跑这一枚文件。
+
+### 6.74 注销那一格补上了真 socket 读数，而**两条臂各红各的调用点**（互不重叠）（10-10 04:3x 现量，载体 `.worktrees/iosacct` 纯 tip）
+
+§6.73 那张表原来只有三条路。第四格（注销）用的是同一枚 WS 夹具：两条真连接（`device-g` / `device-h`）
+→ 真 `DELETE /api/account` → 断言"两条都以 `4003 / Token revoked` 当场断 + `accessSession` 零行 +
+`syncDevice` **零行** + 手上那枚令牌此后 **410 / `ACCOUNT_CLOSED`**"。
+
+| 那一格 | 现量 |
+|---|---|
+| 未变异（默认 5 s 预算，`--maxWorkers=1`） | `7 passed (7)` rc=0，`Duration 4.31s` |
+| 🔴 臂 **W4**：摘 `api.ts` 里 `DELETE /account` 那一处**直接**的 `closeForUser(userId)` | **恰好 1 红 = 新那条**（`Error: Test timed out in 5000ms.`），其余 `6 passed` |
+| 🔴 臂 **W1** 重取：摘 `revokeAllDeviceSessions` 收口函数里那一行 | `2 failed / 5 passed (7)` —— 红的还是改密与重置那两条，**新那条照旧绿（60 ms）** |
+
+⇒ 这一行是本节的全部要点：**两条臂的红集互不重叠**，因为注销那一路的 `closeForUser` 是**另一个调用点**，
+不经过那个收口函数。它自己那条理由（生产注释原文）是"级联删掉用户行之后不关那条连接，它还继续答 ping，
+于是死连接那支永远收不掉它，而它的心跳 touch 会替一个**已经不存在的账号**重新 INSERT 一行 `sync_devices`，
+从此每个节流窗口撞一次外键"。**spy 层（`delete-account.routes.spec.ts`）表达不了这条理由**：
+它断的是"调用了 `closeForUser`"和"调用排在删除之后"，而"没有再长出一行设备"只有在真库 + 真连接那一层才读得到
+（所以那条用例里 `syncDevice.count` 那一格是**这一层独有的**，不是重复 `accessSession` 那一格）。
+§6.13 那一族（"判据四层里只有真运行时这一层能红"）在本线的**第四次**实证。
+
+🔴 **最后一格我一开始写错了档**，写成了其余三条撤销路径的 401：
+`AssertionError: 注销之后那枚令牌还在用: expected 410 to be 401`。
+查 `account-closed-signal.spec.ts`：410 是**注销独占**的对外契约（2026-10-04 随 E1b 落地，那里还钉了
+"其余三种失效各自仍是 401，且码各不相同"）⇒ **产品没错，是我的期望错**。
+这是 §6.70 那句"姊妹用例的状态码不能照抄"的**第二次**实证，同一型：前一次是把重置的重放写成 401（实收 400 + `code`）。
+判据的档位只能从**对外契约那一层**取，不能从"同一族里另一条路的读数"取。
+
+一臂的定位方式也改了：夹具第一版按**行号**写死 `api.ts:1491`，在载体上直接 `TARGET_LINE_MATCHED=NO-ABORT` 自闸
+（主检出那枚 `api.ts` 的工作树比载体 tip 多几行 ⇒ 同一句在生产里落在 **1481**）。
+⇒ 改成"按整行 trim 相等找唯一命中，命中数 ≠ 1 就退 7 不动文件"，并把 `hits=` 与 `MUTATED_LINE=` 打进读数；
+加了一发 `STILL_PRESENT_AFTER_MUTATION` 复验（§7 那条"变异到底进没进产物"的前置）。
+**行号跨树会漂，整行内容不会** —— 与本文件 §6.69 那三条硬规矩同族，但这一发是"定位"而不是"还原"。
+
+复取（载体 `.worktrees/iosacct`，库 `heyta_account_w9`）：
+`cd server && NO_COLOR=1 DATABASE_URL='postgresql://rocalight@127.0.0.1:5432/heyta_account_w9?schema=public' npx vitest run --config vitest.integration.config.ts --maxWorkers=1 tests/integration/session-revoke-websocket.integration.spec.ts`
+⇒ 期望 `7 passed`。两条臂的夹具与逐臂还原留在线下载物目录（`~/heyta-carriers/w9-acct-logs/arms-ws-close.mjs`，
+按 §6.69 三条硬规矩：每臂独立 `.mut-bak-<臂名>`、跑完 `git checkout -- <path>` + `git diff --quiet -- <path>` 复验、
+红句抄原文）。取数时负载 6.17（16 核）/ 余量 6936 MB / 轻量档在册 0 趟。
+载体收尾：`git status --porcelain` 只剩那枚预期未提交的 spec，`.mut-bak*` 残留 0 枚。
+
+仍然开着的：§6.73 那张表里唯一那个 ❌ —— **换绑生效那一路的真 socket 读数**（本线欠项，未闭合）。
+
+🔴 **顺带一格，不是本线的，但下一个跑 `check:docs` 的人会以为是自己的**（§6.73 那一族"红不是自己造成的"）：
+纯 tip 载体上 `node research/tools/docs-link-check.mjs` **真 rc=1**（尾巴上照旧别拿 `tail` 的码 —— 陷阱 **#363**），
+唯一那处死链是 `apps/web/evidence/ux-final-20261009/reinstall/RESULT.md:22 → windows/`：
+那枚 `RESULT.md` **已入库**（`4f375210`，产品体验线），而它指的那个子目录**本机有、git 没跟踪**
+（`git ls-files` 该前缀命中 **0**、`git check-ignore` 不回 ⇒ 是未跟踪，不是被忽略）。
+⇒ 干净检出 / CI 那一侧它是死的，本机那一侧它是活的。两处**话术也不同**，别当成两条不同缺陷：
+纯 tip 上打「🔴 发现 1 个死链：`…RESULT.md:22 -> windows/`」，主检出上打「发现 1 处**本机有、仓库里没有**的链接」。
+**同一时刻主检出红的却是另一处**（`apps/desktop-windows/README.md:89 → scripts/windows/launch-data-transfer-qa.ps1`，
+`BLOCKED.md` 已登记），两棵树的死链**不重叠** —— 所以"我这笔提交把文档门禁弄红了"这句话在两棵树上都判不了，
+要先说清是哪棵树。本线那两枚文件（本台账 + 那枚 WS spec）在两棵树上都不是命中项，`check:docs-voice` 两棵树都 rc=0。
+三条出路（① 把它入库 / ② 链接改成纯文字 / ③ 在 `UNTRACKED_LINK_OK` 里登记路径 + 一句理由）
+是**那条线自己的证据件与判据口径**，本线不代拍、不代改，
+只把读数与归属留在这里。
+
 
 
 
