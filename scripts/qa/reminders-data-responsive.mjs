@@ -353,7 +353,11 @@ const seedStorage = (page, theme) => page.addInitScript((t) => {
  */
 async function themeLayerFacts(page, scopeSelector) {
   return page.evaluate(({ scope, plantIndex, plantColor }) => {
-    const root = (scope ? document.querySelector(scope) : null) ?? document;
+    // 🔴 `root` 在没命中时**退回整棵 document**，所以"这一格 0 枚候选"有两种读法：
+    // 这一组里真没有带字面色的节点，或者那枚选择器根本没命中（改了 IA 的锚点 id 就会这样）。
+    // 两种读法在候选数上一模一样 ⇒ 作用域命中与否必须自己交出来（下面 `scopeMatched`，另有那条判据）。
+    const scopeEl = scope ? document.querySelector(scope) : null;
+    const root = scopeEl ?? document;
     const title = root.querySelector('.ht-settings__group-title')
       ?? root.querySelector('.ht-settings__title')
       ?? document.querySelector('.ht-settings__group-title, .ht-settings__title');
@@ -378,6 +382,7 @@ async function themeLayerFacts(page, scopeSelector) {
     const titleText = title ? (title.textContent ?? '').trim() : '';
     return {
       scope: scope ?? '(document)',
+      scopeMatched: Boolean(scopeEl),
       // 03:3x 补：把作用域内**每一枚**带字面 `color` 的节点一起交出去（至多 8 枚），
       // 好让"跟档"那条判据的样本不再只压在"第一枚"上 —— 第一枚在 30 格里都是同一枚卡片标题，
       // 于是配对数恒等于 1。配对是按节点文字认身份的，多几枚就多几对。
@@ -502,6 +507,9 @@ async function dataJourney(browser, spec) {
   const panel = page.getByTestId('data-settings-panel');
   await panel.waitFor();
   const before = await layoutFacts(page, 'data-settings-panel');
+  // 数据管理这一面此前只被 CSS 那一层量过（`dataset.theme` 是探针自己写的，量不到共享层，
+  // 成因见台账 00:5x 那格）。这一枚读数把它的共享层形状一起交出去，供配对判据用。
+  const themeLayers = await themeLayerFacts(page, '#settings-group-data');
   await page.screenshot({ path: `${OUT}/${spec.theme}-${spec.width}-data-before.png`, fullPage: true });
 
   const jsonDownload = page.waitForEvent('download');
@@ -543,7 +551,7 @@ async function dataJourney(browser, spec) {
   await page.screenshot({ path: `${OUT}/${spec.theme}-${spec.width}-data-refused-existing.png`, fullPage: true });
   await context.close();
   return {
-    theme: spec.theme, width: spec.width, before,
+    theme: spec.theme, width: spec.width, before, themeLayers,
     exports: { json: backup, markdown: markdownPath, jsonEntities: backupBody.entities?.length ?? 0, opCount: backupBody.opLog?.length ?? 0 },
     failurePreserved, refusedExisting, existingTaskStillVisible, cancelPreserved,
   };
@@ -856,6 +864,8 @@ async function syncPrivacyJourney(browser, spec) {
   const signInAfterAccept = await dismissSignInModal(page, '首启点同意');
 
   await openGroup(page, 'sync');
+  // 起点态（还没做决定）的两层形状：与数据管理那一腿同理，这一面此前只有 CSS 层被量过。
+  const themeLayers = await themeLayerFacts(page, '#settings-group-sync');
   const states = [];
   const screenshots = [];
   const shot = async (name) => {
@@ -1005,6 +1015,7 @@ async function syncPrivacyJourney(browser, spec) {
     theme: spec.theme,
     width: spec.width,
     height: spec.height,
+    themeLayers,
     states,
     screenshots,
     clicks,
@@ -1056,8 +1067,9 @@ const assertionOwner = {
   everyCaseCoversEverySelectedMode: ['reminders'],
   reminderPermissionProvenanceIsLabeled: ['reminders'],
   darkTierReachesBothThemeLayers: ['reminders', 'groups'],
-  themeLayerRulerSwitchesWithTier: ['reminders', 'groups'],
+  themeLayerRulerSwitchesWithTier: ['reminders', 'groups', 'data', 'sync'],
   plantedThemeSampleTookEffect: ['reminders', 'groups'],
+  themeRulerScopesAllMatched: ['reminders', 'groups', 'data', 'sync'],
   dataFailurePreserved: ['data'],
   existingDataRefusedWithoutLoss: ['data'],
   cancelPreserved: ['data'],
@@ -1110,8 +1122,19 @@ const themeRulerCells = [
 // 为什么要这一层：`darkTierReachesBothThemeLayers` 比的是两枚**不同角色**的节点是否同色（见那条断言里的限定），
 // 换一棵 IA 就不可比（2026-10-10 02:0x 在只含已提交内容那棵树上就是这么判假的）。
 // 而"同一枚节点在两档之间色值必须变"与角色无关 —— 半暗那种坏法恰好就是它不变。
+// 配对判据吃的格子集合，比 `themeRulerCells` **宽两条腿**：数据管理与同步与隐私也进来。
+// 🔴 为什么两条判据不共用一个集合：`darkTierReachesBothThemeLayers` 的谓词是"同一档内那两枚节点同色"，
+// 而那两枚的角色不对等已被 02:2x 那格钉死（它比的是卡片标题 vs 分组标题）。把它扩到更多面，
+// 只会按面对象多造"标题 vs 状态字"那种**已知不可比**的假红，不会多证一件事；
+// 而配对那条与角色无关（它要的是"同一枚节点跨档必须变"），扩它才有意义。
+const themeRulerPairCells = [
+  ...themeRulerCells,
+  ...data.map((x) => ({ ...x.themeLayers, theme: x.theme, leg: 'data' })),
+  ...syncPrivacy.map((x) => ({ ...x.themeLayers, theme: x.theme, leg: 'sync' })),
+];
+
 const themeRulerPairIndex = new Map();
-for (const cell of themeRulerCells.filter((x) => x.sharedLayerFound)) {
+for (const cell of themeRulerPairCells.filter((x) => x.sharedLayerFound)) {
   // 03:3x 起：样本从"每格第一枚"扩到"每格每一枚"（`sharedLayerCandidates`）。
   // 节点身份仍按**文字**认（同一作用域内同一文字的节点在亮暗两档各量到一次才算一对），
   // 没有这枚字段的格子退回单节点字段，所以这条扩样不会把已有配对清零。
@@ -1151,6 +1174,9 @@ const report = {
     // 配对上的"同一枚节点 × 亮暗两档"有几对：`themeLayerRulerSwitchesWithTier` 只在它 > 0 时才在判事。
     // ⚠️ 03:4x 起这一枚的口径是**配对到的节点数**，不是格子数（一格最多交 8 枚候选，同文字会并成一条键）。
     themeLayerRulerPairedCells: themeRulerPairs.length,
+    // 配对那条吃的格子集合（比上面两枚的集合宽：多了数据管理与同步与隐私两条腿）。
+    themeRulerPairSampleCells: themeRulerPairCells.length,
+    themeRulerPairMeasuredCells: themeRulerPairCells.filter((x) => x.sharedLayerFound).length,
     // 种臂的身份：-1 = 这趟的每枚色值都来自界面本身；≥0 = 该臂号那枚共享层候选被装置钉住了（见那条判据）。
     plantedStuckTierIndex: PLANT_STUCK_TIER_INDEX,
     realPermissionModes: HEADED
@@ -1222,6 +1248,12 @@ const report = {
     plantedThemeSampleTookEffect: PLANT_STUCK_TIER_INDEX < 0
       || themeRulerCells.some((cell) => (cell.sharedLayerCandidates ?? [])
         .some((c, i) => i === PLANT_STUCK_TIER_INDEX && c.color === PLANTED_STUCK_TIER_COLOR)),
+    // 🔴 作用域没命中会**静默退回整棵 document**（那一步就写在 `themeLayerFacts` 里），于是"这一格 0 枚候选"
+    // 分不清是"这一组真没有带字面色的节点"还是"锚点 id 被改了"。这条把它从歧义读数变成响亮失败；
+    // 它的坏形状是现成的：把传进去的那枚 `#settings-group-*` 改掉，配对集合还会非空、
+    // `sharedLayerFound` 还可能因为 document 兜底而为真，只有这一条会红。
+    themeRulerScopesAllMatched: themeRulerPairCells.length > 0
+      && themeRulerPairCells.every((x) => x.scopeMatched === true),
     // ── 明暗 × 视口下「个人资料 / 账号与安全」两组（补 account-suite 零暗色那个洞）──
     everyCaseCoversEverySweepGroup: sweepCases.every((spec) =>
       sweepGroups.every((group) =>
