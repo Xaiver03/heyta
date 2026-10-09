@@ -1382,6 +1382,12 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
               **归属现量**：`apps/node-host/src/host.ts` = ` M`、`packages/app-host/src/index.ts`（导出桶）= ` M`、`apps/web/src/features/settings/inbound-runtime.ts` = `??`，而被它消费的 `InboundAutomationCycleResult` 住在**已提交**的 `packages/app-host/src/inbound-process.ts`（`git status` 空）⇒ **红在一条正在写的 inbound automation 线上（消费方未提交），不是仓库已提交态的红**。这与我 21:3x 量 `@heyta/web` typecheck 时新增的那第 17 条是**同一个成因的两种面目**（同一处类型不匹配，一处从 tsc 报、一处从 tsup 的 dts 阶段报）。
               🔴 **代理尺那一档被直接读数否掉了**：单独跑 `pnpm --filter @heyta/ui build` ⇒ **rc=0**（`dist/index.d.ts 311.79 KB` 等都出来了），而它带着自己那 **42 枚 ` M` + 11 枚 `??`**。所以"`packages/ui/src` 脏 ⇒ 打不出包"这句**不成立**：脏文件数不是原因，上面那条类型不匹配才是此刻的原因。⚠️ **但这条读数不推翻代理尺想挡的那件事**：`-r` 停在第一枚失败包，`packages/ui` 之后的包**一个都没走到**，"干净检出能不能建"仍要等 ①（锁 ↔ 清单）与那条 inbound 线落地才能答。
               📌 可迁移的一条：**代理尺给的是"我怀疑什么"，直接读数给的是"此刻真正挡住的是谁"**。这一格四趟复量都在换更细的代理（25 笔→47 笔、脏文件逐字同值），而没有一发是 `pnpm -r build` 本身；今天第一发就把归因换了人。以后引用"打不出包"这句时**必须带上当时的错误原文**，不许再拿脏文件数充当。
+              🔴 **分母也量了：`--no-bail` 那一趟把"红在第一枚"换成了全量读数**（`pnpm -r --no-bail build`，约 3 分钟）：**19 枚有 `build` 脚本的包全部被跑到**（按目录名逐一对账：日志里出现的 `packages/*` + `apps/*` 去重正好 19 枚），**2 枚失败、17 枚成功**。两枚失败是**同一处类型不匹配的两种面目**：
+              | 失败包 | 错误原文位置 | 该文件此刻的 git 状态 |
+              |---|---|---|
+              | `@heyta/node-host` | `src/host.ts(422,5) TS2322` | ` M`（别线在飞） |
+              | `@heyta/web` | `src/features/settings/inbound-runtime.ts(209,5) TS2322` | `??`（别线未提交的新文件） |
+              两边都对不上已提交的 `packages/app-host/src/inbound-process.ts` 里那个 `InboundAutomationCycleResult`（该文件 `git status` 为空），而它自己的包 `@heyta/inbound-core` **build 成功** ⇒ **不是那条功能的包坏了，是两个消费方还在半路上**。⚠️ 顺带一条量具自照（**两个错叠在一起，报出来的结论恰好与"18 枚都跑了"同形**）：我第一版数分母是 `grep -c "@heyta/<包名>"` 再 `awk '$4=="0"'` —— ① 那份日志里成功包是按**目录名**出现的，包名只出现在失败行，所以 18 个计数**全是 0**；② 而 `printf` 那行的第 4 栏是"次"字，`$4=="0"` 永不成立 ⇒ `z` 恒 0 ⇒ 它一边打印"一次都没出现的包数 = **0**"、一边在每行显示 0 次。⇒ 真正的分母是**按目录名去重**数出来的 19，不是那条 awk 给的数。同族的 `awk` 段宽恒 0 上面已记过一发，这是第二发：**awk 的字段号要先看一眼实际输出对不对，别照记忆写**（而"0 与预期恰好相同"这件事本身，就是上一格那条"探针坏了恰好撞上事实成立"的同一形状）。
 
 - [ ] 🔴 **10-09 15:5x 在 `08d67071` 上把上面那四条逐条重量**（`git rev-list --count 61126d7d..HEAD` = **4**：本线 1 笔 + 别线 3 笔）—— 四条**全部仍然真**，而第三条今天多量出了三件事，使它的修法从"等那条线拍"变成"照着做就行"：
     - ① `pnpm install --frozen-lockfile` 仍红：`git show 08d67071:pnpm-lock.yaml` 的 `packages/ui` importer 段 zxcvbn 命中 **2**，`git show 08d67071:packages/ui/package.json | grep -c zxcvbn` = **0**（比的是同一枚 ref ↔ 同一枚 ref，照上面那条口径只读那一段）。
