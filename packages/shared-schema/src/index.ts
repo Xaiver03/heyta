@@ -1,5 +1,12 @@
 // Schema version constants
 export {
+  inboundDraftEventIdSchema, inboundDraftSnapshotSchema, inboundDraftDecisionSchema,
+  inboundDraftDecisionResponseSchema,
+  inboundDraftTaskSchema, inboundDraftPayloadSchema,
+} from './inbound-draft-contract';
+export type { InboundDraftSnapshot, InboundDraftDecision, InboundDraftDecisionResponse, InboundDraftTask, InboundDraftPayload } from './inbound-draft-contract';
+
+export {
   INBOUND_MAX_PLAINTEXT_BYTES,
   inboundKeyScopeSchema, inboundEnvelopeContextSchema,
   inboundEnvelopeSchema, inboundWrappedKeySchema,

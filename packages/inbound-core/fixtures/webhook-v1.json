@@ -1,0 +1,8 @@
+{
+  "purpose": "PUBLIC TEST VECTOR ONLY; this key is not a credential",
+  "keyHex": "0101010101010101010101010101010101010101010101010101010101010101",
+  "bodyUtf8": "{\"text\":\"计划\"}",
+  "bodySha256": "57798f4a79c3076301b5a4de5c0e34928c7768ea35f9ddfa73fb33e163c1498e",
+  "canonicalUtf8": "heyta-inbound-v1\nPOST\n/api/automation/v1/hooks/rule\nkey\n1800000000\nsource-event\napplication/json\n57798f4a79c3076301b5a4de5c0e34928c7768ea35f9ddfa73fb33e163c1498e",
+  "signatureHex": "bba2c93150f17523e916dd0a84c7ad26a116ee043e9dcc1dc2c49a460829c775"
+}
