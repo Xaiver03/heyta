@@ -178,6 +178,23 @@ EVIDENCE-1，并对所有已完成项做截图、交互、测试和文档回读�
 | UX-S9-31 显示：中文 / English | 语言组已具备自称、`aria-current`、`lang` 与键盘路径；选中态改为填充高亮并与显示控件同层，不再使用下划线或额外面板 | 继续保持单层紧凑选择；四端安装态复验中英切换与返回路径 | **代码完成；Web 1440/375 亮暗浏览器验收通过，四端最终重装待验收** |
 | UX-S9-32 显示：暗色切换 | 主题切换已收敛为直接可见的紧凑按钮，保留当前状态、图标和焦点环，移除无关长说明与厚重嵌套表面 | 继续保持直接切换；四端安装态复验亮暗主题与窗口重启后的偏好 | **代码完成；Web 1440/375 亮暗浏览器验收通过，四端最终重装待验收** |
 
+> 🔴 **10-09 16:1x 把上面这张主表逐行按 `HEAD` 现量了一遍：哪几行的"已完成"指的是仓库里的代码，哪几行不是**（载体 `ca81dbf8`；每条都给命令，不要求谁信我）。这一趟的起因是我刚给「同步与隐私」那一行补指针，回头发现**同样的形状在主表里不止那一处**，而它最刺眼的一处是「数据管理」：
+>
+> | 主表行 | 它点名的产物 | 在 `HEAD` 吗 | 现量命令与读数 |
+> |---|---|---|---|
+> | 任务与显示（Widget 环境识别） | `apps/web/src/pwa/widget-install.ts`、`.../settings/WidgetJourneyPanel.tsx` | ✅ **在，且零脏** | `git cat-file -e HEAD:<两枚>` 双双 YES；`git status --porcelain -- <两枚>` 输出为空 ⇒ **主表里唯一一枚"产物已入库、且没人在改"的行**（它剩下的只有原生壳内读数那一格） |
+> | 个人资料 / AI 与集成 / 账号与安全 | `ProfileOverview.tsx` / `AiSettings.tsx` / `CloseAccountPanel.tsx` | ✅ 在（三枚都是 ` M`） | `git cat-file -e HEAD:…` 三枚 YES ⇒ 这三行说的"结构改造完成"在仓库里**有对应物**；工作树那批 ` M` 是另一条会话的两栏 IA 重写，不是这三行的主张 |
+> | 同步与隐私 | `PrivacyPanel.tsx` 等 | ⚠️ 一半 | 不重述 —— 逐条对账在 §UX-S9-139 那张分叉表（含 16:0x 那次重跑） |
+> | 数据管理 | 🔴 `DataSettingsPanel.tsx` | ❌ **整枚文件不在仓库** | `git cat-file -e HEAD:apps/web/src/features/settings/DataSettingsPanel.tsx` → **NO**；更要紧的是 **`git grep -c DataSettingsPanel HEAD -- apps/web/src` 命中 0 枚文件** —— `HEAD` 那份 `App.tsx` 根本不 import 它（只有工作树那版 import），`data-settings.css` 同样 `??`。⇒ **这一行「代码完成：`DataSettingsPanel` 已拆为三张卡」描述的是工作树，不是 `main`**；干净检出上的"数据管理"面还是拆卡之前的形状。 |
+> | 关于与帮助 | `HelpPanel.tsx` 在、`help-settings.css` 不在 | ⚠️ 一半 | `git cat-file -e HEAD:…/help-settings.css` → **NO**（`??`）。该行右侧早已注明判据 spec 未入库，这里补上**产物**这一半：UX-S9-44 那行点名的受控内容列靠的就是那枚未跟踪的 css。 |
+> | 提醒状态卡 | `ReminderNotifyPanel.tsx` 在，但**只有两态** | ⚠️ 一半 | `git show HEAD:…ReminderNotifyPanel.tsx` 的分支只有 `granted` / `denied`（加 `reminder-notify-request` 按钮与 `…-limit`）；**`unsupported` 与 `request-failed` 两态在 `HEAD` 不存在**（`git grep -n reminder-notify-request-failed HEAD -- 'apps/*/src' 'packages/*/src' 'server/src'` = 0）。⇒ 主表那句"成功、拒绝、不支持与错误状态卡"里，**后两态只活在工作树**。 |
+>
+> 三条给下一个人的话：
+>
+> 1. **"代码完成"这四个字在主表里不是一种状态，是两种** —— 一种能在干净检出上复跑，一种只能在这台机器的工作树里复跑。上面那枚 `git grep -c … HEAD -- apps/web/src` 为 0 的证据最有用：它说明缺口不是"少一个文件"，而是**少整条接线**，摘文件进去也不会亮。
+> 2. ⚠️ **这一趟我自己先造了一枚假读数**：第一版用 `grep -oE 'data-testid="…"'` 比两版面板，得到"工作树反而少了 granted/denied 两态"。错在**形状**——工作树那版把状态卡换成了共享组件、testId 走 `testId="…"` **prop**（`grep -oE 'testId="…"'` 数出四态齐），字面 `data-testid=` 是 `HEAD` 那代的写法。⇒ **比"界面上有没有 X"要按实质特征筛、不能按抄来的字面形状 grep**（与 §7 那条"分母要按实质特征筛，不按文件名前缀"同族，这次是同一枚坑换到属性写法上）。
+> 3. 这一格只登记**主表与仓库的差**，不改任何一行的结论，也不替谁把 `??` 提交掉（那些文件正被另一条会话写）。关闭它的动作在那一线：把 `apps/web/src/features/settings/` 那批与其消费侧同一笔落地，之后主表这三行才升成"在 `main` 上"。那批的**条数每次现取**（`git status --porcelain -- apps/web/src/features/settings/ | awk '{print $1}' | sort | uniq -c`；这一趟读数是 15 枚 ` M` + 9 枚 `??`，别把这两个数抄进别的句子）。
+
 ### 8.3 设计规则
 
 - 选中态使用填充背景、语义色、勾选或状态徽标表达；不使用单独的下划线作为主要状态反馈。
