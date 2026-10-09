@@ -130,11 +130,14 @@ payload 只有 `{userId, email, tokenVersion}`。撤销只有一档：`tokenVers
   那是第二份 mint —— 一并改掉）。payload 增加 `jti`（`randomBytes(16).hex`）。
 - 新表 `access_sessions`：`jti_hash`（SHA-256 hex，主键，同 `hashToken` 那一族的立场：
   **库里不存那句发出去的东西**）、`user_id`（FK `ON DELETE CASCADE`）、`device_name`、`user_agent`、
-  `created_at`、`last_seen_at`、`revoked_at`。
+  `created_at`、`last_seen_at`。🔴 **没有** `revoked_at`：撤销=删那一行，"存在即有效"。
+  软撤销标记那一版**被否掉了**，理由是它只换来一行多余留存 —— 撤过的会话没有任何产品用途，
+  而"留一行只为了记下它曾被撤"在 GDPR 侧是反向的（同一句理由写在迁移文件第 57 行的注释里）。
 - `verifyToken` 在签名与 `tokenVersion` 判定**之后**加一关：这一枚 `jti` 有没有被单独撤销。
   撤销任一会话时 `authCache.invalidate(userId)`，所以 30 s 的缓存窗口不会变成"撤销了还能用半小时"。
 - 三条路由（全部 `preHandler: authenticate`）：`GET /api/auth/sessions`（列，含 `current: true` 标记）、
-  `DELETE /api/auth/sessions/:jtiHash`（撤销一枚）、`POST /api/auth/sessions/revoke-all`（撤销全部 = 旧的全局档）。
+  `DELETE /api/auth/sessions/:sessionId`（撤销一枚；线名是 `sessionId`，库里那一列叫 `jti_hash`，
+  界面上不需要知道它来自 `jti`）、`POST /api/auth/sessions/revoke-all`（撤销全部 = 旧的全局档）。
 - **界面上两个动作分开、措辞分开**：「退出登录（本设备）」= 撤销这一枚 + 清本机凭据；
   「登出所有设备」= 那枚早已存在、但客户端从来没有调用点的 `/api/replace-token`（`app-host` 里
   连 `replaceToken` 函数都没有，实测：`hosted-auth.ts` 全部导出零命中）。
@@ -170,6 +173,13 @@ payload 只有 `{userId, email, tokenVersion}`。撤销只有一档：`tokenVers
 2. **邮件从五封变八封**（换绑-新邮箱确认 / 换绑-旧邮箱授权 / 换绑完成通知）。"五封"这个数字在
    `privacy.ts:201`、`:296`、`:315` 与 `third-parties.ts:130`（en 栏 `:513`）**四处**被当封闭枚举用，
    漏改任一处就是一句假话。
+   🔴 **2026-10-08 落地时实测更正：真值是十封，不是八封。** 两处当时都还没被算进来 ——
+   `sendEmailPasswordRegistrationCodeEmail`（注册验证码那封）**在本批之前就存在而词表里没有它**，
+   也就是说那句"五封"在 2026-10-08 之前就已经是假的，而没有任何一层会失败（同批那笔提交给
+   政策加了「邮箱注册验证码挑战」这一*数据*类别，却没动这三个数 —— 同一功能在一份政策里一半新一半旧）；
+   本批 §2.6 的「新增认证器告知」又是一封。⇒ 五 + 1（早已存在的注册验证码）+ 3（换绑）+ 1（认证器）= **十封**，
+   四处与中英两栏逐处改写，并由新落成的 `packages/legal/tests/email-catalog.spec.ts` 把这整族封闭枚举
+   钉在 `server/src/email.ts` 的导出集合上（新增一封而词表没跟上 ⇒ 红；撤掉一封而文案留着 ⇒ 也红）。
 3. **一次性令牌的种类封闭枚举要重算**：`privacy.ts:539`、`personal-info-list.ts:229`、`:540` 三处
    逐类写了种类与时长（24h/15min/1h），换绑令牌与"新增认证器"通知都进这几张表。
 4. **新增一张账号关联表** ⇒ 注销级联数从迁移终态**重算**（`structure.spec.ts:483-589` 会算它，
@@ -191,7 +201,7 @@ payload 只有 `{userId, email, tokenVersion}`。撤销只有一档：`tokenVers
 - 换绑之后**旧邮箱不留墓碑**：`account_tombstones` 只在注销那一刻按当时地址取哈希（ADR-0055）。
   用旧邮箱去恢复一份旧备份，恢复闸认不出它。这是**既有形状**的延续，不是新增破口，
   但它是真的边界，写在这里而不是等下一个人重新发现。
-- 单进程内存限流（`email-password-auth.md` §10.7）对本次新增的三条路由**同样是坏的**：
+- 单进程内存限流（`email-password-auth.md` §10）对本次新增的三条路由**同样是坏的**：
   多副本部署下形同虚设。本文不解决它，只把它从"口令那族"扩大到"换绑与会话"。
 - `jti` 只让"撤销这一枚"成为可能；它**不**缩短仍然 365 天的有效期，也不解决
   "从未被列出来的历史令牌"（本次之前签的令牌没有 `jti`，因此**不可单独撤销**，只能全局 bump）。
