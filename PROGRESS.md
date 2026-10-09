@@ -2129,3 +2129,36 @@ AC 现量（同轮）：`grep -c '^- \[ \] \*\*AC-' docs/plans/inbound-automatio
 "中英条款、帮助"两半的落点在 `packages/legal/src/documents/` 与词条/帮助页，全在白名单外，
 而 `pnpm check` 里那六枚 `check:legal-*` + `check:ai-quota` 会把生成物与真源逐字对账 —— 只改 `docs/reference/` 那一层
 会不会把某把尺改红，要在动笔前现量，不能猜。
+
+## 2026-10-10 03:0x · T6 第一批：`docs/reference/inbound-automation-protocol.md` 与 HEAD 对账，改掉三处会说谎的句子
+
+按 B118 的现量结论做（ADR 那一半已由 ADR-0060 占着、`docs/adr/` 与 `packages/legal`、词条都在白名单外），
+本批只动白名单内那两份里被 HEAD 推翻的措辞。**先量后写**：改的三句每一句都有当轮的代码位置对着。
+
+| 改掉的说法 | 为什么它当时是假的 | 现在的写法 |
+|---|---|---|
+| 「`X-Heyta-Entitlement-Ticket` 在客户端侧还没有供给方」 | `inbound-worker.ts` 里五对（选项声明 + 请求头附着）、`inbound-rules-remote.ts:105/177`、`inbound-draft-review.ts:128` —— 除 `session` 之外八个动作全带票 | 逐动作列出落点，并写明"续租不带票：它不在动作词表里"、"取消那支不带票请求"（45 行现量） |
+| 「各宿主每 30 秒续票据」整句挂在未闭合里 | 机制与判据已在 HEAD（`de18b730`），缺的是**没有宿主 start 它** | 拆成两半写：机制闭合 / 消费者数量现量 0，并明写"公网接收不得因这条心跳入库就被读成绑定会自己续上" |
+| 「累计模型周期额度不退还」 | T4 之后 `reserved → released` 会把 `managed` 那一枚退回计数器（同一条 CAS 内），这句话照原样读会反过来说 | 限定成"删除规则不退还**已经消耗掉的**额度"，并指出唯一反向情形退的是"一次没有发生的事情" |
+
+新增的对外可读段落：三种状态转移各自的计费方向表（`reserved→released` 退 / `sent→released` 不退 / `→unknown` 不退，
+各自一句为什么）、退款挂在 CAS 侧所以"只退一次"由库保证、跨周期退的是那枚尝试行自己的 `periodAnchor`、
+以及**对账读路径的口径边界**（账号级共用计数器 ⇒ 只判"计数器 < 已计费尝试数"一个方向，多出来原样披露）。
+对账函数**还没有界面或后台消费者**这一句也写进去了（B113），不把它写成"运营已经能查"。
+
+| 项 | 现量读数 |
+|---|---|
+| `node scripts/check-docs-voice.mjs` | rc=0 —— ⚠️ **这条读数不给本批背书**：它自己打印"扫描 site.* 1074 条"，`docs/reference/` 不在它的分母里 |
+| `node research/tools/docs-link-check.mjs` | **两次读数都记**：本批改完第一跑 **rc=0**，收尾复跑 **rc=1**，红的那一条始终是开工快照里那条别线的 `apps/desktop-windows/README.md:89 → scripts/windows/launch-data-transfer-qa.ps1`（本机有、git 没跟踪）。⇒ 它在同一轮里随 HEAD/索引摆动，**不是本线引入的死链**（本批新增文本 grep 不出任何指向未跟踪文件的链接），归属仍是那条线的 |
+| `node scripts/check-doc-citations.mjs` | rc=0，`SELFTEST=pass`（路径维/无锚维/假 SHA 维三臂都抓到），文档 1 份、span 2000、锚 8 枚 |
+| `node scripts/check-ai-quota-consistency.mjs` / `check-pricing-consistency.mjs` | 各 rc=0 —— 本批没动 `pricing-and-entitlements.md`，这两条是"没有把额度口径改成分叉"的证据 |
+| 表格结构尺（`check-md-table-rows.mjs`）的**覆盖现量** | 🔴 它的 `FILES` 是一张**显式登记表**，本线那两份**不在表里** ⇒ 直接跑它 rc=0 对本批证明为零。做法：把那枚脚本的 `FILES` 换成 `PROGRESS.md`、`BLOCKED.md`、计划与本份协议四份、`CODE_SPAN_BASELINE` 清空（那是别人文件的登记），跑同一份判据代码 ⇒ `4 个文件 … 都一致`，rc=0 |
+| 上面那把尺拓到本线的反向验证 | 往协议文档尾部注入一枚 2 列的行（表头 3 列）⇒ **`protocol.md:195 这一块的表头下面没有分隔行（GFM 把它当裸文字渲染 ⇒ 列数判据对整个碎片失效）`**，rc=1；从 `.mut-bak` 还原后哈希 `68f8f56dc73171d8` 与注入前逐字相同，复跑 rc=0，`.mut-bak` 已删、工作树只剩本批的合法修改 |
+
+登记 **B119**：`scripts/check-md-table-rows.mjs` 的登记表不含 `docs/plans/inbound-automation.md` 与本份协议文档
+⇒ 本线往后每次加表都得自己带一次"把 FILES 换成本线两份跑同一份判据代码"的现量，或者由仓库治理把这两枚并进登记表
+（那是别人那把尺的覆盖口径，本线不代改，理由见 B107 同一族）。
+
+仍未闭合（不包装成完成）：中英条款与帮助页同步（白名单外，B118）、`unknown` 那一句要不要写进对外文案（B114 裁决）、
+每周期 300 次那句要不要说明跨周期退款那一格（B114/本批同族）、`waiting-entitlement` 界面文案（B110）。
+AC 现量：未勾 8 / 已勾 0。
