@@ -13,18 +13,28 @@ import {
   readAutomationRevocationFloor,
   redeemAutomationEntitlementActivation,
   revokeAutomationEntitlementLink,
+  signAutomationEntitlementActionTicket,
   signAutomationEntitlementSessionTicket,
   signAutomationRevocationManifest,
   type AutomationEntitlementIssuer,
   type AutomationEntitlementKeyring,
   type IssuerDatabase,
 } from '../src/automation/entitlement-issuer';
+import {
+  AUTOMATION_ENTITLEMENT_DENIALS,
+  AUTOMATION_ENTITLEMENT_SCOPES,
+  inspectAutomationEntitlementTicket,
+  type AutomationEntitlementAction,
+} from '../src/automation/entitlement-ticket';
 import { evaluateAutomationEntitlementForUser, type AutomationEntitlementSource } from '../src/entitlement';
 
 const installationId = '11111111-1111-4111-8111-111111111111';
 const otherInstallation = '99999999-9999-4999-8999-999999999999';
 const localAccount = '22222222-2222-4222-8222-222222222222';
 const otherLocalAccount = '33333333-3333-4333-8333-333333333333';
+const ruleId = '44444444-4444-4444-8444-444444444444';
+const otherRule = '55555555-5555-4555-8555-555555555555';
+const eventId = 'evt_01ABCdef-9:_x';
 const ISSUER = 'https://official.example/entitlements';
 
 function keys() {
@@ -284,5 +294,81 @@ describe('自动收集权益签发端', () => {
       .toEqual({ allowed: true });
     expect(await evaluateAutomationEntitlementForUser({ userId: 7, mode: 'selfhost-online', now: 4_000_000, source: source(9), keyring: base }))
       .toMatchObject({ allowed: false, reason: 'REVOKED_VERSION' });
+  });
+
+  describe('逐次动作票据的签发通道', () => {
+    /** 取票只认绑定行：先用真握手把 `installationId` 绑到账号 7 的官方主体上。 */
+    const bind = async (): Promise<string> => {
+      const issued = await issueAutomationEntitlementActivation({ client: db.client, userId: 7, installationId, now: new Date(0) });
+      await redeemAutomationEntitlementActivation({ client: db.client, userId: 7, code: issued.code, installationId, localAccountUuid: localAccount, now: new Date(1) });
+      return issued.subject;
+    };
+    // `db` / `issuerConfig` 是 beforeEach 才赋值的，所以这里必须是**取一次算一次**的函数：
+    // 写成常量会在用例收集期读到 undefined。
+    const base = () => ({ client: db.client, userId: 7, installationId, issuer: issuerConfig, revocationVersion: 4, now: 1_000_000 });
+    const claimsOf = (token: string): Record<string, unknown> =>
+      JSON.parse(Buffer.from(token.split('.')[0]!, 'base64url').toString('utf8')) as Record<string, unknown>;
+
+    it('每个动作的 scope 由词表决定，签出的票据能被判定核在同一动作上认下', async () => {
+      const subject = await bind();
+      const actions = Object.entries(AUTOMATION_ENTITLEMENT_SCOPES).filter(([action]) => action !== 'session');
+      // 分母自检：词表里除了 session 之外每一个动作都要走一遍，漏一个就是漏签一种。
+      expect(actions).toHaveLength(8);
+      for (const [rawAction, scope] of actions) {
+        const action = rawAction as AutomationEntitlementAction;
+        const scopeFields = scope === 'rule' ? { ruleId } : scope === 'event' ? { eventId } : {};
+        const signed = await signAutomationEntitlementActionTicket({ ...base(), action, ...scopeFields });
+        expect(signed.action).toBe(action);
+        expect(signed.subject).toBe(subject);
+        const inspected = inspectAutomationEntitlementTicket(signed.token, keyring, { action, ...scopeFields, localAccountUuid: localAccount });
+        expect(inspected).toMatchObject({ ok: true });
+        expect(claimsOf(signed.token)).toMatchObject({ action, capability: 'automation', officialSubject: subject, revocationVersion: 4 });
+      }
+    });
+
+    it('session 不许走取票通道：它是唯一能写绑定的动作', async () => {
+      await bind();
+      expect(await denial(() => signAutomationEntitlementActionTicket({ ...base(), action: 'session' })))
+        .toBe(AUTOMATION_ISSUER_DENIALS.ACTION_UNKNOWN);
+    });
+
+    it('作用域与动作不符一律不签：缺 id、多 id、串台各算一次', async () => {
+      await bind();
+      expect(await denial(() => signAutomationEntitlementActionTicket({ ...base(), action: 'rule-enable' })))
+        .toBe(AUTOMATION_ISSUER_DENIALS.SCOPE_MISMATCH);
+      expect(await denial(() => signAutomationEntitlementActionTicket({ ...base(), action: 'event-claim', ruleId })))
+        .toBe(AUTOMATION_ISSUER_DENIALS.SCOPE_MISMATCH);
+      expect(await denial(() => signAutomationEntitlementActionTicket({ ...base(), action: 'result-publish' })))
+        .toBe(AUTOMATION_ISSUER_DENIALS.SCOPE_MISMATCH);
+      expect(await denial(() => signAutomationEntitlementActionTicket({ ...base(), action: 'result-publish', ruleId, eventId })))
+        .toBe(AUTOMATION_ISSUER_DENIALS.SCOPE_MISMATCH);
+    });
+
+    it('绑定字段取自绑定行而不是请求：换账号顶不掉，未绑定与已撤销都不签', async () => {
+      const subject = await bind();
+      const signed = await signAutomationEntitlementActionTicket({ ...base(), action: 'worker-register' });
+      expect(claimsOf(signed.token)).toMatchObject({ officialSubject: subject, installationId, localAccountUuid: localAccount });
+      expect((claimsOf(signed.token).expiresAt as number) - (claimsOf(signed.token).issuedAt as number)).toBe(30);
+      expect(await denial(() => signAutomationEntitlementActionTicket({ ...base(), userId: 8, action: 'worker-register' })))
+        .toBe(AUTOMATION_ISSUER_DENIALS.SUBJECT_MISMATCH);
+
+      const unbound = database();
+      expect(await denial(() => signAutomationEntitlementActionTicket({ ...base(), client: unbound.client, action: 'worker-register' })))
+        .toBe(AUTOMATION_ISSUER_DENIALS.LINK_NOT_BOUND);
+      expect(await revokeAutomationEntitlementLink({ client: db.client, userId: 7, installationId, now: new Date(5) })).toBe(true);
+      expect(await denial(() => signAutomationEntitlementActionTicket({ ...base(), action: 'worker-register' })))
+        .toBe(AUTOMATION_ISSUER_DENIALS.LINK_NOT_BOUND);
+    });
+
+    it('一枚票据只放行它那一个动作：换 rule、换动作都判 SCOPE_MISMATCH', async () => {
+      await bind();
+      const signed = await signAutomationEntitlementActionTicket({ ...base(), action: 'rule-enable', ruleId });
+      expect(inspectAutomationEntitlementTicket(signed.token, keyring, { action: 'rule-enable', ruleId, localAccountUuid: localAccount }))
+        .toMatchObject({ ok: true });
+      expect(inspectAutomationEntitlementTicket(signed.token, keyring, { action: 'rule-enable', ruleId: otherRule, localAccountUuid: localAccount }))
+        .toMatchObject({ ok: false, code: AUTOMATION_ENTITLEMENT_DENIALS.TICKET_SCOPE_MISMATCH });
+      expect(inspectAutomationEntitlementTicket(signed.token, keyring, { action: 'worker-register', localAccountUuid: localAccount }))
+        .toMatchObject({ ok: false, code: AUTOMATION_ENTITLEMENT_DENIALS.TICKET_SCOPE_MISMATCH });
+    });
   });
 });
