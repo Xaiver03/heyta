@@ -85,7 +85,9 @@ date-only 与 instant 是两种不同语义：date-only 由 `*DateLocal` 字段�
 
 **吊销版本的在线刷新**：官方实例发布签名清单 `GET /automation/entitlement/revocations`（域 `heyta-automation-revocation-v1.`，claims 含 `scope='global'/revocationVersion/issuedAt/expiresAt`，寿命 ≤24h），自托管实例经 `POST /automation/entitlement/revocations/refresh` 转述并**只用本部署配置的公钥环验签**，合并单调只升；判定用的下限 = `max(部署时手配的那一个, 库里刷新到的那一个)`。抬下限本身要管理员，`refresh` 只要登录 —— 恰恰在绑定被吊销或过期之后才需要它。
 
-已闭合的部分到此为止；下列仍是**未闭合门槛**，不得读成已实现：各宿主每 30 秒续票据与 `waiting-entitlement` 展示；`X-Heyta-Entitlement-Ticket` 在客户端侧还没有供给方；`automation_entitlement_clocks` 的实例退役清扫还没有消费者。（官方签发端、`officialSubject ↔ 实例 ↔ 本地账号` 的链接握手、吊销版本在线刷新三件已于 2026-10-09 闭合；除草稿确认与首次许可外的票据消费也于同日**从 HTTP 闸门自己的事务挪进业务写事务**，闸门只留离线预检 —— 判据见 [落地计划](../plans/inbound-automation.md) 文末同名小节。唯一留在闸门里消费的是上面注明的 `ai-reserve`。）
+**逐次动作的票据从哪来**：`POST /automation/entitlement/ticket`（需登录、`no-store`、限流 60/分）。请求体只有 `installationId/action/ruleId?/eventId?` 四个字段且 `strict`：`session` 走它自己那条通道（它是唯一能建立/续期绑定的动作，从这条通道取会被拒），作用域与动作不符直接拒签，绑定三字段照旧只从 `links` 行读回。🔴 **这条通道判的是「这个主体可否在这个作用域上做这一个动作」，不判「这个 rule/event 是否真属于那个本地账号」** —— 后者只有客户实例知道（它的库是端到端加密的，官方侧看不到也不该看），所以归属由客户端在消费那一步判。
+
+已闭合的部分到此为止；下列仍是**未闭合门槛**，不得读成已实现：各宿主每 30 秒续票据与 `waiting-entitlement` 展示；`X-Heyta-Entitlement-Ticket` 在客户端侧还没有供给方（**服务端那条取票通道已于 2026-10-10 闭合**，见上一段；缺的是宿主真的去调它并把票据附到每次写入上）；`automation_entitlement_clocks` 的实例退役清扫还没有消费者。（官方签发端、`officialSubject ↔ 实例 ↔ 本地账号` 的链接握手、吊销版本在线刷新三件已于 2026-10-09 闭合；除草稿确认与首次许可外的票据消费也于同日**从 HTTP 闸门自己的事务挪进业务写事务**，闸门只留离线预检 —— 判据见 [落地计划](../plans/inbound-automation.md) 文末同名小节。唯一留在闸门里消费的是上面注明的 `ai-reserve`。）
 
 事件模型账本唯一键 `(eventId, parseVersion, attempt)`，状态 `reserved/sent/consumed/released/unknown`；计量来源在 reserve 时冻结为 `local`、`direct` 或 `managed`，并写入同一账本。`managed` 才消费托管 AI 周期额度并带 `periodAnchor`；本地模型和用户自有端点不消费托管额度，二者的 `periodAnchor` 必须为 `null`。同一尝试重试时来源不允许改变，来源错配必须拒绝。额度判定与 reserve 在同一个数据库事务中，旧的周期计数器不能被另一路无条件加一。明确未发送的失败才 release；已发出后丢失响应记 unknown，默认不自动重新调用。取得结果后只保存客户端加密结果；重试提交不再调用模型。
 
