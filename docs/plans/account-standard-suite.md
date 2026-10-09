@@ -260,9 +260,10 @@ W1 先落、W7 后落 ⇒ 中间任何一次 `pnpm check` 都会红。**这不�
     判据四层里只有**真运行时那一层**能红（改前产物 `37 过 / 2 红`，改后 `39 过 / 0 红`）：
     单元与 HTTP 层对一个"只写计数器"的实现全绿，因为它们数的是请求与响应，
     缺的那一半是一条**已经建立的连接**。
-    🔴 **这一条的"哪几条路已在运行时层验过"已有独立状态表**（§6.73，第四格注销补在 §6.74）：
-    改密 ✅ / 重置 ✅ / **换绑生效 ❌**（只有 spy）/ 注销 ✅（它的 `closeForUser` 不经过收口函数，
-    红在另一枚臂，§6.74 那两条臂互不重叠）。这一条本文原样保留 —— 它记的是**发现方式**（两个动作集合做减法），
+    🔴 **这一条的"哪几条路已在运行时层验过"已有独立状态表**（§6.73，第四格注销补在 §6.74、
+    换绑生效补在 §6.75）：**改密 ✅ / 重置 ✅ / 换绑生效 ✅ / 注销 ✅ —— 四格全闭合**。
+    注销那一格的 `closeForUser` 不经过收口函数，红在另一枚臂（§6.74 那两条臂互不重叠）。
+    这一条本文原样保留 —— 它记的是**发现方式**（两个动作集合做减法），
     而那张表记的是**现在的覆盖**，两码事，别拿后者去删前者。
 17. ✅ **逐枚撤销不关那一枚的实时通道** —— **这一格已关**（10-10 02:45，`be4e41b4` + `0c7e7476`，读数与三臂在 §6.60）。
     原文留着，因为它记的三件前置正是落地时做的三件：upgrade 鉴权时把 `jti` 的 SHA-256 记进连接、
@@ -3734,13 +3735,18 @@ cd .worktrees/<载体> && git checkout --force $(git rev-parse refs/heads/main)
 |---|---|---|
 | 改口令 `/password/change` | ✅ §6.72 | 同左 |
 | 重置口令 `/password/reset` | ✅ 本节 | 同左 |
-| 换绑生效（`EMAIL_CHANGE_PATHS.confirm` 那一步） | ❌ **仍未补** | `account-security.routes.spec.ts` 断的是"调用了 `closeForUser`"，不是"那条连接真的断了" |
+| 换绑生效（`EMAIL_CHANGE_PATHS.confirm` 那一步） | ❌ **本节登记成欠项** —— ✅ **同批就补了，见 §6.75**（这一行原文留着，因为下面那段"为什么不补"的理由**是错的**） | `account-security.routes.spec.ts` 断的是"调用了 `closeForUser`"，不是"那条连接真的断了" |
 | 注销账号 `DELETE /api/account` | ✅ §6.74（**第四格，本节原来没有它**） | `delete-account.routes.spec.ts` 断的是"调用了 `closeForUser`"＋"调用排在删除**之后**"，同样不是"那条连接真的断了" |
 
-🔴 为什么这一格**登记而不顺手补**：同一枚共用收口函数（`revokeAllDeviceSessions`）已经在**两个调用方**上
+🔴 ~~为什么这一格**登记而不顺手补**：同一枚共用收口函数（`revokeAllDeviceSessions`）已经在**两个调用方**上
 取到"真的把连接断了"的读数，臂 W1 一次同时打红这两条；而要在这一层补换绑那一路，
 得把另一枚套件的那两封信装置（`sent.authorize/confirm/changed` 那份 mock）重铺进 WS 套件 ——
-那会让两枚套件共享一份夹具，此后任何一侧动它都会红在另一侧。这一格留成欠项，不包装成完成。
+那会让两枚套件共享一份夹具，此后任何一侧动它都会红在另一侧。这一格留成欠项，不包装成完成。~~
+**这段理由是错的，§6.75 用一条真用例否证了它**：生效那一步读的是**库里那张请求行的两边确认状态**
+（`confirmEmailChange` 只看 `email_change_requests.oldConfirmedAt/newConfirmedAt`），
+所以按形状直接把那张行写进库就够了 —— 与本节上面重置那条写 `resetPasswordToken` 是同一手法，
+**一行邮件装置都不用搬**。留下的教训：**"要共享别人的夹具"这句判断要先去读被验那一步的输入来自哪里**，
+从"这条路是靠两封信驱动的"直接推"就得有两封信的装置"，推的是**用户视角的形状**，不是**代码的输入**。
 
 复取：与 §6.72 同一条命令（文件名 `session-revoke-websocket`），期望从 `5 passed` 变成 **`6 passed`**；
 臂 W1 那一行的摘除与还原照 §6.69 那三条硬规矩，重取时预期 `2 failed / 24 passed`。
@@ -3789,6 +3795,7 @@ cd .worktrees/<载体> && git checkout --force $(git rev-parse refs/heads/main)
 载体收尾：`git status --porcelain` 只剩那枚预期未提交的 spec，`.mut-bak*` 残留 0 枚。
 
 仍然开着的：§6.73 那张表里唯一那个 ❌ —— **换绑生效那一路的真 socket 读数**（本线欠项，未闭合）。
+✅ **同一批就补了**（§6.75），而那一格登记的理由本身是错的，见 §6.73 被划掉的那段。
 
 🔴 **顺带一格，不是本线的，但下一个跑 `check:docs` 的人会以为是自己的**（§6.73 那一族"红不是自己造成的"）：
 纯 tip 载体上 `node research/tools/docs-link-check.mjs` **真 rc=1**（尾巴上照旧别拿 `tail` 的码 —— 陷阱 **#363**），
@@ -3803,6 +3810,64 @@ cd .worktrees/<载体> && git checkout --force $(git rev-parse refs/heads/main)
 三条出路（① 把它入库 / ② 链接改成纯文字 / ③ 在 `UNTRACKED_LINK_OK` 里登记路径 + 一句理由）
 是**那条线自己的证据件与判据口径**，本线不代拍、不代改，
 只把读数与归属留在这里。
+
+🔴 **同一批还照出第二格，形状更要紧**：纯 tip 上 `node scripts/check-layering.mjs` **也 rc=1**，
+唯一那处违规是 `apps/web/src/features/share/share-key-store.ts:56` 的 `entityType: 'SHARE_KEY'`
+（AGENTS §3.5"外壳里不许自己拼 op"那一族），来自 `e6058120`（10-09 14:35，**同一条线**那批），
+载体那一侧该文件与 tip 逐字相同（`git status --porcelain -- <那枚>` 为空）。
+⇒ HEAD 上现在有**两道门禁是红的**（`check:docs` + `check:layering`），而且两道都不红在本线文件上 ——
+本线那枚 `check:session-revocation` 在同一棵树上 rc=0（`文件=116 bump=6 豁免命中=1 违规=0`）。
+修法（把 `SHARE_KEY` 的 op 构造收进 `@heyta/app-host` 的动作层再让外壳调它）**改的是产品语义的落点**，
+归那条线拍；这里只留读数、归属与一条复现命令，**不代改、也不因为"不是我弄红的"就把它当不存在**。
+下一个从干净检出跑 `pnpm check` 的人会先撞见 `check:layering`，所以这一格值得写在离门禁最近的地方。
+
+### 6.75 换绑生效那一路补上了真 socket 读数，而 §6.73 登记它时写的那条理由是**错的**（10-10 04:4x 现量，载体 `.worktrees/iosacct` 纯 tip）
+
+§6.73 那张表里最后一个 ❌ 用同一枚 WS 夹具补上了，**一行邮件装置都没搬**：
+`confirmEmailChange` 生效那一步读的是**库里那张请求行的两边确认状态**
+（`email_change_requests.oldConfirmedAt / newConfirmedAt` 都非 null 才进事务），
+所以直接按形状把那张行写进库就够了 —— 与本文件重置那条写 `resetPasswordToken` 同一手法，
+两次 `POST /api/account/email/change/confirm`（旧边一枚令牌、新边一枚令牌）就把它驱动到生效。
+SMTP mock 只多一枚 `sendEmailChangedEmail`（在**本文件已有**的那份 `vi.mock('../../src/email')` 上加一项，
+不是把另一枚套件的 `sent.authorize/confirm/changed` 那套装置重铺过来）。
+
+那条用例断的是**两半**，各自有归宿：
+**只点一边** ⇒ `applied:false`，且**两条真连接一条都不许断**（先挂监听、`waitForClose(ws, 400)` 回 `null`、`readyState` 仍 `OPEN`）；
+**两边齐** ⇒ `applied:true` + 两条都以 `4003 / Token revoked` 当场断 + `accessSession` 零行 +
+那张请求行零行 + `users.email` **真的换成了待绑地址**（这一格防的是"通道断了但地址没换"）。
+
+| 那一格 | 现量 |
+|---|---|
+| 未变异（默认 5 s 预算，`--maxWorkers=1`） | `8 passed (8)` rc=0，`Duration 4.59s`；新那条 441 ms。同一份文件（含后来那段注释修订）**再跑一趟**：`8 passed (8)` rc=0 / `4.66s` |
+
+⚠️ 这两趟之间有一次**被内存闸门按水位维拒了启动**（`立即可用 346MB < 这一档要求的 384MB`），
+那一趟的包装 rc=1 **不是产品红**，日志里没有被测命令自己的读数行（§6.71 那格同一形状）；
+复跑走的是"原样重试在册那条命令、阈值一个字不动"的那条路，第一发就排到。
+| 🔴 臂 **W1** 重取（摘 `revokeAllDeviceSessions` 里 `closeForUser` 那一行，行号 261） | `3 failed / 5 passed (8)` —— 改密、重置、**换绑**三条一起红（各 `Error: Test timed out in 5000ms.`），注销那条照旧绿（60 ms） |
+| 🔴 臂 **W5**（把 `email-change.ts:332` 那道"两边都确认才生效"的闸改成 `if (false)`） | **恰好 1 红 = 新那条**，红句原文 `AssertionError: 只点一边就生效了: expected true to be false`；其余 7 条全绿 |
+
+⇒ 这一节真正要记的是**两枚臂各管一条用例里的一半**：W1 只证得到"生效那一步真的把通道关了"，
+它证不到"只点一边时不许关" —— 后一半由 W5 负责，而且 W5 红的**不是** socket 那一格，
+是 `applied` 那一格先错（`if (false)` 让第一次点击就走进生效分支，而那条分支的
+`deleteMany(where 两边都已确认)` 拿不到行 ⇒ `appliedId=null` ⇒ 回的是 `applied:true` 而**地址没换、通道也没关**）。
+所以这条用例里"两条都不许断"那三句**当下不是被 W5 照出来的**，它是被 W1 的反向形状（未变异时两边齐才断）
+与 W5 的 `applied` 那一行**合起来**钉住的 —— 记清哪一枚臂负责哪一格，别让"做过两臂"读成"两臂各自覆盖了全部断言"。
+
+🔴 **§6.73 那句登记理由已被本节否证**（原文与划掉它的位置在那里，不重复抄）：
+"要在这一层补它，得把那两封信的装置重铺进 WS 套件"——**它推的是用户视角的形状**（这条路是靠两封信驱动的），
+不是**代码的输入**（生效那一步只看那张行）。可迁移的一条：**判"补它要搬多少装置"要先读被验那一步读的是什么**，
+读到的是库里的形状而不是邮件里的字符串，就不需要邮件装置。
+
+复取（载体 `.worktrees/iosacct`，库 `heyta_account_w9`，与 §6.74 同一条命令）⇒ 期望 `8 passed`。
+两臂夹具与逐臂还原：`~/heyta-carriers/w9-acct-logs/arms-emailchange.mjs`（按 §6.69 三条硬规矩 + §6.74 那处改进：
+按整行 trim 唯一命中定位、`ORIGINAL_LINE_STILL_PRESENT` 复验变异真落进文件、每臂独立 `.mut-bak-<臂名>`、
+跑完 `git checkout -- <path>` + `git diff --quiet -- <path>` 复验）。
+取数时（臂读数收工后同一分钟现量）负载 6.17（16 核）/ 余量 6936 MB / 轻量档在册 0 趟。
+载体收尾：`git status --porcelain` 只剩那枚预期未提交的 spec，`.mut-bak*` 残留 0 枚。
+
+⇒ **§6.73 那张表现在四格全 ✅**，这一层（真库 + 真 Fastify + 真 WebSocket）没有欠项了。
+本线仍然开着的格都不在这一层：iOS 设备腿与四端重装（等 `packages/ui` 那批入库）、
+法务「十封」联合提交、帮助中心两行、§5 第 18 条那一半（对外文案 + 判据口径，等负责人拍）。
 
 
 
