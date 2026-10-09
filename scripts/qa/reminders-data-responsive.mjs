@@ -7,6 +7,8 @@
  */
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -62,12 +64,50 @@ if (trackedInEvidenceDir > 0 && !ALLOW_TRACKED_OVERWRITE) {
       '② 确实要刷新入库的那批证据，显式加 `HEYTA_ALLOW_TRACKED_EVIDENCE=1`，并在提交信息里写明是哪一趟、哪棵树。',
   );
 }
+/**
+ * 这一趟读数**指认哪一棵树**（2026-10-10 03:0x 加）。理由不是整洁，是两条在案事实撞在一起：
+ * ① 本仓库有一条在案缺陷 ——「跑一趟会把已跟踪证据就地改写 ⇒ 证据不再指认任何一棵树」；
+ * ② 主检出上别的线一直在落笔（现量：02:5x 那格量到 70 分钟里落 25 笔）。
+ * 于是"整族最新读数"这句话必须自带：起跑那一刻的 `HEAD`、脏集合大小，**以及装置自己的 sha256**
+ * —— 最后那枚让「读数 = 当前入库那版装置」这条口径从"人记得去复跑"变成**能机械对账**。
+ * ⚠️ 这是**读数不是判据**：它不判红（对账发生在读台账的那一刻，不是跑装置的那一刻），
+ * 所以别把它当"有牙的门口" —— 它挡的是"三个月后没人知道这行是哪棵树上量的"。
+ */
+const RIG_REL = 'scripts/qa/reminders-data-responsive.mjs';
+const TREE = (() => {
+  const git = (args) => {
+    try {
+      return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' });
+    } catch {
+      return null;
+    }
+  };
+  const dirtyCount = (path) => {
+    const out = git(['status', '--porcelain', '--', path]);
+    return out === null ? '(git unavailable)' : out.split('\n').filter(Boolean).length;
+  };
+  const head = git(['rev-parse', 'HEAD']);
+  let rigSha = '(rig unreadable)';
+  try {
+    rigSha = createHash('sha256').update(readFileSync(resolve(ROOT, RIG_REL))).digest('hex').slice(0, 12);
+  } catch {}
+  return {
+    headSha: head ? head.trim() : '(git unavailable)',
+    rigFile: RIG_REL,
+    rigSha256Prefix: rigSha,
+    rigWorktreeMatchesHead: dirtyCount(RIG_REL) === 0,
+    dirtyFiles: { 'apps/web/src': dirtyCount('apps/web/src'), 'packages/ui/src': dirtyCount('packages/ui/src') },
+    at: new Date().toISOString(),
+  };
+})();
+
 if (process.env.HEYTA_RESPONSIVE_PLAN_ONLY === '1') {
   console.log(JSON.stringify({
     legs: LEGS,
     evidenceDir: OUT_LABEL,
     trackedEvidenceFiles: trackedInEvidenceDir,
     allowedTrackedOverwrite: ALLOW_TRACKED_OVERWRITE,
+    tree: TREE,
     browserLaunched: false,
   }));
   process.exit(0);
@@ -99,6 +139,7 @@ const writeFailure = async (kind, err) => {
     message,
     stack: String(err?.stack ?? '').split('\n').slice(0, 6).join('\n'),
     origin: ORIGIN,
+    tree: TREE,
     legs: LEGS,
     cellsSoFar: {
       reminders: reminders.length,
@@ -1047,6 +1088,8 @@ const report = {
   origin: ORIGIN,
   carrier: {
     headless: !HEADED,
+    // 这行读数指认的那棵树与那版装置（成因见上面 `TREE` 的注释块）。
+    tree: TREE,
     legs: LEGS,
     skippedLegs: ALL_LEGS.filter((l) => !LEGS.includes(l)),
     legCells,
