@@ -10,8 +10,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   installSteps,
+  isNativeShellHost,
   isRunningStandalone,
   resolveInstallPlatform,
+  resolveWidgetJourneyHost,
   shouldShowInstallGuide,
 } from '../src/pwa/widget-install';
 
@@ -102,5 +104,95 @@ describe('shouldShowInstallGuide', () => {
 
   it('🔴 已经装成应用 → 不再教怎么装', () => {
     expect(shouldShowInstallGuide(true)).toBe(false);
+  });
+});
+
+describe('resolveWidgetJourneyHost', () => {
+  it('原生桌面壳是已安装宿主，但不冒充系统小组件提供方', () => {
+    expect(resolveWidgetJourneyHost('Windows', false, true)).toEqual({
+      platform: 'windows',
+      host: 'native-shell',
+      provider: 'none',
+      standalone: true,
+      showInstallGuide: false,
+    });
+    expect(resolveWidgetJourneyHost('MacIntel', true, true).provider).toBe('none');
+  });
+
+  it('非 Windows 的独立窗口仍显示为已安装宿主，但不宣称有系统小组件', () => {
+    expect(resolveWidgetJourneyHost('MacIntel', true, false)).toEqual({
+      platform: 'macos',
+      host: 'standalone',
+      provider: 'none',
+      standalone: true,
+      showInstallGuide: false,
+    });
+  });
+
+  it('Windows PWA 才是当前桌面小组件提供方', () => {
+    expect(resolveWidgetJourneyHost('Win32', true, false)).toEqual({
+      platform: 'windows',
+      host: 'windows-pwa',
+      provider: 'windows-pwa',
+      standalone: true,
+      showInstallGuide: false,
+    });
+  });
+
+  it('Windows 浏览器标签页显示安装路径，非 Windows 不显示走不通的步骤', () => {
+    expect(resolveWidgetJourneyHost('Windows', false, false)).toMatchObject({
+      host: 'browser',
+      provider: 'windows-pwa-candidate',
+      showInstallGuide: true,
+    });
+    expect(resolveWidgetJourneyHost('MacIntel', false, false)).toMatchObject({
+      host: 'browser',
+      provider: 'none',
+      showInstallGuide: false,
+    });
+    expect(resolveWidgetJourneyHost('Linux x86_64', false, false)).toMatchObject({
+      host: 'browser',
+      provider: 'none',
+      showInstallGuide: false,
+    });
+  });
+});
+
+describe('native widget capability', () => {
+  it('requires an actual bridge in the native shell, not just an installed window', () => {
+    expect(resolveWidgetJourneyHost('MacIntel', true, true, true).provider).toBe('native');
+    expect(resolveWidgetJourneyHost('Windows', true, true, true).provider).toBe('native');
+    expect(resolveWidgetJourneyHost('MacIntel', true, true, false).provider).toBe('none');
+    expect(resolveWidgetJourneyHost('MacIntel', false, false, true).provider).toBe('none');
+  });
+});
+
+describe('isNativeShellHost', () => {
+  const none = { storagePort: false, webview2Host: false, shellMessageHandlers: [] as const };
+
+  it('存储端口在 ⇒ 是壳（原有判据不丢）', () => {
+    expect(isNativeShellHost({ ...none, storagePort: true })).toBe(true);
+  });
+
+  it('🔴 逃生门关掉存储宿主后，WebView2 里的同一个窗口仍判为壳', () => {
+    // 这条就是计划 §8.2 记的残留：只认 `__heytaHostStoragePort` 时，
+    // `HEYTA_SHELL_STORAGE=0` 会让已装进 MSIX 的界面开始教用户"先把 heyta 装成应用"。
+    const windowsShellWithoutStorageHost = { ...none, webview2Host: true };
+    expect(isNativeShellHost(windowsShellWithoutStorageHost)).toBe(true);
+    expect(
+      resolveWidgetJourneyHost('Win32', false, isNativeShellHost(windowsShellWithoutStorageHost)),
+    ).toMatchObject({ host: 'native-shell', showInstallGuide: false });
+  });
+
+  it('🔴 macOS / Linux 壳的 heyta* 消息处理器也算壳身份', () => {
+    expect(isNativeShellHost({ ...none, shellMessageHandlers: ['heytaStorage'] })).toBe(true);
+    expect(isNativeShellHost({ ...none, shellMessageHandlers: ['heytaWidget'] })).toBe(true);
+  });
+
+  it('普通浏览器里三条信号都没有 ⇒ 仍然是浏览器', () => {
+    // Chrome 有 `window.chrome` 但没有 `chrome.webview`；Safari 有
+    // `webkit.messageHandlers` 却没有我们注册的那两个名字。
+    expect(isNativeShellHost(none)).toBe(false);
+    expect(isNativeShellHost({ ...none, shellMessageHandlers: ['anotherHandler'] })).toBe(false);
   });
 });
