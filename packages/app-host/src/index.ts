@@ -22,10 +22,11 @@ export {
   materializedState,
   type AppHost,
   type AppHostOptions,
-  type InboundAutomationHostOptions,
   type SyncConfig,
   type VaultRootRotationOptions,
 } from './host.js';
+
+export { type InboundAutomationHostOptions } from './inbound-host-options.js';
 
 export {
   createTaskActions,
