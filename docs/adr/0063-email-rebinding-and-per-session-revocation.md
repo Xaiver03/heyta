@@ -135,6 +135,18 @@ payload 只有 `{userId, email, tokenVersion}`。撤销只有一档：`tokenVers
   而"留一行只为了记下它曾被撤"在 GDPR 侧是反向的（同一句理由写在迁移文件第 57 行的注释里）。
 - `verifyToken` 在签名与 `tokenVersion` 判定**之后**加一关：这一枚 `jti` 有没有被单独撤销。
   撤销任一会话时 `authCache.invalidate(userId)`，所以 30 s 的缓存窗口不会变成"撤销了还能用半小时"。
+  🔴 **上面那句 10-09 之前不成立，被一次真机旅程前的协议探针否证**（全过程与三层变异读数在
+  [`../plans/account-standard-suite.md`](../plans/account-standard-suite.md) §6.7）：`authCache` 的条目
+  **只按 `userId` 分格**，而**命中路径直接回 `valid: true`、根本不读 `sessionIsLive`** ⇒
+  撤掉 C 之后只要同账号的 B 还在鉴权（它会把 `userId` 那一格重新焐热），C 仍回 **200**。
+  `invalidate` 该调的地方一条都没少调 —— 它挡不住的是**"别一枚令牌把这一枚的判断替做了"**。
+  修法：缓存键换成 `userId:<sessionId | 'no-jti'>`，`invalidate(userId)` 改成扫掉该用户的全部格。
+  ⚠️ 这一句修的是**实现事实**，本节三条裁决（双确认、会话带 `jti`、撤销=删行）**一条没动**；
+  没有 `jti` 的老令牌落 `'no-jti'` 那一格，所以上面 §4 边界那族"本轮之前签的令牌不可单独撤销"照旧成立
+  （同一条也记在计划 §5 第 1 条）。
+  📌 留下一句被证伪的原文是为了让人看清这类断言怎么活下来的：
+  当时单测与集成**全绿**，因为它们检查的是"我有没有调 `invalidate`"，不是"撤销之后那一枚还能不能被接受"；
+  而那条"撤一枚不动另一枚"的断言把**被撤的那一枚排在最前面探**，顺序本身就照不出焐热路径（traps **#392**）。
 - 三条路由（全部 `preHandler: authenticate`）：`GET /api/auth/sessions`（列，含 `current: true` 标记）、
   `DELETE /api/auth/sessions/:sessionId`（撤销一枚；线名是 `sessionId`，库里那一列叫 `jti_hash`，
   界面上不需要知道它来自 `jti`）、`POST /api/auth/sessions/revoke-all`（撤销全部 = 旧的全局档）。
