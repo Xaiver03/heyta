@@ -6940,6 +6940,7 @@ T1 的真库腿**已经取到读数**（`python3 research/tools/verify-inbound-w
 - 两处变异还原后 `cmp -s /tmp/entitlement.ts.mut-bak src/entitlement.ts` 逐字一致 ⇒ **43/43 那次读数描述的字节 == 现在工作树里的字节**，所以这一格不是"没证据"，是"没有第二次证据"。
 - 现量命令（等台账空出后一条就能闭合）：`pgrep -f 'pnpm --dir e2e run test' || echo 载体空` → 空了就 `python3 research/tools/verify-inbound-worker-identity.py --log /tmp/…log`，判据仍是 `Tests 43 passed (43)` + PY_RC=0。
 - 🔴 **不受它挡、也不归它解释的那一大格**：`pnpm check` / `pnpm -r test` / `pnpm reinstall:all` 在**隔离副本**上整条跑（T7），那一步另有 B103 那 16 条别人的类型错挡着。两件事不要混读成同一个"环境无效"。
+- ⚠️ 2026-10-09 22:1x 部分收窄（T2 那一趟）：本线**同一载体**上把变异还原后的复跑取到了，但取的是 vitest 那两条腿（六文件 `Tests 51 passed (51)` rc=0 + 真库 `tests/integration/inbound-worker-identity.integration.spec.ts` `Tests 45 passed (45)` `REAL_RC=0`），**不是**上面那条 Python 装置。**这一格仍然开着**：`verify-inbound-worker-identity.py` 那 43 条对应的那一次"还原后复跑"没做过，闭合命令不变。
 
 ## B105（2026-10-09 18:1x，本会话 · 顺手活登记，没有动手）：`docs/plans/inbound-automation.md` 里有一整节被复制了两遍
 
@@ -6949,3 +6950,17 @@ T1 的真库腿**已经取到读数**（`python3 research/tools/verify-inbound-w
 
 - 为什么不当场删：那两节的措辞是并行会话在飞的落点，删一份等于替对方决定哪一份是权威；而且 `docs-link-check` 的章节引用检查是按标题计数的，动结构要连带重跑文档门禁，那是另一条线的收尾。
 - 谁来判：计划文档的作者（本线）在 T6 那一步统一收口时顺手做最合适 —— 那时要重写对外说明段落，正好一次对齐。
+
+## B106（2026-10-09 22:1x，本会话 · 入站自动收集 Goal T2）：`automation_entitlement_clocks` 的退役清扫**落点在本线地界之外**，只能登记接线需求
+
+任务书把这一格排在 T2（"实例退役清扫"）。现量到的形状是：
+
+- 表已经在了（`server/prisma/schema.prisma` 的 `AutomationEntitlementClock` → `automation_entitlement_clocks`），写入方也在了 —— 票据判定在账号锁之后读 `clock_timestamp()` 并按安装实例抬高水位，时钟回拨后本机停止获得新授权。
+- **没有任何一方删它**。现量：`grep -rn 'automationEntitlementClock' server/src | wc -l` = **3**，三处全在 `server/src/automation/entitlement-ticket.ts`（一枚类型成员、第 291 行那次 `findUnique` 读、第 317 行那次 `upsert` 写）；`grep -c 'automationEntitlementClock' server/src/sync/cleanup.ts` = **0**。也就是说这台实例被重装/换 installationId 之后，旧实例那一行会**永久留着**，而它的存在没有任何后果（只是不再有票据来更新它）。
+
+为什么不当场做完（两条，都是硬的）：
+
+1. 🔴 **落点越界**。这类"过期行按保留期清掉"的既有收口点是 `server/src/sync/cleanup.ts`（`purgeExpired*` 那一族都挂在那枚周期任务上）。这个路径**不在本线的只允许改清单里**，写进去就是替另一条线决定它的清扫批次与日志形状。本线能做的只到"把需求写清楚"。
+2. ⚠️ **判据口径要人拍**。这一格真正的产品问题不是"能不能删"，而是"**什么条件下算退役**"：按 `installationId` 最近一次票据活动时间？按绑定行过期时间？还是保留一个观察窗口？三种都会让这台实例的**时钟高水位丢失**，而高水位唯一的用途就是拦时钟回拨 —— 清掉等于把回拨防护清零。⚠️ 这是判据口径，按规矩不代拍。
+
+不受影响的三格照做：每 30 秒续票据、`waiting-entitlement` 展示、`X-Heyta-Entitlement-Ticket` 的供给方在 app-host 侧（都在本线地界内），本轮没轮到它们。

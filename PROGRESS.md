@@ -1874,3 +1874,46 @@ OS 通知投递通过。原 [多端计划](docs/plans/goal-multi-end-coverage.md
 - 入库后门禁读数：`check-migrations` rc=0、`license-inventory` rc=0、AC 未勾 8 / 已勾 0。
   切片带过去的 14 枚 import 符号在 HEAD 里逐个 `git grep` 命中 ≥1（`requireAdmin` 也在）——
   这是"拼出来的那一份树"的**符号级**核对，整树编译仍在 T7 的隔离副本上做，不拿它冒充。
+
+## 2026-10-09 22:1x · T2 第三格（票据消费从闸门事务挪进业务写事务）—— ✅ 本格闭合
+
+- 做了什么：五处逐次放行动作（`worker-register` / `rule-enable` / `sender-credential-issue` /
+  `event-claim` / `result-publish`）的闸门改成 `precheckOnly: true`（只离线预检，不开事务不写库），
+  票据经路由传给各自的服务，在**业务写事务内、账号锁之后、第一笔不可逆写之前**消费。
+  `authorizeAutomationWrite` 的射程定为"有没有一次性东西要烧"：没出示票据就什么都不做 ——
+  官方模式没有一次性凭据，写成"再判一次订阅"会让每次内部写入都去读订阅行，那是重复判定不是加防护。
+- 🔴 顺手抓到并当场修完的一条（是我自己 T1 留的）：`selfhost-online` 没配公钥环时原来抛裸 `Error`
+  出 preHandler ⇒ HTTP **500**；客户端把 500 读成"服务端坏了、重试"。两处调用点（闸门与
+  `authorizeAutomationOperation`）都改成回 `ISSUER_NOT_CONFIGURED` 判拒 ⇒ **402**，
+  那个会抛的 `configuredAutomationKeyring()` 已删。**判据口径没动**：402/403 的分布照旧。
+- 边界（不包装成完成）：`ai-reserve` **仍由闸门消费** —— 它的计量走位置参数的 `SqlRunner` 端口，
+  接不住 Prisma 形状的 redeem；要么复制一份判定（正是本仓库"同一个判断写三遍"那个漂移源头），
+  要么改端口形状（牵连托管额度那一路）。两个都不便宜，所以留在闸门并在路由上注明，
+  同时进计划 T2 那节的落点表。
+- 读数：六文件单测 `Tests 51 passed (51)` rc=0；新形状判卷单跑 `Tests 10 passed (10)`；
+  真库 `--config vitest.integration.config.ts --maxWorkers=1` ⇒ `Tests 45 passed (45)`、`REAL_RC=0`
+  （一次性库 `heyta_inbound_wtx_20261009`，本机 homebrew postgresql@15，迁移已用仓库脚本应用）。
+  ⚠️ 那次"No test files found"不是红：默认 `vitest.config.ts` 的 `exclude` 里就排掉了
+  `tests/integration/**`，集成腿必须带 `--config vitest.integration.config.ts`。
+  静态门：`tsc --noEmit` rc=0、`check-docs-voice` rc=0、`check-migrations` rc=0、
+  `license-inventory` rc=0、`docs-link-check` rc=1 且唯一一条仍是那条非本线的、
+  AC 未勾 8 / 已勾 0。
+- 反向验证两臂（各只红自己那一条，都 `cp` + `cmp` 从 `.mut-bak` 还原后复跑为绿）：
+  臂 1 摘掉 `precheckOnly` ⇒ 真库那条回滚判据红（`expected 402 to be 409`）；
+  臂 2 把授权移到 `automationSenderCredential.updateMany` 之后 ⇒ 形状那条红
+  （`expected 797 to be less than 619`）。🔴 **臂 2 真库那套打不红**：吊销与后续失败同事务，
+  回滚把差别抹平 —— 所以形状判据是它唯一防线，这条判据不许因为"真库更全"而被当成多余。
+- 📌 一条判据教训（臂 2 的第一版是**假臂**）：标记写成 `.create` 时，"在 create 之前、却在吊销之后"
+  这种改法照样满足判据，所以变异注入后什么都不会红。标记必须落在**第一笔不可逆写**上
+  （吊销旧 worker / 旧凭据那两笔 `updateMany`）。另外那次假臂差点没被看出来是因为它同时被内存闸门
+  挡住了启动 —— **存活读数之前先 `sed -n` 把改动后的那几行打出来确认变异真进了产物**。
+- ✅ 已入库四笔（只本地提交、未 push）：`4b84584d` 判定层与业务写事务落点（5 文件）·
+  `c6808d1e` HTTP 面（1 文件，`api.ts` 走"HEAD + 本线切片"）· `3e7f7e41` 判据（2 文件）·
+  `ce52fa26` 计划与协议（2 文件）。每笔 `--stat` 的枚数等于点名枚数（5/1/2/2）。
+  切片核对：`diff /tmp/api.slice.ts server/src/api.ts` 的 164 行差异里 `[Aa]utomation` 命中 **0**
+  ⇒ 我的改动全进切片、别人的注册验证码/`normalizeEmail`/`issueSession` 那一片一个字没带走。
+  共享索引按新 HEAD 逐枚刷过（刷前先证 9 枚已有路径 `idx blob == 旧 HEAD blob`、新文件无条目），
+  复验：本线十枚路径的状态只剩 ` M server/src/api.ts`（那是在飞改动）。
+- T2 还欠三格（都在本线地界内，下一轮做）：宿主每 30 秒续票据、`X-Heyta-Entitlement-Ticket`
+  的供给方（app-host 里还没有生产者）、`waiting-entitlement` 展示。
+  `automation_entitlement_clocks` 的退役清扫登记成 `BLOCKED.md` **B106**（落点越界 + 判据口径要人拍）。
