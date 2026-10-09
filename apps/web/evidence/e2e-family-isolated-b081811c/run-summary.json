@@ -213,12 +213,17 @@
   "scopeLimits": [
     "载体是 b081811c，不是当日 HEAD：它比 c04e34e4 早 3 笔，HEAD 上『helpers 缺 selectSettingsSection ⇒ 干净检出必红』那枚地雷在这趟里根本走不到。",
     "不覆盖主检出上别人在飞的未提交改动。",
-    "narrow-sweep / pages-sweep 那 9 条 click/fill 超时是否由负载造成没有回答：定向复跑起跑时 load1=44.54（前置是 12），跑了 23 条后被本线主动停掉，按无效读数处理。"
+    "那 9 条 click/fill 超时与负载无关，已由静态证据链判定（README 第 3 条那四步：调用日志是 waiting 从未出现、失败时的 a11y 快照只有 5 枚 tab、被测树自己写着「主段最多 5 个按钮 + 更多」且 overflow 只在 moreOpen 时渲染成 role=menuitem、enableAllModules 写的键与 registry 逐字一致）。定向复跑因起跑 load1=44.54 被按无效读数处理，不需要再做。"
   ],
   "errorKindHistogram": {
     "assertion": 6,
     "timeout": 13,
     "custom-message": 2
   },
-  "retryStructure": "42 个红标记 ÷ 21 条唯一用例 = 每条首跑与 retry 双红；flaky 计数 0 ⇒ 不是抖动形状（取现量：见 noteOnCounting 那条剥色口径）"
+  "retryStructure": "42 个红标记 ÷ 21 条唯一用例 = 每条首跑与 retry 双红；flaky 计数 0 ⇒ 不是抖动形状（取现量：见 noteOnCounting 那条剥色口径）",
+  "loadQuestion": {
+    "status": "closed-by-static-evidence",
+    "whyTheRerunWasInvalid": "起跑 load1=44.54，前置立的是 12；跑到第 23 条由本线主动停掉",
+    "unverifiedSubQuestion": "四象限 为什么只在 660 窄档失败（候选：splitRailTabs 把当前视图顶进主段 + 窄档 collapse 分支）"
+  }
 }
