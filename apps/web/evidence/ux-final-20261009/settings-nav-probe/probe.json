@@ -1,0 +1,278 @@
+{
+  "375": {
+    "mid": {
+      "viewport": {
+        "w": 375,
+        "h": 812
+      },
+      "nav": {
+        "box": {
+          "x": 0,
+          "y": 72,
+          "w": 315,
+          "h": 60
+        },
+        "scrollWidth": 805,
+        "clientWidth": 315,
+        "scrollLeft": 0,
+        "overflowX": "auto",
+        "position": "sticky",
+        "zIndex": "200"
+      },
+      "close": {
+        "box": {
+          "x": 315,
+          "y": 72,
+          "w": 44,
+          "h": 44
+        },
+        "position": "sticky",
+        "zIndex": "auto"
+      },
+      "activeLabel": "关于与帮助",
+      "activeBox": {
+        "x": 631,
+        "y": 80,
+        "w": 106,
+        "h": 44
+      },
+      "activeInView": false,
+      "navCloseOverlap": null,
+      "elementAtNavCenter": "button.ht-settings__nav-link",
+      "atEmptyCenter": "span.ht-type-row-meta insideEmpty=false",
+      "emptyChain": [
+        "div.ht-empty pos=static z=auto op=1",
+        "div pos=static z=auto op=1",
+        "div.ht-content pos=relative z=auto op=1",
+        "main.ht-main pos=relative z=auto op=1",
+        "div.ht-app pos=static z=auto op=1",
+        "div pos=static z=auto op=1",
+        "body pos=static z=auto op=1"
+      ],
+      "emptyState": {
+        "box": {
+          "x": 16,
+          "y": 108,
+          "w": 343,
+          "h": 261
+        },
+        "opacity": "1",
+        "position": "static",
+        "zIndex": "auto",
+        "paintsAboveSheet": "outside-sheet"
+      },
+      "sheetBox": {
+        "x": 0,
+        "y": 56,
+        "w": 375,
+        "h": 700
+      }
+    },
+    "settled": {
+      "viewport": {
+        "w": 375,
+        "h": 812
+      },
+      "nav": {
+        "box": {
+          "x": 0,
+          "y": 72,
+          "w": 315,
+          "h": 60
+        },
+        "scrollWidth": 805,
+        "clientWidth": 315,
+        "scrollLeft": 0,
+        "overflowX": "auto",
+        "position": "sticky",
+        "zIndex": "200"
+      },
+      "close": {
+        "box": {
+          "x": 315,
+          "y": 72,
+          "w": 44,
+          "h": 44
+        },
+        "position": "sticky",
+        "zIndex": "auto"
+      },
+      "activeLabel": "关于与帮助",
+      "activeBox": {
+        "x": 631,
+        "y": 80,
+        "w": 106,
+        "h": 44
+      },
+      "activeInView": false,
+      "navCloseOverlap": null,
+      "elementAtNavCenter": "button.ht-settings__nav-link",
+      "atEmptyCenter": "span.ht-type-row-meta insideEmpty=false",
+      "emptyChain": [
+        "div.ht-empty pos=static z=auto op=1",
+        "div pos=static z=auto op=1",
+        "div.ht-content pos=relative z=auto op=1",
+        "main.ht-main pos=relative z=auto op=1",
+        "div.ht-app pos=static z=auto op=1",
+        "div pos=static z=auto op=1",
+        "body pos=static z=auto op=1"
+      ],
+      "emptyState": {
+        "box": {
+          "x": 16,
+          "y": 116,
+          "w": 343,
+          "h": 261
+        },
+        "opacity": "1",
+        "position": "static",
+        "zIndex": "auto",
+        "paintsAboveSheet": "outside-sheet"
+      },
+      "sheetBox": {
+        "x": 0,
+        "y": 56,
+        "w": 375,
+        "h": 700
+      }
+    }
+  },
+  "1440": {
+    "mid": {
+      "viewport": {
+        "w": 1440,
+        "h": 812
+      },
+      "nav": {
+        "box": {
+          "x": 176,
+          "y": 80,
+          "w": 224,
+          "h": 348
+        },
+        "scrollWidth": 224,
+        "clientWidth": 224,
+        "scrollLeft": 0,
+        "overflowX": "visible",
+        "position": "sticky",
+        "zIndex": "200"
+      },
+      "close": {
+        "box": {
+          "x": 1292,
+          "y": 72,
+          "w": 44,
+          "h": 44
+        },
+        "position": "sticky",
+        "zIndex": "auto"
+      },
+      "activeLabel": "关于与帮助",
+      "activeBox": {
+        "x": 176,
+        "y": 376,
+        "w": 224,
+        "h": 44
+      },
+      "activeInView": true,
+      "navCloseOverlap": null,
+      "elementAtNavCenter": "button.ht-settings__nav-link",
+      "atEmptyCenter": "a.ht-settings__help-link insideEmpty=false",
+      "emptyChain": [
+        "div.ht-empty pos=static z=auto op=1",
+        "div pos=static z=auto op=1",
+        "div.ht-content pos=relative z=auto op=1",
+        "main.ht-main pos=relative z=auto op=1",
+        "div.ht-app pos=static z=auto op=1",
+        "div pos=static z=auto op=1",
+        "body pos=static z=auto op=1"
+      ],
+      "emptyState": {
+        "box": {
+          "x": 176,
+          "y": 116,
+          "w": 1152,
+          "h": 261
+        },
+        "opacity": "1",
+        "position": "static",
+        "zIndex": "auto",
+        "paintsAboveSheet": "outside-sheet"
+      },
+      "sheetBox": {
+        "x": 152,
+        "y": 56,
+        "w": 1200,
+        "h": 756
+      }
+    },
+    "settled": {
+      "viewport": {
+        "w": 1440,
+        "h": 812
+      },
+      "nav": {
+        "box": {
+          "x": 176,
+          "y": 80,
+          "w": 224,
+          "h": 348
+        },
+        "scrollWidth": 224,
+        "clientWidth": 224,
+        "scrollLeft": 0,
+        "overflowX": "visible",
+        "position": "sticky",
+        "zIndex": "200"
+      },
+      "close": {
+        "box": {
+          "x": 1292,
+          "y": 72,
+          "w": 44,
+          "h": 44
+        },
+        "position": "sticky",
+        "zIndex": "auto"
+      },
+      "activeLabel": "关于与帮助",
+      "activeBox": {
+        "x": 176,
+        "y": 376,
+        "w": 224,
+        "h": 44
+      },
+      "activeInView": true,
+      "navCloseOverlap": null,
+      "elementAtNavCenter": "button.ht-settings__nav-link",
+      "atEmptyCenter": "span.ht-type-row-title insideEmpty=false",
+      "emptyChain": [
+        "div.ht-empty pos=static z=auto op=1",
+        "div pos=static z=auto op=1",
+        "div.ht-content pos=relative z=auto op=1",
+        "main.ht-main pos=relative z=auto op=1",
+        "div.ht-app pos=static z=auto op=1",
+        "div pos=static z=auto op=1",
+        "body pos=static z=auto op=1"
+      ],
+      "emptyState": {
+        "box": {
+          "x": 176,
+          "y": 124,
+          "w": 1152,
+          "h": 261
+        },
+        "opacity": "1",
+        "position": "static",
+        "zIndex": "auto",
+        "paintsAboveSheet": "outside-sheet"
+      },
+      "sheetBox": {
+        "x": 152,
+        "y": 56,
+        "w": 1200,
+        "h": 756
+      }
+    }
+  }
+}

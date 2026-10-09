@@ -1,0 +1,1088 @@
+{
+  "ok": true,
+  "baseUrl": "http://127.0.0.1:4369",
+  "profileDir": "/tmp/heyta-webkit-persistent-app-profile",
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6 Safari/605.1.15",
+  "themes": [
+    {
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "controls": [
+        {
+          "index": 0,
+          "hover": {
+            "name": "任务",
+            "testId": "rail-view-tasks",
+            "button": {
+              "x": 9.5,
+              "y": 68,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 77,
+              "width": 39.984375,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "hover"
+          },
+          "focus": {
+            "name": "任务",
+            "testId": "rail-view-tasks",
+            "button": {
+              "x": 9.5,
+              "y": 68,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 77,
+              "width": 39.984375,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "focus"
+          }
+        },
+        {
+          "index": 1,
+          "hover": {
+            "name": "日历",
+            "testId": "rail-view-calendar",
+            "button": {
+              "x": 9.5,
+              "y": 120,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 129,
+              "width": 39.984375,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "hover"
+          },
+          "focus": {
+            "name": "日历",
+            "testId": "rail-view-calendar",
+            "button": {
+              "x": 9.5,
+              "y": 120,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 129,
+              "width": 39.984375,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "focus"
+          }
+        },
+        {
+          "index": 2,
+          "hover": {
+            "name": "习惯",
+            "testId": "rail-view-habits",
+            "button": {
+              "x": 9.5,
+              "y": 172,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 181,
+              "width": 39.984375,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "hover"
+          },
+          "focus": {
+            "name": "习惯",
+            "testId": "rail-view-habits",
+            "button": {
+              "x": 9.5,
+              "y": 172,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 181,
+              "width": 39.984375,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "focus"
+          }
+        },
+        {
+          "index": 3,
+          "hover": {
+            "name": "搜索",
+            "testId": "rail-view-search",
+            "button": {
+              "x": 9.5,
+              "y": 224,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 233,
+              "width": 39.984375,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "hover"
+          },
+          "focus": {
+            "name": "搜索",
+            "testId": "rail-view-search",
+            "button": {
+              "x": 9.5,
+              "y": 224,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 233,
+              "width": 39.984375,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "focus"
+          }
+        },
+        {
+          "index": 4,
+          "hover": {
+            "name": "对话助手",
+            "testId": "rail-assistant",
+            "button": {
+              "x": 9.5,
+              "y": 276,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 285,
+              "width": 63.96875,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "hover"
+          },
+          "focus": {
+            "name": "对话助手",
+            "testId": "rail-assistant",
+            "button": {
+              "x": 9.5,
+              "y": 276,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 285,
+              "width": 63.96875,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "focus"
+          }
+        },
+        {
+          "index": 5,
+          "hover": {
+            "name": "更多",
+            "testId": null,
+            "button": {
+              "x": 9.5,
+              "y": 328,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 337,
+              "width": 39.984375,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "hover"
+          },
+          "focus": {
+            "name": "更多",
+            "testId": null,
+            "button": {
+              "x": 9.5,
+              "y": 328,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 337,
+              "width": 39.984375,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "focus"
+          }
+        },
+        {
+          "index": 6,
+          "hover": {
+            "name": "回收站",
+            "testId": null,
+            "button": {
+              "x": 9.5,
+              "y": 668,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 677,
+              "width": 51.984375,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "hover"
+          },
+          "focus": {
+            "name": "回收站",
+            "testId": null,
+            "button": {
+              "x": 9.5,
+              "y": 668,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 677,
+              "width": 51.984375,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "focus"
+          }
+        },
+        {
+          "index": 7,
+          "hover": {
+            "name": "通知",
+            "testId": "inbox-trigger",
+            "button": {
+              "x": 9.5,
+              "y": 724,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 733,
+              "width": 39.984375,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "hover"
+          },
+          "focus": {
+            "name": "通知",
+            "testId": "inbox-trigger",
+            "button": {
+              "x": 9.5,
+              "y": 724,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 733,
+              "width": 39.984375,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "focus"
+          }
+        },
+        {
+          "index": 8,
+          "hover": {
+            "name": "帮助",
+            "testId": "rail-help",
+            "button": {
+              "x": 9.5,
+              "y": 780,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 789,
+              "width": 39.984375,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "hover"
+          },
+          "focus": {
+            "name": "帮助",
+            "testId": "rail-help",
+            "button": {
+              "x": 9.5,
+              "y": 780,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 789,
+              "width": 39.984375,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "focus"
+          }
+        },
+        {
+          "index": 9,
+          "hover": {
+            "name": "同步，当前状态：登录以同步",
+            "testId": "sync-rail-action",
+            "button": {
+              "x": 9.5,
+              "y": 836,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 845,
+              "width": 75.953125,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "hover"
+          },
+          "focus": {
+            "name": "同步，当前状态：登录以同步",
+            "testId": "sync-rail-action",
+            "button": {
+              "x": 9.5,
+              "y": 836,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 845,
+              "width": 75.953125,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "focus"
+          }
+        }
+      ]
+    },
+    {
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "controls": [
+        {
+          "index": 0,
+          "hover": {
+            "name": "任务",
+            "testId": "rail-view-tasks",
+            "button": {
+              "x": 9.5,
+              "y": 68,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 77,
+              "width": 39.984375,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "hover"
+          },
+          "focus": {
+            "name": "任务",
+            "testId": "rail-view-tasks",
+            "button": {
+              "x": 9.5,
+              "y": 68,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 77,
+              "width": 39.984375,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "focus"
+          }
+        },
+        {
+          "index": 1,
+          "hover": {
+            "name": "日历",
+            "testId": "rail-view-calendar",
+            "button": {
+              "x": 9.5,
+              "y": 120,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 129,
+              "width": 39.984375,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "hover"
+          },
+          "focus": {
+            "name": "日历",
+            "testId": "rail-view-calendar",
+            "button": {
+              "x": 9.5,
+              "y": 120,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 129,
+              "width": 39.984375,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "focus"
+          }
+        },
+        {
+          "index": 2,
+          "hover": {
+            "name": "习惯",
+            "testId": "rail-view-habits",
+            "button": {
+              "x": 9.5,
+              "y": 172,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 181,
+              "width": 39.984375,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "hover"
+          },
+          "focus": {
+            "name": "习惯",
+            "testId": "rail-view-habits",
+            "button": {
+              "x": 9.5,
+              "y": 172,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 181,
+              "width": 39.984375,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "focus"
+          }
+        },
+        {
+          "index": 3,
+          "hover": {
+            "name": "搜索",
+            "testId": "rail-view-search",
+            "button": {
+              "x": 9.5,
+              "y": 224,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 233,
+              "width": 39.984375,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "hover"
+          },
+          "focus": {
+            "name": "搜索",
+            "testId": "rail-view-search",
+            "button": {
+              "x": 9.5,
+              "y": 224,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 233,
+              "width": 39.984375,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "focus"
+          }
+        },
+        {
+          "index": 4,
+          "hover": {
+            "name": "对话助手",
+            "testId": "rail-assistant",
+            "button": {
+              "x": 9.5,
+              "y": 276,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 285,
+              "width": 63.96875,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "hover"
+          },
+          "focus": {
+            "name": "对话助手",
+            "testId": "rail-assistant",
+            "button": {
+              "x": 9.5,
+              "y": 276,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 285,
+              "width": 63.96875,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "focus"
+          }
+        },
+        {
+          "index": 5,
+          "hover": {
+            "name": "更多",
+            "testId": null,
+            "button": {
+              "x": 9.5,
+              "y": 328,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 337,
+              "width": 39.984375,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "hover"
+          },
+          "focus": {
+            "name": "更多",
+            "testId": null,
+            "button": {
+              "x": 9.5,
+              "y": 328,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 337,
+              "width": 39.984375,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "focus"
+          }
+        },
+        {
+          "index": 6,
+          "hover": {
+            "name": "回收站",
+            "testId": null,
+            "button": {
+              "x": 9.5,
+              "y": 668,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 677,
+              "width": 51.984375,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "hover"
+          },
+          "focus": {
+            "name": "回收站",
+            "testId": null,
+            "button": {
+              "x": 9.5,
+              "y": 668,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 677,
+              "width": 51.984375,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "focus"
+          }
+        },
+        {
+          "index": 7,
+          "hover": {
+            "name": "通知",
+            "testId": "inbox-trigger",
+            "button": {
+              "x": 9.5,
+              "y": 724,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 733,
+              "width": 39.984375,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "hover"
+          },
+          "focus": {
+            "name": "通知",
+            "testId": "inbox-trigger",
+            "button": {
+              "x": 9.5,
+              "y": 724,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 733,
+              "width": 39.984375,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "focus"
+          }
+        },
+        {
+          "index": 8,
+          "hover": {
+            "name": "帮助",
+            "testId": "rail-help",
+            "button": {
+              "x": 9.5,
+              "y": 780,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 789,
+              "width": 39.984375,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "hover"
+          },
+          "focus": {
+            "name": "帮助",
+            "testId": "rail-help",
+            "button": {
+              "x": 9.5,
+              "y": 780,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 789,
+              "width": 39.984375,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "focus"
+          }
+        },
+        {
+          "index": 9,
+          "hover": {
+            "name": "同步，当前状态：登录以同步",
+            "testId": "sync-rail-action",
+            "button": {
+              "x": 9.5,
+              "y": 836,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 845,
+              "width": 75.953125,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "hover"
+          },
+          "focus": {
+            "name": "同步，当前状态：登录以同步",
+            "testId": "sync-rail-action",
+            "button": {
+              "x": 9.5,
+              "y": 836,
+              "width": 44,
+              "height": 44
+            },
+            "label": {
+              "x": 62,
+              "y": 845,
+              "width": 75.953125,
+              "height": 26
+            },
+            "labelOpacity": "1",
+            "labelVisibility": "visible",
+            "mode": "focus"
+          }
+        }
+      ]
+    }
+  ],
+  "axis": {
+    "railCenter": 32,
+    "controls": [
+      {
+        "testId": "account-menu-avatar",
+        "label": "账号",
+        "buttonCenter": 31.5,
+        "svgCenter": 31.5,
+        "button": {
+          "x": 9.5,
+          "y": 12,
+          "width": 44,
+          "height": 44
+        }
+      },
+      {
+        "testId": "rail-view-tasks",
+        "label": "任务",
+        "buttonCenter": 31.5,
+        "svgCenter": 31.5,
+        "button": {
+          "x": 9.5,
+          "y": 68,
+          "width": 44,
+          "height": 44
+        }
+      },
+      {
+        "testId": "rail-view-calendar",
+        "label": "日历",
+        "buttonCenter": 31.5,
+        "svgCenter": 31.5,
+        "button": {
+          "x": 9.5,
+          "y": 120,
+          "width": 44,
+          "height": 44
+        }
+      },
+      {
+        "testId": "rail-view-habits",
+        "label": "习惯",
+        "buttonCenter": 31.5,
+        "svgCenter": 31.5,
+        "button": {
+          "x": 9.5,
+          "y": 172,
+          "width": 44,
+          "height": 44
+        }
+      },
+      {
+        "testId": "rail-view-search",
+        "label": "搜索",
+        "buttonCenter": 31.5,
+        "svgCenter": 31.5,
+        "button": {
+          "x": 9.5,
+          "y": 224,
+          "width": 44,
+          "height": 44
+        }
+      },
+      {
+        "testId": "rail-assistant",
+        "label": "对话助手",
+        "buttonCenter": 31.5,
+        "svgCenter": 31.5,
+        "button": {
+          "x": 9.5,
+          "y": 276,
+          "width": 44,
+          "height": 44
+        }
+      },
+      {
+        "testId": null,
+        "label": "更多",
+        "buttonCenter": 31.5,
+        "svgCenter": 31.5,
+        "button": {
+          "x": 9.5,
+          "y": 328,
+          "width": 44,
+          "height": 44
+        }
+      },
+      {
+        "testId": null,
+        "label": "回收站",
+        "buttonCenter": 31.5,
+        "svgCenter": 31.5,
+        "button": {
+          "x": 9.5,
+          "y": 668,
+          "width": 44,
+          "height": 44
+        }
+      },
+      {
+        "testId": "inbox-trigger",
+        "label": "通知",
+        "buttonCenter": 31.5,
+        "svgCenter": 31.5,
+        "button": {
+          "x": 9.5,
+          "y": 724,
+          "width": 44,
+          "height": 44
+        }
+      },
+      {
+        "testId": "rail-help",
+        "label": "帮助",
+        "buttonCenter": 31.5,
+        "svgCenter": 31.5,
+        "button": {
+          "x": 9.5,
+          "y": 780,
+          "width": 44,
+          "height": 44
+        }
+      },
+      {
+        "testId": "sync-rail-action",
+        "label": "登录以同步",
+        "buttonCenter": 31.5,
+        "svgCenter": 31.5,
+        "button": {
+          "x": 9.5,
+          "y": 836,
+          "width": 44,
+          "height": 44
+        }
+      }
+    ]
+  },
+  "assistantMark": {
+    "count": 1,
+    "box": {
+      "x": 23.5,
+      "y": 290,
+      "width": 16,
+      "height": 16
+    },
+    "buttonBox": {
+      "x": 9.5,
+      "y": 276,
+      "width": 44,
+      "height": 44
+    },
+    "visible": true
+  },
+  "scroll": {
+    "viewport": {
+      "width": 1280,
+      "height": 420
+    },
+    "state": {
+      "scrollTop": 196,
+      "scrollHeight": 304,
+      "clientHeight": 108
+    },
+    "probe": {
+      "name": "更多",
+      "testId": null,
+      "button": {
+        "x": 9.5,
+        "y": 132,
+        "width": 44,
+        "height": 44
+      },
+      "label": {
+        "x": 62,
+        "y": 141,
+        "width": 39.984375,
+        "height": 26
+      },
+      "labelOpacity": "1",
+      "labelVisibility": "visible",
+      "mode": "hover"
+    }
+  },
+  "resize": {
+    "beforeViewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "before": {
+      "name": "任务",
+      "testId": "rail-view-tasks",
+      "button": {
+        "x": 9.5,
+        "y": 68,
+        "width": 44,
+        "height": 44
+      },
+      "label": {
+        "x": 62,
+        "y": 77,
+        "width": 39.984375,
+        "height": 26
+      },
+      "labelOpacity": "1",
+      "labelVisibility": "visible",
+      "mode": "hover"
+    },
+    "afterViewport": {
+      "width": 1024,
+      "height": 600
+    },
+    "after": {
+      "button": {
+        "x": 9.5,
+        "y": 68,
+        "width": 44,
+        "height": 44
+      },
+      "label": {
+        "x": 62,
+        "y": 77,
+        "width": 39.984375,
+        "height": 26
+      }
+    }
+  },
+  "consoleEvents": [
+    {
+      "type": "debug",
+      "text": "[vite] connecting..."
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connected."
+    },
+    {
+      "type": "warning",
+      "text": "Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation. To resolve this, add `RCTAnimation` module to this app, or remove `useNativeDriver`. Make sure to run `bundle exec pod install` first. Read more about autolinking: https://github.com/react-native-community/cli/blob/master/docs/autolinking.md"
+    }
+  ],
+  "pageErrors": [],
+  "requestFailures": []
+}

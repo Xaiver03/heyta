@@ -1,0 +1,432 @@
+{
+  "cdp": "http://127.0.0.1:9287",
+  "browser": "Edg/154.0.4258.62",
+  "pageOrigin": "https://heyta.local",
+  "growthModuleEnabledViaUi": true,
+  "profileCenter": {
+    "visible": true,
+    "achievementsVisible": true,
+    "growthActionVisible": true,
+    "text": "仅在本机使用\n\n仅在本机使用\n\n数据先保存在本机，服务器只负责同步加密内容。\n\n近期状态\n0\n本周完成任务\n0\n本周专注分钟\n0\n本周习惯打卡\n成就进度\n\n只和过去的自己比较，达成不会因中断而消失。\n\n0/17\n下一个里程碑是 10 次，还差 10 次\n打卡\n查看完整成长\n打开设置"
+  },
+  "growthView": {
+    "header": "成长",
+    "visible": true,
+    "body": "任务\n日历\n习惯\n成长\n对话助手\n更多\n回收站\n通知\n帮助\n登录以同步\n登录以同步\n成长\n本周\n2026-10-05 至 2026-10-11\n这一周还没有记录。从今天的一件小事开始就好。\n打卡\n0\n次\n上周 0\n完成任务\n0\n件\n上周 0\n专注\n0\n分钟\n上周 0\n这一年\n\n一格是一天。有记录的日子才会亮起来 —— 打卡、完成任务、跑完一轮专注都算。\n\n10月\n11月\n12月\n1月\n2月\n3月\n4月\n5月\n6月\n7月\n8月\n9月\n10月\n左右滑动查看最近日期。\n少\n多\n分类时长\n统计近 12 周的专注与打卡时间。\n还没有可展示的记录\n先给任务归类，或记录一次习惯时长。\n里程碑\n\n只增不减。中断不会让这些数字变小。\n\n打卡\n0\n次\n0/5\n10\n50\n200\n500\n1000\n下一个里程碑是 10 次，还差 10 次\n专注\n0\n小时\n0/4\n10\n50\n200\n1000\n下一个里程碑是 10 小时，还差 10 小时\n完成任务\n0\n件\n0/4\n50\n200\n1000\n5000\n下一个里程碑是 50 件，还差 50 件\n活跃天数\n0\n天\n0/4\n7\n30\n100\n365\n下一个里程碑是 7 天，还差 7 天\n你的标签\n距离「百次打卡」还差 100 次\n距离「深度工作 50 小时」还差 50 小时\n上面这些是离你最近的两个。到了就会出现在这里。\n带走这一周\n\n复制成一段纯文字，粘到哪都行。它不含你的账号、设备或任何标识。\n\n复制本周小结",
+    "elements": [
+      {
+        "tag": "BUTTON",
+        "testid": "rail-view-growth",
+        "class": "ht-rail__tab ht-rail__tab--active",
+        "text": "成长",
+        "rect": {
+          "x": 8,
+          "y": 224,
+          "w": 33.60000228881836,
+          "h": 44
+        }
+      },
+      {
+        "tag": "DIV",
+        "testid": "growth-board",
+        "class": "css-g5y9jx r-f4gmv6",
+        "text": "本周\n2026-10-05 至 2026-10-11\n这一周还没有记录。从今天的一件小事开始就好。\n打卡\n0\n次\n上周 0\n完成任务\n0\n件\n上周 0\n专注\n0\n分钟\n上周 0\n这一年\n\n一格是一天。有记录的日子才会亮起来 —— 打卡、完成任务、跑完一轮专注都算。\n\n10月\n11月\n12月\n1月\n2月\n3月\n4月\n5月\n6月\n7月\n8月\n9月\n10月\n左右滑动查看最近日期。\n少\n多\n分类时长\n统计近 12 周的专注与打卡时间。\n还没有可展示的记录\n先给任务归类，或记录一次习惯时长。\n里程碑\n\n只增不减。中断不会让这些数字变小。\n\n打卡\n0\n次\n0/5\n10\n50\n200\n500\n1000\n下一",
+        "rect": {
+          "x": 114.80000305175781,
+          "y": 84.80000305175781,
+          "w": 960,
+          "h": 1282.2000732421875
+        }
+      },
+      {
+        "tag": "DIV",
+        "testid": "growth-section-week",
+        "class": "css-g5y9jx",
+        "text": "本周\n2026-10-05 至 2026-10-11\n这一周还没有记录。从今天的一件小事开始就好。\n打卡\n0\n次\n上周 0\n完成任务\n0\n件\n上周 0\n专注\n0\n分钟\n上周 0",
+        "rect": {
+          "x": 114.80000305175781,
+          "y": 84.80000305175781,
+          "w": 960,
+          "h": 161.10000610351562
+        }
+      },
+      {
+        "tag": "DIV",
+        "testid": "growth-week",
+        "class": "css-g5y9jx r-14lw9ot r-1wr2p1e r-1q9bdsx r-rs99b7 r-1cmwbt1 r-xyw6el",
+        "text": "2026-10-05 至 2026-10-11\n这一周还没有记录。从今天的一件小事开始就好。\n打卡\n0\n次\n上周 0\n完成任务\n0\n件\n上周 0\n专注\n0\n分钟\n上周 0",
+        "rect": {
+          "x": 114.80000305175781,
+          "y": 107.30000305175781,
+          "w": 960,
+          "h": 138.60000610351562
+        }
+      },
+      {
+        "tag": "DIV",
+        "testid": "growth-week-stats",
+        "class": "css-g5y9jx r-18u37iz r-f4gmv6",
+        "text": "打卡\n0\n次\n上周 0\n完成任务\n0\n件\n上周 0\n专注\n0\n分钟\n上周 0",
+        "rect": {
+          "x": 127.5999984741211,
+          "y": 178.10000610351562,
+          "w": 934.4000244140625,
+          "h": 55
+        }
+      },
+      {
+        "tag": "DIV",
+        "testid": "growth-week-stat-checkIns",
+        "class": "css-g5y9jx r-1habvwh r-13awgt0 r-eqz5dr r-1cmwbt1 r-bcqeeo",
+        "text": "打卡\n0\n次\n上周 0",
+        "rect": {
+          "x": 127.5999984741211,
+          "y": 178.10000610351562,
+          "w": 300.8000183105469,
+          "h": 55
+        }
+      },
+      {
+        "tag": "DIV",
+        "testid": "growth-week-stat-tasksCompleted",
+        "class": "css-g5y9jx r-1habvwh r-13awgt0 r-eqz5dr r-1cmwbt1 r-bcqeeo",
+        "text": "完成任务\n0\n件\n上周 0",
+        "rect": {
+          "x": 444.3999938964844,
+          "y": 178.10000610351562,
+          "w": 300.8000183105469,
+          "h": 55
+        }
+      },
+      {
+        "tag": "DIV",
+        "testid": "growth-week-stat-focusMinutes",
+        "class": "css-g5y9jx r-1habvwh r-13awgt0 r-eqz5dr r-1cmwbt1 r-bcqeeo",
+        "text": "专注\n0\n分钟\n上周 0",
+        "rect": {
+          "x": 761.2000122070312,
+          "y": 178.10000610351562,
+          "w": 300.8000183105469,
+          "h": 55
+        }
+      },
+      {
+        "tag": "DIV",
+        "testid": "growth-section-heatmap",
+        "class": "css-g5y9jx",
+        "text": "这一年\n\n一格是一天。有记录的日子才会亮起来 —— 打卡、完成任务、跑完一轮专注都算。\n\n10月\n11月\n12月\n1月\n2月\n3月\n4月\n5月\n6月\n7月\n8月\n9月\n10月\n左右滑动查看最近日期。\n少\n多",
+        "rect": {
+          "x": 114.80000305175781,
+          "y": 269.8999938964844,
+          "w": 960,
+          "h": 272.5
+        }
+      },
+      {
+        "tag": "DIV",
+        "testid": "growth-heatmap",
+        "class": "css-g5y9jx r-14lw9ot r-1wr2p1e r-1q9bdsx r-rs99b7 r-9aw3ui r-xyw6el",
+        "text": "10月\n11月\n12月\n1月\n2月\n3月\n4月\n5月\n6月\n7月\n8月\n9月\n10月\n左右滑动查看最近日期。\n少\n多",
+        "rect": {
+          "x": 114.80000305175781,
+          "y": 322.3999938964844,
+          "w": 960,
+          "h": 220
+        }
+      },
+      {
+        "tag": "SECTION",
+        "testid": "growth-heatmap-scroll",
+        "class": "css-g5y9jx r-150rngu r-18u37iz r-16y2uox r-1wbh5a2 r-lltvgl r-buy8e9 r-agouwx",
+        "text": "10月\n11月\n12月\n1月\n2月\n3月\n4月\n5月\n6月\n7月\n8月\n9月\n10月",
+        "rect": {
+          "x": 127.5999984741211,
+          "y": 335.20001220703125,
+          "w": 934.4000244140625,
+          "h": 150.40000915527344
+        }
+      },
+      {
+        "tag": "DIV",
+        "testid": "growth-heatmap-month",
+        "class": "css-146c3p1 r-dnmrzs r-1udh08x r-1udbk01 r-3s2u2q r-1iln25a",
+        "text": "10月",
+        "rect": {
+          "x": 111.5999984741211,
+          "y": 335.20001220703125,
+          "w": 32,
+          "h": 18
+        }
+      },
+      {
+        "tag": "DIV",
+        "testid": "growth-heatmap-month",
+        "class": "css-146c3p1 r-dnmrzs r-1udh08x r-1udbk01 r-3s2u2q r-1iln25a",
+        "text": "11月",
+        "rect": {
+          "x": 183.60000610351562,
+          "y": 335.20001220703125,
+          "w": 32,
+          "h": 18
+        }
+      },
+      {
+        "tag": "DIV",
+        "testid": "growth-heatmap-month",
+        "class": "css-146c3p1 r-dnmrzs r-1udh08x r-1udbk01 r-3s2u2q r-1iln25a",
+        "text": "12月",
+        "rect": {
+          "x": 273.6000061035156,
+          "y": 335.20001220703125,
+          "w": 32,
+          "h": 18
+        }
+      },
+      {
+        "tag": "DIV",
+        "testid": "growth-heatmap-month",
+        "class": "css-146c3p1 r-dnmrzs r-1udh08x r-1udbk01 r-3s2u2q r-1iln25a",
+        "text": "1月",
+        "rect": {
+          "x": 345.6000061035156,
+          "y": 335.20001220703125,
+          "w": 32,
+          "h": 18
+        }
+      },
+      {
+        "tag": "DIV",
+        "testid": "growth-heatmap-month",
+        "class": "css-146c3p1 r-dnmrzs r-1udh08x r-1udbk01 r-3s2u2q r-1iln25a",
+        "text": "2月",
+        "rect": {
+          "x": 417.6000061035156,
+          "y": 335.20001220703125,
+          "w": 32,
+          "h": 18
+        }
+      },
+      {
+        "tag": "DIV",
+        "testid": "growth-heatmap-month",
+        "class": "css-146c3p1 r-dnmrzs r-1udh08x r-1udbk01 r-3s2u2q r-1iln25a",
+        "text": "3月",
+        "rect": {
+          "x": 489.6000061035156,
+          "y": 335.20001220703125,
+          "w": 32,
+          "h": 18
+        }
+      },
+      {
+        "tag": "DIV",
+        "testid": "growth-heatmap-month",
+        "class": "css-146c3p1 r-dnmrzs r-1udh08x r-1udbk01 r-3s2u2q r-1iln25a",
+        "text": "4月",
+        "rect": {
+          "x": 579.6000366210938,
+          "y": 335.20001220703125,
+          "w": 32,
+          "h": 18
+        }
+      },
+      {
+        "tag": "DIV",
+        "testid": "growth-heatmap-month",
+        "class": "css-146c3p1 r-dnmrzs r-1udh08x r-1udbk01 r-3s2u2q r-1iln25a",
+        "text": "5月",
+        "rect": {
+          "x": 651.6000366210938,
+          "y": 335.20001220703125,
+          "w": 32,
+          "h": 18
+        }
+      },
+      {
+        "tag": "DIV",
+        "testid": "growth-heatmap-month",
+        "class": "css-146c3p1 r-dnmrzs r-1udh08x r-1udbk01 r-3s2u2q r-1iln25a",
+        "text": "6月",
+        "rect": {
+          "x": 741.6000366210938,
+          "y": 335.20001220703125,
+          "w": 32,
+          "h": 18
+        }
+      },
+      {
+        "tag": "DIV",
+        "testid": "growth-heatmap-month",
+        "class": "css-146c3p1 r-dnmrzs r-1udh08x r-1udbk01 r-3s2u2q r-1iln25a",
+        "text": "7月",
+        "rect": {
+          "x": 813.6000366210938,
+          "y": 335.20001220703125,
+          "w": 32,
+          "h": 18
+        }
+      },
+      {
+        "tag": "DIV",
+        "testid": "growth-heatmap-month",
+        "class": "css-146c3p1 r-dnmrzs r-1udh08x r-1udbk01 r-3s2u2q r-1iln25a",
+        "text": "8月",
+        "rect": {
+          "x": 885.6000366210938,
+          "y": 335.20001220703125,
+          "w": 32,
+          "h": 18
+        }
+      },
+      {
+        "tag": "DIV",
+        "testid": "growth-heatmap-month",
+        "class": "css-146c3p1 r-dnmrzs r-1udh08x r-1udbk01 r-3s2u2q r-1iln25a",
+        "text": "9月",
+        "rect": {
+          "x": 975.6000366210938,
+          "y": 335.20001220703125,
+          "w": 32,
+          "h": 18
+        }
+      },
+      {
+        "tag": "DIV",
+        "testid": "growth-heatmap-month",
+        "class": "css-146c3p1 r-dnmrzs r-1udh08x r-1udbk01 r-3s2u2q r-1iln25a",
+        "text": "10月",
+        "rect": {
+          "x": 1029.5999755859375,
+          "y": 335.20001220703125,
+          "w": 32,
+          "h": 18
+        }
+      },
+      {
+        "tag": "DIV",
+        "testid": "growth-heatmap-scroll-hint",
+        "class": "css-146c3p1 r-1s7ct43",
+        "text": "左右滑动查看最近日期。",
+        "rect": {
+          "x": 127.5999984741211,
+          "y": 489.6000061035156,
+          "w": 934.4000244140625,
+          "h": 18
+        }
+      },
+      {
+        "tag": "DIV",
+        "testid": "growth-section-category",
+        "class": "css-g5y9jx",
+        "text": "分类时长\n统计近 12 周的专注与打卡时间。\n还没有可展示的记录\n先给任务归类，或记录一次习惯时长。",
+        "rect": {
+          "x": 114.80000305175781,
+          "y": 566.4000244140625,
+          "w": 960,
+          "h": 151.10000610351562
+        }
+      },
+      {
+        "tag": "DIV",
+        "testid": "growth-section-milestones",
+        "class": "css-g5y9jx",
+        "text": "里程碑\n\n只增不减。中断不会让这些数字变小。\n\n打卡\n0\n次\n0/5\n10\n50\n200\n500\n1000\n下一个里程碑是 10 次，还差 10 次\n专注\n0\n小时\n0/4\n10\n50\n200\n1000\n下一个里程碑是 10 小时，还差 10 小时\n完成任务\n0\n件\n0/4\n50\n200\n1000\n5000\n下一个里程碑是 50 件，还差 50 件\n活跃天数\n0\n天\n0/4\n7\n30\n100\n365\n下一个里程碑是 7 天，还差 7 天",
+        "rect": {
+          "x": 114.80000305175781,
+          "y": 741.5,
+          "w": 960,
+          "h": 350.1000061035156
+        }
+      },
+      {
+        "tag": "DIV",
+        "testid": "growth-milestones",
+        "class": "css-g5y9jx r-1ssbvtb",
+        "text": "打卡\n0\n次\n0/5\n10\n50\n200\n500\n1000\n下一个里程碑是 10 次，还差 10 次\n专注\n0\n小时\n0/4\n10\n50\n200\n1000\n下一个里程碑是 10 小时，还差 10 小时\n完成任务\n0\n件\n0/4\n50\n200\n1000\n5000\n下一个里程碑是 50 件，还差 50 件\n活跃天数\n0\n天\n0/4\n7\n30\n100\n365\n下一个里程碑是 7 天，还差 7 天",
+        "rect": {
+          "x": 114.80000305175781,
+          "y": 794,
+          "w": 960,
+          "h": 297.6000061035156
+        }
+      },
+      {
+        "tag": "DIV",
+        "testid": "growth-section-tags",
+        "class": "css-g5y9jx",
+        "text": "你的标签\n距离「百次打卡」还差 100 次\n距离「深度工作 50 小时」还差 50 小时\n上面这些是离你最近的两个。到了就会出现在这里。",
+        "rect": {
+          "x": 114.80000305175781,
+          "y": 1115.5999755859375,
+          "w": 960,
+          "h": 114.0999984741211
+        }
+      },
+      {
+        "tag": "DIV",
+        "testid": "growth-tags",
+        "class": "css-g5y9jx r-14lw9ot r-1wr2p1e r-1q9bdsx r-rs99b7 r-1cmwbt1 r-xyw6el",
+        "text": "距离「百次打卡」还差 100 次\n距离「深度工作 50 小时」还差 50 小时\n上面这些是离你最近的两个。到了就会出现在这里。",
+        "rect": {
+          "x": 114.80000305175781,
+          "y": 1138.0999755859375,
+          "w": 960,
+          "h": 91.5999984741211
+        }
+      },
+      {
+        "tag": "DIV",
+        "testid": "growth-section-share",
+        "class": "css-g5y9jx",
+        "text": "带走这一周\n\n复制成一段纯文字，粘到哪都行。它不含你的账号、设备或任何标识。\n\n复制本周小结",
+        "rect": {
+          "x": 114.80000305175781,
+          "y": 1253.7000732421875,
+          "w": 960,
+          "h": 113.30000305175781
+        }
+      },
+      {
+        "tag": "DIV",
+        "testid": "growth-share",
+        "class": "css-g5y9jx r-1cmwbt1",
+        "text": "复制本周小结",
+        "rect": {
+          "x": 114.80000305175781,
+          "y": 1315,
+          "w": 960,
+          "h": 52
+        }
+      },
+      {
+        "tag": "BUTTON",
+        "testid": "growth-share-copy",
+        "class": "css-g5y9jx r-1loqt21 r-1otgn73 r-1awozwy r-k200y r-tg9xy0 r-1xfd6ze r-18u37iz r-9aw3ui r-1777fci r-peo1c r-3o4zer",
+        "text": "复制本周小结",
+        "rect": {
+          "x": 114.80000305175781,
+          "y": 1315,
+          "w": 114.4375,
+          "h": 44
+        }
+      },
+      {
+        "tag": "DIV",
+        "testid": "growth-share-state",
+        "class": "css-146c3p1",
+        "text": "",
+        "rect": {
+          "x": 114.80000305175781,
+          "y": 1367,
+          "w": 960,
+          "h": 0
+        }
+      }
+    ]
+  },
+  "screenshots": [
+    "windows-profile-growth.png",
+    "windows-growth.png"
+  ],
+  "consoleErrors": []
+}
