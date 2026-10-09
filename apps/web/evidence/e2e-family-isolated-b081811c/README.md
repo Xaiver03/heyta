@@ -107,3 +107,16 @@ python3 -c "import re;print(re.sub(r'\x1b\[[0-9;]*m','',open('<日志>')).read()
 ② 或给每条 spec 一个 `--evidence-dir` 旋钮，默认指向临时目录，CI 与门禁永不写跟踪路径；
 ③ 无论哪种，都该有一条能红的门：**跑完整族之后 `git status --porcelain -- apps/web/evidence` 必须为空**，
 非空就报出枚数与清单（上面那条命令就是它的取现量版本，152 / 330 可当基线，只应减不应增）。
+
+## 4. 第二趟：只把"本机有、仓库里没有"的六枚用例放上来跑（13:1x）
+
+读数与逐枚原因在 [`six-untracked-specs-run.md`](six-untracked-specs-run.md)，失败那一刻的图在
+[`six-specs-viewport-600x800-overflow.png`](six-specs-viewport-600x800-overflow.png)（人打开看过）。
+一句话结论：`17 failed / 0 passed`，其中五枚红在"用例判的界面从没进过任何一棵已提交的树"，
+第六枚红在一处**旧树真有**的 600×800 横向溢出。
+
+📌 **这一趟顺带把上面那条建议门的覆盖面测清了**：它 `changed_tracked_evidence = 0`
+（不是"没写图"，是那五个证据目录在 `b081811c` 上**还不存在**，所以写出来的是未跟踪新文件）。
+⇒ 上面提的那条判据（跑完 `git status --porcelain -- apps/web/evidence` 必须为空）**两种形状都能抓**：
+既抓"改写已入库那 152 枚"，也抓"在旧树上凭空多出 `?? settings-finish/`"。
+但同一枚用例搬到**主检出**上跑就会覆盖已入库的两枚 —— 那条门要建在覆盖发生之前，不是之后。
