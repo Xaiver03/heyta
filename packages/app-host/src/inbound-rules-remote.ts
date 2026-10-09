@@ -137,10 +137,10 @@ export function createInboundRulesRemote(options: {
         return checked.data;
       } catch { throw new InboundRulesRemoteError('transport'); }
     },
-    async decideDraft(eventId: string, decision: InboundDraftDecision): Promise<InboundDraftDecisionResponse> {
+    async decideDraft(eventId: string, decision: InboundDraftDecision, ticketRequest?: AutomationTicketRequest): Promise<InboundDraftDecisionResponse> {
       const checked = inboundDraftDecisionSchema.safeParse(decision);
       if (!inboundDraftEventIdSchema.safeParse(eventId).success || !checked.success) throw new InboundRulesRemoteError('validation');
-      const response = await request(`/events/${encodeURIComponent(eventId)}/draft/decision`, 'POST', checked.data);
+      const response = await request(`/events/${encodeURIComponent(eventId)}/draft/decision`, 'POST', checked.data, ticketRequest);
       try {
         const result = inboundDraftDecisionResponseSchema.safeParse(await response.json());
         const expected = checked.data.decision === 'confirm' ? 'prepared' : 'cancelled';

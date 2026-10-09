@@ -3,6 +3,7 @@ import { heytaTaskBatchPayloadSchema, inboundDraftPayloadSchema, inboundDraftTas
   type InboundDraftTask, type InboundDraftSnapshot, type HeytaTaskBatchPayload } from '@heyta/shared-schema';
 import { createInboundRulesRemote } from './inbound-rules-remote.js';
 import { createInboundRecipientRemote } from './inbound-recipient-remote.js';
+import type { AutomationTicketRequest } from './inbound-entitlement-tickets.js';
 
 export interface InboundDraftReviewOptions {
   accountId: string; baseUrl: string; getToken: () => Promise<string | undefined>;
@@ -10,6 +11,12 @@ export interface InboundDraftReviewOptions {
   loadPrivateKey: (epoch: number) => Promise<Uint8Array | undefined>;
   assertActive: () => void;
   fetchImpl?: typeof fetch;
+  /**
+   * 只有**确认**要票：服务端把 `draft-confirm` 的授权放在账号锁之后、业务写事务之内
+   * （`server/src/automation/events.ts` 的 `decideAutomationDraft`），而**取消**明确允许
+   * 无订阅进行。给取消取票会多一次注定被拒的签发往返。
+   */
+  getEntitlementTicket?: (request: AutomationTicketRequest) => Promise<string>;
 }
 export interface InboundDraftReview {
   eventId: string; timezone: string; targetProjectId?: string;
@@ -30,7 +37,8 @@ export function createInboundDraftReviewer(options: InboundDraftReviewOptions) {
     return response;
   };
   const getToken = async () => { assertActive(); const token = await options.getToken(); assertActive(); return token; };
-  const remote = createInboundRulesRemote({ baseUrl: options.baseUrl, getToken, fetchImpl });
+  const remote = createInboundRulesRemote({ baseUrl: options.baseUrl, getToken, fetchImpl,
+    ...(options.getEntitlementTicket === undefined ? {} : { getEntitlementTicket: options.getEntitlementTicket }) });
   const recipient = createInboundRecipientRemote({ baseUrl: options.baseUrl, getToken, fetchImpl });
   const cancel = async (snapshot: InboundDraftSnapshot): Promise<void> => {
     assertActive();
@@ -117,7 +125,7 @@ export function createInboundDraftReviewer(options: InboundDraftReviewOptions) {
           finally { encoded.fill(0); }
           assertActive();
           await remote.decideDraft(eventId, { ...revision(snapshot), decision: 'confirm', resultDigest: frozen.resultDigest,
-            resultItemCount: frozen.itemCount, resultCiphertext: JSON.stringify(sealed) });
+            resultItemCount: frozen.itemCount, resultCiphertext: JSON.stringify(sealed) }, { action: 'draft-confirm', eventId });
           assertActive();
         },
       };

@@ -909,6 +909,7 @@ export {
   type AutomationTicketRequest,
 } from './inbound-entitlement-tickets.js';
 export { AUTOMATION_ACTION_TICKET_ACTIONS, AUTOMATION_ENTITLEMENT_TICKET_HEADER } from './inbound-entitlement-tickets.js';
+export { createAutomationInstallationMetaStore } from './inbound-installation-store.js';
 export { createInboundRecipientKeyStore, type InboundRecipientKeyScope } from './inbound-key-store.js';
 export { createVaultWrappedAutomationWorkerStore, createInboundCommitJournal } from './inbound-secret-store.js';
 export { generateInboundKeyPair, inboundPublicKey } from '@heyta/inbound-core';
