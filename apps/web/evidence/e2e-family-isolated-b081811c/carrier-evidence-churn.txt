@@ -1,0 +1,308 @@
+# 那趟整族运行把载体里**已跟踪**的证据 PNG 就地改写了 —— 载体基线 b081811c，取数时刻 2026-10-09T12:08+0000
+# 生成方式：cd <载体> && git status --porcelain -- apps/web/evidence | wc -l ；git diff --numstat -- apps/web/evidence
+changed_tracked_evidence=152
+binary_files=152 head_total_bytes=10544925 worktree_total_bytes=10718650 delta=+173725  (HEAD 用 git cat-file -s，工作树用 os.path.getsize)
+apps/web/evidence/admin-holiday/admin-holiday-papers.png		HEAD=111971	worktree=118717	+6746
+apps/web/evidence/calendar-capture/calendar-capture-input-wins.png		HEAD=83533	worktree=83813	+280
+apps/web/evidence/calendar-capture/calendar-capture.png		HEAD=80244	worktree=82305	+2061
+apps/web/evidence/calendar-day-time/day-hour-labels.png		HEAD=50797	worktree=51832	+1035
+apps/web/evidence/calendar-day-time/day-timed-hour16.png		HEAD=59720	worktree=60178	+458
+apps/web/evidence/calendar-day-time/day-timed.png		HEAD=55874	worktree=56670	+796
+apps/web/evidence/calendar-day/day-en-empty.png		HEAD=51602	worktree=51806	+204
+apps/web/evidence/calendar-day/day-en-full.png		HEAD=58150	worktree=57876	-274
+apps/web/evidence/calendar-view-options/view-select-closed.png		HEAD=65535	worktree=66270	+735
+apps/web/evidence/calendar-view-options/view-tabs-year.png		HEAD=92768	worktree=93243	+475
+apps/web/evidence/calendar-year/year-bottom.png		HEAD=96087	worktree=96502	+415
+apps/web/evidence/calendar-year/year-drilled.png		HEAD=74064	worktree=74969	+905
+apps/web/evidence/calendar-year/year-next.png		HEAD=91457	worktree=92199	+742
+apps/web/evidence/calendar-year/year.png		HEAD=92894	worktree=93469	+575
+apps/web/evidence/countdown-calendar/after-reload.png		HEAD=68653	worktree=69514	+861
+apps/web/evidence/countdown-calendar/day-band.png		HEAD=50758	worktree=51460	+702
+apps/web/evidence/countdown-calendar/day-list.png		HEAD=65998	worktree=66693	+695
+apps/web/evidence/countdown-calendar/month-cell.png		HEAD=69175	worktree=70013	+838
+apps/web/evidence/countdown-calendar/year-dot.png		HEAD=94045	worktree=94751	+706
+apps/web/evidence/countdown-export/board-dark.png		HEAD=41690	worktree=42316	+626
+apps/web/evidence/countdown-export/board.png		HEAD=35307	worktree=35920	+613
+apps/web/evidence/countdown-export/card-dark.png		HEAD=66707	worktree=66173	-534
+apps/web/evidence/countdown-export/card-light.png		HEAD=66047	worktree=65432	-615
+apps/web/evidence/countdown-export/export-failed.png		HEAD=50210	worktree=50824	+614
+apps/web/evidence/detail-column-resize/d1-empty-no-column.png		HEAD=64615	worktree=65263	+648
+apps/web/evidence/detail-column-resize/d2-column-back.png		HEAD=97624	worktree=99851	+2227
+apps/web/evidence/detail-column-resize/d3-dragged.png		HEAD=103786	worktree=106022	+2236
+apps/web/evidence/detail-column-resize/d5-collapsed.png		HEAD=73835	worktree=76100	+2265
+apps/web/evidence/detail-column-resize/d5-reexpanded.png		HEAD=95329	worktree=97465	+2136
+apps/web/evidence/detail-column-slot/back-to-desktop.png		HEAD=102214	worktree=104432	+2218
+apps/web/evidence/detail-column-slot/desktop-with-detail.png		HEAD=98153	worktree=100331	+2178
+apps/web/evidence/detail-column-slot/no-sidebar-view.png		HEAD=20844	worktree=21537	+693
+apps/web/evidence/detail-pane-collapse/t1-height-boundary-back.png		HEAD=98153	worktree=100331	+2178
+apps/web/evidence/detail-pane-collapse/t2-collapsed-no-gutter.png		HEAD=75265	worktree=77522	+2257
+apps/web/evidence/detail-pane-collapse/t2-still-collapsed-after-reload.png		HEAD=49455	worktree=77185	+27730
+apps/web/evidence/detail-pane-collapse/t4-toggle-gone-when-infeasible.png		HEAD=56459	worktree=58628	+2169
+apps/web/evidence/detail-pane-collapse/t5-header-with-toggle.png		HEAD=63718	worktree=64332	+614
+apps/web/evidence/detail-pane-habit/h1-wide-in-column.png		HEAD=68499	worktree=69299	+800
+apps/web/evidence/detail-pane-habit/h2-same-slot.png		HEAD=66236	worktree=66767	+531
+apps/web/evidence/detail-pane-habit/h3-follows-cursor.png		HEAD=69961	worktree=70569	+608
+apps/web/evidence/detail-pane-habit/h4-collapsed-back-to-pane.png		HEAD=60408	worktree=60974	+566
+apps/web/evidence/detail-pane-habit/h4-reexpanded-in-column.png		HEAD=64902	worktree=65210	+308
+apps/web/evidence/detail-pane-habit/h5-heatmap-fits.png		HEAD=64906	worktree=65564	+658
+apps/web/evidence/detail-pane-habit/h6-head-row.png		HEAD=67581	worktree=68291	+710
+apps/web/evidence/detail-pane-habit/h7-tools-with-their-card.png		HEAD=63947	worktree=64894	+947
+apps/web/evidence/detail-pane-habit/h8-rows-fill-width.png		HEAD=69482	worktree=69927	+445
+apps/web/evidence/detail-pane-note-editor/n1-wide-in-column.png		HEAD=30972	worktree=31636	+664
+apps/web/evidence/detail-pane-note-editor/n2-same-slot.png		HEAD=26906	worktree=27548	+642
+apps/web/evidence/detail-pane-note-editor/n3-follows-cursor.png		HEAD=31438	worktree=32092	+654
+apps/web/evidence/detail-pane-note-editor/n4-back-to-column.png		HEAD=31313	worktree=31966	+653
+apps/web/evidence/detail-pane-note-editor/n4-narrow-above-board.png		HEAD=29203	worktree=29842	+639
+apps/web/evidence/detail-pane-note-editor/n5-collapsed-above-board.png		HEAD=25752	worktree=26445	+693
+apps/web/evidence/detail-pane-note-editor/n5-reexpanded-in-column.png		HEAD=26030	worktree=26718	+688
+apps/web/evidence/detail-pane-overlay/search-overlay.png		HEAD=82875	worktree=85018	+2143
+apps/web/evidence/detail-pane-task/t1-wide-in-column.png		HEAD=95049	worktree=97204	+2155
+apps/web/evidence/detail-pane-task/t10-reminder-field-in-column.png		HEAD=104415	worktree=106645	+2230
+apps/web/evidence/detail-pane-task/t11-narrow-reminder-falls-back-to-row.png		HEAD=73945	worktree=76031	+2086
+apps/web/evidence/detail-pane-task/t11-narrow-reminder-panel-open.png		HEAD=74244	worktree=76301	+2057
+apps/web/evidence/detail-pane-task/t12-due-field-in-column.png		HEAD=97050	worktree=99214	+2164
+apps/web/evidence/detail-pane-task/t13-narrow-due-falls-back-to-row.png		HEAD=67674	worktree=69735	+2061
+apps/web/evidence/detail-pane-task/t14-organizer-field-in-column.png		HEAD=95061	worktree=97152	+2091
+apps/web/evidence/detail-pane-task/t15-narrow-organizer-falls-back-to-row.png		HEAD=66352	worktree=66385	+33
+apps/web/evidence/detail-pane-task/t2-pane-follows-cursor.png		HEAD=105597	worktree=107639	+2042
+apps/web/evidence/detail-pane-task/t3-enter-focuses-note.png		HEAD=97424	worktree=99677	+2253
+apps/web/evidence/detail-pane-task/t4-narrow-falls-back-to-row.png		HEAD=72490	worktree=74552	+2062
+apps/web/evidence/detail-pane-task/t5-long-title-wraps.png		HEAD=111913	worktree=114399	+2486
+apps/web/evidence/detail-pane-task/t8-subtask-field-in-column.png		HEAD=105698	worktree=107958	+2260
+apps/web/evidence/detail-pane-task/t9-narrow-subtask-falls-back-to-row.png		HEAD=79855	worktree=81876	+2021
+apps/web/evidence/focus-detail-pane/f1-four-cards.png		HEAD=59891	worktree=60693	+802
+apps/web/evidence/focus-detail-pane/f3-empty-records.png		HEAD=59891	worktree=60693	+802
+apps/web/evidence/focus-detail-pane/f5-aborted-record.png		HEAD=59894	worktree=60685	+791
+apps/web/evidence/habit-counted-amount/dark-counted-row.png		HEAD=73673	worktree=73966	+293
+apps/web/evidence/habit-counted-amount/light-after-undo-and-full.png		HEAD=71792	worktree=72083	+291
+apps/web/evidence/habit-counted-amount/light-five-of-eight.png		HEAD=72889	worktree=73010	+121
+apps/web/evidence/habit-frequency/interval-ten.png		HEAD=57080	worktree=55671	-1409
+apps/web/evidence/habit-frequency/panel-open.png		HEAD=56807	worktree=57130	+323
+apps/web/evidence/habit-frequency/weekly-dark.png		HEAD=53716	worktree=54491	+775
+apps/web/evidence/habit-frequency/weekly-in-viewport.png		HEAD=52326	worktree=53116	+790
+apps/web/evidence/habit-frequency/weekly-selected.png		HEAD=53481	worktree=54115	+634
+apps/web/evidence/habit-heatmap-labels/labels-aligned.png		HEAD=1522	worktree=1531	+9
+apps/web/evidence/habit-heatmap-labels/labels-in-pane.png		HEAD=3919	worktree=3882	-37
+apps/web/evidence/habit-heatmap-labels/labels-one-line.png		HEAD=3490	worktree=3481	-9
+apps/web/evidence/habit-icon-picker/icon-changed.png		HEAD=50411	worktree=51078	+667
+apps/web/evidence/habit-icon-picker/picker-in-viewport.png		HEAD=51044	worktree=51362	+318
+apps/web/evidence/habit-icon-picker/picker-open.png		HEAD=50829	worktree=51203	+374
+apps/web/evidence/habit-month-stats/dark-month-cells.png		HEAD=75350	worktree=76091	+741
+apps/web/evidence/habit-month-stats/light-after-checkin.png		HEAD=73887	worktree=74987	+1100
+apps/web/evidence/habit-month-stats/light-two-cards.png		HEAD=80373	worktree=80813	+440
+apps/web/evidence/habit-month-stats/light-unit-vs-no-unit.png		HEAD=77732	worktree=78988	+1256
+apps/web/evidence/habit-month/month-backfilled.png		HEAD=20153	worktree=20185	+32
+apps/web/evidence/habit-month/month-board.png		HEAD=20222	worktree=20254	+32
+apps/web/evidence/habit-month/month-dark.png		HEAD=20267	worktree=20306	+39
+apps/web/evidence/habit-month/month-default.png		HEAD=57572	worktree=58255	+683
+apps/web/evidence/habit-month/month-disabled.png		HEAD=21050	worktree=22339	+1289
+apps/web/evidence/habit-month/month-prev.png		HEAD=19316	worktree=19315	-1
+apps/web/evidence/habit-month/month-weekly.png		HEAD=20442	worktree=20162	-280
+apps/web/evidence/habits-two-column/cards-2-dark-selected.png		HEAD=60755	worktree=61178	+423
+apps/web/evidence/habits-two-column/cards-4-light.png		HEAD=34618	worktree=35495	+877
+apps/web/evidence/habits-two-column/cards-narrow-one-column.png		HEAD=28949	worktree=29368	+419
+apps/web/evidence/keyboard-cursor/k1-first-row-highlighted.png		HEAD=108011	worktree=110244	+2233
+apps/web/evidence/keyboard-cursor/k10-enter-focuses-note-input.png		HEAD=33329	worktree=33995	+666
+apps/web/evidence/keyboard-cursor/k11-unmarked-row-keeps-enter.png		HEAD=59708	worktree=60374	+666
+apps/web/evidence/keyboard-cursor/k12-arrows-then-enter-focuses-pane.png		HEAD=116439	worktree=118750	+2311
+apps/web/evidence/keyboard-cursor/k2-typing-row-unchanged.png		HEAD=108900	worktree=111156	+2256
+apps/web/evidence/keyboard-cursor/k3-cursor-back-after-closing-sheet.png		HEAD=104033	worktree=106279	+2246
+apps/web/evidence/keyboard-cursor/k4-quadrant-same-selection.png		HEAD=65718	worktree=66388	+670
+apps/web/evidence/keyboard-cursor/k5-avatar-owns-arrow.png		HEAD=110313	worktree=112872	+2559
+apps/web/evidence/keyboard-cursor/k6-habits-cursor-aria-current.png		HEAD=65326	worktree=66120	+794
+apps/web/evidence/keyboard-cursor/k6-habits-unselected-pane.png		HEAD=33313	worktree=33849	+536
+apps/web/evidence/keyboard-cursor/k7-notes-editor-follows-cursor.png		HEAD=33529	worktree=34253	+724
+apps/web/evidence/keyboard-cursor/k8-notes-selection-visible.png		HEAD=39650	worktree=40302	+652
+apps/web/evidence/keyboard-cursor/k9-enter-focuses-pane.png		HEAD=58559	worktree=59176	+617
+apps/web/evidence/p0-remediation/w1-more-open-dark.png		HEAD=71310	worktree=72010	+700
+apps/web/evidence/p0-remediation/w1-more-open-light.png		HEAD=70656	worktree=71342	+686
+apps/web/evidence/p0-remediation/w1w3-tasks-1440-light.png		HEAD=93218	worktree=95295	+2077
+apps/web/evidence/p0-remediation/w2-settings-suppresses-detail.png		HEAD=89385	worktree=85600	-3785
+apps/web/evidence/p0-remediation/w4-narrow-375-tasks.png		HEAD=61550	worktree=59349	-2201
+apps/web/evidence/p0-remediation/w5-quadrant-after.png		HEAD=41091	worktree=40963	-128
+apps/web/evidence/p0-remediation/w6w7-detail-groups.png		HEAD=108547	worktree=110790	+2243
+apps/web/evidence/profile-panel/r15b-1-need-password.png		HEAD=82283	worktree=73873	-8410
+apps/web/evidence/profile-panel/r15b-2-ready.png		HEAD=74504	worktree=67247	-7257
+apps/web/evidence/profile-panel/r15b-3-ready-dark.png		HEAD=76300	worktree=68729	-7571
+apps/web/evidence/profile-panel/r15b-4-after-reload.png		HEAD=82283	worktree=73873	-8410
+apps/web/evidence/quadrant-fill/chain-800.png		HEAD=42204	worktree=42208	+4
+apps/web/evidence/quadrant-fill/fill-1000.png		HEAD=43645	worktree=43643	-2
+apps/web/evidence/quadrant-fill/fill-1200.png		HEAD=45360	worktree=45357	-3
+apps/web/evidence/quadrant-fill/fill-800.png		HEAD=42204	worktree=42208	+4
+apps/web/evidence/quadrant-fill/narrow-top.png		HEAD=34844	worktree=34841	-3
+apps/web/evidence/selection-projections/01-list.png		HEAD=108936	worktree=108942	+6
+apps/web/evidence/selection-projections/02-quadrant.png		HEAD=68147	worktree=68141	-6
+apps/web/evidence/selection-projections/03-timeline.png		HEAD=56091	worktree=55969	-122
+apps/web/evidence/selection-projections/04-switch.png		HEAD=108773	worktree=108780	+7
+apps/web/evidence/selection-projections/05-search.png		HEAD=111900	worktree=111905	+5
+apps/web/evidence/shell-no-document-scroll/w1-before-scroll.png		HEAD=141785	worktree=141782	-3
+apps/web/evidence/shell-no-document-scroll/w2-after-scroll-bottom.png		HEAD=145665	worktree=145658	-7
+apps/web/evidence/shell-no-document-scroll/w3-last-view.png		HEAD=28739	worktree=28591	-148
+apps/web/evidence/shell-sidebar-height/after-first-click.png		HEAD=96860	worktree=101505	+4645
+apps/web/evidence/shell-sidebar-height/before-first-click.png		HEAD=96879	worktree=102761	+5882
+apps/web/evidence/shell-sync-rail/settings-sync-section.png		HEAD=88131	worktree=96235	+8104
+apps/web/evidence/task-priority-checkbox/dark-four-tiers.png		HEAD=134613	worktree=132253	-2360
+apps/web/evidence/task-priority-checkbox/light-done-overrides-priority.png		HEAD=81291	worktree=80838	-453
+apps/web/evidence/task-priority-checkbox/light-four-tiers.png		HEAD=132875	worktree=130437	-2438
+apps/web/evidence/task-row-touch-target/quadrant-light.png		HEAD=69157	worktree=69140	-17
+apps/web/evidence/task-row-touch-target/tasks-dark.png		HEAD=128676	worktree=128499	-177
+apps/web/evidence/task-row-touch-target/tasks-light.png		HEAD=126800	worktree=126614	-186
+apps/web/evidence/task-row-touch-target/timeline-light.png		HEAD=54471	worktree=54230	-241
+apps/web/evidence/vault-panel/00-loaded-light.png		HEAD=87533	worktree=97074	+9541
+apps/web/evidence/vault-panel/01-created-light.png		HEAD=95968	worktree=105665	+9697
+apps/web/evidence/vault-panel/02-ready-light.png		HEAD=90795	worktree=100335	+9540
+apps/web/evidence/vault-panel/03-locked-after-reload-light.png		HEAD=80784	worktree=89934	+9150
+apps/web/evidence/vault-panel/04-wrong-recovery-dark.png		HEAD=86014	worktree=94503	+8489
+apps/web/evidence/vault-panel/05-ready-dark.png		HEAD=84575	worktree=92375	+7800
+apps/web/evidence/admin-holiday/admin-holiday-papers.png	e40c6695
+apps/web/evidence/calendar-capture/calendar-capture-input-wins.png	bac982de
+apps/web/evidence/calendar-capture/calendar-capture.png	bf5e58bf
+apps/web/evidence/calendar-day-time/day-hour-labels.png	ff8a1a29
+apps/web/evidence/calendar-day-time/day-timed-hour16.png	7c09d8ae
+apps/web/evidence/calendar-day-time/day-timed.png	6ad83a0f
+apps/web/evidence/calendar-day/day-en-empty.png	b640693c
+apps/web/evidence/calendar-day/day-en-full.png	31a077bd
+apps/web/evidence/calendar-view-options/view-select-closed.png	414e5a5f
+apps/web/evidence/calendar-view-options/view-tabs-year.png	aa7eb824
+apps/web/evidence/calendar-year/year-bottom.png	3822000b
+apps/web/evidence/calendar-year/year-drilled.png	a30c664e
+apps/web/evidence/calendar-year/year-next.png	d062fc45
+apps/web/evidence/calendar-year/year.png	38a5613d
+apps/web/evidence/countdown-calendar/after-reload.png	8fd002cd
+apps/web/evidence/countdown-calendar/day-band.png	afe72abe
+apps/web/evidence/countdown-calendar/day-list.png	b8f3ecd2
+apps/web/evidence/countdown-calendar/month-cell.png	2050aa9d
+apps/web/evidence/countdown-calendar/year-dot.png	aa7139cf
+apps/web/evidence/countdown-export/board-dark.png	0dcb3bb4
+apps/web/evidence/countdown-export/board.png	d4e045ea
+apps/web/evidence/countdown-export/card-dark.png	9b9c4f94
+apps/web/evidence/countdown-export/card-light.png	73850126
+apps/web/evidence/countdown-export/export-failed.png	d2bdc323
+apps/web/evidence/detail-column-resize/d1-empty-no-column.png	44898c25
+apps/web/evidence/detail-column-resize/d2-column-back.png	ed29cb1d
+apps/web/evidence/detail-column-resize/d3-dragged.png	82408a9a
+apps/web/evidence/detail-column-resize/d5-collapsed.png	72006e28
+apps/web/evidence/detail-column-resize/d5-reexpanded.png	5c95f97b
+apps/web/evidence/detail-column-slot/back-to-desktop.png	95698ab5
+apps/web/evidence/detail-column-slot/desktop-with-detail.png	eb7fc225
+apps/web/evidence/detail-column-slot/no-sidebar-view.png	52178357
+apps/web/evidence/detail-pane-collapse/t1-height-boundary-back.png	eb7fc225
+apps/web/evidence/detail-pane-collapse/t2-collapsed-no-gutter.png	1c8107c4
+apps/web/evidence/detail-pane-collapse/t2-still-collapsed-after-reload.png	c7b289ff
+apps/web/evidence/detail-pane-collapse/t4-toggle-gone-when-infeasible.png	034829f7
+apps/web/evidence/detail-pane-collapse/t5-header-with-toggle.png	afd4f8af
+apps/web/evidence/detail-pane-habit/h1-wide-in-column.png	b2419468
+apps/web/evidence/detail-pane-habit/h2-same-slot.png	a17344c1
+apps/web/evidence/detail-pane-habit/h3-follows-cursor.png	b2bbeb30
+apps/web/evidence/detail-pane-habit/h4-collapsed-back-to-pane.png	16cf677a
+apps/web/evidence/detail-pane-habit/h4-reexpanded-in-column.png	977c5fc4
+apps/web/evidence/detail-pane-habit/h5-heatmap-fits.png	75a1adec
+apps/web/evidence/detail-pane-habit/h6-head-row.png	92ec7b5c
+apps/web/evidence/detail-pane-habit/h7-tools-with-their-card.png	c8251f64
+apps/web/evidence/detail-pane-habit/h8-rows-fill-width.png	f0a7604a
+apps/web/evidence/detail-pane-note-editor/n1-wide-in-column.png	adec2924
+apps/web/evidence/detail-pane-note-editor/n2-same-slot.png	10e48515
+apps/web/evidence/detail-pane-note-editor/n3-follows-cursor.png	a000054e
+apps/web/evidence/detail-pane-note-editor/n4-back-to-column.png	7ff27843
+apps/web/evidence/detail-pane-note-editor/n4-narrow-above-board.png	5c17392f
+apps/web/evidence/detail-pane-note-editor/n5-collapsed-above-board.png	899ac4d8
+apps/web/evidence/detail-pane-note-editor/n5-reexpanded-in-column.png	c8cfde9b
+apps/web/evidence/detail-pane-overlay/search-overlay.png	035dbe0f
+apps/web/evidence/detail-pane-task/t1-wide-in-column.png	8d1059bc
+apps/web/evidence/detail-pane-task/t10-reminder-field-in-column.png	b875a709
+apps/web/evidence/detail-pane-task/t11-narrow-reminder-falls-back-to-row.png	78c78d05
+apps/web/evidence/detail-pane-task/t11-narrow-reminder-panel-open.png	71ff37a4
+apps/web/evidence/detail-pane-task/t12-due-field-in-column.png	dd9fe1d8
+apps/web/evidence/detail-pane-task/t13-narrow-due-falls-back-to-row.png	96cfc90a
+apps/web/evidence/detail-pane-task/t14-organizer-field-in-column.png	e7ad05ea
+apps/web/evidence/detail-pane-task/t15-narrow-organizer-falls-back-to-row.png	c035b2c7
+apps/web/evidence/detail-pane-task/t2-pane-follows-cursor.png	3e074c10
+apps/web/evidence/detail-pane-task/t3-enter-focuses-note.png	8aa19d80
+apps/web/evidence/detail-pane-task/t4-narrow-falls-back-to-row.png	a54046c6
+apps/web/evidence/detail-pane-task/t5-long-title-wraps.png	c76f1772
+apps/web/evidence/detail-pane-task/t8-subtask-field-in-column.png	b42fc64e
+apps/web/evidence/detail-pane-task/t9-narrow-subtask-falls-back-to-row.png	5d1853f0
+apps/web/evidence/focus-detail-pane/f1-four-cards.png	d7107083
+apps/web/evidence/focus-detail-pane/f3-empty-records.png	d7107083
+apps/web/evidence/focus-detail-pane/f5-aborted-record.png	f7e0c105
+apps/web/evidence/habit-counted-amount/dark-counted-row.png	b7854a8e
+apps/web/evidence/habit-counted-amount/light-after-undo-and-full.png	90d18796
+apps/web/evidence/habit-counted-amount/light-five-of-eight.png	b20bd1d7
+apps/web/evidence/habit-frequency/interval-ten.png	65604263
+apps/web/evidence/habit-frequency/panel-open.png	50b1cf69
+apps/web/evidence/habit-frequency/weekly-dark.png	f1ab15b8
+apps/web/evidence/habit-frequency/weekly-in-viewport.png	9b6b90e4
+apps/web/evidence/habit-frequency/weekly-selected.png	d81a6959
+apps/web/evidence/habit-heatmap-labels/labels-aligned.png	9eceadf0
+apps/web/evidence/habit-heatmap-labels/labels-in-pane.png	4b72888b
+apps/web/evidence/habit-heatmap-labels/labels-one-line.png	af8c7381
+apps/web/evidence/habit-icon-picker/icon-changed.png	783ee60f
+apps/web/evidence/habit-icon-picker/picker-in-viewport.png	b5cd2418
+apps/web/evidence/habit-icon-picker/picker-open.png	e272e768
+apps/web/evidence/habit-month-stats/dark-month-cells.png	bdf08930
+apps/web/evidence/habit-month-stats/light-after-checkin.png	646cb37d
+apps/web/evidence/habit-month-stats/light-two-cards.png	f9b7e7d1
+apps/web/evidence/habit-month-stats/light-unit-vs-no-unit.png	730d9471
+apps/web/evidence/habit-month/month-backfilled.png	c556583a
+apps/web/evidence/habit-month/month-board.png	8a478d7e
+apps/web/evidence/habit-month/month-dark.png	fc18a88f
+apps/web/evidence/habit-month/month-default.png	cd8bf466
+apps/web/evidence/habit-month/month-disabled.png	abaabb14
+apps/web/evidence/habit-month/month-prev.png	a6b18101
+apps/web/evidence/habit-month/month-weekly.png	f9aec04f
+apps/web/evidence/habits-two-column/cards-2-dark-selected.png	db63b248
+apps/web/evidence/habits-two-column/cards-4-light.png	584206b9
+apps/web/evidence/habits-two-column/cards-narrow-one-column.png	4f73ad1b
+apps/web/evidence/keyboard-cursor/k1-first-row-highlighted.png	6631df7f
+apps/web/evidence/keyboard-cursor/k10-enter-focuses-note-input.png	576dfe92
+apps/web/evidence/keyboard-cursor/k11-unmarked-row-keeps-enter.png	2b6cabdb
+apps/web/evidence/keyboard-cursor/k12-arrows-then-enter-focuses-pane.png	45af1771
+apps/web/evidence/keyboard-cursor/k2-typing-row-unchanged.png	5515bd5e
+apps/web/evidence/keyboard-cursor/k3-cursor-back-after-closing-sheet.png	4bb45cf5
+apps/web/evidence/keyboard-cursor/k4-quadrant-same-selection.png	65a964be
+apps/web/evidence/keyboard-cursor/k5-avatar-owns-arrow.png	b27a5462
+apps/web/evidence/keyboard-cursor/k6-habits-cursor-aria-current.png	4d13d7d0
+apps/web/evidence/keyboard-cursor/k6-habits-unselected-pane.png	321607ca
+apps/web/evidence/keyboard-cursor/k7-notes-editor-follows-cursor.png	a5fa7699
+apps/web/evidence/keyboard-cursor/k8-notes-selection-visible.png	58711abc
+apps/web/evidence/keyboard-cursor/k9-enter-focuses-pane.png	3e30305d
+apps/web/evidence/p0-remediation/w1-more-open-dark.png	b3273632
+apps/web/evidence/p0-remediation/w1-more-open-light.png	e82dc177
+apps/web/evidence/p0-remediation/w1w3-tasks-1440-light.png	3ac52c49
+apps/web/evidence/p0-remediation/w2-settings-suppresses-detail.png	5cb50182
+apps/web/evidence/p0-remediation/w4-narrow-375-tasks.png	c8d4993d
+apps/web/evidence/p0-remediation/w5-quadrant-after.png	01f717e3
+apps/web/evidence/p0-remediation/w6w7-detail-groups.png	a3e90114
+apps/web/evidence/profile-panel/r15b-1-need-password.png	6367aa65
+apps/web/evidence/profile-panel/r15b-2-ready.png	bfc5ca5a
+apps/web/evidence/profile-panel/r15b-3-ready-dark.png	cac7475a
+apps/web/evidence/profile-panel/r15b-4-after-reload.png	6367aa65
+apps/web/evidence/quadrant-fill/chain-800.png	a7a8c0f9
+apps/web/evidence/quadrant-fill/fill-1000.png	e0f19dbb
+apps/web/evidence/quadrant-fill/fill-1200.png	579d3688
+apps/web/evidence/quadrant-fill/fill-800.png	a7a8c0f9
+apps/web/evidence/quadrant-fill/narrow-top.png	55f5dc6c
+apps/web/evidence/selection-projections/01-list.png	9c17b681
+apps/web/evidence/selection-projections/02-quadrant.png	615413a1
+apps/web/evidence/selection-projections/03-timeline.png	58f678c1
+apps/web/evidence/selection-projections/04-switch.png	5a4aba81
+apps/web/evidence/selection-projections/05-search.png	e7baf9cc
+apps/web/evidence/shell-no-document-scroll/w1-before-scroll.png	94078e63
+apps/web/evidence/shell-no-document-scroll/w2-after-scroll-bottom.png	5158e939
+apps/web/evidence/shell-no-document-scroll/w3-last-view.png	06671665
+apps/web/evidence/shell-sidebar-height/after-first-click.png	928598a1
+apps/web/evidence/shell-sidebar-height/before-first-click.png	ba09cfa1
+apps/web/evidence/shell-sync-rail/settings-sync-section.png	34176a8b
+apps/web/evidence/task-priority-checkbox/dark-four-tiers.png	e01c6792
+apps/web/evidence/task-priority-checkbox/light-done-overrides-priority.png	dc865607
+apps/web/evidence/task-priority-checkbox/light-four-tiers.png	80665e1f
+apps/web/evidence/task-row-touch-target/quadrant-light.png	e93a2095
+apps/web/evidence/task-row-touch-target/tasks-dark.png	757dd8fa
+apps/web/evidence/task-row-touch-target/tasks-light.png	0df7e510
+apps/web/evidence/task-row-touch-target/timeline-light.png	fd947e25
+apps/web/evidence/vault-panel/00-loaded-light.png	53bb7d3f
+apps/web/evidence/vault-panel/01-created-light.png	285f9553
+apps/web/evidence/vault-panel/02-ready-light.png	4a9a0f90
+apps/web/evidence/vault-panel/03-locked-after-reload-light.png	4470ea13
+apps/web/evidence/vault-panel/04-wrong-recovery-dark.png	b6ade33a
+apps/web/evidence/vault-panel/05-ready-dark.png	0a2d8f30

@@ -73,4 +73,34 @@ python3 -c "import re;print(re.sub(r'\x1b\[[0-9;]*m','',open('<日志>')).read()
 
 ⚠️ `dist` 那枚哈希只是"这棵树打过包"的证据：这套件的界面由 **vite dev 现编译源码**，不走 `dist`，
 所以 AGENTS §7 第 27 条那一族（旧 bundle 冒充新代码）在这趟里的形状是"给 `packages/*` 的构建用"，
-界面侧新鲜度由 `git status` 为空担保。
+界面侧新鲜度由**起跑那一刻** `git status --porcelain | wc -l` = 0 担保。
+⚠️ 09 日复量时发现这句要加一个时间限定，因为**这趟运行本身会把树改脏**（见下面那一节）——"跑完之后 status 为空"从来不成立，能担保的只有"起跑前为空"。
+
+
+## 🔴 复量查出一条比红集更影响"下一位怎么用这份证据"的事：整族运行会**就地改写仓库里已跟踪的证据图**
+
+取数时刻 2026-10-09 12:0x（UTC），全部现量：
+
+| 读数 | 值 |
+|---|---|
+| 载体里被改写的**已跟踪**证据文件 | `git status --porcelain -- apps/web/evidence \| wc -l` = **152** |
+| 字节量 | HEAD 侧合计 10,544,925 B → 运行后 10,718,650 B（**+173,725**），逐枚清单见 [`carrier-evidence-churn.txt`](carrier-evidence-churn.txt) |
+| 谁在写 | `grep -rln "apps/web/evidence" e2e/tests/*.ts` ⇒ **20+ 枚 spec**（calendar / detail-pane / habits / admin / countdown / assistant …），跨好几条线 |
+| 主检出此刻 | `git status --porcelain -- apps/web/evidence \| wc -l` = **330**，mtime 落在 14:21–14:30（**不是本线那趟**，是别线的运行） |
+
+为什么这条比"哪 21 条红了"更要紧：**证据一旦由"提交进仓库的截图"变成"最近一次跑出来的截图"，它就再也不指认任何一棵树**。
+任何一次 `pnpm check:ai-e2e`（它在 `pnpm check` 里）都会覆盖它们，而覆盖动作没有归属、没有门禁、也不需要谁同意；
+下一次有人宽 `git add` 就会把 330 枚截图连同别人的改动一起提交，提交信息里不会提到这件事。
+这与 §7 第 83 条那一族（探针会改变被测对象的状态）同型，只是被改变的不是应用状态而是**仓库里的证据**。
+
+⚠️ 本线自己也在这条里：`scripts/qa/reminders-data-responsive.mjs` 写的是 `apps/web/evidence/settings-group-theme-sweep/`，
+同样是已跟踪目录 —— 这句是自我披露，不是只登记别人。
+
+载体侧已做的处置（可复跑、可回退）：`cd <载体> && git restore -- apps/web/evidence` ⇒ `git status --porcelain | wc -l` 回到 **0**、
+`git rev-parse --short HEAD` 仍是 `b081811c`。**主检出那 330 枚没动**（那是别线运行的产物与在飞状态，归属不在本线）。
+
+修法方向写在这里但不代改（写图的 spec 分属多条线，且"证据要不要由运行自动覆盖"是判据口径，得负责人拍）：
+① 运行期截图只落 `e2e/test-results/**`（未跟踪），入库证据改成**显式**的"采集/晋升"动作；
+② 或给每条 spec 一个 `--evidence-dir` 旋钮，默认指向临时目录，CI 与门禁永不写跟踪路径；
+③ 无论哪种，都该有一条能红的门：**跑完整族之后 `git status --porcelain -- apps/web/evidence` 必须为空**，
+非空就报出枚数与清单（上面那条命令就是它的取现量版本，152 / 330 可当基线，只应减不应增）。
