@@ -10,17 +10,24 @@
 不会漂，抄进**说明文**里一样会漂。
 
 抽取规则（只用能确定的形状，不猜）：
-1. 中文：`点/按/走/用/进入/打开/在/见` 之后紧跟的 `「X」`；以及加粗段以 `「X」` 开头。
-2. 英文：`press/click/tap/choose/select/use/open/in/under/see` 之后紧跟的 `"X"`；以及加粗段以 `"X"` 开头。
+1. 中文：`点/按/走/用/进入/打开/在/见/前往` 之后紧跟的 `「X」`；以及加粗段以 `「X」` 开头。
+2. 英文：`press/click/tap/choose/select/use/open/in/under/see/with/go to` 之后紧跟的 `"X"` 或 `“X”`；
+   以及加粗段以其中一副引号开头。
+
+载体（`SCOPE_PREFIXES`）= 帮助页/文档页里本线那几页，**加上服务端的全部对外文案**（`server.*`：
+三封安全通知信 + 三张凭据页）。加服务端那一档是因为实测到的四处错名里，有两封是
+"这不是你本人操作 ⇒ 去点忘记密码"那种**给可能被盗号的人看的信**，
+而它写的名字界面上不存在。
 
 分母 = **同语种整张词条表的所有值**（含 `site.*`，因为文档也会指另一篇文档的标题）。
 判据问的是"这个名字在唯一文案事实源里存在吗"，不是"它是不是按钮"。
 
-🔴 射程边界（不许读成"整站都验了"）：只查 `SCOPE` 里列出的那几页（账号 / 口令 / 通行密钥 /
-会话 / 找回），也就是本线交付的那几条旅程。整站普查另有 16 处引号段落在**别的线**的页面里
-（重复任务、导出、迁移、视图、自托管、集成说明），其中多数指的是文档站自己的导航标题，
-而那些标题住在 `apps/landing/src/site/pages.ts`、不在词条表里 —— 要把它们一起钉住，得先给
-那道门禁加第二个分母。取现量：见 `--self-test` 之外那条 census 打印。
+🔴 射程边界（不许读成"整站都验了"）：只查 `SCOPE` 里列出的那几页 + `server.*`
+（账号 / 口令 / 通行密钥 / 会话 / 找回那几条旅程，以及服务端的信与凭据页）。整站普查另有 16 处
+引号段落在**别的线**的页面里（重复任务、导出、迁移、视图、自托管、集成说明），其中多数指的是
+文档站自己的导航标题，而那些标题住在 `apps/landing/src/site/pages.ts`、不在词条表里 ——
+要把它们一起钉住，得先给那道门禁加第二个分母。两条候选规则（近似名档 / 动词表扩进法务散文）
+都在纯 HEAD 上实测过并被否证，逐条读数见 `docs/plans/account-standard-suite.md` §6.22。
 
 用法：
     python3 scripts/qa/check-site-control-names.py            # 真表
@@ -49,7 +56,7 @@ _spec.loader.exec_module(_locator)
 template_matches = _locator.template_matches
 entry_to_pattern = _locator.entry_to_pattern
 
-SCOPE_PREFIXES = ("site.docs.account.", "site.docs.loss.", "site.docs.passphrase.")
+SCOPE_PREFIXES = ("site.docs.account.", "site.docs.loss.", "site.docs.passphrase.", "server.")
 SCOPE_EXACT = {
     "site.help.a.rebind",
     "site.help.a.sessions",
@@ -64,8 +71,11 @@ ZH_PATTERNS = (
     re.compile(r"\*\*「([^「」]+?)」"),
 )
 EN_PATTERNS = (
-    re.compile(r"(?:press|click|tap|choose|select|use|open|in|under|see)\s+\"([^\"]+?)\"", re.I),
-    re.compile(r"\*\*\"([^\"]+?)\""),
+    # 🔴 英文文案里的"引号"有**两副**：站点帮助页用直引号 `"X"`，而服务端的信模板用排版弯引号 `“X”`
+    # （`server.email.changed.notYou` 实测是后者）。只认直引号那一副时，这两封安全通知信里的
+    # 错名**一根都扫不到** —— 症状不是报错，而是"这条判据绿"。
+    re.compile(r"(?:press|click|tap|choose|select|use|open|in|under|see|with|go to)\s+[\"“]([^\"”]+?)[\"”]", re.I),
+    re.compile(r"\*\*[\"“]([^\"”]+?)[\"”]"),
 )
 
 # 例外要带理由，而且**用不上就是错** —— 一张只进不出的豁免表会和它要挡的漂移一起烂掉。
@@ -81,7 +91,7 @@ def in_scope(key: str) -> bool:
 def quoted_names(table: dict[str, str], patterns: tuple[re.Pattern[str], ...]) -> list[tuple[str, str]]:
     out: list[tuple[str, str]] = []
     for key, value in table.items():
-        if not key.startswith("site.") or not in_scope(key) or not value:
+        if not in_scope(key) or not value:
             continue
         for pattern in patterns:
             for match in pattern.finditer(value):
@@ -155,7 +165,7 @@ def main(argv: list[str]) -> int:
     if "--self-test" in argv:
         return self_test()
     zh, en = _locator.ZH_TABLE, _locator.EN_TABLE
-    scoped = [k for k in zh if k.startswith("site.") and in_scope(k)]
+    scoped = [k for k in zh if in_scope(k)]
     if not scoped:
         # 键被改名/整页挪走时，这道检查会静默变成"什么都不查"。那一格必须响亮地红。
         print("🔴 射程内一条 site 键都没匹配上 ——  SCOPE 已经和真源脱节", file=sys.stderr)
