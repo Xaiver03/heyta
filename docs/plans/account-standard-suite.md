@@ -182,9 +182,17 @@ W1 先落、W7 后落 ⇒ 中间任何一次 `pnpm check` 都会红。**这不�
 4. 真收件箱那一腿（G1）与真实 SMTP 投递仍未验。
 5. 换绑不要求重输当前口令（ADR-0063 §2.7 登记为可复议项）。
 6. 鸿蒙端没有壳，谈不上账号面。
-7. 🔴 **级联数字与"类别名"那两格在共享检出上会红到并行 automation 线把 `20261018160000` 那笔补完对外文案为止**。
-   本线的数已按约束逐条归因证明是对的（全树 34/33；摘掉那笔 32/31 = 文案现值）。
-   归那条线的是**两张新表的用户可读类别名 + 数字跟着 +2**，不是本线能代拍的两件对外承诺。
+7. 🔴 **级联数字与"类别名"那两格现在在纯 HEAD 上也是红的**（10-10 03:0x 现量更正，两臂读数与逐枚归属在 §6.65）。
+   ~~归并行 automation 线的是两张新表的用户可读类别名 + 数字跟着 +2。~~
+   这句已被现量否证：纯 HEAD 上缺类别名的是 **17 枚**表，其中只有 2 枚是本线的，
+   而**把本线那份还没入库的文案算进去之后**还剩 3 枚（`automation_entitlement_activations` / `_links` / `_subjects`，
+   `3fcc3bef` 10-09 18:25 带进来），数字差也跟着从 +2 变 **+3**（臂 B 现量：文案 34/33，真源 37/36）。
+   仍然成立的只有"类别名与数字是对外承诺，本线不代拍"这一半。
+   而**这一格里有本线自己的责任**：本线 10-08 21:31 那笔"立 ADR-0063"的提交 `9fa53ab9`
+   把**六枚别的线的迁移目录**一起带进了 main，其中**八枚新表随注销级联**
+   （`automation_workers` `automation_commit_permits` `automation_rules` `automation_events` `automation_recipient_keys`
+   `shares` `share_invitations` `share_members`），而它们的对外文案当时还躺在别人工作树里；那笔提交的"归属说明"只声明了 `docs/plans/README.md` 三行。
+   本线**能停手的只有措辞那一半**，"把别人的持久层带进 main"这一半不是判据口径，是动作。
 8. 新增的集成套件要真 PostgreSQL（本地建的是隔离库 `heyta_account_w9`），
    `pnpm -r test` 那条默认通道**不含**它（`vitest.integration.config.ts` 的 exclude 是对的）。
    它已点名进 `server/package.json` 的 `test:integration:postgres`（`check:integration-coverage` rc=0），
@@ -3241,6 +3249,64 @@ done
 （声明处写的是 `export interface Foo`），另有注释块里的示例文本与 `as` 改名两种形状也会命中。
 那 169 枚我**没有逐枚复核**，所以这一格的读数只认按 §6.59 那张表手点的五枚符号 + `git grep <符号> HEAD -- <文件>`。
 要把类 B 做成自动判据的人，得先把这三种形状处理掉，否则它会比 §6.63 那条更长红。
+
+### 6.65 §5 第 7 条那一格没有闭合，而且它有一半是本线自己造的（10-10 03:0x 现量，纯 HEAD 与共享检出两臂）
+
+去检查它是因为 `20261018160000_add_automation_entitlement_tickets` **已经进 main 了**（`git ls-tree -r --name-only HEAD -- server/prisma/migrations` 现量：
+它之后还有 `…170000 / …180000 / …190000`），也就是说 §5 第 7 条写的等待条件按字面已经满足 ⇒ 该收这一格了。
+读数是：**没闭合，而且比登记的更糟** —— 那两格红**在纯 HEAD 上也在**。
+
+| 臂 | 载体 | 读数 | 缺类别名的表 | 级联数字 |
+|---|---|---|---|---|
+| A | 隔离载体纯 `refs/heads/main`（`39eb92e9`） | `2 failed / 60 passed (62)` | **17 枚** | 文案 20 处 / 19 张，真源 37 条 / 36 张 |
+| B | 共享检出（本线 parked 的那份文案在工作树里） | `2 failed / 61 passed (63)` | **3 枚** | 文案 34 / 33，真源 37 / 36 |
+
+两枚红的判据（都在 `packages/legal/tests/structure.spec.ts`，`对外文本里可复算的数字，回到真源对账` 那一组）：
+`:489` "每张随注销消失的表都在文案里有一个用户读得到的类别名"、`:533` "所有抄了「N 处级联 / N cascades / N foreign keys」的文档、中英两栏，都等于真源条数"。
+
+**臂 B 是决定性的那一臂**：它说明本线那份还没入库的文案一旦落，`17` 会降到 `3` ——
+剩下的三枚（`automation_entitlement_activations` / `_links` / `_subjects`）连名字都还没有，
+数字差也从登记的 "+2" 变成 **+3**。它们由 `3fcc3bef`（10-09 18:25，`feat(自动收集 持久层)`）带进来，
+而本线写下 §5 第 7 条那次登记时那三枚还不存在（当时登记的是 `20261018160000` 那两枚）⇒ 那句"两张 / +2"之外又多出三枚，数字差跟着变 +3。
+⇒ 原文那句"等 `20261018160000` 补完对外文案为止"整句作废（已就地更正）。
+
+17 枚逐枚归属（判据自己的推导复刻一遍：`CREATE TABLE` 在 HEAD 各迁移里的位置 → `git log --full-history --diff-filter=A` 找把它带进 main 的那笔）：
+
+| 带进 main 的那笔 | 表 | 归属 |
+|---|---|---|
+| `703cafc8`（本线服务端一笔） | `access_sessions`、`email_change_requests` | **本线**：类别名写在 parked 文案里（`privacy.ts:404` 枚举"登录会话""邮箱变更请求"、`personal-info-list.ts:236 / :243` 两行），**没入库** |
+| `9fa53ab9`（**本线"立 ADR-0063"那笔**） | `automation_workers`、`automation_commit_permits`、`automation_rules`、`automation_events`、`automation_recipient_keys`、`shares`、`share_invitations`、`share_members` | **别线的持久层 + 别线的类别名**：那笔提交一共带了 **6 枚迁移目录**（另有 `20261018000000_add_automation_grant`、`20261018110000_separate_direct_automation_ai_attempts`），而它正文里的"归属说明"只声明了 `docs/plans/README.md` 那 3 行 |
+| `e8b3e982`（自动收集 服务端） | `automation_ai_attempts`、`automation_sender_credentials`、`automation_entitlement_bindings`、`automation_entitlement_ticket_uses` | 自动收集线 |
+| `3fcc3bef`（自动收集 持久层） | `automation_entitlement_activations`、`automation_entitlement_links`、`automation_entitlement_subjects` | 自动收集线 |
+
+🔴 **本线的责任有两处，都不在"别人没提交"这一侧**：
+① `9fa53ab9` 把别的线**尚未配好对外文案的持久层**一次性带进了 main —— 这是 §6.50 / §6.55 / §6.59 那一族的**第四种面目**：
+§6.55 "路由写了没挂"、§6.50 "面板写了没 mount"、§6.59 "barrel 入库而来源文件没入库"，这一格是"**表建好了、界面上读得到它的那句话还不存在**"。
+② 本线自己那枚迁移 `703cafc8` 也先入库了，而它的类别名躺在 parked 文案里（同一件事，只是成员换成我）。
+
+**这一格为什么不能由本线现在收**：类别名与"共 N 处级联 / 覆盖 N 张表"是**对外承诺**（判据口径，归负责人；
+本线在 §5 第 7 条、§6.59、§6.63 三处都按这条停手）；而承载它们的那几枚文件此刻正被别的会话写
+（现量：`packages/legal` 下 7 枚 `M` + 3 枚 `??`），本线落任何一行都等于替别人决定入库时机。
+⇒ 交给负责人的一句话判断是：**要么由自动收集线把这三枚的名字与数字补完，要么把 §5 第 7 条改成一条长期边界**，两个都比"本线代写"干净。
+
+复取（两臂各一条，秒级）：
+```bash
+# 臂 A（纯 HEAD；先 `git checkout --force $(git rev-parse refs/heads/main)` 把载体钉到尖上，三件前置照 §6.62）
+cd .worktrees/<载体>/packages/legal && NO_COLOR=1 npx vitest run tests/structure.spec.ts
+# 臂 B（共享检出，读 parked 文案的那一份）
+cd packages/legal && NO_COLOR=1 npx vitest run tests/structure.spec.ts
+```
+
+🔴 **HEAD 为什么能带着这两枚红长这么久**：判据**在**默认通道里（`packages/legal` 有 `test` 脚本 ⇒ `pnpm check` 末尾那步 `pnpm -r test` 会跑它），
+停的是**执行者**：`gh run list -L 5` 现量最近一枚 CI run 是 `2026-10-05T16:32:52Z`（结论 failure），
+而 `git rev-list --count --since='2026-10-05T16:33:00Z' refs/heads/main` = **321** ——
+321 笔 main 提交没有一笔被那道链跑过。⇒ 这条与 §6.55（判据写了没挂进链）同型但方向不同：
+**那一格缺消费者，这一格缺执行者**。恢复 CI 属于运维口径（见记忆「CI/CD 因代理流量额度暂停，改 SSH」），本线不代做。
+
+⚠️ 取证时踩到的一个分母坑，值得单独留形：`git show --stat 9fa53ab9 | grep prisma/migrations` 命中 **0 枚**，
+而同一笔用 `git show --numstat` 全路径读是 **6 枚**。`--stat` 会把长路径中段缩成 `...`（这笔的输出里就有
+`.../inbound-recovery/…png` 那种形状），所以"我这笔没带迁移"这个**否结论**差一点就从一条 grep 上写出去了。
+判"某笔提交带没带某类路径"要用 `--numstat` / `--name-status`，`--stat` 只配给人看形状。（同一族：负结论也要枚举分母。）
 
 
 
