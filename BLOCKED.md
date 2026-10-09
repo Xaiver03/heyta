@@ -7276,6 +7276,16 @@ C) 先不接消费者，等 T6 的对外措辞定了一起做。**推荐 A**（�
 （与 B107 把 `tests/**` 纳入类型检查是同一族：改法本身会让 `pnpm check` 多拦别人那条线的既有形状）。
 ⇒ 在并进去之前，本线每次给这两份加表都要自己带一次上面的现量，不许拿 `check:md-tables rc=0` 当证据。
 
+✅ **上面那句"每次自己带一次现量"已经有装置了**（2026-10-10 03:1x，T8 那轮落成
+`research/tools/verify-inbound-doc-tables.py`，命令：`python3 research/tools/verify-inbound-doc-tables.py`，
+三臂自测 `--self-test`）。它与本条原来那个手工做法有一处**实质差别**，值得记下来防下一个人再踩：
+手工那版是把 `CODE_SPAN_BASELINE` **清空**再跑 —— 那等于第四类（格内反引号配对）整档不参与判定；
+新装置改成"**只追加文件、不动登记表与基线**"，于是四类判据全都活着。
+差别不是洁癖：第一版新装置照手工做法去**替换** `FILES`（基线仍留着），当场报出
+`calendar-year-time-and-mobile-profile.md 反引号基线登记 3，现量 0` —— 而真尺同日 rc=0，
+那条红是变体自己造的。⇒ 结论：**基线与登记表是一对绑死的**，改清单只能并、不能换。
+本条"要有人收"那半（把两枚路径并进 `scripts/` 的登记表）仍然开着 —— 那是覆盖口径，不在本线地界。
+
 ## B120（2026-10-10 03:1x，本会话 · T6 第二批逐枚复跑对外尺时量出的四枚既有红）：合流之前 `pnpm check` 不会自己绿
 
 现量方式：按根 `package.json` 的 `check` 链**现量重取**对外承诺类尺名（不是照记忆列），
@@ -7290,3 +7300,22 @@ C) 先不接消费者，等 T6 的对外措辞定了一起做。**推荐 A**（�
 
 ⇒ **要有人收**：T7 那三条命令里的 `pnpm check` 会同时撞上这四枚 + `server` 全套那 6 条既有红（**B115**），
 其中没有任何一条能在本线白名单内修掉。本线不顺手修、不代改判卷口径，也不把它们记成"环境无效"。
+
+## B121（2026-10-10 03:1x，本会话 · T8 逐条复审）：对外承诺里「这一档授予哪些 capability」那一列**不在任何尺的分母里**
+
+T8 给 AC-7 收证时撞出来的，且它正好是任务书说的那种「坏了没人会知道」。`docs/reference/pricing-and-entitlements.md`
+§1 那张表第 22/23 行的授予列写着 `hosting` + `ai` + `automation`，而同一文件 §6 的 `pricing-ssot` JSON 块里
+也有 `grants` —— 两处会不会各自漂开？本轮用**双向臂**量了，不是推断：
+
+| 臂 | 改法（只改这一枚白名单内文件） | 读数 | 判读 |
+|---|---|---|---|
+| 盲区臂 | 把第 22 行表格 prose 里的 `+ \`automation\`` 删掉 | `node scripts/check-pricing-consistency.mjs` **rc=0**、`node scripts/check-ai-quota-consistency.mjs` **rc=0** | 两把尺都看不见这句 ⇒ 「¥12 含自动收集」是一个**没有守者**的对外承诺 |
+| 阳性对照 | 把 `ai-quota-ssot` 块的 `"quota": 300` 改成 `299` | `check:ai-quota` **rc=1**，逐条点名 5 处消费者（zh/en 词条、AI 服务条款、定价文档…） | 同一把尺**能红** ⇒ 上一行的 rc=0 是盲区而不是尺坏 |
+
+两臂之间与之后各还原一次，改前后 sha256 前缀 `05303dfe5088f029` 逐字相同、该文件 `git status --porcelain` 为空。
+
+**为什么记在这里而不是自己修**：修法必须是"把授予那一列并进 `pricing-ssot` 的 JSON 块，并让
+`scripts/check-pricing-consistency.mjs` 对账 capability 集合 ↔ 服务端判定" —— 这是**改判卷口径**（任务书：不许，要改记 BLOCKED）。
+两个落点也都在白名单外：`scripts/check-pricing-consistency.mjs` 与 `server/src/billing/`（价目表代码那半）。
+⇒ 要负责人拍的只有一句：**"这一档给哪些 capability" 要不要成为一条对账门禁**。要，就给那两枚文件开地界；
+不要，就把 §1 表格那一列降格成"注释"，别让它读起来像承诺。

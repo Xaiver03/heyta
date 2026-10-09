@@ -636,3 +636,86 @@ T2 那句话里"每 30 秒续票据"这一格，此前是**一整套零件都在
 三条候选修法与各自代价都在那条），本线不代拍 —— 它连着一次新的出境；`waiting-entitlement` 的界面文案等 B110（词条地界）；
 `automation_entitlement_clocks` 的退役清扫等 B106（落点 `server/src/sync/cleanup.ts` 在白名单外）。
 ⇒ 现在的诚实读数就是：**机制与判据已在 HEAD，消费者零个**。AC-1～AC-8 继续不勾选，公网接收与售卖继续关闭。
+
+## 2026-10-10 03:1x · T8 逐条复审第一版：每条 AC 有没有一把能复跑的尺
+
+这一节只回答一个问题：**AC-1～AC-8 的每一句，今天拿哪条命令能复核？拿不出来就写"无尺"**，
+不许用"某包全量测试通过"顶替某一句。下面每一行都是本轮亲手跑的，命令照抄即可复跑。
+**AC 一条都不勾**（现量在最后一格）。
+
+### 当日尺与读数（下表 12 条测试命令：41 个测试文件 / 418 条 / 跳过 0）
+
+合计不是手加的，是把每份日志里 vitest 自己打的 `Test Files n passed (n)` 与 `Tests n passed (n)`
+两行逐份相加得到的（复算装置：`python3` 剥 ANSI 后按这两枚正则取数并累加，本轮读数 `命令数=12 files=41 tests=418`）。
+
+| 尺（命令） | 读数 | 它量的是 AC 的哪一句 |
+|---|---|---|
+| `cd server && npx --no-install vitest run --maxWorkers=1 tests/automation-entitlement-ticket.spec.ts tests/automation-drafts.spec.ts tests/inbound-automation.routes.spec.ts tests/inbound-entitlement-write-tx.spec.ts tests/inbound-worker-identity.spec.ts tests/automation-entitlement-issuer.spec.ts tests/automation-commit-proof.spec.ts tests/automation-events.spec.ts tests/automation-rules.spec.ts tests/automation-sender-credentials.spec.ts tests/automation-ai-metering.spec.ts` | `Test Files 11 passed (11)` / `Tests 99 passed (99)` | AC-1 拒绝词表、AC-2 线协议、AC-3 许可与提交身份、AC-4 判定表 |
+| `cd server && npx --no-install vitest run --maxWorkers=1 tests/entitlement.spec.ts tests/entitlement-gate.routes.spec.ts tests/entitlement-across.spec.ts` | `Test Files 3 passed (3)` / `Tests 56 passed (56)` | AC-1「**免费同步仍通过**」与权益并集（旧 gate 关掉不等于旁路） |
+| `cd server && npx --no-install vitest run --maxWorkers=1 tests/automation-ai-metering.pglite.spec.ts` | `Tests 12 passed (12)` | AC-1「重试账目可对账」+ AC-4：真库（pglite）里退款 CAS 只退一次、逐周期分行、`unexplainedByAutomation` 单向口径 |
+| `python3 research/tools/verify-inbound-worker-identity.py --log <路径>` | `Test Files 1 passed (1)` / `Tests 46 passed (46)`（临时 initdb 起的**真 PostgreSQL**，全部迁移逐条 apply） | AC-2 真 HTTP 字节级签名、AC-3 许可/回执/回滚、AC-1 票据一次性与吊销 |
+| `cd packages/inbound-core && npx --no-install vitest run --maxWorkers=1` | `Test Files 3 passed (3)` / `Tests 47 passed (47)`（envelope 11 / parser 18 / webhook 18） | AC-2 签名与大小/时间窗边界、AC-4 字段裁剪与 DST、AC-2/3 envelope AAD |
+| `cd packages/shared-schema && npx --no-install vitest run --maxWorkers=1 tests/task-batch-contract.spec.ts` | `Tests 15 passed (15)` | AC-5 严格批 payload 契约（未知字段、长度、重复 ID） |
+| `cd packages/op-log && npx --no-install vitest run --maxWorkers=1 tests/task-batch.spec.ts` | `Tests 16 passed (16)` = 5 组 × **三套适配器**（memory / IndexedDbAdapter / SqliteAdapter，另有第 143 行真文件库 `state.db`） | AC-5「多项不同字段只产生一枚逻辑 op」「三套存储适配器与远端回放收敛」「中断重启无半批」 |
+| `cd packages/app-host && npx --no-install vitest run --maxWorkers=1 tests/task-batch-actions.spec.ts` | `Tests 9 passed (9)` | AC-5 共享创建动作（唯一入口） |
+| `cd packages/app-host && npx --no-install vitest run --maxWorkers=1 tests/inbound-*.spec.ts` | `Test Files 13 passed (13)` / `Tests 103 passed (103)` | AC-2/3 客户端领取-发布-许可循环、AC-4 收件密钥与草稿审阅、T2 心跳 |
+| `cd packages/domain && npx --no-install vitest run --maxWorkers=1 tests/inbound-local-date.spec.ts` | `Tests 1 passed (1)` | AC-4 date-only 与 instant 的领域语义 |
+| `cd packages/sync-client && npx --no-install vitest run --maxWorkers=1 tests/inbound-authorization.spec.ts` | `Tests 6 passed (6)` | AC-3 上传授权接缝（引擎边界） |
+| `cd apps/web && npx --no-install vitest run --maxWorkers=1 tests/inbound-draft-review.spec.tsx tests/inbound-event-retry.spec.tsx tests/inbound-upload-authorization.spec.ts tests/inbound-worker-lifecycle.spec.tsx` | `Test Files 4 passed (4)` / `Tests 8 passed (8)` | AC-6 界面层（jsdom，非真浏览器） |
+| `node scripts/check-migrations.mjs` | rc=0，72 个迁移文件、9 枚含 CONCURRENTLY | AC-2/3 的库层前置 |
+| `node research/tools/license-inventory.mjs` | rc=0，白名单外已登记 **1**（`caniuse-lite` CC-BY-4.0，构建期数据包） | 「不新增依赖」 |
+| `python3 research/tools/verify-inbound-api-slice.py --self-test` / `…-host-options-slice.py --self-test` | 各自 `臂数=3，全部成立=True`，**真 rc=0**（不经管道取） | 本线入库配据：切片切错会被抓住 |
+| `grep -c '^- \[ \] \*\*AC-' docs/plans/inbound-automation.md` / `grep -c '^- \[x\] \*\*AC-' …` | **8 / 0** | 完成条件第 2 条 |
+
+与任务书 0 那一格的差异只有一处，且方向是多的不是少的：`verify-inbound-worker-identity.py`
+从写下的 38/38 变成 **46/46**（T1 的签发/绑定/吊销那几组用例进来了）。**测试数只许 ≥ 基线这一条成立。**
+
+⚠️ 这一格记一条**取证过程**而不是结论：同一根尺本轮**第一跑是 rc=1**，红因是宿主侧并发档
+（`内存闸门拒绝启动：轻量档已有 2 趟在跑（上限 2）`），占用者是**另一个仓库**的 vitest，
+不是本仓的产品红；等它退出后第二跑才拿到 46/46。**把"第一跑红"写成产品失败会是假的**，
+把"rc 取自管道尾巴"也同样是假的。
+
+### 无尺的句子（这才是要负责人点头的东西 —— 它们不是"还没测"，是"现在没有任何命令能证明"）
+
+| AC | 原句 | 现状 | 为什么做不了 |
+|---|---|---|---|
+| AC-3 | 「**两个独立真实宿主与独立数据库**跑通下方十个（现 13 个）故障注入窗口，观察任务数、op 数、回执与计量」 | **无尺**：`research/tools/` 里与本线有关的装置只有 `verify-inbound-worker-identity.py` 一枚，另两枚是入库切片器；跑 13 个窗口的双宿主装置**不存在** | 它跑在 app-host 的 `dist` 产物上，而 HEAD 仍被 B112 那四处白名单外接缝挡住（当日现量：`git show HEAD:` 查四枚成员命中 **0/0/0/0**，六枚文件仍 `M`）⇒ 现在写装置=在没有可编译的树上写 |
+| AC-6 | 「用户**独立完成**"启用 → 测试发送 → 等待 → 打开/解锁 → 自动处理 → 查看结果"」 | **无尺**：真浏览器那份 `e2e/tests/inbound-automation.spec.ts` 只有 2 条，且**它走的是 route 桩**（文件头自述 "Real browser/UI with HTTP fixtures; database authorization is tested separately"），量的是界面形状，不是这条旅程 | 旅程需要公网接收 + 有权益的宿主在跑，两者都关着；本轮**没有**复跑那 2 条，因为它会改写 `apps/web/evidence/inbound-recovery/` 那 16 枚**已跟踪**PNG，而该目录不在本线白名单 |
+| AC-7 | 「官方与自托管样例分别**可运行**，端点与权限真实」 | **无尺**（帮助中心/中英条款的落点也在白名单外，B118） | 半尺有：`docs/reference/` 那两份当日已按 HEAD 更正过措辞（协议 + 定价） |
+| AC-8 | 「平台 × 权益 × 设备状态 × 失败阶段的具体用例表」 | **无产物**：矩阵文件不存在，且 `pnpm check` / `-r test` / `reinstall:all` 三条在隔离副本上仍过不去（同 B112） | 需要 B112 的 A/B/C 拍板 |
+
+⇒ **逐格结论**：AC-1 / AC-2 / AC-4 / AC-5 的句子基本有尺（AC-4 的「实际出境请求符合披露」依赖
+`AiFeature='inbound-automation'` 那半，仍在 B112 的未提交里）；AC-3 有服务端半尺、缺双宿主半尺；
+AC-6/AC-7/AC-8 各缺的不是工时而是**判据的载体**。
+
+### 一把尺的反向验证：对外承诺里「授予」那一列**根本不在任何尺的分母里**
+
+这是本轮新做的两枚反向验证之一（另一枚在下面那把表格尺的三臂），因为它挡的正是"坏了没人会知道"那一类：
+`docs/reference/pricing-and-entitlements.md` §1 表格里 ¥12 那行的**授予列**写着
+`hosting` + `ai` + `automation`，而同节下面那条 bullet 把 `grants` 讲成另一套话（两处都不写行号 —— 行号会随别人提交漂）
+—— 两处会不会自己漂开？
+
+| 臂 | 改法 | 结果 | 判读 |
+|---|---|---|---|
+| 盲区臂 | 只删 ¥12 大陆那行授予列里的 `+ \`automation\`` | `check:pricing` **rc=0**、`check:ai-quota` **rc=0** | 两把尺都**看不见**这句承诺 ⇒ 对外"这一档包含自动收集"这句话没有任何一层在守 |
+| 阳性对照 | 只把 `ai-quota-ssot` JSON 块里的 `"quota": 300` 改成 `299` | `check:ai-quota` **rc=1**，逐条点名 5 处消费者（zh/en 词条、AI 服务条款、定价文档…） | 同一把尺**能红** ⇒ 上一行那个 rc=0 是"盲区"，不是"尺坏了" |
+
+两臂之间与之后各还原一次：改前后 sha256 前缀 `05303dfe5088f029` 逐字相同，`git status --porcelain` 对该文件为空。
+⇒ 修法要改的是**判据口径**（把 `grants` 那一列并进 `pricing-ssot` 的 JSON 块，让 `check:pricing` 对账），
+所以它记成 **B121** 待裁决，不在本线自己动。
+
+### 顺手把那枚"表格形状"的尺从手工配方收成常驻装置（B117 / B119 指的那第三次）
+
+本线文档不在 `scripts/check-md-table-rows.mjs` 的 `FILES` 登记表里，而 `scripts/` 不在白名单 ⇒
+前两次都是**临时改清单**跑一遍。这一次把它落成 `research/tools/verify-inbound-doc-tables.py`（白名单内的路径）：
+它不重写判据，只在运行时把本线四份**并进**登记表，再带着三臂自测。
+
+| 命令 | 当日读数 |
+|---|---|
+| `python3 research/tools/verify-inbound-doc-tables.py` | `清单 = 登记表 12 份 + 本线追加 4 份 = 16 份` / `✔ …16 个文件，列数、断行、"是不是表"与格内反引号配对都一致（第四类基线 3 行，只许减）` ⇒ 本线四份（含本轮新写的三张表）**形状干净** |
+| `python3 research/tools/verify-inbound-doc-tables.py --self-test` | `ARM-3 路径不存在：rc=1（响亮地失败 OK）` / `ARM-1 表格少一格：rc=1（红 OK）` / `ARM-2 还原同一份：rc=0` / `臂数=3，全部成立=True`（真 rc 不经管道取） |
+
+🔴 造它时踩到的那一格值得单独留一句，因为它是一种通用错法：**第一版把 `FILES` 整个替换成本线四份**，
+于是判据报 `calendar-year-time-and-mobile-profile.md 反引号基线登记 3，现量 0`，而真尺同日 rc=0。
+红因不是别线坏了，是**我的变体**让第四类基线找不到自己登记的那枚文件 —— 基线是按路径登记的，跟清单是一对绑死的。
+⇒ 凡是"把某枚登记表换掉再跑"的做法，落笔前先问一句：**这张表还有谁在引用它？**（这里答案就写在那枚源码的注释里：只许追加。）
