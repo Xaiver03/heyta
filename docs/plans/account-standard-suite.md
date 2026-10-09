@@ -1552,3 +1552,73 @@ pnpm-lock.yaml is not up to date with <ROOT>/packages/ui/package.json
 本线的处置：载体改用 `pnpm install --no-frozen-lockfile`，**装完立刻把 `pnpm-lock.yaml` 还原成 HEAD 那一版**，
 再用 `git status --porcelain` 数被跟踪脏 = 0 才允许过窗口门 ——
 否则"我为了让装起来而改动的字节"会混进本轮打包输入，读数就不再属于这批代码。
+
+### 6.27 🔴 更正 §6.18：移动端那两块面板**从来没在 HEAD 上挂过** —— 那句"已 = 2"是拿脏树量的（12:2x 现量）
+
+为 iOS 设备腿起完隔离载体，第一件事是把判据**对着 HEAD 复跑**（§6.18 那条行当时写的是
+`git show HEAD:apps/mobile/src/screens/ProfileScreen.tsx | grep -c EmailChangeSection` 已 = 2）。
+现量结果：
+
+| 问法 | 命令 | 读数 |
+|---|---|---|
+| HEAD 上有没有换绑挂载 | `git grep -c EmailChangeSection HEAD -- apps/mobile/src/screens/ProfileScreen.tsx` | **无匹配**（不是 0，是根本没有） |
+| 工作树里呢 | `grep -nE "EmailChangeSection" apps/mobile/src/screens/ProfileScreen.tsx` | 第 87 行 import + 第 1249 行 JSX ⇒ **挂载只活在未提交的工作树里** |
+
+"那两块组件在 HEAD 上到底有没有人渲染"这条问法里有管道符，放进表格会把列数改掉，所以单独列：
+
+```bash
+git grep -lE 'import .*(EmailChangeSection|SessionsSection)' HEAD -- apps   # 空 ⇒ 两枚组件都是孤儿
+```
+
+⇒ §6.18 那句是**把"工作区属性"读成了"提交属性"**：`git show HEAD:` 那条命令本身没写错，
+是我当时读的是一份已经被别的会话写过、而我把它当成 HEAD 的树。这一条在本线不是新鲜事
+（记忆 `feedback-rerun-the-gate-against-head-after-committing` 记的就是同一个形状），但**这次它把一格本该做的工作伪装成了已完成**。
+
+产品后果是实的：`EmailChangeSection`、中英词条、`packages/app-host` 编排、服务端路由、单测、
+设备脚本全在仓库里，而**移动端界面上点不到"更换登录邮箱"** —— 一个只能靠设备验收才能证的入口，
+在 HEAD 上任何设备上都找不到。这一格此前记成"早已入库"，所以没人去查。
+
+### 6.28 换绑那两行挂载落到了 HEAD（`76944386`），会话那一块**没有跟着挂**，理由写在账上
+
+**挂上的**：`ProfileScreen.tsx` 两行（import + JSX），插在 HEAD 自带的 `profileEditor` 区域里
+只读邮箱行与那句 `common.profile.email.hint` 之后。三件事各自成立才敢说这一格：
+- 入参 `form.serverUrl` / `form.token` / `signedInEmail` **逐字取自 HEAD 已有的标识符**
+  （同一份 HEAD 文件里 `signedInEmail` 在 620 行、`form.token` 在 621 行、`form.serverUrl` 在 894 行都已经在用），不依赖任何未提交代码；
+- 装配前用 `git show HEAD:<file>` 造 blob、两处锚各断言"恰好命中 1 次"，落盘后先过一遍
+  **解析证明**（`esbuild --loader=tsx` rc=0）再谈提交 —— 见 §7 第 397 条，
+  自报"PATCHED"不算生效，能被解析才算；
+- 那两行与在飞那版**逐字同形**（`grep -Fxq` 两条都命中）⇒ 对方整份提交 `ProfileScreen.tsx` 时
+  不会把我这两行当"多出来的改动"删掉。
+- 判据：`check:mobile-settings` rc=0（那块表单不进「我的」滚动流这条形状由它的 R3 钉住）；
+  `git grep -c EmailChangeSection HEAD -- …` 现在**真的是 2**。
+
+**没挂的**：`SessionsSection`。它需要 `onSignOutCurrentDevice` / `onSignedOutEverywhere` 两个回调，
+而这两个名字在 HEAD 的 `SecurityScreen` 里出现 **0 次** —— 它们住在别人正在重写的
+`ProfileScreen.tsx` / `SecurityScreen.tsx` 的未提交部分（那一趟现量 `git diff --stat` 得
+616 插入 / 117 删除；这个数会漂，复取：`git diff --stat -- apps/mobile/src/screens/{ProfileScreen,SecurityScreen}.tsx`）。按记忆里那条"隔离载体叠哪些未提交改动是一个要明写的裁决"：
+从 616 行里只挑我那几行 = 造一棵谁都不有的树，红了没人能归因；整片叠上 = 读数含别人在飞的代码。
+两种都不做 ⇒ **这一格等那两枚文件落地**，闭合判据现量一条：
+
+```bash
+git grep -c "onSignOutCurrentDevice" HEAD -- apps/mobile/src/screens/SecurityScreen.tsx   # 非 0 ⇒ 可以挂了
+```
+
+### 6.29 设备腿那一趟是怎么排的（载体、探针、以及我自己写坏的那枚探针）
+
+- 载体：`.worktrees/iosacct`，`git worktree add --detach` 到当时 HEAD，`pnpm install --no-frozen-lockfile`
+  （frozen 装不起来的原因见 §6.26 —— **那是 HEAD 自带的漂移，不是载体的问题**），
+  装完立刻 `git checkout -- pnpm-lock.yaml` 并断言被跟踪脏 = 0，
+  否则窗口门的 `src` 那一格会把我自己为了让装起来而改的字节算进本轮打包输入。
+- 编排：`~/.heyta-window-rigs/heyta-ios-account-chain.sh`，串行四步 + 每步落 rc 到证据目录，
+  **只认整条链的 `CHAIN_RC`**：`install.rc` → 载体脏=0 → 软链解析 → blob 同枚自证 →
+  `verify-mobile-window-gate.sh --target b`（负载 / 脏源码 / 设备独占，有界轮询 60 分钟，等满退 3）→
+  `reinstall-all.sh --only ios`（第 0 段自己跑 `pnpm -r build` ⇒ 它就是这笔挂载的编译证明）→
+  `--target c` → `verify-mobile-ios-account-email-sessions.sh` → 收尾把验收流程自己改写的
+  `apps/mobile/ios/*` 留 diff 后还原，并核对载体首尾同一枚 pin。
+- 🔴 **我第一版探针把合格的载体判成不合格**：软链自证写的是 `readlink … | grep iosacct`，
+  而 pnpm 的 workspace 软链是**相对**串（`../../../../packages/domain`），恒不含树名 ⇒
+  第一轮 `CHAIN_RC=3` 报"软链没指载体这棵树"，而那棵树其实完全指对自己。
+  改成 `realpath` 后比前缀才分得开。这正是记忆里"入口判断要比 realpath（/tmp 是软链）"那条的第二次命中，
+  换了个对象又踩一次 —— **假阻塞的形状永远是"探针报红"，不是"事情做不成"**。
+- 读数落在 `~/.heyta-evidence/ios-account-email-<时间戳>-r3/`（`chain.log` 有各步 rc；
+  截图按 §7 第 208 条只认 `primary` 那张，并按"腿绿 + mtime + md5"三条齐才算本轮）。
