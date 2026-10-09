@@ -85,9 +85,22 @@ const ENDPOINTS = [
       // 服务端那一半在 `server/tests/integration/email-change-and-sessions.integration.spec.ts`（真 PG）。
       // ⚠️ 它**在** `pnpm check` 里（`check:ai-e2e` 跑整个 `e2e/tests/`），不像上面三条各有独立驱动。
       'e2e/tests/account-email-change-and-sessions.spec.ts',
+      // 🔴 **设置面那五条界面腿 + 深浅两层主题对账**（提醒五态 / 数据管理 / 分组走查四组 /
+      //    关于与帮助长标题 / 同步与隐私三决定态）。判据全部住在装置
+      //    `scripts/qa/reminders-data-responsive.mjs` 里（逐条带 owner 腿，条数现量：读它自己
+      //    交的 `report.json` 的 `assertions` 键数），这一枚登记的是**入口**：起一棵只服务当前
+      //    源码的 vite、按无头那一档跑（AGENTS §6.2 规定二）、收尾按 spawn 回来的 pid 关。
+      //    由 `pnpm verify:web-ui-sweep` 驱动，刻意不进 `pnpm check`（要浏览器 + 自己那棵 vite，
+      //    与上面 `verify:web-auth` / `verify:password-web` 同一条理由）。
+      //    为什么这里必须有它：这条入口落地前，那批判据**只有人手动敲五条环境变量才会跑**
+      //    （本文件的老形状：「入口没登记 ≠ 验收不存在，但门禁看不见它就是没有」）；
+      //    登记之后，改名/删掉入口会红，而"跑不跑"仍然交给跑的人。
+      //    牙（2026-10-10 实测）：`HEYTA_RESPONSIVE_LEGS=nosuchleg` 那一臂 ⇒ 入口非 0 退出
+      //    **且**打印 `port_released=yes` —— 被测命令红了以后包装者没把 vite 漏在后台。
+      'scripts/verify-web-ui-sweep.mjs',
     ],
     shellSpecs: [],
-    covers: 'J1–J7 全覆盖（jsdom 逻辑层）+ 真浏览器整条旅程（e2e/auth-journey，verify:web-auth）+ 账号面两段旅程（换绑 / 登录设备，在 check:ai-e2e 里）',
+    covers: 'J1–J7 全覆盖（jsdom 逻辑层）+ 真浏览器整条旅程（e2e/auth-journey，verify:web-auth）+ 账号面两段旅程（换绑 / 登录设备，在 check:ai-e2e 里）+ 设置面五条界面腿与深浅两层主题对账（verify:web-ui-sweep）',
   },
   {
     end: 'mobile',
