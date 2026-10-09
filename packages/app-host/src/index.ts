@@ -402,6 +402,29 @@ export {
 } from './hosted-auth.js';
 
 /**
+ * 换绑登录邮箱 + 登录会话（ADR-0063）。**所有宿主共用这一份** ——
+ * 见 `account-security.ts` 文件头：路径、Bearer、失败归类是业务语义，不许各写一份。
+ *
+ * 🔴 刻意**不含** confirm 那一条：点邮件链接的人手上没有会话，那一侧的出口是
+ * 服务端渲染的凭据页 `/change-email`。客户端再加一条通路就是造第二个裁决点。
+ */
+export {
+  ACCOUNT_SECURITY_PATHS,
+  cancelEmailChange,
+  emailChangeStage,
+  getEmailChangeStatus,
+  listHostedSessions,
+  logoutCurrentDevice,
+  logoutEveryDevice,
+  planSignOut,
+  requestEmailChange,
+  revokeHostedSession,
+  type EmailChangeRequestResult,
+  type EmailChangeStage,
+  type SignOutPlan,
+} from './account-security.js';
+
+/**
  * 账号级"重新确认"闸门（G-27）。
  *
  * 🔴 与链 5 那道设备级闸**串联、不合并**：判据不同、事实源不同、失败方向也不同
