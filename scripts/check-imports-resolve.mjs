@@ -26,13 +26,14 @@
  *
  *   node scripts/check-imports-resolve.mjs                    # 审 HEAD
  *   node scripts/check-imports-resolve.mjs --tree <rev>       # 审任意一枚提交（取证用）
- *   node scripts/check-imports-resolve.mjs --self-test        # 三臂：两红一绿，证明它能失败
+ *   node scripts/check-imports-resolve.mjs --self-test        # 内存夹具多臂，证明它能红也能绿（臂数由它自己打印）
  *   node scripts/check-imports-resolve.mjs --sources-only     # 只看构建输入（测试文件那一类另算）
  *
  * ## 变异/负向已经做过什么
  *
  * - **真实事故的阳性对照**：`--tree 9fa53ab9` 报出那四枚 `shared-schema` 契约文件（它当时就是红的）。
- * - `--self-test` 用临时夹具（不碰仓库）造三臂：引用未跟踪的实现、引用根本不存在的模块、合规形状。
+ * - `--self-test` 用内存夹具造多臂：引用未跟踪的实现、引用根本不存在的模块、合规形状、
+ *   **判据字符串里的 `from '…'`（期望绿）**、真 import 但行尾注释带撇号 / 带 URL（期望仍红）。
  */
 import { execFileSync } from 'node:child_process';
 import { dirname, join, posix } from 'node:path';
@@ -52,15 +53,49 @@ const SPEC_RE = /(?:from|import|require)\s*\(?\s*['"](\.[^'"]+)['"]/g;
 
 /**
  * 注释里的例子不是 import。
- * 🔴 只剥"块注释"与"整行 `//` / `*` 开头"这两种：行尾 `//` 不能碰，
+ * 🔴 只剥"块注释"与"整行 `//` / `*` 开头"这两种：行尾 `//` 不能**整段**碰，
  *    否则 `https://…` 那一段会被吃掉，而它常常出现在被扫描的那一行的**后面**。
+ *    行尾注释还是要剥的 —— 见 `stripTrailingComment`：它只剥**不是 URL 续段**的那个 `//`
+ *    （前面紧邻 `:` 的不动），否则同一行尾注释里的一个撇号（`// it's fine`）
+ *    会让下面的引号配对判据把**真 import** 误判成"落在字符串里"而漏报。
  */
+const stripTrailingComment = (line) => line.replace(/(?<!:)\/\//, '\u0000//');
+
 const stripComments = (text) =>
   text
     .replace(/\/\*[\s\S]*?\*\//g, (block) => block.replace(/[^\n]/g, ' '))
     .split('\n')
-    .map((line) => (/^\s*(\/\/|\*|\/\/\/)/.test(line) ? '' : line))
+    .map((line) => {
+      if (/^\s*(\/\/|\*|\/\/\/)/.test(line)) return '';
+      const cut = stripTrailingComment(line);
+      const i = cut.indexOf('\u0000//');
+      return i === -1 ? line : line.slice(0, i);
+    })
     .join('\n');
+
+/**
+ * 这一处 `from '…'` 是不是落在一个字符串字面量**里面**？
+ *
+ * 🔴 这是本尺第一轮量出的**假红来源**：源码文本型判据（`expect(src).not.toContain("from './x'")`）
+ * 把 import 语句当**字符串**写进了测试里，正则照单全收，于是 HEAD 上凭空多出 12 条"测试 import 了没入库的主体"。
+ * 判据：从行首数到命中处，未转义的引号个数为奇数 ⇒ 它在一个字符串里 ⇒ 那不是 import。
+ */
+const insideString = (linePrefix) => {
+  const parity = { "'": 0, '"': 0, '`': 0 };
+  let escaped = false;
+  for (const ch of linePrefix) {
+    if (ch in parity) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      parity[ch] ^= 1;
+      continue;
+    }
+    escaped = ch === '\\';
+  }
+  return parity["'"] === 1 || parity['"'] === 1 || parity['`'] === 1;
+};
 
 const resolveCandidates = (fromFile, spec) => {
   const base = posix.join(posix.dirname(fromFile), spec);
@@ -102,6 +137,9 @@ const findViolations = ({ listFiles, readFile, label, sourcesOnly = false }) => 
       const spec = m[1];
       // `./dist/…` 是**构建产物**，不在版本控制里 —— 拿它当"实现没入库"是假红。
       if (/(^|\/)dist\//.test(spec)) continue;
+      // 落在字符串字面量里的那个 `from './x'` 是**源码文本型判据**，不是 import。
+      const lineStart = code.lastIndexOf('\n', m.index) + 1;
+      if (insideString(code.slice(lineStart, m.index))) continue;
       const hit = resolveCandidates(file, spec).find((c) => present.has(posix.normalize(c)));
       if (hit === undefined) {
         const line = code.slice(0, m.index).split('\n').length;
@@ -143,9 +181,11 @@ const report = (violations, out = console) => {
   return 1;
 };
 
-/** 三臂夹具：在内存里伪造一棵"树"（文件清单 + 内容），不碰仓库也不落盘。 */
+/** 多臂夹具（臂数由它自己打印，文档里不许抄）：在内存里伪造一棵"树"，不碰仓库也不落盘。 */
 const selfTest = () => {
+  let arms = 0;
   const arm = (name, files, expect) => {
+    arms += 1;
     const list = Object.keys(files);
     const got = findViolations({ label: name, listFiles: () => list, readFile: (p) => files[p] });
     const red = got.length > 0;
@@ -176,7 +216,30 @@ const selfTest = () => {
     },
     false,
   ) && allOk;
-  console.log(allOk ? '✅ 自检三臂都按期望走' : '🔴 自检没过：这枚尺不能失败，就别拿它当门禁');
+  // 🔴 臂 4 是本尺第一轮**自己造出来的那 12 条假红**的形状：源码文本型判据把 import 当字符串写。
+  //    没有这一臂，"修了假红"这句话只能靠人肉复跑一遍 HEAD 来信。
+  allOk = arm(
+    'assertion-string（判据字符串里的 from 不是 import）',
+    {
+      'packages/x/tests/a.spec.ts':
+        "expect(source).not.toContain(\"from './gone'\");\n" +
+        "const fixture = \"import { a } from './gone2';\\n\";\n",
+    },
+    false,
+  ) && allOk;
+  // 🔴 臂 5 是臂 4 的**反面**：真 import 的行尾注释里带撇号或 URL 时，不许被上面的配对判据吞掉。
+  //    漏报比假红更危险 —— 假红有人来问，漏报没人知道。
+  allOk = arm(
+    'real-import-with-apostrophe-comment（真 import + 行尾注释里有撇号）',
+    { 'packages/x/src/index.ts': "import { a } from './gone3'; // it's a real import\n" },
+    true,
+  ) && allOk;
+  allOk = arm(
+    'real-import-with-url-comment（真 import + 行尾注释里有 URL）',
+    { 'packages/x/src/index.ts': "import { a } from './gone4'; // see https://x.test/a\n" },
+    true,
+  ) && allOk;
+  console.log(allOk ? `✅ 自检 ${arms} 臂都按期望走` : '🔴 自检没过：这枚尺不能失败，就别拿它当门禁');
   return allOk ? 0 : 1;
 };
 
