@@ -3152,6 +3152,96 @@ cd .worktrees/<载体> && git checkout --force $(git rev-parse refs/heads/main)
 运行时腿（iOS 设备、真浏览器）仍然等 §6.59 那一格（`packages/ui` 的 barrel 已入库、它引用的 11 枚来源没入库），
 而默认通道 `pnpm check` 里本线的红也不在这层：见 §6.17 / §6.20 / §6.21 / §6.59 / §6.61 各自归属。
 
+### 6.63 默认通道那条 `expected 18 to be 17` 是一台"只会因为自己过期而红"的机器（10-10 02:57 现量，归 产品体验线，本线不代改）
+
+§6.62 提到 HEAD 上那条红（`server/tests/validation.service.spec.ts:667`，`ALLOWED_ENTITY_TYPES.size` vs
+`HEYTA_ENTITY_TYPES.length`）时只写了"跨层词表漂移"。这一轮把它量到底，结论是**链上没有任何不一致**，
+红的是判据自己的第三份手抄清单。
+
+现量（载体纯 `refs/heads/main`，两条都是同一棵树上读的）：
+
+| 趟 | 读数 |
+|---|---|
+| 只读，不改 | `1 failed / 62 passed (63)`，红的就是那条 count 断言 |
+| 阳性对照：**只**往那枚副本里补一个 `'COMMENT'` | `63 passed (63)` |
+
+差的正是 `COMMENT`。它的来历：`e6058120` 把 `'COMMENT'` 加进 `packages/shared-schema/src/entity-types.ts`
+的 `ENTITY_TYPES`（与 §6.59 那格**同一笔**），没动这枚副本。
+
+三份清单的受控程度各不相同，这是这格的全部成因：
+
+- 服务端：`ALLOWED_ENTITY_TYPES: Set<string> = new Set(ENTITY_TYPES)` —— **派生**，不可能与单一来源不一致。
+- 领域层：`packages/domain` 的 `MODELED_ENTITY_TYPES` 带**编译期兜底**（`AllModeledAreListed`：清单漏掉
+  `EntityModelMap` 任何一个键就编译不过）+ 一条运行时守卫。
+- 服务端那枚 spec：一份**手抄数组**，没有任何一层看着它。⇒ 唯一会红的就是这份副本没跟上。
+
+🔴 由此这条判据**照不出任何产品缺陷**：它比的是"我的抄本"与"抄本所抄的那个派生集合"的长度，
+而后者永远相等。真有牙的是同一文件 `:670` 那条（不许接受 Super Productivity 专属实体）。
+⇒ 修法有两个候选，**口径归负责人**（本线不代改别线判据）：
+① 往抄本补 `'COMMENT'`（一行，恢复绿，但同一台机器下一次加实体还会再红）；
+② 让这条判据去量一个真正会变的东西 —— 例如断言"客户端可构造的实体集合 ⊆ 服务端白名单"两侧都取被约束的那份源，
+把"不许多收"写成真判据，删掉长度相等这一条。
+复取：`cd .worktrees/<载体> && git checkout --force $(git rev-parse refs/heads/main) && ln -sfn ../../../packages/inbound-core server/node_modules/@heyta/inbound-core && (cd server && npx vitest run tests/validation.service.spec.ts)`
+（载体三件前置照 §6.62；跑完 `git checkout -- pnpm-lock.yaml` 并撤链接。）
+
+可迁移的形状：**"手抄清单的长度 == 派生集合的大小"这类断言是一台只会因为自己过期而红的机器**。
+它看起来像护栏（每次加实体都要有人动测试），实际把"审查"实现成了"改一个数字"，
+于是它的红既不能拦住真正的漏改（比如 §6.59：加了实体却没人检查法务文本与存储层），
+又会在什么都没坏的时候长红。要么删，要么让它去量两侧都可能变的东西。
+同一枚病在本线已经出现过：§6.52 那条"引用的词条在不在词表"我准备写门禁前先量了编译器已经管着 ⇒ 没写。
+
+### 6.64 那两腿 runtime 证据的拦路（§6.59）现在有两条秒级只读谓词，不必再重跑整条 build（10-10 03:0x 现量）
+
+产品体验线 02:5x 那一笔（`54e1a7d7`）写的是"本轮没有重跑 install / build 本身（要新建检出 + 2.8 G 全新装，此刻负载 26），
+量的是产生那条报错的谓词"。这一轮把那两条谓词固定下来 —— 它们就是 §6.59 那格的两类成因。
+只读、零依赖安装、零构建，本机实测 1.4 秒。
+
+**类 A（来源文件完全没入库）**：
+
+```bash
+git show HEAD:packages/ui/src/index.ts | grep -oE "from '\./[^']+'" \
+  | sed "s/from '//;s/'$//" | sed 's/\.js$//' | sort -u \
+  | while read f; do found=""; for ext in ts tsx; do p="packages/ui/src/${f#./}.${ext}"; [ -e "$p" ] && found="$p"; done; \
+      if [ -z "$found" ]; then echo "ABSENT_ON_DISK ${f#./}"; elif ! git cat-file -e "HEAD:${found}" 2>/dev/null; then echo "UNTRACKED_IN_HEAD $found"; fi; done | sort
+```
+
+03:0x 读数：**7 枚 `UNTRACKED_IN_HEAD`，`ABSENT_ON_DISK` 0 枚** ——
+`ai/AiGeneratedLabel` `ai/AssistantMark` `auth/LegalDocumentSheet` `auth/PasswordStrength`
+`empty-state/StateIllustration` `habits/HabitArtwork` `habits/HabitMetricIcon`
+（与工作树侧同刻的 `packages/ui/src` = 42 枚 `M` + 11 枚 `??` 一并看：文件数比 7 大，因为那 11 枚里含类 B 的文件与它们各自的依赖。）
+
+**类 B（文件入库了，被引用的成员只在工作树版里）**——逐枚对符号，`HEAD=` 那列为**空**就是这一枚缺
+（`git grep -c` 无匹配时整行不输出，所以这里读"空"而不是 0）：
+
+```bash
+for pair in "calendar/model.ts:calendarTaskSpan" "calendar/model.ts:groupTasksByCalendarDate" \
+            "calendar/model.ts:CalendarTaskSpan" "theme.tsx:useHeytaUiLocale" \
+            "ai/AiDisclosure.tsx:AI_DISCLOSURE_FIELD_GROUPS"; do
+  f="packages/ui/src/${pair%%:*}"; s="${pair#*:}"
+  printf "%-40s %-28s HEAD=%s disk=%s git=%s\n" "$f" "$s" \
+    "$(git grep -c -- "$s" HEAD -- "$f" 2>/dev/null | cut -d: -f3)" \
+    "$(grep -c -- "$s" "$f" 2>/dev/null)" "$(git status --porcelain -- "$f" | awk '{print $1}')"
+done
+```
+
+03:0x 读数：五枚符号 `HEAD=` 全空、`disk` 分别 3/1/2/1/1、三枚宿主文件 `git=M` ⇒ 类 B 成立的是
+**三枚文件里的五枚成员**（`calendar/model.ts`、`theme.tsx`、`ai/AiDisclosure.tsx`），与 §6.59 那张表逐枚对上。
+⚠️ 符号要给**声明处的写法**，别照 barrel 写成 `type CalendarTaskSpan` —— 声明是 `export interface CalendarTaskSpan`，
+带前缀去 grep 会把一枚真缺口读成 `disk=0`（本机第一次就是这么读的，已按去前缀的写法重取）。
+
+⇒ **A 红了就足以判定 HEAD 打不出包（充分条件）；A 绿了还不能判定拦路已撤**，因为 B 是另一种形状（文件在、成员不在）。
+本线那两腿（iOS 设备 / 真浏览器）的关闭判据因此是"这两条谓词都空 **且** 载体上 `pnpm -r build` rc=0"，
+后者不能省 —— 谓词是"必要且好查"，构建才是"充分"。
+
+登记这一条的理由不是它新，是它**改变了等法**：之前 §6.59/§6.62 写的都是"等别人提交完"，而这句话没法检查；
+现在它是两条命令，下一位（或本线下一轮）先跑这两行，再决定要不要花那 2.8 G 新建一棵检出。
+
+⚠️ 一条踩过的写法：把类 B 的检查自动化成"把 barrel 里 `export { A, B } from './x'` 的名字逐个去 HEAD 的那份文件里找"是**不可用的** ——
+本机实测它一次报出 **169** 枚"缺失"，而绝大多数是 `export { type Foo }` 那个 `type ` 前缀造成的假红
+（声明处写的是 `export interface Foo`），另有注释块里的示例文本与 `as` 改名两种形状也会命中。
+那 169 枚我**没有逐枚复核**，所以这一格的读数只认按 §6.59 那张表手点的五枚符号 + `git grep <符号> HEAD -- <文件>`。
+要把类 B 做成自动判据的人，得先把这三种形状处理掉，否则它会比 §6.63 那条更长红。
+
 
 
 
