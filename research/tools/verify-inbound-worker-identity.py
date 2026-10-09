@@ -41,7 +41,7 @@ def main():
             try:
                 run([str(pg / 'initdb'), '-D', str(data), '-A', 'trust', '--no-locale', '--encoding=UTF8'])
                 run([str(pg / 'pg_ctl'), '-D', str(data), '-l', str(base / 'postgres.log'),
-                     '-o', f'-h 127.0.0.1 -p {port} -k {base}', '-w', 'start'])
+                     '-o', f'-h 127.0.0.1 -p {port} -k {base} -c shared_buffers=16MB -c work_mem=1MB -c maintenance_work_mem=16MB -c max_connections=32', '-w', 'start'])
                 started = True
                 run([str(pg / 'createdb'), '-h', '127.0.0.1', '-p', str(port), 'heyta_inbound'])
                 for migration in sorted((root / 'server/prisma/migrations').glob('*/migration.sql')):
