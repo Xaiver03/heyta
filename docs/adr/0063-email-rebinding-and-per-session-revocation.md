@@ -89,6 +89,16 @@ payload 只有 `{userId, email, tokenVersion}`。撤销只有一档：`tokenVers
 （`ADR-0040:206` 引 OWASP "don't auto-login after reset"）。换绑的生效同样发生在**点邮件链接**那一刻，
 所以它也必须不发会话。界面上把后果写在那一次点击**之前**（`web.settings.password.otherDevices` 同族句式）。
 
+🔴 **一条实现事实（2026-10-09 补，结论一个字没动）**：上面那句"J13：其他设备全失效"里的
+**"全"**，靠 `tokenVersion` 一个计数器是**做不全**的 —— 实时通道只在 WebSocket **upgrade** 时鉴权，
+之后靠心跳维持，所以只抬计数器时，那台旧设备**已经打开着的那个页面**会带着上一个地址那枚令牌
+继续实时收 op（`websocket-connection.service.ts` 的 `closeForUser` 注释原话）。
+这条 ADR 立的语义是"其他设备全失效"，兑现它需要**四件**：抬计数器、失效认证缓存、删会话行、
+关实时通道。本 ADR 落地时前三条路（改密 / 重置 / 换绑生效）只写了前两件，
+现已由 `revokeAllDeviceSessions()` 把后两件绑成一个动作，并由 `pnpm check:session-revocation`
+钉成结构判据（任何抬计数器的文件必须关得到通道）。逐层读数与两条边界在
+[`account-standard-suite.md`](../plans/account-standard-suite.md) §6.13，类别级教训并入 traps **#395**。
+
 ### 2.3 不留历史邮箱：一个字段一个值，审计不落明文
 
 被否决的"换绑要留 `previous_email` 审计列"：
