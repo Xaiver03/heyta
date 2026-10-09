@@ -93,8 +93,11 @@ python3 -c "import re;print(re.sub(r'\x1b\[[0-9;]*m','',open('<日志>')).read()
 下一次有人宽 `git add` 就会把 330 枚截图连同别人的改动一起提交，提交信息里不会提到这件事。
 这与 §7 第 83 条那一族（探针会改变被测对象的状态）同型，只是被改变的不是应用状态而是**仓库里的证据**。
 
-⚠️ 本线自己也在这条里：`scripts/qa/reminders-data-responsive.mjs` 写的是 `apps/web/evidence/settings-group-theme-sweep/`，
-同样是已跟踪目录 —— 这句是自我披露，不是只登记别人。
+✅ **本线自己那一份已经修掉了**（同日）：`scripts/qa/reminders-data-responsive.mjs` 原先默认落在已跟踪的
+`apps/web/evidence/reminders-data-responsive`（47 枚），现在**目标目录里有已跟踪文件就在起跑前响亮拒绝**，
+要覆盖必须显式 `HEYTA_ALLOW_TRACKED_EVIDENCE=1`。五臂读数（零浏览器）：无 flag **rc=1** ×2、
+带 flag **rc=0**、未跟踪落点 **rc=0**、未知腿 **rc=1**（腿校验先于落点校验）。
+⚠️ 这只收掉**一枚写图者**；那 20+ 枚 spec 的行为没变，本仓的证据覆盖问题仍然开着。
 
 载体侧已做的处置（可复跑、可回退）：`cd <载体> && git restore -- apps/web/evidence` ⇒ `git status --porcelain | wc -l` 回到 **0**、
 `git rev-parse --short HEAD` 仍是 `b081811c`。**主检出那 330 枚没动**（那是别线运行的产物与在飞状态，归属不在本线）。

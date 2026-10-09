@@ -5,11 +5,21 @@
 ```bash
 # 另起一台 vite（本线用 4379，与 e2e 套件的 4318/4319 不撞）
 cd apps/web && ./node_modules/.bin/vite --host 127.0.0.1 --port 4379 --strictPort
-# 再跑装置，把证据指到本目录
+# 再跑装置，把证据指到本目录。🔴 本目录 32 枚文件**是已跟踪的**，所以从 2026-10-09 起
+# 必须显式带 HEYTA_ALLOW_TRACKED_EVIDENCE=1 —— 不带时装置会在起跑前响亮拒绝（见下）。
 HEYTA_RESPONSIVE_HEADED=0 \
+  HEYTA_ALLOW_TRACKED_EVIDENCE=1 \
   HEYTA_RESPONSIVE_EVIDENCE="$PWD/../../apps/web/evidence/settings-group-theme-sweep" \
   node scripts/qa/reminders-data-responsive.mjs
 ```
+
+🔴 **为什么这颗 flag 是必需的（2026-10-09）**：同日复量整族 `check:ai-e2e` 时现量到"跑一趟会把已跟踪的
+截图就地改写"（那棵隔离载体 152 枚、主检出 330 枚），而本装置默认落的也是已跟踪目录 —— 覆盖没有归属也没有门禁，
+证据一旦变成"最近一次跑出来的图"就不再指认任何一棵树。所以装置加了落点闸门：**目标目录里有已跟踪文件 ⇒ 起跑前拒绝**，
+两条出路写死在报错里（例行复跑指到未跟踪目录；确实要刷新入库证据才显式加这颗 flag，并在提交信息里写明是哪一趟、哪棵树）。
+五臂读数（全部零浏览器，`HEYTA_RESPONSIVE_PLAN_ONLY=1` 只走前置不启动 Chromium）：
+默认落点无 flag **rc=1**、plan-only 无 flag **rc=1**、plan-only + `ALLOW=1` **rc=0**（`trackedEvidenceFiles:47`）、
+plan-only + 未跟踪落点 **rc=0**（`trackedEvidenceFiles:0`）、未知腿 **rc=1**（腿校验在落点校验之前，顺序也是判据）。
 
 ### 只想跑其中几条腿（`HEYTA_RESPONSIVE_LEGS`）
 
