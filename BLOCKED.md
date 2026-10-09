@@ -7119,3 +7119,35 @@ git show --numstat --format='' 6d06bae4   # 空输出
 风险边界（为什么不紧急）：`scripts/check-layering.mjs` 那条"游标键名只能有一份"的判据针对的是
 **存储层与宿主各读一遍**的键（`lastServerSeq`），而这个键只有本模块读写，所以"改键名时有一端静默读到旧值"
 那个事故形状在这里不成立。登记表所有者顺手把它收进去即可，不需要新判据。
+
+## B112（2026-10-10 02:0x，本会话 · 入站自动收集 Goal T3 起手前的现量）：本线**已入库**的那几笔在 HEAD 上单独编译不过 —— 41 条错，红因全在白名单外的五枚接缝
+
+起 T3 之前先量了一次"HEAD 到底自不自洽"，办法是把包体放到**干净的分离检出**里编译（共享工作树带着别人未提交的改动，量不出 HEAD 的形状）：
+
+| 尺 | 命令 | 读数 |
+|---|---|---|
+| 工作树 | `cd packages/app-host && pnpm exec tsc --noEmit -p tsconfig.spec.json` | **rc=0，0 条错** |
+| 干净 HEAD 树 | 同一根尺，跑在 `.worktrees/iosacct`（tracked 文件逐字等于某个已提交点） | **rc=2，41 条错** |
+| HEAD 树打包 | `pnpm exec tsup`（同一枚分离检出） | **rc=1**，dts 阶段那条错是 `src/index.ts(25,8): TS2305: Module '"./host.js"' has no exported member 'InboundAutomationHostOptions'` |
+
+41 条按来源归组只有五处，**每一处都是"本线已提交的代码引用了一枚尚未提交的成员"**：
+
+| 缺的成员 | 本该落在哪枚文件 | 条数 | 内容在工作树里写好了吗 |
+|---|---|---|---|
+| `META_KEYS.INBOUND_{RECIPIENT_KEY,WORKER_CREDENTIAL,COMMIT_JOURNAL}` | `packages/storage/src/stores.ts` | 24 | ✅ 6 行，未提交 |
+| `AiFeature` 成员 `'inbound-automation'`（含能力表那一行） | `packages/ai/src/{egress,routing}.ts` | 8 | ✅ 5 行，未提交 |
+| `SyncClientOptions.getInboundUploadAuthorization` | `packages/sync-client/src/client.ts` | 5（1 条本体 + 4 条它引起的隐式 any） | ✅ 未提交 |
+| `OpLogEngine.dispatchValidated`（本线测试用它） | `packages/op-log/src/engine.ts` | 3 | ✅ 未提交 |
+| `InboundAutomationHostOptions` 类型 | `packages/app-host/src/host.ts` | 1 | ✅ 未提交（本线已提交的 `index.ts` 从它 re-export） |
+
+⇒ **后果要说全**：T7 的三条命令在任何隔离副本上都过不去（`pnpm check` 第一道 typecheck 就红，`pnpm -r build` 卡在 app-host 的 dts，`pnpm reinstall:all` 因此打不出任何一端的包）；T3 的双真 SQLite 宿主装置和 T5 的界面层入库都跑在这个 dts 产物上，所以**这两格现在做也是白做**。此前几轮报的"app-host typecheck rc=0"全是**工作树**读数，它们没有错，但它们不是 HEAD —— 这一格是本轮才量出来的，记在这里而不是去改前几轮的措辞。
+
+本轮已经在本线地界内关掉的那一格：`InboundAutomationHostOptions` 的定义搬进新文件 `packages/app-host/src/inbound-host-options.ts`（形状与未提交那版 host.ts 逐字相同），`index.ts` 改从它 re-export —— 于是**本线造成的那条 dts 失败**没了，HEAD 的打包不再被本线挡住（其余四处仍挡着）。切片与反向验证：`python3 research/tools/verify-inbound-host-options-slice.py --self-test`（三臂全拒，臂数由它自己打印）与同一条不带 `--self-test`（`+2/-1`，多一行少一行都拒）。
+⚠️ 这格留了一条**必须有人收的重复**：`host.ts` 落地时它自己那份同名 interface 要删掉、改成从 `./inbound-host-options.js` 导入，否则一枚契约两处定义 —— 这是 AGENTS.md §3.5 那个"抽取了但旧的那份没删"的形状。`packages/app-host/src/host.ts` 不在本线白名单，所以只能登记。
+
+**要负责人拍的（这才是这一节的实质）**：剩下四处怎么进 HEAD ——
+- **A（推荐）**：把这四枚文件临时并进本线白名单，我按同一套切片配方逐枚落，每枚只带本线那几行（storage 6 行、ai 5 行、sync-client 那个可选回调、op-log 的 `dispatchValidated`），逐枚读回 `--stat` 的文件数与 diff 行数。理由：这些成员**只因本线而需要**，别条线现在没有消费者。
+- **B**：由那四个包的所有者各自提交（内容已经在工作中，各一笔，代价比 A 低但时间不可控）。
+- **C（不建议）**：本线绕着未提交的东西写 —— 自持三枚 META 键、自己再实现一条 `dispatchValidated`、把上传授权从类型上摘掉。这能骗过 typecheck，但会把"唯一登记表"和"唯一写入入口"两条既有立场拆掉，属于把判据做绿而把产品做坏。
+
+反向验证的边界：本轮没有把这枚切片放进真编译器里复跑一次 HEAD 级的 dts（那需要一个带 node_modules 的干净检出，现成的分离检出不是本会话创建的，不动别人的载体）。按那条错文的构造（同包内 `./host.js` 的 re-export 指向一枚 HEAD 不存在的符号）这一格是关掉了，但**下一条会话要真复跑一次**：起一棵自己的隔离副本（`git worktree add` + `pnpm install --offline`），在新 HEAD 上跑 `pnpm exec tsup`，预期 **不再出现 TS2305 那一行**，而仍会看到 `META_KEYS.INBOUND_*` 那 24 条 —— 那 24 条在 dts 里不一定现形（外包是按各自 dist 的 `.d.ts` 解析的，分离检出的 dist 可能比源码新），所以**判 HEAD 用 tsc 那条尺，别用 dts 那条**。

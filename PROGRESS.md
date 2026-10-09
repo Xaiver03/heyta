@@ -2000,3 +2000,32 @@ OS 通知投递通过。原 [多端计划](docs/plans/goal-multi-end-coverage.md
 
 下一格（不受 B109/B110 挡）：**T3 的双真 SQLite 宿主 13 个故障窗口装置** —— 照
 `research/tools/verify-inbound-worker-identity.py` 的形状新建 `verify-inbound-*.py`，自报 n/n 且拒绝 0/0。
+
+## 2026-10-10 02:0x · 起 T3 之前先量了 HEAD 自不自洽 —— 量出 41 条红，并把本线自己那一半关掉了（**这是接着做的人要先看的一段**）
+
+T3 要在两个真 SQLite 宿主上跑故障窗口，而宿主跑的是 `@heyta/app-host` 的 **dist 产物**。所以动手前的第一把尺不是判据，是"HEAD 到底能不能编译"。两条尺同一轮跑：
+
+| 尺 | 读数 |
+|---|---|
+| 工作树 `pnpm exec tsc --noEmit -p tsconfig.spec.json`（app-host） | **rc=0，0 条错** |
+| 同一根尺跑在干净的分离检出（tracked 文件逐字等于已提交点） | **rc=2，41 条错** |
+| 分离检出里 `pnpm exec tsup` | **rc=1**，dts 报 `src/index.ts(25,8) TS2305: Module '"./host.js"' has no exported member 'InboundAutomationHostOptions'` |
+
+41 条全部是"已提交的代码引用尚未提交的成员"，五处来源、四处在本线地界之外 —— 明细、归因表、三条修法与要拍的板在 **`BLOCKED.md` B112**。这一格把前面几轮写的"app-host typecheck rc=0"限定住了：**那是工作树读数，不是 HEAD 读数**；T7 那三条命令在 HEAD 上过不去，与别的线无关的部分由 B103 记着。
+
+本线地界内当场关掉的那一半：`InboundAutomationHostOptions` 的定义搬进 `packages/app-host/src/inbound-host-options.ts`（形状与未提交那版 `host.ts` 里的逐字相同），`index.ts` 改从它 re-export ⇒ 本线自己那条 dts 失败消失，HEAD 的 app-host 打包不再被本线挡着。
+
+| 项 | 读数 |
+|---|---|
+| 切片与反向验证 | `python3 research/tools/verify-inbound-host-options-slice.py --self-test` ⇒ 三臂全部拒绝、`臂数=3，全部成立=True`、rc=0；不带 `--self-test` ⇒ `切片相对 HEAD：+2 行 / -1 行`，删加逐字打印，rc=0 |
+| 工作树 app-host typecheck（搬完之后） | rc=0，0 条错 |
+| 工作树 app-host `tsup` | rc=0 |
+| app-host inbound 测试 | `Test Files 12 passed (12) / Tests 91 passed (91)`，跳过 0（与上一轮基线同数） |
+| 未提交的 web 界面层四条 inbound 用例 | `Test Files 4 passed (4) / Tests 8 passed (8)`，跳过 0 —— 文件仍未入库（T5 被 B112 的四处接缝挡住，现在落只会让 HEAD 更红） |
+
+边界，不包装成完成：
+1. 这格没有真复跑 HEAD 级 dts（那要一棵带 node_modules 的干净检出，现成那枚分离检出不是本会话建的，不动别人的载体）。按错文构造这一格是关掉了；**下一条会话请起自己的隔离副本真复跑一次**，预期 TS2305 那一行消失、`META_KEYS.INBOUND_*` 那 24 条仍在（判 HEAD 用 tsc，别用 dts —— 外包在 dts 里按各自 `.d.ts` 解析，分离检出的 dist 可能比源码新，这 24 条不一定现形）。
+2. `host.ts` 落地时**必须删掉它自己那份同名 interface、改从 `./inbound-host-options.js` 导入**，否则一枚契约两处定义（AGENTS.md §3.5 那个"抽取了但旧的那份没删"的形状）。该文件不在本线白名单，只能登记。
+3. B109（票由哪个 URL 签发）与 B110（waiting 词条）仍然开着；B112 是第三条拦路的，且它挡的是 T3/T5/T7 三格。
+
+下一格（不受 B109/B110/B112 挡）：T4 的事件级计量账本 —— 全在 `server/src/automation/` + `server/tests/` 地界内，`pnpm --filter @heyta/server test` 自己就能判，不依赖 app-host 的 dist。
