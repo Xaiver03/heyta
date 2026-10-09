@@ -1,0 +1,887 @@
+{
+  "producedBy": "scripts/qa/reminders-data-responsive.mjs 里的 captureHelpWrap 那一趟",
+  "runCommand": "cd apps/web && ./node_modules/.bin/vite --host 127.0.0.1 --port 4379 --strictPort  # 另起一台，本线用 4379\nHEYTA_RESPONSIVE_HEADED=0 HEYTA_RESPONSIVE_EVIDENCE=<目录> node scripts/qa/reminders-data-responsive.mjs",
+  "carrier": {
+    "headless": true,
+    "locale": "zh-CN",
+    "unauthenticated": true,
+    "note": "注入的是运行时元素自己的 style（未改 CSS 源码）；主题不影响盒模型，所以这一趟只在 light 拍图"
+  },
+  "longTitle": {
+    "text": "帮助与问题反馈的超长中文标题换行实测",
+    "repeatedTimes": 4,
+    "injectedLength": 72
+  },
+  "caliperWarning": "换行由「标题盒高度 / 它自己的 line-height」推，不是 getClientRects().length —— 块级元素只给一枚矩形，第一版照它量把真在换行的界面读成没换行",
+  "helpWrapWidths": [
+    375,
+    768,
+    1440
+  ],
+  "assertions": {
+    "helpWrapFourRowsMeasured": true,
+    "helpWrapInjectionTookEffect": true,
+    "helpLongTitleWraps": true,
+    "helpLongTitleStaysInContentColumn": true,
+    "helpLongTitleRowInsideViewport": true,
+    "helpLongTitleNoHorizontalOverflow": true,
+    "helpLongTitleBadArmsFlipTheJudgment": true
+  },
+  "helpWrap": [
+    {
+      "width": 375,
+      "baseline": {
+        "arm": "baseline",
+        "linksWidth": 343,
+        "doc": {
+          "scrollWidth": 375,
+          "clientWidth": 375
+        },
+        "rows": [
+          {
+            "index": 0,
+            "textLength": 4,
+            "lineHeight": 24,
+            "lineCount": 1,
+            "copyWidth": 243,
+            "rowRight": 359,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 1,
+            "textLength": 4,
+            "lineHeight": 24,
+            "lineCount": 1,
+            "copyWidth": 243,
+            "rowRight": 359,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 2,
+            "textLength": 5,
+            "lineHeight": 24,
+            "lineCount": 1,
+            "copyWidth": 243,
+            "rowRight": 359,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 3,
+            "textLength": 5,
+            "lineHeight": 24,
+            "lineCount": 1,
+            "copyWidth": 275,
+            "rowRight": 359,
+            "gapToArrow": null,
+            "overlapsArrow": false
+          }
+        ]
+      },
+      "wrap": {
+        "arm": "wrap",
+        "linksWidth": 343,
+        "doc": {
+          "scrollWidth": 375,
+          "clientWidth": 375
+        },
+        "rows": [
+          {
+            "index": 0,
+            "textLength": 72,
+            "lineHeight": 24,
+            "lineCount": 5,
+            "copyWidth": 243,
+            "rowRight": 359,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 1,
+            "textLength": 72,
+            "lineHeight": 24,
+            "lineCount": 5,
+            "copyWidth": 243,
+            "rowRight": 359,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 2,
+            "textLength": 72,
+            "lineHeight": 24,
+            "lineCount": 5,
+            "copyWidth": 243,
+            "rowRight": 359,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 3,
+            "textLength": 72,
+            "lineHeight": 24,
+            "lineCount": 5,
+            "copyWidth": 275,
+            "rowRight": 359,
+            "gapToArrow": null,
+            "overlapsArrow": false
+          }
+        ]
+      },
+      "badArms": {
+        "nowrap": {
+          "arm": "nowrap",
+          "linksWidth": 343,
+          "doc": {
+            "scrollWidth": 375,
+            "clientWidth": 375
+          },
+          "rows": [
+            {
+              "index": 0,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1219.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 1,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1219.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 2,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1219.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 3,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1135.34,
+              "rowRight": 1219.34,
+              "gapToArrow": null,
+              "overlapsArrow": false
+            }
+          ]
+        },
+        "ellipsis": {
+          "arm": "ellipsis",
+          "linksWidth": 343,
+          "doc": {
+            "scrollWidth": 375,
+            "clientWidth": 375
+          },
+          "rows": [
+            {
+              "index": 0,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1219.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 1,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1219.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 2,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1219.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 3,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1135.34,
+              "rowRight": 1219.34,
+              "gapToArrow": null,
+              "overlapsArrow": false
+            }
+          ]
+        },
+        "fixedWidth": {
+          "arm": "fixedWidth",
+          "linksWidth": 343,
+          "doc": {
+            "scrollWidth": 375,
+            "clientWidth": 375
+          },
+          "rows": [
+            {
+              "index": 0,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 12,
+              "copyWidth": 100,
+              "rowRight": 1219.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 1,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 12,
+              "copyWidth": 100,
+              "rowRight": 1219.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 2,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 12,
+              "copyWidth": 100,
+              "rowRight": 1203.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 3,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 12,
+              "copyWidth": 100,
+              "rowRight": 359,
+              "gapToArrow": null,
+              "overlapsArrow": false
+            }
+          ]
+        }
+      },
+      "judgment": {
+        "wraps": true,
+        "copyFitsColumn": true,
+        "rowInsideViewport": true,
+        "noTextOverlappingArrow": true,
+        "noHorizontalOverflow": true
+      },
+      "badJudgments": {
+        "nowrap": {
+          "wraps": false,
+          "copyFitsColumn": false,
+          "rowInsideViewport": false,
+          "noTextOverlappingArrow": true,
+          "noHorizontalOverflow": true
+        },
+        "ellipsis": {
+          "wraps": false,
+          "copyFitsColumn": false,
+          "rowInsideViewport": false,
+          "noTextOverlappingArrow": true,
+          "noHorizontalOverflow": true
+        },
+        "fixedWidth": {
+          "wraps": true,
+          "copyFitsColumn": true,
+          "rowInsideViewport": false,
+          "noTextOverlappingArrow": true,
+          "noHorizontalOverflow": true
+        }
+      }
+    },
+    {
+      "width": 768,
+      "baseline": {
+        "arm": "baseline",
+        "linksWidth": 655.08,
+        "doc": {
+          "scrollWidth": 768,
+          "clientWidth": 768
+        },
+        "rows": [
+          {
+            "index": 0,
+            "textLength": 4,
+            "lineHeight": 24,
+            "lineCount": 1,
+            "copyWidth": 555.08,
+            "rowRight": 679.08,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 1,
+            "textLength": 4,
+            "lineHeight": 24,
+            "lineCount": 1,
+            "copyWidth": 555.08,
+            "rowRight": 679.08,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 2,
+            "textLength": 5,
+            "lineHeight": 24,
+            "lineCount": 1,
+            "copyWidth": 555.08,
+            "rowRight": 679.08,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 3,
+            "textLength": 5,
+            "lineHeight": 24,
+            "lineCount": 1,
+            "copyWidth": 587.08,
+            "rowRight": 679.08,
+            "gapToArrow": null,
+            "overlapsArrow": false
+          }
+        ]
+      },
+      "wrap": {
+        "arm": "wrap",
+        "linksWidth": 655.08,
+        "doc": {
+          "scrollWidth": 768,
+          "clientWidth": 768
+        },
+        "rows": [
+          {
+            "index": 0,
+            "textLength": 72,
+            "lineHeight": 24,
+            "lineCount": 3,
+            "copyWidth": 555.08,
+            "rowRight": 679.08,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 1,
+            "textLength": 72,
+            "lineHeight": 24,
+            "lineCount": 3,
+            "copyWidth": 555.08,
+            "rowRight": 679.08,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 2,
+            "textLength": 72,
+            "lineHeight": 24,
+            "lineCount": 3,
+            "copyWidth": 555.08,
+            "rowRight": 679.08,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 3,
+            "textLength": 72,
+            "lineHeight": 24,
+            "lineCount": 2,
+            "copyWidth": 587.08,
+            "rowRight": 679.08,
+            "gapToArrow": null,
+            "overlapsArrow": false
+          }
+        ]
+      },
+      "badArms": {
+        "nowrap": {
+          "arm": "nowrap",
+          "linksWidth": 655.08,
+          "doc": {
+            "scrollWidth": 768,
+            "clientWidth": 768
+          },
+          "rows": [
+            {
+              "index": 0,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1227.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 1,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1227.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 2,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1227.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 3,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1135.34,
+              "rowRight": 1227.34,
+              "gapToArrow": null,
+              "overlapsArrow": false
+            }
+          ]
+        },
+        "ellipsis": {
+          "arm": "ellipsis",
+          "linksWidth": 655.08,
+          "doc": {
+            "scrollWidth": 768,
+            "clientWidth": 768
+          },
+          "rows": [
+            {
+              "index": 0,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1227.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 1,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1227.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 2,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1227.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 3,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1135.34,
+              "rowRight": 1227.34,
+              "gapToArrow": null,
+              "overlapsArrow": false
+            }
+          ]
+        },
+        "fixedWidth": {
+          "arm": "fixedWidth",
+          "linksWidth": 655.08,
+          "doc": {
+            "scrollWidth": 768,
+            "clientWidth": 768
+          },
+          "rows": [
+            {
+              "index": 0,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 12,
+              "copyWidth": 100,
+              "rowRight": 1227.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 1,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 12,
+              "copyWidth": 100,
+              "rowRight": 1227.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 2,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 12,
+              "copyWidth": 100,
+              "rowRight": 1211.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 3,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 12,
+              "copyWidth": 100,
+              "rowRight": 679.08,
+              "gapToArrow": null,
+              "overlapsArrow": false
+            }
+          ]
+        }
+      },
+      "judgment": {
+        "wraps": true,
+        "copyFitsColumn": true,
+        "rowInsideViewport": true,
+        "noTextOverlappingArrow": true,
+        "noHorizontalOverflow": true
+      },
+      "badJudgments": {
+        "nowrap": {
+          "wraps": false,
+          "copyFitsColumn": false,
+          "rowInsideViewport": false,
+          "noTextOverlappingArrow": true,
+          "noHorizontalOverflow": true
+        },
+        "ellipsis": {
+          "wraps": false,
+          "copyFitsColumn": false,
+          "rowInsideViewport": false,
+          "noTextOverlappingArrow": true,
+          "noHorizontalOverflow": true
+        },
+        "fixedWidth": {
+          "wraps": true,
+          "copyFitsColumn": true,
+          "rowInsideViewport": false,
+          "noTextOverlappingArrow": true,
+          "noHorizontalOverflow": true
+        }
+      }
+    },
+    {
+      "width": 1440,
+      "baseline": {
+        "arm": "baseline",
+        "linksWidth": 655.08,
+        "doc": {
+          "scrollWidth": 1440,
+          "clientWidth": 1440
+        },
+        "rows": [
+          {
+            "index": 0,
+            "textLength": 4,
+            "lineHeight": 24,
+            "lineCount": 1,
+            "copyWidth": 555.08,
+            "rowRight": 1079.08,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 1,
+            "textLength": 4,
+            "lineHeight": 24,
+            "lineCount": 1,
+            "copyWidth": 555.08,
+            "rowRight": 1079.08,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 2,
+            "textLength": 5,
+            "lineHeight": 24,
+            "lineCount": 1,
+            "copyWidth": 555.08,
+            "rowRight": 1079.08,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 3,
+            "textLength": 5,
+            "lineHeight": 24,
+            "lineCount": 1,
+            "copyWidth": 587.08,
+            "rowRight": 1079.08,
+            "gapToArrow": null,
+            "overlapsArrow": false
+          }
+        ]
+      },
+      "wrap": {
+        "arm": "wrap",
+        "linksWidth": 655.08,
+        "doc": {
+          "scrollWidth": 1440,
+          "clientWidth": 1440
+        },
+        "rows": [
+          {
+            "index": 0,
+            "textLength": 72,
+            "lineHeight": 24,
+            "lineCount": 3,
+            "copyWidth": 555.08,
+            "rowRight": 1079.08,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 1,
+            "textLength": 72,
+            "lineHeight": 24,
+            "lineCount": 3,
+            "copyWidth": 555.08,
+            "rowRight": 1079.08,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 2,
+            "textLength": 72,
+            "lineHeight": 24,
+            "lineCount": 3,
+            "copyWidth": 555.08,
+            "rowRight": 1079.08,
+            "gapToArrow": 16,
+            "overlapsArrow": false
+          },
+          {
+            "index": 3,
+            "textLength": 72,
+            "lineHeight": 24,
+            "lineCount": 2,
+            "copyWidth": 587.08,
+            "rowRight": 1079.08,
+            "gapToArrow": null,
+            "overlapsArrow": false
+          }
+        ]
+      },
+      "badArms": {
+        "nowrap": {
+          "arm": "nowrap",
+          "linksWidth": 655.08,
+          "doc": {
+            "scrollWidth": 1440,
+            "clientWidth": 1440
+          },
+          "rows": [
+            {
+              "index": 0,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1627.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 1,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1627.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 2,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1627.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 3,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1135.34,
+              "rowRight": 1627.34,
+              "gapToArrow": null,
+              "overlapsArrow": false
+            }
+          ]
+        },
+        "ellipsis": {
+          "arm": "ellipsis",
+          "linksWidth": 655.08,
+          "doc": {
+            "scrollWidth": 1440,
+            "clientWidth": 1440
+          },
+          "rows": [
+            {
+              "index": 0,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1627.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 1,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1627.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 2,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1103.34,
+              "rowRight": 1627.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 3,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 1,
+              "copyWidth": 1135.34,
+              "rowRight": 1627.34,
+              "gapToArrow": null,
+              "overlapsArrow": false
+            }
+          ]
+        },
+        "fixedWidth": {
+          "arm": "fixedWidth",
+          "linksWidth": 655.08,
+          "doc": {
+            "scrollWidth": 1440,
+            "clientWidth": 1440
+          },
+          "rows": [
+            {
+              "index": 0,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 12,
+              "copyWidth": 100,
+              "rowRight": 1627.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 1,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 12,
+              "copyWidth": 100,
+              "rowRight": 1627.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 2,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 12,
+              "copyWidth": 100,
+              "rowRight": 1611.34,
+              "gapToArrow": 16,
+              "overlapsArrow": false
+            },
+            {
+              "index": 3,
+              "textLength": 72,
+              "lineHeight": 24,
+              "lineCount": 12,
+              "copyWidth": 100,
+              "rowRight": 1079.08,
+              "gapToArrow": null,
+              "overlapsArrow": false
+            }
+          ]
+        }
+      },
+      "judgment": {
+        "wraps": true,
+        "copyFitsColumn": true,
+        "rowInsideViewport": true,
+        "noTextOverlappingArrow": true,
+        "noHorizontalOverflow": true
+      },
+      "badJudgments": {
+        "nowrap": {
+          "wraps": false,
+          "copyFitsColumn": false,
+          "rowInsideViewport": false,
+          "noTextOverlappingArrow": true,
+          "noHorizontalOverflow": true
+        },
+        "ellipsis": {
+          "wraps": false,
+          "copyFitsColumn": false,
+          "rowInsideViewport": false,
+          "noTextOverlappingArrow": true,
+          "noHorizontalOverflow": true
+        },
+        "fixedWidth": {
+          "wraps": true,
+          "copyFitsColumn": true,
+          "rowInsideViewport": false,
+          "noTextOverlappingArrow": true,
+          "noHorizontalOverflow": true
+        }
+      }
+    }
+  ]
+}
