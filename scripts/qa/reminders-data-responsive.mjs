@@ -242,11 +242,12 @@ async function dataJourney(browser, spec) {
 }
 
 /**
- * 明暗 × 视口下把「个人资料」与「账号与安全」各拍一张，并记下这一组的标题、
- * 文本量与几何。加这一趟的理由是覆盖表实测出来的洞：
+ * 明暗 × 视口下把「个人资料 / 账号与安全 / 同步与隐私 / AI 与集成」各拍一张，
+ * 并记下这一组的导航文案、标题、可交互控件枚数与几何。加这一趟的理由是覆盖表实测出来的洞：
  * `apps/web/evidence/account-suite/` 那 11 张里带 dark 命名的 **0 张**，
  * `assistant/` 7 张里 1 张 —— 而本轮的验收要求是"实际验收深浅主题"。
- * 这枚装置是本线的，补这两组不需要动别人在写的 spec。
+ * 「显示」与「数据管理」两组由本装置另外两趟覆盖，「关于与帮助」由 help-entry-ux 覆盖。
+ * 补这四组用的是本线自己的装置，没有去改别人在写的 spec。
  */
 async function captureGroup(browser, spec, group) {
   const context = await browser.newContext({ viewport: { width: spec.width, height: spec.height }, locale: 'zh-CN' });
@@ -287,7 +288,7 @@ for (const spec of cases) {
 }
 const data = [];
 for (const spec of cases) data.push(await dataJourney(browser, spec));
-const sweepGroups = ['profile', 'account'];
+const sweepGroups = ['profile', 'account', 'sync', 'ai'];
 const groups = [];
 for (const spec of cases) for (const group of sweepGroups) groups.push(await captureGroup(browser, spec, group));
 await browser.close();
