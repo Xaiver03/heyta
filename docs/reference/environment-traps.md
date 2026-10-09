@@ -9005,3 +9005,42 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     理由管不到它）。宿主机 1 分钟负载 371 时两条换绑用例报的是 `Test timed out in 5000ms`，
     同一份代码 `--testTimeout=30000` 复跑 14/14 绿 ⇒ **那两红是载体天花板，不是产品失败**。
     现量：`grep -n 'testTimeout' server/vitest.integration.config.ts`（今天为空）。
+
+393. 🔴 **`test` 脚本写成 `tsc && vitest run` 的那一层，在类型检查失败时不产生任何测试读数** ——
+    它既不算红也不算绿，只会让"跑了全量单测"这句话少算一整包。
+
+    2026-10-09 12:4x 实测：`pnpm -r --no-bail test` 之后按 AGENTS §6 那条对账数两遍——
+    **有 `test` 脚本的包 = 21 枚，打了 `Tests` 汇总行的包 = 20 枚**，差的正是 `packages/sync-core`：
+    它的 `test` 是 `npm run test:typecheck && vitest run`，而 `tsc -p tsconfig.spec.json` 在一枚
+    别人的 spec 上报了 `TS2345`（少一个 `identity` 参数）⇒ **`&&` 右边那句从来没起跑**，
+    于是那一包的全部用例在这一趟里**不存在**，而输出里没有任何一行写着这件事。
+
+    两种读法都会把人带偏，而且方向相反：
+    ① 看 rc —— `--no-bail` 的整体 rc≠0，只说"有包失败"，不说失败在测试**之前**；
+    ② 看测试计数 —— `12937 passed / 43 failed` 读起来像"全跑过了"，实际少了一整层。
+    ⚠️ 默认（不带 `--no-bail`）更糟：链条停在第一个失败包，本轮第一趟就只拿到 **4** 行汇总对 21 枚包。
+
+    判据（两条都是现量命令，别抄数；第一条 12:51 实跑过，输出就是 `有脚本 21 有汇总 20` 加一行
+    `没起跑的: packages/sync-core/` —— **它点名是谁没跑**，只报两个数不够，人会当成"差不多"）：
+    ```bash
+    # A：两数必须相等，并且要打出差集的名字
+    LOG=那一趟的日志 node -e "const fs=require('fs'),{execSync}=require('child_process');
+      const dirs=execSync('ls -d packages/*/ apps/*/ server 2>/dev/null',{shell:'bash'}).toString().trim().split('\n')
+        .filter(d=>{try{return JSON.parse(fs.readFileSync(d+'/package.json')).scripts?.test}catch(e){return false}});
+      const rep=new Set([...fs.readFileSync(process.env.LOG,'utf8').matchAll(/^(\S+) test: +Tests /gm)].map(m=>m[1]));
+      const run=dirs.filter(d=>rep.has(d.replace(/\/$/,'')));
+      console.log('有脚本',dirs.length,'有汇总',run.length);
+      console.log('没起跑的: '+dirs.filter(d=>!rep.has(d.replace(/\/$/,''))).join(' '));"
+    # B：谁没起跑、为什么 —— 看那一包里 `test` 那串里的 `&&`，右边那半就是被跳过的那层
+    node -e "console.log(require('./packages/sync-core/package.json').scripts.test)"
+    ```
+
+    处置：这一族的修法**不是**给 vitest 加超时或去掉 `tsc`，而是**把两类读数分开**——
+    要么让那一层的缺失本身响亮（对账判据 A 就是干这个的），要么在报告里同时给
+    "跑到测试的包数 / 有 test 脚本的包数"。⚠️ 报"全量单测通过"之前必须先过对账 A，
+    否则这句话的含金量取决于有没有人恰好去数第二遍。
+
+    📌 一般规律：**串式 `test` 脚本里，前置那一环失败会把测试计数清成零而不留痕迹**；
+    凡是"N passed"这类聚合读数，必须有一条"N 的分母从哪来"的对账，
+    否则少掉的那一整层永远以"绿色"的面目出现（§7 元规则 2 的又一种形状：不能失败的判据比没有更糟，
+    而**根本不产生读数**比不能失败更安静）。

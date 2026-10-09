@@ -227,6 +227,11 @@ W1 先落、W7 后落 ⇒ 中间任何一次 `pnpm check` 都会红。**这不�
     ⚠️ 换签名之后 `tests/` 里还有**两处旧调用点**是本线自己的，而**没有一档编译期检查看得见它们**
     （§6.9，并入 traps #210 的第三种面目：`tsconfig` 不含 tests、这一包没有 `typecheck`）——
     那一格是随后那趟**全量单测**替本线抓出来的，不是构建也不是 typecheck。
+15. ⚠️ **"跑了全量单测"这句话的分母要自己数**（§6.11，traps **#393**）：
+    21 枚有 `test` 脚本的包里只有 20 枚打了 `Tests` 汇总行，差的 `packages/sync-core`
+    是因为它的 `test` 写成 `tsc && vitest run` 而前置那半红在**别人一枚 spec** 上 ⇒
+    那一包的全部用例这一趟**不存在**，而输出里没有任何一行写这件事。
+    本线报绿之前要先过那条对账（它会点名是谁没起跑）；这条边界是全仓的，不是本线开的洞。
 
 ---
 
@@ -597,6 +602,25 @@ ps aux | grep -E '[c]heck-ai-e2e|[p]laywright' | wc -l        # >0 就别抢（�
 判据只要 §6.7 那 31 条里**界面半边**的那几条：两节渲染出来 → 发起更换后状态区读到"还在等两个邮箱各点一次" →
 会话列表里 `current` 只有一枚 → 撤"这一台"之外的那一枚 → 手上这枚仍 200。
 
+#### 6.8.1 12:3x 摸完现状之后，这一格从"留给下一位"变成**一枚有名字的接缝**
+
+跑之前先量了这台模拟器的现状，两条读数决定它不是"写个脚本就能跑"：
+
+| 现量 | 读数 | 后果 |
+|---|---|---|
+| 已装 App 的本地库 `Library/heyta.sqlite` | `ops` = **0 行**；`meta` 只 1 行，里面**一条 http URL 都没有** | 这台是**全新未配置**态 ⇒ iOS 旅程必须自己走完"填服务器地址 + E2EE 口令 + 访问令牌"那一步才到得了已登录 |
+| 那一步的实现住在哪 | **不在** `scripts/lib/mobile-e2e.sh`（那里只有 `idb_dump / idb_has / idb_label_center / idb_field_center / ok / bad / summary` 这些原子），而是内联在 `scripts/verify-mobile-ios-account-erasure.sh:662` 的 `fill_three_credentials` 与其依赖簇：`open_settings_sheet`、`fill_field`、`dismiss_ios_save_password`、`close_settings_sheet`、`ax_press`、`idb_wait_label`、`HOST_SERVER`、`E2EE` | 那一枚脚本 **1055 行、属于注销那条线**。复制这七个函数就是 AGENTS §3.5 数过的那种"同一件事的第二份实现"（代价是两套裁决标准）；正道是**由那一格的 owner 把这簇抽进一份 iOS rig lib**，抽完之后本线的旅程只剩约 120 行判据 |
+
+🔴 **为什么这一抽不由本线代做**（不是懒，是验不动）：搬共享函数要主张"运行时形状逐字段等于改前"，
+而对这簇唯一有意义的复验 = **把那一格 1055 行的整条验收再跑一遍**，它要占的正是此刻挂着
+别人 `idb_companion`（pid 27352，起于 10-08 08:19，父进程是另一条会话的 codex app-server）的那台模拟器。
+没有窗口就没有复验，**没有复验的搬迁比复制更危险**。
+⚠️ 载体读数一并留着：12:35 `load 29.11 / 26 / 60`（比 §6.7 那三趟时的 342 已退潮），
+但仍有 5 枚 headless chromium 在别人那族 e2e 里没收尾。
+
+⇒ 这一格的**准确等待条件**从"给个设备窗口"改成：**与注销那条线约一次共享窗口，把那簇抽成 lib，本线再补旅程**。
+`BLOCKED.md` 里那一格由 owner 那一线登记更合适（本线不代写别人的账）。
+
 ### 6.9 换缓存键之后跑的那一层全量单测：它抓到的是**本线自己的两处旧调用点**
 
 改的是 `src/auth-cache.ts` 的**函数签名**（`get(userId)` → `get(userId, sessionId)`），
@@ -659,7 +683,7 @@ node -e "console.log(require('./server/tsconfig.json').include)"                
 | `packages/i18n/src/locales/{zh-CN,en}.ts` | 我的 37 枚 key 与他们的措辞混在同一个 blob | 仍 `M `（staged），staged blob 里本线 `common.emailChange\|common.sessions` **37 处**、协作线 `comment\|share\|评论\|共享` **75 处** | ❌ 取走 = 把别人未完成的措署在本线提交信息下；不取 = 面板引用的 key 不在 HEAD |
 | 根 `package.json` | （§6.6 只记了"被别人 staged"这一半） | 仍 `M `，且 staged 版本里本线那枚 `verify:mobile-account` 别名 **0 处** | ❌ 别名与脚本必须同一笔（见 §6.7 那段 `check:verify-script-copy` 的自动收录） |
 | `server/src/api.ts` → 其实注册点是 `server/src/server.ts` | 🔴 记的是"api.ts +596 行里本线只占几行" | **这句按现量更正**：本线的服务端接线**不在 api.ts**，注册点是 `server/src/server.ts` 那四行（`import { accountSecurityRoutes }` + `await fastifyServer.register(accountSecurityRoutes, { prefix: '/api' })`）。现量：`git status --porcelain=v2 -- server/src/server.ts` 打的是 **`.M`**（只有未暂存改动），而 `git diff -- server/src/server.ts` 的 `^+` 行**全是本线那四行** | ✅ 这一枚**单独可取** —— 但它等的是下面那一枚（路径常量） |
-| `packages/shared-schema/src/index.ts` | +32 行里本线只占 4 行 | 本线那两枚路径常量 `EMAIL_CHANGE_PATHS` / `SESSION_PATHS` 在 **HEAD 与他们的暂存版里各 0 处**（`git show HEAD:… \| grep -c` = 0、`git show :… \| grep -c` = 0），只活在工作树；而 `server/src/account/account-security.routes.ts:33` 正是从那一枚 import 它们的 | ❌ 要单独取本线那 4 行，就得**替他们重写 index 里那枚 blob**（在他们正在写的暂存态上动刀，AGENTS §8 第 9 条 + "只对自己创建的对象动手"） |
+| `packages/shared-schema/src/index.ts` | +32 行里本线只占 4 行 | ✅ **已单独落（`343ffc8a`）**，而且落之前先更正了本台账自己的两处错记：① 那 25 行未暂存差异**全是本线的**（先前那次"归属探针"拿 `share` 当特征串，把 `shared` 这个词自己命中了 ⇒ 假阴性一个人都没抓到）；② 这一枚**根本不在他们的暂存集里**（`.M`，只有未暂存改动），所以"要替别人重写 index blob"那句前提当场不成立 | ✅ 落法：整枚 pathspec 取走，两枚新契约文件零 import、`tsup.config.ts` 只有 `src/index.ts` 一个 entry ⇒ 不需要动 `package.json`。复验：该包 build RC=0（含 tsup 的 dts 档）+ `Tests 173 passed (173)` |
 
 🔴 **顺手否证掉本会话自己刚假设过的一个最坏形状**：12:2x 曾推"他们那份 staged 的 `server.ts` 里可能已经带着本线那行 import ⇒ 他们一提交，HEAD 就得到一句指向**未入库文件**的 import、构建当场坏"。
 三行现量把它推翻：`git show HEAD:server/src/server.ts \| grep -c accountSecurityRoutes` = **0**、
@@ -671,15 +695,83 @@ node -e "console.log(require('./server/tsconfig.json').include)"                
 而是**这一批本身是一个原子集** —— `schema.prisma` 的 `AccessSession` 模型 + 迁移 +
 `server/src/account/*` + `auth.ts`/`auth-cache.ts` 的新签名 + `server.ts` 那四行注册 +
 `@heyta/shared-schema` 里那两枚路径常量 + 两端面板引用的 i18n key。
+🟢 **这一节写完之后原子集缩了一次**：路径常量那一枚已单独落（见上面那张表的 shared-schema 那行），
+所以现在挡着的只剩 **i18n 两份词条表**（仍 `M `、staged blob 里本线 37 处 / 协作线 75 处）、
+根 `package.json`（仍 `M `）、`server/package.json`（那一行还指着别人未入库的 spec）。
+⚠️ 另外记下服务端那一笔的一条**结构性**依赖（**尚未实测**）：`server/src/copy.generated.ts`
+是 i18n 词条的生成物且已在库里，服务端代码落库而词条不落 ⇒ 那条门禁按 HEAD 的词条重生成再逐字节比，
+应当红 —— 机制出自 AGENTS"改词条必须重跑生成"那一档的反面，但要判它还得构造一次部分提交，本轮没造。
 **任取其一都会在 HEAD 上留下一个跑不通的形状**，而它不一定报出来：
-最硬的一环是路径常量 —— 服务端与客户端 import 的是**同一个字面量**（这条纪律本轮刚立），
-它不在 HEAD，两侧就各拼各的。至于"面板引用不在 HEAD 的词条 key"那一档**由谁拦，本轮没验**
+最硬的一环原本是那两枚路径常量 —— 服务端与客户端 import 的是**同一个字面量**（这条纪律本轮刚立），
+它不在 HEAD 时两侧就各拼各的；这一节写完之后它已单独落库（`343ffc8a`），所以现在最硬的一环换成 i18n。
+至于"面板引用不在 HEAD 的词条 key"那一档**由谁拦，本轮没验**
 （判它要么构造一次部分提交 —— 那是在共享检出上自己造红，不划算；要么读 `check:ui-language` 的实现，
 那是别人的判据口径，不该由我这一笔记成结论）。
 逐枚试探过一遍的事实就记在上面那张表里。
 
-📌 这一节要留下的教训与 §6.6 那条是同一族的第三面：**"谁挡住了我"必须每次重取，
-而且重取之后常常发现**挡住的不是当初记的那一枚**。本轮三处都变了形：
-`server/package.json` 离开了暂存集、api.ts 那一枚本线其实只占 2 行而**注册点在 `server.ts`**、
+📌 这一节要留下的教训与 §6.6 那条是同一族的第三面：**「谁挡住了我」必须每次重取，
+而重取之后常常发现挡住的不是当初记的那一枚**。本轮四处都变了形：
+`server/package.json` 离开了他们的暂存集（但那一行仍指着别人未入库的 spec，所以照样不能单独取）、
+本线服务端接线的注册点其实是 `server.ts` 而不是 api.ts（**本台账自己记错的一条**）、
+`shared-schema/index.ts` 那 25 行全是本线的、且它根本不在他们的暂存集里（先前那句"要替别人重写 index blob"
+的前提当场不成立 ⇒ 已单独落），
 而真正没变的是 i18n 那一枚 —— 它从 10:55 起一直是 `M `。
+⚠️ 这一族的成因值得单独记一句：那两次错记都来自**同一种探针写法** ——
+拿 `share` 这类子串当"归属特征串"去 `grep`，结果 `shared` 这个词自己命中了。
+**归属探针要用区分大小写的完整标识符**（`SharePanel`、`inboundCommitProofs` 这种），
+否则它会同时造出假阳性（"这枚文件被污染了"）和假阴性（"这一枚不能单独取"），而两种错都会让人不去动手。
 判据现量命令就在表里，别照抄这一节的结论去决定下一笔要不要落。
+
+### 6.11 全量单元测试那一趟：43 条红逐条归属，其中**零条在本线文件上**，而覆盖对账自己抓到一层从没起跑
+
+跑法：`pnpm -r --no-bail test`（`NO_COLOR=1`），10-09 12:40–12:43。
+**为什么带 `--no-bail`**：默认那条会在第一个失败包停下 —— 12:39 先按默认跑过一趟，
+它停在 `packages/ai`，于是只拿到 **4 行**汇总，而**有 `test` 脚本的包是 21 枚**。
+AGENTS §6 那条对账（"两数不等就说明有一层从来没被跑过"）在这一趟里以两种方式各命中一次：
+一次是 bail 造成的 4 ≠ 21，一次是 `--no-bail` 之后仍然 **20 ≠ 21**。
+
+🔴 **那 21 枚与 20 枚之间差的正是 `packages/sync-core`**：它的 `test` 是
+`npm run test:typecheck && vitest run`，而 `tsc -p tsconfig.spec.json` 在
+`tests/share-keys.spec.ts:234` 报 **TS2345 少一个 `identity` 参数** ⇒ **vitest 从来没起跑**，
+所以它连一行 `Tests` 都不会打。归属：那枚 spec 配套的 `packages/sync-core/src/share-keys.ts`
+正在他们的 42 枚暂存集里（协作线，ADR-0062 的 share 那一族）。
+⚠️ 值得单独记住的形状：**一层"类型检查先跑"的测试在类型检查失败时不会计入任何测试读数** ——
+它既不算红也不算绿，只在 `--no-bail` 的 rc 里现形；不数"有 test 脚本的包 vs 打了汇总行的包"就看不见它。
+
+**总和（现量取自那一趟的汇总行）**：`passed 12937 / failed 43 / skipped 14`。43 条的逐条归属：
+
+| 包 | 红数 | 是什么 | 归属（带现量） |
+|---|---|---|---|
+| `packages/ai` | 5 | `capability-manifest.spec.ts`：产物与上游不逐字一致、工具集合双向不等、kind 逐字、分母成员点名、剔除项登记 | 协作线加了实体没重生成清单。现量：`node scripts/gen-ai-capability-manifest.mjs --check` 打出的"应为"集合里含 **`COMMENT`**，产物里没有；与 §6.5 第 1/11/12 道同源 |
+| `packages/domain` | 1 | `subscription.spec.ts > contract with server/src/entitlement.ts`：断言"我们知道的全部 denial reason 与服务端那侧逐字相等"，实测**服务端 16 枚 vs 这份清单 8 枚** | 不是本线（本线一枚 entitlement 词都没加）。深因归收款/AI 计量那一族，**本轮不代归因** |
+| `apps/mobile` | 1 | `legal-recheck-mobile.spec.ts > 补签闸门的宿主接缝 > 没配凭据时一个请求都不发、判 anonymous 且不拦` | 补签/法务那条线，不是本线 |
+| `server` | 7 | §6.9 那 5 条 `sync-compressed-body` + 1 条 `validation.service`（`COMMENT` 实体进了共享清单）+ **新增的第 7 条** `backup-script.spec.ts > the closure ledger carries one row per tombstone` | 🔴 第 7 条**单跑复验后判为载体**：`npx vitest run tests/backup-script.spec.ts --testTimeout=90000` ⇒ `16 passed (16)` RC=0，而它在整包里报的是 `Test timed out in 20000ms`。**同一条在 §6.9 那趟（6 红）与这一趟（7 红）之间的差就是负载**（12:43 那次现量 `load 339.76`），不是产品 |
+| `apps/web` | 29 | 13 份文件 | 拆两半，见下 |
+
+`apps/web` 那 29 条**不能整块推给载体**，所以把那 13 份文件单独复跑了一遍
+（`npx vitest run <13 份> --testTimeout=90000`）：`Test Files 2 failed | 11 passed (13)`、
+`Tests 9 failed | 151 passed (160)` ⇒
+
+- **20 条**是默认 5 s 超时的载体红（在 90 s 预算下全过）。这与 traps #392 那格同族，
+  但它是**单位层**（jsdom 测试），比集成层更容易被负载打到 —— 记在这里以免下一个人重新查。
+- **残留 9 条**集中在两份文件：`ai-panel-remount.spec.tsx`(4) 与 `assistant-history-panel.spec.tsx`(5)，
+  九条的 Error 是**同一条**：`useHeytaUiTheme 必须在 <HeytaUiProvider> 内使用`。
+  归属现量：那两份 spec 渲染的是 `apps/web/src/features/ai/AssistantPanel`，
+  而 `apps/web/src/features/ai/*` 有一整片 ` M`（体验/AI 那条线正在写）；
+  本线在 `apps/web` 只碰 `features/settings/*` 那几枚与 `App.tsx` 的接线。
+  ⇒ **不是本线的文件**；深因（他们新用的那个 hook 没进测试夹具）归那条线自己判，
+  本线不代改别人的判据夹具。
+
+🔴 本线在这一趟里的位置：**43 条红里没有一条落在本线的文件上**。
+本线那份 web 面板 spec 另外**单独复跑取过直接读数**：
+`npx vitest run tests/account-security.spec.tsx --testTimeout=90000` ⇒ `Tests 41 passed (41)`，RC=0
+（引这个而不是整包那 2156 —— 整包读数不指名到文件，单跑才算直接证据）。
+⚠️ 这条结论的边界要说清：它说的是**当前共享工作树**（含别人未提交的改动）；
+**不等于**"本线那一笔落到干净 HEAD 上会绿"——那一格要等代码整笔入库后在隔离副本里再取一次
+（AGENTS §8 第 9 条：隔离副本通过不能冒充主检出后续改动已验）。
+
+**同一时段落的第二笔**：`343ffc8a` 那枚共享契约层落之前/之后各取一次复验 ——
+`pnpm --filter @heyta/shared-schema build` RC=0（含 tsup 的 `dts` 那一档，traps #162 说的就是它），
+`pnpm --filter @heyta/shared-schema test` `Tests 173 passed (173)`。
+另外两枚新装置过了它们能过的静态档：`bash -n` SYNTAX=OK、
+`check:verify-script-copy` 14/14 needle 命中、`check:script-snapshot` 把它计入 41 枚在位脚本。
