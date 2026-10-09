@@ -1,0 +1,573 @@
+{
+  "origin": "http://127.0.0.1:4379",
+  "carrier": {
+    "headless": true,
+    "legs": [
+      "sync"
+    ],
+    "skippedLegs": [
+      "reminders",
+      "data",
+      "groups",
+      "help"
+    ],
+    "legCells": {
+      "reminders": 0,
+      "data": 0,
+      "groups": 0,
+      "help": 0,
+      "sync": 3
+    },
+    "expectedLegCells": {
+      "reminders": 12,
+      "data": 4,
+      "groups": 24,
+      "help": 3,
+      "sync": 3
+    },
+    "reminderModes": [
+      "denied",
+      "unsupported",
+      "error"
+    ],
+    "skippedReminderModes": [
+      "default",
+      "granted"
+    ],
+    "skipReason": "default 与 granted 两态在无头 Chromium 里都会退化成 denied（granted 那一格是 2026-10-09 无头趟实测出来的），而无头是不抢前台的唯一一档（AGENTS §6.2 规定二）"
+  },
+  "cases": [
+    {
+      "theme": "light",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "height": 960
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "height": 960
+    }
+  ],
+  "reminders": [],
+  "data": [],
+  "sweepGroups": [
+    "profile",
+    "account",
+    "sync",
+    "ai"
+  ],
+  "sweepCases": [
+    {
+      "theme": "light",
+      "width": 375,
+      "height": 812
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "height": 812
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "height": 900
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "height": 900
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "height": 900
+    }
+  ],
+  "groups": [],
+  "helpWrapWidths": [
+    375,
+    768,
+    1440
+  ],
+  "helpWrap": [],
+  "syncCases": [
+    {
+      "theme": "light",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "theme": "light",
+      "width": 375,
+      "height": 812
+    }
+  ],
+  "syncPrivacy": [
+    {
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "states": [
+        {
+          "reached": "accepted",
+          "theme": "light",
+          "panelVisible": true,
+          "panelInstances": 1,
+          "chooseAgain": 0,
+          "revoke": 1,
+          "chooseLabel": null,
+          "revokeLabel": "撤回同意",
+          "stateText": "已同意与服务器通信决定于 2026-10-09 15:25（UTC）",
+          "hints": [
+            "这项选择只控制本机是否允许 heyta 与服务器通信，不会删除或改变本地数据。",
+            "撤回后这台设备立刻停止对外请求（包括已经建立的实时连接），并重新询问一次。本地数据不受影响。"
+          ],
+          "consentDialogs": 0,
+          "notPersistedNotice": 0,
+          "settledMs": 1,
+          "settled": true,
+          "signInAfterAccept": {
+            "appeared": true,
+            "closedBy": "auth-form-close"
+          }
+        },
+        {
+          "reached": "undecided",
+          "theme": "light",
+          "panelVisible": true,
+          "panelInstances": 1,
+          "chooseAgain": 1,
+          "revoke": 0,
+          "chooseLabel": "重新作出选择",
+          "revokeLabel": null,
+          "stateText": "还没有作出选择",
+          "hints": [
+            "这项选择只控制本机是否允许 heyta 与服务器通信，不会删除或改变本地数据。",
+            "需要同步或登录时，可以在这里重新选择是否联网。打开选择面板不会改变当前权限。"
+          ],
+          "consentDialogs": 0,
+          "notPersistedNotice": 0,
+          "settledMs": 1,
+          "settled": true
+        },
+        {
+          "reached": "local-only",
+          "theme": "light",
+          "panelVisible": true,
+          "panelInstances": 1,
+          "chooseAgain": 1,
+          "revoke": 0,
+          "chooseLabel": "重新作出选择",
+          "revokeLabel": null,
+          "stateText": "只用本机（未同意联网）决定于 2026-10-09 15:25（UTC）",
+          "hints": [
+            "这项选择只控制本机是否允许 heyta 与服务器通信，不会删除或改变本地数据。",
+            "需要同步或登录时，可以在这里重新选择是否联网。打开选择面板不会改变当前权限。"
+          ],
+          "consentDialogs": 0,
+          "notPersistedNotice": 0,
+          "settledMs": 1,
+          "settled": true
+        }
+      ],
+      "screenshots": [
+        "sync-privacy-1-accepted-light-1440.png",
+        "sync-privacy-2-undecided-light-1440.png",
+        "sync-privacy-3-reopen-dialog-light-1440.png",
+        "sync-privacy-4-local-only-light-1440.png"
+      ],
+      "clicks": [
+        {
+          "testId": "privacy-revoke",
+          "present": true,
+          "reachable": true,
+          "onScreen": true,
+          "topInsidePanel": true,
+          "top": "button.ht-btn[privacy-revoke]",
+          "ownLabel": "button.ht-btn[privacy-revoke]",
+          "rect": {
+            "x": 440,
+            "y": 681,
+            "w": 88,
+            "h": 44
+          },
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "via": "pointer",
+          "note": null
+        },
+        {
+          "testId": "privacy-choose-again",
+          "present": true,
+          "reachable": true,
+          "onScreen": true,
+          "topInsidePanel": true,
+          "top": "button.ht-btn[privacy-choose-again]",
+          "ownLabel": "button.ht-btn[privacy-choose-again]",
+          "rect": {
+            "x": 440,
+            "y": 635,
+            "w": 116,
+            "h": 44
+          },
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "via": "pointer",
+          "note": null
+        }
+      ],
+      "reopen": {
+        "reopenedFromChooseAgain": true,
+        "dialogsWhileOpen": 1
+      },
+      "renavigations": 0,
+      "planted": {
+        "actionBefore": 1,
+        "actionAfter": 0,
+        "dialogsBefore": 0,
+        "dialogsAfter": 1
+      },
+      "pageErrors": []
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "states": [
+        {
+          "reached": "accepted",
+          "theme": "dark",
+          "panelVisible": true,
+          "panelInstances": 1,
+          "chooseAgain": 0,
+          "revoke": 1,
+          "chooseLabel": null,
+          "revokeLabel": "撤回同意",
+          "stateText": "已同意与服务器通信决定于 2026-10-09 15:25（UTC）",
+          "hints": [
+            "这项选择只控制本机是否允许 heyta 与服务器通信，不会删除或改变本地数据。",
+            "撤回后这台设备立刻停止对外请求（包括已经建立的实时连接），并重新询问一次。本地数据不受影响。"
+          ],
+          "consentDialogs": 0,
+          "notPersistedNotice": 0,
+          "settledMs": 3,
+          "settled": true,
+          "signInAfterAccept": {
+            "appeared": true,
+            "closedBy": "auth-form-close"
+          }
+        },
+        {
+          "reached": "undecided",
+          "theme": "dark",
+          "panelVisible": true,
+          "panelInstances": 1,
+          "chooseAgain": 1,
+          "revoke": 0,
+          "chooseLabel": "重新作出选择",
+          "revokeLabel": null,
+          "stateText": "还没有作出选择",
+          "hints": [
+            "这项选择只控制本机是否允许 heyta 与服务器通信，不会删除或改变本地数据。",
+            "需要同步或登录时，可以在这里重新选择是否联网。打开选择面板不会改变当前权限。"
+          ],
+          "consentDialogs": 0,
+          "notPersistedNotice": 0,
+          "settledMs": 1,
+          "settled": true
+        },
+        {
+          "reached": "local-only",
+          "theme": "dark",
+          "panelVisible": true,
+          "panelInstances": 1,
+          "chooseAgain": 1,
+          "revoke": 0,
+          "chooseLabel": "重新作出选择",
+          "revokeLabel": null,
+          "stateText": "只用本机（未同意联网）决定于 2026-10-09 15:25（UTC）",
+          "hints": [
+            "这项选择只控制本机是否允许 heyta 与服务器通信，不会删除或改变本地数据。",
+            "需要同步或登录时，可以在这里重新选择是否联网。打开选择面板不会改变当前权限。"
+          ],
+          "consentDialogs": 0,
+          "notPersistedNotice": 0,
+          "settledMs": 1,
+          "settled": true
+        }
+      ],
+      "screenshots": [
+        "sync-privacy-1-accepted-dark-1440.png",
+        "sync-privacy-2-undecided-dark-1440.png",
+        "sync-privacy-3-reopen-dialog-dark-1440.png",
+        "sync-privacy-4-local-only-dark-1440.png"
+      ],
+      "clicks": [
+        {
+          "testId": "privacy-revoke",
+          "present": true,
+          "reachable": true,
+          "onScreen": true,
+          "topInsidePanel": true,
+          "top": "button.ht-btn[privacy-revoke]",
+          "ownLabel": "button.ht-btn[privacy-revoke]",
+          "rect": {
+            "x": 440,
+            "y": 681,
+            "w": 88,
+            "h": 44
+          },
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "via": "pointer",
+          "note": null
+        },
+        {
+          "testId": "privacy-choose-again",
+          "present": true,
+          "reachable": true,
+          "onScreen": true,
+          "topInsidePanel": true,
+          "top": "button.ht-btn[privacy-choose-again]",
+          "ownLabel": "button.ht-btn[privacy-choose-again]",
+          "rect": {
+            "x": 440,
+            "y": 635,
+            "w": 116,
+            "h": 44
+          },
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "via": "pointer",
+          "note": null
+        }
+      ],
+      "reopen": {
+        "reopenedFromChooseAgain": true,
+        "dialogsWhileOpen": 1
+      },
+      "renavigations": 0,
+      "planted": {
+        "actionBefore": 1,
+        "actionAfter": 0,
+        "dialogsBefore": 0,
+        "dialogsAfter": 1
+      },
+      "pageErrors": []
+    },
+    {
+      "theme": "light",
+      "width": 375,
+      "height": 812,
+      "states": [
+        {
+          "reached": "accepted",
+          "theme": "light",
+          "panelVisible": true,
+          "panelInstances": 1,
+          "chooseAgain": 0,
+          "revoke": 1,
+          "chooseLabel": null,
+          "revokeLabel": "撤回同意",
+          "stateText": "已同意与服务器通信决定于 2026-10-09 15:25（UTC）",
+          "hints": [
+            "这项选择只控制本机是否允许 heyta 与服务器通信，不会删除或改变本地数据。",
+            "撤回后这台设备立刻停止对外请求（包括已经建立的实时连接），并重新询问一次。本地数据不受影响。"
+          ],
+          "consentDialogs": 0,
+          "notPersistedNotice": 0,
+          "settledMs": 1,
+          "settled": true,
+          "signInAfterAccept": {
+            "appeared": true,
+            "closedBy": "auth-form-close"
+          }
+        },
+        {
+          "reached": "undecided",
+          "theme": "light",
+          "panelVisible": true,
+          "panelInstances": 1,
+          "chooseAgain": 1,
+          "revoke": 0,
+          "chooseLabel": "重新作出选择",
+          "revokeLabel": null,
+          "stateText": "还没有作出选择",
+          "hints": [
+            "这项选择只控制本机是否允许 heyta 与服务器通信，不会删除或改变本地数据。",
+            "需要同步或登录时，可以在这里重新选择是否联网。打开选择面板不会改变当前权限。"
+          ],
+          "consentDialogs": 0,
+          "notPersistedNotice": 0,
+          "settledMs": 0,
+          "settled": true
+        },
+        {
+          "reached": "local-only",
+          "theme": "light",
+          "panelVisible": true,
+          "panelInstances": 1,
+          "chooseAgain": 1,
+          "revoke": 0,
+          "chooseLabel": "重新作出选择",
+          "revokeLabel": null,
+          "stateText": "只用本机（未同意联网）决定于 2026-10-09 15:25（UTC）",
+          "hints": [
+            "这项选择只控制本机是否允许 heyta 与服务器通信，不会删除或改变本地数据。",
+            "需要同步或登录时，可以在这里重新选择是否联网。打开选择面板不会改变当前权限。"
+          ],
+          "consentDialogs": 0,
+          "notPersistedNotice": 0,
+          "settledMs": 1,
+          "settled": true
+        }
+      ],
+      "screenshots": [
+        "sync-privacy-1-accepted-light-375.png",
+        "sync-privacy-2-undecided-light-375.png",
+        "sync-privacy-3-reopen-dialog-light-375.png",
+        "sync-privacy-4-local-only-light-375.png"
+      ],
+      "clicks": [
+        {
+          "testId": "privacy-revoke",
+          "present": true,
+          "reachable": true,
+          "onScreen": true,
+          "topInsidePanel": true,
+          "top": "button.ht-btn[privacy-revoke]",
+          "ownLabel": "button.ht-btn[privacy-revoke]",
+          "rect": {
+            "x": 32,
+            "y": 644,
+            "w": 311,
+            "h": 44
+          },
+          "viewport": {
+            "width": 375,
+            "height": 812
+          },
+          "via": "pointer",
+          "note": null
+        },
+        {
+          "testId": "privacy-choose-again",
+          "present": true,
+          "reachable": true,
+          "onScreen": true,
+          "topInsidePanel": true,
+          "top": "button.ht-btn[privacy-choose-again]",
+          "ownLabel": "button.ht-btn[privacy-choose-again]",
+          "rect": {
+            "x": 32,
+            "y": 644,
+            "w": 311,
+            "h": 44
+          },
+          "viewport": {
+            "width": 375,
+            "height": 812
+          },
+          "via": "pointer",
+          "note": null
+        }
+      ],
+      "reopen": {
+        "reopenedFromChooseAgain": true,
+        "dialogsWhileOpen": 1
+      },
+      "renavigations": 0,
+      "planted": {
+        "actionBefore": 1,
+        "actionAfter": 0,
+        "dialogsBefore": 0,
+        "dialogsAfter": 1
+      },
+      "pageErrors": []
+    }
+  ],
+  "assertions": {
+    "everySelectedLegProducedItsCells": true,
+    "unselectedLegsReportEmpty": true,
+    "noHorizontalOverflow": true,
+    "allPermissionStatesRendered": true,
+    "dataFailurePreserved": true,
+    "existingDataRefusedWithoutLoss": true,
+    "cancelPreserved": true,
+    "everyCaseCoversEverySelectedMode": false,
+    "everyCaseCoversEverySweepGroup": false,
+    "groupSweepThemeApplied": true,
+    "groupSweepTitleMatchesNav": true,
+    "groupSweepActionable": true,
+    "groupSweepNoHorizontalOverflow": true,
+    "groupSweepNothingPushedOffViewport": true,
+    "groupSweepOffViewportRulerHasTeeth": true,
+    "helpWrapFourRowsMeasured": true,
+    "helpWrapInjectionTookEffect": true,
+    "helpLongTitleWraps": true,
+    "helpLongTitleStaysInContentColumn": true,
+    "helpLongTitleRowInsideViewport": true,
+    "helpLongTitleNoHorizontalOverflow": true,
+    "helpLongTitleBadArmsFlipTheJudgment": true,
+    "syncPrivacyThreeStatesReached": true,
+    "syncPrivacyPanelVisibleAndThemeApplied": true,
+    "syncPrivacyExactlyOneActionPerState": true,
+    "syncPrivacyAcceptedShowsOnlyRevoke": true,
+    "syncPrivacyRevokeReturnsToChooseAgain": true,
+    "syncPrivacyReopenUsesOneAndOnlyOneDialog": true,
+    "syncPrivacyEveryStateSettled": true,
+    "syncPrivacyConsentDialogUnmountedAfterDecide": true,
+    "syncPrivacyDecisionButtonsPointerReachable": true,
+    "syncPrivacyBadArmsFlipTheRuler": true
+  },
+  "notJudged": [
+    "noHorizontalOverflow",
+    "allPermissionStatesRendered",
+    "everyCaseCoversEverySelectedMode",
+    "dataFailurePreserved",
+    "existingDataRefusedWithoutLoss",
+    "cancelPreserved",
+    "everyCaseCoversEverySweepGroup",
+    "groupSweepThemeApplied",
+    "groupSweepTitleMatchesNav",
+    "groupSweepActionable",
+    "groupSweepNoHorizontalOverflow",
+    "groupSweepNothingPushedOffViewport",
+    "groupSweepOffViewportRulerHasTeeth",
+    "helpWrapFourRowsMeasured",
+    "helpWrapInjectionTookEffect",
+    "helpLongTitleWraps",
+    "helpLongTitleStaysInContentColumn",
+    "helpLongTitleRowInsideViewport",
+    "helpLongTitleNoHorizontalOverflow",
+    "helpLongTitleBadArmsFlipTheJudgment"
+  ]
+}

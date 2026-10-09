@@ -516,6 +516,9 @@ async function privacyReadState(page) {
     return {
       theme: document.documentElement.dataset.theme ?? 'light',
       panelVisible: Boolean(panel) && panel.getBoundingClientRect().height > 0,
+      // 这一份只入读数：整份文档里`privacy-panel`有几枚。第一次真跑时"文档里点得到、
+      // 组内数不到"把我带偏过一次（真因见下面 `clickAction` 那段注释），所以留这一栏。
+      panelInstances: document.querySelectorAll('[data-testid="privacy-panel"]').length,
       chooseAgain: count('privacy-choose-again'),
       revoke: count('privacy-revoke'),
       chooseLabel: text('privacy-choose-again'),
@@ -533,14 +536,67 @@ async function privacyReadState(page) {
   });
 }
 
+/**
+ * 同意之后被弹出来的登录引导，用它**自己的**关闭把手收掉。
+ *
+ * 🔴 为什么不能用 Escape：10-09 15:2x 第三趟实测 —— 那一记 Escape 关掉的不是这张模态
+ * （它把设置浮层带走了，而 `auth-form-close` 那张面还在），于是后面每一步都对着空 DOM 量，
+ * 报错形状是一个 `account-menu-avatar … element is not visible` 的 30s 超时堆栈。
+ * 收不掉就响亮地抛，别让它伪装成"这一族没红"。
+ */
+async function dismissSignInModal(page, where) {
+  const modal = page.locator('.ht-sheet__auth');
+  if ((await modal.count()) === 0) return { appeared: false, closedBy: null };
+  const closer = page.getByTestId('auth-form-close');
+  let closedBy = null;
+  if ((await closer.count()) === 1) {
+    await closer.click({ timeout: 8_000 }).catch(() => undefined);
+    closedBy = 'auth-form-close';
+  } else {
+    await page.keyboard.press('Escape');
+    closedBy = 'escape';
+  }
+  const gone = await modal.waitFor({ state: 'detached', timeout: 6_000 }).then(() => true).catch(() => false);
+  if (!gone) {
+    throw new Error(`「${where}」之后弹出来的登录引导关不掉（试了 ${closedBy}，`.concat(
+      '`auth-form-close` 命中数不是 1 就退到 Escape）—— 这一腿剩下的读数会全部对着被盖住的界面拍，别当通过。',
+    ));
+  }
+  return { appeared: true, closedBy };
+}
+
+/**
+ * 「同步与隐私」那一组的决定态走查。三态各读一次 DOM、各拍一张图，逐条见上面的注释块。
+ *
+ * 🔴 走查的起点是**首启那张面板上点「同意」**，不是点「只用本机」。理由不是省事：
+ * 「已同意」这一档在**两棵树里都给「撤回」**，所以整条路不需要按树分叉；
+ * 而「只用本机」那一档两棵树给的是不同按钮（现量见上面那段），一开始就从它走就必须写分叉，
+ * 第一趟那个 `if (local.revoke === 1)` 就是这么来的 —— 分叉本身就是第二处会错的地方。
+ * 「只用本机」仍然被走到：它是**最后一步**（从「重新选择」开的面板里点它），
+ * 那一格的按钮归属只入读数、不作判据。
+ *
+ * 🔴 三处"探针必须先把自己弄对"的地方，都是 10-09 连着三趟照出来的，别当风格问题删：
+ * 1. **主题走应用自己的机制**（`heyta.theme` 那一键），不直接改 `dataset.theme`。
+ *    `apps/web/src/lib/theme.ts` 写着启动时 `applyTheme(resolveInitialTheme())`，手工挂上去的
+ *    属性会被盖回 `light` —— 那趟暗色那格读到的就是 light，而 `panelVisible` 照样为真（假绿形状）。
+ * 2. **决定之后要等界面落定**，不是睡固定毫秒。那趟 `accept()` 之后 250ms 就去读，读到的是
+ *    上一条决定，于是"已同意"这一格整条判据都在对一个没到达的状态打分。这里改成**有界轮询**：
+ *    等动作按钮（`readSettled`）或等那句话变口（`readLabelChanged`），最多 6s；
+ *    等不到也返回读数并记 `settled:false` —— 判据据实判，等待是为了让红指对地方。
+ * 3. **点之前先把控件滚进视口、再量命中**。375 那一档 `elementFromPoint` 曾返回 null
+ *    （按钮在 812 高的视口之外）—— 那**不是**"被盖住"，是探针没把东西搬到眼前
+ *    （AGENTS §6.2「滚动后重新读 bounds」同一族）。
+ */
 async function syncPrivacyJourney(browser, spec) {
   const context = await browser.newContext({ viewport: { width: spec.width, height: spec.height }, locale: 'zh-CN' });
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
-  await page.addInitScript(() => localStorage.setItem('heyta.locale', 'zh-CN'));
+  await page.addInitScript(([, theme]) => {
+    localStorage.setItem('heyta.locale', 'zh-CN');
+    if (theme) localStorage.setItem('heyta.theme', theme);
+  }, ['zh-CN', spec.theme === 'dark' ? 'dark' : null]);
   await page.goto(`${ORIGIN}/?lang=zh-CN`);
-  if (spec.theme === 'dark') await page.evaluate(() => { document.documentElement.dataset.theme = 'dark'; });
 
   // 起点：首启那张同意面板必须真的在场（不在场就说明这棵树没有同意闸，下面的读数全部作废）。
   const dialog = page.getByTestId('privacy-consent-dialog');
@@ -549,8 +605,10 @@ async function syncPrivacyJourney(browser, spec) {
     await context.close();
     throw new Error(`首启同意面板没出现 —— 这一趟没有"决定"可测，别把下面的读数当通过（载体 ${spec.theme}/${spec.width}）`);
   }
-  await page.getByTestId('privacy-consent-local-only').click();
+  await page.getByTestId('privacy-consent-accept').click();
   await dialog.waitFor({ state: 'detached' });
+  // 未提交那版的 `accept()` 会顺手 `openSignIn()`（HEAD 的 `onClick={accept}` 不会）。
+  const signInAfterAccept = await dismissSignInModal(page, '首启点同意');
 
   await openGroup(page, 'sync');
   const states = [];
@@ -560,51 +618,130 @@ async function syncPrivacyJourney(browser, spec) {
     await page.screenshot({ path });
     screenshots.push(path.split('/').pop());
   };
-  // 🔴 三态之间只有两枚按钮，而两棵树给「只用本机」那档挂的按钮不一样（见上面那段现量）。
-  // 所以走查**不写死顺序，按界面上在场的那枚按钮走**，两种形状都必须把三态走全 ——
-  // 写死任何一种，另一棵树上这一腿就死在第一枚定位器上（同一族前科：本文件 `openGroup` 那段）。
-  const reopenConsent = async () => {
-    await page.getByTestId('privacy-choose-again').click();
-    const reopened = await dialog.waitFor({ state: 'visible', timeout: 8_000 }).then(() => true).catch(() => false);
-    const whileOpen = await privacyReadState(page);
-    await shot('reopen-dialog');
-    await page.getByTestId('privacy-consent-accept').click();
-    await dialog.waitFor({ state: 'detached' });
-    await page.waitForTimeout(250);
-    return { reopenedFromChooseAgain: reopened, dialogsWhileOpen: whileOpen.consentDialogs };
-  };
-  const revoke = async () => {
-    await page.getByTestId('privacy-revoke').click();
-    await page.waitForTimeout(250);
+
+  // 有界落定之前先确认面板还在 DOM 里。第三趟就是这里死的：Escape 把设置浮层带走了，
+  // 于是后面每一步都对着 null 量。这里把它变成一句能读的报错，并把"还回得来"记成读数。
+  let renavigations = 0;
+  const ensurePanel = async (why) => {
+    const alive = await page.evaluate(() =>
+      Boolean(document.querySelector('#settings-group-sync [data-testid="privacy-panel"]')));
+    if (alive) return true;
+    await openGroup(page, 'sync');
+    const back = await page.evaluate(() =>
+      Boolean(document.querySelector('#settings-group-sync [data-testid="privacy-panel"]')));
+    if (!back) {
+      throw new Error(`设置面在「${why}」之后回不来（组内那枚 privacy-panel 不在 DOM 里）—— 这一格不能当通过（载体 ${spec.theme}/${spec.width}）`);
+    }
+    renavigations += 1;
+    return true;
   };
 
-  const local = await privacyReadState(page);
-  states.push({ reached: 'local-only', ...local });
-  await shot('1-local-only');
+  // 🔴 有界落定：轮询到"期望那枚动作按钮在组内那枚面板里出现"为止，最多 6s。
+  // 到点没等到也返回读数并记 `settled:false` —— 后面的判据据实判，不靠等待造绿。
+  const readSettled = async (expect) => {
+    await ensurePanel(`等 ${expect}`);
+    const t0 = Date.now();
+    for (;;) {
+      const s = await privacyReadState(page);
+      if (s[expect] === 1) return { ...s, settledMs: Date.now() - t0, settled: true };
+      if (Date.now() - t0 > 6_000) return { ...s, settledMs: Date.now() - t0, settled: false };
+      await page.waitForTimeout(150);
+    }
+  };
+  // 另一档落定判据：「我说完一句话，界面那句话得跟着变」。它不比"按钮是哪一枚"更绑源码，
+  // 所以能用在不分叉的那一步（重新决定成「只用本机」之后）。
+  const readLabelChanged = async (prevText) => {
+    await ensurePanel('等决定改口');
+    const t0 = Date.now();
+    for (;;) {
+      const s = await privacyReadState(page);
+      if (s.stateText !== prevText) return { ...s, settledMs: Date.now() - t0, settled: true };
+      if (Date.now() - t0 > 6_000) return { ...s, settledMs: Date.now() - t0, settled: false };
+      await page.waitForTimeout(150);
+    }
+  };
 
-  if (local.revoke === 1) {
-    // HEAD 形状：有过任何决定就给「撤回」⇒ 先撤回拿到「还没选择」，再重新选择并同意。
-    await revoke();
-    states.push({ reached: 'undecided', ...(await privacyReadState(page)) });
-    await shot('2-undecided');
-    states.push({ reached: 'accepted', ...(await privacyReadState(page)), ...(await reopenConsent()) });
-    await shot('3-accepted');
-    await revoke();
-    states.push({ reached: 'revoked', ...(await privacyReadState(page)) });
-    await shot('4-revoked');
-  } else {
-    // 未提交那版形状：非 accepted 一律给「重新选择」⇒ 先同意拿到「已同意」，再撤回。
-    states.push({ reached: 'accepted', ...(await privacyReadState(page)), ...(await reopenConsent()) });
-    await shot('2-accepted');
-    await revoke();
-    states.push({ reached: 'undecided', ...(await privacyReadState(page)) });
-    await shot('3-undecided');
-  }
+  const clicks = [];
+  const clickAction = async (testId) => {
+    await ensurePanel(`点 ${testId} 之前`);
+    const hit = await page.evaluate(async (id) => {
+      const panel = document.querySelector('#settings-group-sync [data-testid="privacy-panel"]');
+      const el = panel?.querySelector(`[data-testid="${id}"]`) ?? null;
+      const label = (n) => {
+        if (!(n instanceof Element)) return null;
+        const cls = (n.getAttribute('class') ?? '').split(/\s+/).filter(Boolean)[0] ?? '';
+        const tid = n.getAttribute('data-testid');
+        return `${n.tagName.toLowerCase()}${cls ? `.${cls}` : ''}${tid ? `[${tid}]` : ''}`;
+      };
+      const viewport = { width: window.innerWidth, height: window.innerHeight };
+      if (!el) return { present: false, reachable: false, onScreen: false, top: null, rect: null, viewport };
+      // 先滚进视口再量：`elementFromPoint` 吃的是视口坐标。
+      el.scrollIntoView({ block: 'center', inline: 'nearest' });
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const r = el.getBoundingClientRect();
+      const cx = Math.round(r.x + r.width / 2);
+      const cy = Math.round(r.y + r.height / 2);
+      const top = document.elementFromPoint(cx, cy);
+      return {
+        present: true,
+        // 命中测试的判法：`elementFromPoint` 返回该点上最内层的元素。按钮真的在最前面时，
+        // 它要么就是按钮本身，要么是按钮的后代；被别的东西盖住时，两者都不成立。
+        reachable: top === el || el.contains(top),
+        onScreen: r.bottom > 0 && r.top < window.innerHeight && r.right > 0 && r.left < window.innerWidth,
+        topInsidePanel: Boolean(top && panel.contains(top)),
+        top: label(top),
+        ownLabel: label(el),
+        rect: { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) },
+        viewport,
+      };
+    }, testId);
+    let via = 'pointer';
+    let note = null;
+    if (!hit.reachable) {
+      // 鼠标点不到 ⇒ 用 DOM 层的 click 把旅程走完：**读数照记、判据照红**，
+      // 只是不让一层遮挡把后面三态的判据一起带走（崩溃会让整腿零读数）。
+      via = 'dom-fallback';
+      await page.evaluate((id) => document.querySelector(`#settings-group-sync [data-testid="privacy-panel"] [data-testid="${id}"]`)?.click(), testId);
+    } else {
+      try {
+        await page.getByTestId(testId).click({ timeout: 8_000 });
+      } catch (e) {
+        // 命中测试说能点到、真点却超时：这是"载体在抖"还是"界面在骗人"，**不能靠猜**。
+        // 记下报错首行再走 DOM 兜底，红照样红，但红里带着可复现的坐标。
+        via = 'pointer-timeout';
+        note = String(e).split('\n')[0];
+        await page.evaluate((id) => document.querySelector(`#settings-group-sync [data-testid="privacy-panel"] [data-testid="${id}"]`)?.click(), testId);
+      }
+    }
+    clicks.push({ testId, ...hit, via, note });
+  };
+
+  // ── 走查：已同意 → 撤回 → 还没选择 → 重新选择(开同一张面板) → 只用本机 ──
+  const accepted = await readSettled('revoke');
+  states.push({ reached: 'accepted', ...accepted, signInAfterAccept });
+  await shot('1-accepted');
+
+  await clickAction('privacy-revoke');
+  const undecided = await readSettled('chooseAgain');
+  states.push({ reached: 'undecided', ...undecided });
+  await shot('2-undecided');
+
+  await clickAction('privacy-choose-again');
+  const reopened = await dialog.waitFor({ state: 'visible', timeout: 8_000 }).then(() => true).catch(() => false);
+  const whileOpen = await privacyReadState(page);
+  await shot('3-reopen-dialog');
+  // 这一次点「只用本机」而不是「同意」：同意的副作用是把登录引导弹出来，会挡住后面的读数。
+  await page.getByTestId('privacy-consent-local-only').click();
+  await dialog.waitFor({ state: 'detached' });
+  const reopen = { reopenedFromChooseAgain: reopened, dialogsWhileOpen: whileOpen.consentDialogs };
+  states.push({ reached: 'local-only', ...(await readLabelChanged(undecided.stateText)) });
+  await shot('4-local-only');
 
   // 🔴 牙：往运行时 DOM 里种两枚坏，上面那把尺必须都数得到。数不到就说明
   // `privacyReadState` 的计数是恒 0 的装饰（同一族前科：不能失败的检查没有价值）。
+  await ensurePanel('种坏臂之前');
   const planted = await page.evaluate(() => {
-    const panel = document.querySelector('[data-testid="privacy-panel"]');
+    const panel = document.querySelector('#settings-group-sync [data-testid="privacy-panel"]');
     const actionSel = '[data-testid="privacy-choose-again"], [data-testid="privacy-revoke"]';
     const actionBefore = panel.querySelectorAll(actionSel).length;
     panel.querySelector(actionSel)?.remove();
@@ -625,6 +762,9 @@ async function syncPrivacyJourney(browser, spec) {
     height: spec.height,
     states,
     screenshots,
+    clicks,
+    reopen,
+    renavigations,
     planted,
     pageErrors: errors,
   };
@@ -695,7 +835,9 @@ const assertionOwner = {
   syncPrivacyAcceptedShowsOnlyRevoke: ['sync'],
   syncPrivacyRevokeReturnsToChooseAgain: ['sync'],
   syncPrivacyReopenUsesOneAndOnlyOneDialog: ['sync'],
+  syncPrivacyEveryStateSettled: ['sync'],
   syncPrivacyConsentDialogUnmountedAfterDecide: ['sync'],
+  syncPrivacyDecisionButtonsPointerReachable: ['sync'],
   syncPrivacyBadArmsFlipTheRuler: ['sync'],
 };
 const TRACKING_ASSERTIONS = ['everySelectedLegProducedItsCells', 'unselectedLegsReportEmpty'];
@@ -805,12 +947,19 @@ const report = {
       const u = privacyRole(x, 'undecided');
       return u !== null && u.chooseAgain === 1 && u.revoke === 0 && Boolean(u.chooseLabel);
     }),
-    syncPrivacyReopenUsesOneAndOnlyOneDialog: syncPrivacy.every((x) => {
-      const a = privacyRole(x, 'accepted');
-      return a !== null && a.reopenedFromChooseAgain === true && a.dialogsWhileOpen === 1;
-    }),
+    syncPrivacyReopenUsesOneAndOnlyOneDialog: syncPrivacy.every((x) =>
+      x.reopen?.reopenedFromChooseAgain === true && x.reopen?.dialogsWhileOpen === 1),
+    // 🔴 每一态的"等界面落定"必须真的落定。少了这条，读早一步会伪装成"那一态就是这个样子"——
+    // 第二趟的四条红全是这个形状（等 250ms 不够，「已同意」那格装的是同意之前的 DOM）。
+    syncPrivacyEveryStateSettled: syncPrivacy.every((x) => x.states.every((s) => s.settled === true)),
     syncPrivacyConsentDialogUnmountedAfterDecide: syncPrivacy.every((x) =>
       x.states.every((s) => s.consentDialogs === 0)),
+    // 🔴 「在场、可见、稳定」三句话加起来仍然点不到 —— 本腿第一次真跑(10-09 15:1x)就是被
+    // 一层 `aria-hidden` 的登录引导装饰面盖住的。上面 `exactlyOneAction` 那几条只数 DOM 里的枚数，
+    // 数不出"这枚按钮在真人鼠标底下够不够得着"，所以命中测试单独钉一条（形状见 §6.2 规定一：
+    // 断言只会验界面写了什么，不会验界面少了什么 / 被什么盖住）。
+    syncPrivacyDecisionButtonsPointerReachable: syncPrivacy.every((x) =>
+      x.clicks.length >= 2 && x.clicks.every((c) => c.present && c.reachable && c.via === 'pointer')),
     // 🔴 牙：种进运行时 DOM 的两枚坏必须都数得到。这条转红说的是"上面那几条 counting 已经变成恒 0 的装饰"，
     // 不是界面坏了 —— 和 `groupSweepOffViewportRulerHasTeeth` 同一个用途。
     syncPrivacyBadArmsFlipTheRuler: syncPrivacy.every((x) =>
