@@ -658,7 +658,7 @@ T2 那句话里"每 30 秒续票据"这一格，此前是**一整套零件都在
 | `cd packages/shared-schema && npx --no-install vitest run --maxWorkers=1 tests/task-batch-contract.spec.ts` | `Tests 15 passed (15)` | AC-5 严格批 payload 契约（未知字段、长度、重复 ID） |
 | `cd packages/op-log && npx --no-install vitest run --maxWorkers=1 tests/task-batch.spec.ts` | `Tests 16 passed (16)` = 5 组 × **三套适配器**（memory / IndexedDbAdapter / SqliteAdapter，另有第 143 行真文件库 `state.db`） | AC-5「多项不同字段只产生一枚逻辑 op」「三套存储适配器与远端回放收敛」「中断重启无半批」 |
 | `cd packages/app-host && npx --no-install vitest run --maxWorkers=1 tests/task-batch-actions.spec.ts` | `Tests 9 passed (9)` | AC-5 共享创建动作（唯一入口） |
-| `cd packages/app-host && npx --no-install vitest run --maxWorkers=1 tests/inbound-*.spec.ts` | `Test Files 13 passed (13)` / `Tests 103 passed (103)` | AC-2/3 客户端领取-发布-许可循环、AC-4 收件密钥与草稿审阅、T2 心跳 |
+| `cd packages/app-host && npx --no-install vitest run --maxWorkers=1 tests/inbound-*.spec.ts` | `Test Files 13 passed (13)` / `Tests 103 passed (103)` | AC-2/3 客户端领取-发布-许可循环、AC-4 收件密钥与草稿审阅、T2 心跳。🔴 其中 AC-4「实际出境请求符合披露」那一句**在这 103 条里原先没有尺**（只有一枚按禁字串写的 `not.toContain`），本轮补成闭合键集并做了两臂 —— 见下面「复审把自己一条看着有牙的判据照出来了」那一节 |
 | `cd packages/domain && npx --no-install vitest run --maxWorkers=1 tests/inbound-local-date.spec.ts` | `Tests 1 passed (1)` | AC-4 date-only 与 instant 的领域语义 |
 | `cd packages/sync-client && npx --no-install vitest run --maxWorkers=1 tests/inbound-authorization.spec.ts` | `Tests 6 passed (6)` | AC-3 上传授权接缝（引擎边界） |
 | `cd apps/web && npx --no-install vitest run --maxWorkers=1 tests/inbound-draft-review.spec.tsx tests/inbound-event-retry.spec.tsx tests/inbound-upload-authorization.spec.ts tests/inbound-worker-lifecycle.spec.tsx` | `Test Files 4 passed (4)` / `Tests 8 passed (8)` | AC-6 界面层（jsdom，非真浏览器） |
@@ -684,9 +684,12 @@ T2 那句话里"每 30 秒续票据"这一格，此前是**一整套零件都在
 | AC-7 | 「官方与自托管样例分别**可运行**，端点与权限真实」 | **无尺**（帮助中心/中英条款的落点也在白名单外，B118） | 半尺有：`docs/reference/` 那两份当日已按 HEAD 更正过措辞（协议 + 定价） |
 | AC-8 | 「平台 × 权益 × 设备状态 × 失败阶段的具体用例表」 | **无产物**：矩阵文件不存在，且 `pnpm check` / `-r test` / `reinstall:all` 三条在隔离副本上仍过不去（同 B112） | 需要 B112 的 A/B/C 拍板 |
 
-⇒ **逐格结论**：AC-1 / AC-2 / AC-4 / AC-5 的句子基本有尺（AC-4 的「实际出境请求符合披露」依赖
-`AiFeature='inbound-automation'` 那半，仍在 B112 的未提交里）；AC-3 有服务端半尺、缺双宿主半尺；
+⇒ **逐格结论**：AC-1 / AC-2 / AC-4 / AC-5 的句子基本有尺；AC-3 有服务端半尺、缺双宿主半尺；
 AC-6/AC-7/AC-8 各缺的不是工时而是**判据的载体**。
+🔴 03:3x 复审后对本行**自己那格的更正**：AC-4 的「实际出境请求符合披露」原先写成"依赖 `AiFeature='inbound-automation'`
+那半，仍在 B112 的未提交里" —— 那句话说的是"**这把尺在干净 HEAD 上编不出来**"（编译层），
+它当时**根本没有尺**这件事我没写出来：唯一的落点是一枚按禁字串写的 `not.toContain`，
+而那句承诺是封闭集合。现在它有闭合键集的尺了，B112 仍只挡"能不能在 HEAD 上跑"。两种读法不要混。
 
 ### 一把尺的反向验证：对外承诺里「授予」那一列**根本不在任何尺的分母里**
 
@@ -743,3 +746,41 @@ AC-6/AC-7/AC-8 各缺的不是工时而是**判据的载体**。
 
 🔴 边界，别读多：这枚尺证的是"**已入库那 34 笔**带过的路径全在白名单内"，它**不**证工作树现在的未提交内容没越界
 （那本来就不是它的分母，也不可能是 —— 别人正在写的文件不歸我管）；也不证 AC 里任何一句功能断言。
+
+### 复审把自己一条"看着有牙"的判据照出来了：AC-4「实际出境请求符合披露」原先只钉了"某个字符串没出去"
+
+复审 AC-4 时逐枚读它对应的断言，`packages/app-host/tests/inbound-runner.spec.ts:39` 是这句承诺唯一的落点：
+
+```ts
+expect(requestBody.messages.at(-1).content).not.toContain('must-not-leave');
+```
+
+它量的是"**这一枚禁字串**没出现在出境正文里"。而对外说明写的是"只把规则允许的那几个字段交给模型"——
+那是个**封闭集合**的承诺。两者不等宽：多发一枚**不含那个字符串**的未披露字段（最典型就是 `projectId`，
+它坐在 `INBOUND_AUTOMATION_FIELDS` 里，读起来像"合法字段"，但由模型自己填就是越权选目标清单），
+上面那行一个字都不会红。**"坏了没人会知道"正是这个形状。**
+
+补法只加不断（既有的两行原样留着，用例条数不变）：把出境正文解析回来，对**键集合**做逐字相等判断。
+
+| 臂 | 改法 | 结果 | 判读 |
+|---|---|---|---|
+| 基线 | 不加变异 | `Test Files 1 passed (1)` / `Tests 9 passed (9)`，rc=**0**；`tsc --noEmit -p tsconfig.spec.json` rc=**0** | 新断言在**当前实现**上成立 ⇒ 投影确实只送 allowlist |
+| 盲区臂 | `packages/app-host/src/inbound-runner.ts` 里把 `source: projected` 改成 `source: { ...projected, projectId: 'undisclosed' }` | rc=**1**，`AssertionError: expected [ 'title', 'projectId' ] to deeply equal [ 'title' ]`，且 **`Tests 1 failed \| 8 passed`** —— 旧的 `not.toContain` 那一行**没红** | 同一枚越界写法，旧判据静默、新判据点名 ⇒ 上一行的 rc=0 是**盲区**不是"尺坏了" |
+| 还原 | 从 `.mut-bak` 搬回（不走 git） | 改前/改后 sha256 前缀 `ab81e26b2f1a559a` **逐字相同**，该文件 porcelain 为空；复跑 rc=0 | 共享树里没留变异 |
+
+判据一共钉四枚：外层键集 `{source, context}`、`source` 的键集逐字等于 allowlist（当日 `['title']`）、
+`source` 的值逐字等于投影结果、`context` 的键集只有 `{receivedAt, timezone}`。
+
+🔴 这一类不是只查了这一处（否定结论要枚举分母）。本线测试里全部 **9** 枚 `not.toContain`
+（`packages/{app-host,sync-client}/tests/inbound-*.spec.ts` 与 `packages/inbound-core/tests/`）逐枚读过，
+它们声称的是"**这一个具体值**（票据正文 / 回执 / 恢复码片段）不出现在错误信息与请求体里"，
+按值判absence 就是正确形状，且有两处自带配对（`inbound-entitlement-tickets.spec.ts:88` 另判 `secret.slice(0, 12)`，
+`inbound-draft-review.spec.ts` 那枚把"明文不进请求"和"明文必须在密文里"**两头各钉一次**）；
+唯一把**集合**承诺写成 absence 的就是上面这一处。服务端 `ai-metering.pglite.spec.ts` 的保留承诺早就是
+**集合相等**（那里注释写明"写成包含的话，加一列 `last_prompt` 照样全绿"）；
+`managed-proxy.routes.spec.ts:657` 的 `toContain('messages')` 是对 `stream` 这一枚键的宽严配对，不声称集合，
+属托管 AI 那条线的**窄承诺**，形状正确，不是缺陷 —— 所以这里**不**登记 B 号，只把"查过它"这件事留下。
+
+⚠️ 与 B112 的关系要说准：B112 那四枚未提交成员挡的是"**这把尺在只含 HEAD 的干净检出上编不出 app-host**"
+（编译层），它不改变"这句话现在**有**尺了"。上面三条读数取自**工作树**，与这一节其余尺同源。
+
