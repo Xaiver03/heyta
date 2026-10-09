@@ -69,7 +69,7 @@ import { createAutomationRule, deleteAutomationRule, listAutomationRules, setAut
 import { claimAutomationEvent, listAutomationEvents, publishAutomationResult, readAutomationPreparedResult, renewAutomationLease, retryUncertainAutomationEvent, readAutomationDraft, decideAutomationDraft } from './automation/events';
 import { advanceAutomationAiAttempt, reserveAutomationAiAttempt } from './automation/ai-metering';
 import { issueSenderCredential, listSenderCredentials, revokeSenderCredential } from './automation/sender-credentials';
-import { AutomationEntitlementError, redeemAutomationEntitlementTicket } from './automation/entitlement-ticket';
+import { AUTOMATION_ENTITLEMENT_ACTIONS, AutomationEntitlementError, redeemAutomationEntitlementTicket } from './automation/entitlement-ticket';
 import {
   AutomationIssuerError,
   bumpAutomationRevocationFloor,
@@ -82,6 +82,7 @@ import {
   revokeAutomationEntitlementLink,
   loadEffectiveAutomationKeyring,
   signAutomationEntitlementSessionTicket,
+  signAutomationEntitlementActionTicket,
   signAutomationRevocationManifest,
   type AutomationEntitlementIssuer,
 } from './automation/entitlement-issuer';
@@ -106,6 +107,12 @@ const AutomationEntitlementTicketSchema = z.object({
   localAccountUuid: z.string().uuid(),
 }).strict();
 const AutomationInstallationSchema = z.object({ installationId: z.string().uuid() }).strict();
+const AutomationActionTicketSchema = z.object({
+  installationId: z.string().uuid(),
+  action: z.enum(AUTOMATION_ENTITLEMENT_ACTIONS),
+  ruleId: z.string().uuid().optional(),
+  eventId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$/).optional(),
+}).strict();
 const AutomationActivationRedeemSchema = z.object({
   code: z.string().min(20).max(64),
   installationId: z.string().uuid(),
@@ -748,6 +755,39 @@ export const apiRoutes = async (
           issuer: ready.issuer, revocationVersion: floor,
         }));
         return reply.header('Cache-Control', 'no-store').send({ ticket: signed.token, expiresAt: signed.expiresAt.toISOString() });
+      } catch (error) {
+        const code = error instanceof AutomationIssuerError ? error.code : 'AUTOMATION_LINK_NOT_BOUND';
+        Logger.audit({ event: 'AUTOMATION_ENTITLEMENT_DENIED', userId: getAuthUser(req).userId, errorCode: code, capability: 'automation' });
+        return reply.status(403).send({ error: 'Automation entitlement issuance rejected', errorCode: code });
+      }
+    },
+  );
+
+  // 逐次放行动作的**取票通道**。上一轮把闸门改成"这些动作各要一枚自己的票据"，但只有
+  // `session` 有供给方 —— 自托管那一侧因此永远停在"等权益"。签出来的是
+  // "这个主体可以在这个作用域上做这一个动作"；🔴 **作用域是否真属于这个本地账号由客户实例
+  // 判**（官方实例看不到、也不该看到客户库里的规则与事件 —— 那是 E2EE 的前提）。
+  // 限流的数从被约束的常量推：worker 默认 30 s 一跳 ⇒ 稳态 ≤ 2 跳/分，一跳最多 5 枚
+  // （领取、预留、发布、提交许可、草稿确认）⇒ 合法上限 10 枚/分；60 是 6 倍余量，
+  // 同时把"无限制索取 Ed25519 签名"这条路堵掉。
+  fastify.post<{ Body: z.infer<typeof AutomationActionTicketSchema> }>(
+    '/automation/entitlement/ticket',
+    { preHandler: [authenticate], config: { rateLimit: { max: 60, timeWindow: '1 minute' } } },
+    async (req, reply) => {
+      const parsed = AutomationActionTicketSchema.safeParse(req.body);
+      if (!parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      const ready = automationIssuerSide();
+      if ('code' in ready) return reply.status(403).send({ error: 'Automation entitlement issuance unavailable', errorCode: ready.code });
+      try {
+        const floor = await readAutomationRevocationFloor(prisma);
+        const data = parsed.data;
+        const signed = await prisma.$transaction((tx) => signAutomationEntitlementActionTicket({
+          client: tx, userId: getAuthUser(req).userId, installationId: data.installationId, action: data.action,
+          ...(data.ruleId === undefined ? {} : { ruleId: data.ruleId }),
+          ...(data.eventId === undefined ? {} : { eventId: data.eventId }),
+          issuer: ready.issuer, revocationVersion: floor,
+        }));
+        return reply.header('Cache-Control', 'no-store').send({ ticket: signed.token, expiresAt: signed.expiresAt.toISOString(), action: signed.action });
       } catch (error) {
         const code = error instanceof AutomationIssuerError ? error.code : 'AUTOMATION_LINK_NOT_BOUND';
         Logger.audit({ event: 'AUTOMATION_ENTITLEMENT_DENIED', userId: getAuthUser(req).userId, errorCode: code, capability: 'automation' });
