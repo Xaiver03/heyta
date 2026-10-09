@@ -882,7 +882,7 @@ export interface TextFieldProps {
    * 🔴 地址字段必须能输入 `://` 与 `.` —— 默认键盘没有这些键，
    * 用户会看到"明明填了地址却少了几个字符"。`url` 键盘才带 `/` 和 `.`。
    */
-  keyboard?: 'default' | 'url';
+  keyboard?: 'default' | 'url' | 'email-address';
   autoCapitalize?: 'none' | 'sentences';
   editable?: boolean;
   /** 字段下方的说明或错误。传了就会占位，所以只在真有时才传。 */
