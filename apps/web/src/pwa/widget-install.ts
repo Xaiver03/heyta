@@ -92,6 +92,9 @@ export interface ShellHostSignals {
  * · `webkit.messageHandlers` 里那两个名字由 macOS/Linux 壳注册 ——
  *   `heytaStorage`（`ShellStorageHost.swift` / `heyta_web.c` 的 `HANDLER_NAME`）与
  *   `heytaWidget`（`ShellWidgetBridge.swift`）。Safari 自己不会注册它们。
+ *
+ * ⚠️ 边界：Electron 过渡壳（`apps/desktop`）注入的是 `window.heytaDesktop`，不在这三条里，
+ * 所以它里面板仍走浏览器分支。那是有意的 —— 它是待退役的自动化门禁载体，不是交付端。
  */
 export function isNativeShellHost(signals: ShellHostSignals): boolean {
   if (signals.storagePort) return true;
