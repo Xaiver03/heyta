@@ -1,6 +1,6 @@
 import type { SuperSyncInboundUploadAuthorization } from '@heyta/shared-schema';
 import type { SyncClientOptions } from '@heyta/sync-client';
-import type { InboundAutomationField } from '@heyta/inbound-core';
+import { AUTOMATION_ENTITLEMENT_TICKET_HEADER, type InboundAutomationField } from '@heyta/inbound-core';
 
 /** The worker token is a platform secret, never an op-log value. */
 export interface AutomationWorkerCredential {
@@ -40,10 +40,34 @@ const claimEventPath = '/api/automation/events/claim';
 const reserveAiAttemptPath = (eventId: string) => `/api/automation/events/${encodeURIComponent(eventId)}/ai-attempt/reserve`;
 const preparedResultPath = (eventId: string, clientId: string) => `/api/automation/events/${encodeURIComponent(eventId)}/result?clientId=${encodeURIComponent(clientId)}`;
 
-const workerHeaders = (token: string, worker: AutomationWorkerCredential): Record<string, string> => ({
+/**
+ * 闸门与写事务那两路权益被拒时服务端回 **402**（见协议 §4）。这是宿主唯一能拿到
+ * "停止重试、显示等待权益"信号的地方：把它混进"这次传输失败了"会让用户对着一条
+ * 报错反复点同一个按钮。`reason` 原样带出去，界面按它决定文案。
+ */
+export class AutomationEntitlementRequiredError extends Error {
+  constructor(readonly reason: string) {
+    super(`Automation entitlement required: ${reason}`);
+  }
+}
+
+const rejectionReason = async (response: Response): Promise<string> => {
+  const raw = await response.json().catch(() => ({}) as Record<string, unknown>) as Record<string, unknown>;
+  return typeof raw.reason === 'string' ? raw.reason : `HTTP_${response.status}`;
+};
+
+/**
+ * 逐次放行的那一次动作各带**自己**的一枚票据。没给就不发这个头 —— 官方模式下没有它，
+ * 而"带了别的动作的票"和"没带票"在服务端是两种不同的拒法，宿主必须能把它分开。
+ */
+const entitlementHeader = (ticket?: string): Record<string, string> =>
+  ticket === undefined ? {} : { [AUTOMATION_ENTITLEMENT_TICKET_HEADER]: ticket };
+
+const workerHeaders = (token: string, worker: AutomationWorkerCredential, ticket?: string): Record<string, string> => ({
   authorization: `Bearer ${token}`,
   'x-heyta-worker-token': worker.workerToken,
   'x-heyta-database-epoch': worker.databaseEpoch,
+  ...entitlementHeader(ticket),
 });
 
 export interface RegisterAutomationWorkerOptions {
@@ -53,6 +77,7 @@ export interface RegisterAutomationWorkerOptions {
   clientId: string;
   databaseEpoch: string;
   secrets: AutomationWorkerSecretStore;
+  entitlementTicket?: string;
   fetchImpl?: typeof fetch;
 }
 
@@ -60,9 +85,11 @@ export interface RegisterAutomationWorkerOptions {
 export async function registerAutomationWorker(options: RegisterAutomationWorkerOptions): Promise<AutomationWorkerCredential> {
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
   const response = await fetchImpl(new URL(workerRegistrationPath, options.baseUrl), {
-    method: 'POST', redirect: 'error', headers: { authorization: `Bearer ${options.token}`, ...jsonHeaders },
+    method: 'POST', redirect: 'error',
+    headers: { authorization: `Bearer ${options.token}`, ...jsonHeaders, ...entitlementHeader(options.entitlementTicket) },
     body: JSON.stringify({ clientId: options.clientId, databaseEpoch: options.databaseEpoch }),
   });
+  if (response.status === 402) throw new AutomationEntitlementRequiredError(await rejectionReason(response));
   if (!response.ok) throw new Error('Automation worker registration failed');
   const raw = await response.json() as Record<string, unknown>;
   if (typeof raw.workerId !== 'string' || typeof raw.workerToken !== 'string' ||
@@ -96,15 +123,15 @@ export async function requestCommitPermitAndJournal(options: {
   worker: AutomationWorkerCredential;
   request: CommitPermitRequest;
   journal: AutomationCommitJournal;
+  entitlementTicket?: string;
   fetchImpl?: typeof fetch;
 }): Promise<string> {
   const response = await (options.fetchImpl ?? globalThis.fetch)(new URL(commitPermitPath, options.baseUrl), {
     method: 'POST', redirect: 'error',
-    headers: { authorization: `Bearer ${options.token}`, ...jsonHeaders,
-      'x-heyta-worker-token': options.worker.workerToken,
-      'x-heyta-database-epoch': options.worker.databaseEpoch },
+    headers: workerHeaders(options.token, options.worker, options.entitlementTicket),
     body: JSON.stringify(options.request),
   });
+  if (response.status === 402) throw new AutomationEntitlementRequiredError(await rejectionReason(response));
   if (!response.ok) throw new Error('Automation commit authorization failed');
   const raw = await response.json() as Record<string, unknown>;
   if (typeof raw.proof !== 'string' || raw.eventId !== options.request.eventId || raw.opId !== options.request.opId) {
@@ -137,12 +164,15 @@ export async function claimAutomationEvent(options: {
   token: string;
   worker: AutomationWorkerCredential;
   eventId?: string;
+  entitlementTicket?: string;
   fetchImpl?: typeof fetch;
 }): Promise<ClaimedAutomationEvent | undefined> {
   const response = await (options.fetchImpl ?? globalThis.fetch)(new URL(claimEventPath, options.baseUrl), {
-    method: 'POST', redirect: 'error', headers: { ...workerHeaders(options.token, options.worker), ...jsonHeaders },
+    method: 'POST', redirect: 'error',
+    headers: { ...workerHeaders(options.token, options.worker, options.entitlementTicket), ...jsonHeaders },
     body: JSON.stringify({ clientId: options.worker.clientId, ...(options.eventId === undefined ? {} : { eventId: options.eventId }) }),
   });
+  if (response.status === 402) throw new AutomationEntitlementRequiredError(await rejectionReason(response));
   if (!response.ok) throw new Error('Automation event claim failed');
   const raw = await response.json() as Record<string, unknown>;
   if (raw.state === 'empty') return undefined;
@@ -208,15 +238,17 @@ export async function publishAutomationResult(options: {
   resultDigest: string;
   resultCiphertext: string;
   needsConfirmation?: boolean;
+  entitlementTicket?: string;
   fetchImpl?: typeof fetch;
 }): Promise<{ eventId: string; state: string; parseVersion: number }> {
   const response = await (options.fetchImpl ?? globalThis.fetch)(
     new URL(`/api/automation/events/${encodeURIComponent(options.eventId)}/result`, options.baseUrl),
-    { method: 'POST', redirect: 'error', headers: { ...workerHeaders(options.token, options.worker), ...jsonHeaders },
+    { method: 'POST', redirect: 'error', headers: { ...workerHeaders(options.token, options.worker, options.entitlementTicket), ...jsonHeaders },
       body: JSON.stringify({ clientId: options.worker.clientId, leaseGeneration: options.leaseGeneration,
         parseVersion: options.parseVersion, itemCount: options.itemCount, resultDigest: options.resultDigest, resultCiphertext: options.resultCiphertext,
         ...(options.needsConfirmation === undefined ? {} : { needsConfirmation: options.needsConfirmation }) }) },
   );
+  if (response.status === 402) throw new AutomationEntitlementRequiredError(await rejectionReason(response));
   if (!response.ok) throw new Error('Automation result publication failed');
   const raw = await response.json() as Record<string, unknown>;
   if (typeof raw.eventId !== 'string' || typeof raw.state !== 'string' || typeof raw.parseVersion !== 'number') {
@@ -249,13 +281,15 @@ export async function readAutomationPreparedResult(options: {
 export async function reserveAutomationAiAttempt(options: {
   baseUrl: string; token: string; worker: AutomationWorkerCredential; eventId: string;
   ruleId: string; parseVersion: number; attempt: number; leaseGeneration: number;
+  entitlementTicket?: string;
   billingSource: 'local' | 'direct' | 'managed'; fetchImpl?: typeof fetch;
 }): Promise<{ periodAnchor: number | null; billingSource: 'local' | 'direct' | 'managed'; state: string }> {
   const response = await (options.fetchImpl ?? globalThis.fetch)(new URL(reserveAiAttemptPath(options.eventId), options.baseUrl), {
-    method: 'POST', redirect: 'error', headers: { ...workerHeaders(options.token, options.worker), ...jsonHeaders },
+    method: 'POST', redirect: 'error', headers: { ...workerHeaders(options.token, options.worker, options.entitlementTicket), ...jsonHeaders },
     body: JSON.stringify({ clientId: options.worker.clientId, ruleId: options.ruleId, parseVersion: options.parseVersion,
       attempt: options.attempt, leaseGeneration: options.leaseGeneration, billingSource: options.billingSource }),
   });
+  if (response.status === 402) throw new AutomationEntitlementRequiredError(await rejectionReason(response));
   if (!response.ok) throw new Error('Automation AI attempt reservation failed');
   const raw = await response.json() as Record<string, unknown>;
   if ((raw.periodAnchor !== null && typeof raw.periodAnchor !== 'number') ||
