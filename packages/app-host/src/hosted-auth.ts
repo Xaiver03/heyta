@@ -371,7 +371,42 @@ export type HostedAuthFailureReason =
    *
    * ⚠️ 它**不代表**服务端拒绝了什么 —— 请求从未离开这台设备。
    */
-  | 'consent-required';
+  | 'consent-required'
+  /**
+   * 换绑邮箱那封邮件里的链接查不到 / 已过期 / 已被撤销 / 已被用过
+   * （400 + `code: 'invalid_change_link'`）。
+   *
+   * 🔴 动作与 `invalid-reset-link` **一样是"重新发起一次"**，但刻意不共用一个 reason：
+   * 两条路的发起入口在界面上是两个不同的地方（「忘记密码」在登录页，换绑在设置里），
+   * 共用就意味着界面没法把用户送回**那一个**入口，只能说"再试一次"。
+   */
+  | 'invalid-change-link'
+  /** 新地址与当前地址是同一个（400 + `code: 'email_unchanged'`）。没有要执行的动作。 */
+  | 'email-unchanged'
+  /**
+   * 那个地址已经被另一个账号用着（409 + `code: 'email_taken'`）。
+   *
+   * 🔴 只在**已认证**的 `request` 那一侧出现。不要把它加进未认证的 `confirm` ——
+   * 那等于给一个不需要身份就能问出口的问题"这个邮箱有没有账号"开了通道
+   * （判据在 `server/tests/email-change.spec.ts` 的"四条失败路径同码同句"那条）。
+   */
+  | 'email-taken'
+  /**
+   * 上一张换绑请求还在有效期内（429 + `code: 'email_change_cooldown'`）。
+   *
+   * 🔴 与 `rate-limited` 分开：后者说"你发得太猛，等一会儿"，而这里的实话是
+   * **"两封信已经在两个收件箱里了"** —— 用户该去做的是去点开它们，不是再等一刻钟。
+   * 秒数在 `retryAfterSeconds`，界面上那句"如果没收到可以稍后重新发起"用的就是它。
+   */
+  | 'email-change-cooldown'
+  /**
+   * 要撤销的那枚会话不认（400 + `code: 'unknown_session'`）。
+   *
+   * 不存在 / 不是你的 / 已经撤过 —— 三种在服务端**故意同一句**（同一枚令牌撤两次
+   * 是界面上最容易发生的事，把它报成"这个会话不存在"就是一句谎）。
+   * 动作是"刷新一下这个列表"。
+   */
+  | 'unknown-session';
 
 export interface HostedAuthFailure {
   ok: false;
@@ -438,10 +473,7 @@ export interface HostedAuthOptions {
   signal?: AbortSignal;
 }
 
-/** 只报 2xx 主体，失败已归一成 `HostedAuthFailure`。 */
-type PostResult = { ok: true; body: unknown } | HostedAuthFailure;
 
-const failure = (
   reason: HostedAuthFailureReason,
   status?: number,
   message?: string,
@@ -587,6 +619,19 @@ export const FAILURE_REASON_BY_SERVER_CODE: Readonly<Record<string, HostedAuthFa
   no_password_set: 'no-password-set',
   // "设第一个口令"打在已有口令的账号上 ⇒ 该走改密。与上一条相反，两张不同的表单。
   password_already_set: 'password-already-set',
+  // 注册验证码的 code 保留在 HostedAuthFailure.code；reason 复用已有动作分类，
+  // 避免为了一个注册子流程迫使所有壳重复增加词条。
+  invalid_registration_challenge: 'invalid-input',
+  registration_code_rate_limited: 'rate-limited',
+
+  // ── 换绑登录邮箱与登录会话（ADR-0063）──────────────────────────
+  invalid_change_link: 'invalid-change-link',
+  email_unchanged: 'email-unchanged',
+  email_taken: 'email-taken',
+  // 与 `account_locked` 同一个手法：状态码分类会把 429 说成"你发得太猛"，
+  // 而这里的实话是"两封信已经在收件箱里了"。
+  email_change_cooldown: 'email-change-cooldown',
+  unknown_session: 'unknown-session',
 };
 
 /** 由服务端 `code` 与 HTTP 状态共同决定原因；只有白名单里的码会覆盖状态分类。 */
@@ -628,7 +673,6 @@ function classifyStatus(status: number): HostedAuthFailureReason {
  * `token` 是**访问令牌**（服务端发的是 Bearer，不是 cookie）。带上它时
  * 请求就是"以某个已登录用户的名义"发的 —— 列 / 删自己的凭据走这条。
  */
-async function sendJson(
   options: HostedAuthOptions,
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   path: string,
