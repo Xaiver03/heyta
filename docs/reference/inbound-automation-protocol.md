@@ -75,7 +75,7 @@ date-only 与 instant 是两种不同语义：date-only 由 `*DateLocal` 字段�
 
 [ADR-0060](../adr/0060-automation-entitlement-and-retention.md)记录 2026-10-07 负责人确认的商业基线：现有 AI 付费档包含 automation，不新增 SKU；自托管绑定官方付费主体；不另收事件费；托管模型沿用既有额度，BYO 成本由用户端点承担。**实现与验收未闭合前不开放自动收集购买承诺。**
 
-自托管首版采用在线核验，不承诺离线宽限。绑定 `(officialSubject, installationId, localAccountUuid)`，不使用本地数字 userId 跨实例认同一主体。首次绑定需要官方账号登录授权和本地账号认证，签发凭据不能借给客户端 worker。官方 issuer、Ed25519 keyId/公钥及吊销版本分别管理；部署者不能从客户端参数替换验证公钥。
+自托管首版采用在线核验，不承诺离线宽限。绑定 `(officialSubject, installationId, localAccountUuid)`，不使用本地数字 userId 跨实例认同一主体。首次绑定需要官方账号登录授权和本地账号认证，签发凭据不能借给客户端 worker：官方实例为每个账号惰性生成一枚不透明主体 `htsub_<32 hex>`，账号在同一台实例上申请**一次性激活码**（库里只存域分隔的 SHA-256，明文只在签发那一次响应里出现，`Cache-Control: no-store`；一台实例最多一张活码），由该本地账号认证后带 `installationId` + `localAccountUuid` 兑换；兑换写绑定行并删掉活码，同一台实例被别人绑着时兑换判 `LINK_CONFLICT`，换主体必须先显式撤销。此后 `session` 票据的三个绑定字段**一律由服务端从绑定行读回**，请求体不参与任何一个 —— 客户端自报 `localAccountUuid` 只发生在兑换那一次。官方 issuer、Ed25519 keyId/公钥及吊销版本分别管理；部署者不能从客户端参数替换验证公钥。
 
 **权益来源由部署模式决定，两模式互斥**（`AUTOMATION_ENTITLEMENT_MODE`，只接受 `official` / `selfhost-online`，写错在读取时**报错**）：`official` 只看本机 `subscriptions` 的 `automation` grant；`selfhost-online` **不看本机订阅行**（在自己的库里给自己发货不算买到了），只看官方签发的票据。未配置 = 自动收集不可用（响的拒绝），代码不猜"这是不是官方实例"。自托管仍可免费同步，`hosting` 判定不受影响。
 
@@ -83,7 +83,9 @@ date-only 与 instant 是两种不同语义：date-only 由 `*DateLocal` 字段�
 
 **一枚票据只放行它那一个动作。** 每次授权在同一把账号锁内：读数据库时钟 → 判新鲜度 → 检查该实例的时钟高水位（回拨即停止签发新授权）→ 在唯一约束下消费 nonce → 记录 action 与作用域。只有 `session` 写绑定行；其余动作留下的是消费证据，不是可复用的权益。撤销对已签发 `session` 票据至多有 30 秒窗口，必须披露；不能宣称跨数据库瞬时撤销。**公网接收是唯一例外**：发送方不是账号、拿不到票据，只能按 `session` 建立的短期绑定判定，这一格就是上面那个 30 秒窗口。最终本地提交仍以第 2 节许可为边界。
 
-已闭合的部分到此为止；下列仍是**未闭合门槛**，不得读成已实现：官方签发端（含 `officialSubject` ↔ 实例 ↔ 本地账号的链接握手，目前 `session` 的 `localAccountUuid` 由客户端声明，服务端只能要求后续票据与首次记录一致）、吊销版本的在线刷新、各宿主每 30 秒续票据与 `waiting-entitlement` 展示。
+**吊销版本的在线刷新**：官方实例发布签名清单 `GET /automation/entitlement/revocations`（域 `heyta-automation-revocation-v1.`，claims 含 `scope='global'/revocationVersion/issuedAt/expiresAt`，寿命 ≤24h），自托管实例经 `POST /automation/entitlement/revocations/refresh` 转述并**只用本部署配置的公钥环验签**，合并单调只升；判定用的下限 = `max(部署时手配的那一个, 库里刷新到的那一个)`。抬下限本身要管理员，`refresh` 只要登录 —— 恰恰在绑定被吊销或过期之后才需要它。
+
+已闭合的部分到此为止；下列仍是**未闭合门槛**，不得读成已实现：各宿主每 30 秒续票据与 `waiting-entitlement` 展示；`X-Heyta-Entitlement-Ticket` 在客户端侧还没有供给方；除草稿确认与首次许可外的票据消费还在 HTTP 闸门自己的事务里，不在业务写事务里。（官方签发端、`officialSubject ↔ 实例 ↔ 本地账号` 的链接握手、吊销版本在线刷新三件已于 2026-10-09 闭合，判据见 [落地计划](../plans/inbound-automation.md) 文末同名小节。）
 
 事件模型账本唯一键 `(eventId, parseVersion, attempt)`，状态 `reserved/sent/consumed/released/unknown`；计量来源在 reserve 时冻结为 `local`、`direct` 或 `managed`，并写入同一账本。`managed` 才消费托管 AI 周期额度并带 `periodAnchor`；本地模型和用户自有端点不消费托管额度，二者的 `periodAnchor` 必须为 `null`。同一尝试重试时来源不允许改变，来源错配必须拒绝。额度判定与 reserve 在同一个数据库事务中，旧的周期计数器不能被另一路无条件加一。明确未发送的失败才 release；已发出后丢失响应记 unknown，默认不自动重新调用。取得结果后只保存客户端加密结果；重试提交不再调用模型。
 
