@@ -1880,3 +1880,64 @@ git grep -hoE "from '\.[^']*'" HEAD -- packages | sort -u                # HEAD 
 载体 = `209f7997` 且被跟踪脏 = 0，三枚闸门脚本与主 HEAD 逐枚同 blob。
 它第 4 步的窗口门第一趟报 `REDS=load` —— 那是负载门在正常工作，不是缺陷。
 
+
+### 6.38 把这型缺陷变成一枚尺：`scripts/check-imports-resolve.mjs`（含它现在量到的 9 + 12 条红）
+
+§6.36 那一型（引用进了 HEAD、实现留在工作树）能藏十六小时，是因为**没有一层判它**：
+`pnpm check` 不含 `pnpm -r build`（AGENTS §6.1 明确说构建要单独跑），
+死链检查只看 markdown 里可点的链接，`check:docs` 判的是链接目标存不存在。
+补的尺是纯静态一条：某一枚 ref 里每个源码文件的每个相对 import，都必须解析到**同一枚 ref 里存在的文件**。
+
+```bash
+node scripts/check-imports-resolve.mjs                    # 默认 --tree HEAD
+node scripts/check-imports-resolve.mjs --sources-only     # 只看构建输入（测试文件另算一档）
+node scripts/check-imports-resolve.mjs --self-test        # 三臂：两红一绿
+node scripts/check-imports-resolve.mjs --tree 9fa53ab9 --sources-only   # 事故本体的阳性对照
+```
+
+它自己得先证明能红，两件事分别做了：
+
+| 证明 | 读数 |
+|---|---|
+| `--self-test` 三臂（内存夹具，不碰仓库）：引用未入库的实现 / 引用不存在的模块 / 合规形状（`.js` 后缀的 NodeNext 写法 + 目录 index） | 期望红/红/绿 ⇒ **实得红/红/绿** |
+| 事故本体当阳性对照：`--tree 9fa53ab9 --sources-only` | 🔴 7 条，其中 `packages/shared-schema/src/index.ts` 的四枚契约文件全在里面，**还多抓出两条我肉眼没找到的**（`./inbound-crypto-contract`、`server/src/automation/inbound.routes`） |
+
+🔴 探针第一版有假红，形状很典型：注释里的示例（`apps/landing/src/site/pages.ts` 那段讲 Node ESM 解析的散文里
+写着 `from './x.js'`）被当成 import，`../dist/index.js` 那类**构建产物**也被当成"实现没入库"。
+⇒ 加了"剥块注释与整行 `//`、`*` 注释"与"`spec` 里含 `dist/` 就不算"两条，行数在剥注释后仍逐行对齐
+（块注释按字符换成空格、保留换行），否则报出来的行号会指错地方。
+
+**HEAD 现在的读数**（这一轮现量）：`21 条解析不到` = **构建输入 9 条** + **测试文件 12 条**。
+构建输入那九条是：`packages/ui/src/index.ts` 引七枚组件（`StateIllustration`、`HabitArtwork`、
+`HabitMetricIcon`、`PasswordStrength`、`LegalDocumentSheet`、`AssistantMark`、`AiGeneratedLabel`）、
+`packages/app-host/src/inbound-process.ts` 引 `./task-batch-actions`、
+`apps/web/src/features/settings/WidgetJourneyPanel.tsx` 引 `../../lib/native-widgets` ——
+这十三枚（含它们各自的生成 JSON 与 model 文件）**都只在别人的工作树里**，mtime 从 10-07 19:29 到 10-09 10:43。
+
+⇒ **结论：`209f7997` 只修好了第一条红**。HEAD 仍然打不出包，而这次不是本线的字节：
+那七枚是 UI 那条线的、`task-batch-actions` 是入站那条线的、`native-widgets` 是 widget 那条线的。
+**本线不代提这些**（§6.37 代提的是自己 `9fa53ab9` 造成的裂口；这三条是别人正在写的产品语义，
+其中 `AiGeneratedLabel.tsx` 的 mtime 是今天 10:43）。各位的闭合动作是同一条：把自己的实现 `git add` 进来。
+
+**为什么这枚尺先不接进 `pnpm check`**：接进去 = 立刻让别人那九条红挂在本线的提交上，
+而本线没有办法替他们把它们变绿（§6.22 那条"扩射程会造出一屏假红"是同一件事）。
+登记在 `scripts/check-gate-wiring.mjs` 的 `ALLOWED_UNREFERENCED_IMPL` 里，
+消费方 = 本节与设备腿载体（下面那条）。等 `--sources-only` 在 HEAD 上报 0 条时接进链，判据口径不变。
+
+### 6.39 设备腿 r6：载体身份是"HEAD + 13 枚声明过的在飞实现"，这一条写在读数旁边
+
+纯 HEAD 打不出包 ⇒ 干净载体上设备腿不可能起跑。这一趟没有等别人，而是把"叠哪些未提交改动"**写成明账**
+（记忆里那条"隔离载体叠哪些未提交改动是一个要明写的裁决"）：
+
+- 载体 = `f1edde47` = main `a458abb1` + 13 枚文件（清单 `overlay-manifest-files.txt`，逐条 `git diff --name-only` 导出，
+  不是手抄）；那枚提交住 `refs/tmp/heyta-headplus-account-1009`，**不在 `main` 上**，不替任何人决定落地；
+- 造它用的是临时索引（`GIT_INDEX_FILE=… git read-tree <HEAD>` + 逐枚 `git add` + `write-tree` + `commit-tree`），
+  共享索引从头到尾没被我碰过；
+- 复取叠加集与校验叠加后自洽：
+  `git diff --name-only a458abb1 f1edde47` 与 `node scripts/check-imports-resolve.mjs --tree f1edde47 --sources-only`（⇒ 绿）；
+- 载体的被跟踪脏 = 0，三枚闸门/验收脚本与 main HEAD 逐枚同 blob，装依赖沿用 r4 的终态旗
+  （叠加只加源码文件，没有依赖变动）；
+- 🔴 因此 r6 那趟读数只能说"**HEAD + 这叠在飞代码**"，不能说"HEAD 已验"。
+  步骤 11–14（会话那一块）在 HEAD 上仍是必红，理由见 §6.35 那张表；
+  `CHAIN_RC` 的读法照 §6.32：0 = 全链成，3 = 环境无效，其余 = 产品或装置红。
+

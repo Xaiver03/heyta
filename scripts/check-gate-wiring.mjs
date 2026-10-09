@@ -202,6 +202,27 @@ const ALLOWED_UNREFERENCED_IMPL = new Map([
       ],
     },
   ],
+  [
+    'check-imports-resolve.mjs',
+    {
+      reason:
+        '它判的是**某一枚 ref 自不自洽**（引用在册、实现不在册 ⇒ 干净检出打不出包），' +
+        '输入是修订号而不是工作树，所以放进 `pnpm check` 那条无参数的链里它只会反复判 HEAD 同一枚对象。' +
+        '而 2026-10-09 这一轮它现量到 HEAD 上还有 9 条构建输入红，全是别的线**正在写**的实现文件' +
+        '（`packages/ui` 七枚组件、`packages/app-host` 的 task-batch-actions、`apps/web` 的 native-widgets）' +
+        '⇒ 现在就接进链 = 把别人的红挂到本线提交上，且本线无法替他们变绿。' +
+        '那九条清完（`--sources-only` 报 0）就是它转正的时刻，判据口径一个字不动。',
+      consumers: [
+        {
+          file: 'docs/plans/account-standard-suite.md',
+          needle: 'node scripts/check-imports-resolve.mjs --sources-only',
+          role:
+            '§6.38 那张用法表（取证与转正判据都写在那里）；§6.39 用它校验设备腿叠加载体的自洽性 ' +
+            '（`--tree <叠加提交> --sources-only` 必须报绿才敢起跑）',
+        },
+      ],
+    },
+  ],
 ]);
 
 /** 链必须包含的锚点：掉哪一个都是"整条链不再检查一件事"级别的事故。 */
