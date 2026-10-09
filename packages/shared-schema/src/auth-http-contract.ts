@@ -39,6 +39,12 @@
 export const AUTH_PASSWORD_PATHS = {
   /** 建号并设口令（成功语义是"去看收件箱"，不发会话）。 */
   register: '/register/email-password',
+  /** 建号并发送一次性邮箱验证码（新客户端的注册入口）。 */
+  registerRequest: '/register/email-password/request',
+  /** 用 challengeId + 6 位验证码完成邮箱验证并换会话。 */
+  registerVerify: '/register/email-password/verify',
+  /** 为已有 challenge 重发验证码（服务端按 challenge 限制频率）。 */
+  registerResend: '/register/email-password/resend',
   /** 换会话。 */
   login: '/login/email-password',
   /** 发一封重置口令的邮件。**响应与账号是否存在无关**。 */
@@ -61,6 +67,32 @@ export const AUTH_PASSWORD_PATHS = {
    */
   set: '/password/set',
 } as const;
+
+/** 邮箱密码注册验证码的稳定机器码。未知、错误、过期、已消费统一为同一错误。 */
+export const EMAIL_PASSWORD_REGISTRATION_ERROR_CODES = [
+  'invalid_registration_challenge',
+  'registration_code_rate_limited',
+] as const;
+
+export type EmailPasswordRegistrationErrorCode =
+  (typeof EMAIL_PASSWORD_REGISTRATION_ERROR_CODES)[number];
+
+/** 验证码约束由服务端执行，客户端只用它展示计时与输入提示。 */
+export const EMAIL_PASSWORD_REGISTRATION_CODE_LENGTH = 6;
+export const EMAIL_PASSWORD_REGISTRATION_CODE_TTL_MS = 10 * 60 * 1000;
+export const EMAIL_PASSWORD_REGISTRATION_RESEND_COOLDOWN_MS = 60 * 1000;
+
+export interface EmailPasswordRegistrationChallengeResponse {
+  challengeId: string;
+  expiresAt: number;
+  resendAvailableAt: number;
+  emailDelivered?: boolean;
+}
+
+export interface EmailPasswordRegistrationVerifyRequest {
+  challengeId: string;
+  code: string;
+}
 
 /**
  * 服务端在口令这条路上发出的**稳定机器码**（响应体的 `code` 字段）。
