@@ -1030,6 +1030,19 @@ const themeRulerCells = [
   ...groups.map((x) => ({ ...x.themeLayers, theme: x.theme, leg: 'groups', group: x.group })),
 ];
 
+// 两层对账的**配对**样本：同一枚节点（同腿 / 同组 / 同作用域 / 同文字）在亮暗两档各量到一次才算一对。
+// 为什么要这一层：`darkTierReachesBothThemeLayers` 比的是两枚**不同角色**的节点是否同色（见那条断言里的限定），
+// 换一棵 IA 就不可比（2026-10-10 02:0x 在只含已提交内容那棵树上就是这么判假的）。
+// 而"同一枚节点在两档之间色值必须变"与角色无关 —— 半暗那种坏法恰好就是它不变。
+const themeRulerPairIndex = new Map();
+for (const cell of themeRulerCells.filter((x) => x.sharedLayerFound)) {
+  const key = `${cell.leg}|${cell.group ?? ''}|${cell.scope}|${cell.sharedLayerNodeText}`;
+  const row = themeRulerPairIndex.get(key) ?? {};
+  row[cell.theme] = cell;
+  themeRulerPairIndex.set(key, row);
+}
+const themeRulerPairs = [...themeRulerPairIndex.values()].filter((row) => row.light && row.dark);
+
 const report = {
   origin: ORIGIN,
   carrier: {
@@ -1049,6 +1062,8 @@ const report = {
     // 这把尺子实际量到共享层节点的格数（读数，不是判据）：0 就说明两条判据都在空转。
     themeRulerMeasuredCells: themeRulerCells.filter((x) => x.sharedLayerFound).length,
     themeRulerSampleCells: themeRulerCells.length,
+    // 配对上的"同一枚节点 × 亮暗两档"有几对：`themeLayerRulerSwitchesWithTier` 只在它 > 0 时才在判事。
+    themeLayerRulerPairedCells: themeRulerPairs.length,
     realPermissionModes: HEADED
       ? ['default', 'granted', 'denied']
       : ['denied'],
@@ -1104,19 +1119,14 @@ const report = {
     darkTierReachesBothThemeLayers: themeRulerCells.length > 0
       && themeRulerCells.every((x) => !x.sharedLayerFound
         || x.sharedLayerColor === x.cssLayerColor),
-    // 上一条对"共享层节点没量到"是放过的 ⇒ 尺子自己要有一条不空转的对账：
-    // 亮、暗两档各至少量到一格，且**两层的色值在亮暗之间都要真的变过**。
-    // 少了这条，把 `themeLayerFacts` 的选择器写坏（永远 found=false）会让上一条恒真 ——
-    // 而"半暗"那种坏法（只写 dataset.theme）恰好只被这一条抓到，因为那时两层各自内部一致、
-    // 只是暗档的共享层色**等于亮档**。（AGENTS §7 元规则二）
-    themeLayerRulerSwitchesWithTier: (() => {
-      const measured = themeRulerCells.filter((x) => x.sharedLayerFound);
-      const light = measured.filter((x) => x.theme === 'light');
-      const dark = measured.filter((x) => x.theme === 'dark');
-      if (light.length === 0 || dark.length === 0) return false;
-      return light[0].cssLayerColor !== dark[0].cssLayerColor
-        && light[0].sharedLayerColor !== dark[0].sharedLayerColor;
-    })(),
+    // 上一条对"共享层节点没量到"是放过的 ⇒ 尺子自己要有一条不空转的对账。
+    // 02:3x 起这条**按节点配对**（不再只比第一格）：至少要有 1 对"同一枚节点在亮暗两档各量到一次"，
+    // 且每一对的**两层色值都必须跨档变过**。少了配对这一层，跨 IA 时它只看了样本集的第一格；
+    // 而"半暗"那种坏法（只写 `dataset.theme`）恰好被它抓到：那时两层各自内部一致、
+    // 只是暗档的共享层色**等于亮档**，配对之后那一格就再也混不过去。（AGENTS §7 元规则二）
+    themeLayerRulerSwitchesWithTier: themeRulerPairs.length > 0
+      && themeRulerPairs.every((row) => row.light.sharedLayerColor !== row.dark.sharedLayerColor
+        && row.light.cssLayerColor !== row.dark.cssLayerColor),
     // ── 明暗 × 视口下「个人资料 / 账号与安全」两组（补 account-suite 零暗色那个洞）──
     everyCaseCoversEverySweepGroup: sweepCases.every((spec) =>
       sweepGroups.every((group) =>
