@@ -70,10 +70,39 @@ async function openSettings(page) {
   await page.getByTestId('settings-sheet').waitFor();
 }
 
+/**
+ * 选设置浮层里的某一组。
+ *
+ * 🔴 **两种形状都要认**：HEAD 的导航是 `<a class="ht-settings__nav-link" href="#settings-group-x">`
+ * （长页面 + 锚点跳转），而那笔未提交的两栏设置 IA 把它换成
+ * `button[aria-controls="settings-group-x"]` + 一次只显示一组。原先这里只写后者，
+ * 于是这枚**已入库**的装置在干净检出上定位器恒空、死在第一次点击（2026-10-09 现量：
+ * `git show HEAD:apps/web/src/App.tsx | grep -c aria-controls` = 0）。
+ * ⚠️ 找不到就响亮失败，不静默继续 —— 否则下面的截图会全对着同一屏拍，而 `.every`
+ * 那类判据对空集合是真（同一形状见文件末尾那条 `everyCaseCoversEverySelectedMode`）。
+ */
 async function openGroup(page, group) {
   await openSettings(page);
-  await page.locator(`button.ht-settings__nav-link[aria-controls="settings-group-${group}"]`).click();
-  await page.waitForTimeout(120);
+  const link = page.locator(
+    `button.ht-settings__nav-link[aria-controls="settings-group-${group}"],` +
+    ` a.ht-settings__nav-link[href="#settings-group-${group}"]`,
+  );
+  const found = await link.count();
+  if (found !== 1) {
+    throw new Error(`设置导航里「${group}」那一档命中 ${found} 枚（应为 1）：button[aria-controls] 与 a[href="#…"] 两种形状各查了一次`);
+  }
+  await link.first().click();
+  const navLabel = (await link.first().innerText()).trim();
+  const section = page.locator(`#settings-group-${group}`);
+  await section.waitFor({ state: 'visible', timeout: 15_000 });
+  // 落定之后再拍：等**浮层自己**那条入场淡入跑完，而不是睡固定毫秒 ——
+  // 动画中途按的截图会把下层视图叠进来，看着像文字压文字的排版事故（仓里
+  // `waitForOverlaySettled` 的注释记着同一前科）。
+  await page.evaluate(async () => {
+    const sheet = document.querySelector('[data-testid="settings-sheet"]');
+    await Promise.all((sheet ? sheet.getAnimations() : []).map((a) => a.finished.catch(() => undefined)));
+  });
+  return navLabel;
 }
 
 async function layoutFacts(page, testId) {
@@ -212,6 +241,43 @@ async function dataJourney(browser, spec) {
   };
 }
 
+/**
+ * 明暗 × 视口下把「个人资料」与「账号与安全」各拍一张，并记下这一组的标题、
+ * 文本量与几何。加这一趟的理由是覆盖表实测出来的洞：
+ * `apps/web/evidence/account-suite/` 那 11 张里带 dark 命名的 **0 张**，
+ * `assistant/` 7 张里 1 张 —— 而本轮的验收要求是"实际验收深浅主题"。
+ * 这枚装置是本线的，补这两组不需要动别人在写的 spec。
+ */
+async function captureGroup(browser, spec, group) {
+  const context = await browser.newContext({ viewport: { width: spec.width, height: spec.height }, locale: 'zh-CN' });
+  const page = await context.newPage();
+  await page.addInitScript(() => localStorage.setItem('heyta.locale', 'zh-CN'));
+  await page.goto(`${ORIGIN}/?lang=zh-CN`);
+  await decidePrivacy(page);
+  if (spec.theme === 'dark') await page.evaluate(() => { document.documentElement.dataset.theme = 'dark'; });
+  const navLabel = await openGroup(page, group);
+  const facts = await page.evaluate((id) => {
+    const el = document.getElementById(id);
+    const title = el?.querySelector('.ht-settings__group-title, h2, h3') ?? null;
+    const r = el?.getBoundingClientRect();
+    return {
+      documentScrollWidth: document.documentElement.scrollWidth,
+      documentClientWidth: document.documentElement.clientWidth,
+      theme: document.documentElement.dataset.theme ?? 'light',
+      title: title?.textContent?.trim() ?? null,
+      box: r ? { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) } : null,
+      textLength: (el?.innerText ?? '').trim().length,
+      // 这一组里可交互控件的枚数。判"空壳分组"用的就是它 —— 比"文本长度 > 某个我拍的数"硬：
+      // 未登录时「账号与安全」整组只有一句门禁文案（实测 33 字），任何字面阈值都会把
+      // **正常的一屏**判成缺陷，而那才是这条判据该回答的问题（这一组能不能被操作）。
+      interactive: el ? el.querySelectorAll('button, a[href], input').length : 0,
+    };
+  }, `settings-group-${group}`);
+  await page.screenshot({ path: `${OUT}/${spec.theme}-${spec.width}-${group}.png`, fullPage: true });
+  await context.close();
+  return { theme: spec.theme, width: spec.width, group, navLabel, facts };
+}
+
 // Headed Chromium is required for the real `default` notification state; headless
 // Chromium coerces notifications to `denied` even after Browser.setPermission.
 const browser = await chromium.launch({ headless: !HEADED });
@@ -221,6 +287,9 @@ for (const spec of cases) {
 }
 const data = [];
 for (const spec of cases) data.push(await dataJourney(browser, spec));
+const sweepGroups = ['profile', 'account'];
+const groups = [];
+for (const spec of cases) for (const group of sweepGroups) groups.push(await captureGroup(browser, spec, group));
 await browser.close();
 
 const report = {
@@ -236,6 +305,8 @@ const report = {
   cases,
   reminders,
   data,
+  sweepGroups,
+  groups,
   assertions: {
     noHorizontalOverflow: [...reminders.map((x) => x.facts), ...data.map((x) => x.before)].every((x) => x.documentScrollWidth <= x.documentClientWidth + 1),
     allPermissionStatesRendered: reminders.every((x) => x.mode === 'default' ? x.statuses.request : x.mode === 'granted' ? x.statuses.granted : x.mode === 'denied' ? x.statuses.denied : x.mode === 'unsupported' ? x.statuses.unsupported : x.statuses.failed),
@@ -246,6 +317,14 @@ const report = {
     everyCaseCoversEverySelectedMode: cases.every((spec) =>
       reminderModes.every((mode) =>
         reminders.some((x) => x.theme === spec.theme && x.width === spec.width && x.mode === mode))),
+    // ── 明暗 × 视口下「个人资料 / 账号与安全」两组（补 account-suite 零暗色那个洞）──
+    everyCaseCoversEverySweepGroup: cases.every((spec) =>
+      sweepGroups.every((group) =>
+        groups.some((x) => x.theme === spec.theme && x.width === spec.width && x.group === group))),
+    groupSweepThemeApplied: groups.every((x) => x.facts.theme === x.theme),
+    groupSweepTitleMatchesNav: groups.every((x) => Boolean(x.facts.title) && x.facts.title === x.navLabel),
+    groupSweepActionable: groups.every((x) => x.facts.interactive >= 1),
+    groupSweepNoHorizontalOverflow: groups.every((x) => x.facts.documentScrollWidth <= x.facts.documentClientWidth + 1),
   },
 };
 await writeFile(`${OUT}/report.json`, `${JSON.stringify(report, null, 2)}\n`);

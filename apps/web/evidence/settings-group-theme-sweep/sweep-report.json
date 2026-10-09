@@ -1,0 +1,190 @@
+{
+  "producedBy": "scripts/qa/reminders-data-responsive.mjs（captureGroup 那一趟）",
+  "runCommand": "HEYTA_RESPONSIVE_HEADED=0 HEYTA_RESPONSIVE_EVIDENCE=<本目录的绝对路径> node scripts/qa/reminders-data-responsive.mjs",
+  "carrier": {
+    "headless": true,
+    "reminderModes": [
+      "denied",
+      "unsupported",
+      "error"
+    ],
+    "skippedReminderModes": [
+      "default",
+      "granted"
+    ],
+    "skipReason": "default 与 granted 两态在无头 Chromium 里都会退化成 denied（granted 那一格是 2026-10-09 无头趟实测出来的），而无头是不抢前台的唯一一档（AGENTS §6.2 规定二）"
+  },
+  "sweepGroups": [
+    "profile",
+    "account"
+  ],
+  "assertions": {
+    "everyCaseCoversEverySweepGroup": true,
+    "groupSweepThemeApplied": true,
+    "groupSweepTitleMatchesNav": true,
+    "groupSweepActionable": true,
+    "groupSweepNoHorizontalOverflow": true
+  },
+  "groups": [
+    {
+      "theme": "light",
+      "width": 390,
+      "group": "profile",
+      "navLabel": "个人资料",
+      "facts": {
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "theme": "light",
+        "title": "个人资料",
+        "box": {
+          "x": 16,
+          "y": 132,
+          "width": 358,
+          "height": 273
+        },
+        "textLength": 44,
+        "interactive": 1
+      }
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "group": "account",
+      "navLabel": "账号与安全",
+      "facts": {
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "theme": "light",
+        "title": "账号与安全",
+        "box": {
+          "x": 16,
+          "y": 132,
+          "width": 358,
+          "height": 185
+        },
+        "textLength": 33,
+        "interactive": 1
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "group": "profile",
+      "navLabel": "个人资料",
+      "facts": {
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "theme": "dark",
+        "title": "个人资料",
+        "box": {
+          "x": 16,
+          "y": 132,
+          "width": 358,
+          "height": 273
+        },
+        "textLength": 44,
+        "interactive": 1
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "group": "account",
+      "navLabel": "账号与安全",
+      "facts": {
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "theme": "dark",
+        "title": "账号与安全",
+        "box": {
+          "x": 16,
+          "y": 132,
+          "width": 358,
+          "height": 185
+        },
+        "textLength": 33,
+        "interactive": 1
+      }
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "group": "profile",
+      "navLabel": "个人资料",
+      "facts": {
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "theme": "light",
+        "title": "个人资料",
+        "box": {
+          "x": 424,
+          "y": 80,
+          "width": 655,
+          "height": 195
+        },
+        "textLength": 44,
+        "interactive": 1
+      }
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "group": "account",
+      "navLabel": "账号与安全",
+      "facts": {
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "theme": "light",
+        "title": "账号与安全",
+        "box": {
+          "x": 424,
+          "y": 80,
+          "width": 655,
+          "height": 125
+        },
+        "textLength": 33,
+        "interactive": 1
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "group": "profile",
+      "navLabel": "个人资料",
+      "facts": {
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "theme": "dark",
+        "title": "个人资料",
+        "box": {
+          "x": 424,
+          "y": 80,
+          "width": 655,
+          "height": 195
+        },
+        "textLength": 44,
+        "interactive": 1
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "group": "account",
+      "navLabel": "账号与安全",
+      "facts": {
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "theme": "dark",
+        "title": "账号与安全",
+        "box": {
+          "x": 424,
+          "y": 80,
+          "width": 655,
+          "height": 125
+        },
+        "textLength": 33,
+        "interactive": 1
+      }
+    }
+  ]
+}
