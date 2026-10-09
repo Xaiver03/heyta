@@ -3352,7 +3352,7 @@ HEAD 上的实际后果（都在 `pnpm check` 链里，不是登记在册的边�
 ⇒ **凡用 plumbing 推进共享分支，收尾都要对这些路径各做一次 `git ls-files -s` 与 `git status` 对账**，
 否则留下的是一颗"谁的提交都会回退我"的索引。
 
-剩余三枚 HEAD 红逐条归属（都不是本线的，且本线不代改）：
+剩余三枚 HEAD 红逐条归属（**这一列只覆盖 `server` 那一层**；其余各包的逐层读数在 §6.67。都不是本线的，且本线不代改）：
 ① `migration-sql.spec.ts` 那条 `@map` 列对账（6 枚列没有对应迁移）—— 注册验证码那一族的 `schema.prisma` 已入库而 `20261016000000_…` 那枚迁移还没入库；
 ② `password-contract.spec.ts` 那条"六条路由都要以常量注册"—— 同一族：`AUTH_PASSWORD_PATHS.registerRequest/Verify/Resend` 三枚常量已在 HEAD（`209f7997`），
    而注册它们的路由还没入库；
@@ -3374,6 +3374,44 @@ A/B 是同一枚 spec 在两棵树上的对照 —— 纯 `2647f768`（补之前
 两者都不是"别人没提交"，而是**在同一枚被多人共写的文件上，本线只落了能被单独提交的那一半**。
 防法不是"以后小心点"：接线落不下的那一笔，提交信息里就要写明"这枚文件还剩哪几处没落、落在谁的工作树里"，
 并且**在纯 HEAD 的载体上取一次整包读数**——主检出的绿在这条路上没有任何预警价值。
+
+### 6.67 默认通道在纯 HEAD 上的红，逐包取完了：本线的格子已清，剩下每一格都点名得到别线（10-10 03:3x 现量）
+
+§6.66 那一格教的东西直接拿去扫一遍"还有没有同类"：把本线涉及的每一层都在**载体纯 tip**（`d0ea794d`）上跑一次。
+前置除 §6.58 / §6.62 那三件之外又冒出一件，写在最后一格。
+
+| 层（都住在默认通道 `pnpm check` 里） | 纯 HEAD 现量 | 逐条归属 |
+|---|---|---|
+| `server` 整包 | `3 failed / 2730 passed / 1 skipped (2734)` | ① `migration-sql.spec.ts`：6 枚 `@map` 列没有对应迁移 —— 注册验证码那族的 `schema.prisma` 已入库而 `20261016000000_…` 还没；② `password-contract.spec.ts`：`AUTH_PASSWORD_PATHS.registerRequest/Verify/Resend` 三枚常量已在 HEAD（`209f7997`）而注册它们的路由还没入库；③ `validation.service.spec.ts` 的 `18 ≠ 17` ⇒ §6.63 |
+| `packages/app-host` 整包 | `15 failed / 1579 passed (1594)`，另有 **7 枚 spec 一条都没跑**（加载期就失败） | 7 枚同一个成因：`src/inbound-process.ts:8` import 了 **HEAD 里没有的** `./task-batch-actions.js`，而 `src/index.ts:895` 转出它 ⇒ 凡走 barrel 的 spec 全挂（§6.59 那一型在 `app-host` 的再现，归入站自动化线）。那 15 条测试红的成因是 `storage` 内存适配器抛「store「meta」的 put 缺少主键」（入站 / Vault 两线） |
+| `packages/sync-client` | `5 failed / 149 passed (154)`，全在 `inbound-authorization.spec.ts` | 🔴 **同一族的第三种位置**：`getInboundUploadAuthorization` 这个成员在 HEAD 里只存在于**判据**（`packages/sync-client/tests/inbound-authorization.spec.ts`）与**消费者**（`packages/app-host/src/inbound-worker.ts:332`）两处，而 `packages/sync-client/src/client.ts` 里没有 —— 主检出那份实现是别人正在写的 ` M`。⇒ 与 §6.66 逐字同型（判据与消费者入库、被约束的实现没入库），只是换了一枚包 |
+| `packages/i18n` | `1 failed / 25 passed (26)` | 判据"中文表每一条都含汉字"抓到 `web.ai.settings.localApi.source.file` / `.command`（中文栏的值是 `heyta-ai local-api init`，纯命令串）。判据与词条同生于 `1ca03ed4`，而把中文值换成命令串的是 **`e6058120`（10-09 14:35，产品体验线）** —— 与 §6.59、§6.63 同一笔 |
+| `packages/shared-schema` | `1 failed / 147 passed (148)` | `auth-http-contract.spec.ts` 的 `toHaveLength(6)` 对上现在有 **9** 条的契约 ⇒ **§6.63 那台"只会因自己过期而红"的机器的第二例**，形状逐字相同。⚠️ 现量：这枚文件此刻是 ` M`，另一条会话正在把它改成 `9` 并把标题里的"六条"去掉 —— 也就是正按 §6.63 写的**选项①**修（恢复绿，下次加路径还会红）。本线不插手：那是别人手里的判据，而且那一行正在被写 |
+| `packages/legal` | `2 failed / 60 passed (62)` | §6.65（17 枚缺类别名里 2 枚是本线的，文案躺在 parked 那一份里） |
+| 构建（`check` 的第 2 步就是 `pnpm build`） | `@heyta/ui` 红（§6.59 / §6.64 谓词）；**新读数**：`@heyta/app-host` 也红 | `pnpm --filter "@heyta/app-host..." build` 在纯 tip `Failed`：`src/inbound-worker.ts(332,34) error TS2339` ⇒ 就是上面 `sync-client` 那一格，只是从"测试红"升级成"**构建红**"。依赖是先编的（`ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL` 落在 app-host），所以这不是载体旧 dist 的假红 |
+
+🔴 **这一节最要紧的后果不是"还有几条红"，是有一整层现在没法验**：客户端的单测层要在纯 HEAD 上跑需要依赖包的 `dist`，
+而 `app-host` / `ui` 的 `dist` 在 HEAD 上**打不出来** ⇒ 载体里 `apps/web/tests/account-security.spec.tsx` 连加载都过不去
+（`Failed to resolve entry for package "@heyta/app-host"`，汇总行是 `no tests`），`apps/mobile` 同理。
+⇒ 本线 W3/W4/W5 那些界面层读数**只能标注成"共享检出（含未入库内容）"** —— §6.66 收窄的那两句话就是这条的落地。
+这一格不是"本线还没跑"，是**在 HEAD 上跑不出来**；等的是 §6.64 那两条谓词清空之后才能重取。
+
+本线自己的格子在这一节里的状态（同一趟取的，都是纯 tip）：
+`packages/app-host/tests/account-security.spec.ts 49 passed (49)`、`server` 那 5 枚本线 spec `141 passed`（§6.66 表）、
+`packages/i18n` 里本线新增的换绑/会话词条通过（唯一两条红是别人的 `localApi` 值）、
+`packages/shared-schema` 里本线那批断言通过（唯一那条是过期抄本），`packages/legal` 见 §6.65。
+⇒ **除 §6.65 那一格对外承诺的边界之外，默认通道里没有一条红是本线的了。**
+
+复取（每条一行，都不写死数字）：
+```bash
+cd .worktrees/<载体>/packages/app-host && NO_COLOR=1 npx vitest run          # 15 failed + 7 枚 FAIL [ … ]
+cd .worktrees/<载体>/packages/sync-client && NO_COLOR=1 npx vitest run       # 5 failed，全在 inbound-authorization
+cd .worktrees/<载体>/packages/i18n && NO_COLOR=1 npx vitest run
+cd .worktrees/<载体>/packages/shared-schema && NO_COLOR=1 npx vitest run
+cd .worktrees/<载体> && NO_COLOR=1 pnpm --filter "@heyta/app-host..." build  # 看那行 error TS2339
+```
+⚠️ 载体前置再补一件：`pnpm --filter … build` 会重写 `pnpm-lock.yaml` —— 本线跑完 `git checkout -- pnpm-lock.yaml`，
+`git status --porcelain` 回空才敢说载体没被自己污染。（§6.62 那三件前置之外的第四件是**构建类**命令带来的，测试类命令不会。）
 
 
 
