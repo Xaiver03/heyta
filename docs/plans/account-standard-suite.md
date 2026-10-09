@@ -1526,3 +1526,29 @@ automation 那条线的两个 `purgeExpired*` 调用（未提交）和我这一�
 `TS1308 await outside async` 当场抓住），再 `git hash-object -w` + `update-index --cacheinfo`，
 `git diff --cached --name-only` 确认恰好是本线那几枚路径，最后 **不带 pathspec 的 `git commit`**
 （`git commit -- <path>` 提交的是工作树内容，会把别人的脏行一起带走）。
+
+### 6.26 为 iOS 设备腿起隔离载体时，当场撞出两件**在 HEAD 上就坏**的跨线缺陷（12:1x 现量）
+
+隔离载体（`.worktrees/iosacct` @ 当时 HEAD）第一步是 `pnpm install --frozen-lockfile`。它没装成，
+报的不是网络也不是磁盘：
+
+```
+[ERR_PNPM_OUTDATED_LOCKFILE] Cannot install with "frozen-lockfile" because
+pnpm-lock.yaml is not up to date with <ROOT>/packages/ui/package.json
+* 2 dependencies were removed: @zxcvbn-ts/core@4.2.0, @zxcvbn-ts/language-common@4.1.3
+```
+
+| 缺陷 | 现量形状 | 由谁消 / 一条命令 |
+|---|---|---|
+| 🔴 **HEAD 的 `pnpm-lock.yaml` 与 HEAD 的 `packages/ui/package.json` 互相不认** | `git show HEAD:pnpm-lock.yaml \| grep -c zxcvbn` = 10；`git show HEAD:packages/ui/package.json \| grep -c zxcvbn` = 0。⇒ **任何干净检出（CI 的默认形态就是 frozen）装不起来**，而 `packages/ui/package.json` 在主检出是 `M`（有人正在把那一半补上）= 锁文件先落地、声明还在飞 | ui 那条线：把 package.json 那一半与锁文件一起落；复核命令 `git -C <干净检出> pnpm install --frozen-lockfile` |
+| 🔴 **`pnpm check` 链里没有任何一道比这对** | `node -e` 扫 `check:*` 键名含 lock/depend/install 的 = 0 道；链的 `&&` 串里含 `lock\|frozen` 字样的段 = 0 段。也就是说这条**会让 CI 整条挂掉**的不变量，靠的是"有人恰好跑过 frozen 安装" | 谁先需要谁立：最小形状是把 `pnpm install --frozen-lockfile --lockfile-only` 做成一道门（它会因这对漂移而红）——**本线不代建**：新建判据的口径要负责人拍（§6.22 那两条被否证的规则就是先例） |
+| ⚠️ `check:docs` 在 HEAD 上红一处 | `apps/desktop-windows/README.md:89` 指向 `scripts/windows/launch-data-transfer-qa.ps1`，"本机有、仓库里没有"；该 README 在主检出是 `M` | Windows 那条线：把那枚脚本一起提交，或按它自己的说明进 `UNTRACKED_LINK_OK` 带理由登记 |
+
+📌 **为什么这条值得单独一节**：这两格都不是"某条线的功能没做完"，而是**干净检出这一形态本身已经不成立**。
+本仓库的立场（AGENTS §7 第 46 条那一族）是"红要能归因到字节"，而 frozen 安装失败这件事
+`pnpm check` 全链一次都不会碰 —— 链里 `pnpm -r build` / `-r test` 都吃**已经装好的** `node_modules`。
+⇒ 我在隔离载体上撞见它，不是运气：那是这台机器上**唯一一个"从锁文件重新装一遍"的动作**。
+
+本线的处置：载体改用 `pnpm install --no-frozen-lockfile`，**装完立刻把 `pnpm-lock.yaml` 还原成 HEAD 那一版**，
+再用 `git status --porcelain` 数被跟踪脏 = 0 才允许过窗口门 ——
+否则"我为了让装起来而改动的字节"会混进本轮打包输入，读数就不再属于这批代码。
