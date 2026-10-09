@@ -8905,3 +8905,35 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
        是的话就写清口径差异，**不要**为了让数字好看把任何一边改小 —— 那等于把判据喂给对方。
     同族：#167（改不变量要按"谁引用了输入"枚举）、#174（只哈希两三个文件的对账，证明的就是那两个文件）、
     #32（pod 装了 ≠ 链接了：同一件东西有两种"在"）。
+389. 🔴 **新写一份 e2e 夹具时，第一趟红的大概率不是产品，而是"这个应用开机还发了别人的请求"。**
+    账号面那两块面板的真浏览器套件（`e2e/tests/account-email-change-and-sessions.spec.ts`）
+    第一趟 **4 条全红**，报错逐字是
+    `除已登记缺失外不该有非 2xx：["/api/automation/rules","/api/automation/events","/api/account/profile"]` ——
+    三条都是**别的线**挂在开机路径上的（入站自动化面板、自己的资料），与换绑/会话这个主题无关。
+    修法**不是**把 `assertNoProblems` 关掉，而是把那三条补成"空但合法"的应答，且形状**抄真源**：
+    `packages/app-host/src/inbound-rules-remote.ts:143-146`/`:131-134` 要求 `{rules: []}` / `{events: []}`
+    （不是数组就整条判 `transport`），`packages/shared-schema/src/account-profile-contract.ts:286`
+    的 `accountProfileResponseSchema` 少一个字段就整条判 `malformed-response`。
+    📌 一般规律：**在共享检出上，"这个界面开机只会发我这几条"永远不成立**。
+    新 e2e 的默认形状 = `inbox.spec.ts` / `admin-console.spec.ts` 那套（补无关的开机请求 +
+    结尾 `assertNoProblems`），而不是自己造一个只认自己那几条的假服务端 —— 后者会让
+    "别人的面板把这条链带坏了"看起来像"我的用例红了"。
+    同族：#87（e2e 前置 SIGKILL 别人的 dev server）、#176（桩在外面预取值 ⇒ 用例没走到被测判据就返回）。
+
+390. 🔴 **现行控件风格是"无边框输入框" ⇒ 空着的那一格在截图里是一片白。四层判据都说"框在"，只有看图知道它不存在。**
+    `.ht-input` 是 `border: 0` + `flex: 1`（`apps/web/src/styles/app/controls.css:224-233`），
+    放进 `display:flex` 的 `.ht-settings__actions`（`ai-panels.css:472-478`）里横向铺满整行：
+    **有值**时清清楚楚（`apps/web/evidence/account-suite/03-after-cancel.png` 里那行地址），
+    **空着**时那一格就是纯白，只剩上面的标签和右边的按钮。
+    而 `fill()` 成功、`toBeVisible()` 成立、DOM 里有节点、jsdom 断言全绿 ——
+    没有一层会报"用户认不出这里能打字"。
+    修：给那一格加占位文字（`common.emailChange.newPlaceholder`，中英各一条），
+    并钉一条"占位文字不许为空"的判据；变异=摘掉 `placeholder` ⇒ **1 红**
+    （`占位文字不能是空的: expected 0 to be greater than 0`）。
+    ⚠️ 同一张图还查出第二条：读侧失败印的是"更换没有成功，请重试"——**一次不存在的尝试**。
+    根因形状值得记住：一张 `failureKey(reason)` 表**同时**服务读侧与发起侧，
+    而表里句句都带发起侧的预设（移动侧早就分成两档了，web 少这一档）。
+    📌 与 #82、§8.5 W5 同族但**不是同一件事**：那两条讲"非空白挡不住错误屏""断言只验写了什么、
+    不验少了什么"；这一条讲的是**可供性在静态图里消失** —— 判据能验"元素在不在"，
+    验不了"看不看得出来那是个能输入的地方"。姊妹那一栏（昵称）本来就有占位文字，
+    所以这不是全局控件的缺陷，是**新面板没跟上新风格**。
