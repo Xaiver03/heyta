@@ -2145,7 +2145,8 @@ OPP 已过期、随时回收。✅ 已经搬走的（**这次实测确认不在 
 ### 8.1 SSH 可达性
 
 ```bash
-for h in 12km sanjiaozhou ubuntu-jcli wunoos lingchuang; do
+# 别名清单里没有 12km（=121.4.24.238，2026-09-27 已退役，那台不再应答；现役机取法 grep -E '^Host ' ~/.ssh/config）
+for h in sanjiaozhou ubuntu-jcli wunoos lingchuang; do
   printf '%-14s ' "$h"
   ssh -o BatchMode=yes -o ConnectTimeout=8 "$h" 'hostname; whoami' 2>&1 | tr '\n' ' '; echo
 done
@@ -2161,8 +2162,8 @@ ssh -o BatchMode=yes ubuntu-jcli '
   ss -lntp
   systemctl list-timers --no-pager | head -20
 '
-# 12km 上 docker 需要 sudo（ubuntu 不在 docker 组）：
-ssh -o BatchMode=yes 12km 'sudo -n docker ps --format "{{.Names}}\t{{.Status}}"'
+# 要不要 sudo 看这台的 docker 组成员（2026-10-10 实测 `ssh finlaw 'getent group docker'` ⇒ `docker:x:999:ubuntu`，ubuntu 已在组里 ⇒ 不需要 sudo）：
+# （原来这一发写的是 `ssh 12km 'sudo -n docker ps …'`；12km 已退役，命令删掉，形状照上句现取）
 ```
 
 ### 8.3 heyta 公网部署
