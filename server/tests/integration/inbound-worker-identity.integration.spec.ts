@@ -1022,6 +1022,77 @@ describe.skipIf(!DATABASE_URL)('inbound identity through ordinary sync HTTP', ()
       await db.automationEvent.deleteMany({ where: { userId, ruleId: permitRule } });
       await db.automationRule.deleteMany({ where: { id: permitRule } });
     });
+
+    // 🔴 T2：一次性票据的**消费**必须坐在业务写事务里，不是闸门事务里。
+    // AC-1 那句"拒绝且不产生业务效果"的反向也要成立：业务写失败回滚的那一次，
+    // nonce 不能被烧掉 —— 否则用户会因为一次与我们自己的故障而少一次机会，
+    // 而"回滚不烧"这件事除了真 PostgreSQL 事务没人能证。
+    // 这一档选的失败点是**产品自己的**：部署没配 sender KEK 时，密封密钥那一步在
+    // 授权之后、create 之前抛 —— 不需要往被测路径里塞测试桩。
+    it('写事务回滚不烧 nonce：同一枚票据在业务恢复后仍能用，且只用一次', async () => {
+      const credentialRule = randomUUID();
+      const savedKek = process.env.AUTOMATION_SENDER_KEK;
+      delete process.env.AUTOMATION_SENDER_KEK;
+      await db.automationRule.create({ data: { id: credentialRule, userId, enabled: true, keyId: 'inbound-v1' } });
+      await db.automationEntitlementBinding.upsert({ where: { userId },
+        create: { userId, officialSubject: 'acct-postgres', installationId: installation, localAccountUuid: localAccount,
+          issuer: 'https://official.test/entitlements', keyId: 'k1', revocationVersion: 1,
+          expiresAt: new Date(Date.now() + 600_000), checkedAt: new Date() },
+        update: { officialSubject: 'acct-postgres', installationId: installation, localAccountUuid: localAccount,
+          revocationVersion: 1, expiresAt: new Date(Date.now() + 600_000) } });
+      const ticket = ticketFor('sender-credential-issue', { ruleId: credentialRule });
+      const nonce = JSON.parse(Buffer.from(ticket.split('.')[0]!, 'base64url').toString('utf8')).nonce as string;
+      const issue = () => fetch(`${base}/api/automation/rules/${credentialRule}/sender-credentials`, {
+        method: 'POST', headers: { authorization: token, 'content-type': 'application/json', 'x-heyta-entitlement-ticket': ticket },
+        body: JSON.stringify({ keyId: 'hk-rollback' }) });
+      try {
+        const failed = await issue();
+        expect(failed.status).toBe(409);
+        expect(await db.automationSenderCredential.count({ where: { userId, ruleId: credentialRule } })).toBe(0);
+        // 🔴 反向那一半：那一次回滚**没有**把 nonce 烧掉。闸门若仍在自己的事务里消费，
+        // 这一条就先红，后面那次 201 也拿不到。
+        expect(await db.automationEntitlementTicketUse.count({ where: { nonce } })).toBe(0);
+
+        process.env.AUTOMATION_SENDER_KEK = '33'.repeat(32);
+        const issued = await issue();
+        expect(issued.status).toBe(201);
+        expect(await db.automationSenderCredential.count({ where: { userId, ruleId: credentialRule } })).toBe(1);
+        expect(await db.automationEntitlementTicketUse.count({ where: { nonce } })).toBe(1);
+
+        // 重放同一枚票据 ⇒ 拒。而"吊销旧凭据"与"建新的"在同一笔里，
+        // 这次失败的那笔必须把已签发的那条原样留着。
+        const replay = await issue();
+        expect(replay.status).toBe(402);
+        expect((await replay.json() as { ticketCode?: string }).ticketCode).toBe('AUTOMATION_TICKET_USED');
+        const kept = await db.automationSenderCredential.findFirstOrThrow({ where: { userId, ruleId: credentialRule } });
+        expect(kept.revokedAt).toBeNull();
+        expect(await db.automationSenderCredential.count({ where: { userId, ruleId: credentialRule } })).toBe(1);
+      } finally {
+        if (savedKek === undefined) delete process.env.AUTOMATION_SENDER_KEK; else process.env.AUTOMATION_SENDER_KEK = savedKek;
+        await db.automationSenderCredential.deleteMany({ where: { userId, ruleId: credentialRule } });
+        await db.automationEntitlementTicketUse.deleteMany({ where: { nonce } });
+        await db.automationRule.deleteMany({ where: { id: credentialRule } });
+      }
+    });
+
+    it('闸门只预检：写在授权之前被产品条件拒掉的那些路径同样不烧 nonce', async () => {
+      // 作用域不符（票据绑的是另一条清单）—— 消费必须在写事务里，
+      // 而这一条连业务写都没走到，所以既没有效果也没有 nonce。
+      const otherRule = randomUUID();
+      await db.automationRule.create({ data: { id: otherRule, userId, enabled: true, keyId: 'inbound-v1' } });
+      const ticket = ticketFor('sender-credential-issue', { ruleId: otherRule });
+      const nonce = JSON.parse(Buffer.from(ticket.split('.')[0]!, 'base64url').toString('utf8')).nonce as string;
+      try {
+        const wrongScope = await fetch(`${base}/api/automation/rules/${randomUUID()}/sender-credentials`, {
+          method: 'POST', headers: { authorization: token, 'content-type': 'application/json', 'x-heyta-entitlement-ticket': ticket },
+          body: JSON.stringify({ keyId: 'hk-scope' }) });
+        expect(wrongScope.status).toBe(402);
+        expect((await wrongScope.json() as { ticketCode?: string }).ticketCode).toBe('AUTOMATION_TICKET_SCOPE_MISMATCH');
+        expect(await db.automationEntitlementTicketUse.count({ where: { nonce } })).toBe(0);
+      } finally {
+        await db.automationRule.deleteMany({ where: { id: otherRule } });
+      }
+    });
   });
 
   // 🔴 签发端与账号绑定握手（official 模式、真库、真 HTTP）：
