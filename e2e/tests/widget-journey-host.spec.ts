@@ -48,35 +48,42 @@ async function pretendWindows(page: Page) {
   });
 }
 
-test('Windows 浏览器标签页：按真实路径教「如何装成应用」', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await pretendWindows(page);
+for (const theme of ['light', 'dark']) {
+  test(`Windows 浏览器标签页（${theme}）：按真实路径教「如何装成应用」`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await pretendWindows(page);
 
-  const panel = await openWidgetJourney(page);
-  await expect(panel.getByTestId('widget-journey-status')).toContainText('正在浏览器标签页里运行');
-  // 存在性判据，不是内容判据：这一步少了任何一条都算回归。
-  await expect(panel.getByTestId('web.widgetJourney.windows.step1')).toBeVisible();
+    const panel = await openWidgetJourney(page);
+    await page.evaluate((value) => { document.documentElement.dataset.theme = value; }, theme);
+    await expect(panel.getByTestId('widget-journey-status')).toContainText('正在浏览器标签页里运行');
+    // 存在性判据，不是内容判据：这一段少了任何一条都算回归。
+    await expect(panel.getByTestId('web.widgetJourney.windows.step1')).toBeVisible();
 
-  // 🔴 元素截图，不是整屏截图：这条主张说的是"这一段面板画了什么"，
-  //    而整屏只拍到分组顶部（显示 / 功能模块），小组件那段在折叠线以下 ——
-  //    那种图既不能证也不能伪（§7 第 170 条同一族）。
-  await panel.screenshot({ path: `${EVIDENCE}/browser-windows-tab.png` });
-});
-
-test('🔴 存储宿主逃生门关掉的 WebView2：认得自己是壳，不再教怎么装', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await pretendWindows(page);
-  await page.addInitScript(() => {
-    // WebView2 独有的名字；Chrome/Edge 浏览器里没有 `chrome.webview`。
-    (window as { chrome?: Record<string, unknown> }).chrome = {
-      ...(window as { chrome?: Record<string, unknown> }).chrome,
-      webview: { postMessage: () => undefined, addEventListener: () => undefined },
-    };
+    // 🔴 元素截图，不是整屏截图：这条主张说的是"这一段面板画了什么"，
+    //    而整屏只拍到分组顶部（显示 / 功能模块），小组件那段在折叠线以下 ——
+    //    那种图既不能证也不能伪（§7 第 170 条同一族）。
+    await panel.screenshot({ path: `${EVIDENCE}/browser-windows-tab-${theme}.png` });
   });
 
-  const panel = await openWidgetJourney(page);
-  await expect(panel.getByTestId('widget-journey-status')).toContainText('正在原生桌面应用中运行');
-  await expect(panel.getByTestId('web.widgetJourney.windows.step1')).toHaveCount(0);
+  test(`🔴 存储宿主逃生门关掉的 WebView2（${theme}）：认得自己是壳，不再教怎么装`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await pretendWindows(page);
+    await page.addInitScript(() => {
+      // WebView2 独有的名字；Chrome/Edge 浏览器里没有 `chrome.webview`。
+      (window as { chrome?: Record<string, unknown> }).chrome = {
+        ...(window as { chrome?: Record<string, unknown> }).chrome,
+        webview: { postMessage: () => undefined, addEventListener: () => undefined },
+      };
+    });
 
-  await panel.screenshot({ path: `${EVIDENCE}/native-shell-storage-host-off.png` });
-});
+    const panel = await openWidgetJourney(page);
+    await page.evaluate((value) => { document.documentElement.dataset.theme = value; }, theme);
+    await expect(panel.getByTestId('widget-journey-status')).toContainText('正在原生桌面应用中运行');
+    await expect(panel.getByTestId('web.widgetJourney.windows.step1')).toHaveCount(0);
+    // 暗色不是亮色的反相：这一段在暗态下也必须给出"暂不支持系统小组件"的实话，
+    // 而不是退化成空白或把安装三步露回来。
+    await expect(panel.getByTestId('widget-journey-capability')).toContainText('暂不支持系统小组件');
+
+    await panel.screenshot({ path: `${EVIDENCE}/native-shell-storage-host-off-${theme}.png` });
+  });
+}
