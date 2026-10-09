@@ -193,10 +193,15 @@ try:
  adb('shell','am','start','-W','-n','com.heyta/com.heytamobile.MainActivity')
  time.sleep(2.0)
  r=app_tree()
- english = find(r,'Profile') is not None
+ # First launch can show consent before the bottom tabs exist. Detect the
+ # language from each supported initial surface, not only the Profile tab.
+ english = any(find(r,label) is not None for label in (
+  'Profile','Before any network feature runs','Use offline for now',
+ ))
  if find(r,T('只用本机','This device only')) is not None:tap(T('只用本机','This device only'),T('先离线使用','Use offline for now'),T('在使用联网功能之前','Before any network feature runs'))
  r=tree()
  if find(r,T('先离线使用','Use offline for now')) is not None:tap(T('先离线使用','Use offline for now'),T('我的','Profile'),T('在使用联网功能之前','Before any network feature runs'))
+ r=tree()
  # The current tab is already “我的”; this tap is an explicit assertion that
  # the profile surface is reachable before entering its settings row below.
  if find_resource(r,'profile-entry-settings') is None:
