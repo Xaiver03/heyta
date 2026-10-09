@@ -195,8 +195,13 @@ W1 先落、W7 后落 ⇒ 中间任何一次 `pnpm check` 都会红。**这不�
 10. ✅ **换绑与会话两块新界面的真浏览器证据已取**（AGENTS §6.2 规定一，10-09 01:1x）。
     判据文件 `e2e/tests/account-email-change-and-sessions.spec.ts` **4 条全绿**、七张图**在最后一趟之后**
     逐张打开看过，看图当场查出**两条断言查不出的缺陷**并修完（两条各做过一次变异）⇒ 全过程在 §6.4。
-    ⚠️ 仍然开着的不是这一格，是**移动端那一腿**：两个壳共用同一份共享层与同一套词条，
-    但移动侧只有 RN 测试树（30 条），**没有上真机/模拟器**点过一遍 —— 那要设备窗口（§8 第 9 条）。
+    ⚠️ **仍然开着的是移动端那一腿，但措辞要换准**（10-09 12:0x 现量）：设备窗口产品负责人给了，
+    三趟都跑了 —— 红的分别是**探针判定窗口不够**、**模拟器系统语言是英文**（traps #391）、
+    **模拟器进程被宿主机负载风暴打死**（swap 6.2 G / load 158–540），
+    🔴 **没有一趟红在移动壳的代码上，所以这一腿的证据仍然等于零**，不是"验过没验好"。
+    它带回来的唯一一条产品缺陷在**服务端**（`authCache` 按用户分格 ⇒ 撤掉的那一枚仍被接受），
+    三层证据与逐层变异读数、续跑配方都在 §6.7。
+    ⚠️ 移动侧那 30 条 RN 测试树照旧存在，它证的是共享层接线，**不替代**真机界面。
 11. 🔴 **本轮没有跑 `pnpm reinstall:all`** ⇒ 现在装在四个端上的产物**不含**这一批
     （AGENTS §6.1.1 的固定收尾；与 §7 第 27/82 条、traps #178 同一条理由："测试全绿 ≠ 这是当前产物"）。
     起跑时 1 分钟负载 **340** / 16 核（并行会话在跑自己的链），而那条链要独占模拟器与打包目录。
@@ -205,6 +210,17 @@ W1 先落、W7 后落 ⇒ 中间任何一次 `pnpm check` 都会红。**这不�
     两条可迁移的教训已入 `docs/reference/environment-traps.md`
     （**#389**：共享检出上"这个界面开机只发我这几条"永远不成立；
     **#390**：无边框控件风格下空输入框在截图里是一片白，判据验得出"在"验不出"看得见"）。
+13. ⚠️ **本线那份集成套件在共享载体上有一条载体天花板，不是产品红**：
+    `server/vitest.integration.config.ts` **不设** `testTimeout` ⇒ 走 vitest 默认 **5 s**，
+    而它跑的是真库 + 真 HTTP。10-09 11:4x 那次 1 分钟负载 **371**，两条换绑用例报 timeout；
+    同一条命令加 `--testTimeout=30000` 复跑 `14 passed` ⇒ 判据成立、超时预算不够。
+    🔴 **没有**顺手把默认超时写进配置 —— 超时预算属于判据口径，要拍由负责人拍（同 §5 第 12 条那两条的处置）。
+14. 🔴 **`authCache` 那一格不是"登记一条边界"，是本轮修掉的一条真缺陷**（§6.7）：
+    它让 ADR-0063 §2.5 那句"30 s 的缓存窗口不会变成撤销了还能用半小时"在实测上**不成立**。
+    ADR 里那句话已就地更正（**结论一条没动**：双确认、`jti` 会话、撤销=删行），
+    改的是那句被证伪的实现事实。⚠️ 单测与集成当时**全是绿的** ——
+    "撤一枚不动另一枚"这条断言写在了错误的顺序上（先探被撤的那一枚就永远照不出焐热路径），
+    这条是 traps **#392**。
 
 ---
 
@@ -404,3 +420,132 @@ Chromium、IndexedDB、React 树、store、词条渲染、点击与焦点。
 现取命令：`git status --porcelain -- packages/i18n server/package.json packages/shared-schema/src/index.ts`
 ＋ `git diff --cached --name-only | wc -l`。
 ⚠️ 这条边界与 §5 第 11 条不是一回事：那条讲**装出来的产物**，这条讲**历史里的代码**。
+
+### 6.7 移动端那一腿：设备窗口给了、三趟各红在别处，而它当场照出**一条真缺陷**
+
+10-09 01:4x 产品负责人给出设备窗口（`emulator-5554` + `heyta-iphone-17pro` 两台 booted）。
+三趟旅程各有根因，**只有一趟是产品**，而那一条不是移动壳的 —— 是服务端 `authCache` 的。
+这一节按"装置 → 三趟 → 那条缺陷 → 续跑配方"记，因为装置与配方是下一个跑这一腿的人唯一需要的东西。
+
+**两枚装置（都还没入库，落点见本节末）**
+
+| 装置 | 形状 | 它能拒绝什么 |
+|---|---|---|
+| `scripts/verify-mobile-account-email-sessions.sh` | 14 步零 mock 真机旅程：注册 → 验证邮箱 → 改密 → 换绑双确认 → 列会话 → 撤一枚 → 另一枚照常 → `logout` → `revoke-all` | 走 `mobile-e2e` 那套共享 lib，所以服务端认证闸（cwd=`server/`、`dist` 不早于 `src`、进程启动晚于 `dist`、与 `ROOT` HEAD 一致）是它自带的 |
+| `research/tools/account-email-sessions-http-probe.mjs` | 同一条旅程在 **HTTP + 库面**上跑一遍，**31 条判据** | 🔴 两道自检：① `PORT` / `PUBLIC_URL` / `HEYTA_E2E_LOGFILE` / `HEYTA_E2E_DB` 少一枚就**拒绝跑**；② 开跑前两条新路由必须回 **401**，不对就**拒绝跑** |
+
+**自检当场抓到一次真误连**（这是那两道自检存在的理由）：这台机上 `:3000` 有一个 **10-06 的 dist** 在跑，
+对本线那两条路由回 **404**。判据是 **404 ≠ 401** —— 形状不对就不继续。若探针只连端口不验形状，
+整趟会对着那份旧产物跑完，31 条要么全红、要么被误读成产品失败。
+📌 这是 AGENTS §7 元规则 1（先怀疑探针）的一次**正例**：探针没坏，是它够不着的那个东西救了整轮。
+
+**产物新鲜度怎么证的**（§6.1.1 / §7 第 27 条那一族）。APK 里是 Hermes 字节码，
+🔴 中文在里面是 **UTF-16LE**，直接 `grep` 中文**恒 0**（traps #171）⇒ 判据必须**把要搜的词条先编成 UTF-16LE** 再搜。
+现量命令（读数：`APK` mtime `10-09 01:52` = 本线移动侧那两节落地之后）：
+
+```bash
+APK=apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+unzip -p "$APK" assets/index.android.bundle > /tmp/h.bundle
+python3 -c 'd=open("/tmp/h.bundle","rb").read(); print(d[:4].hex(), [(s, d.count(s.encode("utf-16-le")), d.count(s.encode())) for s in ["更换登录邮箱","发起更换","退出所有设备","退出这一台"]])'
+```
+
+12:07 实跑：魔数 `c61fbc03`、8 385 088 B，四枚词条 **UTF-16LE 命中 3/1/4/5 而 UTF-8 命中全 0**
+⇒ 这一份 APK 里**确实**是本线当前的移动侧文案，而不是 §7 第 27 条那种旧 bundle。
+
+**三趟红，各自的根因（只有一趟是产品）**
+
+| 趟 | 屏幕上看到的 | 真实根因 | 这一趟产出什么 |
+|---|---|---|---|
+| 1 | `三次启动都没到前台` | **探针坏**：App 其实已经在前台，判定窗口 10×3 s 在负载 497 下不够（实测那台机上一次冷启动到前台 **27 s**）。⚠️ 更糟的是它连"没到前台"都**判错方向** —— 它会对着一个已经能操作的屏幕报失败 | 窗口放宽到 40×3 s。**只改判据不查根因就是 §7 元规则 1 的反例**，这一趟没犯 |
+| 2 | 整族**逐条**红，一条都点不到 | 🔴 **模拟器系统语言是 `en-US`** ⇒ App 跟着走英文词条，而 lib 里那道 `privacy_gate_present()` **只认中文**，英文下它返回的是"没有门"（**不是**"没有同意"），于是脚本一直停在隐私同意之前 | traps **#391**：按文案定位的探针隐含"载体语言"前提。处置=`settings put system system_locales zh-Hans-CN` **且必须重起 App 进程** |
+| 3 | `120 秒内没到前台（模拟器状态或宿主机负载？）` | **载体死了**：`adb devices` 空列、`ps` 里 emulator 进程 **0** 枚、swap used **6.2 G**、load **158–540**（风暴来自另一条线的 `.worktrees` 扇出） | 设备腿到本轮为止**仍未闭合**。⚠️ **没有**在这台 Mac 上重起模拟器 —— AGENTS §6.1 那条资源纪律（headless 模拟器 3.6 G+ 常驻 / 90 % CPU / 20 G+ 缓存）优先于"这一趟想跑完" |
+
+🔴 三趟里**没有一趟**红在移动壳的代码上。这不等于移动壳没问题 —— 它等于**这一腿的证据还没取到**，
+§5 第 10 条那一格按这个措辞改（见下面）。
+
+**这一腿真正带回来的一条产品缺陷：`authCache` 按用户分格，撤销挡不住**
+
+`server/src/auth-cache.ts` 的条目**只按 `userId` 分格**，而 `verifyToken` 的**命中路径直接回 `valid: true`、
+根本不读 `sessionIsLive`**。于是：
+
+1. 撤掉会话 C ⇒ 那一行删了，`authCache.invalidate(userId)` 也**确实调了**（ADR-0063 §2.5 就是靠这句立"没有空窗"的）；
+2. 同账号的会话 B 下一次鉴权 ⇒ 把 `userId` 那一格重新焐热；
+3. 会话 C 再鉴权 ⇒ **命中那一格**，压根没走到"这一枚还在不在库里" ⇒ **回 200**。
+
+`invalidate` 一条都没少调，它挡不住的是**"别枚令牌把这一枚的判断替做了"**。
+这条不是推理：判据 25 在第一版探针上打的是 `实测 200`，
+而**当时 `server/tests/auth-cache.spec.ts` 与集成套件里那条"撤一枚不动另一枚"全是绿的** ——
+它们检查的是"我有没有调 `invalidate`"，不是"撤销之后那一枚还能不能被接受"。
+
+修法（一笔，键的形状换掉，`invalidate` 改成扫该用户的全部格）：
+
+```ts
+const keyOf = (userId: number, sessionId: string | null): string =>
+  `${userId}:${sessionId ?? 'no-jti'}`;
+```
+
+`sessionId` 就是线协议上那枚 SHA-256 hex；**没有 `jti` 的老令牌落 `'no-jti'` 那一格**，
+所以 §5 第 1 条那条"本轮之前签的令牌不可单独撤销"没有被顺手改掉。
+
+**三层证据 + 每层一次变异**（读数都带日期；复跑命令在下面"续跑配方"）：
+
+| 层 | 修后 | 变异（将缓存键改回只按 `userId`） |
+|---|---|---|
+| 单测 `server/tests/auth-cache.spec.ts` | `Tests 6 passed (6)`（10-09 11:2x） | `1 failed \| 5 passed` —— 红的是新加那一枚"另一枚焐热缓存，被撤的那一枚必须仍然 401" |
+| 真 PostgreSQL 集成 `email-change-and-sessions.integration.spec.ts` | `14 passed`（10-09 11:4x） | `1 failed \| 13 passed (14)`，且红的**恰好**是 `链路 3b`，`✓ 链路 3` 仍绿 |
+| 协议探针（真服务端 + 真库，跨进程） | `通过 31 项，失败 0 项`、判据 25 `实测 401`（10-09 12:08 复跑仍 31/31） | 修前那趟打的是 `判据 25 … 实测 200` |
+
+🔴 **判据顺序本身是一个维度**（traps **#392**）：`链路 3` 撤的是**手上那一枚**，它先探自己 ⇒
+缓存里那一格是它自己的，永远照不出"另一台把它焐热"。`链路 3b` 写的是
+**先撤 C、再用 A 焐热、然后探 C** —— 只有这个顺序会红。
+"两条用例断言同一件事、一条能红一条不能红"是变异测试唯一能照出来的东西。
+
+⚠️ 集成那一层的**载体天花板**（不是产品失败，两条换绑用例在负载 371 下报 timeout，
+`--testTimeout=30000` 复跑 `14/14`）：`server/vitest.integration.config.ts` **不设** `testTimeout` ⇒ 走 vitest 默认 **5 s**，
+而真库 + 真 HTTP 在那台载体上会超。这一格**没有**顺手改配置（改默认超时是判据口径，不是本轮该拍的）。
+
+**ADR-0063 §2.5 那句"所以 30 s 的缓存窗口不会变成撤销了还能用半小时"已就地更正** ——
+它不是结论变更（撤销=删行、`jti` 会话、双确认三条裁决一条没动），是**一条实现事实写错了**，
+而写错的这句话正是"为什么不需要额外撤销延迟设计"的依据。
+
+**续跑配方（下一个跑这一腿的人从这里开始）**
+
+```bash
+# ① 槽端口 + 隔离库起栈（不要复用 :3000 —— 那是 10-06 的 dist，对本线路由回 404）
+export PORT=3101 PUBLIC_URL=http://127.0.0.1:3101 HEYTA_E2E_DB=heyta_account_w9 \
+       HEYTA_E2E_PIDFILE=/tmp/heyta-acc-mobile-3101.pid HEYTA_E2E_LOGFILE=/tmp/heyta-acc-mobile-3101.log
+bash scripts/mobile-e2e-up.sh
+# ② 协议层（31 条，零设备依赖 —— 设备死了也能跑这一层）
+node research/tools/account-email-sessions-http-probe.mjs
+# ③ 设备层前置：模拟器必须**中文**，且负载低到一次冷启动 < 40×3 s
+adb -s emulator-5554 shell settings put system system_locales zh-Hans-CN
+scripts/verify-mobile-account-email-sessions.sh
+```
+
+⚠️ 两处**仍未闭合**，不包装成完成：① 设备层那条 14 步旅程**一次都没跑完过**（趟 3 之后模拟器进程没了，
+按资源纪律没重起）；② §5 第 9 条那句"`access_sessions.device_name` 没有任何客户端上报"会在设备层
+**第一次被真实读到** —— 界面上那一栏此刻应当是空的，这条预期还没在真机上对过。
+
+**落点**：装置与修复分散在两笔里 ——
+`auth-cache.ts` / `auth.ts` / 两份 spec 属于本线那一笔**代码**（仍被 §6.6 那三条挡住：
+现量 `git diff --cached --name-only | wc -l` = **42**（12:04，比 §6.6 写下的 32 又涨 10 ⇒ 还在写），
+`git show HEAD:packages/i18n/src/locales/zh-CN.ts | grep -c 'common\.emailChange'` = **0**）；
+`scripts/verify-mobile-account-email-sessions.sh` 与 `research/tools/account-email-sessions-http-probe.mjs`
+**必须和词条同一笔落**，理由不是"登记表要同步"而是 `check:verify-script-copy` 会**自动**把
+`scripts/verify-*.sh` 全收进输入集合（`readdirSync` + `/^verify-/`，128-167 行）——
+脚本一入库，它里面每一句界面 needle 就得能在 `packages/i18n/dist` 里查到，**分两笔必先红那道门禁**。
+✅ 预检已经跑过（这正是那道门禁存在的理由：把这类缺陷挪到**不占设备窗口**的地方）：
+
+```bash
+node scripts/check-verify-script-copy.mjs scripts/verify-mobile-account-email-sessions.sh
+```
+
+10-09 12:09 读数：`输入脚本=1 needle=14 命中词条表=14 … 缺失=0`、`RC=0`，
+对照样本里就有本线那三句（`更换登录邮箱` / `两封信已经发出` / `还在等两个邮箱各点一次`）
+⇒ **趟 2 那一族（needle 对不上词条）在这份脚本里不存在**，它红的是载体语言，不是文案。
+根 `package.json` 里那枚 `verify:mobile-account-email-sessions` 别名此刻**加不了**：
+`package.json` 正被别人 staged（现量 `git diff --cached --name-only | grep -c '^package.json$'`），
+所以别名与脚本同一笔落 —— 这条与 §6.6 第 1 条是同一个阻塞，不是新开的。
+
+⚠️ 旅程账本 `scripts/check-journey-coverage.mjs` 那一格**要写"已登记缺口"而不是"已验证"** ——
+设备层一次都没跑完过；这条区分本身就是那枚门禁唯一判得动的事，写反了就是拿装置给自己发绿。

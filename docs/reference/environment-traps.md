@@ -8937,3 +8937,59 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     不验少了什么"；这一条讲的是**可供性在静态图里消失** —— 判据能验"元素在不在"，
     验不了"看不看得出来那是个能输入的地方"。姊妹那一栏（昵称）本来就有占位文字，
     所以这不是全局控件的缺陷，是**新面板没跟上新风格**。
+
+391. 🔴 **模拟器的系统语言决定 App 的语言，而这一族真机脚本按中文写 —— 语言不对时最先红的不是断言，是"隐私门没弹"。**
+    10-09 设备窗口实测：`adb -s emulator-5554 shell getprop ro.product.locale` = **`en-US`**、
+    `settings get system system_locales` = **`null`** ⇒ 界面是英文的
+    （`Plan your day` / `Sign in or register` / `Before any network feature runs` / `Agree and connect`）。
+    App 侧没有第二条路：`apps/mobile/src/i18n/locale.ts` 的 `resolveDeviceLocale()` 读的是
+    `I18nManager.localeIdentifier`（Android），拿不到才回落 `DEFAULT_LOCALE` —— 设备设成哪种就是哪种。
+
+    **为什么这一条比"断言查不到中文"更阴**：`scripts/lib/mobile-e2e.sh` 的
+    `privacy_gate_present()` 判的是 `has_text "在使用联网功能之前"`，英文下恒 0，而该函数
+    是**返回 0 就跳过整段处理**（`handle_privacy_consent` 里 `privacy_gate_present || return 0`）。
+    于是"面板还在、只是话说的是英文"被读成"这台没有面板要处理"——
+    下一步 `configure_sync_credentials` 对着**还立着的同意面板**找三个输入框，
+    报出来的是「找不到输入框：服务器地址」，看起来像表单搬走了，实际是**上一格没收下**。
+    同理 `dismiss_welcome_if_present` 之后 `has_text "任务"` 报「应用没起来」——
+    那一趟应用一直在前台（`topResumedActivity` 里有它，实测还印着"到前台用了 27 秒"）。
+
+    现量（三条，跑完就有结论，别靠印象）：
+    ```bash
+    adb -s emulator-5554 shell getprop ro.product.locale            # en-US ⇒ App 会是英文
+    adb -s emulator-5554 shell settings get system system_locales    # null ⇒ 从没被显式设过
+    adb -s emulator-5554 shell uiautomator dump /sdcard/u.xml >/dev/null \
+      && adb -s emulator-5554 shell cat /sdcard/u.xml | grep -o 'text="[^"]*"' | head -4
+    ```
+
+    处置：`adb -s emulator-5554 shell settings put system system_locales zh-Hans-CN` 之后
+    **必须重起 App 进程**（`am force-stop` 再起）；RN 的原生常量在桥创建时取，进程不换就读到新语言。
+    只换 locale 不换进程 = 读数逐字不变，会被误读成"这条没用"。
+    📌 一般形状：**凡是按文案定位的探针，都隐含一条"载体语言"前提，而这条前提不在脚本的检查清单里。**
+    它和"没显式声明的东西都在替用户的系统设置说话"是同一立场的语言版 ——
+    差别在代价：那种红通常只有一条断言，而这一条会同时打红**整族按文案定位的真机脚本**
+    （条数现量，别抄：`grep -rl 'has_text\|has_sub\|xy_text\|xy_desc' scripts/verify-mobile-*.sh | wc -l`），
+    而且第一个症状指向"应用坏了"（找不到输入框、应用没起来），不指向语言。
+
+392. 🔴 **判据的先后顺序决定它能不能红 —— 先探被撤的那一枚，永远照不出"另一台把缓存焐热"这条路。**
+    2026-10-09 实测。会话撤销在真库集成套件里本来有一条判据（`链路 3`）：撤 A 那一枚，
+    然后探 A ⇒ 401、探 B ⇒ 200。它一直是绿的。而 `authCache` 那格是**按 `userId`** 存的，
+    命中就整段跳过 `sessionIsLive` ⇒ 撤销只在"缓存恰好没人焐"时才生效：
+    `research/tools/account-email-sessions-http-probe.mjs` 把顺序换成
+    **先让还活着的那台再请求一次，再探被撤的那一枚** ⇒ 同一台服务端、同一份库，
+    被撤的令牌回 **200**。修法是把会话身份放进缓存键（`server/src/auth-cache.ts` 文件头记成因）。
+
+    变异复现（同一把尺，两代判据对着照）：把 `keyOf` 改回只按 `userId` ⇒
+    新增那条**转红**，而 `链路 3` **逐字照旧绿**（实测 `Tests 1 failed | 13 passed (14)`）。
+    这既证明新判据有牙，也证明旧判据的盲区不是措辞问题，是**动作次序**问题。
+
+    📌 一般规律：**一条"撤销/失效"类判据必须先把那个资产的持有者以外的人活动一次，
+    再探撤销对象**。只做"改完立刻验"的次序，验的是缓存失效路径里**最配合**的那一条，
+    而生产上不会有第二次请求刚好落在未命中的窗口里。姊妹形状：同一条判据在
+    真机/真浏览器/协议三层各跑一次，只有会**并发产生请求**的那一层能照出这类问题。
+
+    ⚠️ 另一条载体事实（同一次复跑撞到的）：`server/vitest.integration.config.ts` **不设**
+    `testTimeout` ⇒ 集成用例走 vitest 默认 **5 s**（根 `vitest.config.ts` 放宽到 20 s 的那条
+    理由管不到它）。宿主机 1 分钟负载 371 时两条换绑用例报的是 `Test timed out in 5000ms`，
+    同一份代码 `--testTimeout=30000` 复跑 14/14 绿 ⇒ **那两红是载体天花板，不是产品失败**。
+    现量：`grep -n 'testTimeout' server/vitest.integration.config.ts`（今天为空）。
