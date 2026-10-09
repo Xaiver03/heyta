@@ -1257,7 +1257,7 @@ mobile `auth-flow.spec.ts` **17 passed**（新增 3 条：覆盖旧值 / 空串�
 | Android 侧「改密会让其它设备失效」那一句 | `verify-mobile-account.sh` 有改密那一发（真点提交 + 轮询成功文案），但**没有**这一句 | 本线可写，但**写不了读数**：`adb devices` 当前为空，而 AGENTS §6.1（产品负责人 10-04 拍板）明令不要再在这台 Mac 上起模拟器 ⇒ 要么给一台已连着的设备，要么由 Windows 侧设备窗口承接。在此之前它是**已登记的缺口**，不是"验过" |
 | 步骤 14 那一格（E2EE 口令进不了应用状态） | 三件凭据都填进去了、掩码码点对得上，界面仍停在「还没设置端到端加密口令,同步已停止」 | 不在本线：同一份产物上兄弟 rig `verify:mobile-ios` 也拿不到（`SIB_RC=1`）。归多端覆盖那条线；顺带一条更正 —— AGENTS §6.1 写着它"36 项零 mock 全绿"，当前实测是红的 |
 | `check:layering` / `check:ui-language` 两道仓库级红 | 都在 HEAD、都属 share 那条线（逐条见 §6.17） | share 那条线：`SHARE_KEY` 动作层进 `app-host`；英文词条那一行换回单引号（运行时值逐字不变）。本线不代改：前者是别人的产品语义，后者落在一枚**脏的**共享词条文件上 |
-| UI 挂载那一笔（web 三块面板 + `account-security-wiring.spec.ts`） | 三枚面板与 `SettingsAccountGate.tsx` 都还是 `??`，而 `App.tsx` / `main.tsx` 是别人在写的 `M` | 🔴 **这一格原先那句"移动端挂载早就在 HEAD 里"是错的**（那条命令当时是对着脏树跑的）；更正见 §6.27，移动端那两行已落到 `76944386`，`SessionsSection` 为什么没跟着挂、以及它的闭合判据在 §6.28。剩下的只有 web 这一半：等 `App.tsx` / `main.tsx` 落地后一次提交 |
+| UI 挂载那一笔（web 三块面板 + `account-security-wiring.spec.ts`） | 三枚面板与 `SettingsAccountGate.tsx` 都还是 `??`，而 `App.tsx` / `main.tsx` 是别人在写的 `M` | 🔴 **这一格原先那句"移动端挂载早就在 HEAD 里"是错的**（那条命令当时是对着脏树跑的）；更正见 §6.27，移动端那两行已落到 `76944386`，`SessionsSection` 为什么没跟着挂、以及它的闭合判据在 §6.28。剩下的只有 web 这一半：等 `App.tsx` / `main.tsx` 落地后一次提交（⚠️ **09 23:3x 更正**：这一半不等他们 —— 面板与挂载落进 `3dd210bd`、判据与真浏览器图落进 `23a3a24b`，而且挂载落点是 `App.tsx` 与 `ProfilePanel.tsx` 两处，`main.tsx` 从来不是那两块的宿主。读数与三条边界在 §6.41） |
 | 全量 `pnpm check` 与 `pnpm reinstall:all` | 都没在最终载体上跑过 | 环境前提同 `FULLCHECK-01` 那一档：负载短窗/长窗比值正常、工作树没有别人未提交的源码、e2e 那三段不与别人的 dev server 抢端口 |
 | 帮助页控件名门禁的**射程外**那 16 处 | `check:site-control-names` 只查本线那几页；整站普查另有 16 处引号名对不上真源（逐条现量命令见 §6.19） | 各页面所属线：多数要先把"文档站导航标题"接成第二个分母（那些标题住 `pages.ts`，不在词条表），否则一并钉会造出一屏假红 |
 | `check:entries` 那 32 格生成物滞后 | **HEAD 自己就红**，与本线无关（纯 HEAD 对照臂读数与一格实例见 §6.20） | landing 那条线在他们那笔里连源码一起重生成；本线不代提交产物 |
@@ -1634,13 +1634,15 @@ node /tmp/cited-paths-sweep2.mjs docs/plans/account-standard-suite.md
 
 （脚本本体是一次性夹具，不入库；形状就两步：`git ls-files` 与 `git ls-files --others --exclude-standard`
 各取一份，按 basename 分桶后用**后缀**匹配，命中未跟踪那一桶就是它。）
-现量结果：计划里 64 枚被点名的路径，**3 枚只有未跟踪的那份**，其中两枚属本线：
+现量结果：计划里 64 枚被点名的路径，**3 枚只有未跟踪的那份**，其中两枚属本线
+（⚠️ 这一句是**当时**的读数。复取：`git ls-files --error-unmatch <每一枚>`，逐枚看退码 ——
+现在本线那两枚都已入库，只剩另一条线那一枚。写这张表的理由不变，别把"表里三行"读成"现在还有三枚"。）
 
 | 被引用的东西 | 归谁 | 为什么承重 |
 |---|---|---|
-| `research/tools/account-email-sessions-http-probe.mjs` | 本线，计划里 6 处（§6.7 / §6.13 的读数 34、35 出自它） | 干净检出上那些"可复跑"的引用指向**不存在的文件** |
-| `apps/web/tests/account-security.spec.tsx` | 本线 | 🔴 **这一枚不能单独入库**，理由在 §6.31 |
-| `server/tests/integration/registration-otp.integration.spec.ts` | 另一条线（注册口令验证码那一族） | 本计划只是在写 `test:integration:postgres` 那份清单时点到它 ⇒ **只登记，不动别人的字节** |
+| `research/tools/account-email-sessions-http-probe.mjs` | 本线，计划里 6 处（§6.7 / §6.13 的读数 34、35 出自它） | ✅ 已入库（现量：`git ls-files --error-unmatch research/tools/account-email-sessions-http-probe.mjs`） |
+| `apps/web/tests/account-security.spec.tsx` | 本线 | ✅ 已入库 `23a3a24b`。它当时"不能单独入库"的理由（§6.31）随挂载那笔 `3dd210bd` 消失，读数在 §6.41 |
+| `server/tests/integration/registration-otp.integration.spec.ts` | 另一条线（注册口令验证码那一族） | 本计划只是在写 `test:integration:postgres` 那份清单时点到它 ⇒ **只登记，不动别人的字节**。现量：`git ls-files --error-unmatch <这枚>` 仍报 not tracked |
 
 反过来的形状也查了一遍，并且命中一枚：`research/tools/mutate-credential-sweep.py`（§6.25 那批变异臂的装置）
 此前**入了工作树却没有任何文档引用过它** —— 那批读数在仓库里就没有可复跑的通道。
@@ -1681,6 +1683,17 @@ git ls-files --others --exclude-standard -- apps/web/src/features/settings | wc 
 （现量：`git grep -c "onSignOutCurrentDevice" HEAD -- apps/mobile/src/screens/SecurityScreen.tsx` 非 0 那一趟，
 web 侧对应的是 `App.tsx` / `main.tsx` 落地）。
 在那之前，任何人在干净检出上跑 `check:ai-e2e` 见到这一条红，**归本线**，不要记成环境。
+
+✅ **09 23:3x 现量：这一格已闭合，而且本节那条预测被否证了一半。** 面板与挂载落进 `3dd210bd`、
+判据与真浏览器图落进 `23a3a24b`，于是上面那两条现量命令换了读数：
+`git grep -c "email-change-submit" HEAD -- apps/web` 从 **0**（干净检出必红）变成 **1**。
+预测里"他们下一次整份提交会把我的行当多出来的改动删掉"这一半**没有发生**：
+他们那版 `App.tsx` 的工作树里现在带着 `<SessionsPanel active={…} />`（现量：
+`grep -n 'SessionsPanel' apps/web/src/App.tsx` ⇒ 三处，含带 `active` 那一处），
+也就是**覆盖同一行**而不是删掉 —— 这正是当初把落点取在他们那一处的全部理由（§6.41 有对照：
+第一版候选把两块面板都往 `App.tsx` 挂，那才会造出第二张）。
+本节"为什么不现在单独入库"的**前提**（挂载点没落地 ⇒ 面板入库就是死代码）随挂载那笔消失，
+留在原文里是为了让后来者认出"判据先于主体入库"这个形状，不是照它行动。
 
 ### 6.32 设备腿 r3 那趟整链死在**我自己两枚探针缺陷**上，而它的症状是"链在跑"
 
@@ -1779,7 +1792,7 @@ git grep -q 'sendEmailPasswordRegistrationCodeEmail' HEAD -- server/src/email.ts
 | 移动端「登录设备 / 逐枚撤销 / 退出这台 / 退出所有」挂载 | ❌ 没有（`onSignOutCurrentDevice` 在 HEAD 的 `SecurityScreen.tsx` 里 0 次） | 写好在那枚文件**未提交**的那 432 行里 | 等 `SecurityScreen.tsx` 落地 |
 | 移动端「丢失了通行密钥？发一封找回链接」 | ❌ 没有，但**词条在 HEAD**：`mobile.security.passkeys.recover` / `.recoverHint` 都在表里 ⇒ 又是一枚孤儿词条 | 写好在同一枚未提交的 `SecurityScreen.tsx`（`requestPasskeyRecovery` 3 处） | 同上；复取：`git grep -c "security-recover-submit" HEAD -- apps/mobile` |
 | 移动端「忘记密码？」入口 | ❌ 没有（`git grep -c forgotPassword HEAD -- apps/mobile` = 0） | 写好在**未提交**的 `AuthScreen.tsx`（`requestPasswordReset` 导入 + `forgotPassword` 那个 handler） | 等 `AuthScreen.tsx` 落地 |
-| web 三块面板（换绑 / 会话 / 登出这台与所有） | ❌ 组件与 jsdom 判据都**未跟踪**，挂载点在别人在飞的 `App.tsx` / `main.tsx` | 已写好（工作树里） | 等那两枚落地，见 §6.31 |
+| web 三块面板（换绑 / 会话 / 登出这台与所有） | ✅ **有**（现量：`git grep -c "EmailChangePanel" HEAD -- apps/web` ⇒ 面板 1 / `ProfilePanel.tsx` 3 / 判据 23；`git grep -c "email-change-submit" HEAD -- apps/web` = 1） | 已入库：组件+挂载 `3dd210bd`，jsdom 判据 41 条 + 6 张真浏览器图 `23a3a24b` | 已关，见 §6.41（含 §6.31 那道必红的闭合）；剩下的只有设备腿与法务那一笔 |
 | 法务「十封」政策文本 + `email-catalog` 对账判据 | ❌ 文本改动在未提交的 5 份 legal 文档里，判据未跟踪 | 已写好 | 与实现同一批，见 §6.34 |
 | 移动端「改登录密码」 | ✅ **有**（`changePassword` 在 HEAD 的 `SecurityScreen.tsx` 里 4 处） | 早已入库 | 本线没有欠项，这一格只是设备腿还没在干净载体上证过 |
 
@@ -2029,3 +2042,103 @@ bash ~/.heyta-window-rigs/heyta-ios-account-chain.sh ~/.heyta-evidence/<新戳>-
 ⚠️ 不写成"等明天就好了"：`--target b` 这一档在并行会话密集时段本来就够不着（今晚 30 趟、负载最高 103）。
 任务 #15 的闭合判据仍是 §6.28 / §6.35 那两行现量命令 **加** 一趟真的走到第 5、6 步的读数；
 在那之前这一格的状态是"**设备腿未取数**"，不是"验过但没验好"。
+
+### 6.41 Web 那半的挂载落到了 HEAD（换绑挂 `ProfilePanel`、会话挂 `App.tsx`），并当场避开一张重复面板
+
+先说这一格先前被记成什么：§6.18 / §6.35 一直写"web 那一半等 `App.tsx` 落地后一次提交"。
+现量否证了"只能等"这一半 —— **等的是别人的 hunk，不是我的入口**：
+
+| 问法 | 命令 | 读数 |
+|---|---|---|
+| 那块真浏览器判据在不在 HEAD | `git ls-files --error-unmatch e2e/tests/account-email-change-and-sessions.spec.ts` | 在册 |
+| 它断言的两块面板在不在 HEAD | `git grep -c -F "email-change-panel" HEAD -- apps/web/src`（同问法换 `sessions-panel` / `password-panel`） | 前两个 **无匹配**；`password-panel` ⇒ `PasswordPanel.tsx:1` 这一条是**对照臂**（同一个问法量得出在册的那枚，说明尺没坏） |
+| 所以 HEAD 上那一族用例的形状 | —— | **不是"某条断言红"，是"界面里根本没有那两个东西"** —— 一道已入库的判据红在产品没入库上，就是 §6.36 那一型换到 e2e 层 |
+
+**闭合动作不是"等 `App.tsx`"，是把 13 枚自洽的东西一次落完**：
+8 枚面板/store（`EmailChangePanel`、`SessionsPanel`、`SettingsAccountGate`、`SettingsNotice`、`SignOutNotice`、
+`emailChangeStore`、`sessionsStore`、`signOutStore`）+ 2 枚样式（`settings-notice.css`、
+`styles/app/settings-account.css`）+ 3 处 hunk（`App.tsx` 会话挂载、`ProfilePanel.tsx` 换绑挂载、`app.css` 那行 `@import`）。
+入库那一笔是 `3dd210bd`（13 枚路径 +1452/−0，纯新增）。判据那枚 `account-security.spec.tsx`（41 条）
+与 6 张真浏览器图随后落进 `23a3a24b` —— 它当初"不能单独入库"的理由（§6.31）随挂载那笔消失。
+
+🔴 **中途差点造出一张重复面板，靠的是"先查这块 UI 现在挂在谁身上"**：
+第一版把两块面板都往 `App.tsx` 挂。现量工作树：换绑挂在 `ProfilePanel.tsx`（就在"当前邮箱"那一行下面），
+只有会话挂在 `App.tsx`。照第一版落地 ⇒ 别人那笔一落，设置页会出现**两张换绑面板**，
+而 `check:ui-language` / `check:design` / typecheck **三道都不会响**。
+⇒ 落点改成与 theirs 同一处：他们落地时是**覆盖同一行**，不是并列第二份。
+这条预测当场有了读数：他们那版 `App.tsx` 现在带着 `<SessionsPanel active={…} />`
+（现量：`grep -n 'SessionsPanel' apps/web/src/App.tsx`），没有把我的行当"多出来的改动"删掉。
+
+**落地前验的三件事**（都在隔离载体 `.worktrees/iosacct` 上对着候选树做，不是对着工作树；
+候选树 `845e81c9` = 当时的 HEAD + 那 13 枚在飞构建输入 + 我这一笔的 13 枚。
+⚠️ 早先那版候选 `9c1dafa1` 作废：它钉在 `f1edde47` 上，而 HEAD 在它之后又动了，重建成 `845e81c9` 才是"落完这一笔之后 HEAD 长什么样"）：
+
+| 验什么 | 命令 | 读数 |
+|---|---|---|
+| 这棵树的相对 import 全解析（没有"引用在册、实现不在册"） | `node scripts/check-imports-resolve.mjs --tree 845e81c9 --sources-only` | ✅ 全解析 |
+| 我这 13 枚路径有没有类型错误 | 一份临时 `apps/web/tsconfig.mountcheck.json`（把 `@heyta/ui` / `app-host` / `i18n` / `design-system` 四条 `paths` 指到**源码**，因为那几枚包的 `dist` 里根本没有 `.d.ts`）+ `tsc -p` | **基线臂（同一棵树去掉我这 13 枚）68 条 / 挂载臂 68 条，两份错误集合逐字相同**（`diff <(sort 基线) <(sort 挂载)` 空），我这 13 枚里 **0 条**。那 68 条全在 `@heyta/widget-core`、`@heyta/inbound-core` 两枚不在这棵树上的包与 `packages/ui/src/index.ts` 那 5 个缺失具名导出里 |
+| 这两臂有没有牙 | 两趟变异：`sessionsStore.ts` 的 `listHostedSessions` 改成不存在的名字 ⇒ 我的文件多 2 条；`SessionsPanel.tsx` 一个词条 key 改成 `common.sessionZ.title` ⇒ 多 1 条 TS2345（`t()` 的参数是 3950 个 key 的并集）。两趟都从 `.mut-bak` 还原并 `cmp -s` 过 | 变异进得来、还原得回去 |
+| 中英词条 | 上面那条 TS2345 就是编译级核对（比 §6.15 那次逐枚 grep 更强）；两侧表的集合对账在 `packages/i18n` 自己的测试里 | 0 缺 |
+| 三道静态门 | `node design-system/heyta/check-hardcoded.mjs`、`node scripts/check-md-table-rows.mjs`、`node scripts/check-ui-language.mjs`、`node scripts/check-layering.mjs` | design **rc=0**（扫 500 枚源文件含我这 3 枚新样式）、md-tables **rc=0**；ui-language 与 layering **红**，但**基线臂输出逐字相同**（两份 log `diff` 空）⇒ 红的是价格词条三处不一致与别处就地拼 op，属另外的线 |
+
+⚠️ 三条边界，不包装成完成：
+1. **图先于这笔**：那 6 张截图是 14:2x 在主检出的工作树上取的（那时那三处 hunk 还没入库），
+   所以图里的设置面 IA 是并行会话那一版（rail 里"账号与安全"那一格）。挂载**落点**与入库那份逐字相同，
+   但"在干净检出上重跑一趟 e2e"这一格没做，前置是隔离载体里装得起 `e2e/` 那份独立 lockfile（registry 通道被本机代理额度挡着）。
+2. `main` 这一笔之后**仍然打不出包**，因为别人那 13 枚构建输入还没落（§6.38 现量命令）——它没让它变好也没让它变坏；
+   候选树之所以能构建，是因为它叠了那 13 枚。
+3. `SessionsPanel` / `EmailChangePanel` 那条 `active` 属性在这一笔里**没有传**（HEAD 还没有分组目录那个变量），
+   默认值 `true` 等于"总是活跃"。别人那笔一落就会带上 `active={…}` —— 这是 §7 第 195 条那种
+   "默认值会把宿主没接伪装成做完了"，所以写在这里而不是藏在代码注释里。
+
+📌 一处要撤回的措辞（写在我自己的提交信息里，改在台账而不是改写历史）：
+`23a3a24b` 的信息写了"挂载行与入库的那份逐字相同"，并给了一条支撑不住它的命令。
+现量是 `grep -n SessionsPanel` 在 HEAD 那份 4 处、在他们工作树那份 3 处 ——
+差的那一处是我那三行注释里的一句（他们把它压成了一行）。**挂载的两行（import 与 JSX）两边都在**，
+"逐字相同"这四个字说过头了。判据同 §6.38 那一型：**引用一条命令时，它打印的东西必须能撑起紧跟它的那句结论**。
+
+### 6.42 🔴 HEAD 上有一枚文件 parse 不过，是**本线昨天那笔**造成的：`hosted-auth.ts` 少了三行声明
+
+发现它不是靠 `pnpm check`（它跑在脏树上，见 §6.38），也不是靠 §6.38 那枚 import 尺
+（那三行是**声明**不是**引用**，尺只会说"每个 import 都解析得到"然后报绿）。
+它是上一节那把临时 tsconfig 的副产品：`paths` 指对之后错误从 **697 条掉到 22 条**，
+而 22 条**全在同一枚文件**里，且全是 `TS1109 / TS1005 / TS1128` 这种**语法**码 —— 语法码成堆出现
+意味着 parse 失败，不是类型不匹配。文件：`packages/app-host/src/hosted-auth.ts`。
+
+根因逐字可查：`git show 469408c4 -- packages/app-host/src/hosted-auth.ts` 的那个 hunk
+`@@ -438,10 +473,7 @@` 与 `@@ -628,7 +673,6 @@` 删了 **5 行**，其中三行是声明：
+
+```
+export type PostResult = { ok: true; body: unknown } | HostedAuthFailure;
+export const failure = (          ← 同文件 100+ 处调用它
+export async function sendJson(   ← 同一笔带进来的 account-security.ts 从 './hosted-auth.js' import 它
+```
+
+**`-` 行没有配对的 `+` 行**，而调用点与返回类型标注全留着 —— 于是整枚文件 parse 不过，
+`@heyta/app-host` 这一层编译不了，所有依赖它的包连编译都到不了。
+那两行本来是要改成 `export` 的（工作树里别人那份就是 `export const failure` / `export async function sendJson`），
+补丁只落了删除那一半。⇒ 这一型与 §6.36 / §6.37 是同一个动作（hunk 级入库）的第三种失效面，
+入档为 **§7 第 400 条**。
+
+修法与取证（`63e3fbbd`，只补那三行，`+3/−0`）：
+
+| 判据 | 命令 | 读数 |
+|---|---|---|
+| 整棵 HEAD 有没有第二枚这样的文件 | 一次性 sweep：拿 esbuild 的 `transform` API 逐文件 parse `git ls-tree -r --name-only HEAD` 里全部 `.ts/.tsx` | **扫 1823 枚，parse-broken = 1**，就是这一枚。这条 sweep 同时是它自己的阳性对照（它抓到的正是已知那一枚），装置在 `/tmp` 一次性用完即弃，**没有**升成门禁（升不升见下面那条边界） |
+| 补完能不能 parse | `git show HEAD:packages/app-host/src/hosted-auth.ts \| apps/web/node_modules/.bin/esbuild --loader=ts` | 修前 `✘ Unexpected ":"` rc=1 → 修后 **rc=0** |
+| 有没有动别人在这枚文件上的在飞改动 | `git hash-object <工作树那份>` 落地前后各一次 | 两次同一个 sha（`11eaea7b…`），`git status` 从 `MM` 回到 ` M` ⇒ 他们那 40 行改动逐字节还在，**没有**被我的 blob 顶掉 |
+| 落地只 staged 我自己 | `git diff --cached --name-only`（提交前后各一次） | 恰好 1 枚路径，`--numstat` = `3 0` |
+
+⚠️ 三条没包装成完成的边界：
+1. **sweep 做成了可复跑的一次性装置，但没升成门禁**。装置：`research/tools/parse-sweep-ts.mjs`
+   （`node research/tools/parse-sweep-ts.mjs [ref]`，ref 默认 `HEAD`；它先比"要扫的 ref"与"工作树的 HEAD"，
+   不一致就**拒绝跑**并以 2 退出 —— 因为它是读工作树的字节，ref 与工作树不一致时读数不是那棵树的）。
+   三臂读数：修前那棵 `d1704811` ⇒ `parse-broken = 1` 且 rc=1（**阳性对照**，它抓到的正是已知那一枚）；
+   挂载候选 `845e81c9` ⇒ `1842 枚 / 0 条` rc=0；ref 与工作树不一致那一臂 ⇒ rc=2。
+   为什么不进 `pnpm check`：这一格 `pnpm -r typecheck` 本来就该抓到，它抓不到的唯一理由是链在更上游就断了
+   （§6.38 那 9 枚）。要加就得连"排在第几步、非 TS 文件怎么办、与 typecheck 的分工"一起拍 ——
+   那是**判据口径**，不是本线能代拍的。留在这里是"能复跑的读数"，不是"已生效的门"。
+2. `pnpm -r typecheck` 在**干净 HEAD** 上仍然到不了 `app-host` 之后的那些包（`packages/ui` 先红），
+   所以"HEAD 现在能编译"这句**没有**取到，只取到了"这枚文件 parse 得过"。
+3. 归因写清楚：`469408c4` 是**本线**那笔（`feat(账号标准套件 共享层一笔)`），不是并行会话。
+   修它的这笔也归本线。别人工作树里那份带导出注释的版本落地时会**覆盖同一行**，与 §6.41 那个落点是同一条规矩。
