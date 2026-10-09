@@ -2902,6 +2902,50 @@ git checkout -- server/src/account/account-security.routes.ts
 rm -f server/node_modules/@heyta/inbound-core; git status --porcelain | grep -v pnpm-lock   # 期望空
 ```
 
+### 6.57 试过"明账叠加"之后：两趟运行时腿等的**不是负载**，是别人一整片在飞实现（10-10 02:00 现量，载体已复原）
+
+§6.49 / §6.53 把那两趟读数记成"内存闸门 + 负载 + 9 条构建输入"。这一轮真去叠那 9 条，量到的比那多得多，
+于是**这一格的等待条件要改写**：
+
+- 9 枚 `check-imports-resolve` 报的实现文件**全部在别人的工作树里**（`??`，逐枚 sha256 前缀记在下面），
+  拷进载体后 `packages/app-host` 的 **ESM 产物出得来**（`dist/index.js` 427 KB），
+  但 `tsup` 的 **dts 那一步红**：`src/index.ts(25,8) TS2305: Module './host.js' has no exported member
+  'InboundAutomationHostOptions'` —— 该成员只存在于他们工作树那版 `host.ts`（`M`，HEAD 里命中 0）。
+- 再往下游：`pnpm --filter @heyta/ui build` 又报**三枚**新的解析不到
+  （`./artwork.js`、`./password-strength-model.js`、`./habit-artwork.generated.json`），
+  其中最后一枚是**生成物**（主检出有它：`packages/ui/src/habits/habit-artwork.generated.json`），
+  不是"拷一个源码"能补的。
+- ⇒ 要在载体里得到一棵**构建得起来**的树，需要 **11 枚未入库源码 + 1 枚未入库生成物
+  （`packages/ui/src/habits/habit-artwork.generated.json`）+ 1 枚已跟踪文件的未提交版本（`host.ts`，` M`）**。
+  到那一步，读数描述的就是**他们的树**而不是 HEAD 了 —— 那不再叫"明账叠加"，叫替别人构树。
+  **本轮就此收手**：叠加的 9 枚已逐枚删除、载体 `checkout --force` 复原（`脏=0`、`未跟踪=0`）。
+
+🔴 所以这一格的准确说法是：**web 的运行时腿（jsdom 与真浏览器）与设备腿等的不是机器空不空，
+是 `packages/ui` / `apps/web` 在 HEAD 上根本打不出产物**。在此之前任何"负载降到 12 以下再起"的排期都是白排。
+闭合判据（不是"9 条变 0 条"，是构建本身）：
+
+```bash
+pnpm -r build; echo rc=$?                       # 这才是那条旗
+# 分步定位（现量按这两条读）：
+node scripts/check-imports-resolve.mjs --tree $(git rev-parse HEAD) --sources-only   # 文件存在性
+pnpm --filter '@heyta/app-host...' build; echo $?                                    # 导出成员契约
+```
+
+⚠️ 两条探针语义，都是本轮自己踩的，值得留：
+
+1. `check-imports-resolve` 读的是**提交树**（默认 `HEAD`，可用 `--tree <ref>` 换），
+   所以**工作树里补上那些文件不会让它变绿**。我这轮拷完 9 枚见它还报 9 条，一度判成"叠加失败"——
+   它报的从来不是我脚下这棵树。叠加成功与否要用**构建**和**产物在不在**来判。
+2. **"构建输入解析得到" ≠ "构建得出来"**：前者只查文件存在性，后者还查导出成员契约（dts 那一步）。
+   `app-host` 这一枚就是"ESM 出得来、dts 出不来"，所以一条尺绿不能替另一条尺绿。
+
+叠加清单（撤除前的现量，逐枚 sha256 前缀，来自**主检出工作树**）：
+`d647a635142b415d apps/web/src/lib/native-widgets.ts`、`19934156c9fe7668 packages/app-host/src/task-batch-actions.ts`、
+`db05322b3f4a6796 packages/ui/src/empty-state/StateIllustration.tsx`、`8a6edf9fc480870a packages/ui/src/habits/HabitArtwork.tsx`、
+`22b803d1416464e4 packages/ui/src/habits/HabitMetricIcon.tsx`、`ccc66edb7f089a11 packages/ui/src/auth/PasswordStrength.tsx`、
+`4408ec692c7549c3 packages/ui/src/auth/LegalDocumentSheet.tsx`、`728ba7b330d89c73 packages/ui/src/ai/AssistantMark.tsx`、
+`a334dca4aaec4ace packages/ui/src/ai/AiGeneratedLabel.tsx`。
+
 
 
 
