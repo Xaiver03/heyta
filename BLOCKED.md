@@ -7463,3 +7463,23 @@ HEAD，且**新路径必须带 `--add`**，刷完要用"`git diff --cached` 为�
 ⇒ 要拍的（一条问题，不是工时）：**那 8 行是谁的、要不要入库、和 `inbound-core` 那枚常量谁当唯一事实源**。
 顺带本格真正值得记的形状：**白名单是按目录画的，碰撞是按文件发生的** —— 我有权限写的目录里
 坐着别人的未提交设计，这件事在 porcelain 上只体现为一个 ` M`，靠"这在我的地界"是看不出来的。
+
+## B128（2026-10-10 05:3x，本会话 · 做 AC-8 矩阵时量出的）：界面层不是"没测"，是**根本没入库**；而它自己这一组其实闭合
+
+矩阵要把"平台"这一维逐端写清楚，就必须逐端现量。量出来的是这组事实：
+
+- T5 的全部落点此刻都是 `??`（未跟踪）：`git status --porcelain -- apps/web/src/features/settings/{InboundAutomationSettings.tsx,inbound-automation.css,inbound-runtime.ts} apps/web/tests/ apps/mobile/src/inbound/ e2e/playwright.inbound.config.ts e2e/tests/inbound-automation.spec.ts` 当日命中 **15 条 `??`**。
+- HEAD 上整个 `apps/` 里 `inbound|EntitlementTicket` 只命中 **2 枚文件**，而且两枚都是**另一条线的取证 JSON**（`apps/web/evidence/ux-closeout/...`）⇒ **代码层零接线**，不是"接了没测"。
+- 🔴 但我顺手把"所以 T5 只能等 B112"这句**否证了一半**：逐枚解析那六份 web 文件的相对导入后，唯一不在 HEAD 里的目标就是**它们自己**（设置面 ↔ `inbound-runtime.ts` ↔ 四份用例，互相闭合）；其余导入（`../../lib/oplog.js`、`../../lib/vault-session.js`、`../privacy/consent-gate.js`、`../sync/store.js`、`aiStore.js`）在 HEAD 里**文件与具名成员都在**。
+ ⇒ 界面层 web 那一部分**现在就能整体入库**（仍受 B112 的 app-host 类型缝影响，但那是既有的一格，不是这六枚新引入的）；我此前几轮把它整格写成"等 B112 拍板"是**把一处依赖推广成了全部依赖**。
+ 本线取舍：本轮先把矩阵与它的尺落地（这份产物今天可验、可复跑），T5 的入库放在矩阵之后紧接着做，并在隔离副本上先跑一次 HEAD 自洽性再提交 —— 不拿"工作树绿"当提交理由。
+
+**为什么这一格值得单独登记（可迁移的形状）**：同一张矩阵里的"无尺"其实有**三种成因**，混着写会把下一位带偏：
+① 载体不存在（双宿主装置、断网注入）；② 代码未入库（界面层六枚）；③ 门禁被别线挡（`pnpm check` 三条）。
+三者的修法、归属、能不能自己做完全不同 —— ②我自己现在就能做，①要新装置，③要负责人拍 B112。
+所以矩阵里每一格无尺都**必须**写明是哪一种，光写"未验证"等于没写。
+
+另量出一格 T2 的尾巴：`grep -rn "automationEntitlementClock" server/src` 当日只有 `findUnique` 与 `upsert`
+两处，**零删除** ⇒ 实例退役清扫没做，时钟高水位行会随实例数永久累积。没顺手补的原因不是工时：
+"退役"有三种候选定义（绑定被撤销 / 实例从 `AUTOMATION_OFFICIAL_KEYS` 的密钥环里消失 / 两者任一），
+取哪种会给出**不同的保留集**，而保留集就是数据删除边界 —— 这一格归 B118 那一档（要拍板，不代拍）。

@@ -682,7 +682,7 @@ T2 那句话里"每 30 秒续票据"这一格，此前是**一整套零件都在
 | AC-3 | 「**两个独立真实宿主与独立数据库**跑通下方十个（现 13 个）故障注入窗口，观察任务数、op 数、回执与计量」 | **无尺**：`research/tools/` 里与本线有关的装置只有 `verify-inbound-worker-identity.py` 一枚，另两枚是入库切片器；跑 13 个窗口的双宿主装置**不存在** | 它跑在 app-host 的 `dist` 产物上，而 HEAD 仍被 B112 那四处白名单外接缝挡住（当日现量：`git show HEAD:` 查四枚成员命中 **0/0/0/0**，六枚文件仍 `M`）⇒ 现在写装置=在没有可编译的树上写 |
 | AC-6 | 「用户**独立完成**"启用 → 测试发送 → 等待 → 打开/解锁 → 自动处理 → 查看结果"」 | **无尺**：真浏览器那份 `e2e/tests/inbound-automation.spec.ts` 只有 2 条，且**它走的是 route 桩**（文件头自述 "Real browser/UI with HTTP fixtures; database authorization is tested separately"），量的是界面形状，不是这条旅程 | 旅程需要公网接收 + 有权益的宿主在跑，两者都关着；本轮**没有**复跑那 2 条，因为它会改写 `apps/web/evidence/inbound-recovery/` 那 16 枚**已跟踪**PNG，而该目录不在本线白名单 |
 | AC-7 | 「官方与自托管样例分别**可运行**，端点与权限真实」 | **无尺**（帮助中心/中英条款的落点也在白名单外，B118） | 半尺有：`docs/reference/` 那两份当日已按 HEAD 更正过措辞（协议 + 定价） |
-| AC-8 | 「平台 × 权益 × 设备状态 × 失败阶段的具体用例表」 | **无产物**：矩阵文件不存在，且 `pnpm check` / `-r test` / `reinstall:all` 三条在隔离副本上仍过不去（同 B112） | 需要 B112 的 A/B/C 拍板 |
+| AC-8 | 「平台 × 权益 × 设备状态 × 失败阶段的具体用例表」 | ⚠️ **本行已被文末「2026-10-10 05:2x · AC-8 用例矩阵」一节取代**（当日现量：矩阵已落成 34 行、逐格带尺或带归属，`python3 research/tools/verify-inbound-ac8-matrix.py` rc=0）。原先写的"**无产物**：矩阵文件不存在"在 10-10 05:0x 之前是真的，留着是为了让人认出"表格类交付物最容易糊过去的是它自己" | 剩余的那半仍然过不去：`pnpm check` / `-r test` / `reinstall:all` 三条在隔离副本上仍红（同 B112），矩阵里 C30~C34 五格因此记无尺 |
 
 ⇒ **逐格结论**：AC-1 / AC-2 / AC-4 / AC-5 的句子基本有尺；AC-3 有服务端半尺、缺双宿主半尺；
 AC-6/AC-7/AC-8 各缺的不是工时而是**判据的载体**。
@@ -1015,3 +1015,151 @@ AC-1 的拒绝词表里**「额度耗尽」这一枚在自动收集预留那一�
   界面文案只能按 `reason` 分派 —— 这一格归 T5。
 - AC-1 整体**继续不勾选**：现在"额度耗尽"和"票据六枚拒绝"两枚各有尺，免费/过期那两句与
   宿主每 30 秒续票据的消费者那一格仍分别被 B109/B116 挡着。
+
+## 2026-10-10 05:2x · AC-8 用例矩阵：把「平台 × 权益 × 设备状态 × 失败阶段」落成一张能对账的表
+
+AC-8 那一格此前的现状是**无产物**（复审表里唯一一处连尺都没有的：不是"还没测"，是连一张表都不存在）。
+这一节把它补成产物，并把"补"的标准定成一件具体的事：**这张表必须能被一台装置逐格对账**，
+否则它只是一份读起来像有证据的清单 —— 而矩阵最擅长的恰恰是装得像有证据：
+引用的用例改了名、引用的文件被删了、维度名写漂了、无尺那格没人认领，四种都会安静地烂掉，
+而 markdown 表格自己永远不会失败。
+
+对账装置：`research/tools/verify-inbound-ac8-matrix.py`（六条规矩 R1..R6 写在它的文件头）。
+🔴 **三张维值词表与 W1..W13 的判卷口径住在那枚装置里，不住在这一节** —— 加一维必须同时改两处，
+改动在同一笔提交里看得见；这一节只放图例，避免同一个口径有两个家。
+矩阵住在本文件而不是新开一份"验收矩阵"文档（AGENTS §8：不另建第二份计划）。
+
+### 图例：失败阶段（切断点）
+
+「无注入」这一档给**不是崩溃注入**的行用（平台维度与当前产物），它们照样要占一行 ——
+否则"跨端"两个字就把没有尺的那几端隐掉了，而 AC-8 原句专门点了这一件事。
+
+| 阶段 | 切断点（逐字抄自上面「AC-3 的十个故障注入窗口」那一节 + 新增三枚） |
+|---|---|
+| W1 | 队列已落盘、接收 HTTP 响应丢失；发送方以原键重试 |
+| W2 | 已领取、解析前终止；租约到期后恢复/转派 |
+| W3 | 模型已计量且可能完成、结果响应丢失；按规定的重试/unknown 策略处理 |
+| W4 | 解析结果已冻结、提交前终止；接手方不得按新的"今天"或新模型重新解释 |
+| W5 | 本地 op 已落盘、来源索引/回执未完成；同设备重启不再派发 |
+| W6 | 本地 op 已落盘未上传、ACK 丢失，A 租约过期后 B 领取；最终不得两次创建，也不得偷偷降级成两个 op |
+| W7 | A 持过期 lease 恢复、B 已获得新 generation；A 的续租、提交与 ACK 都按明确边界处理 |
+| W8 | 暂停/删除规则、撤销凭据/设备、权益到期、撤回模型同意、Vault 锁定，分别发生在解析中与提交前 |
+| W9 | 任务被用户编辑/删除、队列正文过期后上游重试；既不覆盖编辑，也不重建已删任务 |
+| W10 | 第一台设备永久丢失、新设备加入、根密钥轮换；每个保留事件要么可解密恢复，要么有确定终态与可见原因 |
+| W11 | 提交许可与暂停/撤销两种相反事务顺序 |
+| W12 | 换 keyId 后同事件重试与旧钥查询 |
+| W13 | date-only、start-only 在跨时区日/月/年/时间线的展示与编辑往返 |
+| 无注入 | 正常路径与"装出来的必须是当前源码产物"那一格（T7） |
+
+### 图例：三张维值词表
+
+| 维度 | 取值（封闭的；判卷口径在装置里，这里只是给人读的图例） |
+|---|---|
+| 平台 | `server`（服务端，无宿主）· `node-host`（非 UI 宿主，真 SQLite）· `shared`（平台无关的共享层）· `web` · `android` · `ios` · `harmony` · `macos` · `windows` · `linux` |
+| 权益 | `未订阅` · `付费有效` · `付费过期` · `错主体` · `错实例` · `坏签名` · `额度耗尽` · `未配密钥环` · `自托管带票` |
+| 设备状态 | `未绑定` · `已绑定` · `Vault 锁定` · `后台` · `离线` · `进程已终止` · `新设备` · `密钥已轮换` · `时钟回拨` |
+
+「尺」列只有两种写法：`无尺`，或 `路径::「用例名片段」` 的列表（多枚用 `；` 分隔）。
+写路径时装置核两件事：**该路径在 HEAD 里被跟踪**（工作树里有不算，理由见 BLOCKED.md B127），
+以及**那句用例名在 `git show HEAD:<路径>` 的字节里逐字命中**（文件在 ≠ 那句用例还在）。
+
+### 矩阵
+
+| 号 | 失败阶段 | 平台 | 权益 | 设备状态 | 判据（这一格要读出什么） | 尺 | 证据归属 |
+|---|---|---|---|---|---|---|---|
+| C1 | W1 接收响应丢失后同键重试 | server | 自托管带票 | 已绑定 | 同键同体重放返回同一条受理结果、同键异体判冲突；落库写失败那一路不许报 accepted | `server/tests/inbound-automation.routes.spec.ts::「returns the existing opaque state for an exact retry and conflicts on new bytes」；server/tests/inbound-automation.routes.spec.ts::「does not report accepted when the enqueue write itself fails」` | 本线，已入库（无外部服务依赖） |
+| C2 | W1 受理前的权益判定 | server | 未订阅 | 已绑定 | 未授权不收信；免费同步仍通过且零查库；本机的订阅行不给自托管开闸 | `server/tests/inbound-automation.routes.spec.ts::「requires paid automation even with the default self-hosted gate disabled」；server/tests/entitlement-gate.routes.spec.ts::「passes a subscription-less user through, and never queries the database」；server/tests/integration/inbound-worker-identity.integration.spec.ts::「a local subscription row does not open the public receiver on a self-hosted instance」` | 本线；第三枚要真 PostgreSQL，跑法见下面「怎么跑」 |
+| C3 | W1 陈旧签名与时间窗外 | server | 坏签名 | 已绑定 | 拒，而且**不碰账本** | `server/tests/inbound-automation.routes.spec.ts::「rejects a stale signature without touching the ledger」` | 本线，已入库 |
+| C4 | W1 错实例 | server | 错实例 | 已绑定 | 给 A 发的激活码不能在 B 上兑换；票据签给别的 installationId 判拒且 nonce 不烧 | `server/tests/automation-entitlement-issuer.spec.ts::「错实例：给 A 发的码不能在 B 上兑换」；server/tests/inbound-ticket-rejection-route.spec.ts::「错实例：票据签给别的 installationId ⇒ 402 + TICKET_INVALID」` | 本线 T1 |
+| C5 | W1 错主体 | server | 错主体 | 已绑定 | 绑定行主体与票据不符 ⇒ 402 + SUBJECT_CONFLICT；一台新码顶不掉别人的绑定 | `server/tests/inbound-ticket-rejection-route.spec.ts::「错主体：绑定行记的主体与票据不符 ⇒ 402 且 ticketCode 是 SUBJECT_CONFLICT」；server/tests/automation-entitlement-issuer.spec.ts::「错主体：这台实例已绑给别人的账号，一枚新码顶不掉」` | 本线 T1 |
+| C6 | W1 没配公钥环 | server | 未配密钥环 | 已绑定 | 拒绝而不是退化成免费，也不是会被宿主重试一整期的 500 | `server/tests/automation-entitlement-ticket.spec.ts::「without an official keyring it refuses instead of falling back to free」；server/tests/inbound-entitlement-write-tx.spec.ts::「🔴 配了自托管模式却没配公钥环：闸门回 402 并停止重试，不是 500」` | 本线 |
+| C7 | W1 未绑定账号出示票据 | server | 自托管带票 | 未绑定 | 绑定字段只取绑定行；未绑定与已撤销都不签；别人的本地账号不能在这里建立绑定 | `server/tests/automation-entitlement-issuer.spec.ts::「绑定字段取自绑定行而不是请求：换账号顶不掉，未绑定与已撤销都不签」；server/tests/integration/inbound-worker-identity.integration.spec.ts::「a ticket for another local account cannot establish the binding here」` | 本线 T1 |
+| C8 | W1 托管额度耗尽 | server | 额度耗尽 | 已绑定 | 拒绝且不落账行、计数器不抬过上限；终态不许被说成可重试 | `server/tests/automation-ai-metering.pglite.spec.ts::「额度用尽时预留被拒，且既不落账行也不把计数器抬过上限」；server/tests/inbound-ai-quota-route.spec.ts::「额度用尽回 402 + QUOTA_EXCEEDED，把 used/limit 给宿主，且不写账行」；server/tests/inbound-ai-quota-route.spec.ts::「反向：数据库故障仍然回 409，不许被一并变成"停止重试"」` | 本线；有牙的反向验证在 `research/tools/verify-inbound-quota-teeth.py` |
+| C9 | W2 已领取、解析前终止 | server | 付费有效 | 已绑定 | 代次抬升、停用规则拒领；结果发布按 owner 与 generation fencing | `server/tests/automation-events.spec.ts::「increments generation and refuses a disabled rule」；server/tests/automation-events.spec.ts::「fences result publication to the lease owner and generation」` | 本线 |
+| C10 | W2 双宿主接手（真终止后另一台恢复/转派） | node-host | 付费有效 | 进程已终止 | 两台独立 SQLite + 独立库：任务数不双、op 数不双、回执与计量逐事件对得上 | 无尺 | 本线 T3：跑 13 枚窗口的双宿主装置**不存在**；前置 = B112 那四处白名单外接缝（HEAD 编不出 app-host 产物）+ B126 两枚类型红 |
+| C11 | W3 模型已计量、结果响应丢失 | server、node-host | 付费有效 | 已绑定 | sent 租约过期后要对账而不是再买一次；供应商歧义失败不许悄悄发第二个端点 | `server/tests/integration/inbound-worker-identity.integration.spec.ts::「requires reconciliation instead of buying another attempt after a sent lease expires」；packages/app-host/tests/inbound-runner.spec.ts::「does not silently send to a second endpoint after an ambiguous provider failure」` | 本线 T4 |
+| C12 | W3 逐事件计量对账 | server | 额度耗尽 | 已绑定 | 账行按 (规则, 事件, 解析版本, 尝试) 归属；净额与计数器的差分成 short 与 unexplained；重放不二次收费 | `server/tests/automation-ai-metering.pglite.spec.ts::「逐事件明细按 (规则, 事件, 解析版本, 尝试) 归属，状态与来源逐行可见」；server/tests/automation-ai-metering.pglite.spec.ts::「同一枚尝试的重放不因额度耗尽被拒（断链重试不能二次收费）」；server/tests/automation-ai-metering.pglite.spec.ts::「计数器多出来的手工托管用量不算缺陷，只披露成 unexplainedByAutomation」` | 本线 T4 |
+| C13 | W4 结果已冻结、提交前终止 | server、node-host | 付费有效 | 已绑定 | 接手方不许把冻结的确认草稿重新解释成 prepared；旧 input 用当前 epoch 封回 | `server/tests/automation-events.spec.ts::「does not reinterpret a frozen confirmation draft as prepared on an idempotent publish」；packages/app-host/tests/inbound-runner.spec.ts::「decrypts old input, uses the provider secret, and seals the result to the current epoch」` | 服务端半本线已入库；"提交前终止"那一半要两台真宿主 ⇒ 同 C10 前置 |
+| C14 | W5 本地 op 已落盘、回执未完成 | node-host | 付费有效 | 进程已终止 | journal-before-dispatch；派发失败留回执；精确重试只一次，填充过的请求缓存不能替 B 授权 | `packages/app-host/tests/inbound-worker.spec.ts::「journals before dispatch and leaves the receipt on dispatch failure」；server/tests/integration/inbound-worker-identity.integration.spec.ts::「repairs completion on an exact persisted retry outside the HTTP cache」；server/tests/integration/inbound-worker-identity.integration.spec.ts::「accepts owner and exact retry once, but the populated request cache cannot authorize B」` | 共享层与服务端有尺；"同设备重启不再派发"要真 SQLite 落盘 ⇒ T3 |
+| C15 | W6 A 租约过期后 B 领取 | server、node-host | 付费有效 | 已绑定 | 不得两次创建、不得偷偷降级成两个 op；B 两枚 clientId 都自称 A 也不行 | `server/tests/integration/inbound-worker-identity.integration.spec.ts::「rejects B even when BOTH clientId claims are A, on both upload paths」；server/tests/integration/inbound-worker-identity.integration.spec.ts::「internal upload callers cannot bypass identity checks for an exact persisted duplicate」` | 半尺：身份边界在服务端有；两台各自落库的对账归 T3 |
+| C16 | W7 A 持过期 lease、B 新 generation | server | 付费有效 | 已绑定 | 续租、提交、ACK 三处都按代次与保留边界拒 | `server/tests/automation-events.spec.ts::「fences result publication to the lease owner and generation」；server/tests/integration/inbound-worker-identity.integration.spec.ts::「fences model reservations and sends by current rule, attempt and retention」` | 本线 |
+| C17 | W8 权益到期发生在解析中与提交前 | server、node-host | 付费过期 | 已绑定 | 到期在账号锁内复判；取消不受权益挡；许可读取期间的等待不丢精确重试 | `server/tests/automation-drafts.spec.ts::「rejects entitlement expiry at the locked transaction boundary」；server/tests/integration/inbound-worker-identity.integration.spec.ts::「rechecks entitlement after waiting for the account lock while preserving exact owner retries」；server/tests/automation-drafts.spec.ts::「allows cancellation without querying subscription and clears both bodies」` | 本线 |
+| C18 | W8 撤销凭据与设备 | server | 付费有效 | 已绑定 | 撤销提交排在许可读取期间要串行化；被撤的托管凭据不许回退旧密钥环；缓存不许替被撤的 owner 放行 | `server/tests/integration/inbound-worker-identity.integration.spec.ts::「serializes a revocation that commits during the permit read, through the subscription row lock」；server/tests/inbound-automation.routes.spec.ts::「does not fall back to the legacy keyring after a managed credential is revoked」；server/tests/integration/inbound-worker-identity.integration.spec.ts::「rejects revoked owner before cached response」；server/tests/automation-sender-credentials.spec.ts::「revokes by account and credential identity only」` | 本线 |
+| C19 | W8 Vault 锁定 | node-host | 付费有效 | Vault 锁定 | 锁定后开放审阅失效且不再发任何网络请求；清扫抹掉的密文不能被"等待中"的确认复活 | `packages/app-host/tests/inbound-draft-review.spec.ts::「invalidates an open review without making a subsequent network request」；server/tests/integration/inbound-worker-identity.integration.spec.ts::「cannot resurrect ciphertext cleared by a sweep while draft confirmation waits on the event row」；server/tests/integration/inbound-worker-identity.integration.spec.ts::「rechecks draft confirmation entitlement after an observed account lock wait while keeping cancellation usable」` | 共享层与服务端本线已入库；界面那格见 C29/C31 |
+| C20 | W8 暂停/删除规则与字段策略 | server | 付费有效 | 已绑定 | 管理与关闭规则不要求付费；规则删除留墓碑并抹掉摘要与密文；字段策略是封闭的 | `server/tests/inbound-ticket-rejection-route.spec.ts::「关闭规则不带票也不许被权益挡住（"管理/关闭规则不要求付费"这一句在线层有尺）」；server/tests/automation-rules.spec.ts::「erases rule digests and ciphertext while retaining the rule tombstone」；server/tests/automation-rules.spec.ts::「persists a closed field policy and bounded output configuration」` | 本线；「撤回模型同意」那一半落在 ADR-0010 的出境闸门，其档不在本线白名单 |
+| C21 | W8 后台与定时器 | node-host | 付费有效 | 后台 | 手动与定时唤醒串行、stop 之后所有触发被 fence；续期排在服务端报的到期之前、比例 = 剩余寿命三分之一 | `packages/app-host/tests/inbound-worker-loop.spec.ts::「serializes manual and timer wake-ups and fences all triggers after stop」；packages/app-host/tests/inbound-session-keepalive.spec.ts::「定时器真到点会再走一跳，且 token 每次重读（换令牌之后不会拿旧的敲）」；packages/app-host/tests/inbound-session-keepalive.spec.ts::「下一次排在服务端报的到期时刻之前，比例是剩余寿命的三分之一」` | 本线 T2；真后台（移动壳）见 C31 |
+| C22 | W8 离线 | node-host | 付费有效 | 离线 | 凭据只在入站上传那一趟带、无关回执被过滤；等待族报 waiting-entitlement 而不是错误 | `packages/sync-client/tests/inbound-authorization.spec.ts::「sends credentials only on its inbound upload and filters unrelated receipts」；packages/app-host/tests/inbound-session-keepalive.spec.ts::「等待族（没绑定 / 签发方没配 / 不在这台实例上）报 waiting-entitlement 并按退避继续」` | 半尺：断网注入的载体在 e2e 那两份里，**未入库** ⇒ C29 |
+| C23 | W9 用户编辑/删除后上游重试 | server、node-host | 付费有效 | 已绑定 | 既不覆盖编辑也不重建已删；队列正文过期即终态；预留与来源不符就拒 | `server/tests/integration/inbound-worker-identity.integration.spec.ts::「erases expired ciphertext without losing completion, and expires unprocessed drafts」；packages/app-host/tests/inbound-worker.spec.ts::「freezes source only at reserve and rejects a mismatched reservation」` | 半尺："用户已编辑那一条"要两台真宿主对账 ⇒ T3 |
+| C24 | W10 设备丢失、新设备加入、根密钥轮换 | node-host | 付费有效 | 密钥已轮换、新设备 | 旧队列事件的密钥不丢；跨轮换重包裹 worker 令牌与收件密钥；换钥后旧验证钥仍认既有凭据 | `packages/app-host/tests/inbound-key-store.spec.ts::「upgrades legacy records without losing queued-event keys」；packages/app-host/tests/inbound-secret-store.spec.ts::「re-wraps worker token and recipient key across a Vault root rotation」；server/tests/automation-commit-proof.spec.ts::「rotation keeps old verification keys; removing one invalidates only its proofs」` | 共享层本线已入库；"新设备真装出来并读到那条事件"需实机 ⇒ C30/C34 |
+| C25 | W11 提交许可与撤销的两种相反顺序 | server | 自托管带票 | 已绑定 | 票据在账号锁之后、第一笔不可逆写之前消费；业务回滚不烧 nonce；闸门只预检不开事务；只减不增的终态写排在授权之前 | `server/tests/inbound-entitlement-write-tx.spec.ts::「领取那一路：只减不增的终态写故意排在授权之前（保留义务不看权益）」；server/tests/integration/inbound-worker-identity.integration.spec.ts::「写事务回滚不烧 nonce：同一枚票据在业务恢复后仍能用，且只用一次」；server/tests/inbound-entitlement-write-tx.spec.ts::「闸门那一步即使带着合法票据也不开事务」` | 本线 T2；后半（许可先落盘、撤销后到）仍按既有许可语义取证 |
+| C26 | W12 换 keyId 后同事件重试与旧钥查询 | server | 自托管带票 | 已绑定 | 换钥后旧钥仍能验既有提交凭据；吊销清单合并只升不降；重放那一枚撞唯一约束判 USED | `server/tests/automation-commit-proof.spec.ts::「rotation keeps old verification keys; removing one invalidates only its proofs」；server/tests/automation-entitlement-issuer.spec.ts::「吊销清单：验签只认本部署配置的公钥，合并只升不降」；server/tests/inbound-ticket-rejection-route.spec.ts::「重放：nonce 已存在 ⇒ 402 + TICKET_USED（这一枚确实要撞唯一约束）」` | 本线；票据那一半有八臂反向验证 `research/tools/verify-inbound-ticket-teeth.py` |
+| C27 | W12 实例时钟回拨 | server | 自托管带票 | 时钟回拨 | 高水位高于库时钟即停止授权；消费侧被判过期/已用时报 retrying 而不是永久停住 | `server/tests/automation-entitlement-ticket.spec.ts::「stops authorizing when the installation clock rolls backwards」；server/tests/inbound-ticket-rejection-route.spec.ts::「时钟回拨：实例高水位高于数据库时钟 ⇒ 402 + CLOCK_ROLLBACK」；packages/app-host/tests/inbound-session-keepalive.spec.ts::「票据被自己的实例判过期/已用时报 retrying 而不是永久停住」` | 本线 T2；**实例退役清扫仍无尺**：`server/src` 里对 `automationEntitlementClock` 只有读与 upsert，零删除（现量 `grep -rn "automationEntitlementClock" server/src`） |
+| C28 | W13 date-only 与 start-only 的领域语义 | shared | 付费有效 | 已绑定 | 规则日历日不随处理日/时区漂；无效日期仍可编辑，修正后冻结为 date-only 并按当前钥封装 | `packages/domain/tests/inbound-local-date.spec.ts::「keeps the rule calendar day for today, grouping, urgency and display」；packages/app-host/tests/inbound-draft-review.spec.ts::「keeps invalid dates editable, then freezes corrected date-only values and seals to the current key」` | 本线（共享层）；界面展示与编辑往返那一半见 C29 |
+| C29 | W13 跨时区展示与编辑往返 | web | 付费有效 | 已绑定 | 亮暗、窄屏、中英三档下同一日期在列表/详情/编辑三处逐字一致 | 无尺 | 本线 T5：六枚落点此刻全是 `??`（未跟踪），且 HEAD 的 `apps/` 里代码层零接线（现量：`git status --porcelain -- apps/web/tests/`，以及 `git grep -l inbound HEAD -- apps/` 与 `git grep -l EntitlementTicket HEAD -- apps/` 各自只命中别线那两枚取证 JSON）。🔴 但**不等 B112**：逐枚解析相对导入后唯一缺口是它们互相引用，本组闭合（B128）⇒ 入库这一格本线自己能做，排在矩阵之后紧接着做 |
+| C30 | 无注入 当前产物 | web、android、ios、macos、windows、linux | 付费有效 | 已绑定、新设备 | 装出来的必须是当前源码产物：四端清旧包 → 重打 → 重装，每端一条判据 | 无尺 | 本线 T7：`pnpm check` / `-r test` / `reinstall:all` 在隔离副本过不去（B112 四处外接缝 + B126 两枚类型红），需负责人 A/B/C 拍板 |
+| C31 | 无注入 移动壳生命周期 | android、ios | 付费有效 | 后台、Vault 锁定 | 真机后台/锁屏后凭据仍在、票据续得上、恢复后不重复派发 | 无尺 | 本线 T5 + 设备腿：`apps/mobile/src/inbound/lifecycle.ts` 未入库 |
+| C32 | 无注入 鸿蒙端 | harmony | 付费有效 | 后台 | 这一端有没有壳能承载自动收集 | 无尺 | 现状：`apps/mobile` 下没有鸿蒙工程（AGENTS §1 那张地图），构建链已通但缺模拟器镜像与签名 ⇒ 不在本轮可闭合集 |
+| C33 | 无注入 桌面壳内入口 | macos、windows | 付费有效 | 已绑定 | 壳里那份共享 UI 有没有自动收集入口 | 无尺 | 本线 T5/T7：入口随 web 产物一起进包，web 那格没入库就没有 |
+| C34 | 无注入 Linux 交付定位 | linux | 付费有效 | 已绑定 | 装出来的 `.deb` 里那份共享 UI 有没有这个入口，以及 Linux 在矩阵里算不算交付端 | 无尺 | 本线 T5/T7 + Linux 交付取证；定位单列在下面「Linux 那一格」，不许被"跨端"隐去 |
+
+### Linux 那一格（AC-8 原句要求它单列）
+
+Linux 同时是**一等开发载体**与**第五个交付端**（这个定位 2026-10-06 由产品负责人指令改掉，
+不是"顺手也算一端"）。矩阵里它占 C30 与 C34 两格，两格都是**无尺**，理由不同一层：
+C30 卡在打不出装得出来的产物（B112 / B126），C34 卡在**入口本身还没入库**（T5）。
+🔴 这两句都不许被"跨端闭环已完成"这类话替掉 —— 仓里已经有一次"四端重装判据全绿但装的是旧树"
+的先例（AGENTS §7 第 82 条），而 Linux 是那一族里最容易被子弹过去的一档：
+它的 `.deb` 已进包并免 root 取过证，但**装进系统**那一格没做、也没有 Linux 桌面用户的证据。
+
+### 怎么跑（三档，各自的依赖不一样）
+
+| 档 | 命令 | 需要外部服务吗 |
+|---|---|---|
+| 服务端离线档（真库形状由 PGlite 承担） | `cd server && npx --no-install vitest run --maxWorkers=1 tests/inbound-automation.routes.spec.ts tests/automation-events.spec.ts tests/automation-drafts.spec.ts tests/automation-rules.spec.ts tests/automation-sender-credentials.spec.ts tests/automation-commit-proof.spec.ts tests/automation-entitlement-ticket.spec.ts tests/automation-entitlement-issuer.spec.ts tests/entitlement-gate.routes.spec.ts tests/inbound-entitlement-write-tx.spec.ts tests/inbound-ai-quota-route.spec.ts tests/inbound-ticket-rejection-route.spec.ts` | 不需要 |
+| 真库计量档 | `cd server && npx --no-install vitest run --maxWorkers=1 tests/automation-ai-metering.pglite.spec.ts` | 不需要（WASM 版 Postgres 在进程内） |
+| 真 HTTP + 真 PostgreSQL 档 | `python3 research/tools/verify-inbound-worker-identity.py`（自己起 loopback 临时库并跑那枚 integration 文件；结束停机清理） | 装置自带 |
+| 共享层档 | `cd packages/app-host && npx --no-install vitest run --maxWorkers=1 tests/inbound-*.spec.ts`；`cd packages/domain && npx --no-install vitest run --maxWorkers=1 tests/inbound-local-date.spec.ts`；`cd packages/sync-client && npx --no-install vitest run --maxWorkers=1 tests/inbound-authorization.spec.ts` | 不需要 |
+| 矩阵对账 | `python3 research/tools/verify-inbound-ac8-matrix.py` | 不需要 |
+
+### 这台装置自己能不能红：六臂反向验证
+
+`python3 research/tools/verify-inbound-ac8-matrix.py --self-test`（臂数由装置自己打印，本文件不抄第二份）。
+每一臂都绑定它**声称的那条规矩号**，不是"随便哪条红" —— 第一版只要求 rc=1，于是"删 W13"那条臂的
+红其实来自 R2 死值（那一行恰好是 `shared` 唯一的持有者），它测的并不是它说自己测的那件事；
+绑号之后才看得出这条臂原本在测别的。当日读数（`SELF_RC=0`）：
+
+```
+臂 1 把尺的路径换成不存在的文件 ⇒ 该红: 成立　rc=1（要求 1）　命中 R4 的红=R4 …`server/tests/__no_such__.spec.ts` 在 HEAD 里没有被跟踪
+臂 2 把尺的用例名换成源码里没有的文字 ⇒ 该红: 成立　rc=1（要求 1）　命中 R4 的红=R4 …没有逐字命中那句用例 ——「这句用例名在源码里不存在」
+臂 3 删掉 W13 那 2 行 ⇒ 该红: 成立　rc=1（要求 1）　命中 R3 的红=R3 缺窗：W13 没有用例行
+臂 4 把那格的证据归属掏成占位 ⇒ 该红: 成立　rc=1（要求 1）　命中 R5 的红=R5 …无尺格的证据归属是占位 `—`
+臂 5 把平台写成词表外的散文值 ⇒ 该红: 成立　rc=1（要求 1）　命中 R2 的红=R2 …平台 值 `桌面端` 在封闭词表外
+臂 6 静止对照：只改引言散文 ⇒ 必须保持绿: 成立　rc=0（要求 0）　红行数=0
+SELF_TEST=OK（六臂各自成立：R4 两半能红、R3/R5/R2 能红、静止臂没跟着红）
+```
+
+### 当日读数（矩阵对账 + 它引用的尺今天跑不跑得过）
+
+| 尺 | 当日读数 | 这一格说明什么 |
+|---|---|---|
+| `python3 research/tools/verify-inbound-ac8-matrix.py` | `读数 行数=34　有尺行=27　无尺行=7　尺枚=67　窗=13/13　平台=10/10　权益=9/9　设备状态=9/9` + `结论：矩阵与 HEAD 逐格对账成立`，**rc=0**（不经管道取） | 矩阵那 67 枚引用逐枚在 **HEAD 的字节**里命中；三张词表没有死值；十三个窗口逐枚有用例行；无尺的七格逐格有归属。那串数是装置自报的，要现量请重跑，别把这一格当"现在的数" |
+| 服务端离线档（上面「怎么跑」第 1 行，12 份文件） | `Test Files 12 passed (12)` / `Tests 124 passed (124)`，RC=0 | 矩阵里 `server` 那批尺今天**跑得绿**，不只是文件在 |
+| 真库计量档（PGlite） | `Tests 17 passed (17)`，RC=0 | 额度耗尽与逐事件对账那两格（C8/C12）的尺有活体 |
+| `python3 research/tools/verify-inbound-worker-identity.py` | 真 PostgreSQL 14.18 起在 `127.0.0.1` 临时端口 → `Tests 46 passed (46)`，装置 rc=**0**，结束 `server stopped` 并自清 | 矩阵里 15 枚 integration 引用（C7/C11/C13~C19/C23/C25）的那份文件今天有活体；**基线那句 38/38 已被本轮之前的 46/46 取代，测试数只增未减** |
+| 共享层档（app-host 7 份 + domain + sync-client） | `Test Files 7 passed (7)` / `Tests 55 passed (55)`；`Tests 1 passed (1)`；`Tests 6 passed (6)`，三档各自 RC=0 | C14/C19~C24/C28 引用的共享层尺有活体 |
+
+🔴 **两种读法不许混**：矩阵的 R4 核的是「这句用例在 **HEAD** 的字节里逐字可寻」，
+上面那批 rc=0 核的是「这把尺在**当前工作树**里跑得绿」。**它们不是同一件事**，
+差的那一层就是 B112：`packages/app-host`、`packages/domain`、`packages/sync-client` 这三档
+在干净 HEAD 上编不出来（四处白名单外接缝），所以那 62 条今天只在共享工作树里绿。
+写矩阵时故意选"字节命中"而不是"能跑"作判据 —— 前者今天就能机械核，后者要等 B112 拍板。
+
+### 未闭合的那几格（不包装成完成）
+
+- 七个**无尺**格（C10、C29、C30~C34）不是"还没测"，是两种不同的缺：C10/C29 缺**载体**
+  （双宿主装置不存在 / 界面层文件根本没入库），C30~C34 缺**当前产物**（T7 那三条过不去）。
+- C27 里那句「实例退役清扫仍无尺」本轮新量出来的：`server/src` 里对 `automationEntitlementClock`
+  只有 `findUnique`（读）与 `upsert`（写）两处，**零删除** —— 高水位行会随实例数永久累积。
+  这一格仍归 T2，本轮没有顺手做（它要先把"退役"定义拍下来：绑定撤销？实例从密钥环消失？两者给出的保留集不同）。
+- AC-8 整体**继续不勾选**：这张矩阵把"要哪些格、每格凭什么"说清了，但它的第二条证据
+  （当前源码产物完成跨端安装/实机闭环）仍卡在 B112 与 B126。
