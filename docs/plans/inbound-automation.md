@@ -328,7 +328,7 @@ Web 设置页已接入生成/轮换、一次性展示与复制、活动凭据元
 上一轮留下的三处会在真实链路上出事的形状已改掉，并补了两处此前没有任何一层在守的边界：
 
 1. **一台实例只有一个权益来源**。新增严格读取的 `AUTOMATION_ENTITLEMENT_MODE`（只接受 `official` / `selfhost-online`，写错**报错**，未配置则自动收集不可用 —— 响的拒绝，不静默落到任何一边，与本仓库 `ENTITLEMENT_GATE_ENABLED` 同一条纪律）。`selfhost-online` 下 `evaluateAutomationEntitlementForUser` **不再读 `subscriptions`**：本机订阅行放行自动收集等于“在自己的库里给自己发货”。
-2. **一枚票据只放行它那一个动作**。`action` 改成封闭词表（`session`/`rule-enable`/`sender-credential-issue`/`worker-register`/`event-claim`/`ai-reserve`/`result-publish`/`commit-permit`/`draft-confirm`），每个动作按词表要求带**恰好**它自己的 rule/event 作用域，矛盾组合在签发侧就签不出来；消费记录新增 `action/rule_id/event_id/installation_id` 列（迁移 `20261018170000_harden_automation_entitlement_ticket_scope`，未改任何已应用文件）。只有 `session` 写绑定行 —— 原来那张“30 秒内可放行任意次操作”的通行证不存在了。声明了 `action` 的闸门在自己的事务里消费票据（回滚不烧 nonce）；草稿确认与首次提交许可仍在**各自写事务内**消费，且草稿那侧去掉了 HTTP 层的重复判定（同一次请求烧两张票据是错的）。
+2. **一枚票据只放行它那一个动作**。`action` 改成封闭词表（`session`/`rule-enable`/`sender-credential-issue`/`worker-register`/`event-claim`/`ai-reserve`/`result-publish`/`commit-permit`/`draft-confirm`），每个动作按词表要求带**恰好**它自己的 rule/event 作用域，矛盾组合在签发侧就签不出来；消费记录新增 `action/rule_id/event_id/installation_id` 列（迁移 `20261018170000_harden_automation_entitlement_ticket_scope`，未改任何已应用文件）。只有 `session` 写绑定行 —— 原来那张“30 秒内可放行任意次操作”的通行证不存在了。声明了 `action` 的闸门在自己的事务里消费票据（回滚不烧 nonce）；草稿确认与首次提交许可仍在**各自写事务内**消费，且草稿那侧去掉了 HTTP 层的重复判定（同一次请求烧两张票据是错的）。⚠️ **2026-10-09 T2 更正这一格**：上面那句"闸门在自己的事务里消费"当天是真的，但它把"业务写失败"和"票据被烧"绑在了一起 —— 现在闸门只做**离线预检**（一个字节都不写库），五个逐次放行动作（`worker-register`/`rule-enable`/`sender-credential-issue`/`event-claim`/`result-publish`）的消费挪进各自业务写事务、写在第一笔业务写之前；`ai-reserve` 是留在闸门事务里的唯一例外（原因见文末 T2 那节的边界表）。
 3. **可信时钟只有一个来源，且在锁后读**。票据的时间判定不再接受调用方传入的绝对时间：账号锁之后读 `clock_timestamp()`，过期即拒；新增按**安装实例**记录的高水位表，时钟回拨后本机所有账号都停止获得新授权。`session` 建立绑定时的 `localAccountUuid` 仍来自客户端声明 —— 这一格是真的未闭合，见文末。
 4. **恢复被替换掉的订阅行锁**。抽象成通用 reader 时，锁内那次订阅读退化成普通 `SELECT`；账号行的 `FOR UPDATE` 挡不住 `billing/webhook.routes.ts` 与 `activity/invite.ts` 对订阅行的写入（这两处都不取账号锁），于是“读到的权益快照”可以在提交前被撤销。现在锁内那次读显式 `... FROM subscriptions ... FOR SHARE`。
 5. **生产路径不再为测试桩降级**：默认绑定读取里那句“模型不存在就当没有绑定”的可选链已删；判定用的 reader 换成具名类型（`AutomationEntitlementSource` / `EntitlementDatabase` 取 Prisma 生成类型），不再出现 `any`。受影响的两份测试改为**声明自己建模哪一种部署**（`automation-drafts.spec.ts` 与公网接收套件 = `official`），而不是让生产代码去迁就最小 double。
@@ -350,7 +350,7 @@ Web 设置页已接入生成/轮换、一次性展示与复制、活动凭据元
 
 变异验证（每臂只打红它那一条，全部从 `.mut-bak` 还原后复跑为绿）：锁后新鲜度判定、票据 action/作用域逐字匹配、只有 `session` 写绑定、未配置模式必须拒绝、自托管不看本机订阅、实例时钟回拨停止授权、nonce 一次性消费 ⇒ 各红 1 条；摘掉 `FOR SHARE` ⇒ 红真库那条锁串行判据。**一条臂的教训已入档**：第一版“锁后新鲜度”变异写成 `if (false && A || B || C)`，`||` 把 B/C 留在判定里，测试仍全绿 —— 臂是假的；存活读数必须先确认变异真的进了产物。
 
-仍然没闭合的（不包装成完成；⚠️ 2026-10-09 当天后续：**前两格已闭合** —— 签发端与 `officialSubject ↔ installation ↔ 本地账号` 握手、吊销版本在线刷新，判据与反向验证见文末「2026-10-09 T1 签发端与账号绑定握手」一节；其余各格仍未闭合，逐格状态以那一节为准）：官方签发端与 `officialSubject ↔ installation ↔ 本地账号` 的链接握手（现在没有 issuer，自托管这一档在真机上**拿不到票据**，因此也只能在测试签发者下取证）；吊销版本在线刷新；各宿主每 30 秒续票据与 `waiting-entitlement` UI；`X-Heyta-Entitlement-Ticket` 在 app-host 客户端侧还没有供给方；其余动作（领取/预留/发布/注册/启用规则/签发凭据）的一次性票据目前在 HTTP 闸门自己的事务里消费，不在业务写事务里；故障窗口 11 只做了前半（撤销先赢），后半“许可先落盘、撤销后到”仍按既有许可语义取证。AC-1～AC-8 继续不勾选，公网接收与售卖继续关闭。
+仍然没闭合的（不包装成完成；⚠️ 2026-10-09 当天后续：**前两格已闭合** —— 签发端与 `officialSubject ↔ installation ↔ 本地账号` 握手、吊销版本在线刷新，判据与反向验证见文末「2026-10-09 T1 签发端与账号绑定握手」一节；其余各格仍未闭合，逐格状态以那一节为准）：官方签发端与 `officialSubject ↔ installation ↔ 本地账号` 的链接握手（现在没有 issuer，自托管这一档在真机上**拿不到票据**，因此也只能在测试签发者下取证）；吊销版本在线刷新；各宿主每 30 秒续票据与 `waiting-entitlement` UI；`X-Heyta-Entitlement-Ticket` 在 app-host 客户端侧还没有供给方；~~其余动作（领取/预留/发布/注册/启用规则/签发凭据）的一次性票据目前在 HTTP 闸门自己的事务里消费，不在业务写事务里~~ → ⚠️ **2026-10-09 T2 现量更正：这一格已闭合**，五个动作（领取/发布/注册/启用规则/签发凭据）的消费挪进业务写事务，闸门只做离线预检；**`ai-reserve` 仍留在闸门事务里**（唯一例外，理由与取证见文末「2026-10-09 T2：票据消费挪进业务写事务」）；故障窗口 11 只做了前半（撤销先赢），后半“许可先落盘、撤销后到”仍按既有许可语义取证。AC-1～AC-8 继续不勾选，公网接收与售卖继续关闭。
 
 两条这一改动带来的**代价**，不是 bug，但下一轮必须按它们设计：① 声明了 `action` 的闸门在官方模式下也开始在事务里以 `FOR SHARE` 读订阅行，于是领取这类高频调用会与计费写入排队（量级取决于计费写入频率）；② “每动作一枚一次性票据 + 首版只支持在线核验”意味着设备每 20 秒一轮的 worker 循环要额外产生票据往返 —— 签发端与续票据节奏要和票据一起定，不能事后靠放宽票据复用次数来补。
 
@@ -377,7 +377,7 @@ Web 设置页已接入生成/轮换、一次性展示与复制、活动凭据元
 
 判据复跑边界：这批提交没有改动工作树任何一个字节（现量：`git diff --stat HEAD -- <这 86 枚路径>` 只剩 4 枚混合文件的差量，而那差量正是别人的 hunk），所以上一节那张读数表描述的还是同一批源码。把整套判据对着新 HEAD 重跑（`pnpm -r test`、完整 `pnpm check`、`pnpm reinstall:all` 四端重装）**仍然欠着** —— 起跑那一刻共享载体上有并行写入者且负载高，按 §8 第 9 条那格要在隔离副本上做，不能拿这趟的工作树读数冒充。
 
-仍然没闭合的（不包装成完成；⚠️ 2026-10-09 当天后续：**前两格已闭合** —— 签发端与 `officialSubject ↔ installation ↔ 本地账号` 握手、吊销版本在线刷新，判据与反向验证见文末「2026-10-09 T1 签发端与账号绑定握手」一节；其余各格仍未闭合，逐格状态以那一节为准）：官方签发端与 `officialSubject ↔ installation ↔ 本地账号` 的链接握手（现在没有 issuer，自托管这一档在真机上**拿不到票据**，因此也只能在测试签发者下取证）；吊销版本在线刷新；各宿主每 30 秒续票据与 `waiting-entitlement` UI；`X-Heyta-Entitlement-Ticket` 在 app-host 客户端侧还没有供给方；其余动作（领取/预留/发布/注册/启用规则/签发凭据）的一次性票据目前在 HTTP 闸门自己的事务里消费，不在业务写事务里；故障窗口 11 只做了前半（撤销先赢），后半“许可先落盘、撤销后到”仍按既有许可语义取证。AC-1～AC-8 继续不勾选，公网接收与售卖继续关闭。
+仍然没闭合的（不包装成完成；⚠️ 2026-10-09 当天后续：**前两格已闭合** —— 签发端与 `officialSubject ↔ installation ↔ 本地账号` 握手、吊销版本在线刷新，判据与反向验证见文末「2026-10-09 T1 签发端与账号绑定握手」一节；其余各格仍未闭合，逐格状态以那一节为准）：官方签发端与 `officialSubject ↔ installation ↔ 本地账号` 的链接握手（现在没有 issuer，自托管这一档在真机上**拿不到票据**，因此也只能在测试签发者下取证）；吊销版本在线刷新；各宿主每 30 秒续票据与 `waiting-entitlement` UI；`X-Heyta-Entitlement-Ticket` 在 app-host 客户端侧还没有供给方；~~其余动作（领取/预留/发布/注册/启用规则/签发凭据）的一次性票据目前在 HTTP 闸门自己的事务里消费，不在业务写事务里~~ → ⚠️ **2026-10-09 T2 现量更正：这一格已闭合**，五个动作（领取/发布/注册/启用规则/签发凭据）的消费挪进业务写事务，闸门只做离线预检；**`ai-reserve` 仍留在闸门事务里**（唯一例外，理由与取证见文末「2026-10-09 T2：票据消费挪进业务写事务」）；故障窗口 11 只做了前半（撤销先赢），后半“许可先落盘、撤销后到”仍按既有许可语义取证。AC-1～AC-8 继续不勾选，公网接收与售卖继续关闭。
 
 两条这一改动带来的**代价**，不是 bug，但下一轮必须按它们设计：① 声明了 `action` 的闸门在官方模式下也开始在事务里以 `FOR SHARE` 读订阅行，于是领取这类高频调用会与计费写入排队（量级取决于计费写入频率）；② “每动作一枚一次性票据 + 首版只支持在线核验”意味着设备每 20 秒一轮的 worker 循环要额外产生票据往返 —— 签发端与续票据节奏要和票据一起定，不能事后靠放宽票据复用次数来补。
 
@@ -409,4 +409,46 @@ Web 设置页已接入生成/轮换、一次性展示与复制、活动凭据元
 
 现量读数（这台机器，一次性真实 PostgreSQL + 真 HTTP + 真 Ed25519，零 mock）：`python3 research/tools/verify-inbound-worker-identity.py` → **`Tests 43 passed (43)`**（本线原有 38 条 + 这一段 5 条），`npx tsc --noEmit -p tsconfig.json` 0 错，闸门三个消费方文件 40/40。⚠️ **边界**：还原两处变异之后又跑了一次装置，那趟被本机测试内存闸门拒了启动（`立即可用 185MB < 这一档要求的 384MB`，浏览器那趟 pid=90222 已跑 40 分钟）⇒ 43/43 对应的是 `cmp` 逐字相同的那一份源码，但**合并态的整仓重跑仍欠着**，记在 `BLOCKED.md`。
 
-仍未闭合（不包装成完成）：宿主每 30 秒续票据 + `waiting-entitlement` 展示、`X-Heyta-Entitlement-Ticket` 在 app-host 侧的供给方、票据消费挪进业务写事务、`automation_entitlement_clocks` 的退役清扫（上一条那句还成立）、事件级计量、界面层、对外说明。AC-1～AC-8 继续不勾选，公网接收与售卖继续关闭。
+仍未闭合（不包装成完成）：宿主每 30 秒续票据 + `waiting-entitlement` 展示、`X-Heyta-Entitlement-Ticket` 在 app-host 侧的供给方、~~票据消费挪进业务写事务~~（✅ 2026-10-09 T2 已闭合，见下一节）、`automation_entitlement_clocks` 的退役清扫（上一条那句还成立）、事件级计量、界面层、对外说明。AC-1～AC-8 继续不勾选，公网接收与售卖继续关闭。
+
+### 2026-10-09 T2：票据消费从闸门事务挪进业务写事务（阶段证据，仍不开放）
+
+上一条那句「其余动作在 HTTP 闸门自己的事务里消费」已经作废。现在一次自托管操作走两步：
+
+1. **闸门只做离线预检**（`precheckOnly: true`）：验签、验作用域、验吊销下限与过期 —— 纯密码学与算术，**不开事务、不写库**，所以预检本身失败或被中断都不会烧掉 nonce。
+2. **业务写事务内消费**：`authorizeAutomationWrite` 在账号行 `FOR UPDATE` 之后、**第一笔不可逆业务写之前** redeem 票据并落 `automation_entitlement_ticket_uses`。业务失败 ⇒ 事务回滚 ⇒ 消费记录一起回滚 ⇒ **同一枚票据仍可再用**（它自己的 30 秒寿命就是重试窗口）。
+
+逐格落点（哪些在写事务里烧、哪些仍由闸门烧）：
+
+| 动作 | 现在消费在哪 | 挡住它的那笔不可逆写 |
+|---|---|---|
+| `worker-register` | 业务写事务 | `automationWorker.updateMany`（吊销同键旧 worker） |
+| `sender-credential-issue` | 业务写事务 | `automationSenderCredential.updateMany`（吊销同 keyId 旧凭据） |
+| `rule-enable` | 业务写事务 | `automationRule.update` |
+| `event-claim` | 业务写事务 | `status: 'leased'` 那一笔（递增 generation = 发活） |
+| `result-publish` | 业务写事务 | `automationEvent.update` |
+| `draft-confirm` / `commit-permit` | 各自写事务（本轮之前就是） | —— |
+| `ai-reserve` | ⚠️ **仍由闸门消费** | `ai-metering.ts` 走位置参数的 `SqlRunner` 端口，接不住 Prisma 形状的那次 redeem；这条边界已在 `server/src/api.ts` 的路由上注明 |
+| `session` | 建立绑定那一步 | —— |
+
+`event-claim` 这一路有个**故意不对称**，值得单独记：领取路径上 `expired` / `needs-confirmation` / `cancelled` 三笔终态写排在授权**之前**，不受权益支配。它们只减不增（抹掉到保留期的密文、把结果不明的转成待确认、把规则已停用的转成取消），不给这台 worker 任何新工作，多数还是保留义务的产物 —— 让权益决定「做不做合规动作」是错的；而空轮询一次都不该烧 nonce。这条理由在判据里是**反向钉住**的：把授权提到事务开头就会红。
+
+顺手抓到并修掉的一格真缺陷（我自己 T1 留的）：自托管模式配了却**没配公钥环**时，原来的 `configuredAutomationKeyring()` 抛一个裸 `Error` 出 preHandler ⇒ HTTP **500**。客户端把 500 读成「服务端坏了，重试」，而正确语义是「这台实例没连上签发方，停止重试」⇒ 两处调用点（闸门与 `authorizeAutomationOperation`）都改成返回 `ISSUER_NOT_CONFIGURED` 判拒，走 `replyAutomationRejection` 出 **402**；那个会抛的辅助函数已删。
+
+现量读数（本机真实 PostgreSQL + 真 HTTP，零 mock；还原变异之后复跑）：
+
+| 判据 | 读数 |
+|---|---|
+| `tests/inbound-entitlement-write-tx.spec.ts`（新写，落点形状） | **10/10** |
+| 同文连同 `automation-entitlement-ticket` / `-issuer` / `inbound-worker-identity` / `automation-sender-credentials` / `automation-rules` 六文件 | **Tests 51 passed (51)**，rc=0 |
+| `tests/integration/inbound-worker-identity.integration.spec.ts`（真库，含本段两条） | **Tests 45 passed (45)**，`REAL_RC=0`（`--config vitest.integration.config.ts --maxWorkers=1`，一次性库 `heyta_inbound_wtx_20261009`） |
+| `npx tsc --noEmit`（server） | rc=0 |
+
+反向验证（两臂，各自只打红它那一条，都从 `.mut-bak` 用 `cp` + `cmp` 还原）：
+
+- **臂 1**｜把 `sender-credentials` 那条路由的 `precheckOnly: true` 摘掉（= 消费退回闸门）⇒ 真库那条「写事务回滚不烧 nonce：同一枚票据在业务恢复后仍能用，且只用一次」转红，形状是 `expected 402 to be 409`——第一次请求就把 nonce 烧了，所以业务恢复后重放拿到的是「票据已用过」而不是「加密配置缺失」。**恰好 1 红 / 44 绿**。
+- **臂 2**｜把 `issueSenderCredential` 里的授权移到 `automationSenderCredential.updateMany` **之后**（吊销已落，票据还没验）⇒ 形状那条 `expected 797 to be less than 619` 转红，**恰好 1 红 / 9 绿**。⚠️ 这一臂**真库那套打不红**：吊销与后续失败仍在同一事务里，回滚把两者一起抹掉，所以数据库层面看不出差别 —— 挡得住这个改法的只有落点判据。**这就是它必须存在的理由**，也是第一版把标记写成 `.create` 时臂 2 存活的原因（`.create` 在吊销之后，把授权塞进两者中间照样「在 `.create` 之前」）⇒ 标记换成第一笔**不可逆**写，判据才有牙。
+
+第一条臂的教训同样入档：本段的臂 2 第一次是**假臂**（改动把授权塞回原位，跑不跑都绿），当时又被本机测试内存闸门（`立即可用 266MB < 这一档要求的 384MB`）挡住而没暴露 —— 存活读数之前必须先确认「变异真的进了产物」，做法是 `sed -n` 把改动后的那几行打出来看一眼。
+
+T2 剩下未闭合的（不包装成完成）：宿主侧每 30 秒续票据与 `X-Heyta-Entitlement-Ticket` 的供给方（app-host 里还没有生产者）、`waiting-entitlement` 展示、`automation_entitlement_clocks` 的实例退役清扫（落点 `server/src/sync/cleanup.ts` **在本线白名单之外** ⇒ 只登记接线需求，不代改）。AC-1～AC-8 继续不勾选，公网接收与售卖继续关闭。
