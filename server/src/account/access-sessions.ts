@@ -217,7 +217,14 @@ export const revokeSession = async (userId: number, sessionId: string): Promise<
   const deleted = await prisma.accessSession.deleteMany({
     where: { jtiHash: sessionId, userId },
   });
-  return deleted.count === 1;
+  if (deleted.count !== 1) {
+    return false;
+  }
+  // 🔴 那一枚的实时通道也要当场断掉。删行与失效缓存只管得住**下一句 HTTP 请求**，
+  // 而那一台**已经开着的页面**只在 upgrade 时鉴权 —— 不关它就继续收这个账号的 op，
+  // 直到它自己重连。逐枚只关这一枚：`closeForUser` 是 `revoke-all` 的语义，会把别的设备一起退出。
+  getWsConnectionService().closeForSession(userId, sessionId);
+  return true;
 };
 
 /**

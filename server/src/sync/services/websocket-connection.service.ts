@@ -6,6 +6,16 @@ interface ConnectedClient {
   ws: WebSocket;
   clientId: string;
   userId: number;
+  /**
+   * SHA-256 hex of the `jti` of the token this socket was accepted with — i.e.
+   * which *session* owns this connection. Taken from the server's own verified
+   * payload, never from a query param: `clientId` is self-declared, so it cannot
+   * be used to decide "close exactly the session the user just signed out of"
+   * (a client could claim another device's id and spare its socket).
+   * `null` for tokens minted before `jti` existed — those sessions have no
+   * per-session handle at all, so nothing here can match them.
+   */
+  sessionId: string | null;
   lastPong: number;
   /** Wall-clock ms when this socket was accepted (used for the storm summary). */
   connectedAt: number;
@@ -155,7 +165,12 @@ export class WebSocketConnectionService {
     }
   >();
 
-  addConnection(userId: number, clientId: string, ws: WebSocket): void {
+  addConnection(
+    userId: number,
+    clientId: string,
+    ws: WebSocket,
+    sessionId: string | null,
+  ): void {
     // A new socket from the same clientId means the device is reconnecting — the
     // server's old entry is by definition stale (network blip, proxy idle close,
     // OS sleep). Evict it eagerly instead of waiting up to ~40s for the heartbeat
@@ -234,6 +249,7 @@ export class WebSocketConnectionService {
       ws,
       clientId,
       userId,
+      sessionId,
       lastPong: nowMs,
       connectedAt: nowMs,
       lastTouchedAt: nowMs,
@@ -687,6 +703,31 @@ export class WebSocketConnectionService {
         code: WebSocketConnectionService.TOKEN_REVOKED_CLOSE_CODE,
         reason: 'Token revoked',
       });
+    }
+  }
+
+  /** Close the sockets that were accepted with exactly this session token
+   * (`sessionId` = SHA-256 hex of the verified `jti`). This is what "退出这一台"
+   * owes that device: the row and the 30 s auth cache die at revoke time, but a
+   * page that is *already open* only re-authenticates at upgrade, so without it
+   * it keeps receiving op notifications until it happens to reconnect.
+   *
+   * `closeForUser` would be wrong here — that is the `revoke-all` semantic and it
+   * would sign the other devices out too. Matching on `clientId` would also be
+   * wrong: that is a self-declared query param, so a client could claim another
+   * device's id and exempt its own socket. */
+  closeForSession(userId: number, sessionId: string): void {
+    const userSet = this.connections.get(userId);
+    if (!userSet) {
+      return;
+    }
+    for (const client of [...userSet]) {
+      if (client.sessionId === sessionId) {
+        this.removeConnection(userId, client, {
+          code: WebSocketConnectionService.TOKEN_REVOKED_CLOSE_CODE,
+          reason: 'Session revoked',
+        });
+      }
     }
   }
 
