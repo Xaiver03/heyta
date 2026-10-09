@@ -194,6 +194,8 @@ EVIDENCE-1，并对所有已完成项做截图、交互、测试和文档回读�
 > 1. **"代码完成"这四个字在主表里不是一种状态，是两种** —— 一种能在干净检出上复跑，一种只能在这台机器的工作树里复跑。上面那枚 `git grep -c … HEAD -- apps/web/src` 为 0 的证据最有用：它说明缺口不是"少一个文件"，而是**少整条接线**，摘文件进去也不会亮。
 > 2. ⚠️ **这一趟我自己先造了一枚假读数**：第一版用 `grep -oE 'data-testid="…"'` 比两版面板，得到"工作树反而少了 granted/denied 两态"。错在**形状**——工作树那版把状态卡换成了共享组件、testId 走 `testId="…"` **prop**（`grep -oE 'testId="…"'` 数出四态齐），字面 `data-testid=` 是 `HEAD` 那代的写法。⇒ **比"界面上有没有 X"要按实质特征筛、不能按抄来的字面形状 grep**（与 §7 那条"分母要按实质特征筛，不按文件名前缀"同族，这次是同一枚坑换到属性写法上）。
 > 3. 这一格只登记**主表与仓库的差**，不改任何一行的结论，也不替谁把 `??` 提交掉（那些文件正被另一条会话写）。关闭它的动作在那一线：把 `apps/web/src/features/settings/` 那批与其消费侧同一笔落地，之后主表这三行才升成"在 `main` 上"。那批的**条数每次现取**（`git status --porcelain -- apps/web/src/features/settings/ | awk '{print $1}' | sort | uniq -c`；这一趟读数是 15 枚 ` M` + 9 枚 `??`，别把这两个数抄进别的句子）。
+> 4. 🔴 **10-10 01:3x 同一张表上还有一种更隐蔽的形状：一句合取由两把尺的并集撑着**。UX-S9-29/30/31/32 四行都写着「Web **1440/375 亮暗**浏览器验收通过」。拆开看：375 那一档由 `e2e/tests/ux-viewport-matrix.spec.ts`（29 组，产出 `apps/web/evidence/settings-finish/viewport-metrics.json`）覆盖，而**那把尺没有主题维度**（现量：`grep -cE "emulateMedia|colorScheme|dataset\.theme|heyta\.theme" e2e/tests/ux-viewport-matrix.spec.ts` = 0）；"亮暗"由 `scripts/qa/reminders-data-responsive.mjs` 覆盖，而它这一组以前只拍 **390/1440**。⇒ "375 × 暗 × 「任务与显示」这一组"这个**交集**从来没有被任何一把尺同时打中过。
+>    ⚠️ 这一条我第一版写重了，当场按实际收窄：那个交集**是有图的** —— `apps/web/evidence/settings-finish/settings-375-dark-appearance.png`（10-07 那批，今天人打开看过：暗色渲染正确，蓝点与文字都亮），但它拍的是**拆两栏之前的 IA**、且没有判据。⇒ 准确说法是：**旧源码上有图，当前源码上没有带判据的读数**。本轮把 375 × 明暗 补进提醒腿（`cases` 4 档 → 6 档、提醒腿 30 格，读数 `apps/web/evidence/sync-privacy-leg-1009-r16/report.json`），那四行的"通过"从这一趟起才是**同一把尺**说得出口的话。
 
 ### 8.3 设计规则
 
