@@ -680,7 +680,7 @@ T2 那句话里"每 30 秒续票据"这一格，此前是**一整套零件都在
 | AC | 原句 | 现状 | 为什么做不了 |
 |---|---|---|---|
 | AC-3 | 「**两个独立真实宿主与独立数据库**跑通下方十个（现 13 个）故障注入窗口，观察任务数、op 数、回执与计量」 | **无尺**：`research/tools/` 里与本线有关的装置只有 `verify-inbound-worker-identity.py` 一枚，另两枚是入库切片器；跑 13 个窗口的双宿主装置**不存在** | 它跑在 app-host 的 `dist` 产物上，而 HEAD 仍被 B112 那四处白名单外接缝挡住（当日现量：`git show HEAD:` 查四枚成员命中 **0/0/0/0**，六枚文件仍 `M`）⇒ 现在写装置=在没有可编译的树上写 |
-| AC-6 | 「用户**独立完成**"启用 → 测试发送 → 等待 → 打开/解锁 → 自动处理 → 查看结果"」 | **无尺**：真浏览器那份 `e2e/tests/inbound-automation.spec.ts` 只有 2 条，且**它走的是 route 桩**（文件头自述 "Real browser/UI with HTTP fixtures; database authorization is tested separately"），量的是界面形状，不是这条旅程 | 旅程需要公网接收 + 有权益的宿主在跑，两者都关着；本轮**没有**复跑那 2 条，因为它会改写 `apps/web/evidence/inbound-recovery/` 那 16 枚**已跟踪**PNG，而该目录不在本线白名单 |
+| AC-6 | 「用户**独立完成**"启用 → 测试发送 → 等待 → 打开/解锁 → 自动处理 → 查看结果"」 | **无尺**：真浏览器那份 `e2e/tests/inbound-automation.spec.ts` 只有 2 条，且**它走的是 route 桩**（文件头自述 "Real browser/UI with HTTP fixtures; database authorization is tested separately"），量的是界面形状，不是这条旅程 | 旅程需要公网接收 + 有权益的宿主在跑，两者都关着；本轮**没有**复跑那 2 条，因为它会改写 `apps/web/evidence/inbound-recovery/` 那 16 枚**已跟踪**PNG，而该目录不在本线白名单。🔴 05:5x 再加一层更硬的：那份用例 import 的 `selectSettingsSection` **只存在于 `e2e/tests/helpers.ts` 的未提交 diff 里**（HEAD 的该文件 grep 命中 0），helpers 在白名单外 ⇒ 这份 e2e 现在**连入库都做不到**，不是"入库了没跑" |
 | AC-7 | 「官方与自托管样例分别**可运行**，端点与权限真实」 | **无尺**（帮助中心/中英条款的落点也在白名单外，B118） | 半尺有：`docs/reference/` 那两份当日已按 HEAD 更正过措辞（协议 + 定价） |
 | AC-8 | 「平台 × 权益 × 设备状态 × 失败阶段的具体用例表」 | ⚠️ **本行已被文末「2026-10-10 05:2x · AC-8 用例矩阵」一节取代**（当日现量：矩阵已落成 34 行、逐格带尺或带归属，`python3 research/tools/verify-inbound-ac8-matrix.py` rc=0）。原先写的"**无产物**：矩阵文件不存在"在 10-10 05:0x 之前是真的，留着是为了让人认出"表格类交付物最容易糊过去的是它自己" | 剩余的那半仍然过不去：`pnpm check` / `-r test` / `reinstall:all` 三条在隔离副本上仍红（同 B112），矩阵里 C30~C34 五格因此记无尺 |
 
@@ -1095,9 +1095,9 @@ AC-8 那一格此前的现状是**无产物**（复审表里唯一一处连尺�
 | C26 | W12 换 keyId 后同事件重试与旧钥查询 | server | 自托管带票 | 已绑定 | 换钥后旧钥仍能验既有提交凭据；吊销清单合并只升不降；重放那一枚撞唯一约束判 USED | `server/tests/automation-commit-proof.spec.ts::「rotation keeps old verification keys; removing one invalidates only its proofs」；server/tests/automation-entitlement-issuer.spec.ts::「吊销清单：验签只认本部署配置的公钥，合并只升不降」；server/tests/inbound-ticket-rejection-route.spec.ts::「重放：nonce 已存在 ⇒ 402 + TICKET_USED（这一枚确实要撞唯一约束）」` | 本线；票据那一半有八臂反向验证 `research/tools/verify-inbound-ticket-teeth.py` |
 | C27 | W12 实例时钟回拨 | server | 自托管带票 | 时钟回拨 | 高水位高于库时钟即停止授权；消费侧被判过期/已用时报 retrying 而不是永久停住 | `server/tests/automation-entitlement-ticket.spec.ts::「stops authorizing when the installation clock rolls backwards」；server/tests/inbound-ticket-rejection-route.spec.ts::「时钟回拨：实例高水位高于数据库时钟 ⇒ 402 + CLOCK_ROLLBACK」；packages/app-host/tests/inbound-session-keepalive.spec.ts::「票据被自己的实例判过期/已用时报 retrying 而不是永久停住」` | 本线 T2；**实例退役清扫仍无尺**：`server/src` 里对 `automationEntitlementClock` 只有读与 upsert，零删除（现量 `grep -rn "automationEntitlementClock" server/src`） |
 | C28 | W13 date-only 与 start-only 的领域语义 | shared | 付费有效 | 已绑定 | 规则日历日不随处理日/时区漂；无效日期仍可编辑，修正后冻结为 date-only 并按当前钥封装 | `packages/domain/tests/inbound-local-date.spec.ts::「keeps the rule calendar day for today, grouping, urgency and display」；packages/app-host/tests/inbound-draft-review.spec.ts::「keeps invalid dates editable, then freezes corrected date-only values and seals to the current key」` | 本线（共享层）；界面展示与编辑往返那一半见 C29 |
-| C29 | W13 跨时区展示与编辑往返 | web | 付费有效 | 已绑定 | 亮暗、窄屏、中英三档下同一日期在列表/详情/编辑三处逐字一致 | 无尺 | 本线 T5：六枚落点此刻全是 `??`（未跟踪），且 HEAD 的 `apps/` 里代码层零接线（现量：`git status --porcelain -- apps/web/tests/`，以及 `git grep -l inbound HEAD -- apps/` 与 `git grep -l EntitlementTicket HEAD -- apps/` 各自只命中别线那两枚取证 JSON）。🔴 但**不等 B112**：逐枚解析相对导入后唯一缺口是它们互相引用，本组闭合（B128）⇒ 入库这一格本线自己能做，排在矩阵之后紧接着做 |
+| C29 | W13 跨时区展示与编辑往返 | web | 付费有效 | 已绑定 | 亮暗、窄屏、中英三档下同一日期在列表/详情/编辑三处逐字一致 | 无尺 | 本线 T5：六枚落点此刻全是 `??`（未跟踪），且 HEAD 的 `apps/` 里代码层零接线（现量：`git status --porcelain -- apps/web/tests/`，以及 `git grep -l inbound HEAD -- apps/` 与 `git grep -l EntitlementTicket HEAD -- apps/` 各自只命中别线那两枚取证 JSON）。🔴 **05:5x 更正：上一轮写"入库这一格本线自己能做"是错的** —— 挂载面（`AiSettings.tsx` +6 行、`features/sync/store.ts` +3 行、`features/ai/route-explanation.ts` +1 行）在未提交且**白名单外**的文件里，那六枚即便入库也没有渲染入口；而 HEAD 又带着 **B129** 那道本线自造的编译红，"入库没让 HEAD 变更差"这句话现在取不了证 ⇒ 入库排在 B129 之后 |
 | C30 | 无注入 当前产物 | web、android、ios、macos、windows、linux | 付费有效 | 已绑定、新设备 | 装出来的必须是当前源码产物：四端清旧包 → 重打 → 重装，每端一条判据 | 无尺 | 本线 T7：`pnpm check` / `-r test` / `reinstall:all` 在隔离副本过不去（B112 四处外接缝 + B126 两枚类型红），需负责人 A/B/C 拍板 |
-| C31 | 无注入 移动壳生命周期 | android、ios | 付费有效 | 后台、Vault 锁定 | 真机后台/锁屏后凭据仍在、票据续得上、恢复后不重复派发 | 无尺 | 本线 T5 + 设备腿：`apps/mobile/src/inbound/lifecycle.ts` 未入库 |
+| C31 | 无注入 移动壳生命周期 | android、ios | 付费有效 | 后台、Vault 锁定 | 真机后台/锁屏后凭据仍在、票据续得上、恢复后不重复派发 | 无尺 | 本线 T5 + 设备腿：`apps/mobile/src/inbound/lifecycle.ts` 未入库。05:5x 现量补一句它到底缺哪一层：文件自己的三枚相对导入（`../sync/config`、`../db/open-host`、`../ai/settings-store`）与 `@heyta/app-host` 的具名导入在 HEAD **全都在**，缺的是**调用方** —— `startMobileInboundWorker` 只出现在 `apps/mobile/src/App.tsx:64` 那行未提交的 import 里（HEAD 那版 `App.tsx` grep inbound 命中 **0**），而 `App.tsx` 在白名单外 ⇒ 入库也是死代码，设备腿要排在挂载之后 |
 | C32 | 无注入 鸿蒙端 | harmony | 付费有效 | 后台 | 这一端有没有壳能承载自动收集 | 无尺 | 现状：`apps/mobile` 下没有鸿蒙工程（AGENTS §1 那张地图），构建链已通但缺模拟器镜像与签名 ⇒ 不在本轮可闭合集 |
 | C33 | 无注入 桌面壳内入口 | macos、windows | 付费有效 | 已绑定 | 壳里那份共享 UI 有没有自动收集入口 | 无尺 | 本线 T5/T7：入口随 web 产物一起进包，web 那格没入库就没有 |
 | C34 | 无注入 Linux 交付定位 | linux | 付费有效 | 已绑定 | 装出来的 `.deb` 里那份共享 UI 有没有这个入口，以及 Linux 在矩阵里算不算交付端 | 无尺 | 本线 T5/T7 + Linux 交付取证；定位单列在下面「Linux 那一格」，不许被"跨端"隐去 |
@@ -1156,10 +1156,44 @@ SELF_TEST=OK（六臂各自成立：R4 两半能红、R3/R5/R2 能红、静止�
 
 ### 未闭合的那几格（不包装成完成）
 
-- 七个**无尺**格（C10、C29、C30~C34）不是"还没测"，是两种不同的缺：C10/C29 缺**载体**
-  （双宿主装置不存在 / 界面层文件根本没入库），C30~C34 缺**当前产物**（T7 那三条过不去）。
+- 七个**无尺**格（C10、C29、C30~C34）不是"还没测"，是三种不同的缺：C10 缺**装置**
+  （跑 13 枚窗口的双宿主载体不存在），C29/C31 缺**挂载**（六枚界面文件与它的四个挂点都没入库，见下），
+  C30~C34 缺**当前产物**（T7 那三条过不去）。上一版把 C29 也写成"缺载体"是读错了自己那行 ——
+  载体不缺，缺的是有人把组件挂进设置页。
 - C27 里那句「实例退役清扫仍无尺」本轮新量出来的：`server/src` 里对 `automationEntitlementClock`
   只有 `findUnique`（读）与 `upsert`（写）两处，**零删除** —— 高水位行会随实例数永久累积。
   这一格仍归 T2，本轮没有顺手做（它要先把"退役"定义拍下来：绑定撤销？实例从密钥环消失？两者给出的保留集不同）。
 - AC-8 整体**继续不勾选**：这张矩阵把"要哪些格、每格凭什么"说清了，但它的第二条证据
   （当前源码产物完成跨端安装/实机闭环）仍卡在 B112 与 B126。
+
+## 2026-10-10 05:5x · 入库前先量 HEAD：本线的已入库代码引用了一枚只在未提交 diff 里的生产者
+
+按上一节"紧接着做 T5 入库"往下走，第一步是"提交前跑相关的 typecheck"。这一跑照出来的不是界面的事：
+**HEAD 的 `@heyta/app-host` 编不过，红因是本线自己那 7 笔提交**。逐枚现量：
+
+| 量什么 | 命令 | 读数 |
+|---|---|---|
+| 消费者在不在 HEAD | `git grep -o "META_KEYS.INBOUND_[A-Z_]*" HEAD -- packages/app-host` 按文件汇总 | `inbound-key-store.ts` **10**、`inbound-secret-store.ts` **12**、`tests/inbound-key-store.spec.ts` **2** ⇒ **24 处** |
+| 生产者在不在 HEAD | `git show HEAD:packages/storage/src/stores.ts` grep `INBOUND_` | **0**（工作树 grep = 3）⇒ 这三枚键只活在未提交 diff |
+| 这包一共欠多少行 | `git diff --stat -- packages/storage` | 4 files changed，**20 insertions(+), 0 deletions** |
+| 别的跨包缝还有没有 | 逐枚扫 71 个 HEAD 已跟踪的 inbound/automation 文件的跨包成员访问 | 除上述 3 枚成员外**零命中**；`getOpById` 那 14 行不构成红（HEAD 的调用走 `packages/op-log/src/engine.ts:302`） |
+
+两臂反向验证（臂 1 = HEAD 那代生产者，臂 2 = 工作树那代，两臂只差"生产者是哪一代"）：
+
+```
+RC_ARM1_HEAD_PRODUCER=2
+error TS2339: Property 'INBOUND_RECIPIENT_KEY' does not exist on type '{ readonly CLIENT_ID: … }'（另两枚同形）
+错误条数=3
+RC_ARM2_WORKTREE_PRODUCER=0
+```
+
+**为什么这件事必须单独记一格**：所有门禁都跑在共享工作树上，生产者与消费者在同一棵树里就是齐的 ——
+这道红**只有干净检出才现形**，而那条腿正是 T7。⇒ 命名路径的提交配方保证的是"我没动别人的文件"，
+**不保证**"我提交的东西只依赖已提交的东西"。这一格登记在 **B129**，三条候选修法与代价都在那里，本线不代拍。
+
+对界面的直接后果（把上一节的取舍改口径）：**T5 的入库排在 B129 之后**。理由不是没权限，是无法取证 ——
+web 的 typecheck 在 app-host 的产物下游，HEAD 产物产不出来时，"我这六枚没让 HEAD 变更差"这句写不了。
+本轮把三处挂点逐枚量清（`AiSettings.tsx` 6 行、`features/sync/store.ts` 3 行、`route-explanation.ts` 1 行、
+`apps/mobile/src/App.tsx` 2 行，`git show HEAD:` 那四枚文件 inbound 命中 **0**），
+以及 e2e 那份比"没挂载"更硬的一层：它 import 的 `selectSettingsSection` 只在 `e2e/tests/helpers.ts`
+的未提交 diff 里，而 helpers 在白名单外 ⇒ **e2e 那份现在连编译都过不去**。

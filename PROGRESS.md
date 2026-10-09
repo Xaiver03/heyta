@@ -2395,3 +2395,40 @@ AC 现量：**未勾 8 / 已勾 0**。
    **把一处依赖推广成了全部依赖**，登记 **B128**，并把 web 半的入库排到本轮矩阵之后紧接着做。
 6. 台账自洽：上面那张 AC 复审表里 AC-8 那格原来写"**无产物**：矩阵文件不存在"，已就地标注被本节取代并写明
    剩余过不去的那一半是什么。AC 现量：**未勾 8 / 已勾 0**（AC-8 仍不勾 —— 它的第二条证据是"当前产物跨端闭环"）。
+
+## 2026-10-10 05:5x · 入库前先量 HEAD：量出来的不是界面的事，是本线自己造的一道编译红（B129）
+
+上一节末尾写的"T5 的入库放在矩阵之后紧接着做"，这一节就是那件"紧接着做"的第一步 ——
+按规矩"提交前跑相关的 typecheck"去量 HEAD。**量完没有提交那六枚文件**，原因是 HEAD 先红了。
+
+1. 🔴 **主读数**：HEAD 已跟踪的 `packages/app-host/src/inbound-key-store.ts` / `inbound-secret-store.ts` /
+   `tests/inbound-key-store.spec.ts` 里 `META_KEYS.INBOUND_*` 共 **24 处**访问（按文件 10 / 12 / 2，
+   `git grep -o "META_KEYS.INBOUND_[A-Z_]*" HEAD -- packages/app-host` 汇总；按成员 12 / 7 / 5，两把尺都收到 24），
+   而这三个成员的生产者 `packages/storage/src/stores.ts` 在 HEAD 里 grep `INBOUND_` = **0**（工作树 = 3）
+   ⇒ **干净检出上 `@heyta/app-host` 编不过**，红因是本线那 7 笔已入库提交：消费者进了库、生产者留在工作树。
+   整包欠量 `git diff --stat -- packages/storage` = 4 files，**20 insertions(+), 0 deletions**。
+2. **两臂反向验证**（命令全文在 B129，逐臂单独取 rc，不走管道）：
+   `RC_ARM1_HEAD_PRODUCER=2` + `error TS2339 ×3`（三枚成员各一条）；
+   `RC_ARM2_WORKTREE_PRODUCER=0`（同一枚最小消费者只换生产者那一代 ⇒ 绿）。
+   臂 2 是"探针没坏"的那一半：红确实由那 6 行缺席造成，不是尺自己永远红。
+3. **分母也取了**（否定结论要枚举分母）：把 HEAD 已跟踪的 **71 枚**本线 inbound / automation 文件逐枚扫跨包成员访问，
+   除上面 3 枚成员外**零命中**；顺带排掉一格假的 —— `packages/storage` 那 20 行里另有 14 行是给
+   `DbAdapter` / `OpLogStore` 加 `getOpById`，而 HEAD 的调用走 `packages/op-log/src/engine.ts:302`
+   （已跟踪）⇒ **它不构成 HEAD 的红**，只是 `host.ts` 那 115 行将来入库的前置。不写清这句，下一位会把 20 行整体算进"必须一起提交"。
+4. 🔴 **上一节那条推论被本轮否证**（B128 已就地改写，原文留形）：我当时只核了**相对导入目标**齐不齐，
+   没核**跨包成员**齐不齐，于是把"这组文件自己闭合"错读成"现在就能整体入库"。三条真实的前置：
+   ① 挂载面在白名单外的未提交文件里 —— `AiSettings.tsx` 6 行、`features/sync/store.ts` 3 行、
+   `route-explanation.ts` 1 行、`apps/mobile/src/App.tsx` 2 行，而 `git show HEAD:` 那四枚里 inbound 命中 **0**
+   ⇒ 六枚即便入库也没有渲染入口（死代码，不是"界面能用"）；② `e2e/tests/inbound-automation.spec.ts` 要的
+   `selectSettingsSection` 只在 `e2e/tests/helpers.ts` 的未提交 diff 里 ⇒ 那份**连编译都过不去**；
+   ③ B129 那格红没修掉之前，"我这几枚没让 HEAD 变更差"取不了证（web typecheck 是 app-host 产物的下游）。
+   ⇒ **T5 的入库排在 B129 之后**，不是排在"本轮之后紧接着做"。
+5. 台账同步改了四处：C29（web 那格的归属换成"缺挂载 + B129 挡取证"）、C31（补"文件自己导入齐、缺的是调用方"）、
+   AC-6（补 e2e 那层编译硬伤）、「未闭合的那几格」把"两种缺"改成**三种**并新增文末一节带两臂读数。
+   改完 `python3 research/tools/verify-inbound-ac8-matrix.py` → rc=**0**，`行数=34　有尺行=27　无尺行=7　尺枚=67`。
+   🔴 顺带一次"这把尺有牙"的现量：**第一版 C31 我在那枚表格里写了带管道的 grep 命令，
+   装置立刻红 `R1 第 1100 行：列数 9 ≠ 表头 8`** —— 它把我自己的编辑抓住了，不是我告诉它的。
+6. 静态门当日读数（逐条单独取 rc）：`check-docs-voice` rc=**0**（1074 条、禁词 30 项零命中）、
+   `check-migrations` rc=**0**、`docs-link-check` rc=**1** 且唯一那条仍是开工快照里别线的
+   `apps/desktop-windows/README.md:89 → scripts/windows/launch-data-transfer-qa.ps1`（本机有、git 没跟踪），
+   AC 现量 **未勾 8 / 已勾 0**。本线笔数现量 `git log --oneline --grep='自动收集' | wc -l` = **49**（不抄数，要现量）。

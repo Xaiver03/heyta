@@ -7470,9 +7470,20 @@ HEAD，且**新路径必须带 `--add`**，刷完要用"`git diff --cached` 为�
 
 - T5 的全部落点此刻都是 `??`（未跟踪）：`git status --porcelain -- apps/web/src/features/settings/{InboundAutomationSettings.tsx,inbound-automation.css,inbound-runtime.ts} apps/web/tests/ apps/mobile/src/inbound/ e2e/playwright.inbound.config.ts e2e/tests/inbound-automation.spec.ts` 当日命中 **15 条 `??`**。
 - HEAD 上整个 `apps/` 里 `inbound|EntitlementTicket` 只命中 **2 枚文件**，而且两枚都是**另一条线的取证 JSON**（`apps/web/evidence/ux-closeout/...`）⇒ **代码层零接线**，不是"接了没测"。
-- 🔴 但我顺手把"所以 T5 只能等 B112"这句**否证了一半**：逐枚解析那六份 web 文件的相对导入后，唯一不在 HEAD 里的目标就是**它们自己**（设置面 ↔ `inbound-runtime.ts` ↔ 四份用例，互相闭合）；其余导入（`../../lib/oplog.js`、`../../lib/vault-session.js`、`../privacy/consent-gate.js`、`../sync/store.js`、`aiStore.js`）在 HEAD 里**文件与具名成员都在**。
- ⇒ 界面层 web 那一部分**现在就能整体入库**（仍受 B112 的 app-host 类型缝影响，但那是既有的一格，不是这六枚新引入的）；我此前几轮把它整格写成"等 B112 拍板"是**把一处依赖推广成了全部依赖**。
- 本线取舍：本轮先把矩阵与它的尺落地（这份产物今天可验、可复跑），T5 的入库放在矩阵之后紧接着做，并在隔离副本上先跑一次 HEAD 自洽性再提交 —— 不拿"工作树绿"当提交理由。
+- 🔴 **但 05:5x 现量否证：这句把"导入目标齐"当成了"生产者齐"，结论因此是错的**（原文留在下面，划掉的是我那半句推论）。
+ ~~⇒ 界面层 web 那一部分**现在就能整体入库**（仍受 B112 的 app-host 类型缝影响，但那是既有的一格，不是这六枚新引入的）；
+ 我此前几轮把它整格写成"等 B112 拍板"是把一处依赖推广成了全部依赖。本线取舍：T5 的入库放在矩阵之后紧接着做。~~
+ 三条新读数：
+ ① **挂载面在未提交、且不在白名单的文件里**：逐枚 `git diff -- <file> | grep -c "^+.*[Ii]nbound"` 当日 =
+ `apps/web/src/features/settings/AiSettings.tsx` **6**、`apps/web/src/features/sync/store.ts` **3**、
+ `apps/web/src/features/ai/route-explanation.ts` **1**、`apps/mobile/src/App.tsx` **2**，而
+ `git show HEAD:<同一枚>` 里 inbound 命中 **0** ⇒ 那六枚文件即便整体入库也**没有渲染入口**（是死代码，不是"界面能用"）。
+ ② `e2e/tests/inbound-automation.spec.ts` 要用的 `selectSettingsSection` **只活在 `e2e/tests/helpers.ts` 的未提交 diff 里**
+ ⇒ e2e 那一份在干净检出上**连编译都过不去**，比 ① 更硬。
+ ③ 更要紧的是 **HEAD 此刻已经带着一道本线自己造的编译红**（**B129**）：app-host 的 `.d.ts` 在干净检出上产不出来，
+ 而 web 的 typecheck 是它的下游 ⇒ "我这三枚 + 四份用例没让 HEAD 变更差"这句话**现在无法取证**。
+ ⇒ 修正后的处置：T5 的入库**排在 B129 之后**，不排在本轮。原句里"本线自己能做"读的是"我有写权限"，没读"我能证明" ——
+ 缺的是后者。**可迁移的形状：命名路径的提交配方保证"我没动别人的文件"，它不保证"我提交的东西只依赖已提交的东西"。**
 
 **为什么这一格值得单独登记（可迁移的形状）**：同一张矩阵里的"无尺"其实有**三种成因**，混着写会把下一位带偏：
 ① 载体不存在（双宿主装置、断网注入）；② 代码未入库（界面层六枚）；③ 门禁被别线挡（`pnpm check` 三条）。
@@ -7483,3 +7494,69 @@ HEAD，且**新路径必须带 `--add`**，刷完要用"`git diff --cached` 为�
 两处，**零删除** ⇒ 实例退役清扫没做，时钟高水位行会随实例数永久累积。没顺手补的原因不是工时：
 "退役"有三种候选定义（绑定被撤销 / 实例从 `AUTOMATION_OFFICIAL_KEYS` 的密钥环里消失 / 两者任一），
 取哪种会给出**不同的保留集**，而保留集就是数据删除边界 —— 这一格归 B118 那一档（要拍板，不代拍）。
+
+## B129（2026-10-10 05:5x，本会话 · 按 B128 原计划准备入库时量出来的）：**HEAD 此刻编不过，而红因是本线自己造的**
+
+准备把界面层那六枚文件入库前，先按"提交前跑相关的 typecheck"这条规矩量了一次 HEAD。量出来的不是界面的事，
+是**已入库的共享层自己缺生产者**：
+
+- HEAD 已跟踪的 `packages/app-host/src/inbound-key-store.ts`、`inbound-secret-store.ts`、
+  `packages/app-host/tests/inbound-key-store.spec.ts` 里，`META_KEYS.INBOUND_*` 一共 **24 处**访问
+  （按文件分 **10 / 12 / 2**：`git grep -o "META_KEYS.INBOUND_[A-Z_]*" HEAD -- packages/app-host | sed 's|.*HEAD:||' | awk -F: '{print $1}' | sort | uniq -c`；
+  按成员分 **12 / 7 / 5**，两把尺都收到 24）。
+- 这三枚成员的生产者 `packages/storage/src/stores.ts` 第 234/236/238 行**只活在未提交 diff 里**：
+  `git show HEAD:packages/storage/src/stores.ts | grep -c INBOUND_` = **0**，工作树里 = 3。
+  整包 `git diff --stat -- packages/storage` = **4 files changed, 20 insertions(+), 0 deletions** —— 全是新增，
+  而这包**整棵目录树都在本线白名单之外**。
+
+**这道红为什么没人会知道**：所有门禁都跑在**工作树**上，生产者和消费者在同一棵树里就是齐的，
+红只在**干净检出**上现形 —— 而那条腿正是 T7 的隔离副本，也正是 B112 / B126 已经压着的那一条。
+形状值得单独记：**命名路径的提交配方保证"我没动别人的文件"，它不保证"我提交的东西只依赖已提交的东西"**。
+
+**反向验证两臂**（把两代生产者各取一份、写一枚最小消费者，逐臂单独取退出码 —— 不走管道，
+§7 里那条"管道后 `$?` 是 `tail` 的"在这儿同样成立）：
+
+```bash
+S=node_modules/.cache/t5-consistency && rm -rf "$S" && mkdir -p "$S"
+git show HEAD:packages/storage/src/stores.ts \
+  | sed "s|import type { Operation } from '@heyta/sync-core';|type Operation = Record<string, unknown>;|" > "$S/stores_head.ts"
+sed  "s|import type { Operation } from '@heyta/sync-core';|type Operation = Record<string, unknown>;|" \
+  packages/storage/src/stores.ts > "$S/stores_work.ts"
+printf "import { META_KEYS } from './stores_head.js';\nexport const A = META_KEYS.INBOUND_RECIPIENT_KEY;\nexport const B = META_KEYS.INBOUND_WORKER_CREDENTIAL;\nexport const C = META_KEYS.INBOUND_COMMIT_JOURNAL;\n" > "$S/consumer_head.ts"
+sed "s/stores_head/stores_work/" "$S/consumer_head.ts" > "$S/consumer_work.ts"
+npx --no-install tsc --noEmit --strict --skipLibCheck --target ES2022 --module esnext --moduleResolution bundler "$S/consumer_head.ts" > "$S/a1.log" 2>&1; echo "RC_ARM1_HEAD_PRODUCER=$?"
+npx --no-install tsc --noEmit --strict --skipLibCheck --target ES2022 --module esnext --moduleResolution bundler "$S/consumer_work.ts" > "$S/a2.log" 2>&1; echo "RC_ARM2_WORKTREE_PRODUCER=$?"
+```
+
+当日读数（逐字）：
+
+```
+RC_ARM1_HEAD_PRODUCER=2
+consumer_head.ts(2,28): error TS2339: Property 'INBOUND_RECIPIENT_KEY' does not exist on type '{ readonly CLIENT_ID: "clientId"; … 9 more …; readonly VAULT_PENDING_ROOT_ROTATION: "vaultPendingRootRotationV1"; }'.
+consumer_head.ts(3,28): error TS2339: Property 'INBOUND_WORKER_CREDENTIAL' does not exist on type '…'
+consumer_head.ts(4,28): error TS2339: Property 'INBOUND_COMMIT_JOURNAL' does not exist on type '…'
+错误条数=3
+RC_ARM2_WORKTREE_PRODUCER=0
+```
+
+臂 2 就是"生产者齐时这把尺必须是绿的"那一半 —— 它证明红的成因确实是那 6 行缺席，而不是探针本身坏。
+（那条把 `import type` 换成 `type Operation = …` 的 sed 是**披露过的最小改写**：`stores.ts` 只在这一处依赖
+`@heyta/sync-core`，而 `META_KEYS` 是纯字面对象，改写不动它。臂 2 走同一条改写 ⇒ 两臂只差"生产者是哪一代"。）
+
+**分母**：本线在 HEAD 已跟踪的 inbound / automation 文件共 **71 枚**逐枚扫过跨包成员访问，
+除这 3 枚成员外**没有其他**"消费者已入库、生产者未入库"的缝。顺带排掉一格：`packages/storage` 那 20 行里
+另有 14 行是给 `DbAdapter` / `OpLogStore` 加 `getOpById`，而 HEAD 上的 `getOpById` 调用走的是
+`packages/op-log` 引擎那一层（`git grep -n getOpById HEAD -- packages | grep -v packages/storage` 命中
+`packages/op-log/src/engine.ts:302` 的已跟踪定义）⇒ **它不构成 HEAD 的红**，只是 `host.ts` 那 115 行将来入库的前置。
+写清这句是为了防下一位把 20 行整体算进"必须一起提交"。
+
+**要拍的（一条，不是工时）**：那 6 行怎么入库。三条候选与各自代价 ——
+① **授权本线按命名路径配方把 `packages/storage/src/stores.ts` 那 6 行入库**（本线推荐：这 6 行是本线的字，
+不碰另外 14 行；回退是一条命令 —— HEAD 那一版就是回退点；代价：本线动了一枚白名单外的文件，需要一句话授权）；
+② 由 storage 的所有者提交（代价：本线的 HEAD 红要等他们那一笔，而 T7 与 T5 两条腿都排在它后面）；
+③ 我在白名单内把 24 处访问改成自带常量（代价：**同一枚持久化键名出现两处定义**，且与那 6 行将来必撞车 ——
+IndexedDB 的 META 行键是磁盘上的东西，两处定义就是漂移的起点，本线判断这个代价比等一笔授权大）。
+
+**对本线的直接影响（这才是要登记的原因）**：T5 的入库**排在 B129 之后**。在那之前，"我这六枚文件没让 HEAD 变更差"
+无法取证 —— web 的 typecheck 是 app-host `.d.ts` 的下游，而后者在干净检出上就产不出来。
+连带效果：T7 那条 `pnpm check` 的红集里从此多一格**归属明确是本线的**，跑之前先修它，否则归因会糊在 B112 那四处缝里。
