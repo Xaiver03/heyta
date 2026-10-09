@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { prisma } from '../db';
+import { authorizeAutomationWrite } from '../entitlement';
 import { INBOUND_AUTOMATION_FIELDS, type InboundAutomationField } from '@heyta/inbound-core';
 
 const KEY_ID = /^[A-Za-z0-9_-]{1,32}$/;
@@ -121,7 +122,7 @@ export async function listAutomationRules(userId: number): Promise<AutomationRul
   return rows.map(toSummary);
 }
 
-export async function setAutomationRuleEnabled(userId: number, ruleId: string, enabled: boolean): Promise<AutomationRuleSummary> {
+export async function setAutomationRuleEnabled(userId: number, ruleId: string, enabled: boolean, ticket?: string): Promise<AutomationRuleSummary> {
   if (!Number.isSafeInteger(userId) || userId < 1 || !/^[0-9a-f-]{36}$/.test(ruleId)) throw new Error('Invalid automation rule');
   return prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
@@ -130,6 +131,9 @@ export async function setAutomationRuleEnabled(userId: number, ruleId: string, e
     if (enabled) {
       const managed = await tx.automationSenderCredential.findFirst({ where: { userId, ruleId: current.id, keyId: current.keyId, revokedAt: null }, select: { id: true } });
       if (!managed && !hasConfiguredWebhookKey(current.keyId, userId)) throw new Error('Automation webhook key is not configured');
+      // 启用才收费（协议 §4），而授权放在**这一支的最后一行**：上面那两条前置检查是
+      // 纯读，规则本来不能启用时直接抛错，票据一枚都不该烧。
+      await authorizeAutomationWrite({ client: tx, userId, action: 'rule-enable', ruleId: current.id, ...(ticket === undefined ? {} : { ticket }) });
     }
     const row = await tx.automationRule.update({ where: { id: current.id }, data: { enabled, version: { increment: 1 } } });
     return toSummary(row);

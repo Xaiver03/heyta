@@ -1,5 +1,6 @@
 import { createCipheriv, createDecipheriv, randomBytes, randomUUID } from 'node:crypto';
 import { prisma } from '../db';
+import { authorizeAutomationWrite } from '../entitlement';
 
 const KEY_ID = /^[A-Za-z0-9_-]{1,32}$/;
 const KEK = /^[0-9a-f]{64}$/;
@@ -25,12 +26,15 @@ export interface SenderCredentialResolution { configured: boolean; credentialId?
 const validate = (userId: number, ruleId: string, keyId: string): void => {
   if (!Number.isSafeInteger(userId) || userId < 1 || !/^[0-9a-f-]{36}$/.test(ruleId) || !KEY_ID.test(keyId)) throw new Error('Invalid sender credential');
 };
-export async function issueSenderCredential(userId: number, ruleId: string, keyId: string): Promise<IssuedSenderCredential> {
+export async function issueSenderCredential(userId: number, ruleId: string, keyId: string, ticket?: string): Promise<IssuedSenderCredential> {
   validate(userId, ruleId, keyId); const secret = randomBytes(32);
   try {
     const row = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
       const rule = await tx.automationRule.findFirst({ where: { id: ruleId, userId, deletedAt: null } }); if (!rule) throw new Error('Automation rule not found');
+      // 签发会把同一 keyId 的旧凭据一并吊销 —— 那是不可逆的一步，所以授权必须
+      // 走在它之前，且与 create 落在同一个事务里。
+      await authorizeAutomationWrite({ client: tx, userId, action: 'sender-credential-issue', ruleId, ...(ticket === undefined ? {} : { ticket }) });
       await tx.automationSenderCredential.updateMany({ where: { userId, ruleId, keyId, revokedAt: null }, data: { revokedAt: BigInt(Date.now()), rotatedAt: BigInt(Date.now()) } });
       return tx.automationSenderCredential.create({ data: { id: randomUUID(), userId, ruleId, keyId, secretCiphertext: seal(secret, userId, ruleId, keyId) } });
     });
