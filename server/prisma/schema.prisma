@@ -121,6 +121,10 @@ model User {
   sharesOwned                        Share[]               @relation("ShareOwner")
   shareMemberships                   ShareMember[]
   shareInvitationsCreated            ShareInvitation[]
+  // 换绑登录邮箱的**活请求**（一个账号同时最多一张，见下面 `EmailChangeRequest`）。
+  emailChangeRequest                   EmailChangeRequest?
+  // 已签发的访问令牌（一枚一行，见下面 `AccessSession`）。
+  accessSessions                       AccessSession[]
 
   @@index([verificationToken])
   @@index([resetPasswordToken])
@@ -555,6 +559,94 @@ model AccountTombstone {
   closedAt  DateTime @map("closed_at")
 
   @@map("account_tombstones")
+}
+
+/// 换绑登录邮箱的**活请求**（ADR-0063 §2.1）。一个账号同时**最多一张**，所以 `user_id`
+/// 直接做主键 —— 与 `user_avatars` / `vault_key_packages` 同一形状，也顺带免掉"一人多张活请求"
+/// 这种根本不该存在的状态。
+///
+/// 🔴 **两侧各一枚独立的一次性令牌**，不是因为发信要发两次，是因为**授权面有两个**：
+/// `oldToken` 那句是「我授权把我的账号换到 X」（旧邮箱 = 这个账号唯一的找回通道），
+/// `newToken` 那句是「这个新收件箱归我管」（否则换上去一个攻击者的地址，"忘记密码"
+/// 以后就都发到他那里）。**两半都点齐**才生效；只点一边，`users.email` 一个字都不动。
+///
+/// 两列存的都是**那句令牌的 SHA-256 hex**（`server/src/auth-tokens.ts` 的 `hashToken`），
+/// 不是发进邮件的那句话 —— 与 `users` 上那四列同一条立场，理由在 `auth-tokens.ts:6-12`。
+///
+/// ⚠️ `pending_email` 上的唯一约束管的是"两个账号抢同一个待绑地址"，**不管**
+/// "另一个账号已经**持有**那个地址"——后一半由发起那一步查 `users.email` 负责，两侧都要有判据。
+///
+/// **不留历史邮箱**（ADR-0063 §2.3）：生效之后这张表里没有这一行，`users.email` 只有当前值。
+/// 留一份 `previous_email` 会让隐私政策那句"库里**唯一的**直接标识符"变成假话，
+/// 而它落进的是每晚都进备份的那张表 —— 收益只有"运营方便"，代价是身份残留面变大。
+model EmailChangeRequest {
+  userId           Int     @id @map("user_id")
+  /// 归一化后的待绑地址（`server/src/account/email-normalize.ts` 那一处，口径 `trim().toLowerCase()`）。
+  pendingEmail     String  @unique @map("pending_email")
+  oldToken         String? @map("old_token")
+  newToken         String? @map("new_token")
+  oldExpiresAt     BigInt? @map("old_expires_at")
+  newExpiresAt     BigInt? @map("new_expires_at")
+  /// 旧邮箱那一边点过的时刻。`null` = 还没点。
+  oldConfirmedAt   BigInt? @map("old_confirmed_at")
+  /// 新邮箱那一边点过的时刻。两个都非 null 的那一次点击触发生效。
+  newConfirmedAt   BigInt? @map("new_confirmed_at")
+  requestedAt      BigInt  @map("requested_at")
+  /// 按**行本身**限流（照 `password/recovery.ts:15-22` 那条立场：内存计数器重启归零、多副本各数各的）。
+  lastSentAt       BigInt  @default(0) @map("last_sent_at")
+  resendCount      Int     @default(0) @map("resend_count")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("email_change_requests")
+}
+
+/// 一枚**已签发的访问令牌**。一行 = 一次登录，撤销 = **删掉这一行**。
+///
+/// ## 为什么这张表存在
+///
+/// `issueSession` 签的 JWT 有效期 365 天，而撤销原来只有一档：`tokenVersion++`（全局）。
+/// 于是界面上那个「退出登录」实际只做了本机删凭据，**服务端那枚令牌仍然有效一整年**——
+/// 共享电脑上"我已经退出了"是一句界面在说谎。`jti` 进 payload 之后，"撤销这一枚"
+/// 才成为一个写得出来的动作（ADR-0063 §2.5）。
+///
+/// 🔴 主键是 `jti` 的 **SHA-256 hex**，不是 `jti` 本身 —— 与 `users` 上那四列同一条立场：
+/// 库里不存那句发出去的东西。这里还多一层理由：`jti` 就在令牌里（JWT 的 payload 只是
+/// base64，不是加密），列表接口把哈希而不是原值交给界面，免得"会话列表"顺手变成
+/// 一个可以照抄的凭据来源。
+///
+/// ⚠️ **这一行不存在 = 这枚令牌不能用**，所以 `verifyToken` 的判定挂在它身上。
+/// 但那条检查**只在缓存未命中时**打库（与 `tokenVersion` 完全同一档：`authCache.invalidate(userId)`
+/// 在撤销时当场调用，所以单进程内没有 30 s 空窗；多副本下最长 30 s，
+/// 与 `email-password-auth.md` §10.7 登记的那条限流边界同源，本文件不另开一份）。
+/// 🔴 "单进程内没有空窗"这一句的**前提是鉴权缓存按会话分格**（`auth-cache.ts` 的 `keyOf`）。
+/// 按 `userId` 分格的那一版里，同一账号另一台设备的每次鉴权都会替被撤的那一枚免查这一行，
+/// 于是撤掉 C 之后只要 B 还在同步，C 仍回 200（实测读数与三层变异见仓库 `docs/plans/account-standard-suite.md` §6.7）。
+///
+/// `last_seen_at` 的写入是**限流的**（只在距上次记录超过 5 分钟时才 UPDATE）——
+/// 每次鉴权都写一行会把登录面变成同步面那样的热写路径。
+model AccessSession {
+  jtiHash    String  @id @map("jti_hash")
+  userId     Int     @map("user_id")
+  /// 铸这一枚时账号上那个**全局**计数器。
+  ///
+  /// 🔴 为什么要有它：改密 / 重置 / 管理员强制登出 / 撤销设备都会 `tokenVersion++`，那一下
+  /// **已经**让所有旧令牌失效，但那些行还留在库里。没有这一格，「登录设备」会在用户改完密码之后
+  /// 继续列出**那些其实早就登不进来的设备** —— 那是"界面在说谎"的形状（本轮整件事的起点就是它）。
+  /// 有了它，"全设备登出"自动等于"列表空掉"，不需要每个 bump 点都记得来删一遍：
+  /// **写不出坏状态** 优于 "记得清理"。
+  tokenVersion Int   @map("token_version")
+  /// 客户端上报的设备名；今天没有任何一条登录路由接收它（见 `deviceName` 为什么可空）。
+  deviceName String? @map("device_name")
+  /// 来自 `User-Agent` 头。**明文**，与 `sync_devices.user_agent` 同一档元数据。
+  userAgent  String? @map("user_agent")
+  createdAt  BigInt  @map("created_at")
+  lastSeenAt BigInt  @map("last_seen_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, tokenVersion])
+  @@map("access_sessions")
 }
 
 /// Opaque E2EE key package. The server stores wrappers only; it cannot derive

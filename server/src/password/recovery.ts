@@ -36,6 +36,10 @@
  * 改密与重置都会 bump 它，而 `verifyToken` 每一条 JWT 都比对它 ⇒
  * 所有旧设备当场 401。本地数据**继续可读**（口令在本地，数据不该因为一次改密变得不可读），
  * 客户端的后续行为是产品要求，见 §3.5 与 J13。
+ *
+ * 🔴 它只覆盖 **HTTP** 那一半。实时通道只在 upgrade 时鉴权，所以旧设备**已经开着的那个页面**
+ * 不会因为计数器变了而断开，它会继续收 op 通知 —— 那一半是 `revokeAllDeviceSessions()`
+ * （删会话行 + `closeForUser`），两条路各调一次。只写计数器这一句会漏，而且漏了没有界面看得见。
  */
 import { randomBytes } from 'crypto';
 import { prisma } from '../db';
@@ -43,7 +47,9 @@ import { Logger } from '../logger';
 import { hashToken } from '../auth-tokens';
 import { authCache } from '../auth-cache';
 import { issueSession } from '../auth';
+import { revokeAllDeviceSessions, type SessionMeta } from '../account/access-sessions';
 import { sendPasswordChangedEmail, sendPasswordResetEmail } from '../email';
+import { normalizeEmail } from '../account/email-normalize';
 import type { ServerLocale } from '../copy.generated.js';
 import {
   PASSWORD_ACCOUNT_LOCKED_MESSAGE,
@@ -105,7 +111,7 @@ export const requestPasswordReset = async (
   input: PasswordResetRequestInput,
 ): Promise<{ message: string }> => {
   const neutral = { message: PASSWORD_RESET_REQUEST_MESSAGE };
-  const email = input.email.toLowerCase();
+  const email = normalizeEmail(input.email);
   const now = Date.now();
 
   const user = await prisma.user.findUnique({
@@ -263,6 +269,11 @@ export const resetPasswordWithToken = async (
   Logger.info(`Password reset completed (ID: ${user.id})`);
   // AUTH_CACHE_INVALIDATION: keep adjacent to tokenVersion writes.
   authCache.invalidate(user.id);
+  // 🔴 计数器和缓存只管得住**下一次的 HTTP 请求**。旧设备那个已经开着的页面走的是实时通道，
+  // 而通道只在 upgrade 时鉴权 ⇒ 不关掉，它会在"已经被踢下线"的这段时间里继续收 op 通知。
+  // 这一句也在改密/重置这两条路上把会话行一起删掉（那一半由 `credential-sweep` 按 365 天收，
+  // 但这一批行是**当场已知死掉**的，没理由再留一年）。
+  await revokeAllDeviceSessions(user.id);
   // 🔴 **不发会话**（J14）。这里返回的只有"去登录"这句话。
   //
   // 改口令成功的**告知信**：与 `changePassword` 同一条立场（那里的注释写了为什么
@@ -292,6 +303,7 @@ export const changePassword = async (
   currentPassword: string,
   newPassword: string,
   locale?: ServerLocale,
+  meta: SessionMeta = {},
 ): Promise<ChangePasswordResult> => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -358,11 +370,11 @@ export const changePassword = async (
   // AUTH_CACHE_INVALIDATION: keep adjacent to tokenVersion writes.
   authCache.invalidate(user.id);
 
-  // 🔴 新版本号从**写**里读回来，不是 `user.tokenVersion + 1` 算出来的：
-  // 两次并发的改密（同一个人开两个标签页各点一次保存）会各自读到同一个旧值、
-  // 各自算出同一个"新"值，于是其中一枚新签的令牌一出生就对不上库里那格。
-  // `increment` + `select` 让服务端自己把决胜后的值告诉我们。
-  const updated = await prisma.user.update({
+  // 🔴 新版本号不再从这里"读回来给签名用"了：`issueSession` 自己回读那一格
+  // （理由写在 `auth.ts` 的那段注释里 —— 签名值、库里那格、会话行那三样必须由同一次读决定，
+  // 不然调用方传一个过期版本号就能签出一枚"一出生就失效"的令牌）。
+  // 这里剩下的是一次**普通的写**：改口令 + 全设备登出 + 清在途链接 + 解掉口令爆破的锁。
+  await prisma.user.update({
     where: { id: user.id },
     data: {
       passwordHash,
@@ -374,15 +386,23 @@ export const changePassword = async (
       resetPasswordToken: null,
       resetPasswordTokenExpiresAt: null,
     },
-    select: { tokenVersion: true },
   });
   // AUTH_CACHE_INVALIDATION: keep adjacent to tokenVersion writes.
   authCache.invalidate(user.id);
 
   Logger.info(`Password changed (ID: ${user.id}); all other sessions revoked`);
+  // 🔴 排在 `issueSession` **之前**：这一句删掉的是"版本号已经对不上"的那些行，
+  // 而紧接着要铸的那一枚是当前设备的新会话 —— 排在后面会把它一起删掉，
+  // 于是"当前设备不掉线"变成"当前设备从登录设备列表里消失"。
+  //
+  // ⚠️ `closeForUser` 关的是**所有**通道，包括发起这一次的这台。它不是把当前设备踢下线
+  // （口令已经换、新令牌就在返回值里），而是让它用新令牌重连 —— 与 `POST /api/replace-token`
+  // 逐字同一件事，理由也同一份：通道的 clientId 是自报的，放行"调用者自己那一枚"等于让
+  // 拿着被盗令牌的人自称是调用者。
+  await revokeAllDeviceSessions(user.id);
   await notifyPasswordChanged(user.id, user.email, locale);
   return {
-    token: issueSession({ id: user.id, email: user.email, tokenVersion: updated.tokenVersion }),
+    token: await issueSession({ id: user.id }, meta),
     user: { id: user.id, email: user.email, locale: user.locale },
   };
 };

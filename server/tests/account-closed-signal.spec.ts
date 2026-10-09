@@ -194,7 +194,17 @@ describe('失效原因的可辨识码（真 verifyToken）', () => {
   it('正向对照：正常账号仍然通过，且**不带**失效码', async () => {
     const result = await verifyToken(tokenFor());
 
-    expect(result).toEqual({ valid: true, userId: 1, email: 'user@example.com' });
+    // 🔴 逐字钉住**整个**成功形状（这就是这条用例的价值：新增一格、少一格都会红）。
+    // `sessionId: null` 不是装饰 —— `tokenFor()` 手工签的 payload 里**没有 `jti`**，
+    // 而 ADR-0063 §4 第 1 条要的正是"没有 `jti` 的令牌不可单独撤销"这一支。
+    // `tokenVersion` 同样出现在成功返回值里（`verifyToken` 现在把库里那一格回传给调用方）。
+    expect(result).toEqual({
+      valid: true,
+      userId: 1,
+      email: 'user@example.com',
+      tokenVersion: 0,
+      sessionId: null,
+    });
   });
 });
 

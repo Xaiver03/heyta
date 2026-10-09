@@ -37,7 +37,16 @@ vi.hoisted(() => {
 });
 
 const mocks = vi.hoisted(() => ({
-  user: { findUnique: vi.fn(), findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+  user: {
+    findUnique: vi.fn(),
+    findFirst: vi.fn(),
+    /** ADR-0063：`issueSession()` 签名前回读 `email` / `tokenVersion`。 */
+    findUniqueOrThrow: vi.fn(),
+    update: vi.fn(),
+    updateMany: vi.fn(),
+  },
+  /** 一枚令牌 = `access_sessions` 里的一行（`recordSession`：先插行、后签名）。 */
+  accessSession: { create: vi.fn(), deleteMany: vi.fn() },
 }));
 
 const hashSpies = vi.hoisted(() => ({
@@ -52,19 +61,34 @@ const policySpies = vi.hoisted(() => ({ checkNewPassword: vi.fn() }));
 const authSpies = vi.hoisted(() => ({ registerWithMagicLink: vi.fn() }));
 
 /**
- * 邮件层只 spy 这两封（其余导出保留真实现）。`/password/forgot` 会**真的**去发信，
+ * 邮件层只 spy 这三封（其余导出保留真实现）。`/password/forgot` 会**真的**去发信，
  * 而这一组要钉的是"响应长什么样"，不是 SMTP —— 让它打真端点会让这 20 条用例
  * 依赖网络与凭据（没凭据的机器上永远红，那等于没有测试）。
+ *
+ * 🔴 第三封（ADR-0063 §2.6「新增认证器」）必须一起 spy：`/password/set` 成功时**真的会发**。
+ * 不 spy 它，这一组就会在测试机上跑出一封真邮件或一次真 SMTP 连接，
+ * 而"这封信到底发没发"又变成没人在看的断言。
  */
 const emailSpies = vi.hoisted(() => ({
   sendPasswordResetEmail: vi.fn(),
   sendPasswordChangedEmail: vi.fn(),
+  sendAuthenticatorAddedEmail: vi.fn(),
 }));
 
 const spiedLogger = vi.hoisted(() => ({ warn: vi.fn(), info: vi.fn(), error: vi.fn() }));
 
+/**
+ * 实时通道的间谍。它**本身是一条 HTTP 半边的判据**（见下面改密/重置那两条用例）：
+ * 通道只在 upgrade 时鉴权，所以只 bump 计数器时，旧设备那个已经开着的页面继续收 op 通知。
+ * 不 mock 它则会去碰真的 `getWsConnectionService()` 单例（跨用例共享的进程内状态）。
+ */
+const wsSpies = vi.hoisted(() => ({ closeForUser: vi.fn() }));
+
 vi.mock('../src/db', () => ({ prisma: mocks }));
 vi.mock('../src/logger', () => ({ Logger: spiedLogger }));
+vi.mock('../src/sync/services/websocket-connection.service', () => ({
+  getWsConnectionService: () => wsSpies,
+}));
 vi.mock('../src/password/hash', () => hashSpies);
 vi.mock('../src/password/policy', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
@@ -162,6 +186,15 @@ beforeEach(async () => {
   mocks.user.findFirst.mockResolvedValue(null);
   mocks.user.update.mockResolvedValue(readyRow());
   mocks.user.updateMany.mockResolvedValue({ count: 1 });
+  // 🔴 ADR-0063：`issueSession` 在签名**之前**回读账号行（`select: { email, tokenVersion }`），
+  // 所以每一次换会话都会多打这一格。默认值就是上面 `readyRow()` 那一行（id 7 / tokenVersion 3）；
+  // 需要别的版本的用例（改密那一条）自己覆盖 —— 但它必须等于**那次 UPDATE 写回之后**的那一格，
+  // 否则"令牌带的是 bump 后的版本"那条判据就变成夹具与实现各说一套。
+  mocks.user.findUniqueOrThrow.mockResolvedValue({ email: EMAIL, tokenVersion: 3 });
+  // 一枚令牌 = 一行 `access_sessions`（先插行、后签名）。`deleteMany` 是"全设备登出"删那些行，
+  // 返回值必须带 `count` —— `revokeAllSessions` 读它。
+  mocks.accessSession.create.mockResolvedValue({});
+  mocks.accessSession.deleteMany.mockResolvedValue({ count: 0 });
   hashSpies.verifyPassword.mockResolvedValue(true);
   hashSpies.needsRehash.mockReturnValue(false);
   hashSpies.dummyVerify.mockResolvedValue(undefined);
@@ -175,6 +208,7 @@ beforeEach(async () => {
   });
   emailSpies.sendPasswordResetEmail.mockResolvedValue(true);
   emailSpies.sendPasswordChangedEmail.mockResolvedValue(true);
+  emailSpies.sendAuthenticatorAddedEmail.mockResolvedValue(true);
 });
 
 afterEach(async () => {
@@ -392,6 +426,29 @@ describe('POST /login/email-password', () => {
     expect(res.body).not.toContain('tokenVersion');
   });
 
+  it('🔴 会话行带上请求的 `user-agent`（工单 W10：「登录设备」列表里唯一认得出来源的一列）', async () => {
+    await makeApp();
+    mocks.user.findUnique.mockResolvedValue(readyRow());
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/login/email-password',
+      headers: { 'user-agent': 'HeytaTestAgent/9.9' },
+      payload: { email: EMAIL, password: PASSWORD },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(mocks.accessSession.create).toHaveBeenCalledTimes(1);
+    const row = (mocks.accessSession.create.mock.calls[0] as [{ data: Record<string, unknown> }])[0].data;
+    expect(row.userAgent).toBe('HeytaTestAgent/9.9');
+
+    // 🔴 另一半同样要紧：**没带** UA 时那一格必须是 `null`，不许替用户编一个
+    // "未知设备 / 浏览器" —— 那列是给人用来认设备的，编出来的名字会让人登错一台。
+    mocks.accessSession.create.mockClear();
+    const bare = await post('/login/email-password', { email: EMAIL, password: PASSWORD });
+    expect(bare.statusCode).toBe(200);
+    const bareRow = (mocks.accessSession.create.mock.calls[0] as [{ data: Record<string, unknown> }])[0].data;
+    expect(bareRow.deviceName).toBeNull();
+  });
+
   it('🔴 口令错 / 账号不存在 / 没设口令：同码同句同状态，日志也同级别', async () => {
     await makeApp();
     hashSpies.verifyPassword.mockResolvedValue(false);
@@ -529,6 +586,8 @@ describe('POST /password/reset：成功不发会话（J14 的 HTTP 半边）', (
     // `toEqual` 是逐字比较：`{ token, user, message }` 这种"顺手签一枚"会直接红。
     expect(res.json()).toEqual({ message: PASSWORD_RESET_SUCCESS_MESSAGE });
     expect(res.body).not.toContain('token');
+    // 🔴 J13 的 HTTP 半边：这条路必须真的把实时通道关掉（计数器只管得住下一次请求）。
+    expect(wsSpies.closeForUser).toHaveBeenCalledWith(7);
   });
 
   it('查不到这枚令牌 ⇒ 400 + code=invalid_reset_link（不是 401：不是"你是谁"的问题）', async () => {
@@ -598,6 +657,10 @@ describe('POST /password/change：preHandler 真的挂上了（J13 的 HTTP 半�
     routeFindUnique(readyRow({ isVerified: 1, tokenVersion: 3 }));
     // 写库回来的版本要**大于**令牌里那枚：这枚新会话才不会被自己刚做的 bump 作废。
     mocks.user.update.mockResolvedValue({ tokenVersion: 4 });
+    // 🔴 回读那一格必须**等于上面这次 UPDATE 写回的值**（真库里是同一次提交后的同一行，
+    // 而 `issueSession` 读的就是它）。写成 3 会让下面那条 `tokenVersion: 4` 的判据
+    // 变成"实现得从调用方传进来的值里拿"—— 而那正是 ADR-0063 拿掉的那条通道。
+    mocks.user.findUniqueOrThrow.mockResolvedValue({ email: EMAIL, tokenVersion: 4 });
 
     const res = await app.inject({
       method: 'POST',
@@ -614,6 +677,26 @@ describe('POST /password/change：preHandler 真的挂上了（J13 的 HTTP 半�
       algorithms: ['HS256'],
     }) as { userId: number; tokenVersion: number };
     expect(claims).toMatchObject({ userId: 7, tokenVersion: 4 });
+    // 🔴 J13 的 HTTP 半边（改密这一条）：其余设备的实时通道当场关掉。
+    expect(wsSpies.closeForUser).toHaveBeenCalledWith(7);
+  });
+
+  it('🔴 换发的那枚新会话也带上 UA（工单 W10：这条路以前签完就把来源丢了）', async () => {
+    await boot();
+    routeFindUnique(readyRow({ isVerified: 1, tokenVersion: 3 }));
+    mocks.user.update.mockResolvedValue({ tokenVersion: 4 });
+    mocks.user.findUniqueOrThrow.mockResolvedValue({ email: EMAIL, tokenVersion: 4 });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/password/change',
+      headers: { authorization: bearerFor(3), 'user-agent': 'HeytaChangeAgent/1.0' },
+      payload: { currentPassword: 'old one', newPassword: PASSWORD },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(mocks.accessSession.create).toHaveBeenCalledTimes(1);
+    const row = (mocks.accessSession.create.mock.calls[0] as [{ data: Record<string, unknown> }])[0].data;
+    expect(row.userAgent).toBe('HeytaChangeAgent/1.0');
   });
 
   it('🔴 账号根本没有口令 ⇒ 400 + code=no_password_set，句子导向「忘记密码」', async () => {
@@ -700,9 +783,12 @@ describe('POST /password/set：加认证器，不是换钥匙', () => {
     const row = readyRow({ passwordHash: null, ...overrides });
     mocks.user.findUnique.mockImplementation(async (args: unknown) => {
       const select = (args as { select?: Record<string, unknown> })?.select ?? {};
-      return 'passwordHash' in select
-        ? { ...row }
-        : { id: 7, tokenVersion: row.tokenVersion, isVerified: row.isVerified };
+      if ('passwordHash' in select) return { ...row };
+      // 🔴 ADR-0063 §2.6 那封告知信在写入**之后**按 id 回读 `{ email, locale }`。
+      // 这一格必须单独分流：把它并进"验身份"那一支会让信收到 `undefined` 地址，
+      // 而"收件地址取自账号那一行"这条判据就变成断言夹具自己。
+      if ('locale' in select) return { email: row.email, locale: row.locale };
+      return { id: 7, tokenVersion: row.tokenVersion, isVerified: row.isVerified };
     });
     mocks.user.updateMany.mockImplementation(async () => {
       if (row.passwordHash !== null) return { count: 0 };
@@ -838,6 +924,90 @@ describe('POST /password/set：加认证器，不是换钥匙', () => {
     expect((await setWith(bearer(3), { newPassword: '' })).statusCode).toBe(400);
     expect(hashSpies.hashPassword).not.toHaveBeenCalled();
     expect(mocks.user.updateMany).not.toHaveBeenCalled();
+  });
+
+  /**
+   * ADR-0063 §2.6：加第一个登录口令 = **多开一扇门** ⇒ 发那封"账号多了一种登录方式"。
+   *
+   * 这一组存在的理由是一条真实伤害：拿着别人遗失的会话，可以先给自己加一个
+   * **他知道的**口令当持久入口，而原主一个字都收不到（`email-password-auth.md` 缺口 13）。
+   * 每条各挡一种坏法 —— 少发 / 发在失败路径上 / 收件地址跟着请求体走 / 通知失败翻转成功。
+   */
+  describe('告知信（ADR-0063 §2.6）', () => {
+    it('🔴 成功 ⇒ 发一封 password 信，收件地址是账号那一行的邮箱', async () => {
+      await boot();
+      fakeAccount();
+
+      const res = await setWith(bearer(3), { newPassword: PASSWORD });
+      expect(res.statusCode).toBe(200);
+
+      expect(emailSpies.sendAuthenticatorAddedEmail).toHaveBeenCalledTimes(1);
+      expect(emailSpies.sendAuthenticatorAddedEmail.mock.calls[0]).toEqual([
+        EMAIL,
+        'password',
+        'zh-CN',
+      ]);
+    });
+
+    it('🔴 抢输的那一次（count=0）⇒ 一封都不发', async () => {
+      await boot();
+      fakeAccount();
+      mocks.user.updateMany.mockImplementationOnce(async () => ({ count: 0 }));
+
+      expect((await setWith(bearer(3), { newPassword: PASSWORD })).statusCode).toBe(400);
+      expect(emailSpies.sendAuthenticatorAddedEmail).not.toHaveBeenCalled();
+    });
+
+    it('🔴 账号**已经有**口令 ⇒ 不发：这一次什么都没加', async () => {
+      await boot();
+      fakeAccount({ passwordHash: PHC });
+
+      expect((await setWith(bearer(3), { newPassword: PASSWORD })).statusCode).toBe(400);
+      expect(emailSpies.sendAuthenticatorAddedEmail).not.toHaveBeenCalled();
+    });
+
+    it('🔴 未认证 ⇒ 401 且一封都不发（连账号那一行都不许多读一次）', async () => {
+      await boot();
+      fakeAccount();
+
+      expect((await setWith(undefined, { newPassword: PASSWORD })).statusCode).toBe(401);
+      expect(emailSpies.sendAuthenticatorAddedEmail).not.toHaveBeenCalled();
+    });
+
+    it('🔴 信发不出去 / 发信那步抛错 ⇒ **仍然 200**：口令已经设上了', async () => {
+      await boot();
+      // 两次各换一行**新账号**（`fakeAccount()` 会重置 `passwordHash: null`）：
+      // 复用第一次那行的话，第二次拿到的是业务的 `password_already_set`，
+      // 那条 200 就什么都没证明。
+      fakeAccount();
+      emailSpies.sendAuthenticatorAddedEmail.mockResolvedValueOnce(false);
+      expect((await setWith(bearer(3), { newPassword: PASSWORD })).statusCode).toBe(200);
+
+      fakeAccount();
+      emailSpies.sendAuthenticatorAddedEmail.mockRejectedValueOnce(new Error('smtp exploded'));
+      // 这两条各自对应实现里的一处 swallow：`deliver()` 返回 false，和整段 try 兜住抛出。
+      // 只测前一条，摘掉外层 catch 也照样绿。
+      expect((await setWith(bearer(3), { newPassword: PASSWORD })).statusCode).toBe(200);
+    });
+
+    it('语言取**账号上的** locale；没有值时走默认中文，不跟着请求体走', async () => {
+      await boot();
+      fakeAccount({ locale: 'en' });
+      await setWith(bearer(3), { newPassword: PASSWORD });
+      expect(emailSpies.sendAuthenticatorAddedEmail.mock.calls[0]).toEqual([
+        EMAIL,
+        'password',
+        'en',
+      ]);
+
+      fakeAccount({ locale: null });
+      await setWith(bearer(3), { newPassword: PASSWORD, locale: 'en' });
+      expect(emailSpies.sendAuthenticatorAddedEmail.mock.calls[1]).toEqual([
+        EMAIL,
+        'password',
+        'zh-CN',
+      ]);
+    });
   });
 });
 

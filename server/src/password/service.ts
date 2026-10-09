@@ -30,7 +30,10 @@ import type { PasswordAuthErrorCode } from '@heyta/shared-schema';
 import { prisma } from '../db';
 import { Logger } from '../logger';
 import { issueSession, registerWithMagicLink } from '../auth';
+import type { SessionMeta } from '../account/access-sessions';
 import type { ServerLocale } from '../copy.generated.js';
+import { notifyAuthenticatorAdded } from '../account/authenticator-notice';
+import { normalizeEmail } from '../account/email-normalize';
 import {
   dummyVerify,
   hashPassword,
@@ -182,11 +185,13 @@ export const registerWithEmailPassword = async (
  *   2. 🔴 **不 bump `tokenVersion`**：这是**加一个认证器**，不是换一把钥匙。把其余设备
  *      踢下线在这条路上没有任何安全收益（这个人此刻就登录着），只有成本。
  *      也因此**不返回新会话** —— 手上那枚仍然有效，客户端不需要换。
- *   3. 成功后**不发信**：`notifyPasswordChanged` 那封信的语义是"你的口令被改了"，
- *      用在这里会说谎（这个账号本来没有口令）。而"新增一把认证器要不要通知"
- *      是一个**还没有答案**的问题 —— 已登录加通行密钥那条路（
- *      `passkeys/registration/complete`）同样一封都不发，所以这里不发是与现状一致，
- *      不是新挖的洞。洞本身登记在 `docs/plans/email-password-auth.md` 的缺口清单。
+ *   3. 🔴 **成功后发"账号多了一种登录方式"那封信**（`notifyAuthenticatorAdded`，
+ *      ADR-0063 §2.6）。这里**不用** `notifyPasswordChanged` —— 那封信的语义是"你的口令
+ *      被改了"，这个账号本来没有口令，用它就是说谎。要说的是一件不同的事：
+ *      **多开了一扇门**。原来这条路上一个字都不发，于是"拿着别人遗失的会话给自己加一个
+ *      他知道的口令"是一条**没有回声**的提权路径（`email-password-auth.md` 缺口 13 原文）。
+ *      已登录加通行密钥那条路（`passkeys/registration/complete`）同批发同一封 ——
+ *      两处共用 `account/authenticator-notice.ts` 这一个收口，免得一条纪律漂成两份。
  *
  * 已认证就够了，不需要"再证明一次邮箱"：登录态本身就是这把钥匙的授权边界，
  * 而 E2EE 之下服务端读不到任何明文数据 —— 加一个口令不放大任何人的数据面。
@@ -241,6 +246,7 @@ export const setInitialPassword = async (input: {
   }
 
   Logger.info(`Initial password set (ID: ${user.id})`);
+  await notifyAuthenticatorAdded(user.id, 'password');
   return { message: PASSWORD_SET_SUCCESS_MESSAGE };
 };
 
@@ -306,10 +312,11 @@ export const clearFailedAttempts = (userId: number): Promise<unknown> =>
 export const loginWithEmailPassword = async (
   email: string,
   password: string,
+  meta: SessionMeta = {},
 ): Promise<LoginResult> => {
   const normalized = normalizePassword(password);
   const user = await prisma.user.findUnique({
-    where: { email: email.toLowerCase() },
+    where: { email: normalizeEmail(email) },
     select: {
       id: true,
       email: true,
@@ -382,7 +389,7 @@ export const loginWithEmailPassword = async (
 
   Logger.info(`User logged in with password (ID: ${user.id})`);
   return {
-    token: issueSession(user),
+    token: await issueSession(user, meta),
     user: { id: user.id, email: user.email, locale: user.locale },
   };
 };

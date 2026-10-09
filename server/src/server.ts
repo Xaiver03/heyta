@@ -36,6 +36,7 @@ import {
 import { testRoutes } from './test-routes';
 import { activityRoutes } from './activity/activity.routes';
 import { shareRoutes } from './shares/share.routes';
+import { accountSecurityRoutes } from './account/account-security.routes';
 import { accountProfileRoutes } from './account/account-profile.routes';
 import { holidayAdjustmentRoutes } from './holidays/holiday-adjustment.routes';
 import { adminRoutes } from './admin/admin.routes';
@@ -586,6 +587,9 @@ export const createServer = (
       // 没有任何共享状态。路径与客户端共用 `@heyta/shared-schema` 的常量。
       // ⚠️ 它同样不受计费闸门影响 —— 改自己的昵称不是付费能力。
       await fastifyServer.register(accountProfileRoutes, { prefix: '/api' });
+      // 换绑登录邮箱 + 登录会话（工单 W1/W2/W3，ADR-0063）。同一枚 `/api` 前缀，
+      // 路径常量在 `@heyta/shared-schema` 里，服务端与客户端拼的是同一个字面量。
+      await fastifyServer.register(accountSecurityRoutes, { prefix: '/api' });
 
       // 调休/补班（公共事实）的**匿名只读**下行。W4b，定性见 ADR-0052。
       //

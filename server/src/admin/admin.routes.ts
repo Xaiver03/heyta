@@ -51,6 +51,8 @@ import {
 import { DEFAULT_ENTITLEMENT_POLICY } from '../entitlement';
 import { getAuthUser } from '../middleware';
 import { Logger } from '../logger';
+import { revokeAllTokens } from '../auth';
+import { revokeAllDeviceSessions } from '../account/access-sessions';
 import {
   deleteHolidayAdjustmentYear,
   listHolidayAdjustmentYearsForAdmin,
@@ -519,20 +521,36 @@ export const adminRoutes = async (
   });
 
   /**
-   * 强制登出：`tokenVersion++` 让该账号**已签发**的全部 JWT 立刻失效
-   * （`auth.ts` 的 `verifyToken` 会比对它）。
+   * 强制登出：让该账号**已签发**的全部 JWT 立刻失效。
    *
-   * 这是账号被盗时唯一能在服务端一侧立刻止血的动作 —— 但要注意它**不撤销 passkey**：
-   * 通行密钥是设备本地的，撤销它要用户自己在设置里删（见 ADR-0029）。
+   * 🔴 这里原来只写了一行 `tokenVersion: { increment: 1 }` 的 `user.update` ——
+   * 那个形状**看起来**是止血，实际三件事都没做，而 ADR-0063 之后每一处撤销都必须同时做完三件：
+   *
+   * | 缺的那一件 | 不做的后果 |
+   *|---|---|
+   *| `authCache.invalidate(userId)` | 缓存命中那条路**整段跳过 DB 读**，而 `verifyToken` 是拿令牌里的 `tokenVersion` 与**缓存里那一格**比 —— 两边都是旧值，于是照样放行。一台正在同步的设备可以让这次强制登出**永远不生效**（`get()` 每次命中都把有效期往后推）。 |
+   *| 会话行没删（`revokeAllSessions`） | `access_sessions` 的行留着，界面上那些会话仍然显示"活着"。 |
+   *| `closeForUser(userId)` | 实时通道是在**升级时**鉴权的：不关掉，旧令牌继续收 op 通知。 |
+   *
+   * 三条都不是假设：第一条是本批次在 `account-security.routes.ts` 里逐处补的那条纪律，
+   * 后台这一处是它的**同一个类的最后一个成员**（`grep 'tokenVersion: { increment'` 能数全）。
+   *
+   * ⚠️ 它**不撤销 passkey**：通行密钥是设备本地的，撤销要用户自己在设置里删（ADR-0029）。
    */
   fastify.post('/users/:id/logout', async (req, reply) => {
     const parsed = IdParamSchema.safeParse(req.params);
     if (!parsed.success) return reply.status(400).send({ error: 'Invalid user id.' });
 
     try {
-      const user = await prisma.user.update({
+      // 收口函数：抬版本 + 抬完/抬前各失效一次缓存（那一对 invalidate 是承重的，
+      // 不在这里重新抄一遍 —— 抄一份就是给下一次漏一条留位置）。
+      await revokeAllTokens(parsed.data.id);
+      // 上面那张表的后两件事是一个助手（`revokeAllDeviceSessions` = 删会话行 + 关实时通道）：
+      // 两半分开写正是这一族漏掉东西的形状 —— 漏掉的那一半没有任何界面会报出来。
+      await revokeAllDeviceSessions(parsed.data.id);
+
+      const user = await prisma.user.findUniqueOrThrow({
         where: { id: parsed.data.id },
-        data: { tokenVersion: { increment: 1 } },
         select: { id: true, email: true, tokenVersion: true },
       });
       // 同上：强制登出的审计行不落邮箱明文（`admin-log-pii` 门禁会红，见

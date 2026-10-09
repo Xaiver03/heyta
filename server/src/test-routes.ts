@@ -8,9 +8,9 @@ import { FastifyInstance } from 'fastify';
 import { Prisma } from '@prisma/client';
 import { SuperSyncOperationSchema, type SuperSyncOperation } from '@heyta/shared-schema';
 import { prisma } from './db';
-import * as jwt from 'jsonwebtoken';
+import { normalizeEmail } from './account/email-normalize';
 import { Logger } from './logger';
-import { getJwtSecret, JWT_EXPIRY, mintLoginMagicLinkToken } from './auth';
+import { issueSession, mintLoginMagicLinkToken } from './auth';
 import { authCache } from './auth-cache';
 import { computeOpStorageBytes } from './sync/sync.const';
 import { hashPassword } from './password/hash';
@@ -67,11 +67,9 @@ export const testRoutes = async (fastify: FastifyInstance): Promise<void> => {
         });
 
         let userId: number;
-        let tokenVersion: number;
 
         if (existingUser) {
           userId = existingUser.id;
-          tokenVersion = existingUser.tokenVersion ?? 0;
           Logger.info(
             `[TEST] Returning existing user (ID: ${userId}) - Clearing old data`,
           );
@@ -79,10 +77,16 @@ export const testRoutes = async (fastify: FastifyInstance): Promise<void> => {
           // Clear old data for this user to ensure clean state.
           // Unlike production clean-slate (which preserves lastSeq for existing clients),
           // test reset deletes everything — no existing clients need sequence continuity.
+          //
+          // 🔴 `accessSessions` 必须在这张清单里：这一条路由**不 bump** `tokenVersion`，
+          // 所以旧测试会话的令牌在新一次 reset 之后**仍然有效** —— 那正是本仓登记过的形状
+          // （"上一例未同步状态污染下一例"，AGENTS §8 第 9 条）。漏掉它的症状不是报错，
+          // 是「登录设备」列表里多出几台从没存在过的设备，而它会喂给会话面的判据。
           await prisma.$transaction([
             prisma.operation.deleteMany({ where: { userId } }),
             prisma.syncDevice.deleteMany({ where: { userId } }),
             prisma.userSyncState.deleteMany({ where: { userId } }),
+            prisma.accessSession.deleteMany({ where: { userId } }),
           ]);
         } else {
           // Create user with isVerified=1 (skip email verification)
@@ -98,13 +102,16 @@ export const testRoutes = async (fastify: FastifyInstance): Promise<void> => {
           });
 
           userId = user.id;
-          tokenVersion = 0;
           Logger.info(`[TEST] Created test user (ID: ${userId})`);
         }
 
-        // Generate JWT token (include tokenVersion for consistency with auth.ts)
-        const token = jwt.sign({ userId, email, tokenVersion }, getJwtSecret(), {
-          expiresIn: JWT_EXPIRY,
+        // 🔴 走 `issueSession`，不在这里再签一遍。这一行原来是全仓**第四份**裸 `jwt.sign`，
+        // 注释写着「for consistency with auth.ts」—— 而"与那一份保持一致"从来不是一致性的
+        // 实现方式：它签出来的令牌没有 `jti`，于是 E2E 走的那条登录路**永远碰不到**
+        // 会话撤销这一层。本仓吃过太多次这个形状：测试贴的是主干之外的路，然后主干被判为已验证。
+        const token = await issueSession({ id: userId }, {
+          userAgent: request.headers['user-agent'] ?? null,
+          deviceName: 'TEST-MODE',
         });
 
         return reply.status(201).send({
@@ -155,7 +162,7 @@ export const testRoutes = async (fastify: FastifyInstance): Promise<void> => {
       const { email } = request.body;
 
       const user = await prisma.user.findUnique({
-        where: { email: email.toLowerCase() },
+        where: { email: normalizeEmail(email) },
       });
       if (!user) {
         return reply.status(404).send({ error: 'user-not-found' });

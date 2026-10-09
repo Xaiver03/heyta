@@ -8,10 +8,11 @@
  * When unset, all emails are allowed (open registration).
  */
 import { Logger } from './logger';
+import { normalizeEmail } from './account/email-normalize';
 
 const rules: string[] = (process.env.ALLOWED_EMAILS ?? '')
   .split(',')
-  .map((e) => e.trim().toLowerCase())
+  .map((entry) => normalizeEmail(entry))
   .filter((e) => e.length > 0);
 
 if (rules.length > 0) {
@@ -21,7 +22,7 @@ if (rules.length > 0) {
 export const isEmailAllowed = (email: string): boolean => {
   if (rules.length === 0) return true;
 
-  const normalized = email.toLowerCase();
+  const normalized = normalizeEmail(email);
   const domain = normalized.split('@')[1];
 
   return rules.some((rule) =>

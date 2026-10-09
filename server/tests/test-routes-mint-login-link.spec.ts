@@ -26,7 +26,16 @@ vi.hoisted(() => {
 });
 
 const mocks = vi.hoisted(() => ({
-  user: { findUnique: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn(), create: vi.fn() },
+  user: {
+    findUnique: vi.fn(),
+    findFirst: vi.fn(),
+    /** ADR-0063：`issueSession()` 签名前回读 `email` / `tokenVersion`。 */
+    findUniqueOrThrow: vi.fn(),
+    updateMany: vi.fn(),
+    create: vi.fn(),
+  },
+  /** 一枚令牌 = `access_sessions` 里的一行（`recordSession`：先插行、后签名）。 */
+  accessSession: { create: vi.fn() },
 }));
 
 const spiedLogger = vi.hoisted(() => ({ warn: vi.fn(), info: vi.fn(), error: vi.fn() }));
@@ -63,6 +72,15 @@ const verifiedUser = {
 describe('POST /api/test/mint-login-link', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // 🔴 ADR-0063：`issueSession` 在签名前回读账号行的 `email` / `tokenVersion`。
+    // 默认喂的就是上面 `verifiedUser` **同一份常量** —— 于是往返那条用例里
+    // "令牌里的 tokenVersion 等于库里那一格"是由夹具的同源保证的，不是再手写一遍数字。
+    mocks.user.findUniqueOrThrow.mockResolvedValue({
+      email: verifiedUser.email,
+      tokenVersion: verifiedUser.tokenVersion,
+    });
+    // 一枚令牌 = 一行 `access_sessions`（先插行、后签名）。
+    mocks.accessSession.create.mockResolvedValue({});
   });
 
   it('邮箱不存在 → 404（不签发任何东西）', async () => {
@@ -133,6 +151,10 @@ describe('POST /api/test/mint-login-link', () => {
     expect(claims.email).toBe(verifiedUser.email);
     // tokenVersion 在 —— 少了它，"改密/登出全部设备"对这枚会话就失效了。
     expect(claims.tokenVersion).toBe(verifiedUser.tokenVersion);
+    // 🔴 而且这一枚是**可单独撤销**的：载荷里有 `jti`，库里落了那一行（ADR-0063 §2.5）。
+    // 少了这两条，E2E 走的那条登录路就永远碰不到会话撤销那一层。
+    expect(typeof claims.jti).toBe('string');
+    expect(mocks.accessSession.create).toHaveBeenCalledTimes(1);
   });
 
   it('重复签发拿到的是新的一枚（强制新签：清旧 → 占槽，各一次）', async () => {

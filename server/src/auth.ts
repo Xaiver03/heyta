@@ -12,6 +12,14 @@ import { getDefaultStorageQuotaBytes } from './sync/services/storage-quota.servi
 import { hashToken } from './auth-tokens';
 import { consentedLegalSetVersion } from './legal-consent';
 import { withAccountProfile, type AccountSessionUser } from './account/account-profile.store';
+import {
+  newJti,
+  recordSession,
+  sessionIdOf,
+  sessionIsLive,
+  type SessionMeta,
+} from './account/access-sessions';
+import { normalizeEmail } from './account/email-normalize';
 
 // Auth constants
 const MIN_JWT_SECRET_LENGTH = 32;
@@ -218,6 +226,7 @@ export const revokeAllTokens = async (userId: number): Promise<void> => {
 export const replaceToken = async (
   userId: number,
   email: string,
+  meta: SessionMeta = {},
 ): Promise<{ token: string; user: { id: number; email: string } }> => {
   // AUTH_CACHE_INVALIDATION: keep adjacent to tokenVersion writes.
   authCache.invalidate(userId);
@@ -234,9 +243,11 @@ export const replaceToken = async (
   // AUTH_CACHE_INVALIDATION: keep adjacent to tokenVersion writes.
   authCache.invalidate(userId);
 
-  const token = jwt.sign({ userId, email, tokenVersion: newTokenVersion }, JWT_SECRET, {
-    expiresIn: JWT_EXPIRY,
-  });
+  // 🔴 签名走 `issueSession`，不在这里再 `jwt.sign` 一遍。原来这一行是全仓**第二份**
+  // 裸签名（第三份在 `api.ts` 的通行密钥登录里，注释还写着 "same format as password login"），
+  // 而它签出来的令牌**没有 `jti`** —— 也就是说「退出登录」对这一枚无事可做，
+  // 偏偏这一条路由正是"令牌泄漏了，换一枚"的那一条。一句"格式相同"的注释不能代替共用一个函数。
+  const token = await issueSession({ id: userId }, meta);
 
   Logger.info(`Token replaced for user ${userId} (new version: ${newTokenVersion})`);
 
@@ -262,7 +273,14 @@ export type TokenFailureCode =
   | 'TOKEN_INVALID';
 
 export type TokenVerificationResult =
-  | { valid: true; userId: number; email: string }
+  /**
+   * `sessionId` = 手上这一枚令牌在 `access_sessions` 里那一行的主键；
+   * **`null` = 这一枚是本轮之前签的、没有 `jti`**，因此**不可单独撤销**（ADR-0063 §4 第 1 条）。
+   * 它必须出现在类型上：「退出登录」要撤销的就是**这一次调用所用的那枚**令牌，
+   * 而那个判断只能由服务端从**自己验出来的** payload 里取（信客户端传来的标记 = 用户会在
+   * 别的设备上把"退出登录"点成撤销自己的）。
+   */
+  | { valid: true; userId: number; email: string; tokenVersion: number; sessionId: string | null }
   | { valid: false; reason: string; code: TokenFailureCode };
 
 /**
@@ -304,17 +322,31 @@ export const verifyToken = async (token: string): Promise<TokenVerificationResul
       userId: number;
       email: string;
       tokenVersion?: number;
+      jti?: string;
     }>((resolve, reject) => {
       jwt.verify(token, JWT_SECRET, (err, decoded) => {
         if (err) return reject(err);
-        resolve(decoded as { userId: number; email: string; tokenVersion?: number });
+        resolve(
+          decoded as { userId: number; email: string; tokenVersion?: number; jti?: string },
+        );
       });
     });
 
     const tokenVersion = payload.tokenVersion ?? 0;
-    const cachedUser = authCache.get(payload.userId);
-    if (cachedUser && cachedUser.isVerified && cachedUser.tokenVersion === tokenVersion) {
-      return { valid: true, userId: payload.userId, email: payload.email };
+    // 🔴 这一枚是哪一次登录：只从**自己验过的** payload 里算，且 `jti` 缺失 ⇒ `null`
+    // （本轮之前签的令牌不可单独撤销，见 `TokenVerificationResult` 上那段与 ADR-0063 §4）。
+    const sessionId = typeof payload.jti === 'string' && payload.jti.length > 0
+      ? sessionIdOf(payload.jti)
+      : null;
+    const cachedSession = authCache.get(payload.userId, sessionId);
+    if (cachedSession && cachedSession.isVerified && cachedSession.tokenVersion === tokenVersion) {
+      return {
+        valid: true,
+        userId: payload.userId,
+        email: payload.email,
+        tokenVersion,
+        sessionId,
+      };
     }
     const cacheVersionBeforeRead = authCache.getInvalidationVersion(payload.userId);
 
@@ -338,6 +370,7 @@ export const verifyToken = async (token: string): Promise<TokenVerificationResul
       Logger.warn(`Token verification failed: User ${payload.userId} is not verified`);
       authCache.setIfCurrent(
         payload.userId,
+        sessionId,
         user.tokenVersion ?? 0,
         false,
         cacheVersionBeforeRead,
@@ -360,8 +393,39 @@ export const verifyToken = async (token: string): Promise<TokenVerificationResul
       };
     }
 
-    authCache.setIfCurrent(payload.userId, currentVersion, true, cacheVersionBeforeRead);
-    return { valid: true, userId: payload.userId, email: payload.email };
+    // 🔴 **这一枚会话还活着吗** —— 「退出登录」第一次真的有一件事可做（ADR-0063 §2.5）。
+    //
+    // 只在**缓存未命中**这条路上打库，与上面 `tokenVersion` 完全同一档：撤销时当场
+    // `authCache.invalidate(userId)`，所以单进程内没有 30 s 空窗，多副本下最长 30 s
+    // —— 与 `email-password-auth.md` §10.7 登记的"限流是单进程内存态"同源，不另开一份。
+    //
+    // ⚠️ "没有空窗"这句**只在缓存按会话分格之后**才成立。原来那一格按 `userId` 存，
+    //    命中就整段跳过这里 —— 于是同账号另一台设备每次请求都在替**被撤销的那一枚**
+    //    免查会话边界（实测：撤掉 C 之后，只要 B 还在同步，C 仍回 200）。
+    //    判据与成因写在 `server/src/auth-cache.ts` 的文件头，回归钉在
+    //    `server/tests/integration/email-change-and-sessions.integration.spec.ts`
+    //    那条"B 的请求焐不热 C 那一格"。
+    //
+    // `sessionId === null` 走的是**变更之前签的、没有 `jti` 的令牌**：它们只能靠
+    // `tokenVersion` 整体作废。这一支不是"允许没有 jti 的令牌"—— 铸造口（`issueSession`）
+    // 现在**永远**带 `jti`，所以它只可能出现在旧令牌与测试夹具里，而伪造不出合法的签名。
+    if (sessionId !== null && !(await sessionIsLive(payload.userId, sessionId))) {
+      Logger.warn(`Token verification failed: session revoked for user ${payload.userId}`);
+      return {
+        valid: false,
+        reason: 'Token was revoked. Please log in again to get a new token.',
+        code: 'TOKEN_REVOKED',
+      };
+    }
+
+    authCache.setIfCurrent(payload.userId, sessionId, currentVersion, true, cacheVersionBeforeRead);
+    return {
+      valid: true,
+      userId: payload.userId,
+      email: payload.email,
+      tokenVersion,
+      sessionId,
+    };
   } catch (err) {
     if (err instanceof TokenExpiredError) {
       return {
@@ -437,7 +501,7 @@ export const requestLoginMagicLink = async (
   };
 
   const user = await prisma.user.findUnique({
-    where: { email: email.toLowerCase() },
+    where: { email: normalizeEmail(email) },
   });
 
   if (!user) {
@@ -482,26 +546,51 @@ export const requestLoginMagicLink = async (
  * Verify a magic link login token and return a JWT.
  */
 /**
- * **签发会话** —— 全仓**只有这一处**把 `{userId,email,tokenVersion}` 签成 JWT。
+ * **签发会话** —— 全仓**只有这一处**把 `{userId,email,tokenVersion,jti}` 签成 JWT，
+ * 也只有这一处往 `access_sessions` 落那一行。
  *
  * 🔴 抽出来的理由：邮箱链接这条路现在有**三种令牌**都能换到会话
  * （登录令牌 / 邮箱注册令牌 / 将来手机号的），若每处各签一遍，
  * 迟早出现"某种令牌签出来的 JWT 少了 `tokenVersion`"这种极难查的破口 ——
  * 而 `tokenVersion` 正是**改密/登出全部设备**赖以生效的那一格。
+ *
+ * ⚠️ **上面这段原本是一句谎话**（2026-10-08 实测）：它写着"只有这一处"，而
+ * `auth.ts:237`（`replaceToken`）与 `api.ts:1370`（通行密钥登录）各有一份**裸 `jwt.sign`**，
+ * 后者注释还写着 "same format as password login"。同一个立场被实现三遍、而声明只有一处，
+ * 就是从"抽取的收尾没删旧的那份"开始的（AGENTS §3.5 的 `ids.ts` 那条）。
+ * 这一版把那两处**改成调用这里**，并由 `pnpm check:token-minting` 钉住"只有一处 `jwt.sign`"。
+ *
+ * 🔴 `jti` 让「退出登录」第一次真的能撤销**这一枚**（ADR-0063 §2.5）。
+ * 顺序是**先插行、后签名**：反过来会造出一枚"自己验不过"的令牌，而它的症状是
+ * 用户刚登录成功、下一次请求当场 401。插失败就抛，绝不返回令牌。
+ *
+ * 🔴 签名用的 `email` 与 `tokenVersion` 都**由这里回读**，不接受调用方传进来的值。
+ * 原来那版收 `tokenVersion ?? 0` —— 那个 `?? 0` 是一枚会走响的地雷：任何一处调用忘了带上
+ * 版本号，签出来的令牌**一出生就对不上库里那一格**，症状是"登录成功、下一个请求 401"，
+ * 而这在界面上与密码错长得一模一样。改由这里读之后，"签名值 = 库里那格 = 会话行那一格"
+ * 是同一次读出来的三样东西，写不出不一致。
  */
-export const issueSession = (user: {
-  id: number;
-  email: string;
-  tokenVersion?: number | null;
-}): string =>
-  jwt.sign(
-    { userId: user.id, email: user.email, tokenVersion: user.tokenVersion ?? 0 },
+export const issueSession = async (
+  user: { id: number },
+  meta: SessionMeta = {},
+): Promise<string> => {
+  const row = await prisma.user.findUniqueOrThrow({
+    where: { id: user.id },
+    select: { email: true, tokenVersion: true },
+  });
+  const tokenVersion = row.tokenVersion ?? 0;
+  const jti = newJti();
+  await recordSession({ jti, userId: user.id, tokenVersion, ...meta });
+  return jwt.sign(
+    { userId: user.id, email: row.email, tokenVersion, jti },
     JWT_SECRET,
     { expiresIn: JWT_EXPIRY },
   );
+};
 
 export const verifyLoginMagicLink = async (
   token: string,
+  meta: SessionMeta = {},
 ): Promise<{ token: string; user: AccountSessionUser }> => {
   // 邮件里那句令牌**原样**传进来，库里那一列是它的 SHA-256 ⇒ 每次按哈希查。
   const tokenHash = hashToken(token);
@@ -544,7 +633,7 @@ export const verifyLoginMagicLink = async (
     throw new Error('Invalid or expired login link');
   }
 
-  const jwtToken = issueSession(user);
+  const jwtToken = await issueSession(user, meta);
 
   Logger.info(`User logged in via magic link (ID: ${user.id})`);
 
@@ -579,8 +668,11 @@ export type EmailLinkVerifyResult =
  * ⚠️ 令牌的**消费**仍然只在 `verifyEmail` / `verifyLoginMagicLink` 里发生 ——
  *    这里不写第二份消费逻辑，避免"两处各扣一次"的经典竞态。
  */
-export const verifyEmailLink = async (token: string): Promise<EmailLinkVerifyResult> => {
-  const viaLogin = await verifyLoginMagicLink(token).catch(() => null);
+export const verifyEmailLink = async (
+  token: string,
+  meta: SessionMeta = {},
+): Promise<EmailLinkVerifyResult> => {
+  const viaLogin = await verifyLoginMagicLink(token, meta).catch(() => null);
   if (viaLogin) return { kind: 'session', ...viaLogin };
 
   const pendingPasskey = await prisma.pendingPasskeyRegistration.findUnique({
@@ -611,7 +703,7 @@ export const verifyEmailLink = async (token: string): Promise<EmailLinkVerifyRes
   Logger.info(`User registered and signed in via email link (ID: ${user.id})`);
   return {
     kind: 'session',
-    token: issueSession(user),
+    token: await issueSession(user, meta),
     user: await withAccountProfile(user),
   };
 };
@@ -643,7 +735,7 @@ export const registerWithMagicLink = async (
    */
   passwordHash?: string,
 ): Promise<{ message: string; emailDelivered?: boolean }> => {
-  const normalizedEmail = email.toLowerCase();
+  const normalizedEmail = normalizeEmail(email);
 
   // Check if email already exists and is verified
   const existingUser = await prisma.user.findUnique({
