@@ -289,8 +289,18 @@ for (const spec of cases) {
 const data = [];
 for (const spec of cases) data.push(await dataJourney(browser, spec));
 const sweepGroups = ['profile', 'account', 'sync', 'ai'];
+// 视口口径跟着台账 UX-S9-44 那一行的**验收列原文**（375/768/1440 无横向溢出），
+// 不跟着上面 `cases` 的 390 —— 差 15px 也算两套口径。
+const sweepCases = [
+  { theme: 'light', width: 375, height: 812 },
+  { theme: 'dark', width: 375, height: 812 },
+  { theme: 'light', width: 768, height: 900 },
+  { theme: 'dark', width: 768, height: 900 },
+  { theme: 'light', width: 1440, height: 900 },
+  { theme: 'dark', width: 1440, height: 900 },
+];
 const groups = [];
-for (const spec of cases) for (const group of sweepGroups) groups.push(await captureGroup(browser, spec, group));
+for (const spec of sweepCases) for (const group of sweepGroups) groups.push(await captureGroup(browser, spec, group));
 await browser.close();
 
 const report = {
@@ -307,6 +317,7 @@ const report = {
   reminders,
   data,
   sweepGroups,
+  sweepCases,
   groups,
   assertions: {
     noHorizontalOverflow: [...reminders.map((x) => x.facts), ...data.map((x) => x.before)].every((x) => x.documentScrollWidth <= x.documentClientWidth + 1),
@@ -319,7 +330,7 @@ const report = {
       reminderModes.every((mode) =>
         reminders.some((x) => x.theme === spec.theme && x.width === spec.width && x.mode === mode))),
     // ── 明暗 × 视口下「个人资料 / 账号与安全」两组（补 account-suite 零暗色那个洞）──
-    everyCaseCoversEverySweepGroup: cases.every((spec) =>
+    everyCaseCoversEverySweepGroup: sweepCases.every((spec) =>
       sweepGroups.every((group) =>
         groups.some((x) => x.theme === spec.theme && x.width === spec.width && x.group === group))),
     groupSweepThemeApplied: groups.every((x) => x.facts.theme === x.theme),
