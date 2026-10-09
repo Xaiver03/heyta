@@ -3509,6 +3509,7 @@ HIBP 真实外发查询 —— 它 fail-open，所以它只会拖时间、不会
 ② `legacy 那路 /login/magic-link/verify` 与 `/auth/passkey/verify`（见 §6.68 那张表）；
 ③ **重置口令**那条路（`/password/reset`）成功时不发会话、也不换发 —— 它的"删行 + 关通道"那一半
    由 `revokeAllDeviceSessions` 共用，但**它自己**在运行时层同样零判据，与臂 2 是同一型，下一格补它。
+   ✅ **同批就补了**（链路 9，读数与三臂在 §6.70；那里还留下一条**存活臂**的归因）。
 
 复取（一条命令，载体账与判据都在 §6.62）：
 ```bash
@@ -3524,6 +3525,58 @@ cd .worktrees/<载体> && git checkout --force $(git rev-parse refs/heads/main)
 现量（为 `1` 才算真入库）：`git show HEAD:docs/reference/environment-traps.md | grep -c '^401\. '`。
 它有两种收敛方式，都比本线整枚提交安全：别线那笔把这枚文件带进去（`git add` 取的是当前工作树字节，会带上这段），
 或本线在它干净时按 §6.66 那套 plumbing 只补自己那一段。
+
+### 6.70 链路 9 把 §6.69 那第③格关掉，而它留下一条**有归因的存活臂**（10-10 03:5x 现量，载体 `.worktrees/iosacct` 纯 tip，`79b2614c`+）
+
+`/password/reset` 那一路在真库层此前零判据（§6.69 边界③）。新增那条走真 HTTP：
+另一台设备先从真登录口进来（留下一行带 UA 的会话），重置令牌按这套既有手法直接写库
+（`hashToken(link)` + 到期），然后 POST 换口令，断言逐条读观察者的库：
+
+- 响应 200 且**没有** `token`（J14：点开一封重置邮件不等于一次登录）；
+- 🔴 `access_sessions` 里这个账号**一行都不剩**（`count === 0`）；
+- 那一枚旧令牌 401；
+- `users` 上那两列当场清空，同一枚链接第二次点 ⇒ **400** + `code: 'invalid_reset_link'`，
+  且与"从没有过这枚链接"**逐字同一句**（账号存在性证据）；
+- 旧口令 401、新口令 200（真换了）；
+- `lockedUntil` 为 `null`、`failedLoginAttempts` 为 `0`、`tokenVersion` 为 `1`；
+- 告知信恰好一封。
+
+读数（同一载体、同一库，前置仍是 §6.58 那条五秒 Prisma 判据）：基线 **`17 passed (17)`**（tests 1.58 s，
+链路 9 那条 655 ms）。三臂：
+
+| 臂 | 摘掉的那一句 | 结果 | 红句原文 |
+|---|---|---|---|
+| R1 | `resetPasswordWithToken` 里的 `await revokeAllDeviceSessions(user.id)` | 🔴 恰好 1 红（链路 9） | `expected 1 to be +0` |
+| R2 | 那道 `if (consumed.count !== 1) throw` | 🟡 **存活**（`17 passed`） | —— |
+| R3 | `resetPasswordWithToken` 里的 `await notifyPasswordChanged(...)` | 🔴 恰好 1 红（链路 9） | `expected [] to have a length of 1 but got +0` |
+
+🔴 **R2 存活是本线要的读数，不是这一格的缺口**，归因写清楚：那道闸门管的是**并发**——
+同一枚链接在两个请求之间被用掉。单线程重放撞不到它，因为更前面那次
+`findFirst({ where: { resetPasswordToken: tokenHash } })` 已经先因为那一列被清空而抛
+`invalid_reset_link`（所以 R2 之后我的那两条 400 断言仍然成立）。
+**能造出那个时序的是 mock**：单元层 `password-recovery.spec.ts` 就有一条「③ 被并发的第二个请求用掉了
+（`consumed.count === 0`）」，用 `updateMany` 返回 `count: 0` 把这一刻顶出来 —— 那正是运行时层结构上够不着的位置。
+⇒ 记这一条的理由：AGENTS §9 那条 W10 教训说的是"**存活的那几条才是这单真正产出的判据**"，
+而它的前置是每条存活都要能被归因（是判据没牙，还是这一档本来就不属于这一层）。这里答案是后者，
+且证据是那一枚具体用例名，不是"应该有人测过"。
+
+⚠️ 顺带一条**本线自己写错的期望**，被运行时当场否证：我第一趟把"同一枚链接第二次点"写成
+`toBe(401)`，实收 **400**。单元层早就钉着这一档（`password-auth-routes.spec.ts:593`：
+"查不到这枚令牌 ⇒ 400 + code=invalid_reset_link（**不是 401**：不是'你是谁'的问题）"）。
+⇒ 可迁移的一句：**姊妹用例的状态码不能照抄**。这一族里"邮件链接换会话"（`/auth/email/verify`）是认证边界 ⇒ 401，
+"链接换口令"（`/password/reset`）不是 ⇒ 400，两条路只差一个字面、语义差一档。
+现在那条按 `code` 断言而不是只看状态码，因为 400 在这条路上有两种来源（口令策略不过 / 链接无效）。
+
+仍然开着的边界（这一格没关的）：
+① 重置那一路的**实时通道**那一半（`revokeAllDeviceSessions` 里 `closeForUser` 那半）—— 链路 9 不建 socket，
+   所以它只声称"会话行当场删掉"；通道那一半的证据仍是 §5 第 16 条那趟（改前 `37 过 / 2 红` ⇒ 改后 `39 过 / 0 红`）与 §6.60。
+   这一格能补，但要动 `session-revoke-websocket` 那枚夹具（socket 建两条 + 走真重置口），不是零新装置。
+② `legacy 那路 /login/magic-link/verify` 与 `/auth/passkey/verify`（§6.68 那张表的剩下两行）。
+
+复取：与 §6.69 同一条命令（同一枚文件），期望从 `16 passed` 变成 `17 passed`；
+三臂的摘除锚点各是一条整句，逐字抄在本节表中，改哪一句就应当红哪一条 —— 除 R2 以外。
+载体收尾：`git status --porcelain` 只剩那枚预期新增的 spec，无 `.mut-bak` 残留（§6.69 那三条硬规矩这一趟全程执行：
+还原走 `git checkout --`、每臂跑完 `git diff --quiet -- <path>` 复验、红句逐条抄原文）。
 
 
 
