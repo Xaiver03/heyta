@@ -1795,11 +1795,17 @@ git grep -q 'sendEmailPasswordRegistrationCodeEmail' HEAD -- server/src/email.ts
 `AuthScreen.tsx` 单枚 381 插入 / 108 删除、`SecurityScreen.tsx` 432 行改动 —— 都是**别人的活**，
 从里面挑我那几行就是造一棵谁都不有的树，见 §6.28）。
 
+⚠️ **09 23:5x 现量更正这一句里关于 `SecurityScreen.tsx` 的那一半**：那批改动**是本线自己写好没提交的**，
+不是别人的（判据：那 369 行加/删行里的标识符只有账号套件的词，别线词命中 0 —— 现量与两条后果在 §6.43）。
+`ProfileScreen.tsx` 那一半才是真混的。所以这一格卡住的原因从"等别人提交"换成
+"**要整片落，而那一片里含别线字节**"—— 这不是等待条件变了，是**归属**变了：它归本线做，
+欠的是一次能过编译级判据的整片落地。
+
 | 格 | HEAD 上到底有没有 | 代码在哪 | 谁关 |
 |---|---|---|---|
 | 移动端「更换登录邮箱」挂载 | ✅ **有**（`git grep -c EmailChangeSection HEAD -- apps/mobile/src/screens/ProfileScreen.tsx` = 2） | 已入库 `76944386` | 已关，见 §6.28 |
-| 移动端「登录设备 / 逐枚撤销 / 退出这台 / 退出所有」挂载 | ❌ 没有（`onSignOutCurrentDevice` 在 HEAD 的 `SecurityScreen.tsx` 里 0 次） | 写好在那枚文件**未提交**的那 432 行里 | 等 `SecurityScreen.tsx` 落地 |
-| 移动端「丢失了通行密钥？发一封找回链接」 | ❌ 没有，但**词条在 HEAD**：`mobile.security.passkeys.recover` / `.recoverHint` 都在表里 ⇒ 又是一枚孤儿词条 | 写好在同一枚未提交的 `SecurityScreen.tsx`（`requestPasskeyRecovery` 3 处） | 同上；复取：`git grep -c "security-recover-submit" HEAD -- apps/mobile` |
+| 移动端「登录设备 / 逐枚撤销 / 退出这台 / 退出所有」挂载 | ❌ 没有（`onSignOutCurrentDevice` 在 HEAD 的 `SecurityScreen.tsx` 里 0 次） | 写好在那枚文件**未提交**的那 432 行里（⚠️ 那批是**本线自己的**，见 §6.35 上面那条更正） | **本线整片落**：与 `ProfileScreen` 那处 hunk 是一个原子改动，现量与为什么不能手搬在 §6.43 |
+| 移动端「丢失了通行密钥？发一封找回链接」 | ❌ 没有，但**词条在 HEAD**：`mobile.security.passkeys.recover` / `.recoverHint` 都在表里 ⇒ 又是一枚孤儿词条 | 写好在同一枚未提交的 `SecurityScreen.tsx`（`requestPasskeyRecovery` 3 处） | 同上（同一批 hunk）；复取：`git grep -c "security-recover-submit" HEAD -- apps/mobile` |
 | 移动端「忘记密码？」入口 | ❌ 没有（`git grep -c forgotPassword HEAD -- apps/mobile` = 0） | 写好在**未提交**的 `AuthScreen.tsx`（`requestPasswordReset` 导入 + `forgotPassword` 那个 handler） | 等 `AuthScreen.tsx` 落地 |
 | web 三块面板（换绑 / 会话 / 登出这台与所有） | ✅ **有**（现量：`git grep -c "EmailChangePanel" HEAD -- apps/web` ⇒ 面板 1 / `ProfilePanel.tsx` 3 / 判据 23；`git grep -c "email-change-submit" HEAD -- apps/web` = 1） | 已入库：组件+挂载 `3dd210bd`，jsdom 判据 41 条 + 6 张真浏览器图 `23a3a24b` | 已关，见 §6.41（含 §6.31 那道必红的闭合）；剩下的只有设备腿与法务那一笔 |
 | 法务「十封」政策文本 + `email-catalog` 对账判据 | ❌ 文本改动在未提交的 5 份 legal 文档里，判据未跟踪 | 已写好 | 与实现同一批，见 §6.34 |
@@ -2168,3 +2174,65 @@ export async function sendJson(   ← 同一笔带进来的 account-security.ts 
    所以"HEAD 现在能编译"这句**没有**取到，只取到了"这枚文件 parse 得过"。
 3. 归因写清楚：`469408c4` 是**本线**那笔（`feat(账号标准套件 共享层一笔)`），不是并行会话。
    修它的这笔也归本线。别人工作树里那份带导出注释的版本落地时会**覆盖同一行**，与 §6.41 那个落点是同一条规矩。
+
+### 6.43 移动端那 4 条红在干净 main 上现量到了；当场关掉一条真类型红，剩下的写明为什么不能手搬
+
+**先说怎么发现的**：不是跑出来的，是**换了载体才看见的**。之前所有"移动端验过"的读数都来自主检出
+（脏树）。这一轮为了拿编译级判据，把两份把 `@heyta/*` 指到**源码**的临时 tsconfig 正式落进仓库：
+`apps/web/tsconfig.mountcheck.json` 与 `apps/mobile/tsconfig.mountcheck.json`（用法：
+`cd apps/<web|mobile> && ./node_modules/.bin/tsc -p tsconfig.mountcheck.json`）。
+它们存在的理由是**当前唯一能跑的编译级尺**：`pnpm -r typecheck` 在干净 main 上先死在
+`packages/ui` 的 dist（§6.38 那几枚），根本到不了这两枚 app。四枚读数（同一台机器、同一批源码）：
+
+| 臂 | `apps/web` | `apps/mobile` |
+|---|---|---|
+| 干净 main（隔离副本 detached 在 `1b14b3e0`） | 69 条（**app 里 10 条**，全是引用不到在飞实现：`native-widgets` / `@heyta/widget-core`…） | 76 条（**app 里 1 条**：`src/ui/habit-icon-slot.tsx` 要的 `HABIT_GLYPHS` 那枚导出不在 `@heyta/ui` —— 归习惯/图标那条线） |
+| 主检出工作树（叠着所有在飞改动） | **0 条** | **0 条** |
+
+⇒ "app 侧一行都不错"这件事**只有在工作树里成立**。这一格与 §6.38 是同一句话的两侧：
+在飞的代码是对的，落地的代码缺一块。
+
+**那 4 条红**（`cd apps/mobile && vitest run tests/account-security-wiring.spec.ts`，干净 main ⇒ **4 failed / 15 passed**）：
+
+| 红的断言 | 它要的主体在哪 | 本线能不能自己搬 |
+|---|---|---|
+| `SECURITY` 不出现 `readSyncConfig(` | 在 `SecurityScreen.tsx` 未提交的那 +369/−63 里 | 见下 |
+| import 了 `beginPasskeyEnrollment` / `completePasskeyEnrollment` | 同一枚文件的同一批 hunk（`git grep -l beginPasskeyEnrollment HEAD -- apps/mobile/src` ⇒ **空**） | 同上 |
+| 平台那一步只用 `auth/passkey-host.ts`，且探测在发请求之前 | 同上（`resolvePasskeyProvider` 在 HEAD 的 `SecurityScreen.tsx` 里**只出现在注释**，而这份判据先 `stripComments`） | 同上 |
+| 两条退出出口接到 `ProfileScreen` 的清理编排上 | `ProfileScreen.tsx` 未提交 diff 的 `950-953` / `1309-1312` 两处 | 见下 |
+
+🔴 归属这一次要写准，因为**它和台账原先记的不是一回事**。§6.28 / §6.35 记的是"这两枚文件正被并行会话整片重写"。
+现量把这句话拆成两半：`SecurityScreen.tsx` 那批 hunk 里**加/删行的标识符集合只有账号套件的**
+（`SessionsSection` / `beginPasskeyEnrollment` / `submitRecovery` / `onSignedOutEverywhere` / `readSyncConfig`，
+而习惯·日历·倒数·小组件·assistant 这些别线词命中 **0**）⇒ 那 369 行是**本线自己写好没提交的**，不是别人在写。
+`ProfileScreen.tsx` 那批则**确实是混的**（同一枚 diff 里加了 `widgetCleanupRetrying` / `widgetCleanupPending` /
+`assistant` / `countdown` 等 5+3+3+1 处别线标识符，30 个 hunk）。
+
+**为什么不能手搬**（这是本轮唯一"看起来能做、量完决定不做"的一格）：
+只落 `SecurityScreen` 一枚，编译级判据给出**恰好 1 条新错** ——
+`src/screens/ProfileScreen.tsx(823,8): TS2739 … missing … baseUrl, token, onSignOutCurrentDevice, onSignedOutEverywhere`
+（两臂同一台载体：基线 76 条 / 加这枚 77 条，差集就这一行）。
+也就是这两枚文件是**一个原子改动**，而其中一枚的 diff 挑不出干净的账号子集：
+手挑出来的 `ProfileScreen` 会是"既不是 HEAD 也不是他们那版"的**第三份**，
+下一笔整片提交要么覆盖它要么和它冲突。⇒ 把没编译验过的东西落到 HEAD 正是 §6.42 / 第 400 条那一型，
+本线刚为它写过教训，不再犯一次。**这一格只能整片落**（本线那 369 行 + 那两处 `ProfileScreen` hunk 一起），
+而"整片"里含别线的字节 ⇒ 要么那条线自己把账号 hunk 带上，要么等 `ProfileScreen` 那批别线改动落地后本线重打一次。
+
+✅ **当场关掉的一条**：`1b14b3e0` 给 `apps/mobile/src/ui/kit.tsx` 的 `TextField.keyboard` 联合加上
+`'email-address'`。它不是"顺手改别人"：`EmailChangeSection.tsx:298`（**已入库的本线界面**）写的就是
+`keyboard="email-address"`，而 HEAD 的联合只有 `'default' | 'url'` ⇒ 干净 main 上 `apps/mobile`
+本来就有一条 TS2322（现量：`src/screens/EmailChangeSection.tsx(298,9)`，加完这一笔后**读数 0**）。
+一个联合成员、纯类型层、运行时 `keyboardType={keyboard}` 逐字不变，且与并行会话工作树里那一行
+**文本逐字相同**（只有行号差 51）⇒ 他们落地时覆盖同一行。
+落法用临时索引 `read-tree main` + `update-index` + `commit-tree` + `update-ref … <旧值>`：
+**当时共享索引里有别人 staged 的 `BLOCKED.md` / `PROGRESS.md`**（现量：`git diff --cached --numstat` 三行），
+裸 `git commit` 会把他们那两枚的暂存态一起带走 —— 这一型下**不能**用裸提。
+
+复取这一格还开着的判据：
+
+```bash
+cd .worktrees/<一棵 detached 在 main 的副本>/apps/mobile
+./node_modules/.bin/vitest run tests/account-security-wiring.spec.ts   # 4 failed / 15 passed = 还开着
+git diff --numstat HEAD -- apps/mobile/src/screens/ProfileScreen.tsx    # 别线字节还在里面 = 还不能整片落
+git grep -c "onSignOutCurrentDevice" HEAD -- apps/mobile/src/screens/ProfileScreen.tsx   # 0 = 那处 hunk 没落
+```

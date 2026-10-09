@@ -1,0 +1,31 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["ES2022", "DOM"],
+    "jsx": "react-jsx",
+    "moduleResolution": "bundler",
+    "module": "esnext",
+    "types": ["react", "node"],
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@heyta/ui/node": ["../../packages/ui/src/node"],
+      "@heyta/ui": ["../../packages/ui/src/index"],
+      "@heyta/app-host": ["../../packages/app-host/src/index"],
+      "@heyta/i18n": ["../../packages/i18n/src/index"],
+      "@heyta/domain": ["../../packages/domain/src/index"],
+      "@heyta/sync-client": ["../../packages/sync-client/src/index"],
+      "@heyta/shared-schema": ["../../packages/shared-schema/src/index"],
+      "@heyta/ai": ["../../packages/ai/src/index"],
+      "@heyta/local-api": ["../../packages/local-api/src/index"],
+      "@heyta/design-system": ["../../packages/design-system/src/index"],
+      "@heyta/sync-core": ["../../packages/sync-core/src/index"],
+      "@heyta/legal": ["../../packages/legal/src/index"],
+      "@heyta/storage": ["../../packages/storage/src/index"],
+      "@heyta/widget-core": ["../../packages/widget-core/src/index"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "ios", "android"]
+}
