@@ -238,3 +238,7 @@ e2e/selfhost-stack-results/**/test-failed-*.png
 # `git status` 里出现 `?? selfhost-stack-results/.playwright-artifacts-0/`）。
 # 它和上面三行是同一份数据的**前身**，所以按前缀忽略，而不是按那一次的具体编号。
 e2e/selfhost-stack-results/.playwright-artifacts-*/
+
+# `pnpm verify:web-ui-sweep` 每轮自己清掉重建的运行落点（入口脚本里写明它不是入库证据）。
+# 要入库的读数走带趟号的落点惯例，那一类**不**在这里忽略。
+apps/web/evidence/web-ui-sweep-latest/

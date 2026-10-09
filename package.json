@@ -128,6 +128,7 @@
     "verify:multi-end": "bash scripts/verify-multi-end-sync.sh",
     "verify:selfhost-stack": "bash scripts/verify-selfhost-stack.sh",
     "verify:web-auth": "node scripts/verify-web-auth-journey.mjs",
+    "verify:web-ui-sweep": "node scripts/verify-web-ui-sweep.mjs",
     "verify:windows-auth": "node scripts/verify-windows-shell-journey.mjs",
     "verify:sync-recovery": "bash scripts/verify-sync-rejection-recovery.sh",
     "verify:consent-trail": "node scripts/verify-consent-trail-production.mjs",
