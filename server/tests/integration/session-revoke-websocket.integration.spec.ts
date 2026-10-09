@@ -29,9 +29,19 @@ const describeWithDb = DATABASE_URL ? describe : describe.skip;
 // `JWT_SECRET` 必须在模块图加载前就位（`auth.ts` 在 import 时读它），所以用 hoisted。
 vi.hoisted(() => {
   process.env.JWT_SECRET ??= 'session-revoke-ws-integration-secret-at-least-32-chars';
+  // 合成值，只为让 `password/hash.ts` 那道"至少要 32 字符"的前置成立（最后那条用例要真加一次口令）。
+  process.env.PASSWORD_PEPPER ??= 'session-revoke-ws-integration-pepper-not-a-real-secret';
   delete process.env.TEST_MODE;
   delete process.env.TEST_MODE_CONFIRM;
 });
+
+// 这一套的口径与 `email-change-and-sessions.integration.spec.ts` 相同：**只 mock SMTP 发信函数**。
+// 不 mock 它，改口令那一步会去 Ethereal 真建一个测试账号（实测 +1 s 起，而这一条用例的预算本来
+// 就被 `checkNewPassword` 里那道 fail-open 的 HIBP 外发查询吃掉一大截 —— 见计划 §6.69 与 §5 第 13 条）。
+vi.mock('../../src/email', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/email')>()),
+  sendPasswordChangedEmail: vi.fn(async () => true),
+}));
 
 import { disconnectDb } from '../../src/db';
 import { apiRoutes } from '../../src/api';
@@ -39,6 +49,9 @@ import { accountSecurityRoutes } from '../../src/account/account-security.routes
 import { wsRoutes } from '../../src/sync/websocket.routes';
 import { issueSession } from '../../src/auth';
 import { sessionIdOf } from '../../src/account/access-sessions';
+import { getWsConnectionService } from '../../src/sync/services/websocket-connection.service';
+import { hashFor } from '../../src/password/service';
+import { AUTH_PASSWORD_PATHS } from '@heyta/shared-schema';
 
 /** 从自己刚铸出来的那枚令牌里取会话 id（= 库里那一行的主键）。只取，不打印。 */
 const sessionIdOfToken = (token: string): string => {
@@ -78,6 +91,29 @@ const waitForClose = (ws: WebSocket, ms = 5000): Promise<{ code: number; reason:
       resolve({ code, reason: reason.toString('utf8') });
     });
   });
+
+/**
+ * 🔴 **等到服务端真的把这条连接登记进簿记，而不是只等到客户端的 `open`。**
+ *
+ * `websocket.routes.ts` 那一段是 `await verifyToken(token)` **之后**才 `addConnection`，
+ * 而 `verifyToken` 里有一次库查（撤销的那一格就走在那条查上）。客户端的 `open` 在握手完成时
+ * 就发了 ⇒ 只等 `open` 的"前提"可以在服务端一条都没登记时就成立，于是随后那句撤销
+ * 找不到该关的连接，而那枚令牌自己的 `verifyToken` 晚一步回来时 socket 收到的是
+ * `4003 / Invalid token`（升级期那条通用拒绝），本套件钉的那句 `Session revoked` 根本不会发生。
+ * 10-10 04:1x 在这台机器上实测到这一型（读数与归因在计划 §6.72）：同一枚文件在 HEAD 上
+ * 单独重跑也红，而 `git log 331f563c..HEAD -- server/src/sync` 为空 ⇒ 不是产品回归，是探针抢跑。
+ */
+const waitForConnectionCount = async (target: number, ms = 5000): Promise<void> => {
+  const deadline = Date.now() + ms;
+  for (;;) {
+    const now = getWsConnectionService().getConnectionCount();
+    if (now >= target) return;
+    if (Date.now() > deadline) {
+      throw new Error(`前提不成立：服务端在 ${ms}ms 内没把连接登记到 ${target} 条（现在 ${now} 条）`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+};
 
 describeWithDb('逐枚撤销会话 ⇒ 那一枚的实时通道当场断（真 PostgreSQL + 真 Fastify + 真 WebSocket）', () => {
   let app: FastifyInstance;
@@ -134,11 +170,16 @@ describeWithDb('逐枚撤销会话 ⇒ 那一枚的实时通道当场断（真 P
   it('前提：同一个账号的两条连接都真的建立了（少了这一条，下面三条可以是空过）', async () => {
     sockets.push(await openSocket(wsBase, tokenA, 'client-a'));
     sockets.push(await openSocket(wsBase, tokenB, 'client-b'));
+    // 🔴 只等 `open` 不够：服务端的登记排在 `await verifyToken` 之后（见上面那条注释）。
+    await waitForConnectionCount(2);
     expect(sockets[0]!.readyState).toBe(WebSocket.OPEN);
     expect(sockets[1]!.readyState).toBe(WebSocket.OPEN);
   });
 
   it('🔴 撤销 A 那一枚 ⇒ A 的 socket 当场以"令牌已撤销"那一档关掉', async () => {
+    // 🔴 监听必须排在请求**之前**：close 帧与 HTTP 响应是两条通道，谁先到没有保证。
+    // 排在后面时这一条是抢跑读（关掉比挂上更早 ⇒ `waitForClose` 白等满预算再返回 null）。
+    const closing = waitForClose(sockets[0]!);
     const res = await app.inject({
       method: 'DELETE',
       url: `/api/auth/sessions/${sessionIdOfToken(tokenA)}`,
@@ -146,7 +187,7 @@ describeWithDb('逐枚撤销会话 ⇒ 那一枚的实时通道当场断（真 P
     });
     expect(res.statusCode).toBe(200);
 
-    const closed = await waitForClose(sockets[0]!);
+    const closed = await closing;
     // 4003 = 客户端按"鉴权失败/已撤销"处理的那一档（`websocket.routes.ts` 里的线契约）。
     // 🔴 reason 也必须逐字对上：只比 code 分不出"这一枚被精确关掉"和"整个账号的通道被一起关掉"
     // ——`closeForUser` 发的是 `Token revoked`，而它会让上面那条和下面"别的设备还活着"那条**一起绿**。
@@ -162,8 +203,10 @@ describeWithDb('逐枚撤销会话 ⇒ 那一枚的实时通道当场断（真 P
   });
 
   it('撤销一个不存在（且形状合法）的会话 id ⇒ 谁都不许多关', async () => {
+    const before = getWsConnectionService().getConnectionCount();
     const third = await openSocket(wsBase, tokenB, 'client-c');
     sockets.push(third);
+    await waitForConnectionCount(before + 1);
     const ghost = 'f'.repeat(64);
 
     const res = await app.inject({
@@ -174,5 +217,59 @@ describeWithDb('逐枚撤销会话 ⇒ 那一枚的实时通道当场断（真 P
     expect(res.json().code).toBe('unknown_session');
     expect(third.readyState).toBe(WebSocket.OPEN);
     expect(await waitForClose(third, 1200)).toBeNull();
+  });
+
+  /**
+   * 🔴 **§5 第 16 条那一半取在"改口令"这条路上，而不是取在撤销接口上。**
+   *
+   * 上面三条走的是逐枚撤销；而用户说的"把别人踢下线"真正的入口是改口令 / 重置口令，
+   * 它们共用 `revokeAllDeviceSessions()` —— 那里头 `closeForUser` 那一句才是
+   * "已经开着的页面"那一半。只写 `tokenVersion` 那一半时，这几条 socket 会照常活着
+   * 继续收 op 通知，而 HTTP 层的鉴权断言**全绿**（同一型缺陷在计划 §6.13 记过，
+   * 那次的形状是"日志还在印 all revoked"）。
+   *
+   * 这一条**自带**两条连接，不读前面那几条留下的 socket —— 前面那几条共享状态是有意的
+   * （逐枚那条必须看着另一枚还活着），而这一条要证的不是顺序，是"全部"。
+   */
+  it('🔴 真改口令 ⇒ 这个账号所有已经开着的页面当场断，换发给当前设备的那枚新令牌能重新连上', async () => {
+    const oldPassword = `ws-suite-old-${Date.now()}-${process.pid}-Pass!`;
+    const newPassword = `ws-suite-new-${Date.now()}-${process.pid}-Pass!`;
+    await observer.user.update({ where: { id: userId }, data: { passwordHash: await hashFor(oldPassword) } });
+
+    const tokenC = await issueSession({ id: userId }, { deviceName: 'device-c' });
+    const tokenD = await issueSession({ id: userId }, { deviceName: 'device-d' });
+    const registeredBefore = getWsConnectionService().getConnectionCount();
+    const wsC = await openSocket(wsBase, tokenC, 'client-change-actor');
+    const wsD = await openSocket(wsBase, tokenD, 'client-victim');
+    sockets.push(wsC, wsD);
+    // 🔴 服务端的登记排在 `await verifyToken` 之后，只等客户端 `open` 会抢跑（见上面那条注释）。
+    await waitForConnectionCount(registeredBefore + 2);
+
+    // 🔴 两条监听都排在请求之前（同一型抢跑，见上面那条注释）。
+    const closingD = waitForClose(wsD);
+    const closingC = waitForClose(wsC);
+    const changed = await app.inject({
+      method: 'POST',
+      url: `/api${AUTH_PASSWORD_PATHS.change}`,
+      headers: { ...bearer(tokenC), 'user-agent': 'WS-Suite-Actor' },
+      payload: { currentPassword: oldPassword, newPassword },
+    });
+    expect(changed.statusCode, changed.body).toBe(200);
+    const issued = JSON.parse(changed.body) as { token: string };
+
+    // 🔴 两条都必须当场断，而 reason 是 `closeForUser` 那一档的 `Token revoked`：
+    // 只比 code 4003 分不出走的是逐枚那条（`Session revoked`）还是全部那条。
+    expect(await closingD).toEqual({ code: 4003, reason: 'Token revoked' });
+    expect(await closingC).toEqual({ code: 4003, reason: 'Token revoked' });
+
+    // 其余设备的会话行**当场**删掉（不是留满 365 天等 `credential-sweep`）：库里只剩换发给当前设备那一枚。
+    expect(await observer.accessSession.count({ where: { userId } })).toBe(1);
+
+    // 而当前设备**没被踢下线**：响应里那枚新令牌能重新连上
+    // （"改个密码把自己的这个标签页也踢出去"就是这句话没兑现时的症状）。
+    const revived = await openSocket(wsBase, issued.token, 'client-after-change');
+    sockets.push(revived);
+    await waitForConnectionCount(1);
+    expect(revived.readyState).toBe(WebSocket.OPEN);
   });
 });
