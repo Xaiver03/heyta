@@ -12,8 +12,19 @@
 用法：
 
     python3 scripts/qa/check-locator-labels.py scripts/qa/profile-settings-android.py …
+    python3 scripts/qa/check-locator-labels.py --print-floors   # 重取反盲基线
 
-非零退出 = 有标签对不上真源。查的是**字面量与键的对应关系**，不验旅程本身是否跑通。
+非零退出 = 有标签对不上真源、**或**某处 `T(中, 英)` 只写了一种语态、**或**量具看不见这枚脚本的标签。
+查的是**字面量与键的对应关系**，不验旅程本身是否跑通。
+
+🔴 三条判据各自的"能红"形状（都做过变异验证）：
+1. 配对不对同一个键 ⇒ 红；
+2. 用了 `T(...)` 这个形状就是**声称**双语可定位，任何一处只写一种语态 ⇒ 红
+   （原来这条只写在文件头，实现里两语态齐时才有输入 —— 也就是说"只写一种语态"以前**永远不会红**）；
+3. 反盲：每枚脚本在 `CJK_GROUP_FLOOR` 里有一组**含中文定位标签组数**的基线，只许降不许升；
+   标签换写法（例如 `T(` 改名）会让组数掉到 0 ⇒ 红。没登记基线的新脚本也红 —— 那条成本是刻意的。
+另有一行**披露不判红**：`tap_label("我的")` 这类单语定位的条数（那是该脚本负责人的欠项，
+不该由这枚门把共享的 `pnpm check` 按红）。
 """
 
 from __future__ import annotations
@@ -31,6 +42,19 @@ ENTRY_RE = re.compile(
     r"(?:'([A-Za-z0-9_.-]+)'|\"([A-Za-z0-9_.-]+)\")\s*:\s*(?:'((?:[^'\\\n]|\\.)*)'|\"((?:[^\"\\\n]|\\.)*)\")"
 )
 CJK = re.compile(r"[一-鿿]")
+# 🔴 **反盲判据的基线：每枚脚本"量具读得到的含中文定位标签组数"。只许降不许升** ——
+# 调高要连着改脚本；往下掉就是这一格红。
+# 为什么不写成"0 组就红"那种一刀切：`tap_label("我的")` 这种**单语**写法今天确实存在于别的线的脚本里，
+# 那是**该线自己的欠项**（在计划里登记、由这枚门披露），不该由它把共享的 `pnpm check` 按红；
+# 但"量具突然看不见标签了"是**门自己的病**，必须红 —— 两件事用两把不同的尺分开。
+# 取现量（改脚本或改量具之后重取）：`python3 scripts/qa/check-locator-labels.py --print-floors`
+CJK_GROUP_FLOOR = {
+    "profile-settings-android.py": 56,
+    "profile-settings-ios.py": 43,
+    "tasks-ux-android.py": 2,
+    "tasks-ux-ios.py": 42,
+    "ai-assistant-atomic-android.py": 0,
+}
 # TS 源码不是 Python，不能用 ast 扫；这里抓所有引号里的"像键名"的串，再和真源的键集合取交集。
 ANY_QUOTED = re.compile(r"""['"]([A-Za-z0-9_.-]{3,})['"]""")
 
@@ -140,17 +164,35 @@ def is_mobile(script: Path) -> bool:
     return ("android" in name or "ios" in name) and "web" not in name
 
 
-def check(script: Path) -> list[str]:
-    tree = ast.parse(script.read_text(encoding="utf-8"))
+def check(script: Path) -> tuple[list[str], dict[str, int]]:
+    empty = {"组数": 0, "含中文组数": 0, "T()调用": 0, "单语标签": 0}
+    source = script.read_text(encoding="utf-8")
+    try:
+        tree = ast.parse(source)
+    except SyntaxError as error:
+        # 传进来一枚非 Python 的脚本（或语法坏掉的）时，**不许 traceback**：
+        # 那会被读成"门坏了"而不是"这一枚脚本量具吃不下"，下一个人就直接把它从清单里删了。
+        return [f"量具解析不了这枚脚本（只吃 Python 旅程脚本）：{error}"], empty
     problems: list[str] = []
     fstring_parts: set[str] = set()
     literals: set[str] = set()
     groups: list[list[str]] = []
+    t_groups: list[list[str]] = []
+    bilingual_calls = 0
     for node in ast.walk(tree):
         if isinstance(node, ast.Constant) and isinstance(node.value, str):
             literals.add(node.value)
         elif isinstance(node, ast.Tuple):
             groups.append([e.value for e in node.elts if isinstance(e, ast.Constant) and isinstance(e.value, str)])
+        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "T":
+            # `T('我的','Profile')` 是中英同义定位的另一种写法（Android 那条旅程脚本 2026-10-09 改成这个形状）。
+            # 只认 `ast.Tuple` 的量具对它**一组都读不到** —— 那行 "✅ 这个脚本没问题" 其实是
+            # "这个脚本我一个字都没看见"。⇒ `T(...)` 的字符串实参也算一组。
+            vals = [a.value for a in node.args if isinstance(a, ast.Constant) and isinstance(a.value, str)]
+            if vals:
+                groups.append(vals)
+                t_groups.append(vals)
+                bilingual_calls += 1
     for node in ast.walk(tree):
         if isinstance(node, ast.JoinedStr):  # f-string 的片段是模板，不是界面标签
             fstring_parts.update(v.value for v in node.values if isinstance(v, ast.Constant) and isinstance(v.value, str))
@@ -188,10 +230,61 @@ def check(script: Path) -> list[str]:
                     f"中英配对不对同一个键：{chinese!r} → {', '.join(zh_keys)}；"
                     f"{english!r} → {', '.join(en_keys)}"
                 )
-    return problems
+
+    # 判据二：文件头那条"只写一种语态"的失效模式，原来**没人兑现**（配对检查在两语态齐时才有输入）。
+    # 用了 `T(中, 英)` 这个形状就是**声称**这条脚本双语可定位 ⇒ 每一处都必须两种语态齐。
+    for vals in t_groups:
+        has_cjk = any(CJK.search(v) for v in vals)
+        has_latin = any(not CJK.search(v) and re.search(r"[A-Za-z]{3}", v) for v in vals)
+        if has_cjk and not has_latin:
+            problems.append(f"`T(...)` 只写了中文、没有英文同义定位：{vals!r}（设备换系统语言就整条走不到被测判据）")
+        elif has_latin and not has_cjk:
+            problems.append(f"`T(...)` 只写了英文、没有中文同义定位：{vals!r}")
+
+    # 反盲判据：量具**看不见标签**时不许静默返回"没问题"。按**含中文的那一组**数，不是按总组数 ——
+    # `T(` 换成 `L(` 之后元组组还在（那些是 resource-id 一类），只看"组数为 0"会照样静默放行。
+    cjk_groups = sum(1 for vals in groups if any(CJK.search(v) for v in vals))
+    label_like = [v for v in literals if CJK.search(v) and "\n" not in v]
+    grouped = {v for vals in groups for v in vals}
+    single_language = sorted(
+        {
+            a.value
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            for a in [*node.args, *(k.value for k in node.keywords)]
+            if isinstance(a, ast.Constant)
+            and isinstance(a.value, str)
+            and CJK.search(a.value)
+            and "\n" not in a.value
+            and a.value not in grouped
+        }
+    )
+    floor = CJK_GROUP_FLOOR.get(script.name)
+    if floor is None:
+        problems.append(
+            f"「{script.name}」没在 CJK_GROUP_FLOOR 里登记基线（量具当前读到 {cjk_groups} 组含中文定位标签）"
+            "⇒ 新脚本要**显式**登记它的组数，哪怕是 0：这条成本是刻意的，"
+            "否则「以后多加一枚脚本」会让反盲判据静默失效"
+        )
+    elif cjk_groups < floor:
+        example = sorted(label_like)[0] if label_like else "(无中文字面量)"
+        problems.append(
+            f"量具读到的含中文定位标签组数从基线 {floor} 掉到 {cjk_groups} ⇒ "
+            f"要么标签换了写法（量具看不见它了），要么中英同义定位被删了。这不是「这个脚本没问题」。例：{example!r}"
+        )
+    return problems, {
+        "组数": len(groups),
+        "含中文组数": cjk_groups,
+        "T()调用": bilingual_calls,
+        "单语标签": len(single_language),
+    }
 
 
 def main(argv: list[str]) -> int:
+    if argv == ["--print-floors"]:
+        for name, value in sorted(CJK_GROUP_FLOOR.items()):
+            print(f'    "{name}": {value},')
+        return 0
     if not argv:
         print("用法：check-locator-labels.py <scripts/qa/某条旅程脚本> …", file=sys.stderr)
         return 2
@@ -202,14 +295,23 @@ def main(argv: list[str]) -> int:
     failed = False
     for name in argv:
         script = Path(name)
-        problems = check(script)
+        problems, stats = check(script)
+        readout = (
+            f"读到 {stats['组数']} 组（含中文 {stats['含中文组数']}、"
+            f"T() 同义定位 {stats['T()调用']} 处）"
+        )
         if problems:
             failed = True
-            print(f"🔴 {script}")
+            print(f"🔴 {script}  {readout}")
             for problem in dict.fromkeys(problems):
                 print(f"   {problem}")
         else:
-            print(f"✅ {script}")
+            print(f"✅ {script}  {readout}")
+        if stats["单语标签"]:
+            print(
+                f"   ⚠️ 披露（**不判红**）：{stats['单语标签']} 条定位标签只写了一种语态 —— "
+                "设备换系统语言时这些点不到；归该脚本的负责人，欠项记在计划里"
+            )
     return 1 if failed else 0
 
 
