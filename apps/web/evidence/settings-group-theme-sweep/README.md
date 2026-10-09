@@ -156,6 +156,12 @@ plan-only + 未跟踪落点 **rc=0**（`trackedEvidenceFiles:0`）、未知腿 *
 主检出那 30 格里 `sharedLayerSameRoleAsTitle` **全是 false**（量到的是卡片小标题，与分组标题同色是因为两者都吃 `color.foreground`）。
 它抓得住半暗（色值必然分开），但**不许读成"同一角色的两层一致"**。
 
+> **02:3x 补：跟档那一半已经拆成独立一条，并且两棵树都判得动。** `themeLayerRulerSwitchesWithTier` 现在
+> 按节点身份配对（同一枚节点在亮暗两档各量到一次才算一对，0 对判假），主检出 paired=1、本载体 paired=**2 且为真**；
+> 变异臂（载体退回只写 `dataset.theme`）只打红这一条，读数是 `sync-privacy-leg-1009-r26-pairjudge-main/`、
+> `-r27-pairjudge-carrier/`、`-r28-mut-pairjudge/` 三份 `report.json`。
+> 分工写清楚：`darkTierReachesBothThemeLayers` 挡"**同一档内**两层不一致"，这条挡"**两档之间**两层都没变"（档位没落地时前者是盲的）。
+
 ## 「长标题自然换行」那一趟（`light-{375,768,1440}-help-long-title.png` + `help-long-title-report.json`）
 
 补的是台账 `UX-S9-44` 验收列欠的第三条：给「关于与帮助」那四条外链行各喂一枚 **72 字**的中文标题
