@@ -28,7 +28,12 @@ import { readFileSync } from 'node:fs';
 import { PrismaClient } from '@prisma/client';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
-const sent = vi.hoisted(() => ({ authorize: [] as unknown[][], confirm: [] as unknown[][], changed: [] as unknown[][] }));
+const sent = vi.hoisted(() => ({
+  authorize: [] as unknown[][],
+  confirm: [] as unknown[][],
+  changed: [] as unknown[][],
+  passwordChanged: [] as unknown[][],
+}));
 
 vi.mock('../../src/email', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../src/email')>()),
@@ -42,6 +47,13 @@ vi.mock('../../src/email', async (importOriginal) => ({
   }),
   sendEmailChangedEmail: vi.fn(async (...args: unknown[]) => {
     sent.changed.push(args);
+    return true;
+  }),
+  // 🔴 这第四枚不是"为了让测试变快"加的：不 mock 它，`changePassword` 会去 Ethereal 真建一个
+  // 测试账号（实测把这一条用例拖过 vitest 默认 5 s ⇒ 红的是超时预算，不是产品，见 §5 第 13 条）。
+  // 而这一套的口径本来就是"唯一 mock 的是 SMTP 发信函数"，前三枚已经在 mock 它。
+  sendPasswordChangedEmail: vi.fn(async (...args: unknown[]) => {
+    sent.passwordChanged.push(args);
     return true;
   }),
 }));
@@ -109,6 +121,7 @@ describeWithDb('换绑邮箱与会话撤销（真 PostgreSQL + 真 Prisma + 真 
     sent.authorize.length = 0;
     sent.confirm.length = 0;
     sent.changed.length = 0;
+    sent.passwordChanged.length = 0;
   });
 
   it('前提：这条链在**生产的装载路径**上（`src/server.ts` 真的 register 了它）', () => {
@@ -426,6 +439,82 @@ describeWithDb('换绑邮箱与会话撤销（真 PostgreSQL + 真 Prisma + 真 
     expect(after.statusCode, '撤掉的那一枚还在用 —— 撤销没当场失效').toBe(401);
   });
 
+  /**
+   * 🔴 **工单 W2/W8 里"改口令"那一路的运行时半边，兼 §5 第 16 条那句"撤销的第二半"。**
+   *
+   * `changePassword` 除了抬 `tokenVersion`，还要**删掉其余设备的会话行**并换发给当前设备一枚新的。
+   * 只抬计数器那一半的实现在这里**必须红**：旧令牌因为版本号对不上照样 401，那两条鉴权断言
+   * 分辨不了它 —— 分辨得了的是**库里那一行在不在**。这就是 §5 第 16 条说的"每一处单看都做了
+   * 它说的事"：日志印着 `all previous sessions revoked`，而那一行可以留满 365 天。
+   */
+  it('链路 8：真 HTTP 改口令 ⇒ 其余设备那行**当场删掉**、旧令牌 401，当前设备换发的新令牌带着元数据', async () => {
+    const email = `w9-change-${Date.now()}@example.test`;
+    const userId = await makeUser(email);
+    // 两条口令都带时间戳：`checkNewPassword` 会走本地常见口令表，而泄露检查那一道（HIBP）是
+    // fail-open 的，所以这里要防的是"被字典表命中"，不是"没查成"。
+    const oldPassword = `W9-chain8-old-${Date.now()}-${process.pid}-Pass!`;
+    const newPassword = `W9-chain8-new-${Date.now()}-${process.pid}-Pass!`;
+    await observer.user.update({ where: { id: userId }, data: { passwordHash: await hashFor(oldPassword) } });
+
+    const login = async (agent: string): Promise<string> => {
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api${AUTH_PASSWORD_PATHS.login}`,
+        headers: { 'user-agent': agent },
+        payload: { email, password: oldPassword },
+      });
+      expect(res.statusCode, res.body).toBe(200);
+      return (JSON.parse(res.body) as { token: string }).token;
+    };
+    const tokenA = await login('W9-Chain8-Device-A');
+    const tokenB = await login('W9-Chain8-Device-B');
+    expect(await observer.accessSession.count({ where: { userId } })).toBe(2);
+
+    const changed = await app.inject({
+      method: 'POST',
+      url: `/api${AUTH_PASSWORD_PATHS.change}`,
+      headers: { ...bearer(tokenA), 'user-agent': 'W9-Chain8-Device-A-after' },
+      payload: { currentPassword: oldPassword, newPassword },
+    });
+    expect(changed.statusCode, changed.body).toBe(200);
+    const issued = JSON.parse(changed.body) as { token: string };
+
+    // 🔴 这一格是本条的全部要点：摘掉 `revokeAllDeviceSessions()`  ⇒ 这里读到 2 行，
+    // 而上面那两条 401 断言**照旧绿**（变异读数在计划 §6.69）。
+    const rows = await observer.accessSession.findMany({ where: { userId }, select: { userAgent: true } });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.userAgent, '当前设备换发的那一枚没带上改密请求的 UA').toBe('W9-Chain8-Device-A-after');
+
+    const staleA = await app.inject({
+      method: 'GET',
+      url: `/api/${SESSION_PATHS.list}`,
+      headers: bearer(tokenA),
+    });
+    expect(staleA.statusCode, '改密后手上那枚旧令牌还在用 —— 界面没换用新发的那枚').toBe(401);
+    const other = await app.inject({
+      method: 'GET',
+      url: `/api/${SESSION_PATHS.list}`,
+      headers: bearer(tokenB),
+    });
+    expect(other.statusCode, '另一台设备没被踢下线').toBe(401);
+
+    const list = await app.inject({
+      method: 'GET',
+      url: `/api/${SESSION_PATHS.list}`,
+      headers: bearer(issued.token),
+    });
+    expect(list.statusCode, list.body).toBe(200);
+    const body = JSON.parse(list.body) as { sessions: Array<{ current: boolean; userAgent: string | null }> };
+    expect(body.sessions).toHaveLength(1);
+    expect(body.sessions[0]?.current).toBe(true);
+    expect(body.sessions[0]?.userAgent).toBe('W9-Chain8-Device-A-after');
+
+    // 告知信：改密成功必须发**一封**，收件人是这个账号的邮箱（工单 W6 那一族的立场：
+    // 只在成功时发 —— 挂在失败路径上就成了一条可以对着别人邮箱发信的接口）。
+    expect(sent.passwordChanged).toHaveLength(1);
+    expect(sent.passwordChanged[0]?.[0]).toBe(email);
+  });
+
   // ── D1（工单 §1 量出来的那条"全仓零 HTTP 判据"）─────────────────────────
   // `POST /api/auth/email/verify` 是三类令牌的**唯一**分流口（ADR-0039 §2.1）。
   // 它此前只在 service 层被测：那里的"返回一枚会话"是假的，而线上症状是
@@ -458,8 +547,16 @@ describeWithDb('换绑邮箱与会话撤销（真 PostgreSQL + 真 Prisma + 真 
       headers: bearer(body.token ?? ''),
     });
     expect(probe.statusCode, probe.body).toBe(200);
-    const sessions = (JSON.parse(probe.body) as { sessions: Array<{ current: boolean }> }).sessions;
-    expect(sessions.filter((s) => s.current)).toHaveLength(1);
+    const sessions = (JSON.parse(probe.body) as {
+      sessions: Array<{ current: boolean; sessionId: string }>;
+    }).sessions;
+    const current = sessions.filter((s) => s.current);
+    expect(current).toHaveLength(1);
+    // 🔴 这一枚是**邮件链接**换出来的，而它带着那一次点击的请求头（`verifyEmailLink` 的调用点）。
+    // 摘掉 `api.ts` 那一处的 `sessionMetaFromRequest(req)` ⇒ 库里这一行的 `userAgent` 是 `null`
+    // （变异读数在计划 §6.69）。列表接口不给这一列，客户端就永远看不出是哪一台。
+    const d1Row = await observer.accessSession.findUnique({ where: { jtiHash: current[0]!.sessionId } });
+    expect(d1Row?.userAgent, '邮箱链接换出的会话行没带上那一次点击的 UA').toBe('W9-D1-probe');
   });
 
   it('D1 消费即失效：同一枚链接第二次点 ⇒ 401，且库里那两列被清空', async () => {

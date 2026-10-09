@@ -3413,6 +3413,118 @@ cd .worktrees/<载体> && NO_COLOR=1 pnpm --filter "@heyta/app-host..." build  #
 ⚠️ 载体前置再补一件：`pnpm --filter … build` 会重写 `pnpm-lock.yaml` —— 本线跑完 `git checkout -- pnpm-lock.yaml`，
 `git status --porcelain` 回空才敢说载体没被自己污染。（§6.62 那三件前置之外的第四件是**构建类**命令带来的，测试类命令不会。）
 
+### 6.68 工单 W10 的运行时半边补了一条**真 HTTP** 判据，而它顺带说清"那一格以前没有任何一层守着"（10-10 03:3x 现量，载体 `.worktrees/iosacct` 纯 tip，`331f563c`）
+
+起因不是"再补一条测试"，是 §6.66 那次漏入库**为什么能漏**。本线那枚真库集成套件里，前面六条链**全都自己用
+`issueSession()` 铸会话**，所以整套对"登录路由有没有把请求头的元数据交给铸造口"这句话是**瞎的**。那一格在仓库里的
+状态是三层全绿：helper 在（`sessionMetaFromRequest`）、唯一签名出口在（`issueSession`）、单元判据在
+（`password-auth-routes.spec.ts` 那两枚 UA）—— 唯独 `api.ts` 里那次**调用**没入库，而它恰好躺在被三线共写的那枚文件里。
+⇒ 真库判据逐字照旧绿，而 10-10 那次"HEAD 上 `user-agent` 收 `null`"没有任何一层会失败。
+
+新增那条（链路 7）不替被测代码自报，四步都在别人的库连接上读：
+
+1. 从**真 HTTP 口令登录口**拿令牌，请求头带 `user-agent: W9-W10-Agent/7.7`；
+2. 用**观察者的那条 Prisma 连接**读 `access_sessions` 那一行（不是响应体自报）；
+3. 逐字对 `userAgent`（值就是请求头原文），并对列表接口给出的 `sessionId` == 库里那格 `jtiHash`；
+4. 同一条里把"这一枚可被单独撤销"走完（撤自己那枚 ⇒ 下一发 401）。
+
+`PASSWORD_PEPPER` 给的是**合成假值**（只为满足 `password/hash.ts` 那道"至少 32 字符"的前置），**没有**把哈希函数
+mock 掉 —— 这一套的口径是"除 SMTP 之外零 mock"，给假值比换掉被测实现诚实。
+
+读数（载体 = 纯 `refs/heads/main` + 本地隔离库 `heyta_account_w9`，命令逐字沿用 §6.62 那一行，只把文件名换成这一枚）：
+
+| 臂 | 读数 |
+|---|---|
+| 基线 | `15 passed (15)` |
+| 变异：只摘掉 `api.ts` 口令登录那一处的 `sessionMetaFromRequest(req)` | `1 failed / 14 passed`，红的正是新那条，报 `expected null to be 'W9-W10-Agent/7.7'` |
+
+🔴 两行合起来才是这一节的产出：**变异红 = 判据有牙**；**其余 14 条逐字照旧绿 = 这一格以前没有任何一层守着**
+（与 §6.66 那次"漏入库没被照出来"同一个形状，区别是现在它有了守的那一层）。
+
+⚠️ **这一条没覆盖到的，别读成"六条登录路都验了"**（现量：`git show HEAD:server/src/api.ts | grep -n sessionMetaFromRequest`，
+去掉那行 import 之后是 **6 处调用**）：
+
+| 那一路 | 运行时层状态 | 为什么 |
+|---|---|---|
+| 口令登录 `/login/email-password` | ✅ 链路 7 | —— |
+| 邮箱链接换会话 `/auth/email/verify` | ✅ **同批已补**（§6.69 臂 4 证明它会红） | 原先 D1 那条**发了**请求头却没对库里的 `userAgent` 断言 |
+| 魔法登录（legacy 那路 `/login/magic-link/verify`） | ❌ 集成层从没走过 | ADR-0039 §3.2 那句"同一封邮件走两条路不能有两种结果"在真库层无判据 |
+| 改口令后换发的那一枚 `/password/change` | ✅ **同批已补**（链路 8，§6.69 三臂各红一次） | §5 第 16 条那句话（"改密/重置/换绑三条路的撤销第二半"）的**改密那一路**运行时半边 |
+| 通行密钥登录 `/auth/passkey/verify` | ❌ | 要真 WebAuthn 断言；`registration-races` 那套只走注册侧 |
+| 注册验证码激活 | ❌ | 那一族的实现还没入库（§6.67 server 那格的红②） |
+
+⇒ 这一节的产出不是"补了一条"，是**把"运行时层对登录元数据是瞎的"这个类别量成了上表**。
+其中两行（换会话断言、改密那一路）**在同一批就补完了**（§6.69），剩下三行分别等：legacy 那路的对账判据（本线能补，
+只是没排进这一批）、真 WebAuthn 装置、别人那笔还没入库的实现。
+
+载体复原：跑完 `git checkout -- server/src/api.ts`、变异文件只从 `<file>.mut-bak` 还原（§6.66 那条索引副作用的教训：
+本线在载体上不动共享 `refs/heads/main`，只动工作树），`git status --porcelain` 已逐字为空。
+
+### 6.69 把 §6.68 那张表里"现在就能补"的两行补完了，而第一趟四臂里有两臂是**叠加读数**（10-10 03:5x 现量，载体 `.worktrees/iosacct` 纯 tip，已入 traps #401）
+
+补的两处（都在 `server/tests/integration/email-change-and-sessions.integration.spec.ts`）：
+
+1. **链路 8 —— 真 HTTP 改口令**：两台设备各从真登录口进来（各自的会话行带各自的 UA），A 调
+   `POST /api/password/change`，然后逐条读**观察者的库**：
+   会话行只剩 **1** 行、那一行的 `userAgent` == 改密那一发的请求头原文、
+   A 手上那枚旧令牌 401（界面必须换用响应里新发的那枚）、B 那枚 401、
+   用新令牌读列表 ⇒ 只剩 1 枚且 `current: true`、告知信恰好一封且收件人是这个账号的邮箱。
+2. **D1 那条已有的用例补一句**：邮箱链接换出来的那一枚，库里的会话行必须带着**那一次点击**的 UA。
+   它此前发了 `user-agent` 头却只断言"列表里有当前会话"，所以那一行是 `null` 也照样绿。
+
+第四枚 SMTP 捕获（`sendPasswordChangedEmail`）**不是为了让测试变快**：不 mock 它，`changePassword`
+会去 Ethereal 真建一个测试账号，第一趟就是被这件事拖过 vitest 默认 5 s 而报
+`Test timed out in 5000ms` —— 那一条红的是超时预算（§5 第 13 条已经登记过这一型），不是产品。
+这一套的口径本来就是"唯一 mock 的是 SMTP 发信函数"，前三枚早在那儿了。
+
+读数（载体纯 `refs/heads/main` + 本地隔离库 `heyta_account_w9`；前置 = §6.58 那条五秒 Prisma 判据读到 `function`）：
+基线 **`16 passed (16)`**，`链路 8` 那一趟 1401 ms（整套最慢的一条，慢在 `checkNewPassword` 里那道
+HIBP 真实外发查询 —— 它 fail-open，所以它只会拖时间、不会造红）。
+
+四臂，每臂跑完立刻 `git checkout -- <文件>` + `git diff --quiet -- <文件>` 复验，红句逐条抄原文：
+
+| 臂 | 摘掉的那一句 | 唯一那条红 | 红句原文 |
+|---|---|---|---|
+| 1 | `api.ts` 里 `changePassword(...)` 的第五个实参 `sessionMetaFromRequest(req)` | 链路 8 | `当前设备换发的那一枚没带上改密请求的 UA: expected null to be 'W9-Chain8-Device-A-after'` |
+| 2 | `recovery.ts` 里 `changePassword` 那句 `await revokeAllDeviceSessions(user.id)` | 链路 8 | `expected [ …(3) ] to have a length of 1 but got 3` |
+| 3 | 同一处的 `await notifyPasswordChanged(user.id, user.email, locale)` | 链路 8 | `expected [] to have a length of 1 but got +0` |
+| 4 | `api.ts` 里 `/auth/email/verify` 那处的 `verifyEmailLink(token, …)` 第二实参 | D1 登录令牌那条分流 | `邮箱链接换出的会话行没带上那一次点击的 UA: expected null to be 'W9-D1-probe'` |
+
+🔴 **臂 2 才是这一节真正的新判据**：只抬 `tokenVersion` 的实现（也就是 §5 第 16 条那句"每一处单看都做了它说的事"）
+在 HTTP 层**全绿** —— 旧令牌与另一台那枚都因为版本号对不上而 401，两条鉴权断言分辨不了它。
+分辨得了的是**库里那一行在不在**，而那一句此前只在 WS 层与结构门禁 `check:session-revocation` 里有过。
+`3` 这个数字本身就是形状：两枚登录 + 换发的一枚 = 3，说明删的那一步整条没跑。
+
+⚠️ **第一趟的四臂读数有两臂是作废的**，根因记成 **traps #401**：还原那一步的 `mv` 把路径拼重了一层
+（`server/server/src/…`），报了一行 `No such file or directory` 之后**没有停**（`$?` 被后面那条 `git diff` 吃掉），
+而下一臂的 `cp <file> <file>.mut-bak` 是**无条件覆盖**——于是它把"已经带着前一臂变异"的那份存成了基线。
+输出完全正常：`1 failed | 15 passed`、红的还是同一条用例 —— **条数与用例名都区分不了叠加**，只有红句能。
+那两臂（当时的臂 2/臂 3）的读数是三臂叠加，本表不采用；上表四行都是**重跑后的单臂**。
+⇒ 从此本线多臂装置的三条硬规矩（已写进 traps #401）：还原走 `git checkout --`；每臂跑完立刻复验
+`git diff --quiet -- <path>` 并把退出码打进同一行；台账抄**红句原文**而不是"1 failed"。
+
+这一条**没有**覆盖到的（别读成"改密的运行时半边全验了"）：
+① 改密那一路的**实时通道**那一半 —— 这条新用例不建 socket，所以它只声称"会话行当场删掉"，
+   通道那一半的证据仍是 §5 第 16 条那趟（改前 `37 过 / 2 红` ⇒ 改后 `39 过 / 0 红`）与 §6.60；
+② `legacy 那路 /login/magic-link/verify` 与 `/auth/passkey/verify`（见 §6.68 那张表）；
+③ **重置口令**那条路（`/password/reset`）成功时不发会话、也不换发 —— 它的"删行 + 关通道"那一半
+   由 `revokeAllDeviceSessions` 共用，但**它自己**在运行时层同样零判据，与臂 2 是同一型，下一格补它。
+
+复取（一条命令，载体账与判据都在 §6.62）：
+```bash
+cd .worktrees/<载体> && git checkout --force $(git rev-parse refs/heads/main)
+( cd server && node -e "const {Prisma}=require('@prisma/client');console.log(typeof Prisma.PrismaClientKnownRequestError)" )   # 期望 function
+( cd server && NO_COLOR=1 DATABASE_URL="postgresql://$(whoami)@127.0.0.1:5432/heyta_account_w9?schema=public" \
+  npx vitest run --config vitest.integration.config.ts --maxWorkers=1 \
+  tests/integration/email-change-and-sessions.integration.spec.ts )                                                              # 期望 16 passed
+```
+载体收尾：`git status --porcelain` 只剩那枚预期新增的 spec，`.mut-bak` 已清，`pnpm-lock.yaml` 未被这条链碰过。
+⚠️ **traps #401 这一条目前只在那枚文件的**工作树版**里**（`docs/reference/environment-traps.md` 此刻正被别线写着，
+` M`），所以它没有随本笔入库 —— 这不是本线把它落在工作树里，是那枚文件不能整枚代提交（§6.66 同一条理由）。
+现量（为 `1` 才算真入库）：`git show HEAD:docs/reference/environment-traps.md | grep -c '^401\. '`。
+它有两种收敛方式，都比本线整枚提交安全：别线那笔把这枚文件带进去（`git add` 取的是当前工作树字节，会带上这段），
+或本线在它干净时按 §6.66 那套 plumbing 只补自己那一段。
+
 
 
 
