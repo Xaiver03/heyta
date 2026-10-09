@@ -52,7 +52,7 @@ import { sessionIdOf } from '../../src/account/access-sessions';
 import { hashToken } from '../../src/auth-tokens';
 import { getWsConnectionService } from '../../src/sync/services/websocket-connection.service';
 import { hashFor } from '../../src/password/service';
-import { AUTH_PASSWORD_PATHS } from '@heyta/shared-schema';
+import { AUTH_PASSWORD_PATHS, SESSION_PATHS } from '@heyta/shared-schema';
 
 /** 从自己刚铸出来的那枚令牌里取会话 id（= 库里那一行的主键）。只取，不打印。 */
 const sessionIdOfToken = (token: string): string => {
@@ -313,5 +313,43 @@ describeWithDb('逐枚撤销会话 ⇒ 那一枚的实时通道当场断（真 P
     expect(await closingF).toEqual({ code: 4003, reason: 'Token revoked' });
     // 这条路不换发新令牌 ⇒ 全部删干净，库里应当**零行**。
     expect(await observer.accessSession.count({ where: { userId } })).toBe(0);
+  });
+
+  /**
+   * 🔴 **§6.73 那张表的第四格：注销账号。** 它比改密/重置更适合在这一层验 ——
+   * 因为生产代码里那句 `closeForUser` 有它**自己的一条理由**（注释写的：删掉之后不关，
+   * 那条还活着的连接会继续答 ping，于是"死连接"那支永远收不掉它，而它的心跳 touch
+   * 会替一个已经不存在的账号重新 INSERT 一行 `sync_devices`，从此每个节流窗口撞一次外键）。
+   * spy 层断的是"调用了 `closeForUser`"，这一层断的是"那条连接真的断了、而且没有再长出一行设备"。
+   */
+  it('🔴 真注销账号 ⇒ 所有已经开着的页面当场断，而库里既没有会话行也没有被心跳重新插出来的设备行', async () => {
+    const tokenG = await issueSession({ id: userId }, { deviceName: 'device-g' });
+    const tokenH = await issueSession({ id: userId }, { deviceName: 'device-h' });
+    const registeredBefore = getWsConnectionService().getConnectionCount();
+    const wsG = await openSocket(wsBase, tokenG, 'client-delete-g');
+    const wsH = await openSocket(wsBase, tokenH, 'client-delete-h');
+    sockets.push(wsG, wsH);
+    await waitForConnectionCount(registeredBefore + 2);
+
+    const closingG = waitForClose(wsG);
+    const closingH = waitForClose(wsH);
+
+    const deleted = await app.inject({ method: 'DELETE', url: '/api/account', headers: bearer(tokenG) });
+    expect(deleted.statusCode, deleted.body).toBe(200);
+
+    expect(await closingG).toEqual({ code: 4003, reason: 'Token revoked' });
+    expect(await closingH).toEqual({ code: 4003, reason: 'Token revoked' });
+
+    // 🔴 注销之后这个人**不存在**了：会话行与设备行都该随真外键级联消失。
+    // 设备行那一格是这段注释要防的形状 —— 连接没关时它会被心跳重新插出来。
+    expect(await observer.accessSession.count({ where: { userId } })).toBe(0);
+    expect(await observer.syncDevice.count({ where: { userId } })).toBe(0);
+    // 手上那枚令牌此后不能用（缓存里那一格也必须已经失效）。
+    // 🔴 档位是 **410**，不是其余撤销路径那三条的 401：410 是注销独占的对外契约
+    //（`account-closed-signal.spec.ts` 已钉死"其余三种失效各自仍是 401"），照抄姊妹
+    // 用例的 401 会写成一条永远不可能红的判据 —— 台账 §6.70 那条"状态码不能照抄"的翻版。
+    const after = await app.inject({ method: 'GET', url: `/api/${SESSION_PATHS.list}`, headers: bearer(tokenG) });
+    expect(after.statusCode, '注销之后那枚令牌还在用').toBe(410);
+    expect(after.json()).toMatchObject({ code: 'ACCOUNT_CLOSED' });
   });
 });
