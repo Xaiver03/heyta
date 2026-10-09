@@ -117,6 +117,9 @@ model User {
   automationAiAttempts               AutomationAiAttempt[]
   automationEntitlementBinding       AutomationEntitlementBinding?
   automationEntitlementTicketUses    AutomationEntitlementTicketUse[]
+  automationEntitlementSubject       AutomationEntitlementSubject?
+  automationEntitlementActivations   AutomationEntitlementActivation[]
+  automationEntitlementLinks         AutomationEntitlementLink[]
   emailPasswordRegistrationChallenges EmailPasswordRegistrationChallenge[]
   sharesOwned                        Share[]               @relation("ShareOwner")
   shareMemberships                   ShareMember[]
@@ -1792,4 +1795,59 @@ model AutomationEntitlementClock {
   maxSeenAtMs    BigInt   @map("max_seen_at_ms")
   updatedAt      DateTime @updatedAt @map("updated_at")
   @@map("automation_entitlement_clocks")
+}
+
+// 🔴 公开主体：跨实例稳定、且**不是**本地数字 `users.id`。票据里的 `officialSubject`
+// 只能取自这一张表，不能取自请求体 —— 否则客户端可以自报任意主体。
+model AutomationEntitlementSubject {
+  userId    Int      @id @map("user_id")
+  subject   String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  @@map("automation_entitlement_subjects")
+}
+
+// 一次性激活码：把"官方那侧付过费的那个主体"和"这台实例上的这个本地账号"绑起来的
+// 唯一凭据。存的是哈希，不是码本身；`@@id([userId, installationId])` 让一台实例
+// 同时最多只有一张活码，兑换成功即删行（换绑历史留在 links）。
+model AutomationEntitlementActivation {
+  userId         Int      @map("user_id")
+  installationId String   @map("installation_id")
+  codeHash       String   @unique @map("code_hash")
+  expiresAt      DateTime @map("expires_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  lastSentAt     DateTime @default(now()) @map("last_sent_at")
+  resendCount    Int      @default(0) @map("resend_count")
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  @@id([userId, installationId])
+  @@index([expiresAt])
+  @@map("automation_entitlement_activations")
+}
+
+// 绑定事实本身，也是此后签发 `session` 票据的**唯一依据**：三个 claims
+// （subject / installationId / localAccountUuid）全部来自这一行，全部不由客户端声明。
+// 主键是 installation_id ⇒ 一台实例只有一个当前绑定，换主体必须先撤销。
+model AutomationEntitlementLink {
+  installationId   String    @id @map("installation_id")
+  userId           Int       @map("user_id")
+  subject          String
+  localAccountUuid String    @map("local_account_uuid")
+  boundAt          DateTime  @default(now()) @map("bound_at")
+  revokedAt        DateTime? @map("revoked_at")
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  @@index([subject])
+  @@index([revokedAt])
+  @@map("automation_entitlement_links")
+}
+
+// 吊销下限的两代读数共用一张表：官方实例存运营者抬上去的全局下限，自托管实例存
+// **上一次验过签的那份清单**解出来的值与它的期限。单调性（只升不降）在代码里守，
+// 不在这里 —— 这里只保证"存下来的数来自已签名清单，不来自可信请求体"。
+model AutomationEntitlementRevocation {
+  scope             String    @id
+  revocationVersion Int       @map("revocation_version")
+  manifestKeyId     String?   @map("manifest_key_id")
+  manifestExpiresAt DateTime? @map("manifest_expires_at")
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at")
+  @@map("automation_entitlement_revocations")
 }
