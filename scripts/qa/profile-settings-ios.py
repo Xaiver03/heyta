@@ -257,20 +257,24 @@ def run(probe: Probe) -> None:
 
     # `隐私同意` is the current Chinese value of common.privacy.settings.title;
     # do not infer a label from the section name.
-    probe.tap("open sync and privacy", ("同步与隐私", "Sync & privacy"), ("隐私同意",))
+    probe.tap("open sync and privacy", ("同步与隐私", "Sync and privacy"), ("隐私同意",))
     probe.screenshot("sync")
-    probe.tap("sync back to directory", ("返回", "Back"), ("同步与隐私", "Sync & privacy"))
+    probe.tap("sync back to directory", ("返回", "Back"), ("同步与隐私", "Sync and privacy"))
 
-    probe.tap("open data management", ("数据管理", "Data management", "Data"), ("导出数据", "Export data"))
+    # 移动端那一屏**没有**「导出数据」这个标题 —— `导出数据`/`Export data` 是
+    # `web.export.title`；移动端的入口与页头都是 `mobile.export.entry`/`.title`
+    # =「备份与迁移」/「Backup & migration」。原先两处都按 web 那一列定位，
+    # 于是这一步在中英文两种语态下都永远打不中（与 Android 那条脚本同一件事）。
+    probe.tap("open data management", ("数据管理", "Data management", "Data"), ("备份与迁移", "Backup & migration"))
     probe.tap(
         "open export screen",
-        ("导出数据", "Export data"),
+        ("备份与迁移", "Backup & migration"),
         ("返回", "Back"),
         absent=("数据管理", "Data management", "Data"),
     )
     probe.tap("export back to data group", ("返回", "Back"), ("数据管理", "Data management", "Data"))
     probe.tap("data group back to directory", ("返回", "Back"), ("常规", "General"))
-    probe.tap("close settings to profile", ("关闭", "Close"), ("我的", "Profile"), absent=("偏好与账号", "Settings"))
+    probe.tap("close settings to profile", ("关闭", "Close"), ("我的", "Profile"), absent=("偏好与账号", "Preferences and account"))
 
     probe.tap("open full growth", ("查看完整成长", "View full growth"), ("我的成长", "My growth"))
     probe.screenshot("growth")
