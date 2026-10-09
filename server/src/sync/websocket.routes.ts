@@ -97,7 +97,7 @@ export const wsRoutes = async (fastify: FastifyInstance): Promise<void> => {
         }
 
         const wsService = getWsConnectionService();
-        wsService.addConnection(result.userId, clientId, socket);
+        wsService.addConnection(result.userId, clientId, socket, result.sessionId);
       } catch (err) {
         Logger.error('[ws] Unexpected error in WebSocket handler:', err);
         try {

@@ -187,9 +187,10 @@ export async function accountSecurityRoutes(fastify: FastifyInstance): Promise<v
           .status(400)
           .send({ error: 'That session is not valid.', code: 'unknown_session' });
       }
-      // ⚠️ 这里**不**关实时连接。`closeForUser(userId)` 关掉的是这个账号**所有**设备的通道，
-      // 而"退出这一台"不该把别人踢下线（那是 `revoke-all` 的语义，也只有它该做那件事）。
-      // 被撤销那一枚的下一句 HTTP 请求会 401，那台设备自己的通道随进程结束而断。
+      // 实时通道由 `revokeSession` 在那一行真删掉时关掉**那一枚自己的**连接
+      // （`closeForSession(userId, sessionId)`），这里不重复做、也**不该**做 `closeForUser` ——
+      // 那是 `revoke-all` 的语义，"退出这一台"不许把别的设备一起踢下线。
+      // ⚠️ 本轮之前签的令牌没有 `jti` ⇒ 那一枚会话认不出对应哪条连接，只能等它自己重连（ADR-0063 §4 第 1 条）。
       Logger.audit({ event: 'SESSION_REVOKED', userId: user.userId });
       return reply.send({ success: true });
     },
@@ -239,7 +240,8 @@ export async function accountSecurityRoutes(fastify: FastifyInstance): Promise<v
       if (sessionId !== null) {
         await revokeSession(user.userId, sessionId);
         authCache.invalidate(user.userId);
-        // 同上一条：本机退出**不**关掉整个账号的实时连接。
+        // 本机这一枚的通道由 `revokeSession` 关掉（按 session id 精确匹配），
+        // 这里同样**不**关整个账号 —— 别的设备不该为"这一台退出登录"买单。
         Logger.audit({ event: 'SESSION_LOGOUT', userId: user.userId });
       } else {
         Logger.info(`Legacy token without jti logged out locally (ID: ${user.userId})`);
