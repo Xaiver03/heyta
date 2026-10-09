@@ -1202,6 +1202,55 @@ describe.skipIf(!DATABASE_URL)('inbound identity through ordinary sync HTTP', ()
       expect(binding).toMatchObject({ officialSubject: link.subject, installationId: installation, localAccountUuid: link.localAccountUuid });
     });
 
+    it('逐次动作票据的取票通道：只按绑定行签发，形状不合与没绑定都不给', async () => {
+      // 🔴 上一轮闸门改成"这些动作各要一枚自己的票据"时，供给方只有 `session` 那一枚，
+      // 自托管一侧因此永远停在"等权益"。这一条钉的是通道真的存在，以及它**不因取票而放宽**
+      // 那三条判据（未绑定 / 别人的实例 / 形状与作用域不合）。
+      const unbound = await post('/automation/entitlement/ticket', { installationId: randomUUID(), action: 'worker-register' });
+      expect(unbound.status).toBe(403);
+      expect(await errorCode(unbound)).toBe('AUTOMATION_LINK_NOT_BOUND');
+
+      const noAuth = await fetch(`${base}/api/automation/entitlement/ticket`, {
+        method: 'POST', headers: { authorization: 'Bearer not-a-real-token', 'content-type': 'application/json' },
+        body: JSON.stringify({ installationId: installation, action: 'worker-register' }),
+      });
+      expect(noAuth.status).toBe(401);
+
+      const badAction = await post('/automation/entitlement/ticket', { installationId: installation, action: 'delete-everything' });
+      expect(badAction.status).toBe(400);
+      // `session` 是唯一能建/续短期绑定的动作，不许从逐次通道取。
+      const sessionViaTicket = await post('/automation/entitlement/ticket', { installationId: installation, action: 'session' });
+      expect(sessionViaTicket.status).toBe(403);
+      expect(await errorCode(sessionViaTicket)).toBe('AUTOMATION_ISSUER_ACTION_UNKNOWN');
+
+      // 作用域与动作不符由签发端拒；形状由**与判定核逐字相同**的那份 schema 先挡（UUID / 128 上限）。
+      const wrongScope = await post('/automation/entitlement/ticket', { installationId: installation, action: 'rule-enable' });
+      expect(wrongScope.status).toBe(403);
+      expect(await errorCode(wrongScope)).toBe('AUTOMATION_ISSUER_SCOPE_MISMATCH');
+      for (const body of [{ action: 'rule-enable', ruleId: 'not-a-uuid' },
+        { action: 'result-publish', eventId: `x${'y'.repeat(128)}` },
+        // strict：客户端想把本地账号自报进票据里 —— 请求体压根没有这个字段。
+        { action: 'worker-register', localAccountUuid: localAccount }]) {
+        const rejected = await post('/automation/entitlement/ticket', { installationId: installation, ...body });
+        expect(rejected.status).toBe(400);
+      }
+
+      const signed = await post('/automation/entitlement/ticket', { installationId: installation, action: 'rule-enable', ruleId });
+      expect(signed.status).toBe(200);
+      expect(signed.headers.get('cache-control')).toBe('no-store');
+      const { ticket, action } = await signed.json() as { ticket: string; action: string };
+      expect(action).toBe('rule-enable');
+      const claims = JSON.parse(Buffer.from(ticket.split('.')[0]!, 'base64url').toString('utf8')) as Record<string, unknown>;
+      const link = await db.automationEntitlementLink.findUniqueOrThrow({ where: { installationId: installation } });
+      expect(claims).toMatchObject({ action: 'rule-enable', ruleId, capability: 'automation', issuer: ISSUER_URL,
+        officialSubject: link.subject, installationId: installation, localAccountUuid: link.localAccountUuid });
+      expect(Number(claims.expiresAt) - Number(claims.issuedAt)).toBeLessThanOrEqual(30);
+
+      const otherAccount = await post('/automation/entitlement/ticket', { installationId: installation, action: 'worker-register' }, otherToken);
+      expect(otherAccount.status).toBe(403);
+      expect(await errorCode(otherAccount)).toBe('AUTOMATION_SUBJECT_MISMATCH');
+    });
+
     it('换主体必须先撤销：一枚新码顶不掉别人在这台实例上的绑定', async () => {
       const otherActivation = await post('/automation/entitlement/activations', { installationId: installation }, otherToken);
       expect(otherActivation.status).toBe(200);
