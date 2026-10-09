@@ -82,7 +82,7 @@ async function simulateWsHandler(
     }
 
     const wsService = getWsConnectionService();
-    wsService.addConnection(result.userId, clientId, socket as any);
+    wsService.addConnection(result.userId, clientId, socket as any, result.sessionId);
     return 'accepted';
   } catch {
     try {
@@ -326,7 +326,7 @@ describe('WebSocket Route Validation', () => {
 
       expect(result).toBe('accepted');
       expect(mockSocket.close).not.toHaveBeenCalled();
-      expect(mockAddConnection).toHaveBeenCalledWith(1, 'a'.repeat(255), mockSocket);
+      expect(mockAddConnection).toHaveBeenCalledWith(1, 'a'.repeat(255), mockSocket, undefined);
     });
 
     it('should reject when verifyToken returns invalid', async () => {
@@ -346,6 +346,15 @@ describe('WebSocket Route Validation', () => {
     });
 
     it('should accept valid connection and call addConnection', async () => {
+      // 哨兵值：这一条要钉的是"处理函数把**服务端自己验出来的** session id 原样交给连接簿记"，
+      // 而不是它内部怎么算那个哈希（算法在 `access-sessions.spec.ts` 那边钉）。
+      (verifyToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        valid: true,
+        userId: 1,
+        email: 'test@test.com',
+        tokenVersion: 0,
+        sessionId: 'session-id-from-verified-token',
+      });
       const result = await simulateWsHandler(
         { token: 'good-token', clientId: 'client_1' },
         mockSocket,
@@ -353,7 +362,14 @@ describe('WebSocket Route Validation', () => {
 
       expect(result).toBe('accepted');
       expect(verifyToken).toHaveBeenCalledWith('good-token');
-      expect(mockAddConnection).toHaveBeenCalledWith(1, 'client_1', mockSocket);
+      // 🔴 第四枚参数必须是那枚 session id：逐枚撤销靠它认出该关哪条连接。
+      // 传 `clientId`（客户端自报）或干脆不传，界面上那句"退出这一台"就只管得住下一句 HTTP 请求。
+      expect(mockAddConnection).toHaveBeenCalledWith(
+        1,
+        'client_1',
+        mockSocket,
+        'session-id-from-verified-token',
+      );
       expect(mockSocket.close).not.toHaveBeenCalled();
     });
 

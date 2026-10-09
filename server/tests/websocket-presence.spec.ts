@@ -65,7 +65,7 @@ describe('WebSocketConnectionService presence relay', () => {
 
   const connect = (userId: number, clientId: string): MockWs => {
     const ws = createMockWs();
-    service.addConnection(userId, clientId, ws as unknown as WebSocket);
+    service.addConnection(userId, clientId, ws as unknown as WebSocket, null);
     return ws;
   };
 
