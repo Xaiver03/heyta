@@ -2710,6 +2710,71 @@ pnpm --filter '@heyta/app-host...' build; echo rc=$?     # 期望 rc=1，报 tas
 node scripts/check-imports-resolve.mjs --sources-only
 ```
 
+### 6.54 移动端那一笔的变异验证补完了，而它照出来的是**本线自己的一条判据缺口**（10-10 01:4x 现量，载体 `d971a73f`）
+
+§6.44 那两枚移动端文件落地时只做过 A/B 两臂（HEAD 4 红 → 候选 19 过），没证过"删掉挂载会让判据红"。
+这一轮在纯 HEAD 载体里补完，三条臂各红自己那条：
+
+- 臂② `断掉本屏两条退出出口的接线`（从 `ProfileScreen` 删 `onSignOutCurrentDevice={…}` 与
+  `onSignedOutEverywhere={runSignOutEverywhere}`）⇒ **恰好 1 条红**：
+  `本屏那两条退出出口都接到了 ProfileScreen 的清理编排上`。
+- 臂③ `负向判据的正向对照`（往 `SecurityScreen` 函数体里把 `const legacySnap = readSyncConfig();` 读回来）
+  ⇒ **恰好 1 条红**：`SecurityScreen 不出现 readSyncConfig(` —— 那条"会不会永不成立"的嫌疑被这次量掉了。
+- 🔴 **臂① 一开始什么都没红**：把 `<SessionsSection … />` 整块**删掉**，
+  `account-security-wiring.spec.ts` 依旧 `19 passed / rc=0`。
+  这不是探针坏 —— 逐条读过那枚 spec：它对 `SECURITY` 只断言通行密钥那族符号、两个 prop 类型声明，
+  和那条 `readSyncConfig(` 负向判据，**没有任何一条钉着"登录设备这一块挂在安全面上"**；
+  全仓再搜一遍，这个挂载只被 `verify-mobile-account-email-sessions.sh` 与它的 iOS 姊妹**两枚设备脚本**读着
+  （而那两枚要真模拟器，`pnpm check` 与 CI 都不跑）。
+  ⇒ **症状会是"设置面里根本没有登录设备这一块"，而静态一层完全不响** ——
+  这一型本线在 web 侧**早就写过**（`apps/web/tests/account-security.spec.tsx:988`
+  那枚 `接线（挂载点真的存在 —— "做好了但没接上"不算做完）` 的 describe），
+  移动端那笔落地时**漏了它的孪生**。
+
+**已补并落地**（`b6581174`，只改测试文件，`+17/−0`）：新判据把挂载与四个 prop 一起钉
+（`<SessionsSection` + `baseUrl={baseUrl}` + `token={token}` + `onSignOutCurrentDevice={onSignOutCurrentDevice}`
++ `onSignedOutEverywhere={onSignedOutEverywhere}`）。补完后**臂① 恰好 1 条红**，红名就是
+`那一块真的挂在安全面上，四个 prop 一起接`；同一载体里带新判据的基线 `rc=0`
+（`it(` 数 19 → 20，与跑出的条数一致）。
+
+⚠️ **这一轮还犯了一条装置错，值得留**：`mutate()` 里 `shutil.copy(path, path+'.mut-bak')` 对**同一枚文件的两处编辑**
+各跑一次 ⇒ 第二次 copy 把**已经改过的那份**当基线存了，随后第一次 `restore()` 就把"半变异"写回树上、
+第二次无源可回直接抛 `FileNotFoundError` —— 载体里 `ProfileScreen.tsx` 当场停在缺一个 prop 的状态。
+后果可控（那是我的隔离载体，随后 `git checkout -- <文件>` + `git show HEAD:<文件> | cmp -s - <文件>` 验回 SAME），
+但形状是通用的：**"一处编辑一个 bak"的写法在同文件多编辑下必坏**。
+改法：变异臂的还原**一律从 `git show HEAD:<path>` 取**（载体是纯 HEAD ⇒ HEAD 就是基线），
+还原后 `git diff --quiet -- <path>` 复验；`.mut-bak` 只留给"工作树本身是脏的、HEAD 不是基线"那种场景
+（那也正是仓库既有纪律用它的前提，不是默认起手式）。
+
+复取这三条臂（不依赖那个一次性脚本 —— 它住 `/tmp`，会被清；下面这段自包含）：
+
+```bash
+cd .worktrees/<载体> && git checkout --force $(git rev-parse refs/heads/main)
+R() { git show HEAD:"$1" > "$1"; }            # 还原 = 从 HEAD 取
+run() { pnpm --filter @heyta/mobile exec vitest run tests/account-security-wiring.spec.ts 2>&1 | grep -E '^ *(Test Files|Tests|×)'; }
+S=apps/mobile/src/screens/SecurityScreen.tsx; P=apps/mobile/src/screens/ProfileScreen.tsx
+python3 - <<'PY'   # 臂①：删掉挂载整块（补判据之后这条必须红）
+import io; p='apps/mobile/src/screens/SecurityScreen.tsx'; s=io.open(p,encoding='utf8').read()
+m='      <SessionsSection\n        baseUrl={baseUrl}\n        token={token}\n        onSignOutCurrentDevice={onSignOutCurrentDevice}\n        onSignedOutEverywhere={onSignedOutEverywhere}\n      />\n'
+assert s.count(m)==1; io.open(p,'w',encoding='utf8').write(s.replace(m,''))
+PY
+run; R $S; git diff --quiet -- $S && echo CLEAN
+python3 - <<'PY'   # 臂②：断掉两条退出出口的接线
+import io; p='apps/mobile/src/screens/ProfileScreen.tsx'; s=io.open(p,encoding='utf8').read()
+a='        onSignOutCurrentDevice={() => {\n          void runSignOut();\n        }}\n'
+b='        onSignedOutEverywhere={runSignOutEverywhere}\n'
+assert s.count(a)==1 and s.count(b)==1
+io.open(p,'w',encoding='utf8').write(s.replace(a,'').replace(b,''))
+PY
+run; R $P; git diff --quiet -- $P && echo CLEAN
+python3 - <<'PY'   # 臂③：负向判据的正向对照
+import io; p='apps/mobile/src/screens/SecurityScreen.tsx'; s=io.open(p,encoding='utf8').read()
+a='  return (\n    <Screen'; assert s.count(a)==1
+io.open(p,'w',encoding='utf8').write(s.replace(a,'  const legacySnap = readSyncConfig(); //MUT\n'+a))
+PY
+run; R $S; git diff --quiet -- $S && echo CLEAN
+```
+
 
 
 
