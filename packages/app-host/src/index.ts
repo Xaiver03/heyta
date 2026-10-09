@@ -176,6 +176,7 @@ export {
   registerAutomationWorker,
   renewAutomationLease,
   requestCommitPermitAndJournal,
+  AutomationEntitlementRequiredError,
   type AutomationCommitJournal,
   type AutomationWorkerCredential,
   type AutomationWorkerSecretStore,
@@ -890,9 +891,24 @@ export {
   type NewAssistantTurn,
 } from './assistant-session-actions.js';
 export { requestInboundAutomation, runInboundAutomationEvent, type InboundAutomationRunOptions } from './inbound-runner.js';
-export { processInboundAutomationEvent, type ProcessInboundAutomationOptions } from './inbound-process.js';
+export {
+  processInboundAutomationEvent,
+  type InboundAutomationCycleResult,
+  type InboundAutomationCycleState,
+  type ProcessInboundAutomationOptions,
+} from './inbound-process.js';
 export { startInboundWorkerLoop, type InboundWorkerLoopOptions, type InboundWorkerLoop } from './inbound-worker-loop.js';
 export { verifyAutomationEntitlementTicket, type AutomationEntitlementStatus } from './inbound-entitlement-remote.js';
+export {
+  AutomationTicketError,
+  createAutomationTicketSource,
+  loadOrCreateAutomationInstallationId,
+  newAutomationInstallationId,
+  type AutomationActionTicketAction,
+  type AutomationInstallationStore,
+  type AutomationTicketRequest,
+} from './inbound-entitlement-tickets.js';
+export { AUTOMATION_ACTION_TICKET_ACTIONS, AUTOMATION_ENTITLEMENT_TICKET_HEADER } from './inbound-entitlement-tickets.js';
 export { createInboundRecipientKeyStore, type InboundRecipientKeyScope } from './inbound-key-store.js';
 export { createVaultWrappedAutomationWorkerStore, createInboundCommitJournal } from './inbound-secret-store.js';
 export { generateInboundKeyPair, inboundPublicKey } from '@heyta/inbound-core';

@@ -1,8 +1,10 @@
 import { runInboundAutomationEvent, type InboundAutomationRunOptions } from './inbound-runner.js';
 import {
   claimAutomationEvent, readAutomationPreparedResult, publishAutomationResult, requestCommitPermitAndJournal,
-  reserveAutomationAiAttempt, advanceAutomationAiAttempt, renewAutomationLease, type AutomationCommitJournal, type AutomationWorkerCredential,
+  reserveAutomationAiAttempt, advanceAutomationAiAttempt, renewAutomationLease, AutomationEntitlementRequiredError,
+  type AutomationCommitJournal, type AutomationWorkerCredential,
 } from './inbound-worker.js';
+import { AutomationTicketError, type AutomationTicketRequest } from './inbound-entitlement-tickets.js';
 import { createTaskBatch, type TaskBatchContext } from './task-batch-actions.js';
 import type { AiRoutingConfig, EgressConsent, SecretStore } from '@heyta/ai';
 import type { InboundAutomationField } from '@heyta/inbound-core';
@@ -40,18 +42,46 @@ export interface ProcessInboundAutomationOptions {
   loadPrivateKey?: (keyEpoch: number) => Promise<Uint8Array | undefined>;
   /** Synchronous host fence: account/session/Vault must still belong to this run. */
   assertActive?: () => void;
+  /**
+   * 每一次受权益闸门的动作**临写之前**现取一枚只放行它自己的票据（协议 §4：票据绑
+   * action + 实例 + 账号 + rule/event + nonce + 版本 + expiry，≤30 秒且一次使用）。
+   * 不给 = 这一路不带票，服务端按官方模式那套订阅判定放行。
+   */
+  getEntitlementTicket?: (request: AutomationTicketRequest) => Promise<string>;
 }
+
+export type InboundAutomationCycleState = 'empty' | 'submitted' | 'needs-confirmation' | 'waiting-entitlement';
+
+export type InboundAutomationCycleResult = { state: InboundAutomationCycleState; eventId?: string; itemCount?: number };
 
 /**
  * Claim at most one event and finish the durable commit fence. A prepared
  * result is frozen before asking for a permit; the proof is journaled before
  * dispatching the single batch op. Re-running after a crash reuses that proof
  * and the stable event/task identities.
+ *
+ * 🔴 权益不足回 `waiting-entitlement`，不回一条报错：402（服务端判这台实例现在没资格）
+ * 和"取票被拒且属于等待族"（没绑定 / 签发方没配 / 签发方不在这台实例上）都让用户
+ * 重试同一个按钮没有意义。非等待族（票据坏、作用域不符）照原样抛出 —— 那是缺陷，
+ * 把它一起吞成"等待权益"就是把 bug 说成订阅问题。
  */
-export async function processInboundAutomationEvent(options: ProcessInboundAutomationOptions): Promise<{
-  state: 'empty' | 'submitted' | 'needs-confirmation'; eventId?: string; itemCount?: number;
-}> {
+export async function processInboundAutomationEvent(options: ProcessInboundAutomationOptions): Promise<InboundAutomationCycleResult> {
+  try {
+    return await runInboundAutomationCycle(options);
+  } catch (error) {
+    if (error instanceof AutomationTicketError && error.waiting) return { state: 'waiting-entitlement' };
+    if (error instanceof AutomationEntitlementRequiredError) return { state: 'waiting-entitlement' };
+    throw error;
+  }
+}
+
+async function runInboundAutomationCycle(options: ProcessInboundAutomationOptions): Promise<InboundAutomationCycleResult> {
   const assertActive = (): void => { options.assertActive?.(); };
+  const getTicket = options.getEntitlementTicket;
+  // 没配取票源时返回空展开，而不是 `entitlementTicket: undefined` —— 这个仓库的可选属性
+  // 是精确可选的，塞一个 undefined 进去与"没有这一项"不是同一件事。
+  const ticketFor = async (request: AutomationTicketRequest): Promise<{ readonly entitlementTicket: string } | Record<string, never>> =>
+    getTicket === undefined ? {} : { entitlementTicket: await getTicket(request) };
   const fetchImpl: typeof fetch = async (input, init) => {
     assertActive();
     const response = await (options.fetchImpl ?? globalThis.fetch)(input, init);
@@ -62,7 +92,8 @@ export async function processInboundAutomationEvent(options: ProcessInboundAutom
   const recovered = await readAutomationPreparedResult({ baseUrl: options.baseUrl,
     token: options.token, worker: options.worker, eventId: options.eventId, fetchImpl });
   const claimed = recovered === undefined
-    ? await claimAutomationEvent({ baseUrl: options.baseUrl, token: options.token, worker: options.worker, eventId: options.eventId, fetchImpl })
+    ? await claimAutomationEvent({ baseUrl: options.baseUrl, token: options.token, worker: options.worker, eventId: options.eventId, fetchImpl,
+      ...(await ticketFor({ action: 'event-claim' })) })
     : undefined;
   assertActive();
   if (!recovered && !claimed) return { state: 'empty' };
@@ -107,12 +138,12 @@ export async function processInboundAutomationEvent(options: ProcessInboundAutom
     maxItems: claimed.maxItems > 0 ? claimed.maxItems : options.maxItems,
     timezone: claimed.timezone ?? options.timezone,
     targetProjectId: claimed.targetProjectId,
-    reserve: (input) => reserveAutomationAiAttempt({ ...input, baseUrl: options.baseUrl, token: options.token,
-      worker: options.worker, fetchImpl }),
+    reserve: async (input) => reserveAutomationAiAttempt({ ...input, baseUrl: options.baseUrl, token: options.token,
+      worker: options.worker, fetchImpl, ...(await ticketFor({ action: 'ai-reserve', eventId: input.eventId })) }),
     advance: (input) => advanceAutomationAiAttempt({ ...input, baseUrl: options.baseUrl, token: options.token,
       worker: options.worker, fetchImpl }),
-    publish: (input) => publishAutomationResult({ ...input, baseUrl: options.baseUrl, token: options.token,
-      worker: options.worker, fetchImpl }),
+    publish: async (input) => publishAutomationResult({ ...input, baseUrl: options.baseUrl, token: options.token,
+      worker: options.worker, fetchImpl, ...(await ticketFor({ action: 'result-publish', eventId: input.eventId })) }),
     fetchImpl,
     now: options.now,
   };
@@ -144,7 +175,7 @@ export async function processInboundAutomationEvent(options: ProcessInboundAutom
       request: { clientId: options.worker.clientId, databaseEpoch: options.worker.databaseEpoch,
         eventId, opId, ruleId, ruleVersion,
         parseVersion: completed.payload.source.parseVersion, resultDigest: completed.resultDigest, itemCount: completed.itemCount },
-      journal: options.journal, fetchImpl });
+      journal: options.journal, fetchImpl, ...(await ticketFor({ action: 'commit-permit', eventId })) });
   }
   // The sealed result froze the original rule target. Neither current UI state
   // nor a caller fallback may retarget an already prepared batch during recovery.
