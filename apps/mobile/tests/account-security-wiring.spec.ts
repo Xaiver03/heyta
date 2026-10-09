@@ -119,6 +119,23 @@ describe('凭据快照：本屏不再自己读一次磁盘', () => {
 });
 
 describe('登录设备：三件事各是一条路，不许合并', () => {
+  it('那一块真的挂在安全面上，四个 prop 一起接', () => {
+    // 变异靶：把 `<SessionsSection … />` 整块删掉 ⇒ 本条必须红。
+    // 补这条之前 `pnpm check` 里没有任何一层钉着这次挂载：它只被
+    // `verify-mobile-account-email-sessions.sh` 与 `verify-mobile-ios-account-email-sessions.sh`
+    // 两枚设备脚本读着，而那两枚要真模拟器。少挂一层的症状是"设置面里根本没有
+    // 登录设备这一块"，而单测与全部静态门禁照样绿。
+    expect(SECURITY).toContain('<SessionsSection');
+    for (const prop of [
+      'baseUrl={baseUrl}',
+      'token={token}',
+      'onSignOutCurrentDevice={onSignOutCurrentDevice}',
+      'onSignedOutEverywhere={onSignedOutEverywhere}',
+    ]) {
+      expect(SECURITY, `挂载里缺 prop：${prop}`).toContain(prop);
+    }
+  });
+
   it('逐枚撤销 / 退出这台 / 退出所有 —— 三个函数各自被用', () => {
     expect(SESSIONS).toContain('listHostedSessions');
     expect(SESSIONS).toContain('revokeHostedSession');
