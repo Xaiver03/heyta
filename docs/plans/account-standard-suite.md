@@ -1798,3 +1798,46 @@ git grep -q 'sendEmailPasswordRegistrationCodeEmail' HEAD -- server/src/email.ts
    11–14 需要会话挂载 ⇒ 本轮载体读数的**上限**就是"除 11–14 外全绿"。真实读数落在下一节，别看这段倒推。
 ② web 那一族真浏览器判据 `e2e/tests/account-email-change-and-sessions.spec.ts` —— §6.31 说了它现在是必红。
 
+
+### 6.36 🔴 HEAD 打不出包：`pnpm -r build` 在纯 HEAD 的隔离载体上第 0 段就失败 —— 根因是本线昨天那一笔"docs"提交
+
+r4 那条设备腿链走到第 5 步（`reinstall-all.sh --only ios`）以 rc=1 结束，`CHAIN_RC=1`。
+失败点是它自己的第 0 段前置，而那句前置语现在读起来是这十六小时里最有价值的一行字：
+
+```
+═══ 0. 前置：pnpm -r build ═══
+  🔴 全仓构建失败 —— 打包必然打进旧产物，停下
+```
+
+失败体（`reinstall-ios.log` 与 `reinstall-ios.tail.txt`，载体 = `76944386`、被跟踪脏 = 0）：
+`packages/shared-schema/src/index.ts` 报 **TS2307 / TS2305**，指向四枚**没入库的 contract 文件**
+与 `auth-http-contract.ts` 里**七个没入库的导出成员**。
+那一趟只留了日志末尾若干行，所以"到底缺哪几枚"是拿 `git ls-tree` 对着 `index.ts` 的引用逐枚问出来的：
+
+| index.ts 引用了 | 那些东西在哪 |
+|---|---|
+| `./task-batch-contract`、`./task-priority-batch-contract`、`./task-repeat-completion-contract`、`./reminder-owner-contract` | **四枚全部未跟踪**：`git ls-tree --name-only HEAD packages/shared-schema/src/` 里没有它们，而 `git ls-files --others --exclude-standard -- packages/shared-schema` 里四枚都在 |
+| `EMAIL_PASSWORD_REGISTRATION_{ERROR_CODES, CODE_LENGTH, CODE_TTL_MS, RESEND_COOLDOWN_MS}` + 三个同名类型 | 住在 `auth-http-contract.ts` 那 32 行**未提交**的 diff 里 |
+
+现量（一条命令，退出码非 0 = HEAD 仍然打不出包）：
+
+```bash
+git grep -c "EMAIL_PASSWORD_REGISTRATION" HEAD -- packages/shared-schema/src/auth-http-contract.ts || echo "HEAD 里没有那些成员"
+```
+
+🔴 **归因：是本线，不是别人。** `git log -S task-priority-batch-contract -- packages/shared-schema/src/index.ts`
+指向 `9fa53ab9`（10-08 21:31，标题 `docs(账号面): 立 ADR-0063 与标准套件工单…`）。
+那一笔的 `--stat` 里除了 ADR 与计划，还扫进了 **ADR-0058/0059/0060**、`apps/landing` 两份文档页、
+33 张别的线的证据图，以及上面这些**别人的导出块** —— 而实现文件没跟着进来。
+⇒ 一句"docs"标题的提交把别人半条流水线钉进了 HEAD，却把它们的依赖留在工作树里。
+
+**为什么十六小时没人发现**：主检出一直是脏的（这一轮现量 `git status --porcelain | wc -l` = 1477 枚），
+任何在主树上跑的构建都"看得见"那些文件。AGENTS §7 那条"『测过是绿的』是工作区属性不是提交属性"
+这一轮被推到了极致 —— 连 **`pnpm -r build` 能不能过**都是工作区属性，而只有"纯 HEAD 的隔离载体"
+这种载体才照得出来（这正是 §6.26 起隔离载体的理由，也是 §6.16 那趟 73 过的读数**不能**当作
+"HEAD 可用"的证据的原因：它跑在脏树上）。
+
+**影响面（不是本线一格，是全仓）**：`pnpm reinstall:all` 的每一端、任何设备腿、CI 打包路径全部阻塞；
+本线剩下的 iOS 设备腿因此**无法由干净载体取证** —— `CHAIN_RC=1` 既不是产品失败也不是探针失败，
+是 HEAD 本身不可构建。修复与预演在 §6.37。
+
