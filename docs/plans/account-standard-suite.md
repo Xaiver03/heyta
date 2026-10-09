@@ -1477,3 +1477,52 @@ traps 第 396 条同理已补进工作树那份（他们那 40 行未提交条�
 `No projects matched the filters` 然后**退 0**（真名是 `@heyta/sync-server`）。AGENTS §6 早就把这条列成假绿，
 我第一次读数时还是照直觉写了包名 —— 读数必须来自 `pnpm -r … test` 那种**会因缺脚本而退 1** 的形状，
 或者直接把退出码与 `Tests N passed` 那行一起看。
+
+### 6.25 过期凭据的清扫落到了地上：6 + 9 + 36 条判据，以及那条**第一趟活下来的变异**（11:5x 现量）
+
+ADR-0063 §3 承诺过"一次性、消费即失效、留存 N 天"，而**没有任何一层真的去清**：
+`users` 上四对「令牌 + 过期时刻」列、`email_change_requests` 那一行（它带**新邮箱明文** `pending_email`）、
+`access_sessions`（带设备名与 UA）在过期之后一直留在库里。
+
+落地三件：
+
+| 文件 | 内容 |
+|---|---|
+| `server/src/account/credential-sweep.ts` | `sweepExpiredAccountCredentials(nowMs)`：四列各一次 `updateMany`（条件 `not: null` **且** `lt: now`），换绑行 `deleteMany` 要求**两侧都无人持有**，会话行走 `deleteSessionsOlderThan(now - SESSION_ROW_RETENTION_MS)`，阈值从 `JWT_EXPIRY` 推导 |
+| `server/src/sync/cleanup.ts` 第 9 步 | 调用它并**计数为 0 也记日志**（"跑了但没活干"必须与"根本没跑到"分得开）；炸了响亮记 error，不局部吞掉 |
+| `server/tests/credential-sweep.spec.ts` | J-S1…J-S6，6 条 |
+| `server/tests/email-change-page.spec.ts` | `/change-email` 凭据页 9 条（GET 不消费令牌、令牌进 HTML 属性前过 `escapeHtml`、两种成功是两句不同的话、「去登录」只在生效那一支才亮、失败不回显内部话术、脚本挂在 `</main>` 之后） |
+
+读数（载体 = `.worktrees/mail` 那棵**只含本线改动**的树，`server/node_modules` 软链到主检出；
+这条很重要：主检出的 `server/src` 里同时躺着别人未提交的改动（automation 那条线的 `purgeExpired*` 就在其中），读数为 0 或为 1 都不能归因到本笔）：
+
+- `credential-sweep.spec.ts` **6 passed (6)**
+- `credential-sweep` + `email-change-page` + `email-change` **51 passed (51)**（9 + 36 + 6）
+- `tsc --noEmit -p tsconfig.json`：该树 **2 错**（`src/automation/ai-metering.ts(98,85) TS2741`、`src/email.ts(314,60) TS2554`），
+  主检出（脏）**0 错** ⇒ **那两枚红是 HEAD 自带的**（消费者已提交、生产者在路上），不是本笔带进来的；
+  本笔那块代码在该树上类型干净。
+
+🔴 **这一族真正产出的判据来自一条活下来的变异**：
+臂 `cs-2-drop-old-side-guard`（把换绑那行的"old 侧也要无人持有"整段删掉，只剩 new 侧）
+**第一趟 6 条全绿**。查了才确认不是探针坏：`git diff` 证明变异进了产物（`oldExpiresAt` 在 `where` 里出现次数
+由 2 变 0、`OR` 子句只剩 1 段），而 J-S3 的 fixture **只造了"new 侧有人在等"那一半** ——
+"只看 new 一侧"的错法在那一行数据上行为完全一样。
+⇒ 补了**镜像 fixture**（old 侧 `FUTURE` + 有 token、new 侧 `null`），
+J-S3 从此要求"两边各有一行都在等人"，重跑该臂 = **rc=1、恰好 J-S3 红**。
+这是 §7 第 274 条的形状（负向断言的正向对照要落在"条件不成立时确实会变"那一侧）在本线的第二次命中。
+
+三臂终局读数（每臂跑完立刻从 `.mut-bak` 还原并 `cmp -s` 验证）：
+
+| 臂 | 改的是哪条形状 | 红在哪条 |
+|---|---|---|
+| `cs-1-unpair-columns`（`data` 里去掉过期时刻列） | "令牌与它的时刻必须在同一次写里成对出现" | J-S1 + J-S2（2 failed） |
+| `cs-2-drop-old-side-guard` | "两侧都无人持有才删" | J-S3（1 failed，补镜像 fixture 之后） |
+| `cs-7-sessions-unreported`（`sessions` 写死 0） | "每格报告的都是真正删掉的行数，0 也必须在场" | J-S6（1 failed） |
+
+⚠️ **一枚混着两条线的文件是怎么只提交自己那一半的**：`server/src/sync/cleanup.ts` 在主检出里同时带着
+automation 那条线的两个 `purgeExpired*` 调用（未提交）和我这一步。直接提交工作树内容 = 代他们提交。
+做法：在隔离树上从 **HEAD 版**出发只插入我那块（锚点选 ai-usage-counters 那节的收尾，
+并断言 `startCleanupJobs` 排在我的块之后 —— 第一次锚 `body.rindex("};\n")` 把块插进了 `startCleanupJobs` 里，
+`TS1308 await outside async` 当场抓住），再 `git hash-object -w` + `update-index --cacheinfo`，
+`git diff --cached --name-only` 确认恰好是本线那几枚路径，最后 **不带 pathspec 的 `git commit`**
+（`git commit -- <path>` 提交的是工作树内容，会把别人的脏行一起带走）。

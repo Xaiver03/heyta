@@ -5,6 +5,7 @@ import { runBillingReconciliation } from '../billing/reconcile-job';
 import { DEFAULT_SYNC_CONFIG, MS_PER_DAY } from './sync.types';
 import { MIN_CHECKPOINT_SAFE_APP_VERSION } from './checkpoint-gate';
 import { vaultKeyMigrationService } from './services/vault-key-migration.service';
+import { sweepExpiredAccountCredentials } from '../account/credential-sweep';
 
 let cleanupTimer: NodeJS.Timeout | null = null;
 let initialCleanupTimer: NodeJS.Timeout | null = null;
@@ -169,6 +170,22 @@ const runDailyCleanup = async (): Promise<void> => {
     Logger.info(`Cleanup [ai-usage-counters]: removed ${deleted} row(s)`);
   } catch (error) {
     Logger.error(`Cleanup [ai-usage-counters] failed: ${error}`);
+  }
+  // 9. 过期的**账号凭据列**、过期/无人在等的换绑请求行、过了 JWT 生命周期的会话行。
+  // 🔴 这一条是"一次性令牌"与"留存 N 天"那两句对外政策的执行者：政策写的是形状
+  // （只存 SHA-256、过期即无用），只有这一趟能把 hex 从库里拿掉。没有它，那句"一次性"
+  // 说的只是"验证那一步会拒"，而那一串哈希与它的过期时刻会留到备份滚完为止 ——
+  // 换绑那一行还多带一份**新邮箱明文**（`pending_email`）。
+  // 计数为 0 也记日志（与 [old-ops]、[ai-usage-counters] 同一条理由）。
+  try {
+    const swept = await sweepExpiredAccountCredentials(Date.now());
+    Logger.info(
+      `Cleanup [account-credentials]: verification=${swept.verificationTokens} ` +
+        `reset=${swept.resetTokens} recovery=${swept.recoveryTokens} login=${swept.loginTokens} ` +
+        `change-requests=${swept.changeRequests} sessions=${swept.sessions}`,
+    );
+  } catch (error) {
+    Logger.error(`Cleanup [account-credentials] failed: ${error}`);
   }
 };
 
