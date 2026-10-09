@@ -63,13 +63,29 @@ import { asServerLocale, resolveLocale } from './design-html.js';
 import { SERVER_LOCALES, type ServerLocale } from './copy.generated.js';
 import { authCache } from './auth-cache';
 import { getWsConnectionService } from './sync/services/websocket-connection.service';
-import { createEntitlementGuard, readAutomationEntitlementTicketHeader } from './entitlement';
+import { createEntitlementGuard, readAutomationEntitlementTicketHeader, resolveAutomationEntitlementMode } from './entitlement';
 import { issueAutomationCommitPermit, readInboundUploadIdentity, registerAutomationWorker, revokeAutomationWorker } from './automation/worker-identity';
 import { createAutomationRule, deleteAutomationRule, listAutomationRules, setAutomationRuleEnabled, updateAutomationRuleConfig } from './automation/rules';
 import { claimAutomationEvent, listAutomationEvents, publishAutomationResult, readAutomationPreparedResult, renewAutomationLease, retryUncertainAutomationEvent, readAutomationDraft, decideAutomationDraft } from './automation/events';
 import { advanceAutomationAiAttempt, reserveAutomationAiAttempt } from './automation/ai-metering';
 import { issueSenderCredential, listSenderCredentials, revokeSenderCredential } from './automation/sender-credentials';
 import { AutomationEntitlementError, redeemAutomationEntitlementTicket } from './automation/entitlement-ticket';
+import {
+  AutomationIssuerError,
+  bumpAutomationRevocationFloor,
+  applyAutomationRevocationManifest,
+  ensureAutomationEntitlementSubject,
+  issueAutomationEntitlementActivation,
+  loadAutomationEntitlementIssuer,
+  readAutomationRevocationFloor,
+  redeemAutomationEntitlementActivation,
+  revokeAutomationEntitlementLink,
+  loadEffectiveAutomationKeyring,
+  signAutomationEntitlementSessionTicket,
+  signAutomationRevocationManifest,
+  type AutomationEntitlementIssuer,
+} from './automation/entitlement-issuer';
+import { requireAdmin } from './admin/admin.middleware';
 
 // Zod Schemas
 const VerifyEmailSchema = z.object({
@@ -89,6 +105,14 @@ const AutomationEntitlementTicketSchema = z.object({
   ticket: z.string().min(1).max(8192),
   localAccountUuid: z.string().uuid(),
 }).strict();
+const AutomationInstallationSchema = z.object({ installationId: z.string().uuid() }).strict();
+const AutomationActivationRedeemSchema = z.object({
+  code: z.string().min(20).max(64),
+  installationId: z.string().uuid(),
+  localAccountUuid: z.string().uuid(),
+}).strict();
+const AutomationRevocationManifestBodySchema = z.object({ manifest: z.string().min(1).max(8192) }).strict();
+const AutomationRevocationBumpSchema = z.object({ revocationVersion: z.number().int().nonnegative().max(1_000_000) }).strict();
 const AutomationWorkerRevokeSchema = z.object({ workerId: z.string().uuid() }).strict();
 const AutomationCommitPermitSchema = z.object({
   clientId: SuperSyncClientIdSchema,
@@ -596,12 +620,15 @@ export const apiRoutes = async (
       try {
         // `session` 是唯一能建立/续期短期绑定的动作，也就是公网接收那一格
         // "至多 30 秒已签发窗口"的来源；其它动作的票据只放行它自己那一次操作。
+        // 判定用的下限 = 手配的那一个与在线刷新到的那一个里较大的（只升不降）。
+        const keyring = await loadEffectiveAutomationKeyring(prisma);
         const consumed = await prisma.$transaction((tx) => redeemAutomationEntitlementTicket({
           client: tx,
           userId: getAuthUser(req).userId,
           action: 'session',
           token: parsed.data.ticket,
           localAccountUuid: parsed.data.localAccountUuid,
+          keyring,
         }));
         return reply.header('Cache-Control', 'no-store').send({ state: 'active', expiresAt: consumed.expiresAt.toISOString() });
       } catch (error) {
@@ -609,6 +636,161 @@ export const apiRoutes = async (
         const code = error instanceof AutomationEntitlementError ? error.code : 'AUTOMATION_TICKET_INVALID';
         Logger.audit({ event: 'AUTOMATION_ENTITLEMENT_DENIED', userId: getAuthUser(req).userId, errorCode: code, capability: 'automation' });
         return reply.status(403).send({ error: 'Automation entitlement verification failed', errorCode: code });
+      }
+    },
+  );
+
+  // ── 签发端（只在 `official` 模式的实例上开放）───────────────────────────────
+  // 🔴 判定内核管"这枚票据能不能信"，这一段管"这枚票据该不该签"。两件事的凭据也
+  // 分开：验证侧配的是公钥环（`AUTOMATION_OFFICIAL_KEYS`），签发侧配的是私钥
+  // （`AUTOMATION_OFFICIAL_PRIVATE_KEY` + issuer + keyId）。自托管实例配了公钥环
+  // 也签不出任何东西。
+  const automationIssuerSide = (): { issuer: AutomationEntitlementIssuer } | { code: string } => {
+    if (resolveAutomationEntitlementMode() !== 'official') return { code: 'AUTOMATION_ISSUER_NOT_ON_THIS_INSTANCE' };
+    const issuer = loadAutomationEntitlementIssuer();
+    return issuer ? { issuer } : { code: 'AUTOMATION_ISSUER_NOT_CONFIGURED' };
+  };
+
+  fastify.post<{ Body: z.infer<typeof AutomationInstallationSchema> }>(
+    '/automation/entitlement/subject',
+    { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation' })] },
+    async (req, reply) => {
+      const ready = automationIssuerSide();
+      if ('code' in ready) return reply.status(403).send({ error: 'Automation entitlement issuance unavailable', errorCode: ready.code });
+      const { userId } = getAuthUser(req);
+      const row = await prisma.$transaction((tx) => ensureAutomationEntitlementSubject(tx, userId));
+      return reply.header('Cache-Control', 'no-store').send({ subject: row.subject });
+    },
+  );
+
+  // 激活码明文**只在这一个响应里出现一次**：库里只有它的 SHA-256，日志与审计只记码的存续。
+  fastify.post<{ Body: z.infer<typeof AutomationInstallationSchema> }>(
+    '/automation/entitlement/activations',
+    { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation' })] },
+    async (req, reply) => {
+      const parsed = AutomationInstallationSchema.safeParse(req.body);
+      if (!parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      const ready = automationIssuerSide();
+      if ('code' in ready) return reply.status(403).send({ error: 'Automation entitlement issuance unavailable', errorCode: ready.code });
+      try {
+        const issued = await prisma.$transaction((tx) => issueAutomationEntitlementActivation({
+          client: tx, userId: getAuthUser(req).userId, installationId: parsed.data.installationId,
+        }));
+        return reply.header('Cache-Control', 'no-store').send({ code: issued.code, expiresAt: issued.expiresAt.toISOString(), subject: issued.subject });
+      } catch (error) {
+        const code = error instanceof AutomationIssuerError ? error.code : 'AUTOMATION_ACTIVATION_INVALID';
+        Logger.audit({ event: 'AUTOMATION_ENTITLEMENT_DENIED', userId: getAuthUser(req).userId, errorCode: code, capability: 'automation' });
+        return reply.status(403).send({ error: 'Automation entitlement issuance rejected', errorCode: code });
+      }
+    },
+  );
+
+  // 兑换 = 把 (主体, 实例, 本地账号) 写成服务端事实。此后签 `session` 票据只认这一行。
+  fastify.post<{ Body: z.infer<typeof AutomationActivationRedeemSchema> }>(
+    '/automation/entitlement/activations/redeem',
+    { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation' })] },
+    async (req, reply) => {
+      const parsed = AutomationActivationRedeemSchema.safeParse(req.body);
+      if (!parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      const ready = automationIssuerSide();
+      if ('code' in ready) return reply.status(403).send({ error: 'Automation entitlement issuance unavailable', errorCode: ready.code });
+      try {
+        const link = await prisma.$transaction((tx) => redeemAutomationEntitlementActivation({
+          client: tx, userId: getAuthUser(req).userId, code: parsed.data.code,
+          installationId: parsed.data.installationId, localAccountUuid: parsed.data.localAccountUuid,
+        }));
+        return reply.header('Cache-Control', 'no-store').send({ subject: link.subject, installationId: link.installationId, boundAt: link.boundAt.toISOString() });
+      } catch (error) {
+        const code = error instanceof AutomationIssuerError ? error.code : 'AUTOMATION_ACTIVATION_INVALID';
+        Logger.audit({ event: 'AUTOMATION_ENTITLEMENT_DENIED', userId: getAuthUser(req).userId, errorCode: code, capability: 'automation' });
+        return reply.status(403).send({ error: 'Automation entitlement binding rejected', errorCode: code });
+      }
+    },
+  );
+
+  fastify.post<{ Body: z.infer<typeof AutomationInstallationSchema> }>(
+    '/automation/entitlement/activations/revoke',
+    { preHandler: authenticate },
+    async (req, reply) => {
+      const parsed = AutomationInstallationSchema.safeParse(req.body);
+      if (!parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      const ready = automationIssuerSide();
+      if ('code' in ready) return reply.status(403).send({ error: 'Automation entitlement issuance unavailable', errorCode: ready.code });
+      const revoked = await revokeAutomationEntitlementLink({
+        client: prisma, userId: getAuthUser(req).userId, installationId: parsed.data.installationId,
+      });
+      // 撤销自己的绑定不是失败：没有可撤销的绑定时返回 false，但账号侧状态本就干净。
+      return reply.header('Cache-Control', 'no-store').send({ revoked });
+    },
+  );
+
+  // 签一枚 30 秒 `session` 票据。claims 三个绑定字段全部来自 links 行，请求体一个字都不参与。
+  fastify.post<{ Body: z.infer<typeof AutomationInstallationSchema> }>(
+    '/automation/entitlement/session',
+    { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation' })] },
+    async (req, reply) => {
+      const parsed = AutomationInstallationSchema.safeParse(req.body);
+      if (!parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      const ready = automationIssuerSide();
+      if ('code' in ready) return reply.status(403).send({ error: 'Automation entitlement issuance unavailable', errorCode: ready.code });
+      try {
+        const floor = await readAutomationRevocationFloor(prisma);
+        const signed = await prisma.$transaction((tx) => signAutomationEntitlementSessionTicket({
+          client: tx, userId: getAuthUser(req).userId, installationId: parsed.data.installationId,
+          issuer: ready.issuer, revocationVersion: floor,
+        }));
+        return reply.header('Cache-Control', 'no-store').send({ ticket: signed.token, expiresAt: signed.expiresAt.toISOString() });
+      } catch (error) {
+        const code = error instanceof AutomationIssuerError ? error.code : 'AUTOMATION_LINK_NOT_BOUND';
+        Logger.audit({ event: 'AUTOMATION_ENTITLEMENT_DENIED', userId: getAuthUser(req).userId, errorCode: code, capability: 'automation' });
+        return reply.status(403).send({ error: 'Automation entitlement issuance rejected', errorCode: code });
+      }
+    },
+  );
+
+  // ── 吊销版本：官方侧签发清单，自托管侧吃清单 ──────────────────────────────
+  // 公开可读：它讲的是"哪些票据已经作废"，不含任何账号信息，且必须**验签**才作数。
+  fastify.get('/automation/entitlement/revocations', async (_req, reply) => {
+    const ready = automationIssuerSide();
+    if ('code' in ready) return reply.status(403).send({ error: 'Automation entitlement issuance unavailable', errorCode: ready.code });
+    const manifest = signAutomationRevocationManifest({ issuer: ready.issuer, revocationVersion: await readAutomationRevocationFloor(prisma) });
+    return reply.header('Cache-Control', 'no-store').send({ manifest });
+  });
+
+  fastify.post<{ Body: z.infer<typeof AutomationRevocationBumpSchema> }>(
+    '/automation/entitlement/revocations',
+    { preHandler: [authenticate, requireAdmin] },
+    async (req, reply) => {
+      const parsed = AutomationRevocationBumpSchema.safeParse(req.body);
+      if (!parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      const ready = automationIssuerSide();
+      if ('code' in ready) return reply.status(403).send({ error: 'Automation entitlement issuance unavailable', errorCode: ready.code });
+      try {
+        const version = await bumpAutomationRevocationFloor({ client: prisma, revocationVersion: parsed.data.revocationVersion });
+        Logger.audit({ event: 'AUTOMATION_ENTITLEMENT_REVOKED', userId: getAuthUser(req).userId, revocationVersion: version, capability: 'automation' });
+        return reply.header('Cache-Control', 'no-store').send({ revocationVersion: version });
+      } catch (error) {
+        const code = error instanceof AutomationIssuerError ? error.code : 'AUTOMATION_REVOCATION_NOT_INCREASING';
+        return reply.status(403).send({ error: 'Automation revocation update rejected', errorCode: code });
+      }
+    },
+  );
+
+  // 自托管侧的在线刷新：清单由客户端**转述**，但下限只认**验过签**的那个数。
+  // 这一条不需要权益闸门 —— 恰恰是在绑定被吊销或过期之后才需要它。
+  fastify.post<{ Body: z.infer<typeof AutomationRevocationManifestBodySchema> }>(
+    '/automation/entitlement/revocations/refresh',
+    { preHandler: authenticate },
+    async (req, reply) => {
+      const parsed = AutomationRevocationManifestBodySchema.safeParse(req.body);
+      if (!parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      try {
+        const applied = await applyAutomationRevocationManifest({ client: prisma, manifest: parsed.data.manifest });
+        return reply.header('Cache-Control', 'no-store').send({ revocationVersion: applied.revocationVersion, refreshed: applied.refreshed });
+      } catch (error) {
+        const code = error instanceof AutomationIssuerError ? error.code : 'AUTOMATION_REVOCATION_MANIFEST_INVALID';
+        Logger.audit({ event: 'AUTOMATION_ENTITLEMENT_DENIED', userId: getAuthUser(req).userId, errorCode: code, capability: 'automation' });
+        return reply.status(403).send({ error: 'Automation revocation manifest rejected', errorCode: code });
       }
     },
   );
