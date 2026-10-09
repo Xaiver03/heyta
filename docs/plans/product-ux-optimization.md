@@ -1395,3 +1395,10 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
     本线只交这把尺的射程与这条分诊口径。
     📌 **给下一个跑这条命令的人留一条探针坑**：这把尺的**命中打在 stderr**，
     所以 `… 2>/dev/null | grep -c …` 会读出 0 并让人以为"全仓引用都干净"（本线第一次跑就是这么空手而归的）。
+    ✅ **同一把尺接着打到本线的 23 份证据 README 上**（它们才是下一个人真正会照着找东西的地方）：
+    `for d in apps/web/evidence/*/README.md; do node scripts/check-doc-citations.mjs --doc "$d" 2>&1 | grep -cE '引用了不存在|没写锚'; done`
+    ⇒ **23 份里 3 份各 1 条**。逐条读完：两条是诚实形状（一份写"临时夹具 `…tmp-scope-column-compare.spec.ts` 跑完即删"、
+    一份引的是 `e2e/test-results/` 里 spec 自己现拍的那枚图 —— 两处都是按设计不入库的运行期产物），
+    第三条是**本线自己那份**：它把一条链的出处写成 `test-results/…/error-context.md`，而那个目录是 gitignore 的暂存、
+    这趟收尾时就没了 ⇒ 改成"**承重的是抄进正文的那句快照内容，不是那个路径**"，并补一条重取命令；
+    那条命令只用 `--list` 验过它能命中（`Total: 1 test in 1 file`），**没有真跑去重新生成快照**，这句边界也写在 README 里。

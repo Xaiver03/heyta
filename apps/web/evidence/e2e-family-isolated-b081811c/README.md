@@ -43,8 +43,14 @@ python3 -c "import re;print(re.sub(r'\x1b\[[0-9;]*m','',open('<日志>')).read()
    链条四步，每步都可复跑：
    ① 失败调用日志写的是 `waiting for getByRole('tab', { name: '番茄钟' })`，
       也就是**元素从来没出现**，不是被别的层拦住；
-   ② 同一目录里 Playwright 自己存的 `test-results/narrow-sweep-塌缩态扫描：番茄钟-chromium/error-context.md`
-      在那一刻的 a11y 快照里只有 `tab "任务" / 日历 / 习惯 / 搜索 / 回收站` 五枚 —— **低频视图根本不在主段**；
+   ② 同一趟 Playwright 自己存的 `test-results/narrow-sweep-塌缩态扫描：番茄钟-chromium/error-context.md`
+      在那一刻的 a11y 快照里只有 `tab "任务" / 日历 / 习惯 / 搜索 / 回收站` 五枚 —— **低频视图根本不在主段**。
+      ⚠️ **那枚文件不是入库证据**：`e2e/test-results/` 是 gitignore 的运行期暂存，每次跑都重写、清一次就没了
+      （本目录这趟收尾时它就没了）。所以这条链的**承重的是上面那句抄下来的快照内容**，不是那个路径；
+      要重新拿到那份快照：`cd e2e && npx playwright test tests/narrow-sweep.spec.ts -g '番茄钟'`，
+      然后开 `test-results/<那条用例名>-chromium/error-context.md`。⚠️ 这条命令**只用 `--list` 验过它能命中**
+      （现读 `Total: 1 test in 1 file`，命中的是 `narrow-sweep.spec.ts:33:3 › 塌缩态扫描：番茄钟`）——
+      没有真跑过一遍去重新生成那份快照，所以它保证的是"这条命令找得到那条用例"，不是"跑完一定得到同样的五枚 tab"。
    ③ 被测那棵树的设计裁决就在 `apps/web/src/App.tsx:2140`：「主段最多 5 个按钮（四个高频目的地 +「更多」），
       低频目的地通过「更多」保持可达」，而 overflow 那批渲染成 `role="menuitem"`、
       装在一个 `role="menu"` 里，**且只在 `moreOpen` 为真时存在**（`App.tsx:2206–2226`）；
