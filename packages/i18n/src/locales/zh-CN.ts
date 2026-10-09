@@ -4144,7 +4144,7 @@ export const zhCN = {
   'site.docs.account.s1p1': '同步设置包含服务端连接信息，以及独立的加密数据钥匙管理。登录后可以创建钥匙、保存恢复码或解锁已有数据。',
   'site.docs.account.s1i1': '服务端地址：你要连的那台同步服务器。什么都不填就是纯本地使用，数据只留在这台设备上。',
   'site.docs.account.s1i2': '访问令牌：由服务端签发，代表「这个账号在这台服务器上的那块空间」。已经有令牌的可以直接粘贴。',
-  'site.docs.account.s1i3': '加密口令：不发给服务端，与登录密码分开。恢复码与设备记住解锁的边界见「端到端加密口令」。',
+  'site.docs.account.s1i3': '加密口令：不发给服务端，与登录密码分开。恢复码与设备记住解锁的边界见「加密与恢复码」。',
   'site.docs.account.s2': '三条登录方式，邮箱 + 口令是主路',
   'site.docs.account.s2p1': '注册与登录走的是**邮箱 + 口令**，另外邮箱链接与通行密钥也一直在。服务器上存的口令不是能读回来的样子，也没有任何人能把它交还给你 —— 忘了就走「忘记密码？」，它会发一封带一次性重置链接的信，那是真重置，不是绕过口令的后门。',
   'site.docs.account.s2i1': '邮箱 + 口令：填邮箱、设一个口令（至少 8 个字符）、点验证邮件里的链接激活，之后每次输口令登录。',
@@ -4894,7 +4894,7 @@ export const zhCN = {
   'server.email.passwordChanged.title': '登录密码已更改',
   'server.email.passwordChanged.body': '你的 heyta 账号刚刚设置了新的登录密码，其他设备上的登录都已失效。',
   'server.email.passwordChanged.button': '打开 heyta',
-  'server.email.passwordChanged.notYou': '如果这不是你本人操作的，请立刻用「忘记密码」重新拿回账号，并确认你的邮箱有没有被别人读到。',
+  'server.email.passwordChanged.notYou': '如果这不是你本人操作的，请立刻用「忘记密码？」重新拿回账号，并确认你的邮箱有没有被别人读到。',
   // ── 换绑登录邮箱（ADR-0063）：两半确认 + 一封完成通知 ──
   'server.email.changeConfirm.subject': '确认这个邮箱要成为你的 heyta 登录标识',
   'server.email.changeConfirm.title': '确认新的登录邮箱',
@@ -4910,7 +4910,7 @@ export const zhCN = {
   'server.email.changed.title': '登录邮箱已更改',
   'server.email.changed.body': '你的 heyta 账号现在用这个邮箱登录。其他设备上的登录都已失效，要用新的邮箱重新登录一次。',
   'server.email.changed.button': '打开 heyta',
-  'server.email.changed.notYou': '如果这不是你本人操作的，说明有人同时读到了你的两个邮箱，请立刻用「忘记密码」拿回账号。',
+  'server.email.changed.notYou': '如果这不是你本人操作的，说明有人同时读到了你的两个邮箱，请立刻用「忘记密码？」拿回账号。',
   // ── 账号新增了一种登录方式（兑现 email-password-auth.md 缺口 13）──
   'server.email.authenticatorAdded.title': '你的 heyta 账号多了一种登录方式',
   'server.email.authenticatorAdded.password.subject': '你的 heyta 账号设置了登录密码',
@@ -4918,7 +4918,7 @@ export const zhCN = {
   'server.email.authenticatorAdded.passkey.subject': '你的 heyta 账号新增了一条通行密钥',
   'server.email.authenticatorAdded.passkey.body': '你的 heyta 账号刚刚添加了一条通行密钥。多一条登录方式意味着多一个能进到这个账号的入口。',
   'server.email.authenticatorAdded.button': '打开 heyta',
-  'server.email.authenticatorAdded.notYou': '如果这不是你本人添加的，请到设置里的「登录方式」把它删掉，并修改你的登录密码。',
+  'server.email.authenticatorAdded.notYou': '如果这不是你本人添加的，请到设置里「账号与安全」的「通行密钥」那一栏把它删掉，并修改你的登录密码。',
   // 🔴 第四张凭据页：**设置新密码**那一页。这一页只设密码、**不发登录态** ——
   //    能走到这里只说明他持有收件箱，而收件箱是可以被旁观的（共享电脑、被转发的邮件）。
   'server.page.reset.title': '设置新登录密码',
