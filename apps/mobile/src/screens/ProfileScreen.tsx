@@ -91,6 +91,7 @@ import { GrowthScreen } from './GrowthScreen';
 import { ProfileProgressSummary } from './ProfileProgressSummary';
 import { HabitsScreen } from './HabitsScreen';
 import { ListsSection } from './ListsSection';
+import { EmailChangeSection } from './EmailChangeSection';
 import { NotesSection } from './NotesSection';
 import { NotificationsScreen } from './NotificationsScreen';
 import { SecurityScreen } from './SecurityScreen';
@@ -1100,6 +1101,7 @@ export function ProfileScreen(): React.JSX.Element {
           )}
       <SettingsRow row={{ kind: 'value', label: t('common.profile.email.label'), value: signedInEmail ?? t('mobile.profile.account.offline') }} />
       <Text variant="caption" tone="subtle">{t('common.profile.email.hint')}</Text>
+      <EmailChangeSection baseUrl={form.serverUrl} token={form.token} currentEmail={signedInEmail} />
     </Stack>
   ) : undefined;
 
