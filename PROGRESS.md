@@ -1803,3 +1803,12 @@ OS 通知投递通过。原 [多端计划](docs/plans/goal-multi-end-coverage.md
   真装机与最空真图绿，读数 0.9% / 71.4% / 10.3%）。`verify-mobile-notes.sh:711` 那处印主蓝但
   明写"不当阈值用"，不动。⚠️ 后者的判据代码是 `package-app.sh` 里的一段 heredoc，
   验法是把**那段真实代码**从文件里抽出来跑（不是照抄一遍），跑前把相对 import 改成绝对路径。
+
+## 2026-10-09 · 入站自动收集（付费自动收集）Goal 开工回执
+
+1. 目标：让负责人能对 AC-1～AC-8 逐条点头，之后才允许开公网接收与售卖。
+2. 顺序：T1 签发端与账号绑定 → T2 宿主续票据与票据消费所在事务 → T3 双真宿主 13 个故障窗口 → T4 事件级计量账本 → T5 界面层入库 → T6 对外说明与限定取代旧承诺的 ADR → T7 全仓门禁与四端重装 → T8 严格复审。前四件决定"能不能卖"，后四件决定"敢不敢开"。
+3. 最大风险：赶进度时最容易偷工的就是**判定算得对**这一格 —— 票据或权益任何一处放宽，直接变成"自托管白送"或"收钱不交付"，所以每条新判据都要过一次反向验证（亲手弄红再还原）。
+4. 任务 0 已逐条亲手复跑（本机 16:52–16:54）：`python3 research/tools/verify-inbound-worker-identity.py` **38/38** 且 rc=0；`server` 票据+草稿+公网接收三文件 **47/47**；`node scripts/check-migrations.mjs` rc=0；`node scripts/check-docs-voice.mjs` rc=0；`node research/tools/license-inventory.mjs` rc=0；`node research/tools/docs-link-check.mjs` rc=1，唯一一条不是本线（`apps/desktop-windows/README.md:89`）；`grep -c '^- \[ \] \*\*AC-' docs/plans/inbound-automation.md` = 8、已勾 0。
+5. 发现**任务书自己写错了两条判据**，已记 `BLOCKED.md` B102 并在那里给出改用版本：窗口数不许按行号数（行号区间里坐着别人的实施顺序），完成条件第 2 条那种"与开工快照枚数相同"在并行提交下量的不是我的动作。
+6. 界面层的挡路条件已解除：`packages/i18n` 进了 HEAD，界面用到的 72 个词条键中英两侧都齐（现量见 B102 与计划里那条更正），计划里那句旧断言就地改写，不留两套状态。
