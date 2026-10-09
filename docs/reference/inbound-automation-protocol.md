@@ -89,6 +89,8 @@ date-only 与 instant 是两种不同语义：date-only 由 `*DateLocal` 字段�
 
 已闭合的部分到此为止；下列仍是**未闭合门槛**，不得读成已实现：各宿主每 30 秒续票据与 `waiting-entitlement` 展示；`X-Heyta-Entitlement-Ticket` 在客户端侧还没有供给方（**服务端那条取票通道已于 2026-10-10 闭合**，见上一段；缺的是宿主真的去调它并把票据附到每次写入上）；`automation_entitlement_clocks` 的实例退役清扫还没有消费者。（官方签发端、`officialSubject ↔ 实例 ↔ 本地账号` 的链接握手、吊销版本在线刷新三件已于 2026-10-09 闭合；除草稿确认与首次许可外的票据消费也于同日**从 HTTP 闸门自己的事务挪进业务写事务**，闸门只留离线预检 —— 判据见 [落地计划](../plans/inbound-automation.md) 文末同名小节。唯一留在闸门里消费的是上面注明的 `ai-reserve`。）
 
+🔴 **"宿主真的去调它"这一格 2026-10-10 量出一道拦路的前置，不是接线工时问题**：逐次动作的票**只在 `official` 模式的实例上签得出**（`server/src/api.ts:660-664` 第一行就按部署模式分流，自托管实例配了公钥环也只验不签），而签票又要求这台 `installationId` 的绑定行已存在（`server/src/automation/entitlement-issuer.ts:323-324`，缺则 `AUTOMATION_LINK_NOT_BOUND`）。客户端侧目前既没有签发方 URL 这个概念（取票源的 `baseUrl` 就是同步实例），也没有绑定握手的调用方（`packages/app-host/src/inbound-entitlement-remote.ts` 只有 `verify` 一个出口）。⇒ 宿主现在无条件取票会**两种读法都错**：官方实例上未兑换过安装身份的已订阅用户被读成"等待权益"，自托管实例则永远拿 `NOT_ON_THIS_INSTANCE`。所以宿主侧只落了**与模式无关的那半**：安装身份的持久化（`createAutomationInstallationMetaStore`：只写一次、坏值不覆盖、退登不清）与草稿确认自己那一枚票的取用（`createInboundDraftReviewer` 现在给 `confirm` 取 `draft-confirm` 票，`cancel` 明确不取 —— 取消允许无订阅进行）。**待裁决的是票由哪个 URL 签**（宿主直连官方＝新增一次出境；客户实例转述＝绑定与限流粒度重定），三条选项与代价登记在项目 `BLOCKED.md` 的 B109。
+
 事件模型账本唯一键 `(eventId, parseVersion, attempt)`，状态 `reserved/sent/consumed/released/unknown`；计量来源在 reserve 时冻结为 `local`、`direct` 或 `managed`，并写入同一账本。`managed` 才消费托管 AI 周期额度并带 `periodAnchor`；本地模型和用户自有端点不消费托管额度，二者的 `periodAnchor` 必须为 `null`。同一尝试重试时来源不允许改变，来源错配必须拒绝。额度判定与 reserve 在同一个数据库事务中，旧的周期计数器不能被另一路无条件加一。明确未发送的失败才 release；已发出后丢失响应记 unknown，默认不自动重新调用。取得结果后只保存客户端加密结果；重试提交不再调用模型。
 
 无功能事件费不等于模型免费；人为再次解析属于明确的新模型尝试且必须重新确认其额度消耗。代理不持久缓存模型正文。新增 ADR 须同时限定 ADR-0054 的事件元数据例外，保留其“代理正文不持久化”边界。
