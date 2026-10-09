@@ -1120,6 +1120,7 @@ C30 卡在打不出装得出来的产物（B112 / B126），C34 卡在**入口�
 | 真 HTTP + 真 PostgreSQL 档 | `python3 research/tools/verify-inbound-worker-identity.py`（自己起 loopback 临时库并跑那枚 integration 文件；结束停机清理） | 装置自带 |
 | 共享层档 | `cd packages/app-host && npx --no-install vitest run --maxWorkers=1 tests/inbound-*.spec.ts`；`cd packages/domain && npx --no-install vitest run --maxWorkers=1 tests/inbound-local-date.spec.ts`；`cd packages/sync-client && npx --no-install vitest run --maxWorkers=1 tests/inbound-authorization.spec.ts` | 不需要 |
 | 矩阵对账 | `python3 research/tools/verify-inbound-ac8-matrix.py` | 不需要 |
+| HEAD 生产者缝对账（B129 那一类） | `python3 research/tools/verify-inbound-producer-seam.py`（只读 HEAD 的字节，每枚在册文件逐枚 `git show`） | 不需要 |
 
 ### 这台装置自己能不能红：六臂反向验证
 
@@ -1197,3 +1198,71 @@ web 的 typecheck 在 app-host 的产物下游，HEAD 产物产不出来时，"�
 `apps/mobile/src/App.tsx` 2 行，`git show HEAD:` 那四枚文件 inbound 命中 **0**），
 以及 e2e 那份比"没挂载"更硬的一层：它 import 的 `selectSettingsSection` 只在 `e2e/tests/helpers.ts`
 的未提交 diff 里，而 helpers 在白名单外 ⇒ **e2e 那份现在连编译都过不去**。
+
+## 2026-10-10 06:0x · 把上面那遍手扫变成一枚能重跑的尺
+
+那一节是**手工**扫出来的，而手工一遍的保质期只到下一次入库之前：本线还会继续往 HEAD 里提交，
+而所有门禁都读**共享工作树** —— 生产者与消费者在同一棵树里就是齐的，所以"消费者已入库、
+生产者留在未提交 diff"这一类缺陷在本机永远现不出来，只在干净检出（CI、T7 隔离副本、下一位克隆的人）上炸。
+⇒ 新增 `research/tools/verify-inbound-producer-seam.py`：只读 **HEAD 的字节**（逐枚 `git show HEAD:<path>`），
+把本线在册文件（路径含 inbound/automation 的 + `EXTRA_SCOPE` 三枚名字不含关键词的落点）里
+每一处跨包具名绑定访问分进四档，**只有机械可判的那一档判红**：
+
+| 档 | 判什么 | 会不会红 |
+|---|---|---|
+| 命中 | 那枚成员在生产包的 HEAD 源码里逐字出现 | 不判 |
+| 盲区 | `import * as ns`、下标访问、生产包在 HEAD 没有任何 .ts | 只数不判 |
+| 登记 | `KNOWN_SEAMS` 里挂了 BLOCKED 号的已知缝（当前 = B129 那三枚） | 大声列出，不判红 |
+| 新缝 | 三档都不沾 | **R2 判红** |
+
+四条规矩：R1 在册清单逐枚必须在 HEAD 找得到（挡"目标文件被删了，装置安静地不执行还照样打印通过"），
+R2 新缝判红，R3 分母自洽（四档相加 == 独立取一次的访问总数，不相等就是"有访问根本没进任何一档"），
+R4 登记的缝不许过期（那三枚键如果真入库了，必须响亮报"撤登记、回写台账"，退 3 而不是闷着变绿）。
+
+### 现量（正常档 + 五臂自测，两条计时都取到）
+
+```
+$ time python3 research/tools/verify-inbound-producer-seam.py
+读数　在册文件=74　跨包成员访问=105　命中=81　盲区(生产包无 .ts)=0　盲区(命名空间)=0　停用=0　登记缝=24　新缝=0
+结论：已入库的消费者不再依赖任何未入库的生产者（ KNOWN_SEAMS 那几枚除外，见上面登记档）
+python3 research/tools/verify-inbound-producer-seam.py  0.75s user 0.94s system 88% cpu 1.917 total
+RC=0
+```
+
+```
+$ python3 research/tools/verify-inbound-producer-seam.py --self-test
+自测　臂数=5
+  臂 1 往已入库的消费者里塞一枚不存在的成员访问 ⇒ 该红：成立（scan 判红，命中 R2）
+  臂 2 清单里放一枚 HEAD 没有的 path ⇒ 该红：成立（scan 判红，命中 R1）
+  臂 3 生产包里那三枚键真的入库了 ⇒ R4 必须说登记已过期（不许闷着变绿）：成立（scan 判红，命中 R4）
+  臂 4 静止对照（scan 不判红）⇒ 必须绿：成立　登记缝 24 枚仍在册、新缝 0、盲区 0、命中 81、分母 105
+  臂 5 子进程跑真 CLI：静止 rc=0 且把登记档拆掉后 rc=1 ⇒ 两个方向都要成立：成立　green rc=0　red rc=1
+结论：全部臂成立
+python3 … --self-test  4.73s user 6.04s system 88% cpu 12.223 total
+SELFTEST_RC=0
+```
+
+那 24 = 上一节逐枚量到的 `10 + 12 + 2`，两条独立通道对上了（手扫是 `git grep -o` 按文件汇总，
+装置是逐绑定逐访问计数）；105 是分母，81 命中 + 24 登记 = 105 ⇒ R3 成立。
+
+### 臂 5 第一次是坏的，而它坏的方式正是这枚装置要防的那一类
+
+第一版注入写的是 `KNOWN_SEAMS = {` → `KNOWN_SEAMS = {} or {`，看着像"把登记档拆空"，
+实际是**语义空操作**（空 dict 是假值 ⇒ `or` 取后面那份非空），所以红腿拿到的是 `rc=0`，
+臂自己报了「不成立」。改成把登记键里的生产包名换成不存在的那枚（那 24 处访问判成新缝），
+并在写副本之前断言"那份文本确实变了"，否则登记档一改形状，这一臂会悄悄退化成只测绿的那一腿。
+⇒ 可迁移的一条：**注入式自测臂必须断言注入本身落进了被注入的那份东西** ——
+不然它测的是"我以为改了"，而输出上和"判据有牙"长得一模一样。
+
+另一条同族的读数：第一版正常档跑一次 **>2 分钟**（把每枚生产包的全部 HEAD `.ts` 逐枚 `git show`
+再拼成整包文本，且一个 scan 里拼六次）。改成 `git grep -l -w -e <成员> HEAD -- <包>` 按对缓存
+（只有被覆盖的那一枚包退回整包拼接）后 1.9 s。这不是洁癖：**一条要人每次入库后重跑的尺不能是几十秒** ——
+它一旦被跳过，这档判据就等同于没有。
+
+盲区说在前头：这是**粗筛**，不是 typechecker。命中档只要求标识符在生产包 HEAD 源码里逐字出现，
+所以"名字在注释里 / 是另一枚对象的同名成员"会算成命中（假绿方向）；精确那一腿仍是上一节那两臂 tsc 还原。
+
+**怎么用**：本线每提交一笔之后跑一次（它是唯一能在"提交后"而不是"CI 上"发现这类红的一遍）；
+红集里出现新缝 ⇒ 按 R2 那句话把生产者一并入库，或在 B129 那一档登记后进 `KNOWN_SEAMS`。
+等 B129 修掉，R4 会自己把这三枚登记顶出来 —— 届时删登记，不留一条会过期还报绿的状态。
+
