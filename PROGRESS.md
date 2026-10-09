@@ -1859,3 +1859,18 @@ OS 通知投递通过。原 [多端计划](docs/plans/goal-multi-end-coverage.md
   §4 把握手与在线刷新的**机制**写实（活码域分隔、明文只出一次、`session` 三字段取自 `links`、下限取 max），
   未闭合清单只剩续票据/展示、票据供给方、票据消费所在事务三格。门禁：`check-docs-voice` rc=0、
   `check-migrations` rc=0、`docs-link-check` rc=1 且唯一一条仍是那条非本线的（`apps/desktop-windows/README.md:89`）。
+- ✅ **T1 已入库（六笔，只本地提交、未 push）**：`3fcc3bef` 持久层（schema + 两枚迁移）·
+  `b087dd67` 签发端与判定层 · `dc1750ab` HTTP 面 · `8f3df6ed` 判据 · `82e16169` 计划与协议 ·
+  `302e1802` 台账。每笔 `--stat` 的枚数等于点名的枚数（3/2/1/2/2/2，逐笔读回贴在上面那条命令的输出里）。
+  `server/src/api.ts` 走的是"**HEAD 那一份 + 本线切片**"的 blob（别人的在飞改动一个字没带走）：
+  现量 = 提交后 `git diff HEAD -- server/src/api.ts | grep -c '^+.*[Aa]utomation'` → **0**，
+  而剩下的 131/33 全是 `normalizeEmail` / `sessionMetaFromRequest` / registration-otp 那一族。
+- ⚠️ **共享索引的那一格必须跟着刷**：plumbing 提交之后主索引对**新 HEAD** 是落后的，`git status` 会把
+  刚提交的六笔内容报成 `D`（暂存删除）+ `??`（未跟踪）。这不是丢文件，是索引不知道 HEAD 里有它们 ——
+  真正的问题是别人随后用主索引做一笔提交就会把这两枚迁移和签发端**整个退回**。
+  刷之前先证"索引里没有别人的暂存工作"（逐枚对 `idx blob == 旧 HEAD blob`，八枚全等、四枚新路径无条目），
+  再逐枚点名 `git update-index --add --cacheinfo 100644,$(git rev-parse HEAD:<path>),<path>`；
+  复验：本线 12 枚路径的状态行只剩 ` M server/src/api.ts`（那是在飞改动，不是我的）。
+- 入库后门禁读数：`check-migrations` rc=0、`license-inventory` rc=0、AC 未勾 8 / 已勾 0。
+  切片带过去的 14 枚 import 符号在 HEAD 里逐个 `git grep` 命中 ≥1（`requireAdmin` 也在）——
+  这是"拼出来的那一份树"的**符号级**核对，整树编译仍在 T7 的隔离副本上做，不拿它冒充。
