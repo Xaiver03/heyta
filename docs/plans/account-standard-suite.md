@@ -1804,8 +1804,8 @@ git grep -q 'sendEmailPasswordRegistrationCodeEmail' HEAD -- server/src/email.ts
 | 格 | HEAD 上到底有没有 | 代码在哪 | 谁关 |
 |---|---|---|---|
 | 移动端「更换登录邮箱」挂载 | ✅ **有**（`git grep -c EmailChangeSection HEAD -- apps/mobile/src/screens/ProfileScreen.tsx` = 2） | 已入库 `76944386` | 已关，见 §6.28 |
-| 移动端「登录设备 / 逐枚撤销 / 退出这台 / 退出所有」挂载 | ❌ 没有（`onSignOutCurrentDevice` 在 HEAD 的 `SecurityScreen.tsx` 里 0 次） | 写好在那枚文件**未提交**的那 432 行里（⚠️ 那批是**本线自己的**，见 §6.35 上面那条更正） | **本线整片落**：与 `ProfileScreen` 那处 hunk 是一个原子改动，现量与为什么不能手搬在 §6.43 |
-| 移动端「丢失了通行密钥？发一封找回链接」 | ❌ 没有，但**词条在 HEAD**：`mobile.security.passkeys.recover` / `.recoverHint` 都在表里 ⇒ 又是一枚孤儿词条 | 写好在同一枚未提交的 `SecurityScreen.tsx`（`requestPasskeyRecovery` 3 处） | 同上（同一批 hunk）；复取：`git grep -c "security-recover-submit" HEAD -- apps/mobile` |
+| 移动端「登录设备 / 逐枚撤销 / 退出这台 / 退出所有」挂载 | ✅ **有**（10-09 16:3x 现量：`git grep -c "onSignOutCurrentDevice" HEAD -- apps/mobile/src/screens/SecurityScreen.tsx` = 3，`…ProfileScreen.tsx` = 1） | 已入库 `bf9426d0`（`SecurityScreen.tsx` +369/−63 与 `ProfileScreen.tsx` 那处 hunk +103/−0 一次落） | 已关，读数与为什么必须整片落在 §6.44；**只剩设备腿那一趟读数**（§5 第 10 项、§6.40） |
+| 移动端「丢失了通行密钥？发一封找回链接」 | ✅ **有**（同一笔里落的；`git grep -c "security-recover-submit" HEAD -- apps/mobile` = 1 ⇒ 那枚孤儿词条从此有宿主了） | 同上 `bf9426d0`（`requestPasskeyRecovery` 在 HEAD 命中 1 枚文件） | 同上（同一批）；已登录那条添加通行密钥的路径也在这笔里从红转绿（`beginPasskeyEnrollment` HEAD 命中 2） |
 | 移动端「忘记密码？」入口 | ❌ 没有（`git grep -c forgotPassword HEAD -- apps/mobile` = 0） | 写好在**未提交**的 `AuthScreen.tsx`（`requestPasswordReset` 导入 + `forgotPassword` 那个 handler） | 等 `AuthScreen.tsx` 落地 |
 | web 三块面板（换绑 / 会话 / 登出这台与所有） | ✅ **有**（现量：`git grep -c "EmailChangePanel" HEAD -- apps/web` ⇒ 面板 1 / `ProfilePanel.tsx` 3 / 判据 23；`git grep -c "email-change-submit" HEAD -- apps/web` = 1） | 已入库：组件+挂载 `3dd210bd`，jsdom 判据 41 条 + 6 张真浏览器图 `23a3a24b` | 已关，见 §6.41（含 §6.31 那道必红的闭合）；剩下的只有设备腿与法务那一笔 |
 | 法务「十封」政策文本 + `email-catalog` 对账判据 | ❌ 文本改动在未提交的 5 份 legal 文档里，判据未跟踪 | 已写好 | 与实现同一批，见 §6.34 |
@@ -2236,3 +2236,83 @@ cd .worktrees/<一棵 detached 在 main 的副本>/apps/mobile
 git diff --numstat HEAD -- apps/mobile/src/screens/ProfileScreen.tsx    # 别线字节还在里面 = 还不能整片落
 git grep -c "onSignOutCurrentDevice" HEAD -- apps/mobile/src/screens/ProfileScreen.tsx   # 0 = 那处 hunk 没落
 ```
+
+⚠️ **这三条读数已经在 10-09 16:3x 换相了**（那一格由 §6.44 那笔关掉）：现在跑它们得到的是
+`19 passed`、`git grep -c … = 1`。留着这段是因为它记录的是"**为什么当时不能手搬**"那套判据，
+不是当前的状态；当前状态一律读 §6.44。
+
+### 6.44 移动端那一格整片落了：`bf9426d0` —— 两枚文件一次落，四道判据逐条现量
+
+先说这一笔落的是**什么形状**，因为它决定下一个读这段的人能不能照做：
+
+| 问法 | 命令 | 读数 |
+|---|---|---|
+| 这一笔到底动了哪几枚文件 | `git diff-tree -r --name-only 9e02933d bf9426d0` | 恰好两枚：`SecurityScreen.tsx`、`ProfileScreen.tsx` |
+| `ProfileScreen` 里进了多少别线字节 | `git diff --numstat 9e02933d bf9426d0 -- …/ProfileScreen.tsx` | `103 0` —— **零删除**，只有我那一处加法 |
+| 那 103 行是不是工作树那枚的子集（决定别人落地时是覆盖还是并列第二份） | 逐行取 `git diff -U0` 的 `+` 行，问它在不在工作树版本里 | **103 / 103 逐字命中，缺失 0 行** ⇒ 他们那笔一落是**盖在同一批行上**，不会长出第二份退出编排（§6.41 那把判别尺在这里同样成立） |
+
+`ProfileScreen.tsx` 那 103 行是**我自己写的最小 hunk**（不是从工作树那枚 30 hunk 的版本里搬的）：
+五个唯一锚点各命中 1 次 —— ① `../auth/session` 那行 import 之后加 `../auth/sign-out-flow`；
+② `setSecurityOpen` 那个函数之后加两条退出出口的状态与三个回调；
+③ `<SecurityScreen` 之后补 `baseUrl={form.serverUrl}` 与 `token={form.token}`；
+④ `onPasswordChanged` 那个闭包之后补 `onSignOutCurrentDevice` / `onSignedOutEverywhere`；
+⑤ 账号那颗按钮之后、`<SettingsRow row={settingsRow} />` 之前插"还没撤成 / 已退出所有设备"两张卡。
+
+为什么②③④⑤必须同时在场 —— 这就是 §6.43 说的原子性：只落 `SecurityScreen.tsx` 会让
+`ProfileScreen` 少四枚必填 props，编译级判据当场给出恰好一条 `TS2739`（当刻现量取到过）。
+
+**证据四条，全部在同一棵隔离载体（`.worktrees/iosacct`）上两臂对跑**：
+
+1. **编译级**：`tsc -p apps/mobile/tsconfig.mountcheck.json --noEmit` 的错误行排序后取双向差集：
+   基线臂（干净 `a1d9eb60`）**76 条**，候选臂**76 条**，`comm -13` 与 `comm -23` **都是空**；
+   而那 76 条全落在 `packages/*`（`grep "screens/SecurityScreen\|screens/ProfileScreen"` 命中 0）
+   ⇒ 本笔对类型面**净贡献 0**。
+   尺有牙：摘掉 `token={form.token}` 那一行 ⇒ `error TS2741: Property 'token' is missing…` 精确指到那枚 props；
+   还原走 `src/screens/ProfileScreen.tsx.mut-bak`，`cmp -s` 对过与候选**逐字相同**。
+2. **接线判据**：`account-security-wiring.spec.ts` 基线 `4 failed | 15 passed` → 候选 **`19 passed`**。
+   摘掉 `onSignedOutEverywhere` 那条 prop ⇒ **恰好 1 条红**（不是整片红，说明那四条各钉各的）。
+3. **整族不回归**：`vitest run`（`apps/mobile` 全量）基线 `55 failed | 502 passed` → 候选
+   `51 failed | 506 passed`；把两臂的失败用例名排序做差集，**候选 − 基线 = 空**，
+   基线 − 候选 = 恰好那 4 条 ⇒ 剩下的 51 条红**一条都不是本笔带来的**（它们是别线没落的实现与缺依赖）。
+4. **静态门**：`check:mobile-settings` rc=0（那张卡进的是「我的」常驻区，不是凭据表单，
+   所以没有撞"表单不许进滚动流"那条），`check:rn-aria` rc=0；
+   `check:layering` / `check:ui-language` 两臂输出用 `cmp` 比过**逐字相同** ⇒ 与本笔无关。
+   词条：这两枚文件用到 109 枚键，对 HEAD 中英两份表逐枚比 ⇒ **zh 缺 0 / en 缺 0**。
+
+🔴 **顺带现量到、且必须让下一位知道的一条**：HEAD 上 `pnpm check` 现在**不会全绿**，红的两道不在本线：
+
+| 门 | 命中 | 归属 |
+|---|---|---|
+| `check:layering` | `apps/web/src/features/share/share-key-store.ts:56` 在 `apps/*` 里就地拼 op | 那条共享层/后台那一线（最近碰那枚文件的是 `e6058120`，产品体验线那笔） |
+| `check:ui-language` | 价格 SSOT 三处不一致：`server/src/billing/price-book.ts` 的 `SKU_GRANTS` = `[ai, hosting]`，而 `docs/reference/pricing-and-entitlements.md` = `[ai, automation, hosting]`；另有 `web.ai.settings.localApi.source.file` 那条"zh 里没有汉字" | `automation` 那一档由 `7350e309`（自动收集线权益判定定案）写进价格表。这不是抄错数字：它判的是**对外承诺哪组能力**，按口径要负责人拍，且与本线无关 ⇒ 不代改，只登记 |
+
+复取这两道红的现量命令（都在干净载体上跑，别在主检出跑 —— 那里工作树是别人的）：
+
+```bash
+node scripts/check-layering.mjs        # rc=1，指向 share-key-store.ts:56
+node scripts/check-ui-language.mjs     # rc=1，指向价格 SSOT 那条
+```
+
+**落法**：临时索引 `read-tree <tip>` + 两枚 `update-index` + `write-tree` + `commit-tree` +
+`update-ref refs/heads/main <新> <旧>`。那条**旧值守卫真的拦下了一次**：
+`update_ref failed … is at 9e02933d but expected a1d9eb60` —— 并行会话在我取数期间落了一笔
+只动 `docs/plans/product-ux-optimization.md` 的文档笔。守卫的作用不是仪式：
+落笔前重取了一次那两枚文件在两个 ref 上的 blob（`ad17a925` / `3ffe25c2` **两侧逐字相同**）
+⇒ 那份 A/B 读数描述的就是落地面内容，取数臂不必重跑。
+落完刷新了共享索引里我那两枚（`update-index --cacheinfo`），否则下一位的裸 `git commit`
+会拿旧索引把我的 hunk 倒回去。
+
+🔴 **那次刷新十分钟内被倒回去了一次，形状正是上面说的那种**（现量：`git diff --cached --numstat`
+给出 `0 103 ProfileScreen.tsx` + `63 369 SecurityScreen.tsx` —— 索引里躺的是 `ad17a925` / `3ffe25c2`
+即落地面之前那两枚 blob，而 HEAD 里是 `6c8a5fcd` / `eec92b1b`）。谁刷的没查（那一档正是并行会话在
+落他们那三笔的时候），但**只要有人在那段时间裸 `git commit` 一次，本笔就被静默撤掉，而且门禁不会响**。
+对策写成可复取的两句：落完立刻刷；**下一笔落地前再取一次** `git diff --cached --numstat -- <我的路径>`，
+非空就再刷。这条不是"洁癖"，是本线在 §6.42 刚写过的那一型（一道已入库的判据红在产品没入库上）
+的反面：一次已入库的落地红在索引被倒回上。
+
+**这一格关掉之后仍然开着的两件事**（不许读成"移动端全做完了"）：
+1. **设备腿那一趟读数**：界面在 HEAD 上了，但"真模拟器上点得到这四格 + 退出这台/退出所有"
+   还没取过 —— 前置三个（能构建的载体 ref、没人占的模拟器窗口、1 分钟负载 ≤12）见 §6.40。
+2. **HEAD 整仓仍然打不出包**（§6.38 那 9 枚构建输入）—— 本笔没让它变好也没让它变坏；
+   上面那条"编译级 = 0 新增错误"用的是 mountcheck 那把尺（源码映射，绕开 `packages/ui` 的 dist），
+   它**不是** `pnpm -r build`，不要把两者读成一回事。
