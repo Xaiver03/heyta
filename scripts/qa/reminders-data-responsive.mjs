@@ -15,14 +15,17 @@ const ORIGIN = process.env.HEYTA_RESPONSIVE_ORIGIN ?? 'http://127.0.0.1:4379';
 const ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const OUT = resolve(process.env.HEYTA_RESPONSIVE_EVIDENCE ?? `${ROOT}/apps/web/evidence/reminders-data-responsive`);
 
-// 真实的 `default` 通知态只存在于**有头** Chromium：无头下即便 `Browser.setPermission`
-// 也会被折成 `denied`（下面那条注释就是那次实测）。而有头=开一个会抢前台的窗口，
-// AGENTS §6.2 规定二不许在无人应窗的时候开。所以 `default` 这一档改成显式 opt-in：
-// 无头那一趟取四态，并把跳过的那一态如实写进 report，而不是假装五态齐。
+// 真实的 `default` **与 `granted`** 两态只存在于有头 Chromium。原先这里只写了 `default`，
+// 2026-10-09 无头那一趟把它照出来了：`granted` 档设完权限后回读 `Notification.permission`
+// 得到的是 `denied`（`report.json` 里 `mode:'granted'` 那 4 格 `permission:'denied'`、
+// granted 卡 0 张），`allPermissionStatesRendered` 因此判假红。⇒ 无头那一档取三态，
+// 跳过的两态如实写进 report，而不是让五档 `.every` 对着空集合假装齐了。
+// 有头 = 会开一个抢前台的窗口（AGENTS §6.2 规定二），所以它必须是显式 opt-in。
 const HEADED = process.env.HEYTA_RESPONSIVE_HEADED !== '0';
+const HEADLESS_SKIPPED = ['default', 'granted'];
 const reminderModes = HEADED
   ? ['default', 'granted', 'denied', 'unsupported', 'error']
-  : ['granted', 'denied', 'unsupported', 'error'];
+  : ['denied', 'unsupported', 'error'];
 const cases = [
   { theme: 'light', width: 390, height: 844 },
   { theme: 'dark', width: 390, height: 844 },
@@ -225,10 +228,10 @@ const report = {
   carrier: {
     headless: !HEADED,
     reminderModes,
-    skippedReminderModes: HEADED ? [] : ['default'],
+    skippedReminderModes: HEADED ? [] : HEADLESS_SKIPPED,
     skipReason: HEADED
       ? null
-      : '真实的 default 通知态在无头 Chromium 会被折成 denied，而无头是不抢前台的唯一一档（AGENTS §6.2 规定二）',
+      : 'default 与 granted 两态在无头 Chromium 里都会退化成 denied（granted 那一格是 2026-10-09 无头趟实测出来的），而无头是不抢前台的唯一一档（AGENTS §6.2 规定二）',
   },
   cases,
   reminders,
