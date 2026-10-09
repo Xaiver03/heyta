@@ -3128,6 +3128,30 @@ AGENTS §6.1.1 那套 `pnpm reinstall:all` 固定收尾在干净检出上同样�
 判据是 `grep -n "async function simulate\|function mock_\|mirrors" <那枚 spec>` ——
 命中就说明那一组在测副本。镜像本身不一定错（有些分支用真 HTTP 造不出来），但它**不能算成接线证据**。
 
+### 6.62 本线服务端那一层在新尖上的合并读数：两枚集成套件一起 `18 passed`（10-10 02:53 现量，载体已复原）
+
+上面几笔落完之后重新取一次"这一层合在一起是不是绿的"，而不是只看新加那一枚：
+
+```bash
+cd .worktrees/<载体> && git checkout --force $(git rev-parse refs/heads/main)
+# 前置三件，缺一件就整组读不到（都是载体账，不是产品账）：
+# ①§6.58 那条 Prisma 判据  ②server/node_modules/@heyta/inbound-core 那枚按 lockfile 本该存在的链接
+#   （缺了的症状是 `Cannot find package '@heyta/inbound-core' imported from src/entitlement.ts`，
+#    两枚 spec 都以 **[文件]** 形状报"加载不到"，一条用例都不会起跑）  ③跑完 `git checkout -- pnpm-lock.yaml`
+(cd server && DATABASE_URL="postgresql://$(whoami)@127.0.0.1:5432/heyta_account_w9?schema=public" \
+  npx vitest run --config vitest.integration.config.ts --maxWorkers=1 \
+  tests/integration/email-change-and-sessions.integration.spec.ts \
+  tests/integration/session-revoke-websocket.integration.spec.ts)
+```
+
+读数：`Test Files 2 passed (2)` / `Tests 18 passed (18)` —— W9 那 14 条（真库换绑 + 会话撤销全链）
+与本轮新增那 4 条（真连接撤销 A／B 不被牵连／幽灵 id 不许多关／前提两条连接真 up）**同趟**绿。
+载体跑完已把链接撤掉、锁文件复原、`git status --porcelain` 逐字为空。
+
+⚠️ 这一格回答的问题有边界，别读多：它只说"**服务端那一层**在本线的文件上是绿的"。
+运行时腿（iOS 设备、真浏览器）仍然等 §6.59 那一格（`packages/ui` 的 barrel 已入库、它引用的 11 枚来源没入库），
+而默认通道 `pnpm check` 里本线的红也不在这层：见 §6.17 / §6.20 / §6.21 / §6.59 / §6.61 各自归属。
+
 
 
 
