@@ -1622,3 +1622,85 @@ git grep -c "onSignOutCurrentDevice" HEAD -- apps/mobile/src/screens/SecurityScr
   换了个对象又踩一次 —— **假阻塞的形状永远是"探针报红"，不是"事情做不成"**。
 - 读数落在 `~/.heyta-evidence/ios-account-email-<时间戳>-r3/`（`chain.log` 有各步 rc；
   截图按 §7 第 208 条只认 `primary` 那张，并按"腿绿 + mtime + md5"三条齐才算本轮）。
+
+### 6.30 三份只活在工作树里的东西入库，以及"文档引用的文件根本没跟踪"这一整形状（12:5x 现量）
+
+起 iOS 设备腿的等待窗口里做了一件不依赖设备的事：把本计划**自己引用过、但从来没入库**的东西查出来。
+一条命令（反引号里出现过的路径 ∩ 未跟踪集合）：
+
+```bash
+node /tmp/cited-paths-sweep2.mjs docs/plans/account-standard-suite.md
+```
+
+（脚本本体是一次性夹具，不入库；形状就两步：`git ls-files` 与 `git ls-files --others --exclude-standard`
+各取一份，按 basename 分桶后用**后缀**匹配，命中未跟踪那一桶就是它。）
+现量结果：计划里 64 枚被点名的路径，**3 枚只有未跟踪的那份**，其中两枚属本线：
+
+| 被引用的东西 | 归谁 | 为什么承重 |
+|---|---|---|
+| `research/tools/account-email-sessions-http-probe.mjs` | 本线，计划里 6 处（§6.7 / §6.13 的读数 34、35 出自它） | 干净检出上那些"可复跑"的引用指向**不存在的文件** |
+| `apps/web/tests/account-security.spec.tsx` | 本线 | 🔴 **这一枚不能单独入库**，理由在 §6.31 |
+| `server/tests/integration/registration-otp.integration.spec.ts` | 另一条线（注册口令验证码那一族） | 本计划只是在写 `test:integration:postgres` 那份清单时点到它 ⇒ **只登记，不动别人的字节** |
+
+反过来的形状也查了一遍，并且命中一枚：`research/tools/mutate-credential-sweep.py`（§6.25 那批变异臂的装置）
+此前**入了工作树却没有任何文档引用过它** —— 那批读数在仓库里就没有可复跑的通道。
+本条就是那条引用：`python3 research/tools/mutate-credential-sweep.py --list`（臂数由装置自己打印）。
+
+入库的三件（`7f6fb547`）与各自入库前怎么验的：
+
+- `server/tests/email-change-sessions-schema.pglite.spec.ts` —— W1 那张迁移的**数据库层**证据。
+  应用层那两组（`email-change.spec.ts` / `access-sessions.spec.ts`）跑的是假 prisma，
+  `where` / `deleteMany` / 主键都是测试自己写的模拟，
+  证得了"代码按我理解的语义走"，证不了"库真的拦得住"。这一趟 `14 passed`（PGlite 是真 Postgres 语义）。
+  🔴 判据**能不能红**没有靠嘴说：用一枚一次性负向对照探针（跑完即删，不进仓库）把两句 DDL 各自摘掉 ——
+  臂 1 摘 `pending_email` 那条 UNIQUE ⇒ "两个账号抢同一个待绑地址"就**写得进去**；
+  臂 2 摘两条外键 ⇒ 注销账号后那张待绑请求与会话行**留在库里成孤儿**。
+  同一份未改的 SQL 上两臂的反面都成立（第二句被拒 / 两张表的行一起消失）
+  ⇒ 那两条 🔴 判据的红分别由那两句 DDL 承担，不是由测试脚手架或驱动报错承担。
+- 两份 `research/tools/` 装置入库前各跑一次：`python3 -m py_compile` 过、
+  `--list` 由装置**自己**打印臂数与每臂该点名的判据编号；探针在缺前置变量时**响亮拒绝并退 2**
+  （不是栈，也不是"跑成功但什么都没判"）。
+
+### 6.31 🔴 本线在 HEAD 上留了一道必红的 e2e，归属写清楚，别让它被读成别人的
+
+`e2e/tests/account-email-change-and-sessions.spec.ts` **已入库**，而它点的那三块 web 面板
+（`EmailChangePanel` / `SessionsPanel` / `SettingsAccountGate` 与两份 store、一枚 css）
+**全部还是未跟踪**。于是干净检出上这条判据**永远红** —— 不是抖动，是主体没跟着判据一起进来。
+现量两条：
+
+```bash
+git grep -c "email-change-submit" HEAD -- apps/web      # 0 ⇒ 界面里没有这个 testID
+git ls-files --others --exclude-standard -- apps/web/src/features/settings | wc -l   # 本线那几枚在未跟踪集合里
+```
+
+🔴 **为什么不现在把面板单独入库**：那枚 jsdom 判据 import 的就是这几枚面板，面板又要挂进设置面才有意义，
+而挂载点 `apps/web/src/App.tsx` 正被并行会话整片重写（那一趟现量 `git diff --stat` =
+367 插入 / 471 删除；复取：`git diff --stat -- apps/web/src/App.tsx`）。
+把别人文件里的挂载行提取进我这一笔 = 替他们决定"这一节可以落地了"，而且他们下一次整份提交会把我的行
+当"多出来的改动"删掉。⇒ **这一格与挂载同一笔闭合**，与 §6.28 移动端那一格是同一个等待条件
+（现量：`git grep -c "onSignOutCurrentDevice" HEAD -- apps/mobile/src/screens/SecurityScreen.tsx` 非 0 那一趟，
+web 侧对应的是 `App.tsx` / `main.tsx` 落地）。
+在那之前，任何人在干净检出上跑 `check:ai-e2e` 见到这一条红，**归本线**，不要记成环境。
+
+### 6.32 设备腿 r3 那趟整链死在**我自己两枚探针缺陷**上，而它的症状是"链在跑"
+
+- 缺陷 1：链的第 0 步是"等载体装依赖的终态旗 `$EVID/pnpm-install2.rc`"，而那枚旗由**外面那一趟 launcher** 落。
+  我 kill 掉旧链、直接重投链本体时没人落旗 ⇒ 它在第 0 步空转 `160 × 15 s` 然后 `finish 3`。
+  现象是"进程活着、`chain.log` 一个字节都没写"—— 与"正在安静地等窗口"逐字同形。
+  ✅ 修在**行为**上：旗改由链自己落（没有旗就自己装、装完落旗），不再依赖上游那一趟存在。
+- 缺陷 2：软链自证那一步我上一版写的是 `cd "$(dirname "$0")"; realpath 相对路径` ——
+  脚本住在 `~/.heyta-window-rigs`，于是那枚相对路径在**脚本自己的目录**里解析 ⇒ 恒 `MISSING`
+  ⇒ 把合格的载体第二次判成不合格（`CHAIN_RC=3`）。同一枚教训（入口判断要比 realpath）第二次命中，
+  这次咬的是我为了"修第一版"新写的那一行。✅ 修法：那一步不许 `cd`（链在第 1 步前已经 `cd` 进载体）。
+- 🔴 **判"链在跑"与"链在等一个永远不会来的东西"的现量只有一条**：看它有没有写出**新的**读数文件
+  （`gate-b.log` / `reinstall-ios.log`），不是看 `ps` 里有没有那个 pid。
+- 载体 pin 复用是有据的，不是省事：`git diff --name-only 76944386 HEAD` 只列
+  两份 plan 文档 + `scripts/qa/check-locator-labels.py` + 那两份装置 + 那一枚 pglite 判据 ——
+  **一枚移动端产品源码都没有** ⇒ r3 那趟装依赖的终态旗对 r4 仍然成立（沿用并写明出处：
+  `install-flag-provenance.txt`）。
+- r4 窗口门 `--target b` 第一趟就开（`chain.log` 20:58:09）：负载 **11 < 阈值 12**（16 核，阈值由 `hw.ncpu` 推）、
+  载体被跟踪脏 = 0、`scripts/reinstall-all.sh` 自身干净、没有别的移动端验收/别的 `reinstall-all` 在跑。
+  ⚠️ 那一趟现量有**两台 booted 模拟器**（`heyta-iphone-17pro` 与另一条项目留下的 `ssos-1.0.6-review-ipad`），
+  门自己警告 `--confirm` 默认取列表第一台 ⇒ 链是**显式**传 `IOS_DEVICE_NAME=heyta-iphone-17pro` 的，
+  没有依赖顺序。闸门与验收脚本的 blob 与主 HEAD 逐枚同枚（三枚都 `blob 同枚`）。
+
