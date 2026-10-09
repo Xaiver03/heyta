@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import Fastify from 'fastify';
 import websocket from '@fastify/websocket';
 import rateLimit from '@fastify/rate-limit';
@@ -401,6 +403,31 @@ describe('WebSocket Route Validation', () => {
 
       expect(result).toBe('rejected');
       expect(verifyToken).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * 🔴 上面那一整组跑的是 `simulateWsHandler` —— 本文件里**重写的**一份处理流程，
+   * 所以它对生产代码的漂移天生是瞎的（实测：把 `src/sync/websocket.routes.ts` 里
+   * `addConnection` 的第四枚参数摘掉，上面所有用例照样全绿）。
+   * 逐枚撤销靠的就是那一枚参数，所以这一半接线必须由**读生产源码**的判据钉住，
+   * 而不是由镜像钉住。真连接那一层的正面对账在
+   * `tests/integration/session-revoke-websocket.integration.spec.ts`（要本地库，另一条命令跑）。
+   */
+  describe('接线（生产处理函数真的把服务端验出的 session id 交给连接簿记）', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/sync/websocket.routes.ts'), 'utf8');
+
+    it('upgrade 成功那一步调 addConnection 时带上 result.sessionId', () => {
+      expect(source).toMatch(
+        /addConnection\(\s*result\.userId,\s*clientId,\s*socket,\s*result\.sessionId\s*\)/,
+      );
+    });
+
+    it('不许改成把客户端自报的 clientId 当会话凭据（那一条冒认得起）', () => {
+      const call = source.match(/addConnection\([^)]*\)/g) ?? [];
+      for (const one of call) {
+        expect(one, `连接簿记不该按自报值关：${one}`).not.toMatch(/clientId\s*\)\s*;?$/);
+      }
     });
   });
 });
