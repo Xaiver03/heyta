@@ -1,4 +1,6 @@
 import Fastify, { type FastifyInstance } from 'fastify';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import * as jwt from 'jsonwebtoken';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -523,4 +525,27 @@ describe('换绑那四条：错误码到状态码的映射只按封闭词表', (
     });
     expect(res.statusCode).toBe(500);
   });
+});
+
+describe('接线（生产入口真的注册了这两族路由 —— "路由写好了没人挂"不算做完）', () => {
+  // 🔴 变异靶：删掉 `server.ts` 里 `register(accountSecurityRoutes, …)` 那一行 ⇒ 本条必须红。
+  // 补这条之前**没有任何一层**守着它：上面每一组用例都是自己起一个 Fastify 再
+  // `app.register(accountSecurityRoutes)`，所以生产入口少挂一行时单测照样全绿，
+  // 而线上那几条路由会直接 404（症状是"界面上点了没反应"，服务端零日志）。
+  // 集成那份 `email-change-and-sessions.integration.spec.ts` 真能抓到，但它没有
+  // `DATABASE_URL` 时整组 `describe.skip`（见那文件头），所以不能当这一格的守卫。
+  const serverSource = readFileSync(resolve(process.cwd(), 'src/server.ts'), 'utf8');
+
+  for (const [name, file, why] of [
+    ['accountSecurityRoutes', 'account-security.routes', '换绑邮箱 + 逐枚会话撤销'],
+    ['accountProfileRoutes', 'account-profile.routes', '账号资料（含改登录密码）'],
+  ] as const) {
+    it(`${name}：import 与注册都在生产入口里（${why}）`, () => {
+      expect(serverSource, `${name} 没被 import`).toContain(`from './account/${file}'`);
+      // 连 prefix 一起钉：路由自己的路径是 `/account/...`，少了 `/api` 前缀就等于换了一条对外契约。
+      expect(serverSource, `${name} 没注册，或注册的 prefix 不是 /api`).toContain(
+        `register(${name}, { prefix: '/api' })`,
+      );
+    });
+  }
 });
