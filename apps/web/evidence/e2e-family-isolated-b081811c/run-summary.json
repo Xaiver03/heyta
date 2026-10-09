@@ -1,0 +1,224 @@
+{
+  "producedBy": "scripts/check-ai-e2e-preflight.mjs + e2e/playwright.config.ts（pnpm check:ai-e2e）",
+  "runCommand": "cd /Users/rocalight/heyta-carriers/heyta-uxhead-1009 && NO_COLOR=1 pnpm check:ai-e2e",
+  "runAt": "2026-10-09T09:27Z–10:20Z（52.6 分钟）",
+  "carrier": {
+    "path": "/Users/rocalight/heyta-carriers/heyta-uxhead-1009",
+    "commit": "b081811c691a17ff57ed0379a005d1a175fe393d",
+    "tree": "5dceff75d44e57d7e87d680ffc0b90afe496bb09",
+    "uncommittedPaths": 0,
+    "e2eLockSha256Prefix": "021a9df4add85253",
+    "webDistIndexHtmlSha256Prefix": "f9c1b85615f63e4e5a4e98c2",
+    "preflight": "✅ 4318 / 4319 都是空的（没有退 2，所以这趟是跑成了）",
+    "load": {
+      "start1": "7.68",
+      "peak1": "36.94（09:30 现量）",
+      "end1": "12.23"
+    }
+  },
+  "totals": {
+    "running": "289 tests using 1 worker, retries 1",
+    "passed": 266,
+    "failed": 21,
+    "skipped": 2,
+    "flaky": 0,
+    "rc": 1
+  },
+  "failMarks": 42,
+  "noteOnCounting": "pnpm 设了 FORCE_COLOR，NO_COLOR=1 被忽略（日志里有原句警告），所以数失败必须先剥 ANSI：re.sub(r'\\x1b\\[[0-9;]*m','',text)",
+  "failedBySpec": {
+    "tests/ai-assistant.spec.ts": 1,
+    "tests/ai-row-layout.spec.ts": 2,
+    "tests/ai-tool-run.spec.ts": 2,
+    "tests/countdown.spec.ts": 1,
+    "tests/detail-pane-collapse.spec.ts": 1,
+    "tests/detail-pane-overlay.spec.ts": 1,
+    "tests/detail-pane-task.spec.ts": 2,
+    "tests/narrow-sweep.spec.ts": 5,
+    "tests/pages-sweep.spec.ts": 4,
+    "tests/quadrant-layout.spec.ts": 2
+  },
+  "failedTests": [
+    {
+      "spec": "tests/ai-assistant.spec.ts",
+      "line": 66,
+      "title": "对话助手：真浏览器端到端旅程 › 披露前零出境 → 多步读循环 → 第二句不再拦 → 档位刷新后仍在",
+      "errorKind": "timeout",
+      "firstErrorLine": "locator.click: Test timeout of 60000ms exceeded."
+    },
+    {
+      "spec": "tests/ai-row-layout.spec.ts",
+      "line": 115,
+      "title": "常规宽度：AI 工具行单行、不与采集条重叠",
+      "errorKind": "timeout",
+      "firstErrorLine": "locator.click: Test timeout of 60000ms exceeded."
+    },
+    {
+      "spec": "tests/ai-row-layout.spec.ts",
+      "line": 124,
+      "title": "窄窗：按钮换行而不是折断，仍不重叠，且 AI 面退回中间列",
+      "errorKind": "custom-message",
+      "firstErrorLine": ""
+    },
+    {
+      "spec": "tests/ai-tool-run.spec.ts",
+      "line": 99,
+      "title": "单步工具面板：真浏览器端到端旅程 › 规则命中零出境 → 模型那条先披露后出境 → 结果卡片",
+      "errorKind": "custom-message",
+      "firstErrorLine": ""
+    },
+    {
+      "spec": "tests/ai-tool-run.spec.ts",
+      "line": 151,
+      "title": "单步工具面板：真浏览器端到端旅程 › 写工具只出提案：确认前不落库、确认后一次都不再多出境",
+      "errorKind": "custom-message",
+      "firstErrorLine": ""
+    },
+    {
+      "spec": "tests/countdown.spec.ts",
+      "line": 73,
+      "title": "倒数纪念日：真浏览器契约（W5） › 打开模块：tab 在、切得过去、板子渲染出来，且页标题跟着 tab 走",
+      "errorKind": "custom-message",
+      "firstErrorLine": ""
+    },
+    {
+      "spec": "tests/detail-pane-collapse.spec.ts",
+      "line": 192,
+      "title": "详情列的出现条件与收起 › T3b 恢复路径②：设置里那一项",
+      "errorKind": "custom-message",
+      "firstErrorLine": ""
+    },
+    {
+      "spec": "tests/detail-pane-overlay.spec.ts",
+      "line": 115,
+      "title": "浮层与详情列 › 设置浮层只盖中间那一列，详情列在它外面且没被挤掉",
+      "errorKind": "custom-message",
+      "firstErrorLine": ""
+    },
+    {
+      "spec": "tests/detail-pane-task.spec.ts",
+      "line": 299,
+      "title": "任务面单落进那一栏（§8.138） › T6 宽档：重复的编辑本体在栏里那一格，行尾只剩只读徽标（§8.141）",
+      "errorKind": "custom-message",
+      "firstErrorLine": ""
+    },
+    {
+      "spec": "tests/detail-pane-task.spec.ts",
+      "line": 340,
+      "title": "任务面单落进那一栏（§8.138） › T7 窄档：那一栏整个不在，重复的编辑入口回到行尾那颗浮层",
+      "errorKind": "custom-message",
+      "firstErrorLine": ""
+    },
+    {
+      "spec": "tests/narrow-sweep.spec.ts",
+      "line": 33,
+      "title": "塌缩态扫描：便签",
+      "errorKind": "custom-message",
+      "firstErrorLine": ""
+    },
+    {
+      "spec": "tests/narrow-sweep.spec.ts",
+      "line": 33,
+      "title": "塌缩态扫描：四象限",
+      "errorKind": "custom-message",
+      "firstErrorLine": ""
+    },
+    {
+      "spec": "tests/narrow-sweep.spec.ts",
+      "line": 33,
+      "title": "塌缩态扫描：成长",
+      "errorKind": "custom-message",
+      "firstErrorLine": ""
+    },
+    {
+      "spec": "tests/narrow-sweep.spec.ts",
+      "line": 33,
+      "title": "塌缩态扫描：时间线",
+      "errorKind": "custom-message",
+      "firstErrorLine": ""
+    },
+    {
+      "spec": "tests/narrow-sweep.spec.ts",
+      "line": 33,
+      "title": "塌缩态扫描：番茄钟",
+      "errorKind": "custom-message",
+      "firstErrorLine": ""
+    },
+    {
+      "spec": "tests/pages-sweep.spec.ts",
+      "line": 32,
+      "title": "页8 扫描：便签",
+      "errorKind": "custom-message",
+      "firstErrorLine": ""
+    },
+    {
+      "spec": "tests/pages-sweep.spec.ts",
+      "line": 32,
+      "title": "页8 扫描：成长",
+      "errorKind": "custom-message",
+      "firstErrorLine": ""
+    },
+    {
+      "spec": "tests/pages-sweep.spec.ts",
+      "line": 32,
+      "title": "页8 扫描：时间线",
+      "errorKind": "custom-message",
+      "firstErrorLine": ""
+    },
+    {
+      "spec": "tests/pages-sweep.spec.ts",
+      "line": 32,
+      "title": "页8 扫描：番茄钟",
+      "errorKind": "custom-message",
+      "firstErrorLine": ""
+    },
+    {
+      "spec": "tests/quadrant-layout.spec.ts",
+      "line": 36,
+      "title": "宽窗：四象限是 2×2 十字网格",
+      "errorKind": "custom-message",
+      "firstErrorLine": ""
+    },
+    {
+      "spec": "tests/quadrant-layout.spec.ts",
+      "line": 61,
+      "title": "窄窗：低于断点优雅降级单列（窗口变化不塌）",
+      "errorKind": "custom-message",
+      "firstErrorLine": ""
+    }
+  ],
+  "errorKinds": {
+    "tests/ai-assistant.spec.ts:66:3 › 对话助手：真浏览器端到端旅程 › 披露前零出境 → 多步读循环 → 第二句不再拦 → 档位刷新后仍在": "expect(locator).toBeVisible() failed",
+    "tests/ai-row-layout.spec.ts:115:1 › 常规宽度：AI 工具行单行、不与采集条重叠 ────────────────────────": "expect(locator).toBeVisible() failed",
+    "tests/ai-row-layout.spec.ts:124:1 › 窄窗：按钮换行而不是折断，仍不重叠，且 AI 面退回中间列 ────────────────": "expect(locator).toBeVisible() failed",
+    "tests/ai-tool-run.spec.ts:99:3 › 单步工具面板：真浏览器端到端旅程 › 规则命中零出境 → 模型那条先披露后出境 → 结果卡片 ──": "expect(locator).toBeVisible() failed",
+    "tests/ai-tool-run.spec.ts:151:3 › 单步工具面板：真浏览器端到端旅程 › 写工具只出提案：确认前不落库、确认后一次都不再多出境 ──": "locator.fill: Test timeout of 60000ms exceeded.",
+    "tests/countdown.spec.ts:73:3 › 倒数纪念日：真浏览器契约（W5） › 打开模块：tab 在、切得过去、板子渲染出来，且页标题跟着 tab 走": "expect(locator).toHaveCount(expected) failed",
+    "tests/detail-pane-collapse.spec.ts:192:3 › 详情列的出现条件与收起 › T3b 恢复路径②：设置里那一项 ────────": "expect(locator).toBeVisible() failed",
+    "tests/detail-pane-overlay.spec.ts:115:3 › 浮层与详情列 › 设置浮层只盖中间那一列，详情列在它外面且没被挤掉 ──────": "界面上没有详情列",
+    "tests/detail-pane-task.spec.ts:299:3 › 任务面单落进那一栏（§8.138） › T6 宽档：重复的编辑本体在栏里那一格，行尾只剩只读徽标（§8.141）": "locator.fill: Test timeout of 60000ms exceeded.",
+    "tests/detail-pane-task.spec.ts:340:3 › 任务面单落进那一栏（§8.138） › T7 窄档：那一栏整个不在，重复的编辑入口回到行尾那颗浮层": "界面上找不到这个元素",
+    "tests/narrow-sweep.spec.ts:33:3 › 塌缩态扫描：四象限 ─────────────────────────────────────": "locator.click: Test timeout of 60000ms exceeded.",
+    "tests/narrow-sweep.spec.ts:33:3 › 塌缩态扫描：时间线 ─────────────────────────────────────": "locator.click: Test timeout of 60000ms exceeded.",
+    "tests/narrow-sweep.spec.ts:33:3 › 塌缩态扫描：番茄钟 ─────────────────────────────────────": "locator.click: Test timeout of 60000ms exceeded.",
+    "tests/narrow-sweep.spec.ts:33:3 › 塌缩态扫描：成长 ──────────────────────────────────────": "locator.click: Test timeout of 60000ms exceeded.",
+    "tests/narrow-sweep.spec.ts:33:3 › 塌缩态扫描：便签 ──────────────────────────────────────": "locator.click: Test timeout of 60000ms exceeded.",
+    "tests/pages-sweep.spec.ts:32:3 › 页8 扫描：时间线 ──────────────────────────────────────": "locator.click: Test timeout of 60000ms exceeded.",
+    "tests/pages-sweep.spec.ts:32:3 › 页8 扫描：番茄钟 ──────────────────────────────────────": "locator.click: Test timeout of 60000ms exceeded.",
+    "tests/pages-sweep.spec.ts:32:3 › 页8 扫描：成长 ───────────────────────────────────────": "locator.click: Test timeout of 60000ms exceeded.",
+    "tests/pages-sweep.spec.ts:32:3 › 页8 扫描：便签 ───────────────────────────────────────": "locator.click: Test timeout of 60000ms exceeded.",
+    "tests/quadrant-layout.spec.ts:36:1 › 宽窗：四象限是 2×2 十字网格 ───────────────────────────": "locator.click: Test timeout of 60000ms exceeded.",
+    "tests/quadrant-layout.spec.ts:61:1 › 窄窗：低于断点优雅降级单列（窗口变化不塌） ──────────────────────": "locator.click: Test timeout of 60000ms exceeded."
+  },
+  "scopeLimits": [
+    "载体是 b081811c，不是当日 HEAD：它比 c04e34e4 早 3 笔，HEAD 上『helpers 缺 selectSettingsSection ⇒ 干净检出必红』那枚地雷在这趟里根本走不到。",
+    "不覆盖主检出上别人在飞的未提交改动。",
+    "narrow-sweep / pages-sweep 那 9 条 click/fill 超时是否由负载造成没有回答：定向复跑起跑时 load1=44.54（前置是 12），跑了 23 条后被本线主动停掉，按无效读数处理。"
+  ],
+  "errorKindHistogram": {
+    "assertion": 6,
+    "timeout": 13,
+    "custom-message": 2
+  },
+  "retryStructure": "42 个红标记 ÷ 21 条唯一用例 = 每条首跑与 retry 双红；flaky 计数 0 ⇒ 不是抖动形状（取现量：见 noteOnCounting 那条剥色口径）"
+}
