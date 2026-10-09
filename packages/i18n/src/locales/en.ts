@@ -3919,7 +3919,7 @@ export const en = {
   'site.docs.account.s1p1': 'Sync settings contain the server connection and separate encrypted data key controls. After signing in, you can create a key, save its recovery code, or unlock existing data.',
   'site.docs.account.s1i1': 'Server address: the sync server you want to connect to. Leave everything empty and you are using heyta purely locally — the data stays on this device.',
   'site.docs.account.s1i2': 'Access token: issued by the server, it stands for "this account\'s space on that server". If you already have one, paste it straight in.',
-  'site.docs.account.s1i3': 'Encryption passphrase: never sent to the server, and separate from your sign-in password. See “The encryption passphrase” for recovery codes and remembering unlock on a device.',
+  'site.docs.account.s1i3': 'Encryption passphrase: never sent to the server, and separate from your sign-in password. See “Encryption and recovery” for recovery codes and remembering unlock on a device.',
   'site.docs.account.s2': 'Three ways in, with email plus password as the main one',
   'site.docs.account.s2p1': 'Registration and sign-in run on **email plus password**; the emailed link and the passkey both stayed. What the server holds for your password is not something it can read back or hand to anyone — if you forget it, "Forgot password?" mails a one-time reset link, which is a real reset rather than a way around the password.',
   'site.docs.account.s2i1': 'Email plus password: give your address, set a password (at least 8 characters), click the link in the verification mail to activate, then sign in with that password.',
@@ -4387,7 +4387,7 @@ export const en = {
   'common.share.consent.scope.notAffected': 'Your other lists are not affected',
   'common.share.consent.accept': 'Confirm sharing',
   'common.share.consent.cancel': 'Cancel',
-  'common.share.consent.dontAskAgain': 'Don\'t ask again',
+  'common.share.consent.dontAskAgain': "Don't ask again",
   'common.share.notif.sectionTitle': 'Shared-list notifications',
   'common.share.notif.activitiesTitle': 'Activity notifications',
   'common.share.notif.activityCompleted': 'Task completed/uncompleted',
@@ -4633,7 +4633,7 @@ export const en = {
   'server.email.passwordChanged.title': 'Password changed',
   'server.email.passwordChanged.body': 'A new sign-in password was just set for your heyta account, and every other device has been signed out.',
   'server.email.passwordChanged.button': 'Open heyta',
-  'server.email.passwordChanged.notYou': 'If this wasn’t you, take your account back right away with “Forgot password”, and check whether someone else can read your email inbox.',
+  'server.email.passwordChanged.notYou': 'If this wasn’t you, take your account back right away with “Forgot password?”, and check whether someone else can read your email inbox.',
   // ── Rebinding the sign-in email (ADR-0063): two halves of one confirmation + a completion notice ──
   'server.email.changeConfirm.subject': 'Confirm this address as your heyta sign-in email',
   'server.email.changeConfirm.title': 'Confirm the new sign-in email',
@@ -4649,7 +4649,7 @@ export const en = {
   'server.email.changed.title': 'Sign-in email changed',
   'server.email.changed.body': 'Your heyta account now signs in with this address. Every other device has been signed out and needs the new address to sign in again.',
   'server.email.changed.button': 'Open heyta',
-  'server.email.changed.notYou': 'If this wasn’t you, someone can read both of these mailboxes — take your account back with “Forgot password” right away.',
+  'server.email.changed.notYou': 'If this wasn’t you, someone can read both of these mailboxes — take your account back with “Forgot password?” right away.',
   // ── A new way to sign in was added (closes email-password-auth.md gap 13) ──
   'server.email.authenticatorAdded.title': 'A new sign-in method was added to your heyta account',
   'server.email.authenticatorAdded.password.subject': 'A sign-in password was set on your heyta account',
@@ -4657,7 +4657,7 @@ export const en = {
   'server.email.authenticatorAdded.passkey.subject': 'A new passkey was added to your heyta account',
   'server.email.authenticatorAdded.passkey.body': 'A passkey was just added to your heyta account. Another way in means another way for someone else in too.',
   'server.email.authenticatorAdded.button': 'Open heyta',
-  'server.email.authenticatorAdded.notYou': 'If you didn’t add this, remove it under “Sign-in methods” in Settings and change your sign-in password.',
+  'server.email.authenticatorAdded.notYou': 'If you didn’t add this, remove it under “Passkeys” in Settings and change your sign-in password.',
   // 🔴 The fourth credential page: **set a new password**. It sets the password and
   //    issues **no session** — getting here only proves they hold the inbox,
   //    and an inbox can be observed (shared computer, forwarded mail).
