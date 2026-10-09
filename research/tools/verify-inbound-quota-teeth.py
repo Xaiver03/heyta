@@ -129,20 +129,23 @@ class Targets:
         hits = self.original[path].count(pattern)
         if hits != 1:
             return f'PATTERN_MISS(命中 {hits} 处，要求恰好 1 处)'
+        mutated = self.original[path].replace(pattern, replacement)
         with open(path, 'w', encoding='utf-8') as handle:
-            handle.write(self.original[path].replace(pattern, replacement))
+            handle.write(mutated)
+        # 🔴 记下"我这臂写进去的那份字节"的哈希，`restore` 才有可比的东西。
+        # 以前这里不记，于是那根保险丝拿同一个文件算两次同一个哈希再自比 —— 恒等、永不触发。
+        self.mutated[path] = hashlib.sha256(mutated.encode('utf-8')).hexdigest()
         return None
 
-    def restore(self, path):
+    def restore(self, path, final=False):
         """还原并核三件事：还原后 == 开局哈希；还原前工作树 == 我写进去的那份变异字节。
 
-        第二件事是并行那条线的保险丝：不一致说明窗口里别人写过，那**不能覆盖**，
-        否则会把别人的未提交 hunk 当成我的变异一起抹掉。
+        第二件事是并行那条线的保险丝：不一致说明窗口里别人写过，那**不能当成我的变异覆盖掉**，
+        先把意外字节另存到仓库外，再落回开局那份，并大声报出两枚哈希。
         """
-        expected = sha256(path)
-        now = sha256(path) if expected == expected else expected  # (no-op, kept explicit below)
-        current = now
-        if current != expected:
+        current = sha256(path)
+        expected = self.mutated.pop(path, None)  # pop 而不是 get：收尾那一遍不该再拿上一臂的哈希当预期
+        if expected is not None and current != expected:
             saved = os.path.join(BACKUP, f'{os.path.basename(path)}.unexpected-{current[:12]}.save')
             with open(path, encoding='utf-8') as handle:
                 data = handle.read()
@@ -150,6 +153,8 @@ class Targets:
                 handle.write(data)
             print(f'RESTORE_GUARD {os.path.basename(path)} 当前 {current[:16]} != 本臂写入 {expected[:16]}')
             print(f'  ⇒ 窗口里有别的写入者；意外字节已另存 {saved}（没丢东西），随后落回开局那份')
+        if final and current == self.before[path]:
+            return 0  # 收尾那一遍：已经是开局那份，不必再写一次
         with open(path, 'w', encoding='utf-8') as handle:
             handle.write(self.original[path])
         after = sha256(path)
@@ -192,7 +197,8 @@ def run_arms(arms, label):
             failures += 0 if holds else 1
     finally:
         for path in paths:
-            state.restore(path)
+            if state.restore(path, final=True):
+                return 3
 
     for path in paths:
         print(f'  末次 sha256 {os.path.relpath(path, REPO)} = {sha256(path)[:16]}（须等于开局那枚）')
@@ -200,14 +206,41 @@ def run_arms(arms, label):
     return 1 if failures else 0
 
 
+def fuse_test():
+    """保险丝臂：窗口里出现别的写入者时，`restore` 必须**报出** RESTORE_GUARD。
+
+    为什么要有这一臂：那根保险丝自己曾经坏过一整轮 —— 它把同一个文件的同一个哈希算两次再自比，
+    恒等、永不触发。"能红的判据"要有人证明它真会红，否则修好它和没修好长得一样。
+    """
+    import contextlib
+    import io
+    _, path, pattern, mutant, _ = ARMS[-1]  # 静止臂：只改对行为没有影响的字节，够用来测保险丝
+    state = Targets([path])
+    if state.apply(path, pattern, mutant):
+        print('FUSE_TEST_FAILED: 静止臂没命中，这台装置连保险丝都没法自测')
+        return 1
+    with open(path, 'a', encoding='utf-8') as handle:  # 模拟并行那条线在我变异期间写了这个文件
+        handle.write('\n// 外来写入（保险丝自测模拟）\n')
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        state.restore(path)
+    text = buf.getvalue()
+    if 'RESTORE_GUARD' not in text or sha256(path) != state.before[path]:
+        print('FUSE_TEST_FAILED: 别人在窗口里写过，保险丝却没说 —— 这条判据永远不会触发')
+        print(text or '（restore 什么都没报）')
+        return 1
+    print('  保险丝臂：成立（RESTORE_GUARD 报了，且落回开局那份 ' + sha256(path)[:16] + '）')
+    return 0
+
+
 def self_test():
-    """失配臂：模式在源码里不存在时，装置必须报 PATTERN_MISS 并非零退出。"""
+    """两臂负面对照：失配必须被拒、保险丝必须会触发。"""
     bogus = [('不存在的裁决（负面对照）',
               METERING,
               "if (!quota.allowed) throw new AutomationAiMeteringDeniedError({ reason: 'NOPE_NOT_A_REASON' });",
               "if (false) throw new Error('nope');",
               '额度用尽时预留被拒，且既不落账行也不把计数器抬过上限')]
-    code = run_arms(bogus, '自测：失配必须响亮拒绝')
+    code = run_arms(bogus, '自测一：失配必须响亮拒绝')
     # 期望：非零退出（PATTERN_MISS 记成一臂不成立），而且**没有**动过源码。
     if code == 0:
         print('SELF_TEST_FAILED: 失配臂居然报绿 —— 这台装置会在没变异任何东西时报"有牙"')
@@ -215,7 +248,11 @@ def self_test():
     if sha256(METERING) != sha256(os.path.join(BACKUP, 'ai-metering.ts.mut-bak')):
         print('SELF_TEST_FAILED: 失配臂居然写了源码')
         return 1
-    print('SELF_TEST=OK（失配臂被拒；真臂的绿只有在模式确实命中时才算数）')
+    print('  失配臂：被拒（真臂的绿只有在模式确实命中时才算数）')
+    fuse = fuse_test()
+    if fuse:
+        return fuse
+    print('SELF_TEST=OK（失配臂被拒 + 保险丝会触发）')
     return 0
 
 
