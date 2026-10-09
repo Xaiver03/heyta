@@ -2564,6 +2564,53 @@ for k in $(git grep -h -oE "'site\.docs\.account\.s[67][a-z0-9]*'" HEAD -- apps/
     "$(git grep -c "'$k'" HEAD -- packages/i18n/src/locales/en.ts | cut -d: -f3)"; done   # 两列都必须 = 1
 ```
 
+### 6.51 本线自己的判据里有没有"死针"：67 枚引用逐枚对表，唯一那枚是故意的负向断言（10-10 01:2x 现量，纯只读）
+
+"绿色证据会跟着针一起过期"这一型本线抓到过两次（`scripts/lib/mobile-e2e.sh`、
+`verify-mobile-ios-account-erasure.sh` 各拿一句**已不存在的中文**做负向检查 ⇒ 那条**永远不会红**）。
+测试腿现在起不了（§6.49 的内存闸门），所以这一格可以用只读的方式先关掉：
+把本线八枚文件（四枚界面 + 四枚判据）引用的**词条 key** 逐枚对两张词表。
+
+**先记两次探针自错（它们比结论更值得留，因为两次都是 rc 正常、数字却毫无意义）**：
+
+1. 第一版把三份 spec 里所有含汉字的字符串都当针 ⇒ 报"174 条里 147 条找不到"。
+   那 147 条绝大多数是 `it('…')` 的**用例标题**和注释 —— 它们本来就不该出现在词条表里。
+2. 收紧到断言调用（`toContainText(` / `getByText(` / `toHaveText(`…）后只命中 **1 条**。
+   这不是"针少"，是本线那几份套件**不按字面文案断言**：jsdom 那份走词条 key，
+   `apps/mobile/tests/account-security-wiring.spec.ts` 那份整枚是**源码文本判据**（它验的是"这个文件里出现了哪些标识符"）。
+   ⇒ 取样口径要先问"这份套件凭什么说话"，不然尺量到的永远是空集或垃圾集。
+
+**用对的口径重取，结论是干净的**：八枚文件各自去重后**引用数相加 = 67 次**（同一枚 key 在多份文件里各数一次），
+`zh-CN.ts` 与 `en.ts` 两张表里**都在的 = 66 次**，唯一"两张表都没有"的那枚
+`common.emailChange.applied` 不是死针，是 `account-security-wiring.spec.ts:89` 那行
+**故意的负向断言** —— `expect(EMAIL).not.toContain('common.emailChange.applied')`，
+它钉的是"移动端成功文案只许说『信发出去了』，不许说『邮箱已经改好了』"（服务端那一边还没确认旧邮箱）。
+🔴 关键是这行的**上一行就是它的正向对照**：`expect(EMAIL).toContain('common.emailChange.sent')`，
+而 `…​.sent` 两张表里都在 ⇒ 这条负向断言不是"永不成立"，它配的那句实话要是哪天不说了，88 行会红。
+（这一对正是"负向断言要落在条件不成立时确实会变的那一侧"该有的形状。）
+
+复取这一节（python 内联，取样口径写死在正则里）：
+
+```bash
+python3 - <<'PY'
+import subprocess, re
+files = ["e2e/tests/account-email-change-and-sessions.spec.ts", "apps/web/tests/account-security.spec.tsx",
+         "apps/mobile/tests/account-security-wiring.spec.ts", "apps/web/tests/password-panel.spec.tsx",
+         "apps/web/src/features/settings/EmailChangePanel.tsx", "apps/mobile/src/screens/EmailChangeSection.tsx",
+         "apps/mobile/src/screens/SessionsSection.tsx", "apps/web/src/features/settings/SessionsPanel.tsx"]
+loci = {l: subprocess.run(["git","show",f"HEAD:packages/i18n/src/locales/{l}.ts"],capture_output=True,text=True).stdout
+        for l in ("zh-CN","en")}
+KEY = re.compile(r"['\"]((?:common|settings|site|app|errors|auth)\.[A-Za-z0-9_.]{2,60})['\"]")
+for f in files:
+    src = subprocess.run(["git","show",f"HEAD:{f}"],capture_output=True,text=True).stdout
+    miss = [k for k in sorted(set(KEY.findall(src)))
+            if all(("'"+k+"'") not in v and ('"'+k+'"') not in v for v in loci.values())]
+    print(f, "缺:", miss)
+PY
+# 期望：只有 apps/mobile/tests/account-security-wiring.spec.ts 报出 ['common.emailChange.applied']，其余七枚报 []；
+# 再用 git show HEAD:apps/mobile/tests/account-security-wiring.spec.ts | sed -n '86,90p' 确认它是 not.toContain 且上一行有正向对照
+```
+
 
 
 
