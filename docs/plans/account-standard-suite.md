@@ -616,7 +616,7 @@ node -e "console.log(require('./server/tsconfig.json').include)"                
 
 | 红的那几条 | 现量证据 | 归属 |
 |---|---|---|
-| 5 条 `sync-compressed-body.routes.spec.ts` | 断言的是 `uploadOps` **调用参数形状**多出一枚实参；出处 = 未提交的 `server/src/sync/sync.types.ts` 新增 `inboundCommitProofs?: Record<string, string>`（`git diff -- server/src/sync/sync.types.ts`） | 入站那条线。本线**一枚 `server/src/sync/**` 都没碰**（本线服务端改动只有 `auth.ts`/`auth-cache.ts`/`api.ts`/`account/*`/`password/*`/`routes/*`） |
+| 5 条 `sync-compressed-body.routes.spec.ts` | 断言的是 `uploadOps` **调用参数形状**多出一枚实参；出处 = 未提交的 `server/src/sync/sync.types.ts` 新增 `inboundCommitProofs?: Record<string, string>`（`git diff -- server/src/sync/sync.types.ts`） | 入站那条线。本线**一枚 `server/src/sync/**` 都没碰**（本线服务端改动是 `server.ts`/`auth.ts`/`auth-cache.ts`/`account/*`/`password/*`，另有 `api.ts` 里 2 行邮箱归一化收口 —— 那张文件同一枚 diff 里另有他们 10 行，见 §6.10） |
 | 1 条 `validation.service.spec.ts` | 它断言 `ALLOWED_ENTITY_TYPES.size === HEYTA_ENTITY_TYPES.length`，两侧现在不等；出处 = **别人 staged 的** `packages/shared-schema/src/entity-types.ts` 新增 `TASK_COMMENT`（ADR-0062 协作线，`git diff --cached -- …/entity-types.ts`） | 与 §6.5 第 1 道 `check:reachability` **同一根因** |
 
 🔴 而这一层**为**本线抓到的两条（两条都红在 `expected null not to be null`）：
@@ -647,3 +647,39 @@ node -e "console.log(require('./server/tsconfig.json').include)"                
 （它已在验收库 `heyta_account_w9` 上应用过，改注释会造成 checksum 漂移）。
 更正写在四处：`server/prisma/schema.prisma`（那三行补了前提）、`server/src/account/access-sessions.ts`
 规则 3、`server/src/auth.ts` 的 ⚠️ 段，以及 ADR-0063 §2.5。
+
+### 6.10 代码那一笔的阻塞集，12:2x **重取**之后形状变了三条（含一条对本台账自己的更正）
+
+现量：`git diff --cached --name-only | wc -l` = **42**，全部属于协作线（shares/comments，ADR-0062）
+与入站线；逐枚名列在 `git diff --cached --name-only` 里，本台账**不抄这份清单**（它每十分钟就不是这个样了）。
+
+| 注册点 | §6.6 当时记的 | 12:2x 现量 | 本线能不能单独取 |
+|---|---|---|---|
+| `server/package.json` | 我的行与别人的行**在同一行**，且含未入库包名 `@heyta/inbound-core` | 它**已经离开**他们的暂存集（现在是 ` M`）；`@heyta/inbound-core` **已在 HEAD**（`git ls-tree -r HEAD -- packages/inbound-core` 有产物），但那一行还指着 **未入库** 的 `server/tests/integration/registration-otp.integration.spec.ts`（磁盘上有、`git ls-tree HEAD` 里 0） | ❌ 单独取 = 在 HEAD 上留一条指向**别人未入库 spec** 的脚本，干净检出上那条 `test:integration:postgres` 直接找不到文件 |
+| `packages/i18n/src/locales/{zh-CN,en}.ts` | 我的 37 枚 key 与他们的措辞混在同一个 blob | 仍 `M `（staged），staged blob 里本线 `common.emailChange\|common.sessions` **37 处**、协作线 `comment\|share\|评论\|共享` **75 处** | ❌ 取走 = 把别人未完成的措署在本线提交信息下；不取 = 面板引用的 key 不在 HEAD |
+| 根 `package.json` | （§6.6 只记了"被别人 staged"这一半） | 仍 `M `，且 staged 版本里本线那枚 `verify:mobile-account` 别名 **0 处** | ❌ 别名与脚本必须同一笔（见 §6.7 那段 `check:verify-script-copy` 的自动收录） |
+| `server/src/api.ts` → 其实注册点是 `server/src/server.ts` | 🔴 记的是"api.ts +596 行里本线只占几行" | **这句按现量更正**：本线的服务端接线**不在 api.ts**，注册点是 `server/src/server.ts` 那四行（`import { accountSecurityRoutes }` + `await fastifyServer.register(accountSecurityRoutes, { prefix: '/api' })`）。现量：`git status --porcelain=v2 -- server/src/server.ts` 打的是 **`.M`**（只有未暂存改动），而 `git diff -- server/src/server.ts` 的 `^+` 行**全是本线那四行** | ✅ 这一枚**单独可取** —— 但它等的是下面那一枚（路径常量） |
+| `packages/shared-schema/src/index.ts` | +32 行里本线只占 4 行 | 本线那两枚路径常量 `EMAIL_CHANGE_PATHS` / `SESSION_PATHS` 在 **HEAD 与他们的暂存版里各 0 处**（`git show HEAD:… \| grep -c` = 0、`git show :… \| grep -c` = 0），只活在工作树；而 `server/src/account/account-security.routes.ts:33` 正是从那一枚 import 它们的 | ❌ 要单独取本线那 4 行，就得**替他们重写 index 里那枚 blob**（在他们正在写的暂存态上动刀，AGENTS §8 第 9 条 + "只对自己创建的对象动手"） |
+
+🔴 **顺手否证掉本会话自己刚假设过的一个最坏形状**：12:2x 曾推"他们那份 staged 的 `server.ts` 里可能已经带着本线那行 import ⇒ 他们一提交，HEAD 就得到一句指向**未入库文件**的 import、构建当场坏"。
+三行现量把它推翻：`git show HEAD:server/src/server.ts \| grep -c accountSecurityRoutes` = **0**、
+`git show :server/src/server.ts \| grep -c …` = **0**、工作树 = **2** ⇒ **他们那笔不会带着本线的接线**。
+记下来是因为"会撞坏别人"这类判断和"没人挡我"一样，**只有 `git show :<file>` 这一种读法能定**，
+从"这枚文件在暂存集里"推不出来。
+
+🔴 结论没有变，但**理由换了**，而这个理由要写清：不把代码一笔整部落，不是"每一枚注册点都被挡住"，
+而是**这一批本身是一个原子集** —— `schema.prisma` 的 `AccessSession` 模型 + 迁移 +
+`server/src/account/*` + `auth.ts`/`auth-cache.ts` 的新签名 + `server.ts` 那四行注册 +
+`@heyta/shared-schema` 里那两枚路径常量 + 两端面板引用的 i18n key。
+**任取其一都会在 HEAD 上留下一个跑不通的形状**，而它不一定报出来：
+最硬的一环是路径常量 —— 服务端与客户端 import 的是**同一个字面量**（这条纪律本轮刚立），
+它不在 HEAD，两侧就各拼各的。至于"面板引用不在 HEAD 的词条 key"那一档**由谁拦，本轮没验**
+（判它要么构造一次部分提交 —— 那是在共享检出上自己造红，不划算；要么读 `check:ui-language` 的实现，
+那是别人的判据口径，不该由我这一笔记成结论）。
+逐枚试探过一遍的事实就记在上面那张表里。
+
+📌 这一节要留下的教训与 §6.6 那条是同一族的第三面：**"谁挡住了我"必须每次重取，
+而且重取之后常常发现**挡住的不是当初记的那一枚**。本轮三处都变了形：
+`server/package.json` 离开了暂存集、api.ts 那一枚本线其实只占 2 行而**注册点在 `server.ts`**、
+而真正没变的是 i18n 那一枚 —— 它从 10:55 起一直是 `M `。
+判据现量命令就在表里，别照抄这一节的结论去决定下一笔要不要落。
