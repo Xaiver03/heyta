@@ -38,9 +38,12 @@ vi.hoisted(() => {
 // 这一套的口径与 `email-change-and-sessions.integration.spec.ts` 相同：**只 mock SMTP 发信函数**。
 // 不 mock 它，改口令那一步会去 Ethereal 真建一个测试账号（实测 +1 s 起，而这一条用例的预算本来
 // 就被 `checkNewPassword` 里那道 fail-open 的 HIBP 外发查询吃掉一大截 —— 见计划 §6.69 与 §5 第 13 条）。
+// 第二枚（换绑完成通知）是换绑那一条用例要用的：生效那一步会给**两个**地址各发一封，
+// 同一封信的理由（它只把成功晚一点报成失败，而这里断的是通道）。
 vi.mock('../../src/email', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../src/email')>()),
   sendPasswordChangedEmail: vi.fn(async () => true),
+  sendEmailChangedEmail: vi.fn(async () => true),
 }));
 
 import { disconnectDb } from '../../src/db';
@@ -52,7 +55,7 @@ import { sessionIdOf } from '../../src/account/access-sessions';
 import { hashToken } from '../../src/auth-tokens';
 import { getWsConnectionService } from '../../src/sync/services/websocket-connection.service';
 import { hashFor } from '../../src/password/service';
-import { AUTH_PASSWORD_PATHS, SESSION_PATHS } from '@heyta/shared-schema';
+import { AUTH_PASSWORD_PATHS, EMAIL_CHANGE_PATHS, SESSION_PATHS } from '@heyta/shared-schema';
 
 /** 从自己刚铸出来的那枚令牌里取会话 id（= 库里那一行的主键）。只取，不打印。 */
 const sessionIdOfToken = (token: string): string => {
@@ -275,12 +278,13 @@ describeWithDb('逐枚撤销会话 ⇒ 那一枚的实时通道当场断（真 P
   });
 
   /**
-   * 🔴 **三条撤销路径的最后一格**：重置口令（忘记密码）那一路的通道那一半。
+   * 🔴 **重置口令（忘记密码）那一路的通道那一半。**
    * 它与改密那条共用 `revokeAllDeviceSessions()`，但它**不换发会话**（J14），
    * 所以这一路要的是"两条全断 + 库里一条不剩"。
-   * ⚠️ 这一路补上之后，§5 第 16 条那三条路里**改密与重置**两条有真 socket 读数了；
-   * **换绑生效**那一路仍只有 spy 层那一条（`account-security.routes.spec.ts` 断的是"调用了 `closeForUser`"，
-   * 不是"那条连接真的断了"）—— 要在这一层补它，得把那两封信的装置重铺进本套件，理由与取舍写在计划 §6.73。
+   * ⚠️ 这里原先写的是"**换绑生效**那一路仍只有 spy 层那一条，要在这一层补它得把那两封信的装置
+   * 重铺进本套件"—— 那句已被下一格否证：生效那一步只看**库里那张请求行的两边确认状态**，
+   * 所以按形状直接写那张行就行（与本条写 `resetPasswordToken` 同一手法），不需要另一套邮件装置。
+   * 理由与两枚臂的读数在计划 §6.75。
    */
   it('🔴 真重置口令 ⇒ 已经开着的页面当场断，而库里一条会话都不剩（这条路不换发会话）', async () => {
     const newPassword = `ws-suite-reset-${Date.now()}-${process.pid}-Pass!`;
@@ -313,6 +317,75 @@ describeWithDb('逐枚撤销会话 ⇒ 那一枚的实时通道当场断（真 P
     expect(await closingF).toEqual({ code: 4003, reason: 'Token revoked' });
     // 这条路不换发新令牌 ⇒ 全部删干净，库里应当**零行**。
     expect(await observer.accessSession.count({ where: { userId } })).toBe(0);
+  });
+
+  /**
+   * 🔴 **§6.73 那张表里最后那个 ❌：换绑生效那一路的通道那一半。**
+   *
+   * 它不经过前面那两条的"发起那两封信"，所以**不需要**把另一枚套件的邮件装置重铺进来
+   * （§6.73 原本把这一格登记成欠项的理由就是那个），只需要把那张活请求按**库里的形状**直接写进去
+   * —— 与本文件上面重置那条写 `resetPasswordToken` 同一手法：令牌按 `hashToken` 落库，
+   * 生效那一步由**两次点链接**（旧地址一边、新地址一边）驱动。
+   * 完成通知那一封（`sendEmailChangedEmail`）走本文件既有的 SMTP mock，见文件头那段理由。
+   *
+   * 为什么这一路在这一层尤其要紧：`users.email` 是**在邮件里点开的**，App 从头到尾没被通知过，
+   * 而 JWT 的 payload 里带着 `email`（J13 同族）⇒ 不关通道时留下的不是"多活 30 秒"，
+   * 是"**旧地址那枚令牌**继续实时收这个账号的 op"。
+   */
+  it('🔴 真换绑生效（两边都点开）⇒ 已经开着的页面当场断，而只点一边时一条都不许断', async () => {
+    const pendingEmail = `ws-email-change-${Date.now()}-${process.pid}@example.test`;
+    const tokenOldSide = `ws-ec-old-${Date.now()}-${process.pid}`;
+    const tokenNewSide = `ws-ec-new-${Date.now()}-${process.pid}`;
+    const expiresAt = BigInt(Date.now() + 60_000);
+    await observer.emailChangeRequest.create({
+      data: {
+        userId,
+        pendingEmail,
+        oldToken: hashToken(tokenOldSide),
+        newToken: hashToken(tokenNewSide),
+        oldExpiresAt: expiresAt,
+        newExpiresAt: expiresAt,
+        requestedAt: BigInt(Date.now()),
+      },
+    });
+
+    const tokenI = await issueSession({ id: userId }, { deviceName: 'device-i' });
+    const tokenJ = await issueSession({ id: userId }, { deviceName: 'device-j' });
+    const registeredBefore = getWsConnectionService().getConnectionCount();
+    const wsI = await openSocket(wsBase, tokenI, 'client-change-i');
+    const wsJ = await openSocket(wsBase, tokenJ, 'client-change-j');
+    sockets.push(wsI, wsJ);
+    await waitForConnectionCount(registeredBefore + 2);
+
+    const confirm = (token: string) =>
+      app.inject({ method: 'POST', url: `/api/${EMAIL_CHANGE_PATHS.confirm}`, payload: { token } });
+
+    // 🔴 只点一边：这一边回"收到了"，但**不能**生效、更不能关通道 —— 换绑的语义是两个人
+    // 各点各的链接，最后那一次点击才是生效。先把监听挂上再确认"两条都还活着"。
+    const watchingI = waitForClose(wsI, 400);
+    const watchingJ = waitForClose(wsJ, 400);
+    const first = await confirm(tokenOldSide);
+    expect(first.statusCode, first.body).toBe(200);
+    expect((JSON.parse(first.body) as { applied: boolean }).applied, '只点一边就生效了').toBe(false);
+    expect(await watchingI).toBeNull();
+    expect(await watchingJ).toBeNull();
+    expect(wsI.readyState).toBe(WebSocket.OPEN);
+
+    // 两边齐 ⇒ 生效，两条当场断。
+    const closingI = waitForClose(wsI);
+    const closingJ = waitForClose(wsJ);
+    const second = await confirm(tokenNewSide);
+    expect(second.statusCode, second.body).toBe(200);
+    expect((JSON.parse(second.body) as { applied: boolean }).applied, '两边都点完没生效').toBe(true);
+
+    expect(await closingI).toEqual({ code: 4003, reason: 'Token revoked' });
+    expect(await closingJ).toEqual({ code: 4003, reason: 'Token revoked' });
+
+    // 会话行全删（这条路同样不换发会话，J14）；那张活请求随生效被删掉；地址真的换了。
+    expect(await observer.accessSession.count({ where: { userId } })).toBe(0);
+    expect(await observer.emailChangeRequest.count({ where: { userId } })).toBe(0);
+    const row = await observer.user.findUniqueOrThrow({ where: { id: userId }, select: { email: true } });
+    expect(row.email, '通道断了但地址没换').toBe(pendingEmail);
   });
 
   /**
