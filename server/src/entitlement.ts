@@ -29,6 +29,7 @@ import {
   type AutomationEntitlementKeyring,
   type EntitlementDatabase,
 } from './automation/entitlement-ticket';
+import { readAutomationRevocationFloor } from './automation/entitlement-issuer';
 
 /** 审计事件名。复用既有 `Logger.audit`，不新造一套日志。 */
 export const ENTITLEMENT_AUDIT_EVENTS = {
@@ -333,6 +334,12 @@ export const resolveAutomationEntitlementMode = (
 export interface AutomationEntitlementSource {
   readSubscriptions(userId: number): PromiseLike<readonly EntitlementSubscription[]>;
   readBinding(userId: number): PromiseLike<AutomationEntitlementBindingRecord | null>;
+  /**
+   * 在线刷新到的**全局吊销下限**（来自已验签清单落库的那个数，见
+   * `automation/entitlement-issuer.ts`）。缺省按 0 处理：这是一个单调只升的数，
+   * 读不到只会晚一点生效，不会放行已被吊销的东西。
+   */
+  readRevocationFloor?(): PromiseLike<number>;
 }
 
 /** 事务客户端在此只需要原始查询与绑定读取；类型直接取 Prisma 生成的那个。 */
@@ -352,13 +359,38 @@ export const lockedAutomationEntitlementSource = (tx: AutomationEntitlementTrans
     return (Array.isArray(rows) ? rows : []) as readonly EntitlementSubscription[];
   },
   readBinding: (userId) => tx.automationEntitlementBinding.findUnique({ where: { userId } }),
+  readRevocationFloor: async () => readAutomationRevocationFloorValue(await tx.$queryRaw`SELECT revocation_version AS "revocationVersion" FROM automation_entitlement_revocations WHERE scope = 'global'`),
 });
 
 /** 不在事务内（HTTP preHandler）使用的来源：读快照、不锁行，也不是任何判定的最终依据。 */
 export const prismaAutomationEntitlementSource = (): AutomationEntitlementSource => ({
   readSubscriptions: (userId) => prisma.subscription.findMany({ where: { userId }, orderBy: { id: 'desc' } }),
   readBinding: (userId) => prisma.automationEntitlementBinding.findUnique({ where: { userId } }),
+  readRevocationFloor: () => readAutomationRevocationFloor(prisma),
 });
+
+/** 原始查询的返回值形状不固定（驱动/BigInt/空表），下限只认一个非负安全整数。 */
+export const readAutomationRevocationFloorValue = (rows: unknown): number => {
+  const value = (Array.isArray(rows) ? (rows[0] as { revocationVersion?: unknown } | undefined)?.revocationVersion : undefined);
+  return typeof value === 'bigint' ? (value >= 0n && value <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(value) : 0)
+    : typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : 0;
+};
+
+/** 手配的签发者配置；没配就抛 —— "没配" 的判定在调用方（`ISSUER_NOT_CONFIGURED`）。 */
+const configuredAutomationKeyring = (): AutomationEntitlementKeyring => {
+  const keyring = loadAutomationEntitlementKeyring();
+  if (!keyring) throw new Error('Automation entitlement issuer is not configured');
+  return keyring;
+};
+
+/** 把在线刷新到的吊销下限并进签发者配置；下限只升不降，读不到就用手配的那一个。 */
+export const withAutomationRevocationFloor = async (
+  keyring: AutomationEntitlementKeyring,
+  source?: Pick<AutomationEntitlementSource, 'readRevocationFloor'>,
+): Promise<AutomationEntitlementKeyring> => {
+  const floor = source === undefined ? 0 : await source.readRevocationFloor?.() ?? 0;
+  return floor > (keyring.minRevocationVersion ?? 0) ? { ...keyring, minRevocationVersion: floor } : keyring;
+};
 
 /**
  * 自动收集的权益判定：先按部署模式选来源，再判定。
@@ -383,8 +415,11 @@ export async function evaluateAutomationEntitlementForUser(input: {
   if (mode === 'official') {
     return evaluateCapabilityAcross(await source.readSubscriptions(input.userId), 'automation', now, policy);
   }
-  const keyring = input.keyring === undefined ? loadAutomationEntitlementKeyring() : input.keyring;
-  if (!keyring) return { allowed: false, reason: 'ISSUER_NOT_CONFIGURED' };
+  const configured = input.keyring === undefined ? loadAutomationEntitlementKeyring() : input.keyring;
+  if (!configured) return { allowed: false, reason: 'ISSUER_NOT_CONFIGURED' };
+  // 🔴 判定用的下限 = 手配的那一个与**在线刷新到的**那一个里较大的。只看环境变量，
+  // "在线刷新"就只是往库里写了个数；只看库里那个，换一次部署就丢。
+  const keyring = await withAutomationRevocationFloor(configured, source);
   const binding = await source.readBinding(input.userId);
   if (binding === null) return { allowed: false, reason: 'NO_BINDING' };
   if (!isAutomationEntitlementBindingUsable(binding, keyring, now)) {
@@ -426,7 +461,8 @@ export async function authorizeAutomationOperation(input: {
       ...(input.ruleId !== undefined ? { ruleId: input.ruleId } : {}),
       ...(input.eventId !== undefined ? { eventId: input.eventId } : {}),
       token: input.ticket,
-      keyring: input.keyring === undefined ? loadAutomationEntitlementKeyring() : input.keyring,
+      keyring: input.keyring !== undefined ? await withAutomationRevocationFloor(input.keyring, input.source)
+        : await withAutomationRevocationFloor(configuredAutomationKeyring(), input.source),
     });
     return { allowed: true };
   } catch (error) {
@@ -465,6 +501,11 @@ export interface EntitlementGuardOptions {
    * 判定要看签发者/实例/吊销版本，只回 `expiresAt` 会把这些防线在读数里就抹掉。
    */
   loadAutomationBinding?: (userId: number) => Promise<AutomationEntitlementBindingRecord | null>;
+  /**
+   * 在线刷新到的吊销下限（**闸门读的那一份**）。省略时查 `prisma`；
+   * 注入它是为了让"下限来自清单还是来自环境变量"这一档能被测到。
+   */
+  loadAutomationRevocationFloor?: () => Promise<number>;
   /** 部署模式与官方钥匙环；省略时读显式 env，不猜。 */
   automationMode?: AutomationEntitlementMode | undefined;
   automationKeyring?: AutomationEntitlementKeyring | undefined;
@@ -527,6 +568,21 @@ const defaultLoadAutomationBinding = async (
   prisma.automationEntitlementBinding.findUnique({ where: { userId } });
 
 /**
+ * 闸门在无事务时读在线刷新到的吊销下限。
+ *
+ * 🔴 这一读数缺了会怎样：环境变量里的手配下限只有部署时改一次，`revocations/refresh`
+ * 那条路写进库的下限将**没有任何一个判定会去看** —— "在线刷新"就只是往库里写了个数。
+ * 读失败按下限 0 处理（合并单调只升，最坏是晚一点生效，不会放行已被吊销的东西）。
+ */
+const defaultLoadAutomationRevocationFloor = async (): Promise<number> => {
+  try {
+    return readAutomationRevocationFloorValue(await prisma.$queryRaw`SELECT revocation_version AS "revocationVersion" FROM automation_entitlement_revocations WHERE scope = 'global'`);
+  } catch {
+    return 0;
+  }
+};
+
+/**
  * preHandler 守卫。
  *
  * 🔴 **必须注册在 `authenticate` 之后** —— Fastify 的 hook 按注册顺序执行，
@@ -545,6 +601,7 @@ export const createEntitlementGuard = (
   const now = options.now ?? Date.now;
   const loadSubscriptions = options.loadSubscriptions ?? defaultLoadSubscriptions;
   const loadAutomationBinding = options.loadAutomationBinding ?? defaultLoadAutomationBinding;
+  const loadAutomationRevocationFloor = options.loadAutomationRevocationFloor ?? defaultLoadAutomationRevocationFloor;
 
   return async (req, reply) => {
     if (options.when && !options.when(req)) return;
@@ -563,7 +620,7 @@ export const createEntitlementGuard = (
         userId: user.userId,
         now: now(),
         policy,
-        source: { readSubscriptions: () => loadSubscriptions(user.userId), readBinding: () => loadAutomationBinding(user.userId) },
+        source: { readSubscriptions: () => loadSubscriptions(user.userId), readBinding: () => loadAutomationBinding(user.userId), readRevocationFloor: () => loadAutomationRevocationFloor() },
         ...(options.automationMode !== undefined ? { mode: options.automationMode } : {}),
         ...(options.automationKeyring !== undefined ? { keyring: options.automationKeyring } : {}),
       });
@@ -581,6 +638,12 @@ export const createEntitlementGuard = (
         ...(ticket === undefined ? {} : { ticket }),
         now: now(),
         policy,
+        // 🔴 票据那一路也必须对着**在线刷新到的**下限判，且这一读放在同一个事务里 ——
+        // 不传 source 时下面的 keyring 合并读不到库里的下限，"抬下限"就只挡住了
+        // 没有 action 的那条判定，逐次放行的写路径照旧放行旧票据。
+        source: options.loadAutomationRevocationFloor === undefined
+          ? lockedAutomationEntitlementSource(tx)
+          : { ...lockedAutomationEntitlementSource(tx), readRevocationFloor: options.loadAutomationRevocationFloor },
         ...(options.automationMode !== undefined ? { mode: options.automationMode } : {}),
         ...(options.automationKeyring !== undefined ? { keyring: options.automationKeyring } : {}),
       }));
