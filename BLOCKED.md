@@ -8191,3 +8191,50 @@ Error: locator.click: Test timeout of 60000ms exceeded.
 2. 新增 **ARM-4**（两半：已知提及件不许进本线桶 + 它的外线路径不许从打印集合里消失），并把 `self_test()` 从"首败即返回"改成"每臂都跑完再汇总 rc"—— 否则前一臂长红时后面那几枚臂**根本没有读数**。变异证明：把 `partition` 改成全部归本线桶 ⇒ `ARM-4 … 坏 731cc2e2 被当成本线笔; 6e813df9 被当成本线笔; docs/plans/account-standard-suite.md 的证据被分流丢了; docs/plans/product-ux-optimization.md 的证据被分流丢了`、`不成立=2 → ARM-3, ARM-4`；从 `.mut-bak` 还原后回到基线（`不成立=1 → ARM-3`）。
 
 **要拍的只有一件**：ARM-3 那句"动了独占路径却没被计入必须为 0"在共享检出下有两种真实成因 ——（甲）本线自己某笔没带主题词（这条臂当初就是为了它写的）；（乙）别线把本线路径提交了（今天的实际成因）。三种读法：① 保持长红，把它当"跨线提交"的告警器，每次由本线确认成因后在台账记一行；② 让 ARM-3 只认**主题里没有任何别线标记**的漏网（要给它一张别的线的主题词表，会随线的增减漂）；③ 把独占路径的归属判据从"笔"改成"内容"（HEAD 里那枚文件的内容等于本线台账登记的那一版就算闭合）。本线按纪律**没有**自己挑一种 —— 这是判卷口径，不是代码 bug。
+
+## B145（2026-10-10 20:2x，账号标准套件线 · 取 iOS 设备腿时量出的）：**无头 boot 的模拟器上 `simctl io screenshot` 恒给纯黑**，idb 的 framebuffer 采集才是真屏 —— `reinstall-all.sh` 的 ios 段截图判据在这类设备上**恒红（假红）**
+
+**现量（同一时刻、同一台设备 `heyta-ios-isolated`，app 进程在跑）**：
+
+| 采集路 | 产物 | 人眼看到 |
+|---|---|---|
+| `xcrun simctl io <UDID> screenshot` | **106123 bytes 纯黑**（`--display internal` 与默认同字节） | 黑 |
+| `idb --companion <addr> screenshot` | **3331342 bytes** | **主屏**：heyta 图标（品牌蓝）在左上、Safari 在 dock、状态栏 20:24 |
+
+两枚 `cmp` 不同；黑图与"app 没起来"的黑**长得一模一样**，所以这一格会把"装上了、起得来"读成"没起来"。
+📌 这与陷阱 #208（多显示器要显式选 primary）**不是同一件事**：这里 `--display internal` 与默认**逐字节相同**，
+换显示器救不了；差别在**采集通道**（`simctl io` 走窗口/ScreenCaptureKit 那条路，无头 boot 没有窗口；
+idb 走设备内部 framebuffer）。
+
+**影响面**：`scripts/reinstall-all.sh` 的 ios 段（`xcrun simctl io "$UDID" screenshot "$IOS_SHOT"` +
+`shot_ok_logged`）在**任何无头 boot 的设备上**都会判 🔴「启动后截图为空/缺失 —— 装上了但没起来」，
+而装包与新鲜度两格是 ✅。AGENTS §6.1.1 把这一格当"装上了且能起来"的定义 ⇒ 无头跑四端重装会**永远收不到 OK**。
+
+**修法（不放松判据）**：截图改走 idb 采集；或 simctl 黑时**回退 idb 并响亮打印用了哪条路**。
+判据本身一条不动（仍要非空白 + 主蓝 `#2563EB` 命中）。本会话**没改**那个共享脚本，
+设备腿的"能起来"证据改由腿脚本自己的 AX/界面判据给（见台账 §6.83）。
+
+**给下一个跑的人**：看到这一格红，先做上面那张两路对照表再下结论；**别去查产品**。
+
+## B146（2026-10-10 20:1x，账号标准套件线 · 隔离载体里量出的）：`pnpm install --frozen-lockfile --offline`（**含 `--force`**）在 lockfile 与 manifest 一致时**仍不补** node_modules 里缺的链接，报 `Already up to date`
+
+**症状两枚**（都是"包在虚拟 store 里就有、链接没有"）：
+1. Metro：`UnableToResolveError … targetModuleName: '@heyta/legal'`（`apps/mobile/src/screens/AuthScreen.tsx`）
+   ⇒ `xcodebuild` 的 `Bundle React Native code and images` 段失败，`reinstall-all.sh` 判 🔴。
+2. tsup dts：`packages/ui/src/auth/password-strength-model.ts(1,31): error TS2307: Cannot find module '@zxcvbn-ts/core'`。
+
+**现量**：主检出 `apps/mobile/node_modules/@heyta/legal`、`packages/ui/node_modules/@zxcvbn-ts/{core,language-common}`
+**都在**；载体**都不在**（`packages/ui/node_modules/@zxcvbn-ts/` 是个**空目录**）。
+两棵树全量链接差集 = **恰好这 3 枚**（脚本见下）；手补 3 枚后 `pnpm -r build` ⇒ `BUILD_RC=0`、18 个顶层目录。
+`pnpm install --offline --frozen-lockfile --force` 仍然 `Already up to date / Done in 3.8s`，**一枚都不补**。
+
+**为什么会这样**：载体是"先装过一次、之后主检出的 manifest 才长出新依赖"的形状；
+pnpm 用 `.modules.yaml` 的已记录状态判"最新"，离线模式下不去逐 importer 对账。
+⇒ **任何"复用旧 node_modules 的隔离载体/干净检出"流程都会撞**，而且症状长得像"仓库坏了"。
+
+**修法（已在本线载体装置里用着）**：同步完之后跑一次**链接差集对账**，缺就按主检出的相对目标补链并打印：
+```bash
+# 只比对 packages/*/node_modules 与 apps/*/node_modules 下的软链，缺即在载体里 ln -sfn 同一条相对目标
+```
+（本会话的实现是内联 python，未入库；要入库就进 `sync-dirty-to-carrier.sh` 的收尾，并加一条"差集必须为 0"的判据。）
+**不**用 `--force` 假装修好了 —— 它什么都不做。
