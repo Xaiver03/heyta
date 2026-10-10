@@ -623,6 +623,48 @@ describe('SessionsPanel', () => {
     expect(text(`session-row-${SESSION_A.sessionId}`)).toContain('Last used');
   });
 
+  /**
+   * 🔴 **设备名与 UA 都没有 ⇒ 那一行什么都不写，不许编一个名字。**
+   * 这一格不是设想：`access_sessions.device_name` **今天没有任何一条登录路由接收它**
+   * （计划 §5 第 9 条），所以"两个都空"是当前线上每一枚会话的真实形状 ——
+   * 负责人 10-10 拍的是不给登录请求加一个客户端自报的 `deviceName`（收益零，代价是一条不可逆的线协议），
+   * 于是这个形状会长期存在，必须由判据钉住而不是靠注释（裁决记录在计划 §6.77）。
+   * 界面上宁可那一行只有时间，也不许出现一句"未命名设备"——那是替服务端说谎。
+   */
+  it('🔴 设备名与 UA 都缺（含只有空格的）⇒ 那一行不画标签，也不编一个名字', async () => {
+    const bothNull = {
+      sessionId: 'c'.repeat(64),
+      createdAt: 1_600_000_000_000,
+      lastSeenAt: 1_600_000_100_000,
+      deviceName: null,
+      userAgent: null,
+      current: false,
+    };
+    const bothBlank = {
+      sessionId: 'd'.repeat(64),
+      createdAt: 1_600_000_000_100,
+      lastSeenAt: 1_600_000_100_100,
+      deviceName: '   ',
+      userAgent: '   ',
+      current: false,
+    };
+    stubRoutes([{ method: 'GET', path: P.sessions, body: { sessions: [bothNull, bothBlank] } }]);
+
+    await render(<SessionsPanel />);
+
+    // 前提：两行**都画出来了** —— 否则"标签是 null"可以是"整片没渲染"的另一种读法。
+    expect(byId(`session-row-${bothNull.sessionId}`)).not.toBeNull();
+    expect(byId(`session-row-${bothBlank.sessionId}`)).not.toBeNull();
+    expect(byId(`session-label-${bothNull.sessionId}`)).toBeNull();
+    expect(byId(`session-label-${bothBlank.sessionId}`)).toBeNull();
+
+    // 整张表里不许出现任何一句编出来的名字，也不许出现"这台设备"（两行都不是 current）。
+    const rendered = container!.textContent ?? '';
+    for (const invented of ['Unknown device', 'Unnamed device', '未命名', 'This device']) {
+      expect(rendered, `界面上出现了编出来的名字：${invented}`).not.toContain(invented);
+    }
+  });
+
   it('🔴 current 那一行标成"这台设备"，撤销它的按钮是禁用的，并且旁边有一句为什么', async () => {
     stubRoutes([LIST_OK]);
 
