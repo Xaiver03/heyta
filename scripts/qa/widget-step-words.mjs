@@ -84,6 +84,26 @@ export function stepTexts(keys) {
 }
 
 /**
+ * 产品认"这是我们的原生壳"用的那条**封闭名单**（`SHELL_MESSAGE_HANDLER_NAMES`）。
+ * 以前它在 Windows 那枚装置里自己读一遍真源（第二份实现）—— 与这枚模块存在的理由同一件事，
+ * 所以搬到这里：装置只调这个函数，读不到就响亮失败，而这一档现在有 `--self-test` 能重跑。
+ */
+const HANDLERS_MARKER = /SHELL_MESSAGE_HANDLER_NAMES\s*=\s*\[([^\]]*)\]/;
+
+export function readShellHandlerNames(sourceText) {
+  const block = sourceText.match(HANDLERS_MARKER);
+  const names = [...new Set([...(block?.[1] ?? '').matchAll(/'([^']+)'/g)].map((m) => m[1]))];
+  if (names.length === 0) {
+    throw new Error(
+      `${SOURCE} 里读不出 SHELL_MESSAGE_HANDLER_NAMES —— 这条判据的名单是承重的，读空不许当通过`,
+    );
+  }
+  return names;
+}
+
+export const shellHandlerNames = () => readShellHandlerNames(readFileSync(resolve(REPO, SOURCE), 'utf8'));
+
+/**
  * `--self-test`：不起壳、不要设备，只问这枚真源模块自己的承重条件**能不能红**。
  * 这枚模块是两枚壳级取证装置唯一的区分依据，而那两枚装置都要装出来的产物才跑得动 ——
  * 所以它的全部判据在设备腿放开之前没有任何东西试过；这一档就是那段"没人试过"的替身。
@@ -119,6 +139,22 @@ async function runSelfTest() {
     missingThrew = true;
   }
   arm('正对照：读不到的键必须抛（不许静默少一枚）', missingThrew ? [] : ['`stepTexts` 对不存在的键没抛 ⇒ 分母会静默变短']);
+
+  // 封闭名单那一档：正对照同样是"读不到必须抛"，而形状那一臂挡的是把别的数组读成名单。
+  let handlers = [];
+  try {
+    handlers = shellHandlerNames();
+    arm('壳信号名单读得到、且每枚都是合法标识符', handlers.filter((n) => !/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(n)).map((n) => `非法名字：${n}`));
+  } catch (error) {
+    arm('壳信号名单读得到、且每枚都是合法标识符', [error.message]);
+  }
+  let handlerThrowThrew = false;
+  try {
+    readShellHandlerNames('export const SOMETHING_ELSE = [1];');
+  } catch {
+    handlerThrowThrew = true;
+  }
+  arm('正对照：读不出名单必须抛（读空不许当通过）', handlerThrowThrew ? [] : ['`readShellHandlerNames` 对没有这枚常量的源码没抛']);
 
   let failures = 0;
   for (const { name, problems } of arms) {

@@ -26,7 +26,7 @@ import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '../../e2e/node_modules/@playwright/test/index.mjs';
-import { installStepKeys, nativeStepKeys } from './widget-step-words.mjs';
+import { installStepKeys, nativeStepKeys, shellHandlerNames } from './widget-step-words.mjs';
 
 const ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const CDP = process.env['HEYTA_WIN_CDP'] ?? 'http://127.0.0.1:9287';
@@ -49,15 +49,7 @@ const PROBE = resolve(ROOT, 'scripts/qa/windows-external-browser-probe.ps1');
  * `x !== undefined`），属性存在但值为 `undefined` 时两者读数相反 ⇒ 那条 backend 对账会在真壳上
  * 造一次假红。名单从真源读，**读空就响亮失败**（空集合不许算通过）。
  */
-const SHELL_HANDLER_NAMES = (() => {
-  const source = readFileSync(resolve(ROOT, 'apps/web/src/pwa/widget-install.ts'), 'utf8');
-  const block = source.match(/SHELL_MESSAGE_HANDLER_NAMES\s*=\s*\[([^\]]*)\]/);
-  const names = [...new Set([...(block?.[1] ?? '').matchAll(/'([^']+)'/g)].map((m) => m[1]))];
-  if (names.length === 0) {
-    throw new Error('没能从 apps/web/src/pwa/widget-install.ts 读出 SHELL_MESSAGE_HANDLER_NAMES —— 这条判据的名单是承重的，读空不许当通过');
-  }
-  return names;
-})();
+const SHELL_HANDLER_NAMES = shellHandlerNames();
 // 两套步骤键都从产品真源读（同一枚模块，理由写在 `widget-step-words.mjs` 文件头）：
 // 安装引导是要**判零**的那一套，原生小组件引导是要**记下来**的那一套。
 const INSTALL_STEP_KEYS = installStepKeys();
