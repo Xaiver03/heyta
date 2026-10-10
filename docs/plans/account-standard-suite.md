@@ -1,14 +1,16 @@
 # 注册登录标准套件：补齐账号面
 
-> 状态：**代码与判据侧已闭合；剩下的格全部有外部前提**（2026-10-08 立，10-10 04:5x 现量刷新）
+> 状态：**代码与判据侧已闭合；剩下的格要么有外部前提，要么是本线在案的对外欠账**（2026-10-08 立，10-10 12:2x 现量刷新）
 > ⇒ 已闭合的那一半：换绑邮箱（服务端 + app-host + Web/移动界面 + 中英词条）、忘记密码/重置、改口令、
 > 逐台撤销与"退出这台设备"的实时通道、账号注销对齐，四层判据（单元 / HTTP / SQL / **真库+真 socket**）
 > 加真浏览器腿都有，且每条 🔴 判据各做过变异 —— 逐格读数在 §6，撤销那一族的现状表在 §6.73（四格全 ✅）。
 > ⇒ 还开着的格，每一格写清了它等的是谁：iOS 设备腿与四端重装（等 `packages/ui` 那批入库，§5 第 11 条）、
-> 法务「十封」联合提交与帮助中心两行（等别线那批落地）、真收件箱那一腿（§5 第 4 条）、
-> `SAFE_ERROR_MESSAGES` 认不出那句兜底话（§5 第 18 条那一半 —— 改的是对外文案 + 判据口径，归负责人拍）、
-> 会话表 `device_name` 没有任何客户端上报（§5 第 9 条 —— 补它要给登录请求加一个入参，
-> 而动线契约与"界面显示哪一列"是**判据口径 + 对外说明**两件事，界面上现在显示的是 UA，不是空白）。
+> 法务那三句**漏披露**（本线自己欠的账，逐枚名字由 `pnpm check:legal-email-claims` 的 🟡 那行给出；
+> 为什么不能从这条共享检出单面提交，见 §6.78）、帮助中心那两行挂载（等 landing 那批 ——
+> 但那两行的**内容**已逐句对过实现与判据，§6.78 末段；原先那条"必须与十封联合提交"的理由已被现量否证）、
+> 真收件箱那一腿（§5 第 4 条）。
+> §5 第 9 条（`device_name` 没有任何客户端上报）与第 18 条那一半（`SAFE_ERROR_MESSAGES` 认不出那句兜底话）
+> 已按负责人这一轮的授权拍完并落：拍板表在 §6.77，静态尺与那条被否证的第一版口径在 §6.79。
 > 裁决层：[ADR-0063](../adr/0063-email-rebinding-and-per-session-revocation.md)
 > 上游规范：[`user-journey-and-auth.md`](user-journey-and-auth.md)（A1–A8、§7 明确不做、J1–J7 —— **本文不改它，只补它没覆盖的动作**）
 > 姊妹工单：[`email-password-auth.md`](email-password-auth.md)（它的缺口 13 由本文 W6 兑现）
@@ -208,6 +210,10 @@ W1 先落、W7 后落 ⇒ 中间任何一次 `pnpm check` 都会红。**这不�
 9. `access_sessions.device_name` 这一列**目前没有任何客户端上报**（界面上看到的一律为空）。
    政策文本里那句"设备名你起"讲的是**同步设备**那张表（`sync_devices`），不是会话表 ——
    两者在 `personal-info-list.ts` 里是分开的两行，别读成同一件事。
+   🔴 **这一格已拍完（10-10 12:0x，负责人把这类口径交给产品侧拍）**：**不给登录请求加上报入参**
+   （那要动线协议契约，换来的只是把已经能读的 UA 换成一个客户端自报、服务端无从校验的字符串），
+   界面继续读 `deviceName ?? userAgent`。要钉的换成另一件事：**两个都没有时不许替用户编一个设备名**。
+   用例 `apps/web/tests/account-security.spec.tsx`（臂 M1 编名字 / 臂 M2 空标签行，各红各的断言）与两臂读数在 §6.77。
 10. ✅ **换绑与会话两块新界面的真浏览器证据已取**（AGENTS §6.2 规定一，10-09 01:1x）。
     判据文件 `e2e/tests/account-email-change-and-sessions.spec.ts` **4 条全绿**、七张图**在最后一趟之后**
     逐张打开看过，看图当场查出**两条断言查不出的缺陷**并修完（两条各做过一次变异）⇒ 全过程在 §6.4。
@@ -296,12 +302,13 @@ W1 先落、W7 后落 ⇒ 中间任何一次 `pnpm check` 都会红。**这不�
     新增的链路 10b 第一次把两条路放在一起比字节，当场红 —— legacy 那路回
     `{"error":"Invalid or expired login link"}`，唯一入口回 `{"error":"Invalid or expired link"}`。
     现量（行号会漂，只给命令）：`git grep -n "Invalid or expired" HEAD -- server/src/api.ts server/src/auth.ts`。
-    🔴 **仍然开着的那一半，不由本线代拍**：`SAFE_ERROR_MESSAGES` 那张表认得出
-    `verifyLoginMagicLink` 抛的 `'Invalid or expired login link'`，**认不出** `auth.ts` 里
-    「查不到这个人」那句 `'Invalid or expired link'` ⇒ 后者永远被兜底句顶掉。
-    现在两条路的兜底句对齐了，所以用户读不出差别；但**结构上**这件事仍只由链路 10b 一条运行时判据守着，
-    没有静态尺。要把它做成封闭词表的一部分（进 allowlist，或改由 `copy.generated.ts` 下发中英两句），
-    那是**对外可见文案 + 判据口径**，与 §5 第 7 条同一条立场，等负责人拍。
+    ✅ **那一半已闭合**（10-10 11:4x，读数在 §6.77）：负责人把这类口径的拍板权交给了产品线，
+    处置是**纳进封闭词表 + 补一把静态尺**，不是继续只靠一条运行时判据。
+    静态尺 `pnpm check:safe-error-fallbacks` 已进 `pnpm check` 链；它拦的形状是
+    "一句话既被 `throw` 又被某处当 `getSafeErrorMessage` 的兜底句 ⇒ 必须在 `SAFE_ERROR_MESSAGES` 里"。
+    ⚠️ 口径**不是**"所有兜底句都进表" —— 那样一条会一次判红别线在用的十七处通用失败句，
+    等于给封闭词表灌水；逐格理由与那条否证在 §6.77。
+    现量（这一档还剩几处）：`pnpm check:safe-error-fallbacks`（rc=0 即清零）。
 
 ---
 
@@ -319,7 +326,7 @@ W1 先落、W7 后落 ⇒ 中间任何一次 `pnpm check` 都会红。**这不�
 | W4 | ✅ 代码 + jsdom 判据 | web `EmailChangePanel.tsx`+`emailChangeStore.ts`，mobile `EmailChangeSection.tsx`；服务端第 5 张凭据页 `server/public/change-email.js`（守"GET 不消费令牌"）。后果先写在点之前那句进词条（中英各一份），状态区读 `GET …/status`。判据含在 W3/W1 的三组里（web 40→**41** 条、mobile 30 条、server 31+28 条）。<br>⚠️ 这一格原先写着"没有真浏览器截图"，**10-09 01:1x 已闭合**：`e2e/tests/account-email-change-and-sessions.spec.ts` 4 条 + 七张图逐张看过，看图查出两条并修完 ⇒ **§6.4**。移动端那一腿仍只有测试树（没上真机），留在 §5 第 10 条 |
 | W5 | ✅ | `apps/mobile/src/screens/SecurityScreen.tsx` 接上三块纯缺 UI 的：`setInitialPassword` / `beginPasskeyEnrollment`+`complete` / `requestPasskeyRecovery`（app-host 那三个函数早就有）。判据在 mobile 那 30 条与既有 `auth-screen-password.spec.ts` 里 |
 | W6 | ✅ | `server/src/account/authenticator-notice.ts` 一份收口，`/password/set`（`service.ts:249`）与通行密钥注册完成（`passkey.ts:556`）两处共用；`service.ts` 那句"成功后不发信"的**说明**已改写（语义没动：改口令那封照旧只在成功后发）。发信失败的形状由 `passkey-enrollment.spec.ts:529` 那条钉住 |
-| W7 | 🟡 本线已落，**两枚红归并行线** | 九行逐条对过：①三份文本的"邮箱不可更换"改成双侧确认（`privacy.ts:506`、`terms.ts:76`+`:80`+`:317`、`data-rights.ts:158`）②触发条件表那条结掉换成"旧地址收不到信时如何更正"（`data-rights.ts:352`）③功能邮件**五封→十封**并逐类点名（`privacy.ts:201`/`:296`）④一次性凭据时长表补注册验证码 10 min 与换绑两枚 24 h（`privacy.ts:539`）⑤`personal-info-list.ts:236`/`:243` 新增"待绑定的新邮箱地址"与"登录会话"两行，并写明"设备名那一列目前没有任何客户端上报"⑦`gen:server-legal` 重跑 ⇒ `check:server-legal` rc=0（顺带关掉 **D4**）⑧帮助中心 `site.docs.account.s6/s7` + `site.help.q/a.rebind|sessions` ⑨五份版本各 bump 一版（`privacy@1.9`、`terms@1.4`、`data-rights@1.6`、`personal-info-list@1.6`、`third-parties@1.5`）+ 变更表各一行、中英同序 ⇒ 进 `legalSetVersion()`，补签同批。<br>🔴 **⑥级联数字这一格是本次唯一"判据绿不了但不是我的数错了"**：`structure.spec.ts` 现量真源 **34 处 / 33 张**，文案写 **32 / 31**。逐约束归因（用该判据自己的推导复刻一遍，标定=不排除时逐字等于它报的数）：**摘掉并行 automation 线那笔未提交的 `20261018160000_add_automation_entitlement_tickets` ⇒ 32 / 31 = 文案现值**；再摘掉本线那笔 ⇒ 30 / 29（= 本批的底数）。⇒ 本线的数字是对的，多出来的两张表（`automation_entitlement_bindings`、`automation_entitlement_ticket_uses`）与它们缺的那个"用户读得到的类别名"归那条线。**不代改**：类别名与对外承诺的措辞是判据口径（见记忆「代改别线代码要三条齐」） |
+| W7 | 🔴 **未入库 —— "已落"这句是错的，10-10 现量更正**（九行的字都只在共享检出的工作树里；`git log -S '十封功能邮件'`、`-S '换绑-新邮箱确认'` 两把都输出空，而 HEAD 里现在还是"发五封"与"**邮箱不可更换。**"。逐枚现量、为什么不能从这条检出单面提交、以及本线自己欠的那四枚漏披露，全在 §6.78）。下面那九行照原样留着，读的时候要带上这一句：**两枚红归并行线** | 九行逐条对过：①三份文本的"邮箱不可更换"改成双侧确认（`privacy.ts:506`、`terms.ts:76`+`:80`+`:317`、`data-rights.ts:158`）②触发条件表那条结掉换成"旧地址收不到信时如何更正"（`data-rights.ts:352`）③功能邮件**五封→十封**并逐类点名（`privacy.ts:201`/`:296`）④一次性凭据时长表补注册验证码 10 min 与换绑两枚 24 h（`privacy.ts:539`）⑤`personal-info-list.ts:236`/`:243` 新增"待绑定的新邮箱地址"与"登录会话"两行，并写明"设备名那一列目前没有任何客户端上报"⑦`gen:server-legal` 重跑 ⇒ `check:server-legal` rc=0（顺带关掉 **D4**）⑧帮助中心 `site.docs.account.s6/s7` + `site.help.q/a.rebind|sessions` ⑨五份版本各 bump 一版（`privacy@1.9`、`terms@1.4`、`data-rights@1.6`、`personal-info-list@1.6`、`third-parties@1.5`）+ 变更表各一行、中英同序 ⇒ 进 `legalSetVersion()`，补签同批。<br>🔴 **⑥级联数字这一格是本次唯一"判据绿不了但不是我的数错了"**：`structure.spec.ts` 现量真源 **34 处 / 33 张**，文案写 **32 / 31**。逐约束归因（用该判据自己的推导复刻一遍，标定=不排除时逐字等于它报的数）：**摘掉并行 automation 线那笔未提交的 `20261018160000_add_automation_entitlement_tickets` ⇒ 32 / 31 = 文案现值**；再摘掉本线那笔 ⇒ 30 / 29（= 本批的底数）。⇒ 本线的数字是对的，多出来的两张表（`automation_entitlement_bindings`、`automation_entitlement_ticket_uses`）与它们缺的那个"用户读得到的类别名"归那条线。**不代改**：类别名与对外承诺的措辞是判据口径（见记忆「代改别线代码要三条齐」） |
 | W8 | ✅ | **D1** `/auth/email/verify` 此前全仓零 HTTP 判据 ⇒ 现在真库 5 条（`email-change-and-sessions.integration.spec.ts` 的 D1 组：三种分流形状、消费即失效、过期与"从没有过"同码同句逐字相同、空令牌 400、通行密钥那一格不发会话）。`/password/change`、`/password/set` 的路由级判据在 `password-auth-routes.spec.ts`。<br>**D2** `admin POST /users/:id/logout` 改走 `revokeAllTokens` + `revokeAllSessions` + `getWsConnectionService().closeForUser`，钉在 `admin-routes.spec.ts:415`/`:420`。<br>**D3** `credential-sweep.ts` 覆盖 `users` 那四列 + 换绑双令牌那两张 + `access_sessions` 过期行，判据 **6 条**；变异 **M8** 摘掉 `lt` ⇒ 2 红（`J-S1` 与配对那条）。挂在 `sync/cleanup.ts` 第 9 步。<br>**邮箱归一化**收进 `account/email-normalize.ts` 一处（11 个调用点），门禁 `check:email-normalization` rc=0 |
 | W9 | ✅ 真 PG，零 mock | 隔离验收库 `heyta_account_w9`（本地 PG 14，`psql` 建库 → `sh scripts/migrate-deploy.sh` 应用**全部**迁移 ⇒ "All migrations have been successfully applied"，含本线那笔）。判据文件 `server/tests/integration/email-change-and-sessions.integration.spec.ts`：**13 条全绿**（真 `PrismaClient` + 真 `apiRoutes` + 真 `accountSecurityRoutes`，只 mock SMTP）。跑法（已点名进 `server/package.json` 的 `test:integration:postgres`，`check:integration-coverage` rc=0）：<br>`cd server && DATABASE_URL=postgresql://$USER@127.0.0.1:5432/heyta_account_w9?schema=public npx vitest run --config vitest.integration.config.ts tests/integration/email-change-and-sessions.integration.spec.ts`<br>🔴 这一层当场照出**我自己写错的一条前提**：D1 那格我先按"邮箱注册⇒不发会话"写，真库里返回的是 `session`（`auth.ts:697`），"不发会话"的是**通行密钥注册**那一格（`auth.ts:680`）⇒ 拆成两条各测各的。假绿的一层（假 prisma）不会告这个 |
 
@@ -435,8 +442,9 @@ Chromium、IndexedDB、React 树、store、词条渲染、点击与焦点。
 
 ### 6.5 整条 `pnpm check` 链的读数，与 16 道红的逐条归因
 
-链跑法：逐条 `pnpm <step>` 串行、`NO_COLOR=1`、每步只留 rc 与末两行（脚本在 `/tmp/run-check-chain.mjs`，
-一次性夹具，不入库）。**97 步取数 + 2 步单独取数（`typecheck` / `-r test`）= 99**，其中 **16 道非零**。
+链跑法：逐条 `pnpm <step>` 串行、`NO_COLOR=1`、每步只留 rc 与末两行（脚本原先住 `/tmp/run-check-chain.mjs`，
+10-10 已把它连 md5 一起挪到 `~/heyta-carriers/w9-acct-logs/run-check-chain.mjs` —— 一次性夹具也不该住 /tmp，
+因为一次重启就把这条链的复取装置抹掉；它仍然**不入库**，因为它是本线这轮的取数壳，不是仓库的门禁），**97 步取数 + 2 步单独取数（`typecheck` / `-r test`）= 99**，其中 **16 道非零**。
 本线自己的那部分：**没有一道红是本线的实现或判据**；第 13 道（`check:ai-e2e`）里**有本线那份新 spec
 第一趟的夹具缺口**（已修，见 §6.4），但那一趟留下的末两行**不是**本线的形状 —— 两半在表里分开记。
 
@@ -3881,6 +3889,132 @@ SMTP mock 只多一枚 `sendEmailChangedEmail`（在**本文件已有**的那份
 `2 failed / 24 passed (26)` 那个分母今天的对应值（26 → 28 是本轮加的两条真 socket 用例）。
 本线仍然开着的格都不在这一层：iOS 设备腿与四端重装（等 `packages/ui` 那批入库）、
 法务「十封」联合提交、帮助中心两行、§5 第 18 条那一半（对外文案 + 判据口径，等负责人拍）。
+
+### 6.76 设备腿那两条谓词复量到第三次，顺带照出**同一形状的第三处**（10-10 12:0x 现量，载体 `.worktrees/iosacct` 纯 tip）
+
+负责人这一轮把还开着的四类交给我按产品口径拍板（原话："我授权你来从产品经理的角度来拍板"）。
+拍板之前先把"设备腿到底等什么"再量一遍 —— 两条谓词的命令在 §6.64，读数逐字未变：
+
+- 类 A：**7 枚 `UNTRACKED_IN_HEAD`、`ABSENT_ON_DISK` 0 枚**，名字与 §6.64 那次列的同一批。
+- 类 B：**五枚符号 `HEAD=` 那列仍全空**，`disk` 分别 3/1/2/1/1，三枚宿主文件 `git=M`。
+
+⚠️ 别把这两个数与 `git status --porcelain -- packages/ui` 的枚数当同一分母 —— 那次是 42 枚 `M` + 11 枚 `??`，
+比类 A 大是因为那 11 枚里含类 B 的文件与它们各自的依赖（§6.64 已经写过一次，这次仍然有人按裸 `M` 数读）。
+
+**这一轮真正新增的是第三处同形状**：`packages/app-host` 也在类 A 那一档里。
+现量（只读，两条命令）：
+
+```bash
+git show HEAD:packages/app-host/src/inbound-process.ts | grep -c "task-batch-actions"   # 1
+git cat-file -e HEAD:packages/app-host/src/task-batch-actions.ts && echo 在 || echo 没在  # 没在
+git status --porcelain -- packages/app-host/src/task-batch-actions.ts                     # ?? （工作树里有）
+```
+
+⇒ §6.64 把这两条谓词写成"设备腿的关闭判据"时**漏了这一枚**，而它比 ui 那一处更硬：
+它不是"装不上模拟器"，是 **HEAD 上 `packages/app-host` 根本打不出包** —— 直接证据是载体里
+`tsup` 在 ESM 阶段就断：`Could not resolve "./task-batch-actions.js"`（`tsup` 整段读数在
+`~/heyta-carriers/w9-acct-logs/app-host-build-nodts.log`）。
+`check:reachability` 那一条 COMMENT 写路径的红、`packages/ai` manifest 的红、这一枚，
+是同一条线（入站/自动收集）在 HEAD 上的三张脸。
+
+**这一枚把本线一格的口径改了**：web 层的单元判据（`apps/web/tests/*.spec.tsx`）在纯 tip 上**取不了数** ——
+`apps/web` 里那些面板 `import { … } from '@heyta/app-host'`，而 app-host 的 `exports` 指向 `dist/`，
+tip 打不出那份 `dist` ⇒ vitest 在**收集期**就断，报的是 `Failed to resolve entry for package "@heyta/app-host"`
+而不是任何产品断言。第一趟我就把这一行当成"套件红了"读过，实际是**探针够不着**（§7 元规则第 1 条）。
+
+本线 §6.77 那一枚 web 层新用例因此记两条边界，别读成"载体没毛病"：
+① 取数在**主检出**（那里 `packages/app-host/dist` 是别线在飞源码打出来的）；
+② 被测的两枚面板 `SessionsPanel.tsx` / `EmailChangePanel.tsx` 当场 `git status --porcelain` 为空 ⇒
+   界面实物是 tip 字节，掺进来的只有 `ProfilePanel.tsx` 那类同目录别人在改的文件，
+   而本用例不渲染它们（`grep -c "^  it(" ` 现量：tip 41 → 工作树 42，只多我这枚）。
+
+### 6.77 负责人授权后拍掉的四格，每格带现量与臂（10-10 12:0x–12:2x）
+
+| 拍的那一格 | 拍成什么 | 依据与读数 |
+|---|---|---|
+| iOS 设备腿 | **不抢跑**：继续等，但等待条件从"别人跑完"换成 §6.64 那两条命令 + 一条新增的 app-host 谓词 | 上面那三个数；载体上 tip 打不出包是当场撞出来的，不是推断 |
+| `access_errors.device_name` 没有任何客户端上报（§5 第 9 条） | **不做上报**（要给登录请求加一个入参、动线协议契约，而界面读的是 UA）；改钉"两个都缺 ⇒ 那一行不许编名字" | `apps/web/tests/account-security.spec.tsx` 新增一枚，基线 **42 passed**；臂 M1（`rowLabel` 兜底成 `'Unknown device'`）红 **1 条 = 本用例**，臂 M2（兜底成空串 ⇒ 标签行照样渲染）红 **2 条 = 本用例 + 那条"念出设备名与 UA"**。两臂各红各的断言，M2 证明"不许出现编出来的名字"那半不是独木难支 |
+| `SAFE_ERROR_MESSAGES` 认不出那句兜底话（§5 第 18 条那一半） | 纳进封闭词表 + 补一把静态尺（`pnpm check:safe-error-fallbacks`） | 读数与那条被否证的第一版口径在 §6.79（不要在这里抄臂数） |
+| 法务「十封」联合提交 + 帮助中心两行 | 两格都**不是**原先登记的那个形状 —— 见 §6.78，处置也不同 | §6.78 |
+
+拍板口径的来源记清楚，免得下一位以为是本线自决：负责人这一轮把"还开着的 4 类"整体交给产品侧拍，
+但**没有**授权把对外法律句子的**内容**改成我没写过的东西 —— 所以 §6.78 那一格里我把能机械推导的做掉、
+要重新起草法律句子的留成在案欠项（这是同一条授权的两面，不是挑软柿子）。
+
+### 6.78 法务那一类：我原先登记的**两条理由都被现量否证**，而真相是本线自己的一笔欠账（10-10 12:0x–12:2x 现量）
+
+原先写的是"等注册验证码那封同批落地的联合提交"，以及 §6.47 那格"排在别人的 landing 重生成批次之后"。
+这一轮逐枚现量，两句都站不住：
+
+**① 那批法务文本从来没进过 HEAD —— 一行都没有。**
+`git log --oneline -S '十封功能邮件' -- packages/legal/src` 输出空，`git log -S '换绑-新邮箱确认'` 同样空；
+而 HEAD 里现在躺着的是：`发五封功能邮件（验证邮箱、魔法登录、找回通行密钥、重置口令、口令已改通知）`、
+`**邮箱不可更换。**`（`data-rights.ts` 命中 3 处、`privacy.ts` 2 处、`terms.ts` 3 处）、
+`personal-info-list.ts` 里 `登录会话|待绑定` 命中 **0**。
+⇒ W7 那行写的"①…⑨ 已落"读起来像"已入库"，实际是"已改在工作树"。**这句要按本节改**（原文留着看清它怎么错的）。
+
+**② "等注册验证码那封"这句把因果写反了：那一封在 HEAD（也在工作树）里根本发不出去。**
+`server/src/email.ts` **有** `export const sendEmailPasswordRegistrationCodeEmail`（158 行），
+但 `git grep -l "sendEmailPasswordRegistrationCodeEmail(" -- server/src` 去掉定义文件后**零命中**，
+`server.email.registerCode.*` 那套词条在 HEAD 里有、消费者没有，`EMAIL_PASSWORD_REGISTRATION_CODE_TTL_MS` 只有声明处一处命中。
+⇒ 工作树里那句"十封"是**对外承诺了一封代码不会发的信**（超前表述），不是"等它落地就齐了"。
+所以那格合法的等法是：**先有调用点，文本才能点那一封** —— 顺序原先写反了。
+
+**③ 剩下的那一半是本线自己的欠账，而且是可机械量出来的。**
+把 HEAD 的真源数一遍：`server/src/email.ts` 里被调用到的发信口共 **9 封**（逐枚 `git grep -l '<fn>(' -- server/src` 去掉定义文件都有命中），
+而 HEAD 的对外文本写 5 封 ⇒ **少披露 4 枚，全是我那笔服务端提交（`703cafc8`）带进去的**：
+`changeConfirm` / `changeAuthorize` / `changed` / `authenticatorAdded`。
+AGENTS §8 工作流第 18 条要的正是"新增持久数据与能力须同步原有对外说明"，这条我欠着。
+
+**这一格落了什么**：`pnpm check:legal-email-claims`（`scripts/check-legal-email-claims.mjs`，已进链）。
+它把"封闭句式 ↔ 代码集合"钉成对账（先例是 `check:legal-tools` 钉那张工具表），两个方向按形状分档：
+
+- 文本点名的那封**代码里不会发** ⇒ 判红。它现在就是红的，红在共享检出的那两行"十封/registration code"上 ——
+  归那条把 `registerCode` 写进文本的线，四枚命中逐条带文件与句子；复现：`pnpm check:legal-email-claims`。
+- 代码会发而文本没点名 ⇒ 只打印（那一档要**重写对外句子**，而那五份文件此刻被三条线同时握着未提交改动：
+  `privacy.ts` 的 19 枚 hunk 里 **8 枚**带 `automation-metadata` / `2026-10-07` 那批行 / `本公司` 整片改写，
+  `index.ts` 还多一枚指向未跟踪 `presentation.ts` 的导出，`terms.ts` 有 368 行是别人的合同主体重写。
+  从这条检出单面提交整片＝切掉别人那半，而法务版本号进 `legalSetVersion()` ⇒ 连带同意指纹）。
+  臂 A4 钉住"这一档现在只报不红"，等那批一次收拢后把 `undisclosed` 并进 failing，臂不用改。
+
+⚠️ 造这把尺的过程中，我自己的探针先中了两枪（都在 tip 那趟读数里现形，不是设计时想到的）：
+`email.ts` 的发信口是 `export const` 不是 `export async function` ⇒ 第一版解析出 `shipped=0`（臂 A1 当场拦住）；
+英文枚举最后一枚带 `and ` 前缀 ⇒ 被我的连接词过滤器整枚丢掉，把 HEAD 判成"写五封只点到四枚"的假自相矛盾。
+两条都是**尺错，不是文本错** —— 逐条按 `SELFTEST_ARMS` 的输出复核才敢下结论，臂数与全部臂名由 `--self-test` 自己打印。
+
+**这一格仍然开着的**（写成欠项，不包装成做完）：§5 第 9 条那半句"界面上现在显示的是 UA"已用用例钉住；
+但 §6.78③ 那四枚**漏披露的文本更正还没落** —— 它要重写 `privacy.ts`/`third-parties.ts` 那三句（中英各三），
+而这三句和上面那 8 枚别线 hunk 在同一批文件里。落法已备齐：改哪三句、每句改成什么，由
+`pnpm check:legal-email-claims` 的 🟡 那行直接给出名字清单；落地那一笔必须**一次收拢三条线**（像倒数纪念日
+那批的分组提交），并连带 `node server/scripts/gen-server-legal.mjs` 与 `node packages/legal/scripts/gen-site-copy.mjs`
+两份生成物 —— 后者会写 `packages/i18n/src/locales/{zh-CN,en}.ts` 里那一段 `<<<generated>>>` 块，
+不碰 landing 的 HTML，所以与 §6.47 那格"landing 重生成批次"的撞车面**不相交**（原先那条登记理由也因此作废）。
+
+### 6.79 `SAFE_ERROR_MESSAGES` 那一格：静态尺的形状、被否证的第一版口径，与"两半各归各"的臂（10-10 11:3x–12:0x 现量）
+
+§6.71 修完之后剩的那一半是：`auth.ts` 抛的 `'Invalid or expired link'` 不在 `SAFE_ERROR_MESSAGES` 里
+⇒ 它永远被 `getSafeErrorMessage` 的兜底句顶掉，而那件事当时**只有链路 10b 一条运行时判据守着**，没有静态尺。
+
+落的两样：
+
+1. `server/src/api.ts` 的白名单里补进那一句（一笔五行：四行理由 + 那一句）。
+   `api.ts` 在主检出被别人写着 ⇒ 走 plumbing（HEAD 版 + 我这五枚字节的 hunk），随后把**同一片补丁**打回工作树，
+   复验 `git diff HEAD -- server/src/api.ts | grep -c "Invalid or expired link'"` = **0**（两边都不掺）。
+2. 新门禁 `scripts/check-safe-error-fallbacks.mjs`（`pnpm check:safe-error-fallbacks`，已进链）。
+
+**第一版口径是错的，而且是"把自己的 RED 消掉"那种错法**：我原先写成"每一枚兜底句都必须在白名单里"。
+真树现量：白名单 12 句 / 抛出点 115 处（去重 68）/ 兜底句 18 处（去重 14）⇒ 那一版**一次判红 17 处**，
+全是别线在用的通用失败句。那不是他们错了，是我那条规则超出了主张本身 ——
+主张讲的是"抛出的那句与兜底的那句是同一句话时，它必须能被识别"，所以判据是 **throw 集合 ∩ fallback 集合**，
+交集命中才是缺陷。改成交集后真数 **2 处**命中（其中一处正是我这格），修完 **0** 处、白名单 13 句。
+⚠️ 记这条是因为它的反面很有诱惑力：给封闭词表加一档豁免、或者把别人那 17 处一起登记成缺陷，都能让我自己那枚红消失。
+
+臂（`--self-test` 自己打印臂数与每条名，别在这里抄）：阳性对照（真树必须扫到 ≥1 处交集）、
+把白名单里那一行摘掉 ⇒ 红、只抛不兜底 ⇒ 放行、只兜底不抛出 ⇒ 放行、注释里提到 ⇒ 不算、
+跨三行的调用点 ⇒ 认得出、双常量名 ⇒ 认得出。自守下限三条（分母解析不足退 **2** 而不是退 0）。
+真树臂 S1：在纯 tip 载体上摘掉我加的那行 ⇒ rc=1 并点名两处命中，`RESTORE=clean`、复跑 rc=0。
+
+
 
 
 
