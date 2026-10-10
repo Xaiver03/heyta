@@ -1219,8 +1219,36 @@ sync_now_states() {
   done
 }
 
+# 🔴 2026-10-10 第五趟实测：凭据变更（含"退出所有设备"之后重贴令牌）之后，应用**按设计**
+#    弹出法务重新询问面（`LegalReconfirmSheet.tsx`，标题「条款文本已经更新」），
+#    在确认之前**一切对外请求被闸住** ⇒ 「立即同步」按了也没有任何反应，
+#    签名里「上次成功同步」停在「从未」。第三、五趟的 step 14/15 都死在这里。
+#    首启同意（「同意并联网」）腿早就接了；这一张是**第二张**同意面，之前没人接。
+#    判据没放松：确认面按三次还在 = 判红（那意味着确认提交失败，不是"没有这张面"）。
+accept_legal_reconfirm() {
+  local i
+  for i in 1 2 3; do
+    idb_dump
+    if ! idb_has "条款文本已经更新"; then
+      [ "$i" = "1" ] || ok "法务重新询问已确认（第 $((i-1)) 次按压生效）"
+      return 0
+    fi
+    echo "     命中法务重新询问面 ⇒ 按「我已读完并确认」"
+    ax "我已读完并确认" --pressable --scroll-into-view --press --json >/dev/null 2>&1 || ax_press "我已读完并确认"
+    sleep 3
+  done
+  idb_dump
+  if idb_has "条款文本已经更新"; then
+    bad "法务重新询问面按了 3 次还在 ⇒ 确认没提交成功（同步会继续被闸住）"
+    return 1
+  fi
+  ok "法务重新询问已确认"
+  return 0
+}
+
 sync_now() {  # 点「立即同步」：忙时它会改名叫「正在同步…」，所以先等它回到空闲名
   dismiss_keyboard
+  accept_legal_reconfirm || true
   ax_press "我的"; sleep 3
   if ! idb_wait_label "立即同步" 90; then
     echo "     第一轮没等到 ⇒ 先按系统弹窗处置一遍再等第二轮"
@@ -1294,8 +1322,11 @@ sync_now() {  # 点「立即同步」：忙时它会改名叫「正在同步…�
 # 因为**新账号首次同步要走纯 JS 的 Argon2id 派生**（Hermes 没有 WASM，实测 30–40 秒起）。
 wait_sync_terminal() {  # <这一档在等什么> → 0=已同步 / 1=凭据已失效 / 2=超时
   local what="$1" i
+  # 凭据变更后这张面可能在等待中途才弹（闸门是请求级的）；不接它就会干等满 4 分钟。
+  accept_legal_reconfirm || true
   for i in $(seq 1 60); do
     idb_dump
+    if idb_has "条款文本已经更新"; then accept_legal_reconfirm || true; fi
     if needle_state "已是最新" >/dev/null 2>&1 || needle_state "其余数据已同步" >/dev/null 2>&1; then
       echo "     ${what}：已到已同步态（第 $((i * 4)) 秒）"
       return 0
