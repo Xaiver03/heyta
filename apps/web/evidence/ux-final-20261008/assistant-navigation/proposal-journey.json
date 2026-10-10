@@ -1,0 +1,16 @@
+{
+  "route": [
+    "任务",
+    "设置/显示",
+    "任务",
+    "日历",
+    "任务"
+  ],
+  "light": "proposal-confirmable",
+  "dark": "proposal-confirmable",
+  "opCountBefore": 1,
+  "opCountAfter": 2,
+  "taskNoteAfter": "- [ ] 跨设置返回后只确认一次",
+  "opDelta": 1,
+  "result": "one-confirmation-one-op"
+}

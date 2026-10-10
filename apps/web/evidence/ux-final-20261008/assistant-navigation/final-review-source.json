@@ -1,0 +1,25 @@
+{
+  "tree": "/Users/rocalight/.codex/worktrees/ux-final-verification/heyta",
+  "date": "2026-10-08",
+  "sourceSha256": {
+    "apps/web/src/features/ai/AssistantPanel.tsx": "b728419e72763ccfd2cd5e244341586ac1685e33d4c5501454cdee222e5fa707",
+    "apps/web/src/features/ai/panel-ephemeral.tsx": "386fc4ee5ff059290a767fff0e96af95e7db8a4b71888b3178c1b9cae256df09",
+    "apps/web/src/features/ai/assistant-history.ts": "33c7cfe5d4413e972724db8e9bc4d93aa5ae15faf484b43a7a99d26fd7a308de",
+    "apps/web/src/features/sync/store.ts": "27d162a8f3febf7952a75c6080677538c75e6fba418bf561200f2e5e3b58ffe9",
+    "packages/app-host/src/assistant-local-history.ts": "45e4a579669cd9d0fac49f9fca59346998143648b72b61a6d353b56918e60fea",
+    "packages/app-host/tests/assistant-history-accounts.spec.ts": "f058f7918c8ba5347942bf3863eb7327ab98e5bc1b36b4d96704a01aea88692b",
+    "apps/web/tests/ai-panel-remount.spec.tsx": "8b28fc3f346623a3b6783ac31e922b73bf45fdf11080c3a89990e3e0cb3a0f2c",
+    "apps/web/tests/credential-storage.spec.ts": "a3f25501d954ddfc464451195bffc694513df8eb8f56397738dc06641facb061",
+    "e2e/tests/assistant-navigation-acceptance.spec.ts": "e1f9940e187d4fd7002739b04769c8d3ab3a5076a5553973b114eed7478f0514"
+  },
+  "results": {
+    "webUnitFiles": 6,
+    "webUnitPassed": 80,
+    "historyAccountUnitPassed": 7,
+    "browserPassed": 9,
+    "browserRetries": 0,
+    "webTypecheckExitCode": 0,
+    "appHostBuildExitCode": 0
+  },
+  "nativeOrPublishedBuildVerified": false
+}
