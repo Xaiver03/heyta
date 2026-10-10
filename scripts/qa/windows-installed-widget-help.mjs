@@ -26,6 +26,7 @@ import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '../../e2e/node_modules/@playwright/test/index.mjs';
+import { installStepKeys, nativeStepKeys } from './widget-step-words.mjs';
 
 const ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const CDP = process.env['HEYTA_WIN_CDP'] ?? 'http://127.0.0.1:9287';
@@ -57,6 +58,10 @@ const SHELL_HANDLER_NAMES = (() => {
   }
   return names;
 })();
+// 两套步骤键都从产品真源读（同一枚模块，理由写在 `widget-step-words.mjs` 文件头）：
+// 安装引导是要**判零**的那一套，原生小组件引导是要**记下来**的那一套。
+const INSTALL_STEP_KEYS = installStepKeys();
+const NATIVE_STEP_KEYS = nativeStepKeys();
 // 函数体逐字照 `isNativeShellHost()`（`apps/web/src/pwa/widget-install.ts:99-103`）的三步形状，
 // 连"名单在前、注入的 key 在后"的方向一起照 —— 这枚装置里唯一该出现的判断形状就是产品那一枚。
 const isNativeShellHost = ({ storagePort, webview2Host, shellMessageHandlers }) => {
@@ -201,11 +206,20 @@ await page.locator('[data-testid="settings-sheet"]').waitFor();
 await page.locator('button.ht-settings__nav-link[aria-controls="settings-group-appearance"]').click();
 const widget = page.locator('[data-testid="widget-journey-panel"]');
 await widget.waitFor();
-const widgetFacts = await widget.evaluate((panel, handlerNames) => ({
+const widgetFacts = await widget.evaluate((panel, facts) => ({
   statusCount: panel.querySelectorAll('[data-testid="widget-journey-status"]').length,
   statusText: panel.querySelector('[data-testid="widget-journey-status"]')?.textContent?.trim() ?? '',
   capabilityText: panel.querySelector('[data-testid="widget-journey-capability"]')?.textContent?.trim() ?? '',
-  installStepCount: panel.querySelectorAll('[data-testid^="web.widgetJourney."][data-testid*=".step"]').length,
+  // 🔴 "安装步骤"只能按**产品那批键名**数，不能按 `web.widgetJourney.*.step` 这种形状挑：
+  //    原生小组件引导的键（`web.widgetJourney.native.*.step1`）同样带 `.step`，
+  //    现量 3 枚原生键里有 2 枚会被那个形状选择器算成安装步骤 ⇒ 壳真的给了原生引导时，
+  //    旧挑法会在**正确的界面**上报"对着已装好的应用教怎么装应用"。两套键都从真源读。
+  installStepCount: [...panel.querySelectorAll('[data-testid]')]
+    .map((el) => el.getAttribute('data-testid'))
+    .filter((id) => facts.installKeys.includes(id)).length,
+  nativeStepCount: [...panel.querySelectorAll('[data-testid]')]
+    .map((el) => el.getAttribute('data-testid'))
+    .filter((id) => facts.nativeKeys.includes(id)).length,
   backend: (globalThis.__heytaStorage ?? {}).backend ?? '',
   // `isNativeShellHost()` reads these three, not `backend`. Recording them separately is
   // what makes this run evidence about the *shell environment*: an installed build whose
@@ -213,20 +227,20 @@ const widgetFacts = await widget.evaluate((panel, handlerNames) => ({
   // fall back to the browser branch.
   //
   // 🔴 三条测法逐字照抄产品那侧（`!== undefined`，`WidgetJourneyPanel.tsx:45-49`），不用
-  //    `in` / `Boolean()`：属性**存在但值是 undefined** 时两种尺读数相反，而下面那条 backend
+  //    `in` / `Boolean()`：属性存在但值是 undefined 时两种尺读数相反，而下面那条 backend
   //    对账比的就是产品的 `resolveStorageBackend()`（同样是 `!== undefined`）⇒ 尺不一致会在
   //    真壳上造一次假红。名单经 evaluate 的参数传进来：Playwright 序列化函数体，闭包读不到外层常量。
   shellSignals: {
     storagePort: globalThis.__heytaHostStoragePort !== undefined,
     webview2Host: globalThis.chrome?.webview !== undefined,
-    shellMessageHandlers: handlerNames.filter(
+    shellMessageHandlers: facts.handlerNames.filter(
       (name) => globalThis.webkit?.messageHandlers?.[name] !== undefined,
     ),
     // 只留证据、不参与判定：壳**实际**注册了哪些 handler 名（含产品名单之外的那些）。
     injectedHandlerKeys: Object.keys(globalThis.webkit?.messageHandlers ?? {}),
   },
   panelText: panel.textContent?.trim() ?? '',
-}), SHELL_HANDLER_NAMES);
+}), { handlerNames: SHELL_HANDLER_NAMES, installKeys: INSTALL_STEP_KEYS, nativeKeys: NATIVE_STEP_KEYS });
 assert(widgetFacts.statusCount === 1, `Widget Journey 状态行应恰好 1 条，实际 ${String(widgetFacts.statusCount)}`);
 // `backend` 从"硬判据"降级成"对账项"：它只回答"存储端口在不在"，而这一趟要判的是"页侧认不认这是壳"。
 // 两者不一致才红（自报 shell 却没注入端口 = 页侧在说谎；注入了端口却自报非 shell = 接线断了）。

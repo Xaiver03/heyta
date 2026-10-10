@@ -44,12 +44,44 @@ if [ "$WINDOWS" -eq 0 ]; then
 fi
 
 ERRLOG=$(mktemp -t heyta-mac-widget-help-ax)
+
+# 🔴 "这段是不是 PWA 安装引导"只能按**产品那批词条原文**判，不能按行首的 `1.`/`2.`/`3.` 判。
+#    原生小组件引导（`web.widgetJourney.native.*`）渲染出来**同样带序号**，所以旧的形状判据会在
+#    壳真的给了小组件引导 —— 也就是产品该有的样子 —— 时报"原生壳暴露了 PWA 安装引导"。
+#    两套键名与原文都从真源读（读不到就响亮失败，见 widget-step-words.mjs 文件头）。
+RIG_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INSTALL_WORDS=$(mktemp -t heyta-mac-widget-install-words)
+NOTE_AVAIL_WORDS=$(mktemp -t heyta-mac-widget-note-avail-words)
+NOTE_SHELL_WORDS=$(mktemp -t heyta-mac-widget-note-shell-words)
+export HEYTA_WIDGET_STEP_MODULE="$RIG_DIR/widget-step-words.mjs"
+node --input-type=module -e '
+  const { pathToFileURL } = await import("node:url");
+  const m = await import(pathToFileURL(process.env.HEYTA_WIDGET_STEP_MODULE).href);
+  process.stdout.write(m.stepTexts(m.installStepKeys()).join("\n") + "\n");
+' >"$INSTALL_WORDS" || { echo "PROBE=UNAVAILABLE"; echo "REASON=读不出 PWA 安装步骤的词条原文"; exit 4; }
+node --input-type=module -e '
+  const { pathToFileURL } = await import("node:url");
+  const m = await import(pathToFileURL(process.env.HEYTA_WIDGET_STEP_MODULE).href);
+  process.stdout.write(m.stepTexts(["web.widgetJourney.note.nativeAvailable"]).join("\n") + "\n");
+' >"$NOTE_AVAIL_WORDS" || { echo "PROBE=UNAVAILABLE"; echo "REASON=读不出「原生小组件可用」那行词条原文"; exit 4; }
+node --input-type=module -e '
+  const { pathToFileURL } = await import("node:url");
+  const m = await import(pathToFileURL(process.env.HEYTA_WIDGET_STEP_MODULE).href);
+  process.stdout.write(m.stepTexts(["web.widgetJourney.note.nativeShell"]).join("\n") + "\n");
+' >"$NOTE_SHELL_WORDS" || { echo "PROBE=UNAVAILABLE"; echo "REASON=读不出「原生壳但无小组件桥」那行词条原文"; exit 4; }
+for f in "$INSTALL_WORDS" "$NOTE_AVAIL_WORDS" "$NOTE_SHELL_WORDS"; do
+  if [ ! -s "$f" ]; then echo "PROBE=UNAVAILABLE"; echo "REASON=词条原文文件是空的（${f}）—— 读空不许当通过"; exit 4; fi
+done
+
 set +e
-osascript - "$APP_PROCESS" "$EXPECTED" "$OUT" >"$ERRLOG" 2>&1 <<'APPLESCRIPT' &
+osascript - "$APP_PROCESS" "$EXPECTED" "$OUT" "$INSTALL_WORDS" "$NOTE_AVAIL_WORDS" "$NOTE_SHELL_WORDS" >"$ERRLOG" 2>&1 <<'APPLESCRIPT' &
 on run argv
   set appProcess to item 1 of argv
   set expectedUrl to item 2 of argv
   set outPath to item 3 of argv
+  set installWords to paragraphs of (read POSIX file (item 4 of argv) as «class utf8»)
+  set noteAvailable to paragraphs of (read POSIX file (item 5 of argv) as «class utf8»)
+  set noteNativeShell to paragraphs of (read POSIX file (item 6 of argv) as «class utf8»)
   set lines to {}
   set end of lines to "PROBE=macOS-AX"
   set end of lines to "PROCESS=" & appProcess
@@ -160,6 +192,8 @@ on run argv
       set nodes to entire contents of theWindow
       set nativeStatus to false
       set installGuide to false
+      set numberedRows to 0
+      set capabilityKind to "none"
       set aboutButton to missing value
       set webViewUrlBefore to ""
       set inWidgetSection to false
@@ -177,10 +211,21 @@ on run argv
         end try
         if labelText is "正在原生桌面应用中运行" or labelText is "Running in the native desktop app" then set nativeStatus to true
         if labelText is "桌面小组件" or labelText is "Desktop widgets" then set inWidgetSection to true
-        -- SettingsSection renders ordered notes as `1. …`, `2. …`, `3. …`.
-        -- Scope this check to the Widget section and the numeric row shape;
-        -- never classify a sentence merely because it contains “install”.
-        if inWidgetSection and (labelText starts with "1." or labelText starts with "2." or labelText starts with "3.") then set installGuide to true
+        -- 🔴 "是不是 PWA 安装引导"按**产品词条原文**判（含就行，AX 会把序号拼在前面，
+        --    所以不能整行相等，也不能按行首 "1."/"2."/"3." 的形状判 —— 原生小组件引导同样带序号）。
+        if inWidgetSection and (labelText starts with "1." or labelText starts with "2." or labelText starts with "3.") then set numberedRows to numberedRows + 1
+        repeat with w in installWords
+          set wText to (w as text)
+          if (count of wText) > 0 and inWidgetSection and (wText is in labelText) then set installGuide to true
+        end repeat
+        repeat with n in noteAvailable
+          set nText to (n as text)
+          if (count of nText) > 0 and (nText is in labelText) then set capabilityKind to "nativeAvailable"
+        end repeat
+        repeat with n in noteNativeShell
+          set nText to (n as text)
+          if (count of nText) > 0 and (nText is in labelText) and capabilityKind is "none" then set capabilityKind to "nativeShell"
+        end repeat
         try
           if role of nodeItem is "AXWebArea" then
             set webViewUrlBefore to value of attribute "AXURL" of nodeItem as text
@@ -190,8 +235,14 @@ on run argv
       end repeat
       set end of lines to "NATIVE_STATUS_MATCH=" & nativeStatus
       set end of lines to "INSTALL_GUIDE_MATCH=" & installGuide
+      set end of lines to "NUMBERED_ROWS_IN_WIDGET=" & numberedRows
+      set end of lines to "WIDGET_CAPABILITY_KIND=" & capabilityKind
       if nativeStatus is false then error "AX did not expose the native desktop status"
       if installGuide is true then error "native shell exposed a PWA install guide"
+      -- capabilityKind 只可能是产品那两行之一：状态行已判为 native-shell，而 noteKey 在该分支里
+      -- 只有 nativeAvailable / nativeShell 两种取值（`WidgetJourneyPanel.tsx:84-91`）。
+      -- 读到 "none" 说明这段说明文字不是产品写的（或词条原文对不上），那是探针未闭合，响亮失败。
+      if capabilityKind is "none" then error "AX 里那行小组件能力边界说明不等于产品两条原文之一"
       if aboutButton is missing value then error "AX did not expose the About and Help settings section"
       click aboutButton
       delay 2
@@ -315,9 +366,9 @@ if [ "$status" -ne 0 ]; then
   if [ -s "$ERRLOG" ]; then
     echo "AX_ERROR=$(head -5 "$ERRLOG" | tr '\n' ' ')"
   fi
-  rm -f "$ERRLOG"
+  rm -f "$ERRLOG" "$INSTALL_WORDS" "$NOTE_AVAIL_WORDS" "$NOTE_SHELL_WORDS"
   echo "RESULT=UNVERIFIED"
   exit 4
 fi
-rm -f "$ERRLOG"
+rm -f "$ERRLOG" "$INSTALL_WORDS" "$NOTE_AVAIL_WORDS" "$NOTE_SHELL_WORDS"
 echo "RESULT=OK"
