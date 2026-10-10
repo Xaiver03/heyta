@@ -126,6 +126,8 @@ const ERROR_CODES: readonly CheckoutFailureCode[] = [
 
 interface CheckoutResponseBody {
   readonly error?: unknown;
+  /** 2026-10-10 全局错误信封的稳定机器码（`api-error-contract` 那批的另一半）。 */
+  readonly code?: unknown;
   readonly outTradeNo?: unknown;
   readonly qrCode?: unknown;
   readonly redirectUrl?: unknown;
@@ -195,7 +197,8 @@ export async function startCheckout(options: StartCheckoutOptions): Promise<Chec
   }
 
   if (!response.ok) {
-    const reported = typeof payload?.error === 'string' ? payload.error : undefined;
+    // 2026-10-10 起服务端错误统一信封 { code, message }；稳定码从 `code` 读。
+    const reported = typeof payload?.code === 'string' ? payload.code : undefined;
     const code =
       reported !== undefined && (ERROR_CODES as readonly string[]).includes(reported)
         ? (reported as CheckoutFailureCode)

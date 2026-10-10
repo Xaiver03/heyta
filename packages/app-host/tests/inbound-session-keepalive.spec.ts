@@ -89,7 +89,7 @@ describe('automation session keepalive', () => {
       const scheduled: number[] = [];
       const keepalive = startAutomationSessionKeepalive({
         issuerBaseUrl: ISSUER, selfBaseUrl: SELF, token: 'jwt', installationId: installation, localAccountUuid: account,
-        fetchImpl: (async () => new Response(JSON.stringify({ errorCode: code }), { status: 403 })) as unknown as typeof fetch,
+        fetchImpl: (async () => new Response(JSON.stringify({ code, message: code }), { status: 403 })) as unknown as typeof fetch,
         now: () => NOW, setTimeoutImpl: (_fn, ms) => { scheduled.push(ms); return scheduled.length; },
         clearTimeoutImpl: () => undefined, onState: (state) => states.push(state),
       });
@@ -109,7 +109,7 @@ describe('automation session keepalive', () => {
       issuerBaseUrl: ISSUER, selfBaseUrl: SELF, token: 'jwt', installationId: installation, localAccountUuid: account,
       fetchImpl: (async (input: URL | string) => new URL(String(input)).pathname.endsWith('/session')
         ? new Response(JSON.stringify({ ticket: TICKET, expiresAt: new Date(NOW + 30_000).toISOString() }), { status: 200 })
-        : new Response(JSON.stringify({ errorCode: 'AUTOMATION_ISSUER_NOT_CONFIGURED' }), { status: 403 })) as unknown as typeof fetch,
+        : new Response(JSON.stringify({ code: 'AUTOMATION_ISSUER_NOT_CONFIGURED', message: 'x' }), { status: 403 })) as unknown as typeof fetch,
       now: () => NOW, setTimeoutImpl: (_fn, ms) => { scheduled.push(ms); return 1; }, clearTimeoutImpl: () => undefined,
       onState: (state) => states.push(state),
     });
@@ -128,7 +128,7 @@ describe('automation session keepalive', () => {
           return new Response(JSON.stringify({ ticket: TICKET, expiresAt: new Date(NOW + 30_000).toISOString() }), { status: 200 });
         }
         verifyRejected = true;
-        return new Response(JSON.stringify({ errorCode: 'AUTOMATION_TICKET_EXPIRED' }), { status: 403 });
+        return new Response(JSON.stringify({ code: 'AUTOMATION_TICKET_EXPIRED', message: 'x' }), { status: 403 });
       }) as unknown as typeof fetch,
       now: () => NOW, setTimeoutImpl: (_fn, ms) => { scheduled.push(ms); return 1; }, clearTimeoutImpl: () => undefined,
       onState: (state) => states.push(state),
@@ -145,7 +145,7 @@ describe('automation session keepalive', () => {
     const states: AutomationSessionState[] = [];
     const keepalive = startAutomationSessionKeepalive({
       issuerBaseUrl: ISSUER, selfBaseUrl: SELF, token: 'jwt', installationId: installation, localAccountUuid: account,
-      fetchImpl: (async () => new Response(JSON.stringify({ errorCode: 'AUTOMATION_ISSUER_SCOPE_MISMATCH' }), { status: 403 })) as unknown as typeof fetch,
+      fetchImpl: (async () => new Response(JSON.stringify({ code: 'AUTOMATION_ISSUER_SCOPE_MISMATCH', message: 'x' }), { status: 403 })) as unknown as typeof fetch,
       now: () => NOW, setTimeoutImpl: (_fn, ms) => { scheduled.push(ms); return 1; }, clearTimeoutImpl: () => undefined,
       onState: (state) => states.push(state),
     });
