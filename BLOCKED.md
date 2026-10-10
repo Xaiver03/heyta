@@ -8883,7 +8883,7 @@ stat -f '%Sm  %N'  server/dist/src/automation/entitlement-ticket.js  server/src/
 ② 口径定了之后本线在 `server/tests/`（白名单内）补一条"畸形 `EVENT_ID` 被拒并回类型化拒绝码"的断言，
    并把它挂进票据那把八臂尺 —— 现在那八臂里没有这一档，也就是说**这一格无论怎么改都没有尺在守**。
 
-## B156（2026-10-11 03:0x，账号标准套件线 · 第一次在合并态上跑整条 `pnpm check` 撞上的）：**「已建模 ≠ 可达」那把尺红了，红在 `COMMENT` 一枚上 —— 它挡住的是所有线的 `pnpm check`，而它不是本线登记的**
+## B159（2026-10-11 03:0x，账号标准套件线 · 第一次在合并态上跑整条 `pnpm check` 撞上的）〔原登 B156，与并行线同日撞号 ⇒ 后写的这枚改号，理由与读数见 B161〕：**「已建模 ≠ 可达」那把尺红了，红在 `COMMENT` 一枚上 —— 它挡住的是所有线的 `pnpm check`，而它不是本线登记的**
 
 **怎么撞上的**：goal 的交付标准里有「门禁全绿」，本线此前只按文件跑过单测，
 所以第一次跑整条 76 步链（`/tmp/fullcheck.log`）。
@@ -8918,3 +8918,76 @@ stat -f '%Sm  %N'  server/dist/src/automation/entitlement-ticket.js  server/src/
 不拍，`pnpm check` 对所有线都是红的；拍了也不该由本线做。
 🔴 门禁自己写了不许用的三种"修绿"手法（删实体 / 只补 `ACTION_FAMILIES` / 拿测试当调用点），
 本线一种都没用。
+
+## B160（2026-10-11 04:0x，账号标准套件线 · 把 B159 那道"链断在 reachability"往下推之后撞上的）：**`ADR-0058` 在 HEAD 上有两枚文件，同号是本线引入的（`9fa53ab9`）—— 本线自己改号成 0064 收回，逐处读数如下**
+
+**先说清是谁的**：`git log --diff-filter=A` 逐枚取到
+· `docs/adr/0058-download-page-and-manifest-single-source.md` ← **`f97013de`（10-07 11:49，分发线）**
+· `docs/adr/0058-inbound-automation-commit-and-task-batch.md` ← **本线 `9fa53ab9`（10-08 21:31）**
+⇒ 后到的是**本线这一枚**，按 `scripts/check-adr-numbering.mjs` 文件头写明的修法（"先把后来那一枚改号"），改号的是我，不是他们。
+
+**这就是 AGENTS.md §6 那条门禁注释里写过的形状（10-05 的 `ADR-0053` 双订），第二次发生，而且这次是本线自己**：
+文件名不同 ⇒ git 连冲突都不报；两条链接各指各的 ⇒ `check:docs` 的死链检查也不报。
+唯一会现形的是 `check:adr-numbering` 判据 ①（同号唯一），
+它红的时候只印一句 `同号=1 歧义=4`，**不会说是哪一枚该动** —— 所以归属必须回去查 `--diff-filter=A`，不能猜。
+
+**改号前对目标号的三次现量**（免得把一个撞号换成另一个撞号）：
+`ls docs/adr/0064*` 无、`.worktrees/*/docs/adr/0064*` 无、
+`git log --all --diff-filter=A -- 'docs/adr/0064*'` 无、`grep -rn 'ADR-0064' docs` 0 命中 ⇒ 0064 是空号。
+
+**逐处改动（六处，计数由脚本自己核，对不上就整批不写盘）**：
+| 处 | 改的东西 | 命中数 |
+|---|---|---|
+| 那枚 ADR 自己 | 改名 `0058-…` → `0064-…`，标题 `# ADR-0058：` → `# ADR-0064：` | 1 |
+| `docs/adr/0059-inbound-worker-authenticated-identity.md` | `[ADR-0058](0058-…md)` → `[ADR-0064](0064-…md)` | 1 |
+| `docs/adr/0060-automation-entitlement-and-retention.md` | 同上 | 1 |
+| `docs/adr/0061-owner-held-inbound-commit-receipt.md` | 同上 | 1 |
+| `docs/plans/inbound-automation.md:57` | 同上（**别人正在写的那份，见下面那条边界**） | 1 |
+| `docs/README.md` | 索引行 `[0058](…)` → `[0064](…)`，并把该行移到 0062 之后（表是按号升序的） | 1 |
+
+外加本线自己台账里那一处引用（`docs/plans/account-standard-suite.md` §6.85 附近）原本裸写了 `ADR-0058/0059/0060`
+—— 那是**这次撞号唯一一处会误导人的读者文本**（它想指的是入站那枚，裸号读法两种都成立），改成写文件名。
+
+**复验读数**：`pnpm check:adr-numbering` → `SUMMARY ADR文件=64 裸引用=2223 同号=0 歧义=0 悬空=0`、RC=**0**；
+`node scripts/check-md-table-rows.mjs` → 12 文件全绿（README 那张表动了行序，所以专门复跑）；
+`pnpm check:doc-citations` → 绿（含 self-test 五臂）。
+⚠️ `pnpm check:docs`（死链）在**改名落地之前**必然红 5 处，而且报的是"本机有、git 没有跟踪"——
+那 5 处就是上面那 5 个链接，指向新名那枚；提交之后它自己收平（这也是本线**没有**把改名与引用拆成两笔提交的原因：拆开的那中间态就是死链）。
+
+🔴 **一条本线踩过的边界（下次别学）**：`docs/plans/inbound-automation.md` 在主检出里有**对方未提交的 100 行新增**。
+本线只改了 line 57 那一枚链接，那 100 行**一个字没动、也没代他们提交**
+（提交走 plumbing：从 **HEAD** 那枚 blob 出发只做这一处替换 ⇒ 他们的工作树保持原样，
+而他们的文件里已经带着新链接，下次 `git add` 整份时不会被本线回退）。
+**先量再动**：`git diff -U0 -- 那份文件 | grep 0058` = **0 命中**，才说明本线那一处不与他们的改动重叠。
+
+**还没闭合的两格，不包装成完成**：
+① `.worktrees/inb-t7`、`.worktrees/iosacct` 两枚检出里仍是旧名那枚 —— **独立工作树，本线不代改**，各自由其所有者 pull 后收敛；
+② `docs/README.md` 那张 ADR 索引此前**没有** 0063（本线自己的裁决），本线补上了；**0060/0061 仍缺**，那是入站线的欠账，本线不代登。
+
+## B161（2026-10-11 04:0x，账号标准套件线）：**合并态上还有四道门禁红，逐道查过归属 —— 其中三道来自**同一枚**别线提交；顺带：`BLOCKED.md` 自己的编号也在撞号，而且没有尺在守**
+
+**这四道是本线在 `check:adr-numbering`（已修，见 B160）之后逐道单独跑出来的**，都不是本线能修的：
+
+| 门禁 | 红的落点 | 引入它的提交（`git blame` / `--diff-filter=A` 现量） | 为什么本线不修 |
+|---|---|---|---|
+| `check:layering` | `apps/web/src/features/share/share-key-store.ts:64` `entityType: 'SHARE_KEY',`（外壳里就地拼 op） | **`e6058120`**（10-09 14:35） | 修法是给 `SHARE_KEY` 在 app-host 补一族动作层 —— 那是**共享清单协作**那条功能的语义 |
+| `check:ui-language` | `packages/i18n/src/locales/zh-CN.ts:4758` `web.share.invite.emailPlaceholder = name@example.com`（zh-CN 里没汉字） | **`2f59b075`**（10-10 19:53，协作 packages） | 两条出路都不许本线代做：翻成中文=改**别人的对外文案**，塞进 `UNTRANSLATABLE_KEYS`=改**判卷口径** |
+| `check:verify-script-copy` | 2 枚 needle 失效：`scripts/lib/mobile-e2e.sh:1475`、`scripts/verify-mobile-habits.sh:631`（都找 `填好服务器地址与访问令牌后才能同步。`） | 词条 `mobile.profile.sync.notConfigured` 被 **`e6058120`** 改成「登录 heyta，让任务在设备间自动同步。」，脚本没跟着改 | 那两条 needle 是**别人验收脚本的判据**，本线改=替他们决定"哪句才算界面到位" |
+| `check:integration-coverage` | `server/tests/integration/inbound-dual-host-fault-windows.integration.spec.ts` 盘上有、脚本没点名 ⇒ **从建立起一次都没跑过** | **`0eea4c0f`**（10-10 13:43，自动收集 T3） | 点名要写进 `server/package.json` 的 `test:integration:postgres`，那是入站线那条用例的运行前提 |
+
+📌 **可迁移的一条**：`e6058120`（产品体验线 10-09 那笔四面回归读数）**一枚就占了三道红**
+（`COMMENT` 的可达性 = B159、`SHARE_KEY` 的分层、`notConfigured` 换词而脚本 needle 没跟上）。
+⇒ 一道大红后面可能坐着同一批的其它道红：撞第一道时就该 `git show --stat` 那笔看看它还动过哪些收口面，
+而不是每撞一道重新查一次归属。**"改了一句文案"在门禁图上不是一句文案的成本**（词条是脚本 needle 的真源）。
+
+🔴 **顺带量到的一件仓级形状：`BLOCKED.md` 的编号没有任何尺在守**（ADR 有 `check:adr-numbering`，这里没有）。
+本线在 03:0x 写下 `B156`（= B159），而并行线在 02:0x 已写过 `B156`/`B157`/`B158`，
+`grep -c '^## B156' BLOCKED.md` 当场 = **2**，同一个文件里躺着两枚 `## B156`（现量：`grep -n '^## B156' BLOCKED.md`，改号之前返回两行）。
+修法沿用 ADR 那套：**后写的那一枚改号**，本线这枚 → **B159**，并在标题里留一句"原登 B156"；
+`docs/plans/inbound-automation.md:1966` 那句"登记成 B156"指的是**他们那枚**（讲隔离副本里 `server/dist` 陈旧字节），
+所以**不能**动他们的文本 —— 本线文档对 B15x/B16x 的引用以 `grep -rn 'B1[56][0-9]' docs/plans/account-standard-suite*.md` 现量，逐枚都唯一。
+📌 **同一件形状的更早一例（本线量到的，不代改）**：`grep -o '^## B1[0-9][0-9]' BLOCKED.md | sort | uniq -c | awk '$1>1'` 现在还返回
+**`B102` ×2** —— 一枚是分发线 10-07 12:05（`0533f460`，下载面落地），一枚是自动收集线 10-09 16:58（`2a378fdf`，任务 0 收尾）。
+它躺了两天没有任何一层报出来，而两条线互相引用对方那个号时读的是自己那枚。
+⚠️ 本线**没有**顺手给 `BLOCKED.md` 加一枚编号门禁 —— 那是判据口径，且撞号在这一层只伤读、不伤跑；
+要加得由想清"唯一编号是不是这台的硬要求"的人来做（成本与 `check:adr-numbering` 那条一样，是刻意的）。

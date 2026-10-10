@@ -54,7 +54,7 @@
 ## 实施前置：协议契约（P1-1～P1-8）
 
 > 来源：[独立审计](../research/inbound-automation-plan-audit.md) §3（逐项源码依据在那里，此处只留裁定与要求）。
-> 第二轮复审后的技术裁定以[协议 v1](../reference/inbound-automation-protocol.md)与[ADR-0058](../adr/0058-inbound-automation-commit-and-task-batch.md)为准。**协议设计、反例验证和已定契约的基础切片可先进行；生产接线必须完成它依赖的 P1，全部门槛闭合前不开放接收与售卖。** 负责人已在本轮确认套餐与 7 天正文/草稿保留基线；下方〔裁决〕项按协议逐项落实，不以技术实现替代上线验收。
+> 第二轮复审后的技术裁定以[协议 v1](../reference/inbound-automation-protocol.md)与[ADR-0064](../adr/0064-inbound-automation-commit-and-task-batch.md)为准。**协议设计、反例验证和已定契约的基础切片可先进行；生产接线必须完成它依赖的 P1，全部门槛闭合前不开放接收与售卖。** 负责人已在本轮确认套餐与 7 天正文/草稿保留基线；下方〔裁决〕项按协议逐项落实，不以技术实现替代上线验收。
 
 - **P1-1 事件状态机与提交唯一性**（AC-3 前置）。租约不能独自防止跨设备重复创建：A 落盘任务 T1 后断网未 ACK，租约过期 B 领取再生成 T2，两个 op 都会上传。必须定：`accountId + ruleId + eventId` 唯一约束、载荷摘要、冻结的规则版本/解析结果版本、执行设备认证身份、单调 lease generation 与 fencing（必须约束**业务提交**，不能只约束队列表），以及续租/结果发布/提交声明/ACK 的 CAS 条件；“本地已写、中心未知”要选一种完整协议（持久化提交身份与恢复证据后再授权唯一提交；无法证明原 worker 未落盘时进 `commit-uncertain` 并对账，不盲目转派新建）。现有 `executeAiToolProposal` 的宿主内 WeakMap 去重明确**不是**持久协议。
 - **P1-2 批创建语义是新增能力，不是既有接线**（AC-5 前置）。审计基线的 `OpType.Batch` 对多个 `entityIds` 只施加**同一** payload；导入路径是循环 `dispatch`。必须新增“内容各异的一批新任务”的 intent/reducer/线形状：批大小、零/一/多项、每项稳定身份、共享来源 receipt、整批校验失败是否全拒；覆盖本地原子落盘、远端回放、重复与乱序、checkpoint 恢复、三套存储实现；不允许“先 create 后补备注/排期/来源”形成多个 op。新字段可选并有运行时默认。

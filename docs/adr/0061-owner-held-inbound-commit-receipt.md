@@ -1,6 +1,6 @@
 # ADR-0061：规则删除后凭原设备持有的回执完成迟到同步
 
-> 状态：**已接受（技术裁定，2026-10-08）**。补全 [ADR-0058](0058-inbound-automation-commit-and-task-batch.md) 的许可后不转派与 [ADR-0060](0060-automation-entitlement-and-retention.md) 的删除保留边界；未代表整条功能已开放。
+> 状态：**已接受（技术裁定，2026-10-08）**。补全 [ADR-0064](0064-inbound-automation-commit-and-task-batch.md) 的许可后不转派与 [ADR-0060](0060-automation-entitlement-and-retention.md) 的删除保留边界；未代表整条功能已开放。
 
 ## 必须同时成立的两个要求
 

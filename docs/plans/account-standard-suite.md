@@ -1913,7 +1913,7 @@ git grep -c "EMAIL_PASSWORD_REGISTRATION" HEAD -- packages/shared-schema/src/aut
 
 🔴 **归因：是本线，不是别人。** `git log -S task-priority-batch-contract -- packages/shared-schema/src/index.ts`
 指向 `9fa53ab9`（10-08 21:31，标题 `docs(账号面): 立 ADR-0063 与标准套件工单…`）。
-那一笔的 `--stat` 里除了 ADR 与计划，还扫进了 **ADR-0058/0059/0060**、`apps/landing` 两份文档页、
+那一笔的 `--stat` 里除了 ADR 与计划，还扫进了 **`0064-inbound-automation-commit-and-task-batch` / `0059-inbound-worker-authenticated-identity` / `0060-automation-entitlement-and-retention`（写文件名不写裸号：`0058` 这个号在 HEAD 上有两枚文件，裸号读法判别不了 —— `check:adr-numbering` 当时因此红；本线按那枚门禁文件头写明的修法把后来那一枚（本线自己的 `9fa53ab9`）改号成 0064 收回 ⇒ 该门禁现 RC=0，逐处读数见 BLOCKED B160；裸号仍不许写，写文件名。**、`apps/landing` 两份文档页、
 33 张别的线的证据图，以及上面这些**别人的导出块** —— 而实现文件没跟着进来。
 ⇒ 一句"docs"标题的提交把别人半条流水线钉进了 HEAD，却把它们的依赖留在工作树里。
 
