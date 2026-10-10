@@ -448,6 +448,16 @@ export function AuthForm({
    * 而 jsdom 那批用例当时全都只判"状态区有没有话"，所以没人红。
    * caption 因此只认 `missingField`，`aria-invalid` 仍认 `errorField`（指格子是对的）。
    */
+  /*
+    🔴 勾选框与它那行字的**对齐**（2026-10-10 产品负责人实测点名）：
+    行是 `alignItems: 'flex-start'`（多行换行时框必须留在第一行），
+    所以框要自己在「第一行的行盒内」居中 —— 偏移 = (第一行行高 − 框高) / 2。
+    两个数都来自 token/解析后的文字样式，不写死像素：caption 的行高或框的尺寸
+    改了，这里跟着对，不会重新错开。
+  */
+  const termsCheckboxOffset =
+    (((text['caption'].lineHeight as number | undefined) ?? 0) - tokens['size.checkbox']) / 2;
+
   const errorField: AuthFormField | undefined =
     status?.tone === 'error' ? status.field : localField;
   /** 只有**本地**那次"没填"的判定才配得上"还没有填 X"这句话。 */
@@ -906,7 +916,13 @@ export function AuthForm({
                 style={styles.termsRow}
                 testID={`${testID}-terms`}
               >
-                <View style={[styles.checkbox, termsAccepted ? styles.checkboxOn : null]}>
+                <View
+                  style={[
+                    styles.checkbox,
+                    { marginTop: termsCheckboxOffset },
+                    termsAccepted ? styles.checkboxOn : null,
+                  ]}
+                >
                   {termsAccepted ? (
                     <HeytaIcon
                       data={Check}
@@ -1364,7 +1380,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       backgroundColor: tokens['color.background'],
       alignItems: 'center',
       justifyContent: 'center',
-      marginTop: tokens['space.1'],
     },
     checkboxOn: {
       backgroundColor: tokens['color.primary'],
