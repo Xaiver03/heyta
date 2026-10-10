@@ -1,6 +1,6 @@
 # Goal：共享清单（多人协作）—— 试实施（W0 + W1）
 
-> 状态：🔄 **进行中（Goal 模式已启用，2026-10-08）** —— W0+W1 ✅ 完成（见下）；**W2 服务端核心 ✅ 完成（本节下方）**；W2 余项（法务第一批、app-host share-client）与 W3–W6 未开工。DoD 全清单见 [collaboration-shared-lists.md](collaboration-shared-lists.md) §7。
+> 状态：🔄 **进行中（会话交接中，2026-10-10）** —— W0+W1 ✅ / W2 服务端核心 ✅ / W3 纯层+格式统一 ✅ / 法务 ✅ / **W4 主体接线代码已落但未提交未跑旅程（见文末「2026-10-10 交接」节，下一个 AI 从那里接）**。DoD 全清单见 [collaboration-shared-lists.md](collaboration-shared-lists.md) §7。
 > 权威计划：[collaboration-shared-lists.md](collaboration-shared-lists.md)（W0–W6 全量分期、判据、验证矩阵、边界登记）
 > 决策：[ADR-0062](../adr/0062-shared-list-key-distribution.md)（密钥分发型协作；聚合型红线不动）
 > 证据层：[共享清单调研](../research/collaboration-shared-lists.md)
@@ -297,3 +297,82 @@ rekey=同 shareId 覆盖；错误口令（vault 未解锁形状）⇒ undefined�
 | 回归 | ✅ sync-core **318/318**（share-keys 15 条更新后全绿）、sync-client **147/147**（share spec 重写 8 条）、四个 verify 脚本 **5/9/7/6 步全 OK** |
 | 本段事故（如实） | ① python 补丁的 stray `write(src)` 先截断文件再抛 NameError ⇒ **share-keys.ts 被清空**——从 git 暂存区 `git show :path` 恢复 W1 完整版后重放全部改动（暂存区第二次救场）；② 恢复版测试照跑才发现脚本还有多处旧调用——**恢复后必须全量重跑而不是只跑改动点**；③ 变异还原的 cp 备份纪律再次生效（checkout 事故后未再犯） |
 | 五个 verify 进度 | keys ✅ / sync ✅ / revoke ✅ / conflict ✅ / journey ⏸（等 W4 UI）|
+
+## 2026-10-10 交接（会话中断，交给下一个 AI；本节是唯一权威交接面）
+
+> 背景一句话：产品负责人授权「按产品角度/PM 思维/用户旅程最佳实践完整合并」。上一会话完成
+> 大提交推送（`d8d6a783..8bbc50b1`，5 笔+merge）后，继续做了 **W4 入口接线 + W5 挂载 +
+> journey 三件套**，**代码全部落盘但未提交**，`verify:collab-journey` **一次都还没跑过**，
+> 随后按产品负责人指令停止并写本交接。
+
+### 一、本段已完成（有读数）
+
+| 项 | 结果 | 读数 |
+|---|---|---|
+| 🔴 server 循环依赖修复 | ✅ `entitlement-ticket.ts` 的 `@heyta/inbound-core` import 原写在**使用点之后**——ESM 提升使 typecheck 绿，但 CJS 编译时 require 按源码顺序落位 ⇒ dist 里 `inbound_core_1` before initialization。修法=把 import 块挪到文件顶部。**该修复已随某笔并行提交进 HEAD**（工作树与 HEAD diff 为空，勿重复修） | 三脚本复跑全绿：`verify:collab-sync` RESULT=OK steps=9 / `revoke` 7 / `conflict` 7→6（6） |
+| app-host `setProjectShareId` | ✅ `packages/app-host/src/project-actions.ts`（接口+实现，一个意图一条 op：载荷只有 shareId）+ 3 条测试 | project-actions.spec 通过（同轮 run 里 checkout/entitlement/keepalive 的红是**并行会话在途**，见下） |
+| ui 面板自识别按 memberId | ✅ `share-model.ts` `SharePanelData.selfMemberId?`（有它按 memberId 判 isSelf，否则回落 userId）+ `SharePanel.tsx` `selfUserId?` 可省 + 3 条测试 | ui 全量 **664 passed** |
+| share-key-store 身份持久化 | ✅ 新增 `wrappedIdentitySeed?` / `ownMemberId?` 字段 + `storeShareIdentity` / `getShareKeyEntry` / `unwrapShareIdentitySeed` / `deleteShareKey`。🔴 upsert 契约：`wrapAndStoreShareKey` **不保留**旧身份字段，换钥调用必须回传（测试钉住） | 测试**已写未跑**（用户中止了那次 run） |
+| W4 入口接线（web） | ✅ `ShareFeature.tsx` **全量重写**为旅程对话框（同意模态→createShare→自封信封→Project.shareId 回写→面板+邀请+一次性凭证+自动封信封轮询+改角色+移除+离开）；`JoinSharedListDialog.tsx` 新建（贴 token→accept→等信封→解钥→建清单落侧栏）；`ProjectsPanel` 加「加入共享清单」入口；`App.tsx` 清单头部「共享」按钮+双对话框挂载 | web typecheck **绿**（ui/i18n/app-host/shared-schema dist 重建后） |
+| W5 通知偏好挂载 | ✅ `ShareNotificationSettings.tsx` 新建（设置→同步与隐私组内、`syncConfigured` 才渲染、localStorage 落盘零网络）+ `ui/index.ts` 补 notification-model 导出 | typecheck 绿；e2e 断言未写 |
+| i18n 中英同步 | ✅ `web.share.*` ~50 键（zh+en 镜像）+ `common.share.panel.membersTitle` | i18n build 绿 |
+| journey 三件套 | ✅ `e2e/playwright.collab.config.ts`（无 webServer、baseURL 走 env、trace/video 关——口令与 token 不进自动产物）+ `e2e/tests/collab-journey.spec.ts`（双 context 全旅程、截图固定路径 `e2e/test-results/collab-journey/`、console/pageerror 挂在页面创建时）+ `scripts/verify-collab-journey.mjs`（起真服务端+vite+Playwright，`pnpm verify:collab-journey` 已接线进 package.json） | 🔴 **从未运行**——首跑大概率要调试 |
+| 顺手替并行会话补的半截活 | ✅ `packages/app-host/src/checkout.ts` 给 `CheckoutResponseBody` 补 `code?: unknown`（他们的消费端已改读 `payload.code`，类型侧差这一行，dts 构建红挡了我）；`apps/web/tests/app-mount.spec.tsx` mailto[0] 加守卫；ui/web 两处测试的索引非空断言 | app-host build 恢复绿 |
+
+### 二、🔴 工作树状态（下一个 AI 的第一件事：分清两条线）
+
+全树 **86 个未提交路径**，两条线混居（并行会话在做「api-error 全局信封迁移 + 邮箱验证码登录」，他们的文件**不要**打进协作线的提交）：
+
+**协作线（建议单独一笔 commit）**：
+```
+apps/web/src/App.tsx
+apps/web/src/features/projects/ProjectsPanel.tsx
+apps/web/src/features/projects/store.ts
+apps/web/src/features/share/ShareFeature.tsx
+apps/web/src/features/share/share-key-store.ts
+apps/web/src/features/share/JoinSharedListDialog.tsx   (新)
+apps/web/src/features/share/ShareNotificationSettings.tsx (新)
+apps/web/tests/share-key-store.spec.ts
+packages/app-host/src/project-actions.ts
+packages/app-host/tests/project-actions.spec.ts
+packages/i18n/src/locales/zh-CN.ts
+packages/i18n/src/locales/en.ts
+packages/ui/src/index.ts
+packages/ui/src/sync/SharePanel.tsx
+packages/ui/src/sync/share-model.ts
+packages/ui/tests/share-model.spec.ts
+e2e/playwright.collab.config.ts   (新)
+e2e/tests/collab-journey.spec.ts  (新)
+scripts/verify-collab-journey.mjs (新)
+package.json   (只加了一行 verify:collab-journey)
+```
+
+**我替并行会话补的（协作提交里捎带或在提交信息里注明归属）**：
+`packages/app-host/src/checkout.ts`（+1 行 code 字段）、`apps/web/tests/app-mount.spec.tsx`（mailto 守卫）。
+
+**并行会话的（不碰、不代提交）**：`packages/shared-schema/src/{auth-http-contract,index}.ts`、`api-error-contract.ts`(新)、`server/src/api-error.ts`(新)、全部 server 路由文件、`packages/sync-client/src/share-api-client.ts`、`server/src/shares/share.routes.ts`、`packages/app-host/src/inbound-entitlement-tickets.ts`、BLOCKED/PROGRESS、web evidence png 等。
+
+**已知红（并行会话在途，非协作线）**：app-host 测试 `checkout.spec.ts` 2 红 / `inbound-entitlement-tickets.spec.ts` 1 红 / `inbound-session-keepalive.spec.ts` 4 红——全是他们 api-error 迁移的爆炸半径（mock 还是旧 `{error}` 形状）。协作线收尾跑 `pnpm check` 前**先现量**这些是否已被他们修掉；若他们已收工（文件 mtime 停滞数小时）仍红，按产品负责人既有授权「直接把别的会话应该做的工作做掉」补完（把 mock 更新为 `{code,message}` 信封）。
+
+### 三、剩余工作（按优先级，下一个 AI 的执行序）
+
+1. **首跑 journey（最可能出活的调试点）**：`pnpm verify:collab-journey`。spec 的未验证假设：① zh 占位符 `input[placeholder^="添加任务"]`；② 真 vault 建立流（`vault-create-passphrase`→恢复码回显→`vault-publish`→`vault-ready`）在**真服务端**下 publish 走真 key-package 端点；③ RNW 的 `testID` → `data-testid` 映射（SharePanel 是 RN 组件）；④ `share-join-entry` 只在 `syncConfigured` 时渲染；⑤ bob 入群后标题切到自己起的本机名。截图落在 `e2e/test-results/collab-journey/`，**人必须看图**（§6.2 规定一）。变异臂在脚本头：注释掉 `ShareFeature.tsx` 的 autoSeal useEffect ⇒ bob 卡「等待所有者分发密钥」⇒ 恰好该断言红。
+2. **补跑被中止的测试**：`pnpm --filter @heyta/web test -- tests/share-key-store.spec.ts`。
+3. **W6 两个真缺口**：① **分享链接落点**——`buildShareJoinLink(baseUrl, token)` 拼的是**同步服务器**的 `/share/join?token=…`，服务端**没有**这个路由页面；点链接会 404。改法二选一：服务端加一页跳转（到 app URL 带 token），或链接改拼应用地址（需要 app URL 可得——`apps/landing` 的 `VITE_APP_URL` 先例）。v1 诚实态：token 手动粘贴可用，链接复制是「给朋友的凭证载体」，页面路由登记为缺口。② **owner 转让**：计划 W6「转让=换 owner + 原 owner 降 editor」；服务端无端点（`PATCH members` 明确拒改 owner 角色），要加 `POST /shares/:id/transfer` + 面板入口。🔴 语义是 B 类停止点：**验收时请产品负责人过目**（滴答行为未确证）。
+4. **W4 残余（如实登记，不包装）**：评论/指派/动态 UI **未建**（`CommentThread` 组件在 ui 包但没挂载；任务指派选择器没做；**共享任务的写路径路由**——共享清单里的任务 CRUD 应走 share 通道而非个人 op-log——是最大的剩余架构件）。这些做完之前，「协作」的实际内容只有成员管理+密钥分发；计划 §4 journey 行的「指派→评论→通知→动态」覆盖登记为部分完成。
+5. **B 类待产品负责人过目**：PIPL 方案 a 模态视觉（02-owner-consent-modal.png 那张图）；owner 转让语义。
+6. **收尾固定动作**：`pnpm -r typecheck && pnpm -r test`（注意 app-host 在途红）→ `pnpm check` 全绿 → `pnpm reinstall:all` 四端 → 写回（`dida365-feature-benchmark.md` §2.6 的 6.1/6.2/6.3 按实际完成度翻✅带证据、`feature-matrix.md`、`roadmap.md`、AGENTS §9、本计划状态行）→ 分线 commit + push。
+7. **法务联动检查**：共享 UI 上线后按 AGENTS 规则 18 核对 privacy 帮助文案是否需要更新（并行会话已把 share 三类进 privacy 1.9，本次 UI 措辞与那版一致性顺带核对）。
+
+### 四、下一个 AI 的 Goal 原文（创建 Goal 时逐字用这份）
+
+> 【Goal】收口 heyta 共享清单（多人协作）功能：上一会话已把 W4 入口接线 / W5 通知偏好挂载 / verify:collab-journey 三件套的代码全部写完但**未提交、journey 未跑过**（交接面：`docs/plans/goal-collaboration-shared-lists.md` 的「2026-10-10 交接」节，从那里接）。目标：① 跑绿 `pnpm verify:collab-journey`（首跑需调试，变异臂在脚本头）并人工查看 `e2e/test-results/collab-journey/` 全部截图；② 补跑被中止的 `apps/web` share-key-store 测试；③ W6 两缺口：分享链接落点（服务端 `/share/join` 无路由，二选一改法见交接节）+ owner 转让端点与 UI（语义=转让后原 owner 降 editor；🔴 停止点：验收时请产品负责人过目）；④ `pnpm -r typecheck && test` + `pnpm check` 全绿（app-host 有并行会话在途红测试，处置规则见交接节二）+ `pnpm reinstall:all` 四端；⑤ 写回 dida365-feature-benchmark §2.6 / feature-matrix / roadmap / AGENTS §9 / 计划状态行，评论/指派/共享任务写路径路由如实登记为 W4 残余；⑥ 按交接节的文件清单**分线提交**（协作线一笔、并行会话的不碰）并 push。
+> 纪律：AGENTS.md 全文有效（尤其 §3.5 op 构造归 app-host、§6.2 截图人看、§8.7 完成范围逐项对账、§8.8 写回原入口）；每个新判据至少一个变异臂；汇报带 A（活跃撞车）/B（需拍板）/C（纯执行）三分类。
+> 停止点（只有这两个要问用户）：PIPL 方案 a 模态视觉追认；owner 转让语义。其余一律连续推进不问。
+
+### 五、本段事故与教训（如实）
+
+- 我一度以为 entitlement-ticket.ts 修复未提交；现量发现**已随并行会话某笔提交进 HEAD**（教训照旧：交接前必须 `git status`/`git diff HEAD` 现量，不凭记忆）。
+- 并行会话这 10 小时又落了 7+ 笔提交（含一条「跨线提交」自报）——工作树是共享的、活的；**每一步动文件前重新现量撞车面**（mtime >8h=稳定成品可增量落针；分钟级=活跃改写真等待）。
+- `cssVar` 的 token 名两处写错（`border.width`→`border-width.thin`、`color.surface-muted`→`color.surface-subtle`）：**TokenName 是类型检查的，写错编译期就红**——这正是设计系统三条硬规则的价值，照单全收即可。
+- e2e spec 初稿的成员计数选择器 `[data-testid^="share-member-"]` 会被 `share-member-actions-*` 污染（数成 3）——已改 `:not()` 排除；下一个 AI 首跑若还遇到计数不对，先查这类前缀包含。
