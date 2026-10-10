@@ -8192,6 +8192,41 @@ Error: locator.click: Test timeout of 60000ms exceeded.
 
 **要拍的只有一件**：ARM-3 那句"动了独占路径却没被计入必须为 0"在共享检出下有两种真实成因 ——（甲）本线自己某笔没带主题词（这条臂当初就是为了它写的）；（乙）别线把本线路径提交了（今天的实际成因）。三种读法：① 保持长红，把它当"跨线提交"的告警器，每次由本线确认成因后在台账记一行；② 让 ARM-3 只认**主题里没有任何别线标记**的漏网（要给它一张别的线的主题词表，会随线的增减漂）；③ 把独占路径的归属判据从"笔"改成"内容"（HEAD 里那枚文件的内容等于本线台账登记的那一版就算闭合）。本线按纪律**没有**自己挑一种 —— 这是判卷口径，不是代码 bug。
 
+## B144（2026-10-10 19:3x，本会话 · 在隔离副本上取 T7 第一条读数时量出的）：`pnpm -r typecheck` 在 HEAD 上仍红，但**分母换了一族** —— 23 条错没有一条在本线地界，全在 `share-*` 那族测试里
+
+**为什么这一格值得单独登记**：B103 原来写的是"16 条 `apps/web` 类型错挡死 `pnpm check`"。那个数既不是全集也不是当前值 ——
+第一次跑 `pnpm -r typecheck` 时它在 `@heyta/sync-core` 就**中止**（`ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL`），
+后面的包根本没跑到，所以当时看到的 1 条错**不是分母**。加 `--no-bail` 让每一层都跑完才拿到全集。
+
+**现量（载体：隔离副本 `.worktrees/inb-t7` @ `8962927d`，dirty=0，`pnpm -r build` rc=0，`prisma generate` rc=0）**：
+
+```
+pnpm -r --no-bail typecheck   ⇒  NB_RC=1　error TS 行数=23
+失败的包：apps/web、packages/sync-client、packages/sync-core、packages/ui
+```
+
+按成因分三族（条数之和 = 23）：
+
+| 族 | 条数 | 形状 | 落点 |
+|---|---|---|---|
+| A：`Storage` 桩缺成员 | **13** | `Type '{ getItem; setItem; removeItem; _map }' is missing the following properties from type 'Storage': length, clear, key` | `apps/web/tests/share-key-store.spec.ts`（36/37/44/52/53/54/56/57/64/68/74/78/80 行） |
+| B：`Object is possibly 'undefined'` | **9** | TS2532 | `apps/web/tests/app-mount.spec.tsx`（796/801/803）、`packages/ui/tests/share-model.spec.ts`（43/44/45/53）、`packages/sync-client/tests/share-api-client.spec.ts`（82）、`…/share-payload-cipher.spec.ts`（50） |
+| C：新增必填实参没传 | **1** | TS2345 `Property 'identity' is missing` | `packages/sync-core/tests/share-keys.spec.ts:234`（同一段里前一次调用传了 `identity: mkIdentity('op-1')`，第二次"同键异绑定"那次没传） |
+
+**归属**：这五枚文件最近一笔都是 `e6058120`（10-09 14:35，产品体验线台账那一笔）带的，`app-mount.spec.tsx` 是 `63e61f23`（10-10 18:49，同一条线）。
+**本线地界内命中 0**：`grep -E "error TS" | grep -c inbound` ⇒ **0**（现量见上）。所以这不是本线的红，本线也不去代改 —— 死规矩写着不动别人的文件，而这五枚路径一枚都不在本线白名单里。
+
+**对 T7 与本线交付的直接影响**：完成条件第 1 条要 `pnpm check` 在隔离副本 exit 0，而 `check` 的第一道就是 typecheck ⇒
+**只要这三族还在，T7 那条命令到不了 0**，与本线做了多少无关。`pnpm -r test`（运行时）**不**被它挡：vitest 不做类型检查，
+所以测试那一条仍可独立取读数（本会话已另跑一趟，读数见 PROGRESS 那一节）。
+
+**要拍的（都能闭合，任选其一）**：① 由产品体验线把这三族修掉（A 族是给桩补 `length/clear/key`，B 族是按 `noUncheckedIndexedAccess` 取值前先判，C 族是补 `identity` 一枚实参 —— 全是测试侧，一子一因）；
+② 负责人授权本线代改这五枚文件（要逐条过"一子可删／运行时形状逐字段等于改前／一条命令可回退"三条，本线不自行判定通过）；
+③ 承认 `pnpm check` 的可达性由**别的线的在飞改动**决定，把 T7 那一条改写成"除 B144 列出的三族之外全绿"—— 那是改判卷口径，必须由负责人点头，本线不自己改。
+
+⚠️ 给下一位：判"web 已经干净"之前先确认那趟 typecheck **有没有中止**。`pnpm -r` 的首败中止会把后面的包整段抹掉，
+而中止时打印的错误条数看起来像是"就这一条"。要么 `--no-bail`，要么逐包跑并核对"有 typecheck 脚本的包数 == 打印了结果的包数"。
+
 ## B145（2026-10-10 20:2x，账号标准套件线 · 取 iOS 设备腿时量出的）：**无头 boot 的模拟器上 `simctl io screenshot` 恒给纯黑**，idb 的 framebuffer 采集才是真屏 —— `reinstall-all.sh` 的 ios 段截图判据在这类设备上**恒红（假红）**
 
 **现量（同一时刻、同一台设备 `heyta-ios-isolated`，app 进程在跑）**：
@@ -8238,6 +8273,29 @@ pnpm 用 `.modules.yaml` 的已记录状态判"最新"，离线模式下不去�
 ```
 （本会话的实现是内联 python，未入库；要入库就进 `sync-dirty-to-carrier.sh` 的收尾，并加一条"差集必须为 0"的判据。）
 **不**用 `--force` 假装修好了 —— 它什么都不做。
+
+## B147（2026-10-10 20:5x，账号标准套件线 · 设备腿第 8 步量出的）：截图判据的"禁用态主蓝"只按 `color-surface` 算混合底，而那颗禁用按钮坐在**卡片底**上 ⇒ 精确匹配数 0，判据红在标定上而不是产品上
+
+**现场**：设备腿第 8 步（「只点旧那半 → 读到等新邮箱那一边」）的截图
+`apps/mobile/evidence/account-suite-ios/08-awaiting-new.png` **人眼看过**：是真界面、真状态 ——
+「当前邮箱那一边已经确认，还在等新邮箱这一边。」＋待绑邮箱＋`86327 秒后可以重新发起`＋「取消这次更换」＋
+一颗**禁用态**的「发起更换」。同一步的**内容判据全绿**（重新挂载后那句实话来自服务端、句子说清了哪一边点过）。
+红的只有截图那一格：`blue=0`（启用态主蓝，这屏确实没有）且 `blueDisabled=0`（阈值 1000）。
+
+**根因（读尺读出来的，不是猜的）**：`verify-mobile-ios-account-email-sessions.sh` 的 `png_judge`
+（约 1290–1320 行）**自己注释里就写着**禁用态是 `state.disabled-opacity`（token 现值 0.38）叠在底上的混合色、
+屏幕上没有 `#2563EB`；但它算混合时只遍历 `--ht-color-primary × --ht-color-surface`，
+而这颗按钮实际坐在**个人资料那张卡片**的底上（不是 surface）⇒ 算出的混合值与屏幕像素差几个码点，
+而 `countColor` 是**精确 RGB 匹配** ⇒ 数 0。
+
+**为什么不当场改尺**：腿正在跑，改尺会让这一趟读数作废；且改判据必须配变异臂
+（把禁用按钮的底换成 surface 应红 / 换回卡片底应绿），那要单独一趟。
+**本会话没有放松任何阈值**：`blueDisabled` 的 1000 与 `blue` 的 1 一个字没动。
+
+**修法（留给下一趟，二选一，都要带臂）**：① 混合底把 `--ht-color-card`（或该屏实际的那枚 token）也并进遍历；
+② `countColor` 加一个**从 token 推导**的容差（例如 ±2 码点，理由写进注释：iOS 的合成与抗锯齿）。
+两条都不改变"这屏必须数得出品牌色"这件事，只是把"底"和"容差"对准真源。
+⚠️ 别走第三条路 —— 把这一格从判据里摘掉：那会把 #82 那条"错误屏非空白假绿"的牙拔掉一半。
 
 ## B148（2026-10-10 21:0x，账号标准套件线 · 设备腿第一趟量出的）：设置面两枚导航缺陷 —— 「关闭」点 6 次关不上；「同步与隐私」在 AX 树里有行但**没有可点节点**
 
@@ -8300,3 +8358,161 @@ pnpm 用 `.modules.yaml` 的已记录状态判"最新"，离线模式下不去�
 应当就够；先修导航、重跑一趟，**用读数说话**，不再凭日志片段推产品缺口。
 📌 留给后来者的一般规律：**"等不到某个控件"先证明那控件此刻在不在屏上**（把当前树的根节点打出来），
 再推"它被闸住了" —— 本条两版归因都是跳过这一步造成的。
+
+## B145（2026-10-10 23:3x，本会话 · 第一次整包跑 `pnpm -r test` 才量出来的）：**本线自己让 `packages/domain` 的对账臂长红了** —— 服务端多了 8 枚拒绝码，域层那份"客户端认识的码"清单没跟上
+
+**怎么才发现的**：本线此前所有单测读数都是**按文件**跑的（`inbound-*.spec.ts` 那几族），
+而这条红坐在 `packages/domain/tests/subscription.spec.ts` —— 一个**不是本线命名、却在核对本线改动**的文件。
+只有整包跑（`pnpm -r --no-bail test`）才会撞到它。**"本线的测试全绿"从来不等于"本线的改动没让别的臂变红"**，
+这条就是那一格的下场读数。
+
+**现量（载体：隔离副本 `.worktrees/inb-t7` @ `8962927d`，dirty=0，`pnpm -r build` rc=0、`prisma generate` rc=0）**：
+
+```
+pnpm --filter @heyta/domain test
+  → packages/domain/tests/subscription.spec.ts (43 files)  Test Files 1 failed | 42 passed
+    Tests 1 failed | 1022 passed (1023)   Exit status 1
+```
+单跑复现 ⇒ **确定性红，与载体负载无关**。
+
+**红的那一条**（`subscription.spec.ts:215`）：
+
+```
+expect([...serverReasons].sort()).toEqual([...ENTITLEMENT_DENIAL_REASONS].sort())
+AssertionError: expected [ 'BINDING_EXPIRED', …(15) ] to deeply equal [ 'GRANT_NOT_INCLUDED', …(7) ]
+```
+
+臂的做法是把 `server/src/entitlement.ts` 里那枚 `reason` 联合类型的字面量**扫出来**，与
+`packages/domain/src/subscription.ts:59` 的 `ENTITLEMENT_DENIAL_REASONS` 做**集合相等**。
+差集就是本线加的这 8 枚：`BINDING_EXPIRED`、`DEPLOYMENT_MISMATCH`、`ENTITLEMENT_MODE_UNCONFIGURED`、
+`ENTITLEMENT_TICKET_REJECTED`、`ENTITLEMENT_TICKET_REQUIRED`、`ISSUER_NOT_CONFIGURED`、`NO_BINDING`、`REVOKED_VERSION`。
+**肇事物件**：`e8b3e982 feat(自动收集 服务端): 权益判定改成部署模式二选一，自托管走按操作一次性票据`（本线）。
+
+**代价说清楚，不夸大也不缩小**。现量过的两件事：
+
+1. 这 8 枚里**有 7 枚在四个客户端源码里零命中**，只有 `ISSUER_NOT_CONFIGURED` 出现在本线自己的
+   `packages/inbound-core/src/entitlement-contract.ts:56`：
+   ```
+   for r in BINDING_EXPIRED DEPLOYMENT_MISMATCH ENTITLEMENT_MODE_UNCONFIGURED \
+            ENTITLEMENT_TICKET_REJECTED ENTITLEMENT_TICKET_REQUIRED ISSUER_NOT_CONFIGURED \
+            NO_BINDING REVOKED_VERSION; do grep -rl "$r" packages/app-host/src packages/inbound-core/src \
+     apps/web/src apps/mobile/src; done
+   ```
+2. 界面的 `waiting-entitlement` 那一档**不由服务端 reason 驱动**（它住在
+   `InboundAutomationSettings.tsx` 与 `packages/app-host/src/inbound-session-keepalive.ts`，读的是周期状态），
+   而 `inbound-runtime.ts` 里 `reason` 与 `waiting-entitlement` **两个词都零命中**（现量见上）。
+
+⇒ 所以**现在没有**"界面把新码显示成 UNKNOWN_REASON"的用户可见后果，这条红**不该**被写成界面在说谎。
+它真正的代价是那条臂本身：**集合相等判据一旦长红，之后新增的拒绝码就再也不会被它抓到** ——
+下一位给客户端接这些码时，编译期词表里没有它们，而唯一会提醒他的那把尺已经是红的了。
+按 AGENTS §7 那条元规则："一条永远通过的判据比没有判据更糟"，反过来**一条永远红的判据同样瞎**。
+
+**修法（一子，改码不改判据）**：把 8 枚加进 `packages/domain/src/subscription.ts:59` 那个常量，
+并按它上面那段注释的立场分档（"档位不含这项"与"你没有订阅"是两句话，不能并成一句"请订阅"）。
+**落点不在本线白名单**：白名单只给了 `packages/domain/tests/inbound-*`，`packages/domain/src` 是只读面。
+
+**本线故意没做的两件事**：① 不放宽那条断言、不给它加豁免名单（那是判卷口径）；
+② 不代改 `packages/domain/src`（别人的地界）。要拍的只有位置：**谁**把那 8 枚补进去 ——
+本线可以在获得授权后一次做完（改动形状明确、一条命令可回退），或者由域层的地界所有者补。
+
+## B146（2026-10-10 23:3x，同一次整包跑量出的第二条本线债）：`packages/legal` 两条臂在 HEAD 长红 —— **都是本线那三张新表造成的**，而修法落点一枚都不在白名单里
+
+**现量（同一隔离副本，单跑复现 ⇒ 确定性红）**：
+
+```
+pnpm --filter @heyta/legal test
+  → packages/legal/tests/structure.spec.ts   Test Files 1 failed | 3 passed (4)
+    Tests 2 failed | 74 passed (76)   Exit status 1
+```
+
+**臂 1（`structure.spec.ts:583`）**：每张引用 `users` 且 `ON DELETE CASCADE` 的表，都必须能在中英条款里
+找到一个**用户读得到的类别名**（登记表在 `:494` 的 `CATEGORY_NAMES`）。报出的缺项正好是本线那三张：
+
+```
+这些表会随注销被级联删除，但文案里没有任何一处点到它们这一类：
+automation_entitlement_activations, automation_entitlement_links, automation_entitlement_subjects
+```
+
+**臂 2（`:627`）**：条款里抄成句子的**可复算数字**必须等于真源。真源现在是**级联 37 条 / 表 36 张**，
+而被抄的旧值少 3 —— 与本线加的表数逐一对上：
+
+```
+privacy/zh-CN    「处级联」34 → 应为 37    「张表」33 → 应为 36
+privacy/en       「cascades in total」34 → 37   「tables」33 → 36
+data-rights/zh-CN 「张表」33 → 36
+data-rights/en    「foreign keys」34 → 37   「covering tables」33 → 36
+```
+**肇事物件**：`3fcc3bef feat(自动收集 持久层): 官方签发端要记住的三件事各给一张表, 外加吊销下限的持久落点`（本线）。
+
+**为什么这条比一般的测试红重**：隐私政策那两句是对**公安机关与应用市场**的正式声明（本仓库还有专门的安全评估口径）。
+"注销会把下列类别的数据一并删除"少报三类，是一份**对外不实陈述**；按 AGENTS §8 第 18 条，
+新增持久数据必须同步改原有对外说明。**这条债属于 T6（对外说明），不属于"台账噪音"那一档。**
+
+**落点**：`packages/legal/src/documents/privacy.ts`（zh 段约 `:404`、en 段约 `:998`）、
+`packages/legal/src/documents/data-rights.ts`（zh `:317`、en `:654`），外加 `structure.spec.ts:494` 的
+`CATEGORY_NAMES` 登记表本身。这四处**全不在本线白名单**，而 `packages/legal/src/documents/third-parties.ts`
+此刻在主检出里是 `M`（法务那条线正在写）—— 白名单与"不动别人在写的文件"两条一起挡着，本线一行都不该代改。
+
+**要拍的**：谁在那四处补三类别名 + 把 7 处数字改成按真源复算，并给条款换版本号（版本号进同意指纹，
+`check:legal-tools` 那套纪律同样适用于"数据类别变了"）。本线可以代做，但需要**明确授权**，
+因为改的是**对外声明的措辞**，不是代码。
+
+## B147（2026-10-10 23:5x，本会话 · T7 第二条 `pnpm -r test` 第一次在合并态上跑完）：**全量并发跑报 77 条红，逐包单跑复测后只剩 15 条是真的** —— 其中 3 条是本线自己造的（B145/B146），12 条是别线的
+
+**载体**：隔离副本 `.worktrees/inb-t7` @ `8962927d`，dirty=0，`pnpm -r build` rc=0、`prisma generate` rc=0。
+起跑时 `uptime` 的 1 分钟负载 **14.65**（15 分钟 124.91，正在往下走）。
+
+**第一趟（并发全量）**：
+
+```
+pnpm -r --no-bail test   ⇒  RTEST_NOBAIL_RC=1
+打了汇总行的包 20 个；失败 77 条，分布在 8 个包
+```
+
+**分母自检没过**：有 `test` 脚本的包是 **21** 个（`node` 逐份 `package.json` 现量，含 `server/` 自己那一枚），
+打了 `Tests` 汇总行的只有 **20** 个 ⇒ 有一层从没跑到。缺的那层是 `packages/sync-core`：
+它的脚本是 `npm run test:typecheck && vitest run`，typecheck 前置就是 B144 的 C 族（`share-keys.spec.ts:234` 少 `identity`）
+⇒ **脚本以 rc=1 结束在第一步，vitest 整层没执行**，而 `--no-bail` 让它安静地缺席汇总。
+补量：`pnpm --filter @heyta/sync-core exec vitest run` ⇒ `Test Files 20 passed (20)`、`Tests 318 passed (318)`、rc=0。
+**这一层的运行时是绿的，红的只是它自己的类型前置** —— 不补这一枪就会把 sync-core 记成"没读数"。
+
+**第二趟（把最容易受负载影响的包逐包单跑，串行）**：
+
+| 包 | 并发全量 | 单跑复测 | 判定 |
+|---|---|---|---|
+| `apps/web` | 56 failed | `Test Files 170 passed \| 2 skipped (172)`；`Tests 2190 passed \| 13 skipped (2203)`；**rc=0** | **56 条全是负载假红** |
+| `apps/mobile` | 2 failed | `958 passed (958)`；**rc=0** | 2 条是假红（那两条本来就报 `Test timed out in 5000ms`） |
+| `server` | 10 failed | `2 failed \| 155 passed (157)`；`6 failed \| 2767 passed \| 1 skipped (2774)`；rc=1 | **6 条真红**，另外 4 条（tombstone 1 + backup-script 2 + 1 条 hook timeout）是假红 |
+| `packages/sync-core` | 无汇总 | vitest 单层 `318 passed`，rc=0 | 真红只在 typecheck |
+| `packages/{i18n,ai,legal,domain}` | 1 / 5 / 2 / 1 failed | 逐包单跑**同样红、条数一样** | 确定性真红 |
+
+⇒ **HEAD 上的确定性红 = 15 条**：i18n 1 + ai 5 + legal 2 + domain 1 + server 6。
+**并发全量那一趟不许当分母用**：它把 62 条负载造成的超时混进来了（AGENTS §7 那一族"载体会同时造红和造绿"的又一例，
+而 `--no-bail` 的 rc=1 不会告诉你是哪一种）。
+
+**15 条的归属（逐条点名，本线的两枚已在 B145/B146 单独登记）**：
+
+| 红 | 条数 | 形状 | 归属 |
+|---|---|---|---|
+| `packages/legal/tests/structure.spec.ts:583` + `:627` | **2** | 三张 `automation_entitlement_*` 表在注销类别里没名字；条款抄的级联/表数比真源少 3 | 🔴 **本线**（`3fcc3bef`），见 B146 |
+| `packages/domain/tests/subscription.spec.ts:215` | **1** | 服务端 8 枚新拒绝码没进域层词表 | 🔴 **本线**（`e8b3e982`），见 B145 |
+| `packages/i18n/tests/catalog.spec.ts:67` | 1 | `site.download.row.*` 那 7 枚键的中文值不含汉字（`macOS`/`Windows x86_64` 这类专名） | 下载面 `f9c042a7`（10-07）。白名单 `allowed` 里登记的是 `site.platforms.*.name` 那一族，同形状的专名没登记。修法落 `packages/i18n` 或该测试的白名单，**都在本线地界外** |
+| `packages/ai/tests/capability-manifest.spec.ts` | 5 | `gen-ai-capability-manifest.mjs --check` 红：产物 26 条 vs 目录 30 条、实体 8 vs 9、剔除项集合差一枚 | **生产者缝没重跑**（B129 那一类的第二次命中）。工具与实体是批次二（W2 的 `EVENT`）带进来的，生成物没跟着重新提交。修法=跑一次生成器并把产物入库，落点 `packages/ai` + `scripts/`，不在本线地界 |
+| `server/tests/sync-compressed-body.routes.spec.ts` | 5 | 逐条 mock 断言要 8 个实参、实际收到 7（`expected "vi.fn()" to be called with arguments: [ 1, 'mixed-schema-client', …(6) ]`） | 逐操作校验的**调用 arity 变了而测试没跟上**（同步协议那条线的在飞改动）。`server/tests/` 名义上在本线地界里，但**改既有断言=改判卷口径**，本线不动 |
+| `server/tests/validation.service.spec.ts` | 1 | `expected 18 to be 17`（`ALLOWED_ENTITY_TYPES` 枚数） | `EVENT` 实体（批次二 W2）抬了枚举，这条钉死枚数的测试没跟上。同上，属于判卷口径，本线不代改 |
+
+**跳过数（不许被读成本线加的）**：单跑读数是 `server 1 skipped` + `apps/web 13 skipped` + `apps/web 2 个文件 skipped`，
+全是 HEAD 存量。本线各族（`packages/inbound-core/tests`、`packages/{app-host,domain,sync-client}/tests/inbound-*`、
+`apps/web/tests/inbound-*`、`server/tests/inbound-*`/`automation-*`）里 `.skip`/`.todo` 命中 **0**（现量见上）。
+`- [x] **AC-` 勾数现量 **0**、未勾 **8**。
+
+**对完成条件第 1 条的影响**：`pnpm -r test` 在合并 HEAD 上**到不了 exit 0**，而且**不是本线一家能闭合的**：
+15 条里本线只占 3 条，且那 3 条的修法落点（`packages/domain/src`、`packages/legal/src/documents`）都在白名单外；
+其余 12 条要等 i18n 白名单登记、ai 生成物重跑、server 那两条 arity/枚数判据的归属者来收。
+再叠上 B144 的 23 枚类型错（它挡 `pnpm check`），T7 那三条命令目前的可达性是：
+`pnpm check` ✗（B144）、`pnpm -r test` ✗（B145/B146 + 12 条别线）、`pnpm reinstall:all` 未跑（需要安静载体与设备窗口）。
+
+**给下一位的两句**：① 判"`pnpm -r test` 有多少红"必须先做**分母自检**（有 test 脚本的包数 == 打汇总的包数），
+再用**逐包单跑**去掉负载超时；并发那一趟的红数只能当线索。
+② 本线的测试族全绿**不证明**本线的改动没让别的臂变红 —— 会被 `domain`/`legal` 这种**跨线对账臂**抓到，
+所以整包跑（不是整文件跑）是本线每轮的必做项，这一轮之前一直没做。

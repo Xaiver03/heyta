@@ -1651,3 +1651,38 @@ cd apps/web && NO_COLOR=1 pnpm exec vitest run tests/inbound-cycle-display.spec.
 1. **不等于 `pnpm check` / `pnpm -r test` 绿过** —— 全仓合并态那三条命令（T7）本趟仍欠，结构性阻挡是 **B103**（别人的 16 条 web 类型错）。载体空出来后的第一条是 `cd .worktrees/inb-t7 && pnpm -r typecheck`。
 2. **不等于公网接收或售卖可开** —— AC 全未勾（现量 `已勾=0 / 未勾=8`），负责人点头之前这开关不动。
 3. **主检出的红不等于 HEAD 的红** —— B142 那 9 条就是这样：同一把尺在主检出 rc=1/9 红、在干净 HEAD 上 rc=0/46 绿。
+
+## T7 第二条腿：`pnpm -r test` 第一次整包跑，以及它抓出的**本线两条债**（2026-10-10 23:5x）
+
+上面 T8 那张九趟表是**按文件**跑的（本线各族的 spec）。这一轮改成**按包**整跑，第一条读数就把 T8 的一种误读堵掉了：
+**"本线的测试族全绿"不等于"本线的改动没让别的臂变红"** —— 跨线对账臂住在别的包里。
+
+**现量（隔离副本 `.worktrees/inb-t7` @ `8962927d`，dirty=0，build rc=0，prisma generate rc=0；起跑 1 分钟负载 14.65）**：
+
+| 读数 | 命令 | 结果 |
+|---|---|---|
+| 并发全量 | `pnpm -r --no-bail test` | rc=**1**，失败 **77** 条 / 8 个包；打汇总的包 **20**，而有 `test` 脚本的包是 **21** ⇒ 分母自检不过 |
+| 补缺的那层 | `pnpm --filter @heyta/sync-core exec vitest run` | `Tests 318 passed (318)`、rc=0（它自己的 `test` 脚本红在 typecheck 前置，就是 B144 的 C 族） |
+| web 单跑 | `pnpm --filter @heyta/web test` | `Test Files 170 passed \| 2 skipped (172)`、`Tests 2190 passed \| 13 skipped (2203)`、**rc=0** ⇒ 并发那趟的 **56 条红全是负载假红** |
+| mobile 单跑 | `pnpm --filter @heyta/mobile test` | `958 passed (958)`、**rc=0** ⇒ 那 2 条是假红 |
+| server 单跑 | `pnpm --filter @heyta/sync-server test` | `2 failed \| 155 passed (157)`、`6 failed \| 2767 passed \| 1 skipped (2774)`、rc=1 ⇒ **6 条真红**、4 条假红 |
+| 四小包单跑 | `pnpm --filter @heyta/{legal,domain,ai} test` | 与并发趟**逐条同形** ⇒ 确定性真红（i18n 那一趟本来就是首败包，等于单跑） |
+
+**HEAD 的确定性红 = 15 条**，本线占 **3 条**（另外 12 条：i18n 1、ai 5、server 6）。
+逐条归因、肇事物件与修法落点都在 **BLOCKED.md 的 B145 / B146 / B147**，这里不重抄。
+
+**本线那 3 条是什么性质的东西**（不许读成"测试没跑好"）：
+
+- **B145**：本线给服务端加了 8 枚拒绝码，域层那份"客户端认识的码"词表没跟上。
+  现量过的事实是这 8 枚里 7 枚在四个客户端源码零命中、界面的 `waiting-entitlement` 由周期状态驱动而不是 reason，
+  所以**目前没有用户可见的错文案**；代价是那条集合相等臂从此长红，**以后再加码没人会被它提醒**。
+- **B146**：本线加的三张表进了"随注销级联删除"的集合，而中英条款的**类别清单少三类、抄的 7 处数字各少 3**。
+  这是**对外声明**级别的红（隐私政策/自评估口径那份），归属 T6，不是台账噪音。
+
+**这两条本线都不自己动手**：修法落点是 `packages/domain/src/subscription.ts` 与 `packages/legal/src/documents/{privacy,data-rights}.ts`，
+都在白名单外，而 `packages/legal/src/documents/third-parties.ts` 此刻还被法务那条线写着（`M`）。
+**但责任是本线的** —— 登记的每一条都写清"哪一笔提交的、改哪四处、改成什么"，谁批都能一子做完。
+
+**T7 三条命令的当前可达性**：`pnpm check` ✗（B144 的 23 枚类型错）、
+`pnpm -r test` ✗（本线 3 + 别线 12，且本线那 3 条的落点在地界外）、
+`pnpm reinstall:all` + Linux 交付取证：未跑（要安静载体与设备窗口；本机 1 分钟负载 14 只是回落中，15 分钟均值仍在 100+）。
