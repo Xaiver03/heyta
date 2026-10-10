@@ -8245,6 +8245,21 @@ pnpm -r --no-bail typecheck   ⇒  NB_RC=1　error TS 行数=23
 ⚠️ 给下一位：判"web 已经干净"之前先确认那趟 typecheck **有没有中止**。`pnpm -r` 的首败中止会把后面的包整段抹掉，
 而中止时打印的错误条数看起来像是"就这一条"。要么 `--no-bail`，要么逐包跑并核对"有 typecheck 脚本的包数 == 打印了结果的包数"。
 
+**🔴 10-11 00:4x 现量更正（同一把尺、同一枚隔离副本，载体换到 `800f70ac`）**：那三族 23 条**已被别线自己修完**，
+`pnpm -r --no-bail typecheck` 的现在全集是 **1 条**：
+
+```
+pnpm -r --no-bail typecheck ⇒ RC_TC_NOBAIL=1　error TS 行数=1
+packages/app-host typecheck: tests/login-code.spec.ts(44,5): error TS2578: Unused '@ts-expect-error' directive.
+分母自检：有 typecheck 脚本的包 20 枚 == 打了 typecheck 行的包 20 枚
+```
+
+⇒ B144 这一格从"23 条三族"换成"**1 条，落在账号标准套件线自己的测试文件里**"（`login-code.spec.ts` 干净、与 HEAD 逐字相同）。
+本线**不能**改它：白名单只给到 `packages/app-host/tests/inbound-*`，`login-code.spec.ts` 不在内。
+也**与本线那笔迁移无关**：那笔动的 5 枚代码文件全是 `.spec.ts` 叶子（没有一枚被别处 import），
+而这条红讲的是 `requestEmailLoginCode` 的返回值如今合法、那行 `@ts-expect-error` 因此成了多余指令。
+`pnpm check` 现在挡在第 4 步 `pnpm typecheck` 上的就是这一条 —— 上面"要拍的（①②③）"仍然有效，只是分母换成 1。
+
 ## B145（2026-10-10 20:2x，账号标准套件线 · 取 iOS 设备腿时量出的）：**无头 boot 的模拟器上 `simctl io screenshot` 恒给纯黑**，idb 的 framebuffer 采集才是真屏 —— `reinstall-all.sh` 的 ios 段截图判据在这类设备上**恒红（假红）**
 
 **现量（同一时刻、同一台设备 `heyta-ios-isolated`，app 进程在跑）**：

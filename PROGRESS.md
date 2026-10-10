@@ -2781,3 +2781,17 @@ AC 已勾数现量 **0**、未勾 **8**。
 
 **没做的事**：没动 `packages/domain` / `packages/legal` / `packages/i18n`（白名单外，B150/B151 照旧开着）；
 没给 `tests/integration/**` 加执行档（属判卷口径，B153 待拍）；那 5 枚 op 级读法一枚没碰。
+
+## 2026-10-11 00:4x · T7 第一条腿第一次跑起来：`pnpm check` 过前三步、停在第 4 步的**别线**一条类型错
+
+- 载体：`.worktrees/inb-t7` 先逐字节确认那 5 枚脏文件 == `800f70ac` 的 blob，才 `reset --hard` 到刚入库的那笔（dirty=0）。
+- 读数：`pnpm check` → `RC_CHECK=2`。① `check:gate-wiring` 过、② `pnpm build` 过、③ landing `check:entries` 过、
+  **④ `pnpm typecheck` 中止**在 `packages/app-host/tests/login-code.spec.ts(44,5) TS2578`。
+- 分母自检：`pnpm -r --no-bail typecheck` ⇒ `error TS` 行数 **1**；有 typecheck 脚本的包 **20** == 跑了的 **20**。
+  ⇒ **B144 那 23 条三族已被 share 那条线自己修完**，现在整仓就这一条，且它是别线的（本线白名单只到 `tests/inbound-*`）。
+- 撞过一次假绿：`pnpm --filter @heyta/server exec vitest …` 打的是 `No projects matched the filters` 然后 **退 0** ——
+  真名带 `sync-` 前缀。改用 `cd server && npx --no-install vitest run …` 才拿到 `18 passed (18)`（AGENTS §6 那条的第二次命中）。
+- 入库：`800f70ac`（9 枚文件、+202 −34，点名字段 + 临时索引 plumbing，读回 `--stat` 数过文件数；索引随后可见地干净）。
+- 仍欠（不变）：`pnpm check` 的后 70+ 步与末尾 `-r test` 无读数（被那条别线类型错挡在第 4 步）；
+  `pnpm reinstall:all` + Linux 交付取证未跑（本机 1 分钟负载 23.8 / 15 分钟 51，且设备槽是共享资产）；
+  B150/B151 的落点在地界外；B139 的 ADR 等地界；AC-6 等 `App.tsx`/`AiSettings.tsx` 那格接线（地界外）。

@@ -1683,7 +1683,7 @@ cd apps/web && NO_COLOR=1 pnpm exec vitest run tests/inbound-cycle-display.spec.
 都在白名单外，而 `packages/legal/src/documents/third-parties.ts` 此刻还被法务那条线写着（`M`）。
 **但责任是本线的** —— 登记的每一条都写清"哪一笔提交的、改哪四处、改成什么"，谁批都能一子做完。
 
-**T7 三条命令的当前可达性**：`pnpm check` ✗（B144 的 23 枚类型错）、
+**T7 三条命令的当前可达性**（10-11 00:4x 现量更新）：`pnpm check` ✗ —— B144 那 23 条已被别线修完，现在全集是 1 条类型错，落在 `packages/app-host/tests/login-code.spec.ts(44,5) TS2578`（别线地界，见 B144 的更正段），`pnpm check` 因此仍停在第 4 步 `pnpm typecheck`；
 `pnpm -r test` ✗（本线 3 + 别线 12，且本线那 3 条的落点在地界外；台账侧对应 B150/B151/B152）、
 `pnpm reinstall:all` + Linux 交付取证：未跑（要安静载体与设备窗口；本机 1 分钟负载 14 只是回落中，15 分钟均值仍在 100+）。
 
@@ -1757,3 +1757,33 @@ op 级结果（`results[].errorCode`、`SYNC_ERROR_CODES.*`）从来就不在那
 - 没给 `tests/integration/**` 新增门禁（那要改 `server/vitest.config.ts` 的 include 或加一条 `check:*`，
   属于判卷口径，只登记）；
 - 那 5 枚 op 级读法一枚都没碰（它们不是红的）。
+
+## T7 第一条腿 `pnpm check` 第一次在隔离副本上跑起来（2026-10-11 00:4x）：过了前三步，停在第 4 步的一条**别线**类型错
+
+载体 `.worktrees/inb-t7`，**HEAD 逐字 = `800f70ac`、dirty=0**（先确认副本里那 5 枚脏文件与
+`800f70ac` 的对应 blob 逐字节相同，才做的 `reset --hard` —— 所以这一步没有丢任何东西）。
+命令与日志：`cd .worktrees/inb-t7 && pnpm check` → `/tmp/inb-check-carrier.log`，末尾 `RC_CHECK=2`。
+
+| `pnpm check` 的前四步 | 读数 |
+|---|---|
+| ① `check:gate-wiring` | 过 |
+| ② `pnpm build` | 过 |
+| ③ `--filter @heyta/landing check:entries` | 过 |
+| ④ `pnpm typecheck` | **✗ 中止**：`[ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL] @heyta/app-host typecheck: tsc --noEmit -p tsconfig.spec.json / Exit status 2` |
+
+**中止的那一条**（全集就这一条，分母自检见 B144 的 10-11 更正段：有 typecheck 脚本的包 **20** 枚 ==
+跑了的 **20** 枚，`error TS` 行数 **1**）：
+
+```
+packages/app-host typecheck: tests/login-code.spec.ts(44,5): error TS2578: Unused '@ts-expect-error' directive.
+```
+
+⇒ B144 那 23 条三族已被**他们自己**修完，`pnpm check` 现在只差这一条，而这条**不在本线地界**
+（白名单给到 `packages/app-host/tests/inbound-*`，`login-code.spec.ts` 不在内），
+本线按死规矩不改它，登记在 B144 的更正段里。
+⚠️ 别把这条读成"本线那笔迁移带来的"：本笔动的 5 枚代码文件全是 `.spec.ts` 叶子、没有一枚被别处 import，
+而这条红说的是 `requestEmailLoginCode` 的返回值如今合法 ⇒ 那行 `@ts-expect-error` 成了多余指令。
+
+**这一次顺带证到的**：`check` 的前三步（含整仓 `pnpm build` 与落地页 `check:entries` 逐字节对账）
+在**合并态 + 本线全部改动**下是过的 —— 这是本线第一次拿到这个读数。
+后面 70+ 步与末尾的 `pnpm -r test` 因此**还没有读数**，不许写成"已过"。
