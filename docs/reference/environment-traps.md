@@ -9343,3 +9343,25 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     关联：第 165 条（变异"复跑变回绿"要配对的断言）、第 196 条（`.gitignore` 尾斜杠只匹配目录，
     同一族"条件写窄了装置就不生效"）、第 86 条（一条判据里藏两个缺陷）、第 179 条（管道后 `$?`
     是 `tee` 的 —— 这里 `$?` 是后面那条 `git diff` 的）。
+
+402. **跨会话 union 合并把同名配置键并成两份，JSON 静默取最后一个**
+     （2026-10-10，`package.json` 的 `check` 链）
+
+两个并行会话各自改了根 `package.json` 的 `"check"` 链，跨会话合并按"union 合流"
+把**两条链都保留**——于是文件里出现两个 `"check":` 键。`pnpm`/`JSON.parse` 对
+重复键**不报错、静默取最后一个**：第一条链里的 7 道门禁
+（`token-minting` / `session-revocation` / `safe-error-fallbacks` / `legal-email-claims` /
+`email-normalization` / `locator-labels` / `site-control-names`）从此**安静地不跑**，
+没有任何一层会红。发现路径是纯运气：`grep '"check"' package.json` 数出了两行。
+
+修法与判据：两链逐门禁取**并集**（106 道）写回单一键；
+`node -e "json.load"` 类的检查不拦重复键，拦它的是
+`pnpm check:gate-wiring`（"链上每一道都能对到定义"）在链并完之后恰好能绿——
+但它**拦不住合并那一刻**的丢失，因为链被截断时 wiring 对**剩下**的链仍然成立。
+
+规矩：**对"两侧都改过同一个配置键"的 union 合并，合完必须 `grep -c '"键名"'`
+一遍**；凡输出 >1 的键，逐条 diff 两份取值再合。会静默取最后的同族形状还有：
+`.git/config` 的同名 section、compose 的同名 service、tsconfig 的重复 `extends` 覆盖。
+
+关联：第 88 条（plumbing 半个文件的索引尾巴——同是"合并工具的边界没人盯"）、
+第 191 条（挂在枚举上的门禁在目标消失时安静不执行——同是"安静地不跑"）。
