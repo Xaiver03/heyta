@@ -41,7 +41,6 @@ describe('邮箱验证码登录（客户端）', () => {
       resendAvailableAt: Date.now() + 60_000,
     });
     const outcome = await requestEmailLoginCode({ baseUrl: 'https://x.test', fetchImpl: impl } as never, 'a@b.test');
-    // @ts-expect-error narrowing by hand in the test
     expect(outcome.ok).toBe(true);
   });
 
