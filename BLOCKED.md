@@ -8817,3 +8817,104 @@ server/package.json:12 点名 33 枚 .integration.spec.ts        → 需要活�
 如果 Apple 之后带着真设备发布，"顶栏最右那一格在真机上被挖孔吃掉"就是**所有**用标准
 app bar 的 App 的共同问题，那时要不要在产品侧给一条防线（例如最右格改用 `insets.top`
 之外的第二个来源）—— 这一格不该由一条设备腿的红来拍，也不该由一份模拟器的读数拍。
+
+## B156（2026-10-11 02:0x，本会话 · T8 终版取证时撞上的）：**同步过的隔离副本里 `server/dist` 是上一枚 HEAD 的字节，而它报出来的红长得像"当前源码坏"**
+
+现量（载体 `.worktrees/inb-t7`，`git rev-parse --short HEAD` = `9fb9eed2`、dirty=0）：
+
+```
+stat -f '%Sm  %N'  server/dist/src/automation/entitlement-ticket.js  server/src/automation/entitlement-ticket.ts
+2026-10-11 00:40:53  …/dist/src/automation/entitlement-ticket.js     ← 产物
+2026-10-11 01:51:13  …/server/src/automation/entitlement-ticket.ts   ← 源码（副本同步的时刻）
+```
+
+对它跑 `node -e 'require(…)'` ⇒ **`ReferenceError: Cannot access 'inbound_core_1' before initialization`，rc=1**，
+而 HEAD 的源码当时**已经是修好的**（`git rev-parse HEAD:…` = `c600de92…`，import 在第 19 行、引用在第 30 行）。
+`npx --no-install tsc` 重打（`TSC_RC=0`）之后同一条命令 ⇒ **`LOAD_OK … rc=0`**、
+产物里 `require` 落在第 21 行、引用第 31 行。
+
+**为什么这条要登记而不是就地写进陷阱文件**：`docs/reference/environment-traps.md` **不在本线白名单**。
+它是 §7 第 27 条那一族的新面目 —— 那一族讲的是"APK 里装着旧 JS bundle"，这里是**旧产物被当成当前源码的判决**，
+而且这一枚**既能造红也能造绿**（若旧产物恰好是好的、当前源码是坏的，同一把尺会报绿）。
+
+**建议的判据（谁批谁落，本线不代改那两份文件）**：任何"读构建产物"的验收，先证 `产物 mtime ≥ 输入源码 mtime`，
+或直接绕开宿主产物 —— 从 `git archive HEAD` 物化一份 HEAD 的字节现编（本线那把
+`research/tools/verify-inbound-cjs-require-order.py` 就是这么写的，它因此**不会**被这一格骗到）。
+
+## B157（2026-10-11 02:0x，本会话 · 一次已入库修复被并行裸提交撤掉之后量出来的仓级形状）：**plumbing 提交只动 ref 不动索引 ⇒ 下一枚裸 `git commit` 会把上一次提交静默回退**
+
+本线实测（不是推断）：`a49f534c`（本线那枚生产缺陷修复）落地后，并行会话的三枚**裸** `git commit`
+（`3998e598` / `f201b001` / `1394061f`）里，`server/src/automation/entitlement-ticket.ts` 被逐字退回
+**修复前**的字节 —— 因为共享 `.git/index` 里那一枚路径还坐着"上一枚 HEAD 的 blob"，
+而裸 `commit` 提交的是**索引**，不是工作树。对方看到的仍是"提交成功"。
+
+🔴 **这是仓级形状，不是本线的 bug，也不是任何一行的错**：`git commit-tree`/`update-ref` 本来就不该动索引；
+出问题的是"用 plumbing 提交完不刷新共享索引"这一步以前被记成收尾整洁动作，其实它是**承重**的。
+本线已做的两件（都在白名单内，不需要谁批）：
+① 配方写进 `PROGRESS.md`（`update-ref` 之后**同一条命令链里**
+`git update-index --add --cacheinfo 100644,<blob>,<路径>`，再验
+`git diff --cached --name-only -- <本笔全部点名路径> | wc -l` 必须为 0）；
+② 补了一把能**当场照出回退**的尺（`verify-inbound-cjs-require-order.py` 在被回退的那枚 HEAD 上
+`命中=1`、rc=1，逐字指出产物第 20 行是加载期引用、源码第 25 行才是那行 import）。
+
+**要拍的两件（都在本线地界外）**：
+1. 要不要给 `pnpm check` 加一道"**索引逐路径等于 HEAD**"的门（`scripts/` 不在本线白名单）。
+   它能拦下这一族的**所有**实例，成本是：任何正当的"故意 staged"操作都会红 ⇒ 词表怎么划归拍的人定。
+2. 要不要把"plumbing 之后必须刷新共享索引"写进 `AGENTS.md` / `CONTRIBUTING.md` 的提交纪律
+   （这两份的**规则**部分明令不许本线改，除非负责人当轮要求）。
+
+⚠️ 一条已写进 `PROGRESS.md` 的伴生坑，一并留给拍的人：`git restore --staged -- <路径…>` 是**原子的** ——
+路径清单里有一枚不在索引（新文件常见）时它报一句 `did not match any file(s) known to git` 然后
+**整条什么都不做**，而只看其中一枚路径的读数会显示"已经等于 0"。这正是本线那一次回退没被第一次补救救回来的原因。
+
+## B158（2026-10-11 02:0x，本会话 · 在**本线白名单文件**上发现的别线未提交改动）：`EVENT_ID` 的校验被放宽，而这是**判卷口径**级别的变更，本线不代提交
+
+形状：主检出的 `server/src/automation/entitlement-ticket.ts` 工作树里（mtime 10-10 20:18，不是本线写的）
+除本线那枚"导入上移"之外还坐着两处改动 ——
+`const EVENT_ID = z.string().regex(/^[A-Za-z0-9:_-]{1,127}$/)` 被放宽，以及那枚值导入的 JSDoc 被删掉。
+
+**为什么本线一行都没提交它们**：`EVENT_ID` 是票据正文里事件标识的接受集，放宽它=改**判定输入的形状**，
+落在"改判卷口径（既有断言、验收脚本的判据）要记 BLOCKED.md"这一条上；而本线的 T1 判据是
+"错主体 / 错实例 / 吊销落后各红一条"，**畸形 `EVENT_ID` 该不该红**目前两种读法都自洽，不能由本线替他们定。
+所以处置是：**留他们在树里，本线只落自己那半**（HEAD 那枚文件 = 本线修复版 `c600de92…`）。
+
+**开着的两条路（任一条都比"就这么放着"好）**：
+① 由改动的所有者自己提交并写清为什么放宽（本线不动）；
+② 口径定了之后本线在 `server/tests/`（白名单内）补一条"畸形 `EVENT_ID` 被拒并回类型化拒绝码"的断言，
+   并把它挂进票据那把八臂尺 —— 现在那八臂里没有这一档，也就是说**这一格无论怎么改都没有尺在守**。
+
+## B156（2026-10-11 03:0x，账号标准套件线 · 第一次在合并态上跑整条 `pnpm check` 撞上的）：**「已建模 ≠ 可达」那把尺红了，红在 `COMMENT` 一枚上 —— 它挡住的是所有线的 `pnpm check`，而它不是本线登记的**
+
+**怎么撞上的**：goal 的交付标准里有「门禁全绿」，本线此前只按文件跑过单测，
+所以第一次跑整条 76 步链（`/tmp/fullcheck.log`）。
+链在 `check:reachability` 断掉：`断言 B 不通过：1 个已建模的实体零写路径 —— COMMENT`。
+其余断言 A/C/D 都过。
+
+**归属是查过的，不是猜的**：
+· 实体登记面（`packages/domain`、`packages/shared-schema`、`packages/app-host/src`）
+  最近两笔是 `a63aa9e9`（10-10 20:07 邮箱验证码登录的客户端）与 `2f59b075`（19:53 协作 packages）；
+· `COMMENT` 这一枚登记进 `entity-types.ts` / `entities.ts` 的那一笔是
+  **`e6058120`（10-09 14:35，产品体验线 台账 §UX-S9-153）**。
+· 本线今天这几笔**没有一行**落在那三个路径里（改的是 `server/src/password/*`、`server/src/passkey.ts`、
+  `packages/app-host/tests/*`、`scripts/*`、文档）。
+⇒ 这一格红**不是本线造成的，也不是本线能修的**：它的修法是"在 app-host 里补一族
+`comment-actions.ts`，并在宿主里接上真实入口"—— 那是**任务评论这个功能**，
+不属于注册登录标准套件的地界。
+
+**为什么仍然登记在本线名下**：是本线第一次把它量出来的，读数在本线手上。
+下一条跑到 `pnpm check` 的线会看到同一枚红，不必再花一次整链去撞。
+
+**本线因此不能声明的那一格**：goal 的「门禁全绿」在**整条 `pnpm check` 这一层未闭合**
+（链在 76 步里的 `check:reachability` 断掉，后面还有 `check:ai-e2e`、`pnpm -r test` 等没走到）。
+**已经单独取到读数的**（这些覆盖本线改动的全部落点）：
+· `pnpm -r typecheck` **RC=0、0 条错、20 个顶层目录**（本线顺手收掉了唯一那枚多余指令，见 `50a43d64`）；
+· 服务端 **158 文件 / 2785 passed + 1 skipped**；`server` 的 `tsc --noEmit` **0 条错**；
+· `@heyta/app-host` **94 文件 / 1775 passed**；
+· 本线新加的那条真库判据所在文件 **21/21**；
+· `check:docs`（无死链）与 `check:doc-citations`（含 self-test 四臂）都 **RC=0**；
+· iOS 设备腿第 8 趟 **101 项 / 0 失败**（§6.87）。
+
+**要拍的只有一句**：`COMMENT` 这一枚由哪条线、什么时候补上写路径与宿主入口。
+不拍，`pnpm check` 对所有线都是红的；拍了也不该由本线做。
+🔴 门禁自己写了不许用的三种"修绿"手法（删实体 / 只补 `ACTION_FAMILIES` / 拿测试当调用点），
+本线一种都没用。
