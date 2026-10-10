@@ -810,16 +810,35 @@ open_settings_sheet() {
 
 close_settings_sheet() {
   local i
+  # 🔴 2026-10-10 第一趟实测：6 次「关闭」全不中，真因两枚，都不是"按钮不在"——
+  #   ① 填完 secure 框**键盘还立着**，✕ 被键盘盖住，tap 落在键盘上；
+  #   ② ✕ 在滚动区外时 shim 的几何安全检查会把 tap 拒掉（AGENTS §25），
+  #      而旧写法把"被拒"也数成一次尝试，6 次很快烧完。
+  #   修法：先收键盘；按压带 `--scroll-into-view`（AGENTS §22 那枚现成旋钮）；
+  #   被拒/没落地时改按「返回」兜底一次。**判据没放松**：仍然要求树里再也读不到「关闭」。
+  dismiss_keyboard
   for i in $(seq 1 6); do
     idb_dump
     if ! idb_has "关闭"; then
       ok "设置面已关（第 ${i} 次检查）"
       return 0
     fi
-    ax_press "关闭"
+    ax "关闭" --pressable --scroll-into-view --press --json >/dev/null 2>&1 || ax_press "关闭"
     sleep 2
+    idb_dump
+    if idb_has "关闭"; then
+      # 没落地 ⇒ 换「返回」兜底一次（分组目录那一代第一下是回目录，见 unwind_second_level 注释）
+      ax_press "返回"
+      sleep 2
+    fi
   done
-  bad "设置面关不上（点了 6 次「关闭」它还在）—— 下一轮起点会脏"
+  idb_dump
+  if ! idb_has "关闭"; then
+    ok "设置面已关（靠「返回」兜底关上的）"
+    return 0
+  fi
+  bad "设置面关不上（收键盘 + scroll-into-view + 返回兜底都试过，「关闭」还在树上）—— 下一轮起点会脏"
+  return 1
 }
 
 # fill_three_credentials <令牌> —— **手抄令牌**那条路（设置 → 同步 → 自托管表单）。
@@ -1228,10 +1247,20 @@ sync_now() {  # 点「立即同步」：忙时它会改名叫「正在同步…�
         # ⚠️ `_rc=2`（这一棵树读不出）也走这一支 —— 那是**响亮失败**，不是把它读成
         #    "不在忙态所以按钮应该在"。下面的 `sync_now_states` 会把每一档标成
         #    在 / 不在 / 读不出，人一眼能分"界面不在这颗按钮上"与"探针够不着"。
+        # 🔴 2026-10-10 第一趟实测（leg-run3.log 215 行）：「我的」根层等 90+90 秒等不到，
+        #    而[态]清单里树上只有根 tab —— 分组目录那一代把「立即同步」放在
+        #    **设置面→同步与隐私**里（`SettingsScreen` 的 renderSync），根层从来没有它。
+        #    所以判红之前先走一遍 `open_settings_sheet`（它自己量三代 IA，不静默选一条），
+        #    在那一层再等一轮。**判据没放松**：等不到的仍然红，只是多量一层界面。
+        echo "     诊断：根层没有这颗按钮 ⇒ 进设置面的同步分组再等一轮（分组目录那一代它在那里）"
+        if open_settings_sheet && idb_wait_label "立即同步" 60; then
+          echo "     在同步分组里等到 ⇒ IA 代际腿成立（按钮不在根层，在设置面里）"
+        else
         bad "90+90 秒内仍没等到「立即同步」，且此刻也不在忙态（忙态读数 rc=${_rc}）—— 这一次同步没被触发，后面的读数不作数"
         sync_now_states
         dump_screen_text
         return 1
+        fi
       fi
     fi
   fi
