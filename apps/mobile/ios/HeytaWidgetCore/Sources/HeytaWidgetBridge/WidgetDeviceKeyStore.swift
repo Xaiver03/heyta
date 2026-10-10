@@ -46,7 +46,7 @@ public struct WidgetDeviceKeyStore: WidgetBridgeService.KeyStore {
 
     /// 读；没有就生成一把并写进去。
     public func getOrCreate() throws -> Data {
-        if let existing = read() { return existing }
+        if let existing = try readThrowing() { return existing }
 
         // 32 字节 —— 与 `widgetKeyBytes` 一致。
         var bytes = [UInt8](repeating: 0, count: widgetKeyBytes)
@@ -66,16 +66,17 @@ public struct WidgetDeviceKeyStore: WidgetBridgeService.KeyStore {
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
             kSecValueData as String: key,
         ]
-        if let group = WidgetSharedConstants.resolvedKeychainAccessGroup() {
-            add[kSecAttrAccessGroup as String] = group
-        }
+        #if os(macOS)
+        add[kSecUseDataProtectionKeychain as String] = true
+        #endif
+        add[kSecAttrAccessGroup as String] = try accessGroup()
 
         let addStatus = SecItemAdd(add as CFDictionary, nil)
         if addStatus == errSecDuplicateItem {
             // 竞态：另一个线程/进程刚好也创建了。
             // ⚠️ **不要**在这里覆写 —— 覆写会让对方刚加密的快照变成解不开。
             //    读回已经存在的那一把。
-            guard let raced = read() else { throw Failure.keychain(addStatus) }
+            guard let raced = try readThrowing() else { throw Failure.keychain(addStatus) }
             return raced
         }
         guard addStatus == errSecSuccess else { throw Failure.keychain(addStatus) }
@@ -84,22 +85,27 @@ public struct WidgetDeviceKeyStore: WidgetBridgeService.KeyStore {
         // ⚠️ 这一步不是多余的 —— 访问组配错时 `SecItemAdd` 可能成功而
         //    `SecItemCopyMatching` 失败（或者反过来，取决于 entitlement 的形状）。
         //    在**写入点**发现比在"组件没数据"时发现便宜得多。
-        guard let written = read() else { throw Failure.keychain(addStatus) }
+        guard let written = try readThrowing() else { throw Failure.keychain(addStatus) }
         return written
     }
 
-    /// 读。拿不到返回 `nil`（设备没解锁、没登录、Keychain 没配好）。
+    /// 读。配置错误、设备没解锁或密钥不存在都按扩展侧的空结果处理；不会退回默认组。
     public func read() -> Data? {
+        try? readThrowing()
+    }
+
+    private func readThrowing() throws -> Data? {
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: WidgetSharedConstants.keychainService,
             kSecAttrAccount as String: WidgetSharedConstants.keychainAccount,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecAttrAccessGroup as String: try accessGroup(),
         ]
-        if let group = WidgetSharedConstants.resolvedKeychainAccessGroup() {
-            query[kSecAttrAccessGroup as String] = group
-        }
+        #if os(macOS)
+        query[kSecUseDataProtectionKeychain as String] = true
+        #endif
 
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
@@ -109,17 +115,25 @@ public struct WidgetDeviceKeyStore: WidgetBridgeService.KeyStore {
         return data
     }
 
-    /// 删除。**不存在的条目也算成功** —— 登出流程要幂等。
-    public func delete() {
+    /// 删除。**不存在的条目也算成功** —— 登出流程要幂等；配置或 Keychain 错误必须抛出。
+    public func delete() throws {
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: WidgetSharedConstants.keychainService,
             kSecAttrAccount as String: WidgetSharedConstants.keychainAccount,
+            kSecAttrAccessGroup as String: try accessGroup(),
         ]
-        if let group = WidgetSharedConstants.resolvedKeychainAccessGroup() {
-            query[kSecAttrAccessGroup as String] = group
+        #if os(macOS)
+        query[kSecUseDataProtectionKeychain as String] = true
+        #endif
+        let status = SecItemDelete(query as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw Failure.keychain(status)
         }
-        SecItemDelete(query as CFDictionary)
+    }
+
+    private func accessGroup() throws -> String {
+        try WidgetSharedConstants.resolvedKeychainAccessGroup()
     }
 
     public enum Failure: Error, Equatable {

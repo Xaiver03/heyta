@@ -28,6 +28,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   ScrollView,
@@ -35,6 +36,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LOCALES, useI18n } from '@heyta/i18n';
+import { OPERATOR } from '@heyta/legal';
 import {
   SettingsSection,
   resolveSettingAvailability,
@@ -63,6 +65,7 @@ import { AiSettingsSection } from '../ai/AiSettingsSection';
 import {
   privacyConsent,
   privacyConsentActions,
+  readPrivacyConsentPersistence,
   subscribePrivacyConsent,
 } from '../privacy/consent-gate';
 import { openPrivacySheet } from '../privacy/consent-ui';
@@ -96,10 +99,15 @@ export function SettingsScreen({
   vaultCleanupPending,
   onRetryVaultCleanup,
   onVaultCleanupPending,
+  widgetCleanupPending,
+  widgetCleanupRetrying,
+  onRetryWidgetCleanup,
   profileEditor,
   dataActions,
   securityActions,
   syncStatus,
+  onOpenAuth,
+  onUseOfficialSync,
   initialSection,
 }: {
   /** 「我的」持有这个状态；关闭只是把它拨回 `false`，不卸载「我的」。 */
@@ -113,6 +121,10 @@ export function SettingsScreen({
   vaultCleanupPending?: boolean;
   onRetryVaultCleanup?: () => void;
   onVaultCleanupPending?: (scope: import('../lib/vault-secure-storage').VaultSecureStorageScope) => void;
+  /** 小组件清理与加密数据钥匙是两条独立的设备清理状态。 */
+  widgetCleanupPending?: boolean;
+  widgetCleanupRetrying?: boolean;
+  onRetryWidgetCleanup?: () => void;
   /** 资料编辑器由 ProfileScreen 持有；设置面只提供唯一入口，不复制表单。 */
   profileEditor?: React.ReactNode;
   /** 数据管理入口由父屏提供，避免在设置面复制整屏路由状态。 */
@@ -121,6 +133,10 @@ export function SettingsScreen({
   securityActions?: readonly SettingsRowModel[];
   /** 同步状态与重试动作由父屏提供，表单仍由父屏持有。 */
   syncStatus?: React.ReactNode;
+  /** 从同步设置进入登录；参数为 true 时明确打开自托管认证路径。 */
+  onOpenAuth?: (allowServerSelection?: boolean) => void;
+  /** 切回官方同步时清理自托管凭据，避免把令牌带到另一个服务端。 */
+  onUseOfficialSync?: () => void;
   /** 从个人资料直达“个人资料”二级分组，普通打开时留在目录。 */
   initialSection?: SettingsSectionKey;
 }): React.JSX.Element {
@@ -144,11 +160,37 @@ export function SettingsScreen({
   const [privacyFailed, setPrivacyFailed] = useState(false);
   const [privacyBusy, setPrivacyBusy] = useState(false);
   const [section, setSection] = useState<SettingsSectionKey | undefined>(initialSection);
+  const [advancedSync, setAdvancedSync] = useState(
+    () => form.token.trim() !== '' && form.serverUrl.trim() !== '' && form.serverUrl !== DEFAULT_SERVER_URL,
+  );
   const sectionRef = useRef<SettingsSectionKey | undefined>(initialSection);
   const openSection = useCallback((next: SettingsSectionKey | undefined): void => {
     sectionRef.current = next;
     setSection(next);
   }, []);
+
+  /*
+    ── 对外投诉/举报入口 ──────────────────────────────────────────
+    🔴 **打不开邮件应用必须说出口**：这一格是备案材料与隐私政策对用户承诺的
+    投诉举报途径。`Linking.openURL` 失败时什么都不画，用户以为自己已经把情况
+    反映出去了 —— 那比没有入口更坏（同 `consentNotPersisted` 的理由）。
+    失败文案里给出地址本身，用户还能手动发；只说"打开失败"没有出口。
+
+    ⚠️ `feedbackRequest` 是**请求代数**而不是布尔量（与 `PrivacyConsentSheet`
+    的 `linkRequest` 同一形状）：连点两次时，第一次的失败回调不能覆盖第二次的
+    成功——那会把一条已经发出去的举报显示成失败。
+  */
+  const [feedbackFailed, setFeedbackFailed] = useState(false);
+  const feedbackRequest = useRef(0);
+  const openFeedbackMail = useCallback((): void => {
+    const request = ++feedbackRequest.current;
+    setFeedbackFailed(false);
+    void Linking.openURL(
+      `mailto:${OPERATOR.contactEmail}?subject=${encodeURIComponent(t('common.feedback.subject'))}`,
+    ).catch(() => {
+      if (request === feedbackRequest.current) setFeedbackFailed(true);
+    });
+  }, [t]);
 
   useEffect(() => {
     if (!visible) return;
@@ -168,9 +210,17 @@ export function SettingsScreen({
   const [consentRecord, setConsentRecord] = useState<PrivacyConsentRecord | null>(() =>
     privacyConsent.current(),
   );
-  const [revokeNotPersisted, setRevokeNotPersisted] = useState(false);
+  const [consentNotPersisted, setConsentNotPersisted] = useState(() => !readPrivacyConsentPersistence());
 
-  useEffect(() => subscribePrivacyConsent(() => setConsentRecord(privacyConsent.current())), []);
+  useEffect(
+    () =>
+      subscribePrivacyConsent(({ persisted }) => {
+        setConsentRecord(privacyConsent.current());
+        // 只有新的决定确实写入设备后，才清掉上一条失败提示；再次失败时保留提示。
+        setConsentNotPersisted(!persisted);
+      }),
+    [],
+  );
 
   useEffect(() => {
     let alive = true;
@@ -212,8 +262,7 @@ export function SettingsScreen({
    * 里闸门确实关了，但下次冷启动磁盘上还是旧决定 —— 不说这一句，用户以为撤回是永久的。
    */
   const revokeConsent = useCallback((): void => {
-    const { persisted } = privacyConsentActions.revoke();
-    setRevokeNotPersisted(!persisted);
+    privacyConsentActions.revoke();
   }, []);
 
   /**
@@ -228,7 +277,7 @@ export function SettingsScreen({
    */
   const chooseAgain = useCallback((): void => {
     closeParent();
-    openPrivacySheet('revoked');
+    openPrivacySheet('settings');
   }, [closeParent]);
 
   /**
@@ -339,23 +388,35 @@ export function SettingsScreen({
         <Stack>
           <Text variant="row-title">
             {t(consentStateKey)}
-            {consentRecord === null
-              ? null
-              : ` · ${t('common.privacy.settings.decidedAt', {
-                  time: formatPrivacyDecisionTime(consentRecord.decidedAt),
-                })}`}
           </Text>
+          {consentRecord === null ? null : (
+            <Text variant="caption" tone="subtle">
+              {t('common.privacy.settings.decidedAt', {
+                time: formatPrivacyDecisionTime(consentRecord.decidedAt),
+              })}
+            </Text>
+          )}
           <Text variant="caption" tone="subtle">
-            {t('common.privacy.settings.revokeHint')}
+            {t(consentRecord?.decision === 'accepted' ? 'common.privacy.settings.revokeHint' : 'common.privacy.settings.chooseHint')}
           </Text>
         </Stack>
       </Card>
-      {consentRecord === null ? (
-        <Button label={t('common.privacy.settings.chooseAgain')} onPress={chooseAgain} tone="primary" />
+      {consentRecord?.decision !== 'accepted' ? (
+        <Button
+          label={t('common.privacy.settings.chooseAgain')}
+          onPress={chooseAgain}
+          tone="primary"
+          style={{ alignSelf: 'flex-start' }}
+        />
       ) : (
-        <Button label={t('common.privacy.settings.revoke')} onPress={revokeConsent} tone="secondary" />
+        <Button
+          label={t('common.privacy.settings.revoke')}
+          onPress={revokeConsent}
+          tone="secondary"
+          style={{ alignSelf: 'flex-start' }}
+        />
       )}
-      {revokeNotPersisted ? (
+      {consentNotPersisted ? (
         <Text variant="caption" tone="warning">
           {t('common.privacy.consent.notPersisted')}
         </Text>
@@ -363,49 +424,100 @@ export function SettingsScreen({
     </Stack>
   );
 
+  const renderSyncConfiguration = (): React.JSX.Element => (
+    <>
+      <SectionHeader icon="action.sync" title={t('mobile.profile.section.sync')} />
+      <Card>
+        {advancedSync ? (
+          <View style={{ gap: tokens['space.4'] }}>
+            <Stack>
+              <Text variant="row-title">{t('mobile.profile.sync.advancedTitle')}</Text>
+              <Text variant="caption" tone="subtle">
+                {t('mobile.profile.sync.advancedHint')}
+              </Text>
+            </Stack>
+            <TextField
+              label={t('mobile.profile.serverUrl.label')}
+              value={form.serverUrl}
+              onChangeText={form.setServerUrl}
+              placeholder={DEFAULT_SERVER_URL}
+              keyboard="url"
+              hint={t('mobile.profile.serverUrl.hint')}
+            />
+            {form.transport === 'plaintext' ? (
+              <Text variant="caption" tone="warning">
+                {t('mobile.profile.transport.plaintext')}
+              </Text>
+            ) : null}
+            {form.transport === 'plaintext-local' ? (
+              <Text variant="caption" tone="warning">
+                {t('mobile.profile.transport.plaintextLocal')}
+              </Text>
+            ) : null}
+            <TextField
+              label={t('mobile.profile.token.label')}
+              value={form.token}
+              onChangeText={form.setToken}
+              placeholder={t('mobile.profile.token.placeholder')}
+            />
+            <TextField
+              label={t('mobile.profile.password.label')}
+              value={form.password}
+              onChangeText={form.setPassword}
+              secure
+              hint={t('mobile.profile.password.hint')}
+            />
+            {onOpenAuth !== undefined ? (
+              <Button
+                label={form.configured ? t('mobile.profile.account.switchAccount') : t('mobile.profile.account.signIn')}
+                tone="primary"
+                onPress={() => onOpenAuth(true)}
+                style={{ alignSelf: 'flex-start' }}
+              />
+            ) : null}
+            <Button
+              label={t('mobile.profile.sync.advancedClose')}
+              tone="ghost"
+              onPress={() => {
+                onUseOfficialSync?.();
+                form.setServerUrl(DEFAULT_SERVER_URL);
+                setAdvancedSync(false);
+              }}
+              style={{ alignSelf: 'flex-start' }}
+            />
+          </View>
+        ) : (
+          <Stack>
+            <Text variant="row-title">{t('mobile.profile.sync.officialTitle')}</Text>
+            <Text variant="caption" tone="subtle">
+              {t('mobile.profile.sync.officialHint')}
+            </Text>
+            {onOpenAuth !== undefined ? (
+              <Button
+                label={form.configured ? t('mobile.profile.account.switchAccount') : t('mobile.profile.account.signIn')}
+                tone="primary"
+                onPress={() => onOpenAuth()}
+                style={{ alignSelf: 'flex-start' }}
+              />
+            ) : null}
+            <Button
+              label={t('mobile.profile.sync.advancedOpen')}
+              tone="ghost"
+              onPress={() => setAdvancedSync(true)}
+              style={{ alignSelf: 'flex-start' }}
+            />
+          </Stack>
+        )}
+      </Card>
+    </>
+  );
+
+  const syncStatusVisible = form.configured || advancedSync;
   const renderSync = (): React.JSX.Element => (
     <>
-      {syncStatus}
-      {renderPrivacy()}
-      <SectionHeader icon="action.sync" title={t('mobile.profile.section.sync')} />
-      <Text variant="caption" tone="subtle">
-        {t('mobile.profile.sync.manualHint')}
-      </Text>
-      <Card>
-        <View style={{ gap: tokens['space.4'] }}>
-          <TextField
-            label={t('mobile.profile.serverUrl.label')}
-            value={form.serverUrl}
-            onChangeText={form.setServerUrl}
-            placeholder={DEFAULT_SERVER_URL}
-            keyboard="url"
-            hint={t('mobile.profile.serverUrl.hint')}
-          />
-          {form.transport === 'plaintext' ? (
-            <Text variant="caption" tone="warning">
-              {t('mobile.profile.transport.plaintext')}
-            </Text>
-          ) : null}
-          {form.transport === 'plaintext-local' ? (
-            <Text variant="caption" tone="warning">
-              {t('mobile.profile.transport.plaintextLocal')}
-            </Text>
-          ) : null}
-          <TextField
-            label={t('mobile.profile.token.label')}
-            value={form.token}
-            onChangeText={form.setToken}
-            placeholder={t('mobile.profile.token.placeholder')}
-          />
-          <TextField
-            label={t('mobile.profile.password.label')}
-            value={form.password}
-            onChangeText={form.setPassword}
-            secure
-            hint={t('mobile.profile.password.hint')}
-          />
-        </View>
-      </Card>
+      {syncStatusVisible ? syncStatus : renderSyncConfiguration()}
+      {syncStatusVisible ? renderPrivacy() : null}
+      {syncStatusVisible ? renderSyncConfiguration() : renderPrivacy()}
     </>
   );
 
@@ -441,6 +553,34 @@ export function SettingsScreen({
           ))}
         </View>
       </SettingsSection>
+      <SettingsSection
+        variant="card"
+        testID="settings-feedback"
+        title={t('mobile.settings.feedback.section')}
+        leading={<Icon name="action.settings" size="sm" color={tokens['color.foreground-muted']} />}
+        rows={
+          [
+            {
+              kind: 'action',
+              testID: 'settings-entry-feedback',
+              label: t('common.feedback.label'),
+              hint: t('common.feedback.hint'),
+              leading: <Icon name="action.send" size="sm" color={tokens['color.foreground-muted']} />,
+              onPress: openFeedbackMail,
+            },
+            ...(feedbackFailed
+              ? [
+                  {
+                    kind: 'note' as const,
+                    testID: 'settings-feedback-failed',
+                    text: t('mobile.settings.feedback.failed', { email: OPERATOR.contactEmail }),
+                    tone: 'warning' as const,
+                  },
+                ]
+              : []),
+          ] as readonly SettingsRowModel[]
+        }
+      />
     </>
   );
 
@@ -466,6 +606,24 @@ export function SettingsScreen({
           </Stack>
         </Card>
       ) : null}
+      {widgetCleanupPending && onRetryWidgetCleanup !== undefined ? (
+        <View testID="widget-cleanup-pending">
+          <Card>
+            <Stack>
+              <Text variant="caption" tone="danger">
+                {t('mobile.widgetCleanup.failed')}
+              </Text>
+              <Button
+                label={widgetCleanupRetrying ? t('mobile.widgetCleanup.retrying') : t('mobile.widgetCleanup.retry')}
+                onPress={onRetryWidgetCleanup}
+                tone="ghost"
+                disabled={widgetCleanupRetrying}
+                loading={widgetCleanupRetrying}
+              />
+            </Stack>
+          </Card>
+        </View>
+      ) : null}
       <Button
         label={t('mobile.profile.clearCredentials')}
         onPress={onClearCredentials}
@@ -490,8 +648,6 @@ export function SettingsScreen({
           <SettingsSection
             variant="card"
             testID="settings-data-actions"
-            title={sectionLabels.data}
-            leading={<Icon name="action.share" size="sm" color={tokens['color.foreground-muted']} />}
             rows={dataActions ?? []}
           />
         );
@@ -533,8 +689,6 @@ export function SettingsScreen({
             alignItems: 'center',
             paddingHorizontal: tokens['screen.gutter'],
             gap: tokens['space.2'],
-            borderBottomWidth: tokens['border-width.thin'],
-            borderBottomColor: tokens['color.border'],
             backgroundColor: tokens['color.surface'],
           }}
         >
@@ -554,7 +708,7 @@ export function SettingsScreen({
           )}
         </View>
 
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <ScrollView
             key={section ?? 'directory'}
             style={{ flex: 1 }}

@@ -45,6 +45,9 @@ public struct WidgetBridgeService {
         /// 契约拒绝。`reason` 用的词与 TS / Android / 组件侧是**同一套**。
         case invalidEnvelope(reason: String, detail: String)
         case writeFailed(String)
+        case readFailed(String)
+        case ackFailed(String)
+        case clearFailed(String)
         case sealFailed(String)
     }
 
@@ -56,11 +59,13 @@ public struct WidgetBridgeService {
     public protocol Store {
         func readSnapshot() -> Data?
         func writeSnapshot(_ envelope: Data) throws
-        /// **读出原始 JSON 并清空**。`nil` = 没有待处理的点击。
-        func drainIntents() -> String?
+        /// **读取原始 JSON（非破坏）**。`nil` = 没有待处理的点击。
+        func drainIntents() throws -> String?
+        /// 精确确认已处理的点击，返回实际删除数量。
+        func ackIntents(_ processed: WidgetIntentQueue) throws -> Int
         /// 原子读-改-写。返回写回之后的队列。
         func updateIntents(_ body: (WidgetIntentQueue) -> WidgetIntentQueue) -> WidgetIntentQueue
-        func clearAll()
+        func clearAll() throws
 
         /// W5-2 · 读锁屏隐私偏好的**原始值**（未解析）。`nil` = 没写过。
         ///
@@ -76,7 +81,7 @@ public struct WidgetBridgeService {
     /// 设备密钥。**只有应用侧有 `getOrCreate`**（理由见扩展侧 `WidgetDeviceKey` 的注释）。
     public protocol KeyStore {
         func getOrCreate() throws -> Data
-        func delete()
+        func delete() throws
     }
 
     private let store: Store
@@ -138,7 +143,7 @@ public struct WidgetBridgeService {
     // ─────────────────────────────────────────────────────────────
 
     /**
-     取出意图队列的**原始 JSON** 并清空。`nil` = 没有待处理的点击。
+     读取意图队列的**原始 JSON**，不会清空。`nil` = 没有待处理的点击；成功处理后由 `ackIntentQueue` 精确确认。
 
      ⚠️ 刻意**不在原生侧解析**：队列语义（last-wins 折叠、上限 50、类型校验）
      只有一份真源，在 `@heyta/widget-core` 的 `parseIntentQueue` 里。
@@ -148,28 +153,40 @@ public struct WidgetBridgeService {
      在 JS 侧要走不同的分支（前者直接跳过 drain），而 `"[]"` 会被
      `JSON.parse` 成一个空数组 —— 调用方必须判断两种形态。`nil` 只有一种含义。
      */
-    public func drainIntentQueue() -> String? {
-        store.drainIntents()
+    public func drainIntentQueue() throws -> String? {
+        do {
+            return try store.drainIntents()
+        } catch {
+            throw Failure.readFailed("读取小组件意图失败：\(error)")
+        }
+    }
+
+    /// 精确确认已处理的意图。原生只删除与 processedJson 中三元组完全相同的条目。
+    public func ackIntentQueue(_ processedJson: String) throws -> Int {
+        guard let data = processedJson.data(using: .utf8),
+              let root = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]),
+              let object = root as? [String: Any],
+              let version = object["v"] as? Int, version == widgetIntentVersion,
+              let rawIntents = object["intents"] as? [Any] else {
+            throw Failure.ackFailed("确认的小组件意图不是合法队列")
+        }
+        let processed = WidgetIntentQueues.parse(data)
+        guard rawIntents.isEmpty || !processed.intents.isEmpty else {
+            throw Failure.ackFailed("确认的小组件意图包含无效条目")
+        }
+        do {
+            return try store.ackIntents(processed)
+        } catch {
+            throw Failure.ackFailed("确认小组件意图失败：\(error)")
+        }
     }
 
     /**
-     把 drain 之后**执行失败**的意图写回容器。返回写回后队列的长度。
-
-     ## 🔴 是合并，不是覆盖
-
-     `drainIntentQueue` 是"读出来 + 清空"，写回发生在之后 ——
-     这两步之间用户**完全可能又点一下**，那个新点击已经进了容器。
-     整体覆盖会把它**悄悄抹掉**，而用户看到的是"我点了，它没反应"。
-
-     ## 🔴 顺序是「容器里的更新」
-     见 `WidgetIntentQueues.mergeOlderIntoNewer`。
+     兼容旧版调用方的失败意图合并路径。新流程使用 `ackIntentQueue`，
+     但保留这个入口以便旧客户端升级过程中不丢失待处理点击。
      */
     public func mergeIntentQueue(_ pendingJson: String) throws -> Int {
-        // 坏数据降级为空队列（与四端解析器同一策略）。
-        // 这里传入的是 JS 刚序列化出来的对象，现实中不该坏；
-        // 真坏了也只会"少写回几条"，而不是抛出去让应用起不来。
         let pending = WidgetIntentQueues.parse(Data(pendingJson.utf8))
-
         let merged = store.updateIntents { current in
             WidgetIntentQueues.mergeOlderIntoNewer(current, pending.intents)
         }
@@ -218,9 +235,19 @@ public struct WidgetBridgeService {
      "旧密文 + 无密钥" —— 虽然也只是占位符，但先删密钥能让
      "任何一刻崩溃都不会留下**可解开的**旧密文"这一点成立。
      */
-    public func clearWidgetState() {
-        keyStore.delete()
-        store.clearAll()
+    public func clearWidgetState() throws {
+        do {
+            // 先删密钥，再清共享容器。任何一步失败都必须把失败传给宿主，
+            // 不能让登出流程误报成功或继续刷新旧快照。
+            try keyStore.delete()
+            try store.clearAll()
+        } catch {
+            throw Failure.clearFailed("清理小组件状态失败：\(error)")
+        }
+
+        // 清理已经成功；通知 WidgetKit 让已存在的组件立即重画占位态。
+        // 这一步必须在 do/catch 之后，避免清理失败时把刷新误报为成功路径。
+        push()
     }
 
     // ─────────────────────────────────────────────────────────────

@@ -4,10 +4,13 @@ import { ICON_SIZE } from '@heyta/design-system';
  * =========================
  *
  * 复现对象：`apps/web/src/App.tsx` 的 `.ht-app` 网格
- * （侧栏 + 主区；主区里是标题栏 / 视图切换 / 内容区）。
+ * （rail + 当前视图范围侧栏 + 主区 + 详情栏；主区里是标题栏 / 内容区）。
  *
  * ⚠️ 这是**复现**，不是应用本身 —— 详见 `mockup.css` 文件头。
- * 它刻意不可交互（外框 `pointer-events: none`）：展示品不该让人以为能点。
+ * 默认不可交互（外框 `pointer-events: none`）：静态复现不该让人以为能点。
+ * 展厅可显式传 `interactive` 开启导航与任务勾选；视图里的编辑控件仍是
+ * 产品形态的静态复现。这样访客能在同一份演示数据里浏览页面、感受任务完成如何
+ * 改变列表与四象限，而不会误以为落地页已经接入真实账户或持久化。
  *
  * 🔴 **外壳结构不在这里手写**：导航项、视图 tab、面板区块全部从
  * `./app-shell-shape.js` 的登记处派生，而那份登记由
@@ -21,7 +24,15 @@ import { ICON_SIZE } from '@heyta/design-system';
  * 而不是"重新做一套看着差不多的响应式布局"。
  */
 
-import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import {
   CalendarDays,
   CalendarRange,
@@ -29,6 +40,11 @@ import {
   Check,
   CheckCircle2,
   CircleDot,
+  CircleHelp,
+  Folder,
+  MoreHorizontal,
+  RefreshCw,
+  UserRound,
   Inbox,
   PanelRightOpen,
   Plus,
@@ -36,8 +52,10 @@ import {
   Settings,
   Sun,
   StickyNote,
+  Tag as TagIcon,
   Trash2,
   TrendingUp,
+  X,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -52,6 +70,7 @@ import {
   SHELL_QUADRANT_NAV,
   SHELL_QUADRANT_SECTION_KEY,
   SHELL_VIEW_TABS,
+  MOCKUP_PREVIEW_TABS,
   type MockView,
   type ShellNavIconId,
   type ShellViewKey,
@@ -63,7 +82,7 @@ import {
   MOCK_CAPTURE_KEYS,
   mockCaptureAddClass,
 } from './capture-shape.js';
-import { showcaseQuadrantCounts } from './showcase-data.js';
+import { SHOWCASE_TASKS, showcaseQuadrantCounts } from './showcase-data.js';
 import { TaskList } from './TaskList.js';
 import { QuadrantGrid } from './QuadrantGrid.js';
 import { HabitHeatmap } from './HabitHeatmap.js';
@@ -101,6 +120,7 @@ const SHELL_ICONS: Record<ShellNavIconId, LucideIcon> = {
  */
 function useStageScale(
   frameRef: RefObject<HTMLDivElement | null>,
+  mobileMinimum = 0,
 ): number {
   const [scale, setScale] = useState(0);
 
@@ -113,8 +133,12 @@ function useStageScale(
         getComputedStyle(document.documentElement).fontSize,
       );
       const stageWidth = STAGE_WIDTH_REM * rootFontSize;
-      const available = el.getBoundingClientRect().width;
-      if (available > 0 && stageWidth > 0) setScale(available / stageWidth);
+      const available = el.clientWidth;
+      const isNarrow = typeof window.matchMedia === 'function' &&
+        window.matchMedia('(max-width: 40rem)').matches;
+      if (available > 0 && stageWidth > 0) {
+        setScale(Math.max(available / stageWidth, isNarrow ? mobileMinimum : 0));
+      }
     };
 
     compute();
@@ -135,39 +159,101 @@ function NavItem({
   count,
   active,
   swatch,
+  onClick,
 }: {
   icon?: ReactNode;
   label: string;
   count?: number;
   active?: boolean;
   swatch?: string;
+  onClick?: () => void;
 }): React.JSX.Element {
-  return (
-    <div className={`mk-nav__item${active === true ? ' mk-nav__item--active' : ''}`}>
-      {swatch !== undefined ? (
-        <span className={`mk-swatch ${swatch}`} />
-      ) : (
-        (icon ?? null)
-      )}
+  const content = (
+    <>
+      {swatch !== undefined ? <span className={`mk-swatch ${swatch}`} /> : (icon ?? null)}
       {label}
       {/* 与真应用 `NavButton` 同一条判据：**只有 > 0 才渲染计数位**。
           空账号的计数恒为 0，所以审计那张截图上一个数字都没有 ——
           那不是"产品没有这个位"，是"位在、值为 0"。 */}
       {count !== undefined && count > 0 && <span className="mk-nav__count">{count}</span>}
-    </div>
+    </>
+  );
+  return onClick === undefined ? (
+    <div className={`mk-nav__item${active === true ? ' mk-nav__item--active' : ''}`}>{content}</div>
+  ) : (
+    <button type="button" className={`mk-nav__item${active === true ? ' mk-nav__item--active' : ''}`} onClick={onClick}>
+      {content}
+    </button>
   );
 }
 
 export function AppWindow({
   view = 'tasks',
   className,
+  interactive = false,
+  onViewChange,
 }: {
   view?: MockView;
   className?: string;
+  interactive?: boolean;
+  onViewChange?: (view: MockView) => void;
 }): React.JSX.Element {
   const frameRef = useRef<HTMLDivElement>(null);
-  const scale = useStageScale(frameRef);
+  const scale = useStageScale(frameRef, interactive ? 1 : 0);
   const { t } = useI18n();
+  const [completedIds, setCompletedIds] = useState<ReadonlySet<string>>(
+    () => new Set(SHOWCASE_TASKS.filter((task) => task.done === true).map((task) => task.id)),
+  );
+  const [activeView, setActiveView] = useState<MockView>(view);
+  const [overflowOpen, setOverflowOpen] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState('mk-weekly');
+  const [detailOpen, setDetailOpen] = useState(false);
+  const detailRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (detailOpen && window.matchMedia('(max-width: 40rem)').matches) {
+      detailRef.current?.focus({ preventScroll: true });
+      detailRef.current?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [detailOpen, selectedTaskId]);
+
+  useEffect(() => {
+    setActiveView(view);
+  }, [view]);
+
+  const navigate = useCallback((next: MockView): void => {
+    const focusedRail = frameRef.current?.contains(document.activeElement) === true &&
+      document.activeElement instanceof HTMLButtonElement;
+    setActiveView(next);
+    setDetailOpen(false);
+    setOverflowOpen(false);
+    onViewChange?.(next);
+    if (focusedRail) {
+      // The selected overflow item is reparented into the primary rail after
+      // navigation. Restore focus after that commit so keyboard users do not
+      // fall back to document.body when the overflow menu closes.
+      window.setTimeout(() => {
+        const button = [...(frameRef.current?.querySelectorAll<HTMLButtonElement>('[data-view-key]') ?? [])]
+          .find((candidate) => candidate.dataset.viewKey === next);
+        button?.focus();
+      }, 0);
+    }
+  }, [onViewChange]);
+
+  const isMockView = (key: ShellViewKey): key is MockView =>
+    key === 'tasks' || key === 'quadrant' || key === 'habits' || key === 'focus' || key === 'timeline';
+
+  const toggleTask = useCallback((id: string): void => {
+    setCompletedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const selectedTask = SHOWCASE_TASKS.find((task) => task.id === selectedTaskId) ?? SHOWCASE_TASKS[0]!;
+  const selectedTaskDone = completedIds.has(selectedTask.id);
 
   /**
    * 顶部标题。
@@ -176,8 +262,8 @@ export function AppWindow({
    * 「任务」视图的标题是「收集箱」（`web.shell.nav.inbox`），其余直接用 tab 的 key ——
    * 这一条对应 `App.tsx` 的 `title` 推导（任务 / 四象限的标题更具体）。
    *
-   * ⚠️ 覆盖**全部 9 个 tab**（`Record<ShellViewKey, …>`），不是只覆盖复刻能画内容的
-   * 那 4 个。只填 4 个时，`titles[view]` 对没登记的那个 key 会是 `undefined`
+   * ⚠️ 覆盖**全部视图 key**（`Record<ShellViewKey, …>`），不是只覆盖展厅当前能画的
+   * 几个。只填已展示视图时，`titles[view]` 对其他合法 key 会是 `undefined`
    * 并静默回落成别的标题 —— 加了「便签」这一项之后，那正是会发生的漂移。
    */
   const titles = useMemo<Record<ShellViewKey, string>>(() => {
@@ -207,17 +293,121 @@ export function AppWindow({
    * 卡片数结构上一致。复刻原来在这里写死了 3 / 5 / 2 / 1，与真应用算出来的不一致
    * （§2 #2）。已完成任务不计入 —— 与 `bucketByQuadrant()` 同一条语义。
    */
-  const counts = useMemo(() => showcaseQuadrantCounts(), []);
+  const counts = useMemo(
+    () =>
+      showcaseQuadrantCounts(
+        SHOWCASE_TASKS.map((task) =>
+          ({ ...task, done: completedIds.has(task.id) }),
+        ),
+      ),
+    [completedIds],
+  );
+
+  // The real Web shell is rail → scope sidebar → main → detail.  The rail
+  // keeps four high-frequency destinations on the surface and moves the rest
+  // behind “More”; an active overflow view is promoted so its location remains
+  // visible.  This is deliberately derived from the same default rail list
+  // used by the shell shape registry rather than drawing a second tab strip in
+  // the header.
+  const railTabs = useMemo(() => {
+    const visible = [...(interactive ? MOCKUP_PREVIEW_TABS : SHELL_VIEW_TABS)]
+      .filter((tab) => !interactive || isMockView(tab.key));
+    const pinned = new Set<ShellViewKey>(['tasks', 'calendar', 'habits', 'search']);
+    const primary = visible
+      .filter((tab) => pinned.has(tab.key))
+      .slice(0, 4)
+      .concat(visible.filter((tab) => !pinned.has(tab.key)).slice(0, 4))
+      .slice(0, 4);
+    const primaryKeys = new Set(primary.map((tab) => tab.key));
+    const overflow = visible.filter((tab) => !primaryKeys.has(tab.key));
+    if (overflow.some((tab) => tab.key === activeView)) {
+      const promoted = overflow.find((tab) => tab.key === activeView);
+      const replaced = primary[primary.length - 1];
+      if (promoted !== undefined && replaced !== undefined) {
+        return { primary: [...primary.slice(0, -1), promoted], overflow: [replaced, ...overflow.filter((tab) => tab.key !== activeView)] };
+      }
+    }
+    return { primary, overflow };
+  }, [activeView, interactive]);
+
+  const renderRailTab = (
+    tab: (typeof MOCKUP_PREVIEW_TABS)[number],
+    menuItem = false,
+  ): React.JSX.Element => {
+    const Icon = SHELL_ICONS[tab.icon];
+    const destination = isMockView(tab.key) ? tab.key : undefined;
+    const tabClass = `mk-rail__tab${tab.key === activeView ? ' mk-rail__tab--active' : ''}`;
+    const content = <><Icon size={ICON_SIZE.sm} /><span>{t(tab.labelKey)}</span></>;
+    if (!interactive) {
+      return <div key={tab.key} data-view-key={tab.key} className={tabClass}>{content}</div>;
+    }
+    return (
+      <button
+        key={tab.key}
+        type="button"
+        data-view-key={tab.key}
+        className={tabClass}
+        aria-label={t(tab.labelKey)}
+        title={t(tab.labelKey)}
+        role={menuItem ? 'menuitem' : undefined}
+        aria-current={tab.key === activeView ? 'page' : undefined}
+        onClick={destination === undefined ? undefined : () => navigate(destination)}
+      >
+        {content}
+      </button>
+    );
+  };
 
   return (
-    <div ref={frameRef} className={`mk-frame${className !== undefined ? ` ${className}` : ''}`}>
+    <div
+      ref={frameRef}
+      className={`mk-frame${interactive ? ' mk-frame--interactive' : ''}${className !== undefined ? ` ${className}` : ''}`}
+    >
       <div className="mk-stage" style={{ '--mk-scale': String(scale) } as React.CSSProperties}>
-        <div className="mk-app">
-          <nav className="mk-sidebar">
-            <div className="mk-brand">
-              <span className="mk-brand__dot" />
-              {t('common.brand')}
+        <div className={`mk-app${activeView === 'tasks' ? ' mk-app--with-sidebar' : ''}`}>
+          <nav className="mk-rail" onKeyDown={(event) => {
+            if (event.key === 'Escape' && overflowOpen) {
+              setOverflowOpen(false);
+              frameRef.current?.querySelector<HTMLButtonElement>('.mk-rail__more')?.focus();
+            }
+          }} onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget)) setOverflowOpen(false);
+          }}>
+            <div className="mk-rail__top">
+              <span className="mk-avatar" aria-label={t('web.shell.account.aria')}><UserRound size={ICON_SIZE.sm} /></span>
             </div>
+            <div className="mk-rail__tabs">
+              {railTabs.primary.map((tab) => renderRailTab(tab))}
+              {railTabs.overflow.length > 0 && !interactive ? (
+                <div className="mk-rail__more"><MoreHorizontal size={ICON_SIZE.sm} /><span>{t('web.shell.views.groupMore')}</span></div>
+              ) : railTabs.overflow.length > 0 ? (
+                <button
+                  type="button"
+                  className="mk-rail__more"
+                  aria-label={t('web.shell.views.groupMore')}
+                  title={t('web.shell.views.groupMore')}
+                  aria-expanded={overflowOpen}
+                  aria-haspopup="menu"
+                  onClick={() => setOverflowOpen((open) => !open)}
+                >
+                  <MoreHorizontal size={ICON_SIZE.sm} />
+                  <span>{t('web.shell.views.groupMore')}</span>
+                </button>
+              ) : null}
+              {overflowOpen && railTabs.overflow.length > 0 ? (
+                <div className="mk-rail__overflow" role="menu">
+                  {railTabs.overflow.map((tab) => renderRailTab(tab, true))}
+                </div>
+              ) : null}
+            </div>
+            <div className="mk-rail__tools">
+              {interactive ? null : renderRailTab(SHELL_VIEW_TABS.find((tab) => tab.key === 'trash') ?? SHELL_VIEW_TABS[0]!)}
+              <div className="mk-rail__tab"><CircleHelp size={ICON_SIZE.sm} /><span>{t('web.shell.nav.help')}</span></div>
+              <div className="mk-rail__sync"><RefreshCw size={ICON_SIZE.xs} /><span>{t('web.sync.status.synced')}</span></div>
+            </div>
+          </nav>
+
+          {activeView === 'tasks' ? <nav className="mk-sidebar">
 
             {/*
               🔴 主导航三项（今天 / 最近 7 天 / 已完成），从 `SHELL_PRIMARY_NAV` 派生。
@@ -235,6 +425,7 @@ export function AppWindow({
                     icon={<ItemIcon size={ICON_SIZE.sm} />}
                     label={t(item.labelKey)}
                     active={false}
+                    onClick={interactive ? () => navigate('tasks') : undefined}
                   />
                 );
               })}
@@ -254,55 +445,43 @@ export function AppWindow({
                   swatch={`mk-swatch--${item.swatch}`}
                   label={t(item.labelKey)}
                   count={counts[item.quadrant]}
+                  onClick={interactive ? () => navigate('quadrant') : undefined}
                 />
               ))}
             </div>
 
             {/*
-              清单与标签。真应用里这两块都是 `ProjectsPanel`（aria-label「清单与标签」），
-              每块 = 标题 + **输入框形态的「新…」+ `+`**。
-              复刻原来把清单画成三行静态名字，**标签整块没有**（§2 #3/#4）。
+              清单与标签。真实 Web 是「分区标题 + OrganizerList 行 + 标题级创建按钮」；
+              创建表单在点击 `+` 后才出现，由宿主对话框承载。静态展厅因此只保留真实的
+              行层级和创建入口，不画一个看起来随时可输入、却没有行为的假输入框。
             */}
             {SHELL_PANEL_SECTIONS.map((section) => (
               <div key={section.id} className="mk-projects">
-                <div className="mk-nav__section">{t(section.headingKey)}</div>
-                <div className="mk-field">
-                  <span className="mk-field__box">{t(section.newPlaceholderKey)}</span>
-                  <span className="mk-field__add">
+                <div className="mk-nav__section mk-projects__heading">
+                  <span>{t(section.headingKey)}</span>
+                  <span className="mk-field__add" aria-label={t(section.createLabelKey)}>
                     <Plus size={ICON_SIZE.xs} />
                   </span>
                 </div>
+                <div className="mk-projects__rows">
+                  {section.sampleNameKeys.map((nameKey) => (
+                    <div key={nameKey} className="mk-projects__row">
+                      {section.id === 'projects' ? (
+                        <Folder size={ICON_SIZE.xs} aria-hidden="true" />
+                      ) : (
+                        <TagIcon size={ICON_SIZE.xs} aria-hidden="true" />
+                      )}
+                      <span>{t(nameKey)}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             ))}
-          </nav>
+          </nav> : null}
 
           <main className="mk-main">
             <header className="mk-header">
-              <h1 className="mk-header__title">{titles[view]}</h1>
-
-              {/*
-                🔴 **9 项，与 `apps/web/src/App.tsx` 的 `VIEW_TABS` 逐项对齐**，
-                从 `SHELL_VIEW_TABS` 派生。复刻原来只有 4 项，于是复刻出来的界面
-                **比真应用好看** —— 访客在页面上看到 4 个干净的标签，装上应用拿到 9 个（§2 #5）。
-                后 5 项（时间线/成长/便签/回收站/设置）在这一屏里没有对应内容，
-                它们只是外壳的一部分（复刻刻意不可交互，见文件头）。
-              */}
-              <div className="mk-viewtabs">
-                {SHELL_VIEW_TABS.map((tab) => {
-                  const TabIcon = SHELL_ICONS[tab.icon];
-                  return (
-                    <div
-                      key={tab.key}
-                      className={`mk-viewtab${
-                        tab.key === view ? ' mk-viewtab--active' : ''
-                      }`}
-                    >
-                      <TabIcon size={ICON_SIZE.xs} />
-                      {t(tab.labelKey)}
-                    </div>
-                  );
-                })}
-              </div>
+              <h1 className="mk-header__title">{titles[activeView]}</h1>
 
               <div className="mk-header__actions">
                 {/*
@@ -316,9 +495,15 @@ export function AppWindow({
                   `tests/mockup-shell-shape.spec.tsx` 的 #7 那一组。
                 */}
                 {SHELL_HEADER_ACTIONS.filter(
-                  (action) => action.onlyForView === undefined || action.onlyForView === view,
+                  (action) =>
+                    action.mockedInLanding !== false &&
+                    (action.onlyForView === undefined || action.onlyForView === activeView),
                 ).map((action) =>
-                  action.kind === 'sort-select' ? (
+                  action.kind === 'bulk-toolbar' ? (
+                    <div key={action.id} className="mk-bulk" data-testid="bulk-toolbar">
+                      <span className="mk-bulk__select">{t(action.labelKey)}</span>
+                    </div>
+                  ) : action.kind === 'sort-select' ? (
                     <div key={action.id} className="mk-sort">
                       {/* 与真应用同一条：**带可见的文字标签**，不是光秃秃一枚下拉。 */}
                       <span className="mk-sort__label">{t(action.labelKey)}</span>
@@ -362,21 +547,84 @@ export function AppWindow({
                 所以本行**恰好两个子元素**是对的，不是漏画。按钮的 `--off`
                 也来自同一个事实 —— 空标题下真实现给的是 `state.disabled-opacity`。
               */}
-              <div className={MOCK_CAPTURE_CLASS.row}>
-                <div className={MOCK_CAPTURE_CLASS.input}>{t(MOCK_CAPTURE_KEYS.placeholder)}</div>
-                <div className={mockCaptureAddClass(MOCK_CAPTURE_CAN_SUBMIT)}>
-                  <Plus size={MOCK_CAPTURE_ADD_ICON_SIZE} />
-                  {t(MOCK_CAPTURE_KEYS.add)}
+              {activeView === 'tasks' ? (
+                <div className={MOCK_CAPTURE_CLASS.row}>
+                  <div className={MOCK_CAPTURE_CLASS.input}>{t(MOCK_CAPTURE_KEYS.placeholder)}</div>
+                  <div className={mockCaptureAddClass(MOCK_CAPTURE_CAN_SUBMIT)}>
+                    <Plus size={MOCK_CAPTURE_ADD_ICON_SIZE} />
+                    {t(MOCK_CAPTURE_KEYS.add)}
+                  </div>
                 </div>
-              </div>
+              ) : null}
 
-              {view === 'tasks' && <TaskList />}
-              {view === 'quadrant' && <QuadrantGrid />}
-              {view === 'habits' && <HabitHeatmap />}
-              {view === 'focus' && <FocusRing />}
-              {view === 'timeline' && <TimelineBoard />}
+              {activeView === 'tasks' && (
+                <TaskList
+                  completedIds={completedIds}
+                  onTaskToggle={interactive ? toggleTask : undefined}
+                  selectedId={selectedTask.id}
+                  onSelect={interactive ? (id) => { setSelectedTaskId(id); setDetailOpen(true); } : undefined}
+                />
+              )}
+              {activeView === 'quadrant' && <QuadrantGrid completedIds={completedIds} />}
+              {activeView === 'habits' && <HabitHeatmap interactive={interactive} />}
+              {activeView === 'focus' && <FocusRing />}
+              {activeView === 'timeline' && <TimelineBoard />}
             </div>
           </main>
+
+          {activeView === 'tasks' ? (
+            <aside ref={detailRef} tabIndex={-1} data-open={detailOpen} className="mk-detail" aria-label={t('web.tasks.detail.section.basic')}>
+              <div className="mk-detail__task-title">
+                <span className={`mk-detail__status${selectedTaskDone ? ' mk-detail__status--done' : ''}`} aria-hidden="true"><Check size={ICON_SIZE.xs} /></span>
+                <strong>{t(selectedTask.titleKey)}</strong>
+                {interactive && <button type="button" className="mk-detail__close" aria-label={t('web.inbox.close')}
+                  onClick={() => {
+                    setDetailOpen(false);
+                    frameRef.current?.querySelector<HTMLButtonElement>('.mk-task__body[aria-pressed="true"]')?.focus();
+                  }}><X size={ICON_SIZE.sm} /></button>}
+              </div>
+
+              <section className="mk-detail__group">
+                <h2>{t('web.tasks.detail.section.basic')}</h2>
+                <div className="mk-detail__field">
+                  <span className="mk-detail__label">{t('web.note.toggle')}</span>
+                  <span className="mk-detail__value">{t('web.note.placeholder')}</span>
+                </div>
+              </section>
+
+              <section className="mk-detail__group">
+                <h2>{t('web.tasks.detail.section.time')}</h2>
+                <div className="mk-detail__field">
+                  <span className="mk-detail__label">{t('web.due.trigger')}</span>
+                  <span className="mk-detail__value">{selectedTask.dueKey === undefined ? t('web.ai.capture.priority.none') : t(selectedTask.dueKey)}</span>
+                </div>
+              </section>
+
+              <section className="mk-detail__group">
+                <h2>{t('web.tasks.detail.section.organize')}</h2>
+                <div className="mk-detail__field">
+                  <span className="mk-detail__label">{t('web.organize.projectLabel')}</span>
+                  <span className="mk-detail__value">{selectedTask.projectKey === undefined ? t('web.ai.capture.priority.none') : t(selectedTask.projectKey)}</span>
+                </div>
+                <div className="mk-detail__field">
+                  <span className="mk-detail__label">{t('web.subtask.none')}</span>
+                  <span className="mk-detail__value">{t('web.subtask.none')}</span>
+                </div>
+                <div className="mk-detail__field">
+                  <span className="mk-detail__label">{t('web.ai.capture.field.priority')}</span>
+                  <span className="mk-detail__value">{selectedTask.priority === undefined ? t('web.ai.prioritize.priority.none') : t(`web.ai.prioritize.priority.${selectedTask.priority === 3 ? 'high' : selectedTask.priority === 2 ? 'medium' : 'low'}` as MessageKey)}</span>
+                </div>
+              </section>
+
+              <section className="mk-detail__group">
+                <h2>{t('web.tasks.detail.section.automation')}</h2>
+                <div className="mk-detail__field">
+                  <span className="mk-detail__label">{t('web.tasks.detail.section.automation')}</span>
+                  <span className="mk-detail__value">{t('web.repeat.none')}</span>
+                </div>
+              </section>
+            </aside>
+          ) : null}
         </div>
       </div>
     </div>

@@ -89,6 +89,20 @@ object QuadrantWidgetViews {
                 ?: R.string.widget_message_no_tasks.takeIf { model.groups.all { it.total == 0 } },
         )
 
+        WidgetViewParts.applyTheme(
+            context,
+            views,
+            R.id.widget_root,
+            intArrayOf(
+                R.id.widget_header,
+                R.id.widget_quadrant_1_header, R.id.widget_quadrant_1_row_0, R.id.widget_quadrant_1_row_1,
+                R.id.widget_quadrant_2_header, R.id.widget_quadrant_2_row_0, R.id.widget_quadrant_2_row_1,
+                R.id.widget_quadrant_3_header, R.id.widget_quadrant_3_row_0, R.id.widget_quadrant_3_row_1,
+                R.id.widget_quadrant_4_header, R.id.widget_quadrant_4_row_0, R.id.widget_quadrant_4_row_1,
+            ),
+            mutedTextIds = intArrayOf(R.id.widget_message),
+        )
+
         return views
     }
 }

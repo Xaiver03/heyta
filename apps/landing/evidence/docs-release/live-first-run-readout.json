@@ -1,0 +1,609 @@
+{
+  "checkedAt": "2026-10-07T09:23:58.323Z",
+  "source": "https://heyta.waytofuture.cn",
+  "route": "/docs/first-run/",
+  "screenshots": [],
+  "captures": [
+    "docs-live-first-run-1440-light.png",
+    "docs-live-first-run-1440-dark.png",
+    "docs-live-first-run-390-light.png",
+    "docs-live-first-run-390-dark.png"
+  ],
+  "results": [
+    {
+      "url": "https://heyta.waytofuture.cn/docs/first-run/",
+      "title": "装完第一步，先弄清三件事 —— heyta",
+      "lang": "zh-CN",
+      "home": {
+        "text": "返回首页",
+        "href": "/",
+        "visible": true
+      },
+      "headings": 1,
+      "searchboxes": 1,
+      "groupStyles": [
+        {
+          "text": "开始使用",
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "lineHeight": "20px"
+        },
+        {
+          "text": "同步与账号",
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "lineHeight": "20px"
+        },
+        {
+          "text": "组织与节奏",
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "lineHeight": "20px"
+        },
+        {
+          "text": "数据与自建",
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "lineHeight": "20px"
+        },
+        {
+          "text": "隐私",
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "lineHeight": "20px"
+        }
+      ],
+      "childStyles": [
+        {
+          "text": "开始使用 heyta",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "任务、清单与标签",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "设置与检查同步",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "账号与登录",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "加密与恢复码",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "处理同步冲突",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "选择任务视图",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "设置重复任务",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "提醒与通知",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "自托管同步服务",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "导出与恢复数据",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "回收站与删除",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "隐私与数据流向",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "账号与数据恢复",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        }
+      ],
+      "groupLargerThanChild": true,
+      "underlined": [],
+      "overflow": false,
+      "headingInsideBody": true,
+      "theme": {
+        "wanted": "light",
+        "state": {
+          "attr": "light",
+          "bodyClass": "",
+          "colorScheme": "light"
+        }
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "url": "https://heyta.waytofuture.cn/docs/first-run/",
+      "title": "装完第一步，先弄清三件事 —— heyta",
+      "lang": "zh-CN",
+      "home": {
+        "text": "返回首页",
+        "href": "/",
+        "visible": true
+      },
+      "headings": 1,
+      "searchboxes": 1,
+      "groupStyles": [
+        {
+          "text": "开始使用",
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "lineHeight": "20px"
+        },
+        {
+          "text": "同步与账号",
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "lineHeight": "20px"
+        },
+        {
+          "text": "组织与节奏",
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "lineHeight": "20px"
+        },
+        {
+          "text": "数据与自建",
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "lineHeight": "20px"
+        },
+        {
+          "text": "隐私",
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "lineHeight": "20px"
+        }
+      ],
+      "childStyles": [
+        {
+          "text": "开始使用 heyta",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "任务、清单与标签",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "设置与检查同步",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "账号与登录",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "加密与恢复码",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "处理同步冲突",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "选择任务视图",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "设置重复任务",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "提醒与通知",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "自托管同步服务",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "导出与恢复数据",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "回收站与删除",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "隐私与数据流向",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "账号与数据恢复",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        }
+      ],
+      "groupLargerThanChild": true,
+      "underlined": [],
+      "overflow": false,
+      "headingInsideBody": true,
+      "theme": {
+        "wanted": "dark",
+        "state": {
+          "attr": "dark",
+          "bodyClass": "",
+          "colorScheme": "dark"
+        }
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    },
+    {
+      "url": "https://heyta.waytofuture.cn/docs/first-run/",
+      "title": "装完第一步，先弄清三件事 —— heyta",
+      "lang": "zh-CN",
+      "home": {
+        "text": "返回首页",
+        "href": "/",
+        "visible": true
+      },
+      "headings": 1,
+      "searchboxes": 1,
+      "groupStyles": [
+        {
+          "text": "开始使用",
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "lineHeight": "20px"
+        },
+        {
+          "text": "同步与账号",
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "lineHeight": "20px"
+        },
+        {
+          "text": "组织与节奏",
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "lineHeight": "20px"
+        },
+        {
+          "text": "数据与自建",
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "lineHeight": "20px"
+        },
+        {
+          "text": "隐私",
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "lineHeight": "20px"
+        }
+      ],
+      "childStyles": [
+        {
+          "text": "开始使用 heyta",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "任务、清单与标签",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "设置与检查同步",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "账号与登录",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "加密与恢复码",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "处理同步冲突",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "选择任务视图",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "设置重复任务",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "提醒与通知",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "自托管同步服务",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "导出与恢复数据",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "回收站与删除",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "隐私与数据流向",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "账号与数据恢复",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        }
+      ],
+      "groupLargerThanChild": true,
+      "underlined": [],
+      "overflow": false,
+      "headingInsideBody": true,
+      "theme": {
+        "wanted": "light",
+        "state": {
+          "attr": "light",
+          "bodyClass": "",
+          "colorScheme": "light"
+        }
+      },
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "url": "https://heyta.waytofuture.cn/docs/first-run/",
+      "title": "装完第一步，先弄清三件事 —— heyta",
+      "lang": "zh-CN",
+      "home": {
+        "text": "返回首页",
+        "href": "/",
+        "visible": true
+      },
+      "headings": 1,
+      "searchboxes": 1,
+      "groupStyles": [
+        {
+          "text": "开始使用",
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "lineHeight": "20px"
+        },
+        {
+          "text": "同步与账号",
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "lineHeight": "20px"
+        },
+        {
+          "text": "组织与节奏",
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "lineHeight": "20px"
+        },
+        {
+          "text": "数据与自建",
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "lineHeight": "20px"
+        },
+        {
+          "text": "隐私",
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "lineHeight": "20px"
+        }
+      ],
+      "childStyles": [
+        {
+          "text": "开始使用 heyta",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "任务、清单与标签",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "设置与检查同步",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "账号与登录",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "加密与恢复码",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "处理同步冲突",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "选择任务视图",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "设置重复任务",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "提醒与通知",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "自托管同步服务",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "导出与恢复数据",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "回收站与删除",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "隐私与数据流向",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        },
+        {
+          "text": "账号与数据恢复",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "21px"
+        }
+      ],
+      "groupLargerThanChild": true,
+      "underlined": [],
+      "overflow": false,
+      "headingInsideBody": true,
+      "theme": {
+        "wanted": "dark",
+        "state": {
+          "attr": "dark",
+          "bodyClass": "",
+          "colorScheme": "dark"
+        }
+      },
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    }
+  ],
+  "returnHome": {
+    "href": "/",
+    "destination": {
+      "url": "https://heyta.waytofuture.cn/",
+      "title": "heyta：本地优先的任务管理，可自建自托管",
+      "h1": "今天该做什么，一眼看见"
+    },
+    "passed": true
+  },
+  "consoleErrors": [],
+  "pageErrors": []
+}

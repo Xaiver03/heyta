@@ -1,7 +1,11 @@
 using System.Collections.ObjectModel;
+using System.Runtime.InteropServices;
+using Microsoft.UI;
+using Microsoft.UI.Windowing;
 using Heyta.Windows.Host;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Windows.ApplicationModel;
 using Windows.System;
 using Microsoft.Web.WebView2.Core;
 
@@ -20,10 +24,12 @@ public sealed partial class MainWindow : Window
     private readonly ObservableCollection<TaskItem> _tasks = new();
     private AppApi? _api;
     private string _dbPath = string.Empty;
+    private WindowsDataPaths? _dataPaths;
 
     public MainWindow()
     {
         InitializeComponent();
+        ConfigureIntegratedTitleBar();
         TaskList.ItemsSource = _tasks;
 
         AddButton.Click += (_, _) => AddCurrentTask();
@@ -52,6 +58,51 @@ public sealed partial class MainWindow : Window
 
         // 🔴 M2-A spike：共享 UI 的宿主。**失败必须显示出来**，不吞。
         _ = MountSharedUiAsync();
+    }
+
+    /// <summary>
+    /// Makes the Windows non-client area part of the same visual surface as
+    /// the application.  The caption buttons remain native (and therefore
+    /// keep system hit testing, touch targets, snap, and accessibility), while
+    /// the app supplies a transparent drag region with no redundant branding.
+    /// </summary>
+    private void ConfigureIntegratedTitleBar()
+    {
+        // AppWindow owns non-client hit testing. An opaque XAML title-bar
+        // overlay would hide the WebView's header and modal backdrop.
+        if (!AppWindowTitleBar.IsCustomizationSupported()) return;
+
+        var titleBar = AppWindow.TitleBar;
+        titleBar.ExtendsContentIntoTitleBar = true;
+        titleBar.PreferredHeightOption = TitleBarHeightOption.Standard;
+        titleBar.IconShowOptions = IconShowOptions.HideIconAndSystemMenu;
+
+        ApplyTitleBarColors();
+    }
+
+    /// <summary>
+    /// Keep caption surfaces tied to semantic design resources. The normal
+    /// surface remains transparent so the WebView paints through; hover and
+    /// pressed states retain a quiet, visible system affordance.
+    /// </summary>
+    private void ApplyTitleBarColors()
+    {
+        if (!AppWindowTitleBar.IsCustomizationSupported()) return;
+        var titleBar = AppWindow.TitleBar;
+        titleBar.BackgroundColor = Colors.Transparent;
+        titleBar.InactiveBackgroundColor = Colors.Transparent;
+        titleBar.ButtonBackgroundColor = Colors.Transparent;
+        titleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
+        titleBar.ButtonHoverBackgroundColor = ResourceColor("HeytaColorHover");
+        titleBar.ButtonPressedBackgroundColor = ResourceColor("HeytaColorActive");
+        titleBar.ButtonForegroundColor = ResourceColor("HeytaColorForeground");
+        titleBar.ButtonInactiveForegroundColor = ResourceColor("HeytaColorForegroundMuted");
+    }
+
+    private static global::Windows.UI.Color ResourceColor(string key)
+    {
+        return (Application.Current.Resources[key] as Microsoft.UI.Xaml.Media.SolidColorBrush)?.Color
+            ?? Colors.Transparent;
     }
 
     /// <summary>
@@ -104,6 +155,145 @@ public sealed partial class MainWindow : Window
         };
         """;
 
+    // A tiny host capability marker consumed by the shared Web layout.  It
+    // reserves the native caption safe area while keeping the WebView itself
+    // full-window, so fixed sheets/backdrops continue behind the title bar.
+    private const string WindowChromeShim = """
+        (() => {
+          function start() {
+            const root = document.documentElement;
+            root.classList.add('heyta-windows-shell');
+            const probe = document.createElement('span');
+            probe.hidden = true;
+            document.body.append(probe);
+            let pending = false;
+            let previous = '';
+            function sync() {
+              pending = false;
+              const chrome = window.__heytaWindowChromeMetrics;
+              if (!chrome) return;
+              // AppWindow coordinates can be DPI-virtualized while WebView DPR
+              // reports the monitor scale. Compare actual client widths instead.
+              const scale = chrome.width / innerWidth;
+              const right = chrome.right / scale;
+              const height = chrome.height / scale;
+              root.style.setProperty('--ht-shell-caption-right', right + 'px');
+              root.style.setProperty('--ht-shell-caption-height', height + 'px');
+              // Only the rightmost header needs caption-button space. Keep
+              // all other columns at their original top edge.
+              for (const header of document.querySelectorAll('.ht-header')) {
+                const r = header.getBoundingClientRect();
+                header.toggleAttribute('data-heyta-caption-safe', r.width > 0 && r.top < height && r.right > innerWidth - right);
+              }
+              const colors = {};
+              for (const [key, token] of Object.entries({background:'background',foreground:'foreground',muted:'foreground-muted',hover:'hover',active:'active'})) {
+                probe.style.color = 'var(--ht-color-' + token + ')';
+                colors[key] = getComputedStyle(probe).color;
+              }
+              // Subtract real interactive regions from the top band. This
+              // preserves native drag/double-click without stealing buttons,
+              // editing fields, the rail, resizers or modal interactions.
+              const blocked = [];
+              const modal = [...document.querySelectorAll('[aria-modal="true"]')].some(e => e.getClientRects().length > 0);
+              for (const e of document.querySelectorAll('button,a,input,textarea,select,[role="button"],[role="tab"],[role="separator"],[contenteditable="true"],.ht-rail')) {
+                const r = e.getBoundingClientRect();
+                if (r.width > 0 && r.bottom > 0 && r.top < height) blocked.push([Math.min(innerWidth-right,Math.max(0,r.left)),Math.min(innerWidth-right,r.right)]);
+              }
+              blocked.sort((a,b) => a[0]-b[0]);
+              const rects = [];
+              let left = 0;
+              if (!modal) {
+                for (const [a,b] of blocked) {
+                  if (a > left) rects.push({x:left,y:0,width:a-left,height});
+                  left = Math.max(left,b);
+                }
+                if (left < innerWidth-right) rects.push({x:left,y:0,width:innerWidth-right-left,height});
+              }
+              const payload = JSON.stringify({heytaWindowChrome:colors,dragRects:rects,scale});
+              if (payload !== previous) {
+                previous = payload;
+                window.chrome.webview.postMessage(JSON.parse(payload));
+              }
+            }
+            function schedule() {
+              if (!pending) { pending = true; requestAnimationFrame(sync); }
+            }
+            window.__heytaSyncWindowChrome = schedule;
+            new MutationObserver(schedule).observe(root, {
+              subtree:true, childList:true, attributes:true,
+              attributeFilter:['data-theme','class','hidden','aria-modal']
+            });
+            window.addEventListener('resize', schedule);
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', schedule);
+            schedule();
+          }
+          if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, {once:true});
+          else start();
+        })();
+        """;
+
+    private async Task SyncWindowChromeMetricsAsync()
+    {
+        if (!AppWindowTitleBar.IsCustomizationSupported() || SharedUi.CoreWebView2 is null) return;
+        var titleBar = AppWindow.TitleBar;
+        var metrics = System.Text.Json.JsonSerializer.Serialize(new {
+            right = titleBar.RightInset, height = titleBar.Height, width = AppWindow.ClientSize.Width
+        });
+        await SharedUi.CoreWebView2.ExecuteScriptAsync(
+            $"window.__heytaWindowChromeMetrics={metrics};window.__heytaSyncWindowChrome?.();");
+    }
+
+    // Chrome-only messages are consumed before the unchanged op-log bridge.
+    private bool TryHandleWindowChromeMessage(string raw)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(raw);
+            if (doc.RootElement.ValueKind != System.Text.Json.JsonValueKind.Object
+                || !doc.RootElement.TryGetProperty("heytaWindowChrome", out var colors)) return false;
+            global::Windows.UI.Color ReadColor(string name)
+            {
+                var value = colors.GetProperty(name).GetString() ?? "";
+                var match = System.Text.RegularExpressions.Regex.Match(value,
+                    @"^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)$");
+                if (!match.Success) throw new FormatException("Invalid caption color");
+                var alpha = match.Groups[4].Success
+                    ? double.Parse(match.Groups[4].Value, System.Globalization.CultureInfo.InvariantCulture)
+                    : 1;
+                return global::Windows.UI.Color.FromArgb((byte)Math.Round(Math.Clamp(alpha, 0, 1) * 255),
+                    byte.Parse(match.Groups[1].Value), byte.Parse(match.Groups[2].Value), byte.Parse(match.Groups[3].Value));
+            }
+            var titleBar = AppWindow.TitleBar;
+            // WebView paints the complete surface, including modal backdrops.
+            // Native caption buttons retain platform hover/snap/accessibility.
+            if (doc.RootElement.TryGetProperty("dragRects", out var rects)
+                && doc.RootElement.TryGetProperty("scale", out var scaleElement))
+            {
+                var scale = scaleElement.GetDouble();
+                if (!double.IsFinite(scale) || scale <= 0 || scale > 8) return false;
+                var drag = new List<global::Windows.Graphics.RectInt32>();
+                foreach (var rect in rects.EnumerateArray())
+                {
+                    int Pixel(string key) => checked((int)Math.Round(rect.GetProperty(key).GetDouble() * scale));
+                    var area = new global::Windows.Graphics.RectInt32(Pixel("x"), Pixel("y"), Pixel("width"), Pixel("height"));
+                    if (area.Width > 0 && area.Height > 0) drag.Add(area);
+                }
+                titleBar.SetDragRectangles(drag.ToArray());
+            }
+            titleBar.ButtonForegroundColor = ReadColor("foreground");
+            titleBar.ButtonHoverForegroundColor = ReadColor("foreground");
+            titleBar.ButtonPressedForegroundColor = ReadColor("foreground");
+            titleBar.ButtonInactiveForegroundColor = ReadColor("muted");
+            titleBar.ButtonHoverBackgroundColor = ReadColor("hover");
+            titleBar.ButtonPressedBackgroundColor = ReadColor("active");
+            return true;
+        }
+        catch (Exception error) when (error is System.Text.Json.JsonException or FormatException or KeyNotFoundException or InvalidOperationException or OverflowException)
+        {
+            return false;
+        }
+    }
+
     /// <summary>
     /// M2-A spike：把 `packages/ui` 的共享 UI 挂进这个原生壳。
     ///
@@ -139,6 +329,9 @@ public sealed partial class MainWindow : Window
         if (_webMode == "app")
         {
             Root.Padding = new Thickness(0);
+            // 隐藏实验面板不会移除 Grid 行间距：WebView 前仍有四段空隙。
+            // 产品模式只留共享 UI，行距必须一起归零（125% 缩放时原空带为 60px）。
+            Root.RowSpacing = 0;
             NativeRow.Height = new GridLength(0);
             ShellTitle.Visibility = Visibility.Collapsed;
             ShellComposer.Visibility = Visibility.Collapsed;
@@ -152,7 +345,37 @@ public sealed partial class MainWindow : Window
     {
         try
         {
-            await SharedUi.EnsureCoreWebView2Async();
+            if (_dataPaths is null)
+            {
+                // TryInitialize already surfaced the path validation error.
+                // Do not let WebView2 fall back to its default profile after a
+                // failed QA-path setup: that would mix a QA run with user data.
+                return;
+            }
+
+            if (_dataPaths.IsQaOverride)
+            {
+                var webViewEnvironment = await CoreWebView2Environment.CreateAsync();
+                await SharedUi.EnsureCoreWebView2Async(webViewEnvironment);
+                // The WinAppSDK projection only exposes the parameterless
+                // factory. Record the profile WebView2 actually selected so
+                // the QA runner can reject a fallback to the user's profile.
+                File.WriteAllText(
+                    Path.Combine(_dataPaths.DataDirectory, "qa-webview2-user-data-folder.txt"),
+                    webViewEnvironment.UserDataFolder);
+            }
+            else
+            {
+                // Preserve the product's existing WebView2 profile resolution
+                // when no QA override is requested.
+                await SharedUi.EnsureCoreWebView2Async();
+            }
+
+            // Public help, pricing and changelog pages belong in the system
+            // browser. Keep the workspace mounted in this window and only
+            // hand off absolute HTTP(S) URLs; the local heyta host stays inside.
+            SharedUi.CoreWebView2.NavigationStarting += OnNavigationStarting;
+            SharedUi.CoreWebView2.NewWindowRequested += OnNewWindowRequested;
 
             // 共享 UI 的产物目录：优先环境变量（spike 用），否则找 exe 旁边的 web-dist。
             var root = Environment.GetEnvironmentVariable("HEYTA_WEB_ROOT");
@@ -169,6 +392,25 @@ public sealed partial class MainWindow : Window
 
             SharedUi.CoreWebView2.SetVirtualHostNameToFolderMapping(
                 "heyta.local", root, CoreWebView2HostResourceAccessKind.Allow);
+
+            // Native Widgets Board support is available only from the packaged
+            // identity that also carries the COM provider registration. Keep
+            // unpackaged development and the legacy shell probe on their old
+            // bridge surface instead of advertising a capability they cannot
+            // actually serve.
+            var widgetBridgeAvailable = TryConfigureWindowsWidgetStore();
+            if (widgetBridgeAvailable)
+            {
+                await SharedUi.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(
+                    WindowsWidgetBridge.Script);
+            }
+
+            if (AppWindowTitleBar.IsCustomizationSupported())
+            {
+                await SharedUi.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(WindowChromeShim);
+                SharedUi.CoreWebView2.NavigationCompleted += async (_, _) => await SyncWindowChromeMetricsAsync();
+                SharedUi.SizeChanged += async (_, _) => await SyncWindowChromeMetricsAsync();
+            }
 
             /**
              * 🔴 **存储宿主（B）：在页侧加载之前注入端口 shim。**
@@ -190,6 +432,13 @@ public sealed partial class MainWindow : Window
             //    在这里写"该不该变、变成什么"就等于分叉出第二份实现。
             SharedUi.CoreWebView2.WebMessageReceived += async (_, args) =>
             {
+                var rawMessage = args.WebMessageAsJson;
+                if (widgetBridgeAvailable && WindowsWidgetBridge.TryHandleMessage(
+                        SharedUi.CoreWebView2,
+                        args.Source,
+                        rawMessage)) return;
+                if (TryHandleWindowChromeMessage(rawMessage)) return;
+
                 /**
                  * 🔴 **存储宿主接管时，页侧所有消息都是 op-log 请求或交握** ——
                  * 交给 TS 的 `handleHostMessage`，C# 只把返回的每一串**原样发出去**。
@@ -220,8 +469,8 @@ public sealed partial class MainWindow : Window
 
                 try
                 {
-                    var raw = args.TryGetWebMessageAsString();
-                    using var doc = System.Text.Json.JsonDocument.Parse(raw);
+                    // The legacy shell probe sends a JSON string; preserve its existing contract.
+                    using var doc = System.Text.Json.JsonDocument.Parse(args.TryGetWebMessageAsString());
                     var op = doc.RootElement.GetProperty("op").GetString();
                     if (op != "setTaskDone")
                     {
@@ -452,6 +701,90 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private static bool TryConfigureWindowsWidgetStore()
+    {
+        try
+        {
+            var familyName = Package.Current.Id.FamilyName;
+            if (string.IsNullOrWhiteSpace(familyName)) return false;
+            WindowsWidgetStore.ConfigureStateDirectory(familyName);
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            // Package.Current is unavailable for unpackaged local development.
+            return false;
+        }
+        catch (COMException)
+        {
+            // A package identity can be present but unavailable while the
+            // shell is being launched by a test harness. Fail closed.
+            return false;
+        }
+    }
+
+    private void OnNavigationStarting(object? sender, CoreWebView2NavigationStartingEventArgs args)
+    {
+        if (!IsExternalHttpUri(args.Uri)) return;
+        args.Cancel = true;
+        _ = OpenExternalUriAsync(args.Uri);
+    }
+
+    private void OnNewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs args)
+    {
+        if (IsExternalHttpUri(args.Uri))
+        {
+            args.Handled = true;
+            _ = OpenExternalUriAsync(args.Uri);
+            return;
+        }
+
+        // Keep links back into the packaged app in the current workspace too.
+        // Leaving this request unhandled lets WebView2 create a second window,
+        // which would split the shell even though the URL is ours.
+        if (!IsInternalShellUri(args.Uri)) return;
+        args.Handled = true;
+        SharedUi.CoreWebView2.Navigate(args.Uri);
+    }
+
+    private static bool IsExternalHttpUri(string raw)
+    {
+        if (!Uri.TryCreate(raw, UriKind.Absolute, out var uri)) return false;
+        if (!string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        // The packaged app itself is served from this virtual host. It must
+        // remain in the WebView while public-site links leave for the browser.
+        return !IsInternalShellUri(uri);
+    }
+
+    private static bool IsInternalShellUri(string raw)
+    {
+        return Uri.TryCreate(raw, UriKind.Absolute, out var uri) && IsInternalShellUri(uri);
+    }
+
+    private static bool IsInternalShellUri(Uri uri)
+    {
+        return string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(uri.Host, "heyta.local", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static async Task OpenExternalUriAsync(string raw)
+    {
+        if (!Uri.TryCreate(raw, UriKind.Absolute, out var uri)) return;
+        try
+        {
+            await Launcher.LaunchUriAsync(uri);
+        }
+        catch
+        {
+            // A failed handoff must not navigate or close the current workspace.
+        }
+    }
+
     /// <summary>
     /// 从 `ExecuteScriptAsync` 的返回值里取一个**数值**字段。
     ///
@@ -637,11 +970,10 @@ public sealed partial class MainWindow : Window
         try
         {
             var bundle = Path.Combine(AppContext.BaseDirectory, "native-bridge.js");
-            _dbPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "heyta",
-                "heyta.sqlite");
-            Directory.CreateDirectory(Path.GetDirectoryName(_dbPath)!);
+            _dataPaths = WindowsDataPaths.Resolve(
+                Environment.GetEnvironmentVariable("HEYTA_QA_DATA_DIR"));
+            Directory.CreateDirectory(_dataPaths.DataDirectory);
+            _dbPath = _dataPaths.DatabasePath;
 
             _api = new AppApi(bundle, _dbPath);
 

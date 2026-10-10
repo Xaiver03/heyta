@@ -85,6 +85,17 @@ object FocusWidgetViews {
             },
         )
 
+        WidgetViewParts.applyTheme(
+            context,
+            views,
+            R.id.widget_root,
+            intArrayOf(
+                R.id.widget_header,
+                R.id.widget_focus_title,
+            ),
+            mutedTextIds = intArrayOf(R.id.widget_focus_target, R.id.widget_message),
+        )
+
         return views
     }
 }

@@ -28,12 +28,14 @@ import HeytaWidgetCore
 |---|---|---|
 | `setWidgetSnapshot` | 坏信封必须在**写入点**被拒，不能落盘 | `test_坏信封必须被拒且不落盘` |
 | `setWidgetSnapshot` | 推送必须在写入**之后**（否则失败会被误报成写入失败） | `test_推送发生在落盘之后` |
-| `drainIntentQueue` | 读 + 清，且返回**原始 JSON** | `test_drain是读后即清` |
+| `drainIntentQueue` | 非破坏读取，且返回**原始 JSON** | `test_drain是非破坏读取且没有点击时给nil` |
 | `mergeIntentQueue` | **合并**，且"容器里的更新" | `test_写回更旧的意图不能盖掉期间的新点击` |
 | `clearWidgetState` | 先删密钥、再清容器 | `test_登出先删密钥再清容器` |
 | `sealWidgetSnapshot` | 密钥不穿桥；AAD 取整 | `test_seal与读取器闭环` |
  */
 final class WidgetBridgeTests: XCTestCase {
+
+    private enum TestFailure: Error { case injected }
 
     // ─────────────────────────────────────────────────────────────
     // 测试替身
@@ -65,6 +67,8 @@ final class WidgetBridgeTests: XCTestCase {
         /// 让 `updateIntents` 的闭包在被调用时**再塞一条更新的意图** ——
         /// 这正是 drain 窗口竞态的形状。
         var injectDuringUpdate: WidgetIntent?
+        var injectDuringAck: WidgetIntent?
+        var clearShouldFail = false
 
         init(log: OpLog) { self.log = log }
 
@@ -78,12 +82,24 @@ final class WidgetBridgeTests: XCTestCase {
             snapshot = envelope
         }
 
-        func drainIntents() -> String? {
+        func drainIntents() throws -> String? {
             log.append("drainIntents")
             guard !intents.intents.isEmpty else { return nil }
-            let raw = Self.encode(intents)
-            intents = .empty
-            return raw
+            return Self.encode(intents)
+        }
+
+        func ackIntents(_ processed: WidgetIntentQueue) throws -> Int {
+            log.append("ackIntents")
+            if let injected = injectDuringAck {
+                intents = WidgetIntentQueue(intents.intents + [injected])
+                injectDuringAck = nil
+            }
+            let wanted = Set(processed.intents.map { "\($0.taskId)|\($0.targetIsDone)|\($0.at)" })
+            let before = intents.intents.count
+            intents = WidgetIntentQueue(intents.intents.filter {
+                !wanted.contains("\($0.taskId)|\($0.targetIsDone)|\($0.at)")
+            })
+            return before - intents.intents.count
         }
 
         func updateIntents(_ body: (WidgetIntentQueue) -> WidgetIntentQueue) -> WidgetIntentQueue {
@@ -99,12 +115,12 @@ final class WidgetBridgeTests: XCTestCase {
             return intents
         }
 
-        func clearAll() {
+        func clearAll() throws {
             log.append("clearAll")
+            if clearShouldFail { throw TestFailure.injected }
             snapshot = nil
             intents = .empty
-            // ⚠️ **刻意不动 `privacy`** —— 见下面那条测试。
-            //    "清掉组件状态"是清**数据**，不是清**用户的隐私设置**。
+            privacy = nil
         }
 
         /// W5-2 · 隐私偏好的替身。与 `snapshot` 分开，形状与真实的两个文件一致。
@@ -170,22 +186,20 @@ final class WidgetBridgeTests: XCTestCase {
         XCTAssertFalse(WidgetPrivacyPreference.parse(["alwaysHideTitles": "yes"]).alwaysHideTitles)
     }
 
-    /// 🔴 **清组件状态不能把隐私偏好一起清掉。**
+    /// 🔴 **清组件状态必须清掉隐私文件。**
     ///
-    /// 这不是洁癖 —— 反过来的后果很严重：用户打开了「始终隐藏标题」，
-    /// 某天清一次凭据（换账号 / 重新登录），锁屏就**又开始显示任务标题了**，
-    /// 而用户以为那个开关还开着。**一个会自己关掉的安全开关比没有更坏**，
-    /// 因为它会让人以为已经设过了。
-    func test_清组件状态_不能清掉隐私偏好() throws {
+    /// 隐私偏好属于当前本地凭据上下文；切换账号或登出时不能让下一位用户
+    /// 继承上一位用户的共享容器状态。
+    func test_清组件状态_清掉隐私偏好() throws {
         let (service, store, _, _, _) = makeService()
 
         try service.setWidgetPrivacy(alwaysHideTitles: true)
-        service.clearWidgetState()
+        try service.clearWidgetState()
 
         XCTAssertNil(store.snapshot, "快照必须被清掉")
-        XCTAssertTrue(
+        XCTAssertFalse(
             WidgetPrivacyPreference.parse(store.privacy).alwaysHideTitles,
-            "清组件状态把用户的隐私选择一起清掉了 —— 锁屏会重新显示标题"
+            "清组件状态必须清掉隐私文件"
         )
     }
 
@@ -193,6 +207,7 @@ final class WidgetBridgeTests: XCTestCase {
         var key: Data?
         /// **同一个** [OpLog] 实例 —— 顺序纪律跨对象。
         let log: OpLog
+        var deleteShouldFail = false
 
         init(log: OpLog, key: Data? = Data(repeating: 0x42, count: widgetKeyBytes)) {
             self.log = log
@@ -207,8 +222,9 @@ final class WidgetBridgeTests: XCTestCase {
             return fresh
         }
 
-        func delete() {
+        func delete() throws {
             log.append("delete")
+            if deleteShouldFail { throw TestFailure.injected }
             key = nil
         }
     }
@@ -385,23 +401,52 @@ final class WidgetBridgeTests: XCTestCase {
     // drainIntentQueue / mergeIntentQueue
     // ─────────────────────────────────────────────────────────────
 
-    func test_drain是读后即清且没有点击时给nil() {
+    func test_drain是非破坏读取且没有点击时给nil() throws {
         let (service, store, _, _, _) = makeService()
 
         // ⚠️ 没有点击时给 `nil`，**不是** `"[]"` / `"{}"` ——
         //    调用方要能用一个判断区分"没点击"与"有零条点击"。
-        XCTAssertNil(service.drainIntentQueue())
+        XCTAssertNil(try service.drainIntentQueue())
 
         store.intents = WidgetIntentQueue([
             WidgetIntent(taskId: "t1", targetIsDone: true, at: 100)
         ])
 
-        let raw = service.drainIntentQueue()
+        let raw = try service.drainIntentQueue()
         XCTAssertNotNil(raw, "有待处理的点击时必须给字符串")
-        XCTAssertTrue(store.intents.intents.isEmpty, "drain 必须清空")
+        XCTAssertEqual(store.intents.intents.count, 1, "drain 只能读取，不能破坏队列")
         XCTAssertEqual(WidgetIntentQueues.parse(raw).intents.count, 1, "drain 出来的必须能解析")
+        XCTAssertEqual(
+            WidgetIntentQueues.parse(try service.drainIntentQueue()).intents,
+            WidgetIntentQueues.parse(raw).intents,
+            "未 ack 前重复读取必须得到同一队列"
+        )
 
-        XCTAssertNil(service.drainIntentQueue(), "清空之后再 drain 必须给 nil（幂等）")
+        _ = try service.ackIntentQueue(raw!)
+        XCTAssertNil(try service.drainIntentQueue(), "ack 后再读取必须给 nil")
+    }
+
+    func test_ack只删除完全匹配的条目并保留并发新点击() throws {
+        let (service, store, _, _, _) = makeService()
+        let old = WidgetIntent(taskId: "t1", targetIsDone: true, at: 200)
+        store.intents = WidgetIntentQueue([old])
+        let raw = try service.drainIntentQueue()
+        store.injectDuringAck = WidgetIntent(taskId: "t1", targetIsDone: false, at: 300)
+
+        let removed = try service.ackIntentQueue(raw!)
+
+        XCTAssertEqual(removed, 1)
+        XCTAssertEqual(store.intents.intents, [WidgetIntent(taskId: "t1", targetIsDone: false, at: 300)])
+    }
+
+    func test_ack拒绝坏队列且不删除现有点击() throws {
+        let (service, store, _, _, _) = makeService()
+        store.intents = WidgetIntentQueue([
+            WidgetIntent(taskId: "t1", targetIsDone: true, at: 200)
+        ])
+
+        XCTAssertThrowsError(try service.ackIntentQueue("不是队列"))
+        XCTAssertEqual(store.intents.intents.count, 1)
     }
 
     func test_写回更旧的意图不能盖掉期间的新点击() throws {
@@ -412,8 +457,8 @@ final class WidgetBridgeTests: XCTestCase {
             WidgetIntent(taskId: "t1", targetIsDone: true, at: 200)
         ])
 
-        // drain 读走并清空（JS 侧拿到的就是这个）
-        let drained = service.drainIntentQueue()
+        // drain 只读不清空（JS 侧拿到的就是这个）；旧版兼容 merge 仍可测试合并语义
+        let drained = try service.drainIntentQueue()
         XCTAssertEqual(WidgetIntentQueues.parse(drained).intents.first?.targetIsDone, true)
 
         // 🔴 drain 与写回之间，用户**又点了一下"取消"**。
@@ -443,7 +488,7 @@ final class WidgetBridgeTests: XCTestCase {
         store.intents = WidgetIntentQueue([
             WidgetIntent(taskId: "t1", targetIsDone: true, at: 100)
         ])
-        _ = service.drainIntentQueue()
+        _ = try service.drainIntentQueue()
 
         // drain 期间用户点了**另一条**任务
         store.injectDuringUpdate = WidgetIntent(taskId: "t2", targetIsDone: true, at: 200)
@@ -470,7 +515,7 @@ final class WidgetBridgeTests: XCTestCase {
         store.intents = WidgetIntentQueue([WidgetIntent(taskId: "t1", targetIsDone: true, at: 1)])
         log.entries.removeAll()
 
-        service.clearWidgetState()
+        try service.clearWidgetState()
 
         // 🔴 顺序：**先删密钥**。反过来的话，两步之间崩溃会留下
         //    "旧密文 + 无密钥" —— 虽然不是可解开的，但先删密钥能让
@@ -484,21 +529,56 @@ final class WidgetBridgeTests: XCTestCase {
         XCTAssertNil(keyStore.key)
     }
 
-    func test_登出必须同时清密钥与快照() throws {
-        let (service, store, keyStore, _, _) = makeService()
+    func test_密钥清理失败会拒绝成功并保留容器() throws {
+        let (service, store, keyStore, log, _) = makeService()
         try service.setWidgetSnapshot(
             try service.sealWidgetSnapshot(payloadJson: payloadJson(), dayStr: dayStr, validUntil: validUntil)
         )
+        keyStore.deleteShouldFail = true
+
+        XCTAssertThrowsError(try service.clearWidgetState())
+        XCTAssertEqual(log.entries, ["getOrCreate", "writeSnapshot", "delete"])
+        XCTAssertNotNil(store.snapshot, "密钥删除失败时不能假报成功并继续清空容器")
+    }
+
+    func test_容器清理失败会拒绝成功() throws {
+        let (service, store, keyStore, log, _) = makeService()
+        try service.setWidgetSnapshot(
+            try service.sealWidgetSnapshot(payloadJson: payloadJson(), dayStr: dayStr, validUntil: validUntil)
+        )
+        store.clearShouldFail = true
+
+        XCTAssertThrowsError(try service.clearWidgetState())
+        XCTAssertEqual(log.entries, ["getOrCreate", "writeSnapshot", "delete", "clearAll"])
+        XCTAssertNil(keyStore.key, "容器清理失败也必须已完成密钥删除")
+        XCTAssertNotNil(store.snapshot, "容器清理失败时不能假报成功")
+    }
+
+    func test_登出必须同时清密钥与快照() throws {
+        let (service, store, keyStore, _, pushCount) = makeService()
+        try service.setWidgetSnapshot(
+            try service.sealWidgetSnapshot(payloadJson: payloadJson(), dayStr: dayStr, validUntil: validUntil)
+        )
+        let pushesBeforeClear = pushCount()
         XCTAssertNotNil(store.snapshot)
         XCTAssertNotNil(keyStore.key)
 
-        service.clearWidgetState()
+        try service.clearWidgetState()
 
         // 🔴 只清一处就会出现：下一个人登录后组件**能显示上一个账号的旧快照**
         //    （如果密钥还在），或者永远显示占位符（如果密钥清了、密文没清）。
         //    两种都不会报错。
         XCTAssertNil(keyStore.key, "密钥必须清")
         XCTAssertNil(store.snapshot, "快照必须清")
+        XCTAssertEqual(pushCount(), pushesBeforeClear + 1, "清理成功后必须刷新所有系统小组件")
+    }
+
+    func test_清理失败不刷新系统小组件() {
+        let (service, _, keyStore, _, pushCount) = makeService()
+        keyStore.deleteShouldFail = true
+
+        XCTAssertThrowsError(try service.clearWidgetState())
+        XCTAssertEqual(pushCount(), 0, "清理失败时不能刷新并暗示清理已成功")
     }
 
     // ─────────────────────────────────────────────────────────────

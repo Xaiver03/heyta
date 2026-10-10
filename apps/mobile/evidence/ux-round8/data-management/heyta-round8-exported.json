@@ -1,0 +1,113 @@
+{
+  "app": {
+    "host": "mobile",
+    "name": "heyta"
+  },
+  "counts": {
+    "entities": {
+      "AI_FEEDBACK": {
+        "deleted": 0,
+        "total": 0
+      },
+      "ASSISTANT_TURN": {
+        "deleted": 0,
+        "total": 0
+      },
+      "EVENT": {
+        "deleted": 0,
+        "total": 0
+      },
+      "FOCUS_SESSION": {
+        "deleted": 0,
+        "total": 0
+      },
+      "HABIT": {
+        "deleted": 0,
+        "total": 0
+      },
+      "HABIT_LOG": {
+        "deleted": 0,
+        "total": 0
+      },
+      "NOTE": {
+        "deleted": 0,
+        "total": 0
+      },
+      "PREFERENCE_CORRECTION": {
+        "deleted": 0,
+        "total": 0
+      },
+      "PROJECT": {
+        "deleted": 0,
+        "total": 0
+      },
+      "REMINDER": {
+        "deleted": 0,
+        "total": 0
+      },
+      "TAG": {
+        "deleted": 0,
+        "total": 0
+      },
+      "TASK": {
+        "deleted": 0,
+        "total": 1
+      }
+    },
+    "opsByEntityType": {
+      "TASK": 1
+    },
+    "totalDeleted": 0,
+    "totalEntities": 1,
+    "totalOps": 1
+  },
+  "entities": {
+    "AI_FEEDBACK": [],
+    "ASSISTANT_TURN": [],
+    "EVENT": [],
+    "FOCUS_SESSION": [],
+    "HABIT": [],
+    "HABIT_LOG": [],
+    "NOTE": [],
+    "PREFERENCE_CORRECTION": [],
+    "PROJECT": [],
+    "REMINDER": [],
+    "TAG": [],
+    "TASK": [
+      {
+        "_lastClientId": "b2b42c4a-38a7-45d4-8840-0b73947fde8f",
+        "_lastClock": {
+          "b2b42c4a-38a7-45d4-8840-0b73947fde8f": 1
+        },
+        "_lastOpId": "b2b42c4a-38a7-45d4-8840-0b73947fde8f-1790760771673-1",
+        "createdAt": 1790760771673,
+        "id": "task-537bb35b-cd59-4f25-b25f-1d90516090a3",
+        "priority": 0,
+        "title": "B-legacy-1790760770566",
+        "updatedAt": 1790760771673
+      }
+    ]
+  },
+  "exportedAt": "2026-10-08T03:39:01.145Z",
+  "formatVersion": 1,
+  "opLog": [
+    {
+      "actionType": "CRT_TASK",
+      "clientId": "b2b42c4a-38a7-45d4-8840-0b73947fde8f",
+      "entityId": "task-537bb35b-cd59-4f25-b25f-1d90516090a3",
+      "entityType": "TASK",
+      "id": "b2b42c4a-38a7-45d4-8840-0b73947fde8f-1790760771673-1",
+      "opType": "CRT",
+      "payload": {
+        "priority": 0,
+        "title": "B-legacy-1790760770566"
+      },
+      "schemaVersion": 1,
+      "timestamp": 1790760771673,
+      "vectorClock": {
+        "b2b42c4a-38a7-45d4-8840-0b73947fde8f": 1
+      }
+    }
+  ],
+  "schemaVersion": 1
+}

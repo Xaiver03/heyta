@@ -1,0 +1,29 @@
+{
+  "buildRc": 0,
+  "buildSummary": "BUILD SUCCESSFUL in 3m 21s",
+  "buildBeginUtc": "2026-10-08T10:14:42Z",
+  "apkBytes": 68878328,
+  "apkSha256": "26d39bc0ca06d13e6000a363649cdf56f42d52d9a4fc0e6f2c3e4d0dbb36d115",
+  "remoteArtifact": {
+    "mtimeUtc": "2026-10-08T10:18:04.3059991Z",
+    "bytes": 68878328,
+    "sha256": "26d39bc0ca06d13e6000a363649cdf56f42d52d9a4fc0e6f2c3e4d0dbb36d115"
+  },
+  "localRemoteArtifactMatch": true,
+  "localMtimeUtc": "2026-10-08T10:18:04+00:00",
+  "mtimeComparison": "run-gradle writes local mtime rounded to full second; remote metadata keeps actual fraction",
+  "archiveSha256": "3de6e414aaa9243f6b5bffa9b6176f21b2d47777f24548a3fe2afb1e44e4c371",
+  "sourceFilesCaptured": 506,
+  "authControlledSourceMatchesActualArchive": true,
+  "hermesBundle": {
+    "bytes": 7894548,
+    "sha256": "29dc4ad071550c0ab44be2ca8136ae3eff0c461c54b59ba9bcbb3a14309c8741",
+    "headerHex": "c61fbc03c103191f620000005784681b"
+  },
+  "signatureVerifyRc": 0,
+  "signatureV2": true,
+  "signerCertSha256": "c46d0386179c3cef12582d1347ed2f871eb03a64aaa2bff96511c1cb76062556",
+  "deviceInstalledByThisAgent": false,
+  "newNativeTestsRun": false,
+  "nativeTestsPriorEvidence": "previous candidate widget unit 135/135; no native product source changes this round, not rerun"
+}

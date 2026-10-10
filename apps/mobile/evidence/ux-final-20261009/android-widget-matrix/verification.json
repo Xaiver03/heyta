@@ -1,0 +1,25 @@
+{
+  "date": "2026-10-09",
+  "device": "emulator-5554",
+  "apkSha256": "1a01024e1d90aaae0e6bf446af7a329e9ac542427435f2e8e1497ba7c28d86c3",
+  "installedApkSha256": "1a01024e1d90aaae0e6bf446af7a329e9ac542427435f2e8e1497ba7c28d86c3",
+  "providers": ["TodayWidgetProvider", "QuadrantWidgetProvider", "HabitsWidgetProvider", "FocusWidgetProvider"],
+  "existingWidgetIds": [2, 3, 4, 5],
+  "checks": {
+    "releaseInstall": "passed",
+    "providerRegistration": "passed",
+    "launcherInstances": "passed",
+    "lightThemeRender": "passed",
+    "darkThemeRender": "passed",
+    "refreshAfterAppLaunch": "passed",
+    "fourTemplateTapMatrix": "not_run",
+    "focusStartPauseResumeImmediate": "not_run",
+    "freshGalleryAdd": "not_run",
+    "talkback": "not_run"
+  },
+  "dataPreservation": {
+    "clearAppData": false,
+    "uninstall": false,
+    "normalDataDeleted": false
+  }
+}

@@ -24,6 +24,8 @@ import { classifyTransportSecurity } from '@heyta/sync-client';
 import { notifyConfigured } from './auto-sync';
 import { DEFAULT_SERVER_URL, readSyncConfig, writeSyncConfig } from './config';
 import { syncNow } from './store';
+import { clearMobileVaultSession } from '../lib/vault-session-cleanup';
+import type { VaultSecureStorageScope } from '../lib/vault-secure-storage';
 
 export interface SyncCredentialForm {
   readonly serverUrl: string;
@@ -45,14 +47,41 @@ export interface SyncCredentialForm {
   clear: () => void;
 }
 
-export function useSyncCredentialForm(): SyncCredentialForm {
+export function useSyncCredentialForm(
+  onVaultCleanupPending?: (scope: VaultSecureStorageScope) => void,
+): SyncCredentialForm {
   // 🔴 初值从**活配置**里读，而不是各写一份空字符串 ——
   // 否则切走再切回来（组件会卸载重建）会把用户刚填的内容抹掉，
   // 而看起来像"填了没保存"。
   const existing = readSyncConfig();
-  const [serverUrl, setServerUrl] = useState(existing?.serverUrl ?? DEFAULT_SERVER_URL);
+  const [serverUrl, setServerUrlValue] = useState(existing?.serverUrl ?? DEFAULT_SERVER_URL);
   const [token, setToken] = useState(existing?.token ?? '');
   const [password, setPassword] = useState(existing?.password ?? '');
+
+  /** 更换服务端即更换认证边界：先清掉旧 token，再让新地址进入表单。 */
+  const setServerUrl = (value: string): void => {
+    if (value.trim() !== serverUrl.trim() && (token.trim() !== '' || password !== '')) {
+      const existing = readSyncConfig();
+      let scope: VaultSecureStorageScope | undefined;
+      const accountId = existing?.accountId?.trim();
+      if (existing !== undefined && accountId !== undefined && accountId !== '') {
+        try {
+          scope = { serverOrigin: new URL(existing.serverUrl).origin, accountId };
+        } catch {
+          // The auth fence still runs when the old URL is malformed; there is
+          // simply no safe scope to pass to secure-storage cleanup.
+        }
+      }
+      void clearMobileVaultSession(scope).then((cleanup) => {
+        if (cleanup.secureStorageError !== undefined && scope !== undefined) {
+          onVaultCleanupPending?.(scope);
+        }
+      });
+      setToken('');
+      setPassword('');
+    }
+    setServerUrlValue(value);
+  };
 
   /**
    * 凭据是否**上一次就已完整**。

@@ -202,14 +202,13 @@ export function growthBoardLabels(t: I18nValue['t']): GrowthBoardLabels {
        * 不给我一条编的文案，让它退回"不存在"。
        */
       repair: ({ count }) => t('mobile.growth.streak.repair', { days: count }),
-      /**
-       * ⚠️ **刻意不给 `repairAction` / `freshStartAction`**：
-       * 共享层"不给按钮就只显示提示文字"，而移动端迁移前正是**只有文字**。
-       * 移动端没有剪贴板之外的写路径接线（补打卡要走 action 层），
-       * 本轮不引入 —— 见 `GrowthBoard` 的 `onRepair` / `onFreshStart` 也没传。
-       */
+      /** Web 与移动端共用动作语义：补打卡与今天重新开始都只写一条默认量记录。 */
+      repairAction: t('web.habits.repairAction'),
+      repairA11y: ({ date, name }) => t('web.habits.a11y.repair', { date, name }),
       freshStart: ({ days, longest, total }) =>
         t('mobile.growth.streak.freshStart', { days, longest, total }),
+      freshStartAction: t('web.habits.freshStartAction'),
+      freshStartA11y: (name) => t('web.habits.a11y.freshStart', { name }),
       /**
        * 习惯名的无障碍名。
        *
@@ -273,26 +272,12 @@ export function growthBoardLabels(t: I18nValue['t']): GrowthBoardLabels {
     },
 
     /**
-     * 🔴 热力图的两条文案是**类型要求的死字段**：本端**不传** `activityDays`，
-     * 所以 `GrowthBoard` 永远不会调用它们（`GrowthBoard.tsx` 里
-     * `activityDays === undefined` 直接不渲染那一块）。
-     *
-     * 为什么本轮不给移动端加年度热力图 —— 两条独立的理由：
-     *   1. **缺一条可用的词条。** 唯一候选 `web.growth.year.heatmap` 用的是
-     *      **库自己的** `{{count}}` 占位符（react-activity-calendar），
-     *      `t()` 会把它渲染成字面的 `{5}` —— 这正是 `habits-display.ts`
-     *      文件头记过的坑。而 `packages/i18n` 不在本刀白名单。
-     *   2. 它是**产品决定**：手机屏幕小，把 web 的年度视图免费带过来要另一次
-     *      真机验收（横向滚动/尺寸），本轮拿不到真机。
-     *
-     * 月份表复用 `habits-display.ts` 已经导出的那份（不复制第三份）；
-     * `grid` 返回空串而不是编一句错的话。
-     * 最小一步：补 `mobile.growth.year.heatmap`（含 `{total}`/`{days}`），
-     * 再把 `dailyActivityCountsFromState(tables, now)` 传给 `GrowthBoard`。
+     * 年度热力图的事实由 `GrowthScreen` 从 app-host 投影后传入；这里仅提供
+     * 中英标签。月份表复用 `habits-display.ts` 的既有词条，不复制第二份。
      */
     heatmap: {
       month: (month) => t(MOBILE_HEATMAP_MONTH_KEYS[month - 1] ?? 'web.heatmap.month.1'),
-      grid: () => '',
+      grid: ({ total }) => t('web.growth.year.heatmap', { count: total }),
     },
 
     /**

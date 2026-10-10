@@ -50,6 +50,15 @@ object HabitsWidgetViews {
                 ?: R.string.widget_habits_empty.takeIf { model.totalCount == 0 },
         )
 
+        WidgetViewParts.applyTheme(
+            context,
+            views,
+            R.id.widget_root,
+            intArrayOf(R.id.widget_header, R.id.widget_row_0, R.id.widget_row_1, R.id.widget_row_2,
+                R.id.widget_row_3, R.id.widget_row_4),
+            mutedTextIds = intArrayOf(R.id.widget_message),
+        )
+
         return views
     }
 

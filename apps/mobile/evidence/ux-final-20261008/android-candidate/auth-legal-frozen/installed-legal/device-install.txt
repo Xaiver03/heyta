@@ -1,0 +1,14 @@
+Acceptance: installed Android candidate legal reader
+UTC/local captured: 2026-10-08 18:24:52 +0800
+Device serial: emulator-5554
+Device model: sdk_gphone64_arm64
+Android release: 16
+Display: Physical size: 1080x2400
+Locale: null
+Package: com.heyta
+Activity: com.heytamobile.MainActivity
+Installed APK path: /data/app/~~EyQTJDvHHxg-A8A9tcb4Ew==/com.heyta-9x60m9P6cM0D5aPkHvn_Mg==/base.apk
+Installed APK sha256: 26d39bc0ca06d13e6000a363649cdf56f42d52d9a4fc0e6f2c3e4d0dbb36d115  /data/app/~~EyQTJDvHHxg-A8A9tcb4Ew==/com.heyta-9x60m9P6cM0D5aPkHvn_Mg==/base.apk
+Expected candidate sha256 (provided): 26d39bc0ca06d13e6000a363649cdf56f42d52d9a4fc0e6f2c3e4d0dbb36d115
+SHA_MATCH=YES
+Install/update time: 2026-10-08 18:20:07

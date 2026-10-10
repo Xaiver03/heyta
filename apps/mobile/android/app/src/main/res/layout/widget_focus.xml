@@ -12,15 +12,16 @@
 
   ## 其余注意点与 widget_today.xml 相同
 
-  四个布局的 id 故意同名（见那个文件顶部）；颜色全用系统主题属性（同上）；
+  四个布局的 id 故意同名（见那个文件顶部）；颜色全用应用语义资源（同上）；
   固定槽而不是动态添加（同上）。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="12dp"
-    android:background="?android:attr/colorBackground">
+    android:background="@color/heyta_widget_surface">
 
     <TextView
         android:id="@+id/widget_header"
@@ -28,7 +29,7 @@
         android:layout_height="wrap_content"
         android:maxLines="1"
         android:ellipsize="end"
-        android:textColor="?android:attr/textColorPrimary"
+        android:textColor="@color/heyta_widget_foreground"
         android:textSize="13sp"
         android:textStyle="bold" />
 
@@ -46,7 +47,7 @@
             android:layout_height="wrap_content"
             android:maxLines="2"
             android:ellipsize="end"
-            android:textColor="?android:attr/textColorPrimary"
+            android:textColor="@color/heyta_widget_foreground"
             android:textSize="15sp"
             android:textStyle="bold" />
 
@@ -57,7 +58,7 @@
             android:maxLines="1"
             android:ellipsize="end"
             android:layout_marginTop="2dp"
-            android:textColor="?android:attr/textColorSecondary"
+            android:textColor="@color/heyta_widget_foreground_muted"
             android:textSize="12sp" />
 
     </LinearLayout>
@@ -67,7 +68,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
-        android:textColor="?android:attr/textColorSecondary"
+        android:textColor="@color/heyta_widget_foreground_muted"
         android:textSize="12sp" />
 
 </LinearLayout>

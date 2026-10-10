@@ -1,0 +1,20 @@
+Windows Web Experience Pack official installer provenance
+Captured: 2026-10-08 Asia/Shanghai
+
+Source URL:
+https://get.microsoft.com/installer/download/9MSSGKG348SP
+
+Downloaded file:
+Windows Web Experience Pack Installer.exe
+Source size: 813088 bytes
+Mac SHA256: 2f13810d851abc98e1cd9843336ab0f45dbe188c0589c4c31e043d155fdf8e78
+Windows SHA256: 2F13810D851ABC98E1CD9843336AB0F45DBE188C0589C4C31E043D155FDF8E78
+
+Windows Get-AuthenticodeSignature:
+Status: Valid
+Signer: CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US
+Issuer: CN=Microsoft Marketplace CA G 023, OU=AOC, O=Microsoft Corporation
+Thumbprint: 0F7E3531DB084A3D45759670B7699E53985E8742
+Path: C:\Users\41478\AppData\Local\Temp\heyta-widgets-installer.exe
+
+The downloaded object is the Microsoft Store installer bootstrapper. It is not the 93 MB Web Experience Pack AppxBundle.

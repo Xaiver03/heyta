@@ -55,6 +55,10 @@ RCT_EXTERN_METHOD(setWidgetSnapshot:(NSString *)envelopeJson
 RCT_EXTERN_METHOD(drainIntentQueue:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 
+RCT_EXTERN_METHOD(ackIntentQueue:(NSString *)processedJson
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
 RCT_EXTERN_METHOD(mergeIntentQueue:(NSString *)pendingJson
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
@@ -65,6 +69,10 @@ RCT_EXTERN_METHOD(clearWidgetState:(RCTPromiseResolveBlock)resolve
 RCT_EXTERN_METHOD(sealWidgetSnapshot:(NSString *)payloadJson
                   dayStr:(NSString *)dayStr
                   validUntil:(double)validUntil
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(setWidgetLocale:(NSString *)locale
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 

@@ -1,0 +1,44 @@
+{
+  "date": "2026-10-08",
+  "device": "emulator-5554",
+  "installedApkSha256": "381203459ba9da1c85d4d5215fba8a32ce1b63992d87ef915a3e53de82c34ba3",
+  "widgetInstances": {
+    "focus": 2,
+    "habits": 3,
+    "today": 4,
+    "quadrant": 5
+  },
+  "checks": {
+    "systemLauncherHostsAllFour": "passed-existing-instances-not-readded",
+    "lightDarkNonemptyToday": "passed",
+    "lightDarkNonemptyHabits": "passed",
+    "lightDarkNonemptyQuadrant": "passed",
+    "lightDarkNonemptyFocusRendering": "passed-after-unrelated-local-task-op",
+    "focusStartImmediatePublish": "failed",
+    "focusTaskLocalWriteRefresh": "failed-earlier-then-refreshed-on-focus-completion",
+    "focusAbandonImmediatePublish": "passed-through-focus-log-op",
+    "focusIdleBodyOpenApp": "failed-message-tap-did-not-open-app-header-did",
+    "appWidgetLanguageConsistency": "failed-app-zh-system-en-with-no-app-locale-override",
+    "fixedSourceNewApkRegression": "not-performed",
+    "systemLocale": "en_US",
+    "androidAppLocales": [],
+    "systemNightRestored": "yes",
+    "activeQaFocusAtEnd": false,
+    "qaTaskDoneAtEnd": false,
+    "qaHabitCheckedAtEnd": false
+  },
+  "dataPreservation": {
+    "uninstall": false,
+    "clearAppData": false,
+    "rebuild": false,
+    "removeNormalData": false,
+    "qaTaskToggledAndRestored": true,
+    "qaFocusNaturalCompletionCount": 1,
+    "qaFocusAbandonedCount": 1
+  },
+  "boundaries": [
+    "No final-source build or reinstall performed.",
+    "Appearance pass does not prove focus start publication.",
+    "Focus pause/resume, widget resize, account switch/clear, screen reader, and fresh widget gallery addition are not claimed."
+  ]
+}

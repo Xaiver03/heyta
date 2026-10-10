@@ -1,0 +1,1671 @@
+TASK null id=2 userId=0 displayId=0(type=INTERNAL)
+  ACTIVITY com.google.android.apps.nexuslauncher/.NexusLauncherActivity 33bb596 pid=1077 userId=0 uid=10185 displayId=0(type=INTERNAL)
+    Local Activity 3b7429f State:
+      mResumed=false mStopped=true mFinished=false
+      mIsInMultiWindowMode=false mIsInPictureInPictureMode=false
+      mChangingConfigurations=false
+      mCurrentConfig={1.0 310mcc260mnc [en_US] ldltr sw411dp w411dp h914dp 420dpi nrml long port finger -keyb/v/h -nav/h winConfig={ mBounds=Rect(0, 0 - 1080, 2400) mAppBounds=Rect(0, 0 - 1080, 2400) mMaxBounds=Rect(0, 0 - 1080, 2400) mDisplayRotation=ROTATION_0 mWindowingMode=fullscreen mActivityType=home mAlwaysOnTop=undefined mRotation=ROTATION_0} s.168 fontWeightAdjustment=0}
+      mLoadersStarted=true
+      FragmentManager misc state:
+        mHost=android.app.Activity$HostCallbacks@1be870a
+        mContainer=android.app.Activity$HostCallbacks@1be870a
+        mCurState=3 mStateSaved=true mDestroyed=false
+    ViewRoot:
+      mAdded=true
+      mRemoved=false
+      mStopped=true
+      mPausedForTransition=false
+      mConsumeBatchedInputScheduled=false
+      mConsumeBatchedInputImmediatelyScheduled=false
+      mPendingInputEventCount=0
+      mProcessInputEventsScheduled=false
+      mTraversalScheduled=false
+      mReportNextDraw=false
+      mLastPerformTraversalsFailedReason=view_not_visible
+      mLastReportedMergedConfiguration={mGlobalConfig={1.0 310mcc260mnc [en_US] ldltr sw411dp w411dp h914dp 420dpi nrml long port finger -keyb/v/h -nav/h winConfig={ mBounds=Rect(0, 0 - 1080, 2400) mAppBounds=Rect(0, 0 - 1080, 2400) mMaxBounds=Rect(0, 0 - 1080, 2400) mDisplayRotation=ROTATION_0 mWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=ROTATION_0} s.10595 fontWeightAdjustment=0} mOverrideConfig={1.0 310mcc260mnc [en_US] ldltr sw411dp w411dp h914dp 420dpi nrml long port finger -keyb/v/h -nav/h winConfig={ mBounds=Rect(0, 0 - 1080, 2400) mAppBounds=Rect(0, 0 - 1080, 2400) mMaxBounds=Rect(0, 0 - 1080, 2400) mDisplayRotation=ROTATION_0 mWindowingMode=fullscreen mActivityType=home mAlwaysOnTop=undefined mRotation=ROTATION_0} s.168 fontWeightAdjustment=0}}
+      mLastConfigurationFromResources={1.0 310mcc260mnc [en_US] ldltr sw411dp w411dp h914dp 420dpi nrml long port finger -keyb/v/h -nav/h winConfig={ mBounds=Rect(0, 0 - 1080, 2400) mAppBounds=Rect(0, 0 - 1080, 2400) mMaxBounds=Rect(0, 0 - 1080, 2400) mDisplayRotation=ROTATION_0 mWindowingMode=fullscreen mActivityType=home mAlwaysOnTop=undefined mRotation=ROTATION_0} s.4 fontWeightAdjustment=0}
+      mLastReportedActivityWindowInfo=ActivityWindowInfo{isEmbedded=false, taskBounds=Rect(0, 0 - 1080, 2400), taskFragmentBounds=Rect(0, 0 - 1080, 2400)}
+      mIsAmbientMode=false
+      mUnbufferedInputSource=0
+      mAttachInfo=       AttachInfo:
+        mHasWindowFocus=false
+        mWindowVisibility=4
+        mInTouchMode=true
+        mUnbufferedDispatchRequested=false
+      android.view.ViewRootImpl$NativePreImeInputStage: mQueueLength=0
+      android.view.ViewRootImpl$ImeInputStage: mQueueLength=0
+      android.view.ViewRootImpl$NativePostImeInputStage: mQueueLength=0
+      android.view.ViewRootImpl$WindowInputEventReceiver
+       mInputChannel: 2f14277 com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity
+       mSeqMap: {}
+       mReceiverPtr:
+        mInputConsumer:
+          mResampleTouch = true
+          mChannel = 2f14277 com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity
+          mMsgDeferred: false
+          Batches:
+              <empty>
+          mSeqChains:
+              <empty>
+          mConsumeTimes:
+              <empty>
+          
+        mBatchedInputEventPending: false
+        mOutboundQueue:
+          <empty>
+        
+    Choreographer:
+      mFrameScheduled=false
+      mLastFrameTime=178214801 (2556232 ms ago)
+    InsetsController:
+        InsetsState
+          mDisplayFrame=Rect(0, 0 - 1080, 2400)
+          mDisplayCutout=DisplayCutout{insets=Rect(0, 0 - 0, 0) waterfall=Insets{left=0, top=0, right=0, bottom=0} boundingRect={Bounds=[Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0)]} cutoutPathParserInfo={CutoutPathParserInfo{displayWidth=0 displayHeight=0 physicalDisplayWidth=0 physicalDisplayHeight=0 density={0.0} cutoutSpec={} rotation={0} scale={0.0} physicalPixelDisplaySizeRatio={0.0}}} sideOverrides=null}
+          mRoundedCorners=RoundedCorners{[RoundedCorner{position=TopLeft, radius=0, center=Point(0, 0)}, RoundedCorner{position=TopRight, radius=0, center=Point(0, 0)}, RoundedCorner{position=BottomRight, radius=0, center=Point(0, 0)}, RoundedCorner{position=BottomLeft, radius=0, center=Point(0, 0)}]}
+          mRoundedCornerFrame=Rect(0, 0 - 1080, 2400)
+          mPrivacyIndicatorBounds=PrivacyIndicatorBounds {static bounds=Rect(827, 0 - 1043, 63) rotation=0}
+          mDisplayShape=DisplayShape{ spec=-1893857183 displayWidth=1080 displayHeight=2400 physicalPixelDisplaySizeRatio=1.0 rotation=0 offsetX=0 offsetY=0 scale=1.0}
+            InsetsSource id=9aa30000 type=statusBars frame=[0,0][1080,63] visible=true flags= sideHint=TOP boundingRects=null
+            InsetsSource id=9aa30005 type=mandatorySystemGestures frame=[0,0][1080,63] visible=true flags= sideHint=TOP boundingRects=null
+            InsetsSource id=9aa30006 type=tappableElement frame=[0,0][1080,63] visible=true flags= sideHint=TOP boundingRects=null
+            InsetsSource id=f26f0001 type=navigationBars frame=[0,2337][1080,2400] visible=true flags=SUPPRESS_SCRIM|ANIMATE_RESIZING sideHint=BOTTOM boundingRects=null
+            InsetsSource id=f26f0004 type=systemGestures frame=[0,0][78,2400] visible=true flags= sideHint=LEFT boundingRects=null
+            InsetsSource id=f26f0005 type=mandatorySystemGestures frame=[0,2316][1080,2400] visible=true flags= sideHint=BOTTOM boundingRects=null
+            InsetsSource id=f26f0006 type=tappableElement frame=[0,0][0,0] visible=true flags= sideHint=NONE boundingRects=null
+            InsetsSource id=f26f0024 type=systemGestures frame=[1002,0][1080,2400] visible=true flags= sideHint=RIGHT boundingRects=null
+            InsetsSource id=3 type=ime frame=[0,0][0,0] visibleFrame=[0,2400][1080,2400] visible=false flags= sideHint=NONE boundingRects=null
+        mIsPredictiveBackImeHideAnimInProgress=false
+    WindowOnBackDispatcher:
+        Top Callback: com.android.launcher3.uioverrides.QuickstepLauncher$3@d8a5655
+        Callbacks: 
+          Callback: android.app.Activity$$ExternalSyntheticLambda0@ab8bd0c Priority=-1
+          Callback: com.android.launcher3.uioverrides.QuickstepLauncher$3@d8a5655 Priority=0
+    ImeBackAnimationController:
+        mLastProgress=0.0
+        mTriggerBack=false
+        mIsPreCommitAnimationInProgress=false
+        mStartRootScrollY=0
+        isBackAnimationAllowed=true
+        isAdjustPan=false
+        isHideAnimationInProgress=false
+    View Hierarchy:
+      com.android.internal.policy.DecorView{700bb7b I.E...... R......D 0,0-1080,2400}[NexusLauncherActivity]
+        android.widget.LinearLayout{5452ce V.E...... .......D 0,0-1080,2400}
+          android.view.ViewStub{917d98 G.E...... ......I. 0,0-0,0 #10201ed android:id/action_mode_bar_stub}
+          android.widget.FrameLayout{e7635ef V.E...... .......D 0,0-1080,2400 #1020002 android:id/content}
+            com.android.launcher3.LauncherRootView{29df8fc V.E...... .......D 0,0-1080,2400 #7f0a021a app:id/launcher}
+              com.android.launcher3.dragndrop.DragLayer{e07fb85 V.E...... .......D 0,0-1080,2400 #7f0a0161 app:id/drag_layer}
+                com.android.launcher3.views.AccessibilityActionsView{7f1e43b V.E...... ........ 0,63-1080,2337 #7f0a001b app:id/accessibility_action_view}
+                com.android.launcher3.Workspace{62a5758 V.ED..... .......D 0,0-1080,2400 #7f0a0481 app:id/workspace}
+                  com.android.launcher3.CellLayout{3a8f3e7 V.ED..... .......D 39,66-1041,1720}
+                    com.android.launcher3.ShortcutAndWidgetContainer{4ea6b94 V.E...... .......D 28,28-974,1626}
+                      com.google.android.apps.nexuslauncher.qsb.SmartspaceViewContainer{71bd6c1 V.E...... ........ 0,0-946,286 #7f0a032d app:id/search_container_workspace}
+                        com.google.android.systemui.smartspace.BcSmartspaceView{4a6f231 V.E...... ........ 0,6-946,279 #7f0a00c1 app:id/bc_smartspace_view}
+                          com.google.android.systemui.smartspace.InterceptingViewPager{d0f163d VFED...L. ........ 0,0-946,273 #7f0a0368 app:id/smartspace_card_pager}
+                            com.google.android.systemui.smartspace.uitemplate.BaseTemplateCard{f06e783 VFE...C.. ........ 0,0-946,273 #7f0a00bf app:id/base_template_card_with_date}
+                              androidx.constraintlayout.widget.ConstraintLayout{2ccad00 V.E...... ........ 16,106-930,168 #7f0a03e9 app:id/text_group}
+                                com.google.android.systemui.smartspace.IcuDateTextView{bdbd939 VFED..C.. ........ 0,0-237,62 #7f0a0133 app:id/date}
+                                androidx.constraintlayout.widget.ConstraintLayout{dc6f9f1 GFE...C.. ......I. 0,0-0,0 #7f0a036b app:id/smartspace_subtitle_group}
+                                  com.google.android.systemui.smartspace.DoubleShadowTextView{f4609d6 GFED..C.. ......I. 0,0-0,0 #7f0a039c app:id/subtitle_text}
+                                  com.google.android.systemui.smartspace.DoubleShadowTextView{9559457 GFED..C.. ......I. 0,0-0,0 #7f0a00be app:id/base_action_icon_subtitle}
+                                android.widget.LinearLayout{eecdb44 G.E...... ......I. 0,0-0,0 #7f0a0369 app:id/smartspace_extras_group}
+                                  com.google.android.systemui.smartspace.DoubleShadowTextView{40442d GFED..C.. ......I. 0,0-0,0 #7f0a03a1 app:id/supplemental_line_text}
+                          com.google.android.systemui.smartspace.PageIndicator{7f0ed62 G.E...... ......I. 0,0-0,0 #7f0a036a app:id/smartspace_page_indicator}
+                      com.android.launcher3.views.DoubleShadowBubbleTextView{4a88620 VFED..CL. ......ID 247,1312-452,1598 #4}
+                      com.android.launcher3.views.DoubleShadowBubbleTextView{15f0bd9 VFED..CL. ......ID 494,1312-699,1598 #5}
+                      com.android.launcher3.views.DoubleShadowBubbleTextView{dea599e VFED..CL. ......ID 741,1312-946,1598 #6}
+                com.android.launcher3.Hotseat{5b51ef3 I.ED..... ......ID 0,1873-1080,2400 #7f0a01e3 app:id/hotseat}
+                  com.android.launcher3.ShortcutAndWidgetContainer{7e67b0 V.E...... ......ID 83,0-997,195}
+                    com.android.launcher3.views.DoubleShadowBubbleTextView{d565edd VFED..CL. ......ID 0,0-173,195 #1}
+                    com.android.launcher3.views.DoubleShadowBubbleTextView{a9bea52 VFED..CL. ......ID 247,0-420,195 #2}
+                    com.android.launcher3.views.DoubleShadowBubbleTextView{333f123 VFED..CL. ......ID 494,0-667,195 #3}
+                    com.android.launcher3.uioverrides.PredictedAppIcon{dbfd50c VFED..CL. ......ID 741,0-914,195}
+                  com.google.android.apps.nexuslauncher.qsb.SearchDelegateView{b89f629 VFE...CL. ......ID 90,252-990,417 #7f0a032c app:id/search_container_hotseat}
+                    android.widget.ImageView{f747dae VFED..C.. ......ID 11,19-137,145 #7f0a01a8 app:id/g_icon}
+                    android.widget.LinearLayout{578b74f V.E...... ......ID 637,-1-889,166 #7f0a0179 app:id/end_part}
+                      android.widget.ImageButton{25a4edc GFED..C.. ......I. 0,0-0,0 #7f0a0082 app:id/aim_icon}
+                      com.google.android.apps.nexuslauncher.qsb.AssistantIconView{224e372 VFED..C.. ......ID 0,0-126,167 #7f0a025c app:id/mic_icon}
+                      android.widget.ImageButton{ea2cbe5 VFED..C.. ......ID 126,0-252,167 #7f0a0221 app:id/lens_icon}
+                com.android.launcher3.pageindicators.PageIndicatorDots{d8ec6ba I.ED..... ......ID 0,1810-1080,1873 #7f0a02c3 app:id/page_indicator}
+                com.android.launcher3.DropTargetBar{433796b I.E...... ......ID 11,147-1069,294 #7f0a0164 app:id/drop_target_bar}
+                  com.android.launcher3.DeleteDropTarget{cab7cc8 V.ED..... ......ID 177,0-486,147 #7f0a013e app:id/delete_target_text}
+                  com.android.launcher3.SecondaryDropTarget{fb94161 V.ED..... ......ID 560,0-880,147 #7f0a0426 app:id/uninstall_target_text}
+                com.android.launcher3.views.ScrimView{cb430b1 V.ED..... ......ID 0,0-1080,2400 #7f0a031b app:id/scrim_view}
+                com.android.quickstep.views.LauncherRecentsView{5d29486 IFED..... ......I. 0,0-1080,2400 #7f0a02c1 app:id/overview_panel}
+                com.google.android.apps.nexuslauncher.overview.NexusOverviewActionsView{974d996 V.E...... ........ 0,1973-1080,2400 #7f0a02c0 app:id/overview_actions_view}
+                  android.widget.LinearLayout{98e4147 I.E...... ......ID 212,63-867,189 #7f0a0050 app:id/action_buttons}
+                    android.widget.Button{d5f9d74 VFED..C.. ......ID 0,0-322,126 #7f0a0072 app:id/action_screenshot}
+                    android.widget.Button{f67929d VFED..C.. ......ID 417,0-655,126 #7f0a0073 app:id/action_select}
+                    android.widget.Button{337312 GFED..C.. ......I. 0,0-0,0 #7f0a0075 app:id/action_split}
+                  android.widget.Button{4e3aae3 IFED..C.. ......I. 360,63-719,189 #7f0a0071 app:id/action_save_app_pair}
+                  android.widget.FrameLayout{1931ce0 G.E...... ......I. 0,0-0,0 #7f0a0349 app:id/select_mode_buttons}
+                    android.widget.ImageButton{3afbb99 VFED..C.. ......I. 0,0-0,0 #7f0a0105 app:id/close}
+                  com.google.android.apps.nexuslauncher.overview.ShareTargetsView{e51ae5e I.E...... ......I. 0,42-1080,42 #7f0a0352 app:id/share_targets_view}
+                com.google.android.apps.nexuslauncher.allapps.SearchContainerView{1108917 V.ED..... .......D 0,0-1080,2400 #7f0a00ad app:id/apps_view}
+                  android.widget.FrameLayout{69c123f G.E...... ......I. 0,0-0,0 #7f0a00ce app:id/bottom_sheet_background}
+                    android.view.View{9bd270c V.ED..... ......I. 0,0-0,0 #7f0a00d0 app:id/bottom_sheet_handle_area}
+                    android.view.View{6b77855 V.ED..... ......I. 0,0-0,0 #7f0a00cf app:id/bottom_sheet_handle}
+                  com.android.launcher3.allapps.SearchRecyclerView{986526a GFED..... ......I. 0,0-0,0 #7f0a0338 app:id/search_results_list_view}
+                  com.android.launcher3.allapps.AllAppsRecyclerView{c999104 VFED..... .F.....D 0,168-1080,2400 #7f0a00ab app:id/apps_list_view aid=1073741826}
+                    com.android.launcher3.BubbleTextView{f20522b VFED..CL. ......ID 46,499-293,827 #7f0a01f0 app:id/icon}
+                    com.android.launcher3.BubbleTextView{20e4688 VFED..CL. ......ID 293,499-540,827 #7f0a01f0 app:id/icon}
+                    com.android.launcher3.BubbleTextView{ec1a821 VFED..CL. ......ID 540,499-787,827 #7f0a01f0 app:id/icon}
+                    com.android.launcher3.BubbleTextView{434d446 VFED..CL. ......ID 787,499-1034,827 #7f0a01f0 app:id/icon}
+                    com.android.launcher3.BubbleTextView{74fe607 VFED..CL. ......ID 46,827-293,1155 #7f0a01f0 app:id/icon}
+                    com.android.launcher3.BubbleTextView{5854334 VFED..CL. ......ID 293,827-540,1155 #7f0a01f0 app:id/icon}
+                    com.android.launcher3.BubbleTextView{26fa55d VFED..CL. ......ID 540,827-787,1155 #7f0a01f0 app:id/icon}
+                    com.android.launcher3.BubbleTextView{d9eed2 VFED..CL. ......ID 787,827-1034,1155 #7f0a01f0 app:id/icon}
+                    com.android.launcher3.BubbleTextView{bfadba3 VFED..CL. ......ID 46,1155-293,1483 #7f0a01f0 app:id/icon}
+                    com.android.launcher3.BubbleTextView{bcd5ea0 VFED..CL. ......ID 293,1155-540,1483 #7f0a01f0 app:id/icon}
+                    com.android.launcher3.BubbleTextView{9063a59 VFED..CL. ......ID 540,1155-787,1483 #7f0a01f0 app:id/icon}
+                    com.android.launcher3.BubbleTextView{744261e VFED..CL. ......ID 787,1155-1034,1483 #7f0a01f0 app:id/icon}
+                    com.android.launcher3.BubbleTextView{4d58eff VFED..CL. ......ID 46,1483-293,1811 #7f0a01f0 app:id/icon}
+                    com.android.launcher3.BubbleTextView{8b9c4cc VFED..CL. ......ID 293,1483-540,1811 #7f0a01f0 app:id/icon}
+                    com.android.launcher3.BubbleTextView{2d72315 VFED..CL. ......ID 540,1483-787,1811 #7f0a01f0 app:id/icon}
+                    com.android.launcher3.BubbleTextView{988862a VFED..CL. ......ID 787,1483-1034,1811 #7f0a01f0 app:id/icon}
+                    com.android.launcher3.BubbleTextView{67e1c1b VFED..CL. ......ID 46,1811-293,2139 #7f0a01f0 app:id/icon}
+                    com.android.launcher3.BubbleTextView{82461b8 VFED..CL. ......ID 293,1811-540,2139 #7f0a01f0 app:id/icon}
+                    com.android.launcher3.BubbleTextView{349935b VFED..CL. ......ID 540,1811-787,2139 #7f0a01f0 app:id/icon}
+                    android.view.View{400daf6 V.ED..... ........ 46,2139-1034,2139}
+                  com.android.launcher3.allapps.FloatingHeaderView{859c4be V.E...... .......D 0,168-1080,704 #7f0a008a app:id/all_apps_header}
+                    com.android.launcher3.appprediction.PredictionRowView{e8f44e9 V.E...... .......D 46,95-1034,385 #7f0a02da app:id/prediction_row}
+                      com.android.launcher3.BubbleTextView{985840f VFED..CL. ......ID 0,0-247,290 #7f0a01f0 app:id/icon}
+                      com.android.launcher3.BubbleTextView{eaffc9c VFED..CL. ......ID 247,0-494,290 #7f0a01f0 app:id/icon}
+                      com.android.launcher3.BubbleTextView{c8e46a5 VFED..CL. ......ID 494,0-741,290 #7f0a01f0 app:id/icon}
+                      com.android.launcher3.BubbleTextView{ab88a7a VFED..CL. ......ID 741,0-988,290 #7f0a01f0 app:id/icon}
+                    com.android.launcher3.appprediction.AppsDividerView{f35856e V.ED..... ........ 46,385-1034,499 #7f0a00aa app:id/apps_divider_view}
+                    com.android.launcher3.workprofile.PersonalWorkSlidingTabStrip{49ba7f8 G.E...... ......I. 0,0-0,0 #7f0a03ad app:id/tabs}
+                      android.widget.Button{54444d1 VFED..C.. ......I. 0,0-0,0 #7f0a03aa app:id/tab_personal}
+                      android.widget.Button{5af2b36 VFED..C.. ......I. 0,0-0,0 #7f0a03ab app:id/tab_work}
+                  android.widget.TextView{4aa26ed V.ED..... ......ID 833,205-1030,368 #7f0a0186 app:id/fast_scroller_popup}
+                  com.android.launcher3.views.RecyclerViewFastScroller{c9cf922 V.ED..... ........ 996,205-1148,2400 #7f0a0185 app:id/fast_scroller}
+                  androidx.constraintlayout.widget.ConstraintLayout{50a9fb3 V.E...... ........ 954,205-1106,2400 #7f0a0322 app:id/scroll_letter_layout}
+                  com.google.android.apps.nexuslauncher.allapps.UniversalSearchInputView{9a0b970 VFE...C.. ......ID 90,81-990,246 #7f0a032b app:id/search_container_all_apps}
+                    android.widget.RelativeLayout{7585ef7 V.E...... .......D 0,10-889,155}
+                      android.widget.FrameLayout{6899fcd V.E...... ........ 752,4-889,141 #7f0a004c app:id/action_btn_container}
+                        android.widget.ImageButton{c840a37 IFED..C.. ......I. 0,0-137,137 #7f0a00ff app:id/clear_btn}
+                      android.widget.ImageView{cd7b082 VFED..C.. ......ID 11,9-137,135 #7f0a01a8 app:id/g_icon}
+                      com.google.android.apps.nexuslauncher.search.TypeAheadSearchInputView{629f393 V.E...... ........ 148,0-752,145 #7f0a0423 app:id/typeahead_input}
+                        android.widget.TextView{cdf4ba4 I.ED..... ......I. 0,0-604,145 #7f0a01dd app:id/hint}
+                        com.google.android.apps.nexuslauncher.search.SearchEditText{9f3eda6 VFED..CL. ........ 0,0-604,145 #7f0a020b app:id/input}
+                      android.widget.LinearLayout{ec5afd0 V.E...... .......D 637,9-889,135 #7f0a0177 app:id/end_icons}
+                        com.google.android.apps.nexuslauncher.qsb.AssistantIconView{bbdca35 VFED..C.. ......ID 0,0-126,126 #7f0a025c app:id/mic_icon}
+                        android.widget.ImageButton{9d6bc9 VFED..C.. ......ID 126,0-252,126 #7f0a0221 app:id/lens_icon}
+                    android.view.View{799e164 V.ED..... ......ID 0,-1-900,164 #7f0a0309 app:id/ripple}
+    Looper (main, tid 2) {8f75d0d}
+      (MessageQueue is using Legacy implementation)
+      (Total messages: 0, polling=false, quitting=false)
+    ResourcesManager:
+      total apks: 5
+      resources: 13
+      resource impls: 6
+    1 dumpables:
+    #0: AutofillManager
+        AutofillManager:
+          sessionId: 2147483647
+          state: UNKNOWN
+          context: com.google.android.apps.nexuslauncher.NexusLauncherActivity@3b7429f
+          service client: null
+          client: android.view.autofill.AutofillClientController@4bac4c2 (android.os.BinderProxy@6bd4fb7)
+          enabled: false
+          enabledAugmentedOnly: false
+          hasService: true
+          hasCallback: false
+          onInvisibleCalled false
+          last autofilled data: null
+          id of last fill UI shown: null
+          tracked views: null
+          fillable ids: null
+          entered ids: null
+          save trigger id: null
+          save on finish(): false
+          options: logLvl=2, compatMode=false, augmented=false, appDisabledExpiration=0
+          fill dialog enabled: false
+          fill dialog enabled hints: []
+          compat mode enabled: false
+          debug: true verbose: false
+        Autofill Compat Mode: false
+    Misc:
+    	deviceProfile isTransposed=false
+    	orientation=1
+    	mSystemUiController: mStates=[10, 5, 0, 0, 0]
+    	mActivityFlags: 
+    	mForceInvisible: 0
+    	mWorkspaceLoading=false
+    	mPendingRequestArgs=null mPendingActivityResult=null
+    	mRotationHelper: [mStateHandlerRequest=0, mCurrentStateRequest=0, mLastActivityFlags=5, mIgnoreAutoRotateSettings=false, mHomeRotationEnabled=false, mForceAllowRotationForTesting=false, mDestroyed=false, mIsFixedLandscape=false]
+    	mAppWidgetHolder.isListening: false
+    	mWorkspace.mHasOnLayoutBeenCalled=true
+    	cellLayout.0.mHasOnLayoutBeenCalled=true
+    	shortcutAndWidgetContainer.0.mHasOnLayoutBeenCalled=true
+    DragLayer:
+    	dragLayerAlpha : [1.0, 1.0]
+    StateManager:
+    	mLastStableState:Normal
+    	mCurrentStableState:AllApps
+    	mState:AllApps
+    	mRestState:null
+    	isInTransition:false
+    PopupDataProvider:
+    	mPackageUserToDotInfos:{android#UserHandle{0},category=-1=1}
+    WidgetPickerDataProvider:
+    	widgetPickerData:WidgetPickerData(allWidgets=[Header:com.android.settings:1, Content:com.android.settings:1 maxSpanSize: 0, Header:com.google.android.apps.photos:2, Content:com.google.android.apps.photos:2 maxSpanSize: 0, Header::1, Content::1 maxSpanSize: 0, Header:com.android.chrome:4, Content:com.android.chrome:4 maxSpanSize: 0, Header:com.google.android.gm:4, Content:com.google.android.gm:4 maxSpanSize: 0, Header:com.google.android.apps.docs:4, Content:com.google.android.apps.docs:4 maxSpanSize: 0, Header:com.google.android.deskclock:5, Content:com.google.android.deskclock:5 maxSpanSize: 0, Header:com.google.android.contacts:6, Content:com.google.android.contacts:6 maxSpanSize: 0, Header:com.google.android.calendar:2, Content:com.google.android.calendar:2 maxSpanSize: 0, Header:com.google.android.apps.maps:7, Content:com.google.android.apps.maps:7 maxSpanSize: 0, Header:com.google.android.apps.youtube.music:2, Content:com.google.android.apps.youtube.music:2 maxSpanSize: 0, Header:com.google.android.youtube:2, Content:com.google.android.youtube:2 maxSpanSize: 0, Header:com.heyta:4, Content:com.heyta:4 maxSpanSize: 0, Header:com.google.android.googlequicksearchbox:5, Content:com.google.android.googlequicksearchbox:5 maxSpanSize: 0, Header:com.google.android.as:1, Content:com.google.android.as:1 maxSpanSize: 0, Header:com.google.android.apps.wellbeing:1, Content:com.google.android.apps.wellbeing:1 maxSpanSize: 0, Header::1, Content::1 maxSpanSize: 0], defaultWidgets=[], recommendations={})
+    DeviceProfile:
+    	1 dp = 2.625 px
+    	isTablet:false
+    	isPhone:true
+    	transposeLayoutWithOrientation:true
+    	isGestureMode:true
+    	isLandscape:false
+    	isMultiWindowMode:false
+    	isTwoPanels:false
+    	isLeftRightSplit:false
+    	windowX: 0.0px (0.0dp)
+    	windowY: 0.0px (0.0dp)
+    	widthPx: 1080.0px (411.42856dp)
+    	heightPx: 2400.0px (914.2857dp)
+    	availableWidthPx: 1080.0px (411.42856dp)
+    	availableHeightPx: 2274.0px (866.2857dp)
+    	mInsets.left: 0.0px (0.0dp)
+    	mInsets.top: 63.0px (24.0dp)
+    	mInsets.right: 0.0px (0.0dp)
+    	mInsets.bottom: 63.0px (24.0dp)
+    	aspectRatio:2.2222223
+    	isResponsiveGrid:true
+    	isScalableGrid:true
+    	inv.numRows: 5
+    	inv.numColumns: 4
+    	inv.numSearchContainerColumns: 4
+    	minCellSize: PointF(80.0, 104.0)dp
+    	cellWidthPx: 205.0px (78.09524dp)
+    	cellHeightPx: 286.0px (108.95238dp)
+    	getCellSize().x: 205.0px (78.09524dp)
+    	getCellSize().y: 286.0px (108.95238dp)
+    	cellLayoutBorderSpacePx Horizontal: 42.0px (16.0dp)
+    	cellLayoutBorderSpacePx Vertical: 42.0px (16.0dp)
+    	cellLayoutPaddingPx.left: 28.0px (10.666667dp)
+    	cellLayoutPaddingPx.top: 28.0px (10.666667dp)
+    	cellLayoutPaddingPx.right: 28.0px (10.666667dp)
+    	cellLayoutPaddingPx.bottom: 28.0px (10.666667dp)
+    	iconSizePx: 173.0px (65.90476dp)
+    	iconTextSizePx: 37.0px (14.095238dp)
+    	iconDrawablePaddingPx: 14.0px (5.3333335dp)
+    	numFolderRows: 3
+    	numFolderColumns: 3
+    	folderCellWidthPx: 205.0px (78.09524dp)
+    	folderCellHeightPx: 247.0px (94.09524dp)
+    	folderChildIconSizePx: 173.0px (65.90476dp)
+    	folderChildTextSizePx: 37.0px (14.095238dp)
+    	folderChildDrawablePaddingPx: 21.0px (8.0dp)
+    	folderCellLayoutBorderSpacePx.x: 42.0px (16.0dp)
+    	folderCellLayoutBorderSpacePx.y: 42.0px (16.0dp)
+    	folderContentPaddingLeftRight: 42.0px (16.0dp)
+    	folderTopPadding: 63.0px (24.0dp)
+    	folderFooterHeight: 147.0px (56.0dp)
+    	bottomSheetTopPadding: 91.0px (34.666668dp)
+    	bottomSheetOpenDuration: 267
+    	bottomSheetCloseDuration: 267
+    	bottomSheetWorkspaceScale: 1.0
+    	bottomSheetDepth: 0.0
+    	allAppsShiftRange: 788.0px (300.1905dp)
+    	allAppsOpenDuration: 600
+    	allAppsCloseDuration: 300
+    	allAppsIconSizePx: 173.0px (65.90476dp)
+    	allAppsIconTextSizePx: 37.0px (14.095238dp)
+    	allAppsIconDrawablePaddingPx: 14.0px (5.3333335dp)
+    	allAppsCellHeightPx: 328.0px (124.95238dp)
+    	allAppsCellWidthPx: 205.0px (78.09524dp)
+    	allAppsBorderSpacePxX: 42.0px (16.0dp)
+    	allAppsBorderSpacePxY: 42.0px (16.0dp)
+    	numShownAllAppsColumns: 4
+    	allAppsPadding.top: 0.0px (0.0dp)
+    	allAppsPadding.left: 46.0px (17.52381dp)
+    	allAppsPadding.right: 46.0px (17.52381dp)
+    	allAppsLeftRightMargin: 0.0px (0.0dp)
+    	hotseatBarSizePx: 527.0px (200.7619dp)
+    	mHotseatColumnSpan: 4
+    	mHotseatWidthPx: 914.0px (348.1905dp)
+    	hotseatCellHeightPx: 195.0px (74.28571dp)
+    	hotseatBarBottomSpacePx: 126.0px (48.0dp)
+    	mHotseatBarEdgePaddingPx: 0.0px (0.0dp)
+    	mHotseatBarWorkspaceSpacePx: 0.0px (0.0dp)
+    	inlineNavButtonsEndSpacingPx: 0.0px (0.0dp)
+    	navButtonsLayoutWidthPx: 0.0px (0.0dp)
+    	hotseatBarEndOffset: 0.0px (0.0dp)
+    	hotseatQsbSpace: 95.0px (36.190475dp)
+    	hotseatQsbHeight: 165.0px (62.857143dp)
+    	springLoadedHotseatBarTopMarginPx: 200.0px (76.190475dp)
+    	getHotseatLayoutPadding(context).top: 0.0px (0.0dp)
+    	getHotseatLayoutPadding(context).bottom: 332.0px (126.47619dp)
+    	getHotseatLayoutPadding(context).left: 83.0px (31.619047dp)
+    	getHotseatLayoutPadding(context).right: 83.0px (31.619047dp)
+    	numShownHotseatIcons: 4
+    	hotseatBorderSpace: 74.0px (28.190475dp)
+    	isQsbInline: false
+    	hotseatQsbWidth: 900.0px (342.85715dp)
+    	isTaskbarPresent:false
+    	isTaskbarPresentInApps:false
+    	taskbarHeight: 0.0px (0.0dp)
+    	stashedTaskbarHeight: 0.0px (0.0dp)
+    	taskbarBottomMargin: 0.0px (0.0dp)
+    	taskbarIconSize: 0.0px (0.0dp)
+    	desiredWorkspaceHorizontalMarginPx: 67.0px (25.52381dp)
+    	workspacePadding.left: 39.0px (14.857142dp)
+    	workspacePadding.top: 3.0px (1.1428572dp)
+    	workspacePadding.right: 39.0px (14.857142dp)
+    	workspacePadding.bottom: 617.0px (235.04762dp)
+    	iconScale: 1.0px (0.3809524dp)
+    	cellScaleToFit : 1.0px (0.3809524dp)
+    	extraSpace: 0.0px (0.0dp)
+    	unscaled extraSpace: 0.0px (0.0dp)
+    	maxEmptySpace: 0.0px (0.0dp)
+    	workspaceTopPadding: 31.0px (11.809524dp)
+    	workspaceBottomPadding: 181.0px (68.95238dp)
+    	overviewTaskMarginPx: 42.0px (16.0dp)
+    	overviewTaskIconSizePx: 126.0px (48.0dp)
+    	overviewTaskIconDrawableSizePx: 116.0px (44.190475dp)
+    	overviewTaskIconDrawableSizeGridPx: 0.0px (0.0dp)
+    	overviewTaskThumbnailTopMarginPx: 168.0px (64.0dp)
+    	overviewActionsTopMarginPx: 63.0px (24.0dp)
+    	overviewActionsHeight: 126.0px (48.0dp)
+    	overviewActionsClaimedSpaceBelow: 63.0px (24.0dp)
+    	overviewActionsButtonSpacing: 95.0px (36.190475dp)
+    	overviewPageSpacing: 42.0px (16.0dp)
+    	overviewRowSpacing: 0.0px (0.0dp)
+    	overviewGridSideMargin: 0.0px (0.0dp)
+    	dropTargetBarTopMarginPx: 84.0px (32.0dp)
+    	dropTargetBarSizePx: 147.0px (56.0dp)
+    	dropTargetBarBottomMarginPx: 42.0px (16.0dp)
+    	getCellLayoutSpringLoadShrunkTop(): 336.0px (128.0dp)
+    	getCellLayoutSpringLoadShrunkBottom(): 1673.0px (637.3333dp)
+    	workspaceSpringLoadedMinNextPageVisiblePx: 126.0px (48.0dp)
+    	getWorkspaceSpringLoadScale(): 0.7666667px (0.2920635dp)
+    	getCellLayoutHeight(): 1654.0px (630.0952dp)
+    	getCellLayoutWidth(): 1002.0px (381.7143dp)
+    	mResponsiveWorkspaceHeightSpec:CalculatedWorkspaceSpec(availableSpace=1810, cells=5, startPaddingPx=31, endPaddingPx=181, gutterPx=42, cellSizePx=286, aspectRatio=0.45, WorkspaceSpec.maxAvailableSize=26247)
+    	mResponsiveWorkspaceWidthSpec:CalculatedWorkspaceSpec(availableSpace=1080, cells=4, startPaddingPx=67, endPaddingPx=67, gutterPx=42, cellSizePx=205, aspectRatio=0.45, WorkspaceSpec.maxAvailableSize=1082)
+    	mResponsiveAllAppsHeightSpec:CalculatedAllAppsSpec(availableSpace=2337, cells=5, startPaddingPx=0, endPaddingPx=0, gutterPx=42, cellSizePx=286, aspectRatio=0.45, AllAppsSpec.maxAvailableSize=26247)
+    	mResponsiveAllAppsWidthSpec:CalculatedAllAppsSpec(availableSpace=1080, cells=4, startPaddingPx=67, endPaddingPx=67, gutterPx=42, cellSizePx=205, aspectRatio=0.45, AllAppsSpec.maxAvailableSize=26247)
+    	mResponsiveFolderHeightSpec:CalculatedFolderSpec(availableSpace=1810, cells=3, startPaddingPx=63, endPaddingPx=147, gutterPx=42, cellSizePx=247, aspectRatio=0.45, FolderSpec.maxAvailableSize=26247)
+    	mResponsiveFolderWidthSpec:CalculatedFolderSpec(availableSpace=1080, cells=3, startPaddingPx=42, endPaddingPx=42, gutterPx=42, cellSizePx=205, aspectRatio=0.45, FolderSpec.maxAvailableSize=26247)
+    	mResponsiveHotseatSpec:CalculatedHotseatSpec(availableSpace=2400, hotseatQsbSpace=95, edgePadding=126, HotseatSpec.maxAvailableSize=26247)
+    	mResponsiveWorkspaceCellSpec:CalculatedCellSpec(availableSpace=2400, iconSize=173, iconTextSize=37, iconDrawablePadding=21, CellSpec.maxAvailableSize=26247)
+    	mResponsiveAllAppsCellSpec:CalculatedCellSpec(availableSpace=2337, iconSize=173, iconTextSize=37, iconDrawablePadding=21, CellSpec.maxAvailableSize=26247)
+    	AllAppsStore Apps[] size: 19
+    	Package index, name, class, description, bitmap flag: 0/com.android.camera2:com.android.camera.CameraLauncher, Camera, 0+0
+    	Package index, name, class, description, bitmap flag: 1/com.android.chrome:com.google.android.apps.chrome.Main, Chrome, 0+0
+    	Package index, name, class, description, bitmap flag: 2/com.android.settings:com.android.settings.Settings, Settings, 0+0
+    	Package index, name, class, description, bitmap flag: 3/com.android.stk:com.android.stk.StkMain, TMoble, 0+0
+    	Package index, name, class, description, bitmap flag: 4/com.google.android.apps.docs:com.google.android.apps.docs.app.NewMainProxyActivity, Drive, 0+0
+    	Package index, name, class, description, bitmap flag: 5/com.google.android.apps.maps:com.google.android.maps.MapsActivity, Maps, 0+0
+    	Package index, name, class, description, bitmap flag: 6/com.google.android.apps.messaging:com.google.android.apps.messaging.ui.ConversationListActivity, Messages, 0+0
+    	Package index, name, class, description, bitmap flag: 7/com.google.android.apps.photos:com.google.android.apps.photos.home.HomeActivity, Photos, 0+0
+    	Package index, name, class, description, bitmap flag: 8/com.google.android.apps.safetyhub:com.google.android.apps.safetyhub.LauncherActivity, Safety, 0+0
+    	Package index, name, class, description, bitmap flag: 9/com.google.android.apps.youtube.music:com.google.android.apps.youtube.music.activities.MusicActivity, YT Music, 0+0
+    	Package index, name, class, description, bitmap flag: 10/com.google.android.calendar:com.android.calendar.AllInOneActivity, Calendar, 0+0
+    	Package index, name, class, description, bitmap flag: 11/com.google.android.contacts:com.android.contacts.activities.PeopleActivity, Contacts, 0+0
+    	Package index, name, class, description, bitmap flag: 12/com.google.android.deskclock:com.android.deskclock.DeskClock, Clock, 0+0
+    	Package index, name, class, description, bitmap flag: 13/com.google.android.dialer:com.google.android.dialer.extensions.GoogleDialtactsActivity, Phone, 0+0
+    	Package index, name, class, description, bitmap flag: 14/com.google.android.documentsui:com.android.documentsui.LauncherActivity, Files, 0+0
+    	Package index, name, class, description, bitmap flag: 15/com.google.android.gm:com.google.android.gm.ConversationListActivityGmail, Gmail, 0+0
+    	Package index, name, class, description, bitmap flag: 16/com.google.android.googlequicksearchbox:com.google.android.googlequicksearchbox.SearchActivity, Google, 0+0
+    	Package index, name, class, description, bitmap flag: 17/com.google.android.youtube:com.google.android.youtube.app.honeycomb.Shell$HomeActivity, YouTube, 0+0
+    	Package index, name, class, description, bitmap flag: 18/com.heyta:com.heytamobile.MainActivity, heyta, 0+0
+    SectionInfo[] size: 11
+	FastScrollSection: C
+	FastScrollSection: D
+	FastScrollSection: F
+	FastScrollSection: G
+	FastScrollSection: H
+	FastScrollSection: M
+	FastScrollSection: P
+	FastScrollSection: S
+	FastScrollSection: T
+	FastScrollSection: Y
+	FastScrollSection: Y
+
+--- logfile: log-0 ---
+10/7/26 12:08 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 12:08 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 12:08 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 12:08 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 12:15 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 12:15 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 12:15 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 12:15 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 12:54 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 12:54 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 12:54 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 12:54 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 1:03 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 1:03 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 1:03 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 1:03 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 1:10 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 1:10 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 1:10 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 1:10 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 1:22 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 1:22 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 1:22 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 1:22 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 1:30 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 1:30 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 1:30 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 1:30 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 1:30 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 1:30 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 1:30 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 1:30 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 1:53 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 1:53 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 1:53 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 1:53 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 1:58 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 1:58 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 1:58 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 1:58 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 2:05 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 2:05 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 2:05 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 2:05 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 2:09 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 2:09 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 2:09 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 2:09 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 2:13 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 2:13 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 2:13 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 2:13 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 2:16 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 2:16 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 2:16 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 2:16 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 2:19 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 2:19 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 2:19 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 2:19 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 2:25 AM BaseIconCache Default icon returned for com.android.vending
+10/7/26 2:27 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 2:27 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 2:27 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 2:27 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 2:29 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 2:29 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 2:29 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 2:29 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 2:43 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 2:43 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 2:43 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 2:43 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 2:48 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 2:48 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 2:48 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 2:48 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 2:55 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 2:55 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 2:55 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 2:55 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 2:57 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 2:57 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 2:57 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 2:57 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 3:00 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 3:00 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 3:00 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 3:00 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 3:05 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 3:05 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 3:05 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 3:05 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 3:19 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 3:19 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 3:19 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 3:19 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 9:49 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 9:49 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 9:49 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 9:49 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 11:27 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 11:27 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 11:27 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 11:27 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 12:17 PM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 12:17 PM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 12:17 PM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 12:17 PM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 12:39 PM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 12:39 PM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 12:39 PM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 12:39 PM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 1:30 PM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 1:30 PM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 1:30 PM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 1:30 PM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 5:23 PM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 5:23 PM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 5:23 PM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 5:23 PM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 5:46 PM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 5:46 PM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 5:46 PM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 5:46 PM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 6:04 PM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 6:04 PM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 6:04 PM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 6:04 PM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 7:11 PM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 7:11 PM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 7:11 PM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 7:11 PM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 10:13 PM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 10:13 PM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 10:13 PM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 10:13 PM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 11:59 PM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/7/26 11:59 PM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/7/26 11:59 PM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/7/26 11:59 PM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+
+--- logfile: log-1 ---
+10/8/26 12:07 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/8/26 12:07 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/8/26 12:07 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/8/26 12:07 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/8/26 12:18 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/8/26 12:18 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/8/26 12:18 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/8/26 12:18 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/8/26 12:34 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/8/26 12:34 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/8/26 12:34 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/8/26 12:34 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/8/26 1:27 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/8/26 1:27 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/8/26 1:27 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/8/26 1:27 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/8/26 7:05 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/8/26 7:05 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/8/26 7:05 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/8/26 7:05 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/8/26 10:20 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/8/26 10:20 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/8/26 10:20 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/8/26 10:20 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+
+--- logfile: log-2 ---
+10/5/26 2:15 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 2:15 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 2:15 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 2:15 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 3:00 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 3:00 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 3:00 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 3:00 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 4:23 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 4:23 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 4:23 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 4:23 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 4:30 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 4:30 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 4:30 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 4:30 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 4:39 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 4:39 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 4:39 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 4:39 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 4:45 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 4:45 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 4:45 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 4:45 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 4:59 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 4:59 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 4:59 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 4:59 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 5:09 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 5:09 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 5:09 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 5:09 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 5:20 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 5:20 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 5:20 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 5:20 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 5:31 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 5:31 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 5:31 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 5:31 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 6:26 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 6:26 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 6:26 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 6:26 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 6:26 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 6:26 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 6:26 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 6:26 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 6:38 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 6:38 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 6:38 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 6:38 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 6:41 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 6:41 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 6:41 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 6:41 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 6:41 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 6:41 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 6:41 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 6:41 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 6:53 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 6:53 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 6:53 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 6:53 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 6:55 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 6:55 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 6:55 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 6:55 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 7:17 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 7:17 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 7:17 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 7:17 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 7:17 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 7:17 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 7:17 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 7:17 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 7:23 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 7:23 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 7:23 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 7:23 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 7:25 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 7:25 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 7:25 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 7:25 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 7:42 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 7:42 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 7:42 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 7:42 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 7:42 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 7:42 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 7:42 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 7:42 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 7:54 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 7:54 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 7:54 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 7:54 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 7:58 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 7:58 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 7:58 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 7:58 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 7:58 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 7:58 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 7:58 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 7:58 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 8:10 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 8:10 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 8:10 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 8:10 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 8:12 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 8:12 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 8:12 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 8:12 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 11:29 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 11:29 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 11:29 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 11:29 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 1:14 PM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 1:14 PM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 1:14 PM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 1:14 PM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 1:35 PM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 1:35 PM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 1:35 PM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 1:35 PM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 2:18 PM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 2:18 PM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 2:18 PM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 2:18 PM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 5:02 PM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 5:02 PM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 5:02 PM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 5:02 PM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 5:20 PM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 5:20 PM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 5:20 PM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 5:20 PM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 8:01 PM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 8:01 PM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 8:01 PM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 8:01 PM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 10:04 PM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 10:04 PM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 10:04 PM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 10:04 PM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 10:39 PM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/5/26 10:39 PM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/5/26 10:39 PM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/5/26 10:39 PM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+
+--- logfile: log-3 ---
+10/6/26 5:51 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/6/26 5:51 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/6/26 5:51 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/6/26 5:51 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/6/26 9:30 AM IDP After initGrid:gridName:practical, dbFile:launcher_4_by_5.db, LauncherPrefs GRID_NAME:practical, LauncherPrefs DB_FILE:launcher_4_by_5.db
+10/6/26 9:30 AM ModelDbController isGridMigrationNecessary: no grid migration needed
+10/6/26 9:30 AM LoaderTask loadWorkspace: Packages with active install/update sessions: []
+10/6/26 9:30 AM LoaderTask No pinned shortcuts found for user UserHandle{0}
+10/6/26 9:30 AM WorkspaceItemProcessor valid target true, marking restored: com.google.android.dialer, itemType=0, restoreFlag=0
+10/6/26 9:30 AM WorkspaceItemProcessor valid target true, marking restored: com.google.android.apps.messaging, itemType=0, restoreFlag=0
+10/6/26 9:30 AM WorkspaceItemProcessor valid target true, marking restored: com.android.chrome, itemType=0, restoreFlag=0
+10/6/26 9:30 AM WorkspaceItemProcessor valid target true, marking restored: com.google.android.gm, itemType=0, restoreFlag=0
+10/6/26 9:30 AM WorkspaceItemProcessor valid target true, marking restored: com.google.android.apps.photos, itemType=0, restoreFlag=0
+10/6/26 9:30 AM WorkspaceItemProcessor valid target true, marking restored: com.google.android.youtube, itemType=0, restoreFlag=0
+10/6/26 9:30 AM LoaderTask stopLocked: Loader stopping
+10/6/26 9:30 AM LoaderTask LoaderTask cancelled
+10/6/26 9:30 AM ModelDbController isGridMigrationNecessary: no grid migration needed
+10/6/26 9:30 AM LoaderTask loadWorkspace: Packages with active install/update sessions: []
+10/6/26 9:30 AM LoaderTask No pinned shortcuts found for user UserHandle{0}
+10/6/26 9:30 AM WorkspaceItemProcessor valid target true, marking restored: com.google.android.dialer, itemType=0, restoreFlag=0
+10/6/26 9:30 AM WorkspaceItemProcessor valid target true, marking restored: com.google.android.apps.messaging, itemType=0, restoreFlag=0
+10/6/26 9:30 AM WorkspaceItemProcessor valid target true, marking restored: com.android.chrome, itemType=0, restoreFlag=0
+10/6/26 9:30 AM WorkspaceItemProcessor valid target true, marking restored: com.google.android.gm, itemType=0, restoreFlag=0
+10/6/26 9:30 AM WorkspaceItemProcessor valid target true, marking restored: com.google.android.apps.photos, itemType=0, restoreFlag=0
+10/6/26 9:30 AM WorkspaceItemProcessor valid target true, marking restored: com.google.android.youtube, itemType=0, restoreFlag=0
+10/6/26 10:53 AM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/6/26 10:53 AM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/6/26 10:53 AM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/6/26 10:53 AM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/6/26 4:44 PM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/6/26 4:44 PM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/6/26 4:44 PM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/6/26 4:44 PM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/6/26 5:29 PM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/6/26 5:29 PM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/6/26 5:29 PM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/6/26 5:29 PM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/6/26 6:28 PM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/6/26 6:28 PM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/6/26 6:28 PM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/6/26 6:28 PM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/6/26 6:46 PM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/6/26 6:46 PM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/6/26 6:46 PM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/6/26 6:46 PM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/6/26 8:41 PM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/6/26 8:41 PM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/6/26 8:41 PM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/6/26 8:41 PM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/6/26 10:42 PM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/6/26 10:42 PM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/6/26 10:43 PM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/6/26 10:43 PM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/6/26 10:55 PM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/6/26 10:55 PM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/6/26 10:55 PM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/6/26 10:55 PM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/6/26 11:19 PM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/6/26 11:19 PM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/6/26 11:19 PM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/6/26 11:19 PM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/6/26 11:30 PM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/6/26 11:30 PM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/6/26 11:30 PM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/6/26 11:30 PM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/6/26 11:32 PM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/6/26 11:32 PM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/6/26 11:32 PM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/6/26 11:32 PM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/6/26 11:51 PM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/6/26 11:51 PM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/6/26 11:51 PM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/6/26 11:51 PM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+10/6/26 11:57 PM LauncherAppsCallbackImpl onPackageRemoved triggered for packageName=com.heyta, user=UserHandle{0}
+10/6/26 11:57 PM ModelWriter removing items from db . Reason: [removed because the corresponding package or component is removed. mOp=3 removedPackages=[com.heyta] removedComponents=[]]
+10/6/26 11:57 PM SessionCommitReceiver Removing unneeded PromiseIcon for package: com.heyta, install reason: 0, alreadyAddedPromiseIcon: false
+10/6/26 11:57 PM LauncherAppsCallbackImpl onPackageAdded triggered for packageName=com.heyta, user=UserHandle{0}
+    Recent BC Smartspace Targets (most recent first)
+       Number of targets: 0
+
+       Number of targets: 0
+
+       Number of targets: 0
+
+       Number of targets: 0
+
+       Number of targets: 0
+
+    Data Model:
+     ---- items id map 
+    	ItemInfo(id=1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@1a1bf6a
+hotseat {
+  index: 0
+} targetComponent=ComponentInfo{com.google.android.dialer/com.google.android.dialer.extensions.GoogleDialtactsActivity} screen=0 cell(0,0) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=Phone supportsMultiInstance=false nonResizeable=false)
+    	ItemInfo(id=2 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@1a1ca63
+hotseat {
+  index: 1
+} targetComponent=ComponentInfo{com.google.android.apps.messaging/com.google.android.apps.messaging.ui.ConversationListActivity} screen=1 cell(1,0) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=Messages supportsMultiInstance=false nonResizeable=false)
+    	ItemInfo(id=3 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@1a1d55c
+hotseat {
+  index: 2
+} targetComponent=ComponentInfo{com.android.chrome/com.google.android.apps.chrome.Main} screen=2 cell(2,0) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=Chrome supportsMultiInstance=true nonResizeable=false)
+    	ItemInfo(id=4 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@1a430db
+workspace {
+  grid_x: 1
+  grid_y: 4
+} targetComponent=ComponentInfo{com.google.android.gm/com.google.android.gm.ConversationListActivityGmail} screen=0 cell(1,4) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=Gmail supportsMultiInstance=false nonResizeable=false)
+    	ItemInfo(id=5 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@1a67668
+workspace {
+  grid_x: 2
+  grid_y: 4
+} targetComponent=ComponentInfo{com.google.android.apps.photos/com.google.android.apps.photos.home.HomeActivity} screen=0 cell(2,4) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=Photos supportsMultiInstance=false nonResizeable=false)
+    	ItemInfo(id=6 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@1a8bbf5
+workspace {
+  grid_x: 3
+  grid_y: 4
+} targetComponent=ComponentInfo{com.google.android.youtube/com.google.android.youtube.app.honeycomb.Shell$HomeActivity} screen=0 cell(3,4) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=YouTube supportsMultiInstance=false nonResizeable=false)
+     ---- extra items 
+    	FixedContainerItems: id=-203 itemCount=1 item #0: ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@7bc6f targetComponent=null screen=-1 cell(-1,-1) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=null)
+    	FixedContainerItems: id=-202 itemCount=0
+    	FixedContainerItems: id=-114 itemCount=1 item #0: ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@1a1ca63 targetComponent=null screen=-1 cell(-1,-1) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=null)
+    	FixedContainerItems: id=-111 itemCount=0
+    	FixedContainerItems: id=-103 itemCount=10 item #0: ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@1a89011
+predicted_hotseat_container {
+  index: 3
+} targetComponent=ComponentInfo{com.heyta/com.heytamobile.MainActivity} screen=3 cell(3,0) span(1,1) minSpan(1,1) rank=3 user=UserHandle{0} title=heyta supportsMultiInstance=false nonResizeable=false) item #1: ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@19f79dd
+predicted_hotseat_container {
+  index: -1
+} targetComponent=ComponentInfo{com.android.stk/com.android.stk.StkMain} screen=-1 cell(-1,-1) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=TMoble supportsMultiInstance=false nonResizeable=false) item #2: ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@19f79dd
+predicted_hotseat_container {
+  index: -1
+} targetComponent=ComponentInfo{com.google.android.gm/com.google.android.gm.ConversationListActivityGmail} screen=-1 cell(-1,-1) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=Gmail supportsMultiInstance=false nonResizeable=false) item #3: ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@19f79dd
+predicted_hotseat_container {
+  index: -1
+} targetComponent=ComponentInfo{com.google.android.youtube/com.google.android.youtube.app.honeycomb.Shell$HomeActivity} screen=-1 cell(-1,-1) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=YouTube supportsMultiInstance=false nonResizeable=false) item #4: ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@19f79dd
+predicted_hotseat_container {
+  index: -1
+} targetComponent=ComponentInfo{com.google.android.apps.photos/com.google.android.apps.photos.home.HomeActivity} screen=-1 cell(-1,-1) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=Photos supportsMultiInstance=false nonResizeable=false) item #5: ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@19f79dd
+predicted_hotseat_container {
+  index: -1
+} targetComponent=ComponentInfo{com.google.android.deskclock/com.android.deskclock.DeskClock} screen=-1 cell(-1,-1) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=Clock supportsMultiInstance=false nonResizeable=false) item #6: ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@19f79dd
+predicted_hotseat_container {
+  index: -1
+} targetComponent=ComponentInfo{com.google.android.contacts/com.android.contacts.activities.PeopleActivity} screen=-1 cell(-1,-1) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=Contacts supportsMultiInstance=false nonResizeable=false) item #7: ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@19f79dd
+predicted_hotseat_container {
+  index: -1
+} targetComponent=ComponentInfo{com.google.android.calendar/com.android.calendar.AllInOneActivity} screen=-1 cell(-1,-1) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=Calendar supportsMultiInstance=false nonResizeable=false) item #8: ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@19f79dd
+predicted_hotseat_container {
+  index: -1
+} targetComponent=ComponentInfo{com.google.android.apps.maps/com.google.android.maps.MapsActivity} screen=-1 cell(-1,-1) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=Maps supportsMultiInstance=false nonResizeable=false) item #9: ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@19f79dd
+predicted_hotseat_container {
+  index: -1
+} targetComponent=ComponentInfo{com.google.android.apps.docs/com.google.android.apps.docs.app.NewMainProxyActivity} screen=-1 cell(-1,-1) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=Drive supportsMultiInstance=true nonResizeable=false)
+    	FixedContainerItems: id=-102 itemCount=9 item #0: ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@1a1bf6a
+prediction_container {
+} targetComponent=ComponentInfo{com.google.android.gm/com.google.android.gm.ConversationListActivityGmail} screen=-1 cell(0,0) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=Gmail supportsMultiInstance=false nonResizeable=false) item #1: ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@1a1bf6a
+prediction_container {
+} targetComponent=ComponentInfo{com.google.android.youtube/com.google.android.youtube.app.honeycomb.Shell$HomeActivity} screen=-1 cell(1,0) span(1,1) minSpan(1,1) rank=1 user=UserHandle{0} title=YouTube supportsMultiInstance=false nonResizeable=false) item #2: ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@1a1bf6a
+prediction_container {
+} targetComponent=ComponentInfo{com.google.android.apps.photos/com.google.android.apps.photos.home.HomeActivity} screen=-1 cell(2,0) span(1,1) minSpan(1,1) rank=2 user=UserHandle{0} title=Photos supportsMultiInstance=false nonResizeable=false) item #3: ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@1a1bf6a
+prediction_container {
+} targetComponent=ComponentInfo{com.android.stk/com.android.stk.StkMain} screen=-1 cell(3,0) span(1,1) minSpan(1,1) rank=3 user=UserHandle{0} title=TMoble supportsMultiInstance=false nonResizeable=false) item #4: ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@1a1bf6a
+prediction_container {
+} targetComponent=ComponentInfo{com.google.android.deskclock/com.android.deskclock.DeskClock} screen=-1 cell(-1,-1) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=Clock supportsMultiInstance=false nonResizeable=false) item #5: ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@1a1bf6a
+prediction_container {
+} targetComponent=ComponentInfo{com.google.android.contacts/com.android.contacts.activities.PeopleActivity} screen=-1 cell(-1,-1) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=Contacts supportsMultiInstance=false nonResizeable=false) item #6: ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@1a1bf6a
+prediction_container {
+} targetComponent=ComponentInfo{com.google.android.calendar/com.android.calendar.AllInOneActivity} screen=-1 cell(-1,-1) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=Calendar supportsMultiInstance=false nonResizeable=false) item #7: ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@1a1bf6a
+prediction_container {
+} targetComponent=ComponentInfo{com.google.android.apps.maps/com.google.android.maps.MapsActivity} screen=-1 cell(-1,-1) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=Maps supportsMultiInstance=false nonResizeable=false) item #8: ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@1a1bf6a
+prediction_container {
+} targetComponent=ComponentInfo{com.google.android.apps.docs/com.google.android.apps.docs.app.NewMainProxyActivity} screen=-1 cell(-1,-1) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=Drive supportsMultiInstance=true nonResizeable=false)
+     TaskFragmentOverlayManager:
+    	isDestroyed: false
+    	currentInfo: TaskFragmentInfo{ fragmentToken=android.os.Binder@b7d7398 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@64820c5} runningActivityCount=0 isVisible=false activities=[] inRequestedTaskFragmentActivities[] positionInParent=Point(0, 0) isTaskClearedForReuse=false isTaskFragmentClearedForPip=false mIsClearedForReorderActivityToFront=false minimumDimensions=Point(0, 0) isTopNonFinishingChild=false}
+    	currentSwipeSession: null
+    	isInputManagerRelayingInput: false
+    	mayBeOverlayVisible: false
+    	fragmentConfig: {1.0 310mcc260mnc [en_US] ldltr sw411dp w411dp h914dp 420dpi nrml long port finger -keyb/v/h -nav/h winConfig={ mBounds=Rect(0, 0 - 1080, 2400) mAppBounds=Rect(0, 0 - 1080, 2400) mMaxBounds=Rect(0, 0 - 1080, 2400) mDisplayRotation=ROTATION_0 mWindowingMode=multi-window mActivityType=home mAlwaysOnTop=undefined mRotation=ROTATION_0} s.10533 fontWeightAdjustment=0}
+    	 InputMonitorManager:
+    		isInTransition: false
+    		overlaySurface: Surface(name=home_task_overlay_container)/@0x4102a1a
+    		fragmentSurface: Surface(name=TaskFragment{7def547 mode=fullscreen})/@0x1d2094b
+    	 TaskFragmentComponent:
+    		fragmentToken: android.os.Binder@b7d7398
+    		windowContainerToken: WCT{android.window.IWindowContainerToken$Stub$Proxy@64820c5}
+    		taskSurface: Surface(name=TaskFragment{7def547 mode=fullscreen})/@0x1d2094b
+    		organizer.organizerToken: TaskFragmentOrganizerToken{android.window.TaskFragmentOrganizer$1@44ff28}
+    	TaskOverlayEvent event history:
+    	  02:01:20.973+0800  onFragmentCreated
+    	  02:01:20.972+0800  onSwipeTransitionFinished: false
+    	  02:01:20.886+0800  TaskFragmentOverlayManager-init: 116050296
+    ContextTracker:
+    	mCurrentContext=com.google.android.apps.nexuslauncher.NexusLauncherActivity@3b7429f
+    	mCallbacks=[]
+    Default MSDL player implementation.
+Vibrator: android.os.SystemVibrator@40f0441
+Repository: p3.c@8f6cde6
+    MSDLPlayerWrapper history of latest events:
+    DepthController
+    	mMaxBlurRadius=23
+    	mCrossWindowBlursEnabled=true
+    	mBaseSurface=null
+    	mBaseSurfaceOverride=null
+    	mStateDepth=0.6
+    	mWidgetDepth=0.0
+    	mCurrentBlur=0
+    	mInEarlyWakeUp=true
+    	mIgnoreStateChangesDuringMultiWindowAnimation=false
+    	mPauseBlurs=false
+    	mWaitingOnSurfaceValidity=false
+
+QuickstepLauncher:
+    	mOrientationState: [this=RecentsOrientedState@53330883 mOrientationHandler=PortraitPagedViewHandler@162918183 mDisplayRotation=0 mTouchRotation=0 mRecentsActivityRotation=0 mRecentsRotation=0 isRecentsActivityRotationAllowed=false mSystemRotation=true mStateId=38272 mFlags=299]
+     SplitSelectDataHolder
+    	initialStagePosition= -1
+    	initialTaskId= -1
+    	secondTaskId= -1
+    	initialUser= null
+    	secondUser= null
+    	initialIntent= null
+    	secondIntent= null
+    	secondPendingIntent= null
+    	itemInfo= null
+    	splitEvent= null
+    	initialShortcut= null
+    	secondShortcut= null
+    	RingAppearAnimation	DreamAnimationController event history:
+    HotseatPredictionController
+    	Flags: 
+    	mHotSeatItemsCount: 4
+    	mPredictedItems: 10
+    		ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@1a89011
+predicted_hotseat_container {
+  index: 3
+} targetComponent=ComponentInfo{com.heyta/com.heytamobile.MainActivity} screen=3 cell(3,0) span(1,1) minSpan(1,1) rank=3 user=UserHandle{0} title=heyta supportsMultiInstance=false nonResizeable=false)
+    		ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@19f79dd
+predicted_hotseat_container {
+  index: -1
+} targetComponent=ComponentInfo{com.android.stk/com.android.stk.StkMain} screen=-1 cell(-1,-1) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=TMoble supportsMultiInstance=false nonResizeable=false)
+    		ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@19f79dd
+predicted_hotseat_container {
+  index: -1
+} targetComponent=ComponentInfo{com.google.android.gm/com.google.android.gm.ConversationListActivityGmail} screen=-1 cell(-1,-1) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=Gmail supportsMultiInstance=false nonResizeable=false)
+    		ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@19f79dd
+predicted_hotseat_container {
+  index: -1
+} targetComponent=ComponentInfo{com.google.android.youtube/com.google.android.youtube.app.honeycomb.Shell$HomeActivity} screen=-1 cell(-1,-1) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=YouTube supportsMultiInstance=false nonResizeable=false)
+    		ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@19f79dd
+predicted_hotseat_container {
+  index: -1
+} targetComponent=ComponentInfo{com.google.android.apps.photos/com.google.android.apps.photos.home.HomeActivity} screen=-1 cell(-1,-1) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=Photos supportsMultiInstance=false nonResizeable=false)
+    		ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@19f79dd
+predicted_hotseat_container {
+  index: -1
+} targetComponent=ComponentInfo{com.google.android.deskclock/com.android.deskclock.DeskClock} screen=-1 cell(-1,-1) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=Clock supportsMultiInstance=false nonResizeable=false)
+    		ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@19f79dd
+predicted_hotseat_container {
+  index: -1
+} targetComponent=ComponentInfo{com.google.android.contacts/com.android.contacts.activities.PeopleActivity} screen=-1 cell(-1,-1) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=Contacts supportsMultiInstance=false nonResizeable=false)
+    		ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@19f79dd
+predicted_hotseat_container {
+  index: -1
+} targetComponent=ComponentInfo{com.google.android.calendar/com.android.calendar.AllInOneActivity} screen=-1 cell(-1,-1) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=Calendar supportsMultiInstance=false nonResizeable=false)
+    		ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@19f79dd
+predicted_hotseat_container {
+  index: -1
+} targetComponent=ComponentInfo{com.google.android.apps.maps/com.google.android.maps.MapsActivity} screen=-1 cell(-1,-1) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=Maps supportsMultiInstance=false nonResizeable=false)
+    		ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@19f79dd
+predicted_hotseat_container {
+  index: -1
+} targetComponent=ComponentInfo{com.google.android.apps.docs/com.google.android.apps.docs.app.NewMainProxyActivity} screen=-1 cell(-1,-1) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=Drive supportsMultiInstance=true nonResizeable=false)
+    PredictionRowView
+    	mPredictionsEnabled: true
+    	mPredictionUiUpdatePaused: false
+    	mNumPredictedAppsPerRow: 4
+    	mPredictedApps: 9
+    		ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@1a1bf6a
+prediction_container {
+} targetComponent=ComponentInfo{com.google.android.gm/com.google.android.gm.ConversationListActivityGmail} screen=-1 cell(0,0) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=Gmail supportsMultiInstance=false nonResizeable=false)
+    		ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@1a1bf6a
+prediction_container {
+} targetComponent=ComponentInfo{com.google.android.youtube/com.google.android.youtube.app.honeycomb.Shell$HomeActivity} screen=-1 cell(1,0) span(1,1) minSpan(1,1) rank=1 user=UserHandle{0} title=YouTube supportsMultiInstance=false nonResizeable=false)
+    		ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@1a1bf6a
+prediction_container {
+} targetComponent=ComponentInfo{com.google.android.apps.photos/com.google.android.apps.photos.home.HomeActivity} screen=-1 cell(2,0) span(1,1) minSpan(1,1) rank=2 user=UserHandle{0} title=Photos supportsMultiInstance=false nonResizeable=false)
+    		ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@1a1bf6a
+prediction_container {
+} targetComponent=ComponentInfo{com.android.stk/com.android.stk.StkMain} screen=-1 cell(3,0) span(1,1) minSpan(1,1) rank=3 user=UserHandle{0} title=TMoble supportsMultiInstance=false nonResizeable=false)
+    		ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@1a1bf6a
+prediction_container {
+} targetComponent=ComponentInfo{com.google.android.deskclock/com.android.deskclock.DeskClock} screen=-1 cell(-1,-1) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=Clock supportsMultiInstance=false nonResizeable=false)
+    		ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@1a1bf6a
+prediction_container {
+} targetComponent=ComponentInfo{com.google.android.contacts/com.android.contacts.activities.PeopleActivity} screen=-1 cell(-1,-1) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=Contacts supportsMultiInstance=false nonResizeable=false)
+    		ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@1a1bf6a
+prediction_container {
+} targetComponent=ComponentInfo{com.google.android.calendar/com.android.calendar.AllInOneActivity} screen=-1 cell(-1,-1) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=Calendar supportsMultiInstance=false nonResizeable=false)
+    		ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@1a1bf6a
+prediction_container {
+} targetComponent=ComponentInfo{com.google.android.apps.maps/com.google.android.maps.MapsActivity} screen=-1 cell(-1,-1) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=Maps supportsMultiInstance=false nonResizeable=false)
+    		ItemInfo(id=-1 type=APP container=# com.android.launcher3.logger.LauncherAtom$ContainerInfo@1a1bf6a
+prediction_container {
+} targetComponent=ComponentInfo{com.google.android.apps.docs/com.google.android.apps.docs.app.NewMainProxyActivity} screen=-1 cell(-1,-1) span(1,1) minSpan(1,1) rank=0 user=UserHandle{0} title=Drive supportsMultiInstance=true nonResizeable=false)
+NexusLauncher
+    OneSearch:
+    		shouldShowSuggest=true
+    		SearchRequestTimeout=200
+    		mEnableOneSearch=true
+    		mEnableOneSearchAA=false
+    		mLaunchOnDefaultBrowser=false
+    		mShowSearchEducardQsb=true
+    		mEnableImeLatencyLogger=true
+    		mEnableRichAnswer=true
+    		mEnableQuickLaunchV3Qsb=false
+    		mEnableQuickLaunchV3AA=false
+    		mGboardUpdateEnterKey=false
+    		mEnableImpressionLogging=true
+    		mEnableHideGboardHeaderStatic=false
+    		mUninstalledAppsQueryLenLowerBound=2
+    		mUninstalledAppsQueryLenUpperBound=20
+    		mUninstalledAppsCount=2
+    		mIsTrampolineActivityEnabled=true
+    		mIsOpenSrpInBrowserSupported=false
+    		mPsTileQueryLenLowerBound=2
+    		mWidgetTileQueryLenLowerBound=3
+    		mQsbVoiceIconType=0
+    		mUseAppSearchZeroStateWeb=true
+    		mOverlayScrollExclusionHeightLimitDp=400
+    	ZeroStateResultProvider
+    		mWebUiUpdatePaused=false
+    		mPendingWebTargets=[]
+    		mCurrentWebTargets=[android.app.search.SearchTarget@7ee5d4, android.app.search.SearchTarget@606a37d, android.app.search.SearchTarget@651e272, android.app.search.SearchTarget@a0856c3, android.app.search.SearchTarget@dce8b40, android.app.search.SearchTarget@2defa79, android.app.search.SearchTarget@bd7b3be, android.app.search.SearchTarget@68f9c1f, android.app.search.SearchTarget@bb11b6c, android.app.search.SearchTarget@24bc535, android.app.search.SearchTarget@c574dca, android.app.search.SearchTarget@f1bdb3b, android.app.search.SearchTarget@64a8258, android.app.search.SearchTarget@9807fb1, android.app.search.SearchTarget@6847c96]
+    LauncherSmartspace:
+    		mUpdatesPaused=false
+    		mIsAodEnabled=false
+    		mLastReceivedTargetIds={date_card_794317_92634}
+    		mAnimateSmartspaceUpdate=false
+    		mScrollState=0
+    		mCardPosition=0
+    		mPendingTargetIds=[]
+    	RingAppearAnimation	LauncherUnlock event history:
+    DeviceSearchSettings:
+      ShortcutResult:true
+      PixelTipsResult:true
+      WebResult:true
+      SettingsResult:true
+
+TASK 10340:com.heyta id=416 userId=0 displayId=0(type=INTERNAL)
+  ACTIVITY com.heyta/com.heytamobile.MainActivity bdd737a pid=7448 userId=0 uid=10340 displayId=0(type=INTERNAL)
+    Local Activity 7c4a698 State:
+      mResumed=true mStopped=false mFinished=false
+      mIsInMultiWindowMode=false mIsInPictureInPictureMode=false
+      mChangingConfigurations=false
+      mCurrentConfig={1.0 310mcc260mnc [en_US] ldltr sw411dp w411dp h914dp 420dpi nrml long port finger -keyb/v/h -nav/h winConfig={ mBounds=Rect(0, 0 - 1080, 2400) mAppBounds=Rect(0, 0 - 1080, 2400) mMaxBounds=Rect(0, 0 - 1080, 2400) mDisplayRotation=ROTATION_0 mWindowingMode=fullscreen mActivityType=standard mAlwaysOnTop=undefined mRotation=ROTATION_0} s.2 fontWeightAdjustment=0}
+      mLoadersStarted=true
+      Active Fragments in f8a907b:
+        #0: ReportFragment{272e98 #0 androidx.lifecycle.LifecycleDispatcher.report_fragment_tag}
+          mFragmentId=#0 mContainerId=#0 mTag=androidx.lifecycle.LifecycleDispatcher.report_fragment_tag
+          mState=5 mIndex=0 mWho=android:fragment:0 mBackStackNesting=0
+          mAdded=true mRemoving=false mFromLayout=false mInLayout=false
+          mHidden=false mDetached=false mMenuVisible=true mHasMenu=false
+          mRetainInstance=false mRetaining=false mUserVisibleHint=true
+          mFragmentManager=FragmentManager{f8a907b in HostCallbacks{27156f1}}
+          mHost=android.app.Activity$HostCallbacks@27156f1
+          Child FragmentManager{225a2d6 in ReportFragment{272e98}}:
+            FragmentManager misc state:
+              mHost=android.app.Activity$HostCallbacks@27156f1
+              mContainer=android.app.Fragment$1@927b957
+              mParent=ReportFragment{272e98 #0 androidx.lifecycle.LifecycleDispatcher.report_fragment_tag}
+              mCurState=5 mStateSaved=false mDestroyed=false
+      Added Fragments:
+        #0: ReportFragment{272e98 #0 androidx.lifecycle.LifecycleDispatcher.report_fragment_tag}
+      FragmentManager misc state:
+        mHost=android.app.Activity$HostCallbacks@27156f1
+        mContainer=android.app.Activity$HostCallbacks@27156f1
+        mCurState=5 mStateSaved=false mDestroyed=false
+    ViewRoot:
+      mAdded=true
+      mRemoved=false
+      mStopped=false
+      mPausedForTransition=false
+      mConsumeBatchedInputScheduled=false
+      mConsumeBatchedInputImmediatelyScheduled=false
+      mPendingInputEventCount=0
+      mProcessInputEventsScheduled=false
+      mTraversalScheduled=false
+      mReportNextDraw=false
+      mLastReportedMergedConfiguration={mGlobalConfig={1.0 310mcc260mnc [en_US] ldltr sw411dp w411dp h914dp 420dpi nrml long port finger -keyb/v/h -nav/h winConfig={ mBounds=Rect(0, 0 - 1080, 2400) mAppBounds=Rect(0, 0 - 1080, 2400) mMaxBounds=Rect(0, 0 - 1080, 2400) mDisplayRotation=ROTATION_0 mWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=ROTATION_0} s.10754 fontWeightAdjustment=0} mOverrideConfig={1.0 310mcc260mnc [en_US] ldltr sw411dp w411dp h914dp 420dpi nrml long port finger -keyb/v/h -nav/h winConfig={ mBounds=Rect(0, 0 - 1080, 2400) mAppBounds=Rect(0, 0 - 1080, 2400) mMaxBounds=Rect(0, 0 - 1080, 2400) mDisplayRotation=ROTATION_0 mWindowingMode=fullscreen mActivityType=standard mAlwaysOnTop=undefined mRotation=ROTATION_0} s.2 fontWeightAdjustment=0}}
+      mLastConfigurationFromResources={1.0 310mcc260mnc [en_US] ldltr sw411dp w411dp h914dp 420dpi nrml long port finger -keyb/v/h -nav/h winConfig={ mBounds=Rect(0, 0 - 1080, 2400) mAppBounds=Rect(0, 0 - 1080, 2400) mMaxBounds=Rect(0, 0 - 1080, 2400) mDisplayRotation=ROTATION_0 mWindowingMode=fullscreen mActivityType=standard mAlwaysOnTop=undefined mRotation=ROTATION_0} s.2 fontWeightAdjustment=0}
+      mLastReportedActivityWindowInfo=ActivityWindowInfo{isEmbedded=false, taskBounds=Rect(0, 0 - 1080, 2400), taskFragmentBounds=Rect(0, 0 - 1080, 2400)}
+      mIsAmbientMode=false
+      mUnbufferedInputSource=0
+      mAttachInfo=       AttachInfo:
+        mHasWindowFocus=true
+        mWindowVisibility=0
+        mInTouchMode=true
+        mUnbufferedDispatchRequested=false
+      android.view.ViewRootImpl$NativePreImeInputStage: mQueueLength=0
+      android.view.ViewRootImpl$ImeInputStage: mQueueLength=0
+      android.view.ViewRootImpl$NativePostImeInputStage: mQueueLength=0
+      android.view.ViewRootImpl$WindowInputEventReceiver
+       mInputChannel: 73a7cf5 com.heyta/com.heytamobile.MainActivity
+       mSeqMap: {}
+       mReceiverPtr:
+        mInputConsumer:
+          mResampleTouch = true
+          mChannel = 73a7cf5 com.heyta/com.heytamobile.MainActivity
+          mMsgDeferred: false
+          Batches:
+              <empty>
+          mSeqChains:
+              <empty>
+          mConsumeTimes:
+              <empty>
+          
+        mBatchedInputEventPending: false
+        mOutboundQueue:
+          <empty>
+        
+    Choreographer:
+      mFrameScheduled=true
+      mLastFrameTime=180771034 (15 ms ago)
+    InsetsController:
+        InsetsState
+          mDisplayFrame=Rect(0, 0 - 1080, 2400)
+          mDisplayCutout=DisplayCutout{insets=Rect(0, 0 - 0, 0) waterfall=Insets{left=0, top=0, right=0, bottom=0} boundingRect={Bounds=[Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0)]} cutoutPathParserInfo={CutoutPathParserInfo{displayWidth=0 displayHeight=0 physicalDisplayWidth=0 physicalDisplayHeight=0 density={0.0} cutoutSpec={} rotation={0} scale={0.0} physicalPixelDisplaySizeRatio={0.0}}} sideOverrides=null}
+          mRoundedCorners=RoundedCorners{[RoundedCorner{position=TopLeft, radius=0, center=Point(0, 0)}, RoundedCorner{position=TopRight, radius=0, center=Point(0, 0)}, RoundedCorner{position=BottomRight, radius=0, center=Point(0, 0)}, RoundedCorner{position=BottomLeft, radius=0, center=Point(0, 0)}]}
+          mRoundedCornerFrame=Rect(0, 0 - 1080, 2400)
+          mPrivacyIndicatorBounds=PrivacyIndicatorBounds {static bounds=Rect(827, 0 - 1043, 63) rotation=0}
+          mDisplayShape=DisplayShape{ spec=-1893857183 displayWidth=1080 displayHeight=2400 physicalPixelDisplaySizeRatio=1.0 rotation=0 offsetX=0 offsetY=0 scale=1.0}
+            InsetsSource id=9aa30000 type=statusBars frame=[0,0][1080,63] visible=true flags= sideHint=TOP boundingRects=null
+            InsetsSource id=9aa30005 type=mandatorySystemGestures frame=[0,0][1080,63] visible=true flags= sideHint=TOP boundingRects=null
+            InsetsSource id=9aa30006 type=tappableElement frame=[0,0][1080,63] visible=true flags= sideHint=TOP boundingRects=null
+            InsetsSource id=f26f0001 type=navigationBars frame=[0,2337][1080,2400] visible=true flags=SUPPRESS_SCRIM|ANIMATE_RESIZING sideHint=BOTTOM boundingRects=null
+            InsetsSource id=f26f0004 type=systemGestures frame=[0,0][78,2400] visible=true flags= sideHint=LEFT boundingRects=null
+            InsetsSource id=f26f0005 type=mandatorySystemGestures frame=[0,2316][1080,2400] visible=true flags= sideHint=BOTTOM boundingRects=null
+            InsetsSource id=f26f0006 type=tappableElement frame=[0,0][0,0] visible=true flags= sideHint=NONE boundingRects=null
+            InsetsSource id=f26f0024 type=systemGestures frame=[1002,0][1080,2400] visible=true flags= sideHint=RIGHT boundingRects=null
+            InsetsSource id=3 type=ime frame=[0,0][0,0] visibleFrame=[0,2400][1080,2400] visible=false flags= sideHint=NONE boundingRects=null
+        mIsPredictiveBackImeHideAnimInProgress=false
+    WindowOnBackDispatcher:
+        Top Callback: androidx.activity.OnBackPressedDispatcher$Api33Impl$$ExternalSyntheticLambda0@57e660b
+        Callbacks: 
+          Callback: androidx.activity.OnBackPressedDispatcher$Api33Impl$$ExternalSyntheticLambda0@57e660b Priority=0
+          Callback: android.app.Activity$$ExternalSyntheticLambda0@65e7f85 Priority=-1
+    ImeBackAnimationController:
+        mLastProgress=0.0
+        mTriggerBack=false
+        mIsPreCommitAnimationInProgress=false
+        mStartRootScrollY=0
+        isBackAnimationAllowed=true
+        isAdjustPan=false
+        isHideAnimationInProgress=false
+    View Hierarchy:
+      com.android.internal.policy.DecorView{ac9c44 V.E...... R....... 0,0-1080,2400 aid=0}[MainActivity]
+        android.widget.LinearLayout{4c7bc6d V.E...... ........ 0,0-1080,2400}
+          android.view.ViewStub{1b3712d G.E...... ......I. 0,0-0,0 #10201ed android:id/action_mode_bar_stub}
+          android.widget.FrameLayout{dc2a0a2 V.E...... ........ 0,0-1080,2400}
+            androidx.appcompat.widget.FitWindowsLinearLayout{81bf133 V.E...... ........ 0,0-1080,2400 #7f080036 app:id/action_bar_root aid=1073741826}
+              androidx.appcompat.widget.ViewStubCompat{bb11662 G.E...... ......I. 0,0-0,0 #7f080041 app:id/action_mode_bar_stub aid=1073741827}
+              androidx.appcompat.widget.ContentFrameLayout{7d56cf0 V.E...... ........ 0,0-1080,2400 #1020002 android:id/content}
+                com.facebook.react.runtime.ReactSurfaceView{eb0b269 V.E...... ........ 0,0-1080,2400 #1}
+                  com.th3rdwave.safeareacontext.SafeAreaProvider{dce24ee V.E...... ........ 0,0-1080,2400 #2}
+                    com.facebook.react.views.view.ReactViewGroup{e1a6d8f V.E...... ........ 0,0-1080,2400 #496}
+                    com.facebook.react.views.view.ReactViewGroup{10493f3 I.E...... ......ID 0,0-0,0 #30 aid=1073741991}
+                      com.facebook.react.views.view.ReactViewGroup{a3c681c V.E...... ......ID 0,0-1080,2169 #4fc}
+                      com.facebook.react.views.view.ReactViewGroup{5190c25 V.E...... ......ID 0,0-1080,210 #4b8}
+                      com.facebook.react.views.text.ReactTextView{4b5ea08 V.ED..... ......ID 42,110-765,163 #49a aid=1073741828}
+                      com.facebook.react.views.view.ReactViewGroup{8f345a1 VFE...C.. ......ID 786,79-902,194 #4a6}
+                        com.horcrux.svg.SvgView{b37d87f V.ED..... ........ 32,32-84,85 #4a4}
+                          com.horcrux.svg.GroupView{bf8104c V.E...... ........ 0,0-0,0 #4a2}
+                            com.horcrux.svg.PathView{e807daa V.E...... ........ 36,36-46,46 #49e}
+                            com.horcrux.svg.CircleView{45e4895 V.E...... ........ 6,7-42,42 #4a0}
+                      com.facebook.react.views.view.ReactViewGroup{a51e3c6 VFE...C.. ......ID 923,79-1038,194 #4b4}
+                        com.horcrux.svg.SvgView{e7b7d9b V.ED..... ........ 32,32-85,85 #4b2}
+                          com.horcrux.svg.GroupView{bbbe538 V.E...... ........ 0,0-0,0 #4b0}
+                            com.horcrux.svg.PathView{27d911 V.E...... ........ 6,6-47,27 #4a8}
+                            com.horcrux.svg.PathView{940ca76 V.E...... ........ 35,6-47,18 #4aa}
+                            com.horcrux.svg.PathView{b8a5877 V.E...... ........ 6,26-47,47 #4ac}
+                            com.horcrux.svg.PathView{3e61ce4 V.E...... ........ 6,35-18,47 #4ae}
+                      com.facebook.react.views.scroll.ReactScrollView{9687f87 VFED.V... ......ID 42,273-1038,1896 #4f2}
+                        com.facebook.react.views.view.ReactViewGroup{21ff54d V.E...... .......D 0,0-996,1133 #4f0}
+                          com.facebook.react.views.view.ReactViewGroup{ae71802 V.E...... .......D 0,0-996,461 #4e0}
+                            com.facebook.react.views.text.ReactTextView{b2b24e V.ED..... ........ 0,21-996,121 #4bc aid=1073741829}
+                            com.facebook.react.views.text.ReactTextView{4bddf6f V.ED..... ........ 0,131-996,187 #4c0 aid=1073741830}
+                            com.facebook.react.views.textinput.ReactEditText{dc6247c VFED..CL. ......ID 0,209-996,325 #4c4 aid=1073741824}
+                            com.facebook.react.views.view.ReactViewGroup{638105 VFE...C.. ......ID 0,345-231,461 #4d6}
+                              com.horcrux.svg.SvgView{773038b V.ED..... ........ 42,37-84,79 #4d0}
+                                com.horcrux.svg.GroupView{6202881 V.E...... ........ 0,0-0,0 #4ce}
+                                  com.horcrux.svg.CircleView{30c4d67 V.E...... ........ 19,19-23,23 #4c8}
+                                  com.horcrux.svg.CircleView{7c8714 V.E...... ........ 31,19-35,23 #4ca}
+                                  com.horcrux.svg.CircleView{ccebd26 V.E...... ........ 7,19-11,23 #4cc}
+                              com.facebook.react.views.text.ReactTextView{f8f0c68 V.ED..... ........ 105,31-189,84 #4d4 aid=1073741831}
+                            com.facebook.react.views.view.ReactViewGroup{a8ba55a VFE...C.. ......ID 252,345-462,461 #4dc}
+                              com.facebook.react.views.text.ReactTextView{3a5cbbd V.ED..... ........ 31,29-178,85 #4da aid=1073741832}
+                          com.horcrux.svg.SvgView{fc0e9aa V.ED..... ........ 0,535-42,577 #5a2}
+                            com.horcrux.svg.GroupView{4f938b0 V.E...... ........ 0,0-0,0 #5a0}
+                              com.horcrux.svg.PathView{e490402 V.E...... ........ 3,21-39,27 #59c}
+                              com.horcrux.svg.PathView{766114d V.E...... ........ 3,6-39,35 #59e}
+                          com.facebook.react.views.text.ReactTextView{fd1799b V.ED..... ........ 63,525-951,586 #5a6 aid=1073741959}
+                          com.facebook.react.views.text.ReactTextView{8203138 V.ED..... ........ 972,524-996,587 #5aa aid=1073741960}
+                          com.facebook.react.views.view.ReactViewGroup{b2d3f86 V.E...... ........ 0,597-996,769 #6a0}
+                          com.facebook.react.views.view.ReactViewGroup{3431047 VFE...C.. .......D 0,625-116,741 #678}
+                            com.facebook.react.views.view.ReactViewGroup{582f329 V.E...... ......ID 29,29-87,87 #676}
+                          com.facebook.react.views.view.ReactViewGroup{6dc074 VFE...C.. ........ 126,597-870,769 #68e}
+                            com.facebook.react.views.text.ReactTextView{98e36ae V.ED..... ........ 0,21-744,84 #67c aid=1073741977}
+                            com.horcrux.svg.SvgView{eca7c4f V.ED..... ........ 0,105-37,142 #682}
+                              com.horcrux.svg.GroupView{80dce12 V.E...... ........ 0,0-0,0 #680}
+                                com.horcrux.svg.PathView{69669e3 V.E...... ........ 3,4-34,31 #67e}
+                            com.facebook.react.views.text.ReactTextView{2312fdc V.ED..... ........ 47,95-158,151 #686 aid=1073741978}
+                          com.facebook.react.views.view.ReactViewGroup{d16799d VFE...C.. ......ID 881,625-996,741 #69e}
+                            com.horcrux.svg.SvgView{bae98e5 V.ED..... ........ 32,32-85,84 #69c}
+                              com.horcrux.svg.GroupView{ae06fe0 V.E...... ........ 0,0-0,0 #69a}
+                                com.horcrux.svg.PathView{60caa0c V.E...... ........ 22,23-23,37 #690}
+                                com.horcrux.svg.PathView{7c3f55 V.E...... ........ 30,23-31,37 #692}
+                                com.horcrux.svg.PathView{a3bc13f V.E...... ........ 11,13-42,48 #694}
+                                com.horcrux.svg.PathView{8f6b95e V.E...... ........ 7,13-46,13 #696}
+                                com.horcrux.svg.PathView{ae61299 V.E...... ........ 17,4-36,13 #698}
+                          com.facebook.react.views.view.ReactViewGroup{6845447 V.E...... ........ 0,779-996,951 #640}
+                          com.facebook.react.views.view.ReactViewGroup{defb474 VFE...C.. .......D 0,807-116,923 #618}
+                            com.facebook.react.views.view.ReactViewGroup{20b0fba V.E...... ......ID 29,29-87,87 #616}
+                          com.facebook.react.views.view.ReactViewGroup{dc35d9d VFE...C.. ........ 126,779-870,951 #62e}
+                            com.facebook.react.views.text.ReactTextView{15c8e6b V.ED..... ........ 0,21-744,84 #61c aid=1073741969}
+                            com.horcrux.svg.SvgView{98f6dc8 V.ED..... ........ 0,105-37,142 #622}
+                              com.horcrux.svg.GroupView{6a7ede3 V.E...... ........ 0,0-0,0 #620}
+                                com.horcrux.svg.PathView{8da3e0 V.E...... ........ 3,4-34,31 #61e}
+                            com.facebook.react.views.text.ReactTextView{634de61 V.ED..... ........ 47,95-158,151 #626 aid=1073741970}
+                          com.facebook.react.views.view.ReactViewGroup{722e212 VFE...C.. ......ID 881,807-996,923 #63e}
+                            com.horcrux.svg.SvgView{4a6d86 V.ED..... ........ 32,32-85,84 #63c}
+                              com.horcrux.svg.GroupView{37d3699 V.E...... ........ 0,0-0,0 #63a}
+                                com.horcrux.svg.PathView{561a355 V.E...... ........ 22,23-23,37 #630}
+                                com.horcrux.svg.PathView{314a16a V.E...... ........ 30,23-31,37 #632}
+                                com.horcrux.svg.PathView{b591e0c V.E...... ........ 11,13-42,48 #634}
+                                com.horcrux.svg.PathView{3e1853f V.E...... ........ 7,13-46,13 #636}
+                                com.horcrux.svg.PathView{6490d5e V.E...... ........ 17,4-36,13 #638}
+                          com.facebook.react.views.view.ReactViewGroup{e043511 V.E...... ........ 0,961-996,1133 #5dc}
+                          com.facebook.react.views.view.ReactViewGroup{c1bf676 VFE...C.. .......D 0,989-116,1105 #5b4}
+                            com.facebook.react.views.view.ReactViewGroup{8b3a647 V.E...... ......ID 29,29-87,87 #5b2}
+                          com.facebook.react.views.view.ReactViewGroup{2441477 VFE...C.. ........ 126,961-870,1133 #5ca}
+                            com.facebook.react.views.text.ReactTextView{3119e74 V.ED..... ........ 0,21-744,84 #5b8 aid=1073741961}
+                            com.horcrux.svg.SvgView{e7fff9d V.ED..... ........ 0,105-37,142 #5be}
+                              com.horcrux.svg.GroupView{fdb8113 V.E...... ........ 0,0-0,0 #5bc}
+                                com.horcrux.svg.PathView{97bef50 V.E...... ........ 3,4-34,31 #5ba}
+                            com.facebook.react.views.text.ReactTextView{ccfdc12 V.ED..... ........ 47,95-158,151 #5c2 aid=1073741962}
+                          com.facebook.react.views.view.ReactViewGroup{4328e4 VFE...C.. ......ID 881,989-996,1105 #5da}
+                            com.horcrux.svg.SvgView{17a5fe3 V.ED..... ........ 32,32-85,84 #5d8}
+                              com.horcrux.svg.GroupView{48f7549 V.E...... ........ 0,0-0,0 #5d6}
+                                com.horcrux.svg.PathView{cd11d05 V.E...... ........ 22,23-23,37 #5cc}
+                                com.horcrux.svg.PathView{2bf115a V.E...... ........ 30,23-31,37 #5ce}
+                                com.horcrux.svg.PathView{f38b07c V.E...... ........ 11,13-42,48 #5d0}
+                                com.horcrux.svg.PathView{9731b6f V.E...... ........ 7,13-46,13 #5d2}
+                                com.horcrux.svg.PathView{6475e4e V.E...... ........ 17,4-36,13 #5d4}
+                      com.facebook.react.views.view.ReactViewGroup{1c39eb4 VFE...C.. ......ID 891,1812-1038,1959 #506}
+                        com.horcrux.svg.SvgView{7065903 V.ED..... ........ 47,47-100,100 #504}
+                          com.horcrux.svg.GroupView{8250080 V.E...... ........ 0,0-0,0 #502}
+                            com.horcrux.svg.PathView{83fff8b V.E...... ........ 11,26-42,27 #4fe}
+                            com.horcrux.svg.PathView{39e5868 V.E...... ........ 26,11-27,42 #500}
+                    com.facebook.react.views.view.ReactViewGroup{6e42de0 I.E...... ......ID 0,0-0,0 #238 aid=1073741835}
+                      com.facebook.react.views.view.ReactViewGroup{61f899 V.E...... ......ID 0,0-0,0 #236}
+                      com.facebook.react.views.view.ReactViewGroup{2cba75e V.E...... ......ID 0,0-0,0 #3a}
+                      com.facebook.react.views.text.ReactTextView{e69173f V.ED..... ......ID 0,0-0,0 #34 aid=1073741836}
+                      com.facebook.react.views.scroll.ReactScrollView{18e480c VFED.V... ......I. 0,0-0,0 #234}
+                        com.facebook.react.views.view.ReactViewGroup{8d08555 V.E...... ......ID 0,0-0,0 #232}
+                          com.facebook.react.views.view.ReactViewGroup{e26db6a V.E...... ......ID 0,0-0,0 #54}
+                          com.facebook.react.views.view.ReactViewGroup{b61e85b VFE...C.. ..S...ID 0,0-0,0 #40}
+                            com.facebook.react.views.text.ReactTextView{eddd8f8 V.ED..... ......ID 0,0-0,0 #3e aid=1073741837}
+                          com.facebook.react.views.view.ReactViewGroup{46121d1 VFE...C.. ......ID 0,0-0,0 #46}
+                            com.facebook.react.views.text.ReactTextView{e4f4436 V.ED..... ......ID 0,0-0,0 #44 aid=1073741838}
+                          com.facebook.react.views.view.ReactViewGroup{64caf37 VFE...C.. ......ID 0,0-0,0 #4c}
+                            com.facebook.react.views.text.ReactTextView{7938ca4 V.ED..... ......ID 0,0-0,0 #4a aid=1073741839}
+                          com.facebook.react.views.view.ReactViewGroup{9850a0d VFE...C.. ......ID 0,0-0,0 #52}
+                            com.facebook.react.views.text.ReactTextView{9c36dc2 V.ED..... ......ID 0,0-0,0 #50 aid=1073741840}
+                          com.facebook.react.views.view.ReactViewGroup{9b307d3 V.E...... ......ID 0,0-0,0 #22c}
+                          com.facebook.react.views.view.ReactViewGroup{dcecf10 V.E...... ......ID 0,0-0,0 #1f4}
+                          com.facebook.react.views.view.ReactViewGroup{a853a09 VFE...C.. ......ID 0,0-0,0 #5c}
+                            com.horcrux.svg.SvgView{e5ea40e V.ED..... ......ID 0,0-0,0 #5a}
+                              com.horcrux.svg.GroupView{51c4e2f V.E...... ......ID 0,0-0,0 #58}
+                                com.horcrux.svg.PathView{439cc3c V.E...... ......ID 0,0-0,0 #56}
+                          com.facebook.react.views.text.ReactTextView{b3e6dc5 V.ED..... ......ID 0,0-0,0 #60 aid=1073741841}
+                          com.facebook.react.views.view.ReactViewGroup{a64f31a VFE...C.. ......ID 0,0-0,0 #68}
+                            com.horcrux.svg.SvgView{f299e4b V.ED..... ......ID 0,0-0,0 #66}
+                              com.horcrux.svg.GroupView{bf57028 V.E...... ......ID 0,0-0,0 #64}
+                                com.horcrux.svg.PathView{69d2141 V.E...... ......ID 0,0-0,0 #62}
+                          com.facebook.react.views.text.ReactTextView{a4f26e6 V.ED..... ......ID 0,0-0,0 #6e aid=1073741842}
+                          com.facebook.react.views.text.ReactTextView{d71d427 V.ED..... ......ID 0,0-0,0 #74 aid=1073741843}
+                          com.facebook.react.views.text.ReactTextView{54566d4 V.ED..... ......ID 0,0-0,0 #7a aid=1073741844}
+                          com.facebook.react.views.text.ReactTextView{fd9907d V.ED..... ......ID 0,0-0,0 #80 aid=1073741845}
+                          com.facebook.react.views.text.ReactTextView{756cb72 V.ED..... ......ID 0,0-0,0 #86 aid=1073741846}
+                          com.facebook.react.views.text.ReactTextView{e1d8bc3 V.ED..... ......ID 0,0-0,0 #8c aid=1073741847}
+                          com.facebook.react.views.text.ReactTextView{efc1c40 V.ED..... ......ID 0,0-0,0 #92 aid=1073741848}
+                          com.facebook.react.views.view.ReactViewGroup{b73b779 VFE...C.. ......ID 0,0-0,0 #9e}
+                            com.facebook.react.views.text.ReactTextView{2c22cbe V.ED..... ......ID 0,0-0,0 #9a aid=1073741849}
+                          com.facebook.react.views.view.ReactViewGroup{f43211f VFE...C.. ......ID 0,0-0,0 #a6}
+                            com.facebook.react.views.text.ReactTextView{a6bc6c V.ED..... ......ID 0,0-0,0 #a2 aid=1073741850}
+                          com.facebook.react.views.view.ReactViewGroup{bef5235 VFE...C.. ......ID 0,0-0,0 #ae}
+                            com.facebook.react.views.text.ReactTextView{9f056ca V.ED..... ......ID 0,0-0,0 #aa aid=1073741851}
+                          com.facebook.react.views.view.ReactViewGroup{2b03b VFE...C.. ......ID 0,0-0,0 #b6}
+                            com.facebook.react.views.text.ReactTextView{b793358 V.ED..... ......ID 0,0-0,0 #b2 aid=1073741852}
+                          com.facebook.react.views.view.ReactViewGroup{e4fdcb1 VFE...C.. ......ID 0,0-0,0 #be}
+                            com.facebook.react.views.text.ReactTextView{f251596 V.ED..... ......ID 0,0-0,0 #ba aid=1073741853}
+                          com.facebook.react.views.view.ReactViewGroup{7621517 VFE...C.. ......ID 0,0-0,0 #c6}
+                            com.facebook.react.views.text.ReactTextView{dfa2d04 V.ED..... ......ID 0,0-0,0 #c2 aid=1073741854}
+                          com.facebook.react.views.view.ReactViewGroup{25492ed VFE...C.. ......ID 0,0-0,0 #ce}
+                            com.facebook.react.views.text.ReactTextView{314f522 V.ED..... ......ID 0,0-0,0 #ca aid=1073741855}
+                          com.facebook.react.views.view.ReactViewGroup{ce8ebb3 VFE...C.. ......ID 0,0-0,0 #d8}
+                            com.facebook.react.views.text.ReactTextView{66f1570 V.ED..... ......ID 0,0-0,0 #d4 aid=1073741856}
+                          com.facebook.react.views.view.ReactViewGroup{a7470e9 VFE...C.. ......ID 0,0-0,0 #e0}
+                            com.facebook.react.views.text.ReactTextView{b31416e V.ED..... ......ID 0,0-0,0 #dc aid=1073741857}
+                          com.facebook.react.views.view.ReactViewGroup{efc900f VFE...C.. ......ID 0,0-0,0 #e8}
+                            com.facebook.react.views.text.ReactTextView{8189c V.ED..... ......ID 0,0-0,0 #e4 aid=1073741858}
+                          com.facebook.react.views.view.ReactViewGroup{f9a32a5 VFE...C.. ..S...ID 0,0-0,0 #f0}
+                            com.facebook.react.views.text.ReactTextView{b4067a V.ED..... ......ID 0,0-0,0 #ec aid=1073741859}
+                          com.facebook.react.views.view.ReactViewGroup{2fc1e2b VFE...C.. ......ID 0,0-0,0 #f8}
+                            com.facebook.react.views.text.ReactTextView{6cc2288 V.ED..... ......ID 0,0-0,0 #f4 aid=1073741860}
+                          com.facebook.react.views.view.ReactViewGroup{4a05421 VFE...C.. ......ID 0,0-0,0 #100}
+                            com.facebook.react.views.text.ReactTextView{46c1046 V.ED..... ......ID 0,0-0,0 #fc aid=1073741861}
+                          com.facebook.react.views.view.ReactViewGroup{b1c7207 VFE...C.. ......ID 0,0-0,0 #108}
+                            com.facebook.react.views.text.ReactTextView{e44df34 V.ED..... ......ID 0,0-0,0 #104 aid=1073741862}
+                          com.facebook.react.views.view.ReactViewGroup{58d115d VFE...C.. ......ID 0,0-0,0 #112}
+                            com.facebook.react.views.text.ReactTextView{348ead2 V.ED..... ......ID 0,0-0,0 #10e aid=1073741863}
+                          com.facebook.react.views.view.ReactViewGroup{e0427a3 VFE...C.. ......ID 0,0-0,0 #11a}
+                            com.facebook.react.views.text.ReactTextView{6eabaa0 V.ED..... ......ID 0,0-0,0 #116 aid=1073741864}
+                          com.facebook.react.views.view.ReactViewGroup{e8e6659 VFE...C.. ......ID 0,0-0,0 #122}
+                            com.facebook.react.views.text.ReactTextView{7a6e21e V.ED..... ......ID 0,0-0,0 #11e aid=1073741865}
+                          com.facebook.react.views.view.ReactViewGroup{c279aff VFE...C.. ......ID 0,0-0,0 #12a}
+                            com.facebook.react.views.text.ReactTextView{e50e0cc V.ED..... ......ID 0,0-0,0 #126 aid=1073741866}
+                          com.facebook.react.views.view.ReactViewGroup{6b60f15 VFE...C.. ......ID 0,0-0,0 #132}
+                            com.facebook.react.views.text.ReactTextView{35b022a V.ED..... ......ID 0,0-0,0 #12e aid=1073741867}
+                          com.facebook.react.views.view.ReactViewGroup{ee4e81b VFE...C.. ......ID 0,0-0,0 #13a}
+                            com.facebook.react.views.text.ReactTextView{6113db8 V.ED..... ......ID 0,0-0,0 #136 aid=1073741868}
+                          com.facebook.react.views.view.ReactViewGroup{a758791 VFE...C.. ......ID 0,0-0,0 #142}
+                            com.facebook.react.views.text.ReactTextView{e7f16f6 V.ED..... ......ID 0,0-0,0 #13e aid=1073741869}
+                          com.facebook.react.views.view.ReactViewGroup{d5feaf7 VFE...C.. ......ID 0,0-0,0 #14c}
+                            com.facebook.react.views.text.ReactTextView{d787d64 V.ED..... ......ID 0,0-0,0 #148 aid=1073741870}
+                          com.facebook.react.views.view.ReactViewGroup{1da0bcd VFE...C.. ......ID 0,0-0,0 #154}
+                            com.facebook.react.views.text.ReactTextView{6fdac82 V.ED..... ......ID 0,0-0,0 #150 aid=1073741871}
+                          com.facebook.react.views.view.ReactViewGroup{31e3f93 VFE...C.. ......ID 0,0-0,0 #15c}
+                            com.facebook.react.views.text.ReactTextView{9f20bd0 V.ED..... ......ID 0,0-0,0 #158 aid=1073741872}
+                          com.facebook.react.views.view.ReactViewGroup{e8897c9 VFE...C.. ......ID 0,0-0,0 #164}
+                            com.facebook.react.views.text.ReactTextView{cde0ece V.ED..... ......ID 0,0-0,0 #160 aid=1073741873}
+                          com.facebook.react.views.view.ReactViewGroup{46341ef VFE...C.. ......ID 0,0-0,0 #16c}
+                            com.facebook.react.views.text.ReactTextView{a3414fc V.ED..... ......ID 0,0-0,0 #168 aid=1073741874}
+                          com.facebook.react.views.view.ReactViewGroup{d79e785 VFE...C.. ......ID 0,0-0,0 #174}
+                            com.facebook.react.views.text.ReactTextView{75049da V.ED..... ......ID 0,0-0,0 #170 aid=1073741875}
+                          com.facebook.react.views.view.ReactViewGroup{c4c0e0b VFE...C.. ......ID 0,0-0,0 #17c}
+                            com.facebook.react.views.text.ReactTextView{2b84e8 V.ED..... ......ID 0,0-0,0 #178 aid=1073741876}
+                          com.facebook.react.views.view.ReactViewGroup{8767701 VFE...C.. ......ID 0,0-0,0 #186}
+                            com.facebook.react.views.text.ReactTextView{e7929a6 V.ED..... ......ID 0,0-0,0 #182 aid=1073741877}
+                          com.facebook.react.views.view.ReactViewGroup{ab7fe7 VFE...C.. ......ID 0,0-0,0 #18e}
+                            com.facebook.react.views.text.ReactTextView{da80794 V.ED..... ......ID 0,0-0,0 #18a aid=1073741878}
+                          com.facebook.react.views.view.ReactViewGroup{352823d VFE...C.. ......ID 0,0-0,0 #196}
+                            com.facebook.react.views.text.ReactTextView{5fe3a32 V.ED..... ......ID 0,0-0,0 #192 aid=1073741879}
+                          com.facebook.react.views.view.ReactViewGroup{7a63383 VFE...C.. ......ID 0,0-0,0 #19e}
+                            com.facebook.react.views.text.ReactTextView{fc80900 V.ED..... ......ID 0,0-0,0 #19a aid=1073741880}
+                          com.facebook.react.views.view.ReactViewGroup{ea0539 VFE...C.. ......ID 0,0-0,0 #1a6}
+                            com.facebook.react.views.text.ReactTextView{451c77e V.ED..... ......ID 0,0-0,0 #1a2 aid=1073741881}
+                          com.facebook.react.views.view.ReactViewGroup{b0e84df VFE...C.. ......ID 0,0-0,0 #1ae}
+                            com.facebook.react.views.text.ReactTextView{524b52c V.ED..... ......ID 0,0-0,0 #1aa aid=1073741882}
+                          com.facebook.react.views.view.ReactViewGroup{bdcbbf5 VFE...C.. ......ID 0,0-0,0 #1b6}
+                            com.facebook.react.views.text.ReactTextView{2bedd8a V.ED..... ......ID 0,0-0,0 #1b2 aid=1073741883}
+                          com.facebook.react.views.view.ReactViewGroup{5808ffb VFE...C.. ......ID 0,0-0,0 #1c0}
+                            com.facebook.react.views.text.ReactTextView{abdf818 V.ED..... ......ID 0,0-0,0 #1bc aid=1073741884}
+                          com.facebook.react.views.view.ReactViewGroup{f0a2271 VFE...C.. ......ID 0,0-0,0 #1c8}
+                            com.facebook.react.views.text.ReactTextView{2354856 V.ED..... ......ID 0,0-0,0 #1c4 aid=1073741885}
+                          com.facebook.react.views.view.ReactViewGroup{53e30d7 VFE...C.. ......ID 0,0-0,0 #1d0}
+                            com.facebook.react.views.text.ReactTextView{ba67dc4 V.ED..... ......ID 0,0-0,0 #1cc aid=1073741886}
+                          com.facebook.react.views.view.ReactViewGroup{9cd74ad VFE...C.. ......ID 0,0-0,0 #1d8}
+                            com.facebook.react.views.text.ReactTextView{d593e2 V.ED..... ......ID 0,0-0,0 #1d4 aid=1073741887}
+                          com.facebook.react.views.view.ReactViewGroup{cb0373 VFE...C.. ......ID 0,0-0,0 #1e0}
+                            com.facebook.react.views.text.ReactTextView{f6fb230 V.ED..... ......ID 0,0-0,0 #1dc aid=1073741888}
+                          com.facebook.react.views.view.ReactViewGroup{bf9aea9 VFE...C.. ......ID 0,0-0,0 #1e8}
+                            com.facebook.react.views.text.ReactTextView{c3d0c2e V.ED..... ......ID 0,0-0,0 #1e4 aid=1073741889}
+                          com.facebook.react.views.view.ReactViewGroup{94863cf VFE...C.. ......ID 0,0-0,0 #1f0}
+                            com.facebook.react.views.text.ReactTextView{355c15c V.ED..... ......ID 0,0-0,0 #1ec aid=1073741890}
+                          com.horcrux.svg.SvgView{5958c65 V.ED..... ......ID 0,0-0,0 #20c}
+                            com.horcrux.svg.GroupView{c91bd3a V.E...... ......ID 0,0-0,0 #20a}
+                              com.horcrux.svg.PathView{6916deb V.E...... ......ID 0,0-0,0 #1f6}
+                              com.horcrux.svg.PathView{a2b9748 V.E...... ......ID 0,0-0,0 #1f8}
+                              com.horcrux.svg.RectView{65789e1 V.E...... ......ID 0,0-0,0 #1fa}
+                              com.horcrux.svg.PathView{44e7306 V.E...... ......ID 0,0-0,0 #1fc}
+                              com.horcrux.svg.PathView{916fdc7 V.E...... ......ID 0,0-0,0 #1fe}
+                              com.horcrux.svg.PathView{f06dff4 V.E...... ......ID 0,0-0,0 #200}
+                              com.horcrux.svg.PathView{8e1e31d V.E...... ......ID 0,0-0,0 #202}
+                              com.horcrux.svg.PathView{ceb992 V.E...... ......ID 0,0-0,0 #204}
+                              com.horcrux.svg.PathView{d7baf63 V.E...... ......ID 0,0-0,0 #206}
+                              com.horcrux.svg.PathView{6ac0760 V.E...... ......ID 0,0-0,0 #208}
+                          com.facebook.react.views.text.ReactTextView{5be9419 V.ED..... ......ID 0,0-0,0 #210 aid=1073741891}
+                          com.facebook.react.views.text.ReactTextView{79adcde V.ED..... ......ID 0,0-0,0 #214 aid=1073741892}
+                          com.facebook.react.views.view.ReactViewGroup{defdebf V.E...... ......ID 0,0-0,0 #21e}
+                          com.facebook.react.views.view.ReactViewGroup{bba398c V.E...... ......ID 0,0-0,0 #21c}
+                          com.facebook.react.views.text.ReactTextView{a1b58d5 V.ED..... ......ID 0,0-0,0 #21a aid=1073741893}
+                          com.facebook.react.views.view.ReactViewGroup{c73e8ea VFE...C.. ......ID 0,0-0,0 #224}
+                            com.facebook.react.views.text.ReactTextView{d4da7db V.ED..... ......ID 0,0-0,0 #222 aid=1073741894}
+                          com.facebook.react.views.text.ReactTextView{1976278 V.ED..... ......ID 0,0-0,0 #22a aid=1073741895}
+                    com.facebook.react.views.view.ReactViewGroup{e45ad51 I.E...... ......ID 0,0-0,0 #2b2 aid=1073741896}
+                      com.facebook.react.views.view.ReactViewGroup{c1fa9b6 V.E...... ......ID 0,0-0,0 #2b0}
+                      com.facebook.react.views.view.ReactViewGroup{7f4e6b7 V.E...... ......ID 0,0-0,0 #242}
+                      com.facebook.react.views.text.ReactTextView{a1c2e24 V.ED..... ......ID 0,0-0,0 #23c aid=1073741897}
+                      com.facebook.react.views.scroll.ReactScrollView{7e6cd8d VFED.V... ......I. 0,0-0,0 #2ae}
+                        com.facebook.react.views.view.ReactViewGroup{7f4ab42 V.E...... ......ID 0,0-0,0 #2ac}
+                          com.facebook.react.views.view.ReactViewGroup{6673753 V.E...... ......ID 0,0-0,0 #256}
+                          com.horcrux.svg.SvgView{a000890 V.ED..... ......ID 0,0-0,0 #24a}
+                            com.horcrux.svg.GroupView{3ffb589 V.E...... ......ID 0,0-0,0 #248}
+                              com.horcrux.svg.CircleView{e26398e V.E...... ......ID 0,0-0,0 #244}
+                              com.horcrux.svg.CircleView{da3f5af V.E...... ......ID 0,0-0,0 #246}
+                          com.facebook.react.views.text.ReactTextView{8051dbc V.ED..... ......ID 0,0-0,0 #24e aid=1073741898}
+                          com.facebook.react.views.text.ReactTextView{4a52145 V.ED..... ......ID 0,0-0,0 #252 aid=1073741899}
+                          com.facebook.react.views.text.ReactTextView{ad0609a V.ED..... ......ID 0,0-0,0 #25a aid=1073741900}
+                          com.facebook.react.views.view.ReactViewGroup{9443dcb VFE...C.. ......ID 0,0-0,0 #266}
+                            com.horcrux.svg.SvgView{2e459a8 V.ED..... ......ID 0,0-0,0 #260}
+                              com.horcrux.svg.GroupView{e7b8cc1 V.E...... ......ID 0,0-0,0 #25e}
+                                com.horcrux.svg.PathView{dc3ec66 V.E...... ......ID 0,0-0,0 #25c}
+                            com.facebook.react.views.text.ReactTextView{b56eba7 V.ED..... ......ID 0,0-0,0 #264 aid=1073741901}
+                          com.facebook.react.views.view.ReactViewGroup{9f96854 VFE...C.. ..S...ID 0,0-0,0 #270}
+                            com.facebook.react.views.text.ReactTextView{1f333fd V.ED..... ......ID 0,0-0,0 #26e aid=1073741902}
+                          com.facebook.react.views.view.ReactViewGroup{11268f2 VFE...C.. ......ID 0,0-0,0 #276}
+                            com.facebook.react.views.text.ReactTextView{dfc9b43 V.ED..... ......ID 0,0-0,0 #274 aid=1073741903}
+                          com.facebook.react.views.view.ReactViewGroup{4aeb5c0 VFE...C.. ......ID 0,0-0,0 #27c}
+                            com.facebook.react.views.text.ReactTextView{c4412f9 V.ED..... ......ID 0,0-0,0 #27a aid=1073741904}
+                          com.horcrux.svg.SvgView{c5a223e V.ED..... ......ID 0,0-0,0 #288}
+                            com.horcrux.svg.GroupView{2c3a89f V.E...... ......ID 0,0-0,0 #286}
+                              com.horcrux.svg.PathView{4a96dec V.E...... ......ID 0,0-0,0 #280}
+                              com.horcrux.svg.PathView{c29e5b5 V.E...... ......ID 0,0-0,0 #282}
+                              com.horcrux.svg.LineView{d2244a V.E...... ......ID 0,0-0,0 #284}
+                          com.facebook.react.views.text.ReactTextView{bc42fbb V.ED..... ......ID 0,0-0,0 #28c aid=1073741905}
+                          com.facebook.react.views.view.ReactViewGroup{eb57cd8 V.E...... ......ID 0,0-0,0 #294}
+                          com.facebook.react.views.text.ReactTextView{6602831 V.ED..... ......ID 0,0-0,0 #292 aid=1073741906}
+                          com.horcrux.svg.SvgView{a163b16 V.ED..... ......ID 0,0-0,0 #2a0}
+                            com.horcrux.svg.GroupView{a7c0c97 V.E...... ......ID 0,0-0,0 #29e}
+                              com.horcrux.svg.PathView{6718e84 V.E...... ......ID 0,0-0,0 #296}
+                              com.horcrux.svg.PathView{5de166d V.E...... ......ID 0,0-0,0 #298}
+                              com.horcrux.svg.PathView{fb2f2a2 V.E...... ......ID 0,0-0,0 #29a}
+                              com.horcrux.svg.PathView{6adb33 V.E...... ......ID 0,0-0,0 #29c}
+                          com.facebook.react.views.text.ReactTextView{8bb0ef0 V.ED..... ......ID 0,0-0,0 #2a4 aid=1073741907}
+                          com.facebook.react.views.view.ReactViewGroup{3d2ac69 V.E...... ......ID 0,0-0,0 #51e}
+                          com.facebook.react.views.text.ReactTextView{37196ee V.ED..... ......ID 0,0-0,0 #50c aid=1073741908}
+                          com.facebook.react.views.text.ReactTextView{d6df78f V.ED..... ......ID 0,0-0,0 #510 aid=1073741909}
+                          com.facebook.react.views.text.ReactTextView{da2a1c V.ED..... ......ID 0,0-0,0 #516 aid=1073741910}
+                          com.facebook.react.views.text.ReactTextView{360a625 V.ED..... ......ID 0,0-0,0 #51a aid=1073741911}
+                    com.facebook.react.views.view.ReactViewGroup{86433fa I.E...... ......ID 0,0-0,0 #2ce aid=1073741912}
+                      com.facebook.react.views.view.ReactViewGroup{7dc7dab V.E...... ......ID 0,0-0,0 #2cc}
+                      com.facebook.react.views.view.ReactViewGroup{46dcc08 V.E...... ......ID 0,0-0,0 #2bc}
+                      com.facebook.react.views.text.ReactTextView{d1a7fa1 V.ED..... ......ID 0,0-0,0 #2b6 aid=1073741913}
+                      com.facebook.react.views.scroll.ReactScrollView{eb195c6 VFED.V... ......I. 0,0-0,0 #2ca}
+                        com.facebook.react.views.view.ReactViewGroup{a634987 V.E...... ......ID 0,0-0,0 #2c8}
+                          com.facebook.react.views.view.ReactViewGroup{217a0b4 V.E...... ......ID 0,0-0,0 #2c2}
+                          com.facebook.react.views.text.ReactTextView{63e74dd V.ED..... ......ID 0,0-0,0 #2c0 aid=1073741914}
+                          com.facebook.react.views.view.ReactViewGroup{214852 V.E...... ......ID 0,0-0,0 #56c}
+                          com.facebook.react.views.text.ReactTextView{3a0f723 V.ED..... ......ID 0,0-0,0 #56a aid=1073741915}
+                    com.facebook.react.views.view.ReactViewGroup{82e32ae V.E...... ........ 0,0-1080,2169 #aba}
+                    com.facebook.react.views.view.ReactViewGroup{fb0c84f V.E...... ........ 0,0-1080,210 #a14}
+                    com.facebook.react.views.view.ReactViewGroup{7678bdc V.E...... ........ 42,110-95,163 #9f6}
+                      com.horcrux.svg.SvgView{a08ca61 V.ED..... ........ 0,0-53,53 #9f4}
+                        com.horcrux.svg.GroupView{b6de986 V.E...... ........ 0,0-0,0 #9f2}
+                          com.horcrux.svg.PathView{e977247 V.E...... ........ 6,7-20,46 #9ec}
+                          com.horcrux.svg.PathView{9a6ab9d V.E...... ........ 33,7-47,46 #9ee}
+                          com.horcrux.svg.PathView{5377a74 V.E...... ........ 17,20-36,33 #9f0}
+                    com.facebook.react.views.text.ReactTextView{bdbc4e5 V.ED..... ........ 116,110-766,163 #9fa aid=1073741992}
+                    com.facebook.react.views.view.ReactViewGroup{aecbba VFE...C.. ........ 786,79-902,194 #a06}
+                      com.horcrux.svg.SvgView{caf1812 V.ED..... ........ 32,32-84,85 #a04}
+                        com.horcrux.svg.GroupView{fceebe3 V.E...... ........ 0,0-0,0 #a02}
+                          com.horcrux.svg.PathView{b8bc9e0 V.E...... ........ 10,26-42,27 #9fe}
+                          com.horcrux.svg.PathView{5476499 V.E...... ........ 26,11-26,42 #a00}
+                    com.facebook.react.views.view.ReactViewGroup{85b9a6b VFE...C.. ........ 923,79-1038,194 #a10}
+                      com.horcrux.svg.SvgView{762a35e V.ED..... ........ 32,32-85,85 #a0e}
+                        com.horcrux.svg.GroupView{b7a633f V.E...... ........ 0,0-0,0 #a0c}
+                          com.horcrux.svg.PathView{f13a40c V.E...... ........ 11,11-27,42 #a08}
+                          com.horcrux.svg.PathView{4a0b155 V.E...... ........ 11,26-42,27 #a0a}
+                    com.facebook.react.views.view.ReactViewGroup{1cf89c8 V.E...... ........ 42,252-1038,2169 #ab4}
+                      com.facebook.react.views.view.ReactViewGroup{b31976a V.E...... ........ 0,0-996,1917 #ab0}
+                      com.facebook.react.views.view.ReactViewGroup{63bf45b VFE...C.. ........ 0,0-168,116 #a1a}
+                        com.facebook.react.views.text.ReactTextView{c4293d3 V.ED..... ........ 42,31-126,84 #a18 aid=1073741993}
+                      com.facebook.react.views.view.ReactViewGroup{55cf4f8 VFE...C.. ........ 179,0-316,116 #a20}
+                        com.facebook.react.views.text.ReactTextView{9956b10 V.ED..... ........ 31,29-105,85 #a1e aid=1073741994}
+                      com.facebook.react.views.view.ReactViewGroup{b080dd1 VFE...C.. ..S..... 326,0-463,116 #a26}
+                        com.facebook.react.views.text.ReactTextView{99da609 V.ED..... ........ 31,29-105,85 #a24 aid=1073741995}
+                      com.facebook.react.views.scroll.ReactScrollView{749c036 VFED.V... ........ 0,116-996,1670 #a9a}
+                        com.facebook.react.views.view.ReactViewGroup{4aca00e V.E...... ........ 0,0-996,4408 #a98}
+                          com.facebook.react.views.view.ReactViewGroup{f189a2f V.E...... ........ 0,32-996,368 #a30}
+                          com.facebook.react.views.view.ReactViewGroup{bce283c V.E...... ........ 80,32-996,368 #a2e}
+                          com.facebook.react.views.text.ReactTextView{d96af1a VFED..CL. ........ 122,74-954,326 #a2c aid=1073741996}
+                          com.facebook.react.views.view.ReactViewGroup{a9eaa4b V.E...... ........ 0,400-996,912 #a4c}
+                          com.facebook.react.views.view.ReactViewGroup{4a6ff49 V.E...... ........ 0,400-916,912 #a4a}
+                          com.facebook.react.views.text.ReactTextView{859204e VFED..CL. ........ 42,442-874,505 #a34 aid=1073741997}
+                          com.facebook.react.views.text.ReactTextView{1eb56f V.ED..... ........ 42,516-874,564 #a38 aid=1073741998}
+                          com.facebook.react.views.text.ReactTextView{b35427c V.ED..... ........ 42,574-874,686 #a3c aid=1073741999}
+                          com.facebook.react.views.view.ReactViewGroup{7d74705 VFE...C.. ........ 42,697-874,813 #a42}
+                            com.facebook.react.views.text.ReactTextView{ad70d41 V.ED..... ........ 353,31-479,84 #a40 aid=1073742000}
+                          com.facebook.react.views.text.ReactTextView{12af35a V.ED..... ........ 42,823-874,871 #a46 aid=1073742001}
+                          com.facebook.react.views.view.ReactViewGroup{70b398b V.E...... ........ 0,944-996,1406 #a54}
+                          com.facebook.react.views.view.ReactViewGroup{7d20a68 V.E...... ........ 80,944-996,1406 #a52}
+                          com.facebook.react.views.text.ReactTextView{80a4e81 VFED..CL. ........ 122,986-954,1364 #a50 aid=1073742002}
+                          com.facebook.react.views.view.ReactViewGroup{914eb26 V.E...... ........ 0,1437-996,2006 #a70}
+                          com.facebook.react.views.view.ReactViewGroup{2f1e367 V.E...... ........ 0,1437-916,2006 #a6e}
+                          com.facebook.react.views.text.ReactTextView{cf16514 VFED..CL. ........ 42,1479-874,1542 #a58 aid=1073742003}
+                          com.facebook.react.views.text.ReactTextView{10c51bd V.ED..... ........ 42,1553-874,1601 #a5c aid=1073742004}
+                          com.facebook.react.views.text.ReactTextView{85493b2 V.ED..... ........ 42,1611-874,1779 #a60 aid=1073742005}
+                          com.facebook.react.views.view.ReactViewGroup{eaf4f03 VFE...C.. ........ 42,1790-874,1905 #a66}
+                            com.facebook.react.views.text.ReactTextView{78942d4 V.ED..... ........ 353,31-479,84 #a64 aid=1073742006}
+                          com.facebook.react.views.text.ReactTextView{a09be80 V.ED..... ........ 42,1916-874,1964 #a6a aid=1073742007}
+                          com.facebook.react.views.view.ReactViewGroup{5314cb9 V.E...... ........ 0,2037-996,2310 #a78}
+                          com.facebook.react.views.view.ReactViewGroup{b7438fe V.E...... ........ 80,2037-996,2310 #a76}
+                          com.facebook.react.views.text.ReactTextView{c4dd85f VFED..CL. ........ 122,2079-954,2268 #a74 aid=1073742008}
+                          com.facebook.react.views.view.ReactViewGroup{d8c42ac V.E...... ........ 0,2342-996,2854 #a94}
+                          com.facebook.react.views.view.ReactViewGroup{e10fb75 V.E...... ........ 0,2342-916,2854 #a92}
+                          com.facebook.react.views.text.ReactTextView{b56e70a VFED..CL. ........ 42,2384-874,2447 #a7c aid=1073742009}
+                          com.facebook.react.views.text.ReactTextView{a219b7b V.ED..... ........ 42,2458-874,2506 #a80 aid=1073742010}
+                          com.facebook.react.views.text.ReactTextView{9d0dd98 V.ED..... ........ 42,2516-874,2628 #a84 aid=1073742011}
+                          com.facebook.react.views.view.ReactViewGroup{d02d9f1 VFE...C.. ........ 42,2639-874,2755 #a8a}
+                            com.facebook.react.views.text.ReactTextView{9a817c3 V.ED..... ........ 353,31-479,84 #a88 aid=1073742012}
+                          com.facebook.react.views.text.ReactTextView{a0469d6 V.ED..... ........ 42,2765-874,2813 #a8e aid=1073742013}
+                          com.facebook.react.views.view.ReactViewGroup{da47457 V.E...... ........ 0,2886-996,3285 #ac2}
+                          com.facebook.react.views.view.ReactViewGroup{cc23b44 V.E...... ........ 80,2886-996,3285 #ac0}
+                          com.facebook.react.views.text.ReactTextView{75a242d VFED..CL. ........ 122,2928-954,3243 #abe aid=1073742014}
+                          com.facebook.react.views.view.ReactViewGroup{354d62 V.E...... ........ 0,3316-996,3522 #ad6}
+                          com.facebook.react.views.view.ReactViewGroup{11fef3 V.E...... ........ 0,3316-280,3522 #ad4}
+                          com.facebook.react.views.text.ReactTextView{649c7b0 VFED..CL. ........ 42,3358-238,3421 #ace aid=1073742015}
+                          com.facebook.react.views.text.ReactTextView{a61d629 VFED..CL. ........ 42,3431-238,3479 #ad2 aid=1073742016}
+                          com.facebook.react.views.view.ReactViewGroup{2352473 V.E...... ........ 0,3553-996,3889 #ae6}
+                          com.facebook.react.views.view.ReactViewGroup{5adbf30 V.E...... ........ 80,3553-996,3889 #ae4}
+                          com.facebook.react.views.text.ReactTextView{a5b37a9 VFED..CL. ........ 122,3595-954,3847 #ae2}
+                          com.facebook.react.views.view.ReactViewGroup{982612e V.E...... ........ 0,3921-996,4377 #b0c}
+                          com.facebook.react.views.view.ReactViewGroup{db394cf V.E...... ........ 0,3921-791,4377 #b0a}
+                          com.facebook.react.views.text.ReactTextView{3e79e5c VFED..CL. ........ 42,3963-749,4026 #af2}
+                          com.facebook.react.views.text.ReactTextView{306a565 V.ED..... ........ 42,4037-749,4085 #af6}
+                          com.facebook.react.views.text.ReactTextView{157623a V.ED..... ........ 42,4095-749,4151 #afa}
+                          com.facebook.react.views.view.ReactViewGroup{4feaeeb VFE...C.. ........ 42,4162-749,4278 #b00}
+                            com.facebook.react.views.text.ReactTextView{35eecfd V.ED..... ........ 290,31-416,84 #afe}
+                          com.facebook.react.views.text.ReactTextView{1794ad9 V.ED..... ........ 42,4288-749,4336 #b20}
+                      com.facebook.react.views.view.ReactViewGroup{2bb7b37 V.E...... ........ 0,1670-996,1827 #aaa}
+                      com.facebook.react.views.textinput.ReactEditText{ce868a4 VFED..CL. ........ 0,1691-860,1807 #a9c aid=1073741990}
+                      com.facebook.react.views.view.ReactViewGroup{1aeb60d VF....C.. ........ 881,1691-996,1806 #aa6}
+                        com.horcrux.svg.SvgView{ee81420 V.ED..... ........ 37,37-79,79 #b28}
+                          com.horcrux.svg.GroupView{26f83ac V.E...... ........ 0,0-0,0 #b26}
+                            com.horcrux.svg.PathView{2492c9e V.E...... ........ 3,3-39,39 #b22}
+                            com.horcrux.svg.PathView{4f4537f V.E...... ........ 19,3-39,23 #b24}
+                      com.facebook.react.views.text.ReactTextView{de9a9c2 V.ED..... ........ 0,1827-996,1896 #aae aid=1073742017}
+                    com.facebook.react.views.view.ReactViewGroup{ddd9add V.E...... ........ 0,2169-1080,2400 #494}
+                    com.facebook.react.views.view.ReactViewGroup{787652 VFE...C.. ........ 0,2169-216,2337 #432}
+                      com.horcrux.svg.SvgView{dafe907 V.ED..... ........ 77,29-140,92 #42a}
+                        com.horcrux.svg.GroupView{e866b9 V.E...... ........ 0,0-0,0 #428}
+                          com.horcrux.svg.PathView{40b825f V.E...... ........ 34,13-56,14 #41e}
+                          com.horcrux.svg.PathView{f19a4ac V.E...... ........ 34,31-56,32 #420}
+                          com.horcrux.svg.PathView{f48190a V.E...... ........ 34,49-56,50 #422}
+                          com.horcrux.svg.PathView{71fb575 V.E...... ........ 7,39-24,50 #424}
+                          com.horcrux.svg.RectView{e564afe V.E...... ........ 7,10-24,27 #426}
+                      com.facebook.react.views.view.ReactViewGroup{f508a34 V.E...... ........ 113,19-162,67 #5e4}
+                      com.facebook.react.views.text.ReactTextView{79ee05d V.ED..... ........ 128,24-145,61 #5e2 aid=1073741963}
+                      com.facebook.react.views.text.ReactTextView{bf00dd2 V.ED..... ........ 78,102-137,139 #430 aid=1073741949}
+                    com.facebook.react.views.view.ReactViewGroup{cc38d23 VFE...C.. ........ 216,2169-432,2337 #454}
+                      com.horcrux.svg.SvgView{16e2559 V.ED..... ........ 77,29-140,92 #44c}
+                        com.horcrux.svg.GroupView{10fe57b V.E...... ........ 0,0-0,0 #44a}
+                          com.horcrux.svg.PathView{14333f1 V.E...... ........ 21,5-21,14 #436}
+                          com.horcrux.svg.PathView{d6bbd6 V.E...... ........ 42,5-42,14 #438}
+                          com.horcrux.svg.RectView{3d25f98 V.E...... ........ 7,7-56,56 #43a}
+                          com.horcrux.svg.PathView{62d5e57 V.E...... ........ 7,23-56,24 #43c}
+                          com.horcrux.svg.PathView{259dd44 V.E...... ........ 21,34-22,35 #43e}
+                          com.horcrux.svg.PathView{8461e2d V.E...... ........ 31,34-32,35 #440}
+                          com.horcrux.svg.PathView{6dabf62 V.E...... ........ 42,34-43,35 #442}
+                          com.horcrux.svg.PathView{8ec8b47 V.E...... ........ 21,44-22,45 #444}
+                          com.horcrux.svg.PathView{f111f74 V.E...... ........ 31,44-32,45 #446}
+                          com.horcrux.svg.PathView{997ec9d V.E...... ........ 42,44-43,45 #448}
+                      com.facebook.react.views.text.ReactTextView{71d351e V.ED..... ........ 78,102-137,139 #452 aid=1073741950}
+                    com.facebook.react.views.view.ReactViewGroup{55f220 VFE...C.. ........ 432,2169-648,2337 #468}
+                      com.horcrux.svg.SvgView{d2f1ff V.ED..... ........ 77,29-140,92 #460}
+                        com.horcrux.svg.GroupView{93f88f3 V.E...... ........ 0,0-0,0 #45e}
+                          com.horcrux.svg.LineView{ab989b0 V.E...... ........ 26,5-37,6 #458}
+                          com.horcrux.svg.LineView{8296fae V.E...... ........ 31,28-40,37 #45a}
+                          com.horcrux.svg.CircleView{7137029 V.E...... ........ 10,15-53,58 #45c}
+                      com.facebook.react.views.text.ReactTextView{9c6ebcc V.ED..... ........ 78,102-137,139 #466 aid=1073741951}
+                    com.facebook.react.views.view.ReactViewGroup{91e07d9 VFE...C.. ........ 648,2169-864,2337 #47e}
+                      com.horcrux.svg.SvgView{152be15 V.ED..... ........ 77,29-140,92 #476}
+                        com.horcrux.svg.GroupView{83fc14f V.E...... ........ 0,0-0,0 #474}
+                          com.horcrux.svg.PathView{22590dc V.E...... ........ 7,7-56,56 #46c}
+                          com.horcrux.svg.PathView{d61236b V.E...... ........ 47,23-48,45 #46e}
+                          com.horcrux.svg.PathView{1a0d8ba V.E...... ........ 34,13-35,45 #470}
+                          com.horcrux.svg.PathView{249e5e5 V.E...... ........ 21,36-21,45 #472}
+                      com.facebook.react.views.text.ReactTextView{f63852a V.ED..... ........ 78,102-137,139 #47c aid=1073741952}
+                    com.facebook.react.views.view.ReactViewGroup{303a59e VFE...C.. ..S..... 864,2169-1080,2337 #490}
+                      com.facebook.react.views.view.ReactViewGroup{79eddae V.E...... ..S..... 82,11-134,18 #480}
+                      com.horcrux.svg.SvgView{a5cf8b8 V.ED..... ..S..... 77,29-140,92 #488}
+                        com.horcrux.svg.GroupView{ae8dec8 V.E...... ..S..... 0,0-0,0 #486}
+                          com.horcrux.svg.PathView{df3c686 V.E...... ..S..... 13,39-50,56 #482}
+                          com.horcrux.svg.CircleView{fb7fb61 V.E...... ..S..... 21,7-42,29 #484}
+                      com.facebook.react.views.text.ReactTextView{3ae2691 V.ED..... ..S..... 78,102-137,139 #48e aid=1073741953}
+    Looper (main, tid 2) {fb281d9}
+      (MessageQueue is using Legacy implementation)
+      (Total messages: 0, polling=false, quitting=false)
+    ResourcesManager:
+      total apks: 7
+      resources: 3
+      resource impls: 4
+    1 dumpables:
+    #0: AutofillManager
+        AutofillManager:
+          sessionId: 2147483647
+          state: FINISHED
+          context: com.heytamobile.MainActivity@7c4a698
+          service client: android.view.autofill.AutofillManager$AutofillManagerClient@967979e
+          client: android.view.autofill.AutofillClientController@381e27f (android.os.BinderProxy@a03145a)
+          enabled: true
+          enabledAugmentedOnly: false
+          hasService: true
+          hasCallback: false
+          onInvisibleCalled false
+          last autofilled data: null
+          id of last fill UI shown: null
+          tracked views: null
+          fillable ids: null
+          entered ids: {1073741824, 1073741990}
+          save trigger id: null
+          save on finish(): false
+          options: logLvl=2, compatMode=false, augmented=false, appDisabledExpiration=0
+          fill dialog enabled: false
+          fill dialog enabled hints: []
+          compat mode enabled: false
+          debug: true verbose: false
+        Autofill Compat Mode: false
+    Local FragmentActivity 7c4a698 State:
+      mCreated=true mResumed=true mStopped=false    Back Stack Index: 0
+    FragmentManager misc state:
+      mHost=androidx.fragment.app.FragmentActivity$HostCallbacks@e8a524c
+      mContainer=androidx.fragment.app.FragmentActivity$HostCallbacks@e8a524c
+      mCurState=7 mStateSaved=false mStopped=false mDestroyed=false

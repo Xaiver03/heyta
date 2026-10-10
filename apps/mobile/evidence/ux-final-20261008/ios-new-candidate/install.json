@@ -1,0 +1,28 @@
+{
+  "date": "2026-10-08",
+  "platform": "iOS Simulator",
+  "device": "FE195661-B021-4A71-AAD1-1F2F7AE3A102",
+  "install": "data-preserving-upgrade",
+  "notFinalCleanReinstall": true,
+  "candidateBuildExitCode": 0,
+  "checks": {
+    "Heyta": {
+      "candidateSha256": "5745c49f80b16b18a6c27a1619b1ce44c93fbb1457d62538669da33072a7a377",
+      "installedSha256": "5745c49f80b16b18a6c27a1619b1ce44c93fbb1457d62538669da33072a7a377",
+      "match": true
+    },
+    "main.jsbundle": {
+      "candidateSha256": "012eeae13dfb8d7f2309da42992e584071ac93b0919bbfc30bae73f4f16c6668",
+      "installedSha256": "012eeae13dfb8d7f2309da42992e584071ac93b0919bbfc30bae73f4f16c6668",
+      "match": true
+    },
+    "PlugIns/HeytaWidgetExtension.appex/HeytaWidgetExtension": {
+      "candidateSha256": "57c905b3a4869c94bda1a6d114dea2cdd9e6d10c97ab9b372e58dddb2747f17e",
+      "installedSha256": "57c905b3a4869c94bda1a6d114dea2cdd9e6d10c97ab9b372e58dddb2747f17e",
+      "match": true
+    }
+  },
+  "physicalIPhoneVerified": false,
+  "systemWidgetVisualMatrix": "pending",
+  "fourPlatformFrozenSourceRelease": false
+}

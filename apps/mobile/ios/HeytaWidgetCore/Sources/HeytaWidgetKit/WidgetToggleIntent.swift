@@ -69,14 +69,26 @@ public struct ToggleTaskIntent: AppIntent {
     }
 
     public func perform() async throws -> some IntentResult {
+        // 登出会先删除设备密钥，再清共享文件。旧的系统 PendingIntent 仍可能到达，
+        // 这时必须丢弃，不能让它在清理完成后重新创建 intent 队列。
+        guard WidgetDeviceKey.read() != nil else { return .result() }
+
         // `at` 用真实时间：合并是"后写者胜"，但这个字段也让排查有据可查。
         WidgetSharedStore.mergeIntent(
             WidgetIntent(
                 taskId: taskId,
                 targetIsDone: targetIsDone,
-                at: Date().timeIntervalSince1970 * 1000
+                at: widgetIntentEpochMilliseconds()
             )
         )
+
+        #if os(macOS)
+        // Wake an already running host; no task data travels through the notification.
+        DistributedNotificationCenter.default().postNotificationName(
+            Notification.Name("cloud.finlaw.heyta.widget-intents"), object: nil,
+            userInfo: nil, deliverImmediately: true
+        )
+        #endif
 
         // 🔴 只刷这一款组件。`reloadTimelines(ofKind:)` 而不是
         //    `reloadAllTimelines()` —— 后者会让四款全部重画，

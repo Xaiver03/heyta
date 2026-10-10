@@ -1,0 +1,9 @@
+{
+  "platform": "iOS simulator",
+  "build": "1.0(6) B4",
+  "nativePickerCancel": "returned to export screen",
+  "nativePickerSelected": "heyta-qa-round8.json",
+  "fixturePlacement": "QA fixture copied into simulator Files provider; data restored only via actual picker and UI",
+  "result": "failed reading: native module null",
+  "ops": 0
+}

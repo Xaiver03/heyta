@@ -1,0 +1,66 @@
+=== 1. dotnet publish ===
+  C:\src\heyta\apps\desktop-windows\HeytaWindows\HeytaWindows.csproj : warning NU1801: ????????https://api.nuget.org/v3-index/repository-signatures/5.0.0/index.json ??????????????
+  exe = 308736 bytes
+  publish files = 528
+=== 1a. Windows widget provider publish ===
+  provider exe = 308736 bytes
+  provider files = 526
+  native-bridge.js=True
+=== 1b. web-dist (real shared UI) ===
+  web-dist files = 26
+  web-dist index.html = 7666 bytes
+  build output for XAML resources = C:\src\heyta\apps\desktop-windows\HeytaWindows\bin\x64\Release\net10.0-windows10.0.19041.0\win-x64
+  restored into publish: App.xbf, HeytaWindows.pri, MainWindow.xbf, Microsoft.UI.pri, Microsoft.UI.Xaml.Controls.pri, Microsoft.Windows.Workloads.pri, Microsoft.WindowsAppRuntime.pri
+=== 2. logo assets ===
+  heyta.ico copied (PE icon for the unpackaged exe is set in the csproj)
+  copied = Square150x150Logo.png, Square44x44Logo.png, Square44x44Logo.targetsize-24_altform-unplated.png, Square44x44Logo.targetsize-48_altform-unplated.png, StoreLogo.png, Wide310x150Logo.png (all IHDR sizes verified)
+  provider picker assets copied (StoreLogo + four screenshots)
+=== 3. AppxManifest.xml ===
+  written (Publisher must match the signing cert subject byte for byte)
+  Publisher = CN=heyta local build
+=== 4. makeappx pack ===
+  Processing "\\?\C:\src\heyta-msix\stage\WidgetProvider\HeytaWidgetProvider.exe" as a payload file.  Its path in the package will be "WidgetProvider\HeytaWidgetProvider.exe".
+  
+  Package creation succeeded.
+  
+  msix = 195867409 bytes
+=== 5. sign (self-signed) ===
+  thumbprint = 1A548787DF909A998645854BD8987359D84D0E45
+  Done Adding Additional Store
+  Successfully signed: C:\src\heyta-msix\heyta.msix
+  
+=== 6. trust the self-signed cert ===
+  packager session elevated = True
+  cert trusted in LocalMachine\TrustedPeople
+  signtool verify exit = 0
+=== 7. install + launch + capture (interactive, non-elevated) ===
+  schtasks create exit = 0
+  schtasks run exit = 0
+--- install-and-capture (interactive session) ---
+  CONTEXT IsAdmin=False SessionId=2
+  MSIX_EXISTS=True
+  INSTALL_MODE=preserve-data-upgrade
+  ADD_APPX=OK
+  INSTALLED_VERSION=1.0.0.1
+  INSTALL_LOCATION=C:\Program Files\WindowsApps\cloud.finlaw.heyta.desktop_1.0.0.1_x64__d8ndx02bjp3sw
+  UPGRADE_DATA_UNCHANGED=True
+  PAYLOAD_PRI=True
+  PAYLOAD_XBF=2
+  PAYLOAD_WEBDIST=True
+  PAYLOAD_INDEX_SHA=7C3A2668EAA7ABD4E328A5E5B18209CDCB500B914BEF7227440974781672D5CB
+  PAYLOAD_CHUNK_TOTAL=2
+  PAYLOAD_CHUNK_PRESENT=2
+  SHORTCUT_STARTAPP=True  cloud.finlaw.heyta.desktop_d8ndx02bjp3sw!App
+  SHORTCUT_ICON=C:\Program Files\WindowsApps\cloud.finlaw.heyta.desktop_1.0.0.1_x64__d8ndx02bjp3sw\heyta.ico
+  SHORTCUT_PATH=C:\Users\<WindowsUser>\Desktop\heyta.lnk
+  SHORTCUT_CREATED=True
+  SHORTCUT_ARGS=shell:AppsFolder\cloud.finlaw.heyta.desktop_d8ndx02bjp3sw!App
+  SHORTCUT_RESOLVES=True
+  APP_ID=cloud.finlaw.heyta.desktop_d8ndx02bjp3sw!App
+  M2D=OK
+  PID=35032
+  WINDOW_TITLE=heyta
+  WINDOW_RECT=1152x587
+  PNG_SAVED=True bytes=145554
+  RESULT=OK
+  SHORTCUT_OK=True

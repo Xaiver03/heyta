@@ -17,7 +17,7 @@
  * 全部来自 `@heyta/app-host` 的 `createTaskActions`。
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BackHandler,
   KeyboardAvoidingView,
@@ -29,6 +29,13 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  classifyQuadrant,
+  planQuadrantDrop,
+  planQuadrantDropUndo,
+  Quadrant,
+  type QuadrantTaskPatch,
+} from '@heyta/domain';
 import type { Project, Tag, Task, TaskSortKey } from '@heyta/domain';
 // `formatDayTitleText` 在壳里把领域层给的 `LocalDate` 说成当前语言：
 // **"某一天的标题"的日期语义（`isoWeekday`、`parseLocalDate`）仍只有领域层一份**，
@@ -63,6 +70,7 @@ import { useToday } from '../lib/use-today';
 // 🔴 日期措辞已上移到共享层（见 `lib/date.ts` 文件头）：日历要在四端共用。
 import { formatDayTitleText } from '@heyta/ui';
 import { describeRecurrenceText } from '../lib/recurrence-display';
+import { quadrantBoardLabels } from '../lib/quadrant-display';
 import { useText, useTheme, useTokens } from '../theme';
 import {
   Button,
@@ -117,11 +125,10 @@ import { useMobileNavigation } from '../nav/navigation';
 
 import { dueTone, toDueDisplay, type DueDisplayMode } from '../lib/due-display';
 // 🔴 排序档位：比较规则**不在这里**（在 `@heyta/domain` 的 `sortTasks`），
-// 本屏只从这一层拿"当前是哪一档"和"这一档说什么话"。
+// 本屏只从这一层拿当前档位与选项名称，设备偏好仍由这一层负责读写。
 import {
   TASK_SORT_OPTIONS,
   readTaskSort,
-  taskSortChipLabel,
   taskSortName,
   writeTaskSort,
 } from '../lib/task-sort';
@@ -287,31 +294,31 @@ function Composer({
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// 排序档位选择面板
-// ─────────────────────────────────────────────────────────────
-
 /**
- * 🔴 为什么是"一颗 chip + 一个面板"，而不是三颗并排的 chip：
- * 这一屏已经有三行 chip（视图 / 截止呈现 / 标签筛选），再加一行三个档位会把
- * 任务列表推到首屏之外 —— 而列表才是这一屏的主角。
+ * 任务首屏的按需选项。
  *
- * chip 上写的是**当前是哪一档**（「排序：按优先级」），不是光一个"排序"。
- * 这是 2026-09-30 那次「日期|倒计时」裸 chip 被退回之后定下的纪律：
- * 用户看不出那是什么的控件，等于没有控件。
- *
- * ⚠️ 面板只**列出**领域给的档位（`TASK_SORT_OPTIONS`），不在此声明选项，
- * 也不在此比较任务 —— 那一层的事在 `lib/task-sort.ts` 与 `@heyta/domain`。
+ * 首屏只保留当前视图、明确的多选入口；日期呈现、排序与
+ * 手势说明都放进这里，避免控制区把真正的任务列表推到屏幕下方。选项仍然
+ * 使用原来的 state 与设备偏好写入口，所以这里只改变信息密度，不改变能力或
+ * 持久化语义。
  */
-function SortPicker({
+function TaskViewOptions({
   visible,
-  current,
-  onSelect,
+  view,
+  dueMode,
+  currentSort,
+  onSelectView,
+  onSelectDueMode,
+  onSelectSort,
   onClose,
 }: {
   visible: boolean;
-  current: TaskSortKey;
-  onSelect: (sort: TaskSortKey) => void;
+  view: 'list' | 'quadrant' | 'timeline';
+  dueMode: DueDisplayMode;
+  currentSort: TaskSortKey;
+  onSelectView: (next: 'list' | 'quadrant' | 'timeline') => void;
+  onSelectDueMode: (next: DueDisplayMode) => void;
+  onSelectSort: (next: TaskSortKey) => void;
   onClose: () => void;
 }): React.JSX.Element {
   const tokens = useTokens();
@@ -326,9 +333,6 @@ function SortPicker({
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      {/* 🔴 遮罩**离开 flex 流**（绝对定位铺满）。`flex: 1` 的遮罩会和贴底面板抢同一份
-          高度，于是面板的百分比上限算在"抢完剩下的"空间上 —— 那不是上限。
-          同屏 `Composer` 的注释里记着这次实测出来的完整数字。 */}
       <Pressable
         style={{
           position: 'absolute',
@@ -339,10 +343,13 @@ function SortPicker({
           backgroundColor: tokens['material.scrim'],
         }}
         onPress={onClose}
-        accessibilityLabel={t('mobile.tasks.sort.close')}
+        accessible={false}
+        importantForAccessibility="no"
+        accessibilityElementsHidden
       />
       <View
         style={{
+          marginTop: 'auto',
           backgroundColor: tokens['color.surface'],
           borderTopLeftRadius: tokens['radius.xl'],
           borderTopRightRadius: tokens['radius.xl'],
@@ -350,41 +357,88 @@ function SortPicker({
           paddingHorizontal: tokens['screen.gutter'],
           paddingBottom: insets.bottom + tokens['space.8'],
           gap: tokens['space.2'],
-          // 遮罩退出 flex 流之后，面板是唯一的在流孩子 —— 靠 `marginTop: auto` 贴底。
-          marginTop: 'auto',
-          // 🔴 R5 的本体：面板的高度**必须有一个来自视口的上限**。
-          //
-          // 改之前这里没有 `maxHeight` 也没有 `ScrollView`，于是面板高度 = 内容高度，
-          // 而上面那块遮罩是 `flex: 1` —— 它在抢同一份高度。Android 1080×2400 实测：
-          // 遮罩 bounds `[0,0][1080,2134]`，面板从 `y=2176` 起，三个档位里
-          // **第二个只剩 5px、第三个根本不在无障碍树里**
-          // （`apps/mobile/evidence/android-sort-2-picker.png`）。
-          //
-          // ⚠️ 单加这一行**不够**（实测过）：遮罩还在抢高度时，`90%` 算在
-          // "遮罩吃掉之后剩下的"那块空间上，面板会被压在比内容矮的位置，
-          // 裁切只是从屏幕底边挪到面板折叠线。上限 + 能缩的孩子 + 不在流里的遮罩，
-          // 三件事各挡一种坏情况。
           maxHeight: '90%',
         }}
       >
-        <Text variant="section-title">{t('mobile.tasks.sort.choose')}</Text>
-        {/* 档位数量由领域层给（`TASK_SORT_OPTIONS`），**不在这个文件里写死**，
-            所以"能不能全看见"不能依赖"现在只有三个" —— 高度不够时滚动，不裁切。 */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <Text variant="section-title">{t('mobile.tasks.viewOptions.title')}</Text>
+          <IconButton
+            icon="action.close"
+            label={t('mobile.tasks.viewOptions.close')}
+            color={tokens['color.foreground-muted']}
+            onPress={onClose}
+          />
+        </View>
         <ScrollView contentContainerStyle={{ gap: tokens['space.2'] }}>
-          {TASK_SORT_OPTIONS.map((option) => (
-            <Button
-              key={option}
-              label={taskSortName(t, option)}
-              // 当前档位用实心主色，其余次要 —— 面板打开时"现在选的是哪个"要一眼看出，
-              // 而不是让用户从三个长得一样的按钮里找。
-              tone={option === current ? 'primary' : 'secondary'}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens['space.2'] }}>
+            <Chip
+              label={t('mobile.tasks.view.list')}
+              selected={view === 'list'}
               onPress={() => {
-                onSelect(option);
+                onSelectView('list');
+                onClose();
               }}
-              accessibilityLabel={taskSortName(t, option)}
-              style={{ flex: 1 }}
             />
-          ))}
+            <Chip
+              label={t('mobile.tasks.view.quadrant')}
+              selected={view === 'quadrant'}
+              onPress={() => {
+                onSelectView('quadrant');
+                onClose();
+              }}
+            />
+            <Chip
+              label={t('mobile.tasks.view.timeline')}
+              selected={view === 'timeline'}
+              onPress={() => {
+                onSelectView('timeline');
+                onClose();
+              }}
+            />
+          </View>
+
+          {view === 'timeline' ? null : (
+            <>
+              <Text variant="caption" tone="muted">{t('mobile.tasks.viewOptions.dueMode')}</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens['space.2'] }}>
+                <Chip
+                  label={t('mobile.tasks.mode.date')}
+                  selected={dueMode === 'date'}
+                  onPress={() => onSelectDueMode('date')}
+                />
+                <Chip
+                  label={t('mobile.tasks.mode.countdown')}
+                  selected={dueMode === 'countdown'}
+                  onPress={() => onSelectDueMode('countdown')}
+                />
+              </View>
+            </>
+          )}
+
+          {view === 'list' ? (
+            <View style={{ gap: tokens['space.2'] }}>
+              <Text variant="caption" tone="muted">{t('mobile.tasks.sort.choose')}</Text>
+              {TASK_SORT_OPTIONS.map((option) => (
+                <Button
+                  key={option}
+                  icon="action.sort"
+                  label={taskSortName(t, option)}
+                  tone={option === currentSort ? 'primary' : 'ghost'}
+                  onPress={() => {
+                    onSelectSort(option);
+                    onClose();
+                  }}
+                />
+              ))}
+            </View>
+          ) : null}
+          <Text variant="caption" tone="muted">{t('mobile.tasks.gestureHint')}</Text>
         </ScrollView>
       </View>
     </Modal>
@@ -408,6 +462,7 @@ export function TasksScreen({
   onPendingCountChange?: (pending: number) => void;
 } = {}): React.JSX.Element {
   const tokens = useTokens();
+  const insets = useSafeAreaInsets();
   // 搜索框要 `fontSans` 与 `row-meta` 两样（都走归一化访问器）。
   const text = useText();
   const { native } = useTheme();
@@ -483,14 +538,29 @@ export function TasksScreen({
    * 被同步改掉它自己的选择 —— Web 端同一处置（`features/tasks/sort-pref.ts`）。
    */
   const [taskSort, setTaskSort] = useState<TaskSortKey>(readTaskSort);
-  /** 排序选择面板。 */
-  const [sortPickerOpen, setSortPickerOpen] = useState(false);
+  /** 首屏只展示当前视图与多选入口，其余呈现选项按需打开。 */
+  const [viewOptionsOpen, setViewOptionsOpen] = useState(false);
   /** 移动端批量选择态：长按一条任务进入，之后点行只切换选择，不打开详情。 */
   const [bulkSelecting, setBulkSelecting] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState<ReadonlySet<string>>(new Set());
   const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
   const [bulkUndoIds, setBulkUndoIds] = useState<readonly string[] | null>(null);
   const [bulkError, setBulkError] = useState<string | null>(null);
+  const [quadrantMoveTaskId, setQuadrantMoveTaskId] = useState<string | null>(null);
+  const [quadrantMoveUndo, setQuadrantMoveUndo] = useState<{
+    readonly taskId: string;
+    readonly plan: QuadrantTaskPatch;
+    readonly target: Quadrant;
+    readonly changedDue: boolean;
+  } | null>(null);
+  const [quadrantMoveError, setQuadrantMoveError] = useState<string | null>(null);
+  /**
+   * A ref closes the same-frame gap before `setBusyId` re-renders the sheet.
+   * Without it, two rapid confirmations (or undo taps) can each enqueue an op
+   * before the disabled state reaches the button.
+   */
+  const quadrantMoveBusyRef = useRef(false);
+  const quadrantLabels = useMemo(() => quadrantBoardLabels(t), [t]);
   const chooseTaskSort = useCallback((next: TaskSortKey) => {
     // `writeTaskSort` 的返回值这里**刻意不消费**：写不进去的唯一后果是
     // "下次冷启动回到默认档"，而那一天的列表照常可用 —— 为它弹一句
@@ -498,7 +568,6 @@ export function TasksScreen({
     // 这条降级在 `lib/task-sort.ts` 里写明，不是这里临时决定。
     writeTaskSort(next);
     setTaskSort(next);
-    setSortPickerOpen(false);
   }, []);
   /**
    * 「任务」页的两种视图：按今天的**列表**，与按艾森豪威尔矩阵的**四象限**。
@@ -639,6 +708,14 @@ export function TasksScreen({
     return () => clearTimeout(timer);
   }, [bulkUndoIds]);
 
+  // 四象限移动的撤销入口与批量删除使用同一条短时窗口，避免把旧动作
+  // 留在屏幕上，让用户误以为它仍然可以回滚。
+  useEffect(() => {
+    if (quadrantMoveUndo === null) return;
+    const timer = setTimeout(() => setQuadrantMoveUndo(null), 5000);
+    return () => clearTimeout(timer);
+  }, [quadrantMoveUndo]);
+
   const clearBulkSelection = useCallback(() => {
     setBulkSelecting(false);
     setSelectedTaskIds(new Set());
@@ -658,12 +735,17 @@ export function TasksScreen({
         setBulkMoveOpen(false);
         return true;
       }
-      if (sortPickerOpen) {
-        setSortPickerOpen(false);
+      if (viewOptionsOpen) {
+        setViewOptionsOpen(false);
         return true;
       }
       if (searchOpen) {
         setSearchOpen(false);
+        return true;
+      }
+      if (quadrantMoveUndo !== null || quadrantMoveError !== null) {
+        setQuadrantMoveUndo(null);
+        setQuadrantMoveError(null);
         return true;
       }
       if (editingNoteId !== null) {
@@ -690,8 +772,10 @@ export function TasksScreen({
     detailTaskId,
     editingNoteId,
     navigation.tab,
+    quadrantMoveError,
+    quadrantMoveUndo,
     searchOpen,
-    sortPickerOpen,
+    viewOptionsOpen,
   ]);
 
   const enterBulkSelection = useCallback((id: string) => {
@@ -725,6 +809,59 @@ export function TasksScreen({
     },
     [actions, clearBulkSelection, refresh, selectedTaskIds],
   );
+
+  const moveTaskToQuadrant = useCallback(
+    async (target: Quadrant): Promise<void> => {
+      if (quadrantMoveBusyRef.current) return;
+      const taskId = quadrantMoveTaskId;
+      const task = taskId === null ? undefined : tasks.find((item) => item.id === taskId);
+      if (task === undefined || actions === null) return;
+
+      quadrantMoveBusyRef.current = true;
+      const plan = planQuadrantDrop(task, target, { now });
+      const undoPlan = planQuadrantDropUndo(task, plan);
+      setQuadrantMoveTaskId(null);
+      setQuadrantMoveError(null);
+      setBusyId(task.id);
+      try {
+        await actions.setQuadrantDrop(task.id, plan);
+        setQuadrantMoveUndo({
+          taskId: task.id,
+          plan: undoPlan,
+          target,
+          changedDue: plan.dueDateChange !== undefined,
+        });
+        refresh();
+      } catch {
+        // Keep transport/storage details out of product UI. The technical
+        // error remains available to diagnostics at the action boundary;
+        // this surface only needs the stable, localized recovery copy.
+        setQuadrantMoveError(t('web.quadrant.drop.error'));
+      } finally {
+        quadrantMoveBusyRef.current = false;
+        setBusyId(null);
+      }
+    },
+    [actions, now, quadrantMoveTaskId, quadrantMoveBusyRef, refresh, t, tasks],
+  );
+
+  const undoQuadrantMove = useCallback(async (): Promise<void> => {
+    if (quadrantMoveBusyRef.current) return;
+    const undo = quadrantMoveUndo;
+    if (undo === null || actions === null) return;
+    quadrantMoveBusyRef.current = true;
+    setQuadrantMoveUndo(null);
+    setBusyId(undo.taskId);
+    try {
+      await actions.setQuadrantDrop(undo.taskId, undo.plan);
+      refresh();
+    } catch {
+      setQuadrantMoveError(t('web.quadrant.drop.error'));
+    } finally {
+      quadrantMoveBusyRef.current = false;
+      setBusyId(null);
+    }
+  }, [actions, quadrantMoveBusyRef, quadrantMoveUndo, refresh, t]);
 
   /**
    * 离开这一屏时收起"详情"这一层。
@@ -832,6 +969,10 @@ export function TasksScreen({
   }, [pending, onPendingCountChange]);
 
   const nothing = tasks.length === 0;
+  const quadrantMoveTask =
+    quadrantMoveTaskId === null ? undefined : tasks.find((task) => task.id === quadrantMoveTaskId);
+  const quadrantMoveCurrent =
+    quadrantMoveTask === undefined ? undefined : classifyQuadrant(quadrantMoveTask, { now });
 
   /**
    * 分节数据交给共享 `TaskList`（M1-4）。
@@ -955,6 +1096,25 @@ export function TasksScreen({
     [actions, runFor, t, tokens],
   );
 
+  /** 四象限里的显式移动入口：一行意图一次调用，沿用领域层投放计划。 */
+  const renderQuadrantTrailing = useCallback(
+    (row: SharedTaskRow): React.ReactNode => (
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.1'] }}>
+        <IconButton
+          icon="action.more"
+          label={t('web.quadrant.moveTask', { title: row.title })}
+          color={tokens['color.foreground-subtle']}
+          onPress={() => {
+            setQuadrantMoveError(null);
+            setQuadrantMoveTaskId(row.id);
+          }}
+        />
+        {renderTaskTrailing(row)}
+      </View>
+    ),
+    [renderTaskTrailing, t, tokens],
+  );
+
   /**
    * 行级无障碍文案。
    *
@@ -1035,26 +1195,15 @@ export function TasksScreen({
     );
   }
 
-  return (
-    <View style={{ flex: 1 }}>
-      <Screen
-        title={t('mobile.tasks.title')}
-        actions={[
-          // 🔴 全局搜索的**唯一**入口（产品负责人 2026-10-01：一个应用只有一个搜索入口）。
-          // 放在「同步」之前 = 靠左，因为它是日常动作、同步是偶发动作。
-          { icon: 'action.search', label: t('mobile.search.open'), onPress: () => setSearchOpen(true) },
-          { icon: 'action.sync', label: t('mobile.common.sync'), onPress: refresh },
-        ]}
-      >
-        {bulkSelecting ? (
+  const bulkControls = (
+    <>
+      {bulkSelecting ? (
           <View
             testID="mobile-bulk-toolbar"
             style={{
               gap: tokens['space.2'],
               padding: tokens['space.2'],
               borderRadius: tokens['radius.md'],
-              borderWidth: tokens['border-width.thin'],
-              borderColor: tokens['color.primary'],
               backgroundColor: tokens['color.primary-subtle'],
             }}
           >
@@ -1111,6 +1260,11 @@ export function TasksScreen({
           />
         )}
 
+    </>
+  );
+
+  const taskControls = (
+    <>
         {/* 大标题 + 日期。大标题属于**内容区**（会随内容滚动），不属于顶栏。 */}
         <View style={{ paddingTop: tokens['space.2'], gap: tokens['space.1'] }}>
           <Text variant="screen-title">{formatDayTitleText(toLocalDate(now), t)}</Text>
@@ -1123,7 +1277,6 @@ export function TasksScreen({
                 })}
           </Text>
         </View>
-
         {/*
           搜索框。
 
@@ -1157,8 +1310,6 @@ export function TasksScreen({
                 minHeight: tokens['touch-target.min'],
                 paddingHorizontal: tokens['space.3'],
                 borderRadius: tokens['radius.md'],
-                borderWidth: tokens['border-width.thin'],
-                borderColor: tokens['color.border'],
                 backgroundColor: tokens['color.surface-sunken'],
                 color: tokens['color.foreground'],
                 fontFamily: native.fontSans,
@@ -1175,78 +1326,41 @@ export function TasksScreen({
           ) : null}
         </View>
 
-        {/* 视图切换：**列表**（按今天分组）↔ **四象限**（艾森豪威尔矩阵）。
-            两种视图读的是**同一批任务**，只是分组方式不同 —— 见 ADR-0015 §4。 */}
+        {/* 首屏只保留当前视图入口与明确的多选入口；其余选项按需打开。 */}
         <View style={{ flexDirection: 'row', gap: tokens['space.2'], paddingTop: tokens['space.2'] }}>
-          <Chip
-            label={t('mobile.tasks.view.list')}
-            selected={view === 'list'}
-            onPress={() => {
-              setView('list');
-            }}
+          <Button
+            label={
+              view === 'list'
+                ? t('mobile.tasks.view.list')
+                : view === 'quadrant'
+                  ? t('mobile.tasks.view.quadrant')
+                  : t('mobile.tasks.view.timeline')
+            }
+            icon="action.more"
+            tone="ghost"
+            accessibilityLabel={t('mobile.tasks.viewOptions.open', {
+              view:
+                view === 'list'
+                  ? t('mobile.tasks.view.list')
+                  : view === 'quadrant'
+                    ? t('mobile.tasks.view.quadrant')
+                    : t('mobile.tasks.view.timeline'),
+            })}
+            onPress={() => setViewOptionsOpen(true)}
           />
-          <Chip
-            label={t('mobile.tasks.view.quadrant')}
-            selected={view === 'quadrant'}
-            onPress={() => {
-              setView('quadrant');
-            }}
-          />
-          {/* 🔴 时间线不在底部导航里（P10：5 个平级 tab），而是**「任务」页内的第三档**
-              —— 与象限同一个处置（见 ADR-0015 §4）。三档读的是**同一批任务**，
-              只是呈现不同。 */}
-          <Chip
-            label={t('mobile.tasks.view.timeline')}
-            selected={view === 'timeline'}
-            onPress={() => {
-              setView('timeline');
-            }}
-          />
-        </View>
-
-        {/* 截止时间两种呈现的开关。
-            竞品调研里这是**唯一有规模证据**的时间可视化形态
-            （滴答清单的 Task time ↔ Countdown Time），见
-            `docs/research/ai-competitive-and-architecture.md` §5.2。
-            两种呈现读的是同一个 `dueDate`，所以开关只是换说法、不动数据。 */}
-        <View style={{ flexDirection: 'row', gap: tokens['space.2'], paddingTop: tokens['space.2'] }}>
-          <Chip
-            label={t('mobile.tasks.mode.date')}
-            selected={dueMode === 'date'}
-            onPress={() => {
-              setDueMode('date');
-            }}
-          />
-          <Chip
-            label={t('mobile.tasks.mode.countdown')}
-            selected={dueMode === 'countdown'}
-            onPress={() => {
-              setDueMode('countdown');
-            }}
-          />
-        </View>
-
-        {/*
-          排序入口。和上面那行同属"这一列表怎么呈现"，但**单独一行**：
-          它是打开面板的按钮，不是三个并列档位（理由见 `SortPicker` 文件头）。
-
-          🔴 只在**列表视图**出现：四象限与时间线读的是同一批任务，但它们各自的
-          分桶/铺陈顺序由领域与共享层决定（`bucketByQuadrant` / `TimelineBoard`），
-          在这里挂一个"排序"会让用户以为它能改那两个视图的排法 —— 而它不能。
-        */}
-        {view === 'list' ? (
-          <View style={{ flexDirection: 'row', paddingTop: tokens['space.2'] }}>
+          {bulkSelecting || view === 'timeline' ? null : (
             <Chip
-              icon="action.sort"
-              label={taskSortChipLabel(t, taskSort)}
+              label={t('web.shell.bulk.select')}
               onPress={() => {
-                setSortPickerOpen(true);
+                setBulkSelecting(true);
+                setSelectedTaskIds(new Set());
+                setBulkError(null);
               }}
             />
-          </View>
-        ) : null}
+          )}
+        </View>
 
-        {/*
+      {/*
           标签筛选行。
 
           🔴 **它必须在空态时也可见** —— 否则"筛选之后一条都没有"会让这一行
@@ -1284,6 +1398,26 @@ export function TasksScreen({
             ))}
           </ScrollView>
         ) : null}
+    </>
+  );
+
+  return (
+    <View style={{ flex: 1 }}>
+      <Screen
+        title={t('mobile.tasks.title')}
+        // 列表视图把 FlatList 作为唯一纵向滚动宿主；标题、筛选与视图控制
+        // 也在它的 ListHeaderComponent 内，避免 ScrollView + FlatList 竞争手势。
+        // 四象限/时间线仍使用屏幕级滚动。
+        scroll={view !== 'list'}
+        fixedControls={bulkSelecting || bulkUndoIds !== null ? bulkControls : undefined}
+        actions={[
+          // 🔴 全局搜索的**唯一**入口（产品负责人 2026-10-01：一个应用只有一个搜索入口）。
+          // 放在「同步」之前 = 靠左，因为它是日常动作、同步是偶发动作。
+          { icon: 'action.search', label: t('mobile.search.open'), onPress: () => setSearchOpen(true) },
+          { icon: 'action.sync', label: t('mobile.common.sync'), onPress: refresh },
+        ]}
+      >
+        {view === 'list' ? null : taskControls}
 
         {view === 'quadrant' ? (
           /*
@@ -1304,7 +1438,7 @@ export function TasksScreen({
             activeTaskId={detailTaskId}
             labels={taskRowLabels}
             renderMeta={renderTaskMeta}
-            renderTrailing={renderTaskTrailing}
+            renderTrailing={bulkSelecting ? undefined : renderQuadrantTrailing}
             onToggleTask={(id) => {
               runFor(id, actions.toggleCompleted(id));
             }}
@@ -1339,15 +1473,20 @@ export function TasksScreen({
               selection.select('task', id);
             }}
           />
-        ) : nothing ? (
-          <EmptyState
-            icon="group.inbox"
-            title={t('mobile.tasks.empty.title')}
-            hint={t('mobile.tasks.empty.hint')}
-          />
         ) : (
-          <View style={{ paddingTop: tokens['space.2'] }}>
+          <View style={{ paddingTop: tokens['space.2'], flex: 1 }}>
             <TaskList
+              listHeaderComponent={taskControls}
+              emptyComponent={
+                nothing ? (
+                  <EmptyState
+                    illustration="tasks"
+                    icon="group.inbox"
+                    title={t('mobile.tasks.empty.title')}
+                    hint={t('mobile.tasks.empty.hint')}
+                  />
+                ) : undefined
+              }
               sections={listSections}
               // 🔴 组内顺序由这一档决定（共享层把它交给领域的 `sortTasks`）。
               // 这一行就是"删掉屏幕里那句 `reverse()`"之后唯一的顺序来源 ——
@@ -1436,15 +1575,111 @@ export function TasksScreen({
         />
       )}
 
-      <Fab icon="task.add" label={t('mobile.tasks.new')} onPress={() => setComposerOpen(true)} />
-      <SortPicker
-        visible={sortPickerOpen}
-        current={taskSort}
-        onSelect={chooseTaskSort}
-        onClose={() => {
-          setSortPickerOpen(false);
+      {bulkSelecting ? null : quadrantMoveUndo === null && quadrantMoveError === null ? (
+        <Fab icon="task.add" label={t('mobile.tasks.new')} onPress={() => setComposerOpen(true)} />
+      ) : (
+        <View accessibilityLiveRegion="polite" style={{
+          position: 'absolute', left: tokens['screen.gutter'], right: tokens['screen.gutter'],
+          bottom: tokens['nav.tab-bar-height'] + insets.bottom + tokens['space.4'],
+          padding: tokens['space.3'], borderRadius: tokens['radius.md'],
+          backgroundColor: tokens['color.surface-raised'],
+        }}>
+        {quadrantMoveUndo === null ? null : (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.2'] }}>
+            <Text variant="caption" tone="muted" grow>
+              {t(
+                !quadrantMoveUndo.changedDue
+                  ? 'web.quadrant.drop.success'
+                  : 'web.quadrant.drop.changedDue',
+                { quadrant: quadrantLabels.title(quadrantMoveUndo.target) },
+              )}
+            </Text>
+            <Button label={t('web.quadrant.drop.undo')} tone="ghost" onPress={() => void undoQuadrantMove()} />
+          </View>
+        )}
+        {quadrantMoveError === null ? null : (
+          <Text variant="caption" tone="danger">
+            {t('web.quadrant.drop.error')}
+          </Text>
+        )}
+        <Button label={t('mobile.tasks.feedback.dismiss')} tone="ghost" onPress={() => {
+          setQuadrantMoveUndo(null);
+          setQuadrantMoveError(null);
+        }} />
+        </View>
+      )}
+      <TaskViewOptions
+        visible={viewOptionsOpen}
+        view={view}
+        dueMode={dueMode}
+        currentSort={taskSort}
+        onSelectView={(next) => {
+          // Timeline has no selection affordance: do not carry hidden targets
+          // and a destructive bulk toolbar into that view.
+          if (next === 'timeline') clearBulkSelection();
+          setView(next);
         }}
+        onSelectDueMode={setDueMode}
+        onSelectSort={chooseTaskSort}
+        onClose={() => setViewOptionsOpen(false)}
       />
+      <Modal
+        visible={quadrantMoveTask !== undefined}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setQuadrantMoveTaskId(null)}
+      >
+        <Pressable
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: tokens['material.scrim'],
+          }}
+          onPress={() => setQuadrantMoveTaskId(null)}
+          accessibilityLabel={t('mobile.tasks.composer.close')}
+        />
+        <View
+          style={{
+            marginTop: 'auto',
+            padding: tokens['space.4'],
+            paddingBottom: insets.bottom + tokens['space.4'],
+            gap: tokens['space.2'],
+            backgroundColor: tokens['color.surface'],
+            borderTopLeftRadius: tokens['radius.lg'],
+            borderTopRightRadius: tokens['radius.lg'],
+          }}
+        >
+          <Text variant="section-title">
+            {quadrantMoveTask === undefined
+              ? t('web.quadrant.move')
+              : t('web.quadrant.moveTask', { title: quadrantMoveTask.title })}
+          </Text>
+          {(
+            [
+              Quadrant.UrgentImportant,
+              Quadrant.ImportantNotUrgent,
+              Quadrant.UrgentNotImportant,
+              Quadrant.Neither,
+            ] as const
+          ).map((target) => (
+            <Button
+              key={target}
+              label={quadrantLabels.title(target)}
+              icon="action.more"
+              disabled={quadrantMoveCurrent === target || busyId === quadrantMoveTask?.id}
+              onPress={() => void moveTaskToQuadrant(target)}
+            />
+          ))}
+          <Button
+            label={t('web.shell.bulk.cancel')}
+            tone="ghost"
+            onPress={() => setQuadrantMoveTaskId(null)}
+          />
+        </View>
+      </Modal>
       <Modal
         visible={bulkMoveOpen}
         transparent

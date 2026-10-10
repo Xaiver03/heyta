@@ -1,0 +1,89 @@
+{
+  "status": "passed",
+  "serial": "emulator-5554",
+  "steps": [
+    {
+      "name": "01-created-task-a",
+      "status": "passed",
+      "at": 1791368064.9574459,
+      "title": "UxTaskA1791368056"
+    },
+    {
+      "name": "02-created-task-b",
+      "status": "passed",
+      "at": 1791368073.439301,
+      "title": "UxTaskB1791368056"
+    },
+    {
+      "name": "03-list-scroll",
+      "status": "passed",
+      "at": 1791368082.7392588,
+      "rowCount": 6
+    },
+    {
+      "name": "04-long-press-enters-selection",
+      "status": "passed",
+      "at": 1791368087.789439
+    },
+    {
+      "name": "05-multi-select-second-task",
+      "status": "passed",
+      "at": 1791368091.940446
+    },
+    {
+      "name": "06-exit-selection",
+      "status": "passed",
+      "at": 1791368096.114948
+    },
+    {
+      "name": "07-open-quadrant-move-sheet",
+      "status": "passed",
+      "at": 1791368106.218839
+    },
+    {
+      "name": "08-quadrant-move-feedback",
+      "status": "passed",
+      "at": 1791368110.324955,
+      "sourceQuadrant": "quadrant-cell-1",
+      "targetQuadrant": "quadrant-cell-2",
+      "feedback": "任务已移动到「计划做」，截止时间已调整",
+      "undoBounds": [
+        753,
+        1628,
+        1004,
+        1744
+      ]
+    },
+    {
+      "name": "09-quadrant-undo",
+      "status": "passed",
+      "at": 1791368114.3236248,
+      "sourceQuadrant": "quadrant-cell-1"
+    },
+    {
+      "name": "10-timeline-row-opens-detail",
+      "status": "passed",
+      "at": 1791368126.592586
+    },
+    {
+      "name": "11-detail-keyboard-visible",
+      "status": "passed",
+      "at": 1791368129.305842
+    },
+    {
+      "name": "12-detail-keyboard-dismissed",
+      "status": "passed",
+      "at": 1791368131.580721
+    },
+    {
+      "name": "13-detail-closes-after-second-back",
+      "status": "passed",
+      "at": 1791368135.751613
+    },
+    {
+      "name": "14-profile-settings-chain",
+      "status": "passed",
+      "profileEvidence": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/mobile/evidence/settings-finish-release/android/profile"
+    }
+  ]
+}

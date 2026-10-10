@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS "ops" ("pk0", "ix0_0", "ix1_0", "ix2_0", "ix2_1", "ix4_0", "data" TEXT NOT NULL, PRIMARY KEY ("pk0"));
+CREATE UNIQUE INDEX "ops__iix0_0" ON "ops" ("ix0_0");
+CREATE INDEX "ops__iix1_0" ON "ops" ("ix1_0");
+CREATE INDEX "ops__iix2_0" ON "ops" ("ix2_0", "ix2_1");
+CREATE INDEX "ops__iix4_0" ON "ops" ("ix4_0");

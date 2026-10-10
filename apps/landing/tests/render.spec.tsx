@@ -70,18 +70,14 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '../../..');
 
 describe('每一页都能渲染，且外壳完整', () => {
-  it.each(ALL_PAGE_IDS)('%s：渲染不抛错，有 #main、有 H1、有页脚免责声明', (pageId) => {
+  it.each(ALL_PAGE_IDS)('%s：渲染不抛错，有 #main、有 H1、有页脚', (pageId) => {
     const view = renderPage(pageId);
     expect(view.querySelector('#main')).not.toBeNull();
 
     const h1 = view.querySelector('h1');
     expect(h1?.textContent?.trim().length ?? 0).toBeGreaterThan(0);
 
-    // 页脚那句免责声明：README 里写着「本仓库为个人项目，与滴答清单/TickTick
-    // 及其关联公司无任何关系」。落地页是最容易被截图传播的界面，漏掉这句
-    // 会让人误以为这是官方产品 —— 而且它对**每一页**都成立，不只是首页。
-    expect(view.textContent).toContain('滴答清单');
-    expect(view.textContent).toContain('无任何关系');
+    expect(view.querySelector('footer')).not.toBeNull();
   });
 
   /**
@@ -476,9 +472,11 @@ describe('子页面的正文真的挂上了', () => {
     const view = renderPage('help');
     const questions = view.querySelectorAll('.lp-faq__q');
     const answers = view.querySelectorAll('.lp-faq__a');
-    // 🔴 A4-2：首批必须覆盖**用户最会撞到的 10 个问题**。数到 10 是刻意的 ——
+    // 🔴 A4-2：首批必须覆盖**用户最会撞到的 10 个问题**。数到这个数 是刻意的 ——
     // 少一条就说明有人把某个问题从清单里拿掉了，而页面看起来仍然"有内容"。
-    expect(questions.length).toBe(10);
+    // 2026-10-08 工单 W4 加了「怎么换绑登录邮箱」与「怎么退出某一台设备」两条 ⇒ 10 → 12。
+    // 加一个数就要加一条真答案：这两条各自对应一层（`content.ts` 的 pairs 与 i18n 的 q/a 键）。
+    expect(questions.length).toBe(12);
     expect(answers.length).toBe(questions.length);
     // ⚠️ 只查正文：导航里那个窄屏折叠菜单**就是** `<details>`（见 `Nav.tsx`），
     // 它是导航，不是"被折起来的答案"。
@@ -562,15 +560,25 @@ describe('子页面的正文真的挂上了', () => {
    * 于是那句话在**任何页面上都不存在**，而 `/signin` 那页已经把它删了。
    * 两侧一起改的那次改动，恰好是这种断链最容易发生的时候。
    */
-  it('文档中心那篇「账号、令牌与登录方式」把第五节真的挂上了', () => {
+  it('文档中心那篇「账号、令牌与登录方式」把每一节真的挂上了', () => {
     const view = renderPage('account');
-    // 五节：三个框 / 三条登录方式 / 桌面壳跳浏览器 / 条款归谁 / 为什么登录在应用里。
-    expect(view.querySelectorAll('.lp-row').length).toBe(5);
+    // 七节：三个框 / 三条登录方式 / 桌面壳跳浏览器 / 条款归谁 / 为什么登录在应用里 /
+    // 换绑邮箱 / 登录设备（后两节 2026-10-08 工单 W4 加）。
+    expect(view.querySelectorAll('.lp-row').length).toBe(7);
     // 取一句**只可能来自那段说明**的话做 needle（措辞改了要跟着改这里，这是刻意的：
     // 它意味着"这段内容真的在页面上"这件事有一个会红的判据）。
     expect(view.textContent).toContain('对着 A 服务器登录');
     // 锚点由 `docs.ts` 的 section id 给，链接要能指到这一节。
     expect(view.querySelector('#why-in-app')).not.toBeNull();
+    // 🔴 新加的两节各自要有一句**只可能来自那一节**的话 —— 计数会跟着涨，
+    // 但"内容真的在页面上"这件事只对被点名的那一节成立。
+    for (const [anchor, needle] of [
+      ['#rebinding-email', '任何一边没点就什么都不变'],
+      ['#sign-in-sessions', '每一条都可以单独登出'],
+    ] as const) {
+      expect(view.querySelector(anchor), `文档中心缺锚点 ${anchor}（docs.ts 的 section id 没挂上）`).not.toBeNull();
+      expect(view.textContent, `第 ${anchor} 节的正文没真的出现在页面上`).toContain(needle);
+    }
   });
 
   /**

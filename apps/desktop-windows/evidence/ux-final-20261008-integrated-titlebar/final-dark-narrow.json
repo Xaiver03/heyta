@@ -1,0 +1,35 @@
+﻿{
+    "threadDpiContextPrevious":  2147483682,
+    "hwnd":  16453608,
+    "action":  "narrow",
+    "capture":  {
+                    "y":  60,
+                    "width":  800,
+                    "height":  680,
+                    "x":  80
+                },
+    "maximized":  false,
+    "window":  {
+                   "y":  60,
+                   "width":  800,
+                   "height":  680,
+                   "x":  80
+               },
+    "before":  {
+                   "y":  60,
+                   "width":  1440,
+                   "height":  880,
+                   "x":  80
+               },
+    "label":  "final-dark-narrow",
+    "dpi":  96,
+    "foreground":  true,
+    "processId":  31996,
+    "processDpiAware":  true,
+    "screen":  {
+                   "y":  0,
+                   "width":  1920,
+                   "height":  1080,
+                   "x":  0
+               }
+}

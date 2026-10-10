@@ -1,0 +1,20 @@
+MSIX_SHA256=c1cad48eb0aaf1ca2221a5c84295d3cf2733e11a9a849144ead2a667ab406c3f
+PACKAGE_VERSION=1.0.0.0
+PACKAGE_ID=cloud.finlaw.heyta.desktop_d8ndx02bjp3sw!App
+WEB_DIST_INDEX_SHA=ee60cb88921ac46b662ba82ab665b6b0fdbfabf90ce8086819fb27dc9636a94b
+BRIDGE_BUNDLE_SHA=5ec4b488cac4b4844a7686e04a5d14d34ec8b26029924a0c9e27d0e726bd1610
+INSTALL_FACTS=ADD_APPX=OK RESULT=OK PAYLOAD_WEBDIST=True M2D=OK SHORTCUT_OK=True
+TITLEBAR_QA=WINDOW_TITLE=heyta WINDOW_RECT=1152x587 FOREGROUND=True RESULT=OK
+TITLEBAR_QA_DATA_DIR=C:\Users\41478\heyta-msix-qa-20261008-titlebar\data
+TITLEBAR_QA_DB_EXISTS=True
+TITLEBAR_DPI_AWARE_SET=True
+TITLEBAR_WINDOW_RECT_PHYSICAL=228,228,1440x734
+TITLEBAR_WINDOW_DPI=96
+TITLEBAR_VIRTUAL_SCREEN_PHYSICAL=0,0,1920x1080
+TITLEBAR_WINDOW_WITHIN_VIRTUAL_SCREEN=True
+TITLEBAR_PNG_DIMENSIONS=1440x734
+TITLEBAR_QA_REQUESTED_WEBVIEW_PROFILE=C:\Users\41478\heyta-msix-qa-20261008-titlebar\webview-profile
+TITLEBAR_QA_ACTUAL_WEBVIEW_PROFILE=C:\Users\41478\AppData\Local\Packages\cloud.finlaw.heyta.desktop_d8ndx02bjp3sw\LocalState
+BOUNDARY=Current shell falls back to the package LocalState WebView2 profile despite the QA user-data request; this evidence does not claim full WebView profile isolation.
+BOUNDARY=No Windows Widgets Board registration or host availability claim was made.
+BOUNDARY=No old QA finalize manifest or stale PID was used.

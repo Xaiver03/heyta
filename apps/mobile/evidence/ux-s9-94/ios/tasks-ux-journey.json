@@ -1,0 +1,70 @@
+{
+  "status": "passed",
+  "udid": "FE195661-B021-4A71-AAD1-1F2F7AE3A102",
+  "steps": [
+    {
+      "name": "01-created-task-a",
+      "status": "passed",
+      "at": 1791390721.8855639,
+      "title": "UxTaskA1791390715"
+    },
+    {
+      "name": "02-created-task-b",
+      "status": "passed",
+      "at": 1791390728.733902,
+      "title": "UxTaskB1791390715"
+    },
+    {
+      "name": "03-list-scroll",
+      "status": "passed",
+      "at": 1791390731.136013
+    },
+    {
+      "name": "04-long-press-enters-selection",
+      "status": "passed",
+      "at": 1791390733.620641
+    },
+    {
+      "name": "05-multi-select-second-task",
+      "status": "passed",
+      "at": 1791390736.054275
+    },
+    {
+      "name": "06-exit-selection",
+      "status": "passed",
+      "at": 1791390737.85748
+    },
+    {
+      "name": "07-quadrant-move-feedback",
+      "status": "passed",
+      "at": 1791390746.8668401,
+      "destination": "马上做"
+    },
+    {
+      "name": "08-quadrant-undo",
+      "status": "passed",
+      "at": 1791390748.833262
+    },
+    {
+      "name": "09-timeline-row-opens-detail",
+      "status": "passed",
+      "at": 1791390755.772761
+    },
+    {
+      "name": "10-detail-keyboard-visible-and-unobstructed",
+      "status": "passed",
+      "at": 1791390761.166759,
+      "keyboardTop": 545
+    },
+    {
+      "name": "11-detail-recovers-after-keyboard",
+      "status": "passed",
+      "at": 1791390767.891341
+    },
+    {
+      "name": "12-profile-settings-chain",
+      "status": "passed",
+      "profileEvidence": "apps/mobile/evidence/ux-s9-94/ios/profile"
+    }
+  ]
+}

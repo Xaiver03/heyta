@@ -1,0 +1,53 @@
+{
+  "capturedAt": "2026-10-08T07:27:00+08:00",
+  "capturedBy": "idb AX accessibility automation + simctl + PlugInKit/chronod/SpringBoard unified log",
+  "simulator": {
+    "udid": "FE195661-B021-4A71-AAD1-1F2F7AE3A102",
+    "runtime": "iOS 27.1",
+    "appBundle": "com.heyta",
+    "extensionBundleId": "com.heyta.WidgetExtension",
+    "installedAppPath": "/Users/rocalight/Library/Developer/CoreSimulator/Devices/FE195661-B021-4A71-AAD1-1F2F7AE3A102/data/Containers/Bundle/Application/95FF7AC3-67C0-4E5E-8F4D-1B7AAFD2357E/Heyta.app"
+  },
+  "election": {
+    "command": "xcrun simctl spawn FE195661-B021-4A71-AAD1-1F2F7AE3A102 pluginkit -e use -p com.apple.widgetkit-extension -i com.heyta.WidgetExtension",
+    "rc": 0,
+    "status": "pluginkit -m -p com.apple.widgetkit-extension shows +    com.heyta.WidgetExtension(1.0)",
+    "meaning": "the WidgetKit extension is explicitly elected/enabled in PlugInKit"
+  },
+  "serviceRefresh": {
+    "commands": [
+      "xcrun simctl spawn FE195661-B021-4A71-AAD1-1F2F7AE3A102 launchctl kickstart -k user/501/com.apple.SpringBoard",
+      "xcrun simctl spawn FE195661-B021-4A71-AAD1-1F2F7AE3A102 launchctl kickstart -k user/501/com.apple.chronod"
+    ],
+    "result": "rc=0; chronod later published Heyta descriptors and precached all four widget kinds"
+  },
+  "chronodEvidence": {
+    "published": "count = 4",
+    "descriptors": [
+      "HeytaTodayWidget",
+      "HeytaQuadrantWidget",
+      "HeytaHabitsWidget",
+      "HeytaFocusWidget"
+    ],
+    "descriptorState": "enabled = YES",
+    "reloadState": "Heyta extension reloads completed with Reload success",
+    "log": "ios/widget-election-20261008.log.txt"
+  },
+  "galleryEvidence": {
+    "actions": [
+      "long press Home blank area",
+      "tap 编辑",
+      "tap 添加小组件",
+      "set 搜索小组件 = heyta"
+    ],
+    "axResult": "search field retained heyta; no Heyta provider/widget row exposed",
+    "widgetAdded": false,
+    "axEvidence": "ios/widget-gallery-idb-heyta-after-election.ax.json",
+    "screenshot": "ios/widget-gallery-idb-heyta-after-election.png"
+  },
+  "springboardCorrelation": {
+    "result": "Presenting add widget sheet applicationWidgetCollections contains Apple collections but no com.heyta collection",
+    "interpretation": "PlugInKit election and chronod descriptor/reload layers are now confirmed healthy; remaining gap is SpringBoard/ATX gallery collection presentation/indexing"
+  },
+  "sourceChanged": false
+}

@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 2,
+  "lifecycle": "finalized",
+  "processId": 30840,
+  "finalizedUtc": "2026-10-08T07:48:20.4055233Z",
+  "processStop": {
+    "pid": 30840,
+    "state": "already-exited"
+  },
+  "defaultFilesBeforeCount": 1277,
+  "defaultFilesAfterCount": 1277,
+  "defaultComparison": {
+    "unchanged": true,
+    "differences": []
+  },
+  "qaProcessCount": 0,
+  "scheduledTaskPresent": false,
+  "runnerSha256": "8B22FD4B49893F925550D1DED6EAFB59C0B9C4537DA54FE23B97E29703DA17FC",
+  "captionResult": {
+    "nativeRestoreClick": true,
+    "nativeCloseClick": true,
+    "processId": 30840,
+    "nativeMinimizeClick": true,
+    "nativeMaximizeClick": true,
+    "showWindowRestore": true,
+    "utc": "2026-10-08T07:47:53.6695919Z"
+  }
+}

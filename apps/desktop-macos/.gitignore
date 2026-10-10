@@ -13,3 +13,12 @@
 # 设计系统 token 的**派生物**（构建期从 tokens.css 的产物同步而来）。
 # 不入库：入库就等于第二份设计变量。同步 + 校验见 scripts/sync-tokens.sh。
 Sources/HeytaMac/Generated/
+
+# WidgetKit extension is a checked-in Xcode target (SwiftPM cannot emit .appex metadata).
+!HeytaWidgets.xcodeproj/
+HeytaWidgets.xcodeproj/*
+!HeytaWidgets.xcodeproj/project.pbxproj
+!HeytaWidgets.xcodeproj/xcshareddata/
+HeytaWidgets.xcodeproj/xcshareddata/*
+!HeytaWidgets.xcodeproj/xcshareddata/xcschemes/
+!HeytaWidgets.xcodeproj/xcshareddata/xcschemes/HeytaMacWidget.xcscheme

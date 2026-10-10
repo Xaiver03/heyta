@@ -17,7 +17,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_LOCALE } from '@heyta/i18n';
 
-import { resolveDeviceLocale } from '../src/i18n/locale';
+import { resolveDeviceLocale, resolveNativeLocale } from '../src/i18n/locale';
 
 describe('resolveDeviceLocale', () => {
   it('🔴 在没有 react-native 的环境里不抛异常，回落到默认语言', () => {
@@ -26,5 +26,28 @@ describe('resolveDeviceLocale', () => {
     // 否则 `App.tsx` 的初始化会直接崩在启动路径上。
     expect(() => resolveDeviceLocale()).not.toThrow();
     expect(resolveDeviceLocale()).toBe(DEFAULT_LOCALE);
+  });
+});
+
+describe('独立设备语言与系统组件一致', () => {
+  it('中文偏好覆盖英文系统；英文偏好覆盖中文系统', () => {
+    expect(resolveNativeLocale({ HeytaWidget: { preferredLocale: 'zh-CN', deviceLocale: 'en-US' } })).toBe('zh-CN');
+    expect(resolveNativeLocale({ HeytaWidget: { preferredLocale: 'en', deviceLocale: 'zh-Hans-CN' } })).toBe('en');
+  });
+
+  it('没有偏好时由原生设备语言补足现代 RN 缺失的 localeIdentifier', () => {
+    expect(resolveNativeLocale({ HeytaWidget: { deviceLocale: 'en-US' }, I18nManager: {} })).toBe('en');
+    expect(resolveNativeLocale({ HeytaWidget: { deviceLocale: 'zh-Hans-CN' } })).toBe('zh-CN');
+  });
+
+  it('坏偏好回落设备语言，旧桥继续使用已有系统模块', () => {
+    expect(resolveNativeLocale({ HeytaWidget: { preferredLocale: 'invalid', deviceLocale: 'en-US' } })).toBe('en');
+    expect(resolveNativeLocale({ SettingsManager: { settings: { AppleLanguages: ['en-US'] } } })).toBe('en');
+    expect(resolveNativeLocale({ I18nManager: { localeIdentifier: 'zh_CN' } })).toBe('zh-CN');
+  });
+
+  it('原生 getter 失败不会阻断启动', () => {
+    const modules = { get HeytaWidget(): unknown { throw new Error('native unavailable'); } };
+    expect(resolveNativeLocale(modules)).toBe(DEFAULT_LOCALE);
   });
 });

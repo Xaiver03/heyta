@@ -346,7 +346,7 @@ describe('每格的标题 / 说明 / 空态 / 无障碍 = web `copy.ts`', () => 
     }
   });
 
-  it('`cellA11y` / `empty` / `footnote` 三个 key = `copy.ts` 里 `t(...)` 的实参', () => {
+  it('`cellA11y` / `empty` 两个 key = `copy.ts` 里 `t(...)` 的实参', () => {
     const copy = quadrantCopySource();
     const cell = firstKeyIn(copyFieldExpr(copy, 'cellA11y'));
     const empty = firstKeyIn(copyFieldExpr(copy, 'empty'));
@@ -355,24 +355,7 @@ describe('每格的标题 / 说明 / 空态 / 无障碍 = web `copy.ts`', () => 
     expect(MOCK_QUADRANT_KEYS.cellA11y).toBe(cell);
     expect(MOCK_QUADRANT_KEYS.empty).toBe(empty);
 
-    const footnoteExpr = copyFieldExpr(copy, 'footnote');
-    if (footnoteExpr === undefined) {
-      // 🔴 **方向从产品源码读出来**，不是写死"这一行一定在"（与今天 #24 那条同一口径）：
-      // 产品哪天不再给 footnote，复刻就不许画它。
-      const view = renderMockup('quadrant');
-      expect(
-        view.querySelector('.mk-quadrant__footnote'),
-        '产品侧 `copy.ts` 已经没有 `footnote` 这一项，而复刻还在画 `.mk-quadrant__footnote`。' +
-          '要撤的有三处：`AppWindow.tsx` 里那个节点、`mockup.css` 里那条规则、' +
-          '`mockup-fidelity.spec.tsx` 的「四象限底部有 footnote」那一条。' +
-          '⚠️ 若产品侧那半**还没入库**（现量：`git status --porcelain -- apps/web/src/features/quadrant/copy.ts`），' +
-          '这条红说的是"提交那一笔要同时改复刻"，不是"复刻坏了"。',
-      ).toBeNull();
-      return;
-    }
-    const footnote = firstKeyIn(footnoteExpr);
-    expect(footnote, 'copy.ts 里有 footnote 这一项，但取不到它的词条实参').toBeDefined();
-    expect(MOCK_QUADRANT_KEYS.footnote).toBe(footnote);
+    expect(MOCK_QUADRANT_KEYS).not.toHaveProperty('footnote');
   });
 
   it('真实现的空态是**纯文字**（登记处说不许有图标，真实现的文件里也没有图标）', () => {
@@ -483,8 +466,8 @@ describe('`mockup.css` 用的是真实现那一组 token', () => {
     expectVar(css, '.mk-quad__head', 'letter-spacing', rowMeta.tracking);
     expectVar(css, '.mk-quad__head', 'font-weight', 'font-weight.semibold');
 
-    // 说明 / 空态 / footnote：`caption` 的四个 token，逐属性对账。
-    for (const selector of ['.mk-quad__hint', '.mk-quad__empty', '.mk-quadrant__footnote']) {
+    // 说明 / 空态：`caption` 的四个 token，逐属性对账。
+    for (const selector of ['.mk-quad__hint', '.mk-quad__empty']) {
       expectVar(css, selector, 'font-size', caption.size);
       expectVar(css, selector, 'font-weight', caption.weight);
       expectVar(css, selector, 'line-height', caption.leading);

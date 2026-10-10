@@ -47,7 +47,11 @@ New-Item -ItemType Directory -Path $build, $stage -Force | Out-Null
 
 # ---- 1. publish -------------------------------------------------------------
 $facts += '=== 1. dotnet publish ==='
-$pub = dotnet publish $proj -c Release -p:Platform=x64 -p:RuntimeIdentifier=win-x64 --self-contained true -o $pubDir 2>&1
+# NuGet audit is an advisory HTTP lookup. The Windows packaging host may have the
+# required packages cached while the advisory endpoint is unavailable; treating
+# that lookup as a build dependency turns a complete local restore into NU1900.
+# Package restore itself remains strict: missing packages still fail publish.
+$pub = dotnet publish $proj -c Release -p:Platform=x64 -p:RuntimeIdentifier=win-x64 -p:NuGetAudit=false --ignore-failed-sources --self-contained true -o $pubDir 2>&1
 $pub | Select-String -Pattern 'error|Build succeeded|warning' | Select-Object -First 6 | ForEach-Object { $facts += ('  ' + $_.Line) }
 $exe = Join-Path $pubDir 'HeytaWindows.exe'
 if (-not (Test-Path $exe)) { $facts += 'RESULT=PUBLISH_FAILED'; $facts | Set-Content $manifestOut -Encoding ASCII; $facts | Write-Output; exit 1 }

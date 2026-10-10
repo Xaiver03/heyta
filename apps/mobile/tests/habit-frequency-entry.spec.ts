@@ -77,14 +77,6 @@ describe('移动端频次编辑器的接线与单一口径（源码层）', () =
       SEPARATOR_OWNER,
     ]);
     // 直接写死标点的那条路也堵住（不声明表、在组件里 inline `'、'`）。
-    /* 🔴 **已登记的债**，不是放行条件：`src/ai/AssistantScreen.tsx` 有两处
-       `.join('、')`（628 与 1467 行），它在**英文界面也会印顿号**。
-       这不是本单（H5）的东西，而"代改别线代码"要三条齐 —— 其中"运行时形状逐字不变"
-       这一条**不成立**（改完英文侧的行为就变了），所以这里**不代改**，
-       只把它记进 [`docs/plans/habits-alignment.md`](../../../docs/plans/habits-alignment.md) §5 的 P-4。
-       ⚠️ 这张表是**精确集合相等**，不是"命中就跳过"：再长出第三处 inline 顿号会红，
-          而债还掉之后这张表也要跟着删 —— 留着它就是一次假绿。 */
-    const SEPARATOR_DEBT = ['apps/mobile/src/ai/AssistantScreen.tsx'];
     const inline = mobileSources()
       .filter(
         (rel) => rel !== SEPARATOR_OWNER && /['"]、['"]/.test(stripComments(read(rel))),
@@ -93,14 +85,10 @@ describe('移动端频次编辑器的接线与单一口径（源码层）', () =
     expect(
       inline,
       `绕过单源写死顿号的文件（登记过的债见本条注释）：${inline.join(' , ')}`,
-    ).toEqual(SEPARATOR_DEBT.slice().sort());
+    ).toEqual([]);
     // 阳性对照：频次摘要确实**取**了那位所有者，而不是没用到所以没红。
     expect(slot, '频次摘要没走 LIST_SEPARATOR 那一份单源').toMatch(
       /import\s*\{\s*LIST_SEPARATOR\s*\}\s*from/,
-    );
-    // 阳性对照（债本身还在）：这条判据不是靠"那文件已经不写顿号"变绿的。
-    expect(stripComments(read('apps/mobile/src/ai/AssistantScreen.tsx')), '登记的债已经还了 —— 该把这张表删掉').toContain(
-      "join('、')",
     );
   });
 

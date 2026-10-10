@@ -99,7 +99,7 @@
         "name": "How do I create a task?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Type one line into the capture box at the top of the app and press Enter. Dates and priorities can be written inside the sentence (for example \"submit the report tomorrow at 3pm\"); whatever it recognises appears as a chip you can undo. A bare title is fine too — you can add a note later on the task row."
+          "text": "Enter a title above the task list and press Enter. You can also type “submit the report tomorrow at 3pm” and review the detected date before adding it. Open the task to add notes, a list and tags."
         }
       },
       {
@@ -107,7 +107,7 @@
         "name": "I have a new device — how does my data get there?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Enter the sync server address and an access token in settings. Data is uploaded encrypted, so the passphrase must match — data encrypted under a different passphrase cannot be decrypted. That is the cost of end-to-end encryption, not a bug."
+          "text": "Enable networking and sign in to heyta to use the official sync service. No server address or token is required. Check the connection under App settings → Account sync. Keep your recovery information when setting up encryption; other devices need the same encryption credentials."
         }
       },
       {
@@ -123,7 +123,23 @@
         "name": "How do passkeys work?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Choose \"passkey\" when signing in and confirm with your device's face / fingerprint / system PIN. There is no password to remember and none to breach. If you lose it, the app's sign-in panel offers \"Lost your passkey?\", which emails a recovery link where you register a new one. ⚠️ The last remaining credential cannot be deleted — delete it and you are locked out."
+          "text": "Choose \"Sign in with a passkey\" when signing in and confirm with your device's face / fingerprint / system PIN. There is no password to remember and none to breach. If you lose it, the app's sign-in panel offers \"Lost your passkey? Email me a recovery link\", which sends the link you use to register a new one. ⚠️ The last remaining credential cannot be deleted — delete it and you are locked out."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How do I change my sign-in e-mail?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "In Settings → Account, press \"Change sign-in email\" and type the new one. heyta mails both the current and the new address, and the change only lands after both links are clicked - while either is outstanding, nothing changes. Each link is valid for 24 hours, and when the change lands your other devices are signed out, so you sign in again with the new address. If the current mailbox no longer receives mail (typed wrong at sign-up, closed), this route cannot complete: two-sided confirmation is exactly what makes it safe, so that case needs the operator of your server."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How do I sign one device out?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Settings → Account lists your sign-in sessions: when each started, when it was last used and which browser it came from, each with its own sign-out. \"Sign out this device\" revokes only that token, the others keep working; use \"Sign out everywhere\" to clear them in one go. Changing your password and rebinding the e-mail also sign every other device out."
         }
       },
       {
@@ -163,7 +179,7 @@
         "name": "How do I run my own server?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "You can, but this is \"operate a service yourself\": no prebuilt image is published (you build it), and upgrading is not one command — the one-shot migration service exits after it runs and compose does not restart an exited service, so after a table-structure change you re-run the command that names supersync-migrate. Registration and sign-in run on email + password; outgoing mail only covers the *activate your account* step — you can still create an account without SMTP and the app says so plainly, while a private instance can skip the step with REQUIRE_EMAIL_VERIFICATION=false. See \"Running your own sync server\"."
+          "text": "You can use your own sync server. See “Self-host your sync” for deployment, upgrades and backups. Connect through the advanced options in sync settings."
         }
       },
       {
@@ -171,7 +187,7 @@
         "name": "Where does my data actually live?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "On your own device first. This answer is about the sync channel - once sync is on, that channel holds ciphertext only in the cloud, and a sync endpoint that receives plaintext rejects it outright. ⚠️ AI is a different path and is not covered by that sentence: a language model has to read your text in order to suggest anything, so the field-by-field, feature-by-feature disclosure lives in the \"AI & Data Flow\" document, linked in the footer. One more thing: sync metadata is not encrypted - sync times, device identifiers, and the fact that a task changed are visible to it. We do not advertise \"we can see nothing\"."
+          "text": "Tasks are saved on your device first. Sync uploads task content with end-to-end encryption; metadata such as sync times and device identifiers remains visible to the server. AI has separate data permissions. See “AI & Data Flow” for the information it sends."
         }
       }
     ]

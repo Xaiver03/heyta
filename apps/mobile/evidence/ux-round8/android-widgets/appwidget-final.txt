@@ -1,0 +1,110 @@
+Providers:
+  [0] provider ProviderId{user:0, app:10153, cmp:ComponentInfo{com.android.chrome/org.chromium.chrome.browser.quickactionsearchwidget.QuickActionSearchWidgetProvider$QuickActionSearchWidgetProviderSearch}}
+    min=(66561x12289)   minResize=(66561x12289) updatePeriodMillis=0 resizeMode=3 widgetCategory=5 autoAdvanceViewId=-1 initialLayout=#7f0e02be initialKeyguardLayout=#0   zombie=false
+  [1] provider ProviderId{user:0, app:10153, cmp:ComponentInfo{com.android.chrome/org.chromium.chrome.browser.quickactionsearchwidget.QuickActionSearchWidgetProvider$QuickActionSearchWidgetProviderDino}}
+    min=(28161x28161)   minResize=(28161x28161) updatePeriodMillis=0 resizeMode=0 widgetCategory=1 autoAdvanceViewId=-1 initialLayout=#7f0e02bb initialKeyguardLayout=#0   zombie=false
+  [2] provider ProviderId{user:0, app:10153, cmp:ComponentInfo{com.android.chrome/com.google.android.apps.chrome.appwidget.bookmarks.BookmarkThumbnailWidgetProvider}}
+    min=(46081x38401)   minResize=(16385x12289) updatePeriodMillis=86400000 resizeMode=3 widgetCategory=1 autoAdvanceViewId=-1 initialLayout=#7f0e008b initialKeyguardLayout=#0   zombie=false
+  [3] provider ProviderId{user:0, app:10153, cmp:ComponentInfo{com.android.chrome/org.chromium.chrome.browser.searchwidget.SearchWidgetProvider}}
+    min=(61441x12289)   minResize=(61441x12289) updatePeriodMillis=86400000 resizeMode=1 widgetCategory=5 autoAdvanceViewId=-1 initialLayout=#7f0e02f0 initialKeyguardLayout=#0   zombie=false
+  [4] provider ProviderId{user:0, app:10186, cmp:ComponentInfo{com.android.systemui/com.android.systemui.people.widget.PeopleSpaceWidgetProvider}}
+    min=(34817x0)   minResize=(15361x12801) updatePeriodMillis=60000 resizeMode=3 widgetCategory=1 autoAdvanceViewId=-1 initialLayout=#7f0d0204 initialKeyguardLayout=#0   zombie=false
+  [5] provider ProviderId{user:0, app:10157, cmp:ComponentInfo{com.google.android.apps.docs/com.google.android.apps.docs.drive.widget.suggestion.SuggestionAppWidgetProvider}}
+    min=(51201x28161)   minResize=(36353x25601) updatePeriodMillis=14400000 resizeMode=3 widgetCategory=3 autoAdvanceViewId=-1 initialLayout=#7f0e0051 initialKeyguardLayout=#0   zombie=false
+  [6] provider ProviderId{user:0, app:10157, cmp:ComponentInfo{com.google.android.apps.docs/com.google.android.apps.docs.drive.widget.CakemixAppWidgetProvider}}
+    min=(57345x18433)   minResize=(36353x12289) updatePeriodMillis=79200000 resizeMode=3 widgetCategory=1 autoAdvanceViewId=-1 initialLayout=#7f0e004c initialKeyguardLayout=#0   zombie=false
+  [7] provider ProviderId{user:0, app:10151, cmp:ComponentInfo{com.google.android.apps.maps/com.google.android.apps.gmm.widget.SearchWidgetProvider}}
+    min=(56321x25601)   minResize=(40961x25601) updatePeriodMillis=43200000 resizeMode=3 widgetCategory=1 autoAdvanceViewId=-1 initialLayout=#7f0e021e initialKeyguardLayout=#0   zombie=false
+  [8] provider ProviderId{user:0, app:10151, cmp:ComponentInfo{com.google.android.apps.maps/com.google.android.apps.gmm.widget.traffic.TrafficWidgetProvider}}
+    min=(56321x25601)   minResize=(35841x20481) updatePeriodMillis=0 resizeMode=3 widgetCategory=3 autoAdvanceViewId=-1 initialLayout=#7f0e033c initialKeyguardLayout=#0   zombie=false
+  [9] provider ProviderId{user:0, app:10169, cmp:ComponentInfo{com.google.android.apps.photos/com.google.android.apps.photos.widget.people.WidgetProviderPeoplePets}}
+    min=(15361x25601)   minResize=(15361x25601) updatePeriodMillis=0 resizeMode=3 widgetCategory=1 autoAdvanceViewId=-1 initialLayout=#7f0e0815 initialKeyguardLayout=#0   zombie=false
+  [10] provider ProviderId{user:0, app:10169, cmp:ComponentInfo{com.google.android.apps.photos/com.google.android.apps.photos.widget.WidgetProvider}}
+    min=(15361x25601)   minResize=(15361x25601) updatePeriodMillis=0 resizeMode=3 widgetCategory=3 autoAdvanceViewId=-1 initialLayout=#7f0e0815 initialKeyguardLayout=#0   zombie=false
+  [11] provider ProviderId{user:0, app:10145, cmp:ComponentInfo{com.google.android.apps.wellbeing/com.google.android.apps.wellbeing.widget.screentime.ScreenTimeWidgetProviderReceiver_Receiver}}
+    min=(25601x23041)   minResize=(25601x12801) updatePeriodMillis=0 resizeMode=3 widgetCategory=1 autoAdvanceViewId=-1 initialLayout=#7f0d0088 initialKeyguardLayout=#0   zombie=false
+  [12] provider ProviderId{user:0, app:10156, cmp:ComponentInfo{com.google.android.apps.youtube.music/com.google.android.apps.youtube.music.player.widget.MusicWidgetProvider}}
+    min=(89089x14337)   minResize=(49153x14337) updatePeriodMillis=1800000 resizeMode=1 widgetCategory=1 autoAdvanceViewId=-1 initialLayout=#7f0e0044 initialKeyguardLayout=#0   zombie=false
+  [13] provider ProviderId{user:0, app:10156, cmp:ComponentInfo{com.google.android.apps.youtube.music/com.google.android.apps.youtube.music.player.widget.gm3.FreeformMusicWidgetProvider}}
+    min=(38401x25601)   minResize=(38401x25601) updatePeriodMillis=1800000 resizeMode=3 widgetCategory=1 autoAdvanceViewId=-1 initialLayout=#7f0e0045 initialKeyguardLayout=#0   zombie=false
+  [14] provider ProviderId{user:0, app:10152, cmp:ComponentInfo{com.google.android.calendar/com.android.calendar.widget.CalendarAppWidgetProvider}}
+    min=(28161x28161)   minResize=(28161x28161) updatePeriodMillis=0 resizeMode=3 widgetCategory=3 autoAdvanceViewId=-1 initialLayout=#7f0e0269 initialKeyguardLayout=#0   zombie=false
+  [15] provider ProviderId{user:0, app:10152, cmp:ComponentInfo{com.google.android.calendar/com.google.android.calendar.widgetmonth.MonthViewWidgetProvider}}
+    min=(64001x64001)   minResize=(64001x64001) updatePeriodMillis=0 resizeMode=3 widgetCategory=3 autoAdvanceViewId=-1 initialLayout=#7f0e0269 initialKeyguardLayout=#0   zombie=false
+  [16] provider ProviderId{user:0, app:10150, cmp:ComponentInfo{com.google.android.contacts/com.google.android.apps.contacts.widget.besties.BestiesWidgetProvider}}
+    min=(97281x26625)   minResize=(30721x10241) updatePeriodMillis=86400000 resizeMode=3 widgetCategory=1 autoAdvanceViewId=-1 initialLayout=#7f0e01b9 initialKeyguardLayout=#0   zombie=false
+  [17] provider ProviderId{user:0, app:10150, cmp:ComponentInfo{com.google.android.contacts/com.google.android.apps.contacts.widget.favoritecontactsgrid.FavoriteContactsWidgetProviderUpgradeWrapper}}
+    min=(97281x26625)   minResize=(30721x10241) updatePeriodMillis=86400000 resizeMode=3 widgetCategory=1 autoAdvanceViewId=-1 initialLayout=#7f0e01b9 initialKeyguardLayout=#0   zombie=false
+  [18] provider ProviderId{user:0, app:10150, cmp:ComponentInfo{com.google.android.contacts/com.google.android.apps.contacts.widget.singlecontact.SingleContactWidgetProvider}}
+    min=(34817x30721)   minResize=(5121x5121) updatePeriodMillis=10800000 resizeMode=3 widgetCategory=1 autoAdvanceViewId=-1 initialLayout=#7f0e0669 initialKeyguardLayout=#0   zombie=false
+  [19] provider ProviderId{user:0, app:10163, cmp:ComponentInfo{com.google.android.deskclock/com.android.alarmclock.AnalogAppWidgetProvider}}
+    min=(28161x28161)   minResize=(1x1) updatePeriodMillis=0 resizeMode=3 widgetCategory=1 autoAdvanceViewId=-1 initialLayout=#7f0e0080 initialKeyguardLayout=#0   zombie=false
+  [20] provider ProviderId{user:0, app:10163, cmp:ComponentInfo{com.google.android.deskclock/com.android.alarmclock.StopwatchAppWidgetProvider}}
+    min=(38401x38401)   minResize=(28161x28161) updatePeriodMillis=0 resizeMode=3 widgetCategory=1 autoAdvanceViewId=-1 initialLayout=#7f0e0080 initialKeyguardLayout=#0   zombie=false
+  [21] provider ProviderId{user:0, app:10163, cmp:ComponentInfo{com.google.android.deskclock/com.android.alarmclock.DigitalAppWidgetProvider}}
+    min=(38401x25601)   minResize=(21761x1) updatePeriodMillis=0 resizeMode=3 widgetCategory=3 autoAdvanceViewId=-1 initialLayout=#7f0e0080 initialKeyguardLayout=#0   zombie=false
+  [22] provider ProviderId{user:0, app:10163, cmp:ComponentInfo{com.google.android.deskclock/com.android.alarmclock.DigitalStackedAppWidgetProvider}}
+    min=(46081x35841)   minResize=(21761x1) updatePeriodMillis=0 resizeMode=3 widgetCategory=3 autoAdvanceViewId=-1 initialLayout=#7f0e0080 initialKeyguardLayout=#0   zombie=false
+  [23] provider ProviderId{user:0, app:10163, cmp:ComponentInfo{com.google.android.deskclock/com.android.alarmclock.DigitalCitiesAppWidgetProvider}}
+    min=(76801x30721)   minResize=(21761x1) updatePeriodMillis=0 resizeMode=3 widgetCategory=3 autoAdvanceViewId=-1 initialLayout=#7f0e0080 initialKeyguardLayout=#0   zombie=false
+  [24] provider ProviderId{user:0, app:10161, cmp:ComponentInfo{com.google.android.gm/com.google.android.gm.widget.GmailWidgetProvider}}
+    min=(46081x28161)   minResize=(38401x28161) updatePeriodMillis=79200000 resizeMode=3 widgetCategory=3 autoAdvanceViewId=-1 initialLayout=#7f0e0902 initialKeyguardLayout=#0   zombie=false
+  [25] provider ProviderId{user:0, app:10161, cmp:ComponentInfo{com.google.android.gm/com.google.android.gm.widget.GoogleMailWidgetProvider}}
+    min=(46081x28161)   minResize=(38401x28161) updatePeriodMillis=79200000 resizeMode=3 widgetCategory=3 autoAdvanceViewId=-1 initialLayout=#7f0e0902 initialKeyguardLayout=#0   zombie=false
+  [26] provider ProviderId{user:0, app:10147, cmp:ComponentInfo{com.google.android.googlequicksearchbox/com.google.android.apps.gsa.staticplugins.smartspace.widget.SmartspaceWidgetProvider}}
+    min=(84737x12801)   minResize=(84737x12801) updatePeriodMillis=7200000 resizeMode=3 widgetCategory=1 autoAdvanceViewId=-1 initialLayout=#7f0e04ca initialKeyguardLayout=#0   zombie=false
+  [27] provider ProviderId{user:0, app:10147, cmp:ComponentInfo{com.google.android.googlequicksearchbox/com.google.android.apps.search.assistant.verticals.automation.routines.routineblocks.widget.RoutineAppWidgetProvider}}
+    min=(30721x23041)   minResize=(12289x12289) updatePeriodMillis=0 resizeMode=3 widgetCategory=1 autoAdvanceViewId=-1 initialLayout=#7f0e046f initialKeyguardLayout=#0   zombie=false
+  [28] provider ProviderId{user:0, app:10147, cmp:ComponentInfo{com.google.android.googlequicksearchbox/com.google.android.googlequicksearchbox.SearchWidgetProvider}}
+    min=(71681x10241)   minResize=(20481x10241) updatePeriodMillis=0 resizeMode=1 widgetCategory=5 autoAdvanceViewId=-1 initialLayout=#7f0e0b6d initialKeyguardLayout=#0   zombie=false
+  [29] provider ProviderId{user:0, app:10147, cmp:ComponentInfo{com.google.android.googlequicksearchbox/com.google.android.apps.gsa.staticplugins.searchwidget.GoogleSearchWidgetProvider}}
+    min=(71681x10241)   minResize=(20481x10241) updatePeriodMillis=0 resizeMode=1 widgetCategory=5 autoAdvanceViewId=-1 initialLayout=#7f0e0b09 initialKeyguardLayout=#0   zombie=false
+  [30] provider ProviderId{user:0, app:10147, cmp:ComponentInfo{com.google.android.googlequicksearchbox/com.google.android.apps.search.widgets.stocks.StocksWidgetReceiver}}
+    min=(35841x23041)   minResize=(35841x23041) updatePeriodMillis=86400000 resizeMode=3 widgetCategory=3 autoAdvanceViewId=-1 initialLayout=#7f0e1436 initialKeyguardLayout=#7f0e1436   zombie=false
+  [31] provider ProviderId{user:0, app:10137, cmp:ComponentInfo{com.google.android.settings.intelligence/com.google.android.settings.intelligence.modules.batterywidget.impl.BatteryAppWidgetProvider}}
+    min=(46081x12289)   minResize=(28161x12289) updatePeriodMillis=3600000 resizeMode=3 widgetCategory=3 autoAdvanceViewId=-1 initialLayout=#7f0e004a initialKeyguardLayout=#0   zombie=false
+  [32] provider ProviderId{user:0, app:10166, cmp:ComponentInfo{com.google.android.youtube/com.google.android.apps.youtube.app.widget.YtQuickActionsWidgetProvider}}
+    min=(48641x30721)   minResize=(48641x12801) updatePeriodMillis=72000000 resizeMode=3 widgetCategory=1 autoAdvanceViewId=-1 initialLayout=#7f0e0070 initialKeyguardLayout=#0   zombie=false
+  [33] provider ProviderId{user:0, app:10166, cmp:ComponentInfo{com.google.android.youtube/com.google.android.apps.youtube.app.widget.YtSearchWidgetProvider}}
+    min=(57345x12801)   minResize=(48641x12801) updatePeriodMillis=72000000 resizeMode=3 widgetCategory=1 autoAdvanceViewId=-1 initialLayout=#7f0e0070 initialKeyguardLayout=#0   zombie=false
+  [34] provider ProviderId{user:0, app:10340, cmp:ComponentInfo{com.heyta/com.heytamobile.widget.TodayWidgetProvider}}
+    min=(46081x28161)   minResize=(46081x28161) updatePeriodMillis=1800000 resizeMode=3 widgetCategory=1 autoAdvanceViewId=-1 initialLayout=#7f0b0034 initialKeyguardLayout=#0   zombie=false
+  [35] provider ProviderId{user:0, app:10340, cmp:ComponentInfo{com.heyta/com.heytamobile.widget.QuadrantWidgetProvider}}
+    min=(46081x46081)   minResize=(46081x46081) updatePeriodMillis=1800000 resizeMode=3 widgetCategory=1 autoAdvanceViewId=-1 initialLayout=#7f0b0033 initialKeyguardLayout=#0   zombie=false
+  [36] provider ProviderId{user:0, app:10340, cmp:ComponentInfo{com.heyta/com.heytamobile.widget.HabitsWidgetProvider}}
+    min=(46081x28161)   minResize=(46081x28161) updatePeriodMillis=1800000 resizeMode=3 widgetCategory=1 autoAdvanceViewId=-1 initialLayout=#7f0b0032 initialKeyguardLayout=#0   zombie=false
+  [37] provider ProviderId{user:0, app:10340, cmp:ComponentInfo{com.heyta/com.heytamobile.widget.FocusWidgetProvider}}
+    min=(46081x19457)   minResize=(46081x19457) updatePeriodMillis=1800000 resizeMode=3 widgetCategory=1 autoAdvanceViewId=-1 initialLayout=#7f0b0031 initialKeyguardLayout=#0   zombie=false
+ 
+Widgets:
+  [0] id=2
+    host=HostId{user:0, app:10185, hostId:1024, pkg:com.google.android.apps.nexuslauncher}
+    provider=ProviderId{user:0, app:10340, cmp:ComponentInfo{com.heyta/com.heytamobile.widget.FocusWidgetProvider}}
+    host.callbacks=com.android.internal.appwidget.IAppWidgetHost$Stub$Proxy@388ad2
+    views=android.widget.RemoteViews@5b67547
+    views_bitmap_memory=0
+  [1] id=3
+    host=HostId{user:0, app:10185, hostId:1024, pkg:com.google.android.apps.nexuslauncher}
+    provider=ProviderId{user:0, app:10340, cmp:ComponentInfo{com.heyta/com.heytamobile.widget.HabitsWidgetProvider}}
+    host.callbacks=com.android.internal.appwidget.IAppWidgetHost$Stub$Proxy@388ad2
+    views=android.widget.RemoteViews@255c174
+    views_bitmap_memory=0
+  [2] id=4
+    host=HostId{user:0, app:10185, hostId:1024, pkg:com.google.android.apps.nexuslauncher}
+    provider=ProviderId{user:0, app:10340, cmp:ComponentInfo{com.heyta/com.heytamobile.widget.TodayWidgetProvider}}
+    host.callbacks=com.android.internal.appwidget.IAppWidgetHost$Stub$Proxy@388ad2
+    views=android.widget.RemoteViews@32ce69d
+    views_bitmap_memory=0
+  [3] id=5
+    host=HostId{user:0, app:10185, hostId:1024, pkg:com.google.android.apps.nexuslauncher}
+    provider=ProviderId{user:0, app:10340, cmp:ComponentInfo{com.heyta/com.heytamobile.widget.QuadrantWidgetProvider}}
+    host.callbacks=com.android.internal.appwidget.IAppWidgetHost$Stub$Proxy@388ad2
+    views=android.widget.RemoteViews@2d03712
+    views_bitmap_memory=0
+ 
+Hosts:
+  [0] hostId=HostId{user:0, app:10185, hostId:1024, pkg:com.google.android.apps.nexuslauncher}
+    callbacks=com.android.internal.appwidget.IAppWidgetHost$Stub$Proxy@388ad2
+    widgets.size=4 zombie=false
+ 
+Grants:

@@ -36,13 +36,15 @@ import { Pressable, View } from 'react-native';
 import { type FocusSessionKind, type Task } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import { FocusPanel, focusLogFailureMessageKey } from '@heyta/ui';
-import { createTaskActions, focusOverview, type AppHost } from '@heyta/app-host';
+import { focusOverview, type AppHost } from '@heyta/app-host';
 
 import { useText, useTokens } from '../theme';
 import { Button, Card, Chip, Screen, SectionHeader, Text } from '../ui/kit';
 import { Icon } from '../ui/icons';
-import { openTaskHost } from '../db/open-host';
+import { getOpenTaskHostIfReady, openTaskHost } from '../db/open-host';
+import { readFocusTaskSource } from '../lib/focus-task-source';
 import { useMobileSync } from '../sync/store';
+import { onLocalWrite } from '../sync/write-signal';
 import {
   FOCUS_CONFIG,
   abortFocus,
@@ -101,10 +103,7 @@ function TaskChoice({
         gap: tokens['space.2'],
         paddingHorizontal: tokens['space.3'],
         borderRadius: tokens['radius.md'],
-        // 选中态同时改**边框**与底色，不只改颜色 ——
-        // 只改颜色的话色觉障碍用户看不出选中了哪一个（UIX Pro 第 1 条）。
-        borderWidth: selected ? tokens['border-width.thick'] : tokens['border-width.thin'],
-        borderColor: selected ? tokens['color.primary'] : tokens['color.border'],
+        // 选中态用底色与图标语义表达，不给每个选项套一层框。
         backgroundColor: selected
           ? tokens['color.primary-subtle']
           : pressed
@@ -169,11 +168,18 @@ export function FocusScreen(): React.JSX.Element {
   // 同步完成 → `dataRevision` 变 → 下面的 effect 重读物化状态。
   const { dataRevision } = useMobileSync();
 
+  const refresh = useCallback(() => {
+    const source = readFocusTaskSource(getOpenTaskHostIfReady);
+    setHost(source.host);
+    setTasks(source.tasks);
+    setPendingTasks(source.pendingTasks);
+  }, []);
+
   useEffect(() => {
     let alive = true;
     void openTaskHost()
-      .then((opened) => {
-        if (alive) setHost(opened);
+      .then(() => {
+        if (alive) refresh();
       })
       .catch((error: unknown) => {
         if (alive) setLoadError(error instanceof Error ? error.message : String(error));
@@ -181,15 +187,7 @@ export function FocusScreen(): React.JSX.Element {
     return () => {
       alive = false;
     };
-  }, []);
-
-  const refresh = useCallback(() => {
-    if (host === null) return;
-    // 三个都是**同步**读物化状态（不是 Promise）。
-    const taskActions = createTaskActions(host);
-    setTasks(taskActions.listTasks());
-    setPendingTasks(taskActions.listPendingTasks());
-  }, [host]);
+  }, [refresh]);
 
   useEffect(() => {
     refresh();
@@ -198,6 +196,10 @@ export function FocusScreen(): React.JSX.Element {
     // `dataRevision`：同步完成后也要重读 —— 别的设备上的专注记录同步下来时，
     // 本屏同样需要看见（与任务屏/日历屏同一种毛病，见 `sync/store.ts`）。
   }, [refresh, timer.savedAt, dataRevision]);
+
+  // 标签切换只隐藏本屏，不会重新挂载。成功落库后重读，避免本机新任务
+  // 要等同步或完成一轮专注才出现在任务选择器里。
+  useEffect(() => onLocalWrite(refresh), [refresh]);
 
   /*
    * 🔴 工单 W7 判据 ③：这一屏的"今日专注时长 / 今日番茄"与 web 那一栏

@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 /Users/rocalight/.codex/worktrees/ux-final-verification/heyta/apps/mobile
+
+
+ Test Files  4 passed (4)
+      Tests  51 passed (51)
+   Start at  12:54:58
+   Duration  503ms (transform 67%, import 25%, tests 8%, worker 1%)
+

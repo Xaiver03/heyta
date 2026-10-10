@@ -1,0 +1,436 @@
+{
+  "status": "passed",
+  "serial": "emulator-5554",
+  "steps": [
+    {
+      "name": "first-use-before",
+      "status": "passed",
+      "at": 1791428296.824606
+    },
+    {
+      "name": "first-use-after-consent",
+      "status": "passed",
+      "at": 1791428300.8813062
+    },
+    {
+      "name": "capture-created",
+      "status": "passed",
+      "at": 1791428334.911445,
+      "taskA": "AndroidAtomicA1791428308",
+      "taskB": "AndroidAtomicB1791428308",
+      "taskC": "AndroidAtomicC1791428308",
+      "taskAId": "task-muyy5xzw-1-a09e7d57",
+      "taskBId": "task-muyy64fd-2-0qjn6o7t",
+      "taskCId": "task-muyy6bjv-3-lo5c6q3y"
+    },
+    {
+      "name": "append-checklist-proposal",
+      "status": "passed",
+      "at": 1791428364.205873,
+      "before": {
+        "opCount": 3,
+        "last": {
+          "op": {
+            "id": "muyy5h9v-1-nko5jg2i-1791428332029-3",
+            "opType": "CRT",
+            "actionType": "CRT_TASK",
+            "entityType": "TASK",
+            "entityId": "task-muyy6bjv-3-lo5c6q3y",
+            "payload": {
+              "title": "AndroidAtomicC1791428308",
+              "priority": 0
+            },
+            "clientId": "muyy5h9v-1-nko5jg2i",
+            "vectorClock": {
+              "muyy5h9v-1-nko5jg2i": 3
+            },
+            "timestamp": 1791428332029,
+            "schemaVersion": 1
+          },
+          "source": "local",
+          "applyStatus": "applied",
+          "uploadStatus": "pending",
+          "seq": 3
+        }
+      },
+      "expectedText": "Check login"
+    },
+    {
+      "name": "append-checklist-confirmed",
+      "status": "passed",
+      "at": 1791428368.457433,
+      "after": {
+        "opCount": 4,
+        "last": {
+          "op": {
+            "id": "muyy5h9v-1-nko5jg2i-1791428365613-4",
+            "opType": "UPD",
+            "actionType": "UPD_TASK",
+            "entityType": "TASK",
+            "entityId": "task-muyy5xzw-1-a09e7d57",
+            "payload": {
+              "note": "- [ ] Check login"
+            },
+            "clientId": "muyy5h9v-1-nko5jg2i",
+            "vectorClock": {
+              "muyy5h9v-1-nko5jg2i": 4
+            },
+            "timestamp": 1791428365613,
+            "schemaVersion": 1
+          },
+          "source": "local",
+          "applyStatus": "applied",
+          "uploadStatus": "pending",
+          "seq": 4
+        }
+      }
+    },
+    {
+      "name": "batch-priority-proposal",
+      "status": "passed",
+      "at": 1791428383.4302511,
+      "before": {
+        "opCount": 4,
+        "last": {
+          "op": {
+            "id": "muyy5h9v-1-nko5jg2i-1791428365613-4",
+            "opType": "UPD",
+            "actionType": "UPD_TASK",
+            "entityType": "TASK",
+            "entityId": "task-muyy5xzw-1-a09e7d57",
+            "payload": {
+              "note": "- [ ] Check login"
+            },
+            "clientId": "muyy5h9v-1-nko5jg2i",
+            "vectorClock": {
+              "muyy5h9v-1-nko5jg2i": 4
+            },
+            "timestamp": 1791428365613,
+            "schemaVersion": 1
+          },
+          "source": "local",
+          "applyStatus": "applied",
+          "uploadStatus": "pending",
+          "seq": 4
+        }
+      },
+      "expectedText": "高"
+    },
+    {
+      "name": "batch-priority-confirmed",
+      "status": "passed",
+      "at": 1791428387.7220008,
+      "after": {
+        "opCount": 5,
+        "last": {
+          "op": {
+            "id": "muyy5h9v-1-nko5jg2i-1791428384798-5",
+            "opType": "BATCH",
+            "actionType": "BATCH_TASK",
+            "entityType": "TASK",
+            "entityId": "task-muyy5xzw-1-a09e7d57",
+            "entityIds": [
+              "task-muyy64fd-2-0qjn6o7t"
+            ],
+            "payload": {
+              "heytaTaskPriorityBatch": 1,
+              "items": [
+                {
+                  "id": "task-muyy5xzw-1-a09e7d57",
+                  "priority": 3
+                },
+                {
+                  "id": "task-muyy64fd-2-0qjn6o7t",
+                  "priority": 1
+                }
+              ]
+            },
+            "clientId": "muyy5h9v-1-nko5jg2i",
+            "vectorClock": {
+              "muyy5h9v-1-nko5jg2i": 5
+            },
+            "timestamp": 1791428384798,
+            "schemaVersion": 1
+          },
+          "source": "local",
+          "applyStatus": "applied",
+          "uploadStatus": "pending",
+          "seq": 5
+        }
+      }
+    },
+    {
+      "name": "estimate-normalized-proposal",
+      "status": "passed",
+      "at": 1791428400.2138188,
+      "before": {
+        "opCount": 5,
+        "last": {
+          "op": {
+            "id": "muyy5h9v-1-nko5jg2i-1791428384798-5",
+            "opType": "BATCH",
+            "actionType": "BATCH_TASK",
+            "entityType": "TASK",
+            "entityId": "task-muyy5xzw-1-a09e7d57",
+            "entityIds": [
+              "task-muyy64fd-2-0qjn6o7t"
+            ],
+            "payload": {
+              "heytaTaskPriorityBatch": 1,
+              "items": [
+                {
+                  "id": "task-muyy5xzw-1-a09e7d57",
+                  "priority": 3
+                },
+                {
+                  "id": "task-muyy64fd-2-0qjn6o7t",
+                  "priority": 1
+                }
+              ]
+            },
+            "clientId": "muyy5h9v-1-nko5jg2i",
+            "vectorClock": {
+              "muyy5h9v-1-nko5jg2i": 5
+            },
+            "timestamp": 1791428384798,
+            "schemaVersion": 1
+          },
+          "source": "local",
+          "applyStatus": "applied",
+          "uploadStatus": "pending",
+          "seq": 5
+        }
+      },
+      "expectedText": "480"
+    },
+    {
+      "name": "estimate-normalized-confirmed",
+      "status": "passed",
+      "at": 1791428404.45531,
+      "after": {
+        "opCount": 6,
+        "last": {
+          "op": {
+            "id": "muyy5h9v-1-nko5jg2i-1791428401596-6",
+            "opType": "UPD",
+            "actionType": "UPD_TASK",
+            "entityType": "TASK",
+            "entityId": "task-muyy5xzw-1-a09e7d57",
+            "payload": {
+              "note": "- [ ] Check login\n预计耗时：480 分钟"
+            },
+            "clientId": "muyy5h9v-1-nko5jg2i",
+            "vectorClock": {
+              "muyy5h9v-1-nko5jg2i": 6
+            },
+            "timestamp": 1791428401596,
+            "schemaVersion": 1
+          },
+          "source": "local",
+          "applyStatus": "applied",
+          "uploadStatus": "pending",
+          "seq": 6
+        }
+      }
+    },
+    {
+      "name": "multi-field-update-auto",
+      "status": "passed",
+      "at": 1791428446.008079,
+      "after": {
+        "opCount": 7,
+        "last": {
+          "op": {
+            "id": "muyy5h9v-1-nko5jg2i-1791428443052-7",
+            "opType": "UPD",
+            "actionType": "UPD_TASK",
+            "entityType": "TASK",
+            "entityId": "task-muyy6bjv-3-lo5c6q3y",
+            "payload": {
+              "title": "AndroidAtomicCUpdated",
+              "priority": 2
+            },
+            "clientId": "muyy5h9v-1-nko5jg2i",
+            "vectorClock": {
+              "muyy5h9v-1-nko5jg2i": 7
+            },
+            "timestamp": 1791428443052,
+            "schemaVersion": 1
+          },
+          "source": "local",
+          "applyStatus": "applied",
+          "uploadStatus": "pending",
+          "seq": 7
+        }
+      }
+    },
+    {
+      "name": "batch-complete-proposal",
+      "status": "passed",
+      "at": 1791428458.931077,
+      "before": {
+        "opCount": 7,
+        "last": {
+          "op": {
+            "id": "muyy5h9v-1-nko5jg2i-1791428443052-7",
+            "opType": "UPD",
+            "actionType": "UPD_TASK",
+            "entityType": "TASK",
+            "entityId": "task-muyy6bjv-3-lo5c6q3y",
+            "payload": {
+              "title": "AndroidAtomicCUpdated",
+              "priority": 2
+            },
+            "clientId": "muyy5h9v-1-nko5jg2i",
+            "vectorClock": {
+              "muyy5h9v-1-nko5jg2i": 7
+            },
+            "timestamp": 1791428443052,
+            "schemaVersion": 1
+          },
+          "source": "local",
+          "applyStatus": "applied",
+          "uploadStatus": "pending",
+          "seq": 7
+        }
+      },
+      "expectedText": "2"
+    },
+    {
+      "name": "batch-complete-confirmed",
+      "status": "passed",
+      "at": 1791428463.3007438,
+      "after": {
+        "opCount": 8,
+        "last": {
+          "op": {
+            "id": "muyy5h9v-1-nko5jg2i-1791428460333-8",
+            "opType": "BATCH",
+            "actionType": "BATCH_TASK",
+            "entityType": "TASK",
+            "entityId": "task-muyy5xzw-1-a09e7d57",
+            "entityIds": [
+              "task-muyy64fd-2-0qjn6o7t"
+            ],
+            "payload": {
+              "completedAt": 1791428460327
+            },
+            "clientId": "muyy5h9v-1-nko5jg2i",
+            "vectorClock": {
+              "muyy5h9v-1-nko5jg2i": 8
+            },
+            "timestamp": 1791428460333,
+            "schemaVersion": 1
+          },
+          "source": "local",
+          "applyStatus": "applied",
+          "uploadStatus": "pending",
+          "seq": 8
+        }
+      }
+    },
+    {
+      "name": "journey-finished",
+      "status": "passed",
+      "at": 1791428463.432053,
+      "final": {
+        "opCount": 8,
+        "last": {
+          "op": {
+            "id": "muyy5h9v-1-nko5jg2i-1791428460333-8",
+            "opType": "BATCH",
+            "actionType": "BATCH_TASK",
+            "entityType": "TASK",
+            "entityId": "task-muyy5xzw-1-a09e7d57",
+            "entityIds": [
+              "task-muyy64fd-2-0qjn6o7t"
+            ],
+            "payload": {
+              "completedAt": 1791428460327
+            },
+            "clientId": "muyy5h9v-1-nko5jg2i",
+            "vectorClock": {
+              "muyy5h9v-1-nko5jg2i": 8
+            },
+            "timestamp": 1791428460333,
+            "schemaVersion": 1
+          },
+          "source": "local",
+          "applyStatus": "applied",
+          "uploadStatus": "pending",
+          "seq": 8
+        }
+      }
+    }
+  ],
+  "fixtureCalls": [
+    {
+      "hasToolResult": false,
+      "toolStep": 0,
+      "name": "append_task_checklist",
+      "arguments": {
+        "taskId": "task-muyy5xzw-1-a09e7d57",
+        "items": [
+          "Check login"
+        ]
+      }
+    },
+    {
+      "hasToolResult": false,
+      "toolStep": 0,
+      "name": "set_task_priorities",
+      "arguments": {
+        "entries": [
+          {
+            "taskId": "task-muyy5xzw-1-a09e7d57",
+            "priority": "high"
+          },
+          {
+            "taskId": "task-muyy64fd-2-0qjn6o7t",
+            "priority": "low"
+          }
+        ]
+      }
+    },
+    {
+      "hasToolResult": false,
+      "toolStep": 0,
+      "name": "set_task_estimate",
+      "arguments": {
+        "taskId": "task-muyy5xzw-1-a09e7d57",
+        "minutes": 999
+      }
+    },
+    {
+      "hasToolResult": false,
+      "toolStep": 0,
+      "name": "update_task",
+      "arguments": {
+        "taskId": "task-muyy6bjv-3-lo5c6q3y",
+        "fields": {
+          "title": "AndroidAtomicCUpdated",
+          "priority": "medium"
+        }
+      }
+    },
+    {
+      "hasToolResult": false,
+      "toolStep": 0,
+      "name": "complete_task",
+      "arguments": {
+        "taskIds": [
+          "task-muyy5xzw-1-a09e7d57",
+          "task-muyy64fd-2-0qjn6o7t"
+        ]
+      }
+    }
+  ],
+  "apk": {
+    "path": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/mobile/android/app/build/outputs/apk/release/app-release.apk",
+    "size": 68246980,
+    "sha256": "1be30293234b47cc546d78d907112df1c7d3789476bf4018f2d8306e2448a74c",
+    "apksignerExitCode": 0,
+    "certificateSha256": "c46d0386179c3cef12582d1347ed2f871eb03a64aaa2bff96511c1cb76062556",
+    "certificateSubject": "CN=heyta, OU=Mobile, O=Xiaoli Creativity Culture Industry, L=Hangzhou, ST=Zhejiang, C=CN"
+  }
+}

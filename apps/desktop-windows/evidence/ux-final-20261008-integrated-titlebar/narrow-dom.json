@@ -1,0 +1,35 @@
+{
+  "metrics": {
+    "right": 136,
+    "height": 32,
+    "width": 624
+  },
+  "innerWidth": 624,
+  "innerHeight": 536,
+  "dpr": 1.25,
+  "appTop": 0,
+  "header": {
+    "x": 0,
+    "y": 0,
+    "width": 624,
+    "height": 60,
+    "top": 0,
+    "right": 624,
+    "bottom": 60,
+    "left": 0
+  },
+  "headerPadding": "160px",
+  "documentOverflow": 0,
+  "rail": {
+    "x": 0,
+    "y": 480,
+    "width": 624,
+    "height": 56,
+    "top": 480,
+    "right": 624,
+    "bottom": 536,
+    "left": 0
+  },
+  "detail": "none",
+  "theme": "dark"
+}

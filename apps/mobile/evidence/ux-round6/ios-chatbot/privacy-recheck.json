@@ -1,0 +1,19 @@
+{
+  "time": "2026-10-08T01:34:46.878488+00:00",
+  "installedBundleSha256": "d9deabfbbf6a4a4da2556a935c4015e024a6fb7d58817d005bce2850a278bf3c",
+  "simulator": "FE195661-B021-4A71-AAD1-1F2F7AE3A102",
+  "preservedData": true,
+  "correctDestination": true,
+  "officialSyncEntry": true,
+  "localOnlyUnchanged": true,
+  "limits": [
+    "Intermediate source, before new duration tools",
+    "Simulator not physical iPhone",
+    "System appearance light did not immediately change current app screen; screenshot12 remains dark"
+  ],
+  "checks": {
+    "lightScreenshot": "13-privacy-destination-light.png",
+    "darkScreenshot": "11-privacy-destination-corrected-dark.png",
+    "bothManuallyViewed": true
+  }
+}

@@ -28,6 +28,7 @@ import { startCta } from '../lib/app-url.js';
 import { useTheme } from '../lib/theme.js';
 import { GITHUB_URL } from '../lib/repo.js';
 import { DocsSearch } from './DocsSearch.js';
+import '../styles/docs-layout.css';
 import { pageById } from './pages.js';
 import { siteHref } from './paths.js';
 
@@ -35,6 +36,7 @@ export function DocsShell({ children }: { children: ReactNode }): React.JSX.Elem
   const { theme, toggleTheme } = useTheme();
   const { t, locale } = useI18n();
   const hub = pageById('help');
+  const home = pageById('home');
 
   // 主题按钮的可访问名取决于当前主题（说的是"切到哪去"）——与营销站 Nav 同一条纪律。
   const themeToggleLabel =
@@ -55,6 +57,10 @@ export function DocsShell({ children }: { children: ReactNode }): React.JSX.Elem
           <a className="lp-docs-topnav__logo" href={siteHref(hub, locale)}>
             <span className="lp-docs-topnav__brand">{t('common.brand')}</span>
             <span className="lp-docs-topnav__site">{t('site.docs.shell.title')}</span>
+          </a>
+
+          <a className="lp-docs-topnav__home" href={siteHref(home, locale)}>
+            {t('site.docs.nav.home')}
           </a>
 
           <DocsSearch />

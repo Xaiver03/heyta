@@ -1,0 +1,10 @@
+UX-S9-101 badge verification
+Date: 2026-10-08 06:51:47 +0800
+Simulator: heyta-iphone-17pro (FE195661-B021-4A71-AAD1-1F2F7AE3A102)
+Build: xcodebuild Release succeeded; log=/tmp/heyta-ios-badge-build.log
+Install: com.heyta installed without uninstalling simulator data
+Bundle: /Users/rocalight/Library/Developer/CoreSimulator/Devices/FE195661-B021-4A71-AAD1-1F2F7AE3A102/data/Containers/Bundle/Application/7EED0F0D-D980-4DF2-BA92-BBEF264F92B1/Heyta.app/main.jsbundle
+Bundle mtime: 1791413356
+Newest source mtime: 1791413115
+Screenshot: ios-count14-after-badge-fix.png
+Visual result: bottom Tasks tab badge displays the complete numeric count “12”, with no truncation/ellipsis; AX count remains sourced from the real count.

@@ -100,14 +100,13 @@ public enum WidgetDeviceKey {
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
         ]
-        // 🔴 访问组用**运行时解析出来的完整形式**（带 `AppIdentifierPrefix`）。
-        //    拿不到就**不带**这个属性 —— 那会退化成"本 target 自己的默认访问组"，
-        //    在同一个 team 里通常仍能命中应用写的那一条。
-        //    这个降级是刻意的：宁可"可能命中"也不要"肯定查不到"
-        //    （`errSecMissingEntitlement` 不崩溃，只让组件永远显示占位）。
-        if let group = WidgetSharedConstants.resolvedKeychainAccessGroup() {
-            query[kSecAttrAccessGroup as String] = group
-        }
+        // 🔴 访问组必须是构建期展开的完整值；配置缺失时返回空结果，
+        //    绝不能退回 target 的默认 Keychain 组。
+        guard let group = try? WidgetSharedConstants.resolvedKeychainAccessGroup() else { return nil }
+        query[kSecAttrAccessGroup as String] = group
+        #if os(macOS)
+        query[kSecUseDataProtectionKeychain as String] = true
+        #endif
 
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)

@@ -1,6 +1,5 @@
 import Foundation
 
-import HeytaWidgetCore
 
 /**
  W5-2 · **锁屏组件的隐私策略**（纯逻辑，可测）。

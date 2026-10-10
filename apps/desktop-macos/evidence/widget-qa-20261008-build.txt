@@ -1,0 +1,14 @@
+
+Correction after installed-run audit
+  The original package self-capture did not pass HEYTA_SHELL_DB_DIR.
+  A differently named QA.app does NOT isolate SQLite by itself.
+  The earlier statement about untouched default user data was not established by the build invocation.
+  Root removed only its own temporary task/habit entries via UI; normal op/tombstone history remains.
+  package-app.sh now creates an absolute mktemp directory for its self-capture subprocess.
+  Equivalent installed-binary self-capture was actually run with that environment on 2026-10-08:
+    WEBVIEW_SNAPSHOT_BYTES=244891
+    WINDOW_SIZE=1159x754
+    PNG_BYTES=221767
+    SMOKE_DB_CREATED=yes
+  See widget-qa-20261008-isolated-smoke{,.webview}.png.
+  This establishes isolated SQLite startup, not complete App Group/Keychain isolation or system Gallery acceptance.

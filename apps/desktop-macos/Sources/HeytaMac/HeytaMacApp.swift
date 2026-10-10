@@ -162,21 +162,8 @@ enum SelfCapture {
             view.layoutSubtreeIfNeeded()
             view.displayIfNeeded()
 
-            let bounds = view.bounds
-            guard let (method, data) = await capture(window: window, bounds: bounds) else {
-                FileHandle.standardError.write(Data("截图失败（多半是没给屏幕录制权限）\n".utf8))
-                exit(4)
-            }
-            try? data.write(to: URL(fileURLWithPath: path))
-            let info = """
-            WINDOW_SIZE=\(Int(bounds.width))x\(Int(bounds.height))
-            WINDOW_TITLE=\(window.title)
-            PNG_BYTES=\(data.count)
-            CAPTURE_METHOD=\(method.rawValue)
-            """
-            try? info.write(toFile: path + ".txt", atomically: true, encoding: .utf8)
-            print(info)
-
+            // Keep the app-owned snapshot even when the window server cannot capture
+            // a locked desktop. Window capture still fails explicitly below.
             /**
              🔴 **另取一份 WKWebView 自己的快照**（`takeSnapshot`）。
 
@@ -202,6 +189,22 @@ enum SelfCapture {
             } else {
                 print("WEBVIEW_SNAPSHOT_BYTES=0")
             }
+
+            let bounds = view.bounds
+            guard let (method, data) = await capture(window: window, bounds: bounds) else {
+                FileHandle.standardError.write(Data("截图失败（多半是没给屏幕录制权限）\n".utf8))
+                exit(4)
+            }
+            try? data.write(to: URL(fileURLWithPath: path))
+            let info = """
+            WINDOW_SIZE=\(Int(bounds.width))x\(Int(bounds.height))
+            WINDOW_TITLE=\(window.title)
+            PNG_BYTES=\(data.count)
+            CAPTURE_METHOD=\(method.rawValue)
+            """
+            try? info.write(toFile: path + ".txt", atomically: true, encoding: .utf8)
+            print(info)
+
             exit(0)
     }
 
@@ -459,8 +462,16 @@ struct SharedWebView: NSViewRepresentable {
             context.coordinator.storageHost = host
         }
 
+        config.userContentController.addScriptMessageHandler(
+            context.coordinator.widgetBridge, contentWorld: .page, name: "heytaWidget"
+        )
+        config.userContentController.addUserScript(WKUserScript(
+            source: ShellWidgetBridge.shim, injectionTime: .atDocumentStart, forMainFrameOnly: true
+        ))
         let webView = WKWebView(frame: .zero, configuration: config)
+        context.coordinator.widgetBridge.webView = webView
         webView.navigationDelegate = context.coordinator
+        webView.uiDelegate = context.coordinator
         // 回推消息要 `evaluateJavaScript` ⇒ Coordinator 得握着这个 WebView。
         // ⚠️ **weak**：`WKUserContentController` 强引用着 handler（Coordinator），
         //    而 WebView 强引用着它的 configuration ⇒ 强引用 WebView 就是环。
@@ -475,10 +486,11 @@ struct SharedWebView: NSViewRepresentable {
 
     func updateNSView(_ nsView: WKWebView, context: Context) {}
 
-    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
         let onProbe: (String) -> Void
         let onStorageFact: (String) -> Void
         /// 存储宿主（`nil` = 不当宿主）。见 `ShellStorageHost.decide()`。
+        let widgetBridge = ShellWidgetBridge()
         var storageHost: ShellStorageHost?
         /// 🔴 **weak**：见 `makeNSView` 里的说明（强引用会成环）。
         weak var webView: WKWebView?
@@ -772,6 +784,48 @@ struct SharedWebView: NSViewRepresentable {
                 "document.documentElement.classList.add('heyta-shell')"
             )
             probe(webView)
+        }
+
+        /// Help, pricing and changelog belong to the public site. Opening them in
+        /// the shell would replace the user's workspace with a marketing page;
+        /// hand only real HTTP(S) URLs to the system browser instead.
+        @discardableResult
+        private func openExternalURLIfAllowed(_ url: URL) -> Bool {
+            guard let scheme = url.scheme?.lowercased(),
+                  scheme == "http" || scheme == "https" else {
+                return false
+            }
+            NSWorkspace.shared.open(url)
+            return true
+        }
+
+        @MainActor
+        func webView(
+            _ webView: WKWebView,
+            decidePolicyFor navigationAction: WKNavigationAction,
+            decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void
+        ) {
+            guard let url = navigationAction.request.url else {
+                decisionHandler(.allow)
+                return
+            }
+            decisionHandler(openExternalURLIfAllowed(url) ? .cancel : .allow)
+        }
+
+        /// `target="_blank"` does not necessarily pass through the normal
+        /// navigation policy. WKWebView asks its UI delegate to create a child
+        /// view instead; open public HTTP(S) pages in the system browser and
+        /// return the current view for internal shell URLs.
+        @MainActor
+        func webView(
+            _ webView: WKWebView,
+            createWebViewWith configuration: WKWebViewConfiguration,
+            for navigationAction: WKNavigationAction,
+            windowFeatures: WKWindowFeatures
+        ) -> WKWebView? {
+            guard let url = navigationAction.request.url else { return webView }
+            if openExternalURLIfAllowed(url) { return nil }
+            return webView
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {

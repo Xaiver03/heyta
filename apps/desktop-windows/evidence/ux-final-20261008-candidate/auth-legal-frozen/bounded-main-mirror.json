@@ -1,0 +1,175 @@
+{
+  "scope": "only Windows auth-legal-frozen evidence, Android auth-legal-frozen evidence and three candidate artifacts; no product source copied",
+  "files": [
+    {
+      "path": "apps/desktop-windows/evidence/ux-final-20261008-candidate/auth-legal-frozen/package-msix-preserve.ps1",
+      "sha256": "d565e522530e2f079463bac6efec5ff0a7655d38d1b970dee396cd7a80e40dca",
+      "bytes": 22417
+    },
+    {
+      "path": "apps/desktop-windows/evidence/ux-final-20261008-candidate/auth-legal-frozen/sync.json",
+      "sha256": "b32aab9c1cfb469f9153192a610455a2b17739be1f97479d696398385edbd485",
+      "bytes": 353
+    },
+    {
+      "path": "apps/desktop-windows/evidence/ux-final-20261008-candidate/auth-legal-frozen/sync.log",
+      "sha256": "d6de71e7228ac58266a5f50ea2725534a49dffa1bd0293fce8378c02b2f16d88",
+      "bytes": 750
+    },
+    {
+      "path": "apps/desktop-windows/evidence/ux-final-20261008-candidate/auth-legal-frozen/install-and-capture-preserve.ps1",
+      "sha256": "ac8ccd7a917a10064f521278e878b10a4564e5946c04f8874c31be361c5815b1",
+      "bytes": 15890
+    },
+    {
+      "path": "apps/desktop-windows/evidence/ux-final-20261008-candidate/auth-legal-frozen/source-inputs.json",
+      "sha256": "c181b18a9249b1e32527f8c844b3005c796be7a028dc72ccc0a6c66499d9fdc2",
+      "bytes": 12236
+    },
+    {
+      "path": "apps/desktop-windows/evidence/ux-final-20261008-candidate/auth-legal-frozen/attempt-2-same-version-rejected/RESULT.md",
+      "sha256": "19bd8c67571ff5991084165fd465f4a0679a2480f7e008ff8a8f881e25e0a6ca",
+      "bytes": 304
+    },
+    {
+      "path": "apps/desktop-windows/evidence/ux-final-20261008-candidate/auth-legal-frozen/attempt-2-same-version-rejected/install-capture.txt",
+      "sha256": "6b0fc89d2bfc97f9e8c3166f3d6428100c76fe49b2221c898323db328c1bcf66",
+      "bytes": 1381
+    },
+    {
+      "path": "apps/desktop-windows/evidence/ux-final-20261008-candidate/auth-legal-frozen/attempt-2-same-version-rejected/facts.txt",
+      "sha256": "ad3a90242aa7c02859825e91ddead3ce183b1666b54381def7414054da21f8ef",
+      "bytes": 3499
+    },
+    {
+      "path": "apps/desktop-windows/evidence/ux-final-20261008-candidate/auth-legal-frozen/attempt-2-same-version-rejected/upgrade-data-before.json",
+      "sha256": "135e0548179fcc424e2ebfcf4b2aace8f270c34f6cac3b52aae9d2b0acad2801",
+      "bytes": 258
+    },
+    {
+      "path": "apps/desktop-windows/evidence/ux-final-20261008-candidate/auth-legal-frozen/attempt-2-same-version-rejected/pipeline.log",
+      "sha256": "77b10388023dbdd095a59d1fa807f8de44ddce505b8793d4b66e0cb51c55e9e0",
+      "bytes": 3817
+    },
+    {
+      "path": "apps/desktop-windows/evidence/ux-final-20261008-candidate/auth-legal-frozen/attempt-2-same-version-rejected/upgrade-data-after-install.json",
+      "sha256": "135e0548179fcc424e2ebfcf4b2aace8f270c34f6cac3b52aae9d2b0acad2801",
+      "bytes": 258
+    },
+    {
+      "path": "apps/desktop-windows/evidence/ux-final-20261008-candidate/auth-legal-frozen/attempt-3-upgraded/RESULT.md",
+      "sha256": "258ca58dfac7c28341be28a12579f435639775be5ef1396d906090b52c5b0c7b",
+      "bytes": 2222
+    },
+    {
+      "path": "apps/desktop-windows/evidence/ux-final-20261008-candidate/auth-legal-frozen/attempt-3-upgraded/packaged-first-run.png",
+      "sha256": "6b1df6e9b8799d9f04178c6b47b5ebd9bf92ef78fc5a6ff99823b721326407bc",
+      "bytes": 145554
+    },
+    {
+      "path": "apps/desktop-windows/evidence/ux-final-20261008-candidate/auth-legal-frozen/attempt-3-upgraded/install-capture.txt",
+      "sha256": "babe58a90b2926a8e38256984361af0e78ce87b157470be3bfd271a7b54751e7",
+      "bytes": 954
+    },
+    {
+      "path": "apps/desktop-windows/evidence/ux-final-20261008-candidate/auth-legal-frozen/attempt-3-upgraded/facts.txt",
+      "sha256": "58764b2c23168cb4780d6dd159869b79cbb6bb474914bd42d438964df3c4ff39",
+      "bytes": 3046
+    },
+    {
+      "path": "apps/desktop-windows/evidence/ux-final-20261008-candidate/auth-legal-frozen/attempt-3-upgraded/capture-installed-dpi.ps1",
+      "sha256": "b123fd8914698ab8020d1db003944aa9117c176c6b1d3e94e53bb722abb8e80b",
+      "bytes": 2402
+    },
+    {
+      "path": "apps/desktop-windows/evidence/ux-final-20261008-candidate/auth-legal-frozen/attempt-3-upgraded/upgrade-data-before.json",
+      "sha256": "755738540b3f7013262bfd70ec95bd55f22e4786a14c266aec5104f6ac94b607",
+      "bytes": 258
+    },
+    {
+      "path": "apps/desktop-windows/evidence/ux-final-20261008-candidate/auth-legal-frozen/attempt-3-upgraded/installed-dpi-full.json",
+      "sha256": "c54d4da7c3c3133cc3cdc3af506a8c8c9cc31c72af8efbcabf759cf46baa425a",
+      "bytes": 182
+    },
+    {
+      "path": "apps/desktop-windows/evidence/ux-final-20261008-candidate/auth-legal-frozen/attempt-3-upgraded/pipeline.log",
+      "sha256": "9a1670ab9102f7a8ea10e5315cef3b186196f7edca2d52211ad4f7de5fc9deb0",
+      "bytes": 3356
+    },
+    {
+      "path": "apps/desktop-windows/evidence/ux-final-20261008-candidate/auth-legal-frozen/attempt-3-upgraded/screenshot-check.json",
+      "sha256": "74416a8a9967d7363d0033a500275f5abc1e22e2de890e672611905c454ae757",
+      "bytes": 516
+    },
+    {
+      "path": "apps/desktop-windows/evidence/ux-final-20261008-candidate/auth-legal-frozen/attempt-3-upgraded/upgrade-data-after-install.json",
+      "sha256": "755738540b3f7013262bfd70ec95bd55f22e4786a14c266aec5104f6ac94b607",
+      "bytes": 258
+    },
+    {
+      "path": "apps/desktop-windows/evidence/ux-final-20261008-candidate/auth-legal-frozen/attempt-3-upgraded/installed-dpi-full.png",
+      "sha256": "a689207f8d0d0c189516950514afb10f5ac340a3a283b5f8f572bc4e0b58f635",
+      "bytes": 192613
+    },
+    {
+      "path": "apps/desktop-windows/evidence/ux-final-20261008-candidate/auth-legal-frozen/attempt-3-upgraded/installed-verification.json",
+      "sha256": "1529810de95f84fcddd147762e118c69fb7ea6bc7a079cd57a19fc46476e35ba",
+      "bytes": 5945
+    },
+    {
+      "path": "apps/mobile/evidence/ux-final-20261008/android-candidate/auth-legal-frozen/RESULT.md",
+      "sha256": "dc1ff7f3ae932316a10150711d06eaa69ca1270fbcf63c2540db75084e9a4f2e",
+      "bytes": 1713
+    },
+    {
+      "path": "apps/mobile/evidence/ux-final-20261008/android-candidate/auth-legal-frozen/attempt-1-dependency-missing.log",
+      "sha256": "bfe3f02b645364d786165de3da87e97298e6185865304b80e32095e4d4ef6117",
+      "bytes": 1371
+    },
+    {
+      "path": "apps/mobile/evidence/ux-final-20261008/android-candidate/auth-legal-frozen/run-gradle.log",
+      "sha256": "76c9fd29483eebdee45b607ff9f6312f1cc4fd0045fe194870e7c18f191ed370",
+      "bytes": 33591
+    },
+    {
+      "path": "apps/mobile/evidence/ux-final-20261008/android-candidate/auth-legal-frozen/remote-artifact.json",
+      "sha256": "e304b7bfc844bd2cbd1a1c3bcd0f9e419f7b4c621ac0c37d3a0e941b9764a6d9",
+      "bytes": 150
+    },
+    {
+      "path": "apps/mobile/evidence/ux-final-20261008/android-candidate/auth-legal-frozen/signature.stdout",
+      "sha256": "5dfde2422bc3923b953c188939bc84732d21f7eae3c902d204f4b8dfe7aa649b",
+      "bytes": 1045
+    },
+    {
+      "path": "apps/mobile/evidence/ux-final-20261008/android-candidate/auth-legal-frozen/remote-dependency-link-repair.log",
+      "sha256": "684fef3ce4c72ce66dc3630938a400a69c7cb266213b1cbb9cf128e45e6ba4ca",
+      "bytes": 474
+    },
+    {
+      "path": "apps/mobile/evidence/ux-final-20261008/android-candidate/auth-legal-frozen/verification.json",
+      "sha256": "5f9b91f8f02fc324735a40604c5daed69f9a85de26d4d2bcb97f49c28c58d9b1",
+      "bytes": 1282
+    },
+    {
+      "path": "apps/mobile/evidence/ux-final-20261008/android-candidate/auth-legal-frozen/source-inputs.json",
+      "sha256": "e9efb549b341321a0398b3ed8fb4935de52e9df5d9720600b9e80ed738f788ce",
+      "bytes": 92282
+    },
+    {
+      "path": "dist/windows-auth-legal-frozen/heyta.msix",
+      "sha256": "126dad13692ffd71accc13fbb50ff8329a5914ea559fbbe2374b36bdc01feaae",
+      "bytes": 195873256
+    },
+    {
+      "path": "dist/windows-auth-legal-frozen/heyta-selfsigned.cer",
+      "sha256": "317f77c47f320bb6362a3e434610dcf30aea2e599030f8cac57d26672853cdb3",
+      "bytes": 794
+    },
+    {
+      "path": "apps/mobile/android/app/build/outputs/apk/release/app-release.apk",
+      "sha256": "26d39bc0ca06d13e6000a363649cdf56f42d52d9a4fc0e6f2c3e4d0dbb36d115",
+      "bytes": 68878328
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "platform": "iOS simulator",
+  "build": "isolated QA Release; not yet published",
+  "cancel": "passed on B4",
+  "defaultRawInputsHidden": true,
+  "actualFilePickerRead": true,
+  "emptyRestore": {
+    "beforeOps": 0,
+    "afterOps": 1
+  },
+  "nonemptyRestore": "visible refusal",
+  "afterRefusalAndRelaunchOps": 1,
+  "sourceFixture": "apps/web/evidence/data-transfer-windows-qa/export-json.json",
+  "invalidJson": "actual file selection gives visible error",
+  "jsonShareCopy": {
+    "ops": 1,
+    "entities": 1
+  },
+  "markdownShareCopy": "contains restored QA task",
+  "exportCarrier": "system text share; not named-file export",
+  "bundleSha256": "f2df06a5622b10140a243adf5f98d8db9778459943491c0b408cc4006b2d80a5"
+}

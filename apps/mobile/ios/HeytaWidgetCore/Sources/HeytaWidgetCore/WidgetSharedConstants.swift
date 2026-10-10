@@ -21,15 +21,18 @@ import Foundation
  也就是说，**配错了和"应用还没发布过快照"看起来一模一样**。
  所以这些字符串只能有**一处声明** —— 这就是这一处。
 
- ⚠️ 注意：`keychainAccessGroup` 里的前缀是 **`$(AppIdentifierPrefix)`**，
- 在真实工程里由 entitlements 展开成 `TEAMID.com.heyta.shared`。
- 这里存的是**不带 TeamID** 的部分，Keychain 查询时**必须**带上完整形式
- （见 `WidgetKeychainQuery`）—— 直接拿这个常量去查会得到 `errSecMissingEntitlement`。
- 这是一个很容易在真机上才发现的坑，所以把完整形式的拼法也放在这里。
+ ⚠️ Keychain 访问组必须由构建期展开并写入专用的 Info.plist 键
+ `HeytaWidgetKeychainAccessGroup`。运行时绝不能把未展开的
+ `$(AppIdentifierPrefix)` 当成真实访问组，也不能在缺失时退回默认组：那会把
+ 配置错误伪装成组件没有数据，并且在不同 target 上得到不同结果。
  */
 public enum WidgetSharedConstants {
 
-    public static let appGroupId = "group.com.heyta"
+    public static var appGroupId: String {
+        // Developer ID macOS groups use the signing team prefix. iOS keeps its registered group.
+        Bundle.main.object(forInfoDictionaryKey: "HeytaWidgetAppGroupIdentifier") as? String
+            ?? "group.com.heyta"
+    }
 
     public static let appBundleId = "com.heyta"
     public static let widgetExtensionBundleId = "com.heyta.WidgetExtension"
@@ -38,28 +41,27 @@ public enum WidgetSharedConstants {
     public static let keychainService = "com.heyta.widget-key"
     public static let keychainAccount = "widget-snapshot-key"
 
-    /// **不带 TeamID** 的访问组后缀。
-    public static let keychainAccessGroupSuffix = "com.heyta.shared"
+    public static let keychainAccessGroupInfoKey = "HeytaWidgetKeychainAccessGroup"
 
-    /// 完整的访问组 = `$(AppIdentifierPrefix)` + 后缀。
-    ///
-    /// 🔴 `AppIdentifierPrefix` 只能在**签名后的**二进制里才被展开成真值
-    /// （它是一个 entitlements 占位符，不是一个环境变量），所以运行时**读不到**它。
-    /// 唯一的办法是从**自己的 entitlements** 里把 `keychain-access-groups` 的第一项
-    /// 读出来 —— 那是系统已经展开好的值。
-    ///
-    /// 拿不到时返回 `nil`，调用方应当**不带** `kSecAttrAccessGroup` 去查
-    /// （那会退化成"本 target 自己的默认访问组"，在同一个 team 里通常仍能命中
-    /// 应用写的那一条 —— 因为两者共享同一个 `$(AppIdentifierPrefix)`）。
-    /// 这个降级是**有意的**：宁可"可能命中"也不要"肯定查不到"。
-    public static func resolvedKeychainAccessGroup() -> String? {
-        guard
-            let groups = Bundle.main.object(forInfoDictionaryKey: "keychain-access-groups") as? [String],
-            let first = groups.first(where: { $0.hasSuffix(keychainAccessGroupSuffix) })
-        else {
-            return nil
+    public enum ConfigurationError: Error, Equatable {
+        case missingKeychainAccessGroup
+        case unresolvedKeychainAccessGroup(String)
+        case invalidKeychainAccessGroup(String)
+    }
+
+    /// 返回构建期已经展开的完整访问组。缺失、占位符残留、或格式非法都必须失败。
+    public static func resolvedKeychainAccessGroup() throws -> String {
+        guard let raw = Bundle.main.object(forInfoDictionaryKey: keychainAccessGroupInfoKey) as? String,
+              !raw.isEmpty else {
+            throw ConfigurationError.missingKeychainAccessGroup
         }
-        return first
+        guard !raw.contains("$(") && !raw.contains(")") else {
+            throw ConfigurationError.unresolvedKeychainAccessGroup(raw)
+        }
+        guard raw.range(of: #"^[A-Za-z0-9.-]+\.[A-Za-z0-9.-]+$"#, options: .regularExpression) != nil else {
+            throw ConfigurationError.invalidKeychainAccessGroup(raw)
+        }
+        return raw
     }
 
     public static let snapshotFileName = "widget-snapshot.json"

@@ -1,0 +1,14 @@
+{
+  "apps/desktop-windows/Heyta.Windows.Core/Heyta.Windows.Core.csproj": "ed321b234d90c226c255b0d309b0db23322503b8c745c3beaaf2035ee365559b",
+  "apps/desktop-windows/Heyta.Windows.Core/WindowsWidgetStore.cs": "7e605fd4b50a13180659f905277931feb2db03f639cf56ce9e621393c0857f06",
+  "apps/desktop-windows/Heyta.Windows.Core/WidgetCardTemplates.cs": "d4b69ba435d4d1eaa0be5867054046c6665907f86a51b3f787c89d6a809d469a",
+  "apps/desktop-windows/Heyta.Windows.Core/WindowsWidgetStrings.cs": "2fbdc74cb9186d9e3b0b5ba4c8ac7c76c4171ebce362092be068dbce5dd1aee9",
+  "apps/desktop-windows/Heyta.Windows.Core/widget-strings.generated.json": "d5512bfb855a89f8731d602e79f7107b4412487b201f883cb95737ce3f3ad0ef",
+  "apps/desktop-windows/HeytaWindows/WindowsWidgetBridge.cs": "d0023d54706473c85d51ba5803e9583ca6cab4c05538b9ed1f44c0d4a79ba1db",
+  "apps/desktop-windows/HeytaWidgetProvider/HeytaWidgetProvider.cs": "d3095980055cc2be4865928cbd4e34a4e14a7e9d04ab973f6380f7a72249c21b",
+  "apps/desktop-windows/HeytaWidgetProvider/README.md": "4eea210f74c96e4de9b4440803bbac5bee230fe1ad2d2500359d1a1f5771f124",
+  "apps/desktop-windows/widget-smoke/WidgetSmoke.csproj": "1fd2752de94fd9bc5c3de3f7ce56d11a35764f3358db23ceb5ca68c2b5fcc983",
+  "apps/desktop-windows/widget-smoke/Program.cs": "242a9e91997281bdd7c55ee14b7c88db6f834bd8141804da04780f7c11d21d03",
+  "scripts/gen-windows-widget-strings.mjs": "999bf2f431ea050af608e9b3be090b8d199d59aa7a69f55c6010b4ffabcfa126",
+  "scripts/check-windows-shell.mjs": "951e18747291ce22d68aa7438e7081069be2034f063a1f4016eb1e3b55d5548c"
+}

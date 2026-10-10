@@ -8,22 +8,23 @@
   所以这里预置 5 个行槽，渲染时按条数显示/隐藏。行数上限选 5 的理由：
   再多就得靠更大的网格，而小尺寸组件上塞 7 行会挤成一团；5 行是"看一眼今天"的量级。
 
-  ## 为什么一个颜色都没写
+  ## 为什么颜色使用应用资源
 
-  全部用**系统主题属性**（`?android:attr/...`）：组件是由**启动器**的 Context 充气的，
-  主题属性会跟着启动器的明暗走。写死颜色会让组件在深色启动器上白底黑字地刺眼，
-  也会造出 `check:design` **扫不到**的硬编码 —— 那条门禁的 `SCAN_EXT`
-  只含 `.ts/.tsx/.js/.jsx/.css`，**不含 `.xml`**。
+  组件由**启动器**进程通过 `RemoteViews` 充气，不能依赖启动器自己的
+  `?android:attr/...` 主题属性：不同启动器可能把它们固定解析成浅色组件主题。
+  所以这里使用与 design-system 语义 token 对齐的 `@color/heyta_widget_*`，
+  并由 `values-night/colors.xml` 在系统夜间模式下切换暗色档。
 
-  ⚠️ 主题属性在 `RemoteViews` 里的解析**依赖启动器实现**，所以这一条
-  **必须在真机上验收**（已列进 W1-3 的验收项）。
+  ⚠️ 资源限定符在 `RemoteViews` 里的解析仍依赖启动器实现，所以这一条
+  **必须在真机上验收**（亮暗两档都要看）。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="12dp"
-    android:background="?android:attr/colorBackground">
+    android:background="@color/heyta_widget_surface">
 
     <!-- 头部：日期 + 完成进度 -->
     <TextView
@@ -32,7 +33,7 @@
         android:layout_height="wrap_content"
         android:maxLines="1"
         android:ellipsize="end"
-        android:textColor="?android:attr/textColorPrimary"
+        android:textColor="@color/heyta_widget_foreground"
         android:textSize="13sp"
         android:textStyle="bold" />
 
@@ -74,7 +75,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
-        android:textColor="?android:attr/textColorSecondary"
+        android:textColor="@color/heyta_widget_foreground_muted"
         android:textSize="12sp" />
 
 </LinearLayout>

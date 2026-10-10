@@ -1,0 +1,48 @@
+{
+  "capturedAt": "2026-10-08T08:00:00+08:00",
+  "device": {
+    "name": "heyta-iphone-17pro",
+    "udid": "FE195661-B021-4A71-AAD1-1F2F7AE3A102",
+    "stateAfterCleanup": "Booted",
+    "appTermination": "com.heyta terminated",
+    "tcpCompanion10982": "not listening"
+  },
+  "build": {
+    "configuration": "Release-iphonesimulator",
+    "derivedData": "/tmp/heyta-ios-release",
+    "app": "/tmp/heyta-ios-release/Build/Products/Release-iphonesimulator/Heyta.app",
+    "buildLog": "release-build.log",
+    "buildResult": "BUILD SUCCEEDED",
+    "mainJsBundleSha256": "6627b4765b93a6aeb4bb40bccccf0cca8082fa747a00d5101a17c1c9707d74a5",
+    "appBinarySha256": "978bff294b9dc994c28607e29f0d797debb29d3b6bd24fc9566b5b4278eb323b",
+    "sourceManifestSha256": "46f89b52000cbad9cff2293138baf4f65bbd1d61d0ee59f81fbae05d0efc4325",
+    "gitHeadAtCapture": "b081811c691a17ff57ed0379a005d1a175fe393d"
+  },
+  "sourceFreshnessBoundary": {
+    "artifactBuiltAt": "2026-10-08T07:37:10+08:00",
+    "assistantScreenSourceMtime": "2026-10-08T07:42:15+08:00",
+    "statement": "The installed reminder artifact predates the later AssistantScreen apply-gate/unexpected-catch/tab-unmount fixes; it is valid reminder evidence but must not be called the final AssistantScreen source package."
+  },
+  "reminderReceipt": {
+    "entityId": "task-muyqzpxc-2-myoyotgx:1791416400000",
+    "triggerAt": 1791416400000,
+    "firedAt": 1791416406652,
+    "firedForTriggerAt": 1791416400000,
+    "scriptResult": "26 passed / 1 failed",
+    "axFailure": "Notification-center AX tree did not expose the current task title",
+    "independentConfirmation": [
+      "Human inspection confirmed the title in the visible system banner screenshot.",
+      "SpringBoard log contains Posting banner and Presentable did appear as banner for the exact occurrence identifier."
+    ]
+  },
+  "evidenceFiles": [
+    "full-run.log",
+    "release-build.log",
+    "system-notification.log",
+    "notification-center.png",
+    "after-reconcile.png",
+    "cancelled.png",
+    "legal-sheet.png",
+    "legal-sheet.ax.json"
+  ]
+}

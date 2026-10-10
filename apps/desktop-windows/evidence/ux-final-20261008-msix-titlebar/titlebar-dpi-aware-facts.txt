@@ -1,0 +1,23 @@
+QA=msix-titlebar-current-dpi-aware
+QA_ROOT=C:\Users\41478\heyta-msix-qa-20261008-titlebar
+DATA_DIR=C:\Users\41478\heyta-msix-qa-20261008-titlebar\data
+CONTEXT IsAdmin=False SessionId=2
+DPI_AWARE_SET=True
+INSTALLED_VERSION=1.0.0.0
+PACKAGE_FAMILY=cloud.finlaw.heyta.desktop_d8ndx02bjp3sw
+EXE=C:\Program Files\WindowsApps\cloud.finlaw.heyta.desktop_1.0.0.0_x64__d8ndx02bjp3sw\HeytaWindows.exe
+PID=7760
+HWND=4786088
+WINDOW_TITLE=heyta
+WINDOW_RECT_PHYSICAL=228,228,1440x734
+DWM_EXTENDED_RECT_PHYSICAL=0,0,0x0
+DWM_RC=
+WINDOW_DPI=96
+VIRTUAL_SCREEN_PHYSICAL=0,0,1920x1080
+FOREGROUND=True
+WINDOW_WITHIN_VIRTUAL_SCREEN=True
+DB_EXISTS=True
+WEBVIEW_PROFILE=C:\Users\41478\AppData\Local\Packages\cloud.finlaw.heyta.desktop_d8ndx02bjp3sw\LocalState
+PNG_SAVED=True bytes=188578
+PNG_DIMENSIONS=1440x734
+RESULT=OK

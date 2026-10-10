@@ -40,6 +40,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { TextStyleName } from '@heyta/design-system';
 import { useI18n } from '@heyta/i18n';
+import { StateIllustration, type StateIllustrationVariant } from '@heyta/ui';
 import { useText, useTheme, useTokens } from '../theme';
 import { Icon, type IconName } from './icons';
 
@@ -64,7 +65,7 @@ const TONE_TOKENS = {
   subtle: 'color.foreground-subtle',
   primary: 'color.primary',
   danger: 'color.danger',
-  success: 'color.success',
+  success: 'color.success-strong',
   'on-primary': 'color.on-primary',
   // 🔴 用 `warning-strong`（amber-700，5.02:1）而不是 `warning`（amber-600，3.19:1）。
   // 设计系统的对比度测试已经证明 amber-600 不达标（quadrant-3 就是因此改的），
@@ -134,6 +135,8 @@ export interface AppBarAction {
   icon: IconName;
   label: string;
   onPress: () => void;
+  /** 请求仍在执行时，顶栏动作必须显式进入禁用态，而不是静默吞掉点击。 */
+  disabled?: boolean;
   /** 设备级验收（真模拟器 AX 探针）按它定位控件。 */
   testID?: string;
 }
@@ -149,9 +152,11 @@ export interface AppBarAction {
 export function AppBar({
   title,
   actions,
+  titleLeading,
 }: {
   title: string;
   actions?: ReadonlyArray<AppBarAction>;
+  titleLeading?: React.ReactNode;
 }): React.JSX.Element {
   const t = useTokens();
   const insets = useSafeAreaInsets();
@@ -161,8 +166,6 @@ export function AppBar({
       style={{
         paddingTop: insets.top,
         backgroundColor: t['color.surface'],
-        borderBottomWidth: t['border-width.thin'],
-        borderBottomColor: t['color.border'],
       }}
     >
       <View
@@ -176,6 +179,7 @@ export function AppBar({
       >
         {/* 标题区 flex:1 且**不加 numberOfLines 限制**会让长标题把操作挤掉；
             这里限 1 行并允许收缩。 */}
+        {titleLeading}
         <View style={{ flex: 1 }}>
           <Text variant="headline" numberOfLines={1}>
             {title}
@@ -188,6 +192,7 @@ export function AppBar({
             label={a.label}
             testID={a.testID}
             onPress={a.onPress}
+            disabled={a.disabled}
           />
         ))}
       </View>
@@ -202,12 +207,14 @@ export function IconButton({
   onPress,
   color,
   testID,
+  disabled,
 }: {
   icon: IconName;
   label: string;
   onPress: () => void;
   color?: string;
   testID?: string;
+  disabled?: boolean;
 }): React.JSX.Element {
   const t = useTokens();
   const { reducedMotion } = useTheme();
@@ -215,8 +222,10 @@ export function IconButton({
     <Pressable
       onPress={onPress}
       testID={testID}
+      disabled={disabled === true}
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ disabled: disabled === true }}
       style={({ pressed }) => ({
         width: t['touch-target.min'],
         height: t['touch-target.min'],
@@ -224,7 +233,8 @@ export function IconButton({
         justifyContent: 'center',
         borderRadius: t['radius.full'],
         // 按下即反馈（Apple：反馈必须在 pointer-down 上出现）。
-        backgroundColor: pressed && !reducedMotion ? t['color.hover'] : 'transparent',
+        backgroundColor: pressed && !reducedMotion && disabled !== true ? t['color.hover'] : 'transparent',
+        opacity: disabled === true ? t['state.disabled-opacity'] : 1,
       })}
     >
       <Icon name={icon} size="md" color={color ?? t['color.foreground']} />
@@ -245,13 +255,21 @@ export function IconButton({
 export function Screen({
   title,
   actions,
+  titleLeading,
   children,
   scroll = true,
+  fixedControls,
+  bottomInset = true,
 }: {
   title: string;
   actions?: ReadonlyArray<AppBarAction>;
+  titleLeading?: React.ReactNode;
   children: React.ReactNode;
   scroll?: boolean;
+  /** Contextual controls remain reachable while the content scrolls. */
+  fixedControls?: React.ReactNode;
+  /** 固定输入区由调用方管理底部留白，避免重复预留滚动空间。 */
+  bottomInset?: boolean;
 }): React.JSX.Element {
   const t = useTokens();
   const body = (
@@ -268,15 +286,20 @@ export function Screen({
      * 最后一个子节点之后（`justifyContent` 默认 `flex-start`）—— 所以这不是
      * "给所有屏加了一条高度约束"，只是把"母层给不给确定高度"这一环补上。
      */
-    <View style={{ paddingHorizontal: t['screen.gutter'], gap: t['space.4'], flexGrow: 1 }}>
+    <View style={{ paddingHorizontal: t['screen.gutter'], gap: t['space.4'], flexGrow: 1, ...(scroll ? {} : { flex: 1, minHeight: 0 }) }}>
       {children}
-      <View style={{ height: t['screen.bottom-inset'] }} />
+      {bottomInset ? <View style={{ height: t['screen.bottom-inset'] }} /> : null}
     </View>
   );
 
   return (
     <View style={{ flex: 1, backgroundColor: t['color.background'] }}>
-      <AppBar title={title} actions={actions} />
+      <AppBar title={title} actions={actions} titleLeading={titleLeading} />
+      {fixedControls ? (
+        <View style={{ paddingHorizontal: t['screen.gutter'], paddingTop: t['space.2'] }}>
+          {fixedControls}
+        </View>
+      ) : null}
       {scroll ? (
         <ScrollView
           style={{ flex: 1 }}
@@ -515,13 +538,16 @@ export function Badge({ count, max = 99, dot, tone = 'danger' }: BadgeProps): Re
 
   const bg = tone === 'primary' ? t['color.primary'] : t['color.danger'];
   const label = count !== undefined && count > max ? `${max}+` : String(count ?? '');
+  // 视觉上用 `max+` 保持角标紧凑，但无障碍树必须读出真实数量；
+  // 否则 137 会被错误地报告成 99+，用户无法得到准确计数。
+  const accessibilityCount = String(count ?? '');
   // 同上：无障碍名在外面算好，别把字面量留在无障碍名的花括号表达式里。
   // 英文单复数也在这一层分支（词条表没有 ICU）：`1` 走单数兄弟词条。
   const accessibility =
     dot === true
       ? translate('mobile.common.badge.new')
       : translate(count === 1 ? 'mobile.common.badge.countOne' : 'mobile.common.badge.count', {
-          count: label,
+          count: accessibilityCount,
         });
 
   return (
@@ -529,13 +555,22 @@ export function Badge({ count, max = 99, dot, tone = 'danger' }: BadgeProps): Re
       accessibilityRole="text"
       accessibilityLabel={accessibility}
       style={{
-        minWidth: dot === true ? t['size.badge-dot'] : t['size.badge-min-width'],
-        height: dot === true ? t['size.badge-dot'] : t['size.badge-height'],
+        ...(dot === true
+          ? {
+              width: t['size.badge-dot'],
+              height: t['size.badge-dot'],
+            }
+          : {
+              minWidth: t['size.badge-min-width'],
+              minHeight: t['size.badge-height'],
+            }),
         borderRadius: t['radius.full'],
         backgroundColor: bg,
         // 与所在底色同色的外圈，把角标从图标笔画上"切"出来。
         borderWidth: t['size.badge-ring'],
         borderColor: t['color.surface'],
+        // 宽度由内容决定；由宿主决定对齐方向，不覆盖角标右锚点。
+        flexShrink: 0,
         alignItems: 'center',
         justifyContent: 'center',
         paddingHorizontal: dot === true ? 0 : t['space.1'],
@@ -544,7 +579,15 @@ export function Badge({ count, max = 99, dot, tone = 'danger' }: BadgeProps): Re
       {dot === true ? null : (
         <RNText
           numberOfLines={1}
-          style={[text.badge, { color: t['color.on-primary'], fontFamily: native.fontSans }]}
+          maxFontSizeMultiplier={2}
+          style={[
+            text.badge,
+            {
+              color: t['color.on-primary'],
+              fontFamily: native.fontSans,
+              flexShrink: 0,
+            },
+          ]}
         >
           {label}
         </RNText>
@@ -641,9 +684,6 @@ export function Card({ children, style, gap = 'default' }: CardProps): React.JSX
         {
           backgroundColor: t['color.surface'],
           borderRadius: t['radius.lg'],
-          borderWidth: t['border-width.thin'],
-          // 扁平风格用边框表达层次，阴影只给真正的浮层（AGENTS.md §5）。
-          borderColor: t['color.border'],
           padding: t['space.4'],
           gap: gapValue(t, gap),
         },
@@ -665,6 +705,8 @@ export interface ButtonProps {
   icon?: IconName;
   disabled?: boolean;
   loading?: boolean;
+  /** 展开/收起状态，供无边框的渐进展开按钮向读屏器暴露。 */
+  expanded?: boolean;
   style?: StyleProp<ViewStyle>;
   /**
    * 设备级验收的锚点 id（真模拟器 AX 探针按它找控件）。
@@ -688,6 +730,7 @@ export function Button({
   icon,
   disabled,
   loading,
+  expanded,
   style,
   testID,
   accessibilityLabel,
@@ -715,7 +758,7 @@ export function Button({
       testID={testID}
       disabled={isDisabled}
       accessibilityRole="button"
-      accessibilityState={{ disabled: isDisabled, busy: loading === true }}
+      accessibilityState={{ disabled: isDisabled, busy: loading === true, expanded }}
       accessibilityLabel={accessibilityLabel ?? label}
       style={({ pressed }) => [
         {
@@ -728,8 +771,7 @@ export function Button({
           paddingHorizontal: t['space.4'],
           borderRadius: t['radius.md'],
           backgroundColor: c.bg,
-          borderWidth: tone === 'ghost' ? 0 : t['border-width.thin'],
-          borderColor: c.border,
+          borderWidth: 0,
           // disabled 用 token 的不透明度，不写死 0.5。
           opacity: isDisabled
             ? t['state.disabled-opacity']
@@ -818,12 +860,14 @@ export function Divider({ inset = true }: { inset?: boolean }): React.JSX.Elemen
 /** 空状态。不是"暂无数据"四个字就完事 —— 它得说明下一步能做什么。 */
 export function EmptyState({
   icon,
+  illustration,
   title,
   hint,
   detail,
   detailTone = 'danger',
 }: {
   icon?: IconName;
+  illustration?: StateIllustrationVariant;
   title: string;
   hint: string;
   /** 补充说明。技术细节给错误用，step 说明给"还没做"用。 */
@@ -846,7 +890,9 @@ export function EmptyState({
         gap: t['space.2'],
       }}
     >
-      {icon !== undefined ? (
+      {illustration !== undefined ? (
+        <StateIllustration variant={illustration} />
+      ) : icon !== undefined ? (
         <Icon name={icon} size="xl" color={t['color.foreground-subtle']} strokeWidth={1.5} />
       ) : null}
       <Text variant="section-title" tone="muted" style={{ textAlign: 'center' }}>
@@ -881,6 +927,11 @@ export interface TextFieldProps {
    *
    * 🔴 地址字段必须能输入 `://` 与 `.` —— 默认键盘没有这些键，
    * 用户会看到"明明填了地址却少了几个字符"。`url` 键盘才带 `/` 和 `.`。
+   *
+   * `email-address` 是给换绑邮箱那几格加的：iOS 上它把 `@` 与 `.` 放在主键盘区，
+   * 而默认键盘要用户去第二层找 —— 邮箱是唯一**不能填错**的那个字段（填错了
+   * 收到的那封信就落在别人的地址里，而那张换绑请求两边都不生效）。
+   * 这一档是纯追加：现有调用点一个都不改行为。
    */
   keyboard?: 'default' | 'url' | 'email-address';
   autoCapitalize?: 'none' | 'sentences';
@@ -938,7 +989,6 @@ export function TextField({
 }: TextFieldProps): React.JSX.Element {
   const t = useTokens();
   const text = useText();
-  const [focused, setFocused] = React.useState(false);
 
   return (
     <View style={{ gap: t['space.1'] }}>
@@ -965,12 +1015,6 @@ export function TextField({
         returnKeyType={onSubmitEditing === undefined ? undefined : 'done'}
         // cursorColor 是 TextInput 的 **prop**，不是 style —— 放进 style 会被静默忽略。
         cursorColor={t['color.primary']}
-        onFocus={() => {
-          setFocused(true);
-        }}
-        onBlur={() => {
-          setFocused(false);
-        }}
         style={[
           // ⚠️ 样式名必须**真实存在**于 `TEXT_STYLES`。我第一版写了 `'body'` ——
           // 表里没有这个名字（最接近的是 `row-title`），取到 `undefined`，
@@ -989,10 +1033,8 @@ export function TextField({
             borderRadius: t['radius.md'],
             backgroundColor: t['color.surface'],
             color: t['color.foreground'],
-            // 🔴 焦点态用**边框加粗**表达，不用阴影位移 ——
-            // 扁平风格靠边框分层，且位移会让布局跳动。
-            borderWidth: focused ? t['border-width.thick'] : t['border-width.thin'],
-            borderColor: focused ? t['color.primary'] : t['color.border'],
+            // 文本输入以光标表示编辑位置，不再叠加焦点边框。
+            borderWidth: 0,
             opacity: editable ? 1 : t['state.disabled-opacity'],
           },
         ]}
@@ -1019,9 +1061,8 @@ export function TextField({
  * 改用 `color.surface-sunken` 这个**已有的** token。
  * 需要新变量时先加 token 再消费，而不是先写个数字。
  *
- * 🔴 选中态同时改**边框粗细**与**底色**，不只改颜色：
- * 只改颜色的话，色觉障碍用户看不出哪一个是选中的
- * （UIX Pro 第 1 条是可达性，排在风格前面）。
+ * 🔴 选中态使用主色底与反色文字表达，不再叠加边框：
+ * `accessibilityState.selected` 同步保留给读屏，视觉上避免框中框。
  */
 export function Chip({
   label,
@@ -1029,16 +1070,18 @@ export function Chip({
   onPress,
   icon,
   color,
+  tone = 'filled',
 }: {
   label: string;
   selected?: boolean;
   onPress: () => void;
   icon?: IconName;
   color?: string;
+  tone?: 'filled' | 'quiet';
 }): React.JSX.Element {
   const t = useTokens();
 
-  const fg = selected ? t['color.on-primary'] : t['color.foreground'];
+  const fg = selected ? t[tone === 'quiet' ? 'color.primary' : 'color.on-primary'] : t['color.foreground'];
 
   return (
     <Pressable
@@ -1054,9 +1097,10 @@ export function Chip({
         gap: t['space.1'],
         paddingHorizontal: t['space.3'],
         borderRadius: t['radius.full'],
-        borderWidth: selected ? t['border-width.thick'] : t['border-width.thin'],
-        borderColor: selected ? t['color.primary'] : t['color.border'],
-        backgroundColor: selected
+        borderWidth: 0,
+        backgroundColor: tone === 'quiet'
+          ? (pressed ? t['color.surface-sunken'] : 'transparent')
+          : selected
           ? t['color.primary']
           : pressed
             ? t['color.surface-sunken']

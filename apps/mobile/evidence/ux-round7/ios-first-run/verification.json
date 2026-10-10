@@ -1,0 +1,14 @@
+{
+  "bundleSha256": "e548b39df20e10a72a1afc7c2e3f91b965b10b49a372720a11bddebacaef1847",
+  "checks": {
+    "noLinkUnderlineVisuallyReviewed": true,
+    "linksHave44PointTouchHeight": true,
+    "termsLinkOpenedSafari": true,
+    "termsUrlReadback": "https://heyta.waytofuture.cn/legal/terms/"
+  },
+  "limits": [
+    "Keyboard focus and VoiceOver not verified",
+    "Safari page content not verified",
+    "Simulator only"
+  ]
+}

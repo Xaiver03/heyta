@@ -80,7 +80,7 @@ object WidgetRefresh {
 
     private fun pushRendered(context: Context, spec: Spec, content: WidgetContent) {
         AppWidgetManager.getInstance(context)
-            .updateAppWidget(ComponentName(context, spec.provider), spec.render(context, content))
+            .updateAppWidget(ComponentName(context, spec.provider), spec.render(WidgetLocalePreference.localizedContext(context), content))
     }
 
     /**

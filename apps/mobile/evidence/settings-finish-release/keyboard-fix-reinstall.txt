@@ -1,0 +1,30 @@
+$ bash scripts/reinstall-all.sh --only android,ios
+═══ 0. 前置：pnpm -r build ═══
+  ✅ 全仓构建完成（日志 /tmp/heyta-reinstall-build.log）
+
+═══ 3. Android：清旧包 → release APK → 模拟器卸旧装新 ═══
+  ✅ release APK 已重打（ 65M；日志 /tmp/heyta-reinstall-apk.log）
+  ✅ 模拟器 emulator-5554 全新安装成功
+  ⚠️ monkey 之后前台不是 com.heyta，用 am start -W 显式拉起再验一次
+  ✅ 前台窗口确认：  mCurrentFocus=Window{c4c04c9 u0 com.heyta/com.heytamobile.MainActivity}
+  主蓝采样命中 4001（数的是 heyta-reinstall-android.png）
+  ✅ 窗口 1080x2400、heyta-reinstall-android.png 内容占比 58.9%、主蓝命中 4001 —— 是共享 UI
+  截图证据：/tmp/heyta-reinstall-android.png
+
+═══ 4. iOS：模拟器卸旧 → Release 重打 → 装新 + 新鲜度判据 ═══
+  模拟器：FE195661-B021-4A71-AAD1-1F2F7AE3A102
+  Pods 哈希本已一致，仍重跑 pod install（半写沙盒不会被哈希相等挡住）…
+  ✅ 沙盒已同步（Manifest.lock == Podfile.lock）
+  正在 xcodebuild Release（重打 JS bundle，数分钟）…
+  ✅ 构建成功（日志 /tmp/heyta-reinstall-ios-build.log）
+  ✅ 已安装进模拟器（全新安装）
+  ✅ 已装的包比源码新 —— 这一轮装的是当前产物
+  主蓝采样命中 4138（数的是 heyta-reinstall-ios.png）
+  ✅ 窗口 1206x2622、heyta-reinstall-ios.png 内容占比 99.8%、主蓝命中 4138 —— 是共享 UI
+  截图证据：/tmp/heyta-reinstall-ios.png
+
+═══ 重装汇总 ═══
+  ⏭ mac：不在 --only 范围 —— 这端**没有**验证当前产物
+  ⏭ windows：不在 --only 范围 —— 这端**没有**验证当前产物
+  ✅ android：已清旧包、重打、重装、有当前产物判据
+  ✅ ios：已清旧包、重打、重装、有当前产物判据

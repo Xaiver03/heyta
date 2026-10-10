@@ -1,0 +1,2 @@
+  mViewports=[DisplayViewport{type=INTERNAL, valid=true, isActive=true, displayId=0, uniqueId='local:4619827259835644672', physicalPort=0, orientation=1, logicalFrame=Rect(0, 0 - 2400, 1080), physicalFrame=Rect(0, 0 - 2400, 1080), deviceWidth=2400, deviceHeight=1080}]
+    mCurrentOrientation=1

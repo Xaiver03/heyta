@@ -4,7 +4,7 @@
  *
  * 复现对象：`apps/web/src/App.tsx` 的 `PRIMARY_NAV` / `QUADRANT_NAV` / `VIEW_TABS`
  * 与 `apps/web/src/features/projects/ProjectsPanel.tsx` 的两块区块
- * （清单「新清单」输入框 + `+`，标签「新标签」输入框 + `+`）。
+ * （清单 / 标签标题 + 共享行列表 + 标题级 `+` 创建入口）。
  *
  * ─────────────────────────────────────────────────────────────────────────
  * 🔴 为什么需要它
@@ -16,8 +16,8 @@
  *   |---|---|---|
  *   | 主导航 | 收集箱 / 今天 / **已完成** | 只有前两项 |
  *   | 四象限计数 | 由 `bucketByQuadrant` **算出来** | 手写 3 / 5 / 2 / 1 |
- *   | 标签区 | 有（标题 + 输入框 + `+`） | **完全没有** |
- *   | 视图 tab | **8 个** | 4 个 |
+ *   | 标签区 | 有（标题 + 行列表 + `+`） | **完全没有** |
+ *   | 视图 tab | 默认 rail 7 个目的地 | 旧版 4 个 |
  *
  * 当时**没有任何门禁看得见**：`check:design` 管取值来源、`check:ui-language`
  * 管有没有硬编码文案、`check:widgets` 管小组件契约 —— 没有一条在问
@@ -63,7 +63,7 @@ export type ShellNavIconId =
   | 'trash'
   | 'settings';
 
-/** 顶栏视图 key。与 `apps/web/src/App.tsx` 的 `ViewKey` 一致。 */
+/** rail 视图 key。与 `apps/web/src/App.tsx` 的 `ViewKey` 一致。 */
 export type ShellViewKey =
   | 'tasks'
   /* 日历：2026-09-29 与 web 壳一起加进 rail（滴答 rail 的「日历」那一格）。 */
@@ -96,7 +96,7 @@ export interface ShellQuadrantNavItem {
   readonly swatch: 'q1' | 'q2' | 'q3' | 'q4';
 }
 
-/** 顶栏视图 tab 的一项。对应 `App.tsx` 的 `VIEW_TABS`。 */
+/** rail 视图 tab 的一项。对应 `App.tsx` 的 `VIEW_TABS`。 */
 export interface ShellViewTab {
   readonly key: ShellViewKey;
   readonly labelKey: MessageKey;
@@ -107,8 +107,11 @@ export interface ShellViewTab {
 export interface ShellPanelSection {
   readonly id: 'projects' | 'tags';
   readonly headingKey: MessageKey;
-  readonly newPlaceholderKey: MessageKey;
+  /** The accessible name of the heading-level create action. */
+  readonly createLabelKey: MessageKey;
   readonly icon: ShellNavIconId;
+  /** A small set of real sample rows shown in the static landing mockup. */
+  readonly sampleNameKeys: readonly MessageKey[];
 }
 
 /**
@@ -146,12 +149,11 @@ export const SHELL_QUADRANT_NAV: readonly ShellQuadrantNavItem[] = [
 ];
 
 /**
- * 顶栏视图 tab：**9 项**。对应 `App.tsx` 的 `VIEW_TABS`。
+ * Landing 复现的默认 rail 目的地：**7 项**。对应 `App.tsx` 的默认开启模块与工具。
  *
- * 🔴 后 5 项（时间线 / 成长 / 便签 / 回收站 / 设置）在这一屏里没有对应内容 ——
- * 它们只是外壳的一部分（复刻刻意不可交互，见 `AppWindow.tsx` 文件头）。
- * 但它们**必须画出来**：复刻只画 4 个 tab 时，访客在页面上看到干净的 4 个标签，
- * 装上应用拿到的是别的一堆 —— 一个比真应用好看的界面图就是一句会兑现不了的承诺。
+ * 这份登记包含默认用户可达的任务、日历、四象限、习惯、时间线、搜索与回收站；
+ * rail 会按 Web 的规则把其中低频目的地收进「更多」，而不是在主栏平铺全部项目。
+ * 关闭的番茄钟、成长、便签等模块不进入默认登记，避免 Landing 承诺新装用户看不到的入口。
  *
  * 🔴 **2026-09-29：这里是「默认 rail」而不是"全部视图"。**
  * 产品负责人要求"左侧按钮尽可能地减少"，于是加了**功能模块开关**：
@@ -178,6 +180,15 @@ export const SHELL_VIEW_TABS: readonly ShellViewTab[] = [
 ];
 
 /**
+ * 展厅额外开放的预览入口。专注在产品里是可选模块，因而不进入默认 rail；
+ * 展厅把它作为已有 `MockView` 的可探索内容放进「更多」，仍复用产品词条与图标形状。
+ */
+export const MOCKUP_PREVIEW_TABS: readonly ShellViewTab[] = [
+  ...SHELL_VIEW_TABS,
+  { key: 'focus', labelKey: 'web.shell.views.focus', icon: 'circle-dot' },
+];
+
+/**
  * 侧栏面板区块：**2 块**（清单 + 标签）。对应 `ProjectsPanel.tsx`。
  *
  * 🔴 「标签」整块曾经**完全没有**（§2 #4）。它与清单是并排的两块同形区块，
@@ -187,14 +198,23 @@ export const SHELL_PANEL_SECTIONS: readonly ShellPanelSection[] = [
   {
     id: 'projects',
     headingKey: 'web.projects.heading',
-    newPlaceholderKey: 'web.projects.newPlaceholder',
+    createLabelKey: 'web.projects.addNew',
     icon: 'inbox',
+    sampleNameKeys: [
+      'landing.mock.project.work',
+      'landing.mock.project.personal',
+      'landing.mock.project.reading',
+    ],
   },
   {
     id: 'tags',
     headingKey: 'web.tags.heading',
-    newPlaceholderKey: 'web.tags.newPlaceholder',
+    createLabelKey: 'web.tags.addNew',
     icon: 'inbox',
+    sampleNameKeys: [
+      'landing.mock.tag.deepWork',
+      'landing.mock.tag.waiting',
+    ],
   },
 ];
 
@@ -211,10 +231,10 @@ export const SHELL_PANEL_SECTIONS: readonly ShellPanelSection[] = [
  * 那条绿色的判据 positively 要求"页头要有同步 + 立即同步 + 设置 + 语言 + 主题"。
  * 一条把过时的形状钉成期望的判据，比没有判据更糟（AGENTS §8 第 3 条）。
  */
-export type ShellHeaderActionKind = 'sort-select' | 'detail-toggle';
+export type ShellHeaderActionKind = 'bulk-toolbar' | 'sort-select' | 'detail-toggle' | 'assistant-toggle';
 
 export type ShellHeaderAction = {
-  readonly id: 'task-sort' | 'detail-pane-toggle';
+  readonly id: 'bulk-toolbar' | 'task-sort' | 'detail-pane-toggle' | 'assistant-open';
   readonly kind: ShellHeaderActionKind;
   /** 图上读到的名字（产品用它当可访问名 / 可见标签）。 */
   readonly labelKey: MessageKey;
@@ -224,9 +244,21 @@ export type ShellHeaderAction = {
   readonly onlyForView?: MockView;
   /** `sort-select` 展示的那一档（产品的默认值）。 */
   readonly optionKey?: MessageKey;
+  /**
+   * 真实应用只在详情列收起时显示这枚回退入口。Landing 默认展示任务详情列，
+   * 因此不额外画一枚没有行为的 AI 按钮，避免把静态展厅误读成可用 Chatbot。
+   */
+  readonly mockedInLanding?: boolean;
 };
 
 export const SHELL_HEADER_ACTIONS: readonly ShellHeaderAction[] = [
+  {
+    id: 'bulk-toolbar',
+    kind: 'bulk-toolbar',
+    labelKey: 'web.shell.bulk.select',
+    anchors: ['bulk-toolbar', 'bulk-complete', 'bulk-repeat-warning', 'bulk-undo'],
+    onlyForView: 'tasks',
+  },
   {
     id: 'task-sort',
     kind: 'sort-select',
@@ -236,6 +268,14 @@ export const SHELL_HEADER_ACTIONS: readonly ShellHeaderAction[] = [
     // 其余视图没有列表 ⇒ 只有任务屏画它。
     onlyForView: 'tasks',
     optionKey: 'web.shell.sort.display',
+  },
+  {
+    id: 'assistant-open',
+    kind: 'assistant-toggle',
+    labelKey: 'web.ai.assistant.title',
+    anchors: ['assistant-open'],
+    onlyForView: 'tasks',
+    mockedInLanding: false,
   },
   {
     id: 'detail-pane-toggle',

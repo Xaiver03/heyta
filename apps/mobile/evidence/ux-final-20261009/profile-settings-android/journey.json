@@ -1,0 +1,8 @@
+{
+  "status": "failed",
+  "uiLocale": "zh-CN",
+  "error": "Command '['adb', '-s', 'emulator-5554', 'shell', 'pm', 'path', 'com.heyta']' returned non-zero exit status 1.",
+  "artifact": null,
+  "geometry": null,
+  "steps": []
+}

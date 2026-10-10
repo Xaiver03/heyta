@@ -1,0 +1,8 @@
+Current UI Mode Service state:
+  mDockState=0 mLastBroadcastState=0
+ mStartDreamImmediatelyOnDock=true  mNightMode=2 (yes)  mOverrideOn/Off=false/false  mAttentionModeThemeOverlay=1000 mNightModeLocked=true
+  mCarModeEnabled=false (carModeApps=
+ mWaitForDeviceInactive=false mComputedNightMode=true customStart=22:00 customEnd06:00 mCarModeEnableFlags=0 mEnableCarDockLaunch=false
+  mCurUiMode=0x21 mUiModeLocked=false mSetUiMode=0x21
+  mHoldingConfiguration=false mSystemReady=true
+  mTwilightService.getLastTwilightState()=null

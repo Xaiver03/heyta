@@ -68,7 +68,7 @@ export interface TabBarProps {
    *
    * 🔴 **不传就等于没有角标**，而不是"传 0" —— 把"没有待办"也渲染成一个
    * 写着 0 的红点，会让所有 tab 常年顶着装饰性噪音，真正的数字反而看不见了。
-   * `Badge` 自己也把 `0` 当作不渲染。
+   * 标签栏角标也把 `0` 当作不渲染。
    */
   badges?: Partial<Record<TabKey, number>>;
 }
@@ -90,8 +90,6 @@ export function TabBar({ active, onChange, badges }: TabBarProps): React.JSX.Ele
           // 上下各剩 1px，看着像完全没有留白。
           paddingBottom: Math.max(insets.bottom, tokens['nav.safe-bottom-min']),
           backgroundColor: tokens['color.surface'],
-          borderTopWidth: tokens['border-width.thin'],
-          borderTopColor: tokens['color.border'],
         },
         barRow: {
           flexDirection: 'row',
@@ -142,6 +140,14 @@ export function TabBar({ active, onChange, badges }: TabBarProps): React.JSX.Ele
           // 而不是完全在图标外面 —— 后者会让标签栏显得拥挤。
           top: -tokens['space.1'],
           right: -tokens['space.2'],
+          // 让共享 Badge 的内容宽度不受图标容器的横向约束；角标不能挤压
+          // 或裁掉图标，也不能把图标从中轴推开。
+          // 绝对定位节点仍需要一个完整 tab 的测量空间；否则 RN 会按图标
+          // 容器的 24px 宽度测量数字，放大字号后「14」会被截成「1…」。
+          width: tokens['nav.tab-item-min-width'],
+          alignSelf: 'flex-start',
+          alignItems: 'flex-end',
+          flexShrink: 0,
         },
       }),
     [tokens, insets.bottom],

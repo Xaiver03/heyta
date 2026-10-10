@@ -1,0 +1,19 @@
+{
+  "time": "2026-10-08T02:01:47.071341+00:00",
+  "target": "iOS 27.0 simulator",
+  "buildSdk": "27.1",
+  "installedBundleSha256": "5593711c8c9cb6af13164d2c37a70af15ab2f4766f6090c9f3bc749221be6baa",
+  "widgetExecutableSha256": "0f9445391f1b7f79643058b6e47f4edf01890b65cf4d795e3d6e2bb207123e14",
+  "checks": {
+    "addedViaApp": true,
+    "todayTaskRefreshVisible": true,
+    "originalToggleWasOptimisticOnly": true,
+    "fixedToggleCreatesSingleCompletionOp": true,
+    "secondResumeNoExtraOp": true
+  },
+  "limits": [
+    "Only Today template verified",
+    "Other templates and physical iPhone pending",
+    "Before latest proposal separator presentation-only edit"
+  ]
+}

@@ -7112,6 +7112,15 @@ git show --numstat --format='' 6d06bae4   # 空输出
 `'waiting-entitlement'`）+ 把 `processWebInboundOnce` 的返回类型换成 app-host 已导出的
 `InboundAutomationCycleResult`，两处都在白名单内，可在同一批做完。
 
+⚠️ **2026-10-10 18:4x 现量更正：上面那句"待做"已经完成一半半**。类型接缝两处都已落
+（`inbound-runtime.ts` 现在返回 `InboundAutomationCycleResult`；`InboundAutomationSettings.tsx` 的状态联合是
+`'idle' | 'failed' | InboundAutomationCycleState`，`apps/web` 那两枚文件 `tsc` 读数 **0 条错**），
+并且原先 `t(\`web.ai.inbound.process.${state}\` as any)` 那种**拼出不存在的键**的写法已换成模块级 `PROCESS_COPY` 表 ——
+`packages/i18n/src/catalog.ts:53` 对缺键是**抛**，所以那一行以前会让整块设置面板崩，而不是只显示一句怪文案。
+**只剩词条那一行**：`PROCESS_COPY` 里刻意不含 `waiting-entitlement`，该状态现在渲染成一个带
+`data-inbound-cycle-state="waiting-entitlement"` 的空句子节点（不说成"处理失败"）。B110 的成对追加落进去时，
+在这张表加一行映射即可，界面与判据都不用再动。
+
 ## B111 安装身份的 META 键没进 `packages/storage` 的登记表
 
 `packages/app-host/src/inbound-installation-store.ts` 自持常量 `automationInstallationIdV1`，
@@ -7694,3 +7703,23 @@ grep -c "inbound-dual-host" server/package.json server/tsconfig.json ⇒ 0 / 0
 **要负责人拍的一句**：已删规则的计量账要不要留一份**只含计数**的摘要（不含事件/规则正文摘要）？
 留 ⇒ 一枚新迁移 + `deleteAutomationRule` 的删除集要重划；不留 ⇒ T4 的对账判据必须写明"仅覆盖未删除的规则"，
 而对外说明里"逐事件可对账"这句要跟着收窄。本会话按现状把这一档**量出来并写进台账**，没动删除语义。
+
+## B135 交接件按仓库约定应落 `docs/plans/inbound-automation-handoff.md`，那个路径不在本线白名单
+
+仓库既有约定是把交接件写成 `docs/plans/<线>-handoff.md`（现量：`ls docs/plans/*-handoff.md | wc -l`，2026-10-10 读到 13 枚）。
+本线白名单里只有 `docs/plans/inbound-automation.md`，**不含** `inbound-automation-handoff.md` ⇒ 2026-10-10 18:4x 那次交接
+按任务书指定的续读入口写进了 `PROGRESS.md`（标题「【交接】T5 界面层……」那一节），没有新建约定路径下那份文件。
+
+**要拍的就一句话**：把交接件挪到约定位置（需要把 `docs/plans/inbound-automation-handoff.md` 并进白名单），
+还是让它留在 `PROGRESS.md` 里。不改判定、不改代码，只改落点。
+
+## B136 界面层那两把尺量出来的红都在**别人文件**里，按死规矩只登记不修
+
+1. `cd apps/web && npx --no-install tsc --noEmit -p tsconfig.spec.json`：本线两枚文件（`inbound-runtime.ts`、
+   `InboundAutomationSettings.tsx`）**0 条**；剩下 **16 条**分组是 `tests/share-key-store.spec.ts` 13 条 +
+   `tests/app-mount.spec.tsx` 3 条。两枚都在别的线手里（`git status --porcelain` 现量为 `M`），且都不在本线白名单 ⇒ 顺手活。
+   ⚠️ 这直接影响 T7 那一格：`pnpm -r typecheck` 在**合并态**上现在是红的，而红不是本线造的。
+2. `node research/tools/docs-link-check.mjs`：除任务 0 记的那条 `apps/desktop-windows/README.md:89`，
+   本轮**多出 3 条**在 `docs/plans/account-standard-suite-handoff.md:8-10`（他线那份交接件，本轮才出现的）。
+   ⇒ 台账与任务 0 里"**唯一一条**不是本线"那句已过期，见到别照它行动；重取用
+   `node research/tools/docs-link-check.mjs 2>&1 | sed -n '/死链/,/$/p'`。本线新建的链接 0 条死链（`grep -c inbound` 读数为 0）。

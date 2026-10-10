@@ -307,6 +307,13 @@ final class WidgetParsingTests: XCTestCase {
         )
     }
 
+    func test_意图时间戳写成整数毫秒() {
+        let at = widgetIntentEpochMilliseconds(Date(timeIntervalSince1970: 1_790_000_000.1234))
+
+        XCTAssertEqual(at, 1_790_000_000_123)
+        XCTAssertEqual(at.rounded(.towardZero), at)
+    }
+
     func test_意图_合并是后写者胜() {
         let q = WidgetIntentQueue([WidgetIntent(taskId: "t1", targetIsDone: true, at: 0)])
         let merged = WidgetIntentQueues.merge(q, WidgetIntent(taskId: "t1", targetIsDone: false, at: 1))
