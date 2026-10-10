@@ -1,4 +1,4 @@
-# ADR-0058：自动收集的提交许可与异构任务批
+# ADR-0064：自动收集的提交许可与异构任务批
 
 > 状态：**已接受（技术方案，2026-10-07）**。实施状态见[计划](../plans/inbound-automation.md)，线形状见[协议](../reference/inbound-automation-protocol.md)。本 ADR 不批准价格、套餐和保留期，也不声明功能上线。
 

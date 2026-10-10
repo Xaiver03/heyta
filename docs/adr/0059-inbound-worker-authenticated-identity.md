@@ -1,6 +1,6 @@
 # ADR-0059：入站 worker 身份必须由独立凭据认证
 
-> 状态：**已接受（技术方案，2026-10-07）**。更正 [ADR-0058](0058-inbound-automation-commit-and-task-batch.md) 背景中“现有认证同步禁止 B 冒充 A 上传”的依据，不改变其唯一许可/唯一提交身份决定。实现与验证仍见[计划](../plans/inbound-automation.md)。
+> 状态：**已接受（技术方案，2026-10-07）**。更正 [ADR-0064](0064-inbound-automation-commit-and-task-batch.md) 背景中“现有认证同步禁止 B 冒充 A 上传”的依据，不改变其唯一许可/唯一提交身份决定。实现与验证仍见[计划](../plans/inbound-automation.md)。
 
 ## 更正依据
 
