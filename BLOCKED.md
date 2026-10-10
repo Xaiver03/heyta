@@ -7613,6 +7613,23 @@ IndexedDB 的 META 行键是磁盘上的东西，两处定义就是漂移的起�
 上面那 3 枚成员现在坐在 `KNOWN_SEAMS` 里挂着 B129 —— **R4 会盯着它**：那 6 行一旦以任何方式入库，
 这枚装置不再报绿，而是退 **3** 报"登记的缝已闭合 ⇒ 撤登记、回写台账"。所以这一格修完之后不需要有人记得来改尺。
 
+**✅ 10-11 01:1x 闭合（R4 真的顶出来了，按它说的做）**：那 6 行由候选 ② 那条路入库 —— 并行会话的
+`16da3ecb`（10-10 18:48，`feat(cross-session): 共享清单基础设施 + 入站自动化 + …`，`--stat` 里
+`packages/storage/src/stores.ts | 6 ++`）**已在本线 HEAD 的祖先链上**（`git merge-base --is-ancestor 16da3ecb HEAD` = 真）。
+现量（三条都带正向对照 —— "文件在"不等于"键在"）：
+
+```
+git grep -l INBOUND_RECIPIENT_KEY  HEAD -- packages/storage ⇒ HEAD:packages/storage/src/stores.ts
+git grep -l INBOUND_WORKER_CREDENTIAL HEAD -- packages/storage ⇒ 同上
+git grep -l INBOUND_COMMIT_JOURNAL HEAD -- packages/storage ⇒ 同上
+python3 research/tools/verify-inbound-producer-seam.py ⇒ rc=3（R4×N："登记的缝已闭合 ⇒ 撤登记并回写台账"）
+```
+
+处置：`KNOWN_SEAMS` **清空**（撤登记）并把这一档的两向验证从"读工作树"改成"内存注合成登记"
+（臂 3a 注一枚 HEAD 已闭合的 ⇒ R4 必须顶；臂 3b 注一枚仍未闭合的 ⇒ **不许**判 R4 —— 登记是挂账不是报错）。
+撤完之后的静止读数：**`在册文件=76　跨包成员访问=133　命中=133　登记缝=0　新缝=0`，rc=0** ——
+也就是说这 133 处访问**从没进过盲区**，它们现在逐枚按 HEAD 现量算命中，比挂着登记的版本咬得更实。
+本线那三拍（①②③）因此**不再需要负责人拍**：走的是②，代价是那 6 行由别人提交（归属仍是本线的字，只是笔不是本线的）。
 
 ## B130（2026-10-10 06:2x，本会话 · 上一节那把尺第一次全量跑时自己照出来的）：同一类缝还有**第二种形状**，而且这次缺的是整枚文件
 
@@ -7650,6 +7667,23 @@ HEAD 解析得开 **209**、登记 **1**（就是这一枚）、新缝 **0**；�
 **对本线的直接影响**：T7 干净检出的红集里现在有**两格归属明确是本线的**，而且是**两种不同的修法**：
 B129 缺三枚成员（改 6 行、在 `packages/storage`），B130 缺整枚模块（新入库 2 枚文件、在 `packages/app-host`）。
 下一位跑 `pnpm check` 之前先跑这把尺，否则归因会糊在 B112 那四处缝里。
+
+
+**✅ 10-11 01:1x 闭合（与 B129 同一批、同一条路）**：那两枚文件由候选 ③ 入库 —— 还是 `16da3ecb`
+（`--stat`：`packages/app-host/src/task-batch-actions.ts | 60 +++`、`packages/app-host/tests/task-batch-actions.spec.ts | 77 +++`）。
+现量（这一档的"在"要判**解析得开**，不是判文件存在 —— 缺 `.js` 后缀映射时文件在也解不开）：
+
+```
+git cat-file -e HEAD:packages/app-host/src/task-batch-actions.ts ⇒ rc=0
+python3 research/tools/verify-inbound-producer-seam.py
+  撤登记前 ⇒ rc=3（R6："登记的模块缝已闭合 ⇒ 撤登记并回写台账"）
+  撤登记后静止 ⇒ `相对导入=225　模块在 HEAD=225　登记模块缝=0　新模块缝=0　尺瞎了=0`，rc=0
+```
+
+`KNOWN_MODULE_SEAMS` 同样清空，R6 的两向验证改由内存合成登记承担（臂 7a 注已闭合的 ⇒ 必须顶 R6；
+臂 7b 注仍未闭合的 ⇒ **不许**判 R6 也不许判 R5）。B130 那三拍因此也不用拍了。
+⚠️ 一笔诚实账：**AC-5 那份"唯一入口"的 spec 是别人替本线提交的**，本线没有对它做过逐条复核；
+它进 HEAD 之后 `packages/app-host` 的 test 汇总里它算一条，那条的读数在计划 §6 的逐包表里，**不在本格**。
 
 ## B131 `waiting-entitlement` 的**第三处同形**：`apps/node-host` 把 app-host 的 cycle 状态内联重抄了一遍，`pnpm -r build` 在带工作树改动的树上必红
 

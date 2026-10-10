@@ -109,6 +109,12 @@ def self_test() -> int:
 def main() -> int:
     if '--self-test' in sys.argv:
         return self_test()
+    # 同 api-slice：一次性入库切片器，前提是"HEAD 里还挂着那行悬空导出"。
+    # 那前提由本线自己那一笔 `376d1bc9` 结束了 ⇒ 响亮退 3，不要报成"锚点漂了"那种假失败。
+    head = head_text()
+    if EXPORT_LINE in head and DANGLING not in head:
+        print('本切片已落进 HEAD（376d1bc9）⇒ 入库工具退役，不再产出切片（退 3）')
+        return 3
     head, sliced = head_text(), build_slice()
     code = audit(head, sliced)
     if code != 0:

@@ -1111,7 +1111,7 @@ AC-8 那一格此前的现状是**无产物**（复审表里唯一一处连尺�
 | C26 | W12 换 keyId 后同事件重试与旧钥查询 | server | 自托管带票 | 已绑定 | 换钥后旧钥仍能验既有提交凭据；吊销清单合并只升不降；重放那一枚撞唯一约束判 USED | `server/tests/automation-commit-proof.spec.ts::「rotation keeps old verification keys; removing one invalidates only its proofs」；server/tests/automation-entitlement-issuer.spec.ts::「吊销清单：验签只认本部署配置的公钥，合并只升不降」；server/tests/inbound-ticket-rejection-route.spec.ts::「重放：nonce 已存在 ⇒ 402 + TICKET_USED（这一枚确实要撞唯一约束）」` | 本线；票据那一半有八臂反向验证 `research/tools/verify-inbound-ticket-teeth.py` |
 | C27 | W12 实例时钟回拨 | server | 自托管带票 | 时钟回拨 | 高水位高于库时钟即停止授权；消费侧被判过期/已用时报 retrying 而不是永久停住 | `server/tests/automation-entitlement-ticket.spec.ts::「stops authorizing when the installation clock rolls backwards」；server/tests/inbound-ticket-rejection-route.spec.ts::「时钟回拨：实例高水位高于数据库时钟 ⇒ 402 + CLOCK_ROLLBACK」；packages/app-host/tests/inbound-session-keepalive.spec.ts::「票据被自己的实例判过期/已用时报 retrying 而不是永久停住」` | 本线 T2；**实例退役清扫仍无尺**：`server/src` 里对 `automationEntitlementClock` 只有读与 upsert，零删除（现量 `grep -rn "automationEntitlementClock" server/src`） |
 | C28 | W13 date-only 与 start-only 的领域语义 | shared | 付费有效 | 已绑定 | 规则日历日不随处理日/时区漂；无效日期仍可编辑，修正后冻结为 date-only 并按当前钥封装 | `packages/domain/tests/inbound-local-date.spec.ts::「keeps the rule calendar day for today, grouping, urgency and display」；packages/app-host/tests/inbound-draft-review.spec.ts::「keeps invalid dates editable, then freezes corrected date-only values and seals to the current key」` | 本线（共享层）；界面展示与编辑往返那一半见 C29 |
-| C29 | W13 跨时区展示与编辑往返 | web | 付费有效 | 已绑定 | 亮暗、窄屏、中英三档下同一日期在列表/详情/编辑三处逐字一致 | 无尺 | 本线 T5：六枚落点此刻全是 `??`（未跟踪），且 HEAD 的 `apps/` 里代码层零接线（现量：`git status --porcelain -- apps/web/tests/`，以及 `git grep -l inbound HEAD -- apps/` 与 `git grep -l EntitlementTicket HEAD -- apps/` 各自只命中别线那两枚取证 JSON）。🔴 **05:5x 更正：上一轮写"入库这一格本线自己能做"是错的** —— 挂载面（`AiSettings.tsx` +6 行、`features/sync/store.ts` +3 行、`features/ai/route-explanation.ts` +1 行）在未提交且**白名单外**的文件里，那六枚即便入库也没有渲染入口；而 HEAD 又带着 **B129** 那道本线自造的编译红，"入库没让 HEAD 变更差"这句话现在取不了证 ⇒ 入库排在 B129 之后 |
+| C29 | W13 跨时区展示与编辑往返 | web | 付费有效 | 已绑定 | 亮暗、窄屏、中英三档下同一日期在列表/详情/编辑三处逐字一致 | 无尺 | 本线 T5：六枚落点此刻全是 `??`（未跟踪），且 HEAD 的 `apps/` 里代码层零接线（现量：`git status --porcelain -- apps/web/tests/`，以及 `git grep -l inbound HEAD -- apps/` 与 `git grep -l EntitlementTicket HEAD -- apps/` 各自只命中别线那两枚取证 JSON）。🔴 **05:5x 更正：上一轮写"入库这一格本线自己能做"是错的** —— 挂载面（`AiSettings.tsx` +6 行、`features/sync/store.ts` +3 行、`features/ai/route-explanation.ts` +1 行）在未提交且**白名单外**的文件里，那六枚即便入库也没有渲染入口；而 HEAD 又带着 **B129** 那道本线自造的编译红，"入库没让 HEAD 变更差"这句话现在取不了证 ⇒ 入库排在 B129 之后。🔴 **10-11 01:2x 现量更正**：B129 与 B130 都已由 `16da3ecb` 闭合（生产者进了 HEAD，登记已撤），所以这一格**只剩挂载面那一条**：`AiSettings.tsx` +6 行、`features/sync/store.ts` +3 行、`features/ai/route-explanation.ts` +1 行仍在未提交且白名单外 ⇒ 本线六枚即便入库也没有渲染入口。本线自造的那道编译红已不存在。 |
 | C30 | 无注入 当前产物 | web、android、ios、macos、windows、linux | 付费有效 | 已绑定、新设备 | 装出来的必须是当前源码产物：四端清旧包 → 重打 → 重装，每端一条判据 | 无尺 | 本线 T7：`pnpm check` / `-r test` / `reinstall:all` 在隔离副本过不去（B112 四处外接缝 + B126 两枚类型红），需负责人 A/B/C 拍板 |
 | C31 | 无注入 移动壳生命周期 | android、ios | 付费有效 | 后台、Vault 锁定 | 真机后台/锁屏后凭据仍在、票据续得上、恢复后不重复派发 | 无尺 | 本线 T5 + 设备腿：`apps/mobile/src/inbound/lifecycle.ts` 未入库。05:5x 现量补一句它到底缺哪一层：文件自己的三枚相对导入（`../sync/config`、`../db/open-host`、`../ai/settings-store`）与 `@heyta/app-host` 的具名导入在 HEAD **全都在**，缺的是**调用方** —— `startMobileInboundWorker` 只出现在 `apps/mobile/src/App.tsx:64` 那行未提交的 import 里（HEAD 那版 `App.tsx` grep inbound 命中 **0**），而 `App.tsx` 在白名单外 ⇒ 入库也是死代码，设备腿要排在挂载之后 |
 | C32 | 无注入 鸿蒙端 | harmony | 付费有效 | 后台 | 这一端有没有壳能承载自动收集 | 无尺 | 现状：`apps/mobile` 下没有鸿蒙工程（AGENTS §1 那张地图），构建链已通但缺模拟器镜像与签名 ⇒ 不在本轮可闭合集 |
@@ -1228,7 +1228,7 @@ web 的 typecheck 在 app-host 的产物下游，HEAD 产物产不出来时，"�
 |---|---|---|
 | 命中 | 那枚成员在生产包的 HEAD 源码里逐字出现 | 不判 |
 | 盲区 | `import * as ns`、下标访问、生产包在 HEAD 没有任何 .ts | 只数不判 |
-| 登记 | `KNOWN_SEAMS` 里挂了 BLOCKED 号的已知缝（当前 = B129 那三枚） | 大声列出，不判红 |
+| 登记 | `KNOWN_SEAMS` 里挂了 BLOCKED 号的已知缝（🔴 10-11 01:1x 现量：**0 枚** —— B129 那三枚与 B130 那一枚都已闭合、登记已撤；撤之前是 4 枚） | 大声列出，不判红 |
 | 新缝 | 三档都不沾 | **R2 判红** |
 
 四条规矩：R1 在册清单逐枚必须在 HEAD 找得到（挡"目标文件被删了，装置安静地不执行还照样打印通过"），
@@ -1281,6 +1281,14 @@ SELFTEST_RC=0
 **怎么用**：本线每提交一笔之后跑一次（它是唯一能在"提交后"而不是"CI 上"发现这类红的一遍）；
 红集里出现新缝 ⇒ 按 R2 那句话把生产者一并入库，或在 B129 那一档登记后进 `KNOWN_SEAMS`。
 等 B129 修掉，R4 会自己把这三枚登记顶出来 —— 届时删登记，不留一条会过期还报绿的状态。
+
+✅ **10-11 01:1x：这句话兑现了，而且是装置自己叫的，不是本线记得的。** `16da3ecb`（10-10 18:48）把
+`packages/storage` 那 6 行与 `packages/app-host` 那 2 枚文件一起带进 HEAD ⇒ 装置退 **3**、逐枚报「登记的缝已闭合 ⇒
+撤登记并回写台账」。两本登记表现量都是空的，静止读数
+`跨包成员访问=133　命中=133　登记缝=0　新缝=0` / `相对导入=225　模块在 HEAD=225　登记模块缝=0　新模块缝=0`，rc=0
+⇒ 这 133 处访问**不再挂在登记档、逐枚按 HEAD 算命中**，撤登记之后尺咬得更实。登记档清空后 R4/R6 那一档没有变成装饰：
+臂 3a/3b 与 7a/7b 改为**内存注合成登记**验两向（已闭合的必须顶出来、未闭合的不许判红），臂数与逐臂结论跑
+`--self-test` 现量。
 
 🔴 本节那套规矩与"五臂/105/81"的读数是 06:0x 当时的形状。**它已被下一节扩成两维**（成员缝 + 模块缝，
 八臂，127/103）—— 以 `## 2026-10-10 06:2x` 那节为准，别照本节那串数行动。
@@ -1339,6 +1347,12 @@ SELFTEST_RC=0
 对本线的影响：T7 干净检出的红集里现在有**两格归属明确是本线的**，修法是两种不同的动作 ——
 B129 改 `packages/storage` 的 6 行、B130 把 `packages/app-host` 的 2 枚文件入库。两者都要一句授权（路径在白名单外），
 本线不代拍。
+
+🔴 **10-11 01:1x 更正这两句的当前状态**：那一句授权**没有用到** —— 两格都由并行会话的 `16da3ecb` 入库
+（`git merge-base --is-ancestor 16da3ecb HEAD` 为真，`--stat` 里三枚路径逐枚可见），本线因此**没有**动过白名单外的文件。
+⇒ 「T7 干净检出的红集里有两格归属明确是本线的」这句已不成立：现量只剩**别线那 1 枚**类型错误（B144/B103 那格，
+`server/tests/login-code.spec.ts(44,5)` TS2578）。归属仍要说清：**生产者是本线的字、笔是别人提交的**，
+B130 那份 `task-batch-actions.spec.ts`（AC-5 唯一入口的尺）本线**没有逐条复核过**，只核到它在 HEAD 且被 app-host 的套件计入条数。
 
 ## 2026-10-10 12:5x · 十三个故障窗口第一次在**两条真 SQLite 宿主 + 一次性真库**上整跑：装置自报 13/13
 
@@ -1625,7 +1639,7 @@ cd apps/web && NO_COLOR=1 pnpm exec vitest run tests/inbound-cycle-display.spec.
 
 | AC | 证据命令（可复跑） | 贴出的输出（日期 · 载体） | 结论 |
 |---|---|---|---|
-| **AC-1 权益与授权** | `cd .worktrees/inb-t7 && python3 research/tools/verify-inbound-worker-identity.py --log /tmp/inb-wt-worker.log`；离线档：`cd server && npx --no-install vitest run --maxWorkers=1 tests/automation-entitlement-ticket.spec.ts tests/automation-drafts.spec.ts tests/inbound-automation.routes.spec.ts tests/inbound-entitlement-write-tx.spec.ts tests/inbound-worker-identity.spec.ts tests/automation-entitlement-issuer.spec.ts tests/automation-commit-proof.spec.ts tests/automation-events.spec.ts tests/automation-rules.spec.ts tests/automation-sender-credentials.spec.ts tests/automation-ai-metering.spec.ts`；HTTP 收口：`… tests/inbound-ai-quota-route.spec.ts`；真库对账：`… tests/automation-ai-metering.pglite.spec.ts` | 真库腿（临时 initdb 起真 PostgreSQL、全部迁移逐条 apply）：**`Test Files 1 passed (1)` / `Tests 46 passed (46)`，`WT_WORKER_RC=0`**（10-10 19:1x · 隔离副本 @ `a195a37f`）；离线 11 文件（同一枚命令逐枚写死路径）：**`Test Files 11 passed (11)` / `Tests 103 passed (103)`，`S11_RC=0`**（10-10 19:2x · 隔离副本）—— 台账 §665 那行原记 `99 passed`，**+4 只增不减**，多出的 4 条本趟**未逐枚归因**（不许读成回归，也不许读成"本线新加的尺"）；额度 HTTP `3 passed (3)`（402 + `errorCode` + 事务执行器零调用）、pglite `17 passed (17)`（§906，10-10 当日） | **判定层已闭合到可复跑**：错主体/错实例/坏签名/吊销落后/额度耗尽各红一条且**零业务效果**。⚠️ 两处不闭合：① 额度耗尽那条原钉 `errorCode`，别线那枚改名（**B142**）✅ **10-11 已落地并被本线跟上**：本线 5 枚文件的 12 处响应体读法迁到 `code`，真库腿从 `9 failed | 37 passed` 回到 **`Tests 46 passed (46)` / `rc=0`**，对照臂（把那份文件换回改名前、同一隔离载体重跑）**精确回到 9 红** ⇒ 差值归因于这次迁移而非载体噪声；② 新 ADR（限定取代 ADR-0017/0020）**还没写**，它在 **B139** 那格里等地界 |
+| **AC-1 权益与授权** | `cd .worktrees/inb-t7 && python3 research/tools/verify-inbound-worker-identity.py --log /tmp/inb-wt-worker.log`；离线档：`cd server && npx --no-install vitest run --maxWorkers=1 tests/automation-entitlement-ticket.spec.ts tests/automation-drafts.spec.ts tests/inbound-automation.routes.spec.ts tests/inbound-entitlement-write-tx.spec.ts tests/inbound-worker-identity.spec.ts tests/automation-entitlement-issuer.spec.ts tests/automation-commit-proof.spec.ts tests/automation-events.spec.ts tests/automation-rules.spec.ts tests/automation-sender-credentials.spec.ts tests/automation-ai-metering.spec.ts`；HTTP 收口：`… tests/inbound-ai-quota-route.spec.ts`；真库对账：`… tests/automation-ai-metering.pglite.spec.ts` | 真库腿（临时 initdb 起真 PostgreSQL、全部迁移逐条 apply）：**`Test Files 1 passed (1)` / `Tests 46 passed (46)`，`WT_WORKER_RC=0`**（10-10 19:1x · 隔离副本 @ `a195a37f`）；离线 11 文件（同一枚命令逐枚写死路径）：**`Test Files 11 passed (11)` / `Tests 103 passed (103)`，`S11_RC=0`**（10-10 19:2x · 隔离副本）—— 台账 §665 那行原记 `99 passed`，**+4 只增不减**，多出的 4 条本趟**未逐枚归因**（不许读成回归，也不许读成"本线新加的尺"）；额度 HTTP `3 passed (3)`（402 + `errorCode` + 事务执行器零调用）、pglite `17 passed (17)`（§906，10-10 当日） | **判定层已闭合到可复跑**：错主体/错实例/坏签名/吊销落后/额度耗尽各红一条且**零业务效果**。⚠️ 两处不闭合：① 额度耗尽那条原钉 `errorCode`，别线那枚改名（**B142**）✅ **10-11 已落地并被本线跟上**：本线 5 枚文件的 12 处响应体读法迁到 `code`，真库腿从 `9 failed \| 37 passed` 回到 **`Tests 46 passed (46)` / `rc=0`**，对照臂（把那份文件换回改名前、同一隔离载体重跑）**精确回到 9 红** ⇒ 差值归因于这次迁移而非载体噪声；② 新 ADR（限定取代 ADR-0017/0020）**还没写**，它在 **B139** 那格里等地界 |
 | **AC-2 接收与队列** | `cd packages/inbound-core && npx --no-install vitest run --maxWorkers=1`；同一把真库尺（AC-1 第一条） | `Test Files 3 passed (3)` / `Tests 47 passed (47)`（envelope 11 / parser 18 / webhook 18，§665 表，10-10 当日）；真库尺 **46/46**（19:1x 本趟） | **字节级签名 / 时间窗 / 上限 / 同键同体重放 / 同键异体冲突 / 跨账号隔离有尺**，且查询面不回传明文（那条断言在 webhook + envelope 两档里）。不闭合的只有"公网接收"这一开关本身 —— 按负责人指令仍关着 |
 | **AC-3 领取与提交** | `python3 research/tools/verify-inbound-dual-host.py` | 装置自报 **`Windows: 13/13`**（10-10 13:3x · 主检出，含窗口 11 后半、真进程终止、窗口 13 跨时区往返；逐档读数在 §13:3x 那一节） | **13 个故障窗口两个独立真 SQLite 宿主全跑通**，观察的是任务数/op 数/回执/计量而不是 HTTP 码。⚠️ 那一趟跑在**共享主检出**上（当时合并态全仓门禁还没跑）⇒ 这一格按 T7 的读数收口才算完整 |
 | **AC-4 解析** | AC-1 的离线 11 文件（含 `automation-drafts`）+ `cd packages/domain && npx --no-install vitest run --maxWorkers=1 tests/inbound-local-date.spec.ts` + `cd packages/inbound-core … `（parser 18） | 离线 11 文件 **99 passed**；共享层三档 47 passed；本地时区档读数在 §1132 那行（同日） | **同时区/同归一化/DST/非法日期/长输入/多输出受限有尺**；注入指令与模型额外字段的越权那一条走的是出境闸门既有断言。⚠️ "实际出境请求符合披露"要真 provider 流量，本线**没有**这一档读数 ⇒ 记为未闭合，不许读成已验 |
