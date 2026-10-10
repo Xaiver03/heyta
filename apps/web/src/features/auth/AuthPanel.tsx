@@ -92,6 +92,7 @@ import {
 } from '@heyta/ui';
 
 import { detectPasskeyBrowser } from './passkey-browser.js';
+import { readRememberedCredentials, rememberCredentials } from './remembered-credentials.js';
 import { useAuthStore, type AuthBusyAction } from './store.js';
 import { authBaseUrl, isUnconfigured } from '../../lib/auth-endpoint.js';
 import './auth-dialog.css';
@@ -130,6 +131,7 @@ const BUSY_MESSAGE_KEY: Record<AuthBusyAction, MessageKey> = {
   'password-sign-in': 'common.auth.busy.signIn',
   'password-register': 'common.auth.busy.register',
   'registration-code': 'common.auth.busy.verify',
+  'login-code': 'web.auth.busy.loginCode',
   'password-forgot': 'common.auth.busy.forgot',
   'password-change': 'common.auth.busy.change',
   'password-set': 'web.settings.password.setBusy',
@@ -169,6 +171,11 @@ export function AuthPanel({
   const verifyRegistrationCode = useAuthStore((s) => s.verifyRegistrationCode);
   const resendRegistrationCode = useAuthStore((s) => s.resendRegistrationCode);
   const cancelRegistrationCode = useAuthStore((s) => s.cancelRegistrationCode);
+  const loginChallenge = useAuthStore((s) => s.loginChallenge);
+  const requestLoginCode = useAuthStore((s) => s.requestLoginCode);
+  const verifyLoginCode = useAuthStore((s) => s.verifyLoginCode);
+  const resendLoginCode = useAuthStore((s) => s.resendLoginCode);
+  const cancelLoginCode = useAuthStore((s) => s.cancelLoginCode);
   const forgotPassword = useAuthStore((s) => s.forgotPassword);
   const invalidatePendingAuth = useAuthStore((s) => s.invalidatePendingAuth);
 
@@ -258,6 +265,11 @@ export function AuthPanel({
    * ① 有人是口头/截图拿到码的，没有链接可点；② 链接里的码可能被截断，用户得能改；
    * ③ 用户应该**看得见**自己正在被谁邀请（而不是被静默归因）。
    */
+  /*
+    「记住密码」的预填：挂载时读一次（只读一次，不订阅 —— 存储只在登录成功那一刻
+    被写，而面板开着时不会再有第二次写）。initial* 全部只进共享表单的本地 state。
+  */
+  const [remembered] = useState(() => readRememberedCredentials());
   const [inviteSeed] = useState(() => {
     if (typeof window === 'undefined') return '';
     const raw = new URLSearchParams(window.location.search).get(INVITE_QUERY_PARAM);
@@ -299,6 +311,20 @@ export function AuthPanel({
     confirmPassword: t('common.auth.form.confirmPassword'),
     passwordMismatch: t('common.auth.form.passwordMismatch'),
     passwordConfirmationRequired: t('common.auth.form.passwordConfirmationRequired'),
+    loginCode: {
+      trigger: t('web.auth.loginCode.trigger'),
+      title: t('web.auth.loginCode.title'),
+      sent: (email) => t('web.auth.loginCode.sent', { email }),
+      label: t('web.auth.loginCode.label'),
+      placeholder: t('web.auth.loginCode.placeholder'),
+      verify: t('web.auth.loginCode.verify'),
+      resend: t('web.auth.loginCode.resend'),
+      resendIn: (seconds) => t('web.auth.loginCode.resendIn', { seconds }),
+      changeEmail: t('web.auth.loginCode.changeEmail'),
+      expired: t('web.auth.loginCode.expired'),
+      codeLength: 6,
+    },
+    rememberPassword: t('common.auth.form.rememberPassword'),
     registrationCode: {
       title: t('web.auth.registrationCode.title'),
       sent: (email) => t('web.auth.registrationCode.sent', { email }),
@@ -424,6 +450,8 @@ export function AuthPanel({
         return status.mailDelivered === false
           ? { tone: 'error', message: t('web.auth.sent.mailNotSent') }
           : { tone: 'info', message: t('web.auth.sent.register') };
+      case 'login-code-sent':
+        return { tone: 'info', message: t('web.auth.status.loginCodeSent') };
       case 'recovery-sent':
         return { tone: 'info', message: t('web.auth.sent.recovery') };
       case 'reset-sent':
@@ -487,6 +515,9 @@ export function AuthPanel({
             busy={busy}
             passkeyAvailable={passkeySupported}
             waitingForPasskey={waitingForPasskey}
+            initialEmail={remembered?.email ?? ''}
+            initialPassword={remembered?.password ?? ''}
+            initialRememberPassword={remembered !== undefined}
             initialInviteCode={inviteSeed}
             onInviteCodeChange={setInviteMirror}
             inviteCodeLength={INVITE_CODE_LENGTH}
@@ -494,11 +525,16 @@ export function AuthPanel({
             {...(allowAdvanced && isUnconfigured(baseUrl)
               ? { serverUrl: { value: addressDraft, onChange: changeAddress } }
               : {})}
-            onSignIn={({ email, password }) => {
+            onSignIn={({ email, password, rememberPassword }) => {
               // 🔴 口令**原样**交出：不在这里 trim / normalize / 改大小写。
               // 归一化只在服务端一处发生，客户端多算一次就是第二套规则。
               void signInWithPassword(effectiveBaseUrl, email, password).then((session) => {
-                if (session !== undefined) onSignedIn?.(session);
+                if (session !== undefined) {
+                  // 「记住密码」：用户**明示勾选**才落存储；没勾/取消勾都要清掉旧值。
+                  // 存储属壳这一层（共享表单与 store 不持久化口令）。
+                  rememberCredentials(email, password, rememberPassword === true);
+                  onSignedIn?.(session);
+                }
               });
             }}
             onRegister={({ email, password, termsAccepted, inviteCode }) => {
@@ -528,6 +564,27 @@ export function AuthPanel({
                   },
                 }
               : {})}
+            {...(loginChallenge !== undefined
+              ? {
+                  loginChallenge: {
+                    email: loginChallenge.email,
+                    expiresAt: loginChallenge.expiresAt,
+                    resendAvailableAt: loginChallenge.resendAvailableAt,
+                    onVerify: (code: string) => {
+                      void verifyLoginCode(effectiveBaseUrl, loginChallenge.challengeId, code).then((session) => {
+                        if (session !== undefined) onSignedIn?.(session);
+                      });
+                    },
+                    onResend: () => {
+                      void resendLoginCode(effectiveBaseUrl, loginChallenge.challengeId);
+                    },
+                    onChangeEmail: cancelLoginCode,
+                  },
+                }
+              : {})}
+            onLoginCode={(email) => {
+              void requestLoginCode(effectiveBaseUrl, email);
+            }}
             onMagicLink={(email) => {
               void sendLoginLink(effectiveBaseUrl, email);
             }}

@@ -58,19 +58,30 @@ describe('AuthForm —— 不该存在的形状', () => {
   it('🔴 普通登录注册提交不禁用；验证码过期或未完整时可以禁用', () => {
     // 普通提交仍用 in-flight guard，避免提交后焦点被抽走；验证码是明确的
     // 例外：过期或位数不足时必须阻止无效请求，并让控件呈现不可提交状态。
-    const registrationStageStart = code.indexOf("{stage === 'registration-code' &&");
+    const loginStageStart = code.indexOf("{stage === 'login-code' &&");
+    // 2026-10-10 起登录码分支排在前面，注册码分支成了三元链的**中间**一环
+    // （`) : stage === 'registration-code' && …`），不再是开头的 `{stage === …`。
+    const registrationStageStart = code.indexOf(") : stage === 'registration-code' &&");
     const registrationStageEnd = code.indexOf(") : stage === 'identify' ?", registrationStageStart);
-    expect(registrationStageStart, '验证码阶段不见了').toBeGreaterThanOrEqual(0);
+    expect(loginStageStart, '登录码阶段不见了').toBeGreaterThanOrEqual(0);
+    expect(registrationStageStart, '注册码阶段不见了').toBeGreaterThanOrEqual(0);
     expect(registrationStageEnd, '验证码阶段边界不完整').toBeGreaterThan(registrationStageStart);
     const registrationStage = code.slice(registrationStageStart, registrationStageEnd);
     expect(registrationStage).toMatch(/disabled=\{busy \|\| registrationExpired \|\| registrationCode\.length !== registrationCodeLabel\.codeLength\}/);
+    const loginStage = code.slice(loginStageStart, registrationStageStart);
+    expect(loginStage).toMatch(/disabled=\{busy \|\| loginExpired \|\| loginCode\.length !== loginCodeLabel\.codeLength\}/);
 
     // `aria-disabled` is an accessibility description of the same control, not a
     // second native disabled prop. Keep the count scoped to the actual attribute.
+    // 2026-10-10 起挑战视图有**两个**（注册码 + 登录码），都允许在"过期/未输满"时
+    // 禁用；普通登录/注册提交仍然一处 disabled 都不许有 —— 所以全文件恰好 2 处，
+    // 且都落在两个挑战阶段的范围里。
     const disabledMatches = [...code.matchAll(/(?<!aria-)\bdisabled=/g)];
-    expect(disabledMatches, '普通登录/注册提交不应重新长出 disabled').toHaveLength(1);
-    expect(disabledMatches[0]?.index).toBeGreaterThan(registrationStageStart);
-    expect(disabledMatches[0]?.index).toBeLessThan(registrationStageEnd);
+    expect(disabledMatches, '挑战提交的 disabled 必须恰好两处（注册码 + 登录码）').toHaveLength(2);
+    for (const match of disabledMatches) {
+      expect(match.index ?? -1, 'disabled 只允许出现在挑战阶段').toBeGreaterThanOrEqual(loginStageStart);
+      expect(match.index ?? -1, 'disabled 只允许出现在挑战阶段').toBeLessThan(registrationStageEnd);
+    }
   });
 
   it('🔴 没有协议知识：不许出现端点、fetch、服务端的错误码', () => {

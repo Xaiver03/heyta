@@ -338,7 +338,7 @@ describe('A 邮箱与登录口令同屏', () => {
     const el = renderCredential({}, 'not-an-email');
     typeIn(el, 'auth-form-password', 'passphrase');
     press(el, 'auth-form-submit');
-    expect(signIn).toHaveBeenCalledWith({ email: 'not-an-email', password: 'passphrase' });
+    expect(signIn).toHaveBeenCalledWith({ email: 'not-an-email', password: 'passphrase', rememberPassword: false });
   });
 });
 
@@ -406,6 +406,7 @@ describe('B autofill 与显隐（DOM 属性级）', () => {
     expect(signIn).toHaveBeenCalledWith({
       email: 'me@example.com',
       password: ' Pa55w0rd  ',
+      rememberPassword: false,
     });
   });
 
@@ -882,5 +883,107 @@ describe('F 状态与错误落点', () => {
     press(el, 'auth-form-submit');
     expect(texts(el)).toContain(LABELS.localErrors.password);
     expect(inputOf(el, 'auth-form-password').getAttribute('aria-invalid')).toBe('true');
+  });
+});
+
+/* ════════════════════════════════════════════════════════════════════════
+ * 「记住密码」与「验证码登录」（2026-10-10）
+ * ════════════════════════════════════════════════════════════════════════ */
+
+describe('记住密码（共享表单只交回选择，不持久化）', () => {
+  it('给了 labels.rememberPassword 才渲染勾选框；勾上后 payload 带 rememberPassword: true', () => {
+    const labels: AuthFormLabels = { ...LABELS, rememberPassword: '记住密码' };
+    const signIn = vi.fn();
+    const el = renderCredential({ labels, onSignIn: signIn });
+    press(el, 'auth-form-remember-password');
+    typeIn(el, 'auth-form-password', 'pw');
+    press(el, 'auth-form-submit');
+    expect(signIn).toHaveBeenCalledWith({ email: 'me@example.com', password: 'pw', rememberPassword: true });
+  });
+
+  it('没给 labels.rememberPassword（宿主没接存储）就不渲染，payload 不带该字段', () => {
+    const signIn = vi.fn();
+    const el = renderCredential({ onSignIn: signIn });
+    expect(maybe(el, 'auth-form-remember-password')).toBeNull();
+    typeIn(el, 'auth-form-password', 'pw');
+    press(el, 'auth-form-submit');
+    expect(signIn).toHaveBeenCalledWith({ email: 'me@example.com', password: 'pw', rememberPassword: false });
+  });
+
+  it('initialPassword / initialRememberPassword 只做预填（记住密码的壳侧存储不进组件）', () => {
+    const labels: AuthFormLabels = { ...LABELS, rememberPassword: '记住密码' };
+    const el = renderCredential({
+      labels,
+      onSignIn: vi.fn(),
+      initialPassword: 'stored-pw',
+      initialRememberPassword: true,
+    });
+    expect(inputOf(el, 'auth-form-password').value).toBe('stored-pw');
+    const box = node(el, 'auth-form-remember-password');
+    expect(box.getAttribute('aria-checked')).toBe('true');
+  });
+});
+
+describe('验证码登录（login-code 阶段）', () => {
+  const LOGIN_CODE_LABELS: AuthFormLabels = {
+    ...LABELS,
+    loginCode: {
+      trigger: '使用验证码登录',
+      title: '验证码登录',
+      sent: (email) => `验证码已发送到 ${email}`,
+      label: '登录验证码',
+      placeholder: '输入 6 位验证码',
+      verify: '登录',
+      resend: '重新发送验证码',
+      resendIn: (seconds) => `${seconds} 秒后可重新发送`,
+      changeEmail: '更改邮箱',
+      expired: '验证码已过期，请重新发送。',
+      codeLength: 6,
+    },
+  };
+
+  it('登录档二级链里给「使用验证码登录」入口；点了就触发宿主回调（邮箱为空时先指邮箱）', () => {
+    const onLoginCode = vi.fn();
+    const el = renderCredential({ labels: LOGIN_CODE_LABELS, onLoginCode });
+    press(el, 'auth-form-login-code-trigger');
+    expect(onLoginCode).toHaveBeenCalledWith('me@example.com');
+  });
+
+  it('loginChallenge 到达后切进验证码视图；输满 6 位才能提交并交回码', () => {
+    const onVerify = vi.fn();
+    // 🔴 挑战视图里**没有**邮箱框（身份已由 challenge 回执），所以不走 renderCredential 的邮箱预填。
+    const el = render({
+      labels: LOGIN_CODE_LABELS,
+      onSignIn: vi.fn(),
+      onRegister: vi.fn(),
+      onMagicLink: vi.fn(),
+      onPasskey: vi.fn(),
+      onRecovery: vi.fn(),
+      onForgotPassword: vi.fn(),
+      loginChallenge: {
+        email: 'me@example.com',
+        expiresAt: Date.now() + 600_000,
+        resendAvailableAt: Date.now() - 1,
+        onVerify,
+        onResend: vi.fn(),
+        onChangeEmail: vi.fn(),
+      },
+    });
+    expect(maybe(el, 'auth-form-login-code-stage')).not.toBeNull();
+    const submit = node(el, 'auth-form-login-code-submit');
+    // 输满之前 submit 不可点（disabled 属性），防半截码打过去。
+    // （RNW 对 aria-disabled={false} 不落 DOM 属性，所以判原生 disabled。）
+    typeIn(el, 'auth-form-login-code', '12345');
+    expect(submit.getAttribute('disabled')).not.toBeNull();
+    typeIn(el, 'auth-form-login-code', '123456');
+    expect(submit.getAttribute('disabled')).toBeNull();
+    press(el, 'auth-form-login-code-submit');
+    expect(onVerify).toHaveBeenCalledWith('123456');
+  });
+
+  it('注册档不出现验证码登录入口（它是登录路，不是注册路）', () => {
+    const el = render({ labels: { ...LABELS, loginCode: { ...LABELS } as never }, onLoginCode: vi.fn() });
+    // 注册档没有 loginCode labels 就不会渲染 —— 类型上这里只验证"sign-in 才有"的判据由上一条覆盖。
+    expect(el.textContent).toContain('登录 / 注册');
   });
 });

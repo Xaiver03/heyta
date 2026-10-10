@@ -38,6 +38,9 @@ import {
   completePasskeyRegistration,
   extractAuthLinkToken,
   loginWithEmailPassword,
+  requestEmailLoginCode,
+  resendEmailLoginCode,
+  verifyEmailLoginCode,
   registerWithMagicLink,
   registerWithEmailPassword,
   requestMagicLink,
@@ -75,6 +78,7 @@ import {
  */
 export type AuthBusyAction =
   | 'login-link'
+  | 'login-code'
   | 'register'
   | 'verify'
   | 'passkey-register'
@@ -116,6 +120,11 @@ export type AuthStatus =
    */
   | { kind: 'registered'; mailDelivered?: false }
   | ({ kind: 'registration-code' } & HostedRegistrationChallengeResult & { email: string })
+  /**
+   * 登录码已发出（2026-10-10）。**不是"已登录"**，也不是"邮箱存在"：
+   * 账号不存在时服务端回诱饵（同形状），所以这句话只能是"去查收件箱"。
+   */
+  | { kind: 'login-code-sent'; email: string }
   /** 找回通行密钥的邮件已发出（入口见 `requestRecovery`）。同样不断言邮箱存在。 */
   | { kind: 'recovery-sent' }
   /**
@@ -166,6 +175,8 @@ export type RegistrationChallengeState = HostedRegistrationChallengeResult & { e
 export interface AuthStoreState {
   status: AuthStatus;
   registrationChallenge?: RegistrationChallengeState;
+  /** 验证码登录的进行中挑战（形状与注册挑战同族；见 hosted-auth 的读取器）。 */
+  loginChallenge?: RegistrationChallengeState;
 
   /** Invalidate in-flight work when the selected server/issuer changes. */
   invalidatePendingAuth: () => void;
@@ -292,6 +303,12 @@ export interface AuthStoreState {
   verifyRegistrationCode: (baseUrl: string, challengeId: string, code: string) => Promise<HostedAuthSession | undefined>;
   resendRegistrationCode: (baseUrl: string, challengeId: string) => Promise<void>;
   cancelRegistrationCode: () => void;
+  // ── 验证码登录（2026-10-10）。诱饵响应与注册同口径：没有"邮箱不存在"这一档，
+  // 成功 = "去查收件箱"（emailDelivered 严格读取，见 hosted-auth）。
+  requestLoginCode: (baseUrl: string, email: string) => Promise<void>;
+  verifyLoginCode: (baseUrl: string, challengeId: string, code: string) => Promise<HostedAuthSession | undefined>;
+  resendLoginCode: (baseUrl: string, challengeId: string) => Promise<void>;
+  cancelLoginCode: () => void;
   /**
    * 申请一封"重置口令"的邮件。
    *
@@ -446,10 +463,11 @@ const isCurrentAuthGeneration = (generation: number): boolean =>
 export const useAuthStore = create<AuthStoreState>((set) => ({
   status: { kind: 'signed-out' },
   registrationChallenge: undefined,
+  loginChallenge: undefined,
 
   invalidatePendingAuth: () => {
     authGeneration += 1;
-    set({ status: { kind: 'signed-out' }, registrationChallenge: undefined });
+    set({ status: { kind: 'signed-out' }, registrationChallenge: undefined, loginChallenge: undefined });
   },
 
   adoptSession: (baseUrl, session) => {
@@ -719,7 +737,59 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
 
   cancelRegistrationCode: () => {
     authGeneration += 1;
-    set({ status: { kind: 'signed-out' }, registrationChallenge: undefined });
+    set({ status: { kind: 'signed-out' }, registrationChallenge: undefined });  },
+
+  requestLoginCode: async (baseUrl, email) => {
+    const generation = ++authGeneration;
+    set({ status: { kind: 'busy', action: 'login-code' }, loginChallenge: undefined });
+    const outcome = await requestEmailLoginCode({ baseUrl, locale: currentLocale() }, email);
+    if (!isCurrentAuthGeneration(generation)) return;
+    if (!outcome.ok) {
+      set({ status: failedFrom(outcome) });
+      return;
+    }
+    // 🔴 emailDelivered === false：服务端亲口说信没发出去（SMTP 没配/被拒）。
+    // 这不是"去查收件箱"，是一条要走 error 路的失败（壳把它渲染成 mailNotSent）。
+    if (outcome.emailDelivered === false) {
+      set({ status: { kind: 'registered', mailDelivered: false } });
+      return;
+    }
+    set({
+      status: { kind: 'login-code-sent', email },
+      loginChallenge: { email, ...outcome },
+    });
+  },
+
+  verifyLoginCode: async (baseUrl, challengeId, code) => {
+    const generation = ++authGeneration;
+    set({ status: { kind: 'busy', action: 'login-code' } });
+    const outcome = await verifyEmailLoginCode({ baseUrl, locale: currentLocale() }, { challengeId, code });
+    if (!isCurrentAuthGeneration(generation)) return undefined;
+    if (!outcome.ok) {
+      set({ status: failedFrom(outcome) });
+      return undefined;
+    }
+    applyAuthSession(baseUrl, outcome.session);
+    set({ status: { kind: 'signed-in', email: outcome.session.user.email }, loginChallenge: undefined });
+    return outcome.session;
+  },
+
+  resendLoginCode: async (baseUrl, challengeId) => {
+    const generation = ++authGeneration;
+    const previous = useAuthStore.getState().loginChallenge;
+    if (previous === undefined) return;
+    set({ status: { kind: 'busy', action: 'login-code' } });
+    const outcome = await resendEmailLoginCode({ baseUrl, locale: currentLocale() }, challengeId);
+    if (!isCurrentAuthGeneration(generation)) return;
+    if (!outcome.ok) {
+      set({ status: failedFrom(outcome) });
+      return;
+    }
+    set({ status: { kind: 'login-code-sent', email: previous.email }, loginChallenge: { email: previous.email, ...outcome } });
+  },
+
+  cancelLoginCode: () => {
+    set({ loginChallenge: undefined });
   },
 
   forgotPassword: async (baseUrl, email) => {
