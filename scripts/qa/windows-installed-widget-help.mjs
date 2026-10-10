@@ -43,8 +43,10 @@ const PROBE = resolve(ROOT, 'scripts/qa/windows-external-browser-probe.ps1');
  * `bridge` 之类无关 handler 的普通 WKWebView 会被判"壳注入了信号"，而页侧照样走浏览器岔路；
  * ② 装置原先还把 `backend === 'shell'` 当硬判据，而 `resolveStorageBackend()` 的 `'shell'`
  * 只在 `__heytaHostStoragePort` 存在时才给（`apps/web/src/lib/oplog.ts:107`）⇒ `HEYTA_SHELL_STORAGE=0`
- * 那一趟会先死在这一行，本格想证的"逃生门关掉后也认得壳"根本走不到。名单从真源读，**读空就响亮失败**
- * （空集合不许算通过）。
+ * 那一趟会先死在这一行，本格想证的"逃生门关掉后也认得壳"根本走不到；③ 修完 ② 之后当场复量发现
+ * 装置**取这三条信号的尺**仍与产品不同（装置用 `'x' in globalThis` / `Boolean(x)`，产品用
+ * `x !== undefined`），属性存在但值为 `undefined` 时两者读数相反 ⇒ 那条 backend 对账会在真壳上
+ * 造一次假红。名单从真源读，**读空就响亮失败**（空集合不许算通过）。
  */
 const SHELL_HANDLER_NAMES = (() => {
   const source = readFileSync(resolve(ROOT, 'apps/web/src/pwa/widget-install.ts'), 'utf8');
@@ -55,8 +57,13 @@ const SHELL_HANDLER_NAMES = (() => {
   }
   return names;
 })();
-const isNativeShellHost = ({ storagePort, webview2Host, shellMessageHandlers }) =>
-  storagePort || webview2Host || shellMessageHandlers.some((name) => SHELL_HANDLER_NAMES.includes(name));
+// 函数体逐字照 `isNativeShellHost()`（`apps/web/src/pwa/widget-install.ts:99-103`）的三步形状，
+// 连"名单在前、注入的 key 在后"的方向一起照 —— 这枚装置里唯一该出现的判断形状就是产品那一枚。
+const isNativeShellHost = ({ storagePort, webview2Host, shellMessageHandlers }) => {
+  if (storagePort) return true;
+  if (webview2Host) return true;
+  return SHELL_HANDLER_NAMES.some((name) => shellMessageHandlers.includes(name));
+};
 
 mkdirSync(OUT, { recursive: true });
 
@@ -194,7 +201,7 @@ await page.locator('[data-testid="settings-sheet"]').waitFor();
 await page.locator('button.ht-settings__nav-link[aria-controls="settings-group-appearance"]').click();
 const widget = page.locator('[data-testid="widget-journey-panel"]');
 await widget.waitFor();
-const widgetFacts = await widget.evaluate((panel) => ({
+const widgetFacts = await widget.evaluate((panel, handlerNames) => ({
   statusCount: panel.querySelectorAll('[data-testid="widget-journey-status"]').length,
   statusText: panel.querySelector('[data-testid="widget-journey-status"]')?.textContent?.trim() ?? '',
   capabilityText: panel.querySelector('[data-testid="widget-journey-capability"]')?.textContent?.trim() ?? '',
@@ -204,13 +211,22 @@ const widgetFacts = await widget.evaluate((panel) => ({
   // what makes this run evidence about the *shell environment*: an installed build whose
   // storage port is closed still has to expose at least one of them, or the panel would
   // fall back to the browser branch.
+  //
+  // 🔴 三条测法逐字照抄产品那侧（`!== undefined`，`WidgetJourneyPanel.tsx:45-49`），不用
+  //    `in` / `Boolean()`：属性**存在但值是 undefined** 时两种尺读数相反，而下面那条 backend
+  //    对账比的就是产品的 `resolveStorageBackend()`（同样是 `!== undefined`）⇒ 尺不一致会在
+  //    真壳上造一次假红。名单经 evaluate 的参数传进来：Playwright 序列化函数体，闭包读不到外层常量。
   shellSignals: {
-    storagePort: '__heytaHostStoragePort' in globalThis,
-    webview2Host: Boolean(globalThis.chrome?.webview),
-    shellMessageHandlers: Object.keys(globalThis.webkit?.messageHandlers ?? {}),
+    storagePort: globalThis.__heytaHostStoragePort !== undefined,
+    webview2Host: globalThis.chrome?.webview !== undefined,
+    shellMessageHandlers: handlerNames.filter(
+      (name) => globalThis.webkit?.messageHandlers?.[name] !== undefined,
+    ),
+    // 只留证据、不参与判定：壳**实际**注册了哪些 handler 名（含产品名单之外的那些）。
+    injectedHandlerKeys: Object.keys(globalThis.webkit?.messageHandlers ?? {}),
   },
   panelText: panel.textContent?.trim() ?? '',
-}));
+}), SHELL_HANDLER_NAMES);
 assert(widgetFacts.statusCount === 1, `Widget Journey 状态行应恰好 1 条，实际 ${String(widgetFacts.statusCount)}`);
 // `backend` 从"硬判据"降级成"对账项"：它只回答"存储端口在不在"，而这一趟要判的是"页侧认不认这是壳"。
 // 两者不一致才红（自报 shell 却没注入端口 = 页侧在说谎；注入了端口却自报非 shell = 接线断了）。
@@ -221,10 +237,10 @@ assert(
 assert(/原生桌面|native desktop/i.test(widgetFacts.statusText), `状态行没有识别为原生桌面：${widgetFacts.statusText}`);
 assert(widgetFacts.capabilityText.length > 0, '原生壳没有渲染小组件能力边界说明');
 assert(widgetFacts.installStepCount === 0, `原生壳不应显示 PWA 安装步骤，实际 ${String(widgetFacts.installStepCount)} 条`);
-const { storagePort, webview2Host, shellMessageHandlers } = widgetFacts.shellSignals;
+const { storagePort, webview2Host, shellMessageHandlers, injectedHandlerKeys } = widgetFacts.shellSignals;
 assert(
   isNativeShellHost(widgetFacts.shellSignals),
-  `壳没有注入产品认得的任何一条原生信号（storagePort=${String(storagePort)} webview2Host=${String(webview2Host)} handlers=${JSON.stringify(shellMessageHandlers)} 名单=${JSON.stringify(SHELL_HANDLER_NAMES)}）⇒ 页侧只能把它当浏览器`,
+  `壳没有注入产品认得的任何一条原生信号（storagePort=${String(storagePort)} webview2Host=${String(webview2Host)} 命中名单=${JSON.stringify(shellMessageHandlers)} 名单=${JSON.stringify(SHELL_HANDLER_NAMES)} 壳实际注册的 handler=${JSON.stringify(injectedHandlerKeys)}）⇒ 页侧只能把它当浏览器`,
 );
 await widget.scrollIntoViewIfNeeded();
 await page.screenshot({ path: resolve(OUT, 'windows-widget-native.png'), fullPage: false });
