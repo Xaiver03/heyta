@@ -41,6 +41,14 @@ export interface WrappedShareKey {
   keyEpoch: number;
   /** sync 载荷信封加密后的 base64（明文 = listKey 的 base64）。 */
   wrappedListKey: string;
+  /**
+   * 身份种子的 vault 包裹（明文 = 32 字节 seed 的 base64）。
+   * 换钥（epoch+1）时成员要用它派生出的私钥解**新**信封——不落盘就等于
+   * "每次换钥都要重新入群"。与 listKey 同一条生命周期（vault 锁 ⇒ 解不开）。
+   */
+  wrappedIdentitySeed?: string;
+  /** 自己的成员行 id（create/accept 响应回给本人；面板自识别用）。 */
+  ownMemberId?: string;
 }
 
 export interface ShareKeyStoreShape {
@@ -82,26 +90,77 @@ export function removeShareKey(store: ShareKeyStoreShape, shareId: string): Shar
   return { version: FORMAT_VERSION, entries: store.entries.filter((e) => e.shareId !== shareId) };
 }
 
-/** 包裹一把 listKey 并 upsert 进存储（换钥 = 同 shareId 覆盖世代与信封）。 */
+/** 剔除一条并落盘（离开/被移除清单时用——只 remove 不 save 等于没删）。 */
+export function deleteShareKey(storage: Storage, shareId: string): void {
+  saveShareKeyStore(storage, removeShareKey(loadShareKeyStore(storage), shareId));
+}
+
+/** 包裹一把 listKey 并 upsert 进存储（换钥 = 同 shareId 覆盖世代与信封）。
+ *
+ * ⚠️ upsert **不保留**旧条目的 wrappedIdentitySeed / ownMemberId —— 身份种子
+ * 只在入群那一刻生成一次，后续调用（换钥收新 listKey）必须把原值**传回来**，
+ * 否则换钥会顺手把身份抹掉。调用方从 `getShareKeyEntry` 读旧值再回填。
+ */
 export async function wrapAndStoreShareKey(args: {
   storage: Storage;
   cipher: SyncPayloadCipher;
   shareId: string;
   listKey: Uint8Array;
   keyEpoch: number;
+  identitySeed?: Uint8Array;
+  ownMemberId?: string;
 }): Promise<ShareKeyStoreShape> {
   const store = loadShareKeyStore(args.storage);
   const wrappedListKey = await args.cipher.encrypt(
     toBase64(args.listKey),
     syntheticIdentity(args.shareId),
   );
+  const wrappedIdentitySeed = args.identitySeed === undefined
+    ? undefined
+    : await args.cipher.encrypt(toBase64(args.identitySeed), syntheticIdentity(args.shareId));
   const others = store.entries.filter((e) => e.shareId !== args.shareId);
   const next: ShareKeyStoreShape = {
     version: FORMAT_VERSION,
-    entries: [...others, { shareId: args.shareId, keyEpoch: args.keyEpoch, wrappedListKey }],
+    entries: [...others, {
+      shareId: args.shareId,
+      keyEpoch: args.keyEpoch,
+      wrappedListKey,
+      ...(wrappedIdentitySeed === undefined ? {} : { wrappedIdentitySeed }),
+      ...(args.ownMemberId === undefined ? {} : { ownMemberId: args.ownMemberId }),
+    }],
   };
   saveShareKeyStore(args.storage, next);
   return next;
+}
+
+/** 只回填身份/memberId（不动 listKey）——接受邀请后先记身份、等 owner 信封的那段窗口用。 */
+export async function storeShareIdentity(args: {
+  storage: Storage;
+  cipher: SyncPayloadCipher;
+  shareId: string;
+  identitySeed: Uint8Array;
+  ownMemberId: string;
+}): Promise<void> {
+  const store = loadShareKeyStore(args.storage);
+  const existing = store.entries.find((e) => e.shareId === args.shareId);
+  const wrappedIdentitySeed = await args.cipher.encrypt(
+    toBase64(args.identitySeed),
+    syntheticIdentity(args.shareId),
+  );
+  const entry: WrappedShareKey = {
+    shareId: args.shareId,
+    keyEpoch: existing?.keyEpoch ?? 0,
+    wrappedListKey: existing?.wrappedListKey ?? '',
+    wrappedIdentitySeed,
+    ownMemberId: args.ownMemberId,
+  };
+  const next = { version: FORMAT_VERSION, entries: [...store.entries.filter((e) => e.shareId !== args.shareId), entry] };
+  saveShareKeyStore(args.storage, next);
+}
+
+/** 读一条原始条目（不解密）——回填身份/查看世代用。 */
+export function getShareKeyEntry(storage: Storage, shareId: string): WrappedShareKey | undefined {
+  return loadShareKeyStore(storage).entries.find((e) => e.shareId === shareId);
 }
 
 /** 解出某共享的 listKey。信封解不开（vault 未解锁/换口令/被换记录）⇒ undefined。 */
@@ -112,9 +171,26 @@ export async function unwrapShareListKey(args: {
 }): Promise<Uint8Array | undefined> {
   const store = loadShareKeyStore(args.storage);
   const entry = store.entries.find((e) => e.shareId === args.shareId);
-  if (entry === undefined) return undefined;
+  if (entry === undefined || entry.wrappedListKey === '') return undefined;
   try {
     const plain = await args.cipher.decrypt(entry.wrappedListKey, syntheticIdentity(args.shareId));
+    const bytes = fromBase64(plain);
+    return bytes.length === 32 ? bytes : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** 解出某共享的身份种子（换钥解新信封要用）。没有/解不开 ⇒ undefined。 */
+export async function unwrapShareIdentitySeed(args: {
+  storage: Storage;
+  cipher: SyncPayloadCipher;
+  shareId: string;
+}): Promise<Uint8Array | undefined> {
+  const entry = getShareKeyEntry(args.storage, args.shareId);
+  if (entry?.wrappedIdentitySeed === undefined) return undefined;
+  try {
+    const plain = await args.cipher.decrypt(entry.wrappedIdentitySeed, syntheticIdentity(args.shareId));
     const bytes = fromBase64(plain);
     return bytes.length === 32 ? bytes : undefined;
   } catch {

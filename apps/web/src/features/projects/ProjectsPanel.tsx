@@ -51,7 +51,7 @@ import { useMemo, useState } from 'react';
 import { cssVar } from '@heyta/design-system';
 import { useI18n, type MessageKey } from '@heyta/i18n';
 import { folderTargetsFor, parseCategorySlot } from '@heyta/domain';
-import { Archive, Folder, Plus, Tag as TagIcon } from 'lucide-react';
+import { Archive, Folder, Plus, Tag as TagIcon, UserPlus } from 'lucide-react';
 import {
   archivedProjects,
   FolderPicker,
@@ -68,7 +68,9 @@ import {
 
 import { ColorSlotPicker } from '../categories/ColorSlotPicker.js';
 import { CategoryCreateDialog, type CategoryCreateKind } from '../categories/CategoryCreateDialog.js';
+import { JoinSharedListDialog } from '../share/JoinSharedListDialog.js';
 import { useTaskStore, type TaskFilter } from '../tasks/store.js';
+import { useSyncStore } from '../sync/store.js';
 import { useProjectStore } from './store.js';
 
 export function ProjectsPanel({
@@ -97,6 +99,15 @@ export function ProjectsPanel({
    *    是"这按钮是不是坏了"那种噪音。
    */
   const [showArchived, setShowArchived] = useState(false);
+  /**
+   * 「加入共享清单」对话框（被邀请者贴 token 入群；ADR-0062 W4）。
+   * 挂在这里是因为侧栏清单区就是"清单从哪来"的地方：新建（+）与
+   * 接受别人的邀请是同一层级的两个来源。
+   */
+  const [joinOpen, setJoinOpen] = useState(false);
+  // 共享入口的可见性判据：同步已配置（有地址 + 有令牌）。「判断」在 store 形状上，
+  // 不在这里复制 configure 逻辑 —— 两处各判一遍就是两套"已登录"标准。
+  const syncConfigured = useSyncStore((s) => s.baseUrl.trim() !== '' && s.token !== undefined && s.token.trim() !== '');
   // 层级与计数口径都在共享层（`toOrganizerTree` / `openTaskCounts`）。
   const archivedCount = useMemo(
     () => archivedProjects(projects.projects).length,
@@ -194,6 +205,22 @@ export function ProjectsPanel({
             >
               <Plus size={ICON_SIZE.sm} aria-hidden="true" />
             </button>
+            {/*
+              被邀请者的入口（共享清单 W4）：与「新建」并排 —— 清单的两个来源，
+              自己建的 / 别人分享来的。只在配好同步时显示：没登录的话这个入口
+              只会走进去报"未连接"，那是把死路摆到界面上。
+            */}
+            {syncConfigured ? (
+              <button
+                type="button"
+                className="ht-sidebar__organizer-add"
+                aria-label={t('web.share.join.button')}
+                data-testid="share-join-entry"
+                onClick={() => setJoinOpen(true)}
+              >
+                <UserPlus size={ICON_SIZE.sm} aria-hidden="true" />
+              </button>
+            ) : null}
           </div>
 
           <OrganizerList
@@ -365,6 +392,17 @@ export function ProjectsPanel({
             }
           }}
         />
+
+        {joinOpen ? (
+          <JoinSharedListDialog
+            onClose={() => setJoinOpen(false)}
+            onJoined={(projectId) => {
+              setJoinOpen(false);
+              // 入群即导航：清单出现在侧栏的同时人已经站在里面（与新建清单同一条决策）。
+              onFilterWith({ kind: 'project', projectId });
+            }}
+          />
+        ) : null}
       </aside>
     </HeytaUiProvider>
   );

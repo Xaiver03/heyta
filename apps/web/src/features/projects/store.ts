@@ -68,6 +68,11 @@ interface ProjectState {
    *    界面自己筛一遍 = 第二套裁决标准，而两端各筛一次就是两套。
    */
   setProjectParent: (id: string, parentId?: string) => Promise<void>;
+  /**
+   * 挂上服务端 share id（共享清单旅程的本地回写；op 构造在 `app-host`）。
+   * 薄转发 —— 与 `renameProject` 同一条纪律。
+   */
+  setProjectShare: (id: string, shareId: string) => Promise<void>;
 
   addTag: (name: string) => Promise<string | undefined>;
   renameTag: (id: string, name: string) => Promise<void>;
@@ -134,6 +139,11 @@ export const useProjectStore = create<ProjectState>(() => ({
     // 界面负责把错误显示出来（`ProjectsPanel` 里那条候选集本来就是按同一条规则筛的，
     // 所以正常操作走不到拒绝分支；走到了就是真有第二套标准，不许在这里吞掉）。
     await projectActions.setParent(id, parentId);
+  },
+
+  setProjectShare: async (id, shareId) => {
+    await projectActions.setProjectShareId(id, shareId);
+    syncProjects();
   },
 
   addTag: async (name) => {

@@ -793,14 +793,15 @@ describe('应用 → 站点：孤岛的另一半', () => {
     const mailto = links.filter(isMailto);
 
     expect(mailto, '设置页里缺少投诉/举报入口 —— 备案材料与隐私政策承诺的途径没有落点').toHaveLength(1);
-    const href = mailto[0].getAttribute('href') ?? '';
+    const complaintLink = mailto[0]!;
+    const href = complaintLink.getAttribute('href') ?? '';
     expect(href.startsWith(`mailto:${OPERATOR.contactEmail}?subject=`)).toBe(true);
     expect(
       decodeURIComponent(href.slice(`mailto:${OPERATOR.contactEmail}?subject=`.length)),
     ).toBe('heyta 算法服务投诉/举报');
-    expect(mailto[0].textContent).toContain('投诉与举报');
+    expect(complaintLink.textContent).toContain('投诉与举报');
     // `target="_blank"` 在 mailto 上会先开一个空白标签页，读起来像"点了没反应"。
-    expect(mailto[0].getAttribute('target')).toBeNull();
+    expect(complaintLink.getAttribute('target')).toBeNull();
   });
 
   it('站点的域名由 VITE_SITE_URL 决定（分域名部署时不是写死的那一个）', async () => {
