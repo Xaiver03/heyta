@@ -1,20 +1,9 @@
 import { createPublicKey, sign, verify, type KeyObject } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
-import { prisma } from '../db';
-
-const UUID = z.string().uuid();
-const IDENTIFIER = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,254}$/);
-const RULE_ID = z.string().uuid();
-const EVENT_ID = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$/);
-const TICKET_DOMAIN = 'heyta-automation-entitlement-v1.';
-// 🔴 「最多 30 秒」这一格只有一个事实源：@heyta/inbound-core 的毫秒常量（宿主拿它判"这张票还能不能用"，
-// 服务端拿它判"这张票收不收"）。原来这里是另一枚字面量 30 —— 两份 = 可以从类型上漂开，
-// 而漂开的后果是一枚 30 秒通用通行证。导出它，测试就把边界压在这枚数上而不是抄 30。
-export const MAX_TICKET_SECONDS = AUTOMATION_ENTITLEMENT_MAX_TICKET_LIFETIME_MS / 1000;
-const CLOCK_SKEW_SECONDS = 5;
-const REPLAY_RETENTION_MS = 5 * 60 * 1000;
-
+// 🔴 这枚值导入必须排在首次使用（下方 MAX_TICKET_SECONDS）之前：ESM 会提升 import，所以
+// typecheck 与单测都绿；但 tsc 的 CJS 产物**按源码顺序**落 require ⇒ 用早了就是 `inbound_core_1`
+// 的 TDZ，服务端一加载就崩。
 /**
  * 🔴 票据的**封闭动作词表与作用域档**只有一份，在 `@heyta/inbound-core`（签发侧与宿主侧
  * 共用）；这里原样转出，服务端各调用点保持既有导入路径。`session` 是唯一能建立/续期短期
@@ -28,6 +17,19 @@ import {
   automationEntitlementScopeMismatch,
   type AutomationEntitlementAction,
 } from '@heyta/inbound-core';
+import { prisma } from '../db';
+
+const UUID = z.string().uuid();
+const IDENTIFIER = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,254}$/);
+const RULE_ID = z.string().uuid();
+const EVENT_ID = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$/);
+const TICKET_DOMAIN = 'heyta-automation-entitlement-v1.';
+// 🔴 「最多 30 秒」这一格只有一个事实源：@heyta/inbound-core 的毫秒常量（宿主拿它判"这张票还能不能用"，
+// 服务端拿它判"这张票收不收"）。原来这里是另一枚字面量 30 —— 两份 = 可以从类型上漂开，
+// 而漂开的后果是一枚 30 秒通用通行证。导出它，测试就把边界压在这枚数上而不是抄 30。
+export const MAX_TICKET_SECONDS = AUTOMATION_ENTITLEMENT_MAX_TICKET_LIFETIME_MS / 1000;
+const CLOCK_SKEW_SECONDS = 5;
+const REPLAY_RETENTION_MS = 5 * 60 * 1000;
 
 export { AUTOMATION_ENTITLEMENT_ACTIONS, AUTOMATION_ENTITLEMENT_SCOPES, type AutomationEntitlementAction } from '@heyta/inbound-core';
 
