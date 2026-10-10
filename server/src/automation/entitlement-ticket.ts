@@ -1,22 +1,6 @@
 import { createPublicKey, sign, verify, type KeyObject } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
-// 🔴 这枚值导入必须排在首次使用（下方 MAX_TICKET_SECONDS）之前：ESM 会提升 import，所以
-// typecheck 与单测都绿；但 tsc 的 CJS 产物**按源码顺序**落 require ⇒ 用早了就是 `inbound_core_1`
-// 的 TDZ，服务端一加载就崩。
-/**
- * 🔴 票据的**封闭动作词表与作用域档**只有一份，在 `@heyta/inbound-core`（签发侧与宿主侧
- * 共用）；这里原样转出，服务端各调用点保持既有导入路径。`session` 是唯一能建立/续期短期
- * 绑定的动作，其余每一项都必须在它自己要保护的那次写事务里一次性消费 —— 否则一枚票据就成了
- * 一张 30 秒通用通行证，与[协议 §4](../../../docs/reference/inbound-automation-protocol.md) 要求的
- * "票据绑定 action、实例、账号、rule/event、nonce、版本和 expiry，最多 30 秒且一次使用"不符。
- */
-import {
-  AUTOMATION_ENTITLEMENT_ACTIONS,
-  AUTOMATION_ENTITLEMENT_MAX_TICKET_LIFETIME_MS,
-  automationEntitlementScopeMismatch,
-  type AutomationEntitlementAction,
-} from '@heyta/inbound-core';
 import { prisma } from '../db';
 
 const UUID = z.string().uuid();
@@ -30,6 +14,20 @@ const TICKET_DOMAIN = 'heyta-automation-entitlement-v1.';
 export const MAX_TICKET_SECONDS = AUTOMATION_ENTITLEMENT_MAX_TICKET_LIFETIME_MS / 1000;
 const CLOCK_SKEW_SECONDS = 5;
 const REPLAY_RETENTION_MS = 5 * 60 * 1000;
+
+/**
+ * 🔴 票据的**封闭动作词表与作用域档**只有一份，在 `@heyta/inbound-core`（签发侧与宿主侧
+ * 共用）；这里原样转出，服务端各调用点保持既有导入路径。`session` 是唯一能建立/续期短期
+ * 绑定的动作，其余每一项都必须在它自己要保护的那次写事务里一次性消费 —— 否则一枚票据就成了
+ * 一张 30 秒通用通行证，与[协议 §4](../../../docs/reference/inbound-automation-protocol.md) 要求的
+ * "票据绑定 action、实例、账号、rule/event、nonce、版本和 expiry，最多 30 秒且一次使用"不符。
+ */
+import {
+  AUTOMATION_ENTITLEMENT_ACTIONS,
+  AUTOMATION_ENTITLEMENT_MAX_TICKET_LIFETIME_MS,
+  automationEntitlementScopeMismatch,
+  type AutomationEntitlementAction,
+} from '@heyta/inbound-core';
 
 export { AUTOMATION_ENTITLEMENT_ACTIONS, AUTOMATION_ENTITLEMENT_SCOPES, type AutomationEntitlementAction } from '@heyta/inbound-core';
 

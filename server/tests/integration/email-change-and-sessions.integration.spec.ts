@@ -60,6 +60,7 @@ vi.mock('../../src/email', async (importOriginal) => ({
 
 import { disconnectDb } from '../../src/db';
 import { apiRoutes } from '../../src/api';
+import { sendPasswordChangedEmail } from '../../src/email';
 import { accountSecurityRoutes } from '../../src/account/account-security.routes';
 import { issueSession } from '../../src/auth';
 import { hashToken } from '../../src/auth-tokens';
@@ -514,6 +515,84 @@ describeWithDb('换绑邮箱与会话撤销（真 PostgreSQL + 真 Prisma + 真 
     expect(sent.passwordChanged).toHaveLength(1);
     expect(sent.passwordChanged[0]?.[0]).toBe(email);
   });
+
+  /**
+   * 🔴 **改密的响应不许等那封告知信**（2026-10-11 iOS 设备腿第 7 趟量出来的）。
+   *
+   * 那一趟里服务端日志印着 `Password changed (ID: 719); all other sessions revoked`，
+   * 库里 `token_version` 真的从 2 涨到 3、旧令牌当场 401、新口令换得到新会话，
+   * 而**界面上是一行红字「连不上服务端，检查地址与网络后重试。」**
+   * （证据图 `apps/mobile/evidence/account-suite-ios/15-password-changed.png`）。
+   * 成因：路由 `await` 了告知信，而那一趟的 SMTP 不可达 —— 同一份服务端日志
+   * **7 分钟后**才写 `Failed to send Password changed notice: Error: read ETIMEDOUT`，
+   * iOS 的 fetch 在这之前就已经断了。一次**成功**的改密被报成失败，
+   * 而且报的还是一句假原因（网络好好的，是我们把响应扣住了）。
+   *
+   * 这一条把"不等"钉成判据：让发信**永不 resolve、也永不 reject**
+   * （正是 SMTP 黑洞那一段的形状），改密请求仍然必须当场返回。
+   * 把 `await` 加回去 ⇒ 这一条在 `NOTICE_BUDGET_MS` 处红，红的是"被扣住"这件事本身。
+   */
+  it('告知信永不 resolve 时改密请求仍当场返回（成功不许被报成「连不上服务端」）', async () => {
+    // 阈值推导：真正约束这一条的是**客户端**那一侧 —— `sendJson` 自己不设超时，
+    // 于是兜底的是 iOS URLSession 的默认请求超时 60 s。取它的 1/20：
+    // 响应用到秒级时，那句「连不上服务端」就已经在等着用户了。
+    const NOTICE_BUDGET_MS = 60_000 / 20;
+
+    const email = `w9-notice-hang-${Date.now()}@example.test`;
+    const userId = await makeUser(email);
+    const oldPassword = `W9-notice-hang-old-${Date.now()}-${process.pid}-Pass!`;
+    const newPassword = `W9-notice-hang-new-${Date.now()}-${process.pid}-Pass!`;
+    await observer.user.update({
+      where: { id: userId },
+      data: { passwordHash: await hashFor(oldPassword) },
+    });
+    const login = await app.inject({
+      method: 'POST',
+      url: `/api${AUTH_PASSWORD_PATHS.login}`,
+      headers: { 'user-agent': 'W9-Notice-Hang' },
+      payload: { email, password: oldPassword },
+    });
+    expect(login.statusCode, login.body).toBe(200);
+    const token = (JSON.parse(login.body) as { token: string }).token;
+
+    // 挂死的这一封**仍然要留下"发过"的痕迹** —— `mockImplementationOnce` 是整枚替换实现，
+    // 不在这里 push 一下，下面那条阳性对照就是在给自己造红（第一趟实测：0 枚）。
+    vi.mocked(sendPasswordChangedEmail).mockImplementationOnce((...args: unknown[]) => {
+      sent.passwordChanged.push(args);
+      return new Promise<boolean>(() => undefined);
+    });
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const changed = await Promise.race([
+      app.inject({
+        method: 'POST',
+        url: `/api${AUTH_PASSWORD_PATHS.change}`,
+        headers: bearer(token),
+        payload: { currentPassword: oldPassword, newPassword },
+      }),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () =>
+            reject(
+              new Error(
+                `改密请求 ${NOTICE_BUDGET_MS} ms 没返回 ⇒ 响应被那封告知信扣住了` +
+                  `（实测 SMTP 不可达时它 7 分钟才失败，客户端 60 秒就断）`,
+              ),
+            ),
+          NOTICE_BUDGET_MS,
+        );
+      }),
+    ]).finally(() => clearTimeout(timer));
+
+    expect(changed.statusCode, changed.body).toBe(200);
+    expect(
+      (JSON.parse(changed.body) as { token?: string }).token,
+      '改密必须换发给当前设备一枚新会话',
+    ).toBeTruthy();
+    // 🔴 阳性对照：**不等**不等于**没发**。这一封必须已经尝试过
+    //    （mock 的 push 在调用当刻同步发生），否则这条判据就是在给"漏发信"背书。
+    expect(sent.passwordChanged.length, '告知信一次都没尝试发').toBeGreaterThanOrEqual(1);
+  }, 30_000);
 
   /**
    * 🔴 **工单 W1"忘记密码"那一路的运行时半边**，与链路 8 同一型：
