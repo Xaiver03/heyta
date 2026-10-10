@@ -158,6 +158,13 @@ const REASON_TEXT: Record<HostedAuthFailureReason, string> = {
   'password-already-set': '这个账号已经有登录口令了 —— 该走「修改密码」',
   'password-policy': '新口令不满足这个实例的策略',
   'consent-required': '本机闸门把请求拦下了（还没同意联网，或选的是只用本机）',
+  // 换绑邮箱与逐个登出（ADR-0063）新增的五条。穷尽检查在这里是**编译期**生效的：
+  // 少了任何一条，这个文件编不过 —— 而不是把新失败说成一句旧的假话。
+  'email-unchanged': '新地址就是当前地址（只差大小写或空格也算同一个）—— 什么都不用换',
+  'email-taken': '那个邮箱已经属于别的账号，或被另一张在途换绑占着 —— 换一个地址',
+  'email-change-cooldown': '这张换绑请求刚发过信，冷却没过不许重发 —— 等一会儿再点',
+  'invalid-change-link': '换绑链接查不到 / 已过期 / 已被点过 —— 重新发起一次换绑',
+  'unknown-session': '服务端找不到这一枚会话（不存在 / 不是这个账号的 / 已经退出过 —— 这三者同一句）',
 };
 
 /**
