@@ -190,6 +190,9 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | 🔴 [goal-p0-ux-remediation.md](plans/goal-p0-ux-remediation.md) | **P0 体验整改执行账**（2026-10-06 立项，依据[审计合并稿](research/product-level-ia-ux-audit.md) §8"一周内"批 W1-W9）：工单台账 + 撞车登记（App.tsx / i18n locale 实时占用 ⇒ W1/W2/W3/W6/W8b 换序）+ 逐条证据回填。判据以审计稿 §8 为准，本文只记状态 |
 | 🔴 [linux-adaptation.md](plans/linux-adaptation.md) | 🐧 **Linux 端适配（本单权威计划，2026-10-06 立项）**：两批口径 —— **批一工程侧**（Linux 成一等开发机：门禁链在这台 Ubuntu 上跑到哪、`check:linux-shell` 怎么从"永远不执行"变成能红、载体 provisioning 与 runbook）/ **批二产品侧**（Linux 桌面用户装上的是同一个 heyta：走既定 M2 让原生壳载共享 `web-dist`、`.deb` 新鲜度对账、窗口判据升级为主蓝命中、原生 LGPL 系统库变成逐项登记）。§0 列了被本次实测**推翻的在册决策**，§2 记 GNU `stat -f` 那个"退 0 却返回文件系统统计"的静默错值机制，§3 是 E0–E8 / P1–P6 工单台账（每条带实测读数与状态），§3.1 写 P2 的三条硬约束（WebKitGTK 的传递依赖闭包、能装包的载体只剩一枚、登记必须与接线同批），§4.1 逐条列出**归属别人、只登记不代改**的四格 |
 | 🔴 [trash-and-archive-execution-brief.md](plans/trash-and-archive-execution-brief.md) | 🤝 **回收站与归档：执行交接书**（2026-10-03，P-1…P-9 已拍 ⇒ 可交给另一个 agent 跑）：批次 A（现在就能交，落点实测无人占用）/ B（等并行那批落地，每条带**可跑的开工判据**）/ C（要额外裁决）/ D（额外授权的"顺便做"，其中一条是**该删的多余门面**、一条是缺陷修复不是功能）、三道现场门（`git status` 归属门 + 两道余量为 0 的棘轮读数 + 不许放宽判据）、🔴 **八条防作弊验收**（不许只报"测试通过"、不许写"四端已修"、登记≠跑绿、`pnpm check` 会抢别人的 dev server）与"只有产品负责人能拍的值"清单。⚠️ 行号是 2026-10-03 工作树读数，每条开工前 `grep -n` 复跑 |
+| 🔴 [account-standard-suite.md](plans/account-standard-suite.md) | **注册登录标准套件（本单权威台账）**：换绑邮箱 / 忘记密码 / 改密 / 会话管理与逐个登出 / 注销对齐，逐趟验收读数在 §6（末节号现量 `grep -oE '^### 6\.[0-9]+' docs/plans/account-standard-suite.md \| tail -1`）。裁决层是 [ADR-0063](adr/0063-email-rebinding-and-per-session-revocation.md) |
+| [account-standard-suite-handoff.md](plans/account-standard-suite-handoff.md) | **交接：注册登录标准套件** —— 只记「现在停在哪、下一步按什么顺序做」：设备腿是收口条件、载体与跑法、已排除的死胡同 |
+| [account-standard-suite-reflection.md](plans/account-standard-suite-reflection.md) | **复盘：注册登录标准套件** —— 纠正表（修改内容/错误归因/证据/下次开头指令建议）＋可长期记忆候选 |
 
 ### 工程参考
 
