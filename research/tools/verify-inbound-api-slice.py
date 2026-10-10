@@ -141,6 +141,12 @@ def self_test() -> int:
 def main() -> int:
     if '--self-test' in sys.argv:
         return self_test()
+    # 本工具是**一次性入库切片器**：它的前提是"HEAD 里还没有这一段"。
+    # 那前提由 `0b7ff357` 自己结束了 —— 再让它跑就会在 IMPORT_OLD 上报"锚点命中 0 次"，
+    # 那既不是失败也不是通过，所以响亮地退 3（与 verify-inbound-producer-seam 的"缝已闭合"同一档）。
+    if IMPORT_NEW in head_text():
+        print('本切片已落进 HEAD（0b7ff357）⇒ 入库工具退役，不再产出切片（退 3）')
+        return 3
     head, sliced = head_text(), build_slice()
     code = audit(head, sliced)
     if code != 0:

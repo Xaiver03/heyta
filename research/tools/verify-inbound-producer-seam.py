@@ -9,8 +9,9 @@ HEAD 已跟踪的 `packages/app-host/src/inbound-{key,secret}-store.ts` 有 24 �
 `META_KEYS.INBOUND_*`，而这三枚成员的生产者 `packages/storage/src/stores.ts` 只活在未提交 diff ⇒
 `@heyta/app-host` 在干净检出上编不过，而 `pnpm check` 在本机一路绿灯。
 
-它判的是 HEAD，不是工作树：逐枚 `git show HEAD:<path>` 取字节。唯一读磁盘的地方是自测臂 3，
-它读工作树那一代**只是为了扮演"生产者真入库了"**，不进正常判卷路径。
+它判的是 HEAD，不是工作树：逐枚 `git show HEAD:<path>` 取字节。自测各臂也一律从 HEAD 取，
+需要"生产者换成另一代"时走**内存 override**，不落盘、不读工作树（2026-10-11 撤掉 B129/B130 的
+登记后，臂 3/7 不再需要工作树那份字节）。
 
 它查两维，都是"消费者已入库、生产者不在 HEAD"这一类，只是缺的东西形状不同：
 ① **成员缝** —— 已入库代码引用了某枚跨包具名绑定的成员，而那成员在生产包的 HEAD 源码里不存在（B129）。
@@ -40,12 +41,19 @@ HEAD 已跟踪的 `packages/app-host/src/inbound-{key,secret}-store.ts` 有 24 �
 写明的 tsc 两臂还原（HEAD 那代生产者 → rc=2 + TS2339；工作树那代 → rc=0），这枚装置负责的是
 **每次入库后都能一条命令重跑的那一遍粗筛**。
 
-自测八臂，两个方向都要有：臂 1 注入一枚不存在的成员访问（R2）、臂 2 清单里放一枚 HEAD 没有的 path（R1）、
-臂 3 把生产包换成含那三枚键的那一代（R4 必须说登记已过期，不许闷着变绿）、臂 4 静止对照不判红、
-臂 5 **起子进程跑真 CLI 取退出码**：静止 rc=0，把登记档里那枚生产包名换成不存在的那枚后 rc=1、
-臂 6 注入一枚指向不存在文件的相对 import（R5）、臂 7 把那枚登记过的生产者"入库"（R6 必须顶出来）、
-臂 8 注入一枚带代码后缀却不是导入的相对路径（R7）。
-只测"能红"会把判据写成永远红，只测"能绿"会把它写成永远绿；"退出码"这个词只在臂 5 出现 ——
+自测臂（**臂数由 `--self-test` 自己打印，这里不抄数**），两个方向都要有：
+臂 1 注入一枚不存在的成员访问（R2）、臂 2 清单里放一枚 HEAD 没有的 path（R1）、
+臂 3a/3b 成员登记档的正反两腿（注一枚 HEAD 已闭合的合成登记 ⇒ R4 必须顶出来；注一枚仍未闭合的 ⇒
+        不许判 R4 —— 登记是挂账，不是报错。真表在 2026-10-11 随 B129 闭合清空，静止臂 4 的
+        `登记缝=0` 就是"注入没漏回真表"的对照），
+臂 4 静止对照不判红、
+臂 5 **起子进程跑真 CLI 取退出码**：静止 rc=0，往在册清单塞一枚 HEAD 没有的文件后 rc=1、
+臂 6 注入一枚指向不存在文件的相对 import（R5）、
+臂 7a/7b 模块登记档的正反两腿（同 3，对应 B130 那一档）、
+臂 8 注入一枚带代码后缀却不是导入的相对路径（R7）、
+臂 9 子进程跑注了"已闭合合成登记"的副本 ⇒ 真退出码必须是 **3**（撤登记提示那一腿在 main() 里，
+        scan 碰不到它，表清空后它最容易变成装饰）。
+只测"能红"会把判据写成永远红，只测"能绿"会把它写成永远绿；"退出码"这个词只在臂 5 与臂 9 出现 ——
 其余各臂走的是进程内 scan()，它们判的是规矩命中，不是 rc。
 """
 import argparse
@@ -72,11 +80,12 @@ EXTRA_SCOPE = [
 ]
 
 # 已知且已登记的缝：(生产包, 成员) -> BLOCKED 号。登记不是放行，R4 会盯着它过期。
-KNOWN_SEAMS = {
-    ("packages/storage", "INBOUND_RECIPIENT_KEY"): "B129",
-    ("packages/storage", "INBOUND_WORKER_CREDENTIAL"): "B129",
-    ("packages/storage", "INBOUND_COMMIT_JOURNAL"): "B129",
-}
+# 🔴 2026-10-11 00:5x 撤登记（B129 那三枚）：`16da3ecb`（10-10 18:48，并行会话那代提交）把
+# `INBOUND_RECIPIENT_KEY / INBOUND_WORKER_CREDENTIAL / INBOUND_COMMIT_JOURNAL` 落进了
+# `packages/storage/src/stores.ts`，R4 当场报"登记的缝已闭合 ⇒ 撤登记"。撤掉之后那 24 处访问
+# 不再进"登记"档，而是逐枚按 HEAD 现量进"命中"档 —— 表清空不等于判据变松，是它开始真咬了。
+# "登记过期必须响亮"这一档没有因为表空而失去验证：臂 3 在内存里注一枚合成登记来证明它。
+KNOWN_SEAMS = {}
 
 MEMBER_STOP = {"prototype", "constructor"}
 # 整句解析（跨行也算）。仓里普遍写成 `import {\n a, b,\n} from './x.js'`，按行锚定的正则抓不到 ——
@@ -109,12 +118,10 @@ def iter_refs(src):
                 yield kind, "", m.group("spec")
 
 # 已知且已登记的**模块**缝：(消费者文件, 相对 spec) -> BLOCKED 号。登记不是放行，R6 会盯着它过期。
-KNOWN_MODULE_SEAMS = {
-    ("packages/app-host/src/inbound-process.ts", "./task-batch-actions.js"): "B130",
-}
-
-# 只给自测臂用的旋钮：假装这些路径在 HEAD 已被跟踪（= "生产者那一代入库了"）
-EXTRA_TRACKED = []
+# 🔴 2026-10-11 00:5x 撤登记（B130 那一枚）：`16da3ecb` 把 `packages/app-host/src/task-batch-actions.ts`
+# 带进了 HEAD，`./task-batch-actions.js` 现在解析得开 ⇒ R6 报"已闭合、撤登记"。臂 7 用内存注入的
+# 合成登记保住这一档（表空了不等于这一档没牙）。
+KNOWN_MODULE_SEAMS = {}
 
 
 def resolve_rel(consumer, spec, tracked_set):
@@ -196,7 +203,7 @@ def scan(overrides=None):
             reds.append(("R1", f"在册清单指向一枚 HEAD 不存在的文件：{p}（它被删了还是改名了？"
                                f"这一档不修，装置就只对越来越少的文件负责）"))
     in_scope = sorted(set(in_scope))
-    tracked_set = set(tracked) | set(EXTRA_TRACKED)
+    tracked_set = set(tracked)
 
     ts_by_pkg = {}
     for p in tracked:
@@ -351,27 +358,79 @@ def bindings_all(src, own):
     return out
 
 
-def run_arm(overrides, label, expect_rule, extra_scope_missing=None, extra_tracked=None):
+def run_arm(overrides, label, expect_rule, extra_scope_missing=None,
+           inject_known=None, inject_known_module=None):
     """臂 1-4 走的是进程内 scan()：注入只存在于内存，不落盘、不碰工作树。
-    **"rc"这个词不出现在这里** —— 真退出码那一腿由下面臂 5 用子进程跑 CLI 证明。"""
+    **"rc"这个词不出现在这里** —— 真退出码那一腿由下面臂 5 与臂 9 用子进程跑 CLI 证明。
+    `inject_known` / `inject_known_module`：登记档在 2026-10-11 已随 B129/B130 闭合清空，
+    所以"登记过期必须响亮"那一档（R4/R6）只能靠内存里注一枚**合成**登记来验 —— 臂结束立即还原，
+    真表始终是空的（静止臂 4 就是它的对照：`登记缝=0 登记模块缝=0`）。"""
     ov = dict(overrides or {})
-    global EXTRA_SCOPE, EXTRA_TRACKED
+    global EXTRA_SCOPE, KNOWN_SEAMS, KNOWN_MODULE_SEAMS
     if extra_scope_missing:
         keep = EXTRA_SCOPE
         EXTRA_SCOPE = keep + [extra_scope_missing]
-    if extra_tracked:
-        EXTRA_TRACKED = list(extra_tracked)
+    if inject_known:
+        keep_known = KNOWN_SEAMS
+        KNOWN_SEAMS = {**keep_known, **inject_known}
+    if inject_known_module:
+        keep_known_mod = KNOWN_MODULE_SEAMS
+        KNOWN_MODULE_SEAMS = {**keep_known_mod, **inject_known_module}
     try:
-        reds, stats = scan(ov)
+        reds, _stats = scan(ov)
     finally:
         if extra_scope_missing:
             EXTRA_SCOPE = keep
-        if extra_tracked:
-            EXTRA_TRACKED = []
+        if inject_known:
+            KNOWN_SEAMS = keep_known
+        if inject_known_module:
+            KNOWN_MODULE_SEAMS = keep_known_mod
     fired = next((rule for rule, _ in reds if rule == expect_rule), None)
     if fired:
         return f"成立（scan 判红，命中 {expect_rule}）　{next(m for r, m in reds if r == expect_rule)[:64]} …"
     return f"**不成立**（{label} 要 {expect_rule} 会红，实际红={[r for r, _ in reds]}）"
+
+
+def run_arm_no_rule(overrides, label, rule, inject_known=None, inject_known_module=None):
+    """反方向的那一腿：注一枚生产者**确实还没入库**的合成登记 ⇒ 该档必须**不红**（登记=挂账，不是判红）。
+    只测"能红"会把判据写成永远红：那等于用 R4/R6 逼着人删登记，而不问登记说的是不是真的。"""
+    global KNOWN_SEAMS, KNOWN_MODULE_SEAMS
+    if inject_known:
+        keep_known = KNOWN_SEAMS
+        KNOWN_SEAMS = {**keep_known, **inject_known}
+    if inject_known_module:
+        keep_known_mod = KNOWN_MODULE_SEAMS
+        KNOWN_MODULE_SEAMS = {**keep_known_mod, **inject_known_module}
+    try:
+        reds, _stats = scan(overrides or {})
+    finally:
+        if inject_known:
+            KNOWN_SEAMS = keep_known
+        if inject_known_module:
+            KNOWN_MODULE_SEAMS = keep_known_mod
+    fired = [r for r, _ in reds if r == rule]
+    if fired:
+        return f"**不成立**（{label} 里未入库的登记被判成 {rule} 红 ⇒ 登记档没在'挂账'，在'报错'）"
+    return f"成立　未入库的合成登记不判 {rule}（登记=挂账，闭合了才报）"
+
+
+def _arm7b():
+    """臂 7b：登记的模块缝**仍未闭合**时，这一档必须既不报 R6（不许逼着人删一道真缝），
+    也不报 R5（登记就是为了让它不判红）。两向都要有 —— 只测 7a 会把判据写成"只要挂着登记就红"。"""
+    global KNOWN_MODULE_SEAMS
+    keep = KNOWN_MODULE_SEAMS
+    KNOWN_MODULE_SEAMS = {
+        **keep,
+        ("packages/app-host/src/inbound-process.ts", "./arm7b-still-missing-9127.js"): "ARM7B-合成",
+    }
+    try:
+        reds, _stats = scan()
+    finally:
+        KNOWN_MODULE_SEAMS = keep
+    fired = sorted({r for r, _ in reds if r in ("R5", "R6")})
+    if fired:
+        return f"**不成立**（未闭合的合成模块登记被判成 {fired} ⇒ 登记档在报错，不在挂账）"
+    return "成立　未闭合的合成模块登记不判 R5/R6（它挂在 mod_known 档里，读数能看见）"
 
 
 def _finish_self_test(lines):
@@ -399,12 +458,17 @@ def self_test():
     lines.append(("臂 2 清单里放一枚 HEAD 没有的 path ⇒ 该红",
                   run_arm(None, "臂2", "R1", extra_scope_missing="packages/definitely-not-here/nope.ts")))
 
-    # 臂 3：把生产者换成含那三枚键的工作树版本 ⇒ R4 必须报"登记的缝已闭合"
-    real = os.path.join(REPO, "packages/storage/src/stores.ts")
-    with open(real, encoding="utf-8") as fh:
-        worktree = fh.read()
-    lines.append(("臂 3 生产包里那三枚键真的入库了 ⇒ R4 必须说登记已过期（不许闷着变绿）",
-                  run_arm({"packages/storage/src/stores.ts": worktree}, "臂3", "R4")))
+    # 臂 3：登记档已随 B129 闭合清空（2026-10-11），所以这一档改由**内存注入的合成登记**验两向：
+    #   3a 登记的成员在 HEAD 找得到 ⇒ R4 必须顶出来（不许闷着变绿 —— 挂着一道已经不存在的缝，
+    #      下一位会按"生产者还没入库"去行动）；
+    #   3b 登记的成员在 HEAD 找不到 ⇒ 该档必须**不红**（登记=挂账不是报错，否则这一档永远红，
+    #      人会把它当噪声读，而它唯一的价值就是在闭合那天出声）。
+    lines.append(("臂 3a 注一枚'已闭合'的合成成员登记 ⇒ R4 必须说登记已过期（不许闷着变绿）",
+                  run_arm(None, "臂3a", "R4",
+                          inject_known={("packages/storage", "INBOUND_RECIPIENT_KEY"): "ARM3-合成（不对应 BLOCKED 号）"})))
+    lines.append(("臂 3b 注一枚'还没闭合'的合成成员登记 ⇒ 不许判 R4（登记=挂账，不是报错）",
+                  run_arm_no_rule(None, "臂3b", "R4",
+                                  inject_known={("packages/storage", "MEMBER_NOT_IN_HEAD_9127"): "ARM3B-合成"})))
 
     # 臂 4：静止对照（进程内 scan）—— 必须保持绿
     reds, stats = scan()
@@ -416,35 +480,57 @@ def self_test():
                       f"成立　登记缝 {stats['known']} 枚仍在册、新缝 {stats['new']}、"
                       f"盲区 {stats['blind']}、命中 {stats['hit']}、分母 {stats['total']}"))
 
-    # 臂 5：真退出码两条腿 —— 直接起子进程跑 CLI：静止必须 rc=0，把登记档拆掉后必须 rc=1
-    #        （这一臂排除"装置永远绿"与"退出码被包装吞掉"两件事；§7 那条"管道后 $? 是 tail 的"同款陷阱）
+    # 臂 5：真退出码两条腿 —— 直接起子进程跑 CLI：静止必须 rc=0，把在册清单里塞一枚 HEAD 没有的
+    #        文件后必须 rc=1（这一档与登记档无关，表清空后它仍要能红；§7 那条"管道后 $? 是 tail 的"同款陷阱）
+    # 臂 9：CLI 层的"撤登记提示"腿 —— 注一枚已闭合的合成登记，子进程必须退 **3** 而不是 0/1
+    #        （表清空之后这一档最容易变成装饰：它只由 main() 里那一句返回码决定，scan 不碰它）
     import tempfile
     src_path = os.path.abspath(__file__)
     with open(src_path, encoding="utf-8") as fh:
         here = fh.read()
     green = subprocess.run([sys.executable, src_path, "--quiet"], capture_output=True, text=True)
     rc_green = green.returncode
-    stripped = here.replace('("packages/storage", "INBOUND_', '("packages/NOWHERE", "INBOUND_')
-    if stripped == here:
-        lines.append(("臂 5 子进程跑真 CLI：静止 rc=0 且把登记档拆掉后 rc=1 ⇒ 两个方向都要成立",
-                      "**不成立**（注入没落进那份副本：源码里找不到 `(\"packages/storage\", \"INBOUND_` —— "
-                      "登记档改了形，这一臂就悄悄变成只测绿的那一腿）"))
+    bogus = here.replace(
+        '    "packages/app-host/src/index.ts",\n]',
+        '    "packages/app-host/src/index.ts",\n    "packages/definitely-not-here/arm5.ts",\n]', 1)
+    if bogus == here:
+        lines.append(("臂 5 子进程跑真 CLI：静止 rc=0 且在册清单塞一枚不存在的文件后 rc=1 ⇒ 两个方向都要成立",
+                      "**不成立**（注入没落进那份副本：源码里找不到 `EXTRA_SCOPE` 的收尾那两行 —— "
+                      "在册清单改了形，这一臂就悄悄变成只测绿的那一腿）"))
+        return _finish_self_test(lines)
+    stale = here.replace(
+        "KNOWN_SEAMS = {}",
+        'KNOWN_SEAMS = {("packages/storage", "INBOUND_RECIPIENT_KEY"): "ARM9-合成"}', 1)
+    if stale == here:
+        lines.append(("臂 9 子进程：注一枚已闭合的合成登记 ⇒ 真 CLI 必须退 3（撤登记提示）",
+                      "**不成立**（注入没落进那份副本：`KNOWN_SEAMS = {}` 改了形，这一臂从此只测绿）"))
         return _finish_self_test(lines)
     with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False, encoding="utf-8") as tmp:
-        tmp.write(stripped)
+        tmp.write(bogus)
         tmp_path = tmp.name
+    with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False, encoding="utf-8") as tmp9:
+        tmp9.write(stale)
+        tmp9_path = tmp9.name
     try:
         red = subprocess.run([sys.executable, tmp_path, "--quiet"], capture_output=True, text=True)
         rc_red = red.returncode
+        retire = subprocess.run([sys.executable, tmp9_path, "--quiet"], capture_output=True, text=True)
+        rc_retire = retire.returncode
     finally:
         os.unlink(tmp_path)
+        os.unlink(tmp9_path)
     if rc_green == 0 and rc_red == 1:
-        lines.append(("臂 5 子进程跑真 CLI：静止 rc=0 且把登记档拆掉后 rc=1 ⇒ 两个方向都要成立",
-                      f"成立　green rc={rc_green}　red rc={rc_red}（把登记的生产包名换成不存在的那枚之后，"
-                      f"那 24 处访问判成新缝）"))
+        lines.append(("臂 5 子进程跑真 CLI：静止 rc=0 且在册清单塞一枚不存在的文件后 rc=1 ⇒ 两个方向都要成立",
+                      f"成立　green rc={rc_green}　red rc={rc_red}（R1 在真退出码上咬得住）"))
     else:
-        lines.append(("臂 5 子进程跑真 CLI：静止 rc=0 且把登记档拆掉后 rc=1 ⇒ 两个方向都要成立",
+        lines.append(("臂 5 子进程跑真 CLI：静止 rc=0 且在册清单塞一枚不存在的文件后 rc=1 ⇒ 两个方向都要成立",
                       f"**不成立**（green rc={rc_green} 要 0，red rc={rc_red} 要 1）"))
+    if rc_retire == 3:
+        lines.append(("臂 9 子进程：注一枚已闭合的合成登记 ⇒ 真 CLI 必须退 3（撤登记提示）",
+                      f"成立　rc={rc_retire}（这一档只活在 main() 的返回码里，表清空后它是唯一还证明'撤登记提示'存在的那一腿）"))
+    else:
+        lines.append(("臂 9 子进程：注一枚已闭合的合成登记 ⇒ 真 CLI 必须退 3（撤登记提示）",
+                      f"**不成立**（rc={rc_retire} 要 3 ⇒ 那句'撤登记、回写台账'不再改变退出码）"))
 
     # 臂 6：注入一枚指向不存在文件的相对导入 ⇒ R5（模块缝）必须红
     mod_target = "packages/app-host/src/inbound-runner.ts"
@@ -453,10 +539,14 @@ def self_test():
                   run_arm({mod_target: mod_base + "\nimport { nope } from './definitely-missing-9127.js';\n"},
                           "臂6", "R5")))
 
-    # 臂 7：把 B130 那枚生产者"入库" ⇒ R6 必须说登记已过期，不许闷着变绿
-    lines.append(("臂 7 登记过的生产者真的进 HEAD ⇒ R6 必须说模块缝已闭合",
-                  run_arm(None, "臂7", "R6",
-                          extra_tracked=["packages/app-host/src/task-batch-actions.ts"])))
+    # 臂 7：登记档已随 B130 闭合清空（2026-10-11），这一档同样改由内存注入的合成登记验两向：
+    #   7a 登记的相对 spec 现在解析得开 ⇒ R6 必须顶出来（"撤登记并回写台账"）；
+    #   7b 登记的 spec 仍解析不开 ⇒ 不许判 R6，也不许判 R5（登记=挂账那一档，未闭合时它就该安静挂着）。
+    lines.append(("臂 7a 注一枚'生产者已入库'的合成模块登记 ⇒ R6 必须说模块缝已闭合",
+                  run_arm(None, "臂7a", "R6", inject_known_module={
+                      ("packages/app-host/src/inbound-process.ts", "./task-batch-actions.js"): "ARM7-合成"})))
+    lines.append(("臂 7b 注一枚'生产者仍未入库'的合成模块登记 ⇒ 不许判 R6，也不许判 R5",
+                  _arm7b()))
 
     # 臂 8：注入一枚"带代码后缀、但不是导入语句"的相对路径 ⇒ R7 必须红（这一档挡的是尺自己瞎了）
     lines.append(("臂 8 注入一枚 `const legacy = './weird-9127.js'` ⇒ 该红（R7 尺瞎了）",
@@ -491,7 +581,8 @@ def main():
     if reds:
         print(f"结论：{len([r for r, _ in reds if r not in ('R4', 'R6')])} 条红")
         return 1
-    print("结论：已入库的消费者不再依赖任何未入库的生产者（ KNOWN_SEAMS 那几枚除外，见上面登记档）")
+    print("结论：已入库的消费者不再依赖任何未入库的生产者"
+          f"（登记档在册 {stats['known'] + stats['mod_known']} 枚 —— 非 0 时它们挂在上面那两行读数里）")
     return 0
 
 

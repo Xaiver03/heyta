@@ -47,9 +47,11 @@ ARMS = [
      "if (!Number.isSafeInteger(bytes) || bytes + Buffer.byteLength(payloadCiphertext, 'utf8') > MAX_QUEUE_BYTES) throw new InboundQueueLimitError('bytes');",
      "if (!Number.isSafeInteger(bytes) || bytes + Buffer.byteLength(payloadCiphertext, 'utf8') > MAX_QUEUE_BYTES) Logger.warn('mutant: queue byte cap not enforced');",
      'counts the sealed envelope against the byte cap'),
+    # 10-11 重锚：信封改名（d361209e）把 `{ error }` 换成了 `{ code, message }`，
+    # 原文匹配不上会让这一臂静默 PATTERN_MISS —— 那条承诺当时就没有变异在守。
     ('写失败仍报 accepted',
-     "return reply.status(500).send({ error: 'Inbound event could not be accepted' });",
-     "return reply.status(202).send({ error: 'Inbound event could not be accepted' });",
+     "return reply.status(500).send({ code: 'inbound_event_could_not_be_accepted', message: 'Inbound event could not be accepted' });",
+     "return reply.status(202).send({ code: 'inbound_event_could_not_be_accepted', message: 'Inbound event could not be accepted' });",
      'does not report accepted when the enqueue write itself fails'),
     ('插入竞态不重读赢家（直接漏 500）',
      "if ((error as { code?: string }).code !== 'P2002') throw error;",
