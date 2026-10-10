@@ -49,6 +49,18 @@ def labels(nodes: Iterable[dict[str, Any]]) -> list[str]:
     return [value for node in nodes if (value := AX.label_of(node))]
 
 
+def T(zh: str, en: str) -> tuple[str, str]:
+    """One on-screen label in both languages it can render in (same i18n key)."""
+    return (zh, en)
+
+
+def any_of(*pairs: tuple[str, str]) -> list[str]:
+    # A launch state has several possible labels, but `check:locator-labels`
+    # judges every Chinese x English combination inside one group against the
+    # 词条真源, so labels of different keys cannot share a group: 一个组 = 一枚标签的两种语态.
+    return [label for pair in pairs for label in pair]
+
+
 def present(nodes: list[dict[str, Any]], candidates: Iterable[str], *, pressable: bool = False) -> str | None:
     for candidate in candidates:
         node = AX.find(nodes, candidate, pressable, False, None, False, 0)
@@ -220,20 +232,53 @@ def run(probe: Probe) -> None:
     # Fresh install journey is privacy sheet -> welcome -> app.  The probe is
     # also rerunnable on an existing home screen, so inspect the current AX
     # state before deciding whether either onboarding tap is needed.
-    launch_tree = probe.wait_for_any_label(("只用本机", "先离线使用", "任务", "我的"))
-    if present(launch_tree, ("只用本机",), pressable=True) is not None:
+    # Each English candidate is read from packages/i18n/src/locales/en.ts under
+    # the same key its Chinese twin lives on (mobile.tab.tasks / .profile,
+    # common.privacy.consent.localOnly, mobile.welcome.offline) — not guessed
+    # from the screen name.  Chinese stays first so a zh device behaves exactly
+    # as before.
+    launch_tree = probe.wait_for_any_label(
+        any_of(
+            T("只用本机", "This device only"),
+            T("先离线使用", "Use offline for now"),
+            T("任务", "Tasks"),
+            T("我的", "Profile"),
+        )
+    )
+    if present(launch_tree, T("只用本机", "This device only"), pressable=True) is not None:
         # This label is sourced from common.privacy.consent.localOnly.  It is
         # the privacy sheet action, not the later welcome-page offline action.
-        probe.tap("choose local-only privacy", ("只用本机",), ("先离线使用",))
-        launch_tree = probe.wait_for_any_label(("先离线使用", "任务", "我的"))
+        probe.tap(
+            "choose local-only privacy",
+            T("只用本机", "This device only"),
+            ("先离线使用",),
+        )
+        launch_tree = probe.wait_for_any_label(
+            any_of(
+                T("先离线使用", "Use offline for now"),
+                T("任务", "Tasks"),
+                T("我的", "Profile"),
+            )
+        )
 
-    if present(launch_tree, ("先离线使用",), pressable=True) is not None:
-        probe.tap("choose offline", ("先离线使用",), ("任务", "我的"))
+    if present(launch_tree, T("先离线使用", "Use offline for now"), pressable=True) is not None:
+        probe.tap(
+            "choose offline",
+            T("先离线使用", "Use offline for now"),
+            ("任务", "我的"),
+        )
     else:
         # 「引导已经走完」和「这两枚中文定位符没命中（例如界面不是中文）」在两棵 AX 树上长得
         # 一模一样，所以以前这一支无条件记 `passed` —— 那是把探针没走到被测路径当成验收通过。
         # 能区分两者的可观测形状只有一个：真走完引导的那棵树里必然读得到首页标签。
-        onboarded = present(launch_tree, ("任务", "我的"), pressable=True) is not None
+        onboarded = (
+            present(
+                launch_tree,
+                any_of(T("任务", "Tasks"), T("我的", "Profile")),
+                pressable=True,
+            )
+            is not None
+        )
         probe.record(
             "onboarding already complete",
             "passed" if onboarded else "home-labels-absent",
@@ -268,8 +313,10 @@ def run(probe: Probe) -> None:
     probe.screenshot("general")
     probe.tap("general back to directory", ("返回", "Back"), ("常规", "General"))
 
-    # `隐私同意` is the current Chinese value of common.privacy.settings.title;
-    # do not infer a label from the section name.
+    # `隐私同意` is the current Chinese value of common.privacy.settings.title.
+    # The `then` slot stays Chinese-only on purpose: it is the arrival assertion,
+    # and a one-language assertion fails closed ("语言不对" cannot masquerade as
+    # "IA 通过") — see the settings-directory comment above.
     probe.tap("open sync and privacy", ("同步与隐私", "Sync and privacy"), ("隐私同意",))
     probe.screenshot("sync")
     probe.tap("sync back to directory", ("返回", "Back"), ("同步与隐私", "Sync and privacy"))
@@ -294,6 +341,12 @@ def run(probe: Probe) -> None:
     probe.tap("growth back to profile", ("返回", "Back"), ("我的", "Profile"))
 
     probe.scroll_to("scroll lists entry", ("清单", "Lists"))
+    # `absent` is an assertion slot too, so it stays Chinese-only here.  Note the
+    # asymmetry for whoever resolves the pair/OR 口径: a one-language `then` fails
+    # closed, while a one-language `absent` on an English screen would be vacuous
+    # (the forbidden header reads "Organize and capture" there, so the check could
+    # never fire).  Today the script cannot reach this line in English because the
+    # `then` slots above it fail first — that premise is what keeps this safe.
     probe.tap("open lists", ("清单", "Lists"), ("清单", "Lists"), absent=("整理与记录",))
     probe.tap("lists back to profile", ("返回", "Back"), ("我的", "Profile"))
 
