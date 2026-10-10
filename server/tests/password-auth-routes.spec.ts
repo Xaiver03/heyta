@@ -949,6 +949,34 @@ describe('POST /password/set：加认证器，不是换钥匙', () => {
       ]);
     });
 
+    /**
+     * 🔴 与 `passkey-enrollment.spec.ts` 里那一条同一型：**永不 settle** 才是实际咬过我们的
+     * 那种坏法（`notifyAuthenticatorAdded` 内部已经 catch ⇒ 不抛、只挂）。
+     * 设第一个口令的路由 `await` 它 ⇒ 口令已经写进库了，而界面上是一句「连不上服务端」。
+     */
+    it('🔴 发信永不 settle（SMTP 黑洞）⇒ 设口令仍当场 200，且那一封确实尝试发了', async () => {
+      await boot();
+      fakeAccount();
+      emailSpies.sendAuthenticatorAddedEmail.mockImplementationOnce(
+        () => new Promise<boolean>(() => undefined),
+      );
+
+      const BUDGET_MS = 60_000 / 20;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const res = await Promise.race([
+        setWith(bearer(3), { newPassword: PASSWORD }),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error(`响应被那封告知信扣住了（${BUDGET_MS} ms 内没返回）`)),
+            BUDGET_MS,
+          );
+        }),
+      ]).finally(() => clearTimeout(timer));
+
+      expect(res.statusCode).toBe(200);
+      expect(emailSpies.sendAuthenticatorAddedEmail).toHaveBeenCalledTimes(1);
+    }, 30_000);
+
     it('🔴 抢输的那一次（count=0）⇒ 一封都不发', async () => {
       await boot();
       fakeAccount();

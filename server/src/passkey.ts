@@ -553,7 +553,11 @@ export const completeUserPasskeyRegistration = async (
   // （纪律与 `notifyPasswordChanged` 同一条，写在 `account/authenticator-notice.ts` 文件头）。
   // 另外两处 `passkey.create` **不发**这封信是有意的：注册期那一处由验证邮件本身授权，
   // 恢复那一处是**换掉全部**旧凭据（换钥匙，不是多开门），而且那封恢复链接就是记录。
-  await notifyAuthenticatorAdded(userId, 'passkey');
+  // 🔴 但是**不等**：`notifyAuthenticatorAdded` 内部已经 catch ⇒ 它不会抛，只会挂。
+  // 挂住的就是这一格：SMTP 不可达时 nodemailer 7 分钟才失败，客户端 60 s 先断，
+  // 于是「通行密钥已经加上了」被报成「连不上服务端」（同一形状在改密那一格实测到过，
+  // 见 `password/recovery.ts` 的 `notifyPasswordChangedSoon` 与陷阱第 405 条）。
+  void notifyAuthenticatorAdded(userId, 'passkey');
 
   return { id: created.id, message: 'Passkey added successfully.' };
 };

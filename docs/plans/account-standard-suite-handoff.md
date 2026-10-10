@@ -49,7 +49,7 @@
 >
 > | 格 | 真因 | 状态 |
 > |---|---|---|
-> | 改密成功句没出现（判据 L 两枚） | **产品缺陷**：`server/src/password/recovery.ts` 两条改口令的路由 `await` 了那封"你的密码被改了"的告知信。服务端 16:57:03.811 已经改完（`token_version` 2→3、其余设备 401、新口令换得到新会话），而 nodemailer 在 SMTP 不可达时 **17:04:00 才**写 `Failed to send … read ETIMEDOUT` —— 响应被一封邮件扣住，iOS `URLSession` 默认 60 s 先断 ⇒ **界面对一次已成功的改密说「连不上服务端」**。 | ✅ 已修（发出但不等：`notifyPasswordChangedSoon`）＋新判据（发信永不 resolve 时改密仍当场返回，预算取自约束方 60 s 的 1/20）＋变异（`await` 加回 ⇒ `MUT_RC=1` 红在"被扣住"那行）＋全文件 21/21、`server` tsc 0 错。见 **B154** / 陷阱 **#405**。同一形状另两枚（`service.ts:249`、`passkey.ts:556`）不在本线地界，**只登记未改**。 |
+> | 改密成功句没出现（判据 L 两枚） | **产品缺陷**：`server/src/password/recovery.ts` 两条改口令的路由 `await` 了那封"你的密码被改了"的告知信。服务端 16:57:03.811 已经改完（`token_version` 2→3、其余设备 401、新口令换得到新会话），而 nodemailer 在 SMTP 不可达时 **17:04:00 才**写 `Failed to send … read ETIMEDOUT` —— 响应被一封邮件扣住，iOS `URLSession` 默认 60 s 先断 ⇒ **界面对一次已成功的改密说「连不上服务端」**。 | ✅ 已修（发出但不等：`notifyPasswordChangedSoon`）＋新判据（发信永不 resolve 时改密仍当场返回，预算取自约束方 60 s 的 1/20）＋变异（`await` 加回 ⇒ `MUT_RC=1` 红在"被扣住"那行）＋全文件 21/21、`server` tsc 0 错。见 **B154** / 陷阱 **#405**。同一形状另两枚（`service.ts:249`、`passkey.ts:556`）先查了归属：**也是本线那笔 `703cafc8` 引进的**，已一并收掉，各带一条同型判据与一次变异。 |
 > | 「设置面关不上」2 枚 + 第 16 步「退不回根层」3 枚 | **载体机型**：`heyta-ios-isolated` 是 iOS 27.1 SDK 新增的 **iPhone-Duo**，实测顶栏标题 y=18（同一份产物在 iPhone 17 Pro 上 y=80）⇒ 它给的 `insets.top` 是 **0**，顶栏**最右那一格**（中心 (428,28)）坐在系统状态列的挖孔摄像头下面，`ui tap` 回 `success` 而控件收不到。 | ✅ 归因闭合，处置是**换载体不改产品**（`Screen` 本来就写 `paddingTop: insets.top`）：新载体 `heyta-ios-isolated17`（iPhone 17 Pro / iOS 27.0）装同一份当前产物。见 **B155** / 陷阱 **#404**，以及 **#403 的追记**（那条当时把同一枚「关闭」归成"父面板残留节点"，而那个实验分辨不了这两种成因）。 |
 >
 > 🔴 **上面那块 21:10 的归因里，"②残留 AX 节点"那一半是本文件自己写错的一条**：

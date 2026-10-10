@@ -246,7 +246,9 @@ export const setInitialPassword = async (input: {
   }
 
   Logger.info(`Initial password set (ID: ${user.id})`);
-  await notifyAuthenticatorAdded(user.id, 'password');
+  // 告知信**不等**（它内部已经 catch，所以不会抛、只会挂：实测 SMTP 不可达时
+  // nodemailer 要 7 分钟才失败，而客户端 60 s 就断 ⇒ 口令已经设好，界面却说「连不上服务端」）。
+  void notifyAuthenticatorAdded(user.id, 'password');
   return { message: PASSWORD_SET_SUCCESS_MESSAGE };
 };
 

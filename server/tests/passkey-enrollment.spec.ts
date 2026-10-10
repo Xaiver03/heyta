@@ -532,6 +532,43 @@ describe('通行密钥「已认证再加一条」', () => {
         expect(dbState.passkeys).toHaveLength(1);
       });
 
+      /**
+       * 🔴 上面两条测的是"返回 false"与"抛出"。这第三条测**第三种、也是实际咬过我们的那种**：
+       * 既不 resolve 也不 reject。`notifyAuthenticatorAdded` 内部已经 catch ⇒ 它**不会抛，只会挂**，
+       * 而 SMTP 不可达时 nodemailer 要 7 分钟才失败（设备腿第 7 趟同形状的那一格：
+       * 服务端日志 16:57:03 已写「Password changed」，17:04:00 才写
+       * `Failed to send Password changed notice: read ETIMEDOUT`）。
+       * 挂住 ⇒ 响应被一封邮件扣住 ⇒ 客户端 60 s 后对**一次已成功**的添加说「连不上服务端」。
+       */
+      it('🔴 发信**永不 settle**（SMTP 黑洞）⇒ 添加仍当场 200，且那一封确实尝试发了', async () => {
+        await beginEnrollment(app);
+        mockNotice.mockImplementationOnce(() => new Promise<boolean>(() => undefined));
+
+        // 预算：约束方是客户端那一侧的默认请求超时 60 s（`sendJson` 自己不设超时），
+        // 取它的 1/20 —— 响应用到秒级时那句假话就已经在等着用户了。
+        const BUDGET_MS = 60_000 / 20;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const res = await Promise.race([
+          app.inject({
+            method: 'POST',
+            url: '/api/passkeys/registration/complete',
+            headers: AUTH,
+            payload: { credential },
+          }),
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(
+              () => reject(new Error(`响应被那封告知信扣住了（${BUDGET_MS} ms 内没返回）`)),
+              BUDGET_MS,
+            );
+          }),
+        ]).finally(() => clearTimeout(timer));
+
+        expect(res.statusCode).toBe(200);
+        expect(dbState.passkeys).toHaveLength(1);
+        // 不等 ≠ 不发：这一封必须仍然尝试过。
+        expect(mockNotice).toHaveBeenCalledTimes(1);
+      }, 30_000);
+
       it('语言取**账号上的** locale；没有值时走默认中文，不跟着请求体的任何东西走', async () => {
         dbState.users.set(1, { id: 1, email: 'owner@example.com', locale: 'en' });
         await beginEnrollment(app);
