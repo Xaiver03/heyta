@@ -199,8 +199,10 @@ try:
   'Profile','Before any network feature runs','Use offline for now',
  ))
  if find(r,T('只用本机','This device only')) is not None:tap(T('只用本机','This device only'),T('先离线使用','Use offline for now'),T('在使用联网功能之前','Before any network feature runs'))
+ else:records.append({'action':'skip:consent-sheet-not-on-first-screen','destination':None,'labels':texts(r),'uiLocale':'en' if english else 'zh-CN'})
  r=tree()
  if find(r,T('先离线使用','Use offline for now')) is not None:tap(T('先离线使用','Use offline for now'),T('我的','Profile'),T('在使用联网功能之前','Before any network feature runs'))
+ else:records.append({'action':'skip:welcome-offline-not-on-first-screen','destination':None,'labels':texts(r),'uiLocale':'en' if english else 'zh-CN'})
  r=tree()
  # The current tab is already “我的”; this tap is an explicit assertion that
  # the profile surface is reachable before entering its settings row below.
