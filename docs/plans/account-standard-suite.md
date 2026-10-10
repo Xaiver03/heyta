@@ -326,7 +326,7 @@ W1 先落、W7 后落 ⇒ 中间任何一次 `pnpm check` 都会红。**这不�
 | W4 | ✅ 代码 + jsdom 判据 | web `EmailChangePanel.tsx`+`emailChangeStore.ts`，mobile `EmailChangeSection.tsx`；服务端第 5 张凭据页 `server/public/change-email.js`（守"GET 不消费令牌"）。后果先写在点之前那句进词条（中英各一份），状态区读 `GET …/status`。判据含在 W3/W1 的三组里（web 40→**41** 条、mobile 30 条、server 31+28 条）。<br>⚠️ 这一格原先写着"没有真浏览器截图"，**10-09 01:1x 已闭合**：`e2e/tests/account-email-change-and-sessions.spec.ts` 4 条 + 七张图逐张看过，看图查出两条并修完 ⇒ **§6.4**。移动端那一腿仍只有测试树（没上真机），留在 §5 第 10 条 |
 | W5 | ✅ | `apps/mobile/src/screens/SecurityScreen.tsx` 接上三块纯缺 UI 的：`setInitialPassword` / `beginPasskeyEnrollment`+`complete` / `requestPasskeyRecovery`（app-host 那三个函数早就有）。判据在 mobile 那 30 条与既有 `auth-screen-password.spec.ts` 里 |
 | W6 | ✅ | `server/src/account/authenticator-notice.ts` 一份收口，`/password/set`（`service.ts:249`）与通行密钥注册完成（`passkey.ts:556`）两处共用；`service.ts` 那句"成功后不发信"的**说明**已改写（语义没动：改口令那封照旧只在成功后发）。发信失败的形状由 `passkey-enrollment.spec.ts:529` 那条钉住 |
-| W7 | 🔴 **未入库 —— "已落"这句是错的，10-10 现量更正**（九行的字都只在共享检出的工作树里；`git log -S '十封功能邮件'`、`-S '换绑-新邮箱确认'` 两把都输出空，而 HEAD 里现在还是"发五封"与"**邮箱不可更换。**"。逐枚现量、为什么不能从这条检出单面提交、以及本线自己欠的那四枚漏披露，全在 §6.78）。下面那九行照原样留着，读的时候要带上这一句：**两枚红归并行线** | 九行逐条对过：①三份文本的"邮箱不可更换"改成双侧确认（`privacy.ts:506`、`terms.ts:76`+`:80`+`:317`、`data-rights.ts:158`）②触发条件表那条结掉换成"旧地址收不到信时如何更正"（`data-rights.ts:352`）③功能邮件**五封→十封**并逐类点名（`privacy.ts:201`/`:296`）④一次性凭据时长表补注册验证码 10 min 与换绑两枚 24 h（`privacy.ts:539`）⑤`personal-info-list.ts:236`/`:243` 新增"待绑定的新邮箱地址"与"登录会话"两行，并写明"设备名那一列目前没有任何客户端上报"⑦`gen:server-legal` 重跑 ⇒ `check:server-legal` rc=0（顺带关掉 **D4**）⑧帮助中心 `site.docs.account.s6/s7` + `site.help.q/a.rebind|sessions` ⑨五份版本各 bump 一版（`privacy@1.9`、`terms@1.4`、`data-rights@1.6`、`personal-info-list@1.6`、`third-parties@1.5`）+ 变更表各一行、中英同序 ⇒ 进 `legalSetVersion()`，补签同批。<br>🔴 **⑥级联数字这一格是本次唯一"判据绿不了但不是我的数错了"**：`structure.spec.ts` 现量真源 **34 处 / 33 张**，文案写 **32 / 31**。逐约束归因（用该判据自己的推导复刻一遍，标定=不排除时逐字等于它报的数）：**摘掉并行 automation 线那笔未提交的 `20261018160000_add_automation_entitlement_tickets` ⇒ 32 / 31 = 文案现值**；再摘掉本线那笔 ⇒ 30 / 29（= 本批的底数）。⇒ 本线的数字是对的，多出来的两张表（`automation_entitlement_bindings`、`automation_entitlement_ticket_uses`）与它们缺的那个"用户读得到的类别名"归那条线。**不代改**：类别名与对外承诺的措辞是判据口径（见记忆「代改别线代码要三条齐」） |
+| W7 | 🔴 **未入库 —— "已落"这句是错的，10-10 现量更正**（九行的字都只在共享检出的工作树里；`git log -S '十封功能邮件'`、`-S '换绑-新邮箱确认'` 两把都输出空，而 HEAD 里现在还是"发五封"与"**邮箱不可更换。**"。逐枚现量、为什么不能从这条检出单面提交、以及本线自己欠的那四枚漏披露，全在 §6.78）。下面那九行照原样留着，读的时候要带上这一句：**两枚红归并行线** | 九行逐条对过：①三份文本的"邮箱不可更换"改成双侧确认（`privacy.ts:506`、`terms.ts:76`+`:80`+`:317`、`data-rights.ts:158`）②触发条件表那条结掉换成"旧地址收不到信时如何更正"（`data-rights.ts:352`）③功能邮件**五封→十封**并逐类点名（`privacy.ts:201`/`:296`）④一次性凭据时长表补注册验证码 10 min 与换绑两枚 24 h（`privacy.ts:539`）⑤`personal-info-list.ts:236`/`:243` 新增"待绑定的新邮箱地址"与"登录会话"两行，并写明"设备名那一列目前没有任何客户端上报"⑦`gen:server-legal` 重跑 ⇒ `check:server-legal` rc=0（顺带关掉 **D4**）⑧帮助中心 `site.docs.account.s6/s7` + `site.help.q/a.rebind|sessions` ⑨五份版本各 bump 一版（`privacy@1.9`、`terms@1.4`、`data-rights@1.6`、`personal-info-list@1.6`、`third-parties@1.5`）+ 变更表各一行、中英同序 ⇒ 进 `legalSetVersion()`，补签同批。<br>🔴 **⑥级联数字这一格是本次唯一"判据绿不了但不是我的数错了"**：`structure.spec.ts` 现量真源 **34 处 / 33 张**，文案写 **32 / 31**。逐约束归因（用该判据自己的推导复刻一遍，标定=不排除时逐字等于它报的数）：**摘掉并行 automation 线那笔未提交的 `20261018160000_add_automation_entitlement_tickets` ⇒ 32 / 31 = 文案现值**；再摘掉本线那笔 ⇒ 30 / 29（= 本批的底数）。⇒ 本线的数字是对的，多出来的两张表（`automation_entitlement_bindings`、`automation_entitlement_ticket_uses`）与它们缺的那个"用户读得到的类别名"归那条线。**不代改**：类别名与对外承诺的措辞是判据口径（见记忆「代改别线代码要三条齐」）。<br>🔴 **10-10 12:5x 两格状态换人**（逐条读数在 §6.80②③）：本线**不再欠那四枚漏披露** —— 这一格里 ③④ 的文本与 `CATEGORY_NAMES` 登记都已在 10-08 那批里做过，我这一轮从 tip 重推导是多余且错的（tip 的探针不认识 `DROP TABLE`）；而"十封那行超承诺"也不是缺陷，是我那把尺用 `git grep` 找调用点造出的假红，已修（`server/src/password/registration-otp.ts` 有调用点，只是那枚文件未跟踪） |
 | W8 | ✅ | **D1** `/auth/email/verify` 此前全仓零 HTTP 判据 ⇒ 现在真库 5 条（`email-change-and-sessions.integration.spec.ts` 的 D1 组：三种分流形状、消费即失效、过期与"从没有过"同码同句逐字相同、空令牌 400、通行密钥那一格不发会话）。`/password/change`、`/password/set` 的路由级判据在 `password-auth-routes.spec.ts`。<br>**D2** `admin POST /users/:id/logout` 改走 `revokeAllTokens` + `revokeAllSessions` + `getWsConnectionService().closeForUser`，钉在 `admin-routes.spec.ts:415`/`:420`。<br>**D3** `credential-sweep.ts` 覆盖 `users` 那四列 + 换绑双令牌那两张 + `access_sessions` 过期行，判据 **6 条**；变异 **M8** 摘掉 `lt` ⇒ 2 红（`J-S1` 与配对那条）。挂在 `sync/cleanup.ts` 第 9 步。<br>**邮箱归一化**收进 `account/email-normalize.ts` 一处（11 个调用点），门禁 `check:email-normalization` rc=0 |
 | W9 | ✅ 真 PG，零 mock | 隔离验收库 `heyta_account_w9`（本地 PG 14，`psql` 建库 → `sh scripts/migrate-deploy.sh` 应用**全部**迁移 ⇒ "All migrations have been successfully applied"，含本线那笔）。判据文件 `server/tests/integration/email-change-and-sessions.integration.spec.ts`：**13 条全绿**（真 `PrismaClient` + 真 `apiRoutes` + 真 `accountSecurityRoutes`，只 mock SMTP）。跑法（已点名进 `server/package.json` 的 `test:integration:postgres`，`check:integration-coverage` rc=0）：<br>`cd server && DATABASE_URL=postgresql://$USER@127.0.0.1:5432/heyta_account_w9?schema=public npx vitest run --config vitest.integration.config.ts tests/integration/email-change-and-sessions.integration.spec.ts`<br>🔴 这一层当场照出**我自己写错的一条前提**：D1 那格我先按"邮箱注册⇒不发会话"写，真库里返回的是 `session`（`auth.ts:697`），"不发会话"的是**通行密钥注册**那一格（`auth.ts:680`）⇒ 拆成两条各测各的。假绿的一层（假 prisma）不会告这个 |
 
@@ -3954,6 +3954,9 @@ tip 打不出那份 `dist` ⇒ vitest 在**收集期**就断，报的是 `Failed
 ⇒ W7 那行写的"①…⑨ 已落"读起来像"已入库"，实际是"已改在工作树"。**这句要按本节改**（原文留着看清它怎么错的）。
 
 **② "等注册验证码那封"这句把因果写反了：那一封在 HEAD（也在工作树）里根本发不出去。**
+⚠️ **这一整条的"工作树"那一半于 10-10 12:5x 被现量否证，见 §6.80②** —— 工作树里有调用点，
+是我那把尺用 `git grep` 找调用点（只看得见索引）才把它读成"发不出去"。留原文是为了看清混载体造出的假红长什么样。
+
 `server/src/email.ts` **有** `export const sendEmailPasswordRegistrationCodeEmail`（158 行），
 但 `git grep -l "sendEmailPasswordRegistrationCodeEmail(" -- server/src` 去掉定义文件后**零命中**，
 `server.email.registerCode.*` 那套词条在 HEAD 里有、消费者没有，`EMAIL_PASSWORD_REGISTRATION_CODE_TTL_MS` 只有声明处一处命中。
@@ -4013,6 +4016,57 @@ AGENTS §8 工作流第 18 条要的正是"新增持久数据与能力须同步�
 把白名单里那一行摘掉 ⇒ 红、只抛不兜底 ⇒ 放行、只兜底不抛出 ⇒ 放行、注释里提到 ⇒ 不算、
 跨三行的调用点 ⇒ 认得出、双常量名 ⇒ 认得出。自守下限三条（分母解析不足退 **2** 而不是退 0）。
 真树臂 S1：在纯 tip 载体上摘掉我加的那行 ⇒ rc=1 并点名两处命中，`RESTORE=clean`、复跑 rc=0。
+
+### 6.80 三把尺互相指认的"法务欠账"，最后两条是我自己造的（10-10 12:3x–13:0x 现量）
+
+这一节四条，前两条各自撤回一条我已经入库的结论。起因是我想把 W7 那批法务文本"按 HEAD 的真值重推导一遍"，
+而推导用的是 tip 那几把尺 —— 结果 tip 的尺本身就是坏的，于是我"修"出来一份**假话**，
+差点把它提交进法务文件。
+
+**① 我从 tip 派生的那批法务文本整个作废**（载体 `.worktrees/iosacct` 已 `git checkout --` 回 tip；派生过程的中间件
+留在 `~/heyta-carriers/w9-acct-logs/legal-derived/` 那 6 枚作留形，最后那两笔 —— 把数字改成 37/36、把「墓碑」加回英文清单 ——
+没有留形，因为它们本来就不该存在）。
+坏在探针，不在文本：tip 的 `packages/legal/tests/structure.spec.ts` 顺序回放迁移里的外键增删，
+但**不认识 `DROP TABLE`** —— `tombstones_user_id_fkey`（`0_init:130` 加、`20251228000001_remove_tombstones` 随表删掉）
+一直留在账上。于是 tip 现量算出 **37 条 / 36 张**，而真表 `account_tombstones`（`schema.prisma:549-553`）
+**故意不建外键** —— 建了级联就会把注销标记一起抹掉。
+我按那个数改了 privacy 与 data-rights 的级联数字，又把「墓碑 / tombstones」加回注销承诺的英文清单，
+而那句对本线恰好是**假话**（注销标记必须比账号活得久，这是那份文件自己写明的设计）。
+主检出里 10-08 那批未提交的法务文本早就把这两处修掉了：它带一枚把这条扣减照出来的判据
+「🔴 已 DROP 的表不许留在级联账上（幽灵外键）」，并把 `tombstones` 从 `CATEGORY_NAMES` 摘掉。
+
+派生过程中的三档读数（**"失败条数更少"不等于更对**，那一红列里的表名才是内容）：
+纯 tip 基线 `2 failed | 64 passed (66)` ⇒ 我的派生态 `1 failed | 65 passed (66)` ⇒
+主检出那批装在纯 tip 代码上 `5 failed | 71 passed (76)`。
+
+**② §6.78② 那句"工作树里也发不出去"是假的，错因是我今天刚入库的那把尺混了载体。**
+`check:legal-email-claims` 读文本用磁盘（`readFileSync`）、找调用点用 `git grep`（只看得见索引）。
+`server/src/password/registration-otp.ts:259,319` 真的调 `sendEmailPasswordRegistrationCodeEmail`
+（那一枚文件此刻未跟踪），所以"十封"是**真话**，被我的尺判成四枚超承诺。
+改法与两向取证：调用点改成按磁盘扫（`SERVER_TS` 递归收 `server/src/**/*.ts`，跳 node_modules/dist），
+删掉 `gitGrepFiles`；新臂 A6 抹掉那一枚发信常量的**全部**调用文件 ⇒ 那一封必须立刻不算实发
+（`git grep` 那一版在这臂上纹丝不动），A2 改成用 A6 那把摘掉调用点的读法现造"有发信器、没调用点"，
+不再依赖真树上恰好有一封没接上的信。`--self-test` **7/7 绿**。
+两头读数：主检出实发 **10**、rc=**0**；纯 tip 代码 + 那批未提交文本实发 **9**、rc=**1** 逐条点名「注册验证码 / registration code」。
+同类扫查：本线另一把新尺 `check-safe-error-fallbacks` 走 `readdirSync` ⇒ 没有这个形状；
+仓内另有九枚脚本用 `git grep`，但它们判的是 tracked 内容自身的形状，不属于这一类。提交 `scripts/check-legal-email-claims.mjs` 单独一笔。
+
+**③ 那批法务文本（10-08，未提交）的真身：本线那一格其实早就做完了，还差的两格都不是我的。**
+它已经把 `access_sessions`／`email_change_requests` 逐类写进注销承诺**并**登记进 `CATEGORY_NAMES`
+（中英两栏 + 变更行），所以 §5 那条"本线欠四枚漏披露"的判据侧不必重做。差的两格：
+- **差 A**（自动收集那条线）：带修正探针的真源现为 **36 条 / 35 张**，文案写 34/33；
+  `automation_entitlement_activations` / `_links` / `_subjects` 三张在类别表里没登记。
+- **差 B**（同批里别人那半，`packages/legal/tests/email-catalog.spec.ts` 未跟踪）：三枚命中，
+  其中一枚是它自己的内部矛盾「排除变更表之后仍有不符项，与上面那条判据矛盾: expected 10 to be +0」。
+⇒ 联合提交的前置没有变（那五份文件此刻仍被三条线同时握着），但**"欠什么"这张表现在是准的**：
+本线不再欠法务文本，只欠"由文件的写入者一次收拢"。
+
+**④ 共享检出那几分钟的索引里躺着我线的删除件**（写清给并行会话）：`git status` 报 **6 枚**路径 D/M，
+恰好是本线最后四笔提交的全部文件 —— 两枚门禁脚本 `D`、台账 −162 行、`apps/web` 用例 −42、`server/src/api.ts` −5、
+`package.json` 那两条门禁链。工作树完好（磁盘内容逐枚 == HEAD），所以**任何一次基于索引的提交都会把本线那四笔无声删掉**。
+处置只动索引、不动工作树：`git restore --staged --source=HEAD -- <那 6 枚路径>`，
+复验 `git diff --cached` 空、`server/src/api.ts` 回到 ` M`（别人那半没碰）。不猜是谁写的，也不替谁回滚别的路径。
+
 
 
 
