@@ -1086,24 +1086,38 @@ async function syncPrivacyJourney(browser, spec) {
       boxWidth: Math.round(rect.width),
       clientWidth: el.clientWidth,
       scrollWidth: el.scrollWidth,
-      lineRects: el.getClientRects().length,
+      // ⚠️ 这**不是**折行数：块级 `<p>` 上 `getClientRects()` 给的是边框盒，恒为 1（r58 三格都是 1）。
+      // 原来叫 `lineRects` 是我给它安了一个做不到的名字。要量行盒得用 `Range` 逐行取。
+      clientRectCount: el.getClientRects().length,
       rightBeyondViewport: rect.right > document.documentElement.clientWidth + 1,
     };
   }, NOTE_TEXT);
-  // 牙：把那一枚钉成"单行 + 撑破容器"，上面那三个几何量必须都数得到坏 —— 数不到这条判据就是装饰。
+  // 牙（两头的，不是"每格都必须溢出"）：① 每一格都要证明种下去的东西**确实生效** —— 回读计算样式
+  // 真的变成 `nowrap`，且盒子宽度随 `max-content` 变了；② 至少要有一格真的被上面那三个几何量数到溢出。
+  // 🔴 原来这一支写的是"每一格都必须溢出"，r58 现量那是**恒假**的：1440 那两格盒子有 623px，整句单行
+  // 本来就放得下，种 `nowrap` 也溢不出来 ⇒ 一条永远为假的判据（AGENTS §7 元规则二），而且是我一小时前
+  // 刚修掉同一型之后自己新写的（台账可 grep：`07:09 修好的尺第一次真跑成`）。溢出该不该出现，
+  // 由盒子宽不宽决定，不由我猜；"生效"那一半才是每格都该成立的。
   const noteBadArm = await page.evaluate((needle) => {
     const el = [...document.querySelectorAll('#settings-group-sync .ht-settings__hint')]
       .find((x) => (x.textContent ?? '').trim() === needle);
     if (!el) return { found: false };
     const prev = el.getAttribute('style') ?? '';
+    const boxWidthNatural = Math.round(el.getBoundingClientRect().width);
     el.setAttribute('style', `${prev ? `${prev};` : ''}white-space:nowrap;width:max-content`);
+    const plantedWhiteSpace = getComputedStyle(el).whiteSpace;
     const rect = el.getBoundingClientRect();
+    const boxWidthMaxContent = Math.round(rect.width);
     const plantedClipped = el.scrollWidth > el.clientWidth + 1
       || rect.right > document.documentElement.clientWidth + 1;
     el.setAttribute('style', prev);
     const back = el.getBoundingClientRect();
     return {
       found: true,
+      tookEffect: plantedWhiteSpace === 'nowrap' && boxWidthMaxContent !== boxWidthNatural,
+      plantedWhiteSpace,
+      boxWidthNatural,
+      boxWidthMaxContent,
       plantedClipped,
       restoredInside: back.right <= document.documentElement.clientWidth + 1,
     };
@@ -1460,8 +1474,11 @@ const report = {
       x.noteFacts.scrollWidth <= x.noteFacts.clientWidth + 1),
     // 牙：种下去那枚"单行 + 撑破容器"必须被上面同一组量数到，撤掉之后要回到视口内。
     syncPrivacyHeaderNoteBadArmFlipsIt: syncPrivacy.every((x) =>
-      x.noteBadArm.found === true && x.noteBadArm.plantedClipped === true &&
-      x.noteBadArm.restoredInside === true),
+      x.noteBadArm.found === true && x.noteBadArm.tookEffect === true &&
+      x.noteBadArm.restoredInside === true)
+      // 溢出那一半只要求"至少一格数得到"：宽屏盒子放得下整句单行，种 `nowrap` 也不会溢出，
+      // 要求每格都溢出等于写一条恒假的判据（r58 现量就是这么红的）。
+      && syncPrivacy.some((x) => x.noteBadArm.plantedClipped === true),
   },
 };
 // 分母自检：这张归属表必须覆盖每一条断言。漏登记不是"少一行注释"——那条断言会既不进
