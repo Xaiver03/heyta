@@ -8,6 +8,7 @@ parser.add_argument('--serial', default=os.environ.get('ANDROID_SERIAL','emulato
 parser.add_argument('--timeout', type=float, default=12.0, help='seconds to wait for each UI state')
 parser.add_argument('--adb-timeout', type=float, default=45.0, help='seconds to wait for each adb call')
 parser.add_argument('--evidence-dir', type=Path, default=Path(__file__).resolve().parents[2]/'apps/mobile/evidence/profile-center/android')
+parser.add_argument('--in-app-language', choices=['en'], default=None, help='用产品自己的语言开关（设置→常规→语言）把整条旅程走成英文；不动设备语言')
 args=parser.parse_args()
 out=args.evidence_dir
 out.mkdir(parents=True,exist_ok=True)
@@ -217,6 +218,17 @@ try:
  shot('my')
  tap(T('设置','Settings'),T('常规','General'),resource='settings-section-general');shot('settings-directory')
  tap(T('常规','General'),T('语言','Language'));shot('general')
+ # 产品的语言开关按它自己的说明只在本会话内生效，所以英文分支可以不动设备语言、
+ # 走产品真正那条路验到；开关不开时这一整块跳过，原有行为逐字不变。
+ if args.in_app_language=='en':
+  tap('English','Language',absent=T('语言','Language'))
+  # 开关按它自己的说明只在本会话内生效，所以英文分支可以不动设备语言、
+  # 走产品真正那条路验到；旋钮不开时这一整块跳过，原有行为逐字不变。
+  r=tree()
+  enHint='This choice lasts for the current session only; reopening the app returns to the device language.'
+  if find_exact(r,enHint) is None:raise AssertionError(('in-app language switch took effect?',texts(r)))
+  english=True
+  shot('language-panel-en')
  back(T('偏好与账号','Preferences and account'),T('语言','Language'),resource='settings-directory')
  tap(T('同步与隐私','Sync and privacy'),T('隐私同意','Privacy consent'),resource='settings-sheet');shot('sync')
  back(T('偏好与账号','Preferences and account'),T('隐私同意','Privacy consent'),resource='settings-directory')
