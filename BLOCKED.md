@@ -8254,3 +8254,27 @@ pnpm 用 `.modules.yaml` 的已记录状态判"最新"，离线模式下不去�
 **要拍的两问**：① iOS 这条"凭据表单里填的 E2EE 口令"进应用状态的路，是不是缺一步显式 unlock/set
 （web 那条路是好的 —— §6.14 真浏览器腿改密三块全绿）；② 若缺，补在 `apps/mobile` 还是 `packages/app-host`。
 在拍之前，**改密的设备侧读数保持"未闭合"**，不许拿 web 腿的绿顶替它（AGENTS §8 第 10 条同族：跨端不能互顶）。
+
+### B149 的 21:1x 追读：归因从"未定"收窄到**两条候选路**，各带文件级证据（仍不代改）
+
+1. **移动端手动凭据这条路，存的口令没有任何 unlock 消费者。**
+   `apps/mobile/src/sync/credential-form.ts:102,115` 把 `{serverUrl, token, password}` 写进
+   `writeSyncConfig`；`apps/mobile/src/sync/config.ts:76` 确实落盘 password；
+   但全 `apps/mobile` 里读 `.password` 的只有 `auth/session.ts:65,91`（**托管登录**那条路），
+   `sync/store.ts` / `db/open-host.ts` **一处都不读**。
+2. **移动端的 unlock 设计走的是另一条路**：`apps/mobile/src/db/open-host.ts:87-120` 只注入
+   `getSyncConfig: readSyncConfig` 与 `vaultRootKeyStore{load, isAutoUnlockDisabled}`，
+   注释明写「Settings UI 只是控制面板，**不是**后台/自动同步所需的 unlock 路」⇒ 它指望**原生 keychain 里的 root key 自动 unlock**。
+   手动凭据的新账号在 keychain 里没有 root key，而 password-mode 会话又没人建 ⇒ `no-encryption-password`。
+3. **web 手动路为什么是好的**：`apps/web/src/features/sync/store.ts:255` `getPassword: async () => get().password`
+   —— 内存里的口令直接喂给 `createSyncClient`（`packages/app-host/src/sync-wiring.ts:108` 的 `getPassword`）。
+   即：**同一条共享接线，web 宿主喂了口令、移动宿主没喂**。
+
+⇒ 两问变成两选：
+- **选 A（接线对齐 web）**：移动宿主的 `getPassword` 从 vault 会话取，会话锁着且 config 有口令时用它 unlock 一次。
+  风险：与「口令绝不长期落盘」（`hosted-auth.ts:1224` 引用的 sync-wiring 立场）相冲 —— config 里那份 password
+  已经是落盘的，选 A 等于承认手动路就是"落盘口令 + 启动时 unlock"，要把立场句子改准。
+- **选 B（界面收掉误导）**：手动凭据表单**不显示**口令框（口令只走 SecurityScreen 的设置/解锁），
+  即承认移动端手动路要求先设 E2EE 口令再同步。风险：与 web 手动路形状不一致，跨端体验分叉。
+两选都是**对外/产品口径**，本线不代拍。改完必须重跑设备腿（改密块）并配一条变异臂
+（把 unlock 拿掉 ⇒ 腿的同步等待判据必须红）。
