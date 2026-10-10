@@ -1950,6 +1950,11 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
   🔴 **复量证明这红不是本线那三笔带进来的**：把 checker 取回 `62daca0d`（本线动它之前那一版）对同一棵 HEAD 树再跑 ⇒ 同样 **14 条**、`OLD_CHECKER_RC=1`。
   ⚠️ 顺带一条量具自身的形状（不是缺陷，但会让下一个复现的人以为门坏了）：这枚门运行时按 `REPO = parents[2]` 去读那三份真源，**部分解包直接 traceback**（`FileNotFoundError` 落在 `zh-CN.ts`），本线第一趟就撞在只解 `scripts/qa` 那一次上 ⇒ 要复现这条读数，三样一起解。
 
+- [x] ✅ **01:1x 把本账那些"HEAD 里没有"的判据一次批量重量**（八条，全用它们自己正文里写好的命令，HEAD 与主检出各取一次），因为 HEAD 从昨天夜里到现在被推进了十几笔：**八条全部仍然成立，但没有一条还"没人做"**——它们**每一条都已经躺在别人的工作树里**。逐条 `HEAD / 工作树`：
+  ① `e2e/tests/helpers.ts` 的 `selectSettingsSection` = **0 / 4**；② `apps/web/src/App.tsx` 的 `DataSettingsPanel` 接线 = **0 / 2**（数据管理那面）；③ 同一份 `App.tsx` 的 `aria-controls` = **0 / 2**（上面那格"这枚装置在干净检出上定位器恒空、死在第一次点击"对 HEAD 仍成立）；④ `App.tsx` 里那串"一组一标题"的形状 = **0 / 7**；⑤ `HelpPanel.tsx` 的 `about-link-feedback` = **0 / 1**（帮助面那格挡着 `help-entry-ux` 的那条）；⑥ `PrivacyPanel.tsx` 的 `SettingsNotice` = **0 / 4**；⑦ 提醒面板 `apps/web/src/features/reminders/ReminderNotifyPanel.tsx`（⚠️ 目录是 `reminders` 复数。**本账三处都写对了，是我自己第一趟把路径猜成单数、`git ls-files` 取回空行**——那次的下一步我做对了：改成 `find apps/web/src -name ReminderNotifyPanel.tsx` 现取，而不是照猜的路径写结论）`unsupported` 那档 = **0 / 3** 而 `granted` 两侧都 4；⑧ `packages/ui/package.json` 的 `zxcvbn` = **0 / 2**（⑦ 那一行原本就写着"后两态只活在工作树"，所以它不是被否证的旧断言，是同一句的数值复量；**⑧ 不是复量，是本笔新添的一条** —— 那一格只把 lockfile 与 `packages/ui/package.json` 比在**同一个 ref** 上（3 对 0），从来没说过工作树那边补没补，而现量工作树是 **2** ⇒ "生产者已经补上声明、只等入库"这句以前不在账上）。
+  🔴 **⑧ 是这轮唯一改变等待内容的一条**：那枚"HEAD 装不起来"的红（`pnpm install --frozen-lockfile` 死在 lockfile 里有 `@zxcvbn-ts/core` 而 `package.json` 没有）**在生产者那一侧已经修好了，只是没入库** ⇒ 这一格现在该等的不是"谁去修"，是**那一笔提交落进来**；落进来之后 `#25`/`#26` 那两格的前置才有意义可谈。
+  📌 **一条元教训，它比这八条数值更值得留下**：`selectSettingsSection` 这**一个事实在本账被抄了 15 处**（`grep -c selectSettingsSection docs/plans/product-ux-optimization.md`，现量于本笔），每处都是"当时为真"。⇒ 一个瞬时属性抄 N 遍，重量时就得改 N 处，漏改的那些**不会报错，只会各自漂**——这正是 AGENTS §7 与本页那几格"正文别存会漂的值"的同一件事，只是这次的代价形态是"复量要做 15 次替换"。所以本笔起，**这类批量的复量只写一条带命令的格子**，别往那 15 处各贴一个新数值。
+
 - [ ] 🔴 **分诊那 11 组时顺出来一条本线自己脚本里的假通过形状（iOS Profile/Settings 那条旅程），登记，本线此刻不修**：第 224 与 230 行是 `present(launch_tree, ("只用本机",) / ("先离线使用",), pressable=True)` —— 这两处是**分支条件**，不是断言。
   它们决定这条旅程要不要点首屏那两下：命中才点，**没命中就走 `else` 记一条 `onboarding already complete / passed`**。
   ⇒ 在英文系统的模拟器上，全新安装的首屏标签是英文，这两个**只写中文**的条件都取不到 ⇒ 脚本**不会失败、也不会点**，而是直接给首屏那一步记一个 `passed`。
