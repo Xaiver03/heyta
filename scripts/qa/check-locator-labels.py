@@ -56,7 +56,7 @@ CJK = re.compile(r"[一-鿿]")
 # 拿它"重取基线"会把旧值抄回去，于是这一格从此不会变。实测：同一枚脚本正常运行读到 14、`--print-floors` 报 0。
 CJK_GROUP_FLOOR = {
     "profile-settings-android.py": 56,
-    "profile-settings-ios.py": 43,
+    "profile-settings-ios.py": 44,
     "tasks-ux-android.py": 2,
     "tasks-ux-ios.py": 42,
     "ai-assistant-atomic-android.py": 14,

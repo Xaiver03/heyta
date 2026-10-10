@@ -230,7 +230,20 @@ def run(probe: Probe) -> None:
     if present(launch_tree, ("先离线使用",), pressable=True) is not None:
         probe.tap("choose offline", ("先离线使用",), ("任务", "我的"))
     else:
-        probe.record("onboarding already complete", "passed", labels=labels(launch_tree)[:100])
+        # 「引导已经走完」和「这两枚中文定位符没命中（例如界面不是中文）」在两棵 AX 树上长得
+        # 一模一样，所以以前这一支无条件记 `passed` —— 那是把探针没走到被测路径当成验收通过。
+        # 能区分两者的可观测形状只有一个：真走完引导的那棵树里必然读得到首页标签。
+        onboarded = present(launch_tree, ("任务", "我的"), pressable=True) is not None
+        probe.record(
+            "onboarding already complete",
+            "passed" if onboarded else "home-labels-absent",
+            labels=labels(launch_tree)[:100],
+        )
+        if not onboarded:
+            raise JourneyError(
+                "onboarding labels were not found and the home tab is not visible either; "
+                f"visible labels={labels(launch_tree)[:80]!r}"
+            )
 
     # The screenshot is intentionally taken only after the Profile tab is
     # active; a fresh install otherwise captures the default Tasks tab.
