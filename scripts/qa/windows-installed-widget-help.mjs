@@ -37,6 +37,27 @@ const OUT = resolve(
 );
 const PROBE = resolve(ROOT, 'scripts/qa/windows-external-browser-probe.ps1');
 
+/**
+ * 判"这个窗口是不是原生壳"用的是产品自己那三条信号加它自己的封闭名单，不在这枚装置里另写一份。
+ * 两条实测理由：① 装置原先写的是 `shellMessageHandlers.length > 0`，比产品松 —— 一枚只暴露
+ * `bridge` 之类无关 handler 的普通 WKWebView 会被判"壳注入了信号"，而页侧照样走浏览器岔路；
+ * ② 装置原先还把 `backend === 'shell'` 当硬判据，而 `resolveStorageBackend()` 的 `'shell'`
+ * 只在 `__heytaHostStoragePort` 存在时才给（`apps/web/src/lib/oplog.ts:107`）⇒ `HEYTA_SHELL_STORAGE=0`
+ * 那一趟会先死在这一行，本格想证的"逃生门关掉后也认得壳"根本走不到。名单从真源读，**读空就响亮失败**
+ * （空集合不许算通过）。
+ */
+const SHELL_HANDLER_NAMES = (() => {
+  const source = readFileSync(resolve(ROOT, 'apps/web/src/pwa/widget-install.ts'), 'utf8');
+  const block = source.match(/SHELL_MESSAGE_HANDLER_NAMES\s*=\s*\[([^\]]*)\]/);
+  const names = [...new Set([...(block?.[1] ?? '').matchAll(/'([^']+)'/g)].map((m) => m[1]))];
+  if (names.length === 0) {
+    throw new Error('没能从 apps/web/src/pwa/widget-install.ts 读出 SHELL_MESSAGE_HANDLER_NAMES —— 这条判据的名单是承重的，读空不许当通过');
+  }
+  return names;
+})();
+const isNativeShellHost = ({ storagePort, webview2Host, shellMessageHandlers }) =>
+  storagePort || webview2Host || shellMessageHandlers.some((name) => SHELL_HANDLER_NAMES.includes(name));
+
 mkdirSync(OUT, { recursive: true });
 
 function runFileCommand(command, args) {
@@ -191,14 +212,19 @@ const widgetFacts = await widget.evaluate((panel) => ({
   panelText: panel.textContent?.trim() ?? '',
 }));
 assert(widgetFacts.statusCount === 1, `Widget Journey 状态行应恰好 1 条，实际 ${String(widgetFacts.statusCount)}`);
-assert(widgetFacts.backend === 'shell', `页侧存储后端不是 native shell：${String(widgetFacts.backend)}`);
+// `backend` 从"硬判据"降级成"对账项"：它只回答"存储端口在不在"，而这一趟要判的是"页侧认不认这是壳"。
+// 两者不一致才红（自报 shell 却没注入端口 = 页侧在说谎；注入了端口却自报非 shell = 接线断了）。
+assert(
+  (widgetFacts.backend === 'shell') === widgetFacts.shellSignals.storagePort,
+  `存储后端自报与注入信号不一致：backend=${String(widgetFacts.backend)} storagePort=${String(widgetFacts.shellSignals.storagePort)}`,
+);
 assert(/原生桌面|native desktop/i.test(widgetFacts.statusText), `状态行没有识别为原生桌面：${widgetFacts.statusText}`);
 assert(widgetFacts.capabilityText.length > 0, '原生壳没有渲染小组件能力边界说明');
 assert(widgetFacts.installStepCount === 0, `原生壳不应显示 PWA 安装步骤，实际 ${String(widgetFacts.installStepCount)} 条`);
 const { storagePort, webview2Host, shellMessageHandlers } = widgetFacts.shellSignals;
 assert(
-  storagePort || webview2Host || shellMessageHandlers.length > 0,
-  `壳没有注入任何一条原生信号（storagePort=${String(storagePort)} webview2Host=${String(webview2Host)} handlers=${JSON.stringify(shellMessageHandlers)}），页侧只能把它当浏览器`,
+  isNativeShellHost(widgetFacts.shellSignals),
+  `壳没有注入产品认得的任何一条原生信号（storagePort=${String(storagePort)} webview2Host=${String(webview2Host)} handlers=${JSON.stringify(shellMessageHandlers)} 名单=${JSON.stringify(SHELL_HANDLER_NAMES)}）⇒ 页侧只能把它当浏览器`,
 );
 await widget.scrollIntoViewIfNeeded();
 await page.screenshot({ path: resolve(OUT, 'windows-widget-native.png'), fullPage: false });
