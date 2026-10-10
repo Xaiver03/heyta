@@ -8,7 +8,10 @@ parser.add_argument('--serial', default=os.environ.get('ANDROID_SERIAL','emulato
 parser.add_argument('--timeout', type=float, default=12.0, help='seconds to wait for each UI state')
 parser.add_argument('--adb-timeout', type=float, default=45.0, help='seconds to wait for each adb call')
 parser.add_argument('--evidence-dir', type=Path, default=Path(__file__).resolve().parents[2]/'apps/mobile/evidence/profile-center/android')
-parser.add_argument('--in-app-language', choices=['en'], default=None, help='用产品自己的语言开关（设置→常规→语言）把整条旅程走成英文；不动设备语言')
+# 说明走注释而不是走 help= 字符串：`check-locator-labels.py` 把这五枚脚本里的中文
+# 字面量当成"界面标签"去词条真源对账，CLI 帮助不是界面文案（同目录的
+# profile-settings-ios.py 的 help= 也一律是英文）。
+parser.add_argument('--in-app-language', choices=['en'], default=None, help='drive the whole journey in English through the app\'s own language switch (Settings > General > Language); does not touch the device locale')
 args=parser.parse_args()
 out=args.evidence_dir
 out.mkdir(parents=True,exist_ok=True)
