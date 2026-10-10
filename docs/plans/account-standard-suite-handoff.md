@@ -13,12 +13,56 @@
 
 ## 0. 一句话现状
 
-**代码与判据侧已闭合，四端里三端有真读数；唯一没取到的是 iOS 设备腿那一趟，而它今天被两枚不属于本线的构建红挡着。**
+**代码与判据侧已闭合；iOS 设备腿的两堵墙在 19:1x 都由 owner 自己收掉了，全链构建第一次跑绿，那一腿正在跑。**
 负责人已把这一腿留成 goal 的收口条件（原话：「先不合上，等设备腿」）⇒ **goal 不许自行 complete，必须先请示**。
 
-🔴 **本文件写成的同一趟里量到一条新事实，它推翻了 §6.81 那枚「排除 `apps/node-host` 就能构建」的打算**：
-把 node-host 整层退回已提交那版之后，**同一形状的第三处**在 `apps/web` 里立刻顶上来了（详见 §4.1）。
-⇒ 那一枚红不是「一处内联 union」，是**一类三处**，而且第三处被第二处**遮着**（修了第二处它才会现形）。
+> ### 🔴 19:1x 闭合读数（这一段**取代**下面"两堵墙"那张表，也取代 §4.1 / §4.2 的红）
+>
+> | 格 | 现在 | 现量 |
+> |---|---|---|
+> | i18n 四行重复键（我登的 **B141**，原取 B138 后与别线撞号让号） | ✅ 已入库 | 那两个语言文件上复核枚举 ⇒ **重复=0** |
+> | `waiting-entitlement` 的内联重抄（**B137**） | ✅ **零处剩下** | `apps/node-host/src/host.ts:275` = `Promise<InboundAutomationCycleResult>`（`:56` 已 import）；`inbound-runtime.ts:15/:184` 同；`InboundAutomationSettings.tsx:13/:37/:72` 用 `Partial<Record<InboundAutomationCycleState \| 'failed', …>>` ⇒ 四态都有位置 |
+> | 全链构建 | ✅ **绿** | 载体（tip `1a30d3bc` ＋ 32 枚脏路径）`pnpm -r build` ⇒ `BUILD_RC=0`、`error TS` **0 条**、18 个顶层目录被建（`~/heyta-carriers/w9-acct-logs/greencheck.log`） |
+>
+> ✅ **两格都不是本线修的，也不是本线等的** —— owner 在我写这份交接的同一小时里收掉的。
+> 本线一次都没代改别人的文件（那枚"替 owner 打上类型修正"的有界实验，断言
+> `assert s.count(old)==1` 当场 `AssertionError: 0` —— **那正是"已经修好了"的证明**，见复盘表第 10 行）。
+>
+> ▶ **正在进行**：`IOS_DEVICE_NAME="heyta-ios-isolated" HEYTA_NO_FOCUS=1 bash scripts/reinstall-all.sh --only ios`
+> 在载体里跑（**走脚本原路，零偏离**）。第 0 步 `pnpm -r build` 已是 `✅ 全仓构建完成` ——
+> 这是本线开工以来**第一次**过了那道没有逃生门的闸门。当前卡在段内 `pod install`
+> （最多 6 趟有界重试，`ArgumentError - path name contains null byte` 是逐趟非确定性的上游缺陷，
+> 不是产品坏了），随后 `xcodebuild Release`。日志 `~/heyta-carriers/w9-acct-logs/reinstall-ios-leg.log`。
+> 装完之后跑 `bash ~/heyta-carriers/w9-acct-logs/run-ios-account-leg.sh <UDID>`，读数写进过程账 **§6.83**。
+> 🔴 若这一腿仍未闭合，**goal 就还是 open**，别把"构建绿了"读成"设备腿取到数了"。
+
+---
+
+**（下面是 18:4x 那版现状，保留是为了让下一手认出"墙是怎么塌的"；照行动前先看上面那块。）**
+
+
+**代码与判据侧已闭合，四端里三端有真读数；唯一没取到的是 iOS 设备腿那一趟，而它现在卡在别人那 5 行代码上。**
+负责人已把这一腿留成 goal 的收口条件（原话：「先不合上，等设备腿」）⇒ **goal 不许自行 complete，必须先请示**。
+
+🔴 **本文件写成之后主检出又被别线连续提交（`7c30ca62` → `0243762a` → `8bbc50b1`，18:47–18:53），
+拦路的红整个换了一批。** 本节下面这些结论**全部是对 tip `8bbc50b1` 现量的**，
+照它行动前请先 `git rev-parse --short HEAD` 对一次（**这份仓里任何"X 会红在 Y"的结论都是瞬时属性**）。
+
+现在拦在设备腿前面的只有两件事，**顺序是 ①→②**：
+
+| ① 第一堵墙 | 已提交的 i18n 里 `site.platforms.{android,desktop}.body` **各写了两遍**（en 两枚 + zh 两枚，共 4 行）。
+`packages/i18n` 以 `TS1117` 拒绝 ⇒ `pnpm -r build` 停在**第一枚包**，后面每枚包都没被编译过。登记为 **B141**（原取 B138，与别线那枚撞号后让号）。 |
+|---|---|
+| ② 第二堵墙 | `apps/node-host/src/host.ts:274` 那个**内联三态**返回类型（= 原 B131/B137）。摘掉 ① 之后，**全链只剩这一处 TS 红**（现量：`BUILD_RC=1`、`error TS` 计数 **= 1**）。 |
+
+✅ **原先登记的三处内联 union，另外两处已被那条线自己修掉了**，而且修法比"补 union"好：
+`inbound-runtime.ts:15/:184` 改成 import 共享类型，`InboundAutomationSettings.tsx:13/:37/:72` 用
+`Partial<Record<InboundAutomationCycleState | 'failed', …>>` ⇒ 四态都有位置。逐条读数在 `BLOCKED.md` **B137 的 19:0x 更正块**。
+
+✅ **原先 §4.2 / §4.3 那两堵"HEAD 装不了 / HEAD 的 barrel 导入未提交文件"的墙，被这批提交一并拆了**：
+那 7 枚 `packages/ui` 组件与三枚在飞 manifest 现在都在 HEAD 里，
+`pnpm install --frozen-lockfile --offline` 在载体上 `INSTALL_RC=0`（`Already up to date`、231 ms、**零网络**）。
+
 
 ---
 
@@ -105,100 +149,116 @@
 
 ---
 
-## 4. 阻塞与风险（**全部不属于本线**，逐枚带现量）
+## 4. 阻塞与风险（**除 §4.5 外全部不属于本线**，逐枚带现量）
 
-### 4.1 🔴 B131 是一类三处，不是一处（**本文件写成时新量到**）
+### 4.0 🔴 先读这一句：**本节每一条都是"对某个 tip"的读数，不是状态**
 
-生产侧真源（在飞）已把状态加宽成四态：
+写这份交接时是 `7c30ca62`；18:47–18:53 别线连续提交把它推到 `0243762a` 再到 `8bbc50b1`，
+**§4.3 与 §4.4 那两堵墙当场消失**（它们依赖的"未提交文件"被提交了）。
+⇒ 接手第一件事是 `git rev-parse --short HEAD` + 跑 §6 第 1 步那条命令，**别照本节任何一行推断"现在还红"**。
+
+### 4.1 🔴 第一堵墙（新）：已提交的 i18n 有 **4 行重复键** ⇒ 全仓构建停在第一枚包 → **B141**（原取 B138，与别线撞号后让号）
 
 ```
-packages/app-host/src/inbound-process.ts:53
-  export type InboundAutomationCycleState = 'empty' | 'submitted' | 'needs-confirmation' | 'waiting-entitlement';
+packages/i18n/src/locales/en.ts      site.platforms.android.body  行 3789 与 3791
+packages/i18n/src/locales/en.ts      site.platforms.desktop.body  行 3795 与 3797
+packages/i18n/src/locales/zh-CN.ts   site.platforms.android.body  行 4024 与 4026
+packages/i18n/src/locales/zh-CN.ts   site.platforms.desktop.body  行 4030 与 4032
 ```
 
-消费侧**手抄了三态**的地方，全仓枚举结果（命令见下）：
+`error TS1117: An object literal cannot have multiple properties with the same name`（`tsup` 的 dts 阶段）。
+两代落地页平台文案被一次合并**都留下了**，没有二选一。中英各两枚、同名同位置 ⇒
+**不是**中英不同步（`check:ui-language` 那侧是对称的），是同一侧写了两个值。
 
-| # | 位置 | 形状 | 现在红不红 |
-|---|---|---|---|
-| 1 | `apps/node-host/src/host.ts:274` | `processInboundAutomation` 的**内联返回类型** | 🔴 红（= 已登记的 B131） |
-| 2 | `apps/web/src/features/settings/inbound-runtime.ts:184` | web 包装函数的**内联返回类型**；报错落在 `:210`（把 `processInboundAutomationEvent(...)` 的结果交给那个签名） | 🔴 **红（今天新量到）** |
-| 3 | `apps/web/src/features/settings/InboundAutomationSettings.tsx:56` + `:291` | `useState<'idle'\|'submitted'\|'empty'\|'needs-confirmation'\|'failed'>`，而 `:291` 直接 `setProcessState(result.state)` | ⚪ **现在不红，因为被 #2 遮着** —— `result` 的类型来自 #2 那个三态签名。**把 #2 改成 import 共享类型的那一刻，#3 立刻变红** |
+🔴 **修法其实零行为变更**：JS 对象字面量**后者覆盖前者** ⇒ 任何已经构建出来的产物，界面上一直是后一版。
+所以"删前留后"改的不是对外承诺的内容，只是把**没生效的那半行**注释掉。
+（反证形状：把留/删反过来，界面文案会变 —— 那才是一次真实的对外陈述修改。）
 
-```bash
-# 枚举命令（可复现）
-cd "<repo>" && grep -rn 'needs-confirmation' --include='*.ts' --include='*.tsx' apps packages server
-# 生产侧真源
-grep -n 'InboundAutomationCycleState' packages/app-host/src/inbound-process.ts
-```
+**为什么不代改**：这两段是**落地页对外陈述**（"有签名测试包 / 不在应用商店 / 三端都在公开桶 / SmartScreen 拦一次 /
+`dpkg -i` 未实测"），选哪半行是**对外口径**，按既有边界要先说一声；而且文件不在本线手里。
+⇒ 已登 **B141**，含只读枚举命令与两版措辞逐字对照。
 
-🔴 **还有一条产品行为缺口，不只是类型缺口**：`waiting-entitlement` 在 `apps/` 的**源码里零消费**
-（只在 `apps/desktop/dist/*.cjs` 那两份**构建产物**里出现）。
-⇒ 即使把三处类型都修通，**web 界面也没有 `waiting-entitlement` 那一档的渲染分支**：
-`:291` 会把一个不在本地 union 里的值塞进 `processState`，落到「没有任何分支匹配」。
-这需要那一档的产品语义（退避重试？报错？安静等订阅？）—— **不是删一子能修的**。
+**本线只做了一次有界诊断**（在隔离载体里、**做完逐字还原**）：摘掉那 4 行后 `pnpm -r build` 从
+"停在 i18n" 变成"停在 node-host"，且**全链 `error TS` 计数 = 1**。
+还原证明：`git hash-object <file>` == `git rev-parse HEAD:<file>`，`git status --porcelain -- packages/i18n/` 为空。
+**主检出一个字都没动。**
 
-**不代改**（三条不齐，按既有纪律）：① 修它不是删一子，要决定产品语义；
-② 改后的运行时形状无法现量等于改前；③ 这三个文件此刻都在别人手上（` M`）。
-⇒ **交回给 owner**，并已登记为 `BLOCKED.md` 的 **B137**（末号现量：
-`grep -oE '^## B[0-9]+' BLOCKED.md | sort -t B -k2 -n | tail -1`；写这份时工作树读到 **B136**、
-HEAD 只到 **B134** ⇒ B135/B136 是别线**未提交**那两枚，**下一个属于我的空号是 B137**）。
+### 4.2 🔴 第二堵墙（旧 B131，现在**只剩一处**）：`apps/node-host/src/host.ts:274` 的内联三态 → **B137**
 
-### 4.2 🔴 HEAD 的 `pnpm-lock.yaml` 与 HEAD 的 manifest 对不上 ⇒ 离线装不了
+生产侧真源仍是四态：`packages/app-host/src/inbound-process.ts:53`
+（`'empty' | 'submitted' | 'needs-confirmation' | 'waiting-entitlement'`）。
+**18:5x 现量**：原先枚出的三处内联重抄，另外两处**已被那条线在 18:47–18:53 那批提交里修掉了** ——
 
-HEAD 的 lockfile 记着 HEAD 的 manifest **没声明**的依赖（`@zxcvbn-ts/core@4.2.0`、
-`@zxcvbn-ts/language-common@4.1.3`、`@heyta/legal@workspace:*`）。
-后果：`pnpm install --frozen-lockfile` 报 `ERR_PNPM_OUTDATED_LOCKFILE`；
-不带 `--frozen-lockfile` 就要去 registry 做协调，而**本机到 registry 不可达**
-（症状是 `ECONNRESET` / `error 23` / `[ERR_PNPM_META_FETCH_FAIL]`，长得像「缺依赖」，其实是网络）。
+| # | 位置 | 现在 |
+|---|---|---|
+| 1 | `apps/node-host/src/host.ts:274` | 🔴 **仍是内联三态** ⇒ 唯一剩下的红（`src/host.ts(422,5): error TS2322`） |
+| 2 | `apps/web/src/features/settings/inbound-runtime.ts` | ✅ `:15` `import type { InboundAutomationCycleResult }`、`:184` 用它 |
+| 3 | `apps/web/src/features/settings/InboundAutomationSettings.tsx` | ✅ `:13` import 共享类型、`:72` `useState<'idle' \| 'failed' \| InboundAutomationCycleState>`、`:37` `PROCESS_COPY: Partial<Record<InboundAutomationCycleState \| 'failed', MessageKey>>` ⇒ 四态都有位置 |
 
-```bash
-# 现量（在载体里）
-pnpm install --frozen-lockfile --offline 2>&1 | tail -5
-# 纯 HEAD 那趟的证据
-grep -n 'ERR_PNPM_META_FETCH_FAIL' ~/heyta-carriers/w9-acct-logs/build-pure-head.log
-```
+**"只剩一处"是怎么证明的**（下一手的人可以直接信这两条，也可以重跑）：
+- `pnpm -r build` ⇒ `BUILD_RC=1`，`grep -cE 'error TS'` = **1**，就是 `host.ts(422,5)`。
+- `pnpm -r --filter '!@heyta/node-host' build` ⇒ **`BUILD_RC=0`**、`error TS` 0 条，
+  并且**排除了"过滤器打空"那种假绿**：`No projects matched` 命中 0、17 个顶层目录被建、
+  `apps/web build: ✓ built in 3.71s / Done`、`apps/node-host` 提及 0 行。
+  日志 `~/heyta-carriers/w9-acct-logs/build-after-dupfix3.log` 与 `/tmp/nh.log`。
 
-✅ **绕法已实测有效**：把在飞的那几枚 manifest 叠进载体之后，
-`pnpm install --frozen-lockfile --offline` = `INSTALL_RC=0`、`Already up to date`、**227 ms、零网络**
-（读数 `~/heyta-carriers/w9-acct-logs/full-overlay-build.log`，18:35:03–18:35:19）。
+**为什么本会话仍不代改**：换成共享类型之后，`host.ts` 的实现必须处理第四态，
+而"CLI 在 `waiting-entitlement` 那一档做什么"（退避重试 / 报错 / 安静等订阅）是**产品语义**，不是删一子；
+改后运行时形状无法现量等于改前；该文件此刻在别线手里。三条不齐 ⇒ 只登记。
 
-🔴 **两条试过但没用的绕法，别再试**：`npm_config_verify_deps_before_run=false`
+### 4.3 ✅ 曾经过的第一条墙：HEAD 的 `pnpm-lock.yaml` 与 manifest 对不上 ⇒ **已被那批提交拆掉**
+
+18:3x 那趟的现量是：HEAD 的 lockfile 记着 HEAD 的 manifest **没声明**的依赖
+（`@zxcvbn-ts/core@4.2.0`、`@zxcvbn-ts/language-common@4.1.3`、`@heyta/legal@workspace:*`），
+于是 `pnpm install --frozen-lockfile` 报 `ERR_PNPM_OUTDATED_LOCKFILE`，
+不带 `--frozen-lockfile` 就要去 registry 协调，而**本机到 registry 不可达**
+（症状是 `ECONNRESET` / `error 23` / `[ERR_PNPM_META_FETCH_FAIL]`，长得像「缺依赖」，其实是网络 —— 见 `build-pure-head.log`）。
+
+✅ **19:0x 现量：这一格已经好了。** 那批在飞 manifest 现在就在 HEAD 里，
+载体（tip `8bbc50b1` + 24 枚脏路径）上 `pnpm install --frozen-lockfile --offline` =
+`INSTALL_RC=0`、`Already up to date`、**231 ms、零网络**（`rebuild-at-newtip.log` / `dupdiag3.log` 所在那趟）。
+
+🔴 **但那两条试过的绕法仍然无效，别再试**：`npm_config_verify_deps_before_run=false`
 与在载体里放一份 `.npmrc`（`verify-deps-before-run=false`）—— **两者都拦不住那次协调**。
 那份 `.npmrc` 已删（**不要靠静默关掉一道守卫来通过**，要修真的不一致）。
-⚠️ 这一条**同时更正了 §6.81 里那句「加 `npm_config_verify_deps_before_run=false` 才是走到真错的那一步」** ——
-它在 13:1x 那趟确实管用，在 18:xx 这趟不管用；差别是**当时载体里 lockfile 与 manifest 已一致**。
-⇒ 那个环境变量不是「让 pnpm 别自检」的开关，它只在「不一致本来就不存在」时无害。
+⚠️ 这一条**同时更正了过程账 §6.81 里那句「加 `npm_config_verify_deps_before_run=false` 才是走到真错的那一步」**：
+它在 13:1x 那趟"看起来"管用，18:xx 这趟不管用；差别是那会儿载体的 lockfile 与 manifest **本来就一致**。
+⇒ 那个环境变量不是「让 pnpm 别自检」的开关。**写进文档的因果句要先跑一次"去掉这一步"的对照**（复盘表第 2 行）。
 
-### 4.3 🔴 HEAD 自己构建不起来：committed barrel 导入了 7 个从未提交的文件
+### 4.4 ✅ 曾经过的第二条墙：HEAD 的 `packages/ui` barrel 导入 7 个从未提交的文件 ⇒ **已被那批提交拆掉**
 
-`packages/ui/src/index.ts`（来自 `e6058120`，产品体验线）导入的这 **7 枚**在主检出里是 `file/untracked`
-（存在、但从未 `git add`），另有 **5 个导出**只在工作副本里有：
+16:4x 那趟现量：committed 的 `packages/ui/src/index.ts`（来自 `e6058120`）导入 7 枚 `file/untracked` 的组件
+（`ai/AiGeneratedLabel.tsx`、`ai/AssistantMark.tsx`、`auth/LegalDocumentSheet.tsx`、`auth/PasswordStrength.tsx`、
+`empty-state/StateIllustration.tsx`、`habits/HabitArtwork.tsx`、`habits/HabitMetricIcon.tsx`）
+＋ 5 个只在**工作副本**里存在的导出 ⇒ 干净检出上 `pnpm -r build` 必红（12 条 TS2305/2307）。
+分类装置：`~/heyta-carriers/w9-acct-logs/missing-ui-mods.sh`；原文 `build-head3.log`。
 
-```
-packages/ui/src/{ai/AiGeneratedLabel.tsx, ai/AssistantMark.tsx, auth/LegalDocumentSheet.tsx,
-                 auth/PasswordStrength.tsx, empty-state/StateIllustration.tsx,
-                 habits/HabitArtwork.tsx, habits/HabitMetricIcon.tsx}
-```
+✅ **19:0x 现量：这 7 枚现在都在 HEAD 里**（逐枚 `test -e` + `git ls-files --error-unmatch` 可核）。
+⇒ 这一格和 §4.3 是**同一批提交**一起解决的，本文件留着它们是为了让下一个人认出"未提交文件被 committed barrel 引用"这个形状 ——
+**它还会再来**（任何一条线用宽 `git add` 挑一半文件都会再造一次）。
 
-```bash
-# 分类命令（逐枚判 file/untracked）
-bash ~/heyta-carriers/w9-acct-logs/missing-ui-mods.sh
-# 那趟红的原文
-grep -nE 'error TS' ~/heyta-carriers/w9-acct-logs/build-head3.log | head -14
-```
+### 4.5 🟡 方法论风险：叠加口径切一半会造出**无法归因**的红（本会话实测两次）
 
-⇒ **在一个干净检出上 `pnpm -r build` 今天必红**，而这与本线无关。
-
-### 4.4 🟡 窄叠加会造出**无法归因**的红（`apps/landing`）
-
-只叠 `packages/*` + `server/*` + `apps/mobile/*` 三个前缀时，红在：
+**第一次**：只叠 `packages/*` + `server/*` + `apps/mobile/*` 三个前缀时，红在
 ```
 apps/landing build: src/components/Footer.tsx(148,17): error TS2345:
   Argument of type '"landing.footer.disclaimer"' is not assignable to parameter of type …
 ```
-成因是**混代**：在飞的 i18n 词条 ＋ HEAD 的 landing 源码。这不是任何一条线的缺陷，是叠加口径不一致造出来的。
-⇒ **教训**：叠加要么「只叠自己那几枚」，要么「叠整片」，**不能按目录前缀切一半**；
-而且选了哪种**必须写进装置头与台账**（`sync-prefixes-to-carrier.sh` / `sync-dirty-to-carrier.sh` 的头注释就是干这个的）。
+成因是**混代**：在飞的 i18n 词条 ＋ HEAD 的 landing 源码。**不是任何一条线的缺陷**，是叠加口径切了一半造出来的。
+
+**第二次（更贵的一次）**：只把 `apps/node-host` 退回已提交那版，红**没有消失，只是搬到 `apps/web`**，
+让我一度以为"排除一处就够了"。⇒ 见复盘表第 3 行。
+
+🔴 **现在这一档已经不需要了**：主检出把在飞改动都提交完之后，载体只需要
+`git checkout -f <主检出 tip>` + 少量脏路径（19:0x 现量 `DIRTY_COUNT=24 / COPIED_VERIFIED=24`）。
+⇒ 但**下次主检出又攒了一批未提交改动时，这个选择会重新出现**，所以留两条纪律：
+① 叠加要么「只叠自己那几枚」要么「叠整片」，**不许按目录前缀切一半**；
+② 选了哪种**必须写进装置头与台账**（`sync-prefixes-to-carrier.sh` / `sync-dirty-to-carrier.sh` 的头注释就是干这个的）。
+
+⚠️ 一条配套的现量教训：`git checkout -f` 之前要确认载体是**自己的**（`.worktrees/iosacct` 由本线创建），
+且里面的字节可以从主检出重放出来（`sync-dirty-to-carrier.sh` 一条命令）。
+第一次没带 `-f` 时被拒绝了 —— 症状是那批"未跟踪文件"现在被新 tip 跟踪了：
+`error: The following untracked working tree files would be overwritten by checkout`（列了几十枚 widget 相关文件）。
 
 ---
 

@@ -22,6 +22,9 @@
 | **共享检出里那 6 枚删除件**（差点把本线最后四笔提交无声删掉） | `信息不足`：提交前没查**索引**，只看了工作树 | `git status` 报 6 枚 D/M，恰好是本线最后四笔的全部文件；工作树磁盘内容逐枚 == HEAD ⇒ 任何一次基于索引的提交都会删掉它们。处置：`git restore --staged --source=HEAD -- <6 枚>`，复验 `git diff --cached` 空 | 在共享检出里**每次**提交前先 `git diff --cached --name-status`；不属于我那片就把索引退回 HEAD，**只动索引、不动工作树** |
 | **本线 `BLOCKED.md` B131 那段文字被别线那笔提交吸走**（`0eea4c0f`） | `判断逻辑有问题`：知道共享检出要带 pathspec，实际操作时用了宽 `git add`。缺失信号 = 当时手边就有 plumbing 那条路 | `git log -S'B131' --oneline -- BLOCKED.md` 落在别线的 `0eea4c0f`；那段文字现在**已公开、不能再 amend** | 共享检出里落自己的 hunk **走 plumbing**（`hash-object -w` → 临时索引 → `write-tree` → `commit-tree` → CAS `update-ref` → `diff-tree` 证明），不用 `git add` |
 | **我自己那条挂了 52 分钟的陈旧门禁循环**占着载体，让我误判"载体空闲/负载高" | `判断逻辑有问题`：起后台等待循环时**没设终止条件、没登记 pid**，于是下一轮无从判断载体归谁 | 载体里查到 PID 28750 + 子 97598；**先**用 `lsof -a -p 28750 -d cwd` 证明其 cwd = `.worktrees/iosacct`（即我自己起的），才 kill —— 符合"只对自己创建的对象动手" | 起任何等待循环之前**登记 pid + 最长寿命**；怀疑载体被占，用 `lsof` 的 cwd **认人**之后再动，禁止按名字 kill |
+| **交接件里两枚 ADR 文件名是我凭记忆拼的，两枚都不存在**（`0063-session-rows-and-email-rebind.md`／`0039-token-compartmentalization.md`） | `判断逻辑有问题`：以为「ADR 编号 + 主题」能拼出文件名。缺失信号就是一次 `ls docs/adr/`，我跳过了 | 🔴 **发现者不是我**：别线那枚 B136 的死链读数点名 `account-standard-suite-handoff.md:8-10` 三条，我这才去 `ls` ⇒ 真名 `0063-email-rebinding-and-per-session-revocation.md`／`0039-email-first-auth-and-desktop-reverse-authorization.md`。改后 `node research/tools/docs-link-check.mjs` 对这两个文件只剩一条命中（"reflection 尚未被 git 跟踪"，新文件正常态） | 文档里**任何**指向具体文件的路径，落笔前先 `ls`/`test -e` 现量 —— 编号与主题拼不出文件名。写完立刻跑一次死链检查，别把"提交前再跑"当保障：**共享仓里别人可能比你先跑到，并把你的名字写进他的账** |
+| **我"替 owner 打上那枚类型修正"的有界实验**——其实早就没东西可打了 | `信息不足`：我在 19:11 打算改 `apps/node-host/src/host.ts:274` 做实验，**依据是 19:0x 那次现量**，而载体落后主检出 3 笔。缺失信号 = 实验前没重读那枚文件 | `python3` 替换脚本里的 `assert s.count(old)==1` 当场 `AssertionError: 0` ⇒ 那枚"旧串"已经不存在（owner 已把它改成 `Promise<InboundAutomationCycleResult>`）。📌 **这次不是失误而是装置救了场**：动手前的"旧串还在不在"断言，本身就是一枚免费的现量尺 | 往别人的文件上打任何临时补丁之前，**先跑一次"我要替换的那段还在不在"的断言**；断言失败就停下现量，别把"改不动"当成"改坏了" |
+| **我给那枚 i18n 重复键取的号（B138）与别线 18:5x 那枚撞了**，而两件事确实不是同一件 | `判断逻辑有问题`：18:5x 现量末号 B136 ⇒ 取 B137/B138；**中间隔了一小时多的构建与写文档**，而那一个小时里别人追加了 B137…B140。`BLOCKED.md` **没有防重号门禁**（`check:adr-numbering` 只管 ADR）⇒ 没有任何一层会替我发现 | `grep -oE '^## B[0-9]+' BLOCKED.md \| sort \| uniq -d` 抓到 `## B138` 命中 2 次（7184 行是别线的 `InboundAutomationHostOptions` 两份定义、7989 行是我这枚）⇒ 已把我这枚改成 **B141**（后到者让号），并更正三处交叉引用；仓内另有一枚**历史遗留**的 `## B102` 重号，不归本线 | **取号与落笔之间不许隔任何等待**：落笔前再跑一次 `uniq -d`。（更一般地：共享账本上"我是第 N 号"这件事的保质期，只到你写下它的那一秒。） |
 
 ---
 
@@ -32,7 +35,7 @@
    而不是重新赌一遍。它当场照出一枚无法归因的红（`apps/landing` 的在飞 i18n 词条 + HEAD 的 landing 源码 = **混代**），
    而我能立刻说清"这不是任何一条线的缺陷，是我的叠加口径切了一半"。
 2. **否证掉自己的打算之后没有硬修。** 发现 B131 是一类三处时，按既有三条（一子可删／改后运行时形状现量等于改前／
-   一条命令可回退）判为**不齐**，登记成 B135 交回 owner —— 而不是为了让设备腿能跑去代改别人的产品语义。
+   一条命令可回退）判为**不齐**，登记成 **B137** 交回 owner —— 而不是为了让设备腿能跑去代改别人的产品语义。
    代价是这一腿今天没取到数，但这正是那三条要付的价。
 
 ---
@@ -58,7 +61,15 @@
 - 用户级记忆是否更新：见 `~/.qoder-cn/memory/families/gates-teeth-and-consumers.md` 与
   `~/.qoder-cn/memory/feedback-reported-defect-is-a-class.md` 的当前内容（**接手者请现量核对**，
   本文件不构成"已经写进去了"的证据）。
-- `BLOCKED.md` 的 **B135**：本轮已登记（B131 一类三处的交回内容）。末号现量
+- `BLOCKED.md` 的 **B137**：本轮已登记（B131 一类三处的交回内容，含"第三处被第二处遮着"那一形）。
+  末号现量 `grep -oE '^## B[0-9]+' BLOCKED.md | grep -oE '[0-9]+' | sort -n | tail -1`。
+- 🔴 **这两份交接件本身是被别线那笔 `0243762a` 提交进去的**（18:49，宽 `git add` 第二次把本线未提交件扫走 ——
+  第一次是 B131 那段进 `0eea4c0f`）。⇒ 内容里若有错**不能再 amend**，只能新写一笔更正。
+  本轮就当场用上了这条：我凭记忆写下的两枚 ADR 文件名**都是错的**
+  （写成 `0063-session-rows-and-email-rebind.md` / `0039-token-compartmentalization.md`，
+  真名是 `0063-email-rebinding-and-per-session-revocation.md` / `0039-email-first-auth-and-desktop-reverse-authorization.md`），
+  是别线 B136 那次死链检查**先于我发现**并点名了我这两行 ⇒ 已改成真名，
+  并被这条新事实改写了处置：**猜文件名 = 造死链，必须 `ls` 现量**（见下表第 9 行）。
   `grep -oE '^## B[0-9]+' BLOCKED.md | tail -1`。
 - 过程账对应节：**§6.81**（已入库、其中两句本文件已否证 ⇒ 下一个接手的人应就地改准，
   别只在文末追加成功记录而保留正文旧断言 —— AGENTS §8 第 8 条）。
