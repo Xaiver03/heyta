@@ -181,6 +181,31 @@ const notifyPasswordChanged = async (
   }
 };
 
+/**
+ * 发那封告知信，但**不等它**。
+ *
+ * 🔴 为什么不能 `await`：`deliver` 内部已经 catch，所以这封信**不会抛，只会挂着**。
+ * 实测（2026-10-11 iOS 设备腿第 7 趟）SMTP 不可达时它 **7 分钟**才失败，而客户端的
+ * fetch 60 秒就超时 —— 于是口令已经换完、其余设备已经踢完、新令牌已经铸好，
+ * 界面却对用户说「连不上服务端，检查地址与网络后重试」。那是把一次**成功**
+ * 报成失败，而且报的还是一句假原因（网络好好的）。
+ * 本文件 `resetPasswordWithToken` 里那句立场注释早就写明了"一封通知发不出去
+ * 不许把成功报成失败"，`await` 恰好把它自己否证了。
+ *
+ * `.catch` 不是装饰：`sendPasswordChangedEmail` 在 `deliver` 的 try **之外**读一次
+ * 配置（`loadConfigFromEnv()`），那一发是真会抛的；不接住它就是一条未处理的
+ * rejection，而调用方此刻已经返回了。
+ */
+const notifyPasswordChangedSoon = (
+  userId: number,
+  email: string,
+  locale?: ServerLocale,
+): void => {
+  void notifyPasswordChanged(userId, email, locale).catch((error: unknown) => {
+    Logger.error(`Password-changed notice threw (ID: ${userId}): ${String(error)}`);
+  });
+};
+
 export interface PasswordResetInput {
   token: string;
   password: string;
@@ -279,7 +304,8 @@ export const resetPasswordWithToken = async (
   // 改口令成功的**告知信**：与 `changePassword` 同一条立场（那里的注释写了为什么
   // 只在成功时发）。发信失败**不影响**已经完成的重置 —— 口令已经换了，
   // 因为一封通知发不出去而把成功报成失败，会让人以为没改成而再去申请一张链接。
-  await notifyPasswordChanged(user.id, user.email, locale);
+  // 所以这一句**不许 await**（理由与被否证的旧写法都在 `notifyPasswordChangedSoon`）。
+  notifyPasswordChangedSoon(user.id, user.email, locale);
   return { message: PASSWORD_RESET_SUCCESS_MESSAGE };
 };
 
@@ -400,7 +426,9 @@ export const changePassword = async (
   // 逐字同一件事，理由也同一份：通道的 clientId 是自报的，放行"调用者自己那一枚"等于让
   // 拿着被盗令牌的人自称是调用者。
   await revokeAllDeviceSessions(user.id);
-  await notifyPasswordChanged(user.id, user.email, locale);
+  // 告知信**不等**（`notifyPasswordChangedSoon` 里写着为什么：等它会让一次已经
+  // 完成的改密在客户端看起来像"连不上服务端"）。
+  notifyPasswordChangedSoon(user.id, user.email, locale);
   return {
     token: await issueSession({ id: user.id }, meta),
     user: { id: user.id, email: user.email, locale: user.locale },
