@@ -53,6 +53,7 @@ import {
   restoreIntoEmptyTarget,
   type AppHost,
   type ExportDocument,
+  type InboundAutomationCycleResult,
   type InboundAutomationHostOptions,
   type InboundRecipientKeyScope,
   type InboundRecipientRegistration,
@@ -271,7 +272,7 @@ export interface NodeHost {
   ensureInboundRecipientKey(): Promise<InboundRecipientRegistration>;
   rotateInboundRecipientKey(): Promise<InboundRecipientRegistration>;
   /** Process one queue item through the shared inbound protocol. */
-  processInboundAutomation(options: InboundAutomationHostOptions): Promise<{ state: 'empty' | 'submitted' | 'needs-confirmation'; eventId?: string; itemCount?: number }>;
+  processInboundAutomation(options: InboundAutomationHostOptions): Promise<InboundAutomationCycleResult>;
   /** Start the same non-overlapping worker loop used by foreground hosts. */
   startInboundWorker(options: InboundAutomationHostOptions & { intervalMs?: number; isRunnable?: () => boolean; onError?: (error: unknown) => void }): () => void;
 
