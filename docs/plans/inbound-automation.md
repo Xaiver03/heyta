@@ -1482,7 +1482,7 @@ DEVICE_RC=0
 ### 缺陷一：402 在 `renew` 与 `ai-attempt/state` 两笔上被读成"传输失败"
 
 ①b 那一腿第一次跑就抛 `Error: Automation AI attempt state transition failed`，服务端给的是
-`402 {"errorCode":"SUBSCRIPTION_REQUIRED","reason":"PERIOD_ENDED"}`。`server/src/api.ts` 的
+`402 {"errorCode":"SUBSCRIPTION_REQUIRED","reason":"PERIOD_ENDED"}`（🔴 **10-11 重述**：这一格的键名在记录之后换了 —— 同一份判定今天回的是 `{"code":"SUBSCRIPTION_REQUIRED","message":"…","reason":"PERIOD_ENDED"}`。上面那句留着是因为它是**当天的真实读数**，不是措辞模板；照它去写断言会红。）。`server/src/api.ts` 的
 `/renew` 与 `/ai-attempt/state` 都挂着 `createEntitlementGuard({ capability: 'automation' })` ⇒ 它们**会**回 402，
 而 `packages/app-host/src/inbound-worker.ts` 里只有八笔中的五笔把 402 映射成
 `AutomationEntitlementRequiredError`。后果不是"少一条文案"：`inbound-process.ts` 靠那个异常类型收口成
@@ -1620,7 +1620,7 @@ cd apps/web && NO_COLOR=1 pnpm exec vitest run tests/inbound-cycle-display.spec.
 
 | AC | 证据命令（可复跑） | 贴出的输出（日期 · 载体） | 结论 |
 |---|---|---|---|
-| **AC-1 权益与授权** | `cd .worktrees/inb-t7 && python3 research/tools/verify-inbound-worker-identity.py --log /tmp/inb-wt-worker.log`；离线档：`cd server && npx --no-install vitest run --maxWorkers=1 tests/automation-entitlement-ticket.spec.ts tests/automation-drafts.spec.ts tests/inbound-automation.routes.spec.ts tests/inbound-entitlement-write-tx.spec.ts tests/inbound-worker-identity.spec.ts tests/automation-entitlement-issuer.spec.ts tests/automation-commit-proof.spec.ts tests/automation-events.spec.ts tests/automation-rules.spec.ts tests/automation-sender-credentials.spec.ts tests/automation-ai-metering.spec.ts`；HTTP 收口：`… tests/inbound-ai-quota-route.spec.ts`；真库对账：`… tests/automation-ai-metering.pglite.spec.ts` | 真库腿（临时 initdb 起真 PostgreSQL、全部迁移逐条 apply）：**`Test Files 1 passed (1)` / `Tests 46 passed (46)`，`WT_WORKER_RC=0`**（10-10 19:1x · 隔离副本 @ `a195a37f`）；离线 11 文件（同一枚命令逐枚写死路径）：**`Test Files 11 passed (11)` / `Tests 103 passed (103)`，`S11_RC=0`**（10-10 19:2x · 隔离副本）—— 台账 §665 那行原记 `99 passed`，**+4 只增不减**，多出的 4 条本趟**未逐枚归因**（不许读成回归，也不许读成"本线新加的尺"）；额度 HTTP `3 passed (3)`（402 + `errorCode` + 事务执行器零调用）、pglite `17 passed (17)`（§906，10-10 当日） | **判定层已闭合到可复跑**：错主体/错实例/坏签名/吊销落后/额度耗尽各红一条且**零业务效果**。⚠️ 两处不闭合：① 额度耗尽那条钉的是 `errorCode`，别线正把它改成 `code`（**B142**）——落地当天这 16 枚断言会红；② 新 ADR（限定取代 ADR-0017/0020）**还没写**，它在 **B139** 那格里等地界 |
+| **AC-1 权益与授权** | `cd .worktrees/inb-t7 && python3 research/tools/verify-inbound-worker-identity.py --log /tmp/inb-wt-worker.log`；离线档：`cd server && npx --no-install vitest run --maxWorkers=1 tests/automation-entitlement-ticket.spec.ts tests/automation-drafts.spec.ts tests/inbound-automation.routes.spec.ts tests/inbound-entitlement-write-tx.spec.ts tests/inbound-worker-identity.spec.ts tests/automation-entitlement-issuer.spec.ts tests/automation-commit-proof.spec.ts tests/automation-events.spec.ts tests/automation-rules.spec.ts tests/automation-sender-credentials.spec.ts tests/automation-ai-metering.spec.ts`；HTTP 收口：`… tests/inbound-ai-quota-route.spec.ts`；真库对账：`… tests/automation-ai-metering.pglite.spec.ts` | 真库腿（临时 initdb 起真 PostgreSQL、全部迁移逐条 apply）：**`Test Files 1 passed (1)` / `Tests 46 passed (46)`，`WT_WORKER_RC=0`**（10-10 19:1x · 隔离副本 @ `a195a37f`）；离线 11 文件（同一枚命令逐枚写死路径）：**`Test Files 11 passed (11)` / `Tests 103 passed (103)`，`S11_RC=0`**（10-10 19:2x · 隔离副本）—— 台账 §665 那行原记 `99 passed`，**+4 只增不减**，多出的 4 条本趟**未逐枚归因**（不许读成回归，也不许读成"本线新加的尺"）；额度 HTTP `3 passed (3)`（402 + `errorCode` + 事务执行器零调用）、pglite `17 passed (17)`（§906，10-10 当日） | **判定层已闭合到可复跑**：错主体/错实例/坏签名/吊销落后/额度耗尽各红一条且**零业务效果**。⚠️ 两处不闭合：① 额度耗尽那条原钉 `errorCode`，别线那枚改名（**B142**）✅ **10-11 已落地并被本线跟上**：本线 5 枚文件的 12 处响应体读法迁到 `code`，真库腿从 `9 failed | 37 passed` 回到 **`Tests 46 passed (46)` / `rc=0`**，对照臂（把那份文件换回改名前、同一隔离载体重跑）**精确回到 9 红** ⇒ 差值归因于这次迁移而非载体噪声；② 新 ADR（限定取代 ADR-0017/0020）**还没写**，它在 **B139** 那格里等地界 |
 | **AC-2 接收与队列** | `cd packages/inbound-core && npx --no-install vitest run --maxWorkers=1`；同一把真库尺（AC-1 第一条） | `Test Files 3 passed (3)` / `Tests 47 passed (47)`（envelope 11 / parser 18 / webhook 18，§665 表，10-10 当日）；真库尺 **46/46**（19:1x 本趟） | **字节级签名 / 时间窗 / 上限 / 同键同体重放 / 同键异体冲突 / 跨账号隔离有尺**，且查询面不回传明文（那条断言在 webhook + envelope 两档里）。不闭合的只有"公网接收"这一开关本身 —— 按负责人指令仍关着 |
 | **AC-3 领取与提交** | `python3 research/tools/verify-inbound-dual-host.py` | 装置自报 **`Windows: 13/13`**（10-10 13:3x · 主检出，含窗口 11 后半、真进程终止、窗口 13 跨时区往返；逐档读数在 §13:3x 那一节） | **13 个故障窗口两个独立真 SQLite 宿主全跑通**，观察的是任务数/op 数/回执/计量而不是 HTTP 码。⚠️ 那一趟跑在**共享主检出**上（当时合并态全仓门禁还没跑）⇒ 这一格按 T7 的读数收口才算完整 |
 | **AC-4 解析** | AC-1 的离线 11 文件（含 `automation-drafts`）+ `cd packages/domain && npx --no-install vitest run --maxWorkers=1 tests/inbound-local-date.spec.ts` + `cd packages/inbound-core … `（parser 18） | 离线 11 文件 **99 passed**；共享层三档 47 passed；本地时区档读数在 §1132 那行（同日） | **同时区/同归一化/DST/非法日期/长输入/多输出受限有尺**；注入指令与模型额外字段的越权那一条走的是出境闸门既有断言。⚠️ "实际出境请求符合披露"要真 provider 流量，本线**没有**这一档读数 ⇒ 记为未闭合，不许读成已验 |
@@ -1669,14 +1669,14 @@ cd apps/web && NO_COLOR=1 pnpm exec vitest run tests/inbound-cycle-display.spec.
 | 四小包单跑 | `pnpm --filter @heyta/{legal,domain,ai} test` | 与并发趟**逐条同形** ⇒ 确定性真红（i18n 那一趟本来就是首败包，等于单跑） |
 
 **HEAD 的确定性红 = 15 条**，本线占 **3 条**（另外 12 条：i18n 1、ai 5、server 6）。
-逐条归因、肇事物件与修法落点都在 **BLOCKED.md 的 B145 / B146 / B147**，这里不重抄。
+逐条归因、肇事物件与修法落点都在 **BLOCKED.md 的 B150 / B151 / B152**（原记 B145/B146/B147，与账号标准套件线同号后整体重编，见 B150 标题那句），这里不重抄。
 
 **本线那 3 条是什么性质的东西**（不许读成"测试没跑好"）：
 
-- **B145**：本线给服务端加了 8 枚拒绝码，域层那份"客户端认识的码"词表没跟上。
+- **B150**：本线给服务端加了 8 枚拒绝码，域层那份"客户端认识的码"词表没跟上。
   现量过的事实是这 8 枚里 7 枚在四个客户端源码零命中、界面的 `waiting-entitlement` 由周期状态驱动而不是 reason，
   所以**目前没有用户可见的错文案**；代价是那条集合相等臂从此长红，**以后再加码没人会被它提醒**。
-- **B146**：本线加的三张表进了"随注销级联删除"的集合，而中英条款的**类别清单少三类、抄的 7 处数字各少 3**。
+- **B151**：本线加的三张表进了"随注销级联删除"的集合，而中英条款的**类别清单少三类、抄的 7 处数字各少 3**。
   这是**对外声明**级别的红（隐私政策/自评估口径那份），归属 T6，不是台账噪音。
 
 **这两条本线都不自己动手**：修法落点是 `packages/domain/src/subscription.ts` 与 `packages/legal/src/documents/{privacy,data-rights}.ts`，
@@ -1684,5 +1684,76 @@ cd apps/web && NO_COLOR=1 pnpm exec vitest run tests/inbound-cycle-display.spec.
 **但责任是本线的** —— 登记的每一条都写清"哪一笔提交的、改哪四处、改成什么"，谁批都能一子做完。
 
 **T7 三条命令的当前可达性**：`pnpm check` ✗（B144 的 23 枚类型错）、
-`pnpm -r test` ✗（本线 3 + 别线 12，且本线那 3 条的落点在地界外）、
+`pnpm -r test` ✗（本线 3 + 别线 12，且本线那 3 条的落点在地界外；台账侧对应 B150/B151/B152）、
 `pnpm reinstall:all` + Linux 交付取证：未跑（要安静载体与设备窗口；本机 1 分钟负载 14 只是回落中，15 分钟均值仍在 100+）。
+
+---
+
+## T7 第三条腿：那 9 条真库红里有 3 条是**次生伤**，而"变好"必须先归因（2026-10-11 00:2x）
+
+上一节记下"本线那 3 条跨线对账红"之后，接着处理 B142 那格：别线的
+`{error, errorCode}` → `{code, message}` 改名已经落地（`d361209e`，335 处 + 新门禁
+`scripts/check-server-error-shape.mjs`）。本线在白名单内的 5 枚文件里有过时的响应体读法，
+迁完之后真库腿从 `9 failed | 37 passed` 变成 `46 passed (46)`。**比预期好**——
+我原本预期只剩 3 条状态码红（`expected 403 to be 201` / `402 to be 409` / `200 to be 403`），
+并准备把它们登记成"签发闸门改坏的产品缺陷"。**结果全绿，所以那三条一条都不许登记**，
+而归因必须先做，不能拿"绿了"当结论。
+
+### 归因（三条臂，全部同一隔离载体 `.worktrees/inb-t7` @ `5223c3c9`）
+
+| 臂 | 那份文件 | 读数 |
+|---|---|---|
+| 改后 | 迁移版（`code`） | `DEVICE_FINALLY_RC=0` / `Tests 46 passed (46)` |
+| **对照**：换回改名前那份 | HEAD 版（`errorCode`） | `DEVICE_CONTROL_RC=1` / `Tests 9 failed \| 37 passed (46)` |
+| 变异：只把一枚期望值改成不存在的码 | 迁移版 + `AUTOMATION_CLOCK_ROLLBACK_MUTATED` | `rc=1` / `Tests 1 failed \| 45 passed (46)` |
+
+对照臂**精确重现 9 红**（同一载体、隔几分钟、只有那一枚文件不同）⇒ 9→0 是这次迁移的，
+不是载体抖动，也不是别线又动了什么。
+
+### 机制：一条键名红怎么变成三条"状态码红"
+
+`server/tests/integration/inbound-worker-identity.integration.spec.ts` 里
+「stops issuing when the installation clock rolls backwards」那一档：
+
+1. 它先 `automationEntitlementClock.upsert({ installationId, maxSeenAtMs: now + 120_000 })` ——
+   `installation` 是 describe 级共享的，不是本档私有的；
+2. 然后两条硬断言（状态码 + 拒绝码）；
+3. **撤销 `deleteMany` 坐在断言之后**。
+
+`errorCode` 那条读法在 HEAD 上必然红 ⇒ 第 3 步永远不执行 ⇒ 一枚"未来两分钟"的时钟行
+泄漏给后面每一条用例 ⇒ 后面三档各自的第一条断言读到 403/402/200，
+看起来像三条互不相干的缺陷。**这是同一条判据里藏两个缺陷的形状**（AGENTS §7 第 86 条那一族），
+差别在于第二个缺陷不在判据里，而在**判据的清理顺序**里。
+
+同文件同 describe 里其他共享状态的撤销本来就在 `finally`（`subscription` 快照还原 :245–248、
+`AUTOMATION_OFFICIAL_KEYS` :949–951），**这一档是唯一没跟上文件自己纪律的那一枚**。
+修法照那个既有范式：把那两行断言包进 `try`，`deleteMany` 移到 `finally`。
+零断言改动、零阈值改动，只是让撤销无条件跑。
+
+变异臂是这条修法的**反向验证**：同一枚断言再次失败时，红集恰好 1 条而不是 4 条——
+它同时证明两件事：迁移后的断言仍有牙（改期望值会红），且级联被 `finally` 挡住了。
+
+### 撤回一条我自己差点写错的判断
+
+上一轮我准备登记"另有 5 枚 `tests/integration/**` 文件也还带着 `errorCode`，都属同族过时"。
+**现量否证**：`server/src` 里 `errorCode` 仍有 65 处命中——那枚改名只覆盖 HTTP **错误信封**，
+op 级结果（`results[].errorCode`、`SYNC_ERROR_CODES.*`）从来就不在那个集合里。
+逐枚读那 5 枚文件的命中行，全部是 `results[0].errorCode` / `staleBody.results[0]?.errorCode`
+这一类 **op 级**读法 ⇒ 不是过时。"某文件还写着 errorCode" 推不出 "该文件是红的"，
+**分母得按被改名的那一层来数**，不能按词频（AGENTS §7 第 167 条那一族）。
+真过时的只有本线那 12 处信封级读法，已迁完，残留 `errorCode` 计数 = 0。
+
+### 仍然成立的那格盲区
+
+`server/tests/integration/**` 被 `server/vitest.config.ts` **excluded**，
+`pnpm -r test` 与 `pnpm check` 都不跑它，唯一跑它的是 `pnpm test:integration:postgres`
+或本线那枚 Python 装置。所以别线那枚改名在这里**安静了几天**没有任何一层会失败。
+这一条登记成 **B153**（判卷口径类，不自己动手）。同节也写清了已有那一半：
+`scripts/check-integration-coverage.mjs` 已在 `pnpm check` 链里，钉的是**点名登记**，不是执行。
+
+### 这一节没做的事
+
+- 没动 `packages/domain` / `packages/legal` / `packages/i18n`（白名单外，B150/B151 照旧开着）；
+- 没给 `tests/integration/**` 新增门禁（那要改 `server/vitest.config.ts` 的 include 或加一条 `check:*`，
+  属于判卷口径，只登记）；
+- 那 5 枚 op 级读法一枚都没碰（它们不是红的）。

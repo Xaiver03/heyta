@@ -8176,6 +8176,24 @@ Error: locator.click: Test timeout of 60000ms exceeded.
 
 **给下一位的提醒**：判这 9 条红之前先确认自己站在哪棵树上。隔离副本那条腿现在就能当"HEAD 真值"用：`cd .worktrees/inb-t7 && python3 research/tools/verify-inbound-worker-identity.py --log /tmp/inb-wt-worker.log`（干净 worktree **没有 dist**，必须先 `pnpm -r build` 再 `pnpm --filter @heyta/server exec prisma generate`，否则红的是探针不是产品）。
 
+**✅ 10-11 00:3x 闭合（走的就是上面那条"① 由本线出一笔专笔"）**：改名已落地（`d361209e`，335 处 +
+新门禁 `scripts/check-server-error-shape.mjs`），本线那三处落点逐枚现量，残留 `errorCode` 计数**全为 0**：
+
+```
+server/tests/integration/inbound-worker-identity.integration.spec.ts     errorCode=0
+server/tests/inbound-ai-quota-route.spec.ts                              errorCode=0
+server/tests/inbound-ticket-rejection-route.spec.ts                      errorCode=0
+docs/reference/inbound-automation-protocol.md                            errorCode=0
+```
+
+`inbound-ticket-rejection-route.spec.ts` 这一枚是**他们那笔里就带走的**（本线没碰过它），所以"本线 16 枚"
+这个数里只有 12+1 处是本线自己换的 —— 上面那张表按文件计数，不留 16 这种会漂的合计。
+真库腿同步复跑：`Tests 9 failed | 37 passed (46)` → **`Tests 46 passed (46)` / `rc=0`**，
+对照臂（把那份文件换回改名前）精确回到 9 红 ⇒ 归因于这次迁移。
+**并当场抓到一处更值得记的东西**：那 9 条里有 3 条不是键名过时，是**同一条键名红泄漏出来的次生伤**
+（`automationEntitlementClock` 的撤销坐在硬断言之后），已照本文件自己既有的 `finally` 范式修掉，
+机制与三条臂读数在 `docs/plans/inbound-automation.md` 的「T7 第三条腿」那一节。
+
 ## B143（2026-10-10 19:2x，本会话 · 修 `verify-inbound-commit-scope.py` 时它自己报出来的）：本线**独占路径**有 11 枚是被**别线的批量提交**装进 main 的，那把尺的归属反查因此长红
 
 **现量**：`python3 research/tools/verify-inbound-commit-scope.py --self-test` ⇒ `臂数=4，不成立=1 → ARM-3`，ARM-3 打印 `动了独占路径却没被计入 = 2 ⇒ 漏网 d49f77e3→apps/mobile/src/inbound/lifecycle.ts, 63e61f23→apps/web/tests/inbound-cycle-display.spec.tsx`。逐笔数它们带走了本线多少枚：
@@ -8426,7 +8444,7 @@ pnpm 用 `.modules.yaml` 的已记录状态判"最新"，离线模式下不去�
 > 探针从头到尾没按到过那颗按钮。修完交给第 7 趟。
 > ⚠️ 这一格仍**不记成"改密设备侧已验证"**：判据 L/M/N 要到第 7 趟才有读数。
 
-## B145（2026-10-10 23:3x，本会话 · 第一次整包跑 `pnpm -r test` 才量出来的）：**本线自己让 `packages/domain` 的对账臂长红了** —— 服务端多了 8 枚拒绝码，域层那份"客户端认识的码"清单没跟上
+## B150（2026-10-10 23:3x，本会话 · 第一次整包跑 `pnpm -r test` 才量出来的）【**10-11 重编**：本线与账号标准套件线在同一天各占过 B145/B146/B147，本线那三条已整体后移为 **B150/B151/B152**；老提交信息与旧台账里写的 B145/B146/B147 若指本线，读作新号。145–149 那五条是他们的，逐字未动。】：**本线自己让 `packages/domain` 的对账臂长红了** —— 服务端多了 8 枚拒绝码，域层那份"客户端认识的码"清单没跟上
 
 **怎么才发现的**：本线此前所有单测读数都是**按文件**跑的（`inbound-*.spec.ts` 那几族），
 而这条红坐在 `packages/domain/tests/subscription.spec.ts` —— 一个**不是本线命名、却在核对本线改动**的文件。
@@ -8482,7 +8500,7 @@ AssertionError: expected [ 'BINDING_EXPIRED', …(15) ] to deeply equal [ 'GRANT
 ② 不代改 `packages/domain/src`（别人的地界）。要拍的只有位置：**谁**把那 8 枚补进去 ——
 本线可以在获得授权后一次做完（改动形状明确、一条命令可回退），或者由域层的地界所有者补。
 
-## B146（2026-10-10 23:3x，同一次整包跑量出的第二条本线债）：`packages/legal` 两条臂在 HEAD 长红 —— **都是本线那三张新表造成的**，而修法落点一枚都不在白名单里
+## B151（2026-10-10 23:3x，同一次整包跑量出的第二条本线债）：`packages/legal` 两条臂在 HEAD 长红 —— **都是本线那三张新表造成的**，而修法落点一枚都不在白名单里
 
 **现量（同一隔离副本，单跑复现 ⇒ 确定性红）**：
 
@@ -8524,7 +8542,7 @@ data-rights/en    「foreign keys」34 → 37   「covering tables」33 → 36
 `check:legal-tools` 那套纪律同样适用于"数据类别变了"）。本线可以代做，但需要**明确授权**，
 因为改的是**对外声明的措辞**，不是代码。
 
-## B147（2026-10-10 23:5x，本会话 · T7 第二条 `pnpm -r test` 第一次在合并态上跑完）：**全量并发跑报 77 条红，逐包单跑复测后只剩 15 条是真的** —— 其中 3 条是本线自己造的（B145/B146），12 条是别线的
+## B152（2026-10-10 23:5x，本会话 · T7 第二条 `pnpm -r test` 第一次在合并态上跑完）：**全量并发跑报 77 条红，逐包单跑复测后只剩 15 条是真的** —— 其中 3 条是本线自己造的（B150/B151），12 条是别线的
 
 **载体**：隔离副本 `.worktrees/inb-t7` @ `8962927d`，dirty=0，`pnpm -r build` rc=0、`prisma generate` rc=0。
 起跑时 `uptime` 的 1 分钟负载 **14.65**（15 分钟 124.91，正在往下走）。
@@ -8557,12 +8575,12 @@ pnpm -r --no-bail test   ⇒  RTEST_NOBAIL_RC=1
 **并发全量那一趟不许当分母用**：它把 62 条负载造成的超时混进来了（AGENTS §7 那一族"载体会同时造红和造绿"的又一例，
 而 `--no-bail` 的 rc=1 不会告诉你是哪一种）。
 
-**15 条的归属（逐条点名，本线的两枚已在 B145/B146 单独登记）**：
+**15 条的归属（逐条点名，本线的两枚已在 B150/B151 单独登记）**：
 
 | 红 | 条数 | 形状 | 归属 |
 |---|---|---|---|
-| `packages/legal/tests/structure.spec.ts:583` + `:627` | **2** | 三张 `automation_entitlement_*` 表在注销类别里没名字；条款抄的级联/表数比真源少 3 | 🔴 **本线**（`3fcc3bef`），见 B146 |
-| `packages/domain/tests/subscription.spec.ts:215` | **1** | 服务端 8 枚新拒绝码没进域层词表 | 🔴 **本线**（`e8b3e982`），见 B145 |
+| `packages/legal/tests/structure.spec.ts:583` + `:627` | **2** | 三张 `automation_entitlement_*` 表在注销类别里没名字；条款抄的级联/表数比真源少 3 | 🔴 **本线**（`3fcc3bef`），见 B151 |
+| `packages/domain/tests/subscription.spec.ts:215` | **1** | 服务端 8 枚新拒绝码没进域层词表 | 🔴 **本线**（`e8b3e982`），见 B150 |
 | `packages/i18n/tests/catalog.spec.ts:67` | 1 | `site.download.row.*` 那 7 枚键的中文值不含汉字（`macOS`/`Windows x86_64` 这类专名） | 下载面 `f9c042a7`（10-07）。白名单 `allowed` 里登记的是 `site.platforms.*.name` 那一族，同形状的专名没登记。修法落 `packages/i18n` 或该测试的白名单，**都在本线地界外** |
 | `packages/ai/tests/capability-manifest.spec.ts` | 5 | `gen-ai-capability-manifest.mjs --check` 红：产物 26 条 vs 目录 30 条、实体 8 vs 9、剔除项集合差一枚 | **生产者缝没重跑**（B129 那一类的第二次命中）。工具与实体是批次二（W2 的 `EVENT`）带进来的，生成物没跟着重新提交。修法=跑一次生成器并把产物入库，落点 `packages/ai` + `scripts/`，不在本线地界 |
 | `server/tests/sync-compressed-body.routes.spec.ts` | 5 | 逐条 mock 断言要 8 个实参、实际收到 7（`expected "vi.fn()" to be called with arguments: [ 1, 'mixed-schema-client', …(6) ]`） | 逐操作校验的**调用 arity 变了而测试没跟上**（同步协议那条线的在飞改动）。`server/tests/` 名义上在本线地界里，但**改既有断言=改判卷口径**，本线不动 |
@@ -8577,9 +8595,50 @@ pnpm -r --no-bail test   ⇒  RTEST_NOBAIL_RC=1
 15 条里本线只占 3 条，且那 3 条的修法落点（`packages/domain/src`、`packages/legal/src/documents`）都在白名单外；
 其余 12 条要等 i18n 白名单登记、ai 生成物重跑、server 那两条 arity/枚数判据的归属者来收。
 再叠上 B144 的 23 枚类型错（它挡 `pnpm check`），T7 那三条命令目前的可达性是：
-`pnpm check` ✗（B144）、`pnpm -r test` ✗（B145/B146 + 12 条别线）、`pnpm reinstall:all` 未跑（需要安静载体与设备窗口）。
+`pnpm check` ✗（B144）、`pnpm -r test` ✗（B150/B151 + 12 条别线）、`pnpm reinstall:all` 未跑（需要安静载体与设备窗口）。
 
 **给下一位的两句**：① 判"`pnpm -r test` 有多少红"必须先做**分母自检**（有 test 脚本的包数 == 打汇总的包数），
 再用**逐包单跑**去掉负载超时；并发那一趟的红数只能当线索。
 ② 本线的测试族全绿**不证明**本线的改动没让别的臂变红 —— 会被 `domain`/`legal` 这种**跨线对账臂**抓到，
 所以整包跑（不是整文件跑）是本线每轮的必做项，这一轮之前一直没做。
+
+## B153（2026-10-11 00:3x，本会话 · 追 B142 那枚改名时量出来的）：`tests/integration/**` 有**登记层**、没有**执行层** —— 别线改了本线读的字段，红整整几天而没有任何一层会失败
+
+**先把已有那半层说清楚（本线不许把它当成缺口重报）**：
+`server/vitest.config.ts:30-34` 的 exclude 旁边带着理由注释，而
+`scripts/check-integration-coverage.mjs`（经 `check:integration-coverage`，**已在 `pnpm check` 链里**）
+钉的是「每枚 `*.integration.spec.ts` 必须被某条 `test:integration*` 脚本点名」，
+两个方向都查（盘上有/脚本没点名 ⇒ 永不执行；点名了/盘上没有 ⇒ 清单假覆盖）。
+它那文件头自己记着 2026-10-05 的 `ai-metering-race` 事故 —— 也就是说"这族存在"这件事有人守。
+
+**没被守的是"跑没跑过"**。现量三条：
+
+```
+node -e "…p.scripts.check.split('&&')…filter(含 integration)"  → ["pnpm check:integration-coverage"]   # 链里只有登记，没有执行
+grep -c 'test:integration:postgres' package.json              → 0   # 根 package.json 不转发；它只在 server/package.json:12
+server/package.json:12 点名 33 枚 .integration.spec.ts        → 需要活的 PostgreSQL，本仓没有任何一层去起它
+```
+
+⇒ 那一族里 33 枚文件的**执行**完全靠人工跑一条带库的命令。`d361209e`（335 处 `{error, errorCode}` → `{code, message}`）
+把本线那枚真库文件打红之后，登记层照样绿、`pnpm check` 照样绿、`pnpm -r test` 连看都没看过它，
+`check-server-error-shape.mjs` 只管 `server/src` 的**发送侧**、不管测试的**读侧**。
+本线是 10-10 夜做 T7 分母时才撞上的，而改名是 10-09/10-10 落的。
+
+**本轮顺带量清的一件事（免得下一个人在这里再错一次）**：那 5 枚仍带 `errorCode` 的 integration 文件
+**不是过时** —— 逐枚读过命中行，全部是 op 级结果字段（`results[0].errorCode`、
+`staleBody.results[0]?.errorCode`、`SYNC_ERROR_CODES.*`），而 `server/src` 里 `errorCode` 仍有 65 处命中，
+说明被改名的只有 HTTP **错误信封**那一层。**分母要按"被改名那一层"数，不能按词频**。
+
+**要拍的（三条都属判卷口径，本线不自决）**：
+① 给 `pnpm check`（或一条带库的门禁档）加一步**真执行**：起临时 initdb、跑 `test:integration:postgres` 那 33 枚
+   —— 本线那枚 `research/tools/verify-inbound-*.py` 已经是可抄的样板（临时库 + 逐条 apply 迁移 + 零外部依赖）；
+② 或把「这一族只由人工执行」写进 `docs/reference/`（现在只写在 vitest 注释与 coverage 门禁的文件头里，
+   读不到的人会以为 `pnpm check` 覆盖了它）；
+③ 加一道**读侧契约对账**：把 `server/src` 实际 `send({…})` 的字段集合与测试里 `await json() as {…}` 读的字段集合对账。
+   这次的红属于「契约变了、只有发送侧知道自己变了」，①② 只治"没人跑"，③ 才治"跑的人读的是旧字段"。
+   代价要先量：op 级与信封级两层混在同一族文件里（上面那 5 枚的判断就是混层的现场），
+   一刀切的对账会把合法的 op 级读法全报成红。
+
+**本线已做的那一半**：B142 那三处落点迁完（残留 0），真库腿 `46 passed (46)` / `rc=0`，
+对照臂与变异臂读数在 `docs/plans/inbound-automation.md`「T7 第三条腿」那一节。
+**没做的**：①②③ 一条都不动 —— 它们改的是"谁来跑、判什么"。

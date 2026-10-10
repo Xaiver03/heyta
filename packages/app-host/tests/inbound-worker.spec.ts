@@ -272,7 +272,7 @@ describe('per-action entitlement ticket on the worker transport', () => {
     const readings: Record<string, string> = {};
     for (const call of gatedCalls) {
       const fetchImpl = vi.fn().mockImplementation(async () => new Response(JSON.stringify({
-        error: 'Subscription required', errorCode: 'SUBSCRIPTION_REQUIRED', reason: 'entitlement-lapsed',
+        code: 'SUBSCRIPTION_REQUIRED', message: 'A paid subscription is required to use this hosted service.', reason: 'entitlement-lapsed',
       }), { status: 402 }));
       const caught = await call.run(fetchImpl, ticket).catch((error: unknown) => error);
       readings[call.name] = caught instanceof AutomationEntitlementRequiredError
