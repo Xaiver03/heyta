@@ -41,12 +41,16 @@
  *   ⇒ 装置在选腿校验那一步抛错 ⇒ 本脚本必须**非 0** 退出，且回读端口为空
  *     （= 被测命令红了以后，包装者没有把 vite 漏在后台）。
  *   2026-10-10 实测读数记在计划台账里那一格，不写在这里（写在这里就会漂）。
+ *
+ * `node scripts/verify-web-ui-sweep.mjs --self-test` —— **只**验第 4 件（读数与图同批那条对账）
+ * 能不能红：在系统临时目录造报告、逐臂断言问题编号，不起浏览器、不碰仓内证据、跑完自己清掉。
  */
 
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
-import { mkdir, readFile, readdir, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, relative, resolve, sep } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 
@@ -109,6 +113,83 @@ async function reportBatchProblems(reportPath, label) {
     problems.push(`${missing.length}/${anchors.length} 枚锚点指不到文件，首枚=${missing[0]}（②）`);
   }
   return problems;
+}
+
+/**
+ * `--self-test`：不起浏览器、不碰仓内证据，只在系统临时目录里造报告，逐臂问上面那条对账
+ * **能不能红**。断言的是问题的**编号**（①/②）不是措辞；臂数由它自己打印，别抄进文档。
+ * 这条入口刻意不进 `pnpm check`（它要起浏览器），所以"能红"这件事只能由这一档自己证明。
+ */
+async function runSelfTest() {
+  const dir = await mkdtemp(join(tmpdir(), 'heyta-batch-identity-'));
+  const label = dir;
+  // 仓内真存在的两枚文件：让"锚点存在"这一半有真输入，而不是靠空集合蒙过。
+  const realAnchor = join(dir, 'leg-a-1.png');
+  await writeFile(realAnchor, 'png-placeholder');
+  const machineOnlyAnchor = join(dir, 'leg-b-1.png');
+  await writeFile(machineOnlyAnchor, 'png-placeholder');
+
+  const arms = [
+    {
+      name: 'control（自报落点一致 + 一枚真存在的锚点）',
+      report: { carrier: { evidenceDir: label }, legs: { a: [realAnchor] } },
+      expect: [],
+    },
+    {
+      name: '① 报告自报的是别那一批的落点',
+      report: { carrier: { evidenceDir: 'apps/web/evidence/some-other-run' }, legs: { a: [realAnchor] } },
+      expect: ['（①）'],
+    },
+    {
+      name: '② 落点对但锚点指不到文件',
+      report: { carrier: { evidenceDir: label }, legs: { a: [join(dir, 'never-captured.png')] } },
+      expect: ['（②）'],
+    },
+    {
+      name: '② 一枚本批锚点都没有（空集合不许判真）',
+      report: { carrier: { evidenceDir: label }, legs: { a: ['machine-only:/somewhere/else/x.png'] } },
+      expect: ['（②）'],
+    },
+    {
+      name: 'machine-only: 前缀那枚真存在的锚点不许被误报',
+      report: { carrier: { evidenceDir: label }, legs: { a: [`machine-only:${machineOnlyAnchor}`] } },
+      expect: [],
+    },
+    {
+      name: '① 旧那批报告根本没有 carrier 这枚字段（新字段是承重的）',
+      report: { legs: { a: [realAnchor] } },
+      expect: ['（①）'],
+    },
+  ];
+
+  let failures = 0;
+  for (const arm of arms) {
+    const reportPath = join(dir, `report-${arm.name.charCodeAt(0)}.json`);
+    await writeFile(reportPath, JSON.stringify(arm.report));
+    let problems;
+    try {
+      problems = await reportBatchProblems(reportPath, label);
+    } catch (error) {
+      console.error(`SELFTEST ARM=throw ${arm.name} —— ${error.message}`);
+      failures += 1;
+      continue;
+    }
+    const wanted = arm.expect.length;
+    const hitMarkers = arm.expect.filter((marker) => problems.some((p) => p.includes(marker)));
+    const ok = problems.length === wanted && hitMarkers.length === wanted;
+    if (!ok) failures += 1;
+    console.log(
+      `${ok ? '✅' : '🔴'} SELFTEST ${arm.name} ⇒ 问题数=${problems.length}（期望 ${wanted}）` +
+        (problems.length ? `：${problems.join(' ｜ ')}` : ''),
+    );
+  }
+  console.log(`SELFTEST ARMS=${arms.length} FAILED=${failures}`);
+  await rm(dir, { recursive: true, force: true });
+  return failures === 0 ? 0 : 1;
+}
+
+if (process.argv.includes('--self-test')) {
+  process.exit(await runSelfTest());
 }
 
 /** 向系统要一枚空端口；拿到就关掉监听，只借用那个号（不猜固定号，避免撞别人的 vite）。 */
