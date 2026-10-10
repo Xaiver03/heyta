@@ -139,8 +139,9 @@ grep -n 'InboundAutomationCycleState' packages/app-host/src/inbound-process.ts
 
 **不代改**（三条不齐，按既有纪律）：① 修它不是删一子，要决定产品语义；
 ② 改后的运行时形状无法现量等于改前；③ 这三个文件此刻都在别人手上（` M`）。
-⇒ **交回给 owner**，并已登记为 `BLOCKED.md` 的 **B135**（末号现量：
-`grep -oE '^## B[0-9]+' BLOCKED.md | tail -1`；写这份时是 B134 ⇒ 下一个空号 B135）。
+⇒ **交回给 owner**，并已登记为 `BLOCKED.md` 的 **B137**（末号现量：
+`grep -oE '^## B[0-9]+' BLOCKED.md | sort -t B -k2 -n | tail -1`；写这份时工作树读到 **B136**、
+HEAD 只到 **B134** ⇒ B135/B136 是别线**未提交**那两枚，**下一个属于我的空号是 B137**）。
 
 ### 4.2 🔴 HEAD 的 `pnpm-lock.yaml` 与 HEAD 的 manifest 对不上 ⇒ 离线装不了
 
@@ -226,9 +227,9 @@ apps/landing build: src/components/Footer.tsx(148,17): error TS2345:
      && pnpm install --frozen-lockfile --offline && pnpm -r build; echo "BUILD_RC=$?"
    ```
    `BUILD_RC=0` ⇒ 直接跳第 3 步。仍是 1 ⇒ 读红的**包名**：
-   还是 `apps/web`/`apps/node-host` 的 `waiting-entitlement` ⇒ B135 未收，**不要代改**，回到「等 owner」；
+   还是 `apps/web`/`apps/node-host` 的 `waiting-entitlement` ⇒ B137 未收，**不要代改**，回到「等 owner」；
    变成别的包 ⇒ 是新红，重新归因（**别沿用旧结论**）。
-2. **B135 未收时的替代路**（要做就得**显式声明这是对 §6.1.1 的偏离**）：
+2. **B137 未收时的替代路**（要做就得**显式声明这是对 §6.1.1 的偏离**）：
    手工跑 ios 段自己那四个动作（清 → 打 → 卸 → 装）并沿用脚本的判据
    （新鲜度 + 截图非空白 + **主蓝 `#2563EB` 命中**），**不**跑 `reinstall-all.sh`。
    ⚠️ 这条路会让「装的是当前产物」那一格失去脚本自带的对账，所以要自己补一条哈希对账。

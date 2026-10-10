@@ -47,11 +47,15 @@ import {
   exportDocumentFromHost,
   materializedState,
   openAppHost,
+  startInboundWorkerLoop,
   type NewAssistantTurn,
   type RestoreDocument,
   restoreIntoEmptyTarget,
   type AppHost,
   type ExportDocument,
+  type InboundAutomationHostOptions,
+  type InboundRecipientKeyScope,
+  type InboundRecipientRegistration,
   type NewTaskFields,
   type RestoreExportResult,
 } from '@heyta/app-host';
@@ -61,6 +65,7 @@ import type { OpIntent } from '@heyta/op-log';
 import type { EntityType } from '@heyta/shared-schema';
 import { NodeSqliteDriver } from '@heyta/storage/sqlite/node';
 import type { SyncStatus } from '@heyta/sync-client';
+import type { AutomationWorkerCredential } from '@heyta/app-host';
 
 export interface NodeHostOptions {
   /** **真实 SQLite 文件**路径。不要传 `:memory:` —— 那证明不了持久化。 */
@@ -257,6 +262,18 @@ export interface NodeHost {
   sync(): Promise<SyncStatus>;
   /** 待上传队列长度（同步后应该为 0）。 */
   pendingUploadCount(): Promise<number>;
+  /** Register and durably persist this device's inbound worker token. */
+  registerInboundWorker(input: { userId: string; databaseEpoch: string }): Promise<AutomationWorkerCredential>;
+  /** Persist/load the recipient private key through the Vault-wrapped store. */
+  saveInboundRecipientKey(key: InboundRecipientKeyScope, privateKey: Uint8Array): Promise<void>;
+  loadInboundRecipientKey(key: InboundRecipientKeyScope): Promise<Uint8Array | undefined>;
+  getInboundRecipientRegistration(): Promise<InboundRecipientRegistration | undefined>;
+  ensureInboundRecipientKey(): Promise<InboundRecipientRegistration>;
+  rotateInboundRecipientKey(): Promise<InboundRecipientRegistration>;
+  /** Process one queue item through the shared inbound protocol. */
+  processInboundAutomation(options: InboundAutomationHostOptions): Promise<{ state: 'empty' | 'submitted' | 'needs-confirmation'; eventId?: string; itemCount?: number }>;
+  /** Start the same non-overlapping worker loop used by foreground hosts. */
+  startInboundWorker(options: InboundAutomationHostOptions & { intervalMs?: number; isRunnable?: () => boolean; onError?: (error: unknown) => void }): () => void;
 
   /**
    * 导出一份**完整保真**的文档（含全部实体、墓碑与完整 op-log）。
@@ -321,6 +338,8 @@ export async function openNodeHost(options: NodeHostOptions): Promise<NodeHost> 
   };
 
   const actions = createTaskActions(app);
+  const inboundLoops = new Set<() => void>();
+  let closed = false;
   const projectActions = createProjectActions(app);
   const noteActions = createNoteActions(app);
   const habitActions = createHabitActions(app);
@@ -388,9 +407,43 @@ export async function openNodeHost(options: NodeHostOptions): Promise<NodeHost> 
       return app.sync();
     },
     pendingUploadCount: () => app.pendingUploadCount(),
+    registerInboundWorker: (input) => app.registerInboundWorker(input),
+    saveInboundRecipientKey: (key, privateKey) => app.saveInboundRecipientKey(key, privateKey),
+    loadInboundRecipientKey: (key) => app.loadInboundRecipientKey(key),
+    getInboundRecipientRegistration: () => app.getInboundRecipientRegistration(),
+    ensureInboundRecipientKey: async () => {
+      await ensureVaultUnlocked();
+      return app.ensureInboundRecipientKey();
+    },
+    rotateInboundRecipientKey: async () => {
+      await ensureVaultUnlocked();
+      return app.rotateInboundRecipientKey();
+    },
+    processInboundAutomation: async (input) => {
+      await ensureVaultUnlocked();
+      return app.processInboundAutomation(input);
+    },
+    startInboundWorker: (input) => {
+      if (closed) throw new Error('Host is closed');
+      const loop = startInboundWorkerLoop({
+      intervalMs: input.intervalMs,
+      isRunnable: input.isRunnable,
+      onError: input.onError,
+      processOnce: async () => {
+        await ensureVaultUnlocked();
+        if (closed) return;
+        return app.processInboundAutomation(input);
+      },
+      });
+      const stop = (): void => { loop(); inboundLoops.delete(stop); };
+      inboundLoops.add(stop);
+      return stop;
+    },
     exportDocument: () => exportDocumentFromHost(app, { exportedAt: Date.now(), host: 'node' }),
     restoreExport: (document) => restoreIntoEmptyTarget(app, document),
     close: () => {
+      closed = true;
+      for (const stop of inboundLoops) stop();
       app.close();
     },
   };
