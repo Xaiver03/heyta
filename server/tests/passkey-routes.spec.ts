@@ -169,8 +169,8 @@ describe('通行密钥自助管理（HTTP）', () => {
       // 403 会说"存在但不归你"；这条断言就是防它回来的。
       expect(others.statusCode).not.toBe(403);
       expect(others.json()).toEqual({
-        error: 'Passkey not found',
         code: 'passkey_not_found_for_user',
+        message: 'Passkey not found',
       });
       // 不泄露存在性：两种输入必须产出**完全相同**的响应。
       expect(others.statusCode).toBe(ghost.statusCode);
@@ -191,7 +191,7 @@ describe('通行密钥自助管理（HTTP）', () => {
       const body = res.json();
       expect(body.code).toBe('last_passkey_required');
       expect(body.success).not.toBe(true);
-      expect(body.error).toContain('only passkey');
+      expect(body.message).toContain('only passkey');
     });
 
     it('空 id → 400，且不发删除', async () => {
@@ -257,8 +257,8 @@ describe('通行密钥自助管理（HTTP）', () => {
       // 403 会说"存在但不归你"；这条断言就是防它回来的。
       expect(others.statusCode).not.toBe(403);
       expect(others.json()).toEqual({
-        error: 'Passkey not found',
         code: 'passkey_not_found_for_user',
+        message: 'Passkey not found',
       });
       // 不泄露存在性：两种输入必须产出**完全相同**的响应。
       expect(others.body).toBe(ghost.body);

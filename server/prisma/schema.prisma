@@ -121,6 +121,7 @@ model User {
   automationEntitlementActivations   AutomationEntitlementActivation[]
   automationEntitlementLinks         AutomationEntitlementLink[]
   emailPasswordRegistrationChallenges EmailPasswordRegistrationChallenge[]
+  emailLoginChallenges    EmailLoginChallenge[]
   sharesOwned                        Share[]               @relation("ShareOwner")
   shareMemberships                   ShareMember[]
   shareInvitationsCreated            ShareInvitation[]
@@ -165,6 +166,30 @@ model EmailPasswordRegistrationChallenge {
   @@index([userId])
   @@index([expiresAt])
   @@map("email_password_registration_challenges")
+}
+
+/// 邮箱验证码登录的一次性挑战（2026-10-10）。形状与注册挑战同族：
+/// 码本身绝不落库（只有 HMAC 摘要），同一账号至多一条未消费挑战。
+model EmailLoginChallenge {
+  id                String   @id
+  email             String
+  userId            Int
+  codeDigest        String   @map("code_digest")
+  expiresAt         BigInt   @map("expires_at")
+  lastSentAt        BigInt   @map("last_sent_at")
+  resendAvailableAt BigInt   @map("resend_available_at")
+  attemptCount      Int      @default(0) @map("attempt_count")
+  resendCount       Int      @default(0) @map("resend_count")
+  consumedAt        BigInt?  @map("consumed_at")
+  locale            String?
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([email])
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("email_login_challenges")
 }
 
 model Passkey {

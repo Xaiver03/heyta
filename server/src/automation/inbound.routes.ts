@@ -77,7 +77,7 @@ export const inboundAutomationRoutes = async (
     async (req, reply) => {
       const request = req as HookRequest;
       const rawBody = rawBodyOf(request.body);
-      if (!rawBody) return reply.status(415).send({ error: 'Raw request body is required' });
+      if (!rawBody) return reply.status(415).send({ code: 'raw_request_body_is_required', message: 'Raw request body is required' });
 
       let headers: ReturnType<typeof readWebhookHeaders>;
       try {
@@ -100,11 +100,11 @@ export const inboundAutomationRoutes = async (
         const rule = await prisma.automationRule.findUnique({ where: { id: request.params.ruleId } });
         const managed = rule ? await resolveSenderCredential(rule.userId, rule.id, headers.keyId).catch(() => ({ configured: true, credentialId: undefined, secret: undefined })) : undefined;
         const secret = managed?.configured ? managed.secret : rule ? loadAutomationWebhookSecret(headers.keyId, rule.userId) : undefined;
-        if (!secret) return reply.status(401).send({ error: 'Invalid webhook signature' });
+        if (!secret) return reply.status(401).send({ code: 'invalid_webhook_signature', message: 'Invalid webhook signature' });
         try { verifyWebhook(secret, input, headers.signature, now()); }
         finally { managed?.secret?.fill(0); }
         if (!rule || rule.deletedAt !== null || !rule.enabled || rule.keyId !== headers.keyId) {
-          return reply.status(403).send({ error: 'Webhook is not enabled' });
+          return reply.status(403).send({ code: 'webhook_is_not_enabled', message: 'Webhook is not enabled' });
         }
 
         {
@@ -115,7 +115,7 @@ export const inboundAutomationRoutes = async (
           if (!decision.allowed) {
             Logger.audit({ event: 'ENTITLEMENT_DENIED', userId: rule.userId, errorCode: ENTITLEMENT_ERROR_CODE,
               reason: decision.reason, capability: 'automation' });
-            return reply.status(402).send({ error: 'A paid subscription is required to use this hosted service.', errorCode: ENTITLEMENT_ERROR_CODE, reason: decision.reason });
+            return reply.status(402).send({ code: ENTITLEMENT_ERROR_CODE, message: 'A paid subscription is required to use this hosted service.', reason: decision.reason });
           }
         }
 
@@ -124,16 +124,16 @@ export const inboundAutomationRoutes = async (
         const existing = await prisma.automationEvent.findFirst({ where: { eventId: headers.eventId, userId: rule.userId, ruleId: rule.id } });
         if (existing) {
           if (existing.userId !== rule.userId || existing.ruleId !== rule.id) {
-            return reply.status(403).send({ error: 'Webhook is not enabled' });
+            return reply.status(403).send({ code: 'webhook_is_not_enabled', message: 'Webhook is not enabled' });
           }
           if (existing.dedupeDigest !== digest || existing.contentType !== contentType) {
-            return reply.status(409).send({ error: 'EVENT_CONTENT_CONFLICT' });
+            return reply.status(409).send({ code: 'EVENT_CONTENT_CONFLICT', message: 'EVENT_CONTENT_CONFLICT' });
           }
           return reply.status(202).send(statusResponse(existing.eventId, existing.status));
         }
 
         const recipient = await prisma.automationRecipientKey.findUnique({ where: { userId: rule.userId } });
-        if (!recipient) return reply.status(503).send({ error: 'Recipient key is not available' });
+        if (!recipient) return reply.status(503).send({ code: 'recipient_key_is_not_available', message: 'Recipient key is not available' });
 
         const envelope = await sealInbound(
           new Uint8Array(rawBody),
@@ -195,27 +195,27 @@ export const inboundAutomationRoutes = async (
           if ((error as { code?: string }).code !== 'P2002') throw error;
           const winner = await prisma.automationEvent.findFirst({ where: { eventId: headers.eventId, userId: rule.userId, ruleId: rule.id } });
           if (!winner || winner.userId !== rule.userId || winner.ruleId !== rule.id) {
-            return reply.status(409).send({ error: 'EVENT_CONTENT_CONFLICT' });
+            return reply.status(409).send({ code: 'EVENT_CONTENT_CONFLICT', message: 'EVENT_CONTENT_CONFLICT' });
           }
           if (winner.dedupeDigest !== digest || winner.contentType !== contentType) {
-            return reply.status(409).send({ error: 'EVENT_CONTENT_CONFLICT' });
+            return reply.status(409).send({ code: 'EVENT_CONTENT_CONFLICT', message: 'EVENT_CONTENT_CONFLICT' });
           }
           return reply.status(202).send(statusResponse(winner.eventId, winner.status));
         }
         return reply.status(202).send(statusResponse(row.eventId, row.status));
       } catch (error) {
-        if (error instanceof InboundEntitlementError) return reply.status(402).send({ errorCode: ENTITLEMENT_ERROR_CODE });
+        if (error instanceof InboundEntitlementError) return reply.status(402).send({ code: ENTITLEMENT_ERROR_CODE, message: 'A paid subscription is required to use this hosted service.' });
         const code = errorCode(error);
         if (error instanceof InboundQueueLimitError) {
-          return reply.status(error.kind === 'events' ? 429 : 413).send({ error: error.kind === 'events' ? 'QUEUE_EVENTS_LIMIT' : 'QUEUE_BYTES_LIMIT' });
+          return reply.status(error.kind === 'events' ? 429 : 413).send({ code: error.kind === 'events' ? 'QUEUE_EVENTS_LIMIT' : 'QUEUE_BYTES_LIMIT', message: 'Inbound event exceeds the allowed quota.' });
         }
         if (error instanceof InboundRequestError) {
           const status = code === 'BODY_TOO_LARGE' ? 413 : code === 'SIGNATURE_EXPIRED' || code === 'INVALID_SIGNATURE' ? 401 : 400;
-          return reply.status(status).send({ error: code });
+          return reply.status(status).send({ code, message: code });
         }
         // Do not include event IDs, rule IDs or database details in the public response.
         Logger.warn(`Inbound automation receiver rejected request: ${code}`);
-        return reply.status(500).send({ error: 'Inbound event could not be accepted' });
+        return reply.status(500).send({ code: 'inbound_event_could_not_be_accepted', message: 'Inbound event could not be accepted' });
       }
     },
   );
@@ -243,31 +243,31 @@ export const inboundAutomationRoutes = async (
         const rule = await prisma.automationRule.findUnique({ where: { id: req.params.ruleId } });
         const managed = rule ? await resolveSenderCredential(rule.userId, rule.id, headers.keyId).catch(() => ({ configured: true, credentialId: undefined, secret: undefined })) : undefined;
     const secret = managed?.configured ? managed.secret : rule ? loadAutomationWebhookSecret(headers.keyId, rule.userId) : undefined;
-        if (!secret) return reply.status(401).send({ error: 'Invalid webhook signature' });
+        if (!secret) return reply.status(401).send({ code: 'invalid_webhook_signature', message: 'Invalid webhook signature' });
         // The header event ID must match the path event ID. This prevents a
         // valid signature for one event from being replayed as another lookup.
-        if (headers.eventId !== req.params.eventId) return reply.status(400).send({ error: 'INVALID_REQUEST' });
+        if (headers.eventId !== req.params.eventId) return reply.status(400).send({ code: 'INVALID_REQUEST', message: 'INVALID_REQUEST' });
         try { verifyWebhook(secret, input, headers.signature, now()); }
         finally { managed?.secret?.fill(0); }
         const latestManaged = await resolveSenderCredential(rule!.userId, rule!.id, headers.keyId).catch(() => ({ configured: true, credentialId: undefined, secret: undefined }));
         latestManaged.secret?.fill(0);
         if (latestManaged.configured !== managed?.configured || latestManaged.credentialId !== managed?.credentialId) {
-          return reply.status(401).send({ error: 'Invalid webhook signature' });
+          return reply.status(401).send({ code: 'invalid_webhook_signature', message: 'Invalid webhook signature' });
         }
         if (!rule || rule.deletedAt !== null || !rule.enabled || rule.keyId !== headers.keyId) {
-          return reply.status(403).send({ error: 'Webhook is not enabled' });
+          return reply.status(403).send({ code: 'webhook_is_not_enabled', message: 'Webhook is not enabled' });
         }
         const event = await prisma.automationEvent.findFirst({ where: { eventId: req.params.eventId, userId: rule.userId, ruleId: rule.id } });
-        if (!event) return reply.status(404).send({ error: 'Event not found' });
+        if (!event) return reply.status(404).send({ code: 'event_not_found', message: 'Event not found' });
         return reply.send(statusResponse(event.eventId, event.status));
       } catch (error) {
         if (error instanceof InboundRequestError) {
           const code = error.code;
           const status = code === 'SIGNATURE_EXPIRED' || code === 'INVALID_SIGNATURE' ? 401 : 400;
-          return reply.status(status).send({ error: code });
+          return reply.status(status).send({ code, message: code });
         }
         Logger.warn('Inbound automation status lookup failed');
-        return reply.status(500).send({ error: 'Event status is unavailable' });
+        return reply.status(500).send({ code: 'event_status_is_unavailable', message: 'Event status is unavailable' });
       }
     },
   );

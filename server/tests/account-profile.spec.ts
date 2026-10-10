@@ -179,9 +179,8 @@ describe('头像：服务端只收密文，而且 hash 由它自己算', () => {
     ['短于形状门（6 字节）', Buffer.from('hello').toString('base64'), 'payload-not-encrypted'],
     ['带 base64url 字符（`-`/`_`）', 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA-_==', 'payload-not-encrypted'],
     ['长度不是 4 的倍数', 'AAAAAAAAA', 'payload-not-encrypted'],
-    // 非字符串走的是 zod 那道门（400 的**另一种**形状：`error: Validation failed`，
-    // 没有 `code`）。把它也算进"形状闸门拒绝"里会得到一条假断言。
-    ['根本不是字符串', 42 as unknown as string, undefined],
+    // 非字符串走的是 zod 那道门（400 也是统一信封：`validation_failed`）。
+    ['根本不是字符串', 42 as unknown as string, 'validation_failed'],
   ])('头像载荷 %s ⇒ 400，且不写库', async (_label, value, code) => {
     const res = await app.inject({
       method: 'PUT',

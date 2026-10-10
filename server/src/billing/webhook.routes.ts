@@ -352,14 +352,14 @@ export const webhookRoutes = async (
 
       // fail-closed：没注册的 provider 不接、不落行。
       if (adapter === undefined) {
-        return reply.status(404).send({ error: 'Unknown billing provider' });
+        return reply.status(404).send({ code: 'unknown_billing_provider', message: 'Unknown billing provider' });
       }
 
       const rawBody = readRawBody(req.body);
       if (rawBody === null) {
         // 只可能是有人在本插件作用域外注册了别的解析器 —— 明确报错，
         // 而不是拿一个"看起来能验签"的空 buffer 继续。
-        return reply.status(415).send({ error: 'Raw request body is required' });
+        return reply.status(415).send({ code: 'raw_request_body_is_required', message: 'Raw request body is required' });
       }
 
       const verification = await adapter.verifyWebhook(rawBody, req.headers);
@@ -374,7 +374,7 @@ export const webhookRoutes = async (
           reason: verification.reason,
           ip: req.ip,
         });
-        return reply.status(401).send({ error: 'Invalid webhook signature' });
+        return reply.status(401).send({ code: 'invalid_webhook_signature', message: 'Invalid webhook signature' });
       }
 
       const event = verification.event;

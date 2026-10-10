@@ -168,14 +168,14 @@ const requireShareMember = async (
   const share = await prisma.share.findFirst({ where: { id: shareId, deletedAt: null } });
   // 非成员与不存在同形：404。share 的存在性本身不向外人泄露。
   if (!share) {
-    void reply.code(404).send({ error: 'Share not found', code: SHARE_ERROR_CODES.NOT_FOUND });
+    void reply.code(404).send({ code: SHARE_ERROR_CODES.NOT_FOUND, message: 'Share not found' });
     return { ok: false, sent: true };
   }
   const member = await prisma.shareMember.findFirst({
     where: { shareId, userId, removedAt: null },
   });
   if (!member) {
-    void reply.code(404).send({ error: 'Share not found', code: SHARE_ERROR_CODES.NOT_FOUND });
+    void reply.code(404).send({ code: SHARE_ERROR_CODES.NOT_FOUND, message: 'Share not found' });
     return { ok: false, sent: true };
   }
   return {
@@ -198,7 +198,7 @@ const requireShareOwner = async (
   const lookup = await requireShareMember(req, reply, shareId);
   if (!lookup.ok) return lookup;
   if (lookup.member.role !== 'owner') {
-    void reply.code(403).send({ error: 'Owner only', code: SHARE_ERROR_CODES.ROLE_FORBIDDEN });
+    void reply.code(403).send({ code: SHARE_ERROR_CODES.ROLE_FORBIDDEN, message: 'Owner only' });
     return { ok: false, sent: true };
   }
   return lookup;
@@ -298,7 +298,7 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
       if (!lookup.ok) return;
       const parsed = CreateInvitationSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
-        return reply.code(400).send({ error: 'Validation failed', details: parsed.error.issues });
+        return reply.code(400).send({ code: 'validation_failed', message: 'Validation failed', details: parsed.error.issues });
       }
       const ttlDays = parsed.data.ttlDays ?? INVITATION_DEFAULT_TTL_DAYS;
       const token = randomBytes(32).toString('base64url');
@@ -358,7 +358,7 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
         data: { revokedAt: BigInt(Date.now()) },
       });
       if (result.count === 0) {
-        return reply.code(404).send({ error: 'Invitation not revocable', code: SHARE_ERROR_CODES.INVITATION_INVALID });
+        return reply.code(404).send({ code: SHARE_ERROR_CODES.INVITATION_INVALID, message: 'Invitation not revocable' });
       }
       return reply.send({ revoked: true });
     },
@@ -369,34 +369,34 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
     const { userId } = getAuthUser(req);
     const parsed = AcceptInvitationSchema.safeParse(req.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: 'Validation failed', code: SHARE_ERROR_CODES.INVITATION_INVALID });
+      return reply.code(400).send({ code: SHARE_ERROR_CODES.INVITATION_INVALID, message: 'Validation failed' });
     }
     const tokenHash = sha256Hex(parsed.data.token);
     const invitation = await prisma.shareInvitation.findUnique({ where: { tokenHash } });
     if (!invitation) {
-      return reply.code(404).send({ error: 'Invitation not found', code: SHARE_ERROR_CODES.INVITATION_INVALID });
+      return reply.code(404).send({ code: SHARE_ERROR_CODES.INVITATION_INVALID, message: 'Invitation not found' });
     }
     if (invitation.revokedAt !== null) {
-      return reply.code(410).send({ error: 'Invitation revoked', code: SHARE_ERROR_CODES.INVITATION_REVOKED });
+      return reply.code(410).send({ code: SHARE_ERROR_CODES.INVITATION_REVOKED, message: 'Invitation revoked' });
     }
     if (Number(invitation.expiresAt) <= Date.now()) {
-      return reply.code(410).send({ error: 'Invitation expired', code: SHARE_ERROR_CODES.INVITATION_EXPIRED });
+      return reply.code(410).send({ code: SHARE_ERROR_CODES.INVITATION_EXPIRED, message: 'Invitation expired' });
     }
     const share = await prisma.share.findFirst({
       where: { id: invitation.shareId, deletedAt: null },
     });
     if (!share) {
-      return reply.code(404).send({ error: 'Share not found', code: SHARE_ERROR_CODES.NOT_FOUND });
+      return reply.code(404).send({ code: SHARE_ERROR_CODES.NOT_FOUND, message: 'Share not found' });
     }
     const existing = await prisma.shareMember.findFirst({
       where: { shareId: share.id, userId },
     });
     if (existing && existing.removedAt === null) {
-      return reply.code(409).send({ error: 'Already a member', code: SHARE_ERROR_CODES.ALREADY_MEMBER });
+      return reply.code(409).send({ code: SHARE_ERROR_CODES.ALREADY_MEMBER, message: 'Already a member' });
     }
     const activeCount = await countActiveMembers(share.id);
     if (activeCount >= MAX_SHARE_MEMBERS) {
-      return reply.code(403).send({ error: 'Share is full', code: SHARE_ERROR_CODES.MEMBER_LIMIT });
+      return reply.code(403).send({ code: SHARE_ERROR_CODES.MEMBER_LIMIT, message: 'Share is full' });
     }
     const now = BigInt(Date.now());
     // 曾经被移除的人经新邀请回来：复用同一行（唯一约束 [shareId,userId]），
@@ -473,16 +473,16 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
       if (!lookup.ok) return;
       const parsed = PatchMemberSchema.safeParse(req.body);
       if (!parsed.success || !isShareMemberRole(parsed.data.role) || parsed.data.role === 'owner') {
-        return reply.code(400).send({ error: 'Invalid role', code: SHARE_ERROR_CODES.ROLE_FORBIDDEN });
+        return reply.code(400).send({ code: SHARE_ERROR_CODES.ROLE_FORBIDDEN, message: 'Invalid role' });
       }
       const target = await prisma.shareMember.findFirst({
         where: { id: memberId, shareId, removedAt: null },
       });
       if (!target) {
-        return reply.code(404).send({ error: 'Member not found', code: SHARE_ERROR_CODES.NOT_FOUND });
+        return reply.code(404).send({ code: SHARE_ERROR_CODES.NOT_FOUND, message: 'Member not found' });
       }
       if (target.role === 'owner') {
-        return reply.code(400).send({ error: 'Cannot change owner role', code: SHARE_ERROR_CODES.ROLE_FORBIDDEN });
+        return reply.code(400).send({ code: SHARE_ERROR_CODES.ROLE_FORBIDDEN, message: 'Cannot change owner role' });
       }
       await prisma.shareMember.update({ where: { id: target.id }, data: { role: parsed.data.role } });
       return reply.send({ memberId, role: parsed.data.role });
@@ -499,13 +499,13 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
       if (!lookup.ok) return;
       const parsed = PutEnvelopeSchema.safeParse(req.body);
       if (!parsed.success) {
-        return reply.code(400).send({ error: 'Validation failed', details: parsed.error.issues });
+        return reply.code(400).send({ code: 'validation_failed', message: 'Validation failed', details: parsed.error.issues });
       }
       const target = await prisma.shareMember.findFirst({
         where: { id: memberId, shareId, removedAt: null },
       });
       if (!target) {
-        return reply.code(404).send({ error: 'Member not found', code: SHARE_ERROR_CODES.NOT_FOUND });
+        return reply.code(404).send({ code: SHARE_ERROR_CODES.NOT_FOUND, message: 'Member not found' });
       }
       const { keyEpoch, keyEnvelope } = parsed.data;
       await prisma.shareMember.update({
@@ -536,10 +536,10 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
         where: { id: memberId, shareId, removedAt: null },
       });
       if (!target) {
-        return reply.code(404).send({ error: 'Member not found', code: SHARE_ERROR_CODES.NOT_FOUND });
+        return reply.code(404).send({ code: SHARE_ERROR_CODES.NOT_FOUND, message: 'Member not found' });
       }
       if (target.role === 'owner') {
-        return reply.code(400).send({ error: 'Cannot remove owner', code: SHARE_ERROR_CODES.ROLE_FORBIDDEN });
+        return reply.code(400).send({ code: SHARE_ERROR_CODES.ROLE_FORBIDDEN, message: 'Cannot remove owner' });
       }
       await prisma.shareMember.update({
         where: { id: target.id },
@@ -555,7 +555,7 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
     const lookup = await requireShareMember(req, reply, shareId);
     if (!lookup.ok) return;
     if (lookup.member.role === 'owner') {
-      return reply.code(400).send({ error: 'Owner cannot leave', code: SHARE_ERROR_CODES.OWNER_CANNOT_LEAVE });
+      return reply.code(400).send({ code: SHARE_ERROR_CODES.OWNER_CANNOT_LEAVE, message: 'Owner cannot leave' });
     }
     await prisma.shareMember.update({
       where: { id: lookup.member.id },
@@ -571,7 +571,7 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
     if (!lookup.ok) return;
     const parsed = UploadShareOpsSchema.safeParse(req.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: 'Validation failed', details: parsed.error.issues });
+      return reply.code(400).send({ code: 'validation_failed', message: 'Validation failed', details: parsed.error.issues });
     }
     const role = lookup.member.role as ShareMemberRole;
     const accepted: ValidatedShareOp[] = [];
@@ -690,7 +690,7 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
       if (!lookup.ok) return;
       const parsed = DownloadShareOpsQuerySchema.safeParse(req.query);
       if (!parsed.success) {
-        return reply.code(400).send({ error: 'Validation failed', details: parsed.error.issues });
+        return reply.code(400).send({ code: 'validation_failed', message: 'Validation failed', details: parsed.error.issues });
       }
       const { after, limit } = parsed.data;
       const ops = await prisma.shareOperation.findMany({

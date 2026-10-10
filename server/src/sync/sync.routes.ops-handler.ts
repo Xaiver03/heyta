@@ -127,8 +127,8 @@ export const uploadOpsHandler = async (
         opsCount: ops.length,
       });
       return reply.status(429).send({
-        error: 'Rate limited',
-        errorCode: SYNC_ERROR_CODES.RATE_LIMITED,
+        code: SYNC_ERROR_CODES.RATE_LIMITED,
+        message: 'Rate limited',
       });
     }
 
@@ -147,7 +147,7 @@ export const uploadOpsHandler = async (
     const inboundIdentity = readInboundUploadIdentity(req.raw.rawHeaders, getAuthUser(req).tokenVersion);
     if (inboundIdentity && inboundCommitProofs) inboundIdentity.commitProofs = inboundCommitProofs;
     if (!await authorizeInboundOperations(prisma, userId, clientId, ops as unknown as Operation[], inboundIdentity)) {
-      return reply.status(403).send({ error: 'Inbound commit authorization required', errorCode: SYNC_ERROR_CODES.INBOUND_AUTH_REQUIRED });
+      return reply.status(403).send({ code: SYNC_ERROR_CODES.INBOUND_AUTH_REQUIRED, message: 'Inbound commit authorization required' });
     }
 
     const hasFrontierDelta = ops.some((op) => op.vectorClockEncoding === 'frontier-delta');
@@ -159,14 +159,14 @@ export const uploadOpsHandler = async (
       if (!frontier) {
         Logger.warn(`[user:${userId}] Causal frontier validation failed for encoded upload`);
         return reply.status(400).send({
-          error: 'Invalid causal frontier',
-          errorCode: SYNC_ERROR_CODES.INVALID_VECTOR_CLOCK,
+          code: SYNC_ERROR_CODES.INVALID_VECTOR_CLOCK,
+          message: 'Invalid causal frontier',
         });
       }
       try {
         ops = expandFrontierDelta(ops, frontier);
       } catch {
-        return reply.status(400).send({ error: 'Invalid causal frontier delta', errorCode: SYNC_ERROR_CODES.INVALID_VECTOR_CLOCK });
+        return reply.status(400).send({ code: SYNC_ERROR_CODES.INVALID_VECTOR_CLOCK, message: 'Invalid causal frontier delta' });
       }
     }
 
@@ -439,6 +439,6 @@ export const uploadOpsHandler = async (
     return reply.send(response);
   } catch (err) {
     Logger.error(`Upload ops error: ${errorMessage(err)}`);
-    return reply.status(500).send({ error: 'Internal server error' });
+    return reply.status(500).send({ code: 'internal_server_error', message: 'Internal server error' });
   }
 };

@@ -655,6 +655,8 @@ describe('ValidationService', () => {
       // `ENTITY_TYPES`，如果生产环境的库里没有它，带 `ASSISTANT_TURN` 的 op 会被
       // 判成 `INVALID_ENTITY_TYPE` 永久拒绝（后果是 §7 第 34/41 条那两个 P0 的形状）。
       'ASSISTANT_TURN',
+      // 分享实体的评论（分享/评论线，2026-10-10 并入 main）。同一条纪律。
+      'COMMENT',
     ];
 
     it('should include all heyta entity types', () => {

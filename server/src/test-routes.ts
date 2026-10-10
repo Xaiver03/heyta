@@ -122,7 +122,7 @@ export const testRoutes = async (fastify: FastifyInstance): Promise<void> => {
       } catch (err: unknown) {
         Logger.error('[TEST] Failed to create test user:', err);
         return reply.status(500).send({
-          error: 'Failed to create test user',
+          code: 'failed_to_create_test_user',
           message: (err as Error).message,
         });
       }
@@ -165,10 +165,10 @@ export const testRoutes = async (fastify: FastifyInstance): Promise<void> => {
         where: { email: normalizeEmail(email) },
       });
       if (!user) {
-        return reply.status(404).send({ error: 'user-not-found' });
+        return reply.status(404).send({ code: 'user-not-found', message: 'user-not-found' });
       }
       if (user.isVerified === 0) {
-        return reply.status(409).send({ error: 'email-not-verified' });
+        return reply.status(409).send({ code: 'email-not-verified', message: 'email-not-verified' });
       }
 
       // 强制新签：清掉可能存在的旧令牌（含未过期的），让每次调用都拿到确定的一枚。
@@ -180,7 +180,7 @@ export const testRoutes = async (fastify: FastifyInstance): Promise<void> => {
       const loginToken = await mintLoginMagicLinkToken(user);
       if (loginToken === null) {
         Logger.error(`[TEST] Failed to mint login link (ID: ${user.id})`);
-        return reply.status(503).send({ error: 'mint-conflict' });
+        return reply.status(503).send({ code: 'mint-conflict', message: 'mint-conflict' });
       }
 
       Logger.info(`[TEST] Minted login link token (ID: ${user.id})`);
@@ -217,7 +217,7 @@ export const testRoutes = async (fastify: FastifyInstance): Promise<void> => {
       } catch (err: unknown) {
         Logger.error('[TEST] Cleanup failed:', err);
         return reply.status(500).send({
-          error: 'Cleanup failed',
+          code: 'cleanup_failed',
           message: (err as Error).message,
         });
       }
@@ -248,7 +248,7 @@ export const testRoutes = async (fastify: FastifyInstance): Promise<void> => {
       const userId = parseInt(request.params.userId, 10);
 
       if (isNaN(userId)) {
-        return reply.status(400).send({ error: 'Invalid userId' });
+        return reply.status(400).send({ code: 'invalid_userid', message: 'Invalid userId' });
       }
 
       try {
@@ -263,7 +263,7 @@ export const testRoutes = async (fastify: FastifyInstance): Promise<void> => {
       } catch (err: unknown) {
         Logger.error('[TEST] Failed to delete test user:', err);
         return reply.status(404).send({
-          error: 'User not found or already deleted',
+          code: 'user_not_found_or_already_deleted',
           message: (err as Error).message,
         });
       }
@@ -304,7 +304,7 @@ export const testRoutes = async (fastify: FastifyInstance): Promise<void> => {
       const userId = parseInt(request.params.userId, 10);
 
       if (isNaN(userId)) {
-        return reply.status(400).send({ error: 'Invalid userId' });
+        return reply.status(400).send({ code: 'invalid_userid', message: 'Invalid userId' });
       }
 
       const limit = parseInt(request.query.limit ?? '10', 10);
@@ -331,7 +331,7 @@ export const testRoutes = async (fastify: FastifyInstance): Promise<void> => {
       } catch (err: unknown) {
         Logger.error('[TEST] Failed to query ops:', err);
         return reply.status(500).send({
-          error: 'Failed to query ops',
+          code: 'failed_to_query_ops',
           message: (err as Error).message,
         });
       }
@@ -372,18 +372,19 @@ export const testRoutes = async (fastify: FastifyInstance): Promise<void> => {
     async (request, reply) => {
       const userId = parseInt(request.params.userId, 10);
       if (isNaN(userId)) {
-        return reply.status(400).send({ error: 'Invalid userId' });
+        return reply.status(400).send({ code: 'invalid_userid', message: 'Invalid userId' });
       }
 
       const parsedOp = SuperSyncOperationSchema.safeParse(request.body.op);
       if (!parsedOp.success) {
-        return reply.status(400).send({ error: 'Invalid operation' });
+        return reply.status(400).send({ code: 'invalid_operation', message: 'Invalid operation' });
       }
 
       const op: SuperSyncOperation = parsedOp.data;
       if (op.isPayloadEncrypted !== false) {
         return reply.status(400).send({
-          error: 'Legacy plaintext seed requires isPayloadEncrypted=false',
+          code: 'legacy_plaintext_seed_requires_ispayloadencrypted_false',
+          message: 'Legacy plaintext seed requires isPayloadEncrypted=false',
         });
       }
 
@@ -430,7 +431,7 @@ export const testRoutes = async (fastify: FastifyInstance): Promise<void> => {
         });
 
         if (!seededOp) {
-          return reply.status(404).send({ error: 'User not found' });
+          return reply.status(404).send({ code: 'user_not_found', message: 'User not found' });
         }
 
         Logger.info(
@@ -443,7 +444,7 @@ export const testRoutes = async (fastify: FastifyInstance): Promise<void> => {
           opId: op.id,
           errorName: err instanceof Error ? err.name : 'UnknownError',
         });
-        return reply.status(500).send({ error: 'Failed to seed operation' });
+        return reply.status(500).send({ code: 'failed_to_seed_operation', message: 'Failed to seed operation' });
       }
     },
   );
@@ -479,7 +480,7 @@ export const testRoutes = async (fastify: FastifyInstance): Promise<void> => {
       const serverSeq = parseInt(request.params.serverSeq, 10);
 
       if (isNaN(userId) || isNaN(serverSeq)) {
-        return reply.status(400).send({ error: 'Invalid userId or serverSeq' });
+        return reply.status(400).send({ code: 'invalid_userid_or_serverseq', message: 'Invalid userId or serverSeq' });
       }
 
       try {
@@ -506,7 +507,7 @@ export const testRoutes = async (fastify: FastifyInstance): Promise<void> => {
       } catch (err: unknown) {
         Logger.error('[TEST] Failed to simulate backup revert:', err);
         return reply.status(500).send({
-          error: 'Failed to simulate backup revert',
+          code: 'failed_to_simulate_backup_revert',
           message: (err as Error).message,
         });
       }

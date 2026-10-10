@@ -220,7 +220,7 @@ describe('passwordAuthResponseOf：七个码 → 状态码的唯一映射表', (
   it('不经过 Fastify 也能钉住（这个函数刻意不碰 reply）', () => {
     expect(
       passwordAuthResponseOf(new PasswordAuthError('invalid_credentials', 'Invalid credentials')),
-    ).toEqual({ status: 401, body: { error: 'Invalid credentials', code: 'invalid_credentials' } });
+    ).toEqual({ status: 401, body: { code: 'invalid_credentials', message: 'Invalid credentials' } });
 
     expect(
       passwordAuthResponseOf(
@@ -229,8 +229,8 @@ describe('passwordAuthResponseOf：七个码 → 状态码的唯一映射表', (
     ).toEqual({
       status: 403,
       body: {
-        error: 'Email not verified. Check your inbox for the verification link.',
         code: 'email_not_verified',
+        message: 'Email not verified. Check your inbox for the verification link.',
       },
     });
 
@@ -241,8 +241,8 @@ describe('passwordAuthResponseOf：七个码 → 状态码的唯一映射表', (
     ).toEqual({
       status: 400,
       body: {
-        error: 'That password does not meet the requirements.',
         code: 'password_policy_violation',
+        message: 'That password does not meet the requirements.',
         policyCode: 'too_short',
       },
     });
@@ -254,7 +254,7 @@ describe('passwordAuthResponseOf：七个码 → 状态码的唯一映射表', (
     );
     expect(res.status).toBe(429);
     expect(res.retryAfterSeconds).toBe(120);
-    expect(res.body.error).toBe(PASSWORD_ACCOUNT_LOCKED_MESSAGE);
+    expect(res.body.message).toBe(PASSWORD_ACCOUNT_LOCKED_MESSAGE);
   });
 
   it('锁定缺 retryAfterSeconds 时兜底为整个锁定时长（不写"0 秒后再来"）', () => {
@@ -267,7 +267,7 @@ describe('passwordAuthResponseOf：七个码 → 状态码的唯一映射表', (
     expect(res.status).toBe(503);
     expect(res.retryAfterSeconds).toBe(4);
     // 内部那句"哪个闸门满了、排了多少"不许透传。
-    expect(res.body.error).not.toMatch(/saturated|slot|queue/i);
+    expect(res.body.message).not.toMatch(/saturated|slot|queue/i);
   });
 
   /**
@@ -282,7 +282,7 @@ describe('passwordAuthResponseOf：七个码 → 状态码的唯一映射表', (
     );
     expect(link).toEqual({
       status: 400,
-      body: { error: PASSWORD_INVALID_RESET_LINK_MESSAGE, code: 'invalid_reset_link' },
+      body: { code: 'invalid_reset_link', message: PASSWORD_INVALID_RESET_LINK_MESSAGE },
     });
 
     const unset = passwordAuthResponseOf(
@@ -290,12 +290,12 @@ describe('passwordAuthResponseOf：七个码 → 状态码的唯一映射表', (
     );
     expect(unset).toEqual({
       status: 400,
-      body: { error: PASSWORD_NOT_SET_MESSAGE, code: 'no_password_set' },
+      body: { code: 'no_password_set', message: PASSWORD_NOT_SET_MESSAGE },
     });
 
     // 界面靠 `code` 换 CTA（一句导向「忘记密码」，一句导向"回去重新点链接"），
     // 所以这两句**不许相同** —— 相同就等于把两个 code 合并成一个，白加。
-    expect(unset.body.error).not.toBe(link.body.error);
+    expect(unset.body.message).not.toBe(link.body.message);
   });
 
   it('`no_password_set` 不许是 401：他不是"没证明你是谁"，他已经证明了（带着有效会话）', () => {
@@ -335,7 +335,7 @@ describe('POST /register/email-password', () => {
     await app.register(apiRoutes, { prefix: '/api', requireTermsConsent: true });
     const res = await post('/register/email-password', { email: EMAIL, password: PASSWORD });
     expect(res.statusCode).toBe(400);
-    expect(String(res.json().error)).toMatch(/Validation failed/);
+    expect(String(res.json().message)).toMatch(/Validation failed/);
     expect(authSpies.registerWithMagicLink).not.toHaveBeenCalled();
   });
 
@@ -347,8 +347,8 @@ describe('POST /register/email-password', () => {
     const res = await post('/register/email-password', { email: EMAIL, password: 'password' });
     expect(res.statusCode).toBe(400);
     expect(res.json()).toEqual({
-      error: 'That password does not meet the requirements.',
       code: 'password_policy_violation',
+      message: 'That password does not meet the requirements.',
       policyCode: 'too_common',
     });
     expect(hashSpies.hashPassword).not.toHaveBeenCalled();
@@ -375,7 +375,7 @@ describe('POST /register/email-password', () => {
     const oversized = 'x'.repeat(MAX_PASSWORD_CODE_POINTS * 2 + 1);
     const rejected = await post('/register/email-password', { email: EMAIL, password: oversized });
     expect(rejected.statusCode).toBe(400);
-    expect(String(rejected.json().error)).toMatch(/Validation failed/);
+    expect(String(rejected.json().message)).toMatch(/Validation failed/);
     expect(policySpies.checkNewPassword).not.toHaveBeenCalled();
   });
 
@@ -389,8 +389,8 @@ describe('POST /register/email-password', () => {
       password: 'x'.repeat(MAX_PASSWORD_CODE_POINTS + 1),
     });
     expect(res.json()).toEqual({
-      error: 'That password does not meet the requirements.',
       code: 'password_policy_violation',
+      message: 'That password does not meet the requirements.',
       policyCode: 'too_long',
     });
   });
@@ -467,7 +467,7 @@ describe('POST /login/email-password', () => {
 
     for (const res of [wrongPassword, unknownEmail, noPasswordSet]) {
       expect(res.statusCode).toBe(401);
-      expect(res.json()).toEqual({ error: 'Invalid credentials', code: 'invalid_credentials' });
+      expect(res.json()).toEqual({ code: 'invalid_credentials', message: 'Invalid credentials' });
     }
     // 分级成 error/info 的话，日志本身就成了可读出来的信号。
     const loginWarns = spiedLogger.warn.mock.calls.filter((c) =>
@@ -505,8 +505,8 @@ describe('POST /login/email-password', () => {
       const res = await post('/login/email-password', { email: EMAIL, password: PASSWORD });
       expect(res.statusCode).toBe(503);
       expect(res.json().code).toBe('password_backend_busy');
-      expect(String(res.json().error)).toMatch(/too many sign-in requests/i);
-      expect(String(res.json().error)).not.toMatch(/saturated|slot/i);
+      expect(String(res.json().message)).toMatch(/too many sign-in requests/i);
+      expect(String(res.json().message)).not.toMatch(/saturated|slot/i);
       expect(Number(res.headers['retry-after'])).toBeGreaterThan(0);
     } finally {
       free();
@@ -596,8 +596,8 @@ describe('POST /password/reset：成功不发会话（J14 的 HTTP 半边）', (
     const res = await post('/password/reset', { token: 'a'.repeat(64), password: PASSWORD });
     expect(res.statusCode).toBe(400);
     expect(res.json()).toEqual({
-      error: PASSWORD_INVALID_RESET_LINK_MESSAGE,
       code: 'invalid_reset_link',
+      message: PASSWORD_INVALID_RESET_LINK_MESSAGE,
     });
   });
 
@@ -710,7 +710,7 @@ describe('POST /password/change：preHandler 真的挂上了（J13 的 HTTP 半�
       payload: { currentPassword: 'old one', newPassword: PASSWORD },
     });
     expect(res.statusCode).toBe(400);
-    expect(res.json()).toEqual({ error: PASSWORD_NOT_SET_MESSAGE, code: 'no_password_set' });
+    expect(res.json()).toEqual({ code: 'no_password_set', message: PASSWORD_NOT_SET_MESSAGE });
     // 这条路**不**跑哈希：他没有"输错当前口令"这回事，一次都不该算。
     expect(hashSpies.verifyPassword).not.toHaveBeenCalled();
   });
@@ -726,7 +726,7 @@ describe('POST /password/change：preHandler 真的挂上了（J13 的 HTTP 半�
       payload: { newPassword: PASSWORD },
     });
     expect(res.statusCode).toBe(400);
-    expect(res.json().error).toBe('Validation failed');
+    expect(res.json().message).toBe('Validation failed');
     expect(hashSpies.verifyPassword).not.toHaveBeenCalled();
   });
 });
@@ -854,8 +854,8 @@ describe('POST /password/set：加认证器，不是换钥匙', () => {
     const res = await setWith(bearer(3), { newPassword: PASSWORD });
     expect(res.statusCode).toBe(400);
     expect(res.json()).toEqual({
-      error: PASSWORD_ALREADY_SET_MESSAGE,
       code: 'password_already_set',
+      message: PASSWORD_ALREADY_SET_MESSAGE,
     });
   });
 
@@ -866,8 +866,8 @@ describe('POST /password/set：加认证器，不是换钥匙', () => {
 
     expect(res.statusCode).toBe(400);
     expect(res.json()).toEqual({
-      error: PASSWORD_ALREADY_SET_MESSAGE,
       code: 'password_already_set',
+      message: PASSWORD_ALREADY_SET_MESSAGE,
     });
     expect(hashSpies.hashPassword).not.toHaveBeenCalled();
     expect(mocks.user.updateMany).not.toHaveBeenCalled();
@@ -909,8 +909,8 @@ describe('POST /password/set：加认证器，不是换钥匙', () => {
     const res = await setWith(bearer(3), { newPassword: 'short' });
     expect(res.statusCode).toBe(400);
     expect(res.json()).toEqual({
-      error: 'That password does not meet the requirements.',
       code: 'password_policy_violation',
+      message: 'That password does not meet the requirements.',
       policyCode: 'too_short',
     });
     expect(hashSpies.hashPassword).not.toHaveBeenCalled();

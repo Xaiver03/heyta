@@ -288,7 +288,7 @@ export const adminRoutes = async (
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       Logger.error(`Admin overview error: ${message}`);
-      return reply.status(500).send({ error: 'Failed to load admin overview.' });
+      return reply.status(500).send({ code: 'failed_to_load_admin_overview', message: 'Failed to load admin overview.' });
     }
   });
 
@@ -296,7 +296,7 @@ export const adminRoutes = async (
   fastify.get('/users', async (req, reply) => {
     const parsed = UserListQuerySchema.safeParse(req.query);
     if (!parsed.success) {
-      return reply.status(400).send({ error: 'Invalid query parameters.' });
+      return reply.status(400).send({ code: 'invalid_query_parameters', message: 'Invalid query parameters.' });
     }
     const { take, skip } = pageParams(parsed.data);
     const q = parsed.data.q;
@@ -331,13 +331,13 @@ export const adminRoutes = async (
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       Logger.error(`Admin user list error: ${message}`);
-      return reply.status(500).send({ error: 'Failed to load users.' });
+      return reply.status(500).send({ code: 'failed_to_load_users', message: 'Failed to load users.' });
     }
   });
 
   fastify.get('/users/:id', async (req, reply) => {
     const parsed = IdParamSchema.safeParse(req.params);
-    if (!parsed.success) return reply.status(400).send({ error: 'Invalid user id.' });
+    if (!parsed.success) return reply.status(400).send({ code: 'invalid_user_id', message: 'Invalid user id.' });
 
     try {
       const now = Date.now();
@@ -394,7 +394,7 @@ export const adminRoutes = async (
         },
       });
 
-      if (user === null) return reply.status(404).send({ error: 'User not found.' });
+      if (user === null) return reply.status(404).send({ code: 'user_not_found', message: 'User not found.' });
 
       return reply.send({
         user: {
@@ -443,7 +443,7 @@ export const adminRoutes = async (
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       Logger.error(`Admin user detail error: ${message}`);
-      return reply.status(500).send({ error: 'Failed to load user.' });
+      return reply.status(500).send({ code: 'failed_to_load_user', message: 'Failed to load user.' });
     }
   });
 
@@ -457,7 +457,7 @@ export const adminRoutes = async (
    */
   fastify.post('/users/:id/unlock', async (req, reply) => {
     const parsed = IdParamSchema.safeParse(req.params);
-    if (!parsed.success) return reply.status(400).send({ error: 'Invalid user id.' });
+    if (!parsed.success) return reply.status(400).send({ code: 'invalid_user_id', message: 'Invalid user id.' });
 
     try {
       const user = await prisma.user.update({
@@ -473,21 +473,22 @@ export const adminRoutes = async (
       // Prisma 的 P2025 = 记录不存在。这是预期结果（并发删除 / 手输错 id），
       // 不该报 500。
       if (typeof err === 'object' && err !== null && (err as { code?: string }).code === 'P2025') {
-        return reply.status(404).send({ error: 'User not found.' });
+        return reply.status(404).send({ code: 'user_not_found', message: 'User not found.' });
       }
       const message = err instanceof Error ? err.message : 'Unknown error';
       Logger.error(`Admin unlock error: ${message}`);
-      return reply.status(500).send({ error: 'Failed to unlock user.' });
+      return reply.status(500).send({ code: 'failed_to_unlock_user', message: 'Failed to unlock user.' });
     }
   });
 
   fastify.post('/users/:id/quota', async (req, reply) => {
     const params = IdParamSchema.safeParse(req.params);
-    if (!params.success) return reply.status(400).send({ error: 'Invalid user id.' });
+    if (!params.success) return reply.status(400).send({ code: 'invalid_user_id', message: 'Invalid user id.' });
     const body = QuotaBodySchema.safeParse(req.body);
     if (!body.success) {
       return reply.status(400).send({
-        error: 'Invalid quota.',
+        code: 'invalid_quota',
+        message: 'Invalid quota.',
         details: body.error.issues.map((issue) => issue.message),
       });
     }
@@ -512,11 +513,11 @@ export const adminRoutes = async (
       });
     } catch (err) {
       if (typeof err === 'object' && err !== null && (err as { code?: string }).code === 'P2025') {
-        return reply.status(404).send({ error: 'User not found.' });
+        return reply.status(404).send({ code: 'user_not_found', message: 'User not found.' });
       }
       const message = err instanceof Error ? err.message : 'Unknown error';
       Logger.error(`Admin quota error: ${message}`);
-      return reply.status(500).send({ error: 'Failed to update quota.' });
+      return reply.status(500).send({ code: 'failed_to_update_quota', message: 'Failed to update quota.' });
     }
   });
 
@@ -539,7 +540,7 @@ export const adminRoutes = async (
    */
   fastify.post('/users/:id/logout', async (req, reply) => {
     const parsed = IdParamSchema.safeParse(req.params);
-    if (!parsed.success) return reply.status(400).send({ error: 'Invalid user id.' });
+    if (!parsed.success) return reply.status(400).send({ code: 'invalid_user_id', message: 'Invalid user id.' });
 
     try {
       // 收口函数：抬版本 + 抬完/抬前各失效一次缓存（那一对 invalidate 是承重的，
@@ -559,18 +560,18 @@ export const adminRoutes = async (
       return reply.send({ ok: true, user });
     } catch (err) {
       if (typeof err === 'object' && err !== null && (err as { code?: string }).code === 'P2025') {
-        return reply.status(404).send({ error: 'User not found.' });
+        return reply.status(404).send({ code: 'user_not_found', message: 'User not found.' });
       }
       const message = err instanceof Error ? err.message : 'Unknown error';
       Logger.error(`Admin logout error: ${message}`);
-      return reply.status(500).send({ error: 'Failed to force logout.' });
+      return reply.status(500).send({ code: 'failed_to_force_logout', message: 'Failed to force logout.' });
     }
   });
 
   // ── 订阅 / 订单 / 优惠码 / 邀请 ────────────────────────────────────
   fastify.get('/subscriptions', async (req, reply) => {
     const parsed = PageQuerySchema.safeParse(req.query);
-    if (!parsed.success) return reply.status(400).send({ error: 'Invalid query parameters.' });
+    if (!parsed.success) return reply.status(400).send({ code: 'invalid_query_parameters', message: 'Invalid query parameters.' });
     const { take, skip } = pageParams(parsed.data);
 
     try {
@@ -613,13 +614,13 @@ export const adminRoutes = async (
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       Logger.error(`Admin subscriptions error: ${message}`);
-      return reply.status(500).send({ error: 'Failed to load subscriptions.' });
+      return reply.status(500).send({ code: 'failed_to_load_subscriptions', message: 'Failed to load subscriptions.' });
     }
   });
 
   fastify.get('/orders', async (req, reply) => {
     const parsed = PageQuerySchema.safeParse(req.query);
-    if (!parsed.success) return reply.status(400).send({ error: 'Invalid query parameters.' });
+    if (!parsed.success) return reply.status(400).send({ code: 'invalid_query_parameters', message: 'Invalid query parameters.' });
     const { take, skip } = pageParams(parsed.data);
 
     try {
@@ -672,13 +673,13 @@ export const adminRoutes = async (
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       Logger.error(`Admin orders error: ${message}`);
-      return reply.status(500).send({ error: 'Failed to load orders.' });
+      return reply.status(500).send({ code: 'failed_to_load_orders', message: 'Failed to load orders.' });
     }
   });
 
   fastify.get('/coupons', async (req, reply) => {
     const parsed = PageQuerySchema.safeParse(req.query);
-    if (!parsed.success) return reply.status(400).send({ error: 'Invalid query parameters.' });
+    if (!parsed.success) return reply.status(400).send({ code: 'invalid_query_parameters', message: 'Invalid query parameters.' });
     const { take, skip } = pageParams(parsed.data);
 
     try {
@@ -728,13 +729,13 @@ export const adminRoutes = async (
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       Logger.error(`Admin coupons error: ${message}`);
-      return reply.status(500).send({ error: 'Failed to load coupons.' });
+      return reply.status(500).send({ code: 'failed_to_load_coupons', message: 'Failed to load coupons.' });
     }
   });
 
   fastify.get('/invites', async (req, reply) => {
     const parsed = PageQuerySchema.safeParse(req.query);
-    if (!parsed.success) return reply.status(400).send({ error: 'Invalid query parameters.' });
+    if (!parsed.success) return reply.status(400).send({ code: 'invalid_query_parameters', message: 'Invalid query parameters.' });
     const { take, skip } = pageParams(parsed.data);
 
     try {
@@ -804,7 +805,7 @@ export const adminRoutes = async (
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       Logger.error(`Admin invites error: ${message}`);
-      return reply.status(500).send({ error: 'Failed to load invites.' });
+      return reply.status(500).send({ code: 'failed_to_load_invites', message: 'Failed to load invites.' });
     }
   });
 
@@ -826,7 +827,7 @@ export const adminRoutes = async (
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       Logger.error(`Admin holiday adjustments error: ${message}`);
-      return reply.status(500).send({ error: 'Failed to load holiday adjustments.' });
+      return reply.status(500).send({ code: 'failed_to_load_holiday_adjustments', message: 'Failed to load holiday adjustments.' });
     }
   });
 
@@ -838,7 +839,8 @@ export const adminRoutes = async (
     const parsed = parseHolidayYearPut(req.body);
     if (!parsed.success) {
       return reply.status(400).send({
-        error: 'Invalid holiday adjustment year.',
+        code: 'invalid_holiday_adjustment_year',
+        message: 'Invalid holiday adjustment year.',
         // 逐字段回给运营看。**不含**任何用户数据 —— 这里根本没有用户数据可泄，
         // 而把 `issues` 原样返回是 zod 的默认形状，改写成"人类可读"要一套映射、
         // 一套映射就会漂。
@@ -875,7 +877,7 @@ export const adminRoutes = async (
       Logger.error(
         `Admin holiday adjustment PUT rejected by the database (zod accepted it): ${message}`,
       );
-      return reply.status(400).send({ error: 'Rejected by database constraints.', rejectedBy: 'database' });
+      return reply.status(400).send({ code: 'rejected_by_database_constraints', message: 'Rejected by database constraints.', rejectedBy: 'database' });
     }
 
     // 🔴 判据②：`papers` 随数据入库且**能回显**。回显在 PUT 的响应里也给一份，
@@ -893,7 +895,7 @@ export const adminRoutes = async (
     // 年份走查询串而不是 `/years/:year` —— 与 PUT 同一口径，理由见契约里
     // `HOLIDAY_ADJUSTMENT_PATHS.adminDelete` 那段（两个来源 = 一条必须额外写的守卫）。
     const parsed = holidayAdjustmentAdminDeleteQuerySchema.safeParse(req.query);
-    if (!parsed.success) return reply.status(400).send({ error: 'Invalid query parameters.' });
+    if (!parsed.success) return reply.status(400).send({ code: 'invalid_query_parameters', message: 'Invalid query parameters.' });
 
     const deleted = await deleteHolidayAdjustmentYear(parsed.data.year);
     // 0 = 那一年本来就没录过。**这是幂等成功**，不是 404：
@@ -936,7 +938,7 @@ export const adminRoutes = async (
         limit: z.coerce.number().int().positive().max(200).optional(),
       })
       .safeParse(req.query);
-    if (!query.success) return reply.status(400).send({ error: 'Invalid query parameters.' });
+    if (!query.success) return reply.status(400).send({ code: 'invalid_query_parameters', message: 'Invalid query parameters.' });
 
     try {
       const refunds = await listRefunds(createPrismaSqlExecutor(prisma), {
@@ -947,7 +949,7 @@ export const adminRoutes = async (
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       Logger.error(`Admin refunds list error: ${message}`);
-      return reply.status(500).send({ error: 'Failed to load refunds.' });
+      return reply.status(500).send({ code: 'failed_to_load_refunds', message: 'Failed to load refunds.' });
     }
   });
 
@@ -955,7 +957,8 @@ export const adminRoutes = async (
     const parsed = refundRequestSchema.safeParse(req.body);
     if (!parsed.success) {
       return reply.status(400).send({
-        error: 'Invalid refund request.',
+        code: 'invalid_refund_request',
+        message: 'Invalid refund request.',
         issues: parsed.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
       });
     }
@@ -971,19 +974,19 @@ export const adminRoutes = async (
       });
 
       if (result.outcome === 'not-found') {
-        return reply.status(404).send({ error: 'Order not found.' });
+        return reply.status(404).send({ code: 'order_not_found', message: 'Order not found.' });
       }
       if (result.outcome === 'denied') {
         // 🔴 409 而不是 400：请求本身是**合法的**，被拒的是那一单当前的状态
         // （过期、已退过、不是收银台的单）。把状态冲突报成"你传错了"，
         // 运营会去改参数重试，而改参数永远改不动"这笔已经过了 7 天"。
-        return reply.status(409).send({ error: 'Refund not allowed.', reason: result.reason });
+        return reply.status(409).send({ code: 'refund_not_allowed', message: 'Refund not allowed.', reason: result.reason });
       }
       return reply.status(201).send({ ok: true, ...result });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       Logger.error(`Admin refund request error: ${message}`);
-      return reply.status(500).send({ error: 'Failed to create refund.' });
+      return reply.status(500).send({ code: 'failed_to_create_refund', message: 'Failed to create refund.' });
     }
   });
 
@@ -992,7 +995,7 @@ export const adminRoutes = async (
     const id = z.coerce.number().int().positive().safeParse(params.id);
     const body = refundDecisionSchema.safeParse(req.body);
     if (!id.success || !body.success) {
-      return reply.status(400).send({ error: 'Invalid refund approval.' });
+      return reply.status(400).send({ code: 'invalid_refund_approval', message: 'Invalid refund approval.' });
     }
     const actor = await adminActor(getAuthUser(req).userId);
     const sql = createPrismaSqlExecutor(prisma);
@@ -1004,19 +1007,20 @@ export const adminRoutes = async (
       note: body.data.note,
       now: Date.now(),
     });
-    if (decided.outcome === 'not-found') return reply.status(404).send({ error: 'Refund not found.' });
+    if (decided.outcome === 'not-found') return reply.status(404).send({ code: 'refund_not_found', message: 'Refund not found.' });
     if (decided.outcome === 'not-decidable') {
       // 🔴 409 一律带 `reason` 这个**机器码**：`error` 是给人读的散文，而界面要按码选措辞。
       // 后台那一片拿不到码就只能说"状态冲突"，运营分不清"这条已经决定过了"与"这一单过期了"
       // （ADR-0053 §5 第 11 条）。
       return reply.status(409).send({
-        error: 'Refund already decided or finished.',
+        code: 'refund_already_decided_or_finished',
+        message: 'Refund already decided or finished.',
         reason: 'NOT_DECIDABLE',
       });
     }
 
     const channel = await refundChannelOf(sql, id.data);
-    if (channel === null) return reply.status(404).send({ error: 'Refund not found.' });
+    if (channel === null) return reply.status(404).send({ code: 'refund_not_found', message: 'Refund not found.' });
     const adapter = createBillingAdapterRegistry(options.adapters ?? []).get(channel.provider);
     if (adapter === undefined) {
       // 订单写着某个 provider，而这台实例**没有**注册它 —— 换过支付商的形状。
@@ -1045,7 +1049,7 @@ export const adminRoutes = async (
     const id = z.coerce.number().int().positive().safeParse(params.id);
     const body = refundDecisionSchema.safeParse(req.body);
     if (!id.success || !body.success) {
-      return reply.status(400).send({ error: 'Invalid refund rejection.' });
+      return reply.status(400).send({ code: 'invalid_refund_rejection', message: 'Invalid refund rejection.' });
     }
 
     const decided = await decideRefund(createPrismaSqlExecutor(prisma), {
@@ -1055,11 +1059,12 @@ export const adminRoutes = async (
       note: body.data.note,
       now: Date.now(),
     });
-    if (decided.outcome === 'not-found') return reply.status(404).send({ error: 'Refund not found.' });
+    if (decided.outcome === 'not-found') return reply.status(404).send({ code: 'refund_not_found', message: 'Refund not found.' });
     if (decided.outcome === 'not-decidable') {
       // 与 approve 那条同一码、同一理由：界面要能区分"这条已经决定过了"与别的状态冲突。
       return reply.status(409).send({
-        error: 'Refund already decided or finished.',
+        code: 'refund_already_decided_or_finished',
+        message: 'Refund already decided or finished.',
         reason: 'NOT_DECIDABLE',
       });
     }

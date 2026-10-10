@@ -136,8 +136,8 @@ export const sendQuotaExceededReply = (
   },
 ): FastifyReply =>
   reply.status(413).send({
-    error: 'Storage quota exceeded',
-    errorCode: SYNC_ERROR_CODES.STORAGE_QUOTA_EXCEEDED,
+    code: SYNC_ERROR_CODES.STORAGE_QUOTA_EXCEEDED,
+    message: 'Storage quota exceeded',
     ...body,
   });
 
@@ -217,8 +217,7 @@ export const sendSyncImportExistsReply = (
       `Client should download and merge instead.`,
   );
   return reply.status(409).send({
-    error: 'SYNC_IMPORT_EXISTS',
-    errorCode: 'SYNC_IMPORT_EXISTS',
+    code: 'SYNC_IMPORT_EXISTS',
     message:
       'A SYNC_IMPORT already exists. Download existing data and upload your changes as regular operations.',
     existingImportId: existingImport.id,

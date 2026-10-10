@@ -276,6 +276,7 @@ describe('Sync compressed body routes', () => {
       undefined,
       false,
       undefined,
+      undefined,
     );
   });
 
@@ -344,6 +345,7 @@ describe('Sync compressed body routes', () => {
       undefined,
       false,
       undefined,
+      undefined,
     );
   });
 
@@ -402,6 +404,7 @@ describe('Sync compressed body routes', () => {
       undefined,
       false,
       undefined,
+      undefined,
     );
   });
 
@@ -454,6 +457,7 @@ describe('Sync compressed body routes', () => {
       new Set([incomingOp.id]),
       undefined,
       false,
+      undefined,
       undefined,
     );
   });
@@ -743,6 +747,7 @@ describe('Sync compressed body routes', () => {
       undefined,
       false,
       0,
+      undefined,
     );
   });
 
@@ -1135,7 +1140,7 @@ describe('Sync compressed body routes', () => {
     });
 
     expect(response.statusCode).toBe(400);
-    expect(response.json().error).toBe('Failed to decompress gzip body');
+    expect(response.json().message).toBe('Failed to decompress gzip body');
     expect(mocks.syncService.uploadOps).not.toHaveBeenCalled();
   });
 
@@ -1170,7 +1175,7 @@ describe('Sync compressed body routes', () => {
     });
 
     expect(response.statusCode).toBe(413);
-    expect(response.json().errorCode).toBe('STORAGE_QUOTA_EXCEEDED');
+    expect(response.json().code).toBe('STORAGE_QUOTA_EXCEEDED');
     expect(mocks.syncService.uploadOps).not.toHaveBeenCalled();
   });
 
@@ -1332,7 +1337,7 @@ describe('Sync compressed body routes', () => {
 
     expect(response.statusCode).toBe(409);
     expect(response.json()).toMatchObject({
-      errorCode: 'SYNC_IMPORT_EXISTS',
+      code: 'SYNC_IMPORT_EXISTS',
       existingImportId: 'existing-import',
     });
     expect(mocks.prisma.operation.findFirst).toHaveBeenCalledTimes(2);
@@ -1675,7 +1680,7 @@ describe('Sync compressed body routes', () => {
 
     expect(response.statusCode).toBe(409);
     expect(response.json()).toMatchObject({
-      errorCode: 'SYNC_IMPORT_EXISTS',
+      code: 'SYNC_IMPORT_EXISTS',
       existingImportId: '018f2f0b-8888-7a1b-8c3d-bbbbbbbbbbbb',
     });
   });
@@ -1742,9 +1747,9 @@ describe('Sync compressed body routes', () => {
 
     expect(response.statusCode).toBe(413);
     const body = response.json();
-    expect(body.errorCode).toBe('STORAGE_QUOTA_EXCEEDED');
-    // No legacy `code:` key — clients dispatch on errorCode.
-    expect(body.code).toBeUndefined();
+    expect(body.code).toBe('STORAGE_QUOTA_EXCEEDED');
+    // 统一信封后没有旧 `errorCode` 键 —— 客户端只认 `code`。
+    expect(body.errorCode).toBeUndefined();
     expect(mocks.syncService.uploadOps).not.toHaveBeenCalled();
   });
 
@@ -1773,7 +1778,7 @@ describe('Sync compressed body routes', () => {
     });
 
     expect(response.statusCode).toBe(413);
-    expect(response.json().errorCode).toBe('STORAGE_QUOTA_EXCEEDED');
+    expect(response.json().code).toBe('STORAGE_QUOTA_EXCEEDED');
   });
 
   it('should mark the user for forced reconcile when post-commit counter delta fails', async () => {

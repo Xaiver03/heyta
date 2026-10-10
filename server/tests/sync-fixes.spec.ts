@@ -321,7 +321,7 @@ describe('Sync System Fixes', () => {
     });
 
     expect(response.statusCode).toBe(400);
-    expect(response.json().error).toBe('Target sequence 3 is no longer available');
+    expect(response.json().message).toBe('Target sequence 3 is no longer available');
   });
 
   // =============================================================================
@@ -500,7 +500,7 @@ describe('Sync System Fixes', () => {
       });
 
       expect(snapshotResponse.statusCode).toBe(400);
-      expect(snapshotResponse.json().errorCode).toBe(SYNC_ERROR_CODES.E2EE_REQUIRED);
+      expect(snapshotResponse.json().code).toBe(SYNC_ERROR_CODES.E2EE_REQUIRED);
 
       // Download and verify the rejected snapshot left no operation behind
       const downloadResponse = await app.inject({

@@ -239,11 +239,11 @@ describe('entitlement gate on sync routes', () => {
 
       expect(response.statusCode).toBe(402);
       const body = response.json();
-      expect(body.errorCode).toBe(ENTITLEMENT_ERROR_CODE);
-      expect(body.errorCode).not.toBe('STORAGE_QUOTA_EXCEEDED');
+      expect(body.code).toBe(ENTITLEMENT_ERROR_CODE);
+      expect(body.code).not.toBe('STORAGE_QUOTA_EXCEEDED');
       expect(body.reason).toBe('NO_SUBSCRIPTION');
-      expect(typeof body.error).toBe('string');
-      expect(body.error.length).toBeGreaterThan(0);
+      expect(typeof body.message).toBe('string');
+      expect(body.message.length).toBeGreaterThan(0);
 
       // Denied before the upload handler ran.
       expect(mocks.syncService.uploadOps).not.toHaveBeenCalled();

@@ -262,7 +262,7 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
         return reply.send(response);
       } catch (err) {
         Logger.error(`Download ops error: ${errorMessage(err)}`);
-        return reply.status(500).send({ error: 'Internal server error' });
+        return reply.status(500).send({ code: 'internal_server_error', message: 'Internal server error' });
       }
     },
   );
@@ -328,7 +328,7 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
         return reply.send(response);
       } catch (err) {
         Logger.error(`Get status error: ${errorMessage(err)}`);
-        return reply.status(500).send({ error: 'Internal server error' });
+        return reply.status(500).send({ code: 'internal_server_error', message: 'Internal server error' });
       }
     },
   );
@@ -354,7 +354,7 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
         return reply.send(response);
       } catch (err) {
         Logger.error(`Get devices error: ${errorMessage(err)}`);
-        return reply.status(500).send({ error: 'Internal server error' });
+        return reply.status(500).send({ code: 'internal_server_error', message: 'Internal server error' });
       }
     },
   );
@@ -364,11 +364,11 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
   fastify.get('/key-package', async (req: FastifyRequest, reply: FastifyReply) => {
     const userId = getAuthUser(req).userId;
     const row = await prisma.vaultKeyPackage.findUnique({ where: { userId } });
-    if (!row) return reply.status(404).send({ error: 'key_package_not_found' });
+    if (!row) return reply.status(404).send({ code: 'key_package_not_found', message: 'key_package_not_found' });
     const parsed = vaultKeyPackageSchema.safeParse(row.packageData);
     if (!parsed.success) {
       Logger.error(`[user:${userId}] Stored vault key package failed validation`);
-      return reply.status(500).send({ error: 'invalid_stored_key_package' });
+      return reply.status(500).send({ code: 'invalid_stored_key_package', message: 'invalid_stored_key_package' });
     }
     // `payloadKeyVersion` is deliberately a sibling field rather than part of
     // the wrapper package: rotating a passphrase wrapper does not rewrite op
@@ -386,7 +386,7 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
       const userId = getAuthUser(req).userId;
       const { clientId } = req.params;
       if (!SUPER_SYNC_CLIENT_ID_REGEX.test(clientId)) {
-        return reply.status(400).send({ error: 'invalid_client_id' });
+        return reply.status(400).send({ code: 'invalid_client_id', message: 'invalid_client_id' });
       }
       await getSyncService().revokeDevice(userId, clientId);
       await revokeAllTokens(userId);
@@ -403,7 +403,7 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
       const userId = getAuthUser(req).userId;
       const parsed = vaultKeyPackageUploadSchema.safeParse(req.body);
       if (!parsed.success) {
-        return reply.status(400).send({ error: 'invalid_key_package' });
+        return reply.status(400).send({ code: 'invalid_key_package', message: 'invalid_key_package' });
       }
       const now = BigInt(Date.now());
       const packageData = parsed.data.package as Prisma.InputJsonValue;
@@ -468,16 +468,16 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
       }
       if (current?.keyVersion === expectedKeyVersion && currentPackage.success &&
           currentPackage.data.rootKeyFingerprint !== parsed.data.package.rootKeyFingerprint) {
-        return reply.status(409).send({ error: 'root_rotation_requires_atomic_migration' });
+        return reply.status(409).send({ code: 'root_rotation_requires_atomic_migration', message: 'root_rotation_requires_atomic_migration' });
       }
-      return reply.status(409).send({ error: 'stale_key_package' });
+      return reply.status(409).send({ code: 'stale_key_package', message: 'stale_key_package' });
     },
   );
 
   fastify.delete('/key-package', async (_req: FastifyRequest, reply: FastifyReply) => {
     // Deleting wrappers independently strands ciphertext and permits version
     // reset. Account/data erasure must own its separate atomic cleanup policy.
-    return reply.status(409).send({ error: 'key_package_removal_requires_atomic_erasure' });
+    return reply.status(409).send({ code: 'key_package_removal_requires_atomic_erasure', message: 'key_package_removal_requires_atomic_erasure' });
   });
 
   /**
@@ -492,7 +492,7 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
       const userId = getAuthUser(req).userId;
       const limit = req.query.limit === undefined ? 500 : Number(req.query.limit);
       if (!Number.isSafeInteger(limit) || limit < 1 || limit > 500) {
-        return reply.status(400).send({ error: 'invalid_key_migration_inventory_limit' });
+        return reply.status(400).send({ code: 'invalid_key_migration_inventory_limit', message: 'invalid_key_migration_inventory_limit' });
       }
       try {
         const page = await vaultKeyMigrationService.inventory(userId, req.query.cursor, limit);
@@ -500,9 +500,9 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
         // explicit so an accidental future field cannot become wire contract.
         return reply.send(vaultKeyMigrationInventoryPageSchema.parse(page));
       } catch (error) {
-        if (error instanceof VaultKeyMigrationError) return reply.status(error.statusCode).send({ error: error.code });
+        if (error instanceof VaultKeyMigrationError) return reply.status(error.statusCode).send({ code: error.code, message: error.code });
         Logger.error(`Vault key migration inventory failed for user ${userId}: ${errorMessage(error)}`);
-        return reply.status(500).send({ error: 'key_migration_failed' });
+        return reply.status(500).send({ code: 'key_migration_failed', message: 'key_migration_failed' });
       }
     },
   );
@@ -528,14 +528,14 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
         try {
           return reply.send(await vaultKeyMigrationService.begin(userId, manifest.data));
         } catch (error) {
-          if (error instanceof VaultKeyMigrationError) return reply.status(error.statusCode).send({ error: error.code });
+          if (error instanceof VaultKeyMigrationError) return reply.status(error.statusCode).send({ code: error.code, message: error.code });
           Logger.error(`Vault key migration manifest failed for user ${userId}: ${errorMessage(error)}`);
-          return reply.status(500).send({ error: 'key_migration_failed' });
+          return reply.status(500).send({ code: 'key_migration_failed', message: 'key_migration_failed' });
         }
       }
       const parsed = vaultKeyMigrationRequestSchema.safeParse(req.body);
       if (!parsed.success) {
-        return reply.status(400).send({ error: 'invalid_key_migration_request' });
+        return reply.status(400).send({ code: 'invalid_key_migration_request', message: 'invalid_key_migration_request' });
       }
       try {
         const result = await vaultKeyMigrationService.migrate(userId, parsed.data);
@@ -551,10 +551,10 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
         return reply.send(result);
       } catch (error) {
         if (error instanceof VaultKeyMigrationError) {
-          return reply.status(error.statusCode).send({ error: error.code });
+          return reply.status(error.statusCode).send({ code: error.code, message: error.code });
         }
         Logger.error(`Vault key migration failed for user ${userId}: ${errorMessage(error)}`);
-        return reply.status(500).send({ error: 'key_migration_failed' });
+        return reply.status(500).send({ code: 'key_migration_failed', message: 'key_migration_failed' });
       }
     },
   );
@@ -569,14 +569,14 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
       const userId = getAuthUser(req).userId;
       const parsed = vaultKeyMigrationChunkSchema.safeParse(req.body);
       if (!parsed.success || parsed.data.requestId !== req.params.requestId) {
-        return reply.status(400).send({ error: 'invalid_key_migration_chunk' });
+        return reply.status(400).send({ code: 'invalid_key_migration_chunk', message: 'invalid_key_migration_chunk' });
       }
       try {
         return reply.send(await vaultKeyMigrationService.uploadChunk(userId, parsed.data));
       } catch (error) {
-        if (error instanceof VaultKeyMigrationError) return reply.status(error.statusCode).send({ error: error.code });
+        if (error instanceof VaultKeyMigrationError) return reply.status(error.statusCode).send({ code: error.code, message: error.code });
         Logger.error(`Vault key migration chunk failed for user ${userId}: ${errorMessage(error)}`);
-        return reply.status(500).send({ error: 'key_migration_failed' });
+        return reply.status(500).send({ code: 'key_migration_failed', message: 'key_migration_failed' });
       }
     },
   );
@@ -586,14 +586,14 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
     async (req, reply) => {
       const userId = getAuthUser(req).userId;
       if (!vaultKeyMigrationRequestIdSchema.safeParse(req.params.requestId).success) {
-        return reply.status(400).send({ error: 'invalid_key_migration_request' });
+        return reply.status(400).send({ code: 'invalid_key_migration_request', message: 'invalid_key_migration_request' });
       }
       try {
         return reply.send(await vaultKeyMigrationService.status(userId, req.params.requestId));
       } catch (error) {
-        if (error instanceof VaultKeyMigrationError) return reply.status(error.statusCode).send({ error: error.code });
+        if (error instanceof VaultKeyMigrationError) return reply.status(error.statusCode).send({ code: error.code, message: error.code });
         Logger.error(`Vault key migration status failed for user ${userId}: ${errorMessage(error)}`);
-        return reply.status(500).send({ error: 'key_migration_failed' });
+        return reply.status(500).send({ code: 'key_migration_failed', message: 'key_migration_failed' });
       }
     },
   );
@@ -604,14 +604,14 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
     async (req, reply) => {
       const userId = getAuthUser(req).userId;
       if (!vaultKeyMigrationRequestIdSchema.safeParse(req.params.requestId).success) {
-        return reply.status(400).send({ error: 'invalid_key_migration_request' });
+        return reply.status(400).send({ code: 'invalid_key_migration_request', message: 'invalid_key_migration_request' });
       }
       try {
         return reply.send(await vaultKeyMigrationService.commit(userId, req.params.requestId));
       } catch (error) {
-        if (error instanceof VaultKeyMigrationError) return reply.status(error.statusCode).send({ error: error.code });
+        if (error instanceof VaultKeyMigrationError) return reply.status(error.statusCode).send({ code: error.code, message: error.code });
         Logger.error(`Vault key migration commit failed for user ${userId}: ${errorMessage(error)}`);
-        return reply.status(500).send({ error: 'key_migration_failed' });
+        return reply.status(500).send({ code: 'key_migration_failed', message: 'key_migration_failed' });
       }
     },
   );
@@ -622,14 +622,14 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
     async (req, reply) => {
       const userId = getAuthUser(req).userId;
       if (!vaultKeyMigrationRequestIdSchema.safeParse(req.params.requestId).success) {
-        return reply.status(400).send({ error: 'invalid_key_migration_request' });
+        return reply.status(400).send({ code: 'invalid_key_migration_request', message: 'invalid_key_migration_request' });
       }
       try {
         return reply.send(await vaultKeyMigrationService.cancel(userId, req.params.requestId));
       } catch (error) {
-        if (error instanceof VaultKeyMigrationError) return reply.status(error.statusCode).send({ error: error.code });
+        if (error instanceof VaultKeyMigrationError) return reply.status(error.statusCode).send({ code: error.code, message: error.code });
         Logger.error(`Vault key migration cancellation failed for user ${userId}: ${errorMessage(error)}`);
-        return reply.status(500).send({ error: 'key_migration_failed' });
+        return reply.status(500).send({ code: 'key_migration_failed', message: 'key_migration_failed' });
       }
     },
   );
@@ -660,7 +660,7 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
         return reply.send({ success: true });
       } catch (err) {
         Logger.error(`Delete user data error: ${errorMessage(err)}`);
-        return reply.status(500).send({ error: 'Internal server error' });
+        return reply.status(500).send({ code: 'internal_server_error', message: 'Internal server error' });
       }
     },
   );
@@ -683,7 +683,8 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
 
         if (isNaN(limit) || limit < 1 || limit > 100) {
           return reply.status(400).send({
-            error: 'Invalid limit parameter (must be 1-100)',
+            code: 'invalid_limit_parameter_must_be_1_100',
+            message: 'Invalid limit parameter (must be 1-100)',
           });
         }
 
@@ -696,7 +697,7 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
         return reply.send({ restorePoints });
       } catch (err) {
         Logger.error(`Get restore points error: ${errorMessage(err)}`);
-        return reply.status(500).send({ error: 'Internal server error' });
+        return reply.status(500).send({ code: 'internal_server_error', message: 'Internal server error' });
       }
     },
   );
@@ -720,7 +721,8 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
 
         if (isNaN(targetSeq) || targetSeq < 1) {
           return reply.status(400).send({
-            error: 'Invalid serverSeq parameter (must be a positive integer)',
+            code: 'invalid_serverseq_parameter_must_be_a_positive_integer',
+            message: 'Invalid serverSeq parameter (must be a positive integer)',
           });
         }
 
@@ -738,8 +740,8 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
             `[user:${getAuthUser(req).userId}] Restore blocked due to encrypted ops (count=${err.encryptedOpCount})`,
           );
           return reply.status(400).send({
-            error: ENCRYPTED_OPS_CLIENT_MESSAGE,
-            errorCode: SYNC_ERROR_CODES.ENCRYPTED_OPS_NOT_SUPPORTED,
+            code: SYNC_ERROR_CODES.ENCRYPTED_OPS_NOT_SUPPORTED,
+            message: ENCRYPTED_OPS_CLIENT_MESSAGE,
           });
         }
         const message = errorMessage(err);
@@ -751,10 +753,10 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
           Logger.warn(
             `[user:${getAuthUser(req).userId}] Invalid restore request: ${message}`,
           );
-          return reply.status(400).send({ error: message });
+          return reply.status(400).send({ code: 'restore_request_rejected', message });
         }
         Logger.error(`Get restore snapshot error: ${message}`);
-        return reply.status(500).send({ error: 'Internal server error' });
+        return reply.status(500).send({ code: 'internal_server_error', message: 'Internal server error' });
       }
     },
   );

@@ -155,8 +155,8 @@ describe('Sync upload route rate limiting', () => {
 
     expect(limitedResponse.statusCode).toBe(429);
     expect(limitedResponse.json()).toMatchObject({
-      error: 'Rate limited',
-      errorCode: 'RATE_LIMITED',
+      code: 'RATE_LIMITED',
+      message: 'Rate limited',
     });
   });
 

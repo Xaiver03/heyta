@@ -57,7 +57,7 @@ describe('authenticate', () => {
     await authenticate(req, reply);
 
     expect(reply._statusCode).toBe(401);
-    expect(reply._body).toEqual({ error: 'Missing or invalid Authorization header' });
+    expect(reply._body).toEqual({ code: 'missing_or_invalid_authorization_header', message: 'Missing or invalid Authorization header' });
   });
 
   it('should return 401 when header does not start with "Bearer "', async () => {
@@ -67,12 +67,12 @@ describe('authenticate', () => {
     await authenticate(req, reply);
 
     expect(reply._statusCode).toBe(401);
-    expect(reply._body).toEqual({ error: 'Missing or invalid Authorization header' });
+    expect(reply._body).toEqual({ code: 'missing_or_invalid_authorization_header', message: 'Missing or invalid Authorization header' });
   });
 
   it('should return 401 with reason when verifyToken returns invalid', async () => {
     const revokedReason = 'Token was revoked. Please log in again to get a new token.';
-    mockVerifyToken.mockResolvedValue({ valid: false, reason: revokedReason });
+    mockVerifyToken.mockResolvedValue({ valid: false, code: revokedReason, reason: revokedReason });
     const req = createMockRequest('Bearer invalid-token');
     const reply = createMockReply();
 
@@ -80,7 +80,7 @@ describe('authenticate', () => {
 
     expect(mockVerifyToken).toHaveBeenCalledWith('invalid-token');
     expect(reply._statusCode).toBe(401);
-    expect(reply._body).toEqual({ error: revokedReason });
+    expect(reply._body).toEqual({ code: revokedReason, message: revokedReason });
   });
 
   it('should set req.user when token is valid', async () => {

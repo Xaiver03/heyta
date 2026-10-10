@@ -94,7 +94,7 @@ describe('POST /api/test/mint-login-link', () => {
     });
 
     expect(res.statusCode).toBe(404);
-    expect(res.json()).toEqual({ error: 'user-not-found' });
+    expect(res.json()).toEqual({ code: 'user-not-found', message: 'user-not-found' });
     expect(mocks.user.updateMany).not.toHaveBeenCalled();
   });
 
@@ -109,7 +109,7 @@ describe('POST /api/test/mint-login-link', () => {
     });
 
     expect(res.statusCode).toBe(409);
-    expect(res.json()).toEqual({ error: 'email-not-verified' });
+    expect(res.json()).toEqual({ code: 'email-not-verified', message: 'email-not-verified' });
   });
 
   it('🔴 往返：签出的令牌能被生产的 verifyLoginMagicLink 换成带 tokenVersion 的会话', async () => {

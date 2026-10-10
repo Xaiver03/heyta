@@ -148,7 +148,7 @@ const expectRejected = (presented: string | undefined, code: string, eventId = '
   reserve(eventId, presented).then((response) => {
     expect(response.statusCode).toBe(402);
     const body = response.json() as Record<string, unknown>;
-    expect(body.errorCode).toBe(ENTITLEMENT_ERROR_CODE);
+    expect(body.code).toBe(ENTITLEMENT_ERROR_CODE);
     expect(body.reason).toBe('ENTITLEMENT_TICKET_REJECTED');
     expect(body.ticketCode).toBe(code);
     expect(mocks.useCreate).toHaveBeenCalledTimes(burned ? 1 : 0);
@@ -288,7 +288,7 @@ describe('自动收集票据拒绝的 HTTP 收口（真库那一半在集成档�
       { clientId: `c-${randomUUID()}`, databaseEpoch: randomUUID() }, ticket({ action: 'worker-register', secret: foreign.privateKey }));
     expect(response.statusCode).toBe(402);
     expect(response.json()).toMatchObject({
-      errorCode: ENTITLEMENT_ERROR_CODE, reason: 'ENTITLEMENT_TICKET_REJECTED', ticketCode: AUTOMATION_ENTITLEMENT_DENIALS.TICKET_INVALID,
+      code: ENTITLEMENT_ERROR_CODE, reason: 'ENTITLEMENT_TICKET_REJECTED', ticketCode: AUTOMATION_ENTITLEMENT_DENIALS.TICKET_INVALID,
     });
     expect(mocks.prisma.$transaction).not.toHaveBeenCalled();
     expect(mocks.useCreate).not.toHaveBeenCalled();

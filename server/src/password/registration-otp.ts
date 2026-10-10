@@ -452,9 +452,9 @@ export const verifyRegistrationCode = async (
 export const registrationOtpErrorResponse = (error: RegistrationOtpError): {
   status: number;
   retryAfterSeconds?: number;
-  body: { error: string; code: RegistrationOtpErrorCode };
+  body: { code: RegistrationOtpErrorCode; message: string };
 } => ({
   status: error.code === 'registration_code_rate_limited' ? 429 : 400,
   ...(error.retryAfterSeconds === undefined ? {} : { retryAfterSeconds: error.retryAfterSeconds }),
-  body: { error: error.message, code: error.code },
+  body: { code: error.code, message: error.message },
 });

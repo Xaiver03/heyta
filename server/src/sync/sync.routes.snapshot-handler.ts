@@ -170,7 +170,8 @@ export const uploadSnapshotHandler = async (
     // a schema in another package staying strict. Keep the invariant local.
     if (isCleanSlate && !opId) {
       return reply.code(400).send({
-        error: 'opId is required for clean-slate snapshot idempotency',
+        code: 'opid_is_required_for_clean_slate_snapshot_idempotency',
+        message: 'opId is required for clean-slate snapshot idempotency',
       });
     }
 
@@ -520,6 +521,6 @@ export const uploadSnapshotHandler = async (
     return reply.send(responseBody);
   } catch (err) {
     Logger.error(`Upload snapshot error: ${errorMessage(err)}`);
-    return reply.status(500).send({ error: 'Internal server error' });
+    return reply.status(500).send({ code: 'internal_server_error', message: 'Internal server error' });
   }
 };

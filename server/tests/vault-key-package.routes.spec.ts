@@ -155,7 +155,7 @@ describe('opaque vault key-package routes', () => {
     const res = await app.inject({ method: 'PUT', url: '/api/sync/key-package', headers: AUTH,
       payload: { expectedKeyVersion: 1, package: { ...PACKAGE, keyVersion: 2, rootKeyFingerprint: 'b'.repeat(64) } } });
     expect(res.statusCode).toBe(409);
-    expect(res.json()).toEqual({ error: 'root_rotation_requires_atomic_migration' });
+    expect(res.json()).toEqual({ code: 'root_rotation_requires_atomic_migration', message: 'root_rotation_requires_atomic_migration' });
   });
 
   it('does not treat database failures as a create race', async () => {

@@ -210,7 +210,7 @@ describe('POST /api/account/legal-consent', () => {
       payload: { documentVersion: OLD, acceptedAt: 1_800_000_000_000 },
     });
     expect(res.statusCode).toBe(409);
-    expect(res.json()).toEqual({ error: 'version_mismatch' });
+    expect(res.json()).toEqual({ code: 'version_mismatch', message: 'Legal consent could not be recorded.' });
     expect(mocks.$transaction).not.toHaveBeenCalled();
   });
 
@@ -223,7 +223,7 @@ describe('POST /api/account/legal-consent', () => {
       payload: good,
     });
     expect(res.statusCode).toBe(409);
-    expect(res.json()).toEqual({ error: 'instance_cannot_name_text' });
+    expect(res.json()).toEqual({ code: 'instance_cannot_name_text', message: 'Legal consent could not be recorded.' });
     expect(mocks.$transaction).not.toHaveBeenCalled();
   });
 

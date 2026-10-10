@@ -40,7 +40,7 @@ export const authenticate = async (
 ): Promise<FastifyReply | void> => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return reply.code(401).send({ error: 'Missing or invalid Authorization header' });
+    return reply.code(401).send({ code: 'missing_or_invalid_authorization_header', message: 'Missing or invalid Authorization header' });
   }
   const token = authHeader.split(' ')[1];
 
@@ -61,7 +61,7 @@ export const authenticate = async (
     // 410 是对外说的"别重试了"，码是对内说的"删不删"。
     return reply
       .code(result.code === 'ACCOUNT_CLOSED' ? 410 : 401)
-      .send({ error: result.reason, code: result.code });
+      .send({ code: result.code, message: result.reason });
   }
 
   req.user = {

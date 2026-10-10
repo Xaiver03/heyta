@@ -45,6 +45,12 @@ export type ServerCopyKey =
   | "server.email.login.ignore"
   | "server.email.login.subject"
   | "server.email.login.title"
+  | "server.email.loginCode.body"
+  | "server.email.loginCode.codeLabel"
+  | "server.email.loginCode.expiry"
+  | "server.email.loginCode.ignore"
+  | "server.email.loginCode.subject"
+  | "server.email.loginCode.title"
   | "server.email.passwordChanged.body"
   | "server.email.passwordChanged.button"
   | "server.email.passwordChanged.notYou"
@@ -168,6 +174,12 @@ export const SERVER_COPY: Record<ServerLocale, Record<ServerCopyKey, string>> = 
     "server.email.login.ignore": "如果这不是你本人发起的，忽略这封邮件即可。",
     "server.email.login.subject": "你的 heyta 登录链接",
     "server.email.login.title": "登录 heyta",
+    "server.email.loginCode.body": "请输入下面的验证码完成登录。如果这不是你本人发起的，请不要把验证码给任何人。",
+    "server.email.loginCode.codeLabel": "登录验证码",
+    "server.email.loginCode.expiry": "验证码 10 分钟内有效，最多可尝试 5 次。",
+    "server.email.loginCode.ignore": "如果这不是你本人发起的，忽略这封邮件即可，你的账号不会有任何变化。",
+    "server.email.loginCode.subject": "你的 heyta 登录验证码",
+    "server.email.loginCode.title": "登录 heyta",
     "server.email.passwordChanged.body": "你的 heyta 账号刚刚设置了新的登录密码，其他设备上的登录都已失效。",
     "server.email.passwordChanged.button": "打开 heyta",
     "server.email.passwordChanged.notYou": "如果这不是你本人操作的，请立刻用「忘记密码？」重新拿回账号，并确认你的邮箱有没有被别人读到。",
@@ -288,6 +300,12 @@ export const SERVER_COPY: Record<ServerLocale, Record<ServerCopyKey, string>> = 
     "server.email.login.ignore": "If you did not request this, just ignore this email.",
     "server.email.login.subject": "Your heyta login link",
     "server.email.login.title": "Sign in to heyta",
+    "server.email.loginCode.body": "Enter the code below to finish signing in. If you did not request this, never share the code with anyone.",
+    "server.email.loginCode.codeLabel": "Login code",
+    "server.email.loginCode.expiry": "The code is valid for 10 minutes, with at most 5 attempts.",
+    "server.email.loginCode.ignore": "If you did not request this, just ignore this email — your account is unchanged.",
+    "server.email.loginCode.subject": "Your heyta login code",
+    "server.email.loginCode.title": "Sign in to heyta",
     "server.email.passwordChanged.body": "A new sign-in password was just set for your heyta account, and every other device has been signed out.",
     "server.email.passwordChanged.button": "Open heyta",
     "server.email.passwordChanged.notYou": "If this wasn’t you, take your account back right away with “Forgot password?”, and check whether someone else can read your email inbox.",

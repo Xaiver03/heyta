@@ -148,12 +148,29 @@ const ChatBodySchema = z.object({
   stream: z.boolean().optional(),
 });
 
-/** 拒绝时的响应形状。字段固定这三个，**没有**放内容的地方。 */
+/** 拒绝时的响应形状（全局错误信封 + 平级上下文）。**没有**放内容的地方。 */
 interface RefusalBody {
-  error: string;
+  code: string;
+  message: string;
   reason?: string;
   detail?: { used?: number; limit?: number; periodAnchor?: number | null };
 }
+
+/** UPPER_SNAKE 稳定码 → 给人与日志的兜底句（界面文案归 i18n，不读这里）。 */
+const REFUSAL_MESSAGE: Record<string, string> = {
+  [MANAGED_AI_ERROR_CODES.INVALID_BODY]: 'Invalid request body.',
+  [MANAGED_AI_ERROR_CODES.NOT_CONFIGURED]: 'Managed AI is not configured on this instance.',
+  [MANAGED_AI_ERROR_CODES.UPSTREAM_NOT_DOMESTIC]: 'AI upstream is not eligible.',
+  [MANAGED_AI_ERROR_CODES.ENTITLEMENT_REQUIRED]: 'A paid subscription is required to use this hosted service.',
+  [MANAGED_AI_ERROR_CODES.QUOTA_EXCEEDED]: 'AI quota for this period is exhausted.',
+  [MANAGED_AI_ERROR_CODES.UPSTREAM_FAILED]: 'AI upstream request failed.',
+};
+
+const refusalBody = (code: string, extra?: Omit<RefusalBody, 'code' | 'message'>): RefusalBody => ({
+  code,
+  message: REFUSAL_MESSAGE[code] ?? code,
+  ...(extra ?? {}),
+});
 
 /** 一次上游调用的最小返回形状（流式时 `text` 为 `undefined`）。 */
 export interface ManagedAiUpstreamResponse {
@@ -322,7 +339,7 @@ export const managedAiProxyRoutes: FastifyPluginAsync<ManagedAiProxyRoutesOption
           responseBytes: 0,
           durationMs: now() - startedAt,
         });
-        return refuse(reply, 400, { error: MANAGED_AI_ERROR_CODES.INVALID_BODY });
+        return refuse(reply, 400, refusalBody(MANAGED_AI_ERROR_CODES.INVALID_BODY));
       }
       const { feature, stream } = parsed.data;
       // 🔴 体积闸门只看**消息数组**：此时还没到能拼出请求体的位置（上游可能不合格）。
@@ -340,10 +357,7 @@ export const managedAiProxyRoutes: FastifyPluginAsync<ManagedAiProxyRoutesOption
           responseBytes: 0,
           durationMs: now() - startedAt,
         });
-        return refuse(reply, 400, {
-          error: MANAGED_AI_ERROR_CODES.INVALID_BODY,
-          reason: 'too_large',
-        });
+        return refuse(reply, 400, refusalBody(MANAGED_AI_ERROR_CODES.INVALID_BODY, { reason: 'too_large' }));
       }
 
       // ── ③④ 上游：配了没有 + 合不合格（**预检**，在任何消耗之前）────────
@@ -363,14 +377,16 @@ export const managedAiProxyRoutes: FastifyPluginAsync<ManagedAiProxyRoutesOption
           responseBytes: 0,
           durationMs: now() - startedAt,
         });
-        return refuse(reply, status, {
-          error: notConfigured
-            ? MANAGED_AI_ERROR_CODES.NOT_CONFIGURED
-            : MANAGED_AI_ERROR_CODES.UPSTREAM_NOT_DOMESTIC,
-          // 🔴 只有 reason 码，**没有端点字符串**（见文件头泄露口子 2：
-          // `https://<key>@host` 是合法 URL，把配置原样抄进错误就是抄进日志）。
-          reason: notConfigured ? 'upstream_missing' : rejection,
-        });
+        return refuse(
+          reply,
+          status,
+          refusalBody(
+            notConfigured ? MANAGED_AI_ERROR_CODES.NOT_CONFIGURED : MANAGED_AI_ERROR_CODES.UPSTREAM_NOT_DOMESTIC,
+            // 🔴 只有 reason 码，**没有端点字符串**（见文件头泄露口子 2：
+            // `https://<key>@host` 是合法 URL，把配置原样抄进错误就是抄进日志）。
+            { reason: notConfigured ? 'upstream_missing' : rejection },
+          ),
+        );
       }
 
       // ── 上游合格之后才组装请求体 ──────────────────────────────────────
@@ -403,18 +419,22 @@ export const managedAiProxyRoutes: FastifyPluginAsync<ManagedAiProxyRoutesOption
           responseBytes: 0,
           durationMs: now() - startedAt,
         });
-        return refuse(reply, status, {
-          error: quota
-            ? MANAGED_AI_ERROR_CODES.QUOTA_EXCEEDED
-            : MANAGED_AI_ERROR_CODES.ENTITLEMENT_REQUIRED,
-          reason: metering.reason,
-          // 这两个数是《AI 服务条款》§5.3 承诺给用户看的：拒绝时也要能说清"已用 X / N"。
-          detail: {
-            used: metering.used,
-            limit: metering.limit,
-            periodAnchor: metering.periodAnchor,
-          },
-        });
+        return refuse(
+          reply,
+          status,
+          refusalBody(
+            quota ? MANAGED_AI_ERROR_CODES.QUOTA_EXCEEDED : MANAGED_AI_ERROR_CODES.ENTITLEMENT_REQUIRED,
+            {
+              reason: metering.reason,
+              // 这两个数是《AI 服务条款》§5.3 承诺给用户看的：拒绝时也要能说清"已用 X / N"。
+              detail: {
+                used: metering.used,
+                limit: metering.limit,
+                periodAnchor: metering.periodAnchor,
+              },
+            },
+          ),
+        );
       }
 
       // ── ⑥ 发送点复算（ADR-0056 §5 第 2 条）───────────────────────────
@@ -436,10 +456,7 @@ export const managedAiProxyRoutes: FastifyPluginAsync<ManagedAiProxyRoutesOption
         // 走到这里的唯一条件是 ④ 与 ⑥ 之间上游被换掉 —— 今天的代码里不可能，
         // 所以它是那条"发送点必须自己算一次"的纪律的**载体**，不是装饰：
         // 把它摘掉，「两把尺子各自单独钉住」那一组用例会红。
-        return refuse(reply, CONFLICT_STATUS, {
-          error: MANAGED_AI_ERROR_CODES.UPSTREAM_NOT_DOMESTIC,
-          reason: sendPoint.reason,
-        });
+        return refuse(reply, CONFLICT_STATUS, refusalBody(MANAGED_AI_ERROR_CODES.UPSTREAM_NOT_DOMESTIC, { reason: sendPoint.reason }));
       }
 
       // ── ⑦ 真的发出去 ─────────────────────────────────────────────────
@@ -468,10 +485,7 @@ export const managedAiProxyRoutes: FastifyPluginAsync<ManagedAiProxyRoutesOption
           responseBytes: 0,
           durationMs: now() - startedAt,
         });
-        return refuse(reply, 502, {
-          error: MANAGED_AI_ERROR_CODES.UPSTREAM_FAILED,
-          reason: 'unreachable',
-        });
+        return refuse(reply, 502, refusalBody(MANAGED_AI_ERROR_CODES.UPSTREAM_FAILED, { reason: 'unreachable' }));
       }
 
       const status = upstreamResponse.status;
@@ -491,16 +505,19 @@ export const managedAiProxyRoutes: FastifyPluginAsync<ManagedAiProxyRoutesOption
           responseBytes: 0,
           durationMs: now() - startedAt,
         });
-        return refuse(reply, 502, {
-          error: MANAGED_AI_ERROR_CODES.UPSTREAM_FAILED,
-          reason: 'upstream_status',
-          // 额度**确实被消耗了**，所以这两个数仍然要给（用户质疑的是"我这一期用了几次"）。
-          detail: {
-            used: metering.used,
-            limit: metering.limit,
-            periodAnchor: metering.periodAnchor,
-          },
-        });
+        return refuse(
+          reply,
+          502,
+          refusalBody(MANAGED_AI_ERROR_CODES.UPSTREAM_FAILED, {
+            reason: 'upstream_status',
+            // 额度**确实被消耗了**，所以这两个数仍然要给（用户质疑的是"我这一期用了几次"）。
+            detail: {
+              used: metering.used,
+              limit: metering.limit,
+              periodAnchor: metering.periodAnchor,
+            },
+          }),
+        );
       }
 
       if (stream === true) {

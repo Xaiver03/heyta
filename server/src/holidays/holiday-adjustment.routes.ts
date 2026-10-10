@@ -102,11 +102,11 @@ export const holidayAdjustmentRoutes = async (fastify: FastifyInstance): Promise
           // 库约束没了。响亮地失败（见那个类的注释），不要退化成"返回空的一份" ——
           // 空的一份在客户端的表现是"退回随包表"，那**看起来完全正常**。
           Logger.error(`Holiday adjustments invariant violated: ${err.message}`);
-          return reply.status(500).send({ error: 'Holiday adjustment data is inconsistent.' });
+          return reply.status(500).send({ code: 'holiday_adjustment_data_is_inconsistent', message: 'Holiday adjustment data is inconsistent.' });
         }
         const message = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Holiday adjustments load error: ${message}`);
-        return reply.status(500).send({ error: 'Failed to load holiday adjustments.' });
+        return reply.status(500).send({ code: 'failed_to_load_holiday_adjustments', message: 'Failed to load holiday adjustments.' });
       }
 
       const etag = holidayETag(snapshot.version);
