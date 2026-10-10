@@ -144,6 +144,10 @@ export {
   EMAIL_PASSWORD_REGISTRATION_CODE_LENGTH,
   EMAIL_PASSWORD_REGISTRATION_CODE_TTL_MS,
   EMAIL_PASSWORD_REGISTRATION_RESEND_COOLDOWN_MS,
+  EMAIL_LOGIN_ERROR_CODES,
+  EMAIL_LOGIN_CODE_LENGTH,
+  EMAIL_LOGIN_CODE_TTL_MS,
+  EMAIL_LOGIN_RESEND_COOLDOWN_MS,
 } from './auth-http-contract';
 export type {
   PasswordAuthErrorCode,
@@ -151,7 +155,18 @@ export type {
   EmailPasswordRegistrationErrorCode,
   EmailPasswordRegistrationChallengeResponse,
   EmailPasswordRegistrationVerifyRequest,
+  EmailLoginErrorCode,
+  EmailLoginChallengeResponse,
+  EmailLoginVerifyRequest,
 } from './auth-http-contract';
+
+// 全局 HTTP 错误信封（2026-10-10）：唯一形状 + zod 判据 + 通用码。
+export {
+  apiErrorBodySchema,
+  isApiErrorBody,
+  COMMON_API_ERROR_CODES,
+} from './api-error-contract';
+export type { ApiErrorBody } from './api-error-contract';
 
 // 账号资料（R10）：昵称 + 头像的路径 / 长度界限 / 响应形状。
 // ⚠️ 与上面 `AUTH_PASSWORD_*_CODE_POINTS` 同一档 —— 那才是"两端共用一个常量"的**正确**住处；

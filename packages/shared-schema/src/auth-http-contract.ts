@@ -47,6 +47,12 @@ export const AUTH_PASSWORD_PATHS = {
   registerResend: '/register/email-password/resend',
   /** 换会话。 */
   login: '/login/email-password',
+  /** 发一次性邮箱验证码登录已有账号（2026-10-10；无口令账号的主登录路）。 */
+  loginCodeRequest: '/login/email-code/request',
+  /** 用 challengeId + 6 位验证码换会话。 */
+  loginCodeVerify: '/login/email-code/verify',
+  /** 为已有 challenge 重发登录验证码（服务端按 challenge 限制频率）。 */
+  loginCodeResend: '/login/email-code/resend',
   /** 发一封重置口令的邮件。**响应与账号是否存在无关**。 */
   forgot: '/password/forgot',
   /** 用邮件链接里的一次性令牌换新口令。成功**不发会话**。 */
@@ -90,6 +96,42 @@ export interface EmailPasswordRegistrationChallengeResponse {
 }
 
 export interface EmailPasswordRegistrationVerifyRequest {
+  challengeId: string;
+  code: string;
+}
+
+/* ========================================================================
+ * 邮箱验证码**登录**（2026-10-10）
+ * ====================================================================== */
+
+/**
+ * 登录验证码的稳定机器码。
+ *
+ * 🔴 与注册码的码**分开命名**而不是共用：两个挑战流的 TTL/冷却/上限各自演进，
+ * 共用一个码会让"注册码过期"与"登录码过期"永远同进退。anti-enumeration 的口径
+ * 与注册那条一致：挑战不存在 / 已过期 / 已消费 / 码不对，**四者同一个码**。
+ */
+export const EMAIL_LOGIN_ERROR_CODES = [
+  'invalid_login_challenge',
+  'login_code_rate_limited',
+] as const;
+
+export type EmailLoginErrorCode = (typeof EMAIL_LOGIN_ERROR_CODES)[number];
+
+/** 验证码长度 / 有效期 / 重发冷却与注册那条路**同一组数**（同一颗 6 位数字的肌肉记忆）。 */
+export const EMAIL_LOGIN_CODE_LENGTH = EMAIL_PASSWORD_REGISTRATION_CODE_LENGTH;
+export const EMAIL_LOGIN_CODE_TTL_MS = EMAIL_PASSWORD_REGISTRATION_CODE_TTL_MS;
+export const EMAIL_LOGIN_RESEND_COOLDOWN_MS = EMAIL_PASSWORD_REGISTRATION_RESEND_COOLDOWN_MS;
+
+/** 登录码请求/重发的响应形状与注册挑战**逐字相同**（客户端复用同一个读取器）。 */
+export interface EmailLoginChallengeResponse {
+  challengeId: string;
+  expiresAt: number;
+  resendAvailableAt: number;
+  emailDelivered?: boolean;
+}
+
+export interface EmailLoginVerifyRequest {
   challengeId: string;
   code: string;
 }
