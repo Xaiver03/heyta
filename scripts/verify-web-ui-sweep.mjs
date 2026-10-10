@@ -9,11 +9,13 @@
  *
  * 🔴 判据**不在这个文件里**，一条都不写。全部住在
  * `scripts/qa/reminders-data-responsive.mjs`（条数现量：跑完后读 `report.json` 的
- * `assertions` 键数，别在这里抄数）。这一枚只做三件包装者该做的事：
+ * `assertions` 键数，别在这里抄数）。这一枚只做四件包装者该做的事：
  *   1. 起一棵**只服务当前源码**的 vite（端口向系统要一枚空的，不占别人的固定号）；
  *   2. 按**无头**那一档跑（AGENTS §6.2 规定二：不得抢前台）；
  *   3. 收尾**只按自己 spawn 回来的那枚 pid** 关，并回读端口确认真释放了
  *      —— 绝不按名字 kill，同一棵树上别的会话也在跑自己的 vite。
+ *   4. 跑完后对账一次**读数与图同批**（`reportBatchProblems`）—— 它不判界面，判的是
+ *      "这份被提交的报告指着的图是不是这一趟的"，因为默认落点每轮被这枚入口自己 `rm` 掉。
  *
  * 用法：
  *   pnpm verify:web-ui-sweep                      # 整族五条腿
@@ -43,9 +45,9 @@
 
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
-import { mkdir, readdir, rm } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join, relative, resolve, sep } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 
 const ROOT = join(import.meta.dirname, '..');
@@ -55,6 +57,59 @@ const DEFAULT_EVIDENCE = join(ROOT, 'apps/web/evidence/web-ui-sweep-latest');
 const EVIDENCE = process.env.HEYTA_WEB_UI_SWEEP_EVIDENCE
   ? resolve(ROOT, process.env.HEYTA_WEB_UI_SWEEP_EVIDENCE)
   : DEFAULT_EVIDENCE;
+
+/**
+ * 装置给锚点加的落点前缀与这枚入口刚建的那枚目录必须指同一处，所以比较前先按**装置自己的规则**
+ * 归一（仓内→仓内相对、仓外→绝对），否则仓外落点（例行复跑那条出路）会被下面的对账误报成指错批。
+ */
+function evidenceLabel() {
+  const rel = relative(ROOT, EVIDENCE).split(sep).join('/');
+  return !rel || rel.startsWith('..') ? EVIDENCE : rel;
+}
+
+/**
+ * 「图与读数同批」这一格从手承诺换成这条入口自己判（10-10 02:5x 现量立起来的）。
+ * 起因是在册那份 r49 的 `report.json`：54 枚锚点**全部**指向共用的 `web-ui-sweep-latest/`，
+ * 而它自己那批目录里一张图都没有 —— 报告是跑完被人搬到趟号目录的，而默认那趟开头就把 latest
+ * 整个 `rm` 掉（见上面 `DEFAULT_EVIDENCE` 那两段）⇒ "人看过的那张图"会跟着别人下一趟换掉，
+ * 而文件里没有任何一行说出这件事。判两件事，缺一即红：
+ * ① 报告自报的批次身份 `carrier.evidenceDir` 必须等于本趟落点；
+ * ② 报告里每一枚落在本批目录的锚点必须真的存在，**且一枚都不许没有** ——
+ *   空集合会让 ② 对任何坏形状都判真（同账里 `.every` 对空集合判真那条教训的镜像）。
+ * 只在装置退 0 时才判：产品红的那趟可能确实没截到图，那种红不该被读成"入口坏了"。
+ */
+async function reportBatchProblems(reportPath, label) {
+  const report = JSON.parse(await readFile(reportPath, 'utf8'));
+  const problems = [];
+  const declared = report?.carrier?.evidenceDir;
+  if (declared !== label) {
+    problems.push(`报告自报落点=${String(declared)}，本趟落点=${label}（①）`);
+  }
+  const prefixes = [`${label}/`, `machine-only:${label}/`];
+  const anchors = [];
+  const walk = (node) => {
+    if (Array.isArray(node)) {
+      for (const value of node) walk(value);
+      return;
+    }
+    if (node && typeof node === 'object') {
+      for (const value of Object.values(node)) walk(value);
+      return;
+    }
+    if (typeof node === 'string' && prefixes.some((p) => node.startsWith(p))) anchors.push(node);
+  };
+  walk(report);
+  const missing = anchors.filter((a) => {
+    const bare = a.replace(/^machine-only:/, '');
+    return !existsSync(bare.startsWith('/') ? bare : join(ROOT, bare));
+  });
+  if (anchors.length === 0) {
+    problems.push(`报告里没有一枚指向本批目录（${label}）的锚点 ⇒ 这条对账无事可判（②）`);
+  } else if (missing.length > 0) {
+    problems.push(`${missing.length}/${anchors.length} 枚锚点指不到文件，首枚=${missing[0]}（②）`);
+  }
+  return problems;
+}
 
 /** 向系统要一枚空端口；拿到就关掉监听，只借用那个号（不猜固定号，避免撞别人的 vite）。 */
 function freePort() {
@@ -130,5 +185,13 @@ if (rigCode === 0 && !leftovers.includes('report.json')) {
   // 装置退 0 却没交 report.json：那是"判据一条都没跑完"的形状，不许读成通过。
   console.error('RESULT=NO_REPORT_WITH_RC0 —— 退出码与读数不自洽');
   process.exit(1);
+}
+
+if (rigCode === 0 && leftovers.includes('report.json')) {
+  const problems = await reportBatchProblems(join(EVIDENCE, 'report.json'), evidenceLabel());
+  if (problems.length > 0) {
+    console.error(`RESULT=REPORT_NOT_SAME_BATCH_AS_IMAGES —— 装置退 0，但这份读数指不到自己那批的图：${problems.join(' ｜ ')}`);
+    process.exit(1);
+  }
 }
 process.exit(rigCode ?? 1);
