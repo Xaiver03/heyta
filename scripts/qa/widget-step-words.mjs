@@ -15,11 +15,20 @@
  * 判据因此只能按**键名集合**判，而键名集合的唯一事实源是 `apps/web/src/pwa/widget-install.ts`
  * 里那两支函数。这里读它，读空就响亮失败 —— 与装置里 `SHELL_MESSAGE_HANDLER_NAMES` 同一口径。
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const REPO = resolve(import.meta.dirname, '..', '..');
 const SOURCE = 'apps/web/src/pwa/widget-install.ts';
+
+function safeRealpath(path) {
+  try {
+    return realpathSync(path);
+  } catch {
+    return path;
+  }
+}
 
 /** 从 `startMarker` 到 `endMarker` 之间切出函数体（按源码位置，不按行数）。 */
 function sliceFunction(text, startMarker, endMarker) {
@@ -72,4 +81,59 @@ export function stepTexts(keys) {
     throw new Error(`词条原文枚数 ${String(texts.length)} 不等于 键数×表数 ${String(keys.length * Object.keys(tables).length)}`);
   }
   return texts;
+}
+
+/**
+ * `--self-test`：不起壳、不要设备，只问这枚真源模块自己的承重条件**能不能红**。
+ * 这枚模块是两枚壳级取证装置唯一的区分依据，而那两枚装置都要装出来的产物才跑得动 ——
+ * 所以它的全部判据在设备腿放开之前没有任何东西试过；这一档就是那段"没人试过"的替身。
+ * 臂数由它自己打印，不抄进文档。
+ */
+async function runSelfTest() {
+  const install = installStepKeys();
+  const native = nativeStepKeys();
+  const arms = [];
+  const arm = (name, problems) => arms.push({ name, problems });
+
+  arm('两套步骤键必须互不相交（这枚模块存在的理由）', [
+    ...install.filter((k) => native.includes(k)).map((k) => `同一枚键既算安装步骤又算原生步骤：${k}`),
+  ]);
+  arm('形状不许串（安装那批全带 .step，原生那批全带 .native.）', [
+    ...install.filter((k) => !k.includes('.step')).map((k) => `安装步骤键不带 .step：${k}`),
+    ...native.filter((k) => !k.includes('.native.')).map((k) => `原生步骤键不带 .native.：${k}`),
+  ]);
+
+  let resolved = [];
+  try {
+    resolved = stepTexts([...install, ...native]);
+    arm('每一枚键在中英两份表里都读得到值', resolved.filter((t) => t.trim() === '').map(() => '读到空文案'));
+  } catch (error) {
+    arm('每一枚键在中英两份表里都读得到值', [error.message]);
+  }
+
+  // 正对照：缺一枚键必须抛，不许静默少一格 —— 上面那三条能不能红全靠这一臂配对。
+  let missingThrew = false;
+  try {
+    stepTexts(['web.widgetJourney.nope.nope']);
+  } catch {
+    missingThrew = true;
+  }
+  arm('正对照：读不到的键必须抛（不许静默少一枚）', missingThrew ? [] : ['`stepTexts` 对不存在的键没抛 ⇒ 分母会静默变短']);
+
+  let failures = 0;
+  for (const { name, problems } of arms) {
+    const ok = problems.length === 0;
+    if (!ok) failures += 1;
+    console.log(`${ok ? '✅' : '🔴'} SELFTEST ${name} ⇒ ${problems.length ? problems.join(' ｜ ') : '通过'}`);
+  }
+  console.log(`SELFTEST ARMS=${arms.length} FAILED=${failures} 安装步骤键=${install.length} 原生步骤键=${native.length} 文案=${resolved.length}`);
+  return failures === 0 ? 0 : 1;
+}
+
+// 只在"这枚文件被直接执行"时跑自测。比较要过 realpath：macOS 上 `/tmp` 是 `/private/tmp` 的软链，
+// 拿 `process.argv[1]` 原样比 `import.meta.url` 会在夹具路径下**整档静默不执行还退 0**
+// （实测：仓外软链路径那次一行输出都没有、MUT_RC=0 —— 那正是这枚模块要拦的形状，先发生在它自己身上）。
+const selfPath = process.argv[1] ? safeRealpath(process.argv[1]) : '';
+if (process.argv.includes('--self-test') && selfPath && selfPath === safeRealpath(fileURLToPath(import.meta.url))) {
+  process.exit(await runSelfTest());
 }
