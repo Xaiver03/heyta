@@ -29,6 +29,29 @@ const panel = (members: Parameters<typeof projectMembersFor>[0]['members']) => (
   members,
 });
 
+describe('projectMembersFor · selfMemberId 优先（W4 web 接线）', () => {
+  it('有 selfMemberId 时按成员行 id 判 isSelf —— web 宿主拿不到自己的数字 userId', () => {
+    const views = projectMembersFor(
+      { ...panel([member(1, 'owner', 100), member(2, 'editor', 200)]), selfMemberId: 'm-2' },
+    );
+    expect(views[1]!.isSelf).toBe(true);
+    expect(views[0]!.isSelf).toBe(false);
+  });
+
+  it('selfMemberId 与 userId 都在 ⇒ memberId 赢（userId 与别人的撞上也不误判）', () => {
+    const views = projectMembersFor(
+      { ...panel([member(7, 'viewer', 100)]), selfMemberId: 'm-7' },
+      999, // 一个恰好不匹配任何成员的 userId —— 不许它否掉 memberId 的判定。
+    );
+    expect(views[0]!.isSelf).toBe(true);
+  });
+
+  it('没传 selfMemberId 时回落按 userId 判（既有调用点行为不变）', () => {
+    const views = projectMembersFor(panel([member(2, 'editor', 100)]), 2);
+    expect(views[0]!.isSelf).toBe(true);
+  });
+});
+
 describe('projectMembersFor', () => {
   it('owner 排最先、其余按加入时间；isSelf 精确按 userId', () => {
     const views = projectMembersFor(
@@ -40,9 +63,9 @@ describe('projectMembersFor', () => {
       2,
     );
     expect(views.map((v) => v.userId)).toEqual([1, 2, 3]);
-    expect(views[1].isSelf).toBe(true);
-    expect(views[0].isSelf).toBe(false);
-    expect(views[0].isOwner).toBe(true);
+    expect(views[1]!.isSelf).toBe(true);
+    expect(views[0]!.isSelf).toBe(false);
+    expect(views[0]!.isOwner).toBe(true);
   });
 
   it('世代落后可视：memberKeyEpoch 落后 ⇒ keyEpochLag > 0（「等待所有者授权」的依据）', () => {
@@ -50,7 +73,7 @@ describe('projectMembersFor', () => {
       panel([member(2, 'editor', 100, { memberKeyEpoch: 1 })]),
       2,
     );
-    expect(views[0].keyEpochLag).toBe(1);
+    expect(views[0]!.keyEpochLag).toBe(1);
   });
 });
 
