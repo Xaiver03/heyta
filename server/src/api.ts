@@ -480,6 +480,11 @@ const SAFE_ERROR_MESSAGES = new Set([
   // Magic link messages
   'If an account with that email exists, a login link has been sent.',
   'Invalid or expired login link',
+  // 🔴 下面这句必须逐字在册：它**既**是 `auth.ts` 里「查不到这个人」抛出的那句，**也**是本文件两处
+  // `getSafeErrorMessage` 的兜底句。不在册时它永远被兜底句顶掉 ⇒ 两条邮件链接路由的句子只靠
+  // 「兜底句恰好写得一样」对齐，那是运气不是判据（本线计划 §6.71 照出的正是这一型）。
+  // 静态尺：`scripts/check-safe-error-fallbacks.mjs`（已进 `pnpm check` 链）。
+  'Invalid or expired link',
 ]);
 
 // Returns a safe error message for clients (hides internal details)
