@@ -141,6 +141,8 @@ export interface VaultKeySession {
   /** Return a disposable copy for an explicitly opted-in native secure-store save. */
   copyUnlockedRootKey(): Uint8Array;
   lock(): void;
+  /** Clear host-owned plaintext when this session locks or replaces its root. */
+  subscribeInvalidation(listener: () => void): () => void;
   /** Undefined while locked is intentional: vault mode must fail closed. */
   getPayloadCipher(): Promise<SyncPayloadCipher | undefined>;
   beginCreation(passphrase: string): Promise<PendingVaultCreation>;
@@ -273,6 +275,7 @@ class VaultKeySessionImpl implements VaultKeySession {
   private recoveryRotationRequired = false;
   /** Invalidates in-flight KDFs when the host locks this session. */
   private lifecycleEpoch = 0;
+  private invalidationListeners = new Set<() => void>();
   private activePayloadKeyVersion: number | null | undefined;
   private pendingRootRotation: PendingVaultCreation | undefined;
   private pendingRoots = new WeakMap<object, Uint8Array>();
@@ -371,6 +374,18 @@ class VaultKeySessionImpl implements VaultKeySession {
     }
     this.pendingKeys.clear();
     this.pendingRootRotation = undefined;
+    this.notifyInvalidation();
+  }
+
+  subscribeInvalidation(listener: () => void): () => void {
+    this.invalidationListeners.add(listener);
+    return () => { this.invalidationListeners.delete(listener); };
+  }
+
+  private notifyInvalidation(): void {
+    for (const listener of [...this.invalidationListeners]) {
+      try { listener(); } catch { /* Observers must never interrupt key disposal. */ }
+    }
   }
 
   async getPayloadCipher(): Promise<SyncPayloadCipher | undefined> {
@@ -731,6 +746,7 @@ class VaultKeySessionImpl implements VaultKeySession {
     wipe(this.rootKey);
     this.rootKey = cloneKey(next);
     wipe(next);
+    this.notifyInvalidation();
   }
 
   async restorePendingRootRotation(): Promise<void> {

@@ -46,6 +46,7 @@ import type {
   LocalApiProject,
   LocalApiReminder,
   LocalApiTag,
+  LocalApiTaskEstimateContext,
   LocalApiWriteIntent,
   LocalApiWriteResult,
 } from '@heyta/local-api';
@@ -64,6 +65,7 @@ import {
   isValidRecurrenceRule,
   nextEventOccurrence,
   localDateTimeToEpoch,
+  dueLocalDateOf,
   localTimeOf,
   noteProjectId,
   noteRejection,
@@ -83,7 +85,7 @@ import {
   type Task,
 } from '@heyta/domain';
 
-import type { ActionContext, TaskActions } from './actions.js';
+import type { ActionContext, TaskActions, TaskDetailsPatch } from './actions.js';
 import { createFocusActions, focusLogFailureCode, type FocusActions } from './focus-actions.js';
 import {
   createHabitActions,
@@ -95,6 +97,8 @@ import { createNoteActions, type NoteActions } from './note-actions.js';
 import { createProjectActions, type ProjectActions } from './project-actions.js';
 import { createReminderActions, type ReminderActions } from './reminder-actions.js';
 import { createEventActions, type EventActions } from './event-actions.js';
+import { readDurationFromNote } from './duration-note.js';
+import { selectDurationHistory } from './ai-duration.js';
 
 export interface LocalApiHostOptions {
   /**
@@ -122,6 +126,14 @@ export interface LocalApiHostOptions {
    * 在钩子里判 `'date' in item` 即可（倒数日有 `date`，任务没有）。
    */
   isReadable: (item: Task | CountdownEvent) => boolean;
+
+  /**
+   * The assistant's memory switch is deliberately separate from tool grants.
+   * It defaults closed; hints are read only when this flag is explicitly true.
+   */
+  memoryEnabled?: boolean;
+  /** Narrow prompt hints supplied by the host that owns preference inference. */
+  getDurationPreferenceHints?: () => readonly { id: string; text: string }[];
 
   /**
    * 现在几点。**只在两处用**：给新落的专注记录填 `createdAt`，以及算提醒的
@@ -308,7 +320,8 @@ export function taskToItem(task: Task, readable: boolean): LocalApiItem {
     completed: task.completedAt !== undefined,
     readable,
   };
-  if (task.dueDate !== undefined) item.dueDate = toLocalApiDueString(task.dueDate);
+  const dueDay = dueLocalDateOf(task);
+  if (dueDay !== undefined) item.dueDate = task.dueDateLocal ?? toLocalApiDueString(task.dueDate!);
   if (task.priority !== undefined) item.priority = PRIORITY_TO_NAME[task.priority] ?? 'none';
   // 🔴 正文只在可读时挂上。不可读时**连字段都不存在** ——
   // 与 `projectForTool` 的白名单重建是同一条纪律的两个执行点。
@@ -444,6 +457,7 @@ export function createLocalApiHost(
   options: LocalApiHostOptions,
 ): LocalApiHost {
   const isReadable = options.isReadable;
+  const memoryEnabled = options.memoryEnabled === true;
   const now = options.now ?? ((): number => Date.now());
 
   // 🔴 各实体的动作**在这里内部构造**，不从壳注入 —— 这些动作集只需要
@@ -481,13 +495,13 @@ export function createLocalApiHost(
       if (dueOn !== undefined || dueFrom !== undefined || dueTo !== undefined) {
         tasks = tasks.filter((task) => {
           // 没有截止日的任务**不属于任何一天**（"今天有什么任务"不该把收件箱倒出来）。
-          if (task.dueDate === undefined) return false;
+          const day = dueLocalDateOf(task);
+          if (day === undefined) return false;
           // 用的是**投影那一个换算的前半段**（`taskToItem` → `toLocalApiDueString`
           // → `toLocalDateString`），所以"拿来比的日子"与"返回里显示的日子"
           // 必然是同一个日子 —— 不会出现"筛 15 号，而返回里写着 15 号的那条被漏掉"。
           // ⚠️ 过滤**按日**、不按分钟，这是刻意的：`dueOn` 的契约就是"截止日正好是这一天"
           //   （`server.ts:69-72`），带时刻的任务属于它那一天的 00:00–23:59。
-          const day = toLocalDateString(task.dueDate);
           // 🔴 `YYYY-MM-DD` 的字典序就是时间序（四位年 + 补零月日），
           // 所以闭区间比较不需要再做任何日历算术。两端都**含**。
           if (dueOn !== undefined) return day === dueOn;
@@ -506,6 +520,37 @@ export function createLocalApiHost(
       const task = actions.findTask(taskId);
       if (task === undefined) return Promise.resolve(undefined);
       return Promise.resolve(taskToItem(task, isReadable(task)));
+    },
+
+    getTaskEstimateContext: (taskId): Promise<LocalApiTaskEstimateContext | undefined> => {
+      const task = actions.findTask(taskId);
+      if (task === undefined) return Promise.resolve(undefined);
+      const readable = isReadable(task);
+      if (!readable) {
+        return Promise.resolve({ taskId: task.id, title: task.title, readable: false });
+      }
+
+      const history = selectDurationHistory(
+        focusActions
+          .listSessions()
+          .filter((session) => session.taskId === task.id)
+          .map((session) => ({ plannedMs: session.plannedMs, actualMs: session.actualMs ?? 0 })),
+      );
+      const preferences =
+        memoryEnabled && options.getDurationPreferenceHints !== undefined
+          ? options.getDurationPreferenceHints()
+          : undefined;
+      return Promise.resolve({
+        taskId: task.id,
+        title: task.title,
+        readable: true,
+        ...(task.note === undefined ? {} : { body: task.note }),
+        ...(readDurationFromNote(task.note) === undefined
+          ? {}
+          : { currentMinutes: readDurationFromNote(task.note) }),
+        ...(history.length === 0 ? {} : { history }),
+        ...(preferences === undefined || preferences.length === 0 ? {} : { preferences }),
+      });
     },
 
     listProjects: () => {
@@ -681,10 +726,6 @@ async function submitIntent(
     }
 
     case 'update-task': {
-      const task = actions.findTask(intent.taskId);
-      if (task === undefined) {
-        return { ok: false, reason: 'not-found', message: '没有找到这个任务。' };
-      }
       // 逐字段处理，**不认识的一律拒绝而不是忽略** ——
       // 静默忽略会让调用方以为改成功了。
       const unknown = Object.keys(intent.fields).filter(
@@ -699,21 +740,53 @@ async function submitIntent(
       }
 
       const f = intent.fields;
-      if (typeof f['title'] === 'string') await actions.rename(intent.taskId, f['title']);
-      if (typeof f['completed'] === 'boolean') await actions.setCompleted(intent.taskId, f['completed']);
-      if (typeof f['priority'] === 'string') {
+      const patch: TaskDetailsPatch = {};
+      if ('title' in f) {
+        if (typeof f['title'] !== 'string') {
+          return { ok: false, reason: 'invalid', message: '标题必须是字符串。' };
+        }
+        if (f['title'].trim() === '') {
+          return { ok: false, reason: 'invalid', message: '标题不能为空。' };
+        }
+        patch.title = f['title'];
+      }
+      if ('completed' in f) {
+        if (typeof f['completed'] !== 'boolean') {
+          return { ok: false, reason: 'invalid', message: 'completed 必须是布尔值。' };
+        }
+        patch.completed = f['completed'];
+      }
+      if ('priority' in f) {
+        if (typeof f['priority'] !== 'string') {
+          return { ok: false, reason: 'invalid', message: '优先级必须是字符串。' };
+        }
         const p = NAME_TO_PRIORITY[f['priority'].toLowerCase()];
         if (p === undefined) {
           return { ok: false, reason: 'invalid', message: `未知优先级「${f['priority']}」。` };
         }
-        await actions.setPriority(intent.taskId, p);
+        patch.priority = p;
       }
-      if (typeof f['dueDate'] === 'string') {
+      if ('dueDate' in f) {
+        if (typeof f['dueDate'] !== 'string') {
+          return { ok: false, reason: 'invalid', message: '截止日期必须是日期字符串。' };
+        }
         const epoch = fromLocalDateString(f['dueDate']);
         if (epoch === undefined) {
           return { ok: false, reason: 'invalid', message: `截止日期格式应为 ${LOCAL_API_DUE_FORMAT_HINT}。` };
         }
-        await actions.setDueDate(intent.taskId, epoch);
+        patch.dueDate = epoch;
+      }
+      if (actions.findTask(intent.taskId) === undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个任务。' };
+      }
+      await actions.patchDetails(intent.taskId, patch);
+      return { ok: true, taskId: intent.taskId };
+    }
+
+    case 'append-task-checklist': {
+      const result = await actions.appendChecklist(intent.taskId, intent.items);
+      if (result === 'not-found') {
+        return { ok: false, reason: 'not-found', message: '没有找到这个任务。' };
       }
       return { ok: true, taskId: intent.taskId };
     }
@@ -732,7 +805,8 @@ async function submitIntent(
       // 所以"要么全改、要么全不改"唯一的实现方式是把校验整个放在写之前。
       // 中途才失败（例如第 7 条不存在）会留下"改了 6 条"的状态，而用户看到的是一句报错 ——
       // 那是这套确认机制最坏的失效形状。
-      const missing = intent.taskIds.filter((id) => actions.findTask(id) === undefined);
+      const taskIds = [...new Set(intent.taskIds)];
+      const missing = taskIds.filter((id) => actions.findTask(id) === undefined);
       if (missing.length > 0) {
         const shown = missing.slice(0, 3).join('、');
         return {
@@ -741,26 +815,85 @@ async function submitIntent(
           message: `这批里有 ${String(missing.length)} 条任务已经不在了（${shown}${missing.length > 3 ? ' 等' : ''}），一条都没有改。`,
         };
       }
+      const repeating = taskIds.filter((id) => actions.findTask(id)?.repeatRule !== undefined);
+      if (repeating.length > 0) {
+        return {
+          ok: false,
+          reason: 'invalid',
+          message: `这批里有重复任务（${repeating.slice(0, 3).join('、')}${repeating.length > 3 ? ' 等' : ''}），重复任务请逐条完成。`,
+        };
+      }
       // 已经是完成态的**不重复写**（照 `createReminder` 那条幂等口径：已在该状态就不再发一条 op）。
       // ⚠️ 于是"确认卡上的条数"（用户要提交的范围）与"实际写了几条"可以不相等；
       // 差值只在结果里可见 —— 它不是用户要看的那件事，但 MCP 那侧的外部程序要能算出来。
       const changed: string[] = [];
-      for (const id of intent.taskIds) {
+      for (const id of taskIds) {
         const task = actions.findTask(id);
         if (task === undefined || task.completedAt !== undefined) continue;
-        await actions.setCompleted(id, true);
         changed.push(id);
       }
+      if (changed.length > 0) await actions.bulkSetCompleted(changed, true);
       const [first] = changed;
       if (first === undefined) {
         // 只有"绕过了 `toWriteIntent` 直接构造意图"才可能走到这里（空数组在参数层就被拒）。
         // 不许回一句 `ok` 加一个空 id —— 那是把"什么都没做"报成"做完了"。
-        if (intent.taskIds.length === 0) {
+        if (taskIds.length === 0) {
           return { ok: false, reason: 'invalid', message: 'taskIds 是空的：没有要完成的任务。' };
         }
-        return { ok: true, taskId: intent.taskIds[0] ?? '', taskIds: [] };
+        return { ok: true, taskId: taskIds[0] ?? '', taskIds: [] };
       }
       return { ok: true, taskId: first, taskIds: changed };
+    }
+
+    case 'set-task-priorities': {
+      // 先完整预检，保证批量优先级写入不会留下半批状态。
+      const mapped: { id: string; priority: Priority }[] = [];
+      const taskIds: string[] = [];
+      const seen = new Set<string>();
+      for (const entry of intent.entries) {
+        if (typeof entry.taskId !== 'string' || entry.taskId.trim() === '') {
+          return { ok: false, reason: 'invalid', message: '任务 id 不能为空。' };
+        }
+        const taskId = entry.taskId.trim();
+        if (seen.has(taskId)) {
+          return { ok: false, reason: 'invalid', message: `不能重复修改任务「${taskId}」。` };
+        }
+        if (actions.findTask(taskId) === undefined) {
+          return { ok: false, reason: 'not-found', message: '没有找到这个任务。' };
+        }
+        if (typeof entry.priority !== 'string') {
+          return { ok: false, reason: 'invalid', message: '优先级必须是字符串。' };
+        }
+        const priority = NAME_TO_PRIORITY[entry.priority.trim().toLowerCase()];
+        if (priority === undefined) {
+          return {
+            ok: false,
+            reason: 'invalid',
+            message: `优先级应为 none / low / medium / high，收到「${entry.priority}」。`,
+          };
+        }
+        seen.add(taskId);
+        taskIds.push(taskId);
+        mapped.push({ id: taskId, priority });
+      }
+      const [first] = taskIds;
+      if (first === undefined) {
+        return { ok: false, reason: 'invalid', message: 'entries 是空的：没有要修改的任务。' };
+      }
+      await actions.bulkSetPriorities(mapped);
+      return {
+        ok: true,
+        taskId: first,
+        taskIds,
+      };
+    }
+
+    case 'set-task-estimate': {
+      const result = await actions.setTaskEstimate(intent.taskId, intent.minutes);
+      if (result === 'not-found') {
+        return { ok: false, reason: 'not-found', message: '没有找到这个任务。' };
+      }
+      return { ok: true, taskId: intent.taskId };
     }
 
     case 'create-project': {
@@ -1186,4 +1319,3 @@ async function submitIntent(
     }
   }
 }
-

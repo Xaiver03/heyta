@@ -310,7 +310,8 @@ describe('暗色主题覆盖完整性', () => {
     ]);
     const colorTokens = TOKEN_GROUPS.color.map((n) => `--ht-color-${n}`);
     const identical = colorTokens.filter(
-      (v) => dark.get(v) === light.get(v) && !SAME_IN_BOTH.has(v),
+      // 语义别名的表达式可以相同，实际颜色必须按各自主题展开后比较。
+      (v) => resolveVar(`var(${v})`, dark) === resolveVar(`var(${v})`, light) && !SAME_IN_BOTH.has(v),
     );
     expect(
       identical,

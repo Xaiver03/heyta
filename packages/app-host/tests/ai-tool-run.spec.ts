@@ -22,11 +22,19 @@ import type {
   LocalApiProject,
 } from '@heyta/local-api';
 
-import { confirmAiToolProposal, runSelectedTool } from '../src/ai-tool-run.js';
+import {
+  aiToolProposalRequiresConfirmation,
+  confirmAiToolProposal,
+  executeAiToolProposal,
+  runSelectedTool,
+  type AiToolProposal,
+} from '../src/ai-tool-run.js';
 import {
   resolveToolSelection,
   type ToolSelectionRule,
 } from '../src/ai-tool-selection.js';
+
+const authorization = (tool: string) => ({ getGrants: () => ({ [tool]: true }) });
 
 /** 会记账的假宿主。`submits` 就是本文件的核心断言对象。 */
 function fakeHost(items: readonly LocalApiItem[] = []): LocalApiHost & { submits: number } {
@@ -174,7 +182,7 @@ describe('规则 → 执行（写工具只提案）', () => {
     expect(outcome.kind).toBe('proposal');
     if (outcome.kind !== 'proposal') return;
 
-    const result = await confirmAiToolProposal(host, outcome.proposal);
+    const result = await confirmAiToolProposal(host, outcome.proposal, authorization(outcome.proposal.tool));
     expect(result).toEqual({ ok: true, taskId: 'created-1' });
     expect(host.submits).toBe(1);
   });
@@ -193,6 +201,99 @@ describe('规则 → 执行（写工具只提案）', () => {
       rules: [emptyTitle],
     });
     expect(outcome.kind).toBe('failed');
+    expect(host.submits).toBe(0);
+  });
+});
+
+describe('执行档的写风险与重放保护', () => {
+  const proposal = (intent: AiToolProposal['intent']): AiToolProposal => ({
+    ruleId: 'test',
+    tool: intent.action,
+    intent,
+  });
+
+  it('低风险写意图可自动提交，危险写意图仍要求确认', () => {
+    expect(aiToolProposalRequiresConfirmation(proposal({ action: 'create-task', title: '买牛奶' }))).toBe(false);
+    expect(aiToolProposalRequiresConfirmation(proposal({ action: 'complete-task', taskId: 't1' }))).toBe(false);
+    expect(
+      aiToolProposalRequiresConfirmation(
+        proposal({ action: 'set-task-tags', taskId: 't1', tagIds: ['important'] }),
+      ),
+    ).toBe(false);
+    expect(
+      aiToolProposalRequiresConfirmation(
+        proposal({ action: 'complete-tasks', taskIds: ['t1', 't2'] }),
+      ),
+    ).toBe(true);
+    expect(
+      aiToolProposalRequiresConfirmation(
+        proposal({ action: 'append-task-checklist', taskId: 't1', items: ['准备说明'] }),
+      ),
+    ).toBe(true);
+    expect(
+      aiToolProposalRequiresConfirmation(
+        proposal({
+          action: 'set-task-priorities',
+          entries: [{ taskId: 't1', priority: 'high' }],
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      aiToolProposalRequiresConfirmation(proposal({ action: 'set-task-tags', taskId: 't1', tagIds: [] })),
+    ).toBe(true);
+    expect(
+      aiToolProposalRequiresConfirmation(proposal({ action: 'update-task', taskId: 't1', fields: { title: null } })),
+    ).toBe(true);
+  });
+
+  it('低风险动作同一执行标识只提交一次，换意图则拒绝', async () => {
+    const host = fakeHost();
+    const first = proposal({ action: 'create-task', title: '买咖啡' });
+    const second = proposal({ action: 'create-task', title: '买茶' });
+    const result1 = await executeAiToolProposal(host, first, 'replay-1', authorization(first.tool));
+    const result2 = await executeAiToolProposal(host, first, 'replay-1', authorization(first.tool));
+    expect(result1).toEqual({ ok: true, taskId: 'created-1' });
+    expect(result2).toEqual(result1);
+    expect(host.submits).toBe(1);
+
+    const mismatch = await executeAiToolProposal(host, second, 'replay-1', authorization(second.tool));
+    expect(mismatch).toEqual({ ok: false, reason: 'invalid', message: '同一执行标识对应了不同的改动。' });
+    expect(host.submits).toBe(1);
+  });
+
+  it('单条完成是可撤销的日常动作，可在执行档自动提交', async () => {
+    const host = fakeHost();
+    const result = await executeAiToolProposal(
+      host,
+      proposal({ action: 'complete-task', taskId: 't1' }),
+      'complete-one-1',
+      authorization('complete-task'),
+    );
+    expect(result).toEqual({ ok: true, taskId: 'created-1' });
+    expect(host.submits).toBe(1);
+  });
+
+  it('高风险批量动作不会绕过确认闸门', async () => {
+    const host = fakeHost();
+    const result = await executeAiToolProposal(
+      host,
+      proposal({ action: 'complete-tasks', taskIds: ['t1', 't2'] }),
+      'risky-1',
+      authorization('complete-tasks'),
+    );
+    expect(result).toEqual({ ok: false, reason: 'invalid', message: '这项改动需要先确认。' });
+    expect(host.submits).toBe(0);
+  });
+
+  it('追加清单不会绕过确认闸门', async () => {
+    const host = fakeHost();
+    const result = await executeAiToolProposal(
+      host,
+      proposal({ action: 'append-task-checklist', taskId: 't1', items: ['准备说明'] }),
+      'checklist-1',
+      authorization('append-task-checklist'),
+    );
+    expect(result).toEqual({ ok: false, reason: 'invalid', message: '这项改动需要先确认。' });
     expect(host.submits).toBe(0);
   });
 });
@@ -225,6 +326,52 @@ describe('两道闸', () => {
     const outcome = await runThroughRules('列出所有任务', { host, grants: {} });
     expect(outcome).toEqual({ kind: 'none', reason: 'no-tool-granted' });
     expect(host.submits).toBe(0);
+  });
+});
+
+describe('确认闸门的授权与并发', () => {
+  const writeProposal = (): AiToolProposal => ({
+    ruleId: 'confirm',
+    tool: 'create_task',
+    intent: { action: 'create-task', title: '买牛奶' },
+  });
+
+  it('确认时重新读取 grants，撤销后不提交', async () => {
+    const host = fakeHost();
+    let grants: Record<string, boolean> = { create_task: true };
+    const proposal = writeProposal();
+    const result = await confirmAiToolProposal(host, proposal, { getGrants: () => grants });
+    expect(result.ok).toBe(true);
+
+    const revokedProposal = writeProposal();
+    grants = {};
+    const revoked = await confirmAiToolProposal(host, revokedProposal, { getGrants: () => grants });
+    expect(revoked).toEqual({ ok: false, reason: 'rejected', message: '工具「create_task」的授权已撤销。' });
+    expect(host.submits).toBe(1);
+  });
+
+  it('同一个提案并发确认只提交一次，失败后可重试', async () => {
+    const base = fakeHost();
+    let attempts = 0;
+    const host = {
+      ...base,
+      submit: async () => {
+        attempts += 1;
+        if (attempts === 1) return { ok: false as const, reason: 'rejected' as const, message: '暂时拒绝' };
+        return { ok: true as const, taskId: 'created-2' };
+      },
+    } satisfies LocalApiHost;
+    const proposal = writeProposal();
+    const auth = authorization(proposal.tool);
+    const [first, second] = await Promise.all([
+      confirmAiToolProposal(host, proposal, auth),
+      confirmAiToolProposal(host, proposal, auth),
+    ]);
+    expect(first).toEqual(second);
+    expect(attempts).toBe(1);
+    const retried = await confirmAiToolProposal(host, proposal, auth);
+    expect(retried).toEqual({ ok: true, taskId: 'created-2' });
+    expect(attempts).toBe(2);
   });
 });
 
@@ -380,7 +527,7 @@ describe('倒数日走 AI 执行链（W10）', () => {
     });
 
     // 确认之后才落地，而且**只落一次**
-    await confirmAiToolProposal(host, run.proposal);
+    await confirmAiToolProposal(host, run.proposal, authorization(run.proposal.tool));
     expect(host.submits).toBe(1);
   });
 

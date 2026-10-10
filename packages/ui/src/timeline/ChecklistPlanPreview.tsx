@@ -55,7 +55,7 @@ export function ChecklistPlanPreview(props: ChecklistPlanPreviewProps): React.JS
       StyleSheet.create({
         root: { gap: tokens['space.2'] },
         caption: { color: tokens['color.foreground-subtle'] },
-        warning: { color: tokens['color.warning'] },
+        warning: { color: tokens['color.warning-strong'] },
       }),
     [tokens],
   );

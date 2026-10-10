@@ -85,8 +85,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       paddingTop: tokens['space.2'],
       paddingHorizontal: tokens['size.field-padding-x'],
       borderRadius: tokens['radius.md'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
       backgroundColor: tokens['color.surface'],
       color: tokens['color.foreground'],
       textAlignVertical: 'top',
@@ -111,8 +109,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       borderRadius: tokens['radius.md'],
     },
     cancelButton: {
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
       backgroundColor: 'transparent',
     },
     cancelText: {

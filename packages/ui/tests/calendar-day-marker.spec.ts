@@ -48,7 +48,7 @@ describe('calendarDayMarkerView', () => {
     // 🔴 两条必须**不相等**：同一个 token 时这枚标记对色觉正常的人也是废的。
     expect(off?.colorToken).not.toBe(work?.colorToken);
     // 而且只能是语义名（出现裸色/外观名就是违反 AGENTS §5 第 1 条）。
-    const allowed: readonly string[] = ['color.success-strong', 'color.warning-strong'];
+    const allowed: readonly string[] = ['color.calendar-day-off', 'color.calendar-day-work'];
     expect(allowed).toContain(off?.colorToken);
     expect(allowed).toContain(work?.colorToken);
   });

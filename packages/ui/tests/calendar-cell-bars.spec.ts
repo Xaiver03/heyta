@@ -18,7 +18,13 @@
 import { describe, expect, it } from 'vitest';
 import type { Task } from '@heyta/domain';
 
-import { calendarCellBars, MAX_CALENDAR_BARS, MAX_WEEK_CALENDAR_BARS } from '../src/calendar/model.js';
+import {
+  calendarCellBars,
+  calendarTaskSpan,
+  groupTasksByCalendarDate,
+  MAX_CALENDAR_BARS,
+  MAX_WEEK_CALENDAR_BARS,
+} from '../src/calendar/model.js';
 
 function task(over: Partial<Task> & { id: string }): Task {
   return { title: over.id, createdAt: 0, updatedAt: 0, ...over };
@@ -29,6 +35,83 @@ const PAST = '2026-10-01';
 const FUTURE = '2026-10-08';
 /** 一个"做完了"的时间戳：`done` 只看 `completedAt` 存不存在，不看它是哪天。 */
 const COMPLETED_AT = new Date(2026, 9, 1).getTime();
+
+describe('跨天排期任务：沿用 start / due / duration 的时间线语义', () => {
+  it('uses persisted date-only fields for a cross-zone schedule span', () => {
+    const captured = task({
+      id: 'inbound-span',
+      startDate: Date.UTC(2026, 9, 7, 16), startDateLocal: '2026-10-08',
+      dueDate: Date.UTC(2026, 9, 9, 16), dueDateLocal: '2026-10-10',
+    });
+    expect(calendarTaskSpan(captured)).toEqual({ from: '2026-10-08', to: '2026-10-10' });
+  });
+  it('projects date-only start plus duration from the device calendar day', () => {
+    const captured = task({ id: 'inbound-duration',
+      startDate: Date.UTC(2026, 9, 7, 16), startDateLocal: '2026-10-08',
+      durationMinutes: 30 * 60,
+    });
+    expect(calendarTaskSpan(captured)).toEqual({ from: '2026-10-08', to: '2026-10-09' });
+  });
+  it('start + duration 会摊到每个真实自然日，并在格子里标出连续段', () => {
+    const taskValue = task({
+      id: 'range',
+      startDate: new Date(2026, 9, 2, 9).getTime(),
+      durationMinutes: 30 * 60,
+    });
+    expect(calendarTaskSpan(taskValue)).toEqual({ from: '2026-10-02', to: '2026-10-03' });
+    const byDate = groupTasksByCalendarDate([taskValue], '2026-10-01', '2026-10-04');
+    expect([...byDate.keys()]).toEqual(['2026-10-02', '2026-10-03']);
+    expect(calendarCellBars(byDate.get('2026-10-02')!, TODAY, '2026-10-02').bars[0]?.span).toBe(
+      'start',
+    );
+    expect(calendarCellBars(byDate.get('2026-10-03')!, TODAY, '2026-10-03').bars[0]?.span).toBe(
+      'end',
+    );
+  });
+
+  it('结束在午夜时不凭空多占第二天', () => {
+    const taskValue = task({
+      id: 'midnight',
+      startDate: new Date(2026, 9, 2, 9).getTime(),
+      durationMinutes: 15 * 60,
+    });
+    expect(calendarTaskSpan(taskValue)).toEqual({ from: '2026-10-02', to: '2026-10-02' });
+    expect([...groupTasksByCalendarDate([taskValue], '2026-10-01', '2026-10-04').keys()]).toEqual([
+      '2026-10-02',
+    ]);
+  });
+
+  it('跨天任务在每一天保持同一条 lane，不被当天新任务挤走', () => {
+    const spanning = task({
+      id: 'spanning',
+      startDate: new Date(2026, 9, 2, 9).getTime(),
+      durationMinutes: 72 * 60,
+    });
+    const lastDayOnly = task({
+      id: 'last-day-only',
+      dueDate: new Date(2026, 9, 4).getTime(),
+    });
+    const byDate = groupTasksByCalendarDate(
+      [lastDayOnly, spanning],
+      '2026-10-02',
+      '2026-10-04',
+    );
+    expect(calendarCellBars(byDate.get('2026-10-02')!, TODAY, '2026-10-02').bars[0]?.id).toBe(
+      'spanning',
+    );
+    expect(calendarCellBars(byDate.get('2026-10-04')!, TODAY, '2026-10-04').bars.map((bar) => bar.id)).toEqual([
+      'spanning',
+      'last-day-only',
+    ]);
+  });
+
+  it('只有 dueDate 的旧任务仍然是单日条，没有改变旧输出形状', () => {
+    const taskValue = task({ id: 'due-only', dueDate: new Date(2026, 9, 4).getTime() });
+    expect(calendarTaskSpan(taskValue)).toEqual({ from: '2026-10-04', to: '2026-10-04' });
+    const { bars } = calendarCellBars([taskValue], TODAY, '2026-10-04');
+    expect(bars[0]?.span).toBeUndefined();
+  });
+});
 
 describe('月格任务条：封顶与折叠', () => {
   it('恰好到上限：全部可见，hidden 为 0（界面上就不会出现「+0」）', () => {

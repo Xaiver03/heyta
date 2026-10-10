@@ -100,9 +100,25 @@ export function resolveLocale(explicit?: string | null): ServerLocale {
  *
  * 返回类型是 `string` 而不是可空 —— `ServerCopyKey` 是联合类型，
  * **拼错一个 key 是编译期错误**（生成物同时给出了两个语言的完整表）。
+ *
+ * `vars` 是 `{email}` 这类插值。它**不做转义**，也不该做：转义发生在
+ * `renderEmail` / `renderEmailText` 那一层（它们对 `body` 整串 `escapeHtml`）。
+ * 🔴 所以任何**来自用户输入**的值只能经 `content.body` / `content.note` 进来，
+ * 不许拼好之后再绕过那两个函数 —— 那才是注入面。
  */
-export function t(locale: ServerLocale, key: ServerCopyKey): string {
-  return SERVER_COPY[locale][key];
+export function t(
+  locale: ServerLocale,
+  key: ServerCopyKey,
+  vars?: Readonly<Record<string, string>>,
+): string {
+  const raw = SERVER_COPY[locale][key];
+  if (!vars) return raw;
+  // 只替换词条里**已经写好的** `{name}` 占位符；不给未知占位符兜底成空串 ——
+  // 那会让一句少了一个词的假话看起来像成功。缺参数就让它原样留在那里，测试会读到。
+  return Object.entries(vars).reduce(
+    (text, [name, value]) => text.split(`{${name}}`).join(value),
+    raw,
+  );
 }
 
 /** 一处样式里反复出现的"字体 + 颜色 + 字号"组合。 */

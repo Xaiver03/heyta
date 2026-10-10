@@ -47,6 +47,21 @@ const DAY_BEFORE = new Date(2026, 9, 2, 15, 0, 0, 0).getTime();
 const DAY_AFTER = new Date(2026, 9, 4, 9, 0, 0, 0).getTime();
 
 describe('calendarDayBuckets', () => {
+  it('date-only inbound task stays on the original calendar day across device zones', () => {
+    const captured = task({
+      id: 'inbound', dueDate: Date.UTC(2026, 9, 7, 16), dueDateLocal: '2026-10-08',
+    });
+    const buckets = calendarDayBuckets([captured], '2026-10-08');
+    expect(buckets.allDay.map((item) => item.id)).toEqual(['inbound']);
+    expect(buckets.timedCount).toBe(0);
+  });
+
+  it('start-only date-only task is visible on the day board without inventing a due date', () => {
+    const captured = task({ id: 'start-only', startDate: Date.UTC(2026, 9, 7, 16), startDateLocal: '2026-10-08' });
+    const buckets = calendarDayBuckets([captured], '2026-10-08');
+    expect(buckets.allDay.map((item) => item.id)).toEqual(['start-only']);
+    expect(captured.dueDate).toBeUndefined();
+  });
   it('🔴 本地零点 = 没有时刻 ⇒ 进「全天」带，**不挂 00:00 那一格**', () => {
     const buckets = calendarDayBuckets([task({ id: 'a', dueDate: MIDNIGHT })], DAY);
     expect(buckets.allDay.map((t) => t.id)).toEqual(['a']);

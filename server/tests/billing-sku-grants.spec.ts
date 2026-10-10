@@ -14,7 +14,7 @@ import { ENTITLEMENT_CAPABILITIES } from '../src/entitlement';
 describe('SKU → 能力（两档可分的基础）', () => {
   it('两个 SKU 的能力集合**不同** —— 这就是 ¥5 与 ¥12 的全部区别', () => {
     expect(SKU_GRANTS['hosted-monthly']).toEqual(['hosting']);
-    expect(SKU_GRANTS['hosted-ai-monthly']).toEqual(['hosting', 'ai']);
+    expect(SKU_GRANTS['hosted-ai-monthly']).toEqual(['hosting', 'ai', 'automation']);
     // 反向断言：这两行一旦相等，"两档"就只剩价格不同、交付完全一样。
     expect(SKU_GRANTS['hosted-monthly']).not.toEqual(SKU_GRANTS['hosted-ai-monthly']);
   });

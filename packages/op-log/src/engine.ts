@@ -18,6 +18,17 @@
  */
 
 import type { EntityType } from '@heyta/shared-schema';
+import {
+  hasTaskBatchMarker,
+  parseTaskBatchOperation,
+  taskBatchOperationId,
+  hasTaskPriorityBatchMarker,
+  parseTaskPriorityBatchOperation,
+  hasTaskRepeatCompletionMarker,
+  parseTaskRepeatCompletionOperation,
+  validateReminderOwnerOperation,
+  type HeytaTaskBatchPayload,
+} from '@heyta/shared-schema';
 import type { Operation, VectorClock } from '@heyta/sync-core';
 import {
   OpType,
@@ -61,6 +72,15 @@ export interface OpIntent {
   entityIds?: string[];
 }
 
+/**
+ * Synchronous read/decide step executed inside the engine's mutation queue.
+ * The builder must not await or dispatch; its optional intent is committed by
+ * the queue immediately after the decision is made against the current state.
+ */
+export type CheckedDispatchBuilder<T> = (
+  state: MaterializedState,
+) => { intent?: OpIntent; value: T };
+
 export interface OpLogEngineOptions {
   store: OpLogStore<Operation<string>>;
   /** 本设备稳定 id。LWW 决胜依据，**一经生成不可更改**。 */
@@ -91,6 +111,33 @@ export interface ImportOpsResult {
   imported: number;
   /** 因为 `opId` 已存在而跳过的条数（同一份导出导入两次时全在这里）。 */
   skipped: number;
+}
+
+/**
+ * Clone the JSON-shaped values crossing the op-log boundary.
+ *
+ * An intent can sit in the serialized write queue before it is persisted. A
+ * shallow copy would still let caller-owned arrays (notably tag ids) mutate
+ * the eventual op and reducer state during that wait.
+ */
+function cloneBoundaryValue<T>(value: T): T {
+  if (Array.isArray(value)) return value.map((item) => cloneBoundaryValue(item)) as T;
+  if (value !== null && typeof value === 'object') {
+    // Object.fromEntries creates own data properties, so a JSON key named
+    // `__proto__` cannot invoke the legacy prototype setter on `{}`.
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, cloneBoundaryValue(item)]),
+    ) as T;
+  }
+  return value;
+}
+
+function cloneIntent(intent: OpIntent): OpIntent {
+  return cloneBoundaryValue(intent);
+}
+
+function cloneOperation<T extends Operation<string>>(op: T): T {
+  return cloneBoundaryValue(op);
 }
 
 export class OpLogEngine {
@@ -383,22 +430,84 @@ export class OpLogEngine {
    * 刷新后消失，而且 op-log 里没有痕迹（无法恢复）。
    */
   dispatch(intent: OpIntent): Promise<DispatchResult> {
-    return this.serialize(() => this.dispatchLocked(intent));
+    const snapshot = cloneIntent(intent);
+    return this.serialize(() => this.dispatchLocked(snapshot));
   }
 
-  private async dispatchLocked(intent: OpIntent): Promise<DispatchResult> {
+  /** Host-owned local preconditions run under the same serialization as writes.
+   * Recovery of an already committed intent does not rerun creation preconditions.
+   */
+  dispatchValidated(intent: OpIntent, validate: (state: MaterializedState) => void): Promise<DispatchResult> {
+    const snapshot = cloneIntent(intent);
+    return this.serialize(() => this.dispatchLocked(snapshot, validate));
+  }
+
+  /**
+   * Run a synchronous state-dependent decision and, when requested, commit its
+   * intent without leaving the mutation queue. This is the CAS-like primitive
+   * for actions whose payload depends on the latest materialized value.
+   */
+  dispatchChecked<T>(build: CheckedDispatchBuilder<T>): Promise<T> {
+    return this.serialize(async () => {
+      const result = build(this.state);
+      if (result.intent === undefined) return result.value;
+      await this.dispatchLocked(result.intent);
+      return result.value;
+    });
+  }
+
+  private async dispatchLocked(intent: OpIntent, validate?: (state: MaterializedState) => void): Promise<DispatchResult> {
+    intent = cloneIntent(intent);
+    // Ingress-only validation.  The reducer itself must remain able to replay
+    // historical operations written before the canonical reminder owner
+    // contract existed; otherwise an old log becomes a restart poison pill.
+    validateReminderOwnerOperation(intent);
+    if (hasTaskPriorityBatchMarker(intent.payload)) {
+      parseTaskPriorityBatchOperation({ ...intent, payload: intent.payload });
+    }
+    if (hasTaskRepeatCompletionMarker(intent.payload)) {
+      parseTaskRepeatCompletionOperation({ ...intent, payload: intent.payload });
+    }
+    const batch = hasTaskBatchMarker(intent.payload)
+      ? parseTaskBatchOperation({ ...intent, payload: intent.payload })
+      : undefined;
+    // Do not retain caller-owned arrays/objects across the indexed lookup await.
+    if (batch !== undefined) intent = {
+      entityType: 'TASK', opType: OpType.Batch, entityId: batch.tasks[0]!.id,
+      entityIds: batch.tasks.slice(1).map((task) => task.id), payload: batch,
+    };
+    const fixedId = batch === undefined ? undefined : taskBatchOperationId(batch.source.eventId);
+    if (batch !== undefined && fixedId !== undefined) {
+      const recovered = await this.recoverTaskBatchDispatch(fixedId, batch);
+      if (recovered !== undefined) return recovered;
+      // A snapshot can contain a receipt without the original local log row.
+      // Absence of the row does not authorize recreating a completed event.
+      if (this.appliedOpIds.has(fixedId) || batch.tasks.some((task) => this.state.tasks[task.id] !== undefined)) {
+        throw new Error('Task batch needs original operation reconciliation');
+      }
+    }
     // 先算出**本次写入之后**的时钟；op 与本地时钟用同一个值。
     const clock = this.trimClock({
       ...this.clock,
       [this.options.clientId]: (this.clock[this.options.clientId] ?? 0) + 1,
     });
-    const op = this.buildOp(intent, clock);
+    const op = this.buildOp(intent, clock, fixedId);
     // Validate pure reduction before persisting; an unsupported snapshot must
     // not poison every subsequent recovery of this log.
-    const nextState = applyOperation(this.state, op);
+    // Keep reducer state, persisted op, and the object returned to callers
+    // independent. Reducers intentionally retain payload values in field
+    // history, so sharing one mutable payload would reintroduce the same leak.
+    const nextState = applyOperation(this.state, cloneOperation(op));
+    validate?.(this.state);
 
     // 1. 落盘（原子、单调 seq）
-    const seqs = await this.options.store.appendLocal([op]);
+    const persistedOp = cloneOperation(op);
+    const seqs = await this.options.store.appendLocal([persistedOp]);
+    if (seqs.length === 0 && batch !== undefined && fixedId !== undefined) {
+      // A second host instance may have won the database unique-index race.
+      const recovered = await this.recoverTaskBatchDispatch(fixedId, batch);
+      if (recovered !== undefined) return recovered;
+    }
     if (seqs.length !== 1) {
       throw new Error(
         `本地 op 写入失败：期望 1 个 seq，实际 ${seqs.length} 个。` +
@@ -416,16 +525,27 @@ export class OpLogEngine {
     this.appliedSeq = seqs[0]!;
     await this.maybeCheckpoint(this.appliedSeq);
 
-    return { ops: [op], seqs };
+    return { ops: [cloneOperation(op)], seqs };
+  }
+
+  private async recoverTaskBatchDispatch(id: string, batch: HeytaTaskBatchPayload): Promise<DispatchResult | undefined> {
+    const stored = await this.options.store.getOpById(id);
+    if (stored === undefined) return undefined;
+    if (stored.op.clientId !== this.options.clientId ||
+        JSON.stringify(parseTaskBatchOperation(stored.op)) !== JSON.stringify(batch)) {
+      throw new Error('Task batch submission identity conflict');
+    }
+    if (!this.appliedOpIds.has(id)) await this.recoverLocked();
+    return { ops: [stored.op], seqs: [stored.seq] };
   }
 
   /** 构造 op。向量时钟在这里 snapshot —— 之后不再变。 */
-  private buildOp(intent: OpIntent, vectorClock: VectorClock): Operation<string> {
+  private buildOp(intent: OpIntent, vectorClock: VectorClock, fixedId?: string): Operation<string> {
     this.opCounter += 1;
     const timestamp = (this.options.now ?? Date.now)();
-    const id = this.options.nextOpId
+    const id = fixedId ?? (this.options.nextOpId
       ? this.options.nextOpId()
-      : `${this.options.clientId}-${String(timestamp)}-${String(this.opCounter)}`;
+      : `${this.options.clientId}-${String(timestamp)}-${String(this.opCounter)}`);
 
     // 🔴 op 的时钟包含本次写入自己的递增 —— 由 dispatch 算好后传进来。
     //
@@ -470,13 +590,18 @@ export class OpLogEngine {
    * 这正是"已落盘但没应用"不会静默丢数据的原因。
    */
   applyRemote(ops: Operation<string>[]): Promise<RemoteApplyResult> {
-    return this.serialize(() => this.applyRemoteLocked(ops));
+    const snapshot = ops.map((op) => cloneOperation(op));
+    return this.serialize(() => this.applyRemoteLocked(snapshot));
   }
 
   private async applyRemoteLocked(ops: Operation<string>[]): Promise<RemoteApplyResult> {
     if (ops.length === 0) return { applied: [], skipped: 0, overwritten: [] };
     for (const op of ops) {
-      if (isFullStateOperation(op)) applyOperation(emptyState(), op);
+      validateReminderOwnerOperation(op);
+      if (isFullStateOperation(op) || hasTaskBatchMarker(op.payload) || hasTaskPriorityBatchMarker(op.payload) ||
+          hasTaskRepeatCompletionMarker(op.payload)) {
+        applyOperation(emptyState(), op);
+      }
     }
 
     // 1. 落盘（幂等：重复 op 会被跳过）
@@ -503,7 +628,7 @@ export class OpLogEngine {
       const outcome = this.applyOne(op);
       overwritten.push(...outcome.overwritten);
       if (outcome.didApply) {
-        applied.push(op);
+        applied.push(cloneOperation(op));
         // 合并远程时钟：让后续本地写入与这些远程 op 形成正确的因果关系
         this.observeRemoteClock(op.vectorClock ?? {});
       }
@@ -547,7 +672,8 @@ export class OpLogEngine {
    * `OpLogStore.appendImported`：它们带着别的设备的 `clientId`，服务端会拒绝。
    */
   importOperations(ops: readonly Operation<string>[]): Promise<ImportOpsResult> {
-    return this.serialize(() => this.importOperationsLocked(ops));
+    const snapshot = ops.map((op) => cloneOperation(op));
+    return this.serialize(() => this.importOperationsLocked(snapshot));
   }
 
   private async importOperationsLocked(ops: readonly Operation<string>[]): Promise<ImportOpsResult> {
@@ -555,7 +681,11 @@ export class OpLogEngine {
     // Imported snapshots follow the same pre-persistence validation as remote
     // snapshots. Otherwise a bad backup poisons every subsequent cold start.
     for (const op of ops) {
-      if (isFullStateOperation(op)) applyOperation(emptyState(), op);
+      validateReminderOwnerOperation(op);
+      if (isFullStateOperation(op) || hasTaskBatchMarker(op.payload) || hasTaskPriorityBatchMarker(op.payload) ||
+          hasTaskRepeatCompletionMarker(op.payload)) {
+        applyOperation(emptyState(), op);
+      }
     }
 
     const result = await this.options.store.appendImported([...ops]);
@@ -601,7 +731,9 @@ export class OpLogEngine {
     const ids = [...new Set([...(op.entityId === undefined ? [] : [op.entityId]), ...(op.entityIds ?? [])])];
     const before = bucketFor(this.state, op.entityType);
     const snapshots = ids.map((entityId) => ({ entityId, entity: before?.[entityId] }));
-    this.state = applyOperation(this.state, op);
+    // The reducer retains payload values in field history. Keep its copy
+    // separate from the stored operation and from the object returned below.
+    this.state = applyOperation(this.state, cloneOperation(op));
     this.appliedOpIds.add(op.id);
 
     const after = bucketFor(this.state, op.entityType);

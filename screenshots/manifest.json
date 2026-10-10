@@ -1,14 +1,14 @@
 {
-  "capturedAt": "2026-10-06T14:17:29.113Z",
+  "capturedAt": "2026-10-07T08:13:20.119Z",
   "targets": 1,
   "artifacts": [
     {
-      "path": "screenshots/web-desktop/W01-任务.png",
+      "path": "screenshots/web-desktop/W01-en-Tasks.png",
       "width": 1440,
       "height": 900,
-      "contentRatio": 0.0848,
+      "contentRatio": 0.0876,
       "colorSpan": 228,
-      "sha256": "9c674806ffeb9493ba03b68765c491e55a1eaa6d2599e7dfa6e1a835b06fc47e"
+      "sha256": "ab6f4ba6533911d94eb67d0db290c66d84549e7953bc263b299ec3fc189562ba"
     }
   ]
 }

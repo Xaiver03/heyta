@@ -17,6 +17,21 @@ const makeStore = async () => {
 };
 
 describe('vault key session', () => {
+  it('notifies plaintext owners after lock and does not let an observer interrupt key disposal', async () => {
+    const session = await createVaultKeySession({ store: await makeStore(), scope });
+    const pending = await session.beginCreation('correct horse battery staple');
+    await session.confirmAndPublish(pending, pending.recoveryCode);
+    let calls = 0;
+    session.subscribeInvalidation(() => { throw new Error('observer failure'); });
+    const unsubscribe = session.subscribeInvalidation(() => {
+      calls++;
+      expect(session.state).toBe('locked');
+      expect(() => session.copyUnlockedRootKey()).toThrow();
+    });
+    expect(() => session.lock()).not.toThrow();
+    expect(calls).toBe(1);
+    unsubscribe(); session.lock(); expect(calls).toBe(1);
+  });
   beforeEach(() => {
     setArgon2ParamsForTesting({ parallelism: 1, memorySize: 8, iterations: 1 });
   });

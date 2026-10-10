@@ -15,6 +15,8 @@
 
 /** 揭示落位的判据本体（在页面上下文里跑）。 */
 export function headRevealed() {
+  const docsHeading = document.querySelector('.lp-docs__page-head h1');
+  if (docsHeading) return docsHeading.getBoundingClientRect().height > 0 && getComputedStyle(docsHeading).visibility === 'visible';
   const h1 = document.querySelector('.lp-h1');
   const inner = h1?.querySelector('.lp-mask__inner') ?? null;
   const lede = document.querySelector('.lp-lede');

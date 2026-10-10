@@ -110,6 +110,7 @@
   /* 表面与背景：白底为主，蓝作强调 */
   --ht-color-background: var(--ht-slate-50);
   --ht-color-surface: var(--ht-white);
+  --ht-color-surface-subtle: var(--ht-slate-50);
   --ht-color-surface-raised: var(--ht-white);
   --ht-color-surface-sunken: var(--ht-slate-100);
   --ht-color-overlay: rgb(15 23 42 / 0.5);
@@ -153,6 +154,10 @@
   --ht-color-info: var(--ht-sky-600);
   --ht-color-info-strong: var(--ht-sky-700);
   --ht-color-info-subtle: var(--ht-sky-50);
+
+  /* 日历日期类型：休息不是成功，调休上班也不是警告。随主题语义色解析。 */
+  --ht-color-calendar-day-off: var(--ht-color-primary);
+  --ht-color-calendar-day-work: var(--ht-color-foreground-muted);
 
   /* ── 四象限（heyta 核心功能，必须是一等 token，不能散落在组件里）──
      象限语义固定，颜色可换：Q1 红 / Q2 蓝 / Q3 琥珀 / Q4 石板 */
@@ -357,6 +362,7 @@
    * 东西了 —— 留着旧名字比改名字更容易让人读错（`.ht-content` 现在就是中间列）。
    */
   --ht-layout-content-max: 75rem;     /* 1200px */
+  --ht-layout-report-max: 60rem;      /* Review metrics and yearly activity stay in one readable span. */
   /* 详情列（第四列）的默认宽 + 夹取上下限。2026-10-03 加（W2）。
      ⚠️ 上下限目前**只是 `clamp()` 的两端**，还没有拖拽手柄 —— 那条要另开单
      （`SidebarResizer` 是 sidebar 那条列的现成落点，别顺手以为这里也已经能拖）。
@@ -597,6 +603,8 @@
    组件因为只消费语义变量，这里不需要任何组件改动。
    ──────────────────────────────────────────────────────────── */
 [data-theme='dark'] {
+  --ht-color-calendar-day-off: var(--ht-color-primary);
+  --ht-color-calendar-day-work: var(--ht-color-foreground-muted);
   --ht-color-primary: var(--ht-blue-400);
   --ht-color-primary-hover: var(--ht-blue-300);
   --ht-color-primary-active: var(--ht-blue-200);
@@ -606,6 +614,7 @@
 
   --ht-color-background: var(--ht-slate-950);
   --ht-color-surface: #0d1526;
+  --ht-color-surface-subtle: #101a2e;
   --ht-color-surface-raised: #131e33;
   --ht-color-surface-sunken: #080e1a;
   --ht-color-overlay: rgb(2 6 23 / 0.7);

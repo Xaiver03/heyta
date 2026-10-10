@@ -18,11 +18,11 @@
  * 各端的**外壳**本来就叫 `AuthPanel` / `AuthScreen`：同名的两份东西（一份是被包装的表单、
  * 一份是包装它的壳）会让读代码的人先猜哪份是哪份。形状没变。
  *
- * ## 两步，而不是两个入口
+ * ## 一张主表单，而不是多个技术入口
  *
- * 一个邮箱框 +「继续」，口令紧随其后 —— FIDO 2023 UX Guidelines 的结论：
- * **一个 affordance 同时管注册与登录**比"注册藏在登录后面"更可发现。
- * 于是界面**不许**问用户"你是新来的吗"：他不知道，而且这个实例上他可能就是第一次来。
+ * 默认同屏提供邮箱、登录密码和一个主动作。注册是同一张表单的轻量切换，
+ * 通行密钥、邮件链接、粘贴令牌等低频路径通过「其他登录方式」渐进披露。
+ * 这样普通用户不需要先理解同步令牌，也不需要先回答一个没有意义的「继续」。
  *
  * ## 🔴 为什么这个组件**不知道**任何协议
  *
@@ -59,7 +59,7 @@
  *   播报；**保留用户已输入的内容**；本地校验失败时焦点移到第一个错误字段（GOV.UK）。
  */
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Check, Eye, EyeOff, KeyRound, Loader2, Mail, X } from 'lucide';
@@ -68,6 +68,10 @@ import type { HeytaNativeTokens } from '@heyta/design-system';
 
 import { HeytaIcon } from '../icon/Icon.js';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
+import {
+  PasswordStrength,
+  type PasswordStrengthLabels,
+} from './PasswordStrength.js';
 import {
   AUTH_EMAIL_AUTOCOMPLETE,
   AUTH_TERMS_REQUIRED_KEY,
@@ -98,16 +102,45 @@ export interface AuthFormLabels {
   /** 🔴 「登录密码」（与「加密口令」是两条词条，见 `model.ts` 末尾）。 */
   readonly password: string;
   readonly passwordPlaceholder?: string;
+  /** 注册时第二次输入登录密码，确保粘贴或 autofill 后用户仍能确认。 */
+  readonly confirmPassword?: string;
+  readonly passwordMismatch?: string;
+  readonly passwordConfirmationRequired?: string;
+  /** 邮箱注册验证码阶段。 */
+  readonly registrationCode?: {
+    readonly title: string;
+    readonly sent: (email: string) => string;
+    readonly label: string;
+    readonly placeholder: string;
+    readonly verify: string;
+    readonly resend: string;
+    readonly resendIn: (seconds: number) => string;
+    readonly changeEmail: string;
+    readonly expired: string;
+    readonly codeLength: number;
+  };
+  /** 本地估算仅用于提示，不是服务端策略，也不阻止提交。 */
+  readonly passwordStrength?: PasswordStrengthLabels;
   readonly signIn: string;
   readonly signUp: string;
   readonly showPassword: string;
   readonly hidePassword: string;
-  /** 「长一句比加符号有用」那一句。 */
-  readonly passwordHint: string;
+  /**
+   * 旧宿主仍可能传入的密码说明。认证表单不再展示它：密码策略应由长度、
+   * 泄露检查与强度组件表达，避免把一条未经操作指引的解释塞在输入框下面。
+   * 保留为可选字段只是为了让宿主可以分批升级，不让中英词条或旧适配器成为
+   * 运行时依赖；它不是界面消费点。
+   */
+  readonly passwordHint?: string;
   readonly forgotPassword: string;
   readonly switchToRegister: string;
   readonly switchToSignIn: string;
   readonly otherWays: string;
+  /** 二级登录方式的渐进披露入口；不给时保留旧宿主的常驻行为。 */
+  readonly otherWaysToggle?: {
+    readonly open: string;
+    readonly close: string;
+  };
   readonly terms: string;
   readonly magicLink: string;
   readonly recovery: string;
@@ -161,6 +194,11 @@ export interface AuthFormLabels {
     readonly open: string;
     readonly close: string;
   };
+  /** Web 等宿主把自托管与令牌入口收进同一个渐进披露分组时使用。 */
+  readonly advancedToggle?: {
+    readonly open: string;
+    readonly close: string;
+  };
   /** 条款两条链接的**文字**（地址由宿主的 `legalLinks` 决定，这里不拼 URL）。 */
   readonly legal?: {
     readonly terms: string;
@@ -180,6 +218,7 @@ export interface AuthFormLabels {
     readonly baseUrl: string;
     readonly email: string;
     readonly password: string;
+    readonly passwordConfirmation?: string;
     readonly terms: (key: typeof AUTH_TERMS_REQUIRED_KEY) => string;
   };
 }
@@ -258,6 +297,15 @@ export interface AuthFormProps {
     termsAccepted: boolean;
     inviteCode?: string;
   }) => void;
+  /** 注册验证码挑战由宿主保存；组件只负责收集、展示倒计时与交回用户动作。 */
+  readonly registrationChallenge?: {
+    readonly email: string;
+    readonly expiresAt: number;
+    readonly resendAvailableAt: number;
+    readonly onVerify: (code: string) => void;
+    readonly onResend: () => void;
+    readonly onChangeEmail: () => void;
+  };
   readonly onMagicLink: (email: string) => void;
   readonly onPasskey: (input: {
     kind: 'register' | 'login';
@@ -297,6 +345,7 @@ export function AuthForm({
   onInviteCodeChange,
   onSignIn,
   onRegister,
+  registrationChallenge,
   onMagicLink,
   onPasskey,
   onRecovery,
@@ -311,7 +360,12 @@ export function AuthForm({
 
   const resolvedPlatform = platform ?? (Platform.OS === 'web' ? 'desktop' : 'mobile');
 
-  const [stage, setStage] = useState<AuthFormStage>('identify');
+  /**
+   * 普通登录从同一屏的邮箱 + 登录密码开始。
+   * `identify` 仍保留给需要显式分步的旧宿主，但不能再成为默认入口：
+   * 把密码藏在「继续」之后会让用户误以为产品只支持邮件链接。
+   */
+  const [stage, setStage] = useState<AuthFormStage>('credential');
   /**
    * 两条逃生门各自的开合。**默认收起**（宿主给了 toggle 才折叠，见 labels 上那段）。
    *
@@ -320,18 +374,67 @@ export function AuthForm({
    */
   const [selfHostOpen, setSelfHostOpen] = useState(false);
   const [haveTokenOpen, setHaveTokenOpen] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [otherWaysOpen, setOtherWaysOpen] = useState(false);
   const [mode, setMode] = useState<AuthFormMode>('sign-in');
   const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [revealed, setRevealed] = useState(defaultPasswordRevealed(resolvedPlatform));
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [inviteCode, setInviteCode] = useState(initialInviteCode);
   const [token, setToken] = useState('');
+  const [registrationCode, setRegistrationCode] = useState('');
+  const [now, setNow] = useState(() => Date.now());
   /** 本地校验的错误字段（提交时算一次；输入时**不**逐键校验）。 */
   const [localField, setLocalField] = useState<AuthFormField | undefined>(undefined);
 
+  // Changing the server boundary invalidates credentials entered for the
+  // previous issuer. Keep the component mounted so the address input retains
+  // focus, while clearing the sensitive fields in place.
+  const previousServerUrl = useRef(serverUrl?.value);
+  useEffect(() => {
+    if (previousServerUrl.current !== serverUrl?.value) {
+      setPassword('');
+      setConfirmPassword('');
+      setToken('');
+      setLocalField(undefined);
+    }
+    previousServerUrl.current = serverUrl?.value;
+  }, [serverUrl?.value]);
+
   const emailInput = useRef<TextInput | null>(null);
   const passwordInput = useRef<TextInput | null>(null);
+  const confirmPasswordInput = useRef<TextInput | null>(null);
+  const registrationCodeInput = useRef<TextInput | null>(null);
+  const hadRegistrationChallenge = useRef(false);
+
+  useEffect(() => {
+    if (registrationChallenge === undefined) return;
+    hadRegistrationChallenge.current = true;
+    setStage('registration-code');
+    setRegistrationCode('');
+  }, [registrationChallenge?.email, registrationChallenge?.expiresAt]);
+
+  useEffect(() => {
+    if (registrationChallenge === undefined && hadRegistrationChallenge.current) {
+      hadRegistrationChallenge.current = false;
+      setRegistrationCode('');
+      setStage('credential');
+    }
+  }, [registrationChallenge]);
+
+  useEffect(() => {
+    if (registrationChallenge !== undefined && stage === 'registration-code') {
+      registrationCodeInput.current?.focus();
+    }
+  }, [registrationChallenge?.email, registrationChallenge?.expiresAt, stage]);
+
+  useEffect(() => {
+    if (registrationChallenge === undefined || stage !== 'registration-code') return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [registrationChallenge, stage]);
 
   /**
    * 此刻该标红的字段：本地校验指的那个，或宿主指明的（`status.field`）。
@@ -379,6 +482,18 @@ export function AuthForm({
   };
 
   const onSubmit = (): void => {
+    if (stage === 'registration-code') {
+      const codeLabel = labels.registrationCode;
+      if (registrationChallenge === undefined || codeLabel === undefined) return;
+      if (Date.now() >= registrationChallenge.expiresAt) return;
+      const code = registrationCode.replace(/\D/g, '').slice(0, codeLabel.codeLength);
+      if (code.length !== codeLabel.codeLength) {
+        registrationCodeInput.current?.focus();
+        return;
+      }
+      idleOnly(() => registrationChallenge.onVerify(code));
+      return;
+    }
     const missing = firstAuthErrorField({
       baseUrlMissing: serverUrl !== undefined && serverUrl.value.trim() === '',
       emailMissing: email.trim() === '',
@@ -389,6 +504,16 @@ export function AuthForm({
       setLocalField(missing);
       if (missing === 'email') emailInput.current?.focus();
       if (missing === 'password') passwordInput.current?.focus();
+      return;
+    }
+    if (mode === 'register' && confirmPassword === '') {
+      setLocalField('passwordConfirmation');
+      confirmPasswordInput.current?.focus();
+      return;
+    }
+    if (mode === 'register' && confirmPassword !== password) {
+      setLocalField('passwordConfirmation');
+      confirmPasswordInput.current?.focus();
       return;
     }
     setLocalField(undefined);
@@ -406,6 +531,12 @@ export function AuthForm({
     });
   };
 
+  const registrationCodeLabel = labels.registrationCode;
+  const registrationExpired = registrationChallenge !== undefined && now >= registrationChallenge.expiresAt;
+  const resendSeconds = registrationChallenge === undefined
+    ? 0
+    : Math.max(0, Math.ceil((registrationChallenge.resendAvailableAt - now) / 1000));
+
   /*
     🔴 两条逃生门的可见性（2026-10-02）。宿主给了 toggle 就默认收起；
     **但地址被判为没填时必须强制露出** —— 否则"服务端地址还没填"这句红字
@@ -414,8 +545,17 @@ export function AuthForm({
     收起之后它依然会成立（用户清空过、或宿主传了空值），那时没有下面这半句就是死路。
   */
   const selfHostShown =
-    labels.selfHostToggle === undefined || selfHostOpen || invalidFor('baseUrl');
-  const haveTokenShown = labels.haveTokenToggle === undefined || haveTokenOpen;
+    labels.advancedToggle !== undefined
+      ? advancedOpen || invalidFor('baseUrl')
+      : labels.selfHostToggle === undefined || selfHostOpen || invalidFor('baseUrl');
+  const haveTokenShown =
+    labels.advancedToggle !== undefined
+      ? advancedOpen
+      : labels.haveTokenToggle === undefined || haveTokenOpen;
+  const advancedShown =
+    labels.advancedToggle !== undefined
+      ? advancedOpen || invalidFor('baseUrl')
+      : false;
 
   /**
    * 「继续」之后邮箱框**收起来**，身份以一行的形式回执。
@@ -458,10 +598,12 @@ export function AuthForm({
         testID={`${testID}-status`}
       >
         {status === null ? (
+          labels.emptyTitle === '' && labels.emptyBody === '' ? null : (
           <>
             <Text style={[text['row-title'], styles.statusStrong]}>{labels.emptyTitle}</Text>
             <Text style={[text['row-meta'], styles.muted]}>{labels.emptyBody}</Text>
           </>
+          )
         ) : (
           <>
             <Text
@@ -493,7 +635,60 @@ export function AuthForm({
         ) : null}
       </View>
 
-      {stage === 'identify' ? (
+      {stage === 'registration-code' && registrationChallenge !== undefined && registrationCodeLabel !== undefined ? (
+        <View style={styles.field} testID={`${testID}-registration-code-stage`}>
+          <Text style={[text['section-title'], styles.title]}>{registrationCodeLabel.title}</Text>
+          <Text style={[text['row-meta'], styles.muted]}>{registrationCodeLabel.sent(registrationChallenge.email)}</Text>
+          <TextInput
+            ref={registrationCodeInput}
+            value={registrationCode}
+            onChangeText={(next) => setRegistrationCode(next.replace(/\D/g, '').slice(0, registrationCodeLabel.codeLength))}
+            placeholder={registrationCodeLabel.placeholder}
+            placeholderTextColor={tokens['color.foreground-subtle']}
+            inputMode="numeric"
+            keyboardType="number-pad"
+            autoComplete="one-time-code"
+            autoCorrect={false}
+            style={[text['row-title'], styles.input]}
+            accessibilityLabel={registrationCodeLabel.label}
+            aria-invalid={status?.tone === 'error'}
+            testID={`${testID}-registration-code`}
+          />
+          {registrationExpired ? <Text style={[text['caption'], styles.danger]}>{registrationCodeLabel.expired}</Text> : null}
+          <Pressable
+            accessibilityRole="button"
+            onPress={guard(onSubmit)}
+            testID={`${testID}-registration-code-submit`}
+            disabled={busy || registrationExpired || registrationCode.length !== registrationCodeLabel.codeLength}
+            aria-disabled={busy || registrationExpired || registrationCode.length !== registrationCodeLabel.codeLength}
+            style={({ pressed }) => [styles.primary, pressed ? styles.primaryPressed : null,
+              busy || registrationExpired || registrationCode.length !== registrationCodeLabel.codeLength
+                ? { opacity: tokens['state.disabled-opacity'] } : null]}
+          >
+            <Text style={[text['headline'], styles.primaryLabel]}>{registrationCodeLabel.verify}</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={guard(() => {
+              if (resendSeconds === 0) registrationChallenge.onResend();
+            })}
+            style={({ pressed }) => [styles.textAction, pressed ? styles.pressed : null]}
+            testID={`${testID}-registration-code-resend`}
+          >
+            <Text style={[text['row-meta'], styles.linkText]}>
+              {resendSeconds === 0 ? registrationCodeLabel.resend : registrationCodeLabel.resendIn(resendSeconds)}
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={guard(registrationChallenge.onChangeEmail)}
+            style={({ pressed }) => [styles.textAction, pressed ? styles.pressed : null]}
+            testID={`${testID}-registration-code-change-email`}
+          >
+            <Text style={[text['row-meta'], styles.linkText]}>{registrationCodeLabel.changeEmail}</Text>
+          </Pressable>
+        </View>
+      ) : stage === 'identify' ? (
         <View style={styles.field}>
           <Text style={[text['caption'], styles.muted]}>{labels.email}</Text>
           <TextInput
@@ -539,21 +734,29 @@ export function AuthForm({
         </View>
       ) : (
         <View style={styles.field}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => {
-              // 回到第一步时**不清空**已输入的口令：用户可能只是改个字母。
-              setStage('identify');
-              setLocalField(undefined);
+          <Text style={[text['caption'], styles.muted]}>{labels.email}</Text>
+          <TextInput
+            ref={emailInput}
+            value={email}
+            onChangeText={(next) => {
+              setEmail(next);
+              if (localField === 'email') setLocalField(undefined);
             }}
-            style={({ pressed }) => [styles.identityRow, pressed ? styles.pressed : null]}
-            testID={`${testID}-change-email`}
-          >
-            <Text style={[text['row-meta'], styles.identityText]} numberOfLines={1}>
-              {labels.accountSummary(email)}
-            </Text>
-            <Text style={[text['caption'], styles.linkText]}>{labels.changeEmail}</Text>
-          </Pressable>
+            placeholder={labels.emailPlaceholder}
+            placeholderTextColor={tokens['color.foreground-subtle']}
+            autoComplete={AUTH_EMAIL_AUTOCOMPLETE as 'username'}
+            inputMode="email"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={[text['row-title'], styles.input]}
+            accessibilityLabel={labels.email}
+            aria-invalid={invalidFor('email')}
+            testID={`${testID}-email`}
+          />
+          {missing('email') ? (
+            <Text style={[text['caption'], styles.danger]}>{labels.localErrors.email}</Text>
+          ) : null}
 
           <Text style={[text['caption'], styles.muted]}>{labels.password}</Text>
           <View style={styles.passwordRow}>
@@ -564,7 +767,9 @@ export function AuthForm({
                 // 🔴 原样收下：不 normalize、不 trim、不改大小写。
                 // 归一化只在服务端一处发生（存的与验的都是它归一化后的串）。
                 setPassword(next);
-                if (localField === 'password') setLocalField(undefined);
+                if (localField === 'password' || localField === 'passwordConfirmation') {
+                  setLocalField(undefined);
+                }
               }}
               placeholder={labels.passwordPlaceholder}
               placeholderTextColor={tokens['color.foreground-subtle']}
@@ -602,10 +807,61 @@ export function AuthForm({
           {missing('password') ? (
             <Text style={[text['caption'], styles.danger]}>{labels.localErrors.password}</Text>
           ) : null}
-          <Text style={[text['caption'], styles.muted]}>{labels.passwordHint}</Text>
-
           {mode === 'register' ? (
             <>
+              {labels.passwordStrength !== undefined ? (
+                <PasswordStrength
+                  password={password}
+                  labels={labels.passwordStrength}
+                  testID={`${testID}-password-strength`}
+                />
+              ) : null}
+              <Text style={[text['caption'], styles.muted]}>
+                {labels.confirmPassword ?? labels.password}
+              </Text>
+              <View style={styles.passwordRow}>
+                <TextInput
+                  ref={confirmPasswordInput}
+                  value={confirmPassword}
+                  onChangeText={(next) => {
+                    setConfirmPassword(next);
+                    if (localField === 'passwordConfirmation') setLocalField(undefined);
+                  }}
+                  placeholder={labels.passwordPlaceholder}
+                  placeholderTextColor={tokens['color.foreground-subtle']}
+                  secureTextEntry={!revealed}
+                  autoComplete={passwordAutocomplete(mode)}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  style={[text['row-title'], styles.input, styles.passwordInput]}
+                  accessibilityLabel={labels.confirmPassword ?? labels.password}
+                  aria-invalid={invalidFor('passwordConfirmation')}
+                  testID={`${testID}-password-confirmation`}
+                />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={revealed ? labels.hidePassword : labels.showPassword}
+                  aria-pressed={revealed}
+                  hitSlop={tokens['gesture.hit-slop']}
+                  onPress={() => setRevealed((v) => !v)}
+                  style={({ pressed }) => [styles.reveal, pressed ? styles.pressed : null]}
+                  testID={`${testID}-password-confirmation-reveal`}
+                >
+                  <HeytaIcon
+                    data={revealed ? EyeOff : Eye}
+                    size={tokens['icon.sm']}
+                    color={tokens['color.foreground-muted']}
+                  />
+                </Pressable>
+              </View>
+              {missing('passwordConfirmation') ? (
+                <Text style={[text['caption'], styles.danger]}>
+                  {labels.localErrors.passwordConfirmation ??
+                    (confirmPassword === ''
+                      ? labels.passwordConfirmationRequired ?? labels.password
+                      : labels.passwordMismatch ?? labels.password)}
+                </Text>
+              ) : null}
               {labels.invite !== undefined ? (
                 <View style={styles.field}>
                   <Text style={[text['caption'], styles.muted]}>{labels.invite.label}</Text>
@@ -736,6 +992,7 @@ export function AuthForm({
             onPress={() => {
               const next: AuthFormMode = mode === 'sign-in' ? 'register' : 'sign-in';
               setMode(next);
+              setConfirmPassword('');
               setLocalField(undefined);
             }}
             style={({ pressed }) => [styles.textAction, pressed ? styles.pressed : null]}
@@ -768,7 +1025,23 @@ export function AuthForm({
       */}
       {stage === 'credential' ? (
         <View style={styles.secondary}>
-          <Text style={[text['caption'], styles.muted]}>{labels.otherWays}</Text>
+          {labels.otherWaysToggle === undefined ? (
+            <Text style={[text['caption'], styles.muted]}>{labels.otherWays}</Text>
+          ) : (
+            <Pressable
+              accessibilityRole="button"
+              aria-expanded={otherWaysOpen}
+              onPress={() => setOtherWaysOpen((open) => !open)}
+              style={({ pressed }) => [styles.disclosure, pressed ? styles.pressed : null]}
+              testID={`${testID}-other-ways-toggle`}
+            >
+              <Text style={[text['row-meta'], styles.disclosureText]}>
+                {otherWaysOpen ? labels.otherWaysToggle.close : labels.otherWaysToggle.open}
+              </Text>
+            </Pressable>
+          )}
+          {labels.otherWaysToggle !== undefined && !otherWaysOpen ? null : (
+          <>
           <Pressable
             accessibilityRole="button"
             onPress={guard(() =>
@@ -813,7 +1086,9 @@ export function AuthForm({
             testID={`${testID}-recovery`}
           >
             <Text style={[text['row-meta'], styles.linkText]}>{labels.recovery}</Text>
-          </Pressable>
+            </Pressable>
+          </>
+          )}
         </View>
       ) : null}
 
@@ -831,9 +1106,23 @@ export function AuthForm({
         ⚠️ 位置变了，但 `baseUrlMissing` 的判定与 `firstAuthErrorField` 的顺序**没动**：
         自建用户把地址清空时仍然会被指到那一栏，只是它现在在下方。
       */}
+      {labels.advancedToggle !== undefined ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setAdvancedOpen((v) => !v)}
+          aria-expanded={advancedShown}
+          style={({ pressed }) => [styles.disclosure, pressed ? styles.pressed : null]}
+          testID={`${testID}-advanced-toggle`}
+        >
+          <Text style={[text['row-meta'], styles.disclosureText]}>
+            {advancedShown ? labels.advancedToggle.close : labels.advancedToggle.open}
+          </Text>
+        </Pressable>
+      ) : null}
+
       {serverUrl !== undefined && labels.serverUrl !== undefined ? (
         <>
-          {labels.selfHostToggle === undefined ? null : (
+          {labels.selfHostToggle === undefined || labels.advancedToggle !== undefined ? null : (
             <Pressable
               accessibilityRole="button"
               onPress={() => setSelfHostOpen((v) => !v)}
@@ -872,7 +1161,7 @@ export function AuthForm({
 
       {labels.paste !== undefined && onVerifyToken !== undefined ? (
         <>
-          {labels.haveTokenToggle === undefined ? null : (
+          {labels.advancedToggle === undefined && labels.haveTokenToggle !== undefined ? (
             <Pressable
               accessibilityRole="button"
               onPress={() => setHaveTokenOpen((v) => !v)}
@@ -884,7 +1173,7 @@ export function AuthForm({
                 {haveTokenOpen ? labels.haveTokenToggle.close : labels.haveTokenToggle.open}
               </Text>
             </Pressable>
-          )}
+          ) : null}
           {haveTokenShown ? (
             <View style={styles.field}>
               <Text style={[text['caption'], styles.muted]}>{labels.paste.label}</Text>
@@ -947,7 +1236,7 @@ function makeStyles(tokens: HeytaNativeTokens) {
     statusStrong: { color: tokens['color.foreground'] },
     muted: { color: tokens['color.foreground-muted'] },
     danger: { color: tokens['color.danger'] },
-    success: { color: tokens['color.success'] },
+    success: { color: tokens['color.success-strong'] },
     busyRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -960,8 +1249,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       minHeight: tokens['size.field-height'],
       paddingHorizontal: tokens['space.2'],
       borderRadius: tokens['radius.md'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
       backgroundColor: tokens['color.background'],
       color: tokens['color.foreground'],
       // 🔴 字号走 `text['row-title']`（`font-size.base` = 16）整条带上 ——
@@ -993,8 +1280,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       minHeight: tokens['touch-target.min'],
       paddingHorizontal: tokens['space.2'],
       borderRadius: tokens['radius.md'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border-subtle'],
       backgroundColor: tokens['color.surface-sunken'],
     },
     identityText: {
@@ -1024,14 +1309,11 @@ function makeStyles(tokens: HeytaNativeTokens) {
       paddingHorizontal: tokens['space.4'],
       borderRadius: tokens['radius.md'],
       backgroundColor: tokens['color.primary'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.primary'],
     },
     primaryPressed: {
       // 按压态用**更深的品牌色**，不用透明度：`state.pressed-opacity` 是 0.08，
       // 给实心主按钮用会让它按下去像"变淡了"，而按钮的实心感正是它的可点性提示。
       backgroundColor: tokens['color.primary-active'],
-      borderColor: tokens['color.primary-active'],
     },
     primaryLabel: { color: tokens['color.on-primary'] },
     ghost: {
@@ -1039,8 +1321,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       minHeight: tokens['touch-target.min'],
       paddingHorizontal: tokens['space.3'],
       borderRadius: tokens['radius.md'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -1055,7 +1335,17 @@ function makeStyles(tokens: HeytaNativeTokens) {
     },
     linkText: {
       color: tokens['color.primary'],
-      textDecorationLine: 'underline',
+    },
+    disclosure: {
+      alignSelf: 'stretch',
+      minHeight: tokens['touch-target.min'],
+      justifyContent: 'center',
+      paddingHorizontal: tokens['space.3'],
+      borderRadius: tokens['radius.md'],
+      backgroundColor: tokens['color.surface-sunken'],
+    },
+    disclosureText: {
+      color: tokens['color.foreground'],
     },
     secondary: {
       gap: tokens['space.1'],

@@ -59,7 +59,13 @@ import {
   type ToolSelection,
   type ToolSelectionRule,
 } from './ai-tool-selection.js';
-import { runSelectedTool, type AiToolRunOutcome } from './ai-tool-run.js';
+import {
+  aiToolProposalRequiresConfirmation,
+  executeAiToolProposal,
+  runSelectedTool,
+  type AiToolRunOutcome,
+} from './ai-tool-run.js';
+import type { AssistantTier } from './ai-assistant.js';
 
 /** 单句输入上限。工具选择只处理短命令，长文不是它的场景。 */
 export const MAX_TOOL_CALL_TEXT_LENGTH = 500;
@@ -174,6 +180,32 @@ export interface RequestToolCallDeps {
   policy?: AiRoutingPolicy;
   routed?: RoutedDeps;
   now?: () => number;
+  /** 执行档由调用方传入；未传时保留旧的“只产出提案”单步语义。 */
+  tier?: AssistantTier;
+  /** 最终执行前读取当前工具授权。 */
+  getGrants?: () => LocalApiConfig['grants'];
+  /** 与对话助手共用的一次用户发送标识，供低风险自动提交防重放。 */
+  executionId?: string;
+}
+
+async function applyExecutionMode(
+  run: AiToolRunOutcome,
+  deps: RequestToolCallDeps,
+): Promise<AiToolRunOutcome> {
+  if (
+    run.kind !== 'proposal' ||
+    deps.tier !== 'read-and-propose' ||
+    deps.executionId === undefined ||
+    aiToolProposalRequiresConfirmation(run.proposal)
+  ) {
+    return run;
+  }
+  const result = await executeAiToolProposal(deps.host, run.proposal, deps.executionId, {
+    getGrants: deps.getGrants ?? (() => deps.grants),
+  });
+  return result.ok
+    ? { kind: 'executed', proposal: run.proposal, result }
+    : { kind: 'failed', tool: run.proposal.tool, reason: 'write-failed', message: result.message };
 }
 
 /**
@@ -185,6 +217,7 @@ export async function requestToolCall(
   source: ToolCallSource,
   deps: RequestToolCallDeps,
 ): Promise<ToolCallOutcome> {
+  const currentGrants = deps.getGrants?.() ?? deps.grants;
   const text = source.text.trim();
   if (text === '') {
     return { ok: false, reason: 'empty-text', message: '还没有输入内容。', health: {} };
@@ -200,20 +233,21 @@ export async function requestToolCall(
 
   const localDeps = {
     host: deps.host,
-    grants: deps.grants,
+    grants: currentGrants,
+    ...(deps.getGrants === undefined ? {} : { getGrants: deps.getGrants }),
     ...(deps.rules === undefined ? {} : { rules: deps.rules }),
     ...(deps.now === undefined ? {} : { now: deps.now }),
   };
 
   // ── 第一步：规则（本机、零出境）──────────────────────────────────────
   const local = resolveToolSelection(text, {
-    grants: deps.grants,
+    grants: currentGrants,
     ...(deps.rules === undefined ? {} : { rules: deps.rules }),
     ...(deps.now === undefined ? {} : { now: deps.now }),
   });
 
   if (local.kind === 'tool') {
-    const result = await runSelectedTool(local, localDeps);
+    const result = await applyExecutionMode(await runSelectedTool(local, localDeps), deps);
     return { ok: true, via: 'rule', result, health: {} };
   }
 
@@ -228,7 +262,7 @@ export async function requestToolCall(
   }
 
   // ── 第二步：模型（出境）──────────────────────────────────────────────
-  const tools = toToolDescriptors(deps.grants);
+  const tools = toToolDescriptors(currentGrants);
   if (tools.length === 0) {
     return {
       ok: false,
@@ -307,7 +341,7 @@ export async function requestToolCall(
     tool: call.name,
     args: parsed.args,
   };
-  const run = await runSelectedTool(selection, localDeps);
+  const run = await applyExecutionMode(await runSelectedTool(selection, localDeps), deps);
 
   return {
     ok: true,

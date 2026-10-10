@@ -108,6 +108,16 @@ describe('planTimelineBlock：三个任务三种形态，一块都不少', () =>
 // ─────────────────────────────────────────────────────────────────────────
 
 describe('deriveTaskTimePosition：三态生产者（P1 point/unscheduled + P2 range，ADR-0043 §3）', () => {
+  it('date-only due/start are projected into the current device calendar without changing their day', () => {
+    const start = new Date(2026, 9, 8).getTime();
+    const end = new Date(2026, 9, 11).getTime();
+    expect(deriveTaskTimePosition({
+      startDate: Date.UTC(2026, 9, 7, 16), startDateLocal: '2026-10-08',
+      dueDate: Date.UTC(2026, 9, 9, 16), dueDateLocal: '2026-10-10',
+    })).toEqual({ kind: 'range', startMs: start, endMs: end });
+    expect(deriveTaskTimePosition({ dueDate: Date.UTC(2026, 9, 7, 16), dueDateLocal: '2026-10-08' }))
+      .toEqual({ kind: 'point', atMs: start });
+  });
   it('🔴 有合法 dueDate ⇒ point（atMs 原样），绝不画成条', () => {
     const at = Date.parse('2026-10-01T15:00:00');
     const p = deriveTaskTimePosition({ dueDate: at });

@@ -78,10 +78,12 @@ export interface MilestoneMapLabels {
     readonly unit: string;
     readonly gap: number;
   }) => string;
-  /** 单档位徽章的无障碍名（已达成的带对勾，未达成的只有数字）。 */
+  /** 单档位徽章的无障碍名（已达成与未达成都明确说出阈值和状态）。 */
   readonly tierA11y: (info: {
     readonly threshold: number;
     readonly reached: boolean;
+    /** 宿主有单位时一并读出；移动端可省略。 */
+    readonly unit?: string;
   }) => string;
   /** 一个里程碑都没有时显示什么（领域层理论上不会返回空，但空输入别抛错）。 */
   readonly empty: string;
@@ -105,8 +107,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       padding: tokens['space.3'],
       borderRadius: tokens['radius.lg'],
       backgroundColor: tokens['color.surface'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
     },
     head: {
       flexDirection: 'row',
@@ -232,6 +232,7 @@ export function MilestoneMap({
                   accessibilityLabel={labels.tierA11y({
                     threshold: tier.threshold,
                     reached: tier.reached,
+                    unit,
                   })}
                   style={[
                     styles.tier,

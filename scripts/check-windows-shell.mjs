@@ -28,6 +28,12 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const BUNDLE_SCRIPT = join(ROOT, 'packages/app-host/scripts/build-native-bridge.mjs');
 const BUNDLE = join(ROOT, 'packages/app-host/bridge-bundle/native-bridge.js');
 const SMOKE_PROJECT = join(ROOT, 'apps/desktop-windows/smoke/Smoke.csproj');
+const WIDGET_SMOKE_PROJECT = join(ROOT, 'apps/desktop-windows/widget-smoke/WidgetSmoke.csproj');
+
+// The provider runs independently of the JS UI: its embedded catalog must
+// still come from the same i18n source on every platform.
+const widgetStrings = spawnSync(process.execPath, [join(ROOT, 'scripts/gen-windows-widget-strings.mjs'), '--check'], { stdio: 'inherit', cwd: ROOT });
+if (widgetStrings.error || widgetStrings.status !== 0) process.exit(widgetStrings.status ?? 1);
 
 const hasDotnet = () => {
   try {
@@ -69,4 +75,10 @@ if (smoke.error) {
   console.error(`❌ 冒烟没能启动：${smoke.error.message}`);
   process.exit(1);
 }
-process.exit(smoke.status ?? 1);
+if (smoke.status !== 0) process.exit(smoke.status ?? 1);
+
+const widgetSmoke = spawnSync('dotnet', ['run', '-c', 'Release', '--project', WIDGET_SMOKE_PROJECT], {
+  stdio: 'inherit', cwd: ROOT,
+});
+if (widgetSmoke.error) console.error(`❌ Windows 小组件语言冒烟没能启动：${widgetSmoke.error.message}`);
+process.exit(widgetSmoke.status ?? 1);

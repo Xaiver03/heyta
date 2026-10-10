@@ -44,6 +44,7 @@
 
 import type { LocalDate } from './date.js';
 import { diffDays, today } from './date.js';
+import { dueLocalDateOf } from './date.js';
 import type { Task } from './entities.js';
 
 /**
@@ -86,8 +87,9 @@ export interface CountdownOptions {
 }
 
 /** 把时间戳归到本地日历日，再算天数差。 */
-function daysUntil(dueDate: number, now: number): number {
-  return diffDays(today(now), today(dueDate));
+function daysUntil(task: Task, now: number): number | undefined {
+  const due = dueLocalDateOf(task);
+  return due === undefined ? undefined : diffDays(today(now), due);
 }
 
 /**
@@ -102,11 +104,10 @@ export function computeCountdown(task: Task, options: CountdownOptions = {}): Co
   const now = options.now ?? Date.now();
   const soonDays = options.soonThresholdDays ?? SOON_THRESHOLD_DAYS;
 
-  if (task.dueDate === undefined) {
+  const remainingDays = daysUntil(task, now);
+  if (remainingDays === undefined) {
     return { remainingDays: null, urgency: 'none', progress: null, overdue: false };
   }
-
-  const remainingDays = daysUntil(task.dueDate, now);
 
   if (task.completedAt !== undefined) {
     return { remainingDays, urgency: 'none', progress: null, overdue: false };
@@ -118,7 +119,7 @@ export function computeCountdown(task: Task, options: CountdownOptions = {}): Co
   return {
     remainingDays,
     urgency,
-    progress: computeProgress(task.createdAt, task.dueDate, now),
+    progress: task.dueDate === undefined ? null : computeProgress(task.createdAt, task.dueDate, now),
     overdue: remainingDays < 0,
   };
 }

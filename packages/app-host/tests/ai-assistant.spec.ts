@@ -32,6 +32,8 @@ import {
   assistantEgressFields,
   assistantGrants,
   assistantSystemPrompt,
+  type LocalObservationKey,
+  type LocalObservationTranslate,
   localObservationText,
   observedFieldNames,
   planAssistantEgress,
@@ -94,6 +96,32 @@ const REMOTE: AiEndpointConfig = {
   model: 'a-longer-model-name',
   capabilities: ['structured_output', 'tool_calling'],
 };
+
+const LOCAL_COPY: Record<'zh-CN' | 'en', Record<LocalObservationKey, string>> = {
+  'zh-CN': {
+    'web.ai.chat.local.empty': '没有符合条件的内容。',
+    'web.ai.chat.local.found': '我找到 {count} 项：',
+    'web.ai.chat.local.untitled': '（未命名）',
+    'web.ai.chat.local.more': '还有 {count} 项未列出。',
+  },
+  en: {
+    'web.ai.chat.local.empty': 'I found no matching items.',
+    'web.ai.chat.local.found': 'Found {count}:',
+    'web.ai.chat.local.untitled': '(Untitled)',
+    'web.ai.chat.local.more': '{count} more not shown.',
+  },
+};
+
+function localize(locale: 'zh-CN' | 'en'): LocalObservationTranslate {
+  return (key, vars) =>
+    (vars === undefined ? LOCAL_COPY[locale][key] : LOCAL_COPY[locale][key].replace(/\{(\w+)\}/g, (whole, name: string) => {
+      const value = vars[name];
+      return value === undefined ? whole : String(value);
+    }));
+}
+
+const LOCALIZE_ZH = localize('zh-CN');
+const LOCALIZE_EN = localize('en');
 
 function routing(endpoint: AiEndpointConfig): AiRoutingConfig {
   return {
@@ -183,6 +211,7 @@ describe('多步读循环', () => {
         routing: routing(LOCAL),
         consents: [],
         tier: 'read-only',
+        localize: LOCALIZE_ZH,
         host,
         routed: { fetchImpl: impl },
       },
@@ -219,6 +248,7 @@ describe('多步读循环', () => {
         routing: routing(LOCAL),
         consents: [],
         tier: 'read-only',
+        localize: LOCALIZE_ZH,
         host,
         history: [
           { role: 'user', text: '第一句' },
@@ -253,7 +283,7 @@ describe('多步读循环', () => {
     const { impl, calls } = scriptedFetch(replies);
     const outcome = await requestAssistantTurn(
       { text: '看看那条' },
-      { routing: routing(LOCAL), consents: [], tier: 'read-only', host, routed: { fetchImpl: impl } },
+      { routing: routing(LOCAL), consents: [], tier: 'read-only', localize: LOCALIZE_ZH, host, routed: { fetchImpl: impl } },
     );
     expect(calls.length).toBe(MAX_ASSISTANT_TOOL_STEPS);
     expect(outcome.ok).toBe(true);
@@ -279,7 +309,7 @@ describe('多步读循环', () => {
     ]);
     const outcome = await requestAssistantTurn(
       { text: '看看那条' },
-      { routing: routing(LOCAL), consents: [], tier: 'read-only', host, routed: { fetchImpl: impl } },
+      { routing: routing(LOCAL), consents: [], tier: 'read-only', localize: LOCALIZE_ZH, host, routed: { fetchImpl: impl } },
     );
     expect(outcome.ok).toBe(true);
     if (!outcome.ok || outcome.kind !== 'answer') return;
@@ -289,8 +319,8 @@ describe('多步读循环', () => {
   });
 });
 
-describe('🔴 写：一次一个、一次确认', () => {
-  it('模型要写 ⇒ 产出提案并**停**，第二次请求根本没发', async () => {
+describe('🔴 写：一次一个，按风险自动执行或确认', () => {
+  it('模型要写低风险任务 ⇒ 自动执行并停，第二次请求根本没发', async () => {
     const host = fakeHost();
     const { impl, calls } = scriptedFetch([
       { kind: 'call', id: 'c1', name: 'list_tasks', args: '{}' },
@@ -306,6 +336,7 @@ describe('🔴 写：一次一个、一次确认', () => {
         routing: routing(LOCAL),
         consents: [],
         tier: 'read-and-propose',
+        localize: LOCALIZE_ZH,
         host,
         routed: { fetchImpl: impl },
       },
@@ -313,12 +344,36 @@ describe('🔴 写：一次一个、一次确认', () => {
 
     expect(calls.length).toBe(2);
     expect(outcome.ok).toBe(true);
-    if (!outcome.ok || outcome.kind !== 'proposal') return;
+    if (!outcome.ok || outcome.kind !== 'executed') return;
     expect(outcome.proposal.intent).toEqual({ action: 'create-task', title: '买咖啡' });
     expect(outcome.stopsHere).toBe(true);
-    // 🔴 确认之前不许写：数调用，不看返回值。
-    expect(host.submits).toBe(0);
+    expect(outcome.result).toEqual({ ok: true, taskId: 'created-1' });
+    expect(host.submits).toBe(1);
     expect(outcome.steps.map((s) => s.kind)).toEqual(['read', 'write']);
+  });
+
+  it('模型要批量完成 ⇒ 保留提案并停，不能自动写入', async () => {
+    const host = fakeHost();
+    const { impl, calls } = scriptedFetch([
+      { kind: 'call', id: 'c1', name: 'complete_task', args: '{"taskIds":["t1","t2"]}' },
+    ]);
+    const outcome = await requestAssistantTurn(
+      { text: '把两条任务都完成' },
+      {
+        routing: routing(LOCAL),
+        consents: [],
+        tier: 'read-and-propose',
+        localize: LOCALIZE_ZH,
+        host,
+        executionId: 'assistant-risky-batch',
+        routed: { fetchImpl: impl },
+      },
+    );
+    expect(calls.length).toBe(1);
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok || outcome.kind !== 'proposal') return;
+    expect(outcome.proposal.intent).toEqual({ action: 'complete-tasks', taskIds: ['t1', 't2'] });
+    expect(host.submits).toBe(0);
   });
 
   it('`read-only` 档里写工具**根本不在模型看得见的集合里**', async () => {
@@ -326,7 +381,7 @@ describe('🔴 写：一次一个、一次确认', () => {
     const { impl, calls } = scriptedFetch([{ kind: 'text', text: '我只能读' }]);
     await requestAssistantTurn(
       { text: '帮我建一条' },
-      { routing: routing(LOCAL), consents: [], tier: 'read-only', host, routed: { fetchImpl: impl } },
+      { routing: routing(LOCAL), consents: [], tier: 'read-only', localize: LOCALIZE_ZH, host, routed: { fetchImpl: impl } },
     );
     const tools = (calls[0]?.body['tools'] ?? []) as readonly { function?: { name: string } }[];
     const names = tools.map((t) => t.function?.name ?? '');
@@ -348,7 +403,7 @@ describe('🔴 写：一次一个、一次确认', () => {
     ]);
     const outcome = await requestAssistantTurn(
       { text: '把任务与清单都列一下' },
-      { routing: routing(LOCAL), consents: [], tier: 'read-only', host, routed: { fetchImpl: impl } },
+      { routing: routing(LOCAL), consents: [], tier: 'read-only', localize: LOCALIZE_ZH, host, routed: { fetchImpl: impl } },
     );
     expect(calls.length).toBe(1);
     expect(outcome.ok).toBe(false);
@@ -369,7 +424,7 @@ describe('🔴 出境披露：循环前一次算完，越界就停', () => {
     const { impl, calls } = scriptedFetch([{ kind: 'text', text: '不该走到这里' }]);
     const outcome = await requestAssistantTurn(
       { text: '我都有些啥？' },
-      { routing: routing(REMOTE), consents: [], tier: 'read-only', host, routed: { fetchImpl: impl } },
+      { routing: routing(REMOTE), consents: [], tier: 'read-only', localize: LOCALIZE_ZH, host, routed: { fetchImpl: impl } },
     );
     // 一次请求都不发（出境闸门在网路之前）。
     expect(calls.length).toBe(0);
@@ -400,7 +455,7 @@ describe('🔴 出境披露：循环前一次算完，越界就停', () => {
     // ⚠️ 12 = 目录**当前**的读工具条数（上面那 10 条 + W10 的 `list_events` /
     // `get_event`，2026-10-03 合流进 pack 目录之后）。
     // 写成 `LOCAL_API_TOOLS.filter(…)` 的长度就是拿被验的那份推导去当期望值 —— 一条永真判据。
-    expect(plan.tools.length).toBe(12);
+    expect(plan.tools.length).toBe(13);
     // 🔴 这句以前写的是 `toBe(3)` —— 一个**手抄的**读工具数。W10 给目录加了
     // `list_events` / `get_event`，那条硬编码会红，而红的原因不是缺陷。
     // 正确形状与这条用例的标题同义：**从常量推导**，即"读-only 档 = 目录里全部读工具"。
@@ -427,6 +482,7 @@ describe('🔴 出境披露：循环前一次算完，越界就停', () => {
         routing: routing(LOCAL),
         consents: [],
         tier: 'read-only',
+        localize: LOCALIZE_ZH,
         host: leaky as unknown as LocalApiHost,
         routed: { fetchImpl: impl },
       },
@@ -457,7 +513,7 @@ describe('🔴 三个硬上界：触顶要明说，不许静默截断', () => {
     }));
     const outcome = await requestAssistantTurn(
       { text: '继续' },
-      { routing: routing(LOCAL), consents: [], tier: 'read-only', host, history, routed: { fetchImpl: impl } },
+      { routing: routing(LOCAL), consents: [], tier: 'read-only', localize: LOCALIZE_ZH, host, history, routed: { fetchImpl: impl } },
     );
     expect(calls.length).toBe(0);
     expect(outcome.ok).toBe(true);
@@ -479,7 +535,7 @@ describe('🔴 三个硬上界：触顶要明说，不许静默截断', () => {
     ]);
     const outcome = await requestAssistantTurn(
       { text: '看看那条大任务' },
-      { routing: routing(LOCAL), consents: [], tier: 'read-only', host, routed: { fetchImpl: impl } },
+      { routing: routing(LOCAL), consents: [], tier: 'read-only', localize: LOCALIZE_ZH, host, routed: { fetchImpl: impl } },
     );
     expect(outcome.ok).toBe(true);
     if (!outcome.ok || outcome.kind !== 'stopped') return;
@@ -492,7 +548,7 @@ describe('🔴 三个硬上界：触顶要明说，不许静默截断', () => {
   it('空输入 / 超长输入在出境之前就被拒', async () => {
     const host = fakeHost();
     const { impl, calls } = scriptedFetch([]);
-    const deps = { routing: routing(LOCAL), consents: [], tier: 'read-only' as const, host, routed: { fetchImpl: impl } };
+    const deps = { routing: routing(LOCAL), consents: [], tier: 'read-only' as const, localize: LOCALIZE_ZH, host, routed: { fetchImpl: impl } };
     const empty = await requestAssistantTurn({ text: '   ' }, deps);
     expect(empty.ok).toBe(false);
     const long = await requestAssistantTurn({ text: '字'.repeat(600) }, deps);
@@ -506,12 +562,13 @@ describe('🔴 三个硬上界：触顶要明说，不许静默截断', () => {
 describe('授权前端有两个，判断只有一个', () => {
   it('`assistantGrants` 由**目录**推导，不是一份手写的名单', () => {
     const grants = assistantGrants('read-only');
-    // ⚠️ 下面这 26 个名字是**目录当前的内容**（2026-10-03 合流：W11 补齐五实体 + W10 的
-    // EVENT 四条进 pack 目录），不是一份"允许清单"：
+    // ⚠️ 下面这 27 个名字是**目录当前的内容**（W11 补齐任务清单工具 + W10 的 EVENT
+    // 四条进 pack 目录），不是一份"允许清单"：
     // 判据是"键集合 == 目录"，所以目录扩了就必须跟着列全 ——
     // 把它换成 `LOCAL_API_TOOLS.map(...)` 会让这条断言变成自己比自己的**永真判据**。
     expect(Object.keys(grants).sort()).toEqual(
       [
+        'append_task_checklist',
         'complete_task',
         'create_habit',
         'create_note',
@@ -523,6 +580,7 @@ describe('授权前端有两个，判断只有一个', () => {
         'get_event',
         'get_note',
         'get_task',
+        'get_task_estimate_context',
         'list_checkins',
         'list_events',
         'list_focuses',
@@ -534,7 +592,9 @@ describe('授权前端有两个，判断只有一个', () => {
         'list_tasks',
         'log_focus',
         'record_checkin',
+        'set_task_estimate',
         'set_task_tags',
+        'set_task_priorities',
         'update_event',
         'update_note',
         'update_task',
@@ -564,7 +624,7 @@ describe('授权前端有两个，判断只有一个', () => {
     const { impl, calls } = scriptedFetch(replies);
     const outcome = await requestAssistantTurn(
       { text: '建一条' },
-      { routing: routing(LOCAL), consents: [], tier: 'read-only', host, routed: { fetchImpl: impl } },
+      { routing: routing(LOCAL), consents: [], tier: 'read-only', localize: LOCALIZE_ZH, host, routed: { fetchImpl: impl } },
     );
     expect(calls.length).toBe(MAX_ASSISTANT_TOOL_STEPS);
     // 🔴 核心那条：越权调用**一次都没落成库**。
@@ -605,6 +665,7 @@ describe('🔴 助手知道"今天"是哪天，而且这件事说过', () => {
         routing: routing(LOCAL),
         consents: [],
         tier: 'read-only',
+        localize: LOCALIZE_ZH,
         host,
         routed: { fetchImpl: impl },
         now: NOW,
@@ -633,7 +694,7 @@ describe('🔴 助手知道"今天"是哪天，而且这件事说过', () => {
       ]);
       await requestAssistantTurn(
         { text: '我都有些啥？' },
-        { routing: routing(LOCAL), consents: [], tier: 'read-only', host, routed: { fetchImpl: impl } },
+        { routing: routing(LOCAL), consents: [], tier: 'read-only', localize: LOCALIZE_ZH, host, routed: { fetchImpl: impl } },
       );
       expect(calls.length).toBe(2);
       const first = String(calls[0]?.messages[0]?.['content'] ?? '');
@@ -666,6 +727,7 @@ describe('规则先跑、命中即零外发', () => {
         routing: routing(LOCAL),
         consents: [],
         tier: 'read-only',
+        localize: LOCALIZE_ZH,
         host,
         routed: { fetchImpl: impl },
       },
@@ -690,12 +752,12 @@ describe('规则先跑、命中即零外发', () => {
     const { impl, calls } = scriptedFetch([{ kind: 'text', text: '端点不该被用到' }]);
     const outcome = await requestAssistantTurn(
       { text: '列一下清单' },
-      { routing: routing(LOCAL), consents: [], tier: 'read-only', host, routed: { fetchImpl: impl } },
+      { routing: routing(LOCAL), consents: [], tier: 'read-only', localize: LOCALIZE_ZH, host, routed: { fetchImpl: impl } },
     );
     expect(calls.length).toBe(0);
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
-    expect(outcome.text).toContain('共 0 项');
+    expect(outcome.text).toBe('没有符合条件的内容。');
   });
 
   it('🔴 同一句话连**出境授权都没有**时也不再拦用户：本机能答的就不需要批准', async () => {
@@ -705,7 +767,7 @@ describe('规则先跑、命中即零外发', () => {
     const { impl, calls } = scriptedFetch([{ kind: 'text', text: '不该走到这里' }]);
     const outcome = await requestAssistantTurn(
       { text: '列一下任务' },
-      { routing: routing(REMOTE), consents: [], tier: 'read-only', host, routed: { fetchImpl: impl } },
+      { routing: routing(REMOTE), consents: [], tier: 'read-only', localize: LOCALIZE_ZH, host, routed: { fetchImpl: impl } },
     );
     expect(calls.length).toBe(0);
     expect(outcome.ok).toBe(true);
@@ -724,6 +786,7 @@ describe('规则先跑、命中即零外发', () => {
         routing: routing(REMOTE),
         consents: READ_ONLY_CONSENT,
         tier: 'read-only',
+        localize: LOCALIZE_ZH,
         host,
         routed: { fetchImpl: impl },
         rules: [],
@@ -747,6 +810,7 @@ describe('规则先跑、命中即零外发', () => {
         routing: routing(REMOTE),
         consents: READ_ONLY_CONSENT,
         tier: 'read-only',
+        localize: LOCALIZE_ZH,
         host,
         routed: { fetchImpl: impl },
       },
@@ -758,7 +822,7 @@ describe('规则先跑、命中即零外发', () => {
     expect(outcome.destination).toBe('none');
   });
 
-  it('写意图的规则命中 ⇒ 提案 + 零请求 + 确认前一条 op 都没写', async () => {
+  it('低风险写意图的规则命中 ⇒ 自动执行 + 零请求 + 只提交一次', async () => {
     const host = fakeHost(TASKS, PROJECTS);
     const { impl, calls } = scriptedFetch([{ kind: 'text', text: '端点不该被用到' }]);
     const outcome = await requestAssistantTurn(
@@ -767,6 +831,7 @@ describe('规则先跑、命中即零外发', () => {
         routing: routing(REMOTE),
         consents: [],
         tier: 'read-and-propose',
+        localize: LOCALIZE_ZH,
         host,
         routed: { fetchImpl: impl },
         rules: [
@@ -782,11 +847,11 @@ describe('规则先跑、命中即零外发', () => {
     expect(calls.length).toBe(0);
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
-    expect(outcome.kind).toBe('proposal');
-    if (outcome.kind !== 'proposal') return;
+    expect(outcome.kind).toBe('executed');
+    if (outcome.kind !== 'executed') return;
     expect(outcome.destination).toBe('none');
     expect(outcome.stopsHere).toBe(true);
-    expect(host.submits, '用户还没确认就写了').toBe(0);
+    expect(host.submits).toBe(1);
   });
 
   it('低档（read-only）下写规则**不该**命中：授权范围先于规则', async () => {
@@ -800,6 +865,7 @@ describe('规则先跑、命中即零外发', () => {
         routing: routing(LOCAL),
         consents: [],
         tier: 'read-only',
+        localize: LOCALIZE_ZH,
         host,
         routed: { fetchImpl: impl },
         rules: [
@@ -829,6 +895,7 @@ describe('规则先跑、命中即零外发', () => {
         routing: routing(LOCAL),
         consents: [],
         tier: 'read-only',
+        localize: LOCALIZE_ZH,
         host,
         routed: { fetchImpl: impl },
         rules: [
@@ -848,41 +915,50 @@ describe('规则先跑、命中即零外发', () => {
 
 describe('本机回答的渲染形状', () => {
   it('数组直接渲染', () => {
-    const text = localObservationText('list_tasks', [{ title: '买牛奶' }, { title: '写周报' }]);
-    expect(text).toContain('共 2 项');
+    const text = localObservationText('list_tasks', [{ title: '买牛奶' }, { title: '写周报' }], LOCALIZE_ZH);
+    expect(text).toContain('我找到 2 项：');
     expect(text).toContain('- 买牛奶');
     expect(text).toContain('- 写周报');
   });
 
   it('投影常见的包装形状（`{ tasks: [...] }`）也认', () => {
-    expect(localObservationText('list_tasks', { tasks: [{ title: '买牛奶' }] })).toContain('- 买牛奶');
+    expect(localObservationText('list_tasks', { tasks: [{ title: '买牛奶' }] }, LOCALIZE_ZH)).toContain('- 买牛奶');
   });
 
   it('再往里一层（`{ task: { title } }` 的每一项）认得出来', () => {
-    expect(localObservationText('list_tasks', [{ task: { title: '买牛奶' } }])).toContain('- 买牛奶');
+    expect(localObservationText('list_tasks', [{ task: { title: '买牛奶' } }], LOCALIZE_ZH)).toContain('- 买牛奶');
   });
 
   it('空集合答"0 项"；拿不到数组的才返回 undefined（不硬编一句回答）', () => {
-    expect(localObservationText('list_tasks', [])).toContain('共 0 项');
-    expect(localObservationText('list_tasks', { tasks: [] })).toContain('共 0 项');
-    expect(localObservationText('get_task', { task: { title: '买牛奶' } })).toBeUndefined();
-    expect(localObservationText('list_tasks', [{ dueDate: 'x', priority: 'high' }])).toBeUndefined();
-    expect(localObservationText('list_tasks', '一串字')).toBeUndefined();
+    expect(localObservationText('list_tasks', [], LOCALIZE_ZH)).toBe('没有符合条件的内容。');
+    expect(localObservationText('list_tasks', { tasks: [] }, LOCALIZE_ZH)).toBe('没有符合条件的内容。');
+    expect(localObservationText('get_task', { task: { title: '买牛奶' } }, LOCALIZE_ZH)).toBeUndefined();
+    expect(localObservationText('list_tasks', [{ dueDate: 'x', priority: 'high' }], LOCALIZE_ZH)).toBeUndefined();
+    expect(localObservationText('list_tasks', '一串字', LOCALIZE_ZH)).toBeUndefined();
     // 🔴 这条是"部分可渲染也不许装作全渲染完了"：缺字的那一项明说没标题，
     // 而不是被 filter 掉（那样条数就和内容对不上了）。
-    const partial = localObservationText('list_tasks', [{ title: '买牛奶' }, { dueDate: 'x' }]);
-    expect(partial).toContain('共 2 项');
-    expect(partial).toContain('（这一项没有标题）');
+    const partial = localObservationText('list_tasks', [{ title: '买牛奶' }, { dueDate: 'x' }], LOCALIZE_ZH);
+    expect(partial).toContain('我找到 2 项：');
+    expect(partial).toContain('（未命名）');
   });
 
   it('超过上界要**明说**还剩几条没列出', () => {
     const many = Array.from({ length: LOCAL_ANSWER_MAX_ITEMS + 3 }, (_unused, i) => ({
       title: `任务 ${String(i + 1)}`,
     }));
-    const text = localObservationText('list_tasks', many);
-    expect(text).toContain(`共 ${String(many.length)} 项`);
-    expect(text).toContain('还有 3 项没列出');
+    const text = localObservationText('list_tasks', many, LOCALIZE_ZH);
+    expect(text).toContain(`我找到 ${String(many.length)} 项：`);
+    expect(text).toContain('还有 3 项未列出。');
     // 列出的行数就是上界那一个数（`split` 的第一段是"共 N 项："那一行）。
     expect(text?.split('\n- ').length).toBe(LOCAL_ANSWER_MAX_ITEMS + 1);
+  });
+
+  it('英文界面使用英文词条，且不把工具名或本机链路塞进正文', () => {
+    const text = localObservationText('list_tasks', [{ title: 'Buy milk' }], LOCALIZE_EN);
+    expect(text).toBe('Found 1:\n- Buy milk');
+    expect(localObservationText('list_tasks', [], LOCALIZE_EN)).toBe('I found no matching items.');
+    expect(text).not.toContain('list_tasks');
+    expect(text).not.toContain('device');
+    expect(text).not.toContain('request');
   });
 });

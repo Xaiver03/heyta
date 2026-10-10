@@ -45,6 +45,7 @@ import {
   axisTicksForWindow,
   boardWindow,
   dueText,
+  fitBoardTicks,
   isOverdue,
   markerMs,
   msAtRegionX,
@@ -123,23 +124,35 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
   } = props;
   const tokens = useHeytaTokens();
   const text = useHeytaText();
+  const [axisWidth, setAxisWidth] = useState(0);
   const clock = now ?? Date.now();
+  const dragThreshold = Number(tokens['space.2']);
 
   // ── 拖拽（P2）：ref 持会话（Responder 处理器要读最新值），state 只喂预览 ──
   const regionRef = useRef<View | null>(null);
   /** 轴点击期间是否发生过移动（移动 = 拖拽扫过，不是「点空白」）。 */
   const axisMoved = useRef(false);
+  const axisStartX = useRef<number | null>(null);
   const regionAbs = useRef<{ pageX: number; width: number } | null>(null);
   const dragRef = useRef<{
     taskId: string;
     kind: 'move' | 'resize' | 'lane';
     grantX: number;
+    grantY?: number;
     /** 泳道拖拽时是**指针当前 pageX**（落点换算用）；move/resize 不用。 */
     x?: number;
     origStartMs?: number;
     origMinutes?: number;
     aiMinutes?: number;
+    moved?: boolean;
+    pointerId?: number;
   } | null>(null);
+  /** Suppresses the child Pressable click only after a real drag. */
+  const dragConsumedPress = useRef(false);
+  const webDragCleanup = useRef<(() => void) | null>(null);
+  /** RNW has a global pointer target; native hosts do not, so they use Pressable callbacks. */
+  const pointerTarget =
+    typeof globalThis.addEventListener === 'function' ? globalThis : null;
   const [dragPreview, setDragPreview] = useState<{
     taskId: string;
     kind: 'move' | 'resize' | 'lane';
@@ -161,33 +174,123 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
   useEffect(() => {
     measureRegion();
   });
+  useEffect(() => () => {
+    webDragCleanup.current?.();
+    webDragCleanup.current = null;
+  }, []);
   const schedule = (taskId: string, change: TimelineScheduleChange): void => {
     onScheduleTask?.(taskId, change);
   };
 
-  /** 泳道条目的拖拽属性（拖上轴 = 排期，ADR-0043 §5 手势 1）。 */
+  /** Keep a web pointer stream alive after RNW Pressable leaves its hit rect. */
+  const bindPointerStream = (
+    move: (pageX: number, pageY: number) => void,
+    finish: () => void,
+    cancel: () => void,
+    pointerId?: number,
+  ): void => {
+    if (pointerTarget === null) return;
+    webDragCleanup.current?.();
+    const ownsPointer = (event: PointerEvent): boolean =>
+      pointerId === undefined || event.pointerId === pointerId;
+    const onMove = (event: PointerEvent): void => {
+      if (ownsPointer(event)) move(event.pageX, event.pageY);
+    };
+    const cleanup = (): void => {
+      pointerTarget.removeEventListener('pointermove', onMove);
+      pointerTarget.removeEventListener('pointerup', onUp);
+      pointerTarget.removeEventListener('pointercancel', onCancel);
+      pointerTarget.removeEventListener('blur', onBlur);
+      if (webDragCleanup.current === cleanup) webDragCleanup.current = null;
+    };
+    const onUp = (event: PointerEvent): void => {
+      if (!ownsPointer(event)) return;
+      move(event.pageX, event.pageY);
+      finish();
+      cleanup();
+    };
+    const onCancel = (event: PointerEvent): void => {
+      if (!ownsPointer(event)) return;
+      cancel();
+      cleanup();
+    };
+    const onBlur = (): void => {
+      cancel();
+      cleanup();
+    };
+    pointerTarget.addEventListener('pointermove', onMove);
+    pointerTarget.addEventListener('pointerup', onUp);
+    pointerTarget.addEventListener('pointercancel', onCancel);
+    pointerTarget.addEventListener('blur', onBlur);
+    webDragCleanup.current = cleanup;
+  };
+
+  /**
+   * 泳道条目的拖拽属性（拖上轴 = 排期，ADR-0043 §5 手势 1）。
+   *
+   * RNW's Pressable owns the responder and fires `onPressOut` when the pointer
+   * leaves its retention rectangle. A document-level pointer stream keeps the
+   * drag alive after that boundary; native hosts fall back to the press stream.
+   */
   const laneResponderProps = (row: TimelineBoardRow) => ({
-    onStartShouldSetResponder: (): boolean => {
-      dragRef.current = { taskId: row.taskId, kind: 'lane' as const, grantX: 0, aiMinutes: row.aiMinutes };
+    onPressIn: (e: { nativeEvent: { pageX: number; pageY: number; pointerId?: number } }): void => {
+      // Keyboard activation has no page coordinate; it must remain a click,
+      // never start a phantom global drag session.
+      if (!Number.isFinite(e.nativeEvent.pageX) || !Number.isFinite(e.nativeEvent.pageY)) return;
+      dragRef.current = { taskId: row.taskId, kind: 'lane' as const, grantX: e.nativeEvent.pageX, grantY: e.nativeEvent.pageY, aiMinutes: row.aiMinutes, pointerId: e.nativeEvent.pointerId };
+      dragConsumedPress.current = false;
       measureRegion();
-      return true;
+      bindPointerStream(
+        (pageX, pageY) => {
+          const d = dragRef.current;
+          if (d === null || d.kind !== 'lane' || d.taskId !== row.taskId) return;
+          d.x = pageX;
+          const dy = d.grantY === undefined ? 0 : pageY - d.grantY;
+          if (Math.hypot(pageX - d.grantX, dy) < dragThreshold) return;
+          d.moved = true;
+          setDragPreview({ taskId: row.taskId, kind: 'lane', dx: 0, x: d.x });
+        },
+        () => {
+          const d = dragRef.current;
+          if (d === null || d.kind !== 'lane' || d.taskId !== row.taskId) return;
+          const abs = regionAbs.current;
+          dragConsumedPress.current = d?.moved === true;
+          if (d?.moved === true && abs !== null && abs.width > 0 && d.x !== undefined) {
+            const atMs = msAtRegionX(d.x - abs.pageX, abs.width, timelineWindow);
+            schedule(row.taskId, {
+              startDate: atMs,
+              ...(row.aiMinutes !== undefined ? { durationMinutes: row.aiMinutes } : {}),
+            });
+          }
+          dragRef.current = null;
+          setDragPreview(null);
+        },
+        () => {
+          if (dragRef.current?.kind !== 'lane' || dragRef.current.taskId !== row.taskId) return;
+          dragConsumedPress.current = true;
+          dragRef.current = null;
+          setDragPreview(null);
+        },
+        e.nativeEvent.pointerId,
+      );
     },
-    // 🔴 **拒绝终止请求**：拖拽路径会扫过滚动态的祖先，它们在 move 时会来抢
-    // responder（实测：一抢 release 就永远不来，拖拽静默作废）。拒绝它 =
-    // 拖拽期间祖先不许滚动 —— 这正是排期拖拽想要的语义。
-    onResponderTerminationRequest: (): boolean => false,
-    onResponderMove: (e: { nativeEvent: { pageX: number } }): void => {
+    onPressMove: (e: { nativeEvent: { pageX: number; pageY: number } }): void => {
       const d = dragRef.current;
-      if (d === null) return;
-      if (d.grantX === 0) d.grantX = e.nativeEvent.pageX;
+      if (d === null || d.kind !== 'lane' || d.taskId !== row.taskId) return;
       d.x = e.nativeEvent.pageX;
+      const dy = d.grantY === undefined ? 0 : e.nativeEvent.pageY - d.grantY;
+      if (Math.hypot(e.nativeEvent.pageX - d.grantX, dy) < dragThreshold) return;
+      d.moved = true;
       setDragPreview({ taskId: row.taskId, kind: 'lane' as const, dx: 0, x: d.x });
     },
-    onResponderRelease: (): void => {
+    onPressOut: (): void => {
+      if (webDragCleanup.current !== null) return;
       const d = dragRef.current;
+      if (d !== null && (d.kind !== 'lane' || d.taskId !== row.taskId)) return;
       const abs = regionAbs.current;
-      if (d !== null && abs !== null && d.x !== undefined) {
-        const atMs = msAtRegionX(d.x - abs.pageX, abs.width, window);
+      dragConsumedPress.current = d?.moved === true;
+      if (d?.moved === true && abs !== null && abs.width > 0 && d.x !== undefined) {
+        const atMs = msAtRegionX(d.x - abs.pageX, abs.width, timelineWindow);
         schedule(row.taskId, {
           startDate: atMs,
           // 初始长度取估时（ADR-0043 §5）；没有估时就不点名时长 ——
@@ -198,15 +301,20 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
       dragRef.current = null;
       setDragPreview(null);
     },
+    onPress: (): void => {
+      const consumed = dragConsumedPress.current || dragRef.current?.moved === true;
+      dragConsumedPress.current = false;
+      if (!consumed) onOpenTask?.(row.taskId);
+    },
   });
 
   /** 条的移动拖拽（手势 2：拖整条 = 平移起点；时长不动）。 */
   const barResponderProps = (taskId: string, startMs: number, endMs: number) => ({
-    onStartShouldSetResponder: (): boolean => {
+    onStartShouldSetResponder: (e: { nativeEvent: { pageX: number } }): boolean => {
       dragRef.current = {
         taskId,
         kind: 'move' as const,
-        grantX: 0,
+        grantX: e.nativeEvent.pageX,
         origStartMs: startMs,
         origMinutes: (endMs - startMs) / 60_000,
       };
@@ -215,19 +323,26 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
     },
     // 🔴 同泳道：拒绝滚动态祖先的抢占，否则 release 永远不来。
     onResponderTerminationRequest: (): boolean => false,
+    onResponderTerminate: (): void => {
+      if (dragRef.current?.kind !== 'move' || dragRef.current.taskId !== taskId) return;
+      dragRef.current = null;
+      setDragPreview(null);
+    },
     onResponderMove: (e: { nativeEvent: { pageX: number } }): void => {
       const d = dragRef.current;
       if (d === null) return;
-      if (d.grantX === 0) d.grantX = e.nativeEvent.pageX;
-      setDragPreview({ taskId, kind: 'move' as const, dx: e.nativeEvent.pageX - d.grantX });
+      const dx = e.nativeEvent.pageX - d.grantX;
+      d.x = e.nativeEvent.pageX;
+      if (Math.abs(dx) < dragThreshold) return;
+      d.moved = true;
+      setDragPreview({ taskId, kind: 'move' as const, dx });
     },
     onResponderRelease: (): void => {
       const d = dragRef.current;
-      if (d !== null && d.origStartMs !== undefined) {
-        const dx =
-          d.taskId === taskId && dragPreview !== null && dragPreview.kind === 'move'
-            ? dragPreview.dx
-            : 0;
+      if (d !== null && !d.moved) {
+        onOpenTask?.(taskId);
+      } else if (d !== null && d.origStartMs !== undefined) {
+        const dx = d.x === undefined ? 0 : d.x - d.grantX;
         schedule(taskId, { startDate: moveStartMs(d.origStartMs, dx, pxPerMs) });
       }
       dragRef.current = null;
@@ -237,27 +352,66 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
 
   /** 右缘手柄的拖拽（手势 3：拖边 = 改时长；起点不动）。 */
   const resizeResponderProps = (taskId: string, origMinutes: number) => ({
-    onStartShouldSetResponder: (): boolean => {
-      dragRef.current = { taskId, kind: 'resize' as const, grantX: 0, origMinutes };
+    onPressIn: (e: { nativeEvent: { pageX: number; pageY: number; pointerId?: number } }): void => {
+      if (!Number.isFinite(e.nativeEvent.pageX) || !Number.isFinite(e.nativeEvent.pageY)) return;
+      dragRef.current = { taskId, kind: 'resize' as const, grantX: e.nativeEvent.pageX, grantY: e.nativeEvent.pageY, origMinutes, pointerId: e.nativeEvent.pointerId };
+      dragConsumedPress.current = false;
       measureRegion();
-      return true;
+      bindPointerStream(
+        (pageX) => {
+          const d = dragRef.current;
+          if (d === null || d.kind !== 'resize' || d.taskId !== taskId) return;
+          const dx = pageX - d.grantX;
+          d.x = pageX;
+          if (Math.abs(dx) < dragThreshold) return;
+          d.moved = true;
+          setDragPreview({ taskId, kind: 'resize', dx });
+        },
+        () => {
+          const d = dragRef.current;
+          if (d === null || d.kind !== 'resize' || d.taskId !== taskId) return;
+          dragConsumedPress.current = d?.moved === true;
+          if (d?.moved === true && d.origMinutes !== undefined && pxPerMs > 0) {
+            const dx = d.x === undefined ? 0 : d.x - d.grantX;
+            schedule(taskId, { durationMinutes: resizeMinutes(d.origMinutes, dx, pxPerMs) });
+          }
+          dragRef.current = null;
+          setDragPreview(null);
+        },
+        () => {
+          if (dragRef.current?.kind !== 'resize' || dragRef.current.taskId !== taskId) return;
+          dragConsumedPress.current = true;
+          dragRef.current = null;
+          setDragPreview(null);
+        },
+        e.nativeEvent.pointerId,
+      );
     },
-    // 🔴 同泳道：拒绝滚动态祖先的抢占。
-    onResponderTerminationRequest: (): boolean => false,
-    onResponderMove: (e: { nativeEvent: { pageX: number } }): void => {
+    onPressMove: (e: { nativeEvent: { pageX: number } }): void => {
       const d = dragRef.current;
-      if (d === null) return;
-      if (d.grantX === 0) d.grantX = e.nativeEvent.pageX;
-      setDragPreview({ taskId, kind: 'resize' as const, dx: e.nativeEvent.pageX - d.grantX });
+      if (d === null || d.kind !== 'resize' || d.taskId !== taskId) return;
+      const dx = e.nativeEvent.pageX - d.grantX;
+      d.x = e.nativeEvent.pageX;
+      if (Math.abs(dx) < dragThreshold) return;
+      d.moved = true;
+      setDragPreview({ taskId, kind: 'resize' as const, dx });
     },
-    onResponderRelease: (): void => {
+    onPressOut: (): void => {
+      if (webDragCleanup.current !== null) return;
       const d = dragRef.current;
-      if (d !== null && d.origMinutes !== undefined) {
-        const dx = dragPreview !== null && dragPreview.kind === 'resize' ? dragPreview.dx : 0;
+      if (d !== null && (d.kind !== 'resize' || d.taskId !== taskId)) return;
+      dragConsumedPress.current = d?.moved === true;
+      if (d?.moved === true && d.origMinutes !== undefined && pxPerMs > 0) {
+        const dx = d.x === undefined ? 0 : d.x - d.grantX;
         schedule(taskId, { durationMinutes: resizeMinutes(d.origMinutes, dx, pxPerMs) });
       }
       dragRef.current = null;
       setDragPreview(null);
+    },
+    onPress: (): void => {
+      const consumed = dragConsumedPress.current || dragRef.current?.moved === true;
+      dragConsumedPress.current = false;
+      if (!consumed) onOpenTask?.(taskId);
     },
   });
 
@@ -267,11 +421,17 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
         root: { gap: tokens['space.4'] },
         axisRow: { flexDirection: 'row', alignItems: 'flex-end' },
         headerCol: { width: pct(BOARD_HEADER_PERCENT) },
-        axis: { flex: 1, position: 'relative', height: tokens['space.4'] },
+        createTaskButton: {
+          minHeight: tokens['touch-target.min'],
+          justifyContent: 'center',
+          alignItems: 'flex-start',
+          paddingRight: tokens['space.2'],
+        },
+        axis: { flex: 1, position: 'relative', height: tokens['space.6'] },
         tick: {
           position: 'absolute',
           top: 0,
-          bottom: 0,
+          bottom: tokens['space.2'],
           justifyContent: 'center',
           width: AXIS_LABEL_WIDTH,
         },
@@ -282,8 +442,8 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
         tickToday: { color: tokens['color.primary'] },
         todayTick: {
           position: 'absolute',
-          top: 0,
           bottom: 0,
+          height: tokens['space.1'],
           width: tokens['border-width.thick'],
           backgroundColor: tokens['color.warning'],
         },
@@ -333,6 +493,7 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
           // 裁掉它就是又一次"界面在说谎"。行头列在左边，探出只会进入留白。
           overflow: 'visible',
         },
+        trackContainer: { flex: 1, position: 'relative' },
         point: {
           position: 'absolute',
           width: tokens['space.3'],
@@ -392,7 +553,7 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
     [tokens],
   );
 
-  // ── 空态：一句人话（锚点 testID 不能丢，e2e 白屏检测挂在它上面） ──────
+  // ── 空态：标题 + 下一步提示（锚点 testID 不能丢，e2e 白屏检测挂在它上面） ──
   if (rows.length === 0) {
     return (
       <View
@@ -401,25 +562,31 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
         aria-label={labels.ariaEmpty}
         style={styles.root}
       >
-        <EmptyState title={labels.empty} testID="timeline-view-empty" />
+        <EmptyState
+          illustration="calendar"
+          title={labels.empty}
+          hint={labels.emptyHint}
+          testID="timeline-view-empty"
+        />
       </View>
     );
   }
 
   const safeToday: LocalDate = safeLocalDate(today) ?? toLocalDate(clock);
-  const window = boardWindow(safeToday, rows);
+  const timelineWindow = boardWindow(safeToday, rows);
   const pxPerMs =
     regionAbs.current !== null
-      ? (regionAbs.current.width * TRACK_FRACTION) / (window.endMs - window.startMs)
+      ? (regionAbs.current.width * TRACK_FRACTION) / (timelineWindow.endMs - timelineWindow.startMs)
       : 0;
-  const allTicks = axisTicksForWindow(window, safeToday);
+  const allTicks = axisTicksForWindow(timelineWindow, safeToday);
   // 🔴 紧凑档（窄屏）：刻度密度减半 —— 实测 411dp 的轨道放不下 7 个日期标签，
   // 相邻标签两两重叠成"09-2829"（2026-10-02 移动端截图人眼抓到）。
   // 今天的刻度**永远保留**（隔位过滤时不被跳掉）；定位是百分比，过滤不影响坐标。
-  const ticks = compactTicks
+  const candidateTicks = compactTicks
     ? allTicks.filter((tick, index) => index % 2 === 0 || tick.isToday)
     : allTicks;
-  const todayPct = todayPercent(window, clock);
+  const ticks = fitBoardTicks(candidateTicks, timelineWindow, axisWidth, AXIS_LABEL_WIDTH);
+  const todayPct = todayPercent(timelineWindow, clock);
 
   const scheduled = sortRowsForBoard(
     rows.filter((row) => row.position.kind !== 'unscheduled'),
@@ -442,9 +609,24 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
     >
       {/* ── 轴：整视图只有这一根，也是「点空白建任务」的点击面 ─────────── */}
       <View style={styles.axisRow}>
-        <View style={styles.headerCol} />
+        <View style={styles.headerCol}>
+          {onCreateAt === undefined ? null : (
+            <Pressable
+              testID="timeline-create-task"
+              style={styles.createTaskButton}
+              accessibilityRole="button"
+              accessibilityLabel={labels.createAt ?? labels.untitledTask}
+              onPress={() => onCreateAt(clock)}
+            >
+              <Text style={[text['row-meta'], { color: tokens['color.primary'] }]}>
+                {labels.createAt ?? labels.untitledTask}
+              </Text>
+            </Pressable>
+          )}
+        </View>
         <View
           testID="timeline-axis"
+          onLayout={(event) => setAxisWidth(event.nativeEvent.layout.width)}
           style={[styles.axis, onScheduleTask !== undefined ? styles.axisClickable : undefined]}
           aria-hidden
           {...(onCreateAt === undefined
@@ -452,24 +634,25 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
             : {
                 onStartShouldSetResponder: (): boolean => {
                   axisMoved.current = false;
+                  axisStartX.current = null;
                   measureRegion();
                   return true;
                 },
-                onResponderMove: (): void => {
-                  axisMoved.current = true;
+                onResponderMove: (e: { nativeEvent: { pageX: number } }): void => {
+                  axisStartX.current ??= e.nativeEvent.pageX;
+                  axisMoved.current = Math.abs(e.nativeEvent.pageX - axisStartX.current) >= dragThreshold;
                 },
                 onResponderRelease: (e: { nativeEvent: { pageX: number } }): void => {
                   // 🔴 移动过 = 别的手势扫过轴（比如条被拖出窗口），不是「点空白」。
                   if (axisMoved.current) return;
                   const abs = regionAbs.current;
                   if (abs === null || abs.width <= 0) return;
-                  onCreateAt(msAtRegionX(e.nativeEvent.pageX - abs.pageX, abs.width, window));
+                  onCreateAt(msAtRegionX(e.nativeEvent.pageX - abs.pageX, abs.width, timelineWindow));
+                  axisStartX.current = null;
                 },
               })}
         >
-          {ticks.map((tick) => {
-            const isFirst = tick === ticks[0];
-            const isLast = tick === ticks[ticks.length - 1];
+          {ticks.map(({ tick, left }) => {
             return (
               <View
                 key={tick.atMs}
@@ -477,13 +660,8 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
                 style={[
                   styles.tick,
                   {
-                    left: pct(percentAt(tick.atMs, window)),
-                    marginLeft: isFirst
-                      ? 0
-                      : isLast
-                        ? -AXIS_LABEL_WIDTH
-                        : -AXIS_LABEL_WIDTH / 2,
-                    alignItems: isFirst ? 'flex-start' : isLast ? 'flex-end' : 'center',
+                    left,
+                    alignItems: 'center',
                   },
                 ]}
               >
@@ -513,10 +691,10 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
           const overdue = isOverdue(position, clock);
           const rowSelected = activeTaskId === row.taskId;
           const whenColor = overdue
-            ? tokens['color.warning']
+            ? tokens['color.warning-strong']
             : tokens['color.foreground-subtle'];
           return (
-            <Pressable
+            <View
               key={row.taskId}
               testID={`timeline-row-${row.taskId}`}
               role="listitem"
@@ -525,11 +703,14 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
               //   "现在右边显示的就是这一行"这件事，此前只有像素在说。
               aria-pressed={rowSelected}
               style={rowSelected ? [styles.row, styles.rowActive] : styles.row}
-              onPress={onOpenTask === undefined ? undefined : () => onOpenTask(row.taskId)}
-              accessibilityRole={onOpenTask === undefined ? undefined : 'button'}
             >
               {/* 行头：标题 + 截止文字（只来自 dueDate）+ 逾期/估时 badge */}
-              <View style={styles.rowHead}>
+              <Pressable
+                testID={`timeline-open-task-${row.taskId}`}
+                style={styles.rowHead}
+                onPress={onOpenTask === undefined ? undefined : () => onOpenTask(row.taskId)}
+                accessibilityRole={onOpenTask === undefined ? undefined : 'button'}
+              >
                 <Text
                   testID={`timeline-task-title-${row.taskId}`}
                   numberOfLines={1}
@@ -549,7 +730,7 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
                   {overdue && (
                     <Text
                       testID={`timeline-overdue-${row.taskId}`}
-                      style={[text.caption, { color: tokens['color.warning'] }]}
+                      style={[text.caption, { color: tokens['color.warning-strong'] }]}
                     >
                       {labels.overdue}
                     </Text>
@@ -563,9 +744,10 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
                     </Text>
                   )}
                 </View>
-              </View>
+              </Pressable>
 
               {/* 轨道：菱形/条是装饰（aria-hidden），信息在行头文字里 */}
+              <View style={styles.trackContainer}>
               <View style={styles.track} aria-hidden>
                 {position.kind === 'point' && marker !== undefined && (
                   <View
@@ -574,7 +756,7 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
                       styles.point,
                       overdue ? styles.pointOverdue : undefined,
                       {
-                        left: pct(percentAt(marker, window)),
+                        left: pct(percentAt(marker, timelineWindow)),
                         marginLeft: -(tokens['space.3'] / 2),
                         top: (tokens['space.6'] - tokens['space.3']) / 2,
                       },
@@ -614,8 +796,8 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
                       style={[
                         styles.rangeBar,
                         {
-                          left: pct(percentAt(startMs, window)),
-                          width: pct(Math.max(0, percentAt(endMs, window) - percentAt(startMs, window))),
+                          left: pct(percentAt(startMs, timelineWindow)),
+                          width: pct(Math.max(0, percentAt(endMs, timelineWindow) - percentAt(startMs, timelineWindow))),
                           ...(isDraggingThis ? styles.resizeStripe : {}),
                         },
                       ]}
@@ -625,28 +807,30 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
                     />
                   );
                 })()}
+
+              </View>
                 {position.kind === 'range' && onScheduleTask !== undefined && (
-                  <View
+                  <Pressable
                     testID={`timeline-resize-${row.taskId}`}
+                    accessibilityRole={onOpenTask === undefined ? undefined : 'button'}
+                    accessibilityLabel={labels.editSchedule?.(row.title) ?? row.title}
                     style={[
                       styles.resizeHit,
                       {
-                        left: pct(percentAt(position.endMs, window)),
+                        left: pct(percentAt(position.endMs, timelineWindow)),
                         marginLeft: -(Number(tokens['space.6']) / 2),
                       },
                     ]}
-                    {...(onScheduleTask === undefined
-                      ? {}
-                      : resizeResponderProps(
-                          row.taskId,
-                          (position.endMs - position.startMs) / 60_000,
-                        ))}
+                    {...resizeResponderProps(
+                      row.taskId,
+                      (position.endMs - position.startMs) / 60_000,
+                    )}
                   >
                     <View style={styles.resizeStripe} />
-                  </View>
+                  </Pressable>
                 )}
               </View>
-            </Pressable>
+            </View>
           );
         })}
         {todayLinePct !== undefined && (
@@ -662,8 +846,8 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
           regionAbs.current !== null &&
           onScheduleTask !== undefined &&
           (() => {
-            const atMs = msAtRegionX(dragPreview.x - regionAbs.current.pageX, regionAbs.current.width, window);
-            const p = percentAt(atMs, window);
+            const atMs = msAtRegionX(dragPreview.x - regionAbs.current.pageX, regionAbs.current.width, timelineWindow);
+            const p = percentAt(atMs, timelineWindow);
             return (
               <View
                 testID="timeline-drop-line"
@@ -698,9 +882,10 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
               style={
                 rowSelected ? [styles.laneItem, styles.rowActive] : styles.laneItem
               }
-              onPress={onOpenTask === undefined ? undefined : () => onOpenTask(row.taskId)}
               accessibilityRole={onOpenTask === undefined ? undefined : 'button'}
-              {...(onScheduleTask === undefined ? {} : laneResponderProps(row))}
+              {...(onScheduleTask === undefined
+                ? { onPress: onOpenTask === undefined ? undefined : () => onOpenTask(row.taskId) }
+                : laneResponderProps(row))}
             >
               <Text
                 testID={`timeline-lane-title-${row.taskId}`}

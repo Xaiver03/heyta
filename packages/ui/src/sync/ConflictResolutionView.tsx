@@ -202,7 +202,6 @@ function makeStyles(tokens: ReturnType<typeof useHeytaTokens>) {
       minWidth: 0,
       gap: tokens['space.3'],
       padding: tokens['space.3'],
-      borderWidth: tokens['border-width.thin'],
       borderRadius: tokens['radius.md'],
       backgroundColor: tokens['color.surface'],
     },
@@ -232,7 +231,6 @@ function makeStyles(tokens: ReturnType<typeof useHeytaTokens>) {
       minHeight: tokens['touch-target.min'],
       paddingHorizontal: tokens['space.4'],
       borderRadius: tokens['radius.md'],
-      borderWidth: tokens['border-width.thin'],
       /** 撑到底部，两侧的按钮对齐（内容长短不一时尤其明显）。 */
       marginTop: 'auto',
     },
@@ -378,9 +376,9 @@ function ConflictSidePanel<T extends ConflictLike>({
       testID={`conflict-side-${side}`}
       style={[
         styles.side,
-        // 较新的一侧用主色描边做视觉强调 —— 这只是帮用户建立直觉，
+        // 较新的一侧用浅色底做视觉强调 —— 这只是帮用户建立直觉，
         // **不是裁决依据**（判定见 sync-client 的 compareConflictFreshness）。
-        { borderColor: preferred ? tokens['color.primary'] : tokens['color.border'] },
+        preferred ? { backgroundColor: tokens['color.primary-subtle'] } : null,
       ]}
     >
       <View style={styles.sideHead}>
@@ -480,11 +478,9 @@ function DefaultKeepButton({
         info.preferred
           ? {
               backgroundColor: tokens['color.primary'],
-              borderColor: tokens['color.primary'],
             }
           : {
               backgroundColor: 'transparent',
-              borderColor: tokens['color.border'],
             },
         pressed && !disabled ? { opacity: tokens['state.pressed-opacity'] } : null,
         disabled ? { opacity: tokens['state.disabled-opacity'] } : null,

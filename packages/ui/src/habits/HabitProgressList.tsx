@@ -52,22 +52,11 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { HeytaNativeTokens } from '@heyta/design-system';
 import type { Habit, HabitIcon, HabitLog } from '@heyta/domain';
 import { habitIconOf, parseCategorySlot } from '@heyta/domain';
-import {
-  Activity,
-  BookOpen,
-  Check,
-  Droplet,
-  Flame,
-  Leaf,
-  Moon,
-  Music,
-  Pencil,
-  Sun,
-  TrendingUp,
-} from 'lucide';
+import { Check, Flame, TrendingUp } from 'lucide';
 import { categorySlotToken } from '../categories/model.js';
-import { HeytaIcon, type HeytaIconData } from '../icon/Icon.js';
+import { HeytaIcon } from '../icon/Icon.js';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
+import { HabitArtwork } from './HabitArtwork.js';
 import {
   HABIT_LIST_WEEK_DAYS,
   heatmapLevelToken,
@@ -88,17 +77,6 @@ import {
  *    而它坏的时候的症状是"手机上水滴、web 上月亮"，两边都不报错
  *    （现有判据 `apps/web/tests/habits-list-pane.spec.tsx` F 组只对着**清单**比那两张）。
  */
-export const HABIT_GLYPHS: Record<HabitIcon, HeytaIconData> = {
-  drop: Droplet,
-  activity: Activity,
-  book: BookOpen,
-  moon: Moon,
-  leaf: Leaf,
-  pencil: Pencil,
-  sun: Sun,
-  music: Music,
-};
-
 /**
  * 闭集 key → **名称词条 key**（工单 H3 起也从这里导出）。
  *
@@ -127,6 +105,22 @@ export const HABIT_ICON_LABEL_KEYS = {
   pencil: 'web.habits.icon.pencil',
   sun: 'web.habits.icon.sun',
   music: 'web.habits.icon.music',
+  heart: 'web.habits.icon.heart',
+  strength: 'web.habits.icon.strength',
+  meditation: 'web.habits.icon.meditation',
+  tea: 'web.habits.icon.tea',
+  fruit: 'web.habits.icon.fruit',
+  cycling: 'web.habits.icon.cycling',
+  camera: 'web.habits.icon.camera',
+  art: 'web.habits.icon.art',
+  code: 'web.habits.icon.code',
+  dental: 'web.habits.icon.dental',
+  pet: 'web.habits.icon.pet',
+  savings: 'web.habits.icon.savings',
+  home: 'web.habits.icon.home',
+  language: 'web.habits.icon.language',
+  journal: 'web.habits.icon.journal',
+  walking: 'web.habits.icon.walking',
 } as const satisfies Record<HabitIcon, string>;
 
 /** {@link HABIT_ICON_LABEL_KEYS} 的值类型（宿主 `t()` 的入参上界）。 */
@@ -186,13 +180,9 @@ function makeStyles(tokens: HeytaNativeTokens) {
       minHeight: tokens['touch-target.min'],
       borderRadius: tokens['radius.lg'],
       backgroundColor: tokens['color.surface'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
     },
-    /* 选中态用**边框**表达（扁平风格里阴影只给真正的浮层），再加一层极浅的
-       主色底：两种线索，色觉差异下仍分得出。与 web 的 `.ht-habit__row[aria-current]` 同一条。 */
+    /* 选中态用底色与圆角表达，避免在列表行外再套一层框。 */
     rowSelected: {
-      borderColor: tokens['color.primary'],
       backgroundColor: tokens['color.primary-subtle'],
     },
     head: {
@@ -205,7 +195,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       width: tokens['icon.lg'],
       height: tokens['icon.lg'],
       borderRadius: tokens['radius.full'],
-      borderWidth: tokens['border-width.thin'],
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -305,12 +294,8 @@ export function HabitProgressList({
             style={selected ? [styles.row, styles.rowSelected] : styles.row}
           >
             <View style={styles.head}>
-              <View style={[styles.disc, { borderColor: discColor }]}>
-                <HeytaIcon
-                  data={HABIT_GLYPHS[habitIconOf(habit)]}
-                  size={tokens['icon.sm']}
-                  color={discColor}
-                />
+              <View style={[styles.disc, { backgroundColor: discColor }]}>
+                <HabitArtwork icon={habitIconOf(habit)} size={tokens['icon.sm']} />
               </View>
               <Text style={[text['row-title'], styles.name]} numberOfLines={1}>
                 {habit.name}

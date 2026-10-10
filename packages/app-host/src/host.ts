@@ -31,7 +31,7 @@
  * ─────────────────────────────────────────────────────────────────────────
  */
 
-import { OpLogEngine, type MaterializedState, type OpIntent } from '@heyta/op-log';
+import { OpLogEngine, type MaterializedState, type OpIntent, type CheckedDispatchBuilder } from '@heyta/op-log';
 import {
   DbOpLogStore,
   INDEXEDDB_SCHEMA,
@@ -52,6 +52,7 @@ import type { VaultKeyMigrationResponse } from '@heyta/shared-schema';
 import { randomId } from './ids.js';
 import { hasLocalEraser, registerLocalEraser } from './local-erasure.js';
 import { createSyncClient } from './sync-wiring.js';
+import type { SyncClientOptions } from '@heyta/sync-client';
 import {
   createVaultKeyMigrationRemote,
   createVaultMigrationInventorySource,
@@ -70,6 +71,33 @@ import {
 import type { PendingVaultCreation } from './vault-session.js';
 import { createVaultKeyPackageStore } from './vault-key-package-store.js';
 import type { VaultKeyPackageScope } from './vault-key-package-store.js';
+import type { AiRoutingConfig, EgressConsent, SecretStore } from '@heyta/ai';
+import { generateInboundKeyPair, inboundPublicKey, type InboundAutomationField } from '@heyta/inbound-core';
+import {
+  createInboundRecipientKeyStore,
+  type InboundRecipientKeyScope,
+} from './inbound-key-store.js';
+import {
+  createInboundCommitJournal,
+  createVaultWrappedAutomationWorkerStore,
+} from './inbound-secret-store.js';
+import {
+  processInboundAutomationEvent,
+  type ProcessInboundAutomationOptions,
+} from './inbound-process.js';
+import {
+  registerAutomationWorker,
+  createInboundUploadAuthorization,
+  type AutomationWorkerCredential,
+} from './inbound-worker.js';
+import {
+  createInboundRecipientRemote,
+  InboundRecipientRemoteError,
+  type InboundRecipientRegistration,
+} from './inbound-recipient-remote.js';
+
+/** Stable account binding used in inbound envelope AAD; vault account ids stay numeric. */
+const inboundAccountId = (value: string): string => /^\d+$/.test(value) ? `user-${value}` : value;
 
 /**
  * 一次同步所需的全部凭据。
@@ -168,6 +196,26 @@ export interface AppHostOptions {
    * 销毁抛错时不调（那份库还在，宿主不该假装清过）。
    */
   onLocalDataErased?: () => void;
+  /** Platform secret/journal bridge for inbound automation uploads. */
+  getInboundUploadAuthorization?: SyncClientOptions['getInboundUploadAuthorization'];
+}
+
+/** Configuration for one host-owned inbound automation cycle. */
+export interface InboundAutomationHostOptions {
+  userId: string;
+  keyEpoch: number;
+  allowedFields: readonly InboundAutomationField[];
+  targetProjectId?: string;
+  maxItems?: number;
+  routing: AiRoutingConfig;
+  secretStore?: SecretStore;
+  consents: readonly EgressConsent[];
+  systemPrompt: string;
+  parseVersion: number;
+  timezone?: string;
+  eventId?: string;
+  /** A private key supplied by the host's secure-store bridge. */
+  privateKey?: Uint8Array;
 }
 
 export interface AppHost {
@@ -209,6 +257,7 @@ export interface AppHost {
    * 任何宿主都不得绕过它直接改状态。
    */
   dispatch(intent: OpIntent): Promise<void>;
+  dispatchChecked<T>(build: CheckedDispatchBuilder<T>): Promise<T>;
 
   /**
    * 与真实服务端完整同步一次。
@@ -231,6 +280,21 @@ export interface AppHost {
 
   /** 待上传队列长度（离线队列是否清空，同步后应该为 0）。 */
   pendingUploadCount(): Promise<number>;
+
+  /** Register a durable inbound worker bound to this account/device. */
+  registerInboundWorker(input: { userId: string; databaseEpoch: string }): Promise<AutomationWorkerCredential>;
+  /** Persist the X25519 recipient key under the current Vault root. */
+  saveInboundRecipientKey(key: InboundRecipientKeyScope, privateKey: Uint8Array): Promise<void>;
+  /** Load a recipient key only while the Vault is unlocked. */
+  loadInboundRecipientKey(key: InboundRecipientKeyScope): Promise<Uint8Array | undefined>;
+  /** Read the authenticated public registration; no private key is returned. */
+  getInboundRecipientRegistration(): Promise<InboundRecipientRegistration | undefined>;
+  /** Create the first recipient epoch, refusing to overwrite an existing remote key. */
+  ensureInboundRecipientKey(): Promise<InboundRecipientRegistration>;
+  /** Rotate the recipient epoch with a package-version CAS, retaining old epochs for queued events. */
+  rotateInboundRecipientKey(): Promise<InboundRecipientRegistration>;
+  /** Claim and process at most one inbound event using the shared protocol. */
+  processInboundAutomation(options: InboundAutomationHostOptions): Promise<Awaited<ReturnType<typeof processInboundAutomationEvent>>>;
 
   /**
    * 读**完整** op-log（导出/备份用），按本地 `seq` 升序。
@@ -504,6 +568,20 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
     });
   };
 
+  // Inbound worker secrets and the commit journal share the same durable meta
+  // store as the op-log. Tokens/private keys are only persisted wrapped by the
+  // live Vault root; a locked Vault therefore fails closed.
+  const inboundWorkerSecrets = createVaultWrappedAutomationWorkerStore(adapter, async () => {
+    try {
+      const session = await readVaultSession();
+      if (session?.state !== 'unlocked') return undefined;
+      const root = session.copyUnlockedRootKey();
+      try { return root; } catch { root.fill(0); return undefined; }
+    } catch { return undefined; }
+  });
+  const inboundCommitJournal = createInboundCommitJournal(adapter);
+  const inboundRecipientKeys = createInboundRecipientKeyStore(adapter);
+
   /**
    * 构造一个**当前配置下**的同步客户端。
    *
@@ -533,6 +611,9 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
           await engine.applyRemote(ops);
         },
         ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
+        getInboundUploadAuthorization: options.getInboundUploadAuthorization ?? createInboundUploadAuthorization({
+          userId: config.accountId, secrets: inboundWorkerSecrets, journal: inboundCommitJournal,
+        }),
       });
     }
 
@@ -548,6 +629,8 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
         await engine.applyRemote(ops);
       },
       ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
+      ...(options.getInboundUploadAuthorization !== undefined
+        ? { getInboundUploadAuthorization: options.getInboundUploadAuthorization } : {}),
     });
   };
 
@@ -604,6 +687,12 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
         if (config.token === undefined || config.token === '' || config.serverUrl.trim() === '') {
           throw new Error('Vault migration credentials are unavailable');
         }
+        const oldRoot = session.state === 'unlocked' ? session.copyUnlockedRootKey() : undefined;
+        const serverOrigin = new URL(config.serverUrl).origin;
+        const priorWorker = oldRoot === undefined || config.accountId === undefined
+          ? undefined
+          : await inboundWorkerSecrets.load({ userId: config.accountId, clientId, serverOrigin });
+        try {
         const migrationEpoch = vaultEpoch;
         const migrationToken = config.token;
         const currentPayloadKeyVersion = session.payloadKeyVersion ?? null;
@@ -643,7 +732,23 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
         // The migration journal is acknowledged only after confirmAndMigrate...
         // has atomically installed the package, payload generation, and root.
         await acknowledgeVaultPayloadMigration(vaultMigrationJournal, journalScope, published.requestId);
+        // The root rotation changes the wrapping key for local automation
+        // credentials as well. Re-wrap both durable secrets before exposing the
+        // new session to the next worker cycle; plaintext keys never leave this
+        // closure and are wiped on every path.
+        if (oldRoot !== undefined) {
+          const newRoot = session.copyUnlockedRootKey();
+          try {
+            if (inboundWorkerSecrets.rewrap !== undefined && config.accountId !== undefined) {
+              await inboundWorkerSecrets.rewrap({ userId: config.accountId, clientId, serverOrigin }, oldRoot, newRoot);
+            } else if (priorWorker !== undefined) {
+              await inboundWorkerSecrets.save(priorWorker);
+            }
+            await inboundRecipientKeys.rewrap(oldRoot, newRoot, { ...session.scope, accountId: inboundAccountId(session.scope.accountId) });
+          } finally { newRoot.fill(0); }
+        }
         return published;
+        } finally { oldRoot?.fill(0); }
       });
     },
 
@@ -667,6 +772,10 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
 
     async dispatch(intent: OpIntent): Promise<void> {
       await engine.dispatch(intent);
+    },
+
+    dispatchChecked<T>(build: CheckedDispatchBuilder<T>): Promise<T> {
+      return engine.dispatchChecked(build);
     },
 
     getState: () => engine.getState(),
@@ -700,6 +809,260 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
       return engine.countPendingUpload();
     },
 
+    async registerInboundWorker(input): Promise<AutomationWorkerCredential> {
+      const config = readSyncConfig();
+      if (config.serverUrl.trim() === '' || config.token === undefined || config.token === '') {
+        throw new Error('Inbound automation credentials are unavailable');
+      }
+      return registerAutomationWorker({
+        baseUrl: config.serverUrl,
+        token: config.token,
+        userId: input.userId,
+        clientId,
+        databaseEpoch: input.databaseEpoch,
+        secrets: inboundWorkerSecrets,
+        ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
+      });
+    },
+
+    async saveInboundRecipientKey(key, privateKey): Promise<void> {
+      const session = await readVaultSession();
+      if (session?.state !== 'unlocked') throw new Error('Vault is locked');
+      const root = session.copyUnlockedRootKey();
+      try {
+        const scope = { ...key, accountId: inboundAccountId(key.accountId) };
+        if (scope.accountId !== inboundAccountId(session.scope.accountId) || scope.serverOrigin !== session.scope.serverOrigin) throw new Error('Inbound key scope mismatch');
+        await inboundRecipientKeys.save(scope, privateKey, root);
+      }
+      finally { root.fill(0); }
+    },
+
+    async loadInboundRecipientKey(key): Promise<Uint8Array | undefined> {
+      const session = await readVaultSession();
+      if (session?.state !== 'unlocked') return undefined;
+      const root = session.copyUnlockedRootKey();
+      try {
+        const scope = { ...key, accountId: inboundAccountId(key.accountId) };
+        if (scope.accountId !== inboundAccountId(session.scope.accountId) || scope.serverOrigin !== session.scope.serverOrigin) throw new Error('Inbound key scope mismatch');
+        return await inboundRecipientKeys.load(scope, root);
+      }
+      finally { root.fill(0); }
+    },
+
+    async getInboundRecipientRegistration(): Promise<InboundRecipientRegistration | undefined> {
+      const config = readSyncConfig();
+      if (config.serverUrl.trim() === '' || config.token === undefined || config.token === '') {
+        throw new Error('Inbound automation credentials are unavailable');
+      }
+      return createInboundRecipientRemote({
+        baseUrl: config.serverUrl, getToken: async () => config.token,
+        ...(options.fetchImpl === undefined ? {} : { fetchImpl: options.fetchImpl }),
+      }).get();
+    },
+
+    async ensureInboundRecipientKey(): Promise<InboundRecipientRegistration> {
+      return withVaultExclusive(async () => {
+        const config = readSyncConfig();
+        if (!config.accountId?.trim() || !config.serverUrl.trim() || !config.token) throw new Error('Inbound automation credentials are unavailable');
+        const session = await readVaultSession();
+        if (session?.state !== 'unlocked') throw new Error('Vault is locked');
+        const epoch = vaultEpoch;
+        const assertCurrent = (): void => {
+          const live = readSyncConfig();
+          if (epoch !== vaultEpoch || session.state !== 'unlocked' || live.accountId !== config.accountId || live.serverUrl !== config.serverUrl || live.token !== config.token) {
+            throw new Error('Inbound recipient session changed');
+          }
+        };
+        assertCurrent();
+        const remote = createInboundRecipientRemote({
+          baseUrl: config.serverUrl,
+          getToken: async () => { assertCurrent(); return config.token; },
+          ...(options.fetchImpl === undefined ? {} : { fetchImpl: options.fetchImpl }),
+        });
+        const existing = await remote.get();
+        assertCurrent();
+        const scope = { accountId: inboundAccountId(config.accountId), serverOrigin: session.scope.serverOrigin, keyEpoch: existing?.keyEpoch ?? 1 };
+        const root = session.copyUnlockedRootKey();
+        let privateKey: Uint8Array | undefined;
+        try {
+          privateKey = await inboundRecipientKeys.load(scope, root);
+          assertCurrent();
+          if (existing !== undefined) {
+            if (privateKey === undefined || inboundPublicKey(privateKey).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') !== existing.publicKey) {
+              throw new Error('Inbound recipient key recovery is required');
+            }
+            return existing;
+          }
+          // Reuse a durable candidate after a lost PUT response. Never delete
+          // its private key merely because the network outcome is unknown.
+          if (privateKey === undefined) {
+            privateKey = generateInboundKeyPair().privateKey;
+            await inboundRecipientKeys.save(scope, privateKey, root);
+            assertCurrent();
+          }
+          const candidate = { keyEpoch: 1, packageVersion: 1,
+            publicKey: inboundPublicKey(privateKey).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') };
+          try {
+            const published = await remote.put(candidate, null);
+            assertCurrent();
+            return published;
+          } catch (error) {
+            if (!(error instanceof InboundRecipientRemoteError) || error.code !== 'conflict') throw error;
+            const winner = await remote.get();
+            assertCurrent();
+            if (winner?.publicKey === candidate.publicKey && winner.keyEpoch === candidate.keyEpoch) return winner;
+            throw new Error('Inbound recipient key recovery is required');
+          }
+        } finally { privateKey?.fill(0); root.fill(0); }
+      });
+    },
+
+    async rotateInboundRecipientKey(): Promise<InboundRecipientRegistration> {
+      return withVaultExclusive(async () => {
+        const config = readSyncConfig();
+        if (!config.accountId?.trim() || !config.serverUrl.trim() || !config.token) throw new Error('Inbound automation credentials are unavailable');
+        const session = await readVaultSession();
+        if (session?.state !== 'unlocked') throw new Error('Vault is locked');
+        const epoch = vaultEpoch;
+        const assertCurrent = (): void => {
+          const live = readSyncConfig();
+          if (epoch !== vaultEpoch || session.state !== 'unlocked' || live.accountId !== config.accountId || live.serverUrl !== config.serverUrl || live.token !== config.token) {
+            throw new Error('Inbound recipient session changed');
+          }
+        };
+        assertCurrent();
+        const remote = createInboundRecipientRemote({
+          baseUrl: config.serverUrl,
+          getToken: async () => { assertCurrent(); return config.token; },
+          ...(options.fetchImpl === undefined ? {} : { fetchImpl: options.fetchImpl }),
+        });
+        const existing = await remote.get();
+        assertCurrent();
+        if (existing === undefined) throw new Error('Inbound recipient key is not registered');
+        const serverOrigin = session.scope.serverOrigin;
+        const accountId = inboundAccountId(config.accountId);
+        const root = session.copyUnlockedRootKey();
+        let currentPrivate: Uint8Array | undefined;
+        let candidatePrivate: Uint8Array | undefined;
+        try {
+          currentPrivate = await inboundRecipientKeys.load({ accountId, serverOrigin, keyEpoch: existing.keyEpoch }, root);
+          if (currentPrivate === undefined || inboundPublicKey(currentPrivate).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') !== existing.publicKey) {
+            throw new Error('Inbound recipient key recovery is required');
+          }
+          const candidateScope = { accountId, serverOrigin, keyEpoch: existing.keyEpoch + 1 };
+          candidatePrivate = await inboundRecipientKeys.load(candidateScope, root);
+          if (candidatePrivate === undefined) {
+            candidatePrivate = generateInboundKeyPair().privateKey;
+            await inboundRecipientKeys.save(candidateScope, candidatePrivate, root);
+          }
+          assertCurrent();
+          const candidate = {
+            keyEpoch: candidateScope.keyEpoch,
+            packageVersion: existing.packageVersion + 1,
+            publicKey: inboundPublicKey(candidatePrivate).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''),
+          };
+          try {
+            const published = await remote.put(candidate, existing.packageVersion);
+            assertCurrent();
+            return published;
+          } catch (error) {
+            if (!(error instanceof InboundRecipientRemoteError) || error.code !== 'conflict') throw error;
+            const winner = await remote.get();
+            assertCurrent();
+            if (winner?.keyEpoch === candidate.keyEpoch && winner.packageVersion === candidate.packageVersion && winner.publicKey === candidate.publicKey) return winner;
+            // A different device won. Keep the current epoch for queued work,
+            // but remove only this unpublishable candidate.
+            await inboundRecipientKeys.remove(candidateScope);
+            throw new Error('Inbound recipient key rotation lost a concurrent update');
+          }
+        } finally {
+          currentPrivate?.fill(0);
+          candidatePrivate?.fill(0);
+          root.fill(0);
+        }
+      });
+    },
+
+    async processInboundAutomation(inbound): Promise<Awaited<ReturnType<typeof processInboundAutomationEvent>>> {
+      const config = readSyncConfig();
+      if (config.serverUrl.trim() === '' || config.token === undefined || config.token === '') {
+        throw new Error('Inbound automation credentials are unavailable');
+      }
+      const session = await readVaultSession();
+      const epoch = vaultEpoch;
+      const assertActive = (): void => {
+        const live = readSyncConfig();
+        if (live.accountId !== inbound.userId || live.accountId !== config.accountId ||
+            live.serverUrl !== config.serverUrl || live.token !== config.token ||
+            session?.state !== 'unlocked' || vaultSession !== session || vaultEpoch !== epoch) {
+          throw new Error('Inbound processing session is no longer active');
+        }
+      };
+      assertActive();
+      const worker = await inboundWorkerSecrets.load({
+        userId: inbound.userId,
+        clientId,
+        serverOrigin: new URL(config.serverUrl).origin,
+      });
+      if (worker === undefined) throw new Error('Inbound worker is not registered or Vault is locked');
+      let privateKey = inbound.privateKey;
+      let privateKeyOwned = false;
+      if (privateKey === undefined) {
+        const session = await readVaultSession();
+        if (session?.state !== 'unlocked') throw new Error('Vault is locked');
+        const root = session.copyUnlockedRootKey();
+        try {
+          privateKey = await inboundRecipientKeys.load({
+            accountId: inboundAccountId(inbound.userId),
+            serverOrigin: new URL(config.serverUrl).origin,
+            keyEpoch: inbound.keyEpoch,
+          }, root);
+        } finally { root.fill(0); }
+        privateKeyOwned = true;
+      }
+      if (privateKey === undefined) throw new Error('Inbound recipient key is unavailable');
+      try {
+        const taskBatch = { dispatchValidated: engine.dispatchValidated.bind(engine) };
+        const loadPrivateKey = async (keyEpoch: number): Promise<Uint8Array | undefined> => {
+          const session = await readVaultSession();
+          if (session?.state !== 'unlocked') return undefined;
+          const root = session.copyUnlockedRootKey();
+          try {
+            return await inboundRecipientKeys.load({
+              accountId: inboundAccountId(inbound.userId),
+              serverOrigin: new URL(config.serverUrl).origin,
+              keyEpoch,
+            }, root);
+          } finally { root.fill(0); }
+        };
+        return await processInboundAutomationEvent({
+          assertActive,
+          baseUrl: config.serverUrl,
+          token: config.token,
+          worker,
+          journal: inboundCommitJournal,
+          privateKey,
+          accountId: inboundAccountId(inbound.userId),
+          keyEpoch: inbound.keyEpoch,
+          allowedFields: inbound.allowedFields,
+          ...(inbound.targetProjectId === undefined ? {} : { targetProjectId: inbound.targetProjectId }),
+          ...(inbound.maxItems === undefined ? {} : { maxItems: inbound.maxItems }),
+          routing: inbound.routing,
+          secretStore: inbound.secretStore,
+          consents: inbound.consents,
+          systemPrompt: inbound.systemPrompt,
+          parseVersion: inbound.parseVersion,
+          ...(inbound.timezone === undefined ? {} : { timezone: inbound.timezone }),
+          ...(inbound.eventId === undefined ? {} : { eventId: inbound.eventId }),
+          taskBatch,
+          loadPrivateKey,
+          ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
+        });
+      } finally {
+        if (privateKeyOwned) privateKey.fill(0);
+      }
+    },
+
     async readOpLog(): Promise<Operation<string>[]> {
       // `getAllOps()` 已按 seq 升序，并且是"读全库"的正式入口。
       const rows = await store.getAllOps();
@@ -707,6 +1070,8 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
     },
 
     close(): void {
+      vaultEpoch += 1;
+      vaultSession?.lock();
       adapter.close();
     },
   };

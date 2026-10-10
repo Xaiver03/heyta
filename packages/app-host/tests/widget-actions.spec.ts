@@ -30,7 +30,8 @@ import {
 } from '@heyta/widget-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createTaskActions, type TaskActions } from '../src/actions.js';
+import { createTaskActions, type ActionContext, type TaskActions } from '../src/actions.js';
+import { createReminderActions } from '../src/reminder-actions.js';
 import { drainWidgetIntents, type WidgetDrainTasks } from '../src/widget-actions.js';
 
 let adapter: SqliteAdapter;
@@ -260,6 +261,120 @@ describe('drainWidgetIntents —— 重复任务走既有语义', () => {
 
     expect(task.completedAt).toBeUndefined();
     expect(toLocalDate(task.dueDate!)).toBe('2026-09-28');
+  });
+
+  it('同一 intent 被重复 drain 也只推进一次（receipt 随 TASK op 持久化）', async () => {
+    const id = await tasks.create('每天复盘', { dueDate: localNoon('2026-09-27') });
+    await tasks.setRepeat(id, 'FREQ=DAILY');
+    const queued = queueOf(intent(id, true, 42_001));
+
+    const first = await drainWidgetIntents(queued, tasks);
+    expect(first.applied).toBe(1);
+    expect(first.remaining.intents).toEqual([]);
+    expect(first.acknowledged.intents).toEqual(queued.intents);
+    expect(toLocalDate(tasks.findTask(id)!.dueDate!)).toBe('2026-09-28');
+
+    const beforeReplayOps = await opCount(id);
+    // Recreate the action object to make the test fail if the protection is
+    // only an in-process Set or closure.
+    const restartedTasks = createTaskActions(engine, { now, newTaskId: makeId });
+    const second = await drainWidgetIntents(queued, restartedTasks);
+    expect(second.applied).toBe(0);
+    expect(second.remaining.intents).toEqual([]);
+    expect(second.acknowledged.intents).toEqual(queued.intents);
+    expect(await opCount(id)).toBe(beforeReplayOps);
+    expect(toLocalDate(restartedTasks.findTask(id)!.dueDate!)).toBe('2026-09-28');
+  });
+
+  it('任务与提醒原子写入失败时整体重试，成功只追加一枚 op', async () => {
+    const id = await tasks.create('带提醒的每日复盘', { dueDate: localNoon('2026-09-27') });
+    await tasks.setRepeat(id, 'FREQ=DAILY');
+    clock = localNoon('2026-09-20');
+    const normalReminders = createReminderActions(engine, { now });
+    const reminderId = await normalReminders.createReminderBeforeDue(id, 30 * 60 * 1000);
+    const oldTrigger = engine.getState().reminders[reminderId]!.triggerAt;
+
+    const beforeOps = await engine.getAllOps();
+    let failCompletionOnce = true;
+    const flakyContext: ActionContext = {
+      getState: () => engine.getState(),
+      dispatch: async (op) => {
+        if (
+          failCompletionOnce &&
+          op.entityType === 'TASK' &&
+          typeof op.payload === 'object' &&
+          op.payload !== null &&
+          Object.hasOwn(op.payload, 'heytaTaskRepeatCompletion')
+        ) {
+          failCompletionOnce = false;
+          throw new Error('模拟原子完成写入暂时失败');
+        }
+        return engine.dispatch(op);
+      },
+    };
+    const flakyTasks = createTaskActions(flakyContext, { now, newTaskId: makeId });
+    const queued = queueOf(intent(id, true, 42_002));
+
+    const first = await drainWidgetIntents(queued, flakyTasks);
+    expect(first.applied).toBe(0);
+    expect(first.failed).toEqual([queued.intents[0]]);
+    expect(toLocalDate(flakyTasks.findTask(id)!.dueDate!)).toBe('2026-09-27');
+    expect(flakyTasks.findTask(id)!.widgetCompletionReceipts).toBeUndefined();
+    expect(engine.getState().reminders[reminderId]!.triggerAt).toBe(oldTrigger);
+    expect(await engine.getAllOps()).toHaveLength(beforeOps.length);
+
+    const second = await drainWidgetIntents(queued, flakyTasks);
+    expect(second.applied).toBe(1);
+    expect(second.failed).toEqual([]);
+    expect(second.remaining.intents).toEqual([]);
+    expect(await engine.getAllOps()).toHaveLength(beforeOps.length + 1);
+    const completion = (await engine.getAllOps()).at(-1)!;
+    expect(completion.entityType).toBe('TASK');
+    expect(completion.entityId).toBe(id);
+    expect(completion.payload).toMatchObject({
+      heytaTaskRepeatCompletion: 1,
+      reminders: [{ id: reminderId }],
+    });
+    expect(engine.getState().reminders[reminderId]!.triggerAt).toBe(
+      flakyTasks.findTask(id)!.dueDate! - 30 * 60 * 1000,
+    );
+  });
+});
+
+describe('drainWidgetIntents —— 普通任务 receipt', () => {
+  it('任务被用户重新打开后，旧 intent 重放也不再次完成', async () => {
+    const id = await tasks.create('普通任务');
+    const queued = queueOf(intent(id, true, 42_003));
+    await drainWidgetIntents(queued, tasks);
+    await tasks.setCompleted(id, false);
+
+    const beforeReplayOps = await opCount(id);
+    const replay = await drainWidgetIntents(queued, tasks);
+    expect(replay.applied).toBe(0);
+    expect(replay.remaining.intents).toEqual([]);
+    expect(await opCount(id)).toBe(beforeReplayOps);
+    expect(tasks.findTask(id)!.completedAt).toBeUndefined();
+  });
+
+  it('取消完成 intent 的 receipt 也持久化，旧重放不会撤销后来的完成', async () => {
+    const id = await tasks.create('普通任务');
+    await tasks.setCompleted(id, true);
+    const queued = queueOf(intent(id, false, 42_004));
+
+    const first = await drainWidgetIntents(queued, tasks);
+    expect(first.applied).toBe(1);
+    expect(tasks.findTask(id)!.completedAt).toBeUndefined();
+
+    // 用户后来重新完成任务；旧的“取消完成”点击此时已经过期。
+    await tasks.setCompleted(id, true);
+    const beforeReplayOps = await opCount(id);
+    const restartedTasks = createTaskActions(engine, { now, newTaskId: makeId });
+    const replay = await drainWidgetIntents(queued, restartedTasks);
+
+    expect(replay.applied).toBe(0);
+    expect(replay.remaining.intents).toEqual([]);
+    expect(await opCount(id)).toBe(beforeReplayOps);
+    expect(restartedTasks.findTask(id)!.completedAt).toBeDefined();
   });
 });
 

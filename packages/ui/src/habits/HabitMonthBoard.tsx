@@ -111,16 +111,15 @@ export interface HabitMonthBoardProps {
   readonly testID?: string;
 }
 
-/** 一格的三个色（全部是 token 名，没有一个裸值 —— `check:design` 会拦）。 */
+/** 一格的底色与文字色（全部是 token 名，没有一个裸值 —— `check:design` 会拦）。 */
 function cellColors(
   cell: HabitMonthCell,
   tokens: HeytaNativeTokens,
-): { backgroundColor: string; color: string; borderColor: string } {
+): { backgroundColor: string; color: string } {
   if (!cell.inMonth) {
     return {
       backgroundColor: tokens['color.surface'],
       color: tokens['color.foreground-subtle'],
-      borderColor: tokens['color.border-subtle'],
     };
   }
   switch (cell.state) {
@@ -130,32 +129,27 @@ function cellColors(
       return {
         backgroundColor: tokens[HEAT_TOKENS[4]],
         color: tokens['color.on-primary'],
-        borderColor: tokens[HEAT_TOKENS[4]],
       };
     case 'today':
       return {
         backgroundColor: tokens['color.surface'],
         color: tokens['color.foreground'],
-        borderColor: tokens['color.primary'],
       };
     case 'backfillable':
       return {
         backgroundColor: tokens['color.primary-subtle'],
         color: tokens['color.foreground'],
-        borderColor: tokens['color.primary'],
       };
     case 'too-old':
     case 'future':
       return {
         backgroundColor: tokens['color.disabled-bg'],
         color: tokens['color.disabled-fg'],
-        borderColor: tokens['color.border-subtle'],
       };
     case 'not-scheduled':
       return {
         backgroundColor: tokens['color.surface'],
         color: tokens['color.foreground-muted'],
-        borderColor: tokens['color.border-subtle'],
       };
   }
 }
@@ -181,8 +175,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: tokens['radius.md'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
     },
     weekdays: {
       flexDirection: 'row',
@@ -216,10 +208,9 @@ function makeStyles(tokens: HeytaNativeTokens) {
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: tokens['radius.sm'],
-      borderWidth: tokens['border-width.thin'],
     },
     cellToday: {
-      borderWidth: tokens['border-width.thick'],
+      backgroundColor: tokens['color.primary-subtle'],
     },
     hint: {
       textAlign: 'left',
@@ -341,7 +332,7 @@ export function HabitMonthBoard({
                   testID={testID === undefined ? undefined : `${testID}-cell-${cell.date}`}
                   style={[
                     styles.cell,
-                    { backgroundColor: colors.backgroundColor, borderColor: colors.borderColor },
+                    { backgroundColor: colors.backgroundColor },
                     cell.state === 'today' ? styles.cellToday : undefined,
                   ]}
                   // web 的悬停提示走 `data-cell-title`（宿主 CSS 的 ::after 显示），

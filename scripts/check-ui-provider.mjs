@@ -358,6 +358,18 @@ const PROVIDER_DEPENDENT = [
   'useHeytaTokens',
   'useHeytaText',
   'useHeytaUiTheme',
+  /**
+   * 算法备案·法定显式标识（`packages/ui/src/ai/AiGeneratedLabel.tsx`）。
+   *
+   * 🔴 它透过 `useHeytaTokens` / `useHeytaText` 取 token，宿主把它放在
+   * `<HeytaUiProvider>` 之外会在运行时抛「useHeytaUiTheme 必须在
+   * <HeytaUiProvider> 内使用」。登记与写组件在同一次动作里发生。
+   *
+   * ⚠️ 这一处漏挂的形状比列表页更阴：**标识没了界面照样好看**，只是那句
+   * 「AI 生成合成内容」不再出现 —— 而备案材料里"已实现显式标识"那句话会
+   * 跟着变成假话。六个 AI 输出面的接线因此各自钉了 testID 判据。
+   */
+  'AiGeneratedLabel',
 ];
 const PROVIDER_DEPENDENT_SET = new Set(PROVIDER_DEPENDENT);
 

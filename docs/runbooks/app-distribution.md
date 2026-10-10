@@ -104,3 +104,59 @@ node scripts/tools/cos-api.mjs --bucket heyta-dist-1380503169 \
   （`gh release create`）此处不展开。
 - **MSIX / deb 的常规产出**：Windows 包在远端打包机、Linux 包路径见
   [`multi-platform-build.md`](multi-platform-build.md) §6，接入 upload-dist 时按实际产物路径传参即可。
+
+## 7. 2026-10-08 第一批测试（历史）
+
+发布标签 `v1.0.1-test.20261008.1`，源码快照 `0107fe15440aecf5775a71574ba973406d8b4c49`。批次号区分安装包，非强制改写各端内部版本；iOS 为 `1.0 (3)`，模拟器同源码验收包为 `1.0 (1)`。
+
+| 端 | 测试产物 | 签名/安装状态 |
+|---|---|---|
+| macOS | Apple Silicon arm64 DMG | Developer ID 签名，Apple 公证和 staple 验证通过，已安装 |
+| Windows | x64 ZIP：MSIX + CER + 中文安装说明 + 安装脚本 | 自签名；signtool 验证 0；已安装。首次需管理员信任公开证书，不包含私钥 |
+| Android | 发布签名 APK | 证书指纹与登记一致；当前源码已卸旧装新。曾装 Debug 签名版时须先导出数据再卸载旧版 |
+| Linux | amd64 DEB | 包内共享 UI 对账和解包启动通过；未做系统安装，验证机沙箱限制如实保留 |
+| iOS | TestFlight 1.0 (3) | Apple 处理 VALID，加入既有内部组；没有公开测试邀请链接 |
+
+- [GitHub 测试版与校验和](https://github.com/Xaiver03/heyta/releases/tag/v1.0.1-test.20261008.1)
+- [国内下载清单](https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/latest.json)
+- [TestFlight 管理入口（需相应账号权限）](https://appstoreconnect.apple.com/apps/6817635248/testflight/ios)
+- [本批产物校验记录](../../apps/web/evidence/ux-closeout/release-2026-10-08/release.json)
+
+本轮未发邀请/通知、未提交外部 Beta 审核。Web 和帮助中心已更新，真实邮箱收件及其完整验证码闭环仍待专门验证，不能由上传成功代替。
+
+
+## 8. 2026-10-08 第二批测试（历史）
+
+当前源码快照 `c938a0bbf6e3102652f2358ad987685a65aeaefe`，标签 `v1.0.1-test.20261008.2`。包含移动任务视图菜单与排期渐进披露、个人中心整行入口、成长空态/年度活动，以及四象限撤销与新建清单防重入修复。后续 QA 脚本和证据更新不改变这批二进制。
+
+- iOS：`com.heyta` **1.0 (4)**，Apple 处理 `VALID`；API 回读确认加入既有“内部测试”组，已补 `zh-Hans` 测试说明。本机 Apple Developer 签名可用，无需重新提供账号。未发邀请、未创建公开测试链接；模拟器已重装，不能据此声称用户的实体 iPhone 已安装。
+- macOS：Developer ID 签名，公证 `Accepted`，staple 验证通过；已安装。实际帮助入口点击因本机锁屏尚未复验。
+- Windows：当前 MSIX 已安装，签名有效。ZIP 包含 MSIX、公开 CER、中文安装说明和管理员安装脚本；证书与包签名、说明中的包哈希均已核对。首次安装需按说明信任测试证书。
+- Android：发布签名 APK 已重打、安装；任务旅程、Profile 链路与深浅主题已复验。
+- Linux：DEB 包内共享 UI 字节对账及解包启动通过；尚未系统安装，验证机沙箱限制仍保留。
+- Web：已部署；390/1440 下登录、注册确认密码与强度、帮助首页/文章导航通过。未发送验证码邮件，不代表生产 SMTP 已验收。
+
+[国内下载清单](https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/latest.json) 已切换 `1.0.1-test.20261008.2`，四端文件匿名可读，大小及清单 SHA-256 与本机一致。[GitHub 第二批测试版](https://github.com/Xaiver03/heyta/releases/tag/v1.0.1-test.20261008.2) 已公开，五个资产 SHA-256 与本机一致。完整校验读数见 [第二批分发证据](../../apps/web/evidence/ux-closeout/release-2026-10-08-b2/release.json)。
+
+## 9. 2026-10-08 第三批测试（历史）
+
+本批修复助手长对话滚动、历史面板关闭、取消披露恢复草稿、跨布局披露/等待状态、提醒按钮暗色与宽度，以及移动端任务角标截断。macOS、Windows、Android、iOS 模拟器已完成当前源码重打重装；Web 已部署并通过深浅主题/多视口助手与设置2条真实浏览器旅程。
+
+iOS **1.0 (5)** 已上传 TestFlight，Apple 状态 VALID，既有内部测试组关联已 API 回读确认，附中文测试说明。没有创建公开邀请链接，也没有实体 iPhone 安装证据。其余四个平台的第三批下载包已上传，GitHub五个资产的大小及SHA-256均与本机一致，COS latest清单已切换第三批且逐项对账通过。源码快照 `8a7332c365250d1c8136eb8ef7b9d4d31c1839e9` 的22个workspace依赖清单已通过离线冻结锁文件校验；快照修正未覆盖工作树中的服务端开发改动，也未改动用户Git索引或HEAD。
+
+[下载第三批测试版](https://github.com/Xaiver03/heyta/releases/tag/v1.0.1-test.20261008.3) · [国内下载清单](https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/latest.json)。
+
+本批不部署服务端，仍保留 `3880bdd1fd5e8fe3710bd19c5f753947ea89c468`。另一任务的 inbound automation 服务端修改不纳入本次客户端发布；共享包中的可选 worker 接线不表示公网回调功能已交付。该批发布时仅证实小组件 descriptor 注册；后续第五轮已通过 iOS 系统面板添加“今日任务”小组件，见产品 UX 计划的续验证据，尚不代表全部模板与实时刷新通过。
+
+[第三批构建与分发证据](../../apps/web/evidence/ux-closeout/release-2026-10-08-b3/release.json)。
+
+
+## 10. 2026-10-08 第四批测试（当前）
+
+国内下载清单已更新至 `1.0.1-test.20261008.4`；iOS为 **TestFlight 1.0 (6)**，Apple `VALID`且既有内部测试组关联已回读。macOS、Windows、Android、iOS模拟器均已重新构建安装。macOS通过Developer ID签名、公证和staple；Windows ZIP附本批公开证书、哈希校验安装器与中文说明；Linux DEB字节对账及解包启动通过，未系统安装。无实体iPhone安装证据。
+
+本批包含移动单一助手、披露与切页恢复、清单/批量优先级/估时工具的原子写入、同步入口简化，以及今日Widget完成操作回流修复。Web和落地页已部署，落地页缺失应用地址配置已纠正；首轮线上26通过/4失败，修复后四条中英文入口全部通过，另两条助手/设置真实旅程通过。
+
+发布来源边界：另一项入站自动化工作在构建期间继续改动客户端接线；本批分别记录实际传输包和安装包哈希，**不声称所有端来自同一个冻结提交**。Git标签记录实施快照，不能代替各端构建输入。本批没有部署服务端，也不表示公网入站自动化已经上线。完整跨端交互矩阵和下一次隔离冻结发布仍在活动Goal清单中。
+
+[国内下载清单](https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/latest.json) · [TestFlight管理入口](https://appstoreconnect.apple.com/apps/6817635248/testflight/ios) · [第四批发布证据](../../apps/web/evidence/ux-closeout/release-2026-10-08-b4/release.json) · [构建输入边界](../../apps/web/evidence/ux-closeout/release-2026-10-08-b4/source-provenance.json)。[GitHub第四批测试版](https://github.com/Xaiver03/heyta/releases/tag/v1.0.1-test.20261008.4)已公开，五个资产大小与SHA-256均与本机一致。

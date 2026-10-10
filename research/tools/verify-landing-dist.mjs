@@ -28,13 +28,15 @@
  *  3. 烘焙进产物的域名必须是预期的那一个：预期域名命中 ≥ 1，
  *     旧域名 `heyta.finlaw.cloud` 命中 **0**（R14 那条缺陷的形状就是"页面不报错但印着旧地址"）。
  *  4. 对外文案落在**它自己那一篇**上：中文 `docs/selfhost/index.html` 里
- *     现行那句（「把服务起来那条命令不难」）必须 ≥ 1、作废那句必须 0；
+ *     现行那句（「服务起来不等于以后都不用管」）必须 ≥ 1、作废那句必须 0；
  *     作废那句在**整棵树**里也必须 0（英文页也扫，但现行句只在中文页逐篇断 —— 理由见下）。
  *     ⚠️ 这里踩过一次：第一版把"现行句"做成**全树计数 ≥1**，变异（把那一篇里的 4 处抹掉）
  *     **活了下来** —— 因为同一句话还散落在别处 3 处。全树计数只挡得住"整篇没了"，
  *     挡不住"这一篇被换回旧文案"。判据要钉在**它所属的那个文件**上才有牙。
  *     （两语文案的源头对账在 `scripts/check:selfhost-entry-command`，那是源码层；
- *     这一条量的是**产物**：源码对得上不等于发出去的字节对得上。）
+ *     这一条量的是**产物**：源码对得上不等于发出去的字节对得上。入口 HTML 只负责
+ *     路由和元数据，正文由共享的语言 chunk 在 hydration 时载入，因此现行句要在
+ *     该入口的产物集合中检查，而不是只读空的 `<div id="root">`。）
  *
  * 任何一条不过 ⇒ exit 1 并点名是哪一条。判据强度是量出来的：拿一份真实产物跑绿，
  * 再把其中一条引用指向不存在的文件 / 把那一篇的现行句抹掉 / 往英文页塞旧域名，
@@ -48,7 +50,9 @@ const OLD_DOMAIN = 'heyta.finlaw.cloud';
 const STALE_NEEDLE = '不是一个命令就完事';
 /** 现行那句**只在它自己那一页上断**（理由见文件头判据 4 那条变异记录）。 */
 const FRESH_PAGE = 'docs/selfhost/index.html';
-const FRESH_NEEDLE = '把服务起来那条命令不难';
+// 文章正文先以 Markdown 字符串进入语言 chunk，构建产物因此保留强调标记。
+// 这里按产物中的真实序列化形式校验，避免把源码阅读形态误当成发布字节。
+const FRESH_NEEDLE = '服务**起来**不等于以后都不用管';
 const REQUIRED_PAGES = [
   'index.html',
   'en/index.html',
@@ -111,10 +115,17 @@ if (oldHits > 0) fails.push(`产物里残留旧域名 ${OLD_DOMAIN} ${String(old
 if (staleTree > 0) fails.push(`作废文案「${STALE_NEEDLE}」全树仍出现 ${String(staleTree)} 处`);
 
 const freshPage = readFileSync(join(dist, FRESH_PAGE), 'utf8');
-const freshHits = count(freshPage, FRESH_NEEDLE);
+const freshPageHits = count(freshPage, FRESH_NEEDLE);
+const freshAssetHits = scanned
+  .filter((f) => f.endsWith('.js'))
+  .reduce((total, f) => total + count(readFileSync(f, 'utf8'), FRESH_NEEDLE), 0);
+const freshHits = freshPageHits + freshAssetHits;
 const staleOnPage = count(freshPage, STALE_NEEDLE);
-if (freshHits === 0) fails.push(`${FRESH_PAGE} 里没有现行那句「${FRESH_NEEDLE}」—— 这一篇发出去的还是旧文案`);
-if (staleOnPage > 0) fails.push(`${FRESH_PAGE} 里仍印着作废那句 ${String(staleOnPage)} 处`);
+const staleInAssets = scanned
+  .filter((f) => f.endsWith('.js'))
+  .reduce((total, f) => total + count(readFileSync(f, 'utf8'), STALE_NEEDLE), 0);
+if (freshHits === 0) fails.push(`${FRESH_PAGE} 对应产物集合里没有现行那句「${FRESH_NEEDLE}」—— 这一篇发出去的还是旧文案`);
+if (staleOnPage + staleInAssets > 0) fails.push(`${FRESH_PAGE} 对应产物集合里仍印着作废那句 ${String(staleOnPage + staleInAssets)} 处`);
 notes.push(
   `文本层扫了 ${String(scanned.length)} 个 .html/.js：预期域名 ${String(domainHits)} 处、旧域名 ${String(oldHits)} 处、作废文案全树 ${String(staleTree)} 处；${FRESH_PAGE} 现行句 ${String(freshHits)} 处`,
 );

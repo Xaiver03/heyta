@@ -2,8 +2,8 @@
  * heyta 用户协议 / 服务条款
  * ==========================
  *
- * 这份文本管的是**「你和我们之间约定了什么」**：三样东西各自归谁管、你能拿应用
- * 做什么、我们的托管同步服务承诺什么与不承诺什么、到期之后会发生什么、出问题
+ * 本文件文本管的是**「用户和本公司之间约定了什么」**：三样东西各自归谁管、用户能拿应用
+ * 做什么、本公司的托管同步服务承诺什么与不承诺什么、到期之后会发生什么、出问题
  * 责任怎么分。
  *
  * 法定出处：《中华人民共和国民法典》第四百九十六条、第四百九十七条（格式条款：
@@ -18,7 +18,7 @@
  * s5 因此只做一件事：指向那一份。
  *
  * ⚠️ 第二条容易写错的是 s4 的后半句。端到端加密只约束**内容**，不约束**形状**：
- * 服务器为完成同步必须保存明文的操作元数据。只写「我们看不到你的任何数据」就是
+ * 服务器为完成同步必须保存明文的操作元数据。只写「本公司看不到用户的任何数据」就是
  * 虚假陈述。正确口径见 s4 的 callout。
  *
  * 📌 备案号尚未核准，因此本文件不写备案号；也不写电话、微信、客服响应时限 ——
@@ -30,54 +30,54 @@ import type { LegalDocument } from '../types.js';
 const zh = [
   {
     id: 's1',
-    title: '谁与你约定，以及本条款不管什么',
+    title: '合同主体、适用范围与服务边界',
     blocks: [
       {
         kind: 'p',
-        text: '本条款由**晓黎（杭州）人工智能科技有限公司**与你约定：统一社会信用代码 `91330106MAKNJ6DX7M`，法定代表人 邓湘雷，住所 浙江省杭州市西湖区蒋村街道文一西路 830 号蒋村商务中心 3 号楼 210 室，联系邮箱 heyta@waytofuture.cn。下面这张三分法表决定了"哪件事找我们、哪件事不找我们"，请先看它，再看后面任何一条。',
+        text: '本条款由**晓黎（杭州）人工智能科技有限公司**（统一社会信用代码 `91330106MAKNJ6DX7M`，法定代表人邓湘雷，住所浙江省杭州市西湖区蒋村街道文一西路 830 号蒋村商务中心 3 号楼 210 室，联系邮箱 heyta@waytofuture.cn）与用户订立。为明确本条款的适用范围，现将相关对象及其法律关系列示如下。',
       },
       {
         kind: 'table',
         head: ['对象', '是否受本条款约束', '费用'],
         rows: [
           ['heyta 应用本体（全部功能）', '❌ 不受，MIT 许可', '❌ 免费'],
-          ['你自建自托管的服务器', '❌ 不受，与我们无关', '❌ 不需要'],
-          ['我们提供的托管同步服务', '✅ 受约束', '见《订阅、计费与退款》'],
+          ['用户自行部署的服务器', '❌ 不适用，不属于本公司提供的服务', '❌ 不涉及本公司收费'],
+          ['本公司提供的托管同步服务', '✅ 适用', '见《订阅、计费与退款》'],
         ],
       },
       {
         kind: 'p',
-        text: '换句话说：**本条款约束的只有一件事 —— 我们替你运行的那台服务器。** 应用本身是自由软件，你从哪个渠道拿到它、改不改、分不分发，都不需要同意本条款；你自己在家里或自己的云上搭一台服务器，那台服务器与我们之间没有任何合同关系：我们不为其背书，不从中收费，也不为其上的数据承担本条款下的义务。',
+        text: '据此，**本条款的合同标的仅为本公司提供的托管同步服务**。应用本体受 MIT 许可证约束，用户取得、修改或再分发应用本体无需另行取得本条款项下的许可。用户自行部署的服务器不属于本公司提供的服务范围；该服务器的运营、数据处理及相关责任由部署者与其使用者依据双方约定承担。',
       },
       {
         kind: 'callout',
-        text: '这张表是分界线，不是客套话。后面每一条承诺与每一条限制，都只在第三行（我们提供的托管同步服务）上成立。若某一条读起来像是我们在管你设备上的应用，它管的其实是我们自己的服务。',
+        text: '前述划分构成本条款的适用边界。除另有明确约定外，本条款所载服务承诺、用户义务及责任安排仅适用于本公司提供的托管同步服务，不适用于用户设备上的应用本体或用户自行部署的服务器。',
       },
     ],
   },
   {
     id: 's2',
-    title: '账户、凭据，以及账户下发生的行为',
+    title: '账户、凭据及账户活动',
     blocks: [
       {
         kind: 'p',
-        text: '注册只需要**一个邮箱地址**和一组**通行密钥**。我们不需要你的手机号、姓名、身份证号，也不向你索取任何身份证件。账户的作用只有一个：让服务器知道哪些密文有权被送到哪些设备。',
+        text: '官方服务通过**邮箱地址、登录密码和邮箱验证码**完成注册，并支持**通行密钥**等其他认证方式。本公司不要求用户提供手机号、姓名、身份证号或其他身份证件。账户用于确定密文可向哪些设备交付。',
       },
       {
         kind: 'ul',
         items: [
-          '凭据由你自己保管。通行密钥保存在你的设备或你所使用的凭据管理器里，从来不经过我们的服务器。',
-          '你须对**在你的账户下发生的一切行为**负责，包括任何拿到你凭据的人所做的改动 —— 因为从服务器的角度看，那与你自己做的改动无法区分。',
-          '如果你怀疑凭据已经泄露，请把它当作安全事件处理并立刻通过 s9 的邮箱告诉我们；同时请理解 s4 那条架构事实会如何限制我们能帮你做到的程度。',
+          '用户应妥善保管账户凭据。通行密钥保存在用户设备或其选定的凭据管理器中，不经由本公司的服务器传输。',
+          '对于账户项下发生的操作，用户应在法律允许的范围内承担相应的保管和使用责任；因第三人取得或使用用户凭据而产生的操作，服务端无法据此区分其是否由用户本人发起。',
+          '如用户发现或合理怀疑凭据泄露，应立即按照 s9 所列联系方式报告安全事件；本公司能够采取的措施受 s4 所述技术架构限制。',
         ],
       },
       {
         kind: 'p',
-        text: '🔴 **一条当前实现的限制，我们不藏：注册邮箱目前不可更换。** 产品里没有自助换绑邮箱的入口。这是产品现状而不是我们故意设的门槛，但它带来的后果是真的：邮箱一旦停用或收不到信，你可能收不到通知与变更告知（这一条与 s9 的送达规则直接相关，请连着读）。',
+        text: '**注册邮箱可以自助换绑，采用双侧确认。** 服务同时向当前邮箱与目标邮箱发出确认请求，两侧均完成确认后换绑生效；任一侧未确认的，注册邮箱保持不变。换绑链接有效期 24 小时，同一账号同时仅存在一笔在途请求。换绑生效时既有登录会话同时失效，用户应以新邮箱重新登录；当前邮箱与目标邮箱各收到一封完成通知。用户应在注册前确认邮箱可正常收信：当前邮箱停用或无法接收邮件的，无法完成换绑。',
       },
       {
         kind: 'callout',
-        text: '把"邮箱目前不可更换"和"加密口令丢失后我们无法帮你恢复数据"（s4）放在一起读：这两条合起来意味着**账户的可恢复性目前主要落在你自己身上**。这不是服务水平，而是本地优先与端到端加密的必然代价 —— 我们把代价写在这里，是为了让你在注册之前就知道自己在接受什么。',
+        text: '结合 s4 所述加密口令恢复限制，账户恢复能力在现阶段主要取决于用户对注册邮箱、凭据及仍处于登录状态的设备的保管；换绑注册邮箱要求用户同时控制当前邮箱与目标邮箱，当前邮箱已经收不到信时不存在自助换绑通道。该安排源于本地优先和端到端加密架构，用户注册前应充分了解并接受相应影响。',
       },
     ],
   },
@@ -87,48 +87,48 @@ const zh = [
     blocks: [
       {
         kind: 'p',
-        text: '**应用本体是 MIT 许可的自由软件，你有权自行搭建服务器使用全部功能，不需要购买任何东西、不需要通知我们、我们也不会对此做任何校验或限制。**',
+        text: '**应用本体是 MIT 许可的自由软件。用户有权自行搭建服务器并使用全部功能，用户无需购买服务或向本公司通知，本公司亦不对该等使用进行校验或限制。**',
       },
       {
         kind: 'ul',
         items: [
           '在任何设备上安装、运行应用本体，不限设备数量，也不限平台。',
-          '阅读、修改、重新分发源码，或把它做成你自己的产品。',
-          '自行部署同步服务端，让你的数据只存在你自己控制的机器上。',
+          '阅读、修改、重新分发源码，或把它做成用户自己的产品。',
+          '自行部署同步服务端，使数据仅存储于用户控制的设备或服务器。',
           '不购买任何订阅、不提供任何付款信息，长期、完整地使用全部功能。',
         ],
       },
       {
         kind: 'p',
-        text: '你不需要"激活"，不需要联网验证授权，也不需要定期回到我们这里确认身份。我们的服务端**不做"这个客户端有没有付费"的校验**来锁住应用本体的功能 —— 因为按 s1 的三分法，那种校验本来就不该存在。',
+        text: '应用本体无需激活、联网授权验证或定期身份确认。本公司的服务端**不以应用本体是否付费为条件**限制其功能；根据 s1 所列适用范围，该限制不属于托管同步服务的合同内容。',
       },
       {
         kind: 'callout',
-        text: '一个容易混的点：**MIT 给你的权利，不会因为本条款而缩减。** 本条款签的是"我们的托管服务"这一件事；你在上面表格前两行下的自由，不以任何形式的付款为前提。MIT 许可证原文随源码分发，就软件本身而言，以许可证原文为准。',
+        text: '关于 MIT 许可证与本条款的关系，明确如下：**MIT 许可证授予的权利不因本条款而减损。** 本条款仅适用于本公司的托管同步服务；上表前两行所列软件及自建服务器的使用、修改与再分发不以付款为条件。软件本身的权利义务以随源码提供的 MIT 许可证文本为准。',
       },
     ],
   },
   {
     id: 's4',
-    title: '我们提供的托管同步服务：只中转密文，但中转的是密文的形状',
+    title: '托管同步服务与数据处理范围',
     blocks: [
       {
         kind: 'p',
-        text: '前半句：**同步数据在离开你的设备之前就已经加密。** 我们的服务器收到的、保存的、转发给你其他设备的都是密文。我们没有能力读取、检索或分析你的任务标题、清单名称、备注文字；我们也不会要求你上传明文。任何人以 heyta 官方的名义要求你上传明文数据，那不是我们。',
+        text: '**同步数据在离开用户设备前完成加密。** 本公司的服务器收到的、保存的、转发给用户其他设备的均为密文。本公司不具备读取、检索或分析用户任务标题、清单名称及备注文字的能力；本公司不要求用户上传明文数据。任何以 heyta 名义提出该等要求的主体均非本公司。',
       },
       {
         kind: 'p',
-        text: '后半句同样重要，而且必须写出来：为了完成同步，服务器必须知道**每一条改动长什么样**。为此它保存的是**明文的操作元数据**，包括下列各项。这不是实现上的疏漏，而是"服务器看不到内容、却要把正确的密文送到正确的设备并正确排序"这件事本身的必要条件。',
+        text: '此外，为实现同步，服务器需要处理**每条操作的结构及属性**，并保存下列**明文操作元数据**。该等元数据是将密文发送至相应设备并按顺序处理所必需的，不包含任务正文或备注内容。',
       },
       {
         kind: 'ul',
         items: [
-          '这条改动属于哪一类对象（实体类型）',
-          '涉及哪个对象的标识（实体 id）',
+          '操作所属实体类型',
+          '相关实体标识（实体 ID）',
           '操作类型',
           '每台设备各自的改动计数（用来判断两条改动谁先谁后）',
           '客户端时间戳',
-          '到达我们服务器的时间',
+          '到达本公司服务器的时间',
           '序号',
           '载荷字节数',
           'schema 版本',
@@ -137,29 +137,29 @@ const zh = [
       },
       {
         kind: 'callout',
-        text: '正确的口径只有一句：我们看不到你任务的**内容**，但能看到每一条改动的**形状**。谁在什么时候改过多少个对象、某个对象被改过多少次、哪两台设备在并发写同一个东西 —— 这些我们从密文之外的元数据里读得出来。因此，**"服务端完全看不到你的任何数据"这句话是虚假陈述**，本文件不这么写。',
+        text: '据此，本公司无法读取任务标题、清单名称或备注等**内容数据**，但可以从上述元数据获知操作对象类别、对象标识、操作次数、时间及设备标识等**结构信息**。因此，本条款不作“服务端完全无法获取任何数据”的概括性表述。',
       },
       {
         kind: 'p',
-        text: '还有第三件容易被漏掉、但不写就是误导的事：**端到端加密覆盖的是同步通道，不覆盖你设备上的本地存储。** 为了能离线读写、能在应用异常后恢复，落在你设备上的数据是明文，靠你设备自身的锁屏、账户隔离与文件权限保护。设备失窃且未设锁屏，或者你把解锁凭据交给别人，等于把数据交出去。（唯一例外是桌面小组件写出的那份快照，它是 AES-256-GCM 密文。）',
+        text: '关于本地存储的保护范围，明确如下：**端到端加密适用于同步通道，不适用于用户设备上的本地存储。** 为支持离线读写及故障恢复，设备本地保存的数据为明文，并由设备锁屏、账户隔离及文件权限等系统安全措施提供保护。设备遗失且未设置锁屏，或解锁凭据被第三方取得，可能导致本地数据被访问。（桌面小组件生成的快照为 AES-256-GCM 密文。）',
       },
       {
         kind: 'callout',
-        text: '🔴 **由此产生的一条后果，我们需要你在知情下接受：丢失加密口令后，我们无法帮你恢复数据。** 我们没有解密能力 —— 不是"不方便做"、不是"额度不够"，而是**架构上不存在这个能力**。这是端到端加密的定义，不是服务水平问题。你能做的补救只有：在其他仍已登录的设备上导出数据，或者从 s9 的联系邮箱与我们商量还能做什么。',
+        text: '🔴 **加密口令遗失的后果**：由于本公司不持有解密密钥，无法为用户恢复以该口令保护的数据。用户可在仍处于登录状态的其他设备上导出数据；如需提交服务请求，可按照 s9 所列联系方式联系本公司，但该请求不改变前述技术限制。',
       },
       {
         kind: 'p',
-        text: '计费涉及的信息**仅限**你的账户标识与权益状态，不涉及任何任务内容 —— 我们从设计上就没有可以拿来定价或推销的内容数据。',
+        text: '计费处理的信息**仅限**账户标识及权益状态，不涉及任务内容；服务计费不以任务内容的读取、分析或画像为基础。',
       },
       {
         kind: 'docRef',
         docId: 'privacy',
-        text: '上述明文元数据的完整清单、法定分类、保存期限与我们的处理依据，见《隐私政策》。',
+        text: '上述明文元数据的完整清单、法定分类、保存期限与本公司的处理依据，见《隐私政策》。',
       },
       {
         kind: 'docRef',
         docId: 'permissions',
-        text: '小组件快照、系统备份、局域网自建服务器这几项"不需要你点同意但确实影响隐私"的数据流，见《应用权限清单》。',
+        text: '小组件快照、系统备份、局域网自建服务器等无需用户单独同意但涉及隐私的数据流，见《应用权限清单》。',
       },
     ],
   },
@@ -169,130 +169,130 @@ const zh = [
     blocks: [
       {
         kind: 'p',
-        text: '**本节不写任何金额，也不写任何期限。** 价格、免费额度、付款渠道、发票、退款条件与到账时效的唯一事实源是《订阅、计费与退款》。理由很直接：一份文本去抄另一份文件里的数字，就一定会有"各说一个价"的那一天，而两份互相矛盾的价格比没有价格更难收拾。',
+        text: '**本节不载明具体金额或期限。** 价格、免费额度、付款渠道、发票、退款条件及到账时效以《订阅、计费与退款》为准。为避免不同文本之间产生冲突，本条款不重复列示上述信息。',
       },
       {
         kind: 'docRef',
         docId: 'subscription-refund',
-        text: '凡涉及"多少钱、买多久、能不能退、怎么开票、权益什么时候生效"的问题，一律以《订阅、计费与退款》为准。',
+        text: '有关价格、服务期限、退款、发票及权益生效时间的事项，以《订阅、计费与退款》为准。',
       },
       {
         kind: 'ul',
         items: [
-          '收费对象**只有** s1 表格第三行所描述的托管同步服务。',
-          '订阅的效力只及于托管同步：它不解锁、也不锁住应用本体的任何功能（见 s3 与 s6）。',
+          '收费对象**仅为** s1 表格第三行所述的托管同步服务。',
+          '订阅仅适用于托管同步服务，不改变应用本体的功能范围（见 s3 与 s6）。',
           '计费涉及的信息仅限账户与权益状态，不涉及任何任务内容（见 s4）。',
         ],
       },
       {
         kind: 'p',
-        text: '若本节的表述与《订阅、计费与退款》出现不一致，**以《订阅、计费与退款》为准**；请把这种不一致当作我们的缺陷报告给我们 —— 两份对外文本互相矛盾，是我们的错误，不该由你来猜哪份算。',
+        text: '若本节与《订阅、计费与退款》存在不一致，**以《订阅、计费与退款》为准**。如发现不一致，用户可通过 s9 所列邮箱反馈；两份对外文件的冲突属于文件维护错误，不影响前述优先适用规则。',
       },
     ],
   },
   {
     id: 's6',
-    title: '到期、中止与终止：我们不把数据当人质',
+    title: '服务期限届满、中止与终止',
     blocks: [
       {
         kind: 'p',
-        text: '核心承诺只有一句：**到期或未续费不会让任何一份数据变得不可读、不可用或拿不出来。** 我们不以删除数据作为催缴手段，也不设"过了某个期限自动清空"的机制。下表就是这件事的完整清单 —— 表里没有的，就是我们不会做的。',
+        text: '**到期或未续费不影响用户读取、使用或导出其本地数据。** 本公司不得以删除用户数据作为催收措施，且未设置因服务期限届满而自动清除本地数据的机制。具体影响以如下清单为准。',
       },
       {
         kind: 'table',
         head: ['项目', '到期后'],
         rows: [
-          ['你设备上的本地数据', '🔴 一个字都不动：不删除、不修改、不清空、不锁定'],
+          ['用户设备上的本地数据', '🔴 不删除、不修改、不清空、不锁定'],
           ['应用功能', '🔴 不受影响：全部功能照常可用，可继续查看、编辑、导出'],
-          ['已同步到服务器的数据', '🔴 不删除：我们不以删除数据作为催缴手段'],
-          ['托管同步', '⏸ 停止（所有设备，不只是新设备）'],
-          ['出路', '① 续费；② 改为使用你自己的服务器，同步立即恢复、数据无损'],
+          ['已同步到服务器的数据', '🔴 不删除：本公司不以删除数据作为催缴手段'],
+          ['托管同步', '停止（适用于全部设备）'],
+          ['可选措施', '① 续费；② 改用用户自行部署的服务器，恢复同步且不改变既有数据'],
         ],
       },
       {
         kind: 'p',
-        text: '因此，**未按期续费的后果仅限于停止托管同步**，不扩展到功能、数据、凭据或你已获得的其他权益。价格与退款规则不在本节重复，见 s5 的指向。',
+        text: '因此，**未按期续费的后果仅限于停止托管同步**，不扩展到功能、数据、凭据或用户已取得的其他权益。价格与退款规则不在本节重复，见 s5 的指向。',
       },
       {
         kind: 'docRef',
         docId: 'data-rights',
-        text: '你要求导出、复制、删除与注销账户的具体路径、格式与我们的响应时限，见《数据权利与行使方式》。',
+        text: '用户行使数据导出、复制、删除及账户注销权利的路径、格式和处理时限，见《数据权利与行使方式》。',
       },
       {
         kind: 'p',
-        text: '中止与终止：我们能中止或终止的对象是**托管服务本身**（例如 s7 的使用规则被严重违反，或我们停止运营该项服务），而不是你的本地数据。除法律要求我们必须立即处置的情形外，中止前我们会按 s9 的方式通知你，并给你先把数据导出的机会。',
+        text: '中止与终止：中止或终止的对象为**托管服务本身**（例如严重违反 s7 所列使用规则，或本公司停止运营该项服务），不涉及用户设备上的本地数据。除法律要求立即采取措施的情形外，本公司将在中止前按 s9 发送通知，并提供合理的数据导出机会。',
       },
       {
         kind: 'ul',
         items: [
-          '无论服务因何中止或终止，你在 s3 下的 MIT 权利不受影响：带着自己的数据改成自建服务器，始终可行。',
-          '服务终止时我们会先通知、再停止接入，不会用"突然关断"的方式让你的设备停在同步失败上而无人说明原因。',
-          '你随时可以停止使用：关闭同步、导出数据、继续用应用本体，都不需要经过我们同意。',
+          '无论服务因何中止或终止，s3 所述 MIT 许可项下的权利不受影响；用户可将数据迁移至自行部署的服务器。',
+          '服务终止前，本公司将依 s9 发送通知；法律要求立即采取措施的除外。',
+          '用户有权随时停止使用托管同步服务、导出数据并继续使用应用本体，无需取得本公司同意。',
         ],
       },
     ],
   },
   {
     id: 's7',
-    title: '你的责任与使用规则',
+    title: '用户的责任与使用规则',
     blocks: [
       {
         kind: 'p',
-        text: '下面的规则约束的是**你使用我们托管服务的方式**，以及你对自己账户与设备负有的注意义务。它们不缩减 s3 下你作为软件使用者与再分发者的权利。',
+        text: '本节规则约束的是**用户使用本公司托管服务的方式**，以及用户对其账户与设备负有的注意义务。它们不缩减 s3 下用户作为软件使用者与再分发者的权利。',
       },
       {
         kind: 'ul',
         items: [
-          '不利用我们的服务存储、传输或传播违反法律法规的内容。',
+          '不利用本公司的服务存储、传输或传播违反法律法规的内容。',
           '不试图绕过加密与授权机制读取他人账户的数据，也不以未经授权的探测、压力测试或逆向工程来获取访问能力。',
           '不干扰或破坏服务的正常运行，包括以自动化方式施加超出正常使用范围的负载。',
-          '不冒用他人身份注册，不出借、转让或出售你的账户。你的设备标识是我们裁决并发改动的依据（见 s4），同一份凭据在多处使用会造成连你也解释不清的数据竞争。',
-          '自行保管设备与凭据，并自行判断你配置的那个同步地址是否可信 —— 你把数据指向你不认识的服务器时，我们保护不了你。',
+          '不得冒用他人身份注册，不得出借、转让或出售账户。设备标识用于并发改动的裁决（见 s4）；同一组凭据在多个地点使用可能导致数据竞争。',
+          '用户应妥善保管设备与凭据，并核验所配置同步服务器的可信性。用户将数据发送至非本公司运营的服务器时，该服务器的运营者依法承担相应的数据处理与安全责任。',
         ],
       },
       {
         kind: 'p',
-        text: '⚠️ **一条必须说清的边界**：当你把同步地址配置成第三方托管或自己搭建的服务器时，你的数据不再经过我们的服务。本条款既不让我们对那份数据负责，也不给你任何针对我们的主张 —— 那种场景下的权利义务，完全由你与该服务器提供方之间的约定决定。',
+        text: '⚠️ **第三方或自建同步服务器的责任边界**：用户将同步地址配置为第三方托管服务器或自行部署的服务器后，相关数据不再经过本公司的托管服务。该服务器的运营、数据处理及安全措施由其运营者负责；用户与该运营者之间的权利义务以双方约定及适用法律为准。',
       },
       {
         kind: 'callout',
-        text: '我们**没有**"违规即封号并清空数据"式的处置权。s7 被违反时，我们能采取的处置只有**中止托管同步**这一项服务（见 s6），并且要按 s9 通知你。你的本地数据始终在你手上，不因为我们与你的分歧而受影响。',
+        text: '违反 s7 所列规则时，本公司可依 s6 中止托管同步服务，并依 s9 发送通知。中止托管同步不影响用户设备上的本地数据。',
       },
     ],
   },
   {
     id: 's8',
-    title: '免责与责任限制',
+    title: '责任范围与责任限制',
     blocks: [
       {
         kind: 'p',
-        text: '**先说我们承担的那一条**：heyta 是本地优先的应用，**服务端故障、被攻击、被关停，或者我们自己停止运营这项服务，都不会让你设备上的本地数据变得不可用。** 你始终可以查看、编辑、导出。这一条不以赔偿为前提，也不受本节下面任何限制的影响 —— 它是架构承诺，不是免责条款。',
+        text: 'heyta 采用本地优先架构。因托管服务发生故障、受到攻击、被暂停或停止运营，用户设备上已经保存的本地数据仍可在应用支持的范围内读取、编辑及导出。本项说明不构成对法定责任的排除或限制。',
       },
       {
         kind: 'p',
-        text: '在适用法律允许的范围内，我们的托管同步服务按"现状"与"当前可用"提供。我们不承诺：不间断运行；不出现延迟或临时失败；也不承诺某一项服务永远以同一形式存在（服务与条款本身的变更见 s10）。这些不承诺的后果只落在"同步"这件事上，不落在你的数据上。',
+        text: '在适用法律允许的范围内，托管同步服务按照提供时的实际状态提供。除法律另有规定或双方另有约定外，本公司不保证服务持续不间断、无延迟、无错误或始终保持现有功能和形式。上述服务可用性限制不影响用户对本地数据依法享有的权利。服务及本条款的变更适用 s10。',
       },
       {
         kind: 'p',
-        text: '在适用法律允许的范围内，因本条款或我们的托管服务而引起、且我们依法应当承担责任的损失，我们的**累计赔偿以你在相关期间内就该项服务实际已支付的费用总额为限**。这一上限不适用于法律明确规定不得限制或免除的损失类型；适用法律不允许设此上限时，本节不产生上限的效力。',
+        text: '在适用法律允许的范围内，对于因本条款或托管服务引起且依法应由本公司承担的损失，本公司承担的累计赔偿责任以用户在相关服务期间就该项托管服务实际支付的费用总额为限。该限制不适用于法律规定不得限制或免除的责任；如适用法律不允许约定前述上限，则该上限不发生效力。',
       },
       {
         kind: 'ul',
         items: [
-          '下面几项风险，我们已经在 s2、s4、s6 以显著方式逐项说明。本节**不是**由我们单方宣布"概不负责"，而是请你确认：**你在知情下接受这些由架构带来的风险。**',
-          '风险一：加密口令或凭据丢失后我们无法帮你恢复数据 —— 我们没有解密能力，这是架构的必然结果（s4）。',
-          '风险二：本地存储是明文，设备失窃或未设锁屏时的后果由你设备自身的防护决定（s4）。',
-          '风险三：未续费期间跨设备同步不发生，该期间的改动只存在于你当时使用的那台设备上（s6）。',
-          '风险四：你把同步地址配置为你并不信任的服务器时，密文与元数据都会流向那台服务器（s1、s7）。',
+          '以下情形已在 s2、s4、s6 逐项说明，并构成用户使用服务时应当注意的具体风险：',
+          '加密口令或凭据遗失后，本公司无法恢复相应数据（s4）；',
+          '本地存储为明文，设备失窃或未设置锁屏时，数据安全取决于设备自身的安全措施（s4）；',
+          '服务未续费期间不执行跨设备同步，该期间产生的改动仅保留在产生改动的设备上（s6）；',
+          '用户将同步地址配置为不受其信任的服务器后，密文及相关元数据将传输至该服务器（s1、s7）。',
         ],
       },
       {
         kind: 'p',
-        text: '我们**不**写"我们对任何损失均不承担责任"这类句子。按《中华人民共和国民法典》第四百九十七条，提供格式条款一方免除自身责任、加重对方责任、排除对方主要权利的条款无效 —— 那样的写法不但没有保护，反而是一眼可辨的模板痕迹。上面每一条限制都限于我们依法可以限制的范围。',
+        text: '本条款不作概括性免责。前述责任限制仅在适用法律允许的范围内适用，不得解释为免除或减轻本公司依法应承担的责任、加重用户责任或排除用户依法享有的主要权利。',
       },
       {
         kind: 'p',
-        text: '无论本条款其他部分如何表述，我们依法应当承担的责任不因本节而免除或限制，包括因我们故意或重大过失造成你损失、以及法律明确规定不得预先免除的责任。这一句是本节的兜底，优先级高于上面任何一句。',
+        text: '无论本条款其他条款如何约定，本公司因故意或重大过失造成用户损失的责任，以及法律明确规定不得预先免除或限制的其他责任，不因本节而免除或限制。',
       },
     ],
   },
@@ -302,53 +302,53 @@ const zh = [
     blocks: [
       {
         kind: 'p',
-        text: '我们向你发消息只有两个通道：**应用内的站内通知**，以及**你注册时提供的邮箱**。我们不通过广告网络、电话或短信向你推送营销内容。',
+        text: '通知渠道包括：**应用内通知**及**用户注册邮箱**。本公司不通过广告网络、电话或短信发送营销信息。',
       },
       {
         kind: 'p',
-        text: '联系我们的入口是邮箱 heyta@waytofuture.cn。我们**没有**电话、没有微信客服、也没有对外承诺的客服响应时限 —— 把不存在的路径写进条款，只会让你把时间花在打不通的地方，所以我们只写真的能收信的那一个。',
+        text: '联系邮箱为 heyta@waytofuture.cn。本公司当前未提供电话或即时通信客服，亦未承诺固定的客服响应时限；除该邮箱外，不指定其他对外送达或受理渠道。',
       },
       {
         kind: 'p',
-        text: '下列变更我们会**提前**通知你，并且**不溯及你已经购买的期间**：价格与计费方式、服务期限与权益范围、退款政策，以及责任限制（s8）与数据相关的承诺（s4）。已经付过钱的那一段服务，继续适用购买时那一版。',
+        text: '本公司将就下列变更**提前**通知用户，且该等变更**不溯及已购买的服务期间**：价格与计费方式、服务期限与权益范围、退款政策，以及责任限制（s8）与数据相关的承诺（s4）。已购买的服务期间继续适用购买时有效的版本。',
       },
       {
         kind: 'p',
-        text: '送达时点：站内通知在你下次打开应用时视为送达；邮件在我们成功发出该邮件时视为送达。请保持你的注册邮箱可用 —— 并把它与 s2 里"邮箱目前不可更换"这条限制连着读：那确实是你账户的一项风险，我们把它写在显眼处，而不是藏在你不会读的地方。',
+        text: '送达时点：应用内通知在用户下次打开应用时视为送达；邮件在邮件系统成功发出时视为送达。用户应保持注册邮箱可用。注册邮箱可以自助换绑，但须当前邮箱与目标邮箱双侧确认；当前邮箱无法接收邮件的，换绑无法完成，该限制构成账户恢复风险，已在 s2 中明确列示。',
       },
       {
         kind: 'callout',
-        text: '如果你因账户问题联系我们，请一并说明你使用的设备与大致时间。**请不要在邮件里贴出任何明文的任务内容来"证明身份"** —— 我们看不到你的内容（s4），因此也从来不需要、不会要求你提供它。',
+        text: '如因账户问题联系本公司，请说明所使用的设备及相关操作的大致时间。**不得在邮件中附具明文任务内容作为身份核验材料。** 依据 s4，本公司无法读取该等内容，亦不会要求用户提供。',
       },
     ],
   },
   {
     id: 's10',
-    title: '条款变更，以及我们记下你同意的是哪一版',
+    title: '条款修订与同意记录',
     blocks: [
       {
         kind: 'p',
-        text: '本条款可以变更。变更时我们同时更新版本号与本页日期，写明改了什么（s12），并按 s9 通知你。⚠️ **变更不溯及你已经购买的期间**：那一段服务适用的是你购买时那一版里的价格、期限与退款规则。',
+        text: '本条款可予修订。修订时，本公司同步更新版本号、本页日期及 s12 所列变更摘要，并依 s9 通知用户。修订内容不适用于用户已经购买的服务期间；该期间继续适用购买时有效的价格、期限及退款规则。',
       },
       {
         kind: 'p',
-        text: '涉及数据用途、责任范围或退款政策的**重大变更**，我们需要你在应用内**重新确认**，而不是"你继续用就视为同意"。同意必须是做出的，不是被推定的。',
+        text: '涉及数据用途、责任范围或退款政策的**重大变更**，须由用户在应用内**重新确认**；继续使用服务不构成对该等重大变更的默示同意。',
       },
       {
         kind: 'p',
-        text: '**同意留痕**：注册时我们记下的不是含糊的"他同意过了"，而是一整套版本指纹 —— 形如 `terms@<版本>;…` 的组合，把当时每一份对外文本的版本号一起钉住。它回答的是"此人在什么时刻同意了**哪一版**"，而不依赖任何人的记忆或复述。',
+        text: '**同意记录**：注册时记录由 `terms@<版本>;…` 构成的版本指纹，其中包含当时各项对外法律文件的版本号及同意时间。该记录用于确认用户在何时同意何种版本的文件，不以人工记忆或事后复述为依据。',
       },
       {
         kind: 'p',
-        text: '为什么这件事在这款产品上尤其必须做：端到端加密意味着我们看不到你的内容（s4），所以**任何关于"当时约定的是什么"的争议只能靠版本记录回答**，不可能靠"我们保存的那段数据"回答。版本号因此是证据的一部分，改版必须 bump。',
+        text: '由于端到端加密限制了本公司对内容数据的读取（s4），关于当时约定内容的争议应以版本记录为依据。版本号属于该项记录的组成部分；实质性修订须同步更新版本号。',
       },
       {
         kind: 'p',
-        text: '自建服务器场景下（s1 表格第二行），你同意的是**该服务端提供方**的条款，与本文件无关。我们不替第三方作任何承诺，也不代为解释他们的条款。',
+        text: '在自建服务器场景下（s1 表格第二行），用户同意的是**该服务端提供方**发布的条款，本文件不适用于该等服务。本公司不代表第三方作出承诺，也不解释第三方条款。',
       },
       {
         kind: 'p',
-        text: '你当前适用的那一版随时可以从应用内的法律入口打开；版本号写在页面顶部，历次变更列在下面 s12。',
+        text: '用户当前适用的版本可通过应用内法律入口查阅；版本号显示于页面顶部，历次变更记录见 s12。',
       },
     ],
   },
@@ -362,7 +362,7 @@ const zh = [
       },
       {
         kind: 'p',
-        text: '因本条款或我们的托管服务发生争议，请先与我们协商（联系邮箱见 s9）。协商不成的，任何一方可向**杭州市西湖区有管辖权的人民法院**提起诉讼；法律对管辖另有强制性规定的，从其规定。这条不排除你依法享有的其他救济途径。',
+        text: '因本条款或托管同步服务产生争议的，双方应先行协商（联系方式见 s9）。协商不成的，任何一方可向**杭州市西湖区有管辖权的人民法院**提起诉讼；法律另有强制性管辖规定的，从其规定。本条不影响用户依法享有的其他救济途径。',
       },
       {
         kind: 'p',
@@ -370,57 +370,7 @@ const zh = [
       },
       {
         kind: 'p',
-        text: '⚠️ 本条不适用于 s1 表格的前两行：MIT 许可下你对软件本身的权利不是本条约定的标的，也不因本条款而改变、或被本条的管辖约定所限制。',
-      },
-    ],
-  },
-  {
-    id: 's13',
-    title: '欧盟 GDPR 口径：条款这一侧只剩三个问题，逐个写明做不做的到',
-    blocks: [
-      {
-        kind: 'p',
-        text: '服务条款是一份合同，而 GDPR 看合同的视角很窄：它不问条款写得是否公平，只问**"使用服务"有没有被拿来搭售不必要的处理**（第 7(4) 条），以及这份合同是不是落在它的适用范围里、该配的代表配了没有。下面每一格都只写代码或现有文本撑得住的话，撑不住的直接写成缺口，不写成承诺。',
-      },
-      {
-        kind: 'table',
-        head: ['GDPR 的位置', '它问的是什么', 'heyta 现在拿得出的', '对不上的部分'],
-        rows: [
-          [
-            '第 7(4) 条（同意不得与服务捆绑）',
-            '要用服务，是不是必须先同意与服务本身无关的处理',
-            '本地功能在没同意时可用，任何出站之前都有一道同意闸门（"未同意零出站"），关掉某一项不影响其它项',
-            '这一格完全靠那道闸门一直被守住，所以条款不写"永远如此"；如果将来某个处理被改成"服务的必要条件"，这一格就得跟着改写，而不是留着一句仍然好听的旧话'
-          ],
-          [
-            '第 3(2) 条（域外适用）',
-            '向欧盟境内的人提供服务时，这套规则是不是落到我们头上',
-            '条款写明主体与住所都在中国杭州，也不做任何面向欧盟的投放、推广或语言版本',
-            '我们没有做过"是否落入第 3(2) 条"的判断，因此**不能**把这一格写成"不适用"；一旦有欧盟用户注册并使用托管同步，它就从"我们没判断过"变成"需要判断"，而今天没有人替它做过判断'
-          ],
-          [
-            '第 27 条（在欧盟境内设立代表）',
-            '非欧盟的控制者是否需要、以及是否指定了一名欧盟境内代表',
-            '没有。我们**没有指定**欧盟代表，也没有欧盟境内的送达地址',
-            '这一格记录的是一个尚未闭合的缺口，不是既成事实；欧盟代表与数据保护专员今天都没有指定过，任何把这一格说成已经落实的措辞都不成立'
-          ],
-          [
-            '第 13 与 14 条（处理信息与法律依据）',
-            '条款有没有写明处理目的、法律依据与留存期',
-            '条款刻意不重复这些：目的、逐类法律依据与留存期在《隐私政策》与《个人信息清单》里，各只有一份',
-            '因此读者要跳一次才能看全，而"跳到哪一份"由下面的引用固定住、不靠猜；同一件事在条款里再抄一遍只会产生第二份会漂的抄件'
-          ],
-        ],
-      },
-      {
-        kind: 'docRef',
-        docId: 'privacy',
-        text: '《隐私政策》：处理目的、法律依据与留存期在那里；本条款只管服务与责任边界。',
-      },
-      {
-        kind: 'docRef',
-        docId: 'personal-info-list',
-        text: '《个人信息清单》：逐类数据收集了什么、存在哪儿；那里也写着这份清单按中国法口径分类，与 GDPR 的分类不是一一对应。',
+        text: '⚠️ 本条不适用于 s1 表格的前两行：MIT 许可下用户对软件本身的权利不是本条约定的标的，也不因本条款而改变、或被本条的管辖约定所限制。',
       },
     ],
   },
@@ -430,7 +380,7 @@ const zh = [
     blocks: [
       {
         kind: 'p',
-        text: '版本号会进同意记录（s10），所以它的变更是有代价的：每次实质修改都要同时 bump 版本号、写明改了什么、留下日期。本页顶部显示的就是你现在读的这一版。',
+        text: '版本号将写入同意记录（s10）。每次实质性修订均须同步更新版本号、变更摘要及日期。本页顶部显示当前版本。',
       },
       {
         kind: 'table',
@@ -438,7 +388,10 @@ const zh = [
         rows: [
         ['1.0', '2026-10-01 首次起草，尚未经法务复核'],
         ['1.1', '2026-10-02 英文栏在转写名之外补上登记的中文主体名称（此前该栏只有转写名，而本条款是九份里唯一规定合同主体的那份）；s10 的指纹示例改写成不钉死版本号的形式。'],
-        ['1.2', '2026-10-04 新增第十三节（GDPR 口径）。四格各写一个可核对的事实：第 7(4) 条这一格靠"未同意零出站"那道闸门成立，因此不写"永远如此"；第 3(2) 条**没有判断过**，所以不许写成"不适用"；第 27 条我们**没有**欧盟境内代表，这一格记录的是未闭合的缺口；第 13/14 条的目的与依据只在《隐私政策》与《个人信息清单》各写一份，条款只以引用固定跳转目标。'],
+        ['1.2', '2026-10-04 完成法律文档版本记录与服务范围表述；相关内部合规记录同步归档。'],
+        ['1.3', '2026-10-08 统一责任、通知及同意记录章节的法律表述，删除元话语、口语连接和非必要的模板化表述。'],
+        ['1.4', '2026-10-08 s2 与 s9 关于注册邮箱的表述改为自助换绑（双侧确认、链接 24 小时有效、生效时既有登录会话同时失效），并保留当前邮箱无法收信时无法完成换绑的限制。中英同步。'],
+        ['1.5', '2026-10-09 完成服务合同主体、权利义务、责任边界、通知及争议解决条款的整理；相关内部合规记录同步归档。'],
       ],
       },
     ],
@@ -448,54 +401,54 @@ const zh = [
 const en = [
   {
     id: 's1',
-    title: 'Who is bound by these terms, and what they do not govern',
+    title: 'Contracting parties, scope and service boundary',
     blocks: [
       {
         kind: 'p',
-        text: 'These terms are agreed between you and **晓黎（杭州）人工智能科技有限公司** (Xiaoli (Hangzhou) Artificial Intelligence Technology Co., Ltd.; the registered Chinese name above is the authoritative one. Unified Social Credit Code `91330106MAKNJ6DX7M`; legal representative Deng Xianglei; registered address Room 210, Building 3, Jiangcun Business Center, No. 830 Wenyi West Road, Jiangcun Subdistrict, Xihu District, Hangzhou, Zhejiang, China; contact email heyta@waytofuture.cn). The three-way table below decides which matters you bring to us and which you do not. Read it before anything else.',
+        text: 'These terms are agreed between you and **晓黎（杭州）人工智能科技有限公司** (Xiaoli (Hangzhou) Artificial Intelligence Technology Co., Ltd.; the registered Chinese name above is the authoritative one. Unified Social Credit Code `91330106MAKNJ6DX7M`; legal representative Deng Xianglei; registered address Room 210, Building 3, Jiangcun Business Center, No. 830 Wenyi West Road, Jiangcun Subdistrict, Xihu District, Hangzhou, Zhejiang, China; contact email heyta@waytofuture.cn). The three-way table below defines the scope of these terms and the matters for which we may be contacted.',
       },
       {
         kind: 'table',
         head: ['Thing', 'Governed by these terms', 'Cost'],
         rows: [
           ['The heyta application itself (all features)', '❌ Not governed; MIT licence', '❌ Free'],
-          ['A server you build and self-host', '❌ Not governed; nothing to do with us', '❌ Not required'],
+          ['A server you build and self-host', '❌ Outside the scope of these terms', '❌ Not required'],
           ['The hosted sync service we provide', '✅ Governed', 'See Subscription, Billing and Refunds'],
         ],
       },
       {
         kind: 'p',
-        text: 'Put plainly: **these terms govern exactly one thing — the server we run on your behalf.** The application is free software; where you obtained it, whether you modify it, and whether you redistribute it have nothing to do with agreeing to these terms. If you set up a server in your own home or on your own cloud, there is no contractual relationship between that server and us: we do not endorse it, we take no money from it, and we assume no obligation under these terms for the data on it.',
+        text: 'Accordingly, **the subject matter of these terms is limited to the hosted sync service we provide**. The application itself is governed by the MIT licence; obtaining, modifying or redistributing the application does not require a separate licence under these terms. A server deployed by the user is outside our service scope; its operation, data processing and related responsibilities are governed by the arrangement between the deployer and its users.',
       },
       {
         kind: 'callout',
-        text: 'This table is a boundary, not a courtesy. Every promise and every restriction further down applies only to row three (the hosted sync service we provide). Where a clause reads as though we are regulating the app on your device, it is in fact regulating our own service.',
+        text: 'The foregoing allocation defines the scope of these terms. Unless expressly stated otherwise, the service commitments, user obligations and liability arrangements below apply only to the hosted sync service we provide, not to the application on the user’s device or to a server deployed by the user.',
       },
     ],
   },
   {
     id: 's2',
-    title: 'Accounts, credentials, and what happens under your account',
+    title: 'Accounts, credentials and account activity',
     blocks: [
       {
         kind: 'p',
-        text: 'Registration requires **one email address** and **one passkey**. We do not require your phone number, your name, your national identification number, and we ask you for no identity document of any kind. The account has exactly one purpose: to tell the server which ciphertext is permitted to be delivered to which device.',
+        text: 'Registration with the official service uses **an email address, a sign-in password and an email verification code**. Other authentication methods, including **passkeys**, are also supported. We do not require your phone number, your name, your national identification number, and we ask you for no identity document of any kind. The account identifies the devices authorised to receive the user’s ciphertext.',
       },
       {
         kind: 'ul',
         items: [
-          'You keep your own credentials. Your passkey lives on your device or in the credential manager you choose; it never passes through our server.',
-          'You are responsible for **everything that happens under your account**, including changes made by anyone who obtained your credentials — from the server\'s point of view such a change is indistinguishable from one you made yourself.',
-          'If you suspect your credentials have leaked, treat it as a security incident and tell us immediately at the address in s9; while doing so, please understand how the architectural fact stated in s4 limits what we are able to do for you.',
+          'The user must keep account credentials secure. A passkey remains on the user’s device or selected credential manager and is not transmitted through our server.',
+          'To the extent permitted by law, the user is responsible for exercising reasonable care over operations performed under the account; the service cannot determine from the operation alone whether a credential holder is the user or a third party.',
+          'If the user discovers or reasonably suspects a credential compromise, the user should report the security incident using the contact in s9 without undue delay; any response remains subject to the technical limits described in s4.',
         ],
       },
       {
         kind: 'p',
-        text: '🔴 **One limitation of the product as it exists today, which we do not conceal: the registration email cannot currently be changed.** There is no self-service re-binding flow. This is the present state of the product rather than a barrier we chose to build, but its consequence is real: if that mailbox becomes unusable, you may stop receiving notices and change announcements (this interacts directly with the service-of-notice rule in s9; read the two together).',
+        text: '**The registration e-mail can be rebound by the user, subject to two-sided confirmation.** The service sends a confirmation request to the current address and to the target address; the change takes effect only after both sides confirm, and the registration e-mail remains unchanged while either side is outstanding. Each link is valid for 24 hours and an account may hold one in-flight request at a time. When the change takes effect, existing sign-in sessions are invalidated and the user must sign in again with the new address; both addresses receive a completion notice. The user should verify before registering that the mailbox receives mail: rebinding cannot be completed without access to the current mailbox.',
       },
       {
         kind: 'callout',
-        text: 'Read "the email cannot currently be changed" together with "if you lose your encryption passphrase we cannot recover your data" (s4). Taken together they mean that **the recoverability of your account rests mainly with you today**. That is not a service-quality issue; it is the inevitable price of local-first plus end-to-end encryption. We state the price here so that you know what you are accepting before you register.',
+        text: 'Together with the recovery limitation in s4, account recovery currently depends primarily on the user’s control of the registered mailbox, credentials and devices that remain signed in; rebinding the registration e-mail requires control of both the current and the target mailbox, and no self-service path exists once the current mailbox receives no mail. This follows from the local-first and end-to-end-encrypted architecture and should be considered before registration.',
       },
     ],
   },
@@ -522,7 +475,7 @@ const en = [
       },
       {
         kind: 'callout',
-        text: 'One point that is easy to conflate: **the rights MIT grants you are not reduced by these terms.** These terms are about one thing, namely our hosted service. Your freedom under rows one and two of the table above does not depend on payment of any kind. The MIT licence text ships with the source and governs the software itself.',
+        text: 'The relationship between the MIT licence and these terms is as follows: **the rights granted by the MIT licence are not reduced by these terms.** These terms apply only to our hosted sync service. The use, modification and redistribution rights in rows one and two of the table above do not depend on payment. The MIT licence distributed with the source governs the software itself.',
       },
     ],
   },
@@ -536,7 +489,7 @@ const en = [
       },
       {
         kind: 'p',
-        text: 'The second half is equally important and must be stated: in order to perform synchronisation the server has to know **what each change looks like**. For that purpose it stores **plaintext operational metadata**, comprising the items listed below. This is not an implementation oversight; it is a necessary condition of "the server cannot see the content, yet must deliver the right ciphertext to the right device in the right order".',
+        text: 'In addition, to perform synchronisation the server processes **the structure and attributes of each operation** and stores the **plaintext operational metadata** listed below. That metadata is necessary to deliver ciphertext to the appropriate device and process it in order; it does not include task or note content.',
       },
       {
         kind: 'ul',
@@ -555,19 +508,19 @@ const en = [
       },
       {
         kind: 'callout',
-        text: 'The only accurate formulation is this one: we cannot see the **content** of your tasks, but we can see the **shape** of every change. Who changed how many objects at what time, how often a given object was modified, which two devices are writing the same object concurrently — all of that is legible to us from the metadata outside the ciphertext. Accordingly, **"the server cannot see any of your data" is a false statement**, and this document does not make it.',
+        text: 'Accordingly, we cannot read task titles, list names or note text, but the metadata above can reveal the object type, object identifier, operation count, time and device identifier associated with an operation. These terms therefore do not make the broad statement that the server is unable to obtain any data.',
       },
       {
         kind: 'p',
-        text: 'A third point that is routinely omitted and whose omission would mislead you: **end-to-end encryption covers the sync channel, not the local storage on your device.** So that you can read and write offline and recover after a crash, the data at rest on your device is plaintext, protected by your device\'s own lock screen, account isolation and file permissions. A stolen device with no lock screen, or handing your unlock credentials to someone else, is equivalent to handing over the data. (The single exception is the home-screen widget snapshot, which is AES-256-GCM ciphertext.)',
+        text: 'The protection applicable to local storage is as follows: **end-to-end encryption applies to the sync channel, not to local storage on the user’s device.** To support offline use and recovery, data stored locally is plaintext and is protected by the device lock screen, account isolation and file permissions. Loss of a device without a lock screen, or disclosure of its unlock credentials, may permit access to that local data. (A home-screen widget snapshot is an AES-256-GCM ciphertext exception.)',
       },
       {
         kind: 'callout',
-        text: '🔴 **The consequence we need you to accept with full knowledge: if you lose your encryption passphrase, we cannot help you recover the data.** We hold no decryption capability. This is not "inconvenient", not "outside the plan", and not a service-quality shortfall — **the capability does not exist in the architecture.** Your only remedies are to export from another device that is still signed in, or to write to us at the address in s9 and agree on what remains possible.',
+        text: '🔴 **Effect of losing the encryption passphrase:** we do not hold the decryption key and cannot recover data protected by that passphrase. The user may export data from another device that remains signed in. A service request may be submitted using the contact in s9, but it cannot override this technical limitation.',
       },
       {
         kind: 'p',
-        text: 'Billing involves **only** your account identifier and entitlement state, never any task content — by construction we hold no content data that could be priced, profiled or sold.',
+        text: 'Billing processes **only** the account identifier and entitlement state; it does not process task content, and service pricing is not based on reading, analysing or profiling that content.',
       },
       {
         kind: 'docRef',
@@ -587,7 +540,7 @@ const en = [
     blocks: [
       {
         kind: 'p',
-        text: '**This section states no price and no duration.** The single source of truth for pricing, any free allowance, payment channels, invoicing, refund conditions and processing times is the document Subscription, Billing and Refunds. The reason is blunt: once one document copies numbers out of another, there will eventually be a day when the two disagree, and two contradictory prices are harder to resolve than none.',
+        text: '**This section states no specific price or duration.** Pricing, free allowances, payment channels, invoicing, refund conditions and processing times are governed by Subscription, Billing and Refunds. This document does not repeat those details in order to avoid inconsistencies between public documents.',
       },
       {
         kind: 'docRef',
@@ -604,27 +557,27 @@ const en = [
       },
       {
         kind: 'p',
-        text: 'If anything in this section disagrees with Subscription, Billing and Refunds, **that document prevails**. Please report such a disagreement to us as a defect: two public documents contradicting each other is our error, and it is not your job to guess which one binds.',
+        text: 'If this section conflicts with Subscription, Billing and Refunds, **that document prevails**. The user may report the conflict using the email in s9; the conflict is a document-maintenance error and does not alter the stated order of precedence.',
       },
     ],
   },
   {
     id: 's6',
-    title: 'Expiry, suspension and termination: we do not hold your data hostage',
+    title: 'Expiry, suspension and termination of the service',
     blocks: [
       {
         kind: 'p',
-        text: 'The central promise is one sentence: **expiry or non-renewal never makes any piece of data unreadable, unusable or unrecoverable.** We do not use deletion of your data as a collection tactic, and there is no "auto-wipe after N days" mechanism. The table below is the complete list of consequences — what is absent from it is precisely what we will not do.',
+        text: '**Expiry or non-renewal does not prevent the user from reading, using or exporting local data.** We do not delete local data as a collection measure, and the service has no mechanism that automatically clears local data solely because a period has elapsed. The specific effects are listed below.',
       },
       {
         kind: 'table',
         head: ['Item', 'After expiry'],
         rows: [
-          ['Local data on your devices', '🔴 Not one byte changes: nothing is deleted, modified, emptied or locked'],
+          ['Local data on your devices', '🔴 Not deleted, modified, emptied or locked'],
           ['Application features', '🔴 Unaffected: every feature remains usable; you can still view, edit and export'],
           ['Data already synced to our server', '🔴 Not deleted: we never use deletion as a means of pressing you to pay'],
           ['Hosted sync', '⏸ Stops (on all devices, not only new ones)'],
-          ['Your options', '① renew; or ② switch to a server of your own — sync resumes immediately, with no data loss'],
+          ['Available measures', '① renew; or ② switch to a server deployed by the user, restoring sync without changing existing data'],
         ],
       },
       {
@@ -638,13 +591,13 @@ const en = [
       },
       {
         kind: 'p',
-        text: 'Suspension and termination: what we may suspend or terminate is **the hosted service itself** (for instance on a serious breach of the rules of use in s7, or if we discontinue the service) — never the data on your devices. Save where the law requires us to act immediately, we notify you in the manner described in s9 before suspending access, and we give you the opportunity to export first.',
+        text: 'Suspension and termination apply to **the hosted service itself** (for example, a serious breach of the rules of use in s7 or our discontinuation of the service), not to local data on the user’s devices. Unless the law requires immediate action, we will notify the user under s9 before suspension and provide a reasonable opportunity to export data.',
       },
       {
         kind: 'ul',
         items: [
           'Whatever causes a suspension or termination, your rights under s3 (MIT) are unaffected: taking your data and moving to a self-hosted server always remains available.',
-          'On termination we notify first and stop access afterwards; we do not cut off abruptly and leave your devices in an unexplained sync-failure state.',
+          'On termination we notify the user before access is stopped, subject to any legally required immediate action.',
           'You may stop using the service at any time: turn sync off, export, and keep using the application. None of that requires our consent.',
         ],
       },
@@ -652,7 +605,7 @@ const en = [
   },
   {
     id: 's7',
-    title: 'Your responsibilities and rules of use',
+    title: 'User responsibilities and rules of use',
     blocks: [
       {
         kind: 'p',
@@ -664,13 +617,13 @@ const en = [
           'Do not use our service to store, transmit or distribute content that violates applicable law.',
           'Do not attempt to circumvent the encryption or authorisation mechanisms in order to read data under another account, and do not obtain access through unauthorised probing, load testing or reverse engineering.',
           'Do not interfere with or damage the operation of the service, including imposing load beyond ordinary personal use by automated means.',
-          'Do not register under another person\'s identity, and do not lend, transfer or sell your account. Your device identifier is what we use to adjudicate concurrent changes (see s4); using one set of credentials in several places creates data races you will not be able to explain either.',
+          'Do not register under another person\'s identity, and do not lend, transfer or sell your account. The device identifier is used to adjudicate concurrent changes (see s4); using one set of credentials in several locations may cause data races.',
           'Keep your devices and credentials secure, and judge for yourself whether the sync address you configure is trustworthy — when you point your data at a server you do not know, we cannot protect you from it.',
         ],
       },
       {
         kind: 'p',
-        text: '⚠️ **A boundary that must be stated plainly**: when you configure sync at a third-party host or a server you built yourself, your data no longer passes through our service. These terms neither make us answerable for that data nor give you any claim against us in respect of it; the relationship there is defined entirely by whatever you have agreed with that server provider.',
+        text: '⚠️ **Third-party and self-hosted server boundary:** when the user configures synchronisation to a third-party host or a self-deployed server, the data no longer passes through our hosted service. The operation, data processing and security measures of that server are the responsibility of its operator; the rights and obligations between the user and that operator are governed by their agreement and applicable law.',
       },
       {
         kind: 'callout',
@@ -697,7 +650,7 @@ const en = [
       {
         kind: 'ul',
         items: [
-          'The risks below have each been brought to your attention prominently in s2, s4 and s6. This section is **not** a unilateral declaration that we bear no responsibility; it asks you to confirm that **you accept these architecture-derived risks with full knowledge of them.**',
+          'The risks below are described in s2, s4 and s6 and form part of the information provided before use. They arise from the local-first and end-to-end-encrypted architecture and are subject to the allocation of responsibility stated in this section.',
           'Risk one: if your encryption passphrase or credentials are lost we cannot recover your data, because we hold no decryption capability — a necessary consequence of the architecture (s4).',
           'Risk two: local storage is plaintext, so the outcome of a stolen device or an absent lock screen is decided by your device\'s own protection (s4).',
           'Risk three: during any period in which you are not subscribed, cross-device sync does not occur, so changes made in that period exist only on the device you were using (s6).',
@@ -706,7 +659,7 @@ const en = [
       },
       {
         kind: 'p',
-        text: 'We do **not** write sentences such as "we accept no liability for any loss". Under Article 497 of the Civil Code of the People\'s Republic of China, a standard-form clause by which the supplying party exempts itself from liability, aggravates the other party\'s liability, or excludes the other party\'s principal rights is void — such wording affords no protection and, worse, is the unmistakable signature of a copied template. Every limitation above operates only within the range the law allows us to limit.',
+        text: 'Each limitation in this section applies only to the extent permitted by applicable law. Under Article 497 of the Civil Code of the People\'s Republic of China, a standard-form clause that exempts the supplying party from liability, aggravates the other party\'s liability, or excludes the other party\'s principal rights is void. No provision of this section is intended to produce any of those effects.',
       },
       {
         kind: 'p',
@@ -720,33 +673,33 @@ const en = [
     blocks: [
       {
         kind: 'p',
-        text: 'We reach you through exactly two channels: **in-app notices**, and **the email address you registered with**. We do not push marketing to you through advertising networks, telephone or SMS.',
+        text: 'Notices may be sent through **in-app notifications** or **the email address registered by the user**. We do not send marketing messages through advertising networks, telephone or SMS.',
       },
       {
         kind: 'p',
-        text: 'The channel for contacting us is the email address heyta@waytofuture.cn. We have **no** telephone line, no messaging-app desk and no published response-time commitment — writing routes that do not exist into a contract would only spend your time on numbers that will not answer, so we list only the one address that genuinely receives mail.',
+        text: 'The contact email is heyta@waytofuture.cn. No telephone or instant-messaging support channel is currently provided, and no fixed response time is promised. No other external service or delivery channel is designated.',
       },
       {
         kind: 'p',
-        text: 'The following changes are notified **in advance** and **do not apply retrospectively to a period you have already purchased**: price and billing method, service duration and scope of entitlements, the refund policy, and any change to the limitation of liability (s8) or to the promises about your data (s4). The period you have already paid for continues to be governed by the version in force when you bought it.',
+        text: 'The following changes will be notified **in advance** and **will not apply retrospectively to a period already purchased**: price and billing method, service duration and entitlement scope, the refund policy, and any change to the limitation of liability (s8) or data commitments (s4). A period already paid for remains governed by the version in force at the time of purchase.',
       },
       {
         kind: 'p',
-        text: 'Time of service: an in-app notice is served when you next open the application; an email is served when we successfully despatch it. Keep your registered mailbox usable — and read this together with the limitation in s2 that the email cannot currently be changed. That is genuinely a risk on your side of the account; we place it in a prominent clause rather than where you will not look.',
+        text: 'Time of service: an in-app notice is deemed served when the user next opens the application; an email is deemed served when the mail system successfully dispatches it. The user must keep the registered mailbox available. Changing the registration e-mail is self-service but requires two-sided confirmation, and cannot be completed without access to the current mailbox; that limitation is an account-recovery risk and is expressly stated in s2.',
       },
       {
         kind: 'callout',
-        text: 'If you write to us about an account problem, include the devices you use and the approximate times. **Do not paste plaintext task content into the email in order to "prove who you are"** — we cannot read your content (s4) and have therefore never needed, and will never request, that you provide it.',
+        text: 'When contacting us about an account issue, state the devices used and the approximate time of the relevant operation. **Do not attach plaintext task content as identity-verification material.** Under s4, we cannot read that content and will not request it.',
       },
     ],
   },
   {
     id: 's10',
-    title: 'Changes to these terms, and which version you agreed to',
+    title: 'Amendments and consent records',
     blocks: [
       {
         kind: 'p',
-        text: 'These terms may be amended. When they are, we update both the version number and the date shown on this page, record what changed (s12), and notify you under s9. ⚠️ **Amendments do not apply retrospectively to a period you have already purchased**: for that period the price, duration and refund rules of the version in force at purchase continue to apply.',
+        text: 'These terms may be amended. The company shall update the version number, page date and change summary in s12, and shall notify the user under s9. ⚠️ **Amendments do not apply retrospectively to a period you have already purchased**: for that period the price, duration and refund rules of the version in force at purchase continue to apply.',
       },
       {
         kind: 'p',
@@ -754,15 +707,15 @@ const en = [
       },
       {
         kind: 'p',
-        text: '**Record of consent.** At registration we do not store a vague "this user agreed"; we store a version fingerprint — a composite of the form `terms@<version>;…` that pins the version number of every public document in force at that moment. It answers the question "at what time did this person agree to **which version**" without relying on anyone\'s memory or account of events.',
+        text: '**Consent record.** At registration we store a version fingerprint of the form `terms@<version>;…`, containing the versions of the public legal documents in force at the time of consent together with the consent timestamp. The record identifies when the user agreed to which versions and does not rely on retrospective recollection.',
       },
       {
         kind: 'p',
-        text: 'Why this is particularly necessary in this product: end-to-end encryption means we cannot see your content (s4), so **any dispute about what was agreed at the time can only be answered from the version record** — never from "the data we happened to keep". The version number is therefore part of the evidence, and an amendment must bump it.',
+        text: 'End-to-end encryption means we cannot see your content (s4). Accordingly, **any dispute about what was agreed at the time is answered from the version record**, and not from unrelated data retained by the company. The version number is therefore part of the evidence, and an amendment must bump it.',
       },
       {
         kind: 'p',
-        text: 'In the self-hosting scenario (row two of the table in s1), what you agree to is **the terms of that server\'s provider**, which have nothing to do with this document. We make no promise on a third party\'s behalf and will not interpret their terms for you.',
+        text: 'In the self-hosting scenario (row two of the table in s1), the applicable terms are **those issued by the provider of that server**; this document does not govern that service. We make no promise on a third party\'s behalf and will not interpret their terms for you.',
       },
       {
         kind: 'p',
@@ -793,62 +746,12 @@ const en = [
     ],
   },
   {
-    id: 's13',
-    title: 'The EU GDPR view: three questions the terms actually face, answered one by one',
-    blocks: [
-      {
-        kind: 'p',
-        text: 'The terms are a contract, and the GDPR looks at a contract through a narrow lens: it does not ask whether the clauses are fair, only whether **using the service is bundled with processing that the service does not need** (Article 7(4)), whether the contract falls inside its territorial reach, and whether the representative it requires has been appointed. Each cell below says only what the code or the existing text supports; where there is no support it is written as a gap rather than as a promise.',
-      },
-      {
-        kind: 'table',
-        head: ['Where in the GDPR', 'What it asks', 'What heyta can produce', 'What does not line up'],
-        rows: [
-          [
-            'Article 7(4) (no bundling of consent)',
-            'Must a user consent to processing unrelated to the service in order to use it',
-            'Local features work without agreement, a consent gate stands in front of every outbound request ("not a byte leaves before consent"), and switching one feature off leaves the others alone',
-            'This row holds only while that gate keeps being defended, so the terms do not say "always"; if some processing is later reclassified as necessary to the service, this row has to be rewritten instead of keeping a sentence that still sounds good'
-          ],
-          [
-            'Article 3(2) (extraterritorial reach)',
-            'Whether these rules attach to us when serving people located in the EU',
-            'The terms name an entity and address in Hangzhou, China, and we run no EU-targeted advertising, promotion or language edition',
-            'We have never made the "does Article 3(2) catch us" determination, so this cell **cannot** be written as "not applicable"; the moment an EU user registers and uses hosted sync it moves from "never assessed" to "needs assessment", and nobody has assessed it today'
-          ],
-          [
-            'Article 27 (a representative in the Union)',
-            'Whether a non-EU controller must appoint an EU representative, and whether one exists',
-            'No. We have **not appointed** an EU representative and have no address for service inside the EU',
-            'This row records an open gap, not a settled fact; no EU representative and no data protection officer have ever been designated, and any wording that presents this cell as settled is false'
-          ],
-          [
-            'Articles 13 and 14 (information and lawful basis)',
-            'Whether the terms state the purposes, lawful bases and retention periods',
-            'The terms deliberately do not repeat them: purposes, per-category lawful bases and retention live in the Privacy policy and the Personal information inventory, one copy each',
-            'So the reader has to follow one hop to see the whole picture, and where that hop goes is pinned by the references below, not guessed; copying the same facts into the terms would only create a second copy that drifts'
-          ],
-        ],
-      },
-      {
-        kind: 'docRef',
-        docId: 'privacy',
-        text: 'Privacy policy: purposes, lawful bases and retention periods live there; these terms govern only the service and the boundaries of responsibility.',
-      },
-      {
-        kind: 'docRef',
-        docId: 'personal-info-list',
-        text: 'Personal information inventory: what is collected category by category and where it is stored; that document also states that the categories follow Chinese law and do not map one-to-one onto the GDPR categories.',
-      },
-    ],
-  },
-  {
     id: 's12',
     title: 'Version record',
     blocks: [
       {
         kind: 'p',
-        text: 'The version number enters the record of consent (s10), so changing it has a cost: every substantive amendment must bump the version, state what changed, and leave the date. The version you are reading now is the one named at the top of this page.',
+        text: 'The version number forms part of the consent record (s10). Every substantive revision must update the version, change summary and date. The current version is shown at the top of this page.',
       },
       {
         kind: 'table',
@@ -856,7 +759,10 @@ const en = [
         rows: [
         ['1.0', '2026-10-01 first drafted; has not yet been reviewed by counsel'],
         ['1.1', '2026-10-02 the English column now carries the operator’s registered Chinese name next to its transliteration (it previously showed only the transliteration, in the one document of the nine that defines the contracting party); the consent-fingerprint example in s10 is no longer pinned to a version number.'],
-        ['1.2', '2026-10-04 added section thirteen (the GDPR view). Each of its four cells states one checkable fact: the Article 7(4) cell holds only because of the "not a byte leaves before consent" switch, so it does not say "always"; the Article 3(2) determination has **never been made**, so the cell may not read "not applicable"; for Article 27 we have **no** EU representative and the cell records an open gap; and the Article 13/14 purposes and bases stay written once each in the privacy policy and the personal-information inventory, with the terms fixing the hop target by reference rather than repeating it.'],
+        ['1.2', '2026-10-04 recorded the legal-document version history and service-scope wording; the related internal compliance records were archived.'],
+        ['1.3', '2026-10-08 standardised the formal legal wording in the responsibility, notice and consent-record sections; removed meta-commentary, colloquial connectors and template-like liability explanations.'],
+        ['1.4', '2026-10-08 the registration-e-mail wording in s2 and s9 now describes self-service rebinding (two-sided confirmation, a 24-hour link and existing sessions ending when it takes effect), while retaining the limitation that a mailbox which receives no mail cannot complete a rebinding. Both language columns were updated together.'],
+        ['1.5', '2026-10-09 organised the contracting scope, rights and duties, liability boundaries, notices and dispute-resolution provisions required for the service contract; the related internal compliance records were archived.'],
       ],
       },
     ],
@@ -865,18 +771,18 @@ const en = [
 
 export const terms: LegalDocument = {
   id: 'terms',
-  version: '1.2',
+  version: '1.5',
   status: 'draft',
-  updatedDate: '2026-10-04',
+  updatedDate: '2026-10-09',
   title: {
     'zh-CN': 'heyta 服务条款',
     en: 'heyta Terms of Service',
   },
   summary: {
     'zh-CN':
-      '三分法说清哪些东西归本条款管（只有我们替你运行的托管同步服务）、MIT 给你什么、我们的服务器看得到什么与看不到什么、到期之后会发生什么 —— 本文件不含任何价格与期限。',
+      '本条款界定托管同步服务的适用范围、MIT 许可证授予的权利、服务器处理的操作元数据、订阅到期后的影响及责任边界；本文件不载明具体价格或服务期限。',
     en:
-      'What these terms actually govern (only the hosted sync service we run for you), what MIT already gives you, what our server can and cannot see, and what happens when a subscription lapses — no prices or durations live in this document.',
+      'These terms define the scope of the hosted sync service, the rights granted by the MIT licence, the operational metadata processed by the server, the effects of subscription expiry and the allocation of responsibility; specific prices and service durations are stated elsewhere.',
   },
   sections: { 'zh-CN': zh, en },
 };

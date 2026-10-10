@@ -31,6 +31,7 @@ import {
   axisTicksForWindow,
   boardWindow,
   dueText,
+  fitBoardTicks,
   isAllDayMs,
   isOverdue,
   markerMs,
@@ -184,6 +185,39 @@ describe('刻度（axisTicksForWindow）', () => {
     for (const tick of ticks) {
       expect(new Date(tick.atMs).getDate()).toBe(1);
     }
+  });
+});
+
+describe('刻度布局（fitBoardTicks）', () => {
+  const w = { startMs: 0, endMs: 300 };
+
+  it('按标签宽度避让相邻刻度，同时保留今天并按时间排序', () => {
+    const ticks = [
+      { atMs: 0, granularity: 'day' as const, isToday: false },
+      { atMs: 100, granularity: 'day' as const, isToday: true },
+      { atMs: 200, granularity: 'day' as const, isToday: false },
+      { atMs: 250, granularity: 'day' as const, isToday: false },
+    ];
+
+    const fitted = fitBoardTicks(ticks, w, 300, 64);
+
+    expect(fitted.map(({ tick }) => tick.atMs)).toContain(100);
+    expect(fitted.map(({ tick }) => tick.atMs)).toEqual(
+      [...fitted].sort((a, b) => a.tick.atMs - b.tick.atMs).map(({ tick }) => tick.atMs),
+    );
+    for (let index = 1; index < fitted.length; index += 1) {
+      expect(fitted[index]!.left - fitted[index - 1]!.left).toBeGreaterThanOrEqual(64);
+    }
+  });
+
+  it('窄轨道也会把标签夹在轨道边界内', () => {
+    const ticks = [
+      { atMs: 0, granularity: 'day' as const, isToday: false },
+      { atMs: 100, granularity: 'day' as const, isToday: true },
+    ];
+    const fitted = fitBoardTicks(ticks, w, 40, 64);
+
+    expect(fitted.every(({ left }) => left >= 0 && left <= 0)).toBe(true);
   });
 });
 

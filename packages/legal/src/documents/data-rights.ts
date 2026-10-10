@@ -48,7 +48,7 @@
  *    这一类"句子会因为代码变好而变成谎话"的雷，现在有一条常驻门禁盯着：
  *    `scripts/check-legal-closure-truth.mjs`。
  *
- * 另外两处必须如实写的限制：邮箱**不可更换**（服务端根本没有改邮箱的路由），
+ * 另外两处必须如实写的限制：邮箱换绑要**两边都点**（旧地址已经收不到信的情况没有自助通道），
  * 以及导出文件本身**不受加密保护**（它是客户端解开之后的明文副本）。
  * 联系渠道只有邮箱：没有电话号码、没有在线客服、没有实体受理点，
  * 本文件不许出现这三类承诺。
@@ -155,7 +155,7 @@ const zh = [
       },
       {
         kind: 'callout',
-        text: '**邮箱不可更换。** heyta 的账号就是那个邮箱地址，作为登录凭据它目前不能改、也不能换绑；服务端没有这样的能力，我们也不会在这里承诺它。如果注册时填错了地址，目前可行的做法是用正确的地址重新注册，并请我们注销填错的那个账号。',
+        text: '**换绑邮箱：自助，但要两边都点。** heyta 的账号就是那个邮箱地址，它现在**可以在应用里自己换绑**。发起后我们同时给**当前地址**与**新地址**各发一封信，**两边各点一次才生效**（先后无关）；任何一边没点，账号、地址与登录都原样不动。链接 **24 小时**内有效，过期或被撤销后要重新发起，而且同一个账号同时**只允许一张**在途请求。生效的那一刻：新地址成为登录标识且视为已验证，**所有设备上的登录同时失效**（在途的重置口令与魔法登录链接一并作废），两个地址**各**收到一封完成通知。库里**不保留历史地址** —— 只有那张在途请求行临时存着新地址的明文，用完即删。🔴 仍然真实的一条限制：这套流程要求你**同时控制两个收件箱**。旧地址已经收不到信（注册时填错、停用、被服务商回收）就没有自助通道，只能走下面的邮箱受理渠道，或者用正确的地址重新注册并请我们注销旧的账号。',
       },
       {
         kind: 'p',
@@ -288,7 +288,7 @@ const zh = [
           ['查阅、复制、更正、删除（自助可做的那些）', '应用内直接操作', '即时，无需等待'],
           ['撤回同意、停止某项处理', '应用内关闭对应开关', '即时'],
           ['注销账号', '网页版设置页 / 手机端「我的」/ 命令行版 `account close`，或邮箱申请', '自助即时生效；邮件请求收到后 15 个工作日内'],
-          ['账号类信息（例如填错的注册邮箱）', '邮箱', '收到请求后 15 个工作日内'],
+          ['账号类信息（例如注册时填错、自己根本收不到信的邮箱 —— 换绑要求两边都能收信，所以这一类仍在渠道里）', '邮箱', '收到请求后 15 个工作日内'],
           ['要求解释说明处理规则', '邮箱', '收到请求后 15 个工作日内'],
           ['近亲属请求、投诉与举报', '邮箱', '收到请求后 15 个工作日内'],
         ],
@@ -313,8 +313,8 @@ const zh = [
         rows: [
           ['第 13、14 条 透明度', '处理目的、类别、保留、接收方逐项告知', '这一套对外文本本身就是告知载体：数据清单、保留与备份、第三方、权限逐项列开', '本套文本没有公布数据保护专员或欧盟代表（第 27、37 条）的联系方式；受理渠道只有邮箱'],
           ['第 15 条 访问', '告知并复制其个人数据', '导出是**自助**的，而且只有你解得开：服务端存的是端到端加密的事件，我们没有口令就还原不出明文', '正因为你给的从来不是明文，我们无法替你查出"你的任务标题是什么"——这一条由你的设备行使，不由我们代查'],
-          ['第 16 条 更正', '在不合理延迟内更正', '在界面里直接改，改完经同步到达你的其他设备', '**邮箱改不了**：服务端没有换绑邮箱的路由，所以"账号标识本身写错了"这一类更正今天只能重新注册并请我们注销旧账号'],
-          ['第 17 条 删除', '在不合理延迟内删除', '应用内删除与回收站里的"彻底删除"标记 + 账号级联硬删（现量：引用 `users` 且 CASCADE 的外键 20 条、覆盖 19 张表）+ 点下注销的那台设备当场清本机明文，其它设备在下次同步收到注销信号时各自清', '两个"不承诺"：从此不再上线的设备上的本地副本无法远程清除；整库备份里没有单点删除，随备份保留期自然结束'],
+          ['第 16 条 更正', '在不合理延迟内更正', '在界面里直接改，改完经同步到达你的其他设备；登录邮箱自己换绑，当前地址与新地址各点一次才生效', '**换绑要求你同时控制两个收件箱**：旧地址已经收不到信（注册时填错、停用）时没有自助通道，这一类更正仍然只能走邮箱受理渠道，或重新注册正确的账号并请我们注销旧的'],
+          ['第 17 条 删除', '在不合理延迟内删除', '应用内删除与回收站里的"彻底删除"标记 + 账号级联硬删（现量：引用 `users` 且 CASCADE 的外键 34 条、覆盖 33 张表；范围包括自动化 AI 尝试、自动化事件、自动化接收方密钥、自动化规则、自动化发送方凭据、自动化权益绑定、自动化权益票据使用记录、分享记录、分享邀请、分享成员）+ 点下注销的那台设备当场清本机明文，其它设备在下次同步收到注销信号时各自清；🔴 一件东西**故意不删**：注销标记（账号标识、注销时刻、以及那一刻邮箱的 SHA-256 摘要 —— 摘要不是地址），它是"从整库备份恢复时拒绝把已注销账号带回来"那道闸的唯一依据，所以必须比账号活得久', '两个"不承诺"：从此不再上线的设备上的本地副本无法远程清除；整库备份里没有单点删除，随备份保留期自然结束'],
           ['第 18 条 限制处理', '暂停处理但保留数据', '实际能用的是撤回同意：关掉某项开关后该项出站动作立即停止、已建立的实时连接当场关掉', '没有"整号冻结但数据保留"这一档（产品里没有这个状态），要停就走到注销'],
           ['第 20 条 数据可携带', '以结构化、通用、机器可读格式取得并转移', '导出文件是明文 JSON，含**墓碑**与完整操作日志，另带可核对的 counts（丢掉墓碑的备份在回放时会让已删数据复活）', '我们没有替你把这份文件搬进别家服务的通道；转换由你自己完成'],
           ['第 21、22 条 反对与自动化决策', '反对特定处理；不受仅凭自动化产生法律效果的决策约束', 'AI 在这套代码里**类型上产生不了写入**：读操作即时执行，写操作只产出提案，确认之后才真的落到你的数据里；出境还要过逐功能授权', '撤回同意后已同步到其它设备的既有数据不会自动回滚，那要你自己删'],
@@ -349,7 +349,7 @@ const zh = [
         items: [
           '**如果我们具备远程擦除未连接设备的能力**（今天不具备）：第五节里"再也不联网、再也不登录的那台设备"这条边界就会消失，文本跟着改。原先挂在这里的"注销做出界面入口之后"那一条已在 1.2 兑现，不再是一个待触发的改写条件。',
           '**Linux 桌面壳把「删掉容器」这一步递给界面这一层之后**：第五节 ② 那条"删不掉文件本体"就会消失，"今天不承诺的"从两处回到一处。（macOS 与 Windows 两个桌面壳已在 2026-10-04 接上这一步，所以这里只剩 Linux 一端。）',
-          '**邮箱换绑实现之后**：第三节那条"邮箱不可更换"会被删除，并换成换绑流程。',
+          '**旧地址彻底收不到信时如何更正邮箱**：换绑的双侧确认对这种情况没有自助通道。如果将来开出"经核实的本人请求也能完成换绑"的通道，第三节与第 16 条那两格要一起改写。（原先挂在这里的那条"邮箱换绑实现之后"已在 1.6 兑现，不再是待触发项。）',
           '**保留期调整之后**：第四节的 45 天要跟着改。它是产品设定、不是你可以自选的选项，改它需要发版。还有第二件事也要让文案跟着改：**清理真正开始对我们的数据生效**的那一天（见第四节如实补出的那条边界）。',
           '**托管 AI 那份调用元数据的到期删除装上之后**：《隐私政策》与《个人信息收集清单》里那一格今天写的是"期限定为 45 天，但到期就删这一步还没实现"。那条作业装上、并且真的对这些字段生效的那一天，两处的表述都改成到期删除，本文件第 17 条那一行的"对不上的部分"跟着改。⚠️ 这是表里**第二个** 45 天：它与上一条说的同步流水窗口同值，但不是同一个旋钮，所以"保留期调整"这条触发条件今后要指明是哪一个。',
         ],
@@ -358,6 +358,8 @@ const zh = [
         kind: 'table',
         head: ['版本', '日期', '变化'],
         rows: [
+          ['1.6', '2026-10-08', '把「邮箱不可更换」换成**兑现了的换绑流程**：第三节写明双侧确认、链接 24 小时有效、同一账号同时只许一张在途请求、生效即所有设备登出、库里不留历史地址，并如实保留那条限制 —— 当前地址已经收不到信就没有自助通道；第 16 条与受理表里相应两格一起改写。第 17 条的级联数字按迁移终态重算（旧数含一张早已被 `DROP TABLE` 的表），「墓碑随注销删除」改成**故意保留的注销标记**，注销那一格同时交代保留的是哪三样。第八节的触发条件表把「邮箱换绑实现之后」这一条结掉，换成「旧地址收不到信时如何更正」。中英同步，仍为待审核草案。'],
+          ['1.5', '2026-10-07', "增补自动收集执行身份与提交许可的类别、用途、保留及注销边界；明确功能尚未开放。按当前迁移重算注销范围，并补列邮箱注册验证码挑战。中英同步，仍为待审核草案。"],
           ['1.0', '2026-10-01', '首版草案（尚未生效）：八项权利逐条对照实际代码写成，其中"注销账号"与"邮箱更正"承诺渠道而非自助。'],
           [
             '1.1',
@@ -383,6 +385,7 @@ const zh = [
       },
     ],
   },
+  { id: "automation-metadata", title: "自动收集元数据与注册挑战", blocks: [{ kind: "p", text: "自动收集尚未开放。服务端预留两类明文元数据：自动收集执行身份（账号、设备标识、本地数据库实例标识、随机凭据的 SHA-256、创建及撤销时间），用于确认哪台设备有权提交；自动收集提交许可（不透明事件与规则标识、规则和解析版本、执行身份、固定操作标识、结果摘要、条数及创建时间），用于防止重复创建。这些记录不含任务标题、正文或随机凭据原文。执行身份保留至账号注销；提交许可的规则删除清理必须在功能开放前完成，许可一旦发出不因租约到期而转交另一设备。注销账号时两类记录随账号级联删除，不能据此远程擦除离线设备的本地副本。另有邮箱注册验证码挑战：保存待验证身份、验证码摘要、有效期、尝试次数和待激活的口令散列，用于完成邮箱验证，不保存验证码原文；关联账号的挑战也随注销删除。" }] },
 ] as const;
 
 const en = [
@@ -489,7 +492,7 @@ const en = [
       },
       {
         kind: 'callout',
-        text: '**The email address cannot be changed.** Your heyta account *is* that address, and as a login credential it can currently be neither changed nor rebound; no such capability exists on our server and we will not promise it here. If you registered with a wrong address, the workable route today is to register again with the right one and ask us to close the account holding the wrong address.',
+        text: '**Rebinding the e-mail address: self-service, but both sides have to click.** Your heyta account *is* that address, and you can now change it inside the app. Starting a change sends one letter to the **current** address and one to the **new** one; the change takes effect only after **both** have been clicked (in any order) - while either is outstanding, nothing about the account, the address or your sessions changes. Each link is valid for **24 hours**; once it expires or is withdrawn you have to start again, and an account can hold **one** in-flight request at a time. The moment it takes effect: the new address becomes the sign-in identifier and counts as verified, **sign-ins on every device stop working at once** (a reset-password or magic-link token in flight is voided with them), and **both** addresses receive a completion notice. We **keep no history of addresses** - only that in-flight request row holds the new address in cleartext, and it is deleted when the change lands. 🔴 One limitation that remains true: the flow requires you to control **both** mailboxes. If the old address no longer receives mail (typed wrong at registration, closed, reclaimed by the provider), there is no self-service path - the e-mail channel below is the route, or register again with the right address and ask us to close the account holding the wrong one.',
       },
       {
         kind: 'p',
@@ -622,7 +625,7 @@ const en = [
           ['Access, copy, correction, deletion (the self-service ones)', 'In the app, directly', 'Immediate, no waiting'],
           ['Withdrawal of consent, stopping a processing activity', 'Switch it off in the app', 'Immediate'],
           ['Account closure', 'Web settings / the mobile “Mine” tab / `account close` in the command-line client, or by e-mail', 'Self-service takes effect immediately; e-mail requests within 15 working days of receipt'],
-          ['Account-level information (e.g. a mistyped registration address)', 'Email', 'Within 15 working days of receipt'],
+          ['Account-level information (e.g. a registration address typed wrong at sign-up, which never receives a letter for you - rebinding needs both mailboxes, so this class stays in the channel)', 'Email', 'Within 15 working days of receipt'],
           ['A request to explain our processing rules', 'Email', 'Within 15 working days of receipt'],
           ['Next-of-kin requests, complaints and reports', 'Email', 'Within 15 working days of receipt'],
         ],
@@ -647,8 +650,8 @@ const en = [
         rows: [
           ['Arts. 13, 14 transparency', 'Purposes, categories, retention and recipients disclosed item by item', 'This set of documents **is** the disclosure vehicle: the data inventory, retention and backups, third parties and permissions are each listed out', 'These texts publish no data-protection-officer or EU-representative contact (Arts. 27, 37); the only channel is the mailbox'],
           ['Art. 15 access', 'Inform and provide a copy of the personal data', 'Export is **self-service**, and only you can open it: the server stores end-to-end-encrypted events, which cannot be turned back into plaintext without your passphrase', 'Precisely because what you hold is never our plaintext, we cannot look up "what your task titles are" on your behalf — this right is exercised by your device, not by us querying for you'],
-          ['Art. 16 rectification', 'Correct without undue delay', 'Edit it in the interface; the change reaches your other devices through sync', '**The e-mail address cannot be corrected**: there is no rebinding route on the server, so an account identifier written wrong can only be handled by registering the right one and asking us to close the wrong one'],
-          ['Art. 17 erasure', 'Delete without undue delay', 'In-app deletion plus the "purge" marker in Trash plus the account-level cascade hard delete (measured: 20 foreign keys referencing `users` with CASCADE, covering 19 tables) + the device you press closure on wipes its local plaintext on the spot, and every other device wipes its own on the next sync that receives the closure signal', 'Two things not promised: a device that never comes back online cannot be erased remotely, and a whole-database snapshot offers no targeted removal — it goes away when that backup ages out'],
+          ['Art. 16 rectification', 'Correct without undue delay', 'Edit it in the interface; the change reaches your other devices through sync; the sign-in address is rebound in-app, one click at each side', '**Rebinding requires control of both mailboxes**: where the current address no longer receives mail (typed wrong at registration, closed), there is no self-service path - that class still goes through the e-mail channel, or register the right address and ask us to close the wrong one'],
+          ['Art. 17 erasure', 'Delete without undue delay', 'In-app deletion plus the "purge" marker in Trash plus the account-level cascade hard delete (measured: 34 foreign keys referencing `users` with CASCADE, covering 33 tables, including automation AI attempts, automation events, automation recipient keys, automation rules, automation sender credentials, automation entitlement bindings, automation entitlement ticket uses, shares, share invitations and share members) + the device you press closure on wipes its local plaintext on the spot, and every other device wipes its own on the next sync that receives the closure signal; 🔴 one record is deliberately **not** deleted: the closure marker (your account identifier, the moment of closure and the SHA-256 digest of the e-mail address at that moment - a digest is not the address), because it is the only thing the backup-restore gate can check to refuse resurrecting a closed account, so it has to outlive the account', 'Two things not promised: a device that never comes back online cannot be erased remotely, and a whole-database snapshot offers no targeted removal — it goes away when that backup ages out'],
           ['Art. 18 restriction', 'Suspend processing while keeping the data', 'What actually exists is withdrawal of consent: switch an item off and every outbound action for it stops immediately, and a realtime connection already open is closed on the spot', 'There is no "freeze the whole account but keep the data" state (the product has no such state); stopping everything means closing the account'],
           ['Art. 20 portability', 'Structured, commonly used, machine-readable data, transmitted to another controller', 'The export file is plaintext JSON containing the **tombstones** and the complete operation log, with verifiable counts (a backup that drops tombstones resurrects deleted data on replay)', 'We offer no channel that moves that file into somebody else’s service for you; the conversion is yours'],
           ['Arts. 21, 22 objection and automated decisions', 'Object to specific processing; not be subject to a decision taken solely on automated processing', 'In this code base AI **cannot produce a write at the type level**: reads execute immediately, writes only produce a proposal, and nothing is written into your data until you confirm; leaving the device additionally requires per-feature authorisation', 'Withdrawing consent does not roll back data already synced to your other devices — that part you delete yourself'],
@@ -683,7 +686,7 @@ const en = [
         items: [
           '**If we ever gain the ability to remotely erase a device that is not connected** (we do not have it today): the boundary in section five about “a device that never comes back online” disappears and the text changes with it. The item that used to sit here — “once account closure has an interface entry” — was fulfilled in 1.2 and is no longer a pending trigger.',
           '**Once the Linux desktop shell hands the "remove the container" step down to the interface layer**: item (2) in section five — "the file itself cannot be removed" — disappears and the list of what is not promised goes back from two items to one. (The macOS and Windows desktop shells were wired up on 2026-10-04, so Linux is the only shell left.)',
-          '**Once email rebinding is implemented**: "the email address cannot be changed" in section three is deleted and replaced by the rebinding procedure.',
+          '**How an address is corrected when the old mailbox receives nothing**: two-sided confirmation has no self-service path for that case. Should a route ever open where a verified request from the person completes the rebinding, the cells in section three and in Article 16 are rewritten with it. (The trigger that used to sit here - "once email rebinding is implemented" - was fulfilled in 1.6 and is no longer pending.)',
           '**Once the retention period changes**: the 45 days in section four changes with it. It is a product setting, not an option you can pick, and changing it requires a release. A second event also requires this text to change: **the day the sweep really starts applying to our data** (see the boundary spelled out in section four).',
           '**Once the delete-at-expiry job for managed-AI call metadata exists**: the cell in the Privacy Policy and in the Collection Inventory currently reads "the period is set at 45 days, but the deletion at expiry is not implemented". On the day that job lands and really applies to those fields, both places are rewritten as deletion at expiry, and the "where it does not line up" cell for Article 17 in this document changes with them. ⚠️ This is the **second** 45-day period in those tables: the same value as the window for the sync stream discussed just above, but not the same knob — which is why "the retention period changes" now has to say which one it means.',
         ],
@@ -692,6 +695,8 @@ const en = [
         kind: 'table',
         head: ['Version', 'Date', 'Change'],
         rows: [
+          ['1.6', '2026-10-08', 'Replaces the claim that the e-mail address cannot be changed with the **rebinding flow that now exists**: section three states two-sided confirmation, the 24-hour link, one in-flight request per account, every other device signed out when it lands, and no stored address history - while keeping the limitation that says so plainly (once the current mailbox receives nothing there is no self-service route); the Article 16 row and the matching cell of the intake table are rewritten with it. The cascade figures in the Article 17 row are recomputed from the final migration state (the old count included a table that was `DROP TABLE`d long ago), and tombstones-cascade-away becomes **the closure marker we deliberately keep**, naming the three things that survive. The trigger list in section eight closes the rebinding item and opens the no-mailbox case instead. Both language columns updated together; remains a draft awaiting review.'],
+          ['1.5', '2026-10-07', "Adds automation worker identities and commit permits, their purpose, retention and account-closure boundaries; the feature is not yet available. Recomputes closure scope from current migrations and includes email registration challenges. Both languages updated; remains a draft awaiting review."],
           ['1.0', '2026-10-01', 'First draft (not yet in force): eight rights checked against the actual code, with account closure and email correction committed as a channel rather than as self-service.'],
           [
             '1.1',
@@ -717,6 +722,7 @@ const en = [
       },
     ],
   },
+  { id: "automation-metadata", title: "Automation metadata and registration challenges", blocks: [{ kind: "p", text: "Automatic capture is not yet available. Two categories of plaintext metadata are reserved on the server: automation worker identities (account, device and local database identifiers, SHA-256 of a random credential, creation and revocation times), to authenticate the submitting device; and automation commit permits (opaque event and rule identifiers, rule and parse versions, worker identity, fixed operation identifier, result digest, item count and creation time), to prevent duplicate creation. Neither contains task titles, body content or the original credential. Worker identities remain until account closure. Rule-deletion cleanup of permits must be implemented before launch; an issued permit is not reassigned when a lease expires. Both categories cascade on account closure, which cannot remotely erase local copies on offline devices. Email registration challenges also store pending identity, a verification-code digest, expiry, attempt counts and a pending password hash to verify the email address; they do not store the original code. Challenges associated with an account cascade on closure." }] },
 ] as const;
 
 export const dataRights: LegalDocument = {
@@ -725,9 +731,9 @@ export const dataRights: LegalDocument = {
   // 三处表述同批改），并把"保留期调整"这条限定到**具体哪一个 45 天** —— ADR-0054 之后
   // 期限表里有两个同值的 45 天，不限定就会让下一次改窗口改错那一格。
   // 版本号进同意指纹（`legalSetVersion()`）。
-  version: '1.4',
+  version: '1.6',
   status: 'draft',
-  updatedDate: '2026-10-05',
+  updatedDate: '2026-10-08',
   title: {
     'zh-CN': '个人权利行使与请求响应',
     en: 'Exercising Your Rights: Requests and Responses',

@@ -67,8 +67,8 @@ export interface ProjectActionsOptions {
 }
 
 export interface ProjectActions {
-  /** 新建清单。`parentId` 省略表示顶层清单。返回新实体 id。 */
-  createProject(name: string, parentId?: string): Promise<string>;
+  /** 新建清单。`parentId` 省略表示顶层清单。颜色随同一条 Create op 写入。 */
+  createProject(name: string, parentId?: string, color?: CategorySlot): Promise<string>;
   renameProject(entityId: string, name: string): Promise<void>;
   /**
    * 给清单指定一个**分类色槽位**（1–8），或 `undefined` 表示清掉。
@@ -232,12 +232,17 @@ export function createProjectActions(
     aliveOf(ctx.getState().projects).filter(isArchived).sort(byCreatedAtOrder);
 
   return {
-    async createProject(name, parentId) {
+    async createProject(name, parentId, color) {
       const trimmed = name.trim();
       // 空名字**抛错**而不静默忽略：与 `createTaskActions.create` 同一个理由 ——
       // 静默返回会让调用方以为建成功了。"用户按了空回车什么都不做"是**交互**决策，
       // 由界面自己判断。
       if (trimmed === '') throw new Error('清单名称不能为空');
+
+      const cleanColor = color === undefined ? undefined : parseCategorySlot(color);
+      if (color !== undefined && cleanColor === undefined) {
+        throw new Error(`分类色槽位必须是 1–8 的整数，收到 ${JSON.stringify(color)}`);
+      }
 
       const entityId = makeProjectId();
       await ctx.dispatch({
@@ -246,7 +251,11 @@ export function createProjectActions(
         opType: OpType.Create,
         // 无父时显式写 null —— 见文件头第 1 条。不做 `parentId === undefined`
         // 的分支：那正是"同一件事两种写法"的来源。
-        payload: { name: trimmed, parentId: parentId ?? null },
+        payload: {
+          name: trimmed,
+          parentId: parentId ?? null,
+          ...(cleanColor === undefined ? {} : { color: String(cleanColor) }),
+        },
       });
       return entityId;
     },

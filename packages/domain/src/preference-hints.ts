@@ -40,7 +40,8 @@ export type PreferenceRelevance =
   | 'capture'
   | 'prioritize'
   | 'duration-estimate'
-  | 'tool-calling';
+  | 'tool-calling'
+  | 'inbound-automation';
 
 /**
  * 每个用途**真正需要**的偏好。
@@ -67,6 +68,9 @@ const RELEVANT_PREFERENCES: Record<PreferenceRelevance, readonly PreferenceId[]>
   // 要求每个功能**显式回答**"你要不要偏好"。缺了这个 key，
   // "我们想过，答案是不要"就变成了"有人忘了想"。
   'tool-calling': [],
+  // 入站自动化只解析事件中已获授权的字段；不会把用户历史偏好附加到外部请求。
+  // 显式空数组让出境面保持最小，并满足每个 AiFeature 都必须回答偏好相关性。
+  'inbound-automation': [],
 };
 
 /** 一条要注入 prompt 的偏好提示。 */

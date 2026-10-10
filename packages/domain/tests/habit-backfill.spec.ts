@@ -154,13 +154,15 @@ describe('补打卡窗口（habit-backfill）', () => {
           删掉解释性注释 —— 判据不该收这种税。
        剩下的三处逐个点名（不是"按目录放行"）：
          · 领域层本文件（唯一裁决者）
-         · 实体声明（`entities.ts`）与新建入参声明（`habit-actions.ts`）—— 都是声明，不是读
+       · 实体声明（`entities.ts`）与新建入参声明（`habit-actions.ts`）—— 都是声明，不是读
+       · Web 新建表单只读取自己的草稿并传入新建字段，不读取已持久化的 Habit，也不裁决窗口
        ⚠️ 测试文件不在扫描范围内：测试里写这个字段名是在**说出**这条判据，
           不是在实现第二条裁决 —— 把它们算进来只会逼人把判据删掉。 */
     const allowed = [
       'packages/domain/src/habit-backfill.ts',
       'packages/domain/src/entities.ts',
       'packages/app-host/src/habit-actions.ts',
+      'apps/web/src/features/habits/HabitsView.tsx',
     ].slice().sort();
     const hits = sourceFiles()
       .filter((rel) => /backfillDays/.test(stripComments(readFileSync(join(REPO, rel), 'utf8'))))

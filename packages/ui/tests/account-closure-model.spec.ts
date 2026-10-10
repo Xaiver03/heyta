@@ -107,6 +107,15 @@ const SNAPSHOT_REASONS = [
   'password-already-set',
   'password-policy',
   'consent-required',
+  // 现量 2026-10-08（ADR-0063 那批新添的五条）。这五条都是**换绑邮箱 / 登录会话**那两条
+  // 流程专属的，`DELETE /api/account` 产生不了它们 ⇒ 落到兜底句是**有意的合并**，
+  // 与上面注释里通行密钥、口令那一族同一个理由。登记在这里是为了让"新增一条要做一次
+  // 决定"这件事真的发生一次，而不是让快照与源码悄悄分叉。
+  'email-unchanged',
+  'email-taken',
+  'email-change-cooldown',
+  'invalid-change-link',
+  'unknown-session',
 ];
 
 const OTHER = 'common.accountClosure.failed.other';

@@ -23,6 +23,7 @@ import type { FocusSession, Habit, HabitLog, Task } from './entities.js';
 import { diffDays, toLocalDate, type LocalDate } from './date.js';
 import { isAchieved, isScheduledOn } from './habit-streak.js';
 import { focusSessionDay, shouldPersistSession } from './focus.js';
+import { dueLocalDateOf } from './date.js';
 
 export interface TodayProgressInput {
   habits: readonly Habit[];
@@ -94,9 +95,10 @@ export function isTaskPlannedForToday(task: Task, today: LocalDate): boolean {
   const completedToday = task.completedAt !== undefined && isOn(task.completedAt, today);
   if (task.completedAt !== undefined && !completedToday) return false;
 
-  if (task.dueDate === undefined) return false;
+  const due = dueLocalDateOf(task);
+  if (due === undefined) return false;
   // `diffDays(a, b) = b - a`，所以 >= 0 表示截止日**是今天或已过去**（逾期）
-  return diffDays(toLocalDate(task.dueDate), today) >= 0;
+  return diffDays(due, today) >= 0;
 }
 
 export function computeTodayProgress(input: TodayProgressInput): TodayProgress {

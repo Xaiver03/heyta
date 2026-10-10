@@ -12,7 +12,7 @@
  *   3. 列表顺序依赖存储返回顺序 → 同一份数据在两台设备上顺序不同
  */
 
-import { Priority, startOfDay } from '@heyta/domain';
+import { Priority, Quadrant, isImportant, planQuadrantDrop, planQuadrantDropUndo, startOfDay } from '@heyta/domain';
 import { OpLogEngine } from '@heyta/op-log';
 import { DbOpLogStore, INDEXEDDB_SCHEMA, SqliteAdapter } from '@heyta/storage';
 import { NodeSqliteDriver } from '@heyta/storage/sqlite/node';
@@ -210,6 +210,18 @@ describe('清除类字段（null 语义）', () => {
     const pl = payloadOf(last);
     expect(Object.prototype.hasOwnProperty.call(pl, 'dueDate')).toBe(true);
     expect(pl['dueDate']).toBeNull();
+    expect(pl['dueDateLocal']).toBeNull();
+  });
+
+  it('date-only due survives one op and is cleared by a later instant', async () => {
+    const id = await actions.create('Date-only');
+    await actions.setDueDate(id, Date.UTC(2026, 9, 7, 16), '2026-10-08');
+    expect(actions.findTask(id)?.dueDateLocal).toBe('2026-10-08');
+    await actions.setDueDate(id, Date.UTC(2026, 9, 8, 10));
+    expect(actions.findTask(id)?.dueDateLocal).toBeUndefined();
+    const before = (await opsOf(id)).length;
+    await expect(actions.setDueDate(id, Date.UTC(2026, 9, 8), '2026-02-30')).rejects.toThrow();
+    expect((await opsOf(id)).length).toBe(before);
   });
 
   it('🔴 moveToProject(undefined) 写 null 而不是漏掉键', async () => {
@@ -327,6 +339,48 @@ describe('listPendingTasks（未完成）', () => {
   });
 });
 
+describe('四象限移动撤销', () => {
+  it.each([undefined, false, true])('保留 important=%s 的原始语义，移动和撤销各写一条 op', async (important) => {
+    const id = await actions.create('优先级驱动的重要任务');
+    await actions.setPriority(id, Priority.High);
+    await actions.setDueDate(id, now() + 60_000);
+    if (important !== undefined) await actions.setImportant(id, important);
+    const before = actions.findTask(id)!;
+    const drop = planQuadrantDrop(before, Quadrant.Neither, { now: now() });
+    const undo = planQuadrantDropUndo(before, drop);
+    const beforeCount = (await opsOf(id)).length;
+    await actions.setQuadrantDrop(id, drop);
+    expect(actions.findTask(id)!.dueDate).toBeUndefined();
+    await actions.setQuadrantDrop(id, undo);
+    const ops = await opsOf(id);
+    expect(ops.length).toBe(beforeCount + 2);
+    expect(JSON.parse(JSON.stringify(ops.at(-1)!.payload))).toEqual({
+      important: important ?? null,
+      dueDate: before.dueDate,
+      dueDateLocal: null,
+    });
+    await engine.recover();
+    expect(actions.findTask(id)!.important).toBe(important);
+    expect(actions.findTask(id)!.dueDate).toBe(before.dueDate);
+    // 撤销后再改优先级：隐式重要性仍跟随优先级，显式选择保持不变。
+    await actions.setPriority(id, Priority.Low);
+    expect(isImportant(actions.findTask(id)!)).toBe(important ?? false);
+  });
+
+  it('移动未改截止时间时，撤销不会覆盖之后的日期编辑', async () => {
+    const id = await actions.create('无日期任务');
+    const before = actions.findTask(id)!;
+    const drop = planQuadrantDrop(before, Quadrant.ImportantNotUrgent, { now: now() });
+    const undo = planQuadrantDropUndo(before, drop);
+    expect(undo).not.toHaveProperty('dueDate');
+    await actions.setQuadrantDrop(id, drop);
+    await actions.setDueDate(id, now() + 60_000);
+    await actions.setQuadrantDrop(id, undo);
+    expect(actions.findTask(id)!.dueDate).toBe(now() + 60_000);
+    expect(actions.findTask(id)!.important).toBeUndefined();
+  });
+});
+
 describe('其余字段', () => {
   it('rename / setPriority / setImportant 各产出一条 UPD op', async () => {
     const id = await actions.create('A');
@@ -345,6 +399,61 @@ describe('其余字段', () => {
     const task = actions.findTask(id)!;
     expect(task.title).toBe('B');
     expect(task.priority).toBe(Priority.Medium);
+  });
+});
+
+describe('bulkSetPriorities', () => {
+  it('不同优先级一次写一条 BATCH op，并物化到每条任务', async () => {
+    const low = await actions.create('低优先级');
+    const high = await actions.create('高优先级');
+    const before = await engine.getAllOps();
+
+    await actions.bulkSetPriorities([
+      { id: low, priority: Priority.Low },
+      { id: high, priority: Priority.High },
+    ]);
+
+    const after = await engine.getAllOps();
+    expect(after).toHaveLength(before.length + 1);
+    expect(after.at(-1)?.opType).toBe(OpType.Batch);
+    expect(after.at(-1)?.entityIds).toEqual([high]);
+    expect(payloadOf(after.at(-1)!)).toEqual({
+      heytaTaskPriorityBatch: 1,
+      items: [
+        { id: low, priority: Priority.Low },
+        { id: high, priority: Priority.High },
+      ],
+    });
+    expect(actions.findTask(low)?.priority).toBe(Priority.Low);
+    expect(actions.findTask(high)?.priority).toBe(Priority.High);
+  });
+
+  it('全量预校验失败时不写任何任务', async () => {
+    const first = await actions.create('第一条');
+    const before = await engine.getAllOps();
+    await expect(
+      actions.bulkSetPriorities([
+        { id: first, priority: Priority.High },
+        { id: 'missing-task', priority: Priority.Low },
+      ]),
+    ).rejects.toThrow('找不到任务');
+    expect(await engine.getAllOps()).toHaveLength(before.length);
+    expect(actions.findTask(first)?.priority).toBe(Priority.None);
+  });
+
+  it('重复 id 与非法优先级在 dispatch 前拒绝', async () => {
+    const id = await actions.create('任务');
+    const before = await engine.getAllOps();
+    await expect(
+      actions.bulkSetPriorities([
+        { id, priority: Priority.High },
+        { id, priority: Priority.Low },
+      ]),
+    ).rejects.toThrow('重复');
+    await expect(
+      actions.bulkSetPriorities([{ id, priority: 99 as Priority }]),
+    ).rejects.toThrow('优先级无效');
+    expect(await engine.getAllOps()).toHaveLength(before.length);
   });
 });
 

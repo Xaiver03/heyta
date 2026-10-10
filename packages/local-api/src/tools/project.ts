@@ -9,7 +9,7 @@
  * ⚠️ 界面上还能**改名、设颜色、归档、删除**清单（`ProjectsPanel`），这四个动作
  * 现在**没有工具**。2026-10-03 之前这里写的理由是"目录有一条 `<= 10` 的容量判据，
  * 一次只能挑用户最常让 AI 做的那一件"，那个理由已经不成立了 —— 容量改成按实体算
- * （`shared.ts` 的 `MAX_TOOLS_PER_ENTITY`），PROJECT 用了 2 席、还剩 3 席。
+ * （`shared.ts` 的默认 `MAX_TOOLS_PER_ENTITY`），PROJECT 用了 2 席、还剩 5 席。
  * 所以其余动作是**还没做**，不是被上限挡着；要补就按"它属于哪一档"挑
  * （改名/删除都是"修改"与"该实体专属动作"两档）。逐条登记在
  * `docs/plans/ai-event-tool-contract.md` §5.4。
@@ -119,4 +119,3 @@ export const projectToolPack: EntityToolPack = {
   runRead,
   toIntent,
 };
-

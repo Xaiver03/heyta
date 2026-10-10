@@ -127,7 +127,7 @@ const zh = [
             '邮件投递服务（SMTP，由部署者配置）',
             '委托处理',
             '收件人邮箱地址 + 邮件正文（正文里含一次性链接）',
-            '五封功能性邮件的每一封',
+            '十封功能性邮件的每一封',
           ],
           [
             '微信支付（`api.mch.weixin.qq.com`）',
@@ -149,7 +149,7 @@ const zh = [
       },
       {
         kind: 'p',
-        text: '**关于邮件。** 我们只发**五封纯功能性邮件**：验证邮箱、魔法登录链接、找回通行密钥、重置口令、口令已修改的安全通知。🔴 **没有营销邮件、没有订阅列表、没有任何群发** —— 这一条我们敢确定地写。正文是封闭词表的固定文案，**不含你的任务内容**；但收件人邮箱和正文里那条一次性链接会以明文经过邮件服务商的通道，所以「端到端加密」这句话**不能**延伸到邮件这一段。至于具体是哪家邮件服务商：代码里没有写死，由每个实例的部署者配置；官方托管实例用的是哪一家，会在定稿时单独披露。',
+        text: '**关于邮件。** 我们只发**十封纯功能性邮件**：验证邮箱、注册验证码、魔法登录链接、找回通行密钥、重置口令、口令已改通知、换绑-新邮箱确认、换绑-旧邮箱授权、换绑完成通知、新增认证器告知。🔴 **没有营销邮件、没有订阅列表、没有任何群发** —— 这一条我们敢确定地写。正文是封闭词表的固定文案，**不含你的任务内容**；但收件人邮箱和正文里那条一次性链接会以明文经过邮件服务商的通道，所以「端到端加密」这句话**不能**延伸到邮件这一段。至于具体是哪家邮件服务商：代码里没有写死，由每个实例的部署者配置；官方托管实例用的是哪一家，会在定稿时单独披露。',
       },
       {
         kind: 'p',
@@ -510,7 +510,7 @@ const en = [
             'The mail delivery service (SMTP, configured by whoever deploys)',
             'Entrusted processing',
             'The recipient\'s e-mail address plus the message body (which contains a one-time link)',
-            'Each of the five functional e-mails',
+            'Each of the ten functional e-mails',
           ],
           [
             'WeChat Pay (`api.mch.weixin.qq.com`)',
@@ -532,7 +532,7 @@ const en = [
       },
       {
         kind: 'p',
-        text: '**About mail.** We send **five purely functional e-mails and nothing else**: address verification, magic sign-in link, passkey recovery, password reset, and a security notice that your password changed. 🔴 **There is no marketing mail, no mailing list, no bulk send of any kind** — that sentence we are confident in. The bodies are fixed text drawn from a closed word list and **contain none of your task content**; but the recipient address and the one-time link inside the body do traverse the mail provider\'s channel in cleartext, which is exactly why "end-to-end encryption" **cannot** be extended to the mail leg. As for which provider: nothing is hard-coded, it is set per deployment, and the provider used by the official hosted instance will be disclosed separately at finalisation.',
+        text: '**About mail.** We send **ten purely functional e-mails and nothing else**: address verification, registration code, magic sign-in link, passkey recovery, password reset, password-changed notice, rebinding confirmation for the new address, rebinding authorisation for the current address, e-mail change completed notice, authenticator-added notice. 🔴 **There is no marketing mail, no mailing list, no bulk send of any kind** — that sentence we are confident in. The bodies are fixed text drawn from a closed word list and **contain none of your task content**; but the recipient address and the one-time link inside the body do traverse the mail provider\'s channel in cleartext, which is exactly why "end-to-end encryption" **cannot** be extended to the mail leg. As for which provider: nothing is hard-coded, it is set per deployment, and the provider used by the official hosted instance will be disclosed separately at finalisation.',
       },
       {
         kind: 'p',
@@ -808,7 +808,7 @@ const en = [
 
 export const thirdParties: LegalDocument = {
   id: 'third-parties',
-  version: '1.4',
+  version: '1.5',
   status: 'draft',
   updatedDate: '2026-10-08',
   title: {

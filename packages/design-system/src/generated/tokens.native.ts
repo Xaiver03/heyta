@@ -22,6 +22,7 @@ export interface HeytaNativeTokens {
   readonly 'color.on-primary': string;
   readonly 'color.background': string;
   readonly 'color.surface': string;
+  readonly 'color.surface-subtle': string;
   readonly 'color.surface-raised': string;
   readonly 'color.surface-sunken': string;
   readonly 'color.foreground': string;
@@ -48,6 +49,8 @@ export interface HeytaNativeTokens {
   readonly 'color.info': string;
   readonly 'color.info-strong': string;
   readonly 'color.info-subtle': string;
+  readonly 'color.calendar-day-off': string;
+  readonly 'color.calendar-day-work': string;
   readonly 'color.quadrant-1': string;
   readonly 'color.quadrant-1-subtle': string;
   readonly 'color.quadrant-2': string;
@@ -165,6 +168,7 @@ export interface HeytaNativeTokens {
   readonly 'layout.sidebar-max-width': number;
   readonly 'layout.header-height': number;
   readonly 'layout.content-max': number;
+  readonly 'layout.report-max': number;
   readonly 'layout.detail-width': number;
   readonly 'layout.detail-min-width': number;
   readonly 'layout.detail-max-width': number;
@@ -252,6 +256,7 @@ export const lightTokens: HeytaNativeTokens = {
   'color.on-primary': "#ffffff",
   'color.background': "#f8fafc",
   'color.surface': "#ffffff",
+  'color.surface-subtle': "#f8fafc",
   'color.surface-raised': "#ffffff",
   'color.surface-sunken': "#f1f5f9",
   'color.foreground': "#0f172a",
@@ -278,6 +283,8 @@ export const lightTokens: HeytaNativeTokens = {
   'color.info': "#0284c7",
   'color.info-strong': "#0369a1",
   'color.info-subtle': "#f0f9ff",
+  'color.calendar-day-off': "#2563eb",
+  'color.calendar-day-work': "#475569",
   'color.quadrant-1': "#dc2626",
   'color.quadrant-1-subtle': "#fef2f2",
   'color.quadrant-2': "#2563eb",
@@ -383,6 +390,7 @@ export const lightTokens: HeytaNativeTokens = {
   'layout.sidebar-max-width': 416,
   'layout.header-height': 56,
   'layout.content-max': 1200,
+  'layout.report-max': 960,
   'layout.detail-width': 352,
   'layout.detail-min-width': 288,
   'layout.detail-max-width': 480,
@@ -465,6 +473,7 @@ export const darkTokens: HeytaNativeTokens = {
   'color.on-primary': "#020617",
   'color.background': "#020617",
   'color.surface': "#0d1526",
+  'color.surface-subtle': "#101a2e",
   'color.surface-raised': "#131e33",
   'color.surface-sunken': "#080e1a",
   'color.foreground': "#f1f5f9",
@@ -491,6 +500,8 @@ export const darkTokens: HeytaNativeTokens = {
   'color.info': "#38bdf8",
   'color.info-strong': "#7dd3fc",
   'color.info-subtle': "#0284c729",
+  'color.calendar-day-off': "#60a5fa",
+  'color.calendar-day-work': "#cbd5e1",
   'color.quadrant-1': "#f87171",
   'color.quadrant-1-subtle': "#dc262629",
   'color.quadrant-2': "#60a5fa",
@@ -596,6 +607,7 @@ export const darkTokens: HeytaNativeTokens = {
   'layout.sidebar-max-width': 416,
   'layout.header-height': 56,
   'layout.content-max': 1200,
+  'layout.report-max': 960,
   'layout.detail-width': 352,
   'layout.detail-min-width': 288,
   'layout.detail-max-width': 480,

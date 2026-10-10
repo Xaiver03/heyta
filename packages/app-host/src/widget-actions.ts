@@ -57,6 +57,11 @@ import {
 
 import type { TaskActions } from './actions.js';
 
+/** Stable receipt for one widget click without changing the four-end wire shape. */
+export function widgetIntentReceipt(intent: WidgetIntent): string {
+  return `widget-v1:${intent.taskId}:${intent.targetIsDone ? 'done' : 'open'}:${String(intent.at)}`;
+}
+
 /**
  * drain 需要的能力面。**故意收窄**成两件事，而不是收整个 `TaskActions`：
  *
@@ -74,6 +79,8 @@ export interface WidgetDrainResult {
   skippedMissing: number;
   /** 执行抛错的 —— **仍然留在队列里**，下次 drain 重试。 */
   failed: WidgetIntent[];
+  /** Successfully handled or explicitly skipped intents, for exact native ack. */
+  acknowledged: WidgetIntentQueue;
   /**
    * 应当写回共享容器的队列。
    *
@@ -107,8 +114,11 @@ export async function drainWidgetIntents(
   for (const intent of classified.apply) {
     try {
       // 🔴 一次调用 = 一条 op（重复任务那条路径也是单条 UPD，见文件头）。
-      await tasks.setCompleted(intent.taskId, intent.targetIsDone);
-      applied += 1;
+      const before = tasks.findTask(intent.taskId);
+      const receipt = widgetIntentReceipt(intent);
+      const alreadyConsumed = before?.widgetCompletionReceipts?.includes(receipt) ?? false;
+      await tasks.setCompleted(intent.taskId, intent.targetIsDone, { widgetReceipt: receipt });
+      if (!alreadyConsumed) applied += 1;
     } catch {
       // 单条失败**不中断整批**。没有 catch 的话，一条坏意图会让它后面
       // 所有用户的点击都永远不生效 —— 而且队列会永远堵着。
@@ -121,6 +131,14 @@ export async function drainWidgetIntents(
     skippedAlreadyInTarget: classified.alreadyInTarget.length,
     skippedMissing: classified.missing.length,
     failed,
+    acknowledged: {
+      v: WIDGET_INTENT_VERSION,
+      intents: queue.intents.filter(
+        (intent) => !failed.some(
+          (failedIntent) => widgetIntentReceipt(failedIntent) === widgetIntentReceipt(intent),
+        ),
+      ),
+    },
     // 只有失败的留下。成功的和有意跳过的都必须移除，
     // 否则"已在目标状态"的那些会在每次 drain 时被重新评估一遍、永远清不掉。
     remaining: { v: WIDGET_INTENT_VERSION, intents: failed },

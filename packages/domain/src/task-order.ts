@@ -37,6 +37,7 @@
  */
 
 import { Priority, type Task } from './entities.js';
+import { dueLocalDateOf } from './date.js';
 
 /**
  * 列表可选的**排序口径**。
@@ -72,9 +73,13 @@ function compareBySortKey(key: TaskSortKey, a: Task, b: Task): number {
     case 'display': {
       // `undefined`（无截止）排在有截止的后面。用 Infinity 而不是 0：
       // 0 是 1970-01-01，会被当成最紧急，正好排反。
-      const aDue = a.dueDate ?? Number.POSITIVE_INFINITY;
-      const bDue = b.dueDate ?? Number.POSITIVE_INFINITY;
-      return aDue - bDue;
+      const aDay = dueLocalDateOf(a);
+      const bDay = dueLocalDateOf(b);
+      if (aDay === undefined) return bDay === undefined ? 0 : 1;
+      if (bDay === undefined) return -1;
+      if (aDay !== bDay) return aDay < bDay ? -1 : 1;
+      // Preserve the old within-day ordering for timed tasks.
+      return (a.dueDate ?? 0) - (b.dueDate ?? 0);
     }
     case 'addedAt':
       // **新的在前**。收集箱是「刚记下来的东西」的容器，用户刚写的那条就是他要找的；

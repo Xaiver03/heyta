@@ -76,6 +76,7 @@ export { TEXT_STYLES, resolveTextStyle, resolveAllTextStyles } from './typograph
 // 图标尺寸的数值形态（lucide 的 size prop 需要 SVG 属性数字，CSS 变量帮不上）。
 // 视图住在 L0 内部（宿主直接拿表建视图被 check:theme 的 R3 禁止）。
 export { ICON_SIZE, type IconSizeName } from './icon-size.js';
+export { ASSISTANT_MARK_PATHS, ASSISTANT_MARK_VIEWBOX, ASSISTANT_MARK_STROKE } from './assistant-mark.js';
 
 // 品牌 mark 的**几何真源**（一份「h」，各端图标都从它栅格化）。
 // 动机是实测出的两种失效：手抄一份路径数据（落地页 favicon 与 PWA 图标曾是两枚

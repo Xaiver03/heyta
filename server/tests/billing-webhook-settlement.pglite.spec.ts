@@ -755,7 +755,7 @@ describe('`applySettlementToEvent` 逐结论的分支', () => {
     expect(result?.oneTimeGrant).toEqual({
       periodDays: 30,
       priceId: 'hosted-ai-monthly',
-      grants: ['hosting', 'ai'],
+      grants: ['hosting', 'ai', 'automation'],
     });
     expect(result?.requiresOrderSettlement).toBe(false);
   });

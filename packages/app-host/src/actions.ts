@@ -37,6 +37,7 @@ import {
   MIN_DURATION_MINUTES,
   Priority,
   byCreatedAtOrder,
+  dueLocalDateOf,
   isLive,
   isValidRecurrenceRule,
   trashedIn,
@@ -46,7 +47,7 @@ import {
   toLocalDate,
   today,
   validateParentChange,
-  type QuadrantDropPlan,
+  type QuadrantTaskPatch,
   type Task,
 } from '@heyta/domain';
 import type { MaterializedState, OpIntent } from '@heyta/op-log';
@@ -54,6 +55,8 @@ import type { EntityType } from '@heyta/shared-schema';
 import { OpType } from '@heyta/sync-core';
 
 import { newTaskId } from './ids.js';
+import { clampDurationMinutes } from './ai-duration.js';
+import { writeDurationIntoNote } from './duration-note.js';
 /**
  * 🔴 任务完成一个**重复**任务时，它的提醒要跟着新的截止走
  * （见 `reminder-actions.ts` 里那个函数的文件头）。
@@ -61,7 +64,8 @@ import { newTaskId } from './ids.js';
  * ⚠️ 这**不构成运行时循环依赖**：`reminder-actions.ts` 对 `./actions.js` 的引用是
  * `import type`（编译后被抹掉），所以运行时只有一条边 `actions → reminder-actions`。
  */
-import { rescheduleRemindersForRepeat } from './reminder-actions.js';
+import { planRepeatReminderUpdates } from './reminder-actions.js';
+import { mergeChecklistIntoNote } from './ai-breakdown.js';
 
 /**
  * 动作层需要引擎能力的最小面。
@@ -72,6 +76,10 @@ import { rescheduleRemindersForRepeat } from './reminder-actions.js';
  */
 export interface ActionContext {
   dispatch(intent: OpIntent): Promise<unknown>;
+  /** Run a synchronous state-dependent decision inside the op-log queue. */
+  dispatchChecked?<T>(
+    build: (state: MaterializedState) => { intent?: OpIntent; value: T },
+  ): Promise<T>;
   getState(): MaterializedState;
 }
 
@@ -79,6 +87,7 @@ export interface ActionContext {
 export interface NewTaskFields {
   priority?: Priority;
   dueDate?: number;
+  dueDateLocal?: string;
   projectId?: string;
   important?: boolean;
   /**
@@ -102,6 +111,16 @@ export interface NewTaskFields {
    * 的落点：既有建任务 op **带上日期字段**，一次 CRT 完成、不 fan-out。
    */
   startDate?: number;
+  startDateLocal?: string;
+}
+
+/** Fields accepted by the local API's single-task detail patch. */
+export interface TaskDetailsPatch {
+  title?: string;
+  priority?: Priority;
+  /** Presence means set/clear dueDate; omission leaves it unchanged. */
+  dueDate?: number;
+  completed?: boolean;
 }
 
 export interface TaskActionsOptions {
@@ -124,6 +143,15 @@ export interface TaskActionsOptions {
   newTaskId?: () => string;
 }
 
+/**
+ * 完成动作的可选幂等上下文。
+ *
+ * 只有系统小组件 drain 会传 receipt；普通界面调用保持原有语义。
+ */
+export interface TaskCompletionOptions {
+  widgetReceipt?: string;
+}
+
 export interface TaskActions {
   /**
    * 新建任务。返回新实体 id。
@@ -136,7 +164,7 @@ export interface TaskActions {
   /** 改标题。 */
   rename(entityId: string, title: string): Promise<void>;
   /** 显式设置完成态（幂等，不像 `toggle` 依赖当前状态）。 */
-  setCompleted(entityId: string, completed: boolean): Promise<void>;
+  setCompleted(entityId: string, completed: boolean, options?: TaskCompletionOptions): Promise<void>;
   /** 批量设置完成态：一个用户意图、一个带 entityIds 的 BATCH op。 */
   bulkSetCompleted(entityIds: readonly string[], completed: boolean): Promise<void>;
   /** 在完成/未完成之间切换。 */
@@ -202,8 +230,12 @@ export interface TaskActions {
    */
   purge(entityId: string): Promise<boolean>;
   setPriority(entityId: string, priority: Priority): Promise<void>;
+  /** 一次 AI 取舍 = 一条 BATCH op；每条任务可以有不同优先级。 */
+  bulkSetPriorities(entries: readonly { id: string; priority: Priority }[]): Promise<void>;
   /** 四象限的"重要"维度。 */
   setImportant(entityId: string, important: boolean): Promise<void>;
+  /** Validate and write task details as one UPDATE op. */
+  patchDetails(entityId: string, patch: TaskDetailsPatch): Promise<void>;
   /**
    * **一次拖放 = 一条 op。**
    *
@@ -220,9 +252,9 @@ export interface TaskActions {
    * 投放计划由领域层的纯函数 `planQuadrantDrop` 算出来 —— 那是产品语义，
    * 有穷举测试（4 象限 × 3 种截止时间状态）。这里只负责**原子地写下去**。
    */
-  setQuadrantDrop(entityId: string, plan: QuadrantDropPlan): Promise<void>;
+  setQuadrantDrop(entityId: string, plan: QuadrantTaskPatch): Promise<void>;
   /** 传 `undefined` 表示清除截止时间（会写成 `null`，见文件头第 2 条）。 */
-  setDueDate(entityId: string, dueDate: number | undefined): Promise<void>;
+  setDueDate(entityId: string, dueDate: number | undefined, dueDateLocal?: string): Promise<void>;
   /**
    * 顺延：把**逾期**任务的截止时间推到**今天**，保留原来的时刻
    * （"昨天 09:00 逾期" → "今天 09:00"）。滴答的分组「顺延」就是这个语义。
@@ -267,7 +299,7 @@ export interface TaskActions {
    */
   setSchedule(
     entityId: string,
-    schedule: { startDate?: number; durationMinutes?: number },
+    schedule: { startDate?: number; startDateLocal?: string; durationMinutes?: number },
   ): Promise<void>;
   /**
    * 改备注（Markdown）。传 `undefined` 表示清除（同样写成 `null`）。
@@ -281,6 +313,10 @@ export interface TaskActions {
    * 数据同步到了每台设备却没有任何视图读得到）。
    */
   setNote(entityId: string, note: string | undefined): Promise<void>;
+  /** Set the replaceable AI estimate line using the latest queued note snapshot. */
+  setTaskEstimate(entityId: string, minutes: number): Promise<'updated' | 'unchanged' | 'not-found'>;
+  /** Read, merge, and append a checklist under one serialized write decision. */
+  appendChecklist(entityId: string, items: readonly string[]): Promise<'appended' | 'unchanged' | 'not-found'>;
   /** 传 `undefined` 表示移出项目（会写成 `null`）。 */
   moveToProject(entityId: string, projectId: string | undefined): Promise<void>;
   /** 批量移动到清单：一个用户意图、一个 BATCH op。 */
@@ -420,39 +456,64 @@ export function createTaskActions(
    * 规则已经走到尽头（`UNTIL`/`COUNT` 用尽 → `nextOccurrence` 返回 `undefined`）时
    * **退回普通完成**：这一次是最后一件，之后就没有了。
    */
-  const completeTask = async (entityId: string, task: Task): Promise<void> => {
+  const widgetReceiptsOf = (task: Task): string[] =>
+    Array.isArray(task.widgetCompletionReceipts)
+      ? task.widgetCompletionReceipts.filter((value): value is string => typeof value === 'string')
+      : [];
+
+  const withWidgetReceipt = (
+    task: Task,
+    receipt: string | undefined,
+    payload: Record<string, unknown>,
+  ): Record<string, unknown> => {
+    if (receipt === undefined) return payload;
+    // The active native queue is capped at 50 intents. Retain twice that
+    // window durably without allowing a task record to grow without bound.
+    const next = [...widgetReceiptsOf(task).filter((value) => value !== receipt), receipt].slice(-100);
+    return { ...payload, widgetCompletionReceipts: next };
+  };
+
+  const completeTask = async (
+    entityId: string,
+    task: Task,
+    options: TaskCompletionOptions = {},
+  ): Promise<void> => {
+    const receipt = options.widgetReceipt;
+    if (receipt !== undefined) {
+      if (widgetReceiptsOf(task).includes(receipt)) {
+        // The TASK op already committed before a previous drain was interrupted.
+        // Its reminder patches were part of that same operation, so replay is
+        // a durable no-op and never advances the occurrence again.
+        return;
+      }
+    }
+
     const repeat = repeatOf(task);
     if (repeat === undefined) {
-      await update(entityId, { completedAt: now() });
+      await update(entityId, withWidgetReceipt(task, receipt, { completedAt: now() }));
       return;
     }
 
-    const from = task.dueDate !== undefined ? toLocalDate(task.dueDate) : repeat.dtstart;
+    const from = dueLocalDateOf(task) ?? repeat.dtstart;
     const next = nextOccurrence(repeat.rule, repeat.dtstart, from);
     if (next === undefined) {
-      await update(entityId, { completedAt: now() });
+      await update(entityId, withWidgetReceipt(task, receipt, { completedAt: now() }));
       return;
     }
 
     // 只动到期日：`completedAt` 保持不存在，任务仍然是"待办"。
     // 要把它标成完成必须显式清掉规则，否则两种状态会互相打架。
     const nextDueMs = parseLocalDate(next).getTime();
-    await update(entityId, { dueDate: nextDueMs });
+    const reminderUpdates = planRepeatReminderUpdates(ctx, entityId, nextDueMs);
+    await update(entityId, {
+      heytaTaskRepeatCompletion: 1,
+      task: withWidgetReceipt(task, receipt, {
+        dueDate: nextDueMs,
+        ...(task.dueDateLocal !== undefined ? { dueDateLocal: next } : {}),
+      }),
+      reminders: reminderUpdates,
+    });
 
-    /**
-     * 🔴 **提醒必须跟着新的截止走** —— 见 `reminder-actions.ts` 的
-     * `rescheduleRemindersForRepeat`。
-     *
-     * 带 `offsetMs` 的提醒重置到"新截止 − 提前量"；**绝对时刻**的提醒不动
-     * （"每天 9 点提醒我"里的 9 点是绝对时间，跟着 `dueDate` 漂移反而是错的）。
-     * 这两句话就是 `nextTriggerAfterRepeat` 的定义，这里**不重写**它 —— 只调用。
-     *
-     * 不接这一步的后果（本仓"最后一米"的又一个实例）：用户给"每周一的会"
-     * 挂了"提前 30 分钟"，勾掉之后任务顺延到下周，而那条提醒**仍然钉在上一个周一**
-     * —— 到点弹一条通知，点进去是下周的任务。而所有 op 都是对的、
-     * 相关单测也是绿的，因为"任务顺延"与"提醒顺延"之间**没有任何调用边**。
-     */
-    await rescheduleRemindersForRepeat(ctx, entityId, nextDueMs);
   };
 
   return {
@@ -477,15 +538,17 @@ export function createTaskActions(
       await update(entityId, { title: trimmed });
     },
 
-    async setCompleted(entityId, completed) {
+    async setCompleted(entityId, completed, options) {
       const task = taskOf(entityId);
       if (task === undefined) throw new Error(`找不到任务「${entityId}」`);
       if (completed) {
-        await completeTask(entityId, task);
+        await completeTask(entityId, task, options);
         return;
       }
       // null 而不是 undefined —— 见文件头第 2 条。
-      await update(entityId, { completedAt: null });
+      const receipt = options?.widgetReceipt;
+      if (receipt !== undefined && widgetReceiptsOf(task).includes(receipt)) return;
+      await update(entityId, withWidgetReceipt(task, receipt, { completedAt: null }));
     },
 
     async bulkSetCompleted(entityIds, completed) {
@@ -603,6 +666,76 @@ export function createTaskActions(
       return update(entityId, { priority });
     },
 
+    async patchDetails(entityId, patch) {
+      const task = taskOf(entityId);
+      if (task === undefined) throw new Error(`找不到任务「${entityId}」`);
+
+      // Validate every named field before constructing or dispatching anything.
+      if ('title' in patch && (typeof patch.title !== 'string' || patch.title.trim() === '')) {
+        throw new Error('任务标题不能为空');
+      }
+      if ('priority' in patch && ![Priority.None, Priority.Low, Priority.Medium, Priority.High].includes(patch.priority!)) {
+        throw new Error(`任务「${entityId}」的优先级无效`);
+      }
+      if ('dueDate' in patch && patch.dueDate !== undefined &&
+          (typeof patch.dueDate !== 'number' || !Number.isFinite(patch.dueDate))) {
+        throw new Error(`任务「${entityId}」的截止日期无效`);
+      }
+      if ('completed' in patch && typeof patch.completed !== 'boolean') {
+        throw new Error(`任务「${entityId}」的完成状态无效`);
+      }
+
+      const completed = patch.completed;
+      const repeat = repeatOf(task);
+      if (completed === true && repeat !== undefined) {
+        // Repeating completion advances the occurrence and reschedules reminders;
+        // folding it into a generic patch would silently lose that semantic.
+        if (Object.keys(patch).some((key) => key !== 'completed')) {
+          throw new Error('重复任务不能与其他字段一起完成');
+        }
+        await completeTask(entityId, task);
+        return;
+      }
+
+      const payload: Record<string, unknown> = {};
+      if ('title' in patch) payload.title = patch.title!.trim();
+      if ('priority' in patch) payload.priority = patch.priority;
+      if ('dueDate' in patch) {
+        payload.dueDate = patch.dueDate ?? null;
+        payload.dueDateLocal = null;
+      }
+      if ('completed' in patch) payload.completedAt = completed === true ? now() : null;
+      if (Object.keys(payload).length > 0) await update(entityId, payload);
+    },
+
+    async bulkSetPriorities(entries) {
+      if (entries.length === 0) return;
+      const seen = new Set<string>();
+      for (const entry of entries) {
+        if (typeof entry.id !== 'string' || entry.id === '') {
+          throw new Error('批量优先级包含空任务 id');
+        }
+        if (seen.has(entry.id)) throw new Error(`批量优先级包含重复任务「${entry.id}」`);
+        seen.add(entry.id);
+        if (![Priority.None, Priority.Low, Priority.Medium, Priority.High].includes(entry.priority)) {
+          throw new Error(`任务「${entry.id}」的优先级无效`);
+        }
+        if (taskOf(entry.id) === undefined) throw new Error(`找不到任务「${entry.id}」`);
+      }
+      const [first, ...rest] = entries;
+      if (first === undefined) return;
+      await ctx.dispatch({
+        entityType: 'TASK' as EntityType,
+        entityId: first.id,
+        ...(rest.length > 0 ? { entityIds: rest.map((entry) => entry.id) } : {}),
+        opType: OpType.Batch,
+        payload: {
+          heytaTaskPriorityBatch: 1,
+          items: entries.map((entry) => ({ id: entry.id, priority: entry.priority })),
+        },
+      });
+    },
+
     setImportant(entityId, important) {
       return update(entityId, { important });
     },
@@ -616,13 +749,23 @@ export function createTaskActions(
       const payload: Record<string, unknown> = { important: plan.important };
       if (plan.dueDate !== undefined) {
         payload.dueDate = plan.dueDate;
+        payload.dueDateLocal = null;
       }
       return update(entityId, payload);
     },
 
-    setDueDate(entityId, dueDate) {
+    async setDueDate(entityId, dueDate, dueDateLocal) {
       // undefined → null：null 能穿过 JSON 表达"清除"。
-      return update(entityId, { dueDate: dueDate ?? null });
+      if (dueDateLocal !== undefined) {
+        if (dueDate === undefined || !/^\d{4}-\d{2}-\d{2}$/.test(dueDateLocal)) {
+          throw new Error('非法的仅日期截止');
+        }
+        parseLocalDate(dueDateLocal);
+      }
+      return update(entityId, {
+        dueDate: dueDate ?? null,
+        dueDateLocal: dueDateLocal ?? null,
+      });
     },
 
     async postponeToToday(entityId) {
@@ -632,12 +775,15 @@ export function createTaskActions(
       if (
         task.dueDate === undefined ||
         task.completedAt !== undefined ||
-        startOfDay(task.dueDate) >= startOfDay(now())
+        (dueLocalDateOf(task) ?? toLocalDate(task.dueDate)) >= today(now())
       ) {
         return;
       }
       const timeOfDay = task.dueDate - startOfDay(task.dueDate);
-      await update(entityId, { dueDate: startOfDay(now()) + timeOfDay });
+      await update(entityId, {
+        dueDate: startOfDay(now()) + timeOfDay,
+        ...(task.dueDateLocal !== undefined ? { dueDateLocal: today(now()) } : {}),
+      });
     },
 
     async setSchedule(entityId, schedule) {
@@ -654,6 +800,23 @@ export function createTaskActions(
         } else {
           payload.startDate = v;
         }
+        if (schedule.startDateLocal !== undefined) {
+          if (v === undefined || !/^\d{4}-\d{2}-\d{2}$/.test(schedule.startDateLocal)) {
+            throw new Error('非法的仅日期排期起点');
+          }
+          parseLocalDate(schedule.startDateLocal);
+        }
+        // A named epoch write is an instant/legacy projection. Date-only callers
+        // must opt in explicitly; otherwise stale local text would survive a drag.
+        payload.startDateLocal = schedule.startDateLocal ?? null;
+      } else if ('startDateLocal' in schedule) {
+        if (schedule.startDateLocal !== undefined) {
+          if (taskOf(entityId)?.startDate === undefined || !/^\d{4}-\d{2}-\d{2}$/.test(schedule.startDateLocal)) {
+            throw new Error('非法的仅日期排期起点');
+          }
+          parseLocalDate(schedule.startDateLocal);
+        }
+        payload.startDateLocal = schedule.startDateLocal ?? null;
       }
       if ('durationMinutes' in schedule) {
         const v = schedule.durationMinutes;
@@ -676,6 +839,66 @@ export function createTaskActions(
     setNote(entityId, note) {
       // undefined → null：与 setDueDate 同一个理由，null 能穿过 JSON 表达"清除"。
       return update(entityId, { note: note ?? null });
+    },
+
+    setTaskEstimate(entityId, minutes) {
+      if (ctx.dispatchChecked === undefined) {
+        throw new Error('任务估时需要串行状态写入能力');
+      }
+      if (!Number.isInteger(minutes) || !Number.isFinite(minutes) || minutes < 0) {
+        throw new Error('任务估时必须是非负整数分钟');
+      }
+      // Capture the caller-owned scalar before entering the serialized queue.
+      // The note itself is deliberately read inside the queue so a concurrent
+      // edit cannot be overwritten by a stale snapshot.
+      const snapshot = clampDurationMinutes(minutes);
+      return ctx.dispatchChecked((state) => {
+        const task = state.tasks[entityId];
+        if (task === undefined || task.deletedAt !== undefined) {
+          return { value: 'not-found' as const };
+        }
+        const nextNote = writeDurationIntoNote(task.note, snapshot);
+        if (nextNote === task.note) return { value: 'unchanged' as const };
+        return {
+          value: 'updated' as const,
+          intent: {
+            entityType: 'TASK' as EntityType,
+            entityId,
+            opType: OpType.Update,
+            payload: { note: nextNote },
+          },
+        };
+      });
+    },
+
+    async appendChecklist(entityId, items) {
+      if (ctx.dispatchChecked === undefined) {
+        throw new Error('清单追加需要串行状态写入能力');
+      }
+      if (!Array.isArray(items) || items.some((item) => typeof item !== 'string')) {
+        throw new Error('清单条目必须是字符串数组');
+      }
+      // dispatchChecked may wait behind another write. Capture the caller-owned
+      // array before entering that queue so a later caller mutation cannot
+      // change the checklist selected by the serialized builder.
+      const snapshot = [...items];
+      return ctx.dispatchChecked((state) => {
+        const task = state.tasks[entityId];
+        if (task === undefined || task.deletedAt !== undefined) {
+          return { value: 'not-found' as const };
+        }
+        const nextNote = mergeChecklistIntoNote(task.note, snapshot);
+        if (nextNote === task.note) return { value: 'unchanged' as const };
+        return {
+          value: 'appended' as const,
+          intent: {
+            entityType: 'TASK' as EntityType,
+            entityId,
+            opType: OpType.Update,
+            payload: { note: nextNote },
+          },
+        };
+      });
     },
 
     // 🔴 **必须是 `async`**：校验失败时 `throw` 要变成一个被拒绝的 Promise，
@@ -762,7 +985,7 @@ export function createTaskActions(
 
       // 锚点钉一次：已有截止日就用它，否则用今天 —— 并顺手把截止日补上。
       // 不补的话会出现"有规则、没日子"的任务，它在任何日期视图里都不出现。
-      const anchor = task.dueDate !== undefined ? toLocalDate(task.dueDate) : today(now());
+      const anchor = dueLocalDateOf(task) ?? today(now());
       await update(entityId, {
         repeatRule: rule,
         repeatDtstart: anchor,

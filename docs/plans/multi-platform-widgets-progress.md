@@ -1,5 +1,8 @@
 # 多端小组件实施进度账本
 
+> 2026-10-08 接续：macOS WidgetKit 与 Windows 原生 COM Provider 已实施；四端系统交互尚未全部验收。最新逐端状态、未完成项与证据统一见 [产品 UX 总清单 UX-S9-138](product-ux-optimization.md)，下文旧阶段读数保留为历史记录。
+
+
 > 状态：**实施中**
 > 执行计划：[multi-platform-widgets.md](multi-platform-widgets.md)（做什么、为什么）
 > 证据基础：[multi-platform-selection-evidence.md](../research/multi-platform-selection-evidence.md)（七条调研线）

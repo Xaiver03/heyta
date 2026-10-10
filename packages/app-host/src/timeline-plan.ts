@@ -30,7 +30,9 @@
  */
 
 import {
+  addDays,
   buildTimeline,
+  parseLocalDate,
   parseChecklistFromNote,
   type ChecklistItem,
   type TaskTimePosition,
@@ -50,8 +52,10 @@ export interface TimelineTaskLike {
    * goal P1 硬规则），此前时间线唯一的问题就是没把它接进来（R4 §5.1）。
    */
   readonly dueDate?: number;
+  readonly dueDateLocal?: string;
   /** 排期起点（epoch ms）。可选 —— P2 起接（ADR-0043）。 */
   readonly startDate?: number;
+  readonly startDateLocal?: string;
   /** 排期时长（分钟）。可选；字段缺失时读取侧由 note 里的估时行兜底（ADR-0043 §4）。 */
   readonly durationMinutes?: number;
 }
@@ -59,7 +63,9 @@ export interface TimelineTaskLike {
 /** 推导「任务在时间上的位置」所需的任务时间字段（P2 起含排期字段，ADR-0043）。 */
 export interface TaskScheduleFields {
   readonly dueDate?: number;
+  readonly dueDateLocal?: string;
   readonly startDate?: number;
+  readonly startDateLocal?: string;
   readonly durationMinutes?: number;
 }
 
@@ -71,6 +77,15 @@ function validMs(value: number | undefined): number | undefined {
 /** 有限的正时长（分钟）才算"有"。 */
 function validMinutes(value: number | undefined): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
+function localMidnight(value: string | undefined): number | undefined {
+  if (value === undefined) return undefined;
+  try {
+    return parseLocalDate(value).getTime();
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -90,8 +105,8 @@ function validMinutes(value: number | undefined): number | undefined {
  * 也不该被默默夹成某个"看起来还行"的时刻。
  */
 export function deriveTaskTimePosition(fields: TaskScheduleFields): TaskTimePosition {
-  const start = validMs(fields.startDate);
-  const due = validMs(fields.dueDate);
+  const start = fields.startDateLocal === undefined ? validMs(fields.startDate) : localMidnight(fields.startDateLocal);
+  const due = fields.dueDateLocal === undefined ? validMs(fields.dueDate) : localMidnight(fields.dueDateLocal);
   const duration = validMinutes(fields.durationMinutes);
 
   if (start !== undefined) {
@@ -99,7 +114,11 @@ export function deriveTaskTimePosition(fields: TaskScheduleFields): TaskTimePosi
       return { kind: 'range', startMs: start, endMs: start + duration * 60_000 };
     }
     if (due !== undefined && due > start) {
-      return { kind: 'range', startMs: start, endMs: due };
+      // A date-only due is inclusive. The timeline range endpoint is exclusive.
+      const endMs = fields.dueDateLocal === undefined
+        ? due
+        : localMidnight(addDays(fields.dueDateLocal, 1)) ?? due;
+      return { kind: 'range', startMs: start, endMs };
     }
     return { kind: 'point', atMs: start };
   }
@@ -181,4 +200,3 @@ export function planTimelineBlock(task: TimelineTaskLike): TimelineBlock {
     unattributable: aiMinutes !== undefined && units.length > 1,
   };
 }
-
