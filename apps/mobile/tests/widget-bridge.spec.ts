@@ -5,7 +5,7 @@
  * 🔴 这个文件存在的理由：**桥接层的失败是安静的。**
  *
  * 小组件是附属功能，它的调用点都在"应用已经在正常工作了"的路径上，
- * 所以这里每一个函数的契约都是"**永不抛，回落到安全值**"。
+ * 所以后台刷新函数的契约都是"**永不抛，回落到安全值**"。
  * 而"回落到安全值"如果写错了（比如 `await` 没放进 `try`），
  * 症状是**应用偶发崩溃在小组件刷新路径上** —— 一个附属功能拖垮主应用。
  *
@@ -192,5 +192,15 @@ describe('W5 新增方法的降级路径', () => {
     await expect(
       Promise.all([readWidgetPrivacy(), setWidgetPrivacy(true), syncFocusActivity()]),
     ).resolves.toBeDefined();
+  });
+});
+
+
+describe('显式清理不能将原生失败报告为成功', () => {
+  it('原生拒绝和返回false都传播给清理流程', async () => {
+    const error = new Error('key deletion failed');
+    await expect(clearWidgetState({ clearWidgetState: async () => { throw error; } })).rejects.toBe(error);
+    await expect(clearWidgetState({ clearWidgetState: async () => false })).rejects.toThrow('could not be cleared');
+    await expect(clearWidgetState({ clearWidgetState: async () => true })).resolves.toBeUndefined();
   });
 });

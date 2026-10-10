@@ -114,8 +114,6 @@ export function HabitGoalSlot({
                 minHeight: tokens['touch-target.min'],
                 paddingHorizontal: tokens['space.2'],
                 borderRadius: tokens['radius.md'],
-                borderWidth: tokens['border-width.thin'],
-                borderColor: tokens['color.border'],
                 backgroundColor: tokens['color.surface'],
                 color: tokens['color.foreground'],
               }}
@@ -131,8 +129,6 @@ export function HabitGoalSlot({
                 minHeight: tokens['touch-target.min'],
                 paddingHorizontal: tokens['space.2'],
                 borderRadius: tokens['radius.md'],
-                borderWidth: tokens['border-width.thin'],
-                borderColor: tokens['color.border'],
                 backgroundColor: tokens['color.surface'],
                 color: tokens['color.foreground'],
               }}

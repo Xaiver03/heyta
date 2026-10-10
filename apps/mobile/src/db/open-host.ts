@@ -30,6 +30,7 @@ const DB_NAME = 'heyta.sqlite';
 
 let pending: Promise<AppHost> | null = null;
 let resolvedHost: AppHost | undefined;
+let hostEpoch = 0;
 
 /**
  * 在宿主外面包一层：**每次写入之后喊一声"写了"**，自动同步据此把改动推出去，
@@ -85,6 +86,7 @@ function withWriteSignal(host: AppHost): AppHost {
  */
 export function openTaskHost(): Promise<AppHost> {
   if (pending === null) {
+    const epoch = hostEpoch;
     pending = openAppHost({
       // 🔴 驱动是工厂不是实例：`SqliteAdapter` 会在 close 后靠它重开。
       driverFactory: opSqliteDriverFactory({ name: DB_NAME }),
@@ -131,8 +133,18 @@ export function openTaskHost(): Promise<AppHost> {
        */
       onLocalDataErased: resetTaskHostCache,
     }).then(withWriteSignal).then((host) => {
+      // Account/data cleanup may reset the singleton while native SQLite is
+      // still opening. Never give that old connection a new session's identity.
+      if (epoch !== hostEpoch) {
+        host.close();
+        throw new Error('Task host opening was superseded by a database reset');
+      }
       resolvedHost = host;
       return host;
+    }).catch((error: unknown) => {
+      // A late failure from an old generation must not evict the current open.
+      if (epoch === hostEpoch) pending = null;
+      throw error;
     });
   }
   return pending;
@@ -150,6 +162,7 @@ export function invalidateTaskHostVaultSession(): void {
 
 /** 仅供测试与"重开数据库"这类显式场景使用。 */
 export function resetTaskHostCache(): void {
+  hostEpoch += 1;
   pending = null;
   resolvedHost = undefined;
 }

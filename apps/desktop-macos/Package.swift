@@ -15,6 +15,7 @@ import PackageDescription
 let package = Package(
     name: "HeytaMac",
     platforms: [.macOS(.v14)],
+    dependencies: [.package(path: "../mobile/ios/HeytaWidgetCore")],
     targets: [
         .target(
             name: "HeytaShellCore",
@@ -32,7 +33,7 @@ let package = Package(
         //    "证明原生壳搭起来了、数据真的从共享 TS 那一侧过来了"。
         .executableTarget(
             name: "HeytaMac",
-            dependencies: ["HeytaShellCore"]
+            dependencies: ["HeytaShellCore", .product(name: "HeytaWidgetBridge", package: "HeytaWidgetCore")]
         ),
     ]
 )

@@ -1,8 +1,15 @@
-import type { FocusState, Habit, HabitLog, LocalDate, Project, Task } from '@heyta/domain';
-import { addDays, parseLocalDate, toLocalDate } from '@heyta/domain';
-import { buildWidgetPayload, type WidgetPayload } from '@heyta/widget-core';
+import type { FocusState } from '@heyta/domain';
+import { planWidgetPublish, type WidgetPublishStateSlice, type WidgetPublishPlan } from '@heyta/app-host';
+export { planWidgetPublish, type WidgetPublishStateSlice, type WidgetPublishPlan } from '@heyta/app-host';
 
 import { sealWidgetSnapshot, setWidgetSnapshot } from './widget-bridge';
+import {
+  beginWidgetCleanup,
+  canCommitPublish,
+  currentPublishEpoch,
+  registerPublish,
+  resetWidgetPublishCoordinatorForTests,
+} from './publish-coordinator';
 
 /**
  * 发布管线：物化状态 → 载荷 → 加密信封 → 共享容器
@@ -43,74 +50,6 @@ import { sealWidgetSnapshot, setWidgetSnapshot } from './widget-bridge';
  * 而它的症状是"刚勾的那一条在组件上没变"，下次别的写入一来又"好了"。
  */
 
-/** [planWidgetPublish] 需要的状态切片。写全 `MaterializedState` 会让单测造假数据很啰嗦。 */
-export interface WidgetPublishStateSlice {
-  tasks: Record<string, Task>;
-  projects: Record<string, Project>;
-  habits: Record<string, Habit>;
-  habitLogs: Record<string, HabitLog>;
-}
-
-export interface WidgetPublishPlan {
-  dayStr: LocalDate;
-  validUntil: number;
-  payload: WidgetPayload;
-  payloadJson: string;
-}
-
-/**
- * **纯函数**：算出这一轮该发布什么。
- *
- * ⚠️ 记录是 `Record<string, T>` 而选择器要数组 —— 转换只在这一处做。
- * 让每个调用方各自 `Object.values` 的话，"哪个忘了转"会在某个端上表现为
- * "某个 section 永远是空的"，而类型系统不会拦住它。
- */
-export function planWidgetPublish(input: {
-  state: WidgetPublishStateSlice;
-  focus?: FocusState;
-  now: number;
-}): WidgetPublishPlan {
-  const { state, focus, now } = input;
-
-  const today = toLocalDate(now);
-
-  const payload = buildWidgetPayload({
-    tasks: Object.values(state.tasks),
-    projects: Object.values(state.projects),
-    habits: Object.values(state.habits),
-    logs: Object.values(state.habitLogs),
-    // ⚠️ 专注状态只在应用活着时存在（正在跑的番茄钟不落盘），所以它由调用方传入；
-    //    拿不到时传 `undefined`，选择器会给 `{ active: false }`。
-    focus,
-    today,
-    now,
-  });
-
-  return {
-    dayStr: today,
-    /**
-     * 🔴 **正是下一个本地零点**（不是 `now + msUntilNextMidnight(now)`）。
-     *
-     * 这两件事看起来一样，其实是**两个不同的概念**，而且用错的那个方向是危险的：
-     *
-     * | 谁 | 语义 | 边界行为 |
-     * |---|---|---|
-     * | `msUntilNextMidnight` | **定时器**该睡多久 | 有 `MIN_TICK_DELAY_MS` 下限，保证 `setTimeout` 不会 0 毫秒自旋 |
-     * | `validUntil` | 这份数据**什么时候开始不可信** | 必须是**确切的**零点 |
-     *
-     * 拿前者算后者：在午夜前最后一秒发布时，`next - now` 小于那个下限、
-     * 于是被抬成 1 秒 —— `validUntil` 就落到**午夜之后**，
-     * 组件会在新的一天里继续显示**昨天的任务**（组件侧只判 `now >= validUntil`，
-     * 按设计**不会**自己去推"今天"，所以**没有任何东西会拦住它**）。
-     *
-     * 这个 bug 是测试抓出来的，不是我读代码看出来的。
-     */
-    validUntil: parseLocalDate(addDays(today, 1)).getTime(),
-    payload,
-    payloadJson: JSON.stringify(payload),
-  };
-}
-
 /**
  * 发布的结果。
  *
@@ -124,7 +63,9 @@ export type WidgetPublishOutcome =
   /** 原生封包失败（Keystore 不可用、参数非法……）。细节在日志的错误码里。 */
   | 'seal-failed'
   /** 信封被原生侧拒了（`E_WIDGET_INVALID_ENVELOPE`）或写盘失败。 */
-  | 'write-rejected';
+  | 'write-rejected'
+  /** 清理账号状态已经开始，旧快照不能再写入。 */
+  | 'fenced';
 
 /** 这条管线需要的外部动作。做成可注入是为了让合并逻辑能在单测里跑。 */
 export interface WidgetPublishDeps {
@@ -147,9 +88,11 @@ const defaultDeps: WidgetPublishDeps = {
 export async function runWidgetPublish(
   plan: WidgetPublishPlan,
   deps: WidgetPublishDeps = defaultDeps,
+  canWrite: () => boolean = () => true,
 ): Promise<WidgetPublishOutcome> {
   const envelopeJson = await deps.seal(plan.payloadJson, plan.dayStr, plan.validUntil);
   if (envelopeJson === null) return 'seal-failed';
+  if (!canWrite()) return 'fenced';
 
   const written = await deps.write(envelopeJson);
   return written ? 'published' : 'write-rejected';
@@ -184,6 +127,9 @@ export async function publishWidgetSnapshot(
   source: WidgetPublishSource,
   deps: WidgetPublishDeps = defaultDeps,
 ): Promise<void> {
+  const epoch = currentPublishEpoch();
+  if (epoch === undefined) return;
+
   if (inFlight !== null) {
     rerunRequested = true;
     return inFlight;
@@ -202,7 +148,7 @@ export async function publishWidgetSnapshot(
 
         let outcome: WidgetPublishOutcome;
         try {
-          outcome = await runWidgetPublish(plan, deps);
+          outcome = await runWidgetPublish(plan, deps, () => canCommitPublish(epoch));
         } catch (error) {
           // 走到这里说明原生侧抛了（不是返回 false）。写入本身已经成功，
           // 所以只记日志 —— 让小组件的问题不影响用户正在做的事。
@@ -210,17 +156,20 @@ export async function publishWidgetSnapshot(
           return;
         }
 
-        if (outcome !== 'published') {
+        if (outcome !== 'published' && outcome !== 'fenced') {
           console.warn(`[widget] 快照未发布：${outcome}`);
         }
-      } while (rerunRequested);
+      } while (rerunRequested && canCommitPublish(epoch));
     } finally {
       inFlight = null;
     }
   })();
+  registerPublish(inFlight);
 
   return inFlight;
 }
+
+export { beginWidgetCleanup };
 
 /**
  * 只给测试用：清掉合并状态。
@@ -231,4 +180,5 @@ export async function publishWidgetSnapshot(
 export function __resetWidgetPublishForTests(): void {
   inFlight = null;
   rerunRequested = false;
+  resetWidgetPublishCoordinatorForTests();
 }

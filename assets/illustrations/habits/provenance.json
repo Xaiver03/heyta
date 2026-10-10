@@ -1,0 +1,47 @@
+{
+  "generatedAt": "2026-10-07",
+  "model": "gpt-image-2",
+  "route": "通过本机已配置的图像服务生成；凭据不进入仓库",
+  "source": {
+    "atlas": "habit-icons-atlas.png",
+    "atlasSha256": "da524f0271feb2f5eb97127c156831155b43743ec874e6d0fae5d33589aad414",
+    "prompt": "prompt.txt",
+    "promptSha256": "c3e8f3b38e05767eb826f1f53bd10f404f778c1a1cd368f4d57b7dc9f8a84d1a",
+    "size": [1536, 1024],
+    "layout": "6 columns x 4 rows, 256px cells, left-to-right then top-to-bottom"
+  },
+  "processing": {
+    "script": "scripts/prepare-habit-artwork.py",
+    "background": "edge-connected near-white pixels removed; enclosed white pixels retained",
+    "runtimeSize": [128, 128],
+    "runtimeFormat": "transparent PNG",
+    "runtimeEmbedding": "base64 data URIs in packages/ui/src/habits/habit-artwork.generated.json"
+  },
+  "icons": [
+    "drop",
+    "activity",
+    "book",
+    "moon",
+    "leaf",
+    "pencil",
+    "sun",
+    "music",
+    "heart",
+    "strength",
+    "meditation",
+    "tea",
+    "fruit",
+    "cycling",
+    "camera",
+    "art",
+    "code",
+    "dental",
+    "pet",
+    "savings",
+    "home",
+    "language",
+    "journal",
+    "walking"
+  ],
+  "license": "Original artwork generated for heyta; no third-party icon pack or operating-system glyph is copied."
+}

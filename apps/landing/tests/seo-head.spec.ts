@@ -433,9 +433,10 @@ describe('结构化数据（JSON-LD）', () => {
   });
 
   it('FAQPage 只出现在真正有问答的页面上，且条数与页面一致', () => {
-    // 4 条价格 FAQ、10 条帮助问答 —— 这两个数字来自 `src/site/content.ts`，
+    // 4 条价格 FAQ、12 条帮助问答 —— 这两个数字来自 `src/site/content.ts`，
     // 改那边忘了改这里会立刻红（而不是让结构化数据与页面悄悄不一致）。
-    const expected: Record<string, number> = { pricing: 4, help: 10 };
+    // 帮助那一条从 10 涨到 12 是 2026-10-08 工单 W4（换绑邮箱 / 登录设备各一问）。
+    const expected: Record<string, number> = { pricing: 4, help: 12 };
     for (const { page, locale } of ENTRIES) {
       const faq = readHead(page, locale).jsonLd.find((n) => typeOf(n) === 'FAQPage');
       const want = expected[page.id];

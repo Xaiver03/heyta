@@ -45,6 +45,7 @@ final class ShellAuthSession: NSObject, ASWebAuthenticationPresentationContextPr
 
 private extension ASWebAuthenticationSession {
     /// 系统给的锚点：拿不到就退回 key window，再退回首个可见窗口。
+    @MainActor
     static func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
         let windows = NSApplication.shared.windows
         return windows.first(where: { $0.isKeyWindow })

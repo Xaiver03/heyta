@@ -4,6 +4,7 @@ import { parseLocalDate, type Task } from '@heyta/domain';
 
 import {
   __resetWidgetPublishForTests,
+  beginWidgetCleanup,
   planWidgetPublish,
   publishWidgetSnapshot,
   runWidgetPublish,
@@ -12,6 +13,8 @@ import {
   type WidgetPublishSource,
   type WidgetPublishStateSlice,
 } from '../src/widgets/publish';
+import { clearWidgetState } from '../src/widgets/widget-bridge';
+import { isWidgetPublishBlocked } from '../src/widgets/publish-coordinator';
 
 /**
  * 发布管线的测试。
@@ -305,4 +308,132 @@ describe('publishWidgetSnapshot 的合并', () => {
       warn.mockRestore();
     }
   });
+
+  it('清理开始后，seal 完成也不能把旧快照写回', async () => {
+    __resetWidgetPublishForTests();
+
+    const { seal, release } = deferredSeal();
+    const write = vi.fn(async () => true);
+    const publishing = publishWidgetSnapshot(
+      { read: () => ({ state: slice([task()]) }) },
+      { seal, write },
+    );
+
+    const cleanup = beginWidgetCleanup();
+    release();
+    const lease = await cleanup;
+    await publishing;
+
+    expect(write).not.toHaveBeenCalled();
+    lease.release(true);
+  });
+
+  it('清理等待在途 write 完成后才调用原生删除', async () => {
+    __resetWidgetPublishForTests();
+
+    let releaseWrite: (() => void) | undefined;
+    const writeStarted = new Promise<void>((resolve) => {
+      releaseWrite = resolve;
+    });
+    const write = vi.fn(async () => {
+      await writeStarted;
+      return true;
+    });
+    const publishing = publishWidgetSnapshot(
+      { read: () => ({ state: slice([task()]) }) },
+      { seal: async () => '{"v":1}', write },
+    );
+
+    // 等到 publish 已经进入 native write，再开始清理。
+    await vi.waitFor(() => expect(write).toHaveBeenCalledTimes(1));
+    let nativeClearCalls = 0;
+    const clearing = clearWidgetState({
+      clearWidgetState: async () => {
+        nativeClearCalls += 1;
+        return true;
+      },
+    });
+    await Promise.resolve();
+    expect(nativeClearCalls).toBe(0);
+
+    releaseWrite?.();
+    await Promise.all([publishing, clearing]);
+    expect(nativeClearCalls).toBe(1);
+  });
+
+  it('原生清理失败后保持发布屏障，不能自动恢复旧快照', async () => {
+    __resetWidgetPublishForTests();
+
+    await expect(
+      clearWidgetState({ clearWidgetState: async () => false }),
+    ).rejects.toThrow('could not be cleared');
+
+    const seal = vi.fn(async () => '{"v":1}');
+    await publishWidgetSnapshot(
+      { read: () => ({ state: slice([task()]) }) },
+      { seal, write: async () => true },
+    );
+    expect(seal).not.toHaveBeenCalled();
+  });
+
+  it('重叠清理中先完成的成功不能提前解除仍在途的清理屏障', async () => {
+    __resetWidgetPublishForTests();
+
+    const first = await beginWidgetCleanup();
+    const second = await beginWidgetCleanup();
+    first.release(true);
+
+    // 第二个清理仍未完成，发布必须继续被挡住；旧快照不能趁空档写回。
+    expect(isWidgetPublishBlocked()).toBe(true);
+    const seal = vi.fn(async () => '{"v":1}');
+    await publishWidgetSnapshot(
+      { read: () => ({ state: slice([task()]) }) },
+      { seal, write: async () => true },
+    );
+    expect(seal).not.toHaveBeenCalled();
+
+    second.release(true);
+    expect(isWidgetPublishBlocked()).toBe(false);
+    await publishWidgetSnapshot(
+      { read: () => ({ state: slice([task()]) }) },
+      { seal, write: async () => true },
+    );
+    expect(seal).toHaveBeenCalledTimes(1);
+  });
+
+  it('重叠清理中后完成的失败会保持屏障，直到下一次显式成功清理', async () => {
+    __resetWidgetPublishForTests();
+
+    const first = await beginWidgetCleanup();
+    const second = await beginWidgetCleanup();
+    first.release(true);
+    second.release(false);
+
+    expect(isWidgetPublishBlocked()).toBe(true);
+    const seal = vi.fn(async () => '{"v":1}');
+    const source: WidgetPublishSource = {
+      read: () => ({ state: slice([task()]) }),
+    };
+    await publishWidgetSnapshot(source, { seal, write: async () => true });
+    expect(seal).not.toHaveBeenCalled();
+
+    // 只有失败发生之后开始的显式成功清理，才有资格解除失败闸门。
+    const recovery = await beginWidgetCleanup();
+    recovery.release(true);
+    expect(isWidgetPublishBlocked()).toBe(false);
+    await publishWidgetSnapshot(source, { seal, write: async () => true });
+    expect(seal).toHaveBeenCalledTimes(1);
+  });
+  it('失败之前已开始的后编号清理不能解除失败屏障', async () => {
+    __resetWidgetPublishForTests();
+    const first = await beginWidgetCleanup();
+    const second = await beginWidgetCleanup();
+    first.release(false);
+    second.release(true);
+    expect(isWidgetPublishBlocked()).toBe(true);
+    const recovery = await beginWidgetCleanup();
+    recovery.release(true);
+    expect(isWidgetPublishBlocked()).toBe(false);
+  });
+
 });

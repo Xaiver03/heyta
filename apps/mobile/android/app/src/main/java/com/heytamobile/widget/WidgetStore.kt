@@ -14,26 +14,8 @@ object WidgetKeys {
     // ⚠️ 存量设备上那个键可能还躺在 SharedPreferences 里，见 `WidgetModule` 的迁移注释。
 }
 
-/**
- * 共享容器的**读写逻辑**（不含平台 API，故可在 JVM 单测里跑）。
- *
- * ## 🔴 为什么用一把**进程级**的锁，而不是 `synchronized(this)`
- *
- * "读出意图队列并清空"（[drainIntents]）必须是**原子**的：读与清之间若被另一条路径插进来，
- * 同一次点击就会被执行两遍 —— 而它的症状是"完成时间被改了一次"，**没有任何一处会报错**。
- *
- * 而应用与组件**各自会 new 一个 [WidgetStore]**（它们在不同的调用栈里被实例化）。
- * 若锁加在实例上（`synchronized(this)`），两个实例各锁各的，**等于没锁**。
- * 组件与应用在 Android 上**同进程**，所以进程级的一把锁就是正确且充分的。
- * （若哪天有人把 Provider 配到独立进程，这把锁就失效了 —— 那时必须换成文件锁。
- *   这也是 [WidgetKeyValueStore] 那条"不要用 MODE_MULTI_PROCESS"注释存在的原因。）
- *
- * ## 为什么读后即清（drain）而不是读完再删
- *
- * 读完再删时，如果应用在读完之后、删之前崩了，下次启动会**再执行一遍**那些点击。
- * 而"读到一半崩了"最坏是**丢一次点击** —— 用户会再点一下，代价小得多。
- * 这与整个小组件设计的取向一致：**宁可丢一次点击，也不要重复执行**。
- */
+/** Same-process Android provider/application storage. Reads retain clicks until
+ * exact acknowledgements; all mutations share one lock across store instances. */
 class WidgetStore(private val store: WidgetKeyValueStore) {
 
     // ─────────────────────────────────────────────────────────────
@@ -43,7 +25,7 @@ class WidgetStore(private val store: WidgetKeyValueStore) {
     fun writeSnapshot(envelopeJson: String) {
         synchronized(LOCK) {
             store.putString(WidgetKeys.SNAPSHOT, envelopeJson)
-            store.commit()
+            check(store.commit()) { "Widget storage commit failed" }
         }
     }
 
@@ -53,18 +35,19 @@ class WidgetStore(private val store: WidgetKeyValueStore) {
     // 意图队列（组件写、应用 drain）
     // ─────────────────────────────────────────────────────────────
 
-    /**
-     * 取出意图队列的原始 JSON 并**清空**它。
-     *
-     * 返回 `null` = 没有待处理的点击。**刻意不在这里解析** ——
-     * 解析与折叠的语义只有一份真源，在 `@heyta/widget-core` 的 `parseIntentQueue` 里
-     *（它有 36 条测试）。原生侧再实现一遍解析就是第二个真源，而两个真源会漂移且不报错。
-     */
-    fun drainIntents(): String? = synchronized(LOCK) {
-        val raw = store.getString(WidgetKeys.INTENTS) ?: return null
-        store.remove(WidgetKeys.INTENTS)
-        store.commit()
-        raw
+    /** Non-destructive read. An interrupted app can read the same clicks after restart. */
+    fun drainIntents(): String? = synchronized(LOCK) { store.getString(WidgetKeys.INTENTS) }
+
+    /** Remove only the exact processed click, preserving newer clicks on the same task. */
+    fun acknowledgeIntents(processed: WidgetIntentQueue): Int = synchronized(LOCK) {
+        updateIntents { current -> WidgetIntentQueue(current.intents.filterNot { it in processed.intents }) }.intents.size
+    }
+
+    /** A stale launcher PendingIntent must not recreate state after local data was cleared. */
+    fun appendIntentIfSnapshot(intent: WidgetIntent): Boolean = synchronized(LOCK) {
+        if (store.getString(WidgetKeys.SNAPSHOT) == null) return false
+        updateIntents { current -> WidgetIntentQueues.merge(current, intent) }
+        true
     }
 
     /** 只读，**不清空**。给组件渲染时的乐观叠加用（它需要看到队列，但不能消费掉）。 */
@@ -94,7 +77,7 @@ class WidgetStore(private val store: WidgetKeyValueStore) {
         synchronized(LOCK) {
             val next = transform(WidgetIntentQueues.parse(store.getString(WidgetKeys.INTENTS)))
             store.putString(WidgetKeys.INTENTS, WidgetIntentQueues.toJson(next))
-            store.commit()
+            check(store.commit()) { "Widget storage commit failed" }
             next
         }
 
@@ -133,7 +116,7 @@ class WidgetStore(private val store: WidgetKeyValueStore) {
         synchronized(LOCK) {
             store.remove(WidgetKeys.SNAPSHOT)
             store.remove(WidgetKeys.INTENTS)
-            store.commit()
+            check(store.commit()) { "Widget storage commit failed" }
         }
     }
 

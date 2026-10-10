@@ -5,6 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import java.nio.file.Paths
 
 /**
  * W1-1 的**第一步**：先证明"单测真的能跑"，再写解析器。
@@ -47,10 +48,10 @@ class GoldenFixtureSmokeTest {
         // 🔴 不只断言"文件在"，还断言**它在仓库的正确位置**。
         //    否则若有人把夹具复制一份到 app/src/test/resources 再改路径，
         //    这就变成"两个真源"——四端漂移的起点，而且不会报错。
-        val canonical = fixturesDir.canonicalPath
+        val canonical = fixturesDir.canonicalFile.toPath()
         assertTrue(
             "夹具目录不在 packages/widget-core/fixtures 下：$canonical",
-            canonical.endsWith("packages/widget-core/fixtures")
+            canonical.endsWith(Paths.get("packages", "widget-core", "fixtures"))
         )
 
         listOf("v1.golden.json", "v1.golden.plaintext.json", "v99.unknown.golden.json").forEach {

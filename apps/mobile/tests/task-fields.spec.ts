@@ -61,6 +61,10 @@ describe('toDueDisplay', () => {
   });
 
   describe('date 模式（绝对日期，纯数字、语言无关）', () => {
+    it('date-only from another rule timezone displays its original calendar day', () => {
+      const captured = task({ dueDate: Date.UTC(2026, 8, 25, 16), dueDateLocal: '2026-09-26' });
+      expect(toDueDisplay(captured, 'date', NOW, zh)?.text).toBe('09-26');
+    });
     it('同年只给月日；两种语言一致', () => {
       const t = task({ dueDate: parseLocalDate('2026-09-26').getTime() });
       expect(toDueDisplay(t, 'date', NOW, zh)?.text).toBe('09-26');

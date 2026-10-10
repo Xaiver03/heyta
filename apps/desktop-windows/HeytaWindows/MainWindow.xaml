@@ -6,8 +6,12 @@
     xmlns:local="using:Heyta.Shell"
     Title="heyta">
 
-    <Grid x:Name="Root" Padding="24" RowSpacing="12">
-        <Grid.RowDefinitions>
+    <Grid x:Name="WindowRoot" Background="{ThemeResource HeytaColorBackground}">
+        <!-- The shared Web UI owns the entire client canvas, including modal
+             backdrops beneath the native caption controls. AppWindow drag
+             rectangles perform hit testing without an opaque XAML overlay. -->
+        <Grid x:Name="Root" Padding="24" RowSpacing="12">
+          <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -21,7 +25,7 @@
             <!-- 共享 UI 的宿主（M2-A spike）。 -->
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
+          </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0" x:Name="ShellTitle" Spacing="2">
             <TextBlock Text="heyta" FontSize="{ThemeResource HeytaFontSize2xl}" FontWeight="SemiBold" />
@@ -62,15 +66,12 @@
             </ListView.ItemTemplate>
         </ListView>
 
-        <!--
-          M2-A spike：原生壳里内嵌的 WebView2，承载的是 `packages/ui` 的**同一份**共享 UI
-          （`apps/web` 的 `?slice=1` 入口，经 react-native-web 渲染）。
-
-          🔴 这里不写任何业务逻辑：数据与派生都在 TS 一侧（native-bridge → app-host）。
-          WebView 只是**渲染目标**。
-        -->
+        <!-- M2-A spike：原生壳里内嵌的 WebView2，承载的是 `packages/ui` 的**同一份**共享 UI。 -->
         <WebView2 Grid.Row="4" x:Name="SharedUi" />
 
-        <TextBlock Grid.Row="5" x:Name="FooterText" Opacity="0.6" FontSize="{ThemeResource HeytaFontSizeXs}" TextWrapping="Wrap" />
+          <TextBlock Grid.Row="5" x:Name="FooterText" Opacity="0.6" FontSize="{ThemeResource HeytaFontSizeXs}" TextWrapping="Wrap" />
+        </Grid>
+
+
     </Grid>
 </Window>

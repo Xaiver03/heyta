@@ -14,7 +14,7 @@ import org.json.JSONObject
  * | 方法 | 谁用 | 纪律 |
  * |---|---|---|
  * | `setWidgetSnapshot` | 应用写 | 写进去的**必须先过契约校验**，不能让组件去猜 |
- * | `drainIntentQueue` | 应用读 | **读后即清**、不解析（解析的真源在 `@heyta/widget-core`） |
+ * | `drainIntentQueue` | 应用读 | **非破坏读取**，成功后精确 ack（解析的真源在 `@heyta/widget-core`） |
  * | `clearWidgetState` | 登出 | 快照与密钥**一起**清（D6） |
  *
  * ## 🔴 为什么 `setWidgetSnapshot` 要**拒绝**而不是"先存着看看"
@@ -30,6 +30,22 @@ class WidgetModule(reactContext: ReactApplicationContext) :
     private val store = WidgetStore(SharedPreferencesWidgetStore(reactContext))
 
     override fun getName(): String = NAME
+
+    override fun getConstants(): Map<String, Any> = buildMap {
+        WidgetLocalePreference.read(reactApplicationContext)?.let { put("preferredLocale", it) }
+        put("deviceLocale", reactApplicationContext.resources.configuration.locales[0].toLanguageTag())
+    }
+
+    @ReactMethod
+    fun setWidgetLocale(locale: String, promise: Promise) {
+        try {
+            WidgetLocalePreference.write(reactApplicationContext, locale)
+            WidgetRefresh.pushAll(reactApplicationContext)
+            promise.resolve(true)
+        } catch (e: Throwable) {
+            promise.reject(ERR_WRITE_FAILED, e)
+        }
+    }
 
     /**
      * 写入一份**已加密**的快照信封。
@@ -82,7 +98,7 @@ class WidgetModule(reactContext: ReactApplicationContext) :
     }
 
     /**
-     * 取出意图队列的**原始 JSON** 并清空。`null` = 没有待处理的点击。
+     * 读取意图队列的**原始 JSON**，ack 前保留。`null` = 没有待处理的点击。
      *
      * ⚠️ 刻意**不在原生侧解析**：队列语义（last-wins 折叠、上限 50、类型校验）
      * 只有一份真源，在 `@heyta/widget-core` 的 `parseIntentQueue` 里（36 条测试）。
@@ -97,20 +113,16 @@ class WidgetModule(reactContext: ReactApplicationContext) :
         }
     }
 
-    /**
-     * 把 drain 之后**执行失败**的意图写回容器。返回写回后队列的长度。
-     *
-     * 🔴 **是合并，不是覆盖。** 理由见 `WidgetIntentQueues.mergeAll` 的注释：
-     * `drainIntentQueue` 是"读出来 + 清空"，写回发生在之后，这两步之间用户
-     * 完全可能又点一下 —— 那个新点击已经进了容器，整体覆盖会把它**悄悄抹掉**。
-     *
-     * 🔴 **`updateIntents` 的读-改-写必须在原生做**（它有锁）。让 JS 侧
-     * "先读一次、再写一次"会把同一个竞态搬到桥的两端，而且窗口更大。
-     *
-     * ⚠️ 抛错时不 reject 成"应用崩了"：这些意图是**失败的坏消息**，
-     * 写不回去最多是"下次重试没了"，不该反过来影响用户当前的操作。
-     * 但也不能静默 —— 所以 reject 带错误码，桥接层会记日志。
-     */
+    @ReactMethod
+    fun ackIntentQueue(processedJson: String, promise: Promise) {
+        try {
+            promise.resolve(store.acknowledgeIntents(WidgetIntentQueues.parse(processedJson)))
+        } catch (e: Throwable) {
+            promise.reject(ERR_WRITE_FAILED, e)
+        }
+    }
+
+    /** 兼容旧调用者：旧意图合并时保留较新的点击。当前消费流程使用非破坏读取与精确 ack。 */
     @ReactMethod
     fun mergeIntentQueue(pendingJson: String, promise: Promise) {
         try {
@@ -153,6 +165,8 @@ class WidgetModule(reactContext: ReactApplicationContext) :
         try {
             WidgetDeviceKeyStore.delete()
             store.clearAll()
+            // 清掉系统已缓存的文字；刷新失败也必须让清理流程知道。
+            WidgetRefresh.pushAll(reactApplicationContext)
             promise.resolve(true)
         } catch (e: Throwable) {
             promise.reject(ERR_WRITE_FAILED, e)

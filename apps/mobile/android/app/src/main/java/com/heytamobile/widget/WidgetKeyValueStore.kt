@@ -45,15 +45,23 @@ class SharedPreferencesWidgetStore(context: Context) : WidgetKeyValueStore {
 
     override fun getString(key: String): String? = prefs.getString(key, null)
 
+    private var editor: android.content.SharedPreferences.Editor? = null
+
     override fun putString(key: String, value: String) {
-        prefs.edit().putString(key, value).apply()
+        val transaction = editor ?: prefs.edit().also { editor = it }
+        transaction.putString(key, value)
     }
 
     override fun remove(key: String) {
-        prefs.edit().remove(key).apply()
+        val transaction = editor ?: prefs.edit().also { editor = it }
+        transaction.remove(key)
     }
 
-    override fun commit(): Boolean = prefs.edit().commit()
+    override fun commit(): Boolean {
+        val transaction = editor ?: return true
+        editor = null
+        return transaction.commit()
+    }
 
     companion object {
         /** 存储文件名。**改它等于让已装机的用户丢一次快照** —— 快照会重建，不必改。 */

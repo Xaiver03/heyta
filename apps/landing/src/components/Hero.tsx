@@ -1,4 +1,3 @@
-import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 英雄区
  * ========
@@ -6,23 +5,12 @@ import { ICON_SIZE } from '@heyta/design-system';
  * 版面：**非对称 5/7 分栏**（左文右景）。taste skill 的规则 ——
  * `DESIGN_VARIANCE > 4` 时避免居中英雄区；居中版会立刻读成"模板"。
  *
- * 3D 倾斜（本页第一处"炫酷"）：
- *   用指针位置驱动 `rotateX` / `rotateY`，**X 与 Y 各用一个独立弹簧**。
- *   依据 Apple《Designing Fluid Interfaces》§3：二维运动必须拆成两个独立弹簧 ——
- *   用一个"到目标的二维距离"弹簧，在 X 与 Y 速度不同时两轴会失步。
- *
- *   松手（指针离开）时**从当前值弹回中心**，而不是跳回 ——
- *   这就是"可打断"：指针还在动的时候再进来，弹簧从当前位置重新起步，
- *   不会有可见的跳变。CSS transition 做不到这件事（它只能等上一段跑完）。
- *
- * `prefers-reduced-motion` 下**完全不接倾斜**：位移与前庭不适直接相关，
- * 而且倾斜对理解内容没有任何帮助（Apple §14：减动效是"换成更温和的等价物"，
- * 不是"什么都不动"—— 所以入场淡入仍然保留）。
+ * 产品界面是证据，不是装饰。首屏只做一次轻量入场，避免指针倾斜让文字
+ * 变形、让用户误以为这个窗口可以直接操作，也把动效预算留给后面的真实视图切换。
  */
 
-import { useMemo, useRef } from 'react';
-import { motion, useMotionValue, useSpring, useTransform } from 'motion/react';
-import { Check, WifiOff } from 'lucide-react';
+import { useMemo } from 'react';
+import { motion } from 'motion/react';
 
 import { useI18n } from '@heyta/i18n/provider';
 
@@ -37,62 +25,9 @@ import {
   VIEWPORT,
 } from '../lib/motion.js';
 
-/** 倾斜幅度（度）。刻意小 —— 大角度会让界面文字变形到读不清。 */
-const TILT_Y = 11;
-const TILT_X = 8;
-
 export function Hero(): React.JSX.Element {
   const preset = useMotionPreset();
   const { t } = useI18n();
-  const stageRef = useRef<HTMLDivElement>(null);
-
-  // 0..1 的归一化指针位置，初始在正中
-  const pointerX = useMotionValue(0.5);
-  const pointerY = useMotionValue(0.5);
-
-  // X / Y 各自独立弹簧（见文件头）
-  const rotateY = useSpring(
-    useTransform(pointerX, [0, 1], [TILT_Y, -TILT_Y]),
-    preset.uiSpring,
-  );
-  const rotateX = useSpring(
-    useTransform(pointerY, [0, 1], [-TILT_X, TILT_X]),
-    preset.uiSpring,
-  );
-  // 整卡轻微平移，让"它是浮着的"更可信（Apple §8：中间帧要指向结果）
-  const shiftX = useSpring(useTransform(pointerX, [0, 1], [-12, 12]), preset.uiSpring);
-  const shiftY = useSpring(useTransform(pointerY, [0, 1], [-8, 8]), preset.uiSpring);
-
-  /**
-   * 四个弹簧合成**一条** transform 字符串。
-   *
-   * AUDIT §5：`x`/`y`/`rotateX`/`rotateY` 这类简写会各写一次 style，
-   * 目标是合成单条完整 transform —— 每帧只写一次，旋转顺序也显式可控。
-   * 顺序必须是 translate → rotate：先平移再旋转，卡片才是"在原地转"；
-   * 反过来平移会被旋转一起带偏。
-   */
-  const tilt = useTransform(
-    [rotateX, rotateY, shiftX, shiftY],
-    ([rx = 0, ry = 0, sx = 0, sy = 0]) =>
-      `translate3d(${sx}px, ${sy}px, 0) rotateX(${rx}deg) rotateY(${ry}deg)`,
-  );
-
-  function handlePointerMove(event: React.PointerEvent<HTMLDivElement>): void {
-    if (preset.reduced) return;
-    const stage = stageRef.current;
-    if (stage === null) return;
-    const rect = stage.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return;
-    pointerX.set((event.clientX - rect.left) / rect.width);
-    pointerY.set((event.clientY - rect.top) / rect.height);
-  }
-
-  function handlePointerLeave(): void {
-    if (preset.reduced) return;
-    // 弹回中心 —— 从**当前值**起步，所以中途再进来也不会跳（Apple §3）
-    pointerX.set(0.5);
-    pointerY.set(0.5);
-  }
 
   const copy = revealVariants(preset.reduced, preset.ui, '1rem');
 
@@ -146,53 +81,20 @@ export function Hero(): React.JSX.Element {
         </motion.div>
       </motion.div>
 
-      <div
-        ref={stageRef}
-        className="lp-hero__stage"
-        onPointerMove={handlePointerMove}
-        onPointerLeave={handlePointerLeave}
-      >
+      <div className="lp-hero__stage">
         <div className="lp-hero__glow" aria-hidden="true" />
 
-        {/*
-          🔴 入场与指针倾斜**必须分在两个元素上**。
-          原来两者都绑在 `.lp-hero__card` 上：`style` 里给了 `y: shiftY`，
-          而 `animate` 也想驱动 `y`。Motion 中 `style` 绑定的 MotionValue
-          是该 key 的权威来源，于是入场的 `y: '2rem' → 0` **从未执行过** ——
-          英雄卡本该"从下方升起"，实际只有淡入和放大，而且没有任何报错。
-          拆开之后：外层只管入场，内层只管倾斜。
-        */}
+        {/* 卡片只做一次轻微入场；它是产品证据，不应持续跟随指针漂移。 */}
         <motion.div
           className="lp-hero__enter"
           initial={preset.reduced ? { opacity: 0 } : { opacity: 0, y: '2rem', scale: 0.96 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ ...preset.sheet, delay: preset.reduced ? 0 : HERO_ENTRANCE_DELAY }}
         >
-          <motion.div
-            className="lp-hero__card"
-            style={preset.reduced ? undefined : { transform: tilt }}
-          >
+          <motion.div className="lp-hero__card">
             {/* 真实界面的复现。见 mockup/ 的文件头：这是复现，不是应用本身。 */}
             <AppWindow view="tasks" />
 
-            {/*
-              两片浮层。它们给 3D 纵深提供**参照物** ——
-              一张平卡旋转时读不出深度，有了不同 Z 值的浮片，纵深立刻可见。
-            */}
-            <div
-              className="lp-float lp-float--sync"
-              style={{ '--lp-float-z': '4rem' } as React.CSSProperties}
-            >
-              <Check className="lp-float__icon--ok" size={ICON_SIZE.xs} aria-hidden="true" />
-              {t('landing.hero.floatSynced')}
-            </div>
-            <div
-              className="lp-float lp-float--offline"
-              style={{ '--lp-float-z': '7rem' } as React.CSSProperties}
-            >
-              <WifiOff className="lp-float__icon--info" size={ICON_SIZE.xs} aria-hidden="true" />
-              {t('landing.hero.floatOffline')}
-            </div>
           </motion.div>
         </motion.div>
       </div>

@@ -33,6 +33,16 @@ public let widgetIntentVersion = 1
 /// 队列长度上限。超过时丢**最旧**的（合并之后才截断）。
 public let widgetIntentMax = 50
 
+/// Current time in the queue contract's epoch-millisecond representation.
+///
+/// `Date.timeIntervalSince1970` has sub-millisecond precision, while the
+/// cross-platform queue contract deliberately accepts only safe integers.
+/// Normalizing at the producer boundary keeps iOS from writing a fractional
+/// `at` value that the JS/Android parsers must reject.
+public func widgetIntentEpochMilliseconds(_ date: Date = Date()) -> Double {
+    Double(Int64(date.timeIntervalSince1970 * 1000))
+}
+
 /// 一条点击意图。字段与 TS 的 `WidgetIntent` 一一对应。
 public struct WidgetIntent: Equatable, Sendable {
     public let taskId: String

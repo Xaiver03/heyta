@@ -6,7 +6,7 @@ import Foundation
 
  ## 🔴 为什么这一层必须在 Core，而不是各写一份
 
- 应用侧要写快照、drain 队列、清空；扩展侧要读快照、读队列、**合并**一条点击。
+ 应用侧要写快照、非破坏读取并确认队列、清空；扩展侧要读快照、读队列、**合并**一条点击。
  两组操作**重叠在"读"上**，而重叠的部分恰好是最容易写错的那部分：
 
  | 易错点 | 写错的表现 |
@@ -92,36 +92,97 @@ public enum WidgetContainerFiles {
     }
 
     /**
-     读出原始 JSON 并清空。`nil` = 没有待处理的点击。
+     读取原始 JSON（非破坏）。`nil` = 没有待处理的点击。
 
      ⚠️ 返回 `nil` 而不是 `"[]"`：**"没有点击"与"有零条点击"** 在调用方要走
      不同的分支，而 `"[]"` 会被 `JSON.parse` 成一个空数组 —— 调用方必须判断两种形态。
      */
-    public static func drainIntentsRaw() -> String? {
-        guard let url = intentQueueURL() else { return nil }
+    public static func drainIntentsRaw() throws -> String? {
+        guard let url = intentQueueURL() else { throw Failure.containerUnavailable }
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
 
         let coordinator = NSFileCoordinator()
         var coordinationError: NSError?
+        var readError: Error?
         var result: String?
-
-        coordinator.coordinate(writingItemAt: url, options: .forMerging, error: &coordinationError) { target in
-            guard let data = try? Data(contentsOf: target) else { return }
-            result = String(decoding: data, as: UTF8.self)
-            // 清空：写一个空队列，而不是删文件 —— 删了之后扩展的读会走
-            // "文件不存在"这条路，而那条路和"队列是空的"在语义上应当一致。
-            // 写成空队列让"文件永远存在"这个前提成立，读侧的判据就只剩"内容是不是空"。
-            if let empty = encodeQueue(.empty) {
-                try? empty.write(to: target, options: .atomic)
-                setFileProtection(target)
+        coordinator.coordinate(readingItemAt: url, options: [], error: &coordinationError) { target in
+            do {
+                let data = try Data(contentsOf: target)
+                let raw = String(decoding: data, as: UTF8.self)
+                guard !WidgetIntentQueues.parse(data).intents.isEmpty else { return }
+                result = raw
+            } catch {
+                readError = error
             }
         }
-        if coordinationError != nil { return nil }
+        if let readError { throw Failure.readFailed(readError.localizedDescription) }
+        if let coordinationError { throw Failure.readFailed(coordinationError.localizedDescription) }
+        return result
+    }
 
-        // 空队列与"没有点击"对调用方是同一件事。
-        guard let raw = result, !WidgetIntentQueues.parse(Data(raw.utf8)).intents.isEmpty else {
-            return nil
+    /// 精确确认已处理的点击。只删除三元组完全匹配的条目，读取期间新写入的点击会在
+    /// 同一个 NSFileCoordinator 临界区之后再写入，因此不会被误删。
+    public static func ackIntents(_ processed: WidgetIntentQueue) throws -> Int {
+        guard let url = intentQueueURL() else { throw Failure.containerUnavailable }
+        guard !processed.intents.isEmpty else { return 0 }
+        guard FileManager.default.fileExists(atPath: url.path) else { return 0 }
+
+        let coordinator = NSFileCoordinator()
+        var coordinationError: NSError?
+        var operationError: Error?
+        var removed = 0
+        coordinator.coordinate(writingItemAt: url, options: .forMerging, error: &coordinationError) { target in
+            do {
+                let data = try Data(contentsOf: target)
+                let current = try parseQueueForAck(data)
+                let wanted = Set(processed.intents.map { IntentKey($0) })
+                let kept = current.intents.filter { intent in
+                    if wanted.contains(IntentKey(intent)) {
+                        removed += 1
+                        return false
+                    }
+                    return true
+                }
+                guard let encoded = encodeQueue(WidgetIntentQueue(kept)) else {
+                    throw Failure.ackFailed("无法序列化确认后的意图队列")
+                }
+                try encoded.write(to: target, options: .atomic)
+                setFileProtection(target)
+            } catch {
+                operationError = error
+            }
         }
-        return raw
+        if let operationError {
+            if let failure = operationError as? Failure { throw failure }
+            throw Failure.ackFailed(operationError.localizedDescription)
+        }
+        if let coordinationError { throw Failure.ackFailed(coordinationError.localizedDescription) }
+        return removed
+    }
+
+    private struct IntentKey: Hashable {
+        let taskId: String
+        let targetIsDone: Bool
+        let at: Double
+        init(_ intent: WidgetIntent) {
+            taskId = intent.taskId
+            targetIsDone = intent.targetIsDone
+            at = intent.at
+        }
+    }
+
+    private static func parseQueueForAck(_ data: Data) throws -> WidgetIntentQueue {
+        guard let root = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]),
+              let object = root as? [String: Any],
+              let version = object["v"] as? Int, version == widgetIntentVersion,
+              let rawIntents = object["intents"] as? [Any] else {
+            throw Failure.ackFailed("意图队列格式无效，未执行确认")
+        }
+        let queue = WidgetIntentQueues.parse(data)
+        guard rawIntents.isEmpty || !queue.intents.isEmpty else {
+            throw Failure.ackFailed("意图队列格式无效，未执行确认")
+        }
+        return queue
     }
 
     /**
@@ -131,7 +192,7 @@ public enum WidgetContainerFiles {
  
      应用与扩展是**两个进程**，它们会同时写这个文件：
      - 用户在组件上连点两下 → 两次 intent 执行；
-     - 应用同时在 drain / 写回失败的意图。
+     - 应用同时在 drain / 精确确认已处理的意图（旧版兼容写回）。
 
      不做协调的话，一次"读到旧内容 → 两边各自合并 → 各自写"就会**丢掉一次点击**。
      症状是"我明明点了两下，只有一下生效" —— 而日志里什么都没有。
@@ -160,10 +221,34 @@ public enum WidgetContainerFiles {
         return merged
     }
 
-    /// 登出时清空。**两处一起清**（调用方负责先删密钥，见 `WidgetBridgeService.clearWidgetState`）。
-    public static func clearAll() {
-        if let url = snapshotURL() { try? FileManager.default.removeItem(at: url) }
-        if let url = intentQueueURL() { try? FileManager.default.removeItem(at: url) }
+    /// 登出时清空。调用方负责先删密钥；这里再协调地清除所有共享状态。
+    /// 任何删除失败都抛出，不能让宿主误报清理成功。
+    public static func clearAll() throws {
+        guard containerURL() != nil else { throw Failure.containerUnavailable }
+        for url in [snapshotURL(), intentQueueURL(), privacyURL()].compactMap({ $0 }) {
+            try removeCoordinated(url)
+        }
+    }
+
+    private static func removeCoordinated(_ url: URL) throws {
+        let fileManager = FileManager.default
+        // 登出是幂等的：已经不存在的文件无需报错。
+        guard fileManager.fileExists(atPath: url.path) else { return }
+
+        let coordinator = NSFileCoordinator()
+        var coordinationError: NSError?
+        var operationError: Error?
+        coordinator.coordinate(writingItemAt: url, options: .forDeleting, error: &coordinationError) { target in
+            do {
+                if fileManager.fileExists(atPath: target.path) {
+                    try fileManager.removeItem(at: target)
+                }
+            } catch {
+                operationError = error
+            }
+        }
+        if let operationError { throw Failure.clearFailed(operationError.localizedDescription) }
+        if let coordinationError { throw Failure.clearFailed(coordinationError.localizedDescription) }
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -213,5 +298,8 @@ public enum WidgetContainerFiles {
     public enum Failure: Error, Equatable {
         /// App Group 没配好（`containerURL` 返回 `nil`）。
         case containerUnavailable
+        case clearFailed(String)
+        case readFailed(String)
+        case ackFailed(String)
     }
 }

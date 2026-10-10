@@ -22,9 +22,9 @@
  */
 
 import { useI18n, useLocale, type Locale } from '@heyta/i18n/provider';
-import { legalDocumentById, type LegalBlock, type LegalSection } from '@heyta/legal';
+import { legalDocumentById, legalDocumentPresentation, type LegalBlock, type LegalSection } from '@heyta/legal';
 
-import { PageHead, RichText } from '../site/PageSections.js';
+import { RichText } from '../site/PageSections.js';
 import { legalPageByDocId, type SitePage } from '../site/pages.js';
 import { siteHref } from '../site/paths.js';
 
@@ -38,16 +38,19 @@ export function LegalDocumentPage({ page }: { page: SitePage }): React.JSX.Eleme
   if (docId === undefined) {
     throw new Error(`站点页面 "${page.id}" 没有 legalDocId，却挂在了法律文本组件上。`);
   }
-  const document = legalDocumentById(docId);
+  const document = legalDocumentPresentation(legalDocumentById(docId));
   const sections = document.sections[locale];
 
   return (
     <>
-      <PageHead page={page} cta={false} />
-
       <div className="lp-legal">
+        <header className="lp-legal__header">
+          <h1 className="lp-legal__title">{document.title[locale]}</h1>
         <p className="lp-legal__meta">
           <RichText text={t('site.legal.meta', { version: document.version, date: document.updatedDate })} />
+        </p>
+        <p className="lp-legal__summary">
+          <RichText text={document.summary[locale]} />
         </p>
 
         {document.status === 'draft' ? (
@@ -57,10 +60,12 @@ export function LegalDocumentPage({ page }: { page: SitePage }): React.JSX.Eleme
             <RichText text={t('site.legal.draft.banner')} />
           </p>
         ) : null}
+        </header>
 
         {sections.length > 1 ? (
-          <nav className="lp-legal__toc" aria-label={t('site.legal.toc')}>
-            <p className="lp-legal__toc-title">{t('site.legal.toc')}</p>
+          <details className="lp-legal__toc">
+            <summary className="lp-legal__toc-title">{t('site.legal.toc')}</summary>
+            <nav aria-label={t('site.legal.toc')}>
             <ol>
               {sections.map((section) => (
                 <li key={section.id}>
@@ -70,7 +75,8 @@ export function LegalDocumentPage({ page }: { page: SitePage }): React.JSX.Eleme
                 </li>
               ))}
             </ol>
-          </nav>
+            </nav>
+          </details>
         ) : null}
 
         {sections.map((section) => (
@@ -164,7 +170,7 @@ function LegalBlockView({
     }
     case 'table':
       return (
-        <div className="lp-legal__table-wrap">
+        <div className={`lp-legal__table-wrap${block.head.length > 3 ? ' lp-legal__table-wrap--records' : ''}`}>
           <table className="lp-legal__table">
             <thead>
               <tr>
@@ -180,6 +186,9 @@ function LegalBlockView({
                 <tr key={rowIndex}>
                   {row.map((cell, cellIndex) => (
                     <td key={cellIndex}>
+                      <span className="lp-legal__cell-label" aria-hidden="true">
+                        <RichText text={block.head[cellIndex] ?? ''} />
+                      </span>
                       <RichText text={cell} />
                     </td>
                   ))}

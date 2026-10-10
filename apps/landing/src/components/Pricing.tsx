@@ -1,3 +1,4 @@
+import { AssistantIcon } from './AssistantIcon.js';
 import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 价格
@@ -28,7 +29,7 @@ import { ICON_SIZE } from '@heyta/design-system';
 
 import { useMemo } from 'react';
 import { motion } from 'motion/react';
-import { Check, Cloud, Hourglass, Server, Sparkles } from 'lucide-react';
+import { Check, Cloud, Hourglass, Server } from 'lucide-react';
 
 import { useI18n } from '@heyta/i18n/provider';
 
@@ -188,7 +189,7 @@ export function Pricing(): React.JSX.Element {
           {/* ── 托管 + 云端 AI：唯一一个我们卡得住的能力 ──────────────── */}
           <PaidCard
             keyPrefix="landing.pricing.hostedAi"
-            icon={<Sparkles size={ICON_SIZE.md} aria-hidden="true" />}
+            icon={<AssistantIcon size={ICON_SIZE.md} aria-hidden="true" />}
             preset={preset}
           />
         </motion.div>

@@ -3,10 +3,6 @@ import { ICON_SIZE } from '@heyta/design-system';
  * 页脚
  * =======
  *
- * 🔴 必须有的那句免责声明：README 里写着
- * 「本仓库为个人项目，与滴答清单/TickTick 及其关联公司无任何关系」。
- * 落地页是**最容易被截图传播**的界面，漏掉这句会让人误以为这是官方产品。
- *
  * ⚠️ 这里原本有三组指向 GitHub 的链接（源码 / 贡献指南 / 路线图 / ADR /
  * 第三方许可证 / 文档索引）。仓库私有时期它们一律 404，整组被摘掉过；
  * **2026-09-29 仓库转公开**，恢复为一个「文档」组 + 品牌列的「在 GitHub 上查看」。
@@ -145,7 +141,6 @@ export function Footer(): React.JSX.Element {
         </div>
 
         <div className="lp-footer__bottom">
-          <p>{t('landing.footer.disclaimer')}</p>
           <p>{t('landing.footer.licenseNote')}</p>
         </div>
       </div>

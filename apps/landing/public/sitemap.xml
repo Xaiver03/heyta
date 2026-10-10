@@ -333,6 +333,20 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/selfhost/" />
   </url>
   <url>
+    <loc>https://heyta.waytofuture.cn/docs/automation/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/automation/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/automation/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/automation/" />
+  </url>
+  <url>
+    <loc>https://heyta.waytofuture.cn/en/docs/automation/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/automation/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/automation/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/automation/" />
+  </url>
+  <url>
     <loc>https://heyta.waytofuture.cn/docs/transfer/</loc>
     <changefreq>weekly</changefreq>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/transfer/" />

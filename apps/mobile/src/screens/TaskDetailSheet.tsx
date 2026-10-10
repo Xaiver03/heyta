@@ -34,6 +34,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   KeyboardAvoidingView,
+  Keyboard,
   Modal,
   Platform,
   Pressable,
@@ -41,6 +42,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   Priority,
@@ -145,6 +147,7 @@ export function TaskDetailSheet({
   now: number;
 }): React.JSX.Element | null {
   const tokens = useTokens();
+  const insets = useSafeAreaInsets();
   const text = useText();
   const { native } = useTheme();
   const { t, locale } = useI18n();
@@ -155,6 +158,8 @@ export function TaskDetailSheet({
   /** 行内「新建清单」的输入态与草稿名。 */
   const [newListOpen, setNewListOpen] = useState(false);
   const [newListName, setNewListName] = useState('');
+  /** 排期是进阶属性，默认收起；打开详情先让标题、备注和核心属性占据注意力。 */
+  const [scheduleOpen, setScheduleOpen] = useState(false);
   /** 改父被拒时的**人话**（空串 = 没有错误）。 */
   const [parentError, setParentError] = useState('');
 
@@ -199,7 +204,7 @@ export function TaskDetailSheet({
   );
   const planLabels = useMemo(() => timelineLabels(t).plan, [t]);
   // 排期段（多端不同入口：触屏端在详情表单里排期，web 载荷用拖拽 —— ADR-0043 §5）。
-  const startLocal = task?.startDate === undefined ? undefined : toLocalDate(task.startDate);
+  const startLocal = task?.startDateLocal ?? (task?.startDate === undefined ? undefined : toLocalDate(task.startDate));
   /** 时长档位（分钟）。与 `setSchedule` 的夹取档一致，全落在 [5, 480] 内。 */
   const DURATION_CHIPS: readonly number[] = [30, 60, 120, 240];
   const durationChipLabel = (minutes: number): string =>
@@ -225,6 +230,7 @@ export function TaskDetailSheet({
   useEffect(() => {
     setNewListOpen(false);
     setNewListName('');
+    setScheduleOpen(false);
   }, [taskId, visible]);
 
   /**
@@ -303,6 +309,15 @@ export function TaskDetailSheet({
     onClose();
   }, [commitTitle, commitNote, onClose]);
 
+  /** Android back first dismisses the keyboard; a second back closes the sheet. */
+  const handleRequestClose = useCallback((): void => {
+    if (Keyboard.isVisible()) {
+      Keyboard.dismiss();
+      return;
+    }
+    close();
+  }, [close]);
+
   /**
    * 自定义 RRULE 的输入草稿与错误（B2-3 的移动端尾巴）。
    *
@@ -349,7 +364,7 @@ export function TaskDetailSheet({
 
   if (task === undefined) return null;
 
-  const dueLocal = task.dueDate === undefined ? undefined : toLocalDate(task.dueDate);
+  const dueLocal = task.dueDateLocal ?? (task.dueDate === undefined ? undefined : toLocalDate(task.dueDate));
   const todayLocal = toLocalDate(now);
   // 共享 DatePicker 的注入物（快捷项日期数学在 domain，措辞在这里）。
   const datePicks = quickDatePicks(todayLocal, t);
@@ -364,7 +379,9 @@ export function TaskDetailSheet({
    * ⚠️ 不能写 `localTimeOf(task.dueDate ?? 0)`：`0` 是 1970-01-01，在 UTC+8 上
    * 读得出 08:00 —— 一条本来没有截止的任务会被安上一个凭空的时刻。
    */
-  const dueTimeValue = task.dueDate === undefined ? undefined : localTimeOf(task.dueDate);
+  const dueTimeValue = task.dueDateLocal !== undefined
+    ? undefined
+    : (task.dueDate === undefined ? undefined : localTimeOf(task.dueDate));
   const dueTimeText = datePickerTimeLabels(t, task.title);
   const done = task.completedAt !== undefined;
   /**
@@ -396,7 +413,7 @@ export function TaskDetailSheet({
   const customRule = repeat !== undefined && activePreset === undefined ? repeat.rule : undefined;
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={close} statusBarTranslucent>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={handleRequestClose} statusBarTranslucent>
       {/* 遮罩。**刻意不进无障碍树。**
           理由有两条，第二条是实测踩出来的：
 
@@ -415,7 +432,7 @@ export function TaskDetailSheet({
         importantForAccessibility="no"
         accessibilityElementsHidden
       />
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View
           style={{
             backgroundColor: tokens['color.surface'],
@@ -424,7 +441,7 @@ export function TaskDetailSheet({
             // ⚠️ 只给纵向内边距，不给固定 height ——
             // 同一节点上同时给 height 与 padding 会让内容在被压缩的盒子里居中。
             paddingTop: tokens['space.4'],
-            paddingBottom: tokens['space.8'],
+            paddingBottom: tokens['space.8'] + insets.bottom,
             gap: tokens['space.3'],
             maxHeight: '90%',
           }}
@@ -471,8 +488,6 @@ export function TaskDetailSheet({
                     minHeight: tokens['touch-target.min'],
                     paddingHorizontal: tokens['space.3'],
                     borderRadius: tokens['radius.md'],
-                    borderWidth: tokens['border-width.thin'],
-                    borderColor: tokens['color.border'],
                     backgroundColor: tokens['color.surface-sunken'],
                     color: tokens['color.foreground'],
                     // ⚠️ 走归一化访问器。直接传 `tokens['font.sans']` 会把整条
@@ -506,8 +521,6 @@ export function TaskDetailSheet({
                     paddingHorizontal: tokens['space.3'],
                     paddingVertical: tokens['space.2'],
                     borderRadius: tokens['radius.md'],
-                    borderWidth: tokens['border-width.thin'],
-                    borderColor: tokens['color.border'],
                     backgroundColor: tokens['color.surface-sunken'],
                     color: tokens['color.foreground'],
                     // ⚠️ 走归一化访问器。直接传 `tokens['font.sans']` 会把整条
@@ -525,9 +538,9 @@ export function TaskDetailSheet({
 
             {/* 清单排程预览：备注里写了清单（或 AI 拆解过）时才有内容可排。
                 它是任务内部坐标系，与时间线板的关系由预览自己的说明文字标明。 */}
-            {planBlock !== null && (
+            {planBlock?.hasChecklist ? (
               <ChecklistPlanPreview block={planBlock} labels={planLabels} now={now} />
-            )}
+            ) : null}
 
             <View style={{ gap: tokens['space.2'] }}>
               <SectionHeader icon="task.project" title={t('mobile.detail.field.project')} />
@@ -587,8 +600,6 @@ export function TaskDetailSheet({
                           minHeight: tokens['touch-target.min'],
                           paddingHorizontal: tokens['space.3'],
                           borderRadius: tokens['radius.md'],
-                          borderWidth: tokens['border-width.thin'],
-                          borderColor: tokens['color.border'],
                           backgroundColor: tokens['color.surface-sunken'],
                           color: tokens['color.foreground'],
                           fontFamily: native.fontSans,
@@ -719,7 +730,11 @@ export function TaskDetailSheet({
                   onChange: (next) => {
                     // `enabled` 为假时组件不回调；这一句是给类型看的，不是运行时兜底。
                     if (dueLocal === undefined) return;
-                    run(actions.setDueDate(task.id, dueDateToEpoch(dueLocal, next)));
+                    run(actions.setDueDate(
+                      task.id,
+                      dueDateToEpoch(dueLocal, next),
+                      next === undefined ? dueLocal : undefined,
+                    ));
                   },
                 }}
                 onChange={(date) => {
@@ -734,6 +749,7 @@ export function TaskDetailSheet({
                     actions.setDueDate(
                       task.id,
                       date === undefined ? undefined : dueDateToEpoch(date, dueTimeValue),
+                      date !== undefined && dueTimeValue === undefined ? date : undefined,
                     ),
                   );
                 }}
@@ -743,52 +759,66 @@ export function TaskDetailSheet({
             {/* 排期段（时间线 P2 的触屏入口）：开始 + 时长决定这条任务在时间线板上的条。
                 与截止是两件事 —— 截止是"什么时候到期"，排期是"什么时候做"。 */}
             <View style={{ gap: tokens['space.2'] }}>
-              <SectionHeader icon="task.due" title={t('mobile.detail.field.schedule')} />
-              <Text variant="row-meta" tone="muted">
-                {t('mobile.detail.schedule.hint')}
-              </Text>
-              <Text variant="row-meta" tone="muted">
-                {t('mobile.detail.schedule.start')}
-              </Text>
-              <DatePicker
-                value={startLocal}
-                today={todayLocal}
-                quickPicks={datePicks}
-                labels={datePickerText}
-                // 与截止那张分开（见上面 `task-due` 那段理由）。
-                testID="task-schedule-start"
-                onChange={(date) => {
-                  // 显式 `undefined` ⇒ 动作层写成 `null`（清除排期起点）。
-                  run(
-                    actions.setSchedule(
-                      task.id,
-                      date === undefined ? { startDate: undefined } : { startDate: dueDateToEpoch(date) },
-                    ),
-                  );
-                }}
+              <Button
+                icon="task.due"
+                label={t('mobile.detail.field.schedule')}
+                tone={scheduleOpen ? 'secondary' : 'ghost'}
+                accessibilityLabel={scheduleOpen
+                  ? t('mobile.detail.schedule.close')
+                  : t('mobile.detail.schedule.open')}
+                onPress={() => setScheduleOpen((open) => !open)}
               />
-              <Text variant="row-meta" tone="muted">
-                {t('mobile.detail.schedule.duration')}
-              </Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens['space.2'] }}>
-                <Chip
-                  label={t('mobile.detail.schedule.none')}
-                  selected={task.durationMinutes === undefined}
-                  onPress={() => {
-                    run(actions.setSchedule(task.id, { durationMinutes: undefined }));
-                  }}
-                />
-                {DURATION_CHIPS.map((minutes) => (
-                  <Chip
-                    key={minutes}
-                    label={durationChipLabel(minutes)}
-                    selected={task.durationMinutes === minutes}
-                    onPress={() => {
-                      run(actions.setSchedule(task.id, { durationMinutes: minutes }));
+              {scheduleOpen ? (
+                <View style={{ gap: tokens['space.2'] }}>
+                  <Text variant="row-meta" tone="muted">
+                    {t('mobile.detail.schedule.hint')}
+                  </Text>
+                  <Text variant="row-meta" tone="muted">
+                    {t('mobile.detail.schedule.start')}
+                  </Text>
+                  <DatePicker
+                    value={startLocal}
+                    today={todayLocal}
+                    quickPicks={datePicks}
+                    labels={datePickerText}
+                    // 与截止那张分开（见上面 `task-due` 那段理由）。
+                    testID="task-schedule-start"
+                    onChange={(date) => {
+                      // 显式 `undefined` ⇒ 动作层写成 `null`（清除排期起点）。
+                      run(
+                        actions.setSchedule(
+                          task.id,
+                          date === undefined
+                            ? { startDate: undefined }
+                            : { startDate: dueDateToEpoch(date), startDateLocal: date },
+                        ),
+                      );
                     }}
                   />
-                ))}
-              </View>
+                  <Text variant="row-meta" tone="muted">
+                    {t('mobile.detail.schedule.duration')}
+                  </Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens['space.2'] }}>
+                    <Chip
+                      label={t('mobile.detail.schedule.none')}
+                      selected={task.durationMinutes === undefined}
+                      onPress={() => {
+                        run(actions.setSchedule(task.id, { durationMinutes: undefined }));
+                      }}
+                    />
+                    {DURATION_CHIPS.map((minutes) => (
+                      <Chip
+                        key={minutes}
+                        label={durationChipLabel(minutes)}
+                        selected={task.durationMinutes === minutes}
+                        onPress={() => {
+                          run(actions.setSchedule(task.id, { durationMinutes: minutes }));
+                        }}
+                      />
+                    ))}
+                  </View>
+                </View>
+              ) : null}
             </View>
 
             <View style={{ gap: tokens['space.2'] }}>

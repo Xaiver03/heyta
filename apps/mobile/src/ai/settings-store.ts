@@ -100,10 +100,8 @@ export function reloadAiSettings(): AiSettingsState {
 /**
  * 这台设备**有没有**配 AI：总开关开 + 至少一个端点。
  *
- * 🔴 纯本机判断，不发任何请求。它决定的是「我的」页那行入口
- * **在不在树上** —— 关掉的模块不进 DOM 是本壳一贯的模块开关口径
- * （对照 web 的 `features/shell/modules.ts`：关掉的**一个节点都不渲染**）。
- * 设置那一面**不受它影响**：闸就住在那里，看不见就无法打开。
+ * 只决定助手里的配置提示，不控制入口是否可见。
+ * 未配置端点仍可查询本机任务；模型请求继续经过出境与联网授权。
  */
 export function isAiConfiguredOnThisDevice(settings: AiSettingsState = current): boolean {
   return settings.routing.enabled && settings.routing.endpoints.length > 0;

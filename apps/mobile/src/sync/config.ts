@@ -26,7 +26,7 @@
  * 因为"哪些字段算秘密"是个产品判断，不该由这里顺手决定。
  */
 
-import type { SyncConfig } from '@heyta/app-host';
+import { OFFICIAL_SITE_ORIGIN, type SyncConfig } from '@heyta/app-host';
 
 /**
  * 当前的活凭据。`undefined` = 尚未配置。
@@ -114,12 +114,5 @@ export function clearSyncConfig(): void {
   }
 }
 
-/**
- * Android 模拟器上的默认服务端地址。
- *
- * 🔴 **`127.0.0.1` 在模拟器里指的是模拟器自己**，不是运行服务端的这台 Mac。
- * 模拟器把宿主机的回环地址映射到 `10.0.2.2`。
- * 这是"地址填对了、服务也在跑、就是连不上"最常见的原因。
- * 真机调试要换成局域网 IP。
- */
-export const DEFAULT_SERVER_URL = 'http://10.0.2.2:3000';
+/** Official hosted service is the product default; development servers are explicit overrides. */
+export const DEFAULT_SERVER_URL = OFFICIAL_SITE_ORIGIN;

@@ -65,6 +65,38 @@ void Check(bool ok, string what)
     if (!ok) failures.Add(what);
 }
 
+// ── 0. Windows shell storage path contract ────────────────────────────
+// The QA override is intentionally tested before opening any database.  This
+// keeps the smoke test useful on non-Windows hosts and proves the shell SQLite
+// store moves without touching the default directory. WebView2 profile isolation
+// is a Windows-only runtime assertion in launch-data-transfer-qa.ps1.
+var defaultLocalAppData = Path.Combine(workDir, "default-localappdata");
+var defaultPaths = WindowsDataPaths.Resolve(null, defaultLocalAppData);
+Check(
+    !defaultPaths.IsQaOverride &&
+        defaultPaths.DatabasePath == Path.Combine(defaultLocalAppData, "heyta", "heyta.sqlite"),
+    "未设置 QA 覆盖时保留默认 LocalApplicationData\\heyta\\heyta.sqlite 路径");
+
+var qaDataDirectory = Path.Combine(workDir, "qa-data");
+var qaPaths = WindowsDataPaths.Resolve(qaDataDirectory, defaultLocalAppData);
+Check(
+    qaPaths.IsQaOverride && qaPaths.DatabasePath == Path.Combine(qaDataDirectory, "heyta.sqlite"),
+    "HEYTA_QA_DATA_DIR 把 SQLite 移到显式 QA 目录");
+Check(
+    qaPaths.DataDirectory != defaultPaths.DataDirectory,
+    "QA SQLite 目录不落入默认用户目录");
+
+var defaultDirectoryRejected = false;
+try
+{
+    WindowsDataPaths.Resolve(defaultPaths.DataDirectory, defaultLocalAppData);
+}
+catch (ArgumentException)
+{
+    defaultDirectoryRejected = true;
+}
+Check(defaultDirectoryRejected, "QA 覆盖显式指向默认用户目录时被拒绝");
+
 Console.WriteLine($"bundle：{bundle}（{new FileInfo(bundle).Length} 字节）");
 Console.WriteLine($"db：{dbPath}");
 Console.WriteLine();

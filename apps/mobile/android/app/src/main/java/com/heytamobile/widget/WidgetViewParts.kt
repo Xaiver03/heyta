@@ -1,6 +1,8 @@
 package com.heytamobile.widget
 
+import android.app.UiModeManager
 import android.content.Context
+import android.content.res.Configuration
 import android.view.View
 import android.widget.RemoteViews
 import com.heytamobile.R
@@ -55,6 +57,40 @@ fun taskRow(task: WidgetTask, targets: Map<String, Boolean>): WidgetTaskRow {
  * 这一层**只能靠真机验证**。
  */
 object WidgetViewParts {
+
+    /**
+     * `RemoteViews` 由 Launcher 进程充气。部分 Launcher 会沿用第一次充气时的
+     * 资源限定符，因此只把 `@color/...` 写在 XML 中并不能保证切换夜间模式后
+     * 颜色立即更新。这里根据系统当前模式在应用进程解析颜色，再把最终颜色值
+     * 作为 RemoteViews action 下发，四款组件共用同一条路径。
+     */
+    fun applyTheme(
+        context: Context,
+        views: RemoteViews,
+        rootId: Int,
+        textIds: IntArray,
+        mutedTextIds: IntArray = intArrayOf(),
+    ) {
+        val themedContext = systemThemedContext(context)
+        views.setInt(rootId, "setBackgroundColor", themedContext.getColor(R.color.heyta_widget_surface))
+        val foreground = themedContext.getColor(R.color.heyta_widget_foreground)
+        for (textId in textIds) views.setTextColor(textId, foreground)
+        val muted = themedContext.getColor(R.color.heyta_widget_foreground_muted)
+        for (textId in mutedTextIds) views.setTextColor(textId, muted)
+    }
+
+    /** Resolve the system night mode even when the host activity handles uiMode itself. */
+    private fun systemThemedContext(context: Context): Context {
+        val configuration = Configuration(context.resources.configuration)
+        val mode = context.getSystemService(UiModeManager::class.java)?.nightMode
+        val night = when (mode) {
+            UiModeManager.MODE_NIGHT_YES -> Configuration.UI_MODE_NIGHT_YES
+            UiModeManager.MODE_NIGHT_NO -> Configuration.UI_MODE_NIGHT_NO
+            else -> configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+        }
+        configuration.uiMode = (configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or night
+        return context.createConfigurationContext(configuration)
+    }
 
     /**
      * 行槽与视图 id。**顺序即渲染顺序**，改这里的顺序就是改四个组件的界面。
@@ -174,6 +210,8 @@ object WidgetViewParts {
         } else {
             views.setViewVisibility(R.id.widget_message, View.VISIBLE)
             views.setTextViewText(R.id.widget_message, context.getString(messageRes))
+            // 空态/过期时内容行已隐藏，提示本身就是返回应用的可见入口。
+            views.setOnClickPendingIntent(R.id.widget_message, WidgetClicks.openApp(context))
         }
     }
 

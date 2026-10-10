@@ -27,7 +27,8 @@
  */
 
 import type { LocalApiWriteIntent } from '@heyta/local-api';
-import type { MessageKey } from '@heyta/i18n';
+import type { Locale, MessageKey } from '@heyta/i18n';
+import { LIST_SEPARATOR } from '../lib/recurrence-display';
 
 /** `t` 的最小形状（与 web 那份同一个签名，避免把 `I18nValue` 整块拖进来）。 */
 type Translate = (key: MessageKey, vars?: Readonly<Record<string, string | number>>) => string;
@@ -50,7 +51,7 @@ function focusKindLabel(kind: string, t: Translate): string {
   return key === undefined ? kind : t(key);
 }
 
-export function intentText(intent: LocalApiWriteIntent, t: Translate): string {
+export function intentText(intent: LocalApiWriteIntent, t: Translate, locale: Locale = 'zh-CN'): string {
   switch (intent.action) {
     case 'create-task':
       return t('web.ai.tools.intentCreate', { title: intent.title });
@@ -61,6 +62,11 @@ export function intentText(intent: LocalApiWriteIntent, t: Translate): string {
     case 'complete-tasks':
       // 说**条数**不说 id：手机上 20 串 id 根本读不动，而"这是一次批量"必须看清。
       return t('web.ai.tools.intentCompleteBatch', { count: String(intent.taskIds.length) });
+    case 'append-task-checklist':
+      return t('web.ai.tools.intentAppendTaskChecklist', {
+        id: intent.taskId,
+        items: intent.items.join(LIST_SEPARATOR[locale]),
+      });
     case 'create-project':
       return t('web.ai.tools.intentCreateProject', { name: intent.name });
     case 'create-habit':
@@ -73,6 +79,23 @@ export function intentText(intent: LocalApiWriteIntent, t: Translate): string {
         id: intent.taskId,
         count: String(intent.tagIds.length),
       });
+    case 'set-task-priorities': {
+      const priorityKeys: Readonly<Record<string, MessageKey | undefined>> = {
+        none: 'web.ai.prioritize.priority.none',
+        low: 'web.ai.prioritize.priority.low',
+        medium: 'web.ai.prioritize.priority.medium',
+        high: 'web.ai.prioritize.priority.high',
+      };
+      const items = intent.entries
+        .map(({ taskId, priority }) => {
+          const key = priorityKeys[priority.trim().toLowerCase()];
+          return `${taskId} → ${key === undefined ? priority : t(key)}`;
+        })
+        .join(LIST_SEPARATOR[locale]);
+      return t('web.ai.tools.intentSetTaskPriorities', { items });
+    }
+    case 'set-task-estimate':
+      return t('web.ai.tools.intentSetTaskEstimate', { id: intent.taskId, minutes: intent.minutes });
     case 'create-note':
       return t('web.ai.tools.intentCreateNote', { content: intent.content });
     case 'update-note':

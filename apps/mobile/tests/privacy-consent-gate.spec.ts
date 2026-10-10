@@ -290,9 +290,42 @@ describe('面板的三条界面行为（正常落盘的那台设备）', () => {
     // 不清的话，"上次没记住"这句话会跟着每一次重新打开的面板。
     expect(ui.privacySheetState().notPersisted).toBe(false);
   });
+
+  it('🔴 设置中的重选面板关闭后不改变只用本机决定，也不产生联网请求', async () => {
+    gate.privacyConsentActions.localOnly();
+    expect(gate.privacyConsent.networkAllowed()).toBe(false);
+
+    ui.openPrivacySheet('settings');
+    expect(ui.privacySheetState().reason).toBe('settings');
+    ui.closePrivacySheet();
+
+    expect(ui.privacySheetState().open).toBe(false);
+    expect(ui.privacySheetState().reason).toBe('settings');
+    expect(gate.privacyConsent.current()?.decision).toBe('local-only');
+    expect(gate.privacyConsent.networkAllowed()).toBe(false);
+    expect(egressCount()).toBe(0);
+  });
 });
 
 describe('决定变更要通知订阅者（自动同步与实时通道靠它）', () => {
+  it('保存回执可在设置重新挂载后读取，失败保留直到下一次真正保存成功', () => {
+    gate.privacyConsentActions.accept();
+    expect(gate.readPrivacyConsentPersistence()).toBe(true);
+    prefs.unavailable = true;
+    gate.privacyConsentActions.revoke();
+    expect(gate.readPrivacyConsentPersistence()).toBe(false);
+    ui.openPrivacySheet('settings');
+    ui.closePrivacySheet();
+    expect(gate.readPrivacyConsentPersistence()).toBe(false);
+    gate.privacyConsentActions.localOnly();
+    expect(gate.readPrivacyConsentPersistence()).toBe(false);
+    prefs.unavailable = false;
+    gate.privacyConsentActions.localOnly();
+    expect(gate.readPrivacyConsentPersistence()).toBe(true);
+    expect(gate.privacyConsent.networkAllowed()).toBe(false);
+    expect(egressCount()).toBe(0);
+  });
+
   it('🔴 accept / localOnly / revoke 三个来源都通知 —— 一个都不许漏', () => {
     const seen: string[] = [];
     gate.subscribePrivacyConsent(() => seen.push('x'));

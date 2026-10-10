@@ -146,10 +146,11 @@ app.build_configurations.each do |config|
   #    而 extension 的 id 必须**以 app 的 id 为前缀**（前缀不一致时系统
   #    根本不会把扩展认成这个 app 的扩展，症状是"组件库里看不到"）。
   #    两处写死 + 一条能在本机跑的校验（见 verify 脚本）比"继承"更难配错。
-  config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'com.heyta.mobile'
+  config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'com.heyta'
   config.build_settings['CODE_SIGN_ENTITLEMENTS'] = "#{APP_GROUP}/#{APP_GROUP}.entitlements"
+  config.build_settings['HEYTA_WIDGET_KEYCHAIN_ACCESS_GROUP'] = '$(DEVELOPMENT_TEAM).com.heyta.shared'
 end
-puts '＋ app：bundle id = com.heyta.mobile，entitlements 已接'
+puts '＋ app：bundle id = com.heyta，entitlements 已接'
 
 # ─────────────────────────────────────────────────────────────────────
 # 4. 扩展 target
@@ -197,11 +198,12 @@ puts '＋ 扩展链接 HeytaWidgetKit'
 
 ext.build_configurations.each do |config|
   bs = config.build_settings
-  bs['PRODUCT_BUNDLE_IDENTIFIER'] = 'com.heyta.mobile.WidgetExtension'
+  bs['PRODUCT_BUNDLE_IDENTIFIER'] = 'com.heyta.WidgetExtension'
   bs['PRODUCT_NAME'] = '$(TARGET_NAME)'
   bs['INFOPLIST_FILE'] = "#{EXT_GROUP}/Info.plist"
   bs['GENERATE_INFOPLIST_FILE'] = 'NO'
   bs['CODE_SIGN_ENTITLEMENTS'] = "#{EXT_GROUP}/#{EXT_GROUP}.entitlements"
+  bs['HEYTA_WIDGET_KEYCHAIN_ACCESS_GROUP'] = '$(DEVELOPMENT_TEAM).com.heyta.shared'
   bs['IPHONEOS_DEPLOYMENT_TARGET'] = '17.0'
   bs['SWIFT_VERSION'] = '6.0'
   bs['TARGETED_DEVICE_FAMILY'] = '1,2'

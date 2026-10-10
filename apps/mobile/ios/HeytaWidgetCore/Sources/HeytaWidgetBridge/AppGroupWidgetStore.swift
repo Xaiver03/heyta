@@ -21,16 +21,20 @@ public struct AppGroupWidgetStore: WidgetBridgeService.Store {
         try WidgetContainerFiles.writeSnapshot(envelope)
     }
 
-    public func drainIntents() -> String? {
-        WidgetContainerFiles.drainIntentsRaw()
+    public func drainIntents() throws -> String? {
+        try WidgetContainerFiles.drainIntentsRaw()
+    }
+
+    public func ackIntents(_ processed: WidgetIntentQueue) throws -> Int {
+        try WidgetContainerFiles.ackIntents(processed)
     }
 
     public func updateIntents(_ body: (WidgetIntentQueue) -> WidgetIntentQueue) -> WidgetIntentQueue {
         WidgetContainerFiles.updateIntents(body)
     }
 
-    public func clearAll() {
-        WidgetContainerFiles.clearAll()
+    public func clearAll() throws {
+        try WidgetContainerFiles.clearAll()
     }
 
     /// W5-2 · 隐私偏好与快照是**两个文件**（见 `Store` 协议里的理由）。

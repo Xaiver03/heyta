@@ -27,6 +27,7 @@
 import {
   computeCountdown,
   formatCompactDate,
+  formatCompactLocalDate,
   type CountdownUrgency,
   type Task,
 } from '@heyta/domain';
@@ -82,7 +83,7 @@ export function toDueDisplay(
   now: number,
   t: Translate,
 ): DueDisplay | null {
-  if (task.dueDate === undefined) return null;
+  if (task.dueDateLocal === undefined && task.dueDate === undefined) return null;
 
   const countdown = computeCountdown(task, { now });
 
@@ -90,7 +91,9 @@ export function toDueDisplay(
     mode === 'countdown'
       ? // `remainingDays` 在 dueDate 存在时必为数字，这里只是不让类型裸露
         remainingText(countdown.remainingDays, t)
-      : formatCompactDate(task.dueDate, now);
+      : task.dueDateLocal !== undefined
+        ? formatCompactLocalDate(task.dueDateLocal, now)
+        : formatCompactDate(task.dueDate!, now);
 
   return { text, urgency: countdown.urgency, overdue: countdown.overdue };
 }

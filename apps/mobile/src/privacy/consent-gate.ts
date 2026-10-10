@@ -32,6 +32,7 @@ import {
   createConsentGatedFetch,
   createPrivacyConsentGate,
   type PrivacyConsentPort,
+  type PrivacyConsentRecord,
 } from '@heyta/app-host';
 
 import { deleteDevicePref, readDevicePref, writeDevicePref } from '../prefs/device-prefs';
@@ -70,15 +71,30 @@ export const consentFetch: typeof fetch = createConsentGatedFetch(
   () => privacyConsent.networkAllowed(),
 );
 
-type ConsentListener = () => void;
+/**
+ * 一次决定的通知回执。会话状态立即生效，但设备偏好可能写不进去；
+ * 设置页据此只在后续决定真正落盘时清掉旧的失败提示。
+ */
+type ConsentChange = Readonly<{
+  record: PrivacyConsentRecord | null;
+  persisted: boolean;
+}>;
+type ConsentListener = (change: ConsentChange) => void;
 const listeners = new Set<ConsentListener>();
+let lastConsentPersisted = true;
 
-function notify(): void {
+/** 本次进程中最后一次保存的回执，供重新挂载的设置页读取。 */
+export function readPrivacyConsentPersistence(): boolean {
+  return lastConsentPersisted;
+}
+
+function notify(change: ConsentChange): void {
+  lastConsentPersisted = change.persisted;
   // 🔴 一个订阅者的异常不许影响其余的：这条通知同时驱动自动同步与实时通道，
   // 让"重建 WS 时抛了"变成"同意按钮点了没反应"是错的优先级。
   for (const listener of listeners) {
     try {
-      listener();
+      listener(change);
     } catch (error: unknown) {
       console.warn('[privacy] 决定变更的订阅者抛错（不影响同意本身）：', error);
     }
@@ -106,19 +122,19 @@ export function subscribePrivacyConsent(listener: ConsentListener): () => void {
 export const privacyConsentActions = {
   accept(): { persisted: boolean } {
     const readout = privacyConsent.decide('accepted');
-    notify();
+    notify(readout);
     return readout;
   },
   /** 不同意：只用本机。核心功能全部保留（PIPL 第 16 条的结构理由）。 */
   localOnly(): { persisted: boolean } {
     const readout = privacyConsent.decide('local-only');
-    notify();
+    notify(readout);
     return readout;
   },
   /** 撤回同意（PIPL 第 15 条要的那个"便捷的方式"）：清回"没问过"。 */
   revoke(): { persisted: boolean } {
     const readout = privacyConsent.revoke();
-    notify();
+    notify({ record: null, persisted: readout.persisted });
     return readout;
   },
 };

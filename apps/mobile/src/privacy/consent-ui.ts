@@ -18,14 +18,14 @@ import { useSyncExternalStore } from 'react';
 import { privacyConsent, privacyConsentActions } from './consent-gate';
 
 /**
- * 面板被打开的原因。三种要说的是**不同的话**：
+ * 面板被打开的原因：设置中的主动重选不冒充已撤回同意。
  *
  *   · `first-launch`        —— 还没问过（G-11）。唯一必须**主动**弹的一种。
  *   · `revoked`             —— 刚从设置页撤回，用户要重新选一次。
  *   · `required-for-action` —— 用户点了某个要出门的按钮（同步 / 登录），
  *     而闸门是关的。这时不能只把状态改成"失败"了事 —— 他得有一条走出去的路。
  */
-export type PrivacySheetReason = 'first-launch' | 'revoked' | 'required-for-action';
+export type PrivacySheetReason = 'first-launch' | 'revoked' | 'required-for-action' | 'settings';
 
 interface PrivacyUiState {
   open: boolean;

@@ -26,7 +26,13 @@ public enum WidgetLanguage: Sendable {
     case zh, en
 
     /// 从系统偏好里读。**只支持 zh / en**，其余一律回落到 en。
-    public static func current(preferred: [String] = Locale.preferredLanguages) -> WidgetLanguage {
+    public static func current(
+        preferred: [String] = Locale.preferredLanguages,
+        applicationLocale: String? = WidgetLocalePreference.current()
+    ) -> WidgetLanguage {
+        if let applicationLocale = WidgetLocalePreference.supported(applicationLocale) {
+            return applicationLocale == "zh-CN" ? .zh : .en
+        }
         guard let first = preferred.first?.lowercased() else { return .en }
         return first.hasPrefix("zh") ? .zh : .en
     }

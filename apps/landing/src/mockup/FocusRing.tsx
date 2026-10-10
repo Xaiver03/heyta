@@ -13,11 +13,11 @@ import { ICON_SIZE } from '@heyta/design-system';
  *   3. 工作段与休息段用**不同 token**（`color.focus-work` / `color.focus-break`）——
  *      颜色承载语义，不是装饰。
  *
- * 数值取的是"一段进行到 9 分 28 秒的 25 分钟专注"，
- * 所以剩 15:32、进度 37.9% —— 不是随手写一个 50%。
+ * 数值取的是"准备开始一段 25 分钟专注"，
+ * 所以剩 25:00、进度 0% —— 主路径突出开始，而不是把次级设置抢到前面。
  */
 
-import { Coffee, Pause, Play, Square, Zap } from 'lucide-react';
+import { Coffee, Play, Square } from 'lucide-react';
 
 import { useI18n } from '@heyta/i18n/provider';
 
@@ -26,7 +26,7 @@ const VIEWBOX = 180;
 const STROKE = 10;
 
 const TOTAL_SECONDS = 25 * 60;
-const ELAPSED_SECONDS = 9 * 60 + 28;
+const ELAPSED_SECONDS = 0;
 const REMAINING_SECONDS = TOTAL_SECONDS - ELAPSED_SECONDS;
 
 function formatClock(totalSeconds: number): string {
@@ -81,27 +81,29 @@ export function FocusRing(): React.JSX.Element {
         <Ring progress={progress} />
         <div className="mk-focus__readout">
           <div className="mk-focus__time">{formatClock(REMAINING_SECONDS)}</div>
-          <div className="mk-focus__phase">
-            <Zap size={ICON_SIZE.xs} />
-            {t('landing.mock.focus.phase')}
-          </div>
+          <div className="mk-focus__phase">{t('landing.mock.focus.phase')}</div>
         </div>
       </div>
 
       <div className="mk-focus__actions">
         <div className="mk-btn-primary">
-          <Pause size={ICON_SIZE.md} />
-          {t('landing.mock.focus.pause')}
+          <Play size={ICON_SIZE.md} />
+          {t('web.focus.start')}
         </div>
-        <div className="mk-viewtab">
+        <div className="mk-focus__secondary">
           <Square size={ICON_SIZE.md} />
           {t('landing.mock.focus.stop')}
         </div>
       </div>
 
       {/* 关联任务：只列未完成的，避免选到一个已经做完的任务 */}
-      <div className="mk-input" style={{ inlineSize: 'var(--ht-layout-sidebar-width)' }}>
+      <div className="mk-focus__task mk-input">
         {t('landing.mock.focus.linkedTask', { task: t('landing.mock.task.weeklyReport') })}
+      </div>
+
+      <div className="mk-focus__settings" aria-label={t('web.focus.config.title')}>
+        <span>{t('web.focus.config.title')}</span>
+        <span className="mk-focus__settings-values">25 / 5 / 15 / 4</span>
       </div>
 
       <div className="mk-focus__stat">
@@ -111,10 +113,6 @@ export function FocusRing(): React.JSX.Element {
         </span>
       </div>
 
-      <div className="mk-viewtab">
-        <Play size={ICON_SIZE.xs} />
-        {t('landing.mock.focus.startNext')}
-      </div>
     </div>
   );
 }

@@ -2,18 +2,21 @@ import { AppState, type AppStateStatus } from 'react-native';
 
 import type { AppHost } from '@heyta/app-host';
 
-import { openTaskHost } from '../db/open-host';
+import { getOpenTaskHostIfReady, openTaskHost } from '../db/open-host';
+import { onFocusStateChange } from '../lib/focus-timer';
 import { drainWidgetIntentsNow } from './drain';
 import { publishWidgetSnapshot } from './publish';
 import { syncFocusActivity } from './widget-bridge';
 import { hostPublishSource } from './publish-source';
+import { canCommitPublish, currentPublishEpoch, registerWidgetActivity } from './publish-coordinator';
 
 /**
  * 小组件的生命周期接线：应用什么时候醒、醒了做什么
  * ====================================================
  *
  * 纯逻辑都在 [publish.ts] 与 [drain.ts] 里（那两个文件**能在 node 里跑**，所以有测试）。
- * 本文件只做一件事：把两件事接到平台的两个时机上 —— **启动**与**回到前台**。
+ * 启动与回前台领取意图；计时器语义状态变化也刷新快照和灵动岛。
+ * 显示秒变化不触发原生写入。
  *
  * ## 🔴 两件事，缺一不可
  *
@@ -50,6 +53,8 @@ import { hostPublishSource } from './publish-source';
  */
 
 let subscription: { remove(): void } | undefined;
+let unsubscribeFocus: (() => void) | undefined;
+let lifecycleGeneration = 0;
 let foreground = isForeground(AppState.currentState);
 
 function isForeground(state: AppStateStatus | null | undefined): boolean {
@@ -62,7 +67,10 @@ function isForeground(state: AppStateStatus | null | undefined): boolean {
  * 醒来一次：先 drain，再 publish。**永不抛** —— 它挂在应用启动路径上，
  * 为了一个组件里的点击让应用起不来是荒唐的。
  */
-async function wake(): Promise<void> {
+async function wake(generation: number): Promise<void> {
+  // 必须在任何 await 前绑定清理代际，旧 wake 不得在清理后领取新 epoch。
+  const epoch = currentPublishEpoch();
+  if (epoch === undefined) return;
   let host: AppHost;
   try {
     host = await openTaskHost();
@@ -72,6 +80,7 @@ async function wake(): Promise<void> {
     console.warn('[widget] 无法打开宿主，跳过 drain 与发布：', error);
     return;
   }
+  if (!canRefresh(host, epoch, generation)) return;
 
   // 各自 try/catch：一个失败不该把另一个也带下去。
   // （两者内部都已经吞了异常，这里再包一层是为了"将来有人改了它们"也不会连带。）
@@ -81,11 +90,27 @@ async function wake(): Promise<void> {
     console.warn('[widget] drain 抛出（不应发生）：', error);
   }
 
+  if (!canRefresh(host, epoch, generation)) return;
+  await refreshWidgets(host, epoch, generation);
+}
+
+function canRefresh(host: AppHost, epoch: number, generation: number): boolean {
+  return generation === lifecycleGeneration && canCommitPublish(epoch)
+    && getOpenTaskHostIfReady() === host;
+}
+
+/** 与启动刷新复用同一条快照路径，沿用清理屏障，状态变化不制造 op。 */
+async function refreshWidgets(host: AppHost, epoch: number, generation: number): Promise<void> {
+  if (!canRefresh(host, epoch, generation)) return;
+
   try {
     await publishWidgetSnapshot(hostPublishSource(host));
   } catch (error) {
     console.warn('[widget] 发布抛出（不应发生）：', error);
   }
+
+  // 若发布途中退出账号，不能再用旧会话推进系统实时活动。
+  if (!canRefresh(host, epoch, generation)) return;
 
   // ③ W5-3 · 推进灵动岛。
   //
@@ -98,7 +123,9 @@ async function wake(): Promise<void> {
   // ⚠️ 平台差异：iOS 之外这个原生方法不存在，`callNativeSafely` 会回落到 `'none'`
   //    并**只警告一次** —— 所以安卓/鸿蒙上这行不是死代码，是一个空操作。
   try {
-    await syncFocusActivity();
+    const activity = syncFocusActivity();
+    registerWidgetActivity(activity);
+    await activity;
   } catch (error) {
     console.warn('[widget] 推进灵动岛抛出（不应发生）：', error);
   }
@@ -119,28 +146,44 @@ export function startWidgetLifecycle(): () => void {
       /* 已经启动过：停止由拥有者负责，这里不重复注册。 */
     };
   }
+  const generation = ++lifecycleGeneration;
 
   // 启动时先醒一次：应用可能是被"从组件点进来"的路径拉起来的，
   // 也可能只是隔了一夜被重新打开。
-  void wake();
+  void wake(generation);
 
   subscription = AppState.addEventListener('change', (state: AppStateStatus) => {
     const next = isForeground(state);
     const cameBack = next && !foreground;
     foreground = next;
     // 只在**回到**前台时醒来。"去后台"和"inactive"期间什么都不做。
-    if (cameBack) void wake();
+    if (cameBack) void wake(generation);
+  });
+
+  unsubscribeFocus = onFocusStateChange(() => {
+    // 不为计时信号重新打开已经清理的宿主；初次异步打开的 wake 会读取最新状态。
+    const host = getOpenTaskHostIfReady();
+    const epoch = currentPublishEpoch();
+    if (host !== undefined && epoch !== undefined) void refreshWidgets(host, epoch, generation);
   });
 
   return function stopWidgetLifecycle(): void {
+    if (generation !== lifecycleGeneration) return;
+    lifecycleGeneration += 1;
     subscription?.remove();
     subscription = undefined;
+    unsubscribeFocus?.();
+    unsubscribeFocus = undefined;
     foreground = isForeground(AppState.currentState);
   };
 }
 
 /** 只给测试用：清掉模块级状态。 */
 export function __resetWidgetLifecycleForTests(): void {
+  lifecycleGeneration += 1;
+  subscription?.remove();
   subscription = undefined;
+  unsubscribeFocus?.();
+  unsubscribeFocus = undefined;
   foreground = isForeground(AppState.currentState);
 }

@@ -37,8 +37,9 @@ import HeytaWidgetCore
  | 方法 | 谁用 |
  |---|---|
  | `setWidgetSnapshot` | 应用写快照 |
- | `drainIntentQueue` | 应用读 + 清 |
- | `mergeIntentQueue` | 应用写回失败的意图 |
+ | `drainIntentQueue` | 应用读（不清空） |
+ | `ackIntentQueue` | 应用精确确认已处理的意图 |
+ | `mergeIntentQueue` | 旧版兼容写回 |
  | `clearWidgetState` | 登出 |
  | `sealWidgetSnapshot` | 应用加密（**密钥不穿桥**） |
 
@@ -52,6 +53,9 @@ final class HeytaWidgetModule: NSObject {
   private static let errNotJson = "E_WIDGET_NOT_JSON"
   private static let errInvalidEnvelope = "E_WIDGET_INVALID_ENVELOPE"
   private static let errWriteFailed = "E_WIDGET_WRITE_FAILED"
+  private static let errReadFailed = "E_WIDGET_READ_FAILED"
+  private static let errAckFailed = "E_WIDGET_ACK_FAILED"
+  private static let errClearFailed = "E_WIDGET_CLEAR_FAILED"
 
   /**
    懒加载 —— `WidgetCenter` 与 `UserDefaults(suiteName:)` 在模块构造期
@@ -69,6 +73,24 @@ final class HeytaWidgetModule: NSObject {
 
   @objc
   static func moduleName() -> String! { "HeytaWidget" }
+
+  @objc
+  func constantsToExport() -> [AnyHashable: Any]! {
+    var values: [AnyHashable: Any] = ["deviceLocale": Locale.preferredLanguages.first ?? Locale.current.identifier]
+    if let locale = WidgetLocalePreference.current() { values["preferredLocale"] = locale }
+    return values
+  }
+
+  @objc(setWidgetLocale:resolve:reject:)
+  func setWidgetLocale(_ locale: String, resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
+    do {
+      try WidgetLocalePreference.write(locale)
+      WidgetCenter.shared.reloadAllTimelines()
+      resolve(true)
+    } catch {
+      reject(Self.errWriteFailed, "\(error)", error)
+    }
+  }
 
   /// 模块的方法**不在**主队列上跑：写文件是 IO，不该阻塞 UI。
   /// 但 `WidgetCenter` 是线程安全的，所以这个选择是安全的。
@@ -98,9 +120,31 @@ final class HeytaWidgetModule: NSObject {
 
   @objc(drainIntentQueue:reject:)
   func drainIntentQueue(resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-    // ⚠️ `nil` 而不是 `"[]"` —— "没有点击"与"有零条点击"在 JS 侧走不同分支。
-    //    RN 会把 Swift 的 `nil` 映射成 JS 的 `null`。
-    resolve(service.drainIntentQueue())
+    // 非破坏性读取：应用崩溃或尚未 ack 时，下次启动仍能读到同一队列。
+    do {
+      resolve(try service.drainIntentQueue())
+    } catch let failure as WidgetBridgeService.Failure {
+      let (code, message) = Self.classify(failure)
+      reject(code, message, nil)
+    } catch {
+      reject(Self.errReadFailed, "读取小组件意图失败：\(error)", error)
+    }
+  }
+
+  @objc(ackIntentQueue:resolve:reject:)
+  func ackIntentQueue(
+    _ processedJson: String,
+    resolve: RCTPromiseResolveBlock,
+    reject: RCTPromiseRejectBlock
+  ) {
+    do {
+      resolve(try service.ackIntentQueue(processedJson))
+    } catch let failure as WidgetBridgeService.Failure {
+      let (code, message) = Self.classify(failure)
+      reject(code, message, nil)
+    } catch {
+      reject(Self.errAckFailed, "确认小组件意图失败：\(error)", error)
+    }
   }
 
   @objc(mergeIntentQueue:resolve:reject:)
@@ -162,9 +206,27 @@ final class HeytaWidgetModule: NSObject {
   }
 
   @objc(clearWidgetState:reject:)
-  func clearWidgetState(resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-    service.clearWidgetState()
-    resolve(true)
+  func clearWidgetState(resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    let clearFailure: (code: String, message: String, error: Error)?
+    do {
+      try service.clearWidgetState()
+      clearFailure = nil
+    } catch let failure as WidgetBridgeService.Failure {
+      let (code, message) = Self.classify(failure)
+      clearFailure = (code, message, failure)
+    } catch {
+      clearFailure = (Self.errClearFailed, "清理小组件状态失败：\(error)", error)
+    }
+    // 容器清理失败也必须撤下锁屏上的旧标题；保持原清理错误，不能假报成功。
+    // JS 清理屏障已等待在途更新，结束完成后才允许释放屏障。
+    Task {
+      await FocusActivityRefresh.endAll()
+      if let failure = clearFailure {
+        reject(failure.code, failure.message, failure.error)
+      } else {
+        resolve(true)
+      }
+    }
   }
 
   @objc(sealWidgetSnapshot:dayStr:validUntil:resolve:reject:)
@@ -208,6 +270,12 @@ final class HeytaWidgetModule: NSObject {
       return (errInvalidEnvelope, "\(reason): \(detail)")
     case .writeFailed(let detail):
       return (errWriteFailed, detail)
+    case .readFailed(let detail):
+      return (errReadFailed, detail)
+    case .ackFailed(let detail):
+      return (errAckFailed, detail)
+    case .clearFailed(let detail):
+      return (errClearFailed, detail)
     case .sealFailed(let detail):
       return (errWriteFailed, detail)
     }

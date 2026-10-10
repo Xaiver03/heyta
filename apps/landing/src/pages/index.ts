@@ -70,6 +70,7 @@ export const PAGE_COMPONENTS: Record<SitePageId, PageComponent> = {
   repeat: DocsArticlePage,
   reminders: DocsArticlePage,
   selfhost: DocsArticlePage,
+  automation: DocsArticlePage,
   transfer: DocsArticlePage,
   trash: DocsArticlePage,
   privacy: DocsArticlePage,

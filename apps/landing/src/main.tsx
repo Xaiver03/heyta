@@ -43,6 +43,7 @@ import { I18nCatalogProvider, type Catalog, type Locale } from '@heyta/i18n/prov
 
 import '@heyta/design-system/tokens.css';
 import '@heyta/design-system/reset.css';
+import '@heyta/design-system/typography.css';
 import './styles/landing.css';
 
 import { PAGE_COMPONENTS } from './pages/index.js';

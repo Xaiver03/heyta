@@ -52,7 +52,7 @@ import type { SectionSpec } from './PageSections.js';
 import type { SitePage } from './pages.js';
 import { SITE_PAGES } from './pages.js';
 
-/** 文章路由的形状：`/help/<id>`。这一条形状**就是**"什么算一篇文章"的判据。 */
+/** 文章路由的形状：`/docs/<id>`。这一条形状**就是**"什么算一篇文章"的判据。 */
 const DOCS_PATH_PREFIX = '/docs/';
 
 /**
@@ -65,8 +65,8 @@ const DOCS_PATH_PREFIX = '/docs/';
  * 以及 id 保持**字面量联合** —— 所以 `SitePageId` 里那六个新 id 仍在，
  * "注册了页面却没写组件"那道拦截继续有效。
  *
- * 🔴 **判据是 `docsKind: 'article'`，路径前缀只是加分项。** 分类页 `/help/sync`
- * 同样以 `/help/` 开头 —— 只按形状捞，它会被一起拉进"必须有正文"的那一批，
+ * 🔴 **判据是 `docsKind: 'article'`，路径前缀只是加分项。** 分类页 `/docs/sync`
+ * 同样以 `/docs/` 开头 —— 只按形状捞，它会被一起拉进"必须有正文"的那一批，
  * 于是分类页被迫配一份它不该有的 `DOCS_ENTRIES` 条目。形状能区分"文章 vs 其它页"，
  * 区分不了"文章 vs 分类"，所以这里要的是**意图**而不是形状（见 `pages.ts` 的 `SitePage.docsKind`）。
  */
@@ -226,6 +226,16 @@ const DOCS_ENTRIES: Record<DocsArticleId, DocsEntry> = {
         id: 'what-the-server-cannot-see',
         titleKey: 'site.docs.how.s3',
         bodyKeys: ['site.docs.how.s3p1', 'site.docs.how.s3p2'],
+      },
+      {
+        id: 'sync-failure',
+        titleKey: 'site.docs.how.s4',
+        bodyKeys: [
+          'site.docs.how.s4p1',
+          'site.docs.how.s4p2',
+          'site.docs.how.s4p3',
+          'site.docs.how.s4p4',
+        ],
       },
     ],
   },
@@ -572,6 +582,53 @@ const DOCS_ENTRIES: Record<DocsArticleId, DocsEntry> = {
       },
     ],
   },
+  automation: {
+    moduleId: 'data',
+    sections: [
+      {
+        id: 'ai-capture-today',
+        titleKey: 'site.docs.automation.s1',
+        bodyKeys: ['site.docs.automation.s1p1', 'site.docs.automation.s1p2'],
+      },
+      {
+        id: 'local-api-mcp',
+        titleKey: 'site.docs.automation.s2',
+        bodyKeys: [
+          'site.docs.automation.s2p1',
+          'site.docs.automation.s2p2',
+          'site.docs.automation.s2p3',
+        ],
+      },
+      {
+        id: 'planned-webhook',
+        titleKey: 'site.docs.automation.s3',
+        bodyKeys: [
+          'site.docs.automation.s3p1',
+          'site.docs.automation.s3p2',
+          'site.docs.automation.s3p3',
+        ],
+      },
+      {
+        id: 'scenarios',
+        titleKey: 'site.docs.automation.s4',
+        itemKeys: [
+          'site.docs.automation.s4i1',
+          'site.docs.automation.s4i2',
+          'site.docs.automation.s4i3',
+          'site.docs.automation.s4i4',
+          'site.docs.automation.s4i5',
+          'site.docs.automation.s4i6',
+          'site.docs.automation.s4i7',
+          'site.docs.automation.s4i8',
+        ],
+      },
+      {
+        id: 'privacy-boundary',
+        titleKey: 'site.docs.automation.s5',
+        bodyKeys: ['site.docs.automation.s5p1', 'site.docs.automation.s5p2'],
+      },
+    ],
+  },
   transfer: {
     moduleId: 'data',
     sections: [
@@ -589,6 +646,11 @@ const DOCS_ENTRIES: Record<DocsArticleId, DocsEntry> = {
         id: 'import',
         titleKey: 'site.docs.transfer.s2',
         bodyKeys: ['site.docs.transfer.s2p1', 'site.docs.transfer.s2w1'],
+      },
+      {
+        id: 'diy-current',
+        titleKey: 'site.docs.transfer.diyTitle',
+        bodyKeys: ['site.docs.transfer.diyCurrent', 'site.docs.transfer.diyApi'],
       },
       {
         id: 'not-only-backups',
@@ -751,7 +813,7 @@ const DOCS_ENTRIES: Record<DocsArticleId, DocsEntry> = {
  * 分类页 ↔ 帮助中心模块的绑定。**每一条 key 都必须出现**（`Record` 的判据）。
  *
  * 🔴 它存在的意义是拦下两种"结构上对、意义上错"的分类页：
- *   1. 在 `pages.ts` 注册了 `/help/<某段>` 但这里忘了绑定 —— 编译不过；
+ *   1. 在 `pages.ts` 注册了 `/docs/<某段>` 但这里忘了绑定 —— 编译不过；
  *   2. 绑定了一个 `HelpModuleId` 里不存在的分类 —— 编译不过。
  * 两种的症状都是"页面渲染出来了，但它不属于任何 IA"：侧栏分组与帮助中心的速答
  * 都对不上它，访客从哪儿进来都回不去。让它编译不过，比让它渲染半页强。
@@ -1011,7 +1073,7 @@ export function docsFiguresOf(article: DocsArticle, locale: Locale): readonly Do
   return figures.map((figure, i) => {
     if (!article.sections.some((section) => section.id === figure.sectionId)) {
       throw new Error(
-        `配图 "${figure.targetId}-${figure.slug}" 挂在分区 "${figure.sectionId}" 上，但文章 "${article.id}" 没有这一节（分区清单在 src/site/docs.ts，映射在 src/site/helpFigures.ts）。`,
+        `配图 "${figure.targetId}-${figure.slug}" 挂在分区 "${figure.sectionId}" 上，但文章 "${article.id}" 没有这一节（分区清单在 src/site/docs.ts，映射在 src/site/docsFigures.ts）。`,
       );
     }
     return {

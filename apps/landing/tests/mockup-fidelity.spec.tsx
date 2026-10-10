@@ -96,7 +96,7 @@ afterEach(() => {
 });
 
 function renderMockup(
-  view: 'tasks' | 'quadrant' | 'habits' | 'focus' | 'timeline' = 'quadrant',
+  view: 'tasks' | 'quadrant' | 'habits' | 'focus' | 'timeline' = 'tasks',
 ): HTMLElement {
   container = document.createElement('div');
   document.body.append(container);
@@ -122,6 +122,23 @@ function renderMockup(
 const DOING_VIEWS = ['tasks', 'quadrant', 'habits', 'focus'] as const;
 
 describe('展厅复刻与应用一致', () => {
+  it('复刻外壳与 Web 一样按视图分层：rail → 范围侧栏 → 主区 → 任务详情栏', () => {
+    const tasks = renderMockup('tasks');
+    expect(tasks.querySelector('.mk-rail')).not.toBeNull();
+    expect(tasks.querySelector('.mk-sidebar')).not.toBeNull();
+    expect(tasks.querySelector('.mk-main')).not.toBeNull();
+    expect(tasks.querySelector('.mk-detail')).not.toBeNull();
+    act(() => root?.unmount());
+    root = null;
+    container?.remove();
+    container = null;
+
+    const quadrant = renderMockup('quadrant');
+    expect(quadrant.querySelector('.mk-rail')).not.toBeNull();
+    expect(quadrant.querySelector('.mk-sidebar')).toBeNull();
+    expect(quadrant.querySelector('.mk-detail')).toBeNull();
+  });
+
   it('捕获输入框四屏常驻；今天进度卡的有无从产品源码派生，不是写死的期望', () => {
     const app = readWebAppSource();
     // 阳性对照：`App.tsx` 里"共享的 TodayProgressCard 没有删"是一段**历史注释**，
@@ -139,11 +156,13 @@ describe('展厅复刻与应用一致', () => {
         drawn,
         `${v}：产品${productDraws ? '在' : '不在'}做事视图画今天卡，展厅没跟上一个字节`,
       ).toBe(productDraws);
-      expect(view.querySelector('.mk-compose'), `${v} 缺捕获输入框`).not.toBeNull();
-      // 输入框里的提示语必须是应用自己的那条
-      expect(view.querySelector('.mk-input')?.textContent?.trim()).toBe(
-        zhCN['web.capture.placeholder'],
-      );
+      const shouldDrawCapture = v === 'tasks';
+      expect(view.querySelector('.mk-compose') !== null, `${v} 捕获输入框条件不一致`).toBe(shouldDrawCapture);
+      if (shouldDrawCapture) {
+        expect(view.querySelector('.mk-input')?.textContent?.trim()).toBe(
+          zhCN['web.capture.placeholder'],
+        );
+      }
       // 每渲染一个视图就卸载一次，避免容器累积
       act(() => {
         root?.unmount();
@@ -154,11 +173,10 @@ describe('展厅复刻与应用一致', () => {
     }
   });
 
-  it('四象限底部有 footnote —— 它解释「紧急度由截止时间推导」这条核心不变量', () => {
+  it('四象限不再重复渲染规则说明 —— 真实应用已将它移入帮助折叠', () => {
     const view = renderMockup('quadrant');
     const note = view.querySelector('.mk-quadrant__footnote');
-    expect(note).not.toBeNull();
-    expect(note?.textContent?.trim()).toBe(zhCN['web.quadrant.footnote']);
+    expect(note).toBeNull();
   });
 
   it('页头右侧画的就是登记处那几件，且搬走的四件一张都不许出现', () => {
@@ -168,10 +186,10 @@ describe('展厅复刻与应用一致', () => {
 
     // 数量从登记处推导，不写死 —— 写死的数字就是下一次搬控件时的第三个漂移点。
     // "登记本身对不对"由 `mockup-shell-shape.spec.tsx` #7 与 `App.tsx` 逐字对账负责。
-    // ⚠️ 任务视图：产品那边 `task-sort` 的条件是 `contentView === 'tasks' && visible.length > 0`，
-    // 所以这一屏应当是**全两件**；换一屏就不是这个数（那条条件判据在 #7 的另一条里）。
+    // ⚠️ `assistant-open` 是产品收起详情列时的回退入口；Landing 默认把详情列展示出来，
+    // 所以这枚真实存在的条件控件登记在 shape 中，但静态复刻不再伪造一个 AI 按钮。
     const shownOnTasks = SHELL_HEADER_ACTIONS.filter(
-      (a) => a.onlyForView === undefined || a.onlyForView === 'tasks',
+      (a) => a.mockedInLanding !== false && (a.onlyForView === undefined || a.onlyForView === 'tasks'),
     );
     expect(actions?.children.length, `页头画多了：${actions?.innerHTML ?? ''}`).toBe(
       shownOnTasks.length,
@@ -203,24 +221,22 @@ describe('展厅复刻与应用一致', () => {
 
   it('视图切换条与登记处同项同序，且整个窗口里没有多画一组 tab', () => {
     const view = renderMockup();
-    const tabs = [...view.querySelectorAll('.mk-viewtab')].map((el) => el.textContent?.trim() ?? '');
+    const tabs = [...view.querySelectorAll('.mk-rail__tab[data-view-key]')].map((el) => el.textContent?.trim() ?? '');
 
     // 视图那一组在**真应用**里是 rail（不是页头 tab 条）；项数与顺序由
     // `mockup-shell-shape.spec.tsx` #5 与 `view-tabs.ts` + `modules.ts` 的默认开关逐字对账。
-    const bar = view.querySelector('.mk-header__viewtabs, .mk-viewtabs');
-    expect(bar).not.toBeNull();
-    const viewTabBar = view.querySelectorAll('.mk-header .mk-viewtabs')[0];
-    expect(viewTabBar).toBeDefined();
-    const labels = [...(viewTabBar?.querySelectorAll('.mk-viewtab') ?? [])].map(
-      (el) => el.textContent?.trim() ?? '',
-    );
-
-    expect(labels).toHaveLength(APP_VIEW_TABS.length);
-    expect(labels).toEqual(APP_VIEW_TABS.map((key) => zhCN[key]));
+    const labels = tabs;
+    expect(labels).toEqual([
+      zhCN['web.shell.nav.tasks'],
+      zhCN['web.calendar.title'],
+      zhCN['web.shell.views.habits'],
+      zhCN['web.search.title'],
+      zhCN['web.trash.nav'],
+    ]);
     // 🔴 原来这里写的是「视图 N + 2」—— 那两枚是页头上的「日期 / 倒计时」，
     // 它们 2026-09-30 就搬进 设置 → 显示 了。现在整窗口里只剩视图那一组：
     // 数量仍从登记处推导，写死的 +2 会把下一次"再搬一枚"读成"复刻少画了"。
-    expect(tabs).toHaveLength(APP_VIEW_TABS.length);
+    expect(tabs).toHaveLength(5);
   });
 
   it('侧栏主导航把登记的每一项都画出来了，含「已完成」', () => {
@@ -252,14 +268,20 @@ describe('展厅复刻与应用一致', () => {
     expect(rendered.join(',')).not.toBe('3,5,2,1');
   });
 
-  it('清单与标签两区都在，且都是「输入框 + 加号」的形态', () => {
+  it('清单与标签两区都在，且是「静态行列表 + 标题级加号」的形态', () => {
     const view = renderMockup();
     const sidebarText = view.querySelector('.mk-sidebar')?.textContent ?? '';
     expect(sidebarText).toContain(zhCN['web.projects.heading']);
     expect(sidebarText).toContain(zhCN['web.tags.heading']);
 
-    const boxes = [...view.querySelectorAll('.mk-field__box')].map((el) => el.textContent?.trim());
-    expect(boxes).toEqual([zhCN['web.projects.newPlaceholder'], zhCN['web.tags.newPlaceholder']]);
+    const rows = [...view.querySelectorAll('.mk-projects__row')].map((el) => el.textContent?.trim());
+    expect(rows).toEqual([
+      zhCN['landing.mock.project.work'],
+      zhCN['landing.mock.project.personal'],
+      zhCN['landing.mock.project.reading'],
+      zhCN['landing.mock.tag.deepWork'],
+      zhCN['landing.mock.tag.waiting'],
+    ]);
     expect(view.querySelectorAll('.mk-field__add')).toHaveLength(2);
   });
 

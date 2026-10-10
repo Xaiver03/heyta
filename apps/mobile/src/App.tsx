@@ -61,6 +61,7 @@ import { startWidgetLifecycle } from './widgets/lifecycle';
 import { DEFAULT_SERVER_URL, readSyncConfig } from './sync/config';
 import { hasSeenWelcome, markWelcomeSeen } from './prefs/device-prefs';
 import { reconcileNativeReminders, subscribeNativeReminderWrites } from './lib/native-reminder-scheduler';
+import { startMobileInboundWorker } from './inbound/lifecycle';
 
 /**
  * 🔴 **隐私闸门必须在任何一次渲染之前装好**（G-12）。
@@ -120,6 +121,12 @@ function Shell(): React.JSX.Element {
    * 并且返回停止函数 —— 正好是清理函数该有的形状。
    */
   useEffect(() => startAutoSync(), []);
+
+  // Automatic capture is a foreground worker on mobile. The shared loop
+  // rechecks Vault, recipient-key, worker-token, route and consent readiness;
+  // closing/backgrounding the app stops new claims rather than pretending the
+  // device is an always-on executor.
+  useEffect(() => startMobileInboundWorker(), []);
 
   /**
    * 🔴 **小组件**：启动时醒一次，回到前台再醒一次。醒来做两件事 ——
@@ -247,7 +254,7 @@ export default function App(): React.JSX.Element {
 }
 
 /**
- * 语言宿主：**只在内存里**持有 locale（重启回到设备语言）。
+ * 语言宿主：React 驱动当前 locale；冷启动优先恢复独立设备偏好。
  *
  * 🔴 `I18nProvider` 必须在**所有**调 `useI18n()` 的组件之上 ——
  * 也就是在这里，而不是更靠下的某个屏幕。`useState(resolveDeviceLocale)`
@@ -257,9 +264,11 @@ function LocaleHost(): React.JSX.Element {
   const [locale, setLocale] = useState<Locale>(resolveDeviceLocale);
   return (
     <I18nProvider locale={locale}>
+      <ThemeProvider locale={locale}>
       <LocalePreferenceProvider locale={locale} setLocale={setLocale}>
         <App />
       </LocalePreferenceProvider>
+      </ThemeProvider>
     </I18nProvider>
   );
 }
@@ -287,9 +296,7 @@ function LocaleHost(): React.JSX.Element {
 export function Root(): React.JSX.Element {
   return (
     <SafeAreaProvider>
-      <ThemeProvider>
-        <LocaleHost />
-      </ThemeProvider>
+      <LocaleHost />
     </SafeAreaProvider>
   );
 }

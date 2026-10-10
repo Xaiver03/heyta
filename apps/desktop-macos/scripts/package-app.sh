@@ -9,7 +9,7 @@
 #
 #   Developer ID Application  → 可以签名；**再加 ASC API key 就能公证**
 #   只有 Apple Distribution   → 只能签"App Store 分发"，装不进普通 Mac
-#   什么都没有                → 只能 ad-hoc（`-`），本机能跑，发出去会被 Gatekeeper 拦
+#   原生 WidgetKit + 共享 Keychain 要求 Developer ID 与对应 macOS provisioning profiles。
 #
 # 🔴 「签名」和「公证」是两件事，不要混：
 #   签名证明"这个包是谁发的"；公证是 Apple 又扫了一遍并给你一张票据。
@@ -36,6 +36,13 @@ OUT_DIR="${1:-/tmp/heyta-macos-dist}"
 BUNDLE_ID="cloud.finlaw.heyta.desktop"
 VERSION="1.0.0"
 BUILD_NUM="1"
+DEV_ID="$(security find-identity -v -p codesigning 2>/dev/null | grep -o 'Developer ID Application: .*' | head -1 | sed 's/"$//' || true)"
+# A shared Keychain needs a real signing team. Do not ship a silently disconnected widget.
+[ -n "$DEV_ID" ] || { echo "🔴 原生小组件要求 Developer ID 签名身份"; exit 1; }
+WIDGET_TEAM="$(printf '%s' "$DEV_ID" | sed -E 's/.*\(([A-Z0-9]+)\)$/\1/')"
+[[ "$WIDGET_TEAM" =~ ^[A-Z0-9]{10}$ ]] || { echo "🔴 无法解析小组件签名 Team ID"; exit 1; }
+
+HOST_PROFILE="$(python3 "$HERE/find-signing-profile.py" "$BUNDLE_ID" "$WIDGET_TEAM")"
 
 APP="$OUT_DIR/Heyta.app"
 DMG="$OUT_DIR/Heyta-$VERSION.dmg"
@@ -117,9 +124,10 @@ echo ""
 echo "=== ② 组装 Heyta.app ==="
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/HeytaMac"
+cp "$HOST_PROFILE" "$APP/Contents/embedded.provisionprofile"
 cp "$BUNDLE" "$APP/Contents/Resources/native-bridge.js"
 
-# web-dist 进包（Contents/Resources —— 在签名**之前**，让 --deep 把它封进签名）。
+# web-dist 进包（Contents/Resources —— 在签名**之前**，让宿主签名把它封进资源封印）。
 cp -R "$WEB_DIST" "$APP/Contents/Resources/web-dist"
 [ -f "$APP/Contents/Resources/web-dist/index.html" ]   && echo "  ✅ web-dist 已进包（$(du -sh "$APP/Contents/Resources/web-dist" | cut -f1)）"
 
@@ -147,6 +155,9 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <plist version="1.0">
 <dict>
   <key>CFBundleName</key><string>Heyta</string>
+  <key>HeytaWidgetAppGroupIdentifier</key><string>${WIDGET_TEAM}.cloud.finlaw.heyta.widgets</string>
+  <key>HeytaWidgetKeychainAccessGroup</key><string>${WIDGET_TEAM}.com.heyta.shared</string>
+  <key>keychain-access-groups</key><array><string>${WIDGET_TEAM}.com.heyta.shared</string></array>
   <key>CFBundleIconFile</key><string>Heyta</string>
   <key>CFBundleDisplayName</key><string>heyta</string>
   <key>CFBundleExecutable</key><string>HeytaMac</string>
@@ -172,11 +183,15 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-cat > "$OUT_DIR/entitlements.plist" <<'ENT'
+cat > "$OUT_DIR/entitlements.plist" <<ENT
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+  <key>com.apple.application-identifier</key><string>${WIDGET_TEAM}.${BUNDLE_ID}</string>
+  <key>com.apple.developer.team-identifier</key><string>${WIDGET_TEAM}</string>
+  <key>com.apple.security.application-groups</key><array><string>${WIDGET_TEAM}.cloud.finlaw.heyta.widgets</string></array>
+  <key>keychain-access-groups</key><array><string>${WIDGET_TEAM}.com.heyta.shared</string></array>
   <!-- JavaScriptCore 需要；hardened runtime 默认禁止，不给会启动即崩 -->
   <key>com.apple.security.cs.allow-jit</key><true/>
   <key>com.apple.security.cs.allow-unsigned-executable-memory</key><true/>
@@ -184,26 +199,19 @@ cat > "$OUT_DIR/entitlements.plist" <<'ENT'
 </plist>
 ENT
 
+# Build and sign the nested extension with its own sandbox entitlements before signing the host.
+bash "$HERE/package-widget.sh" "$APP" "$OUT_DIR/widget-build" "$DEV_ID" "$WIDGET_TEAM"
+
 plutil -lint "$APP/Contents/Info.plist" >/dev/null && echo "  ✅ Info.plist 合法"
 
-# ── ③ 签名（按证书可用性降级，并如实说明降到了哪一档）──────────────────
+# ── ③ 签名（扩展已用独立 entitlements 签名）────────────────────────────
 echo ""
 echo "=== ③ 签名 ==="
-DEV_ID="$(security find-identity -v -p codesigning 2>/dev/null | grep -o 'Developer ID Application: .*' | head -1 | sed 's/"$//' || true)"
-SIGN_KIND=""
-if [ -n "$DEV_ID" ]; then
-  SIGN_KIND="developer-id"
-  echo "  身份：$DEV_ID"
-  codesign --force --deep --options runtime --timestamp \
-    --entitlements "$OUT_DIR/entitlements.plist" \
-    --sign "$DEV_ID" "$APP"
-else
-  SIGN_KIND="adhoc"
-  echo "  ⚠️ 没有 Developer ID Application —— 降级为 **ad-hoc**（本机能跑，发出去会被 Gatekeeper 拦）"
-  codesign --force --deep --options runtime \
-    --entitlements "$OUT_DIR/entitlements.plist" \
-    --sign - "$APP"
-fi
+SIGN_KIND="developer-id"
+echo "  身份：$DEV_ID"
+codesign --force --options runtime --timestamp \
+  --entitlements "$OUT_DIR/entitlements.plist" \
+  --sign "$DEV_ID" "$APP"
 
 codesign --verify --deep --strict --verbose=1 "$APP" 2>&1 | tail -2 | awk '{print "  " $0}'
 echo "  --- 展开确认 ---"
@@ -216,7 +224,10 @@ SELFIE="$OUT_DIR/packaged-first-run.png"
 # 🔴 §6.2 规定二：任何会开窗口的验证都必须**不抢前台**。macOS 上光靠"后台启动"不够 ——
 #    窗口只要可聚焦就会被激活，所以壳认 `HEYTA_NO_FOCUS=1`（`reinstall-all.sh` 的启动段
 #    早就带了，这一行漏了；G4 那轮实测过带着它照样能取自截屏）。
-if HEYTA_NO_FOCUS=1 HEYTA_SELF_CAPTURE="$SELFIE" "$APP/Contents/MacOS/HeytaMac" 2>&1 | awk '{print "  " $0}'; then
+# 打包自检只读写独立数据库；改名 QA.app 本身不会隔离 Application Support。
+PACKAGE_SMOKE_DB_DIR="$(mktemp -d "${TMPDIR:-/tmp}/heyta-package-smoke.XXXXXX")"
+echo "  自检数据库：${PACKAGE_SMOKE_DB_DIR}（保留供验收）"
+if HEYTA_SHELL_DB_DIR="$PACKAGE_SMOKE_DB_DIR" HEYTA_NO_FOCUS=1 HEYTA_SELF_CAPTURE="$SELFIE" "$APP/Contents/MacOS/HeytaMac" 2>&1 | awk '{print "  " $0}'; then
   :
 fi
 [ -f "$SELFIE" ] || { echo "  🔴 打包后的 .app 没能自截屏 —— 它跑不起来或渲染失败"; exit 1; }

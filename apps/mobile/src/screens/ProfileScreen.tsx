@@ -67,6 +67,7 @@ import {
   displayNameCodePoints,
 } from '@heyta/shared-schema';
 import {
+  AssistantMark,
   SettingsRow,
   resolvePendingUploadPresentation,
   shouldRenderSettingsRow,
@@ -74,15 +75,16 @@ import {
 } from '@heyta/ui';
 
 import { Button, Card, Divider, HStack, Screen, SectionHeader, Stack, Text, TextField } from '../ui/kit';
+import { Icon, type IconName } from '../ui/icons';
 import { MOBILE_FEATURE_ENTRIES, type MobileFeatureEntryKey } from '../nav/feature-entries';
 import { AssistantScreen } from '../ai/AssistantScreen';
-import { isAiConfiguredOnThisDevice, useAiSettings } from '../ai/settings-store';
 import { AvatarBadge } from '../ui/avatar';
 import { prepareAvatarFromUri, type AvatarPrepareError } from '../lib/avatar-prepare';
 import { AccountClosureScreen } from './AccountClosureScreen';
 import { AuthScreen, type SavedAuthSession } from './AuthScreen';
 import { ConflictSheet } from './ConflictSheet';
 import { CountdownScreen } from './CountdownScreen';
+import { EmailChangeSection } from './EmailChangeSection';
 import { EntitlementSection } from './EntitlementSection';
 // 托管同步的续费入口（与 web 的 RenewPanel 共用 @heyta/app-host 那一份接线）。
 import { RenewSection } from './RenewSection';
@@ -91,7 +93,6 @@ import { GrowthScreen } from './GrowthScreen';
 import { ProfileProgressSummary } from './ProfileProgressSummary';
 import { HabitsScreen } from './HabitsScreen';
 import { ListsSection } from './ListsSection';
-import { EmailChangeSection } from './EmailChangeSection';
 import { NotesSection } from './NotesSection';
 import { NotificationsScreen } from './NotificationsScreen';
 import { SecurityScreen } from './SecurityScreen';
@@ -101,7 +102,7 @@ import { TrashScreen } from './TrashScreen';
 import { formatStamp } from '../lib/date';
 import { useTokens } from '../theme';
 import { useSyncCredentialForm } from '../sync/credential-form';
-import { readSyncConfig, writeSyncConfig } from '../sync/config';
+import { DEFAULT_SERVER_URL, readSyncConfig, writeSyncConfig } from '../sync/config';
 import { describeSyncStatus, statusTone } from '../sync/status-text';
 import { useMobileSync, refreshPendingUpload } from '../sync/store';
 import { currentSignedInEmail, forgetSignedInUser } from '../auth/session';
@@ -114,6 +115,7 @@ import {
 } from '../lib/vault-secure-storage';
 import { clearMobileVaultSession } from '../lib/vault-session-cleanup';
 import { useMobileNavigation } from '../nav/navigation';
+import { isProfileAssistantVisible } from '../nav/navigation-state';
 
 export function ProfileScreen(): React.JSX.Element {
   const { status, lastSyncedAt, pendingUpload, busy } = useMobileSync();
@@ -125,8 +127,11 @@ export function ProfileScreen(): React.JSX.Element {
    * 凭据表单的状态与"输入即生效"接线 —— **活在本屏**（理由见
    * `credential-form.ts` 文件头）。设置面拿的是值与回调。
    */
-  const form = useSyncCredentialForm();
   const [vaultCleanupPending, setVaultCleanupPending] = useState<VaultSecureStorageScope>();
+  /** 小组件清理失败必须留在界面上，直到一次显式重试成功。 */
+  const [widgetCleanupPending, setWidgetCleanupPending] = useState(false);
+  const [widgetCleanupRetrying, setWidgetCleanupRetrying] = useState(false);
+  const form = useSyncCredentialForm(setVaultCleanupPending);
 
   // 🔴 冲突界面的可见性只是**界面状态**，不进 store。
   const [conflictsOpen, setConflictsOpen] = useState(false);
@@ -134,6 +139,13 @@ export function ProfileScreen(): React.JSX.Element {
   /** 设置面是当前 tab 的二级栈页面；返回优先 pop 回个人页。 */
   const settingsOpen = navigation.tab === 'profile' && navigation.stack.at(-1)?.key === 'settings';
   const [settingsSection, setSettingsSection] = useState<SettingsSectionKey>();
+
+  // The profile screen stays mounted while tabs switch. Drop a pending
+  // shortcut section when leaving the profile tab so returning to a retained
+  // settings entry always opens the directory, never a stale child page.
+  useEffect(() => {
+    if (navigation.tab !== 'profile') setSettingsSection(undefined);
+  }, [navigation.tab]);
 
   /**
    * 注册 / 登录面板（W3 · 规范 §3.1 的「前置」落点）。
@@ -143,9 +155,21 @@ export function ProfileScreen(): React.JSX.Element {
    * （一级可见），所以"前置"兑现为"冷启动 ≤1 次点击"而不是"多一个标签"。
    */
   const authOpen = navigation.tab === 'profile' && navigation.stack.at(-1)?.key === 'profile:auth';
+  const [authAllowServerSelection, setAuthAllowServerSelection] = useState(false);
   const setAuthOpen = (open: boolean): void => {
     if (open) navigation.push('profile:auth');
-    else navigation.pop();
+    else {
+      setAuthAllowServerSelection(false);
+      navigation.pop();
+    }
+  };
+  /** 普通账号入口只连官方服务；自托管登录必须从同步设置的高级路径进入。 */
+  const openAuth = (allowServerSelection = false): void => {
+    if (!allowServerSelection) {
+      form.setServerUrl(DEFAULT_SERVER_URL);
+    }
+    setAuthAllowServerSelection(allowServerSelection);
+    setAuthOpen(true);
   };
   /** 登录/切换账号后，个人资料摘要必须按新账号重新读，不能沿用旧账号的投影。 */
   const [profileRevision, setProfileRevision] = useState(0);
@@ -205,6 +229,8 @@ export function ProfileScreen(): React.JSX.Element {
     setProfileRevision((revision) => revision + 1);
     const config = readSyncConfig();
     const accountId = config?.accountId?.trim();
+    setWidgetCleanupPending(false);
+    setWidgetCleanupRetrying(false);
     let scope: VaultSecureStorageScope | undefined;
     if (config !== undefined && accountId !== undefined && accountId !== '') {
       try {
@@ -233,7 +259,10 @@ export function ProfileScreen(): React.JSX.Element {
       });
       form.clear();
       forgetSignedInUser();
-      await wipePromise;
+      const wipe = await wipePromise;
+      // 账号凭据已经清掉，但小组件可能仍留着上一个账号的快照。
+      // 这条状态与 Vault 清理分开呈现，且必须保留到重试成功。
+      setWidgetCleanupPending(!wipe.widgetsCleared);
       const cleanup = await cleanupPromise;
       if (cleanup.secureStorageError !== undefined) {
         setVaultCleanupPending(scope);
@@ -243,6 +272,22 @@ export function ProfileScreen(): React.JSX.Element {
       }
     })();
   };
+
+  const retryWidgetCleanup = useCallback((): void => {
+    if (!widgetCleanupPending || widgetCleanupRetrying) return;
+    setWidgetCleanupRetrying(true);
+    void clearWidgetState()
+      .then(() => {
+        setWidgetCleanupPending(false);
+      })
+      .catch((error: unknown) => {
+        setWidgetCleanupPending(true);
+        console.warn('[widgets] 重试清理小组件状态失败', error);
+      })
+      .finally(() => {
+        setWidgetCleanupRetrying(false);
+      });
+  }, [widgetCleanupPending, widgetCleanupRetrying]);
 
   const retryVaultCleanup = useCallback((): void => {
     const scope = vaultCleanupPending;
@@ -363,14 +408,16 @@ export function ProfileScreen(): React.JSX.Element {
   }, [onClearCredentials, setSecurityOpen]);
 
   /**
-   * AI 助手那一屏（五个功能共用一个入口，见 `ai/AssistantScreen.tsx` 的文件头）。
+   * 单一对话助手，与个人中心共用已有导航栈。
    *
    * 🔴 它是**第二层屏**，不是第 6 个标签 —— 与成长 / 回收站 / 导出同一条纪律。
-   * 🔴 入口行**按本机开关决定是否进树**（`aiEntryVisible`）：
-   * 关掉的功能留在树上、点进去五个面板都发不出去，正是本仓反复记过的那类
-   * "界面在说谎"；而设置那一面**不受它影响** —— 闸就住在那里，看不见就无法打开。
+   * 入口常驻，与 Web 的单一助手一致。未配置远端时仍可执行本地读取，
+   * 需要模型的请求由共享层返回设置提示；可见入口本身不授予出境权限。
    */
-  const assistantOpen = navigation.tab === 'profile' && navigation.stack.at(-1)?.key === 'profile:assistant';
+  // Keep the assistant mounted while another root tab is visible so an in-flight
+  // proposal/draft survives tab switching.  Visibility is separate: the hidden
+  // instance must not register an Android Back handler (see AssistantScreen).
+  const assistantOpen = navigation.stacks.profile.at(-1)?.key === 'profile:assistant';
   const setAssistantOpen = (open: boolean): void => {
     if (open) navigation.push('profile:assistant');
     else navigation.pop();
@@ -742,8 +789,6 @@ export function ProfileScreen(): React.JSX.Element {
    * 就是本仓反复登记过的那个形状（"设置里能授权、授权了什么都不发生"）。
    * 而"关掉的功能不进树"是本壳模块开关的既有口径。
    */
-  const aiSettings = useAiSettings();
-  const aiEntryVisible = isAiConfiguredOnThisDevice(aiSettings);
 
   /**
    * 功能域那几行**由注册表生成**（`nav/feature-entries.ts`）。
@@ -757,6 +802,7 @@ export function ProfileScreen(): React.JSX.Element {
       testID: entry.testID,
       label: t(entry.labelKey),
       hint: t(entry.hintKey),
+      leading: <Icon name={FEATURE_ENTRY_ICONS[entry.key]} size="sm" color={tokens['color.foreground-muted']} />,
       onPress: () => {
         navigation.push(featureRouteKey(entry.key));
       },
@@ -772,6 +818,7 @@ export function ProfileScreen(): React.JSX.Element {
     testID: 'profile-entry-settings',
     label: t('mobile.profile.entry.settings'),
     hint: t('mobile.profile.entry.settings.hint'),
+    leading: <Icon name="action.settings" size="sm" color={tokens['color.foreground-muted']} />,
     onPress: () => {
       setSettingsSection(undefined);
       navigation.push('settings');
@@ -787,54 +834,55 @@ export function ProfileScreen(): React.JSX.Element {
       onPress: () => {
         setNotificationsOpen(true);
       },
-      leading:
-        inboxUnread > 0 ? (
-          <View
-            accessibilityLabel={t('mobile.inbox.badge.aria', { count: inboxUnread })}
-            style={{
-              minWidth: tokens['space.6'],
-              paddingHorizontal: tokens['space.2'],
-              paddingVertical: tokens['space.1'],
-              borderRadius: tokens['radius.full'],
-              backgroundColor: tokens['color.primary'],
-              alignItems: 'center',
-            }}
-          >
-            <Text variant="caption" style={{ color: tokens['color.on-primary'] }}>
-              {inboxUnread}
-            </Text>
-          </View>
-        ) : undefined,
+      leading: (
+        <HStack gap="tight" align="center">
+          <Icon name="task.reminder" size="sm" color={tokens['color.foreground-muted']} />
+          {inboxUnread > 0 ? (
+            <View
+              accessibilityLabel={t('mobile.inbox.badge.aria', { count: inboxUnread })}
+              style={{
+                minWidth: tokens['space.6'],
+                paddingHorizontal: tokens['space.2'],
+                paddingVertical: tokens['space.1'],
+                borderRadius: tokens['radius.full'],
+                backgroundColor: tokens['color.primary'],
+                alignItems: 'center',
+              }}
+            >
+              <Text variant="caption" style={{ color: tokens['color.on-primary'] }}>
+                {inboxUnread}
+              </Text>
+            </View>
+          ) : null}
+        </HStack>
+      ),
     },
     {
       kind: 'action',
       testID: 'profile-entry-security',
       label: t('mobile.security.trigger'),
       hint: t('mobile.security.entry.hint'),
+      leading: <Icon name="privacy.consent" size="sm" color={tokens['color.foreground-muted']} />,
       onPress: () => {
         setSettingsSection('security');
         setSecurityOpen(true);
       },
     },
     ...featureRows,
-    ...(aiEntryVisible
-      ? [
-          {
-            kind: 'action' as const,
-            testID: 'profile-entry-assistant',
-            label: t('mobile.ai.entry'),
-            hint: t('mobile.ai.entry.hint'),
-            onPress: () => {
-              setAssistantOpen(true);
-            },
-          },
-        ]
-      : []),
+    {
+      kind: 'action',
+      testID: 'profile-entry-assistant',
+      label: t('mobile.ai.entry'),
+      hint: t('mobile.ai.entry.hint'),
+      leading: <AssistantMark size={tokens['icon.sm']} color={tokens['color.foreground-muted']} />,
+      onPress: () => setAssistantOpen(true),
+    },
     {
       kind: 'action',
       testID: 'profile-entry-trash',
       label: t('mobile.trash.entry'),
       hint: t('mobile.trash.entry.hint'),
+      leading: <Icon name="task.delete" size="sm" color={tokens['color.foreground-muted']} />,
       onPress: () => {
         setSettingsSection('data');
         setTrashOpen(true);
@@ -845,6 +893,7 @@ export function ProfileScreen(): React.JSX.Element {
       testID: 'profile-entry-export',
       label: t('mobile.export.entry'),
       hint: t('mobile.export.entry.hint'),
+      leading: <Icon name="action.share" size="sm" color={tokens['color.foreground-muted']} />,
       onPress: () => {
         setSettingsSection('data');
         setExportOpen(true);
@@ -857,6 +906,7 @@ export function ProfileScreen(): React.JSX.Element {
       testID: 'profile-entry-close-account',
       label: t('common.accountClosure.title'),
       hint: t('common.accountClosure.entryHint'),
+      leading: <Icon name="privacy.consent" size="sm" color={tokens['color.foreground-muted']} />,
       onPress: () => {
         setSettingsSection('security');
         setClosureOpen(true);
@@ -921,6 +971,15 @@ export function ProfileScreen(): React.JSX.Element {
   if (assistantOpen) {
     return (
       <AssistantScreen
+        onOpenPrivacy={() => {
+          setSettingsSection('sync');
+          navigation.push('settings');
+        }}
+        onOpenSettings={() => {
+          setSettingsSection('ai');
+          navigation.push('settings');
+        }}
+        visible={isProfileAssistantVisible(navigation.tab, navigation.stacks)}
         onBack={() => {
           setAssistantOpen(false);
         }}
@@ -964,6 +1023,7 @@ export function ProfileScreen(): React.JSX.Element {
       <AuthScreen
         initialServerUrl={form.serverUrl}
         initialPassword={form.password}
+        allowServerSelection={authAllowServerSelection}
         onBack={() => {
           setAuthOpen(false);
         }}
@@ -978,9 +1038,15 @@ export function ProfileScreen(): React.JSX.Element {
      * 组件由穷尽 switch 决定：注册表加一项而不在这儿接上 = `apps/mobile` 编译红
      * （这条就是"入口存在但点了没反应"那类失效的编译期版本）。
     */
-    return featureScreen(openFeature, () => {
-      navigation.pop();
-    });
+    return featureScreen(
+      openFeature,
+      () => {
+        navigation.pop();
+      },
+      () => {
+        navigation.push(featureRouteKey('habits'));
+      },
+    );
   }
 
   /**
@@ -1028,6 +1094,7 @@ export function ProfileScreen(): React.JSX.Element {
         icon="action.sync"
         disabled={!form.configured}
         loading={busy}
+        style={{ alignSelf: 'flex-start' }}
       />
       {!form.configured ? (
         <Text variant="caption" tone="subtle" style={{ textAlign: 'center' }}>
@@ -1171,6 +1238,14 @@ export function ProfileScreen(): React.JSX.Element {
           )}
       <SettingsRow row={{ kind: 'value', label: t('common.profile.email.label'), value: signedInEmail ?? t('mobile.profile.account.offline') }} />
       <Text variant="caption" tone="subtle">{t('common.profile.email.hint')}</Text>
+      {/*
+        🔴 「更换登录邮箱」紧接在只读的邮箱行**下面** —— `common.profile.email.hint`
+        那句"请用下面的「更换登录邮箱」"指的就是这里。那句指引指不到东西时，
+        比留着空白更糟（用户会去别处找那个"不能改"的理由）。
+        表单**不许**进「我的」的滚动流（`check:mobile-settings` R3 +
+        `profile-settings-ia.spec.ts`），所以它是一个自带卡片的外挂组件，
+        由这里的 `profileEditor` 摆进设置面的 `profile` 分组。
+      */}
       <EmailChangeSection baseUrl={form.serverUrl} token={form.token} currentEmail={signedInEmail} />
     </Stack>
   ) : undefined;
@@ -1217,9 +1292,7 @@ export function ProfileScreen(): React.JSX.Element {
             ? t('mobile.profile.account.switchAccount')
             : t('mobile.profile.account.signIn')
         }
-        onPress={() => {
-          setAuthOpen(true);
-        }}
+        onPress={openAuth}
         tone={accountHasCredential ? 'secondary' : 'primary'}
       />
       {/*
@@ -1288,9 +1361,9 @@ export function ProfileScreen(): React.JSX.Element {
           便签排最后（它读的是 NOTE，与任务的组织维度无关）。 */}
       <SectionHeader icon="task.project" title={t('mobile.profile.tools')} />
       <Card>
-        <SettingsRow row={{ kind: 'action', label: t('mobile.profile.section.lists'), testID: 'profile-entry-lists', onPress: () => { navigation.push('profile:lists'); } }} />
-        <SettingsRow row={{ kind: 'action', label: t('mobile.profile.section.tags'), testID: 'profile-entry-tags', onPress: () => { navigation.push('profile:tags'); } }} />
-        <SettingsRow row={{ kind: 'action', label: t('notes.title'), testID: 'profile-entry-notes', onPress: () => { navigation.push('profile:notes'); } }} />
+        <SettingsRow row={{ kind: 'action', label: t('mobile.profile.section.lists'), testID: 'profile-entry-lists', leading: <Icon name="task.project" size="sm" color={tokens['color.foreground-muted']} />, onPress: () => { navigation.push('profile:lists'); } }} />
+        <SettingsRow row={{ kind: 'action', label: t('mobile.profile.section.tags'), testID: 'profile-entry-tags', leading: <Icon name="task.tag" size="sm" color={tokens['color.foreground-muted']} />, onPress: () => { navigation.push('profile:tags'); } }} />
+        <SettingsRow row={{ kind: 'action', label: t('notes.title'), testID: 'profile-entry-notes', leading: <Icon name="note.sticky" size="sm" color={tokens['color.foreground-muted']} />, onPress: () => { navigation.push('profile:notes'); } }} />
       </Card>
 
       <ConflictSheet
@@ -1308,12 +1381,18 @@ export function ProfileScreen(): React.JSX.Element {
         initialSection={settingsSection}
         profileEditor={profileEditor}
         syncStatus={syncStatus}
+        onOpenAuth={openAuth}
+        onUseOfficialSync={onClearCredentials}
         dataActions={entryRows.filter((row) => ['profile-entry-export', 'profile-entry-trash'].includes(row.testID ?? ''))}
         securityActions={entryRows.filter((row) => ['profile-entry-security', 'profile-entry-close-account'].includes(row.testID ?? ''))}
         // Shell 保留各 tab 的屏幕实例；设置是 profile 的二级 surface，
         // 离开 profile 时必须隐藏 Modal，回到 profile 再恢复原栈位置。
         visible={navigation.tab === 'profile' && settingsOpen}
         onClose={() => {
+          // Clear the source section when the sheet is dismissed. Otherwise a
+          // profile shortcut can leave a stale child section in the mounted
+          // SettingsScreen while the user changes tabs and returns later.
+          setSettingsSection(undefined);
           navigation.pop();
         }}
         form={form}
@@ -1321,6 +1400,9 @@ export function ProfileScreen(): React.JSX.Element {
         vaultCleanupPending={vaultCleanupPending !== undefined}
         onRetryVaultCleanup={retryVaultCleanup}
         onVaultCleanupPending={setVaultCleanupPending}
+        widgetCleanupPending={widgetCleanupPending}
+        widgetCleanupRetrying={widgetCleanupRetrying}
+        onRetryWidgetCleanup={retryWidgetCleanup}
       />
     </Screen>
   );
@@ -1353,10 +1435,16 @@ function featureKeyFromRoute(routeKey: string | undefined): MobileFeatureEntryKe
  * "行在、点了没反应"，而它**不报错、界面也不难看**（AGENTS §7 那类）。
  * 让它在编译期就站不住，比给它写一条运行时判据更便宜。
  */
-function featureScreen(key: MobileFeatureEntryKey, onBack: () => void): React.JSX.Element {
+const FEATURE_ENTRY_ICONS: Record<MobileFeatureEntryKey, IconName> = {
+  growth: 'growth.week',
+  habits: 'focus.streak',
+  countdown: 'task.due',
+};
+
+function featureScreen(key: MobileFeatureEntryKey, onBack: () => void, onOpenHabits: () => void): React.JSX.Element {
   switch (key) {
     case 'growth':
-      return <GrowthScreen onBack={onBack} />;
+      return <GrowthScreen onBack={onBack} onOpenHabits={onOpenHabits} />;
     case 'habits':
       return <HabitsScreen onBack={onBack} />;
     // 🔴 注册表里加了 `countdown` 而这一行没接上 ⇒ 本函数"所有分支之外还可能走到结尾"，

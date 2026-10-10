@@ -23,6 +23,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="widget-strings.generated.json" LogicalName="Heyta.WidgetStrings" />
     <!-- C# 与 TS 之间的桥：Jint 执行 bundle，Microsoft.Data.Sqlite 提供同步驱动。 -->
     <PackageReference Include="Jint" Version="4.16.4" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />

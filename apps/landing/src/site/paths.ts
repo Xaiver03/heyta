@@ -61,18 +61,18 @@ export function siteHref(page: SitePage, locale: Locale): string {
  * 🔴 **匹配的是"整条注册路径"，不是第一段。** 这一条是文档中心逼出来的，
  * 而原来的写法有两个都是**静默**的失败：
  *
- *   1. 只取第一段 ⇒ `/help/how/` 生成物齐全、`check:entries` 绿、URL 返回 200，
+ *   1. 只取第一段 ⇒ `/docs/how/` 生成物齐全、`check:entries` 绿、URL 返回 200，
  *      但运行时解析成 `help` —— **访客打开文章链接，看到的是帮助页**。
  *      入口 HTML 由注册表生成、正文由这个函数决定，两者对同一件事各说一套。
- *   2. 没剥 `#hash` / `?query` ⇒ `/help/#sync` 的第一段虽然是 `help`，
+ *   2. 没剥 `#hash` / `?query` ⇒ `/docs/#sync` 的第一段虽然是 `help`，
  *      但 `/features#capabilities` 这类**带锚点的站内链接**在别处会解析成首页。
  *      `render.spec.tsx` 的 N2 判据正是拿这个函数**反解**真实 href 的，
  *      于是"链接指向 A、反解出 B"会让可达性统计把真链接算成孤立，
  *      或者更糟：把首页当成被链到（它确实总被链到），从而**永远绿**。
  *
- * 匹配顺序是**深度优先**（段数多的先试）：`/help/how/` 同时是 `help` 与 `how`
+ * 匹配顺序是**深度优先**（段数多的先试）：`/docs/how/` 同时是 `help` 与 `how`
  * 的祖先路径，只有"最深者优先"才能让文章落到文章自己，而**未注册**的
- * `/help/xxx/` 仍然落到父级枢纽 `help` —— 那比弹回首页好（人还在帮助中心里，
+ * `/docs/xxx/` 仍然落到父级枢纽 `help` —— 那比弹回首页好（人还在帮助中心里，
  * 只是那一篇文章不存在）。
  */
 export function pageFromPath(pathname: string): RegisteredSitePage {
@@ -87,7 +87,7 @@ export function pageFromPath(pathname: string): RegisteredSitePage {
   return found ?? SITE_PAGES[0];
 }
 
-/** 注册路径拆成段（`/` ⇒ `[]`，`/help/how` ⇒ `['help', 'how']`）。 */
+/** 注册路径拆成段（`/` ⇒ `[]`，`/docs/how` ⇒ `['help', 'how']`）。 */
 function segmentsOf(path: string): readonly string[] {
   return path.split('/').filter((s) => s !== '');
 }
@@ -101,7 +101,7 @@ function isPathPrefix(prefix: readonly string[], path: readonly string[]): boole
  * 去掉 `#锚点` 与 `?查询串`。
  *
  * ⚠️ 注册表里的 `path` **永远不带**这两样（它们是同一篇文档内部的定位，
- * 不是另一个页面），而真实出现在 DOM 里的 href 会带（`/help/#sync`）。
+ * 不是另一个页面），而真实出现在 DOM 里的 href 会带（`/docs/#sync`）。
  * 不剥掉的话，`pageFromPath` 会把这个地址当成"认不出的路径"。
  */
 function stripFragmentAndQuery(pathname: string): string {

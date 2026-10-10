@@ -97,7 +97,7 @@ export function KeyText({ messageKey }: { messageKey: MessageKey }): React.JSX.E
  * 一个分区。
  *
  * `id` 会变成 `id="..."`，所以它同时是**深链接的落点** —— 应用里的
- * 「帮助 → 怎么同步」这类入口可以直接落到 `/{locale}/help/#sync`，
+ * 「帮助 → 怎么同步」这类入口可以直接落到 `/{locale}/docs/#sync`，
  * 而不必只是把人丢到帮助页顶部。
  *
  * 两个正文位分开，是为了让**每一条文案都带着自己的语气**：
@@ -197,7 +197,7 @@ export function PageHead({
   /**
    * 页头要不要那颗主行动按钮。**默认 `true`**（所有子页面照旧）。
    *
-   * 🔴 文档中心的**文章页**传 `false`，理由是意图不同：读 `/help/passphrase`
+   * 🔴 文档中心的**文章页**传 `false`，理由是意图不同：读 `/docs/passphrase`
    * 的人正在解决一件具体的事，此刻把他从答案里拔出去按「立即使用」，
    * 得到的不是转化而是打断。而帮助中心与文章本身已经有出口 ——
    * 侧栏（文档中心）、导航（每一页都在）、页脚 —— 关掉这一颗不会把人困住。
@@ -211,6 +211,15 @@ export function PageHead({
   const preset = useMotionPreset();
   const start = siteCta(page, locale);
   const copy = revealVariants(preset.reduced, preset.ui);
+
+  if (page.docsKind !== undefined) {
+    return (
+      <header className="lp-docs__page-head">
+        <h1 className="ht-type-screen-title"><KeyText messageKey={page.headingKey} /></h1>
+        <p className="ht-type-body"><KeyText messageKey={page.ledeKey} /></p>
+      </header>
+    );
+  }
 
   return (
     <header
@@ -408,7 +417,7 @@ export function PageSections({
 /**
  * 一个标准子页面：页头 + 分区正文。
  *
- * 需要插入自有区块的页面（`/pricing` 的价格卡与对照表、`/help` 的问答、
+ * 需要插入自有区块的页面（`/pricing` 的价格卡与对照表、`/docs` 的问答、
  * `/changelog` 的日期）通过 `children` 插进来，而**不是另写一套页头** ——
  * 一旦允许"另写一套页头"，各页的 `<h1>` 排版就会开始分叉，而那是 N4 的判据。
  */
