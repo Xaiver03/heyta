@@ -28,6 +28,8 @@ const VIOLATION_PATTERNS = [
   { name: 'send({ error:', re: /\.send\(\s*\{\s*\n?\s*error\s*:/ },
   { name: 'body: { error:', re: /body\s*:\s*\{\s*\n?\s*error\s*:/ },
   { name: 'refuse/error object with error:', re: /\{\s*\n?\s*error\s*:\s*(?:MANAGED_AI_ERROR_CODES|[A-Z_]{2,})/ },
+  { name: 'send(errorObj) 变量直发:', re: /\.send\((?:err|error|e)\)/ },
+  { name: '旧 5xx 形状 send({ statusCode:', re: /send\(\s*\{\s*\n?\s*statusCode\s*:/ },
 ];
 
 const scanFile = (path) => {
@@ -146,6 +148,14 @@ const selfTest = () => {
   assertRed(
     '臂3 错误体发明 errorCode 字段',
     withTempServer(makeFiles("return reply.status(402).send({ error: CODE, errorCode: CODE });\n"), scan),
+  );
+  assertRed(
+    '臂5 send(errorObj) 变量直发',
+    withTempServer(makeFiles("catch (e) { return reply.status(500).send(e); }\n"), scan),
+  );
+  assertRed(
+    '臂6 旧 5xx 形状 send({ statusCode:',
+    withTempServer(makeFiles("return reply.status(500).send({ statusCode: 500, error: 'Internal Server Error' });\n"), scan),
   );
   assertGreen(
     '臂4 阳性对照（信封形状）',
