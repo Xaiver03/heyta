@@ -48,6 +48,7 @@ const EMAIL_MODULE = fileURLToPath(new URL('../../../server/src/email.ts', impor
 const EMAIL_KINDS: Array<{ fn: string; zh: string; en: string }> = [
   { fn: 'sendVerificationEmail', zh: '验证邮箱', en: 'address verification' },
   { fn: 'sendEmailPasswordRegistrationCodeEmail', zh: '注册验证码', en: 'registration code' },
+  { fn: 'sendLoginCodeEmail', zh: '登录验证码', en: 'sign-in code' },
   { fn: 'sendLoginMagicLinkEmail', zh: '魔法登录', en: 'magic sign-in link' },
   { fn: 'sendPasskeyRecoveryEmail', zh: '找回通行密钥', en: 'passkey recovery' },
   { fn: 'sendPasswordResetEmail', zh: '重置口令', en: 'password reset' },
