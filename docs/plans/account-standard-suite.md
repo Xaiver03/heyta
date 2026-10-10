@@ -4263,8 +4263,9 @@ app 二进制对应的源码 tip 与腿跑时服务端对应的 tip **可能不�
 改密请求仍必须当场返回"，预算取自约束方（客户端 60 s）的 1/20；
 变异把 `await` 加回去 ⇒ `MUT_RC=1` 且红的正是「响应被那封告知信扣住了」那一行；
 全文件 21/21、`server` 的 `tsc --noEmit` 0 条错。详见 **B154** 与第 405 条。
-📌 同一形状另两枚（`service.ts:249` / `passkey.ts:556` 的 `notifyAuthenticatorAdded`）
-不在本线地界，只登记不代改。
+📌 同一形状一共四处，另两枚（`service.ts:249` / `passkey.ts:556` 的 `notifyAuthenticatorAdded`）
+`git log -S` 现量**也是本线那笔 `703cafc8` 引进的** ⇒ 已一并收掉：各加一条「发信永不 settle
+仍当场返回」的判据，变异把 `await` 加回 ⇒ 两条各红一次，两文件全量 64/64 绿。
 
 **② 顶栏那一格：不是导航缺陷，是载体机型。**
 `heyta-ios-isolated` 是 iOS 27.1 SDK 新增的 **iPhone-Duo**，实测顶栏标题在 **y=18**
