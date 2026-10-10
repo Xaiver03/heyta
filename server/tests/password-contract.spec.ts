@@ -31,9 +31,9 @@ describe('共享错误词表的每一项都有 HTTP 表达', () => {
       expect(res.status).toBeLessThan(600);
       expect(res.body.code).toBe(code);
       // 句子由服务端给（唯一真源在 `PASSWORD_*_MESSAGE`），不许是空串。
-      expect(res.body.error.length).toBeGreaterThan(0);
+      expect(res.body.message.length).toBeGreaterThan(0);
       // 🔴 内部细节不许透传。这里喂的就是那句"哪个闸门满了"级别的话。
-      expect(res.body.error).not.toContain('internal detail');
+      expect(res.body.message).not.toContain('internal detail');
     }
   });
 

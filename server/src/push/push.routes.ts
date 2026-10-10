@@ -136,7 +136,7 @@ export async function pushRoutes(
   const guard = async (reply: FastifyReply): Promise<boolean> => {
     if (opts.vapidPublicKey !== null && opts.vapidPublicKey !== '') return true;
     await reply.code(503).send({
-      error: 'web_push_disabled',
+      code: 'web_push_disabled',
       message: '这台服务器没有配置 Web Push（VAPID 密钥对缺失）',
     });
     return false;
@@ -169,15 +169,15 @@ export async function pushRoutes(
 
       const endpointCheck = validateEndpoint(body.endpoint);
       if (!endpointCheck.ok) {
-        return reply.code(400).send({ error: 'invalid_endpoint', message: endpointCheck.message });
+        return reply.code(400).send({ code: 'invalid_endpoint', message: endpointCheck.message });
       }
       const p256dhCheck = decodeField('p256dh', body.p256dh, P256DH_BYTES);
       if (!p256dhCheck.ok) {
-        return reply.code(400).send({ error: 'invalid_p256dh', message: p256dhCheck.message });
+        return reply.code(400).send({ code: 'invalid_p256dh', message: p256dhCheck.message });
       }
       const authCheck = decodeField('auth', body.auth, AUTH_BYTES);
       if (!authCheck.ok) {
-        return reply.code(400).send({ error: 'invalid_auth', message: authCheck.message });
+        return reply.code(400).send({ code: 'invalid_auth', message: authCheck.message });
       }
 
       await opts.store.upsert({
@@ -206,7 +206,7 @@ export async function pushRoutes(
       const endpoint = request.body?.endpoint;
       if (typeof endpoint !== 'string' || endpoint === '') {
         return reply.code(400).send({
-          error: 'invalid_endpoint',
+          code: 'invalid_endpoint',
           message: 'endpoint 必须是非空字符串',
         });
       }

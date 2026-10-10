@@ -243,8 +243,9 @@ describe('稳定码要出到线上（真路由 + 真 authenticate）', () => {
     const res = await app.inject({ method: 'PUT', url: '/api/account/locale', payload: { locale: 'en' } });
 
     expect(res.statusCode).toBe(401);
-    // 这条是"缺令牌"，与"账号没了"是两件事；缺 code 就是它的信号。
-    expect(res.json()).not.toHaveProperty('code');
+    // 这条是"缺令牌"，与"账号没了"是两件事；稳定码不同就是它的信号
+    // （统一信封后每条错误都带 code，"没有 code"不再是任何一条错误的形状）。
+    expect(res.json().code).toBe('missing_or_invalid_authorization_header');
   });
 
   it('🔴 注销那一次必须打掉鉴权缓存里的 ghost：预热后注销，旧令牌再请求要 410 ACCOUNT_CLOSED', async () => {

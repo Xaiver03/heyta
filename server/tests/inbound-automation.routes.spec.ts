@@ -199,7 +199,7 @@ describe('public inbound automation receiver', () => {
     mocks.state.queue = { events: BigInt(maxQueueEvents), bytes: 0n };
     const response = await requestAs(Buffer.from('{"title":"one too many"}'), 'evt-cap');
     expect(response.statusCode).toBe(429);
-    expect(response.json()).toEqual({ error: 'QUEUE_EVENTS_LIMIT' });
+    expect(response.json()).toEqual({ code: 'QUEUE_EVENTS_LIMIT', message: 'Inbound event exceeds the allowed quota.' });
     expect(mocks.prisma.automationEvent.create).not.toHaveBeenCalled();
   });
 
@@ -221,7 +221,7 @@ describe('public inbound automation receiver', () => {
     mocks.state.queue = { bytes: BigInt(maxQueueBytes - envelopeBytes + 1), events: 0n };
     const response = await requestAs(body, 'evt-len-over');
     expect(response.statusCode).toBe(413);
-    expect(response.json()).toEqual({ error: 'QUEUE_BYTES_LIMIT' });
+    expect(response.json()).toEqual({ code: 'QUEUE_BYTES_LIMIT', message: 'Inbound event exceeds the allowed quota.' });
     expect(mocks.prisma.automationEvent.create).not.toHaveBeenCalled();
     expect(envelopeBytes).toBeGreaterThan(body.length);
   });
@@ -232,7 +232,7 @@ describe('public inbound automation receiver', () => {
     expect(response.statusCode).toBe(500);
     // 对外响应里不许出现"已受理"的任何形状：状态字段、eventId、`queued` 都不行。
     expect(response.body).not.toContain('queued');
-    expect(response.json()).toEqual({ error: 'Inbound event could not be accepted' });
+    expect(response.json()).toEqual({ code: 'inbound_event_could_not_be_accepted', message: 'Inbound event could not be accepted' });
   });
 
   // 唯一索引上的插入竞态：前置查找没看见对手刚线性化进去的那行，insert 才撞 P2002。
@@ -249,7 +249,7 @@ describe('public inbound automation receiver', () => {
     mocks.prisma.automationEvent.create.mockRejectedValueOnce(Object.assign(new Error('duplicate key'), { code: 'P2002' }));
     const conflict = await requestAs(Buffer.from('{"title":"loser"}', 'utf8'), 'evt-race');
     expect(conflict.statusCode).toBe(409);
-    expect(conflict.json()).toEqual({ error: 'EVENT_CONTENT_CONFLICT' });
+    expect(conflict.json()).toEqual({ code: 'EVENT_CONTENT_CONFLICT', message: 'EVENT_CONTENT_CONFLICT' });
 
     // 同一 eventId、**同样的字节** ⇒ 原样返回赢家的不透明状态；本地没有第二条事件行。
     mocks.prisma.automationEvent.findFirst.mockResolvedValueOnce(null);

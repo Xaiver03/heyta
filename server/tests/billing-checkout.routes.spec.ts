@@ -221,14 +221,14 @@ describe('收银台 —— 认证与准入', () => {
     const res = await post({ priceId: 'hosted-yearly-99' });
 
     expect(res.statusCode).toBe(400);
-    expect(res.json().error).toBe('UNKNOWN_PRICE');
+    expect(res.json().code).toBe('UNKNOWN_PRICE');
   });
 
   it('词表外的币种 / 区域 → 400', async () => {
-    expect((await post({ priceId: 'hosted-monthly', currency: 'XYZ' })).json().error).toBe(
+    expect((await post({ priceId: 'hosted-monthly', currency: 'XYZ' })).json().code).toBe(
       'UNSUPPORTED_CURRENCY',
     );
-    expect((await post({ priceId: 'hosted-monthly', region: 'MARS' })).json().error).toBe(
+    expect((await post({ priceId: 'hosted-monthly', region: 'MARS' })).json().code).toBe(
       'UNSUPPORTED_REGION',
     );
   });
@@ -243,7 +243,7 @@ describe('收银台 —— 认证与准入', () => {
     const res = await post({ priceId: 'hosted-monthly', currency: 'USD' });
 
     expect(res.statusCode).toBe(409);
-    expect(res.json().error).toBe('PROVIDER_CURRENCY_UNSUPPORTED');
+    expect(res.json().code).toBe('PROVIDER_CURRENCY_UNSUPPORTED');
     expect(res.json().currency).toBe('USD');
     const rows = await sql.query<{ n: unknown }>('SELECT count(*)::int AS n FROM checkout_orders');
     expect(Number(rows[0]?.n)).toBe(0);
@@ -270,7 +270,7 @@ describe('收银台 —— 认证与准入', () => {
 
     const cny = await inject({ priceId: 'hosted-monthly' });
     expect(cny.statusCode).toBe(409);
-    expect(cny.json().error).toBe('PROVIDER_CURRENCY_UNSUPPORTED');
+    expect(cny.json().code).toBe('PROVIDER_CURRENCY_UNSUPPORTED');
 
     const usd = await inject({ priceId: 'hosted-monthly', currency: 'USD' });
     expect(usd.statusCode).toBe(200);
@@ -298,7 +298,7 @@ describe('收银台 —— 认证与准入', () => {
     });
 
     expect(res.statusCode).toBe(503);
-    expect(res.json().error).toBe('BILLING_PROVIDER_NOT_CONFIGURED');
+    expect(res.json().code).toBe('BILLING_PROVIDER_NOT_CONFIGURED');
     await noProvider.close();
   });
 });
@@ -408,7 +408,7 @@ describe('收银台 —— 通道侧失败必须释放名额', () => {
     const res = await post({ priceId: 'hosted-monthly', couponCode: 'launch' });
 
     expect(res.statusCode).toBe(502);
-    expect(res.json().error).toBe('CHECKOUT_FAILED');
+    expect(res.json().code).toBe('CHECKOUT_FAILED');
 
     const orders = await sql.query<{ status: string }>('SELECT status FROM checkout_orders');
     expect(orders).toHaveLength(1);

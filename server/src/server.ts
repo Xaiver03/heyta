@@ -12,6 +12,7 @@ import {
   isConsentRequired,
 } from './config';
 import { Logger } from './logger';
+import { GENERIC_ERROR_CODE_BY_STATUS } from './api-error';
 import { registerWebApp, resolveWebAppMount } from './web-app';
 import { prisma, disconnectDb } from './db';
 import websocket from '@fastify/websocket';
@@ -392,10 +393,14 @@ export const createServer = (
         trustProxy: SERVER_TRUST_PROXY,
       });
 
-      // Sanitize 5xx responses so internal details (e.g. raw Prisma errors
-      // exposing DB hostnames or ORM call shapes) never reach clients/log
-      // exports. 4xx errors are passed through — those are typically Fastify
-      // validation messages or auth failures that are safe and actionable.
+      // Every error leaving this server has ONE envelope: { code, message }.
+      //   · 5xx are sanitized to `internal_error` so raw Prisma errors (DB hostnames,
+      //     ORM call shapes) never reach clients or log exports;
+      //   · framework-raised 4xx (route validation, 404, body-limit…) get the
+      //     generic code for their status — routes with something specific to say
+      //     send it themselves before this handler ever runs;
+      //   · error.code is trusted only when it already matches the envelope's
+      //     shape (Fastify plugin codes like FST_ERR_* do not).
       fastifyServer.setErrorHandler((error: FastifyError, req, reply) => {
         const statusCode = error.statusCode ?? 500;
         const sanitizedUrl = sanitizeRequestUrlForLog(req.url);
@@ -410,11 +415,19 @@ export const createServer = (
         }
         if (statusCode >= 500) {
           return reply.status(500).send({
-            statusCode: 500,
-            error: 'Internal Server Error',
+            code: 'internal_error',
+            message: 'Internal Server Error',
           });
         }
-        return reply.send(error);
+        const genericCode = GENERIC_ERROR_CODE_BY_STATUS[statusCode];
+        const shapedCode =
+          genericCode !== undefined && /^[A-Za-z][A-Za-z0-9_-]*$/.test(error.code)
+            ? error.code
+            : (genericCode ?? 'request_rejected');
+        return reply.status(statusCode).send({
+          code: shapedCode,
+          message: error.message.length > 0 ? error.message : 'Request failed.',
+        });
       });
 
       // Security Headers

@@ -135,10 +135,10 @@ describe('encrypted-only upload gate (E2EE_REQUIRED)', () => {
   const expectE2eeRejection = (response: {
     statusCode: number;
     body: string;
-    json: () => { error?: string; errorCode?: string };
+    json: () => { code?: string; message?: string };
   }): void => {
     expect(response.statusCode).toBe(400);
-    expect(response.json().errorCode).toBe(SYNC_ERROR_CODES.E2EE_REQUIRED);
+    expect(response.json().code).toBe(SYNC_ERROR_CODES.E2EE_REQUIRED);
     // The rejected payload value must never be echoed back.
     expect(response.body).not.toContain(PLAINTEXT_TITLE);
   };

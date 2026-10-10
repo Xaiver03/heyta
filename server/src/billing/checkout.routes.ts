@@ -120,7 +120,8 @@ export const checkoutRoutes: FastifyPluginAsync<CheckoutRoutesOptions> = async (
       const parsed = CheckoutBodySchema.safeParse(request.body ?? {});
       if (!parsed.success) {
         return reply.code(400).send({
-          error: 'INVALID_BODY',
+          code: 'INVALID_BODY',
+          message: 'INVALID_BODY',
           detail: parsed.error.issues.map((i) => i.message),
         });
       }
@@ -132,7 +133,8 @@ export const checkoutRoutes: FastifyPluginAsync<CheckoutRoutesOptions> = async (
       const notSellable = notSellableReason(body.priceId);
       if (notSellable !== null) {
         return reply.code(409).send({
-          error: 'PRICE_NOT_SELLABLE',
+          code: 'PRICE_NOT_SELLABLE',
+          message: 'PRICE_NOT_SELLABLE',
           priceId: body.priceId,
           reason: notSellable,
         });
@@ -141,23 +143,23 @@ export const checkoutRoutes: FastifyPluginAsync<CheckoutRoutesOptions> = async (
       // 不认识的档**不报价**：`resolveEffectivePrice` 会抛，但那时错误形状
       // 已经变成"价目表坏了"，而真实原因是"客户端给了个不存在的 priceId"。
       if (grantsForSku(body.priceId) === null) {
-        return reply.code(400).send({ error: 'UNKNOWN_PRICE', priceId: body.priceId });
+        return reply.code(400).send({ code: 'UNKNOWN_PRICE', message: 'UNKNOWN_PRICE', priceId: body.priceId });
       }
       // ── ③ 币种与区域只能来自词表 ──────────────────────────────────────
       const currency = body.currency ?? DEFAULT_CURRENCY;
       if (!isSellableCurrency(currency)) {
-        return reply.code(400).send({ error: 'UNSUPPORTED_CURRENCY', currency });
+        return reply.code(400).send({ code: 'UNSUPPORTED_CURRENCY', message: 'UNSUPPORTED_CURRENCY', currency });
       }
       const region = body.region ?? DEFAULT_REGION;
       if (!isRegion(region)) {
-        return reply.code(400).send({ error: 'UNSUPPORTED_REGION', region });
+        return reply.code(400).send({ code: 'UNSUPPORTED_REGION', message: 'UNSUPPORTED_REGION', region });
       }
       // ── ④ 必须有真通道，而且它得收得了这个币种 ──────────────────────────
       const usable = (options.adapters ?? []).filter((a) => a.provider !== NOOP_PROVIDER);
       if (usable.length === 0) {
         // 自托管默认就是这个形状（只配了 noop）。这不是 500：系统是好的，
         // 只是这台实例没有开通收款能力。
-        return reply.code(503).send({ error: 'BILLING_PROVIDER_NOT_CONFIGURED' });
+        return reply.code(503).send({ code: 'BILLING_PROVIDER_NOT_CONFIGURED', message: 'BILLING_PROVIDER_NOT_CONFIGURED' });
       }
       // 🔴 币种能力在**冻结之前**判。理由与"先冻结后下单"是同一条纪律的反面：
       //    等到 `createCheckout` 才拒，那张订单**已经落库**了（随后被 `failOrder`
@@ -168,7 +170,8 @@ export const checkoutRoutes: FastifyPluginAsync<CheckoutRoutesOptions> = async (
       const adapter = usable.find((a) => a.supportedCurrencies.includes(currency));
       if (adapter === undefined) {
         return reply.code(409).send({
-          error: 'PROVIDER_CURRENCY_UNSUPPORTED',
+          code: 'PROVIDER_CURRENCY_UNSUPPORTED',
+          message: 'PROVIDER_CURRENCY_UNSUPPORTED',
           currency,
           providers: usable.map((a) => a.provider),
         });
@@ -228,7 +231,8 @@ export const checkoutRoutes: FastifyPluginAsync<CheckoutRoutesOptions> = async (
             message: error.message,
           });
           return reply.code(409).send({
-            error: 'PRICE_NOT_EFFECTIVE',
+            code: 'PRICE_NOT_EFFECTIVE',
+            message: 'PRICE_NOT_EFFECTIVE',
             priceId: body.priceId,
             currency,
           });
@@ -284,7 +288,7 @@ export const checkoutRoutes: FastifyPluginAsync<CheckoutRoutesOptions> = async (
           provider: adapter.provider,
           message: error instanceof Error ? error.message : String(error),
         });
-        return reply.code(502).send({ error: 'CHECKOUT_FAILED', outTradeNo });
+        return reply.code(502).send({ code: 'CHECKOUT_FAILED', message: 'CHECKOUT_FAILED', outTradeNo });
       }
 
       // 🔴 只回**这一单自己的**事实：冻结金额、折扣、失效时间、通道侧的支付参数。

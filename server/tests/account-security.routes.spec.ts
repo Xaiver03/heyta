@@ -357,7 +357,7 @@ describe('🔴 J-W2a：撤销一枚 ⇒ 那一枚立刻 401，而别的枚仍然
     expect(res.statusCode).toBe(400);
     expect(res.json().code).toBe('unknown_session');
     // 🔴 措辞与"不存在""已经撤过"**同一句** —— 撤销第二次不许泄露"它存在过"。
-    expect(res.json().error).toBe('That session is not valid.');
+    expect(res.json().message).toBe('That session is not valid.');
     expect(fake.state.sessions.has(victim.sessionId)).toBe(true);
   });
 
@@ -482,7 +482,7 @@ describe('换绑那四条：错误码到状态码的映射只按封闭词表', (
       payload: { newEmail: 'new@example.test' },
     });
     expect(res.statusCode).toBe(status);
-    expect(res.json()).toEqual({ error: `message for ${code}`, code });
+    expect(res.json()).toEqual({ code, message: `message for ${code}` });
   });
 
   it('冷却那一发带 `Retry-After`（界面那句"{seconds} 秒后可以重新发起"用它，不自己数）', async () => {

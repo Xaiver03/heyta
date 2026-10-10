@@ -78,7 +78,8 @@ export async function activityRoutes(fastify: FastifyInstance): Promise<void> {
         const parsed = NotificationListQuerySchema.safeParse(req.query);
         if (!parsed.success) {
           return reply.status(400).send({
-            error: 'Validation failed',
+            code: 'validation_failed',
+            message: 'Validation failed',
             details: parsed.error.issues,
           });
         }
@@ -88,7 +89,7 @@ export async function activityRoutes(fastify: FastifyInstance): Promise<void> {
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Notification list error: ${errMsg}`);
-        return reply.status(500).send({ error: 'Failed to load notifications.' });
+        return reply.status(500).send({ code: 'failed_to_load_notifications', message: 'Failed to load notifications.' });
       }
     },
   );
@@ -106,7 +107,8 @@ export async function activityRoutes(fastify: FastifyInstance): Promise<void> {
         const parsed = MarkReadSchema.safeParse(req.body);
         if (!parsed.success) {
           return reply.status(400).send({
-            error: 'Validation failed',
+            code: 'validation_failed',
+            message: 'Validation failed',
             details: parsed.error.issues,
           });
         }
@@ -120,7 +122,7 @@ export async function activityRoutes(fastify: FastifyInstance): Promise<void> {
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Notification mark-read error: ${errMsg}`);
-        return reply.status(500).send({ error: 'Failed to update notifications.' });
+        return reply.status(500).send({ code: 'failed_to_update_notifications', message: 'Failed to update notifications.' });
       }
     },
   );
@@ -157,7 +159,7 @@ export async function activityRoutes(fastify: FastifyInstance): Promise<void> {
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Activity list error: ${errMsg}`);
-        return reply.status(500).send({ error: 'Failed to load activities.' });
+        return reply.status(500).send({ code: 'failed_to_load_activities', message: 'Failed to load activities.' });
       }
     },
   );

@@ -383,7 +383,7 @@ describe('闸门顺序：每一步都有两个独立观测量', () => {
     const res = await post(chatBody());
     expect(res.statusCode).toBe(UPGRADE_REQUIRED_STATUS);
     expect(res.json()).toMatchObject({
-      error: MANAGED_AI_ERROR_CODES.ENTITLEMENT_REQUIRED,
+      code: MANAGED_AI_ERROR_CODES.ENTITLEMENT_REQUIRED,
       reason: 'GRANT_NOT_INCLUDED',
     });
     expect(upstream.hits()).toHaveLength(0);
@@ -403,7 +403,7 @@ describe('闸门顺序：每一步都有两个独立观测量', () => {
     const res = await post(chatBody());
     expect(res.statusCode).toBe(CONFLICT_STATUS);
     expect(res.json()).toMatchObject({
-      error: MANAGED_AI_ERROR_CODES.QUOTA_EXCEEDED,
+      code: MANAGED_AI_ERROR_CODES.QUOTA_EXCEEDED,
       reason: 'QUOTA_EXCEEDED',
       detail: { used: TEST_LIMIT, limit: TEST_LIMIT },
     });
@@ -416,7 +416,7 @@ describe('闸门顺序：每一步都有两个独立观测量', () => {
   it('请求体不合法 ⇒ 400，且**不消耗额度**（格式错误不该算一次使用）', async () => {
     const res = await post({ feature: 'capture' });
     expect(res.statusCode).toBe(400);
-    expect(res.json()).toMatchObject({ error: MANAGED_AI_ERROR_CODES.INVALID_BODY });
+    expect(res.json()).toMatchObject({ code: MANAGED_AI_ERROR_CODES.INVALID_BODY });
     expect(upstream.hits()).toHaveLength(0);
     expect(await counterRow()).toBeNull();
   });
@@ -433,7 +433,7 @@ describe('闸门顺序：每一步都有两个独立观测量', () => {
     }));
     expect(res.statusCode).toBe(400);
     expect(res.json()).toMatchObject({
-      error: MANAGED_AI_ERROR_CODES.INVALID_BODY,
+      code: MANAGED_AI_ERROR_CODES.INVALID_BODY,
       reason: 'too_large',
     });
     expect(upstream.hits()).toHaveLength(0);
@@ -458,7 +458,7 @@ describe('境内白名单在服务端强制（不是形容词）', () => {
     const res = await post(chatBody());
     expect(res.statusCode).toBe(CONFLICT_STATUS);
     expect(res.json()).toMatchObject({
-      error: MANAGED_AI_ERROR_CODES.UPSTREAM_NOT_DOMESTIC,
+      code: MANAGED_AI_ERROR_CODES.UPSTREAM_NOT_DOMESTIC,
       reason: 'not-allowlisted',
     });
     expect(upstream.hits()).toHaveLength(0);
@@ -491,7 +491,7 @@ describe('境内白名单在服务端强制（不是形容词）', () => {
     await buildApp({ upstream: undefined });
     const res = await post(chatBody());
     expect(res.statusCode).toBe(503);
-    expect(res.json()).toMatchObject({ error: MANAGED_AI_ERROR_CODES.NOT_CONFIGURED });
+    expect(res.json()).toMatchObject({ code: MANAGED_AI_ERROR_CODES.NOT_CONFIGURED });
     expect(await counterRow()).toBeNull();
   });
 
@@ -591,7 +591,7 @@ describe('不保留内容（ADR-0054 §3）', () => {
     const res = await post(chatBody());
     expect(res.statusCode).toBe(502);
     expect(res.json()).toMatchObject({
-      error: MANAGED_AI_ERROR_CODES.UPSTREAM_FAILED,
+      code: MANAGED_AI_ERROR_CODES.UPSTREAM_FAILED,
       reason: 'upstream_status',
     });
     // 这三行是这条用例的全部意义：上游的响应体里同时有 ECHO 与 PROMPT 两个标记。

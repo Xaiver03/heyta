@@ -519,8 +519,8 @@ export const authorizeAutomationWrite = async (input: {
  * 计量：`AiMeteringDenialReason`）。放宽裁决层的类型才会造成漂移，放宽这里不会。
  */
 const automationRejectionBody = (reason: string, code?: string): Record<string, unknown> => ({
-  error: ENTITLEMENT_ERROR_MESSAGE,
-  errorCode: ENTITLEMENT_ERROR_CODE,
+  code: ENTITLEMENT_ERROR_CODE,
+  message: ENTITLEMENT_ERROR_MESSAGE,
   reason,
   ...(code === undefined ? {} : { ticketCode: code }),
 });

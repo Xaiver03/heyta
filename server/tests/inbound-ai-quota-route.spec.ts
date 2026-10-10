@@ -138,10 +138,10 @@ describe('托管额度耗尽的 HTTP 收口', () => {
     const response = await reserve(`ev-quota-${randomUUID()}`);
     expect(response.statusCode).toBe(402);
     const body = response.json() as Record<string, unknown>;
-    expect(body).toMatchObject({ errorCode: ENTITLEMENT_ERROR_CODE, reason: 'QUOTA_EXCEEDED', used: 1 });
+    expect(body).toMatchObject({ code: ENTITLEMENT_ERROR_CODE, reason: 'QUOTA_EXCEEDED', used: 1 });
     // `limit` 从唯一数字源推，不抄 300：抄了的那条在别人改价时仍然绿。
     expect(body.limit).toBe(MANAGED_AI_REQUESTS_PER_PERIOD);
-    expect(typeof body.error).toBe('string');
+    expect(typeof body.message).toBe('string');
     // 🔴 拒掉的这一次**没有业务效果**：授权之后那句 INSERT 不该发生。
     expect(mocks.txExecute).not.toHaveBeenCalled();
     // 审计里那条 DENIED 带着这一路的 reason 与能力，否则运营者查不到是谁被额度挡住。

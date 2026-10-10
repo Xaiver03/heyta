@@ -61,7 +61,7 @@ const sendEmailChangeError = (
   if (err.retryAfterSeconds !== undefined) {
     void reply.header('Retry-After', String(err.retryAfterSeconds));
   }
-  return reply.status(status).send({ error: err.message, code: err.code });
+  return reply.status(status).send({ code: err.code, message: err.message });
 };
 
 export async function accountSecurityRoutes(fastify: FastifyInstance): Promise<void> {
@@ -76,7 +76,7 @@ export async function accountSecurityRoutes(fastify: FastifyInstance): Promise<v
     async (req, reply) => {
       const parsed = EmailChangeRequestSchema.safeParse(req.body);
       if (!parsed.success) {
-        return reply.status(400).send({ error: 'Validation failed', details: parsed.error.issues });
+        return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed', details: parsed.error.issues });
       }
       const userId = getAuthUser(req).userId;
       try {
@@ -116,7 +116,7 @@ export async function accountSecurityRoutes(fastify: FastifyInstance): Promise<v
         // 对点链接的人来说处置完全一样（回界面重新发起一次）。分开报就是给枚举留门。
         return reply
           .status(400)
-          .send({ error: 'That link is not valid. Start the change again from the app.', code: 'invalid_change_link' });
+          .send({ code: 'invalid_change_link', message: 'That link is not valid. Start the change again from the app.' });
       }
       try {
         return reply.send(
@@ -174,7 +174,7 @@ export async function accountSecurityRoutes(fastify: FastifyInstance): Promise<v
       if (!parsed.success) {
         return reply
           .status(400)
-          .send({ error: 'That session is not valid.', code: 'unknown_session' });
+          .send({ code: 'unknown_session', message: 'That session is not valid.' });
       }
       const user = getAuthUser(req);
       const revoked = await revokeSession(user.userId, parsed.data.sessionId);
@@ -185,7 +185,7 @@ export async function accountSecurityRoutes(fastify: FastifyInstance): Promise<v
         // 🔴 与"不存在""不是你的""已经撤过"同一句、同一个码。
         return reply
           .status(400)
-          .send({ error: 'That session is not valid.', code: 'unknown_session' });
+          .send({ code: 'unknown_session', message: 'That session is not valid.' });
       }
       // 实时通道由 `revokeSession` 在那一行真删掉时关掉**那一枚自己的**连接
       // （`closeForSession(userId, sessionId)`），这里不重复做、也**不该**做 `closeForUser` ——

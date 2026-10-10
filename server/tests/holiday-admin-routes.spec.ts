@@ -191,7 +191,7 @@ describe('🔴 判据③：非法录入 ⇒ 400 且**没写库**', () => {
   it('400 的响应体带**逐字段原因**（运营要能知道是哪一天错，不是"Invalid input"）', async () => {
     const res = await put({ ...YEAR_2027, days: [{ day: '2027-02-30', isOffDay: true }] });
     const body = res.json() as { error: string; issues: { path: string; message: string }[] };
-    expect(body.error).toBe('Invalid holiday adjustment year.');
+    expect(body.message).toBe('Invalid holiday adjustment year.');
     expect(body.issues.length).toBeGreaterThan(0);
     // `path` 指到 `days.0.day` —— 没有它，运营面对的是"有一处错了"。
     expect(body.issues[0]!.path).toBe('days.0.day');

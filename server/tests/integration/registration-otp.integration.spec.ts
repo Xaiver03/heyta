@@ -104,12 +104,12 @@ describeWithDb('registration OTP races (PostgreSQL)', () => {
       payload: { email: 'not-an-email', password: '' },
     });
     expect(malformed.statusCode).toBe(400);
-    expect(malformed.json()).toMatchObject({ error: 'Validation failed' });
+    expect(malformed.json()).toMatchObject({ code: 'validation_failed', message: 'Validation failed' });
 
     const email = `${EMAIL_PREFIX}-terms@example.test`;
     const missingTerms = await requestWithTerms(email, password('terms-missing'));
     expect(missingTerms.statusCode).toBe(400);
-    expect(missingTerms.json()).toMatchObject({ error: 'Validation failed' });
+    expect(missingTerms.json()).toMatchObject({ code: 'validation_failed', message: 'Validation failed' });
 
     const rejectedTerms = await requestWithTerms(email, password('terms-false'), false);
     expect(rejectedTerms.statusCode).toBe(400);

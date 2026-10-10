@@ -191,7 +191,7 @@ export const registerWebApp = async (
       // SPA 兜底：前缀内的未知路径回 index.html（应用自己按 hash/路由再分）。
       scope.setNotFoundHandler(async (request, reply) => {
         if (request.method !== 'GET' || !request.url.startsWith(mount.prefix)) {
-          return reply.code(404).send({ error: 'Not Found' });
+          return reply.code(404).send({ code: 'not_found', message: 'Not Found' });
         }
         // 缓存口径由上面那个 onSend 统一管（HTML 一律 no-cache），这里不再设第二遍。
         return reply.sendFile('index.html');

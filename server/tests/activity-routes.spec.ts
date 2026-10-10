@@ -136,7 +136,7 @@ describe('GET /api/notifications', () => {
       headers: AUTH,
     });
     expect(res.statusCode).toBe(400);
-    expect(res.json()).toMatchObject({ error: 'Validation failed' });
+    expect(res.json()).toMatchObject({ code: 'validation_failed', message: 'Validation failed' });
   });
 
   it('limit=0 → 400', async () => {

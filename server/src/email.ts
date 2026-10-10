@@ -187,6 +187,37 @@ export const sendEmailPasswordRegistrationCodeEmail = async (
   });
 };
 
+/**
+ * 邮箱验证码**登录**的那封（2026-10-10）。形状与注册码那封同族：
+ * 码只出现在正文，绝不进链接、绝不进日志。
+ */
+export const sendLoginCodeEmail = async (
+  to: string,
+  code: string,
+  locale: ServerLocale = DEFAULT_SERVER_LOCALE,
+): Promise<boolean> => {
+  const config = loadConfigFromEnv();
+  const codeSeparator = locale === 'zh-CN' ? '：' : ': ';
+  const body = `${t(locale, 'server.email.loginCode.body')}\n\n${t(
+    locale,
+    'server.email.loginCode.codeLabel',
+  )}${codeSeparator}${code}`;
+
+  return deliver({
+    to,
+    locale,
+    subjectKey: 'server.email.loginCode.subject',
+    logLabel: 'Email login code',
+    content: {
+      heading: t(locale, 'server.email.loginCode.title'),
+      body,
+      buttonLabel: t(locale, 'server.email.login.button'),
+      url: `${config.publicUrl}/app/`,
+      note: `${t(locale, 'server.email.loginCode.expiry')}\n${t(locale, 'server.email.loginCode.ignore')}`,
+    },
+  });
+};
+
 export const sendPasskeyRecoveryEmail = async (
   to: string,
   token: string,

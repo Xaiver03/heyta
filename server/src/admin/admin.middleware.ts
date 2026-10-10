@@ -50,6 +50,6 @@ export const requireAdmin = async (
   // 🔴 用户不存在与"不是管理员"返回**同一个**响应：不告诉调用方
   // "这个账号存在但没权限"。
   if (user === null || !user.isAdmin) {
-    return reply.code(403).send({ error: 'Admin access required.' });
+    return reply.code(403).send({ code: 'admin_access_required', message: 'Admin access required.' });
   }
 };

@@ -71,7 +71,7 @@ export async function accountProfileRoutes(fastify: FastifyInstance): Promise<vo
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Account profile read error: ${errMsg}`);
-        return reply.status(500).send({ error: 'Failed to load profile.' });
+        return reply.status(500).send({ code: 'failed_to_load_profile', message: 'Failed to load profile.' });
       }
     },
   );
@@ -91,7 +91,8 @@ export async function accountProfileRoutes(fastify: FastifyInstance): Promise<vo
         const parsed = accountProfileUpdateSchema.safeParse(req.body);
         if (!parsed.success) {
           return reply.status(400).send({
-            error: 'Validation failed',
+            code: 'validation_failed',
+            message: 'Validation failed',
             details: parsed.error.issues,
           });
         }
@@ -105,7 +106,7 @@ export async function accountProfileRoutes(fastify: FastifyInstance): Promise<vo
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Account profile update error: ${errMsg}`);
-        return reply.status(500).send({ error: 'Failed to update profile.' });
+        return reply.status(500).send({ code: 'failed_to_update_profile', message: 'Failed to update profile.' });
       }
     },
   );
@@ -135,7 +136,8 @@ export async function accountProfileRoutes(fastify: FastifyInstance): Promise<vo
         const parsed = accountAvatarUpdateSchema.safeParse(req.body);
         if (!parsed.success) {
           return reply.status(400).send({
-            error: 'Validation failed',
+            code: 'validation_failed',
+            message: 'Validation failed',
             details: parsed.error.issues,
           });
         }
@@ -144,8 +146,8 @@ export async function accountProfileRoutes(fastify: FastifyInstance): Promise<vo
         // 🔴 与同步通道**同一道**闸门：只收密文形状。
         if (!isEncryptedPayloadTransportShape(cipherBase64)) {
           return reply.status(400).send({
-            error: 'Avatar payload must be an encrypted blob',
             code: 'payload-not-encrypted',
+            message: 'Avatar payload must be an encrypted blob',
           });
         }
 
@@ -169,7 +171,7 @@ export async function accountProfileRoutes(fastify: FastifyInstance): Promise<vo
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Avatar upload error: ${errMsg}`);
-        return reply.status(500).send({ error: 'Failed to store avatar.' });
+        return reply.status(500).send({ code: 'failed_to_store_avatar', message: 'Failed to store avatar.' });
       }
     },
   );
@@ -196,7 +198,7 @@ export async function accountProfileRoutes(fastify: FastifyInstance): Promise<vo
           select: { cipher: true, hash: true },
         });
         if (row === null) {
-          return reply.status(404).send({ error: 'No avatar.', code: 'avatar-absent' });
+          return reply.status(404).send({ code: 'avatar-absent', message: 'No avatar.' });
         }
         return reply.send({
           cipherBase64: Buffer.from(row.cipher).toString('base64'),
@@ -205,7 +207,7 @@ export async function accountProfileRoutes(fastify: FastifyInstance): Promise<vo
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Avatar read error: ${errMsg}`);
-        return reply.status(500).send({ error: 'Failed to load avatar.' });
+        return reply.status(500).send({ code: 'failed_to_load_avatar', message: 'Failed to load avatar.' });
       }
     },
   );
@@ -231,7 +233,7 @@ export async function accountProfileRoutes(fastify: FastifyInstance): Promise<vo
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Avatar delete error: ${errMsg}`);
-        return reply.status(500).send({ error: 'Failed to remove avatar.' });
+        return reply.status(500).send({ code: 'failed_to_remove_avatar', message: 'Failed to remove avatar.' });
       }
     },
   );

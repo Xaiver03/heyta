@@ -67,8 +67,8 @@ export const sendE2eeRequiredReply = (
     opsCount: context.opsCount,
   });
   return reply.status(400).send({
-    error: E2EE_REQUIRED_CLIENT_MESSAGE,
-    errorCode: SYNC_ERROR_CODES.E2EE_REQUIRED,
+    code: SYNC_ERROR_CODES.E2EE_REQUIRED,
+    message: E2EE_REQUIRED_CLIENT_MESSAGE,
   });
 };
 
@@ -78,11 +78,11 @@ export const sendE2eeRequiredReply = (
  */
 export const createValidationErrorResponse = (
   zodIssues: ZodIssue[],
-): { error: string; details?: ZodIssue[] } => {
+): { code: string; message: string; details?: ZodIssue[] } => {
   if (process.env.NODE_ENV === 'production') {
-    return { error: 'Validation failed' };
+    return { code: 'validation_failed', message: 'Validation failed' };
   }
-  return { error: 'Validation failed', details: zodIssues };
+  return { code: 'validation_failed', message: 'Validation failed', details: zodIssues };
 };
 
 // Two-stage protection against zip bombs:
@@ -245,5 +245,5 @@ export const sendCompressedBodyParseFailure = (
     );
   }
 
-  return reply.status(failure.statusCode).send({ error: failure.error });
+  return reply.status(failure.statusCode).send({ code: 'compressed_payload_rejected', message: failure.error });
 };

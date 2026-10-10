@@ -73,6 +73,14 @@ import {
   registrationOtpErrorResponse,
   RegistrationOtpError,
 } from './password/registration-otp';
+import {
+  requestLoginCode,
+  resendLoginCode,
+  verifyLoginCode,
+  LoginOtpError,
+  type LoginOtpErrorCode,
+  type EmailLoginChallengeResponse,
+} from './password/login-otp';
 import { AutomationWriteAuthorizationError, createEntitlementGuard, readAutomationEntitlementTicketHeader, replyAutomationMeteringRejection, replyAutomationRejection, resolveAutomationEntitlementMode } from './entitlement';
 import { issueAutomationCommitPermit, readInboundUploadIdentity, registerAutomationWorker, revokeAutomationWorker } from './automation/worker-identity';
 import { createAutomationRule, deleteAutomationRule, listAutomationRules, setAutomationRuleEnabled, updateAutomationRuleConfig } from './automation/rules';
@@ -258,6 +266,31 @@ const RegistrationChallengeVerifySchema = z.object({
 });
 const RegistrationChallengeResendSchema = z.object({
   challengeId: z.string().min(1, 'Challenge is required'),
+});
+
+// 邮箱验证码登录（2026-10-10）：与注册挑战同族的三条线协议。
+const LoginCodeRequestSchema = z.object({
+  email: z.string().email('Invalid email format'),
+});
+const LoginCodeVerifySchema = z.object({
+  challengeId: z.string().min(1, 'Challenge is required'),
+  code: z
+    .string()
+    .regex(/^\d{6}$/, 'Login code is required'),
+});
+const LoginCodeResendSchema = z.object({
+  challengeId: z.string().min(1, 'Challenge is required'),
+});
+
+/** 登录码挑战流的错误 → 统一信封（码词表与注册那条分开，形状同族）。 */
+const loginOtpErrorResponse = (error: LoginOtpError): {
+  status: number;
+  retryAfterSeconds?: number;
+  body: { code: LoginOtpErrorCode; message: string };
+} => ({
+  status: error.code === 'login_code_rate_limited' ? 429 : 400,
+  ...(error.retryAfterSeconds === undefined ? {} : { retryAfterSeconds: error.retryAfterSeconds }),
+  body: { code: error.code, message: error.message },
 });
 
 const EmailPasswordLoginSchema = z.object({
@@ -501,8 +534,8 @@ const getSafeErrorMessage = (err: unknown, fallback: string): string => {
 export interface PasswordAuthResponse {
   status: number;
   body: {
-    error: string;
     code: PasswordAuthErrorCode;
+    message: string;
     policyCode?: PasswordPolicyCode;
   };
   /** 只在需要 `Retry-After` 的两种失败上出现。 */
@@ -543,18 +576,18 @@ export const passwordAuthResponseOf = (pwErr: PasswordAuthError): PasswordAuthRe
       return {
         status: 429,
         retryAfterSeconds: pwErr.retryAfterSeconds ?? Math.ceil(LOGIN_LOCKOUT_MS / 1000),
-        body: { error: PASSWORD_ACCOUNT_LOCKED_MESSAGE, code: pwErr.code },
+        body: { code: pwErr.code, message: PASSWORD_ACCOUNT_LOCKED_MESSAGE },
       };
     case 'password_backend_busy':
       return {
         status: 503,
         retryAfterSeconds: pwErr.retryAfterSeconds ?? PASSWORD_BACKEND_RETRY_AFTER_SECONDS,
-        body: { error: PASSWORD_BACKEND_BUSY_MESSAGE, code: pwErr.code },
+        body: { code: pwErr.code, message: PASSWORD_BACKEND_BUSY_MESSAGE },
       };
     case 'email_not_verified':
       return {
         status: 403,
-        body: { error: PASSWORD_EMAIL_NOT_VERIFIED_MESSAGE, code: pwErr.code },
+        body: { code: pwErr.code, message: PASSWORD_EMAIL_NOT_VERIFIED_MESSAGE },
       };
     case 'invalid_reset_link':
       // 400，不用 401/403：这不是"你没证明你是谁"，是"这个链接本身不成"。
@@ -562,7 +595,7 @@ export const passwordAuthResponseOf = (pwErr: PasswordAuthError): PasswordAuthRe
       // 报 403 是在说"你的账号不许做这件事" —— 也不对。
       return {
         status: 400,
-        body: { error: PASSWORD_INVALID_RESET_LINK_MESSAGE, code: pwErr.code },
+        body: { code: pwErr.code, message: PASSWORD_INVALID_RESET_LINK_MESSAGE },
       };
     case 'no_password_set':
       // 与 `invalid_reset_link` 同为 400（都是"这条路走不通"），但**句子与 code 不同** ——
@@ -572,14 +605,14 @@ export const passwordAuthResponseOf = (pwErr: PasswordAuthError): PasswordAuthRe
       // `requestPasswordReset` 对没有口令认证器的账号根本不发信。
       return {
         status: 400,
-        body: { error: PASSWORD_NOT_SET_MESSAGE, code: pwErr.code },
+        body: { code: pwErr.code, message: PASSWORD_NOT_SET_MESSAGE },
       };
     case 'password_already_set':
       // 同为 400：也是"这条路走不通"，但方向相反 —— 该走 `change`。
       // 不给 403 是因为它读的像"你的账号不许做这件事"，而真相是"这个账号已经有口令"。
       return {
         status: 400,
-        body: { error: PASSWORD_ALREADY_SET_MESSAGE, code: pwErr.code },
+        body: { code: pwErr.code, message: PASSWORD_ALREADY_SET_MESSAGE },
       };
     case 'password_policy_violation':
       return {
@@ -587,15 +620,15 @@ export const passwordAuthResponseOf = (pwErr: PasswordAuthError): PasswordAuthRe
         // 具体是哪条规则（太短 / 太常见 / 已泄露）由客户端按 `policyCode` 取词条 ——
         // 设口令时只说"口令不符合要求"而不给动作，等于没说。
         body: {
-          error: PASSWORD_POLICY_MESSAGE,
           code: pwErr.code,
+          message: PASSWORD_POLICY_MESSAGE,
           policyCode: pwErr.policyCode,
         },
       };
     case 'invalid_credentials':
       return {
         status: 401,
-        body: { error: PASSWORD_INVALID_CREDENTIALS_MESSAGE, code: pwErr.code },
+        body: { code: pwErr.code, message: PASSWORD_INVALID_CREDENTIALS_MESSAGE },
       };
   }
 };
@@ -633,7 +666,7 @@ export const apiRoutes = async (
     { preHandler: authenticate },
     async (req, reply) => {
       const parsed = AutomationEntitlementTicketSchema.safeParse(req.body);
-      if (!parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      if (!parsed.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       try {
         // `session` 是唯一能建立/续期短期绑定的动作，也就是公网接收那一格
         // "至多 30 秒已签发窗口"的来源；其它动作的票据只放行它自己那一次操作。
@@ -652,7 +685,7 @@ export const apiRoutes = async (
         // 只回稳定码；票据正文、官方主体与本地账号 UUID 都不出这道门。
         const code = error instanceof AutomationEntitlementError ? error.code : 'AUTOMATION_TICKET_INVALID';
         Logger.audit({ event: 'AUTOMATION_ENTITLEMENT_DENIED', userId: getAuthUser(req).userId, errorCode: code, capability: 'automation' });
-        return reply.status(403).send({ error: 'Automation entitlement verification failed', errorCode: code });
+        return reply.status(403).send({ code: code, message: 'Automation entitlement verification failed' });
       }
     },
   );
@@ -681,7 +714,7 @@ export const apiRoutes = async (
     { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation' })] },
     async (req, reply) => {
       const ready = automationIssuerSide();
-      if ('code' in ready) return reply.status(403).send({ error: 'Automation entitlement issuance unavailable', errorCode: ready.code });
+      if ('code' in ready) return reply.status(403).send({ code: ready.code, message: 'Automation entitlement issuance unavailable' });
       const { userId } = getAuthUser(req);
       const row = await prisma.$transaction((tx) => ensureAutomationEntitlementSubject(tx, userId));
       return reply.header('Cache-Control', 'no-store').send({ subject: row.subject });
@@ -694,9 +727,9 @@ export const apiRoutes = async (
     { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation' })] },
     async (req, reply) => {
       const parsed = AutomationInstallationSchema.safeParse(req.body);
-      if (!parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      if (!parsed.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       const ready = automationIssuerSide();
-      if ('code' in ready) return reply.status(403).send({ error: 'Automation entitlement issuance unavailable', errorCode: ready.code });
+      if ('code' in ready) return reply.status(403).send({ code: ready.code, message: 'Automation entitlement issuance unavailable' });
       try {
         const issued = await prisma.$transaction((tx) => issueAutomationEntitlementActivation({
           client: tx, userId: getAuthUser(req).userId, installationId: parsed.data.installationId,
@@ -705,7 +738,7 @@ export const apiRoutes = async (
       } catch (error) {
         const code = error instanceof AutomationIssuerError ? error.code : AUTOMATION_ISSUER_DENIALS.ACTIVATION_INVALID;
         Logger.audit({ event: 'AUTOMATION_ENTITLEMENT_DENIED', userId: getAuthUser(req).userId, errorCode: code, capability: 'automation' });
-        return reply.status(403).send({ error: 'Automation entitlement issuance rejected', errorCode: code });
+        return reply.status(403).send({ code: code, message: 'Automation entitlement issuance rejected' });
       }
     },
   );
@@ -716,9 +749,9 @@ export const apiRoutes = async (
     { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation' })] },
     async (req, reply) => {
       const parsed = AutomationActivationRedeemSchema.safeParse(req.body);
-      if (!parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      if (!parsed.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       const ready = automationIssuerSide();
-      if ('code' in ready) return reply.status(403).send({ error: 'Automation entitlement issuance unavailable', errorCode: ready.code });
+      if ('code' in ready) return reply.status(403).send({ code: ready.code, message: 'Automation entitlement issuance unavailable' });
       try {
         const link = await prisma.$transaction((tx) => redeemAutomationEntitlementActivation({
           client: tx, userId: getAuthUser(req).userId, code: parsed.data.code,
@@ -728,7 +761,7 @@ export const apiRoutes = async (
       } catch (error) {
         const code = error instanceof AutomationIssuerError ? error.code : AUTOMATION_ISSUER_DENIALS.ACTIVATION_INVALID;
         Logger.audit({ event: 'AUTOMATION_ENTITLEMENT_DENIED', userId: getAuthUser(req).userId, errorCode: code, capability: 'automation' });
-        return reply.status(403).send({ error: 'Automation entitlement binding rejected', errorCode: code });
+        return reply.status(403).send({ code: code, message: 'Automation entitlement binding rejected' });
       }
     },
   );
@@ -738,9 +771,9 @@ export const apiRoutes = async (
     { preHandler: authenticate },
     async (req, reply) => {
       const parsed = AutomationInstallationSchema.safeParse(req.body);
-      if (!parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      if (!parsed.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       const ready = automationIssuerSide();
-      if ('code' in ready) return reply.status(403).send({ error: 'Automation entitlement issuance unavailable', errorCode: ready.code });
+      if ('code' in ready) return reply.status(403).send({ code: ready.code, message: 'Automation entitlement issuance unavailable' });
       const revoked = await revokeAutomationEntitlementLink({
         client: prisma, userId: getAuthUser(req).userId, installationId: parsed.data.installationId,
       });
@@ -755,9 +788,9 @@ export const apiRoutes = async (
     { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation' })] },
     async (req, reply) => {
       const parsed = AutomationInstallationSchema.safeParse(req.body);
-      if (!parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      if (!parsed.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       const ready = automationIssuerSide();
-      if ('code' in ready) return reply.status(403).send({ error: 'Automation entitlement issuance unavailable', errorCode: ready.code });
+      if ('code' in ready) return reply.status(403).send({ code: ready.code, message: 'Automation entitlement issuance unavailable' });
       try {
         const floor = await readAutomationRevocationFloor(prisma);
         const signed = await prisma.$transaction((tx) => signAutomationEntitlementSessionTicket({
@@ -768,7 +801,7 @@ export const apiRoutes = async (
       } catch (error) {
         const code = error instanceof AutomationIssuerError ? error.code : AUTOMATION_ISSUER_DENIALS.LINK_NOT_BOUND;
         Logger.audit({ event: 'AUTOMATION_ENTITLEMENT_DENIED', userId: getAuthUser(req).userId, errorCode: code, capability: 'automation' });
-        return reply.status(403).send({ error: 'Automation entitlement issuance rejected', errorCode: code });
+        return reply.status(403).send({ code: code, message: 'Automation entitlement issuance rejected' });
       }
     },
   );
@@ -785,9 +818,9 @@ export const apiRoutes = async (
     { preHandler: [authenticate], config: { rateLimit: { max: 60, timeWindow: '1 minute' } } },
     async (req, reply) => {
       const parsed = AutomationActionTicketSchema.safeParse(req.body);
-      if (!parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      if (!parsed.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       const ready = automationIssuerSide();
-      if ('code' in ready) return reply.status(403).send({ error: 'Automation entitlement issuance unavailable', errorCode: ready.code });
+      if ('code' in ready) return reply.status(403).send({ code: ready.code, message: 'Automation entitlement issuance unavailable' });
       try {
         const floor = await readAutomationRevocationFloor(prisma);
         const data = parsed.data;
@@ -801,7 +834,7 @@ export const apiRoutes = async (
       } catch (error) {
         const code = error instanceof AutomationIssuerError ? error.code : AUTOMATION_ISSUER_DENIALS.LINK_NOT_BOUND;
         Logger.audit({ event: 'AUTOMATION_ENTITLEMENT_DENIED', userId: getAuthUser(req).userId, errorCode: code, capability: 'automation' });
-        return reply.status(403).send({ error: 'Automation entitlement issuance rejected', errorCode: code });
+        return reply.status(403).send({ code: code, message: 'Automation entitlement issuance rejected' });
       }
     },
   );
@@ -810,7 +843,7 @@ export const apiRoutes = async (
   // 公开可读：它讲的是"哪些票据已经作废"，不含任何账号信息，且必须**验签**才作数。
   fastify.get('/automation/entitlement/revocations', async (_req, reply) => {
     const ready = automationIssuerSide();
-    if ('code' in ready) return reply.status(403).send({ error: 'Automation entitlement issuance unavailable', errorCode: ready.code });
+    if ('code' in ready) return reply.status(403).send({ code: ready.code, message: 'Automation entitlement issuance unavailable' });
     const manifest = signAutomationRevocationManifest({ issuer: ready.issuer, revocationVersion: await readAutomationRevocationFloor(prisma) });
     return reply.header('Cache-Control', 'no-store').send({ manifest });
   });
@@ -820,16 +853,16 @@ export const apiRoutes = async (
     { preHandler: [authenticate, requireAdmin] },
     async (req, reply) => {
       const parsed = AutomationRevocationBumpSchema.safeParse(req.body);
-      if (!parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      if (!parsed.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       const ready = automationIssuerSide();
-      if ('code' in ready) return reply.status(403).send({ error: 'Automation entitlement issuance unavailable', errorCode: ready.code });
+      if ('code' in ready) return reply.status(403).send({ code: ready.code, message: 'Automation entitlement issuance unavailable' });
       try {
         const version = await bumpAutomationRevocationFloor({ client: prisma, revocationVersion: parsed.data.revocationVersion });
         Logger.audit({ event: 'AUTOMATION_ENTITLEMENT_REVOKED', userId: getAuthUser(req).userId, revocationVersion: version, capability: 'automation' });
         return reply.header('Cache-Control', 'no-store').send({ revocationVersion: version });
       } catch (error) {
         const code = error instanceof AutomationIssuerError ? error.code : AUTOMATION_ISSUER_DENIALS.REVOCATION_NOT_INCREASING;
-        return reply.status(403).send({ error: 'Automation revocation update rejected', errorCode: code });
+        return reply.status(403).send({ code: code, message: 'Automation revocation update rejected' });
       }
     },
   );
@@ -841,14 +874,14 @@ export const apiRoutes = async (
     { preHandler: authenticate },
     async (req, reply) => {
       const parsed = AutomationRevocationManifestBodySchema.safeParse(req.body);
-      if (!parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      if (!parsed.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       try {
         const applied = await applyAutomationRevocationManifest({ client: prisma, manifest: parsed.data.manifest });
         return reply.header('Cache-Control', 'no-store').send({ revocationVersion: applied.revocationVersion, refreshed: applied.refreshed });
       } catch (error) {
         const code = error instanceof AutomationIssuerError ? error.code : AUTOMATION_ISSUER_DENIALS.MANIFEST_INVALID;
         Logger.audit({ event: 'AUTOMATION_ENTITLEMENT_DENIED', userId: getAuthUser(req).userId, errorCode: code, capability: 'automation' });
-        return reply.status(403).send({ error: 'Automation revocation manifest rejected', errorCode: code });
+        return reply.status(403).send({ code: code, message: 'Automation revocation manifest rejected' });
       }
     },
   );
@@ -860,7 +893,7 @@ export const apiRoutes = async (
     { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation', action: 'worker-register', precheckOnly: true })] },
     async (req, reply) => {
       const parsed = AutomationWorkerRegisterSchema.safeParse(req.body);
-      if (!parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      if (!parsed.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       try {
         const user = getAuthUser(req);
         return reply.status(201).send(await registerAutomationWorker(
@@ -869,7 +902,7 @@ export const apiRoutes = async (
       } catch (error) {
         if (error instanceof AutomationWriteAuthorizationError) return replyAutomationRejection(req, reply, error.decision, 'automation');
         Logger.warn(`Automation worker registration rejected: ${error instanceof Error ? error.message : 'unknown'}`);
-        return reply.status(400).send({ error: 'Automation worker registration failed' });
+        return reply.status(400).send({ code: 'automation_worker_registration_failed', message: 'Automation worker registration failed' });
       }
     },
   );
@@ -879,7 +912,7 @@ export const apiRoutes = async (
     { preHandler: authenticate },
     async (req, reply) => {
       const parsed = AutomationWorkerRevokeSchema.safeParse(req.body);
-      if (!parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      if (!parsed.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       const revoked = await revokeAutomationWorker(getAuthUser(req).userId, parsed.data.workerId);
       return reply.send({ revoked });
     },
@@ -892,17 +925,17 @@ export const apiRoutes = async (
     { preHandler: authenticate },
     async (req, reply) => {
       const parsed = AutomationCommitPermitSchema.safeParse(req.body);
-      if (!parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      if (!parsed.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       const user = getAuthUser(req);
       const identity = readInboundUploadIdentity(req.raw.rawHeaders, user.tokenVersion);
-      if (!identity) return reply.status(403).send({ error: 'Automation worker authorization required' });
+      if (!identity) return reply.status(403).send({ code: 'automation_worker_authorization_required', message: 'Automation worker authorization required' });
       const workerToken = req.raw.rawHeaders.find((_value, index, headers) => index % 2 === 0 && headers[index].toLowerCase() === 'x-heyta-worker-token')
         ? req.raw.rawHeaders[req.raw.rawHeaders.findIndex((_value, index, headers) => index % 2 === 0 && headers[index].toLowerCase() === 'x-heyta-worker-token') + 1]
         : undefined;
-      if (workerToken === undefined) return reply.status(403).send({ error: 'Automation worker authorization required' });
+      if (workerToken === undefined) return reply.status(403).send({ code: 'automation_worker_authorization_required', message: 'Automation worker authorization required' });
       try {
         const data = parsed.data;
-        if (data.opId !== `inbound:${data.eventId}`) return reply.status(400).send({ error: 'Validation failed' });
+        if (data.opId !== `inbound:${data.eventId}`) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
         const ticket = readAutomationEntitlementTicketHeader(req.raw.rawHeaders);
         return reply.status(201).send(await issueAutomationCommitPermit({
           userId: user.userId, tokenVersion: user.tokenVersion ?? -1, clientId: data.clientId,
@@ -913,7 +946,7 @@ export const apiRoutes = async (
         }));
       } catch (error) {
         Logger.warn(`Automation permit rejected: ${error instanceof Error ? error.message : 'unknown'}`);
-        return reply.status(403).send({ error: 'Automation commit authorization failed' });
+        return reply.status(403).send({ code: 'automation_commit_authorization_failed', message: 'Automation commit authorization failed' });
       }
     },
   );
@@ -927,12 +960,12 @@ export const apiRoutes = async (
     { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation' })] },
     async (req, reply) => {
       const parsed = AutomationRuleCreateSchema.safeParse(req.body);
-      if (!parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      if (!parsed.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       try {
         const { keyId, ...config } = parsed.data;
         return reply.status(201).send(await createAutomationRule(getAuthUser(req).userId, keyId, config));
       }
-      catch { return reply.status(400).send({ error: 'Automation rule creation failed' }); }
+      catch { return reply.status(400).send({ code: 'automation_rule_creation_failed', message: 'Automation rule creation failed' }); }
     },
   );
 
@@ -942,9 +975,9 @@ export const apiRoutes = async (
     async (req, reply) => {
       const params = AutomationRuleParamsSchema.safeParse(req.params);
       const body = AutomationRuleConfigUpdateSchema.safeParse(req.body);
-      if (!params.success || !body.success) return reply.status(400).send({ error: 'Validation failed' });
+      if (!params.success || !body.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       try { return reply.send(await updateAutomationRuleConfig(getAuthUser(req).userId, params.data.ruleId, body.data)); }
-      catch { return reply.status(404).send({ error: 'Automation rule not found' }); }
+      catch { return reply.status(404).send({ code: 'automation_rule_not_found', message: 'Automation rule not found' }); }
     },
   );
 
@@ -958,11 +991,11 @@ export const apiRoutes = async (
     async (req, reply) => {
       const params = AutomationRuleParamsSchema.safeParse(req.params);
       const body = AutomationRuleEnabledSchema.safeParse(req.body);
-      if (!params.success || !body.success) return reply.status(400).send({ error: 'Validation failed' });
+      if (!params.success || !body.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       try { return reply.send(await setAutomationRuleEnabled(getAuthUser(req).userId, params.data.ruleId, body.data.enabled, automationTicket(req))); }
       catch (error) {
         if (error instanceof AutomationWriteAuthorizationError) return replyAutomationRejection(req, reply, error.decision, 'automation');
-        return reply.status(404).send({ error: 'Automation rule not found' });
+        return reply.status(404).send({ code: 'automation_rule_not_found', message: 'Automation rule not found' });
       }
     },
   );
@@ -972,9 +1005,9 @@ export const apiRoutes = async (
     { preHandler: authenticate },
     async (req, reply) => {
       const params = AutomationRuleParamsSchema.safeParse(req.params);
-      if (!params.success) return reply.status(400).send({ error: 'Validation failed' });
+      if (!params.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       try { return reply.send(await deleteAutomationRule(getAuthUser(req).userId, params.data.ruleId)); }
-      catch { return reply.status(404).send({ error: 'Automation rule not found' }); }
+      catch { return reply.status(404).send({ code: 'automation_rule_not_found', message: 'Automation rule not found' }); }
     },
   );
 
@@ -987,25 +1020,25 @@ export const apiRoutes = async (
       scope: (req) => ({ ruleId: String((req.params as { ruleId?: unknown }).ruleId ?? '') }) })]},
     async (req, reply) => {
       const params = AutomationRuleParamsSchema.safeParse(req.params); const body = AutomationSenderCredentialSchema.safeParse(req.body);
-      if (!params.success || !body.success) return reply.status(400).send({ error: 'Validation failed' });
+      if (!params.success || !body.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       try { return reply.status(201).send(await issueSenderCredential(getAuthUser(req).userId, params.data.ruleId, body.data.keyId, automationTicket(req))); }
       catch (error) {
         if (error instanceof AutomationWriteAuthorizationError) return replyAutomationRejection(req, reply, error.decision, 'automation');
-        return reply.status(409).send({ error: 'Sender credential could not be issued' });
+        return reply.status(409).send({ code: 'sender_credential_could_not_be_issued', message: 'Sender credential could not be issued' });
       }
     },
   );
   fastify.get<{ Params: unknown }>(
     '/automation/rules/:ruleId/sender-credentials', { preHandler: authenticate }, async (req, reply) => {
       const params = AutomationRuleParamsSchema.safeParse(req.params);
-      if (!params.success) return reply.status(400).send({ error: 'Validation failed' });
+      if (!params.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       try { return reply.send({ credentials: await listSenderCredentials(getAuthUser(req).userId, params.data.ruleId) }); }
-      catch { return reply.status(404).send({ error: 'Sender credentials not found' }); }
+      catch { return reply.status(404).send({ code: 'sender_credentials_not_found', message: 'Sender credentials not found' }); }
     },
   );
   fastify.post<{ Body: z.infer<typeof AutomationSenderRevokeSchema> }>(
     '/automation/sender-credentials/revoke', { preHandler: authenticate }, async (req, reply) => {
-      const body = AutomationSenderRevokeSchema.safeParse(req.body); if (!body.success) return reply.status(400).send({ error: 'Validation failed' });
+      const body = AutomationSenderRevokeSchema.safeParse(req.body); if (!body.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       return reply.send({ revoked: await revokeSenderCredential(getAuthUser(req).userId, body.data.credentialId) });
     },
   );
@@ -1017,11 +1050,11 @@ export const apiRoutes = async (
     { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation' })] },
     async (req, reply) => {
       const parsed = AutomationRecipientKeySchema.safeParse(req.body);
-      if (!parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      if (!parsed.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       const userId = getAuthUser(req).userId;
       const data = parsed.data;
       const bytes = Buffer.from(data.publicKey.replace(/-/g, '+').replace(/_/g, '/') + '==', 'base64');
-      if (bytes.length !== 32) return reply.status(400).send({ error: 'Validation failed' });
+      if (bytes.length !== 32) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       try {
         const result = await prisma.$transaction(async (tx) => {
           await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
@@ -1040,12 +1073,12 @@ export const apiRoutes = async (
           return tx.automationRecipientKey.update({ where: { userId }, data: { keyEpoch: data.keyEpoch, publicKey: data.publicKey, packageVersion: data.packageVersion } });
         });
         return reply.send({ keyEpoch: result.keyEpoch, publicKey: result.publicKey, packageVersion: result.packageVersion });
-      } catch { return reply.status(409).send({ error: 'Recipient key version conflict' }); }
+      } catch { return reply.status(409).send({ code: 'recipient_key_version_conflict', message: 'Recipient key version conflict' }); }
     },
   );
   fastify.get('/automation/recipient-key', { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation' })] }, async (req, reply) => {
     const row = await prisma.automationRecipientKey.findUnique({ where: { userId: getAuthUser(req).userId } });
-    if (row === null) return reply.status(404).send({ error: 'Recipient key is not registered' });
+    if (row === null) return reply.status(404).send({ code: 'recipient_key_is_not_registered', message: 'Recipient key is not registered' });
     return reply.send({ keyEpoch: row.keyEpoch, publicKey: row.publicKey, packageVersion: row.packageVersion });
   });
 
@@ -1057,31 +1090,31 @@ export const apiRoutes = async (
     async (req, reply) => {
       const eventId = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$/).safeParse(req.params.eventId);
       const body = z.object({ expectedAttempt: z.number().int().positive(), expectedRuleVersion: z.number().int().positive() }).strict().safeParse(req.body);
-      if (!eventId.success || !body.success) return reply.status(400).send({ error: 'Validation failed' });
+      if (!eventId.success || !body.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       try {
         return reply.send(await retryUncertainAutomationEvent({ userId: getAuthUser(req).userId, eventId: eventId.data, ...body.data }));
-      } catch { return reply.status(409).send({ error: 'Automation event cannot be retried' }); }
+      } catch { return reply.status(409).send({ code: 'automation_event_cannot_be_retried', message: 'Automation event cannot be retried' }); }
     },
   );
 
   fastify.get<{ Params: { eventId: string } }>(
     '/automation/events/:eventId/draft', { preHandler: [authenticate] }, async (req, reply) => {
       const eventId = inboundDraftEventIdSchema.safeParse(req.params.eventId);
-      if (!eventId.success) return reply.status(400).send({ error: 'Validation failed' });
+      if (!eventId.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       const user = getAuthUser(req);
-      if (user.tokenVersion === undefined) return reply.status(403).send({ error: 'Authentication required' });
+      if (user.tokenVersion === undefined) return reply.status(403).send({ code: 'authentication_required', message: 'Authentication required' });
       try {
         return reply.header('Cache-Control', 'no-store').send(await readAutomationDraft({ userId: user.userId, tokenVersion: user.tokenVersion, eventId: eventId.data }));
-      } catch { return reply.status(404).send({ error: 'Automation draft is not available' }); }
+      } catch { return reply.status(404).send({ code: 'automation_draft_is_not_available', message: 'Automation draft is not available' }); }
     },
   );
   fastify.post<{ Params: { eventId: string } }>(
     '/automation/events/:eventId/draft/decision', { preHandler: [authenticate] }, async (req, reply) => {
       const eventId = inboundDraftEventIdSchema.safeParse(req.params.eventId);
       const body = inboundDraftDecisionSchema.safeParse(req.body);
-      if (!eventId.success || !body.success) return reply.status(400).send({ error: 'Validation failed' });
+      if (!eventId.success || !body.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       const user = getAuthUser(req);
-      if (user.tokenVersion === undefined) return reply.status(403).send({ error: 'Authentication required' });
+      if (user.tokenVersion === undefined) return reply.status(403).send({ code: 'authentication_required', message: 'Authentication required' });
       // 确认那一侧的权益判定**只在写事务里做一次**：官方模式看共享锁定的订阅行，
       // 自托管在线模式消费一张绑定本事件的 action 票据。HTTP 层再判一次会把同一张
       // 票据烧掉两次，而闸门那层拦不住"订阅在等锁期间到期"这一格。
@@ -1089,7 +1122,7 @@ export const apiRoutes = async (
       try {
         return reply.send(await decideAutomationDraft({ userId: user.userId, tokenVersion: user.tokenVersion,
           eventId: eventId.data, ...body.data, ...(ticket === undefined ? {} : { ticket }) }));
-      } catch { return reply.status(409).send({ error: 'Automation draft decision could not be applied' }); }
+      } catch { return reply.status(409).send({ code: 'automation_draft_decision_could_not_be_applied', message: 'Automation draft decision could not be applied' }); }
     },
   );
 
@@ -1098,16 +1131,16 @@ export const apiRoutes = async (
     { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation', action: 'event-claim', precheckOnly: true })]},
     async (req, reply) => {
       const parsed = AutomationClaimSchema.safeParse(req.body);
-      if (!parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      if (!parsed.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       const user = getAuthUser(req);
       const identity = readInboundUploadIdentity(req.raw.rawHeaders, user.tokenVersion);
-      if (!identity) return reply.status(403).send({ error: 'Automation worker authorization required' });
+      if (!identity) return reply.status(403).send({ code: 'automation_worker_authorization_required', message: 'Automation worker authorization required' });
       try {
         const claimed = await claimAutomationEvent(user.userId, parsed.data.clientId, identity, new Date(), parsed.data.eventId, automationTicket(req));
         return reply.send(claimed ?? { state: 'empty' });
       } catch (error) {
         if (error instanceof AutomationWriteAuthorizationError) return replyAutomationRejection(req, reply, error.decision, 'automation');
-        return reply.status(403).send({ error: 'Automation worker authorization failed' });
+        return reply.status(403).send({ code: 'automation_worker_authorization_failed', message: 'Automation worker authorization failed' });
       }
     },
   );
@@ -1118,12 +1151,12 @@ export const apiRoutes = async (
     async (req, reply) => {
       const params = z.object({ eventId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$/) }).safeParse(req.params);
       const parsed = AutomationLeaseSchema.safeParse(req.body);
-      if (!params.success || !parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      if (!params.success || !parsed.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       const user = getAuthUser(req);
       const identity = readInboundUploadIdentity(req.raw.rawHeaders, user.tokenVersion);
-      if (!identity) return reply.status(403).send({ error: 'Automation worker authorization required' });
+      if (!identity) return reply.status(403).send({ code: 'automation_worker_authorization_required', message: 'Automation worker authorization required' });
       try { return reply.send(await renewAutomationLease(user.userId, parsed.data.clientId, identity, params.data.eventId, parsed.data.leaseGeneration)); }
-      catch { return reply.status(409).send({ error: 'Automation lease is no longer valid' }); }
+      catch { return reply.status(409).send({ code: 'automation_lease_is_no_longer_valid', message: 'Automation lease is no longer valid' }); }
     },
   );
 
@@ -1135,10 +1168,10 @@ export const apiRoutes = async (
     async (req, reply) => {
       const params = z.object({ eventId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$/) }).safeParse(req.params);
       const parsed = AutomationResultSchema.safeParse(req.body);
-      if (!params.success || !parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      if (!params.success || !parsed.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       const user = getAuthUser(req);
       const identity = readInboundUploadIdentity(req.raw.rawHeaders, user.tokenVersion);
-      if (!identity) return reply.status(403).send({ error: 'Automation worker authorization required' });
+      if (!identity) return reply.status(403).send({ code: 'automation_worker_authorization_required', message: 'Automation worker authorization required' });
       try {
         return reply.send(await publishAutomationResult({ userId: user.userId, clientId: parsed.data.clientId,
           identity, eventId: params.data.eventId, leaseGeneration: parsed.data.leaseGeneration,
@@ -1147,7 +1180,7 @@ export const apiRoutes = async (
           ticket: automationTicket(req) }));
       } catch (error) {
         if (error instanceof AutomationWriteAuthorizationError) return replyAutomationRejection(req, reply, error.decision, 'automation');
-        return reply.status(409).send({ error: 'Automation lease or result is no longer valid' });
+        return reply.status(409).send({ code: 'automation_lease_or_result_is_no_longer_valid', message: 'Automation lease or result is no longer valid' });
       }
     },
   );
@@ -1160,13 +1193,13 @@ export const apiRoutes = async (
     async (req, reply) => {
       const user = getAuthUser(req);
       const clientId = SuperSyncClientIdSchema.safeParse(req.query.clientId);
-      if (!clientId.success) return reply.status(400).send({ error: 'Validation failed' });
+      if (!clientId.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       const identity = readInboundUploadIdentity(req.raw.rawHeaders, user.tokenVersion);
-      if (!identity) return reply.status(403).send({ error: 'Automation worker authorization required' });
+      if (!identity) return reply.status(403).send({ code: 'automation_worker_authorization_required', message: 'Automation worker authorization required' });
       try {
         const result = await readAutomationPreparedResult(user.userId, clientId.data, identity);
         return reply.send(result ?? { state: 'empty' });
-      } catch { return reply.status(403).send({ error: 'Automation worker authorization failed' }); }
+      } catch { return reply.status(403).send({ code: 'automation_worker_authorization_failed', message: 'Automation worker authorization failed' }); }
     },
   );
 
@@ -1178,17 +1211,17 @@ export const apiRoutes = async (
     { preHandler: authenticate },
     async (req, reply) => {
       const params = z.object({ eventId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$/) }).safeParse(req.params);
-      if (!params.success) return reply.status(400).send({ error: 'Validation failed' });
+      if (!params.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       const user = getAuthUser(req);
       const clientId = SuperSyncClientIdSchema.safeParse(req.query.clientId);
-      if (!clientId.success) return reply.status(400).send({ error: 'Validation failed' });
+      if (!clientId.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       const identity = readInboundUploadIdentity(req.raw.rawHeaders, user.tokenVersion);
-      if (!identity) return reply.status(403).send({ error: 'Automation worker authorization required' });
+      if (!identity) return reply.status(403).send({ code: 'automation_worker_authorization_required', message: 'Automation worker authorization required' });
       try {
         const result = await readAutomationPreparedResult(user.userId, clientId.data, identity, params.data.eventId);
-        if (!result) return reply.status(404).send({ error: 'Automation result is not available' });
+        if (!result) return reply.status(404).send({ code: 'automation_result_is_not_available', message: 'Automation result is not available' });
         return reply.send(result);
-      } catch { return reply.status(403).send({ error: 'Automation worker authorization failed' }); }
+      } catch { return reply.status(403).send({ code: 'automation_worker_authorization_failed', message: 'Automation worker authorization failed' }); }
     },
   );
 
@@ -1204,10 +1237,10 @@ export const apiRoutes = async (
     async (req, reply) => {
       const params = z.object({ eventId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$/) }).safeParse(req.params);
       const parsed = AutomationAiReserveSchema.safeParse(req.body);
-      if (!params.success || !parsed.success || params.data.eventId.length > 64) return reply.status(400).send({ error: 'Validation failed' });
+      if (!params.success || !parsed.success || params.data.eventId.length > 64) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       const user = getAuthUser(req);
       const identity = readInboundUploadIdentity(req.raw.rawHeaders, user.tokenVersion);
-      if (!identity) return reply.status(403).send({ error: 'Automation worker authorization required' });
+      if (!identity) return reply.status(403).send({ code: 'automation_worker_authorization_required', message: 'Automation worker authorization required' });
       try {
         return reply.send(await reserveAutomationAiAttempt({ userId: user.userId, ruleId: parsed.data.ruleId,
           eventId: params.data.eventId, parseVersion: parsed.data.parseVersion, attempt: parsed.data.attempt }, Date.now(), undefined,
@@ -1221,7 +1254,7 @@ export const apiRoutes = async (
         // 其余异常（租约掉了、并发 CAS 没命中、限额配错）**仍然**是 409 —— 把它们也变成
         // 402 会让宿主停止重试一件本该重试的事，那是反向的错。
         if (error instanceof AutomationAiMeteringDeniedError) return replyAutomationMeteringRejection(req, reply, error.denial);
-        return reply.status(409).send({ error: 'Automation AI attempt could not be reserved' });
+        return reply.status(409).send({ code: 'automation_ai_attempt_could_not_be_reserved', message: 'Automation AI attempt could not be reserved' });
       }
     },
   );
@@ -1232,17 +1265,17 @@ export const apiRoutes = async (
     async (req, reply) => {
       const params = z.object({ eventId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$/) }).safeParse(req.params);
       const parsed = AutomationAiStateSchema.safeParse(req.body);
-      if (!params.success || !parsed.success) return reply.status(400).send({ error: 'Validation failed' });
+      if (!params.success || !parsed.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       const user = getAuthUser(req);
       const identity = readInboundUploadIdentity(req.raw.rawHeaders, user.tokenVersion);
-      if (!identity) return reply.status(403).send({ error: 'Automation worker authorization required' });
+      if (!identity) return reply.status(403).send({ code: 'automation_worker_authorization_required', message: 'Automation worker authorization required' });
       try {
         const changed = await advanceAutomationAiAttempt({ userId: user.userId, ruleId: parsed.data.ruleId,
           eventId: params.data.eventId, parseVersion: parsed.data.parseVersion, attempt: parsed.data.attempt },
           parsed.data.from, parsed.data.to, undefined, { clientId: parsed.data.clientId, credentialHash: identity.credentialHash,
             databaseEpoch: identity.databaseEpoch, tokenVersion: identity.tokenVersion, leaseGeneration: parsed.data.leaseGeneration });
         return reply.send({ changed });
-      } catch { return reply.status(409).send({ error: 'Automation AI attempt state transition failed' }); }
+      } catch { return reply.status(409).send({ code: 'automation_ai_attempt_state_transition_failed', message: 'Automation AI attempt state transition failed' }); }
     },
   );
 
@@ -1267,7 +1300,8 @@ export const apiRoutes = async (
         const parseResult = VerifyEmailSchema.safeParse(req.body);
         if (!parseResult.success) {
           return reply.status(400).send({
-            error: 'Validation failed',
+            code: 'validation_failed',
+            message: 'Validation failed',
             details: parseResult.error.issues,
           });
         }
@@ -1279,7 +1313,8 @@ export const apiRoutes = async (
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Verification error: ${errMsg}`);
         return reply.status(400).send({
-          error: getSafeErrorMessage(err, 'Verification failed. Please try again.'),
+          code: 'verification_failed',
+          message: getSafeErrorMessage(err, 'Verification failed. Please try again.'),
         });
       }
     },
@@ -1315,7 +1350,8 @@ export const apiRoutes = async (
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Token replacement error: ${errMsg}`);
         return reply.status(500).send({
-          error: 'Failed to replace token. Please try again.',
+          code: 'failed_to_replace_token_please_try_again',
+          message: 'Failed to replace token. Please try again.',
         });
       }
     },
@@ -1350,7 +1386,8 @@ export const apiRoutes = async (
         const parsed = z.object({ locale: z.enum(SERVER_LOCALES) }).safeParse(req.body);
         if (!parsed.success) {
           return reply.status(400).send({
-            error: 'Validation failed',
+            code: 'validation_failed',
+            message: 'Validation failed',
             details: parsed.error.issues,
           });
         }
@@ -1363,7 +1400,7 @@ export const apiRoutes = async (
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Account locale update error: ${errMsg}`);
-        return reply.status(500).send({ error: 'Failed to update locale.' });
+        return reply.status(500).send({ code: 'failed_to_update_locale', message: 'Failed to update locale.' });
       }
     },
   );
@@ -1403,7 +1440,7 @@ export const apiRoutes = async (
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Legal consent status error: ${errMsg}`);
-        return reply.status(500).send({ error: 'Failed to read consent status.' });
+        return reply.status(500).send({ code: 'failed_to_read_consent_status', message: 'Failed to read consent status.' });
       }
     },
   );
@@ -1435,7 +1472,7 @@ export const apiRoutes = async (
           })
           .safeParse(req.body);
         if (!parsed.success) {
-          return reply.status(400).send({ error: 'Validation failed', details: parsed.error.issues });
+          return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed', details: parsed.error.issues });
         }
         const result = await recordLegalReconfirm({
           userId: getAuthUser(req).userId,
@@ -1446,13 +1483,13 @@ export const apiRoutes = async (
           // 409：请求本身合法，但它要写的那件事在当前状态下不成立（不是客户端写错了字段）。
           return reply
             .status(409)
-            .send({ error: result.error === 'not-applicable' ? 'instance_cannot_name_text' : 'version_mismatch' });
+            .send({ code: result.error === 'not-applicable' ? 'instance_cannot_name_text' : 'version_mismatch', message: 'Legal consent could not be recorded.' });
         }
         return reply.send({ ok: true, recordedVersion: result.recordedVersion });
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Legal consent record error: ${errMsg}`);
-        return reply.status(500).send({ error: 'Failed to record consent.' });
+        return reply.status(500).send({ code: 'failed_to_record_consent', message: 'Failed to record consent.' });
       }
     },
   );
@@ -1502,7 +1539,8 @@ export const apiRoutes = async (
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Delete account error: ${errMsg}`);
         return reply.status(500).send({
-          error: 'Failed to delete account. Please try again.',
+          code: 'failed_to_delete_account_please_try_again',
+          message: 'Failed to delete account. Please try again.',
         });
       }
     },
@@ -1528,7 +1566,8 @@ export const apiRoutes = async (
         const parseResult = PasskeyRegisterOptionsSchema.safeParse(req.body);
         if (!parseResult.success) {
           return reply.status(400).send({
-            error: 'Validation failed',
+            code: 'validation_failed',
+            message: 'Validation failed',
             details: parseResult.error.issues,
           });
         }
@@ -1537,7 +1576,7 @@ export const apiRoutes = async (
         if (!isEmailAllowed(email)) {
           return reply
             .status(403)
-            .send({ error: 'Registration is not allowed for this email address.' });
+            .send({ code: 'registration_is_not_allowed_for_this_email_address', message: 'Registration is not allowed for this email address.' });
         }
 
         const options = await generateRegistrationOptions(email);
@@ -1546,7 +1585,8 @@ export const apiRoutes = async (
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Passkey registration options error: ${errMsg}`);
         return reply.status(400).send({
-          error: getSafeErrorMessage(err, 'Failed to generate registration options.'),
+          code: 'passkey_registration_options_failed',
+          message: getSafeErrorMessage(err, 'Failed to generate registration options.'),
         });
       }
     },
@@ -1568,7 +1608,8 @@ export const apiRoutes = async (
         const parseResult = PasskeyRegisterVerifySchema.safeParse(req.body);
         if (!parseResult.success) {
           return reply.status(400).send({
-            error: 'Validation failed',
+            code: 'validation_failed',
+            message: 'Validation failed',
             details: parseResult.error.issues,
           });
         }
@@ -1577,7 +1618,7 @@ export const apiRoutes = async (
         if (!isEmailAllowed(email)) {
           return reply
             .status(403)
-            .send({ error: 'Registration is not allowed for this email address.' });
+            .send({ code: 'registration_is_not_allowed_for_this_email_address', message: 'Registration is not allowed for this email address.' });
         }
 
         const result = await verifyRegistration(
@@ -1592,7 +1633,8 @@ export const apiRoutes = async (
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Passkey registration verify error: ${errMsg}`);
         return reply.status(400).send({
-          error: getSafeErrorMessage(
+          code: 'passkey_registration_failed',
+          message: getSafeErrorMessage(
             err,
             'Passkey registration failed. Please try again.',
           ),
@@ -1617,7 +1659,8 @@ export const apiRoutes = async (
         const parseResult = PasskeyLoginOptionsSchema.safeParse(req.body);
         if (!parseResult.success) {
           return reply.status(400).send({
-            error: 'Validation failed',
+            code: 'validation_failed',
+            message: 'Validation failed',
             details: parseResult.error.issues,
           });
         }
@@ -1629,7 +1672,8 @@ export const apiRoutes = async (
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Passkey login options error: ${errMsg}`);
         return reply.status(400).send({
-          error: getSafeErrorMessage(err, 'Failed to generate login options.'),
+          code: 'passkey_login_options_failed',
+          message: getSafeErrorMessage(err, 'Failed to generate login options.'),
         });
       }
     },
@@ -1651,7 +1695,8 @@ export const apiRoutes = async (
         const parseResult = PasskeyLoginVerifySchema.safeParse(req.body);
         if (!parseResult.success) {
           return reply.status(400).send({
-            error: 'Validation failed',
+            code: 'validation_failed',
+            message: 'Validation failed',
             details: parseResult.error.issues,
           });
         }
@@ -1719,18 +1764,19 @@ export const apiRoutes = async (
         // 不区分"不存在"与"属于别的账号"（后者在这个端点上本来也查不到）。
         if (err instanceof PasskeyError && err.code === 'passkey_not_found') {
           return reply.status(401).send({
-            error: PASSKEY_STALE_MESSAGE,
             code: 'passkey_not_found',
+            message: PASSKEY_STALE_MESSAGE,
           });
         }
         if (err instanceof PasskeyError && err.code === 'passkey_verification_failed') {
           return reply.status(401).send({
-            error: PASSKEY_VERIFICATION_FAILED_MESSAGE,
             code: 'passkey_verification_failed',
+            message: PASSKEY_VERIFICATION_FAILED_MESSAGE,
           });
         }
         return reply.status(401).send({
-          error: getSafeErrorMessage(err, 'Authentication failed'),
+          code: 'authentication_failed',
+          message: getSafeErrorMessage(err, 'Authentication failed'),
         });
       }
     },
@@ -1752,7 +1798,8 @@ export const apiRoutes = async (
         const parseResult = PasskeyRecoveryRequestSchema.safeParse(req.body);
         if (!parseResult.success) {
           return reply.status(400).send({
-            error: 'Validation failed',
+            code: 'validation_failed',
+            message: 'Validation failed',
             details: parseResult.error.issues,
           });
         }
@@ -1764,7 +1811,8 @@ export const apiRoutes = async (
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Passkey recovery request error: ${errMsg}`);
         return reply.status(400).send({
-          error: getSafeErrorMessage(err, 'Recovery request failed. Please try again.'),
+          code: 'recovery_request_failed',
+          message: getSafeErrorMessage(err, 'Recovery request failed. Please try again.'),
         });
       }
     },
@@ -1786,7 +1834,8 @@ export const apiRoutes = async (
         const parseResult = PasskeyRecoveryOptionsSchema.safeParse(req.body);
         if (!parseResult.success) {
           return reply.status(400).send({
-            error: 'Validation failed',
+            code: 'validation_failed',
+            message: 'Validation failed',
             details: parseResult.error.issues,
           });
         }
@@ -1798,7 +1847,8 @@ export const apiRoutes = async (
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Passkey recovery options error: ${errMsg}`);
         return reply.status(400).send({
-          error: getSafeErrorMessage(err, 'Invalid or expired recovery token'),
+          code: 'invalid_recovery_token',
+          message: getSafeErrorMessage(err, 'Invalid or expired recovery token'),
         });
       }
     },
@@ -1820,7 +1870,8 @@ export const apiRoutes = async (
         const parseResult = PasskeyRecoveryCompleteSchema.safeParse(req.body);
         if (!parseResult.success) {
           return reply.status(400).send({
-            error: 'Validation failed',
+            code: 'validation_failed',
+            message: 'Validation failed',
             details: parseResult.error.issues,
           });
         }
@@ -1832,7 +1883,8 @@ export const apiRoutes = async (
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Passkey recovery complete error: ${errMsg}`);
         return reply.status(400).send({
-          error: getSafeErrorMessage(err, 'Passkey recovery failed. Please try again.'),
+          code: 'recovery_failed',
+          message: getSafeErrorMessage(err, 'Passkey recovery failed. Please try again.'),
         });
       }
     },
@@ -1873,7 +1925,7 @@ export const apiRoutes = async (
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Passkey list error: ${errMsg}`);
-        return reply.status(500).send({ error: 'Failed to load passkeys.' });
+        return reply.status(500).send({ code: 'failed_to_load_passkeys', message: 'Failed to load passkeys.' });
       }
     },
   );
@@ -1894,7 +1946,8 @@ export const apiRoutes = async (
       const parsedParams = PasskeyIdParamSchema.safeParse(req.params);
       if (!parsedParams.success) {
         return reply.status(400).send({
-          error: 'Validation failed',
+          code: 'validation_failed',
+          message: 'Validation failed',
           details: parsedParams.error.issues,
         });
       }
@@ -1913,19 +1966,19 @@ export const apiRoutes = async (
         // 抛的是同一个码）。
         if (err instanceof PasskeyError && err.code === 'passkey_not_found_for_user') {
           return reply.status(404).send({
-            error: PASSKEY_NOT_FOUND_FOR_USER_MESSAGE,
             code: 'passkey_not_found_for_user',
+            message: PASSKEY_NOT_FOUND_FOR_USER_MESSAGE,
           });
         }
         // 最后一条 → 409 + 可判别码，让界面说"先加一条新的"，
         // 而不是把一个 500 或者静默失败呈现给用户。
         if (err instanceof PasskeyError && err.code === 'last_passkey_required') {
           return reply.status(409).send({
-            error: LAST_PASSKEY_MESSAGE,
             code: 'last_passkey_required',
+            message: LAST_PASSKEY_MESSAGE,
           });
         }
-        return reply.status(500).send({ error: 'Failed to delete passkey.' });
+        return reply.status(500).send({ code: 'failed_to_delete_passkey', message: 'Failed to delete passkey.' });
       }
     },
   );
@@ -1951,7 +2004,8 @@ export const apiRoutes = async (
       const parsedParams = PasskeyIdParamSchema.safeParse(req.params);
       if (!parsedParams.success) {
         return reply.status(400).send({
-          error: 'Validation failed',
+          code: 'validation_failed',
+          message: 'Validation failed',
           details: parsedParams.error.issues,
         });
       }
@@ -1959,7 +2013,8 @@ export const apiRoutes = async (
       const parsedBody = PasskeyRenameSchema.safeParse(req.body);
       if (!parsedBody.success) {
         return reply.status(400).send({
-          error: 'Validation failed',
+          code: 'validation_failed',
+          message: 'Validation failed',
           details: parsedBody.error.issues,
         });
       }
@@ -1978,18 +2033,18 @@ export const apiRoutes = async (
         // 这里多一个不同的码（或者换成 403）就等于把 404 那条纪律作废。
         if (err instanceof PasskeyError && err.code === 'passkey_not_found_for_user') {
           return reply.status(404).send({
-            error: PASSKEY_NOT_FOUND_FOR_USER_MESSAGE,
             code: 'passkey_not_found_for_user',
+            message: PASSKEY_NOT_FOUND_FOR_USER_MESSAGE,
           });
         }
         // zod 已经挡了正常输入；这是绕过 HTTP 的调用方才撞得到的兜底。
         if (err instanceof PasskeyError && err.code === 'passkey_name_too_long') {
           return reply.status(400).send({
-            error: PASSKEY_NAME_TOO_LONG_MESSAGE,
             code: 'passkey_name_too_long',
+            message: PASSKEY_NAME_TOO_LONG_MESSAGE,
           });
         }
-        return reply.status(500).send({ error: 'Failed to rename passkey.' });
+        return reply.status(500).send({ code: 'failed_to_rename_passkey', message: 'Failed to rename passkey.' });
       }
     },
   );
@@ -2028,12 +2083,13 @@ export const apiRoutes = async (
         // 令牌有效但账号已不在：401 + 可判别码，客户端据此提示重新登录。
         if (err instanceof PasskeyError && err.code === 'passkey_not_found_for_user') {
           return reply.status(401).send({
-            error: 'Account not found',
             code: 'passkey_not_found_for_user',
+            message: 'Account not found',
           });
         }
         return reply.status(400).send({
-          error: getSafeErrorMessage(err, 'Failed to generate registration options.'),
+          code: 'passkey_registration_options_failed',
+          message: getSafeErrorMessage(err, 'Failed to generate registration options.'),
         });
       }
     },
@@ -2055,7 +2111,8 @@ export const apiRoutes = async (
       const parseResult = PasskeyEnrollmentCompleteSchema.safeParse(req.body);
       if (!parseResult.success) {
         return reply.status(400).send({
-          error: 'Validation failed',
+          code: 'validation_failed',
+          message: 'Validation failed',
           details: parseResult.error.issues,
         });
       }
@@ -2075,18 +2132,19 @@ export const apiRoutes = async (
 
         if (err instanceof PasskeyError && err.code === 'passkey_already_registered') {
           return reply.status(409).send({
-            error: PASSKEY_ALREADY_REGISTERED_MESSAGE,
             code: 'passkey_already_registered',
+            message: PASSKEY_ALREADY_REGISTERED_MESSAGE,
           });
         }
         if (err instanceof PasskeyError && err.code === 'passkey_verification_failed') {
           return reply.status(400).send({
-            error: PASSKEY_VERIFICATION_FAILED_MESSAGE,
             code: 'passkey_verification_failed',
+            message: PASSKEY_VERIFICATION_FAILED_MESSAGE,
           });
         }
         return reply.status(400).send({
-          error: getSafeErrorMessage(err, 'Passkey registration failed. Please try again.'),
+          code: 'passkey_registration_failed',
+          message: getSafeErrorMessage(err, 'Passkey registration failed. Please try again.'),
         });
       }
     },
@@ -2112,7 +2170,8 @@ export const apiRoutes = async (
         const parseResult = MagicLinkRegisterSchema.safeParse(req.body);
         if (!parseResult.success) {
           return reply.status(400).send({
-            error: 'Validation failed',
+            code: 'validation_failed',
+            message: 'Validation failed',
             details: parseResult.error.issues,
           });
         }
@@ -2121,7 +2180,7 @@ export const apiRoutes = async (
         if (!isEmailAllowed(email)) {
           return reply
             .status(403)
-            .send({ error: 'Registration is not allowed for this email address.' });
+            .send({ code: 'registration_is_not_allowed_for_this_email_address', message: 'Registration is not allowed for this email address.' });
         }
 
         const result = await registerWithMagicLink(email, Date.now(), inviteCode, await localeForEmail(req, email));
@@ -2130,7 +2189,8 @@ export const apiRoutes = async (
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Magic link registration error: ${errMsg}`);
         return reply.status(400).send({
-          error: getSafeErrorMessage(err, 'Registration failed. Please try again.'),
+          code: 'registration_failed',
+          message: getSafeErrorMessage(err, 'Registration failed. Please try again.'),
         });
       }
     },
@@ -2152,7 +2212,8 @@ export const apiRoutes = async (
         const parseResult = MagicLinkRequestSchema.safeParse(req.body);
         if (!parseResult.success) {
           return reply.status(400).send({
-            error: 'Validation failed',
+            code: 'validation_failed',
+            message: 'Validation failed',
             details: parseResult.error.issues,
           });
         }
@@ -2164,7 +2225,8 @@ export const apiRoutes = async (
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Magic link request error: ${errMsg}`);
         return reply.status(400).send({
-          error: getSafeErrorMessage(err, 'Failed to send login link. Please try again.'),
+          code: 'login_link_failed',
+          message: getSafeErrorMessage(err, 'Failed to send login link. Please try again.'),
         });
       }
     },
@@ -2186,7 +2248,8 @@ export const apiRoutes = async (
         const parseResult = MagicLinkVerifySchema.safeParse(req.body);
         if (!parseResult.success) {
           return reply.status(400).send({
-            error: 'Validation failed',
+            code: 'validation_failed',
+            message: 'Validation failed',
             details: parseResult.error.issues,
           });
         }
@@ -2206,7 +2269,8 @@ export const apiRoutes = async (
           // 明确说出来，而不是返回一个缺少 token 的 200 —— 后者会让调用方
           // 以为"登录成功了但没有令牌"。
           return reply.status(409).send({
-            error: 'This link verifies a passkey registration; please sign in with your passkey.',
+            code: 'this_link_verifies_a_passkey_registration_please_sign_in_with_your_passkey',
+            message: 'This link verifies a passkey registration; please sign in with your passkey.',
           });
         }
         return reply.send(result);
@@ -2218,7 +2282,8 @@ export const apiRoutes = async (
           // 只有一个链接，它落在哪条路上取决于那封信是哪一年发的。深层成因：`SAFE_ERROR_MESSAGES`
           // 认得出 verifyLoginMagicLink 抛的那句，认不出 auth.ts 里「查不到这个人」那句，
           // 所以走到兜底时两条路各说各的。
-          error: getSafeErrorMessage(err, 'Invalid or expired link'),
+          code: 'invalid_or_expired_link',
+          message: getSafeErrorMessage(err, 'Invalid or expired link'),
         });
       }
     },
@@ -2252,12 +2317,12 @@ export const apiRoutes = async (
     async (req, reply) => {
       const parseResult = RegistrationChallengeRequestSchema.safeParse(req.body);
       if (!parseResult.success) {
-        return reply.status(400).send({ error: 'Validation failed', details: parseResult.error.issues });
+        return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed', details: parseResult.error.issues });
       }
       const { email, password, termsAccepted, inviteCode } = parseResult.data;
       try {
         if (!isEmailAllowed(email)) {
-          return reply.status(403).send({ error: 'Registration is not allowed for this email address.' });
+          return reply.status(403).send({ code: 'registration_is_not_allowed_for_this_email_address', message: 'Registration is not allowed for this email address.' });
         }
         return reply.status(201).send(
           await requestRegistrationCode({
@@ -2276,7 +2341,7 @@ export const apiRoutes = async (
           return reply.status(result.status).send(result.body);
         }
         Logger.error(`Email password registration code request failed: ${error instanceof Error ? error.message : 'unknown'}`);
-        return reply.status(500).send({ error: 'Registration failed. Please try again.' });
+        return reply.status(500).send({ code: 'registration_failed_please_try_again', message: 'Registration failed. Please try again.' });
       }
     },
   );
@@ -2292,7 +2357,7 @@ export const apiRoutes = async (
       const parseResult = RegistrationChallengeVerifySchema.safeParse(req.body);
       if (!parseResult.success) {
         // Malformed and wrong codes deliberately share the same public code.
-        return reply.status(400).send({ error: 'This registration code is invalid or has expired.', code: 'invalid_registration_challenge' });
+        return reply.status(400).send({ code: 'invalid_registration_challenge', message: 'This registration code is invalid or has expired.' });
       }
       try {
         return reply.send(await verifyRegistrationCode(parseResult.data, sessionMetaFromRequest(req)));
@@ -2303,7 +2368,7 @@ export const apiRoutes = async (
           return reply.status(result.status).send(result.body);
         }
         Logger.error(`Email password registration code verification failed: ${error instanceof Error ? error.message : 'unknown'}`);
-        return reply.status(400).send({ error: 'This registration code is invalid or has expired.', code: 'invalid_registration_challenge' });
+        return reply.status(400).send({ code: 'invalid_registration_challenge', message: 'This registration code is invalid or has expired.' });
       }
     },
   );
@@ -2318,7 +2383,7 @@ export const apiRoutes = async (
     async (req, reply) => {
       const parseResult = RegistrationChallengeResendSchema.safeParse(req.body);
       if (!parseResult.success) {
-        return reply.status(400).send({ error: 'This registration code is invalid or has expired.', code: 'invalid_registration_challenge' });
+        return reply.status(400).send({ code: 'invalid_registration_challenge', message: 'This registration code is invalid or has expired.' });
       }
       try {
         return reply.send(await resendRegistrationCode(parseResult.data.challengeId));
@@ -2329,7 +2394,100 @@ export const apiRoutes = async (
           return reply.status(result.status).send(result.body);
         }
         Logger.error(`Email password registration code resend failed: ${error instanceof Error ? error.message : 'unknown'}`);
-        return reply.status(400).send({ error: 'This registration code is invalid or has expired.', code: 'invalid_registration_challenge' });
+        return reply.status(400).send({ code: 'invalid_registration_challenge', message: 'This registration code is invalid or has expired.' });
+      }
+    },
+  );
+
+  // ── 邮箱验证码登录（2026-10-10）：request / verify / resend ──────────
+  fastify.post<{ Body: z.infer<typeof LoginCodeRequestSchema> }>(
+    AUTH_PASSWORD_PATHS.loginCodeRequest,
+    {
+      config: {
+        rateLimit: { max: 10, timeWindow: '15 minutes' },
+      },
+    },
+    async (req, reply) => {
+      const parsed = LoginCodeRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
+      }
+      try {
+        const result: EmailLoginChallengeResponse = await requestLoginCode({
+          email: parsed.data.email,
+          locale: await localeForEmail(req, parsed.data.email),
+        });
+        // 🔴 账号不存在/未验证的诱饵与真实挑战同形状同状态码 —— 这条接口的全部
+        // 安全设计就是"响应携带不出账号是否存在"（见 login-otp.ts 文件头）。
+        return reply.status(201).header('Cache-Control', 'no-store').send(result);
+      } catch (error) {
+        if (error instanceof LoginOtpError) {
+          const result = loginOtpErrorResponse(error);
+          if (result.retryAfterSeconds !== undefined) reply.header('retry-after', String(result.retryAfterSeconds));
+          return reply.status(result.status).send(result.body);
+        }
+        Logger.error(`Email login code request failed: ${error instanceof Error ? error.message : 'unknown'}`);
+        // 兜底也保持诱饵形状：不让 5xx 泄露"这个邮箱有没有账号"。
+        return reply.status(201).send({
+          challengeId: crypto.randomUUID(),
+          expiresAt: Date.now() + 10 * 60 * 1000,
+          resendAvailableAt: Date.now() + 60 * 1000,
+        });
+      }
+    },
+  );
+
+  fastify.post<{ Body: z.infer<typeof LoginCodeVerifySchema> }>(
+    AUTH_PASSWORD_PATHS.loginCodeVerify,
+    {
+      config: {
+        rateLimit: { max: 30, timeWindow: '15 minutes' },
+      },
+    },
+    async (req, reply) => {
+      const parsed = LoginCodeVerifySchema.safeParse(req.body);
+      if (!parsed.success) {
+        // 形状不对与码不对故意同一个码：不给人多一种读法。
+        return reply.status(400).send({ code: 'invalid_login_challenge', message: 'This login code is invalid or has expired.' });
+      }
+      try {
+        const result = await verifyLoginCode(parsed.data, sessionMetaFromRequest(req));
+        return reply.header('Cache-Control', 'no-store').send(result);
+      } catch (error) {
+        if (error instanceof LoginOtpError) {
+          const result = loginOtpErrorResponse(error);
+          if (result.retryAfterSeconds !== undefined) reply.header('retry-after', String(result.retryAfterSeconds));
+          return reply.status(result.status).send(result.body);
+        }
+        Logger.error(`Email login code verification failed: ${error instanceof Error ? error.message : 'unknown'}`);
+        return reply.status(400).send({ code: 'invalid_login_challenge', message: 'This login code is invalid or has expired.' });
+      }
+    },
+  );
+
+  fastify.post<{ Body: z.infer<typeof LoginCodeResendSchema> }>(
+    AUTH_PASSWORD_PATHS.loginCodeResend,
+    {
+      config: {
+        rateLimit: { max: 10, timeWindow: '15 minutes' },
+      },
+    },
+    async (req, reply) => {
+      const parsed = LoginCodeResendSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return reply.status(400).send({ code: 'invalid_login_challenge', message: 'This login code is invalid or has expired.' });
+      }
+      try {
+        const result = await resendLoginCode(parsed.data.challengeId);
+        return reply.header('Cache-Control', 'no-store').send(result);
+      } catch (error) {
+        if (error instanceof LoginOtpError) {
+          const result = loginOtpErrorResponse(error);
+          if (result.retryAfterSeconds !== undefined) reply.header('retry-after', String(result.retryAfterSeconds));
+          return reply.status(result.status).send(result.body);
+        }
+        Logger.error(`Email login code resend failed: ${error instanceof Error ? error.message : 'unknown'}`);
+        return reply.status(400).send({ code: 'invalid_login_challenge', message: 'This login code is invalid or has expired.' });
       }
     },
   );
@@ -2352,7 +2510,8 @@ export const apiRoutes = async (
       const parseResult = schema.safeParse(req.body);
       if (!parseResult.success) {
         return reply.status(400).send({
-          error: 'Validation failed',
+          code: 'validation_failed',
+          message: 'Validation failed',
           details: parseResult.error.issues,
         });
       }
@@ -2362,7 +2521,7 @@ export const apiRoutes = async (
         if (!isEmailAllowed(email)) {
           return reply
             .status(403)
-            .send({ error: 'Registration is not allowed for this email address.' });
+            .send({ code: 'registration_is_not_allowed_for_this_email_address', message: 'Registration is not allowed for this email address.' });
         }
 
         const result = await registerWithEmailPassword({
@@ -2388,7 +2547,8 @@ export const apiRoutes = async (
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Email+password registration error: ${errMsg}`);
         return reply.status(400).send({
-          error: getSafeErrorMessage(err, 'Registration failed. Please try again.'),
+          code: 'registration_failed',
+          message: getSafeErrorMessage(err, 'Registration failed. Please try again.'),
         });
       }
     },
@@ -2420,7 +2580,8 @@ export const apiRoutes = async (
       const parseResult = EmailPasswordLoginSchema.safeParse(req.body);
       if (!parseResult.success) {
         return reply.status(400).send({
-          error: 'Validation failed',
+          code: 'validation_failed',
+          message: 'Validation failed',
           details: parseResult.error.issues,
         });
       }
@@ -2440,7 +2601,8 @@ export const apiRoutes = async (
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Password login error: ${errMsg}`);
         return reply.status(401).send({
-          error: getSafeErrorMessage(err, PASSWORD_INVALID_CREDENTIALS_MESSAGE),
+          code: 'invalid_credentials',
+          message: getSafeErrorMessage(err, PASSWORD_INVALID_CREDENTIALS_MESSAGE),
         });
       }
     },
@@ -2479,7 +2641,8 @@ export const apiRoutes = async (
       const parseResult = PasswordForgotSchema.safeParse(req.body);
       if (!parseResult.success) {
         return reply.status(400).send({
-          error: 'Validation failed',
+          code: 'validation_failed',
+          message: 'Validation failed',
           details: parseResult.error.issues,
         });
       }
@@ -2536,7 +2699,8 @@ export const apiRoutes = async (
       const parseResult = PasswordResetSchema.safeParse(req.body);
       if (!parseResult.success) {
         return reply.status(400).send({
-          error: 'Validation failed',
+          code: 'validation_failed',
+          message: 'Validation failed',
           details: parseResult.error.issues,
         });
       }
@@ -2563,8 +2727,8 @@ export const apiRoutes = async (
         // 兜底句用 `invalid_reset_link` 那句：**任何**没走通的重置都只该有一种读法
         // （"回去重新点一次链接"）。说"系统错误"是在告诉对方这次是别的原因。
         return reply.status(500).send({
-          error: PASSWORD_INVALID_RESET_LINK_MESSAGE,
           code: 'invalid_reset_link' satisfies PasswordAuthErrorCode,
+          message: PASSWORD_INVALID_RESET_LINK_MESSAGE,
         });
       }
     },
@@ -2596,7 +2760,8 @@ export const apiRoutes = async (
       const parseResult = PasswordChangeSchema.safeParse(req.body);
       if (!parseResult.success) {
         return reply.status(400).send({
-          error: 'Validation failed',
+          code: 'validation_failed',
+          message: 'Validation failed',
           details: parseResult.error.issues,
         });
       }
@@ -2621,7 +2786,8 @@ export const apiRoutes = async (
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Password change error: ${errMsg}`);
         return reply.status(500).send({
-          error: getSafeErrorMessage(err, 'Password change failed. Please try again.'),
+          code: 'password_change_failed',
+          message: getSafeErrorMessage(err, 'Password change failed. Please try again.'),
         });
       }
     },
@@ -2655,7 +2821,8 @@ export const apiRoutes = async (
       const parseResult = PasswordSetSchema.safeParse(req.body);
       if (!parseResult.success) {
         return reply.status(400).send({
-          error: 'Validation failed',
+          code: 'validation_failed',
+          message: 'Validation failed',
           details: parseResult.error.issues,
         });
       }
@@ -2676,7 +2843,8 @@ export const apiRoutes = async (
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Initial password error: ${errMsg}`);
         return reply.status(500).send({
-          error: getSafeErrorMessage(err, 'Password setup failed. Please try again.'),
+          code: 'password_setup_failed',
+          message: getSafeErrorMessage(err, 'Password setup failed. Please try again.'),
         });
       }
     },
@@ -2708,14 +2876,15 @@ export const apiRoutes = async (
       try {
         const token = typeof req.body?.token === 'string' ? req.body.token : '';
         if (token === '') {
-          return reply.status(400).send({ error: 'Validation failed' });
+          return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
         }
         return reply.send(await verifyEmailLink(token, sessionMetaFromRequest(req)));
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Email link verify error: ${errMsg}`);
         return reply.status(401).send({
-          error: getSafeErrorMessage(err, 'Invalid or expired link'),
+          code: 'invalid_or_expired_link',
+          message: getSafeErrorMessage(err, 'Invalid or expired link'),
         });
       }
     },
