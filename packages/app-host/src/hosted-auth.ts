@@ -131,6 +131,9 @@ export const HOSTED_AUTH_PATHS = {
   // 症状是 404，而 404 在这里归成 `request-rejected` —— 用户看到的是一句
   // "登录没有完成"，没有人会想到"两端各写了一遍路径"。
   emailPasswordRegister: `/api${AUTH_PASSWORD_PATHS.register}`,
+  loginCodeRequest: `/api${AUTH_PASSWORD_PATHS.loginCodeRequest}`,
+  loginCodeVerify: `/api${AUTH_PASSWORD_PATHS.loginCodeVerify}`,
+  loginCodeResend: `/api${AUTH_PASSWORD_PATHS.loginCodeResend}`,
   emailPasswordLogin: `/api${AUTH_PASSWORD_PATHS.login}`,
   passwordForgot: `/api${AUTH_PASSWORD_PATHS.forgot}`,
   passwordReset: `/api${AUTH_PASSWORD_PATHS.reset}`,
@@ -659,6 +662,11 @@ export const FAILURE_REASON_BY_SERVER_CODE: Readonly<Record<string, HostedAuthFa
   // 避免为了一个注册子流程迫使所有壳重复增加词条。
   invalid_registration_challenge: 'invalid-input',
   registration_code_rate_limited: 'rate-limited',
+  // 登录码的码词表与注册分开命名（两个挑战流各自演进），动作分类复用同两条：
+  // 码不对/过期 ⇒ 回去重看邮件；限速 ⇒ 等冷却。服务端不区分"邮箱不存在"
+  // （诱饵），客户端也不区分 —— 分类器没有"邮箱不存在"这一档。
+  invalid_login_challenge: 'invalid-input',
+  login_code_rate_limited: 'rate-limited',
 
   // ── 换绑登录邮箱与登录会话（ADR-0063）──────────────────────────
   invalid_change_link: 'invalid-change-link',
@@ -1842,6 +1850,61 @@ export async function resendEmailPasswordRegistrationCode(
 ): Promise<HostedAuthOutcome<HostedRegistrationChallengeResult>> {
   if (challengeId.trim() === '') return failure('invalid-input');
   const result = await postJson(options, HOSTED_AUTH_PATHS.emailPasswordRegistrationResend, {
+    challengeId,
+  });
+  if (!result.ok) return result;
+  const challenge = registrationChallengeResult(result.body);
+  return challenge === undefined ? failure('malformed-response') : { ok: true, ...challenge };
+}
+
+// ── 邮箱验证码登录（2026-10-10）──────────────────────────────
+
+/**
+ * 发起码登录挑战。
+ *
+ * 🔴 **账号不存在/未验证时服务端回诱饵**（同形状 201、不发信），客户端因此
+ * **没有任何"邮箱不存在"这一档失败** —— 成功响应只该说"去查收件箱"。
+ * `emailDelivered` 的读取沿用注册挑战那套严格语义：只认字面量 `false`。
+ */
+export async function requestEmailLoginCode(
+  options: HostedAuthOptions,
+  email: string,
+): Promise<HostedAuthOutcome<HostedRegistrationChallengeResult>> {
+  const normalized = normalizedEmail(email);
+  if (normalized === undefined) return failure('invalid-input');
+  const result = await postJson(options, HOSTED_AUTH_PATHS.loginCodeRequest, {
+    email: normalized,
+    ...(options.locale === undefined ? {} : { locale: options.locale }),
+  });
+  if (!result.ok) return result;
+  const challenge = registrationChallengeResult(result.body);
+  return challenge === undefined ? failure('malformed-response') : { ok: true, ...challenge };
+}
+
+/** 验证六位登录码换会话；响应与邮箱口令登录同形，复用同一个 parseSession。 */
+export async function verifyEmailLoginCode(
+  options: HostedAuthOptions,
+  input: { challengeId: string; code: string },
+): Promise<HostedAuthOutcome<{ session: HostedAuthSession }>> {
+  if (input.challengeId.trim() === '' || !/^\d{6}$/.test(input.code)) {
+    return failure('invalid-input');
+  }
+  const result = await postJson(options, HOSTED_AUTH_PATHS.loginCodeVerify, {
+    challengeId: input.challengeId,
+    code: input.code,
+  });
+  if (!result.ok) return result;
+  const session = parseSession(result.body);
+  return session === undefined ? failure('malformed-response') : { ok: true, session };
+}
+
+/** 重发登录码；归属由 challengeId 决定，客户端不再次提交邮箱。 */
+export async function resendEmailLoginCode(
+  options: HostedAuthOptions,
+  challengeId: string,
+): Promise<HostedAuthOutcome<HostedRegistrationChallengeResult>> {
+  if (challengeId.trim() === '') return failure('invalid-input');
+  const result = await postJson(options, HOSTED_AUTH_PATHS.loginCodeResend, {
     challengeId,
   });
   if (!result.ok) return result;

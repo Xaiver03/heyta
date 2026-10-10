@@ -107,6 +107,25 @@ export interface AuthFormLabels {
   readonly passwordMismatch?: string;
   readonly passwordConfirmationRequired?: string;
   /** 邮箱注册验证码阶段。 */
+  /**
+   * 验证码**登录**那一块（2026-10-10）。不给 = 整块不渲染（实例/宿主没接这条登录路）。
+   * 形状与 `registrationCode` 同族 —— 两个挑战流的界面义务相同：回执、倒计时、重发、换邮箱。
+   */
+  readonly loginCode?: {
+    readonly trigger: string;
+    readonly title: string;
+    readonly sent: (email: string) => string;
+    readonly label: string;
+    readonly placeholder: string;
+    readonly verify: string;
+    readonly resend: string;
+    readonly resendIn: (seconds: number) => string;
+    readonly changeEmail: string;
+    readonly expired: string;
+    readonly codeLength: number;
+  };
+  /** 「记住密码」勾选框的文字。不给 = 不渲染（宿主没接存储就不许许诺记住）。 */
+  readonly rememberPassword?: string;
   readonly registrationCode?: {
     readonly title: string;
     readonly sent: (email: string) => string;
@@ -290,7 +309,26 @@ export interface AuthFormProps {
    * 需求 —— 宿主拿它只是为了**提前说一句**（以及决定发不发），不需要改写用户正在打的字。
    */
   readonly onInviteCodeChange?: (code: string) => void;
-  readonly onSignIn: (input: { email: string; password: string }) => void;
+  /**
+   * 🔴 `rememberPassword` 是用户的**明示选择**，随登录一起交回宿主；
+   * 宿主决定存不存、存哪（本组件与 store 都不持久化任何口令 —— 文件头那条纪律不变）。
+   */
+  readonly onSignIn: (input: { email: string; password: string; rememberPassword?: boolean }) => void;
+  /** 预填口令（仅当宿主存了「记住密码」且用户上次勾了时才给）。只进组件本地 state。 */
+  readonly initialPassword?: string;
+  readonly initialRememberPassword?: boolean;
+  readonly onRememberPasswordChange?: (checked: boolean) => void;
+  /** 「使用验证码登录」触发。宿主发请求；挑战到达时经 `loginChallenge` 回来。 */
+  readonly onLoginCode?: (email: string) => void;
+  /** 登录码挑战由宿主保存；形状与注册挑战逐字同族（同一读取器产出）。 */
+  readonly loginChallenge?: {
+    readonly email: string;
+    readonly expiresAt: number;
+    readonly resendAvailableAt: number;
+    readonly onVerify: (code: string) => void;
+    readonly onResend: () => void;
+    readonly onChangeEmail: () => void;
+  };
   readonly onRegister: (input: {
     email: string;
     password: string;
@@ -346,6 +384,11 @@ export function AuthForm({
   onSignIn,
   onRegister,
   registrationChallenge,
+  loginChallenge,
+  initialPassword,
+  initialRememberPassword = false,
+  onRememberPasswordChange,
+  onLoginCode,
   onMagicLink,
   onPasskey,
   onRecovery,
@@ -378,7 +421,11 @@ export function AuthForm({
   const [otherWaysOpen, setOtherWaysOpen] = useState(false);
   const [mode, setMode] = useState<AuthFormMode>('sign-in');
   const [email, setEmail] = useState(initialEmail);
-  const [password, setPassword] = useState('');
+  // 🔴 预填口令只来自宿主的「记住密码」存储（用户上次明示勾过）。进组件本地
+  // state 后它仍然**只**活在这里 —— store / 持久化 / 日志都不碰（文件头纪律）。
+  const [password, setPassword] = useState(initialPassword ?? '');
+  const [rememberPassword, setRememberPassword] = useState(initialRememberPassword);
+  const [loginCode, setLoginCode] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [revealed, setRevealed] = useState(defaultPasswordRevealed(resolvedPlatform));
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -407,6 +454,8 @@ export function AuthForm({
   const passwordInput = useRef<TextInput | null>(null);
   const confirmPasswordInput = useRef<TextInput | null>(null);
   const registrationCodeInput = useRef<TextInput | null>(null);
+  const loginCodeInput = useRef<TextInput | null>(null);
+  const hadLoginChallenge = useRef(false);
   const hadRegistrationChallenge = useRef(false);
 
   useEffect(() => {
@@ -435,6 +484,33 @@ export function AuthForm({
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, [registrationChallenge, stage]);
+
+  useEffect(() => {
+    if (loginChallenge === undefined) return;
+    hadLoginChallenge.current = true;
+    setStage('login-code');
+    setLoginCode('');
+  }, [loginChallenge?.email, loginChallenge?.expiresAt]);
+
+  useEffect(() => {
+    if (loginChallenge === undefined && hadLoginChallenge.current) {
+      hadLoginChallenge.current = false;
+      setLoginCode('');
+      setStage('credential');
+    }
+  }, [loginChallenge]);
+
+  useEffect(() => {
+    if (loginChallenge !== undefined && stage === 'login-code') {
+      loginCodeInput.current?.focus();
+    }
+  }, [loginChallenge?.email, loginChallenge?.expiresAt, stage]);
+
+  useEffect(() => {
+    if (loginChallenge === undefined || stage !== 'login-code') return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [loginChallenge, stage]);
 
   /**
    * 此刻该标红的字段：本地校验指的那个，或宿主指明的（`status.field`）。
@@ -492,6 +568,18 @@ export function AuthForm({
   };
 
   const onSubmit = (): void => {
+    if (stage === 'login-code') {
+      const codeLabel = labels.loginCode;
+      if (loginChallenge === undefined || codeLabel === undefined) return;
+      if (Date.now() >= loginChallenge.expiresAt) return;
+      const code = loginCode.replace(/\D/g, '').slice(0, codeLabel.codeLength);
+      if (code.length !== codeLabel.codeLength) {
+        loginCodeInput.current?.focus();
+        return;
+      }
+      idleOnly(() => loginChallenge.onVerify(code));
+      return;
+    }
     if (stage === 'registration-code') {
       const codeLabel = labels.registrationCode;
       if (registrationChallenge === undefined || codeLabel === undefined) return;
@@ -529,7 +617,7 @@ export function AuthForm({
     setLocalField(undefined);
     idleOnly(() => {
       if (mode === 'sign-in') {
-        onSignIn({ email, password });
+        onSignIn({ email, password, rememberPassword });
         return;
       }
       onRegister({
@@ -541,6 +629,11 @@ export function AuthForm({
     });
   };
 
+  const loginCodeLabel = labels.loginCode;
+  const loginExpired = loginChallenge !== undefined && now >= loginChallenge.expiresAt;
+  const loginResendSeconds = loginChallenge === undefined
+    ? 0
+    : Math.max(0, Math.ceil((loginChallenge.resendAvailableAt - now) / 1000));
   const registrationCodeLabel = labels.registrationCode;
   const registrationExpired = registrationChallenge !== undefined && now >= registrationChallenge.expiresAt;
   const resendSeconds = registrationChallenge === undefined
@@ -645,7 +738,60 @@ export function AuthForm({
         ) : null}
       </View>
 
-      {stage === 'registration-code' && registrationChallenge !== undefined && registrationCodeLabel !== undefined ? (
+      {stage === 'login-code' && loginChallenge !== undefined && loginCodeLabel !== undefined ? (
+        <View style={styles.field} testID={`${testID}-login-code-stage`}>
+          <Text style={[text['section-title'], styles.title]}>{loginCodeLabel.title}</Text>
+          <Text style={[text['row-meta'], styles.muted]}>{loginCodeLabel.sent(loginChallenge.email)}</Text>
+          <TextInput
+            ref={loginCodeInput}
+            value={loginCode}
+            onChangeText={(next) => setLoginCode(next.replace(/\D/g, '').slice(0, loginCodeLabel.codeLength))}
+            placeholder={loginCodeLabel.placeholder}
+            placeholderTextColor={tokens['color.foreground-subtle']}
+            inputMode="numeric"
+            keyboardType="number-pad"
+            autoComplete="one-time-code"
+            autoCorrect={false}
+            style={[text['row-title'], styles.input]}
+            accessibilityLabel={loginCodeLabel.label}
+            aria-invalid={status?.tone === 'error'}
+            testID={`${testID}-login-code`}
+          />
+          {loginExpired ? <Text style={[text['caption'], styles.danger]}>{loginCodeLabel.expired}</Text> : null}
+          <Pressable
+            accessibilityRole="button"
+            onPress={guard(onSubmit)}
+            testID={`${testID}-login-code-submit`}
+            disabled={busy || loginExpired || loginCode.length !== loginCodeLabel.codeLength}
+            aria-disabled={busy || loginExpired || loginCode.length !== loginCodeLabel.codeLength}
+            style={({ pressed }) => [styles.primary, pressed ? styles.primaryPressed : null,
+              busy || loginExpired || loginCode.length !== loginCodeLabel.codeLength
+                ? { opacity: tokens['state.disabled-opacity'] } : null]}
+          >
+            <Text style={[text['headline'], styles.primaryLabel]}>{loginCodeLabel.verify}</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={guard(() => {
+              if (loginResendSeconds === 0) loginChallenge.onResend();
+            })}
+            style={({ pressed }) => [styles.textAction, pressed ? styles.pressed : null]}
+            testID={`${testID}-login-code-resend`}
+          >
+            <Text style={[text['row-meta'], styles.linkText]}>
+              {loginResendSeconds === 0 ? loginCodeLabel.resend : loginCodeLabel.resendIn(loginResendSeconds)}
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={guard(loginChallenge.onChangeEmail)}
+            style={({ pressed }) => [styles.textAction, pressed ? styles.pressed : null]}
+            testID={`${testID}-login-code-change-email`}
+          >
+            <Text style={[text['row-meta'], styles.linkText]}>{loginCodeLabel.changeEmail}</Text>
+          </Pressable>
+        </View>
+      ) : stage === 'registration-code' && registrationChallenge !== undefined && registrationCodeLabel !== undefined ? (
         <View style={styles.field} testID={`${testID}-registration-code-stage`}>
           <Text style={[text['section-title'], styles.title]}>{registrationCodeLabel.title}</Text>
           <Text style={[text['row-meta'], styles.muted]}>{registrationCodeLabel.sent(registrationChallenge.email)}</Text>
@@ -816,6 +962,41 @@ export function AuthForm({
           </View>
           {missing('password') ? (
             <Text style={[text['caption'], styles.danger]}>{labels.localErrors.password}</Text>
+          ) : null}
+          {/*
+            「记住密码」（2026-10-10 产品负责人需求）。只出现在**登录**档：
+            注册那一步没有任何"记住"可言。勾选框与同意项同一个对齐算子
+            （`termsCheckboxOffset`）。存储是宿主的事 —— 组件只把选择交回去。
+          */}
+          {mode === 'sign-in' && labels.rememberPassword !== undefined ? (
+            <Pressable
+              accessibilityRole="checkbox"
+              aria-checked={rememberPassword}
+              onPress={() => {
+                const next = !rememberPassword;
+                setRememberPassword(next);
+                onRememberPasswordChange?.(next);
+              }}
+              style={styles.termsRow}
+              testID={`${testID}-remember-password`}
+            >
+              <View
+                style={[
+                  styles.checkbox,
+                  { marginTop: termsCheckboxOffset },
+                  rememberPassword ? styles.checkboxOn : null,
+                ]}
+              >
+                {rememberPassword ? (
+                  <HeytaIcon
+                    data={Check}
+                    size={tokens['icon.xs']}
+                    color={tokens['color.on-primary']}
+                  />
+                ) : null}
+              </View>
+              <Text style={[text['caption'], styles.termsText]}>{labels.rememberPassword}</Text>
+            </Pressable>
           ) : null}
           {mode === 'register' ? (
             <>
@@ -1103,6 +1284,23 @@ export function AuthForm({
           >
             <Text style={[text['row-meta'], styles.linkText]}>{labels.recovery}</Text>
             </Pressable>
+          {mode === 'sign-in' && labels.loginCode !== undefined && onLoginCode !== undefined ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={guard(() => {
+                if (email.trim() === '') {
+                  setLocalField('email');
+                  emailInput.current?.focus();
+                  return;
+                }
+                onLoginCode(email);
+              })}
+              style={({ pressed }) => [styles.textAction, pressed ? styles.pressed : null]}
+              testID={`${testID}-login-code-trigger`}
+            >
+              <Text style={[text['row-meta'], styles.linkText]}>{labels.loginCode.trigger}</Text>
+            </Pressable>
+          ) : null}
           </>
           )}
         </View>
