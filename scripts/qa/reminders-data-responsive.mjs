@@ -925,7 +925,9 @@ async function syncPrivacyJourney(browser, spec) {
   const shot = async (name) => {
     const path = `${OUT}/sync-privacy-${name}-${spec.theme}-${spec.width}.png`;
     await page.screenshot({ path });
-    screenshots.push(path.split('/').pop());
+    // 🔴 记的是**归一后的锚**，不是文件名：只留 basename 的写法在报告里说不出基准（现量在册
+    //    38 份 report.json 的 994 枚图片锚里，252 枚是裸名，全在这一枚字段上）。
+    screenshots.push(toReportPath(path));
   };
 
   // 有界落定之前先确认面板还在 DOM 里。第三趟就是这里死的：Escape 把设置浮层带走了，
