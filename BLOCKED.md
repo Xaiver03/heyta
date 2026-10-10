@@ -7605,3 +7605,92 @@ HEAD 解析得开 **209**、登记 **1**（就是这一枚）、新缝 **0**；�
 **对本线的直接影响**：T7 干净检出的红集里现在有**两格归属明确是本线的**，而且是**两种不同的修法**：
 B129 缺三枚成员（改 6 行、在 `packages/storage`），B130 缺整枚模块（新入库 2 枚文件、在 `packages/app-host`）。
 下一位跑 `pnpm check` 之前先跑这把尺，否则归因会糊在 B112 那四处缝里。
+
+## B131 `waiting-entitlement` 的**第三处同形**：`apps/node-host` 把 app-host 的 cycle 状态内联重抄了一遍，`pnpm -r build` 在带工作树改动的树上必红
+
+**现量（10-10 13:2x，隔离载体 `.worktrees/iosacct`）**：
+
+```
+cd .worktrees/iosacct && npm_config_verify_deps_before_run=false pnpm --filter @heyta/node-host build
+⇒ rc=1
+src/host.ts(422,5): error TS2322: Type '(input: InboundAutomationHostOptions) => Promise<InboundAutomationCycleResult>'
+  is not assignable to type '(options: InboundAutomationHostOptions) => Promise<{ state: "empty" | "submitted" | "needs-confirmation"; … }>'
+  Type '"waiting-entitlement"' is not assignable to type '"empty" | "submitted" | "needs-confirmation"'
+```
+
+- 生产侧：`packages/app-host/src/inbound-process.ts:53` 的四态联合（`:72-73` 真会回 `waiting-entitlement`），
+  **已在 HEAD**（`git show HEAD:…` 命中 4 次）；app-host 也已把它 export 出去（`packages/app-host/src/index.ts:918`）。
+- 消费侧：`apps/node-host/src/host.ts:274` 那个方法签名**把 union 内联重抄了一遍**（没 import 共享类型），
+  而这一枚内联重抄只存在于工作树（`git show HEAD:apps/node-host/src/host.ts | grep -c "'empty' | 'submitted' | 'needs-confirmation'"` = **0**，
+  `git status` 给 ` M`，mtime 10-08 14:07）。
+- ⇒ 两棵树各自在一处红、**没有一棵树能整仓构建**：纯 HEAD 红在别处（`packages/app-host` 的 barrel 曾引一枚未跟踪源文件，见账号标准套件台账 §6.76/§6.81），
+  HEAD＋整片在飞红在这里。AGENTS §6.1.1 的四端重装、以及任何 `verify:*` 设备腿，都被这一格挡住——**不只本线**。
+
+**与 B110 的关系**：B110 是同一枚状态加宽的**界面那半**（`web.ai.inbound.process.*` 缺词条 + `InboundAutomationSettings.tsx:56` 的 `useState` 联合）。
+B110 里那句收尾"把 `processWebInboundOnce` 的返回类型换成 app-host 已导出的 `InboundAutomationCycleResult`"就是这一格的同一种修法，
+只是落在 CLI 那一侧：`host.ts:274` 应 import 那个 export，而不是再抄一遍 union。AGENTS §3.5 拦的正是这个形状
+（apps/ 里重抄一份产品语义；§3.5 的教训原话是"抽取的收尾动作是删掉旧的那份并加门禁"）。
+
+**为什么不代改**（三条不齐）：① 不是删一子 —— 换成 import 之后，node-host 对 `waiting-entitlement` **做什么**是产品语义
+（退避重试？打印一句等待？直接返回 empty？`packages/app-host/src/inbound-session-keepalive.ts:19` 给共享层的规则是"退避重试，订阅到账后用户不必重开应用"，
+CLI 那一侧要不要照它做，归这条线拍）；② 改后的运行时形状无法现量等于改前（新增一条分支）；③ `apps/node-host/src/host.ts` 此刻是 ` M`，那条线还没交。
+
+**给那条线的一次成对追加**（改完这两处，整仓构建与四端重装一起解锁）：
+
+```ts
+// apps/node-host/src/host.ts:274 —— 用共享类型，别再抄一遍 union
+processInboundAutomation(options: InboundAutomationHostOptions): Promise<InboundAutomationCycleResult>;
+// 并在 :422 那个实现旁，按你们决定的口径处理 'waiting-entitlement' 那一档
+```
+
+**顺带一条装置事实**（写给下一个在 linked worktree 里跑构建的人）：`pnpm -r build` 会先跑 pnpm 的 deps 自检并**自作主张 `pnpm install`**，
+本机那一条 ECONNRESET 到 registry ⇒ 失败信息长得像"缺依赖"而不是真错。带 `npm_config_verify_deps_before_run=false` 才走到真错那一步。
+**不需要也不应该动任何本机网络配置**；carrier 的 `node_modules` 是完整的（含在飞新加的 `@zxcvbn-ts/*`），`pnpm-lock.yaml` 干净，别在载体里跑 install。
+
+
+## B132（2026-10-10 13:3x，本会话 · T3 整跑时量出的）：那 13 格故障窗口**没有任何门禁消费者**，只有装置跑它
+
+**现量**（同一棵树上两种跑法）：
+
+```
+cd server && npx vitest run tests/integration/inbound-dual-host-fault-windows.integration.spec.ts
+⇒ rc=1，No test files found          # 默认 server/vitest.config.ts 把 tests/integration/**.integration.spec.ts 整个排除
+cd server && npx vitest run --config vitest.integration.config.ts --maxWorkers=1 <那一枚>
+⇒ 跑得动，但它也不在 server/package.json 的 test:integration:postgres 那枚清单里
+grep -c "inbound-dual-host" server/package.json server/tsconfig.json ⇒ 0 / 0
+```
+
+⇒ 今天的消费者只有 `python3 research/tools/verify-inbound-dual-host.py` 一条命令；`pnpm check`、`pnpm -r test`、
+任何 `tsc` 都不会跑它，也不会编它（所以它的类型红只能靠手动 `tsc --noEmit …` 取，本会话每趟都手动取过）。
+
+**为什么本线不代改**：`server/package.json` 与 `server/tsconfig.json` 在白名单外。
+**给负责人的两条候选**：① 把那枚 spec 加进 `test:integration:postgres` 的清单 + `tsconfig` 的 `include`
+（它要一次性 PG，混进 `pnpm -r test` 会让无库的载体红 —— 所以推荐只进 `tsconfig.include` 和那一枚专项清单）；
+② 新加一枚门禁（`check:inbound-dual-host`）直接调那台装置，并挂进 `pnpm check`。推荐 ②：装置的打分逻辑
+（分母现量、拒绝 0/0、五臂自测）比"vitest 跑没跑过"更硬，而且它已经是这条套件的实际消费者。
+
+## B133（2026-10-10 13:3x，本会话 · 补齐 W8 时量出的）：接手方读到的是 `empty`，服务端那格其实是"结果不确定、要人看"
+
+**现量**：窗口 3 与窗口 8 的①b/④ 三档都走到同一个服务端终态
+`status='needs-confirmation' + reasonCode='model-result-uncertain'`（`server/src/automation/events.ts` 领取分支，
+注释原话 "A new lease generation is not authorization to buy another model request"），
+而宿主侧 `processInboundAutomation` 只回报 `{ state: 'empty' }` —— 领取响应里根本没有这一格，客户端读不到原因。
+
+**为什么这是判据口径而不是代码 bug**：三种读法都自洽，选哪个是产品决定 ——
+① 让领取响应带上那条 reasonCode（要动 `packages/shared-schema` 的入站契约，且要回答"empty 与 refused 怎么区分"）；
+② 让宿主在 cycle 末尾另读一次事件摘要（多一次 HTTP，且要把 `empty` 拆成两档状态词）；
+③ 界面上把"这一格被计过量、结果不确定"单独显示（依赖 ① 或 ②，还要 i18n 词条 —— 而 `packages/i18n` 明令不许动）。
+本会话按纪律**没有**改那枚断言（它现在钉的就是"接手方回 `empty` 且不多买一次模型"，这条承诺成立），
+也没有替负责人选读法。受影响的用户可见面：AC-6 的"状态原因码表"。
+
+## B134（2026-10-10 13:3x，本会话 · W8 第五腿量出的）：删除规则会把这条规则的**许可与计量账本整片抹走**，逐事件对账随删除消失
+
+**现量**：解析中删掉规则以后，`automation_commit_permit` 与 `automation_ai_attempt` 对**该用户**都数到 0
+（`server/src/automation/rules.ts` 的 `deleteAutomationRule` 里那四张 `deleteMany`），事件行也一并删除；
+规则本身留墓碑。这一档不是缺陷（设计就是"规则身份不可复用 + 服务端不留事件摘要"），但它与 **AC-3 那句
+"观察任务数、op 数、回执与计量结果"** 和 **T4 那句"managed 额度与自动收集能逐事件对账"** 有直接关系：
+删完规则就没有逐事件账可对了，而 `hosted-ai-monthly` 的额度承诺（ADR-0023 那条红线）要能对账。
+
+**要负责人拍的一句**：已删规则的计量账要不要留一份**只含计数**的摘要（不含事件/规则正文摘要）？
+留 ⇒ 一枚新迁移 + `deleteAutomationRule` 的删除集要重划；不留 ⇒ T4 的对账判据必须写明"仅覆盖未删除的规则"，
+而对外说明里"逐事件可对账"这句要跟着收窄。本会话按现状把这一档**量出来并写进台账**，没动删除语义。

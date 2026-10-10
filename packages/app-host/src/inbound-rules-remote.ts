@@ -69,8 +69,13 @@ export function createInboundRulesRemote(options: {
       ? {}
       : { [AUTOMATION_ENTITLEMENT_TICKET_HEADER]: await options.getEntitlementTicket(ticketRequest) };
     try {
+      // `content-type: application/json` **只在有体的那一笔**声明。现量（真 Fastify 5.12.5）：
+      // 一个 json 头配空体在 DELETE 上是 400 `FST_ERR_CTP_EMPTY_JSON_BODY` —— 也就是说这一句
+      // 以前把"删除规则"钉死成 400，用户在界面上点删除永远只能看到"请求失败"。
+      // 少带头（提交许可那笔，同族镜像）与多带头是同一类缺陷的两个方向，判据两头都钉。
       const response = await (options.fetchImpl ?? globalThis.fetch)(new URL(`/api/automation${path}`, options.baseUrl), {
-        method, redirect: 'error', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', ...ticketHeaders },
+        method, redirect: 'error',
+        headers: { authorization: `Bearer ${token}`, ...(body === undefined ? {} : { 'content-type': 'application/json' }), ...ticketHeaders },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
       if (response.status === 402) throw new AutomationEntitlementRequiredError(await automationRejectionReason(response));

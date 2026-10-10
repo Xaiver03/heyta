@@ -2498,3 +2498,33 @@ AC 现量：**未勾 8 / 已勾 0**。
    B129 改 `packages/storage` 那 6 行；B130 把 `packages/app-host` 那 2 枚未跟踪文件入库。两格都要一句授权
    （路径在白名单外），没有代拍。下一位跑 `pnpm check` 前先跑 `verify-inbound-producer-seam.py`，
    否则归因会糊在 B112 那四处缝里。
+
+## 2026-10-10 13:3x · T3 那三档"未跑"补齐：先修探针的注入时机，再当场查出两枚"已交付的宿主在真线上走不通"
+
+1. **W8 从两腿扩成六腿，整跑 `Windows: 13/13` / `DEVICE_RC=0`**（套件自己 `Tests 14 passed (14)`），
+   装置五臂 `--self-test` 同一天复跑 `SELFTEST_RC=0`。逐档读数进台账 §13:3x 那张表（七档，含拆分后的两档权益到期）。
+2. 🔴 **第一版那三档全红，根因是探针不是产品**：撤销/删除的注入抢在宿主**第一次 HTTP 请求之前**落库，
+   于是 B 根本没领到格子（`GET /events/<id>/result?clientId=dual-host-b -> 403`），事件停在 `queued`、
+   计量表零行 —— 后来 A 合法地重买一次。旧写法量的其实是"派发前"，而"派发前不许买"与"已买那次不许再买第二遍"
+   是两档不同的承诺。修法是注入前先 `waitProviderHit()`（等真供给方收到请求，5 秒上限，等不到就红且点名），
+   并把那一腿拆成 ①a/①b。**形状：凡"在某阶段中断"的注入，判据要先证明那个阶段真的在进行中。**
+3. 🔴 **真缺陷一（产品）**：`inbound-worker.ts` 八笔 HTTP 里只有五笔把 402 读成 `AutomationEntitlementRequiredError`，
+   而 `/events/:id/renew` 与 `/ai-attempt/state` 的路由**都**挂着权益闸门 ⇒ 订阅到期时那两笔回 402，
+   宿主读成"传输失败"，`inbound-process.ts` 那条 `waiting-entitlement` 收口根本不触发（界面只剩报错，
+   没有"额度已用完"，且会对终态拒绝退避重试）。这条是 ①b 那一腿在真服务端上撞出来的（402 body
+   `SUBSCRIPTION_REQUIRED / PERIOD_ENDED`）。修法：三笔补齐同一句映射；判据按表逐笔读 +
+   **分母从真源自算**（函数体含 `globalThis.fetch` 的导出函数必须与表逐一对齐）。
+   四臂反向验证全红且点名（`ai-attempt-state` / `lease-renew` / `result-recover` / 新加一笔没登记），
+   每臂从 `/tmp` 的 pristine 副本还原、`cmp` 对账后复跑绿。
+4. 🔴 **真缺陷二（产品）**：`inbound-rules-remote.ts` 那句"永远声明 `content-type: application/json`"
+   把**删除规则**钉死成 400。真 Fastify 5.12.5 逐形状现量：`DELETE` + json 头 + 空体 ⇒ 400
+   `FST_ERR_CTP_EMPTY_JSON_BODY`；同一笔不带那个头 ⇒ 200；`GET` + json 头 + 无体 ⇒ 200；`POST` + 空体 ⇒ 400。
+   它与上午那枚（提交许可**少**带头）是同一类缺陷的两个方向 ⇒ 新判据两头都钉：**头的有无与体的有无同生同灭**，
+   分母取自客户端自己导出的方法集（13 枚）。修前红点名 5 枚 `header-without-body`，修后 `Tests 11 passed (11)`，
+   分母那一处的臂（把 `remove` 拿掉）也红。
+5. 门禁/读数：`pnpm --filter @heyta/app-host typecheck` `TSC_RC=0`；`pnpm --filter @heyta/app-host test`
+   `Test Files 93 passed (93)` / `Tests 1766 passed (1766)`、跳过 0（基线 1763，本趟 +3）；
+   `check-docs-voice` rc=0；`docs-link-check` rc=1 且**唯一一条仍不是本线**（`apps/desktop-windows/README.md:89`）。
+   一次 `pnpm exec vitest run` 被内存闸门拒绝（轻量档 2/2 被别人占），按纪律不 kill 任何东西、有界重试后取到读数。
+6. **仍不勾 AC-3**：射程是传输层 + 真服务端 + 两条真宿主本地库，四端壳/界面层（T5、AC-6）不在这一格，
+   且这一趟跑在共享主检出（T7 的合并态门禁从没跑过）。`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` = 0。

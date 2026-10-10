@@ -77,7 +77,7 @@
 
 - [ ] **AC-1 权益与授权**。输入：P1-3 授权契约 + 新增 ADR（限定取代 ADR-0017/0020 的范围）+ 迁移清单 + P1-4 计量契约。证据：关闭旧权益 gate 仍挡住未授权自动收集、免费同步仍通过；免费/过期/错主体/错实例/坏签名/额度耗尽均拒绝且**不产生业务效果**；重试账目可对账。
 - [ ] **AC-2 接收与队列**。输入：P1-5 线协议 + 签名测试向量 + P1-6 envelope。证据：真 HTTP 验证字节级签名、时间窗、大小、并发限额、跨账号隔离；同键同体重放返回同事件、**同键异体冲突**；持久化失败不返回 accepted；查询无任务明文。
-- [ ] **AC-3 领取与提交**。输入：P1-1 事件状态机、lease generation/fencing、提交唯一身份、崩溃恢复图。证据：**两个独立真实宿主与独立数据库**跑通下方十个故障注入窗口，观察任务数、op 数、回执与计量——不只断言 HTTP 成功。
+- [ ] **AC-3 领取与提交**。输入：P1-1 事件状态机、lease generation/fencing、提交唯一身份、崩溃恢复图。证据：**两个独立真实宿主与独立数据库**跑通下方十个故障注入窗口，观察任务数、op 数、回执与计量——不只断言 HTTP 成功。现量入口：`python3 research/tools/verify-inbound-dual-host.py` ⇒ `Windows: 13/13`（2026-10-10 13:3x 在当前源码上复跑取到，读数见 §13:3x 那一节）；**整条仍不勾**：窗口 8 那五档当天已补齐七档逐档读数，但这一趟跑在**共享主检出**上（T7 的合并态全仓门禁从没跑过），且量的是传输层 + 真服务端 + 两条真宿主本地库 —— 四端壳与界面层（T5 / AC-6）不在这格的证据里。
 - [ ] **AC-4 解析**。输入：P1-7 字段映射与判定表 + P1-8 出境授权范围。证据：同一事件在不同时区、不同处理日得到相同归一化结果；DST/非法日期/长输入/多输出受限；正文中的注入指令与模型额外字段不能触发越权调用；实际出境请求符合披露。
 - [ ] **AC-5 批创建与来源记录**。输入：P1-2 批创建 intent/reducer/线形状 + 来源 receipt。证据：多项不同字段只产生一枚逻辑 op；中断重启无半批；三套存储适配器与远端回放收敛；删除任务后重试不复活；旧数据无来源字段仍能 hydration。
 - [ ] **AC-6 规则界面**。输入：规则版本契约、预览的计费/零写语义、状态原因码表、端能力表。证据：用户独立完成“启用 → 测试发送 → 等待 → 打开/解锁 → 自动处理 → 查看结果”；暂停/撤销/改规则与在途处理的竞态可解释；亮暗、窄屏、中英及各壳入口可用。
@@ -128,7 +128,14 @@
 
 阶段验证：shared-schema 新契约 14 项、op-log 新批/恢复 16 项、app-host 新动作 9 项通过；storage 全包 419 项、op-log 全包 133 项通过，五个改动包类型检查通过。上述测试是当前工作树的阶段证据，**不是最终隔离基线的全仓验收**。shared-schema 全包目前 160 通过/1 失败，失败是并行认证变更将 `AUTH_PASSWORD_PATHS` 从 6 项扩为 9 项而原测试仍断言 6（`auth-http-contract.spec.ts:83`）；本轮未改该生产文件或测试。文档死链仍有并行产品 UX 的 14 处，本任务新增文档链路无报错；ADR 编号检查通过。
 
-尚未闭合：各宿主真实生命周期接入、账号/本地库实例绑定的最终验收、清单授权与中心许可的跨版本证据、跨设备十个故障窗口、真进程终止（当前是可控失败/真实文件重开）、根密钥轮换、密码学/时区/商业接线、UI、全仓及当前产物重装。AC-3/AC-5 仍保持未勾选，Goal 保持 active。
+尚未闭合：各宿主真实生命周期接入、账号/本地库实例绑定的最终验收、清单授权与中心许可的跨版本证据、
+密码学/时区/商业接线、UI、全仓及当前产物重装。AC-3/AC-5 仍保持未勾选，Goal 保持 active。
+
+> ⚠️ 这一句写于 W1 阶段，其中**三项已被 2026-10-10 那一节否证**，留着是为了让人看清哪些结论是有保质期的：
+> "跨设备十个故障窗口"、"真进程终止（当前是可控失败/真实文件重开）"、"根密钥轮换" —— 现在都由
+> `research/tools/verify-inbound-dual-host.py` 在两条真 SQLite 宿主 + 一次性真库上量到 **13/13**
+> （窗口 2/4/5 是真 `SIGKILL`，窗口 10 是 root 轮换后原设备仍能处理）。AC-3 整条仍不勾，理由换成
+> `empty` 读法缺口与"这一趟跑在共享主检出、四端壳不在射程内"（撤销族那三档已在同一天 13:3x 补齐）。
 
 ### 身份边界勘误与 W2 基础进度
 
@@ -146,7 +153,11 @@
 临时 PostgreSQL 用原迁移 SQL 构建空库；macOS 上项目部署脚本被 Linux 专属 `client_connection_check_interval` 拒绝，因此这不是部署脚本验收。生产环境未迁移。此前测试许可是显式数据库夹具，不宣称已完成跨端授权状态机；注册、领取/冻结/许可签发和共享 worker 正常路径已接线，但密钥生命周期、日期语义、UI 与各端交付仍未闭合。Goal 继续 active。
 
 
-身份切片复跑入口：`python3 research/tools/verify-inbound-worker-identity.py`（需 PostgreSQL 工具，可用 `--pg-bin` 指定）；它只创建 loopback 临时测试库，结束停止并清理。删除窗口现以“删除事件/摘要/服务端 permit，客户端已保存的签名 owner receipt 支持迟到同步”为边界，但两个独立宿主的真实进程中断验收仍归 AC-3，尚未验收。
+身份切片复跑入口：`python3 research/tools/verify-inbound-worker-identity.py`（需 PostgreSQL 工具，可用 `--pg-bin` 指定）；它只创建 loopback 临时测试库，结束停止并清理。删除窗口现以“删除事件/摘要/服务端 permit，客户端已保存的签名 owner receipt 支持迟到同步”为边界。
+⚠️ 这句尾巴（2026-10-10 更正）：原文写"但两个独立宿主的真实进程中断验收仍归 AC-3，**尚未验收**"——
+这一格已由 `research/tools/verify-inbound-dual-host.py` 量到（两条真 SQLite 宿主 + 一次 `SIGKILL` 真进程终止，13/13，见 12:5x 那一节），
+但**AC-3 整条仍不勾**：撤销族七档当天已逐档补齐（§13:3x），剩下的不是覆盖率而是载体与射程 ——
+这一趟跑在共享主检出（T7 的合并态全仓门禁从没跑过），四端壳与界面层不在这一格。
 
 本切片的[真库输出](../research/evidence/inbound-automation-review/worker-identity-postgres.txt)与[源码摘要](../research/evidence/inbound-automation-review/worker-identity-manifest.json)另存，不覆盖复审前的基线摘要。
 
@@ -1323,5 +1334,217 @@ SELFTEST_RC=0
 对本线的影响：T7 干净检出的红集里现在有**两格归属明确是本线的**，修法是两种不同的动作 ——
 B129 改 `packages/storage` 的 6 行、B130 把 `packages/app-host` 的 2 枚文件入库。两者都要一句授权（路径在白名单外），
 本线不代拍。
+
+## 2026-10-10 12:5x · 十三个故障窗口第一次在**两条真 SQLite 宿主 + 一次性真库**上整跑：装置自报 13/13
+
+新装置 `research/tools/verify-inbound-dual-host.py`（形状照 `verify-inbound-worker-identity.py`），套件
+`server/tests/integration/inbound-dual-host-fault-windows.integration.spec.ts` + 子进程夹具
+`server/tests/integration/inbound-dual-host-child.mjs`。它自己 `initdb` 一枚一次性 PG、逐枚**真应用**
+`server/prisma/migrations` 的全部迁移、确认 `packages/app-host/dist` 不比源码旧，再起两条各自独立 SQLite
+文件的真宿主跑满 13 格。窗口号分母从本节上面那张 AC-3 清单**现量**（不是抄来的常数），套件少报哪一格就报哪一格红。
+
+```
+$ python3 research/tools/verify-inbound-dual-host.py --log ~/.cache/heyta-dual-host-debug/device-run-1.log
+Planned windows (现量自 docs/plans/inbound-automation.md): [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+  WINDOW=1 … 13  全 PASS（每格带中文读数）
+Windows: 13/13
+DEVICE_RC=0
+```
+
+装置自己的五臂反向验证同一趟取到（`--self-test`，`SELFTEST_RC=0`）：静止对照必须绿、抽掉一格必须红且点名、
+汇总 `passed=0`（0/0）必须红、同一格报两遍必须红、把主表读到只剩 `[11]` 必须红 —— 最后这一臂挡的是"尺瞎了
+却报覆盖不全"。
+
+### §AC-3 覆盖矩阵：计划那五档撤销族，谁量了哪一档
+
+计划第 98 行（窗口 8）一句话里列了五档，套件把它**拆到三格**去量，逐档归位如下 ——
+当初没量到的三档当时就写成"未跑"而不是拿"WINDOW=8 PASS"顶过去；下面那三行是**同一天补齐后**改的读数
+（补齐那一趟的现场形状与两枚真缺陷见 §13:3x 那一节）：
+
+| 窗口 8 列的那一档 | 由哪一格量 | 现量形状 |
+|---|---|---|
+| 权益到期（派发前） | W8 第一腿①a | `waiting-entitlement` 且 A 本地零 op、真模型 0 次 |
+| 权益到期（解析中，模型已买） | W8 第一腿①b | `waiting-entitlement`、模型恰好 1 次、零许可、零新 op、计量行 `sent` |
+| Vault 锁定（提交前） | W8 第二腿 | 响亮抛出且 B 本地零 op，不多写 |
+| 暂停规则 | W11（相反顺序那一腿） | 许可先给 ⇒ 暂停后 owner receipt 仍补传；暂停中公网接收 403 |
+| 解析中删除规则 | W8 第五腿 | 抛错、A 仍 1 op；该规则的许可/计量账本随删除整片抹走 |
+| 撤销凭据（解析中） | W8 第四腿 | 抛错、B 零 op、零许可，计量行停在 `sent`；换机接手 ⇒ `needs-confirmation / model-result-uncertain`、模型仍 1 次 |
+| 撤回模型同意 | W8 第三腿 | 两腿才量得出闸门：没同意 ⇒ 拒 `egress-not-authorized`、计量 0 行；给了同意 ⇒ 失败原因挪到网络层、计量落 1 行 `unknown` |
+
+🔴 这三行**当天改过一次**：本节初稿写的是"W8 第一腿 = 权益到期（解析中）"，而那一腿真正量的是**派发前**
+（注入抢在宿主第一次请求之前）。上面那两档的拆分与现量证据在 §13:3x 那一节。
+
+### 这一趟真正查出来的东西（四条，其中一条是交付产物的缺陷）
+
+1. 🔴 **提交许可那一笔请求从来没带 `content-type`**。`packages/app-host/src/inbound-worker.ts` 里同族八个
+   POST 只有它漏了，而 `server/src/api.ts:137` 的 `AutomationCommitPermitSchema` 是 `.strict()` 的对象校验 ——
+   没有 `content-type: application/json` 时 Fastify 把 body 当字符串交给它，**每一次真许可请求都是 400**。
+   也就是说**已经交付的宿主在真线上拿不到提交许可**，自动收集走不到落库那一步。已修（同一处补上
+   `jsonHeaders`），并补一条**类级**判据：`packages/app-host/tests/inbound-worker.spec.ts` 里
+   `declares application/json on every call that carries a body` 遍历 `gatedCalls` 全部 8 枚带 body 的调用，
+   以后新增一枚漏头就红。变异取证：把头拿掉 ⇒ `Tests 1 failed | 14 passed (15)` 且点名 `commit-permit`；
+   还原 ⇒ `15 passed`。这条**不是**测试能替产品说话的那种判据 —— 它把"只有一个调用点漏了"这一整类钉住。
+2. **载体时区会把刚发的租约读成"已过期"**。`automation_events.lease_expires_at/expires_at/created_at` 是
+   `timestamp without time zone`（Prisma 按 UTC 分量写入），而 `server/src/automation/ai-metering.ts:92`
+   拿它和 `clock_timestamp()` 比 —— 本机 `initdb` 出来的会话时区是 `Asia/Shanghai`，这一步整差 8 小时。
+   装置现在对**它自己创建的那枚库** `ALTER DATABASE … SET timezone='UTC'`，让载体等于生产（生产是 UTC 会话），
+   这不是放宽判据。现场形状：`Inbound automation model failed: network`，而 `provider.sources.length` 是 1、
+   真错在 `ai-attempt/reserve → 409` 且 `lease_stale:true`。
+3. **一条永远红的判据**（窗口 9）。原写法是 `expect(actions.findTask(id)?.deletedAt ?? null).not.toBeNull()`，
+   而 `packages/app-host/src/actions.ts:414` 的 `taskOf` 对 `deletedAt !== undefined` **直接返回 undefined** ——
+   所以"已删"与"不存在"在它眼里都是 null，这条判据在正确的产品上也必然红。改成两读并立：
+   活动列表读不到（`findTask` undefined）**且**物化状态里 `deletedAt` 仍在（`host.getState().tasks[id]`）。
+   📌 形状：**用"过滤后的视图"去断言"过滤前那个字段"，判据测的是探针自己的实现**。
+4. **传进去的 clientId 不会写进 META**（`packages/app-host/src/host.ts:397` 是 `options.clientId ?? resolveClientId(...)`）。
+   窗口 5 原想量"同库重开还是不是同一台设备"，但只要夹具传固定 id，这件事**根本测不到**（重开读到一个新随机 id，
+   断言报的是 `expected '7ad4b578…' to be 'dual-host-a'`）。修法不是把断言改成"读到什么都算对"，而是让窗口 5 的
+   设备**不传**固定 id —— 生产里没有任何宿主传它。现在这一格量的是"从这条 SQLite 文件的 META 读回同一枚 id"。
+
+### 由猜改成量的两处（都是本套件自己写的判据，不是既有判据）
+
+- 窗口 3 原来断言"再跑一次必须抛 `/reconciliation/i`"。现量不是抛，而是**服务端**在领取时看见这条事件已有
+  `reserved/sent/consumed/unknown` 的尝试 ⇒ 不发新活，直接把事件收成
+  `status='needs-confirmation' + reasonCode='model-result-uncertain'`、清掉租约（`server/src/automation/events.ts:209-221`，
+  注释原话 "A new lease generation is not authorization to buy another model request"）。宿主侧因此报 `empty`。
+  判据换成三腿且更硬：同设备再跑**模型仍只调用 1 次、账本仍 1 行**；租约到期后换**另一台真宿主**领取被拒，
+  事件落成上面那个确定终态。反向验证：把那个状态列表抽掉成 `in: []` ⇒ W3 立刻红
+  （`expected 'submitted' to be 'empty'`，即接手方重新买了一次模型），还原 ⇒ 绿。
+- 窗口 9 的"编辑后再跑不许是 `submitted`"同样是猜的。现量走的是**认证设备补传**那条 recover 腿
+  （`/api/automation/events/recover?clientId=`），它把同一条持久 op 再提交一次，回报 `submitted` 而幂等闸门
+  让重放产生不了新状态。承诺的内容本来就不是状态词，而是**不覆盖编辑 / 不再买一次 / 不多写一枚 op**，三条各自断言。
+
+### 现在怎么跑（以及它的消费者是谁）
+
+```bash
+python3 research/tools/verify-inbound-dual-host.py          # 一次性 PG + 真迁移 + 两条真宿主 + 13 格打分
+python3 research/tools/verify-inbound-dual-host.py --self-test   # 五臂反向验证，不碰数据库
+```
+
+🔴 这条套件**不在 `pnpm -r test` 与 `test:integration:postgres` 那 32 枚清单里**，也不在任何 `tsc` 的
+`include` 里（`server/tsconfig.json` 只收 `src/**/*` 与 `scripts/**/*`）。它的消费者目前只有上面那条命令。
+两处都在 BLOCKED 登记（`server/package.json` 与 `server/tsconfig.json` 在本线白名单外，不代改）。
+临时类型检查这次手动取到：`pnpm exec tsc --noEmit --strict --target ES2022 --module esnext
+--moduleResolution bundler …integration.spec.ts` ⇒ `TSC_RC=0`。
+
+### 未闭合的边界（不包装成完成）
+
+- ~~窗口 8 那三档未跑~~ —— ✅ 同一天 13:3x 补齐，七档逐档读数在 §13:3x 那张表；这一节当初写的
+  "W8 第一腿 = 权益到期（解析中）"**是错的**，那一腿量的其实是派发前（注入抢在宿主第一次请求之前）。
+- 窗口 3 的读法缺口：事件已落成 `needs-confirmation + model-result-uncertain`，而**宿主侧只回报 `empty`** ——
+  用户界面看不出"这一格被计过量、结果不确定、要人看"。要不要给它一个独立状态词，属于判据口径，记 BLOCKED。
+- `pnpm --filter @heyta/app-host test` 同一趟 `1763 passed / 93 files`，跳过 0。四端与移动端 worker 的
+  真机矩阵、T4 的事件级账本、T7 的合并态全仓门禁都不在这一格里。
+- 装置在**共享主检出**上跑，本线其余未提交改动仍在场；AC-3 整条继续不勾选。
+
+
+## 2026-10-10 13:3x · 窗口 8 的三档"未跑"补齐：它当场查出两枚"已交付的宿主在真线上走不通"的缺陷
+
+上一节那张矩阵里加粗的三行（解析中删除规则 / 撤销凭据 / 撤回模型同意）现在都有读数了，
+补齐的方式是把 W8 那一格从两腿扩成六腿，在**两条真 SQLite 宿主 + 一次性真 PG** 上跑：
+
+```
+$ python3 research/tools/verify-inbound-dual-host.py
+Planned windows (现量自 docs/plans/inbound-automation.md): [1, 2, … 13]
+  WINDOW=1 … 13  全 PASS
+Windows: 13/13
+DEVICE_RC=0
+（套件自己：Test Files 1 passed (1) / Tests 14 passed (14)）
+```
+
+六档的现量读数（逐档取自装置日志里 `WINDOW=8 RESULT=PASS` 那一行，不复述成"符合预期"）：
+
+| 那一档 | 实测形状 |
+|---|---|
+| ①a 权益到期在**派发前** | `waiting-entitlement`、真模型 **0 次**、A 零 op；恢复权益后同一事件补跑 ⇒ `submitted`、1 op |
+| ①b 权益到期在**解析中**（模型已买） | `waiting-entitlement`、模型**恰好 1 次**、零许可、零新 op，计量行 `state=sent`；恢复权益 + 租约过期后再跑 ⇒ `needs-confirmation / model-result-uncertain`，模型仍 1 次 |
+| ② 提交前 Vault 锁定 | 响亮抛出且 B 零 op |
+| ③ 撤回模型同意（出境闸门） | 没同意 ⇒ 拒 `egress-not-authorized`、真模型 0 次、计量 **0 行**；把同意给上 ⇒ 失败原因**挪到网络那一层**（`Inbound automation model failed: network`）、计量落 1 行 `unknown` |
+| ④ 解析中撤销 B 的 worker 凭据 | 抛错（`Automation AI attempt state transition failed`）、B 零 op、零许可，计量行停在 `sent`；租约过期后 A 接手 ⇒ `needs-confirmation / model-result-uncertain`、真模型仍 1 次 |
+| ⑤ 解析中删除规则 | 抛错、A 仍 1 op，而该事件行与这条规则的**许可/计量账本被整片抹走**（本用户两张账表都数到 0） |
+
+③ 那条**必须两条腿**才量得出闸门在拦：只证"没同意⇒一个请求都不发"，也可能是 URL 坏、路由没配、
+目标不可达。第二腿（把同意给上）要求失败原因**从 `egress-not-authorized` 挪走**，这才说明拦住它的是同意、
+不是别的。目的地取非回环的 `https://…invalid`（RFC 6761 保证解析不了）：回环会被分类成 `none`（不需要同意），
+`http:` 非回环会被路由层直接判成 `plaintext-remote` —— 都不是出境闸门的形状。
+
+### 这一趟先修的是探针自己：注入点必须落在"供给方真收到请求之后"
+
+写第一版时那三档全红，红的形状是**接手方重新买了一次模型**（`expected 'submitted' to be 'empty'`）。
+读载体日志（`HEYTA_DUAL_HOST_DEBUG=1`）现量到根因：撤销/删除那几次写**抢在 B 的第一次 HTTP 请求之前**落库，
+于是 B 根本没领到格子（日志里是 `GET /events/<id>/result?clientId=dual-host-b -> 403`），事件还停在 `queued`、
+计量表里连一行 attempt 都没有 —— 后来 A 合法地重买了一次。也就是说旧写法量的从来不是"解析中"那一档，
+而是"派发前"，而这两档的**承诺本来就不一样**（派发前不许买、解析中已买的那次不许再买第二遍）。
+现在每档注入前先 `waitProviderHit()`（轮询真供给方的请求计数，上限 5 秒，等不到就红且点名），
+并把原来那一腿拆成 ①a/①b 两档分别量。
+📌 形状：**凡"在某阶段中断"的注入，判据要先证明那个阶段真的在进行中**，否则测到的是更早的那一档，
+而它的读数同样会"对"。（同一族的第三种面目，前两种是 §12:5x 那节的第 3、4 条。）
+
+### 缺陷一：402 在 `renew` 与 `ai-attempt/state` 两笔上被读成"传输失败"
+
+①b 那一腿第一次跑就抛 `Error: Automation AI attempt state transition failed`，服务端给的是
+`402 {"errorCode":"SUBSCRIPTION_REQUIRED","reason":"PERIOD_ENDED"}`。`server/src/api.ts` 的
+`/renew` 与 `/ai-attempt/state` 都挂着 `createEntitlementGuard({ capability: 'automation' })` ⇒ 它们**会**回 402，
+而 `packages/app-host/src/inbound-worker.ts` 里只有八笔中的五笔把 402 映射成
+`AutomationEntitlementRequiredError`。后果不是"少一条文案"：`inbound-process.ts` 靠那个异常类型收口成
+`waiting-entitlement`，读成传输失败就变成**对一次终态拒绝做退避重试**，界面上只剩报错、
+没有"本月额度已用完"。同一条纪律在服务端那几格的注释里写着（权益/额度拒 ⇒ 402 终态，其余 ⇒ 409 可重试），
+宿主这一侧原来只兑现了一半。
+
+修法是把那三笔补齐（`renewAutomationLease` / `advanceAutomationAiAttempt` / `readAutomationPreparedResult`），
+判据不是"给这三笔各写一条"而是**按表逐笔读**，分母从真源算：
+
+- 表从 5 枚扩到 8 枚，每枚带 `fn`（`inbound-worker.ts` 导出的那笔调用）。
+- 新加一条自检：`inbound-worker.ts` 里所有**函数体含 `globalThis.fetch`** 的导出函数，
+  必须与表里的 `fn` 逐一对齐 —— 传输层新加一笔 HTTP 调用而没进表，这一条就红。
+- 402 那一档改成"八枚各回一个读数再整表比对"（原来在循环里断第一枚，后面几枚"有没有人守"读不出来）。
+
+反向验证（四臂，每臂都从 `/tmp` 的 pristine 副本还原、`cmp` 对账后再复跑一次绿）：
+
+| 臂 | 结果 |
+|---|---|
+| 抹掉 `advanceAutomationAiAttempt` 的 402 那一行 | `Tests 1 failed \| 15 passed (16)`，读数点名 `"ai-attempt-state": "transport"` |
+| 抹掉 `renewAutomationLease` 的那一行 | 同一处红，`"lease-renew": "transport"` |
+| 抹掉 `readAutomationPreparedResult` 的那一行 | 同一处红，`"result-recover": "transport"` |
+| 给传输层新加一笔没人登记的 HTTP 调用 | 红在分母自检那一处（`Tests 1 failed \| 15 passed`） |
+
+`result-recover` 那一笔的两条 GET 腿**今天都没有**权益闸门（`/events/recover` 那格是故意的：
+已经拿到许可的本地意图要能在订阅到期后补传）。它进表是为了钉住分母完整，402 的读法按同一条纪律处理 ——
+"哪条路由挂着闸门"写在另一枚包的 `api.ts` 里，传输层看不见它，也不该替它猜。
+
+### 缺陷二：规则删除那一笔在真线上永远是 400
+
+⑤ 那一腿第一次跑红在 `s.rules.remove()`：`Error: Inbound rules request failed: validation`。
+拿真 Fastify（`server/node_modules`，5.12.5）逐形状现量：
+
+| 形状 | 结果 |
+|---|---|
+| `DELETE /api/automation/rules/<uuid>` + `content-type: application/json` + 空体 | **400 `FST_ERR_CTP_EMPTY_JSON_BODY`** |
+| 同一笔不带那个头 | 200 |
+| `GET` + json 头 + 无体 | 200（GET 不解析体） |
+| `POST` + json 头 + 无体 | 400 |
+
+`packages/app-host/src/inbound-rules-remote.ts` 里那句"永远声明 json"就是这么把**删除规则**钉死的：
+用户在界面上点删除永远只能看到"请求失败"。它与上午查出的那枚（提交许可**少**带这个头，
+见 §12:5x 第 1 条）是同一类缺陷的两个方向 —— 所以判据两头都钉：**头的有无必须与体的有无同时成立**。
+表的分母取自客户端**自己导出的方法集**（`Object.keys(remote)`），新加一枚方法却没进表就红。
+
+- 修前红（未改客户端时）：`Tests 1 failed | 10 passed (11)`，点名 5 枚 `"header-without-body"`
+  （`list` / `listEvents` / `listSenderCredentials` / `readDraft` / `remove`）。
+- 修后绿：`Tests 11 passed (11)`。
+- 分母那一处的臂：把 `remove` 从表里拿掉（客户端仍有 13 枚方法）⇒ `Tests 1 failed | 10 passed (11)` 且红在分母那一处，
+  还原后 `cmp` 对账一致。
+- GET 那四枚本来不会因这个头出错（Fastify 对 GET 不解析体），读数照实写；统一成"同生同灭"是为了
+  不再留一份"哪几笔例外"的清单 —— 那正是本仓库反复出漂移的形状。
+
+### 这一节的边界（不包装成完成）
+
+- 六档量的是 `packages/app-host` 的传输层 + 真服务端 + 两条真宿主本地库，**不是**四端壳里的自动收集；
+  T5 的界面入库、AC-6 的 e2e、T7 的合并态全仓门禁都不在这一格。
+- ⑤ 那一档读出来的是"删除规则会把该规则的许可与计量账本整片抹走"（`deleteAutomationRule` 里四张
+  `deleteMany`）。这是**已定的设计**（规则墓碑保留、账本随规则清除，见 `server/src/automation/rules.ts` 那段注释），
+  这一格把它量出来是为了让"删规则后无法逐事件对账"这件事有据可依，不是判它错。要不要给"已删规则"留一条
+  只含计数的事件级摘要，属于口径，记 BLOCKED。
+- 装置仍在共享主检出上跑；AC-3 整条继续不勾选（现量 `grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` = 0）。
+
 
 
