@@ -39,6 +39,6 @@
 ## 2026-10-09 02:29 公网静态产物复发布
 
 - 法律文本、Landing 与 Web 在级联数量及竞品免责声明清理后重新构建。
-- 回滚包：`/tmp/heyta-public-backup-20261009-022940.tgz`。
+- 回滚包：`/tmp/heyta-public-backup-20261009-022940.tgz`（在那台机器的系统临时目录里，机器本地、Git 忽略、不在仓内 —— 它是回滚用的现场件，不是本页的仓库锚）。
 - `apps/landing/dist/index.html` 与远端 `/var/www/heyta-landing/index.html` SHA-256：`3daf9db8eb7c8b62c8e7d6b100286b1fadb9e98020009a7553bb708b76101301`。
 - `apps/web/dist/index.html` 与远端 `/var/www/heyta-app/index.html` SHA-256：`435bfa315489d38dde6fffe70105b1cf9e55001d3865536cb0864ac682acc428`。
