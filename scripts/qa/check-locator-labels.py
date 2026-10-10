@@ -24,7 +24,9 @@
 3. 反盲：每枚脚本在 `CJK_GROUP_FLOOR` 里有一组**含中文定位标签组数**的基线，只许降不许升；
    标签换写法（例如 `T(` 改名）会让组数掉到 0 ⇒ 红。没登记基线的新脚本也红 —— 那条成本是刻意的。
 另有一行**披露不判红**：`tap_label("我的")` 这类单语定位的条数（那是该脚本负责人的欠项，
-不该由这枚门把共享的 `pnpm check` 按红）。
+不该由这枚门把共享的 `pnpm check` 按红）。还有**第二行披露**：候选**成组**写、组内却整片单语
+（`tap(name, ("常规","同步与隐私"), …)` 这种 iOS 旅程脚本的常见形状）—— 第一行抓不到它，因为
+`single_language` 只收"不在任何组里"的字面量，而判据二只看 `T(...)` 那种写法。
 """
 
 from __future__ import annotations
@@ -167,7 +169,7 @@ def is_mobile(script: Path) -> bool:
 
 
 def check(script: Path) -> tuple[list[str], dict[str, int]]:
-    empty = {"组数": 0, "含中文组数": 0, "T()调用": 0, "单语标签": 0}
+    empty = {"组数": 0, "含中文组数": 0, "T()调用": 0, "单语标签": 0, "单语候选组": 0}
     source = script.read_text(encoding="utf-8")
     try:
         tree = ast.parse(source)
@@ -246,6 +248,16 @@ def check(script: Path) -> tuple[list[str], dict[str, int]]:
     # 反盲判据：量具**看不见标签**时不许静默返回"没问题"。按**含中文的那一组**数，不是按总组数 ——
     # `T(` 换成 `L(` 之后元组组还在（那些是 resource-id 一类），只看"组数为 0"会照样静默放行。
     cjk_groups = sum(1 for vals in groups if any(CJK.search(v) for v in vals))
+    # 🔴 披露的**第二个维度**（原来这一格是空的）：候选**成组**写、但组里只有中文。
+    # 这类整片单语定位在旧尺下两条都不命中 —— `single_language` 只收"**不在任何组里**"的中文字面量，
+    # 判据二只看 `T(...)` 那种写法 —— 于是 `tap(name, ("常规","同步与隐私","数据管理"), …)` 这种
+    # iOS 旅程脚本的常见形状会静默 ✅，而它在英文系统语言下一枚都点不到。
+    mono_groups = sum(
+        1
+        for vals in groups
+        if any(CJK.search(v) for v in vals)
+        and not any(not CJK.search(v) and re.search(r"[A-Za-z]{3}", v) for v in vals)
+    )
     label_like = [v for v in literals if CJK.search(v) and "\n" not in v]
     grouped = {v for vals in groups for v in vals}
     single_language = sorted(
@@ -279,6 +291,7 @@ def check(script: Path) -> tuple[list[str], dict[str, int]]:
         "含中文组数": cjk_groups,
         "T()调用": bilingual_calls,
         "单语标签": len(single_language),
+        "单语候选组": mono_groups,
     }
 
 
@@ -313,6 +326,12 @@ def main(argv: list[str]) -> int:
             print(
                 f"   ⚠️ 披露（**不判红**）：{stats['单语标签']} 条定位标签只写了一种语态 —— "
                 "设备换系统语言时这些点不到；归该脚本的负责人，欠项记在计划里"
+            )
+        # 这一行是**新增的第二维**，措辞与上面那行分开，好让旧读数在台账里仍然逐字对得上。
+        if stats["单语候选组"]:
+            print(
+                f"   ⚠️ 披露（**不判红**）：{stats['单语候选组']} 组候选整片只有一种语态（成组写却组内无英文同义）—— "
+                "同一档失效：英文系统语言下这些一枚都点不到；旧尺看不见它，因为 `single_language` 只收不在任何组里的字面量"
             )
     return 1 if failed else 0
 
