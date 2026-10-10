@@ -1079,6 +1079,11 @@ async function syncPrivacyJourney(browser, spec) {
     const rect = el.getBoundingClientRect();
     return {
       found: true,
+      // 🔴 那一组在不是当前分组时是 `hidden`（`App.tsx:3112`），而隐藏子树的
+      // `getBoundingClientRect()` 全是 0 ⇒ "右缘没出视口""没横向溢出"两条都**空过**。
+      // 所以可见性必须是判据的一部分，不能靠"我导航过去了"这个前提。
+      visible: el.offsetParent !== null && rect.width > 0 && rect.height > 0,
+      boxWidth: Math.round(rect.width),
       clientWidth: el.clientWidth,
       scrollWidth: el.scrollWidth,
       lineRects: el.getClientRects().length,
@@ -1450,7 +1455,8 @@ const report = {
     // ⚠️ 与配对尺不同，这一枚在"没量到"时**判假**是故意的：`#settings-group-sync` 里找不到那枚
     // `.ht-settings__hint` 就是接线断了，不是"这一档真没有"（那句的"真没有"由 `scopeMatched` 那一路负责报）。
     syncPrivacyHeaderNoteInsideViewport: syncPrivacy.every((x) =>
-      x.noteFacts.found === true && x.noteFacts.rightBeyondViewport === false &&
+      x.noteFacts.found === true && x.noteFacts.visible === true &&
+      x.noteFacts.rightBeyondViewport === false &&
       x.noteFacts.scrollWidth <= x.noteFacts.clientWidth + 1),
     // 牙：种下去那枚"单行 + 撑破容器"必须被上面同一组量数到，撤掉之后要回到视口内。
     syncPrivacyHeaderNoteBadArmFlipsIt: syncPrivacy.every((x) =>
