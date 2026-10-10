@@ -12,7 +12,9 @@
 ## macOS
 
 - `pnpm reinstall:all` 的 macOS 段完成当前源码打包、签名、安装和 `web-dist` 资产集合对账。
-- 安装副本启动截图通过真实 UI 判据；证据保留在 `/tmp/heyta-reinstall-mac-installed.png` 及同名 `.webview.png`。
+- 安装副本启动截图通过真实 UI 判据；两张图已收进本目录：`heyta-reinstall-mac-installed.png`（安装副本启动态）与
+  `heyta-reinstall-mac-installed.png.webview.png`（壳内 WebView 那一份）。生成时先落在那台机器的系统临时目录，
+  收尾时复制进本目录并入库 —— **本行不再写那个临时落点，免得它在别的树上成为读不回的锚**。
 
 ## Windows
 
