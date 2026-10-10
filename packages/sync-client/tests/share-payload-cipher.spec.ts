@@ -47,7 +47,8 @@ describe('share payload cipher（薄委托层，格式 = sync-core record 信封
     await expect(cipher.decrypt(stored, identity({ entityType: 'NOTE' }))).rejects.toThrow();
     await expect(cipher.decrypt(stored, identity({ timestamp: 1 }))).rejects.toThrow();
     const raw = Buffer.from(stored, 'base64');
-    raw[raw.length - 1] ^= 0x01;
+    const last = raw.length - 1;
+    raw[last] = (raw[last] ?? 0) ^ 0x01;
     await expect(cipher.decrypt(raw.toString('base64'), identity())).rejects.toThrow();
   });
 

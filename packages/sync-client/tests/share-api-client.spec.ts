@@ -79,9 +79,9 @@ describe('ShareApiClient', () => {
     const client = makeClient();
     const op = { id: 'op-1', clientId: 'c1', payload: 'AQxxx', opType: 'CRT', entityType: 'TASK' };
     const result = await client.uploadOps('share-1', [op]);
-    expect(result.accepted[0].serverSeq).toBe(6);
+    expect(result.accepted[0]!.serverSeq).toBe(6);
     const sent = JSON.parse(lastRequest!.body!);
-    expect(sent.ops[0].payload).toBe('AQxxx');
+    expect(sent.ops[0]!.payload).toBe('AQxxx');
     expect(lastRequest!.url).toContain('/api/shares/share-1/ops');
   });
 

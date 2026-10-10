@@ -235,6 +235,7 @@ describe('history re-encryption', () => {
       record: migrated,
       shareId: SHARE_B,
       listKey: newListKey,
+      identity: mkIdentity('op-1'),
     })).rejects.toThrow();
   });
 
