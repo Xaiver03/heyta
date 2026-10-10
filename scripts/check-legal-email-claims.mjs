@@ -28,7 +28,8 @@ import { dirname, join } from 'node:path';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CN_NUM = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10 };
-const EN_NUM = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+const EN_NUM = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+  eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20 };
 
 /** `server/src` 下的每一枚 `.ts`，**按磁盘上的树**收（含未跟踪文件）。
  *  🔴 调用点不能拿 `git grep` 去找：它只看得见 tracked 内容，而本尺其余部分（`email.ts`、
@@ -66,6 +67,10 @@ const ALIAS = {
   // `server/src/password/registration-otp.ts`（2026-10-10 现量：那枚文件当时还未跟踪）。
   // 它留在别名表里是必须的 —— 文本点名它，而代码确实发得出；把它拿掉会立刻变成"表外名字"假红。
   registerCode: { zh: ['注册验证码'], en: ['registration code'] },
+  // 邮箱验证码登录（2026-10-10 现量：`server/src/email.ts:201-216` 真发这一封）。
+  // 它此前不在表里 ⇒ "漏披露"那一档在打印时 `ALIAS[k].zh` 直接 TypeError 崩掉，
+  // 把一条真红变成了一次崩溃（崩溃比假绿更糟：它连"有一封没披露"都没说出来）。
+  loginCode: { zh: ['登录验证码'], en: ['sign-in code'] },
 };
 
 const DOCS = [
@@ -73,7 +78,17 @@ const DOCS = [
   'packages/legal/src/documents/third-parties.ts',
 ];
 
-const num = (s) => CN_NUM[s] ?? EN_NUM[s?.toLowerCase()] ?? Number(s);
+const num = (s) => cnNum(s) ?? EN_NUM[s?.toLowerCase()] ?? Number(s);
+/** 中文数词：单字查表；复合只认「十 / 十X / X十 / X十Y」（对外文本里出现过的全部形状）。
+ *  🔴 2026-10-10 之前这里只有单字查表 ⇒ 文本写「十一封」时 `num` 回 `NaN`，
+ *  于是"自相矛盾"那一档打印成「写 NaN 封」—— 尺把**自己的解析失败**报成了文本的错。 */
+function cnNum(s) {
+  if (typeof s !== 'string') return undefined;
+  if (CN_NUM[s] !== undefined) return CN_NUM[s];
+  const m = s.match(/^([一二三四五六七八九]?)十([一二三四五六七八九]?)$/);
+  if (!m) return undefined;
+  return (m[1] ? CN_NUM[m[1]] : 1) * 10 + (m[2] ? CN_NUM[m[2]] : 0);
+}
 
 /** 服务端真会发的那些封：email.ts 里声明的 send* 常量，且它在 server/src 里有 email.ts 之外的调用点。
  *  "定义了但没人调"不算会发。调用点按 `SERVER_TS`（磁盘上的树）扫，不按索引扫 —— 理由见上面那段。 */
@@ -239,19 +254,22 @@ function main() {
   const r = judge(readFromDisk);
   if (process.argv.includes('--json')) {
     console.log(JSON.stringify({ shipped: [...r.shipped], declared: r.declared, over: r.over, selfInconsistent: r.selfInconsistent, undisclosed: [...r.undisclosed] }));
-    process.exit(r.over.length || r.selfInconsistent.length ? 1 : 0);
+    process.exit(r.over.length || r.selfInconsistent.length || r.undisclosed.length ? 1 : 0);
   }
   console.log(`实发 ${r.shipped.size} 封：${[...r.shipped].sort().join(' / ')}`);
   console.log(`对外文本里 ${r.declared} 处"N 封"声明，逐枚对账：`);
   for (const o of r.over) console.log(`  🔴 超承诺 ${o.locale} 「${o.name}」—— ${o.why}（${o.d}：${o.hit}）`);
   for (const s of r.selfInconsistent) console.log(`  🔴 自相矛盾 ${s.locale}：写「${s.stated} 封」而点到 ${s.names.length} 枚（${s.d}：${s.hit}）`);
   if (r.undisclosed.length) {
-    console.log(`  🟡 漏披露（代码会发、文本没点名）：${r.undisclosed.map((k) => `${k}=${ALIAS[k].zh}`).join('、')}`);
-    console.log('     这一档要动对外文本的句子，而 packages/legal 那五份此刻被三条线同时握着未提交改动 ——');
-    console.log('     由那一批的写入者一次收拢；收拢后请把这一档也升成判红（把 undisclosed 并进 failing）。');
+    // 🔴 2026-10-10 起这一档**判红**：那批"三条线同时握着 packages/legal"的联合提交已入库，
+    // 本尺自己留的那条 TODO（"收拢后请把这一档也升成判红"）的前提成立了。
+    // 别名缺失不许再崩：表外键打印成 `<表外:KEY>` 并同样判红 —— 崩溃会把真红吞成一次 stack trace。
+    const name = (k) => (ALIAS[k] ? `${k}=${ALIAS[k].zh}` : `<表外:${k}>（别名表缺这一行，先补表再谈披露）`);
+    console.log(`  🔴 漏披露（代码会发、文本没点名）：${r.undisclosed.map(name).join('、')}`);
+    console.log('     修法：把这一封写进对外文本的封闭清单（中英同步、bump 版本行），或证明代码其实发不出它。');
   }
-  if (r.over.length || r.selfInconsistent.length) {
-    console.log('❌ 对外文本承诺了代码里不存在的邮件（或自己前后不符）。');
+  if (r.over.length || r.selfInconsistent.length || r.undisclosed.length) {
+    console.log('❌ 对外文本与代码真会发的邮件对不上（超承诺 / 自相矛盾 / 漏披露）。');
     process.exit(1);
   }
   console.log('✅ 没有一封是对用户的多头承诺。');
