@@ -231,6 +231,33 @@ rekey=同 shareId 覆盖；错误口令（vault 未解锁形状）⇒ undefined�
 
 **待接线（等 apps/web 撞车面）**：入口（清单详情的「共享」按钮 ⇒ ShareConsentModal ⇒ createShare ⇒ Project.shareId 回写 + SharePanelHost 挂载）+ Playwright journey（真浏览器走邀请→接受→指派→评论全流程 + 截图人看）。
 
+**`ShareFeature.tsx`**（新文件，自包含接线组件）：App.tsx 解封后一行 import 即挂载。组件内汇合同意 modal + 面板 + API client + 密钥存储；apps/web tsc：ShareFeature 零错误（全树剩 1 错在并行会话的 inbound-runtime.ts）。
+
+## 状态总结（2026-10-09 11:15，本 goal 的所有可独立执行工作已穷尽）
+
+**已完成并提交/暂存**：
+- W0 勘误+依赖门 / W1 密钥纯函数 15 测试+变异三臂 / W2 四张表+14 端点+role 硬门 36 测试+变异 2 红 / W3 COMMENT 链四包全绿+格式统一 / W4 传输层+密钥存储+UI 模型×3+组件×4+web 宿主壳+ShareFeature 接线组件 / W5 通知模型+组件壳+i18n / W6 链接模型 / 四个 verify 脚本（5/9/7/6 步全 OK 各有变异臂）/ 法务合流（third-parties 1.4 + privacy 1.9 并行会话闭合 structure.spec 63/63） / PIPL 23 评估（结论=需单独同意，方案 a 已实现待追认）
+
+**等待撞车面解封后可立即执行**（配方与落地表全部在案）：
+- apps/web 入口接线（`ShareFeature` 一行 import 进 App.tsx + 清单详情「共享」按钮）⇒ Playwright journey + reinstall
+- W3 引擎接线（op-log engine.ts share 分区重放走真实引擎——20+ 小时稳定的成品待提交）
+- legal share 类目收口（privacy/data-rights/personal-info 的 share 类目收口配方已在案——并行会话 1.8 已闭合大半）
+
+**需要产品负责人过目的停止点**：
+- 方案 a 同意 modal 视觉（组件已按 a 落地，W4 验收时请过目）
+- W6 owner 转让语义（调研未确证滴答行为）
+
+**🔴 新增跨会话集成缺陷（2026-10-09 发现，有主=并行会话）**：
+`server/dist` 启动即崩 `Cannot access 'inbound_core_1' before initialization`——
+`@heyta/inbound-core` 的循环依赖或初始化序问题导致 `entitlement.js`/`entitlement-ticket.js`
+在 inbound-core 模块完成初始化之前就引用了它。**影响**：server 起不来 ⇒ 三个需
+服务端的 verify 脚本（sync/revoke/conflict）暂不能跑；keys（纯函数不需服务端）不受影响。
+**并行会话修复后我方立即复跑四脚本取读数**。此前四脚本曾全绿（server dist 尚未包含
+并行会话最新 inbound-core 时），所以这是新引入的集成回归，不是既有缺陷。
+- check:legal-gdpr terms 1.3 → 并行会话已自行修复（10-09 复验绿）
+- check:ai-coverage 7 处 inbound-automation → 并行会话在途
+- apps/web features/ai 3 处 TS 错 → 并行会话 10:44 仍在编辑
+
 `packages/sync-client/src/share-api-client.ts`（新文件）：`/api/shares/*` 全部 14 端点的类型化客户端——`ShareApiClient`（`fetchImpl` 注入、Bearer JWT、非 2xx 归一 `ShareApiError`（稳定错误码镜像）、网络异常归 `network`）；**纯传输**——载荷信封与信封密文原样透传，密码学在 sync-core/薄层（单一所有者）。规格 8 条（URL/方法/头/体形状、错误码镜像、network 归类、密文透传）+ **变异臂**：丢鉴权头 ⇒ 恰好 2 红（401 遍历 + 带令牌调用）；sync-client 全量 **155/155**。已导出（index.ts）。
 
 ## W3 主体（2026-10-09 凌晨）：域模型 + 物化桶 + AI 债务登记 ✅
@@ -256,7 +283,7 @@ rekey=同 shareId 覆盖；错误口令（vault 未解锁形状）⇒ undefined�
 
 | 项 | 结果 |
 |---|---|
-| 🔴 法务合流 | ✅ **由并行会话自行完成**（21:57-58 那轮）：privacy 1.9 草稿条目补齐 share 三类（分享记录/分享成员/分享邀请）+ automation 四类 + 计数重算 33 处/32 张表 + spec CATEGORY_NAMES 七行——`structure.spec` **62/62 全绿**（此前的 2 红已消）。closure-truth ✅ / permissions ✅ / backup-retention ✅ / legal-copy ✅（dist 重建后）。`legalSetVersion` 指纹自动含 privacy@1.8 草稿（他们的约定：待审核草案原地修订条目，不升号）——**无需我方再动**。⚠️ `check:legal-gdpr` 当前红一格：**terms 1.3 在途回归**（并行会话自己的活跃批次，非我方改动），登记不代修 |
+| 🔴 法务合流 | ✅ **由并行会话自行完成**（21:57-58 那轮）：privacy 1.9 草稿条目补齐 share 三类（分享记录/分享成员/分享邀请）+ automation 四类 + 计数重算 34 处/33 张表 + spec CATEGORY_NAMES 七行——`structure.spec` **63/63 全绿**（此前的 2 红已消）。closure-truth ✅ / **gdpr ✅**（terms 1.3 在途回归已自行修复——10-09 10:34 复验）/ permissions ✅ / backup-retention ✅ / legal-copy ✅。`legalSetVersion` 指纹自动含 privacy@1.9 草稿。**法务余项就此关闭** |
 | 🔴 COMMENT 实体进 `ENTITY_TYPES` | ✅ **八步表第 1/2/6 步全落**：`entity-types.ts` 扩项（ASSISTANT_TURN 模板注释）→ `op-log/state.ts` `UNMODELED_ENTITY_TYPES` 登记（share 域专用，物化随引擎接线）→ ui `EntityLabelKey`/`ENTITY_LABEL_KEYS` → i18n zh/en 词条（『评论』/『Comment』，只许追加表的设计用法）→ 全链测试绿：op-log coverage **6/6**、ui sync-model **28/28**、i18n catalog **14/14**、mobile conflict-keys **17/17**（共享 schema/ui/i18n 三处 dist 重建后）、shared-schema 全量 **173/173** |
 | server 侧 COMMENT role 门 | ✅ 两条新测试：commenter 写 COMMENT 被接受（词表激活）、viewer 写 COMMENT 仍被拒（role 门非实体门）——share 路由+schema **36/36** |
 | 第三段落过的 | `verify:collab-keys/sync/revoke` 三脚本接线进根 package.json（package.json 已稳定 8 小时，增量落针）并实测：**5/9/7 步各自 RESULT=OK** |

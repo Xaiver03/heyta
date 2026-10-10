@@ -235,6 +235,19 @@ export {
   type ConflictSideRenderInfo,
 } from './sync/ConflictResolutionView.js';
 export { SharePanel, type SharePanelLabels, type SharePanelProps, type SharePanelCallbacks } from './sync/SharePanel.js';
+export {
+  ShareConsentModal,
+  type ShareConsentModalLabels,
+  type ShareConsentModalProps,
+} from './sync/ShareConsentModal.js';
+export {
+  shouldShowConsent,
+  applyShareConsent,
+  SHARE_CONSENT_SCOPE_KEYS,
+  type ShareConsentStore,
+  type ShareConsentDecision,
+  type ShareConsentResult,
+} from './sync/share-consent-model.js';
 export { SHARE_MEMBER_ROLES, type ShareRole } from './sync/share-model.js';
 export {
   NotificationPrefsPanel,
