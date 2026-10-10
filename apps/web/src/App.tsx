@@ -21,6 +21,7 @@ import {
   PanelRightOpen,
   Sun,
   Trash2,
+  Users,
   X,
 } from 'lucide-react';
 
@@ -146,6 +147,8 @@ import { useSyncStore } from './features/sync/store.js';
 import { SubscriptionNotice } from './features/subscription/SubscriptionNotice.js';
 import { RenewPanel } from './features/subscription/RenewPanel.js';
 import { ProjectsPanel } from './features/projects/ProjectsPanel.js';
+import { ShareFeature } from './features/share/ShareFeature.js';
+import { ShareNotificationSettings } from './features/share/ShareNotificationSettings.js';
 import { loadProjectTaskSort, saveProjectTaskSort } from './features/projects/project-sort-pref.js';
 import { QuadrantBoard } from './features/quadrant/QuadrantBoard.js';
 import { HabitDetailCard } from './features/habits/HabitDetailCard.js';
@@ -400,6 +403,11 @@ export function App(): React.JSX.Element {
   const [undoAction, setUndoAction] = useState<
     { readonly label: string; readonly run: () => Promise<void> } | undefined
   >(undefined);
+  /**
+   * 共享清单对话框（ADR-0062 W4）：当前停在的清单 + 它的 share id（可空 = 还没共享，
+   * 对话框会先走 PIPL 同意模态再创建）。关掉即卸载 —— 密钥状态不常驻内存。
+   */
+  const [shareDialog, setShareDialog] = useState<{ projectId: string; shareId?: string } | undefined>(undefined);
 
   useEffect(() => {
     if (undoAction === undefined) return;
@@ -1616,6 +1624,20 @@ export function App(): React.JSX.Element {
   const allNotes = useNoteStore(useShallow((s) => s.notes));
 
   /**
+   * 共享清单入口的两块前置事实（W4）：
+   * - `currentProject`：当前**停在**的清单行（智能清单不算 —— 它们是查看方式）。
+   * - `syncConfigured`：同步已配置才有共享可谈；未登录时按钮出现只会走进死路。
+   */
+  const currentProject = useMemo(() => {
+    const f = store.filter;
+    if (view !== 'tasks' || f.kind !== 'project') return undefined;
+    return projects.projects.find((p) => p.id === f.projectId);
+  }, [store.filter, view, projects.projects]);
+  const syncConfigured = useSyncStore(
+    (s) => s.baseUrl.trim() !== '' && s.token !== undefined && s.token.trim() !== '',
+  );
+
+  /**
    * rail 上段「去哪看」= **任务 + 已启用的模块**。
    *
    * 🔴 **任务永远在**（它是这个应用本身，不给关）；`settings` / `trash` 归下段工具。
@@ -2286,6 +2308,26 @@ export function App(): React.JSX.Element {
             **不要把它搬回来。**
           */}
           <div className="ht-header__actions">
+            {/*
+              共享清单入口（ADR-0062 W4）：只停在**自己的清单**上时出现 ——
+              智能清单（今天/收集箱…）不是"存放位置"，共享无从谈起。
+              已共享的清单换 aria-label（管理共享 vs 共享此清单），图标相同：
+              入口稳定、状态用文案说。
+            */}
+            {currentProject !== undefined && syncConfigured ? (
+              <button
+                type="button"
+                className="ht-btn ht-btn--ghost"
+                data-testid="share-open-button"
+                aria-label={currentProject.shareId === undefined ? t('web.share.open.new') : t('web.share.open.manage')}
+                onClick={() => {
+                  setShareDialog({ projectId: currentProject.id, shareId: currentProject.shareId });
+                }}
+              >
+                <Users size={ICON_SIZE.sm} aria-hidden="true" />
+                <span>{t('web.share.open.label')}</span>
+              </button>
+            ) : null}
             {view === 'tasks' && visible.length > 0 ? (
               <div
                 style={{ display: 'flex', alignItems: 'center', gap: cssVar('space.2'), flexWrap: 'wrap' }}
@@ -3128,6 +3170,12 @@ export function App(): React.JSX.Element {
               */}
               <SyncSettingsPanel active={activeSettingsSection === 'settings-group-sync'} />
               {/*
+                共享协作的**本地**通知偏好（W5）：跟同步同一组 —— 它是同步的下游
+                偏好（服务端只广播信号，响不响由本机过滤）。没配同步时整节不渲染，
+                避免把一堆永不生效的开关摆到界面上。
+              */}
+              {syncConfigured ? <ShareNotificationSettings /> : null}
+              {/*
                 🔴 **隐私同意排在 AI 出境开关之前**：那三道闸（总开关 / 允许远程 /
                 逐功能授权）回答的是"哪一类数据可以出境"，而本面板回答的是
                 "**这台设备准不准出门**" —— 后者是前者的前提，顺序反过来会让人
@@ -3335,6 +3383,13 @@ export function App(): React.JSX.Element {
       <ConflictDialog />
       <PrivacyConsentSheet />
       <LegalReconfirmSheet />
+      {shareDialog !== undefined ? (
+        <ShareFeature
+          projectId={shareDialog.projectId}
+          initialShareId={shareDialog.shareId}
+          onClose={() => setShareDialog(undefined)}
+        />
+      ) : null}
       </AiSettingsNavigationContext.Provider>
       </PanelEphemeralProvider>
     </HeytaUiProvider>
