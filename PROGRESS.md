@@ -2550,6 +2550,9 @@ AC 现量：**未勾 8 / 已勾 0**。
 这一节是**交接件**，不是进度结论。负责人 18:4x 指令："用 close session skill 做下交接"。
 断点形状：**代码改完、读数取到、一次提交都没做**。
 
+🔴 **2026-10-10 19:0x 起本节作废**：它的"下一步顺序"第 1、2 条（等 B112 落地、把界面层提进去）**已经做完**，
+拦路的那枚 B112 也已闭合。新会话请从**文末那一节**接着做，本节只当"当时为什么卡住"的记录留着。
+
 ### 1. 位置（不写会漂的值，全部给现量命令）
 
 | 问 | 现量命令 | 本轮读数 |
@@ -2634,3 +2637,64 @@ AC 现量：**未勾 8 / 已勾 0**。
 - 交接件落在 `PROGRESS.md`（任务书指定的续读入口）而**不是** `docs/plans/inbound-automation-handoff.md`：
   后者是本仓库既有约定（`docs/plans/` 下已有 12 枚 `*-handoff.md`），但那个路径**不在本线白名单里** ⇒ 已登记 **B135**，
   要挪就一句话拍。
+
+## 2026-10-10 19:0x · T5 界面层**已入库**（并入 `8bbc50b1`）+ 新 HEAD 上重取全部读数 + 界面层第一次真跑 e2e 量出一格真缺陷
+
+上一节那份交接作废。这一节是**当前状态**。载体 = `8bbc50b1`（`merge: origin/main 并入`）之后的 HEAD；
+本线的界面层七枚落点是**由那一笔并行会话的 merge 带进库的**，归属没有改写 —— 用
+`git log --oneline -- <那七枚路径>` 追得到本线自己的两笔 `0eea4c0f` / `f3eeaf73` 是它的祖先。
+
+### 1. 入库状态（现量命令，别抄本节）
+
+| 问 | 现量命令 | 读数 |
+|---|---|---|
+| 七枚落点在库了吗 | `git ls-files apps/web/src/features/settings/{InboundAutomationSettings.tsx,inbound-runtime.ts,inbound-automation.css} apps/web/tests/inbound-cycle-display.spec.tsx apps/mobile/src/inbound/lifecycle.ts e2e/playwright.inbound.config.ts e2e/tests/inbound-automation.spec.ts \| wc -l` | **7**（工作树对这几枚路径零差量） |
+| 本线入库几笔 | `git log --oneline --grep='自动收集' -50 \| wc -l` | 每次现量（本轮读到 20） |
+| AC 勾了几条 | `grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` | **0**，未勾 **8** |
+
+### 2. 新 HEAD 上重取的读数（旧载体那几份全部作废，逐条可复跑）
+
+| 判据 | 命令 | 读数 |
+|---|---|---|
+| 界面层四份 spec + 新那把尺 | `cd apps/web && NO_COLOR=1 pnpm exec vitest run tests/inbound-{cycle-display,draft-review,event-retry,upload-authorization,worker-lifecycle}.spec.*` | `Test Files 5 passed (5)` / `Tests 11 passed (11)`，跳过 **0**，RC=0 |
+| 共享层那一族 | `cd packages/app-host && NO_COLOR=1 pnpm exec vitest run tests/inbound-*.spec.ts`（13 份） | `Test Files 13 passed (13)` / `Tests 107 passed (107)`，RC=0 |
+| 另两包的本线用例 | `packages/domain` `tests/inbound-local-date.spec.ts`、`packages/sync-client` `tests/inbound-authorization.spec.ts` | **1 passed** / **6 passed**，各自 RC=0 |
+| apps/web 类型 | `cd apps/web && npx --no-install tsc --noEmit -p tsconfig.spec.json` | RC=2、**16** 条错、本线 **0** 条（红因只在 **B103** 立案，B136 已去重） |
+| 生产者缝对账 | `NO_COLOR=1 python3 research/tools/verify-inbound-producer-seam.py` | RC=0（读数见 PROGRESS 那一节的形状；本轮没重抄数字） |
+
+🔴 **B112 这一格在新 HEAD 上闭合了**（那四个跨包成员由各自包的所有者落了库），逐枚读 HEAD 自己的字节而不是工作树：
+`git show HEAD:packages/storage/src/stores.ts \| grep -cE 'INBOUND_(RECIPIENT_KEY\|WORKER_CREDENTIAL\|COMMIT_JOURNAL)'` = **3**、
+`packages/ai/src/{routing,egress}.ts` 各 **1**、`packages/sync-client/src/client.ts` = **2**、`packages/op-log/src/engine.ts` = **1**。
+⚠️ 但它留下了两笔账：**B138**（`InboundAutomationHostOptions` 在 HEAD 上两份定义、逐字相同、编译不红 ⇒ 会悄悄漂移的重复）
+和"HEAD 级 tsc 真复跑仍欠"（并到 T7 那趟隔离副本去取）。
+
+### 3. 界面层第一次真跑 e2e：4 条里 **2 红 2 绿**，红的是产品缺一格
+
+`cd e2e && npx playwright test --config playwright.inbound.config.ts` ⇒ `2 failed / 2 passed (2.1m)`。
+两条红都在 `inbound-automation.spec.ts:85`（确认草稿之后切走切回那一节，"查看并编辑草稿"那颗按钮不再出现）。
+**归因、三处现量与那句一句话修法记在 B140** —— 一句话版：设置分组是 `hidden` 不是卸载，
+而组件本来就备好的 `active` 旋钮在 `App.tsx` / `AiSettings.tsx` 两处**都没接**，所以换回这一节不重取列表。
+那两枚文件不在本线白名单 ⇒ 只登记不代改；**没有动那两条断言**（它们现在就是判据，接上就该绿）。
+
+四张草稿态截图**人打开看过**（1280/390 × 亮/暗）：`docs/research/evidence/inbound-automation-review/ui-draft/draft-*.png`。
+看到的形状：草稿卡带「任务 1」fieldset、标题/备注/优先级/截止时间/开始时间/时长六格，
+顶部披露句明说"确认使用已解析结果，不再调用模型；任务将等待获授权设备创建"，
+非法日期 `2026-02-30` **按冻结的解析结果原样显示**（没有被"修成"合法日期），暗色那两张没有横向溢出、按钮在卡外。
+⚠️ 载体边界：这一趟会让 `apps/web/evidence/inbound-recovery/` 那 12 枚**已跟踪** PNG 变脏（该目录不在白名单，
+台账 694 行当年就是为这个不跑的）。本轮按"跑完复原"处理：3 枚 ` M` 用 `git checkout -- <点名路径>` 还原、
+4 枚新产物**搬进**白名单那枚证据目录（不是删），跑完该目录脏条目数 **0**。
+
+### 4. 顺序（下一会话从这里接）
+
+1. **B140 那一根线**（`active` 接线，两枚文件、一句改动）—— 要么拿到单动作授权由本线接，要么交回设置面所有者；
+   接完复跑 `cd e2e && npx playwright test --config playwright.inbound.config.ts` 判据就是那 4 条从 2 红变 4 绿。
+2. **T6 整条被地界挡着**：四件产物三件（新 ADR、中英条款、帮助中心）不在白名单，而 AC-1 把"新增 ADR"列为**输入**
+   ⇒ 记在 **B139**，要拍的是并进白名单还是整条交出去。本线**没有**动 `pricing-and-entitlements.md`（它是 `check:ai-quota` 的唯一数字源，动一句要连带 5 处对外承诺）。
+3. **T7**：`pnpm check` 整链仍被 B103 那 16 条别人的类型错结构性挡死；能跑的那几道（migrations / license-inventory / docs-link-check / 各包单测）要在**隔离副本**上取一次合并态读数，含 B112 欠的那次 HEAD 级 tsc。
+4. **T8**：AC-1～AC-8 逐条"证据命令 + 贴出的输出 + 结论"，允许结论是未闭合。现量入口已在台账里（AC-3 那格有 `verify-inbound-dual-host.py` ⇒ `Windows: 13/13`）。
+5. B104 那一格（Python 装置"变异还原后的复跑"）仍等载体空出来，闭合命令写在它里面。
+
+⚠️ 死路提醒（本轮新踩的两条）：
+① 用 `ls | grep | tr '\n' ' '` 拼 vitest 的文件参数会留一个**尾空格**，vitest 报的是
+`No test files found, exiting with code 1` —— 那是**探针坏**，不是产品红；改成逐枚写死路径。
+② `grep -rn … --include=*.ts` 在 zsh 下会被 glob 吃掉（`no matches found`），要 `--include="*.ts"` 加引号。

@@ -691,7 +691,7 @@ T2 那句话里"每 30 秒续票据"这一格，此前是**一整套零件都在
 | AC | 原句 | 现状 | 为什么做不了 |
 |---|---|---|---|
 | AC-3 | 「**两个独立真实宿主与独立数据库**跑通下方十个（现 13 个）故障注入窗口，观察任务数、op 数、回执与计量」 | **无尺**：`research/tools/` 里与本线有关的装置只有 `verify-inbound-worker-identity.py` 一枚，另两枚是入库切片器；跑 13 个窗口的双宿主装置**不存在** | 它跑在 app-host 的 `dist` 产物上，而 HEAD 仍被 B112 那四处白名单外接缝挡住（当日现量：`git show HEAD:` 查四枚成员命中 **0/0/0/0**，六枚文件仍 `M`）⇒ 现在写装置=在没有可编译的树上写 |
-| AC-6 | 「用户**独立完成**"启用 → 测试发送 → 等待 → 打开/解锁 → 自动处理 → 查看结果"」 | **无尺**：真浏览器那份 `e2e/tests/inbound-automation.spec.ts` 只有 2 条，且**它走的是 route 桩**（文件头自述 "Real browser/UI with HTTP fixtures; database authorization is tested separately"），量的是界面形状，不是这条旅程 | 旅程需要公网接收 + 有权益的宿主在跑，两者都关着；本轮**没有**复跑那 2 条，因为它会改写 `apps/web/evidence/inbound-recovery/` 那 16 枚**已跟踪**PNG，而该目录不在本线白名单。🔴 05:5x 再加一层更硬的：那份用例 import 的 `selectSettingsSection` **只存在于 `e2e/tests/helpers.ts` 的未提交 diff 里**（HEAD 的该文件 grep 命中 0），helpers 在白名单外 ⇒ 这份 e2e 现在**连入库都做不到**，不是"入库了没跑" |
+| AC-6 | 「用户**独立完成**"启用 → 测试发送 → 等待 → 打开/解锁 → 自动处理 → 查看结果"」 | **半尺**：真浏览器那份 `e2e/tests/inbound-automation.spec.ts` 有 4 条（两个模板 × 1280/390 两窄宽），且**它走的是 route 桩**（文件头自述 "Real browser/UI with HTTP fixtures; database authorization is tested separately"），量的是界面形状，不是这条旅程 | 旅程需要公网接收 + 有权益的宿主在跑，两者都关着。✅ **2026-10-10 19:0x 现量更正，把本行原来那两句划掉**：① "本轮没有复跑"已过期 —— 复跑了，`cd e2e && npx playwright test --config playwright.inbound.config.ts` ⇒ **`2 failed / 2 passed (2.1m)`**，两条红是**产品缺一格**（换回设置那一节不重取事件列表：分组是 `hidden` 不是卸载，而组件备好的 `active` 旋钮在 `App.tsx`/`AiSettings.tsx` 两处都没接），归因与一句修法记在 **B140**，断言**没有**为了变绿而放松；② "这份 e2e 连入库都做不到"也已过期 —— 那份 spec 与它 import 的 `selectSettingsSection` 都在 HEAD（现量 `git show HEAD:e2e/tests/helpers.ts \| grep -c selectSettingsSection` = **4**）。四张草稿态截图人已看过：`docs/research/evidence/inbound-automation-review/ui-draft/draft-{1280,390}-{light,dark}.png`。**仍不勾**：那一格红没修、"各壳入口可用"这半没证（这趟只有 web）、整条旅程要开公网接收才能走 |
 | AC-7 | 「官方与自托管样例分别**可运行**，端点与权限真实」 | **无尺**（帮助中心/中英条款的落点也在白名单外，B118） | 半尺有：`docs/reference/` 那两份当日已按 HEAD 更正过措辞（协议 + 定价） |
 | AC-8 | 「平台 × 权益 × 设备状态 × 失败阶段的具体用例表」 | ⚠️ **本行已被文末「2026-10-10 05:2x · AC-8 用例矩阵」一节取代**（当日现量：矩阵已落成 34 行、逐格带尺或带归属，`python3 research/tools/verify-inbound-ac8-matrix.py` rc=0）。原先写的"**无产物**：矩阵文件不存在"在 10-10 05:0x 之前是真的，留着是为了让人认出"表格类交付物最容易糊过去的是它自己" | 剩余的那半仍然过不去：`pnpm check` / `-r test` / `reinstall:all` 三条在隔离副本上仍红（同 B112），矩阵里 C30~C34 五格因此记无尺 |
 
@@ -1548,3 +1548,65 @@ DEVICE_RC=0
 
 
 
+
+## 2026-10-10 19:0x · T5 界面层**已入库**，并在合并态上重取了全部读数；界面层第一次真跑 e2e 抓到一格真缺陷
+
+载体：`8bbc50b1`（并行会话那笔 `merge: origin/main 并入`）之后的 HEAD。界面层七枚落点是**由那一笔 merge 带进库的**，
+本线自己的两笔 `0eea4c0f` / `f3eeaf73` 是它的祖先 —— **归属没有改写**，`git log --oneline -- <路径>` 追得到。
+
+### 1. 这一节改了什么（两处，都是"类型从共享层 import、句子从表里取"）
+
+| 落点 | 改动 | 为什么 |
+|---|---|---|
+| `apps/web/src/features/settings/inbound-runtime.ts` | `processWebInboundOnce` 的返回类型改成 `import` 来的 `InboundAutomationCycleResult` | 原来那行**手抄**了三态联合，而 app-host 已把它加宽成四态（多 `waiting-entitlement`）。这就是 B131/B137 那一类：`check:layering` 拦得住接线，拦不住**类型签名的手抄** |
+| `…/InboundAutomationSettings.tsx` | 状态联合改 `'idle' \| 'failed' \| InboundAutomationCycleState`；回显从 `t(\`…${state}\`)` 拼键改成模块级 `PROCESS_COPY` 表 + `data-inbound-cycle-state` 属性 | 拼键会**指到一颗不存在的词条**上，而 `translateIn` 查不到是**抛错**（`packages/i18n/src/catalog.ts`）⇒ 整块设置面板当场崩。表是封闭的，`waiting-entitlement` 刻意不在表里（那颗键是 B110），它渲染成**空句子 + 状态属性**，而不是挪用「处理失败」那句去骗人 |
+
+### 2. 判据与三臂反向验证（当日、新 HEAD、命令可复跑）
+
+尺：`apps/web/tests/inbound-cycle-display.spec.tsx`（3 条）。**分母从词条表自己取**
+（`Object.keys(zhCN)` 过滤 `web.ai.inbound.process.` 前缀），所以 B110 那颗键进库的当天，
+第一条对账就会**自己要求补映射** —— 不靠有人记得。
+
+```
+cd apps/web && NO_COLOR=1 pnpm exec vitest run tests/inbound-cycle-display.spec.tsx
+  Test Files  1 passed (1)   Tests  3 passed (3)   RC=0
+```
+
+三臂各自只红该红的那条（注入 → 还原只从 `/tmp/ias.mut-bak` 取，`cmp -s` 三次都逐字一致，还原后 `git status` 该文件 0 条）：
+
+| 臂 | 注入 | 红相 |
+|---|---|---|
+| 1 | 删掉 `submitted` 那一行映射 | **2 条红**：对账 `expected 3 to be greater than or equal to 4` + 正向对照 `expected '' to be '已提交任务。'` |
+| 2 | 未映射状态兜底成 `PROCESS_COPY.failed` | **1 条红**：`expected '处理失败，事件会保留在服务端等待恢复。' not to be` 同一句 —— 正是"把订阅问题说成处理失败"那句谎 |
+| 3 | 把一枚映射指到不存在的键 | **1 条红**：对账 `expected [ Array(1) ] to deeply equal []`（崩在渲染之前就被对账抓到） |
+
+同批在本线白名单里的其余各腿，合并态读数：
+`apps/web` 五份 inbound spec `5 files / 11 tests passed` RC=0；`packages/app-host` 十三份 `13 files / 107 tests` RC=0；
+`packages/domain` 1 条、`packages/sync-client` 6 条各自 RC=0；
+`cd apps/web && npx --no-install tsc --noEmit -p tsconfig.spec.json` = RC 2、**16 条错、本线 0 条**（红因只在 B103 立案）。
+
+### 3. 真浏览器那一趟：**2 failed / 2 passed**，红的是产品缺一格
+
+`cd e2e && npx playwright test --config playwright.inbound.config.ts` ⇒ 两条 `encrypted date draft review and Vault invalidation`
+（1280 与 390）红在 `inbound-automation.spec.ts:85`：确认草稿之后切走切回那一节，「查看并编辑草稿」不再出现。
+归因链三处现量、修法一句话、以及"为什么本线不代改"都记在 **B140**（要点：设置分组是 `hidden` 不是卸载，
+组件备好的 `active` 旋钮在 `App.tsx` / `AiSettings.tsx` 两处都没接；同屏的 `SyncSettingsPanel`、`PrivacyPanel` 都接了）。
+🔴 **没有放松那两条断言** —— 它们现在就是那格缺陷的判据，接上线就该从 2 红变 4 绿。
+
+四张草稿态截图人已打开看过（1280/390 × 亮/暗），落在
+`docs/research/evidence/inbound-automation-review/ui-draft/`。看图得到的两条**不是从代码能读出来的**：
+① 非法日期 `2026-02-30` 在草稿卡里**原样显示**（冻结的解析结果没有被"顺手修成"合法日期，这正是 P1-7 要的语义）；
+② 顶部披露句明说"确认使用已解析结果，不再调用模型；任务将等待获授权设备创建" —— 与 AC-6 那句"等待 → 自动处理"对得上。
+
+⚠️ 载体边界（这一趟**故意**留下的处理）：跑它会改写 `apps/web/evidence/inbound-recovery/` 那 12 枚**已跟踪** PNG，
+而该目录不在本线白名单。处理是"跑完复原"：3 枚变脏的用 `git checkout -- <点名路径>` 还原、4 枚新产物**搬进**白名单证据目录（不是删），
+跑完该目录脏条目数 **0**。⇒ 台账 694 行那句"因为会弄脏别人目录所以不跑"从此不再是理由：**跑要跑，跑完复原**。
+
+### 4. 这一格的边界（不包装成完成）
+
+- 界面层**入库了、单测与真浏览器都跑了**，但 AC-6 **仍不勾**：那一格红没修、"各壳入口可用"这半没证（这趟只有 web）、
+  整条"启用 → 测试发送 → 等待 → 打开/解锁 → 自动处理 → 查看结果"要公网接收与有权益的宿主在跑才能走，两者按负责人指令仍关着。
+- `waiting-entitlement` 的**句子**仍缺（B110 那颗词条在 `packages/i18n`，本线不许动）；界面上已有可见分支与状态属性。
+- 本线**没有**动 `docs/reference/pricing-and-entitlements.md`（它是 `check:ai-quota` 的唯一数字源），
+  因为 T6 的四件产物三件不在白名单 ⇒ 记在 **B139** 等拍。
+- AC-1～AC-8 继续全未勾（现量 `grep -c '^- \[ \] \*\*AC-' docs/plans/inbound-automation.md` = 8），公网接收与售卖继续关闭。

@@ -7169,6 +7169,36 @@ git show --numstat --format='' 6d06bae4   # 空输出
 
 反向验证的边界：本轮没有把这枚切片放进真编译器里复跑一次 HEAD 级的 dts（那需要一个带 node_modules 的干净检出，现成的分离检出不是本会话创建的，不动别人的载体）。按那条错文的构造（同包内 `./host.js` 的 re-export 指向一枚 HEAD 不存在的符号）这一格是关掉了，但**下一条会话要真复跑一次**：起一棵自己的隔离副本（`git worktree add` + `pnpm install --offline`），在新 HEAD 上跑 `pnpm exec tsup`，预期 **不再出现 TS2305 那一行**，而仍会看到 `META_KEYS.INBOUND_*` 那 24 条 —— 那 24 条在 dts 里不一定现形（外包是按各自 dist 的 `.d.ts` 解析的，分离检出的 dist 可能比源码新），所以**判 HEAD 用 tsc 那条尺，别用 dts 那条**。
 
+✅ **2026-10-10 18:5x 现量：这四处成员全部进了 HEAD（选项 B 由那四个包的所有者自己落了），本节"HEAD 不自洽"这一格收掉。** 尺是逐枚直接读 HEAD 的那份文件，不看工作树：
+
+| 缺过的成员 | HEAD 里现在 | 读数 |
+|---|---|---|
+| `META_KEYS.INBOUND_{RECIPIENT_KEY,WORKER_CREDENTIAL,COMMIT_JOURNAL}` | `git show HEAD:packages/storage/src/stores.ts \| grep -cE 'INBOUND_(RECIPIENT_KEY\|WORKER_CREDENTIAL\|COMMIT_JOURNAL)'` | **3** |
+| `AiFeature` 成员 `'inbound-automation'` | 同法读 `packages/ai/src/routing.ts` / `egress.ts` | **1 / 1** |
+| `SyncClientOptions.getInboundUploadAuthorization` | 同法读 `packages/sync-client/src/client.ts` | **2** |
+| `OpLogEngine.dispatchValidated` | 同法读 `packages/op-log/src/engine.ts` | **1** |
+
+🔴 **但本节那条"必须有人收的重复"没被收，而且现在是可证的重复**（见 **B138**）。
+🔴 **本节要求的那次"HEAD 级 tsc 真复跑"仍没做**：上面的表证的是"引用不再指向不存在的成员"，不是"编译过"。它并到 T7 那趟隔离副本里去取。
+
+## B138（2026-10-10 18:5x，本会话 · 收 B112 时量出的）：`InboundAutomationHostOptions` 在 HEAD 上**有两份定义**，B112 登记要删的那份没删
+
+`git show HEAD:packages/app-host/src/host.ts` 第 **204** 行仍是 `export interface InboundAutomationHostOptions { … }` 本体，
+而同一枚 HEAD 的 `packages/app-host/src/index.ts:29` 从 `./inbound-host-options.js` re-export **同一个名字**。
+现量两份**逐字相同**（各 16 行，`diff` 无输出）⇒ **编译期不红**，`pnpm --filter @heyta/app-host typecheck` 在工作树上 rc=0。
+
+红不了正是问题：一枚契约两处定义、当前又恰好一致，**下一次只改其中一处的人不会收到任何信号** ——
+这就是 AGENTS.md §3.5 那句"抽取的收尾动作是删掉旧的那份并加门禁，不是写一个更好的新版本"的原始形状，
+本线在 B112 里亲手把它登记出来，落地时又留下了它。
+
+**为什么本会话不代删**：要删的那半住在 `packages/app-host/src/host.ts`，**不在本线白名单**
+（白名单只到 `src/inbound-*` 与 `src/index.ts`）。删法是一句可执行的：把 `host.ts` 那份 interface 删掉、
+改成 `import type { InboundAutomationHostOptions } from './inbound-host-options.js';`（`:297` 的用法不变），
+`index.ts:29` 那行 re-export 保留。
+
+**要拍的**：① 授权本线删那一枚（只此一处，`--stat` 读回 1 个文件），或 ② 交回 app-host 的所有者随手收。
+判据建议同时补一条"同名 export 在 app-host 的 src 里只许出现一次"，否则下次切片还会留下第二份。
+
 ## B113（2026-10-10 02:2x，本会话 · T4 收尾）：`reconcileAutomationAiMetering` 落进了库，但**没有任何消费者**
 
 `server/src/automation/ai-metering.ts:226` 那枚只读对账函数已经进了 HEAD（`0788432d`，真库判据 12 条），
@@ -7715,14 +7745,16 @@ grep -c "inbound-dual-host" server/package.json server/tsconfig.json ⇒ 0 / 0
 
 ## B136 界面层那两把尺量出来的红都在**别人文件**里，按死规矩只登记不修
 
-1. `cd apps/web && npx --no-install tsc --noEmit -p tsconfig.spec.json`：本线两枚文件（`inbound-runtime.ts`、
-   `InboundAutomationSettings.tsx`）**0 条**；剩下 **16 条**分组是 `tests/share-key-store.spec.ts` 13 条 +
-   `tests/app-mount.spec.tsx` 3 条。两枚都在别的线手里（`git status --porcelain` 现量为 `M`），且都不在本线白名单 ⇒ 顺手活。
-   ⚠️ 这直接影响 T7 那一格：`pnpm -r typecheck` 在**合并态**上现在是红的，而红不是本线造的。
-2. `node research/tools/docs-link-check.mjs`：除任务 0 记的那条 `apps/desktop-windows/README.md:89`，
-   本轮**多出 3 条**在 `docs/plans/account-standard-suite-handoff.md:8-10`（他线那份交接件，本轮才出现的）。
-   ⇒ 台账与任务 0 里"**唯一一条**不是本线"那句已过期，见到别照它行动；重取用
-   `node research/tools/docs-link-check.mjs 2>&1 | sed -n '/死链/,/$/p'`。本线新建的链接 0 条死链（`grep -c inbound` 读数为 0）。
+1. `cd apps/web && npx --no-install tsc --noEmit -p tsconfig.spec.json`：本线五枚文件（`inbound-runtime.ts`、
+   `InboundAutomationSettings.tsx`、`inbound-automation.css`、`tests/inbound-cycle-display.spec.tsx`、
+   `apps/mobile/src/inbound/lifecycle.ts`）**0 条**，总数仍是 **16 条未增**（分组见 **B103** 那张表，
+   那 16 条**只在 B103 立案**，本节不重复登记红因与修法，只留这一句"本线没让它变多"的读数）。
+   两枚红文件都在别的线手里且都不在本线白名单 ⇒ 顺手活。
+2. `node research/tools/docs-link-check.mjs`：18:4x 那一趟量到"除任务 0 记的那条 `apps/desktop-windows/README.md:89`，
+   还**多出 3 条**在 `docs/plans/account-standard-suite-handoff.md:8-10`" ⇒ 台账与任务 0 里"**唯一一条**不是本线"那句当时已过期。
+   ✅ **2026-10-10 19:0x 现量：这一整格自己闭合了，尺回到 `rc=0`、`✅ 无死链`**（那三条由他线收掉，`desktop-windows` 那条也不在列了）。
+   留这一条是为了记住形状：**"哪几条死链不是本线"是瞬时读数**，任何照它行动的人都要先重跑
+   `node research/tools/docs-link-check.mjs; echo rc=$?`，别抄本节。本线新建的链接始终 0 条死链。
 
 ## B102 · 2026-10-07 11:0x–12:0x：下载面落地、macOS 第一次真发布、iOS 那枚假报错
 
@@ -7892,3 +7924,199 @@ asc testflight review submit --build-id ce1f0017-c3e6-4c3c-b66e-e9409fe0e63c --c
 这一轮才是真的九步全过（第 9 步的绿是补跑的，不是原链那一趟）。
 📌 可迁移的一条：**判"某步红了是不是我的"，先问"我有没有和它同时碰过同一份产物目录"**，
 再决定要不要去查被测对象 —— `workers: 1` 只保证一次运行内部不并发，不保证两次运行之间不并发。
+
+## B137（2026-10-10 18:5x，账号标准套件线 · 取 iOS 设备腿时量出的）：`waiting-entitlement` 的内联重抄是**一类三处**，而且第三处被第二处遮着 —— 谁修第二处，第三处才会现形
+
+**背景**：本线要在隔离载体里跑 `scripts/verify-mobile-ios-account-email-sessions.sh`（换绑 / 会话撤销 / 改密三块的设备腿），
+前提是 `pnpm -r build` 绿。18:35 那趟 `BUILD_RC=1`，红点和 13:1x 那次登记的 B131 **不是同一枚**。
+
+**现量（全仓按作用枚举，不是只看报错点名的那一处）**：生产侧真源
+`packages/app-host/src/inbound-process.ts:53` 把 `InboundAutomationCycleState` 加宽成四态（多出的那枚是
+`waiting-entitlement`），而消费侧**把那个 union 内联重抄了一遍**的地方有**三处**：
+
+1. `apps/node-host/src/host.ts:274` —— `processInboundAutomation` 的内联返回类型。= 原 B131，已红。
+2. `apps/web/src/features/settings/inbound-runtime.ts:184` —— web 包装函数的内联返回类型，
+   报错落在 `:210`（把 `processInboundAutomationEvent(...)` 的结果交给那个三态签名）。
+   🔴 **本会话新量到**：把 `apps/node-host` 整层退回已提交那版之后，红**没有消失，只是搬到这里**。
+   读数 `BUILD_RC=1`：`src/features/settings/inbound-runtime.ts(210,5): error TS2322`。
+   复现：`cd .worktrees/iosacct && pnpm install --frozen-lockfile --offline && pnpm -r build`
+   （载体 = 主检出 tip + 整片在飞改动，`apps/node-host` 除外；装置 `~/heyta-carriers/w9-acct-logs/sync-dirty-to-carrier.sh`）。
+3. `apps/web/src/features/settings/InboundAutomationSettings.tsx:56` + `:291` ——
+   `useState<'idle'|'submitted'|'empty'|'needs-confirmation'|'failed'>`，而 `:291` 直接 `setProcessState(result.state)`。
+   🔴 **这一处现在不红，因为它被第 2 处遮着**：`result` 的类型来自第 2 处那个三态签名，
+   所以编译器以为它只会回三态。**把第 2 处改成 import 共享类型的那一刻，第 3 处立刻变红。**
+   ⇒ 只修点名的那一处就宣布"修完了"，会留下一个没人见过的第二红。
+
+**另一条比类型更硬的缺口**：`waiting-entitlement` 在 `apps/` 的**源码里零消费**
+（`grep -rn 'waiting-entitlement' apps/` 只命中 `apps/desktop/dist/*.cjs` 那两份构建产物）。
+⇒ 即使三处类型都修通，**web 界面也没有这一档的渲染分支** —— `:291` 会把一个不在本地 union 里的值塞进
+`processState`，落到"没有任何分支匹配"。这不是类型问题，是**产品语义缺一格**（订阅等待时到底做什么）。
+
+**为什么本会话不代改**（按"代改要三条齐"）：① 修它不是删一子 —— 要把内联 union 换成 import，
+还得决定 `waiting-entitlement` 那一档在 CLI 与 web 各**做什么**（退避重试 / 报错 / 安静等订阅），那是产品语义；
+② 改后的运行时形状无法现量等于改前；③ 这三枚文件此刻都在别的线上写着。
+
+**要那条线做的两句**：把三处内联 union 换成 `import type { InboundAutomationCycleState }`（一处 import 就够，
+别再抄第二遍），并给 `waiting-entitlement` 在 web 补一条**看得见的**处置分支 + 判据。
+按 AGENTS §3.5，`apps/` 里重抄共享层的产品语义本来就是被 `check:layering` 拦的形状 ——
+这一例说明它拦得住接线、拦不住**类型签名的手抄**（dts 阶段才炸，且一次炸一处）。
+
+⚠️ **对本线的影响**：iOS 设备腿（goal 的收口条件）在这一格收掉之前取不了数。
+本线**不动**那三枚文件。
+
+### 🔴 B137 的 19:0x 现量更正（同一会话内，别照上面那版行动）
+
+主检出 tip 从 `7c30ca62` 一路推到 `8bbc50b1`（18:47–18:53 别线连续提交，把那批未跟踪件都收进了 HEAD）。
+在新 tip 上重取，上面那三条**只剩一条**：
+
+| # | 位置 | 18:5x 现量（HEAD `8bbc50b1`） |
+|---|---|---|
+| 1 | `apps/node-host/src/host.ts:274` | 🔴 **仍是内联三态** ⇒ 全链唯一剩下的 TS 红 |
+| 2 | `apps/web/src/features/settings/inbound-runtime.ts` | ✅ **已被 owner 修掉**：`:15` `import type { InboundAutomationCycleResult }`、`:184` 用它，不再有内联 union |
+| 3 | `apps/web/src/features/settings/InboundAutomationSettings.tsx` | ✅ **已被修掉，而且修法比"补 union"更好**：`:13` import 共享类型、`:72` `useState<'idle' \| 'failed' \| InboundAutomationCycleState>`、`:37` `PROCESS_COPY: Partial<Record<InboundAutomationCycleState \| 'failed', MessageKey>>` ⇒ 四态都有位置，第 3 处那个"遮罩"也一起没了 |
+
+证明"只剩一条"的两趟读数（载体 `.worktrees/iosacct` = tip `8bbc50b1`，i18n 那四枚重复键按 **B138** 临时摘掉后）：
+- `pnpm -r build` ⇒ `BUILD_RC=1`，**全链 `error TS` 计数 = 1**，就是 `src/host.ts(422,5)`。日志 `~/heyta-carriers/w9-acct-logs/build-after-dupfix3.log`。
+- `pnpm -r --filter '!@heyta/node-host' build` ⇒ **`BUILD_RC=0`、`error TS` 0 条**；
+  并且证明了过滤器**不是打空**（`No projects matched` 命中 0、17 个顶层目录被建、`apps/web build: ✓ built in 3.71s / Done`、
+  `apps/node-host` 提及 0 行）。日志 `/tmp/nh.log`。
+
+⇒ **剩下的交回内容收窄成一句**：`apps/node-host/src/host.ts:274` 那个内联返回类型换成共享类型，
+并决定 CLI 在 `waiting-entitlement` 那一档做什么。**为什么本会话仍不代改**（原三条不变）：
+换类型会让 `host.ts` 的实现必须处理第四态，那是产品语义（退避重试 / 报错 / 安静等订阅），
+不是删一子；改后运行时形状无法现量等于改前；该文件此刻在别线手里。
+
+## B138（2026-10-10 19:0x，账号标准套件线 · 想在载体里跑 `pnpm -r build` 时撞上的）：已提交的 i18n 里 `site.platforms.{android,desktop}.body` **各写了两遍**，`packages/i18n` 建不起来，全仓构建停在第一枚包
+
+**现量**（只读枚举，命令在下）：`packages/i18n` 在 HEAD 上就红，两条 TS1117 各在一个语言文件里 ——
+
+| 文件 | 重复键 | 行号 |
+|---|---|---|
+| `packages/i18n/src/locales/en.ts` | `site.platforms.android.body` | 3789 与 3791 |
+| `packages/i18n/src/locales/en.ts` | `site.platforms.desktop.body` | 3795 与 3797 |
+| `packages/i18n/src/locales/zh-CN.ts` | `site.platforms.android.body` | 4024 与 4026 |
+| `packages/i18n/src/locales/zh-CN.ts` | `site.platforms.desktop.body` | 4030 与 4032 |
+
+复现（只读）：
+```bash
+node -e 'const fs=require("fs");for(const p of ["packages/i18n/src/locales/en.ts","packages/i18n/src/locales/zh-CN.ts"]){const L=fs.readFileSync(p,"utf8").split("\n");const seen={};const out=[];L.forEach((l,i)=>{const m=l.match(/^\s*[\x27"]([^\x27"]+)[\x27"]\s*:/);if(!m)return;if(Object.prototype.hasOwnProperty.call(seen,m[1]))out.push([seen[m[1]]+1,i+1,m[1]]);seen[m[1]]=i;});console.log(p+" ⇒ 重复 "+out.length+" 枚");out.forEach(([a,b,k])=>console.log("   行"+a+" 与 行"+b+"  :  "+k));}'
+```
+
+**形状**：两代落地页平台文案被一次合并**都留下了**，没有二选一。中英两个文件各两枚、**同名同位置** ⇒
+不是中英不同步（`check:ui-language` 那侧对称），是同一侧写了两个值。TS 在 `tsup` 的 dts 阶段以
+`TS1117: An object literal cannot have multiple properties with the same name` 拒绝，`pnpm -r build` 就在**第一枚包**上失败，
+后面每一枚包都没被编译过 —— 包括别的线想验的东西。
+
+**两版的措辞差别是对外陈述，所以这一格不归本线拍**：
+`android.body` 前一版写「有签名测试包、不在应用商店、跨端小组件覆盖未完成」，后一版写
+「真机上建任务/改期/优先级/清单/标签/重复/专注/冲突/回收箱都能用，发布包是 release 签名且已装到设备（首屏是网络同意页），
+仍不在应用商店，桌面小组件未完成」；
+`desktop.body` 前一版写「三端都能装/跑，交互与小组件覆盖仍在逐端验证」，后一版写
+「三端都在公开桶里：macOS 有 Developer ID 签名且已公证（只 Apple Silicon）；Windows 是免安装 zip 跑
+`HeytaWindows.exe`，首启会被 SmartScreen 拦一次；Linux 的 `.deb` 在机器本机打过、解包跑过但 `dpkg -i` 未实测」。
+
+🔴 **一条对拍板有用的现量事实**：**JS 对象字面量里后者覆盖前者** ⇒ 任何已构建出来的产物，界面上**一直是后一版**。
+所以"删前一版、留后一版"是**零行为变更**的修法，改的不是对外承诺的内容，只是把没生效的那半行注释掉。
+（反证形状：把留/删反过来，界面文案会变 —— 那才是一次真实的对外陈述修改。）
+
+**要谁做**：落地页/平台文案那枚线的 owner（或负责人一句话授权任何人做"删前留后"）。
+本线只在隔离载体里做过这一档**诊断**（`~/heyta-carriers/w9-acct-logs/dupdiag3.log`，
+改后 `BUILD_RC` 从"停在 i18n"变成"停在 node-host"），**诊断完已把载体两枚文件逐字还原成 HEAD**
+（`git hash-object` 与 `git rev-parse HEAD:<file>` 相同，`git status --porcelain -- packages/i18n/` 为空）。
+主检出**一个字都没动**。
+
+⚠️ **别照任何一份旧交接的"排除 node-host 就能构建"行动**：在 i18n 这堵墙前面，那条排除根本不必要
+（node-host 的红被 i18n 挡在后面，从没轮到它）；摘掉 i18n 那四行之后，全链只剩 node-host 一处。
+两件事的顺序是 **B138 在前、B137 在后**。
+
+⚠️ **对本线的直接影响**：AGENTS §6.1.1 的 `pnpm reinstall:all`（含 `--only ios`）第 0 步是
+`pnpm -r build` 且 `exit 1` **没有逃生门**（`--only` / `--skip` 都照跑）⇒ **B138 不收，四端重装整条跑不起来**。
+本线设备腿因此仍卡在别人那两枚文件上（`en.ts` / `zh-CN.ts` 的四行 + `host.ts:274` 的一行）。
+
+
+✅ **2026-10-10 18:5x 本会话（自动收集线 · 本节点名的"那条线"就是本线）回填**：本线在自己白名单内的两处已收掉，
+**第 1 处不在本线地界，仍开着**。
+
+| 本节列的三处 | 现状 | 读数 |
+|---|---|---|
+| 1 `apps/node-host/src/host.ts:274` | 🔴 **仍是内联三态**，而 `apps/node-host` 不在自动收集线白名单 ⇒ 原样留给那枚文件的所有者 | `git show HEAD:apps/node-host/src/host.ts \| sed -n '274p'` 打出 `Promise<{ state: 'empty' \| 'submitted' \| 'needs-confirmation'; … }>` |
+| 2 `apps/web/…/inbound-runtime.ts` | ✅ 改成 `import` 共享类型 | `:15` 导入 `type InboundAutomationCycleResult`，`:184` 签名直接用 `Promise<InboundAutomationCycleResult>` |
+| 3 `apps/web/…/InboundAutomationSettings.tsx` | ✅ 按本节预言**当场跟着变红**（`TS2345`，`:291` 那个窄 useState union），一并收掉 | union 改 `'idle' \| 'failed' \| InboundAutomationCycleState`；回显走导出的 `PROCESS_COPY` 表 |
+
+"另一条比类型更硬的缺口"这一半，本线把它**降级成了一半**：`:291` 现在确实有一条**看得见的**分支接住
+`waiting-entitlement` —— 面板渲染 `role="status"` 且带 `data-inbound-cycle-state="waiting-entitlement"` 的节点，
+句子留空（那颗词条是 **B110**，动 `packages/i18n` 不在本线地界），**没有**挪用「处理失败」那句去骗人。
+钉它的判据在 `apps/web/tests/inbound-cycle-display.spec.tsx`（反头那条：词条表里每颗 `web.ai.inbound.process.*`
+都必须有人接 ⇒ B110 的键进来时这把尺会自己要求补映射）。**"这一档该做什么"（退避重试 / 安静等订阅）仍是产品语义，没拍**。
+
+⚠️ 边界（别读多）：本会话只逐枚现量了上面三处的**源码形状**，**没有**在新 HEAD 上重跑 `pnpm -r build`
+⇒ "第 2、3 处已修"**不等于**"那位的 iOS 设备腿现在能取数"，第 1 处仍挡着。
+
+## B139（2026-10-10 19:0x，本会话 · 排 T6 时量的）：T6 的四件产物**三件不在本线白名单**，照现在的地界做等于逼本线越界
+
+任务书 T6 那句是"新写一枚 ADR 限定取代 ADR-0017/0020 的相关承诺（不改历史 ADR），中英条款、帮助、定价事实源同步"。
+逐件对现量落点：
+
+| T6 要交付的 | 真身落点（现量） | 在本线白名单里吗 |
+|---|---|---|
+| 新 ADR 一枚 | `docs/adr/00NN-*.md` + `docs/adr/README.md` 索引（现量最大号：`ls docs/adr \| tail -3` → 目前是 `0063-…`） | 🔴 **不在**（白名单只有 `docs/plans/inbound-automation.md`、`docs/reference/{inbound-automation-protocol,pricing-and-entitlements}.md`、`docs/research/inbound-automation-review.md`） |
+| 中英条款 | `packages/legal/src/documents/*`（生成物另有 `check:legal-copy` 对账） | 🔴 **不在** |
+| 帮助中心 | 帮助中心页与 `apps/landing` 那侧的说明件 | 🔴 **不在** |
+| 定价事实源 | `docs/reference/pricing-and-entitlements.md` 的 `ai-quota-ssot` 块（`check:ai-quota` 的唯一数字源） | ✅ 在 |
+
+🔴 **这不是"少写了三枚文件"，是 AC-1 的输入项本身就在地界外**：台账 AC-1 那句把"新增 ADR（限定取代 ADR-0017/0020 的范围）"
+列为**输入**（`docs/plans/inbound-automation.md` AC-1 行）。⇒ 白名单不改，AC-1 与 AC-8 那格**结构上闭合不了**，
+不是我慢。
+
+**要拍的（一句话）**：把 `docs/adr/`（本线新增那一枚 + README 索引一行）、`packages/legal/src/documents/` 里自动收集那两份、
+帮助中心那枚页面这三条**并进本线白名单**，还是 T6 整条交回给那三处的所有者。
+本线的倾向：ADR 那枚并进白名单（它是本线判定的**唯一**记录处，代写会丢理由），条款与帮助按原样交出去
+（那两侧各有自己的对账门禁与中英同步纪律，本线代改会撞 `check:legal-copy`）。
+
+⚠️ 顺带一条**不要照抄**的读数：`docs/reference/pricing-and-entitlements.md` 在白名单里，但它是
+`check:ai-quota` 的唯一数字源，动它一句要连带动那 5 处对外承诺（AGENTS §9 ADR-0023 的形状）。
+本会话**没有动它**，因为"每周期 300 次要不要在自动收集文案里出现"是对外陈述，归 T6 整包拍，不做半句。
+
+## B140（2026-10-10 19:0x，本会话 · 第一次真跑界面层 e2e 量出的）：设置分组是 `hidden` 不是卸载，而 `InboundAutomationSettings` 的 `active` **从来没人接** ⇒ 换回那一节不会重取列表，两条用例当场红
+
+命令与读数（真浏览器、零 mock 界面、route 桩只挡 HTTP）：
+
+```
+cd e2e && npx playwright test --config playwright.inbound.config.ts
+  ✘  1 … › encrypted date draft review and Vault invalidation 1280 (1.0m)
+  ✘  2 … › encrypted date draft review and Vault invalidation 390 (1.0m)
+  2 failed / 2 passed (2.1m)
+Error: locator.click: Test timeout of 60000ms exceeded.
+  waiting for getByTestId('inbound-event-date-draft').getByRole('button', { name: '查看并编辑草稿', exact: true })
+    at e2e/tests/inbound-automation.spec.ts:85:69
+```
+
+**归因链（三处现量，不是猜）**：
+
+1. 失败那一刻的 a11y 快照里那一行是 `事件 date-draft` + `等待创建或同步`（`error-context.md` 第 163-164 行），
+   而 `等待创建或同步` 逐字等于 `packages/i18n/src/locales/zh-CN.ts:5275` 的 `web.ai.inbound.events.prepared`
+   ⇒ 界面显示的是**确认之后**那个状态，不是桩里已经翻回 `needs-confirmation` 的那个。
+2. 用例在点确认之后先 `state = 'needs-confirmation'`（spec 第 83 行）再切走切回那一节（第 84 行），
+   期望重进会重取。而 `apps/web/src/App.tsx:3140` 那一带是
+   `<section … hidden={activeSettingsSection !== 'settings-group-ai'}>` —— **分组只是 `hidden`，从不卸载**，
+   所以 `useEffect(() => { void refresh(); }, [refresh])`（组件第 105 行）根本不会再跑一次。
+3. 组件**本来就有**处理这件事的旋钮：第 45 行签名 `active = true`，第 85 行 `if (!active …) { setEvents([]); return; }`。
+   它的挂载链 `AiSettings.tsx:1262` 与 `App.tsx:3143` **都没传 `active`** ⇒ 恒为 `true` ⇒ 换节时既不失效也不重取。
+   同一屏的姊妹面板都是传了的：`App.tsx` 里 `<SyncSettingsPanel active={activeSettingsSection === 'settings-group-sync'} />`、
+   `PrivacyPanel` 同理 —— **仓库已有这一个机制，本线不该再造第二个**。
+
+⇒ 这条红的性质是**产品缺一格**（服务端把事件翻回待确认、或另一台设备改了状态时，用户换回这一节看不到），
+不是用例写错，也不是本会话那两枚类型接缝改坏的：红点在**第一次**成功打开草稿、截图、提交确认之后
+（四张 `draft-*.png` 都产出了，见 `docs/research/evidence/inbound-automation-review/ui-draft/`）。
+
+**修法只有一句，但落点不在本线白名单**：把 `active` 顺着挂载链接上 ——
+`App.tsx` 给 `<AiSettings …>` 传当前节是否 `settings-group-ai`，`AiSettings.tsx:1262` 再转给
+`<InboundAutomationSettings active={…} />`。两枚文件都不在本线地界 ⇒ 只登记不代改。
+
+**要拍的**：① 授权本线接这一根线（只动这两枚文件里的这两个 JSX 调用点，改完复跑那 4 条），
+或 ② 交回 `apps/web` 设置面的所有者（姊妹面板那两枚已经这么接了，他们接本面板是同一件事的收尾）。
+判据不用新写：**这两条用例就是判据**，它们现在红着，接上就该绿。
+
+⚠️ 边界：这一格闭合**不等于 AC-6 闭合**。AC-6 还要"用户独立完成启用 → 测试发送 → 等待 → 打开/解锁 →
+自动处理 → 查看结果"那一整条旅程（要公网接收与有权益的宿主在跑，两者按负责人指令仍关着），
+以及"各壳入口可用"（这一趟只有 web）。
