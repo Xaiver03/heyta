@@ -12,32 +12,45 @@ HEAD 已跟踪的 `packages/app-host/src/inbound-{key,secret}-store.ts` 有 24 �
 它判的是 HEAD，不是工作树：逐枚 `git show HEAD:<path>` 取字节。唯一读磁盘的地方是自测臂 3，
 它读工作树那一代**只是为了扮演"生产者真入库了"**，不进正常判卷路径。
 
-四档，且**只有机械可判的那一档判红**（照本仓 `mps-safety-assessment-prep` 硬规则 15 的分档纪律）：
-  命中  成员在那枚生产包的 HEAD 源码里逐字出现 ⇒ 不判
+它查两维，都是"消费者已入库、生产者不在 HEAD"这一类，只是缺的东西形状不同：
+① **成员缝** —— 已入库代码引用了某枚跨包具名绑定的成员，而那成员在生产包的 HEAD 源码里不存在（B129）。
+② **模块缝** —— 已入库代码 import/`new URL()` 了一枚 HEAD 里根本没有的文件（B130：
+   `inbound-process.ts` 引的 `./task-batch-actions.js` 从未被任何提交带进仓库）。
+第一版只写了①。②是它自己照出来的：加了独立分母那一档（R7）之后，同一趟运行里就跳出一枚
+`new URL('../fixtures/…')` 和两枚**跨行 import** —— 那意味着第一版不只漏了模块这一维，
+连①里"跨包成员访问"都少算了 22 处（改成整句解析后：成员访问 105→127、命中 81→103）。
+
+分档，且**只有机械可判的那几档判红**（照本仓 `mps-safety-assessment-prep` 硬规则 15 的分档纪律）：
+  命中  成员在那枚生产包的 HEAD 源码里逐字出现 / 相对路径在 HEAD 解析得开 ⇒ 不判
   盲区  命名空间导入（`import * as ns`）、下标访问、生产包在 HEAD 没有任何 .ts ⇒ 只数不判
-  登记  在 KNOWN_SEAMS 里挂了 BLOCKED 号的已知缝 ⇒ 大声列出，不判红
-  新缝  以上三档都不沾 ⇒ **判红（R2）**
-四档相加要等于访问总数，不相等就是 R3 红（有访问根本没进任何一档）。
+  登记  在 KNOWN_SEAMS / KNOWN_MODULE_SEAMS 里挂了 BLOCKED 号的已知缝 ⇒ 大声列出，不判红
+  新缝  以上三档都不沾 ⇒ **判红**
 
 规矩：
-  R1 在册可寻：EXTRA_SCOPE 逐枚必须在 HEAD 跟踪得到。挡"清单里指向的文件被删了，装置安静地不执行还照样打印通过"。
-  R2 新缝判红。
-  R3 分母自洽：命中 + 盲区 + 登记 + 新缝 == 成员访问总数。
-  R4 登记的缝不许过期：KNOWN_SEAMS 里那枚成员如果在 HEAD 已经能找到（缝被修掉了），必须响亮报"请删登记并回写台账"（退 3）。
+  R1 在册可寻：EXTRA_SCOPE 逐枚、以及两本登记档指向的消费者文件，都必须在 HEAD 跟踪得到。
+     挡"清单里指向的文件被删了，装置安静地不执行还照样打印通过"。
+  R2 新成员缝判红。  R5 新模块缝判红。
+  R3 成员分母自洽：命中 + 盲区 + 登记 + 新缝 + 停用 == 独立取一次的成员访问总数。
+  R4 / R6 登记不许过期：成员缝（R4）与模块缝（R6）若已在 HEAD 闭合，必须响亮报"请删登记并回写台账"（退 3）。
+  R7 尺自己瞎了：源码里带代码后缀的相对路径，既不被整句解析抓到、又没逐枚登记进 REL_NOT_AN_IMPORT ⇒ 判红。
+     这一档不是为了产品，是为了**这把尺不会悄悄变成只看得见旧写法** —— 跨行 import 就是这么被抓出来的。
 
 盲区说在前头（它是**粗筛**，不是 typechecker）：命中档只要求那枚标识符在生产包的 HEAD 源码里逐字出现，
 所以"名字出现在注释里 / 是另一枚对象的同名成员"会被算成命中（假绿方向）。精确那一腿是 B129 里
 写明的 tsc 两臂还原（HEAD 那代生产者 → rc=2 + TS2339；工作树那代 → rc=0），这枚装置负责的是
 **每次入库后都能一条命令重跑的那一遍粗筛**。
 
-自测五臂，两个方向都要有：臂 1 注入一枚不存在的成员访问（R2 该红）、臂 2 清单里放一枚 HEAD 没有的 path
-（R1 该红）、臂 3 把生产包换成含那三枚键的那一代（R4 必须说登记已过期，不许闷着变绿）、臂 4 静止对照不判红、
-臂 5 **起子进程跑真 CLI 取退出码**：静止 rc=0，把登记档里那枚生产包名换成不存在的那枚后 rc=1。
+自测八臂，两个方向都要有：臂 1 注入一枚不存在的成员访问（R2）、臂 2 清单里放一枚 HEAD 没有的 path（R1）、
+臂 3 把生产包换成含那三枚键的那一代（R4 必须说登记已过期，不许闷着变绿）、臂 4 静止对照不判红、
+臂 5 **起子进程跑真 CLI 取退出码**：静止 rc=0，把登记档里那枚生产包名换成不存在的那枚后 rc=1、
+臂 6 注入一枚指向不存在文件的相对 import（R5）、臂 7 把那枚登记过的生产者"入库"（R6 必须顶出来）、
+臂 8 注入一枚带代码后缀却不是导入的相对路径（R7）。
 只测"能红"会把判据写成永远红，只测"能绿"会把它写成永远绿；"退出码"这个词只在臂 5 出现 ——
-前四臂走的是进程内 scan()，它们判的是规矩命中，不是 rc。
+其余各臂走的是进程内 scan()，它们判的是规矩命中，不是 rc。
 """
 import argparse
 import os
+import posixpath
 import re
 import subprocess
 import sys
@@ -66,7 +79,56 @@ KNOWN_SEAMS = {
 }
 
 MEMBER_STOP = {"prototype", "constructor"}
-IMP = re.compile(r"^[\t ]*import\s+(?P<clause>.*?)\s+from\s+['\"](?P<spec>[^'\"]+)['\"]", re.M)
+# 整句解析（跨行也算）。仓里普遍写成 `import {\n a, b,\n} from './x.js'`，按行锚定的正则抓不到 ——
+# 那不只是漏一枚模块：跨包**成员访问**会整批看不见，于是"命中/新缝"两档同时少计，红就永远不红。
+IMP = re.compile(r"(?<![\w$.])(?:import|export)\b(?P<clause>[^;]{0,4000}?)\bfrom\s*['\"](?P<spec>[^'\"]+)['\"](?![\w])")
+REL_SIDE_EFFECT = re.compile(r"(?<![\w$.])import\s+['\"](?P<spec>\.{1,2}/[^'\"]+)['\"]")
+REL_DYNAMIC = re.compile(r"import\(\s*['\"](?P<spec>\.{1,2}/[^'\"]+)['\"]\s*\)")
+# `new URL('../fixtures/x.json', import.meta.url)` 是运行时要读的文件：干净检出上缺它和缺模块一样致命
+NEW_URL = re.compile(r"new\s+URL\(\s*['\"](?P<spec>\.{1,2}/[^'\"]+)['\"]")
+# 独立分母：源码里**任何**被引起来的相对路径（不经过上面几档）
+REL_ANY = re.compile(r"['\"](?P<spec>\.{1,2}/[^'\"]+)['\"]")
+CODE_EXT = (".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".css", ".json")
+# 逐枚登记"相对路径是真的、但它不是导入语句"的那些（成本是刻意的：要么补一档，要么写清为什么不算）
+REL_NOT_AN_IMPORT = {}
+
+
+def _in_line_comment(src, pos):
+    """命中的关键字之前、同一行里有没有 `//` —— 挡住"注释里提了一句路径"被读成导入。"""
+    return "//" in src[src.rfind("\n", 0, pos) + 1:pos]
+
+
+def iter_refs(src):
+    """逐条给出 (kind, clause, spec)：kind ∈ {from, side, dyn, url}，clause 只有 from 那档有内容。"""
+    for m in IMP.finditer(src):
+        if not _in_line_comment(src, m.start()):
+            yield "from", m.group("clause"), m.group("spec")
+    for rx, kind in ((REL_SIDE_EFFECT, "side"), (REL_DYNAMIC, "dyn"), (NEW_URL, "url")):
+        for m in rx.finditer(src):
+            if not _in_line_comment(src, m.start()):
+                yield kind, "", m.group("spec")
+
+# 已知且已登记的**模块**缝：(消费者文件, 相对 spec) -> BLOCKED 号。登记不是放行，R6 会盯着它过期。
+KNOWN_MODULE_SEAMS = {
+    ("packages/app-host/src/inbound-process.ts", "./task-batch-actions.js"): "B130",
+}
+
+# 只给自测臂用的旋钮：假装这些路径在 HEAD 已被跟踪（= "生产者那一代入库了"）
+EXTRA_TRACKED = []
+
+
+def resolve_rel(consumer, spec, tracked_set):
+    """把相对 spec 解析成 HEAD 里的真实路径；解析不出来 = HEAD 缺这枚模块。
+    仓里的规矩是相对导入带 `.js` 而真文件是 `.ts`，所以要按 Node 的解析顺序试一遍候选。"""
+    base = posixpath.normpath(posixpath.join(posixpath.dirname(consumer), spec))
+    if base in tracked_set:
+        return base
+    stem = re.sub(r"\.(jsx?|mjs|cjs)$", "", base)
+    for cand in (stem + ".ts", stem + ".tsx", stem + ".d.ts", base + ".json", base + ".css",
+                 stem + "/index.ts", stem + "/index.tsx"):
+        if cand in tracked_set:
+            return cand
+    return None
 
 
 def git(*args):
@@ -134,6 +196,7 @@ def scan(overrides=None):
             reds.append(("R1", f"在册清单指向一枚 HEAD 不存在的文件：{p}（它被删了还是改名了？"
                                f"这一档不修，装置就只对越来越少的文件负责）"))
     in_scope = sorted(set(in_scope))
+    tracked_set = set(tracked) | set(EXTRA_TRACKED)
 
     ts_by_pkg = {}
     for p in tracked:
@@ -208,6 +271,47 @@ def scan(overrides=None):
                     news += 1
                     new_detail.append((f, bind, member, target))
 
+    # 模块缝：已入库的源码 import 了一枚 HEAD 里根本不存在的文件（干净检出上是 TS2307 / module not found）。
+    # 第一版只查跨包**成员**，漏了这一整档：`inbound-process.ts:8` 引的 `./task-batch-actions.js` 从未被任何提交带进仓库。
+    mod_ok = mod_known = mod_new = mod_blind = 0
+    mod_known_hits = []
+    mod_new_detail = []
+    mod_blind_detail = []
+    for f in in_scope:
+        if not f.endswith((".ts", ".tsx")):
+            continue
+        src = blob(f) or ""
+        structured = {spec for _kind, _clause, spec in iter_refs(src) if spec.startswith(".")}
+        for spec in sorted(structured):
+            if resolve_rel(f, spec, tracked_set):
+                mod_ok += 1
+            elif (f, spec) in KNOWN_MODULE_SEAMS:
+                mod_known += 1
+            else:
+                mod_new += 1
+                mod_new_detail.append((f, spec))
+        # 独立分母：源码里任何被引起来的相对路径。剩下的那些若带代码后缀，就是"看着是导入而四档都没抓到" ⇒ 尺瞎了（R7）
+        for spec in sorted({m.group("spec") for m in REL_ANY.finditer(src)} - structured):
+            if spec.endswith(CODE_EXT) and (f, spec) not in REL_NOT_AN_IMPORT:
+                mod_blind_detail.append((f, spec))
+            else:
+                mod_blind += 1
+
+    for (consumer, spec), bid in sorted(KNOWN_MODULE_SEAMS.items()):
+        if consumer not in tracked_set:
+            reds.append(("R1", f"模块缝登记指向一枚 HEAD 已不存在的消费者：{consumer}（{bid}）"
+                               f"⇒ 去 BLOCKED.md 撤登记"))
+        elif resolve_rel(consumer, spec, tracked_set):
+            reds.append(("R6", f"登记的模块缝已闭合：{consumer} 的 `{spec}`（{bid}）现在在 HEAD 解析得开"
+                               f"⇒ 撤登记并回写台账，留着它下一位会按旧状态行动"))
+
+    for f, spec in mod_new_detail:
+        reds.append(("R5", f"模块缝：HEAD 的 {f} import 了 `{spec}`，而这枚文件在任何提交里都不存在"
+                           f"⇒ 消费者已入库、生产者从未入库（干净检出上整个包解析不了，本机门禁全绿）"))
+    for f, spec in mod_blind_detail:
+        reds.append(("R7", f"尺瞎了：{f} 里有带代码后缀的相对路径 `{spec}`，看着是导入却不被四档正则抓到"
+                           f"⇒ 要么补一档（改这枚装置），要么逐枚登记进 REL_NOT_AN_IMPORT 并写清它为什么不是导入"))
+
     for (target, member), bid in known_hits:
         reds.append(("R4", f"登记的缝已闭合：{target} 里的 `{member}`（{bid}）现在在 HEAD 找得到了"
                            f"⇒ 去 BLOCKED.md 撤掉这条登记并回写台账，留着它下一位会按旧状态行动"))
@@ -226,7 +330,9 @@ def scan(overrides=None):
         reds.append(("R3", f"分母自洽破：四档 {hit}+{known}+{news}+{blind_producer} 加停用 {skipped_stop} "
                           f"≠ 独立取到的访问数 {access_total} ⇒ 有访问根本没进任何一档"))
     stats = dict(files=len(in_scope), hit=hit, blind=blind_producer + ns_blind, ns=ns_blind,
-                 known=known, new=news, stop=skipped_stop, total=access_total)
+                 known=known, new=news, stop=skipped_stop, total=access_total,
+                 mod_ok=mod_ok, mod_known=mod_known, mod_new=mod_new, mod_blind=mod_blind,
+                 mod_blind_detail=len(mod_blind_detail))
     return reds, stats
 
 
@@ -245,20 +351,23 @@ def bindings_all(src, own):
     return out
 
 
-def run_arm(overrides, label, expect_rule, extra_scope_missing=None):
+def run_arm(overrides, label, expect_rule, extra_scope_missing=None, extra_tracked=None):
     """臂 1-4 走的是进程内 scan()：注入只存在于内存，不落盘、不碰工作树。
     **"rc"这个词不出现在这里** —— 真退出码那一腿由下面臂 5 用子进程跑 CLI 证明。"""
     ov = dict(overrides or {})
+    global EXTRA_SCOPE, EXTRA_TRACKED
     if extra_scope_missing:
-        global EXTRA_SCOPE
         keep = EXTRA_SCOPE
         EXTRA_SCOPE = keep + [extra_scope_missing]
-        try:
-            reds, stats = scan(ov)
-        finally:
-            EXTRA_SCOPE = keep
-    else:
+    if extra_tracked:
+        EXTRA_TRACKED = list(extra_tracked)
+    try:
         reds, stats = scan(ov)
+    finally:
+        if extra_scope_missing:
+            EXTRA_SCOPE = keep
+        if extra_tracked:
+            EXTRA_TRACKED = []
     fired = next((rule for rule, _ in reds if rule == expect_rule), None)
     if fired:
         return f"成立（scan 判红，命中 {expect_rule}）　{next(m for r, m in reds if r == expect_rule)[:64]} …"
@@ -337,6 +446,23 @@ def self_test():
         lines.append(("臂 5 子进程跑真 CLI：静止 rc=0 且把登记档拆掉后 rc=1 ⇒ 两个方向都要成立",
                       f"**不成立**（green rc={rc_green} 要 0，red rc={rc_red} 要 1）"))
 
+    # 臂 6：注入一枚指向不存在文件的相对导入 ⇒ R5（模块缝）必须红
+    mod_target = "packages/app-host/src/inbound-runner.ts"
+    mod_base = git("show", "HEAD:" + mod_target).stdout
+    lines.append(("臂 6 注入一枚 `import … from './definitely-missing-….js'` ⇒ 该红（R5 模块缝）",
+                  run_arm({mod_target: mod_base + "\nimport { nope } from './definitely-missing-9127.js';\n"},
+                          "臂6", "R5")))
+
+    # 臂 7：把 B130 那枚生产者"入库" ⇒ R6 必须说登记已过期，不许闷着变绿
+    lines.append(("臂 7 登记过的生产者真的进 HEAD ⇒ R6 必须说模块缝已闭合",
+                  run_arm(None, "臂7", "R6",
+                          extra_tracked=["packages/app-host/src/task-batch-actions.ts"])))
+
+    # 臂 8：注入一枚"带代码后缀、但不是导入语句"的相对路径 ⇒ R7 必须红（这一档挡的是尺自己瞎了）
+    lines.append(("臂 8 注入一枚 `const legacy = './weird-9127.js'` ⇒ 该红（R7 尺瞎了）",
+                  run_arm({mod_target: mod_base + "\nconst legacy9127 = './weird-9127.js';\n"},
+                          "臂8", "R7")))
+
     return _finish_self_test(lines)
 
 
@@ -356,11 +482,14 @@ def main():
     print(f"读数　在册文件={stats['files']}　跨包成员访问={stats['total']}　"
           f"命中={stats['hit']}　盲区(生产包无 .ts)={stats['blind']}　盲区(命名空间)={stats['ns']}　"
           f"停用={stats['stop']}　登记缝={stats['known']}　新缝={stats['new']}")
-    if any(r == "R4" for r, _ in reds):
+    print(f"读数　相对导入={stats['mod_ok'] + stats['mod_known'] + stats['mod_new']}　"
+          f"模块在 HEAD={stats['mod_ok']}　登记模块缝={stats['mod_known']}　新模块缝={stats['mod_new']}　"
+          f"非导入的相对串={stats['mod_blind']}　尺瞎了={stats['mod_blind_detail']}")
+    if any(r in ("R4", "R6") for r, _ in reds):
         print("结论：登记的缝已闭合 ⇒ 撤登记、回写台账（退 3）")
         return 3
     if reds:
-        print(f"结论：{len([r for r, _ in reds if r != 'R4'])} 条红")
+        print(f"结论：{len([r for r, _ in reds if r not in ('R4', 'R6')])} 条红")
         return 1
     print("结论：已入库的消费者不再依赖任何未入库的生产者（ KNOWN_SEAMS 那几枚除外，见上面登记档）")
     return 0

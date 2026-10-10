@@ -7568,3 +7568,40 @@ IndexedDB 的 META 行键是磁盘上的东西，两处定义就是漂移的起�
 上面那 3 枚成员现在坐在 `KNOWN_SEAMS` 里挂着 B129 —— **R4 会盯着它**：那 6 行一旦以任何方式入库，
 这枚装置不再报绿，而是退 **3** 报"登记的缝已闭合 ⇒ 撤登记、回写台账"。所以这一格修完之后不需要有人记得来改尺。
 
+
+## B130（2026-10-10 06:2x，本会话 · 上一节那把尺第一次全量跑时自己照出来的）：同一类缝还有**第二种形状**，而且这次缺的是整枚文件
+
+B129 那把尺第一版只查"跨包**成员**在不在 HEAD"。加了一档独立分母（R7：源码里带代码后缀、又不被抓到的相对
+路径）之后，**同一趟运行**就跳出一整维它原本看不见的东西：
+
+- 现量：HEAD 已入库的 `packages/app-host/src/inbound-process.ts:8` 写着
+  `import { createTaskBatch, type TaskBatchContext } from './task-batch-actions.js';`
+- 生产者从来不在 git 里：`git ls-files -- packages/app-host/src/task-batch-actions.ts` = **0 行**，
+  `git show HEAD:packages/app-host/src/task-batch-actions.ts` → **rc=128**，
+  `git grep -n "createTaskBatch" HEAD -- packages server apps` 只命中 `inbound-process.ts` 自己的**使用处**（`:38`、`:184`），
+  全仓 HEAD 没有任何定义点 ⇒ 干净检出上是 `TS2307 / Cannot find module`，**整包解析不了**。
+- 工作树里那枚文件在：60 行、mtime `2026-10-07 23:24`，另有 `packages/app-host/tests/task-batch-actions.spec.ts`
+  同为 `??`；台账 `docs/plans/inbound-automation.md` 的 W1 那节把这份 spec 记成 **AC-5 的尺**（唯一入口）
+  ⇒ **归属是本线的**（W1 批语义的共享创建动作），不是别人正在写的东西；是当初分组提交按命名路径挑文件时**漏了 producer 与 spec**。
+- 消费者是怎么进 HEAD 的：`git log --oneline --diff-filter=A -- packages/app-host/src/inbound-process.ts` →
+  `9fa53ab9`（标题是"账号面"那笔），`--stat` 显示它把 `inbound-process / inbound-runner / inbound-worker` 三枚源码
+  加两份 spec（761 行）一起带走了，而 `git ls-tree -r --name-only 9fa53ab9 -- packages/app-host/src | grep -c task-batch` = **0**
+  ⇒ 带进消费者时没带生产者。这条也是本格真正值得记的形状：**"谁提交了这枚消费者"不等于"谁欠这枚生产者"**，
+  但两者一撞，红就落在本线头上。
+
+**量到的分母**（尺自己的两档读数，要现量请重跑）：在册 74 枚文件里相对路径引用共 **210** 处，
+HEAD 解析得开 **209**、登记 **1**（就是这一枚）、新缝 **0**；顺带把这把尺自己的盲区也补了 ——
+改成整句解析后跨包成员访问从 105 涨到 **127**（命中 81→103），也就是**第一版对 22 处访问是瞎的**。
+
+**要拍的（一条，与 B129 同一形状、不同文件）**：这 60 行 + 那份 spec 怎么入库。三条候选 ——
+① **授权本线按命名路径配方把 `packages/app-host/src/task-batch-actions.ts` 与
+`packages/app-host/tests/task-batch-actions.spec.ts` 入库**（本线推荐：这本来就是本线 W1 的产物；
+回退点现成 —— HEAD 那一版没有这枚文件，撤就是一笔删；代价：两枚路径不在白名单里，
+白名单只收 `src/inbound-*` 与 `tests/inbound-*`）；
+② 本线在白名单内把这 60 行**复制**进 `src/inbound-task-batch.ts` 并改那行 import（代价：`createTaskBatch`
+变成两处定义，而它是 AC-5"唯一入口"那条承诺的对象 —— 复制出来的那一刻承诺就假了，本线判断这个代价大于等一句授权）；
+③ 由 app-host 的所有者提交（代价：本线的 HEAD 红要等他们那一笔，T5/T7 两条腿都排在它后面）。
+
+**对本线的直接影响**：T7 干净检出的红集里现在有**两格归属明确是本线的**，而且是**两种不同的修法**：
+B129 缺三枚成员（改 6 行、在 `packages/storage`），B130 缺整枚模块（新入库 2 枚文件、在 `packages/app-host`）。
+下一位跑 `pnpm check` 之前先跑这把尺，否则归因会糊在 B112 那四处缝里。
