@@ -751,14 +751,24 @@ open_profile_tab() {
 # leave_settings_sheet：**判据 E 的载体**（切走再回来 = 第二层屏 + Modal 一起卸载）。
 # 🔴 分组目录里那一屏要按**两下**才出得去（第一下「返回」= 回目录，第二下「关闭」= 关面板），
 #    所以这里是一个循环，而不是一条 `ax_press "关闭"`。
+# 🔴 2026-10-10 第二趟实测：`idb_has` 的语义是"精确标签**或值**"（lib 注释 293 行），
+#    而「我的」页上有一枚**值单元格**就叫「关闭」（自动同步那一行的当前值）⇒
+#    设置面明明关了，`idb_has "关闭"` 仍然真，两个关面函数把 6/8 次尝试全烧在空气上，
+#    然后判"关不上"，后面每一步都从脏起点开始（第一趟 10 枚红里有一半是这条连带）。
+#    修法：开/关的判据只认**可点节点**（✕ 与顶栏返回都是 button），值单元格不可点 ⇒ 不再误命中。
+sheet_open() {
+  [ "$(jget "$(ax "关闭" --pressable --list --json)" found)" = "True" ] && return 0
+  [ "$(jget "$(ax "返回" --pressable --list --json)" found)" = "True" ] && return 0
+  return 1
+}
+
 leave_settings_sheet() {
   local i
   unwind_second_level
   for i in $(seq 1 8); do
     dismiss_keyboard
-    idb_dump
-    if ! idb_has "关闭" && ! idb_has "返回"; then return 0; fi
-    if idb_has "关闭"; then ax_press "关闭"; else ax_press "返回"; fi
+    if ! sheet_open; then return 0; fi
+    if [ "$(jget "$(ax "关闭" --pressable --list --json)" found)" = "True" ]; then ax_press "关闭"; else ax_press "返回"; fi
     sleep 2
   done
   return 1
@@ -810,34 +820,29 @@ open_settings_sheet() {
 
 close_settings_sheet() {
   local i
-  # 🔴 2026-10-10 第一趟实测：6 次「关闭」全不中，真因两枚，都不是"按钮不在"——
-  #   ① 填完 secure 框**键盘还立着**，✕ 被键盘盖住，tap 落在键盘上；
-  #   ② ✕ 在滚动区外时 shim 的几何安全检查会把 tap 拒掉（AGENTS §25），
-  #      而旧写法把"被拒"也数成一次尝试，6 次很快烧完。
-  #   修法：先收键盘；按压带 `--scroll-into-view`（AGENTS §22 那枚现成旋钮）；
-  #   被拒/没落地时改按「返回」兜底一次。**判据没放松**：仍然要求树里再也读不到「关闭」。
+  # 🔴 开/关判据只认**可点**的「关闭」：`idb_has` 的语义是"精确标签或值"，而「我的」页上
+  #    有一枚值单元格就叫「关闭」（自动同步那一行的当前值）⇒ 面明明关了尺仍认为没关，
+  #    第一趟 6 次尝试全烧在空气上，后面每一步都从脏起点开始（见 sheet_open 上那条注释）。
+  #    按压带 `--scroll-into-view`（✕ 在滚动区外时 shim 的几何安全检查会拒 tap，AGENTS §25），
+  #    没落地时按「返回」兜底一次。**判据没放松**：仍要求树上再无可点的「关闭」。
   dismiss_keyboard
   for i in $(seq 1 6); do
-    idb_dump
-    if ! idb_has "关闭"; then
-      ok "设置面已关（第 ${i} 次检查）"
+    if [ "$(jget "$(ax "关闭" --pressable --list --json)" found)" != "True" ]; then
+      ok "设置面已关（第 ${i} 次检查，树上再无可点的「关闭」）"
       return 0
     fi
     ax "关闭" --pressable --scroll-into-view --press --json >/dev/null 2>&1 || ax_press "关闭"
     sleep 2
-    idb_dump
-    if idb_has "关闭"; then
-      # 没落地 ⇒ 换「返回」兜底一次（分组目录那一代第一下是回目录，见 unwind_second_level 注释）
+    if [ "$(jget "$(ax "关闭" --pressable --list --json)" found)" = "True" ]; then
       ax_press "返回"
       sleep 2
     fi
   done
-  idb_dump
-  if ! idb_has "关闭"; then
+  if [ "$(jget "$(ax "关闭" --pressable --list --json)" found)" != "True" ]; then
     ok "设置面已关（靠「返回」兜底关上的）"
     return 0
   fi
-  bad "设置面关不上（收键盘 + scroll-into-view + 返回兜底都试过，「关闭」还在树上）—— 下一轮起点会脏"
+  bad "设置面关不上（收键盘 + scroll-into-view + 返回兜底都试过，可点的「关闭」还在树上）—— 下一轮起点会脏"
   return 1
 }
 
