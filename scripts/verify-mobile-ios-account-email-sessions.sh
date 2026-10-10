@@ -228,7 +228,26 @@ db() { psql -h 127.0.0.1 -p 5432 -U "$E2E_DB_USER" -d "$DB_NAME" -tAc "$1" 2>&1;
 # ── iOS 侧的载体（每个设备脚本自带一份 helper，这是本仓的既有做法）────────
 ax() { python3 "$SHIM" "$@" --udid "$UDID" --idb "$IDB_BIN" --companion "$IDB_COMPANION" --json; }
 jget() { printf '%s' "$1" | python3 -c "import json,sys;print(json.load(sys.stdin).get('$2',''))" 2>/dev/null; }
-ax_press() { ax "$1" --pressable --press --json >/dev/null 2>&1; }
+# 🔴 2026-10-11 实测改的两件事（同一条陷阱的两种面目，`docs/reference/environment-traps.md`
+#    明写过「`--scroll-into-view` 只返回 found/visible，不会替调用方执行 --press」）：
+#    1. **拆成两次调用**：旧那行 `ax … --scroll-into-view --press` 走的是 shim 里
+#       `--scroll-into-view` 那一支 —— 它 `return 0` 在 `--press` **之前**，所以一下都没按；
+#       而 shim 退出码是 0，调用方那句 `|| ax_press` 兜底也就永远不触发。
+#       「立即同步」在分组页的滚动位置是 y=-343（屏外上方），正中这一枪。
+#    2. **不许把没落地当过去**：旧那行 `>/dev/null` 把 `not-found` /
+#       `tap-outside-screen` / `tap-blocked-by-tab-bar` 全吞了，症状与"按成功了"一样。
+#       现在非 success 一律进日志（返回值仍保持 0：几十处调用点没准备接非零，
+#       而"按没按上"的判据在各步自己的回读里，不在这里）。
+ax_press() {
+  local r
+  ax "$1" --pressable --scroll-into-view --json >/dev/null 2>&1
+  r=$(ax "$1" --pressable --press --json 2>/dev/null)
+  case "$r" in
+    *'"result": "success"'*) true ;;
+    *) echo "     [press] 「$1」没落地：${r:-无输出}" >&2 ;;
+  esac
+  return 0
+}
 dismiss_keyboard() { ax --dismiss-keyboard --json >/dev/null 2>&1 || true; }
 # 与 `lib` 的 `idb_ui` 同一条传输规则（`IDB_COMPANION` 含 `:` 且不以 `/` 开头 ⇒ TCP `--companion`；
 # 否则 `--companion-path`）。screenshot / list 不在 `ui` 子命令下，所以 lib 没有封装它。
@@ -820,29 +839,35 @@ open_settings_sheet() {
 
 close_settings_sheet() {
   local i
-  # 🔴 开/关判据只认**可点**的「关闭」：`idb_has` 的语义是"精确标签或值"，而「我的」页上
-  #    有一枚值单元格就叫「关闭」（自动同步那一行的当前值）⇒ 面明明关了尺仍认为没关，
-  #    第一趟 6 次尝试全烧在空气上，后面每一步都从脏起点开始（见 sheet_open 上那条注释）。
-  #    按压带 `--scroll-into-view`（✕ 在滚动区外时 shim 的几何安全检查会拒 tap，AGENTS §25），
-  #    没落地时按「返回」兜底一次。**判据没放松**：仍要求树上再无可点的「关闭」。
+  # 🔴 2026-10-11 只读取数把旧那版的两个错都照出来了（在这台隔离模拟器上逐次按、逐次回读）：
+  #    · 旧版只按「关闭」，而**第二层那枚右上的 ✕ 按了没反应** —— 同一屏上左边的「返回」
+  #      一发就退层（实测：`--press` 返回 success、树上的「服务器地址」照旧在；换按「返回」
+  #      后「服务器地址」与「返回」同时消失，只剩目录层那枚 ✕）；
+  #    · 目录层那枚 ✕ 在**左边**（x=16），按它面板真的关 —— 所以顺序必须是
+  #      **先退层再关面板**，而不是对着 ✕ 连按六次。
+  #    实测两次按压走完两层（1 返回 + 1 关闭 → 树上既无「返回」也无「关闭」）。
+  #    🔴 判据没放松，反而更严：每一轮都重新读**可点**节点（`idb_has` 的"标签或值"语义
+  #    会把值单元格「关闭」也算命中，第一趟就是被它骗的），六轮走完仍在 ⇒ 照旧判红。
   dismiss_keyboard
   for i in $(seq 1 6); do
-    if [ "$(jget "$(ax "关闭" --pressable --list --json)" found)" != "True" ]; then
-      ok "设置面已关（第 ${i} 次检查，树上再无可点的「关闭」）"
+    if [ "$(jget "$(ax "关闭" --pressable --list --json)" found)" != "True" ] &&
+       [ "$(jget "$(ax "返回" --pressable --list --json)" found)" != "True" ]; then
+      ok "设置面已关（第 ${i} 轮，树上既无可点的「关闭」也无可点的「返回」）"
       return 0
     fi
-    ax "关闭" --pressable --scroll-into-view --press --json >/dev/null 2>&1 || ax_press "关闭"
-    sleep 2
-    if [ "$(jget "$(ax "关闭" --pressable --list --json)" found)" = "True" ]; then
+    if [ "$(jget "$(ax "返回" --pressable --list --json)" found)" = "True" ]; then
       ax_press "返回"
-      sleep 2
+    else
+      ax_press "关闭"
     fi
+    sleep 2
   done
-  if [ "$(jget "$(ax "关闭" --pressable --list --json)" found)" != "True" ]; then
-    ok "设置面已关（靠「返回」兜底关上的）"
+  if [ "$(jget "$(ax "关闭" --pressable --list --json)" found)" != "True" ] &&
+     [ "$(jget "$(ax "返回" --pressable --list --json)" found)" != "True" ]; then
+    ok "设置面已关（第 6 轮之后读到的）"
     return 0
   fi
-  bad "设置面关不上（收键盘 + scroll-into-view + 返回兜底都试过，可点的「关闭」还在树上）—— 下一轮起点会脏"
+  bad "设置面关不上（收键盘 + 退层再关面板各按了一轮，可点的「关闭」或「返回」还在树上）—— 下一轮起点会脏"
   return 1
 }
 
@@ -1234,7 +1259,10 @@ accept_legal_reconfirm() {
       return 0
     fi
     echo "     命中法务重新询问面 ⇒ 按「我已读完并确认」"
-    ax "我已读完并确认" --pressable --scroll-into-view --press --json >/dev/null 2>&1 || ax_press "我已读完并确认"
+    # 🔴 走 `ax_press`（滚入 + 按压**两次调用**）。旧那行把两个 flag 合成一次调用，
+    #    而 shim 的 `--scroll-into-view` 分支在 `--press` 之前就 return —— 一下都没按，
+    #    退出码还是 0，所以连 `|| ax_press` 兜底都不会触发（2026-10-11 实测）。
+    ax_press "我已读完并确认"
     sleep 3
   done
   idb_dump
@@ -1421,6 +1449,28 @@ shot() {  # <文件名> [<这一张在证什么>]
   fi
   bad "截图判据红（主蓝那一半）：$name 里既数不出启用态主蓝（${blue} < ${BLUE_MIN}），也数不出禁用态主蓝（${bdisabled} < ${BLUE_DISABLED_MIN}）${why:+（$why）} —— 非空白只回答「有没有东西」，回答不了「是不是这个界面」（§7 第 82 条）"
   return 1
+}
+
+# frame_email_change_action —— 拍等待态之前把「发起更换」那颗按钮**滚进取景框**。
+#
+# 🔴 2026-10-11 逐像素读数（不是猜的）：run 6 那两张判红的图（1398×2034）整屏
+#    精确主蓝 #2563EB = **0**、禁用态混合色 #ACC4F7 = **0**；同一屏在按钮进了取景框的
+#    那两张（03 / 10）里 #ACC4F7 有 **154 257** 枚。差别不是颜色判据错了，是**取景框**：
+#    `EmailChangeSection.tsx:305-311` 那颗 `tone="primary"` 的按钮在等待态是
+#    `disabled`（草稿为空），按 `state.disabled-opacity`=0.38 叠在白底上正是 #ACC4F7，
+#    而它当时在折叠线**以下**。
+#    ⇒ 所以修的是"把要拍的东西拍进来"，**不是**放宽 §7 第 82 条那道主蓝闸。
+#    滚不到（树上没有这颗按钮）只记一行诊断，不判红：判红留给截图自己那条读数，
+#    免得出现"探针说没找到、判据却说画面对了"两套口径。
+frame_email_change_action() {
+  dismiss_keyboard
+  local r
+  r=$(ax "发起更换" --pressable --scroll-into-view --json 2>/dev/null)
+  case "$r" in
+    *'"visible": "True"'*) true ;;
+    *) echo "     [frame] 「发起更换」没滚进取景框（截图的主蓝读数会自己说这件事）：${r:-无输出}" >&2 ;;
+  esac
+  sleep 1
 }
 
 # ── 邮件那两发（照 Android `:254-304`：从日志的 Ethereal 预览里取**整条链接**）──
@@ -1881,7 +1931,8 @@ needle_state "待绑邮箱" >/dev/null 2>&1 \
   && ok "「待绑邮箱」那一行在" || bad "没有待绑邮箱行（pendingEmail 没画出来）"
 needle_state "$NEW_EMAIL" >/dev/null 2>&1 \
   && ok "待绑那一行的值就是新地址" || bad "待绑行里看不到新地址"
-shot "04-awaiting-both.png" "判据 B：等待态三句"
+frame_email_change_action
+shot "04-awaiting-both.png" "判据 B：等待态三句（取景含那颗按钮）"
 
 # ── 5. 服务端读数 ───────────────────────────────────────────────────────────
 step "5. 判据 C：服务端那张活请求 —— 只存哈希、两侧互不相同、两边都没点"
@@ -1999,7 +2050,8 @@ else
 fi
 needle_state "当前邮箱那一边已经确认" >/dev/null 2>&1 \
   && ok "句子说清了哪一边已经点过" || bad "阶段句没写清哪一边已确认"
-shot "08-awaiting-new.png" "判据 E：重挂之后读回来的实话"
+frame_email_change_action
+shot "08-awaiting-new.png" "判据 E：重挂之后读回来的实话（取景含那颗按钮）"
 
 # ── 9. 点新那半：换绑生效 ───────────────────────────────────────────────────
 step "9. 判据 F：点新那半 → 库里地址改了、活请求没留下、换绑前那枚令牌全局失效"
