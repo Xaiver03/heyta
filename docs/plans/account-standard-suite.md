@@ -4067,6 +4067,48 @@ AGENTS §8 工作流第 18 条要的正是"新增持久数据与能力须同步�
 处置只动索引、不动工作树：`git restore --staged --source=HEAD -- <那 6 枚路径>`，
 复验 `git diff --cached` 空、`server/src/api.ts` 回到 ` M`（别人那半没碰）。不猜是谁写的，也不替谁回滚别的路径。
 
+### 6.81 iOS 设备腿今天取不了数：**两棵树各自在一处红**，两处都不是本线（10-10 13:1x 现量）
+
+负责人把这一腿留成 goal 的收口条件（"先不合上，等设备腿"）。这一轮真的去取了，结论是**这一腿现在谁都跑不了**，
+而原因有两种相反的形状 —— 两种都由别线那批在飞的改动带着：
+
+| 载体 | 结果 | 现量 |
+|---|---|---|
+| 纯 HEAD（tip `731cc2e2`） | `pnpm -r build` 红 | §6.76 那第三处：`packages/app-host` 的 barrel 导出一枚**不在 HEAD 里**的源文件（`task-batch-actions.ts`，`??`），另有 `SyncClientOptions.getInboundUploadAuthorization` 只在未跟踪那半里 |
+| HEAD ＋ 整片在飞改动（3782 枚脏路径逐枚 sha256 同步进隔离载体，验过 3707 枚） | `pnpm -r build` 红在**另一处** | `apps/node-host` 的 dts 阶段：`Type '"waiting-entitlement"' is not assignable to type '"empty" \| "submitted" \| "needs-confirmation"'` |
+
+第二处的形状值得写给那条线（也写给下一个跑重装的人）：生产侧 `packages/app-host/src/inbound-process.ts:53`
+把 `InboundAutomationCycleState` 加宽成四态（`:72-73` 真会回 `waiting-entitlement`），
+而消费侧 `apps/node-host/src/host.ts:274` **把那个 union 内联重抄了一遍**（没 import 共享类型）⇒
+共享层加一态，抄的那一处不会报错，直到 dts 阶段才炸。
+这正是 AGENTS §3.5 拦的形状（apps/ 里重抄一份产品语义），而 §3.5 那次教训的原话就是"抽取的收尾动作是删掉旧的那份并加门禁"。
+
+**不代改**（三条不齐）：① 修它不是删一子 —— 要把内联 union 换成 import，还得决定 node-host 在
+`waiting-entitlement` 那一档**做什么**（CLI 是退避重试、报错、还是安静等订阅，那是产品语义）；
+② 改后的运行时形状无法现量等于改前；③ `apps/node-host/src/host.ts` 此刻是 ` M`（那条线正在写）。
+交回内容：根因两行（`inbound-process.ts:53` ↔ `host.ts:274`，报错落在 `src/host.ts(422,5)`：
+把加宽后的 `InboundAutomationCycleResult` 交给那个内联签名）＋ 一条已现量真跑出红（rc=1）的命令
+`cd .worktrees/iosacct && npm_config_verify_deps_before_run=false pnpm --filter @heyta/node-host build`。
+
+⚠️ 另一条顺带的装置事实，写给下一个想在载体里跑构建的人：`pnpm -r build` 在载体里会先触发
+pnpm 的 deps 自检并**自作主张跑 `pnpm install`**，本机那一条会 ECONNRESET 到 registry，
+于是失败信息长得像"缺依赖"。加 `npm_config_verify_deps_before_run=false` 才是走到真错的那一步
+（第一趟就是被它挡住的，红在那枚 install，而不是红在类型）。**不动任何本机网络配置**。
+
+⇒ 台账 §5/§6 的状态不变：本线那三块（换绑 / 会话撤销 / 改密）在**设备**那一腿的最后一趟读数仍停在 §6.16 的第 11 趟
+（步骤 1–9 全绿、5 处探针错）。要取"探针修完之后"那一趟，前提是上面两枚红里有任一枚被它的 owner 收掉。
+
+**载体现在的形状（写给下一个来跑这一腿的人，别重新推一遍）**：`.worktrees/iosacct` 的 HEAD = `731cc2e2`，
+工作树 = 主检出那一刻的整片在飞状态（3782 枚脏路径里 3707 枚逐文件 sha256 对过；
+清单与哈希基线在**本机路径、不在仓内**：`~/heyta-carriers/w9-acct-logs/dirty-files.txt` 与同目录 `dirty-baseline.sha256`）。
+它的 `node_modules` 完整（含在飞新加的 `@zxcvbn-ts/*`），`pnpm-lock.yaml` 干净 ⇒
+**不要**在载体里跑 `pnpm install`（会撞网），构建一律带 `npm_config_verify_deps_before_run=false`。
+跑法两步已备好：`bash ~/heyta-carriers/w9-acct-logs/run-ios-account-leg.sh <IOS_UDID>（同样住在本机、不在仓内）`
+（里面是"槽端口选空位 → `scripts/mobile-e2e-up.sh` → 那一腿 → 只停本趟 pidfile 里那一枚"），
+装包那一层是 `IOS_DEVICE_NAME="heyta-ios-isolated" HEYTA_NO_FOCUS=1 npm_config_verify_deps_before_run=false bash scripts/reinstall-all.sh --only ios`。
+
+
+
 
 
 
