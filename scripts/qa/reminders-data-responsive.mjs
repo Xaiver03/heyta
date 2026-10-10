@@ -85,11 +85,15 @@ if (trackedInEvidenceDir > 0 && !ALLOW_TRACKED_OVERWRITE) {
   );
 }
 /**
- * 报告里每格都带一枚 `screenshot` 锚。它以前写的是**绝对落点**，而这份 `report.json` 是要提交的
- * （图本身住在被 `.gitignore` 忽略的目录）⇒ 别人克隆出来，那 30 枚锚一枚都指不到东西，
- * 而文件里没有任何一行说出这件事。序列化时统一换成仓内相对路径；落点在仓库之外时保留绝对并加
+ * 报告里带路径的锚不止 `screenshot` 一枚键：还有 `exports.json` / `exports.markdown` /
+ * `invalidShot` / `existingShot`。它们以前都写成**绝对落点**，而这份 `report.json` 是要提交的
+ * （图本身住在被 `.gitignore` 忽略的目录）⇒ 别人克隆出来一枚都对不到东西，而文件里没有一行说出
+ * 这件事。02:2x 现量过代价：库里 27 份这种报告共 **926 枚**家目录锚，**882 枚**在库里解析不出
+ * 目标（那 44 枚解析得出的是恰好住在被跟踪目录里的那些）。序列化时按**值**归一（不按键名挑，
+ * 挑键名正是第一版漏掉四枚键的原因）：仓内落点→仓内相对；落点在仓库外→保留绝对并加
  * `machine-only:` 前缀，让"只有这台机读得到"在文件里自己说。
- * ⚠️ 只改**报告里的那个值**，不改 `page.screenshot({ path })` 真正写盘的落点。
+ * ⚠️ 只改**报告里的那些值**，不改 `page.screenshot({ path })` / `writeFile` 真正写盘的落点，
+ * 也不动 `carrier.tree.root`（它是"哪台机哪棵树"的身份项，本来就该是本机路径）。
  */
 const OUT_OUTSIDE_REPO = OUT_REL.startsWith('..');
 const toReportPath = (value) => {
@@ -1414,7 +1418,7 @@ if (judged.length === 0) {
 }
 await writeFile(
   `${OUT}/report.json`,
-  `${JSON.stringify(report, (key, value) => (key === 'screenshot' ? toReportPath(value) : value), 2)}\n`,
+  `${JSON.stringify(report, (key, value) => toReportPath(value), 2)}\n`,
 );
 console.log(JSON.stringify({ legs: LEGS, skippedLegs: report.carrier.skippedLegs, assertions: report.assertions, notJudged: report.notJudged }, null, 2));
 if (judged.some(([, value]) => !value)) process.exitCode = 1;
