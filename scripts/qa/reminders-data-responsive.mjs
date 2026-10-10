@@ -1416,8 +1416,28 @@ if (unmapped.length > 0) {
 report.notJudged = Object.entries(assertionOwner)
   .filter(([, owners]) => !owners.some((o) => LEGS.includes(o)))
   .map(([k]) => k);
+// 🔴 零样本时这两枚尺都不许在判事（10-10 04:2x 现量：r51 那趟 `themeRulerMeasuredCells=0` 而
+// `darkTierReachesBothThemeLayers=true`）。两条谓词对"本批一枚共享层节点都没量到"的读法**正好相反**：
+// `darkTier…` 是 `!found || 同色` ⇒ 空样本集恒过（AGENTS §7 元规则二点名的那一型，本账 03:3x 写过"最坏形状"）；
+// `themeLayerRulerSwitchesWithTier` 要求配对集合非空 ⇒ 0 对直接判假，把一次没跑坏的界面判成红。
+// 一真一假都不说出那句话，而那句话才是读报告的人需要的：**取样代理已经失效** —— 产品的行内色
+// 现在全部走 `cssVar(...)`（渲染成 `var(--ht-…)`，被上面取样规则排除），groups/help/sync 三面结构上
+// 没有可取节点，只有提醒腿那 30 格还量得到。⇒ 两枚一起标成未判：既不让空的真冒充"验过了"，
+// 也不让空的假把整趟判红；样本数照旧随读数交出去（`themeRulerMeasuredCells` 等四枚）。
+const themeRulerSampled = themeRulerPairCells.some((x) => x.sharedLayerFound);
+report.carrier.themeRulerSampled = themeRulerSampled;
+if (!themeRulerSampled) {
+  for (const key of ['darkTierReachesBothThemeLayers', 'themeLayerRulerSwitchesWithTier']) {
+    if (!report.notJudged.includes(key)) report.notJudged.push(key);
+  }
+}
+// 🔴 退出码与 `notJudged` 必须是**同一个集合**决定的：以前这两处各写一遍"这条判没判"（一处按腿归属、
+// 一处按 `notJudged`），于是上面那条"零样本标成未判"只会改报告、不会改退出码 —— 一次没量到共享层节点的
+// 运行照样被 `themeLayerRulerSwitchesWithTier` 的真空假判红。按腿归属那半照旧保留（它是分母自检的输入），
+// 但"未判"只认 `notJudged` 这一枚事实源。
 const judged = Object.entries(report.assertions)
-  .filter(([k]) => TRACKING_ASSERTIONS.includes(k) || (assertionOwner[k] ?? []).some((o) => LEGS.includes(o)));
+  .filter(([k]) => !report.notJudged.includes(k)
+    && (TRACKING_ASSERTIONS.includes(k) || (assertionOwner[k] ?? []).some((o) => LEGS.includes(o))));
 if (judged.length === 0) {
   throw new Error(`这一趟一条断言都没判（legs=${LEGS.join(',')}）—— 别让它退 0`);
 }
