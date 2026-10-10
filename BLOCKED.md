@@ -7723,3 +7723,172 @@ grep -c "inbound-dual-host" server/package.json server/tsconfig.json ⇒ 0 / 0
    本轮**多出 3 条**在 `docs/plans/account-standard-suite-handoff.md:8-10`（他线那份交接件，本轮才出现的）。
    ⇒ 台账与任务 0 里"**唯一一条**不是本线"那句已过期，见到别照它行动；重取用
    `node research/tools/docs-link-check.mjs 2>&1 | sed -n '/死链/,/$/p'`。本线新建的链接 0 条死链（`grep -c inbound` 读数为 0）。
+
+## B102 · 2026-10-07 11:0x–12:0x：下载面落地、macOS 第一次真发布、iOS 那枚假报错
+
+归属：本条由"替三条线收尾"那一会话写（产品负责人随后追加：五端都要发布 + web 部署 + 下载界面）。
+
+### 格 1 — `/download` 已经上线，而它推翻的是**依据**不是纪律
+
+`site-ia-and-landing-audit.md` §3.2 第 3 行当年判"不叫下载、做成平台状态页"，依据是
+"没有可发布的包"。今天现量：macOS 那枚 dmg 里 `codesign` 读到 Developer ID、
+`spctl -a -t install` 判 `accepted / source=Notarized Developer ID`、`stapler validate` 通过，
+而分发桶自 09-30 起就匿名可读。裁决与边界写进 **ADR-0058**（`f97013de`）。
+
+分界：`/download` = 行动面（进导航，「平台」那一格让给它，项数不变），`/platforms` = 状态面
+（退到页脚，仍被正文链住 ⇒ 不是孤岛）。**双向都不许越界**：状态徽标只有一份
+（`render.spec.tsx` 那条既有不变量继续成立），直链只有一处（`/platforms` 上没有下载链接）。
+
+### 格 2 — 出口只由清单决定，而清单第一次真的抓到人
+
+`release-manifest.json` 是桶里 `latest.json` 的逐字快照（唯一写者 `gen-downloads.mjs`），
+组件只消费 `resolveRows(清单)`。带预发布后缀的字节**不算产物** —— 桶里那枚 09-30 的
+macOS zip 装上打不开（§7 第 82 条那一族），它匿名 200 也不该成为按钮。
+
+两处被抓（都不是我提前想到的）：
+1. `check-downloads.mjs` 臂 D：合并进来的旧 android 条目缺 `version`，会被本轮批次号盖成
+   `1.0.0` ⇒ 版本号只能从它自己的文件名取（`upload-dist.sh` 的 `backfill` +
+   `gen-downloads.mjs` 的规范化各一处）。
+2. `render.spec.tsx` 的"外链必须带 rel"在**清单为空时永远测不到** —— 它要等一个真的字节
+   上线才第一次命中。判据要有人跑，也要有真的东西可跑。
+
+### 格 3 — 已发布 / 未发布，逐端读数
+
+| 端 | 状态 | 读数 |
+|---|---|---|
+| macOS | ✅ **已发布** | `heyta-1.0.0-macos.dmg` 2,362,276 B，sha256 `15ae5583…26fe12`，匿名 Range 实取 `206 / bytes 0-0/2362276`。只有 arm64（`lipo -archs`）⇒ Intel 那一行写的是缺口不是文案 |
+| iOS | ✅ **已进 TestFlight 内测** | build 2（`CFBundleShortVersionString 1.0` / `CFBundleVersion 2`）：archive → export（IPA 13,799,274 B，sha256 `de84b207…c2861`）→ `asc builds upload --wait` `uploaded:true` → `processingState VALID` → `add-groups` 成功 → **`internalBuildState: IN_BETA_TESTING`**。**但还没有访客能点开的入口**（见格 5）；`asc builds next-build-number` 现量 `nextBuildNumber=2`，所以 `CURRENT_PROJECT_VERSION 1→2` 四行已入库（`CFBundleVersion` 必须等于**已上传那一枚**，否则下一发撞号。**外部组「公开内测」已建**（id `2e98d782…`，`isInternalGroup:false`）、build 2 已挂上（回读 `/betaGroups/…/builds` = `[ce1f0017…, 2]`）、**公开链接已存在** `https://testflight.apple.com/join/hmMPsDdc`（HTTP 200）—— 但访客现在点进去服务端渲染的第一句是 `This beta isn't accepting any new testers right now.` ⇒ 见格 6 |
+| Android | ✅ **已发布** | 远端 gradle 出包（`run-gradle.mjs` 收口点，回传 `app-release.apk` 67,149,560 B，现量签名 `CN=Android Debug`）⇒ **Mac 本地 `apksigner` 重签**（密钥不出机）→ `heyta-1.0.0-android.apk` 67,196,357 B / sha256 `f8c2b40b…`，`Signer #1 DN: CN=heyta, OU=Mobile, O=Xiaoli …`、v2+v3 过、`zipalign -c` 过、非 debuggable。**设备腿**：`adb uninstall` 调试那枚 → 装这一枚 `Success` → `am start -W` 起 `com.heytamobile.MainActivity` → 前台窗口确认 → 截图内容 56.8%、主蓝 4001，人打开看过 = 首屏联网同意卡 |
+| Windows | ✅ **已发布（便携形态）** | `HeytaWindows.csproj:24` `WindowsPackageType=None` + `:32` `WindowsAppSDKSelfContained=true` ⇒ 从纯 publish 目录 `RESULT=OK`（`cdp_browser=Edg/154…`、`target_heyta_local=True`）。`heyta-1.0.0-windows.zip` 96,659,883 B / sha256 `f024c228…`，651 条目里 `coreclr.dll` + `Microsoft.WindowsAppRuntime.dll` + `Bootstrap.dll` + `Microsoft.WinUI.dll` + `WebView2Loader.dll` 都在。**两格没证**：没在"没装过框架包"的干净机器上跑过；exe 无 Authenticode ⇒ SmartScreen 第一次会拦（已写进访客看得见的 caveat） |
+| Linux | ✅ **已发布**（`sudo dpkg -i` 那一格仍开） | 盒子本机（Ubuntu 24.04.5）原生打出 `heyta_1.0.0_amd64.deb` 1,300,282 B / sha256 `0d9335ee…`，两侧字节逐字相同；`HEYTA_LINUX_SMOKE=OK 13/13`、解包态真窗口 `SHELL_UI=web-dist` 900x523 主蓝 3987。**`dpkg -i` 需要密码，这台机没有免密 root**（`sudo -n` rc=1、`pkexec` 无认证代理），于是把那一格里**能在无 root 下证的全证了**：① 控制包只有 `control` ⇒ **没有 maintainer 脚本**，装的动作就是解 32 个路径；② `Depends` 六枚逐条 `dpkg-query -W` 都装着（`libgtk-4-1 4.14.5`、`libwebkitgtk-6.0-4 2.52.6`…）；③ 32 条路径逐条 `dpkg -S` **零冲突**，阳性对照 `/usr/bin/ls → coreutils` 证明探针认得出所有者 ⇒ 剩下的只是事务本身 |
+| 鸿蒙 | 🔴 结构上没有出口 | 能出 HAP、跑不起来（镜像 + 签名不在我们手里） |
+
+⚠️ 桶里 09-30 那两枚 `0.0.0-dev` 对象**我没有删**（那是别人传的对象），页面也不引用它们。
+
+### 格 4 — iOS 那枚 `path name contains null byte` 是**假报错**
+
+三趟全崩（`/tmp/heyta-reinstall-pod-{1,2,3}.log`）⇒ 上界 3 不够，抬到 6（`fc48599d`），
+判据一个字没放松。两条否证：
+· `[ReactNativeDependencies] Source:` 打空值是源码构建的**正常输出**
+  （`rndependencies.rb:69` 在 `RCT_USE_RN_DEP != 1` 时按设计返回空）—— 我原先把它当 NUL 来源，错了；
+· 崩点涉及的路径两次全量探针都**不含 NUL**，且两次崩在**不同** pod 根 ⇒ NUL 是 CRuby
+  `realdirpath` 解析中途自产。traps #154 那句"未定位到"至少推进到这里。
+
+⚠️ 副作用：`pod install` 会把两枚 `Info.plist` 改脏（**删掉手写 XML 注释**，键本身存活，
+含 `ITSAppUsesNonExemptEncryption=false`）⇒ 别把纪律写进 `Info.plist`。载体那三份已 `git checkout --` 还原。
+
+### 格 5 — 部署与仍未闭合的
+
+`publish-public-sites.mjs --confirm` 九步全过 + live-site **30 passed**（读的是公开域名上的产物）。
+第二次被它自己的守卫挡下（入口 HTML 脏 ⇒ 拒发），修完发第三次 —— 这条守卫是有效能的，别绕。
+
+未闭合：① 各端产物**自己声明的版本号**仍不一致（APK `1.0`、mac `1.0.0`、deb `1.0.0`、
+MSIX `1.0.0.0`、`package-desktop.mjs` 写 `0.0.0`）—— 批次号统一不等于产物统一；**读数与撞车点在格 8**；
+② `feat/self-host-distribution` 上那枚 `check:app-version` 与本格 ① 是同一件事，**不要各建一套**；
+③ 主检出那 34 枚在飞路径仍未动（另一会话正在写）；④ `landing` 那 3 条 mockup 红（B101 格 1）仍是原归属。
+
+### 格 6 — 上一轮那句"公开链接结构上不存在"**被推翻了**，而且推翻它只要一个字段
+
+07 11:5x 那一轮记的是：内部组开公开链接被 Apple 拒（`Public link cannot be enabled for internal group`），
+并且"asc 无处返回 join token（`groups edit` 只有开关、`asc web` 无 testflight 子命令）⇒ 事后只能从 ASC 网页读"。
+**前半句一直是对的**（它打在了内部组上），**后半句是错的**：`BetaGroup` 的可读字段里就有
+`publicLink` / `publicLinkId`，开关一开 API 原样返回 ——
+
+```
+asc testflight groups edit --id 2e98d782-943b-4da8-9f51-04b2d4a60b2d --public-link-enabled
+→ "publicLinkEnabled": true, "publicLink": "https://testflight.apple.com/join/hmMPsDdc"
+```
+
+📌 教训：**"某件事做不到"的结论要连着它的前提一起记**。那轮真正的观察是"内部组不能开公开链接"，
+我把它写成了"公开链接这件事没有出口"—— 多出来的那一半把下一轮引向了"得开浏览器去网页读"，
+而它根本不需要。**外部组 + 一个开关 = API 直接给。**
+
+**现在真正差的那一格只有一个**：Apple 的外部测试审核**没提交成**，因为
+`betaAppReviewDetails` 的 PATCH 必填集是 `contactPhone` + `contactFirstName` + `contactLastName`，
+而**电话号码我们结构上没有** —— 条款里三处（`terms.ts:309`、`minors.ts:214`、`data-rights.ts:273`，中英各一遍）
+明文承诺「我们**没有**电话」，全仓 `docs/` + `packages/legal` 也搜不到任何 11 位号码，
+同账号另外三枚 app 的 `betaAppReviewDetail` 电话字段全是 `null`。
+**没有编号码、没有用占位串** —— 那等于把审核员唯一的升级路径接到空号上。
+联系邮箱不是编的：`packages/legal/src/index.ts:68` 的 `contactEmail: 'heyta@waytofuture.cn'`
+（`terms.ts:309` / `data-rights.ts:273` 对外也只有这一个）。
+
+Beta App Description 已在服务端（`zh-Hans`，id `b95ac97d-2545-46c7-af04-2d247b7039e1`，
+feedbackEmail 同一个地址；文本如实写明开发阶段、连的是自建测试服务端不承诺留存、移动端通行密钥未接入）。
+⚠️ 一条可迁移读数：**Beta 文本里出现 `🔴` 会被判 `Text contains invalid characters/formats`**，
+去掉表情同一条命令就过。
+
+拿到一个能接通的电话之后，**两条命令收口**（描述已在服务端，不必重写）：
+
+```bash
+asc testflight review edit --id 6817635248 --contact-email "heyta@waytofuture.cn" \
+  --contact-first-name "湘雷" --contact-last-name "邓" --contact-phone "<真实号码>" --notes "<同 Beta 描述>"
+asc testflight review submit --build-id ce1f0017-c3e6-4c3c-b66e-e9409fe0e63c --confirm
+```
+
+**过审之前那一行不许变成按钮**：链接活着但服务端写着"暂不接收新测试者"，
+放个按钮上去就是"点了是死路"那一类，正是 ADR-0058 拦的东西。
+过审后不需要任何开关动作，把 `channels.ios` 写进快照 + 刷新 + 重发落地页即可。
+
+### 格 7 — `pod install` 会改脏 `Podfile.lock`，变量是 reinstall-all 自己带的那两个 env
+
+载体上那一趟（用 §6.1.1 脚本的 env）把 `hermes-engine` 从提交态 `208b0dcd…` 改成 `29d18419…`。
+现量到的分母：
+
+| 事实 | 读数 |
+|---|---|
+| 提交态 lock（主检出 == 载体 HEAD） | 两枚树都是 `208b0dcd96feb98e38846908f00249a932833276` |
+| `react-native` 版本 | 两枚树都 `0.84.1` |
+| `hermes-engine.podspec` 源码 | 两枚树 **逐字节相同**（`diff` rc=0）⇒ 不是"树不一样" |
+| 唯一的变量 | `scripts/reinstall-all.sh:514` 那趟带 `RCT_USE_PREBUILT_RNCORE=0 RCT_USE_RN_DEP=0` |
+
+**这条只写成假设，没写成结论**：对照跑（不带那两个 env 再 `pod install` 一次，看 lock 是否落回
+`208b0dcd`）我没有做 —— 它会改脏沙盒，而两个仍在跑的腿正用这枚载体。若假设成立，那么
+`reinstall-all.sh` 里那句注释（"提交态的 lock 能不能复现由 `check:native-deps` 管，traps #150 已实测**是**可复现的"）
+与它自己每次跑完都打印 `⚠️ pod install 改动了 Podfile.lock` 是**同一件事的两面**：
+可复现性取决于跑它时带不带 env，而脚本从来只警告、不判红、也不还原。
+**归属**：那两行 env 与 #150 属于 ios/原生那条线，我不代改判据；这里只把变量收窄到一枚。
+
+### 格 8 — 批次号 `1.0.0` 已经公开，它就变成了一个**不能被后面那批选小的**数
+
+今天以 `--version 1.0.0` 发了四端（mac / android / windows / linux），桶里 `latest.json` 的批次号与
+`latest/` 那一档都写死了 `1.0.0`。而现量的版本号是**三套**：
+
+| 位置 | 值 | 谁定的 |
+|---|---|---|
+| 各端产物自己声明的 | APK `versionName "1.0"`（`apps/mobile/android/app/build.gradle:140`）、mac `1.0.0`、deb `1.0.0`、MSIX `1.0.0.0`（`package-msix.ps1:43`）、iOS `1.0` | 每枚脚本各写一份字面量 |
+| 根 `package.json`（main） | `0.0.0` | 占位值 |
+| 根 `package.json`（`feat/self-host-distribution`） | `0.1.0` | G-44b 把它定成**客户端版本号唯一真源** + `check:app-version` 拦 `0.0.0` |
+
+🔴 **给那条线的撞车点**：`0.1.0 < 1.0.0`。它落 main 之后，如果下一批按 root 取批次号，就会发出一个
+**比公开在外的号更小**的版本 —— `latest.json` 的 `version` 会倒退，而下载页只认文件自己的版本，
+不会报这个错（它没有"批次号必须递增"这条判据）。要么 root 抬到 `>= 1.0.0`，要么下一批直接用 `1.0.1`/`1.1.0`。
+**这一格归 self-host 那条线**（同一件事，本格不另建 `check:app-version`），这里只把数摆出来。
+
+### 格 9 — 我自己写了一遍**已经被记录过的**假绿探针
+
+装机判据我第一趟没走 `reinstall-all.sh`，而是手敲了 monkey + 截图 + `png-stats`，得到
+`contentRatio=86.97% 主蓝=1416 RESULT=OK` —— 打开图一看是 **launcher 的 All apps 页**。
+而 `scripts/reinstall-all.sh:362` 那段注释写的正是同一件事（2026-10-03，同一枚 AVD：monkey 之后
+`mCurrentFocus` 仍是 launcher，两条像素判据全过）。第二趟照脚本的顺序跑（前台窗口不是 `com.heyta`
+就 `am start -W` 重拉，**确认前台之后才打分**）才拿到真读数。
+
+📌 复述一遍元规则：**先怀疑探针，而"怀疑探针"的第一动作是去读仓库里已有的那枚探针** ——
+判据已经在树里写着，我绕过它自己写了一份更弱的。新写验收脚本前先 grep 同名动作的实现。
+
+### 格 10 — 我把发布器的第 9 步跑红了：**同一枚 `outputDir` 不能同时被两趟线上验收用**
+
+第五次发布 `publish-public-sites.mjs --confirm`：1–8 步全 ✅（备份 → 落地页 → 应用），
+第 9 步线上验收 `1 failed / 30 passed` —— 红的是 `live-signin-entry.spec.ts:154`，
+**与这一轮改的东西无关**，而且单独重跑 `3 passed`。
+
+成因是我自己：那 1.8 分钟里我**并发**跑了同一枚 `playwright.live-site.config.ts`
+（一次单文件校验 + 一次手写脚本），而这份 config 的 `outputDir: './live-site-results'` 是
+**共享**的，Playwright 每次运行开始会删除并重建它。这个坑 config 自己的注释里写着
+（"两条会话同时跑线上验收时还会互相删掉对方的 trace，症状是 `browserContext.close: ENOENT`，
+断言其实全过了，用例却判红 —— 2026-10-01 实测吃过一次）。
+**我读过那段注释还是撞了上去**，因为我把"我只跑一个文件"当成了"我不占整条链"。
+
+✅ 收口：等链跑完之后再**独占**重跑整条线上验收 → `31 passed`（`live-site-after-5.log`），
+这一轮才是真的九步全过（第 9 步的绿是补跑的，不是原链那一趟）。
+📌 可迁移的一条：**判"某步红了是不是我的"，先问"我有没有和它同时碰过同一份产物目录"**，
+再决定要不要去查被测对象 —— `workers: 1` 只保证一次运行内部不并发，不保证两次运行之间不并发。

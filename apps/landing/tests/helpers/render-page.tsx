@@ -121,7 +121,19 @@ export function cleanupPage(): void {
  * 所以"同一时刻只有一个容器"是这套用例的硬前提，由这一步保证，
  * 而不是靠每个用例自觉。
  */
-export function renderPage(pageId: SitePageId, locale: Locale = 'zh-CN'): HTMLDivElement {
+/**
+ * `pageProps` 只服务一件事：**把某一页的数据源换成交给它的夹具**，而脚手架一个字不改。
+ *
+ * 为什么开这个口子而不是让用例自己 `createRoot`：那份脚手架的三个前提
+ * （单容器 / IntersectionObserver / ResizeObserver）就是这个文件存在的理由，
+ * 用例各自复制一份就会漂移，而漂移的那一份通常是新加的那份（见文件头）。
+ * 现在唯一的用法是 `renderPage('download', 'zh-CN', { manifest: 夹具 })`。
+ */
+export function renderPage(
+  pageId: SitePageId,
+  locale: Locale = 'zh-CN',
+  pageProps: Record<string, unknown> = {},
+): HTMLDivElement {
   ensureScaffold();
   cleanupPage();
 
@@ -134,7 +146,7 @@ export function renderPage(pageId: SitePageId, locale: Locale = 'zh-CN'): HTMLDi
     root?.render(
       <I18nProvider locale={locale}>
         <SiteLayout page={page}>
-          <Page page={page} />
+          <Page page={page} {...pageProps} />
         </SiteLayout>
       </I18nProvider>,
     );
