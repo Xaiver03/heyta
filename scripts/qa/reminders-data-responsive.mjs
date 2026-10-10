@@ -1066,6 +1066,44 @@ async function syncPrivacyJourney(browser, spec) {
     return { actionBefore, actionAfter, dialogsBefore, dialogsAfter };
   });
 
+  // 🔴 375 那一档逐张看图照出的疑点：页眉那行说明会不会排成一行、被视口右边缘截断
+  // （10-10 04:2x 那格：`2-undecided` 与 `4-local-only` 两张里那句只看得见前半，`1-accepted` 那张两行折完）。
+  // 判据写成**存在性 + 几何**，不是"我以为会有的那几行各写一条内容判据"（本账那条"断言只验写了什么、
+  // 不验看得见的有多少"）。折行数只随读数交出去，不当判据 —— 1440 那一档合法地排一行。
+  await ensurePanel('量页眉那行之前');
+  const NOTE_TEXT = '任务先保存在本机。登录 heyta 后可在设备间自动同步，服务端只接收加密的任务数据。';
+  const noteFacts = await page.evaluate((needle) => {
+    const el = [...document.querySelectorAll('#settings-group-sync .ht-settings__hint')]
+      .find((x) => (x.textContent ?? '').trim() === needle);
+    if (!el) return { found: false };
+    const rect = el.getBoundingClientRect();
+    return {
+      found: true,
+      clientWidth: el.clientWidth,
+      scrollWidth: el.scrollWidth,
+      lineRects: el.getClientRects().length,
+      rightBeyondViewport: rect.right > document.documentElement.clientWidth + 1,
+    };
+  }, NOTE_TEXT);
+  // 牙：把那一枚钉成"单行 + 撑破容器"，上面那三个几何量必须都数得到坏 —— 数不到这条判据就是装饰。
+  const noteBadArm = await page.evaluate((needle) => {
+    const el = [...document.querySelectorAll('#settings-group-sync .ht-settings__hint')]
+      .find((x) => (x.textContent ?? '').trim() === needle);
+    if (!el) return { found: false };
+    const prev = el.getAttribute('style') ?? '';
+    el.setAttribute('style', `${prev ? `${prev};` : ''}white-space:nowrap;width:max-content`);
+    const rect = el.getBoundingClientRect();
+    const plantedClipped = el.scrollWidth > el.clientWidth + 1
+      || rect.right > document.documentElement.clientWidth + 1;
+    el.setAttribute('style', prev);
+    const back = el.getBoundingClientRect();
+    return {
+      found: true,
+      plantedClipped,
+      restoredInside: back.right <= document.documentElement.clientWidth + 1,
+    };
+  }, NOTE_TEXT);
+
   await context.close();
   return {
     theme: spec.theme,
@@ -1078,6 +1116,8 @@ async function syncPrivacyJourney(browser, spec) {
     reopen,
     renavigations,
     planted,
+    noteFacts,
+    noteBadArm,
     pageErrors: errors,
   };
 }
@@ -1157,6 +1197,8 @@ const assertionOwner = {
   syncPrivacyConsentDialogUnmountedAfterDecide: ['sync'],
   syncPrivacyDecisionButtonsPointerReachable: ['sync'],
   syncPrivacyBadArmsFlipTheRuler: ['sync'],
+  syncPrivacyHeaderNoteInsideViewport: ['sync'],
+  syncPrivacyHeaderNoteBadArmFlipsIt: ['sync'],
 };
 const TRACKING_ASSERTIONS = ['everySelectedLegProducedItsCells', 'unselectedLegsReportEmpty'];
 // 按"怎么到达"取那一态的读数（不是按界面文案取 —— 文案是词条表的账，改一个字就该红的是词条对账，
@@ -1404,6 +1446,16 @@ const report = {
     syncPrivacyBadArmsFlipTheRuler: syncPrivacy.every((x) =>
       x.planted.actionBefore === 1 && x.planted.actionAfter === 0 &&
       x.planted.dialogsAfter === x.planted.dialogsBefore + 1),
+    // 页眉那行说明：整句必须在 DOM 里、盒子右缘必须在视口内、且没被横向裁掉。
+    // ⚠️ 与配对尺不同，这一枚在"没量到"时**判假**是故意的：`#settings-group-sync` 里找不到那枚
+    // `.ht-settings__hint` 就是接线断了，不是"这一档真没有"（那句的"真没有"由 `scopeMatched` 那一路负责报）。
+    syncPrivacyHeaderNoteInsideViewport: syncPrivacy.every((x) =>
+      x.noteFacts.found === true && x.noteFacts.rightBeyondViewport === false &&
+      x.noteFacts.scrollWidth <= x.noteFacts.clientWidth + 1),
+    // 牙：种下去那枚"单行 + 撑破容器"必须被上面同一组量数到，撤掉之后要回到视口内。
+    syncPrivacyHeaderNoteBadArmFlipsIt: syncPrivacy.every((x) =>
+      x.noteBadArm.found === true && x.noteBadArm.plantedClipped === true &&
+      x.noteBadArm.restoredInside === true),
   },
 };
 // 分母自检：这张归属表必须覆盖每一条断言。漏登记不是"少一行注释"——那条断言会既不进
