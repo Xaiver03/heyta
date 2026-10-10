@@ -12,7 +12,10 @@ import {
   isConsentRequired,
 } from './config';
 import { Logger } from './logger';
-import { GENERIC_ERROR_CODE_BY_STATUS } from './api-error';
+import { attachErrorEnvelope } from './api-error';
+
+// 兼容再导出：既有测试从这里拿这两个日志辅助函数（实现已随错误信封搬进 api-error.ts）。
+export { pickErrorLogLevel, sanitizeRequestUrlForLog } from './api-error';
 import { registerWebApp, resolveWebAppMount } from './web-app';
 import { prisma, disconnectDb } from './db';
 import websocket from '@fastify/websocket';
@@ -100,22 +103,6 @@ export const SERVER_HELMET_CONFIG = {
  * debug-only behavior. statusCode gate short-circuits the path-normalize on
  * the ~99% of error responses that aren't 429.
  */
-export const pickErrorLogLevel = (
-  url: string,
-  statusCode: number,
-): 'error' | 'warn' | 'debug' => {
-  if (statusCode >= 500) return 'error';
-  if (statusCode === 429 && url.split('?', 1)[0].replace(/\/+$/, '') === '/api/sync/ws') {
-    return 'debug';
-  }
-  return 'warn';
-};
-
-export const sanitizeRequestUrlForLog = (rawUrl: string): string => {
-  const queryStart = rawUrl.indexOf('?');
-  return queryStart === -1 ? rawUrl : `${rawUrl.slice(0, queryStart)}?redacted`;
-};
-
 export const createListenOptions = (
   config: Pick<ServerConfig, 'port' | 'host'>,
 ): { port: number; host: string } => ({
@@ -393,42 +380,9 @@ export const createServer = (
         trustProxy: SERVER_TRUST_PROXY,
       });
 
-      // Every error leaving this server has ONE envelope: { code, message }.
-      //   · 5xx are sanitized to `internal_error` so raw Prisma errors (DB hostnames,
-      //     ORM call shapes) never reach clients or log exports;
-      //   · framework-raised 4xx (route validation, 404, body-limit…) get the
-      //     generic code for their status — routes with something specific to say
-      //     send it themselves before this handler ever runs;
-      //   · error.code is trusted only when it already matches the envelope's
-      //     shape (Fastify plugin codes like FST_ERR_* do not).
-      fastifyServer.setErrorHandler((error: FastifyError, req, reply) => {
-        const statusCode = error.statusCode ?? 500;
-        const sanitizedUrl = sanitizeRequestUrlForLog(req.url);
-        const logMessage = `Request failed ${statusCode} ${req.method} ${sanitizedUrl}: ${error.name}: ${error.message}`;
-        const level = pickErrorLogLevel(req.url, statusCode);
-        if (level === 'error') {
-          Logger.error(logMessage, error.stack);
-        } else if (level === 'debug') {
-          Logger.debug(logMessage);
-        } else {
-          Logger.warn(logMessage);
-        }
-        if (statusCode >= 500) {
-          return reply.status(500).send({
-            code: 'internal_error',
-            message: 'Internal Server Error',
-          });
-        }
-        const genericCode = GENERIC_ERROR_CODE_BY_STATUS[statusCode];
-        const shapedCode =
-          genericCode !== undefined && /^[A-Za-z][A-Za-z0-9_-]*$/.test(error.code)
-            ? error.code
-            : (genericCode ?? 'request_rejected');
-        return reply.status(statusCode).send({
-          code: shapedCode,
-          message: error.message.length > 0 ? error.message : 'Request failed.',
-        });
-      });
+      // 全局错误信封（error handler + not-found handler）—— 实现与注释在
+      // `api-error.ts` 的 attachErrorEnvelope，那里也是它的测试锚点。
+      attachErrorEnvelope(fastifyServer);
 
       // Security Headers
       await fastifyServer.register(helmet, SERVER_HELMET_CONFIG);
