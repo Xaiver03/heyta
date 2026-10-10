@@ -136,7 +136,9 @@ test('中文落地页 →「立即使用」→ 应用：全程新域名，且无
    *    **落地页带来的 `?lang=` 真的压过了系统语言**，而不是"这台机器恰好是中文"。
    *    少了这个参数，整条用例会红在那句等待上（2026-10-04 实测就是这个形状）。
    */
-  const cta = page.locator('a.lp-btn--primary').first();
+  // The hero's first primary button is the showcase anchor. The deployed
+  // "立即使用" action is the navigation CTA, which is the link under test.
+  const cta = page.locator('a.lp-nav__cta');
   await expect(cta).toHaveAttribute('href', `${ORIGIN}/app?lang=zh-CN`);
 
   await cta.click();
@@ -173,7 +175,9 @@ test('英文落地页的入口带 ?lang=en（否则英文访客进应用看到�
   console.log(`📷 英文落地页：${SHOT_DIR}/live-landing-en.png`);
 
   // 同 ZH：不带尾斜杠，英文页额外带 `?lang=en`（否则英文访客进应用看到中文）。
-  const cta = page.locator('a.lp-btn--primary').first();
+  // The hero's first primary button is the showcase anchor. The deployed
+  // "Use it now" action is the navigation CTA, which is the link under test.
+  const cta = page.locator('a.lp-nav__cta');
   await expect(cta).toHaveAttribute('href', `${ORIGIN}/app?lang=en`);
 
   const hard = hardErrors(logs);
@@ -460,7 +464,8 @@ test('凭据页脚本无 JS 报错，且按钮真的有反应', async ({ page })
  *
  * 两条腿成对写（本仓规矩：负向断言必须配阳性对照）——
  * 「旧句 0 命中」单独不构成证据：页面整块没构建、404 兜底、meta 压根没渲染，
- * 给出的都是同一个 0。
+ * 给出的都是同一个 0。阳性对照跟着当前 IA 的实际标题与摘要走，不能继续依赖已被
+ * IA 改写移除的旧锚点。
  */
 test('自托管文案：线上不许再印那句已被现量否证的话', async ({ page }) => {
   const logs = attachLogs(page);
@@ -471,24 +476,26 @@ test('自托管文案：线上不许再印那句已被现量否证的话', async
   await page.locator('h1').first().waitFor({ state: 'visible', timeout: 30_000 });
   await page.screenshot({ path: `${SHOT_DIR}/live-selfhost-copy.png` });
   console.log(`📷 线上自建指南页：${SHOT_DIR}/live-selfhost-copy.png`);
+  await expect(page.locator('h1').first()).toHaveText('自托管同步服务');
 
   const STALE = '不是一个命令就完事';
   /**
-   * `ANCHOR` 是**改前改后都在场**的那半句（「自己运维一套服务」两句都留着），
-   * 所以它证明的是"这一页真的烘了自托管文案"，而不是"修复已经上线"。
-   *
-   * 🔴 第一版我把阳性对照写成了"新句在位"，结果它比那条真判据先红 ——
-   * 红在一个**本来就不该在场**的东西上，把"线上还挂着旧句"这个可执行的结论盖掉了。
-   * 阳性对照必须在**待验状态之外**取，否则它与被验的那条同生同死，等于没有对照。
-   */
-  const ANCHOR = '自己运维一套服务';
-  /**
-   * 每页的 `fresh` 取自**被替换的那一条词条本身**，不是随便挑一句在场的中文：
-   * `/docs/selfhost/` 烘的是 `site.docs.selfhost.sum`，`/docs/` 烘的是 `site.help.a.selfhost`。
+   * 每页的阳性对照取自当前线上实际烘出的标题与正文摘要：
+   * `/docs/selfhost/` 是自托管文章的 SEO 标题与 `site.docs.selfhost.sum`，
+   * `/docs/` 是帮助中心标题与 `site.help.a.selfhost`。
+   * 旧的「自己运维一套服务」锚点已随 IA 改写移除，不能再拿它证明页面存在。
    */
   const targets = [
-    { path: '/docs/selfhost/', fresh: '把服务起来那条命令不难' },
-    { path: '/docs/', fresh: '升级不是一条命令' },
+    {
+      path: '/docs/selfhost/',
+      heading: '自建一套同步服务器 —— heyta',
+      fresh: '部署自己的服务，配置连接，并维护备份与升级。',
+    },
+    {
+      path: '/docs/',
+      heading: '帮助中心 —— heyta',
+      fresh: '可以使用自己的同步服务器。部署、升级与备份步骤请查看“自托管同步服务”；连接入口位于应用同步设置的高级选项。',
+    },
   ];
 
   /** 用页面内的 fetch 拿**原始 HTML** —— 这些句子住在 meta 与 JSON-LD 里，不在可见文本里。 */
@@ -501,18 +508,18 @@ test('自托管文案：线上不许再印那句已被现量否证的话', async
 
   for (const t of targets) {
     const htmlMarks = await countNeedle(t.path, '<html');
-    const anchor = await countNeedle(t.path, ANCHOR);
+    const heading = await countNeedle(t.path, t.heading);
     const stale = await countNeedle(t.path, STALE);
     const fresh = await countNeedle(t.path, t.fresh);
     console.log(
-      `${t.path}  anchor=${String(anchor)}（${ANCHOR}）  stale=${String(stale)}  fresh=${String(fresh)}（${t.fresh}）`,
+      `${t.path}  heading=${String(heading)}（${t.heading}）  stale=${String(stale)}  fresh=${String(fresh)}（${t.fresh}）`,
     );
     expect(htmlMarks, `${t.path} 取回来的不是一份 HTML 文档（<html 数到 ${String(htmlMarks)}）`).toBeGreaterThan(0);
     // 对照必须在被验状态**之外**取：它红了说明这一页根本不在判据射程里，
     // 此时那条 stale=0 什么都证明不了（404 兜底 / 构建没跑 / 词条没接线都是同样的 0）。
     expect(
-      anchor,
-      `对照落空：${t.path} 里连改前改后都在场的「${ANCHOR}」都数不到 —— ` +
+      heading,
+      `对照落空：${t.path} 里连当前页面标题「${t.heading}」都数不到 —— ` +
         `这一页压根没烘自托管文案，下面的"错话停了"就没有意义。`,
     ).toBeGreaterThan(0);
     expect(
@@ -527,7 +534,7 @@ test('自托管文案：线上不许再印那句已被现量否证的话', async
   }
 
   /**
-   * 上面那三处量的是**元数据**（meta / og / twitter / JSON-LD）。但这一页真正被访客读到的
+   * 上面的计数取的是**元数据**（meta / og / twitter / JSON-LD）。但这一页真正被访客读到的
    * 是**渲染出来的正文**，而正文里有一句被本批自己的交付否证得更直接的话：
    *
    *   `site.docs.selfhost.s1i2` 旧值：「…服务自己不在启动时动表结构。」

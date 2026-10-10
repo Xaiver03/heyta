@@ -86,8 +86,14 @@ function themeButton(el: HTMLElement): HTMLButtonElement {
     button.closest('.ht-header__actions'),
     '页头那一排又长出主题开关了（同一个动作两个入口）',
   ).toBeNull();
-  // 措辞跟着当前档位翻 —— 这条断言的是"用户看得见点下去会怎样"，不是实现细节。
-  expect([t('common.a11y.toDarkTheme'), t('common.a11y.toLightTheme')]).toContain(button.textContent);
+  // 可见文字表达当前档位；aria-label 表达点击后的目标档位。
+  const currentTheme = domTheme();
+  expect(button.textContent?.trim()).toBe(
+    currentTheme === 'dark' ? t('web.settings.display.themeDark') : t('web.settings.display.themeLight'),
+  );
+  expect(button.getAttribute('aria-label')).toBe(
+    currentTheme === 'dark' ? t('common.a11y.toLightTheme') : t('common.a11y.toDarkTheme'),
+  );
   return button;
 }
 
@@ -134,6 +140,8 @@ describe('主题记账的时机', () => {
 
     expect(domTheme()).toBe('light');
     expect(storedTheme(), '只有真实点击才配写盘').toBe('light');
+    expect(themeButton(el).textContent?.trim()).toBe(t('web.settings.display.themeLight'));
+    expect(themeButton(el).getAttribute('aria-label')).toBe(t('common.a11y.toDarkTheme'));
   });
 
   /** 优先级那一半：这一条证明"不记账"没有被做过头。 */

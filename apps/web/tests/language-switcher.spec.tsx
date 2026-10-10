@@ -29,7 +29,7 @@
  * （侧栏 + 视图 tab 条 + 空状态），那正是本轮负责的范围。
  *
  * 🔴 **2026-10-03 形态变更加的两条**（产品负责人："中英文的那个切换组件太离谱了"）：
- * 控件从"两枚裸 `.ht-chip`"换成**带可见标签的分组**。语义一条没动
+ * 控件从"两枚裸 `.ht-chip`"换成**有名称的紧凑分段分组**。语义一条没动
  * （`LOCALES` 驱动 / 自称 / `lang` / `aria-current` / 点当前项无操作），
  * 新增的两条钉的是**形态本身**：① 顶栏只有一个入口、且入口自己说明自己是什么；
  * ② 当前语言不只靠颜色标。这两条在旧形态上都会红 —— 改前实测过（见工单汇报）。
@@ -141,6 +141,13 @@ function shellText(el: HTMLElement): string {
   return [sidebar, tabs].map((node) => node.textContent ?? '').join(' ');
 }
 
+/** 工具段（回收站）是 rail 的独立区域，不属于上段 tablist。 */
+function railToolText(el: HTMLElement): string {
+  return [...el.querySelectorAll<HTMLElement>('.ht-rail__tab--tool')]
+    .map((node) => node.textContent ?? '')
+    .join(' ');
+}
+
 /** 顶栏那个语言**分组**本身（`role="group"` 的容器）。找不到就抛，理由同 `option()`。 */
 function switcher(el: HTMLElement): HTMLElement {
   const node = el.querySelector<HTMLElement>('[data-testid="language-switcher"]');
@@ -148,25 +155,12 @@ function switcher(el: HTMLElement): HTMLElement {
   return node;
 }
 
-/** 分组的名字来自**可见**的那个标签（不是只挂在 `aria-label` 上的一份抄件）。 */
-function switcherLabel(el: HTMLElement): HTMLElement {
+/** 分组使用设置词条作为可访问名称；可见说明由设置面板自身提供。 */
+function switcherName(el: HTMLElement): string {
   const group = switcher(el);
-  const id = group.getAttribute('aria-labelledby');
-  if (id === null || id === '') {
-    throw new Error('语言分组没有 aria-labelledby —— 名字要由那个可见标签提供，不是抄第二份');
-  }
-  const label = el.querySelector<HTMLElement>(`#${id}`);
-  if (label === null) throw new Error(`aria-labelledby 指向的 #${id} 不在 DOM 里`);
-  // 🔴 「看得见」是这条判据的全部意义：把标签换成 `.sr-only` 仍然满足
-  //   "分组有可访问名"，但产品负责人那句"用户根本不知道它们是什么"就回来了。
-  //   jsdom 没有布局盒，所以这里查的是**结构**（挂着渲染它的那个类、没挂隐藏类，
-  //   并且**在设置那一节里面**）；"真的画出来了"由 e2e 的
-  //   `getByRole('group', { name: '语言' })` + 截图负责。
-  if (label.className.includes('sr-only')) throw new Error('语言标签被藏成 sr-only —— 界面上没人看得见它');
-  if (!label.className.includes('ht-settings__lang-label')) {
-    throw new Error('语言标签没挂 ht-settings__lang-label —— 它不再是设置那一族的成员');
-  }
-  if (label.textContent === '') throw new Error('语言标签是空的 —— 分组名字来自哪里？');
+  const label = group.getAttribute('aria-label');
+  if (label === null || label === '') throw new Error('语言分组没有可访问名称');
+  if (group.hasAttribute('aria-labelledby')) throw new Error('紧凑选择器不应再嵌入重复语言标签');
   return label;
 }
 
@@ -216,9 +210,8 @@ describe('🔴 可达性：真实外壳里有没有那个控件', () => {
 
     const group = switcher(el);
     expect(group.getAttribute('role')).toBe('group');
-    // 名字**由可见标签提供**（`aria-labelledby`），所以界面与辅助技术读的是同一份字。
-    expect(switcherLabel(el).textContent).toBe('语言');
-    expect(group.getAttribute('aria-label')).toBeNull();
+    // 名字来自设置词条；控件内部不再重复渲染「语言」标签。
+    expect(switcherName(el)).toBe('语言');
   });
 
   it('🔴 当前语言不只靠颜色标出来：勾只出现在它身上（不靠颜色单独表意）', async () => {
@@ -267,9 +260,9 @@ describe('🔴 点一下：界面上的可见文案真的变（不是只改 stat
     act(() => {
       option(el, 'en').click();
     });
-    // 分组自己的标签也跟着翻过去（它是 `web.shell.lang.label`，不是硬编码的「语言」）。
+    // 分组的可访问名称也跟着翻过去（它是 `web.shell.lang.label`，不是硬编码的「语言」）。
     // 自称那两项**不许**跟着翻 —— 上面刚断言过 `English` 仍是 `English`。
-    expect(switcherLabel(el).textContent).toBe('Language');
+    expect(switcherName(el)).toBe('Language');
     // 标记换到 en 项上，中文项回到"可点的目标"（这三条要在**关掉设置之前**量 ——
     // 开关本身住在设置那一层里）。
     expect(option(el, 'en').getAttribute('aria-current')).toBe('true');
@@ -280,8 +273,9 @@ describe('🔴 点一下：界面上的可见文案真的变（不是只改 stat
     await closeSettings(el);
 
     // 三块**各自**都被断言到，避免"某一块没换语言"从缝里漏过去。
-    expect(el.querySelector('.ht-sidebar')?.textContent).toContain('Inbox');
-    expect(el.querySelector('[role="tablist"]')?.textContent).toContain('Trash');
+    expect(el.querySelector('.ht-sidebar')?.textContent).toContain('Today');
+    expect(el.querySelector('[role="tablist"]')?.textContent).toContain('Tasks');
+    expect(railToolText(el)).toContain('Trash');
     // 「帮助」在 tablist **外面**（它是动作）—— 单独断言，正好钉住这一点。
     expect(el.querySelector('[data-testid="rail-help"]')?.textContent).toContain('Help');
     expect(el.textContent).toContain('Your inbox is empty');
@@ -300,7 +294,7 @@ describe('🔴 点一下：界面上的可见文案真的变（不是只改 stat
     });
     // 中文界面点中文项 —— 界面不该动，localStorage 也不该被写出一条"偏好"。
     // 锚用 rail 那一段（设置开着时范围列不在 DOM 里，拿它当锚会假红）。
-    expect(el.querySelector('.ht-rail__tabs')?.textContent).toContain('回收站');
+    expect(railToolText(el)).toContain('回收站');
     expect(localStorage.getItem('heyta.locale')).toBeNull();
     expect(option(el, 'zh-CN').getAttribute('aria-current')).toBe('true');
   });
@@ -312,8 +306,8 @@ describe('🔴 点一下：界面上的可见文案真的变（不是只改 stat
     });
     // 先钉住"第一下真的切过去了"，否则这条测试在"按钮完全没接线"时也会绿。
     // 锚用 rail（此刻还开着设置）。
-    expect(el.querySelector('.ht-rail__tabs')?.textContent).toContain('Trash');
-    expect(el.querySelector('.ht-rail__tabs')?.textContent).not.toContain('回收站');
+    expect(railToolText(el)).toContain('Trash');
+    expect(railToolText(el)).not.toContain('回收站');
 
     act(() => {
       option(el, 'zh-CN').click();
@@ -360,7 +354,7 @@ describe('🔴 刷新后保持：落盘 + <html lang>', () => {
     expect(localStorage.getItem('heyta.locale')).toBe('zh-CN');
     expect(document.documentElement.lang).toBe('zh-CN');
     // 锚用 rail（设置还开着；范围列不在 DOM 里）。
-    expect(el.querySelector('.ht-rail__tabs')?.textContent).toContain('回收站');
+    expect(railToolText(el)).toContain('回收站');
   });
 });
 
@@ -442,7 +436,7 @@ describe('🔴 <StrictMode>：首启推断不落盘，明确选择落盘', () =>
 
     const el = await mountIntoSettings(true);
     // 前提：首启是推断来的英文，且没落盘。（锚用 rail —— 设置还开着。）
-    expect(el.querySelector('.ht-rail__tabs')?.textContent).toContain('Trash');
+    expect(railToolText(el)).toContain('Trash');
     expect(localStorage.getItem('heyta.locale')).toBeNull();
 
     act(() => {

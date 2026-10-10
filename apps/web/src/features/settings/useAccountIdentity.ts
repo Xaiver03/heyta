@@ -9,7 +9,7 @@
  * AbortController 会终止旧请求；generation 检查仍保留，防止不支持真正取消的
  * fetch 替身或已经完成的 Promise 把旧账号的数据写回当前界面。
  */
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import {
   getAccountProfile,
@@ -43,12 +43,14 @@ export interface AccountIdentity {
   readonly avatarDataUri: string | undefined;
   readonly avatarState: AccountAvatarImage['state'] | undefined;
   readonly status: AccountIdentityStatus;
+  /** Re-run the profile read after a transient failure. */
+  readonly retry: () => void;
   /** 仅供显示兜底，不代表用户保存过头像。 */
   readonly email: string | undefined;
   readonly initial: string | undefined;
 }
 
-type ScopedIdentity = Omit<AccountIdentity, 'email' | 'initial'> & { readonly scope: string };
+type ScopedIdentity = Omit<AccountIdentity, 'email' | 'initial' | 'retry'> & { readonly scope: string };
 
 const idleIdentity = (scope: string): ScopedIdentity => ({
   scope,
@@ -74,6 +76,10 @@ export function useAccountIdentity(): AccountIdentity {
   const [profileRevision, setProfileRevision] = useState(0);
   const scope = accountScope(baseUrl, token);
   const [identity, setIdentity] = useState<ScopedIdentity>(() => idleIdentity(scope));
+
+  const retry = useCallback(() => {
+    setProfileRevision((value) => value + 1);
+  }, []);
 
   useEffect(() => subscribePrivacyConsent(() => setConsentRevision((value) => value + 1)), []);
 
@@ -167,6 +173,7 @@ export function useAccountIdentity(): AccountIdentity {
     avatarDataUri: visible.avatarDataUri,
     avatarState: visible.avatarState,
     status: visible.status,
+    retry,
     email,
     initial: avatarInitialFromEmail(email),
   };

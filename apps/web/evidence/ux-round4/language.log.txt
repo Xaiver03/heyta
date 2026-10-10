@@ -1,0 +1,4 @@
+$ node scripts/check-ui-language.mjs
+   ✅ 价格四处一致：hosted-monthly ¥5/月·$5/月、hosted-ai-monthly ¥12/月·$12/月（授予只含 hosting / ai / automation）
+ℹ️  已登记文字系统规则、尚未启用（准备好但先不做）：ja、ko
+✅ 文案合规（扫描 373 个文件、621 处文案、67 处诊断字段；监管定性 0 处（源码 723 个文件 / 69035 条字面量）；词条表 zh-CN 3614 条 / en 3614 条；已迁移：apps/landing/src、apps/web/src、apps/mobile/src；其余按旧契约（中文））。

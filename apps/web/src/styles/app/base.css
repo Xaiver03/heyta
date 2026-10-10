@@ -68,6 +68,18 @@
   background: var(--ht-color-background);
 }
 
+/* Windows caption controls share the application canvas. Insets come from
+   AppWindow.TitleBar, not a second full-width header or a guessed pixel size. */
+html.heyta-windows-shell .ht-header[data-heyta-caption-safe] {
+  padding-inline-end: calc(var(--ht-shell-caption-right, var(--ht-space-0)) + var(--ht-space-6));
+}
+
+/* The detail column can host arbitrary editors. Keep only that local caption
+   corner clear; the rail and main page header stay flush with the top edge. */
+html.heyta-windows-shell .ht-app__detail:not([hidden]) {
+  padding-block-start: var(--ht-shell-caption-height, var(--ht-space-8));
+}
+
 /*
  * 有范围的视图（目前只有 `tasks`）—— 多一列。
  *
@@ -114,7 +126,7 @@
      详情页里"到期复习/记录列表"这类区块会往下长，不该把整页推走。 */
   block-size: 100dvh;
   overflow-y: auto;
-  border-left: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-left: 0;
   background: var(--ht-color-surface);
   /* 这一栏从 2026-10-04 起**有内容**（任务视图里是 AI 面），所以左右必须有留白：
      `.ht-ai-panel` 自己不带 inline padding，挂在零留白的栏里会贴住左边那条
@@ -222,14 +234,11 @@
   inline-size: var(--ht-border-width-thick);
 }
 
-.ht-app__detail-resizer:focus-visible {
-  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
-}
-
+/* 键盘焦点：用同一根实心高亮细条表达，不叠加第二个外框。 */
 .ht-app__detail-resizer:focus-visible::after {
   opacity: 1;
   background: var(--ht-color-primary);
+  inline-size: var(--ht-border-width-thick);
 }
 
 /*
@@ -337,6 +346,78 @@
   color: var(--ht-color-foreground);
 }
 
+/* 专注页的次级入口：默认只显示当前配置摘要，详情按需展开。 */
+.ht-app__focus-settings {
+  width: 100%;
+  max-width: var(--ht-layout-sidebar-width);
+  border-block-start: 0;
+  padding-block-start: var(--ht-space-2);
+}
+
+.ht-app__focus-settings-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-3);
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-1);
+  border-radius: var(--ht-radius-md);
+  color: var(--ht-color-foreground-muted);
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--ht-font-size-sm);
+}
+
+.ht-app__focus-settings-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.ht-app__focus-settings-toggle::after {
+  content: '+';
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-lg);
+  line-height: var(--ht-line-height-tight);
+}
+
+.ht-app__focus-settings[open] .ht-app__focus-settings-toggle::after {
+  content: '−';
+}
+
+.ht-app__focus-settings-toggle:focus-visible {
+  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+.ht-app__focus-settings-summary {
+  color: var(--ht-color-foreground-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.ht-app__focus-settings-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  min-inline-size: 0;
+  margin-block-start: var(--ht-space-2);
+  padding: var(--ht-space-3);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-background);
+}
+
+.ht-app__focus-settings-legend {
+  position: absolute;
+  inline-size: var(--ht-space-1);
+  block-size: var(--ht-space-1);
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.ht-app__focus-task {
+  width: 100%;
+}
+
 .ht-app__detail-cards {
   display: grid;
   /* 两列等宽；`minmax(0, 1fr)` 让长数字（"12 小时 30 分钟"）不会把列撑破。 */
@@ -348,10 +429,9 @@
   display: flex;
   flex-direction: column;
   gap: var(--ht-space-1);
-  padding: var(--ht-space-3);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
-  border-radius: var(--ht-radius-md);
-  background: var(--ht-color-surface);
+  min-inline-size: 0;
+  padding-block: var(--ht-space-2);
+  border-block-end: 0;
 }
 
 .ht-app__detail-card-label {
@@ -384,7 +464,7 @@
   gap: var(--ht-space-1) var(--ht-space-2);
   align-items: baseline;
   padding-block: var(--ht-space-2);
-  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-block-start: 0;
   /* 排版四件套来自语义档位类 `ht-type-row-meta`（JSX 与本类成对出现）。 */
 }
 

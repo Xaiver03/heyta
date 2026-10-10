@@ -31,6 +31,7 @@ import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { OPERATOR } from '@heyta/legal';
 
 import { __resetOpLogForTests, initOpLog } from '../src/lib/oplog.js';
 import { openSettingsViaAvatar } from './open-settings-via-avatar.js';
@@ -39,6 +40,7 @@ import { emptyState } from '@heyta/op-log';
 
 import { useTaskStore } from '../src/features/tasks/store.js';
 import { useProjectStore } from '../src/features/projects/store.js';
+import { usePrivacyStore } from '../src/features/privacy/store.js';
 
 (globalThis as unknown as { indexedDB: IDBFactory }).indexedDB = new IDBFactory();
 (globalThis as unknown as { IDBKeyRange: typeof IDBKeyRange }).IDBKeyRange = IDBKeyRange;
@@ -50,6 +52,8 @@ let container: HTMLDivElement | undefined;
 
 beforeEach(async () => {
   localStorage.clear();
+  localStorage.setItem('privacy.consent', JSON.stringify({ decision: 'local-only', decidedAt: new Date().toISOString() }));
+  usePrivacyStore.setState({ open: false, reason: 'first-launch', notPersisted: false });
   __resetOpLogForTests();
   await initOpLog();
 });
@@ -748,29 +752,61 @@ describe('应用 → 站点：孤岛的另一半', () => {
     return [...container!.querySelectorAll<HTMLAnchorElement>('[data-testid="about-links"] a')];
   }
 
+  /**
+   * 面板里现在是**两类**链接：三条指向站点的页面 + 一条 `mailto:` 的投诉举报入口。
+   * 分开取而不是"取前三个"：一旦有人把入口顺序挪了，切片会安静地拿到错的三条。
+   */
+  const isMailto = (a: HTMLAnchorElement): boolean =>
+    (a.getAttribute('href') ?? '').startsWith('mailto:');
+
   it('🔴 设置页里有指向站点帮助 / 更新动态 / 价格的链接', async () => {
     const links = await openSettings();
 
-    const paths = links.map((a) => a.getAttribute('href') ?? '');
+    const paths = links.filter((a) => !isMailto(a)).map((a) => a.getAttribute('href') ?? '');
     expect(
       paths,
       '设置页里缺少指向站点的入口 —— 应用与站点仍然是两个孤岛',
     ).toEqual([
-      `${window.location.origin}/help`,
-      `${window.location.origin}/changelog`,
-      `${window.location.origin}/pricing`,
+      'https://heyta.waytofuture.cn/docs',
+      'https://heyta.waytofuture.cn/changelog',
+      'https://heyta.waytofuture.cn/pricing',
     ]);
 
     // 外链一律带 noopener：`noopener` 防被打开页面反向操纵本页，
     // `noreferrer` 一起带上是因为 Referer 会泄露用户**在应用的哪一页**。
-    for (const link of links) {
+    for (const link of links.filter((a) => !isMailto(a))) {
       expect(link.getAttribute('rel')).toBe('noopener noreferrer');
+      expect(link.getAttribute('target')).toBe('_blank');
     }
+  });
+
+  /**
+   * 🔴 投诉/举报入口的**接线断言**（不是样式断言）。
+   *
+   * 地址取自 `OPERATOR.contactEmail` —— 那正是隐私政策与个人信息主体权利页对外
+   * 公示的唯一一份。测试里刻意**不写死那个地址**：写死了就只能证明"界面和法律
+   * 文本各自长什么样"，证不了两边指的是同一个信箱；而合法换信箱时写死会假红。
+   * 反过来，界面里硬编码任何别的地址会让这一条**当场红**。
+   */
+  it('🔴 设置页里真的有一键投诉/举报入口，且指向已公示的受理邮箱', async () => {
+    const links = await openSettings();
+    const mailto = links.filter(isMailto);
+
+    expect(mailto, '设置页里缺少投诉/举报入口 —— 备案材料与隐私政策承诺的途径没有落点').toHaveLength(1);
+    const href = mailto[0].getAttribute('href') ?? '';
+    expect(href.startsWith(`mailto:${OPERATOR.contactEmail}?subject=`)).toBe(true);
+    expect(
+      decodeURIComponent(href.slice(`mailto:${OPERATOR.contactEmail}?subject=`.length)),
+    ).toBe('heyta 算法服务投诉/举报');
+    expect(mailto[0].textContent).toContain('投诉与举报');
+    // `target="_blank"` 在 mailto 上会先开一个空白标签页，读起来像"点了没反应"。
+    expect(mailto[0].getAttribute('target')).toBeNull();
   });
 
   it('站点的域名由 VITE_SITE_URL 决定（分域名部署时不是写死的那一个）', async () => {
     vi.stubEnv('VITE_SITE_URL', 'https://site.example.com/');
-    const links = await openSettings();
+    const links = (await openSettings()).filter((a) => !isMailto(a));
+    expect(links.length).toBeGreaterThan(0);
     for (const link of links) {
       expect(link.getAttribute('href')?.startsWith('https://site.example.com/')).toBe(true);
     }
@@ -870,7 +906,8 @@ describe('信息架构：rail / sidebar / header 的分工', () => {
     // 把期望写死在这里，是成本最低、又能真正盖住"有人在 rail 上顺手加了个按钮"
     // 这一失效模式的做法。
     //
-    // 默认主段 = 4 个高频目的地（任务/日历/习惯/搜索）+ 下段工具「回收站」。
+    // 默认主段 = 4 个高频目的地（任务/日历/习惯/搜索）+ 单一 AI Agent 入口；
+    // 下段工具是「回收站」。Agent 是统一聊天入口，不再拆成工具/会话多个目的地。
     // 低频的四象限 / 时间线进入「更多」，但仍必须保持可达。
     const railLabels = [...rail!.querySelectorAll('button[role="tab"]')].map((b) =>
       (b.textContent ?? '').trim(),
@@ -880,6 +917,7 @@ describe('信息架构：rail / sidebar / header 的分工', () => {
       '日历',
       '习惯',
       '搜索',
+      '对话助手',
       '回收站',
     ]);
 
@@ -890,7 +928,7 @@ describe('信息架构：rail / sidebar / header 的分工', () => {
     await act(async () => {
       more?.click();
     });
-    const overflowLabels = [...rail!.querySelectorAll('[role="menuitem"]')].map((button) =>
+    const overflowLabels = [...document.querySelectorAll('[role="menu"] [role="menuitem"]')].map((button) =>
       (button.textContent ?? '').trim(),
     );
     expect(overflowLabels, '低频视图必须在「更多」里可达').toEqual(['四象限', '时间线']);
@@ -903,11 +941,11 @@ describe('信息架构：rail / sidebar / header 的分工', () => {
     ).toBe(0);
   });
 
-  it('🔴 「任务」视图有 sidebar（收集箱/今天/已完成…）', async () => {
+  it('🔴 「任务」视图有 sidebar（今天/最近 7 天/已完成…）', async () => {
     const { container } = await mountApp();
     const sidebar = container.querySelector('.ht-sidebar');
     expect(sidebar, '任务视图应当有范围列').not.toBeNull();
-    expect(sidebar!.textContent ?? '').toContain('收集箱');
+    expect(sidebar!.textContent ?? '').toContain('今天');
   });
 
   it('🔴 没有范围的视图（设置）**不画 sidebar**', async () => {
@@ -950,15 +988,16 @@ describe('信息架构：rail / sidebar / header 的分工', () => {
  */
 describe('功能模块：关掉的模块从 rail 消失', () => {
   const railTabLabels = (el: HTMLElement): string[] =>
-    [...el.querySelectorAll('.ht-rail button[role="tab"], .ht-rail [role="menuitem"]')].map(
-      (b) => b.textContent?.trim() ?? '',
-    );
+    [
+      ...el.querySelectorAll('.ht-rail button[role="tab"], .ht-rail [role="menuitem"]'),
+      ...document.querySelectorAll('[role="menu"] [role="menuitem"]'),
+    ].map((b) => b.textContent?.trim() ?? '');
 
   async function openMoreIfPresent(el: HTMLElement): Promise<void> {
     const more = [...el.querySelectorAll('.ht-rail button')].find(
       (button) => (button.textContent ?? '').trim() === '更多',
     ) as HTMLButtonElement | undefined;
-    if (more !== undefined && el.querySelector('[role="menu"]') === null) {
+    if (more !== undefined && document.querySelector('[role="menu"]') === null) {
       await act(async () => {
         more.click();
       });

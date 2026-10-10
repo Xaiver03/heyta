@@ -206,7 +206,7 @@ describe('倒数日进日历（Web 宿主接线）', () => {
     （它测的是那块板**支持**，不是这一屏**画了**）。
   */
 
-  it('🔴 点进那一天，下面的清单里也有这一行（不是"这天没有安排"）', async () => {
+  it('🔴 点进那一天，月格里也有这一行（不是只存在于隐藏清单）', async () => {
     await mount();
     await openCalendar();
 
@@ -225,18 +225,19 @@ describe('倒数日进日历（Web 宿主接线）', () => {
     });
     await flush();
 
-    // 前提：那天没有任何任务 ⇒ 清单里出现的只可能是倒数日。
+    // 当前 Web 月档不再重复渲染选中日清单；日期内容直接留在月格中，
+    // 因此只验证月格里的事件条。日档全天带另有单独用例覆盖。
     expect(
       container!.querySelector('[data-testid="calendar-board-day-list"]'),
-      '前提不成立：清单里出现了任务',
+      '月档不应再渲染重复的选中日清单',
     ).toBeNull();
     expect(
       container!.querySelector('[data-testid="calendar-board-day-empty"]'),
-      '格子里有那条日子，点进去却说"这天没有安排"',
+      '月档不应再渲染选中日空态',
     ).toBeNull();
 
-    const row = container!.querySelector(`[data-testid="calendar-board-day-event-${id}-title"]`);
-    expect(row, '选中那天的清单里没有倒数日行').not.toBeNull();
+    const row = container!.querySelector(`[data-testid="calendar-cell-${day}-event-title"]`);
+    expect(row, '月格里没有倒数日行').not.toBeNull();
     expect(row?.textContent).toContain('结婚纪念日');
     expect(row?.textContent, '行里没把天数说出来（宿主词表没接到这一屏）').toContain('还有 5 天');
   });

@@ -1,0 +1,40 @@
+{
+  "verificationDateUtc": "2026-10-08T02:29:00Z",
+  "runner": "scripts/windows/launch-data-transfer-qa.ps1",
+  "mode": "ValidateOnly",
+  "status": "passed",
+  "allRejected": true,
+  "allPathsUnchanged": true,
+  "cases": [
+    {
+      "name": "default",
+      "rejected": true,
+      "unchanged": true,
+      "message": "QA root must be separate from the default data directory"
+    },
+    {
+      "name": "ancestor",
+      "rejected": true,
+      "unchanged": true,
+      "message": "QA root must be separate from the default data directory"
+    },
+    {
+      "name": "descendant",
+      "rejected": true,
+      "unchanged": true,
+      "message": "QA root must be separate from the default data directory"
+    },
+    {
+      "name": "existing",
+      "rejected": true,
+      "unchanged": true,
+      "message": "QA root already exists; refusing to delete or reuse it"
+    },
+    {
+      "name": "drive-root",
+      "rejected": true,
+      "unchanged": true,
+      "message": "QA root must not be a drive root"
+    }
+  ]
+}

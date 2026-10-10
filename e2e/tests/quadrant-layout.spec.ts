@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { openApp } from './helpers';
+import { openApp, switchView } from './helpers';
 
 /**
  * 四象限的**排版几何**（goal-layout-audit.md 页 1）
@@ -28,8 +28,9 @@ const NARROW = { width: 660, height: 800 };
 
 async function openQuadrant(page: import('@playwright/test').Page): Promise<void> {
   await openApp(page);
-  // rail 上的「四象限」视图 tab。
-  await page.getByRole('tab', { name: '四象限' }).click();
+  // 四象限是任务的派生数据投影，但在 Web IA 中仍是 rail 的一级视图入口。
+  // 直接走真实的视图切换路径，避免把“侧栏四象限筛选”误当成 2×2 看板入口。
+  await switchView(page, '四象限');
   await expect(page.locator('[data-testid^="quadrant-cell-"]').first()).toBeVisible();
 }
 

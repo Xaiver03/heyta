@@ -65,7 +65,14 @@ export function SyncBar() {
   const { t } = useI18n();
   const sync = useSyncStore();
   const affordances = syncStatusAffordances(sync.status);
-  const statusText = describeSyncStatus(sync.status, t);
+  const signedIn = sync.baseUrl.trim() !== '' && sync.token?.trim() !== '';
+  // Keep an existing error/conflict visible even when credentials are missing:
+  // replacing it with a generic sign-in label hides the action the user needs
+  // to understand or resolve the current state. Only an idle, unconfigured
+  // rail needs the compact sign-in prompt.
+  const statusText = !signedIn && sync.status.kind === 'idle'
+    ? t('common.sync.signIn')
+    : describeSyncStatus(sync.status, t);
   const severity = syncStatusSeverity(sync.status);
   const Glyph = GLYPH_COMPONENTS[syncStatusGlyph(sync.status)];
   /**
@@ -117,8 +124,9 @@ export function SyncBar() {
           className="ht-rail__tab ht-rail__sync__action"
           aria-label={t('web.sync.rail.aria', { status: statusText })}
           data-testid="sync-rail-action"
-          disabled={!affordances.canSyncNow && !affordances.needsResolution}
+          disabled={signedIn && !affordances.canSyncNow && !affordances.needsResolution}
           onClick={() => {
+            if (!signedIn) { sync.openSignIn(); return; }
             if (affordances.needsResolution) {
               sync.openConflictDialog();
               return;
@@ -160,11 +168,12 @@ export function SyncBar() {
            * `syncDraftShown`（见 `SyncSettingsPanel.tsx` 文件头）。
            */
           baseUrl={sync.syncDraftShown ? sync.syncDraft.baseUrl : sync.baseUrl}
+          allowAdvanced={sync.syncDraftShown}
           onClose={() => sync.closeSignIn()}
           onSignedIn={(session: HostedAuthSession) => {
             // 认证 store 已经把令牌写进了同步配置；这里把**那一节的输入框**
             // 也对齐，否则用户接着点「保存并同步」会用空输入框把它覆盖掉。
-            sync.setSyncDraft({ token: session.token });
+            sync.setSyncDraft({ baseUrl: useSyncStore.getState().baseUrl, token: session.token });
             sync.closeSignIn();
           }}
         />

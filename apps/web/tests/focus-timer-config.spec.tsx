@@ -26,8 +26,11 @@ import { HeytaUiProvider } from '@heyta/ui';
 
 // 只替换任务 store（时长设置与它无关，但 FocusTimer 会读它渲染"关联任务"下拉）。
 // 其余跑真实实现 —— 尤其 **focus store 是真的**，否则这条测试就只是在验证 mock。
+const taskFixture = vi.hoisted(() => ({
+  tasks: {} as Record<string, { id: string; title: string; deletedAt?: number; completedAt?: number }>,
+}));
 vi.mock('../src/features/tasks/store.js', () => ({
-  useTaskStore: () => ({ entities: { tasks: {} } }),
+  useTaskStore: () => ({ entities: { tasks: taskFixture.tasks } }),
 }));
 
 const { __clearFocusConfigForTests, loadFocusConfig } = await import('../src/lib/focus-config.js');
@@ -42,6 +45,9 @@ let container: HTMLDivElement | undefined;
 beforeEach(() => {
   __clearFocusConfigForTests();
   __resetFocusForTests();
+  taskFixture.tasks = {
+    'task-1': { id: 'task-1', title: '写交互说明' },
+  };
 });
 
 afterEach(() => {
@@ -101,9 +107,25 @@ function blur(el: HTMLInputElement): void {
   });
 }
 
+function chooseTask(el: HTMLElement, taskId: string): HTMLSelectElement {
+  const select = el.querySelector<HTMLSelectElement>('.ht-app__focus-task select');
+  expect(select, '没找到关联任务选择框').not.toBeNull();
+  act(() => {
+    select!.value = taskId;
+    select!.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  return select!;
+}
+
 describe('番茄钟时长设置', () => {
   it('🔴 四个时长都在界面上（在此之前一个都没有，时长永远 25/5/15）', async () => {
     const el = await mount();
+    const config = el.querySelector<HTMLDetailsElement>('[data-testid="focus-config"]');
+    expect(config?.open).toBe(false);
+    act(() => {
+      el.querySelector<HTMLElement>('[data-testid="focus-config-toggle"]')?.click();
+    });
+    expect(config?.open).toBe(true);
     expect(durationInput(el, '专注').value).toBe('25');
     expect(durationInput(el, '短休息').value).toBe('5');
     expect(durationInput(el, '长休息').value).toBe('15');
@@ -177,5 +199,46 @@ describe('番茄钟时长设置', () => {
     expect(el.textContent ?? '').toContain('计时进行中不能改时长');
     // 值没有被改动
     expect(useFocusStore.getState().config.workMs).toBe(DEFAULT_FOCUS_CONFIG.workMs);
+  });
+});
+
+describe('番茄钟关联任务交互', () => {
+  it('选择关联任务只更新草稿，不会启动计时', async () => {
+    const el = await mount();
+
+    const select = chooseTask(el, 'task-1');
+
+    expect(select.value).toBe('task-1');
+    expect(useFocusStore.getState().state.phase).toBe('idle');
+    expect(useFocusStore.getState().state.taskId).toBeUndefined();
+  });
+
+  it('点击开始时才把草稿关联任务交给计时状态', async () => {
+    const el = await mount();
+
+    chooseTask(el, 'task-1');
+    act(() => {
+      el.querySelector<HTMLElement>('[data-testid="focus-primary"]')?.click();
+    });
+
+    expect(useFocusStore.getState().state.phase).toBe('running');
+    expect(useFocusStore.getState().state.taskId).toBe('task-1');
+  });
+
+  it('计时中禁用关联任务选择，不允许改变已绑定任务', async () => {
+    const el = await mount();
+
+    chooseTask(el, 'task-1');
+    act(() => {
+      el.querySelector<HTMLElement>('[data-testid="focus-primary"]')?.click();
+    });
+
+    const select = el.querySelector<HTMLSelectElement>('.ht-app__focus-task select');
+    expect(select?.matches(':disabled')).toBe(true);
+    act(() => {
+      select!.value = '';
+      select!.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(useFocusStore.getState().state.taskId).toBe('task-1');
   });
 });

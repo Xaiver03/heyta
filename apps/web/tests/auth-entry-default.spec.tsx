@@ -29,7 +29,7 @@
  *      ⚠️ 这条只判"看得见"，不判"够得着"——见下面 D 组。
  *   C. **间距**：「继续」与上方输入框之间必须是表单节奏（`space.3` = 12px），
  *      不是一个控件内部的 `space.1`（4px）。
- *   D. **降级只发生在视觉层**：展开后两条路一条不少，键盘与读屏照样到得了；
+ *   D. **降级通过渐进披露实现**：展开后两条路一条不少，展开入口可被键盘与读屏发现；
  *      而且地址被判"没填"时那一栏**必须自己出现** ——
  *      否则红字指向一个界面上不存在的东西，那是比常驻更坏的状态。
  *
@@ -247,7 +247,7 @@ describe('B 自建与"已有令牌"默认收起', () => {
   });
 });
 
-describe('D 降级只在视觉层，且错误不许指向看不见的东西', () => {
+describe('D 渐进披露且错误不许指向看不见的东西', () => {
   it('🔴 地址为空 ⇒ 提交时那一栏**自己展开**（红字不许指向一个不存在的输入框）', () => {
     const el = render({ serverUrl: { value: '', onChange: noop } });
     const email = query(el, 'auth-form-email') as HTMLInputElement;
@@ -257,11 +257,7 @@ describe('D 降级只在视觉层，且错误不许指向看不见的东西', ()
       setter?.call(email, 'me@example.com');
       email.dispatchEvent(new Event('input', { bubbles: true }));
     });
-    press(el, 'auth-form-continue');
-    // ⚠️ 「继续」**不校验地址**（它只管"这是哪个账号"），所以展开发生在真正提交那一步。
-    // 这条判据如果写成"继续之后就展开"，它会去要求一个不该存在的校验，
-    // 而真实现（onSubmit 里 `firstAuthErrorField` 第一个判据就是 baseUrlMissing）照样是对的。
-    expect(query(el, 'auth-form-server-url')).toBeNull();
+    // 地址校验和邮箱 + 口令提交在同一条主路上。
     press(el, 'auth-form-submit');
     const input = query(el, 'auth-form-server-url');
     expect(input, '地址被判没填，可那一栏还收着 —— 红字指向了不存在的东西').not.toBeNull();
@@ -275,11 +271,11 @@ describe('D 降级只在视觉层，且错误不许指向看不见的东西', ()
   });
 });
 
-describe('C 「继续」与上方输入框的间距', () => {
+describe('C 主提交按钮与上方输入框的间距', () => {
   it('🔴 实测间距是表单节奏 12px，不是一个控件内部的 4px', () => {
     const el = render();
     const input = query(el, 'auth-form-email');
-    const button = query(el, 'auth-form-continue');
+    const button = query(el, 'auth-form-submit');
     expect(input).not.toBeNull();
     expect(button).not.toBeNull();
     // jsdom 不跑布局（getBoundingClientRect 全是 0），所以量的是**样式值**：

@@ -1,0 +1,12 @@
+WINDOW=heyta
+M2D=OK
+M2A_NOTE=M2-D ✅ 身份入口成立（头像 1 个、采集框 1 个）；**身份菜单合规**（第一项 sync-signin-entry、登录入口 1 个、退出登录 0 个）
+PROBE="{\"first\":\"sync-signin-entry\",\"signin\":1,\"settings\":1,\"signout\":0}"
+WEB_ROOT=C:\src\heyta\apps\web\dist
+WEB_MODE=app
+STORAGE=shell
+STORAGE_HOST=on
+WRITE_HANDLED=0
+DB_DONE=-1
+DB_TOTAL=-1
+WRITE_NOTE=M2-D ✅ 身份入口成立（头像 1 个、采集框 1 个）；**身份菜单合规**（第一项 sync-signin-entry、登录入口 1 个、退出登录 0 个）

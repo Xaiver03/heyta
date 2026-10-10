@@ -464,6 +464,17 @@ describe('🔴🔴 AI 的输出不会自己写进数据', () => {
       '本机',
     );
   });
+
+  // 🔴 法定显式标识（《标识办法》+ GB 45438-2025）：这一组候选字段是模型写的。
+  it('🔴 候选里带「AI 生成合成内容」的显式标识', async () => {
+    const { impl } = fakeFetch('{"title":"甲"}');
+    const el = render({ fetchImpl: impl });
+    openDisclosure(el);
+    await clickAsync(el.querySelector('[data-testid="capture-send"]'));
+    expect(el.querySelector('[data-testid="capture-proposal-generated"]')?.textContent).toBe(
+      'AI 生成合成内容',
+    );
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────

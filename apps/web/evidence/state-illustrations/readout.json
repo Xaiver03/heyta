@@ -1,0 +1,262 @@
+[
+  {
+    "id": "tasks",
+    "theme": "light",
+    "width": 1440,
+    "reducedMotion": false,
+    "box": {
+      "x": 664,
+      "y": 193,
+      "width": 64,
+      "height": 64
+    },
+    "overflow": false
+  },
+  {
+    "id": "habits",
+    "theme": "light",
+    "width": 1440,
+    "reducedMotion": false,
+    "box": {
+      "x": 720,
+      "y": 205,
+      "width": 64,
+      "height": 64
+    },
+    "overflow": false
+  },
+  {
+    "id": "notes",
+    "theme": "light",
+    "width": 1440,
+    "reducedMotion": false,
+    "box": {
+      "x": 720,
+      "y": 205,
+      "width": 64,
+      "height": 64
+    },
+    "overflow": false
+  },
+  {
+    "id": "calendar",
+    "theme": "light",
+    "width": 1440,
+    "reducedMotion": false,
+    "box": {
+      "x": 720,
+      "y": 261,
+      "width": 64,
+      "height": 64
+    },
+    "overflow": false
+  },
+  {
+    "id": "search",
+    "theme": "light",
+    "width": 1440,
+    "reducedMotion": false,
+    "box": {
+      "x": 688,
+      "y": 262,
+      "width": 64,
+      "height": 64
+    },
+    "overflow": false
+  },
+  {
+    "id": "tasks",
+    "theme": "light",
+    "width": 390,
+    "reducedMotion": true,
+    "box": {
+      "x": 163,
+      "y": 185,
+      "width": 64,
+      "height": 64
+    },
+    "overflow": false
+  },
+  {
+    "id": "habits",
+    "theme": "light",
+    "width": 390,
+    "reducedMotion": true,
+    "box": {
+      "x": 163,
+      "y": 192,
+      "width": 64,
+      "height": 64
+    },
+    "overflow": false
+  },
+  {
+    "id": "notes",
+    "theme": "light",
+    "width": 390,
+    "reducedMotion": true,
+    "box": {
+      "x": 163,
+      "y": 192,
+      "width": 64,
+      "height": 64
+    },
+    "overflow": false
+  },
+  {
+    "id": "calendar",
+    "theme": "light",
+    "width": 390,
+    "reducedMotion": true,
+    "box": {
+      "x": 163,
+      "y": 284,
+      "width": 64,
+      "height": 64
+    },
+    "overflow": false
+  },
+  {
+    "id": "search",
+    "theme": "light",
+    "width": 390,
+    "reducedMotion": true,
+    "box": {
+      "x": 163,
+      "y": 262,
+      "width": 64,
+      "height": 64
+    },
+    "overflow": false
+  },
+  {
+    "id": "tasks",
+    "theme": "dark",
+    "width": 1440,
+    "reducedMotion": false,
+    "box": {
+      "x": 664,
+      "y": 193,
+      "width": 64,
+      "height": 64
+    },
+    "overflow": false
+  },
+  {
+    "id": "habits",
+    "theme": "dark",
+    "width": 1440,
+    "reducedMotion": false,
+    "box": {
+      "x": 720,
+      "y": 205,
+      "width": 64,
+      "height": 64
+    },
+    "overflow": false
+  },
+  {
+    "id": "notes",
+    "theme": "dark",
+    "width": 1440,
+    "reducedMotion": false,
+    "box": {
+      "x": 720,
+      "y": 205,
+      "width": 64,
+      "height": 64
+    },
+    "overflow": false
+  },
+  {
+    "id": "calendar",
+    "theme": "dark",
+    "width": 1440,
+    "reducedMotion": false,
+    "box": {
+      "x": 720,
+      "y": 261,
+      "width": 64,
+      "height": 64
+    },
+    "overflow": false
+  },
+  {
+    "id": "search",
+    "theme": "dark",
+    "width": 1440,
+    "reducedMotion": false,
+    "box": {
+      "x": 688,
+      "y": 262,
+      "width": 64,
+      "height": 64
+    },
+    "overflow": false
+  },
+  {
+    "id": "tasks",
+    "theme": "dark",
+    "width": 390,
+    "reducedMotion": true,
+    "box": {
+      "x": 163,
+      "y": 185,
+      "width": 64,
+      "height": 64
+    },
+    "overflow": false
+  },
+  {
+    "id": "habits",
+    "theme": "dark",
+    "width": 390,
+    "reducedMotion": true,
+    "box": {
+      "x": 163,
+      "y": 192,
+      "width": 64,
+      "height": 64
+    },
+    "overflow": false
+  },
+  {
+    "id": "notes",
+    "theme": "dark",
+    "width": 390,
+    "reducedMotion": true,
+    "box": {
+      "x": 163,
+      "y": 192,
+      "width": 64,
+      "height": 64
+    },
+    "overflow": false
+  },
+  {
+    "id": "calendar",
+    "theme": "dark",
+    "width": 390,
+    "reducedMotion": true,
+    "box": {
+      "x": 163,
+      "y": 284,
+      "width": 64,
+      "height": 64
+    },
+    "overflow": false
+  },
+  {
+    "id": "search",
+    "theme": "dark",
+    "width": 390,
+    "reducedMotion": true,
+    "box": {
+      "x": 163,
+      "y": 262,
+      "width": 64,
+      "height": 64
+    },
+    "overflow": false
+  }
+]

@@ -49,6 +49,21 @@ const ROUTES = [
 const calls = [];
 
 /**
+ * 可由浏览器验收控制的响应屏障。
+ *
+ * 运行中状态必须在请求真的飞行时观测，不能用 sleep 猜竞态。验收先打开
+ * `/__barrier/hold`，等请求进入 `calls` 后跨视图，再用 `/__barrier/release`
+ * 放行。仅暂停模型响应，不改变请求计数或请求体。
+ */
+let barrierHeld = false;
+const heldResponses = [];
+
+function releaseHeldResponses() {
+  const pending = heldResponses.splice(0, heldResponses.length);
+  for (const respond of pending) respond();
+}
+
+/**
  * 各功能的确定性响应。
  *
  * ⚠️ 形状必须与 `packages/app-host/src/ai-*.ts` 的解析器严格一致 ——
@@ -89,6 +104,39 @@ function respond(feature, userContent) {
 
     default:
       return '假端点不认识这个请求';
+  }
+}
+
+/**
+ * Deterministic tool calls for browser journeys that need a specific write.
+ *
+ * The sentinel is deliberately carried in the user message so the test still
+ * exercises the real browser -> routed provider -> assistant parser path. It
+ * is only a fixture selector; the app remains responsible for validating the
+ * arguments, producing a proposal, and requiring confirmation.
+ *
+ * Shape: `QA_TOOL:{"name":"...","arguments":{...}}` (one line).
+ */
+function qaToolCall(userContent) {
+  const matches = [...userContent.matchAll(/QA_TOOL\s*:\s*(\{[^\n]+\})/gu)];
+  const last = matches.at(-1)?.[1];
+  if (last === undefined) return undefined;
+  try {
+    const parsed = JSON.parse(last);
+    if (
+      parsed === null ||
+      typeof parsed !== 'object' ||
+      typeof parsed.name !== 'string' ||
+      parsed.name.trim() === '' ||
+      parsed.arguments === null ||
+      typeof parsed.arguments !== 'object' ||
+      Array.isArray(parsed.arguments)
+    ) {
+      return undefined;
+    }
+    return { name: parsed.name, arguments: JSON.stringify(parsed.arguments) };
+  } catch {
+    return undefined;
   }
 }
 
@@ -195,6 +243,26 @@ const server = createServer((req, res) => {
     return;
   }
 
+  // 真浏览器验收用它锁住/放行模型响应，避免以固定等待时间猜请求竞态。
+  if (url.startsWith('/__barrier/')) {
+    const action = url.slice('/__barrier/'.length).split('?')[0];
+    if (action === 'hold') barrierHeld = true;
+    else if (action === 'release') {
+      barrierHeld = false;
+      releaseHeldResponses();
+    } else if (action === 'reset') {
+      barrierHeld = false;
+      releaseHeldResponses();
+    } else {
+      res.writeHead(404, { ...cors, 'content-type': 'application/json' });
+      res.end('{"error":"未知屏障动作"}');
+      return;
+    }
+    res.writeHead(200, { ...cors, 'content-type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, held: barrierHeld, pending: heldResponses.length }));
+    return;
+  }
+
   if (!url.includes('/chat/completions')) {
     res.writeHead(404, { ...cors, 'content-type': 'application/json' });
     res.end('{"error":"只实现了 /v1/chat/completions"}');
@@ -253,7 +321,8 @@ const server = createServer((req, res) => {
      */
     // ⚠️ **不能锚 `^`**：出境的用户文本带着前缀（`ai-tool-call.ts` 的
     // `user: \`用户这句话：${source.text}\``），整串并不以"新建任务"开头。
-    const createTitle = /新建任务[：:](.+)$/s.exec(user.trim());
+    const createTitle = /新建任务[：:]([^\r\n]+)$/u.exec(user.trim());
+    const qaCall = feature === 'assistant' ? qaToolCall(user) : undefined;
     const message =
       feature === 'tool-calling'
         ? {
@@ -281,11 +350,21 @@ const server = createServer((req, res) => {
             role: 'assistant',
             content: null,
             tool_calls: [
-              {
-                id: 'stub-call-1',
-                type: 'function',
-                function: { name: 'list_tasks', arguments: '{}' },
-              },
+              qaCall
+                ? {
+                    id: 'stub-qa-tool',
+                    type: 'function',
+                    function: qaCall,
+                  }
+                : createTitle
+                ? {
+                    id: 'stub-assistant-write', type: 'function',
+                    function: { name: 'create_task', arguments: JSON.stringify({ title: createTitle[1].trim() }) },
+                  }
+                : {
+                    id: 'stub-call-1', type: 'function',
+                    function: { name: 'list_tasks', arguments: '{}' },
+                  },
             ],
           }
         : feature === 'assistant'
@@ -297,22 +376,26 @@ const server = createServer((req, res) => {
             }
           : { role: 'assistant', content: respond(feature, user) };
 
-    res.writeHead(200, { ...cors, 'content-type': 'application/json' });
-    res.end(
-      JSON.stringify({
-        id: 'stub',
-        object: 'chat.completion',
-        model: parsed?.model ?? 'stub',
-        choices: [
-          {
-            index: 0,
-            message,
-            finish_reason: message.tool_calls === undefined ? 'stop' : 'tool_calls',
-          },
-        ],
-        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
-      }),
-    );
+    const responseBody = JSON.stringify({
+      id: 'stub',
+      object: 'chat.completion',
+      model: parsed?.model ?? 'stub',
+      choices: [
+        {
+          index: 0,
+          message,
+          finish_reason: message.tool_calls === undefined ? 'stop' : 'tool_calls',
+        },
+      ],
+      usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+    });
+    const finish = () => {
+      if (res.writableEnded) return;
+      res.writeHead(200, { ...cors, 'content-type': 'application/json' });
+      res.end(responseBody);
+    };
+    if (barrierHeld) heldResponses.push(finish);
+    else finish();
   });
 });
 

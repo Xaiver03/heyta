@@ -1,0 +1,199 @@
+{
+  "origin": "https://heyta.waytofuture.cn",
+  "generatedAt": "2026-10-07T16:43:53.492Z",
+  "results": [
+    {
+      "kind": "AUTH",
+      "width": 390,
+      "signinGeom": {
+        "email": {
+          "x": 16,
+          "y": 562,
+          "width": 358,
+          "height": 44
+        },
+        "password": {
+          "x": 16,
+          "y": 632,
+          "width": 310,
+          "height": 44
+        },
+        "submit": {
+          "x": 16,
+          "y": 688,
+          "width": 63.65625,
+          "height": 44
+        },
+        "errors": []
+      },
+      "register": {
+        "confirmation": {
+          "x": 16,
+          "y": 555,
+          "width": 310,
+          "height": 44
+        },
+        "strengthText": 1,
+        "strengthLabel": "当前 1 个字符，至少需要 8 个。",
+        "terms": {
+          "x": 16,
+          "y": 673,
+          "width": 358,
+          "height": 26
+        },
+        "submit": {
+          "x": 16,
+          "y": 736,
+          "width": 111.125,
+          "height": 44
+        }
+      },
+      "url": "https://heyta.waytofuture.cn/app/?lang=zh-CN&signin=1"
+    },
+    {
+      "kind": "AUTH",
+      "width": 1440,
+      "signinGeom": {
+        "email": {
+          "x": 660.640625,
+          "y": 296.25,
+          "width": 547.359375,
+          "height": 44
+        },
+        "password": {
+          "x": 660.640625,
+          "y": 366.25,
+          "width": 499.359375,
+          "height": 44
+        },
+        "submit": {
+          "x": 660.640625,
+          "y": 422.25,
+          "width": 63.65625,
+          "height": 44
+        },
+        "errors": []
+      },
+      "register": {
+        "confirmation": {
+          "x": 660.640625,
+          "y": 425.5,
+          "width": 499.359375,
+          "height": 44
+        },
+        "strengthText": 1,
+        "strengthLabel": "当前 1 个字符，至少需要 8 个。",
+        "terms": {
+          "x": 660.640625,
+          "y": 543.5,
+          "width": 547.359375,
+          "height": 26
+        },
+        "submit": {
+          "x": 660.640625,
+          "y": 606.5,
+          "width": 111.125,
+          "height": 44
+        }
+      },
+      "url": "https://heyta.waytofuture.cn/app/?lang=zh-CN&signin=1"
+    },
+    {
+      "kind": "DOCS_HOME",
+      "homeCount": 1,
+      "homeUrl": "https://heyta.waytofuture.cn/",
+      "errors": []
+    },
+    {
+      "kind": "DOCS_ENTRY",
+      "navLinks": [
+        {
+          "text": "heyta帮助中心",
+          "href": "/docs/"
+        },
+        {
+          "text": "帮助中心首页",
+          "href": "/docs/"
+        },
+        {
+          "text": "开始使用",
+          "href": "/docs/start/"
+        },
+        {
+          "text": "开始使用 heyta",
+          "href": "/docs/first-run/"
+        },
+        {
+          "text": "任务、清单与标签",
+          "href": "/docs/concepts/"
+        },
+        {
+          "text": "同步与账号",
+          "href": "/docs/sync/"
+        },
+        {
+          "text": "设置与检查同步",
+          "href": "/docs/how/"
+        },
+        {
+          "text": "账号与登录",
+          "href": "/docs/account/"
+        },
+        {
+          "text": "加密与恢复码",
+          "href": "/docs/passphrase/"
+        },
+        {
+          "text": "处理同步冲突",
+          "href": "/docs/conflict/"
+        },
+        {
+          "text": "组织与节奏",
+          "href": "/docs/organize/"
+        },
+        {
+          "text": "选择任务视图",
+          "href": "/docs/views/"
+        },
+        {
+          "text": "设置重复任务",
+          "href": "/docs/repeat/"
+        },
+        {
+          "text": "提醒与通知",
+          "href": "/docs/reminders/"
+        },
+        {
+          "text": "数据与自建",
+          "href": "/docs/data/"
+        },
+        {
+          "text": "自托管同步服务",
+          "href": "/docs/selfhost/"
+        },
+        {
+          "text": "自动化与外部数据接入",
+          "href": "/docs/automation/"
+        },
+        {
+          "text": "导出与恢复数据",
+          "href": "/docs/transfer/"
+        },
+        {
+          "text": "回收站与删除",
+          "href": "/docs/trash/"
+        },
+        {
+          "text": "隐私",
+          "href": "/docs/trust/"
+        }
+      ],
+      "entryUrl": "https://heyta.waytofuture.cn/docs/concepts/"
+    },
+    {
+      "kind": "API_READONLY",
+      "status": 400,
+      "body": "{\"error\":\"Validation failed\",\"details\":[{\"origin\":\"string\",\"code\":\"invalid_format\",\"format\":\"email\",\"pattern\":\"/^(?:[A-Za-z0-9_'+\\\\-]+\\\\.)*[A-Za-z0-9_'+\\\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\\\-]*\\\\.)+[A-Za-z]{2,}$/\",\"path\":[\"email\"],\"message\":\"Invalid email format\"}]}"
+    }
+  ]
+}

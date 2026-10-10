@@ -30,3 +30,8 @@
 @import './app/admin.css';
 @import './app/habits.css';
 @import './app/narrow.css';
+
+@import './app/assistant-layout.css';
+@import './app/scope-drawer.css';
+
+@import './app/borderless-controls.css';

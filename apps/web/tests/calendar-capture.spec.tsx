@@ -38,6 +38,7 @@ const { LocaleHost } = await import('../src/lib/locale-host.js');
 const { __resetOpLogForTests, initOpLog } = await import('../src/lib/oplog.js');
 const { useTaskStore } = await import('../src/features/tasks/store.js');
 const { useCalendarViewStore } = await import('../src/features/calendar/store.js');
+const { usePrivacyStore } = await import('../src/features/privacy/store.js');
 const { addDays, isoWeekday, startOfMonth, toLocalDate, FULL_SCOPE } = await import('@heyta/domain');
 
 let root: Root | undefined;
@@ -77,7 +78,8 @@ async function openCalendar(): Promise<void> {
 }
 
 const q = <T extends HTMLElement>(testId: string): T | null =>
-  container!.querySelector<T>(`[data-testid="${testId}"]`);
+  container!.querySelector<T>(`[data-testid="${testId}"]`) ??
+  document.body.querySelector<T>(`[data-testid="${testId}"]`);
 
 async function click(el: HTMLElement | null): Promise<void> {
   expect(el, '判据要点的控件不在 DOM 里').not.toBeNull();
@@ -149,6 +151,8 @@ function localDayOf(ms: number): string {
 beforeEach(async () => {
   __resetOpLogForTests();
   localStorage.clear();
+  localStorage.setItem('privacy.consent', JSON.stringify({ decision: 'local-only', decidedAt: new Date().toISOString() }));
+  usePrivacyStore.setState({ open: false, reason: 'first-launch', notPersisted: false });
   enableModules(['calendar']);
   dbName = `calendar-capture-${Math.random().toString(36).slice(2)}`;
   await initOpLog(dbName);
@@ -252,7 +256,7 @@ describe('日历上的「往选中那天加一条」', () => {
     await mount();
     await openCalendar();
     await click(q('calendar-capture-toggle'));
-    expect(container!.querySelectorAll('[data-testid="capture-input"]')).toHaveLength(1);
+    expect(document.body.querySelectorAll('[data-testid="capture-input"]')).toHaveLength(1);
     await click(q('calendar-capture-toggle'));
     expect(q('capture-input'), '再点一次没有收起').toBeNull();
   });
@@ -278,5 +282,31 @@ describe('日历上的「往选中那天加一条」', () => {
     await submitCapture();
     await waitSubmitted('换格之后写的');
     expect(localDayOf(lastTask()!.dueDate!)).toBe(other);
+  });
+
+  it('🔴 Esc 与外部点击只关闭编辑器，不产生任务，并把焦点还给日期格', async () => {
+    await mount();
+    await openCalendar();
+    await click(q('calendar-capture-toggle'));
+    expect(q('capture-input')).not.toBeNull();
+
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    await flush();
+    expect(q('capture-input')).toBeNull();
+    expect(document.activeElement?.getAttribute('data-testid')).toMatch(/^calendar-cell-/);
+    expect(Object.keys(useTaskStore.getState().entities.tasks)).toHaveLength(0);
+
+    await click(q('calendar-capture-toggle'));
+    const outside = document.createElement('div');
+    document.body.appendChild(outside);
+    await act(async () => {
+      outside.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    });
+    await flush();
+    outside.remove();
+    expect(q('capture-input')).toBeNull();
+    expect(Object.keys(useTaskStore.getState().entities.tasks)).toHaveLength(0);
   });
 });

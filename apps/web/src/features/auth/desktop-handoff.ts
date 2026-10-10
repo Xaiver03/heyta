@@ -1,3 +1,4 @@
+import { DEFAULT_LOCALE, matchLocale, translate } from '@heyta/i18n';
 /**
  * 桌面壳的**反向授权回跳**（ADR-0039 §2.3）
  * ==========================================
@@ -106,8 +107,6 @@ export function handOffToShell(
         `padding:${cssVar('space.3')} ${cssVar('space.4')}`,
         `background:${cssVar('color.surface-raised')}`,
         `color:${cssVar('color.foreground')}`,
-        // 换成主题面之后，原来的"深色块"分隔力没了 —— 用边框 + 投影补回来。
-        `border-top:${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
         `box-shadow:${cssVar('shadow.lg')}`,
         `font-size:${cssVar('font-size.sm')}`,
         `z-index:${cssVar('z.toast')}`,
@@ -116,10 +115,11 @@ export function handOffToShell(
     const link = doc.createElement('a');
     link.setAttribute('data-testid', DESKTOP_HANDOFF_TESTID);
     link.setAttribute('href', url);
-    link.textContent = '正在返回 heyta…（如果没有自动跳转，点这里）';
+    link.textContent = translate(matchLocale(doc.documentElement.lang) ?? DEFAULT_LOCALE, 'web.auth.desktop.return');
+    link.className = 'ht-btn ht-btn--ghost';
     link.setAttribute(
       'style',
-      `color:${cssVar('color.primary')};text-decoration:underline`,
+      `color:${cssVar('color.primary')};text-decoration:none`,
     );
     box.appendChild(link);
     doc.body.appendChild(box);

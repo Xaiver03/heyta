@@ -1,0 +1,34 @@
+{
+  "version": "1.0.1-test.20261008.3",
+  "releasedAt": "2026-10-07T23:11:57+00:00",
+  "files": {
+    "macos": {
+      "name": "heyta-1.0.1-test.20261008.3-macos.dmg",
+      "url": "https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/heyta-1.0.1-test.20261008.3-macos.dmg",
+      "versionedUrl": "https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/1.0.1-test.20261008.3/heyta-1.0.1-test.20261008.3-macos.dmg",
+      "sha256": "6b4cfc26f34c78138ec5f7216c18e274538e4af0ff00bb4c6b48ff409a04c694",
+      "size": 2737725
+    },
+    "windows": {
+      "name": "heyta-1.0.1-test.20261008.3-windows.zip",
+      "url": "https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/heyta-1.0.1-test.20261008.3-windows.zip",
+      "versionedUrl": "https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/1.0.1-test.20261008.3/heyta-1.0.1-test.20261008.3-windows.zip",
+      "sha256": "80b85042c8acb31e54989156677acdc8674fef6c3df7c56f053039a5e8c077b4",
+      "size": 98549331
+    },
+    "android": {
+      "name": "heyta-1.0.1-test.20261008.3-android.apk",
+      "url": "https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/heyta-1.0.1-test.20261008.3-android.apk",
+      "versionedUrl": "https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/1.0.1-test.20261008.3/heyta-1.0.1-test.20261008.3-android.apk",
+      "sha256": "e20072576f5c79bccac8e58fd26e5219cba6566bce7331e4add73af245a2e180",
+      "size": 68002344
+    },
+    "linux": {
+      "name": "heyta-1.0.1-test.20261008.3-linux.deb",
+      "url": "https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/heyta-1.0.1-test.20261008.3-linux.deb",
+      "versionedUrl": "https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/1.0.1-test.20261008.3/heyta-1.0.1-test.20261008.3-linux.deb",
+      "sha256": "6e804176bb366d0e9ed9e6acd50e7107158c2d72e48e34d198fd3e1a6cf8036d",
+      "size": 1763348
+    }
+  }
+}

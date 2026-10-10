@@ -24,7 +24,7 @@ export async function openSettingsViaAvatar(el: HTMLElement): Promise<void> {
   await act(async () => {
     avatar!.click();
   });
-  const item = el.querySelector<HTMLButtonElement>('[data-testid="account-menu-settings"]');
+  const item = document.querySelector<HTMLButtonElement>('[data-testid="account-menu-settings"]');
   expect(item, '头像菜单里没有「设置」').not.toBeNull();
   await act(async () => {
     item!.click();

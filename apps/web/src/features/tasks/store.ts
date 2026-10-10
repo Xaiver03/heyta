@@ -36,7 +36,7 @@ import {
   bucketByQuadrant,
   trashedIn,
   filterTasks,
-  type QuadrantDropPlan,
+  type QuadrantTaskPatch,
   type Task,
   type TaskFilter,
 } from '@heyta/domain';
@@ -48,6 +48,7 @@ import {
   createTaskActions,
   type ActionContext,
   type AiFeedbackInput,
+  type LocalApiHostOptions,
   type NewTaskFields,
   type WidgetDrainTasks,
 } from '@heyta/app-host';
@@ -57,6 +58,7 @@ import {
   __resetOpLogForTests as resetEngine,
   currentState,
   dispatchIntent,
+  dispatchChecked,
   initOpLog as initShared,
   onEngineChange,
 } from '../../lib/oplog.js';
@@ -99,13 +101,14 @@ interface TaskState {
    */
   renameTask: (id: string, title: string) => Promise<void>;
   setPriority: (id: string, priority: Priority) => Promise<void>;
+  bulkSetPriorities: (entries: readonly { id: string; priority: Priority }[]) => Promise<void>;
   setImportant: (id: string, important: boolean) => Promise<void>;
   /**
    * 一次拖放 = 一条 op。计划来自领域层的 `planQuadrantDrop`。
    * 不要拆成 `setImportant` + `setDueDate` 两次 —— 那会写出两条 op。
    */
-  setQuadrantDrop: (id: string, plan: QuadrantDropPlan) => Promise<void>;
-  setDueDate: (id: string, dueDate: number | undefined) => Promise<void>;
+  setQuadrantDrop: (id: string, plan: QuadrantTaskPatch) => Promise<void>;
+  setDueDate: (id: string, dueDate: number | undefined, dueDateLocal?: string) => Promise<void>;
   /**
    * 排期（时间线 P2，ADR-0043）。时间线板的拖拽出口：泳道拖上轴 / 拖条移动 /
    * 拖边改时长都汇到这里 —— 一次调用 = 一条 op（动作层钉死，见 `TaskActions.setSchedule`）。
@@ -195,6 +198,7 @@ export function __resetOpLogForTests(): void {
  */
 const actionContext: ActionContext = {
   dispatch: dispatchIntent,
+  dispatchChecked,
   getState: currentState,
 };
 
@@ -226,8 +230,13 @@ export const widgetDrainTasks: WidgetDrainTasks = {
  * （ADR-0011 §6.1 与 `ai-open-decisions.md` 决策 1：先不做）。
  * 将来接解密失败那条路径时，只需要改这一处。
  */
-export function createAiToolHost(): LocalApiHost {
-  return createLocalApiHost(actionContext, taskActions, { isReadable: () => true });
+export function createAiToolHost(
+  options: Pick<LocalApiHostOptions, 'memoryEnabled' | 'getDurationPreferenceHints'> = {},
+): LocalApiHost {
+  return createLocalApiHost(actionContext, taskActions, {
+    isReadable: () => true,
+    ...options,
+  });
 }
 /**
  * 反馈动作。**与任务动作分开**：它写的不是用户内容，而是"用户怎么用 AI"。
@@ -303,6 +312,10 @@ export const useTaskStore = create<TaskState>((set) => ({
     await taskActions.setPriority(id, priority);
   },
 
+  bulkSetPriorities: async (entries) => {
+    await taskActions.bulkSetPriorities(entries);
+  },
+
   setImportant: async (id, important) => {
     // 四象限的"重要"维度。四象限矩阵的拖拽会改这个 + dueDate。
     await taskActions.setImportant(id, important);
@@ -316,11 +329,11 @@ export const useTaskStore = create<TaskState>((set) => ({
     await taskActions.setQuadrantDrop(id, plan);
   },
 
-  setDueDate: async (id, dueDate) => {
+  setDueDate: async (id, dueDate, dueDateLocal) => {
     // `undefined` → 动作层写成 `null`。null 表示"清除截止时间"，
     // 能穿过 JSON；undefined 会在 `JSON.stringify` 时被丢掉，
     // 于是"清除"在另一端静默失效。
-    await taskActions.setDueDate(id, dueDate);
+    await taskActions.setDueDate(id, dueDate, dueDateLocal);
   },
   setSchedule: async (id, schedule) => {
     // 只转交：字段语义（点名才写 / 夹取 / 非法 throw）全部在动作层 —— 本层不复制。

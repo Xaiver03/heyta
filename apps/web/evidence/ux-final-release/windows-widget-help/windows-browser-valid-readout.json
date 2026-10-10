@@ -1,0 +1,17 @@
+{
+  "source": "Windows UI Automation observations preserved from the 2026-10-07 14:22 UTC run before subsequent rerun; that run failed only its foreground-window assertion",
+  "before": {
+    "capturedAt": "2026-10-07T14:22:05.9605715Z",
+    "url": "https://heyta.waytofuture.cn/docs/",
+    "tabCount": 10,
+    "hwnd": 5898850
+  },
+  "after": {
+    "capturedAt": "2026-10-07T14:22:13.5139144Z",
+    "url": "https://heyta.waytofuture.cn/docs/",
+    "tabCount": 11,
+    "hwnd": 5898850
+  },
+  "shellUrlPreserved": true,
+  "automationSuitePassed": false
+}

@@ -98,8 +98,8 @@ afterEach(() => {
 // ─────────────────────────────────────────────────────────────────────────
 
 describe('默认值与读回', () => {
-  it('🔴 出厂档 = 只读（"让模型能改数据"必须是用户明确选过的状态）', () => {
-    expect(defaultAiSettings().assistantTier).toBe('read-only');
+  it('🔴 出厂档 = 执行（真正落库仍需用户确认）', () => {
+    expect(defaultAiSettings().assistantTier).toBe('read-and-propose');
   });
 
   it('🔴 字段缺失（旧版本存的配置）→ 只读，不是 undefined 漏给调用方', () => {
@@ -129,13 +129,13 @@ describe('默认值与读回', () => {
 });
 
 describe('界面上的两个前端', () => {
-  it('助手这一块存在，两档都在，默认选中只读', () => {
+  it('助手这一块存在，两档都在，默认选中执行', () => {
     const { container } = render(enabledSettings());
     expect(container.querySelector('[data-testid="ai-assistant-section"]')).not.toBeNull();
     const readOnly = radioOf(container, 'read-only');
     const propose = radioOf(container, 'read-and-propose');
-    expect(readOnly?.checked).toBe(true);
-    expect(propose?.checked).toBe(false);
+    expect(readOnly?.checked).toBe(false);
+    expect(propose?.checked).toBe(true);
   });
 
   it('🔴 AI 总开关关着时这一块**不出现**（没有路由就没有可披露的出境）', () => {
@@ -145,7 +145,10 @@ describe('界面上的两个前端', () => {
   });
 
   it('切档 ⇒ 回调里是新档，而 `localApi.grants` 一个字节都没动', () => {
-    const initial = enabledSettings({ localApi: { ...defaultAiSettings().localApi, grants: { list_tasks: true } } });
+    const initial = enabledSettings({
+      assistantTier: 'read-only',
+      localApi: { ...defaultAiSettings().localApi, grants: { list_tasks: true } },
+    });
     const { container, changes } = render(initial);
     act(() => {
       radioOf(container, 'read-and-propose')?.click();
@@ -178,7 +181,7 @@ describe('界面上的两个前端', () => {
 
 describe('披露：界面说的是目录，不是自己抄的一份', () => {
   it('🔴 字段名与工具名逐字来自 `planAssistantEgress(当前档)`', () => {
-    const { container } = render(enabledSettings());
+    const { container } = render(enabledSettings({ assistantTier: 'read-only' }));
     const fields = container.querySelector('[data-testid="assistant-egress-fields"]')?.textContent ?? '';
     const tools = container.querySelector('[data-testid="assistant-tools"]')?.textContent ?? '';
     const plan = planAssistantEgress('read-only');

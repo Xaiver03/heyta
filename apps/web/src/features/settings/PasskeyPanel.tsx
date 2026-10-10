@@ -34,7 +34,7 @@ import { ICON_SIZE } from '@heyta/design-system';
  * 仍然**没有**"是否当前设备"：那只能靠 credential ID 判断，而接口刻意不返回它。
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useI18n, type MessageKey } from '@heyta/i18n';
 import { HOSTED_PASSKEY_NAME_MAX_LENGTH, type HostedAuthFailureReason } from '@heyta/app-host';
@@ -42,6 +42,7 @@ import { AlertTriangle, CheckCircle2, Loader2, Pencil, Plus, RefreshCw, Trash2 }
 
 import { useSyncStore } from '../sync/store.js';
 import { usePasskeysStore } from './passkeysStore.js';
+import { SettingsAccountGate } from './SettingsAccountGate.js';
 
 /**
  * 删除失败原因 → 词条 key。
@@ -129,7 +130,7 @@ function shortDate(iso: string): string {
   return iso.slice(0, 10);
 }
 
-export function PasskeyPanel(): React.JSX.Element {
+export function PasskeyPanel({ active = true }: { active?: boolean }): React.JSX.Element {
   const { t } = useI18n();
 
   // 令牌来自同步设置（登录成功后由认证 store 写进去）。
@@ -158,14 +159,16 @@ export function PasskeyPanel(): React.JSX.Element {
   const [editingRowId, setEditingRowId] = useState<string | undefined>(undefined);
   /** 改名输入框里的草稿。 */
   const [draftName, setDraftName] = useState<string>('');
+  const activeRef = useRef(active);
+  activeRef.current = active;
 
   const signedIn = typeof token === 'string' && token !== '';
 
   useEffect(() => {
-    if (!signedIn) return;
+    if (!active || !signedIn) return;
     // 换账号 / 换服务器地址都重拉：列表必须属于**当前**这个账号。
     void load(baseUrl, token);
-  }, [baseUrl, token, signedIn, load]);
+  }, [active, baseUrl, token, signedIn, load]);
 
   const closeEditors = (): void => {
     setConfirmingId(undefined);
@@ -178,9 +181,10 @@ export function PasskeyPanel(): React.JSX.Element {
       <p className="ht-settings__hint">{t('web.passkeys.lead')}</p>
 
       {!signedIn ? (
-        <p className="ht-settings__hint" data-testid="passkeys-needs-sign-in">
-          {t('web.passkeys.needsSignIn')}
-        </p>
+        <SettingsAccountGate
+          messageKey="web.passkeys.needsSignIn"
+          testId="passkeys-needs-sign-in"
+        />
       ) : (
         <>
           <div className="ht-settings__actions">
@@ -195,6 +199,7 @@ export function PasskeyPanel(): React.JSX.Element {
               data-testid="passkeys-add"
               disabled={adding}
               onClick={() => {
+                if (!activeRef.current) return;
                 dismissNotice();
                 closeEditors();
                 void add(baseUrl, token);
@@ -213,6 +218,7 @@ export function PasskeyPanel(): React.JSX.Element {
               data-testid="passkeys-refresh"
               disabled={status.kind === 'loading'}
               onClick={() => {
+                if (!activeRef.current) return;
                 dismissNotice();
                 closeEditors();
                 void load(baseUrl, token);
@@ -289,24 +295,26 @@ export function PasskeyPanel(): React.JSX.Element {
               const editing = editingRowId === passkey.id;
               return (
                 <section
-                  className="ht-settings__section"
+                  className="ht-settings__section ht-settings__credential"
                   key={passkey.id}
                   data-testid={`passkey-row-${passkey.id}`}
                 >
-                  {passkey.name !== null && (
-                    <p className="ht-settings__item-label" data-testid={`passkey-name-${passkey.id}`}>
-                      {passkey.name}
+                  <div className="ht-settings__credential-main">
+                    {passkey.name !== null && (
+                      <p className="ht-settings__item-label" data-testid={`passkey-name-${passkey.id}`}>
+                        {passkey.name}
+                      </p>
+                    )}
+                    <p className="ht-settings__credential-meta">
+                      {t('web.passkeys.createdAt', { date: shortDate(passkey.createdAt) })}
+                      {' · '}
+                      {passkey.lastUsedAt === null
+                        ? t('web.passkeys.neverUsed')
+                        : t('web.passkeys.lastUsedAt', {
+                            date: shortDate(passkey.lastUsedAt),
+                          })}
                     </p>
-                  )}
-                  <p className="ht-settings__hint">
-                    {t('web.passkeys.createdAt', { date: shortDate(passkey.createdAt) })}
-                    {' · '}
-                    {passkey.lastUsedAt === null
-                      ? t('web.passkeys.neverUsed')
-                      : t('web.passkeys.lastUsedAt', {
-                          date: shortDate(passkey.lastUsedAt),
-                        })}
-                  </p>
+                  </div>
 
                   {editing ? (
                     <div className="ht-settings__actions">

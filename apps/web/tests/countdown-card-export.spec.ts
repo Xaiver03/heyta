@@ -36,7 +36,7 @@ import {
   EXPORT_CARD_SIZE,
 } from '@heyta/shared-schema';
 import type { LocalDate } from '@heyta/domain';
-import { cardTextsFor, type CountdownFace, type EventCard, type EventCardTexts } from '@heyta/ui';
+import { cardTextsFor, resolveHeytaUiTheme, type CountdownFace, type EventCard, type EventCardTexts } from '@heyta/ui';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -94,20 +94,7 @@ function layoutOf(card: EventCard, words: EventCardTexts, dark = false, rasterSc
     texts: words,
     theme: {
       tokens,
-      text: {
-        'screen-title': resolveTextStyle('screen-title', tokens),
-        'section-title': resolveTextStyle('section-title', tokens),
-        headline: resolveTextStyle('headline', tokens),
-        'row-title': resolveTextStyle('row-title', tokens),
-        'row-meta': resolveTextStyle('row-meta', tokens),
-        caption: resolveTextStyle('caption', tokens),
-        'group-label': resolveTextStyle('group-label', tokens),
-        'tab-label': resolveTextStyle('tab-label', tokens),
-        'panel-title': resolveTextStyle('panel-title', tokens),
-        badge: resolveTextStyle('badge', tokens),
-        'numeric-display': resolveTextStyle('numeric-display', tokens),
-        'numeric-body': resolveTextStyle('numeric-body', tokens),
-      },
+      text: resolveHeytaUiTheme({ scheme: dark ? 'dark' : 'light', reducedTransparency: false }).text,
     },
     accentColor: tokens['color.primary'],
     dateStem: words.date,

@@ -327,6 +327,17 @@ describe('🔴🔴 AI 的输出不会自己写进数据', () => {
       '本机',
     );
   });
+
+  // 🔴 法定显式标识（《标识办法》+ GB 45438-2025）：这个顺序是模型给的建议。
+  it('🔴 提议里带「AI 生成合成内容」的显式标识', async () => {
+    const { impl } = fakeFetch(TWO_SUGGESTIONS);
+    const el = render({ fetchImpl: impl });
+    click(el.querySelector('[data-testid="prioritize-open"]'));
+    await clickAsync(el.querySelector('[data-testid="prioritize-send"]'));
+    expect(el.querySelector('[data-testid="prioritize-proposal-generated"]')?.textContent).toBe(
+      'AI 生成合成内容',
+    );
+  });
 });
 
 describe('🔴🔴 逐条取舍', () => {

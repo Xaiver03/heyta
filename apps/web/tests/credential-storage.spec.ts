@@ -45,7 +45,7 @@ let storage: ReturnType<typeof makeStorage>;
 beforeEach(() => {
   storage = makeStorage();
   vi.stubGlobal('localStorage', storage);
-  useSyncStore.setState({ baseUrl: '', token: undefined, password: undefined });
+  useSyncStore.setState({ baseUrl: '', token: undefined, password: undefined, email: undefined, accountId: undefined });
 });
 
 afterEach(() => {
@@ -138,5 +138,33 @@ describe('W4 在 sync store 里的落地', () => {
     expect(raw).not.toContain('绝密口令');
     // 口令仍在内存里（同步要用），只是没落盘
     expect(useSyncStore.getState().password).toBe('绝密口令');
+  });
+
+  it('仅改加密口令保留账号身份，手填新令牌或新服务器清除旧身份标签', () => {
+    const sync = useSyncStore.getState();
+    sync.applyAuthToken('https://sync.example', 'JWT-A', 'alice@example.com', 'alice-id');
+    sync.configure('https://sync.example', 'JWT-A', 'new-local-password');
+    expect(useSyncStore.getState()).toMatchObject({ email: 'alice@example.com', accountId: 'alice-id' });
+    sync.configure('https://sync.example', 'MANUAL-B', 'new-local-password');
+    expect(useSyncStore.getState().email).toBeUndefined();
+    expect(useSyncStore.getState().accountId).toBeUndefined();
+    expect(loadCredentials(storage)).toEqual({ baseUrl: 'https://sync.example', token: 'MANUAL-B' });
+    sync.applyAuthToken('https://sync.example', 'JWT-A', 'alice@example.com', 'alice-id');
+    sync.configure('https://other.example', 'JWT-A', 'local-password');
+    expect(useSyncStore.getState().email).toBeUndefined();
+    expect(useSyncStore.getState().accountId).toBeUndefined();
+  });
+
+  it('缺少核验身份的 applyAuthToken 仅在同凭据时保留身份，换令牌不得继承', () => {
+    const sync = useSyncStore.getState();
+    sync.applyAuthToken('https://sync.example', 'JWT-A', 'alice@example.com', 'alice-id');
+    sync.applyAuthToken('https://sync.example', 'JWT-A');
+    expect(useSyncStore.getState()).toMatchObject({ email: 'alice@example.com', accountId: 'alice-id' });
+    sync.applyAuthToken('https://sync.example', 'JWT-B');
+    expect(useSyncStore.getState().email).toBeUndefined();
+    expect(useSyncStore.getState().accountId).toBeUndefined();
+    expect(loadCredentials(storage)).toEqual({ baseUrl: 'https://sync.example', token: 'JWT-B' });
+    sync.applyAuthToken('https://sync.example', 'JWT-C', 'bob@example.com', 'bob-id');
+    expect(useSyncStore.getState()).toMatchObject({ email: 'bob@example.com', accountId: 'bob-id' });
   });
 });

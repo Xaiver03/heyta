@@ -31,6 +31,7 @@ import { QrCode } from 'lucide-react';
 
 import { useSyncStore } from '../sync/store.js';
 import { privacyConsent } from '../privacy/consent-gate.js';
+import { SettingsAccountGate } from '../settings/SettingsAccountGate.js';
 
 /**
  * 失败码 → 词条。用 `Record` 而不是动态拼 key（拼错了没有类型兜底，
@@ -74,8 +75,13 @@ export function RenewPanel(): React.JSX.Element {
   const [copied, setCopied] = useState(false);
   const [outcome, setOutcome] = useState<CheckoutOutcome | null>(null);
   const [consentBlocked, setConsentBlocked] = useState(false);
+  const token = useSyncStore((state) => state.token);
+  const signedIn = typeof token === 'string' && token.trim() !== '';
 
   const onPlaceOrder = async (): Promise<void> => {
+    // 续费是账号动作。未登录时不创建 checkout 请求，也不把一个支付表单
+    // 摆出来让用户误以为可以匿名下单；登录入口由统一 gate 提供。
+    if (!signedIn) return;
     // 🔴 同意闸门在**这里**判，而不是等 `consentFetch` 抛错再归一：
     //    真浏览器实测过那样会得到一句假话 —— 一个请求都没出去，屏上却写着
     //    "连不上服务端，这一单没有下成"。闸门保证发不出去（`consent-gate.ts`），
@@ -121,30 +127,45 @@ export function RenewPanel(): React.JSX.Element {
       <h2 className="ht-settings__title ht-type-section-title">{t('web.subscription.renew.title')}</h2>
       <p className="ht-settings__hint">{t('web.subscription.renew.intro')}</p>
 
-      <div className="ht-settings__actions">
-        <input
-          type="text"
-          className="ht-input"
-          value={couponCode}
-          placeholder={t('web.subscription.renew.couponPlaceholder')}
-          onChange={(event) => setCouponCode(event.target.value)}
+      {!signedIn ? (
+        <SettingsAccountGate
+          messageKey="web.subscription.renew.fail.unauthorized"
+          testId="renew-needs-sign-in"
         />
-        <button
-          type="button"
-          className="ht-btn ht-btn--primary"
-          data-testid="renew-place-order"
-          disabled={pending}
-          onClick={() => void onPlaceOrder()}
-        >
-          <QrCode size={ICON_SIZE.xs} aria-hidden="true" />
-          {pending ? t('web.subscription.renew.busy') : t('web.subscription.renew.action')}
-        </button>
-      </div>
+      ) : (
+        <div className="ht-settings__field">
+          <label className="ht-settings__item-label" htmlFor="renew-coupon">
+            {t('web.subscription.renew.couponPlaceholder')}
+          </label>
+          <div className="ht-settings__actions">
+            <input
+              id="renew-coupon"
+              type="text"
+              className="ht-input"
+              value={couponCode}
+              placeholder={t('web.subscription.renew.couponPlaceholder')}
+              onChange={(event) => setCouponCode(event.target.value)}
+            />
+            <button
+              type="button"
+              className="ht-btn ht-btn--primary"
+              data-testid="renew-place-order"
+              disabled={pending}
+              onClick={() => void onPlaceOrder()}
+            >
+              <QrCode size={ICON_SIZE.xs} aria-hidden="true" />
+              {pending ? t('web.subscription.renew.busy') : t('web.subscription.renew.action')}
+            </button>
+          </div>
+        </div>
+      )}
 
       {outcome?.kind === 'qr' || outcome?.kind === 'redirect' ? (
-        <div data-testid="renew-order">
-          <p>{t('web.subscription.renew.amount', { amount: amountLabel(outcome.amountMinor, outcome.currency) })}</p>
-          <p>{t('web.subscription.renew.validUntil', { time: expiryLabel(outcome.expiresAt, locale) })}</p>
+        <section className="ht-settings__order-card" data-testid="renew-order">
+          <div className="ht-settings__order-summary" aria-live="polite">
+            <p>{t('web.subscription.renew.amount', { amount: amountLabel(outcome.amountMinor, outcome.currency) })}</p>
+            <p>{t('web.subscription.renew.validUntil', { time: expiryLabel(outcome.expiresAt, locale) })}</p>
+          </div>
           {/*
             🔴 这里只说"哪个码没生效"，**不**渲染服务端的 `explanation`。
             那张表（`coupon.ts` 的 `COUPON_REJECTION_EXPLANATION`）只有中文，
@@ -164,7 +185,7 @@ export function RenewPanel(): React.JSX.Element {
               {copied ? t('web.subscription.renew.copied') : t('web.subscription.renew.copy')}
             </button>
           </div>
-        </div>
+        </section>
       ) : null}
 
       {consentBlocked ? (

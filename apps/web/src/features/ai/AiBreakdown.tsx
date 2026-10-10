@@ -1,3 +1,4 @@
+import { AssistantIcon } from './AssistantIcon.js';
 import { ICON_SIZE } from '@heyta/design-system';
 /**
  * AI 拆解 —— 面向用户的入口
@@ -35,7 +36,7 @@ import { ICON_SIZE } from '@heyta/design-system';
  */
 
 import { useState } from 'react';
-import { AlertTriangle, Sparkles, X } from 'lucide-react';
+import { AlertTriangle, X } from 'lucide-react';
 
 import { breakdownFailureCopy, type AiFailureCopy } from './ai-failure-copy.js';
 import { useI18n } from '@heyta/i18n';
@@ -43,6 +44,7 @@ import { useI18n } from '@heyta/i18n';
 import { AiDisclosureHost } from './AiDisclosureHost.js';
 import { AiPanelHost } from './AiPanelHost.js';
 import { AiPanelHeadHost } from './AiPanelHeadHost.js';
+import { AiGeneratedLabel } from '@heyta/ui';
 import { RouteUnavailable, FailureSettingsAction } from './RouteUnavailable.js';
 import { useAiSettingsNavigation } from './ai-settings-navigation.js';
 import {
@@ -360,7 +362,7 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
             setPhase('disclosing');
           }}
         >
-          <Sparkles size={ICON_SIZE.xs} aria-hidden="true" />
+          <AssistantIcon size={ICON_SIZE.xs} aria-hidden="true" />
           {t('web.ai.breakdown.button')}
         </button>
         {applied && (
@@ -446,6 +448,8 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
           testID: 'ai-proposal-source',
           }}
         />
+
+        <AiGeneratedLabel label={t('common.ai.generatedLabel')} testID="ai-proposal-generated" />
 
         {proposal.truncated && (
           <p className="ht-ai__warn" data-testid="ai-truncated">

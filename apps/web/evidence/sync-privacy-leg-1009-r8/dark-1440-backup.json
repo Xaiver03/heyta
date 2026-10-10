@@ -1,0 +1,118 @@
+{
+  "app": {
+    "host": "web",
+    "name": "heyta"
+  },
+  "counts": {
+    "entities": {
+      "AI_FEEDBACK": {
+        "deleted": 0,
+        "total": 0
+      },
+      "ASSISTANT_TURN": {
+        "deleted": 0,
+        "total": 0
+      },
+      "COMMENT": {
+        "deleted": 0,
+        "total": 0
+      },
+      "EVENT": {
+        "deleted": 0,
+        "total": 0
+      },
+      "FOCUS_SESSION": {
+        "deleted": 0,
+        "total": 0
+      },
+      "HABIT": {
+        "deleted": 0,
+        "total": 0
+      },
+      "HABIT_LOG": {
+        "deleted": 0,
+        "total": 0
+      },
+      "NOTE": {
+        "deleted": 0,
+        "total": 0
+      },
+      "PREFERENCE_CORRECTION": {
+        "deleted": 0,
+        "total": 0
+      },
+      "PROJECT": {
+        "deleted": 0,
+        "total": 0
+      },
+      "REMINDER": {
+        "deleted": 0,
+        "total": 0
+      },
+      "TAG": {
+        "deleted": 0,
+        "total": 0
+      },
+      "TASK": {
+        "deleted": 0,
+        "total": 1
+      }
+    },
+    "opsByEntityType": {
+      "TASK": 1
+    },
+    "totalDeleted": 0,
+    "totalEntities": 1,
+    "totalOps": 1
+  },
+  "entities": {
+    "AI_FEEDBACK": [],
+    "ASSISTANT_TURN": [],
+    "COMMENT": [],
+    "EVENT": [],
+    "FOCUS_SESSION": [],
+    "HABIT": [],
+    "HABIT_LOG": [],
+    "NOTE": [],
+    "PREFERENCE_CORRECTION": [],
+    "PROJECT": [],
+    "REMINDER": [],
+    "TAG": [],
+    "TASK": [
+      {
+        "_lastClientId": "7e4745e7-1fa4-4fd9-8f06-4a09854776a5",
+        "_lastClock": {
+          "7e4745e7-1fa4-4fd9-8f06-4a09854776a5": 1
+        },
+        "_lastOpId": "7e4745e7-1fa4-4fd9-8f06-4a09854776a5-1791562465012-1",
+        "createdAt": 1791562465012,
+        "id": "task-c342b9db-d7de-4395-87b1-284ffb1a2e95",
+        "priority": 0,
+        "title": "数据管理响应式验收 dark 1440",
+        "updatedAt": 1791562465012
+      }
+    ]
+  },
+  "exportedAt": "2026-10-09T16:14:30.716Z",
+  "formatVersion": 1,
+  "opLog": [
+    {
+      "actionType": "CRT_TASK",
+      "clientId": "7e4745e7-1fa4-4fd9-8f06-4a09854776a5",
+      "entityId": "task-c342b9db-d7de-4395-87b1-284ffb1a2e95",
+      "entityType": "TASK",
+      "id": "7e4745e7-1fa4-4fd9-8f06-4a09854776a5-1791562465012-1",
+      "opType": "CRT",
+      "payload": {
+        "priority": 0,
+        "title": "数据管理响应式验收 dark 1440"
+      },
+      "schemaVersion": 1,
+      "timestamp": 1791562465012,
+      "vectorClock": {
+        "7e4745e7-1fa4-4fd9-8f06-4a09854776a5": 1
+      }
+    }
+  ],
+  "schemaVersion": 1
+}

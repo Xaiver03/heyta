@@ -18,8 +18,8 @@
  * （`TaskFilter`），日历侧栏是**多选**复选框。把两者压成一个形状会得到
  * "既不是单选也不是多选"的第三种，而它的症状是勾第二个把第一个顶掉。
  *
- * ⚠️ 这份状态**不落盘**：它是"这一屏看到哪儿"，不是偏好。刷新回到今天与
- * 全范围，是滴答同款行为，也是用户重新打开应用时预期的起点。
+ * ⚠️ 这份状态**不落盘**：它是"这一屏看到哪儿"，不是偏好。刷新回到今天、
+ * 全范围与展开侧栏，是滴答同款行为，也是用户重新打开应用时预期的起点。
  */
 
 import { create } from 'zustand';
@@ -63,6 +63,8 @@ interface CalendarViewState {
    *   只服务一个视图的状态（本文件文件头记过这个理由）。
    */
   captureOpen: boolean;
+  /** 日历侧栏是否展开。筛选范围独立保留，收起侧栏不会让任务悄悄消失。 */
+  calendarSidebarOpen: boolean;
   /**
    * 公共事实（调休 / 补班）覆盖表的**变更计数**（W4b）。
    *
@@ -109,6 +111,8 @@ interface CalendarViewActions {
   drillIntoMonth: (monthFirstDay: LocalDate) => void;
   /** 开/关那一行输入。开着再点 `+` 就是收起 —— 一屏只有一行输入框。 */
   toggleCapture: () => void;
+  toggleCalendarSidebar: () => void;
+  setCalendarSidebarOpen: (open: boolean) => void;
   /** 勾/去掉一条清单或一个标签。 */
   toggleScopeItem: (kind: ScopeKind, id: string) => void;
   /**
@@ -144,6 +148,7 @@ export const useCalendarViewStore = create<CalendarViewState & CalendarViewActio
   scope: FULL_SCOPE,
   view: 'month',
   captureOpen: false,
+  calendarSidebarOpen: true,
   publicFactsEpoch: 0,
 
   setCursor: (date) => {
@@ -175,6 +180,14 @@ export const useCalendarViewStore = create<CalendarViewState & CalendarViewActio
 
   toggleCapture: () => {
     set((state) => ({ captureOpen: !state.captureOpen }));
+  },
+
+  toggleCalendarSidebar: () => {
+    set((state) => ({ calendarSidebarOpen: !state.calendarSidebarOpen }));
+  },
+
+  setCalendarSidebarOpen: (open) => {
+    set({ calendarSidebarOpen: open });
   },
 
   toggleScopeItem: (kind, id) => {

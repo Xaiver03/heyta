@@ -44,7 +44,7 @@
   gap: var(--ht-space-3);
   min-block-size: var(--ht-layout-header-height);
   padding: var(--ht-space-2) var(--ht-space-6);
-  border-bottom: 1px solid var(--ht-color-border);
+  border-bottom: 0;
   background: var(--ht-color-surface);
 }
 
@@ -58,12 +58,7 @@
   flex: 0 0 auto;
 }
 
-.ht-header__brand {
-  flex: 0 0 auto;
-  color: var(--ht-color-primary);
-  white-space: nowrap;
-  letter-spacing: var(--ht-tracking-caption);
-}
+
 
 .ht-header__actions {
   margin-inline-start: auto;
@@ -125,27 +120,111 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border: 0;
   border-radius: var(--ht-radius-md);
-  background: var(--ht-color-background);
+  background: transparent;
   color: var(--ht-color-primary);
   font-size: var(--ht-font-size-lg);
   line-height: var(--ht-line-height-tight);
   cursor: pointer;
 }
 
-/* hover 用**边框**表达层次，不用 translateY（AGENTS §5 那条容易犯的错） */
 .ht-header__capture:hover {
-  border-color: var(--ht-color-primary);
+  background: var(--ht-color-hover);
 }
 
 .ht-header__view select {
   min-block-size: var(--ht-touch-target-min);
   padding-inline: var(--ht-space-2);
   border-radius: var(--ht-radius-md);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border: 0;
   background: var(--ht-color-background);
   color: var(--ht-color-foreground);
+}
+
+/* 日历页头的范围与侧栏控制：状态使用紧凑 surface，不再依赖下划线。 */
+.ht-header__calendar-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+
+.ht-header__calendar-toolbar {
+  display: flex;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  flex: 0 1 auto;
+}
+
+.ht-header__calendar-toolbar > div {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+
+.ht-header__calendar-sidebar-toggle,
+.ht-header__calendar-scope-reset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ht-space-1);
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-2);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+  background: transparent;
+  color: var(--ht-color-foreground-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ht-header__calendar-sidebar-toggle:hover,
+.ht-header__calendar-sidebar-toggle[aria-pressed='true'],
+.ht-header__calendar-scope-reset:hover {
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+}
+
+.ht-header__calendar-sidebar-toggle:focus-visible,
+.ht-header__calendar-scope-reset:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+.ht-header__calendar-sidebar-toggle {
+  inline-size: var(--ht-touch-target-min);
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.ht-header__calendar-scope {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  min-block-size: var(--ht-touch-target-min);
+  max-inline-size: min(100%, var(--ht-layout-content-max));
+  padding-inline: var(--ht-space-2);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-foreground);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-header__calendar-scope > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ht-header__calendar-scope-reset {
+  min-block-size: var(--ht-space-6);
+  padding-inline: var(--ht-space-1);
+  border-color: transparent;
+  background: transparent;
+  color: var(--ht-color-primary);
+  font-size: var(--ht-font-size-xs);
 }
 
 .ht-content {
@@ -236,6 +315,26 @@
   display: flex;
   flex-direction: column;
   flex: 1;
+  position: relative;
   /* 允许在内容超高时收缩（否则 min-height 会停在内容高度，把整页顶出滚动区）。 */
   min-height: 0;
 }
+
+/* 日历格点击后的快速新建：复用现有 CaptureComposer，浮在月历上方，
+   不把六行网格再向下推；锚点日由 composer 的 placeholder 明确告知。 */
+.ht-content__calendar-capture {
+  position: fixed;
+  z-index: var(--ht-z-popover);
+  inset-block-start: var(--ht-layout-header-height);
+  inset-inline-start: var(--ht-space-3);
+  inline-size: min(var(--ht-layout-detail-max-width), calc(100vw - var(--ht-space-6)));
+  max-block-size: calc(100dvh - var(--ht-space-6));
+  overflow-y: auto;
+  padding: var(--ht-space-3);
+  border: 0;
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface);
+  box-shadow: var(--ht-shadow-lg);
+}
+
+.ht-content__calendar-capture-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--ht-space-3); margin-block-end: var(--ht-space-2); }

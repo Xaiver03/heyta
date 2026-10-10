@@ -1,0 +1,36 @@
+{
+  "url": "https://github.com/Xaiver03/heyta/releases/tag/v1.0.1-test.20261008.3",
+  "isDraft": false,
+  "assets": [
+    {
+      "name": "heyta-1.0.1-test.20261008.3-android.apk",
+      "size": 68002344,
+      "digest": "sha256:e20072576f5c79bccac8e58fd26e5219cba6566bce7331e4add73af245a2e180",
+      "url": "https://github.com/Xaiver03/heyta/releases/download/v1.0.1-test.20261008.3/heyta-1.0.1-test.20261008.3-android.apk"
+    },
+    {
+      "name": "heyta-1.0.1-test.20261008.3-linux.deb",
+      "size": 1763348,
+      "digest": "sha256:6e804176bb366d0e9ed9e6acd50e7107158c2d72e48e34d198fd3e1a6cf8036d",
+      "url": "https://github.com/Xaiver03/heyta/releases/download/v1.0.1-test.20261008.3/heyta-1.0.1-test.20261008.3-linux.deb"
+    },
+    {
+      "name": "heyta-1.0.1-test.20261008.3-macos.dmg",
+      "size": 2737725,
+      "digest": "sha256:6b4cfc26f34c78138ec5f7216c18e274538e4af0ff00bb4c6b48ff409a04c694",
+      "url": "https://github.com/Xaiver03/heyta/releases/download/v1.0.1-test.20261008.3/heyta-1.0.1-test.20261008.3-macos.dmg"
+    },
+    {
+      "name": "heyta-1.0.1-test.20261008.3-windows.zip",
+      "size": 98549331,
+      "digest": "sha256:80b85042c8acb31e54989156677acdc8674fef6c3df7c56f053039a5e8c077b4",
+      "url": "https://github.com/Xaiver03/heyta/releases/download/v1.0.1-test.20261008.3/heyta-1.0.1-test.20261008.3-windows.zip"
+    },
+    {
+      "name": "SHA256SUMS.txt",
+      "size": 420,
+      "digest": "sha256:8029a599921764b70c14fbcf631acaab3c405de4a892d6869da44c44f4b27f32",
+      "url": "https://github.com/Xaiver03/heyta/releases/download/v1.0.1-test.20261008.3/SHA256SUMS.txt"
+    }
+  ]
+}

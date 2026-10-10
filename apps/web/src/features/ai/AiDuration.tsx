@@ -48,6 +48,7 @@ import { useI18n, type I18nValue } from '@heyta/i18n';
 import { AiDisclosureHost } from './AiDisclosureHost.js';
 import { AiPanelHost } from './AiPanelHost.js';
 import { AiPanelHeadHost } from './AiPanelHeadHost.js';
+import { AiGeneratedLabel } from '@heyta/ui';
 import { FailureSettingsAction, RouteUnavailable } from './RouteUnavailable.js';
 import { useAiSettingsNavigation } from './ai-settings-navigation.js';
 import {
@@ -472,6 +473,8 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
           testID: 'duration-proposal-source',
           }}
         />
+
+        <AiGeneratedLabel label={t('common.ai.generatedLabel')} testID="duration-proposal-generated" />
 
         {/* 🔴 夹过就必须说 —— 静默夹取等于让用户以为模型说的就是这个数。 */}
         {proposal.clamped && (

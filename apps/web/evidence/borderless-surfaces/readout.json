@@ -1,0 +1,170 @@
+[
+  {
+    "surface": "settings-profile",
+    "width": 1440,
+    "theme": "light",
+    "overflow": false
+  },
+  {
+    "surface": "settings-appearance",
+    "width": 1440,
+    "theme": "light",
+    "overflow": false
+  },
+  {
+    "surface": "settings-sync",
+    "width": 1440,
+    "theme": "light",
+    "overflow": false
+  },
+  {
+    "surface": "settings-ai",
+    "width": 1440,
+    "theme": "light",
+    "overflow": false
+  },
+  {
+    "surface": "settings-data",
+    "width": 1440,
+    "theme": "light",
+    "overflow": false
+  },
+  {
+    "surface": "settings-account",
+    "width": 1440,
+    "theme": "light",
+    "overflow": false
+  },
+  {
+    "surface": "settings-help",
+    "width": 1440,
+    "theme": "light",
+    "overflow": false
+  },
+  {
+    "surface": "settings-profile",
+    "width": 390,
+    "theme": "light",
+    "overflow": false
+  },
+  {
+    "surface": "settings-appearance",
+    "width": 390,
+    "theme": "light",
+    "overflow": false
+  },
+  {
+    "surface": "settings-sync",
+    "width": 390,
+    "theme": "light",
+    "overflow": false
+  },
+  {
+    "surface": "settings-ai",
+    "width": 390,
+    "theme": "light",
+    "overflow": false
+  },
+  {
+    "surface": "settings-data",
+    "width": 390,
+    "theme": "light",
+    "overflow": false
+  },
+  {
+    "surface": "settings-account",
+    "width": 390,
+    "theme": "light",
+    "overflow": false
+  },
+  {
+    "surface": "settings-help",
+    "width": 390,
+    "theme": "light",
+    "overflow": false
+  },
+  {
+    "surface": "settings-profile",
+    "width": 1440,
+    "theme": "dark",
+    "overflow": false
+  },
+  {
+    "surface": "settings-appearance",
+    "width": 1440,
+    "theme": "dark",
+    "overflow": false
+  },
+  {
+    "surface": "settings-sync",
+    "width": 1440,
+    "theme": "dark",
+    "overflow": false
+  },
+  {
+    "surface": "settings-ai",
+    "width": 1440,
+    "theme": "dark",
+    "overflow": false
+  },
+  {
+    "surface": "settings-data",
+    "width": 1440,
+    "theme": "dark",
+    "overflow": false
+  },
+  {
+    "surface": "settings-account",
+    "width": 1440,
+    "theme": "dark",
+    "overflow": false
+  },
+  {
+    "surface": "settings-help",
+    "width": 1440,
+    "theme": "dark",
+    "overflow": false
+  },
+  {
+    "surface": "settings-profile",
+    "width": 390,
+    "theme": "dark",
+    "overflow": false
+  },
+  {
+    "surface": "settings-appearance",
+    "width": 390,
+    "theme": "dark",
+    "overflow": false
+  },
+  {
+    "surface": "settings-sync",
+    "width": 390,
+    "theme": "dark",
+    "overflow": false
+  },
+  {
+    "surface": "settings-ai",
+    "width": 390,
+    "theme": "dark",
+    "overflow": false
+  },
+  {
+    "surface": "settings-data",
+    "width": 390,
+    "theme": "dark",
+    "overflow": false
+  },
+  {
+    "surface": "settings-account",
+    "width": 390,
+    "theme": "dark",
+    "overflow": false
+  },
+  {
+    "surface": "settings-help",
+    "width": 390,
+    "theme": "dark",
+    "overflow": false
+  }
+]

@@ -55,3 +55,35 @@ describe('intentText：批量完成', () => {
     expect(en).toContain('7');
   });
 });
+
+describe('intentText：追加任务清单', () => {
+  it('预览同时显示任务 id 与所有追加条目', () => {
+    expect(
+      intentText(
+        { action: 'append-task-checklist', taskId: 'task-1', items: ['准备说明', '通知团队'] },
+        tZh,
+      ),
+    ).toBe('给任务 task-1 追加清单：准备说明、通知团队');
+    expect(
+      intentText(
+        { action: 'append-task-checklist', taskId: 'task-1', items: ['准备说明', '通知团队'] },
+        tEn,
+      ),
+    ).toBe('Append checklist items to task task-1: 准备说明、通知团队');
+  });
+});
+
+describe('intentText：批量改优先级', () => {
+  it('预览逐条列出任务 id 与优先级', () => {
+    const intent = {
+      action: 'set-task-priorities' as const,
+      entries: [
+        { taskId: 'task-1', priority: 'high' },
+        { taskId: 'task-2', priority: 'low' },
+        { taskId: 'task-3', priority: 'mystery' },
+      ],
+    };
+    expect(intentText(intent, tZh)).toBe('把这些任务的优先级改为：task-1 → 高、task-2 → 低、task-3 → mystery');
+    expect(intentText(intent, tEn)).toBe('Set these task priorities: task-1 → High、task-2 → Low、task-3 → mystery');
+  });
+});

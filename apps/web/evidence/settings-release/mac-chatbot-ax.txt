@@ -1,0 +1,65 @@
+Window: "heyta", App: heyta.
+0 standard window heyta, ID: main, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: heyta, URL: heyta-local://app/index.html
+			3 container 主导航
+				4 pop up button 账号
+				5 tab group (selectable) 视图
+					6 tab (selected) 任务
+					7 tab (selectable) 日历
+					8 tab (selectable) 习惯
+					9 tab (selectable) 搜索
+					10 pop up button 更多
+					11 tab (selectable) 回收站
+				12 pop up button 通知
+				13 button 帮助
+				14 button 同步，当前状态：未同步
+				15 text 未同步
+			16 container 当前视图的范围
+				17 button 今天
+				18 button 最近 7 天
+				19 button 已完成
+				20 text 四象限
+				21 button 重要且紧急
+				22 button 重要不紧急
+				23 button 紧急不重要
+				24 button 不重要不紧急
+				25 container 清单与标签
+					26 heading 清单, Value: 2
+						27 text 清单
+					28 button (collapsed) 新建清单, Secondary Actions: Expand
+					29 text 还没有清单
+					30 text 还没归类的任务都在「收集箱」里，不会丢。
+					31 heading 标签, Value: 2
+						32 text 标签
+					33 button (collapsed) 新建标签, Secondary Actions: Expand
+					34 text 还没有标签
+					35 text 标签可以跨清单给任务归类，比如「紧急」「等回复」。
+				36 splitter 调整侧栏宽度, Value: 240
+			37 container
+				38 container heyta
+					39 text heyta
+				40 heading 收集箱, Value: 1
+					41 text 收集箱
+				42 toggle button 收起详情面, Value: on
+				43 text field (settable) 新任务标题, Placeholder: 添加任务，回车确认（可写「明天」「下周三」「!1」）
+				44 button (disabled) 添加
+				45 text 收集箱是空的 在上面输入框添加第一个任务
+				46 splitter 调整详情栏宽度, Value: 352
+			47 container
+				48 text 对话助手 当前档位：只读 用一句话使唤它：查任务、建任务、改任务。改动要先经你确认才会写进数据。
+				49 button 看看今天有什么任务
+				50 button 帮我记下一件任务
+				51 button 总结一下我的待办
+				52 button 帮我安排一下今天
+				53 text field (settable) 要对助手说的话, Placeholder: 例如：看看今天有什么，然后把最紧急的一条挪到明天
+				54 button (disabled) 发送
+				55 button (disabled) 新会话
+				56 text 内容由 AI 生成，可能有错。落库前请自己看一眼。
+	57 menu button Window sharing
+58 menu bar
+	59 Heyta
+	60 Edit
+	61 View
+	62 Window
+	63 Help

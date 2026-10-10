@@ -36,7 +36,7 @@ async function addList(page: import('@playwright/test').Page, name: string): Pro
   //    所以只在 `aria-expanded` 不为 true 时才点。
   const addBtn = page.locator('[aria-label="新建清单"]');
   if ((await addBtn.getAttribute('aria-expanded')) !== 'true') await addBtn.click();
-  const input = page.locator('input[aria-label="新清单名称"]');
+  const input = page.locator('#ht-category-create-name');
   await expect(input).toBeVisible();
   await input.fill(name);
   await input.press('Enter');

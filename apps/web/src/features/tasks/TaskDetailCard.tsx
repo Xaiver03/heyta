@@ -337,8 +337,8 @@ export function TaskDetailCard(): React.JSX.Element | null {
         key={`due-${task.id}`}
         task={task}
         now={store.now}
-        onSetDueDate={(due) => {
-          void store.setDueDate(task.id, due);
+        onSetDueDate={(due, dueDateLocal) => {
+          void store.setDueDate(task.id, due, dueDateLocal);
         }}
       />
 

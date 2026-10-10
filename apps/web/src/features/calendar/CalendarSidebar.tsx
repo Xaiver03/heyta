@@ -11,7 +11,7 @@ import { ICON_SIZE } from '@heyta/design-system';
  * 🔴 数学与色调**一行都不在这里**
  *
  * * 格子怎么排（周一开头、补白格归哪个月）→ `@heyta/domain` 的 `monthGrid`；
- * * 点是什么颜色 → `@heyta/ui` 的 `calendarDayTone`（与主区同一条）；
+ * * 点是否存在 → 当前日期是否有任务或倒数日；点的颜色始终使用主蓝；
  *   **颗数在这里固定为一颗** —— 侧栏可拖到 12rem，那时一格只有二十来像素，
  *   主区那 1–3 颗会糊成一条线，"3 件事"和"1 件事"看起来一样；
  * * 哪些任务在范围内 → `@heyta/domain` 的 `scopeTasks`；
@@ -26,10 +26,8 @@ import { ICON_SIZE } from '@heyta/design-system';
  * 只会让整列**错位一格** —— 而错位后的界面看上去仍然像个正常日历。
  * 照抄参考图的排布是这里最容易犯的错。
  *
- * ⚠️ 参考图里的**节假日 / 农历 / 休班标记本轮没做**：那需要一份节假日数据源
- * （法定节假日每年由国务院办公厅发布、还要算调休），而 AGENTS §3.1/§3.2
- * 两道门目前没有任何满足条件的库可引，手写表则会在明年静默过期。
- * 这不是"忘了"，是**缺来源**。
+ * ⚠️ 侧栏同时显示**休 / 班标记**与节日辅助名：事实分别来自 `adjustmentOn` / `festivalsOn`，
+ * 文案来自 i18n；这里不重新实现节日算法。
  */
 
 import { useMemo } from 'react';
@@ -39,27 +37,27 @@ import { useI18n } from '@heyta/i18n';
 import {
   addMonths,
   adjustmentOn,
+  festivalsOn,
   isScopeEmpty,
   isoWeekday,
   monthGrid,
   scopeTasks,
   toLocalDate,
+  type FestivalId,
   type LocalDate,
   type Task,
 } from '@heyta/domain';
 import {
   calendarDayMarkerView,
-  calendarDayTone,
   formatDayTitleText,
   formatMonthTitleText,
   groupEventsByOccurrence,
-  groupTasksByDueDate,
+  groupTasksByCalendarDate,
   toOrganizerTree,
   toTagItems,
   WEEKDAY_MESSAGE_KEYS,
-  type CalendarDayMarker,
-  type CalendarDayTone,
 } from '@heyta/ui';
+import type { MessageKey } from '@heyta/i18n';
 import { Check, ChevronLeft, ChevronRight, Circle } from 'lucide-react';
 
 import { SidebarResizer } from '../shell/ColumnResizer.js';
@@ -76,29 +74,31 @@ interface ScopeRow {
   readonly depth: number;
 }
 
-/** 色调 → token 名。**不写裸色值**（§5），且与共享板 `DayCell` 同一张表。 */
-const DOT_TOKEN: Record<CalendarDayTone, 'color.danger' | 'color.primary' | 'color.foreground-subtle' | null> =
-  {
-    danger: 'color.danger',
-    primary: 'color.primary',
-    subtle: 'color.foreground-subtle',
-    plain: null,
-  };
+/** 节日事实 id → 用户可见词条。算法在 domain，名称在 i18n，组件只负责组合。 */
+const FESTIVAL_MESSAGE_KEYS: Record<FestivalId, MessageKey> = {
+  'new-year': 'common.calendar.festival.newYear',
+  'spring-festival': 'common.calendar.festival.springFestival',
+  qingming: 'common.calendar.festival.qingming',
+  'labour-day': 'common.calendar.festival.labourDay',
+  'dragon-boat': 'common.calendar.festival.dragonBoat',
+  'mid-autumn': 'common.calendar.festival.midAutumn',
+  'national-day': 'common.calendar.festival.nationalDay',
+};
 
 /**
  * 「休 / 班」用哪个 class —— **这里不判颜色**。
  *
  * 🔴 键就是共享层 `calendarDayMarkerView` 返回的那个 token 名，尾巴抄进 class 名，
- *    所以"休是绿的、班是琥珀的"这句话全仓库只有一处（RN 那侧走 `tokens[token]`）。
+ *    所以"休与班使用专用日期语义色"这句话全仓库只有一处（RN 那侧走 `tokens[token]`）。
  *    写成**全覆盖的 Record** 而不是查表 + 兜底：共享层哪天多给一个 token，
  *    这一侧编译不过，而不是悄悄画成默认色（§7 那条"跨端常量抄件"的形状）。
  */
 const MARKER_CLASS: Record<
-  'color.success-strong' | 'color.warning-strong',
+  'color.calendar-day-off' | 'color.calendar-day-work',
   string
 > = {
-  'color.success-strong': 'ht-sidebar__day-marker--success-strong',
-  'color.warning-strong': 'ht-sidebar__day-marker--warning-strong',
+  'color.calendar-day-off': 'ht-sidebar__day-marker--off',
+  'color.calendar-day-work': 'ht-sidebar__day-marker--work',
 };
 
 /**
@@ -112,9 +112,10 @@ function MiniDay({
   inMonth,
   isToday,
   isSelected,
-  tone,
   label,
+  festivalNames,
   marker,
+  hasTask,
   hasEvent,
   onPress,
 }: {
@@ -122,17 +123,19 @@ function MiniDay({
   inMonth: boolean;
   isToday: boolean;
   isSelected: boolean;
-  tone: CalendarDayTone;
   label: string;
+  /** 节日名是辅助信息，视觉上低于日期数字，但在读屏名称中完整保留。 */
+  festivalNames: readonly string[];
   /** 「休 / 班」那一枚标记（没说法时不给 ⇒ 一个节点都不画）。 */
-  marker?: { readonly text: string; readonly colorToken: 'color.success-strong' | 'color.warning-strong' } | undefined;
+  marker?: { readonly text: string; readonly colorToken: 'color.calendar-day-off' | 'color.calendar-day-work' } | undefined;
+  /** 这天有没有范围内的任务。 */
+  hasTask: boolean;
   /** 这天有没有倒数日（W6）。 */
   hasEvent: boolean;
   onPress: (date: LocalDate) => void;
 }): React.JSX.Element {
-  // 没任务但**有倒数日**：点照样画。这颗的语义是"这天值得记"，
-  // 不是"这天有几条待办"（下面那段注释已经把"多少"这一维排除在点之外了）。
-  const dotToken = DOT_TOKEN[tone] ?? (hasEvent ? 'color.primary' : null);
+  // 点只回答"这天有没有日历内容"，不表达逾期或完成状态。
+  const hasContent = hasTask || hasEvent;
 
   return (
     <button
@@ -155,6 +158,11 @@ function MiniDay({
       }}
     >
       <span className="ht-sidebar__day-num">{Number(date.slice(8, 10))}</span>
+      {festivalNames.length === 0 ? null : (
+        <span className="ht-sidebar__day-aux" aria-hidden="true">
+          {festivalNames.join(' · ')}
+        </span>
+      )}
       {/*
         🔴 **一颗点，不是一到三颗**：点只回答"这天有没有事、大致什么状态"。
         侧栏宽度是用户可拖的（`--ht-layout-sidebar-min/max-width`），最窄时一格只有
@@ -163,11 +171,11 @@ function MiniDay({
         它登记的语义本来就是"只表示「有」、不表示「多少」"。
       */}
       <span className="ht-sidebar__day-dots" aria-hidden="true">
-        {dotToken === null ? null : (
+        {hasContent ? (
           /* 🔴 这颗点带自己的 testID：判据问的是"这一天有没有被标出来"，
              而按 class 数会连容器一起数（`-dots` 那一层每天都画）。 */
-          <i data-testid={`calendar-mini-dot-${date}`} style={{ background: cssVar(dotToken) }} />
-        )}
+          <i data-testid={`calendar-mini-dot-${date}`} style={{ background: cssVar('color.primary') }} />
+        ) : null}
         {/*
           「休 / 班」（W6 补齐的那半：原先只有主区月历画，侧栏说"这天有没有事"，
           却不说"这天是不是班"）。词与颜色都来自共享层同一个
@@ -268,8 +276,14 @@ export function CalendarSidebar(): React.JSX.Element {
     () => scopeTasks(Object.values(tasks.entities.tasks), view.scope),
     [tasks.entities.tasks, view.scope],
   );
-  const byDate = useMemo(() => groupTasksByDueDate(scoped), [scoped]);
   const weeks = useMemo(() => monthGrid(view.cursor), [view.cursor]);
+  const byDate = useMemo(() => {
+    const first = weeks[0]?.[0]?.date;
+    const lastWeek = weeks[weeks.length - 1];
+    const last = lastWeek?.[lastWeek.length - 1]?.date;
+    if (first === undefined || last === undefined) return new Map<LocalDate, Task[]>();
+    return groupTasksByCalendarDate(scoped, first, last);
+  }, [scoped, weeks]);
 
   /**
    * 侧栏迷你月历里**有倒数日的那些天**（W6）。
@@ -330,6 +344,7 @@ export function CalendarSidebar(): React.JSX.Element {
     list: readonly Task[],
     spoken?: string,
     hasEvent = false,
+    festivalNames: readonly string[] = [],
   ): string => {
     const title = formatDayTitleText(date, t);
     // 数的是**这天有几个条目**（任务 + 倒数日）：只数任务的话，读屏念"没有安排"，
@@ -343,7 +358,8 @@ export function CalendarSidebar(): React.JSX.Element {
           : t('web.calendar.a11y.dayWithTasks', { date: title, count });
     // 标记不进这句就只剩看得见的人知道（与共享板同一条），而词表没给时**不拼**：
     // 那颗点不该被念成"圆点"。
-    return spoken === undefined ? base : `${base} ${spoken}`;
+    const details = [...(spoken === undefined ? [] : [spoken]), ...festivalNames];
+    return details.length === 0 ? base : `${base} ${details.join(' ')}`;
   };
 
   /**
@@ -359,7 +375,11 @@ export function CalendarSidebar(): React.JSX.Element {
   });
 
   return (
-    <nav className="ht-sidebar ht-sidebar--calendar" aria-label={t('web.calendar.side.aria')}>
+    <nav
+      id="calendar-sidebar"
+      className="ht-sidebar ht-sidebar--calendar"
+      aria-label={t('web.calendar.side.aria')}
+    >
       {/* 🔴 滚动的是**这一层**，不是 `<nav>` 自己：把手（`SidebarResizer`）必须留在
           滚动区之外。把手有 4px 骑在这一列的右边缘**外面**，而 `overflow-y: auto`
           会连带把横轴裁掉 —— 症状是"把手在那儿、几何中心按下去拖不动"（真浏览器实测）。 */}
@@ -425,6 +445,7 @@ export function CalendarSidebar(): React.JSX.Element {
                 {week.map((cell) => {
                   const cellTasks = byDate.get(cell.date) ?? [];
                   const marker = calendarDayMarkerView(adjustmentOn(cell.date), markerLabels);
+                  const festivalNames = festivalsOn(cell.date).map((id) => t(FESTIVAL_MESSAGE_KEYS[id]));
                   const hasEvent = eventDates.has(cell.date);
                   return (
                     <MiniDay
@@ -433,9 +454,10 @@ export function CalendarSidebar(): React.JSX.Element {
                       inMonth={cell.inMonth}
                       isToday={cell.date === today}
                       isSelected={cell.date === view.selected}
-                      tone={calendarDayTone(cellTasks, today, cell.date)}
-                      label={dayLabel(cell.date, cellTasks, marker?.spoken, hasEvent)}
+                      label={dayLabel(cell.date, cellTasks, marker?.spoken, hasEvent, festivalNames)}
+                      festivalNames={festivalNames}
                       marker={marker}
+                      hasTask={cellTasks.length > 0}
                       hasEvent={hasEvent}
                       onPress={view.selectDay}
                     />

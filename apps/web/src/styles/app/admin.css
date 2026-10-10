@@ -22,7 +22,7 @@
 
 .ht-settings__admin-tab {
   appearance: none;
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border: 0;
   border-radius: var(--ht-radius-full);
   background: var(--ht-color-surface);
   color: var(--ht-color-foreground-muted);
@@ -70,7 +70,7 @@
   flex-direction: column;
   gap: var(--ht-space-1);
   padding: var(--ht-space-3);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border: 0;
   border-radius: var(--ht-radius-md);
   background: var(--ht-color-surface-raised);
 }
@@ -98,7 +98,7 @@
   flex: 1;
   min-inline-size: 0;
   padding: var(--ht-space-2);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border: 0;
   border-radius: var(--ht-radius-sm);
   background: var(--ht-color-background);
   color: var(--ht-color-foreground);
@@ -124,7 +124,7 @@
   align-items: center;
   gap: var(--ht-space-1);
   appearance: none;
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border: 0;
   border-radius: var(--ht-radius-sm);
   background: var(--ht-color-surface);
   color: var(--ht-color-foreground);
@@ -157,7 +157,7 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border: 0;
   border-radius: var(--ht-radius-md);
   overflow: hidden;
 }
@@ -169,7 +169,7 @@
   gap: var(--ht-space-2);
   inline-size: 100%;
   padding: var(--ht-space-2) var(--ht-space-3);
-  border-block-end: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border-block-end: 0;
   background: var(--ht-color-surface);
   text-align: start;
 }
@@ -301,7 +301,7 @@
   flex-direction: column;
   gap: var(--ht-space-2);
   padding: var(--ht-space-3);
-  border: var(--ht-border-width-thin) solid var(--ht-color-primary);
+  border: 0;
   border-radius: var(--ht-radius-md);
   background: var(--ht-color-surface-raised);
 }

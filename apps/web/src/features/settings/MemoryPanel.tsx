@@ -1,3 +1,4 @@
+import { AssistantIcon } from '../ai/AssistantIcon.js';
 import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 记忆面板：「我了解到的你」+ 还不了解 + 你已忘记
@@ -32,7 +33,7 @@ import { ICON_SIZE } from '@heyta/design-system';
  * （所以跨设备同步），但那是**同步**，不是**出境**。
  */
 
-import { EyeOff, RotateCcw, Sparkles, X } from 'lucide-react';
+import { EyeOff, RotateCcw, X } from 'lucide-react';
 
 import { useI18n } from '@heyta/i18n';
 
@@ -190,7 +191,7 @@ export function MemoryPanel(props: MemoryPanelProps): React.JSX.Element {
     <div className="ht-settings__section" data-testid="memory-panel">
       {/* ── 我了解到的你 ─────────────────────────────────────── */}
       <h3 className="ht-settings__subtitle">
-        <Sparkles size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.memory.known.title')}
+        <AssistantIcon size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.memory.known.title')}
       </h3>
 
       {known.length === 0 ? (

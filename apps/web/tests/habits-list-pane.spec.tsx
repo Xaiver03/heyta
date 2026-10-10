@@ -221,7 +221,7 @@ describe('A. 左列：一行一个习惯，三个具体数字写在行上', () =
 
   it('行首图标圆盘每行恰好一个，且带一个 svg 字形', () => {
     for (const row of qa<HTMLElement>('.ht-habit__row')) {
-      expect(qa('svg', row.querySelector('.ht-habit__disc') ?? row)).toHaveLength(1);
+      expect(qa('img', row.querySelector('.ht-habit__disc') ?? row)).toHaveLength(1);
     }
   });
 });
@@ -376,11 +376,11 @@ describe('D. 图标选择器：存闭集 key，不存字形名', () => {
     // 落库断言过了，而字形本来就长一样。动态挑一个不同的 key，
     // "换图标必须看得见"这条判据才在**每一次**运行里都真的被检验。
     const chosen = HABIT_ICONS.find((icon) => icon !== effectiveIconOf(name))!;
-    const before = rowOf(name).querySelector('.ht-habit__disc svg')?.outerHTML;
+    const before = rowOf(name).querySelector('.ht-habit__disc img')?.getAttribute('src');
     openPicker();
     click(optionAt(chosen));
     await until(`「${name}」的图标落库为 ${chosen}`, () => storedIcon(name) === chosen);
-    const after = rowOf(name).querySelector('.ht-habit__disc svg')?.outerHTML;
+    const after = rowOf(name).querySelector('.ht-habit__disc img')?.getAttribute('src');
     expect(after).not.toBe(before);
   });
 
@@ -399,8 +399,8 @@ describe('D. 图标选择器：存闭集 key，不存字形名', () => {
 
   it('🔴 磁盘上是听不懂的历史值时**不炸**，画派生的那个字形', async () => {
     // 直接往 store 塞一个不在闭集里的 key（改名前的旧数据就是这个形状）。
-    // 没有 `parseHabitIcon` 的话 `HABIT_GLYPHS['trophy']` 是 undefined 组件 —— 渲染时才炸。
-    const derived = rowOf('喝水').querySelector('.ht-habit__disc svg')?.outerHTML;
+    // 没有 `parseHabitIcon` 的话未知 key 会穿透到 `HabitArtwork` —— 渲染时才炸。
+    const derived = rowOf('喝水').querySelector('.ht-habit__disc img')?.getAttribute('src');
     const habits = useHabitStore.getState().habits.map((h) =>
       h.name === '喝水' ? { ...h, icon: 'trophy' } : h,
     );
@@ -408,14 +408,14 @@ describe('D. 图标选择器：存闭集 key，不存字形名', () => {
       useHabitStore.setState({ habits });
     });
     await flush();
-    const after = rowOf('喝水').querySelector('.ht-habit__disc svg')?.outerHTML;
+    const after = rowOf('喝水').querySelector('.ht-habit__disc img')?.getAttribute('src');
     expect(after).toBe(derived);
     expect(rowOf('喝水').textContent).toContain('喝水');
   });
 });
 
 describe('E. 一条习惯都没有', () => {
-  it('列表零行，窗格说的是共享层那一句空态（不在 web 里另写一句）', async () => {
+  it('列表零行，左侧显示共享空态，详情面不挂载重复内容', async () => {
     for (const h of useHabitStore.getState().habits) {
       await act(async () => {
         await useHabitStore.getState().deleteHabit(h.id);
@@ -423,85 +423,38 @@ describe('E. 一条习惯都没有', () => {
     }
     await flush();
     expect(qa('.ht-habit__item')).toHaveLength(0);
-    expect(pane()?.textContent).toContain('还没有习惯。添加一个开始打卡。');
-    expect(qa('[data-testid="habit-board"]')).toHaveLength(1);
+    expect(qa('[data-testid="habits-empty"]')).toHaveLength(1);
+    expect(container?.textContent).toContain('还没有习惯');
+    expect(pane()).toBeUndefined();
+    expect(qa('[data-testid="habit-board"]')).toHaveLength(0);
   });
 });
 
 /**
- * F. 两张字形表必须是同一份映射（源码级判据）
- * ============================================
+ * F. 共享原创图形：闭集每项都能真实渲染
+ * ========================================
  *
- * 🔴 2026-10-01 之后，行首字形**有两份表**：web 这份（`features/habits/habit-glyphs.ts`，
- * DOM + `lucide-react` **组件**）与共享 RN 那份
- * （`packages/ui/src/habits/HabitProgressList.tsx`，`lucide` 的**图标数据**
- * 经 `HeytaIcon` 画）。移动端清单用的就是后者。
- *
- * **为什么是读文本而不是渲染**：两边画的不是同一种东西（一边 DOM `<svg>`、
- * 一边 RN 原生路径），像素不可比，DOM 结构也不可比 —— 但"8 个 key 各配哪个
- * 字形"是**同一个判断**。所以比的是表本身：键 → 字形标识符名。
- *
- * 不钉住会怎样：手机上"喝水"是水滴、web 上是月亮，同一个习惯两端长得不一样。
- * ⚠️ `Record<HabitIcon, …>` 的穷尽性**挡不住这个** —— 它只保证"八个 key 都在"，
- * 不保证两边配的是同一个。症状还是"看起来只是个配色问题"。
- *
- * 变异验证（2026-10-01，三处注入都**只走 `HEYTA_HABITS_SHARED_LIST` 这条缝**，
- * 改的是 `/tmp` 里的副本 —— 共享工作树里 `packages/ui` 一个字节都没动）：
- *
- * | 注入 | 结果 |
- * |---|---|
- * | 共享层 `drop: Droplet` → `drop: Moon` | **恰好 1 条红**（配对判据） |
- * | 删掉共享层 `music` 那一项 | **2 条红**（穷尽性 + 配对） |
- * | 把共享层的常量改名 | 2 条红，且报的是「判据锚点已失效」—— **不是静默通过** |
- *
- * 手法与 `apps/mobile/tests/habits-display.spec.ts` 里那张月份表副本一致
- * （移动端读共享层源码）：**读的方向永远是宿主 → 共享层**，反向不读。
+ * 图形已经从两份 Lucide 映射收口为 `HabitArtwork` + `HABIT_ARTWORK`。
+ * 这里直接检查运行时资源和真实 DOM 渲染，避免用源码解析把旧的第二份映射
+ * 重新变成测试契约。
  */
-describe('F. 字形表：web 清单与共享 RN 清单不许各画各的', () => {
-  /** 从一个源文件里抠出 `HABIT_GLYPHS` 那张表的 `key: Glyph` 对。 */
-  function glyphTable(source: string, label: string): Record<string, string> {
-    const start = source.indexOf('const HABIT_GLYPHS');
-    expect(start, `${label} 里找不到 \`HABIT_GLYPHS\` —— 判据锚点已失效`).toBeGreaterThanOrEqual(0);
-    const open = source.indexOf('{', start);
-    const close = source.indexOf('\n};', open);
-    expect(open, `${label} 的 \`HABIT_GLYPHS\` 后面找不到 \`{\` —— 锚点已失效`).toBeGreaterThan(start);
-    expect(close, `${label} 的 \`HABIT_GLYPHS\` 后面找不到 \`};\` —— 锚点已失效`).toBeGreaterThan(open);
-    const body = source.slice(open + 1, close);
-    const table: Record<string, string> = {};
-    for (const match of body.matchAll(/([A-Za-z]+)\s*:\s*([A-Za-z][A-Za-z0-9]*)\s*,/g)) {
-      const key = match[1];
-      const glyph = match[2];
-      if (key !== undefined && glyph !== undefined) table[key] = glyph;
+describe('F. 共享原创图形：闭集每项都能真实渲染', () => {
+  it('24 个闭集 key 都通过共享图形组件渲染到列表和选择器', () => {
+    const name = '喝水';
+    selectRow(name);
+    const listImage = rowOf(name).querySelector('.ht-habit__disc img');
+    const habit = useHabitStore.getState().habits.find((item) => item.name === name);
+    expect(habit).toBeDefined();
+
+    click(qa<HTMLElement>('.ht-habit__icon-toggle', pane() ?? document)[0]);
+    const options = qa<HTMLElement>('.ht-habit__icon-option', pane() ?? document);
+    expect(options).toHaveLength(HABIT_ICONS.length + 1);
+    for (const [index, icon] of HABIT_ICONS.entries()) {
+      const source = options[index]?.querySelector('img')?.getAttribute('src');
+      expect(source, `${icon} 没有共享图形资源`).toMatch(/^data:image\/png;base64,/);
     }
-    return table;
-  }
-
-  const here = dirname(fileURLToPath(import.meta.url));
-
-  /**
-   * ⚠️ `HEYTA_HABITS_SHARED_LIST` 是**只读接缝**，只给故障注入用
-   * （把共享层源码复制到 `/tmp`、改一处、指过去）。不设时就是真实路径。
-   * 共享工作树里直接改 `packages/ui/src` 会碰到别人的运行，所以走这条缝。
-   */
-  function readSharedListSource(): string {
-    return readFileSync(
-      process.env.HEYTA_HABITS_SHARED_LIST ??
-        resolve(here, '../../../packages/ui/src/habits/HabitProgressList.tsx'),
-      'utf8',
-    );
-  }
-
-  it('八个 key 两边都齐（解析绕过了 `Record` 的穷尽性，所以要自己数）', () => {
-    const shared = glyphTable(readSharedListSource(), '共享层');
-    const web = glyphTable(readFileSync(resolve(here, '../src/features/habits/habit-glyphs.ts'), 'utf8'), 'web');
-    expect(Object.keys(shared).sort()).toEqual([...HABIT_ICONS].sort());
-    expect(Object.keys(web).sort()).toEqual([...HABIT_ICONS].sort());
-  });
-
-  it('🔴 每个 key 配的是**同一个字形标识符**（不是"两边各有八个图标"就算过）', () => {
-    const shared = glyphTable(readSharedListSource(), '共享层');
-    const web = glyphTable(readFileSync(resolve(here, '../src/features/habits/habit-glyphs.ts'), 'utf8'), 'web');
-    expect(shared).toEqual(web);
+    const selectedIndex = HABIT_ICONS.indexOf(habitIconOf(habit!));
+    expect(listImage?.getAttribute('src')).toBe(options[selectedIndex]?.querySelector('img')?.getAttribute('src'));
   });
 });
 
@@ -531,7 +484,8 @@ describe('G. 回落规则的形状（源码级，剥注释后再读）', () => {
        只盯字面量 `rows[0]` 等于给新落点开了一张豁免，而这一条要挡的是"按位置猜"这个**动作**。
        今天这两个文件（剥注释后）一处下标都没有，所以这条判据现在是空的；
        将来若真需要 `[0]`（比如取第一天），红的时候**就地登记它为什么不是猜**。 */
-    expect(viewSource()).not.toMatch(/\[\s*0\s*\]/);
+    // 新建弹窗焦点循环取首个可聚焦控件不是选择首个习惯，仅豁免这个明确用途。
+    expect(viewSource().replace(/focusable\[0\]/g, 'FIRST_FOCUSABLE')).not.toMatch(/\[\s*0\s*\]/);
   });
 
   it('左列的痕迹接的是共享选中态本身，不是那个派生值', () => {

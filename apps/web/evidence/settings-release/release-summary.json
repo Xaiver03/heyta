@@ -1,0 +1,25 @@
+{
+  "date": "2026-10-07",
+  "command": "pnpm reinstall:all",
+  "productionManifestSha256": "260ecbf2e3134753e65c009eca18aaa020398400240044eb272e0a6f7bb0a99d",
+  "productionSourceFiles": 1517,
+  "productionSourceChangedDuringBuild": false,
+  "platforms": {
+    "macOS": "installed-and-started",
+    "Windows": "installed-and-started",
+    "Android": "installed-and-started",
+    "iOS": "installed-and-started"
+  },
+  "macOS": {
+    "notarization": "Accepted",
+    "chatbotRuntime": "single assistant verified through native accessibility tree"
+  },
+  "mobileRuntime": "Android and iOS profile/settings/back-navigation journeys passed",
+  "aiBrowserJourney": "Disclosure, multi-step read loop, conversation reset and persisted access tier passed with local stub provider",
+  "limits": [
+    "Android release APK uses the existing debug signing fallback for internal testing.",
+    "iOS installation target is the existing iPhone simulator, not a physical phone.",
+    "Windows installation and payload hash verified; no separate chatbot DOM inspection.",
+    "Full settings redesign is not finished; follow-up items remain in the product UX plan."
+  ]
+}

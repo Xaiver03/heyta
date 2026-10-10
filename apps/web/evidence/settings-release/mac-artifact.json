@@ -1,0 +1,161 @@
+{
+  "files": [
+    {
+      "file": "index.html",
+      "buildSha256": "ab1e94ced46056a4cdecf54f9e5a7389f50c61108a42214d6699d84f4f698e87",
+      "installedSha256": "ab1e94ced46056a4cdecf54f9e5a7389f50c61108a42214d6699d84f4f698e87",
+      "matches": true
+    },
+    {
+      "file": "manifest.webmanifest",
+      "buildSha256": "370339d9feca29a43ddae21df169017d45d65afd6a75ad5b97ed4e3e74182780",
+      "installedSha256": "370339d9feca29a43ddae21df169017d45d65afd6a75ad5b97ed4e3e74182780",
+      "matches": true
+    },
+    {
+      "file": "sw.js",
+      "buildSha256": "f1edb45d6d258a56b4094a911cfd6d22c2254c738cd837a837f7170c0b84f569",
+      "installedSha256": "f1edb45d6d258a56b4094a911cfd6d22c2254c738cd837a837f7170c0b84f569",
+      "matches": true
+    },
+    {
+      "file": "icons/apple-touch-icon.png",
+      "buildSha256": "993efc029da10850bbc06fcdae8faa1c61d38b23e1290255e11b8da7099dae0e",
+      "installedSha256": "993efc029da10850bbc06fcdae8faa1c61d38b23e1290255e11b8da7099dae0e",
+      "matches": true
+    },
+    {
+      "file": "icons/icon-192.png",
+      "buildSha256": "bbbffd64651d96cb35f7cb3c0d1cb3a7dc2444ed9035c74b01f9c48266475885",
+      "installedSha256": "bbbffd64651d96cb35f7cb3c0d1cb3a7dc2444ed9035c74b01f9c48266475885",
+      "matches": true
+    },
+    {
+      "file": "icons/icon.svg",
+      "buildSha256": "85ec6e5860aae6fc291494f64097587167ffde07ca1247b52648cbadb323ccd2",
+      "installedSha256": "85ec6e5860aae6fc291494f64097587167ffde07ca1247b52648cbadb323ccd2",
+      "matches": true
+    },
+    {
+      "file": "icons/icon-maskable-512.png",
+      "buildSha256": "8232a43189f77124f90717f68927a962ef9acf7e25307beb62b965f0e1e4e93e",
+      "installedSha256": "8232a43189f77124f90717f68927a962ef9acf7e25307beb62b965f0e1e4e93e",
+      "matches": true
+    },
+    {
+      "file": "icons/icon-maskable.svg",
+      "buildSha256": "18d879f635883819ca5493e6b58a27e1d2f845b5c781235041923f3a8ce6926e",
+      "installedSha256": "18d879f635883819ca5493e6b58a27e1d2f845b5c781235041923f3a8ce6926e",
+      "matches": true
+    },
+    {
+      "file": "icons/icon-512.png",
+      "buildSha256": "607f85bf71c5a3922ce932ed0f442401dacfbb45a13405c1530a5f426bc97223",
+      "installedSha256": "607f85bf71c5a3922ce932ed0f442401dacfbb45a13405c1530a5f426bc97223",
+      "matches": true
+    },
+    {
+      "file": "assets/index-DlB-b-Ij.css",
+      "buildSha256": "3f8ea82d2f91ac40e6aa7bb50e0068834df1ffc54bdaab72de6074c79d60174b",
+      "installedSha256": "3f8ea82d2f91ac40e6aa7bb50e0068834df1ffc54bdaab72de6074c79d60174b",
+      "matches": true
+    },
+    {
+      "file": "assets/universal-slice-DEk-fjAw.js",
+      "buildSha256": "6b1d1b1d259b971153f4b722565c7e3032d1faf5bef2a1baf206c967e7bf9769",
+      "installedSha256": "6b1d1b1d259b971153f4b722565c7e3032d1faf5bef2a1baf206c967e7bf9769",
+      "matches": true
+    },
+    {
+      "file": "assets/storage.worker-LICRr0GY.js",
+      "buildSha256": "661a15a0470c24953b51e66748da8077b33cfb98ccbe6ad75ae2e4a859f38b25",
+      "installedSha256": "661a15a0470c24953b51e66748da8077b33cfb98ccbe6ad75ae2e4a859f38b25",
+      "matches": true
+    },
+    {
+      "file": "assets/sqlite3-worker1-DdwV2TBQ.js",
+      "buildSha256": "b87a19bcff4d2bb09cf06e5a6018ac40d28ac084d27c56fa2cd489e86fbdff1b",
+      "installedSha256": "b87a19bcff4d2bb09cf06e5a6018ac40d28ac084d27c56fa2cd489e86fbdff1b",
+      "matches": true
+    },
+    {
+      "file": "assets/index-Bx3mk9NZ.js",
+      "buildSha256": "564f322e827c97f04293b20a28e4e9fc0d8ad1786523afe107683830e8baa8ea",
+      "installedSha256": "564f322e827c97f04293b20a28e4e9fc0d8ad1786523afe107683830e8baa8ea",
+      "matches": true
+    },
+    {
+      "file": "assets/sqlite3-opfs-async-proxy-Ck-yCayi.js",
+      "buildSha256": "9f1970e05ee07a79332498858740b705eeb1dcee03bc150f6f690bc0fb5f0a06",
+      "installedSha256": "9f1970e05ee07a79332498858740b705eeb1dcee03bc150f6f690bc0fb5f0a06",
+      "matches": true
+    },
+    {
+      "file": "assets/index-CYIBHm27.js",
+      "buildSha256": "5079a1751cf86798d507dda2f1a060b32ca2b5d20d65c98e3c310b84c9bc3728",
+      "installedSha256": "5079a1751cf86798d507dda2f1a060b32ca2b5d20d65c98e3c310b84c9bc3728",
+      "matches": true
+    },
+    {
+      "file": "assets/sqlite3-Con_VOcu.wasm",
+      "buildSha256": "2ee8f3dab694532afc8840e07703127287662d08b74e6ff50491ce63f00d5752",
+      "installedSha256": "2ee8f3dab694532afc8840e07703127287662d08b74e6ff50491ce63f00d5752",
+      "matches": true
+    },
+    {
+      "file": "assets/shell-host-DkIdKPig.js",
+      "buildSha256": "3967c5e567b78d983dd1cf6f27f89a3b5c441f61d673c3a0fe7a3326a4e62edc",
+      "installedSha256": "3967c5e567b78d983dd1cf6f27f89a3b5c441f61d673c3a0fe7a3326a4e62edc",
+      "matches": true
+    },
+    {
+      "file": "widgets/focus.json",
+      "buildSha256": "25276b86166c6986277808ced9c7de390b3ef91ae1ff5f528e26e17a81b33c5a",
+      "installedSha256": "25276b86166c6986277808ced9c7de390b3ef91ae1ff5f528e26e17a81b33c5a",
+      "matches": true
+    },
+    {
+      "file": "widgets/today.data.json",
+      "buildSha256": "818b9e7aacae80587bf275e1c8393e28b2113fc490438ddbc946bd0de8e1a775",
+      "installedSha256": "818b9e7aacae80587bf275e1c8393e28b2113fc490438ddbc946bd0de8e1a775",
+      "matches": true
+    },
+    {
+      "file": "widgets/quadrant.json",
+      "buildSha256": "4676f72d8f5dbc8b4f9e48478f3538dd887b3cfac422d59a46f6007b60808972",
+      "installedSha256": "4676f72d8f5dbc8b4f9e48478f3538dd887b3cfac422d59a46f6007b60808972",
+      "matches": true
+    },
+    {
+      "file": "widgets/habits.data.json",
+      "buildSha256": "075d2edab84d16d64b6fa327e94f627c244654230024316a7d80336be61277c4",
+      "installedSha256": "075d2edab84d16d64b6fa327e94f627c244654230024316a7d80336be61277c4",
+      "matches": true
+    },
+    {
+      "file": "widgets/today.json",
+      "buildSha256": "011b4eb72f4a19482a709e4c315a917c93f90dd3215b316af54983e12aba535f",
+      "installedSha256": "011b4eb72f4a19482a709e4c315a917c93f90dd3215b316af54983e12aba535f",
+      "matches": true
+    },
+    {
+      "file": "widgets/quadrant.data.json",
+      "buildSha256": "833f8bbb0e31aaf165f977d391cfe28106274b705b23b70958d69c45c22c3b58",
+      "installedSha256": "833f8bbb0e31aaf165f977d391cfe28106274b705b23b70958d69c45c22c3b58",
+      "matches": true
+    },
+    {
+      "file": "widgets/habits.json",
+      "buildSha256": "d023f596c4431d78c402ac37725f6e35f78fc38c06989ae36f852b0f52a5b376",
+      "installedSha256": "d023f596c4431d78c402ac37725f6e35f78fc38c06989ae36f852b0f52a5b376",
+      "matches": true
+    },
+    {
+      "file": "widgets/focus.data.json",
+      "buildSha256": "9e7851ac81cc657e8c0aedb0b62db72ed74f723b98d4764300f26d695bab7728",
+      "installedSha256": "9e7851ac81cc657e8c0aedb0b62db72ed74f723b98d4764300f26d695bab7728",
+      "matches": true
+    }
+  ],
+  "allMatch": true
+}

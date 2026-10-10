@@ -43,17 +43,22 @@ import {
   requestMagicLink,
   requestPasswordReset,
   requestPasskeyRecovery,
+  requestEmailPasswordRegistrationCode,
+  verifyEmailPasswordRegistrationCode,
+  resendEmailPasswordRegistrationCode,
   resetPasswordWithToken,
   verifyMagicLink,
   type HostedAuthFailure,
   type HostedAuthFailureReason,
   type HostedAuthSession,
   type HostedPasswordPolicyCode,
+  type HostedRegistrationChallengeResult,
 } from '@heyta/app-host';
 
 import { maybeHandOffToShell } from './desktop-handoff.js';
 import { useSyncStore } from '../sync/store.js';
 import { usePrivacyStore } from '../privacy/store.js';
+import { privacyConsent } from '../privacy/consent-gate.js';
 import { applyLocale, currentLocale, hasStoredLocalePreference } from '../../lib/locale.js';
 import {
   createPasskeyCredential,
@@ -83,6 +88,7 @@ export type AuthBusyAction =
    */
   | 'password-sign-in'
   | 'password-register'
+  | 'registration-code'
   | 'password-forgot'
   | 'password-change'
   /**
@@ -109,6 +115,7 @@ export type AuthStatus =
    * 三种情况都是"没说"，那三种下该说的还是原来那句。
    */
   | { kind: 'registered'; mailDelivered?: false }
+  | ({ kind: 'registration-code' } & HostedRegistrationChallengeResult & { email: string })
   /** 找回通行密钥的邮件已发出（入口见 `requestRecovery`）。同样不断言邮箱存在。 */
   | { kind: 'recovery-sent' }
   /**
@@ -154,8 +161,14 @@ export type AuthStatus =
       retryAfterSeconds?: number;
     };
 
+export type RegistrationChallengeState = HostedRegistrationChallengeResult & { email: string };
+
 export interface AuthStoreState {
   status: AuthStatus;
+  registrationChallenge?: RegistrationChallengeState;
+
+  /** Invalidate in-flight work when the selected server/issuer changes. */
+  invalidatePendingAuth: () => void;
 
   /** 发登录链接。`baseUrl` 由壳传入（用户可能刚改过地址但还没保存）。 */
   sendLoginLink: (baseUrl: string, email: string) => Promise<void>;
@@ -269,6 +282,16 @@ export interface AuthStoreState {
      */
     options?: { inviteCode?: string },
   ) => Promise<void>;
+  requestRegistrationCode: (
+    baseUrl: string,
+    email: string,
+    password: string,
+    termsAccepted: boolean,
+    options?: { inviteCode?: string },
+  ) => Promise<void>;
+  verifyRegistrationCode: (baseUrl: string, challengeId: string, code: string) => Promise<HostedAuthSession | undefined>;
+  resendRegistrationCode: (baseUrl: string, challengeId: string) => Promise<void>;
+  cancelRegistrationCode: () => void;
   /**
    * 申请一封"重置口令"的邮件。
    *
@@ -398,28 +421,55 @@ function failedFrom(outcome: HostedAuthFailure): AuthStatus {
  * 三条注册路（邮箱+口令 / 魔法链接 / 通行密钥）都过这里 —— 与 `failedFrom`
  * 同一个理由：谎话修在两处、漏在一处，就是下一次漂移的开始。
  */
+function acceptRegistrationNetworking(termsAccepted: boolean): void {
+  // The registration agreement explicitly includes device networking.
+  // Opening or editing the form must never make this decision.
+  if (termsAccepted && !privacyConsent.networkAllowed()) usePrivacyStore.getState().accept();
+}
+
 function registeredFrom(outcome: { emailDelivered?: false }): AuthStatus {
   return outcome.emailDelivered === undefined
     ? { kind: 'registered' }
     : { kind: 'registered', mailDelivered: false };
 }
 
+/**
+ * A response is bound to the issuer selected when the request started.
+ * Incrementing this generation invalidates every older response before it can
+ * write credentials or status back into the app.
+ */
+let authGeneration = 0;
+
+const isCurrentAuthGeneration = (generation: number): boolean =>
+  generation === authGeneration;
+
 export const useAuthStore = create<AuthStoreState>((set) => ({
   status: { kind: 'signed-out' },
+  registrationChallenge: undefined,
+
+  invalidatePendingAuth: () => {
+    authGeneration += 1;
+    set({ status: { kind: 'signed-out' }, registrationChallenge: undefined });
+  },
 
   adoptSession: (baseUrl, session) => {
+    authGeneration += 1;
     applyAuthSession(baseUrl, session);
     set({ status: { kind: 'signed-in', email: session.user.email } });
   },
 
   sendLoginLink: async (baseUrl, email) => {
+    const generation = ++authGeneration;
     set({ status: { kind: 'busy', action: 'login-link' } });
     // 带上当前界面语言：在中文浏览器里把应用切成英文的用户，邮件也该是英文。
     const outcome = await requestMagicLink({ baseUrl, locale: currentLocale() }, email);
+    if (!isCurrentAuthGeneration(generation)) return;
     set({ status: outcome.ok ? { kind: 'link-sent' } : failedFrom(outcome) });
   },
 
   registerAccount: async (baseUrl, email, termsAccepted, inviteCode) => {
+    const generation = ++authGeneration;
+    acceptRegistrationNetworking(termsAccepted);
     set({ status: { kind: 'busy', action: 'register' } });
     const outcome = await registerWithMagicLink(
       { baseUrl, locale: currentLocale() },
@@ -429,12 +479,14 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
         ...(inviteCode === undefined || inviteCode === '' ? {} : { inviteCode }),
       },
     );
+    if (!isCurrentAuthGeneration(generation)) return;
     set({
       status: outcome.ok ? registeredFrom(outcome) : failedFrom(outcome),
     });
   },
 
   verify: async (baseUrl, input) => {
+    const generation = ++authGeneration;
     // 从"邮件里的链接"或"裸令牌"里取令牌是**协议知识**，在 app-host 里。
     const token = extractAuthLinkToken(input);
     if (token === undefined) {
@@ -444,6 +496,7 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
 
     set({ status: { kind: 'busy', action: 'verify' } });
     const outcome = await verifyMagicLink({ baseUrl }, token);
+    if (!isCurrentAuthGeneration(generation)) return undefined;
     if (!outcome.ok) {
       set({ status: failedFrom(outcome) });
       return undefined;
@@ -455,6 +508,7 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
   },
 
   registerPasskey: async (baseUrl, email, termsAccepted, options) => {
+    const generation = ++authGeneration;
     const inviteCode = options?.inviteCode;
     const browser = options?.browser;
     // 🔴 能力探测必须发生在**发任何请求之前**。不支持的设备上先问服务端要
@@ -465,6 +519,7 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
       return;
     }
 
+    acceptRegistrationNetworking(termsAccepted);
     set({ status: { kind: 'busy', action: 'passkey-register' } });
 
     // ① 取 options（协议在 app-host）。带上界面语言：verify 那步要发验证邮件。
@@ -476,6 +531,7 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
         ...(inviteCode === undefined || inviteCode === '' ? {} : { inviteCode }),
       },
     );
+    if (!isCurrentAuthGeneration(generation)) return;
     if (!begun.ok) {
       set({ status: failedFrom(begun) });
       return;
@@ -484,6 +540,7 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
     // ② 平台那一步（**这一段是本次补上的**）。用户在系统弹窗上操作，
     //    所以这里可能停住很久 —— 状态已经是 busy，界面会如实显示"等待系统弹窗…"。
     const created = await createPasskeyCredential(begun.options, resolved);
+    if (!isCurrentAuthGeneration(generation)) return;
     if (!created.ok) {
       set({ status: failedFrom(created) });
       return;
@@ -500,6 +557,7 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
         ...(inviteCode === undefined || inviteCode === '' ? {} : { inviteCode }),
       },
     );
+    if (!isCurrentAuthGeneration(generation)) return;
     set({
       status: completed.ok
         ? registeredFrom(completed)
@@ -508,6 +566,7 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
   },
 
   loginWithPasskey: async (baseUrl, email, browser) => {
+    const generation = ++authGeneration;
     // 同上：不支持的设备一个请求都不发。
     const resolved = browser ?? detectPasskeyBrowser();
     if (resolved === undefined || !resolved.supported) {
@@ -518,12 +577,14 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
     set({ status: { kind: 'busy', action: 'passkey-login' } });
 
     const begun = await beginPasskeyLogin({ baseUrl }, email);
+    if (!isCurrentAuthGeneration(generation)) return undefined;
     if (!begun.ok) {
       set({ status: failedFrom(begun) });
       return undefined;
     }
 
     const assertion = await getPasskeyCredential(begun.options, resolved);
+    if (!isCurrentAuthGeneration(generation)) return undefined;
     if (!assertion.ok) {
       set({ status: failedFrom(assertion) });
       return undefined;
@@ -533,6 +594,7 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
       { baseUrl },
       { email, credential: assertion.credential },
     );
+    if (!isCurrentAuthGeneration(generation)) return undefined;
     if (!completed.ok) {
       set({ status: failedFrom(completed) });
       return undefined;
@@ -546,19 +608,23 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
   },
 
   requestRecovery: async (baseUrl, email) => {
+    const generation = ++authGeneration;
     set({ status: { kind: 'busy', action: 'recovery' } });
     const outcome = await requestPasskeyRecovery({ baseUrl, locale: currentLocale() }, email);
+    if (!isCurrentAuthGeneration(generation)) return;
     set({
       status: outcome.ok ? { kind: 'recovery-sent' } : failedFrom(outcome),
     });
   },
 
   signInWithPassword: async (baseUrl, email, password) => {
+    const generation = ++authGeneration;
     // 🔴 口令**原样**交出：不 trim、不改大小写、不做 composition 判断。
     // 一次多余的 trim 会让"句口令末尾有个空格"的用户在别的设备上登不进去，
     // 而两边的字节确实不同 —— 这类缺陷只会在真用户身上出现，构建期抓不到。
     set({ status: { kind: 'busy', action: 'password-sign-in' } });
     const outcome = await loginWithEmailPassword({ baseUrl }, { email, password });
+    if (!isCurrentAuthGeneration(generation)) return undefined;
     if (!outcome.ok) {
       set({ status: failedFrom(outcome) });
       return undefined;
@@ -570,8 +636,10 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
   },
 
   registerWithPassword: async (baseUrl, email, password, termsAccepted, options) => {
+    const generation = ++authGeneration;
+    acceptRegistrationNetworking(termsAccepted);
     const inviteCode = options?.inviteCode;
-    set({ status: { kind: 'busy', action: 'password-register' } });
+    set({ status: { kind: 'busy', action: 'password-register' }, registrationChallenge: undefined });
     const outcome = await registerWithEmailPassword(
       { baseUrl, locale: currentLocale() },
       {
@@ -581,6 +649,7 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
         ...(inviteCode === undefined || inviteCode === '' ? {} : { inviteCode }),
       },
     );
+    if (!isCurrentAuthGeneration(generation)) return;
     // ⚠️ 成功 → `registered`（还要去邮箱点验证链接），**不是** `signed-in`。
     // 把"号建了"渲染成"登录好了"是本仓库记过的那类"状态对、界面在说谎"。
     // 同一条纪律的反面：服务端说信没发出去时，也不许再说"去查收邮件"。
@@ -589,9 +658,75 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
     });
   },
 
+  requestRegistrationCode: async (baseUrl, email, password, termsAccepted, options) => {
+    const generation = ++authGeneration;
+    acceptRegistrationNetworking(termsAccepted);
+    set({ status: { kind: 'busy', action: 'password-register' } });
+    const outcome = await requestEmailPasswordRegistrationCode(
+      { baseUrl, locale: currentLocale() },
+      {
+        email,
+        password,
+        ...(termsAccepted ? { termsAccepted: true } : {}),
+        ...(options?.inviteCode === undefined || options.inviteCode === '' ? {} : { inviteCode: options.inviteCode }),
+      },
+    );
+    if (!isCurrentAuthGeneration(generation)) return;
+    if (!outcome.ok) {
+      set({ status: failedFrom(outcome), registrationChallenge: undefined });
+      return;
+    }
+    if (outcome.emailDelivered === false) {
+      set({ status: { kind: 'registered', mailDelivered: false }, registrationChallenge: undefined });
+      return;
+    }
+    set({ status: { kind: 'registration-code', email, ...outcome }, registrationChallenge: { email, ...outcome } });
+  },
+
+  verifyRegistrationCode: async (baseUrl, challengeId, code) => {
+    const generation = ++authGeneration;
+    set({ status: { kind: 'busy', action: 'registration-code' } });
+    const outcome = await verifyEmailPasswordRegistrationCode(
+      { baseUrl, locale: currentLocale() },
+      { challengeId, code },
+    );
+    if (!isCurrentAuthGeneration(generation)) return undefined;
+    if (!outcome.ok) {
+      set({ status: failedFrom(outcome) });
+      return undefined;
+    }
+    applyAuthSession(baseUrl, outcome.session);
+    set({ status: { kind: 'signed-in', email: outcome.session.user.email }, registrationChallenge: undefined });
+    return outcome.session;
+  },
+
+  resendRegistrationCode: async (baseUrl, challengeId) => {
+    const generation = ++authGeneration;
+    const previous = useAuthStore.getState().registrationChallenge;
+    if (previous === undefined) return;
+    set({ status: { kind: 'busy', action: 'registration-code' } });
+    const outcome = await resendEmailPasswordRegistrationCode(
+      { baseUrl, locale: currentLocale() },
+      challengeId,
+    );
+    if (!isCurrentAuthGeneration(generation)) return;
+    if (!outcome.ok) {
+      set({ status: failedFrom(outcome) });
+      return;
+    }
+    set({ status: { kind: 'registration-code', email: previous.email, ...outcome }, registrationChallenge: { email: previous.email, ...outcome } });
+  },
+
+  cancelRegistrationCode: () => {
+    authGeneration += 1;
+    set({ status: { kind: 'signed-out' }, registrationChallenge: undefined });
+  },
+
   forgotPassword: async (baseUrl, email) => {
+    const generation = ++authGeneration;
     set({ status: { kind: 'busy', action: 'password-forgot' } });
     const outcome = await requestPasswordReset({ baseUrl, locale: currentLocale() }, email);
+    if (!isCurrentAuthGeneration(generation)) return;
     // 🔴 成功 → `reset-sent`：服务端对"有这个账号 / 没有 / 异常"回**同一句 + 200**，
     // 所以这里拿到 ok 也**不能**说"信已发到你的邮箱"，只能说"如果我们认得这个邮箱…"。
     // ⚠️ 新口令那张表在服务端渲染的 `/reset-password` 页（ADR-0040），不在这里。
@@ -601,12 +736,14 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
   },
 
   changePassword: async (baseUrl, token, currentPassword, newPassword) => {
+    const generation = ++authGeneration;
     set({ status: { kind: 'busy', action: 'password-change' } });
     const outcome = await changePasswordRequest(
       { baseUrl, locale: currentLocale() },
       token ?? '',
       { currentPassword, newPassword },
     );
+    if (!isCurrentAuthGeneration(generation)) return undefined;
     if (!outcome.ok) {
       set({ status: failedFrom(outcome) });
       return undefined;
@@ -619,12 +756,14 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
   },
 
   setPassword: async (baseUrl, token, newPassword) => {
+    const generation = ++authGeneration;
     set({ status: { kind: 'busy', action: 'password-set' } });
     const outcome = await setInitialPasswordRequest(
       { baseUrl, locale: currentLocale() },
       token ?? '',
       { newPassword },
     );
+    if (!isCurrentAuthGeneration(generation)) return;
     // 🔴 成功时**不碰令牌**（这条不 bump `tokenVersion`，服务端也没发新会话）。
     // 照 `changePassword` 的样子在这里补一次 `applyAuthSession` 会把手上这枚
     // 有效令牌换成 `undefined` —— 症状是"设完密码，这个标签页立刻同步失败"。
@@ -632,7 +771,8 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
   },
 
   reset: () => {
-    set({ status: { kind: 'signed-out' } });
+    authGeneration += 1;
+    set({ status: { kind: 'signed-out' }, registrationChallenge: undefined });
   },
 }));
 
@@ -643,5 +783,8 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
  * 跨测试残留的状态是"随机变红"的常见来源（见 AGENTS.md #25）。
  */
 export function __resetAuthForTests(): void {
-  useAuthStore.setState({ status: { kind: 'signed-out' } });
+  // Keep generations monotonic so a deferred response from a prior test can
+  // never become current again after the reset.
+  authGeneration += 1;
+  useAuthStore.setState({ status: { kind: 'signed-out' }, registrationChallenge: undefined });
 }

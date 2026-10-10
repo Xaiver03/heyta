@@ -1,0 +1,4 @@
+e781ac96aa37aae11deb8bcfe900a1f2246b740be49af228cfe310a8fb08a2e8  apps/web/dist/index.html
+965e9537e1bd744c2ee42d47a53acfa23aab3e4c339bd5933fa2d5d9d8aa1ede  apps/landing/dist/index.html
+e781ac96aa37aae11deb8bcfe900a1f2246b740be49af228cfe310a8fb08a2e8  /var/www/heyta-app/index.html
+965e9537e1bd744c2ee42d47a53acfa23aab3e4c339bd5933fa2d5d9d8aa1ede  /var/www/heyta-landing/index.html

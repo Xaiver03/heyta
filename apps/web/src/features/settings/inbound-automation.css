@@ -1,0 +1,74 @@
+.ht-inbound__group,
+.ht-inbound__stack,
+.ht-inbound__retry {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+  gap: var(--ht-space-3);
+}
+
+.ht-inbound__draft,
+.ht-inbound__draft-task {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+  gap: var(--ht-space-3);
+}
+
+.ht-inbound__credential,
+.ht-inbound__credential-secret {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+  gap: var(--ht-space-2);
+}
+
+.ht-inbound__credential-secret {
+  padding: var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-subtle);
+}
+
+.ht-inbound__credential-secret code {
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.ht-inbound__draft-task {
+  margin: 0;
+  padding: var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+}
+
+.ht-inbound__group {
+  padding-block: var(--ht-space-3);
+  overflow-wrap: anywhere;
+}
+
+.ht-inbound__group > .ht-btn,
+.ht-inbound__retry > .ht-btn {
+  align-self: flex-start;
+}
+
+.ht-inbound__fields {
+  display: flex;
+  flex-wrap: wrap;
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  gap: var(--ht-space-2) var(--ht-space-4);
+}
+
+.ht-inbound__fields > legend {
+  margin-block-end: var(--ht-space-2);
+}
+
+.ht-inbound__check {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--ht-touch-target-min);
+  gap: var(--ht-space-2);
+  white-space: nowrap;
+}

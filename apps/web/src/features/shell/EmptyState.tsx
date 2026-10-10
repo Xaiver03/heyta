@@ -5,8 +5,7 @@
  */
 
 import React from 'react';
-import { Inbox } from 'lucide-react';
-import { ICON_SIZE } from '@heyta/design-system';
+import { HeytaUiProvider, StateIllustration } from '@heyta/ui';
 import { useI18n, type MessageKey } from '@heyta/i18n';
 import type { TaskFilter } from '../tasks/store.js';
 
@@ -53,7 +52,9 @@ export function EmptyState({ filter }: { filter: TaskFilter }): React.JSX.Elemen
 
   return (
     <div className="ht-empty" data-testid="empty-state">
-      <Inbox className="ht-empty__icon" size={ICON_SIZE.xl} aria-hidden="true" />
+      <HeytaUiProvider>
+        <StateIllustration variant="tasks" />
+      </HeytaUiProvider>
       <p className="ht-empty__title">{t(msg.titleKey)}</p>
       <p className="ht-empty__hint">{t(msg.hintKey)}</p>
     </div>

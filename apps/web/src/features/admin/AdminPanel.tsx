@@ -136,7 +136,7 @@ function Stat(props: { labelKey: MessageKey; value: string | number }): React.JS
   );
 }
 
-export function AdminPanel(): React.JSX.Element | null {
+export function AdminPanel({ active = true }: { active?: boolean }): React.JSX.Element | null {
   const { t } = useI18n();
   const store = useAdminStore();
   const [tab, setTab] = useState<AdminTab>('overview');
@@ -145,15 +145,16 @@ export function AdminPanel(): React.JSX.Element | null {
 
   // 挂载时探测一次。未登录的话 store 内部一个请求都不发（见 store.probe）。
   useEffect(() => {
+    if (!active) return;
     void store.probe();
     // 只在挂载时探一次：`probe` 自身对 'denied' 短路，重复调用是安全的，
     // 但把它放进依赖数组会让每次 setState 都重跑一遍。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [active]);
 
   // 切标签页时按需拉数据（概览由 probe 顺手带回来，不重复拉）。
   useEffect(() => {
-    if (store.access !== 'admin') return;
+    if (!active || store.access !== 'admin') return;
     switch (tab) {
       case 'users':
         if (store.users === null) void store.loadUsers();
@@ -186,14 +187,15 @@ export function AdminPanel(): React.JSX.Element | null {
     }
     // 依赖里刻意只放 tab 与 access：store 的字段变化不该触发重新拉取。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, store.access]);
+  }, [active, tab, store.access]);
 
   const submitSearch = useCallback(
     (event: React.FormEvent) => {
       event.preventDefault();
+      if (!active) return;
       void store.loadUsers({ q: search, offset: 0 });
     },
-    [search, store],
+    [active, search, store],
   );
 
   // 探测失败或不是管理员 ⇒ 什么都不渲染。见文件头。
@@ -234,6 +236,7 @@ export function AdminPanel(): React.JSX.Element | null {
           title={t('web.admin.retry')}
           aria-label={t('web.admin.retry')}
           onClick={() => {
+            if (!active) return;
             void store.probe();
             void store.loadUsers({ offset: 0 });
           }}

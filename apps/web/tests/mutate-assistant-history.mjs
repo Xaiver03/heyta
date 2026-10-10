@@ -16,7 +16,12 @@ import { fileURLToPath } from 'node:url';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PKG = resolve(HERE, '..');
 const PANEL = resolve(PKG, 'src/features/ai/AssistantPanel.tsx');
-const HISTORY = resolve(PKG, 'src/features/ai/assistant-history.ts');
+const HISTORY = resolve(PKG, '../../packages/app-host/src/assistant-local-history.ts');
+
+// Shared history is consumed through the package build by both hosts.
+function rebuildHistory() {
+  execFileSync('pnpm', ['--filter', '@heyta/app-host', 'build'], { cwd: PKG, stdio: 'pipe' });
+}
 
 const MUTATIONS = [
   {
@@ -68,6 +73,7 @@ try {
       continue;
     }
     writeFileSync(mut.file, source.text.replace(mut.from, mut.to));
+    if (mut.file === HISTORY) rebuildHistory();
     let out = '';
     let code = 0;
     try {
@@ -82,6 +88,7 @@ try {
       code = typeof e.status === 'number' ? e.status : 1;
     }
     writeFileSync(mut.file, source.text);
+    if (mut.file === HISTORY) rebuildHistory();
     if (readFileSync(mut.file, 'utf8') !== source.text) throw new Error(`还原失败：${mut.file}`);
 
     const failed = [...new Set([...out.matchAll(/^\s*(?:×|FAIL)\s+\S+\s+>\s+(.+?)(?:\s+\d+ms)?$/gm)].map((x) => x[1].trim()))];
@@ -95,6 +102,7 @@ try {
   }
 } finally {
   for (const [file, source] of backups) writeFileSync(file, source.text);
+  rebuildHistory();
   rmSync(backupDir, { recursive: true, force: true });
 }
 

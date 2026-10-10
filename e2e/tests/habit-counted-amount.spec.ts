@@ -30,7 +30,6 @@ import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 import { openApp, parkCursor, switchView } from './helpers';
 
-const ADD_PLACEHOLDER = '新习惯，例如「喝水」';
 const APP_ZH = '/?lang=zh-CN';
 const STAMP = Date.now().toString().slice(-6);
 
@@ -52,9 +51,10 @@ function watchErrors(page: Page): string[] {
 
 /** 建一条习惯并返回它的 id（id 从行自己的 testID 上取，不抄生成规则）。 */
 async function createHabit(page: Page, name: string): Promise<string> {
-  const input = page.getByPlaceholder(ADD_PLACEHOLDER);
-  await input.fill(name);
-  await input.press('Enter');
+  await page.getByTestId('habits-add-open').click();
+  const dialog = page.getByTestId('habit-create-dialog');
+  await dialog.getByLabel('新习惯名称', { exact: true }).fill(name);
+  await dialog.getByRole('button', { name: '添加习惯', exact: true }).click();
   const row = page.locator('[data-testid^="habit-row-"]').filter({ hasText: name }).first();
   await expect(row, `新建的习惯没有出现在清单里：${name}`).toBeVisible();
   const testId = await row.getAttribute('data-testid');

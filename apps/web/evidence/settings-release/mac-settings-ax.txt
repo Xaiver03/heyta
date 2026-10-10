@@ -1,0 +1,75 @@
+Window: "heyta", App: heyta.
+0 standard window heyta, ID: main, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: heyta, URL: heyta-local://app/index.html
+			3 container 主导航
+				4 pop up button 账号
+				5 tab group (selectable) 视图
+					6 tab (selectable) 任务
+					7 tab (selectable) 日历
+					8 tab (selectable) 习惯
+					9 tab (selectable) 搜索
+					10 pop up button 更多
+					11 tab (selectable) 回收站
+				12 pop up button 通知
+				13 button 帮助
+				14 button 同步，当前状态：未同步
+				15 text 未同步
+			16 container
+				17 container heyta
+					18 text heyta
+				19 heading 设置, Value: 1
+					20 text 设置
+				21 toggle button 收起详情面, Value: on
+				22 text field (settable) 新任务标题, Placeholder: 添加任务，回车确认（可写「明天」「下周三」「!1」）
+				23 button (disabled) 添加
+				24 text 收集箱是空的 在上面输入框添加第一个任务
+				25 container 设置
+					26 container
+						27 text heyta
+						28 heading 设置, Value: 1
+							29 text 设置
+						30 button 关闭设置
+					31 container 设置
+						32 button 个人资料
+						33 button 任务与显示
+						34 button 同步与隐私
+						35 button AI 与集成
+						36 button 数据管理
+						37 button 账号与安全
+						38 button 关于与帮助
+					39 container AI 与集成
+						40 heading AI 与集成, Value: 2
+							41 text AI 与集成
+						42 heading AI 设置, Value: 2
+							43 text AI 设置
+						44 container
+							45 switch (settable, boolean) 启用 AI 功能 关着的时候 heyta 不会向任何地方发送数据。, Value: off
+							46 text 启用 AI 功能 关着的时候 heyta 不会向任何地方发送数据。
+						47 container
+							48 switch (settable, boolean) 让 AI 记住我的偏好 从你自己的历史里推断（任务拆解粒度、表达习惯、估时偏差等）。推断只在本机进行、不上传；关掉后 AI 照常工作，只是它不认识你。, Value: off
+							49 text 让 AI 记住我的偏好 从你自己的历史里推断（任务拆解粒度、表达习惯、估时偏差等）。推断只在本机进行、不上传；关掉后 AI 照常工作，只是它不认识你。
+						50 text 记忆已关闭 —— heyta 不会推断你的偏好，AI 也收不到任何与「你是谁」有关的信息。 AI 功能本身照常可用。
+						51 container 本机 API
+							52 heading 本机 API, Value: 3
+								53 text 本机 API
+							54 text 让本机的其他程序（编辑器、脚本、AI 助手）读写你的任务。默认关闭，且每个工具要单独打开。
+							55 text 只保存偏好，不启动 MCP
+							56 text 连接 MCP 需要额外一步
+							57 text 本页只保存浏览器里的偏好，不会启动 MCP 服务。
+							58 summary 查看连接方式, Value: off
+								59 text 查看连接方式
+							60 container
+								61 switch (settable, boolean) 启用本机 API 只监听 127.0.0.1，不会暴露到局域网。, Value: off
+								62 text 启用本机 API 只监听 127.0.0.1，不会暴露到局域网。
+						63 text 浏览器里没有系统钥匙串，密钥只保存在这个标签页的内存中。关掉或刷新页面后需要重新输入。桌面端会把密钥存进系统钥匙串。
+						64 button 恢复默认（全部关闭）
+				65 splitter 调整详情栏宽度, Value: 352
+		66 scroll bar (settable, float) 0
+	67 menu button Window sharing
+68 menu bar
+	69 Heyta
+	70 Edit
+	71 View
+	72 Window
+	73 Help

@@ -1,0 +1,21 @@
+=== 上传（版本 1.0.1-test.20261008.1）===
+  ✅ 1.0.1-test.20261008.1/heyta-1.0.1-test.20261008.1-macos.dmg（2948973 字节，匿名可读）
+  ✅ latest/heyta-1.0.1-test.20261008.1-macos.dmg（2948973 字节，匿名可读）
+  ✅ 1.0.1-test.20261008.1/heyta-1.0.1-test.20261008.1-android.apk（68357256 字节，匿名可读）
+  ✅ latest/heyta-1.0.1-test.20261008.1-android.apk（68357256 字节，匿名可读）
+  ✅ 1.0.1-test.20261008.1/heyta-1.0.1-test.20261008.1-windows.zip（98547886 字节，匿名可读）
+  ✅ latest/heyta-1.0.1-test.20261008.1-windows.zip（98547886 字节，匿名可读）
+  ✅ 1.0.1-test.20261008.1/heyta-1.0.1-test.20261008.1-linux.deb（1763132 字节，匿名可读）
+  ✅ latest/heyta-1.0.1-test.20261008.1-linux.deb（1763132 字节，匿名可读）
+  ✅ latest/latest.json（2069 字节，匿名可读）
+
+=== 公开下载 URL ===
+  macos: https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/heyta-1.0.1-test.20261008.1-macos.dmg
+      sha256 28ce433147cb2c47e1491c03dbf9e66aed2c193acaf71f8b3ffce4a64d32120c
+  android: https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/heyta-1.0.1-test.20261008.1-android.apk
+      sha256 470353159b906fa79f769f9d26fed0ac69a9395d773baf46664271e1732aff67
+  windows: https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/heyta-1.0.1-test.20261008.1-windows.zip
+      sha256 86cf7ee2ee1be31627ed0aee3648f0f499d1f3869dc93a1135523c4296bdf104
+  linux: https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/heyta-1.0.1-test.20261008.1-linux.deb
+      sha256 b41431d1b635ada3d0b206a34f5955aa014c7b5c5bd24855a3ff6091f5da0a4e
+  清单: https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/latest.json
