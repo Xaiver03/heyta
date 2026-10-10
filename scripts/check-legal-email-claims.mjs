@@ -16,15 +16,38 @@
  *    等那一批由文件当前的写入者一次收拢时，把这一档升成判红 —— 升法与判据都印在下面的输出里。
  *
  * 用法：node scripts/check-legal-email-claims.mjs [--json] [--self-test]
+ *
+ * 🔴 载体纪律（2026-10-10 实测出来的，别改回去）：**两边都读磁盘**。第一版用 `git grep`
+ * 找调用点、用 `readFileSync` 读文本，于是一枚未跟踪的在飞调用文件（`server/src/password/registration-otp.ts`）
+ * 在尺上等于"不存在"，把真的会发的那一封判成"对外多承诺"。混载体造的是**假红**，
+ * 而假红最贵 —— 它会让人去改一份本来正确的法务文本。臂 A6 把这一条钉住。
  */
-import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CN_NUM = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10 };
 const EN_NUM = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+
+/** `server/src` 下的每一枚 `.ts`，**按磁盘上的树**收（含未跟踪文件）。
+ *  🔴 调用点不能拿 `git grep` 去找：它只看得见 tracked 内容，而本尺其余部分（`email.ts`、
+ *  那两份法务文本）读的都是磁盘。两种载体混在一把尺里会造出假红 —— 2026-10-10 实测：
+ *  `server/src/password/registration-otp.ts` 那枚未跟踪的在飞文件真的会发注册验证码，
+ *  而 `git grep` 看不见它，于是"十封"被判成对外多承诺。尺错，不是文本错。 */
+const SERVER_TS = (() => {
+  const out = [];
+  const walk = (dir) => {
+    for (const e of readdirSync(join(REPO, dir), { withFileTypes: true })) {
+      if (e.isDirectory()) {
+        if (e.name === 'node_modules' || e.name === 'dist') continue;
+        walk(`${dir}/${e.name}`);
+      } else if (e.name.endsWith('.ts')) out.push(`${dir}/${e.name}`);
+    }
+  };
+  walk('server/src');
+  return out;
+})();
 
 /** subjectKey 家族 → 对外文本里用来点名它的那几个写法（中英各一枚以上，取文本现用写法）。
  *  加一封邮件必须在这里加一行（否则"漏披露"那一档立刻把它报出来），
@@ -39,9 +62,9 @@ const ALIAS = {
   changeAuthorize: { zh: ['换绑-旧邮箱授权'], en: ['rebinding authorisation for the current address'] },
   changed: { zh: ['换绑完成通知'], en: ['e-mail change completed notice'] },
   authenticatorAdded: { zh: ['新增认证器告知'], en: ['authenticator-added notice'] },
-  // 故意登记这一枚：`server/src/email.ts` 里**有** `sendEmailPasswordRegistrationCodeEmail` 的声明，
-  // 但 server/src 里一处调用都没有 ⇒ 它不属于"真会发"。文本点名它 ⇒ 判红走的就是
-  // "有发信器、没调用点"那条分支（臂 A2），而不是"表外名字"那条（臂 A5）。
+  // 注册验证码这一封：`sendEmailPasswordRegistrationCodeEmail` 的调用点在
+  // `server/src/password/registration-otp.ts`（2026-10-10 现量：那枚文件当时还未跟踪）。
+  // 它留在别名表里是必须的 —— 文本点名它，而代码确实发得出；把它拿掉会立刻变成"表外名字"假红。
   registerCode: { zh: ['注册验证码'], en: ['registration code'] },
 };
 
@@ -53,19 +76,21 @@ const DOCS = [
 const num = (s) => CN_NUM[s] ?? EN_NUM[s?.toLowerCase()] ?? Number(s);
 
 /** 服务端真会发的那些封：email.ts 里声明的 send* 常量，且它在 server/src 里有 email.ts 之外的调用点。
- *  "定义了但没人调"不算会发 —— 树上那枚 `sendEmailPasswordRegistrationCodeEmail` 就是这个形状。 */
-function shippedKeys(read) {
+ *  "定义了但没人调"不算会发。调用点按 `SERVER_TS`（磁盘上的树）扫，不按索引扫 —— 理由见上面那段。 */
+function shippedFns(read) {
   const emailSrc = read('server/src/email.ts');
   const decls = [...emailSrc.matchAll(/^export const (send[A-Za-z0-9]+)\b/gm)].map((m) => m[1]);
-  const out = new Set();
+  const out = new Map();
   for (const fn of decls) {
-    const callers = gitGrepFiles(`${fn}(`, 'server/src').filter((f) => f !== 'server/src/email.ts');
-    if (callers.length === 0) continue;
+    const called = SERVER_TS.some((f) => f !== 'server/src/email.ts' && read(f).includes(`${fn}(`));
+    if (!called) continue;
     const body = sliceConst(emailSrc, fn, decls);
-    for (const m of body.matchAll(/server\.email\.([A-Za-z0-9]+)\.[a-zA-Z.]*subject/g)) out.add(m[1]);
+    for (const m of body.matchAll(/server\.email\.([A-Za-z0-9]+)\.[a-zA-Z.]*subject/g)) out.set(m[1], fn);
   }
   return out;
 }
+
+const shippedKeys = (read) => new Set(shippedFns(read).keys());
 
 function sliceConst(src, name, allDecls) {
   const at = src.search(new RegExp(`^export const ${name}\\b`, 'm'));
@@ -77,16 +102,6 @@ function sliceConst(src, name, allDecls) {
     if (i > -1 && i < next) next = i;
   }
   return src.slice(at, next);
-}
-
-function gitGrepFiles(needle, path) {
-  try {
-    return execFileSync('git', ['grep', '-l', '--', needle, '--', path], { cwd: REPO, encoding: 'utf8' })
-      .split('\n')
-      .filter(Boolean);
-  } catch {
-    return [];
-  }
 }
 
 /** 从对外文本里抽出每一处"N 封功能邮件"声明 + 它点名的名字。 */
@@ -175,8 +190,33 @@ function selfTest() {
   const readOf = (map) => (p) => map[p] ?? real(p);
   const ONLY = ['packages/legal/src/documents/privacy.ts'];
 
-  const r2 = judge(readOf(doc(shipped.size + 1, [...FULL, '注册验证码'])), ONLY);
-  push('A2 点名一封代码里不会发的信 ⇒ 抓到', r2.over.length === 1 && r2.over[0].name === '注册验证码', r2.over[0]?.why ?? '没抓到');
+  // A6 钉的是这把尺自己的载体：调用点必须读磁盘。把磁盘上那一枚发信常量的**全部**调用文件抹成空，
+  // 它就必须立刻不算"实发"。用 `git grep` 找调用点的版本在这一臂上不会有任何变化
+  // —— 那正是 2026-10-10 那枚假红的形状（未跟踪的在飞调用文件被索引尺看不见）。
+  const fnOf = shippedFns(real);
+  const probeKey = [...shipped].find((k) => k in ALIAS && fnOf.get(k) !== undefined);
+  const probeFn = probeKey === undefined ? undefined : fnOf.get(probeKey);
+  const probeCallers =
+    probeFn === undefined
+      ? []
+      : SERVER_TS.filter((f) => f !== 'server/src/email.ts' && real(f).includes(`${probeFn}(`));
+  const readNoCaller = (p) => (probeCallers.includes(p) ? '' : real(p));
+  const shippedNoCaller = shippedKeys(readNoCaller);
+  push(
+    'A6 抹掉磁盘上那几枚调用文件 ⇒ 那一封立刻不算实发（调用点读的是工作树，不是索引）',
+    probeKey !== undefined && probeCallers.length > 0 && shipped.has(probeKey) && !shippedNoCaller.has(probeKey),
+    `调用文件 ${probeCallers.length} 枚：${probeCallers.join(', ') || '无'}`,
+  );
+
+  // A2 用 A6 那把"摘掉调用点"的读法造出"有发信器、没调用点"那一枚，走的是同一条分支，
+  // 但不再依赖真树上恰好有一封没接上的信（2026-10-10 起 `registerCode` 已有调用点）。
+  const FULL_NC = [...shippedNoCaller].map((k) => ALIAS[k].zh[0]);
+  const r2 = judge((p) => doc(shippedNoCaller.size + 1, [...FULL_NC, ALIAS[probeKey].zh[0]])[p] ?? readNoCaller(p), ONLY);
+  push(
+    'A2 点名一封代码里不会发的信 ⇒ 抓到',
+    r2.over.length === 1 && r2.over[0].name === ALIAS[probeKey].zh[0] && /没有调用点/.test(r2.over[0].why),
+    r2.over[0]?.why ?? '没抓到',
+  );
 
   const r3 = judge(readOf(doc(shipped.size - 1, FULL)), ONLY);
   push('A3 数字与点名的枚数不符 ⇒ 抓到', r3.selfInconsistent.length === 1, r3.selfInconsistent[0] ? `写 ${r3.selfInconsistent[0].stated} 而点到 ${r3.selfInconsistent[0].names.length}` : '没抓到');
