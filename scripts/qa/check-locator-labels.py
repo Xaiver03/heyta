@@ -23,9 +23,11 @@
    （原来这条只写在文件头，实现里两语态齐时才有输入 —— 也就是说"只写一种语态"以前**永远不会红**）；
 3. 反盲：每枚脚本在 `CJK_GROUP_FLOOR` 里有一组**含中文定位标签组数**的基线，只许降不许升；
    标签换写法（例如 `T(` 改名）会让组数掉到 0 ⇒ 红。没登记基线的新脚本也红 —— 那条成本是刻意的。
-4. `T(中, 英)` 的**英文那一侧必须是 `en.ts` 里真实存在的词值** ⇒ 红。
+4. **声称成对**的中英定位（`T(中, 英)`，以及恰好一枚中文+一枚英文的元组）里，英文那一侧必须是
+   `en.ts` 里真实存在的词值 ⇒ 红。
    补这条的原因：判据一在 `if not zh_keys or not en_keys: continue` 那一支对"取不到键"是放行的，
    所以一枚拼错的、真源里根本没有的英文**两侧都不报**（2026-10-10 用变异臂实测：`T("任务","Taks")` 当时 rc=0）。
+   认形状而不是认函数名，是因为"把 `T(` 改成普通元组"会让只查 `T()` 的判据整条绕过。
    ⇒ 这一条只保证"这个词在真源里存在"，**不保证那一屏当时渲染的就是它** —— 后者只能在设备上读到。
 另有一行**披露不判红**：`tap_label("我的")` 这类单语定位的条数（那是该脚本负责人的欠项，
 不该由这枚门把共享的 `pnpm check` 按红）。还有**第二行披露**：候选**成组**写、组内却整片单语
@@ -254,14 +256,22 @@ def check(script: Path) -> tuple[list[str], dict[str, int]]:
     # 判据二之补（英文那一侧的牙）：上面判据一只在"两侧都能在真源里取到键"时才做交叉 ——
     # `if not zh_keys or not en_keys: continue` 意味着**英文拼错/真源里没这个词**时两边都不报。
     # `T(中, 英)` 这个形状声称的是"同一枚标签的两种语态"，那英文那一侧也必须真的在词条表里。
-    for vals in t_groups:
+    # 只认 `T(` 会被一个动作绕过（把它改写成一中一英的元组），所以**恰好一枚中文+一枚英文**的
+    # 元组同样算"声称成对"：这一档管的是形状，不是拼写函数叫什么名字。
+    claimed_pairs = {tuple(vals) for vals in t_groups} | {
+        tuple(vals)
+        for vals in groups
+        if len([v for v in vals if CJK.search(v)]) == 1
+        and len([v for v in vals if not CJK.search(v) and re.search(r"[A-Za-z]{3}", v)]) == 1
+    }
+    for vals in sorted(claimed_pairs):
         for value in vals:
             if CJK.search(value) or not re.search(r"[A-Za-z]{3}", value):
                 continue
             if value in EN or template_matches(value, EN_TABLE):
                 continue
             problems.append(
-                f"`T(...)` 的英文同义不在 en.ts 的词值里：{value!r}（配对判据读不到它的键，"
+                f"声称成对的中英定位里，英文那一侧不在 en.ts 的词值上：{value!r}（配对判据读不到它的键，"
                 "所以它既不会报混键、也不会报拼写 —— 这一枚英文此刻没有任何东西在守）"
             )
 
