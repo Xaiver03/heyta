@@ -145,10 +145,10 @@ describe('startCheckout', () => {
 
   it('🔴 只有服务端词表里的失败码才照原样报；陌生码归成 UNEXPECTED_RESPONSE（不替服务端编语义）', async () => {
     for (const code of ['BILLING_PROVIDER_NOT_CONFIGURED', 'PRICE_NOT_SELLABLE', 'PROVIDER_CURRENCY_UNSUPPORTED'] as const) {
-      const { impl } = recordingFetch(() => ({ status: 503, body: { error: code } }));
+      const { impl } = recordingFetch(() => ({ status: 503, body: { code, message: code } }));
       expect(await startCheckout(base({ fetchImpl: impl }))).toMatchObject({ kind: 'failed', code });
     }
-    const { impl } = recordingFetch(() => ({ status: 418, body: { error: 'SOMETHING_NEW' } }));
+    const { impl } = recordingFetch(() => ({ status: 418, body: { code: 'SOMETHING_NEW', message: 'x' } }));
     expect(await startCheckout(base({ fetchImpl: impl }))).toEqual({
       kind: 'failed',
       code: 'UNEXPECTED_RESPONSE',
@@ -222,14 +222,15 @@ describe('startCheckout', () => {
   });
 
   it('🔴 服务端点名了的码**优先于**状态码（500 上的 CHECKOUT_FAILED 不降级成 UNEXPECTED_RESPONSE）；没点名的才落到状态码', async () => {
-    const named = recordingFetch(() => ({ status: 500, body: { error: 'CHECKOUT_FAILED' } }));
+    const named = recordingFetch(() => ({ status: 500, body: { code: 'CHECKOUT_FAILED', message: 'x' } }));
     expect(await startCheckout(base({ fetchImpl: named.impl }))).toEqual({
       kind: 'failed',
       code: 'CHECKOUT_FAILED',
       status: 500,
     });
 
-    for (const unnamed of [{ error: { code: 'X' } }, { error: 42 }, {}]) {
+    // 统一信封后服务端报错带 `code`；这三种都不是形状，所以落状态码兜底。
+    for (const unnamed of [{ code: { x: 'X' } }, { code: 42 }, {}]) {
       const { impl } = recordingFetch(() => ({ status: 500, body: unnamed }));
       expect(await startCheckout(base({ fetchImpl: impl }))).toEqual({
         kind: 'failed',

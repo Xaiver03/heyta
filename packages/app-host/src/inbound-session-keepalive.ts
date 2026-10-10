@@ -67,7 +67,7 @@ export async function requestAutomationSessionTicket(options: {
   );
   if (!response.ok) {
     const raw = await response.json().catch(() => ({})) as Record<string, unknown>;
-    const code = typeof raw.errorCode === 'string' ? raw.errorCode : `HTTP_${response.status}`;
+    const code = typeof raw.code === 'string' ? raw.code : `HTTP_${response.status}`;
     throw new AutomationSessionError(code, isAutomationEntitlementWaitingDenial(code));
   }
   const raw = await response.json() as Record<string, unknown>;

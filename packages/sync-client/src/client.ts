@@ -1781,7 +1781,7 @@ async function toHttpError(res: Response): Promise<SyncHttpError> {
   let code: string | undefined;
   try {
     const body = (await res.json()) as { error?: string; message?: string; code?: string; errorCode?: string };
-    detail = body.error ?? body.message ?? '';
+    detail = body.message ?? body.error ?? '';
     // Preserve the existing destructive account-closure signal contract:
     // do not reinterpret arbitrary errorCode values as account lifecycle codes.
     code = body.code ?? (body.errorCode === SUPER_SYNC_ERROR_CODES.INBOUND_AUTH_REQUIRED

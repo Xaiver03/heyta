@@ -67,13 +67,13 @@ describe('automation action ticket source', () => {
     const fetchImpl = vi.fn();
     const get = source(fetchImpl);
     for (const code of ['AUTOMATION_LINK_NOT_BOUND', 'AUTOMATION_ISSUER_NOT_CONFIGURED', 'AUTOMATION_ISSUER_NOT_ON_THIS_INSTANCE']) {
-      fetchImpl.mockResolvedValue(Response.json({ errorCode: code }, { status: 403 }));
+      fetchImpl.mockResolvedValue(Response.json({ code, message: code }, { status: 403 }));
       const error = await get({ action: 'event-claim' }).catch((caught: unknown) => caught);
       expect(error).toBeInstanceOf(AutomationTicketError);
       expect((error as AutomationTicketError).waiting).toBe(true);
       expect((error as AutomationTicketError).code).toBe(code);
     }
-    fetchImpl.mockResolvedValue(Response.json({ errorCode: 'AUTOMATION_SUBJECT_MISMATCH' }, { status: 403 }));
+    fetchImpl.mockResolvedValue(Response.json({ code: 'AUTOMATION_SUBJECT_MISMATCH', message: 'x' }, { status: 403 }));
     const defect = await get({ action: 'event-claim' }).catch((caught: unknown) => caught);
     expect((defect as AutomationTicketError).waiting).toBe(false);
     fetchImpl.mockResolvedValue(new Response('not json', { status: 503 }));

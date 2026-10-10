@@ -37,7 +37,7 @@ export async function verifyAutomationEntitlementTicket(options: {
     // 只取稳定码。响应里的 `error` 那句是给运营者看的自由文本，拼进宿主状态就等于把
     // 内部措辞渲染给用户 —— 与"验证失败页不回显服务端原始错误"是同一条纪律。
     const raw = await response.json().catch(() => ({})) as Record<string, unknown>;
-    const code = typeof raw.errorCode === 'string' ? raw.errorCode : `HTTP_${response.status}`;
+    const code = typeof raw.code === 'string' ? raw.code : `HTTP_${response.status}`;
     throw new AutomationEntitlementVerifyError(code, 'Automation entitlement verification failed');
   }
   const raw = await response.json() as Record<string, unknown>;
