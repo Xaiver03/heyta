@@ -128,7 +128,7 @@ async function request<T>(
   let json: unknown = null;
   try { json = await res.json(); } catch { /* 204 等 */ }
   if (!res.ok) {
-    const err = (json ?? {}) as { code?: string; error?: string };
+    const err = (json ?? {}) as { code?: string; message?: string; error?: string };
     throw new ShareApiError(res.status, err.code as ShareApiErrorCode | undefined, err.message ?? err.error ?? `HTTP ${res.status}`);
   }
   return json as T;
