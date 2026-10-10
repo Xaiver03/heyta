@@ -6932,6 +6932,12 @@ e2e 类型载体 RC=0；臂台四臂 `A→D1`、`B→D3,D6`、`C→D4`、`D→D5
 🔴 为什么这条要立案而不是"反正不是我红的"就过去：T7 的关闭判据是 `pnpm check` 在隔离副本上 exit 0，而 `check` 里含 web 的 typecheck ⇒ **这 16 条不修，T7 结构性地跑不到绿**。修法归那两条线自己（`Storage` 的 double 少实现 `length/clear/key`，以及三处 `Object is possibly 'undefined'`），本线不代改别人的判据文件（越界一次就等于替别人决定"什么算对"）。
 本线的处置：T7 先跑不受它挡的那几道（`check:migrations`、`license-inventory`、`check:docs`、`check:layering`、各包单测），到 `pnpm check` 整链时**记环境无效、不记本线通过**，并在这节等它自己落。
 
+**🔴 10-11 00:4x 现量：这一案的 16 条已经清零**（那两条线自己修的，本线一枚文件没碰）。
+尺是整仓那一把：`pnpm -r --no-bail typecheck` ⇒ `error TS` 行数 **1**、分母自检 20 枚有脚本的包 == 20 枚跑了的包。
+唯一剩下的 1 条不是 web 的，是 `packages/app-host/tests/login-code.spec.ts(44,5) TS2578`（见 B144 的 10-11 更正段）。
+⇒ **B103 的"挡 T7"这一格换人**：现在 `pnpm check` 停的是 app-host 那条，不是 web 那 16 条。
+本节正文保留，因为它记的是那条**判据形状**（按文件归组 + `grep -ic inbound` 做本线相关性对照），换目标还要用它。
+
 ## B104（2026-10-09 18:0x，本会话 · 入站自动收集 Goal T1）：这台机器的测试内存闸门把"还原后的复跑"挡在门外，合并态整仓重跑仍欠着
 
 T1 的真库腿**已经取到读数**（`python3 research/tools/verify-inbound-worker-identity.py` → `Tests 43 passed (43)`，PY_RC=0，18:06）。欠的是**变异还原之后那一次复跑**：18:07 那趟在测试腿之前被本机 tfa-shield 的轻量档拒绝启动 ——
@@ -8515,6 +8521,10 @@ AssertionError: expected [ 'BINDING_EXPIRED', …(15) ] to deeply equal [ 'GRANT
 ② 不代改 `packages/domain/src`（别人的地界）。要拍的只有位置：**谁**把那 8 枚补进去 ——
 本线可以在获得授权后一次做完（改动形状明确、一条命令可回退），或者由域层的地界所有者补。
 
+**🔴 10-11 00:5x 复量（载体 `.worktrees/inb-t7` @ `1b40fa10`，dirty=0）**：这一条**仍红，且是确定性的** ——
+并发全量那一趟读 `Tests 1 failed | 1022 passed (1023)`，随后**逐包单跑**读回同一个 `1 failed | 1022 passed (1023)`。
+差集仍是那 8 枚，一枚不多一枚不少（日志 `+` 侧逐字点名）。⇒ 本节"待拍"的状态不变。
+
 ## B151（2026-10-10 23:3x，同一次整包跑量出的第二条本线债）：`packages/legal` 两条臂在 HEAD 长红 —— **都是本线那三张新表造成的**，而修法落点一枚都不在白名单里
 
 **现量（同一隔离副本，单跑复现 ⇒ 确定性红）**：
@@ -8556,6 +8566,20 @@ data-rights/en    「foreign keys」34 → 37   「covering tables」33 → 36
 **要拍的**：谁在那四处补三类别名 + 把 7 处数字改成按真源复算，并给条款换版本号（版本号进同意指纹，
 `check:legal-tools` 那套纪律同样适用于"数据类别变了"）。本线可以代做，但需要**明确授权**，
 因为改的是**对外声明的措辞**，不是代码。
+
+**✅ 10-11 00:5x 闭合（由账号标准套件线那一笔带走的，本线一行没改）**：
+载体 `.worktrees/inb-t7` @ `1b40fa10`，单文件复跑 `packages/legal` 的 `structure.spec.ts` ⇒
+`Tests 63 passed (63)`、`Test Files 1 passed (1)`。臂 1 与臂 2 同时绿。
+**核对的是正文不是绿灯**：`packages/legal/src/documents/privacy.ts:404`（zh）与 `:999`（en）现在逐字列出了
+「自动收集额度启用记录、自动收集额度关联、自动收集额度主体」三类别名，数字也从 B151 预测的
+"级联 37 / 表 36"变成 **"共 38 处级联，覆盖 37 张表"／"38 cascades in total, across 37 tables"** ——
+多的那一级不是本线的，是他们自己那批新表一起进了真源。两枚文件的最后一笔 =
+**`8389b2a3`（10-10 20:45 `fix(账号标准套件 法务联动): 补披露登录验证码那一封 + 级联数字回真源 + 工具表补 4 枚`）**。
+⇒ **B151 这条本线债已清，不需要再拍"谁来做"**；本节正文保留作归属记录。
+⚠️ 但那一笔只补到 `privacy`／`data-rights`，**没有补 `third-parties`** —— 于是今天 `packages/legal` 剩下的
+2 条红正坐在 `email-catalog.spec.ts`（中英两栏仍写"10 封功能邮件"，代码里已有 11 枚 `send*Email`，
+漏的一类是「登录验证码」，导出真源 `server/src/email.ts:194 sendLoginCodeEmail`）。
+那是**他们那一笔的收尾没做完**，不是本线的债，见 B152 的 10-11 复量段。
 
 ## B152（2026-10-10 23:5x，本会话 · T7 第二条 `pnpm -r test` 第一次在合并态上跑完）：**全量并发跑报 77 条红，逐包单跑复测后只剩 15 条是真的** —— 其中 3 条是本线自己造的（B150/B151），12 条是别线的
 
@@ -8616,6 +8640,26 @@ pnpm -r --no-bail test   ⇒  RTEST_NOBAIL_RC=1
 再用**逐包单跑**去掉负载超时；并发那一趟的红数只能当线索。
 ② 本线的测试族全绿**不证明**本线的改动没让别的臂变红 —— 会被 `domain`/`legal` 这种**跨线对账臂**抓到，
 所以整包跑（不是整文件跑）是本线每轮的必做项，这一轮之前一直没做。
+
+**🔴 10-11 00:5x 复量（同一把尺、同一枚隔离副本，载体换到 `1b40fa10` dirty=0）**：HEAD 上的确定性红从 **15 → 11**。
+
+| 变化 | 条数 | 现量证据 |
+|---|---|---|
+| 已闭合：`packages/i18n` | −1 | 今天 `26 passed (26)`、rc 绿 |
+| 已闭合：`server` 那 6 条（arity 5 + 枚数 1） | −6 | 今天 `Test Files 158 passed (158)`、`2778 passed \| 1 skipped (2779)`，**0 failed** |
+| 已闭合：`packages/legal` 的 `structure.spec.ts` 两臂（= **B151**，本线债） | −2 | 单文件复跑 `63 passed (63)`；闭合人 `8389b2a3`，读数见 B151 的 10-11 段 |
+| 新进来：`packages/shared-schema` 的 `auth-http-contract.spec.ts:83` | +1 | `AUTH_PASSWORD_PATHS` 真值 12 vs 钉的 9，多的三枚是 `loginCode*`；该文件最后一笔 `1c067174`（账号标准套件线） |
+| 新进来：`apps/landing` 的 `mockup-shell-shape.spec.tsx` #7 两臂 | +2 | 页头右侧登记处与产品页头 `testid` 双向等集不成立；该文件最后一笔 `d49f77e3` |
+| 换了文件的同名数：`packages/legal` 仍是 2 条 | ±0 | 但红从 `structure.spec.ts` 换到 **`email-catalog.spec.ts`**（中英两栏写 10 封、代码里 11 枚 `send*Email`，漏「登录验证码」）⇒ **别把这两个 2 读成同一件事** |
+| 内容变了、条数没变：`packages/ai` 5 条 | ±0 | 同一族 `capability-manifest.spec.ts`，差异从 B152 那趟的"工具 26 vs 30、实体 8 vs 9"变成今天的**产物 892 行 vs 应为 979 行**，`+` 侧新增的是 `COMMENT` 实体（`e6058120` 引进，生成物没重跑） |
+| 不变：`packages/domain` 1 条（= **B150**，本线债） | ±0 | 逐包单跑复测同一条红 |
+
+⇒ 剩下的 11 条 = **本线 1（B150）+ 别线 10**（i18n/server 那 7 条没了）。
+分母自检这趟是过的：`Scope: 21 of 22`、打 `test$` 起始行的包 **21** == 打 `Tests` 汇总行的包 **21**。
+⚠️ 本趟顺带又撞一次 §7 那一族的坑：串行复跑那圈我用 `RC_$d=${PIPESTATUS[0]}` 读退出码，
+读回来的五枚**全是 0** —— 因为那段坐在命令替换的子 shell 里，管道尾是 `grep`。
+**这一圈的 rc 不许当判据用**，能用的只有 `Tests N failed` 那五行汇总（它们与并发趟逐字相同 ⇒ 确定性成立）。
+要取每包真实 rc 得 `pnpm --filter <目录> test; echo $?`，不套管道。
 
 ## B153（2026-10-11 00:3x，本会话 · 追 B142 那枚改名时量出来的）：`tests/integration/**` 有**登记层**、没有**执行层** —— 别线改了本线读的字段，红整整几天而没有任何一层会失败
 

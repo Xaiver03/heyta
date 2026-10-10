@@ -2795,3 +2795,40 @@ AC 已勾数现量 **0**、未勾 **8**。
 - 仍欠（不变）：`pnpm check` 的后 70+ 步与末尾 `-r test` 无读数（被那条别线类型错挡在第 4 步）；
   `pnpm reinstall:all` + Linux 交付取证未跑（本机 1 分钟负载 23.8 / 15 分钟 51，且设备槽是共享资产）；
   B150/B151 的落点在地界外；B139 的 ADR 等地界；AC-6 等 `App.tsx`/`AiSettings.tsx` 那格接线（地界外）。
+
+## 2026-10-11 00:4x · 我自己撞了一次"共享索引"红线（记下来，不是别人的账）
+
+入库 `1b40fa10`（3 枚文档、+60 −1）那一步，我把配方里的 `GIT_INDEX_FILE=$IDX` **漏掉了**，
+于是 `git read-tree HEAD` 与随后的 `git update-index --cacheinfo` 打在**主检出的共享索引**上，
+窗口约 40 秒（00:46:34 → 00:47:12）。
+
+- 能证的：`read-tree` / `update-index` **不碰工作树**，所以没有任何人的**内容**可能丢失；
+  事后 `git restore --staged -- <那三枚>` → `git diff --cached` 条目数 **0**。
+- **不能证的**：那 40 秒里**别线有没有把东西 stage 在索引上**。索引没有历史可读，
+  所以我只能说"我恢复后是干净的"，不能说"我进来时本来就是干净的"。
+  观测到的事实：我 read-tree 之后 `diff --cached` 的集合**恰好等于我点名的 3 枚**，
+  没有第四枚 —— 这是"当时索引==HEAD"的**弱**证据（它同样兼容"别人的那几枚恰好被我的 read-tree 抹掉"）。
+- 顺序教训（写死）：**同一句 `git restore --staged -- <paths>` 要跑两次，各管一件事**。
+  第一次在 `update-ref` **之前**：清掉我误 stage 的那三枚，把索引还成 HEAD；
+  第二次在 `update-ref` **之后**：把索引推进到**新** HEAD 的那三枚 blob。
+  少第二次就是本次撞见的形状 —— `git status` 把 `BLOCKED.md`／`PROGRESS.md`／计划文档报成
+  已修改（索引落后一笔），`git diff --cached` 条目数 **3** 而不是 0。
+  判据：收口后 `git diff --cached --name-only | wc -l` 必须是 **0**，且 `git status --porcelain -- <那三枚>` 必须为空。
+- 白名单没破：全程只点名动了 `BLOCKED.md`／`PROGRESS.md`／`docs/plans/inbound-automation.md`。
+
+## 2026-10-11 00:5x · T7 第二条腿 `pnpm -r test` 跑完并逐条归因：11 条红 = 本线 1 + 别线 10，B151 当场闭合
+
+- 载体 `.worktrees/inb-t7` @ `1b40fa10`、dirty=0。`NO_COLOR=1 pnpm -r --no-bail test` ⇒ **RC_TEST=1**（没记成通过）。
+- 分母自检**过了**：`Scope: 21 of 22`；打 `test$` 起始行的包 **21** == 打 `Tests` 汇总行的包 **21**。
+  合计 13561 用例 = 13536 通过 + 11 失败 + 14 跳过（`server` 1 条 `it.skip` 是 `8f65d4d6` 09-25 的存量，`apps/web` 13 条不是本线的）。
+- 11 条红**逐条跑到引入它的那一笔**（不是"看着像别线"）：ai 5 ← `e6058120` 的 `COMMENT` 实体没重跑生成物；
+  shared-schema 1 ← `1c067174` 给 `AUTH_PASSWORD_PATHS` 加了 `loginCode*` 三枚而契约钉 9；
+  legal 2 ← 同一批的 `sendLoginCodeEmail` 没进 `third-parties` 两栏；landing 2 ← `d49f77e3` 页头 `testid` 等集；
+  **domain 1 = 本线**（`e8b3e982` 让服务端多 8 枚拒绝码，域层词表没跟上 = B150，修法落点 `packages/domain/src/subscription.ts:59` 在地界外）。
+- **本线债从 3 条降到 1 条**：B151（legal 三张表的注销类别名 + 条款数字）由 `8389b2a3` 顺带走掉了。
+  核对的是正文不是绿灯：`privacy.ts:404`／`:999` 逐字列出「自动收集额度启用记录／关联／主体」，数字回到「38 处级联 / 37 张表」；
+  单文件复跑 `structure.spec.ts` ⇒ `63 passed (63)`。⚠️ `packages/legal` 今天仍有 2 条红，但**换了文件**（→ `email-catalog.spec.ts`），别把两个 2 读成同一件事。
+- 确定性：并发的 11 条在逐包单跑里**同样 11 条**，没有负载假红。
+  ⚠️ 那一圈我读出的 `RC_*=0` 是**假的**（管道尾 `grep` 吞码，AGENTS §7 那一族又命中一次），只有汇总行能用。
+- 入库两笔：`1b40fa10`（3 枚文档）+ 本条即将入库的那笔。
+- 仍欠：`pnpm reinstall:all` + Linux 交付取证（要设备窗口）；`pnpm check` 停在别线 1 条类型错；B150 等授权或域层所有者；B139 那枚新 ADR 的地界。

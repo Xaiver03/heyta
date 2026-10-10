@@ -384,6 +384,11 @@ Web 设置页已接入生成/轮换、一次性展示与复制、活动凭据元
 
 ✅ **2026-10-09 16:5x 现量更正：上面那格挡路条件已经解除，界面层本轮就补。** 那两枚词条文件随后被并行会话提交进 HEAD，两侧都齐了：`pnpm --filter @heyta/i18n test` **26/26**（它就是"中英必须同步"那条纪律的判卷人），而界面用到的 72 个键在 web 类型检查里命中 0 条错（现量：`NO_COLOR=1 pnpm --filter @heyta/web typecheck 2>&1 | grep -E 'error TS' | grep -ic inbound` = **0**）。⚠️ 同一枚 typecheck 现在整体**是红的**，16 条错全在 `apps/web/tests/{share-key-store,app-mount}.spec.ts` 两枚别线文件里 —— 归属、形状与"为什么不代改"记在 `BLOCKED.md` B103，它挡的是 T7（`pnpm check` 整链），不挡界面层本身。上一段保留是为了让后来者认出这个形状：**"词条在别人索引里"是一种瞬时状态，把它写成判据时必须同时写解除它的现量命令**。
 
+⚠️ **同一段里那句"web typecheck 整体是红的，16 条错"也已过期（10-11 00:4x 现量）**：整仓那把尺
+`pnpm -r --no-bail typecheck` 现在 `error TS` 行数是 **1**（分母自检 20==20），16 条 web 错被那两条线自己修完了，
+剩下那 1 条在 `packages/app-host/tests/login-code.spec.ts(44,5) TS2578`。⇒ 本线 T7 的拦路格从"B103 的 16 条"换成"B144 更正段的 1 条"，
+逐条读数与为什么不代改记在 `BLOCKED.md` 的 B103 / B144 两节。
+
 一条别读成“干净检出就能构建”的实测后果：HEAD 上现在有 **6 枚跨线 dangling relative import**（现量：对 `git ls-tree -r --name-only HEAD` 里 `packages/{shared-schema,app-host}/src/*.ts(x)` 与 `server/src/*.ts` 逐个解 `from './…'`，目标不在 HEAD 树里即计入）。其中 **1 枚属于本线**：`inbound-draft-contract.ts → ./task-batch-contract`（草稿契约复用了批量编辑线尚未提交的那份常量表）；其余 5 枚是并行会话提交了 `shared-schema/src/index.ts` 与 `app-host/src/inbound-process.ts`、却没提交对应契约文件留下的。这批分笔**修掉了原先两枚本线自己的** dangling（`server/src/server.ts → ./automation/inbound.routes`、`index.ts → ./inbound-crypto-contract`）—— 前几轮“api 接线先留在工作树”造成的就是这一种形状：**抽取的收尾动作是把文件提交掉并让 HEAD 自洽，不是把更好的新版本留在工作树里**。
 
 判据复跑边界：这批提交没有改动工作树任何一个字节（现量：`git diff --stat HEAD -- <这 86 枚路径>` 只剩 4 枚混合文件的差量，而那差量正是别人的 hunk），所以上一节那张读数表描述的还是同一批源码。把整套判据对着新 HEAD 重跑（`pnpm -r test`、完整 `pnpm check`、`pnpm reinstall:all` 四端重装）**仍然欠着** —— 起跑那一刻共享载体上有并行写入者且负载高，按 §8 第 9 条那格要在隔离副本上做，不能拿这趟的工作树读数冒充。
@@ -1684,7 +1689,7 @@ cd apps/web && NO_COLOR=1 pnpm exec vitest run tests/inbound-cycle-display.spec.
 **但责任是本线的** —— 登记的每一条都写清"哪一笔提交的、改哪四处、改成什么"，谁批都能一子做完。
 
 **T7 三条命令的当前可达性**（10-11 00:4x 现量更新）：`pnpm check` ✗ —— B144 那 23 条已被别线修完，现在全集是 1 条类型错，落在 `packages/app-host/tests/login-code.spec.ts(44,5) TS2578`（别线地界，见 B144 的更正段），`pnpm check` 因此仍停在第 4 步 `pnpm typecheck`；
-`pnpm -r test` ✗（本线 3 + 别线 12，且本线那 3 条的落点在地界外；台账侧对应 B150/B151/B152）、
+`pnpm -r test` ✗（10-11 00:5x 现量：11 条确定性红 = **本线 1**（B150）+ 别线 10；上一格写的"本线 3 + 别线 12"已被别线自己收走 7 条、本线的 B151 那 2 条由 `8389b2a3` 闭合，台账侧对应 B150/B151/B152 的 10-11 复量段）、
 `pnpm reinstall:all` + Linux 交付取证：未跑（要安静载体与设备窗口；本机 1 分钟负载 14 只是回落中，15 分钟均值仍在 100+）。
 
 ---
@@ -1787,3 +1792,62 @@ packages/app-host typecheck: tests/login-code.spec.ts(44,5): error TS2578: Unuse
 **这一次顺带证到的**：`check` 的前三步（含整仓 `pnpm build` 与落地页 `check:entries` 逐字节对账）
 在**合并态 + 本线全部改动**下是过的 —— 这是本线第一次拿到这个读数。
 后面 70+ 步与末尾的 `pnpm -r test` 因此**还没有读数**，不许写成"已过"。
+
+## T7 第二条腿 `pnpm -r test` 第一次在隔离副本上跑完（2026-10-11 00:5x）：21 枚包全跑，11 条红，**本线只占 1 条**
+
+命令与载体：`cd .worktrees/inb-t7 && NO_COLOR=1 pnpm -r --no-bail test` → `/tmp/inb-rtest-carrier.log`，
+副本 **HEAD 逐字 = `1b40fa10`、dirty=0**（先确认它与上一笔之间只隔那 3 枚文档，才做的快进）。
+`RC_TEST=1`（**没有**记成通过）。
+
+**分母自检**（AGENTS §6 那条"有 test 脚本的包数 == 打了 Tests 汇总行的包数"）：
+
+| 读数 | 值 |
+|---|---|
+| `Scope:` | 21 of 22 workspace projects（第 22 枚没有 `test` 脚本） |
+| 打了 `test$` 起始行的包数 | **21** |
+| 打了 `Tests` 汇总行的包数 | **21** ✅ 相等 |
+| 用例总数（各行 `(N)` 相加） | **13561** |
+| 通过 / 失败 / 跳过 | **13536 / 11 / 14** |
+
+**11 条红逐条归属**（每条都现场跑到引入它的那一笔，不是按"看着像别线"推断）：
+
+| 包 | 红数 | 判据 | 引入它的那一笔（现量） | 归属 |
+|---|---|---|---|---|
+| `packages/ai` | 5 | `capability-manifest.spec.ts`：产物 892 行 vs 应为 979 行，差在 `COMMENT` 实体进了上游、`capability-manifest.generated.ts` 没重跑 | `git log -S"'COMMENT'" -- packages/shared-schema/src/entity-types.ts` → **`e6058120`（10-09 14:35，产品体验线）** | 别线 |
+| `packages/shared-schema` | 1 | `auth-http-contract.spec.ts:83` 钉 `AUTH_PASSWORD_PATHS` 长 9，真值 12（多出 `loginCodeRequest/Verify/Resend`） | 该文件最后一笔 = **`1c067174`（10-10 19:43 账号标准套件线）**，本线八笔里没有一枚碰过它 | 别线 |
+| `packages/legal` | 2 | `email-catalog.spec.ts`：`third-parties` 中英两栏写 10 封，代码里 11 枚 `send*Email` 导出，漏的那一类是「登录验证码」 | 导出真源 `server/src/email.ts:194 sendLoginCodeEmail`，与上一行同一笔引进 | 别线 |
+| `apps/landing` | 2 | `mockup-shell-shape.spec.tsx` #7：页头右侧登记处与产品页头实际 `testid` 双向等集不成立 | `git log -1 -- apps/landing/tests/mockup-shell-shape.spec.tsx` → **`d49f77e3`（10-10 18:49）** | 别线 |
+| `packages/domain` | 1 | `subscription.spec.ts:215`：服务端 denial reason 15 枚 vs 域侧词表 7 枚，多出的**恰好 8 枚**且日志逐字点名：`BINDING_EXPIRED`、`DEPLOYMENT_MISMATCH`、`ENTITLEMENT_MODE_UNCONFIGURED`、`ENTITLEMENT_TICKET_REJECTED`、`ENTITLEMENT_TICKET_REQUIRED`、`ISSUER_NOT_CONFIGURED`、`NO_BINDING`、`REVOKED_VERSION` | `git log -S"DEPLOYMENT_MISMATCH" -- server/src/entitlement.ts` → **`e8b3e982`（10-09 12:21，本线）** | **本线** |
+
+**本线那 1 条的形状与为什么不代改**：红在"注册"这一层，不在"判定"这一层 —— 服务端那 8 枚 reason 语义都是本线该给的
+（票据/部署模式/绑定/吊销各自可辨，AC-1 的线级判据就靠它们），要补的是**域侧那份词表**
+（`packages/domain/src/subscription.ts:59 ENTITLEMENT_DENIAL_REASONS`）+ 该测试文件本身，两枚都在白名单外
+（地界只给到 `packages/domain/tests/inbound-*`）。逐条登记在 **B150**，含"改哪一处、改成什么"，谁批都能一子做完。
+🔴 反向验证的形状：日志里 `+` 侧**只有那 8 枚**、没有第 9 枚 ⇒ 这条红的成因就是本线那笔 `e8b3e982`，
+不是域侧词表本来就有别的缺项。这一格先前记的"本线 3 条"已经不对，**现量是 1 条**（另外两条经上面两行归给了别线）。
+
+**跳过 14 条的归属**：`server` 1 条 = `tests/migration-sql.spec.ts:338 it.skip(...)`，引入于 `8f65d4d6`（09-25，vendored 那批）；
+`apps/web` 13 条不在本线文件里。对本线全部 `*inbound*` 测试文件扫 `.skip` / `.todo` / `skip: true`，
+命中的**只有**下一段说的那两枚 `describe.skipIf`，没有任何一条无条件的 `it.skip`。
+⚠️ 本线的两枚 integration spec 用的是 `describe.skipIf(!DATABASE_URL)` —— **这不是本轮新加的绕过**：
+仓内另外三枚 vault integration spec 用的是同一个形状（5 枚文件 × 同一行），而且它们**根本不进** `pnpm -r test`
+（`server/vitest.config.ts` 把 `tests/integration/**` 排除在 include 之外，见 B153）。
+⇒ 但要把这句留给 B153 的拍板人：**若采纳①（给 integration 加执行档），`skipIf` 会在没有 `DATABASE_URL` 时静默跳整族**，
+所以那一档必须自带"跳过量必须为 0"的判据，否则加了执行档也等于没加。
+
+**T7 三条腿的当前状态**（10-11 00:5x 现量）：
+`pnpm check` ✗（第 4 步 1 条别线类型错）、`pnpm -r test` ✗（11 条红 = 别线 10 + 本线 1，且本线那 1 条落点在地界外）、
+`pnpm reinstall:all` + Linux 交付取证：仍未跑（要安静载体与设备窗口）。
+
+**确定性复跑与一条本线债当场闭合（同一轮，10-11 00:5x）**：并发全量那 11 条红，逐包单跑读回**同样的 5 行汇总**
+（`ai 5 failed`、`shared-schema 1 failed`、`legal 2 failed`、`domain 1 failed`、`landing 2 failed`）⇒ 没有一条是负载造成的假红。
+⚠️ 那一圈的 `RC_*` 读数**全是 0，不许当判据**：管道尾是 `grep`，退出码被吞（AGENTS §7 那一族的又一次命中，
+正确取法是 `pnpm --filter <目录> test; echo $?`，不套管道）。
+
+🔴 **顺带把 B151 那格改成闭合**：`packages/legal` 的 2 条红**换了文件** ——
+从 `structure.spec.ts`（本线三张表的注销类别名 + 条款数字）换成 `email-catalog.spec.ts`（别线的「登录验证码」那封没进 `third-parties` 两栏）。
+单文件复跑 `structure.spec.ts` ⇒ `63 passed (63)`，而核对的是**正文**不是绿灯：
+`privacy.ts:404`／`:999` 已逐字列出「自动收集额度启用记录／关联／主体」，数字随他们那批新表一起回到真源
+（「共 38 处级联，覆盖 37 张表」）。闭合人是 `8389b2a3`（账号标准套件线），本线一行没改。
+⇒ **本线在 `pnpm -r test` 上的债从 3 条降到 1 条**（只剩 B150），
+而 T6「对外说明」这一格少了一件要拍的事 —— 它剩下的硬缺口仍是**那枚新 ADR**（地界外，B139）。
