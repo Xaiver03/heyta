@@ -56,8 +56,33 @@ case "$WINDOWS" in
     ;;
 esac
 if [ "$WINDOWS" -eq 0 ]; then
+  # 🔴 "AX 数到 0 个窗口"有**两种**成因，而它们在输出上长得一模一样：
+  #    ① 真的没有窗口（进程活着、最后一个窗口被关掉了）；
+  #    ② 窗口在，但 AX **看不见它** —— 未被激活的实例不向辅助功能暴露窗口列表。
+  #    2026-10-10 实测到的是②：同一时刻 `window-id.swift --pid` 从窗口服务器读到
+  #    `38031 heyta heyta 1159x754`，而 System Events 报 0。把②说成会让下一个人
+  #    去查"为什么窗口没打开"，而真正的前提是"这枚探针必须跑在前台实例上"
+  #    （与 AGENTS §6.2 规定二"不得抢焦点"直接冲突，是一次需要显式授权的取舍）。
+  CROSSCHECK_PID="$APP_PID"
+  if [ -z "$CROSSCHECK_PID" ]; then
+    PIDS=$(pgrep -x "$APP_PROCESS" | tr '\n' ' ')
+    if [ "$(printf '%s' "$PIDS" | wc -w | tr -d ' ')" -eq 1 ]; then
+      CROSSCHECK_PID=$(printf '%s' "$PIDS" | tr -d ' ')
+    fi
+  fi
+  CG_WINDOWS=""
+  if [ -n "$CROSSCHECK_PID" ] && command -v swift >/dev/null 2>&1 \
+     && [ -f "apps/desktop-macos/scripts/window-id.swift" ]; then
+    CG_WINDOWS=$(swift apps/desktop-macos/scripts/window-id.swift --pid "$CROSSCHECK_PID" 2>/dev/null | head -1)
+  fi
   echo "PROBE=UNAVAILABLE"
-  echo "REASON=$APP_PROCESS 在跑但一个窗口都没有（count of windows = 0）；先把窗口打开再跑本探针"
+  if [ -n "$CG_WINDOWS" ]; then
+    echo "REASON=AX 报 0 个窗口，但窗口服务器看得见 pid $CROSSCHECK_PID 的窗口（$CG_WINDOWS）"
+    echo "CAUSE=该实例没被激活过：未激活的 App 不向辅助功能暴露窗口列表，这不是"没有窗口""
+    echo "NEXT=本探针只能在**前台**实例上跑 —— 先 open -a /Applications/Heyta.app（会抢一次焦点，与 §6.2 规定二冲突，需负责人显式允许），再带 HEYTA_MAC_PID 重跑"
+  else
+    echo "REASON=$APP_PROCESS 在跑但一个窗口都没有（count of windows = 0）；先把窗口打开再跑本探针"
+  fi
   exit 4
 fi
 
@@ -109,17 +134,20 @@ on run argv
 
   -- Capture the browser state before the click. Checking only the final URL can
   -- pass because an old tab was already on the help page.
+  -- 🔴 `is running` 是 Standard Additions 的谓词，**不会**把没开的浏览器叫起来；
+  --    直接 `tell application "Safari" to …` 在 Safari 没跑时**会把它启动并带到前台**
+  --    （AGENTS §6.2 规定二：验收不得抢走用户的输入焦点）。所以先问一句在不在跑。
   set beforeBrowserUrl to ""
-  try
+  if application "Safari" is running then try
     tell application "Safari" to set beforeBrowserUrl to URL of current tab of front window
   end try
-  if beforeBrowserUrl is "" then try
+  if beforeBrowserUrl is "" and application "Google Chrome" is running then try
     tell application "Google Chrome" to set beforeBrowserUrl to URL of active tab of front window
   end try
-  if beforeBrowserUrl is "" then try
+  if beforeBrowserUrl is "" and application "Microsoft Edge" is running then try
     tell application "Microsoft Edge" to set beforeBrowserUrl to URL of active tab of front window
   end try
-  if beforeBrowserUrl is "" then try
+  if beforeBrowserUrl is "" and application "Arc" is running then try
     tell application "Arc" to set beforeBrowserUrl to URL of active tab of front window
   end try
   set end of lines to "BROWSER_URL_BEFORE=" & beforeBrowserUrl
