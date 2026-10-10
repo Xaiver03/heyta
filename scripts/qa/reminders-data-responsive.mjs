@@ -777,16 +777,21 @@ if (LEGS.includes('data')) {
  * 「同步与隐私」那一组的**决定态**交互回归（UX-S9-139 那条裁决的常驻消费者）。
  *
  * 那两条裁决（🔴 「已同意」只给「撤回」、「还没选择」只给「重新选择」；以及「重新选择」开的是
- * **同一张**同意面板而不是第二份同意界面）以前只在写它的那天被手工点过，
- * **仓里没有任何一层在守**（`grep -rn privacy-revoke e2e/tests apps/web/tests` 现量 0 处），
- * 所以一次改文案就能把它悄悄反过来，而界面看起来仍然"有个按钮能点"。
+ * **同一张**同意面板而不是第二份同意界面）以前只在写它的那天被手工点过。
+ * 🔴 这句"仓里没有任何一层在守"要**分树读**（10-10 01:4x 现量）：`grep -rn privacy-revoke e2e/tests apps/web/tests`
+ * 在 **`HEAD` 里仍旧 0 处**，而**工作树 15 处**，全部在未跟踪的 `apps/web/tests/privacy-settings-panel.spec.tsx`
+ * （第 58-77 行断言 `openSheet` 后 `reason === 'settings'`，第 84-102 行用 `privacy-revoke-not-persisted`
+ * 守"最后一次真实保存回执"）⇒ **已提交的树上确实没人守，而那两条判据已经写好了、只欠入库**。
+ * 所以一次改文案在干净检附上仍能把它悄悄反过来，而界面看起来仍然"有个按钮能点"。
  *
  * 🔴 **「只用本机」那一档该显示哪枚按钮，两棵树不一样**（10-09 15:0x 现量，别当成契约）：
  * `git show HEAD:apps/web/src/features/settings/PrivacyPanel.tsx` 的分叉条件是
  * `record === null` ⇒ 只要有过任何决定（含"只用本机"）就给「撤回」；
  * 工作树那版给的是 `record?.decision !== 'accepted'` ⇒ "只用本机"落到「重新选择」。
- * 后者**没有入库**：它依赖的 `SettingsNotice.tsx` 与 `privacy-settings.css` 在 HEAD 里不存在
- * （`git cat-file -e HEAD:…` 双双 rc≠0），属别人在飞的那半。
+ * 🔴 **10-10 01:4x 现量更正支撑件那一半**：原先写的"`SettingsNotice.tsx` 与 `privacy-settings.css`
+ * 在 HEAD 里不存在（双双 rc≠0）"现在**只对一枚** —— `git cat-file -e HEAD:apps/web/src/features/settings/SettingsNotice.tsx`
+ * 成立（那一线 10-09 23:28 的 `3dd210bd` 带进来的，25 行新增），只有 `privacy-settings.css` 还是 `??`。
+ * ⇒ "工作树那一版没入库"这个结论不变，但它欠的支撑件从两枚降到一枚。
  * ⇒ 这一格**只入读数、不作判据**；下面的走查按界面上实际在场的那枚按钮走，两种形状都走得完。
  *
  * 一趟走完三态：**只用本机 / 已同意 / 还没选择**，每态各读一次 DOM 并各拍一张图。
