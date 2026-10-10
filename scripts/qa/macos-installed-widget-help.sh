@@ -14,22 +14,40 @@
 set -euo pipefail
 
 APP_PROCESS="${HEYTA_MAC_PROCESS:-HeytaMac}"
+# 🔴 同一台机器上可以有**两个** HeytaMac（重装时旧实例不会自己退出，而 macOS 上关掉最后一个
+# 窗口后进程照样活着）。按名字的寻址会让 System Events 自己挑一个，
+# 于是探针可能读的是那个没有窗口（或窗口里是旧产物）的实例 —— 症状是 rc=4「一个窗口都没有」，
+# 而按 pid 精确去问同一时刻新起的那个实例会读到 1。给了 HEYTA_MAC_PID 就按 unix id 锁死。
+APP_PID="${HEYTA_MAC_PID:-}"
+if [ -n "$APP_PID" ] && [ "${APP_PID//[0-9]/}" != "" ]; then
+  echo "PROBE=UNAVAILABLE"; echo "REASON=HEYTA_MAC_PID 必须是纯数字（读到 $APP_PID）"; exit 4
+fi
 EXPECTED="${HEYTA_HELP_EXTERNAL_URL:-https://heyta.waytofuture.cn/docs}"
 OUT="${HEYTA_MAC_WIDGET_HELP_EVIDENCE:-apps/desktop-macos/evidence/widget-help-ax.txt}"
 mkdir -p "$(dirname "$OUT")"
 rm -f "$OUT"
 
-if ! pgrep -x "$APP_PROCESS" >/dev/null 2>&1; then
+if [ -n "$APP_PID" ]; then
+  if ! ps -p "$APP_PID" -o comm= 2>/dev/null | grep -q "$APP_PROCESS"; then
+    echo "PROBE=UNAVAILABLE"; echo "REASON=pid $APP_PID 不是 $APP_PROCESS"; exit 4
+  fi
+elif ! pgrep -x "$APP_PROCESS" >/dev/null 2>&1; then
   echo "PROBE=UNAVAILABLE"
   echo "REASON=HeytaMac is not running"
   exit 4
+fi
+
+if [ -n "$APP_PID" ]; then
+  AX_TARGET="(first process whose unix id is $APP_PID)"
+else
+  AX_TARGET="process \"$APP_PROCESS\""
 fi
 
 # 🔴 进程在 ≠ 窗口在。macOS 关掉最后一个窗口后 app 进程照样活着，而下面那趟 AX 遍历
 # 对着空窗口列表会一路走到 15s 超时，把"载体没有窗口"读成"探针没验到东西"（2026-10-09 实测
 # 就是这个形状：装的 HeytaMac 在跑，`count of windows` = 0，输出只有 UNVERIFIED）。
 # 所以先做一次有界的窗口数回读，失败原因要印出来，不能让它伪装成产品结论。
-WINDOWS=$(osascript -e "tell application \"System Events\" to tell process \"$APP_PROCESS\" to count of windows" 2>&1)
+WINDOWS=$(osascript -e "tell application \"System Events\" to tell $AX_TARGET to count of windows" 2>&1)
 case "$WINDOWS" in
   '' | *[!0-9]*)
     echo "PROBE=UNAVAILABLE"
@@ -74,9 +92,11 @@ for f in "$INSTALL_WORDS" "$NOTE_AVAIL_WORDS" "$NOTE_SHELL_WORDS"; do
 done
 
 set +e
-osascript - "$APP_PROCESS" "$EXPECTED" "$OUT" "$INSTALL_WORDS" "$NOTE_AVAIL_WORDS" "$NOTE_SHELL_WORDS" >"$ERRLOG" 2>&1 <<'APPLESCRIPT' &
+osascript - "$APP_PROCESS" "$EXPECTED" "$OUT" "$INSTALL_WORDS" "$NOTE_AVAIL_WORDS" "$NOTE_SHELL_WORDS" "$APP_PID" >"$ERRLOG" 2>&1 <<'APPLESCRIPT' &
 on run argv
   set appProcess to item 1 of argv
+  set appPid to ""
+  if (count of argv) > 6 then set appPid to item 7 of argv
   set expectedUrl to item 2 of argv
   set outPath to item 3 of argv
   set installWords to paragraphs of (read POSIX file (item 4 of argv) as «class utf8»)
@@ -105,8 +125,14 @@ on run argv
   set end of lines to "BROWSER_URL_BEFORE=" & beforeBrowserUrl
 
   tell application "System Events"
-    if not (exists process appProcess) then error "process not visible to System Events"
-    tell process appProcess
+    if appPid is "" then
+      if not (exists process appProcess) then error "process not visible to System Events"
+      set procRef to process appProcess
+    else
+      set procRef to (first process whose unix id is (appPid as integer))
+      set end of lines to "TARGET_PID=" & appPid
+    end if
+    tell procRef
       if (count of windows) = 0 then error "HeytaMac has no window"
       set theWindow to front window
       set end of lines to "WINDOW_TITLE=" & (name of theWindow)
@@ -313,7 +339,7 @@ on run argv
 
   -- The native shell must remain alive after opening the external browser.
   tell application "System Events"
-    tell process appProcess
+    tell procRef
       set shellWindowStillThere to ((count of windows) > 0)
     end tell
   end tell
