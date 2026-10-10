@@ -1216,6 +1216,9 @@ const report = {
     tree: TREE,
     // 这份 report 会被提交而图不会（`evidenceDirTrackedFiles` 就是那枚证据）⇒ 读的人要能在文件里
     // 直接看出"每格的 `screenshot` 锚在本仓库克隆里指不到文件"，不用去翻台账。
+    // 🔴 `evidenceDir` 是这份读数的**批次身份**：没有它，一份被搬到别处的报告在文件里看不出自己
+    //    的图不在旁边（10-10 02:5x 现量撞到的那份 r49 就是这个形状）。入口那侧有判据在比这一格。
+    evidenceDir: OUT_LABEL,
     screenshotAnchorForm: OUT_OUTSIDE_REPO ? 'machine-only' : 'repo-relative',
     screenshotAnchorResolvableInRepo: trackedInEvidenceDir > 0,
     evidenceDirTrackedFiles: trackedInEvidenceDir,
