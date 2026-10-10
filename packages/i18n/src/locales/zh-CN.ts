@@ -4021,14 +4021,10 @@ export const zhCN = {
   'site.platforms.web.name': 'Web',
   'site.platforms.web.body': '完整产品，不是演示。断网也能照常记，恢复后自动补传；数据就存在你自己的浏览器里。',
   'site.platforms.android.name': 'Android',
-  'site.platforms.android.body': '当前版本已在真机运行，主要任务流程和 Android 小组件路径已有验证。已有签名测试安装包可供下载；跨平台小组件覆盖和完整交互验收仍在继续。',
-
   'site.platforms.android.body': '真机可用：建任务、改期、优先级、清单、标签、重复、专注、冲突解决、回收站都能用。安装包已经是正式签名的那一份，也在设备上装起来过（首屏是联网同意）；还没进应用商店，桌面小组件也不完整。',
   'site.platforms.ios.name': 'iOS',
   'site.platforms.ios.body': '主要任务与同步流程已在模拟器跑通。测试版本已关联现有内部测试组；目前没有公开邀请，实体 iPhone 验收仍待完成。',
   'site.platforms.desktop.name': '桌面（Windows / macOS / Linux）',
-  'site.platforms.desktop.body': 'Windows 应用已可安装运行；macOS 有已签名并完成公证的版本；Linux 也已有测试安装包。桌面交互和小组件覆盖仍按平台分别验收。',
-
   'site.platforms.desktop.body': '三个平台都打得出包，也都在桶里能下：macOS 那份已用 Developer ID 签名并通过 Apple 公证，双击即可打开（只有 Apple Silicon 构建）；Windows 是免安装的便携包，解压后双击里面的 HeytaWindows.exe，第一次会被 SmartScreen 拦一次；Linux 的 .deb 在盒子本机打出、解包态真跑过界面，还差一次装进系统的实测。界面也还在打磨。',
   'site.platforms.harmony.name': '鸿蒙',
   'site.platforms.harmony.body': '构建链已经打通，能打出安装包，但应用还跑不起来 —— 卡在模拟器镜像与签名。',

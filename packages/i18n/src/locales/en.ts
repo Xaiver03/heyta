@@ -3786,14 +3786,10 @@ export const en = {
   'site.platforms.web.name': 'Web',
   'site.platforms.web.body': 'The full product, not a demo. It keeps working when you are offline and syncs when the connection returns — your data lives in your own browser.',
   'site.platforms.android.name': 'Android',
-  'site.platforms.android.body': 'The current build runs on a real device, with the main task flows and Android widget path exercised. A signed test package is available; cross-platform widget coverage and full interaction validation are still being completed.',
-
   'site.platforms.android.body': 'Works on a real device: creating tasks, rescheduling, priorities, lists, tags, recurrence, focus, conflict resolution and trash all work. The published package is the release-signed one and it has been installed on a device (first screen is the network consent sheet); it is not in an app store yet, and the home-screen widgets are incomplete.',
   'site.platforms.ios.name': 'iOS',
   'site.platforms.ios.body': 'The main task and sync flows work in the simulator. A test build is available to the existing internal group; public invitations are not open, and physical iPhone testing is still pending.',
   'site.platforms.desktop.name': 'Desktop (Windows / macOS / Linux)',
-  'site.platforms.desktop.body': 'Windows can be installed and runs; macOS has a signed and notarized build; a Linux test package is available too. Desktop interactions and widget coverage are still being verified per platform.',
-
   'site.platforms.desktop.body': 'All three desktop builds exist and all three are in the public bucket: the macOS one is signed with a Developer ID and notarised by Apple, so it opens on a double-click (Apple Silicon builds only); Windows is a portable package you unzip and run HeytaWindows.exe from — SmartScreen stops you once on first launch; the Linux .deb was built on the box itself and its files have been run unpacked, but installing it with dpkg has not been measured yet. The interface is still being polished.',
   'site.platforms.harmony.name': 'HarmonyOS',
   'site.platforms.harmony.body': 'The build chain works and produces an installer package, but the app does not run yet — blocked on an emulator image and signing.',
