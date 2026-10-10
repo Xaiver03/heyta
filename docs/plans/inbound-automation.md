@@ -1610,3 +1610,44 @@ cd apps/web && NO_COLOR=1 pnpm exec vitest run tests/inbound-cycle-display.spec.
 - 本线**没有**动 `docs/reference/pricing-and-entitlements.md`（它是 `check:ai-quota` 的唯一数字源），
   因为 T6 的四件产物三件不在白名单 ⇒ 记在 **B139** 等拍。
 - AC-1～AC-8 继续全未勾（现量 `grep -c '^- \[ \] \*\*AC-' docs/plans/inbound-automation.md` = 8），公网接收与售卖继续关闭。
+
+## T8 严格复审：AC-1～AC-8 逐条「证据命令 + 贴出的输出 + 结论」（2026-10-10 19:2x 起）
+
+**载体口径**（这格容易被读错，先写死）：`HEAD` = 本地 main 当前 tip；本趟起读数时 tip 是 `a195a37f`。
+主检出里**同时坐着别线未提交的改动**（见 **B142**），所以凡在主检出取的红/绿都必须注明"含在飞 diff"；
+干净 HEAD 的读数一律来自隔离副本 `.worktrees/inb-t7`（`checkout --detach <tip>` 后 dirty=0，
+并 `pnpm -r build` + `prisma generate` 补齐产物 —— 干净 worktree **没有 dist**，不补就会拿探针坏当产品红）。
+
+| AC | 证据命令（可复跑） | 贴出的输出（日期 · 载体） | 结论 |
+|---|---|---|---|
+| **AC-1 权益与授权** | `cd .worktrees/inb-t7 && python3 research/tools/verify-inbound-worker-identity.py --log /tmp/inb-wt-worker.log`；离线档：`cd server && npx --no-install vitest run --maxWorkers=1 tests/automation-entitlement-ticket.spec.ts tests/automation-drafts.spec.ts tests/inbound-automation.routes.spec.ts tests/inbound-entitlement-write-tx.spec.ts tests/inbound-worker-identity.spec.ts tests/automation-entitlement-issuer.spec.ts tests/automation-commit-proof.spec.ts tests/automation-events.spec.ts tests/automation-rules.spec.ts tests/automation-sender-credentials.spec.ts tests/automation-ai-metering.spec.ts`；HTTP 收口：`… tests/inbound-ai-quota-route.spec.ts`；真库对账：`… tests/automation-ai-metering.pglite.spec.ts` | 真库腿（临时 initdb 起真 PostgreSQL、全部迁移逐条 apply）：**`Test Files 1 passed (1)` / `Tests 46 passed (46)`，`WT_WORKER_RC=0`**（10-10 19:1x · 隔离副本 @ `a195a37f`）；离线 11 文件（同一枚命令逐枚写死路径）：**`Test Files 11 passed (11)` / `Tests 103 passed (103)`，`S11_RC=0`**（10-10 19:2x · 隔离副本）—— 台账 §665 那行原记 `99 passed`，**+4 只增不减**，多出的 4 条本趟**未逐枚归因**（不许读成回归，也不许读成"本线新加的尺"）；额度 HTTP `3 passed (3)`（402 + `errorCode` + 事务执行器零调用）、pglite `17 passed (17)`（§906，10-10 当日） | **判定层已闭合到可复跑**：错主体/错实例/坏签名/吊销落后/额度耗尽各红一条且**零业务效果**。⚠️ 两处不闭合：① 额度耗尽那条钉的是 `errorCode`，别线正把它改成 `code`（**B142**）——落地当天这 16 枚断言会红；② 新 ADR（限定取代 ADR-0017/0020）**还没写**，它在 **B139** 那格里等地界 |
+| **AC-2 接收与队列** | `cd packages/inbound-core && npx --no-install vitest run --maxWorkers=1`；同一把真库尺（AC-1 第一条） | `Test Files 3 passed (3)` / `Tests 47 passed (47)`（envelope 11 / parser 18 / webhook 18，§665 表，10-10 当日）；真库尺 **46/46**（19:1x 本趟） | **字节级签名 / 时间窗 / 上限 / 同键同体重放 / 同键异体冲突 / 跨账号隔离有尺**，且查询面不回传明文（那条断言在 webhook + envelope 两档里）。不闭合的只有"公网接收"这一开关本身 —— 按负责人指令仍关着 |
+| **AC-3 领取与提交** | `python3 research/tools/verify-inbound-dual-host.py` | 装置自报 **`Windows: 13/13`**（10-10 13:3x · 主检出，含窗口 11 后半、真进程终止、窗口 13 跨时区往返；逐档读数在 §13:3x 那一节） | **13 个故障窗口两个独立真 SQLite 宿主全跑通**，观察的是任务数/op 数/回执/计量而不是 HTTP 码。⚠️ 那一趟跑在**共享主检出**上（当时合并态全仓门禁还没跑）⇒ 这一格按 T7 的读数收口才算完整 |
+| **AC-4 解析** | AC-1 的离线 11 文件（含 `automation-drafts`）+ `cd packages/domain && npx --no-install vitest run --maxWorkers=1 tests/inbound-local-date.spec.ts` + `cd packages/inbound-core … `（parser 18） | 离线 11 文件 **99 passed**；共享层三档 47 passed；本地时区档读数在 §1132 那行（同日） | **同时区/同归一化/DST/非法日期/长输入/多输出受限有尺**；注入指令与模型额外字段的越权那一条走的是出境闸门既有断言。⚠️ "实际出境请求符合披露"要真 provider 流量，本线**没有**这一档读数 ⇒ 记为未闭合，不许读成已验 |
+| **AC-5 批创建与来源记录** | `cd packages/shared-schema && npx --no-install vitest run --maxWorkers=1 tests/task-batch-contract.spec.ts`；`cd packages/op-log && npx --no-install vitest run --maxWorkers=1 tests/task-batch.spec.ts` | 契约 **`Tests 15 passed (15)`**；reducer **`Tests 16 passed (16)`** = 5 组 × **三套适配器**（memory / IndexedDbAdapter / SqliteAdapter，另含真文件库 `state.db`）（§665 表，10-10 当日） | **一枚逻辑 op / 无半批 / 三套适配器收敛 / 删除后重试不复活 / 旧数据无来源字段仍能 hydration 全部有尺**。这一格是本表里最接近"可勾"的一格，但按规矩仍**未勾**（勾由负责人点） |
+| **AC-6 规则界面** | `cd apps/web && NO_COLOR=1 pnpm exec vitest run tests/inbound-cycle-display.spec.tsx`；界面层 e2e：`cd e2e && npx playwright test --config playwright.inbound.config.ts` | 显示层 3 条 + 三臂变异各红一次（§19:0x 那一节，10-10）；e2e **4 条 = 2 passed / 2 failed**，红在"换回 AI 那一节不重取列表"（`inbound-automation.spec.ts:85`），四张草稿截图人已打开看过（`docs/research/evidence/inbound-automation-review/ui-draft/`） | **界面入库且判据有牙**，但**当场量出一格真缺陷**（**B140**：设置分组是 `hidden` 不是卸载，`active` 从没人接）⇒ 未闭合。另两格：状态词 `waiting-entitlement` 的句子缺词条（B110，`packages/i18n` 不许动）；"完整旅程"要公网接收 + 有权益宿主，两者仍关着 |
+| **AC-7 文档** | `node scripts/check-migrations.mjs`；`node scripts/check-docs-voice.mjs`；`node research/tools/docs-link-check.mjs`；`node research/tools/license-inventory.mjs` | **10-10 19:2x · 隔离副本 @ `a195a37f`**：`MIG_RC=0`（`✅ 迁移文件全部符合规范。`）、`VOICE_RC=0`（`扫描 site.* 1159 条（豁免自托管 120 条），禁词表 30 项零命中`）、`LIC_RC=0`（`全部依赖均为宽松许可（含已登记的例外）✅`）、**`LINK_RC=0`** —— 死链那一条**在 HEAD 上已经不红**（B136 记的那枚 `apps/desktop-windows/README.md:89` 已被其所有者改掉；主检出里若仍红是别线未提交改动，不是 HEAD） | **文档四道门在干净 HEAD 上全绿**（本格原来唯一那条"不是本线的红"已消失）。但 **T6 的四件产物三件不在本线白名单**（新 ADR / 中英条款 / 帮助页）⇒ **B139**，这一格按定义未闭合：`docs/reference/pricing-and-entitlements.md` 本线**没动** |
+| **AC-8 验收矩阵** | `python3 research/tools/verify-inbound-ac8-matrix.py` | **10-10 19:2x · 隔离副本 @ `a195a37f`**：`MATRIX_RC=0`，`表头行=1079　行数=34　有尺行=27　无尺行=7　尺枚=67　窗=13/13　平台=10/10　权益=9/9　设备状态=9/9`，`结论：矩阵与 HEAD 逐格对账成立` | **矩阵自洽**（平台×权益×设备状态×失败阶段全枚举、无空行）。⚠️ 它声明的是"用例归属"，不是"跨端装过"：四端重装与 Linux 交付取证属 T7，**未跑** ⇒ 未闭合 |
+
+**本趟逐档复跑（10-10 19:2x–19:3x · 载体：隔离副本 `.worktrees/inb-t7` @ `a195a37f`，dirty=0、`pnpm -r build` 与 `prisma generate` 均 rc=0；一条命令串行跑、不并发，退出码逐个 `echo $?` 取，不经管道）**：
+
+| 档 | 输出 | rc |
+|---|---|---|
+| server 权益三档（`entitlement` / `entitlement-gate.routes` / `entitlement-across`） | `Test Files 3 passed (3)` / `Tests 56 passed (56)` | `ENT_RC=0` |
+| server 计量合跑四文件（pglite + 额度 HTTP + 单测 + 写事务） | `Test Files 4 passed (4)` / `Tests 34 passed (34)` | `COMBO_RC=0` |
+| server 票据拒绝（`inbound-ticket-rejection-route`） | `Tests 15 passed (15)` | `REJ_RC=0` |
+| `packages/inbound-core` 全量 | `Test Files 3 passed (3)` / `Tests 47 passed (47)` | `CORE_RC=0` |
+| `packages/shared-schema` 批契约 | `Tests 15 passed (15)` | `BATCH_RC=0` |
+| `packages/op-log` 批 reducer（三套适配器） | `Tests 16 passed (16)` | `OPLOG_RC=0` |
+| `packages/domain` 本地时区 | `Tests 1 passed (1)` | `DOM_RC=0` |
+| `packages/sync-client` 授权 | `Tests 6 passed (6)` | `SYNC_RC=0` |
+| `packages/app-host` inbound（process + worker 两文件） | `Test Files 2 passed (2)` / `Tests 30 passed (30)` | `HOST_RC=0` |
+
+**九档合计 220 passed、0 failed、0 skipped**（复算：56+34+15+47+15+16+1+6+30）；每条与台账里那行旧读数**逐条对得上或更多**（唯一变化是 server 离线 11 文件 `99 → 103`，+4 未逐枚归因）。
+⚠️ 这一串**不等于** `pnpm -r test` 全量（它只覆盖本线相关的档），也**不等于** `pnpm check` 整链 —— 那两格仍等 T7。
+
+
+
+1. **不等于 `pnpm check` / `pnpm -r test` 绿过** —— 全仓合并态那三条命令（T7）本趟仍欠，结构性阻挡是 **B103**（别人的 16 条 web 类型错）。载体空出来后的第一条是 `cd .worktrees/inb-t7 && pnpm -r typecheck`。
+2. **不等于公网接收或售卖可开** —— AC 全未勾（现量 `已勾=0 / 未勾=8`），负责人点头之前这开关不动。
+3. **主检出的红不等于 HEAD 的红** —— B142 那 9 条就是这样：同一把尺在主检出 rc=1/9 红、在干净 HEAD 上 rc=0/46 绿。

@@ -2698,3 +2698,25 @@ AC 现量：**未勾 8 / 已勾 0**。
 ① 用 `ls | grep | tr '\n' ' '` 拼 vitest 的文件参数会留一个**尾空格**，vitest 报的是
 `No test files found, exiting with code 1` —— 那是**探针坏**，不是产品红；改成逐枚写死路径。
 ② `grep -rn … --include=*.ts` 在 zsh 下会被 glob 吃掉（`no matches found`），要 `--include="*.ts"` 加引号。
+
+## 2026-10-10 19:2x · 那 9 条红的归因落定（HEAD 是绿的）+ 越界尺的两处自身错修完并各造了一次真红
+
+**做的事按原顺序，不含别的**：
+
+| # | 动作 | 读数 |
+|---|---|---|
+| 1 | 确认 `c0f8f059`（T5 文档/证据那笔）在 main 上 | `git merge-base --is-ancestor c0f8f059 a195a37f` ⇒ **YES**；main 现 tip `a195a37f` |
+| 2 | 隔离副本 `.worktrees/inb-t7` 推到当前 HEAD 并补齐产物 | `checkout --detach a195a37f` ⇒ dirty **0**；`pnpm -r build`（不含 mobile/windows）`BUILD_RC=0`；`prisma generate` `PRISMA_RC=0` |
+| 3 | 同一把尺在两棵树上各跑一次 | 主检出（含别线未提交 diff）**rc=1 / 9 红**；隔离副本 @ `a195a37f` **rc=0 / `Tests 46 passed (46)`** |
+| 4 | 归因 | 红来自未提交的错误体改名 `{error, errorCode}` → `{code, message}`（`git diff --stat -- server/ packages/shared-schema/` = 26 文件 / +561 −415；HEAD 的 `inbound.routes.ts` 里 `errorCode` 5 枚，工作树 3 枚 = 改到一半）⇒ 登记 **B142**，本线 16 枚断言与协议文档那句**逐字未动** |
+| 5 | `verify-inbound-commit-scope.py` 的假红 | 改前：`SCOPE_RC=1 … 越界=2`；那三枚（`731cc2e2`/`6e813df9`/`4a1dacd9`）主题分别是账号标准套件线与产品体验线的台账，只因**正文**提了一句"自动收集"就被 `--grep` 算进本线 |
+| 6 | 修法：判决只看主题命中桶，仅提及的照旧枚举并打印 `MENTION-ONLY（非本线动作）` | 改后：`本线笔数=48　仅正文提及=3　涉及路径=61　越界=0`、`SCOPE_RC=0`，两枚外线路径仍逐枚点名 |
+| 7 | 新增 ARM-4 + 把 `self_test()` 改成每臂都跑完再汇总 rc | 变异（`partition` 全归本线桶）⇒ `ARM-4 … 坏 731cc2e2 被当成本线笔; 6e813df9 被当成本线笔; docs/plans/account-standard-suite.md 的证据被分流丢了; docs/plans/product-ux-optimization.md 的证据被分流丢了`、`不成立=2 → ARM-3, ARM-4`；从 `.mut-bak` 还原 ⇒ 回到基线 `不成立=1 → ARM-3` |
+| 8 | ARM-3 那枚长红是**真事实**，不是探针坏 | `d49f77e3`+`63e61f23` 两枚别线批量提交把本线 **11 枚**独占路径装进了 main（内容确实在线：`git show a195a37f:…inbound-runtime.ts` 第 15/184 行有 `InboundAutomationCycleResult`）⇒ 登记 **B143**，三种读法交负责人拍，本线未自选 |
+
+**约束现量**（这一趟之后）：AC 已勾 **0** / 未勾 **8**；`git status --porcelain -- BLOCKED.md` = ` M`（本线 B142/B143 追加，同一份里还坐着别线刚追加的 23 行，提交时**不改写对方内容**）；本线越界动作 **0**（第 6 行那条读数就是它的尺给的）。
+
+**没做的事，写清楚**：`pnpm -r typecheck` / `pnpm check` / `pnpm -r test` / AC-3~AC-5 那三条服务端腿**这一趟都没跑** —— 起跑前查了两次载体：`load1/5/15 = 349/182/88` 与 `776/661/373`、可用内存 `2933MB → 957MB`（16 核）。这不是"等不来"的底噪而是别线正在打包，重量读数在这上面跑只会产出**不能信的绿**（tsc 会被内存挤到假红）。载体空出来后的第一条命令是：
+`cd .worktrees/inb-t7 && pnpm -r typecheck`（它决定 B103 那 16 条别人的类型错是否还在，也决定 T7 的 `pnpm check` 可不可达）。
+
+⚠️ 死路提醒（本轮新添一条）：zsh 里 `${PIPESTATUS[0]}` 是**空值**不是 bash 的数组下标 —— 我用它取还原后那次的 rc，读出空串；改成 `cmd > log 2>&1; RC=$?`。这条早就在册（AGENTS §7 第 184 条），我又踩了一次。
