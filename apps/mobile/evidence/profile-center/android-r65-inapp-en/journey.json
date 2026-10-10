@@ -1,0 +1,1061 @@
+{
+  "status": "passed",
+  "uiLocale": "en",
+  "artifact": {
+    "sha256": "1a01024e1d90aaae0e6bf446af7a329e9ac542427435f2e8e1497ba7c28d86c3",
+    "apk": "apps/mobile/android/app/build/outputs/apk/release/app-release.apk"
+  },
+  "geometry": {
+    "entry": {
+      "label": "Countdowns",
+      "node": {
+        "text": "",
+        "contentDescription": "Countdowns, Keep the dates you watch, and see how far off they are",
+        "resourceId": "profile-entry-countdown",
+        "class": "android.widget.Button",
+        "clickable": "true",
+        "visibleToUser": null,
+        "bounds": {
+          "raw": "[42,1786][1038,1901]",
+          "left": 42,
+          "top": 1786,
+          "right": 1038,
+          "bottom": 1901
+        }
+      }
+    },
+    "tabBar": {
+      "nodes": [
+        {
+          "label": "Tasks",
+          "node": {
+            "text": "",
+            "contentDescription": "Tasks",
+            "resourceId": "",
+            "class": "android.view.View",
+            "clickable": "true",
+            "visibleToUser": null,
+            "bounds": {
+              "raw": "[0,2169][216,2337]",
+              "left": 0,
+              "top": 2169,
+              "right": 216,
+              "bottom": 2337
+            }
+          }
+        },
+        {
+          "label": "Calendar",
+          "node": {
+            "text": "",
+            "contentDescription": "Calendar",
+            "resourceId": "",
+            "class": "android.view.View",
+            "clickable": "true",
+            "visibleToUser": null,
+            "bounds": {
+              "raw": "[216,2169][432,2337]",
+              "left": 216,
+              "top": 2169,
+              "right": 432,
+              "bottom": 2337
+            }
+          }
+        },
+        {
+          "label": "Focus",
+          "node": {
+            "text": "",
+            "contentDescription": "Focus",
+            "resourceId": "",
+            "class": "android.view.View",
+            "clickable": "true",
+            "visibleToUser": null,
+            "bounds": {
+              "raw": "[432,2169][648,2337]",
+              "left": 432,
+              "top": 2169,
+              "right": 648,
+              "bottom": 2337
+            }
+          }
+        },
+        {
+          "label": "Categories",
+          "node": {
+            "text": "",
+            "contentDescription": "Categories",
+            "resourceId": "",
+            "class": "android.view.View",
+            "clickable": "true",
+            "visibleToUser": null,
+            "bounds": {
+              "raw": "[648,2169][864,2337]",
+              "left": 648,
+              "top": 2169,
+              "right": 864,
+              "bottom": 2337
+            }
+          }
+        },
+        {
+          "label": "Profile",
+          "node": {
+            "text": "",
+            "contentDescription": "Profile",
+            "resourceId": "",
+            "class": "android.view.View",
+            "clickable": "true",
+            "visibleToUser": null,
+            "bounds": {
+              "raw": "[864,2169][1080,2337]",
+              "left": 864,
+              "top": 2169,
+              "right": 1080,
+              "bottom": 2337
+            }
+          }
+        }
+      ],
+      "top": 2169,
+      "bottom": 2337
+    },
+    "entryBottomAboveTabTop": true,
+    "entryBottomStrictlyAboveTabTop": true,
+    "visibleTitle": {
+      "raw": "[105,1788][336,1841]",
+      "left": 105,
+      "top": 1788,
+      "right": 336,
+      "bottom": 1841
+    },
+    "visibleSubtitle": {
+      "raw": "[42,1851][1038,1899]",
+      "left": 42,
+      "top": 1851,
+      "right": 1038,
+      "bottom": 1899
+    }
+  },
+  "steps": [
+    {
+      "action": "skip:consent-sheet-not-on-first-screen",
+      "destination": null,
+      "labels": [
+        "任务",
+        "打开搜索",
+        "同步",
+        "10月10日 星期六",
+        "还没有任务",
+        "搜索任务",
+        "视图选项：列表",
+        "列表",
+        "选择任务",
+        "选择任务",
+        "今天还没有安排",
+        "点右下角的加号，写下第一件事。",
+        "新建任务",
+        "任务",
+        "任务",
+        "日历",
+        "日历",
+        "专注",
+        "专注",
+        "分类",
+        "分类",
+        "我的",
+        "我的"
+      ],
+      "uiLocale": "zh-CN"
+    },
+    {
+      "action": "skip:welcome-offline-not-on-first-screen",
+      "destination": null,
+      "labels": [
+        "任务",
+        "打开搜索",
+        "同步",
+        "10月10日 星期六",
+        "还没有任务",
+        "搜索任务",
+        "视图选项：列表",
+        "列表",
+        "选择任务",
+        "选择任务",
+        "今天还没有安排",
+        "点右下角的加号，写下第一件事。",
+        "新建任务",
+        "任务",
+        "任务",
+        "日历",
+        "日历",
+        "专注",
+        "专注",
+        "分类",
+        "分类",
+        "我的",
+        "我的"
+      ],
+      "uiLocale": "zh-CN"
+    },
+    {
+      "action": "我的",
+      "destination": "设置",
+      "labels": [
+        "我的",
+        "账号",
+        "还没登录",
+        "不登录也能使用任务、专注和本地回顾。",
+        "注册 / 登录",
+        "注册 / 登录",
+        "设置, 个人资料、偏好、同步与安全",
+        "设置",
+        "个人资料、偏好、同步与安全",
+        "近期状态",
+        "本周完成任务",
+        "0",
+        "本周专注分钟",
+        "0",
+        "已达成成就",
+        "0/17",
+        "查看完整成长, 查看里程碑、习惯连续性和年度趋势。",
+        "查看完整成长",
+        "查看里程碑、习惯连续性和年度趋势。",
+        "尚未同步",
+        "通知, 系统消息与邀请好友活动",
+        "通知",
+        "系统消息与邀请好友活动",
+        "我的成长, 今日进度、连续天数与里程碑",
+        "我的成长",
+        "今日进度、连续天数与里程碑",
+        "习惯, 打卡、连续天数与热力图",
+        "习惯",
+        "打卡、连续天数与热力图",
+        "倒数纪念日, 记下要盯的日子，看它还有几天",
+        "倒数纪念日",
+        "记下要盯的日子，看它还有几天",
+        "AI 助手, 让一个助手帮你记录、安排、拆解或回顾任务",
+        "AI 助手",
+        "让一个助手帮你记录、安排、拆解或回顾任务",
+        "任务",
+        "任务",
+        "日历",
+        "日历",
+        "专注",
+        "专注",
+        "分类",
+        "分类",
+        "我的",
+        "我的"
+      ]
+    },
+    {
+      "action": "设置",
+      "destination": "常规",
+      "labels": [
+        "关闭",
+        "设置",
+        "偏好与账号",
+        "选择要调整的内容。",
+        "常规",
+        "常规",
+        "同步与隐私",
+        "同步与隐私",
+        "AI 与集成",
+        "AI 与集成",
+        "数据管理",
+        "数据管理",
+        "账号安全",
+        "账号安全"
+      ]
+    },
+    {
+      "action": "常规",
+      "destination": "语言",
+      "labels": [
+        "返回",
+        "常规",
+        "关闭",
+        "桌面小组件",
+        "今日任务、四象限、习惯、专注 —— 四张卡片可以把它们放在桌面上。",
+        "今日任务 · 四象限 · 今日习惯 · 今日专注",
+        "如何添加",
+        "1.",
+        "长按桌面空白处",
+        "2.",
+        "选「小部件」（部分机型叫「微件」）",
+        "3.",
+        "找到 Heyta，长按并拖到桌面上",
+        "系统不允许应用替你把小组件放上桌面，所以只能按下面的步骤自己加一次。",
+        "添加后如果卡片显示「打开 Heyta 以显示小组件」，打开一次 Heyta 就会填充内容。",
+        "凭据只保留在内存中，应用完全退出后需要重新输入。",
+        "语言",
+        "选择只在本会话内生效，重开应用会回到设备的语言。",
+        "中文",
+        "中文",
+        "English",
+        "English"
+      ]
+    },
+    {
+      "action": "English",
+      "destination": "Language",
+      "labels": [
+        "Back",
+        "General",
+        "Close",
+        "Home screen widgets",
+        "Today's tasks, quadrants, habits and focus — four cards you can keep on your home screen.",
+        "Today's tasks · Quadrants · Today's habits · Today's focus",
+        "How to add",
+        "1.",
+        "Touch and hold an empty spot on the home screen",
+        "2.",
+        "Tap “Widgets”",
+        "3.",
+        "Find Heyta, then touch and hold it and drag it onto the home screen",
+        "The system does not let an app place a widget for you, so you add it once by hand.",
+        "If the card says “Open Heyta to show your widget” after adding it, opening Heyta once fills it in.",
+        "Credentials are kept in memory only and must be re-entered after the app fully exits.",
+        "Language",
+        "This choice lasts for the current session only; reopening the app returns to the device language.",
+        "中文",
+        "中文",
+        "English",
+        "English"
+      ]
+    },
+    {
+      "action": "hardwareBack",
+      "destination": "Preferences and account",
+      "labels": [
+        "Close",
+        "Settings",
+        "Preferences and account",
+        "Choose what to adjust.",
+        "General",
+        "General",
+        "Sync and privacy",
+        "Sync and privacy",
+        "AI and integrations",
+        "AI and integrations",
+        "Data management",
+        "Data management",
+        "Account security",
+        "Account security"
+      ]
+    },
+    {
+      "action": "Sync and privacy",
+      "destination": "Privacy consent",
+      "labels": [
+        "Back",
+        "Sync and privacy",
+        "Close",
+        "Sync",
+        "heyta hosted sync",
+        "Sign in to heyta and tasks sync automatically across your devices. You do not need to copy a server address or token.",
+        "Sign in or register",
+        "Sign in or register",
+        "Use a self-hosted server",
+        "Use a self-hosted server",
+        "Privacy consent",
+        "This device only (network not agreed to)",
+        "Decided on 2026-10-10 10:41 (UTC)",
+        "Choose whether to go online when you need sync or sign-in. Opening the choice panel does not change your current permission.",
+        "Choose again",
+        "Choose again"
+      ]
+    },
+    {
+      "action": "hardwareBack",
+      "destination": "Preferences and account",
+      "labels": [
+        "Close",
+        "Settings",
+        "Preferences and account",
+        "Choose what to adjust.",
+        "General",
+        "General",
+        "Sync and privacy",
+        "Sync and privacy",
+        "AI and integrations",
+        "AI and integrations",
+        "Data management",
+        "Data management",
+        "Account security",
+        "Account security"
+      ]
+    },
+    {
+      "action": "Data management",
+      "destination": "Backup & migration",
+      "labels": [
+        "Back",
+        "Data management",
+        "Close",
+        "Trash, Restore the tasks, notes, lists and habits you deleted",
+        "Trash",
+        "Restore the tasks, notes, lists and habits you deleted",
+        "Backup & migration, Export a backup, restore data, or import from TickTick",
+        "Backup & migration",
+        "Export a backup, restore data, or import from TickTick"
+      ]
+    },
+    {
+      "action": "Backup & migration",
+      "destination": "Back",
+      "labels": [
+        "Backup & migration",
+        "Back",
+        "Export, restore, or migrate data on this device. Export runs locally and never touches a server.",
+        "JSON (full fidelity)",
+        "Every entity, the complete operation log, and deleted records included. Machine-readable, good for backup or migration.",
+        "Share JSON",
+        "Share JSON",
+        "Task list (Markdown)",
+        "A task list a person can open and read. It leaves out deleted records and the operation log.",
+        "Share task list",
+        "Share task list",
+        "Restore from backup",
+        "Restore works only into an empty library: it is rejected when this device already has data — nothing existing is cleared or overwritten.",
+        "Choose backup file",
+        "Choose backup file",
+        "Paste backup content (JSON)",
+        "Paste backup content (JSON)",
+        "Import from TickTick",
+        "Import from TickTick",
+        "The export is handed to the system share sheet, where you choose where it goes.",
+        "The JSON export can be imported back (empty databases only for now); the task list is for reading, not for restoring.",
+        "Tasks",
+        "Tasks",
+        "Calendar",
+        "Calendar",
+        "Focus",
+        "Focus",
+        "Categories",
+        "Categories",
+        "Profile",
+        "Profile"
+      ]
+    },
+    {
+      "action": "Back",
+      "destination": "Data management",
+      "labels": [
+        "Back",
+        "Data management",
+        "Close",
+        "Trash, Restore the tasks, notes, lists and habits you deleted",
+        "Trash",
+        "Restore the tasks, notes, lists and habits you deleted",
+        "Backup & migration, Export a backup, restore data, or import from TickTick",
+        "Backup & migration",
+        "Export a backup, restore data, or import from TickTick"
+      ]
+    },
+    {
+      "action": "hardwareBack",
+      "destination": "Preferences and account",
+      "labels": [
+        "Close",
+        "Settings",
+        "Preferences and account",
+        "Choose what to adjust.",
+        "General",
+        "General",
+        "Sync and privacy",
+        "Sync and privacy",
+        "AI and integrations",
+        "AI and integrations",
+        "Data management",
+        "Data management",
+        "Account security",
+        "Account security"
+      ]
+    },
+    {
+      "action": "hardwareBack",
+      "destination": "Recent activity",
+      "labels": [
+        "Profile",
+        "Account",
+        "Not signed in",
+        "Use tasks, focus and local activity without an account.",
+        "Sign in or register",
+        "Sign in or register",
+        "Settings, Profile, preferences, sync and security",
+        "Settings",
+        "Profile, preferences, sync and security",
+        "Recent activity",
+        "Tasks completed this week",
+        "0",
+        "Focus minutes this week",
+        "0",
+        "Achievements reached",
+        "0/17",
+        "View full growth, See milestones, habit streaks, and yearly trends.",
+        "View full growth",
+        "See milestones, habit streaks, and yearly trends.",
+        "Not synced yet",
+        "Notifications, Account notices and the referral program",
+        "Notifications",
+        "Account notices and the referral program",
+        "My growth, Today, streaks and milestones",
+        "My growth",
+        "Today, streaks and milestones",
+        "Habits, Check in, streaks and the heatmap",
+        "Habits",
+        "Check in, streaks and the heatmap",
+        "Countdowns, Keep the dates you watch, and see how far off they are",
+        "Countdowns",
+        "Keep the dates you watch, and see how far off they are",
+        "AI assistant, Ask one assistant to capture, plan, break down, or review your tasks",
+        "AI assistant",
+        "Ask one assistant to capture, plan, break down, or review your tasks",
+        "Tasks",
+        "Tasks",
+        "Calendar",
+        "Calendar",
+        "Focus",
+        "Focus",
+        "Categories",
+        "Categories",
+        "Profile",
+        "Profile"
+      ]
+    },
+    {
+      "action": "View full growth",
+      "destination": "My growth",
+      "labels": [
+        "My growth",
+        "Back",
+        "Streaks",
+        "No habits yet. Create one in Profile → Habits to start tracking.",
+        "Habits",
+        "Habits",
+        "Tasks",
+        "Tasks",
+        "Calendar",
+        "Calendar",
+        "Focus",
+        "Focus",
+        "Categories",
+        "Categories",
+        "Profile",
+        "Profile"
+      ]
+    },
+    {
+      "action": "hardwareBack",
+      "destination": "Settings",
+      "labels": [
+        "Profile",
+        "Account",
+        "Not signed in",
+        "Use tasks, focus and local activity without an account.",
+        "Sign in or register",
+        "Sign in or register",
+        "Settings, Profile, preferences, sync and security",
+        "Settings",
+        "Profile, preferences, sync and security",
+        "Recent activity",
+        "Tasks completed this week",
+        "0",
+        "Focus minutes this week",
+        "0",
+        "Achievements reached",
+        "0/17",
+        "View full growth, See milestones, habit streaks, and yearly trends.",
+        "View full growth",
+        "See milestones, habit streaks, and yearly trends.",
+        "Not synced yet",
+        "Notifications, Account notices and the referral program",
+        "Notifications",
+        "Account notices and the referral program",
+        "My growth, Today, streaks and milestones",
+        "My growth",
+        "Today, streaks and milestones",
+        "Habits, Check in, streaks and the heatmap",
+        "Habits",
+        "Check in, streaks and the heatmap",
+        "Countdowns, Keep the dates you watch, and see how far off they are",
+        "Countdowns",
+        "Keep the dates you watch, and see how far off they are",
+        "AI assistant, Ask one assistant to capture, plan, break down, or review your tasks",
+        "AI assistant",
+        "Ask one assistant to capture, plan, break down, or review your tasks",
+        "Tasks",
+        "Tasks",
+        "Calendar",
+        "Calendar",
+        "Focus",
+        "Focus",
+        "Categories",
+        "Categories",
+        "Profile",
+        "Profile"
+      ]
+    },
+    {
+      "action": "Lists",
+      "destination": "Back",
+      "labels": [
+        "Lists",
+        "Back",
+        "Lists",
+        "No lists yet",
+        "Use the + above to create a list.",
+        "Deleting a list does not delete its tasks — they go back to the Inbox.",
+        "List name",
+        "Name your new list",
+        "New list",
+        "New list",
+        "Tasks",
+        "Tasks",
+        "Calendar",
+        "Calendar",
+        "Focus",
+        "Focus",
+        "Categories",
+        "Categories",
+        "Profile",
+        "Profile"
+      ]
+    },
+    {
+      "action": "hardwareBack",
+      "destination": "Profile",
+      "labels": [
+        "Profile",
+        "Account",
+        "Not signed in",
+        "Use tasks, focus and local activity without an account.",
+        "Sign in or register",
+        "Sign in or register",
+        "Settings, Profile, preferences, sync and security",
+        "Settings",
+        "Profile, preferences, sync and security",
+        "Recent activity",
+        "Tasks completed this week",
+        "0",
+        "Focus minutes this week",
+        "0",
+        "Achievements reached",
+        "0/17",
+        "View full growth, See milestones, habit streaks, and yearly trends.",
+        "View full growth",
+        "See milestones, habit streaks, and yearly trends.",
+        "Not synced yet",
+        "Notifications, Account notices and the referral program",
+        "Notifications",
+        "Account notices and the referral program",
+        "My growth, Today, streaks and milestones",
+        "My growth",
+        "Today, streaks and milestones",
+        "Habits, Check in, streaks and the heatmap",
+        "Habits",
+        "Check in, streaks and the heatmap",
+        "Countdowns, Keep the dates you watch, and see how far off they are",
+        "Countdowns",
+        "Keep the dates you watch, and see how far off they are",
+        "AI assistant, Ask one assistant to capture, plan, break down, or review your tasks",
+        "AI assistant",
+        "Ask one assistant to capture, plan, break down, or review your tasks",
+        "Tasks",
+        "Tasks",
+        "Calendar",
+        "Calendar",
+        "Focus",
+        "Focus",
+        "Categories",
+        "Categories",
+        "Profile",
+        "Profile"
+      ]
+    },
+    {
+      "action": "countdownGeometryBeforeNudge",
+      "geometry": {
+        "entry": {
+          "label": "Countdowns",
+          "node": {
+            "text": "",
+            "contentDescription": "Countdowns, Keep the dates you watch, and see how far off they are",
+            "resourceId": "profile-entry-countdown",
+            "class": "android.widget.Button",
+            "clickable": "true",
+            "visibleToUser": null,
+            "bounds": {
+              "raw": "[42,2123][1038,2169]",
+              "left": 42,
+              "top": 2123,
+              "right": 1038,
+              "bottom": 2169
+            }
+          }
+        },
+        "tabBar": {
+          "nodes": [
+            {
+              "label": "Tasks",
+              "node": {
+                "text": "",
+                "contentDescription": "Tasks",
+                "resourceId": "",
+                "class": "android.view.View",
+                "clickable": "true",
+                "visibleToUser": null,
+                "bounds": {
+                  "raw": "[0,2169][216,2337]",
+                  "left": 0,
+                  "top": 2169,
+                  "right": 216,
+                  "bottom": 2337
+                }
+              }
+            },
+            {
+              "label": "Calendar",
+              "node": {
+                "text": "",
+                "contentDescription": "Calendar",
+                "resourceId": "",
+                "class": "android.view.View",
+                "clickable": "true",
+                "visibleToUser": null,
+                "bounds": {
+                  "raw": "[216,2169][432,2337]",
+                  "left": 216,
+                  "top": 2169,
+                  "right": 432,
+                  "bottom": 2337
+                }
+              }
+            },
+            {
+              "label": "Focus",
+              "node": {
+                "text": "",
+                "contentDescription": "Focus",
+                "resourceId": "",
+                "class": "android.view.View",
+                "clickable": "true",
+                "visibleToUser": null,
+                "bounds": {
+                  "raw": "[432,2169][648,2337]",
+                  "left": 432,
+                  "top": 2169,
+                  "right": 648,
+                  "bottom": 2337
+                }
+              }
+            },
+            {
+              "label": "Categories",
+              "node": {
+                "text": "",
+                "contentDescription": "Categories",
+                "resourceId": "",
+                "class": "android.view.View",
+                "clickable": "true",
+                "visibleToUser": null,
+                "bounds": {
+                  "raw": "[648,2169][864,2337]",
+                  "left": 648,
+                  "top": 2169,
+                  "right": 864,
+                  "bottom": 2337
+                }
+              }
+            },
+            {
+              "label": "Profile",
+              "node": {
+                "text": "",
+                "contentDescription": "Profile",
+                "resourceId": "",
+                "class": "android.view.View",
+                "clickable": "true",
+                "visibleToUser": null,
+                "bounds": {
+                  "raw": "[864,2169][1080,2337]",
+                  "left": 864,
+                  "top": 2169,
+                  "right": 1080,
+                  "bottom": 2337
+                }
+              }
+            }
+          ],
+          "top": 2169,
+          "bottom": 2337
+        },
+        "entryBottomAboveTabTop": true,
+        "entryBottomStrictlyAboveTabTop": false
+      }
+    },
+    {
+      "action": "countdownGeometryCentered",
+      "geometry": {
+        "entry": {
+          "label": "Countdowns",
+          "node": {
+            "text": "",
+            "contentDescription": "Countdowns, Keep the dates you watch, and see how far off they are",
+            "resourceId": "profile-entry-countdown",
+            "class": "android.widget.Button",
+            "clickable": "true",
+            "visibleToUser": null,
+            "bounds": {
+              "raw": "[42,1786][1038,1901]",
+              "left": 42,
+              "top": 1786,
+              "right": 1038,
+              "bottom": 1901
+            }
+          }
+        },
+        "tabBar": {
+          "nodes": [
+            {
+              "label": "Tasks",
+              "node": {
+                "text": "",
+                "contentDescription": "Tasks",
+                "resourceId": "",
+                "class": "android.view.View",
+                "clickable": "true",
+                "visibleToUser": null,
+                "bounds": {
+                  "raw": "[0,2169][216,2337]",
+                  "left": 0,
+                  "top": 2169,
+                  "right": 216,
+                  "bottom": 2337
+                }
+              }
+            },
+            {
+              "label": "Calendar",
+              "node": {
+                "text": "",
+                "contentDescription": "Calendar",
+                "resourceId": "",
+                "class": "android.view.View",
+                "clickable": "true",
+                "visibleToUser": null,
+                "bounds": {
+                  "raw": "[216,2169][432,2337]",
+                  "left": 216,
+                  "top": 2169,
+                  "right": 432,
+                  "bottom": 2337
+                }
+              }
+            },
+            {
+              "label": "Focus",
+              "node": {
+                "text": "",
+                "contentDescription": "Focus",
+                "resourceId": "",
+                "class": "android.view.View",
+                "clickable": "true",
+                "visibleToUser": null,
+                "bounds": {
+                  "raw": "[432,2169][648,2337]",
+                  "left": 432,
+                  "top": 2169,
+                  "right": 648,
+                  "bottom": 2337
+                }
+              }
+            },
+            {
+              "label": "Categories",
+              "node": {
+                "text": "",
+                "contentDescription": "Categories",
+                "resourceId": "",
+                "class": "android.view.View",
+                "clickable": "true",
+                "visibleToUser": null,
+                "bounds": {
+                  "raw": "[648,2169][864,2337]",
+                  "left": 648,
+                  "top": 2169,
+                  "right": 864,
+                  "bottom": 2337
+                }
+              }
+            },
+            {
+              "label": "Profile",
+              "node": {
+                "text": "",
+                "contentDescription": "Profile",
+                "resourceId": "",
+                "class": "android.view.View",
+                "clickable": "true",
+                "visibleToUser": null,
+                "bounds": {
+                  "raw": "[864,2169][1080,2337]",
+                  "left": 864,
+                  "top": 2169,
+                  "right": 1080,
+                  "bottom": 2337
+                }
+              }
+            }
+          ],
+          "top": 2169,
+          "bottom": 2337
+        },
+        "entryBottomAboveTabTop": true,
+        "entryBottomStrictlyAboveTabTop": true,
+        "visibleTitle": {
+          "raw": "[105,1788][336,1841]",
+          "left": 105,
+          "top": 1788,
+          "right": 336,
+          "bottom": 1841
+        },
+        "visibleSubtitle": {
+          "raw": "[42,1851][1038,1899]",
+          "left": 42,
+          "top": 1851,
+          "right": 1038,
+          "bottom": 1899
+        }
+      }
+    },
+    {
+      "action": "Countdowns",
+      "destination": "Countdowns",
+      "labels": [
+        "Countdowns",
+        "Back",
+        "All",
+        "All",
+        "Countdown",
+        "Countdown",
+        "Anniversary",
+        "Anniversary",
+        "Birthday",
+        "Birthday",
+        "Festival",
+        "Festival",
+        "Archived",
+        "Archived",
+        "Name this date",
+        "Date",
+        "Pick a date",
+        "Add",
+        "Add",
+        "No countdowns yet",
+        "Add an important date to see how much time is left.",
+        "Tasks",
+        "Tasks",
+        "Calendar",
+        "Calendar",
+        "Focus",
+        "Focus",
+        "Categories",
+        "Categories",
+        "Profile",
+        "Profile"
+      ]
+    },
+    {
+      "action": "countdownDestination",
+      "title": "Countdowns",
+      "countdownResourcePresent": true,
+      "labels": [
+        "Countdowns",
+        "Back",
+        "All",
+        "All",
+        "Countdown",
+        "Countdown",
+        "Anniversary",
+        "Anniversary",
+        "Birthday",
+        "Birthday",
+        "Festival",
+        "Festival",
+        "Archived",
+        "Archived",
+        "Name this date",
+        "Date",
+        "Pick a date",
+        "Add",
+        "Add",
+        "No countdowns yet",
+        "Add an important date to see how much time is left.",
+        "Tasks",
+        "Tasks",
+        "Calendar",
+        "Calendar",
+        "Focus",
+        "Focus",
+        "Categories",
+        "Categories",
+        "Profile",
+        "Profile"
+      ]
+    },
+    {
+      "action": "hardwareBack",
+      "destination": "Profile",
+      "labels": [
+        "Profile",
+        "Account",
+        "Not signed in",
+        "Use tasks, focus and local activity without an account.",
+        "Sign in or register",
+        "Sign in or register",
+        "Settings, Profile, preferences, sync and security",
+        "Settings",
+        "Profile, preferences, sync and security",
+        "Recent activity",
+        "Tasks completed this week",
+        "0",
+        "Focus minutes this week",
+        "0",
+        "Achievements reached",
+        "0/17",
+        "View full growth, See milestones, habit streaks, and yearly trends.",
+        "View full growth",
+        "See milestones, habit streaks, and yearly trends.",
+        "Not synced yet",
+        "Notifications, Account notices and the referral program",
+        "Notifications",
+        "Account notices and the referral program",
+        "My growth, Today, streaks and milestones",
+        "My growth",
+        "Today, streaks and milestones",
+        "Habits, Check in, streaks and the heatmap",
+        "Habits",
+        "Check in, streaks and the heatmap",
+        "Countdowns, Keep the dates you watch, and see how far off they are",
+        "Countdowns",
+        "Keep the dates you watch, and see how far off they are",
+        "AI assistant, Ask one assistant to capture, plan, break down, or review your tasks",
+        "AI assistant",
+        "Ask one assistant to capture, plan, break down, or review your tasks",
+        "Tasks",
+        "Tasks",
+        "Calendar",
+        "Calendar",
+        "Focus",
+        "Focus",
+        "Categories",
+        "Categories",
+        "Profile",
+        "Profile"
+      ]
+    }
+  ]
+}
