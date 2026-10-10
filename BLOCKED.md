@@ -7986,7 +7986,9 @@ asc testflight review submit --build-id ce1f0017-c3e6-4c3c-b66e-e9409fe0e63c --c
 换类型会让 `host.ts` 的实现必须处理第四态，那是产品语义（退避重试 / 报错 / 安静等订阅），
 不是删一子；改后运行时形状无法现量等于改前；该文件此刻在别线手里。
 
-## B138（2026-10-10 19:0x，账号标准套件线 · 想在载体里跑 `pnpm -r build` 时撞上的）：已提交的 i18n 里 `site.platforms.{android,desktop}.body` **各写了两遍**，`packages/i18n` 建不起来，全仓构建停在第一枚包
+## B141（2026-10-10 19:0x，账号标准套件线 · 想在载体里跑 `pnpm -r build` 时撞上的）
+
+> ⚠️ **本号原取 B138，19:1x 现量发现与别线那枚 B138（`InboundAutomationHostOptions` 两份定义，18:5x）撞号** ⇒ 本让号（后到者让）。`BLOCKED.md` **没有防重号门禁**（`check:adr-numbering` 只管 ADR）⇒ 取号与落笔之间不能隔任何等待，落笔前必须 `grep -oE '^## B[0-9]+' BLOCKED.md | sort -n | uniq -d` 复核一次。：已提交的 i18n 里 `site.platforms.{android,desktop}.body` **各写了两遍**，`packages/i18n` 建不起来，全仓构建停在第一枚包
 
 **现量**（只读枚举，命令在下）：`packages/i18n` 在 HEAD 上就红，两条 TS1117 各在一个语言文件里 ——
 
@@ -8120,3 +8122,72 @@ Error: locator.click: Test timeout of 60000ms exceeded.
 ⚠️ 边界：这一格闭合**不等于 AC-6 闭合**。AC-6 还要"用户独立完成启用 → 测试发送 → 等待 → 打开/解锁 →
 自动处理 → 查看结果"那一整条旅程（要公网接收与有权益的宿主在跑，两者按负责人指令仍关着），
 以及"各壳入口可用"（这一趟只有 web）。
+
+## ✅ B137 / B141（原 B138）的 19:1x 收口读数（2026-10-10，账号标准套件线代登 —— **两格都不是本线修的**）
+
+登记后不到一小时，**owner 自己把两格都收掉了**。现量（主检出 tip `1a30d3bc`）：
+
+| 格 | 现在 | 现量命令与读数 |
+|---|---|---|
+| B141（i18n 四行重复键） | ✅ 已入库 | `node -e`（B138 正文那条枚举命令）在两个语言文件上复核 ⇒ **重复=0** |
+| B137 三处内联 union | ✅ **零处剩下** | `apps/node-host/src/host.ts:275` = `Promise<InboundAutomationCycleResult>`（`:56` 已 import）；`inbound-runtime.ts:15/:184` 同；`InboundAutomationSettings.tsx:13/:37/:72` 用 `Partial<Record<InboundAutomationCycleState \| 'failed', …>>` ⇒ 四态都有位置，**"第三处被第二处遮着"那一形也一起没了** |
+| 全链构建 | ✅ **绿** | 载体 `.worktrees/iosacct`（tip `1a30d3bc` ＋ 32 枚脏路径）`pnpm -r build` ⇒ **`BUILD_RC=0`、`grep -cE 'error TS'` = 0、18 个顶层目录被建**（`~/heyta-carriers/w9-acct-logs/greencheck.log`） |
+
+**两条留给后来者的判据学**：
+1. 本会话曾打算在载体里"替 owner 打上那一枚类型修正"来做有界实验 —— 断言
+   `assert s.count(old)==1` 当场失败（`AssertionError: 0`），**那正是"已经被修好了"的证明**。
+   📌 一般规律：**动手前的那次"旧串还在不在"断言，本身就是一枚免费的现量尺** —— 它比"我先改了再看报不报错"便宜得多。
+2. `grep -c` 零命中时 **rc=1**，接在 `&&` 链里会让后面所有命令静默不执行，症状是"什么都没发生"
+   （本会话真实撞到一次）。数命中就用 `;` 串。
+
+⚠️ 两格都**不删**：号只增不改（AGENTS §7 索引纪律），这一节是它们的**后续裁决**（§8 第 8 条：
+历史失败记录可保留，但必须指向后续裁决与未覆盖边界）。未覆盖边界 = `waiting-entitlement` 那一档在
+**CLI 侧到底该做什么**，类型层已由 owner 对齐，产品层仍没人写 —— 那不属于本线，也不属于这两格。
+
+## B142（2026-10-10 19:2x，本会话 · 给 AC-1/AC-2 那条真库腿做归因时量出的）：全站错误体形状 `{error, errorCode}` → `{code, message}` **正在未提交状态下被改**，它改的落点**就在本线白名单里**
+
+**现量（同一个尺、两棵不同的树，2026-10-10 19:1x）**：
+
+| 载体 | 命令 | 读数 |
+|---|---|---|
+| 主检出（含别线未提交 diff） | `python3 research/tools/verify-inbound-worker-identity.py` | **rc=1**，9 条红，形状是 `expected undefined to be 'AUTOMATION_TICKET_USED'` / `'AUTOMATION_CLOCK_ROLLBACK'` / `'AUTOMATION_ACTIVATION_INVALID'` / `'AUTOMATION_LINK_NOT_BOUND'`，以及 `expected 403 to be 201`、`expected 402 to be 409` |
+| 隔离副本 `.worktrees/inb-t7` @ `a195a37f`（干净、自带 dist、`prisma generate` rc=0） | 同一命令 | **rc=0，`Tests 46 passed (46)`**（日志 `/tmp/inb-wt-worker.log`）|
+
+⇒ **那 9 条红不是 HEAD 的，是工作树里那枚在飞改名的**：`git diff --stat -- server/ packages/shared-schema/` = 26 文件 / +561 −415，里面逐枚长这样 ——
+
+```
+- …send({ error: 'Automation entitlement verification failed', errorCode: code });
++ …send({ code: code, message: 'Automation entitlement verification failed' });
+```
+
+`git show a195a37f:server/src/automation/inbound.routes.ts | grep -c errorCode` = **5**，同一份工作树文件 = **3**（改到一半）。测试读 `.errorCode` 拿到 `undefined`，就是这个形状。
+
+**这和本线的关系（不是"别线的事"）**：错误体字段是**线协议**，本线的断言与本线的对外文档都钉着旧形状。改名若落地，本线要跟着动的东西现量三处：
+
+- `server/tests/integration/inbound-worker-identity.integration.spec.ts` —— `errorCode` 命中 **12**
+- `server/tests/inbound-ai-quota-route.spec.ts` —— **2**；`server/tests/inbound-ticket-rejection-route.spec.ts` —— **2**（合计 **16**）
+- `docs/reference/inbound-automation-protocol.md:110` —— 「响应带 `errorCode=SUBSCRIPTION_REQUIRED`、`reason=QUOTA_EXCEEDED` 以及 `used` 与 `limit` 两个数」
+
+三处落点**都在本线白名单内**（`server/tests/`、那两份文档），所以"能改"这件事不缺授权；缺的是**什么时候改**。
+
+**为什么这一趟没改**：死规矩写着不许改判卷口径（既有断言），而"追一份还没提交的改动去改自己的断言"正是最坏的一种改口径 —— 改名若被回退，本线的断言当场变假。所以只登记，本线的 16 枚断言与协议文档那句**逐字未动**（现量：HEAD 与工作树里那 16 处 `errorCode` 都在）。
+
+**要拍的（三选一，都能闭合）**：① 改名落地当天由本线出一笔专笔，把 16 枚断言 + 协议文档那句一起换掉并复跑那把尺（本线白名单够，不需要别人动手）；② 由改名那条线在他们那笔里一起改本线的测试与文档（要他们出授权，且他们的 diff 要进本线地界）；③ 定一条"错误体形状属全站线协议、改动须先写 ADR"的规矩 —— 那是 AGENTS §3.3/线协议那一档的口径问题，不归本线自决。
+
+**给下一位的提醒**：判这 9 条红之前先确认自己站在哪棵树上。隔离副本那条腿现在就能当"HEAD 真值"用：`cd .worktrees/inb-t7 && python3 research/tools/verify-inbound-worker-identity.py --log /tmp/inb-wt-worker.log`（干净 worktree **没有 dist**，必须先 `pnpm -r build` 再 `pnpm --filter @heyta/server exec prisma generate`，否则红的是探针不是产品）。
+
+## B143（2026-10-10 19:2x，本会话 · 修 `verify-inbound-commit-scope.py` 时它自己报出来的）：本线**独占路径**有 11 枚是被**别线的批量提交**装进 main 的，那把尺的归属反查因此长红
+
+**现量**：`python3 research/tools/verify-inbound-commit-scope.py --self-test` ⇒ `臂数=4，不成立=1 → ARM-3`，ARM-3 打印 `动了独占路径却没被计入 = 2 ⇒ 漏网 d49f77e3→apps/mobile/src/inbound/lifecycle.ts, 63e61f23→apps/web/tests/inbound-cycle-display.spec.tsx`。逐笔数它们带走了本线多少枚：
+
+- `63e61f23`（主题 `feat(web): 产品体验线 + 全局响应式 + 认证/法务冻结 + 证据与测试`）带走 **10 枚**：`apps/web/src/features/settings/inbound-automation.css`、`…/inbound-runtime.ts`、`apps/web/tests/inbound-{cycle-display,draft-review,event-retry,upload-authorization,worker-lifecycle}.*`、`e2e/playwright.inbound.config.ts`、`e2e/tests/inbound-automation.spec.ts`
+- `d49f77e3`（主题 `feat(desktop+mobile+landing): 桌面小组件 + 移动端 + 落地页文档 + 证据`）带走 **1 枚**：`apps/mobile/src/inbound/lifecycle.ts`
+
+**这不是本线越界，也不是本线漏提交** —— 内容确实在 HEAD（`git show a195a37f:apps/web/src/features/settings/inbound-runtime.ts` 里 `InboundAutomationCycleResult` 在第 15/184 行，`InboundAutomationSettings.tsx` 的 `PROCESS_COPY` 在第 37 行），只是**第一枚把这份内容带进 main 的提交主题写的是别线的名字**。共享检出里 git user 对所有会话同值，作者字段区分不了（这把尺的文件头早就写了这一点）。
+
+**顺手修完的那一半（不需拍）**：同一次重量里发现这把尺自己的两处错，都已改并有反向验证：
+
+1. **归属集合按整条提交信息匹配**，`git log --grep` 也吃正文 ⇒ 别线正文里提了一句"自动收集"就被算进本线笔数，它带的外线路径被报成本线越界（就是 `SCOPE_RC=1 … 越界=2` 的来路；那三枚 `731cc2e2`/`6e813df9`/`4a1dacd9` 主题分别是账号标准套件线与产品体验线的台账）。改法是**分层不是放松**：判决只看主题命中的那一桶，仅正文提及的照旧枚举并打印成 `MENTION-ONLY（非本线动作）`。现量：`窗口起 2026-10-09 16:52　本线笔数=48　仅正文提及=3　涉及路径=61　越界=0`，rc=0，两枚外线路径仍在输出里逐枚点名。
+2. 新增 **ARM-4**（两半：已知提及件不许进本线桶 + 它的外线路径不许从打印集合里消失），并把 `self_test()` 从"首败即返回"改成"每臂都跑完再汇总 rc"—— 否则前一臂长红时后面那几枚臂**根本没有读数**。变异证明：把 `partition` 改成全部归本线桶 ⇒ `ARM-4 … 坏 731cc2e2 被当成本线笔; 6e813df9 被当成本线笔; docs/plans/account-standard-suite.md 的证据被分流丢了; docs/plans/product-ux-optimization.md 的证据被分流丢了`、`不成立=2 → ARM-3, ARM-4`；从 `.mut-bak` 还原后回到基线（`不成立=1 → ARM-3`）。
+
+**要拍的只有一件**：ARM-3 那句"动了独占路径却没被计入必须为 0"在共享检出下有两种真实成因 ——（甲）本线自己某笔没带主题词（这条臂当初就是为了它写的）；（乙）别线把本线路径提交了（今天的实际成因）。三种读法：① 保持长红，把它当"跨线提交"的告警器，每次由本线确认成因后在台账记一行；② 让 ARM-3 只认**主题里没有任何别线标记**的漏网（要给它一张别的线的主题词表，会随线的增减漂）；③ 把独占路径的归属判据从"笔"改成"内容"（HEAD 里那枚文件的内容等于本线台账登记的那一版就算闭合）。本线按纪律**没有**自己挑一种 —— 这是判卷口径，不是代码 bug。

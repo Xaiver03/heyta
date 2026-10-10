@@ -4116,3 +4116,42 @@ pnpm 的 deps 自检并**自作主张跑 `pnpm install`**，本机那一条会 E
 
 
 
+
+### 6.82 交接写成的一趟里，拦设备腿的墙**在两小时内自己塌了**；顺带把我自己那三条旧结论各否证一次（10-10 18:3x–19:1x 现量，载体 `.worktrees/iosacct`）
+
+负责人要的是交接（`close-long-session`），落点是仓内既有体例 `docs/plans/<线>-handoff.md` ＋ `-reflection.md`
+（现量：`ls docs/plans/*-handoff.md | wc -l`，写这份时 15 枚，另有同族 `-reflection.md` 3 枚）。
+两份新文件**没等到我提交就被别线那笔 `0243762a` 一起收进 HEAD**（宽 `git add` 第二次扫走本线未提交件；
+第一次是 B131 那段进 `0eea4c0f`）⇒ 里面的错**只能新写一笔更正，不能 amend**。
+
+写交接的同一趟里连着量到四件事，三件**否证我自己刚入库的结论**：
+
+| # | 事实 | 它推翻的是 |
+|---|---|---|
+| ① | `waiting-entitlement` 的内联重抄**不是一处**：18:5x 枚出三处（`apps/node-host/src/host.ts:274`、`apps/web/…/inbound-runtime.ts`、`apps/web/…/InboundAutomationSettings.tsx`），其中**第三处被第二处遮着** —— `setProcessState(result.state)` 里 `result` 的类型来自第二处那个三态签名，所以把第二处改成 import 共享类型的那一刻第三处才会红 | §6.81 那句「排除 `apps/node-host` 就能构建」：排除之后 `BUILD_RC` 仍是 1，红只是搬到 `apps/web` |
+| ② | 已提交的 `packages/i18n` 有 **4 行重复键**（en/zh 各 `site.platforms.android.body` 与 `…desktop.body` 两遍）⇒ `TS1117` 让 `pnpm -r build` **停在第一枚包**，后面每枚包都没编译过。修法零行为变更：JS 字面量**后者覆盖前者**，所以"删前留后"改的只是把没生效的那半行去掉（反证形状：反过来就会改界面文案）。登记 **B141**（原取 B138，19:1x 发现与别线撞号 ⇒ 后到者让号；`BLOCKED.md` 没有防重号门禁） | —— 全新 |
+| ③ | 🔴 **这两格都不是我修的，也不是我等的 —— 是 owner 在我写交接的同一小时里自己收掉的**：19:1x 现量主检出 tip 已到 `1a30d3bc`，i18n 重复键复核 **0**；`apps/node-host/src/host.ts:275` 现在是 `Promise<InboundAutomationCycleResult>`（`:56` 已 import 共享类型），另外两处也一并改成 import（`InboundAutomationSettings.tsx:13/:37/:72` 用 `Partial<Record<InboundAutomationCycleState \| 'failed', …>>` ⇒ 四态都有位置） | §6.81 第一行「纯 HEAD 红在 app-host barrel」；以及我 B137 里那句「三处内联」——现在**零处** |
+| ④ | ⇒ **全链构建绿**（载体 = tip `1a30d3bc` ＋ 32 枚脏路径）：`pnpm -r build` **`BUILD_RC=0`、`error TS` 计数 0、18 个顶层目录被建** | 本线设备腿的**拦路条件消失** |
+
+另外两条**装置层**的自纠，都写进了复盘表：
+
+- 🔴 我凭记忆拼的两枚 ADR 文件名**两枚都不存在**（`0063-session-rows-and-email-rebind.md`、
+  `0039-token-compartmentalization.md`；真名 `0063-email-rebinding-and-per-session-revocation.md`、
+  `0039-email-first-auth-and-desktop-reverse-authorization.md`）。
+  **发现者不是我** —— 别线那枚 B136 的死链读数点名了我这两行。⇒ 文档里指向具体文件的路径必须 `ls` 现量，
+  编号＋主题拼不出文件名。
+- 🔴 我第一版"摘重复键"的脚本有 **off-by-one**（`seen[k]+1` 当 0-based 下标用），删掉的是重复键**中间那行空行**，
+  两枚重复键原封不动 —— 于是「红从 en.ts 搬到 zh-CN.ts」被我一度读成"en 修好了"。
+  改成正确的 `kill.add(seen[k])` 之后复核 `重复=0`。
+  ⚠️ 诊断改动**只落在载体**，做完**逐字还原**（`git hash-object` == `git rev-parse HEAD:<file>`、
+  `git status --porcelain -- packages/i18n/` 当时为空）；**主检出一个字没动**。
+
+⚠️ 一条给下一个跑 pnpm 的人：`grep -c` **在零命中时以 rc=1 结束**，把它接在 `&&` 链里会让后面所有命令静默不执行
+（我这趟真实撞到过一次：`No-projects-matched 命中=0` 之后整条链断了，看起来像"什么都没发生"）。
+数命中就用 `;` 串，别用 `&&`。
+
+**设备腿现状**：墙塌了 ⇒ 19:1x 起 `heyta-ios-isolated`（UDID 现量 `xcrun simctl list devices booted`），
+locale 设 `zh_CN`，`IOS_DEVICE_NAME="heyta-ios-isolated" HEYTA_NO_FOCUS=1 bash scripts/reinstall-all.sh --only ios`
+（**走脚本原路，不做任何偏离**，日志 `~/heyta-carriers/w9-acct-logs/reinstall-ios-leg.log`），
+随后 `bash ~/heyta-carriers/w9-acct-logs/run-ios-account-leg.sh <UDID>`。
+那一腿的读数落在下面 §6.83（跑完再写，跑不完就如实写"未闭合"）。
