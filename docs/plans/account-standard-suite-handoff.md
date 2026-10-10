@@ -28,13 +28,17 @@
 > 本线一次都没代改别人的文件（那枚"替 owner 打上类型修正"的有界实验，断言
 > `assert s.count(old)==1` 当场 `AssertionError: 0` —— **那正是"已经修好了"的证明**，见复盘表第 10 行）。
 >
-> ▶ **正在进行**：`IOS_DEVICE_NAME="heyta-ios-isolated" HEYTA_NO_FOCUS=1 bash scripts/reinstall-all.sh --only ios`
-> 在载体里跑（**走脚本原路，零偏离**）。第 0 步 `pnpm -r build` 已是 `✅ 全仓构建完成` ——
-> 这是本线开工以来**第一次**过了那道没有逃生门的闸门。当前卡在段内 `pod install`
-> （最多 6 趟有界重试，`ArgumentError - path name contains null byte` 是逐趟非确定性的上游缺陷，
-> 不是产品坏了），随后 `xcodebuild Release`。日志 `~/heyta-carriers/w9-acct-logs/reinstall-ios-leg.log`。
-> 装完之后跑 `bash ~/heyta-carriers/w9-acct-logs/run-ios-account-leg.sh <UDID>`，读数写进过程账 **§6.83**。
-> 🔴 若这一腿仍未闭合，**goal 就还是 open**，别把"构建绿了"读成"设备腿取到数了"。
+> ▶ **21:10 终读数（取代上面"正在进行"）**：设备腿第一趟跑完了，**77 绿 / 10 红**，`LEG_RC=1`。
+> 换绑（A–G）与撤销（I + J 的库侧）与本地优先（K）**在真设备上闭合**；
+> **改密那一块没闭合** —— 卡在「E2EE 口令没进应用状态（`no-encryption-password`）⇒ 同步被闸住」，
+> 腿自己注明"不记产品失败、也不记已验证"（同一份产物上兄弟 rig 同症状）⇒ 归因未定，登 **B149**。
+> 10 枚红逐枚归因在过程账 **§6.84** 那张表：4 枚探针/导航（**B147** 截图主蓝标定 ×2、**B148** 设置面导航 ×2）、
+> 1 枚是 B148 的连带读数（行 189，**不许当独立产品结论**）、1 枚 HTTP 抖动（B149）、2 枚同步等待（B149）、
+> 2 枚截图臂（B147）。
+> 🔴 **goal 的收口条件因此仍未满足**：「iOS 设备腿取到读数」取到了，但**改密的设备侧读数没闭合**；
+> 下一趟之前要先拍 B149 那两问（iOS 那条口令进应用状态的路缺不缺一步显式 unlock；补在哪一层）。
+> 📌 两代 tip 要一起抄：app 二进制 = `1a30d3bc`＋32 枚，服务端 = `a63aa9e9`＋7 枚；
+> 两代之间 `git diff --name-only 1a30d3bc..a63aa9e9 -- apps/mobile packages/app-host` **为空**（现量）。
 
 ---
 
