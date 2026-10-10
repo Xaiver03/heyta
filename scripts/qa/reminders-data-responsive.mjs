@@ -85,6 +85,18 @@ if (trackedInEvidenceDir > 0 && !ALLOW_TRACKED_OVERWRITE) {
   );
 }
 /**
+ * 报告里每格都带一枚 `screenshot` 锚。它以前写的是**绝对落点**，而这份 `report.json` 是要提交的
+ * （图本身住在被 `.gitignore` 忽略的目录）⇒ 别人克隆出来，那 30 枚锚一枚都指不到东西，
+ * 而文件里没有任何一行说出这件事。序列化时统一换成仓内相对路径；落点在仓库之外时保留绝对并加
+ * `machine-only:` 前缀，让"只有这台机读得到"在文件里自己说。
+ * ⚠️ 只改**报告里的那个值**，不改 `page.screenshot({ path })` 真正写盘的落点。
+ */
+const OUT_OUTSIDE_REPO = OUT_REL.startsWith('..');
+const toReportPath = (value) => {
+  if (typeof value !== 'string' || !value.startsWith(`${OUT}/`)) return value;
+  return OUT_OUTSIDE_REPO ? `machine-only:${value}` : `${OUT_LABEL}/${value.slice(OUT.length + 1)}`;
+};
+/**
  * 这一趟读数**指认哪一棵树**（2026-10-10 03:0x 加）。理由不是整洁，是两条在案事实撞在一起：
  * ① 本仓库有一条在案缺陷 ——「跑一趟会把已跟踪证据就地改写 ⇒ 证据不再指认任何一棵树」；
  * ② 主检出上别的线一直在落笔（现量：02:5x 那格量到 70 分钟里落 25 笔）。
@@ -1198,6 +1210,11 @@ const report = {
     headless: !HEADED,
     // 这行读数指认的那棵树与那版装置（成因见上面 `TREE` 的注释块）。
     tree: TREE,
+    // 这份 report 会被提交而图不会（`evidenceDirTrackedFiles` 就是那枚证据）⇒ 读的人要能在文件里
+    // 直接看出"每格的 `screenshot` 锚在本仓库克隆里指不到文件"，不用去翻台账。
+    screenshotAnchorForm: OUT_OUTSIDE_REPO ? 'machine-only' : 'repo-relative',
+    screenshotAnchorResolvableInRepo: trackedInEvidenceDir > 0,
+    evidenceDirTrackedFiles: trackedInEvidenceDir,
     legs: LEGS,
     skippedLegs: ALL_LEGS.filter((l) => !LEGS.includes(l)),
     legCells,
@@ -1395,6 +1412,9 @@ const judged = Object.entries(report.assertions)
 if (judged.length === 0) {
   throw new Error(`这一趟一条断言都没判（legs=${LEGS.join(',')}）—— 别让它退 0`);
 }
-await writeFile(`${OUT}/report.json`, `${JSON.stringify(report, null, 2)}\n`);
+await writeFile(
+  `${OUT}/report.json`,
+  `${JSON.stringify(report, (key, value) => (key === 'screenshot' ? toReportPath(value) : value), 2)}\n`,
+);
 console.log(JSON.stringify({ legs: LEGS, skippedLegs: report.carrier.skippedLegs, assertions: report.assertions, notJudged: report.notJudged }, null, 2));
 if (judged.some(([, value]) => !value)) process.exitCode = 1;
