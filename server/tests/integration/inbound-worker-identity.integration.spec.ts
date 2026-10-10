@@ -962,7 +962,7 @@ describe.skipIf(!DATABASE_URL)('inbound identity through ordinary sync HTTP', ()
       expect((await hook(`sh-session-${randomUUID()}`)).status).toBe(202);
       const replay = await verify({ ticket, localAccountUuid: localAccount });
       expect(replay.status).toBe(403);
-      expect((await replay.json() as { errorCode: string }).errorCode).toBe('AUTOMATION_TICKET_USED');
+      expect((await replay.json() as { code: string }).code).toBe('AUTOMATION_TICKET_USED');
       const row = await db.automationEntitlementBinding.findUniqueOrThrow({ where: { userId } });
       expect(row).toMatchObject({ officialSubject: 'acct-postgres', installationId: installation, localAccountUuid: localAccount, revocationVersion: 1 });
     });
@@ -984,10 +984,16 @@ describe.skipIf(!DATABASE_URL)('inbound identity through ordinary sync HTTP', ()
       await db.automationEntitlementClock.upsert({ where: { installationId: installation },
         create: { installationId: installation, maxSeenAtMs: BigInt(Date.now() + 120_000), updatedAt: new Date() },
         update: { maxSeenAtMs: BigInt(Date.now() + 120_000), updatedAt: new Date() } });
-      const response = await verify({ ticket: ticketFor('session', {}), localAccountUuid: localAccount });
-      expect(response.status).toBe(403);
-      expect((await response.json() as { errorCode: string }).errorCode).toBe('AUTOMATION_CLOCK_ROLLBACK');
-      await db.automationEntitlementClock.deleteMany({ where: { installationId: installation } });
+      // 撤销必须无条件跑：这一档写的是 installation 级的共享行，撤销原先坐在两条
+      // 硬断言之后 —— 断言一失败它就跳过，未来时钟泄漏给后面每一条用例，
+      // 于是「一个键名过时」在脸上变成三条互不相干的状态码红。
+      try {
+        const response = await verify({ ticket: ticketFor('session', {}), localAccountUuid: localAccount });
+        expect(response.status).toBe(403);
+        expect((await response.json() as { code: string }).code).toBe('AUTOMATION_CLOCK_ROLLBACK');
+      } finally {
+        await db.automationEntitlementClock.deleteMany({ where: { installationId: installation } });
+      }
     });
 
     it('a commit-permit ticket only authorizes its own event, once', async () => {
@@ -1111,7 +1117,7 @@ describe.skipIf(!DATABASE_URL)('inbound identity through ordinary sync HTTP', ()
     const post = (path: string, body: unknown, auth = token) => fetch(`${base}/api${path}`, {
       method: 'POST', headers: { authorization: auth, 'content-type': 'application/json' }, body: JSON.stringify(body),
     });
-    const errorCode = async (response: Response) => (await response.json() as { errorCode?: string }).errorCode;
+    const refusalCode = async (response: Response) => (await response.json() as { code?: string }).code;
     let lastCode: string;
 
     beforeAll(async () => {
@@ -1171,7 +1177,7 @@ describe.skipIf(!DATABASE_URL)('inbound identity through ordinary sync HTTP', ()
       const wrong = await post('/automation/entitlement/activations/redeem',
         { code: lastCode, installationId: randomUUID(), localAccountUuid: localAccount });
       expect(wrong.status).toBe(403);
-      expect(await errorCode(wrong)).toBe('AUTOMATION_ACTIVATION_INVALID');
+      expect(await refusalCode(wrong)).toBe('AUTOMATION_ACTIVATION_INVALID');
       expect(await db.automationEntitlementLink.count({ where: { userId } })).toBe(0);
       // 拒签不消耗码：给它的那台实例仍然能兑换。
       const right = await post('/automation/entitlement/activations/redeem',
@@ -1183,7 +1189,7 @@ describe.skipIf(!DATABASE_URL)('inbound identity through ordinary sync HTTP', ()
     it('signs session tickets only from the recorded binding, never from what the client declares', async () => {
       const unbound = await post('/automation/entitlement/session', { installationId: randomUUID() });
       expect(unbound.status).toBe(403);
-      expect(await errorCode(unbound)).toBe('AUTOMATION_LINK_NOT_BOUND');
+      expect(await refusalCode(unbound)).toBe('AUTOMATION_LINK_NOT_BOUND');
 
       const signed = await post('/automation/entitlement/session', { installationId: installation });
       expect(signed.status).toBe(200);
@@ -1197,7 +1203,7 @@ describe.skipIf(!DATABASE_URL)('inbound identity through ordinary sync HTTP', ()
       // 自报另一个本地账号：票据不跟着变，消费侧按票据与请求体的不符直接拒。
       const lying = await post('/automation/entitlement/verify', { ticket, localAccountUuid: randomUUID() });
       expect(lying.status).toBe(403);
-      expect(await errorCode(lying)).toBe('AUTOMATION_LOCAL_ACCOUNT_MISMATCH');
+      expect(await refusalCode(lying)).toBe('AUTOMATION_LOCAL_ACCOUNT_MISMATCH');
 
       const honest = await post('/automation/entitlement/verify', { ticket, localAccountUuid: link.localAccountUuid });
       expect(honest.status).toBe(200);
@@ -1211,7 +1217,7 @@ describe.skipIf(!DATABASE_URL)('inbound identity through ordinary sync HTTP', ()
       // 那三条判据（未绑定 / 别人的实例 / 形状与作用域不合）。
       const unbound = await post('/automation/entitlement/ticket', { installationId: randomUUID(), action: 'worker-register' });
       expect(unbound.status).toBe(403);
-      expect(await errorCode(unbound)).toBe('AUTOMATION_LINK_NOT_BOUND');
+      expect(await refusalCode(unbound)).toBe('AUTOMATION_LINK_NOT_BOUND');
 
       const noAuth = await fetch(`${base}/api/automation/entitlement/ticket`, {
         method: 'POST', headers: { authorization: 'Bearer not-a-real-token', 'content-type': 'application/json' },
@@ -1224,12 +1230,12 @@ describe.skipIf(!DATABASE_URL)('inbound identity through ordinary sync HTTP', ()
       // `session` 是唯一能建/续短期绑定的动作，不许从逐次通道取。
       const sessionViaTicket = await post('/automation/entitlement/ticket', { installationId: installation, action: 'session' });
       expect(sessionViaTicket.status).toBe(403);
-      expect(await errorCode(sessionViaTicket)).toBe('AUTOMATION_ISSUER_ACTION_UNKNOWN');
+      expect(await refusalCode(sessionViaTicket)).toBe('AUTOMATION_ISSUER_ACTION_UNKNOWN');
 
       // 作用域与动作不符由签发端拒；形状由**与判定核逐字相同**的那份 schema 先挡（UUID / 128 上限）。
       const wrongScope = await post('/automation/entitlement/ticket', { installationId: installation, action: 'rule-enable' });
       expect(wrongScope.status).toBe(403);
-      expect(await errorCode(wrongScope)).toBe('AUTOMATION_ISSUER_SCOPE_MISMATCH');
+      expect(await refusalCode(wrongScope)).toBe('AUTOMATION_ISSUER_SCOPE_MISMATCH');
       for (const body of [{ action: 'rule-enable', ruleId: 'not-a-uuid' },
         { action: 'result-publish', eventId: `x${'y'.repeat(128)}` },
         // strict：客户端想把本地账号自报进票据里 —— 请求体压根没有这个字段。
@@ -1251,7 +1257,7 @@ describe.skipIf(!DATABASE_URL)('inbound identity through ordinary sync HTTP', ()
 
       const otherAccount = await post('/automation/entitlement/ticket', { installationId: installation, action: 'worker-register' }, otherToken);
       expect(otherAccount.status).toBe(403);
-      expect(await errorCode(otherAccount)).toBe('AUTOMATION_SUBJECT_MISMATCH');
+      expect(await refusalCode(otherAccount)).toBe('AUTOMATION_SUBJECT_MISMATCH');
     });
 
     it('换主体必须先撤销：一枚新码顶不掉别人在这台实例上的绑定', async () => {
@@ -1261,7 +1267,7 @@ describe.skipIf(!DATABASE_URL)('inbound identity through ordinary sync HTTP', ()
       const conflict = await post('/automation/entitlement/activations/redeem',
         { code, installationId: installation, localAccountUuid: randomUUID() }, otherToken);
       expect(conflict.status).toBe(403);
-      expect(await errorCode(conflict)).toBe('AUTOMATION_LINK_CONFLICT');
+      expect(await refusalCode(conflict)).toBe('AUTOMATION_LINK_CONFLICT');
       expect((await db.automationEntitlementLink.findUniqueOrThrow({ where: { installationId: installation } })).userId).toBe(userId);
 
       const revoked = await post('/automation/entitlement/activations/revoke', { installationId: installation });
@@ -1300,7 +1306,7 @@ describe.skipIf(!DATABASE_URL)('inbound identity through ordinary sync HTTP', ()
       }, officialKey.privateKey);
       const refused = await post('/automation/entitlement/verify', { ticket: stale, localAccountUuid: staleLink.localAccountUuid }, otherToken);
       expect(refused.status).toBe(403);
-      expect(await errorCode(refused)).toBe('AUTOMATION_REVOCATION_STALE');
+      expect(await refusalCode(refused)).toBe('AUTOMATION_REVOCATION_STALE');
 
       // 闸门这一侧：绑定行停在 version 4 以下时，抬到 9 之后连"能不能建收件密钥"都要变红。
       await db.automationEntitlementRevocation.deleteMany({});

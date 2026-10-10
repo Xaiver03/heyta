@@ -233,7 +233,7 @@ describe('inbound automation entitlement lifecycle', () => {
 
   it('reports a server-side 402 as the same state, without any local write', async () => {
     const run = await harness({ claimResponse: () => new Response(JSON.stringify({
-      error: 'Subscription required', errorCode: 'SUBSCRIPTION_REQUIRED', reason: 'entitlement-lapsed',
+      code: 'SUBSCRIPTION_REQUIRED', message: 'A paid subscription is required to use this hosted service.', reason: 'entitlement-lapsed',
     }), { status: 402 }) });
     expect({ state: run.state, error: run.error, batchOps: run.batchOps }).toEqual({ state: 'waiting-entitlement', error: undefined, batchOps: 0 });
   });

@@ -119,7 +119,7 @@ describe('automation rule transport entitlement ticket', () => {
 
   it('reports a 402 as a missing entitlement instead of a transport failure', async () => {
     for (const write of gatedWrites) {
-      const fetch = vi.fn().mockResolvedValue(response({ error: 'Subscription required', errorCode: 'SUBSCRIPTION_REQUIRED', reason: 'entitlement-lapsed' }, 402));
+      const fetch = vi.fn().mockResolvedValue(response({ code: 'SUBSCRIPTION_REQUIRED', message: 'A paid subscription is required to use this hosted service.', reason: 'entitlement-lapsed' }, 402));
       const remote = createInboundRulesRemote({ baseUrl: 'https://example.test', getToken: async () => 'token', fetchImpl: fetch,
         getEntitlementTicket: async () => ticket });
       const caught = await write.run(remote).catch((error: unknown) => error);

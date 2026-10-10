@@ -107,7 +107,7 @@ date-only 与 instant 是两种不同语义：date-only 由 `*DateLocal` 字段�
 
 **额度用尽那一次拒绝的形状**是 AC-1 那句"拒绝且不产生业务效果"里此前没有任何一层在守的一半（2026-10-10 补）。
 `managed` 预留被额度拒掉时抛**类型化**的 `AutomationAiMeteringDeniedError`，路由把它收口成 **402**，
-响应带 `errorCode=SUBSCRIPTION_REQUIRED`、`reason=QUOTA_EXCEEDED` 以及 `used` 与 `limit` 两个数 ——
+响应带 `code=SUBSCRIPTION_REQUIRED`、`reason=QUOTA_EXCEEDED`、一句人读的 `message`，以及 `used` 与 `limit` 两个数 ——
 形状与权益闸门那一路逐字同形，只多这两个数（设置页那句"本月 300 次用完了"靠它们，而不是再发一次请求去猜）。
 其余异常（租约失效、状态 CAS 没命中、限额配错）**仍然**是 409：把可重试的事发成 402 会让宿主一整期不再尝试，
 把终态发成 409 会让它对着一个用不完的周期退避空转 —— 两个方向都是缺陷，所以分类判的是"这个条件会不会自己变好"，
