@@ -25,32 +25,6 @@
  * `web.habits.icon.xxx` 这种 key 字符串（`t()` 查不到时的返回形状）。
  */
 
-import {
-  Activity,
-  BookOpen,
-  Droplet,
-  Leaf,
-  Moon,
-  Music,
-  Pencil,
-  Sun,
-  type LucideIcon,
-} from 'lucide-react';
-
-import type { HabitIcon } from '@heyta/domain';
-
-/** key → Lucide 字形组件。 */
-export const HABIT_GLYPHS: Record<HabitIcon, LucideIcon> = {
-  drop: Droplet,
-  activity: Activity,
-  book: BookOpen,
-  moon: Moon,
-  leaf: Leaf,
-  pencil: Pencil,
-  sun: Sun,
-  music: Music,
-};
-
 /**
  * key → **名称词条**。给 `title` 与 `aria-label` 用。
  *
@@ -60,9 +34,8 @@ export const HABIT_GLYPHS: Record<HabitIcon, LucideIcon> = {
  *    挡不住"少的那一端"。抽取的收尾动作是**删掉旧那份**（就是下面这一行代替的 10 行），
  *    不是再写一份更好的。
  *
- * 上面的 `HABIT_GLYPHS` **仍然留在本文件**，那是刻意的：本文件配的是 `lucide-react`
- * 的**组件**，共享层配的是 `lucide` 的**图标数据**，两种东西不能合成一张表；
- * 一致性由 `tests/habits-list-pane.spec.tsx` F 组逐对比钉住。
+ * 图形本体由共享 `HabitArtwork` 统一渲染；本文件只转出名称 key，避免 web 与
+ * 其他宿主各自维护一份图形表。
  *
  * 🔴 这些名字描述的是"这个字形看起来像什么"（水滴 / 书本），**不是**
  * "这个习惯应该是什么活动"。用户把水滴用成"喝水"还是"洗澡"是他的事 ——

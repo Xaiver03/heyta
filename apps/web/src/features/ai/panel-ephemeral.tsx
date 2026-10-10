@@ -43,21 +43,37 @@
  *   未决那一条会留在这份状态里，下一位读者就看得见）。
  */
 
-import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 
-import { loadCredentials } from '../sync/credential-storage.js';
+import { assistantHistoryAccount, createAssistantHistoryAccountResolver } from '@heyta/app-host';
+import type { PersistedCredentials } from '../sync/credential-storage.js';
+import { useSyncStore } from '../sync/store.js';
+
+const manualAccount = createAssistantHistoryAccountResolver();
+function accountFor(credentials: Pick<PersistedCredentials, 'baseUrl' | 'token' | 'email' | 'accountId'> | null): string | null {
+  if (credentials === null) return manualAccount(undefined);
+  const identity = { serverUrl: credentials.baseUrl, accountId: credentials.accountId, email: credentials.email };
+  if (credentials.accountId || credentials.email) {
+    // 离开手填会话后，即便再次使用同一 token 也不能恢复未核验账号的旧历史。
+    manualAccount(undefined);
+    return assistantHistoryAccount(identity);
+  }
+  return manualAccount({ serverUrl: credentials.baseUrl, token: credentials.token });
+}
 
 /**
- * 这段会话属于哪个账号 —— 用的是凭据里那个邮箱**标签**（`credential-storage` 里
- * 明确写着它不是秘密）。落盘记录绑它，读的时候不相等就当没有。
+ * 这段会话属于哪个账号 —— 当前同步 store 是运行时身份的唯一事实源。
+ * 持久化只是冷启动恢复；写满或被浏览器禁用时不能否定已经成功的登录。
  *
  * 🔴 两个面板共用这一枚函数，而不是各写一份：账号绑定是这份状态的**安全判据**，
  * 抄一份漂一份的代价本仓库量过两次（AGENTS §3.5）。
- * ⚠️ 调用方一律在**挂载时**取一次并固定（`useState(currentAccount)`），
- * 不在 render 体里调 —— 那是每次渲染多读一遍盘，而且会让"身份"中途换人。
+ * 挂载时绑定会话；异步完成时再查当前身份与 Provider 代际，旧操作不能串入新会话。
  */
 export function currentAccount(): string | null {
-  return loadCredentials()?.email ?? null;
+  const state = useSyncStore.getState();
+  return accountFor(state.token === undefined ? null : {
+    baseUrl: state.baseUrl, token: state.token, email: state.email, accountId: state.accountId,
+  });
 }
 
 /** 一个面板的未决状态：`owner` = `undefined` 表示**还没有人写过**。 */
@@ -72,27 +88,51 @@ interface PanelEphemeral<T extends object> {
   readonly owner: string | null | undefined;
   /** 账号不符时拿到的是**初始值**（见文件头那条"读也查"）。 */
   readonly value: T;
+  /** 账号经历任何切换后旧异步操作立即失效，包括 A → B → A。 */
+  isCurrent(): boolean;
   /**
    * 落一个补丁。
    *
    * 🔴 `account` 是**调用方当下的账号**（面板挂载时算一次并固定下来）：
    * 与 `owner` 不符时整份重置后再落，符合时原地改。
    */
-  write(account: string | null, patch: Partial<T>): void;
+  write(account: string | null, patch: Partial<T> | ((previous: T) => Partial<T>)): void;
 }
 
 const PanelEphemeralContext = createContext<
   | {
       entries: Record<string, Entry>;
+      account: string | null;
+      generation: number;
+      isCurrent: (generation: number) => boolean;
       setEntries: (next: (previous: Record<string, Entry>) => Record<string, Entry>) => void;
     }
   | null
 >(null);
 
 export function PanelEphemeralProvider({ children }: { children: ReactNode }): React.JSX.Element {
+  const [session, setSession] = useState(() => ({ account: currentAccount(), generation: 0 }));
+  const latest = useRef(session);
   const [entries, setEntries] = useState<Record<string, Entry>>({});
-  const value = { entries, setEntries };
+  useEffect(() => useSyncStore.subscribe(() => {
+    const account = currentAccount();
+    if (account === latest.current.account) return;
+    // 在事件回调中同步失效，不能等 React flush；快速 A → B → A 也必须算两代。
+    const next = { account, generation: latest.current.generation + 1 };
+    latest.current = next;
+    setEntries({});
+    setSession(next);
+  }), []);
+  const isCurrent = useCallback((generation: number) => latest.current.generation === generation, []);
+  const value = { entries, setEntries, ...session, isCurrent };
   return <PanelEphemeralContext.Provider value={value} children={children} />;
+}
+
+/** 助手用代际作为组件 key；同一挂载点退出/换号也重新绑定本机会话。 */
+export function usePanelSession(): { account: string | null; generation: number } {
+  const store = useContext(PanelEphemeralContext);
+  if (store === null) throw new Error('AI 面板必须包在 <PanelEphemeralProvider> 里');
+  return { account: store.account, generation: store.generation };
 }
 
 /**
@@ -114,18 +154,19 @@ export function usePanelEphemeral<T extends object>(
   }
   const entry = store.entries[key];
   const write = useCallback(
-    (nextAccount: string | null, patch: Partial<T>): void => {
+    (nextAccount: string | null, patch: Partial<T> | ((previous: T) => Partial<T>)): void => {
+      if (!store.isCurrent(store.generation) || nextAccount !== store.account) return;
       store.setEntries((previous) => {
+        if (!store.isCurrent(store.generation)) return previous;
         const before = previous[key];
-        const merged =
-          before === undefined || before.owner !== nextAccount
-            ? { ...initial, ...patch }
-            : { ...before.value, ...patch };
+        const base = before === undefined || before.owner !== nextAccount
+          ? initial
+          : before.value as T;
+        const merged = { ...base, ...(typeof patch === 'function' ? patch(base) : patch) };
         return { ...previous, [key]: { owner: nextAccount, value: merged as Record<string, unknown> } };
       });
     },
-    // `store.setEntries` 是 React 的 setState（稳定标识）；`initial` 必须是常量，
-    // 所以调用方一律传**模块级**的那一份，不在 render 里现造对象字面量。
+    // initial 必须在一次挂载内稳定；异步 updater 只能更新自己创建时的会话代际。
     [key, store, initial],
   );
   // 🔴 读侧也查账号（不是只在写的时候查）：换号不重新加载页面，
@@ -134,6 +175,7 @@ export function usePanelEphemeral<T extends object>(
   return {
     owner: entry?.owner,
     value: visible as T,
+    isCurrent: () => store.isCurrent(store.generation) && account === store.account,
     write,
   };
 }

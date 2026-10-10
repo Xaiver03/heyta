@@ -191,7 +191,9 @@ function pressEnter(el: Element | null | undefined): void {
 }
 
 const byTestId = (id: string): Element | null =>
-  container?.querySelector(`[data-testid="${id}"]`) ?? null;
+  (id.startsWith('account-menu-') || id === 'sync-signin-entry'
+    ? document
+    : container)?.querySelector(`[data-testid="${id}"]`) ?? null;
 const bySelector = (s: string): Element | null => container?.querySelector(s) ?? null;
 const byText = (tag: string, text: string): Element | null =>
   [...(container?.querySelectorAll(tag) ?? [])].find((e) => e.textContent?.trim() === text) ??

@@ -1,3 +1,4 @@
+import { startNativeWidgetLifecycle } from './lib/native-widgets.js';
 /**
  * 应用入口。
  *
@@ -165,7 +166,7 @@ if (new URLSearchParams(window.location.search).has('shell')) {
        *
        * 它自己吞掉所有失败（见 `pwa/lifecycle.ts`）：组件是增强，不是功能前提。
        */
-      startWidgetLifecycle();
+      if (!startNativeWidgetLifecycle()) startWidgetLifecycle();
 
       /**
        * 公共事实（调休 / 补班）的下行（W4b，ADR-0052）。

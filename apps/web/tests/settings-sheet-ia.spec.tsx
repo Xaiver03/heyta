@@ -23,6 +23,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { initOpLog, __resetOpLogForTests } from '../src/lib/oplog.js';
 import { useTaskStore } from '../src/features/tasks/store.js';
 import { emptyState } from '@heyta/op-log';
+import { privacyConsent, privacyConsentActions } from '../src/features/privacy/consent-gate.js';
+import { usePrivacyStore } from '../src/features/privacy/store.js';
 
 (globalThis as unknown as { indexedDB: IDBFactory }).indexedDB = new IDBFactory();
 (globalThis as unknown as { IDBKeyRange: typeof IDBKeyRange }).IDBKeyRange = IDBKeyRange;
@@ -36,6 +38,8 @@ let container: HTMLDivElement | undefined;
 
 beforeEach(async () => {
   localStorage.clear();
+  privacyConsentActions.localOnly();
+  usePrivacyStore.setState({ open: false, reason: 'first-launch', notPersisted: false });
   __resetOpLogForTests();
   await initOpLog();
 });
@@ -71,7 +75,7 @@ async function openSettings(el: HTMLElement): Promise<void> {
     avatar?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
     avatar?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
-  const item = el.querySelector('[data-testid="account-menu-settings"]');
+  const item = document.querySelector('[data-testid="account-menu-settings"]');
   expect(item, '头像菜单里必须有「设置」').not.toBeNull();
   await act(async () => {
     item?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -147,6 +151,38 @@ describe('设置浮层的 IA：下层必须可见', () => {
  * 真浏览器那条在 `e2e/tests/search-overlay.spec.ts` 里。
  */
 describe('设置浮层的退出口：Esc 与 ✕ 都要能关', () => {
+  it('先开设置再开隐私面板：第一次 Escape 只关隐私并还焦点，第二次才关设置', async () => {
+    const el = await mountApp();
+    await openSettings(el);
+    const settings = el.querySelector<HTMLElement>('[data-testid="settings-sheet"]')!;
+    const syncNav = el.querySelector<HTMLButtonElement>('[aria-controls="settings-group-sync"]')!;
+    // jsdom 没有滚动 API；只补这两枚真实节点的浏览器边界，不替换导航逻辑。
+    settings.scrollTo = () => undefined;
+    syncNav.scrollIntoView = () => undefined;
+    await act(async () => syncNav.click());
+    const trigger = el.querySelector<HTMLButtonElement>('[data-testid="privacy-choose-again"]')!;
+    expect(trigger.closest('[hidden]')).toBeNull();
+    trigger.focus();
+    await act(async () => trigger.click());
+    const privacy = el.querySelector<HTMLElement>('[data-testid="privacy-consent-dialog"]')!;
+    expect(document.activeElement).toBe(privacy);
+
+    await act(async () => {
+      privacy.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    });
+    expect(el.querySelector('[data-testid="privacy-consent-dialog"]')).toBeNull();
+    expect(el.querySelector('[data-testid="settings-sheet"]')).toBe(settings);
+    expect(document.activeElement).toBe(trigger);
+    expect(privacyConsent.current()?.decision).toBe('local-only');
+    expect(privacyConsent.networkAllowed()).toBe(false);
+
+    await act(async () => {
+      trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    });
+    expect(el.querySelector('[data-testid="settings-sheet"]')).toBeNull();
+    expect(document.activeElement).toBe(el.querySelector('[data-testid="account-menu-avatar"]'));
+  });
+
   it('Esc 关掉设置，回到"开设置前"的那个视图（下层还在）', async () => {
     const el = await mountApp();
     await openSettings(el);

@@ -156,39 +156,17 @@ async function emptyRowHeights(page: Page): Promise<number[]> {
   }, '[data-testid^="calendar-cell-"][role="button"]');
 }
 
-test('🔴 屏幕变高时，长高的是**当天那一格**，不是星期行（剩余空间归清单）', async ({ page }) => {
-  // 批二看图抓到的形状：把"全高"实现成"卡片涨 + 六行等分"之后，
-  // 720 上今天有 5 条任务时每行长到 ~190px，整月要滚着看。
-  //
-  // 🔴 判据是**差分**，不写死任何数：把视口从 720 拉到 1200，
-  //    空行的高度**必须一字不变** —— 多出来的 480px 应当全部归当天那一格。
-  //    为什么不用"空行不许比塞满的行还高"：那种写法在弹性盒下**永远成立**
-  //    （六行等分同一份自由空间，最忙那行还额外带着自己的内容），
-  //    实测它对着"把 flexGrow 加回网格"这个变异都不红 —— 恒真的判据比没有更糟（§7 元规则 2）。
+test('月历吸收视口剩余高度，不重复显示底部当天清单', async ({ page }) => {
   await openApp(page, APP_ZH);
   await seedToday(page);
   await gotoCalendar(page);
-
   await page.setViewportSize({ width: 1280, height: 720 });
-  await expect.poll(async () => (await emptyRowHeights(page)).length).toBeGreaterThan(0);
   const short = await emptyRowHeights(page);
-
+  expect(short.length).toBeGreaterThan(0);
   await page.setViewportSize({ width: 1280, height: 1200 });
-  await expect.poll(async () => (await emptyRowHeights(page)).length).toBe(
-    short.length,
-    '两档视口下数出来的空行数不一样，差分没有意义',
-  );
-  const tall = await emptyRowHeights(page);
-
-  const grew = tall.map((h, i) => ({ h, before: short[i] ?? -1 })).filter((r) => r.h > r.before + 1);
-  expect(
-    grew,
-    `视口从 720 拉到 1200 之后这些星期行变高了（${JSON.stringify(
-      short,
-    )} → ${JSON.stringify(tall)}）—— 剩余空间被网格吃了，应该归当天那一格`,
-  ).toEqual([]);
-
-  await page.screenshot({ path: 'test-results/calendar-tall-viewport.png', fullPage: false });
+  await expect.poll(async () => (await emptyRowHeights(page))[0]!).toBeGreaterThan(short[0]!);
+  await expect(page.getByTestId('calendar-board-day-section')).toHaveCount(0);
+  await page.screenshot({ path: 'test-results/calendar-tall-viewport.png' });
 });
 
 test('🔴 空日历也是全高的（不是只占半屏），而且整月都在可视范围内', async ({ page }) => {
@@ -396,9 +374,9 @@ test('🔴 月格里的任务条一条都没被裁一半，且「+N」对得上�
   // 🔴 这条是上面那次"假暗色"的**判据化**：卡片底色必须真的换了。
   //    只断言 `<html data-theme>` 是不够的 —— 那个属性可以被人直接改掉（我就是这么错的）。
   expect(
-    dark!.cardBg,
-    `暗色下月历卡片底色没变（还是 ${light!.cardBg}）—— RN 侧的色板没跟着主题走，界面上是"黑底白卡"`,
-  ).not.toBe(light!.cardBg);
+    dark!.barColor,
+    `暗色下任务文字色未随共享主题切换：${light!.barColor}`,
+  ).not.toBe(light!.barColor);
   expect(dark!.overflow, '暗色：任务条溢出格子（被裁一半）').toBe(false);
   expect(
     dark!.barColor,

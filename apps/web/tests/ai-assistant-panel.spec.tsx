@@ -8,7 +8,7 @@
  *      这条如果坏了，症状是"一切正常"，只有请求计数知道。
  *   2. 披露里说的字段与工具，必须**逐字等于** `planAssistantEgress(tier)` 给的集合 ——
  *      界面自己抄一份，就是替隐私承诺撒一个会过期的谎。
- *   3. 写提案出现时 `host.submit` **必须是 0**；只有按下确认才变成 1。
+ *   3. 执行档低风险写入自动提交；高风险提案出现时 `host.submit` **必须是 0**，只有按下确认才变成 1。
  *   4. 「新会话」要重新要求披露（上界与出境集合是按"一段会话"承诺的）。
  *
  * ⚠️ 全程真实链路：真 `requestAssistantTurn` + 真 `confirmAiToolProposal`，
@@ -24,6 +24,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { I18nProvider, en, zhCN } from '@heyta/i18n';
+import { HeytaUiProvider } from '@heyta/ui';
 import { planAssistantEgress, type AssistantTier } from '@heyta/app-host';
 import type { AiRoutingConfig } from '@heyta/ai';
 import type { LocalApiHost, LocalApiItem } from '@heyta/local-api';
@@ -115,6 +116,39 @@ function scriptedFetch(replies: readonly Reply[]): { impl: typeof fetch; bodies:
   return { impl, bodies };
 }
 
+/** 延迟回包的 provider：用来把并发发送和切会话竞态固定在测试里。 */
+function delayedFetch(): {
+  impl: typeof fetch;
+  bodies: string[];
+  pending: number;
+  resolve: (index: number, reply: Reply) => void;
+} {
+  const bodies: string[] = [];
+  const resolvers: Array<(value: Response) => void> = [];
+  const impl = ((url: unknown, init?: { body?: unknown }) => {
+    bodies.push(String(init?.body ?? '{}'));
+    return new Promise<Response>((resolve) => {
+      resolvers.push(resolve);
+    });
+  }) as unknown as typeof fetch;
+  return {
+    impl,
+    bodies,
+    get pending() {
+      return resolvers.length;
+    },
+    resolve: (index, reply) => {
+      const resolve = resolvers[index];
+      if (resolve === undefined) throw new Error(`没有第 ${String(index + 1)} 个延迟请求`);
+      resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ choices: [{ message: toMessage(reply) }] }),
+      } as Response);
+    },
+  };
+}
+
 let container: HTMLDivElement | undefined;
 let root: Root | undefined;
 
@@ -125,6 +159,11 @@ async function render(props: {
   routing?: AiRoutingConfig;
   locale?: 'zh-CN' | 'en';
   consents?: typeof CONSENTS;
+  historyStorage?: {
+    getItem: (key: string) => string | null;
+    setItem: (key: string, value: string) => void;
+    removeItem: (key: string) => void;
+  };
 }): Promise<HTMLDivElement> {
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -133,6 +172,10 @@ async function render(props: {
     root!.render(
       <I18nProvider locale={props.locale ?? 'zh-CN'}>
       <PanelEphemeralProvider>
+        {/* 真机上是 `App.tsx` 根部那一层 `<HeytaUiProvider>` 罩住助手面板
+            （共享层的显式标识透过它取 token）；测试单独挂载时必须把同一条
+            前置条件补上，否则测的是"没有 Provider"那条不存在的路。 */}
+        <HeytaUiProvider>
         <AssistantPanel
           routing={props.routing ?? ROUTING}
           consents={props.consents ?? CONSENTS}
@@ -140,7 +183,9 @@ async function render(props: {
           secrets={secrets}
           host={props.host}
           {...(props.fetchImpl === undefined ? {} : { fetchImpl: props.fetchImpl })}
+          {...(props.historyStorage === undefined ? {} : { historyStorage: props.historyStorage })}
         />
+        </HeytaUiProvider>
       </PanelEphemeralProvider>
       </I18nProvider>,
     );
@@ -150,9 +195,10 @@ async function render(props: {
 
 /** React 受控输入：必须走原生 setter，否则 onChange 收不到。 */
 async function type(el: HTMLDivElement, text: string): Promise<void> {
-  const input = el.querySelector<HTMLInputElement>('[data-testid="ai-assistant-input"]');
+  const input = el.querySelector<HTMLInputElement | HTMLTextAreaElement>('[data-testid="ai-assistant-input"]');
   if (input === null) throw new Error('找不到输入框');
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+  const prototype = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  const setter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
   await act(async () => {
     setter?.call(input, text);
     input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -174,6 +220,10 @@ const CJK = /[㐀-䶿一-鿿]/;
 beforeEach(() => {
   container = undefined;
   root = undefined;
+  // Assistant history intentionally persists in the browser by default. Each
+  // test must start with a clean account/session boundary or a previous case
+  // changes the empty-state and disclosure assertions for every later case.
+  window.localStorage.clear();
 });
 
 afterEach(() => {
@@ -201,6 +251,30 @@ describe('🔴 一次性披露在循环之前', () => {
     expect(host.submits).toBe(0);
   });
 
+  it('取消披露会恢复草稿，并移除未发送的乐观消息与本机历史', async () => {
+    let saved: string | null = null;
+    const historyStorage = {
+      getItem: () => saved,
+      setItem: (_key: string, value: string) => { saved = value; },
+      removeItem: () => { saved = null; },
+    };
+    const host = fakeHost();
+    const { impl, bodies } = scriptedFetch([{ kind: 'text', text: '不应发送' }]);
+    const el = await render({ host, fetchImpl: impl, historyStorage });
+
+    await type(el, '先看一下再决定');
+    await click(el, 'ai-assistant-send-button');
+    expect(el.querySelector('[data-testid="ai-chat-user"]')).not.toBeNull();
+    expect(saved).toContain('先看一下再决定');
+
+    await click(el, 'ai-assistant-disclosure-close');
+    expect(el.querySelector('[data-testid="ai-assistant-disclosure"]')).toBeNull();
+    expect(el.querySelector('[data-testid="ai-chat-user"]')).toBeNull();
+    expect((el.querySelector('[data-testid="ai-assistant-input"]') as HTMLTextAreaElement).value).toBe('先看一下再决定');
+    expect(saved).toBeNull();
+    expect(bodies).toHaveLength(0);
+  });
+
   it('按披露块里的「发送」才真的出境，回答渲染出来', async () => {
     const host = fakeHost();
     const { impl, bodies } = scriptedFetch([{ kind: 'text', text: '今天有一条任务。' }]);
@@ -213,6 +287,38 @@ describe('🔴 一次性披露在循环之前', () => {
     expect(bodies).toHaveLength(1);
     expect(el.querySelector('[data-testid="ai-chat-assistant"]')?.textContent).toContain(
       '今天有一条任务。',
+    );
+  });
+
+  // 🔴 法定显式标识（《标识办法》+ GB 45438-2025）：助手回答是生成合成的文本，
+  //    界面上必须带那句提示。少了它，备案材料里"已实现显式标识"就是假话。
+  it('🔴 助手回答带「AI 生成合成内容」的显式标识', async () => {
+    const host = fakeHost();
+    const { impl } = scriptedFetch([{ kind: 'text', text: '今天有一条任务。' }]);
+    const el = await render({ host, fetchImpl: impl });
+
+    await type(el, '随便说点什么吧');
+    await click(el, 'ai-assistant-send-button');
+    await click(el, 'ai-assistant-send');
+
+    expect(el.querySelector('[data-testid^="ai-chat-generated-"]')?.textContent).toBe(
+      'AI 生成合成内容',
+    );
+  });
+
+  it('🔴 未确认的提案卡同样带显式标识（提案文字是模型写的）', async () => {
+    const host = fakeHost();
+    const { impl } = scriptedFetch([
+      { kind: 'call', id: 'c1', name: 'complete_task', args: '{"taskIds":["t1","t2"]}' },
+    ]);
+    const el = await render({ host, fetchImpl: impl, tier: 'read-and-propose' });
+    await type(el, '把买咖啡和写周报都完成');
+    await click(el, 'ai-assistant-send-button');
+    await click(el, 'ai-assistant-send');
+
+    expect(el.querySelector('[data-testid="ai-chat-proposal"]')).toBeTruthy();
+    expect(el.querySelector('[data-testid^="ai-chat-generated-"]')?.textContent).toBe(
+      'AI 生成合成内容',
     );
   });
 
@@ -240,6 +346,7 @@ describe('🔴 一次性披露在循环之前', () => {
     await click(el, 'ai-assistant-send-button');
 
     const plan = planAssistantEgress('read-and-propose');
+    await click(el, 'ai-assistant-fields-toggle');
     const disclosureText =
       el.querySelector('[data-testid="ai-assistant-disclosure"]')?.textContent ?? '';
     for (const field of plan.fields) {
@@ -320,8 +427,151 @@ describe('🔴 一次性披露在循环之前', () => {
   });
 });
 
-describe('🔴 写：提案卡 + 用户确认，没有第二条路', () => {
-  it('模型要写 ⇒ 出提案卡，**submit 次数为 0**', async () => {
+describe('🔴 助手请求竞态：一次发送、一次运行、一次会话', () => {
+  it('待确认阶段重复点击发送不会追加第二条消息或覆盖披露', async () => {
+    const host = fakeHost();
+    const fetch = delayedFetch();
+    const el = await render({ host, fetchImpl: fetch.impl });
+
+    await type(el, '先确认这一句');
+    const button = el.querySelector<HTMLElement>('[data-testid="ai-assistant-send-button"]');
+    if (button === null) throw new Error('找不到发送按钮');
+    await act(async () => {
+      // 两次事件放在同一次 React flush 中，模拟用户快速双击/回车。
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(el.querySelectorAll('[data-testid="ai-chat-user"]')).toHaveLength(1);
+    expect(el.querySelectorAll('[data-testid="ai-assistant-disclosure"]')).toHaveLength(1);
+    expect(fetch.bodies).toHaveLength(0);
+  });
+
+  it('披露确认重复点击只启动一个请求', async () => {
+    const host = fakeHost();
+    const fetch = delayedFetch();
+    const el = await render({ host, fetchImpl: fetch.impl });
+
+    await type(el, '只发送一次');
+    await click(el, 'ai-assistant-send-button');
+    const confirm = el.querySelector<HTMLElement>('[data-testid="ai-assistant-send"]');
+    if (confirm === null) throw new Error('找不到披露确认按钮');
+    await act(async () => {
+      confirm.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      confirm.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(fetch.bodies).toHaveLength(1);
+    expect(el.querySelectorAll('[data-testid="ai-assistant-waiting"]')).toHaveLength(1);
+    fetch.resolve(0, { kind: 'text', text: '只收到一次' });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(el.querySelector('[data-testid="ai-chat-assistant"]')?.textContent).toContain('只收到一次');
+  });
+
+  it('运行中的请求不会被回车再次提交', async () => {
+    const host = fakeHost();
+    const fetch = delayedFetch();
+    const el = await render({ host, fetchImpl: fetch.impl });
+
+    await type(el, '第一句');
+    await click(el, 'ai-assistant-send-button');
+    await click(el, 'ai-assistant-send');
+    expect(fetch.bodies).toHaveLength(1);
+
+    await type(el, '不应并发发送');
+    const input = el.querySelector<HTMLTextAreaElement>('[data-testid="ai-assistant-input"]');
+    if (input === null) throw new Error('找不到输入框');
+    await act(async () => {
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    });
+
+    expect(fetch.bodies).toHaveLength(1);
+    expect(el.querySelectorAll('[data-testid="ai-chat-user"]')).toHaveLength(1);
+    fetch.resolve(0, { kind: 'text', text: '第一句已完成' });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(el.querySelector('[data-testid="ai-chat-assistant"]')?.textContent).toContain('第一句已完成');
+  });
+
+  it('运行中不允许切换新会话；请求结束后才可开启新会话', async () => {
+    const host = fakeHost();
+    const fetch = delayedFetch();
+    const el = await render({ host, fetchImpl: fetch.impl });
+
+    await type(el, '旧会话问题');
+    await click(el, 'ai-assistant-send-button');
+    await click(el, 'ai-assistant-send');
+    expect(fetch.bodies).toHaveLength(1);
+
+    await click(el, 'ai-assistant-new-session');
+    expect(el.querySelectorAll('[data-testid="ai-chat-user"]')).toHaveLength(1);
+    expect(el.querySelector('[data-testid="ai-assistant-waiting"]')).not.toBeNull();
+    expect(fetch.bodies).toHaveLength(1);
+
+    fetch.resolve(0, { kind: 'text', text: '第一会话回答' });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(el.querySelector('[data-testid="ai-chat-assistant"]')?.textContent).toContain('第一会话回答');
+
+    await click(el, 'ai-assistant-new-session');
+    expect(el.querySelector('[data-testid="ai-chat-assistant"]')).toBeNull();
+    await type(el, '新会话问题');
+    await click(el, 'ai-assistant-send-button');
+    await click(el, 'ai-assistant-send');
+    expect(fetch.bodies).toHaveLength(2);
+
+    fetch.resolve(1, { kind: 'text', text: '新会话回答' });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(el.querySelector('[data-testid="ai-chat-assistant"]')?.textContent).toContain('新会话回答');
+  });
+
+  it('运行中即使请求最终产生写入，也不能被新会话隐藏', async () => {
+    const host = fakeHost();
+    const fetch = delayedFetch();
+    const el = await render({ host, fetchImpl: fetch.impl, tier: 'read-and-propose' });
+
+    await type(el, '创建一条任务');
+    await click(el, 'ai-assistant-send-button');
+    await click(el, 'ai-assistant-send');
+    expect(host.submits).toBe(0);
+
+    await click(el, 'ai-assistant-new-session');
+    expect(el.querySelector('[data-testid="ai-assistant-waiting"]')).not.toBeNull();
+    expect(el.querySelectorAll('[data-testid="ai-chat-user"]')).toHaveLength(1);
+
+    fetch.resolve(0, { kind: 'call', id: 'c1', name: 'create_task', args: '{"title":"写报告"}' });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(host.submits).toBe(1);
+    expect(el.querySelector('[data-testid="ai-chat-assistant"]')?.textContent).toContain('已执行');
+  });
+});
+
+describe('Chatbot IA：历史列与中央空态', () => {
+  it('空会话把新会话、历史、问候和紧凑建议收进同一个 Chatbot', async () => {
+    const el = await render({ host: fakeHost(), fetchImpl: scriptedFetch([{ kind: 'text', text: '好。' }]).impl });
+    expect(el.querySelector('[data-testid="ai-assistant-history"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="ai-assistant-greeting"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="ai-assistant-new-session"]')).not.toBeNull();
+    expect(el.querySelectorAll('[data-testid^="ai-assistant-suggestion-"]')).toHaveLength(3);
+    expect(el.querySelector('[data-testid="ai-assistant-input"]')).not.toBeNull();
+  });
+});
+
+describe('🔴 写：低风险自动执行，高风险提案确认', () => {
+  it('执行档模型要建任务 ⇒ 自动执行并显示已执行，不出提案卡', async () => {
     const host = fakeHost();
     const { impl } = scriptedFetch([
       { kind: 'call', id: 'c1', name: 'create_task', args: '{"title":"买咖啡"}' },
@@ -331,16 +581,15 @@ describe('🔴 写：提案卡 + 用户确认，没有第二条路', () => {
     await click(el, 'ai-assistant-send-button');
     await click(el, 'ai-assistant-send');
 
-    const card = el.querySelector('[data-testid="ai-chat-proposal"]');
-    expect(card).not.toBeNull();
-    expect(card?.textContent).toContain('买咖啡');
-    expect(host.submits).toBe(0);
+    expect(el.querySelector('[data-testid="ai-chat-proposal"]')).toBeNull();
+    expect(el.querySelector('[data-testid="ai-chat-assistant"]')?.textContent).toContain('已执行');
+    expect(host.submits).toBe(1);
   });
 
-  it('按下确认才落库：submit 从 0 变 1', async () => {
+  it('高风险批量完成任务 ⇒ 按下确认才落库：submit 从 0 变 1', async () => {
     const host = fakeHost();
     const { impl } = scriptedFetch([
-      { kind: 'call', id: 'c1', name: 'create_task', args: '{"title":"买咖啡"}' },
+      { kind: 'call', id: 'c1', name: 'complete_task', args: '{"taskIds":["t1","t2"]}' },
     ]);
     const el = await render({ host, fetchImpl: impl, tier: 'read-and-propose' });
     await type(el, '记一下 买咖啡');
@@ -355,7 +604,7 @@ describe('🔴 写：提案卡 + 用户确认，没有第二条路', () => {
   it('🔴 提案之后**没有第二次模型调用**（模型看不到它被批准）', async () => {
     const host = fakeHost();
     const { impl, bodies } = scriptedFetch([
-      { kind: 'call', id: 'c1', name: 'create_task', args: '{"title":"买咖啡"}' },
+      { kind: 'call', id: 'c1', name: 'complete_task', args: '{"taskIds":["t1","t2"]}' },
       // 故意留一条：循环没停在提案上就会消费它、请求数变成 2。
       { kind: 'text', text: '我还想再问一句' },
     ]);
@@ -470,7 +719,7 @@ describe('过程可见与失败', () => {
     const { impl } = scriptedFetch([{ kind: 'text', text: '好' }]);
     const el = await render({ host, fetchImpl: impl, tier: 'read-and-propose' });
     expect(el.querySelector('[data-testid="ai-assistant-disclaimer"]')).not.toBeNull();
-    expect(el.querySelector('[data-testid="ai-assistant-tier"]')?.textContent).toContain('可提议改动');
+    expect(el.querySelector('[data-testid="ai-assistant-tier"]')?.textContent).toContain('执行');
   });
 });
 

@@ -6,8 +6,8 @@
   gap: var(--ht-space-2);
   padding: var(--ht-space-4);
   background: var(--ht-color-surface);
-  /* 扁平风格用边框表达层次，不用阴影 */
-  border-right: 1px solid var(--ht-color-border);
+  /* 工作区靠底色与留白分层，拖拽时才显示手柄。 */
+  border-right: 0;
   /*
    * 🔴 2026-10-06（工单 H9 的第二刀）：这一列**自己必须有界**，滚动交给 `.ht-sidebar__body`。
    * 形状与理由逐字照 `.ht-sidebar--calendar`（`sidebar.css:225-239`，日历线已经踩过并写下来了）：
@@ -93,15 +93,11 @@
   inline-size: var(--ht-border-width-thick);
 }
 
-/* 键盘：`outline` 而不是 `outline: none`（§5 明确点名的可访问性回归）。 */
-.ht-sidebar__resizer:focus-visible {
-  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
-}
-
+/* 键盘焦点：用同一根实心高亮细条表达，不叠加第二个外框。 */
 .ht-sidebar__resizer:focus-visible::after {
   opacity: 1;
   background: var(--ht-color-primary);
+  inline-size: var(--ht-border-width-thick);
 }
 
 .ht-brand {
@@ -297,7 +293,7 @@
   flex-direction: column;
   gap: var(--ht-space-1);
   padding: var(--ht-space-2);
-  border: 1px solid var(--ht-color-border);
+  border: 0;
   border-radius: var(--ht-radius-md);
   background: var(--ht-color-surface);
 }
@@ -414,6 +410,17 @@
   line-height: var(--ht-line-height-tight);
 }
 
+/* 节日名是日期下的辅助层：比日期数字弱，但保持可读；窄侧栏只做视觉省略。 */
+.ht-sidebar__day-aux {
+  max-inline-size: 100%;
+  overflow: hidden;
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-2xs);
+  line-height: var(--ht-line-height-tight);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .ht-sidebar__day-dots {
   display: flex;
   align-items: center;
@@ -439,20 +446,20 @@
  * 原先只有主区月历画，侧栏那颗点说"这天有没有事"，却不说"这天是不是班"）。
  *
  * 🔴 用哪一个颜色**不在这里判**：class 尾巴就是共享层 `calendarDayMarkerView`
- *    返回的那个 token 名（`color.success-strong` → `--success-strong`）。
- *    这里再判一次"休该是绿的"，就是同一格两份裁决。
+ *    返回的那个 token 名（`color.calendar-day-off` → `--off`）。
+ *    这里再判一次日期类型的颜色，就是同一格两份裁决。
  */
 .ht-sidebar__day-marker {
   font-size: var(--ht-font-size-2xs);
   line-height: var(--ht-line-height-tight);
 }
 
-.ht-sidebar__day-marker--success-strong {
-  color: var(--ht-color-success-strong);
+.ht-sidebar__day-marker--off {
+  color: var(--ht-color-calendar-day-off);
 }
 
-.ht-sidebar__day-marker--warning-strong {
-  color: var(--ht-color-warning-strong);
+.ht-sidebar__day-marker--work {
+  color: var(--ht-color-calendar-day-work);
 }
 
 /* 今天：列头与数字同色（主蓝），圈出一层边 —— 与主区月历同一条表达。 */

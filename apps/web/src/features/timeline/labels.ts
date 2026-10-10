@@ -62,6 +62,7 @@ export function useTimelineLabels(): TimelineLabels {
 
   const board: TimelineBoardLabels = {
     empty: t('web.timeline.empty'),
+    emptyHint: t('web.timeline.empty.hint'),
     ariaEmpty: t('web.timeline.aria.empty'),
     ariaGroup: (count) =>
       count === 1
@@ -95,6 +96,8 @@ export function useTimelineLabels(): TimelineLabels {
     aiBadge: (minutes) => t('web.board.aiBadge', { duration: formatDuration(minutes, gantt) }),
     overdue: t('web.board.overdue'),
     untitledTask: t('web.board.untitledTask'),
+    createAt: t('web.board.createTask'),
+    editSchedule: (title) => t('web.board.editSchedule', { title }),
   };
 
   const plan: ChecklistPlanLabels = {

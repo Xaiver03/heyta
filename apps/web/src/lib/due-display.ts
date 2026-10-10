@@ -41,6 +41,7 @@
 import {
   computeCountdown,
   formatCompactDate,
+  formatCompactLocalDate,
   type CountdownUrgency,
   type Task,
 } from '@heyta/domain';
@@ -100,11 +101,13 @@ export function dueText(
   now: number,
   t: T,
 ): string | null {
-  if (task.dueDate === undefined) return null;
+  if (task.dueDateLocal === undefined && task.dueDate === undefined) return null;
   const countdown = computeCountdown(task, { now });
   return mode === 'countdown'
     ? remainingText(countdown.remainingDays, t)
-    : formatCompactDate(task.dueDate, now);
+    : task.dueDateLocal !== undefined
+      ? formatCompactLocalDate(task.dueDateLocal, now)
+      : formatCompactDate(task.dueDate!, now);
 }
 
 /**

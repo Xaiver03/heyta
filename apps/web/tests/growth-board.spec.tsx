@@ -21,16 +21,52 @@
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { habitGrowth, identityTagsFromState, milestonesFromState, todayProgressFromState, weeklyReviewFromState } from '@heyta/app-host';
+import type { Habit, HabitPeriodStats } from '@heyta/domain';
 import { translate, type I18nValue } from '@heyta/i18n';
-import { GrowthBoard, HeytaUiProvider, type GrowthBoardLabels } from '@heyta/ui';
+import {
+  GrowthBoard,
+  HeytaUiProvider,
+  type GrowthBoardLabels,
+  type HabitGrowthFn,
+} from '@heyta/ui';
 
 import { growthBoardLabels } from '../src/features/motivation/GrowthView.js';
 
 /** 稳定的"现在"：2026-09-24（周四）10:00 本地时间 —— 与 motivation.spec.ts 同一个。 */
 const NOW = new Date(2026, 8, 24, 10, 0, 0).getTime();
+
+const STREAK_MONTH: HabitPeriodStats = {
+  monthKey: '2026-09',
+  achievedDays: 1,
+  scheduledDays: 1,
+  rate: 1,
+  monthValue: 1,
+  totalValue: 1,
+  totalAchievedDays: 1,
+};
+
+const REPAIR_GROWTH: HabitGrowthFn = () => ({
+  streak: { current: 0, longest: 1 },
+  month: STREAK_MONTH,
+  resilience: {
+    resilience: {
+      current: 0,
+      longest: 1,
+      total: 1,
+      freezesHeld: 0,
+      frozenDays: 0,
+      frozenInCurrentRun: 0,
+    },
+    repair: { date: '2026-09-23', streakIfRepaired: 2 },
+  },
+});
+
+function streakHabit(id: string): Habit {
+  return { id, name: id, createdAt: 1, updatedAt: 1 };
+}
 
 /** 空库。共享 composer 不碰业务判断，空输入也该画出一屏"还没有记录"。 */
 const EMPTY = {
@@ -62,8 +98,15 @@ afterEach(() => {
 
 function renderBoard(over: {
   showToday?: boolean;
+  showStreaks?: boolean;
   activityDays?: readonly { date: string; count: number }[];
   withCategory?: boolean;
+  streak?: {
+    habits: readonly Habit[];
+    growth: HabitGrowthFn;
+    onRepair?: (habitId: string, date: string) => void;
+    busyHabitId?: string | null;
+  };
 }): HTMLElement {
   const labels: GrowthBoardLabels = growthBoardLabels(t);
   act(() => {
@@ -76,12 +119,15 @@ function renderBoard(over: {
           weeklyReview={weeklyReviewFromState(EMPTY, NOW)}
           milestones={milestonesFromState(EMPTY)}
           identityTags={identityTagsFromState(EMPTY, NOW)}
-          habits={[]}
+          habits={over.streak?.habits ?? []}
           logs={[]}
-          growth={habitGrowth}
+          growth={over.streak?.growth ?? habitGrowth}
           {...(over.activityDays === undefined ? {} : { activityDays: over.activityDays })}
           labels={labels}
           {...(over.showToday === undefined ? {} : { showToday: over.showToday })}
+          {...(over.showStreaks === undefined ? {} : { showStreaks: over.showStreaks })}
+          {...(over.streak?.onRepair === undefined ? {} : { onRepair: over.streak.onRepair })}
+          {...(over.streak?.busyHabitId === undefined ? {} : { busyHabitId: over.streak.busyHabitId })}
           {...(over.withCategory === true
             ? { renderCategoryBreakdown: () => <div data-testid="probe-category">分类块</div> }
             : {})}
@@ -153,5 +199,21 @@ describe('GrowthBoard：共享 composer 的组合契约', () => {
     // 分档由共享层内部做：count=3 → level=3，格子必须真的上色（不是全透明）。
     const colored = withDays.querySelector('[data-testid="activity-cell-2026-09-24"]');
     expect(colored?.getAttribute('style') ?? '').toMatch(/background-color:\s*rgb\(/u);
+  });
+
+  it('成长动作忙碌时，所有习惯的续接按钮都禁用', () => {
+    const view = renderBoard({
+      streak: {
+        habits: [streakHabit('h1'), streakHabit('h2')],
+        growth: REPAIR_GROWTH,
+        onRepair: vi.fn(),
+        busyHabitId: 'h1',
+      },
+    });
+    const buttons = view.querySelectorAll('[data-testid^="habit-streak-repair-"]');
+    expect(buttons).toHaveLength(2);
+    for (const button of buttons) {
+      expect(button.getAttribute('aria-disabled')).toBe('true');
+    }
   });
 });

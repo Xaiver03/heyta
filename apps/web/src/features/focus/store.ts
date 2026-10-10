@@ -58,7 +58,7 @@ import {
   type FocusOverview,
 } from '@heyta/app-host';
 
-import { currentState, dispatchIntent, onEngineChange } from '../../lib/oplog.js';
+import { currentState, dispatchIntent, dispatchChecked, onEngineChange } from '../../lib/oplog.js';
 import { loadFocusConfig, saveFocusConfig } from '../../lib/focus-config.js';
 
 interface FocusStoreState {
@@ -121,6 +121,7 @@ interface FocusStoreState {
  */
 const actionContext: ActionContext = {
   dispatch: dispatchIntent,
+  dispatchChecked,
   getState: currentState,
 };
 

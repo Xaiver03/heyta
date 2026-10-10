@@ -170,15 +170,16 @@ test('搜索：贴顶浮层透出下层视图 + 顶栏没有第二个框 + 面�
     .toBeGreaterThan(0.5);
   expect(ratio, `比例过头说明它不再是"跟着宽度的面"：${ratio.toFixed(3)}`).toBeLessThan(0.66);
 
-  // ⑧ 🔴 玻璃材质是**两半**：半透明底色（共享层的 token）+ 背景模糊（宿主 CSS）。
-  //    只查其中一半会漏掉另一半的回归 —— 去掉 blur 或把底色换成实色，界面都还"像卡片"。
-  const material = await card.evaluate((el) => {
-    const s = getComputedStyle(el);
-    return { backdrop: s.backdropFilter || s.webkitBackdropFilter || 'none', bg: s.backgroundColor };
+  // 搜索保持实色，防止下层任务穿透干扰结果；输入和浮层均无描边。
+  const appearance = await card.evaluate((el) => {
+    const panel = getComputedStyle(el);
+    const input = getComputedStyle(el.querySelector('input')!);
+    return { bg: panel.backgroundColor, border: panel.borderTopWidth, outline: input.outlineWidth };
   });
-  expect(material.backdrop, `卡片必须有背景模糊：${material.backdrop}`).toContain('blur(');
-  const alpha = Number(/rgba?\([^)]*?,\s*([\d.]+)\)/.exec(material.bg)?.[1] ?? '1');
-  expect(alpha, `卡片底色必须半透明（玻璃）：${material.bg}`).toBeLessThan(1);
+  expect(appearance.bg).not.toBe('rgba(0, 0, 0, 0)');
+  expect(appearance.bg).toMatch(/^rgb\(/);
+  expect(appearance.border).toBe('0px');
+  expect(appearance.outline).toBe('0px');
 
   await page.screenshot({ path: 'test-results/search-spotlight-empty.png', fullPage: false });
 

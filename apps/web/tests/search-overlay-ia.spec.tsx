@@ -27,6 +27,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { initOpLog, __resetOpLogForTests } from '../src/lib/oplog.js';
 import { useTaskStore } from '../src/features/tasks/store.js';
+import { usePrivacyStore } from '../src/features/privacy/store.js';
 import { emptyState } from '@heyta/op-log';
 
 (globalThis as unknown as { indexedDB: IDBFactory }).indexedDB = new IDBFactory();
@@ -41,6 +42,8 @@ let container: HTMLDivElement | undefined;
 
 beforeEach(async () => {
   localStorage.clear();
+  localStorage.setItem('privacy.consent', JSON.stringify({ decision: 'local-only', decidedAt: new Date().toISOString() }));
+  usePrivacyStore.setState({ open: false, reason: 'first-launch', notPersisted: false });
   __resetOpLogForTests();
   await initOpLog(`search-ia-${Math.random().toString(36).slice(2)}`);
 });

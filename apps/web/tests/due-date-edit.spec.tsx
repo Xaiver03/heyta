@@ -63,9 +63,9 @@ function renderEditor(task: Task): void {
           <DueEditor
             task={task}
             now={NOW}
-            onSetDueDate={(due) => {
+            onSetDueDate={(due, dueDateLocal) => {
               // 🔴 **记下这张凭据**，不要 `void` 掉。见下面 `drainWrites`。
-              writes.push(useTaskStore.getState().setDueDate(task.id, due));
+              writes.push(useTaskStore.getState().setDueDate(task.id, due, dueDateLocal));
             }}
           />
         </HeytaUiProvider>
@@ -193,6 +193,17 @@ afterEach(() => {
 });
 
 describe('🔴 批一判据 ①：选截止日 → 恰好一条只带 dueDate 的 UPD op', () => {
+  it('rule date-only survives a different device timezone and an edit round trip', async () => {
+    await useTaskStore.getState().setDueDate(taskId, Date.UTC(2026, 9, 7, 16), '2026-10-08');
+    renderEditor(taskOf(taskId));
+    expect(container.querySelector('[data-testid="due-editor-summary"]')?.textContent).toContain('10月8日');
+    openPanel();
+    const cell = buttonByAriaLabel('10月18日');
+    expect(cell).not.toBeNull();
+    act(() => cell!.click());
+    await drainWrites();
+    expect(taskOf(taskId).dueDateLocal).toBe('2026-10-18');
+  });
   it('触发器在（行尾 disclosure），没有 due 时不显示日期', () => {
     renderEditor(taskOf(taskId));
     const summary = container.querySelector('[data-testid="due-editor-summary"]');
@@ -219,9 +230,9 @@ await drainWrites();
     expect(ops).toHaveLength(before.length + 1);
     const last = ops[ops.length - 1]!;
     expect(last.opType).toBe(OpType.Update);
-    // 🔴 `toEqual` 钉死"**只有** dueDate"：多带一个字段（比如顺手写 priority）
+    // 🔴 `toEqual` 钉死"只有截止日及其 date-only 语义"：多带业务字段必须红。
     // 就是把一个意图拆成半个意图，这里必须红。
-    expect(last.payload).toEqual({ dueDate: dueDateToEpoch('2026-10-18') });
+    expect(last.payload).toEqual({ dueDate: dueDateToEpoch('2026-10-18'), dueDateLocal: '2026-10-18' });
 
     // 物化状态（引擎重放）：离线刷新后 due 还在的机制就是它。
     expect(taskOf(taskId).dueDate).toBe(dueDateToEpoch('2026-10-18'));
@@ -245,7 +256,7 @@ await drainWrites();
     const ops = await engine.getOpsForEntity('TASK', taskId);
     expect(ops).toHaveLength(before.length + 1);
     expect(ops[ops.length - 1]!.opType).toBe(OpType.Update);
-    expect(ops[ops.length - 1]!.payload).toEqual({ dueDate: null });
+    expect(ops[ops.length - 1]!.payload).toEqual({ dueDate: null, dueDateLocal: null });
     expect(taskOf(taskId).dueDate).toBeUndefined();
   });
 
@@ -265,7 +276,7 @@ await drainWrites();
     const ops = await engine.getOpsForEntity('TASK', taskId);
 
     expect(ops).toHaveLength(before.length + 1);
-    expect(ops[ops.length - 1]!.payload).toEqual({ dueDate: dueDateToEpoch(TODAY) });
+    expect(ops[ops.length - 1]!.payload).toEqual({ dueDate: dueDateToEpoch(TODAY), dueDateLocal: TODAY });
     expect(taskOf(taskId).dueDate).toBe(dueDateToEpoch(TODAY));
   });
 
@@ -380,7 +391,7 @@ describe('🔴 R14 时刻：输入、搬运、全天、无日期四档', () => {
     clickByTestId('date-picker-time-all-day');
 await drainWrites();
     const cleared = await requireEngine().getOpsForEntity('TASK', taskId);
-    expect(cleared[cleared.length - 1]!.payload).toEqual({ dueDate: dueDateToEpoch('2026-10-18') });
+    expect(cleared[cleared.length - 1]!.payload).toEqual({ dueDate: dueDateToEpoch('2026-10-18'), dueDateLocal: '2026-10-18' });
     /*
      * 重新渲染。`task` 是**快照 prop**（宿主在任务行上传的是当前实体），
      * 不重 render 组件就还以为时刻是 16:00 —— 于是"敲进 16:00"变成写同一个值，
@@ -396,6 +407,7 @@ await drainWrites();
     expect(ops[ops.length - 1]!.opType).toBe(OpType.Update);
     expect(ops[ops.length - 1]!.payload).toEqual({
       dueDate: dueDateToEpoch('2026-10-18', '16:00'),
+      dueDateLocal: null,
     });
     expect(new Date(taskOf(taskId).dueDate!).getHours()).toBe(16);
   });
@@ -412,6 +424,7 @@ await drainWrites();
     expect(ops).toHaveLength(before + 1);
     expect(ops[ops.length - 1]!.payload).toEqual({
       dueDate: dueDateToEpoch('2026-10-25', '16:00'),
+      dueDateLocal: null,
     });
   });
 
@@ -421,7 +434,7 @@ await drainWrites();
 await drainWrites();
     const ops = await requireEngine().getOpsForEntity('TASK', taskId);
     expect(ops).toHaveLength(before + 1);
-    expect(ops[ops.length - 1]!.payload).toEqual({ dueDate: dueDateToEpoch('2026-10-18') });
+    expect(ops[ops.length - 1]!.payload).toEqual({ dueDate: dueDateToEpoch('2026-10-18'), dueDateLocal: '2026-10-18' });
     expect(taskOf(taskId).dueDate).toBe(dueDateToEpoch('2026-10-18'));
     // 读回来必须是"全天"（与时间线那侧同一个判定，不是这里自己再算一遍时分）。
     expect(localTimeOf(taskOf(taskId).dueDate!)).toBeUndefined();

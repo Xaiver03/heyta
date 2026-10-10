@@ -299,6 +299,17 @@ describe('🔴🔴 AI 的输出不会自己写进数据', () => {
     await clickAsync(el.querySelector('[data-testid="ai-send"]'));
     expect(el.querySelector('[data-testid="ai-proposal-source"]')?.textContent).toContain('本机');
   });
+
+  // 🔴 法定显式标识（《标识办法》+ GB 45438-2025）：那段草稿是 AI 写的。
+  //    它与上面那条**不是一件事** —— 来源标签说的是"数据去了哪台机器"，
+  //    这一条说的是"这段话是谁写的"。少了它，备案材料里"已实现显式标识"就是假话。
+  it('🔴 提议里带「AI 生成合成内容」的显式标识', async () => {
+    const { impl } = fakeFetch('- 甲');
+    const el = render({ fetchImpl: impl });
+    click(el.querySelector('[data-testid="ai-breakdown-t1"]'));
+    await clickAsync(el.querySelector('[data-testid="ai-send"]'));
+    expect(el.querySelector('[data-testid="ai-proposal-generated"]')?.textContent).toBe('AI 生成合成内容');
+  });
 });
 
 describe('失败路径', () => {

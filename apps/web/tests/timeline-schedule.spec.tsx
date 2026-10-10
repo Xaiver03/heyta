@@ -50,7 +50,7 @@ describe('🔴🔴 P2 出口判据：拖拽 → setSchedule → 恰好一条形�
     expect(ops).toHaveLength(before.length + 1);
     const last = ops[ops.length - 1]!;
     expect(last.opType).toBe(OpType.Update);
-    expect(last.payload).toEqual({ startDate: start, durationMinutes: 90 });
+    expect(last.payload).toEqual({ startDate: start, startDateLocal: null, durationMinutes: 90 });
 
     // 骨架 2 的形态：引擎重放出的物化状态就是"离线刷新后"看到的东西。
     const fresh = useTaskStore.getState().entities;
@@ -91,7 +91,7 @@ describe('🔴🔴 P2 出口判据：拖拽 → setSchedule → 恰好一条形�
     await useTaskStore.getState().setSchedule(entry.id, { startDate: start + 3_600_000 });
     const ops = await engine.getOpsForEntity('TASK', entry.id);
     expect(ops).toHaveLength(before.length + 1);
-    expect(ops[ops.length - 1]!.payload).toEqual({ startDate: start + 3_600_000 });
+    expect(ops[ops.length - 1]!.payload).toEqual({ startDate: start + 3_600_000, startDateLocal: null });
 
     const task = useTaskStore.getState().entities.tasks?.[entry.id];
     expect(task?.startDate).toBe(start + 3_600_000);

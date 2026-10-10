@@ -23,7 +23,7 @@ import { createNoteActions, type ActionContext } from '@heyta/app-host';
 import type { Note } from '@heyta/domain';
 import { create } from 'zustand';
 
-import { currentState, dispatchIntent, onEngineChange } from '../../lib/oplog.js';
+import { currentState, dispatchIntent, dispatchChecked, onEngineChange } from '../../lib/oplog.js';
 
 interface NoteState {
   /** 未删除的便签，**规范顺序**（来自动作层的 `listNotes()`）。 */
@@ -82,6 +82,7 @@ interface NoteState {
 /** 与任务 / 习惯 / 提醒 store 同一个形状。只含两个函数引用，不含任何判断。 */
 const actionContext: ActionContext = {
   dispatch: dispatchIntent,
+  dispatchChecked,
   getState: currentState,
 };
 

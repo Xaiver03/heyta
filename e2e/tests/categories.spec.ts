@@ -75,9 +75,9 @@ test.describe('分类着色：真浏览器契约', () => {
     // ── 建一条清单（真实侧栏表单，真 op）─────────────────────────────
     // 🔴 输入框**默认不在 DOM 里**（2026-09-30 起：点标题右侧的 + 才展开）。
     await page.getByRole('button', { name: '新建清单' }).click();
-    const newProject = page.locator('input[placeholder="新清单"]');
+    const newProject = page.locator('#ht-category-create-name');
     await newProject.fill('深度工作');
-    await page.getByRole('button', { name: '添加清单' }).click();
+    await page.getByRole('button', { name: '创建清单' }).click();
 
     const toggle = page.getByRole('button', { name: '给「深度工作」设置分类颜色' });
     await expect(toggle).toBeVisible();

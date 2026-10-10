@@ -27,7 +27,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { I18nProvider, type Locale } from '@heyta/i18n';
+import { I18nProvider, translate, type Locale } from '@heyta/i18n';
 // M3 第二刀之后，`FocusTimer` 的计时核心来自共享 `FocusPanel`，它从 context 取
 // token —— 所以渲染它的树必须挂 `HeytaUiProvider`（应用里挂在 App 最外层）。
 import { HeytaUiProvider } from '@heyta/ui';
@@ -90,7 +90,7 @@ describe('sync store 只带数据', () => {
       status: { kind: 'error', reason: 'not-configured', retryable: false },
     });
     const el = render(<SyncBar />, 'en');
-    expect(el.textContent).toContain('Sync is not configured yet');
+    expect(el.textContent).toContain(translate('en', 'common.sync.error.notConfigured'));
     expect(el.textContent).not.toMatch(CJK);
   });
 

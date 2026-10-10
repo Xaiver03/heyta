@@ -182,13 +182,12 @@ function milestoneLabels(t: I18nValue['t']): MilestoneMapLabels {
     allReachedA11y: (name) => t('web.growth.milestone.allReached', { name }),
     nextA11y: ({ name, threshold, unit, gap }) =>
       t('web.growth.milestone.nextLabel', { name, threshold, unit, gap }),
-    /*
-      ⚠️ 单档徽章的可访问名：web 词条表里没有"第 N 档 / 已达成"这类条目，
-      而**迁移前 web 的徽章本来也只有数字**（对勾是 `aria-hidden` 的装饰）。
-      原样保留那个可读结果，不编一句新文案 —— 缺的 `web.growth.milestone.tierA11y`
-      记在 `labels.ts` 文件头。
-    */
-    tierA11y: ({ threshold }) => String(threshold),
+    /* 每档都把阈值与完成状态说出来；对勾仍是视觉线索，文案是读屏用户的完整事实。 */
+    tierA11y: ({ threshold, reached, unit = '' }) =>
+      t(
+        reached ? 'web.growth.milestone.tierReached' : 'web.growth.milestone.tierPending',
+        { threshold: String(threshold), unit },
+      ),
     // 领域层理论上不会返回空列表（`MILESTONE_DEFINITIONS` 非空）；
     // 真为空时给一句最接近的事实说明，不抛错。
     empty: t('web.growth.milestones.note'),
@@ -238,6 +237,7 @@ function heatmapLabels(t: I18nValue['t']): ActivityHeatmapLabels {
       的对偶用例会把两种字形当成两份事实源。
     */
     grid: ({ total }) => t('web.growth.year.heatmap', { count: total }),
+    scrollHint: t('web.growth.year.scrollHint'),
     // `web.habits.heatmap.cell` 是 "{date}：{count} 次"，**不含"打卡"字样**，
     // 对"打卡 + 完成任务 + 专注轮次"的年度总览同样成立。
     cellTooltip: ({ date, count }) => t('web.habits.heatmap.cell', { date, count }),

@@ -21,10 +21,8 @@
  * 调 `navigator.credentials.create()`，不可能放进这个面板。
  * 所以本文件只钉**触发那封邮件**这一段，并且明确不假装钉了另一端。
  *
- * ⚠️ 2026-10-02：表单改成两步（邮箱 → 「继续」→ 口令），**恢复入口在第二步**。
- * 这不是措辞变化，是一条真实的可发现性代价：丢了通行密钥的人必须先走过"填邮箱"
- * 才看得见找回那一句。所以这一组判据现在**每次都把两步走完** —— 它钉的仍然是
- * "入口存在"，只是把"存在"定义为"用户真能点到的那个屏幕上存在"。
+ * ⚠️ 2026-10-07：恢复入口与邮箱 + 登录口令同屏，但默认收在「其他登录方式」下。
+ * 每个用例显式展开这组入口，钉住的仍然是"入口存在且用户真能点到"。
  *
  * 全程零联网：`fetch` 一律 stub。
  */
@@ -102,17 +100,22 @@ async function typeInto(el: HTMLElement, selector: string, value: string): Promi
 }
 
 /**
- * 走过第一步（邮箱 → 「继续」）。
+ * 填好邮箱并展开「其他登录方式」。
  *
- * 🔴 2026-10-02：表单改成两步之后，**所有二级入口**（通行密钥 / 邮件链接 / 找回 /
- * 粘贴兜底）都只在第二屏出现 —— 那是"一次只问一件事"的代价，也是这一组判据
- * 必须跟着改写的地方。这里的 `auth-form-email` 选择器是**故意**写成共享表单的
+ * 🔴 二级入口默认收起，展开之后才挂载（通行密钥 / 邮件链接 / 找回 /
+ * 粘贴兜底）。这里的 `auth-form-email` 选择器是**故意**写成共享表单的
  * testID：它由 `@heyta/ui` 那份实现给出，各端共用，不是 web 自己的一套 DOM。
  */
 async function toCredentialStage(el: HTMLElement, email = EMAIL): Promise<void> {
   await typeInto(el, '[data-testid="auth-form-email"]', email);
+  const toggle = el.querySelector('[data-testid="auth-form-other-ways-toggle"]') as HTMLButtonElement | null;
+  if (toggle !== null) {
+    await act(async () => {
+      toggle.click();
+      await Promise.resolve();
+    });
+  }
   await act(async () => {
-    (el.querySelector('[data-testid="auth-form-continue"]') as HTMLButtonElement).click();
     await Promise.resolve();
   });
 }

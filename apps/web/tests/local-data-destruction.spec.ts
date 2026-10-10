@@ -50,6 +50,11 @@ const poolLock = vi.hoisted(() => ({
   succeedFromAttempt: 0,
 }));
 
+// 原生桥是平台边界；此套件的数据库替身不提供原生生命周期所需的引擎订阅。
+// 清理的成功、失败和先于数据库销毁的顺序在这里显式验证。
+const widgetCleanup = vi.hoisted(() => vi.fn<() => Promise<void>>());
+vi.mock('../src/lib/native-widgets.js', () => ({ clearNativeWidgets: widgetCleanup }));
+
 vi.mock('../src/lib/oplog.js', () => ({
   releaseStorageWorker: async () => {
     poolLock.releaseCalls += 1;
@@ -132,6 +137,7 @@ function installServiceWorkerLayer(caches: Record<string, string[]> = { 'app-she
 }
 
 beforeEach(() => {
+  widgetCleanup.mockReset().mockResolvedValue(undefined);
   resetIdb();
   localStorage.clear();
   sessionStorage.clear();
@@ -153,15 +159,17 @@ describe('E2 —— 清单与真源逐字对账（抄件一定会漂）', () => 
     return found[1];
   }
 
-  it('三个库名与各自的真源**逐字相同**', () => {
+  it('四个库名与各自的真源**逐字相同**', () => {
     const oplog = readFileSync(join(WEB_SRC, 'lib/oplog.ts'), 'utf8');
     const vault = readFileSync(join(WEB_SRC, 'lib/vault-session.ts'), 'utf8');
+    const inbound = readFileSync(join(WEB_SRC, 'features/settings/inbound-runtime.ts'), 'utf8');
     const sw = readFileSync(join(WEB_SRC, 'pwa/sw.ts'), 'utf8');
 
     expect([...WEB_DATABASE_NAMES].sort()).toEqual(
       [
         literal(oplog, /export function initOpLog\(dbName = '([^']+)'\)/),
         literal(vault, /const DB_NAME = '([^']+)'/),
+        literal(inbound, /const DB_NAME = '([^']+)'/),
         literal(sw, /const DB_NAME = '([^']+)'/),
       ].sort(),
     );
@@ -290,7 +298,7 @@ function resolveName(arg: string, source: string): string | undefined {
 }
 
 describe('E2 —— 逐类真的清掉', () => {
-  it('🔴 三个库 + heyta* 键 + 令牌四键 + OPFS + CacheStorage 一起没', async () => {
+  it('🔴 四个库 + heyta* 键 + 令牌四键 + OPFS + CacheStorage 一起没', async () => {
     for (const name of WEB_DATABASE_NAMES) {
       const adapter = new IndexedDbAdapter(name);
       await adapter.init();
@@ -311,7 +319,8 @@ describe('E2 —— 逐类真的清掉', () => {
 
     const reports = await eraseWebLocalData();
 
-    expect(reports.length, `报告 ${String(reports.length)} 条 ⇒ 有代码没跑到`).toBe(8);
+    expect(reports.length, `报告 ${String(reports.length)} 条 ⇒ 有代码没跑到`).toBe(9);
+    expect(widgetCleanup).toHaveBeenCalledTimes(1);
     for (const name of WEB_DATABASE_NAMES) {
       expect(await opsCount(name), `「${name}」里还有东西`).toBe(0);
     }
@@ -329,6 +338,27 @@ describe('E2 —— 逐类真的清掉', () => {
     expect(reports.filter((r) => !r.containerRemoved).map((r) => r.target)).toEqual([]);
   });
 
+  it('原生小组件先停止并清理；清理失败仍销毁其他数据并保留失败原因', async () => {
+    widgetCleanup.mockRejectedValue(new Error('widget-clear-rejected'));
+    const destroy = vi.spyOn(IndexedDbAdapter.prototype, 'destroy');
+    localStorage.setItem('heyta.theme', 'dark');
+    sessionStorage.setItem('loginToken', 'one-time-token');
+    const opfs = installOpfs();
+    installServiceWorkerLayer();
+
+    const reports = await eraseWebLocalData();
+
+    expect(widgetCleanup).toHaveBeenCalledTimes(1);
+    expect(widgetCleanup.mock.invocationCallOrder[0]).toBeLessThan(destroy.mock.invocationCallOrder[0]!);
+    expect(reports.filter((r) => !r.containerRemoved)).toEqual([
+      expect.objectContaining({ target: 'native-widgets', reason: expect.stringContaining('widget-clear-rejected') }),
+    ]);
+    expect(reports.filter((r) => WEB_DATABASE_NAMES.includes(r.target as typeof WEB_DATABASE_NAMES[number]))).toHaveLength(WEB_DATABASE_NAMES.length);
+    expect(localStorage.getItem('heyta.theme')).toBeNull();
+    expect(sessionStorage.getItem('loginToken')).toBeNull();
+    expect(opfs.removeEntry).toHaveBeenCalledWith(WEB_OPFS_DIRECTORY, { recursive: true });
+  });
+
   it('🔴 主库销毁抛错 ⇒ 后面的几类**照做**，且这一类以 reason 报出来', async () => {
     // 这一条钉的是"一类失败 = 整次销毁半途而废"：那会留下最难的形态 ——
     // 界面说"同步已停止"，磁盘上留着半份数据，而下一次启动还可能把它灌回来。
@@ -344,7 +374,7 @@ describe('E2 —— 逐类真的清掉', () => {
 
     const reports = await eraseWebLocalData();
 
-    expect(reports).toHaveLength(8);
+    expect(reports).toHaveLength(9);
     expect(reports[0]?.containerRemoved).toBe(false);
     expect(reports[0]?.reason).toContain('别的标签页');
     // 后面几类真的做了，不是被 catch 顺手跳过的。
@@ -392,7 +422,7 @@ describe('E2 —— 逐类真的清掉', () => {
     installServiceWorkerLayer();
 
     const reports = await eraseWebLocalData();
-    expect(reports).toHaveLength(8);
+    expect(reports).toHaveLength(9);
     expect(reports.filter((r) => !r.containerRemoved).map((r) => r.target)).toEqual([
       'sessionStorage',
       'sessionStorage:令牌键',

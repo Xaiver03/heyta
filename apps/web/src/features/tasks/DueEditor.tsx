@@ -126,12 +126,12 @@ export function DueField({
   /** 冻结的"现在"（ms）。今天从它推，不由组件自己取时钟。 */
   now: number;
   /** 传 `undefined` 表示清除截止（动作层写 `null`）。 */
-  onSetDueDate: (due: number | undefined) => void;
+  onSetDueDate: (due: number | undefined, dueDateLocal?: string) => void;
 }): React.JSX.Element {
   const { t } = useI18n();
 
   const today = toLocalDate(now);
-  const value = task.dueDate === undefined ? undefined : toLocalDate(task.dueDate);
+  const value = task.dueDateLocal ?? (task.dueDate === undefined ? undefined : toLocalDate(task.dueDate));
 
   const quickPicks: readonly DatePickerQuickPick[] = quickDuePickDates(today).map((pick) => ({
     key: pick.key,
@@ -144,7 +144,9 @@ export function DueField({
    * 读的是同一个判定）—— 这里如果自己再 `getHours() !== 0` 一次，
    * 就会出现"编辑器说全天、时间线画在 16:00"。
    */
-  const timeValue = task.dueDate === undefined ? undefined : localTimeOf(task.dueDate);
+  const timeValue = task.dueDateLocal !== undefined
+    ? undefined
+    : (task.dueDate === undefined ? undefined : localTimeOf(task.dueDate));
 
   return (
     <DatePicker
@@ -173,7 +175,7 @@ export function DueField({
           // `value` 一定在（`enabled` 为假时组件不会回调），这个判断是给
           // 类型看的，不是给运行时兜底的。
           if (value === undefined) return;
-          onSetDueDate(dueDateToEpoch(value, next));
+          onSetDueDate(dueDateToEpoch(value, next), next === undefined ? value : undefined);
         },
       }}
       onChange={(date) => {
@@ -187,7 +189,10 @@ export function DueField({
          *   同一条立场在这里的输入侧执行一次。
          *   清掉日子（`undefined`）没有"哪一天的几点"可言，那时才真的归零。
          */
-        onSetDueDate(date === undefined ? undefined : dueDateToEpoch(date, timeValue));
+        onSetDueDate(
+          date === undefined ? undefined : dueDateToEpoch(date, timeValue),
+          date !== undefined && timeValue === undefined ? date : undefined,
+        );
       }}
     />
   );
@@ -206,11 +211,11 @@ export function DueEditor({
   /** 冻结的"现在"（ms）。今天从它推，不由组件自己取时钟。 */
   now: number;
   /** 传 `undefined` 表示清除截止（动作层写 `null`）。 */
-  onSetDueDate: (due: number | undefined) => void;
+  onSetDueDate: (due: number | undefined, dueDateLocal?: string) => void;
 }): React.JSX.Element {
   const { t } = useI18n();
 
-  const value = task.dueDate === undefined ? undefined : toLocalDate(task.dueDate);
+  const value = task.dueDateLocal ?? (task.dueDate === undefined ? undefined : toLocalDate(task.dueDate));
 
   /**
    * 🔴 面板**不能用 `position: absolute`**。实测（2026-10-02，探针
@@ -278,7 +283,9 @@ export function DueEditor({
    * 编辑本体（`DueField`）里那一行时刻读的是同一个 `localTimeOf` ——
    * 两处各算一次就会出现"触发器说全天、面板里填着 16:00"。
    */
-  const timeValue = task.dueDate === undefined ? undefined : localTimeOf(task.dueDate);
+  const timeValue = task.dueDateLocal !== undefined
+    ? undefined
+    : (task.dueDate === undefined ? undefined : localTimeOf(task.dueDate));
   const valueText =
     value === undefined
       ? undefined

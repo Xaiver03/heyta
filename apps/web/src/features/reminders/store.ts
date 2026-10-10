@@ -25,7 +25,7 @@ import { createReminderActions, type ActionContext } from '@heyta/app-host';
 import { snoozeDeadline, type Reminder } from '@heyta/domain';
 import { create } from 'zustand';
 
-import { currentState, dispatchIntent, onEngineChange } from '../../lib/oplog.js';
+import { currentState, dispatchIntent, dispatchChecked, onEngineChange } from '../../lib/oplog.js';
 
 /**
  * 失败回执：**哪一个任务的哪一次操作为什么失败**。
@@ -93,6 +93,7 @@ interface ReminderState {
 /** 与任务 / 习惯 / 专注 store 同一个形状。只含两个函数引用，不含任何判断。 */
 const actionContext: ActionContext = {
   dispatch: dispatchIntent,
+  dispatchChecked,
   getState: currentState,
 };
 

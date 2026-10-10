@@ -102,7 +102,7 @@ function SliceBadges({ row }: { row: TaskRow }): React.JSX.Element {
   return (
     <TaskBadges
       due={row.dueAt === null ? null : { text: overdue ? '已逾期' : '还剩 3 天', overdue }}
-      priority={row.important ? { text: '高', color: tokens['color.danger'] } : null}
+      priority={row.important ? { text: '高', color: tokens['color.priority-high'] } : null}
       repeat={row.id === 's2' ? '每周一' : null}
     />
   );

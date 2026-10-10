@@ -55,7 +55,7 @@ export function DueBadge({
 }): React.JSX.Element | null {
   const { t } = useI18n();
 
-  if (task.dueDate === undefined) return null;
+  if (task.dueDateLocal === undefined && task.dueDate === undefined) return null;
 
   const countdown = computeCountdown(task, { now });
   const Icon = mode === 'countdown' ? Timer : CalendarDays;

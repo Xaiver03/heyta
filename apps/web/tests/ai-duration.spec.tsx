@@ -363,6 +363,18 @@ describe('🔴🔴 AI 的输出不会自己写进数据', () => {
     expect(el.querySelector('[data-testid="duration-proposal-source"]')?.textContent).toContain('本机');
   });
 
+  // 🔴 法定显式标识（《标识办法》+ GB 45438-2025）：这个分钟数是模型写的，不是量出来的。
+  //    与上面那条不是一件事 —— 来源标签说"数据去了哪台机器"，这一条说"这个数是谁给的"。
+  it('🔴 提议里带「AI 生成合成内容」的显式标识', async () => {
+    const { impl } = fakeFetch('90');
+    const el = render({ fetchImpl: impl });
+    toDisclosure(el);
+    await clickAsync(el.querySelector('[data-testid="duration-send"]'));
+    expect(el.querySelector('[data-testid="duration-proposal-generated"]')?.textContent).toBe(
+      'AI 生成合成内容',
+    );
+  });
+
   it('"不要了"不写入', async () => {
     const applied: number[] = [];
     const { impl } = fakeFetch('90');

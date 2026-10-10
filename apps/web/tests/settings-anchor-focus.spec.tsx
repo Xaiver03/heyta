@@ -129,12 +129,20 @@ describe('设置浮层的落位与焦点', () => {
 
     const sheet = el.querySelector('[data-testid="settings-sheet"]')!;
     const nav = sheet.querySelector('nav.ht-settings__nav')!;
-    expect(nav.querySelectorAll('a')).toHaveLength(7);
-    expect(nav.querySelector('a[href="#settings-group-sync"]')).not.toBeNull();
+    expect(nav.querySelectorAll('button')).toHaveLength(7);
+    expect(nav.querySelector('[aria-controls="settings-group-sync"]')?.getAttribute('aria-current')).toBe('page');
+    expect(sheet.querySelector('#settings-group-sync')?.hasAttribute('hidden')).toBe(false);
+    expect(sheet.querySelector('#settings-group-profile')?.hasAttribute('hidden')).toBe(true);
     const close = sheet.querySelector('[data-testid="settings-sheet-close"]')!;
     expect(close.compareDocumentPosition(nav) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(sheet.querySelector('#settings-group-profile')).not.toBeNull();
     expect(sheet.querySelector('#settings-group-help')).not.toBeNull();
+    const scrollTo = vi.fn();
+    Object.defineProperty(sheet, 'scrollTo', { value: scrollTo, configurable: true });
+    click(nav.querySelector('[aria-controls="settings-group-help"]')!);
+    expect(sheet.querySelector('#settings-group-sync')?.hasAttribute('hidden')).toBe(true);
+    expect(sheet.querySelector('#settings-group-help')?.hasAttribute('hidden')).toBe(false);
+    expect(nav.querySelector('[aria-controls="settings-group-help"]')?.getAttribute('aria-current')).toBe('page');
   });
 
   it('同步设置请求 ⇒ 浮层打开、滚到「同步」那一节、焦点在**服务端地址框**里', async () => {
@@ -154,7 +162,7 @@ describe('设置浮层的落位与焦点', () => {
     );
     // 🔴 本文件的主要判据：焦点落在**该填的那个框**，而不是浮层容器。
     expect(focusedLabel(el), `焦点没给到地址框，实际在：${focusedLabel(el)}`).toBe(
-      'sync-server-url',
+      'sync-signin-required-action',
     );
     expect(
       el.querySelector('.ht-sheet') === document.activeElement,
@@ -182,7 +190,7 @@ describe('设置浮层的落位与焦点', () => {
       scrolledTo,
       '第二次请求没落地（请求没被消费掉的话就是这个形状）',
     ).toContain('settings-sync');
-    expect(focusedLabel(el)).toBe('sync-server-url');
+    expect(focusedLabel(el)).toBe('sync-signin-required-action');
   });
 
   it('头像 →「编辑个人信息」⇒ 焦点真的进了昵称框（此前只滚不聚焦）', async () => {
@@ -194,7 +202,9 @@ describe('设置浮层的落位与焦点', () => {
     const el = await render();
 
     click(el.querySelector('[data-testid="account-menu-avatar"]')!);
-    click(el.querySelector('[data-testid="account-menu-profile"]')!);
+    // 资料入口已经收敛为「个人中心 → 编辑资料」；头像菜单不再复制一个直达设置动作。
+    click(document.querySelector('[data-testid="account-menu-profile-center"]')!);
+    click(el.querySelector('.ht-profile-overview__identity .ht-btn')!);
 
     expect(scrolledTo).toContain('settings-profile');
     // 这条钉的是"焦点也要一起给"那句话**现在**才成立 ——

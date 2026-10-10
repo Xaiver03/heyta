@@ -1,5 +1,5 @@
 /**
- * 换绑邮箱 + 登录设备两块新界面的**真浏览器**验收（工单 W4/W3 的那条"必须有截图"的腿）。
+ * 换绑邮箱 + 登录设备 + 改登录密码三块新界面的**真浏览器**验收（工单 W4/W3 那条"必须有截图"的腿）。
  *
  * 真：Chromium、IndexedDB、React 树、store、词条渲染、点击与焦点行为。
  * 假：只有账号面那几条 HTTP 的响应体（默认 e2e 的 webServer 后面没有 PostgreSQL）。
@@ -36,6 +36,11 @@ const EVIDENCE = fileURLToPath(new URL('../../apps/web/evidence/account-suite', 
 
 const CURRENT_SESSION_ID = 'a'.repeat(64);
 const OTHER_SESSION_ID = 'b'.repeat(64);
+/** 改密成功换发的那一枚新会话（假库里"其它设备"随 bump 一起消失，与真库同形）。 */
+const CHANGED_SESSION_ID = 'c'.repeat(64);
+/** 假服务端那一侧的当前口令：`fx.password` 的初值。 */
+const OLD_PASSWORD = 'the-old-one';
+const NEW_PASSWORD = 'a-brand-new-one';
 
 /** 界面上那几句话必须逐字对得上词条表（唯一文案事实源），对得上才敢说"分开措辞成立"。 */
 const COPY = {
@@ -46,6 +51,12 @@ const COPY = {
   sessionsTitle: '登录设备',
   revokeOne: '退出这一台',
   logoutAll: '退出所有设备',
+  passwordTitle: '登录密码',
+  passwordChanged: '登录密码已修改。',
+  // 🔴 这句是**后果**不是失败信息：它必须在点之前就在界面上（少一整段说明是抓不到的）。
+  passwordOtherDevices:
+    '其它设备上的登录都会失效，要用新密码重新登录；数据不受影响。这个标签页会自动接着用新密码。',
+  passwordWrongCurrent: '登录失败：邮箱或密码不正确。',
 } as const;
 
 type Fixture = {
@@ -61,6 +72,10 @@ type Fixture = {
   }>;
   /** 界面真的打出来的每一条（`方法 路径`）。 */
   requests: string[];
+  /** 假服务端那一侧"当前"的口令：改密成功就换掉，与真库那次 `passwordHash` 写回同形。 */
+  password: string;
+  /** 改密之后库里剩下的是哪一枚会话（bump 把其它行整个作废 ⇒ 只剩新铸那枚）。 */
+  sessionAfterChange: string | null;
 };
 
 const newFixture = (): Fixture => ({
@@ -82,6 +97,8 @@ const newFixture = (): Fixture => ({
     },
   ],
   requests: [],
+  password: OLD_PASSWORD,
+  sessionAfterChange: null,
 });
 
 async function json(route: Route, body: unknown, status = 200): Promise<void> {
@@ -157,6 +174,34 @@ async function installAccountRoutes(page: Page, fx: Fixture): Promise<void> {
     if (method === 'POST' && path === '/auth/logout') {
       fx.sessions = fx.sessions.filter((s) => !s.current);
       return json(route, { message: 'Signed out.' });
+    }
+    if (method === 'POST' && path === '/password/change') {
+      const body = route.request().postDataJSON() as {
+        currentPassword?: string;
+        newPassword?: string;
+      };
+      if (String(body.currentPassword) !== fx.password) {
+        // 与真服务端同形：401 + `invalid_credentials`（`hosted-auth.ts:644` 把它映射成
+        // `invalid-credentials`，面板据此把焦点落回**当前密码**那个框）。
+        return json(route, { error: 'Invalid credentials.', code: 'invalid_credentials' }, 401);
+      }
+      fx.password = String(body.newPassword);
+      // 🔴 bump 之后**只有新铸那一枚**还在（真库里 `listSessions` 按 `tokenVersion` 过滤），
+      // 而手上这台换成了新令牌 ⇒ 列表自己重拉之后应当只剩这一行。
+      fx.sessionAfterChange = CHANGED_SESSION_ID;
+      fx.sessions = [
+        {
+          sessionId: CHANGED_SESSION_ID,
+          current: true,
+          createdAt: Date.now(),
+          lastSeenAt: Date.now(),
+          userAgent: 'Mozilla/5.0 (Macintosh) Chrome/140',
+        },
+      ];
+      return json(route, {
+        token: 'account-suite-e2e-token-changed',
+        user: { id: 7, email: CURRENT_EMAIL },
+      });
     }
     return json(route, { unexpected: `${method} ${path}` }, 500);
   });
@@ -409,4 +454,108 @@ test('🔴 反证：服务端读不出来的那一格不许被画成"一切正�
 
   await closeSettingsSheet(page);
   assertNoProblems(problems, ['/api/account/email/change/status']);
+});
+
+test('🔴 改登录密码：后果句在点之前、成功后那句、两个框清空、设备列表自己只剩这台', async ({
+  page,
+}) => {
+  const problems = captureProblems(page);
+  const fx = newFixture();
+  await boot(page, fx);
+  await selectSettingsSection(page, 'account');
+
+  const panel = page.getByTestId('password-panel');
+  // 截图先落盘（§6.2 规定一第 1 条：失败时也要有图）。
+  await shot(page, panel, '08-password-before-submit');
+
+  // 🔴 标题按 heading 角色精确匹配，不用 `getByText`：面板里「从来没设过登录密码？
+  // 在这里设一个。」那颗按钮的文本含住「登录密码」，子串匹配会命中两个节点。
+  await expect(
+    panel.getByRole('heading', { name: COPY.passwordTitle, exact: true }),
+  ).toBeVisible();
+
+  // 🔴 存在性判据：那句"其它设备上的登录都会失效"必须在**点之前**就在界面上。
+  // 只断"点了以后出现什么"抓不到"少了一整段后果说明"—— 而这一句正是让人决定要不要点的东西。
+  await expect(panel.getByText(COPY.passwordOtherDevices)).toBeVisible();
+
+  await page.getByTestId('password-current').fill(OLD_PASSWORD);
+  await page.getByTestId('password-new').fill(NEW_PASSWORD);
+  await page.getByTestId('password-submit').click();
+
+  await expect(page.getByTestId('password-changed')).toBeVisible();
+  await shot(page, panel, '09-password-changed');
+  expect(fx.password, '假服务端那一侧的口令必须真的被换掉').toBe(NEW_PASSWORD);
+  // 🔴 两个草稿都要清空：改完之后"当前密码"已经是旧的那句，留着只会让人拿它再提交一次。
+  await expect(page.getByTestId('password-current')).toHaveValue('');
+  await expect(page.getByTestId('password-new')).toHaveValue('');
+
+  // 同一次改密换了令牌 ⇒ `SessionsPanel` 的取数键（baseUrl/token）变了，列表自己重拉。
+  // 这一条钉的是**两块面板不许各说一套**：改密之后还列着那台已被踢下线的设备，
+  // 就是界面在拿"它还登录着"骗人。
+  await expect(page.getByTestId(`session-row-${CHANGED_SESSION_ID}`)).toBeVisible();
+  await expect(page.getByTestId(`session-row-${OTHER_SESSION_ID}`)).toHaveCount(0);
+  await expect(page.getByTestId(`session-row-${CURRENT_SESSION_ID}`)).toHaveCount(0);
+  expect(
+    fx.requests.filter((entry) => entry.startsWith('POST /password/change')),
+    '改密只许打一次那条路由',
+  ).toHaveLength(1);
+
+  await closeSettingsSheet(page);
+  // 🔴 只有这一条用例要登记这一格：改密成功的**定义**就是换发新令牌，而入站自动化的
+  // 收件密钥是按令牌取的（`packages/app-host/src/inbound-recipient-remote.ts:35`），
+  // 令牌一变应用就重新去取 —— 本套件没给它装夹具，于是回 404。
+  // 它不属于账号面，也不影响本节任何一条判据，所以按"已登记的无关路由"处理，
+  // 而不是把它塞进 `KNOWN_MISSING`（那条会替**所有**用例消掉这一格，
+  // 别的用例里它出现就是真信号）。
+  assertNoProblems(problems, ['/api/automation/recipient-key']);
+});
+
+test('🔴 当前密码打错：不许冒一句"已修改"，焦点落回当前密码那个框', async ({ page }) => {
+  const problems = captureProblems(page);
+  const fx = newFixture();
+  await boot(page, fx);
+  await selectSettingsSection(page, 'account');
+
+  await page.getByTestId('password-current').fill('not-the-current-one');
+  await page.getByTestId('password-new').fill(NEW_PASSWORD);
+  await page.getByTestId('password-submit').click();
+
+  const failed = page.getByTestId('password-failed');
+  await expect(failed).toBeVisible();
+  await expect(failed).toContainText(COPY.passwordWrongCurrent);
+  await shot(page, page.getByTestId('password-panel'), '10-password-wrong-current');
+  // 🔴 失败不许被画成成功：这两个 testid 同时存在就是界面在说谎。
+  await expect(page.getByTestId('password-changed')).toHaveCount(0);
+  // 焦点判据：`invalid-credentials` 在这张表上指的是**当前密码**打错（不是"你没登录"），
+  // 所以焦点必须落回那一个框。挂在冒泡阶段的全局键盘监听挡不住它，但 jsdom 里看不见真焦点环。
+  await expect(page.getByTestId('password-current')).toBeFocused();
+  expect(fx.password, '口令错那一次不许把库里的口令换掉').toBe(OLD_PASSWORD);
+  expect(fx.sessions, '失败那一次也不许把设备列表改掉').toHaveLength(2);
+
+  await closeSettingsSheet(page);
+  // 401 是本用例**故意**造的（服务端拒绝一次改密），单独登记进预期。
+  assertNoProblems(problems, ['/api/password/change']);
+});
+
+test('🔴 反证：改密那条路由 500 时不许画成"已修改"（读失败 ≠ 做完了）', async ({ page }) => {
+  const problems = captureProblems(page);
+  const fx = newFixture();
+  await boot(page, fx);
+  // 覆盖必须**后注册**才压得住那条宽泛的 `/ **`。
+  await page.route(`${SERVER}/api/password/change`, async (route) => {
+    fx.requests.push('POST /password/change (stub 500)');
+    await json(route, { error: 'boom' }, 500);
+  });
+  await selectSettingsSection(page, 'account');
+
+  await page.getByTestId('password-current').fill(OLD_PASSWORD);
+  await page.getByTestId('password-new').fill(NEW_PASSWORD);
+  await page.getByTestId('password-submit').click();
+
+  await expect(page.getByTestId('password-failed')).toBeVisible();
+  await expect(page.getByTestId('password-changed')).toHaveCount(0);
+  await shot(page, page.getByTestId('password-panel'), '11-password-route-500');
+
+  await closeSettingsSheet(page);
+  assertNoProblems(problems, ['/api/password/change']);
 });

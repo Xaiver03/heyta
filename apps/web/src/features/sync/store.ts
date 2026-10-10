@@ -32,6 +32,7 @@ import {
 } from '@heyta/sync-client';
 // 🔴 接线只有一份。见下方 `buildClient` 的说明。
 import { createHostRealtimeClient, createSyncClient } from '@heyta/app-host';
+import { getWebInboundUploadAuthorization } from '../settings/inbound-runtime.js';
 
 // W4：凭据持久化。**只存 baseUrl 与 token，绝不存口令** —— 见该文件头。
 import { clearStoredCredentials, loadCredentials, saveCredentials } from './credential-storage.js';
@@ -165,7 +166,8 @@ interface SyncStoreState {
   /** 改设置 → 同步 那一节的草稿（只改传入的字段）。 */
   setSyncDraft: (patch: Partial<SyncStoreState['syncDraft']>) => void;
   /** 面板挂载：按**当前已生效的配置**播种草稿并标记"在屏"。 */
-  showSyncDraft: () => void;
+  /** Mark the sync section visible; preserve keeps an unsaved UI draft intact. */
+  showSyncDraft: (preserve?: boolean) => void;
   /** 面板卸载：撤掉"在屏"标记 ⇒ `AuthPanel` 退回已保存的配置。 */
   hideSyncDraft: () => void;
   startAutoRetry: () => void;
@@ -214,7 +216,7 @@ function buildClient(
   _set: (partial: Partial<SyncStoreState>) => void,
 ): SyncClient | undefined {
   const { baseUrl, token } = get();
-  if (baseUrl === '' || token === undefined) return undefined;
+  if (baseUrl.trim() === '' || token === undefined || token.trim() === '') return undefined;
 
   const accountId = get().accountId;
   if (accountId !== undefined && accountId !== '') {
@@ -225,6 +227,11 @@ function buildClient(
       getToken: async () => get().token,
       getPassword: async () => undefined,
       encryptionMode: 'vault',
+      getInboundUploadAuthorization: async (input) => {
+        const current = get();
+        if (current.accountId !== accountId || current.baseUrl !== baseUrl || current.token !== input.token) return undefined;
+        return getWebInboundUploadAuthorization(accountId, input);
+      },
       getPayloadCipher: async () => {
         const current = get();
         if (current.accountId === undefined || current.accountId === '') return undefined;
@@ -324,7 +331,7 @@ function restartRealtime(get: () => SyncStoreState): void {
   const { baseUrl, token } = get();
   // 未配置/未登录就**不连**。登录之后再调一次本函数即可 ——
   // 这正是 `configure` / `applyAuthToken` 里两处调用的意义。
-  if (baseUrl === '' || token === undefined) return;
+  if (baseUrl.trim() === '' || token === undefined || token.trim() === '') return;
 
   /**
    * 🔴 **先问"引擎就绪了吗"，而不是让 `requireEngine()` 抛了再 catch。**
@@ -509,10 +516,10 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     set({ syncDraft: { ...get().syncDraft, ...patch } });
   },
 
-  showSyncDraft: () => {
+  showSyncDraft: (preserve = false) => {
     const { baseUrl, token, password } = get();
     set({
-      syncDraft: { baseUrl, token: token ?? '', password: password ?? '' },
+      ...(preserve ? {} : { syncDraft: { baseUrl, token: token ?? '', password: password ?? '' } }),
       syncDraftShown: true,
     });
   },
@@ -533,14 +540,21 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     // A server/token edit changes the authentication binding. Fence any
     // in-flight vault load before the new credentials can be used.
     const previous = get();
-    if (previous.baseUrl !== baseUrl || previous.token !== token) invalidateWebVaultSession();
+    const authBindingChanged = previous.baseUrl !== baseUrl || previous.token !== token;
+    if (authBindingChanged) invalidateWebVaultSession();
+    // An account id is scoped to the server/token session that produced it.
+    // Keeping it across a manual advanced/self-hosted credential change makes
+    // the UI enter hosted Vault mode for the previous account and hides the
+    // legacy E2EE password path. Re-authentication is the only operation that
+    // may establish a new hosted account scope.
+    const accountId = authBindingChanged ? undefined : previous.accountId;
+    const email = authBindingChanged ? undefined : previous.email;
     // 🔴 草稿跟着走：「保存并同步」之后，那一节的输入框与配置**必须是同一份值**。
     // 不写这一半的话，症状是配置已经生效、框里还留着上一次的内容 ——
     // 那是 2026-09-30 那条"框与配置两套真相"缺陷的镜像版本。
-    set({ baseUrl, token, password, status: { kind: 'idle' }, syncDraft: { baseUrl, token, password } });
+    set({ baseUrl, token, password, accountId, email, status: { kind: 'idle' }, syncDraft: { baseUrl, token, password } });
     // 🔴 W4：口令**不进** saveCredentials 的参数 —— 它只在内存。
-    // ⚠️ 邮箱**保留已有的那个**：手填凭据这条路径不知道账号是谁，
-    //    而它不该把上一次登录留下的标签抹掉。
+    // 手填新凭据没有核验账号身份，不能继承上一枚令牌的邮箱标签。
     if (baseUrl !== '' && token !== '') {
       saveCredentials({ baseUrl, token, email: get().email, accountId: get().accountId });
     }
@@ -552,15 +566,19 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
 
   applyAuthToken: (baseUrl, token, email, accountId) => {
     invalidateWebVaultSession();
+    const previous = get();
+    const sameBinding = previous.baseUrl === baseUrl && previous.token === token;
+    const nextEmail = email ?? (sameBinding ? previous.email : undefined);
+    const nextAccountId = accountId ?? (sameBinding ? previous.accountId : undefined);
     // 口令与上次同步时间原样保留 —— 见接口上的说明。
     //
-    // ⚠️ `email` 是**可选**的：手填凭据那条路径没有邮箱，此时**保留已有的那个**
-    //（`email ?? get().email`）—— 否则重新登录一次会把头像的标签抹掉。
+    // 认证入口提供核验后的 email/accountId。缺少身份的调用只有同一凭据可以
+    // 保留标签；换地址或令牌不能借用上一位账号的身份。
     set({
       baseUrl,
       token,
-      email: email ?? get().email,
-      accountId: accountId ?? get().accountId,
+      email: nextEmail,
+      accountId: nextAccountId,
       status: { kind: 'idle' },
       // 🔴 登录成功时**那一节可能正开着**（头像 → 登录，设置浮层还在下面）。
       // 地址与令牌要一起对齐，否则用户登录完看到的还是两个空框 ——
@@ -573,8 +591,8 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     saveCredentials({
       baseUrl,
       token,
-      email: email ?? get().email,
-      accountId: accountId ?? get().accountId,
+      email: nextEmail,
+      accountId: nextAccountId,
     });
     // 🔴 登录后**先问补签状态，再**建实时连接（顺序有意义：`refresh()` 同步把闸门
     // 置成 `checking`，于是新连接不会在"还没问到答案"的窗口里建立起来）。

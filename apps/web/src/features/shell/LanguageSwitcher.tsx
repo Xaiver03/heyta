@@ -13,7 +13,7 @@
  *   `locale="en"` 才会被触发。多语言"测得出、用不到"，
  *   等于没有多语言。补上这个入口，比再迁一百条文案更有价值。
  *
- * ## 形态：一个**带标签的分组**，组里列出所有已启用语言的自称
+ * ## 形态：一个**紧凑分段分组**，组里列出所有已启用语言的自称
  *
  * 每一项显示**这门语言自己的文字**（`中文` / `English`），而不是当前语言的翻译。
  * 这不是审美选择：看不懂当前语言的用户，恰恰是最需要找到这个入口的人，
@@ -23,7 +23,7 @@
  * （`apps/mobile/src/screens/SettingsScreen.tsx` 的「语言」一节）用的是
  * **同一条规则**，所以三端只有摆位不同、语义相同。
  *
- * ## 🔴 2026-10-03 形态变更：从"两枚裸 `.ht-chip`"换成带标签的分组
+ * ## 🔴 2026-10-03 形态变更：从"两枚裸 `.ht-chip`"换成有名称的分组
  *
  * 产品负责人：「中英文的那个切换组件太离谱了，你看一下规范应该是什么样子的。」
  * 查到的规范**全在仓库里**，四条，每条都指得到具体出处（逐条的实测数字与
@@ -47,8 +47,8 @@
  * 的「语言」一节）和落地页的既有形态对齐之后，页头那一格是**三端里唯一的例外**。
  *
  * 这次搬家**换掉的是"永远看得见"，没换掉"自己说明自己"**：上面第 1 条规范
- * （控件必须自己说明自己是什么）原来靠页头常驻来免解释，现在由
- * 设置里那一格的可见标签 + 一句说明（`web.settings.display.langNote`）承担。
+ * （控件必须自己说明自己是什么）现在由分组的可访问名称与设置说明
+ * （`web.settings.display.langNote`）共同承担；分段控件本身不重复渲染标签。
  *
  * ⚠️ **代价要写清楚，别让它读起来像纯收益**：看不懂当前界面语言的人，
  * 现在要先认出头像菜单里那一项「设置」才能到这里。兜住它的是解析链本身
@@ -66,9 +66,9 @@
  *   而下面那条"标出当前位置"的裁决正是为了不让用户靠试错找自己在哪儿。
  * - **当前语言那一项标出来而不是隐藏**：三项以上时，"我在这儿"必须看得见，
  *   否则用户要靠试错找当前位置。点它是无操作（不写盘、不发账号请求）。
- *   标记是**勾 + 填充 + 中性边框**三通道冗余，不只是颜色（`MASTER.md` §3）。
- * - **标签用 `aria-labelledby` 指向那个可见的「语言」**：名称只有一处事实源。
- *   写成 `aria-label` 就会和可见文字各写一份，而这两份必然漂。
+ *   标记是**勾 + 填充**两条通道，不只依赖颜色（`MASTER.md` §3）。
+ * - **组用 `aria-label` 读取同一个语言词条**：设置说明已经可见，控件内部不再
+ *   重复渲染「语言」标签；按钮仍保留自己的语言名与 `lang`。
  * - `lang` 属性写在自己的标签上：屏幕阅读器用正确的发音规则读那个词
  *   （用英文发音读 `中文` 会很怪）。
  * - 它**必须在 `LocalePreferenceProvider` 之内**：`useLocalePreference()` 在
@@ -89,9 +89,6 @@ import { Check } from 'lucide-react';
 import { pushLocaleToAccount } from '../../lib/locale-account.js';
 import { useLocalePreference } from '../../lib/locale-preference.js';
 
-/** 可见标签的 `id`。只此一个实例（顶栏），所以不需要后缀。 */
-const LABEL_ID = 'ht-settings-lang-label';
-
 export function LanguageSwitcher(): React.JSX.Element {
   const { locale, t } = useI18n();
   const { setLocale } = useLocalePreference();
@@ -101,14 +98,12 @@ export function LanguageSwitcher(): React.JSX.Element {
     <div
       className="ht-settings__lang"
       // 一组互斥选项 = `role="group"`（不是 radiogroup：那要自己实现方向键漫游，
-      // 而这里 Tab 到每一项本来就是可用的）。名字由**可见**的那个标签提供。
+      // 而这里 Tab 到每一项本来就是可用的）。设置说明文字已经在组外提供，
+      // 这里用同一词条作可访问名称，避免在紧凑分段控件里重复渲染「语言」。
       role="group"
-      aria-labelledby={LABEL_ID}
+      aria-label={label}
       data-testid="language-switcher"
     >
-      <span id={LABEL_ID} className="ht-settings__lang-label ht-type-caption">
-        {label}
-      </span>
       {LOCALES.map((option) => (
         <button
           key={option}

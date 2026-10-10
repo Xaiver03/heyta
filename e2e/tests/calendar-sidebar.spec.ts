@@ -81,8 +81,8 @@ async function seed(page: Page): Promise<void> {
 
   const sidebar = page.locator('aside[aria-label="清单与标签"]');
   await sidebar.getByRole('button', { name: '新建清单' }).click();
-  await sidebar.getByLabel('新清单名称').fill(LIST);
-  await sidebar.getByRole('button', { name: '添加清单' }).click();
+  await sidebar.locator('#ht-category-create-name').fill(LIST);
+  await sidebar.getByRole('button', { name: '创建清单' }).click();
   await expect(sidebar.getByText(LIST, { exact: true })).toBeVisible();
 
   // 截止时间走规则式快速捕获（`@heyta/domain/capture`），不是 mock：

@@ -73,19 +73,41 @@ export function PrivacyConsentSheet(): React.JSX.Element | null {
   // 但捕获阶段让"以后往这里加个搜索框"不会把 Esc 弄丢。
   useEffect(() => {
     if (!open) return;
+    const previousFocus = document.activeElement;
+    const panel = dialogRef.current;
+    panel?.focus();
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') closeSheet();
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        closeSheet();
+        return;
+      }
+      if (event.key !== 'Tab' || !panel) return;
+      const items = [...panel.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], [tabindex="0"]')]
+        .filter((item) => !item.closest('[hidden], [inert]'));
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (!first || !last) {
+        event.preventDefault();
+        panel.focus();
+      } else if (!panel.contains(document.activeElement) || document.activeElement === panel) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener('keydown', onKey, true);
     return () => {
       window.removeEventListener('keydown', onKey, true);
+      if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus();
     };
   }, [open, closeSheet]);
-
-  // 打开时把焦点移进对话框 —— 否则键盘用户还停在背后那页上。
-  useEffect(() => {
-    if (open) dialogRef.current?.focus();
-  }, [open]);
 
   if (!open) return null;
 
@@ -265,7 +287,12 @@ export function PrivacyConsentSheet(): React.JSX.Element | null {
               type="button"
               data-testid="privacy-consent-accept"
               className="ht-btn ht-btn--primary"
-              onClick={accept}
+              onClick={() => {
+                accept();
+                if (!usePrivacyStore.getState().open && !useSyncStore.getState().token) {
+                  useSyncStore.getState().openSignIn();
+                }
+              }}
             >
               {t('common.privacy.consent.accept')}
             </button>

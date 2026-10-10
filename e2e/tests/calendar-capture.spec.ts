@@ -15,7 +15,7 @@
 
 import { expect, test, type Page } from '@playwright/test';
 
-import { openApp } from './helpers';
+import { openApp, switchTheme } from './helpers';
 
 const APP_ZH = '/?lang=zh-CN';
 const BOARD = '[data-testid="calendar-board"]';
@@ -54,11 +54,11 @@ test('🔴 点 `+` → 输入一句话 → 任务条出现在**刚指着的那�
       d.getDate(),
     ).padStart(2, '0')}`;
   });
-  await page.locator(`[data-testid="calendar-cell-${target}"]`).click();
-  await expect(page.getByText('10月', { exact: false }).first()).toBeVisible();
-
   // ── 页头那个 `+`，然后输入框必须**说出落点** ──────────────────────
   await page.getByRole('button', { name: '往选中那天加一条' }).click();
+  // 选中日期本身会打开编辑器；上面的 `+` 测的是同一个入口，避免重复切换将它关闭。
+  await page.locator(`[data-testid="calendar-cell-${target}"]`).click();
+  await expect(page.getByText('10月', { exact: false }).first()).toBeVisible();
   const input = page.locator('[data-testid="capture-input"]');
   await expect(input).toBeVisible();
   const placeholder = (await input.getAttribute('placeholder')) ?? '';
@@ -100,9 +100,9 @@ test('🔴 输入里写了「明天」时以**输入**为准：在 3 号那一�
     return [fmt(1), fmt(2)];
   });
 
-  // 选中"明天"那一格 —— 锚点就是它。
-  await page.locator(`[data-testid="calendar-cell-${dayAfter}"]`).click();
+  // 先打开编辑器，再选中"明天"那一格 —— 锚点就是它。
   await page.getByRole('button', { name: '往选中那天加一条' }).click();
+  await page.locator(`[data-testid="calendar-cell-${dayAfter}"]`).click();
 
   const STAMP = `覆盖-${Date.now().toString().slice(-6)}`;
   await page.locator('[data-testid="capture-input"]').fill(`后天 ${STAMP}`);
@@ -119,4 +119,56 @@ test('🔴 输入里写了「明天」时以**输入**为准：在 3 号那一�
   //    而"用户看得见它落在 5 号那一格、3 号那一格是空的"必须有一张图（§6.2 规定一）。
   //    原来整个 spec 只有第 1 条拍 ⇒ 这条一直只有 DOM 撑着（§4.05 登记的那枚缺口）。
   await page.screenshot({ path: SHOT('calendar-capture-input-wins'), fullPage: false });
+});
+
+test('🔴 日期底部与窄屏：编辑器不越出视口，并留下四端视觉证据', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 720 });
+  await openApp(page, APP_ZH);
+  await gotoCalendar(page);
+
+  const openBottomCapture = async (): Promise<void> => {
+    // 网格 DOM 顺序是日期顺序，最后一格能稳定覆盖“锚点靠近底部”的形状。
+    const bottomCell = page.locator('[data-testid^="calendar-cell-"]').last();
+    await bottomCell.click();
+    // 点击日期会按产品语义直接打开一次；关闭后再用页头 `+` 重新打开，
+    // 这样测到的是相同日期锚点，而不是让浮层遮住待点击的底部格子。
+    await expect(page.locator('[data-testid="calendar-capture"]')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('[data-testid="calendar-capture"]')).toHaveCount(0);
+    await page.getByRole('button', { name: '往选中那天加一条' }).click();
+    await expect(page.locator('[data-testid="calendar-capture"]')).toBeVisible();
+  };
+
+  const assertInsideViewport = async (): Promise<void> => {
+    const viewport = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
+    const rect = await page.locator('[data-testid="calendar-capture"]').boundingBox();
+    expect(rect, '日期编辑器没有真实几何尺寸').not.toBeNull();
+    expect(rect!.x).toBeGreaterThanOrEqual(0);
+    expect(rect!.y).toBeGreaterThanOrEqual(0);
+    expect(rect!.x + rect!.width).toBeLessThanOrEqual(viewport.width + 1);
+    expect(rect!.y + rect!.height).toBeLessThanOrEqual(viewport.height + 1);
+  };
+
+  await openBottomCapture();
+  await assertInsideViewport();
+  await page.screenshot({ path: SHOT('calendar-capture-375-light'), fullPage: false });
+
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-testid="calendar-capture"]')).toHaveCount(0);
+  await switchTheme(page, 'dark');
+  await openBottomCapture();
+  await assertInsideViewport();
+  await page.screenshot({ path: SHOT('calendar-capture-375-dark'), fullPage: false });
+
+  await page.keyboard.press('Escape');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openBottomCapture();
+  await assertInsideViewport();
+  await page.screenshot({ path: SHOT('calendar-capture-1440-dark'), fullPage: false });
+
+  await page.keyboard.press('Escape');
+  await switchTheme(page, 'light');
+  await openBottomCapture();
+  await assertInsideViewport();
+  await page.screenshot({ path: SHOT('calendar-capture-1440-light'), fullPage: false });
 });

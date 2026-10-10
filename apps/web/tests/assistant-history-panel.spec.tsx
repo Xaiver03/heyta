@@ -20,6 +20,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { I18nProvider } from '@heyta/i18n';
+import { HeytaUiProvider } from '@heyta/ui';
 import type { AiRoutingConfig } from '@heyta/ai';
 import type { LocalApiHost, LocalApiItem } from '@heyta/local-api';
 
@@ -130,6 +131,10 @@ async function render(storage: HistoryStorage, fetchImpl?: typeof fetch): Promis
     root!.render(
       <I18nProvider locale="zh-CN">
       <PanelEphemeralProvider>
+        {/* 真机上助手面板被 `App.tsx` 根部那一层 `<HeytaUiProvider>` 罩着（面板里的
+            法定显式标识经它取 token）。测试单独挂载时必须补同一条前置条件 ——
+            否则红的是"没有 Provider"这条真机不存在的路。 */}
+        <HeytaUiProvider>
         <AssistantPanel
           routing={ROUTING}
           consents={CONSENTS}
@@ -139,6 +144,7 @@ async function render(storage: HistoryStorage, fetchImpl?: typeof fetch): Promis
           historyStorage={storage}
           {...(fetchImpl === undefined ? {} : { fetchImpl })}
         />
+        </HeytaUiProvider>
       </PanelEphemeralProvider>
       </I18nProvider>,
     );
@@ -151,9 +157,10 @@ function text(el: Element): string {
 }
 
 async function type(el: HTMLDivElement, value: string): Promise<void> {
-  const input = el.querySelector<HTMLInputElement>('[data-testid="ai-assistant-input"]');
+  const input = el.querySelector<HTMLInputElement | HTMLTextAreaElement>('[data-testid="ai-assistant-input"]');
   if (input === null) throw new Error('找不到输入框');
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+  const prototype = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  const setter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
   await act(async () => {
     setter?.call(input, value);
     input.dispatchEvent(new Event('input', { bubbles: true }));

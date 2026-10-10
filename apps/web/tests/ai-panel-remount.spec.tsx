@@ -29,14 +29,16 @@
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider } from '@heyta/i18n';
+import { HeytaUiProvider } from '@heyta/ui';
 import type { AiRoutingConfig } from '@heyta/ai';
 import type { LocalApiHost, LocalApiItem } from '@heyta/local-api';
 
-import { PanelEphemeralProvider } from '../src/features/ai/panel-ephemeral.js';
+import { currentAccount, PanelEphemeralProvider } from '../src/features/ai/panel-ephemeral.js';
 import { AssistantPanel } from '../src/features/ai/AssistantPanel.js';
+import { useSyncStore } from '../src/features/sync/store.js';
 import { AiToolRun } from '../src/features/ai/AiToolRun.js';
 
 const ROUTING: AiRoutingConfig = {
@@ -97,16 +99,35 @@ function recordingFetch(): { impl: typeof fetch; bodies: string[] } {
   return { impl, bodies };
 }
 
+/** 锁住响应，并在视图重挂载后才放行，覆盖完整请求生命周期。 */
+function deferredFetch(): { impl: typeof fetch; bodies: string[]; resolve: (text: string) => void } {
+  const bodies: string[] = [];
+  let finish: ((response: Response) => void) | undefined;
+  return {
+    bodies,
+    impl: ((_url: unknown, init?: { body?: unknown }) => {
+      bodies.push(String(init?.body ?? '{}'));
+      return new Promise<Response>((resolve) => { finish = resolve; });
+    }) as typeof fetch,
+    resolve: (text) => {
+      if (finish === undefined) throw new Error('请求尚未发出');
+      finish(new Response(JSON.stringify({ choices: [{ message: { role: 'assistant', content: text } }] }), {
+        status: 200, headers: { 'content-type': 'application/json' },
+      }));
+    },
+  };
+}
+
 /** 凭据只用来给会话打账号标签（`credential-storage.ts` 明确写着它不是秘密）。 */
 function setAccount(email: string | null): void {
-  if (email === null) {
-    localStorage.removeItem('heyta.sync.credentials');
-    return;
-  }
-  localStorage.setItem(
-    'heyta.sync.credentials',
-    JSON.stringify({ baseUrl: 'http://localhost:11434', token: 't', email }),
-  );
+  act(() => {
+    if (email === null) localStorage.removeItem('heyta.sync.credentials');
+    else localStorage.setItem('heyta.sync.credentials', JSON.stringify({ baseUrl: 'http://localhost:11434', token: 't', email }));
+    useSyncStore.setState({
+      baseUrl: 'http://localhost:11434', token: email === null ? undefined : 't',
+      email: email ?? undefined, accountId: undefined,
+    });
+  });
 }
 
 type Slot = 'detail' | 'main';
@@ -120,28 +141,33 @@ let root: Root | undefined;
  * ⚠️ Provider 必须在 `slot` 这一层**之上**：它要是跟着面板一起换位置，
  * 就还是每次挂载一份，这条判据会退化成"什么都没测"。
  */
-function tree(props: { slot: Slot; fetchImpl?: typeof fetch }): React.JSX.Element {
+function tree(props: { slot: Slot; fetchImpl?: typeof fetch; host?: LocalApiHost; tier?: 'read-only' | 'read-and-propose' }): React.JSX.Element {
   const panel = (
     <AssistantPanel
       routing={ROUTING}
       consents={CONSENTS}
-      tier="read-only"
+      tier={props.tier ?? 'read-only'}
       secrets={secrets}
-      host={fakeHost()}
+      host={props.host ?? fakeHost()}
+      historyStorage={null}
       {...(props.fetchImpl === undefined ? {} : { fetchImpl: props.fetchImpl })}
     />
   );
   return (
     <I18nProvider locale="zh-CN">
       <PanelEphemeralProvider>
+        {/* 真机上这两个面板都住在 `App.tsx` 根部那层 `<HeytaUiProvider>` 里
+            （面板内的法定显式标识经它取 token）；单独挂载时补上同一条前置条件。 */}
+        <HeytaUiProvider>
         <div data-testid="col-detail">{props.slot === 'detail' ? panel : null}</div>
         <div data-testid="col-main">{props.slot === 'main' ? panel : null}</div>
+        </HeytaUiProvider>
       </PanelEphemeralProvider>
     </I18nProvider>
   );
 }
 
-async function mount(props: { slot: Slot; fetchImpl?: typeof fetch }): Promise<HTMLDivElement> {
+async function mount(props: { slot: Slot; fetchImpl?: typeof fetch; host?: LocalApiHost; tier?: 'read-only' | 'read-and-propose' }): Promise<HTMLDivElement> {
   if (root === undefined) {
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -157,7 +183,7 @@ async function mount(props: { slot: Slot; fetchImpl?: typeof fetch }): Promise<H
  * 单步工具面板的同一形状 —— 它和助手面板**共用那份 Provider**，
  * 而它自己的四样（输入 / 阶段 / 结果 / 提案确认）原来也住在组件里。
  */
-function toolTree(props: { slot: Slot; fetchImpl?: typeof fetch }): React.JSX.Element {
+function toolTree(props: { slot: Slot; fetchImpl?: typeof fetch; host?: LocalApiHost; tier?: 'read-only' | 'read-and-propose' }): React.JSX.Element {
   const panel = (
     <AiToolRun
       routing={ROUTING}
@@ -171,14 +197,16 @@ function toolTree(props: { slot: Slot; fetchImpl?: typeof fetch }): React.JSX.El
   return (
     <I18nProvider locale="zh-CN">
       <PanelEphemeralProvider>
+        <HeytaUiProvider>
         <div data-testid="col-detail">{props.slot === 'detail' ? panel : null}</div>
         <div data-testid="col-main">{props.slot === 'main' ? panel : null}</div>
+        </HeytaUiProvider>
       </PanelEphemeralProvider>
     </I18nProvider>
   );
 }
 
-async function mountToolRun(props: { slot: Slot; fetchImpl?: typeof fetch }): Promise<HTMLDivElement> {
+async function mountToolRun(props: { slot: Slot; fetchImpl?: typeof fetch; host?: LocalApiHost; tier?: 'read-only' | 'read-and-propose' }): Promise<HTMLDivElement> {
   if (root === undefined) {
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -201,16 +229,17 @@ async function typeInto(el: HTMLDivElement, testId: string, text: string): Promi
 
 /** React 受控输入：必须走原生 setter，否则 onChange 收不到。 */
 async function type(el: HTMLDivElement, text: string): Promise<void> {
-  const input = el.querySelector<HTMLInputElement>('[data-testid="ai-assistant-input"]');
+  const input = el.querySelector<HTMLInputElement | HTMLTextAreaElement>('[data-testid="ai-assistant-input"]');
   if (input === null) throw new Error('找不到输入框');
   await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, text);
+    const prototype = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(prototype, 'value')?.set?.call(input, text);
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
 }
 
 function inputValue(el: HTMLDivElement): string {
-  const input = el.querySelector<HTMLInputElement>('[data-testid="ai-assistant-input"]');
+  const input = el.querySelector<HTMLInputElement | HTMLTextAreaElement>('[data-testid="ai-assistant-input"]');
   if (input === null) throw new Error('找不到输入框');
   return input.value;
 }
@@ -230,12 +259,14 @@ function disclosureCount(el: HTMLDivElement): number {
 }
 
 beforeEach(() => {
+  localStorage.clear();
   container = undefined;
   root = undefined;
   setAccount(null);
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   act(() => {
     root?.unmount();
   });
@@ -282,6 +313,42 @@ describe('跨挂载点（右栏 ⇄ 中间列）不掉未决状态', () => {
     );
   });
 
+  it('重挂载后收到回答，下一句保留上下文且不会重新披露或重复发请求', async () => {
+    const fetch = deferredFetch();
+    const el = await mount({ slot: 'detail', fetchImpl: fetch.impl });
+    await type(el, '第一句的问题');
+    await click(el, 'ai-assistant-send-button');
+    await click(el, 'ai-assistant-send');
+    await mount({ slot: 'main', fetchImpl: fetch.impl });
+    expect(fetch.bodies).toHaveLength(1);
+    await act(async () => { fetch.resolve('第一句的回答'); });
+    expect(el.querySelector('[data-testid="ai-assistant-waiting"]')).toBeNull();
+    expect(el.querySelectorAll('[data-testid="ai-chat-assistant"]')).toHaveLength(1);
+    expect(el.textContent).toContain('第一句的回答');
+    expect(Object.keys(localStorage).filter((key) => key.startsWith('heyta.ai.assistant.history'))).toHaveLength(0);
+    await type(el, '第二句的问题');
+    await click(el, 'ai-assistant-send-button');
+    expect(disclosureCount(el)).toBe(0);
+    expect(fetch.bodies).toHaveLength(2);
+    expect(fetch.bodies[1]).toContain('第一句的问题');
+    expect(fetch.bodies[1]).toContain('第一句的回答');
+    await act(async () => { fetch.resolve('第二句的回答'); });
+    expect(el.querySelectorAll('[data-testid="ai-chat-assistant"]')).toHaveLength(2);
+  });
+
+  it('披露重挂载后取消，恢复原草稿并移除乐观消息，零请求', async () => {
+    const fetch = recordingFetch();
+    const el = await mount({ slot: 'detail', fetchImpl: fetch.impl });
+    await type(el, '暂时不要发送这句');
+    await click(el, 'ai-assistant-send-button');
+    await mount({ slot: 'main', fetchImpl: fetch.impl });
+    await click(el, 'ai-assistant-disclosure-close');
+    expect(inputValue(el)).toBe('暂时不要发送这句');
+    expect(disclosureCount(el)).toBe(0);
+    expect(el.querySelectorAll('[data-testid="ai-chat-user"]')).toHaveLength(0);
+    expect(fetch.bodies).toHaveLength(0);
+  });
+
   it('请求正在飞时换挂载点，不许把"正在跑"归零（防二次发送）', async () => {
     // 🔴 故意用**永不 resolve** 的 fetch：回包一进来阶段就自己回 idle，
     //    那条判据就测不到了（探针现量：用一次性回包时，换挂载点前后都读不到差别）。
@@ -308,6 +375,115 @@ describe('跨挂载点（右栏 ⇄ 中间列）不掉未决状态', () => {
 });
 
 describe('账号绑定：换账号不许带一个字', () => {
+  it('真实手填令牌替换不复用旧邮箱会话；仅改口令保留草稿', async () => {
+    act(() => { useSyncStore.getState().applyAuthToken('https://selfhost.example', 'token-a', 'a@example.com'); });
+    const el = await mount({ slot: 'detail' });
+    const oldAccount = currentAccount();
+    await type(el, '原邮箱账号的未发送草稿');
+    act(() => { useSyncStore.getState().configure('https://selfhost.example', 'token-a', 'new-password'); });
+    expect(currentAccount()).toBe(oldAccount);
+    expect(inputValue(el)).toBe('原邮箱账号的未发送草稿');
+    act(() => { useSyncStore.getState().configure('https://selfhost.example', 'token-b', 'new-password'); });
+    const manualAccount = currentAccount();
+    expect(manualAccount).not.toBe(oldAccount);
+    expect(inputValue(el)).toBe('');
+    expect(useSyncStore.getState().email).toBeUndefined();
+    await type(el, '手填令牌 B 的草稿');
+    act(() => { useSyncStore.getState().configure('https://selfhost.example', 'token-c', 'new-password'); });
+    const manualC = currentAccount();
+    expect(manualC).not.toBe(manualAccount);
+    expect(inputValue(el)).toBe('');
+    await type(el, '手填令牌 C 的草稿');
+    act(() => { useSyncStore.getState().clearCredentials(); });
+    expect(currentAccount()).toBeNull();
+    act(() => { useSyncStore.getState().configure('https://selfhost.example', 'token-c', 'new-password'); });
+    expect(currentAccount()).not.toBe(manualC);
+    expect(inputValue(el)).toBe('');
+  });
+  it('真实登录凭据落盘因配额失败时，当前会话仍可收到助手回答', async () => {
+    const fetch = recordingFetch();
+    const el = await mount({ slot: 'detail', fetchImpl: fetch.impl });
+    const quota = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('quota-full'); });
+    act(() => { useSyncStore.getState().applyAuthToken('https://quota.example', 'test-token', 'quota@example.com', 'quota-account'); });
+    expect(quota).toHaveBeenCalled();
+    expect(localStorage.getItem('heyta.sync.credentials')).toBeNull();
+    expect(useSyncStore.getState().accountId).toBe('quota-account');
+    await type(el, '存储写满后仍能回答的问题');
+    await click(el, 'ai-assistant-send-button');
+    await click(el, 'ai-assistant-send');
+    expect(fetch.bodies).toHaveLength(1);
+    expect(el.querySelectorAll('[data-testid="ai-chat-assistant"]')).toHaveLength(1);
+    expect(el.textContent).toContain('三件事');
+    expect(el.querySelector('[data-testid="ai-assistant-waiting"]')).toBeNull();
+  });
+  it('同挂载点退出或换号立即移除旧聊天和草稿，不依赖导航', async () => {
+    setAccount('a@example.com');
+    const el = await mount({ slot: 'detail' });
+    await type(el, 'A 还没发送的私事');
+    setAccount('b@example.com');
+    expect(inputValue(el)).toBe('');
+    await type(el, 'B 草稿');
+    setAccount(null);
+    expect(inputValue(el)).toBe('');
+    expect(el.textContent).not.toContain('A 还没发送');
+    expect(el.textContent).not.toContain('B 草稿');
+  });
+
+  it('A → B → A 后旧 A 的异步回答不能进入 A 的新会话', async () => {
+    const fetch = deferredFetch();
+    setAccount('a@example.com');
+    const el = await mount({ slot: 'detail', fetchImpl: fetch.impl });
+    await type(el, '旧 A 会话');
+    await click(el, 'ai-assistant-send-button');
+    await click(el, 'ai-assistant-send');
+    setAccount('b@example.com');
+    setAccount('a@example.com');
+    await type(el, '新 A 草稿');
+    await act(async () => { fetch.resolve('旧 A 回答'); });
+    expect(inputValue(el)).toBe('新 A 草稿');
+    expect(el.querySelectorAll('[data-testid="ai-chat-assistant"]')).toHaveLength(0);
+    expect(el.textContent).not.toContain('旧 A 回答');
+  });
+
+  it('A 的提案确认晚返回不能覆盖 B 的草稿和会话', async () => {
+    let finish: ((result: { ok: true; taskId: string }) => void) | undefined;
+    const host = { ...fakeHost(), submit: () => new Promise<{ ok: true; taskId: string }>((resolve) => { finish = resolve; }) } as LocalApiHost;
+    const fetchImpl = (() => Promise.resolve(new Response(JSON.stringify({ choices: [{ message: {
+      role: 'assistant', content: '', tool_calls: [{ id: 'checklist', type: 'function', function: {
+        name: 'append_task_checklist', arguments: JSON.stringify({ taskId: 't1', items: ['待确认清单'] }),
+      } }],
+    } }] }), { status: 200, headers: { 'content-type': 'application/json' } }))) as typeof fetch;
+    setAccount('a@example.com');
+    const el = await mount({ slot: 'detail', host, fetchImpl, tier: 'read-and-propose' });
+    await type(el, '帮任务增加清单');
+    await click(el, 'ai-assistant-send-button');
+    await click(el, 'ai-assistant-send');
+    await click(el, 'ai-chat-confirm');
+    expect(finish).toBeDefined();
+    setAccount('b@example.com');
+    await type(el, 'B 不可丢失的草稿');
+    await act(async () => { finish!({ ok: true, taskId: 't1' }); });
+    expect(inputValue(el)).toBe('B 不可丢失的草稿');
+    expect(el.querySelectorAll('[data-testid="ai-chat-proposal"]')).toHaveLength(0);
+    expect(el.querySelectorAll('[data-testid="ai-chat-confirmed"]')).toHaveLength(0);
+  });
+
+  it('旧账号运行中切换账号，旧响应不能写入新账号的活会话', async () => {
+    const fetch = deferredFetch();
+    setAccount('a@example.com');
+    const el = await mount({ slot: 'detail', fetchImpl: fetch.impl });
+    await type(el, 'A 的私密问题');
+    await click(el, 'ai-assistant-send-button');
+    await click(el, 'ai-assistant-send');
+    setAccount('b@example.com');
+    await mount({ slot: 'main', fetchImpl: fetch.impl });
+    await type(el, 'B 尚未发送的草稿');
+    await act(async () => { fetch.resolve('A 的私密回答'); });
+    expect(inputValue(el)).toBe('B 尚未发送的草稿');
+    expect(el.textContent).not.toContain('A 的私密');
+    expect(el.querySelectorAll('[data-testid="ai-chat-assistant"]')).toHaveLength(0);
+  });
+
   it('🔴 上一个人的草稿与未决披露，对下一个人一个字节都不许渲染', async () => {
     setAccount('a@example.com');
     const el = await mount({ slot: 'detail' });

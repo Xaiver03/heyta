@@ -692,7 +692,7 @@ async function clickRailDestination(el: HTMLElement, label: string): Promise<voi
   await act(async () => {
     more!.click();
   });
-  const item = [...el.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find((b) =>
+  const item = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find((b) =>
     (b.textContent ?? '').includes(label),
   );
   expect(item, `「更多」菜单里没有「${label}」`).not.toBeUndefined();

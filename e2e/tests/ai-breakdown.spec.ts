@@ -79,6 +79,10 @@ test.describe('AI 拆解：真浏览器端到端旅程', () => {
     await expect(page.locator('[data-testid="ai-kept-count"]')).toHaveText('4');
     await expect(page.locator('[data-testid="ai-proposal-source"]')).toHaveText('来自本机');
 
+    // ══ 5b. 🔴 法定显式标识：先截图，再断言（失败时也要有图，见 AGENTS §6.2）
+    await page.screenshot({ path: 'test-results/ai-explicit-label-breakdown.png' });
+    await expect(page.locator('[data-testid="ai-proposal-generated"]')).toHaveText('AI 生成合成内容');
+
     // ══ 6. 逐条取舍：去掉第一条 ═════════════════════════════════════════
     await page.locator('[data-testid="ai-item-0"]').uncheck();
     await expect(page.locator('[data-testid="ai-kept-count"]')).toHaveText('3');

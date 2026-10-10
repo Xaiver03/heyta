@@ -38,6 +38,7 @@ import {
   decidePrivacyConsent,
   enableAllModules,
   openSettingsView,
+  selectSettingsSection,
   stubLegalRecheck,
   stubPublicFacts,
 } from './helpers';
@@ -202,6 +203,18 @@ async function fakeServer(
       body: JSON.stringify({ passkeys: [] }),
     });
   });
+  // 设置里的入站自动化与邮箱换绑状态属于账号设置的只读探测；本用例只验头像，
+  // 但这些面板在同一设置壳内会按真实 IA 读取。返回合法空状态，避免把新增的
+  // 设置能力误报成头像链路的未知调用。
+  await page.route(`${SERVER}/api/automation/rules`, async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ rules: [] }) });
+  });
+  await page.route(`${SERVER}/api/automation/events`, async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ events: [] }) });
+  });
+  await page.route(`${SERVER}/api/account/email/change/status`, async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ pending: false, awaitingOld: false, awaitingNew: false }) });
+  });
   // 「保存并同步」会真发一次上传。本用例不验同步，给它一份"没有东西要传"的合法应答，
   // 免得传输层的失败混进上面那条 `unexpected` 与 console 断言里。
   await page.route(`${SERVER}/api/sync/ops**`, async (route) => {
@@ -239,6 +252,9 @@ test('🔴 头像：口令缺失 → 真上传 → 刷新之后仍说"要先填�
 
   // ── ① 冷启动：口令不在内存 ────────────────────────────────────
   await openSettingsView(page);
+  // 设置打开时保留上次选中的分类；这条旅程的目标是 Profile，必须显式选择，
+  // 不能依赖测试前一轮留下的分类状态。
+  await selectSettingsSection(page, 'profile');
   await expect(page.locator(PANEL)).toBeVisible();
   const needPassword = await zhValue('common.profile.avatar.needPassword');
   await expect(page.locator(NEED_PASSWORD)).toHaveText(needPassword);
@@ -252,11 +268,13 @@ test('🔴 头像：口令缺失 → 真上传 → 刷新之后仍说"要先填�
     「同步设置」齿轮，在同级对话框里填 —— 关掉浮层的唯一理由是**浮层盖住了齿轮**。
     现在 同步 就是设置里的**一节**：同一个表面里滚下去填完保存，不用再出去一趟。
   */
+  await selectSettingsSection(page, 'sync');
   const syncSection = page.getByTestId('sync-settings-panel');
   await syncSection.scrollIntoViewIfNeeded();
   await syncSection.getByLabel(await zhValue('web.sync.password.label')).fill(PASSWORD);
   await syncSection.getByRole('button', { name: await zhValue('web.sync.saveAndSync') }).click();
   // 「保存并同步」不再关浮层（它本来就在浮层里）⇒ 回到顶部看头像那一节改口了没有。
+  await selectSettingsSection(page, 'profile');
   await page.getByTestId('profile-section-anchor').scrollIntoViewIfNeeded();
   await expect(page.locator(NEED_PASSWORD)).toHaveCount(0);
 
@@ -309,6 +327,7 @@ test('🔴 头像：口令缺失 → 真上传 → 刷新之后仍说"要先填�
   await page.reload();
   await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible();
   await openSettingsView(page);
+  await selectSettingsSection(page, 'profile');
   await expect(page.locator(PANEL)).toBeVisible();
   // 🔴 这一句是 R15b 的靶心：状态是 `needs-password`，不是 `absent`。
   //    并成 `absent` 的旧形状是"你还没有头像" + 用户接着点「换一张」把自己那张覆盖掉。

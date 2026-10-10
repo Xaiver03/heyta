@@ -81,8 +81,8 @@ describe('notificationsSupported', () => {
 });
 
 describe('notificationPermission', () => {
-  it('不支持时返回 `denied`（与"用户拒绝"同一后果，调用方不必分支）', () => {
-    expect(notificationPermission(undefined)).toBe('denied');
+  it('不支持时返回独立状态，界面才能给出正确说明', () => {
+    expect(notificationPermission(undefined)).toBe('unsupported');
   });
 
   it('透传真实权限', () => {
@@ -97,14 +97,14 @@ describe('requestNotificationPermission', () => {
     await expect(requestNotificationPermission(ctor)).resolves.toBe('granted');
   });
 
-  it('底层抛错时返回 `denied`（**永不抛**）', async () => {
+  it('底层抛错时返回 `error`（**永不抛**）', async () => {
     const ctor = function (): unknown {
       return {};
     } as unknown as NotificationCtor;
     (ctor as { permission: NotificationPermission }).permission = 'default';
     (ctor as { requestPermission: () => Promise<NotificationPermission> }).requestPermission = () =>
       Promise.reject(new Error('被策略拒绝'));
-    await expect(requestNotificationPermission(ctor)).resolves.toBe('denied');
+    await expect(requestNotificationPermission(ctor)).resolves.toBe('error');
   });
 });
 

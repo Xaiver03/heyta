@@ -36,6 +36,7 @@ const { App } = await import('../src/App.js');
 import { LocaleHost } from '../src/lib/locale-host.js';
 import { initOpLog, __resetOpLogForTests } from '../src/lib/oplog.js';
 import { useTaskStore } from '../src/features/tasks/store.js';
+import { usePrivacyStore } from '../src/features/privacy/store.js';
 
 let root: Root | undefined;
 let container: HTMLDivElement | undefined;
@@ -50,6 +51,8 @@ let tick = 1_700_000_000_000;
 
 beforeEach(async () => {
   localStorage.clear();
+  localStorage.setItem('privacy.consent', JSON.stringify({ decision: 'local-only', decidedAt: new Date().toISOString() }));
+  usePrivacyStore.setState({ open: false, reason: 'first-launch', notPersisted: false });
   vi.spyOn(Date, 'now').mockImplementation(() => (tick += 1_000));
   __resetOpLogForTests();
   await initOpLog(`task-sort-${Math.random().toString(36).slice(2)}`);
