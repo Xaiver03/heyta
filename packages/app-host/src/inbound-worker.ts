@@ -131,7 +131,7 @@ export async function requestCommitPermitAndJournal(options: {
 }): Promise<string> {
   const response = await (options.fetchImpl ?? globalThis.fetch)(new URL(commitPermitPath, options.baseUrl), {
     method: 'POST', redirect: 'error',
-    headers: workerHeaders(options.token, options.worker, options.entitlementTicket),
+    headers: { ...workerHeaders(options.token, options.worker, options.entitlementTicket), ...jsonHeaders },
     body: JSON.stringify(options.request),
   });
   if (response.status === 402) throw new AutomationEntitlementRequiredError(await rejectionReason(response));
@@ -213,6 +213,12 @@ export async function renewAutomationLease(options: {
     { method: 'POST', redirect: 'error', headers: { ...workerHeaders(options.token, options.worker), ...jsonHeaders },
       body: JSON.stringify({ clientId: options.worker.clientId, leaseGeneration: options.leaseGeneration }) },
   );
+  // 402 必须在 `!response.ok` **之前**读：`/renew` 的 preHandler 挂着
+  // `createEntitlementGuard({ capability: 'automation' })`，订阅到期就是这一支。
+  // 把它读成"Automation lease renewal failed"是让宿主对一次终态拒绝做退避重试，
+  // 而界面上只剩"报错"，没有"本月额度已用完"—— 服务端那条纪律（api.ts 里
+  // 权益/额度拒⇒402 终态、其余⇒409 可重试）在宿主这一侧要有同样的读法。
+  if (response.status === 402) throw new AutomationEntitlementRequiredError(await rejectionReason(response));
   if (!response.ok) throw new Error('Automation lease renewal failed');
   const raw = await response.json() as Record<string, unknown>;
   if (typeof raw.receivedAt !== 'number' || !Number.isSafeInteger(raw.receivedAt) || raw.receivedAt < 0 || raw.receivedAt > 8_640_000_000_000_000 ||
@@ -270,6 +276,12 @@ export async function readAutomationPreparedResult(options: {
     method: 'GET', redirect: 'error', headers: workerHeaders(options.token, options.worker),
   });
   if (response.status === 404 && options.eventId !== undefined) return undefined;
+  // 这两条 GET 腿（`/events/recover` 与 `/events/:id/result`）**今天**的 preHandler 只有
+  // `authenticate` —— `recover` 那格是故意的：已经拿到许可的本地意图要能在订阅到期后补传。
+  // 402 仍按同一条读法处理：它是服务端对一个**外部**信号的语义（"这一档权益没了"），
+  // 而"哪条路由会挂闸门"写在另一枚包的 `api.ts` 里，传输层看不见它、也不该猜它。
+  // 只有 404 与 2xx 之外的其它码统一当传输失败，那会把一次终态拒绝读成可重试的失败。
+  if (response.status === 402) throw new AutomationEntitlementRequiredError(await rejectionReason(response));
   if (!response.ok) throw new Error('Automation result recovery failed');
   const raw = await response.json() as Record<string, unknown>;
   if (raw.state === 'empty') return undefined;
@@ -315,6 +327,11 @@ export async function advanceAutomationAiAttempt(options: {
     body: JSON.stringify({ clientId: options.worker.clientId, ruleId: options.ruleId, parseVersion: options.parseVersion,
       attempt: options.attempt, leaseGeneration: options.leaseGeneration, from: options.from, to: options.to }),
   });
+  // `/ai-attempt/state` 的 preHandler 同样挂着 `createEntitlementGuard({ capability: 'automation' })`。
+  // 这一笔是 W8 那格**实测**撞出来的：订阅到期时 reserve 已经成功、模型也真跑完了，
+  // 把这次 reserved→sent 的落账读成"state transition failed"会让整次派发以异常收尾，
+  // 而那条 attempt 行停在 `reserved` —— 计量账本上记的是一次"买了但没人认领"的模型调用。
+  if (response.status === 402) throw new AutomationEntitlementRequiredError(await rejectionReason(response));
   if (!response.ok) throw new Error('Automation AI attempt state transition failed');
   const raw = await response.json() as Record<string, unknown>;
   if (typeof raw.changed !== 'boolean') throw new Error('Invalid automation AI state response');

@@ -139,3 +139,50 @@ describe('automation rule transport entitlement ticket', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * 现量（真 Fastify 5.12.5，`server/node_modules`）：同一枚 `DELETE /api/automation/rules/:ruleId`
+ * —— 带 `content-type: application/json` 而无体 ⇒ **400 `FST_ERR_CTP_EMPTY_JSON_BODY`**；
+ * 不带那个头 ⇒ 200。也就是说客户端里"永远声明 json"那一句把**删除规则**钉死成 400，
+ * 用户在界面上点删除只会看到"请求失败"。它的镜像（提交许可**少**带这个头）本线同一天刚查出来，
+ * 所以这一族两头都钉：请求头的有无必须与体的有无**同时**成立。
+ */
+describe('automation rule transport request shape', () => {
+  const drives: Readonly<Record<string, (remote: ReturnType<typeof createInboundRulesRemote>) => Promise<unknown>>> = {
+    listSenderCredentials: (r) => r.listSenderCredentials(rule.id),
+    issueSenderCredential: (r) => r.issueSenderCredential(rule.id, 'hook'),
+    revokeSenderCredential: (r) => r.revokeSenderCredential('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'),
+    testSend: (r) => r.testSend(rule.id, 'hook', 's'.repeat(43)),
+    readDraft: (r) => r.readDraft('event'),
+    decideDraft: (r) => r.decideDraft('event', { decision: 'cancel', expectedAttempt: 2, expectedRuleVersion: 1, expectedDigest: 'a'.repeat(64) }),
+    listEvents: (r) => r.listEvents(),
+    retryEvent: (r) => r.retryEvent({ eventId: 'event', ruleId: rule.id, ruleVersion: 1, attempt: 2, receivedAt: 1, status: 'queued', reasonCode: null }),
+    list: (r) => r.list(),
+    create: (r) => r.create('hook'),
+    update: (r) => r.update(rule.id, {}),
+    setEnabled: (r) => r.setEnabled(rule.id, false),
+    remove: (r) => r.remove(rule.id),
+  };
+
+  it('表的分母等于客户端自己导出的方法集（新加一枚却没进表就红）', () => {
+    const remote = createInboundRulesRemote({ baseUrl: 'https://example.test', getToken: async () => 'token', fetchImpl: vi.fn() });
+    expect(Object.keys(drives).sort()).toEqual(Object.keys(remote).sort());
+  });
+
+  it('每一笔的 content-type 与请求体同生同灭', async () => {
+    const readings: Record<string, string> = {};
+    for (const name of Object.keys(drives)) {
+      const fetch = vi.fn().mockImplementation(async () => response({}));
+      const remote = createInboundRulesRemote({ baseUrl: 'https://example.test', getToken: async () => 'token', fetchImpl: fetch });
+      // 响应一律给 `{}`：各方法的**响应校验**当然会抛，这条判据读的是发出去的那一笔请求，与响应无关。
+      await drives[name]!(remote).catch(() => undefined);
+      const init = fetch.mock.calls[0]?.[1] as RequestInit | undefined;
+      if (init === undefined) { readings[name] = 'no-request'; continue; }
+      const headers = init.headers as Record<string, string>;
+      const hasBody = init.body !== undefined;
+      readings[name] = hasBody === (headers['content-type'] === 'application/json') ? 'ok'
+        : hasBody ? 'body-without-header' : 'header-without-body';
+    }
+    expect(readings).toEqual(Object.fromEntries(Object.keys(drives).map((name) => [name, 'ok'])));
+  });
+});
