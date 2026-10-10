@@ -25,6 +25,8 @@
 
 import type { Locale } from '@heyta/i18n';
 
+export { legalDocumentPresentation } from './presentation.js';
+
 export type {
   LegalBlock,
   LegalDocument,

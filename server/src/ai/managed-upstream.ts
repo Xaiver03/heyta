@@ -99,6 +99,7 @@ export const SERVER_MANAGED_AI_FEATURES = [
   'breakdown',
   'prioritize',
   'duration-estimate',
+  'inbound-automation',
   'tool-calling',
 ] as const;
 

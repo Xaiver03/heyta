@@ -68,6 +68,8 @@ export interface TaskView {
   note: string | undefined;
   projectId: string | undefined;
   dueDate: number | undefined;
+  /** Date-only calendar value; native hosts must prefer this over device-local epoch conversion. */
+  dueDateLocal?: string;
 }
 
 let host: AppHost | null = null;
@@ -280,6 +282,7 @@ export async function listTasks(): Promise<{ tasks: TaskView[] }> {
       note: task.note,
       projectId: task.projectId,
       dueDate: task.dueDate,
+      dueDateLocal: task.dueDateLocal,
     })),
   };
 }

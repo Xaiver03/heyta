@@ -2544,3 +2544,93 @@ AC 现量：**未勾 8 / 已勾 0**。
    `git show --name-only --format= <这笔> | grep -vcE '^(packages/app-host/(src|tests)/inbound-|server/tests/|research/tools/verify-inbound-|docs/plans/inbound-automation\.md|PROGRESS\.md|BLOCKED\.md)'`
    = 0。本轮现量 `TOTAL=2576 白名单内=18 非白名单=2558`，其中"白名单内"那 18 枚是**别人**在白名单地界里
    正在写的文件（例如 `server/tests/integration/registration-otp.integration.spec.ts`，10-07 起未跟踪，不是本线的，没提）。
+
+## 2026-10-10 18:4x · 【交接】T5 界面层：两枚文件已改、未提交，下一会话从这里接
+
+这一节是**交接件**，不是进度结论。负责人 18:4x 指令："用 close session skill 做下交接"。
+断点形状：**代码改完、读数取到、一次提交都没做**。
+
+### 1. 位置（不写会漂的值，全部给现量命令）
+
+| 问 | 现量命令 | 本轮读数 |
+|---|---|---|
+| AC 勾了几条 | `grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` | **0**（未勾数 `grep -c '^- \[ \] \*\*AC-'` = 8） |
+| 本线入库几笔 | `git log --oneline --grep='自动收集' -50 \| wc -l` | 每次现量，别抄本节 |
+| 界面层在不在库 | `git ls-files apps/web/src/features/settings/InboundAutomationSettings.tsx apps/web/tests/inbound-draft-review.spec.tsx` | **空**（整片界面 + 四份 spec 都还是未跟踪） |
+| 轮次 | Goal 面板 | 预算 60，本会话用了约 7 |
+
+### 2. 本会话段做完的事（逐条带读数）
+
+1. **T4 不重做**：计量代码与判据早已在 HEAD（`server/src/automation/ai-metering.ts` 的退款 CAS +
+   `reconcileAutomationAiMetering`，台账 524-587 行那一节）。剩下的只是四格已登记边界（B113/B114/跨周期文案归 T6/
+   `local`·`direct` 按库的 CHECK 不占额度，是设计不是缺口）。
+2. **T5 第一步：把界面层的类型接缝接对**（这是本线唯一一枚编译红，也是 B131 那一类）：
+   - `apps/web/src/features/settings/inbound-runtime.ts`：`processWebInboundOnce` 的返回类型从
+     手抄的三态联合换成 app-host 已导出的 `InboundAutomationCycleResult`（类型从 `@heyta/app-host` 导入，不再内联重抄）。
+   - `apps/web/src/features/settings/InboundAutomationSettings.tsx`：状态联合改成
+     `'idle' | 'failed' | InboundAutomationCycleState`；状态回显不再用 `t(\`…${state}\` as any)` 拼键，
+     改成模块级 `PROCESS_COPY` 表（键类型 `MessageKey`，四条：`submitted/empty/needs-confirmation/failed`），
+     渲染节点带 `data-inbound-cycle-state`。
+3. **读数**（当日，命令可复跑）：
+
+| 判据 | 命令 | 读数 |
+|---|---|---|
+| apps/web 类型 | `cd apps/web && npx --no-install tsc --noEmit -p tsconfig.spec.json` | `RC=2`，`error TS` **16** 条；本线两枚文件 **0** 条 |
+| 那 16 条落在哪 | 同上 + `grep -oE "^[^(]+\([0-9]+,[0-9]+\): error TS" \| sed 's/(.*)//' \| sort \| uniq -c` | `tests/share-key-store.spec.ts` 13、`tests/app-mount.spec.tsx` 3 —— **都在别人文件里**，按任务书是顺手活，只登记不修 |
+| 界面层四份 spec | `cd apps/web && NO_COLOR=1 npx --no-install vitest run tests/inbound-{draft-review,event-retry,worker-lifecycle,upload-authorization}.spec.*` | `Test Files 4 passed (4)` / `Tests 8 passed (8)`，跳过 **0** |
+| 生产者缝对账 | `NO_COLOR=1 python3 research/tools/verify-inbound-producer-seam.py` | `rc=0`，`在册文件=76 跨包成员访问=127 命中=103 登记缝=24 新缝=0 模块在HEAD=215 新模块缝=0` |
+| 改前对照 | 同一把 tsc 尺 | 改前 **17** 条，其中 1 条是本线的 `inbound-runtime.ts(209,5) TS2322` ⇒ 净 **-1，没有一条变多** |
+
+### 3. 这一格为什么**还不能提交**（阻塞，逐条带证据）
+
+🔴 **B112 仍然拦路，而且这一轮的拦法量清楚了**：界面层引用了四枚**只活在共享工作树、不在 HEAD** 的跨包成员。
+干净检出（HEAD + 我要提的这几枚文件）会编译红，所以 `apps/web` 这一笔**必须排在它们之后**。
+现量（同一把尺两头对照，防"符号名写错"那种假读数）：
+
+| 成员 | 落点 | HEAD 命中 | 工作树命中（阳性对照） |
+|---|---|---|---|
+| `dispatchValidated` | `packages/op-log/src/engine.ts` | 0 | **1** ✅ 尺能命中 |
+| `getInboundUploadAuthorization` | `packages/sync-client/src/client.ts` | 0 | **2** ✅ |
+| `'inbound-automation'`（AiFeature） | `packages/ai/src/routing.ts` | 0 | **1** ✅ |
+| 安装身份 META 键 | `packages/storage/src/stores.ts` | 0 | 0 ⚠️ **这一行没有阳性对照** —— 我用的符号名 `INBOUND_AUTOMATION` 在工作树也搜不到，所以"未入库"这一格是**盲区不是读数**，别照它行动；要重取先 `grep -n "META" packages/storage/src/stores.ts` 拿真名 |
+
+前四枚的落点与三条候选修法在 **B112**（要连"唯一登记表/唯一写入入口"这两条既有立场一起拍，本线不代拍）。
+另有 **B110**：`waiting-entitlement` 的句子是**一颗不存在的词条**（`packages/i18n` 正被并行会话写着，3 枚脏；
+本线死规矩不许动它）。所以 `PROCESS_COPY` 里刻意**少一行映射**，那一格渲染空句子 + 状态属性，
+**不挪用 `failed` 那句** —— 把"这台实例还没买到资格"说成"处理失败"正是任务书要消除的那类错。
+`translateIn` 对缺键是 **抛**（`packages/i18n/src/catalog.ts:53`），所以拼键那一步以前会让整块面板崩；
+现在这条路不可能再拼出不存在的键。词条进去时的收尾：`PROCESS_COPY` 加一行 `waiting-entitlement`。
+
+### 4. 下一会话的有序动作（每条写判据与失败形状）
+
+1. **先重取 B112**：上面那张四行表逐枚重跑（HEAD 与工作树各一次，只在工作树命中的才算"未入库"）。
+   若已有成员进了 HEAD ⇒ 界面层这一笔就能落；全没进 ⇒ 仍只能在 B112 之后。**判据**：`新缝=0` 且
+   `verify-inbound-producer-seam.py` 只覆盖**已入库**消费者，未跟踪的界面层**不在它的射程里**，所以那 rc=0
+   **不等于**界面层可提交（本轮差点这样读，别重复）。
+2. **补界面层的判据**（在 `apps/web/tests/inbound-*`，白名单内）：至少两条 —— ①`waiting-entitlement` 渲染出
+   `data-inbound-cycle-state="waiting-entitlement"` 且**不出现** `failed` 那句（钉住"不说成故障"）；
+   ②`PROCESS_COPY` 的每一行与 `InboundAutomationCycleState` 逐一对账，缺一行就红（钉住"下次加状态忘了接界面"）。
+   **反向验证**：把①的分支删掉 ⇒ 必须红；把②表里一行拿掉 ⇒ 必须红。
+3. **界面层真跑一次的取证**：`cd e2e && npx playwright test --config playwright.inbound.config.ts`
+   （两份文件在白名单内，`tests/inbound-automation.spec.ts` 现在仍未跟踪），截图**人打开看过**才算，
+   且按 AGENTS §6.2 规定二后台跑（`HEYTA_NO_FOCUS=1`），不抢前台。
+4. **apps/mobile worker**：`apps/mobile/src/inbound/lifecycle.ts` 未跟踪，它 import 的
+   `apps/mobile/src/ai/settings-store` 正被别人写着 ⇒ 入库前逐枚 `git status --porcelain -- <落点>` 现量，
+   撞车就不提（判据是同一文件的未提交 diff，不是"那条线在忙"的印象）。
+5. **入库配方**（沿用，别换）：临时索引 plumbing（`GIT_INDEX_FILE` + `read-tree` + `write-tree` + `commit-tree` +
+   `update-ref` CAS）→ 点名枚数与实际变动数对账 → `git restore --staged -- <那几枚>` 消幻影 →
+   `git show --name-only --format= HEAD | grep -vcE '<白名单>'` 必须 0。**只本地，不 push**。
+   🔴 不要 `git add`（它读工作树，会把邻座在飞的字节带走）、不要 `git add -A`、不要裸 `git commit`。
+6. 之后才是 **T6 对外说明**（新写一枚 ADR 限定取代 ADR-0017/0020）与 **T7**（三条命令在隔离副本上 exit 0）。
+
+### 5. 防重复死路（本会话真踩过的，别再来一遍）
+
+- **单引号 grep 会漏双引号键**：`grep "'web\.ai\.inbound\.events"` 报 0，而 `zh-CN.ts:5205-5219` 那些键是**双引号**写的。
+  本轮两次差点据此写下"词条不存在"。判"某串在不在 i18n"一律用 `['\"]` 两类引号都进正则。
+- **zsh 里 `${PIPESTATUS[0]}` 是空值**（环境陷阱 #184 又一次）：`… | tail -20; echo ${PIPESTATUS[0]}` 读出来是空，
+  取 rc 要先把输出重定向到文件再 `echo $?`。
+- 一次 `vitest` 被内存闸门拒（轻量档 2/2 被别人占）→ 有界重试，**不 kill 任何进程**。
+- 不许自己把 AC 勾上；不许自己 `UpdateGoal complete` —— 做完或停损都先报告，等负责人点头。
+- 交接件落在 `PROGRESS.md`（任务书指定的续读入口）而**不是** `docs/plans/inbound-automation-handoff.md`：
+  后者是本仓库既有约定（`docs/plans/` 下已有 12 枚 `*-handoff.md`），但那个路径**不在本线白名单里** ⇒ 已登记 **B135**，
+  要挪就一句话拍。

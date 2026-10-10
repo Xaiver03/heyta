@@ -76,19 +76,24 @@ function makeStyles(tokens: HeytaNativeTokens) {
       padding: tokens['space.3'],
       borderRadius: tokens['radius.lg'],
       backgroundColor: tokens['color.surface'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
     },
     statRow: {
-      flexDirection: 'row',
-      alignItems: 'baseline',
-      justifyContent: 'space-between',
+      flex: 1,
+      minWidth: 0,
+      flexDirection: 'column',
+      alignItems: 'flex-start',
       gap: tokens['space.2'],
     },
     statValue: {
       flexDirection: 'row',
+      flexWrap: 'wrap',
+      minWidth: 0,
       alignItems: 'baseline',
       gap: tokens['space.2'],
+    },
+    stats: {
+      flexDirection: 'row',
+      gap: tokens['space.4'],
     },
     numeric: {
       fontVariant: ['tabular-nums'],
@@ -123,37 +128,39 @@ export function WeeklyReviewCard({
         </Text>
       )}
 
-      {rows.map((row) => (
-        <View key={row.id} style={styles.statRow}>
-          <Text style={[text['row-meta'], { color: tokens['color.foreground-muted'] }]}>
-            {labels.stat(row.id)}
-          </Text>
-          <View style={styles.statValue}>
-            <Text style={[text['numeric-body'], styles.numeric, { color: tokens['color.foreground'] }]}>
-              {String(row.value)}
+      <View style={styles.stats} testID="growth-week-stats">
+        {rows.map((row) => (
+          <View key={row.id} style={styles.statRow} testID={`growth-week-stat-${row.id}`}>
+            <Text style={[text['row-meta'], { color: tokens['color.foreground-muted'] }]}>
+              {labels.stat(row.id)}
             </Text>
-            {/*
-              单位与数字**分开**：web 迁移前就是两个元素（数字用 numeric-display、
-              单位用 caption）。合成一段会让单位跟着数字的字号走，而"专注小时"
-              那类单位在数字很大时会被放大到不协调。
-            */}
-            {labels.statUnit === undefined ? null : (
-              <Text style={[text.caption, { color: tokens['color.foreground-muted'] }]}>
-                {labels.statUnit(row.id)}
+            <View style={styles.statValue}>
+              <Text style={[text['numeric-summary'], styles.numeric, { color: tokens['color.foreground'] }]}>
+                {String(row.value)}
               </Text>
-            )}
-            {/*
-              🔴 上周那个数字**只有中性色**（`foreground-subtle`），
-              没有箭头、没有红绿。见文件头。
-            */}
-            <Text
-              style={[text['numeric-body'], styles.numeric, { color: tokens['color.foreground-subtle'] }]}
-            >
-              {labels.previous(row.previous)}
-            </Text>
+              {/*
+                单位与数字**分开**：web 迁移前就是两个元素（数字用 numeric-display、
+                单位用 caption）。合成一段会让单位跟着数字的字号走，而"专注小时"
+                那类单位在数字很大时会被放大到不协调。
+              */}
+              {labels.statUnit === undefined ? null : (
+                <Text style={[text.caption, { color: tokens['color.foreground-muted'] }]}>
+                  {labels.statUnit(row.id)}
+                </Text>
+              )}
+              {/*
+                🔴 上周那个数字**只有中性色**（`foreground-subtle`），
+                没有箭头、没有红绿。见文件头。
+              */}
+              <Text
+                style={[text.caption, styles.numeric, { color: tokens['color.foreground-subtle'] }]}
+              >
+                {labels.previous(row.previous)}
+              </Text>
+            </View>
           </View>
-        </View>
-      ))}
+        ))}
+      </View>
 
       {review.bestFocusDay === undefined ? null : (
         <Text style={[text.caption, { color: tokens['color.foreground-muted'] }]}>

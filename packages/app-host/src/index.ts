@@ -33,6 +33,7 @@ export {
   type ActionContext,
   type TaskActions,
   type NewTaskFields,
+  type TaskDetailsPatch,
 } from './actions.js';
 
 /**
@@ -81,6 +82,12 @@ export {
   type HabitActionsOptions,
   type NewHabitFields,
 } from './habit-actions.js';
+export {
+  buildHabitExportRows,
+  renderHabitCsv,
+  type HabitExportRow,
+  type HabitCsvColumns,
+} from './habit-export.js';
 
 /**
  * 提醒动作（B1-1 的写路径）。
@@ -372,6 +379,9 @@ export {
   passkeyPath,
   planDisplayNameWrite,
   registerWithEmailPassword,
+  requestEmailPasswordRegistrationCode,
+  verifyEmailPasswordRegistrationCode,
+  resendEmailPasswordRegistrationCode,
   registerWithMagicLink,
   renamePasskey,
   requestMagicLink,
@@ -399,6 +409,7 @@ export {
   type HostedPasskeyOptions,
   type HostedPasskeySummary,
   type HostedPasswordPolicyCode,
+  type HostedRegistrationChallengeResult,
   type LegalConsentReason,
   type LegalConsentStatus,
 } from './hosted-auth.js';
@@ -567,9 +578,12 @@ export {
   type AssistantStep,
   type AssistantTier,
   type AssistantTurnDeps,
+  type LocalObservationKey,
+  type LocalObservationTranslate,
 } from './ai-assistant.js';
 export {
   ASSISTANT_TIER_ORDER,
+  ASSISTANT_TIER_EXECUTE,
   ASSISTANT_TIER_READ_AND_PROPOSE,
   ASSISTANT_TIER_READ_ONLY,
   DEFAULT_ASSISTANT_TIER,
@@ -602,8 +616,11 @@ export {
 } from './calendar-anchor.js';
 
 export {
+  aiToolProposalRequiresConfirmation,
   confirmAiToolProposal,
+  executeAiToolProposal,
   runSelectedTool,
+  type AiToolAuthorization,
   type AiToolProposal,
   type AiToolRunOutcome,
   type AiToolRunnerDeps,
@@ -729,6 +746,7 @@ export {
  */
 export {
   drainWidgetIntents,
+  widgetIntentReceipt,
   type WidgetDrainResult,
   type WidgetDrainTasks,
 } from './widget-actions.js';
@@ -891,6 +909,8 @@ export {
   type AssistantSessionActionsOptions,
   type NewAssistantTurn,
 } from './assistant-session-actions.js';
+
+export { prepareTaskBatchIntent, createTaskBatch, type TaskBatchAuthorization, type TaskBatchContext } from './task-batch-actions.js';
 export { requestInboundAutomation, runInboundAutomationEvent, type InboundAutomationRunOptions } from './inbound-runner.js';
 export {
   processInboundAutomationEvent,
@@ -920,6 +940,16 @@ export { createAutomationInstallationMetaStore } from './inbound-installation-st
 export { createInboundRecipientKeyStore, type InboundRecipientKeyScope } from './inbound-key-store.js';
 export { createVaultWrappedAutomationWorkerStore, createInboundCommitJournal } from './inbound-secret-store.js';
 export { generateInboundKeyPair, inboundPublicKey } from '@heyta/inbound-core';
+
+/** 跨端本地会话历史：宿主只注入存储，不另造恢复与账号隔离规则。 */
+export type { ChatItem, WithoutId } from './assistant-local-transcript.js';
+export {
+  ASSISTANT_HISTORY_STORAGE_KEY, ASSISTANT_HISTORY_VERSION, MAX_PERSISTED_ITEMS,
+  truncateForPersistence, saveAssistantHistory, loadAssistantHistory, clearAssistantHistory,
+  scopeAssistantHistoryStorage, assistantHistoryAccount, createAssistantHistoryAccountResolver,
+  type HistoryStorage, type StoredChatItem, type PersistedAssistantHistory,
+} from './assistant-local-history.js';
+
 export {
   createInboundRecipientRemote,
   InboundRecipientRemoteError,
@@ -928,3 +958,6 @@ export {
 export { createInboundRulesRemote, InboundRulesRemoteError, type InboundAutomationRule, type InboundAutomationRuleConfig, type InboundAutomationField, type InboundAutomationEventSummary, type InboundSenderCredential } from './inbound-rules-remote.js';
 export { createInboundDraftReviewer, type InboundDraftReviewOptions, type InboundDraftReview } from './inbound-draft-review.js';
 export type { InboundDraftTask } from '@heyta/shared-schema';
+
+export { planWidgetPublish, type WidgetPublishStateSlice, type WidgetPublishPlan } from './widget-publish.js';
+export { createNativeWidgetSession, type NativeWidgetBridge } from './native-widget-session.js';

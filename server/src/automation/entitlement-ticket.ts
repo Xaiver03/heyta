@@ -8,7 +8,10 @@ const IDENTIFIER = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,254}$/);
 const RULE_ID = z.string().uuid();
 const EVENT_ID = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$/);
 const TICKET_DOMAIN = 'heyta-automation-entitlement-v1.';
-const MAX_TICKET_SECONDS = 30;
+// 🔴 「最多 30 秒」这一格只有一个事实源：@heyta/inbound-core 的毫秒常量（宿主拿它判"这张票还能不能用"，
+// 服务端拿它判"这张票收不收"）。原来这里是另一枚字面量 30 —— 两份 = 可以从类型上漂开，
+// 而漂开的后果是一枚 30 秒通用通行证。导出它，测试就把边界压在这枚数上而不是抄 30。
+export const MAX_TICKET_SECONDS = AUTOMATION_ENTITLEMENT_MAX_TICKET_LIFETIME_MS / 1000;
 const CLOCK_SKEW_SECONDS = 5;
 const REPLAY_RETENTION_MS = 5 * 60 * 1000;
 
@@ -21,6 +24,7 @@ const REPLAY_RETENTION_MS = 5 * 60 * 1000;
  */
 import {
   AUTOMATION_ENTITLEMENT_ACTIONS,
+  AUTOMATION_ENTITLEMENT_MAX_TICKET_LIFETIME_MS,
   automationEntitlementScopeMismatch,
   type AutomationEntitlementAction,
 } from '@heyta/inbound-core';
@@ -44,7 +48,7 @@ const claimsSchema = z.object({
   revocationVersion: z.number().int().nonnegative(),
 }).strict().superRefine((value, ctx) => {
   if (value.expiresAt <= value.issuedAt || value.expiresAt - value.issuedAt > MAX_TICKET_SECONDS) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Ticket lifetime must be at most 30 seconds' });
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Ticket lifetime must be at most ${MAX_TICKET_SECONDS} seconds` });
   }
   const mismatch = automationEntitlementScopeMismatch(value.action, value.ruleId, value.eventId);
   if (mismatch === 'RULE_SCOPE_MISSING') {

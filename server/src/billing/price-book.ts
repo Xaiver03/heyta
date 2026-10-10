@@ -81,7 +81,7 @@ export const isEntryEffectiveAt = (entry: PriceBookEntry, now: number): boolean 
  */
 export const SKU_GRANTS: Readonly<Record<string, readonly string[]>> = {
   'hosted-monthly': ['hosting'],
-  'hosted-ai-monthly': ['hosting', 'ai'],
+  'hosted-ai-monthly': ['hosting', 'ai', 'automation'],
 };
 
 /**

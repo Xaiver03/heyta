@@ -60,7 +60,7 @@
 import { prisma } from '../db';
 import {
   createPrismaSqlExecutor,
-  type SqlExecutor,
+  type SqlRunner,
 } from '../billing/pricing-store';
 import {
   DEFAULT_ENTITLEMENT_POLICY,
@@ -153,7 +153,7 @@ export interface ConsumeManagedAiRequestInput {
   /** 额度上限。默认取本文件那个常量；测试用小值把边界跑满。 */
   readonly limit?: number;
   /** SQL 执行面。默认 `createPrismaSqlExecutor(prisma)`。 */
-  readonly sql?: SqlExecutor;
+  readonly sql?: SqlRunner;
   /** 权益判定策略。省略用 `DEFAULT_ENTITLEMENT_POLICY`。 */
   readonly policy?: EntitlementPolicy;
 }
@@ -433,7 +433,7 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 export const purgeExpiredAiUsageCounters = async (input: {
   readonly now?: number;
   readonly retentionDays?: number;
-  readonly sql?: SqlExecutor;
+  readonly sql?: SqlRunner;
 } = {}): Promise<{ readonly deleted: number; readonly cutoffTime: number }> => {
   const now = input.now ?? Date.now();
   const retentionDays = input.retentionDays ?? AI_USAGE_RETENTION_DAYS;
@@ -473,7 +473,7 @@ export const peekManagedAiUsage = async (input: {
   readonly userId: number;
   readonly now?: number;
   readonly limit?: number;
-  readonly sql?: SqlExecutor;
+  readonly sql?: SqlRunner;
   readonly policy?: EntitlementPolicy;
 }): Promise<{
   readonly used: number;

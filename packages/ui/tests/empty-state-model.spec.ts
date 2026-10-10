@@ -128,4 +128,35 @@ describe('toEmptyStateViewModel —— size 两档', () => {
   it('section 档不豁免 title 必填 —— 空白空态仍然当场响', () => {
     expect(() => toEmptyStateViewModel({ title: '  ', size: 'section' })).toThrow(/title/);
   });
+
+  it('页面档可以挂一枚语义微场景，并默认只播放一次入场动效', () => {
+    const v = toEmptyStateViewModel({ title: '没有任务', icon: ICON, illustration: 'tasks' });
+    expect(v.illustration).toBe('tasks');
+    expect(v.illustrationMotion).toBe('enter');
+    expect(v.icon).toBeUndefined();
+  });
+
+  it('搜索空态可以关闭入场动效，避免每次输入重播', () => {
+    const v = toEmptyStateViewModel({
+      title: '没有匹配结果',
+      illustration: 'search',
+      illustrationMotion: 'none',
+    });
+    expect(v.illustration).toBe('search');
+    expect(v.illustrationMotion).toBe('none');
+  });
+
+  it('空态把宿主传入的 i18n locale 原样交给插画层，省略时使用中文默认值', () => {
+    expect(toEmptyStateViewModel({ title: 'No tasks', illustration: 'tasks', locale: 'en' }).locale).toBe('en');
+    expect(toEmptyStateViewModel({ title: '没有任务', illustration: 'tasks' }).locale).toBe('zh-CN');
+  });
+
+  it('section 档不渲染微场景，避免卡片级空态抢走区块标题的重心', () => {
+    const v = toEmptyStateViewModel({
+      title: '还没有笔记',
+      size: 'section',
+      illustration: 'notes',
+    });
+    expect(v.illustration).toBeUndefined();
+  });
 });

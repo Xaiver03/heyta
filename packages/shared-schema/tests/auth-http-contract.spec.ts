@@ -78,9 +78,9 @@ describe('路径', () => {
    * 服务端注册的是**相对**形状（它挂在 `prefix: '/api'` 下）。这里不许出现 `/api`：
    * 出现了就等于两边各持有一份完整路径，而换挂载点时只有客户端会跟着改。
    */
-  it('六条都是相对路径，不带 /api 前缀、不带结尾斜杠', () => {
+  it('所有口令路径都是相对路径，不带 /api 前缀、不带结尾斜杠', () => {
     const values = Object.values(AUTH_PASSWORD_PATHS);
-    expect(values).toHaveLength(6);
+    expect(values).toHaveLength(9);
     for (const path of values) {
       expect(path.startsWith('/api')).toBe(false);
       expect(path.startsWith('/')).toBe(true);
@@ -88,7 +88,7 @@ describe('路径', () => {
     }
   });
 
-  it('六条路径互不相同', () => {
+  it('路径互不相同', () => {
     const values = Object.values(AUTH_PASSWORD_PATHS);
     expect(new Set(values).size).toBe(values.length);
   });

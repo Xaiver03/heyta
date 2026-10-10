@@ -230,6 +230,12 @@ export const META_KEYS = {
   VAULT_PAYLOAD_KEY_VERSION: 'vaultPayloadKeyVersionV1',
   /** Encrypted pending root-rotation target; never stores a plaintext root. */
   VAULT_PENDING_ROOT_ROTATION: 'vaultPendingRootRotationV1',
+  /** Account-scoped inbound automation recipient private key wrapped by the vault root. */
+  INBOUND_RECIPIENT_KEY: 'inboundRecipientKeyV1',
+  /** Worker token envelope; the plaintext token never enters the op-log. */
+  INBOUND_WORKER_CREDENTIAL: 'inboundWorkerCredentialV1',
+  /** Event → opaque commit proof journal used by the upload fence. */
+  INBOUND_COMMIT_JOURNAL: 'inboundCommitJournalV1',
 } as const;
 
 export type MetaKey = (typeof META_KEYS)[keyof typeof META_KEYS];

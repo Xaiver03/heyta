@@ -68,8 +68,9 @@
  *
  * ## 误报怎么办
  *
- * 如果某个功能**确实**不需要界面入口（例如只给本机 API / MCP 用），
- * 把它加进下面的 `NO_UI_ENTRY` 并**写明理由** —— 不要放宽匹配规则。
+ * 如果某个功能**确实**不需要某个端的直接界面入口（例如由复合 Chatbot 或
+ * 宿主 worker 消费），把它按端加进 `NO_UI_ENTRY_BY_END` 并**写明理由** ——
+ * 不要放宽匹配规则，也不要把它豁免到所有端。
  * 放宽规则会让这条门禁悄悄失效，那比没有门禁更糟。
  *
  * ## 6b：为什么"界面"要**按端**枚举（2026-10-03）
@@ -84,9 +85,8 @@
  *
  * 🔴 这里**原来**还有一张 `GAP_ENDS` 表，用来登记"这端此刻刻意没做 + 出处"，
  * 并配一条会咬人的规则（该端一旦 import 了任何一个入口，剩余几条立刻转红）。
- * 2026-10-05 把它删了，原因是它自己变成了它要防的那件事：移动端 5 条入口全 import 齐了，
- * 那条"会咬人"的红确实响了，但**修法是删登记而不是补核对** —— 一张靠人按时销毁的豁免表，
- * 迟早是一条永久豁免。现在 `UI_ENDS` 里只有**必须全覆盖**的端，没有第三档。
+ * 2026-10-05 把全端 GAP 表删掉，原因是它自己变成了它要防的那件事：靠人按时销毁的
+ * 豁免表迟早会永久存在。当前仅允许下面按端登记的产品裁决；它们不会减少其它端的核对。
  */
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -120,6 +120,25 @@ const UI_ENDS = [
  * 加进来之前先问：**用户在哪儿用它？**
  */
 const NO_UI_ENTRY = new Set([]);
+
+/**
+ * 端级产品入口裁决。
+ *
+ * heyta 的移动端只提供一个 Assistant/Chatbot 表面；capture、breakdown、
+ * prioritize、duration-estimate 是宿主可复用能力，移动端不再复制四套隐形
+ * 页面。入站自动化同样由 Web 设置管理、由宿主 worker 消费，不在移动端直接
+ * 发起模型请求。这里按端登记是为了让门禁表达真实 IA，而不是逼出重复 UI。
+ * Web 的这些能力仍由各自真实组件继续覆盖。
+ */
+const NO_UI_ENTRY_BY_END = new Map([
+  ['web', new Set(['inbound-automation'])],
+  ['mobile', new Set(['capture', 'breakdown', 'prioritize', 'duration-estimate', 'inbound-automation'])],
+]);
+
+/** 复合 UI 的真实挂载组件；实现文件本身是控制器，不是 JSX 组件。 */
+const UI_ENTRY_COMPONENT_BY_END = new Map([
+  ['mobile', new Map([['tool-calling', 'AssistantScreen']])],
+]);
 
 /**
  * 出境披露里那句否定的两个**词条 key**（`packages/i18n`）。
@@ -386,7 +405,7 @@ for (const spec of UI_ENDS) {
   let reached = 0;
 
   for (const feature of aiFeatures) {
-    if (NO_UI_ENTRY.has(feature)) continue;
+    if (NO_UI_ENTRY.has(feature) || NO_UI_ENTRY_BY_END.get(spec.end)?.has(feature)) continue;
     const entry = entryByFeature.get(feature);
     if (entry === undefined || entry === null) continue; // 上面已经报过了
 
@@ -424,7 +443,11 @@ for (const spec of UI_ENDS) {
     // `assistantOpen` 的那个渲染分支** —— 点进去什么都不发生，而"被 import"是绿的。
     // 按 import 判还会跟着打包器的后缀习惯漂移：web 写 `from '../x.js'`，
     // RN 不写后缀，同一条正则一端有效一端失灵。JSX 标签这一层两端同形。
+    const componentName = UI_ENTRY_COMPONENT_BY_END.get(spec.end)?.get(feature);
     const mounted = users.filter((f) => {
+      if (componentName !== undefined) {
+        return files.some((g) => g !== f && new RegExp(`<${componentName}[\\s/>]`).test(srcOf.get(g)));
+      }
       const name = basename(f).replace(/\.(tsx?|jsx?)$/, '');
       if (name === 'index') return true; // 目录入口，从文件名判断不了，放行
       const tag = new RegExp(`<${name}[\\s/>]`);
@@ -1101,7 +1124,10 @@ if (!exists(GEN)) {
 
 console.log(`AI 功能覆盖门禁 —— 由 \`AiFeature\` 联合类型驱动`);
 console.log(`  联合类型成员：${aiFeatures.join(', ')}`);
-console.log(`  界面不可达豁免：${NO_UI_ENTRY.size === 0 ? '（无）' : [...NO_UI_ENTRY].join(', ')}`);
+console.log(`  全局界面不可达豁免：${NO_UI_ENTRY.size === 0 ? '（无）' : [...NO_UI_ENTRY].join(', ')}`);
+for (const [end, features] of NO_UI_ENTRY_BY_END) {
+  if (features.size > 0) console.log(`  ${end} 端按产品裁决不设直接入口：${[...features].join(', ')}`);
+}
 // 🔴 逐端打印覆盖，不能只报一句"全部可达"：那句在只扫 web 的时候本身就是谎。
 for (const cov of endCoverage) {
   console.log(
@@ -1130,7 +1156,6 @@ if (problems.length > 0) {
 
 const coveredEnds = endCoverage.map((c) => `${c.end} ${String(c.reached)}/${String(c.total)}`).join('、');
 console.log(
-  `✅ ${String(aiFeatures.length)} 个 AI 功能在**每一端**端到端可达` +
-    `（实现 → 导出 → 路由声明 → 偏好声明 → 界面调用点 → 界面被渲染）：${coveredEnds}。`,
+  `✅ AI 功能覆盖通过（实现 → 导出 → 路由声明 → 偏好声明；直接 UI 入口按端产品裁决）：${coveredEnds}。`,
 );
 process.exit(0);

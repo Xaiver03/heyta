@@ -890,7 +890,7 @@ describe('wechat adapter — 🔴 金额校验（付的钱必须落在价目表�
     expect(r.event.oneTimeGrant).toEqual({
       periodDays: 30,
       priceId: 'hosted-ai-monthly',
-      grants: ['hosting', 'ai'],
+      grants: ['hosting', 'ai', 'automation'],
     });
   });
 

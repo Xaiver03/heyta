@@ -391,47 +391,98 @@ describe('对外文本里可复算的数字，回到真源对账', () => {
   const MIGRATIONS = fileURLToPath(new URL('../../../server/prisma/migrations', import.meta.url));
 
   /**
+   * 去掉 SQL 的行注释与块注释。
+   *
+   * 🔴 这不是整洁问题：迁移文件里**写着**被判据的那个形状。实测 `20261018140000` 的回滚一节
+   * 原样写着 `-- DROP TABLE "access_sessions"; DROP TABLE "email_change_requests";` ——
+   * 不剥注释就加下面那套 DROP 感知，两条**还活着的**级联表会被当成已删除而扣账（假红），
+   * 而那句话只是一段"如果将来要回滚"的说明。与 `scripts/lib/strip-ts-comments.mjs`
+   * 对 TS 做的是同一件事，理由同源：判据数的是 SQL 语句，不是文档里提到过的名字。
+   */
+  const stripSqlComments = (sql: string): string =>
+    sql.replace(/--[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+
+  const migrationStatements = (): Array<{ rel: string; sql: string }> =>
+    readdirSync(MIGRATIONS, { recursive: true })
+      .filter((p): p is string => typeof p === 'string' && p.endsWith('migration.sql'))
+      .sort()
+      .flatMap((rel) =>
+        stripSqlComments(readFileSync(join(MIGRATIONS, rel), 'utf8')).split(';').map((sql) => ({ rel, sql })),
+      );
+
+  /**
    * 从迁移历史推导"注销一个账号时真的会随 `users` 行消失的外键约束"。
    * 按**约束名**建账：后面某条迁移把它改成非 CASCADE（或重建）就撤账，
    * 所以 42 个文件的累加历史不会变成重复计数。
+   *
+   * 🔴 2026-10-08 补的第二类撤账事件：**`DROP TABLE` 与 `DROP CONSTRAINT`**。
+   * 原来只认"同名约束被重新定义"，于是 `tombstones` 那张**已被删掉的表**的
+   * `tombstones_user_id_fkey`（`0_init:130` 加、`20251228000001_remove_tombstones:2` 随表 DROP）
+   * 永远留在账上 ⇒ 对外文案的「共 33 处级联，覆盖 32 张表」多算了一处，
+   * 而且政策把「墓碑」写成"随注销级联删除"—— 那张表根本不存在，真正的墓碑表
+   * `account_tombstones` **故意不建外键**（`schema.prisma:549-553`：建了级联会把注销记录一起抹掉），
+   * 注销时它是**新写入一行并永久保留**。判据与文案一起错，谁也拦不住谁 —— 这是本条自己的
+   * "恒真方向的假绿"，由产品负责人追问"这些数是谁算的"照出来。
+   *
+   * `everSeen` 是"历史上出现过"的那份账（不做任何扣减），只用来证明上面那条扣减**确实发生过**
+   * （见「幽灵外键」那条判据的承重断言），不是第二份真源。
    */
-  const userCascades = (() => {
+  const { userCascades, everCascades, droppedTables } = (() => {
     const live = new Map<string, string>();
-    for (const rel of readdirSync(MIGRATIONS, { recursive: true })
-      .filter((p): p is string => typeof p === 'string' && p.endsWith('migration.sql'))
-      .sort()) {
-      const sql = readFileSync(join(MIGRATIONS, rel), 'utf8');
-      for (const raw of sql.split(';')) {
-        const s = raw.replace(/\s+/g, ' ');
-        for (const m of s.matchAll(
-          /CONSTRAINT\s+"([^"]+)"\s+FOREIGN KEY\s*\("([^"]+)"\)\s+REFERENCES\s+"([^"]+)"/gi,
-        )) {
-          if (m[3] !== 'users') continue;
-          const [, name, column] = m;
-          if (name === undefined || column === undefined) {
-            throw new Error('Foreign-key constraint match is missing its name or column');
+    const everSeen = new Map<string, string>();
+    const dropped = new Set<string>();
+    for (const { sql: raw } of migrationStatements()) {
+      // 🔴 必须 `trim()`：下面两条 DROP 判据锚在 `^`，而语句片段前面通常留着换行与空格
+      //（剥掉整行注释之后尤其如此）。第一次实现就在这里没 trim，于是
+      // `droppedTables` 是**空集** —— 幽灵判据的承重断言把它抓出来了（"被 DROP 过的表 0 张"）。
+      const s = raw.replace(/\s+/g, ' ').trim();
+      // `DROP TABLE "a", "b" [CASCADE]` —— 表没了，挂在其上的外键也随之消失。
+      const dropTable = s.match(/^DROP\s+TABLE(?:\s+IF\s+EXISTS)?\s+(.+?)(?:\s+CASCADE)?$/i);
+      if (dropTable) {
+        for (const t of dropTable[1]!.matchAll(/"([^"]+)"/g)) {
+          const name = t[1]!;
+          dropped.add(name);
+          for (const [constraint, table] of [...live]) {
+            if (table === name) live.delete(constraint);
           }
-          const tail = s.slice(m.index);
-          const od = tail.match(/ON DELETE (CASCADE|RESTRICT|SET NULL|SET DEFAULT)/i);
-          // 表名 = 约束名去掉 `_<列名>_fkey`（Postgres 默认命名 `<表>_<列>_fkey`）。
-          // 🔴 以前这里是 `name.split('_')[0]`，于是 `account_notifications_user_id_fkey`
-          //    被切成 `account`、`checkout_orders_user_id_fkey` 被切成 `checkout` ——
-          //    整个类别覆盖判据会拿着七个假表名去要求文案点名，红的原因和真的缺陷无关。
-          //    对不上这个形状就**响亮地失败**，不静默猜表名。
-          const suffix = `_${column}_fkey`;
-          if (!name.toLowerCase().endsWith(suffix)) {
-            throw new Error(
-              `约束名 "${name}" 不是 Postgres 默认的 "<表>_<列>_fkey" 形状，` +
-                '推不出表名 —— 这里被手工命名过，判据要先跟着改（不许退回按第一个下划线切）',
-            );
-          }
-          const table = name.slice(0, name.length - suffix.length);
-          if (od?.[1]?.toUpperCase() === 'CASCADE') live.set(name, table);
-          else live.delete(name);
         }
       }
+      // `ALTER TABLE "x" DROP CONSTRAINT [IF EXISTS] "name"`
+      const dropConstraint = s.match(
+        /^ALTER\s+TABLE\s+"[^"]+"\s+DROP\s+CONSTRAINT(?:\s+IF\s+EXISTS)?\s+"([^"]+)"/i,
+      );
+      if (dropConstraint) live.delete(dropConstraint[1]!);
+
+      for (const m of s.matchAll(
+        /CONSTRAINT\s+"([^"]+)"\s+FOREIGN KEY\s*\("([^"]+)"\)\s+REFERENCES\s+"([^"]+)"/gi,
+      )) {
+        if (m[3] !== 'users') continue;
+        const [, name, column] = m;
+        if (name === undefined || column === undefined) {
+          throw new Error('Foreign-key constraint match is missing its name or column');
+        }
+        const tail = s.slice(m.index);
+        const od = tail.match(/ON DELETE (CASCADE|RESTRICT|SET NULL|SET DEFAULT)/i);
+        // 表名 = 约束名去掉 `_<列名>_fkey`（Postgres 默认命名 `<表>_<列>_fkey`）。
+        // 🔴 以前这里是 `name.split('_')[0]`，于是 `account_notifications_user_id_fkey`
+        //    被切成 `account`、`checkout_orders_user_id_fkey` 被切成 `checkout` ——
+        //    整个类别覆盖判据会拿着七个假表名去要求文案点名，红的原因和真的缺陷无关。
+        //    对不上这个形状就**响亮地失败**，不静默猜表名。
+        const suffix = `_${column}_fkey`;
+        if (!name.toLowerCase().endsWith(suffix)) {
+          throw new Error(
+            `约束名 "${name}" 不是 Postgres 默认的 "<表>_<列>_fkey" 形状，` +
+              '推不出表名 —— 这里被手工命名过，判据要先跟着改（不许退回按第一个下划线切）',
+          );
+        }
+        const table = name.slice(0, name.length - suffix.length);
+        if (od?.[1]?.toUpperCase() === 'CASCADE') {
+          live.set(name, table);
+          everSeen.set(name, table);
+        } else live.delete(name);
+      }
     }
-    return live;
+    return { userCascades: live, everCascades: everSeen, droppedTables: dropped };
   })();
 
   const cascadeTables = [...new Set(userCascades.values())].sort();
@@ -441,6 +492,9 @@ describe('对外文本里可复算的数字，回到真源对账', () => {
    * 表名来自上面的推导，而"这一类在中文里叫什么"是人话，只用来检查文案有没有漏掉一类。
    */
   const CATEGORY_NAMES: Array<{ table: string; zh: string; en: string }> = [
+    { table: 'automation_workers', zh: '自动收集执行身份', en: 'automation worker identit' },
+    { table: 'automation_commit_permits', zh: '自动收集提交许可', en: 'automation commit permit' },
+    { table: 'email_password_registration_challenges', zh: '邮箱注册验证码挑战', en: 'email registration challenge' },
     { table: 'operations', zh: '同步事件', en: 'sync event' },
     { table: 'vault_key_packages', zh: '加密密钥包', en: 'wrapped key package' },
     { table: 'vault_key_migrations', zh: '密钥迁移记录', en: 'key migration record' },
@@ -457,8 +511,14 @@ describe('对外文本里可复算的数字，回到真源对账', () => {
     { table: 'account_notifications', zh: '通知', en: 'notification' },
     { table: 'user_avatars', zh: '头像', en: 'avatar' },
     { table: 'user_consents', zh: '条款接受记录', en: 'consent' },
-    { table: 'tombstones', zh: '墓碑', en: 'tombstone' },
+    // 🔴 2026-10-08 摘掉 `{ table: 'tombstones', zh: '墓碑', en: 'tombstone' }`：那张表在
+    // `20251228000001_remove_tombstones` 里已被 `DROP TABLE`，它留在账上只是探针不认识 DROP。
+    // 文案因此把「墓碑」写进了"随注销级联删除"的清单 —— 而真实的墓碑表 `account_tombstones`
+    // **故意没有外键**（注销时新写入一行、永久保留，用来拒绝同一账号复活），
+    // 这句对外承诺对两张表都不成立。它在文案里的正确位置是"注销后仍保留"那一格。
     { table: 'widget_push_subscriptions', zh: '推送订阅', en: 'push subscription' },
+    { table: 'access_sessions', zh: '登录会话', en: 'access session' },
+    { table: 'email_change_requests', zh: '邮箱变更请求', en: 'email change request' },
     // 2026-10-03 vault 批次（ADR-0050）新长的三张级联表。
     { table: 'vault_key_packages', zh: '密钥包', en: 'key package' },
     { table: 'vault_key_migrations', zh: '密钥迁移记录', en: 'key migration record' },
@@ -467,6 +527,16 @@ describe('对外文本里可复算的数字，回到真源对账', () => {
     // 🔴 它只有计数、没有内容列，所以这一类的名字必须能让用户读出"次数"而不是"内容"——
     // 写成「AI 使用记录」会把一张计数表说成一份内容档案，那正是 ADR §2 要避免的读法。
     { table: 'ai_usage_counters', zh: 'AI 用量计数', en: 'AI usage counter' },
+    { table: 'automation_ai_attempts', zh: '自动化 AI 尝试', en: 'automation AI attempt' },
+    { table: 'automation_events', zh: '自动化事件', en: 'automation event' },
+    { table: 'automation_recipient_keys', zh: '自动化接收方密钥', en: 'automation recipient key' },
+    { table: 'automation_rules', zh: '自动化规则', en: 'automation rule' },
+    { table: 'automation_sender_credentials', zh: '自动化发送方凭据', en: 'automation sender credential' },
+    { table: 'automation_entitlement_bindings', zh: '自动化权益绑定', en: 'automation entitlement binding' },
+    { table: 'automation_entitlement_ticket_uses', zh: '自动化权益票据使用记录', en: 'automation entitlement ticket use' },
+    { table: 'share_invitations', zh: '分享邀请', en: 'share invitation' },
+    { table: 'share_members', zh: '分享成员', en: 'share member' },
+    { table: 'shares', zh: '分享记录', en: 'share' },
   ];
 
   it('🔴 推导本身有产出（数不出约束 = 探针坏了，不是"没有级联"）', () => {
@@ -476,6 +546,30 @@ describe('对外文本里可复算的数字，回到真源对账', () => {
     // 正向对照：这两张表是"我的任务数据"的载体，它们必须在集合里；
     // 不在就说明推导口径被改坏了（改名、改约束名形状、或级联被摘掉）。
     expect(cascadeTables).toEqual(expect.arrayContaining(['operations', 'user_sync_state']));
+  });
+
+  it('🔴 已 DROP 的表不许留在级联账上（幽灵外键），且这条扣减真的在承重', () => {
+    // 判据形状 = 从迁移里**自己**取"哪些表被 DROP 过"，而不是写死一张表名清单 ——
+    // 写死只能挡住今天这一次，下一次 `DROP TABLE` 又会变成一个没人认识的幽灵。
+    const ghosts = cascadeTables.filter((t) => droppedTables.has(t));
+    expect(
+      ghosts,
+      `这些表在迁移里被 DROP 过，却仍算在"随注销级联删除"的真源里：${ghosts.join(', ')} ⇒ 对外那句「共 N 处级联，覆盖 N 张表」是虚高的`,
+    ).toEqual([]);
+
+    // 承重断言（防这条判据自己变成恒真）：`droppedTables` 里必须**确实**有一张表曾带过
+    // 引用 `users` 的 CASCADE 约束，也就是说"扣减"这件事在本仓库的迁移历史上真的发生过。
+    // 若哪天有人把 DROP 处理删掉，上面那条会红；若有人把 DROP 处理改成永不相交的死代码，
+    // 这条会红。
+    const subtracted = [...everCascades].filter(
+      ([name, table]) => droppedTables.has(table) && !userCascades.has(name),
+    );
+    expect(
+      subtracted.length,
+      '没有任何一条「引用 users 的 CASCADE」约束被 DROP 事件扣掉 —— 要么迁移历史上确实没有，要么新加的 DROP 感知已经悬空（现量：被 DROP 过的表 ' +
+        String(droppedTables.size) +
+        ' 张）',
+    ).toBeGreaterThan(0);
   });
 
   it('🔴 每张随注销消失的表都在文案里有一个用户读得到的类别名', () => {
@@ -571,6 +665,20 @@ describe('对外文本里可复算的数字，回到真源对账', () => {
           absent,
           `${locale} 栏的注销承诺里少列了这些类别：${absent.join('、')}`,
         ).toEqual([]);
+
+        // 🔴 **反向**也要拦：这一格多列一类同样是虚假陈述，而"逐类点名"只查少了、不查多了。
+        // 2026-10-08 实测的正是这一侧 —— 文案把「墓碑」写进"随注销级联删除"，而那张表
+        // 早就被 `DROP TABLE`；探针与文案一起错，正向判据一个都不红。
+        // 这里不建"全部不该出现的词"的清单（那会变成第二份真源），只钉这一条已知会被混进来的
+        // 词，并且**同一格必须交代保留下来的那件东西** —— 摘掉墓碑不等于把它从承诺里抹掉。
+        expect(
+          lower.includes('墓碑') || lower.includes('tombstone'),
+          `${locale} 栏的注销承诺里出现了「墓碑 / tombstone」：账号墓碑表没有级联外键，它随注销**新增**并保留（ADR-0055），而 op-log 那些"已删除记录"的墓碑根本不在数据库级联这一层`,
+        ).toBe(false);
+        expect(
+          lang === 'zh' ? cell.includes('注销标记') : /closure marker/i.test(cell),
+          `${locale} 栏的注销承诺没有交代"故意保留的注销标记"这一件 —— 删除范围少承诺一项是虚假陈述，多一项也是`,
+        ).toBe(true);
       }
     }
   });

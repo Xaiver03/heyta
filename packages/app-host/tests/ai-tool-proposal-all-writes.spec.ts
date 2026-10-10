@@ -19,6 +19,7 @@
  *   3. 未授权：`denied`，且效果读数没变（逐工具默认关对新工具同样成立）
  */
 
+import { Priority } from '@heyta/domain';
 import { OpLogEngine } from '@heyta/op-log';
 import { DbOpLogStore, INDEXEDDB_SCHEMA, SqliteAdapter } from '@heyta/storage';
 import { NodeSqliteDriver } from '@heyta/storage/sqlite/node';
@@ -28,6 +29,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createTaskActions } from '../src/actions.js';
 import { confirmAiToolProposal, runSelectedTool } from '../src/ai-tool-run.js';
+
+const authorization = (tool: string) => ({ getGrants: () => ({ [tool]: true }) });
 import type { ToolArgs } from '../src/ai-tool-selection.js';
 import { createLocalApiHost } from '../src/local-api-host.js';
 
@@ -92,6 +95,33 @@ const CASES: readonly Case[] = [
     label: '完成状态',
     args: async () => ({ taskId: await seed({ action: 'create-task', title: '要完成的' }) }),
     effect: () => Object.values(engine.getState().tasks).filter((t) => t.completedAt !== undefined).length,
+  },
+  {
+    tool: 'append_task_checklist',
+    intentAction: 'append-task-checklist',
+    label: '任务清单',
+    args: async () => ({
+      taskId: await seed({ action: 'create-task', title: '要拆解的' }),
+      items: ['准备说明'],
+    }),
+    effect: () =>
+      Object.values(engine.getState().tasks).filter((t) => t.note === '- [ ] 准备说明').length,
+  },
+  {
+    tool: 'set_task_priorities',
+    intentAction: 'set-task-priorities',
+    label: '任务优先级',
+    args: async () => ({
+      entries: [{ taskId: await seed({ action: 'create-task', title: '要排优先级的' }), priority: 'high' }],
+    }),
+    effect: () => Object.values(engine.getState().tasks).filter((t) => t.priority === Priority.High).length,
+  },
+  {
+    tool: 'set_task_estimate',
+    intentAction: 'set-task-estimate',
+    label: '任务估时',
+    args: async () => ({ taskId: await seed({ action: 'create-task', title: '要估时的' }), minutes: 45 }),
+    effect: () => Object.values(engine.getState().tasks).filter((t) => t.note === '预计耗时：45 分钟').length,
   },
   {
     tool: 'create_project',
@@ -231,7 +261,7 @@ describe('🔴 提案不是落库：目录里每个写工具各跑一遍三条�
       );
       if (outcome.kind !== 'proposal') throw new Error('这一条跑的不是提案路径');
 
-      const confirmed = await confirmAiToolProposal(host, outcome.proposal);
+      const confirmed = await confirmAiToolProposal(host, outcome.proposal, authorization(outcome.proposal.tool));
       expect(confirmed.ok).toBe(true);
       expect(c.effect()).toBe(before + 1);
     });
@@ -251,6 +281,37 @@ describe('🔴 提案不是落库：目录里每个写工具各跑一遍三条�
   }
 });
 
+describe('任务估时提案先规范化再确认', () => {
+  it.each([
+    { raw: 900, normalized: 480 },
+    { raw: 1, normalized: 5 },
+  ])('原始 $raw 分钟在提案与落库中都使用 $normalized 分钟', async ({ raw, normalized }) => {
+    const taskId = await seed({ action: 'create-task', title: '估时规范化' });
+    const host = makeHost();
+    const outcome = await runSelectedTool(
+      {
+        kind: 'tool',
+        ruleId: 'test.set_task_estimate.normalize',
+        tool: 'set_task_estimate',
+        args: { taskId, minutes: raw },
+      },
+      { host, grants: { set_task_estimate: true } },
+    );
+
+    expect(outcome.kind).toBe('proposal');
+    if (outcome.kind !== 'proposal') return;
+    expect(outcome.proposal.intent).toEqual({
+      action: 'set-task-estimate',
+      taskId,
+      minutes: normalized,
+    });
+
+    const confirmed = await confirmAiToolProposal(host, outcome.proposal, authorization('set_task_estimate'));
+    expect(confirmed.ok).toBe(true);
+    expect(engine.getState().tasks[taskId]?.note).toBe(`预计耗时：${String(normalized)} 分钟`);
+  });
+});
+
 describe('🔴 这份清单必须跟着目录走', () => {
   it('目录里每个 `kind === write` 的工具都在这里（新加写工具却不登记 ⇒ 红）', () => {
     const writeTools = LOCAL_API_TOOLS.filter((t) => t.kind === 'write')
@@ -260,7 +321,7 @@ describe('🔴 这份清单必须跟着目录走', () => {
     expect(covered).toEqual(writeTools);
   });
 
-  it('🔴 重复确认同一个提案 = 两次写入（**这不是幂等**，所以调用方只能确认一次）', async () => {
+  it('🔴 并发或重复确认同一个提案只产生一次写入', async () => {
     // 登记这条现有行为，是为了让"以后有人在这里加去重"时必须在类型/测试上表态：
     // op-log 的幂等键是 op id，而两次 `submit` 生成的是两个 id。
     const host = makeHost();
@@ -270,8 +331,8 @@ describe('🔴 这份清单必须跟着目录走', () => {
       { host, grants: { create_project: true } },
     );
     if (outcome.kind !== 'proposal') throw new Error('这一条跑的是提案路径');
-    await confirmAiToolProposal(host, outcome.proposal);
-    await confirmAiToolProposal(host, outcome.proposal);
-    expect(alive('projects')).toBe(before + 2);
+    await confirmAiToolProposal(host, outcome.proposal, authorization(outcome.proposal.tool));
+    await confirmAiToolProposal(host, outcome.proposal, authorization(outcome.proposal.tool));
+    expect(alive('projects')).toBe(before + 1);
   });
 });

@@ -159,7 +159,6 @@ export function FocusPanel({
           minHeight: tokens['touch-target.min'],
           paddingHorizontal: tokens['space.4'],
           borderRadius: tokens['radius.md'],
-          borderWidth: tokens['border-width.thin'],
         },
         tabular: {
           // 数字等宽：计数变化时宽度不跳。`tabular-nums` 是唯一的字形特性。
@@ -211,7 +210,6 @@ export function FocusPanel({
             fillControls === true ? styles.buttonFill : null,
             {
               backgroundColor: tokens['color.primary'],
-              borderColor: tokens['color.primary'],
               opacity: pressed && !reducedMotion ? tokens['state.pressed-opacity'] : 1,
             },
           ]}
@@ -237,7 +235,6 @@ export function FocusPanel({
               styles.button,
               {
                 backgroundColor: 'transparent',
-                borderColor: tokens['color.border'],
                 opacity: pressed && !reducedMotion ? tokens['state.pressed-opacity'] : 1,
               },
             ]}

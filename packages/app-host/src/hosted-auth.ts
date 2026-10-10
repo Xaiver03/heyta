@@ -57,6 +57,7 @@ import {
   PASSWORD_AUTH_ERROR_CODES,
   PASSWORD_POLICY_CODES,
   type PasswordPolicyCode,
+  type EmailPasswordRegistrationChallengeResponse,
   ACCOUNT_PROFILE_PATHS,
   ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS,
   accountProfileResponseSchema,
@@ -136,6 +137,9 @@ export const HOSTED_AUTH_PATHS = {
   passwordChange: `/api${AUTH_PASSWORD_PATHS.change}`,
   /** 已登录**加上第一个**口令（与 `passwordChange` 不是一条路，见共享契约）。 */
   passwordSet: `/api${AUTH_PASSWORD_PATHS.set}`,
+  emailPasswordRegistrationRequest: `/api${AUTH_PASSWORD_PATHS.registerRequest}`,
+  emailPasswordRegistrationVerify: `/api${AUTH_PASSWORD_PATHS.registerVerify}`,
+  emailPasswordRegistrationResend: `/api${AUTH_PASSWORD_PATHS.registerResend}`,
   /**
    * 注销账号。服务端是 `DELETE /api/account`（**级联硬删**：ops / syncState / devices）。
    *
@@ -473,8 +477,20 @@ export interface HostedAuthOptions {
   signal?: AbortSignal;
 }
 
+/**
+ * 只报 2xx 主体，失败已归一成 `HostedAuthFailure`。
+ *
+ * 🔴 必须导出：`sendJson` 现在是**跨模块共用**的那一个出口（`account-security.ts` 用它），
+ * 而它的返回类型不导出的话，`tsup` 的 dts 阶段会以 TS4060 失败
+ * （环境陷阱 #162 讲的就是这一档：vitest 绿不等于 `pnpm -r build` 绿）。
+ */
 export type PostResult = { ok: true; body: unknown } | HostedAuthFailure;
 
+/**
+ * 🔴 导出给**同目录其他协议模块**用（现在是 `account-security.ts`）。
+ * 理由与 AGENTS §3.5 一致：失败归类、地址闸门、`fetch` 缺失的兜底，
+ * 每多一份实现就多一处漂移。新模块**不许**自己再写一个 `fetch` 包装。
+ */
 export const failure = (
   reason: HostedAuthFailureReason,
   status?: number,
@@ -536,6 +552,24 @@ function readServerEmailDelivered(body: unknown): false | undefined {
  * （AGENTS §3.5：同形状的第二次就是漂移的开始）。
  */
 export type HostedRegisterResult = { message: string; emailDelivered?: false };
+
+export type HostedRegistrationChallengeResult = EmailPasswordRegistrationChallengeResponse;
+
+function registrationChallengeResult(body: unknown): HostedRegistrationChallengeResult | undefined {
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) return undefined;
+  const record = body as Record<string, unknown>;
+  if (typeof record.challengeId !== 'string' || record.challengeId === '') return undefined;
+  if (typeof record.expiresAt !== 'number' || !Number.isFinite(record.expiresAt)) return undefined;
+  if (typeof record.resendAvailableAt !== 'number' || !Number.isFinite(record.resendAvailableAt)) return undefined;
+  const delivered = record.emailDelivered;
+  if (delivered !== undefined && typeof delivered !== 'boolean') return undefined;
+  return {
+    challengeId: record.challengeId,
+    expiresAt: record.expiresAt,
+    resendAvailableAt: record.resendAvailableAt,
+    ...(delivered === undefined ? {} : { emailDelivered: delivered }),
+  };
+}
 
 function registerResult(body: unknown): HostedRegisterResult {
   const delivered = readServerEmailDelivered(body);
@@ -1760,6 +1794,59 @@ export async function registerWithEmailPassword(
   });
   if (!result.ok) return result;
   return { ok: true, ...registerResult(result.body) };
+}
+
+/**
+ * 新版邮箱密码注册的第一步：服务端创建独立验证码 challenge 并发信。
+ * `passwordConfirmation` 只属于 UI 本地校验，不跨网络传送第二份秘密。
+ */
+export async function requestEmailPasswordRegistrationCode(
+  options: HostedAuthOptions,
+  input: { email: string; password: string; termsAccepted?: boolean; inviteCode?: string },
+): Promise<HostedAuthOutcome<HostedRegistrationChallengeResult>> {
+  const normalized = normalizedEmail(input.email);
+  if (normalized === undefined || input.password === '') return failure('invalid-input');
+  const result = await postJson(options, HOSTED_AUTH_PATHS.emailPasswordRegistrationRequest, {
+    email: normalized,
+    password: input.password,
+    ...(options.locale === undefined ? {} : { locale: options.locale }),
+    ...(input.termsAccepted === undefined ? {} : { termsAccepted: input.termsAccepted }),
+    ...(input.inviteCode === undefined ? {} : { inviteCode: input.inviteCode }),
+  });
+  if (!result.ok) return result;
+  const challenge = registrationChallengeResult(result.body);
+  return challenge === undefined ? failure('malformed-response') : { ok: true, ...challenge };
+}
+
+/** 验证六位邮箱验证码，并复用登录端点的会话响应解析。 */
+export async function verifyEmailPasswordRegistrationCode(
+  options: HostedAuthOptions,
+  input: { challengeId: string; code: string },
+): Promise<HostedAuthOutcome<{ session: HostedAuthSession }>> {
+  if (input.challengeId.trim() === '' || !/^\d{6}$/.test(input.code)) {
+    return failure('invalid-input');
+  }
+  const result = await postJson(options, HOSTED_AUTH_PATHS.emailPasswordRegistrationVerify, {
+    challengeId: input.challengeId,
+    code: input.code,
+  });
+  if (!result.ok) return result;
+  const session = parseSession(result.body);
+  return session === undefined ? failure('malformed-response') : { ok: true, session };
+}
+
+/** 重发验证码；服务端以 challengeId 归属邮箱，不接受客户端再次提交邮箱。 */
+export async function resendEmailPasswordRegistrationCode(
+  options: HostedAuthOptions,
+  challengeId: string,
+): Promise<HostedAuthOutcome<HostedRegistrationChallengeResult>> {
+  if (challengeId.trim() === '') return failure('invalid-input');
+  const result = await postJson(options, HOSTED_AUTH_PATHS.emailPasswordRegistrationResend, {
+    challengeId,
+  });
+  if (!result.ok) return result;
+  const challenge = registrationChallengeResult(result.body);
+  return challenge === undefined ? failure('malformed-response') : { ok: true, ...challenge };
 }
 
 /**

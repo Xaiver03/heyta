@@ -16,6 +16,7 @@
 export const TOOL_MINIMAL_ARGS: Readonly<Record<string, Record<string, unknown>>> = {
   list_tasks: {},
   get_task: { taskId: 't1' },
+  get_task_estimate_context: { taskId: 't1' },
   list_projects: {},
   list_habits: {},
   list_tags: {},
@@ -35,7 +36,10 @@ export const TOOL_MINIMAL_ARGS: Readonly<Record<string, Record<string, unknown>>
   log_focus: { kind: 'work', plannedMinutes: 25 },
   create_reminder: { taskId: 't1', date: '2026-10-04', time: '09:00' },
   update_task: { taskId: 't1', fields: { title: '新标题' } },
+  append_task_checklist: { taskId: 't1', items: ['准备说明'] },
   complete_task: { taskId: 't1' },
+  set_task_priorities: { entries: [{ taskId: 't1', priority: 'high' }] },
+  set_task_estimate: { taskId: 't1', minutes: 45 },
   // W10（2026-10-03 合流移植）：倒数日四条。锚点日期必须是真实存在的一天。
   list_events: {},
   get_event: { eventId: 'e1' },

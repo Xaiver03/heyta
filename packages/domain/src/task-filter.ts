@@ -33,8 +33,9 @@
 
 import {
   addDays,
-  startOfDay,
+  dueLocalDateOf,
   type LocalDate,
+  startLocalDateOf,
   toLocalDate,
 } from './date.js';
 import { Quadrant, isLive, type Task } from './entities.js';
@@ -88,8 +89,13 @@ export function isCompleted(task: Task): boolean {
  * ⚠️ 用 `toLocalDate`（按**设备本地时区**）而不是 UTC —— 用户的"今天"
  * 由他所在时区决定。跨端一致的前提是两端都调这一个函数。
  */
-export function dueLocalDate(task: Task): LocalDate | undefined {
-  return task.dueDate === undefined ? undefined : toLocalDate(task.dueDate);
+export function dueLocalDate(task: Pick<Task, 'dueDate' | 'dueDateLocal'>): LocalDate | undefined {
+  return dueLocalDateOf(task);
+}
+
+/** Date-only schedule start, with the epoch projection as an old-data fallback. */
+export function startLocalDate(task: { startDate?: number; startDateLocal?: LocalDate }): LocalDate | undefined {
+  return startLocalDateOf(task);
 }
 
 /**
@@ -113,9 +119,9 @@ export function filterTasks(
     case 'completed':
       return alive.filter(isCompleted);
     case 'today': {
-      const today = startOfDay(context.now);
+      const today = toLocalDate(context.now);
       return alive.filter(
-        (t) => !isCompleted(t) && t.dueDate !== undefined && startOfDay(t.dueDate) === today,
+        (t) => !isCompleted(t) && dueLocalDate(t) === today,
       );
     }
     case 'next7Days': {
@@ -172,7 +178,7 @@ export function sectionTasks(
   tasks: readonly Task[],
   context: FilterContext,
 ): TaskSections {
-  const today = startOfDay(context.now);
+  const today = toLocalDate(context.now);
   const sections: TaskSections = { overdue: [], dueToday: [], inbox: [], completed: [] };
 
   for (const task of aliveTasks(tasks)) {
@@ -180,14 +186,14 @@ export function sectionTasks(
       sections.completed.push(task);
       continue;
     }
-    if (task.dueDate === undefined) {
+    const dueDate = dueLocalDate(task);
+    if (dueDate === undefined) {
       sections.inbox.push(task);
       continue;
     }
-    const due = startOfDay(task.dueDate);
-    if (due < today) {
+    if (dueDate < today) {
       sections.overdue.push(task);
-    } else if (due === today) {
+    } else if (dueDate === today) {
       sections.dueToday.push(task);
     } else {
       // 未来到期的任务归入收集箱 —— 完整的"未来"分组留给日历。
@@ -244,25 +250,26 @@ export function groupTasksByDate(
   tasks: readonly Task[],
   context: FilterContext,
 ): TaskDateGroup[] {
-  const today = startOfDay(context.now);
+  const today = toLocalDate(context.now);
   const overdue: Task[] = [];
   const undated: Task[] = [];
   const byDate = new Map<LocalDate, Task[]>();
 
   for (const task of aliveTasks(tasks)) {
     if (isCompleted(task)) continue;
-    if (task.dueDate === undefined) {
+    const dueDate = dueLocalDate(task);
+    if (dueDate === undefined) {
       undated.push(task);
       continue;
     }
     // 🔴 逾期判据在**入桶前**用时刻比（与 `sectionTasks` 同一条：`startOfDay`
     //    后早于今天零点 = 逾期）。先按日期分桶再挑逾期，就要把 LocalDate 键
     //    与毫秒比较混在两处做 —— 那种写法出现过"逾期组排在今天之后"的形状。
-    if (startOfDay(task.dueDate) < today) {
+    if (dueDate < today) {
       overdue.push(task);
       continue;
     }
-    const due = toLocalDate(task.dueDate);
+    const due = dueDate;
     const bucket = byDate.get(due);
     if (bucket === undefined) {
       byDate.set(due, [task]);

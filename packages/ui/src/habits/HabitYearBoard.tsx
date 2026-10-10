@@ -142,8 +142,7 @@ function makeStyles(tokens: HeytaNativeTokens) {
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: tokens['radius.md'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
+      backgroundColor: tokens['color.surface'],
     },
     /* 一排几枚由 `card` 那一条定（百分比），这里只负责"能换行"。
        为什么不是定宽轨道：频次面板那一排（H5）与图标那一排（H3）为"定宽轨道在窄窗格里
@@ -171,10 +170,9 @@ function makeStyles(tokens: HeytaNativeTokens) {
       gap: tokens['space.1'],
       padding: tokens['space.2'],
       borderRadius: tokens['radius.md'],
-      borderWidth: tokens['border-width.thin'],
     },
     cardCurrent: {
-      borderWidth: tokens['border-width.thick'],
+      backgroundColor: tokens['color.primary-subtle'],
     },
     summary: {
       textAlign: 'left',
@@ -277,10 +275,6 @@ export function HabitYearBoard({
                 styles.card,
                 {
                   backgroundColor: colors.backgroundColor,
-                  borderColor:
-                    row.monthKey === currentMonthKey
-                      ? tokens['color.primary']
-                      : tokens['color.border-subtle'],
                 },
                 row.monthKey === currentMonthKey ? styles.cardCurrent : undefined,
               ]}

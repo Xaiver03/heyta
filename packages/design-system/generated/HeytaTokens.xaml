@@ -15,6 +15,7 @@
     <SolidColorBrush x:Key="HeytaColorOnPrimary" Color="#FFFFFFFF" />
     <SolidColorBrush x:Key="HeytaColorBackground" Color="#FFF8FAFC" />
     <SolidColorBrush x:Key="HeytaColorSurface" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="HeytaColorSurfaceSubtle" Color="#FFF8FAFC" />
     <SolidColorBrush x:Key="HeytaColorSurfaceRaised" Color="#FFFFFFFF" />
     <SolidColorBrush x:Key="HeytaColorSurfaceSunken" Color="#FFF1F5F9" />
     <SolidColorBrush x:Key="HeytaColorForeground" Color="#FF0F172A" />
@@ -41,6 +42,8 @@
     <SolidColorBrush x:Key="HeytaColorInfo" Color="#FF0284C7" />
     <SolidColorBrush x:Key="HeytaColorInfoStrong" Color="#FF0369A1" />
     <SolidColorBrush x:Key="HeytaColorInfoSubtle" Color="#FFF0F9FF" />
+    <SolidColorBrush x:Key="HeytaColorCalendarDayOff" Color="#FF2563EB" />
+    <SolidColorBrush x:Key="HeytaColorCalendarDayWork" Color="#FF475569" />
     <SolidColorBrush x:Key="HeytaColorQuadrant1" Color="#FFDC2626" />
     <SolidColorBrush x:Key="HeytaColorQuadrant1Subtle" Color="#FFFEF2F2" />
     <SolidColorBrush x:Key="HeytaColorQuadrant2" Color="#FF2563EB" />
@@ -146,6 +149,7 @@
     <x:Double x:Key="HeytaLayoutSidebarMaxWidth">416</x:Double>
     <x:Double x:Key="HeytaLayoutHeaderHeight">56</x:Double>
     <x:Double x:Key="HeytaLayoutContentMax">1200</x:Double>
+    <x:Double x:Key="HeytaLayoutReportMax">960</x:Double>
     <x:Double x:Key="HeytaLayoutDetailWidth">352</x:Double>
     <x:Double x:Key="HeytaLayoutDetailMinWidth">288</x:Double>
     <x:Double x:Key="HeytaLayoutDetailMaxWidth">480</x:Double>

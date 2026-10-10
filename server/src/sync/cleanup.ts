@@ -5,7 +5,9 @@ import { runBillingReconciliation } from '../billing/reconcile-job';
 import { DEFAULT_SYNC_CONFIG, MS_PER_DAY } from './sync.types';
 import { MIN_CHECKPOINT_SAFE_APP_VERSION } from './checkpoint-gate';
 import { vaultKeyMigrationService } from './services/vault-key-migration.service';
+import { purgeExpiredAutomationEvents } from '../automation/rules';
 import { sweepExpiredAccountCredentials } from '../account/credential-sweep';
+import { purgeExpiredAutomationEntitlementTicketUses } from '../automation/entitlement-ticket';
 
 let cleanupTimer: NodeJS.Timeout | null = null;
 let initialCleanupTimer: NodeJS.Timeout | null = null;
@@ -171,6 +173,21 @@ const runDailyCleanup = async (): Promise<void> => {
   } catch (error) {
     Logger.error(`Cleanup [ai-usage-counters] failed: ${error}`);
   }
+
+  try {
+    const deleted = await purgeExpiredAutomationEvents(new Date());
+    Logger.info(`Cleanup [automation-events]: removed ${deleted} expired ciphertext row(s)`);
+  } catch (error) {
+    Logger.error(`Cleanup [automation-events] failed: ${error}`);
+  }
+
+  try {
+    const deleted = await purgeExpiredAutomationEntitlementTicketUses(new Date());
+    Logger.info(`Cleanup [automation-entitlement-tickets]: removed ${deleted} replay nonce row(s)`);
+  } catch (error) {
+    Logger.error(`Cleanup [automation-entitlement-tickets] failed: ${error}`);
+  }
+
   // 9. 过期的**账号凭据列**、过期/无人在等的换绑请求行、过了 JWT 生命周期的会话行。
   // 🔴 这一条是"一次性令牌"与"留存 N 天"那两句对外政策的执行者：政策写的是形状
   // （只存 SHA-256、过期即无用），只有这一趟能把 hex 从库里拿掉。没有它，那句"一次性"

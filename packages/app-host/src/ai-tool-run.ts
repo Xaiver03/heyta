@@ -6,16 +6,15 @@
  * 最后一环，也是最需要写清边界的一环。
  *
  * ─────────────────────────────────────────────────────────────────────────
- * 🔴🔴 全案最重要的一条：**写工具在这里永远不会被执行**
+ * 🔴🔴 全案最重要的一条：**工具解析本身永远不会直接执行写入**
  *
- * 本文件里 `host.submit` 只出现在 `confirmAiToolProposal()` 里，
- * 而那个函数**只能由用户确认之后调用**。`runSelectedTool()` 对写工具的唯一动作是
+ * 本文件里真正的 `host.submit` 只出现在最终提交函数里。
+ * `runSelectedTool()` 对写工具的唯一动作是
  * 用 `toWriteIntent()` 造一个**提案**（`LocalApiWriteIntent`）然后返回 ——
- * 它和 op 之间还隔着"用户看见、改过、点确认"这三步。
+ * 它和 op 之间还隔着执行档的风险判断，或用户看见、改过、点确认这一步。
  *
- * 这是 ADR-0005 §3.1 在工具层的落地：**AI 只产出建议，写入必须过
- * `dispatch()` + 用户确认。** 有人要在这里加一行"顺手 submit 一下"，
- * 那就是把"模型可以自己改用户的数据"这件事放进了产品。
+ * 这是 ADR-0005 §3.1 在工具层的落地：**AI 先产出封闭写意图，写入必须过
+ * app-host 的最终提交闸门。** 高风险意图还必须保留用户确认。
  *
  * ⚠️ `ai-tool-run.spec.ts` 有一条测试**数 `submit` 被调了几次**：
  * 跑完所有只读与提案路径后必须是 **0**。不是看返回值，是数调用 ——
@@ -67,6 +66,7 @@ import {
   type ToolSelectionNoneReason,
   type ToolSelectionRule,
 } from './ai-tool-selection.js';
+import { clampDurationMinutes } from './ai-duration.js';
 
 /**
  * 一条**待确认的**写入提案。
@@ -82,22 +82,150 @@ export interface AiToolProposal {
   intent: LocalApiWriteIntent;
 }
 
+/** 执行档自动落地前必须保留确认的破坏性动作。 */
+export function aiToolProposalRequiresConfirmation(proposal: AiToolProposal): boolean {
+  switch (proposal.intent.action) {
+    case 'complete-tasks':
+      return true;
+    case 'append-task-checklist':
+      return true;
+    case 'set-task-priorities':
+      return true;
+    case 'set-task-estimate':
+      return true;
+    case 'set-task-tags':
+      return proposal.intent.tagIds.length === 0;
+    case 'update-note':
+    case 'update-event':
+      return true;
+    case 'update-task': {
+      const fields = proposal.intent.fields;
+      const keys = Object.keys(fields);
+      return (
+        keys.length === 0 ||
+        keys.some(
+          (key) =>
+            !['title', 'completed', 'dueDate', 'priority'].includes(key) ||
+            fields[key] === null ||
+            fields[key] === undefined,
+        )
+      );
+    }
+    default:
+      return false;
+  }
+}
+
+type AutoExecutionRecord = {
+  readonly fingerprint: string;
+  readonly result: Promise<LocalApiWriteResult>;
+};
+
+const autoExecutionRecords = new WeakMap<object, Map<string, AutoExecutionRecord>>();
+type AiToolConfirmationRecord = { readonly result: Promise<LocalApiWriteResult> };
+const confirmationRecords = new WeakMap<object, WeakMap<object, AiToolConfirmationRecord>>();
+
+/** 授权必须在最终提交前读取；不能把提案生成时的 grants 快照当成确认时授权。 */
+export interface AiToolAuthorization {
+  readonly getGrants: () => LocalApiConfig['grants'];
+}
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (typeof value === 'object' && value !== null) {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableJson(record[key])}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+}
+
+/**
+ * 让提案里展示的值与最终动作使用同一份规范化结果。
+ *
+ * local-api 只负责校验输入形状，真正的估时范围属于 app-host 的产品语义。
+ * 在提案边界先规范化，确认卡就不会展示一个随后被 action 夹掉的数字；action
+ * 仍保留自己的防御性夹取，避免绕过提案的其它宿主调用方写入越界值。
+ */
+function normalizeWriteIntent(intent: LocalApiWriteIntent): LocalApiWriteIntent {
+  if (intent.action !== 'set-task-estimate') return intent;
+  return { ...intent, minutes: clampDurationMinutes(intent.minutes) };
+}
+
+/**
+ * 执行档的低风险自动写入收口。相同执行标识在当前宿主生命周期内只提交一次，
+ * 避免 UI 重放生成重复 op；它不是跨进程或跨设备的持久幂等协议。
+ * 不同用户发送必须使用不同标识，即使 intent 相同也仍是两次真实意图。
+ */
+export async function executeAiToolProposal(
+  host: LocalApiHost,
+  proposal: AiToolProposal,
+  executionId: string,
+  authorization: AiToolAuthorization,
+): Promise<LocalApiWriteResult> {
+  if (aiToolProposalRequiresConfirmation(proposal)) {
+    return { ok: false, reason: 'invalid', message: '这项改动需要先确认。' };
+  }
+  const id = executionId.trim();
+  if (id === '') return { ok: false, reason: 'invalid', message: '执行标识不能为空。' };
+
+  const fingerprint = stableJson(proposal.intent);
+  let records = autoExecutionRecords.get(host);
+  if (records === undefined) {
+    records = new Map();
+    autoExecutionRecords.set(host, records);
+  }
+  const existing = records.get(id);
+  if (existing !== undefined) {
+    if (existing.fingerprint !== fingerprint) {
+      return { ok: false, reason: 'invalid', message: '同一执行标识对应了不同的改动。' };
+    }
+    return existing.result;
+  }
+
+  // 低风险自动执行与显式确认共享同一个最终提交闸门；所有写入仍只有一条
+  // app-host → op-log 路径，静态门禁也可以穷举这个写入口。
+  const result = confirmAiToolProposal(host, proposal, authorization);
+  records.set(id, { fingerprint, result });
+  const executionRecords = records;
+  void result.then((write) => {
+    if (!write.ok && executionRecords.get(id)?.result === result) executionRecords.delete(id);
+  }, () => {
+    if (executionRecords.get(id)?.result === result) executionRecords.delete(id);
+  });
+  if (records.size > 128) {
+    const oldest = records.keys().next().value;
+    if (typeof oldest === 'string') records.delete(oldest);
+  }
+  return result;
+}
+
 export type AiToolRunOutcome =
   /** 只读工具执行成功。`data` 已按 Bear 范式投影过。 */
   | { kind: 'observation'; ruleId: string; tool: string; data: unknown }
-  /** 写工具**只产出提案**，没有落库。 */
+  /** 写工具只产出提案；由执行档或确认动作决定是否提交。 */
+  | { kind: 'executed'; proposal: AiToolProposal; result: LocalApiWriteResult }
   | { kind: 'proposal'; proposal: AiToolProposal }
   | { kind: 'ambiguous'; candidates: readonly ToolCandidate[] }
   | { kind: 'none'; reason: ToolSelectionNoneReason }
   /** 用户没授权这个工具。**执行前复查**抓到的。 */
   | { kind: 'denied'; tool: string; message: string }
-  | { kind: 'failed'; tool: string; reason: 'unknown-tool' | 'invalid-args' | 'not-readable'; message: string };
+  | {
+      kind: 'failed';
+      tool: string;
+      reason: 'unknown-tool' | 'invalid-args' | 'not-readable' | 'write-failed';
+      message: string;
+    };
 
 export interface AiToolRunnerDeps {
   /** 工具宿主。复用 `createLocalApiHost()`（壳侧），这里是进程内端口。 */
   readonly host: LocalApiHost;
   /** 已授权的工具范围。**就是 AI 设置里那份 `localApi.grants`**。 */
   readonly grants: LocalApiConfig['grants'];
+  /** 最终执行前读取当前授权；省略时仅兼容旧的静态测试调用方。 */
+  readonly getGrants?: () => LocalApiConfig['grants'];
   /** 规则集。默认只读（见 `ai-tool-selection.ts`）。 */
   readonly rules?: readonly ToolSelectionRule[];
   /** 时间源。默认 `Date.now`。 */
@@ -155,7 +283,8 @@ export async function runSelectedTool(
   }
 
   // 🔴 执行前复查：选择到执行之间用户可能撤销了授权。
-  if (!isToolGranted(deps.grants, tool)) {
+  const currentGrants = deps.getGrants?.() ?? deps.grants;
+  if (!isToolGranted(currentGrants, tool)) {
     return {
       kind: 'denied',
       tool,
@@ -177,22 +306,49 @@ export async function runSelectedTool(
   if (!write.ok) {
     return { kind: 'failed', tool, reason: 'invalid-args', message: write.message };
   }
-  return { kind: 'proposal', proposal: { ruleId, tool, intent: write.intent } };
+  return {
+    kind: 'proposal',
+    proposal: { ruleId, tool, intent: normalizeWriteIntent(write.intent) },
+  };
 }
 
 /**
- * 用户确认之后，才把提案落地。
+ * 把提案提交到宿主的最终写入闸门。
  *
- * 🔴 这是本模块**唯一**调用 `host.submit` 的地方，也是"AI 不能自己改数据"
- * 这条约束的执行点。它必须是**显式的一步**，不能藏在执行函数里。
+ * 🔴 这是本模块**唯一**调用 `host.submit` 的地方，也是所有 AI 写入进入 op-log
+ * 的唯一执行点。显式确认会调用它；执行档的低风险动作也会复用它，差别只在于
+ * 高风险提案必须先经过用户确认。
  * ⚠️ `check:ai-tools` 静态钉住"`RUN_FILE` 里 `.submit(` 恰好 1 次且在本函数内"，
  * 所以这里不是靠注释守着的。
  */
 export async function confirmAiToolProposal(
   host: LocalApiHost,
   proposal: AiToolProposal,
+  authorization: AiToolAuthorization,
 ): Promise<LocalApiWriteResult> {
-  return host.submit(proposal.intent);
+  let proposals = confirmationRecords.get(host);
+  if (proposals === undefined) {
+    proposals = new WeakMap();
+    confirmationRecords.set(host, proposals);
+  }
+  const existing = proposals.get(proposal);
+  if (existing !== undefined) return existing.result;
+
+  const result = (async (): Promise<LocalApiWriteResult> => {
+    if (!isToolGranted(authorization.getGrants(), proposal.tool)) {
+      return {
+        ok: false,
+        reason: 'rejected',
+        message: `工具「${proposal.tool}」的授权已撤销。`,
+      };
+    }
+    return host.submit(proposal.intent);
+  })();
+  proposals.set(proposal, { result });
+  void result.then((write) => {
+    if (!write.ok) proposals?.delete(proposal);
+  }, () => proposals?.delete(proposal));
+  return result;
 }
 
 /** 类型再导出，省得调用方两处 import。 */

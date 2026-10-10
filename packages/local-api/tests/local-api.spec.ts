@@ -20,9 +20,11 @@ import {
   LOCAL_API_TOOLS,
   LOCAL_API_TOOL_PACKS,
   MAX_TOOLS_PER_ENTITY,
+  MAX_TOOLS_PER_ENTITY_BY_TYPE,
   authorizeToolCall,
   findTool,
   isLoopbackAddress,
+  maxToolsPerEntity,
   projectAllForTool,
   projectForTool,
   readItemForTool,
@@ -83,12 +85,12 @@ describe('默认值 —— 一切都是关的', () => {
     expect(LOCAL_API_TOOLS.length).toBeGreaterThan(0);
   });
 
-  it('目录规模按**实体**判上限，不按总数（每实体至多五个工具）', () => {
+  it('目录规模按**实体**判上限，不按总数（默认七个，TASK 单独九个）', () => {
     // 这条取代了 2026-10-03 之前的 `LOCAL_API_TOOLS.length <= 10`。
     // 那句的问题不是"太严"，是**严在了错的那一列**：八个实体每实体一读一写的下限就要 16 席，
     // 所以它会在补齐覆盖面的中途把最后一个实体挡在门外 —— 而那正是它自己不回答的"真的需要吗"。
     // 现在拦的是"某一个实体膨胀"，而总量由覆盖面门禁从分母推导（`check-ai-coverage.mjs` §10）。
-    // 上限的推导（为什么是 5）写在 `src/tools/shared.ts` 的 `MAX_TOOLS_PER_ENTITY` 上。
+    // 上限的推导写在 `src/tools/shared.ts` 的 `MAX_TOOLS_PER_ENTITY` 上。
     const perEntity = new Map<string, string[]>();
     for (const pack of LOCAL_API_TOOL_PACKS) {
       for (const tool of pack.tools) {
@@ -98,12 +100,19 @@ describe('默认值 —— 一切都是关的', () => {
       }
     }
     for (const [entityType, names] of perEntity) {
+      const cap = maxToolsPerEntity(entityType);
       expect(
         names.length,
         `${entityType} 有 ${String(names.length)} 个工具（${names.join('、')}），` +
-          `超过每实体 ${String(MAX_TOOLS_PER_ENTITY)} 个的上限 —— 要加第六个，先回答它属于哪一档`,
-      ).toBeLessThanOrEqual(MAX_TOOLS_PER_ENTITY);
+          `超过该实体 ${String(cap)} 个的上限 —— 要继续增加，先回答它属于哪一档`,
+      ).toBeLessThanOrEqual(cap);
     }
+    expect(MAX_TOOLS_PER_ENTITY).toBe(7);
+    expect(MAX_TOOLS_PER_ENTITY_BY_TYPE.TASK).toBe(9);
+    for (const pack of LOCAL_API_TOOL_PACKS) {
+      if (pack.entityType !== 'TASK') expect(maxToolsPerEntity(pack.entityType)).toBe(7);
+    }
+    expect(maxToolsPerEntity('NOT_AN_ENTITY')).toBe(MAX_TOOLS_PER_ENTITY);
     // 分组本身要有牙齿：目录里出现一个**没有 pack 认领**的工具，上面那个循环就数不到它。
     expect(perEntity.size, '有工具不属于任何 pack').toBeGreaterThan(0);
     const owned = new Set([...perEntity.values()].flat());
@@ -363,7 +372,7 @@ describe('写入路径 —— 只能经 dispatch 形状的端口', () => {
   it('🔴 本包**没有**任何 op 构造函数（写入意图是封闭联合）', async () => {
     // 这个测试的价值不在断言内容，而在**类型系统**：
     // 下面这行如果去掉 as never 就会编译失败，
-    // 因为 LocalApiWriteIntent 是封闭的三种动作。
+    // 因为 LocalApiWriteIntent 是封闭的四种动作。
     // → 工具**表达不出**"随便改个字段"或"自己拼个 op"。
     const port: LocalApiWritePort = {
       submit: () => Promise.resolve({ ok: false, reason: 'invalid', message: '拒绝' }),
@@ -372,15 +381,17 @@ describe('写入路径 —— 只能经 dispatch 形状的端口', () => {
     expect(result.ok).toBe(false);
   });
 
-  it('三种写入动作的形状是固定的', () => {
+  it('四种写入动作的形状是固定的', () => {
     const intents: LocalApiWriteIntent[] = [
       { action: 'create-task', title: '写方案', dueDate: '2026-10-01', priority: 'high' },
       { action: 'update-task', taskId: 't2', fields: { title: '改过的标题' } },
+      { action: 'append-task-checklist', taskId: 't2', items: ['准备说明'] },
       { action: 'complete-task', taskId: 't2' },
     ];
     expect(intents.map((i) => i.action)).toEqual([
       'create-task',
       'update-task',
+      'append-task-checklist',
       'complete-task',
     ]);
   });

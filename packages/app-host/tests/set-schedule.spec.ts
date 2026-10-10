@@ -86,7 +86,7 @@ describe('setSchedule：三种手势 = 三种 payload 形状（goal §3.3 骨架
     const last = await lastOp(id);
     expect(last.opType).toBe(OpType.Update);
     expect(last.entityType).toBe('TASK');
-    expect(payloadOf(last)).toEqual({ startDate: start, durationMinutes: 90 });
+    expect(payloadOf(last)).toEqual({ startDate: start, startDateLocal: null, durationMinutes: 90 });
   });
 
   it('🔴 拖整条移动：{ startDate } ⇒ payload **只有** startDate（时长不进 payload）', async () => {
@@ -101,7 +101,7 @@ describe('setSchedule：三种手势 = 三种 payload 形状（goal §3.3 骨架
     expect(ops).toHaveLength(before + 1);
     // 移动的 op 里没有 durationMinutes —— 字段级 LWW 的决胜单位是字段，
     // payload 越瘦，两台设备同时拖（一台移动一台改时长）的冲突面越小。
-    expect(payloadOf(await lastOp(id))).toEqual({ startDate: start2 });
+    expect(payloadOf(await lastOp(id))).toEqual({ startDate: start2, startDateLocal: null });
 
     // 物化状态：移动没有动时长
     const state = engine.getState();
@@ -123,7 +123,7 @@ describe('setSchedule：三种手势 = 三种 payload 形状（goal §3.3 骨架
     await actions.setSchedule(id, { startDate: 1_700_000_100_000 });
     await actions.setSchedule(id, { startDate: undefined });
 
-    expect(payloadOf(await lastOp(id))).toEqual({ startDate: null });
+    expect(payloadOf(await lastOp(id))).toEqual({ startDate: null, startDateLocal: null });
     expect(engine.getState().tasks[id]?.startDate).toBeUndefined();
   });
 

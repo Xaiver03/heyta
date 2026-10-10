@@ -41,6 +41,25 @@ import process from 'node:process';
 
 import { LEGAL_DOCUMENTS } from '../packages/legal/dist/index.js';
 
+/**
+ * `terms` 的 GDPR 对照表是内部审查台账，不属于对外服务条款。
+ * 它故意放在 docs/research 下：产品包不能 import 这份文件，门禁是唯一读取方。
+ */
+const INTERNAL_TERMS_REVIEW_URL = new URL(
+  '../docs/research/legal-terms-gdpr-review.json',
+  import.meta.url,
+);
+
+function loadInternalTermsReview() {
+  try {
+    return JSON.parse(readFileSync(INTERNAL_TERMS_REVIEW_URL, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+const INTERNAL_TERMS_REVIEW = loadInternalTermsReview();
+
 /** 持有逐条对照表的那一份。 */
 const FULL_TABLE = { docId: 'data-rights', sectionId: 's9' };
 
@@ -148,10 +167,51 @@ const articleSetOf = (table) => {
   return list.sort((a, b) => a - b);
 };
 
+/**
+ * 对外条款可以说明适用法律，但不能携带内部核对表。
+ * 这里只拦内部审计材料的稳定标记，避免把用户可读的条件性 GDPR 说明误判为泄露。
+ */
+const INTERNAL_REVIEW_MARKERS = [
+  '本节仅核对三项事项',
+  '下表仅记载代码或现有文件能够证明的事实',
+  '尚无依据的事项列为待补足事项',
+  '它问的是什么',
+  'heyta 现在拿得出的',
+  '对不上的部分',
+  'this section checks only three items',
+  'what it asks',
+  'what heyta currently has',
+  'what does not match',
+];
+
+function externalTermsContainsInternalReview(doc) {
+  if (!doc) return false;
+  for (const lang of LANGS) {
+    for (const section of doc.sections?.[lang] ?? []) {
+      // s13 是历史内部核对表的固定落点；只要它仍带表，就说明台账没有迁出。
+      if (section.id === 's13' && tableOf(section)) return true;
+      const text = flatten(section).join('\n').toLowerCase();
+      if (INTERNAL_REVIEW_MARKERS.some((marker) => text.includes(marker.toLowerCase()))) return true;
+    }
+  }
+  return false;
+}
+
 /** 返回失败原因数组（空 = 通过）。检查逻辑与输出分离，变异臂才能同一条路径上跑。 */
-export function checkDocs(docs) {
+export function checkDocs(docs, options = {}) {
   const fails = [];
   const byId = new Map(docs.map((d) => [d.id, d]));
+  const termsReview = options.termsGdprReview ?? INTERNAL_TERMS_REVIEW;
+
+  const externalTerms = byId.get('terms');
+  if (externalTermsContainsInternalReview(externalTerms)) {
+    fails.push('terms 对外条款仍包含 GDPR 内部核对表；请移至 docs/research/legal-terms-gdpr-review.json');
+  }
+  if (!termsReview) {
+    fails.push('terms 的 GDPR 内部审查台账不存在或不是有效 JSON：docs/research/legal-terms-gdpr-review.json');
+  } else if (termsReview.id !== 'terms' || !termsReview.sections?.['zh-CN'] || !termsReview.sections?.en) {
+    fails.push('terms 的 GDPR 内部审查台账必须包含 id=terms 以及中英文 sections');
+  }
 
   // —— 0. 封闭集合：每份文档都要有归属，白名单不许过期 ——
   for (const doc of docs) {
@@ -242,7 +302,8 @@ export function checkDocs(docs) {
 
     // —— 3. 其余各份不许把主表抄第二遍 ——
     for (const [docId, sectionId] of Object.entries(POINTERS)) {
-      const doc = byId.get(docId);
+      // `terms` 的 GDPR 证据来自内部审查台账；其它文档的指针仍指向产品文档本身。
+      const doc = docId === 'terms' ? termsReview : byId.get(docId);
       if (!doc) continue;
       const tables = audit(doc, sectionId, `${docId}`);
       if (!tables) continue;
@@ -307,8 +368,9 @@ if (argv.includes('--self-test')) {
 
   const mk = (name, mutate) => {
     const docs = clone(LEGAL_DOCUMENTS);
-    mutate(docs);
-    arms.push({ name, fails: checkDocs(docs) });
+    const termsReview = clone(INTERNAL_TERMS_REVIEW);
+    mutate(docs, termsReview);
+    arms.push({ name, fails: checkDocs(docs, { termsGdprReview: termsReview }) });
   };
 
   mk('主表某行清空"对不上的部分"', (docs) => {
@@ -328,8 +390,24 @@ if (argv.includes('--self-test')) {
     const s = docs.find((d) => d.id === FULL_TABLE.docId).sections['zh-CN'].find((x) => x.id === FULL_TABLE.sectionId);
     s.blocks.find((b) => b.kind === 'p').text += ' An EU representative has been designated.';
   });
-  mk('GDPR 节标题被改名（落点消失）', (docs) => {
-    const s = docs.find((d) => d.id === 'terms').sections['zh-CN'].find((x) => x.id === POINTERS.terms);
+  mk('对外 terms 重新混入内部核对表', (docs) => {
+    const terms = docs.find((d) => d.id === 'terms');
+    for (const lang of LANGS) {
+      terms.sections[lang].push({
+        id: 's13',
+        title: lang === 'zh-CN' ? '欧盟 GDPR 适用性核对' : 'EU GDPR applicability review',
+        blocks: [{
+          kind: 'table',
+          head: lang === 'zh-CN'
+            ? ['它问的是什么', 'heyta 现在拿得出的', '依据', '对不上的部分']
+            : ['What it asks', 'What heyta currently has', 'Evidence', 'What does not match'],
+          rows: [],
+        }],
+      });
+    }
+  });
+  mk('GDPR 节标题被改名（落点消失）', (docs, termsReview) => {
+    const s = termsReview.sections['zh-CN'].find((x) => x.id === POINTERS.terms);
     s.title = '其它口径';
   });
   // 🔴 这一臂以前靠"真白名单里恰好有 privacy"才跑得动。2026-10-04 把三份补完 GDPR 节之后
@@ -342,7 +420,7 @@ if (argv.includes('--self-test')) {
     try {
       const docs = clone(LEGAL_DOCUMENTS);
       if (extra) extra(docs);
-      fails = checkDocs(docs);
+      fails = checkDocs(docs, { termsGdprReview: clone(INTERNAL_TERMS_REVIEW) });
     } finally {
       delete BLOCKED[docId];
     }

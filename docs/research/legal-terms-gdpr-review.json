@@ -1,0 +1,120 @@
+{
+  "id": "terms",
+  "source": "packages/legal/src/documents/terms.ts",
+  "sections": {
+    "zh-CN": [
+      {
+        "id": "s13",
+        "title": "欧盟 GDPR 适用性核对",
+        "blocks": [
+          {
+            "kind": "p",
+            "text": "服务条款属于合同文件。就 GDPR 而言，本节仅核对三项事项：**使用服务是否被附加与服务无关的处理条件**（第 7(4) 条）、本合同是否落入其地域适用范围，以及是否履行代表指定要求。下表仅记载代码或现有文件能够证明的事实；尚无依据的事项列为待补足事项，不构成承诺。"
+          },
+          {
+            "kind": "table",
+            "head": [
+              "GDPR 的位置",
+              "它问的是什么",
+              "heyta 现在拿得出的",
+              "对不上的部分"
+            ],
+            "rows": [
+              [
+                "第 7(4) 条（同意不得与服务捆绑）",
+                "要用服务，是不是必须先同意与服务本身无关的处理",
+                "本地功能在没同意时可用，任何出站之前都有一道同意闸门（\"未同意零出站\"），关掉某一项不影响其它项",
+                "该结论以现有出站授权闸门持续有效为前提，因此不表述为永久保证；如将来将某项处理改为服务的必要条件，应同步修订本项说明"
+              ],
+              [
+                "第 3(2) 条（域外适用）",
+                "向欧盟境内人员提供服务时，是否落入 GDPR 的地域适用范围",
+                "条款写明主体与住所都在中国杭州，也不做任何面向欧盟的投放、推广或语言版本",
+                "本公司尚未完成第 3(2) 条适用性判断，因此该事项不能表述为已确定不适用，列为待判断事项；如有欧盟用户注册并使用托管同步，应重新评估适用性"
+              ],
+              [
+                "第 27 条（在欧盟境内设立代表）",
+                "非欧盟的控制者是否需要、以及是否指定了一名欧盟境内代表",
+                "没有。我们**没有指定**欧盟代表，也没有欧盟境内的送达地址",
+                "本公司尚未指定欧盟境内代表或欧盟境内送达地址，该事项仍待补足；不得将其表述为已经落实"
+              ],
+              [
+                "第 13 与 14 条（处理信息与法律依据）",
+                "条款有没有写明处理目的、法律依据与留存期",
+                "条款刻意不重复这些：目的、逐类法律依据与留存期在《隐私政策》与《个人信息清单》里，各只有一份",
+                "相关信息由下方固定引用指向对应文件；本条款不重复列示，以避免产生不一致的重复文本"
+              ]
+            ]
+          },
+          {
+            "kind": "docRef",
+            "docId": "privacy",
+            "text": "《隐私政策》：处理目的、法律依据与留存期在那里；本条款只管服务与责任边界。"
+          },
+          {
+            "kind": "docRef",
+            "docId": "personal-info-list",
+            "text": "《个人信息清单》：逐类数据收集了什么、存在哪儿；那里也写着这份清单按中国法口径分类，与 GDPR 的分类不是一一对应。"
+          }
+        ]
+      }
+    ],
+    "en": [
+      {
+        "id": "s13",
+        "title": "EU GDPR applicability review",
+        "blocks": [
+          {
+            "kind": "p",
+            "text": "These terms are a contract. For GDPR purposes, this section checks only whether **use of the service is conditional on processing unrelated to that service** (Article 7(4)), whether the contract falls within the territorial scope of the GDPR, and whether any required representative has been appointed. Each cell records only facts supported by the code or existing documents; unsupported matters are recorded as open items and do not constitute promises."
+          },
+          {
+            "kind": "table",
+            "head": [
+              "Where in the GDPR",
+              "What it asks",
+              "What heyta can produce",
+              "What does not line up"
+            ],
+            "rows": [
+              [
+                "Article 7(4) (no bundling of consent)",
+                "Must a user consent to processing unrelated to the service in order to use it",
+                "Local features work without agreement, a consent gate stands in front of every outbound request (\"not a byte leaves before consent\"), and switching one feature off leaves the others alone",
+                "This conclusion depends on the continued operation of the outbound-consent gate and is not stated as a permanent guarantee; if processing is later made necessary for the service, this entry must be revised"
+              ],
+              [
+                "Article 3(2) (extraterritorial reach)",
+                "Whether these rules attach to us when serving people located in the EU",
+                "The terms name an entity and address in Hangzhou, China, and we run no EU-targeted advertising, promotion or language edition",
+                "The Article 3(2) assessment has not been completed and is recorded as open; if an EU user registers and uses hosted sync, applicability must be reassessed"
+              ],
+              [
+                "Article 27 (a representative in the Union)",
+                "Whether a non-EU controller must appoint an EU representative, and whether one exists",
+                "No. We have **not appointed** an EU representative and have no address for service inside the EU",
+                "No EU representative or EU service address has been appointed; this remains an open item and must not be described as completed"
+              ],
+              [
+                "Articles 13 and 14 (information and lawful basis)",
+                "Whether the terms state the purposes, lawful bases and retention periods",
+                "The terms deliberately do not repeat them: purposes, per-category lawful bases and retention live in the Privacy policy and the Personal information inventory, one copy each",
+                "The references below identify the governing documents; the terms do not repeat the same information in order to avoid inconsistent duplicate text"
+              ]
+            ]
+          },
+          {
+            "kind": "docRef",
+            "docId": "privacy",
+            "text": "Privacy policy: purposes, lawful bases and retention periods live there; these terms govern only the service and the boundaries of responsibility."
+          },
+          {
+            "kind": "docRef",
+            "docId": "personal-info-list",
+            "text": "Personal information inventory: what is collected category by category and where it is stored; that document also states that the categories follow Chinese law and do not map one-to-one onto the GDPR categories."
+          }
+        ]
+      }
+    ]
+  }
+}

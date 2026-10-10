@@ -151,6 +151,42 @@ export const sendVerificationEmail = async (
   });
 };
 
+/**
+ * 邮箱+密码注册的六位验证码。验证码只出现在邮件正文，绝不放入链接或日志；
+ * 邮件仍复用统一的 heyta 邮件模板，收件人看到的是明确的下一步而不是一个裸数字。
+ */
+export const sendEmailPasswordRegistrationCodeEmail = async (
+  to: string,
+  code: string,
+  locale: ServerLocale = DEFAULT_SERVER_LOCALE,
+): Promise<boolean> => {
+  const config = loadConfigFromEnv();
+  const codeSeparator = locale === 'zh-CN' ? '：' : ': ';
+  const body = `${t(locale, 'server.email.registerCode.body')}\n\n${t(
+    locale,
+    'server.email.registerCode.codeLabel',
+  )}${codeSeparator}${code}`;
+
+  return deliver({
+    to,
+    locale,
+    subjectKey: 'server.email.registerCode.subject',
+    logLabel: 'Email password registration code',
+    content: {
+      heading: t(locale, 'server.email.registerCode.title'),
+      body,
+      // The template requires a button. It is only a convenience link back to the
+      // app; the code remains the sole credential for this challenge.
+      buttonLabel: t(locale, 'server.email.login.button'),
+      url: `${config.publicUrl}/app/`,
+      note: `${t(locale, 'server.email.registerCode.expiry')}\n${t(
+        locale,
+        'server.email.registerCode.ignore',
+      )}`,
+    },
+  });
+};
+
 export const sendPasskeyRecoveryEmail = async (
   to: string,
   token: string,

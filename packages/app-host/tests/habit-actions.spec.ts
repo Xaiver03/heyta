@@ -94,6 +94,26 @@ describe('新建习惯', () => {
     await expect(actions.createHabit('  ')).rejects.toThrow();
     expect(actions.listHabits()).toEqual([]);
   });
+
+  it('新建配置在一条 Create 中保存，undefined 目标仍取默认值', async () => {
+    const id = await actions.createHabit('阅读', {
+      target: undefined, unit: ' 页 ', icon: 'book', backfillDays: 7,
+      frequency: { type: 'weekly', daysOfWeek: [1, 3, 5] },
+    });
+    const ops = await engine.getOpsForEntity('HABIT', id);
+    expect(ops).toHaveLength(1);
+    expect(payloadOf(ops[0]!)).toMatchObject({ target: 1, unit: '页', icon: 'book', backfillDays: 7 });
+  });
+
+  it('非法目标或补打卡范围在新建时不落盘', async () => {
+    for (const target of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      await expect(actions.createHabit('阅读', { target })).rejects.toThrow();
+    }
+    for (const backfillDays of [0, -1, 1.5, Number.NaN, Number.MAX_SAFE_INTEGER + 1]) {
+      await expect(actions.createHabit('阅读', { backfillDays })).rejects.toThrow();
+    }
+    expect(actions.listHabits()).toEqual([]);
+  });
 });
 
 describe('打卡', () => {
@@ -721,6 +741,20 @@ describe('习惯进回收站（W4 / P-1）', () => {
  *     白写一条 op，而 reducer 收敛成同一条实体 ⇒ 测试全绿、op-log 在长胖）
  */
 describe('打卡量（W6）', () => {
+  it('成长页一键完成显式传入目标量：不足量补到 target，target=0 保留 0', async () => {
+    const counted = await actions.createHabit('阅读', { target: 8 });
+    const countedTarget = actions.listHabits().find((habit) => habit.id === counted)?.target ?? 1;
+    expect(await actions.checkIn(counted, DAY1, countedTarget)).toBe(true);
+    expect(actions.listLogs().find((log) => log.habitId === counted)?.value).toBe(8);
+
+    const zero = await actions.createHabit('戒咖啡', { target: 0, goalType: 'atMost' });
+    const zeroTarget = actions.listHabits().find((habit) => habit.id === zero)?.target ?? 1;
+    expect(await actions.checkIn(zero, DAY1, zeroTarget)).toBe(true);
+    const zeroLog = actions.listLogs().find((log) => log.habitId === zero);
+    expect(zeroLog?.value).toBe(0);
+    expect(isAchieved(actions.listHabits().find((habit) => habit.id === zero)!, zeroLog!)).toBe(true);
+  });
+
   it('🔴 判据①：目标 8、记 5 ⇒ 落盘 value=5，且物化状态读到 5', async () => {
     const id = await actions.createHabit('阅读', { target: 8 });
     expect(await actions.checkIn(id, DAY1, 5)).toBe(true);

@@ -34,14 +34,13 @@
  * ─────────────────────────────────────────────────────────────────────────
  */
 
-import { localTimeOf, type LocalTime, type Priority, type Task } from '@heyta/domain';
+import { dueLocalDateOf, localTimeOf, type LocalTime, type Priority, type Task } from '@heyta/domain';
 import { bucketFor, type MaterializedState } from '@heyta/op-log';
 import { CURRENT_SCHEMA_VERSION, ENTITY_TYPES } from '@heyta/shared-schema';
 import type { Operation } from '@heyta/sync-core';
 
 import { aliveRecords } from './category-report.js';
 import type { AppHost } from './host.js';
-import { toLocalDateString } from './local-api-host.js';
 
 /**
  * 导出格式**自己**的版本号。
@@ -310,13 +309,15 @@ function toExportTaskRow(task: Task, state: MaterializedState): ExportTaskRow {
     .sort();
   // 🔴 只算一次：`localTimeOf` 与 `isAllDue` 的互斥性由领域层保证，
   //   这里不许自己再判"零点不算时刻"—— 那就是第二套判据（AGENTS §3.5）。
-  const dueTime = task.dueDate === undefined ? undefined : localTimeOf(task.dueDate);
+  const dueTime = task.dueDateLocal !== undefined || task.dueDate === undefined
+    ? undefined : localTimeOf(task.dueDate);
+  const dueDay = dueLocalDateOf(task);
 
   return {
     id: task.id,
     title: task.title,
     completed: task.completedAt !== undefined,
-    ...(task.dueDate !== undefined ? { dueDate: toLocalDateString(task.dueDate) } : {}),
+    ...(dueDay !== undefined ? { dueDate: dueDay } : {}),
     ...(dueTime === undefined ? {} : { dueTime }),
     ...(task.priority !== undefined ? { priority: task.priority } : {}),
     ...(project !== undefined ? { projectName: project.name } : {}),

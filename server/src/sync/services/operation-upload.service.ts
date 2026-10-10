@@ -1,3 +1,4 @@
+import { authorizeInboundOperations, completeInboundOperation, type InboundUploadIdentity } from '../../automation/worker-identity';
 import { Prisma } from '@prisma/client';
 import { Logger } from '../../logger';
 import {
@@ -228,6 +229,7 @@ export class OperationUploadService {
     prevalidatedResult?: ValidationResult,
     wasOccupiedAtRequestStart?: boolean,
     firstRequestOperation?: { op: Operation; originalTimestamp: number },
+    inboundIdentity?: InboundUploadIdentity,
   ): Promise<ProcessOperationResult> {
     // Rejected ops have no storage cost; the caller only reads storageBytes when
     // result.accepted is true.
@@ -236,6 +238,12 @@ export class OperationUploadService {
       storageBytes: 0,
       fallback: false,
     });
+
+    // This also guards internal upload callers and exact duplicate returns.
+    if (!await authorizeInboundOperations(tx, userId, clientId, [op], inboundIdentity)) {
+      return reject({ opId: op.id, accepted: false, error: 'Inbound commit authorization required',
+        errorCode: SYNC_ERROR_CODES.INBOUND_AUTH_REQUIRED });
+    }
 
     // Clamp future timestamps instead of rejecting them (prevents silent data
     // loss).
@@ -328,6 +336,7 @@ export class OperationUploadService {
       // 按幂等语义回 accepted + 原来那个 serverSeq。
       // 存储计量必须是 0：本次没有写入任何东西（调用方只在 accepted 时读 storageBytes）。
       // 与 sync.routes.snapshot-handler.ts 里 BACKUP_IMPORT / REPAIR 的幂等分支同形。
+      await completeInboundOperation(tx, userId, op);
       return {
         result: { opId: op.id, accepted: true, serverSeq: existingOp.serverSeq },
         storageBytes: 0,
@@ -494,6 +503,7 @@ export class OperationUploadService {
       // 按幂等语义回 accepted + 原来那个 serverSeq。
       // 存储计量必须是 0：本次没有写入任何东西（调用方只在 accepted 时读 storageBytes）。
       // 与 sync.routes.snapshot-handler.ts 里 BACKUP_IMPORT / REPAIR 的幂等分支同形。
+      await completeInboundOperation(tx, userId, op);
       return {
         result: { opId: op.id, accepted: true, serverSeq: duplicateOp.serverSeq },
         storageBytes: 0,
@@ -509,6 +519,7 @@ export class OperationUploadService {
       await this.persistMergedFullStateClock(tx, userId, serverSeq, fullStateVectorClock);
     }
 
+    await completeInboundOperation(tx, userId, op);
     return {
       result: { opId: op.id, accepted: true, serverSeq },
       storageBytes: sized.bytes,

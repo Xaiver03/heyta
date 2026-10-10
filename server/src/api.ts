@@ -61,10 +61,18 @@ import { MAX_PASSWORD_CODE_POINTS, type PasswordPolicyCode } from './password/po
 import { PASSWORD_BACKEND_RETRY_AFTER_SECONDS } from './password/concurrency';
 import { Logger } from './logger';
 import { prisma } from './db';
-import { asServerLocale, resolveLocale } from './design-html.js';
+import { asServerLocale } from './design-html.js';
+import { localeFromRequest } from './request-locale.js';
 import { SERVER_LOCALES, type ServerLocale } from './copy.generated.js';
 import { authCache } from './auth-cache';
 import { getWsConnectionService } from './sync/services/websocket-connection.service';
+import {
+  requestRegistrationCode,
+  resendRegistrationCode,
+  verifyRegistrationCode,
+  registrationOtpErrorResponse,
+  RegistrationOtpError,
+} from './password/registration-otp';
 import { AutomationWriteAuthorizationError, createEntitlementGuard, readAutomationEntitlementTicketHeader, replyAutomationMeteringRejection, replyAutomationRejection, resolveAutomationEntitlementMode } from './entitlement';
 import { issueAutomationCommitPermit, readInboundUploadIdentity, registerAutomationWorker, revokeAutomationWorker } from './automation/worker-identity';
 import { createAutomationRule, deleteAutomationRule, listAutomationRules, setAutomationRuleEnabled, updateAutomationRuleConfig } from './automation/rules';
@@ -110,6 +118,8 @@ const AutomationEntitlementTicketSchema = z.object({
   localAccountUuid: z.string().uuid(),
 }).strict();
 const AutomationInstallationSchema = z.object({ installationId: z.string().uuid() }).strict();
+// 🔴 作用域字段的形状**逐字**取判定内核那两枚（`entitlement-ticket.ts` 的 RULE_ID / EVENT_ID）。
+// 这里宽一份，请求就能过路由却在 `claimsSchema` 那里抛错变成 500；窄一份，合法的 id 会被拒。
 const AutomationActionTicketSchema = z.object({
   installationId: z.string().uuid(),
   action: z.enum(AUTOMATION_ENTITLEMENT_ACTIONS),
@@ -241,6 +251,15 @@ const PASSWORD_TRANSPORT_MAX = MAX_PASSWORD_CODE_POINTS * 2;
 
 const PasswordSchema = z.string().min(1, 'Password is required').max(PASSWORD_TRANSPORT_MAX);
 
+const RegistrationCodeSchema = z.string().regex(/^\d{6}$/, 'Registration code is required');
+const RegistrationChallengeVerifySchema = z.object({
+  challengeId: z.string().min(1, 'Challenge is required'),
+  code: RegistrationCodeSchema,
+});
+const RegistrationChallengeResendSchema = z.object({
+  challengeId: z.string().min(1, 'Challenge is required'),
+});
+
 const EmailPasswordLoginSchema = z.object({
   email: z.string().email('Invalid email format'),
   password: PasswordSchema,
@@ -285,23 +304,6 @@ const PasswordChangeSchema = z.object({
 const PasswordSetSchema = z.object({
   newPassword: PasswordSchema,
 });
-
-/**
- * 从请求里解析收件人语言。
- *
- * 顺序与 `design-html.ts` 的 `resolveLocale` 一致：
- *   ① `body.locale`（客户端当前界面语言，**可选**——客户端不传也完全正常工作）
- *   ② 默认 `zh-CN`
- *
- * 🔴 **刻意不改任何 zod schema**：`body.locale` 是可选字段，zod 的 `z.object()`
- * 默认会剥掉未声明的键 —— 也就是说这个字段**不会**进 `parseResult.data`，
- * 但也**不会**让请求失败。加它不需要动 schema，于是也不会与正在改这些
- * schema 的人撞车。（要让它进 `data` 就得改 schema，代价远大于收益。）
- */
-const localeFromRequest = (req: { body?: unknown }): ServerLocale => {
-  const body = req.body as { locale?: unknown } | undefined;
-  return resolveLocale(typeof body?.locale === 'string' ? body.locale : null);
-};
 
 /**
  * 🔴 **发信端点的语言优先级**（2026-10-01 定，2026-10-03 产品负责人改判）：
@@ -2236,6 +2238,102 @@ export const apiRoutes = async (
    * 邮箱已被占用时同样返回这句中性消息（`registerWithMagicLink` 里
    * `isVerified === 1` 提前 return），所以这个端点**不是**邮箱存在性预言机。
    */
+  /**
+   * 新版注册：先创建独立 challenge，再把六位验证码发到邮箱。
+   * 旧的 `/register/email-password` 保留给已部署的链接流程，不能让两条流程互相调用。
+   */
+  fastify.post<{ Body: z.infer<typeof RegistrationChallengeRequestSchema> }>(
+    AUTH_PASSWORD_PATHS.registerRequest,
+    {
+      config: {
+        rateLimit: { max: 20, timeWindow: '15 minutes' },
+      },
+    },
+    async (req, reply) => {
+      const parseResult = RegistrationChallengeRequestSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return reply.status(400).send({ error: 'Validation failed', details: parseResult.error.issues });
+      }
+      const { email, password, termsAccepted, inviteCode } = parseResult.data;
+      try {
+        if (!isEmailAllowed(email)) {
+          return reply.status(403).send({ error: 'Registration is not allowed for this email address.' });
+        }
+        return reply.status(201).send(
+          await requestRegistrationCode({
+            email,
+            password,
+            ...(termsAccepted === true ? { termsAcceptedAt: Date.now() } : {}),
+            inviteCode,
+            locale: await localeForEmail(req, email),
+          }),
+        );
+      } catch (error) {
+        if (error instanceof PasswordAuthError) return sendPasswordAuthError(reply, error);
+        if (error instanceof RegistrationOtpError) {
+          const result = registrationOtpErrorResponse(error);
+          if (result.retryAfterSeconds !== undefined) reply.header('retry-after', String(result.retryAfterSeconds));
+          return reply.status(result.status).send(result.body);
+        }
+        Logger.error(`Email password registration code request failed: ${error instanceof Error ? error.message : 'unknown'}`);
+        return reply.status(500).send({ error: 'Registration failed. Please try again.' });
+      }
+    },
+  );
+
+  fastify.post<{ Body: z.infer<typeof RegistrationChallengeVerifySchema> }>(
+    AUTH_PASSWORD_PATHS.registerVerify,
+    {
+      config: {
+        rateLimit: { max: 30, timeWindow: '15 minutes' },
+      },
+    },
+    async (req, reply) => {
+      const parseResult = RegistrationChallengeVerifySchema.safeParse(req.body);
+      if (!parseResult.success) {
+        // Malformed and wrong codes deliberately share the same public code.
+        return reply.status(400).send({ error: 'This registration code is invalid or has expired.', code: 'invalid_registration_challenge' });
+      }
+      try {
+        return reply.send(await verifyRegistrationCode(parseResult.data, sessionMetaFromRequest(req)));
+      } catch (error) {
+        if (error instanceof RegistrationOtpError) {
+          const result = registrationOtpErrorResponse(error);
+          if (result.retryAfterSeconds !== undefined) reply.header('retry-after', String(result.retryAfterSeconds));
+          return reply.status(result.status).send(result.body);
+        }
+        Logger.error(`Email password registration code verification failed: ${error instanceof Error ? error.message : 'unknown'}`);
+        return reply.status(400).send({ error: 'This registration code is invalid or has expired.', code: 'invalid_registration_challenge' });
+      }
+    },
+  );
+
+  fastify.post<{ Body: z.infer<typeof RegistrationChallengeResendSchema> }>(
+    AUTH_PASSWORD_PATHS.registerResend,
+    {
+      config: {
+        rateLimit: { max: 10, timeWindow: '15 minutes' },
+      },
+    },
+    async (req, reply) => {
+      const parseResult = RegistrationChallengeResendSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return reply.status(400).send({ error: 'This registration code is invalid or has expired.', code: 'invalid_registration_challenge' });
+      }
+      try {
+        return reply.send(await resendRegistrationCode(parseResult.data.challengeId));
+      } catch (error) {
+        if (error instanceof RegistrationOtpError) {
+          const result = registrationOtpErrorResponse(error);
+          if (result.retryAfterSeconds !== undefined) reply.header('retry-after', String(result.retryAfterSeconds));
+          return reply.status(result.status).send(result.body);
+        }
+        Logger.error(`Email password registration code resend failed: ${error instanceof Error ? error.message : 'unknown'}`);
+        return reply.status(400).send({ error: 'This registration code is invalid or has expired.', code: 'invalid_registration_challenge' });
+      }
+    },
+  );
+
   fastify.post<{ Body: EmailPasswordRegisterBody }>(
     AUTH_PASSWORD_PATHS.register,
     {

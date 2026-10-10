@@ -58,7 +58,9 @@ export type AiFeature =
    * 🔴 它要求端点在 `capabilities` 里**显式声明** `tool_calling`：
    * 没声明 = 只有基线能力 = 被路由排除。这是 ADR-0010"不做能力推断"的直接后果。
    */
-  | 'tool-calling';
+  | 'tool-calling'
+  /** Inbound automation parsing: frozen source fields are sent to the selected model. */
+  | 'inbound-automation';
 
 /** 一次授权：用户为**某个功能**、**某个目的地**同意过。 */
 export interface EgressConsent {

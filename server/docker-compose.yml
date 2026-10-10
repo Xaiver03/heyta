@@ -51,6 +51,8 @@ services:
       - REQUIRE_DATABASE_POOL_LIMITS=true
       - MIGRATE_RECOVERY_RUNTIME=compose
       - JWT_SECRET=${JWT_SECRET}
+      - AUTOMATION_COMMIT_KEYS=${AUTOMATION_COMMIT_KEYS:-}
+      - AUTOMATION_WEBHOOK_KEYS=${AUTOMATION_WEBHOOK_KEYS:-}
       # Password hashing pepper. REQUIRED — the server verifies it and the Argon2id backend
       # at boot and refuses to start without it. 🔴 Rotating it makes every stored password
       # fail to verify (passkeys and email links still work). Without this line the container

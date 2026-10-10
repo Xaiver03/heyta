@@ -10,9 +10,11 @@
  */
 
 import { Quadrant, type Task } from './entities.js';
+import { diffDays, dueLocalDateOf, toLocalDate } from './date.js';
 
 /** 紧迫性的判定窗口：截止时间在 N 天内算"紧急"。 */
 export const DEFAULT_URGENT_WINDOW_DAYS = 2;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 export interface QuadrantOptions {
   /** 当前时间（epoch ms）。显式传入而不是读 Date.now()，否则函数不可测。 */
@@ -26,8 +28,6 @@ export interface QuadrantOptions {
   urgentWindowDays?: number;
 }
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
-
 /**
  * 判断任务是否紧急。
  *
@@ -38,12 +38,13 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
  */
 export function isUrgent(task: Task, options: QuadrantOptions): boolean {
   if (task.completedAt !== undefined) return false;
-  if (task.dueDate === undefined) return false;
+  const due = dueLocalDateOf(task);
+  if (due === undefined) return false;
 
-  const windowMs =
-    (options.urgentWindowDays ?? DEFAULT_URGENT_WINDOW_DAYS) * MS_PER_DAY;
-  // 已过期也算紧急 —— 差值为负自然满足 <=
-  return task.dueDate - options.now <= windowMs;
+  const windowDays = options.urgentWindowDays ?? DEFAULT_URGENT_WINDOW_DAYS;
+  // 已过期也算紧急；日历日期比较不受规则时区的 epoch 投影影响。
+  if (task.dueDateLocal !== undefined) return diffDays(toLocalDate(options.now), due) <= windowDays;
+  return task.dueDate !== undefined && task.dueDate - options.now <= windowDays * MS_PER_DAY;
 }
 
 /**
@@ -167,8 +168,9 @@ export const QUADRANT_META: Record<
  */
 export const DROP_URGENT_LEAD_MS = 60 * 60 * 1000;
 
-export interface QuadrantDropPlan {
-  important: boolean;
+/** 一次移动或撤销的原子字段改动；null 恢复重要性由优先级推导的状态。 */
+export interface QuadrantTaskPatch {
+  important: boolean | null;
   /**
    * 截止时间的改动：
    *   - `undefined` = 不用改
@@ -176,6 +178,10 @@ export interface QuadrantDropPlan {
    *   - `number` = 设为该值
    */
   dueDate?: number | null;
+}
+
+export interface QuadrantDropPlan extends QuadrantTaskPatch {
+  important: boolean;
   /**
    * 这次投放**动到了用户的截止时间**。
    *
@@ -184,6 +190,14 @@ export interface QuadrantDropPlan {
    * UI 拿到这个字段就必须说明。
    */
   dueDateChange?: 'pushed' | 'cleared';
+}
+
+/** 只还原本次移动触及的字段，保留原先未显式指定重要性的语义。 */
+export function planQuadrantDropUndo(task: Task, drop: QuadrantDropPlan): QuadrantTaskPatch {
+  return {
+    important: task.important ?? null,
+    ...(drop.dueDate === undefined ? {} : { dueDate: task.dueDate ?? null }),
+  };
 }
 
 /**
@@ -221,7 +235,9 @@ export function planQuadrantDrop(
     // 那是**显示语义**。而这里问的是几何问题"它在不在窗口里" ——
     // 混用会让"已完成的紧急任务"被莫名其妙推一个期限。
     const windowMs = (options.urgentWindowDays ?? DEFAULT_URGENT_WINDOW_DAYS) * MS_PER_DAY;
-    const alreadyUrgent = task.dueDate !== undefined && task.dueDate - options.now <= windowMs;
+    const alreadyUrgent = task.dueDateLocal !== undefined
+      ? diffDays(toLocalDate(options.now), task.dueDateLocal) <= (options.urgentWindowDays ?? DEFAULT_URGENT_WINDOW_DAYS)
+      : task.dueDate !== undefined && task.dueDate - options.now <= windowMs;
 
     // 已经紧急 → 别动用户的日期。拖拽只该改它必须改的东西。
     if (alreadyUrgent) return plan;
@@ -236,7 +252,7 @@ export function planQuadrantDrop(
   // 非紧急侧：要**真的落进这一格**，就必须没有截止时间 —— 紧迫性是从它推导的。
   // 这不是"顺手清掉"，而是"这一格的语义就是没有迫近的期限"。
   // 但它是**用户数据的删除**，所以必须通过 `dueDateChange` 让 UI 说出来。
-  if (task.dueDate !== undefined) {
+  if (task.dueDate !== undefined || task.dueDateLocal !== undefined) {
     plan.dueDate = null;
     plan.dueDateChange = 'cleared';
   }

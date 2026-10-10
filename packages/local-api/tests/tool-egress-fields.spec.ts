@@ -92,6 +92,15 @@ function host(
   return {
     listTasks: async () => items,
     getTask: async (taskId: string) => items.find((x) => x.id === taskId),
+    getTaskEstimateContext: async (taskId: string) => ({
+      taskId,
+      title: ITEM.title,
+      readable: true,
+      body: ITEM.body,
+      currentMinutes: 30,
+      history: [{ plannedMs: 1_500_000, actualMs: 1_440_000 }],
+      preferences: [{ id: 'estimate-bias', text: '按历史偏差校正' }],
+    }),
     listProjects: async () => projects,
     listHabits: async () => habits,
     listTags: async () => [TAG],

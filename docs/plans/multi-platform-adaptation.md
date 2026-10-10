@@ -1320,6 +1320,13 @@ check:mobile-bundle                                             ✅ android+ios 
 `createElement('a', …)`、`hrefAttrs.rel` 写进真实 `rel`），
 **不是**靠把三个链接退回宿主手写。
 
+> 📌 **上面这段是本刀当时的证据，不是当前的断言形状。** 2026-10-09 起 `about-links` 里是
+> **四条**链接：三条站点页（`/docs` `/changelog` `/pricing` —— `/help` 那枚早就换成 `/docs` 了）
+> 加一条 `mailto:` 的**应用内一键投诉/举报**入口。那条入口**不带** `target`/`rel`
+> （mailto 上 `target="_blank"` 会让 Chrome 先开一片空白标签页，读起来像点了没反应），
+> 所以"外链一律 noopener"那半只适用于站点链接那一侧 —— 测试按 `href` 前缀分两侧，
+> 不是"取前三个"。理由与判据见 `docs/operations/cac-algorithm-filing/材料包_2026-10-08/README.md` §五 末三行。
+
 ⚠️ **共享层单测"能变红"的证明**（跑在 `/tmp/probe` 隔离副本上，
 `node_modules` 是指向工作区的软链，**没有碰工作区源码**）：
 对 `model.ts` 做四类变异 —— ① `false` 判成 `unsupported`；② `0` 判成 `unknown`；

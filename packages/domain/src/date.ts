@@ -18,6 +18,16 @@
 /** 本地日历日，格式 `YYYY-MM-DD`。 */
 export type LocalDate = string;
 
+/** Read a persisted task date without letting the device timezone rewrite a date-only value. */
+export function dueLocalDateOf(task: { dueDate?: number; dueDateLocal?: LocalDate }): LocalDate | undefined {
+  return task.dueDateLocal ?? (task.dueDate === undefined ? undefined : toLocalDate(task.dueDate));
+}
+
+/** Read a persisted schedule start with the same compatibility fallback. */
+export function startLocalDateOf(task: { startDate?: number; startDateLocal?: LocalDate }): LocalDate | undefined {
+  return task.startDateLocal ?? (task.startDate === undefined ? undefined : toLocalDate(task.startDate));
+}
+
 /**
  * 把时间戳转成本地日历日。
  *
@@ -434,6 +444,11 @@ export function formatCompactDate(timestamp: number, now: number): string {
   return d.getFullYear() === new Date(now).getFullYear()
     ? `${mm}-${dd}`
     : `${String(d.getFullYear())}-${mm}-${dd}`;
+}
+
+/** Compact display for a date-only task; the source calendar day is authoritative. */
+export function formatCompactLocalDate(date: LocalDate, now: number): string {
+  return date.slice(0, 4) === toLocalDate(now).slice(0, 4) ? date.slice(5) : date;
 }
 
 /**
