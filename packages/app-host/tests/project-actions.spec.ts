@@ -528,7 +528,6 @@ describe('分类色槽位', () => {
     await actions.removeProject(id);
     await expect(actions.setProjectColor(id, 1)).rejects.toThrow(/找不到清单/);
   });
-
   it('另一台设备能读到这个槽位（真的物化了，而不是丢在同步里）', async () => {
     const adapterB = new SqliteAdapter({
       schema: INDEXEDDB_SCHEMA,
@@ -550,6 +549,30 @@ describe('分类色槽位', () => {
     adapterB.close();
   });
 });
+
+describe('共享标记（W4 / ADR-0062）', () => {
+  it('一个意图一条 op：载荷只有 shareId，物化后清单带上它', async () => {
+    const id = await actions.createProject('家庭装修');
+    await actions.setProjectShareId(id, 'share-abc123');
+
+    const op = await opWithField('PROJECT', id, 'shareId');
+    expect(op.opType).toBe(OpType.Update);
+    // 🔴 只带 shareId，不顺带别的字段 —— 服务端建 share 成功是独立事实。
+    expect(Object.keys(payloadOf(op))).toEqual(['shareId']);
+    expect(engine.getState().projects[id]?.shareId).toBe('share-abc123');
+  });
+
+  it('🔴 空 shareId 抛错，不静默写空标记（空标记 = "看起来共享了其实没有"）', async () => {
+    const id = await actions.createProject('家庭装修');
+    await expect(actions.setProjectShareId(id, '  ')).rejects.toThrow(/shareId/);
+    expect(engine.getState().projects[id]?.shareId).toBeUndefined();
+  });
+
+  it('找不到（或已删除）的清单不能挂共享', async () => {
+    await expect(actions.setProjectShareId('不存在', 's1')).rejects.toThrow(/找不到清单/);
+  });
+});
+
 
 describe('🔴 反静默丢弃：另一台设备真的能物化它', () => {
   it('A 写入清单与标签 → B 应用远端 → B 的状态里查得到', async () => {

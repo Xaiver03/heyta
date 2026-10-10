@@ -60,8 +60,11 @@ export interface SharePanelProps {
       hasEnvelope: boolean;
       memberKeyEpoch: number;
     }[];
+    /** 见 `share-model.ts` 的 `SharePanelData.selfMemberId`——自识别首选。 */
+    selfMemberId?: string;
   };
-  selfUserId: number;
+  /** 有 `data.selfMemberId` 时可省（web 宿主拿不到自己的数字 userId）。 */
+  selfUserId?: number;
   labels: SharePanelLabels;
   callbacks: SharePanelCallbacks;
 }

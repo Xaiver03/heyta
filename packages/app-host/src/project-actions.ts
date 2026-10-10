@@ -107,6 +107,16 @@ export interface ProjectActions {
    *    也不 fan-out 成"把子清单逐条重写一遍"。
    */
   setParent(entityId: string, parentId?: string): Promise<void>;
+  /**
+   * 把清单标记为共享（挂上服务端 share id；ADR-0062 W4）。
+   *
+   * 🔴 **一个用户意图 = 一个 op**：载荷只有 `shareId` —— 创建共享在服务端
+   *    成功之后，由界面把这一个字段写回清单。不在同一条 op 里顺带改名/归档。
+   *
+   * ⚠️ 只做"挂上"，不做"摘下"：解除共享是 owner 侧服务端动作 + 密钥世代的
+   * 联合变更（W6 的独立旅程），不是一条本地字段清空能表达的。
+   */
+  setProjectShareId(entityId: string, shareId: string): Promise<void>;
   /** 软删除。⚠️ 不级联删除其下的任务（见文件头第 2 条）。 */
   removeProject(entityId: string): Promise<void>;
 
@@ -300,6 +310,12 @@ export function createProjectActions(
       }
       // `undefined` → `null`：见文件头第 1 条，`null` 才能穿过 JSON 表达"清除"。
       await updateProject(entityId, { parentId: verdict.parentId ?? null });
+    },
+
+    async setProjectShareId(entityId, shareId) {
+      if (shareId.trim() === '') throw new Error('shareId 不能为空');
+      // 服务端已认可的 share id 才会走到这里；本地只做字段挂接（接口注释里的契约）。
+      await updateProject(entityId, { shareId: shareId.trim() });
     },
 
     async removeProject(entityId) {

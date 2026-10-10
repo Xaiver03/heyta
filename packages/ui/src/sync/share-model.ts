@@ -51,16 +51,24 @@ export interface SharePanelData {
   keyEpoch: number;
   myRole: ShareRole;
   members: readonly ShareMemberRow[];
+  /**
+   * 自己的成员行 id（`POST /shares` / `accept` 响应里回给本人，宿主持久化）。
+   * 有它时 `isSelf` 按 memberId 判 —— web 宿主拿不到自己的**数字 userId**
+   * （服务端没有 `/me` 端点），但自己的 memberId 在建共享/接受邀请的那一刻
+   * 是明确知道的。
+   */
+  selfMemberId?: string;
 }
 
 export const isShareRole = (value: unknown): value is ShareRole =>
   typeof value === 'string' && (SHARE_MEMBER_ROLES as readonly string[]).includes(value);
 
 /**
- * 成员展示投影（唯一入口）：owner 最先、其余按加入时间；`selfUserId`
- * 由宿主从会话态传入，`isSelf` 精确按 userId 判。
+ * 成员展示投影（唯一入口）：owner 最先、其余按加入时间。
+ * `isSelf` 优先按 `selfMemberId` 判（见 `SharePanelData.selfMemberId`），
+ * 宿主没传时回落按 `selfUserId` 判。
  */
-export function projectMembersFor(data: SharePanelData, selfUserId: number): ShareMemberView[] {
+export function projectMembersFor(data: SharePanelData, selfUserId?: number): ShareMemberView[] {
   // addedAt 理论上必有（服务端 DEFAULT 0）；null 视为最早（排后段不破坏 owner 优先）。
   const at = (v: (typeof data.members)[number]): number => v.addedAt ?? Number.MAX_SAFE_INTEGER;
   const sorted = [...data.members].sort((a, b) => {
@@ -72,7 +80,9 @@ export function projectMembersFor(data: SharePanelData, selfUserId: number): Sha
     memberId: m.memberId,
     userId: m.userId,
     role: (isShareRole(m.role) ? m.role : 'viewer') as ShareRole,
-    isSelf: m.userId === selfUserId,
+    isSelf: data.selfMemberId !== undefined
+      ? m.memberId === data.selfMemberId
+      : selfUserId !== undefined && m.userId === selfUserId,
     isOwner: m.role === 'owner',
     displayName: undefined,
     hasEnvelope: m.hasEnvelope,

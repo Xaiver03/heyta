@@ -50,6 +50,8 @@ describe('词条表完整性', () => {
       // Copyable configuration path and CLI command; translation would break them.
       'web.ai.settings.localApi.source.file',
       'web.ai.settings.localApi.source.command',
+      // Example email address in an input placeholder; it is the example itself.
+      'web.share.invite.emailPlaceholder',
     ]);
     /**
      * 🔴 `.evidence` 是**按后缀**开的第二类例外，而不是逐 key 列。

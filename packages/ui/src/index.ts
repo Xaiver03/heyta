@@ -254,6 +254,12 @@ export {
   type NotificationPrefsLabels,
   type NotificationPrefsPanelProps,
 } from './sync/NotificationPrefsPanel.js';
+export {
+  DEFAULT_NOTIFICATION_PREFS,
+  type ShareActivityKind,
+  type ShareNotificationPrefs,
+  type TaskReminderScope,
+} from './sync/notification-model.js';
 export { buildShareJoinLink, parseShareJoinLink } from './sync/share-link.js';
 export { CommentThread, type CommentThreadLabels, type CommentThreadProps } from './sync/CommentThread.js';
 export { SyncStatusBar, type SyncStatusBarLabels, type SyncStatusBarProps } from './sync/SyncStatusBar.js';
