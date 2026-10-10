@@ -12,7 +12,7 @@
 用法：
 
     python3 scripts/qa/check-locator-labels.py scripts/qa/profile-settings-android.py …
-    python3 scripts/qa/check-locator-labels.py --print-floors   # 重取反盲基线
+    python3 scripts/qa/check-locator-labels.py --print-floors   # 打印**已登记**的基线（现量看正常运行那栏「含中文 N」）
 
 非零退出 = 有标签对不上真源、**或**某处 `T(中, 英)` 只写了一种语态、**或**量具看不见这枚脚本的标签。
 查的是**字面量与键的对应关系**，不验旅程本身是否跑通。
@@ -47,13 +47,15 @@ CJK = re.compile(r"[一-鿿]")
 # 为什么不写成"0 组就红"那种一刀切：`tap_label("我的")` 这种**单语**写法今天确实存在于别的线的脚本里，
 # 那是**该线自己的欠项**（在计划里登记、由这枚门披露），不该由它把共享的 `pnpm check` 按红；
 # 但"量具突然看不见标签了"是**门自己的病**，必须红 —— 两件事用两把不同的尺分开。
-# 取现量（改脚本或改量具之后重取）：`python3 scripts/qa/check-locator-labels.py --print-floors`
+# 取现量：走**正常那次运行**里每枚脚本的「含中文 N」那一栏。
+# ⚠️ `--print-floors` 打印的是**已登记的基线本身**（它读的就是这张表），不是现量 ——
+# 拿它"重取基线"会把旧值抄回去，于是这一格从此不会变。实测：同一枚脚本正常运行读到 14、`--print-floors` 报 0。
 CJK_GROUP_FLOOR = {
     "profile-settings-android.py": 56,
     "profile-settings-ios.py": 43,
     "tasks-ux-android.py": 2,
     "tasks-ux-ios.py": 42,
-    "ai-assistant-atomic-android.py": 0,
+    "ai-assistant-atomic-android.py": 14,
 }
 # TS 源码不是 Python，不能用 ast 扫；这里抓所有引号里的"像键名"的串，再和真源的键集合取交集。
 ANY_QUOTED = re.compile(r"""['"]([A-Za-z0-9_.-]{3,})['"]""")

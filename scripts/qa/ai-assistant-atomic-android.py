@@ -36,6 +36,20 @@ PREF_DB = f"/data/data/{PACKAGE}/databases/heyta-device-prefs.sqlite"
 PORT = 4319
 
 
+def T(zh: str, en: str) -> tuple[str, str]:
+    """一枚界面标签的两种语态；定位端任一命中即算。
+
+    界面文本的唯一真源是 `packages/i18n`，而设备的系统语言决定渲染哪一列。只写一种语态的
+    标签在换语言后点不到，症状是"旅程死在入口"，很容易被读成"界面没有这个功能"。
+    中文那一半与改成双语之前的字面逐字相同 ⇒ 已验过的那条路径行为不变，英文那一半是纯增。
+    """
+    return (zh, en)
+
+
+def label_set(label: "str | tuple[str, str]") -> tuple[str, ...]:
+    return (label,) if isinstance(label, str) else tuple(label)
+
+
 class ProbeError(RuntimeError):
     pass
 
@@ -227,8 +241,9 @@ class Probe:
                 return node
         return None
 
-    def wait_label(self, label: str, *, clickable: bool | None = None) -> ET.Element:
-        return self.wait(lambda nodes: next((node for node in nodes if self.label(node) == label and (clickable is None or (node.get("clickable") == "true") == clickable)), None), f"label {label}")
+    def wait_label(self, label: "str | tuple[str, str]", *, clickable: bool | None = None) -> ET.Element:
+        wanted = label_set(label)
+        return self.wait(lambda nodes: next((node for node in nodes if self.label(node) in wanted and (clickable is None or (node.get("clickable") == "true") == clickable)), None), f"label {wanted}")
 
     def tap(self, node: ET.Element) -> None:
         left, top, right, bottom = self.bounds(node)
@@ -237,17 +252,18 @@ class Probe:
     def tap_resource(self, resource: str) -> None:
         self.tap(self.wait_resource(resource, clickable=True))
 
-    def tap_label(self, label: str) -> None:
+    def tap_label(self, label: "str | tuple[str, str]") -> None:
         self.tap(self.wait_label(label, clickable=True))
 
-    def select_tab(self, label: str) -> None:
+    def select_tab(self, label: "str | tuple[str, str]") -> None:
         """Select a root tab and wait for its accessibility selected state."""
+        wanted = label_set(label)
         for _ in range(3):
             selected = next(
                 (
                     node
                     for node in self.nodes()
-                    if self.label(node) == label
+                    if self.label(node) in wanted
                     and node.get("clickable") == "true"
                     and node.get("selected") == "true"
                 ),
@@ -342,29 +358,29 @@ class Probe:
         time.sleep(1.5)
 
     def first_use(self) -> None:
-        self.wait_label("同意并联网", clickable=True)
+        self.wait_label(T('同意并联网','Agree and connect'), clickable=True)
         self.record("first-use-before")
-        self.tap_label("同意并联网")
-        self.wait_label("先离线使用", clickable=True)
+        self.tap_label(T('同意并联网','Agree and connect'))
+        self.wait_label(T('先离线使用','Use offline for now'), clickable=True)
         self.record("first-use-after-consent")
-        self.tap_label("先离线使用")
-        self.wait_label("任务", clickable=True)
+        self.tap_label(T('先离线使用','Use offline for now'))
+        self.wait_label(T('任务','Tasks'), clickable=True)
 
     def create_task(self, title: str) -> str:
         print(f"[qa] create {title}", flush=True)
-        self.tap_label("新建任务")
+        self.tap_label(T('新建任务','New task'))
         field = self.wait_resource("capture-input")
         self.tap(field)
         self.type_ascii(title)
-        self.tap(self.wait_label("添加", clickable=True))
-        row = self.wait(lambda nodes: next((node for node in nodes if node.get("resource-id", "").find("task-row-") >= 0 and self.label(node) == f"打开任务：{title}"), None), f"task row {title}")
+        self.tap(self.wait_label(T('添加','Add'), clickable=True))
+        row = self.wait(lambda nodes: next((node for node in nodes if node.get("resource-id", "").find("task-row-") >= 0 and self.label(node) in (f'打开任务：{title}', f'Open task: {title}')), None), f"task row {title}")
         resource = row.get("resource-id", "")
         marker = "task-row-"
         return resource[resource.rfind(marker) + len(marker):]
 
     def open_assistant(self) -> None:
         print("[qa] open assistant", flush=True)
-        self.tap_label("我的")
+        self.tap_label(T('我的','Profile'))
         self.wait_resource("profile-entry-settings", clickable=True)
         for _ in range(5):
             if self.current_resource("profile-entry-assistant", clickable=True) is not None:
@@ -396,17 +412,18 @@ class Probe:
             self.tap(first)
         self.wait_resource("assistant-confirm-proposal", clickable=True)
 
-    def confirm_tool(self, name: str, before: dict[str, Any], expected_text: str, forbidden_text: str | None = None) -> dict[str, Any]:
+    def confirm_tool(self, name: str, before: dict[str, Any], expected_text: "str | tuple[str, str]", forbidden_text: str | None = None) -> dict[str, Any]:
         labels = [self.label(node) for node in self.nodes()]
-        if not any(expected_text in label for label in labels):
-            raise ProbeError(f"proposal for {name} did not contain {expected_text!r}; labels={labels[-60:]!r}")
+        wanted = label_set(expected_text)
+        if not any(any(frag in label for label in labels) for frag in wanted):
+            raise ProbeError(f"proposal for {name} did not contain any of {wanted!r}; labels={labels[-60:]!r}")
         if forbidden_text is not None and any(forbidden_text in label for label in labels):
             raise ProbeError(f"proposal for {name} contained forbidden raw value {forbidden_text!r}")
         self.record(f"{name}-proposal", before=before, expectedText=expected_text)
         if self.op_snapshot()["opCount"] != before["opCount"]:
             raise ProbeError(f"proposal {name} changed op-log before confirmation")
         self.tap_resource("assistant-confirm-proposal")
-        self.wait_label("已执行")
+        self.wait_label(T('已执行','Done'))
         deadline = time.monotonic() + self.timeout
         after = self.op_snapshot()
         while time.monotonic() < deadline and after["opCount"] < before["opCount"] + 1:
@@ -427,7 +444,7 @@ class Probe:
         print("[qa] patch fixture", flush=True)
         self.patch_fixture()
         self.launch()
-        self.wait_label("任务", clickable=True)
+        self.wait_label(T('任务','Tasks'), clickable=True)
         stamp = str(int(time.time()))
         task_a = f"AndroidAtomicA{stamp}"
         task_b = f"AndroidAtomicB{stamp}"
@@ -441,7 +458,7 @@ class Probe:
         self.send_tool("append_task_checklist", {"taskId": task_a_id, "items": ["Check login"]})
         after_checklist = self.confirm_tool("append-checklist", before, "Check login")
         self.send_tool("set_task_priorities", {"entries": [{"taskId": task_a_id, "priority": "high"}, {"taskId": task_b_id, "priority": "low"}]})
-        after_priority = self.confirm_tool("batch-priority", after_checklist, "高")
+        after_priority = self.confirm_tool("batch-priority", after_checklist, T('高','High'))
         self.send_tool("set_task_estimate", {"taskId": task_a_id, "minutes": 999})
         after_estimate = self.confirm_tool("estimate-normalized", after_priority, "480", "999")
 
@@ -455,10 +472,10 @@ class Probe:
         # The assistant is a pushed profile route.  Pop it first; changing the
         # root tab underneath a pushed route leaves the assistant visible and
         # makes the tab switch look successful only in accessibility state.
-        self.tap_label("返回")
+        self.tap_label(T('返回','Back'))
         self.wait_resource("profile-entry-settings", clickable=True)
-        self.select_tab("任务")
-        self.select_tab("我的")
+        self.select_tab(T('任务','Tasks'))
+        self.select_tab(T('我的','Profile'))
         self.wait_resource("profile-entry-settings", clickable=True)
         for _ in range(5):
             if self.current_resource("profile-entry-assistant", clickable=True) is not None:
@@ -482,6 +499,9 @@ class Probe:
 
         update_outcome = self.wait(proposal_or_auto, "multi-field update proposal or execution")
         if isinstance(update_outcome, ET.Element):
+            # "更新" 不是界面定位符，而是**助手提案卡自己产出的文本**（`packages/i18n` 里没有渲染成
+            # 「更新」的那一条，英文侧也不存在对应片段），所以它**不进** T() 双语形状：把它做成
+            # 双语会允许英文片段命中，而那条片段这个 fixture 从来不产出 —— 断言会被悄悄放宽。
             after_update = self.confirm_tool("multi-field-update", before_update, "更新")
         else:
             after_update = self.op_snapshot()
