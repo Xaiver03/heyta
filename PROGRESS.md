@@ -2528,3 +2528,19 @@ AC 现量：**未勾 8 / 已勾 0**。
    一次 `pnpm exec vitest run` 被内存闸门拒绝（轻量档 2/2 被别人占），按纪律不 kill 任何东西、有界重试后取到读数。
 6. **仍不勾 AC-3**：射程是传输层 + 真服务端 + 两条真宿主本地库，四端壳/界面层（T5、AC-6）不在这一格，
    且这一趟跑在共享主检出（T7 的合并态门禁从没跑过）。`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` = 0。
+7. **入库（13:4x，只本地、未 push）**：临时索引 plumbing 一笔 `0eea4c0f`，父 `9fccc26c`；
+   `git show --name-only --format= HEAD | grep -c .` = **10**，全部在白名单内。
+   `update-ref` 后共享索引出现 10 枚幻影（HEAD 动了、索引没动，见 **B125**），
+   按既有做法用 `git restore --staged -- <那 10 枚>` 消掉而不是 `git add`（后者读工作树，
+   可能把邻座同时写入的字节提走）：复量 `staged=0`、这 10 枚路径 `git status --porcelain` 为空
+   ⇒ 上面那些单测/typecheck 的字节就是 HEAD 的字节，不需要重跑一遍才算"对着 HEAD 复跑"。
+   提交后再跑 `verify-inbound-producer-seam.py`：rc=0，`在册文件=76 相对导入=216 模块在 HEAD=215 新缝=0 新模块缝=0`
+   （入库前同一把尺是 74/210/209）—— 这三格把"三枚载体第一次在册"量成了读数，不是叙述。
+   两枚共享台账各只有**一枚尾部 hunk、零删除行**（`git diff --numstat HEAD` = 89/0 与 30/0），
+   所以那两枚文件里没有别人的在飞内容被我带走。
+8. 完成条件里"非白名单 porcelain 条目数与开工快照相同"那一格**没有数字基线可对**：
+   任务 0 没把这枚数记成数字（这是我的记录缺口，不推给别人）。可用的等价陈述是
+   "本线每一笔提交的文件集都在白名单内"，逐笔现量：
+   `git show --name-only --format= <这笔> | grep -vcE '^(packages/app-host/(src|tests)/inbound-|server/tests/|research/tools/verify-inbound-|docs/plans/inbound-automation\.md|PROGRESS\.md|BLOCKED\.md)'`
+   = 0。本轮现量 `TOTAL=2576 白名单内=18 非白名单=2558`，其中"白名单内"那 18 枚是**别人**在白名单地界里
+   正在写的文件（例如 `server/tests/integration/registration-otp.integration.spec.ts`，10-07 起未跟踪，不是本线的，没提）。
