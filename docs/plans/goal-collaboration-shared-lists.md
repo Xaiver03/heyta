@@ -1,6 +1,6 @@
 # Goal：共享清单（多人协作）—— 试实施（W0 + W1）
 
-> 状态：🟡 **本地成笔（2026-10-11），全链门禁被别线绊线挡着、push 押在跨线协调** —— W0+W1 ✅ / W2 服务端核心 ✅ / W3 纯层+格式统一 ✅ / 法务 ✅ / W4 已接线、W6 已落地、journey 全绿且链接落点断言已补（`RESULT=OK steps=3`）/ **④ 门禁：`pnpm -r typecheck` 全仓绿 + 本线两枚红（`check:layering`、`check:ui-language`）当场修绿；no-bail 全量 test 已做对数审计（**条数不写在这里，会漂**；现量：逐包 `Tests` 汇总行相加，并核「有 test 脚本的包数 == 打了汇总行的包数」），本线自己那枚下游红（landing `mockup-shell-shape` #7，因 a923f7fa 给页头加了 `share-open-button`）本会话当场修绿销账；整链仍红在三枚别线判断绊线**（`packages/ai`「分母 9→10」= 给 COMMENT 配不配 AI 工具的产品判断；`shared-schema` `AUTH_PASSWORD_PATHS` 9→12 = auth 线口径；`domain subscription.spec` 权益拒绝理由契约 = 计费线，**都不代改**）+ 一枚先前登记的载体抖动（`mobile` Rolldown `RTEST-UNHANDLED-01`）本轮**不摘层重跑未复现**（958 全过、rc=0），已从本线边界里销掉；全量 test 的对数审计分母**含 `server`** —— AGENTS §6 那句"沙箱跑不了 sync-server"是瞬时属性，沿用它会把自己的分母算错（→ §7 第 408 条）/ **⑤ 文档写回已按内容复账并补齐**（benchmark §2.6 的 6.1+6.7、matrix §6（6.2/6.3 按现量更正为「已建模≠可达」）、**roadmap.md 新增 §1.3 并行轨道**、**docs/plans/README.md 索引行**、AGENTS §9、P2-10，均带边界如实登记）/ **⑥ 本线已本地提交（见交接·三），push 未独做**（本地 main 领先 origin 的笔多为别线未公开，`git push` 会一起公开）/ 两个 B 类停止点待产品负责人裁决。逐项读数与执行序见文末「2026-10-11 交接·三」；每步现量——共享检出在动。DoD 全清单见 [collaboration-shared-lists.md](collaboration-shared-lists.md) §7。
+> 状态：🟡 **本地成笔（2026-10-11），全链门禁被别线绊线挡着、push 押在跨线协调** —— W0+W1 ✅ / W2 服务端核心 ✅ / W3 纯层+格式统一 ✅ / 法务 ✅ / W4 已接线、W6 已落地、journey 全绿且链接落点断言已补（`RESULT=OK steps=3`）/ **④ 门禁：`pnpm -r typecheck` 全仓绿 + 本线两枚红（`check:layering`、`check:ui-language`）当场修绿；no-bail 全量 test 已做对数审计（**条数不写在这里，会漂**；现量：逐包 `Tests` 汇总行相加，并核「有 test 脚本的包数 == 打了汇总行的包数」），本线自己那枚下游红（landing `mockup-shell-shape` #7，因 a923f7fa 给页头加了 `share-open-button`）本会话当场修绿销账；整链仍红在三枚别线判断绊线**（`packages/ai`「分母 9→10」= 给 COMMENT 配不配 AI 工具的产品判断；`shared-schema` `AUTH_PASSWORD_PATHS` 9→12 = auth 线口径；`domain subscription.spec` 权益拒绝理由契约 = 计费线，**都不代改**）+ 一枚先前登记的载体抖动（`mobile` Rolldown `RTEST-UNHANDLED-01`）本轮**不摘层重跑未复现**（958 全过、rc=0），已从本线边界里销掉；全量 test 的对数审计分母**含 `server`** —— AGENTS §6 那句"沙箱跑不了 sync-server"是瞬时属性，沿用它会把自己的分母算错（→ §7 第 408 条）/ **⑤ 文档写回已按内容复账并补齐**（benchmark §2.6 的 6.1+6.7、matrix §6（6.2/6.3 按现量更正为「已建模≠可达」）、**roadmap.md 新增 §1.3 并行轨道**、**docs/plans/README.md 索引行**、AGENTS §9、P2-10，均带边界如实登记）/ **⑥ 本线已本地提交（见交接·三），push 未独做**（本地 main 领先 origin 的笔多为别线未公开，`git push` 会一起公开）/ **停止点 ①（同意面视觉层级）已于 2026-10-12 按最佳实践落地并配 8 条判据 + 六臂变异**（见文末那一节），②（owner 转让语义）仍待产品负责人追认。逐项读数与执行序见文末「2026-10-11 交接·三」；每步现量——共享检出在动。DoD 全清单见 [collaboration-shared-lists.md](collaboration-shared-lists.md) §7。
 > 权威计划：[collaboration-shared-lists.md](collaboration-shared-lists.md)（W0–W6 全量分期、判据、验证矩阵、边界登记）
 > 决策：[ADR-0062](../adr/0062-shared-list-key-distribution.md)（密钥分发型协作；聚合型红线不动）
 > 证据层：[共享清单调研](../research/collaboration-shared-lists.md)
@@ -656,7 +656,56 @@ package.json   (只加了一行 verify:collab-journey)
 | `pnpm check` 整链绿 | 别线：AI 工具线（`packages/ai` 分母 + `capability-manifest.generated.ts` 已在他们工作树里被改）、auth 线（`AUTH_PASSWORD_PATHS` 词表）、计费线（权益拒绝理由契约）；`check:reachability` 归 COMMENT 的归属方（产品体验线） | `pnpm check 2>&1 \| sed -E 's/\x1b\[[0-9;]*[a-zA-Z]//g'` —— 先剥 ANSI 再数红（§7 第 163 条：不剥会把红报成 0 条），且**不许接 `head`**（红集要整份拿） | 那四枚红**由他们改口径**；本线代改判据口径属越界（记忆红线：判据口径永不代改） |
 | `pnpm reinstall:all` 四端 | 产品负责人（设备面 + 不抢前台） | `pnpm reinstall:all` | AGENTS §6.1.1：每端一条「远端字节 == 本地工作树」，任一端红整体红、不静默跳过。链可用性已被别线 `92fcff44` 实测，缺的只是设备面同时空 |
 | push 到 `origin/main` | 产品负责人 或 各线各自从自己机器推 | `git rev-list --count refs/remotes/origin/main..HEAD` 现量领先枚数，再 `git --no-pager log refs/remotes/origin/main..HEAD --format='%s' \| sed -E 's/^[a-z]+[（(]([^)）]*).*/\1/' \| sort \| uniq -c` **按线分类** | 只有当领先集里**只剩本线的笔**，或他明确说"整条 main 一起推"，才动。不 force、不 `--no-verify`（pre-push 有外部 bytearm） |
-| 两个 B 类停止点 | 产品负责人（① 涉对外法律表征，② 涉服务端事务形状） | 读第 5 步那两段 + `packages/ui/src/sync/ShareConsentModal.tsx`、`server/src/shares/share.routes.ts` 的 `transfer` 事务 | ① 待拍的是**视觉层级**，不是"控件坏了"（三个控件都是真 `Pressable`）；② 追认现语义或改可撤销/延时/先接受 |
+| 停止点 ②（owner 转让语义） | 产品负责人（改语义要动服务端事务形状） | 读第 5 步那两段 + `server/src/shares/share.routes.ts` 的 `transfer` 事务 | 追认现语义（两步确认、立即生效、原 owner 降 editor、三写同事务）或改可撤销/延时/先接受。⚠️ **① 已从这张表划掉**：2026-10-12 产品负责人授权后按最佳实践落地，见文末「2026-10-12」那一节 |
 
 🔴 **给下一个 AI 的一条**：这四格里**没有一格是"本线忘了做"**。把任何一格重新登记成待办去推动，
 就等于让这条线再排一次已经在别人手里的队 —— 想动之前先跑上面那列命令，看输入是不是真变了。
+
+## 2026-10-12（停止点 ① 按最佳实践落地：同意面不再等权）
+
+触发是产品负责人一句「你来按照最佳实践来排版，并且改掉就行」⇒ ① 从"待拍"变成本线的实施项。
+**②（owner 转让语义）仍在他的格子里**，本轮没碰服务端。
+
+**改了什么**（`packages/ui/src/sync/ShareConsentModal.tsx`；行为与状态机零改动，只多一个可选 prop `titleHidden`）：
+
+| 面 | 之前 | 现在 | 依据 |
+|---|---|---|---|
+| 主按钮「确认共享」 | 与取消同权重（无底色） | 实心 `color.primary` + `on-primary` 文字，按压走 `color.primary-active` | 同层 `AuthForm.primary` / `primaryPressed` 那一套（不新造一套按钮语言） |
+| 取消 | 同上 | 文字按钮，**没有**底色声明 | 同意面里"拒绝"不该长得像第二个主操作 |
+| 三行同意范围 | 三行裸文本带 `·` | 一块 `surface-sunken` 披露面，逐条一行、正文级字号 | 它是同意的**内容**，不该比说明文字小一档 |
+| 「不再提示」 | 只有文字 | `size.checkbox` 方框 + 选中态实心主蓝 + `Check` 图标 + 平铺 `aria-checked` | 状态不靠单一颜色承载（WCAG 1.4.1） |
+| 标题 | 与宿主对话框 `<h2>` 同文重复（中：共享清单／共享清单；英：Share list／Shared list） | 宿主传 `titleHidden` ⇒ 同屏只出现一次 | 一屏两个同名标题等于没有标题 |
+| 命中区 | 无 `minHeight` | 两颗按钮与勾选行都吃 `touch-target.min`（44） | AGENTS §5 可访问性下限 |
+
+**刻意没做的一件事，带读数**：披露面**不描边**。`color.border-subtle` 在亮色档与 `surface-sunken` 是**同一枚** slate-100（比 1.0），换成 `color.border`（slate-200）也只有 **1.13** ⇒ 画上去是一道看不见的线，比不画更容易被读成"渲染坏了"。这块面靠底色凹陷与外部分隔。
+
+**对比度**（两档 × 五对，按 WCAG 公式对**实际解析出的十六进制**现算，不是引用文档里那句"4.5:1"）：
+亮 16.3 / 7.58 / 5.17 / 17.85 / 4.34（项目符号按图形 3.0 判）；暗 17.62 / 11.21 / 7.93 / 15.2 / 7.53
+⇒ 全部过 AA（正文 4.5、图形 3.0）。
+
+**判据**：新增 `apps/web/tests/share-consent-modal-theme.spec.tsx` 8 条（暗 5 + 亮 1 + 标题 2）。
+六臂变异逐臂读数：A 取消也画实心→2 红；B 主按钮换一枚蓝→2 红；C 披露面退平→1 红；D 摘掉 `titleHidden`→1 红；
+E 勾选后不切实心→1 红；F 主按钮文字配对坏→1 红。还原后**两层各验一次**：源码 `cmp` 与备份相同，
+产物指纹 `grep -c 'styles2.checkboxOn : null' packages/ui/dist/index.js` = 3、臂形状 = 0。
+⚠️ 为什么这里不用 `getComputedStyle`、为什么只认 `r-` 原子类、为什么按 `border-color` 读永远是空
+→ §7 第 **411** 条（三个都是本轮实测，每一个的症状都是"用例红了而产品是对的"）。
+
+**e2e 侧也钉了一层**：`e2e/tests/collab-journey.spec.ts` 在点确认之前，让浏览器自己算一次
+"确认按钮的计算底色 == 页面 `--ht-color-primary`、取消 != 它"。判的是**不等权**，不是"有没有 class"。
+
+**暗色为什么没有截图**：旅程里试过补一张 —— `emulateMedia({ colorScheme: 'dark' })` 之后截出来与亮色
+**md5 逐字节相同**（→ §7 第 **409** 条）。web 的暗色开关只改 `<html data-theme>`，而共享层的颜色来自开机时
+解析完的那张表；要真变暗必须重载，而重载会打断这条旅程的解锁态。所以暗色由上面那棵树**在暗色 token 表下渲染**来判。
+
+**读数**：`packages/ui` 44 文件 / 665 通过 rc=0；`apps/web` 全套 174 文件 / 2230 通过 / 13 跳过 rc=0；
+`pnpm verify:collab-journey` `RESULT=OK steps=3` rc=0，02 号图**人打开看过**（同屏只有一处「共享清单」标题、
+主按钮实心蓝、勾选框是看得见的空方框）；静态门 `check:design` / `check:ui-language` / `check:layering` /
+`check:rn-aria` / `check:tokens` 各 rc=0。
+
+🔴 **一枚别线红灯如实记，不代改**：`pnpm --filter @heyta/ui --filter @heyta/web typecheck` rc=2，
+唯一错误在**未跟踪**文件 `apps/web/tests/inbound-panel-layout.spec.tsx:66`
+（`HTMLElement | null` 喂给 `HTMLElement | undefined`，自动收集线在途的夹具文件，`git status` 现量是 `??`）
+⇒ 本线四份文件（组件 / 宿主 / 新用例 / 旅程）在同一趟 tsc 里零错误。它被别线修掉之前，全仓 typecheck 这一格不算绿。
+
+**本轮之后仍然开着的**：② owner 转让语义追认；四端重装（等四端设备面同时空 + 他不被叫醒）；
+`pnpm check` 整链仍挡在那四枚别线绊线上。
