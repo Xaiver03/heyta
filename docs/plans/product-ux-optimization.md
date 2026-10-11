@@ -2144,13 +2144,14 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
   两腿卡在**同一枚外部前提**上，19:31 重装之后又现量过一次：`ssh windows-pc` → `Host is down`、`ssh windows-pc-lan` → `192.168.1.2:22 Connection refused`。⇒ 这是打包机不在网上，不是判据缺口。
   - 🔴→✅ **ios**：第一次红在 `PrecompileModule …/ExplicitPrecompiledModules/Dispatch-….scan`；第二次**同一条命令**（`--only ios`，趟号 r78，19:51–19:56）整条过了：`构建成功` → `已安装进模拟器（全新安装）` → `已装的包比源码新 —— 这一轮装的是当前产物` → `窗口 1206x2622、内容占比 58.8%、主蓝命中 4091`。**第一次那枚红不是产品**，成因见下面那条载体撞车。
   ⚠️ **iOS 这一格只能记成"判据过了、图丢了"**：截图落在写死的 `/tmp/heyta-reinstall-ios.png`，20:41 被**另一条会话**的同一步骤覆盖 ⇒ 现在那份是 `2007x2853`、本仓自己的尺量出 `looksBlank=true`、`brandBlue=0`，与 r78 报的 `1206x2622` 尺寸都不等 ⇒ 不是同一张。**没有把别人那张黑图当自己的证据入库**（拷来后现量否证，随即删掉拷贝）。
+  ✅ **10-11 12:3x 这一格补上了（趟号 r87）**：先把落点修掉（见下面「载体撞车」那格的下半场），再**当场**从私有落点拷进库、两侧 `shasum -a 256` 逐字相同 ⇒ `apps/mobile/evidence/reinstall-20261011-1230-ios-installed.png` + 同戳 `.txt`（自述：树 `a195a37f` / 装置 `63f93a90` / 窗口 `1206x2622` / 内容 `58.8%` / 主蓝 `4091` / 新鲜度判据过）。图**人打开看过**：浅色中文首屏「在使用联网功能之前」同意卡、两条要点、`服务条款` 与 `隐私政策` 两条链接在位、主蓝实心「同意并联网」+ 无底框「只用本机」⇒ 与 r85/r86 那两趟 Android 首屏同一面卡，不是 §7 第 82 条那种"有标题有正文的错误屏"。
 - 🔴 **载体撞车（同一族缺陷第三次露面，这次是它吃掉了我自己的现场）**：`scripts/reinstall-all.sh` 把 iOS 那腿的**派生数据目录、日志、截图**全写成固定 `/tmp` 路径（`rm -rf /tmp/heyta-ios-release`、`>/tmp/heyta-reinstall-ios-build.log`、`IOS_SHOT=/tmp/heyta-reinstall-ios.png`），而仓库 2026-10 起的固定做法是**在隔离检出里跑四端重装** ⇒ 两条会话同时跑必然互相覆盖。三条现量证据：① 我 19:23 结束运行，而 `/tmp/heyta-reinstall-ios-build.log` 在 19:28:58 的内容全是 `…/heyta/.worktrees/iosacct/…` 的路径；② `/tmp/heyta-reinstall-build.log` 停在 19:30:57（我的那次早已写完）；③ 上面那条 20:41 的截图覆盖。**同族缺陷 mac 段 2026-10-04 已经修过一次**（脚本里 `HEYTA_MACOS_DIST_DIR` 那段注释原话："以前是**写死的**，而它下面第一句就是 `rm -rf`…会把**别人的现场**整个删掉"），iOS / windows / android 三段没跟上。**本轮没有代改**：改的是别人也在跑的重装装置，20:41 刚被另一条会话写过 ⇒ 按边界只登记。给下一个人的修法：三处固定路径各加一枚**带默认值**的旋钮（默认值逐字不变），或直接从 `$(basename "$ROOT")` 派生。
 - ✅ **#34 的探针改进做了两枚**（`scripts/qa/macos-installed-widget-help.sh`，两臂都现量）：
   1. **按 pid 锁死寻址**（`HEYTA_MAC_PID`）：同一台机器上可以有两个 `HeytaMac`（重装时旧实例不自己退，macOS 关掉最后一个窗口后进程照样活着），按名字的寻址会让 System Events 自己挑一个。给了 pid 就先验那个 pid 确实是 `HeytaMac`（`pid 999999 不是 HeytaMac` rc=4、非数字 rc=4 都试过），不给时**逐字**走原来的按名字路径。
   2. **窗口数为 0 不再一律判成"没有窗口"**：交叉问一次窗口服务器（`apps/desktop-macos/scripts/window-id.swift --pid`），两种成因分开报。实测 pid 43300：`AX count of windows = 0` 而窗口服务器有 `38031 heyta heyta 1159x754` ⇒ 新走 `REASON=AX 报 0 个窗口，但窗口服务器看得见 pid … 的窗口` + `CAUSE=该实例没被激活过` + `NEXT=…`；反臂（让交叉核对取不到东西）落回原文案 `在跑但一个窗口都没有`。**这就是 §7 元规则第 1 条"先怀疑探针"的一次正面执行**：旧文案会把人支去查"窗口为什么没打开"，而真前提是"这枚探针必须跑在**前台**实例上"。
   🔴 **所以 #34 这一格不能靠脚本自己关掉**：2026-10-08 那趟绿证（`apps/desktop-macos/evidence/ux-round8/b4-installed-widget-help-ax.md`）把前置写得很清楚——`open -a /Applications/Heyta.app` **把 Heyta 带到了前台**。要么负责人点头允许一次前台激活（几秒），要么这格永远停在"探针未闭合"。**我不擅自抢焦点**（AGENTS §6.2 规定二）。
   顺带修掉探针里一处**会抢焦点**的写法：点之前那次"读浏览器当前 URL"直接 `tell application "Safari" to …`，而 **Safari 没在跑时 AppleScript 会把它启动并带到前台**。改成先问 `application "Safari" is running`（Standard Additions 的谓词，不会启动冷浏览器）。实测：谓词返回 `SAFARI_COLD` 之后 `pgrep -x Safari` 仍为空。
-  ⏳ **仍开着的**：iOS 那张图（要取就得连判据一起重跑一趟，而 `/tmp/heyta-reinstall-ios.png` 会被下一条会话再覆盖 ⇒ 得先把上面那枚旋钮补上）；`check:macos-window` 的 `ScreenCaptureKit 未授权` 那一格仍要负责人在系统设置里点一次。
+  ✅ **iOS 那张图已补回**（r87，见上面「判据过了、图丢了」那一格的更正）；⏳ 仍开着的只剩 `check:macos-window` 的 `ScreenCaptureKit 未授权` 那一格 —— 而且它的成因**已被下面那格改判**（不是"必须负责人点系统设置"那一格，dev 构建与安装副本是两枚不同的代码身份）。
 - ✅ **#30 关掉：三种形状现在各有各的读数**（10-10 23:0x，趟号 r80）。
   - **iOS 的"命中"这一支第一次在真设备上取到**：r78 的 iOS 重装把 `com.heyta` 先 `simctl uninstall` 再装 ⇒ 首屏就是联网同意卡，`scripts/qa/profile-settings-ios.py` 这一趟**真的走到了那条岔路**：报告第 1、2 步是 `choose local-only privacy`（`target=只用本机`、`targetFrame=[205,598,161,44]`）与 `choose offline`（`target=先离线使用`、`targetFrame=[16,517,370,44]`），各自带 `beforeLabels` ⇒ "点了"与"没命中"在报告里是**两种不同的形状**，这一格从此不再只有 `875b5a7f` 那三臂离线证撑着。整趟 **24 步 `passed`**，五分组那步 `expected` 与 `labels` 逐字对得上（`常规/同步与隐私/AI 与集成/数据管理/账号安全`），5 张图入库 `apps/mobile/evidence/profile-center/ios-r78-currentproduct/`。
   - 🔴 **顺带把 iOS 端"当前产物"这一格填上**：这趟跑的是 r78 从 `a195a37f` 打出的 Release（判据 `已装的包比源码新`），**不是** Android 那三份 10-09 旧 APK 的处境。
@@ -2170,7 +2171,8 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
   - 🔴 **产物身份这次是逐字节对上的**：设备上 `base.apk` 的 sha256 与载体里 `apps/mobile/android/app/build/outputs/apk/release/app-release.apk` 的 sha256 是**同一个值** `2e559554ad372da3b273df388f0ef28e253fe01d074ca8b5446aba5fc43cd7dd` ⇒ 上面 r60–r65 那六趟的限定"装的是 10-09 旧产物"**对 Android 端作废**（旧读数留着，它们说的是当时那台设备上装的东西，不是现在）。
   - ✅ **顺手把 #30 的 Android"命中"那一支也关掉**：全新安装 ⇒ 首屏就是同意卡，r85 报告前两条 action 是**真点击** `只用本机 → 先离线使用`（各带 `destination` 与在场 `labels`），不再是 `skip:`。**没有动 `pm clear`** —— 清数据是 §6.1.1 重装流程自带的那一步，不是我另起的一次破坏动作（上一条登记的那条顾虑照旧成立：要单独清共享模拟器的数据仍然得先协调）。
   - ✅ **Android 当前产物上中英各一趟**：r85 `uiLocale=zh-CN` **22 步 passed**、r86 `--in-app-language=en` `uiLocale=en` **23 步 passed**，两份 `journey.json` 的 `artifact.sha256` 都等于上面那枚。人打开 `apps/mobile/evidence/profile-center/android-r86-currentproduct-en/language-panel-en.png` 看过：`General / Home screen widgets`（含 `1./2./3.` 那套添加步骤）`/ Language`（`English` 是主蓝实心 pill，`中文` 保持自己的写法）`/ Help and feedback`，那句 "This choice lasts for the current session only…" 也在画面上 ⇒ **产品自己的语言开关在真机上确实生效**，而设备语言全程没动。
-  - ⏳ **四端里仍有一格没闭合**：iOS 那腿的**截图**（判据过了、图被另一条会话在同一固定路径上覆盖，见上面「载体撞车」那格）。要补它得先把 `/tmp` 那三处固定路径改成带默认值的旋钮，否则重跑一次就被再覆盖一次。
+  - ✅ **四端现在四张图都在库里，每一张都是"当场从落点拷进来 + 两侧哈希对账"**：iOS 那一格由 r87 补回（`apps/mobile/evidence/reinstall-20261011-1230-ios-installed.png` + 同戳 `.txt`）。
+    补的前提正是把 `/tmp` 那三处固定路径换成带默认值的旋钮 ⇒ 上面「载体撞车」那一格从此不是"只登记"，而是**已修 + 被自己的消费者用了一次**。
   - ✅ **windows 与 android 两腿的图与读数同批**（都是当场从落点拷进库的，两张人都打开看过）：`apps/desktop-windows/evidence/reinstall-20261011-0014-windows-installed.png`（1152x587，装出来的 MSIX 里是真应用：收集箱 + rail + 头像菜单开着「登录账号 / 个人中心 / 应用设置」+ 联网同意卡）与同戳的 `…-install-capture.txt`（五条判据逐字在位：`ADD_APPX=OK`、`RESULT=OK`、`PAYLOAD_WEBDIST=True`、`M2D=OK`、`PAYLOAD_INDEX_SHA=D29906E44D91258B…` —— 与本地那枚 `d29906e44d91258b…` 是同一个值，这就是"远端装的字节 == 本地当前树"那条对账的落地形状）；`apps/mobile/evidence/reinstall-20261011-0020-android-installed.png`（浅色首屏同意卡，主蓝「同意并联网」）。
 - 🔴 **补跑途中照出另一枚 `pnpm check` 链上的红，不是本线造的，登记并交归属**（10-11 00:3x）：`pnpm check:image-license` **rc=1** —— `@noble/hashes 在两处声明了不同的范围（2.4.0 vs ^2.4.0，来自 sync-core）`。现量两处：`packages/inbound-core/package.json:23` 是 `"2.4.0"`（钉死），`packages/sync-core/package.json:33` 是 `"^2.4.0"`。
   **归因做过一次 A/B**：同一条命令在只含已提交内容的载体 `../heyta-wt-reinstall`（`a195a37f`）上**照样 rc=1** ⇒ 它早于本线今晚的改动，是 `main` 上的既有红，不是共享检出被谁写脏造成的假红。
@@ -2192,4 +2194,23 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
   ⚠️ 两处 `research/tools/b-window-keeper*.sh` 的**注释**里写着 `reinstall-all.sh:161` / `:183`，那一笔插了 24 行 ⇒ 又漂了；
     而且**本来就漂了约 22 行**（现量：`grep -n 'ALL="mac windows android ios"' -e '-r build >'`）。
     那是别人在飞的文件里的行号引用，本线不代改，只把"行号引用不可靠、要按符号 grep"留在这里。
-  - ⏳ 这一格的**下半场**（用私有落点补跑 ios 腿、把那张丢失的安装首屏图带哈希取回来）在同批的下一格。
+  - ✅ 这一格的**下半场也跑完了**（趟号 r87，12:23–12:29）：`HEYTA_REINSTALL_TMP_DIR` 指到 `~/heyta-carriers/tmp-ux-r87-<戳>/`，
+    ios 腿整条过（`全仓构建完成` → `沙盒已同步` → `构建成功` → `全新安装` → `已装的包比源码新` → `窗口 1206x2622、内容占比 58.8%、主蓝命中 4091` → 汇总 `✅ ios`，整条 `rc=0`）。
+    🔴 **这一趟本身就是那枚旋钮的消费者**（不是"加了个默认等于原值的开关就算完"）：派生数据目录、`pod` 日志、构建日志、截图**全部**落在私有目录里，
+    共享 `/tmp` 那四个路径这一趟**一个都没写** —— 也就是说下一次别的会话再跑 ios 腿，两边互不吃图。取证与读数的落点见上面 r87 那一格。
+- 🔴 **改判一格：`#34` 那句"只能靠负责人点头允许一次前台激活"是我把通道想窄了**（10-11 12:3x 现量）。
+  壳里**早就有**一条不经 AX、也不需要激活的后台取证通道：`HEYTA_M2_EVIDENCE=<前缀>` 时，壳自己用 `evaluateJavaScript` 点头像、读菜单第一项的 testID、再进设置找导入面板，
+  把结论写进 `<前缀>.txt`（`HeytaMacApp.swift` 的 `openAccountMenuProbe` / `writeWebEvidence`，与 Windows 侧那句 `M2D=OK` 是**同一形状**）。
+  现量（`HEYTA_NO_FOCUS=1` 后台启动 `/Applications/Heyta.app`，24 秒后**只终止我自己那一发 pid**）：
+  `M2_MACOS_NOTE=✅ 身份入口成立（头像 1 个、采集框 1 个）；身份菜单合规（第一项 sync-signin-entry、登录入口 1 个、退出登录 0 个）；设置里的滴答导入面板可达（panel=1 file=1）`，
+  同批还带 `STORAGE_HOST=on / STORAGE=shell / PAGE_ORIGIN=heyta-local://app / SECURE_CONTEXT=yes / WEBAUTHN=function / AUTH_STATE=signed-out`。
+  ⇒ 三件事分开算，别顺着发现往下编：
+  ① **"身份入口 / 身份菜单 / 设置导入面板"这一类壳级判据从此不需要前台** —— 昨天那句"要么抢焦点、要么这格永远停着"是过头话；
+     成因还是那条老形状：我只查了**我正在用的那枚探针**（AX），没查被测对象自己有没有别的通道（AGENTS §7 元规则一，本线这一轮又一次命中自己）。
+  ② `check:macos-window` 那枚 `ScreenCaptureKit 未授权` 的成因要按这条**重读**：dev 构建与安装副本是**两枚不同的代码身份**，
+     而安装副本 19:16（r77 自截屏）与刚才这一次都取到了东西 ⇒ "缺授权"至少不适用于安装副本，那一格的红更像 dev 构建那一枚。
+  ③ 🔴 **但 `#34` 没有整格关掉**：那枚 AX 探针要读的是**小组件安装说明的环境识别 + 外链交给浏览器**这两样，
+     壳的 JS 通道**现在没有**这两步（它只走到头像菜单与设置导入面板为止）。闭它两条路：给壳再加一条 env 门控的诊断探针（Swift 侧改动 + 重打包，本线能做，排在下一轮），
+     或允许一次前台激活去跑 AX（与 §6.2 规定二冲突，不代拍）。
+  ⚠️ 这一发的**批次归属必须限定**：`/Applications/Heyta.app` 的 mtime 是 10-11 12:00、由**另一条会话**重装 ⇒ 本线不据它主张"当前源码的壳级读数"，
+     它证的是"这条后台通道存在、且能在不抢焦点的情况下把那三项读出来"。

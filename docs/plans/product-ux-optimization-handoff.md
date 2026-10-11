@@ -1,6 +1,6 @@
 # 交接：产品体验线（本轮 UX 优化 Goal）
 
-> 状态：**本轮目标五步都交完，剩四格各有归属，全部只在本地、未 push。**（2026-10-11 收）
+> 状态：**本轮目标五步都交完，四端图与判据齐了；剩三格各有归属，全部只在本地、未 push。**（2026-10-11 12:3x 更新）
 > 本文件只记「现在停在哪、下一步按什么顺序做、哪些手别再碰」。
 > 🔴 **逐格读数与判据形状的事实源**是 [`product-ux-optimization.md`](product-ux-optimization.md) 文末那一串台账格子
 > （取最新几格：`tail -60 docs/plans/product-ux-optimization.md`）。这里**不复制数字** —— 抄件一定会漂。
@@ -65,8 +65,8 @@ df -h /System/Volumes/Data                              # 要不要新开一棵�
 
 | # | 欠的那一格 | 在谁手里 | 一条复现/闭合命令 |
 |---|---|---|---|
-| 1 | iOS 重装后的首屏图（判据过了、图被另一条会话在同一固定路径上覆盖） | **本线自己**（缺的是装置，不是许可） | 先给 `/tmp` 落点加旋钮（第五节第 1 步），再 `IOS_DEVICE_NAME=heyta-iphone-17pro bash scripts/reinstall-all.sh --only ios` |
-| 2 | #34 macOS 壳级 AX 那一趟（三条新判据字段还没在真壳上读过） | **负责人**（两格都只有他点得动） | `HEYTA_MAC_PID=<pid> bash scripts/qa/macos-installed-widget-help.sh`；前置：一次前台激活（与 AGENTS §6.2 规定二冲突，不许我代拍）+ 给 `/Applications/Heyta.app` 那枚 bundle 在「隐私与安全性 → 屏幕录制」里授权 |
+| 1 | ~~iOS 重装后的首屏图~~ ✅ **已补回**（r87：`apps/mobile/evidence/reinstall-20261011-1230-ios-installed.png` + 同戳 `.txt`，两侧 sha256 对过、人看过） | 已闭合 | 重跑：`HEYTA_REINSTALL_TMP_DIR=<私有目录> IOS_DEVICE_NAME=heyta-iphone-17pro bash scripts/reinstall-all.sh --only ios` |
+| 2 | #34 macOS 壳级：**只剩两样**（小组件安装说明的环境识别、外链交给浏览器）——原先记的"身份入口/身份菜单/导入面板"三项**不需要前台也不需要 AX**，壳自己的 `HEYTA_M2_EVIDENCE` 通道在后台就报全了 | 那两样**本线能做**（给壳加一条 env 门控诊断探针 + 重打包）；跑 AX 那条路才需要负责人允许一次前台激活 | 后台三项现量：`HEYTA_NO_FOCUS=1 HEYTA_M2_EVIDENCE=<前缀> /Applications/Heyta.app/Contents/MacOS/HeytaMac &`（读 `<前缀>.txt`，只终止自己那发 pid）；AX 那条：`HEYTA_MAC_PID=<pid> bash scripts/qa/macos-installed-widget-help.sh` |
 | 3 | #28 定位符门按 pair 还是按 OR-set | **负责人一句话**（判据口径，按边界不代改） | `pnpm check:locator-labels` 现量它现在判的是哪种 |
 | 4 | #35 `check:shell-surfaces` 的 W5 产物比源码旧 | **apps/web 在飞那批的所有者** | `node scripts/check-shell-surfaces.mjs`（主检出红 / 干净载体不红 —— 差的就是那批未提交源码） |
 | 5 | #39 `check:image-license` rc=1（`@noble/hashes` 一处钉死、一处范围） | **`packages/inbound-core` 的所有者**（或运营侧统一 `resolutions`） | `pnpm check:image-license`；两枚声明的现量：`grep -n '@noble/hashes' packages/inbound-core/package.json packages/sync-core/package.json` |
@@ -77,7 +77,8 @@ df -h /System/Volumes/Data                              # 要不要新开一棵�
 
 ## 五、下一步（按顺序，每步都带"动手前先量"的前置）
 
-**1) 给 `scripts/reinstall-all.sh` 的固定 `/tmp` 落点加带默认值的旋钮。** 本轮已把前置量完了，别重新量：
+**1) ✅ 已做完（`63f93a90`）：`scripts/reinstall-all.sh` 的固定 `/tmp` 落点收成一枚 `HEYTA_REINSTALL_TMP_DIR`（默认 `/tmp`，13 枚路径派生）。**
+下面这些前置是当时量过的，留着给要改别处落点的人：
 
 - 成员清单现量：`grep -n '/tmp/heyta-reinstall\|/tmp/heyta-ios-release' scripts/reinstall-all.sh`（ ios 段的**派生数据目录 / 构建日志 / 截图**三处是要害，`rm -rf` 那一处最危险）。
 - **编辑正在运行的它，是安全的**：这份脚本自带 `HEYTA-SNAPSHOT-BOOTSTRAP`（现量 `grep -n HEYTA-SNAPSHOT-BOOTSTRAP scripts/reinstall-all.sh`），
@@ -95,17 +96,17 @@ df -h /System/Volumes/Data                              # 要不要新开一棵�
   ⇒ 插行不会打断任何可执行判据，但提交信息里要写明"行号引用又漂了 N 行"，别悄悄留下误导。
 - 改完的三把尺：`bash -n`、"默认值展开 == 旧字面量"的对照、"给了旋钮就变"的反臂。**能失败的检查才有价值**（AGENTS §8 第 3 条）。
 
-**2) 选载体。** 两条路，代价与读数含义不同，按你要证的事挑：
-- 复用 `../heyta-wt-reinstall`（现成 node_modules + Pods，快）⇒ 读数属于**它那一棵那一枚 commit** 的那一批，与已入库的 mac/windows/android 同一批；先跑第三节的 `pgrep`。
-- 新开一棵到**当前 HEAD**（`~/heyta-carriers/heyta-<线>-<mmdd>`，磁盘余量先 `df`）⇒ 证的是"最新源码"，但那张 iOS 图会和另外三端**不在同一批**，台账必须这样写。
+**2) ✅ 载体已选定并留下可复验的形状**：复用 `../heyta-wt-reinstall`（`a195a37f`，只含已提交内容），
+这样补出来的 iOS 图与已入库的 mac / windows / android 三张**同属一批**。
+装置用主检出新版**逐字复制**过去（`cmp` 报 SAME），而且先确认过 `git diff a195a37f HEAD -- scripts/reinstall-all.sh` **为空**
+⇒ 复制过去的只有我自己这一笔，没有夹带别线对同一枚脚本的改动。这一趟的读数因此要写成：**树 `a195a37f` + 装置 `63f93a90`**。
+（另一条路——新开一棵到当前 HEAD——本轮没走：那会让这张图与另三端不在同一批，台账就得写两批。）
 
-**3) 跑 ios 腿并把图坐实。** 关键不是"跑成功"，是**别再把图交回共享路径**：
-`HEYTA_REINSTALL_TMP_DIR=<私有落点> IOS_DEVICE_NAME=heyta-iphone-17pro bash scripts/reinstall-all.sh --only ios`
-当场做两件事：① 从落点**立刻**拷进 `apps/mobile/evidence/reinstall-<戳>-ios-installed.png` 并记 `shasum -a 256`；
-② 打开那张图**人看一眼**（AGENTS §6.2 规定一：截了 ≠ 看了）。判据继续用 `shot_ok`（非空白 + 主蓝命中），
-但**主蓝那张是 WebView 快照，不是窗口图** —— 窗口图不能当 UI 证据（#27 那一格的结论）。
+**3) ✅ 已做完（r87，12:23–12:29，整条 `rc=0`）**：ios 腿在私有落点上跑通，图当场拷进库、两侧 `shasum -a 256` 逐字相同，并**人打开看过**
+   （浅色中文首屏同意卡 + 主蓝「同意并联网」）。要点留给下一次：**先拷图再读判据**，别事后回落点取。
+   判据继续用 `shot_ok`（非空白 + 主蓝命中），而**主蓝那张是 WebView 快照，不是窗口图** —— 窗口图不能当 UI 证据（#27 那一格的结论）。
 
-**4) 就地更正台账里那三句"仍开着"**（iOS 图、`check:macos-window` 的 ScreenCaptureKit 未授权、"要取图就得先补旋钮"）。
+**4) ✅ 台账那三句"仍开着"已就地更正**（iOS 图、"要取图得先补旋钮"、"四端里仍有一格没闭合"），并新增一格把 `#34` 改判。
 🔴 别只在文末追加成功记录而留着旧句 —— 那会制造两套状态（AGENTS §8 第 8 条）。提交逐笔带明确 pathspec，
 新文件先 `git add`，提交后 `git show --name-only` 复验；不 push。文档门：`pnpm check:docs`、`check:md-tables`、
 `check:doc-citations`、`check:docs-voice`、`node research/tools/docs-link-check.mjs`。
