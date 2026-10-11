@@ -79,7 +79,19 @@ interface TaskState {
   /** 当前时间，供象限归类。显式存下来避免渲染间漂移。 */
   now: number;
   ready: boolean;
-  error?: string;
+  /**
+   * 最近一次**用户任务动作**的失败（封闭词表的码，不是文案）。
+   *
+   * 🔴 原来这个字段只有声明、没有任何一处写它，也没有任何一处读它 ——
+   * 于是 `void store.deleteTask(id)` 那批调用点把拒绝丢在地上，
+   * 用户看到的是"点了一下、什么都没发生"（布局审计 §8.2 第 12 条）。
+   *
+   * 写成**码**而不是句子，理由有两条：文案的唯一事实源是 `packages/i18n`
+   * （AGENTS §5），而 store 不是 React 组件、拿不到 `t()`；
+   * 更要紧的是**不许把内部错误原文渲染给用户**（同 `card-export` 那次更正）。
+   * 谁显示它：`features/tasks/TaskActionError.tsx`。
+   */
+  error?: TaskActionFailureCode;
 
   addTask: (title: string, over?: NewTaskFields) => Promise<void>;
   toggleComplete: (id: string) => Promise<void>;
@@ -196,9 +208,48 @@ export function __resetOpLogForTests(): void {
  * 是可以接受的，因为它只是**两个函数引用**，不含任何判断；
  * 一旦它开始包含判断（比如"离线时排队"），就该抽走。
  */
+/**
+ * 「用户发起的任务写入失败了」这一件事的**码**（封闭词表）。
+ *
+ * 只有一枚是刻意的：动作层抛出来的原因有很多种（引擎没初始化、实体不存在、
+ * 存储写不进去），但对用户来说症状是同一个 —— **这一步没生效**。
+ * 逐种原因各配一句界面文案会要求上游先把原因分类，而它现在分不出来；
+ * 把 `error.message` 原样贴到界面上则是把内部信息当文案（`card-export` 那次改过同样的错）。
+ */
+export type TaskActionFailureCode = 'write-failed';
+
+/**
+ * 🔴 失败要落到一个界面读得到的地方（布局审计 §8.2 第 12 条）。
+ *
+ * 挂在这里而不是逐条包那 ~30 个动作，是因为**每一条真正落库的写都必须穿过这两个口**
+ * （`dispatch` / `dispatchChecked`）：逐条包会漏、会把"哪些算用户意图"这个判断
+ * 写散，而新动作从 `app-host` 长出来时不会自带包装。
+ *
+ * 🔴 **这条线覆盖不到的那一格，如实记下**：动作层在**发 op 之前**的校验抛出
+ * （`actions.ts` 的 `setCompleted` / `rename` 那句 `找不到任务「…」`）不经过这里，
+ * 所以不会亮这一行。那种情况的症状本身是"这一条已经不在了"——
+ * 列表会在下一次物化时把它摘掉，界面给出的就是行消失了。
+ * 要把它也覆盖进来，得把这层包装从 dispatch 口移到 store 的动作对象上
+ * （`create()` 里那 30 个方法整体包一次），那是另一刀的半径。
+ *
+ * 记完照原样再抛 —— 上层（AI 提案、小组件 drain、导入）要的是**原始错误**，
+ * 不是被界面吞掉后的静默。
+ */
+async function withActionFailure<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    const value = await run();
+    // 成功要清掉上一条：不清的话，一次失败之后每次正常操作都还挂着"没保存成功"。
+    useTaskStore.setState({ error: undefined });
+    return value;
+  } catch (error) {
+    useTaskStore.setState({ error: 'write-failed' });
+    throw error;
+  }
+}
+
 const actionContext: ActionContext = {
-  dispatch: dispatchIntent,
-  dispatchChecked,
+  dispatch: (intent) => withActionFailure(() => dispatchIntent(intent)),
+  dispatchChecked: (build) => withActionFailure(() => dispatchChecked(build)),
   getState: currentState,
 };
 

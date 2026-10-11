@@ -145,6 +145,7 @@ import {
 import { DetailColumnResizer, SidebarResizer } from './features/shell/ColumnResizer.js';
 import { useSyncStore } from './features/sync/store.js';
 import { SubscriptionNotice } from './features/subscription/SubscriptionNotice.js';
+import { TaskActionError } from './features/tasks/TaskActionError.js';
 import { RenewPanel } from './features/subscription/RenewPanel.js';
 import { ProjectsPanel } from './features/projects/ProjectsPanel.js';
 import { ShareFeature } from './features/share/ShareFeature.js';
@@ -2577,6 +2578,11 @@ export function App(): React.JSX.Element {
               本地任务照常查看 / 编辑 / 导出（subscription-boundary.md §2）。
               未配置 / 自托管 / 断网时不渲染任何东西。 */}
           <SubscriptionNotice />
+          {/* 🔴 任务动作失败了要说一行（布局审计 §8.2 第 12 条）。
+              挂在这里而不是各视图里：这一条要覆盖收集箱/看板/象限/日历/时间线/回收站
+              六个面，逐面各挂一份就会长成六份各自维护的提示。
+              组件自己读 store，所以这里不需要任何条件 —— 没失败时它渲染 `null`。 */}
+          <TaskActionError />
           {/* AI 捕获的接线**留在这个组件内部** —— 输入框的草稿是它的状态，
               而草稿就是 AI 要解析的那句话。把草稿镜像到这里再传回去
               会造出两份状态，且"应用后清空输入框"没法做（清不动上游的 state）。

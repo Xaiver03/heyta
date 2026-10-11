@@ -751,6 +751,12 @@ export const zhCN = {
   'web.shell.tasks.more': '更多操作：{title}',
   'web.shell.tasks.moreLabel': '更多',
   'web.shell.tasks.delete': '删除：{title}',
+  // 🔴 任务动作失败时要显示的那一行（布局审计 §8.2 第 12 条）。
+  // 刻意**不插值内部错误原文**：上游给不出原因分类，而把 `error.message`
+  // 贴到界面上等于把诊断信息当文案。对应的码是
+  // `apps/web/src/features/tasks/store.ts` 的 `TaskActionFailureCode`。
+  'web.tasks.actionFailed': '这一步没有保存成功。你的改动还在本地，可以重试。',
+  'web.tasks.dismissFailure': '知道了',
   // ── 任务页的日期分组头（滴答同款，2026-09-30）────────────────
   // 组序与归属规则在 `@heyta/domain` 的 `groupTasksByDate`；这里只管措辞。
   // ⚠️ `{weekday}` 用的是 `common.weekday.*`（zh 是裸「三」，所以模板里带「周」；
