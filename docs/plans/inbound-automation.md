@@ -1639,8 +1639,9 @@ cd apps/web && NO_COLOR=1 pnpm exec vitest run tests/inbound-cycle-display.spec.
 - 界面层**入库了、单测与真浏览器都跑了**，但 AC-6 **仍不勾**：那一格红没修、"各壳入口可用"这半没证（这趟只有 web）、
   整条"启用 → 测试发送 → 等待 → 打开/解锁 → 自动处理 → 查看结果"要公网接收与有权益的宿主在跑才能走，两者按负责人指令仍关着。
 - `waiting-entitlement` 的**句子**仍缺（B110 那颗词条在 `packages/i18n`，本线不许动）；界面上已有可见分支与状态属性。
-- 本线**没有**动 `docs/reference/pricing-and-entitlements.md`（它是 `check:ai-quota` 的唯一数字源），
-  因为 T6 的四件产物三件不在白名单 ⇒ 记在 **B139** 等拍。
+- ~~本线**没有**动 `docs/reference/pricing-and-entitlements.md`，因为 T6 的四件产物三件不在白名单 ⇒ 记在 **B139** 等拍。~~
+  🔴 **2026-10-12 00:5x 现量更正**：那份事实源已在 `030212b5`「docs(自动收集 对外说明 T6 批二)」按 ADR-0060 补齐，
+  而 B139 那句"三件不在白名单"里有两件早就存在 —— 逐格复账见本节末「T6 的 B139 复账」。
 - AC-1～AC-8 继续全未勾（现量 `grep -c '^- \[ \] \*\*AC-' docs/plans/inbound-automation.md` = 8），公网接收与售卖继续关闭。
 
 ## T8 严格复审：AC-1～AC-8 逐条「证据命令 + 贴出的输出 + 结论」（2026-10-10 19:2x 起）
@@ -1662,7 +1663,7 @@ cd apps/web && NO_COLOR=1 pnpm exec vitest run tests/inbound-cycle-display.spec.
 | **AC-4 解析** | AC-1 的离线 11 文件（含 `automation-drafts`）+ `cd packages/domain && npx --no-install vitest run --maxWorkers=1 tests/inbound-local-date.spec.ts` + `cd packages/inbound-core … `（parser 18） | 离线 11 文件 **99 passed**；共享层三档 47 passed；本地时区档读数在 §1132 那行（同日） | **同时区/同归一化/DST/非法日期/长输入/多输出受限有尺**；注入指令与模型额外字段的越权那一条走的是出境闸门既有断言。⚠️ "实际出境请求符合披露"要真 provider 流量，本线**没有**这一档读数 ⇒ 记为未闭合，不许读成已验 |
 | **AC-5 批创建与来源记录** | `cd packages/shared-schema && npx --no-install vitest run --maxWorkers=1 tests/task-batch-contract.spec.ts`；`cd packages/op-log && npx --no-install vitest run --maxWorkers=1 tests/task-batch.spec.ts` | 契约 **`Tests 15 passed (15)`**；reducer **`Tests 16 passed (16)`** = 5 组 × **三套适配器**（memory / IndexedDbAdapter / SqliteAdapter，另含真文件库 `state.db`）（§665 表，10-10 当日） | **一枚逻辑 op / 无半批 / 三套适配器收敛 / 删除后重试不复活 / 旧数据无来源字段仍能 hydration 全部有尺**。这一格是本表里最接近"可勾"的一格，但按规矩仍**未勾**（勾由负责人点） |
 | **AC-6 规则界面** | `cd apps/web && NO_COLOR=1 pnpm exec vitest run tests/inbound-cycle-display.spec.tsx`；界面层 e2e：`cd e2e && npx playwright test --config playwright.inbound.config.ts` | 显示层 3 条 + 三臂变异各红一次（§19:0x 那一节，10-10）；e2e **4 条 = 2 passed / 2 failed**，红在"换回 AI 那一节不重取列表"（`inbound-automation.spec.ts:85`），四张草稿截图人已打开看过（`docs/research/evidence/inbound-automation-review/ui-draft/`） | **界面入库且判据有牙**，但**当场量出一格真缺陷**（**B140**：设置分组是 `hidden` 不是卸载，`active` 从没人接）⇒ 未闭合。另两格：状态词 `waiting-entitlement` 的句子缺词条（B110，`packages/i18n` 不许动）；"完整旅程"要公网接收 + 有权益宿主，两者仍关着 |
-| **AC-7 文档** | `node scripts/check-migrations.mjs`；`node scripts/check-docs-voice.mjs`；`node research/tools/docs-link-check.mjs`；`node research/tools/license-inventory.mjs` | **10-10 19:2x · 隔离副本 @ `a195a37f`**：`MIG_RC=0`（`✅ 迁移文件全部符合规范。`）、`VOICE_RC=0`（`扫描 site.* 1159 条（豁免自托管 120 条），禁词表 30 项零命中`）、`LIC_RC=0`（`全部依赖均为宽松许可（含已登记的例外）✅`）、**`LINK_RC=0`** —— 死链那一条**在 HEAD 上已经不红**（B136 记的那枚 `apps/desktop-windows/README.md:89` 已被其所有者改掉；主检出里若仍红是别线未提交改动，不是 HEAD） | **文档四道门在干净 HEAD 上全绿**（本格原来唯一那条"不是本线的红"已消失）。但 **T6 的四件产物三件不在本线白名单**（新 ADR / 中英条款 / 帮助页）⇒ **B139**，这一格按定义未闭合：`docs/reference/pricing-and-entitlements.md` 本线**没动** |
+| **AC-7 文档** | `node scripts/check-migrations.mjs`；`node scripts/check-docs-voice.mjs`；`node research/tools/docs-link-check.mjs`；`node research/tools/license-inventory.mjs` | **10-10 19:2x · 隔离副本 @ `a195a37f`**：`MIG_RC=0`（`✅ 迁移文件全部符合规范。`）、`VOICE_RC=0`（`扫描 site.* 1159 条（豁免自托管 120 条），禁词表 30 项零命中`）、`LIC_RC=0`（`全部依赖均为宽松许可（含已登记的例外）✅`）、**`LINK_RC=0`** —— 死链那一条**在 HEAD 上已经不红**（B136 记的那枚 `apps/desktop-windows/README.md:89` 已被其所有者改掉；主检出里若仍红是别线未提交改动，不是 HEAD） | **文档四道门在干净 HEAD 上全绿**（本格原来唯一那条"不是本线的红"已消失）。但 **T6 里三件落在本线地界外** ⇒ **B139**，这一格按定义未闭合。🔴 10-12 00:5x 复账把"三件"降到**实际只剩帮助页那一件，而"没有"正是 ADR-0060 §发布门槛要求的形状**；定价事实源也已由 `030212b5` 动过 |
 | **AC-8 验收矩阵** | `python3 research/tools/verify-inbound-ac8-matrix.py` | **10-10 19:2x · 隔离副本 @ `a195a37f`**：`MATRIX_RC=0`，`表头行=1079　行数=34　有尺行=27　无尺行=7　尺枚=67　窗=13/13　平台=10/10　权益=9/9　设备状态=9/9`，`结论：矩阵与 HEAD 逐格对账成立` | **矩阵自洽**（平台×权益×设备状态×失败阶段全枚举、无空行）。⚠️ 它声明的是"用例归属"，不是"跨端装过"：四端重装与 Linux 交付取证属 T7。⇒ 10-11 12:2x 那格已取到读数（Linux `.deb` `PKG_RESULT=OK`、桌面两端五道判据齐、移动两端按 §8.9 未点，见文末「T7 三条腿的合并态读数」）⇒ **C30 那格按定义仍未闭合**（它要的是四端） |
 
 **本趟逐档复跑（10-10 19:2x–19:3x · 载体：隔离副本 `.worktrees/inb-t7` @ `a195a37f`，dirty=0、`pnpm -r build` 与 `prisma generate` 均 rc=0；一条命令串行跑、不并发，退出码逐个 `echo $?` 取，不经管道）**：
@@ -1885,7 +1886,10 @@ packages/app-host typecheck: tests/login-code.spec.ts(44,5): error TS2578: Unuse
 `privacy.ts:404`／`:999` 已逐字列出「自动收集额度启用记录／关联／主体」，数字随他们那批新表一起回到真源
 （「共 38 处级联，覆盖 37 张表」）。闭合人是 `8389b2a3`（账号标准套件线），本线一行没改。
 ⇒ **本线在 `pnpm -r test` 上的债从 3 条降到 1 条**（只剩 B150），
-而 T6「对外说明」这一格少了一件要拍的事 —— 它剩下的硬缺口仍是**那枚新 ADR**（地界外，B139）。
+而 T6「对外说明」这一格 ~~少了一件要拍的事，硬缺口是那枚新 ADR（地界外，B139）~~
+  🔴 **2026-10-12 00:5x 现量：那枚 ADR 就是 `docs/adr/0060` 本身**（它的第 2 条逐字写着"限定取代 ADR-0017 与
+  ADR-0020 中『自托管的所有功能都不校验付费资格』的适用范围"，状态行「已接受（2026-10-07 负责人裁决）」）
+  —— 我 10-10 那句是按"ADR 最大号 0063"推断出来的，没读 0060。T6 四件逐格复账见本节末。
 
 ## T8 终版：AC-1～AC-8 在同一条款隔离副本上逐格复跑（2026-10-11 01:5x–02:3x）
 
@@ -1909,7 +1913,7 @@ packages/app-host typecheck: tests/login-code.spec.ts(44,5): error TS2578: Unuse
 | **AC-4 解析** | AC-1 的离线 11 枚（含 `automation-drafts`）+ `cd packages/domain && npx --no-install vitest run --maxWorkers=1 tests/inbound-local-date.spec.ts` + inbound-core 全量 + `cd packages/app-host && npx --no-install vitest run --maxWorkers=1 tests/inbound-*.spec.ts`（含 10-11 13:3x 新增的线级出境一枚 `tests/inbound-egress-wire.spec.ts`） | 离线 11 枚 `103 passed (103)`；本地时区 `Tests 1 passed (1)`；inbound-core `47 passed (47)`；app-host inbound **`Test Files 14 passed (14)` / `Tests 111 passed (111)`**（10-10 那格只记到 2 文件 30 条，本线那批界面/循环用例已入库所以分母涨了；整包 `95 files / 1779 passed`、`typecheck` rc=0） | **同时区 / 同归化 / DST / 非法日期 / 长输入 / 多输出受限有尺**；注入指令与模型额外字段的越权走出境闸门既有断言。✅ **"实际出境请求符合披露"这一格原来那句"本线没有读数（要真 provider 流量）"是假阻塞** —— runner 不注入 `fetchImpl` 时走真 `fetch`，把端点指到本机回环就能抓到生产代码自己发出的那一发报文，四条判据 + 一次线级变异（把投影改成"整包发"⇒ 恰好那一条红、其余三条照绿）都在文末「AC-4 出境取证补到线级」那一节。**仍不勾**：这一趟的端点是本机回环，真 provider 的 TLS 与网关行为不在里面 |
 | **AC-5 批创建与来源记录** | `cd packages/shared-schema && npx --no-install vitest run --maxWorkers=1 tests/task-batch-contract.spec.ts`；`cd packages/op-log && npx --no-install vitest run --maxWorkers=1 tests/task-batch.spec.ts`；`cd packages/app-host && npx --no-install vitest run --maxWorkers=1 tests/task-batch-actions.spec.ts`；点名范围尺 `python3 research/tools/verify-inbound-commit-scope.py` | 契约 `Tests 15 passed (15)`；reducer `Tests 16 passed (16)`（= 5 组 × 三套适配器）；唯一入口 `Tests 9 passed (9)`；🔴 范围尺那一格 **10-11 18:1x 在同一枚载体 HEAD（`52d7ba85`）上是 rc=1**（三档仍各 rc=0）—— 红因是装置的**归属判据**把别线的一笔认成本线，不是本线改了白名单外的文件；读数、逐枚取证与待点头的修法见本文末尾那节与 `BLOCKED.md` B169/B170 | **一枚逻辑 op / 无半批 / 三套适配器收敛 / 删除后重试不复活 / 旧数据无来源字段仍能 hydration 全部有尺**，且三档都在本批同一 HEAD 上取到。这是全表最接近"可勾"的一格，按规矩**仍未勾**（勾由负责人点，现量 `已勾=0`） |
 | **AC-6 规则界面** | `cd apps/web && npx --no-install vitest run --maxWorkers=1 tests/inbound-*.spec.tsx tests/inbound-upload-authorization.spec.ts`；界面层 e2e `cd e2e && npx playwright test --config playwright.inbound.config.ts` | jsdom 五枚 `Test Files 5 passed (5)` / `Tests 11 passed (11)` rc=0；**e2e 已在隔离副本上按最终 HEAD 复跑**：`2 failed / 2 passed (2.1m)`，两条红仍在 `inbound-automation.spec.ts:85`（同一处、同一句等待），四张草稿图**逐字节等于**入库件 ⇒ 读数与哈希见文末「AC-6 真浏览器那一趟补跑」那一节。载体追记（10-11 18:4x）：又在 `a599545d` 上复跑同一条，`2 failed / 2 passed`、栈同一行同一句等待 ⇒ 那一格不是"当时红、现在不知道"，是**当前 HEAD 上仍红**，图与 sha256 见文末「这一趟当时没重取的那两格」那节；19:2x 再追一趟：把载体快进到当前 HEAD `1e8ee091` 后复跑同一条，仍 `2 failed / 2 passed (2.1m)`、同一行同一句等待 —— 之所以要重取而不是沿用，是这一格到 HEAD 之间**别线改了共享的 `e2e/tests/helpers.ts`**（`switchView` 加了窄屏那一支），而本线那份 spec 里 `switchView` 命中 0（现量：`grep -c switchView e2e/tests/inbound-automation.spec.ts`）⇒ 语义不进本用例，但文件被 import，所以读数只算到"复跑过的那一枚 HEAD" | **界面入库、jsdom 判据有牙、真浏览器那一格已在 `1c166425` 复跑**：复跑没有把它跑绿，**B140** 那一格（设置分组是 `hidden` 不是卸载，`active` 从没人接）在 HEAD 上现量仍未接（`git show HEAD:apps/web/src/features/settings/AiSettings.tsx \| grep -n 'InboundAutomationSettings routing'` 该行没有 `active`），修法要动的文件不在本线白名单 ⇒ 不代改。**10-11 19:1x 追记：那句"接上就该绿"原来是推断，现在在私有 scratch 副本 `.worktrees/inb-t7`（载体 `a599545d`）用一次可回退的三处改动证成了** —— 同一枚 e2e 命令从 `2 failed / 2 passed` 变成 `4 passed (10.5s)`，`pnpm --filter @heyta/web typecheck` TC=0，apps/web 全量单测 `172 passed \| 2 skipped` / `2216 passed \| 13 skipped` rc=0，改完从 `.mut-bak` 还原并逐字节对账回改前两枚 blob 哈希。**落点是两枚文件三处**（`App.tsx` 那枚 `<AiSettings>` 传节名 + `AiSettings.tsx` 的 props/签名加可选 `active`（解构处默认 `true`）+ 同文件转发给 `<InboundAutomationSettings>`），都不在白名单 ⇒ 仍不代改；逐条命令与读数在 `BLOCKED.md` 的 B140 追记那一节，scratch 副本那批截图**没入库也不算交付证据**（它只证"修好之后长什么样"）。另两格照旧：`waiting-entitlement` 的词条缺（B110，i18n 不许动）；"完整旅程"要公网接收 + 有权益宿主 |
-| **AC-7 文档** | `python3 research/tools/verify-inbound-doc-tables.py`；`node scripts/check-migrations.mjs`；`node research/tools/license-inventory.mjs`；`node scripts/check-docs-voice.mjs`；`node research/tools/docs-link-check.mjs` | 五道**全部 rc=0**（同一批、同一 HEAD）。许可证那把的结论行逐字：`结论：全部依赖均为宽松许可（含已登记的例外）✅` | **文档五道门在干净 HEAD 上全绿**（原来那条"不是本线的死链红"已消失，见 PROGRESS 的漂移记录）。但 **T6 的四件产物三件不在本线白名单**（新 ADR / 中英条款 / 帮助页）⇒ **B139** 未闭合：`docs/reference/pricing-and-entitlements.md` 本线**没动** |
+| **AC-7 文档** | `python3 research/tools/verify-inbound-doc-tables.py`；`node scripts/check-migrations.mjs`；`node research/tools/license-inventory.mjs`；`node scripts/check-docs-voice.mjs`；`node research/tools/docs-link-check.mjs` | 五道**全部 rc=0**（同一批、同一 HEAD）。许可证那把的结论行逐字：`结论：全部依赖均为宽松许可（含已登记的例外）✅` | **文档五道门在干净 HEAD 上全绿**（原来那条"不是本线的死链红"已消失，见 PROGRESS 的漂移记录）。但 **T6 里三件落在本线地界外** ⇒ **B139** 未闭合。🔴 10-12 00:5x 复账：其中两件（那枚 ADR=0060 本身、中英条款=四份 legal 文档 + 六道 legal 门 RC=0）早已存在，第三件（帮助页）"没有"正是 ADR-0060 §发布门槛要求的形状；定价事实源也已由 `030212b5` 动过 |
 | **AC-8 验收矩阵** | `python3 research/tools/verify-inbound-ac8-matrix.py`；生产者缝对账 `python3 research/tools/verify-inbound-producer-seam.py` | 矩阵 `读数　表头行=1084　行数=34　有尺行=27　无尺行=7　尺枚=67　窗=13/13　平台=10/10　权益=9/9　设备状态=9/9` + `结论：矩阵与 HEAD 逐格对账成立`；对账尺 `在册文件=76　跨包成员访问=134　命中=134　盲区(生产包无 .ts)=0　盲区(命名空间)=0　停用=0　登记缝=0　新缝=0` / `相对导入=225　模块在 HEAD=225　…` | **矩阵与 HEAD 逐格自洽**（平台×权益×设备状态×失败阶段全枚举、无空行），且"已入库消费者不依赖未入库生产者"这一条在涨到的 134 枚成员访问 + 225 枚相对导入上仍然**登记缝 0**。⚠️ 它声明的是**用例归属**不是"跨端装过" ⇒ 四端重装与 Linux 交付取证（T7 第三条腿）未跑，这一格按定义未闭合 |
 
 **本批 vitest 分母自检**（AGENTS §6 那条"数一数有没有层根本没跑"）：12 档串行，
@@ -2717,3 +2721,23 @@ cd .worktrees/inb-t7/e2e && npx playwright test --config playwright.inbound.conf
 `packages/i18n` 零改动（七格全部复用既有类与既有条词，包括 `.tabular-nums` 与 `.ht-settings__danger` 两枚**已有**的共享类，
 没有为排版新造一份工具类）；`App.tsx` / `AiSettings.tsx` 一行没碰 ⇒ **B140 那一格照旧**（`active` 仍没人接，
 真浏览器里靠 `selectSettingsSection` 走到 AI 分组，与本节四张图同一通道）；AC 已勾数仍为 0，勾由负责人点。
+
+
+## 2026-10-12 00:5x · T6 的 B139 复账：那"三件地界外的产物"里两件早就存在，第三件"没有"才是合规形状
+
+**触发**：链跑第 35–40 道（六道 legal 门）RC=0 之后，我回去核 B139 那张表，发现它整张表的前提是坏的。
+
+| B139 当年说 | 今日现量（同一批，载体 `1a8de6fd`） | 判定 |
+|---|---|---|
+| 「新 ADR 一枚不在白名单，且还没有」 | `docs/adr/0060-automation-entitlement-and-retention.md`「决策及对旧结论的限定」第 2 条逐字：**限定取代 ADR-0017 与 ADR-0020 中"自托管的所有功能都不校验付费资格"的适用范围**；状态行「已接受（2026-10-07 负责人裁决；功能尚未开放）」 | 🔴 我按"现量最大号 `0063`"推断"那枚还没写"。**号在 0063 之前，0060 就是它**。T6 要的 ADR 早就在册 |
+| 「中英条款不在白名单」 | `packages/legal/src/documents/{privacy,data-rights,personal-info-list,ai-and-transfer}.ts` 四份都含自动收集条目；`check:legal-copy` / `legal-tools` / `legal-permissions` / `legal-host` / `legal-closure-truth` / `legal-gdpr` **六道 RC=0** | ✅ 生成物与真源逐字对账由那六道守着；本线不代改（那是它们自己的门禁与中英同步纪律） |
+| 「帮助中心不在白名单」 | `grep -rln 自动收集 apps/landing/src` = **0 命中** | ✅ **这正是 ADR-0060「发布门槛」那句要求的形状**：「尚未达到可交付条件时，价格与帮助页面**不得**承诺已经包含可用的自动收集」⇒ "没有"= 合规，不是缺口 |
+| 「定价事实源本线没动」 | `030212b5 docs(自动收集 对外说明 T6 批二): 定价事实源里那张表和 §6 的 grants 本来就在同一份文档里互相矛盾 —— 按 ADR-0060 补齐并加限定` | ✅ 已动（§1 表 `automation` 列、§2.1 那句限定、§2.2 整节） |
+
+**结论（要拍的事缩小了）**：T6 现在**没有一件需要"把地界外的文件并进白名单"**。B139 那条待裁决剩下的只是
+「什么时候宣布可交付」= AC-1～AC-8 逐格由负责人点头 + 公网接收与售卖开关，那**不是文件地界问题**。
+B139 本体已在账本里就地追记复账（不是新写一条），旧表留着让下一位看清"按最大号推断没写"是怎么错的。
+
+**顺手立住的一条自证**：我这段初稿把引用写成 `ADR-0060 §2`，`docs-link-check` 当场判
+「该章节号不存在」（0060 的分节是标题不是数字节），rc=1；改成「决策及对旧结论的限定」第 2 条后 rc=0。
+📌 这一格的判据是**别人写的尺**（章节引用必须能在目标文件里查到），它抓到我自己写的假锚点 —— 又一次"能红才算数"。
