@@ -789,6 +789,10 @@ expect(requestBody.messages.at(-1).content).not.toContain('must-not-leave');
 | 盲区臂 | `packages/app-host/src/inbound-runner.ts` 里把 `source: projected` 改成 `source: { ...projected, projectId: 'undisclosed' }` | rc=**1**，`AssertionError: expected [ 'title', 'projectId' ] to deeply equal [ 'title' ]`，且 **`Tests 1 failed \| 8 passed`** —— 旧的 `not.toContain` 那一行**没红** | 同一枚越界写法，旧判据静默、新判据点名 ⇒ 上一行的 rc=0 是**盲区**不是"尺坏了" |
 | 还原 | 从 `.mut-bak` 搬回（不走 git） | 改前/改后 sha256 前缀 `ab81e26b2f1a559a` **逐字相同**，该文件 porcelain 为空；复跑 rc=0 | 共享树里没留变异 |
 
+> ↪ **10-11 13:3x 这一格又往上走了一层**：上面那把尺量的仍是"注入的 `fetchImpl` 收到的那枚对象"。
+> 真 HTTP 报文里有没有多出别的东西、整趟是不是只有一次物理请求、账号侧的地址与私钥有没有混进模型请求 ——
+> 那三格由文末「AC-4 出境取证补到线级」那一节补上（`tests/inbound-egress-wire.spec.ts`，零 mock 被测对象）。
+
 判据一共钉四枚：外层键集 `{source, context}`、`source` 的键集逐字等于 allowlist（当日 `['title']`）、
 `source` 的值逐字等于投影结果、`context` 的键集只有 `{receivedAt, timezone}`。
 
@@ -1893,7 +1897,7 @@ packages/app-host typecheck: tests/login-code.spec.ts(44,5): error TS2578: Unuse
 | **AC-1 权益与授权** | `cd server && npx --no-install vitest run --maxWorkers=1 tests/automation-entitlement-ticket.spec.ts tests/automation-drafts.spec.ts tests/inbound-automation.routes.spec.ts tests/inbound-entitlement-write-tx.spec.ts tests/inbound-worker-identity.spec.ts tests/automation-entitlement-issuer.spec.ts tests/automation-commit-proof.spec.ts tests/automation-events.spec.ts tests/automation-rules.spec.ts tests/automation-sender-credentials.spec.ts tests/automation-ai-metering.spec.ts`（离线判定 11 枚）；权益三档 `tests/entitlement.spec.ts tests/entitlement-gate.routes.spec.ts tests/entitlement-across.spec.ts`；额度 HTTP `tests/inbound-ai-quota-route.spec.ts`；真库对账 `tests/automation-ai-metering.pglite.spec.ts`；真库身份腿 `python3 research/tools/verify-inbound-worker-identity.py`；产物加载级 `python3 research/tools/verify-inbound-cjs-require-order.py` | 离线 11 枚 `Test Files 11 passed (11)` / `Tests 103 passed (103)`；权益三档 `Tests 56 passed (56)`；额度 HTTP `Tests 3 passed (3)`；pglite `Tests 17 passed (17)`；真库腿 rc=0 且 `Test Files 1 passed (1)` / `Tests 46 passed (46)`；CJS 尺 `读数　CJS 包=1　在册 .ts=119　有产物=119　无产物(未编译)=0　扫过的产物=119　命中=0` rc=0，`--self-test` `臂数=8　不成立=0` | **判定层闭合到"同一 HEAD、同一副本、逐格可复跑"**：错主体 / 错实例 / 坏签名 / 吊销落后 / 额度耗尽各红一条且零业务效果，且**服务端产物现在能加载**（第 3 段那一格修完并有尺）。不闭合的两格照旧：① 新 ADR 不在地界内（**B139**）；② `pnpm check` 整链仍停在一枚别线类型错（**B144**），不是本线的红 |
 | **AC-2 接收与队列** | `cd packages/inbound-core && npx --no-install vitest run --maxWorkers=1`；队列判据变异臂 `python3 research/tools/verify-inbound-queue-teeth.py` | `Test Files 3 passed (3)` / `Tests 47 passed (47)`；变异臂 `臂数=6　不成立=0　末次 sha256=52c3fd707977a03e（须等于开局那枚）` rc=0 | **字节级签名 / 时间窗 / 上限 / 同键同体重放 / 同键异体冲突 / 跨账号隔离有尺，且这六臂今天在同一枚 HEAD 上再次证明能红**；查询面不回传明文（webhook + envelope 两档）。"公网接收"这一开关按指令仍关着 |
 | **AC-3 领取与提交** | `python3 research/tools/verify-inbound-dual-host.py`；`cd packages/sync-client && npx --no-install vitest run --maxWorkers=1 tests/inbound-authorization.spec.ts` | 装置 rc=0 且自报 **`Windows: 13/13`**（内层 `Tests 14 passed (14)`）；授权接缝 `Tests 6 passed (6)` | **13 个故障窗口两枚独立真 SQLite 宿主全跑通，且这次是在干净 HEAD 的隔离副本上**（10-10 那一趟跑在共享主检出，这一格原来欠的收口**今天补上了**）。观察量是任务数/op 数/回执/计量，不是 HTTP 码 |
-| **AC-4 解析** | AC-1 的离线 11 枚（含 `automation-drafts`）+ `cd packages/domain && npx --no-install vitest run --maxWorkers=1 tests/inbound-local-date.spec.ts` + inbound-core 全量 + `cd packages/app-host && npx --no-install vitest run --maxWorkers=1 tests/inbound-*.spec.ts` | 离线 11 枚 `103 passed (103)`；本地时区 `Tests 1 passed (1)`；inbound-core `47 passed (47)`；app-host inbound **`Test Files 13 passed (13)` / `Tests 107 passed (107)`**（10-10 那格只记到 2 文件 30 条，本线那批界面/循环用例已入库所以分母涨了） | **同时区 / 同归化 / DST / 非法日期 / 长输入 / 多输出受限有尺**；注入指令与模型额外字段的越权走出境闸门既有断言。⚠️ **"实际出境请求符合披露"这一格本线没有读数**（要真 provider 流量）⇒ 保持未闭合，不许读成已验 |
+| **AC-4 解析** | AC-1 的离线 11 枚（含 `automation-drafts`）+ `cd packages/domain && npx --no-install vitest run --maxWorkers=1 tests/inbound-local-date.spec.ts` + inbound-core 全量 + `cd packages/app-host && npx --no-install vitest run --maxWorkers=1 tests/inbound-*.spec.ts`（含 10-11 13:3x 新增的线级出境一枚 `tests/inbound-egress-wire.spec.ts`） | 离线 11 枚 `103 passed (103)`；本地时区 `Tests 1 passed (1)`；inbound-core `47 passed (47)`；app-host inbound **`Test Files 14 passed (14)` / `Tests 111 passed (111)`**（10-10 那格只记到 2 文件 30 条，本线那批界面/循环用例已入库所以分母涨了；整包 `95 files / 1779 passed`、`typecheck` rc=0） | **同时区 / 同归化 / DST / 非法日期 / 长输入 / 多输出受限有尺**；注入指令与模型额外字段的越权走出境闸门既有断言。✅ **"实际出境请求符合披露"这一格原来那句"本线没有读数（要真 provider 流量）"是假阻塞** —— runner 不注入 `fetchImpl` 时走真 `fetch`，把端点指到本机回环就能抓到生产代码自己发出的那一发报文，四条判据 + 一次线级变异（把投影改成"整包发"⇒ 恰好那一条红、其余三条照绿）都在文末「AC-4 出境取证补到线级」那一节。**仍不勾**：这一趟的端点是本机回环，真 provider 的 TLS 与网关行为不在里面 |
 | **AC-5 批创建与来源记录** | `cd packages/shared-schema && npx --no-install vitest run --maxWorkers=1 tests/task-batch-contract.spec.ts`；`cd packages/op-log && npx --no-install vitest run --maxWorkers=1 tests/task-batch.spec.ts`；`cd packages/app-host && npx --no-install vitest run --maxWorkers=1 tests/task-batch-actions.spec.ts`；点名范围尺 `python3 research/tools/verify-inbound-commit-scope.py` | 契约 `Tests 15 passed (15)`；reducer `Tests 16 passed (16)`（= 5 组 × 三套适配器）；唯一入口 `Tests 9 passed (9)`；范围尺 rc=0 | **一枚逻辑 op / 无半批 / 三套适配器收敛 / 删除后重试不复活 / 旧数据无来源字段仍能 hydration 全部有尺**，且三档都在本批同一 HEAD 上取到。这是全表最接近"可勾"的一格，按规矩**仍未勾**（勾由负责人点，现量 `已勾=0`） |
 | **AC-6 规则界面** | `cd apps/web && npx --no-install vitest run --maxWorkers=1 tests/inbound-*.spec.tsx tests/inbound-upload-authorization.spec.ts`；界面层 e2e `cd e2e && npx playwright test --config playwright.inbound.config.ts` | jsdom 五枚 `Test Files 5 passed (5)` / `Tests 11 passed (11)` rc=0；**e2e 已在隔离副本上按最终 HEAD 复跑**：`2 failed / 2 passed (2.1m)`，两条红仍在 `inbound-automation.spec.ts:85`（同一处、同一句等待），四张草稿图**逐字节等于**入库件 ⇒ 读数与哈希见文末「AC-6 真浏览器那一趟补跑」那一节 | **界面入库、jsdom 判据有牙、真浏览器那一格已在 `1c166425` 复跑**：复跑没有把它跑绿，**B140** 那一格（设置分组是 `hidden` 不是卸载，`active` 从没人接）在 HEAD 上现量仍未接（`git show HEAD:apps/web/src/features/settings/AiSettings.tsx \| grep -n 'InboundAutomationSettings routing'` 该行没有 `active`），修法要动的文件不在本线白名单 ⇒ 不代改。另两格照旧：`waiting-entitlement` 的词条缺（B110，i18n 不许动）；"完整旅程"要公网接收 + 有权益宿主 |
 | **AC-7 文档** | `python3 research/tools/verify-inbound-doc-tables.py`；`node scripts/check-migrations.mjs`；`node research/tools/license-inventory.mjs`；`node scripts/check-docs-voice.mjs`；`node research/tools/docs-link-check.mjs` | 五道**全部 rc=0**（同一批、同一 HEAD）。许可证那把的结论行逐字：`结论：全部依赖均为宽松许可（含已登记的例外）✅` | **文档五道门在干净 HEAD 上全绿**（原来那条"不是本线的死链红"已消失，见 PROGRESS 的漂移记录）。但 **T6 的四件产物三件不在本线白名单**（新 ADR / 中英条款 / 帮助页）⇒ **B139** 未闭合：`docs/reference/pricing-and-entitlements.md` 本线**没动** |
@@ -2209,3 +2213,57 @@ PKG_RESULT=FAIL（正文 rc=1）
 （`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` = 0）。
 仍然开着的三格照旧：完整旅程要公网接收 + 有权益宿主、`waiting-entitlement` 词条（B110）、
 以及上面那两条别线红 —— **本线的读数已经全部是"当场跑出来的"，这两条不是本线能代改的**。
+
+## 2026-10-11 13:3x–14:1x · AC-4 出境取证补到**线级**：那句"要真 provider 流量"是假阻塞
+
+**为什么单独有这一节**：AC-4 那格从第一版起就写着「"实际出境请求符合披露"本线没有读数（要真 provider 流量）
+⇒ 保持未闭合」。这一句在本轮被自己的代码否证了 —— `inbound-runner.ts` 里那发请求走的是
+`(options.fetchImpl ?? globalThis.fetch)`，**不注入 `fetchImpl` 就是真 `fetch`**；而端点本来就是可配的
+（`routing.endpoints[].endpoint`）。所以把端点指到本机回环上真起的一枚 http 服务器，就能拿到
+**生产代码自己发出去的那一发报文**，不需要任何厂商流量。按 §8.9"能自己做完的别登记成等人"补做。
+
+**新用例**：`packages/app-host/tests/inbound-egress-wire.spec.ts`（白名单内，4 条，零 mock 被测对象 ——
+被 mock 的只有计量端口 `reserve/advance`，而那两枚本来就是这条循环的契约面）。
+
+| 判据 | 钉的是什么 | 为什么原来那把尺量不到 |
+|---|---|---|
+| 正控：三枚未勾字段的哨兵**确实躺在解出来的明文里** | 没有这条，下面所有"没上线"都是空话（§8.10 明写的顺序） | `inbound-runner.spec.ts` 只有一个 `must-not-leave` 字符串 |
+| 线上只出现白名单字段 + **整趟只有一次物理请求** | 回环服务器收到的原始字节里：勾了的在、三枚没勾的都不在、`source` 的键集合逐字等于 `['title']`、命中数恰好 1 | 注入的 `fetchImpl` 只到"交给 transport 的那枚对象"，管不到真报文 |
+| 账号侧不外泄 | 同一次运行的原始字节里既没有自建同步服务地址，也没有输入私钥的 base64/hex 两种形态 | 上面那把完全没看过这一维 |
+| 反面对照：勾上 `note` 之后它**必须**上线 | 挡"判据永远红不了" —— 没有这条，第二判可能是空判 | — |
+
+**当场抓到的一枚自造假绿**（写下来，这一族已经第三次命中本线）：第一版把未勾字段写成 `notes:`，
+而封闭词表是 `INBOUND_AUTOMATION_FIELDS = ['title','note','priority','projectId','dueDate','startDate','durationMinutes']`
+（`packages/inbound-core/src/parser.ts:6`）。名字不对 ⇒ 那个字段**永远**不会被投影出去，"没上线"就成了空判。
+是**反面对照那条先红**（`Invalid automation field policy`）才把键名暴露出来的 —— 若只写正判、不写对照，
+这枚假绿会一路带进交付。改成 `note:` 后四条全绿。
+
+**读数**（都在主检出，`packages/app-host`）：
+
+```
+$ NO_COLOR=1 pnpm exec vitest run --maxWorkers=1 tests/inbound-egress-wire.spec.ts   # 改完键名
+Tests  4 passed (4)                                                            rc=0
+$ NO_COLOR=1 pnpm exec vitest run --maxWorkers=1 tests/inbound-*.spec.ts
+Test Files  14 passed (14) / Tests  111 passed (111)                            rc=0   # 分母从 13/107 涨上来
+$ pnpm typecheck   →  rc=0        $ pnpm test（整包）→  Test Files 95 passed (95) / Tests 1779 passed (1779)  rc=0
+```
+
+**线级反向验证（在隔离副本 `.worktrees/inb-t7` 做的，共享检出全程没被写过）**：把
+`buildInboundModelInput` 的投影循环改成"整包都发"，重打 `@heyta/inbound-core` 后复跑 ——
+
+```
+MUT_BUILD_RC=0
+× 🔴 线上只出现白名单字段，且整趟只有一次物理请求
+  AssertionError: 未勾的 NOTE-SENTINEL-must-not-leave 上了线: expected '{"model":"wire-probe","messages":[{"r…' not to contain …
+Tests  1 failed | 3 passed (4)      MUT_TEST_RC=1
+```
+
+**恰好那一条红、其余三条照绿** ⇒ 判据点名的就是它要拦的那件事。还原走 `.mut-bak`（不走 git）：
+改前/改后 sha256 前缀 `698705443bc4d2a5` 逐字相同、`grep -c MUTATION` = 0、重打后复跑 `Tests 4 passed (4)` `rc=0`，
+且主检出 `git status --porcelain -- packages/inbound-core` 为空。
+
+**这一节改了什么**：AC-4 那格从"没有读数"换成"有读数 + 有对照 + 有线级变异"；§「复审把自己一条看着有牙的判据
+照出来了」那节末尾加了指向本节的前向指针。**没改的**：任何既有断言与阈值（只新增一枚文件）。
+**仍然不勾，而且理由换成了实话**：这一趟的端点是本机回环，真 provider 的 TLS 握手、网关与限流行为不在里面；
+"完整旅程"那一格照旧要公网接收 + 有权益的宿主才走得了。
+

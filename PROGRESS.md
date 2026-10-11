@@ -2993,3 +2993,24 @@ git diff --cached --name-only -- <本笔点名的全部路径> | wc -l   # 必�
 **载体边界**：这批读数只描述 `1c166425`；收口那刻主检出已到 `79e8ede1` —— 这个数每分钟都在漂，
 现量 `git rev-list --count 1c166425..HEAD`。负载：起跑 32.46 / 收口 12.08。
 
+## 2026-10-11 13:3x–14:1x · AC-4 那句"要真 provider 流量才取不到读数"是**我自己写的假阻塞**，已补到线级
+
+台账里 AC-4 那格从第一版起挂着「"实际出境请求符合披露"本线没有读数（要真 provider 流量）⇒ 未闭合」。
+本轮读 `inbound-runner.ts` 时否证了它：那发请求走 `(options.fetchImpl ?? globalThis.fetch)`，
+**不注入就是真 fetch**，而端点本来可配 ⇒ 指到本机回环的 http 服务器就能拿到生产代码自己发出的那一发报文。
+新增 `packages/app-host/tests/inbound-egress-wire.spec.ts` 四条（正控 / 线上只有白名单字段 + 一次物理请求 /
+同步服务地址与输入私钥不上线 / 勾上 `note` 后必须上线的对照），4 passed rc=0；
+本线 inbound 分母 `13 files 107 → 14 files 111`，整包 `95 files / 1779 passed`、`typecheck` rc=0。
+
+**一枚当场抓到的自造假绿**（同一族第三次命中本线，值得下一位读）：第一版把未勾字段写成 `notes:`，
+而封闭词表是 `note`（`packages/inbound-core/src/parser.ts:6`）⇒ 那个字段**永远不会**被投影出去，
+"没上线"就成了空判。**是反面对照那条先红**（`Invalid automation field policy`）才把键名暴露出来。
+只写正判不写对照，这枚假绿会一路带进交付。
+
+**线级变异**在隔离副本 `.worktrees/inb-t7` 做（共享检出全程没被写过）：把投影改成"整包都发"⇒
+`Tests 1 failed | 3 passed`，红的恰是"线上只出现白名单字段"那条，其余三条照绿；
+还原走 `.mut-bak`，sha256 前缀 `698705443bc4d2a5` 逐字相同、无残留标记、重打后复跑 4 passed rc=0。
+
+**这一格仍不勾，但理由换成了实话**：端点是本机回环，真 provider 的 TLS / 网关 / 限流不在这一趟里。
+
+
