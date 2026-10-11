@@ -139,7 +139,7 @@ heyta 的核心闭环（任务 / 清单 / 标签 / 四象限 / 习惯 / 专注 /
 
 | # | 能力 | 滴答有 | heyta 状态 | 证据 | 缺口 |
 |---|---|---|---|---|---|
-| 6.1 | 清单共享（邀请成员） | ✅ | ✅ | 邀请凭证 + 成员角色 + 所有权转让：服务端 — `server/src/shares/share.routes.ts`；面板 — `packages/ui/src/sync/SharePanel.tsx`；E2EE 入群信封 — `packages/sync-client/src/share-payload-cipher.ts`；真实旅程 — `pnpm verify:collab-journey`（`RESULT=OK steps=3`） | 🔴 **多人并发写同一条任务的写路径路由**是最大未建架构件；评论 / 指派 / 动态流 UI 未建（见 6.2 / 6.3） |
+| 6.1 | 清单共享（邀请成员） | ✅ | ✅ | 邀请凭证 + 成员角色 + 所有权转让：服务端 — `server/src/shares/share.routes.ts`；面板 — `packages/ui/src/sync/SharePanel.tsx`；E2EE 入群信封 — `packages/sync-client/src/share-payload-cipher.ts`；真实旅程 — `pnpm verify:collab-journey`（`RESULT=OK steps=3`） | 🔴 **多人并发写同一条任务的写路径路由**是最大未建架构件；评论**已建模但不可达**（`COMMENT` 实体 + `CommentThread`/`comments-model` 由产品体验线 `e6058120` 建好并从 ui barrel 导出，但没有任何宿主挂载它、零写路径，`check:reachability` 就红在这"最后一米"）；指派 / 动态流 UI 未建（见 6.2 / 6.3） |
 | 6.2 | 任务指派 | ✅ | ❌ | 同上 | — |
 | 6.3 | 评论 | ✅ | ❌ | 同上 | — |
 | 6.4 | 多设备同步 | ✅（实时） | 🟡 | 协议完整 — `server/src/sync/sync.routes.ts:108-415`；客户端 — `packages/sync-client/src/client.ts:824,1246`；真实多端验收 — `e2e/multi-end/*` + `pnpm verify:multi-end`；服务端 WS 广播 — `websocket.routes.ts:39` | 🔴 **没有任何客户端用 WebSocket**（`apps/*`、`packages/*` grep = 0）→ **不是实时**，靠拉取 + 自动同步。**这是"服务端做完了、客户端没接"的典型** |
@@ -367,7 +367,7 @@ heyta 的核心闭环（任务 / 清单 / 标签 / 四象限 / 习惯 / 专注 /
 | P2-7 | 日历双向同步（Google / Outlook） |
 | P2-8 | CalDAV |
 | P2-9 | 附件 / 图片 |
-| P2-10 | 任务指派 / 评论 / 动态流 UI（**清单共享 + 入群链接已落地**，见 §2.6 的 6.1 / 6.7；剩这一批协作细功能）|
+| P2-10 | 任务指派 / 动态流 UI（**清单共享 + 入群链接已落地**，见 §2.6 的 6.1 / 6.7；评论已建模但**未挂载、零写路径**（`e6058120`），仍不可达）|
 | P2-11 | 鸿蒙应用接入（把 RN 接进 `Index.ets`） |
 | P2-12 | 农历重复 |
 | P2-13 | 清单创建「名字 + 颜色」半步（2026-10-06 补；整对话框结构化建单见 §2.2 #2.11 —— 视图类型 / 智能清单可见性两问依赖 IA 拍板（[product-level-ia-ux-audit.md](product-level-ia-ux-audit.md) §3.3 ③），不随本条立项） |
