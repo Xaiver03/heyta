@@ -560,8 +560,11 @@ package.json   (只加了一行 verify:collab-journey)
 **触发**：现量发现 HEAD 动了（`git rev-list --count origin/main..HEAD` 从 65/66 变 **68**、HEAD 到 `6d657ef7`）。
 按"重验只在输入真变了才跑"的口径，先查这几笔碰了什么：只有一笔，**自动收集线的 docs-only**
 （`PROGRESS.md` + `docs/plans/inbound-automation.md` + 8 张 `ui-retry` 证据图）⇒
-**四枚别线绊线（`check:reachability` + ai + shared-schema + domain）没有被任何人修，也不归本线动**，
-本线读数不变。`git ls-remote origin refs/heads/main` 当场仍读到 `6d1024bd`（无人推送）。
+**四枚别线绊线没有被任何人修**，其中 `check:reachability` 本轮**重新实测 = rc=1**；
+另外三枚按"输入有没有变"判：`git diff --name-only <上次读数那一笔>..HEAD` 里
+`packages/{ai,shared-schema,domain}` **一个文件都没出现** ⇒ 它们的输入未变、无需重跑。
+🟡 但 `packages/ai/src/capability-manifest.generated.ts` **当前正被别会话改着**（工作树 `M`、未提交）
+⇒ 那一枚可能在别处正在收，本线不去动它（归属见上面那条「跨线混物」）。
 
 **趁这次重量顺手把第 3 步的 5 处逐格复核了一遍，查出两处真缺口**（此前我把它当成"已完成"标过，
 是**按文件而不是按内容**勾的）：
