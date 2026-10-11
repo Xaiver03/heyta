@@ -3316,6 +3316,9 @@ e0b0f960                                                                  ← �
 ① **开不开公网接收与售卖**——AC-2 那把开关现在关着，这是本线的产品门，不是技术门。
 ② **B169 选 A 还是 B**：A＝把"仅描述提及"升进判决（会改判卷口径，本线不代改）；B＝维持现状，越界那格继续靠打印层自证归属。
 ③ **B140 给不给一次单动作授权**：只补 `AiSettings.tsx` 里那枚 `active` 转发，AC-6 两条红就会转绿；那枚文件不在白名单。
+   🔴 **这句当场更正（19:1x 现量）**：落点是**两枚文件三处** —— `apps/web/src/App.tsx` 那枚 `<AiSettings>`
+   要先传"当前是不是 AI 那一节"，`AiSettings.tsx` 再加可选 prop 并转发；两枚都不在白名单。
+   ✅ **而且"接上就转绿"已从推断换成实测**（私有 scratch 副本、改完逐字节还原）：见下面 19:18 那一节。
 ④ **B139 的落点**：新 ADR / 中英条款 / 帮助页三件由本线写（要扩白名单）还是交给条款那条线。
 
 **本线不 push**（任务书死规矩）。本地 `main` 领先远端的笔数请现量：
@@ -3332,3 +3335,59 @@ e0b0f960                                                                  ← �
 用 `^## B110（` 去数会读成 0，差点把"这条不存在"写进表里）；
 `grep -c "web.ai.inbound.process.waiting-entitlement" packages/i18n/src/locales/zh-CN.ts packages/i18n/src/locales/en.ts`
 → **0 与 0**（B110 说的那颗键今天仍缺，`en.ts` 里同名键也缺），所以 AC-6 那一格写"词条缺"不是旧话。
+
+### 19:18 现量 · 把 B140 那句"接上就该绿"从推断做成实测（可回退的 scratch 变异），并当场更正我自己写在交付表里的那一格
+
+**为什么这一趟值得跑**：交付表第 ③ 件我写的是"只补 `AiSettings.tsx` 里那枚 `active` 转发"——
+读源码才发现那是**半句**（`App.tsx` 那枚 `<AiSettings>` 根本没收到节名，`AiSettingsProps` 也没有这个 prop），
+而 B140 正文最后一句"接上就该绿"到当时为止**只是推断**。负责人要拍的正是"要不要为这一格开一次白名单外授权"，
+拿推断去让他拍板不合格。
+
+**做法**（全部在本线私有的隔离副本 `.worktrees/inb-t7`，载体 `a599545d`；主检出只读）：
+改前三处各断言"旧串命中恰好 1 次"（那三枚断言本身就是免费的现量尺），
+两枚文件先 `cp` 到 `/tmp/*.mut-bak`，**还原只从 `.mut-bak`、不从 git**（载体的 HEAD 与工作树可以不同步）。
+
+**读数**（同一趟，逐条贴）：
+
+```
+cd .worktrees/inb-t7/e2e && npx --no-install playwright test --config playwright.inbound.config.ts
+  ✓  1 [chromium] › tests/inbound-automation.spec.ts:8:3 › encrypted date draft review and Vault invalidation 1280 (2.9s)
+  ✓  2 [chromium] › tests/inbound-automation.spec.ts:8:3 › encrypted date draft review and Vault invalidation 390 (2.1s)
+  ✓  3 [chromium] › tests/inbound-automation.spec.ts:96:3 › inbound explicit retry and themes 1280 (1.8s)
+  ✓  4 [chromium] › tests/inbound-automation.spec.ts:96:3 › inbound explicit retry and themes 390 (2.3s)
+  4 passed (10.5s)
+RC=0            ← 同一枚载体、同一条命令、改之前是 2 failed / 2 passed（18:4x 那一格）
+pnpm --filter @heyta/web typecheck                                              → TC=0
+cd apps/web && npx --no-install vitest run --maxWorkers=1 tests/inbound-*.spec.tsx tests/inbound-upload-authorization.spec.ts
+  → Test Files 5 passed (5) / Tests 11 passed (11)                              JS=0
+cd apps/web && NO_COLOR=1 npx --no-install vitest run --maxWorkers=1
+  → Test Files 172 passed | 2 skipped (174) / Tests 2216 passed | 13 skipped (2229)   WEB_FULL_RC=0
+```
+
+**看图这一步做了**：那一趟的 `draft-1280-light.png`（scratch 副本里）画的确实是草稿复核面板 ——
+标题 `Draft to review`、截止时间原样保留非法日期 `2026-02-30` 等人改、底部「确认创建这些任务 / 关闭草稿」。
+⚠️ 这批图**没入库、也不算交付证据**：它们证的是"这一格修好之后长什么样"，不是"当前 HEAD 装得上这个"。
+所以 AC-6 那一格照旧不勾，勾由负责人点。
+
+**还原对账**：
+
+```
+git hash-object apps/web/src/App.tsx apps/web/src/features/settings/AiSettings.tsx
+  → a215500c7080d5feb5189b70693da939e96fb5cf / dcf58218855e95f192cc6d84cf2180883f8bbbe3   （与改前逐字相同）
+git status --porcelain -- apps/web/src packages server e2e docs   → 空
+```
+（那两枚是**改前**的取法与当时的值；当前值请现量同一条命令。）
+
+**于是三处落点定死了**（比"只补一枚转发"准确）：`App.tsx` 那枚 `<AiSettings>` 传
+`active={activeSettingsSection === 'settings-group-ai'}`；`AiSettings.tsx` 的 props 加**可选** `active?: boolean`
+且解构处 `active = true`（这样未传该 prop 的挂载点与既有 jsdom 用例行为不变 —— 全量单测 0 红就是这一条的证据）；
+同文件转发给 `<InboundAutomationSettings active={active} …>`。**两枚文件都在白名单外 ⇒ 仍然不代改。**
+
+**顺手量到的一条共享载体事实**（不是本线动的，登记以免下一位误读成越界）：
+主检出 `git status --porcelain | wc -l` 19:20 现量 **107**，其中 `apps/web/evidence` 占 **96** 枚 `M`
+—— 那是别线在重跑界面取证把已入库截图原地刷掉了。本线**没有**碰过 `apps/web/evidence`；
+交付表里"非白名单条目数与开工快照相同"那一格仍按老口径报：**开工没取快照，所以那一格只能报
+"每笔提交只含点名的白名单路径"这个等价陈述**（现量：`git show --stat <本线每一笔>` 的文件数逐笔读回）。
+`git diff --numstat HEAD -- BLOCKED.md` 现量 `205 0`（增 205 / **删 0**）：其中别线未提交那 159 行原样保留，
+本线这一节加的是余下的 46 行 —— 提交时仍用"把同一处插入应用到 `git show HEAD:BLOCKED.md`"的拼法，
+不把别人的未提交文本发出去。

@@ -8163,6 +8163,52 @@ Error: locator.click: Test timeout of 60000ms exceeded.
 自动处理 → 查看结果"那一整条旅程（要公网接收与有权益的宿主在跑，两者按负责人指令仍关着），
 以及"各壳入口可用"（这一趟只有 web）。
 
+**追记（2026-10-11 19:1x，本会话 · 把上面那句"接上就该绿"从推断换成实测）**
+
+它原来是**推断**。现在证了，动作全在**本线私有的隔离副本** `.worktrees/inb-t7`（载体 `a599545d`），
+**共享主检出没被动过**；改前三处落点各自断言"旧串命中恰好 1 次"：
+
+| 改哪 | 改成什么 |
+|---|---|
+| `apps/web/src/App.tsx` 那枚 `<AiSettings>`（取法：`grep -n '<AiSettings' apps/web/src/App.tsx`） | 加一行 `active={activeSettingsSection === 'settings-group-ai'}` |
+| `apps/web/src/features/settings/AiSettings.tsx` 的 `AiSettingsProps` + 函数签名 | 加**可选** `active?: boolean`，解构处给 `active = true`（未传该 prop 的挂载点行为不变） |
+| 同文件那枚 `<InboundAutomationSettings …>` | 转发 `active={active}` |
+
+读数（同一趟，逐条命令，改前那一条是 `2 failed / 2 passed`）：
+
+```
+cd .worktrees/inb-t7/e2e && npx --no-install playwright test --config playwright.inbound.config.ts
+  ✓  1 … encrypted date draft review and Vault invalidation 1280 (2.9s)
+  ✓  2 … encrypted date draft review and Vault invalidation 390 (2.1s)
+  ✓  3 … inbound explicit retry and themes 1280 (1.8s)
+  ✓  4 … inbound explicit retry and themes 390 (2.3s)
+  4 passed (10.5s)                                  RC=0
+pnpm --filter @heyta/web typecheck                  → TC=0
+cd apps/web && npx --no-install vitest run --maxWorkers=1 tests/inbound-*.spec.tsx tests/inbound-upload-authorization.spec.ts
+  → Test Files 5 passed (5) / Tests 11 passed (11)  JS=0
+cd apps/web && NO_COLOR=1 npx --no-install vitest run --maxWorkers=1
+  → Test Files 172 passed | 2 skipped (174) / Tests 2216 passed | 13 skipped (2229)   WEB_FULL_RC=0
+```
+
+**图看过了**：那一趟的 `draft-1280-light.png` 画的确实是草稿复核面板（标题 `Draft to review`、
+截止时间原样保留非法日期 `2026-02-30` 等人改、底部「确认创建这些任务 / 关闭草稿」），
+不是"断言过了而界面没画"。⚠️ 那批图只活在 **scratch 副本**的 `apps/web/evidence/inbound-recovery/`，
+**没有入库、也不算交付证据** —— 它证明的是"这一格修好之后长什么样"，不是"当前 HEAD 装得上这个"。
+
+**还原对账**（只从 `.mut-bak` 还原，不从 git 取 —— 载体的 HEAD 与工作树本来可以不同步）：
+
+```
+git hash-object apps/web/src/App.tsx apps/web/src/features/settings/AiSettings.tsx
+  → a215500c7080d5feb5189b70693da939e96fb5cf / dcf58218855e95f192cc6d84cf2180883f8bbbe3
+    （与改前逐字相同；那两枚是**改前**的取法，当前值请现量同一条命令）
+git status --porcelain -- apps/web/src packages server e2e docs   → 空
+```
+
+⇒ 本节上面那句"两枚文件都不在本线地界"由推断升级为**实测**：修法就是那三处（两枚文件），
+它能让那两条红转绿、不动任何判据、不碰 i18n，apps/web 的 typecheck 与全量单测一条不掉。
+**仍然不代改**（白名单外）。要拍的还是那两选一：① 给本线一次单动作授权（只动这两枚文件的这三处，
+改完复跑上面那四条命令）；② 交回 `apps/web` 设置面所有者接（姊妹面板已经这么接了）。
+
 ## ✅ B137 / B141（原 B138）的 19:1x 收口读数（2026-10-10，账号标准套件线代登 —— **两格都不是本线修的**）
 
 登记后不到一小时，**owner 自己把两格都收掉了**。现量（主检出 tip `1a30d3bc`）：
