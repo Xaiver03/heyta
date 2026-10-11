@@ -1,6 +1,7 @@
 # 交接：产品体验线（本轮 UX 优化 Goal）
 
-> 状态：**本轮目标五步都交完，四端一趟跑齐、图与判据同批入库（r93）；剩四格各有归属，全部只在本地、未 push。**（2026-10-11 15:5x 更新）
+> 状态：**本轮目标五步都交完，四端一趟跑齐、图与判据同批入库（r93）；§四 那张表就是"还剩什么"的唯一清单（这里不写枚数 —— 枚数会随下一笔别线提交漂，本文件自己就漂过一次），全部只在本地、未 push。**
+> ⚠️ 10-11 19:1x 增一条**本线自造并已自修**的红：整族 e2e 在窄屏那一档红三条，根子是共享装置 `switchView` 只认窄屏 rail 的「更多」面板那一段、不认它的常驻段（产品一行没动）。修完复跑绿，成因/两版修法/读数在台账「窄屏那一档的「更多」换了形状」那一串格子。**它不改 §四 任何一行的归属**，只把「8/19 基线」那一格拆成两半读：工作树上跑过了，干净树上还是没有。（2026-10-11 19:1x 更新）
 > 本文件只记「现在停在哪、下一步按什么顺序做、哪些手别再碰」。
 > 🔴 **逐格读数与判据形状的事实源**是 [`product-ux-optimization.md`](product-ux-optimization.md) 文末那一串台账格子
 > （取最新几格：`tail -60 docs/plans/product-ux-optimization.md`）。这里**不复制数字** —— 抄件一定会漂。
@@ -75,6 +76,7 @@ df -h /System/Volumes/Data                              # 要不要新开一棵�
 | 5 | #39 `check:image-license` rc=1（`@noble/hashes` 一处钉死、一处范围） | **`packages/inbound-core` 的所有者**（或运营侧统一 `resolutions`） | `pnpm check:image-license`；两枚声明的现量：`grep -n '@noble/hashes' packages/inbound-core/package.json packages/sync-core/package.json` |
 | 6 | r93 当场量到的红：`check:integration-coverage` rc=1 —— 一枚已提交的集成 spec 没被任何入口点名 | **自动收集 / inbound 那一线**（`0eea4c0f` 带进来的那枚） | `pnpm check:integration-coverage`；现量：`grep -c 'inbound-dual-host' server/package.json`（0）对 `node scripts/check-integration-coverage.mjs` 点名的那一行 |
 | 7 | r93 当场量到的红：`check:verify-script-copy` rc=1 —— 两枚旧针钉着一句**已从词条表消失**的文案 | **`scripts/lib/mobile-e2e.sh` 与 `scripts/verify-mobile-habits.sh` 的所有者**（或改那句同步设置文案的人跟着收） | `pnpm check:verify-script-copy`；现量：`grep -c '填好服务器地址与访问令牌后才能同步' packages/i18n/src/locales/zh-CN.ts`（0）、旧针在 `scripts/lib/mobile-e2e.sh:1475` 与 `scripts/verify-mobile-habits.sh:631` |
+| 8 | 🔴 **这一格是本线自己欠的，不归任何人**：目标那句"从**最终源码**四端构建重装"里，"干净检出可复现"那一半没有读数 —— r93 跑在主检出工作树上。同一棵干净载体还能顺手把「8/19 基线」那格的闭合条件①打掉（那八枚 spec 现在**已入库但没在干净树上跑绿过**，入库由 `63e61f23` 完成，不是本线提交的） | **本线**（一条命令，没有外部前提） | 新载体只含已提交内容 → `pnpm install --frozen-lockfile` → `NO_COLOR=1 pnpm -r --no-bail build`；关闭判据两条：`Failed` 行数 = 0 **且起数仍等于工作区内有 `build` 脚本的包数**（起数由那一趟自己打印，别抄这里的数） |
 
 第 4、5 格都做过**同一枚 A/B**：在只含已提交内容的载体上照样红 ⇒ 是 `main` 上的既有红，不是共享检出被写脏的假红。
 第 6、7 格做的是**同一条判据的窄版**（没有另起一棵载体）：这四枚文件 `git diff --stat HEAD -- server/package.json scripts/lib/mobile-e2e.sh scripts/verify-mobile-habits.sh packages/i18n/src/locales/zh-CN.ts` **无输出**（逐字等于 `HEAD`），且 `git show HEAD:packages/i18n/src/locales/zh-CN.ts` 里那句旧文案命中 **0** ⇒ 红不依赖任何未提交改动。
