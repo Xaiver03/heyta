@@ -2453,7 +2453,9 @@ ARM-3 那 4 枚"漏网"则相反：正文自述归属是账号标准套件线 / 
   变的是载体**（从 `1c166425` 换到当前 HEAD）。没有为变绿动任何断言、阈值或 `.skip`。
 
   图 8 张落 `docs/research/evidence/inbound-automation-review/185x-ac6-rerun-a599545d/`
-  （逐张说明与 sha256 表在同目录 `README.md`），
+  （逐张说明与 sha256 表在同目录 `README.md`；这批证据件与本节文字已在
+  `git log --oneline --grep='自动收集' -1` 那一笔入库，在册复量：
+  `git ls-tree -r --name-only HEAD -- docs/research/evidence/inbound-automation-review/185x-ac6-rerun-a599545d | wc -l`），
   人打开看过其中 4 张：`retry-1280-light`（整页：规则表单 + 最近接收 + `确认重新解析`/`取消` + 底部
   "浏览器里没有系统钥匙串…"那条说明）、`form-1280-light`（表单元素件）、`form-390-dark`（窄屏暗色：
   字段白名单七项换行成两行、数字框原生步进器贴右边界）、`draft-1280-dark`。

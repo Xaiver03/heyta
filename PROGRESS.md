@@ -3229,3 +3229,34 @@ rc=1 + `Cannot find module` 是"解释器认得命令、但那个文件不在"�
 **SCOPE=1 逐字**：`窗口起 2026-10-09 16:52　本线笔数=70　仅正文提及=7　涉及路径=74　越界=1`，
 那一枚 OOB 是 `docs/plans/goal-collaboration-shared-lists.md ['79e8ede1']`，归属行打印
 `命中段=desc 带本线独占路径=0` —— 与 18:3x 补的打印层预期一致，判决没动，登记仍在 B170。
+
+## 2026-10-11 19:1x · 这一批入库：`e0b0f960`（11 枚路径，全部在白名单内）
+
+**提交**：`test(自动收集 AC-6): 撤回我给自己造的"被并行会话挡着"，在 a599545d 上把那格真跑到读数`
+—— plumbing + CAS（临时索引 `read-tree a599545d` → 逐枚 `hash-object -w` + `update-index --cacheinfo`
+→ `write-tree` → `commit-tree -F` → `update-ref` 带期望旧值），**没有** `git add -A`、**没有**裸 `git commit`。
+
+```
+COMMIT=e0b0f960479c2edd55b957d037468ac224d17c9f TIP_WAS=a599545dc9a8732cbfdef7005dd67174d9e50c61
+ 11 files changed, 156 insertions(+), 12 deletions(-)
+逐路径 head==工作树：11/11 yes
+```
+
+前置条件用的是**结构性**那条（不是数字）：`git diff --numstat HEAD -- BLOCKED.md` 的删除列必须为 `0`
+⇒ 实测 `159 0` 通过 —— 别线那 159 行只在追加，我没带走也没删；提交后复量
+`git show --name-only e0b0f960 | grep -c 'BLOCKED.md'` = **0**。
+
+**入库后三格读数**：
+
+- 范围尺 `python3 research/tools/verify-inbound-commit-scope.py`：`本线笔数=71 涉及路径=83 越界=1`
+  ⇒ 笔数 70→71、路径 74→83（正好是这批新入的 9 枚证据件），**越界那一格没动**，仍是 `79e8ede1` 的 B170。
+- 本笔自己的文件集对照**完整白名单**：`git show --name-only --format= e0b0f960 | grep -vcE '<白名单>'` = **0**。
+  ⚠️ 别拿 2541 行那条老命令去复现这个 0 —— 那条正则只列了 5 个前缀，缺 `docs/research/evidence/`，
+  拿它量这一笔会报 9，那是**尺窄**不是越界；权威出处是范围尺本身（它读的是任务书里那张完整白名单）。
+- `git diff --name-only a599545d..HEAD | grep -cE '^(packages/|server/|apps/web/|apps/mobile/|e2e/)'` = **0**
+  ⇒ 这一笔纯文档+证据，所以 18:5x 那批 typecheck/单测读数**继续代表当前产物**，没有重跑的输入变化。
+  🔴 和上一节那条一样，这句也是**瞬时的**：下一个碰那五层的提交（无论谁的）一落地就得重取。
+
+**完成条件第 2 条那格仍是"没有数字基线"**：`git status --porcelain` 非白名单条目数现在量到 **66**，
+但任务 0 没记开工时的这个数（我的记录缺口，2541 行已登记），所以**不把它当成"与快照相同"来勾**，
+只按等价陈述"本线每一笔提交的文件集都在白名单内"逐笔交账。
