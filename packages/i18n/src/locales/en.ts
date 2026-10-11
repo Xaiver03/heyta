@@ -2287,6 +2287,20 @@ export const en = {
   // to the key inputs: otherwise "I have to type it again" looks like a bug.
   'web.ai.settings.keyNotice': 'There is no system keychain in the browser, so keys are kept only in the memory of this tab. You will need to enter them again after closing or refreshing the page. Desktop keeps keys in the system keychain.',
   'web.ai.settings.reset': 'Reset to defaults (everything off)',
+  // "Reset to defaults" is destructive (endpoints / routing / per-feature export
+  // consents / keys held on this device / memory switches), so it gets its own
+  // section and the first click only spells out the cost. Each line below is
+  // written against `defaultAiSettings()` and `secrets.clear()` — no vague
+  // "all settings".
+  'web.ai.settings.reset.zoneTitle': 'Reset this group of AI settings',
+  'web.ai.settings.reset.warning': 'This step is destructive. The first click clears nothing — it only lists what would be lost.',
+  'web.ai.settings.reset.clearsEndpoints': 'The model endpoints you added (address and model name)',
+  'web.ai.settings.reset.clearsRoutes': 'Which endpoint each feature routes to',
+  'web.ai.settings.reset.clearsConsents': 'Per-feature consent for sending your data out',
+  'web.ai.settings.reset.clearsSecrets': 'Keys and tokens stored on this device',
+  'web.ai.settings.reset.clearsSwitches': 'The AI master switch, the remote switch, the local API configuration and the memory preference switch',
+  'web.ai.settings.reset.keepsCorrections': 'Preferences you corrected are not cleared here: they live in the operation log and travel with your data.',
+  'web.ai.settings.reset.confirm': 'Confirm reset',
   // Rejection reason -> primary copy. Pick the catalog entry by `reason` code
   // instead of rendering the cross-package Chinese `message`: the gate cannot
   // see `{r.message}` (a variable, not a literal), but the user can.
