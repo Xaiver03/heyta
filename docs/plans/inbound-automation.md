@@ -768,6 +768,11 @@ AC-2 的「并发限额」「持久化失败不返回 accepted」「重放不重
 🔴 边界，别读多：这枚尺证的是"**已入库那 34 笔**带过的路径全在白名单内"，它**不**证工作树现在的未提交内容没越界
 （那本来就不是它的分母，也不可能是 —— 别人正在写的文件不歸我管）；也不证 AC 里任何一句功能断言。
 
+> **追记（2026-10-11 18:1x）**：上面那句"这一臂的方向是保守的：若别的会话将来动到本线独占路径，它会**假红**而不是假绿"
+> 今天兑现了，且是**它自己报出来的**（`--self-test` 的 ARM-3 由 0 枚变 4 枚）。同一趟里 `report()` 也第一次报错方向：
+> 别线把本线的名字写进**主题散文**，关键词子串就把它判成本线笔。两半的逐枚取证与待点头的归属判据改法在
+> `BLOCKED.md` **B169**（跨线写入这件事本身在 **B170**）。本节的表**不改写** —— 那两行是 10-09/10-10 当天的真读数。
+
 ### 复审把自己一条"看着有牙"的判据照出来了：AC-4「实际出境请求符合披露」原先只钉了"某个字符串没出去"
 
 复审 AC-4 时逐枚读它对应的断言，`packages/app-host/tests/inbound-runner.spec.ts:39` 是这句承诺唯一的落点：
@@ -1902,7 +1907,7 @@ packages/app-host typecheck: tests/login-code.spec.ts(44,5): error TS2578: Unuse
 | **AC-2 接收与队列** | `cd packages/inbound-core && npx --no-install vitest run --maxWorkers=1`；队列判据变异臂 `python3 research/tools/verify-inbound-queue-teeth.py` | `Test Files 3 passed (3)` / `Tests 47 passed (47)`；变异臂 `臂数=6　不成立=0　末次 sha256=52c3fd707977a03e（须等于开局那枚）` rc=0 | **字节级签名 / 时间窗 / 上限 / 同键同体重放 / 同键异体冲突 / 跨账号隔离有尺，且这六臂今天在同一枚 HEAD 上再次证明能红**；查询面不回传明文（webhook + envelope 两档）。"公网接收"这一开关按指令仍关着 |
 | **AC-3 领取与提交** | `python3 research/tools/verify-inbound-dual-host.py`；`cd packages/sync-client && npx --no-install vitest run --maxWorkers=1 tests/inbound-authorization.spec.ts` | 🔴 **01:5x 那一版把载体写高了**：它写"这次是在干净 HEAD 的隔离副本上"，但机器上找不到那一趟的任何产物（装置的 `--log` 默认落点空、`~/.cache/heyta-dual-host-debug/` 只有 10-10 的五份日志、那一时段 /tmp 有 81 枚别的文件说明没被清过、机器自 Oct 6 未重启），而抄来的读数与 10-10 主检出那趟逐字相同。**现在挂的是真在副本上跑过的一趟**（10-11 17:5x · `.worktrees/inb-t7` = `1c166425`）：装置 rc=0 且自报 **`Windows: 13/13`**（内层 `Tests 14 passed (14)`、SKIP 0、五臂自测 rc=0），日志在 `~/.cache/heyta-dual-host-debug/carrier-1011.log`；副本与当前 HEAD 在本线相关源码上只差一枚测试文件 ⇒ 读数算到 HEAD。授权接缝 `Tests 6 passed (6)` 仍是 01:5x 那格的原读数 | **13 个故障窗口在两枚独立真 SQLite 宿主 + 独立库上全跑通，观察量是任务数/op 数/回执/计量而不是 HTTP 码**；四端壳与界面层不在这一格（见文末「AC-3 的隔离副本腿」那一节，含产物缺失的逐条命令） |
 | **AC-4 解析** | AC-1 的离线 11 枚（含 `automation-drafts`）+ `cd packages/domain && npx --no-install vitest run --maxWorkers=1 tests/inbound-local-date.spec.ts` + inbound-core 全量 + `cd packages/app-host && npx --no-install vitest run --maxWorkers=1 tests/inbound-*.spec.ts`（含 10-11 13:3x 新增的线级出境一枚 `tests/inbound-egress-wire.spec.ts`） | 离线 11 枚 `103 passed (103)`；本地时区 `Tests 1 passed (1)`；inbound-core `47 passed (47)`；app-host inbound **`Test Files 14 passed (14)` / `Tests 111 passed (111)`**（10-10 那格只记到 2 文件 30 条，本线那批界面/循环用例已入库所以分母涨了；整包 `95 files / 1779 passed`、`typecheck` rc=0） | **同时区 / 同归化 / DST / 非法日期 / 长输入 / 多输出受限有尺**；注入指令与模型额外字段的越权走出境闸门既有断言。✅ **"实际出境请求符合披露"这一格原来那句"本线没有读数（要真 provider 流量）"是假阻塞** —— runner 不注入 `fetchImpl` 时走真 `fetch`，把端点指到本机回环就能抓到生产代码自己发出的那一发报文，四条判据 + 一次线级变异（把投影改成"整包发"⇒ 恰好那一条红、其余三条照绿）都在文末「AC-4 出境取证补到线级」那一节。**仍不勾**：这一趟的端点是本机回环，真 provider 的 TLS 与网关行为不在里面 |
-| **AC-5 批创建与来源记录** | `cd packages/shared-schema && npx --no-install vitest run --maxWorkers=1 tests/task-batch-contract.spec.ts`；`cd packages/op-log && npx --no-install vitest run --maxWorkers=1 tests/task-batch.spec.ts`；`cd packages/app-host && npx --no-install vitest run --maxWorkers=1 tests/task-batch-actions.spec.ts`；点名范围尺 `python3 research/tools/verify-inbound-commit-scope.py` | 契约 `Tests 15 passed (15)`；reducer `Tests 16 passed (16)`（= 5 组 × 三套适配器）；唯一入口 `Tests 9 passed (9)`；范围尺 rc=0 | **一枚逻辑 op / 无半批 / 三套适配器收敛 / 删除后重试不复活 / 旧数据无来源字段仍能 hydration 全部有尺**，且三档都在本批同一 HEAD 上取到。这是全表最接近"可勾"的一格，按规矩**仍未勾**（勾由负责人点，现量 `已勾=0`） |
+| **AC-5 批创建与来源记录** | `cd packages/shared-schema && npx --no-install vitest run --maxWorkers=1 tests/task-batch-contract.spec.ts`；`cd packages/op-log && npx --no-install vitest run --maxWorkers=1 tests/task-batch.spec.ts`；`cd packages/app-host && npx --no-install vitest run --maxWorkers=1 tests/task-batch-actions.spec.ts`；点名范围尺 `python3 research/tools/verify-inbound-commit-scope.py` | 契约 `Tests 15 passed (15)`；reducer `Tests 16 passed (16)`（= 5 组 × 三套适配器）；唯一入口 `Tests 9 passed (9)`；🔴 范围尺那一格 **10-11 18:1x 在同一枚载体 HEAD（`52d7ba85`）上是 rc=1**（三档仍各 rc=0）—— 红因是装置的**归属判据**把别线的一笔认成本线，不是本线改了白名单外的文件；读数、逐枚取证与待点头的修法见本文末尾那节与 `BLOCKED.md` B169/B170 | **一枚逻辑 op / 无半批 / 三套适配器收敛 / 删除后重试不复活 / 旧数据无来源字段仍能 hydration 全部有尺**，且三档都在本批同一 HEAD 上取到。这是全表最接近"可勾"的一格，按规矩**仍未勾**（勾由负责人点，现量 `已勾=0`） |
 | **AC-6 规则界面** | `cd apps/web && npx --no-install vitest run --maxWorkers=1 tests/inbound-*.spec.tsx tests/inbound-upload-authorization.spec.ts`；界面层 e2e `cd e2e && npx playwright test --config playwright.inbound.config.ts` | jsdom 五枚 `Test Files 5 passed (5)` / `Tests 11 passed (11)` rc=0；**e2e 已在隔离副本上按最终 HEAD 复跑**：`2 failed / 2 passed (2.1m)`，两条红仍在 `inbound-automation.spec.ts:85`（同一处、同一句等待），四张草稿图**逐字节等于**入库件 ⇒ 读数与哈希见文末「AC-6 真浏览器那一趟补跑」那一节 | **界面入库、jsdom 判据有牙、真浏览器那一格已在 `1c166425` 复跑**：复跑没有把它跑绿，**B140** 那一格（设置分组是 `hidden` 不是卸载，`active` 从没人接）在 HEAD 上现量仍未接（`git show HEAD:apps/web/src/features/settings/AiSettings.tsx \| grep -n 'InboundAutomationSettings routing'` 该行没有 `active`），修法要动的文件不在本线白名单 ⇒ 不代改。另两格照旧：`waiting-entitlement` 的词条缺（B110，i18n 不许动）；"完整旅程"要公网接收 + 有权益宿主 |
 | **AC-7 文档** | `python3 research/tools/verify-inbound-doc-tables.py`；`node scripts/check-migrations.mjs`；`node research/tools/license-inventory.mjs`；`node scripts/check-docs-voice.mjs`；`node research/tools/docs-link-check.mjs` | 五道**全部 rc=0**（同一批、同一 HEAD）。许可证那把的结论行逐字：`结论：全部依赖均为宽松许可（含已登记的例外）✅` | **文档五道门在干净 HEAD 上全绿**（原来那条"不是本线的死链红"已消失，见 PROGRESS 的漂移记录）。但 **T6 的四件产物三件不在本线白名单**（新 ADR / 中英条款 / 帮助页）⇒ **B139** 未闭合：`docs/reference/pricing-and-entitlements.md` 本线**没动** |
 | **AC-8 验收矩阵** | `python3 research/tools/verify-inbound-ac8-matrix.py`；生产者缝对账 `python3 research/tools/verify-inbound-producer-seam.py` | 矩阵 `读数　表头行=1084　行数=34　有尺行=27　无尺行=7　尺枚=67　窗=13/13　平台=10/10　权益=9/9　设备状态=9/9` + `结论：矩阵与 HEAD 逐格对账成立`；对账尺 `在册文件=76　跨包成员访问=134　命中=134　盲区(生产包无 .ts)=0　盲区(命名空间)=0　停用=0　登记缝=0　新缝=0` / `相对导入=225　模块在 HEAD=225　…` | **矩阵与 HEAD 逐格自洽**（平台×权益×设备状态×失败阶段全枚举、无空行），且"已入库消费者不依赖未入库生产者"这一条在涨到的 134 枚成员访问 + 225 枚相对导入上仍然**登记缝 0**。⚠️ 它声明的是**用例归属**不是"跨端装过" ⇒ 四端重装与 Linux 交付取证（T7 第三条腿）未跑，这一格按定义未闭合 |
@@ -2357,7 +2362,92 @@ $ sysctl -n kern.boottime
 
 **这一节改了什么**：AC-3 的载体归属换成有产物的一趟；`### 未闭合的边界` 那条 bullet 收掉；
 「无尺的句子」表里 AC-3 那句"双宿主装置**不存在**"按现量作废（它写于 10-10 02:0x，装置 10-10 12:5x 就入库了）。
-**没改的**：任何判据口径与断言、AC 勾选状态（现量 `grep -c '^- [x] \*\*AC-' docs/plans/inbound-automation.md` = 0）。
+**没改的**：任何判据口径与断言、AC 勾选状态（现量 `grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` = 0）。
 **仍然不勾**：这一格量的是传输层 + 真服务端 + 两条真宿主本地库，四端壳与界面层（T5 / AC-6）不在它的证据里；
 窗口 3 那个"宿主只回报 `empty`"的读法缺口仍待裁决。
+
+## 2026-10-11 18:1x–18:2x · T8 那八格的读数整批搬到当前 HEAD；范围尺那一格翻红，而红因在装置自己的归属判据上
+
+**为什么要这一趟**：上一节查出 T8 终版有格子把"跑过"写成"现在的状态"。那一格只是被点名的一枚 ——
+自 T8 终版那轮的载体提交 `9fb9eed2` 以来 HEAD 又推进了 7 个与本线相关的文件（含 `packages/app-host/src/index.ts`），
+⇒ 把 T8 里带读数的腿**整批**在当前 HEAD 重取，而不是只补被点名的那一格。
+链是串行的（一次只跑一条，遵守"重验证不并发"），脚本 `~/.heyta-window-rigs/heyta-inb-t8-recheck-1011.sh`，
+每条腿单独写一份日志，落点 `~/.cache/heyta-inb-t8-recheck-1011/`。
+
+**载体**：`.worktrees/inb-t7` `git checkout --detach` 到 `52d7ba85`（本线 17:5x 那笔文档提交），
+`CHECKOUT_RC=0`、`CARRIER_DIRTY=0`；先 `pnpm -r build` 再跑判定，`BUILD_RC=0`、`TYPECHECK_RC=0`。
+⚠️ 主检出这一趟期间又推进了两笔（现量 `git rev-parse HEAD`），所以下表每格都钉**载体 SHA**而不是"当前 HEAD"。
+
+| 腿 | 命令（都在载体根目录） | 读数 | 日志 |
+|---|---|---|---|
+| AC-1 服务端离线套件 | `cd server && npx --no-install vitest run --maxWorkers=1 tests/automation-*…` | `Test Files 11 passed (11)` / `Tests 103 passed (103)`，`AC1_OFFLINE_RC=0` | `ac1-offline.log` |
+| AC-1 权益判定 | 同上，权益那组 spec | `Tests 56 passed (56)`，rc=0 | `ac1-entitlement.log` |
+| AC-1 额度 | 配额那组 | `Tests 3 passed (3)`，rc=0 | `ac1-quota.log` |
+| AC-1 真库形状 | pglite 那组 | `Tests 17 passed (17)`，rc=0 | `ac1-pglite.log` |
+| AC-1 身份装置 | `python3 research/tools/verify-inbound-worker-identity.py` | rc=0 | 链日志 |
+| AC-1 require 顺序臂 | `verify-inbound-cjs-require-order.py` / `--self-test` | `臂数=8　不成立=0`，两 rc=0 | `ac1-cjs.log` / `ac1-cjs-selftest.log` |
+| AC-2 内核 | `cd packages/inbound-core && npx --no-install vitest run --maxWorkers=1` | `Test Files 3 passed (3)` / `Tests 47 passed (47)`，rc=0 | `ac2-core.log` |
+| AC-2 队列牙臂 | `python3 research/tools/verify-inbound-queue-teeth.py` | `臂数=6　不成立=0　末次 sha256=52c3fd707977a03e`，rc=0 | `ac2-queue-teeth.log` |
+| AC-4 跨时区 | 日期那组 | `Tests 1 passed (1)`，rc=0 | `ac4-date.log` |
+| AC-4 出境 | `cd packages/app-host && npx --no-install vitest run --maxWorkers=1 tests/inbound-*.spec.ts` | `Test Files 14 passed (14)` / `Tests 111 passed (111)`，rc=0 | `ac4-apphost.log` |
+| AC-5 三档 | `task-batch-contract` / `task-batch` / `task-batch-actions` | `15 passed` / `16 passed` / `9 passed`，各 rc=0 | `ac5-{contract,reducer,entry}.log` |
+| AC-5 范围尺 | `python3 research/tools/verify-inbound-commit-scope.py` | 🔴 **rc=1**，见下 | `ac5-scope.log` |
+| 整包 | `cd packages/app-host && npx --no-install vitest run --maxWorkers=1` | `Test Files 95 passed (95)` / `Tests 1779 passed (1779)`，`APPHOST_ALL_RC=0` | `apphost-all.log` |
+| AC-3 双宿主 | `python3 research/tools/verify-inbound-dual-host.py` | `Windows: 13/13`、`Tests 14 passed (14)`、`SKIP` 命中 **0**、`RC=0` | `ac3-dualhost-52d7ba85.log`；装置自报的第二份 `/private/tmp/heyta-inbound-dual-host.log`（36,383 B，**这枚住 /tmp，重启即没**，耐久份是前者） |
+
+**AC-3 因此换成了"与其余各格同一枚 HEAD"的读数** —— 上一节那份取在 `1c166425`，当时靠一枚 scoped diff 说明可迁移；
+现在不需要那个论证了（同一载体、同一 SHA、13/13）。分母仍是计划现量（`grep -oE '^[0-9]+\.' docs/plans/inbound-automation.md` 在故障窗口那一节里取）。
+
+### 翻红的那一格：范围尺两头都判错了方向，而它自己预言情景今天兑现了
+
+```
+$ python3 research/tools/verify-inbound-commit-scope.py                    → rc=1
+窗口起 2026-10-09 16:52　本线笔数=66　仅正文提及=7　涉及路径=73　越界=1
+  OOB docs/plans/goal-collaboration-shared-lists.md ['79e8ede1']
+$ python3 research/tools/verify-inbound-commit-scope.py --self-test         → rc=1
+ARM-3 归属反查：计入的笔中含独占路径 45 笔（分母非空，OK）；动了独占路径却没被计入 = 4 ⇒
+  漏网 3998e598 / 6180eccc / d49f77e3 / 63e61f23
+```
+
+两半都逐枚取证过，不是印象（命令与结论写在 `BLOCKED.md` **B169**）：那 1 枚 OOB 来自 `docs(协作 push 格)` 那笔 ——
+它把本线的名字写在**主题的散文里**（"其余约50笔散在账号套件/自动收集/产品体验/…"），于是关键词子串把它认成本线笔；
+`git log --since='2026-10-09 16:52' -- <那个路径>` 现量 **22** 枚，主题含词的只有这 **1** 枚，其余逐枚都是协作线的账。
+ARM-3 那 4 枚"漏网"则相反：正文自述归属是账号标准套件线 / 统一信封那批 / 桌面小组件批次 / 产品体验线，
+它们**改到了本线的独占文件**（含 `apps/web/src/features/settings/inbound-runtime.ts` 与 `BLOCKED.md` 本身）。
+
+10-09 那一节早就写了这句：「这一臂的方向是保守的：若别的会话将来动到本线独占路径，它会**假红**而不是假绿」——
+今天兑现，且它是**自己报出来的**（不是靠人读主题行才发现）。要改的是归属判据本身，那属于判卷口径，**本会话不代改**，
+登记成 B169 待点头；跨线写入这件事登记成 **B170**（它证的是归属事实，不是新阻塞：这四次跨线写入没有改坏本线判据，
+上面整表除这一格外全绿就是这一句的读数）。
+
+### 同类问题复查：同一构的第二格找到了（不是只有 AC-3）
+
+被点名的毛病是"把当时跑过的读数写成现在的状态"。按这个形状把 T8 终版整表再过一遍，命中第二处：
+**AC-5 那一格**写着「范围尺 rc=**0**」，取的是 10-09/10-10 的读数，而同一枚尺在 10-11 18:1x 是 rc=**1**。
+⇒ 就地改掉（下表），历史那节（`### 完成条件第 2 条那把尺…`）**不改写**，只补一行 dated 追记指向今天。
+其余带装置自报读数的格子本轮都已在同一枚载体上重取（就是上面那张表），没有第三处 —— 判据是"表里每一格的读数
+有没有当天产物路径可对账"，逐格数过，不是抽样。
+
+**这一节改了什么**：新增本节；T8 终版 AC-5 那一格的「范围尺 rc=0」换成当前读数与归属结论；
+AC-3 那一格的载体归属补上"与其余各格同一枚 HEAD"；`### 完成条件第 2 条那把尺` 那节末尾补一行追记。
+**没改的**：任何判据口径与断言（归属判据怎么改是 B169 那件事）、AC 勾选状态
+（现量 `grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` = **0**）。
+
+### 顺手照出来的一枚**永远绿的尺**：这条"防自己勾 AC"的现量命令，写法差两个反斜杠就数不到
+
+这一趟本来只是取 AC 已勾数，取的过程中发现**本文件里有两处把它写成了 `grep -c '^- [x] \*\*AC-'`**（方括号没转义）。
+未转义时 `[x]` 在 BRE 里是**字符类**（匹配一个字母 x），而界面里的字是 `[x]` 三个字符，所以那句话**不可能命中任何一行** ——
+它是一枚"勾了也照样报 0"的尺，正是 §7 元规则 2 说的那类装饰性检查。反向验证在**副本**上做的（不动真文件）：
+
+```
+$ cp docs/plans/inbound-automation.md /tmp/ac-check-mut.md   # 把 AC-5 那一枚改成 [x]，改完即删副本
+转义写法（任务书原样）  grep -c '^- \[x\] \*\*AC-'  →  静止态 0 ／ 改勾后 1   ← 能红
+未转义写法（我那两处）  grep -c '^- [x] \*\*AC-'    →  静止态 0 ／ 改勾后 0   ← 永远绿
+```
+
+⇒ 两处写法就地改成转义的那枚；真文件现量 `已勾=0`、`未勾=8`（`grep -c '^- \[ \] \*\*AC-'`）。
+这也回答了一件事：**把"防作弊"的句子写进文档时，那枚命令必须当场配一次变异验证**，
+否则它只是一句读起来像尺的话。
+**仍然不勾**：范围尺这一格现在**响亮地红**，即便红因是装置归属判据而不是本线动作 —— 在它被裁决之前，
+AC-5 不能以"尺绿"报；那一格的其余三档（契约 / reducer / 唯一入口）在本枚 HEAD 上仍是绿的。
 

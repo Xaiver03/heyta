@@ -9103,3 +9103,68 @@ sha256 前缀 `42f8e4cc3f13c6d3`，产物不入库、载体被跟踪脏仍 0）�
 **建议的判据（谁批谁落）**：要么把 `packages/app-host/scripts/***` 一并放进同步集合，
 要么在**发起方**一侧先断言 bundle 在（不在就响亮失败并点名那条生成命令）——
 别让一条远端自愈分支的可达性挂在"这台机器上有没有上一次构建留下的派生物"。
+
+## B169（2026-10-11 18:1x，本会话 · 在当前 HEAD 复账 AC-5 时撞上的）：**本线那枚「我没有越界」装置的归属判据两头都错 —— 既把别线的笔判成本线的越界（假红），又漏掉四枚改到本线文件的笔（假绿）。改它属于判据口径，本会话不代改。**
+
+装置：`research/tools/verify-inbound-commit-scope.py`（本线自己写的，回答任务书完成条件第 2 条
+"我有没有改过白名单外的文件"）。它的归属判据是 **`SUBJECT in 提交主题行`**，即主题里含「自动收集」子串就算本线笔。
+2026-10-11 18:1x 在 `52d7ba85` 上现量两趟：
+
+```
+$ python3 research/tools/verify-inbound-commit-scope.py                 → rc=1
+窗口起 2026-10-09 16:52　本线笔数=66　仅正文提及=7　涉及路径=73　越界=1
+  OOB docs/plans/goal-collaboration-shared-lists.md ['79e8ede1']
+$ python3 research/tools/verify-inbound-commit-scope.py --self-test      → rc=1
+ARM-1 阳性对照：窗口内越界 24 枚，已知三枚全部命中（OK）
+ARM-2 空分母：report() rc=1 ⇒ 拒绝（OK）
+ARM-3 归属反查：计入的笔中含独占路径 45 笔（分母非空，OK）；动了独占路径却没被计入 = 4 ⇒
+  漏网 3998e598→…cjs-require-order.py, 6180eccc→…inbound-entitlement-remote.ts,
+       d49f77e3→apps/mobile/src/inbound/lifecycle.ts, 63e61f23→apps/web/tests/inbound-cycle-display.spec.tsx
+ARM-4 主题/正文分流：本线 66 笔 / 仅提及 7 笔；已知提及件 2 枚 ⇒ 两半都成立（OK）
+```
+
+**那一枚 OOB 不是本线的动作**（逐枚取证，不是印象）：`docs/plans/goal-collaboration-shared-lists.md` 在窗口内被
+**22 枚**笔带过（`git log --since='2026-10-09 16:52' --format='%H %ad %s' --date=format:'%m-%d %H:%M' -- 那个路径 | cat`），
+主题里含「自动收集」的只有 **1 枚** = `79e8ede1`，而它主题是 `docs(协作 push 格): 补按线现量分类命令 + 本会话读数
+（协作线约12–14笔、其余约50笔散在账号套件/**自动收集**/产品体验/四端重装/BLOCKED 等线）…` ——
+关键词出现在**散文里提别的线的名字**，不是本线动了那个文件。22 枚逐枚读主题，全是 `docs(协作 …)` / `fix(协作 …)` /
+`feat(协作共享清单 …)` / `feat(test(share) …)` 这一条线的账。
+
+**ARM-3 报的"漏网"也不是本线笔没带词**（它的前提被现实否证）：这四枚的正文自述归属，都是**别线笔改到了本线的独占路径** ——
+`3998e598`（账号标准套件线改密，带过 `server/src/automation/entitlement-ticket.ts` 与本线那枚 `verify-inbound-cjs-require-order.py`）、
+`6180eccc`（`fix(app-host,sync-client): 错误体消费点对齐统一信封`，正文写着"inbound 三处读 `raw.code`"）、
+`d49f77e3`（桌面小组件批次，带过 `apps/mobile/src/inbound/lifecycle.ts` 与 `BLOCKED.md`）、
+`63e61f23`（产品体验线，带过 `apps/web/tests/inbound-cycle-display.spec.tsx` 与 `…/settings/inbound-runtime.ts`）。
+ARM-3 的假设写在装置注释里：「只属于本线的路径（别的线不会去动它们）」—— 这句已经不成立。
+
+**为什么这一枚要紧（两个方向都能骗人）**：判据按关键词认笔，那么
+① 别线只要把本线的名列进主题，它带过的外线路径就变成本线的"越界"（今天这枚假红）；
+② 反过来，任何改到本线文件的**别线**笔都不受判决，而 report() 照常打「越界=N」并把它们算进 N ——
+   于是"本线没越界"这句话的证据里**不含**这些笔。这两条同时成立意味着：**这一格现在既不能声称绿，
+   也不能把红算成本线的违规**。本会话取到的只能是"那 1 枚 OOB 归属为别线"这一条有内容的读数。
+
+**待点头的修法（不在本会话做，因为它是判据口径）**：把归属从「主题含关键词」换成两条并集 ——
+(a) 主题以本线 scope 前缀起（`…(自动收集 …)` 这一格），或 (b) 该笔带过 `packages/inbound-core/` 之类的本线独占**源**路径；
+并新增一档**只打印不判决**的「跨线写入本线文件」清单（今天这四枚就落在那一档）。
+⚠️ 它不是"让红变绿"的改动：(b) 会把别线笔带过的**外线**路径也拉进判决集合 ⇒ 极可能**新增**红枚。
+要么按上面这条改并接受新红，要么把这一格从 AC-5 的证据里**摘掉**、改用逐枚人工归属 —— 两条都要负责人选。
+
+## B170（2026-10-11 18:1x，本会话 · 与 B169 同一趟查出来的事实，不是待办）：**本线白名单里的 6 枚文件被别线的四笔改过 —— 「这些文件只有我动过」这句从今天起不能说。**
+
+B169 那枚反查臂报出来的四枚"漏网"，逐枚读正文后确认都是**别线笔改到了本线的独占路径**：
+
+| 笔 | 那笔自己的归属 | 带过的本线路径 |
+|---|---|---|
+| `3998e598` | 账号标准套件线（改密告知信不许等） | `server/src/automation/entitlement-ticket.ts`、`research/tools/verify-inbound-cjs-require-order.py` |
+| `6180eccc` | `fix(app-host,sync-client)` 错误体对齐统一信封 | `packages/app-host/src/inbound-entitlement-remote.ts`（正文自述"inbound 三处读 `raw.code`"） |
+| `d49f77e3` | 桌面小组件批次 | `apps/mobile/src/inbound/lifecycle.ts`、`BLOCKED.md` |
+| `63e61f23` | 产品体验线 | `apps/web/tests/inbound-cycle-display.spec.tsx`、`apps/web/src/features/settings/inbound-runtime.ts` |
+
+**要紧的地方**：`BLOCKED.md` 与 `apps/web/src/features/settings/inbound-runtime.ts` 都在本线的"只允许改"清单里，
+而现在**实际写入者不止本线**。⇒ ① 本线任何"我改过 / 我只改过"的归属句都要改成按内容判，不按名单判；
+② push 归因（那格在协作线账上）不能把这几枚算进本线名下。
+
+**不受影响的那一半，有读数**：这四次跨线写入**没有把本线的判据改坏** —— 2026-10-11 18:1x 在 `52d7ba85`
+的隔离副本上，本线全部证据腿逐条复跑，AC-1/AC-2/AC-4/AC-5（除 B169 那格外）与 `@heyta/app-host` 全量、
+`pnpm -r typecheck` 全 rc=0，双宿主窗口 `Windows: 13/13`。逐条读数与日志路径见计划
+`docs/plans/inbound-automation.md` 当天那一节。⇒ 本条登记的是**归属事实**，不是新增阻塞。
