@@ -1,0 +1,54 @@
+WINDOW=heyta
+WEB_ROOT=/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/dist
+STORAGE_HOST=on
+STORAGE=shell
+PAGE_ORIGIN=heyta-local://app
+SECURE_CONTEXT=yes
+WEBAUTHN=function
+AUTH_STATE=signed-out
+WIDGET_NAV_APPEARANCE=CLICKED
+WIDGET_PROBE=ran
+WIDGET_PANEL=1
+WIDGET_PANEL_VISIBLE=1
+WIDGET_PANEL_ROWS=widget-journey-status,web.widgetJourney.native.macos.step1,web.widgetJourney.native.choose,widget-journey-capability
+WIDGET_STATUS_TEXT=正在原生桌面应用中运行
+WIDGET_CAPABILITY_TEXT=从系统的小组件列表中添加 Heyta。添加后打开一次应用，即可刷新本机数据。
+WIDGET_PLATFORM=MacIntel
+WIDGET_HOST_SIGNALS=storagePort=true webview2=false heytaStorage=true heytaWidget=true widgetBridgeSeal=function
+WIDGET_NAV_HELP=CLICKED
+WIDGET_EXTERNAL_HANDOFFS=1 https://heyta.waytofuture.cn/docs
+WIDGET_EXTERNAL_LAUNCH=suppressed(HEYTA_WIDGET_HELP_PROBE)
+WIDGET_HELP_LINK=1
+WIDGET_HELP_VISIBLE=1
+WIDGET_HELP_HREF=https://heyta.waytofuture.cn/docs
+WIDGET_HELP_TARGET=_blank
+WIDGET_HELP_REL=noopener noreferrer
+WIDGET_WEBVIEW_URL_BEFORE=heyta-local://app/index.html
+WIDGET_WEBVIEW_URL_AFTER=heyta-local://app/index.html
+M2_MACOS_NOTE=M2-macOS 🔬 小组件环境识别/外链交接读数已取（判据由装置下，本链只出读数）
+# ── 装置判据输出（同一次运行）──
+PROBE=ran
+WIDGET_HOST_SIGNALS=storagePort=true webview2=false heytaStorage=true heytaWidget=true widgetBridgeSeal=function
+WIDGET_PLATFORM=MacIntel
+WIDGET_PANEL=1 VISIBLE=1 ROWS=4
+INSTALL_GUIDE_HITS=0
+NATIVE_STEP_ROWS=2
+WIDGET_CAPABILITY_KIND=nativeAvailable
+NATIVE_STATUS_MATCH=yes
+HELP_HREF=https://heyta.waytofuture.cn/docs
+WEBVIEW_URL_BEFORE=heyta-local://app/index.html AFTER=heyta-local://app/index.html
+EXTERNAL_HANDOFFS=1 suppressed(HEYTA_WIDGET_HELP_PROBE)
+BOUNDARY=浏览器里是否真的渲染出那一页**不在本趟读数里**（诊断链故意不叫起浏览器，§6.2 规定二）；那一格归 scripts/qa/macos-installed-widget-help.sh（需前台实例）
+RESULT=OK
+
+# ── 出处 ──
+RUN_TAG=widget-help-1011-141310
+TREE=6d657ef72e215eb3ded2c13a37187a15a809f663
+DIRTY_PATHS= M apps/desktop-macos/Sources/HeytaMac/HeytaMacApp.swift
+WEB_DIST_SHA=3c4764eaae2f7cbd
+SHELL_BIN=/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/desktop-macos/.build/out/Products/Debug/HeytaMac
+PROBE_HITS=2
+EXPECTED_SITE=https://heyta.waytofuture.cn
+JUDGE_RC=0
+S_BEFORE=存在=1 字节=81920 mtime=1790931385 md5=cad2df576f00acc465b499f4871b54ca 前缀枚数=3
+S_AFTER=存在=1 字节=81920 mtime=1790931385 md5=cad2df576f00acc465b499f4871b54ca 前缀枚数=3
