@@ -3104,8 +3104,11 @@ AC-4 日期 `1 passed` 与出境 `111 passed`、AC-5 三档 `15/16/9 passed`、`
 18:3x 那一次 `find e2e/test-results -name '*.png' -newermt '-12 minutes' | wc -l` = **54**（别的会话正在写图），
 18:5x 复量同一条 = **0**（那一批写完了）；但同一分钟里 `lsof -nP -iTCP:4318 -iTCP:4319 -sTCP:LISTEN`
 仍然两枚都在，**且 pid 从 43555/43054 换成 92961/93000** —— 也就是**上一趟跑完、新又一趟起来了**。
-⇒ 判"载体不安静"要看的是**端口 + pid 漂移**这两样，PNG 数只是那批写入的影子；按 §8.9（同一载体两个写入者 +
-同一证据目录）这一趟**仍然不能跑**，计划里「这一趟没重取的那两格」那节的登记继续成立 —— 这次是**又量了一遍**，不是沿用。
+⇒ 判"载体不安静"要看的是**端口 + pid 漂移**这两样，PNG 数只是那批写入的影子。
+🔴 但由这两样得出的那句"这一趟仍然不能跑"**是错的，18:4x 已撤回并补跑完**（见下一节）。
+错因：只量了"那类资源有没有人用"，**没读我自己那两份配置** —— 本线 e2e 用的是它自己的 4468（`--strictPort`、
+`reuseExistingServer:false`）、私有 `outputDir`、私有证据目录 `apps/web/evidence/inbound-recovery/`，
+而且这趟本来就在**本线私有副本**里跑 ⇒ 与别人那两枚端口、那批 `goal-settings-final/`/`ux-final/` 图**一枚都不重合**。
 
 于是回到不受这一格挡着的、仍在界内的那件事：上一节留下的"装置不能自证"。
 
@@ -3142,3 +3145,87 @@ AC 计数装置读回 `已勾=0　未勾=8`。
 **没动**：判卷口径、任何断言、AC 勾选状态、别人的文件。
 
 
+
+## 2026-10-11 18:4x–18:5x · 撤回我自己造的"AC-6 被并行会话挡着"，把那一格在当前 HEAD 上真跑完
+
+**为什么单独有这一节**：上一节那句"这一趟仍然不能跑"是我**没读自己配置**写下的假阻塞。
+读了 `e2e/playwright.inbound.config.ts` 就否证：它跑自己的 4468（`--strictPort`、`reuseExistingServer: false`）、
+`outputDir` 是 `/tmp/heyta-inbound-ui-results`、用例写 `apps/web/evidence/inbound-recovery/`，
+且这趟在本线私有副本里 —— 与别人当时在用的 4318/4319 与那批 `goal-settings-final/`/`ux-final/` 图一枚都不重合。
+⇒ 台账里那条登记按 §8.9 的反面（"能自己做完却登记成没做"）就地撤回，改成本节的真读数。
+
+**跑法与读数**（入口脚本 `~/.cache/heyta-inb-t8-recheck-1011/ac6-rerun-1011.sh`，日志同目录 `ac6-184632.{co,build,e2e}.log`）：
+
+```
+START=18:46:32 load1={ 21.91 28.32 36.59 }
+PRE_DIRTY_LINES=       0
+CHECKOUT_RC=0 HEAD=a599545dc9a8732cbfdef7005dd67174d9e50c61
+POST_DIRTY_LINES=0
+BUILD_RC=0 18:46:55
+E2E_RC=1 18:49:03        # 2 failed / 2 passed (2.1m)
+LOAD_END={ 19.63 25.98 34.32 }
+```
+
+两条红的栈逐字仍指同一处（`inbound-automation.spec.ts:85:69`，等
+`getByTestId('inbound-event-date-draft')` 里那枚 `查看并编辑草稿` 按钮）⇒ **B140 那一格在当前 HEAD 上仍没接**，
+断言/阈值/`.skip` 一枚都没动。四张通过态与两张失败态图共 8 枚落
+`docs/research/evidence/inbound-automation-review/185x-ac6-rerun-a599545d/`（逐张说明与 sha256 表在同目录 `README.md`），
+副本里那 12 枚 `apps/web/evidence/inbound-recovery/*.png` **没有代提交**（不在白名单，且它们是 tracked 文件被覆盖成脏）。
+
+**人打开看过 4 张**（§6.2 规定一，"截了"不等于"看了"）：
+`retry-1280-light` 整页 —— 设置左栏 + `AI 与集成` 选中 + 规则表单（回调密钥编号 `default`、字段白名单七项、
+目标清单编号、规则时区、每事件最多 50 条）+ `最近接收` 的 `事件 event-recovery` + `需要确认` +
+`确认重新解析`/`取消` + 底部"浏览器里没有系统钥匙串…"那条说明；`form-1280-light` 是那张表单的元素件；
+`form-390-dark` 窄屏暗色 —— 字段白名单换行成两行、数字框原生步进器贴右边界；
+🔴 `draft-1280-dark` 是这轮最有用的一格：草稿编辑器**完整渲染**（任务 1 / 标题 `Draft to review` / `无优先级` /
+截止 `2026-02-30` / `确认创建这些任务`、`关闭草稿`）⇒ 那两条红**不是"界面画不出来"**，
+而是**后一个状态里那枚入口按钮没接线**。四张图里没有任何密钥、票据正文或口令。
+⚠️ 顺带一格**新观察**（本线不判缺陷、留给界面层那条线裁）：390 窄屏顶部那排设置分组标签两端都被切
+（左"隐私"、右"账号与…"）——横向可滚是设计还是截断，不在本线判据里。
+
+**其余七格为什么可以随 HEAD 前进而不重取**（这次有一条命令撑着，不再是印象）：
+`git diff --name-only 52d7ba85..HEAD | grep -cE '^(packages/|server/|apps/web/|apps/mobile/|e2e/)'` = **0**
+⇒ 自 18:1x 那批读数起，八格所量的五层源码零改动；那段时间动的 4 枚非文档路径全在 `scripts/`（别线壳级装置）
+与 `apps/desktop-macos/evidence/`。🔴 这条判据是**瞬时的**：下一个碰这五层的提交一落地它就不成立，届时要整批重取。
+
+**写了什么**：计划里那条假阻塞就地撤回 + 该节改名 + T8 终版 AC-6 那一格补一行载体追记 + 新增"当时没重取的那两格"整节读数；
+本文件加本节；8 张图入库到白名单证据目录。**没动**：任何断言与判据口径、AC 勾选状态（`已勾=0　未勾=8`）、别人的文件、
+`packages/i18n`。
+
+## 2026-10-11 19:0x · 改完指针句把那批门重跑一遍：两道"红"是**我把命令名写错**造出来的假红
+
+**为什么跑**：上一节把计划里那句"（sha256 见 PROGRESS 那节）"改成指向证据目录自己的 `README.md`，
+动的是 `docs/plans/inbound-automation.md` 一行 —— 文档类改动要吃文档类门，不能凭"只改了一行"跳过。
+
+**读数（逐条 rc，bash 脚本跑的，不是 zsh 字符串）**：
+
+```
+HEAD=a599545d
+LINK=0 VOICE=0 CITE=0 TICKS=0 MIG=0 LIC=0 PYCO=0
+MDTABLE=1 DOCTABLE=1        # ← 这两个第一次报红，红因不是产品
+SCOPE=1                     # 已知：越界=1，B170 那一格
+```
+
+`MDTABLE` / `DOCTABLE` 那两枚 1 是**我的批次脚本里命令名写错**：`scripts/check-md-tables.mjs`、
+`scripts/check-doc-tables.mjs` 这俩路径**根本不存在**（真名 `scripts/check-md-table-rows.mjs`、
+`research/tools/verify-inbound-doc-tables.py`），node 抛 `Cannot find module` 退 1。
+按真名重跑：**两道都 rc=0** ——
+
+```
+MDTABLE_RC=0  ✔ 12 个文件，列数、断行、"是不是表"与格内反引号配对都一致（第四类基线 3 行，只许减）
+DOCTABLE_RC=0 清单 = 登记表 12 份 + 本线追加 4 份 = 16 份
+              ✔ 16 个文件 …（同一把尺，多量了本线那 4 份）
+```
+
+🔴 这与 18:5x 那批十条全 127 是**同一条坑的第二种面目**：127 是"解释器不认这条字符串"，
+rc=1 + `Cannot find module` 是"解释器认得命令、但那个文件不在"。
+⇒ **一串门同时红，先查执行器和命令名，再查产品**；判"命令不存在"要看 stderr 里那行
+`Error: Cannot find module '<那个路径>'`，不能只看 rc。取命令名的权威出处是 `package.json`
+的 `check:md-tables` 那一行，不是记忆里那个名字。
+
+**AC 勾选那格重取（改文档后必复量）**：`python3 research/tools/verify-inbound-ac-ticks.py` rc=0，
+逐字 `文档 docs/plans/inbound-automation.md　AC 行=8　已勾=0　未勾=8　状态位未分类=0`。
+
+**SCOPE=1 逐字**：`窗口起 2026-10-09 16:52　本线笔数=70　仅正文提及=7　涉及路径=74　越界=1`，
+那一枚 OOB 是 `docs/plans/goal-collaboration-shared-lists.md ['79e8ede1']`，归属行打印
+`命中段=desc 带本线独占路径=0` —— 与 18:3x 补的打印层预期一致，判决没动，登记仍在 B170。
