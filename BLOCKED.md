@@ -9124,6 +9124,61 @@ android/ios 两腿按 AGENTS §8.9（共享资源独占验收）**判为不可�
 不等就**不猜、响亮失败**，而不是拿 `SERIAL` 的默认值 `emulator-5554` 直接卸。这是**改验收脚本的判据**，
 按"改判卷口径要记 BLOCKED.md"这一条交回给负责人／脚本所有者落；本线不动那两份文件。
 
+**21:1x 追记（本会话 · 复账 B164 那句 iOS 前提：它是 03:4x 的读数，隔了 17 小时，按"报阻塞前先重跑那一条命令"重取）**：
+
+```
+$ xcrun simctl list devices | grep -E '\(Booted\)'
+    heyta-ios-isolated17 (3BB27787-9C22-452E-A62C-6BD650D35E27) (Booted)
+    heyta-iphone-17pro (FE195661-B021-4A71-AAD1-1F2F7AE3A102) (Booted)
+$ for u in 3BB27787-9C22-452E-A62C-6BD650D35E27 FE195661-B021-4A71-AAD1-1F2F7AE3A102; do
+    ps Axo command | grep "CoreSimulator/Devices/$u[^ ]*[^ ]*Heyta" | sed "s/.*\/apps\/\([^\/]*\)\/.*Heyta\.app.*/Heyta_procs=\1/";
+  done
+heyta-ios-isolated17 Heyta_procs=2
+heyta-iphone-17pro Heyta_procs=3        # 这一台的 3 枚里含 HeytaWidgetExtension
+$ adb devices -l | sed -n '2p'; adb -s emulator-5554 emu avd name; emulator -list-avds
+emulator-5554   device product:sdk_gphone64_arm64 …
+heyta-w3-yearly                          # 本机 `emulator -list-avds` 只有这一枚 AVD
+```
+
+⇒ **前提仍然成立，本线这一格照旧判不可点**，B164 主条与"要拍的那一格"逐字不变。
+
+🔴 **本追记真正的产出是：我差点把这条登记反。** 第一次探 booted 用的是
+
+```
+$ xcrun simctl list devices booted | grep -E '^\s+- (iPhone|iPad)' | wc -l
+0
+```
+
+它返回空，我就开始写"iOS 那一半的前提已经不成立"。两处都是**探针的错，不是设备的状态**：
+`simctl` 的设备行**没有 `- ` 前缀**（真形状是四空格 + 名字 + `(UDID)` + `(Booted)`），而且这两枚是**自定义名**，
+也不以 `iPhone|iPad` 开头。📌 **一般规律：判"某集合为空"之前，先把过滤器摘掉看一眼输出形状** ——
+`grep` 命中 0 有两种成因（真没有 / 模式对不上），两者在输出上长得一模一样，而只有一种允许你写"没有了"
+（AGENTS §7 元规则 1 的又一种面目）。这把尺的两头：假阴证明 = 上面那两行就是它打的；
+能红的证明 = 把 `Booted` 换成 `Booteded` 立刻 0 行。
+
+顺手两格环境读数（都不是产品缺陷，也不是本线新增阻塞；记下来是为了挡后来者误判）：
+
+1. `bash scripts/verify-mobile-window-gate.sh --target b` ⇒ `GATE_RC=3`，红的**只有第 2 步"工作树"**
+   （`❌ 100 枚未提交的源码改动`，绝大多数是别线的 `apps/web/evidence/borderless-surfaces/*.png`，21:0x 现量、会漂）。
+   设备面那一格是 **✅**：`✅ 有已启动的模拟器：heyta-ios-isolated17; heyta-iphone-17pro`，
+   另打一条 `⚠️ 2 台模拟器同时 booted —— --confirm 默认取列表第一台`；进程面两条也 ✅。
+   ⇒ 这一格正好把 B164 主条**又证了一次**：那道门放行的是"没人正在跑验收"，
+   对"这两台设备上挂着别人的活 App"它给的是 ✅，而后者才是本线不能点火的理由。
+   另一条边界：它按调用时的 `git rev-parse --show-toplevel` 取树，所以**从主检出跑它量的就是主检出的脏** ——
+   而 T7 要求从隔离副本构建，那道门的 `src` 判据与被构建的树**可以不是同一棵**。
+2. `pod install` 在隔离载体 `.worktrees/inb-t7/apps/mobile/ios` **失败**。第一趟被 CocoaPods 的 UTF-8
+   locale 门挡下（`Encoding::CompatibilityError` + "CocoaPods requires your terminal to be using UTF-8 encoding"），
+   带 `LANG/LC_ALL=en_US.UTF-8` 重跑才走到装包那一步，然后：
+   `[ReactNativeCore] Failed to download release tarball: bad component(expected absolute path component):
+   /Users/…/All in one Data/…/Pods/ReactNativeCore-artifacts/reactnative-core-0.84.1-debug.tar.gz`，
+   随后 `[!] The 'React-Core-prebuilt' pod failed to validate due to 1 error: ERROR | attributes: Missing required attribute source`。
+   ⚠️ **不要把这句写成"仓库路径带空格必然装不了"** —— 主检出同一条路径下
+   `apps/mobile/ios/Pods/ReactNativeCore-artifacts/` 里那两枚 tarball **都在**，所以差别不只在空格。
+   要判它得在主检出复跑 `pod install`，那会动到并行会话正在用的 `Pods` ⇒ **本线不代做、也不代断言成因**。
+   载体侧 `git status --porcelain -- apps/mobile/ios` **输出为空**（`Podfile.lock` 没被改），只留下
+   gitignore 内的 `Pods/`；而这一格本线不需要它 —— iOS 腿按上面那条判不可点，重装那一趟没有点火，
+   `pod install` 只是"想让 iOS 腿可跑"的预备动作，它失败了**不改变任何一格的状态判定**。
+
 ## B165（2026-10-11 03:5x，本会话 · T7 的 Linux 交付取证第一次跑就撞上的）：**`package-deb.sh` 的同步集合没带上它自己那条回退分支要跑的生成器 ⇒ 从干净载体跑必然 `MODULE_NOT_FOUND`**
 
 第一跑（载体 `.worktrees/inb-t7` @ `16f72239`，`HEYTA_LINUX_HOST=linux-dev-lan pnpm build:linux linux-dev-lan`）：

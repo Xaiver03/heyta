@@ -2553,3 +2553,62 @@ $ python3 research/tools/verify-inbound-commit-scope.py          # rc=1，与 18
 desktop+mobile+landing 与 web 那两笔 —— 这是 B170 记的"别线写进本线文件"那一格的现行读数，
 不是"本线有笔没打上主题词"。两种读法从此可以在输出里直接分辨，不必再跑四条 `git log`。
 
+## 2026-10-11 21:1x · T7 第四格（`pnpm reinstall:all`）的前提**复账仍然成立**，以及我差点把它登记反
+
+复账动机：`B164` 那句"iOS 两台 booted 模拟器各挂着别人的活 `Heyta` 进程"是 03:4x 的读数，隔了 17 小时；
+按"报阻塞前先重跑那一条命令"重取。**结论：前提没变，那一格照旧判不可点。**
+
+```
+$ xcrun simctl list devices | grep -E '\(Booted\)'
+    heyta-ios-isolated17 (3BB27787-9C22-452E-A62C-6BD650D35E27) (Booted)
+    heyta-iphone-17pro (FE195661-B021-4A71-AAD1-1F2F7AE3A102) (Booted)
+$ for u in 3BB27787-… FE195661-…; do ps Axo command | grep "CoreSimulator/Devices/$u[^ ]*[^ ]*Heyta" | wc -l; done
+2
+3
+$ adb devices -l | sed -n '2p'; adb -s emulator-5554 emu avd name; emulator -list-avds
+emulator-5554   device product:sdk_gphone64_arm64 …
+heyta-w3-yearly        # 本机只有这一枚 AVD，是并行会话在用的那台
+```
+
+🔴 **这一节的产出其实是那枚坏探针**：第一次我用
+`xcrun simctl list devices booted | grep -E '^\s+- (iPhone|iPad)'` ⇒ 命中 **0 行**，我就开始写
+"iOS 那一半的前提已经不成立"。两处错都在探针：`simctl` 的设备行**没有 `- ` 前缀**（真形状 = 四空格 +
+名字 + `(UDID)` + `(Booted)`），而这两枚是**自定义名**、也不以 `iPhone|iPad` 开头。
+📌 **判"某集合为空"之前先把过滤器摘掉看一眼输出形状** —— `grep` 命中 0 有"真没有"和"模式对不上"两种成因，
+它们在输出上长得一模一样，而只有一种允许写"没有了"。这把尺两头都有牙：假阴证明 = 摘掉过滤后那两行就是它打的；
+能红的证明 = 把 `Booted` 换成 `Booteded` 立刻 0 行。
+
+顺手两格环境读数（**都不是产品缺陷，也不新增本线阻塞**，记下来挡后来者误判）：
+
+1. `bash scripts/verify-mobile-window-gate.sh --target b` ⇒ `GATE_RC=3`。红的**只有第 2 步"工作树"**
+   （`❌ 100 枚未提交的源码改动`，绝大多数是别线的 `apps/web/evidence/borderless-surfaces/*.png`）；
+   设备面那格是 **✅**（`✅ 有已启动的模拟器：heyta-ios-isolated17; heyta-iphone-17pro` +
+   一条 `⚠️ 2 台模拟器同时 booted —— --confirm 默认取列表第一台`），进程面两条也 ✅。
+   ⇒ 这正好把 `B164` 主条**又证了一次**：那道门放行"没人正在跑验收"，对"设备上挂着别人的活 App"给的是 ✅，
+   而后者才是本线不能点火的理由。另一条边界：它按调用时的 `git rev-parse --show-toplevel` 取树，
+   所以**从主检出跑它，量的就是主检出的脏** —— 而 T7 要求从隔离副本构建，那道门的 `src` 判据
+   与被构建的那棵树**可以不是同一棵**。这一格属于别线的验收脚本，本线不代改，只在 `B164` 追加读数。
+2. `pod install` 在隔离载体 `.worktrees/inb-t7/apps/mobile/ios` **失败**（第一趟被 CocoaPods 的 UTF-8 locale
+   门挡下；带 `LANG/LC_ALL=en_US.UTF-8` 重跑后走到装包：
+   `Failed to download release tarball: bad component(expected absolute path component): /Users/…/All in one Data/…`
+   ⇒ `[!] The 'React-Core-prebuilt' pod failed to validate … Missing required attribute source`）。
+   ⚠️ **不许写成"仓库路径带空格必然装不了"** —— 主检出同一条路径下
+   `apps/mobile/ios/Pods/ReactNativeCore-artifacts/` 那两枚 tarball **都在**，差别不只在空格；
+   要判成因得在主检出复跑，那会动到并行会话正在用的 `Pods` ⇒ **不代做、不代断言成因**。
+   载体侧 `git status --porcelain -- apps/mobile/ios` 输出为空（`Podfile.lock` 未被改），只留下 gitignore 内的 `Pods/`。
+   而且这一格**不影响任何状态判定**：iOS 腿按上面判不可点，重装那一趟本来就没点火。
+
+T7 前两格（`check:reachability` rc=1 与 `@heyta/ai` `5 failed | 260 passed (265)`）**不需要重取**，
+理由是可查的而不是印象：
+
+```
+$ git diff --name-only 1e8ee091 HEAD
+PROGRESS.md
+docs/plans/inbound-automation.md
+```
+
+⇒ 从取那两枚读数的 `1e8ee091` 到当前 HEAD 只差两枚文档文件，没有任何被 import 的源码或 helper 变动，
+而那两枚红都归**别线**（`COMMENT` 已建模≠可达；`capability-manifest.generated.ts` 按"只提交本线文件"
+刻意留在工作树未并进）。**这一条正是本会话 19:2x 学到的那条规矩的反面用法**：那次是因为别线改了
+本线用例 import 的 `e2e/tests/helpers.ts` 才必须重取；这次 `git diff --name-only` 证明没有，就不重取，
+并把"为什么可以不重取"写成一条命令而不是写成一句自信。

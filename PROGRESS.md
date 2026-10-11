@@ -3410,3 +3410,41 @@ cd .worktrees/inb-t7/e2e && npx --no-install playwright test --config playwright
 ⇒ AC-6 那一格"当前 HEAD 上仍红"这句现在是**算到 `1e8ee091`** 的读数，不是 `a599545d` 的沿用。
 载体快进后与 19:1x 那趟的差别只在文档与那枚 helper；本线相关源码（`server/`、`packages/inbound-core` 等）
 零改动 ⇒ 其余七格的读数不需要重取（要核就现量上面那条 `git diff --name-only` 的作用域筛）。
+
+### 21:1x 现量 · 复账 B164 的 iOS 前提（差点登记反），并把"可以不重取"写成命令
+
+一行结论：**T7 第四格（`pnpm reinstall:all`）的 android/ios 两腿前提仍然成立，那一格仍判不可点**；
+这一轮真正的产出是那枚坏探针和一条"读数什么时候可以不重取"的分辨法。
+
+**做了的事（顺序）**：
+
+1. 先重取设备面。`xcrun simctl list devices | grep -E '\(Booted\)'` ⇒ 两台 booted
+   （`heyta-ios-isolated17` / `heyta-iphone-17pro`）；`ps Axo command | grep "CoreSimulator/Devices/<UDID>…Heyta"`
+   ⇒ 分别 **2** 与 **3** 个活的 `Heyta` 进程。android 侧只有 `emulator-5554` = `heyta-w3-yearly`，
+   `emulator -list-avds` 本机只有这一枚。⇒ **B164 逐字不变**，不新起阻塞。
+2. 🔴 **我第一趟的量法是坏的**：`xcrun simctl list devices booted | grep -E '^\s+- (iPhone|iPad)'` 命中 0 行，
+   于是我起草了"iOS 那一半的前提已经不成立"。**那份草稿没被插进账本，因为它写的是假话**：
+   `simctl` 的行没有 `- ` 前缀，而且这两枚是自定义名、不以 `iPhone|iPad` 开头。
+   ⇒ 落进 `B164` 追记的是**反向验证那一格**：判"集合为空"前先把过滤器摘掉看输出形状；
+   摘掉后那两行就是"不假阴"的证明，把 `Booted` 换成 `Booteded` 立刻 0 行就是"能红"的证明。
+3. `bash scripts/verify-mobile-window-gate.sh --target b` ⇒ `GATE_RC=3`，红的**只有工作树那一格**
+   （100 枚别线未提交改动），设备面/进程面四条全 ✅。⇒ 这条把 B164 主条又证了一次，
+   也暴露那道门的第二个边界：它按调用时的 `--show-toplevel` 取树，所以从主检出跑它量的不是我要构建的那棵树。
+4. `pod install`（隔离载体 `.worktrees/inb-t7/apps/mobile/ios`）失败：先被 CocoaPods 的 UTF-8 locale 门挡下，
+   带 `LANG/LC_ALL=en_US.UTF-8` 重跑后在 `React-Core-prebuilt` 的 tarball  URI 上炸
+   （`bad component(expected absolute path component): /Users/…/All in one Data/…`）。
+   **我没有把它写成"路径带空格必然装不了"** —— 主检出同路径下那两枚 tarball 都在，所以成因不止空格，
+   而那要动并行会话在用的 `Pods` 才能判 ⇒ 登记成"不代做、不代断言成因"。
+   载体 `git status --porcelain -- apps/mobile/ios` 空 ⇒ 没碰被跟踪文件，只有 gitignore 内的 `Pods/`。
+5. T7 前两格（`check:reachability` rc=1、`@heyta/ai` `5 failed | 260 passed (265)`）**没有重跑**，
+   理由写成命令：`git diff --name-only 1e8ee091 HEAD` ⇒ 只差两枚文档文件。
+   📌 这是 19:2x 那条规矩（"被 import 的共享文件被别人改了就不许沿用读数"）的**反面用法**：
+   不重取的资格不是"我觉得没改"，是一条能打印出文件名的命令。
+
+**改了什么**：`BLOCKED.md`（B164 追加 21:1x 追记）、`docs/plans/inbound-automation.md`（新增 21:1x 一节）、
+本节。**没动任何源码、没动任何判据、没 push。**
+
+**下一步（按能不能自己做排）**：
+- 我能自己做的只剩 **T8 交付表终稿**（把这一轮的两条前提读数搬进交付表那两格）与最终汇报。
+- 必须等负责人的：`公网接收与售卖` 开关、B140 那一根线（已量完：两枚文件三处、零附带伤害）、
+  B139 归属、B169 A/B、AC-8 设备腿（就是本节这一格）、push。
