@@ -23,6 +23,13 @@
   gap: var(--ht-space-2);
 }
 
+/* 🔴 通栏的 ghost 按钮会被读成区块标题（真浏览器截图实测：「生成或轮换发送方凭据」
+   正好压在凭据卡上方，看起来像那张卡的表头）。动作按钮要跟卡片里其它动作一样
+   按内容取宽，不铺满一行。 */
+.ht-inbound__credential > .ht-btn {
+  align-self: flex-start;
+}
+
 .ht-inbound__credential-secret {
   padding: var(--ht-space-3);
   border: var(--ht-border-width-thin) solid var(--ht-color-border);
@@ -71,4 +78,15 @@
   min-block-size: var(--ht-touch-target-min);
   gap: var(--ht-space-2);
   white-space: nowrap;
+}
+
+/* 事件区与规则区是两件事（一条是配置、一条是运行结果），用一条上边框分隔，
+   而不是再加一层卡片背景 —— 扁平风格用边框表达层次（AGENTS §5）。 */
+.ht-inbound__events {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+  gap: var(--ht-space-3);
+  padding-block-start: var(--ht-space-4);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
 }
