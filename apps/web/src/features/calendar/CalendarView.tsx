@@ -196,7 +196,10 @@ export function CalendarView(): React.JSX.Element {
       void store
         .toggleComplete(taskId)
         .catch(() => {
-          // store 自己会把失败写进 status（见它的文件头）；这里只负责把忙碌标记放开，
+          // 这一句以前写的是"store 自己会把失败写进 status"—— **当时那句是假的**：
+          // `TaskState.error` 有声明、没有一处写它。现在它真的会被写
+          // （`store.ts` 的 `withActionFailure`），显示的地方是 `TaskActionError`
+          // 挂在内容列顶部那一行。这里只负责把忙碌标记放开，
           // 否则那一条会永远置灰。
         })
         .finally(() => {

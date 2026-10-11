@@ -681,6 +681,13 @@ export const en = {
   'web.shell.tasks.more': 'More actions: {title}',
   'web.shell.tasks.moreLabel': 'More',
   'web.shell.tasks.delete': 'Delete: {title}',
+  // The line shown when a task action fails (layout audit §8.2 item 12).
+  // Deliberately **no interpolation of the internal error text**: the layer above
+  // cannot classify the cause, and rendering `error.message` would turn diagnostic
+  // output into user-facing copy. The code is `TaskActionFailureCode` in
+  // `apps/web/src/features/tasks/store.ts`.
+  'web.tasks.actionFailed': 'That change was not saved. It is still on this device — you can try again.',
+  'web.tasks.dismissFailure': 'Got it',
 
   // Task-list date group headers (Dida-style). Ordering/bucketing lives in
   // `groupTasksByDate` (@heyta/domain); only the wording lives here.
