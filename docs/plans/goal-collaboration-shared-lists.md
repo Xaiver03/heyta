@@ -507,7 +507,8 @@ package.json   (只加了一行 verify:collab-journey)
   4. `packages/domain` `subscription.spec.ts`（**1 failed | 1022 passed**）—— 权益拒绝理由契约，**计费/权益线，不代改**。
   5. ⚠️ `apps/mobile`（**`Tests 958 passed (958)` 却非零退**）—— **958 条全过，红只在一条 unhandled rejection**：`RolldownError: Parse failure` 起源于 `tests/auth-flow.spec.ts`（Rolldown 解析 Flow），
      就是 AGENTS §9 记的 **`RTEST-UNHANDLED-01`**（单跑不现、共享载体上的环境抖动，**不是产品失败、也不记协作线**）。附 `[prefs] op-sqlite Cannot find module` 是沙箱里原生模块解析不到的环境噪声。
-- ⇒ **协作线自己的红：landing 一枚已修绿**。整链 `-r test` / `pnpm check` 现在**只剩三枚别线判断绊线**（ai/shared-schema/domain）+ 一枚已知载体抖动（mobile），
+- ⇒ **协作线自己的红：landing 一枚已修绿**。整链 `-r test` / `pnpm check` 现在**只剩四枚别线判断绊线**（ai-manifest + `check:reachability` 同源 COMMENT/产品体验线 `e6058120`、shared-schema/auth、domain/billing）+ 一枚已知载体抖动（mobile），
+- 🔴 **本线交付物的一键复认证（在最新 HEAD 上跑一遍，确认共享码没被别会话改坏本线）**：静态门 `pnpm check:layering check:ui-language check:design check:migrations check:adr-numbering`（各 rc=0）+ 逐包 `cd packages/{app-host,ui,sync-client,i18n} && npx vitest run`、`cd apps/landing && npx vitest run`、`cd apps/web && npx vitest run tests/share-key-store.spec.ts`（本会话 2026-10-11 全绿，条数以命令现读为准、不写死）。（注：全链 `-r test`/`pnpm check` 因上面四枚别线红仍非零退，与本线交付物是否绿是两件事。）
   **在本线之外，各归其主之前"全链绿"到不了**；reinstall:all 卡在全链绿之后，且产品负责人已明确"本会话不要再触发任何需要我交付的东西"，故不无人值守跑四端设备重装。
 
 
