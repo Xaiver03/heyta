@@ -346,14 +346,14 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
 
   return (
     <section className="ht-settings__subsection" data-testid="inbound-automation-settings">
-      <h3 className="ht-settings__h3">{t('web.ai.inbound.title')}</h3>
+      <h3 className="ht-settings__h3 ht-type-headline">{t('web.ai.inbound.title')}</h3>
       <p className="ht-settings__hint">{t('web.ai.inbound.disclosure')}</p>
       {!signedIn ? <p className="ht-settings__hint">{t('web.ai.inbound.signIn')}</p> : (
         <>
           <div className="ht-inbound__group">
             <p className="ht-settings__hint">{t('web.ai.inbound.formHint')}</p>
             <p className="ht-settings__hint" role="status">{readinessMessage}</p>
-            <p className="ht-settings__hint">{recipient === undefined ? t('web.ai.inbound.keyMissing') : t('web.ai.inbound.keyReady', { epoch: recipient.keyEpoch })}</p>
+            <p className="ht-settings__hint tabular-nums">{recipient === undefined ? t('web.ai.inbound.keyMissing') : t('web.ai.inbound.keyReady', { epoch: recipient.keyEpoch })}</p>
             <div className="ht-settings__actions">
               {recipient === undefined ? <button type="button" className="ht-btn ht-btn--ghost" onClick={() => void setupRecipient()} disabled={busy !== undefined}>{t('web.ai.inbound.keySetup')}</button> : <button type="button" className="ht-btn ht-btn--ghost" onClick={() => void rotateRecipient()} disabled={busy !== undefined}>{t('web.ai.inbound.keyRotate')}</button>}
               <button type="button" className="ht-btn ht-btn--ghost" onClick={() => void setupWorker()} disabled={busy !== undefined}>
@@ -388,11 +388,11 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
             </button>
           </div>
           {loading ? <p className="ht-settings__hint">{t('web.ai.inbound.loading')}</p> : null}
-          {error ? <p className="ht-settings__hint" role="alert">{error}</p> : null}
+          {error ? <p className="ht-settings__danger" role="alert">{error}</p> : null}
           <div className="ht-inbound__stack" aria-live="polite">
             {rules.map((rule) => <article className="ht-inbound__group" key={rule.id} data-testid={`inbound-rule-${rule.id}`}>
-              <strong>{rule.keyId}</strong>
-              <p className="ht-settings__hint">{rule.deletedAt !== null ? t('web.ai.inbound.deleted') : rule.enabled ? t('web.ai.inbound.enabled') : t('web.ai.inbound.disabled')} · {t('web.ai.inbound.version', { version: rule.version })}</p>
+              <strong className="tabular-nums">{rule.keyId}</strong>
+              <p className="ht-settings__hint tabular-nums">{rule.deletedAt !== null ? t('web.ai.inbound.deleted') : rule.enabled ? t('web.ai.inbound.enabled') : t('web.ai.inbound.disabled')} · {t('web.ai.inbound.version', { version: rule.version })}</p>
               <p className="ht-settings__hint">{rule.allowedFields.map((field) => fieldLabel(field, t)).join('、')}</p>
               {rule.deletedAt === null ? <div className="ht-inbound__credential" data-testid={`inbound-credential-${rule.id}`}>
                 <p className="ht-settings__hint">{t('web.ai.inbound.credential.disclosure')}</p>
@@ -402,6 +402,12 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
                 </div>)}
                 <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined} onClick={() => void issueCredential(rule)}>{t('web.ai.inbound.credential.rotate')}</button>
               </div> : null}
+              {oneTimeSecret?.ruleId === rule.id ? <aside className="ht-inbound__credential-secret" role="status" data-testid="inbound-credential-secret">
+                <p className="ht-settings__hint">{t('web.ai.inbound.credential.secretOnce', { keyId: oneTimeSecret.keyId })}</p>
+                <code className="tabular-nums">{oneTimeSecret.secret}</code>
+                <div className="ht-settings__actions"><button type="button" className="ht-btn ht-btn--primary" onClick={() => void copySecret()}>{secretCopied ? t('web.ai.inbound.credential.copied') : t('web.ai.inbound.credential.copy')}</button><button type="button" className="ht-btn ht-btn--ghost" onClick={() => void testSend()}>{t('web.ai.inbound.credential.testSend')}</button><button type="button" className="ht-btn ht-btn--ghost" onClick={() => setOneTimeSecret(undefined)}>{t('web.ai.inbound.draft.close')}</button></div>
+                {testSendState !== undefined ? <p className="ht-settings__hint" role="status">{t('web.ai.inbound.credential.testSendResult', { state: testSendState })}</p> : null}
+              </aside> : null}
               <div className="ht-settings__actions">
                 {rule.deletedAt === null ? <>
                   {rule.enabled ? <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined || processing || !workerRegistered} onClick={() => void workerLoop.current?.wake()}>{t('web.ai.inbound.processOne')}</button> : null}
@@ -409,7 +415,7 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
                   <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined} onClick={() => void updateRule(rule, !rule.enabled)}>
                     {rule.enabled ? t('web.ai.inbound.pause') : t('web.ai.inbound.enable')}
                   </button>
-                  <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined} onClick={() => void removeRule(rule)}>
+                  <button type="button" className="ht-btn ht-btn--danger" disabled={busy !== undefined} onClick={() => void removeRule(rule)}>
                     {t('web.ai.inbound.remove')}
                   </button>
                 </> : null}
@@ -420,53 +426,49 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
               <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined} onClick={() => setEditingRuleId(undefined)}>{t('web.ai.inbound.cancelEdit')}</button>
             </div> : null}
             {processState === 'idle' ? null : <p className="ht-settings__hint" role="status" data-inbound-cycle-state={processState}>{processCopyKey === undefined ? null : t(processCopyKey)}</p>}
-            <h4 className="ht-settings__h3">{t('web.ai.inbound.events.title')}</h4>
-            {events.length === 0 ? <p className="ht-settings__hint">{t('web.ai.inbound.events.empty')}</p> : null}
-            {events.map((event) => {
-              const status = ['queued', 'leased', 'prepared', 'completed', 'needs-confirmation', 'expired', 'cancelled'].includes(event.status) ? event.status : 'waiting';
-              const canRetry = event.status === 'needs-confirmation' && event.reasonCode === 'model-result-uncertain';
-              const canReview = event.status === 'needs-confirmation' && event.reasonCode === 'needs-confirmation';
-              return <article className="ht-inbound__group" key={event.eventId} data-testid={`inbound-event-${event.eventId}`}>
-                <p className="ht-settings__hint">{t('web.ai.inbound.events.event', { id: event.eventId })}</p>
-                <strong>{t(`web.ai.inbound.events.${status}` as any)}</strong>
-                {canReview ? <>
-                  <div className="ht-settings__actions">
-                    <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined} onClick={() => void openDraft(event)}>{t('web.ai.inbound.draft.open')}</button>
-                    <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined} onClick={() => void cancelDraftEvent(event)}>{t('web.ai.inbound.draft.cancelEvent')}</button>
-                  </div>
-                  {active && draft?.binding === draftBinding && draft.review.eventId === event.eventId ? <div className="ht-inbound__draft" data-testid="inbound-draft-editor">
-                    <p className="ht-settings__hint">{t('web.ai.inbound.draft.disclosure', { timezone: draft.review.timezone })}</p>
-                    {draft.tasks.map((task, index) => <fieldset key={task.id} className="ht-inbound__draft-task">
-                      <legend className="ht-settings__legend">{t('web.ai.inbound.draft.item', { index: index + 1 })}</legend>
-                      <label className="ht-settings__field">{t('web.ai.inbound.field.title')}<input className="ht-settings__input" value={task.title} onChange={(e) => editDraftTask(index, { title: e.target.value })} /></label>
-                      <label className="ht-settings__field">{t('web.ai.inbound.field.note')}<textarea className="ht-settings__input" value={task.note ?? ''} onChange={(e) => editDraftTask(index, { note: e.target.value })} /></label>
-                      <label className="ht-settings__field">{t('web.ai.inbound.field.priority')}<select className="ht-settings__input" value={task.priority} onChange={(e) => editDraftTask(index, { priority: Number(e.target.value) as InboundDraftTask['priority'] })}>
-                        {[0, 1, 2, 3].map((value) => <option key={value} value={value}>{t(`web.ai.inbound.draft.priority.${value}` as any)}</option>)}
-                      </select></label>
-                      {(['dueDate', 'startDate'] as const).map((field) => <label key={field} className="ht-settings__field">{t(`web.ai.inbound.field.${field}` as any)}<input className="ht-settings__input" value={task[field] ?? ''} onChange={(e) => editDraftTask(index, { [field]: e.target.value === '' ? undefined : e.target.value })} /></label>)}
-                      <label className="ht-settings__field">{t('web.ai.inbound.field.durationMinutes')}<input className="ht-settings__input" type="number" value={task.durationMinutes ?? ''} onChange={(e) => editDraftTask(index, { durationMinutes: e.target.value === '' ? undefined : Number(e.target.value) })} /></label>
-                    </fieldset>)}
+            <div className="ht-inbound__events">
+              <h4 className="ht-settings__h3 ht-type-group-label">{t('web.ai.inbound.events.title')}</h4>
+              {events.length === 0 ? <p className="ht-settings__hint">{t('web.ai.inbound.events.empty')}</p> : null}
+              {events.map((event) => {
+                const status = ['queued', 'leased', 'prepared', 'completed', 'needs-confirmation', 'expired', 'cancelled'].includes(event.status) ? event.status : 'waiting';
+                const canRetry = event.status === 'needs-confirmation' && event.reasonCode === 'model-result-uncertain';
+                const canReview = event.status === 'needs-confirmation' && event.reasonCode === 'needs-confirmation';
+                return <article className="ht-inbound__group" key={event.eventId} data-testid={`inbound-event-${event.eventId}`}>
+                  <p className="ht-settings__hint">{t('web.ai.inbound.events.event', { id: event.eventId })}</p>
+                  <strong>{t(`web.ai.inbound.events.${status}` as any)}</strong>
+                  {canReview ? <>
                     <div className="ht-settings__actions">
-                      <button type="button" className="ht-btn ht-btn--primary" disabled={busy !== undefined} onClick={() => void confirmDraft()}>{t('web.ai.inbound.draft.confirm')}</button>
-                      <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined} onClick={closeDraft}>{t('web.ai.inbound.draft.close')}</button>
+                      <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined} onClick={() => void openDraft(event)}>{t('web.ai.inbound.draft.open')}</button>
+                      <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined} onClick={() => void cancelDraftEvent(event)}>{t('web.ai.inbound.draft.cancelEvent')}</button>
                     </div>
+                    {active && draft?.binding === draftBinding && draft.review.eventId === event.eventId ? <div className="ht-inbound__draft" data-testid="inbound-draft-editor">
+                      <p className="ht-settings__hint">{t('web.ai.inbound.draft.disclosure', { timezone: draft.review.timezone })}</p>
+                      {draft.tasks.map((task, index) => <fieldset key={task.id} className="ht-inbound__draft-task">
+                        <legend className="ht-settings__legend">{t('web.ai.inbound.draft.item', { index: index + 1 })}</legend>
+                        <label className="ht-settings__field">{t('web.ai.inbound.field.title')}<input className="ht-settings__input" value={task.title} onChange={(e) => editDraftTask(index, { title: e.target.value })} /></label>
+                        <label className="ht-settings__field">{t('web.ai.inbound.field.note')}<textarea className="ht-settings__input" value={task.note ?? ''} onChange={(e) => editDraftTask(index, { note: e.target.value })} /></label>
+                        <label className="ht-settings__field">{t('web.ai.inbound.field.priority')}<select className="ht-settings__input" value={task.priority} onChange={(e) => editDraftTask(index, { priority: Number(e.target.value) as InboundDraftTask['priority'] })}>
+                          {[0, 1, 2, 3].map((value) => <option key={value} value={value}>{t(`web.ai.inbound.draft.priority.${value}` as any)}</option>)}
+                        </select></label>
+                        {(['dueDate', 'startDate'] as const).map((field) => <label key={field} className="ht-settings__field">{t(`web.ai.inbound.field.${field}` as any)}<input className="ht-settings__input" value={task[field] ?? ''} onChange={(e) => editDraftTask(index, { [field]: e.target.value === '' ? undefined : e.target.value })} /></label>)}
+                        <label className="ht-settings__field">{t('web.ai.inbound.field.durationMinutes')}<input className="ht-settings__input" type="number" value={task.durationMinutes ?? ''} onChange={(e) => editDraftTask(index, { durationMinutes: e.target.value === '' ? undefined : Number(e.target.value) })} /></label>
+                      </fieldset>)}
+                      <div className="ht-settings__actions">
+                        <button type="button" className="ht-btn ht-btn--primary" disabled={busy !== undefined} onClick={() => void confirmDraft()}>{t('web.ai.inbound.draft.confirm')}</button>
+                        <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined} onClick={closeDraft}>{t('web.ai.inbound.draft.close')}</button>
+                      </div>
+                    </div> : null}
+                  </> : null}
+                  {canRetry ? <div className="ht-inbound__retry">
+                    {retryEventId === event.eventId ? <>
+                      <p className="ht-settings__hint">{t('web.ai.inbound.events.retryDisclosure')}</p>
+                      <div className="ht-settings__actions"><button type="button" className="ht-btn ht-btn--primary" disabled={busy !== undefined} onClick={() => void retryEvent(event)}>{t('web.ai.inbound.events.confirmRetry')}</button>
+                      <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined} onClick={() => setRetryEventId(undefined)}>{t('web.ai.inbound.events.cancelRetry')}</button></div>
+                    </> : <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined} onClick={() => setRetryEventId(event.eventId)}>{t('web.ai.inbound.events.retry')}</button>}
                   </div> : null}
-                </> : null}
-                {canRetry ? <div className="ht-inbound__retry">
-                  {retryEventId === event.eventId ? <>
-                    <p className="ht-settings__hint">{t('web.ai.inbound.events.retryDisclosure')}</p>
-                    <div className="ht-settings__actions"><button type="button" className="ht-btn ht-btn--primary" disabled={busy !== undefined} onClick={() => void retryEvent(event)}>{t('web.ai.inbound.events.confirmRetry')}</button>
-                    <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined} onClick={() => setRetryEventId(undefined)}>{t('web.ai.inbound.events.cancelRetry')}</button></div>
-                  </> : <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined} onClick={() => setRetryEventId(event.eventId)}>{t('web.ai.inbound.events.retry')}</button>}
-                </div> : null}
-              </article>;
-            })}
-            {oneTimeSecret ? <aside className="ht-inbound__credential-secret" role="status" data-testid="inbound-credential-secret">
-              <p className="ht-settings__hint">{t('web.ai.inbound.credential.secretOnce', { keyId: oneTimeSecret.keyId })}</p>
-              <code>{oneTimeSecret.secret}</code>
-              <div className="ht-settings__actions"><button type="button" className="ht-btn ht-btn--primary" onClick={() => void copySecret()}>{secretCopied ? t('web.ai.inbound.credential.copied') : t('web.ai.inbound.credential.copy')}</button><button type="button" className="ht-btn ht-btn--ghost" onClick={() => void testSend()}>{t('web.ai.inbound.credential.testSend')}</button><button type="button" className="ht-btn ht-btn--ghost" onClick={() => setOneTimeSecret(undefined)}>{t('web.ai.inbound.draft.close')}</button></div>
-            </aside> : null}
-            {testSendState !== undefined ? <p className="ht-settings__hint" role="status">{t('web.ai.inbound.credential.testSendResult', { state: testSendState })}</p> : null}
+                </article>;
+              })}
+            </div>
           </div>
         </>
       )}

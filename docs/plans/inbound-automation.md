@@ -2612,3 +2612,96 @@ docs/plans/inbound-automation.md
 刻意留在工作树未并进）。**这一条正是本会话 19:2x 学到的那条规矩的反面用法**：那次是因为别线改了
 本线用例 import 的 `e2e/tests/helpers.ts` 才必须重取；这次 `git diff --name-only` 证明没有，就不重取，
 并把"为什么可以不重取"写成一条命令而不是写成一句自信。
+
+
+## 2026-10-12 00:1x–00:3x · 负责人把排版决定权交给我之后，我改的七格（含一次自己看图判错的缺陷）
+
+**指令原话**：「你自己来按照最佳实践来进行一下排版吧。产品经理，你就是最厉害的产品经理，你会怎么决定？由你来决定。」
+⇒ 这一节的判据不是"好不好看"，而是**界面有没有在说谎**：层级、动作与结果的从属、危险动作的色差、错误与提示的区分。
+约束先钉死：`packages/i18n` 不许动 ⇒ **零新文案**；`check:design` 不许裸值 ⇒ **零新裸值**；
+两枚文件都在本线白名单内（`InboundAutomationSettings.tsx` / `inbound-automation.css`），第三枚是本线用例。
+
+### 1. 七格决定，以及每一格凭什么
+
+| 决定 | 现量依据（改前） | 为什么这是缺陷不是口味 |
+|---|---|---|
+| 面板标题补语义档位 `ht-type-headline` | `ai-panels.css:304` 那句注释：`.ht-settings__h3` **不带**排版四件套，档位来自成对挂上的 `ht-type-*`；同级 9 枚面板（`AiSettings`、`PasskeyPanel`、`ExportPanel`…）全都成对，本面板两枚标题**都是裸挂** | 裸挂不报错，只是退回浏览器默认 h3 尺寸。AGENTS §5 那条"一页八个页标题"的层级倒挂正是这个来路，而且**没有任何一层会失败** |
+| 事件区分节标题降到 `ht-type-group-label` | 改前是 `<h4 className="ht-settings__h3">` —— 与面板标题同一枚类，而该类不带档位 ⇒ 两档实际由 UA 默认值决定 | 子块标题与面板标题同尺寸＝层级塌；它管辖的是"运行结果"，天然低一级 |
+| 一次性凭据卡从**整块面板页尾**移进它所属的那枚规则卡 | 改前 `<aside data-testid="inbound-credential-secret">` 坐在 `rules.map(...)` 外面，而触发它的「生成或轮换发送方凭据」按钮在卡内 | 动作在卡里、结果在页尾：多枚规则时用户无法判断这串密钥属于谁。这是"界面说谎"那一类，不是疏密问题 |
+| 「删除规则」用 `ht-btn--danger` | 改前与「暂停」「编辑」同为 `ht-btn--ghost` | 不可逆动作与可逆动作同外观 ⇒ 界面把风险等级说平了 |
+| 取数失败的行用设置面板既有的 `.ht-settings__danger` | 改前是 `ht-settings__hint`（与说明句同一个类）。同层六枚面板（`PasskeyPanel`、`SessionsPanel`、`EmailChangePanel`、`ProjectsPanel`、`TrashView`、`AiSettings`）的错误行都用 `.ht-settings__danger` | 错误与提示同外观 ⇒ `role="alert"` 只帮到读屏，不帮到眼睛 |
+| keyId / 版本 / epoch / 密钥展示走 `.tabular-nums` | 该类由 `packages/design-system/src/reset.css:125` 提供（**不是**我新造的类），AGENTS §5 明列"数字不加 `.tabular-nums`"为常见错 | 版本与 epoch 会跳变，字宽不等整行会抖 |
+| 「生成或轮换发送方凭据」不再通栏 | 真浏览器截图：通栏的 ghost 按钮压在凭据卡正上方，**读起来像那张卡的表头** | 动作被渲染成标题＝界面把"这是一个可点的东西"说丢了。修在 CSS 一侧：`.ht-inbound__credential > .ht-btn { align-self: flex-start }` |
+
+### 2. 命令与贴出的读数（主检出，2026-10-12 00:1x–00:2x）
+
+```
+pnpm --filter @heyta/web typecheck                     TC=0
+cd apps/web && npx --no-install vitest run --maxWorkers=1 \
+  tests/inbound-*.spec.tsx tests/inbound-upload-authorization.spec.ts
+  Test Files  6 passed (6)   Tests  17 passed (17)      RC=0     ← 基线 5 文件 11 条，只增不减、跳过 0
+pnpm check:design   DESIGN_RC=0   （扫描 543 个源文件、9 类硬编码，✅ 无硬编码设计变量）
+pnpm check:ui-language LANG_RC=0  （词条表 zh-CN 3983 / en 3983，未新增键）
+pnpm check:layering LAYER_RC=0    （apps/* 438 文件、10 条规则）
+```
+
+新用例 `apps/web/tests/inbound-panel-layout.spec.tsx`（6 条）钉上面前六格。
+**夹具故意给两枚规则卡**：只给一枚时"凭据卡挪到页尾"与"嵌在那枚卡里"在 DOM 上长得一模一样 ——
+第一版就是这么写的，臂 C 因此**存活**（rc=0），当场暴露我那条判据是永远通过的判据。
+
+### 3. 反向验证：八臂，逐臂红了哪一条（`NO_COLOR=1`，载体 sha256 前后对账）
+
+```
+臂 A 面板标题掉档                     rc=1  红 1 条：面板标题与事件区分节标题各自挂到语义档位
+臂 B 事件区标题与面板同档             rc=1  红 1 条：同上
+臂 C1 凭据卡两枚规则都挂              rc=1  红 1 条：一次性凭据卡只在它那一枚规则卡里
+臂 C2 凭据卡合法地挪到整块面板页尾    rc=1  红 1 条：同上          ← 这一臂才是 C 的真正对照
+臂 D 删除不再是危险色                 rc=1  红 1 条：每一枚规则卡的「删除」都是危险动作样式
+臂 E 错误行回成提示外观               rc=1  红 1 条：加载失败那一行是错误样式且带 role=alert
+臂 F keyId 丢等宽数字                 rc=1  红 1 条：每张卡的标识与计数行都走等宽数字
+臂 G 摘掉那条 align-self CSS 规则     rc=1  红 1 条（真浏览器）：动作按钮不许通栏
+每臂跑完还原：InboundAutomationSettings.tsx 工作树 sha256 前 16 位逐臂等于变异前；
+臂 G 还原后载体与主检出的 inbound-automation.css sha256 逐字相同。
+```
+
+🔴 臂 C2 的第一版写法**不算数**：我把整段 `<aside>` 直接搬到页尾锚点，`rule` 出了作用域 ⇒ 组件当场崩、六条全红。
+那红的是"编译不过"，不是我要判的那格。改成"搬过去同时把守卫换成 `oneTimeSecret !== undefined`"（合法 JSX）之后，
+它才**恰好红一条**。判据的对照臂必须落在"缺陷态仍然是一份能跑的代码"那一侧。
+
+### 4. 真浏览器取证（AGENTS §6.2 规定一：截图 + 人真打开看过）
+
+新用例在 `e2e/tests/inbound-automation.spec.ts` 末尾（本线白名单内），两档宽度 × 亮暗：
+
+```
+cd .worktrees/inb-t7/e2e && npx playwright test --config playwright.inbound.config.ts -g "panel layout evidence"
+  ✓ inbound settings panel layout evidence 1280 (2.7s)
+  ✓ inbound settings panel layout evidence 390  (1.6s)
+  2 passed (5.7s)
+```
+
+判据是**计算样式与几何**，不是类名字符串：面板标题 fontSize 真大于事件区标题、事件区 borderTopWidth > 0、
+凭据卡的矩形完全落在那枚规则卡的矩形内、逐元素横向溢出 offenders 为空、面板左右缘不偏出视口、
+危险色与提示色不同、轮换按钮宽度 < 凭据块宽度的 0.9。读数落成 `geometry-<宽>.json` 两份。
+
+四张图（`docs/research/evidence/inbound-automation-review/panel-layout/panel-{1280,390}-{light,dark}.png`）
+**逐张打开看过**：层级两档分明、事件区有分隔线、凭据卡在那枚卡里、删除是红的、暗色下勾选框仍是主蓝。
+
+🔴 **我差点据此入库一条假缺陷**：第一版 390 的图顶部出现"设置"标题与标签行、右侧像被裁，
+我据此判定"窄屏有裁切缺陷"并开始改 CSS。逐元素量下来 `offenders=[]`、面板 `x=32 right=358 ≤ 390` ⇒ **裁切不存在**。
+真因是视口只有 1400 高而面板 1389 高，Playwright 滚动拼接时把设置浮层的**吸顶头**拼进了图里。
+⇒ 修法是把取证视口抬到 2200（单张拍摄，不拼接），而不是改产品。
+这与 §7 第 170 条（窗口截图当内容载体会**同时**假红和假绿）同族：**看图判缺陷之前，先问这张图是怎么拼出来的。**
+
+### 5. 看到但这一轮没改的一格（不包装成完成）
+
+1280 那张上，「创建规则」按钮之后直接是 `hook-layout` 那枚规则卡，两块**只靠空白分组**、没有边界，
+规则卡看起来像表单的延续。要修就得给 `.ht-inbound__group` 加边框或底色，而同一个类还挂在
+**事件卡与草稿卡**上 ⇒ 一改就是三类卡片同时变重，需要一整轮重新取证。
+按让步顺序（判定算得对 > 证据能复跑 > 覆盖全 > 做得快），这一格**留到下一轮单独做**，
+现在如实记在这里而不是顺手改掉。
+
+### 6. 这一节没有动的东西
+
+`packages/i18n` 零改动（七格全部复用既有类与既有条词，包括 `.tabular-nums` 与 `.ht-settings__danger` 两枚**已有**的共享类，
+没有为排版新造一份工具类）；`App.tsx` / `AiSettings.tsx` 一行没碰 ⇒ **B140 那一格照旧**（`active` 仍没人接，
+真浏览器里靠 `selectSettingsSection` 走到 AI 分组，与本节四张图同一通道）；AC 已勾数仍为 0，勾由负责人点。
