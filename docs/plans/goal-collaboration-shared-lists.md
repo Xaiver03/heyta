@@ -540,8 +540,7 @@ package.json   (只加了一行 verify:collab-journey)
      领先集**大头是别的并行线的未公开笔**。**按线现量分类**（给协调用）：
      `git --no-pager log origin/main..HEAD --format='%s' | sed -E 's/^[a-z]+[（(]([^)）]*).*/\1/' | sort | uniq -c | sort -rn`
      —— 本会话某刻读得：协作线（我）约 12–14 笔，其余散在 **账号标准套件 / 自动收集 / 产品体验线 / 四端重装 / BLOCKED 账本 / server / 文档门禁** 等 4–5 条并行线，非本线笔合计约 50。
-     ⇒ `git push origin main` 会替这 ~50 笔**别人只在本地的笔**一起公开到 origin/main —— 这正是「不代公开别人未提交的笔」那条红线，本线不代推。**要落地推送，正确姿势是各线各自从自己机器 push、或产品负责人拍"整条 main 一起推"；下一 AI 别代推**；`.git/hooks/pre-push` 另指向外部 `pre-push-bytearm`，不许 `--no-verify` 绕。
-     `git push origin main` 会把这些**别人只在本地的笔一起公开**到 origin/main —— 这正是「不代公开别人未提交的笔」那条红线，本线不代推。**下一个 AI 若要推，先与那几条线协调，或确认各线已自行 push、`origin/main..HEAD` 只剩本线笔后再判**；`.git/hooks/pre-push` 另指向外部 `pre-push-bytearm`（凭据下线那套），不许 `--no-verify` 绕。
+     ⇒ `git push origin main` 会替这 ~50 笔**别人只在本地的笔**一起公开到 origin/main —— 这正是「不代公开别人未提交的笔」那条红线，本线不代推。**要落地推送，正确姿势是各线各自从自己机器 push、或产品负责人拍"整条 main 一起推"；下一 AI 别代推 —— 除非 `origin/main..HEAD` 现量只剩本线笔**；`.git/hooks/pre-push` 另指向外部 `pre-push-bytearm`（凭据下线那套），不许 `--no-verify` 绕。
    - ⇒ 本线交付形态：**代码已本地成笔、可复核可回退**；公开到 origin 这一步**押在跨线协调上**，不是本线遗漏。
 5. **两停止点（B 类，等产品负责人裁决；本轮已把 ① 的证据看实）**：
    - ① **PIPL 同意弹窗（02 号图 + 本轮读 `packages/ui/src/sync/ShareConsentModal.tsx` 源码现量）**：三个可操作控件（确认共享 / 取消 / 不再询问）**都是真 `Pressable`，功能与无障碍没问题** —— `accessibilityRole="button"`（accept/cancel）/ `accessibilityRole="checkbox"` + `aria-checked`（不再询问）、各自 `onPress` + `testID`（`share-consent-accept`/`-cancel`/`-dont-ask`）齐全。**真正的缺陷是：整个 modal（外层 `View` + 三个 `Pressable`）没有任何 `style`/StyleSheet** ⇒ 渲染成一叠无按钮/勾选框外观的纯文字行（截图里那个样子）。**不是"控件坏了"，是"一个能用、可访问、但零视觉设计的同意面"。** 待产品负责人拍的仍是同一件事，但口径要准：**要不要给它套设计系统样式 + 同意面的视觉层级**（哪枚按钮做主强调、"不再询问"默认关且给真勾选框视觉），而视觉层级在 PIPL 同意面上是**防暗黑模式/合规判断**，不是纯样式偏好，故留给你；若要我改，方向是主 CTA 走 `cssVar('color.primary')` 实底按钮、取消做次级、"不再询问"补真 `<input type=checkbox>` 视觉（带 `accent-color` token，§7 第 83 条），**词条与同意语义一字不动**。
