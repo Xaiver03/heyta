@@ -101,6 +101,42 @@ API 数据出口），已刻意放在**非 AI 分支** —— 理由见该计划
 `main` 的 build / typecheck / test 现在全绿。分支 `feat/motivation-system` 与
 worktree `.worktrees/motivation` **已删除**（相关提交仍是 `main` 的祖先，随时可达）。
 
+### 1.3 并行轨道：共享清单协作（多人）
+
+共享清单也**不是下一个阶段**，而是与 P2/P3、AI 线、激励线并行的一条产品轨道。
+设计冻结、逐项读数与交接面在
+[共享清单协作计划](collaboration-shared-lists.md)（goal 执行账在
+[goal-collaboration-shared-lists.md](goal-collaboration-shared-lists.md)）；
+密钥分发形态的裁决在 [ADR-0062](../adr/0062-shared-list-key-distribution.md)
+（**聚合型与分发型正式拆开**，激励红线不动）。
+
+| 层 | 内容 | 状态 |
+|---|---|---|
+| 服务端 | 共享四张表 + `/api/shares/*` 端点 + **role 硬门在上传边界** + WS 变更信号 | ✅ 已实现 |
+| 密钥层 | ECIES 邀请凭证与共享密钥分发（`packages/sync-core`） | ✅ 已实现 |
+| Web 界面 | 同意弹窗（PIPL）→ 邀请 → 成员列表 → 转让 → 移除 | ✅ 已实现 |
+| 入群链接 | owner 生成 `?shareToken=` 链接，点开进加入流程 | ✅ 已实现，并把落点钉进判据（`e2e/tests/collab-journey.spec.ts`） |
+| 端到端旅程 | `pnpm verify:collab-journey`（真浏览器 + 真服务端，零 mock） | ✅ `RESULT=OK` |
+| 所有权转让 | 两步确认、立即生效、原 owner 降 `editor`（三处写在**一个事务**里，不留双 owner／零 owner） | ✅ 已实现，🔴 **语义待产品负责人追认** |
+
+🔴 **这条线真正的最大件还没做**：多人并发写**同一条任务**的写路径路由。服务端与界面已经能
+把"共享"跑起来，但并发裁决仍走既有 LWW —— 它不构成 bug，构成的是**协作产品还没兑现的那半**。
+
+🟡 **W4 残余**（如实登记，不是已完成）—— 三件的形状都是**"零件已建、最后一米没接"**，
+所以下一步是**挂载与补写路径**，不是重画一遍：
+
+- **评论**：`COMMENT` 实体进了清单，且评论组件 `packages/ui/src/sync/{comments-model.ts,CommentThread.tsx}`
+  **已经写好并从包根导出**（由产品体验线 `e6058120` 落，文件头标的就是本线 ADR-0062 的 W3/W4），
+  但 `apps/*` 与 `packages/app-host` 对它**零引用** ⇒ `check:reachability` 红在这一米（归属登记在 `BLOCKED.md`，不属于本线）。
+- **指派**：`Task.assigneeUserId` 是 domain 里的**可选字段**（且在加密 payload 内），通知过滤层
+  的「指派给我的」那一档**已经在读它** —— 但全仓**没有任何一处写它**（`app-host` 零个指派 op 构造、`apps/*` 零界面）。
+  ⚠️ 这一条 `check:reachability` **拦不住**：它只覆盖**实体**，字段级的"已建模≠可达"目前没人守。
+- **动态流**：三类活动语义（`completed` / `added` / `deleted`）建在 `notification-model.ts` 里，
+  但只作为**通知偏好的开关**存在（`NotificationPrefsPanel`），没有活动流界面。
+
+🔴 **落地形态**：代码已本地成笔、可复核可回退，**尚未 push** —— 共享检出上还有别线只在本地的笔，
+整条 `main` 一起推会把它们替公开，所以推送押在跨线协调上（现量命令与逐线分割见 goal 计划 push 那一格）。
+
 ### P0 完成证据（2026-09-25）
 
 | 交付判据 | 证据 |
