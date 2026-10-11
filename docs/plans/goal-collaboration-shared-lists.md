@@ -1,6 +1,6 @@
 # Goal：共享清单（多人协作）—— 试实施（W0 + W1）
 
-> 状态：🔄 **进行中（会话交接中，2026-10-11）** —— W0+W1 ✅ / W2 服务端核心 ✅ / W3 纯层+格式统一 ✅ / 法务 ✅ / **W4 已接线、W6 已落地、journey 全绿且链接落点断言已补（`RESULT=OK steps=3`）；剩 ④门禁（typecheck 绿；test 卡在 `capability-manifest.generated.ts` 未随 COMMENT 重生成）/⑤写回/⑥提交（见文末「2026-10-11 交接·三」，下一个 AI 从那里接，且每步现量——共享检出在动）**。DoD 全清单见 [collaboration-shared-lists.md](collaboration-shared-lists.md) §7。
+> 状态：🟡 **本地成笔（2026-10-11），全链门禁被两枚别线绊线挡着、push 押在跨线协调** —— W0+W1 ✅ / W2 服务端核心 ✅ / W3 纯层+格式统一 ✅ / 法务 ✅ / W4 已接线、W6 已落地、journey 全绿且链接落点断言已补（`RESULT=OK steps=3`）/ **④ 门禁：`pnpm -r typecheck` 全仓绿 + 本线两枚红（`check:layering`、`check:ui-language`）当场修绿；`-r test`/`check` 仍红在两枚别线判断绊线**（`packages/ai`「分母 9→10」= 给 COMMENT 配不配 AI 工具的产品判断；`shared-schema` `AUTH_PASSWORD_PATHS` 计数 9→12 = auth 线口径，**都不代改**）/ **⑤ 文档写回已做**（benchmark §2.6 的 6.1+6.7、matrix §6、AGENTS §9、P2-10，均带边界如实登记）/ **⑥ 本线已本地提交（见交接·三），push 未独做**（本地 main 领先 origin 的笔多为别线未公开，`git push` 会一起公开）/ 两个 B 类停止点待产品负责人裁决。逐项读数与执行序见文末「2026-10-11 交接·三」；每步现量——共享检出在动。DoD 全清单见 [collaboration-shared-lists.md](collaboration-shared-lists.md) §7。
 > 权威计划：[collaboration-shared-lists.md](collaboration-shared-lists.md)（W0–W6 全量分期、判据、验证矩阵、边界登记）
 > 决策：[ADR-0062](../adr/0062-shared-list-key-distribution.md)（密钥分发型协作；聚合型红线不动）
 > 证据层：[共享清单调研](../research/collaboration-shared-lists.md)
