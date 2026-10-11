@@ -537,7 +537,10 @@ package.json   (只加了一行 verify:collab-journey)
    - 🔴 **push 受阻（不是没做，是不能独做）**：**别在正文写领先笔数与 SHA（会漂）**，现量：
      `git rev-list --count origin/main..HEAD`（本会话某刻读得 41→48→51→55，一路随别线本地笔增长）；远端真实 tip 用
      `timeout 12 git ls-remote origin refs/heads/main`（本会话读得仍 = `origin/main`，即别会话**没**从自己机器推过）。
-     领先集**大头是别的并行线的未公开笔**（账号标准套件 / 自动收集 T8 / 产品体验 / server 错误信封 / 文档门禁 / 四端重装 / BLOCKED 账本）。
+     领先集**大头是别的并行线的未公开笔**。**按线现量分类**（给协调用）：
+     `git --no-pager log origin/main..HEAD --format='%s' | sed -E 's/^[a-z]+[（(]([^)）]*).*/\1/' | sort | uniq -c | sort -rn`
+     —— 本会话某刻读得：协作线（我）约 12–14 笔，其余散在 **账号标准套件 / 自动收集 / 产品体验线 / 四端重装 / BLOCKED 账本 / server / 文档门禁** 等 4–5 条并行线，非本线笔合计约 50。
+     ⇒ `git push origin main` 会替这 ~50 笔**别人只在本地的笔**一起公开到 origin/main —— 这正是「不代公开别人未提交的笔」那条红线，本线不代推。**要落地推送，正确姿势是各线各自从自己机器 push、或产品负责人拍"整条 main 一起推"；下一 AI 别代推**；`.git/hooks/pre-push` 另指向外部 `pre-push-bytearm`，不许 `--no-verify` 绕。
      `git push origin main` 会把这些**别人只在本地的笔一起公开**到 origin/main —— 这正是「不代公开别人未提交的笔」那条红线，本线不代推。**下一个 AI 若要推，先与那几条线协调，或确认各线已自行 push、`origin/main..HEAD` 只剩本线笔后再判**；`.git/hooks/pre-push` 另指向外部 `pre-push-bytearm`（凭据下线那套），不许 `--no-verify` 绕。
    - ⇒ 本线交付形态：**代码已本地成笔、可复核可回退**；公开到 origin 这一步**押在跨线协调上**，不是本线遗漏。
 5. **两停止点（B 类，等产品负责人裁决；本轮已把 ① 的证据看实）**：
