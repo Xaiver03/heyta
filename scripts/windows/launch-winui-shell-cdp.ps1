@@ -154,7 +154,7 @@ Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe) | Out-Null
 # $env:HEYTA_SHELL_STORAGE here (unset) and emit a broken line " = '1'".
 # Measured 2026-09-30: that is exactly what happened, and the shell's own
 # STORAGE= evidence is what caught it.
-$storageLine = if ($ShellStorage) { '$env:HEYTA_SHELL_STORAGE = ''1''' } else { '# storage host OFF (HEYTA_SHELL_STORAGE not set)' }
+$storageLine = if ($ShellStorage) { '$env:HEYTA_SHELL_STORAGE = ''1''' } else { '# HEYTA_SHELL_STORAGE not set => the shell defaults the storage host ON (MainWindow.xaml.cs: env != "0"). Pass -ShellStorage to say so explicitly; the gate-off arm needs =0, which this rig cannot express today.' }
 $launcher = $launcher.Replace('__EXE__', $exe).Replace('__OUT__', $out).Replace('__WEBROOT__', $webTarget).Replace('__PORT__', [string]$CdpPort).Replace('__STORAGELINE__', $storageLine)
 Set-Content -Path $launchPs1 -Value $launcher -Encoding ASCII
 

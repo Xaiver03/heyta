@@ -2220,7 +2220,7 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
   那句"门一关就被识别成浏览器"（`apps/web/src/pwa/widget-install.ts` 与 `e2e/tests/widget-journey-host.spec.ts` 文件头都这么写）
   讲的是**改造成三条信号之前**的形状，本趟把它从"契约里的一句话"变成"真壳上有读数的事实"——**方向相反**。
   ⚠️ **仍然开着的边界，不许读成"逃生门这一格全绿"**：① 这是 **macOS**；Windows 侧那条 e2e 注入的是**合成**的 `chrome.webview`
-  （它自己文件头就写了"不等于 Windows WebView2 壳内的真实读数"），真实那一趟要远端起壳 + 建隧道 ⇒ 归下一格；
+  （它自己文件头就写了"不等于 Windows WebView2 壳内的真实读数"），真实那一趟要远端起壳 + 建隧道 ⇒ 归下一格（任务 #45）；
   ② Linux 壳同语义但**没有**这枚旋钮的读数；③ 本趟证的是**识别**，不证门关掉后**数据路径**的行为（那是存储线的事，不在本线射程）。
   ✅ **配对臂（默认、不带旋钮，趟号 r97）**：判据一行没动，`RESULT=OK`，四条壳信号全在、面板可见、0 行安装引导、
   外链交接 1 次、壳自身地址没变 ⇒ 上面那枚转发旋钮**没有把正常路径改坏**。
@@ -2230,6 +2230,15 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
   且 `JUDGE_RC` 在那一臂记成 `skipped(逃生门臂 …)` 而不是 `0` —— `JUDGE_RC=0` 会被读成"判据过了"，而那一臂根本没跑判据。
   取现量（两臂各一条）：`HEYTA_SHELL_STORAGE=0 HEYTA_WIDGET_HELP_RUN_DIR=<私有目录> bash scripts/verify-macos-widget-help.sh`
   与去掉前缀的同一句。
+- 🔴 **顺手修掉一枚 Windows 取证装置的自述缺陷（不是本线造的装置，但它是"读数旁边那句话"错了）**：
+  `scripts/windows/launch-winui-shell-cdp.ps1:157` 在不带 `-ShellStorage` 时，往生成的启动脚本里写
+  `# storage host OFF (HEYTA_SHELL_STORAGE not set)` —— 而壳的默认恰好相反：
+  `apps/desktop-windows/HeytaWindows/MainWindow.xaml.cs` 那句是 `env != "0"` ⇒ **未设等于开**。
+  同一枚脚本 186 行那条 fact 早就改口成 "default is ON now; =0 disables"，**只有这枚注释没跟着改**，
+  于是按它读现场的人会把自己正在量的那一臂读反（这是 §7 那条"契约抄件漂移"的第三种面目：**同一个事实写在同一枚文件的两个通道上，只改了一个**）。
+  改法只动那行注释（零行为变更），并把"这一臂表达不了 `=0`"这件事写进注释本身，让下一个想找关臂的人不必再翻一遍源码。
+  现量：`grep -c 'storage host OFF' scripts/windows/launch-winui-shell-cdp.ps1` = **0**；纯 ASCII 那条按 `LC_ALL=C grep '[^ -~]'` 判（PS 5.1 读无 BOM UTF-8 会当 ANSI，见 AGENTS §6.1.1）。
+  ⚠️ **没有顺手加 `-NoShellStorage` 那一档**：那是别人装置的功能面，而且真跑它要打包机 `heyta-win-journey` 那枚计划任务的**独占窗口**（脚本自己会先 `schtasks /Delete /F`）⇒ 登记成任务 #45，不无人值守抢。
 - 🔴 **载体撞车（同一族缺陷第三次露面，这次是它吃掉了我自己的现场）**：`scripts/reinstall-all.sh` 把 iOS 那腿的**派生数据目录、日志、截图**全写成固定 `/tmp` 路径（`rm -rf /tmp/heyta-ios-release`、`>/tmp/heyta-reinstall-ios-build.log`、`IOS_SHOT=/tmp/heyta-reinstall-ios.png`），而仓库 2026-10 起的固定做法是**在隔离检出里跑四端重装** ⇒ 两条会话同时跑必然互相覆盖。三条现量证据：① 我 19:23 结束运行，而 `/tmp/heyta-reinstall-ios-build.log` 在 19:28:58 的内容全是 `…/heyta/.worktrees/iosacct/…` 的路径；② `/tmp/heyta-reinstall-build.log` 停在 19:30:57（我的那次早已写完）；③ 上面那条 20:41 的截图覆盖。**同族缺陷 mac 段 2026-10-04 已经修过一次**（脚本里 `HEYTA_MACOS_DIST_DIR` 那段注释原话："以前是**写死的**，而它下面第一句就是 `rm -rf`…会把**别人的现场**整个删掉"），iOS / windows / android 三段没跟上。**本轮没有代改**：改的是别人也在跑的重装装置，20:41 刚被另一条会话写过 ⇒ 按边界只登记。给下一个人的修法：三处固定路径各加一枚**带默认值**的旋钮（默认值逐字不变），或直接从 `$(basename "$ROOT")` 派生。
 - ✅ **#34 的探针改进做了两枚**（`scripts/qa/macos-installed-widget-help.sh`，两臂都现量）：
   1. **按 pid 锁死寻址**（`HEYTA_MAC_PID`）：同一台机器上可以有两个 `HeytaMac`（重装时旧实例不自己退，macOS 关掉最后一个窗口后进程照样活着），按名字的寻址会让 System Events 自己挑一个。给了 pid 就先验那个 pid 确实是 `HeytaMac`（`pid 999999 不是 HeytaMac` rc=4、非数字 rc=4 都试过），不给时**逐字**走原来的按名字路径。
