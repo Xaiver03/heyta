@@ -92,8 +92,8 @@
 | # | 能力 | 优先级 | 备注 |
 |---|------|--------|------|
 | 6.1 | 清单共享（邀请成员） | P2 | **已实现（E2EE 邀请凭证 + 成员角色 + 所有权转让）** — 证据见 [dida365-feature-benchmark.md](dida365-feature-benchmark.md) §2.6 的 6.1 与 `pnpm verify:collab-journey`；多人并发写同一条任务的写路径路由仍是最大连通件 |
-| 6.2 | 任务指派 / 分配 | P2 | |
-| 6.3 | 评论 | P2 | |
+| 6.2 | 任务指派 / 分配 | P2 | 🔴 **已建模、不可达**（W4 残余）：`Task.assigneeUserId` 在 `packages/domain/src/entities.ts` 里是**可选字段**且在加密 payload 内，通知过滤层（`packages/ui/src/sync/notification-model.ts` 的「指派给我的」那档）**已经在读它** —— 但全仓**没有任何一处写它**（`packages/app-host` 零个指派 op 构造、`apps/*` 零个界面）。⇒ 差的是写入者与入口，不是数据模型。⚠️ `check:reachability` 只覆盖**实体**，字段级的"已建模≠可达"它拦不住 |
+| 6.3 | 评论 | P2 | 🔴 **已建模、不可达**（W4 残余）：`COMMENT` 实体进了 `ENTITY_TYPES` 与 domain 物化清单，评论的**共享组件也已经写好了** —— `packages/ui/src/sync/{comments-model.ts,CommentThread.tsx}` 且从包根导出（由产品体验线 `e6058120` 落，文件头标的就是本线 ADR-0062 的 W3/W4）。缺的是**最后一米**：`apps/*` 与 `packages/app-host` 对它是**零引用**（没有挂载、没有指派/评论的 op 构造），`check:reachability` 正是红在这里（归属登记在 `BLOCKED.md`，不属于本协作线）。⚠️ **下一个人要做的不是"画一个评论 UI"** —— 那会造出第二份；是把已有那个接进宿主并补写路径 |
 | 6.4 | 多设备实时同步 | P0 | **架构核心决策点** |
 | 6.5 | 离线可用（offline-first） | P0 | |
 | 6.6 | 冲突解决 | P0 | CRDT 或 last-write-wins + 字段级合并 |
