@@ -3035,6 +3035,12 @@ packages/shared-schema research/tools/verify-inbound-dual-host.py` ⇒ 只差本
 另记一条别线刚改进 AGENTS 的事实：`pnpm --filter @heyta/sync-server test` 现在 rc=0（158 文件全过），
 "沙箱里跑不了这一层"是瞬时属性，收口时要重新现量。
 
+**同类问题有没有第二处**（他会问的那句）：把 T8 终版里其余带装置自报读数的三格在同一枚副本复跑 ——
+`RC_queue=0 / RC_quota=0 / RC_ticket=0`、三格 `不成立=0`、还原 sha256 与开局一致
+（`ai-metering 44855caf55534f65` / `entitlement 954506a226d929a8`），而 queue 那格的末次 sha256
+`52c3fd707977a03e` 与台账记的**逐字相同** ⇒ 那一格是真跑过的，只有 AC-3 这一格抄了。
+跑完副本 `git status --porcelain`（除本轮 e2e 截图）为空，无变异残留。
+
 **写了什么**：`docs/plans/inbound-automation.md` 新增本节对应的那节 + 三处就地更正
 （「无尺的句子」表里 AC-3 那句"双宿主装置不存在"整行拿掉、`未闭合的边界` 那条 bullet 收掉、
 AC-3 勾选项与 T8 终版那一格的载体归属）；本文件加本节。**没动**：任何判据与断言、AC 勾选状态（现量已勾 0）。
