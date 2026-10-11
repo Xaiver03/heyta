@@ -9433,3 +9433,60 @@ $ node scripts/check-public-facts.mjs          # 第 74 道 RC=1
 `docs/reference/inbound-automation-protocol.md` 里"吊销版本的在线刷新"那一节新增一段，写明那条 GET 是匿名的、
 为什么必须是匿名的、claims 逐字段零身份维度、无凭据者由此能知道的只有那三件运维量，
 以及写侧两条各自的闸。⇒ 现在缺的**只有**上面那一行登记，不再有"文档没披露"这一格。
+
+## B174（2026-10-12 01:2x，本会话 · 读 T2 那一格时现量出来的）：**续票据的心跳在任何宿主都没有调用点 —— 模块与 12 条用例都在，缺的那一步落在本线地界外，而本线地界内唯一做得动的落点会造出一句假话**
+
+任务书 T2 第一条是「每 30 秒续票据」。**先说清文档面没有假话**：协议文档 §发布门槛 第 2 条本来就写着
+「⚠️ 但消费者数量现量是 0 —— 没有一个宿主 start 它」，所以本条**不是**更正一句假话，而是把这一格的
+**落点选择**交还（本线地界内做得动的那一种会造出假话，见下）。现量：
+
+```
+$ grep -rn "startAutomationSessionKeepalive" --include="*.ts" --include="*.tsx" apps packages/*/src server/src \
+      | grep -v "packages/app-host/src/inbound-session-keepalive.ts"
+packages/app-host/src/index.ts:938:  startAutomationSessionKeepalive,
+$ grep -rIn "keepalive" apps/web/src apps/mobile/src apps/node-host/src
+（空，rc=1）
+$ grep -c "  it(" packages/app-host/tests/inbound-session-keepalive.spec.ts
+12
+```
+⚠️ 那两枚 `--include=` **必须带引号**。zsh 里裸写 `--include=*.ts` 会因 glob 无匹配而**整行中止**、
+什么也不打印 —— 那看起来和"没有调用点"**一模一样**（本条第一趟就是这么量的，第二趟才发现探针坏了）。
+第一行输出恰好证明另一件事：全仓**唯一**命中是 `index.ts` 的 re-export，而不是任何宿主的调用。
+
+⇒ **实现与测试都在**（`packages/app-host/src/inbound-session-keepalive.ts:109`：按绑定自己的到期时刻排下一次、
+退避档位从窗口寿命推、`stop()` 之后晚回来的续期整块作废），**但没有任何宿主调用它**。
+这正是本仓已经写过两遍的形状（`realtime.ts` 450 行 + 自带测试而"没有任何宿主 `createRealtimeClient()`"；
+`ids.ts` 抽出来了而旧那份一直活着）：**零件齐 ≠ 接上了**。
+
+**要用的三样都已经有现成的来源**（所以这不是"缺设计"，只缺那一步接线）：
+签发实例地址 = `packages/app-host/src/legal-links.ts:58` 的 `OFFICIAL_SITE_ORIGIN`（已由 `index.ts` 导出）；
+`token` / 自家实例地址 / `installationId`（`loadOrCreateAutomationInstallationId`）都在
+`apps/web/src/features/sync/store.ts` 手里 —— 而那枚文件**在本线白名单外**。
+
+**两个落点各自的代价（供拍）**：
+
+1. 🔴 推荐：`apps/web/src/features/sync/store.ts`（地界外）。它是应用级生命周期，
+   登录换凭据、切账号、登出这三个时刻它都已经在管，心跳挂在那里才与"票据 30 秒寿命"这件事同层。
+   改动形状 = 一处 `start`（凭据就绪时）+ 一处 `stop`（登出/切账号时）+ 把 `onState` 汇进已有的回显。
+2. ❌ 本线地界内做得动的那一种（`InboundAutomationSettings.tsx` 的 `useEffect` 里起、卸载时停）**本会话没做，也不建议做**：
+   那等于"只有设置页开着的时候才续票"，而界面关掉 30 秒后票据就过期 ——
+   文档与状态回显都会因此变成假话（`waiting-entitlement` 永远不会被看见，因为心跳根本没跑）。
+   按"没做成但说清了合格，做了但更糟不合格"，这一格宁可登记。
+   ⚠️ 面板本身的挂载是**已经接好的**（`apps/web/src/features/settings/AiSettings.tsx:1262` 就在那里渲染），
+   缺的只有心跳的宿主调用点 —— 别把这两件事读成同一件。
+
+**复账这条格子的现量命令**（谁改完都拿它验，不需要读本条正文）：
+
+```
+grep -rln "startAutomationSessionKeepalive" apps/web/src apps/mobile/src apps/node-host/src
+```
+输出为空 = 仍未接线；出现任一处 = 这一格闭合，届时把协议文档 §发布门槛 里那句"未闭合"就地改掉。
+顺带说明：本条与 **B140**（面板 `active` 那格的挂载缝在别线手里）是同一枚问题的两格，
+`waiting-entitlement` 的展示要等心跳先活着才有意义。
+
+🟡 **本会话已就地改掉该文档一句已过期的措辞**（`docs/reference/inbound-automation-protocol.md` §发布门槛 第 2 条）：
+原文把"签发方 URL 从哪来"列成缺的两个输入之一，读起来像那个地址还没有来源 —— 现量是官方 origin 常量早就有
+（`packages/app-host/src/legal-links.ts:58`），而"它能不能用作签发端"是 **B109** 那一拍（直连官方＝新增一次出境），
+不是缺口。新措辞同时补了复账命令，并加一句说明它与下一段"取票源没有第二个地址旋钮"那句**不冲突**（两层各说一件事：
+后者指 `inbound-entitlement-tickets.ts:84/:104` 只有一个 `baseUrl`，而 web 传进去的就是同步实例地址
+`apps/web/src/features/settings/inbound-runtime.ts:39`、`:50`）。

@@ -100,7 +100,16 @@ date-only 与 instant 是两种不同语义：date-only 由 `*DateLocal` 字段�
 2. `session` 那条心跳的**宿主侧机制与判据已闭合**（`packages/app-host/src/inbound-session-keepalive.ts`，2026-10-10）：
    向签发实例取票 → 在自己的实例上消费 → 按服务端报回的到期时刻排下一次（剩余寿命的三分之一）→ 三族失败分别处置
    （等待族与"这一跳没落地"都继续退避重试，"请求本身不对"判成缺陷并停住）。
-   ⚠️ **但消费者数量现量是 0** —— 没有一个宿主 start 它。缺的不是工时而是两个输入：签发方 URL 从哪来、绑定握手由谁调用。
+   ⚠️ **但消费者数量现量是 0** —— 没有一个宿主 start 它（2026-10-12 复量：全仓唯一命中是 `packages/app-host/src/index.ts` 那行 re-export；
+   复账命令 `grep -rln "startAutomationSessionKeepalive" apps/web/src apps/mobile/src apps/node-host/src`，输出为空 = 仍未接线）。
+   缺的不是工时，是下面那段"票由哪个 URL 签"那一拍，以及拍完之后那一处宿主调用点。
+   🟡 一处**已过期的措辞就地更正**：本条原写"签发方 URL 从哪来"像是一个还没有来源的东西 —— 官方站点的 origin 常量早就有
+   （`packages/app-host/src/legal-links.ts:58` 的 `OFFICIAL_SITE_ORIGIN`，已由 `index.ts` 导出）。
+   它能不能用作签发端**不是缺口而是待拍**：宿主直连官方＝新增一次出境，客户实例转述＝绑定与限流粒度重定（B109）。
+   ⚠️ 与下一段那句"没有签发方 URL 这个概念"**不冲突**，两句话说的是两层：下一段讲的是**取票源自己没有第二个地址旋钮**
+   （`packages/app-host/src/inbound-entitlement-tickets.ts:84` 只有一个 `baseUrl`，`:104` 拿它拼请求，
+   而 web 那侧传进去的就是同步实例地址 —— `apps/web/src/features/settings/inbound-runtime.ts:39`、`:50`），
+   本条讲的是**宿主真要接的时候，官方 origin 这一枚候选并非无处可取**。
    ⇒ 因此下面那段"票由哪个 URL 签"仍然是这道门槛的前置，公网接收不得因这条心跳入库就被读成"绑定会自己续上"。
 
 🔴 **"宿主真的去调它"这一格 2026-10-10 量出一道拦路的前置，不是接线工时问题**：逐次动作的票**只在 `official` 模式的实例上签得出**（`server/src/api.ts:660-664` 第一行就按部署模式分流，自托管实例配了公钥环也只验不签），而签票又要求这台 `installationId` 的绑定行已存在（`server/src/automation/entitlement-issuer.ts:323-324`，缺则 `AUTOMATION_LINK_NOT_BOUND`）。客户端侧目前既没有签发方 URL 这个概念（取票源的 `baseUrl` 就是同步实例），也没有绑定握手的调用方（`packages/app-host/src/inbound-entitlement-remote.ts` 只有 `verify` 一个出口）。⇒ 宿主现在无条件取票会**两种读法都错**：官方实例上未兑换过安装身份的已订阅用户被读成"等待权益"，自托管实例则永远拿 `NOT_ON_THIS_INSTANCE`。所以宿主侧只落了**与模式无关的那半**：安装身份的持久化（`createAutomationInstallationMetaStore`：只写一次、坏值不覆盖、退登不清）与草稿确认自己那一枚票的取用（`createInboundDraftReviewer` 现在给 `confirm` 取 `draft-confirm` 票，`cancel` 明确不取 —— 取消允许无订阅进行）。**待裁决的是票由哪个 URL 签**（宿主直连官方＝新增一次出境；客户实例转述＝绑定与限流粒度重定），三条选项与代价登记在项目 `BLOCKED.md` 的 B109。

@@ -3611,3 +3611,19 @@ claims 逐字段 `{version,issuer,keyId,scope,revocationVersion,issuedAt,expires
 读数：`docs-link-check` rc=0、`check-docs-voice` rc=0、`check-legal-closure-truth` rc=0（后者会扫九份条款
 "没有被实现否证的句子"，这条新增只写已核对过的实现事实，不动版本指纹那栏）。
 B173 就地追记一句：现在缺的**只有**那一行登记，不再有"文档没披露"这一格。
+
+## 2026-10-12 01:3x · 等链第二格：T2 心跳的宿主调用点 → B174（登记，不造假话）
+
+链仍在第 86 道（`check:ai-e2e`，`--timeout 3000`），这一窗口做的不是轮询而是把 T2 那一格复核到底：
+
+- **现量**：`startAutomationSessionKeepalive` 全仓唯一命中 = `packages/app-host/src/index.ts:938` 的 re-export；
+  `grep -rIn "keepalive" apps/web/src apps/mobile/src apps/node-host/src` 空（rc=1）；用例 12 条在。
+  ⇒ **零件齐 ≠ 接上了**（本仓 `realtime.ts` / `ids.ts` 已写过两遍的那个形状）。
+- **地界内做得动的那一种没做**：只在设置面板 `useEffect` 里起 ⇒ 界面关掉 30 秒票据就过期、
+  `waiting-entitlement` 永远看不见 —— 文档与状态回显都会变成假话。按"没做成但说清了合格，做了但更糟不合格"登记。
+- **语义正确的落点** `apps/web/src/features/sync/store.ts`（登录/切账号/登出它已在管）**在白名单外** ⇒ 连同两个落点的代价写进 **B174**。
+- **顺手把该文档一句已过期的措辞改对**（白名单内）：§发布门槛 第 2 条原写"缺的两个输入：签发方 URL 从哪来、绑定握手由谁调用"，
+  读起来像那个地址没有来源 —— 官方 origin 常量早就有（`legal-links.ts:58`），真待拍的是它能不能用作签发端（B109：直连官方＝一次出境）。
+  新措辞补了复账命令，并加一句它与下一段"取票源没有第二个地址旋钮"不冲突的说明（两层：`inbound-entitlement-tickets.ts:84/:104` vs `inbound-runtime.ts:39/:50`）。
+- 🔴 **一条探针教训**：第一趟我用了裸 `--include=*.ts`，zsh 因 glob 无匹配**整行中止、什么都不打印** ——
+  与"没有调用点"的输出**完全同形**。带引号才跑得动；这条已写进 B174 与计划正文，免得下一个人把探针坏了当成结论。

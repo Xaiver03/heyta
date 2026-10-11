@@ -2821,3 +2821,19 @@ B139 本体已在账本里就地追记复账（不是新写一条），旧表留
 📌 与 B171/B172 放一起看，这一腿把"合并态有多少红"分成三类，本线只占前两类的各一格：
 **本线已修待重取**（4）、**本线开的但修在地界外**（50 → B171、74 → B173）、
 **别线写进本线文件的行**（21/23 → B172）。其余九格与本线无关，本线按"顺手活不进代码"不动。
+
+### 2026-10-12 01:3x · 等链的窗口里复核 T2 那一格：**续票心跳零宿主调用点**（→ B174）
+
+任务书 T2 第一条"每 30 秒续票据"的实现与用例都在（`packages/app-host/src/inbound-session-keepalive.ts:109`
++ 同目录 12 条 `it(`），但**没有任何宿主调用它** —— 全仓唯一命中是 `packages/app-host/src/index.ts:938` 那行 re-export。
+复账命令（不需要读本条正文）：`grep -rln "startAutomationSessionKeepalive" apps/web/src apps/mobile/src apps/node-host/src`，
+输出为空 = 仍未接线。
+
+本线地界内做得动的唯一落点（设置面板 `useEffect`）**没做**：那等于"只有设置页开着才续票"，
+界面关掉 30 秒后票据就过期，`waiting-entitlement` 永远不会被看见 —— 文档与状态回显都会变成假话。
+语义正确的落点 `apps/web/src/features/sync/store.ts`（登录/切账号/登出三个时刻它已经在管）**在白名单外**，
+连同"要用的三样地址来源都已有现成物"（`OFFICIAL_SITE_ORIGIN` 在 `packages/app-host/src/legal-links.ts:58`）
+一起写进 **B174** 待拍。
+
+⚠️ 一条探针教训顺手入档（本条第一趟差点把它量成"有调用点"）：zsh 里裸写 `--include=*.ts`
+会因 glob 无匹配而**整行中止、什么也不打印**，与"没有调用点"的输出**完全同形**；`--include=` 必须带引号。
