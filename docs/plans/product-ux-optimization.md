@@ -2417,3 +2417,86 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
      新鲜度按"二进制里读得到那枚 env 常量"量（命中 2 处），出处块里 `TREE` / `WEB_DIST_SHA` / `DIRTY_PATHS` 逐条现量。
   ⚠️ 上面 ①② 那一发的**批次归属必须限定**：`/Applications/Heyta.app` 的 mtime 是 10-11 12:00、由**另一条会话**重装 ⇒ 本线不据它主张"当前源码的壳级读数"，
      它证的是"这条后台通道存在、且能在不抢焦点的情况下把那三项读出来"。
+
+### 2026-10-12 01:5x：这一轮要的是**产品代码**，不是又一批读数 —— §8.2 第 6 / 11 / 12 三条当场落地
+
+> 负责人这一轮的指令原话是「你做了那么久，是不是大部分时间都浪费在跑门禁和检查上面去了？我让你推进了多少代码工作，你推进了吗？」
+> ⇒ 这一节记的**全是改行为的那类**（四笔代码 + 每笔自己的判据与变异臂），读数只在每条末尾作为"它确实跑过"的证据。
+> 来源是布局审计 §8.2 那张"已登记、这轮不修"的表（`docs/plans/goal-layout-audit.md`）——
+> 那三条的处置列原本写着"下一轮"，本轮把它们提前做掉了；**登记不是许可**这句话同样反过来成立：
+> 登记也不是债主，做了就要把那一行改口（见下面"表已同步改口"）。
+
+- ✅ **§8.2 第 6 条：认证面板自报 `aria-modal="true"` 却没有键盘出口**（`3b9d2ff8`）。
+  抽了 `apps/web/src/lib/use-modal-dismiss.ts`（Esc + 焦点入内 + 还给触发者），`AuthPanel` 接上。
+  🔴 监听挂**捕获阶段**（§7 第 80 条：RNW 的 `TextInput` 在 keydown 里无条件 `stopPropagation()`，
+  挂冒泡阶段的话焦点一进输入框 Esc 就永远收不到），且**刻意不** `stopImmediatePropagation` ——
+  同节点捕获监听按注册顺序跑，面板是最后注册的那一层，抢先把事件掐死会剥掉别的层的键盘行为。
+  如实写下的边界：**面板开在设置浮层里时，一次 Esc 会连着关掉两层**（这是现状，不是新造的洞）。
+  判据 `apps/web/tests/auth-panel-modal-dismiss.spec.tsx` 8 条（A 组装件钉 hook 本身，B 组挂真 `App` 走头像→「登录 / 注册」那条真入口）。
+- ✅ **真浏览器那一腿补上了**（`3d7b6dec`）：`e2e/tests/auth-panel-esc.spec.ts`。
+  理由不是"多一层更保险"，是 jsdom **结构上看不见**这条缺陷的原始症状（§7 第 80 条那次是 jsdom 全绿、真浏览器里按 Esc 毫无反应）。
+  用例做的是真动作：焦点进邮箱框 → `page.keyboard.type` 打邮箱（打得进去本身就是"焦点进得去"的证据）→ 回读 `activeElement` →
+  `page.keyboard.press('Escape')`（真键盘事件）→ 断言面板不在 DOM → 再截图 → 重新打开后用界面上的关闭钮收掉（关得掉不止 Esc 一条路）。
+  现量：`cd e2e && npx playwright test --config=playwright.config.ts tests/auth-panel-esc.spec.ts` = **1 passed (6.1s) / rc=0**，
+  用的是**主配置**（起前 `lsof` 现量 4318/4319 无人监听；此前借用的临时配置 `e2e/_ux-esc.config.ts` 已删，不留第二套端口口径）。
+  两张图 `e2e/test-results/auth-panel-1-open.png` / `auth-panel-2-after-esc.png` **都打开看过**：
+  第一张面板开着、邮箱里是刚打进去的 `reader@example.test`；第二张面板没了、底下是收集箱空态 + 完整 rail（不是白屏，也不是设置页）。
+- ✅ **§8.2 第 11 条：「恢复默认（全部关闭）」一击即清**（`35eaa96d`）。
+  原来是 `ghost` 样式、和常规项同分量、不说清会丢什么，而它清掉的是**端点 / 路由 / 逐功能出境授权 / 本机存的密钥 / 记忆开关**
+  （逐条对着 `packages/app-host/src/ai-settings-store.ts` 的默认值与 `secrets.clear()` 数出来，不是"全部设置"这种含混话）。
+  改成单独一区 + 两段式：第一下只把代价列出来（`role="alert" aria-live="assertive"` 五条 + 一条"纠正过的偏好不在这里清"），
+  确认钮 `ht-btn--danger`，取消只收面。**零新 CSS** —— 用到的类名逐枚回查过有规则
+  （`.ht-settings__danger` / `__list` / `__notice` / `__section` / `__actions` 分别命中 `ai-panels.css`、`settings-notice.css`、`data-settings.css`），
+  所以没有出现"挂了类名但没人渲染"的那种假样式。9 枚新词条中英同时补 + 重跑 i18n build（§7 第 79 条）。
+  判据从 1 条变 4 条，**五臂变异**各自只红该红的：① 第一下顺带清 → 2 红；② 取消也清 → 1 红；
+  ③ 清单换成一句"确定吗？" → 1 红（`expected 1 to be greater than or equal to 5`）；④ 确认钮换 ghost → 1 红；⑤ 摘掉 warning → 1 红。
+  关键那条（"第一下什么都不清"）**同时**看界面仍开着与 `localStorage` 逐字没动 ——
+  只看前者会放过"第一步就把设置改了、然后照常显示清单"那种写法。
+- ✅ **§8.2 第 12 条：任务动作失败没有任何反馈**（`ceb04ef9`）。
+  `TaskState.error` 这个字段**只有声明**：全仓没有一处写它、也没有一处读它，而调用点写的是
+  `void store.toggleComplete(id)` / `void store.deleteTask(task.id)`（`App.tsx:1507` / `:2716` / `:2788` / `:2840` / `QuadrantBoard.tsx:420` 现量）。
+  症状就是"这一行闪回去了"或"点了没反应"，而真正发生的可能是这一次 op 根本没落库。
+  `CalendarView` 那里还留着一句"store 自己会把失败写进 status（见它的文件头）"—— **那句当时是假的**，本轮把它改成指向真的机制。
+  写的那一层挂在 `ActionContext` 的 `dispatch` / `dispatchChecked` 两个口上（每条真正落库的写都必须穿过它们），
+  所以不需要逐条包那 ~30 个动作，未来从 `app-host` 长出来的新动作也自带；失败记**码**
+  （`TaskActionFailureCode = 'write-failed'`）并把原始错误照原样再抛（AI 提案 / 小组件 drain / 导入要的是原始错误），
+  成功清掉上一条（否则一次偶发失败会常驻，那比不说还糟）。显示是新组件 `TaskActionError`，挂在内容列顶部、与 `<SubscriptionNotice />` 同一位置逻辑
+  —— 要覆盖的是收集箱/看板/象限/日历/时间线/回收站六个面，逐面各挂一份就会长成六份各自维护的提示。
+  界面只说「这一步没有保存成功，可以重试」，**不**渲染 `error.message` 原文（把诊断信息当文案是 `card-export` 那次已经改过的同一个错）。
+  判据 `apps/web/tests/task-action-error.spec.tsx` 6 条（store 两头 + 界面四条，含"没有失败时不许在场"的阴性对照）；
+  **五臂变异**：① 摘掉失败记录 → 2 红；② 摘掉成功清除 → 1 红；③ 摘掉 `if (failure === undefined) return null` → 2 红；
+  ④ 「知道了」改成空操作 → 1 红；⑤ 把 `error.message` 原文当文案渲染 → 3 红（码的契约与"不贴原文"两头都有牙）。
+  🔴 **这条线覆盖不到的那一格，如实记下**：动作层在**发 op 之前**的校验抛出
+  （`packages/app-host/src/actions.ts:537` / `:543` 那句 `找不到任务「…」`）不经过这两个口，因此不会亮这一行；
+  那种情况的症状本身是"这一条已经不在了"，界面给出的反馈是行消失。要把它也包进来得把包装从 dispatch 口移到 store 的动作对象上，那是另一刀的半径。
+- 🔴 **本线自造、当场修完的一条**（`d776264e`）：`3b9d2ff8` 那笔我把测试辅助函数 `pressKey(target: Element, …)` 签名写窄了，
+  而 B 组那三条**必须**从 `window` 起事件（监听就在 window 的捕获阶段）⇒ `pnpm --filter @heyta/web typecheck` 三处 `TS2345`。
+  我提交前只跑了 vitest —— **vitest 用 esbuild 转译，不做类型检查**，所以"8/8 全绿"和"tsc 红"是同一份代码的两个读数。
+  修的是签名（放宽成 `EventTarget`），不是把用例改成从元素起事件 —— 后者会让那三条测不到它们声称要测的那一层。
+  📌 一般规律：**"跑过测试"不等于"跑过 typecheck"**，这两个读数不能互相顶替。
+- **表已同步改口**：`docs/plans/goal-layout-audit.md` §8.2 的第 6 / 11 / 12 三行处置列改成指向这四笔，
+  并留一句"这轮不修"的原文形状是为了让后来者认出**登记 ≠ 许可**。
+  ⚠️ 同一张表里 **第 5 / 9 / 10 条本轮现量发现早已不是现状**（不是"这轮没做"）：
+  第 5 条（便签失败静默吞 + 草稿无条件清）已被 `packages/ui/src/notes/NotesBoard.tsx:35` 的异步裁决取代
+  （`runNoteSubmit` + `noteComposerAfterOutcome`，只在成功时清草稿）；
+  第 9 条（`AiPanel` 自报 dialog）已改成 `role` **必填无默认值**（`packages/ui/src/ai/AiPanel.tsx:48-49`）；
+  第 10 条（`WidgetPushPanel` 被拒后整块消失）在当前源码里已修。⇒ 这三行**没有**被"照表行动"，登记项要逐条现量这条纪律本轮第三次生效。
+- **本轮代码侧的现量（一条命令可复现）**：
+  `NO_COLOR=1 pnpm --filter @heyta/web test` = **2247 passed / 13 skipped（178 文件，其中 2 skipped）**、
+  `pnpm --filter @heyta/web typecheck` 无 `error TS`、`pnpm --filter @heyta/i18n test` = **26 passed**、
+  `check:ui-language` / `check:design` / `check:layering` 三道 **rc=0**。
+  ⚠️ 这是**逐包/逐道现量**，不等于整条 `pnpm check` 链绿（那条链要独占载体、且末尾的 `-r test` 受别线绊线影响，见上面 FULLCHECK 那一档）。
+- 🔴 **四端重装（goal 第 4 步）这一趟的读数，以及 iOS 那一格的红归因**：
+  载体 `~/heyta-carriers/heyta-ux-r49-1012-0055`，`carrier_head=422850ee`、`rig_blob=46167227685128b0474224daf10c4eb7f66e88a9`、
+  `contains_product_code=YES`（含窄栏那笔 `59c23f40`，**不含**本轮这四笔 —— 它们是在这趟点火之后才提交的）。
+  链的汇总（`/Users/rocalight/.heyta-evidence/ux-r49-reinstall-1012/reinstall.log`）：
+  **mac ✅ / windows ✅ / android ✅**（各自"清旧包 → 从当前源码重打 → 装新 → 一条当前产物判据"，
+  android 那格 `窗口 1080x2400、内容占比 56.1%、主蓝命中 4042`），**ios 🔴 BUILD FAILED**。
+  失败原文：`heyta-reinstall-ios-build.log` 里 `Error: $HOME must be set to run brew.`（`hermes-engine` 那枚 PhaseScriptExecution），
+  ⇒ **归因是本线后台启动器把 `HOME` 弄丢了，不是产品/打包缺陷**（§7 元规则"先怀疑探针"）；
+  同一趟前面还有一条已知的非确定性：`pod install` 第 1 趟 `ArgumentError - path name contains null byte`、第 2 趟成功。
+  ✅ 第二趟已按 `export HOME=…` 修正后重开：载体 `git checkout --detach` 到含本轮四笔的当前 `main`、
+  `git status --porcelain` 回到 0 枚（第一趟留下的三枚 `Info.plist` / `Podfile.lock` 是构建自己写的，不是谁的在飞文件），
+  `pnpm install --frozen-lockfile` + `pnpm -r build` 之后跑 `bash scripts/reinstall-all.sh`（四端，`--only`/`--skip` 一个都不用）。
+  ⚠️ 它的读数出来之前，**"四端都装上了当前源码的产物"这一格对本轮这四笔仍未闭合**；
+  第一趟那三端的读数不能被读成"本轮代码已装到四个端"。

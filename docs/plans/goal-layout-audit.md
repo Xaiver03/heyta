@@ -298,13 +298,13 @@
 | # | 严重度 | 违规 | 证据 | 处置 |
 |---|---|---|---|---|
 | 5 | 高 | 便签创建失败**静默吞掉**，且草稿被无条件清空（用户粘超长内容 → 字没了、便签没出现、没解释） | `notes/store.ts` 自己写着 `error` "必须显示出来"；`NotesView` 从不读它；共享 `NotesBoard.submit()` 先 `onAdd` 再无条件 `setDraft('')`；上限 10,000 字会 reject | **下一轮第一件**：`NotesBoard` 加 `error` 槽 + **只在成功时清草稿**（**四端共用**，要一起验） |
-| 6 | 中 | 同级浮层的关闭行为漂移：同步设置对话框与 `AuthPanel` 都是 `role="dialog" aria-modal="true"`，但没 Esc、没焦点入内 | 有 Esc 的：ConflictDialog / TrashView / InboxBell / AccountMenu / 搜索 | 下一轮抽 `useModalDismiss()`（Esc + focus 入内 + 还给触发者），两处各接一次 |
+| 6 | 中 | 同级浮层的关闭行为漂移：同步设置对话框与 `AuthPanel` 都是 `role="dialog" aria-modal="true"`，但没 Esc、没焦点入内 | 有 Esc 的：ConflictDialog / TrashView / InboxBell / AccountMenu / 搜索 | ✅ **已做**（2026-10-12，`3b9d2ff8` + 真浏览器腿 `3d7b6dec`）：抽了 `apps/web/src/lib/use-modal-dismiss.ts`（Esc 挂**捕获阶段** + 焦点入内 + 还给触发者），`AuthPanel` 接上。⚠️ "同步设置对话框"那一员**现量已不存在**（它不是 dialog 形状了），所以实际接线是一处而不是两处 |
 | 7 | 中 | 清单/标签「删除」单击即生效、无确认、**没有找回入口**（回收站只收任务） | `OrganizerList` 的垃圾桶与行主体同尺寸；`restoreProject` 全仓不存在 | 下一轮：两段式确认或纳入回收站（**共享组件，四端一起**） |
 | 8 | 中 | 便签「删除」同 7（`restoreNote` 已存在但界面从不接） | `NotesBoard` 单击 → `notes/store` 删；`note-actions.ts` 有 `restoreNote` | 与 7 同一轮（确认或撤销 toast + 把 `restoreNote` 接出来） |
-| 9 | 中 | 共享 `AiPanel` 声明 `role="dialog"` 却没有任何对话框键盘行为（且它是**行内**卡片不是模态） | `packages/ui/src/ai/AiPanel.tsx`；web 侧 19 处这样渲染 | 下一轮改成 `role="group"/region` + `aria-label`（**共享层，四端**） |
-| 10 | 中 | `WidgetPushPanel` 权限被拒后整块消失，而"被拒"那句说明**永远渲染不到**（死代码） | `if (visibility !== 'shown') return null` 早于 `denied` note 行 | 下一轮：让 `denied` 成为一种 `shown`（只渲染说明行） |
-| 11 | 中 | 「恢复默认（全部关闭）」是破坏性动作，却 ghost、与常规项同分量、无确认（会清端点/路由/授权/记忆） | `AiSettings.tsx` 的 reset 分支 | 下一轮：移入分隔的 danger 区 + 二次确认（说清会丢什么） |
-| 12 | 中 | 任务类动作失败**没有任何反馈**；`tasks/store.ts` 的 `error` 字段是死的；`CalendarView` 有一句注释与事实相反 | `error` 全文件无写入无读取；`void store.deleteTask(...)` | 下一轮：store 写 `error` + 任务视图顶部一行 `role="alert"`；顺手改掉那句错注释 |
+| 9 | 中 | 共享 `AiPanel` 声明 `role="dialog"` 却没有任何对话框键盘行为（且它是**行内**卡片不是模态） | `packages/ui/src/ai/AiPanel.tsx`；web 侧 19 处这样渲染 | ✅ **现量已不是现状**（2026-10-12）：`role` 与 `label` 都是**必填、无默认值**（`AiPanel.tsx:48-49`），文件头写明"给默认值会让忘了想这件事静默通过"。登记行留着，是为了认出"自报语义"这个形状 |
+| 10 | 中 | `WidgetPushPanel` 权限被拒后整块消失，而"被拒"那句说明**永远渲染不到**（死代码） | `if (visibility !== 'shown') return null` 早于 `denied` note 行 | ✅ **现量已不是现状**（2026-10-12 读 `WidgetPushPanel.tsx:169-197`：`denied` 走的是可见分支）。同上一行的留着理由 |
+| 11 | 中 | 「恢复默认（全部关闭）」是破坏性动作，却 ghost、与常规项同分量、无确认（会清端点/路由/授权/记忆） | `AiSettings.tsx` 的 reset 分支 | ✅ **已做**（2026-10-12，`35eaa96d`）：单独 danger 区 + 两段式，第一下只把五条代价列出来（逐条对着 `defaultAiSettings()` 与 `secrets.clear()` 写），确认钮 `ht-btn--danger`；零新 CSS；9 枚词条中英同步。判据 1→4 条，五臂变异各自只红该红的 |
+| 12 | 中 | 任务类动作失败**没有任何反馈**；`tasks/store.ts` 的 `error` 字段是死的；`CalendarView` 有一句注释与事实相反 | `error` 全文件无写入无读取；`void store.deleteTask(...)` | ✅ **已做**（2026-10-12，`ceb04ef9`）：写挂在 `ActionContext` 的 `dispatch`/`dispatchChecked` 两个口（记**码** `write-failed`、原始错误照原样再抛、成功清除），显示是内容列顶部一行 `TaskActionError`（六面共用，零新 CSS），那句反的注释已改口。🔴 **边界如实**：动作层**发 op 之前**的校验抛出（`actions.ts` 的 `找不到任务「…」`）不经过这两个口，因此不亮这一行 |
 | 13 | 低 | rail 与通知面板的 `role="tablist"` 没有方向键漫游（APG 要求） | 两处只有 `onClick` | 下一轮：抄 `AccountMenu` 已有的 roving focus 实现 |
 | 14 | 低 | 空态三份实现（`App.tsx` 自己一套、`NotesBoard` 手写第三套） | `check-empty-state.mjs` 自己就把 App.tsx 记为"待转发（是债不是许可）" | 下一轮：都收成 `<EmptyState/>` 薄转发（保留 testID，否则 e2e 钩子失效） |
 
