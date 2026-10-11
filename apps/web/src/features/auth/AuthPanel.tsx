@@ -95,6 +95,7 @@ import { detectPasskeyBrowser } from './passkey-browser.js';
 import { readRememberedCredentials, rememberCredentials } from './remembered-credentials.js';
 import { useAuthStore, type AuthBusyAction } from './store.js';
 import { authBaseUrl, isUnconfigured } from '../../lib/auth-endpoint.js';
+import { useModalDismiss } from '../../lib/use-modal-dismiss.js';
 import './auth-dialog.css';
 
 export interface AuthPanelProps {
@@ -199,6 +200,21 @@ export function AuthPanel({
    */
   const [addressDraft, setAddressDraft] = useState(() => authBaseUrl(baseUrl));
   const [openLegalDocument, setOpenLegalDocument] = useState<string | null>(null);
+  /**
+   * 键盘出口（§8.2 第 6 条）：这一层自报 `aria-modal="true"`，此前**没有 Esc、
+   * 焦点也不入内** —— 而它里面有口令输入框，读屏用户 Tab 会走进背后那层。
+   * 一次 Esc 只关**最上面那一层**：法务文书卡开着时先关它，否则关面板。
+   * （`LegalDocumentSheet` 自己不监听键盘，现量：`grep -rn "Escape" packages/ui/src` 空。）
+   */
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  useModalDismiss(dialogRef, () => {
+    if (openLegalDocument !== null) {
+      setOpenLegalDocument(null);
+      return;
+    }
+    onClose();
+  });
+
   const [previousBaseUrl, setPreviousBaseUrl] = useState(baseUrl);
   const baseUrlRef = useRef(baseUrl);
   if (previousBaseUrl !== baseUrl) {
@@ -493,9 +509,11 @@ export function AuthPanel({
 
   return (
     <div
+      ref={dialogRef}
       className="ht-sheet__auth"
       role="dialog"
       aria-modal="true"
+      tabIndex={-1}
       aria-label={t('web.auth.title')}
     >
       <div className="ht-sheet__auth-dialog">
