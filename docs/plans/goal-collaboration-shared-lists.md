@@ -493,6 +493,12 @@ package.json   (只加了一行 verify:collab-journey)
      **修法（不放宽判据）**：在 landing 登记处给共享入口补一项 `id/kind 'share-open-button'`、`labelKey 'web.share.open.label'`（=「共享」，中英词条都在）、`anchors ['share-open-button']`、`mockedInLanding: false`
      （产品条件是 `currentProject!==undefined && syncConfigured`，静态展厅没有"选中清单"那一态，与既有 `assistant-open` 同一档，**只登记锚点、不在图上画**）；阳性对照字面量按 DOM 序把 `share-open-button` 补到**第一**。
      复跑：`mockup-shell-shape.spec.tsx` **21/21**、landing 全包 **1409/1409 `rc=0`**。⇒ 这枚从本线交付里**销账**。
+     - 🔴 **这枚 header 涟漪的作用域已穷举，landing 是唯一真下游消费者**（"缺陷是一类"，故逐个查，别只修看见的那一枚）：其余钉 `.ht-header__actions` 的判据点都**不受影响** ——
+       `e2e/tests/shell-sync-rail.spec.ts` S1 数的是容器 `toHaveCount(1)`、只反向禁**同步**那几枚 testid 与「未同步/立即同步/处理冲突」文案（「共享」两不沾）；
+       `e2e/tests/ux-viewport-matrix.spec.ts` / `playwright.detail-pane` 溢出闸 / `calendar-cells` ④ —— 共享按钮的条件是 `currentProject!==undefined && syncConfigured`，
+       这几支都停在 `/?lang=zh-CN` 默认视图（收集箱/今天、无选中清单、无同步配置）⇒ **那一枚根本不进 DOM**，页头宽度与"首个按钮"都不变。
+       ⇒ 结论：本线加这枚条件页头按钮，除 landing 复刻对账外**没有别的判据被带红**，无需再动别线。
+
   2. `packages/ai` `capability-manifest.spec.ts`（**2 failed | 263 passed**）—— 分母 9→10 与 `entityTypesWithoutTools` 的产品判断绊线，**AI 覆盖范围，不代改**。
   3. `packages/shared-schema` `auth-http-contract.spec.ts`（**1 failed | 172 passed**）—— `AUTH_PASSWORD_PATHS` 9→12，**auth 线判据口径，不代改**。
   4. `packages/domain` `subscription.spec.ts`（**1 failed | 1022 passed**）—— 权益拒绝理由契约，**计费/权益线，不代改**。
