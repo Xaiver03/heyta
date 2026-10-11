@@ -82,7 +82,13 @@ df -h /System/Volumes/Data                              # 要不要新开一棵�
 - 成员清单现量：`grep -n '/tmp/heyta-reinstall\|/tmp/heyta-ios-release' scripts/reinstall-all.sh`（ ios 段的**派生数据目录 / 构建日志 / 截图**三处是要害，`rm -rf` 那一处最危险）。
 - **编辑正在运行的它，是安全的**：这份脚本自带 `HEYTA-SNAPSHOT-BOOTSTRAP`（现量 `grep -n HEYTA-SNAPSHOT-BOOTSTRAP scripts/reinstall-all.sh`），
   入口先把整份拷成 `.reinstall-all.sh.snap.<pid>` 再 `exec` 副本 ⇒ 运行中改源文件不影响那一趟。
-- **没有任何代码判据读这些固定路径**：全仓 grep 只命中记录句子（`BLOCKED.md`、各份计划、`docs/runbooks/android-build-on-windows.md`）⇒ 默认值逐字不变即零行为变更。
+- **没有任何门禁钉住这些字面量**（改它们不会让哪道 `check:*` 红），全仓 grep 命中的其余成员都是**记录句子**
+  （`BLOCKED.md`、各份计划、`docs/runbooks/android-build-on-windows.md`）。
+  ⚠️ 但**有两处代码把它们当默认值消费**：`scripts/verify-mobile-ios.sh` 的 `HEYTA_IOS_DERIVED`，和
+  `research/tools/b-batch-reconcile.sh` 的 `IOS_LOCAL_APP`（现量 `grep -n 'IOS_LOCAL_APP' research/tools/b-batch-reconcile.sh`，
+  默认值正是 `reinstall-all.sh` 那个 derivedDataPath）。⇒ 两个后果：① **默认值必须逐字不变**；
+  ② ios 腿一旦改用私有落点，那次跨产物对账会**响亮地**报"本机没有可比的 iOS 产物"（它 `return 3`、不计入红，
+  所以不会假绿），要让它继续可比，就把**同一个旋钮值**一并传给它。
 - 命名照仓里**现成的形**：`scripts/verify-mobile-ios.sh` 已经是 `X="${HEYTA_IOS_DERIVED:-/tmp/heyta-ios-release}"` 这一套（现量 `grep -n 'HEYTA_IOS_DERIVED' scripts/verify-mobile-ios.sh`）；
   mac 段也有 `HEYTA_MACOS_DIST_DIR` 的先例，注释里写着"以前是写死的，第一句就是 `rm -rf`，会把别人的现场整个删掉"。
 - 引用它**行号**的只有 `research/tools/b-window-keeper*.sh` 里的注释，而且**已经过期**（注释说端序在 `:161`、第 0 步在 `:183`；现量 `grep -n 'ALL="mac windows android ios"\|-r build >' scripts/reinstall-all.sh`）。
