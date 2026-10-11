@@ -491,13 +491,11 @@ package.json   (只加了一行 verify:collab-journey)
    - 本计划头部状态行：**本会话已改指交接·三**（不再是交接·二）。
    - W4 残余如实登记：评论/指派/动态 UI 未建、**共享任务写路径路由**是最大架构件。跑 `docs-link-check` 确认无死链。
    - ⚠️ **前置**：这些写回里凡"✅ 已实现/已完成"的口径，都应在**本线提交并过门禁之后**再落，否则是"代码还在工作树、文档先说完成"的假绿。当前全链被第 0 项两枚别线绊线挡着 ⇒ 文档写回与提交一起，等绊线各归其主。
-4. **⑥ 一笔提交 + push**：协作线文件清单见交接·二「三、4」，**枚数不写在这里（会漂）** —— 提交前 `git status --porcelain` 现量、逐文件 `git diff` 过一遍。
-   🔴 **本会话新加两枚门禁红要一并进这笔提交**（都在协作线上）：
-   - `packages/app-host/src/share-key-identity.ts`（??，新）+ `packages/app-host/src/index.ts`（M，barrel 加导出）+ `apps/web/src/features/share/share-key-store.ts`（M，删本地函数、5 处改指 app-host）—— layering 那枚。
-   - `scripts/check-ui-language.mjs`（M，补 `web.share.invite.emailPlaceholder` 到 `UNTRANSLATABLE_KEYS`）—— ui-language 那枚。
-   另加第 0 项重生成的 `capability-manifest.generated.ts`。locale 两文件提交前再 `git diff` 一次确认只含协作线 5 键。
-   **不碰**：`BLOCKED.md`、`packages/legal/src/documents/third-parties.ts`、`scripts/qa/macos-installed-widget-help.sh`、
-   `scripts/verify-mobile-ios-account-email-sessions.sh`、`.agents/context/`。push 到 origin 当前分支，不 force、不改写已公开历史。
+4. **⑥ 一笔提交 —— ✅ 本会话已提交；push —— 🔴 受阻、已登记**：
+   - **提交 = `2485edde`**（25 文件 / +856 −186），只含协作线：W6 join-link 落点（`join-link.ts` + ProjectsPanel + 其测试）、W4 所有权转让（SharePanel + server share.routes + `transfer.*` 词条中英同步）、`share-link.ts` 空 token bug + ui 判据、layering 分层（`app-host/share-key-identity.ts` 新 + barrel + `share-key-store.ts` 改指）、`check-ui-language.mjs` 补 emailPlaceholder、journey 4 条断言、`.gitignore` 加 `collab-journey-results/`、本计划。**locale 两文件已现量确认各只含协作线 5 键**。
+   - 🔴 **故意没并进 `capability-manifest.generated.ts`**：重生成那份产物会**同时**带上本线 COMMENT **与** AI 工具线早已提交的 4 枚 TASK 工具（`get_task_estimate_context`/`append_task_checklist`/`set_task_priorities`/`set_task_estimate`）—— 它是**跨线混物**，按「只提交协作线文件」不并进本笔。它现在仍在工作树里是 `M`（本会话为验证 `--check` 跑过生成，但没提交）。**重生成的落地归属要单独协调**（谁补 COMMENT、谁补那 4 枚 TASK 工具、`capability-manifest.spec.ts`「分母 9→10 + entityTypesWithoutTools 出现 COMMENT」这条产品判断一并拍），别被某一条线顺手 sweep 进自己提交。
+   - 🔴 **push 受阻（不是没做，是不能独做）**：本地 `main`（现 `2485edde`）**领先 `origin/main`（`6d1024bd`）41 笔**，而那 41 笔**全是别的并行线**的未公开笔（账号标准套件 / 自动收集 T8 / 产品体验 / server 错误信封 / 文档门禁 / BLOCKED 账本）。`git push origin main` 会把这些**别人只在本地的笔一起公开**到 origin/main —— 这正是「不代公开别人未提交的笔」那条红线，本线不代推。**下一个 AI 若本地 main 仍领先别线笔，push 前必须先与那几条线协调（或确认 `origin/main` 现量 tip 后再判）**；`.git/hooks/pre-push` 另指向外部 `pre-push-bytearm`（凭据下线那套），不许 `--no-verify` 绕。
+   - ⇒ 本线交付形态：**代码已本地成笔、可复核可回退**；公开到 origin 这一步**押在跨线协调上**，不是本线遗漏。
 5. **两停止点（B 类，等用户醒来自行过目，不主动弹窗/表单）**：① PIPL 模态视觉（02 号图：主按钮「确认共享」无视觉强调、
    「不再询问」勾选无可见位——词条存在但视觉层级待追认）；② owner 转让语义（两步确认、立即生效、原 owner 降 editor，
    确认文案 `web.share.transfer.confirmHint`）。
