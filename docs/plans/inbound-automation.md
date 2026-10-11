@@ -2475,6 +2475,11 @@ $ git diff --name-only 52d7ba85..HEAD | grep -cE '^(packages/|server/|apps/web/|
 0
 ```
 
+**这条尺能非零的证明（19:1x 补，阴性读数单独看是量不出牙的）**：同一把尺（同一个正则）拿去量一枚
+**真碰源码**的提交 `63e61f23`（`feat(web): 产品体验线 + 全局响应式 + 认证/法务`），逐文件差集
+`git diff --name-only 63e61f23^..63e61f23 | grep -cE '<同一个正则>'` = **2406**（前几枚是
+`apps/web/evidence/assistant-responsive/*.png`）。⇒ 那个 `0` 不是"正则永远配不上"造成的恒真。
+
 ⇒ 自 18:1x 那批读数以来，本线八格所量的**五层源码零改动**；那段时间里动的 4 枚非文档路径全在
 `scripts/`（别线壳级装置）与 `apps/desktop-macos/evidence/`，与这八格的被测物无关。
 🔴 这条判据是**瞬时的**：下一个碰这五层的提交一落地，它就不成立，届时要按 18:1x 那节整批重取。

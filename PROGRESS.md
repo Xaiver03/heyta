@@ -3260,3 +3260,20 @@ COMMIT=e0b0f960479c2edd55b957d037468ac224d17c9f TIP_WAS=a599545dc9a8732cbfdef700
 **完成条件第 2 条那格仍是"没有数字基线"**：`git status --porcelain` 非白名单条目数现在量到 **66**，
 但任务 0 没记开工时的这个数（我的记录缺口，2541 行已登记），所以**不把它当成"与快照相同"来勾**，
 只按等价陈述"本线每一笔提交的文件集都在白名单内"逐笔交账。
+
+### 19:1x 追记 · 给那条"零改动"补了一次阳性对照（`0` 自己证不了自己）
+
+那条尺（`git diff --name-only A..B | grep -cE '^(packages/|server/|apps/web/|apps/mobile/|e2e/)'`）在
+`52d7ba85..HEAD` 上回 `0`。单看 `0` 有两种读法：真的没动 / **正则永远配不上**。后者会让"其余七格不用重取"
+变成一条恒真判据 —— 正是 §7 那条"永远通过的判据比没有判据更糟"。
+
+阳性对照用同一枚正则量一枚**真碰源码**的提交 `63e61f23`：
+
+```
+$ git diff --name-only 63e61f23^..63e61f23 | grep -cE '^(packages/|server/|apps/web/|apps/mobile/|e2e/)'
+2406
+```
+
+前几枚命中是 `apps/web/evidence/assistant-responsive/*.png` ⇒ 这把尺**会**非零，那个 `0` 是读数不是恒真。
+顺带一格口径：`grep -c` 命中 0 时自身退 **1**（上面 `commit-190x.sh` 末尾 `SCRIPT_RC=1` 就是这个，
+不是提交失败 —— `git show --stat` 已回 `2 files changed`）。要"有没有命中"就用 `-c` 拿数，要"成功与否"就别用它。
