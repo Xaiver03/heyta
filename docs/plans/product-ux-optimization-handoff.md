@@ -1,0 +1,141 @@
+# 交接：产品体验线（本轮 UX 优化 Goal）
+
+> 状态：**本轮目标五步都交完，剩四格各有归属，全部只在本地、未 push。**（2026-10-11 收）
+> 本文件只记「现在停在哪、下一步按什么顺序做、哪些手别再碰」。
+> 🔴 **逐格读数与判据形状的事实源**是 [`product-ux-optimization.md`](product-ux-optimization.md) 文末那一串台账格子
+> （取最新几格：`tail -60 docs/plans/product-ux-optimization.md`）。这里**不复制数字** —— 抄件一定会漂。
+
+---
+
+## 一、原始目标（别重新定位、别缩范围）
+
+完成 UX 优化计划本轮剩余未完成项（同步与隐私 / 数据管理 / 提醒状态 / 原生小组件环境识别 /
+个人资料·账号·AI·帮助的剩余交互回归），文档逐项收口，实际验收深浅主题与各端交互，
+**并从最终源码四端构建重装**，诚实记录验证边界。接手顺序原定五步：#38 页眉判据的牙 → #1 Android 设备腿 →
+#30 剩余步骤与 #27/#34 壳级窗口取证 → `pnpm reinstall:all` 四端重装 → #25/#26/#29/#31/#35 逐项确认归属。
+
+两条**负责人指令**都要延续：
+- 2026-10-10 07:4x：可以占用设备与共享载体做验收，不必逐项回问。
+- 2026-10-10 夜：**不要再发任何申请表单、确认表单，不要触发任何需要他交付的东西**（包括会弹"批准"的动作）。
+  ⇒ 汇报里不许有"需要你做的"那张表、不许以问句收尾；卡住的格一律写成**「这一格在谁手里 + 一条现量复现命令」**。
+  ⇒ 与「关闭 Goal 必须先请示」相撞时的解法是**保持 goal 开着**（到点让系统自动暂停），不是发明一句问话。
+
+---
+
+## 二、本轮已交（一格一句话，出处指向事实源）
+
+| 步 | 结果 | 读数与取证 |
+|---|---|---|
+| #38 页眉判据的牙 | ✅ 从"1440 恒假"换成"种下去确实生效"的生效断言，两头都能红 | 台账「#38」那格 + `scripts/verify-web-ui-sweep.mjs` 落点 `apps/web/evidence/<趟号>/` |
+| #1 Android 设备腿 | ✅ 当前产物上中文、英文各一趟；APK 与设备上那份哈希逐字相同 | `apps/mobile/evidence/profile-center/android-r85-currentproduct/`、`android-r86-currentproduct-en/` |
+| #30 三形态 | ✅ "命中/跳过/没命中"三种形状各有各的设备读数，不再同形 | 台账「#30 关掉」那格；iOS 那五张在 `apps/mobile/evidence/profile-center/ios-r78-currentproduct/` |
+| #27 macOS 空窗定性 | ✅ 裁掉一种成因：不是"首帧没画"，是抓**窗口**时 WKWebView 内容没被合成 | 台账「#27」那格；两张图的尺值同批入库 |
+| #34 探针改进 | ✅ 两枚：按 pid 锁死寻址 + 窗口数为 0 时分辨两种成因；顺带去掉一处会冷启动 Safari 抢焦点的写法 | `scripts/qa/macos-installed-widget-help.sh`，提交 `630fb57e` `1f00bb59` |
+| 第 4 步 四端重装 | ✅ 四端各有"装的是当前产物且起得来"的判据读数 | mac/windows/android 三端**图与读数同批**入库；iOS 只有判据、图见第四节 |
+| 第 5 步 归属对账 | ✅ #26/#29/#31 已闭合、#35 归 apps/web 在飞那批、#28 留口径、#39 归 inbound-core | 台账「第 5 步跑完」与「check:image-license」那两格 |
+
+本线那一轮的九笔（都已在 `main` 上，未 push）：
+`630fb57e` `1f00bb59` `ce9af5ba` `c4c18f33` `6ff22289` `0d377b2c` `fee660cc` `5a6e593c` `f9c02443`。
+
+---
+
+## 三、当前状态（每次接手先跑这一组现量）
+
+```bash
+git -C heyta rev-parse --short HEAD                     # 主检出在动，别照抄本文件写过的任何 SHA
+git -C heyta rev-list --count origin/main..HEAD         # 本地领先 origin 多少枚（绝大多数是别线的笔）
+git -C heyta status --porcelain | head -30              # 别人的在飞文件——本线不代提交
+ps -eo pid,etime,command | grep -E 'reinstall-all\.sh|b-window-keeper' | grep -v grep   # 有人在做同一件事就别起
+xcrun simctl list devices booted                        # 现在有几台模拟器、分别是谁的
+adb devices                                             # emulator-5554 在不在
+df -h /System/Volumes/Data                              # 要不要新开一棵载体
+```
+
+⚠️ **本轮量到的形状，写给下一个人省一趟**：
+- 主检出**每十几分钟就被别的会话提交一次**，`HEAD` 是移动靶。任何"四端产物"读数必须带**跑的那一棵树 + 那个 commit**。
+- 本线的四端批次跑在隔离载体 `../heyta-wt-reinstall`（只含已提交内容），**同一枚路径同时是
+  `research/tools/b-window-keeper.sh` 的默认 CARRIER** ⇒ 动它之前先 `pgrep -f b-window-keeper`。
+  它当下带着 ` M apps/mobile/ios/Podfile.lock`（是 `pod install` 的产物，不是谁的半成品）。
+- 已启动的模拟器有**两棵**：本线那台 `heyta-iphone-17pro`，和别线的 `heyta-ios-isolated`。
+  `reinstall-all.sh` 的 ios 段按**名字**选，不会误伤另一台，但**别去动别线那台**。
+
+---
+
+## 四、还欠什么、卡在谁
+
+| # | 欠的那一格 | 在谁手里 | 一条复现/闭合命令 |
+|---|---|---|---|
+| 1 | iOS 重装后的首屏图（判据过了、图被另一条会话在同一固定路径上覆盖） | **本线自己**（缺的是装置，不是许可） | 先给 `/tmp` 落点加旋钮（第五节第 1 步），再 `IOS_DEVICE_NAME=heyta-iphone-17pro bash scripts/reinstall-all.sh --only ios` |
+| 2 | #34 macOS 壳级 AX 那一趟（三条新判据字段还没在真壳上读过） | **负责人**（两格都只有他点得动） | `HEYTA_MAC_PID=<pid> bash scripts/qa/macos-installed-widget-help.sh`；前置：一次前台激活（与 AGENTS §6.2 规定二冲突，不许我代拍）+ 给 `/Applications/Heyta.app` 那枚 bundle 在「隐私与安全性 → 屏幕录制」里授权 |
+| 3 | #28 定位符门按 pair 还是按 OR-set | **负责人一句话**（判据口径，按边界不代改） | `pnpm check:locator-labels` 现量它现在判的是哪种 |
+| 4 | #35 `check:shell-surfaces` 的 W5 产物比源码旧 | **apps/web 在飞那批的所有者** | `node scripts/check-shell-surfaces.mjs`（主检出红 / 干净载体不红 —— 差的就是那批未提交源码） |
+| 5 | #39 `check:image-license` rc=1（`@noble/hashes` 一处钉死、一处范围） | **`packages/inbound-core` 的所有者**（或运营侧统一 `resolutions`） | `pnpm check:image-license`；两枚声明的现量：`grep -n '@noble/hashes' packages/inbound-core/package.json packages/sync-core/package.json` |
+
+第 4、5 格都做过**同一枚 A/B**：在只含已提交内容的载体上照样红 ⇒ 是 `main` 上的既有红，不是共享检出被写脏的假红。
+
+---
+
+## 五、下一步（按顺序，每步都带"动手前先量"的前置）
+
+**1) 给 `scripts/reinstall-all.sh` 的固定 `/tmp` 落点加带默认值的旋钮。** 本轮已把前置量完了，别重新量：
+
+- 成员清单现量：`grep -n '/tmp/heyta-reinstall\|/tmp/heyta-ios-release' scripts/reinstall-all.sh`（ ios 段的**派生数据目录 / 构建日志 / 截图**三处是要害，`rm -rf` 那一处最危险）。
+- **编辑正在运行的它，是安全的**：这份脚本自带 `HEYTA-SNAPSHOT-BOOTSTRAP`（现量 `grep -n HEYTA-SNAPSHOT-BOOTSTRAP scripts/reinstall-all.sh`），
+  入口先把整份拷成 `.reinstall-all.sh.snap.<pid>` 再 `exec` 副本 ⇒ 运行中改源文件不影响那一趟。
+- **没有任何代码判据读这些固定路径**：全仓 grep 只命中记录句子（`BLOCKED.md`、各份计划、`docs/runbooks/android-build-on-windows.md`）⇒ 默认值逐字不变即零行为变更。
+- 命名照仓里**现成的形**：`scripts/verify-mobile-ios.sh` 已经是 `X="${HEYTA_IOS_DERIVED:-/tmp/heyta-ios-release}"` 这一套（现量 `grep -n 'HEYTA_IOS_DERIVED' scripts/verify-mobile-ios.sh`）；
+  mac 段也有 `HEYTA_MACOS_DIST_DIR` 的先例，注释里写着"以前是写死的，第一句就是 `rm -rf`，会把别人的现场整个删掉"。
+- 引用它**行号**的只有 `research/tools/b-window-keeper*.sh` 里的注释，而且**已经过期**（注释说端序在 `:161`、第 0 步在 `:183`；现量 `grep -n 'ALL="mac windows android ios"\|-r build >' scripts/reinstall-all.sh`）。
+  ⇒ 插行不会打断任何可执行判据，但提交信息里要写明"行号引用又漂了 N 行"，别悄悄留下误导。
+- 改完的三把尺：`bash -n`、"默认值展开 == 旧字面量"的对照、"给了旋钮就变"的反臂。**能失败的检查才有价值**（AGENTS §8 第 3 条）。
+
+**2) 选载体。** 两条路，代价与读数含义不同，按你要证的事挑：
+- 复用 `../heyta-wt-reinstall`（现成 node_modules + Pods，快）⇒ 读数属于**它那一棵那一枚 commit** 的那一批，与已入库的 mac/windows/android 同一批；先跑第三节的 `pgrep`。
+- 新开一棵到**当前 HEAD**（`~/heyta-carriers/heyta-<线>-<mmdd>`，磁盘余量先 `df`）⇒ 证的是"最新源码"，但那张 iOS 图会和另外三端**不在同一批**，台账必须这样写。
+
+**3) 跑 ios 腿并把图坐实。** 关键不是"跑成功"，是**别再把图交回共享路径**：
+`HEYTA_REINSTALL_TMP_DIR=<私有落点> IOS_DEVICE_NAME=heyta-iphone-17pro bash scripts/reinstall-all.sh --only ios`
+当场做两件事：① 从落点**立刻**拷进 `apps/mobile/evidence/reinstall-<戳>-ios-installed.png` 并记 `shasum -a 256`；
+② 打开那张图**人看一眼**（AGENTS §6.2 规定一：截了 ≠ 看了）。判据继续用 `shot_ok`（非空白 + 主蓝命中），
+但**主蓝那张是 WebView 快照，不是窗口图** —— 窗口图不能当 UI 证据（#27 那一格的结论）。
+
+**4) 就地更正台账里那三句"仍开着"**（iOS 图、`check:macos-window` 的 ScreenCaptureKit 未授权、"要取图就得先补旋钮"）。
+🔴 别只在文末追加成功记录而留着旧句 —— 那会制造两套状态（AGENTS §8 第 8 条）。提交逐笔带明确 pathspec，
+新文件先 `git add`，提交后 `git show --name-only` 复验；不 push。文档门：`pnpm check:docs`、`check:md-tables`、
+`check:doc-citations`、`check:docs-voice`、`node research/tools/docs-link-check.mjs`。
+
+---
+
+## 六、死过的手（本轮实测，别再试一遍）
+
+1. **不要拿"`/tmp` 里存在一张 ios 截图"当证据。** 本轮就是这么丢的：那份 20:41 被另一条会话覆盖成
+   一张尺寸都不等的黑图。必须当场拷走 + 哈希对账，事后回来取不到就是取不到。
+2. **不要为了凑"命中那一支"去 `pm clear` 共享的 `emulator-5554`。** 清数据只有 §6.1.1 重装流程自带那一步授权；
+   另起一次就是删别人的现场。
+3. **不要 `open -a Heyta` 去抢前台** 来满足 AX 探针 —— 那是 AGENTS §6.2 规定二明确禁的，2026-10-08 那趟绿证的代价就是它。
+4. **不要在主检出补 `pnpm --filter @heyta/web build`** 来消 #35 的红：那会把别人没写完的源码打成 `apps/web/dist`，
+   而 mac / windows 两腿的"同一次构建"对账拿的正是这份 dist。
+5. **不要靠放宽判据消红**（`check:image-license`、`check:locator-labels`、`check:layering` 三处本轮都有人提议过加豁免）。
+   本线自己造的紅（CLI help 写成中文被定位符门当界面标签）改的是**自己的字符串落点**，不是门。
+6. **不要 `git push`。** 本地 main 领先 origin 的枚数现量见第三节，里面绝大多数是别的并行会话未公开的笔。
+
+---
+
+## 七、验证状态（哪些门在哪些树上绿）
+
+- 本轮跑过的：`check:locator-labels` rc=0（五枚脚本全过）、四道文档门绿、`pnpm -r typecheck` 本线范围内绿。
+- 🔴 **整条 `pnpm check` 本轮没有在合并态载体上重跑**（负载与 e2e 抢端口那两档原因记在台账），
+  所以"全链绿"这句话**不成立**，不许照抄。
+- 在册红（都不在本线射程）：#35、#39、`packages/i18n` 那枚"中文表每条都含汉字"对专名（`macOS`/`iOS`/`Android`）的红、
+  根 `package.json` 那对重复 `"check"` 键（口径归所有者）。
+
+---
+
+## 八、相关文件
+
+- 事实源台账：[`product-ux-optimization.md`](product-ux-optimization.md)（文末各格）
+- 跨端交互专项：[`cross-platform-ux-optimization.md`](cross-platform-ux-optimization.md)
+- 装置：`scripts/reinstall-all.sh`、`scripts/qa/macos-installed-widget-help.sh`、
+  `scripts/qa/profile-settings-android.py`、`scripts/qa/profile-settings-ios.py`、`scripts/verify-web-ui-sweep.mjs`
+- 四端重装规则与判据：`AGENTS.md` §6.1.1；产物身份对账：`docs/runbooks/multi-platform-build.md`
+- 同类交接的写法参照：[`account-standard-suite-handoff.md`](account-standard-suite-handoff.md)

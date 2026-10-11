@@ -193,6 +193,7 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | 🔴 [trash-and-archive-execution-brief.md](plans/trash-and-archive-execution-brief.md) | 🤝 **回收站与归档：执行交接书**（2026-10-03，P-1…P-9 已拍 ⇒ 可交给另一个 agent 跑）：批次 A（现在就能交，落点实测无人占用）/ B（等并行那批落地，每条带**可跑的开工判据**）/ C（要额外裁决）/ D（额外授权的"顺便做"，其中一条是**该删的多余门面**、一条是缺陷修复不是功能）、三道现场门（`git status` 归属门 + 两道余量为 0 的棘轮读数 + 不许放宽判据）、🔴 **八条防作弊验收**（不许只报"测试通过"、不许写"四端已修"、登记≠跑绿、`pnpm check` 会抢别人的 dev server）与"只有产品负责人能拍的值"清单。⚠️ 行号是 2026-10-03 工作树读数，每条开工前 `grep -n` 复跑 |
 | 🔴 [account-standard-suite.md](plans/account-standard-suite.md) | **注册登录标准套件（本单权威台账）**：换绑邮箱 / 忘记密码 / 改密 / 会话管理与逐个登出 / 注销对齐，逐趟验收读数在 §6（末节号现量 `grep -oE '^### 6\.[0-9]+' docs/plans/account-standard-suite.md \| tail -1`）。裁决层是 [ADR-0063](adr/0063-email-rebinding-and-per-session-revocation.md) |
 | [account-standard-suite-handoff.md](plans/account-standard-suite-handoff.md) | **交接：注册登录标准套件** —— 只记「现在停在哪、下一步按什么顺序做」：设备腿是收口条件、载体与跑法、已排除的死胡同 |
+| [product-ux-optimization-handoff.md](plans/product-ux-optimization-handoff.md) | **交接：产品体验线（本轮 UX Goal）** —— 五步各自交到哪一格、四端重装跑在哪棵树上、还欠的四格各在谁手里（每格一条复现命令）、本轮实测过的六条死胡同 |
 | [account-standard-suite-reflection.md](plans/account-standard-suite-reflection.md) | **复盘：注册登录标准套件** —— 纠正表（修改内容/错误归因/证据/下次开头指令建议）＋可长期记忆候选 |
 
 ### 工程参考
