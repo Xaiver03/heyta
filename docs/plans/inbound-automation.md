@@ -2649,6 +2649,18 @@ pnpm check:layering LAYER_RC=0    （apps/* 438 文件、10 条规则）
 **夹具故意给两枚规则卡**：只给一枚时"凭据卡挪到页尾"与"嵌在那枚卡里"在 DOM 上长得一模一样 ——
 第一版就是这么写的，臂 C 因此**存活**（rc=0），当场暴露我那条判据是永远通过的判据。
 
+🔴 **上面那条 `TC=0` 读数作废，本节把它改回来**：它是"单卡夹具那一版"的读数，我把夹具改成两枚之后
+**没有重新量过**就写了出去。全仓 `pnpm check` 的第 4 道（`pnpm typecheck`，走 `tsconfig.spec.json`）
+在 `1a8de6fd` 上因此翻红：`tests/inbound-panel-layout.spec.tsx(66,3): error TS2322:
+Type 'HTMLElement | null' is not assignable to type 'HTMLElement | undefined'`。
+修法是让类型说实话（`HTMLElement | null` + `querySelector<HTMLElement>`），**不是**把返回值改成
+`?? undefined` —— 后者会让第 1 条"分母自检"用的 `not.toBeNull()` 在缺卡时**安静通过**，
+等于把刚立的判据磨钝。反向验证臂 H：把选择器里的 testid 打错一个词 ⇒ 分母自检与另三条一起红
+（`ARM_H_RC=1`，4 条红），还原后 `6 passed`、`pnpm typecheck` rc=0。
+📌 教训：**读数的保质期到下一次编辑为止**；改过被测文件之后旧读数就是抄件，不是证据（本仓 §7 那条
+"正文别存会漂的值"在这里的形状是"读数别存已经改过的文件"）。而这次能抓到它，靠的是 no-bail 全链，
+不是我自己重跑的那一道单包 typecheck。
+
 ### 3. 反向验证：八臂，逐臂红了哪一条（`NO_COLOR=1`，载体 sha256 前后对账）
 
 ```
