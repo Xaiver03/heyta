@@ -450,6 +450,8 @@ package.json   (只加了一行 verify:collab-journey)
 | 🔴 本线又查出并修掉 `pnpm check` 里**两枚协作线自己的门禁红**（非别线绊线） | ✅ | 见下"二·补"。`check:ui-language` 与 `check:layering` 都命中本线（`web.share.*` / `apps/web/…/share-key-store.ts`），逐条修完并复验绿 |
 | `check:ui-language`（`web.share.invite.emailPlaceholder = name@example.com`） | ✅ | 根因**不是要翻译**：同一判断本线早已写进 `packages/i18n/tests/catalog.spec.ts` 的 `allowed`（注释"it is the example itself"，由本线 `2f59b075` 引入），但那笔**漏登记到 `scripts/check-ui-language.mjs` 的 `UNTRANSLATABLE_KEYS`** —— 两处各说一套。修法=把这把 key 补进门禁白名单、写清"补的是同一处已有判断"，**不动任何用户可见文案**（示例邮箱中英逐字相同，本就不该翻）。复跑 `check:ui-language` **`EXIT=0`** |
 | 🔴 `check:layering`（`apps/web/src/features/share/share-key-store.ts` 里 `entityType: 'SHARE_KEY'`） | ✅ | `syntheticIdentity` 是喂给 `SyncPayloadCipher.encrypt/decrypt` 的**合成 AAD**（文件头明写"不参与线上协议、只防 localStorage 两条记录互换"），**不是派发的 op**；但门禁按 op 形状（`entityType:` 字面量）拦，不看意图。按 AGENTS §3.5 把 op 形状构造挪出外壳：新建 `packages/app-host/src/share-key-identity.ts`（纯函数 `shareKeyStoreIdentity`，零浏览器依赖）→ 从 `app-host/src/index.ts` barrel 导出 → 外壳删掉本地函数、5 处调用改指 app-host、重打 `app-host dist`。复跑：`check:layering` **`EXIT=0`（438 文件 / 10 规则）**、`pnpm --filter app-host --filter web typecheck` **两个 Done**、外壳 `share-key-store.spec.ts` **10/10 passed** |
+| 第 2 步其余子闸在本地 HEAD 上的现量 | ✅ | 改完本线并三笔提交后：`pnpm -r typecheck` 全仓 **`TYPECHECK_EXIT=0`**、`pnpm -r build` **`BUILD_EXIT=0`**（含 app-host 新导出被各消费者编进 dist）、`@heyta/app-host` 单包 test **1775 passed（94 文件）**（证明 barrel 加导出没破坏任何 app-host 测试）|
+| 第 3 步文档写回 | ✅ | `f1c93750` 一笔：benchmark §2.6 的 **6.1（❌→✅）** 与 **6.7（❌→✅，注明仅 Web 落点）**、`P2-10` 拆口径；feature-matrix §6 的 6.1/6.7 备注；AGENTS §9 新增"协作与共享清单"并行轨道状态；计划头部。roadmap **按 2026-09-29 收敛口径刻意不动**。`check:md-tables` + `check:docs` 均绿（无死链）|
 
 ### 二、第 2 步门禁链：两枚红，性质不同（关键区分，别读成一个）
 
