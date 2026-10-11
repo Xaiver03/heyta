@@ -624,7 +624,7 @@ E2EE 下的**清单共享**基础设施（ADR-0062）已实现并**本地提交*
 - **push 押在跨线协调**：本地 main 领先 `origin/main` 的笔（`git rev-list --count origin/main..HEAD` 现量）里绝大多数是**别的并行会话未公开的笔**，`git push` 会把它们一起公开，本线不代推。
 - **W4 残余**：评论**已建模但不可达**（`COMMENT` + `CommentThread`/`comments-model` 由产品体验线 `e6058120` 建好并从 ui barrel 导出，但无宿主挂载、零写路径，`check:reachability` 就红在这最后一米 —— 归那一线，非本线）；**指派同一类**（`Task.assigneeUserId` 在 domain 是可选字段、通知过滤层**已经在读**它，但 `app-host` 零个指派 op 构造、`apps/*` 零界面 ⇒ 没人写它。⚠️ `check:reachability` 的分母是**实体**，字段级的"已建模≠可达"它拦不到）；**动态流**确实只有通知偏好开关、无活动流界面；**多人并发写同一条任务的写路径路由**是最大未建架构件；入群链接落点仅 Web 接了，移动端未接。
 
-状态与逐项读数见 [`docs/plans/goal-collaboration-shared-lists.md`](docs/plans/goal-collaboration-shared-lists.md)「2026-10-11 交接·三」；PIPL 同意面的视觉层级（旧停止点 ①）已按最佳实践落地并配判据（`apps/web/tests/share-consent-modal-theme.spec.tsx`）；所有权转让语义（②）仍待产品负责人追认。
+状态与逐项读数见 [`docs/plans/goal-collaboration-shared-lists.md`](docs/plans/goal-collaboration-shared-lists.md) **文末那几节**（末节号现量：`grep -n '^## ' docs/plans/goal-collaboration-shared-lists.md | tail -2`，本行不写节名因为它会长）；PIPL 同意面的视觉层级（旧停止点 ①）已按最佳实践落地并配判据（`apps/web/tests/share-consent-modal-theme.spec.tsx`）；所有权转让语义（②）仍待产品负责人追认。
 
 
 
