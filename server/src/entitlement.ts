@@ -99,7 +99,13 @@ export interface EntitlementSubscription {
   grants?: readonly string[] | null;
 }
 
-/** 拒绝原因。对外可区分，写进审计与响应体。 */
+/**
+ * 拒绝原因（**订阅读取那一路**）。对外可区分，写进审计与响应体。
+ *
+ * 🔴 这张表的成员由 `packages/domain/tests/subscription.spec.ts` 拿两份源文件逐字对账。
+ * 自动收集那一路的原因一律**不许并进来**（见下面 `AutomationEntitlementDenialReason`）——
+ * 同一个道理本文件已经为 `QUOTA_EXCEEDED` 写过一次（`replyAutomationMeteringRejection` 的头）。
+ */
 export type EntitlementDenialReason =
   | 'NO_SUBSCRIPTION'
   | 'STATUS_NOT_ENTITLED'
@@ -108,27 +114,48 @@ export type EntitlementDenialReason =
   | 'PERIOD_ENDED'
   | 'INVALID_NOW'
   | 'MISSING_GRANTS'
-  | 'GRANT_NOT_INCLUDED'
-  /** 自托管在线核验：部署没声明判定来源，自动收集不可用。 */
+  | 'GRANT_NOT_INCLUDED';
+
+/**
+ * 自动收集（inbound automation）那一路的拒绝原因 —— 与上面那张表**不相交**。
+ *
+ * 为什么不并进 `EntitlementDenialReason`：那张表每个成员在客户端对应一句"没有订阅／到期了"
+ * 式文案，而这些取值讲的是"这台实例此刻没有权益"或"这一张票据不对"，界面走
+ * `waiting-entitlement` 那一条（`packages/app-host/src/inbound-process.ts:72`）。
+ * 并成一张表会把运营者动作（`REVOKED_VERSION`）也引导到"请订阅"上。
+ *
+ * ⚠️ 宿主侧把 402 里的 `reason` 当**不透明字符串**原样带出去（`inbound-worker.ts:56`），
+ * 从不拿 domain 那张封闭表去校验它，所以拆开不改变任何线上行为，只是不再谎称它们是同一族。
+ */
+export type AutomationEntitlementDenialReason =
+  /** 部署没声明判定来源，自动收集不可用。 */
   | 'ENTITLEMENT_MODE_UNCONFIGURED'
-  /** 自托管在线核验：本部署没有官方验签钥匙环。 */
+  /** 本部署没有官方验签钥匙环。 */
   | 'ISSUER_NOT_CONFIGURED'
-  /** 自托管在线核验：还没有任何有效的官方绑定。 */
+  /** 还没有任何有效的官方绑定。 */
   | 'NO_BINDING'
-  /** 自托管在线核验：绑定已过 30 秒窗口，需要新票据。 */
+  /** 绑定已过 30 秒窗口，需要新票据。 */
   | 'BINDING_EXPIRED'
-  /** 自托管在线核验：绑定记录的签发者/实例不是当前部署的那一个。 */
+  /** 绑定记录的签发者/实例不是当前部署的那一个。 */
   | 'DEPLOYMENT_MISMATCH'
-  /** 自托管在线核验：绑定的吊销版本低于运营者设定的下限。 */
+  /** 绑定的吊销版本低于运营者设定的下限。 */
   | 'REVOKED_VERSION'
-  /** 自托管在线核验：这次操作必须自带一次性票据。 */
+  /** 这次操作必须自带一次性票据。 */
   | 'ENTITLEMENT_TICKET_REQUIRED'
   /** 一次性票据被拒；稳定子码见 `code`。 */
   | 'ENTITLEMENT_TICKET_REJECTED';
 
+/** `official` 模式下自动收集那一路会委托给订阅行裁决，所以那一判两路的原因都可能回。 */
+export type AnyEntitlementDenialReason = EntitlementDenialReason | AutomationEntitlementDenialReason;
+
 export type EntitlementDecision =
   | { allowed: true }
   | { allowed: false; reason: EntitlementDenialReason; code?: string };
+
+/** 自动收集那一路的判定结果。订阅那一路的 `EntitlementDecision` 结构上可直接赋给它。 */
+export type AutomationEntitlementDecision =
+  | { allowed: true }
+  | { allowed: false; reason: AnyEntitlementDenialReason; code?: string };
 
 /**
  * 把订阅里的时间戳归一成 epoch 毫秒，非法值返回 `undefined`（**不抛异常**）。
@@ -401,7 +428,7 @@ export async function evaluateAutomationEntitlementForUser(input: {
   policy?: EntitlementPolicy;
   mode?: AutomationEntitlementMode | undefined;
   keyring?: AutomationEntitlementKeyring | undefined;
-}): Promise<EntitlementDecision> {
+}): Promise<AutomationEntitlementDecision> {
   const mode = input.mode === undefined ? resolveAutomationEntitlementMode() : input.mode;
   const now = input.now ?? Date.now();
   if (mode === undefined) return { allowed: false, reason: 'ENTITLEMENT_MODE_UNCONFIGURED' };
@@ -442,7 +469,7 @@ export async function authorizeAutomationOperation(input: {
   policy?: EntitlementPolicy;
   mode?: AutomationEntitlementMode | undefined;
   keyring?: AutomationEntitlementKeyring | undefined;
-}): Promise<EntitlementDecision> {
+}): Promise<AutomationEntitlementDecision> {
   const mode = input.mode === undefined ? resolveAutomationEntitlementMode() : input.mode;
   const now = input.now ?? Date.now();
   if (mode === undefined) return { allowed: false, reason: 'ENTITLEMENT_MODE_UNCONFIGURED' };
@@ -476,7 +503,7 @@ export async function authorizeAutomationOperation(input: {
  * 含义不同，而 402 是客户端唯一会拿去"停止重试并显示等待权益"的信号。
  */
 export class AutomationWriteAuthorizationError extends Error {
-  constructor(readonly decision: Extract<EntitlementDecision, { allowed: false }>) {
+  constructor(readonly decision: Extract<AutomationEntitlementDecision, { allowed: false }>) {
     super('Automation entitlement authorization failed');
   }
 }
@@ -534,7 +561,7 @@ const automationRejectionBody = (reason: string, code?: string): Record<string, 
 export const replyAutomationRejection = (
   req: FastifyRequest,
   reply: FastifyReply,
-  decision: Extract<EntitlementDecision, { allowed: false }>,
+  decision: Extract<AutomationEntitlementDecision, { allowed: false }>,
   capability: EntitlementCapability,
 ): FastifyReply => {
   Logger.audit({
@@ -728,7 +755,7 @@ export const createEntitlementGuard = (
 
     const user = getAuthUser(req);
     const action = options.action;
-    let decision: EntitlementDecision;
+    let decision: AutomationEntitlementDecision;
     if (capability !== 'automation') {
       decision = evaluateCapabilityAcross(await loadSubscriptions(user.userId), capability, now(), policy);
     } else if (action === undefined) {

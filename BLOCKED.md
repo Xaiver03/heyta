@@ -9587,3 +9587,47 @@ $ git show 1a8de6fd:server/src/automation/entitlement-ticket.ts | grep -n "EVENT
 
 📌 与本线无关的一句提醒：**这 35 条里没有一条来自 `e2e/tests/inbound-automation.spec.ts`** ——
 本线那套走的是 `playwright.inbound.config.ts` 那枚独立配置，不在这道里。别把这 35 条读成"自动收集的界面红了"。
+
+## B179（2026-10-12 04:1x，本会话 · **我自己造的第二次事故，如实记在这里**）：一次 python 写文件把 `server/src/entitlement.ts` 截成 0 字节（809 行）
+
+**发生了什么**：我要给那枚文件做"词表拆分"，写了
+```python
+open(p, "w").write(apply(wt, "worktree"))
+```
+Python 先求值 `open(p, "w")`（**这一步立刻把文件截成 0 字节**），再求值参数 `apply(...)`；
+`apply` 里因为我自己的锚点写错（`")}): Promise<…"` 多了一个括号）抛了 `ValueError`
+⇒ 内容从没算出来，文件已经是空的了。症状是随后 `npx tsc` 报 22 条
+`File 'server/src/entitlement.ts' is not a module` —— **是探针把我自己造成的破坏照出来了，不是产品缺陷**。
+
+**恢复与取证**：
+- 动手前先查恢复源：`git ls-files -s -- server/src/entitlement.ts` 的 blob **逐字等于** `git rev-parse HEAD:…`
+  ⇒ 没有"别人已暂存但没提交"的版本会被我的恢复覆盖掉。
+- `git checkout HEAD -- server/src/entitlement.ts`；`wc -c` 回 41049；
+  `git hash-object <文件>` == `git rev-parse HEAD:<文件>` ⇒ 已提交那一层**逐字节完全恢复**。
+- 🔴 **边界（不包装成零损失）**：那两分钟里文件走的是工作树版本。已提交那层能证明分毫不差；
+  **未提交那层无法证明**（我恢复前没有留 `git status` 的快照，索引也没有）。
+  如果当时另有会话在这枚文件里写着未提交的 hunk，那些 hunk 不在任何提交对象里、本机无副本，恢复不了。
+  本线此后按一条死规矩做：**动共享检出的整文件写之前，先 `cp <file> <仓库外备份>` 再写**（本次拆分全程改为
+  用逐串替换的编辑工具 + 变异实验只在隔离载体 `.worktrees/inb-t7` 里做）。
+
+**可复用的那条**（与本条同类的是 B176）：**"整文件重写"这类动作必须先把新内容算完、再开文件写**
+（`new = transform(old)` 成功后才 `open(...,'w').write(new)`）；只要写这一步可能先于失败发生，
+就要留一个"失败时仍在"的东西（仓库外的原件副本，或临时文件 + `os.replace`）。
+
+## B180（2026-10-12 04:1x，本会话 · 三条**探针/工具层**教训，落点在 `docs/reference/environment-traps.md`，本线地界外只能交可粘条目）
+
+这一轮连续三次"坏探针与真结论输出同形"，都在本线白名单外（`docs/reference/environment-traps.md` 不许本线动），
+所以按既有做法把正文写在这里交还文件主人。**每条都带"怎么复现"**，谁并入都能当场验：
+
+1. **把包名当日志文件名 ⇒ 整条命令根本没跑，而读到的是 21 行整齐的 `rc=1`。**
+   `for pkg in @heyta/ai …; do pnpm --filter "$pkg" run test > "$L/${pkg}.log"; done` 里
+   `$L/@heyta/ai.log` 的父目录不存在 ⇒ **重定向失败、被测命令一次都没执行**，退出码非零；
+   看起来完全像"21 个包全挂"。复现：`echo x > /tmp/nope/x.log` ⇒ `zsh: no such file or directory`，而循环照跑。
+   规矩：**回路里必须同时记日志字节数与"有没有被测工具自己的汇总行"**，缺一项就当"没跑到"而不是"跑挂了"。
+2. **BSD grep 的 `-E` 不认 `\s`。** 上面那条计数用的 `grep -cE '^\s+Tests\s+'` 在 macOS 上匹配不到任何东西
+   （GNU-ism），于是"汇总行条数"读成空 —— 与"这个包没打汇总行"同形。可移植写法：`[[:space:]]`。
+   复现：`printf '  Tests  5 passed\n' | grep -cE '^\s+Tests\s+'` → `0`（本机），换成 `[[:space:]]` → `1`。
+3. **共享检出里"整文件写"的失败模式是截断，不是报错**（事故正文见 **B179**，这里只登记成陷阱的形状）：
+   症状链是 `open(p,"w")` 已执行、参数求值抛错 ⇒ 文件 0 字节、随后一批**毫不相关**的编译错误
+   （本例 22 条 `is not a module`）。判据：改完全文件写**立刻** `wc -c` 并与改前对数；
+   恢复后要用 `git hash-object` 与 `git rev-parse HEAD:<path>` 比 blob，而不是只看命令退出码。

@@ -3664,3 +3664,25 @@ B173 就地追记一句：现在缺的**只有**那一行登记，不再有"文�
 - 本线的账：19 格里只占 4（4 已修待在新 HEAD 复取、50=B171、74=B173、21/23=B172 那格文件是我的行不是）。
 - 仍欠：① 第 4 道在含今天各笔的载体上复取；② 86/105 两道的安静窗口单跑；③ `pnpm reinstall:all` 四端 + Linux 交付取证还没在本 HEAD 跑；
   ④ **全链 exit 0 目前不成立**（15 格别线红），随交付如实报，不勾任何 AC。
+
+## 2026-10-12 01:5x · T7 第 4 道复取：**rc=0**（本线那一格闭合，红集 19 → 18）
+
+- 隔离载体 `.worktrees/inb-t7` 从 `1a8de6fd` 快进到 `c1901982`；快进前现量 `git diff --name-only 1a8de6fd..c1901982 | grep -c apps/web/evidence` = **0**
+  ⇒ 那 126 枚脏（上一趟全链自己重写的证据图）与这批提交无交集，没被覆盖也没被带走。
+- 命令逐字取自 `chain.json` 的 `cmd`：`pnpm build` → `RC_BUILD=0`；`pnpm typecheck` → `RC_TYPECHECK=0`；`grep -c "error TS" 004.log` → **0**。
+- 结论：上一趟第 4 道那条 TS2322 在含 `c887c92c` 的 HEAD 上没了 ⇒ **本线在 19 格里的"待复取"那格闭合**，别线仍 15 格。
+- ⚠️ 负载 66.63 下取的这格是编译判定，不受负载影响；**但同窗口不许取任何 e2e/超时敏感层的读数**（§7 #408 两条腿这里只有一条）。
+- 🔴 一次自己造的探针事故（形状与 B176 同类：坏探针与真结论输出同形）：把 `@heyta/xxx` 直接当日志文件名，
+  目录不存在 ⇒ **重定向失败、命令根本没跑**，而读到的是 21 行整整齐齐的 `rc=1`。
+  判据补进回路：每包跑完**同时记日志字节数**，`log_bytes=0` 或缺 `Tests` 汇总行就当"没跑到"而不是"跑挂了"。
+
+## 2026-10-12 04:1x · T7 第二腿：**逐包跑完 21 包（17 绿 4 红）**；红里一格查出来是本线的，已在地界内修掉
+
+- 为什么要逐包：链里第 105 道是 `FIRST_FAIL`，只证明第一个失败包。补跑后**分母 21 == 打了汇总行的 21**，对数审计这才成立。
+- 4 格红归属：`ai`(5 条，`COMMENT` 分母) / `shared-schema`(1 条，口令路径) / `legal`(2 条，九份文档写 10 封而代码有 11 枚 `send*Email`，漏的那类是登录验证码，`git log -S 'sendLoginCodeEmail'` → 别线 `d361209e`) / **`domain`(1 条，本线)**。
+- 🔴 domain 那格此前被记成"计费/权益线的契约"（AGENTS §9 也是这么写的）—— 现量否证：多出的 8 枚是本线 `e8b3e982`/`4b84584d` **并进了 `EntitlementDenialReason`**，而 `packages/domain/tests/subscription.spec.ts:215` 比对的就是那张表。
+- 修法在地界内：拆成 `EntitlementDenialReason`(8) / `AutomationEntitlementDenialReason`(8) / `AnyEntitlementDenialReason` / `AutomationEntitlementDecision`。行为零变化 —— 宿主本来就把 402 的 `reason` 当不透明串（`inbound-worker.ts:56`），没有任何一层拿 domain 那张表校验它。
+- 新判据 `server/tests/automation-denial-vocabulary.spec.ts` 5 条 + 三臂变异：A 并回 `NO_BINDING` ⇒ 新尺 2 红 **且** domain 那条守卫同时 1 红；B 删一枚 ⇒ 1 红；C 塞 `QUOTA_EXCEEDED` ⇒ 2 红。每臂还原 `cmp` 逐字相同，基线 5 passed / domain 46 passed。`server` 的 `tsc` rc=0。
+- 回归读数（主检出）：server 159/2790+1skip、web 176/2247+13skip、app-host 95/1779、inbound-core 3/47、domain 43/1023 全 rc=0。**跳过逐条查过，本线没新加 `.skip`/`.todo`**。
+- 🔴 一次我自己的事故（B179）：`open(p,'w').write(apply(...))` 里 `open` 先求值 ⇒ `server/src/entitlement.ts` 被截成 **0 字节（809 行）**。`git checkout HEAD --` 恢复 + `git hash-object` 证与 HEAD blob 逐字相同；恢复前查过索引那一路的 blob 与 HEAD 相同 ⇒ 没有"已暂存的别版本"被丢。三条探针/工具教训做成可粘的环境陷阱条目交还文件主人（**B180**）。
+- 红集更新：第 4 道闭合、domain 那格修掉，legal 是新读出的别线格 ⇒ 待办红仍 19 格，本线**不再占代码格**。

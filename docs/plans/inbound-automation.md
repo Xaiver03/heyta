@@ -2898,7 +2898,7 @@ B139 本体已在账本里就地追记复账（不是新写一条），旧表留
 
 | 道 | 命令 | 成因 | 归属 |
 |---|---|---|---|
-| 4 | `pnpm typecheck` | 本线那枚 `InboundCycleResult` 的 TS2322 | 🔴 本线，**已在 `c887c92c` 修掉**（这棵树没有它 ⇒ 待在新 HEAD 复取） |
+| 4 | `pnpm typecheck` | 本线那枚 `InboundCycleResult` 的 TS2322 | 🔴 本线，`c887c92c` 修掉，**已在 `c1901982` 载体复取成 rc=0**（见文末那一节）⇒ 此格不再是红 |
 | 6 | `check:reachability` | `COMMENT` 已建模不可达 | 别线（产品体验线） |
 | 20 | `check:row-single-source` | 行单一事实源 13 处 | 别线 |
 | 21 / 23 | `check:selection-single-source` / `check:empty-state` | 点名的行写在本线面板文件里，但不是本线写的 | 🔴 **B172**（修法一是改判卷口径，二属顺手活） |
@@ -2917,10 +2917,92 @@ B139 本体已在账本里就地追记复账（不是新写一条），旧表留
 | ★100 | `check:android-gradle-remote` | `ux-final-20261008` 两枚证据 json 直接引 `apps/mobile/android/gradlew` 路径（4 处） | 别线（产品体验线的证据产物） |
 | ★105 | `pnpm -r test` | packages/ai 5 红 + shared-schema 1 红，FIRST_FAIL 后各层没跑到 | 别线；**本线那几层要逐包取**（见下） |
 
-**本线的账**：19 格里本线只占 **4**（4 已修待复取、50=B171、74=B173、21/23=B172 那一格文件是我的但行不是），
+**本线的账**：19 格里本线只占 **4**（第 4 道已在 `c1901982` 复取成绿、50=B171、74=B173、21/23=B172 那一格文件是我的但行不是），
 其余 15 格与本线代码无关 —— 按"顺手活不进代码"一律不动。
 
 **这一腿还欠什么**（不包装成完成）：
-① 第 4 道要在**含 `c887c92c` 之后各笔**的载体上复取（现在的 HEAD 还包括今天的清扫函数与新 spec）；
+① ~~第 4 道要在含 `c887c92c` 之后各笔的载体上复取~~ ⇒ **01:5x 已闭合**（载体快进到 `c1901982`：`RC_BUILD=0`、`RC_TYPECHECK=0`、`error TS` 命中 0），读数在文末那一节；
 ② 第 86/105 两道的"回归 vs 载体抖动"判定要在安静窗口做；③ `pnpm reinstall:all`（四端）与 Linux 交付取证还没在本 HEAD 上跑；
 ④ 全链 exit 0 目前**不成立**（15 格别线红），这条要随交付如实报。
+
+### 2026-10-12 01:5x · T7 第 4 道在**含修法的当前 HEAD** 上复取：**rc=0**（19 格里本线那一格就此闭合）
+
+载体推进：同一个隔离副本 `.worktrees/inb-t7` 由 `1a8de6fd` `git checkout c1901982`（17 笔之差）。
+推之前先量过一件事，否则这次快进会踩到别人的行：
+`git diff --name-only 1a8de6fd..c1901982 | grep -c apps/web/evidence` → **0** ⇒
+该副本里那 126 枚脏（全是上一趟全链自己重写的 `apps/web/evidence/**` 证据图）与这批提交**无交集**，
+快进既不覆盖它们也不把它们带进任何提交。
+
+命令逐字取自 `chain.json` 的 `cmd` 字段（第 2 道 `pnpm build`、第 4 道 `pnpm typecheck`），
+日志落工作树外 `~/heyta-inb-logs/t7-step4-c1901982/`：
+
+```
+$ cd .worktrees/inb-t7
+$ NO_COLOR=1 pnpm build     > 002.log 2>&1 ; RC_BUILD=$?          → RC_BUILD=0
+$ NO_COLOR=1 pnpm typecheck > 004.log 2>&1 ; RC_TYPECHECK=$?      → RC_TYPECHECK=0
+$ grep -c "error TS" 004.log                                       → 0
+$ tail -3 004.log                                                  → apps/web typecheck: Done / apps/desktop typecheck: Done
+```
+
+⇒ 上一趟那一格的红（`004.log` 逐字：`tests/inbound-panel-layout.spec.tsx(66,3): error TS2322`）
+**在含 `c887c92c` 的 HEAD 上不再存在**。19 格红集里本线占的"已修待复取"那一格闭合 ——
+**第 4 道不该再算红，红集从 19 格降到 18 格**（其余 15 格仍是别线，另 3 格是本线的 B171/B172/B173）。
+
+⚠️ 一条负载边界，写在读数旁边而不是别处：这一趟跑在 1 分钟负载 **66.63**（阈值 12）。
+`build` 与 `typecheck` 是编译判定、不含计时断言 ⇒ 读数不受负载影响；
+但**同窗口内任何 e2e 或含超时断言的层的读数都不能引这一趟**（§7 第 408 条要的两条腿这里只有负载那条）。
+
+### 2026-10-12 04:1x · T7 第二腿：21 个包**逐包**跑完（17 绿 4 红），其中一格查出是**本线自己造的**，已在地界内修掉并补了词表分离判据
+
+`pnpm -r test` 的 `ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL` 让链里第 105 道只代表"第一个失败包"，
+读不到全量。按 AGENTS §6 那条"逐包汇总行相加"的读法补跑（载体 `.worktrees/inb-t7` @ `c1901982`，
+日志 `~/heyta-inb-logs/t7-step105-c1901982/`）：**分母现量 21 个有 `test` 脚本的包 = 21 份打了 `Tests` 汇总行的日志**
+⇒ 对数审计成立（链里那条 1.3 秒的读数不成立）。
+
+| 红的那 4 包 | 逐字 | 归属 |
+|---|---|---|
+| `@heyta/ai` 5 红 / 260 过 | `capability-manifest` 分母与产物不一致（`COMMENT`） | 别线（链里已由 61/105 两格记到） |
+| `@heyta/shared-schema` 1 红 / 172 过 | `auth-http-contract` 那条口令路径 | 别线（同 105 那一格的原因） |
+| `@heyta/legal` 2 红 / 74 过 | 九份文档写"10 封功能邮件"而代码里有 11 枚 `send*Email`，漏的那类是**登录验证码** | 别线：`git log -S 'sendLoginCodeEmail' -- server/src` → `d361209e`（注册登录标准套件线） |
+| `@heyta/domain` 1 红 / 1022 过 | `expected [...16] to deeply equal [...8]` | 🔴 **本线** |
+
+🔴 **domain 那一格不是"别线绊线"，是本线自己造的**（此前 AGENTS §9 与本台账把它写成"计费/权益线的契约"，
+读起来像别人欠的活 —— 现量否证）：多出来的 8 枚
+`ENTITLEMENT_MODE_UNCONFIGURED / ISSUER_NOT_CONFIGURED / NO_BINDING / BINDING_EXPIRED / DEPLOYMENT_MISMATCH / REVOKED_VERSION / ENTITLEMENT_TICKET_REQUIRED / ENTITLEMENT_TICKET_REJECTED`
+是本线 `e8b3e982` 与 `4b84584d` **并进了 `server/src/entitlement.ts` 那张 `EntitlementDenialReason`**（订阅读取词表），
+而 `packages/domain/tests/subscription.spec.ts:215` 比对的就是这张表与客户端认识的词表。
+本文件里本来就有同一判断的 precedent（`replyAutomationMeteringRejection` 的头写着：
+`QUOTA_EXCEEDED` 不并进去，否则会打断那条漂移守卫，"那是别人的判据，不该由本线放宽"）。
+
+**修法（白名单内，不动任何人的断言）**：拆成两张表。
+`EntitlementDenialReason`（8 枚，订阅裁决）/ `AutomationEntitlementDenialReason`（8 枚，自动收集裁决）/
+`AnyEntitlementDenialReason`（两表之并，因为 `official` 模式下自动收集那一路会委托给订阅裁决）/
+`AutomationEntitlementDecision`。`AutomationWriteAuthorizationError` 与 `replyAutomationRejection`
+收 automation 那型；`EntitlementDecision` 结构上是它的子型，`evaluateCapabilityAcross` 那一路一行没改。
+
+⚠️ **为什么这不叫"为了让测试绿而改代码"**：宿主侧本来就把 402 里的 `reason` 当**不透明字符串**原样带出去
+（`packages/app-host/src/inbound-worker.ts:56`：`typeof raw.reason === 'string' ? raw.reason : 'HTTP_'+status`），
+`waiting-entitlement` 由状态码与 `code` 决定（`inbound-process.ts:72`），
+**全仓没有任何一层拿 domain 那张表去校验这些值**（grep 那 8 枚字面量只命中 `inbound-core/entitlement-contract.ts:56` 的签发侧映射）。
+⇒ 并表没有换来任何行为，只把两条不同族的判定谎称成同一族。
+
+**新增判据**（`server/tests/automation-denial-vocabulary.spec.ts`，5 条，读源文本同一手法）：两张表各自成员逐字锁定、
+**互不相交**、`QUOTA_EXCEEDED` 不在任何一张、两型判定结果都还在。三臂反向验证（每臂跑完都 `cmp` 证还原逐字相同）：
+
+| 臂 | 制造什么 | 结果 |
+|---|---|---|
+| A | 把 `NO_BINDING` 并回订阅那张表 | 本判据 `Tests 2 failed`（成员锁定 + 不相交），**且 domain 那条守卫同时 `Tests 1 failed`** —— 两把尺抓同一件事，且新这把能点名是哪张表多了什么 |
+| B | 从自动收集那张表删一枚 | `Tests 1 failed`（自动收集那张锁定） |
+| C | 把 `QUOTA_EXCEEDED` 塞进订阅那张表 | `Tests 2 failed`（成员锁定 + 那条 QUOTA 判据） |
+
+还原后基线：本判据 **`Tests 5 passed (5)`**、domain 单跑 **`Tests 46 passed (46)`**。
+
+**回归读数**（主检出，负载 66 下取的编译/单测读数，不含计时断言）：
+`server 159 文件 / 2790 passed + 1 skipped`、`web 176 / 2247 passed + 13 skipped`、`app-host 95 / 1779`、
+`inbound-core 3 / 47`、`domain 43 / 1023`，四包 `rc=0`；`cd server && npx tsc --noEmit -p tsconfig.json` **rc=0**。
+（web 那 `+1 文件 / +6 条` 是并行会话在这两趟之间落进主检出的，`git status --porcelain -- apps/web/tests` 为空 ⇒ 已入库、不是本线的。）
+🔴 跳过数逐条查过：web 那 13 条全在 `tests/e2e-sync.integration.spec.ts`(12) 与 `tests/journey-ai-memory.integration.spec.tsx`(1)，
+server 那 1 条走 `DATABASE_URL` 门 —— **本线一行 `.skip`/`.todo` 都没新加**（grep 白名单用例为空）。
+
+**红集因此更新**：链上 19 格里第 4 道已闭合（−1），逐包补跑新读出 domain（本线，已修）与 legal（别线）两格（+2）
+⇒ 当前"待办红"= **19 格**，本线在其中**不再占代码格**，只占三格"修它要动地界外的文件"（50=B171、74=B173、21/23=B172）。
