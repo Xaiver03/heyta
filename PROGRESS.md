@@ -3013,4 +3013,30 @@ git diff --cached --name-only -- <本笔点名的全部路径> | wc -l   # 必�
 
 **这一格仍不勾，但理由换成了实话**：端点是本机回环，真 provider 的 TLS / 网关 / 限流不在这一趟里。
 
+## 2026-10-11 17:3x–18:0x · AC-3 补上隔离副本那一趟，并查出 T8 终版有一格的"载体"写在产物前面
+
+台账里 AC-3 不勾的理由之一是"装置跑在**共享主检出**上"。这轮把它换成隔离副本的复跑：
+`.worktrees/inb-t7`（`1c166425`）里 `python3 research/tools/verify-inbound-dual-host.py`
+⇒ `Windows: 13/13` / `DEVICE_RC=0` / 内层 `Tests 14 passed (14)` / SKIP 计数 0，
+`--self-test` ⇒ `SELFTEST_RC=0`（五臂逐条按预期：静止 rc=0、抽窗 rc=1 且点名、0/0 rc=1、重复报号非零、主表读不到非零）。
+**先证读数能算到 HEAD 再跑**：`git diff --stat 1c166425..HEAD -- server/src packages/app-host packages/inbound-core
+packages/shared-schema research/tools/verify-inbound-dual-host.py` ⇒ 只差本线今日新增的那枚**测试文件**（不进产物）。
+
+🔴 **这轮真正的产出是一条状态造假**：T8 终版（10-11 01:5x–02:3x）的 AC-3 那格写着"这次是在干净 HEAD 的隔离副本上"，
+但机器上找不到那一趟的任何产物 —— 装置的 `--log` 默认落点空、`~/.cache/heyta-dual-host-debug/` 里只有 10-10 的五份日志、
+那一时段 `/tmp` 还留着 81 枚别的文件（⇒ 没被清过）、`kern.boottime` 是 Oct 6（⇒ 没重启），
+而它抄的读数与 10-10 主检出那趟**逐字相同**。我不据此断言当时一定没跑，只断言**当时没有可核对的产物**，
+并把那一格改挂这趟有产物的读数。⚠️ 顺手否证掉一个我自己想用的"证据"：`hosts/` 目录跑完是空的（连我这趟也空）
+⇒ "宿主库文件没留下"不证明任何事，只有日志算产物。
+
+同一天静态复量两格（当前 HEAD `f7a0ea3f`）：B112 那句"HEAD 引用了五枚未提交成员"**已闭合**
+（八枚 `git show HEAD:… | grep -c` 全命中）；T7 那两条别线绊线**仍在**（`packages/app-host/src` 里 `COMMENT` 命中 0、
+`capability-manifest.generated.ts` 里 `COMMENT` 命中 0）⇒ 不重跑那两条命令，红因在 HEAD 的字节里。
+另记一条别线刚改进 AGENTS 的事实：`pnpm --filter @heyta/sync-server test` 现在 rc=0（158 文件全过），
+"沙箱里跑不了这一层"是瞬时属性，收口时要重新现量。
+
+**写了什么**：`docs/plans/inbound-automation.md` 新增本节对应的那节 + 三处就地更正
+（「无尺的句子」表里 AC-3 那句"双宿主装置不存在"整行拿掉、`未闭合的边界` 那条 bullet 收掉、
+AC-3 勾选项与 T8 终版那一格的载体归属）；本文件加本节。**没动**：任何判据与断言、AC 勾选状态（现量已勾 0）。
+
 

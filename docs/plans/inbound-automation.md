@@ -77,7 +77,7 @@
 
 - [ ] **AC-1 权益与授权**。输入：P1-3 授权契约 + 新增 ADR（限定取代 ADR-0017/0020 的范围）+ 迁移清单 + P1-4 计量契约。证据：关闭旧权益 gate 仍挡住未授权自动收集、免费同步仍通过；免费/过期/错主体/错实例/坏签名/额度耗尽均拒绝且**不产生业务效果**；重试账目可对账。
 - [ ] **AC-2 接收与队列**。输入：P1-5 线协议 + 签名测试向量 + P1-6 envelope。证据：真 HTTP 验证字节级签名、时间窗、大小、并发限额、跨账号隔离；同键同体重放返回同事件、**同键异体冲突**；持久化失败不返回 accepted；查询无任务明文。
-- [ ] **AC-3 领取与提交**。输入：P1-1 事件状态机、lease generation/fencing、提交唯一身份、崩溃恢复图。证据：**两个独立真实宿主与独立数据库**跑通下方十个故障注入窗口，观察任务数、op 数、回执与计量——不只断言 HTTP 成功。现量入口：`python3 research/tools/verify-inbound-dual-host.py` ⇒ `Windows: 13/13`（2026-10-10 13:3x 在当前源码上复跑取到，读数见 §13:3x 那一节）；**整条仍不勾**：窗口 8 那五档当天已补齐七档逐档读数，但这一趟跑在**共享主检出**上（当时 T7 的合并态全仓门禁还没跑过），且量的是传输层 + 真服务端 + 两条真宿主本地库 —— 四端壳与界面层（T5 / AC-6）不在这格的证据里。
+- [ ] **AC-3 领取与提交**。输入：P1-1 事件状态机、lease generation/fencing、提交唯一身份、崩溃恢复图。证据：**两个独立真实宿主与独立数据库**跑通下方十个故障注入窗口，观察任务数、op 数、回执与计量——不只断言 HTTP 成功。现量入口：`python3 research/tools/verify-inbound-dual-host.py` ⇒ `Windows: 13/13`（两趟：10-10 13:3x 主检出、10-11 17:5x **隔离副本** `.worktrees/inb-t7`；后一趟带磁盘产物 `~/.cache/heyta-dual-host-debug/carrier-1011.log`，逐条命令与"为什么前一格那句'在副本上跑过'不可核"写在文末那一节）；**整条仍不勾**：窗口 8 那五档当天已补齐七档逐档读数，但它量的是传输层 + 真服务端 + 两条真宿主本地库 —— 四端壳与界面层（T5 / AC-6）不在这格的证据里，窗口 3 那句"宿主只回报 `empty`"的读法缺口仍待裁决。
 - [ ] **AC-4 解析**。输入：P1-7 字段映射与判定表 + P1-8 出境授权范围。证据：同一事件在不同时区、不同处理日得到相同归一化结果；DST/非法日期/长输入/多输出受限；正文中的注入指令与模型额外字段不能触发越权调用；实际出境请求符合披露。
 - [ ] **AC-5 批创建与来源记录**。输入：P1-2 批创建 intent/reducer/线形状 + 来源 receipt。证据：多项不同字段只产生一枚逻辑 op；中断重启无半批；三套存储适配器与远端回放收敛；删除任务后重试不复活；旧数据无来源字段仍能 hydration。
 - [ ] **AC-6 规则界面**。输入：规则版本契约、预览的计费/零写语义、状态原因码表、端能力表。证据：用户独立完成“启用 → 测试发送 → 等待 → 打开/解锁 → 自动处理 → 查看结果”；暂停/撤销/改规则与在途处理的竞态可解释；亮暗、窄屏、中英及各壳入口可用。
@@ -695,13 +695,13 @@ T2 那句话里"每 30 秒续票据"这一格，此前是**一整套零件都在
 
 | AC | 原句 | 现状 | 为什么做不了 |
 |---|---|---|---|
-| AC-3 | 「**两个独立真实宿主与独立数据库**跑通下方十个（现 13 个）故障注入窗口，观察任务数、op 数、回执与计量」 | **无尺**：`research/tools/` 里与本线有关的装置只有 `verify-inbound-worker-identity.py` 一枚，另两枚是入库切片器；跑 13 个窗口的双宿主装置**不存在** | 它跑在 app-host 的 `dist` 产物上，而 HEAD 仍被 B112 那四处白名单外接缝挡住（当日现量：`git show HEAD:` 查四枚成员命中 **0/0/0/0**，六枚文件仍 `M`）⇒ 现在写装置=在没有可编译的树上写 |
-| AC-6 | 「用户**独立完成**"启用 → 测试发送 → 等待 → 打开/解锁 → 自动处理 → 查看结果"」 | **半尺**：真浏览器那份 `e2e/tests/inbound-automation.spec.ts` 有 4 条（两个模板 × 1280/390 两窄宽），且**它走的是 route 桩**（文件头自述 "Real browser/UI with HTTP fixtures; database authorization is tested separately"），量的是界面形状，不是这条旅程 | 旅程需要公网接收 + 有权益的宿主在跑，两者都关着。✅ **2026-10-10 19:0x 现量更正，把本行原来那两句划掉**：① "本轮没有复跑"已过期 —— 复跑了，`cd e2e && npx playwright test --config playwright.inbound.config.ts` ⇒ **`2 failed / 2 passed (2.1m)`**，两条红是**产品缺一格**（换回设置那一节不重取事件列表：分组是 `hidden` 不是卸载，而组件备好的 `active` 旋钮在 `App.tsx`/`AiSettings.tsx` 两处都没接），归因与一句修法记在 **B140**，断言**没有**为了变绿而放松；② "这份 e2e 连入库都做不到"也已过期 —— 那份 spec 与它 import 的 `selectSettingsSection` 都在 HEAD（现量 `git show HEAD:e2e/tests/helpers.ts \| grep -c selectSettingsSection` = **4**）。四张草稿态截图人已看过：`docs/research/evidence/inbound-automation-review/ui-draft/draft-{1280,390}-{light,dark}.png`。**仍不勾**：那一格红没修、"各壳入口可用"这半没证（这趟只有 web）、整条旅程要开公网接收才能走 |
+| AC-6 | 「用户**独立完成**"启用 → 测试发送 → 等待 → 打开/解锁 → 自动处理 → 查看结果"」 | **半尺**：真浏览器那份 `e2e/tests/inbound-automation.spec.ts` 有 4 条（两个模板 × 1280/390 两窄宽），且**它走的是 route 桩**（文件头自述 "Real browser/UI with HTTP fixtures; database authorization is tested separately"），量的是界面形状，不是这条旅程 | 旅程需要公网接收 + 有权益的宿主在跑，两者都关着。✅ **2026-10-10 19:0x 现量更正，把本行原来那两句划掉**：① "本轮没有复跑"已过期 —— 复跑了，`cd e2e && npx --no-install playwright test --config playwright.inbound.config.ts` ⇒ **`2 failed / 2 passed`**，两条红是**产品缺一格**（换回设置那一节不重取事件列表：分组是 `hidden` 不是卸载，而组件备好的 `active` 旋钮在 `App.tsx`/`AiSettings.tsx` 两处都没接），归因与一句修法记在 **B140**，断言**没有**为了变绿而放松；10-11 12:4x 在最新 HEAD 上复跑，红仍在同一行、四张图逐字节相同；② "这份 e2e 连入库都做不到"也已过期 —— 那份 spec 与它 import 的 `selectSettingsSection` 都在 HEAD（现量 `git show HEAD:e2e/tests/helpers.ts \| grep -c selectSettingsSection` = **4**）。四张草稿态截图人已看过：`docs/research/evidence/inbound-automation-review/ui-draft/draft-{1280,390}-{light,dark}.png`，10-11 复跑那四张在 `ui-retry/`（逐张说明与 sha256 在同目录 `README.md`）。**仍不勾**：那一格红没修（B140 那句 `active` 没接，10-11 在最新 HEAD 上逐字复量仍在）、"各壳入口可用"这半没证（这趟只有 web）、整条旅程要开公网接收才能走 |
 | AC-7 | 「官方与自托管样例分别**可运行**，端点与权限真实」 | **无尺**（帮助中心/中英条款的落点也在白名单外，B118） | 半尺有：`docs/reference/` 那两份当日已按 HEAD 更正过措辞（协议 + 定价） |
 | AC-8 | 「平台 × 权益 × 设备状态 × 失败阶段的具体用例表」 | ⚠️ **本行已被文末「2026-10-10 05:2x · AC-8 用例矩阵」一节取代**（当日现量：矩阵已落成 34 行、逐格带尺或带归属，`python3 research/tools/verify-inbound-ac8-matrix.py` rc=0）。原先写的"**无产物**：矩阵文件不存在"在 10-10 05:0x 之前是真的，留着是为了让人认出"表格类交付物最容易糊过去的是它自己" | 剩余的那半仍然过不去：`pnpm check` / `-r test` 两条在隔离副本上仍红（10-11 11:4x 新读数：check 停在第 6 段 `COMMENT 0 处写路径`、`-r test` 停在 `@heyta/ai` 的清单产物缝，两条都在别线地界，见文末「T7 三条腿的合并态读数」）；`reinstall:all` 桌面两端 + Linux 取证已绿、移动两端按 §8.9 未点 ⇒ 矩阵里 C30~C34 五格仍记无尺（C30 要的是**四端**当前产物） |
 
-⇒ **逐格结论**：AC-1 / AC-2 / AC-4 / AC-5 的句子基本有尺；AC-3 有服务端半尺、缺双宿主半尺；
-AC-6/AC-7/AC-8 各缺的不是工时而是**判据的载体**。
+⇒ **逐格结论**（10-11 17:5x 复账）：AC-1 / AC-2 / AC-4 / AC-5 的句子有尺（AC-4 出境那一半是 10-11 补到线级的）；
+**AC-3 不在这张表里** = 双宿主那一半当天就有装置，10-11 又在隔离副本上取到**带磁盘产物**的读数（见文末那一节）；
+AC-6/AC-7/AC-8 各缺的不是工时而是**判据的载体**或**别的线的写入者**。
 🔴 03:3x 复审后对本行**自己那格的更正**：AC-4 的「实际出境请求符合披露」原先写成"依赖 `AiFeature='inbound-automation'`
 那半，仍在 B112 的未提交里" —— 那句话说的是"**这把尺在干净 HEAD 上编不出来**"（编译层），
 它当时**根本没有尺**这件事我没写出来：唯一的落点是一枚按禁字串写的 `not.toContain`，
@@ -1457,7 +1457,11 @@ python3 research/tools/verify-inbound-dual-host.py --self-test   # 五臂反向�
   用户界面看不出"这一格被计过量、结果不确定、要人看"。要不要给它一个独立状态词，属于判据口径，记 BLOCKED。
 - `pnpm --filter @heyta/app-host test` 同一趟 `1763 passed / 93 files`，跳过 0。四端与移动端 worker 的
   真机矩阵、T4 的事件级账本、T7 的合并态全仓门禁都不在这一格里。
-- 装置在**共享主检出**上跑，本线其余未提交改动仍在场；AC-3 整条继续不勾选。
+- ~~装置在**共享主检出**上跑，本线其余未提交改动仍在场；AC-3 整条继续不勾选。~~ —— ✅ **10-11 17:5x 补了隔离副本那一趟**
+  （`.worktrees/inb-t7`，`Windows: 13/13` / `DEVICE_RC=0` / 内层 `Tests 14 passed (14)` / SKIP 0 / 五臂自测 rc=0，
+  日志在 `~/.cache/heyta-dual-host-debug/carrier-1011.log`，副本与 HEAD 的差异只有一枚测试文件，逐条读数见文末
+  「AC-3 的隔离副本腿第一次取到有产物的读数」）。**整条仍不勾**：四端壳与界面层不在这一格的证据里、
+  窗口 3 的读法缺口待裁决。
 
 
 ## 2026-10-10 13:3x · 窗口 8 的三档"未跑"补齐：它当场查出两枚"已交付的宿主在真线上走不通"的缺陷
@@ -1896,7 +1900,7 @@ packages/app-host typecheck: tests/login-code.spec.ts(44,5): error TS2578: Unuse
 |---|---|---|---|
 | **AC-1 权益与授权** | `cd server && npx --no-install vitest run --maxWorkers=1 tests/automation-entitlement-ticket.spec.ts tests/automation-drafts.spec.ts tests/inbound-automation.routes.spec.ts tests/inbound-entitlement-write-tx.spec.ts tests/inbound-worker-identity.spec.ts tests/automation-entitlement-issuer.spec.ts tests/automation-commit-proof.spec.ts tests/automation-events.spec.ts tests/automation-rules.spec.ts tests/automation-sender-credentials.spec.ts tests/automation-ai-metering.spec.ts`（离线判定 11 枚）；权益三档 `tests/entitlement.spec.ts tests/entitlement-gate.routes.spec.ts tests/entitlement-across.spec.ts`；额度 HTTP `tests/inbound-ai-quota-route.spec.ts`；真库对账 `tests/automation-ai-metering.pglite.spec.ts`；真库身份腿 `python3 research/tools/verify-inbound-worker-identity.py`；产物加载级 `python3 research/tools/verify-inbound-cjs-require-order.py` | 离线 11 枚 `Test Files 11 passed (11)` / `Tests 103 passed (103)`；权益三档 `Tests 56 passed (56)`；额度 HTTP `Tests 3 passed (3)`；pglite `Tests 17 passed (17)`；真库腿 rc=0 且 `Test Files 1 passed (1)` / `Tests 46 passed (46)`；CJS 尺 `读数　CJS 包=1　在册 .ts=119　有产物=119　无产物(未编译)=0　扫过的产物=119　命中=0` rc=0，`--self-test` `臂数=8　不成立=0` | **判定层闭合到"同一 HEAD、同一副本、逐格可复跑"**：错主体 / 错实例 / 坏签名 / 吊销落后 / 额度耗尽各红一条且零业务效果，且**服务端产物现在能加载**（第 3 段那一格修完并有尺）。不闭合的两格照旧：① 新 ADR 不在地界内（**B139**）；② `pnpm check` 整链仍停在一枚别线类型错（**B144**），不是本线的红 |
 | **AC-2 接收与队列** | `cd packages/inbound-core && npx --no-install vitest run --maxWorkers=1`；队列判据变异臂 `python3 research/tools/verify-inbound-queue-teeth.py` | `Test Files 3 passed (3)` / `Tests 47 passed (47)`；变异臂 `臂数=6　不成立=0　末次 sha256=52c3fd707977a03e（须等于开局那枚）` rc=0 | **字节级签名 / 时间窗 / 上限 / 同键同体重放 / 同键异体冲突 / 跨账号隔离有尺，且这六臂今天在同一枚 HEAD 上再次证明能红**；查询面不回传明文（webhook + envelope 两档）。"公网接收"这一开关按指令仍关着 |
-| **AC-3 领取与提交** | `python3 research/tools/verify-inbound-dual-host.py`；`cd packages/sync-client && npx --no-install vitest run --maxWorkers=1 tests/inbound-authorization.spec.ts` | 装置 rc=0 且自报 **`Windows: 13/13`**（内层 `Tests 14 passed (14)`）；授权接缝 `Tests 6 passed (6)` | **13 个故障窗口两枚独立真 SQLite 宿主全跑通，且这次是在干净 HEAD 的隔离副本上**（10-10 那一趟跑在共享主检出，这一格原来欠的收口**今天补上了**）。观察量是任务数/op 数/回执/计量，不是 HTTP 码 |
+| **AC-3 领取与提交** | `python3 research/tools/verify-inbound-dual-host.py`；`cd packages/sync-client && npx --no-install vitest run --maxWorkers=1 tests/inbound-authorization.spec.ts` | 🔴 **01:5x 那一版把载体写高了**：它写"这次是在干净 HEAD 的隔离副本上"，但机器上找不到那一趟的任何产物（装置的 `--log` 默认落点空、`~/.cache/heyta-dual-host-debug/` 只有 10-10 的五份日志、那一时段 /tmp 有 81 枚别的文件说明没被清过、机器自 Oct 6 未重启），而抄来的读数与 10-10 主检出那趟逐字相同。**现在挂的是真在副本上跑过的一趟**（10-11 17:5x · `.worktrees/inb-t7` = `1c166425`）：装置 rc=0 且自报 **`Windows: 13/13`**（内层 `Tests 14 passed (14)`、SKIP 0、五臂自测 rc=0），日志在 `~/.cache/heyta-dual-host-debug/carrier-1011.log`；副本与当前 HEAD 在本线相关源码上只差一枚测试文件 ⇒ 读数算到 HEAD。授权接缝 `Tests 6 passed (6)` 仍是 01:5x 那格的原读数 | **13 个故障窗口在两枚独立真 SQLite 宿主 + 独立库上全跑通，观察量是任务数/op 数/回执/计量而不是 HTTP 码**；四端壳与界面层不在这一格（见文末「AC-3 的隔离副本腿」那一节，含产物缺失的逐条命令） |
 | **AC-4 解析** | AC-1 的离线 11 枚（含 `automation-drafts`）+ `cd packages/domain && npx --no-install vitest run --maxWorkers=1 tests/inbound-local-date.spec.ts` + inbound-core 全量 + `cd packages/app-host && npx --no-install vitest run --maxWorkers=1 tests/inbound-*.spec.ts`（含 10-11 13:3x 新增的线级出境一枚 `tests/inbound-egress-wire.spec.ts`） | 离线 11 枚 `103 passed (103)`；本地时区 `Tests 1 passed (1)`；inbound-core `47 passed (47)`；app-host inbound **`Test Files 14 passed (14)` / `Tests 111 passed (111)`**（10-10 那格只记到 2 文件 30 条，本线那批界面/循环用例已入库所以分母涨了；整包 `95 files / 1779 passed`、`typecheck` rc=0） | **同时区 / 同归化 / DST / 非法日期 / 长输入 / 多输出受限有尺**；注入指令与模型额外字段的越权走出境闸门既有断言。✅ **"实际出境请求符合披露"这一格原来那句"本线没有读数（要真 provider 流量）"是假阻塞** —— runner 不注入 `fetchImpl` 时走真 `fetch`，把端点指到本机回环就能抓到生产代码自己发出的那一发报文，四条判据 + 一次线级变异（把投影改成"整包发"⇒ 恰好那一条红、其余三条照绿）都在文末「AC-4 出境取证补到线级」那一节。**仍不勾**：这一趟的端点是本机回环，真 provider 的 TLS 与网关行为不在里面 |
 | **AC-5 批创建与来源记录** | `cd packages/shared-schema && npx --no-install vitest run --maxWorkers=1 tests/task-batch-contract.spec.ts`；`cd packages/op-log && npx --no-install vitest run --maxWorkers=1 tests/task-batch.spec.ts`；`cd packages/app-host && npx --no-install vitest run --maxWorkers=1 tests/task-batch-actions.spec.ts`；点名范围尺 `python3 research/tools/verify-inbound-commit-scope.py` | 契约 `Tests 15 passed (15)`；reducer `Tests 16 passed (16)`（= 5 组 × 三套适配器）；唯一入口 `Tests 9 passed (9)`；范围尺 rc=0 | **一枚逻辑 op / 无半批 / 三套适配器收敛 / 删除后重试不复活 / 旧数据无来源字段仍能 hydration 全部有尺**，且三档都在本批同一 HEAD 上取到。这是全表最接近"可勾"的一格，按规矩**仍未勾**（勾由负责人点，现量 `已勾=0`） |
 | **AC-6 规则界面** | `cd apps/web && npx --no-install vitest run --maxWorkers=1 tests/inbound-*.spec.tsx tests/inbound-upload-authorization.spec.ts`；界面层 e2e `cd e2e && npx playwright test --config playwright.inbound.config.ts` | jsdom 五枚 `Test Files 5 passed (5)` / `Tests 11 passed (11)` rc=0；**e2e 已在隔离副本上按最终 HEAD 复跑**：`2 failed / 2 passed (2.1m)`，两条红仍在 `inbound-automation.spec.ts:85`（同一处、同一句等待），四张草稿图**逐字节等于**入库件 ⇒ 读数与哈希见文末「AC-6 真浏览器那一趟补跑」那一节 | **界面入库、jsdom 判据有牙、真浏览器那一格已在 `1c166425` 复跑**：复跑没有把它跑绿，**B140** 那一格（设置分组是 `hidden` 不是卸载，`active` 从没人接）在 HEAD 上现量仍未接（`git show HEAD:apps/web/src/features/settings/AiSettings.tsx \| grep -n 'InboundAutomationSettings routing'` 该行没有 `active`），修法要动的文件不在本线白名单 ⇒ 不代改。另两格照旧：`waiting-entitlement` 的词条缺（B110，i18n 不许动）；"完整旅程"要公网接收 + 有权益宿主 |
@@ -2266,4 +2270,87 @@ Tests  1 failed | 3 passed (4)      MUT_TEST_RC=1
 照出来了」那节末尾加了指向本节的前向指针。**没改的**：任何既有断言与阈值（只新增一枚文件）。
 **仍然不勾，而且理由换成了实话**：这一趟的端点是本机回环，真 provider 的 TLS 握手、网关与限流行为不在里面；
 "完整旅程"那一格照旧要公网接收 + 有权益的宿主才走得了。
+
+## 2026-10-11 17:3x–17:5x · AC-3 的隔离副本腿第一次取到**有产物**的读数，并照出 T8 终版那一格的载体归属不可核
+
+**为什么做这格**：AC-3 整条不勾的理由里有一条是"装置在**共享主检出**上跑，本线其余未提交改动仍在场"
+（`### 未闭合的边界` 那一节最后一行）。这一趟把它换成隔离副本上的复跑。
+
+**先证"副本的读数能算到 HEAD 上"，再跑**（不然复跑只是换个地方再跑一遍）：
+
+```
+$ git -C .worktrees/inb-t7 rev-parse HEAD
+1c166425801c187e0cb0fd1b939f8baedb89ff25
+$ git merge-base --is-ancestor 9fb9eed2 1c166425 && echo YES
+YES                        # 副本比 T8 终版那一轮用的 9fb9eed2 新
+$ git diff --stat 1c166425..HEAD -- server/src packages/app-host packages/inbound-core \
+      packages/shared-schema research/tools/verify-inbound-dual-host.py
+ .../app-host/tests/inbound-egress-wire.spec.ts     | 110 +++++++++++++++++++++
+ 1 file changed, 110 insertions(+)
+```
+
+⇒ 本线相关源码在副本与当前 HEAD 之间**只差本线今日新加的那一枚测试文件**，而它不进 `dist`、装置判的是产物
+（文件头自述："它判的不是工作树的字节，是产物"）⇒ 这一趟的读数可直接算到当前 HEAD。副本里未提交的只有
+`apps/web/evidence/inbound-recovery/*.png`（AC-6 那趟 e2e 写的截图），装置不读它们。
+
+**读数**（串行一条命令链，退出码逐个取、不经管道）：
+
+```
+$ python3 research/tools/verify-inbound-dual-host.py --log ~/.cache/heyta-dual-host-debug/carrier-1011.log
+Planned windows (现量自 docs/plans/inbound-automation.md): [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+  WINDOW=1 … WINDOW=13   全 PASS（逐窗原文在那份日志里，含窗口 2/4/5 的真 SIGKILL、
+                          窗口 7 的 fencing 三拒、窗口 8 的六档、窗口 13 的跨时区往返）
+Windows: 13/13
+DEVICE_RC=0
+（套件自己：Test Files 1 passed (1) / Tests 14 passed (14)；日志里 SKIP 计数 0）
+
+$ python3 research/tools/verify-inbound-dual-host.py --self-test
+臂 1 静止对照：期望 rc=0 —— 实得 rc=0
+臂 2 注入缺失（抽掉 WINDOW=13 那一行）：期望 rc=1 且点名该格 —— 实得 rc=1，点名=True
+臂 3 注入 0/0（汇总行没有 passed 数）：期望 rc=1 —— 实得 rc=1
+臂 4 注入重复报号：期望非零退出 —— 实得 SystemExit(R4 同一格报了两遍：WINDOW=1)
+臂 5 注入"主表读不到"的计划文本：期望非零退出 —— 实得 SystemExit(R0 分母现量不成：读到 [11]，缺 [1..10])
+SELFTEST_RC=0
+```
+
+🔴 **照出来的一件事（这节的主要产出不是那个 13/13，是这条）**：T8 终版（10-11 01:5x–02:3x · 载体 `9fb9eed2`）
+的 AC-3 那格写着"装置 rc=0 且自报 `Windows: 13/13`（内层 `Tests 14 passed (14)`）……**且这次是在干净 HEAD 的
+隔离副本上**（10-10 那一趟跑在共享主检出，这一格原来欠的收口今天补上了）"。**机器上找不到那一趟的任何产物**：
+
+```
+$ ls -1 ~/.cache/heyta-dual-host-debug/ | grep -c 'Oct'   # 逐份看日期
+device-run-1.log / all1.log / all2.log / device-full-1010.log / device-full-1010b.log   ← 全是 10-10
+carrier-1011.log / carrier-1011.out / carrier-1011-selftest.out                          ← 今天这一趟
+$ ls /tmp/heyta-inbound-dual-host*
+(no matches)                       # 装置 --log 的默认落点是空的
+$ find /private/tmp -maxdepth 1 -type f -newermt '2026-10-11 01:00' ! -newermt '2026-10-11 03:30' | wc -l
+      81                           # 那一时段 /tmp 有 81 枚别的文件 ⇒ /tmp 没被清过
+$ sysctl -n kern.boottime
+{ sec = 1791249078 ... } Tue Oct  6 09:11:18 2026   # 当天也没重启
+```
+
+⇒ 那一格的**载体归属不可核**；它抄的读数与 10-10 主检出那一趟逐字相同（`Windows: 13/13` + 内层 `14 passed`），
+所以最省解释是"把主检出那趟的写到了'隔离副本'这一格"。我不据这几条断言当时**一定**没跑（日志可能被移走），
+只断言**现在没有可核对的产物**，并且 AC-3 那一格从本节点起改挂这一趟有产物的读数。
+📌 这一族的可迁移判据：**"重装置跑过"这类句子必须带一个还在磁盘上的产物路径**；只报 n/n 而报不出日志落在哪，
+下一轮就没法区分"跑过且日志清了"和"没跑过"。
+
+**同一天顺手复量的两格**（当前 HEAD `f7a0ea3f`，静态尺，不占算力）：
+
+- **B112 的挡路条件已闭合**：那句"本线已入库代码在 HEAD 上引用了五枚尚未提交的成员"八枚全命中 ——
+  `git show HEAD:packages/storage/src/stores.ts | grep -c INBOUND_{RECIPIENT_KEY,WORKER_CREDENTIAL,COMMIT_JOURNAL}`
+  = 1/1/1；`packages/ai/src/{egress,routing}.ts` 的 `inbound-automation` = 1/1；
+  `packages/sync-client/src/client.ts` 的 `getInboundUploadAuthorization` = 2；
+  `packages/op-log/src/engine.ts` 的 `dispatchValidated` = 1；`packages/app-host/src/host.ts` 的
+  `InboundAutomationHostOptions` = 2。⇒ 台账里凡是"HEAD 编不出来"的理由都不再成立，AC-3 那格的旧归因要换掉。
+- **T7 那两条别线绊线仍在**：`git grep -c "COMMENT" HEAD -- packages/app-host/src` 命中 **0**
+  （⇒ `check:reachability` 第 6 段那条必红）；把 `git show HEAD:packages/ai/src/capability-manifest.generated.ts`
+  那份产物再数 `COMMENT`，命中 **0**（⇒ `@heyta/ai` 那 5 红必红）。没有重跑那两条门禁命令 —— 红因就在 HEAD 的字节里，
+  跑与不跑同一个结论；要它们变绿得**他们**补写路径 / 重跑生成器。
+
+**这一节改了什么**：AC-3 的载体归属换成有产物的一趟；`### 未闭合的边界` 那条 bullet 收掉；
+「无尺的句子」表里 AC-3 那句"双宿主装置**不存在**"按现量作废（它写于 10-10 02:0x，装置 10-10 12:5x 就入库了）。
+**没改的**：任何判据口径与断言、AC 勾选状态（现量 `grep -c '^- [x] \*\*AC-' docs/plans/inbound-automation.md` = 0）。
+**仍然不勾**：这一格量的是传输层 + 真服务端 + 两条真宿主本地库，四端壳与界面层（T5 / AC-6）不在它的证据里；
+窗口 3 那个"宿主只回报 `empty`"的读法缺口仍待裁决。
 
