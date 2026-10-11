@@ -74,7 +74,8 @@ export function CompactRailNavigation(props: RailNavigationProps): React.JSX.Ele
         <MoreHorizontal size={ICON_SIZE.sm} aria-hidden="true" /><span className="ht-rail__label ht-type-caption">{t('web.shell.views.groupMore')}</span>
       </button>
       <InboxBell />
-      <SyncBar />
+      {/* 这一档的文字预算放不下整句状态，见 `SyncBar.tsx` 的 `compactLabel` 注释。 */}
+      <SyncBar compactLabel />
     </nav>
     {createPortal(<div ref={panel} className={`ht-compact-rail__panel${open ? ' ht-compact-rail__panel--open' : ''}`} style={{ bottom }}>
       <div id="compact-rail-destinations" className="ht-compact-rail__destinations" hidden={!open}>
