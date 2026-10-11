@@ -159,7 +159,35 @@ test('共享清单全旅程：owner 建共享 + 邀请 → bob 贴 token 入群 
   // 头部「共享」→ PIPL 同意模态（方案 a）→ 确认。
   await ownerPage.getByTestId('share-open-button').click();
   await expect(ownerPage.getByTestId('share-consent-modal')).toBeVisible();
+  // 🔴 视觉层级判据。这一格曾经"控件全都能用、整块零样式"通过了一轮 ——
+  // 确认与取消等权时，同意面读起来就是一段裸文本加两颗一样的按钮，而功能断言一条都不会红。
+  // 所以判的是**不等权**（主按钮吃到实心主蓝、取消没有），不是"有没有 class"。
+  const consentEmphasis = await ownerPage.evaluate(() => {
+    const bg = (testId: string) => {
+      const el = document.querySelector(`[data-testid="${testId}"]`);
+      return el === null ? '<missing>' : getComputedStyle(el).backgroundColor;
+    };
+    // `--ht-color-primary` 是十六进制，计算样式是 `rgb(...)`，先归一到后者再比。
+    const raw = getComputedStyle(document.documentElement).getPropertyValue('--ht-color-primary').trim();
+    const hex = raw.replace('#', '');
+    const primaryRgb =
+      hex.length === 6
+        ? `rgb(${Number.parseInt(hex.slice(0, 2), 16)}, ${Number.parseInt(hex.slice(2, 4), 16)}, ${Number.parseInt(hex.slice(4, 6), 16)})`
+        : raw;
+    return { accept: bg('share-consent-accept'), cancel: bg('share-consent-cancel'), primary: primaryRgb };
+  });
+  expect(consentEmphasis.accept, `确认共享按钮应是实心主蓝（现算 ${consentEmphasis.primary}）`).toBe(
+    consentEmphasis.primary,
+  );
+  expect(consentEmphasis.cancel, '取消按钮不许与确认等权（读到同一个主蓝＝同意面又变成裸文本）').not.toBe(
+    consentEmphasis.primary,
+  );
   await evidenceShot(ownerPage, '02-owner-consent-modal.png');
+  // ⚠️ 这一屏的**暗色**证据不在这里（`apps/web/tests/share-consent-modal-theme.spec.tsx` 用
+  // 暗色 token 表渲染同一棵树来判）。原因记在 `apps/web/src/lib/theme.ts` 的文件头：
+  // 应用暗色只改 `<html data-theme>`，而共享层按钮的颜色来自**开机时解析的 token 表**，
+  // 中途 `emulateMedia({colorScheme:'dark'})` 截出来的与亮色那张**逐字节相同**（本轮实测），
+  // 要让它真变暗必须重载页面，而重载会把这条旅程的解锁态打断。
   await ownerPage.getByTestId('share-consent-accept').click();
 
   // 创建共享（服务端建 share + 自封信封 + shareId 回写）→ 面板出现。

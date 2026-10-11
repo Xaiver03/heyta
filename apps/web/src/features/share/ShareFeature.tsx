@@ -372,6 +372,10 @@ export function ShareFeature(props: ShareFeatureProps) {
               <ShareConsentModal
                 labels={consentLabels}
                 store={consentStore}
+                // 这个对话框顶部 `<h2>` 写的就是同一句「共享清单」
+                // （`web.share.dialog.title` 与 `common.share.consent.title` 同文），
+                // 再画一遍会在同屏出现两个同名标题。
+                titleHidden
                 onConsent={(next) => {
                   setConsentStore(next);
                   localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(next));
