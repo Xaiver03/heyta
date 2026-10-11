@@ -738,3 +738,22 @@ E 勾选后不切实心→1 红；F 主按钮文字配对坏→1 红。还原后
 
 **由此固定下来的本线提交动作**：共享检出里提交一律 `git commit -- <自己的路径>` 或 plumbing + 刷索引，
 不再用裸 `git commit`；提交后必查 `git show --stat <新> --` 的路径集是否**恰好**等于本线清单。
+
+### 10-12 01:0x 复量（HEAD 又动了三笔，旧读数不能沿用；这一节只登记"现在还挡着什么"）
+
+四枚绊线**逐条重取**，形状与 10-11 一致、条数有变（写在这里的是这一趟的读数，下一趟必须重跑）：
+
+| 那一格 | 现量命令 | 这一趟读数 |
+|---|---|---|
+| `packages/ai` 分母判断 | `pnpm --filter @heyta/ai test` | rc=1，**2 failed / 263 passed**（10-11 是 5 failed ⇒ 别线自己补掉 3 条，剩下 2 条就是"COMMENT 配不配 AI 工具"那一句） |
+| 已建模≠可达 | `pnpm check:reachability` | rc=1，仍是 COMMENT 零写路径（与上一格同源） |
+| 口令路径封闭词表 | `pnpm --filter @heyta/shared-schema test` | rc=1，`expected […] to have a length of 9 but got 12` |
+| 权益拒绝理由契约 | `pnpm --filter @heyta/domain test` | rc=1，`subscription.spec > every denial reason we know about exists on the server` |
+
+**本线五道静态门在新 HEAD 逐条 rc=0**（`check:design` / `check:layering` / `check:ui-language` / `check:rn-aria` / `check:tokens`）。
+
+🔴 **`pnpm reinstall:all` 这一格现在不能起，且不是"等负责人"，是等设备面**：01:0x 现量
+`xcrun simctl list devices booted` 有 **两台** iOS 模拟器在跑（`heyta-ios-isolated17` +
+`heyta-iphone-17pro`）、`adb devices` 有 `emulator-5554 device`，一分钟负载 12.62（本仓阈值 12）。
+那条流程会 `simctl uninstall` + 卸旧装新，**正在别的会话的在途验收上踩过去**（AGENTS §8 第 9 条
+"共享资源独占验收"）。设备面空出来之后现量这四条读数再起，别照本节推断"现在可以跑"。
