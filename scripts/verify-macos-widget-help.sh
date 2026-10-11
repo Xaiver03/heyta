@@ -74,6 +74,15 @@ BUILD_LOG="$RUN_DIR/swift-build.log"
 EXEC_NAME="HeytaMacWidgetHelp$STAMP"
 SETTLE="${SETTLE:-90}"
 EXPECTED_SITE="${HEYTA_HELP_EXTERNAL_URL:-https://heyta.waytofuture.cn}"
+# 🔴 **逃生门臂**：调用方设了 `HEYTA_SHELL_STORAGE` 就原样转发给壳（macOS 壳在
+#    `apps/desktop-macos/Sources/HeytaMac/ShellStorageHost.swift` 里读它，`=0` 显式关掉宿主端口）。
+#    那一臂下**本装置的判据不适用**：判据钉的是"原生形状"（状态行=正在原生桌面应用中运行、
+#    安装引导 0 行），而门关掉后界面**按设计**改教"先把 heyta 装成应用"（见
+#    `apps/web/src/pwa/widget-install.ts` 那段逃生门注释）⇒ 拿原生判据去量它必然红，而那条红不是缺陷。
+#    所以这一臂只出读数、跳过判据，退出码只代表"探针有没有闭合"。
+STORAGE_GATE="${HEYTA_SHELL_STORAGE:-}"
+GATE_ENV=()
+if [ -n "$STORAGE_GATE" ]; then GATE_ENV=("HEYTA_SHELL_STORAGE=$STORAGE_GATE"); fi
 # 改这几行的人：判据在装置侧，读数键名在壳侧 —— 两边都要动才配得上"加一格读数"。
 
 fails=0
@@ -163,6 +172,7 @@ env HEYTA_NO_FOCUS=1 \
     HEYTA_SHELL_DB_DIR="$DB_DIR" \
     HEYTA_M2_EVIDENCE="$EV_PREFIX" \
     HEYTA_WIDGET_HELP_PROBE=1 \
+    ${GATE_ENV[@]+"${GATE_ENV[@]}"} \
     "$EXEC" >"$RUN_LOG" 2>&1 &
 SHELL_PID=$!
 # 证明它真的在跑（macOS 没有 setsid；先拿 pid 说话，别让"后台"变成一个断言）。
@@ -201,11 +211,23 @@ fi
 
 step "5. 判据（装置侧下，键名集合来自真源）"
 JUDGE_OUT="$RUN_DIR/judge.txt"
-HEYTA_HELP_EXTERNAL_URL="$EXPECTED_SITE" node "$JUDGE" --from-file "$EV_PREFIX.txt" >"$JUDGE_OUT" 2>&1
-JUDGE_RC=$?
-sed 's/^/   /' "$JUDGE_OUT"
-if [ "$JUDGE_RC" -ne 0 ]; then
-  bad "判据 rc=$JUDGE_RC（读数：$EV_PREFIX.txt；判据：$JUDGE）"
+if [ -n "$STORAGE_GATE" ]; then
+  # 逃生门臂：判据钉的是原生形状，门关掉后界面按设计不再是那个形状 ⇒ 跳过判据，只出读数。
+  printf '   ⚠️ 本趟转发了 HEYTA_SHELL_STORAGE=%s ⇒ 判据（按原生形状下的）不适用，跳过。\n' "$STORAGE_GATE"
+  printf '   这一臂要的是读数本身：门一关，壳里那份界面还认不认得自己是壳。\n'
+  # 关键四行直接打在屏幕上（判据跳过时，读数就是产物本身）。
+  grep -E '^(STORAGE|WIDGET_HOST_SIGNALS|WIDGET_PANEL_ROWS|WIDGET_STATUS_TEXT|WIDGET_CAPABILITY_TEXT)=' \
+    "$EV_PREFIX.txt" 2>/dev/null | sed 's/^/     | /' || printf '   （证据文件里连这几行都没有 ⇒ 探针没跑到，见上面的红）\n'
+  : >"$JUDGE_OUT"
+  # 🔴 记成字符串而不是 0：`JUDGE_RC=0` 会被下一个人读成"判据过了"，而这一臂根本没跑判据。
+  JUDGE_RC="skipped(逃生门臂 HEYTA_SHELL_STORAGE=$STORAGE_GATE)"
+else
+  HEYTA_HELP_EXTERNAL_URL="$EXPECTED_SITE" node "$JUDGE" --from-file "$EV_PREFIX.txt" >"$JUDGE_OUT" 2>&1
+  JUDGE_RC=$?
+  sed 's/^/   /' "$JUDGE_OUT"
+  if [ "$JUDGE_RC" -ne 0 ]; then
+    bad "判据 rc=$JUDGE_RC（读数：$EV_PREFIX.txt；判据：$JUDGE）"
+  fi
 fi
 
 step "6. 收尾与安全档 S"
@@ -239,6 +261,7 @@ printf '   PROVENANCE_FILE=%s\n' "$RUN_DIR/provenance.txt"
   printf 'SHELL_BIN=%s\n' "$BIN"
   printf 'PROBE_HITS=%s\n' "$PROBE_HITS"
   printf 'EXPECTED_SITE=%s\n' "$EXPECTED_SITE"
+  printf 'SHELL_STORAGE_GATE=%s\n' "${STORAGE_GATE:-默认（未转发，壳按自己的规则开宿主端口）}"
   printf 'JUDGE_RC=%s\n' "$JUDGE_RC"
   printf 'S_BEFORE=%s\nS_AFTER=%s\n' "$S_BEFORE" "$S_AFTER"
 } >"$RUN_DIR/provenance.txt" 2>/dev/null || true
@@ -262,5 +285,10 @@ fi
 if [ "$fails" -gt 0 ]; then
   printf '\nRESULT=FAIL（%d 条红；证据 %s）\n' "$fails" "$EV_PREFIX.txt"
   exit 1
+fi
+if [ -n "$STORAGE_GATE" ]; then
+  # 🔴 这一臂**不许**说"两格闭合"：判据被跳过了，它取到的只是"门关掉后壳里那份界面认不认得自己"的读数。
+  printf '\nRESULT=READINGS-ONLY（趟号 %s；逃生门臂 HEYTA_SHELL_STORAGE=%s ⇒ 判据按设计跳过，本趟不主张任何一格闭合）\n' "$RUN_TAG" "$STORAGE_GATE"
+  exit 0
 fi
 printf '\nRESULT=OK（趟号 %s；两格闭合，浏览器渲染那一格见上面 BOUNDARY=）\n' "$RUN_TAG"
