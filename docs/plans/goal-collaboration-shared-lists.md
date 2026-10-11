@@ -512,14 +512,14 @@ package.json   (只加了一行 verify:collab-journey)
 
 
 
-0. 🔴 **别线判断绊线（no-bail 现量共三枚，见"二·补"）都是"故意逼决定的判断绊线"，不是机械改数字 —— 本线不代拍，等 owner/产品负责人**：
-   - `packages/ai tests/capability-manifest.spec.ts`：断言 `coverage.denominator === 9` **且** `entityTypesWithoutTools === []`（"9/9 全覆盖"）。COMMENT 进物化清单后是第 10 枚且**无 AI 工具**。要修绿必须先决定其一：① 给 COMMENT 配 AI 工具；② 把它登记进 `DENOMINATOR_EXCLUSIONS` 并写明理由（AI 不管评论）；③ 接受分母=10 且让 COMMENT 落进 `entityTypesWithoutTools`（则"9/9 全覆盖"那句得改）。这正是该绊线设计来逼的显式承认 —— **属 AI 覆盖范围的产品判断，不代改**。
+0. 🔴 **别线判断绊线（no-bail 现量共**四**枚，见"二·补"）都是"故意逼决定的判断绊线"，不是机械改数字 —— 本线不代拍，等 owner/产品负责人**：
+   - `packages/ai tests/capability-manifest.spec.ts` + `scripts/check-reachability.mjs`：**同源于 COMMENT**（产品体验线 `e6058120` 引入的实体，不是本线）。reachability 红在"1 个已建模实体零写路径 —— COMMENT"，ai 红在"分母 9→10 + `entityTypesWithoutTools` 出现 COMMENT"。要修绿必须先决定其一：① 给 COMMENT 配 AI 工具；② 把它登记进 `DENOMINATOR_EXCLUSIONS` 并写明理由（AI 不管评论）；③ 接受分母=10 且改"9/9 全覆盖"那句。属 AI 覆盖范围的产品判断 + 评论功能是否落地，**都非本线、不代改**，且这两枚已在 `BLOCKED.md` B156/B159 由别会话登记（明写不许用删实体/补 ACTION_FAMILIES/拿测试当调用点三种手法修绿）。
    - `packages/shared-schema tests/auth-http-contract.spec.ts:83`：`AUTH_PASSWORD_PATHS` 期望 9、实得 12（auth 线 `a63aa9e9` 加了口令路由没同步这条封闭词表）。**auth 线的判据口径，不代改**。
    - `packages/domain tests/subscription.spec.ts`：权益**拒绝理由契约**（1 failed | 1022 passed），归**计费/权益线**，不代改。
    - ⚠️ `apps/mobile`（958/958 全过、非零退）是 `RTEST-UNHANDLED-01` 那条 Rolldown 解析 Flow 的**载体抖动**，**不记产品失败、也不记本线**。
    - 🔴 **协作线自己那枚下游红（landing #7）已在本会话修绿并从交付里销账**（见"二·补"第 1 条）—— 别再把它算成别线绊线。
    - 本线已把**自己那枚代码 bug** 修掉：`parseShareJoinLink` 空 token 漏判（见 section 一）。清单也已重生成（工作树 `capability-manifest.generated.ts` 是 M，`--check` RC=0）。
-   - ⇒ **本线（web/ui/sync-client/app-host/i18n + 现在连 landing 也）独立全绿**；但 `pnpm -r test` / `pnpm check` 整链被上面**三枚别线绊线** + 一枚已知载体抖动挡着，**在各归其主之前，第 2 步的"全链绿"与第 2 步末尾的 reinstall:all 都到不了**。
+   - ⇒ **本线（web/ui/sync-client/app-host/i18n + 现在连 landing 也）独立全绿**；但 `pnpm -r test` / `pnpm check` 整链被上面**四枚别线绊线** + 一枚已知载体抖动挡着，**在各归其主之前，第 2 步的"全链绿"与第 2 步末尾的 reinstall:all 都到不了**。
 1. `pnpm check` 全绿（含 `check:ai-e2e` 整族 —— 注意它可能重新触发 collab-journey 那枚证据目录，别与并行 e2e 撞）。
 2. `pnpm -r build` → `pnpm reinstall:all` 四端（每端判据按 AGENTS §6.1.1；会开窗口的后台跑、不抢焦点）。
 3. **⑤ 文档写回**（本会话未动，仍是交接·二第 3 项那 5 处，但落点已现量收敛）：
@@ -533,7 +533,11 @@ package.json   (只加了一行 verify:collab-journey)
 4. **⑥ 一笔提交 —— ✅ 本会话已提交；push —— 🔴 受阻、已登记**：
    - **提交 = `2485edde`**（25 文件 / +856 −186），只含协作线：W6 join-link 落点（`join-link.ts` + ProjectsPanel + 其测试）、W4 所有权转让（SharePanel + server share.routes + `transfer.*` 词条中英同步）、`share-link.ts` 空 token bug + ui 判据、layering 分层（`app-host/share-key-identity.ts` 新 + barrel + `share-key-store.ts` 改指）、`check-ui-language.mjs` 补 emailPlaceholder、journey 4 条断言、`.gitignore` 加 `collab-journey-results/`、本计划。**locale 两文件已现量确认各只含协作线 5 键**。
    - 🔴 **故意没并进 `capability-manifest.generated.ts`**：重生成那份产物会**同时**带上本线 COMMENT **与** AI 工具线早已提交的 4 枚 TASK 工具（`get_task_estimate_context`/`append_task_checklist`/`set_task_priorities`/`set_task_estimate`）—— 它是**跨线混物**，按「只提交协作线文件」不并进本笔。它现在仍在工作树里是 `M`（本会话为验证 `--check` 跑过生成，但没提交）。**重生成的落地归属要单独协调**（谁补 COMMENT、谁补那 4 枚 TASK 工具、`capability-manifest.spec.ts`「分母 9→10 + entityTypesWithoutTools 出现 COMMENT」这条产品判断一并拍），别被某一条线顺手 sweep 进自己提交。
-   - 🔴 **push 受阻（不是没做，是不能独做）**：本地 `main`（现 `2485edde`）**领先 `origin/main`（`6d1024bd`）41 笔**，而那 41 笔**全是别的并行线**的未公开笔（账号标准套件 / 自动收集 T8 / 产品体验 / server 错误信封 / 文档门禁 / BLOCKED 账本）。`git push origin main` 会把这些**别人只在本地的笔一起公开**到 origin/main —— 这正是「不代公开别人未提交的笔」那条红线，本线不代推。**下一个 AI 若本地 main 仍领先别线笔，push 前必须先与那几条线协调（或确认 `origin/main` 现量 tip 后再判）**；`.git/hooks/pre-push` 另指向外部 `pre-push-bytearm`（凭据下线那套），不许 `--no-verify` 绕。
+   - 🔴 **push 受阻（不是没做，是不能独做）**：**别在正文写领先笔数与 SHA（会漂）**，现量：
+     `git rev-list --count origin/main..HEAD`（本会话某刻读得 41→48→51→55，一路随别线本地笔增长）；远端真实 tip 用
+     `timeout 12 git ls-remote origin refs/heads/main`（本会话读得仍 = `origin/main`，即别会话**没**从自己机器推过）。
+     领先集**大头是别的并行线的未公开笔**（账号标准套件 / 自动收集 T8 / 产品体验 / server 错误信封 / 文档门禁 / 四端重装 / BLOCKED 账本）。
+     `git push origin main` 会把这些**别人只在本地的笔一起公开**到 origin/main —— 这正是「不代公开别人未提交的笔」那条红线，本线不代推。**下一个 AI 若要推，先与那几条线协调，或确认各线已自行 push、`origin/main..HEAD` 只剩本线笔后再判**；`.git/hooks/pre-push` 另指向外部 `pre-push-bytearm`（凭据下线那套），不许 `--no-verify` 绕。
    - ⇒ 本线交付形态：**代码已本地成笔、可复核可回退**；公开到 origin 这一步**押在跨线协调上**，不是本线遗漏。
 5. **两停止点（B 类，等产品负责人裁决；本轮已把 ① 的证据看实）**：
    - ① **PIPL 同意弹窗（02 号图，本轮重跑后现看）—— 比"无视觉强调"更严重**：弹窗里 **确认共享 / 取消 / 不再提示** 三个可操作控件**全部渲染成裸文本行，没有任何按钮外观/勾选框外观**（对照 04 号图，那里「生成邀请」是正经蓝按钮 —— 同一 app、同一截图管线，所以不是渲染假象，是这个同意面的控件没套上按钮样式）。这是合规同意面的真缺陷，但改它=动对外法律表征的界面，**留给产品负责人拍**；我的修法建议：主 CTA 走设计系统强调（`cssVar('color.primary')` 实底按钮）、取消做次级按钮、"不再提示"改真 `<input type=checkbox>`（带 `accent-color` token，见 §7 第 83 条）。
