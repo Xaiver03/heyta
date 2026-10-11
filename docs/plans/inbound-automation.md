@@ -1895,7 +1895,7 @@ packages/app-host typecheck: tests/login-code.spec.ts(44,5): error TS2578: Unuse
 | **AC-3 领取与提交** | `python3 research/tools/verify-inbound-dual-host.py`；`cd packages/sync-client && npx --no-install vitest run --maxWorkers=1 tests/inbound-authorization.spec.ts` | 装置 rc=0 且自报 **`Windows: 13/13`**（内层 `Tests 14 passed (14)`）；授权接缝 `Tests 6 passed (6)` | **13 个故障窗口两枚独立真 SQLite 宿主全跑通，且这次是在干净 HEAD 的隔离副本上**（10-10 那一趟跑在共享主检出，这一格原来欠的收口**今天补上了**）。观察量是任务数/op 数/回执/计量，不是 HTTP 码 |
 | **AC-4 解析** | AC-1 的离线 11 枚（含 `automation-drafts`）+ `cd packages/domain && npx --no-install vitest run --maxWorkers=1 tests/inbound-local-date.spec.ts` + inbound-core 全量 + `cd packages/app-host && npx --no-install vitest run --maxWorkers=1 tests/inbound-*.spec.ts` | 离线 11 枚 `103 passed (103)`；本地时区 `Tests 1 passed (1)`；inbound-core `47 passed (47)`；app-host inbound **`Test Files 13 passed (13)` / `Tests 107 passed (107)`**（10-10 那格只记到 2 文件 30 条，本线那批界面/循环用例已入库所以分母涨了） | **同时区 / 同归化 / DST / 非法日期 / 长输入 / 多输出受限有尺**；注入指令与模型额外字段的越权走出境闸门既有断言。⚠️ **"实际出境请求符合披露"这一格本线没有读数**（要真 provider 流量）⇒ 保持未闭合，不许读成已验 |
 | **AC-5 批创建与来源记录** | `cd packages/shared-schema && npx --no-install vitest run --maxWorkers=1 tests/task-batch-contract.spec.ts`；`cd packages/op-log && npx --no-install vitest run --maxWorkers=1 tests/task-batch.spec.ts`；`cd packages/app-host && npx --no-install vitest run --maxWorkers=1 tests/task-batch-actions.spec.ts`；点名范围尺 `python3 research/tools/verify-inbound-commit-scope.py` | 契约 `Tests 15 passed (15)`；reducer `Tests 16 passed (16)`（= 5 组 × 三套适配器）；唯一入口 `Tests 9 passed (9)`；范围尺 rc=0 | **一枚逻辑 op / 无半批 / 三套适配器收敛 / 删除后重试不复活 / 旧数据无来源字段仍能 hydration 全部有尺**，且三档都在本批同一 HEAD 上取到。这是全表最接近"可勾"的一格，按规矩**仍未勾**（勾由负责人点，现量 `已勾=0`） |
-| **AC-6 规则界面** | `cd apps/web && npx --no-install vitest run --maxWorkers=1 tests/inbound-*.spec.tsx tests/inbound-upload-authorization.spec.ts`；界面层 e2e `cd e2e && npx playwright test --config playwright.inbound.config.ts` | jsdom 五枚 `Test Files 5 passed (5)` / `Tests 11 passed (11)` rc=0；**e2e 那一趟今天没跑**（🔴 载体里没有 `e2e/node_modules`，`e2e` 刻意不在根工作区内，见 AGENTS §6；要跑必须 `cd e2e && pnpm install`，那会往共享载体写锁文件与依赖）。沿用 10-10 的读数：`2 passed / 2 failed`，红在"换回 AI 那一节不重取列表"（`inbound-automation.spec.ts:85`），四张草稿截图人已打开看过 | **界面入库、jsdom 判据有牙；真浏览器那一格未闭合且在最终 HEAD 上未复跑**：缺陷本体登记在 **B140**（设置分组是 `hidden` 不是卸载，`active` 从没人接），修法要动的文件不在本线白名单 ⇒ 不代改。另两格照旧：`waiting-entitlement` 的词条缺（B110，i18n 不许动）；"完整旅程"要公网接收 + 有权益宿主 |
+| **AC-6 规则界面** | `cd apps/web && npx --no-install vitest run --maxWorkers=1 tests/inbound-*.spec.tsx tests/inbound-upload-authorization.spec.ts`；界面层 e2e `cd e2e && npx playwright test --config playwright.inbound.config.ts` | jsdom 五枚 `Test Files 5 passed (5)` / `Tests 11 passed (11)` rc=0；**e2e 已在隔离副本上按最终 HEAD 复跑**：`2 failed / 2 passed (2.1m)`，两条红仍在 `inbound-automation.spec.ts:85`（同一处、同一句等待），四张草稿图**逐字节等于**入库件 ⇒ 读数与哈希见文末「AC-6 真浏览器那一趟补跑」那一节 | **界面入库、jsdom 判据有牙、真浏览器那一格已在 `1c166425` 复跑**：复跑没有把它跑绿，**B140** 那一格（设置分组是 `hidden` 不是卸载，`active` 从没人接）在 HEAD 上现量仍未接（`git show HEAD:apps/web/src/features/settings/AiSettings.tsx \| grep -n 'InboundAutomationSettings routing'` 该行没有 `active`），修法要动的文件不在本线白名单 ⇒ 不代改。另两格照旧：`waiting-entitlement` 的词条缺（B110，i18n 不许动）；"完整旅程"要公网接收 + 有权益宿主 |
 | **AC-7 文档** | `python3 research/tools/verify-inbound-doc-tables.py`；`node scripts/check-migrations.mjs`；`node research/tools/license-inventory.mjs`；`node scripts/check-docs-voice.mjs`；`node research/tools/docs-link-check.mjs` | 五道**全部 rc=0**（同一批、同一 HEAD）。许可证那把的结论行逐字：`结论：全部依赖均为宽松许可（含已登记的例外）✅` | **文档五道门在干净 HEAD 上全绿**（原来那条"不是本线的死链红"已消失，见 PROGRESS 的漂移记录）。但 **T6 的四件产物三件不在本线白名单**（新 ADR / 中英条款 / 帮助页）⇒ **B139** 未闭合：`docs/reference/pricing-and-entitlements.md` 本线**没动** |
 | **AC-8 验收矩阵** | `python3 research/tools/verify-inbound-ac8-matrix.py`；生产者缝对账 `python3 research/tools/verify-inbound-producer-seam.py` | 矩阵 `读数　表头行=1084　行数=34　有尺行=27　无尺行=7　尺枚=67　窗=13/13　平台=10/10　权益=9/9　设备状态=9/9` + `结论：矩阵与 HEAD 逐格对账成立`；对账尺 `在册文件=76　跨包成员访问=134　命中=134　盲区(生产包无 .ts)=0　盲区(命名空间)=0　停用=0　登记缝=0　新缝=0` / `相对导入=225　模块在 HEAD=225　…` | **矩阵与 HEAD 逐格自洽**（平台×权益×设备状态×失败阶段全枚举、无空行），且"已入库消费者不依赖未入库生产者"这一条在涨到的 134 枚成员访问 + 225 枚相对导入上仍然**登记缝 0**。⚠️ 它声明的是**用例归属**不是"跨端装过" ⇒ 四端重装与 Linux 交付取证（T7 第三条腿）未跑，这一格按定义未闭合 |
 
@@ -1964,7 +1964,7 @@ packages/app-host typecheck: tests/login-code.spec.ts(44,5): error TS2578: Unuse
 
 ### 4. 这一节没做的事（不包装成完成）
 
-1. **AC-6 真浏览器那一趟没在最终 HEAD 上复跑**（载体里没有 `e2e` 的依赖，装它会往共享载体写东西）⇒ 那格沿用 10-10 的 `2 passed / 2 failed` 并注明"未在 `9fb9eed2` 复跑"。
+1. ~~**AC-6 真浏览器那一趟没在最终 HEAD 上复跑**（载体里没有 `e2e` 的依赖，装它会往共享载体写东西）⇒ 那格沿用 10-10 的 `2 passed / 2 failed` 并注明"未在 `9fb9eed2` 复跑"。~~ → ✅ **10-11 12:4x 已复跑，而且原来那句理由被否证了**：载体是本线私有的 detached 副本，`cd e2e && pnpm install` 只往它自己写（`E2E_INSTALL_RC=0`），不碰共享主检出。复跑读数（`2 failed / 2 passed`、四张草稿图逐字节等于入库件）在文末「AC-6 真浏览器那一趟补跑」那一节。**这一格仍不勾**：红没被跑绿，缺陷本体（B140）照旧。
 2. ~~**T7 第三条腿 `pnpm reinstall:all` + Linux 交付取证仍未跑**~~ → ✅ **10-11 12:2x 已跑，读数在文末「T7 三条腿的合并态读数」那一节**：桌面两端 + Linux 取证全绿，移动两端按 §8.9 判为不可点（B164）。
 3. ~~**`pnpm check` 整链仍停在第 4 步那枚别线类型错**（B144）~~ → 那一格**已被他们自己修完**（本轮 `TYPECHECK_RC=0`）；`pnpm check` 现在停在**第 6 段** `check:reachability` 的 `COMMENT` 一条（同 B156，本轮补了"它在 main 的工作树上也红"的现量）。`pnpm -r test` 整包红集仍是 00:5x 那张表（别线 10 + 本线 1，B150），本轮另有一条**新红**（`@heyta/ai` 的清单产物缝），形状与归属见文末那一节。
 4. **载体里 `server/dist` 的陈旧产物会伪装成"HEAD 坏"** —— 这一格我建议追加进 `docs/reference/environment-traps.md`（§7 #27 那一族：产物对账要看 mtime 先后），但该文件不在本线白名单 ⇒ 登记成 **B156**，不代改。
@@ -2136,3 +2136,76 @@ PKG_RESULT=FAIL（正文 rc=1）
 
 ⇒ **完成条件 1 的"T7 三条 exit 0"这一轮拿不到**，两条红各有尺在读、归属都在别线，本线按规矩不代改也不改判卷口径。
 "没做成但说清了"是这一格的合格线。
+
+## 2026-10-11 12:3x–12:4x · AC-6 真浏览器那一趟补跑，并把 T7 的两条挡路红从"推断"换成"实测"
+
+**为什么单独有这一节**：上一节的两条红是**读代码推出来的**（`check:reachability` 的 `COMMENT` 缺写路径、
+`@heyta/ai` 的清单产物过期），而台账里 AC-6 那一格挂着"e2e 没在最终 HEAD 上复跑"。两条都是"能自己做完却登记成没做"
+的形状（§8.9 那条纪律的反面），所以这一节只做两件事：① 把副本快进到当时最新的一枚 HEAD，**逐条真跑**那三道；
+② 把 AC-6 的真浏览器那一趟补上。
+
+**载体**：还是 `.worktrees/inb-t7`（本线私有的 detached 副本），起跑 `git -C .worktrees/inb-t7 rev-parse HEAD`
+= **`1c166425801c187e0cb0fd1b939f8baedb89ff25`**、`status --porcelain -unormal` 行数 = **0**，
+`pnpm-lock.yaml` 与主检出逐字节相同。日志落 `~/.heyta-evidence/inb-t9-123603/`（`rc.txt` / `build.log` /
+`reach.log` / `ai-test.log` / `e2e-install.log` / `e2e.log`，重启不清）。
+⚠️ **这批读数只描述 `1c166425`**：收口那刻主检出已到 `79e8ede1`。这个数每分钟都在漂，别照抄 ——
+现量：`git rev-list --count 1c166425..HEAD`。负载：起跑 1 分钟 **32.46**、收口 **12.08**。
+
+### 1. T7 的两条挡路红：这一轮是**跑出来的**，不是推出来的
+
+串行一条命令链（`~/.heyta-window-rigs/heyta-inb-t9.sh`），退出码逐个取、不经管道（§7 那一族）：
+
+```
+12:36:43 BUILD_RC=0        # pnpm -r build
+12:36:44 REACH_RC=1        # pnpm check:reachability  → 第 6 段那一红
+12:36:45 AI_TEST_RC=1      # pnpm --filter @heyta/ai test
+```
+
+两条红的**原文**（各自日志）：`reach.log` 结尾 `COMMENT 0 处写路径`（`COMMENT` 已建模，`packages/app-host`
+里没有任何一处写路径 —— 别线 产品体验线 `e6058120` 带进来的）；`ai-test.log` 是 `capability-manifest.generated.ts`
+**在册产物与真源不一致**（缺 `COMMENT` 与 4 枚别线工具），修法是他们重跑
+`node scripts/gen-ai-capability-manifest.mjs` 并提交产物。⇒ 上一节"完成条件 1 拿不到"这一格**在最新 HEAD 上仍然成立**，
+而且现在的证据级别是"当场跑红"，不是"读代码判断会红"。
+
+### 2. AC-6 真浏览器那一趟：`2 failed / 2 passed`，红的位置与 10-10 逐字相同
+
+`cd e2e && pnpm install --prefer-offline` 在**私有副本**里 `E2E_INSTALL_RC=0`（`Done in 1m 11.4s`）
+⇒ 台账里那句"要跑必须装依赖，那会往共享载体写东西"**不成立了**（那是共享主检出时代的理由），这一格按 §8.9 的
+"能自己做完就别登记成等人"补跑。跑的是 `npx --no-install playwright test --config playwright.inbound.config.ts`：
+
+| 用例 | 结果 |
+|---|---|
+| `encrypted date draft review and Vault invalidation 1280` | ✘ `Test timeout of 60000ms exceeded`，`locator.click` 等不到 `查看并编辑草稿`，栈在 `inbound-automation.spec.ts:85` |
+| `encrypted date draft review and Vault invalidation 390` | ✘ 同上，同一行 |
+| `inbound explicit retry and themes 1280` | ✓ 2.3s |
+| `inbound explicit retry and themes 390` | ✓ 1.8s |
+
+汇总行逐字：`2 failed / 2 passed (2.1m)`，`E2E_RC=1`。**没有**为变绿动任何断言、阈值、`.skip`（判卷口径不许改，
+且这一格的价值恰恰是它红）。B140 那一格在 HEAD 上的现量：
+`git show HEAD:apps/web/src/features/settings/AiSettings.tsx | grep -n 'InboundAutomationSettings routing'`
+⇒ 那一行仍然只有 `routing / consents / secretStore` 三个入参，**没有 `active`** ⇒ 缺陷未修，读数未过期。
+
+### 3. 图：草稿四张**逐字节等于**入库件，另把通过那两条的八张补进证据目录
+
+复跑产物落 `apps/web/evidence/inbound-recovery/`（载体内，不入库）。四张 `draft-{1280,390}-{light,dark}.png`
+与 `docs/research/evidence/inbound-automation-review/ui-draft/` 那四张 **sha256 全部相同**
+（`9f15d365…` / `f64f9b2f…` / `aae94681…` / `2b01ebb2…`）⇒ 入库件就是当前产物的画面，不需要换图，
+这一格从"沿用 10-10"升成"在 `1c166425` 上重新取到且字节一致"。
+
+通过那两条（显式重试 + 明暗两套）的 `form-*` / `retry-*` 八张此前**从来没有入库**，这次补进
+`docs/research/evidence/inbound-automation-review/ui-retry/`（sha256 见该目录 `README.md`），四张已人打开看过：
+1280 亮色是整页设置面（字段白名单勾选、`回调密钥编号`、`最近接收` 里 `事件 event-recovery` +
+`需要确认` + `确认重新解析 / 取消`），390 暗色是同一格的窄屏态，勾选框是主蓝（§7 #83.2 那条修还在）。
+
+⚠️ **一张图上的一个假缺陷，先记下挡后来者**：`form-*` 那四张是**元素级**截图，其左缘约 10px 被裁
+（`回调密钥编号` 首字缺半笔）。这**不是**界面坏了 —— 同一时刻的**整页**截图 `retry-*` 里同一批标签完整带左边距。
+成因是用例在 `form.screenshot()` 之前自己调了 `scrollIntoViewIfNeeded()`，把设置面板横向推出去一点再截
+（§7 #83 那一族：探针留下的状态就是后续判据的输入）。**看窄屏形状以整页那张为准**；元素图只用来看控件本身。
+
+### 4. 这一节改了什么、没改什么
+
+改的：AC-6 那一格与 §4 第 1 条（那句"没复跑"的理由被现场否证）；新增本节；`ui-retry/` 八张图 + 它的 `README.md`。
+**没改的**：任何断言、任何阈值、任何判卷口径、任何别人在飞的文件；`已勾=0 / 未勾=8` 现量不变
+（`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` = 0）。
+仍然开着的三格照旧：完整旅程要公网接收 + 有权益宿主、`waiting-entitlement` 词条（B110）、
+以及上面那两条别线红 —— **本线的读数已经全部是"当场跑出来的"，这两条不是本线能代改的**。
