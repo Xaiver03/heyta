@@ -2872,3 +2872,55 @@ B139 本体已在账本里就地追记复账（不是新写一条），旧表留
 
 🔴 **本线不声称 T2 第四条已闭合**：函数与判据在，但**没有任何东西调用它** —— 这正是 B174 与本仓 `realtime.ts`
 那条反复出现同一形状。区别只在于：这次缺的是**一行调用**（可粘、无需判断），而心跳缺的那一步要先拍 B109。
+
+### 2026-10-12 01:46 · T7 第一腿**跑完了**：106 道逐道读数、红集 19 格、两处"这条命令为什么不能当判据"
+
+载体：`.worktrees/inb-t7`（detached @ `1a8de6fd`，起跑时 dirty=0），装置 `research/tools/verify-inbound-check-chain.py --timeout 3000`，
+产物在 `~/heyta-inb-logs/t7-check-chain-1a8de6fd/`（`chain.out` / `chain.tsv` / `chain.json` / 每道一份 `NNN.log`，写盘时已做密钥脱敏）。
+现量：`total_steps=106 selected=106 reds=[4, 6, 20, 21, 22, 23, 42, 44, 50, 53, 61, 64, 74, 86, 88, 89, 99, 100, 105]`。
+
+🔴 **两个读数上的坑，先说在表前面**（都会让人把"没跑到"读成"跑过了是绿的"）：
+
+1. **第 86 道 `check:ai-e2e` 的 `rc=124` 是我这台装置的上限切断，不是产品判决。** 切断时跑到第 178 条用例，
+   已看到 **35 条去重后的 ✘**（`admin-console` 16、`ai-unavailable` 8、日历/详情/认证/countdown 各 2–4），
+   耗时形状全是 17 s–60 s（像超时，不像断言不等），而当时的负载是 1 分钟 17–18 / 5 分钟 38–40（阈值 12）。
+   ⚠️ 但**本线据此不能判"回归 vs 载体抖动"** —— §7 第 408 条要求两条腿一起：单跑对照 + 负载读数，这里只有后者。
+   闭合条件：安静窗口（负载 < 12）里 `--only 86` 单跑，并让 Playwright 打出它自己的汇总
+   （这一趟进程是被我杀掉的，**它从来没打印过最终失败清单**，所以逐条错误正文不存在）。已登记 **B177** 交还那几条线。
+   顺带一句：本线的 `e2e/tests/inbound-automation.spec.ts` **不在这道里**（它走 `playwright.inbound.config.ts` 那枚配置），
+   所以这 35 条 ✘ 与本线无关。
+2. **第 105 道 `pnpm -r test` 只用了 1.3 秒就 rc=1，因为它是 FIRST_FAIL 退出**
+   （`ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL @heyta/ai`：packages/ai 5 红 / 260 过，随后 `shared-schema` 的
+   `auth-http-contract.spec.ts` 1 红）。⇒ 这一道**没有覆盖后面的层**，不能拿它当"全量单测跑过了"的证据；
+   要逐层对数还得按 AGENTS §6 那条"逐包汇总行相加"的读法。
+
+**红集 19 格逐条归属**（与 01:0x 那张 13 行的表合并，新增 6 格用 ★）：
+
+| 道 | 命令 | 成因 | 归属 |
+|---|---|---|---|
+| 4 | `pnpm typecheck` | 本线那枚 `InboundCycleResult` 的 TS2322 | 🔴 本线，**已在 `c887c92c` 修掉**（这棵树没有它 ⇒ 待在新 HEAD 复取） |
+| 6 | `check:reachability` | `COMMENT` 已建模不可达 | 别线（产品体验线） |
+| 20 | `check:row-single-source` | 行单一事实源 13 处 | 别线 |
+| 21 / 23 | `check:selection-single-source` / `check:empty-state` | 点名的行写在本线面板文件里，但不是本线写的 | 🔴 **B172**（修法一是改判卷口径，二属顺手活） |
+| 22 | `check:l4` | — | 别线 |
+| 42 | `check:licenses:stamp` | 戳与实装依赖树不一致 | 别线 |
+| 44 | `check:image-license` | `@noble/hashes` `2.4.0` vs `^2.4.0`（vendored sync-core） | 别线 |
+| 50 | `check:integration-coverage` | 本线 T3 那枚 13 窗口用例没进 `test:integration:postgres` 点名 | 🔴 **B171**（修它在 `server/package.json`，地界外） |
+| 53 | `check:linux-shell` | 原生系统库登记 6 处 | 别线 |
+| 61 | `check:ai-tools` | `capability-manifest.generated.ts` 892 / 应 979 行 | 别线（跨线混物，AGENTS §9 已记） |
+| 64 | `check:text-color` | `packages/ui/src/sync/CommentThread.tsx` | 别线 |
+| 74 | `check:public-facts` | 本线 T1 那条匿名下行没登记 | 🔴 **B173**（登记面在 `scripts/`，地界外；文档面已披露） |
+| ★86 | `check:ai-e2e` | 装置上限切断 + 35 条 ✘（见上面第 1 条） | 别线的 12 枚 spec；**本线不判**，⇒ **B177** |
+| ★88 | `check:landing-e2e` | `landing/docs-centre.spec.ts` 4 failed / 37 passed | 别线（帮助中心/文档中心那条线） |
+| ★89 | `check:shell-unicode` | 两枚账号脚本里 `$var（全角括号）` 的取值丢失 | 别线（注册登录标准套件线；它自己给了 `fix-shell-unicode-vars.py --write`） |
+| ★99 | `check:verify-script-copy` | 习惯/便签/标签/回收站脚本里的界面 needle 不在词条表 | 别线（词条/i18n 侧） |
+| ★100 | `check:android-gradle-remote` | `ux-final-20261008` 两枚证据 json 直接引 `apps/mobile/android/gradlew` 路径（4 处） | 别线（产品体验线的证据产物） |
+| ★105 | `pnpm -r test` | packages/ai 5 红 + shared-schema 1 红，FIRST_FAIL 后各层没跑到 | 别线；**本线那几层要逐包取**（见下） |
+
+**本线的账**：19 格里本线只占 **4**（4 已修待复取、50=B171、74=B173、21/23=B172 那一格文件是我的但行不是），
+其余 15 格与本线代码无关 —— 按"顺手活不进代码"一律不动。
+
+**这一腿还欠什么**（不包装成完成）：
+① 第 4 道要在**含 `c887c92c` 之后各笔**的载体上复取（现在的 HEAD 还包括今天的清扫函数与新 spec）；
+② 第 86/105 两道的"回归 vs 载体抖动"判定要在安静窗口做；③ `pnpm reinstall:all`（四端）与 Linux 交付取证还没在本 HEAD 上跑；
+④ 全链 exit 0 目前**不成立**（15 格别线红），这条要随交付如实报。

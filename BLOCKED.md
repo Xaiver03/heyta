@@ -9569,3 +9569,21 @@ $ git show 1a8de6fd:server/src/automation/entitlement-ticket.ts | grep -n "EVENT
 先 `git show HEAD:<file>` 取回上一版、把自己的那段拼上去、`git hash-object -w` 后 `update-index --cacheinfo` 落进去
 （也就是 BLOCKED.md 一直在用的那份配方），然后 `git diff --numstat <新提交>^ <新提交> -- <file>` 的**删除数必须是 0** ——
 只要它不是 0，就说明这一笔动了别人写的内容。这一条应当上升成提交前的一把尺，而不只是记忆。
+
+## B177（2026-10-12 01:46，本会话 · T7 第一腿跑完时量出来的）：**`check:ai-e2e` 这一趟有 35 条去重后的红，但本线不能判它们是回归还是载体抖动 —— 缺的那条腿要由安静窗口补，别线才是判的人**
+
+读数（都可在 `~/heyta-inb-logs/t7-check-chain-1a8de6fd/086.log` 复取）：装置在 `--timeout 3000` 处切断时跑到第 178 条用例，
+`grep -E "^  ✘ " | 去重` = **35 条**，按 spec 分布：`admin-console` 16、`ai-unavailable` 8、`detail-pane-collapse` / `calendar-week` /
+`calendar-sidebar` / `auth-simple-ux` / `auth-consent-registration` / `ai-tool-run` / `ai-row-layout` / `ai-duration` 各 4、
+`detail-column-slot` / `countdown` 各 2。同时刻负载：1 分钟 **17.11**、5 分钟 **38.71**（门禁阈值 12）。
+
+**为什么本线不据此写"这些用例坏了"**：本仓 §7 第 408 条的判据是两条腿一起 —— **单跑对照 + 负载读数**，这里只有后者。
+更要命的是这一趟是**被装置杀掉的**，Playwright **从未打印它自己的最终失败清单**，
+所以 35 条 ✘ 的**错误正文一条都不存在**（耗时形状全是 17 s–60 s，像超时，但没有正文就不能定性）。
+
+**闭合这一格需要什么**（谁做都行，本线不代做，因为跑的是别线的 12 枚 spec）：
+负载 < 12 的窗口里 `python3 research/tools/verify-inbound-check-chain.py --repo . --logs <目录> --only 86`
+（它会把整道跑完并留下 `086.log` 的完整汇总），把 35 条逐条判成"回归 / 载体"。
+
+📌 与本线无关的一句提醒：**这 35 条里没有一条来自 `e2e/tests/inbound-automation.spec.ts`** ——
+本线那套走的是 `playwright.inbound.config.ts` 那枚独立配置，不在这道里。别把这 35 条读成"自动收集的界面红了"。
