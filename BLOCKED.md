@@ -8818,48 +8818,6 @@ server/package.json:12 点名 33 枚 .integration.spec.ts        → 需要活�
 app bar 的 App 的共同问题，那时要不要在产品侧给一条防线（例如最右格改用 `insets.top`
 之外的第二个来源）—— 这一格不该由一条设备腿的红来拍，也不该由一份模拟器的读数拍。
 
-## B156（2026-10-11 02:0x，本会话 · T8 终版取证时撞上）：**同步过的隔离副本里 `server/dist` 是上一枚 HEAD 的字节，它报出来的红长得像"当前源码坏"**
-
-现量（载体 `.worktrees/inb-t7`，HEAD=`9fb9eed2`、dirty=0）：产物 mtime `00:40:53` < 源码 mtime `01:51:13`；
-对它 `require` ⇒ `ReferenceError: Cannot access 'inbound_core_1' before initialization`（rc=1），
-而 HEAD 的源码当时**已是修好的**（`git rev-parse HEAD:…` = `c600de92…`）。`npx --no-install tsc` 重打（`TSC_RC=0`）后
-同一条命令 ⇒ `LOAD_OK … rc=0`。
-
-这是 §7 第 27 条那一族的新面目（旧产物被当成当前源码的判决），**而且两头都能骗**：旧产物若是好的、
-当前源码是坏的，同一把尺会报绿。建议的判据：任何"读构建产物"的验收先证 `产物 mtime ≥ 输入源码 mtime`，
-或从 `git archive HEAD` 现编（本线那把 `research/tools/verify-inbound-cjs-require-order.py` 就是这么写的，
-所以它不会被这一格骗到）。**`docs/reference/environment-traps.md` 不在本线白名单** ⇒ 登记，不代改。
-
-## B157（2026-10-11 02:0x，本会话）：**plumbing 提交只动 ref 不动共享索引 ⇒ 下一枚裸 `git commit` 会把上一次提交静默回退**（本线实测三次）
-
-`a49f534c`（本线那枚生产缺陷修复）落地后，并行会话的三枚**裸** `git commit`（`3998e598`/`f201b001`/`1394061f`）
-把 `server/src/automation/entitlement-ticket.ts` 逐字退回**修复前**——因为共享 `.git/index` 里那一枚路径
-还坐着"上一枚 HEAD 的 blob"，而裸 commit 提交的是索引不是工作树；对方看到的仍是"提交成功"。
-
-本线已做的两件（都在白名单内）：① 配方写进 `PROGRESS.md`（`update-ref` 之后**同一条命令链里**
-`git update-index --add --cacheinfo 100644,<blob>,<路径>`，再验 `git diff --cached --name-only -- <本笔全部点名路径>` 为空）；
-② 补了一把能当场照出回退的尺（在被回退的那枚 HEAD 上 `命中=1` rc=1，逐字指出产物 20 行是加载期引用、源码 25 行才是那行 import）。
-
-**要拍的两件都在本线地界外**：① 要不要给 `pnpm check` 加一道"**索引逐路径等于 HEAD**"的门（`scripts/` 不在白名单；
-它能拦这一族所有实例，代价是"故意 staged"也会红 ⇒ 词表谁批谁定）；② 要不要把"plumbing 之后必须刷新共享索引"
-写进 `AGENTS.md`/`CONTRIBUTING.md` 的提交纪律（这两份的规则部分明令不许本线改）。
-⚠️ 伴生坑一并留档：`git restore --staged -- <路径…>` 是**原子的** —— 清单里有一枚不在索引（新文件常见）时它
-`did not match any file(s) known to git` 然后**整条什么都不做**，而只看一枚路径的读数会显示"已经等于 0"；
-本线那一次回退第一次没补救成功就是栽在这里。
-
-## B158（2026-10-11 02:0x，本会话）：**本线白名单文件上坐着别线的未提交改动，而它改的是判卷口径** —— `EVENT_ID` 的接受集被放宽
-
-形状：主检出的 `server/src/automation/entitlement-ticket.ts` 工作树（mtime 10-10 20:18，不是本线写的）除本线
-那枚"导入上移"外还有两处：`const EVENT_ID = z.string().regex(/^[A-Za-z0-9:_-]{1,127}$/)` 被放宽，值导入的 JSDoc 被删。
-
-**本线一行都没代提交**：票据正文里事件标识的接受集是**判定输入的形状**，落在"改判卷口径要记 BLOCKED.md"这一条上；
-而 T1 的判据只写了"错主体/错实例/吊销落后各红一条"，**畸形 `EVENT_ID` 该不该红**两种读法都自洽。
-HEAD 那枚文件 = 本线修复版 `c600de92…`，他们那两处原样留在工作树里。
-
-开着的两条路（任一条都比放着好）：① 改动的所有者自己提交并写清为什么放宽；② 口径定了之后本线在
-`server/tests/`（白名单内）补一条"畸形 `EVENT_ID` 被拒并回类型化拒绝码"的断言、挂进票据那把八臂尺 ——
-**那八臂现在没有这一档，也就是说无论怎么改都没有尺在守这一格**。
-
 ## B156（2026-10-11 02:0x，本会话 · T8 终版取证时撞上的）：**同步过的隔离副本里 `server/dist` 是上一枚 HEAD 的字节，而它报出来的红长得像"当前源码坏"**
 
 现量（载体 `.worktrees/inb-t7`，`git rev-parse --short HEAD` = `9fb9eed2`、dirty=0）：
@@ -9076,3 +9034,46 @@ stat -f '%Sm  %N'  server/dist/src/automation/entitlement-ticket.js  server/src/
 **本线欠的一格**：这次截断只存在于 `49e7149e` 这一枚提交物里（工作树从来没坏过，别的检出只要 pull 到 `HEAD` 之后就是好的），
 所以**没有丢任何人的内容**；但它证明"共享检出上的一次 plumbing 提交可以静默删掉别人 795 行账本"，
 这个形状比它这次造成的损失大得多 —— 上面判据 2 是唯一能长期挡住它的东西，本线**下一笔**就要开始用。
+
+## B163（2026-10-11 03:4x，本会话 · 差一点把"Linux 交付取证做不了"登记成本线阻塞）：**`ssh <远端> 'command -v X'` 走的是非登录 shell，它的 PATH 里没有那台机的用户前缀 ⇒ 会量出一枚假"没装"**
+
+现量（同一条通道、同一台机 `linux-dev-lan`，三种问法）：
+
+```
+ssh linux-dev-lan 'command -v xvfb-run'                       → 缺        ← 我第一遍据此判"窗口那一格没法取证"
+ssh linux-dev-lan 'ls ~/heyta-linux-prefix/root/usr/bin | grep -iE "xvfb|Xvfb"'
+                                                             → Xvfb / xvfb-run   ← 东西一直在那儿
+ssh linux-dev-lan 'bash -lc "command -v xvfb-run"'            → 登录 PATH 里也没有
+```
+
+三档读数**互不矛盾**，但只有"该载体自己那份 env 里有没有"这一档回答被测问题：
+`scripts/linux/provision-user-prefix.sh` 把 X 载体解进**用户前缀**（免 root，`--with-x11` 只是往同一份前缀多带一枚 `xvfb`），
+`env.sh` 把 `<前缀>/root/usr/bin` 前置进 PATH，而 `apps/desktop-linux/scripts/package-deb.sh:366` 的 `ENV_PRELUDE`
+**自己在远端 source 那份 env.sh**。所以这一格从来不需要系统 PATH 里有 `xvfb-run`。
+
+**这条为什么值得留档**：它造出来的不是假绿而是**假阻塞** —— 一个会让人直接放弃一整格证据的读数。
+建议的判据（`docs/reference/environment-traps.md` 不在本线白名单，与 B156 同一条理由 ⇒ 只登记）：
+凡用 `ssh <远端> 'command -v X'` 判"这台机上没有 X"，必须同时问一遍**该载体自己的 env**（前缀 / profile / 那段脚本里 source 的东西），
+或者干脆**跑那段真要用的脚本，让它自己报** —— `package-deb.sh` 会以 `RESULT=NO_XFB` 响亮拒绝并写明两条出口，
+那句才是权威判据，手搭探针不是。
+
+## B164（2026-10-11 03:4x，本会话 · 按规范裁判放行后仍然不能点火的那一格）：**设备窗口的裁判只看"有没有别人在跑验收"，不看"这台机上那枚设备归谁" ⇒ 绿灯可以正好把别线的设备卸掉**
+
+现量（11:47–11:48，载体对齐 main tip `16f72239` 之后）：
+
+- `scripts/verify-mobile-window-gate.sh --target b` 在 10:13 那一轮报过 `GATE=GREEN`，四条前置里设备面那一格是
+  `✅ 没有别的移动端验收在跑 / ✅ 没有别的 reinstall-all 在跑` —— 它 grep 的是**进程**，不是设备归属。
+- `adb -s emulator-5554 emu avd name` ⇒ **`heyta-w3-yearly`**；`emulator -list-avds` 本机**只有这一枚** AVD；
+  该设备上 `com.heyta` 的 `firstInstallTime=lastUpdateTime=2026-10-11 00:19:55`（本线那一趟是 00:1x 之前的另一枚读数）。
+- `PROGRESS.md:1232`（= `B62` 的 23:5x 段）已经把同一件事记成**越界**："那台 `emulator-5554` 的 AVD 是并行会话在用的设备，
+  `reinstall` 会 `pm clear`/卸装它 ⇒ 我这一段的 `adb uninstall com.heyta` 清掉了对方正在验收的设备。**读数有效、动作越界，两条都记**"。
+- iOS 侧同样不是空的：两台 booted 模拟器（`heyta-ios-isolated17`、`heyta-iphone-17pro`）**各自都有一个活的 `Heyta` 进程**
+  （`ps Axo command | grep CoreSimulator/Devices/<UDID>`），`heyta-iphone-17pro` 上还挂着 `HeytaWidgetExtension`。
+
+⇒ 本线这一轮的 `pnpm reinstall:all` **只点了桌面两腿**（mac + windows，`--only mac,windows`），
+android/ios 两腿按 AGENTS §8.9（共享资源独占验收）**判为不可点**，并大字记成"这端没有验证当前产物"，不拿桌面两腿冒充四端。
+
+**要拍的一格（在本线地界外，不代改）**：`scripts/reinstall-all.sh` 的 android 段在 `adb uninstall` 之前
+应加一条**设备身份判据** —— 例如要求显式声明本线拥有的 AVD（`HEYTA_ANDROID_AVD=<名字>`，与 `IOS_DEVICE_NAME` 同一形状），
+不等就**不猜、响亮失败**，而不是拿 `SERIAL` 的默认值 `emulator-5554` 直接卸。这是**改验收脚本的判据**，
+按"改判卷口径要记 BLOCKED.md"这一条交回给负责人／脚本所有者落；本线不动那两份文件。
