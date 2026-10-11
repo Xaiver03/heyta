@@ -17,13 +17,50 @@ param(
   [string]$Build = 'C:\src\heyta-win-journey',
   [int]$CdpPort = 9287,
   [string]$Result = 'C:\src\heyta-win-journey-result.txt',
-  # B: hand the page's storage to the shell's SQLite (default OFF, see BLOCKED.md #3).
-  [switch]$ShellStorage
+  # B: hand the page's storage to the shell's SQLite.
+  # NOTE the default: the shell turned this ON (MainWindow.xaml.cs decides with
+  # `env != "0"`), so -ShellStorage only says so explicitly. It is NOT "off by
+  # default" -- that older claim is what commit fe401acb fixed in the emitted
+  # comment line; this param comment is the second copy of that same fact.
+  [switch]$ShellStorage,
+  # The gate-off arm. The shell only disables when the value is literally "0",
+  # and "not set" is NOT that, so this needs its own switch. Kept separate from
+  # -ShellStorage so every existing caller keeps its meaning byte for byte.
+  [switch]$ShellStorageOff,
+  # Decide the arm, print it plus the exact line that would go into the
+  # generated launcher, then exit WITHOUT publishing, WITHOUT schtasks and
+  # WITHOUT opening a window. Without this knob the three arms can only be
+  # read on a machine that has an interactive desktop, which is how this rig
+  # ended up unable to express =0 at all.
+  [switch]$PlanOnly
 )
 
 $ErrorActionPreference = 'Continue'
 $facts = New-Object System.Collections.Generic.List[string]
 function Add-Fact([string]$line) { $facts.Add($line) | Out-Null }
+
+# Single-quoted on purpose: a double-quoted string would INTERPOLATE
+# $env:HEYTA_SHELL_STORAGE here (unset) and emit a broken line " = '1'".
+# Measured 2026-09-30: that is exactly what happened, and the shell's own
+# STORAGE= evidence is what caught it.
+if ($ShellStorage -and $ShellStorageOff) {
+  Write-Output 'STORAGE_ARM=conflict'
+  Write-Error 'Pass at most one of -ShellStorage / -ShellStorageOff.'
+  exit 2
+}
+$storageArm = if ($ShellStorageOff) { 'off' } elseif ($ShellStorage) { 'on' } else { 'unset' }
+$storageLine = if ($ShellStorageOff) {
+  '$env:HEYTA_SHELL_STORAGE = ''0'''
+} elseif ($ShellStorage) {
+  '$env:HEYTA_SHELL_STORAGE = ''1'''
+} else {
+  '# HEYTA_SHELL_STORAGE not set => the shell defaults the storage host ON (MainWindow.xaml.cs: env != "0"). Pass -ShellStorage to say so explicitly, or -ShellStorageOff for the gate-off arm.'
+}
+if ($PlanOnly) {
+  Write-Output ('STORAGE_ARM=' + $storageArm)
+  Write-Output ('STORAGE_LINE=' + $storageLine)
+  exit 0
+}
 
 Add-Fact '=== 1. publish (self-contained) ==='
 $proj = Join-Path $Repo 'apps\desktop-windows\HeytaWindows\HeytaWindows.csproj'
@@ -150,11 +187,8 @@ Get-Process -Name HeytaWindows -ErrorAction SilentlyContinue | Stop-Process -For
 Start-Sleep -Seconds 2
 Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe) | Out-Null
 '@
-# Single-quoted on purpose: a double-quoted string would INTERPOLATE
-# $env:HEYTA_SHELL_STORAGE here (unset) and emit a broken line " = '1'".
-# Measured 2026-09-30: that is exactly what happened, and the shell's own
-# STORAGE= evidence is what caught it.
-$storageLine = if ($ShellStorage) { '$env:HEYTA_SHELL_STORAGE = ''1''' } else { '# HEYTA_SHELL_STORAGE not set => the shell defaults the storage host ON (MainWindow.xaml.cs: env != "0"). Pass -ShellStorage to say so explicitly; the gate-off arm needs =0, which this rig cannot express today.' }
+# $storageLine was decided at the top, BEFORE the -PlanOnly exit, so the dry run
+# and the real run can never disagree about which arm was chosen.
 $launcher = $launcher.Replace('__EXE__', $exe).Replace('__OUT__', $out).Replace('__WEBROOT__', $webTarget).Replace('__PORT__', [string]$CdpPort).Replace('__STORAGELINE__', $storageLine)
 Set-Content -Path $launchPs1 -Value $launcher -Encoding ASCII
 
@@ -183,7 +217,9 @@ Add-Fact ('  cdp_browser=' + $(if ($hv -match '"Browser"\s*:\s*"([^"]+)"') { $Ma
 Add-Fact ('  target_heyta_local=' + $found)
 # Name it as the SWITCH, not the outcome: the shell now defaults the storage
 # host ON, so 'shell_storage=False' here would read as 'feature off' (wrong).
-Add-Fact ('  shell_storage_switch=' + $ShellStorage + ' (default is ON now; =0 disables)')
+# arm= is the third reading and the one the gate-off comparison actually keys on:
+# unset and on both mean the host is ON, only off means it is disabled.
+Add-Fact ('  shell_storage_switch=' + $ShellStorage + ' arm=' + $storageArm + ' (default is ON now; =0 disables)')
 $pr = Get-Process -Name HeytaWindows -ErrorAction SilentlyContinue | Select-Object -First 1
 Add-Fact ('  window_title=' + $(if ($pr) { $pr.MainWindowTitle } else { 'NO_PROCESS' }))
 
