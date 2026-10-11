@@ -1632,6 +1632,10 @@ cd apps/web && NO_COLOR=1 pnpm exec vitest run tests/inbound-cycle-display.spec.
 
 ## T8 严格复审：AC-1～AC-8 逐条「证据命令 + 贴出的输出 + 结论」（2026-10-10 19:2x 起）
 
+🔴 **本节已被文末「T8 终版」那一节取代**（10-11 01:5x，载体从 `a195a37f` 推到 `9fb9eed2`，
+同批补齐了重装置腿、八臂产物级尺与三枚变异臂，并当场查出**一条本线生产缺陷**）。
+本节保留是为了让"哪一格在哪个 HEAD 上取过"可追；**要读现状请读文末那一节**，两处不一致时以那里为准。
+
 **载体口径**（这格容易被读错，先写死）：`HEAD` = 本地 main 当前 tip；本趟起读数时 tip 是 `a195a37f`。
 主检出里**同时坐着别线未提交的改动**（见 **B142**），所以凡在主检出取的红/绿都必须注明"含在飞 diff"；
 干净 HEAD 的读数一律来自隔离副本 `.worktrees/inb-t7`（`checkout --detach <tip>` 后 dirty=0，
@@ -1865,3 +1869,99 @@ packages/app-host typecheck: tests/login-code.spec.ts(44,5): error TS2578: Unuse
 （「共 38 处级联，覆盖 37 张表」）。闭合人是 `8389b2a3`（账号标准套件线），本线一行没改。
 ⇒ **本线在 `pnpm -r test` 上的债从 3 条降到 1 条**（只剩 B150），
 而 T6「对外说明」这一格少了一件要拍的事 —— 它剩下的硬缺口仍是**那枚新 ADR**（地界外，B139）。
+
+## T8 终版：AC-1～AC-8 在同一条款隔离副本上逐格复跑（2026-10-11 01:5x–02:3x）
+
+**这一节取代 10-10 19:2x 那一节**（载体从 `a195a37f` 推到 `9fb9eed2`；补齐重装置腿、八臂产物级尺、
+三枚变异臂，并当场查出一条本线生产缺陷 —— 记在下面第 3 段）。
+
+**载体口径**：`.worktrees/inb-t7`，`git rev-parse --short HEAD` = **`9fb9eed2`**，
+`git status --porcelain | wc -l` = **0**（跑完 A/B/C/M 四批之后复量仍是 0）。
+批次与批次之间不并发；每批一条命令链串行；退出码逐个取，不经管道（§7 那一族）。
+🔴 一处载体陷阱当场抓到并写进本节末：**同步过的副本里 `server/dist` 是陈旧的**
+（dist mtime 00:40:53 < 源码 mtime 01:51:13）⇒ 拿它判 HEAD 会读到**上一枚 HEAD 的产物**。
+先 `npx --no-install tsc` 重打（`TSC_RC=0`）再取加载读数。
+
+### 1. AC-1～AC-8 逐格：证据命令 + 贴出的输出 + 结论
+
+| AC | 证据命令（都在上面那枚载体里跑） | 贴出的输出（10-11 01:5x–02:3x · `9fb9eed2`） | 结论 |
+|---|---|---|---|
+| **AC-1 权益与授权** | `cd server && npx --no-install vitest run --maxWorkers=1 tests/automation-entitlement-ticket.spec.ts tests/automation-drafts.spec.ts tests/inbound-automation.routes.spec.ts tests/inbound-entitlement-write-tx.spec.ts tests/inbound-worker-identity.spec.ts tests/automation-entitlement-issuer.spec.ts tests/automation-commit-proof.spec.ts tests/automation-events.spec.ts tests/automation-rules.spec.ts tests/automation-sender-credentials.spec.ts tests/automation-ai-metering.spec.ts`（离线判定 11 枚）；权益三档 `tests/entitlement.spec.ts tests/entitlement-gate.routes.spec.ts tests/entitlement-across.spec.ts`；额度 HTTP `tests/inbound-ai-quota-route.spec.ts`；真库对账 `tests/automation-ai-metering.pglite.spec.ts`；真库身份腿 `python3 research/tools/verify-inbound-worker-identity.py`；产物加载级 `python3 research/tools/verify-inbound-cjs-require-order.py` | 离线 11 枚 `Test Files 11 passed (11)` / `Tests 103 passed (103)`；权益三档 `Tests 56 passed (56)`；额度 HTTP `Tests 3 passed (3)`；pglite `Tests 17 passed (17)`；真库腿 rc=0 且 `Test Files 1 passed (1)` / `Tests 46 passed (46)`；CJS 尺 `读数　CJS 包=1　在册 .ts=119　有产物=119　无产物(未编译)=0　扫过的产物=119　命中=0` rc=0，`--self-test` `臂数=8　不成立=0` | **判定层闭合到"同一 HEAD、同一副本、逐格可复跑"**：错主体 / 错实例 / 坏签名 / 吊销落后 / 额度耗尽各红一条且零业务效果，且**服务端产物现在能加载**（第 3 段那一格修完并有尺）。不闭合的两格照旧：① 新 ADR 不在地界内（**B139**）；② `pnpm check` 整链仍停在一枚别线类型错（**B144**），不是本线的红 |
+| **AC-2 接收与队列** | `cd packages/inbound-core && npx --no-install vitest run --maxWorkers=1`；队列判据变异臂 `python3 research/tools/verify-inbound-queue-teeth.py` | `Test Files 3 passed (3)` / `Tests 47 passed (47)`；变异臂 `臂数=6　不成立=0　末次 sha256=52c3fd707977a03e（须等于开局那枚）` rc=0 | **字节级签名 / 时间窗 / 上限 / 同键同体重放 / 同键异体冲突 / 跨账号隔离有尺，且这六臂今天在同一枚 HEAD 上再次证明能红**；查询面不回传明文（webhook + envelope 两档）。"公网接收"这一开关按指令仍关着 |
+| **AC-3 领取与提交** | `python3 research/tools/verify-inbound-dual-host.py`；`cd packages/sync-client && npx --no-install vitest run --maxWorkers=1 tests/inbound-authorization.spec.ts` | 装置 rc=0 且自报 **`Windows: 13/13`**（内层 `Tests 14 passed (14)`）；授权接缝 `Tests 6 passed (6)` | **13 个故障窗口两枚独立真 SQLite 宿主全跑通，且这次是在干净 HEAD 的隔离副本上**（10-10 那一趟跑在共享主检出，这一格原来欠的收口**今天补上了**）。观察量是任务数/op 数/回执/计量，不是 HTTP 码 |
+| **AC-4 解析** | AC-1 的离线 11 枚（含 `automation-drafts`）+ `cd packages/domain && npx --no-install vitest run --maxWorkers=1 tests/inbound-local-date.spec.ts` + inbound-core 全量 + `cd packages/app-host && npx --no-install vitest run --maxWorkers=1 tests/inbound-*.spec.ts` | 离线 11 枚 `103 passed (103)`；本地时区 `Tests 1 passed (1)`；inbound-core `47 passed (47)`；app-host inbound **`Test Files 13 passed (13)` / `Tests 107 passed (107)`**（10-10 那格只记到 2 文件 30 条，本线那批界面/循环用例已入库所以分母涨了） | **同时区 / 同归化 / DST / 非法日期 / 长输入 / 多输出受限有尺**；注入指令与模型额外字段的越权走出境闸门既有断言。⚠️ **"实际出境请求符合披露"这一格本线没有读数**（要真 provider 流量）⇒ 保持未闭合，不许读成已验 |
+| **AC-5 批创建与来源记录** | `cd packages/shared-schema && npx --no-install vitest run --maxWorkers=1 tests/task-batch-contract.spec.ts`；`cd packages/op-log && npx --no-install vitest run --maxWorkers=1 tests/task-batch.spec.ts`；`cd packages/app-host && npx --no-install vitest run --maxWorkers=1 tests/task-batch-actions.spec.ts`；点名范围尺 `python3 research/tools/verify-inbound-commit-scope.py` | 契约 `Tests 15 passed (15)`；reducer `Tests 16 passed (16)`（= 5 组 × 三套适配器）；唯一入口 `Tests 9 passed (9)`；范围尺 rc=0 | **一枚逻辑 op / 无半批 / 三套适配器收敛 / 删除后重试不复活 / 旧数据无来源字段仍能 hydration 全部有尺**，且三档都在本批同一 HEAD 上取到。这是全表最接近"可勾"的一格，按规矩**仍未勾**（勾由负责人点，现量 `已勾=0`） |
+| **AC-6 规则界面** | `cd apps/web && npx --no-install vitest run --maxWorkers=1 tests/inbound-*.spec.tsx tests/inbound-upload-authorization.spec.ts`；界面层 e2e `cd e2e && npx playwright test --config playwright.inbound.config.ts` | jsdom 五枚 `Test Files 5 passed (5)` / `Tests 11 passed (11)` rc=0；**e2e 那一趟今天没跑**（🔴 载体里没有 `e2e/node_modules`，`e2e` 刻意不在根工作区内，见 AGENTS §6；要跑必须 `cd e2e && pnpm install`，那会往共享载体写锁文件与依赖）。沿用 10-10 的读数：`2 passed / 2 failed`，红在"换回 AI 那一节不重取列表"（`inbound-automation.spec.ts:85`），四张草稿截图人已打开看过 | **界面入库、jsdom 判据有牙；真浏览器那一格未闭合且在最终 HEAD 上未复跑**：缺陷本体登记在 **B140**（设置分组是 `hidden` 不是卸载，`active` 从没人接），修法要动的文件不在本线白名单 ⇒ 不代改。另两格照旧：`waiting-entitlement` 的词条缺（B110，i18n 不许动）；"完整旅程"要公网接收 + 有权益宿主 |
+| **AC-7 文档** | `python3 research/tools/verify-inbound-doc-tables.py`；`node scripts/check-migrations.mjs`；`node research/tools/license-inventory.mjs`；`node scripts/check-docs-voice.mjs`；`node research/tools/docs-link-check.mjs` | 五道**全部 rc=0**（同一批、同一 HEAD）。许可证那把的结论行逐字：`结论：全部依赖均为宽松许可（含已登记的例外）✅` | **文档五道门在干净 HEAD 上全绿**（原来那条"不是本线的死链红"已消失，见 PROGRESS 的漂移记录）。但 **T6 的四件产物三件不在本线白名单**（新 ADR / 中英条款 / 帮助页）⇒ **B139** 未闭合：`docs/reference/pricing-and-entitlements.md` 本线**没动** |
+| **AC-8 验收矩阵** | `python3 research/tools/verify-inbound-ac8-matrix.py`；生产者缝对账 `python3 research/tools/verify-inbound-producer-seam.py` | 矩阵 `读数　表头行=1084　行数=34　有尺行=27　无尺行=7　尺枚=67　窗=13/13　平台=10/10　权益=9/9　设备状态=9/9` + `结论：矩阵与 HEAD 逐格对账成立`；对账尺 `在册文件=76　跨包成员访问=134　命中=134　盲区(生产包无 .ts)=0　盲区(命名空间)=0　停用=0　登记缝=0　新缝=0` / `相对导入=225　模块在 HEAD=225　…` | **矩阵与 HEAD 逐格自洽**（平台×权益×设备状态×失败阶段全枚举、无空行），且"已入库消费者不依赖未入库生产者"这一条在涨到的 134 枚成员访问 + 225 枚相对导入上仍然**登记缝 0**。⚠️ 它声明的是**用例归属**不是"跨端装过" ⇒ 四端重装与 Linux 交付取证（T7 第三条腿）未跑，这一格按定义未闭合 |
+
+**本批 vitest 分母自检**（AGENTS §6 那条"数一数有没有层根本没跑"）：12 档串行，
+`Test Files` 合计 **42**、`Tests` 合计 **391 passed**、**0 failed**、**0 skipped**
+（逐档相加：103+56+3+17+47+15+16+9+107+1+6+11）。
+重装置另两档：真库腿 46、双宿主内层 14（它们不进上面的合计，装置自己 `n/n` 自报）。
+🔴 这批**不等于** `pnpm -r test` 全量（那 21 枚包 11 条红在 T7 那一节），也**不等于** `pnpm check` 整链。
+
+### 2. 三枚变异臂 + 八臂产物级尺：这轮"判据能不能红"的总账
+
+| 尺 | 臂数 | 读数 | 还原对账 |
+|---|---|---|---|
+| 队列判据 `verify-inbound-queue-teeth.py` | 6 | `不成立=0` | `末次 sha256=52c3fd707977a03e` 等于开局那枚 |
+| 票据判据 `verify-inbound-ticket-teeth.py` | 8 | `不成立=0` | 载体 `dirty=0` |
+| 额度判据 `verify-inbound-quota-teeth.py` | 7 | `不成立=0`，其中一臂逐字：`类型化拒绝退化成普通 Error（路由认不出 ⇒ 402 变 409）: 成立　rc=1 命中用例=True` | 载体 `dirty=0` |
+| 产物 require 顺序 `verify-inbound-cjs-require-order.py` | 8 | `不成立=0`（含"把 require 挪到首次引用之后"的**真产物**变异臂、指针臂、函数体负例臂、`export {…} from` 负例臂、子进程退出码臂） | 它在自家里物化 HEAD 到临时树，不动载体 |
+
+三枚变异装置临时改过的那三枚源码文件，跑完后**逐枚与工作树对账**：
+`server/src/automation/entitlement-ticket.ts` / `packages/inbound-core/src/webhook.ts` / `server/src/entitlement.ts`
+的工作树 sha256 与 `git show HEAD:<路径>` 的 sha256 **逐字相同**（前 16 位 `16e0be2bd9c0859a` / `3e19ec5e63ef86b8` / `954506a226d929a8`）。
+
+### 3. 本批当场查出的一条生产缺陷（属于本线，已修并有尺）
+
+**形状**：`server` 的 tsconfig 是 `"module": "commonjs"`，TypeScript 把每枚 `require` 落在它对应
+`import` 的**源码位置**上。`server/src/automation/entitlement-ticket.ts` 里
+`export const MAX_TICKET_SECONDS = AUTOMATION_ENTITLEMENT_MAX_TICKET_LIFETIME_MS / 1000`（顶层）用到了
+`@heyta/inbound-core` 的**值**，而那枚 `import` 写在它下面 ⇒ 产物里 `require` 落在引用之后 ⇒
+`server/dist/.../entitlement-ticket.js` **一加载就** `ReferenceError: Cannot access 'inbound_core_1' before initialization`。
+
+**四道既有尺都看不见它**（这条比那条红更要紧）：`pnpm -r typecheck` 绿、那条 spec 在 `pnpm -r test` 里绿
+（vitest 走 ESM，import 会提升）、`pnpm check` 全链绿、真库腿 46/46 绿 —— **它们都不加载 tsc 的 CJS 产物**。
+
+**两臂反向验证**（都在同一枚载体、今天取）：
+
+```
+臂 a（红，缺陷态产物）：node -e 'require("./server/dist/src/automation/entitlement-ticket.js")'
+  dist 第 20 行 exports.MAX_TICKET_SECONDS = inbound_core_1.AUTOMATION_… / 第 30 行才是 const inbound_core_1 = require("@heyta/inbound-core")
+  ReferenceError: Cannot access 'inbound_core_1' before initialization   RC=1
+臂 b（绿，HEAD 修复态）：npx --no-install tsc（TSC_RC=0）后同一命令
+  LOAD_OK MAX_TICKET_SECONDS=30 ACTIONS=9                                RC=0
+  第 21 行就是 require、第 31 行才是引用（require 在前）
+  整条路由图也加载一次：JWT_SECRET=<随机 32B> timeout 60 node -e 'require("./server/dist/src/api.js"); process.exit(0)'
+  API_GRAPH_LOAD_OK                                                      RC=0
+```
+
+🔴 臂 b 里那句 `SCOPES=undefined` 是**我的读法错了**，不是产品缺陷：`AUTOMATION_ENTITLEMENT_SCOPES`
+是一份 `Object` 不是数组，`.length` 恒 undefined。单独探过：
+`typeof=object 构造=Object 键数=9 键=["session","rule-enable","sender-credential-issue","worker-register","event-claim","ai-reserve","result-publish","commit-permit","draft-confirm"]`
+⇒ 词表与协议文档那 9 个 scope 仍然逐字对上；把这一格写清是因为**它长得像第二条缺陷**，容易被下一位当成红。
+
+**修复**：把那枚值导入（连 JSDoc）整体上移到 `import { prisma } from '../db'` 之前，
+**纯移动**、判定语义零改动（`git show` 的 diff 形状 = 1 文件 / +16 −14，`EVENT_ID` 那行逐字不变）。
+源码里今天的先后：`19:} from '@heyta/inbound-core'` → `20:import { prisma } from '../db'` → `30:export const MAX_TICKET_SECONDS = …`。
+入库 `a49f534c`，被并行会话的**裸 `git commit`** 静默回退（成因见 PROGRESS 01:2x/01:5x 那两节），
+重落 `5f1672c7`；`git merge-base --is-ancestor 5f1672c7 HEAD` = **YES**，
+且 `git rev-parse HEAD:server/src/automation/entitlement-ticket.ts` = `c600de923c531b66…`（**就是修复那一版**）。
+
+**新尺**：`research/tools/verify-inbound-cjs-require-order.py`（白名单内）。
+🔴 它判的是**产物**不是源码 —— 源码级检测会假红：`server/src/shares/share.routes.ts` 那枚 `import { Prisma }`
+是**类型位**，编译后被完全擦除（产物 `grep -c 'require("@prisma/client")'` = 0）。
+指针（"那行 import 在源码第几行"）回到 HEAD 源码取，判决来自产物。
+装置自己 `git archive HEAD` 物化一份 **HEAD 的字节**再编译 —— 第一次没做这件事时拿到过**假绿**
+（编译的是工作树，里面坐着别人已顺手修好的改动）。静止读数已在 AC-1 那格；它上线当天在**被回退的那枚 HEAD**
+上跑出的就是红：`命中=1` + `src/automation/entitlement-ticket.js:20 … 源码 server/src/automation/entitlement-ticket.ts:14 是加载期引用、:25 才是那行 import`，rc=1。
+
+### 4. 这一节没做的事（不包装成完成）
+
+1. **AC-6 真浏览器那一趟没在最终 HEAD 上复跑**（载体里没有 `e2e` 的依赖，装它会往共享载体写东西）⇒ 那格沿用 10-10 的 `2 passed / 2 failed` 并注明"未在 `9fb9eed2` 复跑"。
+2. **T7 第三条腿 `pnpm reinstall:all` + Linux 交付取证仍未跑**（要设备槽与安静载体）⇒ AC-8 那一格按定义未闭合。
+3. **`pnpm check` 整链仍停在第 4 步那枚别线类型错**（B144）；**`pnpm -r test` 那 11 条红 = 别线 10 + 本线 1（B150）**。
+4. **载体里 `server/dist` 的陈旧产物会伪装成"HEAD 坏"** —— 这一格我建议追加进 `docs/reference/environment-traps.md`（§7 #27 那一族：产物对账要看 mtime 先后），但该文件不在本线白名单 ⇒ 登记成 **B156**，不代改。
+5. AC 已勾数现量 `grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` = **0**，未勾 = **8**；公网接收与售卖继续关闭，等负责人逐条点头。

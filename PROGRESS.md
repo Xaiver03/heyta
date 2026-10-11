@@ -2861,3 +2861,81 @@ AC 已勾数现量 **0**、未勾 **8**。
 下一步（按 T8→T7 顺序）：写 AC-1～AC-8 逐条「证据命令 + 贴出的输出 + 结论」；然后 T7 第三条腿
 `pnpm reinstall:all` + Linux 交付取证（要设备槽空闲，此前 1 分钟负载 9–14 / 15 分钟 22）。
 `pnpm check` 仍停在第 4 步那枚**别线**类型错（B144），本线不代改判卷口径。
+## 2026-10-11 01:2x · 共享索引又被我这次的 plumbing 提交留脏了；这次知道成因，配方里补一步硬动作
+
+`git commit-tree` + `update-ref` 只动 **ref**，不动索引。所以在共享载体上，**任何人**（含并行会话）
+在下一次 `git status` 之前，索引都停在"上一枚 HEAD 的那棵树"上 —— 于是我刚提交的那 7 枚路径在
+`git status --porcelain` 里显示成 `MM`（索引里是**上一枚 HEAD 的旧 blob**），而 `git diff --cached` 非空。
+
+这不是整洁问题，是一条会咬人的形状：**这时若有并行会话跑裸 `git commit`（不带 `-a`、不带 `add`），
+提交的是索引 = 旧 blob ⇒ 本线那 7 枚文件会在那一笔里被静默回退**，而对方看到的仍是"提交成功"。
+
+现量（`1f8b795b` 刚落地之后，动索引之前）：
+
+```
+git diff --cached --name-only | wc -l  ⇒ 7      ← 全是我这一笔里的 7 枚路径
+BLOCKED.md：索引 blob=95c9479…  ==  f9f6a8fe 的那一版；HEAD blob=a40b6dc…  ==  工作树 blob
+```
+⇒ 索引里那份是**已提交的旧内容**（可从 git 完整取回），**没有别人的未提交工作**坐在里面。
+
+处置（备份在前、只点我这一笔的 7 枚路径、不碰工作树）：
+`cp .git/index /tmp/inb-index-backup-012152` → `git restore --staged -- <那 7 枚>` →
+复量 `git diff --cached --name-only | wc -l` = **0**，七枚路径 `git status --porcelain` 为空。
+0 的含义比"我这 7 枚干净"更强：**整个索引现在逐路径等于 HEAD**，那一格回退风险被消掉了。
+
+🔴 配方更正（写死，不给下一位留判断题）：用 plumbing 在本仓提交时，`update-ref` 之后**必须**紧跟
+`git restore --staged -- <本笔点名的那些路径>`，然后验一次 `git diff --cached --name-only | wc -l` 应为 0。
+我之前把那一步记成"收尾的整洁动作"，其实它是**防并行会话把我这一笔回退掉**的承重步骤。
+
+🔴🔴 **01:5x 现量：上面这一段的两半都错了，错的方式足以咬掉一次已提交的修复。以文末
+"共享索引刷新的正确配方"那一节为准，别再照这一段行动。**
+- **后果**：那 7 枚里有一枚是本线的生产缺陷修复（`server/src/automation/entitlement-ticket.ts`，
+  CJS 产物加载期 TDZ）。索引没刷新 ⇒ 并行会话一枚裸 `git commit` 把**旧 blob** 提交进去 ⇒
+  **已入库的修复被静默回退**（`3998e598` / `f201b001` / `1394061f` 三笔各带一次）。
+- **`git restore --staged` 为什么没救成**：它是**原子的** —— 只要有一个 pathspec 在索引里不存在
+  （那一趟是 `research/tools/verify-inbound-cjs-require-order.py`，当时还没进索引），
+  它报一句 `did not match any file(s) known to git` 然后**整条命令什么都不做**，
+  而 `wc -l` 我量的是**另一枚路径**的读数 ⇒ 看成"已经等于 0"。
+  教训：**收尾判据必须量"我要清的那一整批"，不能量其中一枚代表全部。**
+
+## 2026-10-11 01:5x · 共享索引刷新的**正确配方**（这次有现量，且新尺当场把它照回来了）
+
+上面那一节被否证之后重做了一遍，可复现的配方是这一条（`update-ref` 之后**在同一条命令链里**刷新索引）：
+
+```bash
+BLOB=$(git rev-parse <sha>:<路径>) && \
+git update-index --add --cacheinfo 100644,$BLOB,<路径> && \
+git diff --cached --name-only -- <本笔点名的全部路径> | wc -l   # 必须是 0
+```
+
+- `update-index --cacheinfo` 是**逐路径**写的，不存在"`restore --staged` 那种一个坏 pathspec 让整条空转"的失效形状。
+- 收尾判据用 `git diff --cached --name-only -- <全部点名路径>`，**不要**只量其中一枚，也不要只看 `git status` 的 `MM`。
+- 提交信息里**不要**在双引号 `-m` 里放反引号：那会触发命令替换。本仓的正确写法是把消息写进
+  `/tmp/inb-msg-*.txt` 再 `git commit-tree -F`（本轮实测：反引号那一次 `NEW=` 空、什么都没提交）。
+
+## 2026-10-11 01:5x · 一条真生产缺陷：CJS 产物在**模块加载期**引用尚未 require 的跨包绑定
+
+发现路径是 T8 的"每条验收都要能复跑"这一步，不是任何一条既有门禁：
+`server` 的 `tsconfig` 是 `"module": "commonjs"`，而 `server/src/automation/entitlement-ticket.ts` 里
+`MAX_TICKET_SECONDS`（顶层 `export const`）**用到了** `@heyta/inbound-core` 的值，
+那枚 `import` 却写在它下面 ⇒ tsc 按**源码顺序**落 `require` ⇒ 产物 `dist/.../entitlement-ticket.js`
+一加载就 `ReferenceError: Cannot access 'inbound_core_1' before initialization`。
+
+四道既有尺都看不见它（这是本节的重点，不是那条红）：`pnpm -r typecheck` 绿、`pnpm -r test` 里那条 spec 绿
+（vitest 走 ESM，import 会提升）、`pnpm check` 全链绿、真库腿 46/46 绿 —— **因为它们都不加载 tsc 的 CJS 产物**。
+
+- **两臂反向验证**（当场做过，读数贴在计划那一节）：臂 a 按 HEAD 那份源码构建后 `node -e require(...)` ⇒ **`ARMA_RC=1` + ReferenceError**；
+  臂 b 换成修复后同一命令 ⇒ `LOAD_OK MAX_TICKET_SECONDS=30 ACTIONS=9 SCOPES=9`、rc=0。
+- **修复**：把 JSDoc + 那枚值导入整体上移到 `import { prisma }` 之前（纯移动，`EVENT_ID` 那行逐字不变，
+  diff 形状 1 文件 / +16 −14）。入库 `a49f534c`，被并行裸提交回退三次后重落 `5f1672c7`。
+- **新尺**：`research/tools/verify-inbound-cjs-require-order.py`（在白名单内）。
+  🔴 它判的是**产物**不是源码 —— 源码里 `import { Prisma }` 在 `shares/share.routes.ts` 是**类型位**，
+  编译后被完全擦除（产物 `grep -c 'require("@prisma/client")'` = 0），按源码判就会假红；
+  指针（"那行 import 在源码第几行"）才回到 HEAD 源码取。
+  装置自己 `git archive HEAD` 物化一份**HEAD 的字节**再编译（共享主检出的工作树里有别人的在飞改动，
+  直接编译工作树会把"别人已经顺手修好"读成"HEAD 没问题"—— 这一格我第一次就踩了，拿到过假绿）。
+  静止读数：`CJS 包=1 在册 .ts=119 有产物=119 无产物=0 扫过的产物=119 命中=0`，rc=0；
+  `--self-test`：**臂数=8 不成立=0**（含"把 require 挪到引用之后"的真产物变异臂、指针臂、
+  函数体负例臂、`export {…} from` 负例臂、子进程退出码臂）。
+- **它上线当天就抓到了回退事件本身**：在 `5f1672c7` 之前的那枚 HEAD 上跑 ⇒ `命中=1`
+  并逐字指出 `src/automation/entitlement-ticket.js:20 … 源码 server/src/automation/entitlement-ticket.ts:14 是加载期引用、:25 才是那行 import`，rc=1。

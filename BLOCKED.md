@@ -8818,6 +8818,48 @@ server/package.json:12 点名 33 枚 .integration.spec.ts        → 需要活�
 app bar 的 App 的共同问题，那时要不要在产品侧给一条防线（例如最右格改用 `insets.top`
 之外的第二个来源）—— 这一格不该由一条设备腿的红来拍，也不该由一份模拟器的读数拍。
 
+## B156（2026-10-11 02:0x，本会话 · T8 终版取证时撞上）：**同步过的隔离副本里 `server/dist` 是上一枚 HEAD 的字节，它报出来的红长得像"当前源码坏"**
+
+现量（载体 `.worktrees/inb-t7`，HEAD=`9fb9eed2`、dirty=0）：产物 mtime `00:40:53` < 源码 mtime `01:51:13`；
+对它 `require` ⇒ `ReferenceError: Cannot access 'inbound_core_1' before initialization`（rc=1），
+而 HEAD 的源码当时**已是修好的**（`git rev-parse HEAD:…` = `c600de92…`）。`npx --no-install tsc` 重打（`TSC_RC=0`）后
+同一条命令 ⇒ `LOAD_OK … rc=0`。
+
+这是 §7 第 27 条那一族的新面目（旧产物被当成当前源码的判决），**而且两头都能骗**：旧产物若是好的、
+当前源码是坏的，同一把尺会报绿。建议的判据：任何"读构建产物"的验收先证 `产物 mtime ≥ 输入源码 mtime`，
+或从 `git archive HEAD` 现编（本线那把 `research/tools/verify-inbound-cjs-require-order.py` 就是这么写的，
+所以它不会被这一格骗到）。**`docs/reference/environment-traps.md` 不在本线白名单** ⇒ 登记，不代改。
+
+## B157（2026-10-11 02:0x，本会话）：**plumbing 提交只动 ref 不动共享索引 ⇒ 下一枚裸 `git commit` 会把上一次提交静默回退**（本线实测三次）
+
+`a49f534c`（本线那枚生产缺陷修复）落地后，并行会话的三枚**裸** `git commit`（`3998e598`/`f201b001`/`1394061f`）
+把 `server/src/automation/entitlement-ticket.ts` 逐字退回**修复前**——因为共享 `.git/index` 里那一枚路径
+还坐着"上一枚 HEAD 的 blob"，而裸 commit 提交的是索引不是工作树；对方看到的仍是"提交成功"。
+
+本线已做的两件（都在白名单内）：① 配方写进 `PROGRESS.md`（`update-ref` 之后**同一条命令链里**
+`git update-index --add --cacheinfo 100644,<blob>,<路径>`，再验 `git diff --cached --name-only -- <本笔全部点名路径>` 为空）；
+② 补了一把能当场照出回退的尺（在被回退的那枚 HEAD 上 `命中=1` rc=1，逐字指出产物 20 行是加载期引用、源码 25 行才是那行 import）。
+
+**要拍的两件都在本线地界外**：① 要不要给 `pnpm check` 加一道"**索引逐路径等于 HEAD**"的门（`scripts/` 不在白名单；
+它能拦这一族所有实例，代价是"故意 staged"也会红 ⇒ 词表谁批谁定）；② 要不要把"plumbing 之后必须刷新共享索引"
+写进 `AGENTS.md`/`CONTRIBUTING.md` 的提交纪律（这两份的规则部分明令不许本线改）。
+⚠️ 伴生坑一并留档：`git restore --staged -- <路径…>` 是**原子的** —— 清单里有一枚不在索引（新文件常见）时它
+`did not match any file(s) known to git` 然后**整条什么都不做**，而只看一枚路径的读数会显示"已经等于 0"；
+本线那一次回退第一次没补救成功就是栽在这里。
+
+## B158（2026-10-11 02:0x，本会话）：**本线白名单文件上坐着别线的未提交改动，而它改的是判卷口径** —— `EVENT_ID` 的接受集被放宽
+
+形状：主检出的 `server/src/automation/entitlement-ticket.ts` 工作树（mtime 10-10 20:18，不是本线写的）除本线
+那枚"导入上移"外还有两处：`const EVENT_ID = z.string().regex(/^[A-Za-z0-9:_-]{1,127}$/)` 被放宽，值导入的 JSDoc 被删。
+
+**本线一行都没代提交**：票据正文里事件标识的接受集是**判定输入的形状**，落在"改判卷口径要记 BLOCKED.md"这一条上；
+而 T1 的判据只写了"错主体/错实例/吊销落后各红一条"，**畸形 `EVENT_ID` 该不该红**两种读法都自洽。
+HEAD 那枚文件 = 本线修复版 `c600de92…`，他们那两处原样留在工作树里。
+
+开着的两条路（任一条都比放着好）：① 改动的所有者自己提交并写清为什么放宽；② 口径定了之后本线在
+`server/tests/`（白名单内）补一条"畸形 `EVENT_ID` 被拒并回类型化拒绝码"的断言、挂进票据那把八臂尺 ——
+**那八臂现在没有这一档，也就是说无论怎么改都没有尺在守这一格**。
+
 ## B156（2026-10-11 02:0x，本会话 · T8 终版取证时撞上的）：**同步过的隔离副本里 `server/dist` 是上一枚 HEAD 的字节，而它报出来的红长得像"当前源码坏"**
 
 现量（载体 `.worktrees/inb-t7`，`git rev-parse --short HEAD` = `9fb9eed2`、dirty=0）：
@@ -8970,9 +9012,9 @@ stat -f '%Sm  %N'  server/dist/src/automation/entitlement-ticket.js  server/src/
 
 | 门禁 | 红的落点 | 引入它的提交（`git blame` / `--diff-filter=A` 现量） | 为什么本线不修 |
 |---|---|---|---|
-| `check:layering` | `apps/web/src/features/share/share-key-store.ts:64` `entityType: 'SHARE_KEY',`（外壳里就地拼 op） | **`e6058120`**（10-09 14:35） | 修法是给 `SHARE_KEY` 在 app-host 补一族动作层 —— 那是**共享清单协作**那条功能的语义 |
-| `check:ui-language` | `packages/i18n/src/locales/zh-CN.ts:4758` `web.share.invite.emailPlaceholder = name@example.com`（zh-CN 里没汉字） | **`2f59b075`**（10-10 19:53，协作 packages） | 两条出路都不许本线代做：翻成中文=改**别人的对外文案**，塞进 `UNTRANSLATABLE_KEYS`=改**判卷口径** |
-| `check:verify-script-copy` | 2 枚 needle 失效：`scripts/lib/mobile-e2e.sh:1475`、`scripts/verify-mobile-habits.sh:631`（都找 `填好服务器地址与访问令牌后才能同步。`） | 词条 `mobile.profile.sync.notConfigured` 被 **`e6058120`** 改成「登录 heyta，让任务在设备间自动同步。」，脚本没跟着改 | 那两条 needle 是**别人验收脚本的判据**，本线改=替他们决定"哪句才算界面到位" |
+| `check:layering` | `apps/web/src/features/share/share-key-store.ts` 里那枚 `entityType: 'SHARE_KEY',`（外壳里就地拼 op；行号门禁自己印，本处不抄。⚠️ 更正一次：本条目第一版写的是"那枚文件正被协作线改"，**现量否证** —— `git status --porcelain -- <那枚>` 为空，它是**已经落地的违规**，不是在飞的东西。不修的理由只剩"那是别人的功能语义"这一条） | **`e6058120`**（10-09 14:35） | 修法是给 `SHARE_KEY` 在 app-host 补一族动作层 —— 那是**共享清单协作**那条功能的语义 |
+| `check:ui-language` | 词条 `web.share.invite.emailPlaceholder = name@example.com`（zh-CN 里没汉字；键与行号门禁自己印） | **`2f59b075`**（10-10 19:53，协作 packages） | 两条出路都不许本线代做：翻成中文=改**别人的对外文案**，塞进 `UNTRANSLATABLE_KEYS`=改**判卷口径** |
+| `check:verify-script-copy` | 2 枚 needle 失效：`scripts/lib/mobile-e2e.sh` 与 `scripts/verify-mobile-habits.sh` 各一处（行号门禁自己印），找的都是 `填好服务器地址与访问令牌后才能同步。` | 词条 `mobile.profile.sync.notConfigured` 被 **`e6058120`** 改成「登录 heyta，让任务在设备间自动同步。」，脚本没跟着改 | 那两条 needle 是**别人验收脚本的判据**，本线改=替他们决定"哪句才算界面到位" |
 | `check:integration-coverage` | `server/tests/integration/inbound-dual-host-fault-windows.integration.spec.ts` 盘上有、脚本没点名 ⇒ **从建立起一次都没跑过** | **`0eea4c0f`**（10-10 13:43，自动收集 T3） | 点名要写进 `server/package.json` 的 `test:integration:postgres`，那是入站线那条用例的运行前提 |
 
 📌 **可迁移的一条**：`e6058120`（产品体验线 10-09 那笔四面回归读数）**一枚就占了三道红**
