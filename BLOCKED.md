@@ -6932,6 +6932,12 @@ e2e 类型载体 RC=0；臂台四臂 `A→D1`、`B→D3,D6`、`C→D4`、`D→D5
 🔴 为什么这条要立案而不是"反正不是我红的"就过去：T7 的关闭判据是 `pnpm check` 在隔离副本上 exit 0，而 `check` 里含 web 的 typecheck ⇒ **这 16 条不修，T7 结构性地跑不到绿**。修法归那两条线自己（`Storage` 的 double 少实现 `length/clear/key`，以及三处 `Object is possibly 'undefined'`），本线不代改别人的判据文件（越界一次就等于替别人决定"什么算对"）。
 本线的处置：T7 先跑不受它挡的那几道（`check:migrations`、`license-inventory`、`check:docs`、`check:layering`、各包单测），到 `pnpm check` 整链时**记环境无效、不记本线通过**，并在这节等它自己落。
 
+**🔴 10-11 00:4x 现量：这一案的 16 条已经清零**（那两条线自己修的，本线一枚文件没碰）。
+尺是整仓那一把：`pnpm -r --no-bail typecheck` ⇒ `error TS` 行数 **1**、分母自检 20 枚有脚本的包 == 20 枚跑了的包。
+唯一剩下的 1 条不是 web 的，是 `packages/app-host/tests/login-code.spec.ts(44,5) TS2578`（见 B144 的 10-11 更正段）。
+⇒ **B103 的"挡 T7"这一格换人**：现在 `pnpm check` 停的是 app-host 那条，不是 web 那 16 条。
+本节正文保留，因为它记的是那条**判据形状**（按文件归组 + `grep -ic inbound` 做本线相关性对照），换目标还要用它。
+
 ## B104（2026-10-09 18:0x，本会话 · 入站自动收集 Goal T1）：这台机器的测试内存闸门把"还原后的复跑"挡在门外，合并态整仓重跑仍欠着
 
 T1 的真库腿**已经取到读数**（`python3 research/tools/verify-inbound-worker-identity.py` → `Tests 43 passed (43)`，PY_RC=0，18:06）。欠的是**变异还原之后那一次复跑**：18:07 那趟在测试腿之前被本机 tfa-shield 的轻量档拒绝启动 ——
@@ -7607,6 +7613,23 @@ IndexedDB 的 META 行键是磁盘上的东西，两处定义就是漂移的起�
 上面那 3 枚成员现在坐在 `KNOWN_SEAMS` 里挂着 B129 —— **R4 会盯着它**：那 6 行一旦以任何方式入库，
 这枚装置不再报绿，而是退 **3** 报"登记的缝已闭合 ⇒ 撤登记、回写台账"。所以这一格修完之后不需要有人记得来改尺。
 
+**✅ 10-11 01:1x 闭合（R4 真的顶出来了，按它说的做）**：那 6 行由候选 ② 那条路入库 —— 并行会话的
+`16da3ecb`（10-10 18:48，`feat(cross-session): 共享清单基础设施 + 入站自动化 + …`，`--stat` 里
+`packages/storage/src/stores.ts | 6 ++`）**已在本线 HEAD 的祖先链上**（`git merge-base --is-ancestor 16da3ecb HEAD` = 真）。
+现量（三条都带正向对照 —— "文件在"不等于"键在"）：
+
+```
+git grep -l INBOUND_RECIPIENT_KEY  HEAD -- packages/storage ⇒ HEAD:packages/storage/src/stores.ts
+git grep -l INBOUND_WORKER_CREDENTIAL HEAD -- packages/storage ⇒ 同上
+git grep -l INBOUND_COMMIT_JOURNAL HEAD -- packages/storage ⇒ 同上
+python3 research/tools/verify-inbound-producer-seam.py ⇒ rc=3（R4×N："登记的缝已闭合 ⇒ 撤登记并回写台账"）
+```
+
+处置：`KNOWN_SEAMS` **清空**（撤登记）并把这一档的两向验证从"读工作树"改成"内存注合成登记"
+（臂 3a 注一枚 HEAD 已闭合的 ⇒ R4 必须顶；臂 3b 注一枚仍未闭合的 ⇒ **不许**判 R4 —— 登记是挂账不是报错）。
+撤完之后的静止读数：**`在册文件=76　跨包成员访问=133　命中=133　登记缝=0　新缝=0`，rc=0** ——
+也就是说这 133 处访问**从没进过盲区**，它们现在逐枚按 HEAD 现量算命中，比挂着登记的版本咬得更实。
+本线那三拍（①②③）因此**不再需要负责人拍**：走的是②，代价是那 6 行由别人提交（归属仍是本线的字，只是笔不是本线的）。
 
 ## B130（2026-10-10 06:2x，本会话 · 上一节那把尺第一次全量跑时自己照出来的）：同一类缝还有**第二种形状**，而且这次缺的是整枚文件
 
@@ -7644,6 +7667,23 @@ HEAD 解析得开 **209**、登记 **1**（就是这一枚）、新缝 **0**；�
 **对本线的直接影响**：T7 干净检出的红集里现在有**两格归属明确是本线的**，而且是**两种不同的修法**：
 B129 缺三枚成员（改 6 行、在 `packages/storage`），B130 缺整枚模块（新入库 2 枚文件、在 `packages/app-host`）。
 下一位跑 `pnpm check` 之前先跑这把尺，否则归因会糊在 B112 那四处缝里。
+
+
+**✅ 10-11 01:1x 闭合（与 B129 同一批、同一条路）**：那两枚文件由候选 ③ 入库 —— 还是 `16da3ecb`
+（`--stat`：`packages/app-host/src/task-batch-actions.ts | 60 +++`、`packages/app-host/tests/task-batch-actions.spec.ts | 77 +++`）。
+现量（这一档的"在"要判**解析得开**，不是判文件存在 —— 缺 `.js` 后缀映射时文件在也解不开）：
+
+```
+git cat-file -e HEAD:packages/app-host/src/task-batch-actions.ts ⇒ rc=0
+python3 research/tools/verify-inbound-producer-seam.py
+  撤登记前 ⇒ rc=3（R6："登记的模块缝已闭合 ⇒ 撤登记并回写台账"）
+  撤登记后静止 ⇒ `相对导入=225　模块在 HEAD=225　登记模块缝=0　新模块缝=0　尺瞎了=0`，rc=0
+```
+
+`KNOWN_MODULE_SEAMS` 同样清空，R6 的两向验证改由内存合成登记承担（臂 7a 注已闭合的 ⇒ 必须顶 R6；
+臂 7b 注仍未闭合的 ⇒ **不许**判 R6 也不许判 R5）。B130 那三拍因此也不用拍了。
+⚠️ 一笔诚实账：**AC-5 那份"唯一入口"的 spec 是别人替本线提交的**，本线没有对它做过逐条复核；
+它进 HEAD 之后 `packages/app-host` 的 test 汇总里它算一条，那条的读数在计划 §6 的逐包表里，**不在本格**。
 
 ## B131 `waiting-entitlement` 的**第三处同形**：`apps/node-host` 把 app-host 的 cycle 状态内联重抄了一遍，`pnpm -r build` 在带工作树改动的树上必红
 
@@ -8176,6 +8216,24 @@ Error: locator.click: Test timeout of 60000ms exceeded.
 
 **给下一位的提醒**：判这 9 条红之前先确认自己站在哪棵树上。隔离副本那条腿现在就能当"HEAD 真值"用：`cd .worktrees/inb-t7 && python3 research/tools/verify-inbound-worker-identity.py --log /tmp/inb-wt-worker.log`（干净 worktree **没有 dist**，必须先 `pnpm -r build` 再 `pnpm --filter @heyta/server exec prisma generate`，否则红的是探针不是产品）。
 
+**✅ 10-11 00:3x 闭合（走的就是上面那条"① 由本线出一笔专笔"）**：改名已落地（`d361209e`，335 处 +
+新门禁 `scripts/check-server-error-shape.mjs`），本线那三处落点逐枚现量，残留 `errorCode` 计数**全为 0**：
+
+```
+server/tests/integration/inbound-worker-identity.integration.spec.ts     errorCode=0
+server/tests/inbound-ai-quota-route.spec.ts                              errorCode=0
+server/tests/inbound-ticket-rejection-route.spec.ts                      errorCode=0
+docs/reference/inbound-automation-protocol.md                            errorCode=0
+```
+
+`inbound-ticket-rejection-route.spec.ts` 这一枚是**他们那笔里就带走的**（本线没碰过它），所以"本线 16 枚"
+这个数里只有 12+1 处是本线自己换的 —— 上面那张表按文件计数，不留 16 这种会漂的合计。
+真库腿同步复跑：`Tests 9 failed | 37 passed (46)` → **`Tests 46 passed (46)` / `rc=0`**，
+对照臂（把那份文件换回改名前）精确回到 9 红 ⇒ 归因于这次迁移。
+**并当场抓到一处更值得记的东西**：那 9 条里有 3 条不是键名过时，是**同一条键名红泄漏出来的次生伤**
+（`automationEntitlementClock` 的撤销坐在硬断言之后），已照本文件自己既有的 `finally` 范式修掉，
+机制与三条臂读数在 `docs/plans/inbound-automation.md` 的「T7 第三条腿」那一节。
+
 ## B143（2026-10-10 19:2x，本会话 · 修 `verify-inbound-commit-scope.py` 时它自己报出来的）：本线**独占路径**有 11 枚是被**别线的批量提交**装进 main 的，那把尺的归属反查因此长红
 
 **现量**：`python3 research/tools/verify-inbound-commit-scope.py --self-test` ⇒ `臂数=4，不成立=1 → ARM-3`，ARM-3 打印 `动了独占路径却没被计入 = 2 ⇒ 漏网 d49f77e3→apps/mobile/src/inbound/lifecycle.ts, 63e61f23→apps/web/tests/inbound-cycle-display.spec.tsx`。逐笔数它们带走了本线多少枚：
@@ -8191,6 +8249,56 @@ Error: locator.click: Test timeout of 60000ms exceeded.
 2. 新增 **ARM-4**（两半：已知提及件不许进本线桶 + 它的外线路径不许从打印集合里消失），并把 `self_test()` 从"首败即返回"改成"每臂都跑完再汇总 rc"—— 否则前一臂长红时后面那几枚臂**根本没有读数**。变异证明：把 `partition` 改成全部归本线桶 ⇒ `ARM-4 … 坏 731cc2e2 被当成本线笔; 6e813df9 被当成本线笔; docs/plans/account-standard-suite.md 的证据被分流丢了; docs/plans/product-ux-optimization.md 的证据被分流丢了`、`不成立=2 → ARM-3, ARM-4`；从 `.mut-bak` 还原后回到基线（`不成立=1 → ARM-3`）。
 
 **要拍的只有一件**：ARM-3 那句"动了独占路径却没被计入必须为 0"在共享检出下有两种真实成因 ——（甲）本线自己某笔没带主题词（这条臂当初就是为了它写的）；（乙）别线把本线路径提交了（今天的实际成因）。三种读法：① 保持长红，把它当"跨线提交"的告警器，每次由本线确认成因后在台账记一行；② 让 ARM-3 只认**主题里没有任何别线标记**的漏网（要给它一张别的线的主题词表，会随线的增减漂）；③ 把独占路径的归属判据从"笔"改成"内容"（HEAD 里那枚文件的内容等于本线台账登记的那一版就算闭合）。本线按纪律**没有**自己挑一种 —— 这是判卷口径，不是代码 bug。
+
+## B144（2026-10-10 19:3x，本会话 · 在隔离副本上取 T7 第一条读数时量出的）：`pnpm -r typecheck` 在 HEAD 上仍红，但**分母换了一族** —— 23 条错没有一条在本线地界，全在 `share-*` 那族测试里
+
+**为什么这一格值得单独登记**：B103 原来写的是"16 条 `apps/web` 类型错挡死 `pnpm check`"。那个数既不是全集也不是当前值 ——
+第一次跑 `pnpm -r typecheck` 时它在 `@heyta/sync-core` 就**中止**（`ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL`），
+后面的包根本没跑到，所以当时看到的 1 条错**不是分母**。加 `--no-bail` 让每一层都跑完才拿到全集。
+
+**现量（载体：隔离副本 `.worktrees/inb-t7` @ `8962927d`，dirty=0，`pnpm -r build` rc=0，`prisma generate` rc=0）**：
+
+```
+pnpm -r --no-bail typecheck   ⇒  NB_RC=1　error TS 行数=23
+失败的包：apps/web、packages/sync-client、packages/sync-core、packages/ui
+```
+
+按成因分三族（条数之和 = 23）：
+
+| 族 | 条数 | 形状 | 落点 |
+|---|---|---|---|
+| A：`Storage` 桩缺成员 | **13** | `Type '{ getItem; setItem; removeItem; _map }' is missing the following properties from type 'Storage': length, clear, key` | `apps/web/tests/share-key-store.spec.ts`（36/37/44/52/53/54/56/57/64/68/74/78/80 行） |
+| B：`Object is possibly 'undefined'` | **9** | TS2532 | `apps/web/tests/app-mount.spec.tsx`（796/801/803）、`packages/ui/tests/share-model.spec.ts`（43/44/45/53）、`packages/sync-client/tests/share-api-client.spec.ts`（82）、`…/share-payload-cipher.spec.ts`（50） |
+| C：新增必填实参没传 | **1** | TS2345 `Property 'identity' is missing` | `packages/sync-core/tests/share-keys.spec.ts:234`（同一段里前一次调用传了 `identity: mkIdentity('op-1')`，第二次"同键异绑定"那次没传） |
+
+**归属**：这五枚文件最近一笔都是 `e6058120`（10-09 14:35，产品体验线台账那一笔）带的，`app-mount.spec.tsx` 是 `63e61f23`（10-10 18:49，同一条线）。
+**本线地界内命中 0**：`grep -E "error TS" | grep -c inbound` ⇒ **0**（现量见上）。所以这不是本线的红，本线也不去代改 —— 死规矩写着不动别人的文件，而这五枚路径一枚都不在本线白名单里。
+
+**对 T7 与本线交付的直接影响**：完成条件第 1 条要 `pnpm check` 在隔离副本 exit 0，而 `check` 的第一道就是 typecheck ⇒
+**只要这三族还在，T7 那条命令到不了 0**，与本线做了多少无关。`pnpm -r test`（运行时）**不**被它挡：vitest 不做类型检查，
+所以测试那一条仍可独立取读数（本会话已另跑一趟，读数见 PROGRESS 那一节）。
+
+**要拍的（都能闭合，任选其一）**：① 由产品体验线把这三族修掉（A 族是给桩补 `length/clear/key`，B 族是按 `noUncheckedIndexedAccess` 取值前先判，C 族是补 `identity` 一枚实参 —— 全是测试侧，一子一因）；
+② 负责人授权本线代改这五枚文件（要逐条过"一子可删／运行时形状逐字段等于改前／一条命令可回退"三条，本线不自行判定通过）；
+③ 承认 `pnpm check` 的可达性由**别的线的在飞改动**决定，把 T7 那一条改写成"除 B144 列出的三族之外全绿"—— 那是改判卷口径，必须由负责人点头，本线不自己改。
+
+⚠️ 给下一位：判"web 已经干净"之前先确认那趟 typecheck **有没有中止**。`pnpm -r` 的首败中止会把后面的包整段抹掉，
+而中止时打印的错误条数看起来像是"就这一条"。要么 `--no-bail`，要么逐包跑并核对"有 typecheck 脚本的包数 == 打印了结果的包数"。
+
+**🔴 10-11 00:4x 现量更正（同一把尺、同一枚隔离副本，载体换到 `800f70ac`）**：那三族 23 条**已被别线自己修完**，
+`pnpm -r --no-bail typecheck` 的现在全集是 **1 条**：
+
+```
+pnpm -r --no-bail typecheck ⇒ RC_TC_NOBAIL=1　error TS 行数=1
+packages/app-host typecheck: tests/login-code.spec.ts(44,5): error TS2578: Unused '@ts-expect-error' directive.
+分母自检：有 typecheck 脚本的包 20 枚 == 打了 typecheck 行的包 20 枚
+```
+
+⇒ B144 这一格从"23 条三族"换成"**1 条，落在账号标准套件线自己的测试文件里**"（`login-code.spec.ts` 干净、与 HEAD 逐字相同）。
+本线**不能**改它：白名单只给到 `packages/app-host/tests/inbound-*`，`login-code.spec.ts` 不在内。
+也**与本线那笔迁移无关**：那笔动的 5 枚代码文件全是 `.spec.ts` 叶子（没有一枚被别处 import），
+而这条红讲的是 `requestEmailLoginCode` 的返回值如今合法、那行 `@ts-expect-error` 因此成了多余指令。
+`pnpm check` 现在挡在第 4 步 `pnpm typecheck` 上的就是这一条 —— 上面"要拍的（①②③）"仍然有效，只是分母换成 1。
 
 ## B145（2026-10-10 20:2x，账号标准套件线 · 取 iOS 设备腿时量出的）：**无头 boot 的模拟器上 `simctl io screenshot` 恒给纯黑**，idb 的 framebuffer 采集才是真屏 —— `reinstall-all.sh` 的 ios 段截图判据在这类设备上**恒红（假红）**
 
@@ -8238,3 +8346,733 @@ pnpm 用 `.modules.yaml` 的已记录状态判"最新"，离线模式下不去�
 ```
 （本会话的实现是内联 python，未入库；要入库就进 `sync-dirty-to-carrier.sh` 的收尾，并加一条"差集必须为 0"的判据。）
 **不**用 `--force` 假装修好了 —— 它什么都不做。
+
+## B147（2026-10-10 20:5x，账号标准套件线 · 设备腿第 8 步量出的）：截图判据的"禁用态主蓝"只按 `color-surface` 算混合底，而那颗禁用按钮坐在**卡片底**上 ⇒ 精确匹配数 0，判据红在标定上而不是产品上
+
+**现场**：设备腿第 8 步（「只点旧那半 → 读到等新邮箱那一边」）的截图
+`apps/mobile/evidence/account-suite-ios/08-awaiting-new.png` **人眼看过**：是真界面、真状态 ——
+「当前邮箱那一边已经确认，还在等新邮箱这一边。」＋待绑邮箱＋`86327 秒后可以重新发起`＋「取消这次更换」＋
+一颗**禁用态**的「发起更换」。同一步的**内容判据全绿**（重新挂载后那句实话来自服务端、句子说清了哪一边点过）。
+红的只有截图那一格：`blue=0`（启用态主蓝，这屏确实没有）且 `blueDisabled=0`（阈值 1000）。
+
+**根因（读尺读出来的，不是猜的）**：`verify-mobile-ios-account-email-sessions.sh` 的 `png_judge`
+（约 1290–1320 行）**自己注释里就写着**禁用态是 `state.disabled-opacity`（token 现值 0.38）叠在底上的混合色、
+屏幕上没有 `#2563EB`；但它算混合时只遍历 `--ht-color-primary × --ht-color-surface`，
+而这颗按钮实际坐在**个人资料那张卡片**的底上（不是 surface）⇒ 算出的混合值与屏幕像素差几个码点，
+而 `countColor` 是**精确 RGB 匹配** ⇒ 数 0。
+
+**为什么不当场改尺**：腿正在跑，改尺会让这一趟读数作废；且改判据必须配变异臂
+（把禁用按钮的底换成 surface 应红 / 换回卡片底应绿），那要单独一趟。
+**本会话没有放松任何阈值**：`blueDisabled` 的 1000 与 `blue` 的 1 一个字没动。
+
+**修法（留给下一趟，二选一，都要带臂）**：① 混合底把 `--ht-color-card`（或该屏实际的那枚 token）也并进遍历；
+② `countColor` 加一个**从 token 推导**的容差（例如 ±2 码点，理由写进注释：iOS 的合成与抗锯齿）。
+两条都不改变"这屏必须数得出品牌色"这件事，只是把"底"和"容差"对准真源。
+⚠️ 别走第三条路 —— 把这一格从判据里摘掉：那会把 #82 那条"错误屏非空白假绿"的牙拔掉一半。
+
+> ### 🔴 2026-10-11 00:1x 逐像素现量：**上面那条根因是错的**，被它指向的"修法"两条都不用做
+>
+> 现量（`PIL` 全像素数，不是跳采样；对象是**载体里那两张真被判红的图**
+> `.worktrees/iosacct/apps/mobile/evidence/account-suite-ios/{04,08}-*.png`，1398×2034）：
+>
+> | 图 | 精确 `#2563EB` | 禁用态混合色 `#ACC4F7` | 判据 |
+> |---|---|---|---|
+> | `04-awaiting-both.png` | 0 | **0** | 红 |
+> | `08-awaiting-new.png` | 0 | **0** | 红 |
+> | `03-email-change-section.png` | 0 | **154 257** | 绿 |
+> | `10-after-both-confirmed.png` | 0 | **154 257** | 绿 |
+>
+> 三点更正：
+> 1. **混合底没算错**。`png_judge` 遍历的是 `--ht-color-primary × --ht-color-surface`，
+>    而 `--ht-color-surface: var(--ht-white)` → 解析出的四枚候选里**第一枚就是 (172,196,247)**
+>    （= 0.38 主蓝叠白，正是卡片/白底上那颗禁用按钮的屏幕色）。"只按 surface 算、按钮坐在卡片底上"
+>    这句是我推的，**它不成立** —— 卡片底与 surface 在这套 token 里是同一个 `#ffffff`。
+> 2. **真因是取景框**：等待态那一屏在拍照时，`EmailChangeSection.tsx:305-311` 那颗
+>    `tone="primary"` 的按钮（草稿为空 ⇒ `disabled` ⇒ 屏幕色正是 `#ACC4F7`）在**折叠线以下**。
+>    同一步在按钮进了取景框的那两张图里同一枚色数到 15.4 万枚。
+> 3. 所以**不需要**动阈值、不需要加容差、不需要并 `color-card`。修的是采集：
+>    新增 `frame_email_change_action`（拍前把「发起更换」滚进取景框，滚不到只记一行诊断、
+>    判红仍交给截图自己的读数），第 4/8 步各调一次。§7 第 82 条那道主蓝闸**一个字没放松**。
+>    读数在第 7 趟（`w9-acct-logs/leg-run7.log`）。
+>
+> 📌 这条的教训不是"混合色算错了"，是**我拿一张推断当根因登记了一整条 B**：
+> 登记里写的"读尺读出来的，不是猜的"只覆盖到"尺的遍历集合"，没覆盖"屏幕像素到底有没有那个色"。
+> 下次判"标定错"之前先数一遍像素（PIL 三行），它比读代码便宜。
+
+## B148（2026-10-10 21:0x，账号标准套件线 · 设备腿第一趟量出的）：设置面两枚导航缺陷 —— 「关闭」点 6 次关不上；「同步与隐私」在 AX 树里有行但**没有可点节点**
+
+设备腿第一趟（`leg-run3.log` 行 133/211 与 180/188）。两次「关不上」都自愈（改走"先关再按一次"），
+「同步与隐私」在**第 14 步同一屏曾点进去过** ⇒ 与滚动/展开态有关，不是恒坏。
+🔴 **连带读数要标死**：行 189「界面还认为已配置 ⇒ 退出所有设备没清本机凭据」是 180 的连带 ——
+进不去那一屏时它回退读根层文本，量的是错的屏；**库侧判据（0 枚 / 对照 401）直接否掉"没清"**。
+谁修：腿脚本的导航（本线），修法要带臂（把"关不上"造出来必须红）。
+
+> ### ✅ 2026-10-11 00:2x 两条都归因完毕并当场修（只读取数 + 在这台隔离模拟器上真按真回读）
+>
+> **一枚新事实推翻了"产品缺陷"这个读法**：设置面**没有坏**。逐枚读出来的树（`idb ui describe-all`）：
+>
+> | 所在层 | 顶栏可点节点 | 按下去的实际结果 |
+> |---|---|---|
+> | 目录层（个人资料/常规/同步与隐私…） | `关闭`(16,6,44×44) | 一发就关面板（回到「我的」根层，实测） |
+> | 分组层（同步与隐私） | `返回`(16,6) + `关闭`(406,6) | 「返回」一发退层；那枚 ✕ **按两下（中心 428,28 与 428,45）界面一动不动** |
+>
+> ⇒ 第二层那枚"可点的关闭"是**外层面板的残留 AX 节点**（被嵌套页的头视图盖住）。
+> `result=success` 只代表 HID tap 被接受（§7 第 25 条的老话题，这一档是"节点还在树上但已被覆盖"）。
+> 已把这条连同"先退层再关面板"的顺序写成新陷阱 **#403**。
+>
+> **修的两处（都在腿脚本，产品侧零改动）**：
+> 1. `close_settings_sheet` 改成 `while 可点的「返回」在 → 按返回；elif 可点的「关闭」在 → 按关闭`，
+>    判据仍是"重读树上两枚可点节点都不在"（比原来更严：原来只查 ✕）。
+>    实测：从自托管表单那一层起，**两次按压走完两层**（`leg-run7` 之前先在模拟器上手动复现过一遍）。
+> 2. `ax_press` 自己修了两个静默失效：① 旧写法 `ax … --scroll-into-view --press` 在 shim 里
+>    **一下都不会按**（`--scroll-into-view` 分支在 `--press` 前 `return`），而退出码 0 ⇒
+>    调用方那句 `|| ax_press` 兜底是死代码（#190 的第二种面目）；② 旧写法把 stdout 丢进
+>    `/dev/null`，于是 `not-found` / `tap-outside-screen` 与"按成功了"长得一模一样。
+>    现在拆成两次调用、非 `success` 一律进日志（返回值仍保持 0，几十处调用点没准备接非零）。
+>    这一条同时是**第 14 步"4 分钟内同步没到已同步态"**的真因：分组页里「立即同步」的 frame
+>    实测在 **y=-343**（屏外上方），`--press` 被几何闸拒成 `tap-outside-screen` 而没人看见。
+>
+> 🔴 **第 13 步那枚「同步与隐私 没有可点节点」是连带，不是独立缺陷**：面板没关成 ⇒ 腿停在
+> "已经在分组页里"的状态，此时 `同步与隐私` 只剩一枚 `StaticText`（标题）。修 1 之后交给第 7 趟验。
+> 判据一条没放松；B149 那句"归因未定"也随这两条一起收口（见下面 B149 的追记）。
+
+## B149（2026-10-10 21:0x，账号标准套件线 · 设备腿第一趟量出的）：iOS 上 **E2EE 口令没进应用状态**（`no-encryption-password`）⇒ 同步被客户端闸住，改密那一块的设备侧基线立不起来；**归因未定**
+
+腿脚本第 68 行原话：「不记产品失败（同一份产物上兄弟 rig 也拿不到『立即同步』），也不记已验证」。
+同趟还有一枚 HTTP 000（行 118，取新侧确认链接那一跳），而同一步的库侧三枚判据全绿 ⇒ 那枚是探针抖动不是产品。
+**要拍的两问**：① iOS 这条"凭据表单里填的 E2EE 口令"进应用状态的路，是不是缺一步显式 unlock/set
+（web 那条路是好的 —— §6.14 真浏览器腿改密三块全绿）；② 若缺，补在 `apps/mobile` 还是 `packages/app-host`。
+在拍之前，**改密的设备侧读数保持"未闭合"**，不许拿 web 腿的绿顶替它（AGENTS §8 第 10 条同族：跨端不能互顶）。
+
+### B149 的 21:1x 追读：归因从"未定"收窄到**两条候选路**，各带文件级证据（仍不代改）
+
+1. **移动端手动凭据这条路，存的口令没有任何 unlock 消费者。**
+   `apps/mobile/src/sync/credential-form.ts:102,115` 把 `{serverUrl, token, password}` 写进
+   `writeSyncConfig`；`apps/mobile/src/sync/config.ts:76` 确实落盘 password；
+   但全 `apps/mobile` 里读 `.password` 的只有 `auth/session.ts:65,91`（**托管登录**那条路），
+   `sync/store.ts` / `db/open-host.ts` **一处都不读**。
+2. **移动端的 unlock 设计走的是另一条路**：`apps/mobile/src/db/open-host.ts:87-120` 只注入
+   `getSyncConfig: readSyncConfig` 与 `vaultRootKeyStore{load, isAutoUnlockDisabled}`，
+   注释明写「Settings UI 只是控制面板，**不是**后台/自动同步所需的 unlock 路」⇒ 它指望**原生 keychain 里的 root key 自动 unlock**。
+   手动凭据的新账号在 keychain 里没有 root key，而 password-mode 会话又没人建 ⇒ `no-encryption-password`。
+3. **web 手动路为什么是好的**：`apps/web/src/features/sync/store.ts:255` `getPassword: async () => get().password`
+   —— 内存里的口令直接喂给 `createSyncClient`（`packages/app-host/src/sync-wiring.ts:108` 的 `getPassword`）。
+   即：**同一条共享接线，web 宿主喂了口令、移动宿主没喂**。
+
+⇒ 两问变成两选：
+- **选 A（接线对齐 web）**：移动宿主的 `getPassword` 从 vault 会话取，会话锁着且 config 有口令时用它 unlock 一次。
+  风险：与「口令绝不长期落盘」（`hosted-auth.ts:1224` 引用的 sync-wiring 立场）相冲 —— config 里那份 password
+  已经是落盘的，选 A 等于承认手动路就是"落盘口令 + 启动时 unlock"，要把立场句子改准。
+- **选 B（界面收掉误导）**：手动凭据表单**不显示**口令框（口令只走 SecurityScreen 的设置/解锁），
+  即承认移动端手动路要求先设 E2EE 口令再同步。风险：与 web 手动路形状不一致，跨端体验分叉。
+两选都是**对外/产品口径**，本线不代拍。改完必须重跑设备腿（改密块）并配一条变异臂
+（把 unlock 拿掉 ⇒ 腿的同步等待判据必须红）。
+
+### 🔴 B149 的 21:2x 自我更正：那条"E2EE 口令没进应用状态"的归因**是过早的**，真阻塞是 B148
+
+追读三处源码之后否证掉本条上面两版的说法：
+1. `apps/mobile/src/sync/config.ts` **本来就纯内存**（文件头第 15–23 行明写"凭据只放内存，刻意不落盘"），
+   `readSyncConfig()` 每次同步现读 ⇒ 口令**喂得进** password 模式
+   （`packages/app-host/src/host.ts:625` `getPassword: async () => config.password`）。
+   所以"存的口令没人消费"这句**是错的**：消费方是 host 的取值器，只是它要进程内还活着。
+2. 腿日志第 68 行那枚 ⚠ 出现在**填凭据之前**（全新安装、三个字段都还空）⇒ 它是初始状态，不是缺陷。
+3. 第 215 行"等不到立即同步"时，[态] 清单里树上只有「我的 / 任务」两个根 tab ——
+   腿当时**停在任务页根**，而「立即同步」在「我的」页里 ⇒ 等的是一个不在屏上的控件。
+   这是第 133/211 行「设置面关不上」的**连带**，不是同步被闸住。
+   同一段里「还没登录 / 所有设备都已退出」是托管登录态的展示行，手动凭据路本来就不设它，
+   **没有证据**表明它闸住了同步（同步触发走 `notifyConfigured()`，表单在凭据变完整那一刻就发，
+   见 `credential-form.ts:104-107`）。
+
+⇒ **B149 降级**：它现在只登记一件仍真的事 —— 改密块的设备侧读数**没取到**，而没取到的原因是
+**B148 的导航缺陷**（设置面关不上 ⇒ 后续每一步量错屏）。"移动端要不要补 unlock 接线"那一问
+（选 A′/A/B）**撤回**：现有接线（内存口令 + password 模式 + `notifyConfigured`）在导航正确的前提下
+应当就够；先修导航、重跑一趟，**用读数说话**，不再凭日志片段推产品缺口。
+📌 留给后来者的一般规律：**"等不到某个控件"先证明那控件此刻在不在屏上**（把当前树的根节点打出来），
+再推"它被闸住了" —— 本条两版归因都是跳过这一步造成的。
+
+> ### 2026-10-11 00:3x 第六趟读数：这一条**只剩"没取到改密读数"那一格**，法务面这一趟根本没出现
+>
+> `leg-run6.log` 里 `条款文本已经更新` / `我已读完并确认` 命中 **0 次**（`grep -c`）⇒
+> 第 5 趟接上的 `accept_legal_reconfirm` 这一趟没被触发，第 14 步"4 分钟内同步没到已同步态"
+> **不是**法务闸住的。真因是 B148 追记里的第 2 处：分组页里「立即同步」实测 frame **y=-343**
+> （屏外上方），而 `ax_press` 旧写法既不滚、又把 `tap-outside-screen` 丢进 `/dev/null` ⇒
+> 探针从头到尾没按到过那颗按钮。修完交给第 7 趟。
+> ⚠️ 这一格仍**不记成"改密设备侧已验证"**：判据 L/M/N 要到第 7 趟才有读数。
+
+## B150（2026-10-10 23:3x，本会话 · 第一次整包跑 `pnpm -r test` 才量出来的）【**10-11 重编**：本线与账号标准套件线在同一天各占过 B145/B146/B147，本线那三条已整体后移为 **B150/B151/B152**；老提交信息与旧台账里写的 B145/B146/B147 若指本线，读作新号。145–149 那五条是他们的，逐字未动。】：**本线自己让 `packages/domain` 的对账臂长红了** —— 服务端多了 8 枚拒绝码，域层那份"客户端认识的码"清单没跟上
+
+**怎么才发现的**：本线此前所有单测读数都是**按文件**跑的（`inbound-*.spec.ts` 那几族），
+而这条红坐在 `packages/domain/tests/subscription.spec.ts` —— 一个**不是本线命名、却在核对本线改动**的文件。
+只有整包跑（`pnpm -r --no-bail test`）才会撞到它。**"本线的测试全绿"从来不等于"本线的改动没让别的臂变红"**，
+这条就是那一格的下场读数。
+
+**现量（载体：隔离副本 `.worktrees/inb-t7` @ `8962927d`，dirty=0，`pnpm -r build` rc=0、`prisma generate` rc=0）**：
+
+```
+pnpm --filter @heyta/domain test
+  → packages/domain/tests/subscription.spec.ts (43 files)  Test Files 1 failed | 42 passed
+    Tests 1 failed | 1022 passed (1023)   Exit status 1
+```
+单跑复现 ⇒ **确定性红，与载体负载无关**。
+
+**红的那一条**（`subscription.spec.ts:215`）：
+
+```
+expect([...serverReasons].sort()).toEqual([...ENTITLEMENT_DENIAL_REASONS].sort())
+AssertionError: expected [ 'BINDING_EXPIRED', …(15) ] to deeply equal [ 'GRANT_NOT_INCLUDED', …(7) ]
+```
+
+臂的做法是把 `server/src/entitlement.ts` 里那枚 `reason` 联合类型的字面量**扫出来**，与
+`packages/domain/src/subscription.ts:59` 的 `ENTITLEMENT_DENIAL_REASONS` 做**集合相等**。
+差集就是本线加的这 8 枚：`BINDING_EXPIRED`、`DEPLOYMENT_MISMATCH`、`ENTITLEMENT_MODE_UNCONFIGURED`、
+`ENTITLEMENT_TICKET_REJECTED`、`ENTITLEMENT_TICKET_REQUIRED`、`ISSUER_NOT_CONFIGURED`、`NO_BINDING`、`REVOKED_VERSION`。
+**肇事物件**：`e8b3e982 feat(自动收集 服务端): 权益判定改成部署模式二选一，自托管走按操作一次性票据`（本线）。
+
+**代价说清楚，不夸大也不缩小**。现量过的两件事：
+
+1. 这 8 枚里**有 7 枚在四个客户端源码里零命中**，只有 `ISSUER_NOT_CONFIGURED` 出现在本线自己的
+   `packages/inbound-core/src/entitlement-contract.ts:56`：
+   ```
+   for r in BINDING_EXPIRED DEPLOYMENT_MISMATCH ENTITLEMENT_MODE_UNCONFIGURED \
+            ENTITLEMENT_TICKET_REJECTED ENTITLEMENT_TICKET_REQUIRED ISSUER_NOT_CONFIGURED \
+            NO_BINDING REVOKED_VERSION; do grep -rl "$r" packages/app-host/src packages/inbound-core/src \
+     apps/web/src apps/mobile/src; done
+   ```
+2. 界面的 `waiting-entitlement` 那一档**不由服务端 reason 驱动**（它住在
+   `InboundAutomationSettings.tsx` 与 `packages/app-host/src/inbound-session-keepalive.ts`，读的是周期状态），
+   而 `inbound-runtime.ts` 里 `reason` 与 `waiting-entitlement` **两个词都零命中**（现量见上）。
+
+⇒ 所以**现在没有**"界面把新码显示成 UNKNOWN_REASON"的用户可见后果，这条红**不该**被写成界面在说谎。
+它真正的代价是那条臂本身：**集合相等判据一旦长红，之后新增的拒绝码就再也不会被它抓到** ——
+下一位给客户端接这些码时，编译期词表里没有它们，而唯一会提醒他的那把尺已经是红的了。
+按 AGENTS §7 那条元规则："一条永远通过的判据比没有判据更糟"，反过来**一条永远红的判据同样瞎**。
+
+**修法（一子，改码不改判据）**：把 8 枚加进 `packages/domain/src/subscription.ts:59` 那个常量，
+并按它上面那段注释的立场分档（"档位不含这项"与"你没有订阅"是两句话，不能并成一句"请订阅"）。
+**落点不在本线白名单**：白名单只给了 `packages/domain/tests/inbound-*`，`packages/domain/src` 是只读面。
+
+**本线故意没做的两件事**：① 不放宽那条断言、不给它加豁免名单（那是判卷口径）；
+② 不代改 `packages/domain/src`（别人的地界）。要拍的只有位置：**谁**把那 8 枚补进去 ——
+本线可以在获得授权后一次做完（改动形状明确、一条命令可回退），或者由域层的地界所有者补。
+
+**🔴 10-11 00:5x 复量（载体 `.worktrees/inb-t7` @ `1b40fa10`，dirty=0）**：这一条**仍红，且是确定性的** ——
+并发全量那一趟读 `Tests 1 failed | 1022 passed (1023)`，随后**逐包单跑**读回同一个 `1 failed | 1022 passed (1023)`。
+差集仍是那 8 枚，一枚不多一枚不少（日志 `+` 侧逐字点名）。⇒ 本节"待拍"的状态不变。
+
+## B151（2026-10-10 23:3x，同一次整包跑量出的第二条本线债）：`packages/legal` 两条臂在 HEAD 长红 —— **都是本线那三张新表造成的**，而修法落点一枚都不在白名单里
+
+**现量（同一隔离副本，单跑复现 ⇒ 确定性红）**：
+
+```
+pnpm --filter @heyta/legal test
+  → packages/legal/tests/structure.spec.ts   Test Files 1 failed | 3 passed (4)
+    Tests 2 failed | 74 passed (76)   Exit status 1
+```
+
+**臂 1（`structure.spec.ts:583`）**：每张引用 `users` 且 `ON DELETE CASCADE` 的表，都必须能在中英条款里
+找到一个**用户读得到的类别名**（登记表在 `:494` 的 `CATEGORY_NAMES`）。报出的缺项正好是本线那三张：
+
+```
+这些表会随注销被级联删除，但文案里没有任何一处点到它们这一类：
+automation_entitlement_activations, automation_entitlement_links, automation_entitlement_subjects
+```
+
+**臂 2（`:627`）**：条款里抄成句子的**可复算数字**必须等于真源。真源现在是**级联 37 条 / 表 36 张**，
+而被抄的旧值少 3 —— 与本线加的表数逐一对上：
+
+```
+privacy/zh-CN    「处级联」34 → 应为 37    「张表」33 → 应为 36
+privacy/en       「cascades in total」34 → 37   「tables」33 → 36
+data-rights/zh-CN 「张表」33 → 36
+data-rights/en    「foreign keys」34 → 37   「covering tables」33 → 36
+```
+**肇事物件**：`3fcc3bef feat(自动收集 持久层): 官方签发端要记住的三件事各给一张表, 外加吊销下限的持久落点`（本线）。
+
+**为什么这条比一般的测试红重**：隐私政策那两句是对**公安机关与应用市场**的正式声明（本仓库还有专门的安全评估口径）。
+"注销会把下列类别的数据一并删除"少报三类，是一份**对外不实陈述**；按 AGENTS §8 第 18 条，
+新增持久数据必须同步改原有对外说明。**这条债属于 T6（对外说明），不属于"台账噪音"那一档。**
+
+**落点**：`packages/legal/src/documents/privacy.ts`（zh 段约 `:404`、en 段约 `:998`）、
+`packages/legal/src/documents/data-rights.ts`（zh `:317`、en `:654`），外加 `structure.spec.ts:494` 的
+`CATEGORY_NAMES` 登记表本身。这四处**全不在本线白名单**，而 `packages/legal/src/documents/third-parties.ts`
+此刻在主检出里是 `M`（法务那条线正在写）—— 白名单与"不动别人在写的文件"两条一起挡着，本线一行都不该代改。
+
+**要拍的**：谁在那四处补三类别名 + 把 7 处数字改成按真源复算，并给条款换版本号（版本号进同意指纹，
+`check:legal-tools` 那套纪律同样适用于"数据类别变了"）。本线可以代做，但需要**明确授权**，
+因为改的是**对外声明的措辞**，不是代码。
+
+**✅ 10-11 00:5x 闭合（由账号标准套件线那一笔带走的，本线一行没改）**：
+载体 `.worktrees/inb-t7` @ `1b40fa10`，单文件复跑 `packages/legal` 的 `structure.spec.ts` ⇒
+`Tests 63 passed (63)`、`Test Files 1 passed (1)`。臂 1 与臂 2 同时绿。
+**核对的是正文不是绿灯**：`packages/legal/src/documents/privacy.ts:404`（zh）与 `:999`（en）现在逐字列出了
+「自动收集额度启用记录、自动收集额度关联、自动收集额度主体」三类别名，数字也从 B151 预测的
+"级联 37 / 表 36"变成 **"共 38 处级联，覆盖 37 张表"／"38 cascades in total, across 37 tables"** ——
+多的那一级不是本线的，是他们自己那批新表一起进了真源。两枚文件的最后一笔 =
+**`8389b2a3`（10-10 20:45 `fix(账号标准套件 法务联动): 补披露登录验证码那一封 + 级联数字回真源 + 工具表补 4 枚`）**。
+⇒ **B151 这条本线债已清，不需要再拍"谁来做"**；本节正文保留作归属记录。
+⚠️ 但那一笔只补到 `privacy`／`data-rights`，**没有补 `third-parties`** —— 于是今天 `packages/legal` 剩下的
+2 条红正坐在 `email-catalog.spec.ts`（中英两栏仍写"10 封功能邮件"，代码里已有 11 枚 `send*Email`，
+漏的一类是「登录验证码」，导出真源 `server/src/email.ts:194 sendLoginCodeEmail`）。
+那是**他们那一笔的收尾没做完**，不是本线的债，见 B152 的 10-11 复量段。
+
+## B152（2026-10-10 23:5x，本会话 · T7 第二条 `pnpm -r test` 第一次在合并态上跑完）：**全量并发跑报 77 条红，逐包单跑复测后只剩 15 条是真的** —— 其中 3 条是本线自己造的（B150/B151），12 条是别线的
+
+**载体**：隔离副本 `.worktrees/inb-t7` @ `8962927d`，dirty=0，`pnpm -r build` rc=0、`prisma generate` rc=0。
+起跑时 `uptime` 的 1 分钟负载 **14.65**（15 分钟 124.91，正在往下走）。
+
+**第一趟（并发全量）**：
+
+```
+pnpm -r --no-bail test   ⇒  RTEST_NOBAIL_RC=1
+打了汇总行的包 20 个；失败 77 条，分布在 8 个包
+```
+
+**分母自检没过**：有 `test` 脚本的包是 **21** 个（`node` 逐份 `package.json` 现量，含 `server/` 自己那一枚），
+打了 `Tests` 汇总行的只有 **20** 个 ⇒ 有一层从没跑到。缺的那层是 `packages/sync-core`：
+它的脚本是 `npm run test:typecheck && vitest run`，typecheck 前置就是 B144 的 C 族（`share-keys.spec.ts:234` 少 `identity`）
+⇒ **脚本以 rc=1 结束在第一步，vitest 整层没执行**，而 `--no-bail` 让它安静地缺席汇总。
+补量：`pnpm --filter @heyta/sync-core exec vitest run` ⇒ `Test Files 20 passed (20)`、`Tests 318 passed (318)`、rc=0。
+**这一层的运行时是绿的，红的只是它自己的类型前置** —— 不补这一枪就会把 sync-core 记成"没读数"。
+
+**第二趟（把最容易受负载影响的包逐包单跑，串行）**：
+
+| 包 | 并发全量 | 单跑复测 | 判定 |
+|---|---|---|---|
+| `apps/web` | 56 failed | `Test Files 170 passed \| 2 skipped (172)`；`Tests 2190 passed \| 13 skipped (2203)`；**rc=0** | **56 条全是负载假红** |
+| `apps/mobile` | 2 failed | `958 passed (958)`；**rc=0** | 2 条是假红（那两条本来就报 `Test timed out in 5000ms`） |
+| `server` | 10 failed | `2 failed \| 155 passed (157)`；`6 failed \| 2767 passed \| 1 skipped (2774)`；rc=1 | **6 条真红**，另外 4 条（tombstone 1 + backup-script 2 + 1 条 hook timeout）是假红 |
+| `packages/sync-core` | 无汇总 | vitest 单层 `318 passed`，rc=0 | 真红只在 typecheck |
+| `packages/{i18n,ai,legal,domain}` | 1 / 5 / 2 / 1 failed | 逐包单跑**同样红、条数一样** | 确定性真红 |
+
+⇒ **HEAD 上的确定性红 = 15 条**：i18n 1 + ai 5 + legal 2 + domain 1 + server 6。
+**并发全量那一趟不许当分母用**：它把 62 条负载造成的超时混进来了（AGENTS §7 那一族"载体会同时造红和造绿"的又一例，
+而 `--no-bail` 的 rc=1 不会告诉你是哪一种）。
+
+**15 条的归属（逐条点名，本线的两枚已在 B150/B151 单独登记）**：
+
+| 红 | 条数 | 形状 | 归属 |
+|---|---|---|---|
+| `packages/legal/tests/structure.spec.ts:583` + `:627` | **2** | 三张 `automation_entitlement_*` 表在注销类别里没名字；条款抄的级联/表数比真源少 3 | 🔴 **本线**（`3fcc3bef`），见 B151 |
+| `packages/domain/tests/subscription.spec.ts:215` | **1** | 服务端 8 枚新拒绝码没进域层词表 | 🔴 **本线**（`e8b3e982`），见 B150 |
+| `packages/i18n/tests/catalog.spec.ts:67` | 1 | `site.download.row.*` 那 7 枚键的中文值不含汉字（`macOS`/`Windows x86_64` 这类专名） | 下载面 `f9c042a7`（10-07）。白名单 `allowed` 里登记的是 `site.platforms.*.name` 那一族，同形状的专名没登记。修法落 `packages/i18n` 或该测试的白名单，**都在本线地界外** |
+| `packages/ai/tests/capability-manifest.spec.ts` | 5 | `gen-ai-capability-manifest.mjs --check` 红：产物 26 条 vs 目录 30 条、实体 8 vs 9、剔除项集合差一枚 | **生产者缝没重跑**（B129 那一类的第二次命中）。工具与实体是批次二（W2 的 `EVENT`）带进来的，生成物没跟着重新提交。修法=跑一次生成器并把产物入库，落点 `packages/ai` + `scripts/`，不在本线地界 |
+| `server/tests/sync-compressed-body.routes.spec.ts` | 5 | 逐条 mock 断言要 8 个实参、实际收到 7（`expected "vi.fn()" to be called with arguments: [ 1, 'mixed-schema-client', …(6) ]`） | 逐操作校验的**调用 arity 变了而测试没跟上**（同步协议那条线的在飞改动）。`server/tests/` 名义上在本线地界里，但**改既有断言=改判卷口径**，本线不动 |
+| `server/tests/validation.service.spec.ts` | 1 | `expected 18 to be 17`（`ALLOWED_ENTITY_TYPES` 枚数） | `EVENT` 实体（批次二 W2）抬了枚举，这条钉死枚数的测试没跟上。同上，属于判卷口径，本线不代改 |
+
+**跳过数（不许被读成本线加的）**：单跑读数是 `server 1 skipped` + `apps/web 13 skipped` + `apps/web 2 个文件 skipped`，
+全是 HEAD 存量。本线各族（`packages/inbound-core/tests`、`packages/{app-host,domain,sync-client}/tests/inbound-*`、
+`apps/web/tests/inbound-*`、`server/tests/inbound-*`/`automation-*`）里 `.skip`/`.todo` 命中 **0**（现量见上）。
+`- [x] **AC-` 勾数现量 **0**、未勾 **8**。
+
+**对完成条件第 1 条的影响**：`pnpm -r test` 在合并 HEAD 上**到不了 exit 0**，而且**不是本线一家能闭合的**：
+15 条里本线只占 3 条，且那 3 条的修法落点（`packages/domain/src`、`packages/legal/src/documents`）都在白名单外；
+其余 12 条要等 i18n 白名单登记、ai 生成物重跑、server 那两条 arity/枚数判据的归属者来收。
+再叠上 B144 的 23 枚类型错（它挡 `pnpm check`），T7 那三条命令目前的可达性是：
+`pnpm check` ✗（B144）、`pnpm -r test` ✗（B150/B151 + 12 条别线）、`pnpm reinstall:all` 未跑（需要安静载体与设备窗口）。
+
+**给下一位的两句**：① 判"`pnpm -r test` 有多少红"必须先做**分母自检**（有 test 脚本的包数 == 打汇总的包数），
+再用**逐包单跑**去掉负载超时；并发那一趟的红数只能当线索。
+② 本线的测试族全绿**不证明**本线的改动没让别的臂变红 —— 会被 `domain`/`legal` 这种**跨线对账臂**抓到，
+所以整包跑（不是整文件跑）是本线每轮的必做项，这一轮之前一直没做。
+
+**🔴 10-11 00:5x 复量（同一把尺、同一枚隔离副本，载体换到 `1b40fa10` dirty=0）**：HEAD 上的确定性红从 **15 → 11**。
+
+| 变化 | 条数 | 现量证据 |
+|---|---|---|
+| 已闭合：`packages/i18n` | −1 | 今天 `26 passed (26)`、rc 绿 |
+| 已闭合：`server` 那 6 条（arity 5 + 枚数 1） | −6 | 今天 `Test Files 158 passed (158)`、`2778 passed \| 1 skipped (2779)`，**0 failed** |
+| 已闭合：`packages/legal` 的 `structure.spec.ts` 两臂（= **B151**，本线债） | −2 | 单文件复跑 `63 passed (63)`；闭合人 `8389b2a3`，读数见 B151 的 10-11 段 |
+| 新进来：`packages/shared-schema` 的 `auth-http-contract.spec.ts:83` | +1 | `AUTH_PASSWORD_PATHS` 真值 12 vs 钉的 9，多的三枚是 `loginCode*`；该文件最后一笔 `1c067174`（账号标准套件线） |
+| 新进来：`apps/landing` 的 `mockup-shell-shape.spec.tsx` #7 两臂 | +2 | 页头右侧登记处与产品页头 `testid` 双向等集不成立；该文件最后一笔 `d49f77e3` |
+| 换了文件的同名数：`packages/legal` 仍是 2 条 | ±0 | 但红从 `structure.spec.ts` 换到 **`email-catalog.spec.ts`**（中英两栏写 10 封、代码里 11 枚 `send*Email`，漏「登录验证码」）⇒ **别把这两个 2 读成同一件事** |
+| 内容变了、条数没变：`packages/ai` 5 条 | ±0 | 同一族 `capability-manifest.spec.ts`，差异从 B152 那趟的"工具 26 vs 30、实体 8 vs 9"变成今天的**产物 892 行 vs 应为 979 行**，`+` 侧新增的是 `COMMENT` 实体（`e6058120` 引进，生成物没重跑） |
+| 不变：`packages/domain` 1 条（= **B150**，本线债） | ±0 | 逐包单跑复测同一条红 |
+
+⇒ 剩下的 11 条 = **本线 1（B150）+ 别线 10**（i18n/server 那 7 条没了）。
+分母自检这趟是过的：`Scope: 21 of 22`、打 `test$` 起始行的包 **21** == 打 `Tests` 汇总行的包 **21**。
+⚠️ 本趟顺带又撞一次 §7 那一族的坑：串行复跑那圈我用 `RC_$d=${PIPESTATUS[0]}` 读退出码，
+读回来的五枚**全是 0** —— 因为那段坐在命令替换的子 shell 里，管道尾是 `grep`。
+**这一圈的 rc 不许当判据用**，能用的只有 `Tests N failed` 那五行汇总（它们与并发趟逐字相同 ⇒ 确定性成立）。
+要取每包真实 rc 得 `pnpm --filter <目录> test; echo $?`，不套管道。
+
+## B153（2026-10-11 00:3x，本会话 · 追 B142 那枚改名时量出来的）：`tests/integration/**` 有**登记层**、没有**执行层** —— 别线改了本线读的字段，红整整几天而没有任何一层会失败
+
+**先把已有那半层说清楚（本线不许把它当成缺口重报）**：
+`server/vitest.config.ts:30-34` 的 exclude 旁边带着理由注释，而
+`scripts/check-integration-coverage.mjs`（经 `check:integration-coverage`，**已在 `pnpm check` 链里**）
+钉的是「每枚 `*.integration.spec.ts` 必须被某条 `test:integration*` 脚本点名」，
+两个方向都查（盘上有/脚本没点名 ⇒ 永不执行；点名了/盘上没有 ⇒ 清单假覆盖）。
+它那文件头自己记着 2026-10-05 的 `ai-metering-race` 事故 —— 也就是说"这族存在"这件事有人守。
+
+**没被守的是"跑没跑过"**。现量三条：
+
+```
+node -e "…p.scripts.check.split('&&')…filter(含 integration)"  → ["pnpm check:integration-coverage"]   # 链里只有登记，没有执行
+grep -c 'test:integration:postgres' package.json              → 0   # 根 package.json 不转发；它只在 server/package.json:12
+server/package.json:12 点名 33 枚 .integration.spec.ts        → 需要活的 PostgreSQL，本仓没有任何一层去起它
+```
+
+⇒ 那一族里 33 枚文件的**执行**完全靠人工跑一条带库的命令。`d361209e`（335 处 `{error, errorCode}` → `{code, message}`）
+把本线那枚真库文件打红之后，登记层照样绿、`pnpm check` 照样绿、`pnpm -r test` 连看都没看过它，
+`check-server-error-shape.mjs` 只管 `server/src` 的**发送侧**、不管测试的**读侧**。
+本线是 10-10 夜做 T7 分母时才撞上的，而改名是 10-09/10-10 落的。
+
+**本轮顺带量清的一件事（免得下一个人在这里再错一次）**：那 5 枚仍带 `errorCode` 的 integration 文件
+**不是过时** —— 逐枚读过命中行，全部是 op 级结果字段（`results[0].errorCode`、
+`staleBody.results[0]?.errorCode`、`SYNC_ERROR_CODES.*`），而 `server/src` 里 `errorCode` 仍有 65 处命中，
+说明被改名的只有 HTTP **错误信封**那一层。**分母要按"被改名那一层"数，不能按词频**。
+
+**要拍的（三条都属判卷口径，本线不自决）**：
+① 给 `pnpm check`（或一条带库的门禁档）加一步**真执行**：起临时 initdb、跑 `test:integration:postgres` 那 33 枚
+   —— 本线那枚 `research/tools/verify-inbound-*.py` 已经是可抄的样板（临时库 + 逐条 apply 迁移 + 零外部依赖）；
+② 或把「这一族只由人工执行」写进 `docs/reference/`（现在只写在 vitest 注释与 coverage 门禁的文件头里，
+   读不到的人会以为 `pnpm check` 覆盖了它）；
+③ 加一道**读侧契约对账**：把 `server/src` 实际 `send({…})` 的字段集合与测试里 `await json() as {…}` 读的字段集合对账。
+   这次的红属于「契约变了、只有发送侧知道自己变了」，①② 只治"没人跑"，③ 才治"跑的人读的是旧字段"。
+   代价要先量：op 级与信封级两层混在同一族文件里（上面那 5 枚的判断就是混层的现场），
+   一刀切的对账会把合法的 op 级读法全报成红。
+
+**本线已做的那一半**：B142 那三处落点迁完（残留 0），真库腿 `46 passed (46)` / `rc=0`，
+对照臂与变异臂读数在 `docs/plans/inbound-automation.md`「T7 第三条腿」那一节。
+**没做的**：①②③ 一条都不动 —— 它们改的是"谁来跑、判什么"。
+
+## B154（2026-10-11 01:4x，账号标准套件线 · 设备腿第 7 趟那 8 枚红里剩下的最后两块）：**改密那一块的红不是"没生效"，是"生效了却被报成连不上服务端"** —— 两条改口令的路由 `await` 了告知信，而 nodemailer 在 SMTP 不可达时 7 分钟才失败
+
+**这条闭合了 B149 从第一趟起就没归对的那一格。** 它先后有过三种归因：
+① "E2EE 口令没进应用状态 ⇒ 同步被闸住"（第一版，后被现量否证）；
+② "B148 的导航缺陷连带，腿量错了屏"（第二版，见 B149 的降级段）；
+③ 本条 —— 前两版都停在腿的日志片段上，**没有去对服务端日志的时刻**。
+
+**对时刻对出来的**（同一份服务端日志 `/tmp/heyta-ios-acc-3102.log`）：
+
+| 时刻 | 事实 |
+|---|---|
+| 16:57:03.797 | `Password breach check not delivered (timeout/network)`（HIBP 那道是 fail-open，2 s 超时，不挡路） |
+| 16:57:03.811 | `Password changed (ID: 719); all other sessions revoked` —— **改密已经做完** |
+| 16:57:0x + 60 s | iOS `URLSession` 默认请求超时到 ⇒ 应用侧 fetch 断 |
+| 16:59（截图 00:59） | 界面上是一行红字「连不上服务端，检查地址与网络后重试。」 |
+| **17:04:00.689** | `Failed to send Password changed notice: Error: read ETIMEDOUT` —— **7 分钟后**那封信才死 |
+
+腿自己在同一次运行里还量到：库里 `token_version` 2→3、旧令牌 401、新口令换得到新会话 200。
+⇒ **服务端全做完了，只有响应被一封邮件扣住**；`deliver()` 内部已经 catch，所以它
+不抛、不 5xx、不留栈，**只会挂** —— 这就是它前六趟一直像"探针没等到"的原因。
+
+**修法**：`server/src/password/recovery.ts` 新增 `notifyPasswordChangedSoon`（发出但**不等**，
+`.catch` 只接住 `sendPasswordChangedEmail` 在 `deliver` 的 try **之外**读配置那一次真会抛的错），
+两条路由（`resetPasswordWithToken` / `changePassword`）各换一行。
+📌 本文件 `:279` 那条立场注释早就写着"一封通知发不出去不许把成功报成失败"——
+**`await` 恰好把这句话自己否证了**：写的人把结论留在了注释里，代码走的是反的。
+
+**判据与它的能红证明**（`server/tests/integration/email-change-and-sessions.integration.spec.ts`，
+真 PG + 真 Prisma + 真 Fastify，只 mock SMTP —— 与这一套既有口径同代）：
+让发信**永不 resolve 也永不 reject**（正是 SMTP 黑洞那一段的形状），改密请求必须当场返回。
+预算不是拍的：约束方是客户端那一侧的 60 s 默认超时，取它的 1/20。
+· 修后：`Tests 1 passed`，全文件 **21/21 绿**，`server` 的 `tsc --noEmit` **0 条错**。
+· 🔴 变异：把 `await` 加回改密那一处 ⇒ `MUT_RC=1`，红的正是
+  「改密请求 3000 ms 没返回 ⇒ 响应被那封告知信扣住了」那一行；从 `.mut-bak` 还原。
+· 第一趟它自己红过一次，红因是**我的判据写坏**：`mockImplementationOnce` 是整枚替换实现，
+  把"留下发过信的痕迹"那半句一起替换掉了 ⇒ 阳性对照恒 0。补回 push 之后才成立。
+  这条留着是因为它是元规则一的又一次命中：**新写的判据先红，要先判它自己。**
+
+**同一形状的两枚也一并收掉了**（先查了归属才动手）：
+`server/src/password/service.ts:249`、`server/src/passkey.ts:556` 的
+`await notifyAuthenticatorAdded(...)` —— `git log -S` 现量：这两枚是本线自己那笔
+`703cafc8`（10-09 16:31「账号标准套件 服务端一笔」）引进的，**不是别线的**。
+各加一条同型判据（发信永不 settle ⇒ 仍当场 200，且那一封确实尝试发）；
+变异把 `await` 加回 ⇒ 两条各红一次（`MUT_RC=1`，红在「响应被那封告知信扣住了」那行）。
+两文件全量 **64/64 绿**、`server` 的 `tsc --noEmit` 0 条错。
+📌 本条第一版把这两枚写成「归属不在本线，只登记不代改」—— 那是**没查归属就登记**，
+与「登记风险前先确认资产归属」是同一条错；这一版的分母是 `git log -S` 给的，不是印象给的。
+
+**这一格剩下的边界，不包装成完成**：改密的**界面侧**读数（「登录密码已修改。」那一句
+到底渲不渲染）要等第 8 趟在新载体上的读数 —— 第 7 趟那一屏同时被 B155 那枚顶栏缺陷挡住，
+两件事在日志里长得一样，得分开取。
+
+## B155（2026-10-11 01:5x，账号标准套件线 · 设备腿第 7 趟剩下那三枚"退不回根层"的红）：**不是导航缺陷，是载体机型** —— `heyta-ios-isolated` 是 iOS 27.1 SDK 新增的 **iPhone-Duo**，它报 `insets.top = 0`，于是顶栏**最右那一格**坐在系统状态列（挖孔摄像头）下面，HID 点击 `result=success` 而控件收不到
+
+这条把 B148 那两枚"设置面关不上"与第 16 步那三枚"退不回根层"**归到同一处**，
+并且**更正 B148/第 403 条当时的归因**（详见第 403 条的追记、第 404 条全文）。
+
+一句话读数（同一台机、同一个 companion、同一条 `ui tap` 通道）：
+
+| | iPhone-Duo（旧载体） | iPhone 17 Pro（新载体，现量） |
+|---|---|---|
+| 顶栏标题 y | 18 | 80 |
+| 推出 `insets.top` | **0** | **62** |
+| 最右那枚动作格 | (428,28) 点不动 | x=342..386，不在挖孔下 |
+| 次右那枚（同带内 y=6..50） | (376,28) **一点就开** | — |
+
+🔴 第四行是本条的关键：**"顶栏带内的点击被系统吞掉"这个说法是错的**，我第一版就是这么写的，
+被同带内的阳性对照否证。死的只有**最右那一格**。少了那次对照，这一条会被记成一条
+不存在的 iOS 行为。
+
+**处置：改载体，不改产品。** `Screen` 顶栏本来就写 `paddingTop: insets.top`
+（`apps/mobile/src/ui/kit.tsx:168`），代码没有漏安全区。为一份模拟器 profile 去给顶栏
+垫一个最小值，是替一个没量到的真设备做设计。
+新载体 `heyta-ios-isolated17`（iPhone 17 Pro / iOS 27.0，UDID `3BB27787-9C22-452E-A62C-6BD650D35E27`），
+装的是同一份当前产物（`/tmp/heyta-ios-release/…/Heyta.app`，bundle mtime 10-10 20:41，
+腿自己的两条新鲜度判据都成立）；旧载体只 `shutdown`、**没删**（那台不是本线独有的资产）。
+
+**开着的问句（要拍，但本线不自决）**：iPhone-Duo 是真机型还是 SDK 里的一份占位 profile？
+如果 Apple 之后带着真设备发布，"顶栏最右那一格在真机上被挖孔吃掉"就是**所有**用标准
+app bar 的 App 的共同问题，那时要不要在产品侧给一条防线（例如最右格改用 `insets.top`
+之外的第二个来源）—— 这一格不该由一条设备腿的红来拍，也不该由一份模拟器的读数拍。
+
+## B156（2026-10-11 02:0x，本会话 · T8 终版取证时撞上）：**同步过的隔离副本里 `server/dist` 是上一枚 HEAD 的字节，它报出来的红长得像"当前源码坏"**
+
+现量（载体 `.worktrees/inb-t7`，HEAD=`9fb9eed2`、dirty=0）：产物 mtime `00:40:53` < 源码 mtime `01:51:13`；
+对它 `require` ⇒ `ReferenceError: Cannot access 'inbound_core_1' before initialization`（rc=1），
+而 HEAD 的源码当时**已是修好的**（`git rev-parse HEAD:…` = `c600de92…`）。`npx --no-install tsc` 重打（`TSC_RC=0`）后
+同一条命令 ⇒ `LOAD_OK … rc=0`。
+
+这是 §7 第 27 条那一族的新面目（旧产物被当成当前源码的判决），**而且两头都能骗**：旧产物若是好的、
+当前源码是坏的，同一把尺会报绿。建议的判据：任何"读构建产物"的验收先证 `产物 mtime ≥ 输入源码 mtime`，
+或从 `git archive HEAD` 现编（本线那把 `research/tools/verify-inbound-cjs-require-order.py` 就是这么写的，
+所以它不会被这一格骗到）。**`docs/reference/environment-traps.md` 不在本线白名单** ⇒ 登记，不代改。
+
+## B157（2026-10-11 02:0x，本会话）：**plumbing 提交只动 ref 不动共享索引 ⇒ 下一枚裸 `git commit` 会把上一次提交静默回退**（本线实测三次）
+
+`a49f534c`（本线那枚生产缺陷修复）落地后，并行会话的三枚**裸** `git commit`（`3998e598`/`f201b001`/`1394061f`）
+把 `server/src/automation/entitlement-ticket.ts` 逐字退回**修复前**——因为共享 `.git/index` 里那一枚路径
+还坐着"上一枚 HEAD 的 blob"，而裸 commit 提交的是索引不是工作树；对方看到的仍是"提交成功"。
+
+本线已做的两件（都在白名单内）：① 配方写进 `PROGRESS.md`（`update-ref` 之后**同一条命令链里**
+`git update-index --add --cacheinfo 100644,<blob>,<路径>`，再验 `git diff --cached --name-only -- <本笔全部点名路径>` 为空）；
+② 补了一把能当场照出回退的尺（在被回退的那枚 HEAD 上 `命中=1` rc=1，逐字指出产物 20 行是加载期引用、源码 25 行才是那行 import）。
+
+**要拍的两件都在本线地界外**：① 要不要给 `pnpm check` 加一道"**索引逐路径等于 HEAD**"的门（`scripts/` 不在白名单；
+它能拦这一族所有实例，代价是"故意 staged"也会红 ⇒ 词表谁批谁定）；② 要不要把"plumbing 之后必须刷新共享索引"
+写进 `AGENTS.md`/`CONTRIBUTING.md` 的提交纪律（这两份的规则部分明令不许本线改）。
+⚠️ 伴生坑一并留档：`git restore --staged -- <路径…>` 是**原子的** —— 清单里有一枚不在索引（新文件常见）时它
+`did not match any file(s) known to git` 然后**整条什么都不做**，而只看一枚路径的读数会显示"已经等于 0"；
+本线那一次回退第一次没补救成功就是栽在这里。
+
+## B158（2026-10-11 02:0x，本会话）：**本线白名单文件上坐着别线的未提交改动，而它改的是判卷口径** —— `EVENT_ID` 的接受集被放宽
+
+形状：主检出的 `server/src/automation/entitlement-ticket.ts` 工作树（mtime 10-10 20:18，不是本线写的）除本线
+那枚"导入上移"外还有两处：`const EVENT_ID = z.string().regex(/^[A-Za-z0-9:_-]{1,127}$/)` 被放宽，值导入的 JSDoc 被删。
+
+**本线一行都没代提交**：票据正文里事件标识的接受集是**判定输入的形状**，落在"改判卷口径要记 BLOCKED.md"这一条上；
+而 T1 的判据只写了"错主体/错实例/吊销落后各红一条"，**畸形 `EVENT_ID` 该不该红**两种读法都自洽。
+HEAD 那枚文件 = 本线修复版 `c600de92…`，他们那两处原样留在工作树里。
+
+开着的两条路（任一条都比放着好）：① 改动的所有者自己提交并写清为什么放宽；② 口径定了之后本线在
+`server/tests/`（白名单内）补一条"畸形 `EVENT_ID` 被拒并回类型化拒绝码"的断言、挂进票据那把八臂尺 ——
+**那八臂现在没有这一档，也就是说无论怎么改都没有尺在守这一格**。
+
+## B156（2026-10-11 02:0x，本会话 · T8 终版取证时撞上的）：**同步过的隔离副本里 `server/dist` 是上一枚 HEAD 的字节，而它报出来的红长得像"当前源码坏"**
+
+现量（载体 `.worktrees/inb-t7`，`git rev-parse --short HEAD` = `9fb9eed2`、dirty=0）：
+
+```
+stat -f '%Sm  %N'  server/dist/src/automation/entitlement-ticket.js  server/src/automation/entitlement-ticket.ts
+2026-10-11 00:40:53  …/dist/src/automation/entitlement-ticket.js     ← 产物
+2026-10-11 01:51:13  …/server/src/automation/entitlement-ticket.ts   ← 源码（副本同步的时刻）
+```
+
+对它跑 `node -e 'require(…)'` ⇒ **`ReferenceError: Cannot access 'inbound_core_1' before initialization`，rc=1**，
+而 HEAD 的源码当时**已经是修好的**（`git rev-parse HEAD:…` = `c600de92…`，import 在第 19 行、引用在第 30 行）。
+`npx --no-install tsc` 重打（`TSC_RC=0`）之后同一条命令 ⇒ **`LOAD_OK … rc=0`**、
+产物里 `require` 落在第 21 行、引用第 31 行。
+
+**为什么这条要登记而不是就地写进陷阱文件**：`docs/reference/environment-traps.md` **不在本线白名单**。
+它是 §7 第 27 条那一族的新面目 —— 那一族讲的是"APK 里装着旧 JS bundle"，这里是**旧产物被当成当前源码的判决**，
+而且这一枚**既能造红也能造绿**（若旧产物恰好是好的、当前源码是坏的，同一把尺会报绿）。
+
+**建议的判据（谁批谁落，本线不代改那两份文件）**：任何"读构建产物"的验收，先证 `产物 mtime ≥ 输入源码 mtime`，
+或直接绕开宿主产物 —— 从 `git archive HEAD` 物化一份 HEAD 的字节现编（本线那把
+`research/tools/verify-inbound-cjs-require-order.py` 就是这么写的，它因此**不会**被这一格骗到）。
+
+## B157（2026-10-11 02:0x，本会话 · 一次已入库修复被并行裸提交撤掉之后量出来的仓级形状）：**plumbing 提交只动 ref 不动索引 ⇒ 下一枚裸 `git commit` 会把上一次提交静默回退**
+
+本线实测（不是推断）：`a49f534c`（本线那枚生产缺陷修复）落地后，并行会话的三枚**裸** `git commit`
+（`3998e598` / `f201b001` / `1394061f`）里，`server/src/automation/entitlement-ticket.ts` 被逐字退回
+**修复前**的字节 —— 因为共享 `.git/index` 里那一枚路径还坐着"上一枚 HEAD 的 blob"，
+而裸 `commit` 提交的是**索引**，不是工作树。对方看到的仍是"提交成功"。
+
+🔴 **这是仓级形状，不是本线的 bug，也不是任何一行的错**：`git commit-tree`/`update-ref` 本来就不该动索引；
+出问题的是"用 plumbing 提交完不刷新共享索引"这一步以前被记成收尾整洁动作，其实它是**承重**的。
+本线已做的两件（都在白名单内，不需要谁批）：
+① 配方写进 `PROGRESS.md`（`update-ref` 之后**同一条命令链里**
+`git update-index --add --cacheinfo 100644,<blob>,<路径>`，再验
+`git diff --cached --name-only -- <本笔全部点名路径> | wc -l` 必须为 0）；
+② 补了一把能**当场照出回退**的尺（`verify-inbound-cjs-require-order.py` 在被回退的那枚 HEAD 上
+`命中=1`、rc=1，逐字指出产物第 20 行是加载期引用、源码第 25 行才是那行 import）。
+
+**要拍的两件（都在本线地界外）**：
+1. 要不要给 `pnpm check` 加一道"**索引逐路径等于 HEAD**"的门（`scripts/` 不在本线白名单）。
+   它能拦下这一族的**所有**实例，成本是：任何正当的"故意 staged"操作都会红 ⇒ 词表怎么划归拍的人定。
+2. 要不要把"plumbing 之后必须刷新共享索引"写进 `AGENTS.md` / `CONTRIBUTING.md` 的提交纪律
+   （这两份的**规则**部分明令不许本线改，除非负责人当轮要求）。
+
+⚠️ 一条已写进 `PROGRESS.md` 的伴生坑，一并留给拍的人：`git restore --staged -- <路径…>` 是**原子的** ——
+路径清单里有一枚不在索引（新文件常见）时它报一句 `did not match any file(s) known to git` 然后
+**整条什么都不做**，而只看其中一枚路径的读数会显示"已经等于 0"。这正是本线那一次回退没被第一次补救救回来的原因。
+
+## B158（2026-10-11 02:0x，本会话 · 在**本线白名单文件**上发现的别线未提交改动）：`EVENT_ID` 的校验被放宽，而这是**判卷口径**级别的变更，本线不代提交
+
+形状：主检出的 `server/src/automation/entitlement-ticket.ts` 工作树里（mtime 10-10 20:18，不是本线写的）
+除本线那枚"导入上移"之外还坐着两处改动 ——
+`const EVENT_ID = z.string().regex(/^[A-Za-z0-9:_-]{1,127}$/)` 被放宽，以及那枚值导入的 JSDoc 被删掉。
+
+**为什么本线一行都没提交它们**：`EVENT_ID` 是票据正文里事件标识的接受集，放宽它=改**判定输入的形状**，
+落在"改判卷口径（既有断言、验收脚本的判据）要记 BLOCKED.md"这一条上；而本线的 T1 判据是
+"错主体 / 错实例 / 吊销落后各红一条"，**畸形 `EVENT_ID` 该不该红**目前两种读法都自洽，不能由本线替他们定。
+所以处置是：**留他们在树里，本线只落自己那半**（HEAD 那枚文件 = 本线修复版 `c600de92…`）。
+
+**开着的两条路（任一条都比"就这么放着"好）**：
+① 由改动的所有者自己提交并写清为什么放宽（本线不动）；
+② 口径定了之后本线在 `server/tests/`（白名单内）补一条"畸形 `EVENT_ID` 被拒并回类型化拒绝码"的断言，
+   并把它挂进票据那把八臂尺 —— 现在那八臂里没有这一档，也就是说**这一格无论怎么改都没有尺在守**。
+
+## B159（2026-10-11 03:0x，账号标准套件线 · 第一次在合并态上跑整条 `pnpm check` 撞上的）〔原登 B156，与并行线同日撞号 ⇒ 后写的这枚改号，理由与读数见 B161〕：**「已建模 ≠ 可达」那把尺红了，红在 `COMMENT` 一枚上 —— 它挡住的是所有线的 `pnpm check`，而它不是本线登记的**
+
+**怎么撞上的**：goal 的交付标准里有「门禁全绿」，本线此前只按文件跑过单测，
+所以第一次跑整条 76 步链（`/tmp/fullcheck.log`）。
+链在 `check:reachability` 断掉：`断言 B 不通过：1 个已建模的实体零写路径 —— COMMENT`。
+其余断言 A/C/D 都过。
+
+**归属是查过的，不是猜的**：
+· 实体登记面（`packages/domain`、`packages/shared-schema`、`packages/app-host/src`）
+  最近两笔是 `a63aa9e9`（10-10 20:07 邮箱验证码登录的客户端）与 `2f59b075`（19:53 协作 packages）；
+· `COMMENT` 这一枚登记进 `entity-types.ts` / `entities.ts` 的那一笔是
+  **`e6058120`（10-09 14:35，产品体验线 台账 §UX-S9-153）**。
+· 本线今天这几笔**没有一行**落在那三个路径里（改的是 `server/src/password/*`、`server/src/passkey.ts`、
+  `packages/app-host/tests/*`、`scripts/*`、文档）。
+⇒ 这一格红**不是本线造成的，也不是本线能修的**：它的修法是"在 app-host 里补一族
+`comment-actions.ts`，并在宿主里接上真实入口"—— 那是**任务评论这个功能**，
+不属于注册登录标准套件的地界。
+
+**为什么仍然登记在本线名下**：是本线第一次把它量出来的，读数在本线手上。
+下一条跑到 `pnpm check` 的线会看到同一枚红，不必再花一次整链去撞。
+
+**本线因此不能声明的那一格**：goal 的「门禁全绿」在**整条 `pnpm check` 这一层未闭合**
+（链在 76 步里的 `check:reachability` 断掉，后面还有 `check:ai-e2e`、`pnpm -r test` 等没走到）。
+**已经单独取到读数的**（这些覆盖本线改动的全部落点）：
+· `pnpm -r typecheck` **RC=0、0 条错、20 个顶层目录**（本线顺手收掉了唯一那枚多余指令，见 `50a43d64`）；
+· 服务端 **158 文件 / 2785 passed + 1 skipped**；`server` 的 `tsc --noEmit` **0 条错**；
+· `@heyta/app-host` **94 文件 / 1775 passed**；
+· 本线新加的那条真库判据所在文件 **21/21**；
+· `check:docs`（无死链）与 `check:doc-citations`（含 self-test 四臂）都 **RC=0**；
+· iOS 设备腿第 8 趟 **101 项 / 0 失败**（§6.87）。
+
+**要拍的只有一句**：`COMMENT` 这一枚由哪条线、什么时候补上写路径与宿主入口。
+不拍，`pnpm check` 对所有线都是红的；拍了也不该由本线做。
+🔴 门禁自己写了不许用的三种"修绿"手法（删实体 / 只补 `ACTION_FAMILIES` / 拿测试当调用点），
+本线一种都没用。
+
+## B160（2026-10-11 04:0x，账号标准套件线 · 把 B159 那道"链断在 reachability"往下推之后撞上的）：**`ADR-0058` 在 HEAD 上有两枚文件，同号是本线引入的（`9fa53ab9`）—— 本线自己改号成 0064 收回，逐处读数如下**
+
+**先说清是谁的**：`git log --diff-filter=A` 逐枚取到
+· `docs/adr/0058-download-page-and-manifest-single-source.md` ← **`f97013de`（10-07 11:49，分发线）**
+· `docs/adr/0058-inbound-automation-commit-and-task-batch.md` ← **本线 `9fa53ab9`（10-08 21:31）**
+⇒ 后到的是**本线这一枚**，按 `scripts/check-adr-numbering.mjs` 文件头写明的修法（"先把后来那一枚改号"），改号的是我，不是他们。
+
+**这就是 AGENTS.md §6 那条门禁注释里写过的形状（10-05 的 `ADR-0053` 双订），第二次发生，而且这次是本线自己**：
+文件名不同 ⇒ git 连冲突都不报；两条链接各指各的 ⇒ `check:docs` 的死链检查也不报。
+唯一会现形的是 `check:adr-numbering` 判据 ①（同号唯一），
+它红的时候只印一句 `同号=1 歧义=4`，**不会说是哪一枚该动** —— 所以归属必须回去查 `--diff-filter=A`，不能猜。
+
+**改号前对目标号的三次现量**（免得把一个撞号换成另一个撞号）：
+`ls docs/adr/0064*` 无、`.worktrees/*/docs/adr/0064*` 无、
+`git log --all --diff-filter=A -- 'docs/adr/0064*'` 无、`grep -rn 'ADR-0064' docs` 0 命中 ⇒ 0064 是空号。
+
+**逐处改动（六处，计数由脚本自己核，对不上就整批不写盘）**：
+| 处 | 改的东西 | 命中数 |
+|---|---|---|
+| 那枚 ADR 自己 | 改名 `0058-…` → `0064-…`，标题 `# ADR-0058：` → `# ADR-0064：` | 1 |
+| `docs/adr/0059-inbound-worker-authenticated-identity.md` | `[ADR-0058](0058-…md)` → `[ADR-0064](0064-…md)` | 1 |
+| `docs/adr/0060-automation-entitlement-and-retention.md` | 同上 | 1 |
+| `docs/adr/0061-owner-held-inbound-commit-receipt.md` | 同上 | 1 |
+| `docs/plans/inbound-automation.md:57` | 同上（**别人正在写的那份，见下面那条边界**） | 1 |
+| `docs/README.md` | 索引行 `[0058](…)` → `[0064](…)`，并把该行移到 0062 之后（表是按号升序的） | 1 |
+
+外加本线自己台账里那一处引用（`docs/plans/account-standard-suite.md` §6.85 附近）原本裸写了 `ADR-0058/0059/0060`
+—— 那是**这次撞号唯一一处会误导人的读者文本**（它想指的是入站那枚，裸号读法两种都成立），改成写文件名。
+
+**复验读数**：`pnpm check:adr-numbering` → `SUMMARY ADR文件=64 裸引用=2223 同号=0 歧义=0 悬空=0`、RC=**0**；
+`node scripts/check-md-table-rows.mjs` → 12 文件全绿（README 那张表动了行序，所以专门复跑）；
+`pnpm check:doc-citations` → 绿（含 self-test 五臂）。
+⚠️ `pnpm check:docs`（死链）在**改名落地之前**必然红 5 处，而且报的是"本机有、git 没有跟踪"——
+那 5 处就是上面那 5 个链接，指向新名那枚；提交之后它自己收平（这也是本线**没有**把改名与引用拆成两笔提交的原因：拆开的那中间态就是死链）。
+
+🔴 **一条本线踩过的边界（下次别学）**：`docs/plans/inbound-automation.md` 在主检出里有**对方未提交的 100 行新增**。
+本线只改了 line 57 那一枚链接，那 100 行**一个字没动、也没代他们提交**
+（提交走 plumbing：从 **HEAD** 那枚 blob 出发只做这一处替换 ⇒ 他们的工作树保持原样，
+而他们的文件里已经带着新链接，下次 `git add` 整份时不会被本线回退）。
+**先量再动**：`git diff -U0 -- 那份文件 | grep 0058` = **0 命中**，才说明本线那一处不与他们的改动重叠。
+
+**还没闭合的两格，不包装成完成**：
+① `.worktrees/inb-t7`、`.worktrees/iosacct` 两枚检出里仍是旧名那枚 —— **独立工作树，本线不代改**，各自由其所有者 pull 后收敛；
+② `docs/README.md` 那张 ADR 索引此前**没有** 0063（本线自己的裁决），本线补上了；**0060/0061 仍缺**，那是入站线的欠账，本线不代登。
+
+## B161（2026-10-11 04:0x，账号标准套件线）：**合并态上还有四道门禁红，逐道查过归属 —— 其中三道来自**同一枚**别线提交；顺带：`BLOCKED.md` 自己的编号也在撞号，而且没有尺在守**
+
+**这四道是本线在 `check:adr-numbering`（已修，见 B160）之后逐道单独跑出来的**，都不是本线能修的：
+
+| 门禁 | 红的落点 | 引入它的提交（`git blame` / `--diff-filter=A` 现量） | 为什么本线不修 |
+|---|---|---|---|
+| `check:layering` | `apps/web/src/features/share/share-key-store.ts` 里那枚 `entityType: 'SHARE_KEY',`（外壳里就地拼 op；行号门禁自己印，本处不抄。⚠️ 更正一次：本条目第一版写的是"那枚文件正被协作线改"，**现量否证** —— `git status --porcelain -- <那枚>` 为空，它是**已经落地的违规**，不是在飞的东西。不修的理由只剩"那是别人的功能语义"这一条） | **`e6058120`**（10-09 14:35） | 修法是给 `SHARE_KEY` 在 app-host 补一族动作层 —— 那是**共享清单协作**那条功能的语义 |
+| `check:ui-language` | 词条 `web.share.invite.emailPlaceholder = name@example.com`（zh-CN 里没汉字；键与行号门禁自己印） | **`2f59b075`**（10-10 19:53，协作 packages） | 两条出路都不许本线代做：翻成中文=改**别人的对外文案**，塞进 `UNTRANSLATABLE_KEYS`=改**判卷口径** |
+| `check:verify-script-copy` | 2 枚 needle 失效：`scripts/lib/mobile-e2e.sh` 与 `scripts/verify-mobile-habits.sh` 各一处（行号门禁自己印），找的都是 `填好服务器地址与访问令牌后才能同步。` | 词条 `mobile.profile.sync.notConfigured` 被 **`e6058120`** 改成「登录 heyta，让任务在设备间自动同步。」，脚本没跟着改 | 那两条 needle 是**别人验收脚本的判据**，本线改=替他们决定"哪句才算界面到位" |
+| `check:integration-coverage` | `server/tests/integration/inbound-dual-host-fault-windows.integration.spec.ts` 盘上有、脚本没点名 ⇒ **从建立起一次都没跑过** | **`0eea4c0f`**（10-10 13:43，自动收集 T3） | 点名要写进 `server/package.json` 的 `test:integration:postgres`，那是入站线那条用例的运行前提 |
+
+📌 **可迁移的一条**：`e6058120`（产品体验线 10-09 那笔四面回归读数）**一枚就占了三道红**
+（`COMMENT` 的可达性 = B159、`SHARE_KEY` 的分层、`notConfigured` 换词而脚本 needle 没跟上）。
+⇒ 一道大红后面可能坐着同一批的其它道红：撞第一道时就该 `git show --stat` 那笔看看它还动过哪些收口面，
+而不是每撞一道重新查一次归属。**"改了一句文案"在门禁图上不是一句文案的成本**（词条是脚本 needle 的真源）。
+
+🔴 **顺带量到的一件仓级形状：`BLOCKED.md` 的编号没有任何尺在守**（ADR 有 `check:adr-numbering`，这里没有）。
+本线在 03:0x 写下 `B156`（= B159），而并行线在 02:0x 已写过 `B156`/`B157`/`B158`，
+`grep -c '^## B156' BLOCKED.md` 当场 = **2**，同一个文件里躺着两枚 `## B156`（现量：`grep -n '^## B156' BLOCKED.md`，改号之前返回两行）。
+修法沿用 ADR 那套：**后写的那一枚改号**，本线这枚 → **B159**，并在标题里留一句"原登 B156"；
+`docs/plans/inbound-automation.md:1966` 那句"登记成 B156"指的是**他们那枚**（讲隔离副本里 `server/dist` 陈旧字节），
+所以**不能**动他们的文本 —— 本线文档对 B15x/B16x 的引用以 `grep -rn 'B1[56][0-9]' docs/plans/account-standard-suite*.md` 现量，逐枚都唯一。
+📌 **同一件形状的更早一例（本线量到的，不代改）**：`grep -o '^## B1[0-9][0-9]' BLOCKED.md | sort | uniq -c | awk '$1>1'` 现在还返回
+**`B102` ×2** —— 一枚是分发线 10-07 12:05（`0533f460`，下载面落地），一枚是自动收集线 10-09 16:58（`2a378fdf`，任务 0 收尾）。
+它躺了两天没有任何一层报出来，而两条线互相引用对方那个号时读的是自己那枚。
+⚠️ 本线**没有**顺手给 `BLOCKED.md` 加一枚编号门禁 —— 那是判据口径，且撞号在这一层只伤读、不伤跑；
+要加得由想清"唯一编号是不是这台的硬要求"的人来做（成本与 `check:adr-numbering` 那条一样，是刻意的）。
+
+## B162（2026-10-11 05:5x，账号标准套件线 · **本线自己造成的破坏，当场量出来并前向修复**）：一次 plumbing 提交把 9035 行的共享账本截成 8240 行 —— 因为脚本从 `/tmp` 复用了一个 20 小时前的陈文件名
+
+**先说清是谁的**：是本线的，而且是这一轮里最贵的一次。提交 `49e7149e` 把 `BLOCKED.md` 写成了 8240 行，
+`HEAD~1`（`eefe118b`）与工作树都是 **9035** 行 ⇒ **795 行没了**：被截掉的是 **B144 与 B147–B161 共 16 枚标题**
+（现量：`diff <(git show "$BEFORE":BLOCKED.md | grep -oE '^## B[0-9]+') <(git show "$COMMIT":BLOCKED.md | grep -oE '^## B[0-9]+')`），
+里面有并行线的 B148–B153、本线自己的 B154/B155/B159/B160/B161，也有他们那对重复的 B156/B157/B158
+
+
+**机制（逐字可复现，不是猜测）**：那笔提交前有一步"从 `git show HEAD:BLOCKED.md` 出发、只套本线那三行表格、
+写到 `/tmp/blocked-mine.md`，再 `git hash-object -w -- /tmp/blocked-mine.md`"。
+那段 python **抛了 `AssertionError`**（它自己的守卫 `assert wl[0] != head[hl[0]]` 命中 —— 因为那三行已被并行线
+随 `eefe118b` 一起提交了，工作树与 HEAD 那三枚逐字相同 ⇒ "改动"其实是 0 行），
+于是**中间文件根本没被重写**，留在盘上的是 **Oct 10 20:26 上一次别的用途留下的陈货**（同名 `/tmp/blocked-mine.md`，
+801208 B）。bash 那边没有检查 python 的退出码（`set -uo pipefail`，而 `<<PY` 这段是脚本里的一条独立命令，
+失败只打印 traceback），`hash-object` 就把那件陈货写进了树。
+⇒ **三个缺陷叠成一枚**：① 可复现物住 `/tmp`（环境陷阱那一族的第七种失法）；② 文件名是**复用**的，
+不是唯一的，陈旧件能被静默当作输入；③ 守卫失败的那一步**没有把非零退出码传给提交**。
+
+**怎么量出来的**（顺序很重要，先记住这条）：修完之后照例对一遍数 ——
+`git show HEAD:BLOCKED.md | wc -l` = 8240 而 `git show HEAD~1:BLOCKED.md | wc -l` = 9035，
+两行一减就现形。**"提交完成后立刻把被写文件的行数与上一枚提交对账"这一条，是本线所有 plumbing 提交以后都要跑的一步。**
+
+**修法（前向恢复，不改写历史）**：`BLOCKED.md` 的工作树此刻与 `eefe118b` 逐字相同（`git diff --numstat HEAD~1 -- BLOCKED.md` 为空），
+所以直接用**工作树那份**（不再经任何中间文件）hash-object 成一枚新 blob、随 B162 一起提交 ⇒ 行数回到 9035+，
+且 `grep -c '行号门禁自己印' = 3`、`grep -c '^## B16[01]' = 2`、`grep -oE '^## B[0-9]+' | sort | uniq -d` 只剩
+**`B102`（10-07 分发线 / 10-09 自动收集线，历史撞号）与 `B156/B157/B158`（并行线自己**又插了一遍**，已随 `eefe118b` 入库）**。
+🔴 那两组重复**都不是本线的**，本线不代去重（他们的账本、他们的号）；
+🔴 本线也**没有** `git reset`/`revert` 去动那笔已存在的提交 —— 已存在的笔可能被别的检出引用，前向修是唯一选项。
+
+**判据（下次必须当场会红的，不是注释）**：
+1. **不许有中间文件**：plumbing 提交里凡是被 `hash-object` 的路径，**只能来自工作树或 `git show` 的管道**，
+   不许先落盘再读回来。要落盘就落到**带本笔唯一后缀**的路径（`mktemp`），并在读回前 `assert` 它的 mtime 晚于本脚本起跑时刻。
+2. **写完立刻对账**：`git show "$COMMIT":<路径> | wc -l` 必须 `>=` `git show "$BEFORE":<路径> | wc -l`
+   （账本只会变长；变短就是截断），并 `grep` 两枚**本线自己的锚点**（这条号的标题、上一轮的锚词）必须命中。
+   这一条**已经拿被截断的那一笔跑过（阳性对照）**：
+   `CONTROL eefe118b -> 49e7149e: 9035 -> 8240 变长=False 缺锚=['## B161', '## B160', '## B159', '行号门禁自己印']`、`CONTROL_RC=1` ⇒ 它拦得住这一族。
+3. 守卫脚本与提交**必须在同一条命令链上互相检查退出码**（`if ! python3 …; then exit 1; fi`），
+   `set -o pipefail` 挡不住 heredoc 里单独一条命令的失败。
+
+**本线欠的一格**：这次截断只存在于 `49e7149e` 这一枚提交物里（工作树从来没坏过，别的检出只要 pull 到 `HEAD` 之后就是好的），
+所以**没有丢任何人的内容**；但它证明"共享检出上的一次 plumbing 提交可以静默删掉别人 795 行账本"，
+这个形状比它这次造成的损失大得多 —— 上面判据 2 是唯一能长期挡住它的东西，本线**下一笔**就要开始用。
