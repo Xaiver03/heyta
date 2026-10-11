@@ -169,7 +169,7 @@ EVIDENCE-1，并对所有已完成项做截图、交互、测试和文档回读�
 |---|---|---|---|
 | 个人资料 | 资料编辑区仍需继续统一摘要、编辑和返回路径的细节 | 保持从头像菜单进入后的返回路径，继续核对 ProfileSummary/ProfileEdit 的真实端间表现 | 已完成本轮结构改造，细节回归随账号验收 |
 | 任务与显示 | 小组件安装说明在原生壳内仍可能把壳环境识别成浏览器，导致显示错误的“如何装成应用”步骤 | 修正原生壳/浏览器能力识别；保留提醒权限的成功、拒绝、不支持与错误状态卡 | **radio、功能卡、提醒状态卡、字段标题、触控尺寸和高亮已完成；Widget 环境识别已在 UX-S9-153 改掉（判据与三条变异臂见该节），原生壳内的真实界面读数仍待取**。🔴 10-09 16:1x 指针：本行右侧那句「保留…不支持与错误状态卡」里，**后两态只活在工作树** —— `HEAD` 那份 `ReminderNotifyPanel.tsx` 的分支只有 `granted`/`denied`，现量见下面那张主表现量表「提醒状态卡」那一行（10-10 00:4x 补：无头那一档现在这两态也有浏览器读数了，来源逐格标注 —— 见本文件 10-10 00:3x 那格「把提醒腿在无头下缺的那两态补上了」，读数在 `apps/web/evidence/sync-privacy-leg-1009-r9/report.json`；**真权限管道仍只有有头与设备算数**） |
-| 同步与隐私 | 服务器地址、凭据、Vault、隐私同意连续排列；连接状态、数据出境状态与操作按钮不在同一视觉层 | 已拆为“同步服务 / 账号凭据 / 端到端加密 / 隐私状态”四张卡；失败状态提供下一步动作 | **代码已落地；最终多端验收待完成**。🔴 10-09 15:5x 三条指针，写给从这张表进来的人：① 「代码已落地」只覆盖**已提交那一半** —— UX-S9-139 那四条改动仍在那条会话的两栏设置 IA 工作树里（逐条对 `git show HEAD:` 的表在 §UX-S9-139 下面），别把本行读成「Web 侧已闭合」；② Web 侧的**决定态**自本日起有常驻判据：`scripts/qa/reminders-data-responsive.mjs` 的 `sync` 腿十条，主检出工作树与隔离副本 `b081811c` 各一趟十条全真（不是取证口先行，干净树上它自己就绿），读数／复跑命令／在案欠项见 [`apps/web/evidence/sync-privacy-leg-1009-carrier-b081811c/`](../../apps/web/evidence/sync-privacy-leg-1009-carrier-b081811c/README.md)，另有三格视口×主题 × 四态共 12 张图在主检出 `apps/web/evidence/sync-privacy-leg-1009-r6/`（已入库）；③ 还没取的那一档不变：**原生壳内的决定态**与**四端重装**（后者按 10-09 负责人那句「先只做不需要设备的」停着） |
+| 同步与隐私 | 服务器地址、凭据、Vault、隐私同意连续排列；连接状态、数据出境状态与操作按钮不在同一视觉层 | 已拆为“同步服务 / 账号凭据 / 端到端加密 / 隐私状态”四张卡；失败状态提供下一步动作 | **代码已落地；最终多端验收待完成**。🔴 10-09 15:5x 三条指针，写给从这张表进来的人：① 「代码已落地」只覆盖**已提交那一半** —— UX-S9-139 那四条改动仍在那条会话的两栏设置 IA 工作树里（逐条对 `git show HEAD:` 的表在 §UX-S9-139 下面），别把本行读成「Web 侧已闭合」；② Web 侧的**决定态**自本日起有常驻判据：`scripts/qa/reminders-data-responsive.mjs` 的 `sync` 腿十条，主检出工作树与隔离副本 `b081811c` 各一趟十条全真（不是取证口先行，干净树上它自己就绿），读数／复跑命令／在案欠项见 [`apps/web/evidence/sync-privacy-leg-1009-carrier-b081811c/`](../../apps/web/evidence/sync-privacy-leg-1009-carrier-b081811c/README.md)，另有三格视口×主题 × 四态共 12 张图在主检出 `apps/web/evidence/sync-privacy-leg-1009-r6/`（已入库）；③ 那一档**两半都取到了**（10-11）：**原生壳内的决定态**由 #34 那条后台诊断链取（读数与边界见下面 #34 那格），**四端重装**由趟号 r93 取（逐端判据 + 四张人看过的图在 [`apps/web/evidence/ux-final-20261011/reinstall/RESULT.md`](../../apps/web/evidence/ux-final-20261011/reinstall/RESULT.md)）；🔴 r93 跑在**主检出的工作树**上 ⇒ 它不证"干净检出可复现"，那一半仍开着（见文末「从最终源码四端构建重装」那格）。 |
 | AI 与集成 | Agent 入口已统一；仍需持续验证 token 权限分组在各端的可理解性 | 保留一个 Agent 主入口；设置内维持“使用方式 → 出境 → 能力 → 记忆”的渐进层级 | **已完成本轮结构改造，保留跨端回归** |
 | 数据管理 | 导出、空库还原、滴答迁移、管理员后台混在一组；限制条件依靠长段落说明 | 拆为“备份与恢复 / 从其他产品迁移 / 管理员工具”，限制改为 warning/info callout | **代码完成：`DataSettingsPanel` 已拆为三张卡，空库、仅本地与格式限制均有独立状态卡；保留端侧产物回归**。🔴 10-09 16:1x 指针，写给从这张表进来的人：本行那句「代码完成」描述的是**工作树**，不是 `main` —— `DataSettingsPanel.tsx` 整枚不在仓库、`HEAD` 那份 `App.tsx` 也不 import 它，现量命令与逐格读数见下面那张主表现量表「数据管理」那一行。**读法**：Web 浏览器取证（`data` 腿）跑的是工作树那版，干净检出上是拆卡之前的形状。 |
 | 账号与安全 | 结构已拆开；仍需验证登录入口、续费和危险操作在未登录/已登录状态下的反馈 | 保持“订阅与托管 / 登录与安全 / 删除账号”三个明确子区，危险操作独立放底部 | **已完成本轮结构改造，保留状态回归** |
@@ -1428,7 +1428,7 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
     - **提醒那一半仍然没入库**：`git grep -c dispatchChecked HEAD` = **0**（工作树 52 处）。 ⚠️ **10-09 15:5x 更正这条的"形式"**：命令原样复跑现在报 **6**，6 处全在这份台账自己身上（那个词是被我写进正文的）⇒ 代码里仍是 0，但**这条结论只有带路径才成立**，见下面 `08d67071` 那格的 ④。
     - **提醒那条腿在干净检出上仍然跑不动**：`reminder-notify-request-failed` 在 HEAD 只命中 2 处，且**都是本线自己的文件**（`scripts/qa/reminders-data-responsive.mjs` 与这份台账），产品代码 `ReminderNotifyPanel.tsx` 里没有 ⇒ 上面那条"选腿旋钮"的理由仍然成立，不许读成"整族五腿现在都能在干净树上跑"。
     - 🔴 **一条形状反过来的新事实，值得单独记**：账号线刚入库的那份 e2e —— `e2e/tests/account-email-change-and-sessions.spec.ts`（`23a3a24b`；10-09 23:4x 现量它已在 `HEAD`）—— 从 `./helpers` import `selectSettingsSection`（第 25 行），而**`HEAD` 的 `e2e/tests/helpers.ts` 里没有这个导出**（`git show HEAD:e2e/tests/helpers.ts | grep -c selectSettingsSection` = 0；定义只存在于未提交的那份 `helpers.ts:401`，文件是 ` M`）。⇒ **干净检出上那份 spec 连编译都过不去**。这正是本线那六份未入库 spec 被判"取证口先行"的**同一形状**，只是这次是消费者已经提交、生产者还在工作树 —— 本线不代提交别人的 helper，登记给那条线，并把它算进"main 现在不可用"这一格（与上一条 `packages/ui` 那批同档）。
-      ⇒ 关闭这一格需要的是那一线把 `packages/ui/src` 整批（现量 42 枚 ` M` + 11 枚 `??`）与其消费侧一起落地；**本线既不代提交别人的在飞文件，也不靠摘掉 `e6058120` 那几行 re-export 把红压掉**（工作树里 `EmptyState.tsx`/`HabitBoard.tsx` 等正在用它们）。探针工作树已 `git worktree remove --force` 收掉（`git worktree list` 回到 21 行）。**四端重装**这一半仍按 10-09 负责人那句「先只做不需要设备的」停着，不由本线擅自起。
+      ⇒ 关闭这一格需要的是那一线把 `packages/ui/src` 整批（现量 42 枚 ` M` + 11 枚 `??`）与其消费侧一起落地；**本线既不代提交别人的在飞文件，也不靠摘掉 `e6058120` 那几行 re-export 把红压掉**（工作树里 `EmptyState.tsx`/`HabitBoard.tsx` 等正在用它们）。探针工作树已 `git worktree remove --force` 收掉（`git worktree list` 回到 21 行）。**四端重装**这一半已经不再停着：10-10 07:4x 解除搁置，10-11 15:3x 由趟号 r93 一趟跑完四端（逐端判据与四张人看过的图在 `apps/web/evidence/ux-final-20261011/reinstall/RESULT.md`）⇒ 它证的是**主检出工作树**的产物装得上、起得来，不证干净检出。
       - 🔴 **10-10 01:2x 重量这三格：两格没变，一格变坏了**（载体 = 主检出、HEAD 是本线 `d971a73f`）：① `check:layering` 仍 **rc=1**，仍只报 `apps/web/src/features/share/share-key-store.ts:56` 那一处；② `packages/ui/src` 仍是 **42 枚 ` M` + 11 枚 `??`**（与 23:3x 那格逐字相同 ⇒ 那一线今天没动过）；③ `packages/app-host` 从 **44 枚涨到 50 枚**，而且**那枚 barrel `src/index.ts` 仍在里面**（`git status --porcelain -- packages/app-host/src/index.ts` 命中 1）⇒ 那笔 AAD 迁移**仍然不能由本线做**，且"再等一等"的预期比 15:5x 那格更悲观：这一格在变长而不是在收干。
       - 🔴 **10-10 01:5x 再重量一次（HEAD 已到本线 `b40f6239`）：三格里两格的形状与 01:2x 逐字相同，第三格回落到原点但没有收干**（全部零浏览器、只读命令，载体 = 主检出）。① `check:layering` **仍 rc=1**，违规**仍只有那一处**（现量：`pnpm check:layering` 的报错块只列 `share-key-store.ts` 那一行）。② `packages/ui/src` **仍 42 枚 ` M` + 11 枚 `??`**（现量：`git status --porcelain -- packages/ui/src | awk '{print $1}' | sort | uniq -c`）；同一条口径下 `packages/shared-schema/src` 现在**一枚都不脏**（上一格点名的四枚模块已在 HEAD），所以那档红换了主人但没有消失。③ `packages/app-host` 从 01:2x 那格的 **50 枚回到 44 枚**（34 ` M` + 10 `??`），**barrel `src/index.ts` 仍在脏集合里** ⇒ 上一格那句"这一格在变长而不是在收干"**只覆盖到那一刻**，现在的准确说法是：**它在原地涨落、承重的 barrel 一枚没被收走**，所以"那笔 AAD 迁移仍不能由本线做"这条裁决不变。另补一条同档现状：`git show HEAD:pnpm-lock.yaml` 的 `@zxcvbn-ts/core` 命中 **3** 而 `git show HEAD:packages/ui/package.json | grep -c zxcvbn` = **0** ⇒ `pnpm install --frozen-lockfile` 在 HEAD 上仍红（两侧同 ref，按上面那格口径）。⇒ **"从最终源码四端构建重装"这一半在 HEAD 上仍结构上做不到**（装不起来 + 打不出包），与负责人那句「先只做不需要设备的」是**两条独立的**拦路，不许并成一条。
         - 🔴 **02:5x 按"这两格每次都要重取"那条再量一遍（HEAD = 本线 `fa01b4bd`）：四条谓词逐条与 01:5x 同值，而这一趟多量到一件有用的事 —— 那两行 zxcvbn 声明的修法此刻具体住在哪儿**（本格**不重述**上面那格的论证，只记差量；命令照抄即可复跑）：
@@ -2145,6 +2145,49 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
   - 🔴→✅ **ios**：第一次红在 `PrecompileModule …/ExplicitPrecompiledModules/Dispatch-….scan`；第二次**同一条命令**（`--only ios`，趟号 r78，19:51–19:56）整条过了：`构建成功` → `已安装进模拟器（全新安装）` → `已装的包比源码新 —— 这一轮装的是当前产物` → `窗口 1206x2622、内容占比 58.8%、主蓝命中 4091`。**第一次那枚红不是产品**，成因见下面那条载体撞车。
   ⚠️ **iOS 这一格只能记成"判据过了、图丢了"**：截图落在写死的 `/tmp/heyta-reinstall-ios.png`，20:41 被**另一条会话**的同一步骤覆盖 ⇒ 现在那份是 `2007x2853`、本仓自己的尺量出 `looksBlank=true`、`brandBlue=0`，与 r78 报的 `1206x2622` 尺寸都不等 ⇒ 不是同一张。**没有把别人那张黑图当自己的证据入库**（拷来后现量否证，随即删掉拷贝）。
   ✅ **10-11 12:3x 这一格补上了（趟号 r87）**：先把落点修掉（见下面「载体撞车」那格的下半场），再**当场**从私有落点拷进库、两侧 `shasum -a 256` 逐字相同 ⇒ `apps/mobile/evidence/reinstall-20261011-1230-ios-installed.png` + 同戳 `.txt`（自述：树 `a195a37f` / 装置 `63f93a90` / 窗口 `1206x2622` / 内容 `58.8%` / 主蓝 `4091` / 新鲜度判据过）。图**人打开看过**：浅色中文首屏「在使用联网功能之前」同意卡、两条要点、`服务条款` 与 `隐私政策` 两条链接在位、主蓝实心「同意并联网」+ 无底框「只用本机」⇒ 与 r85/r86 那两趟 Android 首屏同一面卡，不是 §7 第 82 条那种"有标题有正文的错误屏"。
+- ✅ **第 4 步第二次跑完：一趟四端全绿（趟号 r93，10-11 15:34–15:57）**，`REINSTALL_RC=0`。
+  与 r77 那批**唯一的差别是载体**：r77 跑在隔离检出（只含已提交内容），**r93 跑在主检出的工作树上**
+  （`HEAD=f7a0ea3f` 之上 10 枚未提交路径，含别线的 `packages/ai`/`server/src`/`packages/legal`）
+  ⇒ 这批读数证的是**"当前工作树打出的四端产物装得上、起得来、画面对"**，
+  🔴 **不证**"干净检出可复现"（那一格仍归上面「从最终源码四端构建重装」那条，两个拦路里 ① 负责人指令已解除、
+  ② 已提交树是否打得出包**本趟没有重取** —— 别把这格读成它关掉了）。
+  装置 `scripts/reinstall-all.sh` @ `63f93a90`（现量 `git log -1 --format=%h -- scripts/reinstall-all.sh`），
+  落点是私有目录 `HEYTA_REINSTALL_TMP_DIR=$HOME/heyta-carriers/tmp-ux-r93-10111534` ⇒ 上面那格"固定 `/tmp` 互相覆盖现场"
+  在本趟**不成立**（r87 修的就是它）。逐端判据（四端各一条"当前产物"＋一条"起得来且是共享 UI"，全在 `reinstall-all-20261011-r93.txt`）：
+  - **mac**：`安装对账：.app 里的 web-dist 与本机 apps/web/dist 是同一次构建（9 个 chunk）` + 窗口 `2318x1508`、WebView 那张内容 `74.6%`、主蓝 `997`。
+  - **windows**：远端新鲜度对账 `web-dist/index.html=3c4764eaae2f7cbd…`，且**装出来的包内** `PAYLOAD_INDEX_SHA` 前缀逐字等于本机那份
+    ⇒ 这一端的"装的是当前产物"是**字节级**的，不是"命令退 0"；另有 `ADD_APPX=OK` / `M2D=OK` / `RESULT=OK`、装完窗口 `1152x587` 内容 `57.4%`、主蓝 `1178`。
+  - **android**：远端打包回传 `size=69,445,576 B / sha256=9aacfdcd41c8f04e…`，拉回后**与远端逐字相同**且本地 mtime 回写为远端完成时刻（§6.1 那条"回传到消费者原本期望的路径"在这里生效）；
+    `emulator-5554` 全新安装 + 前台窗口确认 `mCurrentFocus=…com.heyta/com.heytamobile.MainActivity`，截图 `1080x2400` 内容 `55.9%`、主蓝 `4042`。
+    ⚠️ 那一发 `monkey` 之后前台不是 `com.heyta`，脚本按设计用 `am start -W` 显式拉起再验一次 —— 这是**载体形状**，不是产品缺陷。
+  - **ios**：`Pods 哈希本已一致，仍重跑 pod install`（§7 第 32 条那条纪律）→ `已装的包比源码新` → 截图 `1206x2622` 内容 `58.8%`、主蓝 `4091`。
+  **四张图都人打开看过**（§6.2 规定一）：同一张首启联网同意卡「在使用联网功能之前」+ 主蓝实心「同意并联网」，
+  Windows 那张里头像菜单开着、"登录账号"是第一项（壳的 M2 探针留下的状态，不是缺陷）。
+  产物与逐条读数入库在 [`apps/web/evidence/ux-final-20261011/reinstall/RESULT.md`](../../apps/web/evidence/ux-final-20261011/reinstall/RESULT.md)
+  （含四张 png 与私有落点的 `shasum -a 256` 双侧对账、`windows/install-capture.txt` 与整趟日志）。
+  🔴 **这一趟顺手把 #27 那枚载体缺陷改成"间歇"**：r77 的**窗口**那张主蓝 `0`（均匀暗底 + 三个红绿灯点），
+  r93 的**窗口**那张主蓝 **994**、`hasAlpha=false`，人打开看到的是完整共享 UI。
+  ⇒ ① 上一批裁掉的"抓窗口时 WKWebView 没被合成进去"那一支**没有被推翻**，但它现在是个**竞态**而不是恒发；
+  ② **不能写成已修** —— 判据一行没动（`package-app.sh` 的 `shot_ok` 把主蓝数在 `.webview.png` 上，所以两种情况都绿）；
+  ③ 取现量：`node --input-type=module -e "import {countBrandBlue} from './scripts/screenshots/png-stats.mjs'; console.log(countBrandBlue('apps/web/evidence/ux-final-20261011/reinstall/mac/heyta-reinstall-mac-installed.png'))"`。
+- 🔴 **r93 当场的两枚门禁红，都不是本线造的、本线不代改口径**（跑法是逐道不带管道取 rc，见 §7 第 45/179 条那个坑）：
+  - `pnpm check:integration-coverage` → **rc=1**：`server/tests/integration/inbound-dual-host-fault-windows.integration.spec.ts`
+    是已提交的在册文件（`git ls-files` 命中，`0eea4c0f` 自动收集 T3 带进来的），但 `server/package.json` 的
+    `test:integration:postgres` 脚本**没有点名它** ⇒ 覆盖对账判"有一枚集成 spec 从没被任何入口跑过"。
+    归**自动收集 / inbound 那一线**（要么把它加进那条脚本，要么按它的口径说明为什么不该跑）。现量：
+    `grep -c 'inbound-dual-host' server/package.json`（**0** 处点名）对 `git ls-files server/tests/integration | grep -c 'inbound-dual-host'`
+    （**2** 枚 —— 但那两枚里只有 `…fault-windows.integration.spec.ts` 是 spec，另一枚 `inbound-dual-host-child.mjs` 是它的子进程辅助件，
+    🔴 **别把 2 读成"两枚 spec 没跑"**）；门禁自己点名的就是那一枚：`node scripts/check-integration-coverage.mjs` 的红行逐字是
+    `- inbound-dual-host-fault-windows.integration.spec.ts`。
+  - `pnpm check:verify-script-copy` → **rc=1**：两枚**旧针**钉在 `scripts/lib/mobile-e2e.sh:1475` 与 `scripts/verify-mobile-habits.sh:631`，
+    钉的串是 `填好服务器地址与访问令牌后才能同步。`，而这句在 `packages/i18n/src/locales/zh-CN.ts` 里**已经不存在**
+    （同步设置那条文案改过）⇒ 红的是"脚本里还留着旧文案的字面串"，归**那两份脚本的所有者**（或改文案那一批的人跟着收）。
+    现量：`grep -n '填好服务器地址与访问令牌后才能同步' packages/i18n/src/locales/zh-CN.ts`（命中 0）。
+  ✅ **两枚都做过 A/B，而且用的是窄版**（没有另起一棵载体）：涉及的**四枚文件逐字等于 `HEAD`**
+  （`git diff --stat HEAD -- server/package.json scripts/lib/mobile-e2e.sh scripts/verify-mobile-habits.sh packages/i18n/src/locales/zh-CN.ts` 无输出），
+  且 `git show HEAD:packages/i18n/src/locales/zh-CN.ts` 里那句旧文案命中 **0** ⇒ 这两枚红**不依赖任何未提交改动**，
+  是 `HEAD` 上的既有红，不是共享检出被写脏的假红。
+  🔴 **两枚都没有靠"给封闭词表加一档豁免"压掉**，也没有改任何判据口径；本线只登记归属与复现命令。
 - 🔴 **载体撞车（同一族缺陷第三次露面，这次是它吃掉了我自己的现场）**：`scripts/reinstall-all.sh` 把 iOS 那腿的**派生数据目录、日志、截图**全写成固定 `/tmp` 路径（`rm -rf /tmp/heyta-ios-release`、`>/tmp/heyta-reinstall-ios-build.log`、`IOS_SHOT=/tmp/heyta-reinstall-ios.png`），而仓库 2026-10 起的固定做法是**在隔离检出里跑四端重装** ⇒ 两条会话同时跑必然互相覆盖。三条现量证据：① 我 19:23 结束运行，而 `/tmp/heyta-reinstall-ios-build.log` 在 19:28:58 的内容全是 `…/heyta/.worktrees/iosacct/…` 的路径；② `/tmp/heyta-reinstall-build.log` 停在 19:30:57（我的那次早已写完）；③ 上面那条 20:41 的截图覆盖。**同族缺陷 mac 段 2026-10-04 已经修过一次**（脚本里 `HEYTA_MACOS_DIST_DIR` 那段注释原话："以前是**写死的**，而它下面第一句就是 `rm -rf`…会把**别人的现场**整个删掉"），iOS / windows / android 三段没跟上。**本轮没有代改**：改的是别人也在跑的重装装置，20:41 刚被另一条会话写过 ⇒ 按边界只登记。给下一个人的修法：三处固定路径各加一枚**带默认值**的旋钮（默认值逐字不变），或直接从 `$(basename "$ROOT")` 派生。
 - ✅ **#34 的探针改进做了两枚**（`scripts/qa/macos-installed-widget-help.sh`，两臂都现量）：
   1. **按 pid 锁死寻址**（`HEYTA_MAC_PID`）：同一台机器上可以有两个 `HeytaMac`（重装时旧实例不自己退，macOS 关掉最后一个窗口后进程照样活着），按名字的寻址会让 System Events 自己挑一个。给了 pid 就先验那个 pid 确实是 `HeytaMac`（`pid 999999 不是 HeytaMac` rc=4、非数字 rc=4 都试过），不给时**逐字**走原来的按名字路径。
@@ -2209,8 +2252,26 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
      成因还是那条老形状：我只查了**我正在用的那枚探针**（AX），没查被测对象自己有没有别的通道（AGENTS §7 元规则一，本线这一轮又一次命中自己）。
   ② `check:macos-window` 那枚 `ScreenCaptureKit 未授权` 的成因要按这条**重读**：dev 构建与安装副本是**两枚不同的代码身份**，
      而安装副本 19:16（r77 自截屏）与刚才这一次都取到了东西 ⇒ "缺授权"至少不适用于安装副本，那一格的红更像 dev 构建那一枚。
-  ③ 🔴 **但 `#34` 没有整格关掉**：那枚 AX 探针要读的是**小组件安装说明的环境识别 + 外链交给浏览器**这两样，
-     壳的 JS 通道**现在没有**这两步（它只走到头像菜单与设置导入面板为止）。闭它两条路：给壳再加一条 env 门控的诊断探针（Swift 侧改动 + 重打包，本线能做，排在下一轮），
-     或允许一次前台激活去跑 AX（与 §6.2 规定二冲突，不代拍）。
-  ⚠️ 这一发的**批次归属必须限定**：`/Applications/Heyta.app` 的 mtime 是 10-11 12:00、由**另一条会话**重装 ⇒ 本线不据它主张"当前源码的壳级读数"，
+  ③ **`#34` 剩下的那两样已经闭掉了**（10-11 14:5x，`91c6da3a`）：**小组件安装说明的环境识别** + **外链交给浏览器**，
+     后台跑、零前台激活、零录屏权限。上一格当时写的是"壳的 JS 通道没有这两步、只能再加一条或去跑前台 AX" ——
+     那句**已被这一发否证**：加一条 env 门控的诊断链不需要重打包、也不需要谁的许可，本线自己就能做完。
+     形状：壳侧 `HEYTA_WIDGET_HELP_PROBE=1` 那条 `runWidgetJourneyChain` **只出读数**，
+     装置 `scripts/verify-macos-widget-help.sh` 起壳，判据在 `scripts/qa/macos-widget-help-judge.mjs`
+     —— 按**键名集合**分安装引导与原生引导，键名真源仍是 `apps/web/src/pwa/widget-install.ts`（经 `widget-step-words.mjs` 读），
+     壳里不抄第二套词条。
+     真跑读数（趟号 `widget-help-1011-141310`，证据 `apps/desktop-macos/evidence/widget-help-dom-20261011-r92.txt`）：
+     四条壳信号全在（`storagePort/heytaStorage/heytaWidget/widgetBridgeSeal`）、面板**可见**（`hidden=false`，不是"在 DOM 里就算"）、
+     渲染 4 行里 **0 行是 PWA 安装引导**、2 行原生步骤、能力行逐字等于产品「原生小组件可用」那行原文、
+     状态行「正在原生桌面应用中运行」、帮助链接解析后是 `https://heyta.waytofuture.cn/docs`（`target=_blank` / `rel` 带 `noopener`）、
+     点完之后**壳自己的地址没变**、外链交接记录 1 次 ⇒ `RESULT=OK`。
+     判据能红（两臂实测，还原只从 `.mut-bak`）：把 scheme 判定改成只认 http ⇒ `EXTERNAL_HANDOFFS=0` **且** `AFTER=https://…/docs/`（红两条，
+     复现的正是"用户工作区被营销页顶掉"）；把第一次点导航改成点别的节 ⇒ `VISIBLE=0` 红一条（挡住"面板常驻 DOM、看不见也报绿"）。
+     两臂之后按还原态复跑回到 `RESULT=OK`（配对）。判据侧另有 `--self-test` 11 臂（含阳性对照），`FAILED=0`。
+     🔴 **仍然开着的那一格，而且它不是"顺手就能关"**：这一趟证的是**交接这个决定**（scheme + 收到哪个 URL + 壳没有跟着导航），
+     **不是**"浏览器里真的渲染出那一页" —— 诊断模式故意不叫 `NSWorkspace.open`（那会把用户的浏览器拽到前台，§6.2 规定二）。
+     那一格仍归需要前台实例的 AX 装置 `scripts/qa/macos-installed-widget-help.sh`，要闭它需要负责人允许一次前台激活。
+     证据文件里的 `BOUNDARY=` 那一行就是这个边界，别把它读成"外链已验证可达"。
+     ⚠️ 与上面 ①② 那一发不同，这一批**不受"装机归属"那条限定**：装置是 `swift build` 从当前源码起的改名副本，
+     新鲜度按"二进制里读得到那枚 env 常量"量（命中 2 处），出处块里 `TREE` / `WEB_DIST_SHA` / `DIRTY_PATHS` 逐条现量。
+  ⚠️ 上面 ①② 那一发的**批次归属必须限定**：`/Applications/Heyta.app` 的 mtime 是 10-11 12:00、由**另一条会话**重装 ⇒ 本线不据它主张"当前源码的壳级读数"，
      它证的是"这条后台通道存在、且能在不抢焦点的情况下把那三项读出来"。
