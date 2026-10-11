@@ -500,6 +500,9 @@ package.json   (只加了一行 verify:collab-journey)
        ⇒ 结论：本线加这枚条件页头按钮，除 landing 复刻对账外**没有别的判据被带红**，无需再动别线。
 
   2. `packages/ai` `capability-manifest.spec.ts`（**2 failed | 263 passed**）—— 分母 9→10 与 `entityTypesWithoutTools` 的产品判断绊线，**AI 覆盖范围，不代改**。
+     🔴 **归属已现量定案（先前"COMMENT 算不算 W4 的活"存疑，现关掉）**：`git log -S "'COMMENT'"` 命中域/清单**只有 `e6058120`（产品体验线 §UX-S9-153，2026-10-09）**，本线 `a923f7fa` 没碰 `entity-types.ts`/`entities.ts` ⇒ **COMMENT 不是本线引入的，这枚 ai 红不是本线涟漪**（与 landing 那枚不同，那枚 `git log -S` 命中的是本线 `a923f7fa`）。
+     而且同一枚 COMMENT 还挡了**第四道**别线红：`check:reachability`「已建模≠可达，1 个已建模实体零写路径 —— COMMENT」（`CommentThread.tsx`/`comments-model.ts` 建好并从 ui barrel 导出，但 `apps` 里**没有一处 `<CommentThread>` 挂载、没有构造 COMMENT op 的写调用点**）。这道与 ai 那枚都**已在 `BLOCKED.md` B156/B159 由别的会话登记**（明写不许用删实体/补 ACTION_FAMILIES/拿测试当调用点三种手法修绿），**本线不碰 BLOCKED、也不代拍**。
+     ⇒ 修正上一小节"两枚别线绊线"的计数：`pnpm check` 实际卡在**四枚外部红**（ai-manifest + check:reachability 同源于 COMMENT/e6058120、shared-schema/auth、domain/billing）+ 一枚已知载体抖动（mobile）。
   3. `packages/shared-schema` `auth-http-contract.spec.ts`（**1 failed | 172 passed**）—— `AUTH_PASSWORD_PATHS` 9→12，**auth 线判据口径，不代改**。
   4. `packages/domain` `subscription.spec.ts`（**1 failed | 1022 passed**）—— 权益拒绝理由契约，**计费/权益线，不代改**。
   5. ⚠️ `apps/mobile`（**`Tests 958 passed (958)` 却非零退**）—— **958 条全过，红只在一条 unhandled rejection**：`RolldownError: Parse failure` 起源于 `tests/auth-flow.spec.ts`（Rolldown 解析 Flow），
