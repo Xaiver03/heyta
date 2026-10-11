@@ -3448,3 +3448,45 @@ cd .worktrees/inb-t7/e2e && npx --no-install playwright test --config playwright
 - 我能自己做的只剩 **T8 交付表终稿**（把这一轮的两条前提读数搬进交付表那两格）与最终汇报。
 - 必须等负责人的：`公网接收与售卖` 开关、B140 那一根线（已量完：两枚文件三处、零附带伤害）、
   B139 归属、B169 A/B、AC-8 设备腿（就是本节这一格）、push。
+
+### 21:4x–21:5x 收尾 · 完成条件那四格的现量，以及当场排掉的一枚索引地雷
+
+**完成条件第 2 条（约束）逐格现量**（21:47，主检出 HEAD = `4f53a03e`）：
+
+| 那一句 | 命令 | 读数 |
+|---|---|---|
+| `license-inventory` rc=0 | `node research/tools/license-inventory.mjs` | `LIC_RC=0`，结论行逐字 `结论：全部依赖均为宽松许可（含已登记的例外）✅` |
+| `check-migrations` rc=0 | `node scripts/check-migrations.mjs` | `MIG_RC=0` |
+| AC 已勾数 = 0 | `python3 research/tools/verify-inbound-ac-ticks.py` | `AC 行=8　已勾=0　未勾=8　状态位未分类=0`，rc=0 |
+| 文档三道 | `check-docs-voice` / `verify-inbound-doc-tables` / `docs-link-check` | 三道 rc=**0**（`docs-link-check` 现在 **无死链** —— 开工快照里那条别线的 `apps/desktop-windows/README.md:89` 已被那条线自己收掉，不是本线动的） |
+| 非白名单 porcelain 条目数 vs 开工快照 | `git status --porcelain \| wc -l` → 106 条，按白名单前缀分成 白名单内 **4** / 非白名单 **102**（`apps` 96、`docs` 2、`packages` 2、`server` 1、`.agents` 1） | 🔴 **这一格没有基线可对**：开工那趟没取快照（已在前面登记过，不重复自造一个数）。能说的是这 102 条**没有一条是本线造的** —— 它们全是别线未提交的工作树内容；白名单内那 4 条 = 本线三份文档的"别线写进本线账本"那 159 行（B170 那一格）+ `server/src/automation/entitlement-ticket.ts` 那枚 `EVENT_ID` 放宽（B158，不是我的笔，我不代提交） |
+
+🔴 **当场排掉的一枚索引地雷（这一节真正的产出）**：`git status --porcelain` 里本线三份文档是 **`MM`** 而不是 ` M`。
+现量：`git diff --cached --numstat HEAD` ⇒ `BLOCKED.md 0/55`、`PROGRESS.md 0/38`、`docs/plans/inbound-automation.md 0/59`
+（**只有删除、没有新增**），`git show :BLOCKED.md | wc -l` = 9222 而 `git show HEAD:BLOCKED.md | wc -l` = 9277。
+⇒ 共享**索引**里躺着我三份文档的**上一版内容**（既不含我刚发布的那 55 行，也不含别线那 159 行）。
+这正好是 01:2x/01:5x 那两次"**我的修复被并行会话的裸 `git commit` 静默回退**"的**机制本体**：
+plumbing 提交只移动 ref、**不动共享索引**，于是提交后索引相对新 HEAD 就是"把刚发布的内容删掉"，
+任何人此时跑一次裸 `git commit` 就会把我那份文档整片退回上一版，而且**他自己的 `--stat` 看起来完全正常**。
+
+处置（只动本线那三份，别线的一份都没碰）：
+
+```
+$ git reset -q HEAD -- BLOCKED.md PROGRESS.md docs/plans/inbound-automation.md
+$ git diff --cached --name-only HEAD        # ⇒ 空（裸 commit 不再会回退我的三份）
+$ git status --porcelain -- 那三份           # ⇒ 只剩 ` M BLOCKED.md`（那 159 行是别线的，仍不入库）
+$ wc -l < BLOCKED.md                          # ⇒ 9436（9222 + 我的 55 + 别线的 159，一行没丢）
+```
+
+📌 **给下一位（本线任何人用 plumbing 提交后的固定收尾动作）**：提交完必须再跑一次
+`git diff --cached --name-only HEAD`，**输出为空才算这一笔落地安全**；非空就说明共享索引里还留着旧版，
+下一次裸 `git commit` 会把这一笔吞掉。这和"提交前带 pathspec"是同一族纪律的**后半段**，
+以前只做了前半段。（已同步进 user 记忆 `shared-checkout-git-and-concurrency` 那一族。）
+
+**B110 那一格的复账**：词条仍缺（两侧 grep 都是 0），但标题那句"`packages/i18n` 正被并行会话写着"**已经不成立**
+（`git status --porcelain -- packages/i18n` = 0 条）⇒ **结论不变、理由换了**，
+现在拦住的只有任务书那条死规矩本身，谁也再不能拿"等 i18n 空出来"当理由。追记已落 `BLOCKED.md` 的 B110。
+
+**本线笔数与位置（21:5x 现量，别抄这里的 SHA，用命令取）**：
+`git log --oneline --grep='自动收集' -1`、`git rev-list --count origin/main..HEAD`（= **97**，含别线未公开的笔，
+本线不代 push）。
