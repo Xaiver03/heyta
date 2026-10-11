@@ -507,6 +507,12 @@ struct SharedWebView: NSViewRepresentable {
         /// 跑第二遍时面板已经不存在，读数会变成 `NO_CLOSE_ACCOUNT_PANEL`，
         /// 而那看起来像"入口没了"（其实是被第一趟做掉了）。
         private var ranEraseJourney = false
+        /// 小组件环境识别 / 外链交接那条诊断链只跑一次（它会**真的点**帮助外链）。
+        private var ranWidgetJourney = false
+        /// 🔴 诊断链期间**壳实际收到并判给系统浏览器的外链**（逐条留着，供证据自述）。
+        /// 正常路径不填它 —— 只有 `HEYTA_WIDGET_HELP_PROBE` 在环境里时才记，
+        /// 因为那一趟故意**不**叫起浏览器（见 `openExternalURLIfAllowed`）。
+        private var externalHandoffs: [String] = []
 
         /// 🔴 **这两个口子必须"只跑一次"。**
         /// 它们都会**重新加载**页面，而重新加载之后首屏探针会**再次成功** ⇒
@@ -714,6 +720,102 @@ struct SharedWebView: NSViewRepresentable {
         })
         """
 
+        /**
+         🔴 **点设置页左侧导航里的某一节**（`HEYTA_WIDGET_HELP_PROBE` 那条链的第一步）。
+
+         定位靠 `button[aria-controls="<节 id>"]` —— 节 id 是产品写在 `<section id=… hidden=…>`
+         上的那个（`App.tsx` 的 `SETTINGS_NAV_ITEMS`），**不是文案、不是索引**：
+          · 按文案找会在换语言/改词条时静默失效（AX 那枚装置就因此要中英各写一份）；
+          · 按索引找会随导航条目增减漂移。
+         `aria-controls` 是无障碍属性，它坏了界面本身就坏了，所以它是这三条里最稳的一枚。
+
+         ⚠️ 为什么**不**直接把面板当"在 DOM 里就算"：各节都是常驻 DOM、用 `hidden` 切换。
+         于是"面板存在"只证明代码分支走对了，不证明用户看得见它 —— 所以这一链**先点导航**，
+         再回读 `section.hidden`（下面 `visible` 那一格），把"可见"单独记成读数。
+         */
+        static func settingsNavClickProbe(_ sectionId: String) -> String {
+            """
+            (function () {
+              var b = document.querySelector(\(jsStringLiteral("button[aria-controls=\"\(sectionId)\"]")));
+              if (!b) return 'NO_NAV';
+              b.click();
+              return 'CLICKED';
+            })()
+            """
+        }
+
+        /**
+         小组件那一节的**环境识别读数**（原样吐回，判据不在这里下）。
+
+         🔴 为什么 Swift 侧**不判文案**：哪些行算"PWA 安装引导"、哪些算"原生小组件引导"，
+         唯一事实源是 `apps/web/src/pwa/widget-install.ts` 里那两支函数，装置侧由
+         `scripts/qa/widget-step-words.mjs` 按**键名集合**去分（理由写在那枚文件的文件头）。
+         壳里再抄一份词条 = 第二套判据 = 会漂移的那一套。
+         所以这里只回：面板在不在、它渲染出的 `data-testid` 清单、状态行与能力行的**原文**、
+         这一节当前可见不可见、页侧观察到的宿主信号、平台名。
+
+         `host` 那一格是这条链的**理由**：产品判"这是不是我们的原生壳"读的就是这几个信号
+         （`isNativeShellHost`），读数里没有它们，下一个人就无法区分"壳没注入"与"页侧没接上"。
+         */
+        static let widgetJourneyFactsProbe = """
+        (function () {
+          var panel = document.querySelector('[data-testid="widget-journey-panel"]');
+          var status = document.querySelector('[data-testid="widget-journey-status"]');
+          var capability = document.querySelector('[data-testid="widget-journey-capability"]');
+          var section = panel ? panel.closest('section') : null;
+          var rows = panel ? Array.prototype.slice
+            .call(panel.querySelectorAll('[data-testid]'))
+            .map(function (el) { return el.getAttribute('data-testid'); }) : [];
+          var handlers = (window.webkit && window.webkit.messageHandlers) || {};
+          return JSON.stringify({
+            panel: panel ? 1 : 0,
+            rows: rows.join(','),
+            status: status ? (status.textContent || '') : '',
+            capability: capability ? (capability.textContent || '') : '',
+            visible: section ? (section.hidden === false ? 1 : 0) : 0,
+            platform: (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '',
+            host: 'storagePort=' + (typeof window.__heytaHostStoragePort !== 'undefined') +
+              ' webview2=' + !!(window.chrome && window.chrome.webview) +
+              ' heytaStorage=' + (typeof handlers.heytaStorage !== 'undefined') +
+              ' heytaWidget=' + (typeof handlers.heytaWidget !== 'undefined') +
+              ' widgetBridgeSeal=' + typeof (window.__heytaNativeWidgetBridge || {}).sealWidgetSnapshot
+          });
+        })()
+        """
+
+        /**
+         「关于与帮助」那一节里那条**站内帮助链接**：读它的 href/target/rel，然后**真的点它**。
+
+         ⚠️ 读 `link.href`（不是 `getAttribute('href')`）：那拿到的是**解析后的绝对地址**，
+         而判据要的就是"壳实际会收到哪个 URL"。相对写法在 `heyta-local://app` 这个 origin 下
+         会解析成本地地址 —— 那恰恰是要被这一格抓住的缺陷形状。
+         */
+        static let helpLinkClickProbe = """
+        (function () {
+          var link = document.querySelector('[data-testid="about-link-docs"]');
+          var panel = document.querySelector('[data-testid="about-panel"]');
+          var section = panel ? panel.closest('section') : null;
+          if (!link) return JSON.stringify({ link: 0, helpVisible: section ? (section.hidden === false ? 1 : 0) : 0, before: location.href });
+          var out = {
+            link: 1,
+            helpVisible: section ? (section.hidden === false ? 1 : 0) : 0,
+            href: link.href,
+            target: link.target || '',
+            rel: link.rel || '',
+            before: location.href
+          };
+          link.click();
+          return JSON.stringify(out);
+        })()
+        """
+
+        /// 点了外链之后，**壳里这个 WebView 还停在应用上吗**。
+        /// 这是"外链交给浏览器"的另一半：只证"壳说要打开那个 URL"不够，
+        /// 还得证**它自己没有导航过去**（否则用户的工作区被营销页顶掉）。
+        static let webViewUrlAfterProbe = """
+        JSON.stringify({ after: location.href, title: document.title })
+        """
+
         var js = SharedWebView.Coordinator.firstScreenProbe
         private var attempts = 0
         /// 第二段（设置里的导入面板）只跑一次 —— 否则每次轮询都会点一次设置。
@@ -789,11 +891,25 @@ struct SharedWebView: NSViewRepresentable {
         /// Help, pricing and changelog belong to the public site. Opening them in
         /// the shell would replace the user's workspace with a marketing page;
         /// hand only real HTTP(S) URLs to the system browser instead.
+        ///
+        /// 🔴 **诊断链里故意不叫起浏览器**（`HEYTA_WIDGET_HELP_PROBE` 在环境里时）：
+        /// `NSWorkspace.open` 会把用户的浏览器**带到前台并开一个标签页**，
+        /// 而 AGENTS §6.2 规定二写明任何会开窗口的验收都不得抢走输入焦点。
+        /// 于是这一趟证到的是**交接这个决定**（scheme 判定 + 收到哪个 URL + 导航被取消），
+        /// **不是**"浏览器里真的渲染出那一页" —— 两者分开写进证据（`…_LAUNCH=suppressed`），
+        /// 后者那一格仍由需要前台实例的 AX 装置（`scripts/qa/macos-installed-widget-help.sh`）覆盖。
+        /// 把这条边界藏起来、报成"外链已验证可达"，就是界面上那句"点了没反应"的反面。
         @discardableResult
         private func openExternalURLIfAllowed(_ url: URL) -> Bool {
             guard let scheme = url.scheme?.lowercased(),
                   scheme == "http" || scheme == "https" else {
                 return false
+            }
+            if ProcessInfo.processInfo.environment["HEYTA_WIDGET_HELP_PROBE"] != nil {
+                externalHandoffs.append(url.absoluteString)
+                onStorageFact("WIDGET_EXTERNAL_HANDOFFS=\(externalHandoffs.count) \(externalHandoffs.joined(separator: " "))")
+                onStorageFact("WIDGET_EXTERNAL_LAUNCH=suppressed(HEYTA_WIDGET_HELP_PROBE)")
+                return true
             }
             NSWorkspace.shared.open(url)
             return true
@@ -1079,6 +1195,17 @@ struct SharedWebView: NSViewRepresentable {
                                                 let panel = Self.field(t2, "panel")
                                                 let file = Self.field(t2, "fileInput")
                                                 if panel > 0 && file > 0 {
+                                                    /**
+                                                     🔴 诊断链**接管收尾**（回首屏 + 自截屏由它自己做）——
+                                                     它还要在设置里继续走两节，此刻回首屏会把它自己的
+                                                     现场拆掉。旋钮不在环境里时，下面这段**逐字不变**，
+                                                     所以固定收尾流程（§6.1.1）的读数不受影响。
+                                                     */
+                                                    if ProcessInfo.processInfo.environment["HEYTA_WIDGET_HELP_PROBE"] != nil,
+                                                       !self.ranWidgetJourney {
+                                                        self.runWidgetJourneyChain(webView)
+                                                        return
+                                                    }
                                                     // 🔴 验完**先回「任务」首屏**再写证据 ——
                                                     //    自截屏（+3s）截的必须是冷启动第一屏。
                                                     webView.evaluateJavaScript(Self.backToTasksProbe) { _, _ in }
@@ -1127,6 +1254,88 @@ struct SharedWebView: NSViewRepresentable {
             guard let path = ProcessInfo.processInfo.environment["HEYTA_M2_EVIDENCE"], !path.isEmpty else { return }
             let body = "WINDOW=heyta\nM2_MACOS_NOTE=M2-macOS 🟡 第 \(attempts) 次探测还没成功：\(text)\n"
             try? body.write(toFile: path + ".txt", atomically: true, encoding: .utf8)
+        }
+
+        /**
+         🔴 **小组件环境识别 + 外链交接**的壳级诊断链（只按 `HEYTA_WIDGET_HELP_PROBE=1` 启用）。
+
+         ## 它要闭的是哪一格
+         `scripts/qa/macos-installed-widget-help.sh` 那枚装置走 macOS Accessibility，
+         而**未被激活的实例不向辅助功能暴露窗口列表**（实测：同一时刻窗口服务器看得见
+         `1159x754` 的那个窗口，System Events 报 0）⇒ 它必须跑在一个前台实例上，
+         这与 AGENTS §6.2 规定二（验收不得抢走输入焦点）直接冲突。
+         这条链用的是这个壳**本来就在用的**另一条通道：`evaluateJavaScript` ——
+         后台、不激活、不需要录屏权限，也不抢键盘。
+
+         ## 三条实测形状
+         1. **各节常驻 DOM、用 `hidden` 切换** ⇒ "面板在 DOM 里"只证明分支走对了，
+            不证明用户看得见。所以链先点导航、再回读 `section.hidden`，
+            把"可见"单独记成一格读数（`WIDGET_*_VISIBLE`）。
+         2. **`link.href` 要读解析后的绝对地址**，不是 `getAttribute('href')` ——
+            判据问的是"壳实际收到哪个 URL"，而相对写法在 `heyta-local://app` 下
+            会解析成本地地址，那正是要抓住的缺陷形状。
+         3. **点了外链之后必须回读 `location.href`** —— "壳说要交给浏览器"与
+            "壳自己没有导航过去"是两件事，少了后半句就可能在"工作区被营销页顶掉"
+            这种界面上报绿。
+
+         ⚠️ 这一链**只出读数，不下判据**：哪些 `data-testid` 算安装引导、哪些算原生小组件
+         引导，唯一事实源在 `apps/web/src/pwa/widget-install.ts`，由装置侧
+         （`scripts/qa/widget-step-words.mjs`）按键名集合分。壳里抄一份就是第二套判据。
+
+         ⚠️ 边界（不包装成完成）：`WIDGET_EXTERNAL_LAUNCH=suppressed` 说明这一趟**没有**
+         真的叫起浏览器，"浏览器里渲染出那一页"那一格仍归前台 AX 装置。
+         */
+        func runWidgetJourneyChain(_ webView: WKWebView) {
+            ranWidgetJourney = true
+            webView.evaluateJavaScript(Self.settingsNavClickProbe("settings-group-appearance")) { res, _ in
+                self.onStorageFact("WIDGET_NAV_APPEARANCE=\((res as? String) ?? "NIL")")
+                // ⚠️ 点完要等一拍：切节是 React 本地状态更新，同一拍里读还是旧界面。
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    webView.evaluateJavaScript(Self.widgetJourneyFactsProbe) { r, _ in
+                        let t = (r as? String) ?? ""
+                        self.onStorageFact("WIDGET_PROBE=ran")
+                        self.onStorageFact("WIDGET_PANEL=\(Self.field(t, "panel"))")
+                        self.onStorageFact("WIDGET_PANEL_VISIBLE=\(Self.field(t, "visible"))")
+                        self.onStorageFact("WIDGET_PANEL_ROWS=\(Self.text(t, "rows"))")
+                        self.onStorageFact("WIDGET_STATUS_TEXT=\(Self.text(t, "status"))")
+                        self.onStorageFact("WIDGET_CAPABILITY_TEXT=\(Self.text(t, "capability"))")
+                        self.onStorageFact("WIDGET_PLATFORM=\(Self.text(t, "platform"))")
+                        self.onStorageFact("WIDGET_HOST_SIGNALS=\(Self.text(t, "host"))")
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                            webView.evaluateJavaScript(Self.settingsNavClickProbe("settings-group-help")) { r2, _ in
+                                self.onStorageFact("WIDGET_NAV_HELP=\((r2 as? String) ?? "NIL")")
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                    webView.evaluateJavaScript(Self.helpLinkClickProbe) { r3, _ in
+                                        let h = (r3 as? String) ?? ""
+                                        self.onStorageFact("WIDGET_HELP_LINK=\(Self.field(h, "link"))")
+                                        self.onStorageFact("WIDGET_HELP_VISIBLE=\(Self.field(h, "helpVisible"))")
+                                        self.onStorageFact("WIDGET_HELP_HREF=\(Self.text(h, "href"))")
+                                        self.onStorageFact("WIDGET_HELP_TARGET=\(Self.text(h, "target"))")
+                                        self.onStorageFact("WIDGET_HELP_REL=\(Self.text(h, "rel"))")
+                                        self.onStorageFact("WIDGET_WEBVIEW_URL_BEFORE=\(Self.text(h, "before"))")
+                                        // 交给系统浏览器那一步是**同步**发生在委托回调里的，
+                                        // 但留一拍让"壳没有导航"这件事在页侧落定后再回读。
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                                            webView.evaluateJavaScript(Self.webViewUrlAfterProbe) { r4, _ in
+                                                let a = (r4 as? String) ?? ""
+                                                self.onStorageFact("WIDGET_WEBVIEW_URL_AFTER=\(Self.text(a, "after"))")
+                                                self.onProbe(
+                                                    "M2-macOS 🔬 小组件环境识别/外链交接读数已取" +
+                                                    "（判据由装置下，本链只出读数）"
+                                                )
+                                                webView.evaluateJavaScript(Self.backToTasksProbe) { _, _ in }
+                                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                                                    SelfCapture.triggerIfRequested()
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         /**
