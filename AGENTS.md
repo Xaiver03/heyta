@@ -607,15 +607,17 @@ Android Vault 验收还必须把恢复码控件的滚动、输入和业务回读
 E2EE 下的**清单共享**基础设施（ADR-0062）已实现并**本地提交**（`git log` 现量，标题以「协作共享清单 W4/W6 接线」起）：
 邀请凭证 + 成员角色 + **所有权转让**（两步确认、立即生效、原 owner 降 editor）+ **入群链接**落点（`?shareToken=`，
 点开进加入流程、消费后摘参）+ 换钥时身份种子随 listKey 一起落盘。真实旅程 `pnpm verify:collab-journey`
-**`RESULT=OK steps=3`**；本线两枚门禁红当场查并修绿 —— `check:layering`（把外壳里那份合成 AAD 的 op 形状构造
+**`RESULT=OK steps=3`**；本线三枚门禁红当场查并修绿 —— `check:layering`（把外壳里那份合成 AAD 的 op 形状构造
 提进 `@heyta/app-host`）与 `check:ui-language`（`web.share.invite.emailPlaceholder` 补进门禁白名单，与 i18n
-`catalog.spec` 既有同一判断对齐，**不改文案**）。`pnpm -r typecheck` 全仓绿。
+`catalog.spec` 既有同一判断对齐，**不改文案**），以及 **`apps/landing` 复刻对账**（本线 W4 接线 `a923f7fa` 往
+`.ht-header__actions` 加了 `share-open-button`，落地页登记处没跟着补 ⇒ 已按既有 `mockedInLanding:false` 约定补登记、
+阳性对照按真源码补项，**不放宽判据**；作用域已穷举，其余钉页头的判据停在不进共享按钮的默认视图）。`pnpm -r typecheck` 全仓绿。
 
 🔴 **不声称全链绿、且未 push**（逐条如实）：
-- **全链 `pnpm check` / `-r test` 仍红，红在两枚别线判断绊线**：`packages/ai` 的「分母恰好 9→10 + 逐条点名」（域模型已含协作线 W4 引入的 `COMMENT` 实体，但要不要给它配 AI 工具是 **AI 覆盖范围的产品判断**）；`packages/shared-schema` 的 `AUTH_PASSWORD_PATHS` 计数 **9→12**（auth 线加了口令路由没同步那条封闭词表）。**都不是本线代码、本线不代改判据口径**。
+- **全链 `pnpm check` / `-r test` 仍红，红在四枚别线判断绊线（no-bail 现量）**：`packages/ai` 的「分母恰好 9→10 + 逐条点名」与 `check:reachability` 的「已建模≠可达」——**同源**于 `COMMENT` 实体（由**产品体验线 `e6058120`** 引入域模型/清单并建了 `CommentThread`/`comments-model`，🔴 **不是本线 W4 引入的**，`git log -S` 现量），要给评论配 AI 工具/补写路径都是**别线产品判断**；`packages/shared-schema` 的 `AUTH_PASSWORD_PATHS` 计数 **9→12**（auth 线加了口令路由没同步那条封闭词表）；`packages/domain subscription.spec` 权益**拒绝理由契约**（计费/权益线）。另 `apps/mobile` 958/958 全过、非零退只在一条 Rolldown `RTEST-UNHANDLED-01` 载体抖动。**都不是本线代码、本线不代改判据口径**。
 - `capability-manifest.generated.ts` 是**跨线混物**（重生成会同时带本线 `COMMENT` 与 AI 工具线早提交的 4 枚 TASK 工具），按「只提交协作线文件」留在工作树未并进，其落地归属待协调。
 - **push 押在跨线协调**：本地 main 领先 `origin/main` 的笔（`git rev-list --count origin/main..HEAD` 现量）里绝大多数是**别的并行会话未公开的笔**，`git push` 会把它们一起公开，本线不代推。
-- **W4 残余**：任务评论 / 指派 / 动态流 UI 未建；**多人并发写同一条任务的写路径路由**是最大未建架构件；入群链接落点仅 Web 接了，移动端未接。
+- **W4 残余**：评论**已建模但不可达**（`COMMENT` + `CommentThread`/`comments-model` 由产品体验线 `e6058120` 建好并从 ui barrel 导出，但无宿主挂载、零写路径，`check:reachability` 就红在这最后一米 —— 归那一线，非本线）；指派 / 动态流 UI 未建；**多人并发写同一条任务的写路径路由**是最大未建架构件；入群链接落点仅 Web 接了，移动端未接。
 
 状态与逐项读数见 [`docs/plans/goal-collaboration-shared-lists.md`](docs/plans/goal-collaboration-shared-lists.md)「2026-10-11 交接·三」；两个 B 类停止点（PIPL 同意弹窗视觉层级、所有权转让语义追认）待产品负责人裁决。
 
