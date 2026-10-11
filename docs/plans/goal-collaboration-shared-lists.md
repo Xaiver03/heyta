@@ -1,6 +1,6 @@
 # Goal：共享清单（多人协作）—— 试实施（W0 + W1）
 
-> 状态：🟡 **本地成笔（2026-10-11），全链门禁被别线绊线挡着、push 押在跨线协调** —— W0+W1 ✅ / W2 服务端核心 ✅ / W3 纯层+格式统一 ✅ / 法务 ✅ / W4 已接线、W6 已落地、journey 全绿且链接落点断言已补（`RESULT=OK steps=3`）/ **④ 门禁：`pnpm -r typecheck` 全仓绿 + 本线两枚红（`check:layering`、`check:ui-language`）当场修绿；no-bail 全量 test 已做对数审计（**条数不写在这里，会漂**；现量：逐包 `Tests` 汇总行相加，并核「有 test 脚本的包数 == 打了汇总行的包数」），本线自己那枚下游红（landing `mockup-shell-shape` #7，因 a923f7fa 给页头加了 `share-open-button`）本会话当场修绿销账；整链仍红在三枚别线判断绊线**（`packages/ai`「分母 9→10」= 给 COMMENT 配不配 AI 工具的产品判断；`shared-schema` `AUTH_PASSWORD_PATHS` 9→12 = auth 线口径；`domain subscription.spec` 权益拒绝理由契约 = 计费线，**都不代改**）+ 一枚已知载体抖动（`mobile` 958/958 全过、非零退只在一条 Rolldown `RTEST-UNHANDLED-01`）/ **⑤ 文档写回已按内容复账并补齐**（benchmark §2.6 的 6.1+6.7、matrix §6（6.2/6.3 按现量更正为「已建模≠可达」）、**roadmap.md 新增 §1.3 并行轨道**、**docs/plans/README.md 索引行**、AGENTS §9、P2-10，均带边界如实登记）/ **⑥ 本线已本地提交（见交接·三），push 未独做**（本地 main 领先 origin 的笔多为别线未公开，`git push` 会一起公开）/ 两个 B 类停止点待产品负责人裁决。逐项读数与执行序见文末「2026-10-11 交接·三」；每步现量——共享检出在动。DoD 全清单见 [collaboration-shared-lists.md](collaboration-shared-lists.md) §7。
+> 状态：🟡 **本地成笔（2026-10-11），全链门禁被别线绊线挡着、push 押在跨线协调** —— W0+W1 ✅ / W2 服务端核心 ✅ / W3 纯层+格式统一 ✅ / 法务 ✅ / W4 已接线、W6 已落地、journey 全绿且链接落点断言已补（`RESULT=OK steps=3`）/ **④ 门禁：`pnpm -r typecheck` 全仓绿 + 本线两枚红（`check:layering`、`check:ui-language`）当场修绿；no-bail 全量 test 已做对数审计（**条数不写在这里，会漂**；现量：逐包 `Tests` 汇总行相加，并核「有 test 脚本的包数 == 打了汇总行的包数」），本线自己那枚下游红（landing `mockup-shell-shape` #7，因 a923f7fa 给页头加了 `share-open-button`）本会话当场修绿销账；整链仍红在三枚别线判断绊线**（`packages/ai`「分母 9→10」= 给 COMMENT 配不配 AI 工具的产品判断；`shared-schema` `AUTH_PASSWORD_PATHS` 9→12 = auth 线口径；`domain subscription.spec` 权益拒绝理由契约 = 计费线，**都不代改**）+ 一枚先前登记的载体抖动（`mobile` Rolldown `RTEST-UNHANDLED-01`）本轮**不摘层重跑未复现**（958 全过、rc=0），已从本线边界里销掉；全量 test 的对数审计分母**含 `server`** —— AGENTS §6 那句"沙箱跑不了 sync-server"是瞬时属性，沿用它会把自己的分母算错（→ §7 第 408 条）/ **⑤ 文档写回已按内容复账并补齐**（benchmark §2.6 的 6.1+6.7、matrix §6（6.2/6.3 按现量更正为「已建模≠可达」）、**roadmap.md 新增 §1.3 并行轨道**、**docs/plans/README.md 索引行**、AGENTS §9、P2-10，均带边界如实登记）/ **⑥ 本线已本地提交（见交接·三），push 未独做**（本地 main 领先 origin 的笔多为别线未公开，`git push` 会一起公开）/ 两个 B 类停止点待产品负责人裁决。逐项读数与执行序见文末「2026-10-11 交接·三」；每步现量——共享检出在动。DoD 全清单见 [collaboration-shared-lists.md](collaboration-shared-lists.md) §7。
 > 权威计划：[collaboration-shared-lists.md](collaboration-shared-lists.md)（W0–W6 全量分期、判据、验证矩阵、边界登记）
 > 决策：[ADR-0062](../adr/0062-shared-list-key-distribution.md)（密钥分发型协作；聚合型红线不动）
 > 证据层：[共享清单调研](../research/collaboration-shared-lists.md)
@@ -643,3 +643,20 @@ package.json   (只加了一行 verify:collab-journey)
 🔴 但这**不等于本线的第 2 步那格可以勾掉**：AGENTS §6.1.1 要的是"**装上的是当前源码的产物**"，
 他们装的那一批早于本线这一轮的文档笔与协作线全部接线笔 ⇒ 判据（各端 `远端字节 == 本地工作树`）不成立。
 ⇒ 剩下的真前提只有一条：**四端设备面同时空 + 产品负责人醒着**（会开窗口的验收不得抢前台，且他不希望被叫醒）。
+
+### 五、本会话终态：可自主做的格已清空，剩下四格每一格都不在本线射程（附复量命令）
+
+写这一节是为了让下一个会话**不必重新推导"还剩什么、归谁"**，也为了挡住一种特定的浪费：
+剩下四格的重跑条件全在**别人的笔**或**产品负责人的一句话**上，照本线现在的状态再跑一遍整链只会得到同一份红集
+（本轮已现量：`git diff --name-only <本线上一次读数那一笔>..HEAD -- packages/ai packages/shared-schema packages/domain e2e`
+= **0 个文件** ⇒ 三枚判断绊线与 `check:reachability` 的输入没变，重跑不构成新读数）。
+
+| 格 | 归谁 | 复量命令（输入变了才跑） | 闭合的判据 |
+|---|---|---|---|
+| `pnpm check` 整链绿 | 别线：AI 工具线（`packages/ai` 分母 + `capability-manifest.generated.ts` 已在他们工作树里被改）、auth 线（`AUTH_PASSWORD_PATHS` 词表）、计费线（权益拒绝理由契约）；`check:reachability` 归 COMMENT 的归属方（产品体验线） | `pnpm check 2>&1 \| sed -E 's/\x1b\[[0-9;]*[a-zA-Z]//g'` —— 先剥 ANSI 再数红（§7 第 163 条：不剥会把红报成 0 条），且**不许接 `head`**（红集要整份拿） | 那四枚红**由他们改口径**；本线代改判据口径属越界（记忆红线：判据口径永不代改） |
+| `pnpm reinstall:all` 四端 | 产品负责人（设备面 + 不抢前台） | `pnpm reinstall:all` | AGENTS §6.1.1：每端一条「远端字节 == 本地工作树」，任一端红整体红、不静默跳过。链可用性已被别线 `92fcff44` 实测，缺的只是设备面同时空 |
+| push 到 `origin/main` | 产品负责人 或 各线各自从自己机器推 | `git rev-list --count refs/remotes/origin/main..HEAD` 现量领先枚数，再 `git --no-pager log refs/remotes/origin/main..HEAD --format='%s' \| sed -E 's/^[a-z]+[（(]([^)）]*).*/\1/' \| sort \| uniq -c` **按线分类** | 只有当领先集里**只剩本线的笔**，或他明确说"整条 main 一起推"，才动。不 force、不 `--no-verify`（pre-push 有外部 bytearm） |
+| 两个 B 类停止点 | 产品负责人（① 涉对外法律表征，② 涉服务端事务形状） | 读第 5 步那两段 + `packages/ui/src/sync/ShareConsentModal.tsx`、`server/src/shares/share.routes.ts` 的 `transfer` 事务 | ① 待拍的是**视觉层级**，不是"控件坏了"（三个控件都是真 `Pressable`）；② 追认现语义或改可撤销/延时/先接受 |
+
+🔴 **给下一个 AI 的一条**：这四格里**没有一格是"本线忘了做"**。把任何一格重新登记成待办去推动，
+就等于让这条线再排一次已经在别人手里的队 —— 想动之前先跑上面那列命令，看输入是不是真变了。
