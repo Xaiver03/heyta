@@ -202,13 +202,6 @@ export function __resetOpLogForTests(): void {
 }
 
 /**
- * 动作层的宿主上下文。
- *
- * 与专注 store 用的是同一个形状 —— 两个 store 各写一份 `{dispatch, getState}`
- * 是可以接受的，因为它只是**两个函数引用**，不含任何判断；
- * 一旦它开始包含判断（比如"离线时排队"），就该抽走。
- */
-/**
  * 「用户发起的任务写入失败了」这一件事的**码**（封闭词表）。
  *
  * 只有一枚是刻意的：动作层抛出来的原因有很多种（引擎没初始化、实体不存在、
@@ -247,6 +240,16 @@ async function withActionFailure<T>(run: () => Promise<T>): Promise<T> {
   }
 }
 
+/**
+ * 动作层的宿主上下文。
+ *
+ * 与专注 store 用的是同一个形状 —— 两个 store 各写一份 `{dispatch, getState}`
+ * 是可以接受的，因为它只是**两个函数引用**，不含任何判断；
+ * 一旦它开始包含判断（比如"离线时排队"），就该抽走。
+ *
+ * ⚠️ 现在这两个引用**各带一层失败记录**（`withActionFailure`），
+ * 所以"只是两个函数引用"这句已经不完全准确了 —— 它含的是"失败往哪儿记"这一条判断。
+ */
 const actionContext: ActionContext = {
   dispatch: (intent) => withActionFailure(() => dispatchIntent(intent)),
   dispatchChecked: (build) => withActionFailure(() => dispatchChecked(build)),
