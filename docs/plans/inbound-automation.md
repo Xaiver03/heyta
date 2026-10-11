@@ -2966,8 +2966,11 @@ $ tail -3 004.log                                                  → apps/web 
 | `@heyta/legal` 2 红 / 74 过 | 九份文档写"10 封功能邮件"而代码里有 11 枚 `send*Email`，漏的那类是**登录验证码** | 别线：`git log -S 'sendLoginCodeEmail' -- server/src` → `d361209e`（注册登录标准套件线） |
 | `@heyta/domain` 1 红 / 1022 过 | `expected [...16] to deeply equal [...8]` | 🔴 **本线** |
 
-🔴 **domain 那一格不是"别线绊线"，是本线自己造的**（此前 AGENTS §9 与本台账把它写成"计费/权益线的契约"，
-读起来像别人欠的活 —— 现量否证）：多出来的 8 枚
+🔴 **domain 那一格是本线自己造的**。归属这一条**本台账早就记过**（上面 §「逐格归属」那张表里 `packages/domain` 那一行：
+多出的恰好 8 枚、`git log -S"DEPLOYMENT_MISMATCH"` → `e8b3e982`（10-09 12:21，本线）），
+这次不是重新发现，而是**把它从"记着但没人碰"变成"修掉并有尺守着"** ——
+之前那条只写在归属列里、没落成动作，所以从第 105 道 FIRST_FAIL 之后它就一直藏着（链上 19 格里根本没有 domain 这一格）。
+而 AGENTS §9 那句"`packages/domain` 权益拒绝理由契约（计费/权益线）"里的"计费/权益线"**就是本线**，不是别人欠的活。
 `ENTITLEMENT_MODE_UNCONFIGURED / ISSUER_NOT_CONFIGURED / NO_BINDING / BINDING_EXPIRED / DEPLOYMENT_MISMATCH / REVOKED_VERSION / ENTITLEMENT_TICKET_REQUIRED / ENTITLEMENT_TICKET_REJECTED`
 是本线 `e8b3e982` 与 `4b84584d` **并进了 `server/src/entitlement.ts` 那张 `EntitlementDenialReason`**（订阅读取词表），
 而 `packages/domain/tests/subscription.spec.ts:215` 比对的就是这张表与客户端认识的词表。
