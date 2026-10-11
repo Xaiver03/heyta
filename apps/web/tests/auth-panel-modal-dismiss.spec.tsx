@@ -126,7 +126,12 @@ async function mountFixture(node: ReactNode): Promise<void> {
   });
 }
 
-function pressKey(target: Element, key: string): void {
+/**
+ * `target` 是 `EventTarget` 而不是 `Element`：B 组那三条从 `window` 起事件 ——
+ * `useModalDismiss` 把监听挂在 **window 的捕获阶段**（§7 第 80 条），
+ * 而从面板元素起的那条路要留给 A 组那个"输入框吞掉冒泡"的夹具。
+ */
+function pressKey(target: EventTarget, key: string): void {
   act(() => {
     target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
   });
