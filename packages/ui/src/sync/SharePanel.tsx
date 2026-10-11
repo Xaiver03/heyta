@@ -14,6 +14,8 @@
 
 import { Pressable, Text, View } from 'react-native';
 
+import { useState } from 'react';
+
 import {
   canInviteMembers,
   canManageMembers,
@@ -38,12 +40,22 @@ export interface SharePanelLabels {
   limitReached: string;
   removeButton: string;
   fallbackMember: (idPrefix: string) => string;
+  /** 转让所有权（owner 专属；W6）。两步确认在面板内完成。 */
+  transfer: {
+    button: string;
+    /** 确认句必须说清后果 —— 转让者本人会降为可编辑成员（语义拍板：计划 W6）。 */
+    confirmHint: string;
+    confirm: string;
+    cancel: string;
+  };
 }
 
 export interface SharePanelCallbacks {
   onInvite: () => void;
   onRemoveMember: (memberId: string) => void;
   onRoleChange: (memberId: string, nextRole: ShareRole) => void;
+  /** 转让所有权（服务端裁决 owner 身份；面板只把入口如实给 owner）。 */
+  onTransferOwnership: (memberId: string) => void;
 }
 
 export interface SharePanelProps {
@@ -75,6 +87,10 @@ export function SharePanel(props: SharePanelProps) {
   const manage = canManageMembers(myRole);
   const invite = canInviteMembers(myRole);
   const limit = memberLimitState(props.data.members.length);
+  // 转让的两步确认：armed = 已按过一次「转让所有权」、等第二次确认的成员行。
+  // 🔴 必须两步：这是面板里唯一**单向**的管理动作（角色可再改、移除可重邀，
+  // 转让后原 owner 拿不回 owner 身份，除非新 owner 再转回来）。
+  const [transferArmed, setTransferArmed] = useState<string | undefined>(undefined);
 
   return (
     <View testID="share-panel">
@@ -126,6 +142,36 @@ export function SharePanel(props: SharePanelProps) {
                 >
                   <Text>{props.labels.removeButton}</Text>
                 </Pressable>
+                {transferArmed === view.memberId ? (
+                  <View testID={`share-transfer-confirm-${view.memberId}`}>
+                    <Text>{props.labels.transfer.confirmHint}</Text>
+                    <Pressable
+                      onPress={() => {
+                        setTransferArmed(undefined);
+                        props.callbacks.onTransferOwnership(view.memberId);
+                      }}
+                      accessibilityRole="button"
+                      testID={`share-transfer-accept-${view.memberId}`}
+                    >
+                      <Text>{props.labels.transfer.confirm}</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => setTransferArmed(undefined)}
+                      accessibilityRole="button"
+                      testID={`share-transfer-cancel-${view.memberId}`}
+                    >
+                      <Text>{props.labels.transfer.cancel}</Text>
+                    </Pressable>
+                  </View>
+                ) : (
+                  <Pressable
+                    onPress={() => setTransferArmed(view.memberId)}
+                    accessibilityRole="button"
+                    testID={`share-transfer-${view.memberId}`}
+                  >
+                    <Text>{props.labels.transfer.button}</Text>
+                  </Pressable>
+                )}
               </View>
             )}
           </View>

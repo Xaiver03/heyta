@@ -272,6 +272,11 @@ const UNTRANSLATABLE_KEYS = new Set([
   'site.download.row.linux.name',
   'site.download.row.windows.arch',
   'site.download.row.linux.arch',
+  // 输入框里的示例邮箱（`name@example.com`）—— 它的值**就是被演示的那个格式本身**，
+  // 中英两份逐字相同。翻成中文反而把一个假邮箱塞进邮箱输入框。
+  // 🔴 同一个判断早由协作线 `2f59b075` 写在 `packages/i18n/tests/catalog.spec.ts` 的
+  //    `allowed` 里；这一行只是把那份判断补到它漏登记的本门禁，两处不再各说一套。
+  'web.share.invite.emailPlaceholder',
 ]);
 
 /**

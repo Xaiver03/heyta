@@ -203,6 +203,20 @@ export class ShareApiClient {
     return this.call('DELETE', `/api/shares/${shareId}/members/${memberId}`);
   }
 
+  /**
+   * 转让所有权（owner 专属；W6）。语义：目标成员升 owner、**原 owner 降 editor**、
+   * `share.ownerUserId` 同步换人 —— 三处由服务端在一个事务里完成。
+   */
+  transferOwnership(shareId: string, memberId: string): Promise<{
+    shareId: string;
+    ownerId: number;
+    newOwnerMemberId: string;
+    demotedMemberId: string;
+    demotedRole: string;
+  }> {
+    return this.call('POST', `/api/shares/${shareId}/transfer`, { memberId });
+  }
+
   leaveShare(shareId: string): Promise<{ left: boolean }> {
     return this.call('POST', `/api/shares/${shareId}/leave`);
   }

@@ -39,6 +39,9 @@ const mocks = vi.hoisted(() => ({
     findMany: vi.fn(),
   },
   wsNotifyShareOps: vi.fn(),
+  // 转让所有权（W6）用数组式事务：mock 只需把操作数组并发跑掉，断言看的是
+  // 各 update 的调用参数（含顺序 —— 三处写的先后由路由保证，mock 不改变它）。
+  $transaction: vi.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
 }));
 
 vi.mock('../src/db', () => ({ prisma: mocks }));
@@ -103,7 +106,7 @@ afterEach(async () => {
 });
 
 describe('身份：新端点族全部要求令牌', () => {
-  it('没有 Authorization 头 → 401（14 条端点逐一遍历）', async () => {
+  it('没有 Authorization 头 → 401（15 条端点逐一遍历）', async () => {
     for (const [method, url] of [
       ['POST', '/api/shares'],
       ['GET', '/api/shares'],
@@ -116,6 +119,7 @@ describe('身份：新端点族全部要求令牌', () => {
       ['PATCH', '/api/shares/share-1/members/member-1'],
       ['PUT', '/api/shares/share-1/members/member-1/envelope'],
       ['DELETE', '/api/shares/share-1/members/member-1'],
+      ['POST', '/api/shares/share-1/transfer'],
       ['POST', '/api/shares/share-1/leave'],
       ['POST', '/api/shares/share-1/ops'],
       ['GET', '/api/shares/share-1/ops/causal'],
@@ -490,6 +494,101 @@ describe('owner 专属动作', () => {
     expect(mocks.share.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { keyEpoch: 2 } }),
     );
+  });
+});
+
+describe('转让所有权（POST /shares/:id/transfer，W6）', () => {
+  const targetEditor = { ...memberAs('editor'), id: 'member-2', userId: 2n };
+
+  beforeEach(() => {
+    mocks.share.findFirst.mockResolvedValue(activeShare);
+    // mockReset 而不是只排 Once 链：上一条用例没消费完的 Once 队列会**排在**新链
+    // 前面被先消费（validation 用例不查库就会留下两条），顺序就漂了。
+    mocks.shareMember.findFirst.mockReset();
+    mocks.shareMember.findFirst
+      .mockResolvedValueOnce(memberAs('owner'))
+      .mockResolvedValueOnce(targetEditor);
+    mocks.share.update.mockResolvedValue({});
+    mocks.shareMember.update.mockResolvedValue({});
+    mocks.$transaction.mockClear();
+  });
+
+  it('owner 转给 editor：换 owner + 原 owner 降 editor + share.ownerUserId，三处一个事务', async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/api/shares/share-1/transfer', headers: AUTH,
+      payload: { memberId: 'member-2' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      shareId: 'share-1',
+      ownerId: 2,
+      newOwnerMemberId: 'member-2',
+      demotedMemberId: 'member-1',
+      demotedRole: 'editor',
+    });
+    expect(mocks.$transaction).toHaveBeenCalledTimes(1);
+    const ops = mocks.$transaction.mock.calls[0]![0] as unknown[];
+    expect(ops, '三处写必须都进同一个事务').toHaveLength(3);
+    // 🔴 语义核心（变异臂钉在这）：share.ownerUserId 是详情/列表 ownerId 的事实源；
+    // 新 owner 升 owner；**原 owner 必须降 editor** —— 拿掉第三条写，下面这组
+    // 断言恰好红（共享清单不允许出现双 owner）。
+    expect(mocks.share.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'share-1' }, data: { ownerUserId: 2n } }),
+    );
+    expect(mocks.shareMember.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'member-2' }, data: { role: 'owner' } }),
+    );
+    expect(mocks.shareMember.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'member-1' }, data: { role: 'editor' } }),
+    );
+  });
+
+  it('editor 调转让 → 403（owner 专属动作）', async () => {
+    mocks.shareMember.findFirst.mockReset();
+    mocks.shareMember.findFirst
+      .mockResolvedValueOnce(memberAs('editor'))
+      .mockResolvedValueOnce(targetEditor);
+    const res = await app.inject({
+      method: 'POST', url: '/api/shares/share-1/transfer', headers: AUTH,
+      payload: { memberId: 'member-2' },
+    });
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe('SHARE_ROLE_FORBIDDEN');
+    expect(mocks.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('目标不是本共享的活跃成员 → 404（存在性不外泄）', async () => {
+    mocks.shareMember.findFirst.mockReset();
+    mocks.shareMember.findFirst
+      .mockResolvedValueOnce(memberAs('owner'))
+      .mockResolvedValueOnce(null);
+    const res = await app.inject({
+      method: 'POST', url: '/api/shares/share-1/transfer', headers: AUTH,
+      payload: { memberId: 'member-x' },
+    });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('转让给自己 → 400', async () => {
+    mocks.shareMember.findFirst.mockReset();
+    mocks.shareMember.findFirst
+      .mockResolvedValueOnce(memberAs('owner'))
+      .mockResolvedValueOnce(memberAs('owner'));
+    const res = await app.inject({
+      method: 'POST', url: '/api/shares/share-1/transfer', headers: AUTH,
+      payload: { memberId: 'member-1' },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(mocks.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('载荷缺 memberId → 400（validation_failed，统一信封）', async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/api/shares/share-1/transfer', headers: AUTH,
+      payload: {},
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe('validation_failed');
   });
 });
 

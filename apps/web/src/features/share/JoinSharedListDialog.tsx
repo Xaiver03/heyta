@@ -13,6 +13,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 import { cssVar, ICON_SIZE } from '@heyta/design-system';
@@ -46,6 +47,11 @@ export interface JoinSharedListDialogProps {
   onClose: () => void;
   /** 入群成功后宿主导航到那条清单（App 的 `goToFilter`）。 */
   onJoined?: (projectId: string) => void;
+  /**
+   * 预填的入群凭证（token 或整条链接）：分享链接 `?shareToken=` 落进应用时由
+   * 宿主传入（W6 链接落点）。用户仍可改——预填只是把"贴 token"这一步省掉。
+   */
+  initialToken?: string;
 }
 
 type JoinPhase =
@@ -56,7 +62,7 @@ type JoinPhase =
   | { kind: 'error'; message: string };
 
 export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
-  const { onClose, onJoined } = props;
+  const { onClose, onJoined, initialToken } = props;
   const { t } = useI18n();
 
   const baseUrl = useSyncStore((s) => s.baseUrl);
@@ -64,7 +70,7 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
   const accountId = useSyncStore((s) => s.accountId);
 
   const [phase, setPhase] = useState<JoinPhase>({ kind: 'input' });
-  const [inputValue, setInputValue] = useState('');
+  const [inputValue, setInputValue] = useState(initialToken ?? '');
   const [listName, setListName] = useState('');
   const [needsUnlock, setNeedsUnlock] = useState(false);
   const pollRef = useRef<number | undefined>(undefined);
@@ -167,7 +173,12 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
     }
   }, [api, getPayloadCipher, inputValue, t]);
 
-  return (
+  // 🔴 必须走 portal 挂到 body：本组件由侧栏（ProjectsPanel）挂载，而侧栏列
+  // `nav.ht-sidebar` 是 `position: sticky` —— sticky **总是**创建层叠上下文，
+  // 里面的 fixed + z-modal 会被困在该上下文内，整列按树序画在 `.ht-main`
+  // 之前 ⇒ 对话框看得见（fixed 不被裁剪）但**点不到**（命中测试落在主内容上）。
+  // 模态是应用级表面，出口与 App 根部的 ShareFeature 同层（2026-10-10 旅程首跑实测）。
+  return createPortal(
     <div
       style={{
         position: 'fixed',
@@ -302,6 +313,7 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
           </>
         ) : null}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

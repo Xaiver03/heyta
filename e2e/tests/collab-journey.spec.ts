@@ -25,13 +25,18 @@ import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import { mkdir, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
-import { decidePrivacyConsent } from './helpers';
+import { decidePrivacyConsent, selectSettingsSection } from './helpers';
 import { fillVaultSecret } from '../vault/privacy';
 
 const API_BASE = process.env['HEYTA_COLLAB_BASE'] ?? 'http://127.0.0.1:3217';
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
-/** 固定证据路径（§6.2 规定二）：跑完直接打开同一组文件看。 */
-const EVIDENCE = `${ROOT}e2e/test-results/collab-journey`;
+/**
+ * 固定证据路径（§6.2 规定二）：跑完直接打开同一组文件看。
+ * 🔴 不落共享的 `test-results/` 树——并行套件的 Playwright 启动会整树清掉它
+ * （见 playwright.collab.config.ts 的 outputDir 注释）；独立目录才能保证
+ * 「拍了就在」，verify 脚本收口读的也是这里。
+ */
+const EVIDENCE = `${ROOT}e2e/collab-journey-results`;
 
 const OWNER_PASSPHRASE = 'owner journey passphrase 2026';
 const BOB_PASSPHRASE = 'bob journey passphrase 2026';
@@ -80,11 +85,16 @@ async function seedCredentials(context: BrowserContext, user: TestUser): Promise
 async function establishVault(page: Page, passphrase: string): Promise<void> {
   await page.getByTestId('account-menu-avatar').click();
   await page.getByTestId('account-menu-settings').click();
+  // 🔬 设置浮层是「分类导航 + 内容区」的 IA，默认停在「显示」组——必须显式切到
+  // 「同步与隐私」组，否则 sync-settings-panel 在 DOM 里但 hidden（首跑实测）。
+  await selectSettingsSection(page, 'sync');
   await page.getByTestId('sync-settings-panel').waitFor({ state: 'visible' });
   const section = page.getByTestId('sync-settings-panel');
   await section.scrollIntoViewIfNeeded();
 
-  await expect(section.getByTestId('vault-create-form')).toBeVisible();
+  // vault 面板的 session 加载（IndexedDB + 首次 refreshFromRemote）在共享构建机
+  // 上可超过默认 5s —— 这里同样给环境等待留余量。
+  await expect(section.getByTestId('vault-create-form')).toBeVisible({ timeout: 30_000 });
   await fillVaultSecret(section.getByTestId('vault-create-passphrase'), passphrase);
   await section.getByTestId('vault-create').click();
 
@@ -138,7 +148,9 @@ test('共享清单全旅程：owner 建共享 + 邀请 → bob 贴 token 入群 
   // ── owner：vault + 清单 + 共享同意 + 邀请 ────────────────────────────────
   await seedCredentials(ownerContext, owner);
   await ownerPage.goto('/?lang=zh-CN');
-  await expect(ownerPage.locator('input[placeholder^="添加任务"]')).toBeVisible();
+  // 应用就绪探针放 30s：vite dev 冷启动（模块转换）在共享构建机上可超 5s
+  // （首跑实测：同一断言一轮过、一轮超时 —— 是环境等待，不是产品判据）。
+  await expect(ownerPage.locator('input[placeholder^="添加任务"]')).toBeVisible({ timeout: 30_000 });
   await decidePrivacyConsent(ownerPage, 'accepted');
   await establishVault(ownerPage, OWNER_PASSPHRASE);
   await createProjectAndOpen(ownerPage, '家庭装修');
@@ -166,12 +178,23 @@ test('共享清单全旅程：owner 建共享 + 邀请 → bob 贴 token 入群 
   const linkText = await ownerPage.getByTestId('share-invite-ticket').textContent();
   expect(linkText, '票据里不出现密钥材料').not.toContain('listKey');
 
+  // W6 链接落点（把 04 号截图里「凭证 + 链接双展示」的可见事实钉进判据）：
+  // 链接 = 应用可分享地址 + shareToken，落点是**应用自己**（bob 点开直接进加入旅程），
+  // 不是同步服务器（ADR-0062 决策 2；`buildShareJoinLink` 用 window.location.origin 拼）。
+  const inviteLink = (await ownerPage.getByTestId('share-invite-link').textContent())?.trim() ?? '';
+  expect(inviteLink, '邀请链接以查询串形式携带 shareToken').toContain('shareToken=');
+  const parsedLink = new URL(inviteLink);
+  const appOrigin = new URL(ownerPage.url()).origin;
+  expect(parsedLink.origin, '邀请链接落点是应用自己的源').toBe(appOrigin);
+  expect(parsedLink.origin, '邀请链接不得指向同步服务器').not.toBe(new URL(API_BASE).origin);
+  expect(parsedLink.searchParams.get('shareToken'), '链接里的 token 与展示的凭证是同一个').toBe(inviteToken);
+
   // owner 面板保持打开 —— bob 接受后由这里的轮询自动封信封（旅程的下一跳）。
 
   // ── bob：vault + 贴 token 入群 ───────────────────────────────────────────
   await seedCredentials(bobContext, bob);
   await bobPage.goto('/?lang=zh-CN');
-  await expect(bobPage.locator('input[placeholder^="添加任务"]')).toBeVisible();
+  await expect(bobPage.locator('input[placeholder^="添加任务"]')).toBeVisible({ timeout: 30_000 });
   await decidePrivacyConsent(bobPage, 'accepted');
   await establishVault(bobPage, BOB_PASSPHRASE);
 

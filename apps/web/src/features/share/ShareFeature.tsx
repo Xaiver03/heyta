@@ -228,20 +228,25 @@ export function ShareFeature(props: ShareFeatureProps) {
   }, [phase, detail, members, autoSeal]);
 
   // ── 邀请（owner）───────────────────────────────────────────────────────────
+  /** 应用自己的可分享地址（W6 链接落点）：朋友点链接该落进**应用**的入群旅程，
+   *  而不是同步服务器上一个不存在的页面。`BASE_URL` 让挂在子路径（如 `/app/`）
+   *  的部署也拼对。 */
+  const appBaseUrl = `${window.location.origin}${import.meta.env.BASE_URL}`;
+
   const submitInvite = useCallback(async () => {
     if (phase.kind !== 'panel' || api === undefined) return;
     setInviteBusy(true);
     try {
       const email = inviteEmail.trim() === '' ? undefined : inviteEmail.trim();
       const res = await api.createInvitation(phase.shareId, email === undefined ? {} : { invitedEmail: email });
-      setTicket({ token: res.token, link: buildShareJoinLink(baseUrl, res.token), invitedEmail: email ?? '' });
+      setTicket({ token: res.token, link: buildShareJoinLink(appBaseUrl, res.token), invitedEmail: email ?? '' });
       setInviteEmail('');
     } catch (err) {
       setCreatingError(err instanceof ShareApiError ? `${err.status} ${err.code ?? ''}` : String(err));
     } finally {
       setInviteBusy(false);
     }
-  }, [phase, api, inviteEmail, baseUrl]);
+  }, [phase, api, inviteEmail, appBaseUrl]);
 
   const copyText = useCallback(async (value: string, which: 'token' | 'link') => {
     try {
@@ -267,6 +272,13 @@ export function ShareFeature(props: ShareFeatureProps) {
     limitReached: t('common.share.member.limitReached'),
     removeButton: t('web.share.panel.remove'),
     fallbackMember: (idPrefix: string) => t('common.share.comment.fallbackAuthor', { id: idPrefix }),
+    // 转让所有权（W6）：确认句在词条里就说清「转让者降为可编辑」的后果。
+    transfer: {
+      button: t('web.share.transfer.button'),
+      confirmHint: t('web.share.transfer.confirmHint'),
+      confirm: t('web.share.transfer.confirm'),
+      cancel: t('web.share.transfer.cancel'),
+    },
   }), [t]);
 
   const consentLabels = useMemo(() => ({
@@ -435,6 +447,17 @@ export function ShareFeature(props: ShareFeatureProps) {
                 >
                   {ticket.token}
                 </code>
+                {/* 链接与 token 同样明文展示（W6 落点）：剪贴板被拒/接收方要手动转发时，
+                    用户要能看见并选中这条链接本身 —— 与 token 的处理同一条理由。 */}
+                <p style={{ margin: 0, ...text('row-meta'), color: cssVar('color.foreground-muted') }}>
+                  {t('web.share.invite.linkTitle')}
+                </p>
+                <code
+                  data-testid="share-invite-link"
+                  style={{ ...text('row-meta'), wordBreak: 'break-all', padding: cssVar('space.2'), background: cssVar('color.surface-subtle'), borderRadius: cssVar('radius.sm') }}
+                >
+                  {ticket.link}
+                </code>
                 <div style={{ display: 'flex', gap: cssVar('space.2'), flexWrap: 'wrap' }}>
                   <button type="button" className="ht-btn ht-btn--ghost" data-testid="share-invite-copy-token" onClick={() => { void copyText(ticket.token, 'token'); }}>
                     {copied === 'token' ? t('web.share.invite.copied') : t('web.share.invite.copyToken')}
@@ -473,6 +496,11 @@ export function ShareFeature(props: ShareFeatureProps) {
                 },
                 onRoleChange: (memberId, role) => {
                   void api.patchMemberRole(phase.shareId, memberId, role).then(() => reload(phase.shareId));
+                },
+                // 转让所有权（W6）：服务端事务里 ownerUserId 与两条成员行一起换，
+                // 客户端只管发起 + 对账（reload 后自己的角色就是 editor 了）。
+                onTransferOwnership: (memberId) => {
+                  void api.transferOwnership(phase.shareId, memberId).then(() => reload(phase.shareId));
                 },
               }}
             />

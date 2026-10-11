@@ -18,8 +18,9 @@
  * | POST | `/shares/invitations/accept` | 认证 | 凭 token 入群（带封装公钥；29 人上限） |
  * | GET  | `/shares/:id/members` | 成员 | 成员列表（含 identityPublicKey，owner 封信封要用） |
  * | PATCH | `/shares/:id/members/:memberId` | owner | 改角色 |
- * | PUT  | `/shares/:id/members/:memberId/envelope` | owner | 下发/更新密钥信封（rekey 的服务端落点） |
+ * | PUT | `/shares/:id/members/:memberId/envelope` | owner | 下发/更新密钥信封（rekey 的服务端落点） |
  * | DELETE | `/shares/:id/members/:memberId` | owner | 移除成员（removedAt 置位；rekey 由 owner 客户端执行） |
+ * | POST | `/shares/:id/transfer` | owner | 转让所有权（换 owner + 原 owner 降 editor，一个事务） |
  * | POST | `/shares/:id/leave` | 非 owner 成员 | 退出 |
  * | POST | `/shares/:id/ops` | 成员 + role 硬门 | share op 上传（独立发号） |
  * | GET  | `/shares/:id/ops/causal` | 成员 | share op 下载（seq 游标） |
@@ -127,6 +128,9 @@ const AcceptInvitationSchema = z.object({
 });
 
 const PatchMemberSchema = z.object({ role: z.string().min(1).max(16) });
+
+/** 转让所有权（W6）：目标必须是本共享的活跃成员且不是当前 owner 本人。 */
+const TransferOwnershipSchema = z.object({ memberId: z.string().min(1).max(64) });
 
 const PutEnvelopeSchema = z.object({
   keyEpoch: z.number().int().min(1),
@@ -562,6 +566,45 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
       data: { removedAt: BigInt(Date.now()) },
     });
     return reply.send({ left: true });
+  });
+
+  // ── 转让所有权（owner；W6。语义拍板见计划 §W6：转让 = 换 owner + 原 owner 降 editor）──
+  fastify.post('/shares/:shareId/transfer', { preHandler: authenticate }, async (req, reply) => {
+    const { shareId } = req.params as { shareId: string };
+    const lookup = await requireShareOwner(req, reply, shareId);
+    if (!lookup.ok) return;
+    const parsed = TransferOwnershipSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ code: 'validation_failed', message: 'Validation failed' });
+    }
+    const target = await prisma.shareMember.findFirst({
+      where: { id: parsed.data.memberId, shareId, removedAt: null },
+    });
+    if (!target) {
+      return reply.code(404).send({ code: SHARE_ERROR_CODES.NOT_FOUND, message: 'Member not found' });
+    }
+    if (target.id === lookup.member.id) {
+      return reply.code(400).send({ code: SHARE_ERROR_CODES.ROLE_FORBIDDEN, message: 'Cannot transfer to yourself' });
+    }
+    if (target.role === 'owner') {
+      return reply.code(400).send({ code: SHARE_ERROR_CODES.ROLE_FORBIDDEN, message: 'Target is already the owner' });
+    }
+    // 🔴 三处写必须原子：share.ownerUserId（详情/列表的 ownerId 事实源）、新 owner
+    // 角色、旧 owner 降 editor。中途断电留下「双 owner」或「零 owner」都会让
+    // requireShareOwner 的单 owner 假设失效。
+    const targetUserId = target.userId;
+    await prisma.$transaction([
+      prisma.share.update({ where: { id: shareId }, data: { ownerUserId: targetUserId } }),
+      prisma.shareMember.update({ where: { id: target.id }, data: { role: 'owner' } }),
+      prisma.shareMember.update({ where: { id: lookup.member.id }, data: { role: 'editor' } }),
+    ]);
+    return reply.send({
+      shareId,
+      ownerId: Number(targetUserId),
+      newOwnerMemberId: target.id,
+      demotedMemberId: lookup.member.id,
+      demotedRole: 'editor',
+    });
   });
 
   // ── share op 上传（role 硬门在这里） ─────────────────────────────────────

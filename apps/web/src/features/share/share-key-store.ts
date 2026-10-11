@@ -19,6 +19,7 @@
  */
 
 import type { SyncPayloadCipher } from '@heyta/sync-client';
+import { shareKeyStoreIdentity } from '@heyta/app-host';
 
 /** 浏览器安全的 base64（web 无 Buffer；仅用于 32 字节钥与短字符串）。 */
 const toBase64 = (bytes: Uint8Array): string => {
@@ -55,17 +56,6 @@ export interface ShareKeyStoreShape {
   version: number;
   entries: WrappedShareKey[];
 }
-
-const syntheticIdentity = (shareId: string) => ({
-  id: `share-key-store:${shareId}`,
-  clientId: 'share-key-store',
-  actionType: 'store',
-  opType: 'UPD' as const,
-  entityType: 'SHARE_KEY',
-  entityId: shareId,
-  timestamp: 0,
-  schemaVersion: 1,
-});
 
 export function loadShareKeyStore(storage: Storage): ShareKeyStoreShape {
   const raw = storage.getItem(STORAGE_KEY);
@@ -113,11 +103,11 @@ export async function wrapAndStoreShareKey(args: {
   const store = loadShareKeyStore(args.storage);
   const wrappedListKey = await args.cipher.encrypt(
     toBase64(args.listKey),
-    syntheticIdentity(args.shareId),
+    shareKeyStoreIdentity(args.shareId),
   );
   const wrappedIdentitySeed = args.identitySeed === undefined
     ? undefined
-    : await args.cipher.encrypt(toBase64(args.identitySeed), syntheticIdentity(args.shareId));
+    : await args.cipher.encrypt(toBase64(args.identitySeed), shareKeyStoreIdentity(args.shareId));
   const others = store.entries.filter((e) => e.shareId !== args.shareId);
   const next: ShareKeyStoreShape = {
     version: FORMAT_VERSION,
@@ -145,7 +135,7 @@ export async function storeShareIdentity(args: {
   const existing = store.entries.find((e) => e.shareId === args.shareId);
   const wrappedIdentitySeed = await args.cipher.encrypt(
     toBase64(args.identitySeed),
-    syntheticIdentity(args.shareId),
+    shareKeyStoreIdentity(args.shareId),
   );
   const entry: WrappedShareKey = {
     shareId: args.shareId,
@@ -173,7 +163,7 @@ export async function unwrapShareListKey(args: {
   const entry = store.entries.find((e) => e.shareId === args.shareId);
   if (entry === undefined || entry.wrappedListKey === '') return undefined;
   try {
-    const plain = await args.cipher.decrypt(entry.wrappedListKey, syntheticIdentity(args.shareId));
+    const plain = await args.cipher.decrypt(entry.wrappedListKey, shareKeyStoreIdentity(args.shareId));
     const bytes = fromBase64(plain);
     return bytes.length === 32 ? bytes : undefined;
   } catch {
@@ -190,7 +180,7 @@ export async function unwrapShareIdentitySeed(args: {
   const entry = getShareKeyEntry(args.storage, args.shareId);
   if (entry?.wrappedIdentitySeed === undefined) return undefined;
   try {
-    const plain = await args.cipher.decrypt(entry.wrappedIdentitySeed, syntheticIdentity(args.shareId));
+    const plain = await args.cipher.decrypt(entry.wrappedIdentitySeed, shareKeyStoreIdentity(args.shareId));
     const bytes = fromBase64(plain);
     return bytes.length === 32 ? bytes : undefined;
   } catch {
