@@ -452,6 +452,7 @@ package.json   (只加了一行 verify:collab-journey)
 | 🔴 `check:layering`（`apps/web/src/features/share/share-key-store.ts` 里 `entityType: 'SHARE_KEY'`） | ✅ | `syntheticIdentity` 是喂给 `SyncPayloadCipher.encrypt/decrypt` 的**合成 AAD**（文件头明写"不参与线上协议、只防 localStorage 两条记录互换"），**不是派发的 op**；但门禁按 op 形状（`entityType:` 字面量）拦，不看意图。按 AGENTS §3.5 把 op 形状构造挪出外壳：新建 `packages/app-host/src/share-key-identity.ts`（纯函数 `shareKeyStoreIdentity`，零浏览器依赖）→ 从 `app-host/src/index.ts` barrel 导出 → 外壳删掉本地函数、5 处调用改指 app-host、重打 `app-host dist`。复跑：`check:layering` **`EXIT=0`（438 文件 / 10 规则）**、`pnpm --filter app-host --filter web typecheck` **两个 Done**、外壳 `share-key-store.spec.ts` **10/10 passed** |
 | 第 2 步其余子闸在本地 HEAD 上的现量 | ✅ | 改完本线并三笔提交后：`pnpm -r typecheck` 全仓 **`TYPECHECK_EXIT=0`**、`pnpm -r build` **`BUILD_EXIT=0`**（含 app-host 新导出被各消费者编进 dist）、`@heyta/app-host` 单包 test **1775 passed（94 文件）**（证明 barrel 加导出没破坏任何 app-host 测试）|
 | 第 3 步文档写回 | ✅ | `f1c93750` 一笔：benchmark §2.6 的 **6.1（❌→✅）** 与 **6.7（❌→✅，注明仅 Web 落点）**、`P2-10` 拆口径；feature-matrix §6 的 6.1/6.7 备注；AGENTS §9 新增"协作与共享清单"并行轨道状态；计划头部。roadmap **按 2026-09-29 收敛口径刻意不动**。`check:md-tables` + `check:docs` 均绿（无死链）|
+| 🔴 layering 重构后 journey **端到端复跑**（不只是单测） | ✅ | 重构改了 `share-key-store.ts`（journey 的密钥流会走到它），故在本地 HEAD 重跑 `pnpm verify:collab-journey`：**`RESULT=OK steps=3` / `JOURNEY_EXIT=0`**，7 张证据图非空。**04 号图人打开看过**：入群链接 `http://127.0.0.1:4327/?shareToken=s_HopOYsjOM6…GpaI`，token 与上方邀请凭证逐字一致、落点是应用源（4327）不是同步服务器 —— 正是本会话第 1 步那 4 条断言钉的事实。⇒ 分层重构没破坏真实流程 |
 
 ### 二、第 2 步门禁链：两枚红，性质不同（关键区分，别读成一个）
 
@@ -498,9 +499,10 @@ package.json   (只加了一行 verify:collab-journey)
    - 🔴 **故意没并进 `capability-manifest.generated.ts`**：重生成那份产物会**同时**带上本线 COMMENT **与** AI 工具线早已提交的 4 枚 TASK 工具（`get_task_estimate_context`/`append_task_checklist`/`set_task_priorities`/`set_task_estimate`）—— 它是**跨线混物**，按「只提交协作线文件」不并进本笔。它现在仍在工作树里是 `M`（本会话为验证 `--check` 跑过生成，但没提交）。**重生成的落地归属要单独协调**（谁补 COMMENT、谁补那 4 枚 TASK 工具、`capability-manifest.spec.ts`「分母 9→10 + entityTypesWithoutTools 出现 COMMENT」这条产品判断一并拍），别被某一条线顺手 sweep 进自己提交。
    - 🔴 **push 受阻（不是没做，是不能独做）**：本地 `main`（现 `2485edde`）**领先 `origin/main`（`6d1024bd`）41 笔**，而那 41 笔**全是别的并行线**的未公开笔（账号标准套件 / 自动收集 T8 / 产品体验 / server 错误信封 / 文档门禁 / BLOCKED 账本）。`git push origin main` 会把这些**别人只在本地的笔一起公开**到 origin/main —— 这正是「不代公开别人未提交的笔」那条红线，本线不代推。**下一个 AI 若本地 main 仍领先别线笔，push 前必须先与那几条线协调（或确认 `origin/main` 现量 tip 后再判）**；`.git/hooks/pre-push` 另指向外部 `pre-push-bytearm`（凭据下线那套），不许 `--no-verify` 绕。
    - ⇒ 本线交付形态：**代码已本地成笔、可复核可回退**；公开到 origin 这一步**押在跨线协调上**，不是本线遗漏。
-5. **两停止点（B 类，等用户醒来自行过目，不主动弹窗/表单）**：① PIPL 模态视觉（02 号图：主按钮「确认共享」无视觉强调、
-   「不再询问」勾选无可见位——词条存在但视觉层级待追认）；② owner 转让语义（两步确认、立即生效、原 owner 降 editor，
-   确认文案 `web.share.transfer.confirmHint`）。
+5. **两停止点（B 类，等产品负责人裁决；本轮已把 ① 的证据看实）**：
+   - ① **PIPL 同意弹窗（02 号图，本轮重跑后现看）—— 比"无视觉强调"更严重**：弹窗里 **确认共享 / 取消 / 不再提示** 三个可操作控件**全部渲染成裸文本行，没有任何按钮外观/勾选框外观**（对照 04 号图，那里「生成邀请」是正经蓝按钮 —— 同一 app、同一截图管线，所以不是渲染假象，是这个同意面的控件没套上按钮样式）。这是合规同意面的真缺陷，但改它=动对外法律表征的界面，**留给产品负责人拍**；我的修法建议：主 CTA 走设计系统强调（`cssVar('color.primary')` 实底按钮）、取消做次级按钮、"不再提示"改真 `<input type=checkbox>`（带 `accent-color` token，见 §7 第 83 条）。
+   - ② **owner 转让语义**：已实现为两步确认、立即生效、原 owner 降 editor，确认文案 `web.share.transfer.confirmHint`（"转让后你将成为「可编辑」成员…此操作立即生效"）。追认，或改成可撤销/延时/新 owner 先接受。
+
 
 ### 四、给下一个 AI 的硬提醒
 
