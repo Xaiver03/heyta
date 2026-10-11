@@ -77,7 +77,7 @@
 
 - [ ] **AC-1 权益与授权**。输入：P1-3 授权契约 + 新增 ADR（限定取代 ADR-0017/0020 的范围）+ 迁移清单 + P1-4 计量契约。证据：关闭旧权益 gate 仍挡住未授权自动收集、免费同步仍通过；免费/过期/错主体/错实例/坏签名/额度耗尽均拒绝且**不产生业务效果**；重试账目可对账。
 - [ ] **AC-2 接收与队列**。输入：P1-5 线协议 + 签名测试向量 + P1-6 envelope。证据：真 HTTP 验证字节级签名、时间窗、大小、并发限额、跨账号隔离；同键同体重放返回同事件、**同键异体冲突**；持久化失败不返回 accepted；查询无任务明文。
-- [ ] **AC-3 领取与提交**。输入：P1-1 事件状态机、lease generation/fencing、提交唯一身份、崩溃恢复图。证据：**两个独立真实宿主与独立数据库**跑通下方十个故障注入窗口，观察任务数、op 数、回执与计量——不只断言 HTTP 成功。现量入口：`python3 research/tools/verify-inbound-dual-host.py` ⇒ `Windows: 13/13`（2026-10-10 13:3x 在当前源码上复跑取到，读数见 §13:3x 那一节）；**整条仍不勾**：窗口 8 那五档当天已补齐七档逐档读数，但这一趟跑在**共享主检出**上（T7 的合并态全仓门禁从没跑过），且量的是传输层 + 真服务端 + 两条真宿主本地库 —— 四端壳与界面层（T5 / AC-6）不在这格的证据里。
+- [ ] **AC-3 领取与提交**。输入：P1-1 事件状态机、lease generation/fencing、提交唯一身份、崩溃恢复图。证据：**两个独立真实宿主与独立数据库**跑通下方十个故障注入窗口，观察任务数、op 数、回执与计量——不只断言 HTTP 成功。现量入口：`python3 research/tools/verify-inbound-dual-host.py` ⇒ `Windows: 13/13`（2026-10-10 13:3x 在当前源码上复跑取到，读数见 §13:3x 那一节）；**整条仍不勾**：窗口 8 那五档当天已补齐七档逐档读数，但这一趟跑在**共享主检出**上（当时 T7 的合并态全仓门禁还没跑过），且量的是传输层 + 真服务端 + 两条真宿主本地库 —— 四端壳与界面层（T5 / AC-6）不在这格的证据里。
 - [ ] **AC-4 解析**。输入：P1-7 字段映射与判定表 + P1-8 出境授权范围。证据：同一事件在不同时区、不同处理日得到相同归一化结果；DST/非法日期/长输入/多输出受限；正文中的注入指令与模型额外字段不能触发越权调用；实际出境请求符合披露。
 - [ ] **AC-5 批创建与来源记录**。输入：P1-2 批创建 intent/reducer/线形状 + 来源 receipt。证据：多项不同字段只产生一枚逻辑 op；中断重启无半批；三套存储适配器与远端回放收敛；删除任务后重试不复活；旧数据无来源字段仍能 hydration。
 - [ ] **AC-6 规则界面**。输入：规则版本契约、预览的计费/零写语义、状态原因码表、端能力表。证据：用户独立完成“启用 → 测试发送 → 等待 → 打开/解锁 → 自动处理 → 查看结果”；暂停/撤销/改规则与在途处理的竞态可解释；亮暗、窄屏、中英及各壳入口可用。
@@ -157,7 +157,7 @@
 ⚠️ 这句尾巴（2026-10-10 更正）：原文写"但两个独立宿主的真实进程中断验收仍归 AC-3，**尚未验收**"——
 这一格已由 `research/tools/verify-inbound-dual-host.py` 量到（两条真 SQLite 宿主 + 一次 `SIGKILL` 真进程终止，13/13，见 12:5x 那一节），
 但**AC-3 整条仍不勾**：撤销族七档当天已逐档补齐（§13:3x），剩下的不是覆盖率而是载体与射程 ——
-这一趟跑在共享主检出（T7 的合并态全仓门禁从没跑过），四端壳与界面层不在这一格。
+这一趟跑在共享主检出（当时 T7 的合并态全仓门禁还没跑；10-11 11:4x 已在隔离副本上跑过，读数见文末「T7 三条腿的合并态读数」那一节），四端壳与界面层不在这一格。
 
 本切片的[真库输出](../research/evidence/inbound-automation-review/worker-identity-postgres.txt)与[源码摘要](../research/evidence/inbound-automation-review/worker-identity-manifest.json)另存，不覆盖复审前的基线摘要。
 
@@ -698,7 +698,7 @@ T2 那句话里"每 30 秒续票据"这一格，此前是**一整套零件都在
 | AC-3 | 「**两个独立真实宿主与独立数据库**跑通下方十个（现 13 个）故障注入窗口，观察任务数、op 数、回执与计量」 | **无尺**：`research/tools/` 里与本线有关的装置只有 `verify-inbound-worker-identity.py` 一枚，另两枚是入库切片器；跑 13 个窗口的双宿主装置**不存在** | 它跑在 app-host 的 `dist` 产物上，而 HEAD 仍被 B112 那四处白名单外接缝挡住（当日现量：`git show HEAD:` 查四枚成员命中 **0/0/0/0**，六枚文件仍 `M`）⇒ 现在写装置=在没有可编译的树上写 |
 | AC-6 | 「用户**独立完成**"启用 → 测试发送 → 等待 → 打开/解锁 → 自动处理 → 查看结果"」 | **半尺**：真浏览器那份 `e2e/tests/inbound-automation.spec.ts` 有 4 条（两个模板 × 1280/390 两窄宽），且**它走的是 route 桩**（文件头自述 "Real browser/UI with HTTP fixtures; database authorization is tested separately"），量的是界面形状，不是这条旅程 | 旅程需要公网接收 + 有权益的宿主在跑，两者都关着。✅ **2026-10-10 19:0x 现量更正，把本行原来那两句划掉**：① "本轮没有复跑"已过期 —— 复跑了，`cd e2e && npx playwright test --config playwright.inbound.config.ts` ⇒ **`2 failed / 2 passed (2.1m)`**，两条红是**产品缺一格**（换回设置那一节不重取事件列表：分组是 `hidden` 不是卸载，而组件备好的 `active` 旋钮在 `App.tsx`/`AiSettings.tsx` 两处都没接），归因与一句修法记在 **B140**，断言**没有**为了变绿而放松；② "这份 e2e 连入库都做不到"也已过期 —— 那份 spec 与它 import 的 `selectSettingsSection` 都在 HEAD（现量 `git show HEAD:e2e/tests/helpers.ts \| grep -c selectSettingsSection` = **4**）。四张草稿态截图人已看过：`docs/research/evidence/inbound-automation-review/ui-draft/draft-{1280,390}-{light,dark}.png`。**仍不勾**：那一格红没修、"各壳入口可用"这半没证（这趟只有 web）、整条旅程要开公网接收才能走 |
 | AC-7 | 「官方与自托管样例分别**可运行**，端点与权限真实」 | **无尺**（帮助中心/中英条款的落点也在白名单外，B118） | 半尺有：`docs/reference/` 那两份当日已按 HEAD 更正过措辞（协议 + 定价） |
-| AC-8 | 「平台 × 权益 × 设备状态 × 失败阶段的具体用例表」 | ⚠️ **本行已被文末「2026-10-10 05:2x · AC-8 用例矩阵」一节取代**（当日现量：矩阵已落成 34 行、逐格带尺或带归属，`python3 research/tools/verify-inbound-ac8-matrix.py` rc=0）。原先写的"**无产物**：矩阵文件不存在"在 10-10 05:0x 之前是真的，留着是为了让人认出"表格类交付物最容易糊过去的是它自己" | 剩余的那半仍然过不去：`pnpm check` / `-r test` / `reinstall:all` 三条在隔离副本上仍红（同 B112），矩阵里 C30~C34 五格因此记无尺 |
+| AC-8 | 「平台 × 权益 × 设备状态 × 失败阶段的具体用例表」 | ⚠️ **本行已被文末「2026-10-10 05:2x · AC-8 用例矩阵」一节取代**（当日现量：矩阵已落成 34 行、逐格带尺或带归属，`python3 research/tools/verify-inbound-ac8-matrix.py` rc=0）。原先写的"**无产物**：矩阵文件不存在"在 10-10 05:0x 之前是真的，留着是为了让人认出"表格类交付物最容易糊过去的是它自己" | 剩余的那半仍然过不去：`pnpm check` / `-r test` 两条在隔离副本上仍红（10-11 11:4x 新读数：check 停在第 6 段 `COMMENT 0 处写路径`、`-r test` 停在 `@heyta/ai` 的清单产物缝，两条都在别线地界，见文末「T7 三条腿的合并态读数」）；`reinstall:all` 桌面两端 + Linux 取证已绿、移动两端按 §8.9 未点 ⇒ 矩阵里 C30~C34 五格仍记无尺（C30 要的是**四端**当前产物） |
 
 ⇒ **逐格结论**：AC-1 / AC-2 / AC-4 / AC-5 的句子基本有尺；AC-3 有服务端半尺、缺双宿主半尺；
 AC-6/AC-7/AC-8 各缺的不是工时而是**判据的载体**。
@@ -1650,7 +1650,7 @@ cd apps/web && NO_COLOR=1 pnpm exec vitest run tests/inbound-cycle-display.spec.
 | **AC-5 批创建与来源记录** | `cd packages/shared-schema && npx --no-install vitest run --maxWorkers=1 tests/task-batch-contract.spec.ts`；`cd packages/op-log && npx --no-install vitest run --maxWorkers=1 tests/task-batch.spec.ts` | 契约 **`Tests 15 passed (15)`**；reducer **`Tests 16 passed (16)`** = 5 组 × **三套适配器**（memory / IndexedDbAdapter / SqliteAdapter，另含真文件库 `state.db`）（§665 表，10-10 当日） | **一枚逻辑 op / 无半批 / 三套适配器收敛 / 删除后重试不复活 / 旧数据无来源字段仍能 hydration 全部有尺**。这一格是本表里最接近"可勾"的一格，但按规矩仍**未勾**（勾由负责人点） |
 | **AC-6 规则界面** | `cd apps/web && NO_COLOR=1 pnpm exec vitest run tests/inbound-cycle-display.spec.tsx`；界面层 e2e：`cd e2e && npx playwright test --config playwright.inbound.config.ts` | 显示层 3 条 + 三臂变异各红一次（§19:0x 那一节，10-10）；e2e **4 条 = 2 passed / 2 failed**，红在"换回 AI 那一节不重取列表"（`inbound-automation.spec.ts:85`），四张草稿截图人已打开看过（`docs/research/evidence/inbound-automation-review/ui-draft/`） | **界面入库且判据有牙**，但**当场量出一格真缺陷**（**B140**：设置分组是 `hidden` 不是卸载，`active` 从没人接）⇒ 未闭合。另两格：状态词 `waiting-entitlement` 的句子缺词条（B110，`packages/i18n` 不许动）；"完整旅程"要公网接收 + 有权益宿主，两者仍关着 |
 | **AC-7 文档** | `node scripts/check-migrations.mjs`；`node scripts/check-docs-voice.mjs`；`node research/tools/docs-link-check.mjs`；`node research/tools/license-inventory.mjs` | **10-10 19:2x · 隔离副本 @ `a195a37f`**：`MIG_RC=0`（`✅ 迁移文件全部符合规范。`）、`VOICE_RC=0`（`扫描 site.* 1159 条（豁免自托管 120 条），禁词表 30 项零命中`）、`LIC_RC=0`（`全部依赖均为宽松许可（含已登记的例外）✅`）、**`LINK_RC=0`** —— 死链那一条**在 HEAD 上已经不红**（B136 记的那枚 `apps/desktop-windows/README.md:89` 已被其所有者改掉；主检出里若仍红是别线未提交改动，不是 HEAD） | **文档四道门在干净 HEAD 上全绿**（本格原来唯一那条"不是本线的红"已消失）。但 **T6 的四件产物三件不在本线白名单**（新 ADR / 中英条款 / 帮助页）⇒ **B139**，这一格按定义未闭合：`docs/reference/pricing-and-entitlements.md` 本线**没动** |
-| **AC-8 验收矩阵** | `python3 research/tools/verify-inbound-ac8-matrix.py` | **10-10 19:2x · 隔离副本 @ `a195a37f`**：`MATRIX_RC=0`，`表头行=1079　行数=34　有尺行=27　无尺行=7　尺枚=67　窗=13/13　平台=10/10　权益=9/9　设备状态=9/9`，`结论：矩阵与 HEAD 逐格对账成立` | **矩阵自洽**（平台×权益×设备状态×失败阶段全枚举、无空行）。⚠️ 它声明的是"用例归属"，不是"跨端装过"：四端重装与 Linux 交付取证属 T7，**未跑** ⇒ 未闭合 |
+| **AC-8 验收矩阵** | `python3 research/tools/verify-inbound-ac8-matrix.py` | **10-10 19:2x · 隔离副本 @ `a195a37f`**：`MATRIX_RC=0`，`表头行=1079　行数=34　有尺行=27　无尺行=7　尺枚=67　窗=13/13　平台=10/10　权益=9/9　设备状态=9/9`，`结论：矩阵与 HEAD 逐格对账成立` | **矩阵自洽**（平台×权益×设备状态×失败阶段全枚举、无空行）。⚠️ 它声明的是"用例归属"，不是"跨端装过"：四端重装与 Linux 交付取证属 T7。⇒ 10-11 12:2x 那格已取到读数（Linux `.deb` `PKG_RESULT=OK`、桌面两端五道判据齐、移动两端按 §8.9 未点，见文末「T7 三条腿的合并态读数」）⇒ **C30 那格按定义仍未闭合**（它要的是四端） |
 
 **本趟逐档复跑（10-10 19:2x–19:3x · 载体：隔离副本 `.worktrees/inb-t7` @ `a195a37f`，dirty=0、`pnpm -r build` 与 `prisma generate` 均 rc=0；一条命令串行跑、不并发，退出码逐个 `echo $?` 取，不经管道）**：
 
@@ -1667,11 +1667,12 @@ cd apps/web && NO_COLOR=1 pnpm exec vitest run tests/inbound-cycle-display.spec.
 | `packages/app-host` inbound（process + worker 两文件） | `Test Files 2 passed (2)` / `Tests 30 passed (30)` | `HOST_RC=0` |
 
 **九档合计 220 passed、0 failed、0 skipped**（复算：56+34+15+47+15+16+1+6+30）；每条与台账里那行旧读数**逐条对得上或更多**（唯一变化是 server 离线 11 文件 `99 → 103`，+4 未逐枚归因）。
-⚠️ 这一串**不等于** `pnpm -r test` 全量（它只覆盖本线相关的档），也**不等于** `pnpm check` 整链 —— 那两格仍等 T7。
+⚠️ 这一串**不等于** `pnpm -r test` 全量（它只覆盖本线相关的档），也**不等于** `pnpm check` 整链 —— 那两格 10-11 11:4x 已在隔离副本上取到读数（两条都红在别线地界，见文末那一节）。
 
 
 
-1. **不等于 `pnpm check` / `pnpm -r test` 绿过** —— 全仓合并态那三条命令（T7）本趟仍欠，结构性阻挡是 **B103**（别人的 16 条 web 类型错）。载体空出来后的第一条是 `cd .worktrees/inb-t7 && pnpm -r typecheck`。
+1. ~~**不等于 `pnpm check` / `pnpm -r test` 绿过** —— 全仓合并态那三条命令（T7）本趟仍欠，结构性阻挡是 **B103**（别人的 16 条 web 类型错）。载体空出来后的第一条是 `cd .worktrees/inb-t7 && pnpm -r typecheck`。~~
+   → **10-11 11:4x 已取到那三条的合并态读数**（B103 那 16 条与 B144 那 1 条都由他们自己修完，`TYPECHECK_RC=0`）：`pnpm check` 与 `pnpm -r test` **仍各红一条**，但拦路的已换成另外两枚别线缺陷 —— 见文末「T7 三条腿的合并态读数」那一节。**这一条"不等于绿过"仍然成立**。
 2. **不等于公网接收或售卖可开** —— AC 全未勾（现量 `已勾=0 / 未勾=8`），负责人点头之前这开关不动。
 3. **主检出的红不等于 HEAD 的红** —— B142 那 9 条就是这样：同一把尺在主检出 rc=1/9 红、在干净 HEAD 上 rc=0/46 绿。
 
@@ -1856,6 +1857,9 @@ packages/app-host typecheck: tests/login-code.spec.ts(44,5): error TS2578: Unuse
 **T7 三条腿的当前状态**（10-11 00:5x 现量）：
 `pnpm check` ✗（第 4 步 1 条别线类型错）、`pnpm -r test` ✗（11 条红 = 别线 10 + 本线 1，且本线那 1 条落点在地界外）、
 `pnpm reinstall:all` + Linux 交付取证：仍未跑（要安静载体与设备窗口）。
+> ↪ **本行已被文末「2026-10-11 11:4x–12:2x · T7 三条腿的合并态读数」取代**：typecheck 那格他们自己修完了（`TYPECHECK_RC=0`），
+> check 现在停在**第 6 段** `COMMENT 0 处写路径`，`-r test` 停在 `@heyta/ai` 的清单产物缝，重装那条腿**桌面两端 + Linux 已绿**、
+> 移动两端按 §8.9 未点。旧行留着是因为它还记着"当时停在哪一步"，那是这一节读得懂的前提。
 
 **确定性复跑与一条本线债当场闭合（同一轮，10-11 00:5x）**：并发全量那 11 条红，逐包单跑读回**同样的 5 行汇总**
 （`ai 5 failed`、`shared-schema 1 failed`、`legal 2 failed`、`domain 1 failed`、`landing 2 failed`）⇒ 没有一条是负载造成的假红。
@@ -1961,7 +1965,163 @@ packages/app-host typecheck: tests/login-code.spec.ts(44,5): error TS2578: Unuse
 ### 4. 这一节没做的事（不包装成完成）
 
 1. **AC-6 真浏览器那一趟没在最终 HEAD 上复跑**（载体里没有 `e2e` 的依赖，装它会往共享载体写东西）⇒ 那格沿用 10-10 的 `2 passed / 2 failed` 并注明"未在 `9fb9eed2` 复跑"。
-2. **T7 第三条腿 `pnpm reinstall:all` + Linux 交付取证仍未跑**（要设备槽与安静载体）⇒ AC-8 那一格按定义未闭合。
-3. **`pnpm check` 整链仍停在第 4 步那枚别线类型错**（B144）；**`pnpm -r test` 那 11 条红 = 别线 10 + 本线 1（B150）**。
+2. ~~**T7 第三条腿 `pnpm reinstall:all` + Linux 交付取证仍未跑**~~ → ✅ **10-11 12:2x 已跑，读数在文末「T7 三条腿的合并态读数」那一节**：桌面两端 + Linux 取证全绿，移动两端按 §8.9 判为不可点（B164）。
+3. ~~**`pnpm check` 整链仍停在第 4 步那枚别线类型错**（B144）~~ → 那一格**已被他们自己修完**（本轮 `TYPECHECK_RC=0`）；`pnpm check` 现在停在**第 6 段** `check:reachability` 的 `COMMENT` 一条（同 B156，本轮补了"它在 main 的工作树上也红"的现量）。`pnpm -r test` 整包红集仍是 00:5x 那张表（别线 10 + 本线 1，B150），本轮另有一条**新红**（`@heyta/ai` 的清单产物缝），形状与归属见文末那一节。
 4. **载体里 `server/dist` 的陈旧产物会伪装成"HEAD 坏"** —— 这一格我建议追加进 `docs/reference/environment-traps.md`（§7 #27 那一族：产物对账要看 mtime 先后），但该文件不在本线白名单 ⇒ 登记成 **B156**，不代改。
 5. AC 已勾数现量 `grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` = **0**，未勾 = **8**；公网接收与售卖继续关闭，等负责人逐条点头。
+
+## 2026-10-11 11:4x–12:2x · T7 三条腿的合并态读数（隔离副本 @ `16f72239`）
+
+**载体与边界（先读这段再读任何一格读数）**
+
+- 载体 `.worktrees/inb-t7`（detached worktree），起跑那刻 `git -C .worktrees/inb-t7 rev-parse --short HEAD` = **`16f72239`**、
+  `status --porcelain -unormal` 行数 = **0**。日志与截图落 `~/.heyta-evidence/inb-t7-leg3-1011-114300/`（不入库，写路径只为复跑）。
+- 🔴 **这批读数只描述 `16f72239`**。收口时主检出已到 `9542a9ff`，`git rev-list --count 16f72239..HEAD` = **11**
+  （协作 / 产品体验 / 账号套件那几条线的笔）。⇒ 这 11 笔**不在**下面的读数里，别拿这一节当"main 现在绿/红"的依据。
+- 负载披露：起跑前 1 分钟负载 **33.70**、收口 **20.49**；设备窗口门禁 `verify-mobile-window-gate.sh --target b`
+  连八轮全 `rc=3 REDS=load`（负载 20–49）。本线自己的 build/check/test 各推过它一次，**不据此判产品**。
+
+### 腿 0：`pnpm -r build` + `pnpm -r typecheck` —— 第一次两枚都 rc=0
+
+```
+$ cd .worktrees/inb-t7 && NO_COLOR=1 pnpm -r build       → BUILD_RC=0        （11:50:09 → 11:50:26）
+$                                            pnpm -r typecheck → TYPECHECK_RC=0（11:50:26 → 11:50:40）
+```
+
+⇒ **B144 那一格已由他们自己修完**：那条 `packages/app-host/tests/login-code.spec.ts(44,5) TS2578` 不再出现，
+本线第一次拿到"合并态整包 typecheck 绿"。清 `pnpm -r build` 这一步是**判据的一部分**（B156：载体里 `server/dist`
+的陈旧产物会把"HEAD 坏"伪装成"产物坏"）。
+
+### 腿 1：`pnpm check` → `CHECK_RC=1`，停在**第 6 段** `check:reachability`
+
+链定义（`package.json` 里那一整行）是
+`check:gate-wiring && build && landing check:entries && typecheck && check:claims && check:reachability && …`，共 106 段。
+
+```
+✅ check 链与门禁定义对上了（链外逐条有理由+可验消费方…）
+✅ 三处登记相等（集合相等）：AI_FEEDBACK, ASSISTANT_TURN, COMMENT, EVENT, FOCUS_SESSION, HABIT, HABIT_LOG,
+   NOTE, PREFERENCE_CORRECTION, PROJECT, REMINDER, TAG, TASK
+🔴 COMMENT                  0 处写路径
+🔴 断言 B 不通过：1 个已建模的实体**零写路径**
+🔴 「已建模 ≠ 可达」门禁未通过。
+[ELIFECYCLE] Command failed with exit code 1.
+```
+
+🔴 **这一格不许读成"整链跑过、只有一条红"**：第 6 段之后约 100 段（含链尾那枚 `pnpm -r test`）**从未执行**。
+
+归属与"不是载体陈旧"的两条现量（B156 只登记了红，这两条是本轮补的）：
+
+```
+$ git log --oneline -S"'COMMENT'" -- packages/domain/src/entities.ts
+e6058120 docs(产品体验线 台账 §UX-S9-153): 四面回归读数…          ← 10-09 14:35，不是本线
+$ git log --oneline --grep='自动收集' -- packages/domain/src/entities.ts   （空 = 本线从未碰过那枚文件）
+$ node scripts/check-reachability.mjs        # 主检出（main=9542a9ff，工作树含别人在飞改动）
+REACH_RC=1   红集同样只有 COMMENT 一条
+$ git grep -c 'COMMENT' 9542a9ff -- packages/app-host/src   → rc=1，0 命中（分母：该目录 83 枚文件）
+```
+
+⇒ 修它的人要跑的动作是"给 `COMMENT` 补一条 app-host 写路径 + 宿主调用点"，**不是**重跑或放宽门禁。
+那三种修绿手法（删实体 / 补 ACTION_FAMILIES / 拿测试当调用点）本线一种都不用，也不代改。
+
+### 腿 2：`pnpm -r test` → `TEST_RC=1`，**第一枚包就中止**，所以这一格取到的是"新红"而不是整包红集
+
+```
+Scope: 21 of 22 workspace projects
+packages/ai test:  Test Files  1 failed | 10 passed (11)
+packages/ai test:        Tests  5 failed | 260 passed (265)
+packages/ai test:    Duration  800ms
+[ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL] @heyta/ai@0.0.0 test: `vitest run`
+Exit status 1
+```
+
+⚠️ pnpm 的递归在第一枚失败包就中止 ⇒ 其余约 17 包**没跑**。整包红集仍以 00:5x 那一节的 21 包表为准
+（11 条红 = 别线 10 + 本线 1，B150），这一趟的增量是**一条当时不存在的新红**。
+
+🔴 `@heyta/ai` 在 00:5x 那趟里是**绿的**，所以这是 `16f72239` 之后新出现的红，形状正是 **B129 那一族「生产者缝」**
+（改了上游、没重跑生成物）：
+
+```
+🔴 能力清单产物与上游不一致：packages/ai/src/capability-manifest.generated.ts
+   第 34 行起不一致（产物 892 行 / 应为 979 行）。
+```
+
+产物缺的 4 枚工具逐条点名：`append_task_checklist`、`get_task_estimate_context`、`set_task_estimate`、
+`set_task_priorities` —— **没有一枚是自动收集的工具**；实体清单那侧缺 `COMMENT`。
+⇒ 修法是一条命令 + 把产物一起提交（`node scripts/gen-ai-capability-manifest.mjs`），落点 `packages/ai/src/`
+**不在本线地界**；且这条红**已经有尺在读**（就是那 5 条 `capability-manifest.spec.ts`），不代改、不代勾。
+
+### 腿 3：`pnpm reinstall:all` + Linux 交付取证 —— 桌面两端与 Linux 全绿，移动两端按 §8.9 判为**不可点**
+
+```
+$ cd .worktrees/inb-t7 && HEYTA_MACOS_DIST_DIR=/tmp/heyta-macos-dist-inbt7 \
+    NO_COLOR=1 bash scripts/reinstall-all.sh --only mac,windows
+```
+
+（mac 段换输出目录是为了不和别人抢 `/tmp/heyta-macos-dist` —— 那里有一句 `rm -rf`。）
+
+| 端 | 判据读数 | 结论 |
+|---|---|---|
+| mac | 打包 `.app`+`.dmg` 完成 → 装到 `/Applications/Heyta.app`；**安装对账**：包内 `web-dist` 与本机 `apps/web/dist` 是同一次构建（**9 个 chunk**）；窗口 2318×1508、`.webview.png` 内容 **74.6%**、主蓝命中 **997** | ✅ 装的是当前产物、起得来、画的是共享 UI |
+| windows | 源码包 432M / 清单 7848 条 → 远端 tar sha256 `4ba67866c8f815e2…` **逐字相同** → 新鲜度对账 `web-dist/index.html=4f2bcbdc1f4a1932…`、`bridge=42f8e4cc3f13c6d3…`、`assets/*.js` **7 枚一致**；`install-capture.txt`：`ADD_APPX=OK`、`PAYLOAD_WEBDIST=True`、`PAYLOAD_INDEX_SHA=4F2BCBDC…`（与本地同一枚）、`PAYLOAD_CHUNK_TOTAL=2 / PRESENT=2`、`M2D=OK`、`RESULT=OK`；截图 1152×587 内容 **55.8%** | ✅ 五道判据齐（脚本自己数："判据齐了：5 条全在位"） |
+| linux | `PKG_RESULT=OK`（见下面那张块） | ✅ `.deb` 交付取证成立 |
+| android | **未点**。`adb -s emulator-5554 emu avd name` ⇒ `heyta-w3-yearly`（台账 B62 记的那枚别人在用的 AVD），`emulator -list-avds` 只有这一枚 | ⛔ 按 §8.9 共享设备独占，这端**没有**验证当前产物 |
+| ios | **未点**。两台 booted 模拟器里都有活着的 `Heyta` 进程 | ⛔ 同上 |
+
+🔴 **没有冒充四端** —— 汇总自己就写着这两行（不是本线补的话）：
+
+```
+⏭ android：不在 --only 范围 —— 这端**没有**验证当前产物
+⏭ ios：不在 --only 范围 —— 这端**没有**验证当前产物
+```
+
+不点的理由 + "那条窗口门禁看的是进程不是设备归属"这个缺陷，记在 **B164**（含建议的那条机械判据，改的是别人的脚本判卷口径，不代做）。
+
+**Linux 那一格**（`.deb` 交付取证第一次在干净载体上跑通）：
+
+```
+PKG_TARGET=linux-dev-lan   PKG_DEB=heyta_1.0.0_amd64.deb   PKG_DEB_BYTES=2010268
+PKG_FRESHNESS=OK  PKG_FRESHNESS_INPACKAGE=OK  PKG_INDEX_SHA=4f2bcbdc1f4a1932…
+PKG_SHELL_UI=web-dist  PKG_SETTLED=OK  PKG_SNAPSHOT=900x523  PKG_BLUE_HITS=3987  PKG_PIXELS=OK
+PKG_SANDBOX=off  PKG_RUN_RC=0  PKG_RESULT=OK
+```
+
+🔴 **第一趟是红的，而且只有干净载体才红** —— 这是一枚**产物级缺陷**，不是环境：
+
+```
+Error: Cannot find module '/tmp/heyta-linux-pkg/packages/app-host/scripts/build-native-bridge.mjs'
+PKG_RESULT=FAIL（正文 rc=1）
+```
+
+成因：`package-deb.sh` 的同步集合收了产物 `packages/app-host/bridge-bundle/***`，**没收它的生产者**
+`packages/app-host/scripts/***`；主检出因为躺着 gitignored 的产物而永远看不见这一格（§7 #191 那一族）。
+登记成 **B165**（改别人的脚本不在本线地界）。本线的非侵入修法：按那枚生成器**自己文件头**写的那条命令
+先在发起方生成产物，再跑第二趟 ⇒ 上表 `PKG_RESULT=OK`。沙箱那一档 `bwrap: setting up uid map: Permission denied`
+后按脚本自己的降级走 `PKG_SANDBOX=off`（不是本线关的，降级路径是它写好的）。
+
+**两臂**（这条腿的"能红"证据不是造的）：臂 a = 上面那趟真失败（`PKG_RESULT=FAIL`）；臂 b = 补上生产者后同一命令
+`PKG_RESULT=OK`。截图判据 `PKG_PIXELS=OK` 的"能红"由 §7 #82 那对 A/B 早就证过（错误屏命中 0、真界面几十个）。
+
+**界面证据（§6.2 规定一：三张图都人打开看过）**
+
+- mac `/tmp/heyta-reinstall-mac-installed.png.webview.png`：收集箱 + rail + 四象限彩点 + 清单/标签 + 对话助手，首启叠着联网同意弹窗。
+- windows `.worktrees/inb-t7/dist/windows/packaged-first-run.png`：同一份共享 UI，头像菜单开着（`登录账号 / 个人中心 / 应用设置`）。
+- linux `…/inb-t7-leg3-1011-114300/linux/packaged-first-run.png`：900×523，主蓝命中 3987。
+
+⚠️ 三张图停在**首屏 / 头像菜单**，画面里没有自动收集那一格 —— 这只说明"截图取的是首屏"，
+**不构成**"壳里没有这个入口"的判断（那格要进 `设置`，判据是 e2e 那一趟，见 AC-6）。
+
+### 完成条件对照（这一节不许被读成"T7 过了"）
+
+| 完成条件 | 本轮读数 | 差什么 |
+|---|---|---|
+| `pnpm -r build` / `pnpm -r typecheck` | rc=0 / rc=0 | ✅ 第一次拿到 |
+| `pnpm check` exit 0 | **✗ `CHECK_RC=1`**，第 6 段 `COMMENT 0 处写路径`（别线，B156） | 要**他们**补 app-host 写路径；本线不代改、不放宽 |
+| `pnpm -r test` exit 0 | **✗ `TEST_RC=1`**，第一枚包 `@heyta/ai` 5 红（清单产物缝，别线） | 要**他们**重跑生成器并提交产物 |
+| `pnpm reinstall:all` | 桌面两端 + Linux 取证 ✅；移动两端按 §8.9 **未点**（B164） | 设备槽要独占窗口；这不算四端 |
+| `check-migrations` / `license-inventory` | **rc=0 / rc=0**（本轮收口重跑，日志 `docgates.log`） | ✅ |
+| 文档门禁 `check-docs-voice` / `docs-link-check` | rc=0 / rc=0 | ✅ |
+| AC 已勾数 | `已勾=0 / 未勾=8` | 等负责人逐条点头 |
+| 非白名单 porcelain 条目 | 收口现量 **6** 枚（开工快照 29）：`account-standard-suite-handoff.md`、`capability-manifest.generated.ts`、`third-parties.ts`、`scripts/reinstall-all.sh`、`legal.generated.ts`、`.agents/context/` | 全是**别人在飞**的写入（`reinstall-all.sh` 12:22 仍在被改，本线跑的是载体副本）；本线没往这些路径写一个字节 |
+
+⇒ **完成条件 1 的"T7 三条 exit 0"这一轮拿不到**，两条红各有尺在读、归属都在别线，本线按规矩不代改也不改判卷口径。
+"没做成但说清了"是这一格的合格线。

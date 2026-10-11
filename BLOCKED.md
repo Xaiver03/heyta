@@ -9077,3 +9077,29 @@ android/ios 两腿按 AGENTS §8.9（共享资源独占验收）**判为不可�
 应加一条**设备身份判据** —— 例如要求显式声明本线拥有的 AVD（`HEYTA_ANDROID_AVD=<名字>`，与 `IOS_DEVICE_NAME` 同一形状），
 不等就**不猜、响亮失败**，而不是拿 `SERIAL` 的默认值 `emulator-5554` 直接卸。这是**改验收脚本的判据**，
 按"改判卷口径要记 BLOCKED.md"这一条交回给负责人／脚本所有者落；本线不动那两份文件。
+
+## B165（2026-10-11 03:5x，本会话 · T7 的 Linux 交付取证第一次跑就撞上的）：**`package-deb.sh` 的同步集合没带上它自己那条回退分支要跑的生成器 ⇒ 从干净载体跑必然 `MODULE_NOT_FOUND`**
+
+第一跑（载体 `.worktrees/inb-t7` @ `16f72239`，`HEYTA_LINUX_HOST=linux-dev-lan pnpm build:linux linux-dev-lan`）：
+
+```
+--- 门面 bundle 不在，先打一份 ---
+Error: Cannot find module '/tmp/heyta-linux-pkg/packages/app-host/scripts/build-native-bridge.mjs'
+PKG_RESULT=FAIL（正文 rc=1）
+```
+
+机制（读脚本现量，不是推断）：`apps/desktop-linux/scripts/package-deb.sh:346-352` 的 rsync include 列表
+带 `/packages/app-host/bridge-bundle/***`，**不带** `/packages/app-host/scripts/***`；而远端正文里
+"门面 bundle 不在，先打一份"那一支调的正是 `packages/app-host/scripts/build-native-bridge.mjs`。
+⇒ **这一支能不能走通，取决于发起方本地有没有那枚 gitignore 的派生物**：主检出里它早就被某次本地构建生成过，
+同步直接把产物带过去，回退分支一次都没执行过 —— 与 #191（"只在文件存在时才跑的那条支"）同族。
+
+本线的处置（**没有改那两份不在白名单的脚本**）：照生成器自己文件头写的那条命令在载体里补产物 ——
+`node packages/app-host/scripts/build-native-bridge.mjs` → `bridge-bundle/native-bridge.js`（1,653,355 B，
+sha256 前缀 `42f8e4cc3f13c6d3`，产物不入库、载体被跟踪脏仍 0）—— 第二跑就通了：
+`PKG_RESULT=OK`、`.deb` 2,010,268 B、包内 web-dist 30 条目、`PKG_SHELL_UI=web-dist`、
+`PKG_SNAPSHOT=900x523` / `PKG_BLUE_HITS=3987` / `PKG_PIXELS=OK`（窗口快照人已打开看过：共享 UI 的收集箱页 + 首启联网同意弹窗）。
+
+**建议的判据（谁批谁落）**：要么把 `packages/app-host/scripts/***` 一并放进同步集合，
+要么在**发起方**一侧先断言 bundle 在（不在就响亮失败并点名那条生成命令）——
+别让一条远端自愈分支的可达性挂在"这台机器上有没有上一次构建留下的派生物"。
