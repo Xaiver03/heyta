@@ -2262,6 +2262,18 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
   改法只动那行注释（零行为变更），并把"这一臂表达不了 `=0`"这件事写进注释本身，让下一个想找关臂的人不必再翻一遍源码。
   现量：`grep -c 'storage host OFF' scripts/windows/launch-winui-shell-cdp.ps1` = **0**；纯 ASCII 那条按 `LC_ALL=C grep '[^ -~]'` 判（PS 5.1 读无 BOM UTF-8 会当 ANSI，见 AGENTS §6.1.1）。
   ⚠️ **没有顺手加 `-NoShellStorage` 那一档**：那是别人装置的功能面，而且真跑它要打包机 `heyta-win-journey` 那枚计划任务的**独占窗口**（脚本自己会先 `schtasks /Delete /F`）⇒ 登记成任务 #45，不无人值守抢。
+  - ✅ **10-12 01:0x：那一档"装置表达不了 `=0`"已经做掉了（提交 `422850ee`，只改这一枚文件）**。上面那句"没有顺手加"是 10-11 的原话，留着是为了让后来者看清它当时是真的；处置以本行为准。
+    **改的是装置的一个旋钮，不是判据口径**：新增 `-ShellStorageOff`（往生成的启动脚本里写 `$env:HEYTA_SHELL_STORAGE = '0'`，逐字对上壳里那句 `env != "0"`）与 `-PlanOnly`
+    （定臂 → 把将要写进去的那一行原样打印 → 退出，**不 publish、不建 schtasks、不开窗口**）。臂的判定挪到 `-PlanOnly` 退出**之前**，
+    所以"只打印"那一趟与真跑那一趟不可能读到不同的臂。两枚开关同时给 ⇒ `STORAGE_ARM=conflict` + 退 2（不静默挑一个）。
+    事实行补了 `arm=`：`shell_storage_switch` 报的是开关，而 `unset` 与 `on` 都意味着宿主开着 ⇒ 关臂比对键的是 `arm=off` 这个字面值。
+    🔴 **四臂的读数是在打包机的 PowerShell 5.1 上真取的**（本机没有 pwsh，这份文件按设计只能在 Windows 上解析）：
+    `STORAGE_ARM=unset` / `on` / `off` / `conflict`，对应行分别是注释行 / `= '1'` / `= '0'` / 退 **2**；
+    跑的是 `-PlanOnly` ⇒ **零窗口、零进程、没碰那枚计划任务**（先现量 `tasklist /FI "IMAGENAME eq HeytaWindows.exe"` 回"没有匹配的进程"才动）。
+    取现量（不带行号，行号会漂）：`grep -n 'storage host ON' scripts/windows/launch-winui-shell-cdp.ps1` 命中定臂那一处；
+    纯 ASCII 判据 `LC_ALL=C grep -c '[^ -~]' scripts/windows/launch-winui-shell-cdp.ps1` = **0**。
+    ⚠️ **仍未闭合的是设备那一半**（真跑 `arm=off` 看壳里 `STORAGE=` 取证）：它要 `heyta-win-journey` 的独占窗口，而且这一趟会先 `schtasks /Delete /F` —— 任务 #45 因此**不整体关掉**，
+    它的"装置表达不了"那一半从这一笔起不再成立。
 - ✅ **10-11 18:1x 重取"HEAD 拦路"那六条里可以静态量的三条：三条全部否证了旧读数**（不沿用 23:1x 那趟，也不等载体）：
   1. **barrel 自洽**：`git show HEAD:packages/ui/src/index.ts` 里 **93** 个本地说明符，逐枚按 `.js → .ts/.tsx` 映射去问 `git cat-file -e HEAD:<候选>`
      ⇒ **0 枚找不到**。旧那格写的是"HEAD 自己有 **7** 条 re-export 指向不在 `HEAD` 的文件、连辅助件共 **11** 枚"，那枚**全局门槛已经消失**
