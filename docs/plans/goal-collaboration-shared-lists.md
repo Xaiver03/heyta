@@ -757,3 +757,25 @@ E 勾选后不切实心→1 红；F 主按钮文字配对坏→1 红。还原后
 `heyta-iphone-17pro`）、`adb devices` 有 `emulator-5554 device`，一分钟负载 12.62（本仓阈值 12）。
 那条流程会 `simctl uninstall` + 卸旧装新，**正在别的会话的在途验收上踩过去**（AGENTS §8 第 9 条
 "共享资源独占验收"）。设备面空出来之后现量这四条读数再起，别照本节推断"现在可以跑"。
+
+### 10-12 第二次复量（HEAD 之后又落 17 笔；上一节那张表已经作废，以本节为准）
+
+四枚绊线**少了一枚**，另一枚换了位置 —— 这就是"每次现量"的实际成本，也是别把条数写进正文的理由：
+
+| 那一格 | 这一趟 | 归谁 |
+|---|---|---|
+| `packages/domain` 权益拒绝理由契约 | ✅ **rc=0，1023 全过** —— 由自动收集线 `f2a94651` 修掉（它把并进订阅读取词表的 8 枚自动收集拒绝理由拆回自己那张表，那条漂移守卫当场复绿） | 已闭，不再挂在本线边界上 |
+| `packages/shared-schema` 口令路径封闭词表 | ❌ 仍 1 failed / 172 passed | auth 线 |
+| `packages/ai` 分母 + `check:reachability` | ❌ 仍 2 failed / 263 passed；reachability 仍 rc=1（断言 B：已建模实体必须在 app-host 有写路径 —— COMMENT） | 同源于产品体验线 `e6058120` 引入的 COMMENT，两格一起 |
+| `-r typecheck` | ❌ 仍 rc=2，**但错误换了文件**：`apps/web/src/features/shell/RailNavigation.tsx:109` TS2783 `'tabIndex' is specified more than once` | 产品体验线（`59c23f40` 那一族的在途文件） |
+
+🔴 **`RailNavigation.tsx` 那一处为什么不代改（三条代改条件第二条不成立，写清楚免得下一位顺手"修绿"）**：
+`git status --porcelain` 现量该文件是 **`M`（别人正在写）**；而且这不是可证无害的删除 ——
+那行 `tabIndex={roving ? 0 : -1}` 后面紧跟 `{...sortableAttributes}`，dnd-kit 的属性里**也带 `tabIndex`**，
+所以"谁生效"由**展开顺序**决定：删掉前面那行 = 键盘漫游焦点（roving tabindex）交给拖拽库，是**改行为**不是改类型。
+运行时形状不等于改前 ⇒ 按任务书"撞车文件登记不硬改"处理。
+
+**本线交付物在 17 笔之后重新认证过**（判据不变、结果不变）：五道静态门 `check:design` / `check:layering` /
+`check:ui-language` / `check:rn-aria` / `check:tokens` 各 rc=0；`packages/ui` 665 全过；
+`apps/web` 本线两份用例 18 全过（同意面 8 + 密钥信封 10）；
+`apps/landing` 1409 全过 —— 也就是 `a923f7fa` 欠的那枚页头对账锚点**没有被别人刚改的窄屏导航碰坏**。
