@@ -1,16 +1,9 @@
 import { createPublicKey, sign, verify, type KeyObject } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
-// 🔴 这枚值导入必须排在首次使用（下方 MAX_TICKET_SECONDS）之前：ESM 会提升 import，所以
-// typecheck 与单测都绿；但 tsc 的 CJS 产物**按源码顺序**落 require ⇒ 用早了就是 `inbound_core_1`
-// 的 TDZ，服务端一加载就崩。
-/**
- * 🔴 票据的**封闭动作词表与作用域档**只有一份，在 `@heyta/inbound-core`（签发侧与宿主侧
- * 共用）；这里原样转出，服务端各调用点保持既有导入路径。`session` 是唯一能建立/续期短期
- * 绑定的动作，其余每一项都必须在它自己要保护的那次写事务里一次性消费 —— 否则一枚票据就成了
- * 一张 30 秒通用通行证，与[协议 §4](../../../docs/reference/inbound-automation-protocol.md) 要求的
- * "票据绑定 action、实例、账号、rule/event、nonce、版本和 expiry，最多 30 秒且一次使用"不符。
- */
+// 🔴 这个 import 必须待在首次使用（下方 MAX_TICKET_SECONDS）之前：ESM 会提升 import，
+// typecheck 与 ESM 运行都绿；但 tsc 的 CJS 产物按源码顺序落 require ⇒ 用早了就是
+// 「inbound_core_1 before initialization」，服务端起不来。
 import {
   AUTOMATION_ENTITLEMENT_ACTIONS,
   AUTOMATION_ENTITLEMENT_MAX_TICKET_LIFETIME_MS,
@@ -22,7 +15,7 @@ import { prisma } from '../db';
 const UUID = z.string().uuid();
 const IDENTIFIER = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,254}$/);
 const RULE_ID = z.string().uuid();
-const EVENT_ID = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$/);
+const EVENT_ID = z.string().regex(/^[A-Za-z0-9:_-]{1,127}$/);
 const TICKET_DOMAIN = 'heyta-automation-entitlement-v1.';
 // 🔴 「最多 30 秒」这一格只有一个事实源：@heyta/inbound-core 的毫秒常量（宿主拿它判"这张票还能不能用"，
 // 服务端拿它判"这张票收不收"）。原来这里是另一枚字面量 30 —— 两份 = 可以从类型上漂开，
@@ -349,4 +342,40 @@ export async function purgeExpiredAutomationEntitlementTicketUses(now = new Date
   const cutoff = new Date(now.getTime() - REPLAY_RETENTION_MS);
   const result = await prisma.automationEntitlementTicketUse.deleteMany({ where: { expiresAt: { lt: cutoff } } });
   return result.count;
+}
+
+/** 只做一件事：发一条 DELETE。清扫用 `$executeRaw` 而不是 deleteMany，
+ *  因为"这台 installation 还有没有人引用"要跨两张表判，Prisma 的 where 表达不了 NOT EXISTS。 */
+export type AutomationClockPurgeDatabase = Pick<Prisma.TransactionClient, '$executeRaw'>;
+
+/**
+ * 退役实例的时钟高水位清扫（任务书 T2 最后一项）。
+ *
+ * 一行 clock 记录唯一的作用是"这台 installation 在本部署上见过的最大数据库时刻"，
+ * 用来拒绝比它更旧的时间（回滚防护）。所以它**只在该部署再也没有任何东西引用这台
+ * installation 时**才可以删：绑定行算引用（含已过期的那条 —— 换回来复用的是同一条），
+ * 票据消费行也算引用（nonce 一次性栅栏还活着）。第三条阈值从 `REPLAY_RETENTION_MS`
+ * 推导，不新造旋钮：高水位仍落在保留窗内 = 这一批票还有重放的可能，不动它。
+ *
+ * 🔴 边界要写清：清扫之后这台 installation 若再回来兑换，高水位从**当次的数据库时刻**
+ * 重新起算，此前那段记忆不再可比。这是"退役"的定义而不是缺陷 —— 跨越保留窗的旧票
+ * 本来就被 `claims.issuedAt` 那道未来时钟检查与 nonce 栅栏挡着，回滚防护不需要为它保留记忆。
+ */
+export async function purgeRetiredAutomationEntitlementClocks(
+  now = new Date(),
+  client: AutomationClockPurgeDatabase = prisma,
+): Promise<number> {
+  const cutoffMs = BigInt(now.getTime() - REPLAY_RETENTION_MS);
+  return client.$executeRaw`
+    DELETE FROM "automation_entitlement_clocks" AS c
+     WHERE c."max_seen_at_ms" < ${cutoffMs}
+       AND NOT EXISTS (
+         SELECT 1 FROM "automation_entitlement_bindings" AS b
+          WHERE b."installation_id" = c."installation_id"
+       )
+       AND NOT EXISTS (
+         SELECT 1 FROM "automation_entitlement_ticket_uses" AS t
+          WHERE t."installation_id" = c."installation_id"
+       )
+  `;
 }
