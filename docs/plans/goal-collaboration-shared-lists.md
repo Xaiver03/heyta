@@ -485,6 +485,12 @@ package.json   (只加了一行 verify:collab-journey)
 - **对数（AGENTS §6 那条"有 test 脚本的包数 == 打 `Tests` 汇总行的包数"）现在收得平**：
   `grep -rl '"test"' packages/* apps/* server/package.json` = **21 枚**；`--filter` 摘掉 `@heyta/sync-server`（沙箱 `prisma generate` EPERM，如实记的边界）后 **20 枚跑**；
   `grep` 到打了 `Tests` 汇总行的也是**同一批 20 枚**（无"某层从没跑过"）⇒ **对数审计闭合，交接·二那条"做不了"已被这次 no-bail 否证**。
+  🔴 **上面那句 `--filter` 摘层的边界已被本会话自己否证**（2026-10-11 同日补测，见「交接·三」）：
+  `pnpm --filter @heyta/sync-server test` **rc=0**（`Test Files 158 passed`、`Tests 2785 passed | 1 skipped`），
+  走 `cd server && npx vitest run` 也是同一份读数。⇒ 那条 EPERM 只在生成物未落盘的窗口出现过，
+  **这一层从来没有"跑不了"**，而我照抄了 `AGENTS.md` §6 那句旧结论，把一整层永久摘出了分母 ——
+  而"20 == 20"这个审计看起来完全严谨。已入 **§7 第 408 条**，并当场改了 AGENTS §6 那句（见同节）。
+  **闭合后的真审计 = 21 层跑 == 21 层打 `Tests` 汇总，差集空**（含 `server`）。
 - **5 枚红逐个归属（关键：不能一把都推成"别线绊线"）**：
   1. 🔴 **`apps/landing` `tests/mockup-shell-shape.spec.tsx` #7 —— 是协作线自己造成的下游红，本会话当场修绿**。
      根因：本线 `a923f7fa`（W4 web 宿主接线）往 `apps/web/src/App.tsx` 的 `.ht-header__actions` **加了一枚 `data-testid="share-open-button"`**（共享清单入口），
@@ -608,3 +614,25 @@ package.json   (只加了一行 verify:collab-journey)
 **仍然开的四格没有变化，也不在本线射程内**：`pnpm check` 整条被四枚别线绊线挡着；`reinstall:all`
 要设备 + 全链绿；push 要跨线授权；①②两停止点等他醒来看第 5 步那两段（① 的口径本轮已按源码修正过，
 别按"控件坏了"读）。
+
+**补测（同一会话晚些，因为把 AGENTS §6 那句"跑不了"重量了一次）**
+
+全量 `-r --no-bail test`（这次**不摘任何层**）：
+
+| 格 | 读数 | 结论 |
+|---|---|---|
+| 对数审计 | 日志里出现过的层 **21** == 打了 `Tests` 汇总行的层 **21**，差集**空** | 闭合，且**分母含 `server`** —— 上一版"20==20"是照抄旧边界算出来的，见 §7 第 408 条 |
+| `server`（`@heyta/sync-server`） | `Test Files 158 passed`、`Tests 2785 passed \| 1 skipped`，rc=0 | 那层从来没有"跑不了"；EPERM 只在生成物未落盘的窗口出现，client 已生成时 `pretest` 是 no-op |
+| `apps/mobile` | `958 passed`，本轮**没有** `RTEST-UNHANDLED-01` | 之前那枚 Rolldown 载体抖动**已不在**，不再作为本线边界登记 |
+| `apps/web` | 全包 `1 failed \| 2215 passed \| 13 skipped` —— 红在 `tests/task-sort.spec.tsx:253`「批量选择入口只在任务列表里出现，完成后退出选择态」，报 `expected undefined to be defined` | 🔴 **判成负载抖动，不判成本线回归**，证据三条：① 该断言在 `await setTimeout(50)` 之后读 store；② 单跑两趟 `cd apps/web && npx vitest run tests/task-sort.spec.tsx` **各 rc=0**；③ 当时 `uptime` 1 分钟负载 **46.96**（本仓阈值 12）。⇒ 记**载体无效**，不记产品失败，也不记"已验证"；本线未碰 task-sort 的任何一侧（`git status --porcelain -- apps/web/tests/task-sort.spec.tsx` 干净）。 |
+| 真红三枚（不变） | `packages/ai` 2 failed / `packages/shared-schema` 1 failed / `packages/domain` 1 failed | 仍是那三枚别线判断绊线；本线不代改口径 |
+
+🟡 `packages/ai/src/capability-manifest.generated.ts` 在工作树里**被别会话改着**（未提交），
+所以 `ai` 那枚红随时可能在他们那边收掉 —— 本线不动它，也不替它写读数。
+
+**顺手做的第 4 步文件清单逐格对账**（交接·二 §二 那份「协作线（建议单独一笔 commit）」20 条路径）：
+逐条现量 = **20/20 全部 clean**，且最后动它们的笔都是协作线的
+（`a923f7fa` W4 web 宿主 / `2485edde` W4-W6 接线 / `2f59b075` packages 层）⇒ 没有漏格、也没有把别线文件捎进来。
+⚠️ 其中 `server/src/shares/share.routes.ts` 在交接·二 §二 被列进「并行会话的、不碰」，
+而当前 Goal 原文的禁碰清单里没有它，且 W6 的转让端点本来就落在那份文件里 ⇒ 它随 `2485edde` 进了本线的笔，
+这里把两种清单的差异写明，别让下一个读者以为是违规代提交。

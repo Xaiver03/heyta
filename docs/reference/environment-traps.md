@@ -9538,3 +9538,30 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     实体在不在清单 / 组件在不在包里 / 谁 import 它 / 谁写它，四层各 grep 一次再落笔。
     关联：§7 第 195 条（默认 prop 把"没接"伪装成"做完了"）、第 404 条那族"写法≠语义"、
     以及本线 `docs/plans/goal-collaboration-shared-lists.md` 的「2026-10-11 交接·三」。
+
+408. 🔴 **文档里那句"这一层在本机跑不了"是瞬时读数 —— 沿用它的下一次对数审计，分母自己就是错的。**
+
+    `AGENTS.md` §6 长期挂着「沙箱里跑不了 `@heyta/sync-server`（`prisma generate` EPERM），
+    用 `--filter '!@heyta/sync-server' test` 复现其余各包」。本会话按它做了 `-r test --no-bail`
+    的对数审计，并如实把那一层登记成"未测"。收口前重量一次：
+
+    ```
+    pnpm --filter @heyta/sync-server test     # → rc=0，Test Files 158 passed，Tests 2785 passed | 1 skipped
+    cd server && npx vitest run               # → 同一份读数（绕开 pnpm 的 pretest 也跑得通）
+    ```
+
+    ⇒ **EPERM 只在"生成物尚未落盘"那个窗口出现过**；`@prisma/client` 一旦已生成，
+    `pretest: prisma generate` 就是 no-op，那一层从来没有"跑不了"。也就是说：
+    **我照抄了一句环境结论，把一整层（158 个文件）永久摘出了自己的分母，而审计照样报"收得平"。**
+
+    两种绕过法都可用，选一种并在读数旁写清用的是哪种：走 `--filter`（pnpm 会跑 pretest）
+    或 `cd server && npx vitest run`（跳过 pretest，直接吃已生成的 client）。
+
+    📌 **一般规律**：环境边界是**这一台机器、这一刻**的属性，不是包的属性。
+    "某一档没测"这种登记，必须每次收口**重新重量一次能不能测**，不能引用上一轮的登记项、
+    也不能引用文档里那句"跑不了"——否则假阻塞会被复制成永久阻塞，
+    而它的表现形式恰好是"审计看起来很严谨"（分母是照着漏掉的层算出来的）。
+    关联：第 164 条（后台任务通知的 `exit code 0` 是包装命令的，不是被测命令的 ——
+    本轮 `( … ) &` 丢后台又踩一次：那条"completed exit 0"是启动器的，
+    真读数要用日志里的自打标记，例如 `echo RC=$? >> log`）、
+    第 57 条（`check` 曾经不跑任何单元测试）。
