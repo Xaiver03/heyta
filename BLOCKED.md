@@ -9533,3 +9533,39 @@ try {
 🟡 另记一条**测试层的载体事实**（不是缺陷，但影响"这道判据被谁跑"）：`server/tsconfig.json` 的 `include` 只有
 `src/**/*` 与 `scripts/**/*`，所以 `server/tests/**` 的类型**不进 `tsc`**，只由 vitest 运行时执行 —— 新那枚 spec 也是这个形状。
 `npx tsc --noEmit -p tsconfig.json` 在 server 包 rc=0，但它不覆盖测试文件；要说"测试类型也过了"必须另找载体。
+
+## B176（2026-10-12 01:4x，本会话 · **我自己造的事故，如实记在这里**）：我用 `git add <点名文件>` 提交本线那一枚新函数时，把**别线在同一文件里的两处未提交改动**一起公开了 —— 归属不是我的，判断也不该我替
+
+**发生了什么**（不是别人越界，是我越界）：`server/src/automation/entitlement-ticket.ts` 在我追加清扫函数**之前**，
+工作树里已经坐着两处别人的未提交改动。我按"点名文件 = 只落自己那片"的习惯 `git add` 了整枚文件，于是
+`aeca0f77` 把那两处一起写进了 main。事后 `git show --numstat` 才看见 `40 增 / 11 删` —— 我那一笔只该有 40/0。
+
+**那两处是什么**（逐字，本线不判对错）：
+
+1. 文件头那枚 TDZ 注释被改写，并且**票据动作词表那整段 doc 注释被删掉**（`git show aeca0f77^:` 里还在，是我这条线
+   在 `5f1672c7` 落回去的那份）。
+2. 🔴 `const EVENT_ID = z.string().regex(...)` 由 `/^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$/` 改成 `/^[A-Za-z0-9:_-]{1,127}$/`
+   —— 首字符不再强制字母数字，且上界从 128 收到 127。**这是校验口径（判卷口径）的改动**，
+   按本线死规矩「改判卷口径要记 BLOCKED.md，不代改」，我不判它对不对，也不替它写进提交信息里当结论。
+
+**证据命令**（谁复核都用这三行，不需要读正文）：
+
+```
+$ git log --all --oneline -S 'A-Za-z0-9:_-]{1,127}' -- server/src/automation/entitlement-ticket.ts   → 只有 aeca0f77（我那一笔）
+$ git show aeca0f77^:server/src/automation/entitlement-ticket.ts | grep -n "EVENT_ID = "               → 旧正则
+$ git show 1a8de6fd:server/src/automation/entitlement-ticket.ts | grep -n "EVENT_ID = "               → 旧正则（隔离载体那棵树）
+```
+
+⇒ 新正则**从来没在任何提交里出现过**，它只活在共享工作树里 ⇒ 那是别人正在写、还没提交的东西。
+
+**本会话已经做的补救**（一笔新提交，不改写历史、不 amend、不 push）：把该文件的**已提交内容**退回
+"`aeca0f77^` 那份 + 本线追加的清扫函数"，也就是**只把那两处别线 hunk 从 main 里拿掉**。
+工作树一个字都没动 ⇒ 那两处改动**回到它们本来的状态：未提交、归属仍是它的主人**，`git status` 会重新把该文件列成 `M`。
+复账：`git diff HEAD -- server/src/automation/entitlement-ticket.ts` 的两处 hunk 应与上面逐字相同；
+`grep -n "purgeRetiredAutomationEntitlementClocks" <(git show HEAD:server/src/automation/entitlement-ticket.ts)` 应命中（本线那半没丢）。
+
+📌 **可迁移的那一条**（本仓 `git add <文件>` 的同名陷阱，这次栽在我自己手里）：**"点名文件"只保证不提交别人的文件，
+不保证不提交别人在同一文件里的 hunk。** 共享检出里要落自己那片，判据必须是**blob 内容**而不是文件名：
+先 `git show HEAD:<file>` 取回上一版、把自己的那段拼上去、`git hash-object -w` 后 `update-index --cacheinfo` 落进去
+（也就是 BLOCKED.md 一直在用的那份配方），然后 `git diff --numstat <新提交>^ <新提交> -- <file>` 的**删除数必须是 0** ——
+只要它不是 0，就说明这一笔动了别人写的内容。这一条应当上升成提交前的一把尺，而不只是记忆。
