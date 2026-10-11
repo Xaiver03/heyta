@@ -89,7 +89,7 @@ date-only 与 instant 是两种不同语义：date-only 由 `*DateLocal` 字段�
 
 **逐次动作的票据从哪来**：`POST /automation/entitlement/ticket`（需登录、`no-store`、限流 60/分）。请求体只有 `installationId/action/ruleId?/eventId?` 四个字段且 `strict`：`session` 走它自己那条通道（它是唯一能建立/续期绑定的动作，从这条通道取会被拒），作用域与动作不符直接拒签，绑定三字段照旧只从 `links` 行读回。🔴 **这条通道判的是「这个主体可否在这个作用域上做这一个动作」，不判「这个 rule/event 是否真属于那个本地账号」** —— 后者只有客户实例知道（它的库是端到端加密的，官方侧看不到也不该看），所以归属由客户端在消费那一步判。
 
-已闭合的部分到此为止；下列仍是**未闭合门槛**，不得读成已实现：各宿主**真的启动**那条续期心跳与 `waiting-entitlement` 展示；`automation_entitlement_clocks` 的实例退役清扫还没有消费者。（官方签发端、`officialSubject ↔ 实例 ↔ 本地账号` 的链接握手、吊销版本在线刷新三件已于 2026-10-09 闭合；除草稿确认与首次许可外的票据消费也于同日**从 HTTP 闸门自己的事务挪进业务写事务**，闸门只留离线预检 —— 判据见 [落地计划](../plans/inbound-automation.md) 文末同名小节。唯一留在闸门里消费的是上面注明的 `ai-reserve`。）
+已闭合的部分到此为止；下列仍是**未闭合门槛**，不得读成已实现：各宿主**真的启动**那条续期心跳与 `waiting-entitlement` 展示；`automation_entitlement_clocks` 的实例退役清扫**函数与数据库层判据已闭合**（`server/src/automation/entitlement-ticket.ts` 的 `purgeRetiredAutomationEntitlementClocks`，配 `server/tests/automation-clock-retirement.pglite.spec.ts` 五条判据 —— 真 Postgres 上跑生产那条 SQL，三条保留约各被摘掉一次都会红），缺的是**每日清扫任务里那一次调用**：落点 `server/src/sync/cleanup.ts` 不在本线地界内（登记 B175，附可粘的那一段）。（官方签发端、`officialSubject ↔ 实例 ↔ 本地账号` 的链接握手、吊销版本在线刷新三件已于 2026-10-09 闭合；除草稿确认与首次许可外的票据消费也于同日**从 HTTP 闸门自己的事务挪进业务写事务**，闸门只留离线预检 —— 判据见 [落地计划](../plans/inbound-automation.md) 文末同名小节。唯一留在闸门里消费的是上面注明的 `ai-reserve`。）
 
 🔴 **两条以前挂在同一句里的"客户端还没有"，2026-10-10 分别有了不同的结局，必须分开读**：
 

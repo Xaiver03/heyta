@@ -9490,3 +9490,46 @@ grep -rln "startAutomationSessionKeepalive" apps/web/src apps/mobile/src apps/no
 不是缺口。新措辞同时补了复账命令，并加一句说明它与下一段"取票源没有第二个地址旋钮"那句**不冲突**（两层各说一件事：
 后者指 `inbound-entitlement-tickets.ts:84/:104` 只有一个 `baseUrl`，而 web 传进去的就是同步实例地址
 `apps/web/src/features/settings/inbound-runtime.ts:39`、`:50`）。
+
+## B175（2026-10-12 01:4x，本会话 · 做任务书 T2 最后一项时留下的那一行）：**时钟高水位的退役清扫已经写完并有真库判据，缺的只有每日任务里的那一次调用 —— 而 `server/src/sync/cleanup.ts` 不在本线地界内**
+
+现量（这条格子闭合与否不看正文，看这三行）：
+
+```
+$ grep -n "purgeRetiredAutomationEntitlementClocks" server/src/automation/entitlement-ticket.ts
+$ grep -rn "purgeRetiredAutomationEntitlementClocks" server/src/sync/cleanup.ts   → （空，rc=1）
+$ NO_COLOR=1 npx vitest run tests/automation-clock-retirement.pglite.spec.ts      → Tests 5 passed (5)
+```
+
+**为什么这半件事本线能做、那半件不能**：函数与判据都落在 `server/src/automation/` 与 `server/tests/`（白名单内）；
+消费者要落在每日清扫任务里，那个文件 `server/src/sync/cleanup.ts` 与它的启动方 `server/src/server.ts` 都在白名单外。
+本线**没有**为了"让它有人调"而把清扫塞进 `api.ts`（白名单内）—— 那会把一次表级 DELETE 挂到请求路径上，
+而票据消费行的那条同类清扫 `purgeExpiredAutomationEntitlementTicketUses` 本来就在每日任务里（`cleanup.ts:185`），
+同一个判断分两处做会造出第二套节奏。**按既有形状，缺的就只是下面这一段。**
+
+**可粘的那一段**（与上面 `[automation-entitlement-tickets]` 那一块逐字同形：计数为 0 也记日志、失败响亮报错不吞）：
+
+```ts
+// import 处（紧跟既有的 purgeExpiredAutomationEntitlementTicketUses 那行）
+import { purgeRetiredAutomationEntitlementClocks } from '../automation/entitlement-ticket';
+
+// runDailyCleanup 内，紧跟 [automation-entitlement-tickets] 那一块
+try {
+  const deleted = await purgeRetiredAutomationEntitlementClocks(new Date());
+  Logger.info(`Cleanup [automation-entitlement-clocks]: removed ${deleted} retired installation clock row(s)`);
+} catch (error) {
+  Logger.error(`Cleanup [automation-entitlement-clocks] failed: ${error}`);
+}
+```
+
+**判据的形状**（谁改都不必重读实现）：一行时钟**只在**同时满足这三条时被删 ——
+这台 installation 没有绑定行（**已过期的绑定也算引用**，换回来复用同一条）、没有票据消费行（nonce 栅栏还在服役）、
+高水位落在 `REPLAY_RETENTION_MS` 之外。阈值复用票据那条清扫用的同一枚常量，没有新旋钮。
+
+⚠️ **一条必须写清的边界**：清扫之后这台 installation 若再回来兑换，高水位从**当次的数据库时刻**重新起算，
+之前那段记忆不再可比。这是"退役"的定义而不是缺陷 —— 跨越保留窗的旧票本来就被 `claims.issuedAt` 那道未来时钟检查
+与 nonce 栅栏挡着，回滚防护不需要为它保留记忆。这条已写在函数 docstring 与协议文档 §发布门槛 里。
+
+🟡 另记一条**测试层的载体事实**（不是缺陷，但影响"这道判据被谁跑"）：`server/tsconfig.json` 的 `include` 只有
+`src/**/*` 与 `scripts/**/*`，所以 `server/tests/**` 的类型**不进 `tsc`**，只由 vitest 运行时执行 —— 新那枚 spec 也是这个形状。
+`npx tsc --noEmit -p tsconfig.json` 在 server 包 rc=0，但它不覆盖测试文件；要说"测试类型也过了"必须另找载体。

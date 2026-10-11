@@ -2837,3 +2837,38 @@ B139 本体已在账本里就地追记复账（不是新写一条），旧表留
 
 ⚠️ 一条探针教训顺手入档（本条第一趟差点把它量成"有调用点"）：zsh 里裸写 `--include=*.ts`
 会因 glob 无匹配而**整行中止、什么也不打印**，与"没有调用点"的输出**完全同形**；`--include=` 必须带引号。
+
+### 2026-10-12 01:4x · T2 最后一项落地一半：**时钟高水位的退役清扫写完并有真库判据，缺的只有每日任务里那一次调用**（→ B175）
+
+任务书 T2 第四条"`automation_entitlement_clocks` 的实例退役清扫"开工前的现量：那张表全仓只有
+`entitlement-ticket.ts:272`（读）与 `:298`（upsert）两处触碰，**没有任何删除路径** —— 也就是说协议文档
+原来那句"清扫还没有消费者"其实**说过头了**（不是"写了没人调"，是根本没写）。这一格现在补的是实现 + 判据：
+
+| 件 | 落点 | 状态 |
+|---|---|---|
+| 清扫函数 | `server/src/automation/entitlement-ticket.ts` 的 `purgeRetiredAutomationEntitlementClocks(now?, client?)` | ✅ 白名单内 |
+| 判据 | `server/tests/automation-clock-retirement.pglite.spec.ts` **5 条**（真 Postgres 跑生产那条 SQL，结构从两枚迁移文件读出、不手抄） | ✅ 白名单内 |
+| 消费者 | `server/src/sync/cleanup.ts` 每日任务里的那一次调用 | 🔴 **白名单外** ⇒ **B175**，附可粘的一段 |
+
+**判据为什么必须落在真 SQL 上**：三条保留约全写在一条 `DELETE … NOT EXISTS … NOT EXISTS` 里，
+拿假 client 断言"函数发出了一条 DELETE"只能证明它调了驱动，证明不了谓词 —— 而这条判据坏了不会有人知道
+（退役行留着 = 表无界增长；引用行被删 = 回滚防护失忆，两种都不会让任何现有测试变红）。
+所以载体是 PGlite（`@electric-sql/pglite` 已是 server 的 devDependency，与 `admin-migration.pglite.spec.ts` 同一口径）。
+
+**反向验证（三臂逐条摘掉，各红各的那条）**：
+
+| 臂 | 摘掉的约 | 结果 |
+|---|---|---|
+| A | 绑定行的 `NOT EXISTS` | `Tests 1 failed \| 4 passed`（红在"其余三行按各自保留原因活着"） |
+| B | 票据消费行的 `NOT EXISTS` | `Tests 3 failed \| 2 passed` |
+| C | 保留窗那条比较（换成恒真） | `Tests 1 failed \| 4 passed` |
+
+还原：从 `entitlement-ticket.ts.mut-bak` 拷回并 `cmp` 证逐字相同，再跑
+`automation-clock-retirement + automation-entitlement-ticket + inbound-ticket-rejection-route`
+= **`Test Files 3 passed (3)` / `Tests 40 passed (40)`**，`.mut-bak` 已删。`cd server && npx tsc --noEmit -p tsconfig.json` = **rc=0**。
+
+⚠️ 一条载体事实（写下来免得下一个人把 rc=0 读成"测试类型也过了"）：`server/tsconfig.json` 的 `include`
+只有 `src/**/*` 与 `scripts/**/*` ⇒ `server/tests/**` 不进 `tsc`，新那枚 spec 只由 vitest 运行时执行。
+
+🔴 **本线不声称 T2 第四条已闭合**：函数与判据在，但**没有任何东西调用它** —— 这正是 B174 与本仓 `realtime.ts`
+那条反复出现同一形状。区别只在于：这次缺的是**一行调用**（可粘、无需判断），而心跳缺的那一步要先拍 B109。
