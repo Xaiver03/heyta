@@ -764,6 +764,10 @@ export const en = {
   'web.sync.a11y.syncNow': 'Sync now',
   // Full label of the sync button at the bottom of the rail: action + current status.
   'web.sync.rail.aria': 'Sync. Current status: {status}',
+  // The compact bottom bar leaves ~34px for text, so the full status sentence always
+  // ellipsizes into noise there. That tier shows the stable control name instead; the
+  // sentence stays in aria-label and the live region.
+  'web.sync.rail.compact': 'Sync',
   'web.sync.settings.title': 'Sync settings',
   // Cut 3 of ticket H9: this section says what sync actually sends out.
   // "Close sync settings" went away with that sibling overlay — a settings

@@ -1,0 +1,1153 @@
+{
+  "origin": "http://127.0.0.1:4390",
+  "carrier": {
+    "headless": false,
+    "tree": {
+      "headSha": "f16ad4d793b0673e109b0614ebee2841ff63f0af",
+      "root": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta",
+      "provenanceScope": "rig 的检出（ROOT），不是 ORIGIN 那棵被服务的树",
+      "rigFile": "scripts/qa/reminders-data-responsive.mjs",
+      "rigSha256Prefix": "b54c773c17a2",
+      "rigWorktreeMatchesHead": true,
+      "dirtyFiles": {
+        "apps/web/src": 6,
+        "packages/ui/src": 1
+      },
+      "at": "2026-10-11T16:16:38.879Z"
+    },
+    "evidenceDir": "apps/web/evidence/rail-geometry-r106",
+    "screenshotAnchorForm": "repo-relative",
+    "screenshotAnchorResolvableInRepo": false,
+    "evidenceDirTrackedFiles": 0,
+    "legs": [
+      "groups"
+    ],
+    "skippedLegs": [
+      "reminders",
+      "data",
+      "help",
+      "sync"
+    ],
+    "legCells": {
+      "reminders": 0,
+      "data": 0,
+      "groups": 24,
+      "help": 0,
+      "sync": 0
+    },
+    "expectedLegCells": {
+      "reminders": 30,
+      "data": 6,
+      "groups": 24,
+      "help": 6,
+      "sync": 3
+    },
+    "reminderModes": [
+      "default",
+      "granted",
+      "denied",
+      "unsupported",
+      "error"
+    ],
+    "injectedReminderModes": [],
+    "themeCarrier": "localStorage['heyta.theme']（= 产品自己那条开关）",
+    "themeRulerMeasuredCells": 0,
+    "themeRulerSampleCells": 24,
+    "themeLayerRulerPairedCells": 0,
+    "themeRulerPairSampleCells": 24,
+    "themeRulerPairMeasuredCells": 0,
+    "plantedStuckTierIndex": -1,
+    "realPermissionModes": [
+      "default",
+      "granted",
+      "denied"
+    ],
+    "injectionReason": null,
+    "themeRulerSampled": false
+  },
+  "cases": [
+    {
+      "theme": "light",
+      "width": 375,
+      "height": 812
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "height": 812
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "height": 960
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "height": 960
+    }
+  ],
+  "reminders": [],
+  "data": [],
+  "sweepGroups": [
+    "profile",
+    "account",
+    "sync",
+    "ai"
+  ],
+  "sweepCases": [
+    {
+      "theme": "light",
+      "width": 375,
+      "height": 812
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "height": 812
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "height": 900
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "height": 900
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "height": 900
+    }
+  ],
+  "groups": [
+    {
+      "theme": "light",
+      "width": 375,
+      "group": "profile",
+      "navLabel": "个人资料",
+      "facts": {
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "theme": "light",
+        "title": "个人资料",
+        "box": {
+          "x": 16,
+          "y": 132,
+          "width": 343,
+          "height": 273
+        },
+        "textLength": 44,
+        "interactive": 1,
+        "offViewportWholeScreen": 4,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-profile",
+        "scopeMatched": true,
+        "sharedLayerCandidates": [],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "个人资料",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 375,
+      "group": "account",
+      "navLabel": "账号与安全",
+      "facts": {
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "theme": "light",
+        "title": "账号与安全",
+        "box": {
+          "x": 16,
+          "y": 132,
+          "width": 343,
+          "height": 185
+        },
+        "textLength": 33,
+        "interactive": 1,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-account",
+        "scopeMatched": true,
+        "sharedLayerCandidates": [],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "账号与安全",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 375,
+      "group": "sync",
+      "navLabel": "同步与隐私",
+      "facts": {
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "theme": "light",
+        "title": "同步与隐私",
+        "box": {
+          "x": 16,
+          "y": 132,
+          "width": 343,
+          "height": 778
+        },
+        "textLength": 261,
+        "interactive": 6,
+        "offViewportWholeScreen": 2,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-sync",
+        "scopeMatched": true,
+        "sharedLayerCandidates": [],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "同步与隐私",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 375,
+      "group": "ai",
+      "navLabel": "AI 与集成",
+      "facts": {
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "theme": "light",
+        "title": "AI 与集成",
+        "box": {
+          "x": 16,
+          "y": 132,
+          "width": 343,
+          "height": 878
+        },
+        "textLength": 496,
+        "interactive": 4,
+        "offViewportWholeScreen": 1,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-ai",
+        "scopeMatched": true,
+        "sharedLayerCandidates": [],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "AI 与集成",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "group": "profile",
+      "navLabel": "个人资料",
+      "facts": {
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "theme": "dark",
+        "title": "个人资料",
+        "box": {
+          "x": 16,
+          "y": 132,
+          "width": 343,
+          "height": 273
+        },
+        "textLength": 44,
+        "interactive": 1,
+        "offViewportWholeScreen": 4,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-profile",
+        "scopeMatched": true,
+        "sharedLayerCandidates": [],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "个人资料",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "group": "account",
+      "navLabel": "账号与安全",
+      "facts": {
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "theme": "dark",
+        "title": "账号与安全",
+        "box": {
+          "x": 16,
+          "y": 132,
+          "width": 343,
+          "height": 185
+        },
+        "textLength": 33,
+        "interactive": 1,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-account",
+        "scopeMatched": true,
+        "sharedLayerCandidates": [],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "账号与安全",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "group": "sync",
+      "navLabel": "同步与隐私",
+      "facts": {
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "theme": "dark",
+        "title": "同步与隐私",
+        "box": {
+          "x": 16,
+          "y": 132,
+          "width": 343,
+          "height": 778
+        },
+        "textLength": 261,
+        "interactive": 6,
+        "offViewportWholeScreen": 2,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-sync",
+        "scopeMatched": true,
+        "sharedLayerCandidates": [],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "同步与隐私",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 375,
+      "group": "ai",
+      "navLabel": "AI 与集成",
+      "facts": {
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "theme": "dark",
+        "title": "AI 与集成",
+        "box": {
+          "x": 16,
+          "y": 132,
+          "width": 343,
+          "height": 878
+        },
+        "textLength": 496,
+        "interactive": 4,
+        "offViewportWholeScreen": 1,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-ai",
+        "scopeMatched": true,
+        "sharedLayerCandidates": [],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "AI 与集成",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "group": "profile",
+      "navLabel": "个人资料",
+      "facts": {
+        "documentScrollWidth": 768,
+        "documentClientWidth": 768,
+        "theme": "light",
+        "title": "个人资料",
+        "box": {
+          "x": 24,
+          "y": 140,
+          "width": 655,
+          "height": 195
+        },
+        "textLength": 44,
+        "interactive": 1,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-profile",
+        "scopeMatched": true,
+        "sharedLayerCandidates": [],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "个人资料",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "group": "account",
+      "navLabel": "账号与安全",
+      "facts": {
+        "documentScrollWidth": 768,
+        "documentClientWidth": 768,
+        "theme": "light",
+        "title": "账号与安全",
+        "box": {
+          "x": 24,
+          "y": 140,
+          "width": 655,
+          "height": 125
+        },
+        "textLength": 33,
+        "interactive": 1,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-account",
+        "scopeMatched": true,
+        "sharedLayerCandidates": [],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "账号与安全",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "group": "sync",
+      "navLabel": "同步与隐私",
+      "facts": {
+        "documentScrollWidth": 768,
+        "documentClientWidth": 768,
+        "theme": "light",
+        "title": "同步与隐私",
+        "box": {
+          "x": 24,
+          "y": 140,
+          "width": 655,
+          "height": 640
+        },
+        "textLength": 261,
+        "interactive": 6,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-sync",
+        "scopeMatched": true,
+        "sharedLayerCandidates": [],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "同步与隐私",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "group": "ai",
+      "navLabel": "AI 与集成",
+      "facts": {
+        "documentScrollWidth": 768,
+        "documentClientWidth": 768,
+        "theme": "light",
+        "title": "AI 与集成",
+        "box": {
+          "x": 24,
+          "y": 140,
+          "width": 655,
+          "height": 776
+        },
+        "textLength": 496,
+        "interactive": 4,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-ai",
+        "scopeMatched": true,
+        "sharedLayerCandidates": [],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "AI 与集成",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "group": "profile",
+      "navLabel": "个人资料",
+      "facts": {
+        "documentScrollWidth": 768,
+        "documentClientWidth": 768,
+        "theme": "dark",
+        "title": "个人资料",
+        "box": {
+          "x": 24,
+          "y": 140,
+          "width": 655,
+          "height": 195
+        },
+        "textLength": 44,
+        "interactive": 1,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-profile",
+        "scopeMatched": true,
+        "sharedLayerCandidates": [],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "个人资料",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "group": "account",
+      "navLabel": "账号与安全",
+      "facts": {
+        "documentScrollWidth": 768,
+        "documentClientWidth": 768,
+        "theme": "dark",
+        "title": "账号与安全",
+        "box": {
+          "x": 24,
+          "y": 140,
+          "width": 655,
+          "height": 125
+        },
+        "textLength": 33,
+        "interactive": 1,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-account",
+        "scopeMatched": true,
+        "sharedLayerCandidates": [],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "账号与安全",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "group": "sync",
+      "navLabel": "同步与隐私",
+      "facts": {
+        "documentScrollWidth": 768,
+        "documentClientWidth": 768,
+        "theme": "dark",
+        "title": "同步与隐私",
+        "box": {
+          "x": 24,
+          "y": 140,
+          "width": 655,
+          "height": 640
+        },
+        "textLength": 261,
+        "interactive": 6,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-sync",
+        "scopeMatched": true,
+        "sharedLayerCandidates": [],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "同步与隐私",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "group": "ai",
+      "navLabel": "AI 与集成",
+      "facts": {
+        "documentScrollWidth": 768,
+        "documentClientWidth": 768,
+        "theme": "dark",
+        "title": "AI 与集成",
+        "box": {
+          "x": 24,
+          "y": 140,
+          "width": 655,
+          "height": 776
+        },
+        "textLength": 496,
+        "interactive": 4,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-ai",
+        "scopeMatched": true,
+        "sharedLayerCandidates": [],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "AI 与集成",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "group": "profile",
+      "navLabel": "个人资料",
+      "facts": {
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "theme": "light",
+        "title": "个人资料",
+        "box": {
+          "x": 424,
+          "y": 80,
+          "width": 655,
+          "height": 195
+        },
+        "textLength": 44,
+        "interactive": 1,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-profile",
+        "scopeMatched": true,
+        "sharedLayerCandidates": [],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "个人资料",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "group": "account",
+      "navLabel": "账号与安全",
+      "facts": {
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "theme": "light",
+        "title": "账号与安全",
+        "box": {
+          "x": 424,
+          "y": 80,
+          "width": 655,
+          "height": 125
+        },
+        "textLength": 33,
+        "interactive": 1,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-account",
+        "scopeMatched": true,
+        "sharedLayerCandidates": [],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "账号与安全",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "group": "sync",
+      "navLabel": "同步与隐私",
+      "facts": {
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "theme": "light",
+        "title": "同步与隐私",
+        "box": {
+          "x": 424,
+          "y": 80,
+          "width": 655,
+          "height": 640
+        },
+        "textLength": 261,
+        "interactive": 6,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-sync",
+        "scopeMatched": true,
+        "sharedLayerCandidates": [],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "同步与隐私",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "group": "ai",
+      "navLabel": "AI 与集成",
+      "facts": {
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "theme": "light",
+        "title": "AI 与集成",
+        "box": {
+          "x": 424,
+          "y": 80,
+          "width": 655,
+          "height": 758
+        },
+        "textLength": 496,
+        "interactive": 4,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-ai",
+        "scopeMatched": true,
+        "sharedLayerCandidates": [],
+        "datasetTheme": "light",
+        "storedTheme": "light",
+        "cssLayerColor": "rgb(15, 23, 42)",
+        "cssLayerTitleText": "AI 与集成",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "group": "profile",
+      "navLabel": "个人资料",
+      "facts": {
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "theme": "dark",
+        "title": "个人资料",
+        "box": {
+          "x": 424,
+          "y": 80,
+          "width": 655,
+          "height": 195
+        },
+        "textLength": 44,
+        "interactive": 1,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-profile",
+        "scopeMatched": true,
+        "sharedLayerCandidates": [],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "个人资料",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "group": "account",
+      "navLabel": "账号与安全",
+      "facts": {
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "theme": "dark",
+        "title": "账号与安全",
+        "box": {
+          "x": 424,
+          "y": 80,
+          "width": 655,
+          "height": 125
+        },
+        "textLength": 33,
+        "interactive": 1,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-account",
+        "scopeMatched": true,
+        "sharedLayerCandidates": [],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "账号与安全",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "group": "sync",
+      "navLabel": "同步与隐私",
+      "facts": {
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "theme": "dark",
+        "title": "同步与隐私",
+        "box": {
+          "x": 424,
+          "y": 80,
+          "width": 655,
+          "height": 640
+        },
+        "textLength": 261,
+        "interactive": 6,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-sync",
+        "scopeMatched": true,
+        "sharedLayerCandidates": [],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "同步与隐私",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "group": "ai",
+      "navLabel": "AI 与集成",
+      "facts": {
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "theme": "dark",
+        "title": "AI 与集成",
+        "box": {
+          "x": 424,
+          "y": 80,
+          "width": 655,
+          "height": 758
+        },
+        "textLength": 496,
+        "interactive": 4,
+        "offViewportWholeScreen": 0,
+        "offViewportInsideGroup": 0
+      },
+      "planted": true,
+      "themeLayers": {
+        "scope": "#settings-group-ai",
+        "scopeMatched": true,
+        "sharedLayerCandidates": [],
+        "datasetTheme": "dark",
+        "storedTheme": "dark",
+        "cssLayerColor": "rgb(241, 245, 249)",
+        "cssLayerTitleText": "AI 与集成",
+        "sharedLayerColor": "(shared node not found)",
+        "sharedLayerNodeText": "(shared node not found)",
+        "sharedLayerSameRoleAsTitle": false,
+        "sharedLayerFound": false,
+        "sharedLayerCandidateCount": 0
+      }
+    }
+  ],
+  "helpWrapWidths": [
+    375,
+    768,
+    1440
+  ],
+  "helpCases": [
+    {
+      "theme": "light",
+      "width": 375
+    },
+    {
+      "theme": "light",
+      "width": 768
+    },
+    {
+      "theme": "light",
+      "width": 1440
+    },
+    {
+      "theme": "dark",
+      "width": 375
+    },
+    {
+      "theme": "dark",
+      "width": 768
+    },
+    {
+      "theme": "dark",
+      "width": 1440
+    }
+  ],
+  "helpWrap": [],
+  "syncCases": [
+    {
+      "theme": "light",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "theme": "light",
+      "width": 375,
+      "height": 812
+    }
+  ],
+  "syncPrivacy": [],
+  "assertions": {
+    "everySelectedLegProducedItsCells": true,
+    "unselectedLegsReportEmpty": true,
+    "noHorizontalOverflow": true,
+    "allPermissionStatesRendered": true,
+    "dataFailurePreserved": true,
+    "dataRefusalCardsCaptured": false,
+    "existingDataRefusedWithoutLoss": true,
+    "cancelPreserved": true,
+    "everyCaseCoversEverySelectedMode": false,
+    "reminderPermissionProvenanceIsLabeled": false,
+    "darkTierReachesBothThemeLayers": true,
+    "themeLayerRulerSwitchesWithTier": false,
+    "plantedThemeSampleTookEffect": true,
+    "themeRulerScopesAllMatched": true,
+    "everyCaseCoversEverySweepGroup": true,
+    "groupSweepThemeApplied": true,
+    "groupSweepTitleMatchesNav": true,
+    "groupSweepActionable": true,
+    "groupSweepNoHorizontalOverflow": true,
+    "groupSweepNothingPushedOffViewport": true,
+    "groupSweepOffViewportRulerHasTeeth": true,
+    "helpWrapFourRowsMeasured": true,
+    "helpWrapInjectionTookEffect": true,
+    "helpLongTitleWraps": true,
+    "helpLongTitleStaysInContentColumn": true,
+    "helpLongTitleRowInsideViewport": true,
+    "helpLongTitleNoHorizontalOverflow": true,
+    "helpLongTitleBadArmsFlipTheJudgment": true,
+    "syncPrivacyThreeStatesReached": true,
+    "syncPrivacyPanelVisibleAndThemeApplied": true,
+    "syncPrivacyExactlyOneActionPerState": true,
+    "syncPrivacyAcceptedShowsOnlyRevoke": true,
+    "syncPrivacyRevokeReturnsToChooseAgain": true,
+    "syncPrivacyReopenUsesOneAndOnlyOneDialog": true,
+    "syncPrivacyEveryStateSettled": true,
+    "syncPrivacyConsentDialogUnmountedAfterDecide": true,
+    "syncPrivacyDecisionButtonsPointerReachable": true,
+    "syncPrivacyBadArmsFlipTheRuler": true,
+    "syncPrivacyHeaderNoteInsideViewport": true,
+    "syncPrivacyHeaderNoteBadArmFlipsIt": false
+  },
+  "notJudged": [
+    "noHorizontalOverflow",
+    "allPermissionStatesRendered",
+    "everyCaseCoversEverySelectedMode",
+    "reminderPermissionProvenanceIsLabeled",
+    "dataFailurePreserved",
+    "dataRefusalCardsCaptured",
+    "existingDataRefusedWithoutLoss",
+    "cancelPreserved",
+    "helpWrapFourRowsMeasured",
+    "helpWrapInjectionTookEffect",
+    "helpLongTitleWraps",
+    "helpLongTitleStaysInContentColumn",
+    "helpLongTitleRowInsideViewport",
+    "helpLongTitleNoHorizontalOverflow",
+    "helpLongTitleBadArmsFlipTheJudgment",
+    "syncPrivacyThreeStatesReached",
+    "syncPrivacyPanelVisibleAndThemeApplied",
+    "syncPrivacyExactlyOneActionPerState",
+    "syncPrivacyAcceptedShowsOnlyRevoke",
+    "syncPrivacyRevokeReturnsToChooseAgain",
+    "syncPrivacyReopenUsesOneAndOnlyOneDialog",
+    "syncPrivacyEveryStateSettled",
+    "syncPrivacyConsentDialogUnmountedAfterDecide",
+    "syncPrivacyDecisionButtonsPointerReachable",
+    "syncPrivacyBadArmsFlipTheRuler",
+    "syncPrivacyHeaderNoteInsideViewport",
+    "syncPrivacyHeaderNoteBadArmFlipsIt",
+    "darkTierReachesBothThemeLayers",
+    "themeLayerRulerSwitchesWithTier"
+  ]
+}

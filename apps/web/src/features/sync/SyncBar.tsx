@@ -61,7 +61,15 @@ const GLYPH_COMPONENTS = {
   spinner: RefreshCw,
 } as const;
 
-export function SyncBar() {
+/**
+ * `compactLabel` 是给窄屏底部导航那一档的：那里的文字预算实测只有 34px
+ * （按钮 44px 减左右 padding，12px 字号下 = 两个汉字），整句状态一定被截成
+ * 「登…」——比没有状态更难读。那一档因此显示稳定的控制名，而**整句仍然在**
+ * `aria-label` 与下面那枚 `role="status"` 的 live region 里（读屏拿到全句，
+ * 宽屏与 设置 → 同步 也照旧显示全句）。状态本身在那一档由字形族 + 状态点表达，
+ * 不是只靠颜色（`syncStatusGlyph` 与 `syncStatusSeverity` 都在 `@heyta/ui`）。
+ */
+export function SyncBar({ compactLabel = false }: { compactLabel?: boolean } = {}) {
   const { t } = useI18n();
   const sync = useSyncStore();
   const affordances = syncStatusAffordances(sync.status);
@@ -145,7 +153,7 @@ export function SyncBar() {
             />
           </span>
           <span className="ht-rail__label ht-type-caption" aria-hidden="true">
-            {statusText}
+            {compactLabel ? t('web.sync.rail.compact') : statusText}
           </span>
         </button>
         {/* live region 与上面那枚 hover 标签是**两个元素**：标签 `aria-hidden`，只服务眼睛；

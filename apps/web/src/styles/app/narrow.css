@@ -60,6 +60,30 @@
     justify-content: center;
   }
 
+  /* 🔴 上面那行收缩只落在**外层那一格**上。里面的按钮带着 `ht-rail__tab`，而下面那条
+     `.ht-rail__tab { flex: 0 0 auto }` 对非直接子元素仍然生效，加上它在 column 容器里
+     按 max-content 定宽并居中 —— 于是它整枚盒子顶出格子。实测四档同形（375/390 × 明暗）：
+     同步钮自己的盒子 302→388（86px），压住通知那一格 21px、越出视口 13px，
+     而 `document.documentElement.scrollWidth` 仍等于视口宽 ⇒ 是画到屏外，不是能横滚。
+     这条文件头的意图（"不许把恢复类动作推到屏外"）要兑现，收缩必须落到按钮本身。
+     直接子元素那套（窄 padding/gap + column）在这里逐条重申，因为它选不中这枚按钮。 */
+  .ht-compact-rail .ht-rail__sync__action {
+    flex-direction: column;
+    gap: var(--ht-space-1);
+    padding: var(--ht-space-1);
+    min-inline-size: 0;
+    /* 🔴 是 `inline-size: 100%` 而不是只写 max：只封顶的话这枚按钮按内容定宽，
+       换成两字短词之后命中区掉到 34px（低于 44 的下限，实测 under44=1）。 */
+    inline-size: 100%;
+    max-inline-size: 100%;
+  }
+
+  /* 标签在 `.ht-compact-rail .ht-rail__label` 已经有 ellipsis，缺的是"能被压窄"：
+     flex item 默认 `min-inline-size: auto`，不写这条它永远顶到 max-content。 */
+  .ht-compact-rail .ht-rail__sync__action .ht-rail__label {
+    min-inline-size: 0;
+  }
+
   .ht-compact-rail > .ht-rail__tab {
     flex-direction: column;
     gap: var(--ht-space-1);
