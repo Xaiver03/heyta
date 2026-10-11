@@ -62,8 +62,10 @@ async function close(panel: { container: HTMLElement; root: Root }): Promise<voi
   panel.container.remove();
 }
 
-const card = (container: HTMLElement, id: string): HTMLElement | undefined =>
-  container.querySelector(`[data-testid="inbound-rule-${id}"]`) as HTMLElement | null;
+// 运行时缺卡返回的是 null 而不是 undefined：分母自检那条用的正是 `not.toBeNull()`，
+// 把类型写成 undefined 会让那条判据在缺卡时安静通过。
+const card = (container: HTMLElement, id: string): HTMLElement | null =>
+  container.querySelector<HTMLElement>(`[data-testid="inbound-rule-${id}"]`);
 const tier = (node: Element | null): string | undefined =>
   [...(node?.classList ?? [])].find((name) => name.startsWith('ht-type-'));
 
