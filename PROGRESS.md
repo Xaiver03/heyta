@@ -3596,3 +3596,18 @@ $ wc -l < BLOCKED.md                          # ⇒ 9436（9222 + 我的 55 + �
 表里其余 vitest 腿按"重验证不并发"排到链之后 —— 链的第 105 道本身就是 `pnpm -r test`（现量解析：
 `node -e` 拆 `scripts.check` → `N=106`、`86=check:ai-e2e`、`105=pnpm -r test`、`106=check:downloads`），
 那一趟会替整表再取一次全仓读数。
+
+
+## 2026-10-12 01:2x · B173 那格顺手把契约面补到与实现一致（这一步不需要人拍）
+
+B173 交还的是**登记面**那一行（地界外），但"文档没披露这条匿名下行"那一格本线可以自己补 ——
+`docs/reference/inbound-automation-protocol.md` 在本线白名单内。已往"吊销版本的在线刷新"那一节加一段，
+写明：那条 GET 匿名是设计（被吊销/过期之后仍要能读到自己该停在哪一档，挂认证等于让它永远停在旧下限）、
+claims 逐字段 `{version,issuer,keyId,scope,revocationVersion,issuedAt,expiresAt}` 零身份维度、`no-store`、
+对所有调用者同一个答案，以及无凭据者由此能知道的只有那三件运维量（是否签发端 / 全局下限 / 签发者标识与 keyId），
+写侧两条各自的闸逐条点名。
+📌 措辞上刻意没写"已登记入门禁"那类话 —— 那句要等 B173 那一行被它的所有者落下才成立。
+
+读数：`docs-link-check` rc=0、`check-docs-voice` rc=0、`check-legal-closure-truth` rc=0（后者会扫九份条款
+"没有被实现否证的句子"，这条新增只写已核对过的实现事实，不动版本指纹那栏）。
+B173 就地追记一句：现在缺的**只有**那一行登记，不再有"文档没披露"这一格。

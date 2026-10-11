@@ -85,6 +85,8 @@ date-only 与 instant 是两种不同语义：date-only 由 `*DateLocal` 字段�
 
 **吊销版本的在线刷新**：官方实例发布签名清单 `GET /automation/entitlement/revocations`（域 `heyta-automation-revocation-v1.`，claims 含 `scope='global'/revocationVersion/issuedAt/expiresAt`，寿命 ≤24h），自托管实例经 `POST /automation/entitlement/revocations/refresh` 转述并**只用本部署配置的公钥环验签**，合并单调只升；判定用的下限 = `max(部署时手配的那一个, 库里刷新到的那一个)`。抬下限本身要管理员，`refresh` 只要登录 —— 恰恰在绑定被吊销或过期之后才需要它。
 
+🔴 **取清单那一步是匿名的，这是设计而不是疏漏**：绑定被吊销或权益过期之后，那台实例手里已经没有可用凭据，而"读到自己该停在哪一档"恰恰是那一刻唯一还有用的动作；给它挂认证等于让被吊销的实例永远停在旧下限。响应对所有调用者是同一个答案（下限来自库里那一行 `scope='global'`，签发者标识与 keyId 来自部署配置），claims 逐字段为 `{version, issuer, keyId, scope, revocationVersion, issuedAt, expiresAt}`，`Cache-Control: no-store`，**里面没有账号、没有安装、没有绑定、没有票据**。因此一个无凭据的调用者能知道的只有三件事：这台实例是不是签发端（不是则 `403`，响应体只有那一个拒绝码与一句固定说明）、当前的全局下限是多少、该签发者的标识与 keyId —— 都是运维量，按身份给不出不同答案。写侧两条一路都有闸：`POST` 抬下限要 `authenticate` + `requireAdmin` 并逐次留审计，`POST …/refresh` 要 `authenticate`。
+
 **逐次动作的票据从哪来**：`POST /automation/entitlement/ticket`（需登录、`no-store`、限流 60/分）。请求体只有 `installationId/action/ruleId?/eventId?` 四个字段且 `strict`：`session` 走它自己那条通道（它是唯一能建立/续期绑定的动作，从这条通道取会被拒），作用域与动作不符直接拒签，绑定三字段照旧只从 `links` 行读回。🔴 **这条通道判的是「这个主体可否在这个作用域上做这一个动作」，不判「这个 rule/event 是否真属于那个本地账号」** —— 后者只有客户实例知道（它的库是端到端加密的，官方侧看不到也不该看），所以归属由客户端在消费那一步判。
 
 已闭合的部分到此为止；下列仍是**未闭合门槛**，不得读成已实现：各宿主**真的启动**那条续期心跳与 `waiting-entitlement` 展示；`automation_entitlement_clocks` 的实例退役清扫还没有消费者。（官方签发端、`officialSubject ↔ 实例 ↔ 本地账号` 的链接握手、吊销版本在线刷新三件已于 2026-10-09 闭合；除草稿确认与首次许可外的票据消费也于同日**从 HTTP 闸门自己的事务挪进业务写事务**，闸门只留离线预检 —— 判据见 [落地计划](../plans/inbound-automation.md) 文末同名小节。唯一留在闸门里消费的是上面注明的 `ai-reserve`。）
