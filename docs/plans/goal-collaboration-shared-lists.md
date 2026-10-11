@@ -1,6 +1,6 @@
 # Goal：共享清单（多人协作）—— 试实施（W0 + W1）
 
-> 状态：🟡 **本地成笔（2026-10-11），全链门禁被两枚别线绊线挡着、push 押在跨线协调** —— W0+W1 ✅ / W2 服务端核心 ✅ / W3 纯层+格式统一 ✅ / 法务 ✅ / W4 已接线、W6 已落地、journey 全绿且链接落点断言已补（`RESULT=OK steps=3`）/ **④ 门禁：`pnpm -r typecheck` 全仓绿 + 本线两枚红（`check:layering`、`check:ui-language`）当场修绿；`-r test`/`check` 仍红在两枚别线判断绊线**（`packages/ai`「分母 9→10」= 给 COMMENT 配不配 AI 工具的产品判断；`shared-schema` `AUTH_PASSWORD_PATHS` 计数 9→12 = auth 线口径，**都不代改**）/ **⑤ 文档写回已做**（benchmark §2.6 的 6.1+6.7、matrix §6、AGENTS §9、P2-10，均带边界如实登记）/ **⑥ 本线已本地提交（见交接·三），push 未独做**（本地 main 领先 origin 的笔多为别线未公开，`git push` 会一起公开）/ 两个 B 类停止点待产品负责人裁决。逐项读数与执行序见文末「2026-10-11 交接·三」；每步现量——共享检出在动。DoD 全清单见 [collaboration-shared-lists.md](collaboration-shared-lists.md) §7。
+> 状态：🟡 **本地成笔（2026-10-11），全链门禁被两枚别线绊线挡着、push 押在跨线协调** —— W0+W1 ✅ / W2 服务端核心 ✅ / W3 纯层+格式统一 ✅ / 法务 ✅ / W4 已接线、W6 已落地、journey 全绿且链接落点断言已补（`RESULT=OK steps=3`）/ **④ 门禁：`pnpm -r typecheck` 全仓绿 + 本线两枚红（`check:layering`、`check:ui-language`）当场修绿；no-bail 全量 test 已做对数审计（21 枚有 test 脚本 / 摘 sync-server 后 20 枚跑 / 20 枚打 `Tests` 汇总，收得平），本线自己那枚下游红（landing `mockup-shell-shape` #7，因 a923f7fa 给页头加了 `share-open-button`）本会话当场修绿销账；整链仍红在三枚别线判断绊线**（`packages/ai`「分母 9→10」= 给 COMMENT 配不配 AI 工具的产品判断；`shared-schema` `AUTH_PASSWORD_PATHS` 9→12 = auth 线口径；`domain subscription.spec` 权益拒绝理由契约 = 计费线，**都不代改**）+ 一枚已知载体抖动（`mobile` 958/958 全过、非零退只在一条 Rolldown `RTEST-UNHANDLED-01`）/ **⑤ 文档写回已做**（benchmark §2.6 的 6.1+6.7、matrix §6、AGENTS §9、P2-10，均带边界如实登记）/ **⑥ 本线已本地提交（见交接·三），push 未独做**（本地 main 领先 origin 的笔多为别线未公开，`git push` 会一起公开）/ 两个 B 类停止点待产品负责人裁决。逐项读数与执行序见文末「2026-10-11 交接·三」；每步现量——共享检出在动。DoD 全清单见 [collaboration-shared-lists.md](collaboration-shared-lists.md) §7。
 > 权威计划：[collaboration-shared-lists.md](collaboration-shared-lists.md)（W0–W6 全量分期、判据、验证矩阵、边界登记）
 > 决策：[ADR-0062](../adr/0062-shared-list-key-distribution.md)（密钥分发型协作；聚合型红线不动）
 > 证据层：[共享清单调研](../research/collaboration-shared-lists.md)
@@ -472,18 +472,45 @@ package.json   (只加了一行 verify:collab-journey)
      - `packages/ai tests/capability-manifest.spec.ts` 的 **"分母恰好 9"** 那条 —— 域模型加了 COMMENT（→10），
        测试钉的分母与逐条点名没跟着改。
    - **两类同形**：改了上游、没更新钉死的计数断言。按记忆红线「判据口径/别人资产不代改」，**这两枚该由引入方（auth 线 / COMMENT 引入方）改，别本线代 bump 数字**。
-   - `pnpm -r test` 是 **fail-fast**，停在 `@heyta/ai`，**其余各包根本没跑**（日志只有 local-api/i18n/design-system 三行汇总）
-     ⇒ **交接·二要求的对数审计现在做不了**，得先让这两枚别线红各归其主修绿。
+   - `pnpm -r test` **fail-fast** 会停在 `@heyta/ai`、其余各包根本没跑 ⇒ 交接·二要求的对数审计在 fail-fast 下做不了。
+     **本会话改用 `pnpm -r --no-bail --filter '!@heyta/sync-server' test` 跑完并做了对数（见下"二·补"）**，
+     把每一枚红逐个归了属 —— 其中**一枚是协作线自己的下游活，已当场修绿**（不是别线绊线）。
    - ⚠️ COMMENT 归属存疑：域里 `COMMENT` 那笔 `git log -S` 命中 `e6058120`（标"产品体验线"），协作计划正文也把 COMMENT 算 W4 的活。
      若判归本线，则 ai 那条"分母恰好 9→10 + 点名加 COMMENT"是**本线的收尾活**；shared-schema 那 9→12 铁定是 auth 线的，不代改。
 
-### 三、剩余工作（下一个 AI 的执行序，从第 0 项起）
+### 二·补、第 2 步对数审计（本会话用 `--no-bail` 跑完）+ 一枚协作线自己的下游红（已修）
 
-0. 🔴 **两枚 test 红都是"故意逼决定的判断绊线"，不是机械改数字 —— 本线不代拍，等 owner/产品负责人**：
+跑法：`pnpm -r --no-bail --filter '!@heyta/sync-server' test`（后台、日志 `/tmp/rtest2.log`）。汇总 **`5 fails, 15 passes`**。
+
+- **对数（AGENTS §6 那条"有 test 脚本的包数 == 打 `Tests` 汇总行的包数"）现在收得平**：
+  `grep -rl '"test"' packages/* apps/* server/package.json` = **21 枚**；`--filter` 摘掉 `@heyta/sync-server`（沙箱 `prisma generate` EPERM，如实记的边界）后 **20 枚跑**；
+  `grep` 到打了 `Tests` 汇总行的也是**同一批 20 枚**（无"某层从没跑过"）⇒ **对数审计闭合，交接·二那条"做不了"已被这次 no-bail 否证**。
+- **5 枚红逐个归属（关键：不能一把都推成"别线绊线"）**：
+  1. 🔴 **`apps/landing` `tests/mockup-shell-shape.spec.tsx` #7 —— 是协作线自己造成的下游红，本会话当场修绿**。
+     根因：本线 `a923f7fa`（W4 web 宿主接线）往 `apps/web/src/App.tsx` 的 `.ht-header__actions` **加了一枚 `data-testid="share-open-button"`**（共享清单入口），
+     而 landing 复刻对账（`SHELL_HEADER_ACTIONS` 登记处 ⟷ 真应用页头 `data-testid` 双向等集）没跟着补 ⇒ 红在"多一件"。
+     `a923f7fa` **已在 HEAD**（`merge-base --is-ancestor` = YES）⇒ 是提交态的本线涟漪，不是本次未提交改动带来的。**归属查法**：`grep data-testid` 定位 testid 在 App.tsx → `git log -S 'share-open-button'` 命中 a923f7fa → 确认那笔是本线的。
+     **修法（不放宽判据）**：在 landing 登记处给共享入口补一项 `id/kind 'share-open-button'`、`labelKey 'web.share.open.label'`（=「共享」，中英词条都在）、`anchors ['share-open-button']`、`mockedInLanding: false`
+     （产品条件是 `currentProject!==undefined && syncConfigured`，静态展厅没有"选中清单"那一态，与既有 `assistant-open` 同一档，**只登记锚点、不在图上画**）；阳性对照字面量按 DOM 序把 `share-open-button` 补到**第一**。
+     复跑：`mockup-shell-shape.spec.tsx` **21/21**、landing 全包 **1409/1409 `rc=0`**。⇒ 这枚从本线交付里**销账**。
+  2. `packages/ai` `capability-manifest.spec.ts`（**2 failed | 263 passed**）—— 分母 9→10 与 `entityTypesWithoutTools` 的产品判断绊线，**AI 覆盖范围，不代改**。
+  3. `packages/shared-schema` `auth-http-contract.spec.ts`（**1 failed | 172 passed**）—— `AUTH_PASSWORD_PATHS` 9→12，**auth 线判据口径，不代改**。
+  4. `packages/domain` `subscription.spec.ts`（**1 failed | 1022 passed**）—— 权益拒绝理由契约，**计费/权益线，不代改**。
+  5. ⚠️ `apps/mobile`（**`Tests 958 passed (958)` 却非零退**）—— **958 条全过，红只在一条 unhandled rejection**：`RolldownError: Parse failure` 起源于 `tests/auth-flow.spec.ts`（Rolldown 解析 Flow），
+     就是 AGENTS §9 记的 **`RTEST-UNHANDLED-01`**（单跑不现、共享载体上的环境抖动，**不是产品失败、也不记协作线**）。附 `[prefs] op-sqlite Cannot find module` 是沙箱里原生模块解析不到的环境噪声。
+- ⇒ **协作线自己的红：landing 一枚已修绿**。整链 `-r test` / `pnpm check` 现在**只剩三枚别线判断绊线**（ai/shared-schema/domain）+ 一枚已知载体抖动（mobile），
+  **在本线之外，各归其主之前"全链绿"到不了**；reinstall:all 卡在全链绿之后，且产品负责人已明确"本会话不要再触发任何需要我交付的东西"，故不无人值守跑四端设备重装。
+
+
+
+0. 🔴 **别线判断绊线（no-bail 现量共三枚，见"二·补"）都是"故意逼决定的判断绊线"，不是机械改数字 —— 本线不代拍，等 owner/产品负责人**：
    - `packages/ai tests/capability-manifest.spec.ts`：断言 `coverage.denominator === 9` **且** `entityTypesWithoutTools === []`（"9/9 全覆盖"）。COMMENT 进物化清单后是第 10 枚且**无 AI 工具**。要修绿必须先决定其一：① 给 COMMENT 配 AI 工具；② 把它登记进 `DENOMINATOR_EXCLUSIONS` 并写明理由（AI 不管评论）；③ 接受分母=10 且让 COMMENT 落进 `entityTypesWithoutTools`（则"9/9 全覆盖"那句得改）。这正是该绊线设计来逼的显式承认 —— **属 AI 覆盖范围的产品判断，不代改**。
    - `packages/shared-schema tests/auth-http-contract.spec.ts:83`：`AUTH_PASSWORD_PATHS` 期望 9、实得 12（auth 线 `a63aa9e9` 加了口令路由没同步这条封闭词表）。**auth 线的判据口径，不代改**。
-   - 本线已把**自己那枚**修掉：`parseShareJoinLink` 空 token 漏判（见 section 一）。清单也已重生成（工作树 `capability-manifest.generated.ts` 是 M，`--check` RC=0）。
-   - ⇒ **本线三包（web/ui/sync-client）独立全绿**；但 `pnpm -r test` / `pnpm check` 整链被上面两枚别线绊线挡住，**在它们各归其主之前，第 2 步的"全链绿"到不了**。对数审计（分母现量 20）也一并卡住。
+   - `packages/domain tests/subscription.spec.ts`：权益**拒绝理由契约**（1 failed | 1022 passed），归**计费/权益线**，不代改。
+   - ⚠️ `apps/mobile`（958/958 全过、非零退）是 `RTEST-UNHANDLED-01` 那条 Rolldown 解析 Flow 的**载体抖动**，**不记产品失败、也不记本线**。
+   - 🔴 **协作线自己那枚下游红（landing #7）已在本会话修绿并从交付里销账**（见"二·补"第 1 条）—— 别再把它算成别线绊线。
+   - 本线已把**自己那枚代码 bug** 修掉：`parseShareJoinLink` 空 token 漏判（见 section 一）。清单也已重生成（工作树 `capability-manifest.generated.ts` 是 M，`--check` RC=0）。
+   - ⇒ **本线（web/ui/sync-client/app-host/i18n + 现在连 landing 也）独立全绿**；但 `pnpm -r test` / `pnpm check` 整链被上面**三枚别线绊线** + 一枚已知载体抖动挡着，**在各归其主之前，第 2 步的"全链绿"与第 2 步末尾的 reinstall:all 都到不了**。
 1. `pnpm check` 全绿（含 `check:ai-e2e` 整族 —— 注意它可能重新触发 collab-journey 那枚证据目录，别与并行 e2e 撞）。
 2. `pnpm -r build` → `pnpm reinstall:all` 四端（每端判据按 AGENTS §6.1.1；会开窗口的后台跑、不抢焦点）。
 3. **⑤ 文档写回**（本会话未动，仍是交接·二第 3 项那 5 处，但落点已现量收敛）：
