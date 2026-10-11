@@ -541,7 +541,7 @@ package.json   (只加了一行 verify:collab-journey)
    - ⇒ 本线交付形态：**代码已本地成笔、可复核可回退**；公开到 origin 这一步**押在跨线协调上**，不是本线遗漏。
 5. **两停止点（B 类，等产品负责人裁决；本轮已把 ① 的证据看实）**：
    - ① **PIPL 同意弹窗（02 号图 + 本轮读 `packages/ui/src/sync/ShareConsentModal.tsx` 源码现量）**：三个可操作控件（确认共享 / 取消 / 不再询问）**都是真 `Pressable`，功能与无障碍没问题** —— `accessibilityRole="button"`（accept/cancel）/ `accessibilityRole="checkbox"` + `aria-checked`（不再询问）、各自 `onPress` + `testID`（`share-consent-accept`/`-cancel`/`-dont-ask`）齐全。**真正的缺陷是：整个 modal（外层 `View` + 三个 `Pressable`）没有任何 `style`/StyleSheet** ⇒ 渲染成一叠无按钮/勾选框外观的纯文字行（截图里那个样子）。**不是"控件坏了"，是"一个能用、可访问、但零视觉设计的同意面"。** 待产品负责人拍的仍是同一件事，但口径要准：**要不要给它套设计系统样式 + 同意面的视觉层级**（哪枚按钮做主强调、"不再询问"默认关且给真勾选框视觉），而视觉层级在 PIPL 同意面上是**防暗黑模式/合规判断**，不是纯样式偏好，故留给你；若要我改，方向是主 CTA 走 `cssVar('color.primary')` 实底按钮、取消做次级、"不再询问"补真 `<input type=checkbox>` 视觉（带 `accent-color` token，§7 第 83 条），**词条与同意语义一字不动**。
-   - ② **owner 转让语义**：已实现为两步确认、立即生效、原 owner 降 editor，确认文案 `web.share.transfer.confirmHint`（"转让后你将成为「可编辑」成员…此操作立即生效"）。追认，或改成可撤销/延时/新 owner 先接受。
+   - ② **owner 转让语义**：已实现为两步确认、立即生效、原 owner 降 editor，确认文案 `web.share.transfer.confirmHint`（"转让后你将成为「可编辑」成员…此操作立即生效"）。🔴 **本轮读服务端源码核到行为层**（不只 UI 文案）：`server/src/shares/share.routes.ts:596` 的 `POST /shares/:shareId/transfer` 把三处写包进**一个 `prisma.$transaction`** —— `share.ownerUserId`→目标、目标成员 `role:'owner'`、旧 owner 成员 `role:'editor'` ⇒ "立即生效 + 降 editor + 原子（不留双 owner/零 owner）"逐条属实；前置 `requireShareOwner`、拒转给自己、拒目标已是 owner。追认这套语义，或改成可撤销/延时/新 owner 先接受（后者要动服务端事务形状，非纯前端）。
 
 
 ### 四、给下一个 AI 的硬提醒
