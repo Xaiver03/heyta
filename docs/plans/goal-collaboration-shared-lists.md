@@ -703,9 +703,38 @@ E 勾选后不切实心→1 红；F 主按钮文字配对坏→1 红。还原后
 `check:rn-aria` / `check:tokens` 各 rc=0。
 
 🔴 **一枚别线红灯如实记，不代改**：`pnpm --filter @heyta/ui --filter @heyta/web typecheck` rc=2，
-唯一错误在**未跟踪**文件 `apps/web/tests/inbound-panel-layout.spec.tsx:66`
-（`HTMLElement | null` 喂给 `HTMLElement | undefined`，自动收集线在途的夹具文件，`git status` 现量是 `??`）
-⇒ 本线四份文件（组件 / 宿主 / 新用例 / 旅程）在同一趟 tsc 里零错误。它被别线修掉之前，全仓 typecheck 这一格不算绿。
+唯一错误在 `apps/web/tests/inbound-panel-layout.spec.tsx:66`
+（函数签名写 `HTMLElement | undefined`，返回处 `as HTMLElement | null`）。
+**⚠️ 这一格 10-12 现量过两次，形状变了要跟着改**：写本段时它是**未跟踪**文件（`??`，自动收集线在途夹具）；
+他们随后把它提交进 `c099afe6`，我再量**仍然 rc=2** ⇒ 现在它是 **main 上一枚已提交的红灯**，
+不再是"别人工作树里的半成品"。现量命令：
+`pnpm --filter @heyta/ui --filter @heyta/web typecheck`（错误行号会随他们的修改移动，别按本段号找）。
+⇒ 本线四份文件（组件 / 宿主 / 新用例 / 旅程）在同一趟 tsc 里零错误，但**全仓 typecheck 这一格不算绿**。
 
 **本轮之后仍然开着的**：② owner 转让语义追认；四端重装（等四端设备面同时空 + 他不被叫醒）；
 `pnpm check` 整链仍挡在那四枚别线绊线上。
+
+### 我那一笔提交的越界与还原（`6cd953cb` → `1a8de6fd`）
+
+`6cd953cb` 的 `--stat` 里有两行不是本线的：`BLOCKED.md -10`、`PROGRESS.md -42`。
+成因不在我写了什么，在**共享索引**：自动收集线用自己的 plumbing 落台账时只移了 ref、没刷索引，
+于是索引里躺着他们两份文档的旧版；我随后一次裸 `git commit`（提交整份索引）把那份旧版提交了，
+读起来就是"本线把那两条线的刚发布的复账删了"。`BLOCKED.md` 还在任务书的"不碰"清单上 ——
+**我没碰过它的工作树，一次 `git add` 都没写**，但它出现在我的 commit 里，责任是我的收尾动作。
+
+还原（一笔前向修复 `1a8de6fd`，不改写历史、不 force、不越 hook）：
+
+| 前置现量 | 读数 |
+|---|---|
+| `git log --oneline 6cd953cb..HEAD -- BLOCKED.md` | 空 ⇒ 那一枚 blob 里只有我那一刀，整枚换回不盖别人 |
+| `git diff 6cd953cb~1 HEAD -- BLOCKED.md` | 恰好那 10 行 ⇒ 换 blob == 只反向我自己 |
+| 还原后 `git diff 6cd953cb~1 HEAD -- BLOCKED.md` | 空；`git show HEAD:BLOCKED.md \| grep -c 复账（本会话）` = 1 |
+| `PROGRESS.md` 那 42 行 | 已由其所有者在 `c099afe6` 自己提交回来 ⇒ 本笔不涉及 |
+
+🔴 **收尾的第二半才是这次的新内容**：我这一笔也是 plumbing，它自己会留下**新的**索引残留。
+做完 `git update-index --cacheinfo` 后必须读到 `git status --porcelain -- BLOCKED.md` = ` M`（不是 `MM`）
+且 `git diff --cached HEAD --name-only` 为空 —— 少了这一步，下一位裸 commit 会把我的修复再退回去一次，
+而那时"谁删的"已经查不到了。完整机制与三方归属写在 §7 第 **88** 条的第二次实证里（同类事故扩充原条，不另开号）。
+
+**由此固定下来的本线提交动作**：共享检出里提交一律 `git commit -- <自己的路径>` 或 plumbing + 刷索引，
+不再用裸 `git commit`；提交后必查 `git show --stat <新> --` 的路径集是否**恰好**等于本线清单。
