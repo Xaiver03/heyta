@@ -3277,3 +3277,19 @@ $ git diff --name-only 63e61f23^..63e61f23 | grep -cE '^(packages/|server/|apps/
 前几枚命中是 `apps/web/evidence/assistant-responsive/*.png` ⇒ 这把尺**会**非零，那个 `0` 是读数不是恒真。
 顺带一格口径：`grep -c` 命中 0 时自身退 **1**（上面 `commit-190x.sh` 末尾 `SCRIPT_RC=1` 就是这个，
 不是提交失败 —— `git show --stat` 已回 `2 files changed`）。要"有没有命中"就用 `-c` 拿数，要"成功与否"就别用它。
+
+### 19:2x 追记 · 我上一笔刚写下的**定位符**当场漂了（不是数字，是"那一笔"的指法）
+
+18:1x 那批把证据件入库时，我在计划里写的是"已在 `git log --oneline --grep='自动收集' -1` 那一笔入库"。
+本会话随后又落了 `830a3cd7`、`b29c0992` 两笔（标题都带"自动收集"），现量：
+
+```
+$ git log --oneline --grep='自动收集' -1
+b29c0992 test(自动收集 AC-6 复账 补): 给那条"五层零改动"补一次阳性对照 …   ← 已经不是那笔入库件
+$ git log --format=%h -1 -- docs/research/evidence/inbound-automation-review/185x-ac6-rerun-a599545d
+e0b0f960                                                                  ← 按路径反查，稳定
+```
+
+⇒ **按"标题关键字 + 取最近一笔"当定位符，在同一批工作里就会漂**（本会话三次提交都命中同一个关键字）。
+稳定写法是**按路径反查**（`git log -1 -- <那条证据路径>`）或直接写 sha。已就地改掉计划里那一处，
+这一条与 §7 那句"正文别存会漂的值"是同族 —— 漂的不只是计数和哈希，**"位置"也会漂**。
