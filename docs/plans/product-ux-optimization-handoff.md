@@ -1,6 +1,6 @@
 # 交接：产品体验线（本轮 UX 优化 Goal）
 
-> 状态：**本轮目标五步都交完，四端图与判据齐了；剩三格各有归属，全部只在本地、未 push。**（2026-10-11 12:3x 更新）
+> 状态：**本轮目标五步都交完，四端一趟跑齐、图与判据同批入库（r93）；剩四格各有归属，全部只在本地、未 push。**（2026-10-11 15:5x 更新）
 > 本文件只记「现在停在哪、下一步按什么顺序做、哪些手别再碰」。
 > 🔴 **逐格读数与判据形状的事实源**是 [`product-ux-optimization.md`](product-ux-optimization.md) 文末那一串台账格子
 > （取最新几格：`tail -60 docs/plans/product-ux-optimization.md`）。这里**不复制数字** —— 抄件一定会漂。
@@ -29,9 +29,10 @@
 | #38 页眉判据的牙 | ✅ 从"1440 恒假"换成"种下去确实生效"的生效断言，两头都能红 | 台账「#38」那格 + `scripts/verify-web-ui-sweep.mjs` 落点 `apps/web/evidence/<趟号>/` |
 | #1 Android 设备腿 | ✅ 当前产物上中文、英文各一趟；APK 与设备上那份哈希逐字相同 | `apps/mobile/evidence/profile-center/android-r85-currentproduct/`、`android-r86-currentproduct-en/` |
 | #30 三形态 | ✅ "命中/跳过/没命中"三种形状各有各的设备读数，不再同形 | 台账「#30 关掉」那格；iOS 那五张在 `apps/mobile/evidence/profile-center/ios-r78-currentproduct/` |
-| #27 macOS 空窗定性 | ✅ 裁掉一种成因：不是"首帧没画"，是抓**窗口**时 WKWebView 内容没被合成 | 台账「#27」那格；两张图的尺值同批入库 |
+| #27 macOS 空窗定性 | 🔴 **改成"间歇"**：r77 那张窗口图主蓝 0，r93 同一枚装置的窗口图主蓝 994（人打开看过=完整共享 UI）。判据一行没动 ⇒ **不能写成已修** | 台账「r93」那格末尾带一条现量命令；两张图都在库 |
 | #34 探针改进 | ✅ 两枚：按 pid 锁死寻址 + 窗口数为 0 时分辨两种成因；顺带去掉一处会冷启动 Safari 抢焦点的写法 | `scripts/qa/macos-installed-widget-help.sh`，提交 `630fb57e` `1f00bb59` |
-| 第 4 步 四端重装 | ✅ 四端各有"装的是当前产物且起得来"的判据读数 | mac/windows/android 三端**图与读数同批**入库；iOS 只有判据、图见第四节 |
+| #34 壳级两格 | ✅ **闭了**（后台诊断链，零前台激活、零录屏权限） | 提交 `91c6da3a`；读数 `apps/desktop-macos/evidence/widget-help-dom-20261011-r92.txt`；复跑 `bash scripts/verify-macos-widget-help.sh` |
+| 第 4 步 四端重装 | ✅ **一趟四端全绿**（r93，`REINSTALL_RC=0`），四端**图与读数同批**收在一个包 | [`apps/web/evidence/ux-final-20261011/reinstall/RESULT.md`](../../apps/web/evidence/ux-final-20261011/reinstall/RESULT.md)；🔴 载体是**主检出工作树** ⇒ 不证干净检出 |
 | 第 5 步 归属对账 | ✅ #26/#29/#31 已闭合、#35 归 apps/web 在飞那批、#28 留口径、#39 归 inbound-core | 台账「第 5 步跑完」与「check:image-license」那两格 |
 
 本线那一轮的九笔（都已在 `main` 上，未 push）：
@@ -53,9 +54,10 @@ df -h /System/Volumes/Data                              # 要不要新开一棵�
 
 ⚠️ **本轮量到的形状，写给下一个人省一趟**：
 - 主检出**每十几分钟就被别的会话提交一次**，`HEAD` 是移动靶。任何"四端产物"读数必须带**跑的那一棵树 + 那个 commit**。
-- 本线的四端批次跑在隔离载体 `../heyta-wt-reinstall`（只含已提交内容），**同一枚路径同时是
-  `research/tools/b-window-keeper.sh` 的默认 CARRIER** ⇒ 动它之前先 `pgrep -f b-window-keeper`。
-  它当下带着 ` M apps/mobile/ios/Podfile.lock`（是 `pod install` 的产物，不是谁的半成品）。
+- 四端批次**两批载体不同，别混读**：r77/r87 跑在隔离载体 `../heyta-wt-reinstall`（只含已提交内容），
+  **r93 跑在主检出的工作树上**（`HEAD` + 别线未提交路径），落点是私有目录 `HEYTA_REINSTALL_TMP_DIR` ⇒
+  r93 **没有**碰那棵隔离载体，也就没有和 `research/tools/b-window-keeper.sh` 的默认 CARRIER 撞（动那棵之前仍要先 `pgrep -f b-window-keeper`）。
+  代价写在台账里：r93 的读数不证"干净检出可复现"。
 - 已启动的模拟器有**两棵**：本线那台 `heyta-iphone-17pro`，和别线的 `heyta-ios-isolated`。
   `reinstall-all.sh` 的 ios 段按**名字**选，不会误伤另一台，但**别去动别线那台**。
 
@@ -66,12 +68,15 @@ df -h /System/Volumes/Data                              # 要不要新开一棵�
 | # | 欠的那一格 | 在谁手里 | 一条复现/闭合命令 |
 |---|---|---|---|
 | 1 | ~~iOS 重装后的首屏图~~ ✅ **已补回**（r87：`apps/mobile/evidence/reinstall-20261011-1230-ios-installed.png` + 同戳 `.txt`，两侧 sha256 对过、人看过） | 已闭合 | 重跑：`HEYTA_REINSTALL_TMP_DIR=<私有目录> IOS_DEVICE_NAME=heyta-iphone-17pro bash scripts/reinstall-all.sh --only ios` |
-| 2 | #34 macOS 壳级：**只剩两样**（小组件安装说明的环境识别、外链交给浏览器）——原先记的"身份入口/身份菜单/导入面板"三项**不需要前台也不需要 AX**，壳自己的 `HEYTA_M2_EVIDENCE` 通道在后台就报全了 | 那两样**本线能做**（给壳加一条 env 门控诊断探针 + 重打包）；跑 AX 那条路才需要负责人允许一次前台激活 | 后台三项现量：`HEYTA_NO_FOCUS=1 HEYTA_M2_EVIDENCE=<前缀> /Applications/Heyta.app/Contents/MacOS/HeytaMac &`（读 `<前缀>.txt`，只终止自己那发 pid）；AX 那条：`HEYTA_MAC_PID=<pid> bash scripts/qa/macos-installed-widget-help.sh` |
+| 2 | #34 macOS 壳级：✅ **两样都闭了**（10-11 14:5x `91c6da3a`，后台、零前台激活）——壳新增 `HEYTA_WIDGET_HELP_PROBE=1` 那条 `runWidgetJourneyChain`，装置 `scripts/verify-macos-widget-help.sh`，判据 `scripts/qa/macos-widget-help-judge.mjs`；**只剩一小格**：浏览器里是否真的渲染出那一页（诊断模式故意不叫 `NSWorkspace.open`，那会抢前台） | 那两样已由本线做完；剩下那一小格**在负责人手里**（允许一次前台激活去跑 AX） | 复跑闭合的那两样：`bash scripts/verify-macos-widget-help.sh`（读数自带出处；判据侧另有 `node scripts/qa/macos-widget-help-judge.mjs --self-test`）。剩那一小格：`HEYTA_MAC_PID=<pid> bash scripts/qa/macos-installed-widget-help.sh` |
 | 3 | #28 定位符门按 pair 还是按 OR-set | **负责人一句话**（判据口径，按边界不代改） | `pnpm check:locator-labels` 现量它现在判的是哪种 |
 | 4 | #35 `check:shell-surfaces` 的 W5 产物比源码旧 | **apps/web 在飞那批的所有者** | `node scripts/check-shell-surfaces.mjs`（主检出红 / 干净载体不红 —— 差的就是那批未提交源码） |
 | 5 | #39 `check:image-license` rc=1（`@noble/hashes` 一处钉死、一处范围） | **`packages/inbound-core` 的所有者**（或运营侧统一 `resolutions`） | `pnpm check:image-license`；两枚声明的现量：`grep -n '@noble/hashes' packages/inbound-core/package.json packages/sync-core/package.json` |
+| 6 | r93 当场量到的红：`check:integration-coverage` rc=1 —— 一枚已提交的集成 spec 没被任何入口点名 | **自动收集 / inbound 那一线**（`0eea4c0f` 带进来的那枚） | `pnpm check:integration-coverage`；现量：`grep -c 'inbound-dual-host' server/package.json`（0）对 `node scripts/check-integration-coverage.mjs` 点名的那一行 |
+| 7 | r93 当场量到的红：`check:verify-script-copy` rc=1 —— 两枚旧针钉着一句**已从词条表消失**的文案 | **`scripts/lib/mobile-e2e.sh` 与 `scripts/verify-mobile-habits.sh` 的所有者**（或改那句同步设置文案的人跟着收） | `pnpm check:verify-script-copy`；现量：`grep -c '填好服务器地址与访问令牌后才能同步' packages/i18n/src/locales/zh-CN.ts`（0）、旧针在 `scripts/lib/mobile-e2e.sh:1475` 与 `scripts/verify-mobile-habits.sh:631` |
 
 第 4、5 格都做过**同一枚 A/B**：在只含已提交内容的载体上照样红 ⇒ 是 `main` 上的既有红，不是共享检出被写脏的假红。
+第 6、7 格做的是**同一条判据的窄版**（没有另起一棵载体）：这四枚文件 `git diff --stat HEAD -- server/package.json scripts/lib/mobile-e2e.sh scripts/verify-mobile-habits.sh packages/i18n/src/locales/zh-CN.ts` **无输出**（逐字等于 `HEAD`），且 `git show HEAD:packages/i18n/src/locales/zh-CN.ts` 里那句旧文案命中 **0** ⇒ 红不依赖任何未提交改动。
 
 ---
 
