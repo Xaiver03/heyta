@@ -33,6 +33,7 @@
 | #34 探针改进 | ✅ 两枚：按 pid 锁死寻址 + 窗口数为 0 时分辨两种成因；顺带去掉一处会冷启动 Safari 抢焦点的写法 | `scripts/qa/macos-installed-widget-help.sh`，提交 `630fb57e` `1f00bb59` |
 | #34 壳级两格 | ✅ **闭了**（后台诊断链，零前台激活、零录屏权限） | 提交 `91c6da3a`；读数 `apps/desktop-macos/evidence/widget-help-dom-20261011-r92.txt`；复跑 `bash scripts/verify-macos-widget-help.sh` |
 | 第 4 步 四端重装 | ✅ **一趟四端全绿**（r93，`REINSTALL_RC=0`），四端**图与读数同批**收在一个包 | [`apps/web/evidence/ux-final-20261011/reinstall/RESULT.md`](../../apps/web/evidence/ux-final-20261011/reinstall/RESULT.md)；🔴 载体是**主检出工作树** ⇒ 不证干净检出 |
+| 逃生门那一格（§8.2 前提） | ✅ **macOS 半已有真壳读数**（r96 关臂 + r97 默认臂配对，两臂都 `DIRTY_PATHS=clean`）：门关掉后 `storagePort` 与 `heytaStorage` 双双为 false，而 `heytaWidget` 仍在 ⇒ 面板仍是原生形状、0 行安装引导 | 台账「逃生门关掉后还认得壳」那格；两臂各一条命令：`HEYTA_SHELL_STORAGE=0 …` 与去掉前缀的同一句。⚠️ **Windows 真实 WebView2 那一半仍开**（那条 e2e 注入的是合成信号） |
 | 第 5 步 归属对账 | ✅ #26/#29/#31 已闭合、#35 归 apps/web 在飞那批、#28 留口径、#39 归 inbound-core | 台账「第 5 步跑完」与「check:image-license」那两格 |
 
 本线那一轮的九笔（都已在 `main` 上，未 push）：
