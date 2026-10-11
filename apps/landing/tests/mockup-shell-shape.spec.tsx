@@ -510,6 +510,7 @@ describe('#7 页头右侧：登记处 ⟷ 真应用 `.ht-header__actions`', () =
 
   it('解析器读得出东西（阳性对照：挡"改名/挪走之后恒返回空集，于是双向都绿"）', () => {
     expect(webTestids()).toEqual([
+      'share-open-button',
       'bulk-toolbar',
       'bulk-complete',
       'bulk-repeat-warning',

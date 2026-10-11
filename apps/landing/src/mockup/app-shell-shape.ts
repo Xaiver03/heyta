@@ -231,10 +231,10 @@ export const SHELL_PANEL_SECTIONS: readonly ShellPanelSection[] = [
  * 那条绿色的判据 positively 要求"页头要有同步 + 立即同步 + 设置 + 语言 + 主题"。
  * 一条把过时的形状钉成期望的判据，比没有判据更糟（AGENTS §8 第 3 条）。
  */
-export type ShellHeaderActionKind = 'bulk-toolbar' | 'sort-select' | 'detail-toggle' | 'assistant-toggle';
+export type ShellHeaderActionKind = 'bulk-toolbar' | 'sort-select' | 'detail-toggle' | 'assistant-toggle' | 'share-open';
 
 export type ShellHeaderAction = {
-  readonly id: 'bulk-toolbar' | 'task-sort' | 'detail-pane-toggle' | 'assistant-open';
+  readonly id: 'bulk-toolbar' | 'task-sort' | 'detail-pane-toggle' | 'assistant-open' | 'share-open-button';
   readonly kind: ShellHeaderActionKind;
   /** 图上读到的名字（产品用它当可访问名 / 可见标签）。 */
   readonly labelKey: MessageKey;
@@ -275,6 +275,17 @@ export const SHELL_HEADER_ACTIONS: readonly ShellHeaderAction[] = [
     labelKey: 'web.ai.assistant.title',
     anchors: ['assistant-open'],
     onlyForView: 'tasks',
+    mockedInLanding: false,
+  },
+  {
+    id: 'share-open-button',
+    kind: 'share-open',
+    // 产品页头那段最前面这枚共享入口（ADR-0062 W4，`web.share.open.label`=「共享」）。
+    labelKey: 'web.share.open.label',
+    anchors: ['share-open-button'],
+    // 产品那边条件是 `currentProject !== undefined && syncConfigured` —— 只在选中自己的
+    // 清单且同步已配置时出现。静态展厅没有"选中的清单"这一态，也不该画一枚点了没行为的
+    // 共享按钮（同 `assistant-open` 那枚的理由），故登记锚点但不在图上画。
     mockedInLanding: false,
   },
   {
