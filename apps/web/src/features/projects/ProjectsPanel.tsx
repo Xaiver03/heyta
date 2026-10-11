@@ -47,7 +47,7 @@ import { ICON_SIZE } from '@heyta/design-system';
  * 同一条规则）。迁移前空清单上会常驻一个 `0` —— 这是**可见的行为变化**。
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { cssVar } from '@heyta/design-system';
 import { useI18n, type MessageKey } from '@heyta/i18n';
 import { folderTargetsFor, parseCategorySlot } from '@heyta/domain';
@@ -69,6 +69,7 @@ import {
 import { ColorSlotPicker } from '../categories/ColorSlotPicker.js';
 import { CategoryCreateDialog, type CategoryCreateKind } from '../categories/CategoryCreateDialog.js';
 import { JoinSharedListDialog } from '../share/JoinSharedListDialog.js';
+import { extractShareToken, searchWithoutShareToken } from '../share/join-link.js';
 import { useTaskStore, type TaskFilter } from '../tasks/store.js';
 import { useSyncStore } from '../sync/store.js';
 import { useProjectStore } from './store.js';
@@ -105,6 +106,21 @@ export function ProjectsPanel({
    * 接受别人的邀请是同一层级的两个来源。
    */
   const [joinOpen, setJoinOpen] = useState(false);
+  /** 从分享链接（`?shareToken=`）带进来的 token：对话框打开时预填（W6 链接落点）。 */
+  const [joinToken, setJoinToken] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    // W6 分享链接落点：`{应用地址}?shareToken=…`（buildShareJoinLink）。朋友点开
+    // 链接 ⇒ 应用起来后直接打开入群对话框、token 预填。消费完立刻把参数从地址栏
+    // 摘掉（replaceState 不留历史）：刷新不重弹，且 token 不长期躺在地址栏里。
+    // 取/摘都走 `join-link.ts` 的纯函数 —— 与生产端 `buildShareJoinLink`
+    // 同一份约定，round-trip 判据在 `tests/join-link.spec.ts`。
+    const token = extractShareToken(window.location.search);
+    if (token === undefined) return;
+    const rest = searchWithoutShareToken(window.location.search);
+    window.history.replaceState(window.history.state, '', `${window.location.pathname}${rest === '' ? '' : `?${rest}`}${window.location.hash}`);
+    setJoinToken(token);
+    setJoinOpen(true);
+  }, []);
   // 共享入口的可见性判据：同步已配置（有地址 + 有令牌）。「判断」在 store 形状上，
   // 不在这里复制 configure 逻辑 —— 两处各判一遍就是两套"已登录"标准。
   const syncConfigured = useSyncStore((s) => s.baseUrl.trim() !== '' && s.token !== undefined && s.token.trim() !== '');
@@ -395,10 +411,12 @@ export function ProjectsPanel({
 
         {joinOpen ? (
           <JoinSharedListDialog
-            onClose={() => setJoinOpen(false)}
+            initialToken={joinToken}
+            onClose={() => { setJoinOpen(false); setJoinToken(undefined); }}
             onJoined={(projectId) => {
-              setJoinOpen(false);
-              // 入群即导航：清单出现在侧栏的同时人已经站在里面（与新建清单同一条决策）。
+              // 🔴 只导航、不关对话框：成功屏（share-join-done + 关闭按钮）要留到
+              // 用户确认才走 —— 否则 onJoined 与 setPhase(done) 同拍触发父级卸载，
+              // 「加入成功」一瞬即逝（旅程首跑实测：清单已落侧栏，成功屏却没等到）。
               onFilterWith({ kind: 'project', projectId });
             }}
           />

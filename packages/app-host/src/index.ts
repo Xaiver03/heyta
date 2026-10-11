@@ -695,6 +695,16 @@ export {
 } from './share-summary.js';
 
 /**
+ * 共享清单密钥本地信封的**合成 AAD 身份**（ADR-0062 W4）。
+ *
+ * 🔴 它不是派发的 op，但带 `entityType` 字面量 —— `check:layering` 的
+ * `no-op-construction-in-apps` 按 op 形状拦，不看意图。放在这里（而不是留在
+ * `apps/web`）就是那条规则的口径：op 形状的构造不住在外壳（AGENTS §3.5）。
+ * 纯函数、零浏览器依赖，换钥/解锁各宿主共用同一标签约定。
+ */
+export { shareKeyStoreIdentity } from './share-key-identity.js';
+
+/**
  * 导出（**导出自由**，README 设计原则第 5 条）。
  *
  * 🔴 导出的**内容形状**是产品语义，所以它在这里而不在 `apps/*` ——

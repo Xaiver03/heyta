@@ -13,7 +13,7 @@
  *      owner 建清单 → 头部「共享」→ PIPL 同独同意 → 面板 → 邀请（一次性凭证）；
  *      bob vault → 贴 token 入群 → owner 自动封信封 → bob 解钥 → 清单落侧栏；
  *      owner 面板对账出第二个成员。
- *   3. 证据：截图落 `e2e/test-results/collab-journey/`（固定路径，先截图再断言，
+ *   3. 证据：截图落 `e2e/collab-journey-results/`（固定路径，先截图再断言，
  *      console/pageerror 从页面创建起监听）—— **人必须打开看**（AGENTS §6.2 规定一）。
  *
  * 🔴 变异臂（证明判据有牙）：
@@ -88,6 +88,11 @@ const server = spawn(process.execPath, ['dist/src/index.js'], {
     NODE_ENV: 'test',
     TEST_MODE: 'true',
     TEST_MODE_CONFIRM: 'yes-i-understand-the-risks',
+    // 🔴 CORS（首跑实测的真坑）：默认白名单只有上游域名 app.super-productivity.com，
+    // 浏览器里的应用（127.0.0.1:WEB_PORT）打本服务端的每个请求都被预检拦掉 ——
+    // 症状是 vault 面板报「钥匙加载失败」+ 设备列表报错，服务端日志里零请求。
+    // （AGENTS §9 2026-09-29 三端验收撞的是同一堵墙。）
+    CORS_ORIGINS: `http://127.0.0.1:${WEB_PORT}`,
     PORT,
   },
   stdio: ['ignore', 'pipe', 'pipe'],
@@ -149,13 +154,13 @@ const pw = run('pnpm', ['--filter', '@heyta/e2e', 'exec', 'playwright', 'test', 
 });
 if (!pw.ok) {
   console.error(pw.out.slice(-4000));
-  fail('Playwright 旅程失败（上方是失败用例与断言；证据图在 e2e/test-results/collab-journey/）');
+  fail('Playwright 旅程失败（上方是失败用例与断言；证据图在 e2e/collab-journey-results/）');
 }
 console.log('STEP 2 OK 真浏览器旅程通过（owner 邀请 → bob 入群 → 双方成员对账）');
 
 // ── 3. 证据收口 ────────────────────────────────────────────────────────────
 step = 3;
-const evidence = run('ls', ['-1', join(ROOT, 'e2e/test-results/collab-journey')]);
+const evidence = run('ls', ['-1', join(ROOT, 'e2e/collab-journey-results')]);
 const shots = evidence.out.split('\n').filter((l) => l.endsWith('.png'));
 const EXPECTED = [
   '01-owner-list-ready.png',
@@ -167,9 +172,9 @@ const EXPECTED = [
   '07-owner-sees-bob.png',
 ];
 const missing = EXPECTED.filter((name) => !shots.includes(name));
-if (missing.length > 0) fail(`证据图缺：${missing.join('、')}（拍了才算，路径固定）');
+if (missing.length > 0) fail(`证据图缺：${missing.join('、')}（拍了才算，路径固定）`);
 console.log(`STEP 3 OK 证据齐（${shots.length} 张）`);
-console.log(`📸 人要看图：${join(ROOT, 'e2e/test-results/collab-journey')}`);
+console.log(`📸 人要看图：${join(ROOT, 'e2e/collab-journey-results')}`);
 
 cleanup();
 console.log('RESULT=OK steps=3');

@@ -1,6 +1,6 @@
 # Goal：共享清单（多人协作）—— 试实施（W0 + W1）
 
-> 状态：🔄 **进行中（会话交接中，2026-10-10）** —— W0+W1 ✅ / W2 服务端核心 ✅ / W3 纯层+格式统一 ✅ / 法务 ✅ / **W4 主体接线代码已落但未提交未跑旅程（见文末「2026-10-10 交接」节，下一个 AI 从那里接）**。DoD 全清单见 [collaboration-shared-lists.md](collaboration-shared-lists.md) §7。
+> 状态：🔄 **进行中（会话交接中，2026-10-11）** —— W0+W1 ✅ / W2 服务端核心 ✅ / W3 纯层+格式统一 ✅ / 法务 ✅ / **W4 已接线、W6 已落地、journey 全绿且链接落点断言已补（`RESULT=OK steps=3`）；剩 ④门禁（typecheck 绿；test 卡在 `capability-manifest.generated.ts` 未随 COMMENT 重生成）/⑤写回/⑥提交（见文末「2026-10-11 交接·三」，下一个 AI 从那里接，且每步现量——共享检出在动）**。DoD 全清单见 [collaboration-shared-lists.md](collaboration-shared-lists.md) §7。
 > 权威计划：[collaboration-shared-lists.md](collaboration-shared-lists.md)（W0–W6 全量分期、判据、验证矩阵、边界登记）
 > 决策：[ADR-0062](../adr/0062-shared-list-key-distribution.md)（密钥分发型协作；聚合型红线不动）
 > 证据层：[共享清单调研](../research/collaboration-shared-lists.md)
@@ -376,3 +376,134 @@ package.json   (只加了一行 verify:collab-journey)
 - 并行会话这 10 小时又落了 7+ 笔提交（含一条「跨线提交」自报）——工作树是共享的、活的；**每一步动文件前重新现量撞车面**（mtime >8h=稳定成品可增量落针；分钟级=活跃改写真等待）。
 - `cssVar` 的 token 名两处写错（`border.width`→`border-width.thin`、`color.surface-muted`→`color.surface-subtle`）：**TokenName 是类型检查的，写错编译期就红**——这正是设计系统三条硬规则的价值，照单全收即可。
 - e2e spec 初稿的成员计数选择器 `[data-testid^="share-member-"]` 会被 `share-member-actions-*` 污染（数成 3）——已改 `:not()` 排除；下一个 AI 首跑若还遇到计数不对，先查这类前缀包含。
+
+---
+
+## 2026-10-10 交接·二（Goal ①②③已闭环、④⑤⑥未做；本节取代上一节的执行序）
+
+> 上一节（交接·一）描述的状态已被本会话推进：journey 从未跑 → **全绿**，W6 两缺口 → **全栈落地**。
+> 本节是**新的唯一权威执行面**；上一节保留作背景（其中「二、工作树状态」已过时——并行 auth
+> 会话已把他们的线全部提交掉，工作树现在很干净）。
+
+### 一、本会话完成（逐项带读数）
+
+| 项 | 结果 | 读数 |
+|---|---|---|
+| ① journey 全绿 | ✅ 八轮调试（脚本模板串语法错 → server CJS 循环依赖 → 设置浮层导航 → 证据目录被并行套件清掉 → CORS → sticky 层叠上下文拦点击 → 成功屏时序） | `RESULT=OK steps=3`，`JOURNEY_EXIT=0`；证据 **7 张**在 `e2e/collab-journey-results/`（⚠️ 路径已改，见下），**全部人工看过**（07 号可见成员 529·所有者（我）+ 530·可编辑；04 号凭证+链接双展示；06 号成功文案） |
+| ① journey 变异臂 | ✅ 脚本头规定的臂已执行：注释 `ShareFeature.tsx` autoSeal useEffect → bob 卡「等待密钥」→ **恰好 `share-join-done` 一条红**；还原后复绿 | 红跑日志 `share-join-done` 超时定位 spec:198；绿跑 `.last-run.json = passed` |
+| ② share-key-store 补跑 | ✅ 与两个新 spec 同轮跑 | 三文件 **25 passed**（`npx vitest run tests/share-key-store.spec.ts tests/join-link.spec.ts tests/share-panel-transfer.spec.tsx`） |
+| ③ W6-1 链接落点 | ✅ 选了「链接拼应用地址」那一条改法：`share-link.ts` 重写为 `buildShareJoinLink(appBaseUrl, token) → {app}/?shareToken=…`（尾斜杠归一）；`ShareFeature` 用 `origin+BASE_URL` 拼链接并在票据区**明文展示**（`share-invite-link` + `linkTitle` 词条）；`JoinSharedListDialog` 加 `initialToken` 预填 + **createPortal 到 document.body**（sticky 侧栏的层叠上下文困住 fixed 后代，点击被拦——探针二分定位，附注释）；`ProjectsPanel` mount 时消费 `?shareToken=`（摘参数 replaceState + 开对话框）；解析抽成纯函数 `apps/web/src/features/share/join-link.ts` | `tests/join-link.spec.ts` **8 条**（取/摘/round-trip/源码级棘轮「ProjectsPanel 不许自带第二套解析」）；**变异臂已执行**：把 ProjectsPanel 改回内联解析 ⇒ 恰好棘轮那条红 ⇒ 还原复绿 |
+| ③ W6-2 owner 转让 | ✅ 全栈：服务端 `POST /api/shares/:shareId/transfer`（requireShareOwner；目标须活跃成员非自己非 owner；`$transaction` 三写：share.ownerUserId + 目标→owner + 原 owner→editor；响应含 `demotedRole:'editor'`）；`sync-client.transferOwnership` + 契约测试；`SharePanel` 两步确认（armed 单行状态，testID `share-transfer-{id}` / `-confirm-` / `-accept-` / `-cancel-`）；`ShareFeature` 接 `onTransferOwnership` + transfer 四词条 + linkTitle；i18n 中英各 5 键 | 服务端 33/33（新增 5 条 + **变异臂**：去掉降级写 ⇒ 恰好 1 红）；web `tests/share-panel-transfer.spec.tsx` **7 条**（B 前置词条后果句 / C 入口如实×2 / A 两步×4）；**变异臂已执行**：首次按改直发回调 ⇒ 恰好 4 条 A 判据红（C/B 仍绿）⇒ 还原经 `@heyta/ui` 重建后复绿 |
+| ④ 现量（替下一会话省两趟） | ✅ web 全量：**172 文件 2216 passed**（0 红）；app-host 全量：**94 文件 1775 passed**（0 红） | 🔴 交接·一登记的 app-host 在途红（checkout 2 / inbound 1 / keepalive 4）**已被并行会话修掉**——处置规则不需要了 |
+
+### 二、本会话的调试产物（都已落树，别重复做）
+
+- `scripts/verify-collab-journey.mjs`：修模板字符串引号语法错；服务端 env 加 `CORS_ORIGINS: http://127.0.0.1:${WEB_PORT}`（默认白名单只放行上游域名，症状是 bob 页面「离线」+ 服务端零请求）；证据路径改 `e2e/collab-journey-results/`。
+- 🔴 `server/src/automation/entitlement-ticket.ts`：**交接·一说「已随并行提交进 HEAD」是错的**——首跑 server 直接起不来（`inbound_core_1 before initialization`，CJS require 按源码顺序落位而 import 写在使用点后）。本会话已修（import 挪文件顶部 + 注释）。**教训：交接面的「已修」也要现量。**
+- `e2e/playwright.collab.config.ts`：outputDir 改 `./collab-journey-results`（Playwright **每次运行开始整树删除 outputDir**，共享 `test-results/` 会被其他套件互删——先例 `playwright.landing.config.ts`）；timeout 120s→180s。`.gitignore` 已加该目录。
+- `e2e/tests/collab-journey.spec.ts`：vault 建立前加 `selectSettingsSection(page, 'sync')`（设置浮层默认开在「显示」组）；应用就绪断言放宽到 30s。
+- `apps/web/src/features/share/JoinSharedListDialog.tsx` 的 createPortal：**position:sticky 总是创建层叠上下文**，后代 fixed+z-index 出不来 ⇒ 元素命中测试被侧栏拦。层叠问题先查 sticky/fixed 祖先，别先怀疑 z-index 数值。
+
+### 三、剩余工作（下一个 AI 的执行序）
+
+1. **journey 补链接落点断言**（小事，10 分钟）：spec 里 owner 邀请后断言 `[data-testid="share-invite-link"]` 文本含 `http://127.0.0.1:${WEB_PORT}` 且含 `shareToken=`（07 号截图已证链接真实在场，断言是把可见事实钉进判据），然后 `pnpm verify:collab-journey` 复跑绿。
+2. **④ 收尾**：`pnpm -r typecheck && pnpm -r test`（⚠️ `pnpm --filter @heyta/web test -- tests/…` 的 `--` **不过滤**、整套件跑；单测直接在 apps/web 里 `npx vitest run tests/…`）→ `pnpm check` 全绿 → `pnpm reinstall:all` 四端（web/i18n/ui/sync-client dist 已重建过，重打包前照例再 `pnpm -r build`）。
+3. **⑤ 写回**：`dida365-feature-benchmark.md` §2.6 / `feature-matrix.md` / `roadmap.md` / AGENTS §9 / 本计划状态行；W4 残余如实登记（评论/指派/动态 UI 未建；**共享任务写路径路由**是最大架构件）。
+4. **⑥ 分线提交 + push**：现行未提交清单见 `git status`（22 M + 3 ?? + 1 D），**协作线一笔可全收**：
+   ```
+   .gitignore  apps/web/src/features/projects/ProjectsPanel.tsx
+   apps/web/src/features/share/{JoinSharedListDialog.tsx,ShareFeature.tsx,join-link.ts}  (join-link.ts 新)
+   apps/web/src/features/share/SharePanelHost.tsx  (D——零消费者死代码删除)
+   apps/web/tests/{join-link.spec.ts,share-panel-transfer.spec.tsx}  (均新)
+   e2e/{playwright.collab.config.ts,tests/collab-journey.spec.ts}
+   packages/i18n/src/locales/{zh-CN,en}.ts  ← 现量 diff 只含协作线 5 键（并行会话的 loginCode 已随他们自己的提交走），整文件可提交；提交前再 grep 一次 diff 确认
+   packages/sync-client/{src/share-api-client.ts,tests/share-api-client.spec.ts}
+   packages/ui/{src/sync/SharePanel.tsx,src/sync/share-link.ts,tests/share-link.spec.ts}
+   scripts/verify-collab-journey.mjs
+   server/{src/automation/entitlement-ticket.ts,src/shares/share.routes.ts,tests/share-routes.spec.ts}
+   ```
+   **不碰**：`BLOCKED.md`、`packages/legal/src/documents/third-parties.ts`、`scripts/qa/macos-installed-widget-help.sh`、`scripts/verify-mobile-ios-account-email-sessions.sh`、`.agents/context/`（全是并行线的）。
+5. **两停止点（B 类，带证据问产品负责人）**：① PIPL 方案 a 模态视觉——02 号图已人工核验，**发现：主按钮「确认共享」无视觉强调（与次按钮同权重），且无「不再询问」勾选可见位**（词条里有 dontAskAgain 但视觉层级待追认）；② owner 转让语义——已实现为「转让后原 owner 降 editor、立即生效、两步确认」，确认文案即 `web.share.transfer.confirmHint`（验收时请过目）。
+
+### 四、本会话新增教训
+
+- `pnpm --filter @heyta/web test -- <file>` 的 `--` 后参数**没有过滤生效**（整套件 174 文件全跑）——不是假绿来源但浪费 80s；直接 `cd apps/web && npx vitest run tests/<file>` 才是真过滤。
+- vitest jsdom 环境里 `import.meta.url` 不是 `file:` scheme（`fileURLToPath(new URL(...))` 直接炸）——读源码文件用 `join(process.cwd(), 'src/…')`（vitest 以包目录为 cwd）。
+- 测试文件里**有测试不渲染组件**时，afterEach 的 `root.unmount()` 要可空守卫（`'root' is possibly 'undefined'` 会被 typecheck 拦，但运行时炸法是 `Cannot read properties of undefined`）。
+- 变异臂打红后的**红集形状本身就是判据**：transfer 变异的 4 红恰好全是 A 类两步判据、C 类可见性 3 条不受影响——说明变异只打在它声称的那一层；若红集溢出到 C 类，说明组件耦合有问题，要先查组件再还原因果。
+
+## 2026-10-11 交接·三（Goal 第 1 步闭环、第 2 步卡在两枚预存红；本节取代交接·二的执行序）
+
+> 本节是**新的唯一权威执行面**。交接·二记录的完成事实仍成立（journey 全绿、W6 落地、变异臂已执行）。
+> 交接·二「三、剩余工作」的第 1 项（journey 补链接断言）**本会话已完成**，其余未做。
+> ⚠️ **共享检出在动**：本会话期间 HEAD 从 `14e1e322` 漂到 `eefe118b`（并行"自动收集 T8"线在提交），
+> 且一枚 typecheck 红被并行 auth 会话**中途自己修掉**（见下）。下一个 AI **每步都要现量，别照抄本节的号**。
+
+### 一、本会话完成（逐项带读数）
+
+| 项 | 结果 | 读数 |
+|---|---|---|
+| 第 1 步 journey 补链接落点断言 | ✅ | `e2e/tests/collab-journey.spec.ts` 票据区（04 号截图处）新增 4 条：`inviteLink` `toContain('shareToken=')`、`new URL(inviteLink).origin === 应用 origin`、`!== API_BASE origin`（落点是应用不是同步服务器）、`searchParams.get('shareToken') === inviteToken`（链接里的 token 与展示凭证同一个）。`pnpm verify:collab-journey` 复跑 **`RESULT=OK steps=3` / `VERIFY_EXIT=0`**；**04 号截图人打开看过** —— 入群链接 `http://127.0.0.1:4327/?shareToken=DKqG…rNCg`，token 与上方「邀请凭证」逐字一致 |
+| 本线三包独立复跑 | ✅ | `pnpm -r test` fail-fast 停在 `@heyta/ai`，**ui 从没被跑到过** —— 单独跑本线三包：apps/web **2216 passed**、sync-client **156 passed**、ui 首跑 **1 红**（见下）→ 修后 **665 passed** |
+| 🔴 当场修掉本线一个真 bug | ✅ | `packages/ui/src/sync/share-link.ts` 的 `parseShareJoinLink` 用 `token ?? undefined`，**空串漏判**：`…/?shareToken=` 返回 `''` 而非 `undefined`。改为 `token \|\| undefined`（空 token 不是合法入群凭证，应回落"裸 token 粘贴"分支）。**交接·二那句"25/25 绿"没覆盖到它**（那是 apps/web 的测试；这条 ui 判据此前从没进过一次能跑到它的门禁）—— 印证"交接面的『已修』也要现量" |
+| `pnpm -r build`（第 2 步里唯一不被测试绊线挡的子项） | ✅ | **`BUILD_EXIT=0`**、无致命错（只有 zod 的 rollup 注释告警）。⇒ 本线改的 ui 源码编得过、`packages/*/dist` 已重建（reinstall:all 的前置）|
+| 🔴 本线又查出并修掉 `pnpm check` 里**两枚协作线自己的门禁红**（非别线绊线） | ✅ | 见下"二·补"。`check:ui-language` 与 `check:layering` 都命中本线（`web.share.*` / `apps/web/…/share-key-store.ts`），逐条修完并复验绿 |
+| `check:ui-language`（`web.share.invite.emailPlaceholder = name@example.com`） | ✅ | 根因**不是要翻译**：同一判断本线早已写进 `packages/i18n/tests/catalog.spec.ts` 的 `allowed`（注释"it is the example itself"，由本线 `2f59b075` 引入），但那笔**漏登记到 `scripts/check-ui-language.mjs` 的 `UNTRANSLATABLE_KEYS`** —— 两处各说一套。修法=把这把 key 补进门禁白名单、写清"补的是同一处已有判断"，**不动任何用户可见文案**（示例邮箱中英逐字相同，本就不该翻）。复跑 `check:ui-language` **`EXIT=0`** |
+| 🔴 `check:layering`（`apps/web/src/features/share/share-key-store.ts` 里 `entityType: 'SHARE_KEY'`） | ✅ | `syntheticIdentity` 是喂给 `SyncPayloadCipher.encrypt/decrypt` 的**合成 AAD**（文件头明写"不参与线上协议、只防 localStorage 两条记录互换"），**不是派发的 op**；但门禁按 op 形状（`entityType:` 字面量）拦，不看意图。按 AGENTS §3.5 把 op 形状构造挪出外壳：新建 `packages/app-host/src/share-key-identity.ts`（纯函数 `shareKeyStoreIdentity`，零浏览器依赖）→ 从 `app-host/src/index.ts` barrel 导出 → 外壳删掉本地函数、5 处调用改指 app-host、重打 `app-host dist`。复跑：`check:layering` **`EXIT=0`（438 文件 / 10 规则）**、`pnpm --filter app-host --filter web typecheck` **两个 Done**、外壳 `share-key-store.spec.ts` **10/10 passed** |
+
+### 二、第 2 步门禁链：两枚红，性质不同（关键区分，别读成一个）
+
+1. 🔴 **typecheck 红 = 别线的，且已被别线自己修掉，我没代改**：首跑 `pnpm -r typecheck` 红在
+   `packages/app-host/tests/login-code.spec.ts(44)` 一个失效的 `@ts-expect-error`（vitest 不跑 tsc，
+   并行 auth 会话提交 `a63aa9e9` 时没发现）。我**判定归属后没有动手**（记忆红线：判据口径/别人资产不代改）——
+   随后并行会话**自己**提交了 `50a43d64 fix(app-host 测试): 摘掉一条已经多余的 @ts-expect-error`，
+   我重跑 `pnpm -r typecheck` = **`TYPECHECK_EXIT=0` 绿**。**教训：共享检出里撞到别线红，先判归属、别抢修；它可能正被所有者修。**
+2. 🔴 **test 红：本会话已重生成清单，但暴露出两枚别线的"钉住计数没跟着改"红**。
+   - **本会话动作**：跑 `node scripts/gen-ai-capability-manifest.mjs` 重生成了
+     `packages/ai/src/capability-manifest.generated.ts`（补上 COMMENT，覆盖面如实记 9/10），
+     `--check` 现 **RC=0**、diff 只涉及 COMMENT。这枚改动**现在在工作树里（M）**，是协作线提交要带上的。
+     它清掉了 ai 那 3 条"产物与上游逐字节一致"失败。
+   - **但 `pnpm -r --filter '!@heyta/sync-server' test` 仍 `TEST_EXIT=1`**，剩两枚红，**都不是协作线的代码**：
+     - `packages/shared-schema tests/auth-http-contract.spec.ts:83` 期望 `AUTH_PASSWORD_PATHS` 长度 **9、实得 12**
+       —— auth 线（`a63aa9e9` 邮箱口令登录）加了口令路由没同步这条硬编码计数。shared-schema **不在我 diff 里**。
+     - `packages/ai tests/capability-manifest.spec.ts` 的 **"分母恰好 9"** 那条 —— 域模型加了 COMMENT（→10），
+       测试钉的分母与逐条点名没跟着改。
+   - **两类同形**：改了上游、没更新钉死的计数断言。按记忆红线「判据口径/别人资产不代改」，**这两枚该由引入方（auth 线 / COMMENT 引入方）改，别本线代 bump 数字**。
+   - `pnpm -r test` 是 **fail-fast**，停在 `@heyta/ai`，**其余各包根本没跑**（日志只有 local-api/i18n/design-system 三行汇总）
+     ⇒ **交接·二要求的对数审计现在做不了**，得先让这两枚别线红各归其主修绿。
+   - ⚠️ COMMENT 归属存疑：域里 `COMMENT` 那笔 `git log -S` 命中 `e6058120`（标"产品体验线"），协作计划正文也把 COMMENT 算 W4 的活。
+     若判归本线，则 ai 那条"分母恰好 9→10 + 点名加 COMMENT"是**本线的收尾活**；shared-schema 那 9→12 铁定是 auth 线的，不代改。
+
+### 三、剩余工作（下一个 AI 的执行序，从第 0 项起）
+
+0. 🔴 **两枚 test 红都是"故意逼决定的判断绊线"，不是机械改数字 —— 本线不代拍，等 owner/产品负责人**：
+   - `packages/ai tests/capability-manifest.spec.ts`：断言 `coverage.denominator === 9` **且** `entityTypesWithoutTools === []`（"9/9 全覆盖"）。COMMENT 进物化清单后是第 10 枚且**无 AI 工具**。要修绿必须先决定其一：① 给 COMMENT 配 AI 工具；② 把它登记进 `DENOMINATOR_EXCLUSIONS` 并写明理由（AI 不管评论）；③ 接受分母=10 且让 COMMENT 落进 `entityTypesWithoutTools`（则"9/9 全覆盖"那句得改）。这正是该绊线设计来逼的显式承认 —— **属 AI 覆盖范围的产品判断，不代改**。
+   - `packages/shared-schema tests/auth-http-contract.spec.ts:83`：`AUTH_PASSWORD_PATHS` 期望 9、实得 12（auth 线 `a63aa9e9` 加了口令路由没同步这条封闭词表）。**auth 线的判据口径，不代改**。
+   - 本线已把**自己那枚**修掉：`parseShareJoinLink` 空 token 漏判（见 section 一）。清单也已重生成（工作树 `capability-manifest.generated.ts` 是 M，`--check` RC=0）。
+   - ⇒ **本线三包（web/ui/sync-client）独立全绿**；但 `pnpm -r test` / `pnpm check` 整链被上面两枚别线绊线挡住，**在它们各归其主之前，第 2 步的"全链绿"到不了**。对数审计（分母现量 20）也一并卡住。
+1. `pnpm check` 全绿（含 `check:ai-e2e` 整族 —— 注意它可能重新触发 collab-journey 那枚证据目录，别与并行 e2e 撞）。
+2. `pnpm -r build` → `pnpm reinstall:all` 四端（每端判据按 AGENTS §6.1.1；会开窗口的后台跑、不抢焦点）。
+3. **⑤ 文档写回**（本会话未动，仍是交接·二第 3 项那 5 处，但落点已现量收敛）：
+   - `dida365-feature-benchmark.md` §2.6 第 6.1 行（❌→✅，证据：`server/src/shares/*` + `packages/ui/src/sync/SharePanel.tsx` + journey `RESULT=OK steps=3`）；同文件 §末 P2-10 那行跟着改口径。
+   - `feature-matrix.md` §6 第 6.1 行（P2→已实现）。
+   - `roadmap.md`：🔴 **本会话现量：§5.3 那张"按轨道下一步"表 2026-09-29 已刻意收敛**，明写"本节不复述，当前下一步只在 `multi-end-unified-strategy.md` §11 维护" —— **所以协作线不往 §5.3 塞行**（塞了反而违反那条收敛）。roadmap 这格实为 **no-op / 让位给计划文档**，别再纠结"新增一节还是并进 §5.3"。
+   - `AGENTS.md` §9：加一条协作/共享线状态（带 journey/三包绿读数 + 那两枚外部绊线的边界）。
+   - 本计划头部状态行：**本会话已改指交接·三**（不再是交接·二）。
+   - W4 残余如实登记：评论/指派/动态 UI 未建、**共享任务写路径路由**是最大架构件。跑 `docs-link-check` 确认无死链。
+   - ⚠️ **前置**：这些写回里凡"✅ 已实现/已完成"的口径，都应在**本线提交并过门禁之后**再落，否则是"代码还在工作树、文档先说完成"的假绿。当前全链被第 0 项两枚别线绊线挡着 ⇒ 文档写回与提交一起，等绊线各归其主。
+4. **⑥ 一笔提交 + push**：协作线文件清单见交接·二「三、4」，**枚数不写在这里（会漂）** —— 提交前 `git status --porcelain` 现量、逐文件 `git diff` 过一遍。
+   🔴 **本会话新加两枚门禁红要一并进这笔提交**（都在协作线上）：
+   - `packages/app-host/src/share-key-identity.ts`（??，新）+ `packages/app-host/src/index.ts`（M，barrel 加导出）+ `apps/web/src/features/share/share-key-store.ts`（M，删本地函数、5 处改指 app-host）—— layering 那枚。
+   - `scripts/check-ui-language.mjs`（M，补 `web.share.invite.emailPlaceholder` 到 `UNTRANSLATABLE_KEYS`）—— ui-language 那枚。
+   另加第 0 项重生成的 `capability-manifest.generated.ts`。locale 两文件提交前再 `git diff` 一次确认只含协作线 5 键。
+   **不碰**：`BLOCKED.md`、`packages/legal/src/documents/third-parties.ts`、`scripts/qa/macos-installed-widget-help.sh`、
+   `scripts/verify-mobile-ios-account-email-sessions.sh`、`.agents/context/`。push 到 origin 当前分支，不 force、不改写已公开历史。
+5. **两停止点（B 类，等用户醒来自行过目，不主动弹窗/表单）**：① PIPL 模态视觉（02 号图：主按钮「确认共享」无视觉强调、
+   「不再询问」勾选无可见位——词条存在但视觉层级待追认）；② owner 转让语义（两步确认、立即生效、原 owner 降 editor，
+   确认文案 `web.share.transfer.confirmHint`）。
+
+### 四、给下一个 AI 的硬提醒
+
+- **每步现量**：HEAD 在动、别线红会被别线修、生成物红可能已被人重生成 —— 本节任何"红/绿/号"都只是**本会话这一刻**的读数。
+- **不得自行标 Goal complete**：关闭 goal 必须先向产品负责人逐条汇报读数并请示（记忆红线）；且用户已明确"本会话起不再触发任何需要他交付/确认的东西"——
+  能自主做完的做完，需要他拍板的（第 3 步 roadmap 落点、第 5 步两停止点）**写进本节留给他醒来看**，不要弹窗、不要 AskUserQuestion。

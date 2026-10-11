@@ -111,4 +111,17 @@ describe('ShareApiClient', () => {
     expect(lastRequest!.method).toBe('DELETE');
     expect(lastRequest!.url).toContain('/api/shares/share-1/members/m2');
   });
+
+  it('转让所有权：POST /shares/:id/transfer，memberId 在体里（W6）', async () => {
+    responder = () => ({
+      status: 200,
+      body: { shareId: 'share-1', ownerId: 2, newOwnerMemberId: 'm2', demotedMemberId: 'm1', demotedRole: 'editor' },
+    });
+    const client = makeClient();
+    const result = await client.transferOwnership('share-1', 'm2');
+    expect(result.demotedRole, '原 owner 降 editor 是接口契约的一部分').toBe('editor');
+    expect(lastRequest!.method).toBe('POST');
+    expect(lastRequest!.url).toBe('https://api.example/api/shares/share-1/transfer');
+    expect(JSON.parse(lastRequest!.body!)).toEqual({ memberId: 'm2' });
+  });
 });
