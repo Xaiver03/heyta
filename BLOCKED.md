@@ -9298,3 +9298,134 @@ B169 那枚反查臂报出来的四枚"漏网"，逐枚读正文后确认都是*
 的隔离副本上，本线全部证据腿逐条复跑，AC-1/AC-2/AC-4/AC-5（除 B169 那格外）与 `@heyta/app-host` 全量、
 `pnpm -r typecheck` 全 rc=0，双宿主窗口 `Windows: 13/13`。逐条读数与日志路径见计划
 `docs/plans/inbound-automation.md` 当天那一节。⇒ 本条登记的是**归属事实**，不是新增阻塞。
+
+## B171（2026-10-12 00:5x，本会话 · T7 全链第一腿量出来的）：**本线 T3 那枚 13 窗口用例在盘上、被装置跑，却没有进集成通道的点名 ⇒ 第 50 道 `check:integration-coverage` 红，而修它的那枚文件不在本线白名单**
+
+现量（隔离载体 `.worktrees/inb-t7` @ `1a8de6fd`，全 106 步 no-bail，第 50 道 RC=1）：
+
+```
+$ node scripts/check-integration-coverage.mjs
+❌ 真库集成用例与运行脚本**没有对上**（盘上 35 个，被点名 34 个）：
+🔴 盘上有、没有脚本点名（1 个，它们从建立起一次都不会跑）：
+     - inbound-dual-host-fault-windows.integration.spec.ts
+```
+
+**它确实是本线的**，不是别线塞进来的：`server/tests/integration/inbound-dual-host-fault-windows.integration.spec.ts`
+是 T3「两个独立真实 SQLite 宿主跑全 13 个故障窗口」那份用例。
+
+🔴 **但"一次都不会跑"这半句对本线不成立，要如实分开**：它由本线装置直接点名跑 ——
+`research/tools/verify-inbound-dual-host.py:45` 里
+`SPEC = 'tests/integration/inbound-dual-host-fault-windows.integration.spec.ts'`，
+T3 那些 `Windows: 13/13` 读数就是这么取的。
+所以缺的不是"有没有人跑过"，而是**仓的集成通道从不跑它**：
+`pnpm --filter @heyta/server test:integration:postgres`（以及 CI 里照这条走的人）逐条点名，
+名单里没有它 ⇒ 换一台机器、不带本线 Python 装置的人，会把那 13 个窗口当成"没测过"，而且不会有任何东西失败。
+
+**为什么本会话不代改**：那条门自己写明的修法是把文件名加进
+`server/package.json` 的 `test:integration:postgres`，而白名单在 server 那侧只到
+`server/src/{automation/,entitlement.ts,api.ts}`、`server/prisma/{schema.prisma,migrations 新目录}`、`server/tests/`
+⇒ `server/package.json` **不在地界内**。它同时又是"判卷口径"的一种（谁被算作已测），按死规矩要记这里。
+
+**要拍的（一子，可一条命令回退）**：在 `server/package.json` 的 `test:integration:postgres` 那串里补上
+`tests/integration/inbound-dual-host-fault-windows.integration.spec.ts`。
+补它不会引入新依赖、不改任何断言内容，只是让已有的 13 窗口进集成通道。
+⚠️ **不要**按门里那句反面提示把它塞进 `pnpm -r test`（那些用例要真实 PostgreSQL，默认通道跑不了）。
+
+## B172（2026-10-12 00:5x，本会话 · T7 全链第一腿）：**第 21/23 两道门点名本线那枚面板文件，但那几行不是本线写的，而两处修法一个落在判卷口径、一个属顺手活**
+
+现量（隔离载体 `1a8de6fd` 全链，`021.log` / `023.log`）：
+
+```
+$ node scripts/check-selection-single-source.mjs          # 第 21 道 RC=1
+断言 G：宿主里有 6 处本地 `…Id` useState 没有语义登记：
+  apps/web/src/features/settings/InboundAutomationSettings.tsx  retryEventId
+  apps/web/src/features/settings/InboundAutomationSettings.tsx  editingRuleId
+  apps/web/src/features/settings/InboundAutomationSettings.tsx  keyId
+  apps/web/src/features/settings/InboundAutomationSettings.tsx  targetProjectId
+
+$ node scripts/check-empty-state.mjs                      # 第 23 道 RC=1
+🔴 有 5 处**新的**手写空态： … apps/web/src/features/settings/InboundAutomationSettings.tsx（形态：直接渲染空态词条）
+```
+
+**归属先做现量，不靠印象**：那六枚标识符逐枚 `git log -S` 都只命中一笔 ——
+`63e61f23`（2026-10-10 18:49，标题「feat(web): 产品体验线 + 全局响应式 + 认证/法务冻结 + 证据与测试」），
+而本线自己的排版笔 `c099afe6` 没有引入其中任何一行。这正是 **B170** 记的那一格的具体化：
+别线的笔写进了本线白名单里的文件。⇒ 这两道红**不是本线造的**，本线也不按"顺手修别线的红"去动它。
+
+**两处修法各落在哪儿（供拍的人直接用）**：
+
+1. 第 21 道：这四处都不是"当前看的是哪一条"那种第二个选中所有者 ——
+   `retryEventId` 是确认门（confirm-gate）、`editingRuleId` 是表单草稿（form-draft）、
+   `keyId` / `targetProjectId` 是规则表单里的字段值。按门自己给的口径应当走
+   `scripts/check-selection-single-source.mjs:491` 那张 `ROW_ID_EXEMPT`（表按「文件 + 变量名」索引，
+   现成形状见 `HabitDetailCard.tsx` 那两行），**补四行登记**。
+   🔴 那枚文件是判卷口径 ⇒ 本线不代改。要么由所有者补登记，要么把面板改成走
+   `@heyta/app-host` 的 selection（那是产品形态变更，不只是消红）。
+2. 第 23 道：面板两处空态写成 `<p className="ht-settings__hint">{t('web.ai.inbound.empty')}</p>`，
+   按"空态只有一个"应改走 `@heyta/ui` 的 `EmptyState` —— 同层 `SessionsPanel.tsx:42` 就是这么 import 的，
+   `:190` 那条注释还写着「走共享那一个实现，不在视图里手写」。
+   🟡 顺带查出那两道门的**自述已经过期**：`check-empty-state.mjs` 断言 B 的提示语写着
+   「web：目前**没有**可复用的空态组件（壳里那个没 export，共享层只有 `TaskList.emptyMessage`）」，
+   而 `packages/ui/src/index.ts` 现在确实导出 `EmptyState`，`CalendarBoard` / `NotesBoard` / `SearchPanel` /
+   `CategoryReport` / `EventBoard` 与 web 侧 `SessionsPanel` 都在用它。⇒ 那句话该由它的所有者更正，
+   否则下一个人会照着它继续在视图里手写。
+   ⚠️ 即便本线换掉自己这两处，第 23 道**仍然红**（另 4 处在本线地界外），所以它不移动 T7 的完成条件；
+   又因为这是界面视觉变更，按 §6.2 要配一整轮重新取证 —— 归"顺手活"，本会话不做。
+
+**要拍的（两句话）**：① 批准把上面四行补进 `ROW_ID_EXEMPT`（或指定走 selection 重构）；
+② 把 `check-empty-state.mjs` 断言 B 那句"web 没有可复用组件"更正掉。
+
+---
+
+## B173（2026-10-12 01:0x，本会话 · T7 全链第一腿）：**第 74 道 `check:public-facts` 红的这条匿名下行是本线 T1 自己开的 —— 而它的修法落在 `scripts/` 那枚登记面上，不在本线白名单**
+
+现量（隔离载体 `1a8de6fd` 全链，`074.log`）：
+
+```
+$ node scripts/check-public-facts.mjs          # 第 74 道 RC=1
+❌ 公共事实下行对账失败：1 处
+  [判据4] server/src/api.ts 的 GET /api/automation/entitlement/revocations 找不到认证证据，
+          也不在任何登记面上 —— 这是新一条匿名下行。要么挂认证，要么读过实现之后在
+          REVIEWED_ANONYMOUS_GET 写一句它为什么可以匿名
+   本轮：GET 路由 33 条，其中匿名 4 条 → /api/automation/entitlement/revocations
+         /api/holiday-adjustments /health /live
+```
+
+**这条是本线的，不是别线的**（与 B171/B172 不同）：它是 T1「吊销版本在线刷新」开的那条路由，
+现量 `git log -S "automation/entitlement/revocations" --oneline -- server/src/api.ts` = 唯一一笔
+`dc1750ab feat(自动收集 HTTP 面): 活码签发/兑换、session 票据、吊销清单刷新与抬下限七条路由`。
+所以本会话把它的实现读完并给出结论，只是**修它的那枚文件 `scripts/check-public-facts.mjs` 在地界外**（登记面在那里，`:117`），而"往验收脚本的登记表里加一行"
+按任务书属于改判卷口径 ⇒ 不代改。
+
+**读实现后的结论：它应当匿名，且匿名是设计而不是漏洞**（四条锚点）：
+
+1. `server/src/api.ts:844` 那条 GET **没有** `preHandler`；它的两条兄弟路由都有 ——
+   抬下限 `POST`（`:853` `[authenticate, requireAdmin]`）与自托管侧写回 `POST …/refresh`（`:874` `authenticate`）。
+   ⇒ 写侧全有闸，只有"读那一个数"没有。
+2. 响应体只有一个 Ed25519 **签名的清单**，claims 逐字段见 `server/src/automation/entitlement-issuer.ts:358-366`：
+   `{version, issuer, keyId, scope, revocationVersion, issuedAt, expiresAt}` —— **零身份维度**（无 userId / installationId / subject / 账号），
+   且 `:848` 带 `Cache-Control: no-store`。
+3. 匿名不是本会话的事后辩护，**已经被用例钉住**：`server/tests/integration/inbound-worker-identity.integration.spec.ts:1283-1284`
+   用**不带 authorization 的裸 `fetch()`** 打它并断 `status === 200`。⇒ 给它挂认证会把这条用例打红。
+4. 业务上它**必须**能在"没有凭据"时被读到：任务书 T1 要的就是"绑定被吊销或过期之后仍能取到当前下限"
+   （`api.ts:870-871` 那段注释写的正是这条），而那一刻客户端手里没有可用的付费凭据。
+
+**诚实写出来的暴露面（请拍的人看一眼）**：无凭据的调用者由此能分辨"这台实例是不是签发端"
+（`api.ts:845` 的 `automationIssuerSide()` 不是签发端时回 403），并读到该签发者的 `issuer` / `keyId` /
+全局 `revocationVersion`。**不含任何账号级数据**；与已登记的 `/health` 那条"运维量不是身份维度"同族。
+但它不是"常量"，所以它进的是 `REVIEWED_ANONYMOUS_GET`（已审匿名）而不是公共事实那张表。
+
+**给所有者直接可粘的一行**（`scripts/check-public-facts.mjs:117` 那张表里，紧随 `/live` 之后）：
+
+```js
+  '/api/automation/entitlement/revocations':
+    '吊销下限清单：回一枚 Ed25519 签名清单，claims 只有 {version,issuer,keyId,scope,revocationVersion,issuedAt,expiresAt}' +
+    '（server/src/automation/entitlement-issuer.ts:358）—— 零身份维度、no-store。必须匿名是因为绑定被吊销/过期之后' +
+    '自托管侧仍要能取到当前下限（server/src/api.ts:870），而那一刻没有可用凭据；写侧两条都有闸（:853 authenticate+requireAdmin、:874 authenticate）。' +
+    '匿名判据由 server/tests/integration/inbound-worker-identity.integration.spec.ts:1283 钉住。',
+```
+
+⚠️ 登记之后判据 5（同文件 `:34-35`）会**永久禁止**把这条改成需要登录 —— 这正是想要的效果，
+但它把"匿名"变成一条受门禁保护的对外承诺，所以这一行由那枚门的所有者落，不由本线代落。
+**要拍的**：批准上面那一行（或指定别的处置）。本线在白名单内唯一能做的替代动作是挂认证，
+而那会把 `:1283` 那条用例和 T1 的语义一起打红 —— 不做。

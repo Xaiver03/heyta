@@ -2741,3 +2741,64 @@ B139 本体已在账本里就地追记复账（不是新写一条），旧表留
 **顺手立住的一条自证**：我这段初稿把引用写成 `ADR-0060 §2`，`docs-link-check` 当场判
 「该章节号不存在」（0060 的分节是标题不是数字节），rc=1；改成「决策及对旧结论的限定」第 2 条后 rc=0。
 📌 这一格的判据是**别人写的尺**（章节引用必须能在目标文件里查到），它抓到我自己写的假锚点 —— 又一次"能红才算数"。
+
+
+## 2026-10-12 01:0x · T7 第一腿：`pnpm check` 逐道补跑落到一枚可重跑装置上，1–85 道红集与归属
+
+### 装置（本线白名单内新建，`research/tools/verify-inbound-check-chain.py`）
+
+前一腿用的是临时驱动，它在第 87 道的**非 UTF8 字节**上崩掉，读数停在 86 —— 那是"探针坏了长得像被测物坏了"
+的老形状。这次把驱动落成仓库里的装置，契约：
+
+- 从根 `package.json` 的 `scripts.check` 按 `" && "` 解析步序；**步数由装置自己打印**（文档里不抄数字），
+  另有一臂专门证明它解析出的那条链非空且每步非空。
+- **逐道不 bail**：每一步的 rc 都记，红的继续往下跑 —— 任务书不许改判卷口径，所以取"合并态全红集"
+  只能在外层不 bail，任何一道门的判据一个字没动。
+- 子进程输出按**字节**捕获，`excerpt()` 用 `errors="replace"` 解码；**写盘那一步就脱敏**
+  `secret|token|password|authorization|apikey|api_key` 的赋值，落盘的 `NNN.log` 里不留凭据。
+- 产物：`NNN.log` + `chain.tsv` + `chain.json` + 逐行 `STEP= i/N RC=.. SEC=.. CMD=…`。
+- 🔴 **拒跑形状**：空范围与"`--only` 匹配到 0 步"都以 **rc=2** 退出并拒绝运行 —— 否则"什么都没跑"
+  会被读成"全绿"。这两臂各现量一次（`REFUSE_RANGE_RC=2` / `REFUSE_EMPTY_RC=2`）。
+- 自证：`python3 research/tools/verify-inbound-check-chain.py --self-test` —— 六臂逐条 OK、
+  `SELF_TEST arms=6 failed=0`、`SELFTEST_RC=0`。臂内容：红步必须报非零、非 UTF8 子输出必须活下来、
+  绿步必须报零、超时步必须报 124、链必须解析成非空步、`--only` 空匹配必须选到 0（由上面那道拒跑接住）。
+
+### 载体与一条必须写清的关系
+
+隔离副本 `.worktrees/inb-t7`，detached 到 `1a8de6fd`，被跟踪脏 = 0；日志落工作树外
+（`~/heyta-inb-logs/t7-check-chain-1a8de6fd/`）。
+
+🔴 **这条 SHA 不含本线自己的修法**：`git merge-base --is-ancestor c887c92c 1a8de6fd` → **NO**。
+所以这一腿第 4 道 `pnpm typecheck` 的红就是**本线那条已被 `c887c92c` 修掉的类型错**（`004.log` 逐字：
+`tests/inbound-panel-layout.spec.tsx(66,3): error TS2322: Type 'HTMLElement | null' is not assignable to type 'HTMLElement | undefined'`），
+**不能读成"当前 HEAD 上 typecheck 仍红"**。第 4 道要在含 `c887c92c` 的载体上重取（排在链尾之后做，
+不与之并行 —— 同机并发会把两边的读数都搅浑）。
+
+### 1–85 道：13 红，逐格一句因与归属
+
+| 道 | 门 | RC | 一句因（取自该道日志） | 归属 |
+|---|---|---|---|---|
+| 4 | `pnpm typecheck` | 2 | `apps/web` 面板用例：`card()` 声明返回 `undefined` 而函数体回 `null`（TS2322） | 🔴 本线，已修于 `c887c92c`（此载体在其之前） |
+| 6 | `check:reachability` | 1 | 断言 B：1 个已建模实体零写路径（`COMMENT`） | 产品体验线 `e6058120`（AGENTS §9 协作线同源） |
+| 20 | `check:row-single-source` | 1 | 断言 B：`apps/web/src/styles/app.css` 顶层 `ht-*` 前缀族只减不增 | 非本线（该道日志里 `inbound` 命中 0） |
+| 21 | `check:selection-single-source` | 1 | 断言 G：6 处本地 `…Id` useState 无语义登记，其中 4 处在本线面板 | 那 4 行来自别线笔 `63e61f23` ⇒ **B172** |
+| 22 | `check:l4` | 1 | 断言 C：内联样式 `style={{…}}` 只减不增 | 非本线（日志 `inbound` 命中 0） |
+| 23 | `check:empty-state` | 1 | 断言 B：5 处新手写空态，其中面板 2 处 | 同 **B172**；且那 4 处在本线地界外，本线换掉自己那 2 处这道仍红 |
+| 42 | `check:licenses:stamp` | 1 | `render-license-inventory.mjs --check-stamp`：戳与实装依赖树不一致 | 非本线（依赖树由别线动过） |
+| 44 | `check:image-license` | 1 | `@noble/hashes` 两处范围不一致（`2.4.0` vs `^2.4.0`，来自 vendored sync-core） | 非本线 |
+| 50 | `check:integration-coverage` | 1 | 盘上 35 个真库用例、被点名 34 个 ⇒ 本线 T3 那枚 13 窗口用例没进 `test:integration:postgres` 点名 | 🔴 本线用例，修它在 `server/package.json`（地界外）⇒ **B171** |
+| 53 | `check:linux-shell` | 1 | shell 可移植性对账 6 处不一致（按 HEAD 扫 167 个 `.sh`） | 非本线 |
+| 61 | `check:ai-tools` | 1 | `packages/ai/src/capability-manifest.generated.ts` 产物与上游不一致（892 行 / 应为 979 行） | 非本线（AGENTS §9 已记那枚产物是跨线混物） |
+| 64 | `check:text-color` | 1 | 文字色/无障碍位点缺登记（列出的站点在 `packages/ui/src/sync/CommentThread.tsx`） | 非本线 |
+| 74 | `check:public-facts` | 1 | 判据 4：`GET /api/automation/entitlement/revocations` 匿名下行无认领 | 🔴 **本线 T1 自己开的**（`dc1750ab`），修法在地界外 ⇒ **B173** |
+
+**这一腿新查出来的本线实质问题**（不是"读数"，是产品事实）：第 74 道那条匿名 GET 是本线开的，
+读实现后的结论是**它必须匿名**（claims 零身份维度 `server/src/automation/entitlement-issuer.ts:358`；
+写侧两条都有闸 `server/src/api.ts:853`/`:874`；裸 `fetch()` 断 200 已被用例钉住
+`server/tests/integration/inbound-worker-identity.integration.spec.ts:1283`），
+而登记面 `scripts/check-public-facts.mjs:117` 在本线地界外 ⇒ 连可粘的那一行一起写进 **B173** 待拍。
+本线在白名单内唯一能做的替代动作是挂认证，那会把那条用例和 T1 的语义一起打红 —— 不做。
+
+📌 与 B171/B172 放一起看，这一腿把"合并态有多少红"分成三类，本线只占前两类的各一格：
+**本线已修待重取**（4）、**本线开的但修在地界外**（50 → B171、74 → B173）、
+**别线写进本线文件的行**（21/23 → B172）。其余九格与本线无关，本线按"顺手活不进代码"不动。
