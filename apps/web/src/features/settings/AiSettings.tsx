@@ -382,6 +382,14 @@ export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget
    * 而且测试要能在 DOM 上断言它（`data-focused`），不能靠读 class。
    */
   const [focused, setFocused] = useState<SettingsTarget | undefined>(undefined);
+  /**
+   * 「恢复默认」的**第二段**（§8.2 第 11 条）。
+   *
+   * 原来是一击即生效：`ghost` 样式、和常规项同分量、不说清会丢什么 ——
+   * 而它清掉的是端点、路由、逐功能出境授权、本机存的密钥、记忆开关。
+   * 这类动作的最低要求是"点第一下只会把代价说出来"。
+   */
+  const [confirmingReset, setConfirmingReset] = useState(false);
 
   const endpointsSectionRef = useRef<HTMLElement | null>(null);
   const remoteGateRef = useRef<HTMLDivElement | null>(null);
@@ -1266,20 +1274,68 @@ export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget
         {t('web.ai.settings.keyNotice')}
       </p>
 
-      <div className="ht-settings__actions">
-      <button
-        type="button"
-        className="ht-btn ht-btn--ghost"
-        data-testid="reset-ai-settings"
-        onClick={() => {
-          secrets.clear();
-          setRejected([]);
-          update(defaultAiSettings());
-        }}
-      >
-        {t('web.ai.settings.reset')}
-      </button>
-      </div>
+      {/*
+        🔴 破坏性动作单独一区（§8.2 第 11 条）。三条都要成立：
+        ① 与常规项分开、有自己的标题；② 样式说自己是危险的（不是 ghost 混在普通动作里）；
+        ③ **第一下只把代价列出来**，第二下才真的清。
+        清单逐条对着 `defaultAiSettings()` 与 `secrets.clear()` 写，不写"全部设置"这种含混话 ——
+        用户要判断的是"我会不会丢了我以为不会丢的东西"。
+      */}
+      <section className="ht-settings__section" data-testid="reset-ai-zone">
+        <h3 className="ht-settings__h3">{t('web.ai.settings.reset.zoneTitle')}</h3>
+        <p className="ht-settings__danger" role="note" data-testid="reset-ai-warning">
+          {t('web.ai.settings.reset.warning')}
+        </p>
+        {confirmingReset ? (
+          <div role="alert" aria-live="assertive" data-testid="reset-ai-confirm">
+            <ul className="ht-settings__list">
+              <li>{t('web.ai.settings.reset.clearsEndpoints')}</li>
+              <li>{t('web.ai.settings.reset.clearsRoutes')}</li>
+              <li>{t('web.ai.settings.reset.clearsConsents')}</li>
+              <li>{t('web.ai.settings.reset.clearsSecrets')}</li>
+              <li>{t('web.ai.settings.reset.clearsSwitches')}</li>
+            </ul>
+            <p className="ht-settings__notice" data-testid="reset-ai-keeps">
+              {t('web.ai.settings.reset.keepsCorrections')}
+            </p>
+            <div className="ht-settings__actions">
+              <button
+                type="button"
+                className="ht-btn ht-btn--danger"
+                data-testid="reset-ai-confirm-submit"
+                onClick={() => {
+                  secrets.clear();
+                  setRejected([]);
+                  update(defaultAiSettings());
+                  // 重置做完就把第二段收起来：下一次还得再问一遍，不留在"已确认"的形状上。
+                  setConfirmingReset(false);
+                }}
+              >
+                {t('web.ai.settings.reset.confirm')}
+              </button>
+              <button
+                type="button"
+                className="ht-btn ht-btn--ghost"
+                data-testid="reset-ai-confirm-cancel"
+                onClick={() => { setConfirmingReset(false); }}
+              >
+                {t('web.ai.action.cancel')}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="ht-settings__actions">
+            <button
+              type="button"
+              className="ht-btn ht-btn--danger"
+              data-testid="reset-ai-settings"
+              onClick={() => { setConfirmingReset(true); }}
+            >
+              {t('web.ai.settings.reset')}
+            </button>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

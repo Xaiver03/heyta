@@ -454,14 +454,78 @@ describe('AI 设置界面', () => {
     expect(notice?.textContent).toContain('重新输入');
   });
 
-  it('恢复默认会把一切关回去', () => {
+  it('恢复默认会把一切关回去（第一步只把代价说出来，第二步才清）', () => {
     const s = defaultAiSettings();
     s.routing.enabled = true;
     s.routing.allowRemote = true;
     const el = render({ initial: s, secrets: createSessionSecretStore() });
     click(el.querySelector('[data-testid="reset-ai-settings"]'));
+    click(el.querySelector('[data-testid="reset-ai-confirm-submit"]'));
     const enabled = el.querySelector('#ai-enabled') as HTMLInputElement;
     expect(enabled.checked).toBe(false);
+  });
+
+  /**
+   * 🔴 这条钉的是「§8.2 第 11 条」那条在案缺陷本身：原来一击即生效。
+   *
+   * 判据必须同时看两头：
+   * · 界面上**出现了**代价清单（否则"第一步"只是把按钮挪了个位置）；
+   * · 状态与 `localStorage` **一个字都没变**（否则第一步已经在清东西）。
+   * 只断言前者会放过"第一步就把设置改了、然后照常显示清单"那种写法。
+   */
+  it('🔴 第一下只把会丢的东西列出来，什么都不清', () => {
+    const s = defaultAiSettings();
+    s.routing.enabled = true;
+    s.routing.allowRemote = true;
+    s.memoryEnabled = true;
+    const el = render({ initial: s, secrets: createSessionSecretStore() });
+
+    click(el.querySelector('[data-testid="reset-ai-settings"]'));
+
+    const confirm = el.querySelector('[data-testid="reset-ai-confirm"]');
+    expect(confirm, '第一下必须把确认面打开').toBeTruthy();
+    // 说清代价要说得出**名字**：一句"确定要重置吗"等于什么都没说
+    const items = Array.from(confirm?.querySelectorAll('li') ?? []);
+    expect(items.length, '要逐条列出会丢的东西').toBeGreaterThanOrEqual(5);
+    const listed = items.map((li) => li.textContent ?? '').join(' ');
+    for (const word of ['端点', '路由', '出境', '密钥', '开关']) {
+      expect(listed, `代价清单里要点名「${word}」`).toContain(word);
+    }
+    // 破坏性动作要看得出是破坏性的（不是和常规项同分量的 ghost）
+    const submit = confirm?.querySelector('[data-testid="reset-ai-confirm-submit"]');
+    expect(submit?.className).toContain('ht-btn--danger');
+
+    // 🔴 而这一刻**什么都还没清**：界面仍是开着的状态，
+    // `localStorage` 里那一份逐字没动（不是"读回来等于默认值"——
+    // 默认值本身也是关的，那样这条断言在"第一下就清了"的坏实现下照样绿）。
+    const persisted = localStorage.getItem(AI_SETTINGS_STORAGE_KEY);
+    expect((el.querySelector('#ai-enabled') as HTMLInputElement).checked).toBe(true);
+    expect((el.querySelector('#ai-memory-enabled') as HTMLInputElement).checked).toBe(true);
+    expect(localStorage.getItem(AI_SETTINGS_STORAGE_KEY)).toBe(persisted);
+  });
+
+  it('🔴 取消之后设置原样还在，并且确认面收回去', () => {
+    const s = defaultAiSettings();
+    s.routing.enabled = true;
+    s.memoryEnabled = true;
+    const el = render({ initial: s, secrets: createSessionSecretStore() });
+
+    click(el.querySelector('[data-testid="reset-ai-settings"]'));
+    const persisted = localStorage.getItem(AI_SETTINGS_STORAGE_KEY);
+    click(el.querySelector('[data-testid="reset-ai-confirm-cancel"]'));
+
+    expect(el.querySelector('[data-testid="reset-ai-confirm"]'), '取消要把确认面收掉').toBeNull();
+    expect((el.querySelector('#ai-enabled') as HTMLInputElement).checked).toBe(true);
+    expect(localStorage.getItem(AI_SETTINGS_STORAGE_KEY)).toBe(persisted);
+  });
+
+  it('恢复默认不是常驻的破坏性按钮：它单独一区并先说清这一步是破坏性的', () => {
+    const el = render({ initial: defaultAiSettings(), secrets: createSessionSecretStore() });
+    const zone = el.querySelector('[data-testid="reset-ai-zone"]');
+    expect(zone, '重置要占一个自己的区块，不混在常规操作里').toBeTruthy();
+    const warning = el.querySelector('[data-testid="reset-ai-warning"]');
+    expect(warning?.textContent, '不动手也要先说这一步是破坏性的').toContain('破坏性');
+    expect(el.querySelector('[data-testid="reset-ai-confirm"]'), '没点第一就不该有确认面').toBeNull();
   });
 });
 

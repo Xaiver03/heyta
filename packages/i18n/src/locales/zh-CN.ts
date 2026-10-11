@@ -2423,6 +2423,18 @@ export const zhCN = {
   // 🔴 它必须显示在密钥输入框旁边：不说明的话，"下次打开要重输"会被当成 bug。
   'web.ai.settings.keyNotice': '浏览器里没有系统钥匙串，密钥只保存在这个标签页的内存中。关掉或刷新页面后需要重新输入。桌面端会把密钥存进系统钥匙串。',
   'web.ai.settings.reset': '恢复默认（全部关闭）',
+  // 「恢复默认」是破坏性动作（清端点/路由/出境授权/本机密钥/记忆开关），
+  // 所以它单独一区、第一下只把代价列出来。逐条对着 `defaultAiSettings()`
+  // 与 `secrets.clear()` 写，不写"全部设置"这种含混话。
+  'web.ai.settings.reset.zoneTitle': '重置这一组 AI 设置',
+  'web.ai.settings.reset.warning': '这一步是破坏性的。点第一下不会清除任何东西 —— 它先把会丢的东西列出来。',
+  'web.ai.settings.reset.clearsEndpoints': '你添加的模型端点（地址与模型名）',
+  'web.ai.settings.reset.clearsRoutes': '每个功能走哪个端点的路由',
+  'web.ai.settings.reset.clearsConsents': '逐功能的出境授权（AI 能不能把你的数据发出去）',
+  'web.ai.settings.reset.clearsSecrets': '存在这台设备上的密钥与令牌',
+  'web.ai.settings.reset.clearsSwitches': 'AI 总开关、远程开关、本机接口配置与记忆偏好开关',
+  'web.ai.settings.reset.keepsCorrections': '你纠正过的偏好不在这里清：它们记在操作日志里，跟着你的数据走。',
+  'web.ai.settings.reset.confirm': '确认重置',
   // 拒绝原因 → 主文案。**按 `reason` 码取词条，不渲染跨包的中文 `message`**：
   // 门禁看不见 `{r.message}`（那是变量，不是字面量），但用户看得见。
   // 这些句子来自 `@heyta/ai` 的 `validateEndpointUrl()`（`reason` 四种）。
