@@ -1,0 +1,18 @@
+RUN=reinstall:all --only ios（趟号 r87）
+RESULT=OK
+CAPTURED_AT=2026-10-11 12:29（图内状态栏时刻，与文件 mtime 同分钟）
+TREE=a195a37f（隔离检出 ../heyta-wt-reinstall，只含已提交内容；主检出此刻有别的会话未提交源码）
+RIG=63f93a90（scripts/reinstall-all.sh 带 HEYTA_REINSTALL_TMP_DIR 的那一版；逐字复制进载体，cmp 报 SAME）
+TMP_ROOT=/Users/rocalight/heyta-carriers/tmp-ux-r87-10111223（私有落点 ⇒ 这一张不再住共享 /tmp）
+UDID=FE195661-B021-4A71-AAD1-1F2F7AE3A102（heyta-iphone-17pro）
+PNG=reinstall-20261011-1230-ios-installed.png
+PNG_SHA256=9a46b824a3d33581b336afee60105f1c9f74fdd241221afa04674528c426f39c
+SHA_RECONCILED=私有落点那份与本库这份逐字节相同（同一趟当场拷 + 两侧 shasum 对账）
+WINDOW=1206x2622
+CONTENT_RATIO=58.8%
+BRAND_BLUE_HITS=4091
+FRESHNESS=已装的 main.jsbundle 比源码新 —— 这一轮装的是当前产物
+INSTALL=全新安装（simctl uninstall → install），所以首屏就是联网同意卡
+HUMAN_REVIEWED=yes：打开看过 —— 浅色中文首屏「在使用联网功能之前」，两条要点（只用本机 / 同意并联网）、
+  服务条款与隐私政策两条链接在位、主蓝实心按钮「同意并联网」+ 无底框的「只用本机」。
+  不是 §7 第 82 条那种"有标题有正文的错误屏"：主蓝命中 4091 且界面元素与共享 UI 词条逐字对得上。
