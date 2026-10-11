@@ -3391,3 +3391,22 @@ git status --porcelain -- apps/web/src packages server e2e docs   → 空
 `git diff --numstat HEAD -- BLOCKED.md` 现量 `205 0`（增 205 / **删 0**）：其中别线未提交那 159 行原样保留，
 本线这一节加的是余下的 46 行 —— 提交时仍用"把同一处插入应用到 `git show HEAD:BLOCKED.md`"的拼法，
 不把别人的未提交文本发出去。
+
+### 19:2x 现量 · 那一格的读数重算到当前 HEAD（因为别线动了本线用例**import** 的那枚共享 helper）
+
+`git diff --name-only <上一枚载体>..HEAD` 里出现 `e2e/tests/helpers.ts` —— 它是本线那份 spec 的
+`import { … } from './helpers'` 的对象。**语义上不进本用例**（他们改的是 `switchView` 的窄屏那一支，
+现量 `grep -c switchView e2e/tests/inbound-automation.spec.ts` = **0**），但文件被 import，
+所以按老规矩不沿用旧读数：把私有载体快进到 `1e8ee091`（源码 0 条脏）后复跑同一条命令 ——
+
+```
+cd .worktrees/inb-t7/e2e && npx --no-install playwright test --config playwright.inbound.config.ts
+  2 failed
+    [chromium] › tests/inbound-automation.spec.ts:8:3 › encrypted date draft review and Vault invalidation 1280
+    [chromium] › tests/inbound-automation.spec.ts:8:3 › encrypted date draft review and Vault invalidation 390
+  2 passed (2.1m)      ← 红点仍是 spec 第 85 行那一句等待
+```
+
+⇒ AC-6 那一格"当前 HEAD 上仍红"这句现在是**算到 `1e8ee091`** 的读数，不是 `a599545d` 的沿用。
+载体快进后与 19:1x 那趟的差别只在文档与那枚 helper；本线相关源码（`server/`、`packages/inbound-core` 等）
+零改动 ⇒ 其余七格的读数不需要重取（要核就现量上面那条 `git diff --name-only` 的作用域筛）。
