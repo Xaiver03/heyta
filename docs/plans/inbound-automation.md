@@ -2075,6 +2075,10 @@ $ cd .worktrees/inb-t7 && HEYTA_MACOS_DIST_DIR=/tmp/heyta-macos-dist-inbt7 \
 ```
 
 不点的理由 + "那条窗口门禁看的是进程不是设备归属"这个缺陷，记在 **B164**（含建议的那条机械判据，改的是别人的脚本判卷口径，不代做）。
+🟡 **收口时的状态更新**：别线随后落了 `63f93a90 fix(四端重装 落点)`，把 ios/windows/android 三段那批固定 `/tmp` 路径
+换成带默认值的旋钮（`HEYTA_REINSTALL_TMP_DIR`，默认逐字不变）—— 那是 B164 **旁边**的另一格（现场互相覆盖），
+不是设备身份那一格：现量 `grep -n 'AVD\|avd name\|HEYTA_ANDROID' scripts/reinstall-all.sh` 只在一条注释里命中，
+`adb uninstall` 之前仍然没有任何身份判据 ⇒ **B164 那一格仍开着**。
 
 **Linux 那一格**（`.deb` 交付取证第一次在干净载体上跑通）：
 
@@ -2121,7 +2125,7 @@ PKG_RESULT=FAIL（正文 rc=1）
 | `check-migrations` / `license-inventory` | **rc=0 / rc=0**（本轮收口重跑，日志 `docgates.log`） | ✅ |
 | 文档门禁 `check-docs-voice` / `docs-link-check` | rc=0 / rc=0 | ✅ |
 | AC 已勾数 | `已勾=0 / 未勾=8` | 等负责人逐条点头 |
-| 非白名单 porcelain 条目 | 收口现量 **6** 枚（开工快照 29）：`account-standard-suite-handoff.md`、`capability-manifest.generated.ts`、`third-parties.ts`、`scripts/reinstall-all.sh`、`legal.generated.ts`、`.agents/context/` | 全是**别人在飞**的写入（`reinstall-all.sh` 12:22 仍在被改，本线跑的是载体副本）；本线没往这些路径写一个字节 |
+| 非白名单 porcelain 条目 | 收口那刻现量 **7** 枚（开工快照 29）：`account-standard-suite-handoff.md`、`product-ux-optimization-handoff.md`、`capability-manifest.generated.ts`、`third-parties.ts`、`legal.generated.ts`、`.agents/context/`、`apps/mobile/evidence/reinstall-<日期>-ios-installed.png` | 全是**别人在飞**的写入（收口期间 `scripts/reinstall-all.sh` 刚被他们提交掉，同时有人在跑 ios 那条腿 —— 那枚新证据图就是它写的）；本线没往这些路径写一个字节。⚠️ **这个数会漂**：复跑 `git status --porcelain -unormal` 再按上面那张白名单筛，别拿这一行的数当现状 |
 
 ⇒ **完成条件 1 的"T7 三条 exit 0"这一轮拿不到**，两条红各有尺在读、归属都在别线，本线按规矩不代改也不改判卷口径。
 "没做成但说清了"是这一格的合格线。
