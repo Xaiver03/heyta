@@ -7127,6 +7127,16 @@ git show --numstat --format='' 6d06bae4   # 空输出
 `data-inbound-cycle-state="waiting-entitlement"` 的空句子节点（不说成"处理失败"）。B110 的成对追加落进去时，
 在这张表加一行映射即可，界面与判据都不用再动。
 
+**21:4x 复账（本会话）**：这一格的两半都重取了，**结论不变、理由换了**。
+① 词条仍缺 —— `git show HEAD:packages/i18n/src/locales/zh-CN.ts | grep -c 'web.ai.inbound.process.waiting-entitlement'`
+= **0**，`en.ts` 同 **0**；HEAD 上 `web.ai.inbound.process.*` 只有 `submitted / empty / needs-confirmation / failed` 四条。
+② 标题里那句"而 `packages/i18n` 正被并行会话写着"**已经不成立** —— `git status --porcelain -- packages/i18n` 现在 = **0 条**。
+⇒ 所以这一格不做的正当理由**只剩任务书那条死规矩本身**（"不许动 `packages/i18n`"，而它也不在白名单里），
+**不再是**"怕撞别人正在写的文件"。这个区别对下一位有用：现在没有人可以拿"等 i18n 空出来"当理由，
+要补就是负责人点头后一次成对追加（中英同批）+ 本线那一行 `PROCESS_COPY` 映射
+（现量：`grep -n 'export const PROCESS_COPY' apps/web/src/features/settings/InboundAutomationSettings.tsx`，白名单内），
+界面与判据都不用再动。标题保留原文是为了让后来者看清它当初的成因，不是它还成立。
+
 ## B111 安装身份的 META 键没进 `packages/storage` 的登记表
 
 `packages/app-host/src/inbound-installation-store.ts` 自持常量 `automationInstallationIdV1`，
