@@ -1976,8 +1976,15 @@ packages/app-host typecheck: tests/login-code.spec.ts(44,5): error TS2578: Unuse
 
 - 载体 `.worktrees/inb-t7`（detached worktree），起跑那刻 `git -C .worktrees/inb-t7 rev-parse --short HEAD` = **`16f72239`**、
   `status --porcelain -unormal` 行数 = **0**。日志与截图落 `~/.heyta-evidence/inb-t7-leg3-1011-114300/`（不入库，写路径只为复跑）。
-- 🔴 **这批读数只描述 `16f72239`**。收口时主检出已到 `9542a9ff`，`git rev-list --count 16f72239..HEAD` = **11**
-  （协作 / 产品体验 / 账号套件那几条线的笔）。⇒ 这 11 笔**不在**下面的读数里，别拿这一节当"main 现在绿/红"的依据。
+  ⚠️ **收口时把本线在 `/tmp` 下的一次性日志全清了**（`/tmp/inb-*`，128 枚）。所以本节与前面几节里"日志 `/tmp/inb-check-carrier.log`
+  / `inb-rtest-carrier.log` / `inb-wt-worker.log`"这类句子，指的是**当时那次运行的落点**，不是现在还在的文件；
+  复跑那几条命令会重新写出来（`--log` 本来就是命令的一部分），而**持久的一份**在
+  `~/.heyta-evidence/inb-t7-leg3-1011-114300/`（`rc.txt` / `build.log` / `typecheck.log` / `check.log` / `test.log` /
+  `gate-b.log` / `peer-census.log` / `reinstall-desktop.log` / `linux/` / `mac/` / `windows/`，重启不清）。
+  把可复现物留在 `/tmp` 是旧错，这一格按仓库纪律改掉。
+- 🔴 **这批读数只描述 `16f72239`**。收口那刻主检出在 `9542a9ff`（`git rev-list --count 16f72239..HEAD` 当时 = 11）；
+  这个数**每分钟都在漂**，别照抄 —— 现量：`git rev-list --count 16f72239..HEAD`。
+  ⇒ 那些笔**不在**下面的读数里，别拿这一节当"main 现在绿/红"的依据。
 - 负载披露：起跑前 1 分钟负载 **33.70**、收口 **20.49**；设备窗口门禁 `verify-mobile-window-gate.sh --target b`
   连八轮全 `rc=3 REDS=load`（负载 20–49）。本线自己的 build/check/test 各推过它一次，**不据此判产品**。
 
