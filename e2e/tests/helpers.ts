@@ -551,6 +551,24 @@ export async function switchView(
   } catch {
     // 主段确实没有这一枚 ⇒ 走「更多」。
   }
+  // 🔴 宽屏与窄屏的「更多」不是同一个东西，而且窄屏还多一段：
+  // 宽屏 rail = `.ht-rail__more` 里的 `role="menuitem"`；
+  // 窄屏 compact rail 的**常驻段**（`nav.ht-compact-rail` 下只有「任务」「日历」两枚）是**普通 button**，
+  // 不是 `role="tab"` ⇒ 上面那次 tab 点击在窄屏必然等不到；溢出段住在 `[data-testid="compact-rail-more"]`
+  // 展开的 `#compact-rail-destinations` 面板里，收起时整块 `hidden`（隐藏子树不进无障碍树）。
+  // 只走宽屏那一支 ⇒ 390 档 `locator.click` 死等 180/240 秒，长得像"那个视图打不开"（r98 实测）；
+  // 只认面板那一支 ⇒ 常驻段的「任务」「日历」在面板里根本没有，同样死等（r100 实测）。
+  const compactRail = page.locator('nav.ht-compact-rail');
+  if (await compactRail.count()) {
+    const pinned = compactRail.getByRole('button', { name: label, exact: true });
+    if (await pinned.count()) {
+      await pinned.click();
+      return;
+    }
+    await page.getByTestId('compact-rail-more').click();
+    await page.locator('#compact-rail-destinations').getByRole('button', { name: label, exact: true }).click();
+    return;
+  }
   await page.locator('.ht-rail__more button').click();
   await page.getByRole('menuitem', { name: label }).click();
 }

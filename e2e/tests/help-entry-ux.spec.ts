@@ -7,7 +7,18 @@ for (const width of [375, 1440]) {
       await page.setViewportSize({ width, height: 812 });
       await openApp(page, '/?lang=zh-CN');
       if (theme === 'dark') await switchTheme(page, 'dark');
-      await page.getByRole('button', { name: '帮助', exact: true }).click();
+      // 🔴 窄屏（compact rail）那一档，「帮助」不在常驻 rail 上，而在「更多」面板里
+      // （`CompactRailNavigation.tsx` 把面板整块 `hidden={!open}`，隐藏子树不进无障碍树 ——
+      // 直接 `getByRole('button', { name: '帮助' })` 在那一档是**等不到**而不是点不到）。
+      // 先按人的真路径试一次常驻 rail 的直达，等不到才展开「更多」——
+      // 判定用带等待的 click，不用 `isVisible()` 快照（`helpers.ts` 里 `switchView` 记着同一坑）。
+      const help = page.getByRole('button', { name: '帮助', exact: true });
+      try {
+        await help.click({ timeout: 5_000 });
+      } catch {
+        await page.getByTestId('compact-rail-more').click();
+        await help.click();
+      }
       const panel = page.getByTestId('about-panel');
       await expect(panel).toBeVisible();
       // 🔴 入场动画 `ht-sheet-in` 把整块 `opacity` 从 0 跑到 1，动画中途按截图拍到的是
