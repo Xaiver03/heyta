@@ -6,6 +6,7 @@
 > 目标：把产品从“功能面过宽的精致后台”收敛成“本地优先、执行优先的任务工作台”。
 
 本计划的跨端交互专项见 [`cross-platform-ux-optimization.md`](cross-platform-ux-optimization.md)，审计证据见 [`../research/cross-platform-interaction-ux-audit.md`](../research/cross-platform-interaction-ux-audit.md)。
+交接（给下一个会话：本轮停在哪、下一步顺序、别再碰的手）见 [`product-ux-optimization-handoff.md`](product-ux-optimization-handoff.md)。
 
 ## 0. 执行原则
 
