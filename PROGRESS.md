@@ -4055,3 +4055,27 @@ $ grep -rnE '\.(skip|todo)\(|\bxit\b|describe\.skip' <本线全部测试文件> 
   ⇒ **清扫永远不会自己发生**。要接的位置 `server/src/sync/cleanup.ts` 在白名单外（B175 里给了逐字可粘的那一段和不塞进 `api.ts` 的理由，此处不重复）。
 - 台账改动：矩阵 **C27** 的证据归属格按现量改写（保留带时点的更正写法），"尺"那一列没动；B175 追加一段 18:4x 复量。
 - 门禁重取（正文动过 ⇒ 必跑）：见紧随其后的那条对话输出；AC 已勾数现量 **0**，本节不改任何 AC 的闭合状态。
+
+## 2026-10-12 18:5x · 「挂载还没入库」这句过期了：T5 那五格加一张表全按 HEAD 重述，e2e 两条红的红因收窄成 `active` 一根线（B140）
+
+- **触发**：台账里我上一轮写的结论是"web 挂载与移动壳调用方仍在未提交 diff ⇒ 本线六枚即便入库也没有渲染入口"。
+  这一轮去读 HEAD 的字节，那句话已经不成立。
+- **现量（HEAD `46841f13`；逐条命令都写进了台账，正文不重复读数）**：六枚 web spec 全 tracked
+  （`git status --porcelain -- apps/web/tests/` 输出为空）、e2e 两份在 HEAD、`apps/mobile/src/inbound/lifecycle.ts`
+  与**它的调用方**（`HEAD:apps/mobile/src/App.tsx:64` 的 import、`:129` 的 `useEffect(() => startMobileInboundWorker(), [])`）
+  都在 HEAD、web 那三处挂点也在（`AiSettings.tsx` 引用 6 行、`store.ts` 3 行、`route-explanation.ts` 1 行）。
+  带它们进来的是两笔：本线 `c099afe6`（10-12 00:38）与别线 `63e61f23`／`d49f77e3`（都 10-10 18:49）。
+- **一类不是一个**：同一句旧口径散在**六处** —— C22 的"未入库"、C29 的"没有渲染入口"、C31 的"入库也是死代码"、
+  C33 的"web 那格没入库就没有"、C34 的"入口本身还没入库"、以及「未闭合的那几格」那张表里"缺挂载"那一栏。
+  六处全部按 HEAD 重述；**尺那一列一格没动**（判据口径归 B169，升不升由负责人拍）。
+- **顺手翻掉的第二类**：那张表里还留着 C10 的"装置不存在"与 C27 的"零删除、要先拍退役定义"—— 前一句我 18:2x、
+  后一句 18:4x 已在各自格里作废，**却漏了这张表**（同一结论的另一种句子形状）。本轮一并重述并写明作废时点；
+  C27 那句"零删除"是我只 grep Prisma 委托名、漏了它走裸 SQL 的假读数，退役定义其实写在清扫函数自己的谓词里
+  （高水位出保留窗 + 该 installation 既无绑定行也无用票行）。
+- **e2e 两条红没因挂载入库而变绿，但红因收窄**：栈仍指 `spec.ts:85:69` 等不到「查看并编辑草稿」。
+  这一条现在**只用 HEAD 的字节就能证**：`AiSettings.tsx:1270` 只传 `routing`/`consents`/`secretStore`，
+  `App.tsx:3197` 的 `<AiSettings` 不传 `active`，`App.tsx:3193` 的分组是 `hidden=`（换节不卸载）
+  ⇒ 归 B140 那根没接的线，落点两枚文件仍在白名单外，仍不代改。运行佐证（`.run-logs/e2e-after-mount.out`，18:45，
+  `2 failed / 4 passed`）跑在**共享主检出**上、含别线在飞 diff，只当佐证、不当 HEAD 读数。
+- **不做的事**：没动 `apps/web/src/App.tsx`、`apps/web/src/features/settings/AiSettings.tsx`、`e2e/tests/helpers.ts`
+  任何一枚；没给任何 AC 打勾；没改判卷口径。门禁重取见紧随其后的对话输出；AC 已勾数现量 **0**，不自行关闭 Goal。

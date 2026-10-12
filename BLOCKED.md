@@ -8232,6 +8232,35 @@ git status --porcelain -- apps/web/src packages server e2e docs   → 空
 **仍然不代改**（白名单外）。要拍的还是那两选一：① 给本线一次单动作授权（只动这两枚文件的这三处，
 改完复跑上面那四条命令）；② 交回 `apps/web` 设置面所有者接（姊妹面板已经这么接了）。
 
+**追记（2026-10-12 18:5x，本会话 · 挂载入库之后重取的三条现量）**
+
+本节上面 05:5x 与别处台账里"挂载面在未提交 diff 里、本线六枚即便入库也没有渲染入口"那套写法**已过期**。
+现量（HEAD `46841f13`）：
+
+| 问 | 现量命令 | 读数 |
+|---|---|---|
+| 六枚 web spec 在不在 HEAD | `git status --porcelain -- apps/web/tests/` | 输出为空 ⇒ 全部 tracked（本线那笔 `c099afe6` 10-12 00:38 带排版那批；另两枚与 e2e 两份由别线 `63e61f23` 10-10 18:49 带入） |
+| 面板挂载点在不在 HEAD | `git grep -n 'InboundAutomationSettings routing' HEAD -- apps/web/src` | 命中 `apps/web/src/features/settings/AiSettings.tsx:1270` |
+| `active` 接上了没有 | `git show HEAD:apps/web/src/features/settings/AiSettings.tsx` 取 1270 行；`git grep -n '<AiSettings' HEAD -- apps/web/src/App.tsx` | 🔴 **仍没接**：1270 那行只传 `routing`、`consents`、`secretStore`；`App.tsx:3197` 那枚 `<AiSettings` 不传 `active`，而 `App.tsx:3193` 的分组仍是 `hidden=`（换节不卸载） |
+
+第三条是**从 HEAD 的字节直接证的**，不依赖任何一趟运行 —— 这一格的红因因此与"在飞 diff"无关，
+载体是不是干净不影响这一条结论。
+
+同一格的运行佐证（`.run-logs/e2e-after-mount.out`，mtime 10-12 18:45，逐字指定驱动、不走 `npx`，
+形状见 B189 第 3 条）：⚠️ 那一趟跑在**共享主检出**上，含别线未提交 diff，只当佐证、不当 HEAD 读数 ——
+
+```
+✘  1 … tests/inbound-automation.spec.ts:8:3 › encrypted date draft review and Vault invalidation 1280 (1.0m)
+✘  2 … tests/inbound-automation.spec.ts:8:3 › encrypted date draft review and Vault invalidation 390 (1.0m)
+✓  3–6 …（explicit retry/themes 与 settings-panel-layout，1280 与 390 各两枚）
+2 failed / 4 passed (2.2m)
+Call log: waiting for getByTestId('inbound-event-date-draft').getByRole('button', { name: '查看并编辑草稿', exact: true })
+```
+
+⇒ 这一格的卡点由"缺渲染入口"**收窄成只剩 `active` 那一根线**，改法与落点跟 10-10 登记的三处同一件事，
+行号以本节这三条现量命令为准（不给字符串锚点 —— 台账里那条纪律：指代一把尺/一处落点时给结构位置 + 可重跑命令）。
+两选一照旧，本线仍不代改。
+
 ## ✅ B137 / B141（原 B138）的 19:1x 收口读数（2026-10-10，账号标准套件线代登 —— **两格都不是本线修的**）
 
 登记后不到一小时，**owner 自己把两格都收掉了**。现量（主检出 tip `1a30d3bc`）：
