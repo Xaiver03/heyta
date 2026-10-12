@@ -4000,3 +4000,23 @@ $ grep -rnE '\.(skip|todo)\(|\bxit\b|describe\.skip' <本线全部测试文件> 
   `TICKS：AC 行=8　已勾=0　未勾=8`。
 - **没变的**：AC-6 挂载面（B140/B181）、AC-8 四端设备腿（B164）、完成条件 1 的三条 exit 0（别线那几格仍红：ai 5／legal 2／shared-schema 1／
   mobile 那枚未处理拒绝／reachability COMMENT）、完成条件 2 的开工基线仍**不可核**。AC 已勾数现量 **0**，本线仍未闭合，不自行关闭 Goal。
+
+## 2026-10-12 18:2x–18:3x · 别线改过判定代码之后，三枚变异牙臂在隔离副本升到同一 HEAD 重咬：21 臂全成立；链装置拒绝为"选出 0 道"报绿（这正是 B185 那一格的现量）
+
+- **载体升到与主检出同一个 HEAD**：`.worktrees/inb-t8` 切基线前跟踪脏度现量空，切后
+  `HEAD=62f1066f`、跟踪脏度仍空；先 `pnpm -r build`（`RC_BUILD=0`），重建前那把尺报
+  `i18n 2／ui 5／domain 1`，重建后**七包全部 0** —— 上一节那条规矩第一次真被执行并且真的挡住了东西。
+- **三枚牙臂（变异验证）逐臂读数**：`queue` 臂数=6 不成立=0（末次 sha256 与开局一致 `52c3fd707977a03e…`，源文件已还原）；
+  `quota` 臂数=7 不成立=0；`ticket` 臂数=8 不成立=0。**每一枚都带静止对照臂**（只改注释 ⇒ 要求 rc=0 且红 0），三枚都成立。
+  🔴 关键归因：`quota` 的目标是 `server/src/api.ts` + `server/src/automation/ai-metering.ts`、`ticket` 的目标是
+  `server/src/api.ts` + `server/src/entitlement.ts` —— **正是 `c5561959` 那次别线改动动过的文件**。它们改完之后这些用例仍然会红，
+  所以"判定被削掉一块就有人知道"这句话在当前 HEAD 仍然成立。
+- **链装置那一腿（我上一趟少带了 `--logs`，这次带上）**：
+  `verify-inbound-check-chain.py --repo <载体> --logs <载体>/.run-logs/chain-inbound --only inbound` ⇒
+  `CHAIN carrier=… total_steps=106 requested=106 selected=0` → `CHAIN_DEVICE_NO_STEPS_RAN selected=0 (refusing to report a green for an empty run)`、`RC=2`。
+  🔴 这句要说准：`--only` 筛的是**命令行文本**，所以"选出 0 道"证明的是 `pnpm check` 那 106 道里**没有一道命令文本提到 inbound**；
+  它**不**证明"本线零消费者"—— 本线的自动消费者走的是 server 包 vitest 那条腿（`Tests 11 passed (11)`，上一节）。
+  这两面合起来就是 B185 那格的形状：要它们成为 check 链里的一道门，得改**根 `package.json`**（白名单外），仍等负责人裁决。
+- **同一副本重建后重取的两腿**：`AC8_RC=0`、`CJS_RC=0`（确认不是产物问题）。
+- **不变**：AC 已勾数现量 **0**；AC-6 挂载面（B140/B181）、AC-8 四端设备腿（B164）仍开着；
+  `pnpm check` / `pnpm -r test` 仍因别线那几格 rc=1 ⇒ 完成条件 1 三条 exit 0 仍不成立；开工基线未取那一格仍**不可核**。不自行关闭 Goal。

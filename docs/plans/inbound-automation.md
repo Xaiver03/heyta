@@ -3472,3 +3472,26 @@ quota 与 ticket 那两枚的保险丝臂各自报"成立（RESTORE_GUARD 报了
 🔴 本节不改任何 AC 的闭合状态：`已勾=0` 现量未变；C10 从"装置不存在"改成"有读数、但尺仍无"只是**把假话改掉**，不等于那一格闭合；
 AC-6 的界面挂载点（B140/B181）与 AC-8 的四端设备腿（B164）仍按原登记开着；`pnpm check` / `pnpm -r test` 仍因别线那几格 rc=1
 ⇒ 完成条件 1 的"三条 exit 0"仍不成立。
+
+## 2026-10-12 18:2x–18:3x · 判定被别线改过之后重咬三枚变异牙臂：21 臂全成立；链装置拒绝为"选出 0 道"报绿
+
+上一节写下"切基线之后必须先重建产物再量应用层"，这一节就是那条规矩第一次被执行。隔离副本 `.worktrees/inb-t8`
+（全部日志在 `.run-logs/carrier-teeth.log`，逐臂原文在 `.run-logs/ct-teeth-*.out`）先自检跟踪脏度为空，
+切到与主检出同一笔 `HEAD=62f1066f`，`pnpm -r build` 拿 `RC_BUILD=0`；那把尺在重建前报 `i18n 2／ui 5／domain 1`、重建后七包全部 0。
+
+**三枚牙臂逐臂成立（这是"能红"的证据，不是"绿"的证据）**：`queue` 6 臂、`quota` 7 臂、`ticket` 8 臂，各自 `不成立=0`、`RC=0`，
+并且每枚都带那一格静止对照（只改注释 ⇒ 必须 `rc=0` 且红 0）；`queue` 那枚自报末次 sha256 与开局一致（`52c3fd707977a03e…`），
+被变异的源文件已还原。**为什么要重咬**：`quota` 的目标是 `server/src/api.ts` 与 `server/src/automation/ai-metering.ts`、
+`ticket` 的目标是 `server/src/api.ts` 与 `server/src/entitlement.ts`，而 `c5561959` 正是别线对这几枚文件的提交。
+它们改完之后"把裁决摘掉／把 402 挪位／把拒绝码丢掉"仍会让对应用例变红 —— AC-1/AC-2/AC-4 那句
+"削掉一块判定会立刻有人知道"在当前 HEAD 上重新取到了证据。副本重建后另两腿 `AC8_RC=0`、`CJS_RC=0`。
+
+**链装置那一腿，读数要说准**。我上一趟的命令少带了 `--logs`，它按设计退 `2`（"读数必须落盘"）。这次带上并加 `--only inbound`：
+`CHAIN carrier=… total_steps=106 requested=106 selected=0` → `CHAIN_DEVICE_NO_STEPS_RAN selected=0 (refusing to report a green for an empty run)`。
+这枚拒绝本身是对的判据形状（空跑不许报绿，正是"永远绿的判据比没有判据更糟"那一格的反向）。
+它证明的是：**`pnpm check` 那 106 道里没有任何一道的命令文本提到 inbound**；
+它**不**证明"本线的验证没人跑" —— 后者由 `server/tests/inbound-lane-rigs-consumers.spec.ts`（`Tests 11 passed (11)`、跳过 0）
+走 server 包 vitest 那条腿承担。两面合起来就是 B185 的形状：让这些装置成为 check 链上的一道门要改**根 `package.json`**（白名单外），等负责人裁决。
+
+🔴 本节不改任何 AC 的闭合状态：`已勾=0` 现量未变；AC-6 的界面挂载点（B140/B181）、AC-8 的四端设备腿（B164）仍按原登记开着；
+`pnpm check` / `pnpm -r test` 仍因别线那几格 rc=1 ⇒ 完成条件 1 的"三条 exit 0"仍不成立。
