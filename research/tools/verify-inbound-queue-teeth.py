@@ -26,7 +26,9 @@ import argparse
 import hashlib
 import os
 import re
+import shutil
 import subprocess
+import tempfile
 import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -73,11 +75,30 @@ def sha256(path):
         return hashlib.sha256(handle.read()).hexdigest()
 
 
+def vitest_cands():
+    """本地 vitest 二进制的候选，**逐字路径**。不走 npx：npx 判断"本地装没装"按调用方环境推断，
+    落空时会去 registry 取一个真叫 vitest 的包 ⇒ 一道门禁同时有了"读数随载体漂"与"能出网"两种性质。"""
+    return [os.path.join(SERVER, 'node_modules', '.bin', 'vitest'),
+            os.path.join(REPO, 'node_modules', '.bin', 'vitest')]
+
+
+def vitest_argv():
+    for cand in vitest_cands():
+        if os.path.isfile(cand) and os.access(cand, os.X_OK):
+            return [cand]
+    return None
+
+
 def run_suite():
     """返回 (rc, 转红的用例名列表)。读的是 vitest 自己的 × 行，不读汇总数字。"""
+    argv = vitest_argv()
+    if argv is None:
+        print('VITEST_MISSING 本地 vitest 解析不到（绝不退化成 npx 出网），找过：'
+              + ' | '.join(vitest_cands()))
+        return 127, []
     env = dict(os.environ, NO_COLOR='1')
     proc = subprocess.run(
-        ['npx', '--no-install', 'vitest', 'run', '--maxWorkers=1', SPEC],
+        [*argv, 'run', '--maxWorkers=1', SPEC],
         cwd=SERVER, env=env, capture_output=True, text=True,
     )
     return proc.returncode, RED.findall(proc.stdout + proc.stderr)
@@ -141,6 +162,31 @@ def run_arms(arms, label):
     return 1 if failures else 0
 
 
+def resolution_arms():
+    """两臂（都不碰源码、都不起 vitest）：静止解析必须拿到逐字路径且 argv 里没有 npx；
+    把候选全拿掉必须解析不到 —— 绝不退化成出网取包。"""
+    global SERVER, REPO
+    failures = 0
+    argv = vitest_argv()
+    ok = bool(argv) and argv[0].endswith(os.path.join('node_modules', '.bin', 'vitest')) and 'npx' not in argv
+    print(f'  解析臂 静止：跑测试用的是逐字指定的本地 vitest，argv 里没有 npx: {"成立" if ok else "不成立"}　argv={argv}')
+    failures += 0 if ok else 1
+    keep = (SERVER, REPO)
+    empty = tempfile.mkdtemp(prefix='heyta-vitest-absent-')
+    try:
+        SERVER = os.path.join(empty, 'server')
+        REPO = empty
+        got = vitest_argv()
+    finally:
+        SERVER, REPO = keep
+        shutil.rmtree(empty, ignore_errors=True)
+    ok2 = got is None
+    print(f'  解析臂 把候选全拿掉 ⇒ 必须解析不到（返回 None，绝不退化成 npx 出网): {"成立" if ok2 else "不成立"}　实得={got}')
+    failures += 0 if ok2 else 1
+    print(f'解析臂数=2　不成立={failures}')
+    return failures
+
+
 def self_test():
     """失配臂：模式在源码里不存在时，装置必须报 PATTERN_MISS 并非零退出。"""
     bogus = [('不存在的裁决（负面对照）',
@@ -152,13 +198,17 @@ def self_test():
     if code == 0:
         print('SELF_TEST_FAILED: 失配臂居然报绿 —— 这台装置会在没变异任何东西时报"有牙"')
         return 1
+    failures = resolution_arms()
+    if failures:
+        print('SELF_TEST_FAILED: 解析臂不成立 —— 编译器通道又可以是漂的、也可以出网')
+        return 1
     print('SELF_TEST=OK（失配臂被拒；真臂的绿只有在模式确实命中时才算数）')
     return 0
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--self-test', action='store_true', help='只跑失配负面对照')
+    parser.add_argument('--self-test', action='store_true', help='反向验证臂逐条自证（臂数由本装置自己打印，文档里不抄）')
     args = parser.parse_args()
     if args.self_test:
         return self_test()

@@ -3374,3 +3374,39 @@ T7 三条命令里 `pnpm check` / `pnpm -r test` 仍因那八条别线红而 rc=
 
 🔴 本节不改任何 AC 的闭合状态：`已勾=0` 现量未变；AC-6 的界面挂载点（B140/B181）、AC-8 的四端设备腿（B164）
 仍按原登记开着；`pnpm check` / `pnpm -r test` 仍因那八条别线红而 rc=1 ⇒ **完成条件 1 的"三条 exit 0"仍不成立**。
+
+## 2026-10-12 13:1x–15:4x · 上一节排在独占锁后面的那件事做完了：三枚变异牙臂的测试通道也改成逐字指定，整套臂在一只**隔离副本**上真跑了一遍
+
+**改了哪三枚**：`research/tools/verify-inbound-{queue,quota,ticket}-teeth.py`。每枚加两个函数 ——
+`vitest_cands()` 给逐字候选（`server/node_modules/.bin/vitest` → 根 `node_modules/.bin/vitest`），
+`vitest_argv()` 取第一枚"存在且可执行"的。`run_suite()` 开头先解析，解析不到就打印 `VITEST_MISSING` 并列出找过的路径、
+返回 `(127, [])` ⇒ **绝不退化成 `npx`**；原来那行 `npx --no-install vitest` 通道整个删掉，`env` 里补 `NO_COLOR=1`
+（与 `cjs-require-order` 那枚同形，那枚的改法与事故读数在上一节）。
+
+**每枚自证两臂**（`resolution_arms()`，接在原有自测之后、末行 `SELF_TEST=OK` 那句之前 ⇒ 那句原文一个字没动）：
+静止臂断言拿到的是逐字路径且 `argv` 里没有 `npx`；负臂把 `SERVER` 与 `REPO` **两枚根一起**换成空临时目录
+（上一趟那枚装置的负臂第一版只换了一枚、当场红过，这次按那次教训两枚都换），要求解析结果必须是 `None`，
+用 `try/finally` 归还。两臂自己打印 `解析臂数=2　不成立=0`。
+
+**为什么必须换载体**：这三枚是变异装置，运行时会临时改写被跟踪的源码 —— 主检出此刻仍有并行写入者（B182）
+⇒ 按 AGENTS §8.9 只能在独占副本上跑。载体 `.worktrees/inb-t8`，`CARRIER_HEAD=372068796dce35ce3a602fe567053339fc38418c`。
+
+**读数**（一条命令串行跑完三枚，日志 `.worktrees/inb-t8/.run-logs/teeth-fix-proof.log`；臂数由装置自己打印，本文件不抄）：
+`RC_SELF_queue=0`／`RC_SELF_quota=0`／`RC_SELF_ticket=0`，`RC_FULL_{queue,quota,ticket}=0`；三枚都 `解析臂数=2　不成立=0`；
+quota 与 ticket 那两枚的保险丝臂各自报"成立（RESTORE_GUARD 报了，且落回开局那份 …）"；三枚改写过的源码逐枚落回开局 sha256，
+装置侧 `RC_RESTORE=0`；**本节落笔前复量** `git -C .worktrees/inb-t8 diff --numstat 372068796dce35ce3a602fe567053339fc38418c -- server/src packages/inbound-core`
+⇒ 输出为空（变异没有留在副本树上，取证日志是那里唯一的未跟踪产物）。
+
+**没动的东西（边界）**：三枚装置的判卷口径（既有条目断言、变异阈值）逐条没改 —— 只换"从哪拿二进制"这一件事。
+白名单外那两枚（`mutate-credential-sweep.py`、`mutate-w6.py`，用的是**不带 `--no-install`** 的 `npx vitest`，
+本地缺二进制时 npm 会**装包**）不是本线资产 ⇒ 仍只交可粘形状，登记在 B186；B186 里"本线还剩三枚"那一格已改成
+"本趟做完并在隔离副本上证完"。
+
+**这一趟我自己造成的一次数据损失（登记 B188，不写成"已恢复"）**：为了把 B186 那节改成"已做完"，
+我拼了一份"HEAD + 我的更正"的提交件并**写回了共享工作树的 `BLOCKED.md`**，把账号标准套件线**尚未提交**的
+三节 B166／B167／B168 正文覆盖掉了（它们的标题我当天从 `git diff` 的 `+## B1` 行里抄下，正文没保住；
+五条找回路的全负读数在 B188）。本会话早前两次入库用的都是临时件、没落工作树，所以那两次没伤到别人 ——
+多写一行 `write_text` 就把别人的未提交文字删了。**从这一节起，本线入库一律走"临时件 hash、不落工作树"。**
+
+🔴 本节同样不改任何 AC 的闭合状态：`已勾=0` 现量未变；AC-6 的界面挂载点（B140/B181）、AC-8 的四端设备腿（B164）
+仍按原登记开着；`pnpm check` / `pnpm -r test` 仍因那八条别线红而 rc=1 ⇒ 完成条件 1 的"三条 exit 0"仍不成立。
