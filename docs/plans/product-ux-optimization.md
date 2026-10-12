@@ -2530,3 +2530,131 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
     （此后门只能报 `REDS=src`）什么也证明不了。
   ⇒ **边界如实**：这一趟之后"四端都装上了本轮这批产品代码的产物"仍差 iOS 那一格；
   三端的读数只覆盖到 `3d7b6dec`，`8c9541f7`（rail 键盘漫游那一笔）**不在任何一端的已装产物里**。
+
+### 2026-10-12 02:4x：`check:empty-state` 那四枚红里的三枚已改行为（`325b09d7` / `ff88c2e9`）
+
+接着上面"这一轮要的是产品代码"那条，本节的起点是同一枚门禁的读数：
+`node scripts/check-empty-state.mjs` 断言 B 报 **4 处新的手写空态**，其中 **3 处在我自己那两笔里**
+（`AssistantPanel.tsx` 一枚、`web.categories.create.empty` 一枚），1 处属自动收集线。
+
+- ✅ **`325b09d7`：「先输入名称。」那句不再是"手写空态"**。
+  `直接渲染空态词条` 这条 marker 按 **key 的段** 认（`(^|\.)empty(\.|$)`），
+  而 `web.categories.create.empty` 的**值**是一条表单校验错误，跟"这个列表没有内容"没关系 —— 是名字把它骗进了债账。
+  改的是名字（→ `…create.nameRequired`，中英两条同时改、值逐字不变），**判据一个字没松**：
+  往 `NOT_AN_EMPTY_STATE` 加一行也能让它不红，但那张表是给语义上确实不是空态的占位符
+  （冲突载荷的「（空）」、导出文件里的「（没有任务）」）留的出口，不是给取错名的词条留的后门。
+- ✅ **`ff88c2e9`：共享空态补第三档 `line`，并把历史列那行收编进去**。
+  这一枚**不是**"为了消红而改名"：门禁给的唯一修法是"用共享的 `EmptyState`"，而它只有两档 ——
+  `page`（居中 + `paddingVertical: space.16`）会撑出大块空白，`section`（标题走 `row-title` + `foreground`）
+  又让占位行在字号**和**颜色上都盖过它上面那枚 `caption` 分组标签，层级倒置。
+  **判据说"只有一个实现"，工具只给两种形状 —— 缺的那一种才是站点留在账上的真正原因**，
+  所以补的是实现（`row-meta` + `foreground-subtle`，不画图标与插画，归一仍然做在 `model.ts`）。
+  同文件里首屏那一块**确实不是空态**（挂着输入框与三枚建议按钮，可交互），
+  它的类名与定位钩子原先都带 empty 字样 ⇒ 改名字（`ht-ai__welcome` / `ai-assistant-welcome`），三条 marker 一条没松。
+  ⚠️ **第一版解释注释里逐字写了旧类名，于是注释自己把 `__empty` 又点红一次** —— 这条门禁扫的是源码文本，
+  在注释里"引用"一个形状等于造出那个形状。改完必须重跑才算。
+- **读数（全部现量，非沿用）**：
+  断言 B 的新增站点 **4 → 1**；`packages/ui test` rc=0（44 文件 / **668** 条，含新加的 3 条 `line` 档模型用例）、
+  `apps/web/tests/ai-assistant-panel.spec.tsx` **29 → 30** 条 rc=0、
+  `check:design` / `check:ui-language` / `check:layering` / `check:ui-provider` 各 rc=0、
+  `@heyta/ui` / `@heyta/web` / `@heyta/mobile` typecheck 各 rc=0、`pnpm --filter @heyta/i18n test` = 26 passed（rc=0）。
+  变异一臂：把那一行改回手写 `<p>` ⇒ 新用例精确转红（**1 failed / 29 passed**，红的是 `[role="region"]` 那一头；
+  `p` 那一头在同一臂里没走到 —— 用例在第一条失败处就停，两头的牙不是同一臂证的，如实记）。
+- 🔴 **三条登记项，本线一律不动别人的判据口径**：
+  1. **剩那一枚红归自动收集线**：`apps/web/src/features/settings/InboundAutomationSettings.tsx:424` 与 `:431`
+     两处手写 `<p className="ht-settings__hint">{t('web.ai.inbound.empty' / '…events.empty')}</p>`，
+     语义上正是"这个列表没有内容"⇒ 该收编，而且它们需要的就是这次补的 `line` 档。
+     复现：`node scripts/check-empty-state.mjs`（rc=1，断言 B 只剩这一条）。**不改它的判据，也不代改它的面**。
+  2. **门禁报的"登记站点已消失（多半是被收编了 —— 这是好事）"那两行，逐条现量后都不是收编**，
+     而且都不是"藏了一处真空态" —— 三件事各自不同，按报告那句读会把它们全读成一次改进：
+     · `ImportPanel`：那段提示换了承载组件（`apps/web/src/features/settings/ImportPanel.tsx:137-141`
+       用 `SettingsNotice` + `testId="import-empty-only"`，词条也改成 `web.import.emptyOnly`）。
+       marker 认的是 `data-testid="…"` **字面属性**与 key 的 `empty` **整段**，两条都不认这个形状
+       （`emptyOnly` 是一整段，`(^|\.)empty(\.|$)` 打不中）⇒ 屏幕内容没变，门禁从此看不见它。
+     · `AuthPanel`：不是换形状，是**显式关掉**了那一段 ——
+       `apps/web/src/features/auth/AuthPanel.tsx:378-379` 给共享表单传 `emptyTitle: ''` / `emptyBody: ''`，
+       而 `packages/ui/src/auth/AuthForm.tsx:704` 两者皆空时渲染 `null`。
+       所以**没有留白**，但那枚 `EMPTY_SITES` 行现在是一条死账（该由它的作者删）。
+     · 🔴 同一族的第三个口子：`空态文案 prop` 这条 marker 是**枚举出来的三个 prop 名**
+       （`emptyText` / `emptyHint` / `emptyMessage`），而 `AuthForm` 的同类槽位叫
+       `emptyTitle` / `emptyBody` ⇒ 用新名字表达"这是空态文案"不会红。
+       三条都**只是登记**，本线不动那枚门禁的判据口径；复现 = `node scripts/check-empty-state.mjs` 看末段的"已消失"两行。
+  3. **`check:ui-provider` 的 `PROVIDER_DEPENDENT` 清单里没有 `EmptyState`**（它 `useHeytaTokens()` / `useHeytaText()`），
+     ⇒ 宿主把共享空态挂在 Provider 之外**不会红**，只在运行时抛「useHeytaUiTheme 必须在 `<HeytaUiProvider>` 内使用」。
+     那个文件自己为同一件事记过三次"新组件没登记，门禁照样全绿"。这次各宿主是**手工**包了一层 Provider 才没出事。
+  ⚠️ 这三条**没有**写进 `BLOCKED.md`：那一枚文件此刻正被另一条会话写着（`git status` = `M`，+161/−48），
+     而它的 B 号在 HEAD 是 **B184**、在工作树只到 **B183** —— 现在追号必然撞。
+     下一枚 B 号请其所有者收口时补；本线先把状态写在自己的计划里（就是这一节）。
+
+### 2026-10-12 05:1x：删一条清单的**两句后果**上了界面，而"要不要问"这条不对称被**收窄**而不是推翻
+
+这一节的起点不是设计意见，是读源码读出来的三件事，它们各自都成立：
+
+1. `packages/app-host/src/project-actions.ts:321` 的 `removeProject` **只给 `PROJECT` 打一枚墓碑，一条任务都不碰**；
+   而它自己的测试（`packages/app-host/tests/project-actions.spec.ts:167`）标题写着"任务只是变成**无清单**"，
+   第 181 行断言的却是 `task.projectId` **仍然等于**那条已删清单 —— 按标题读会读出一个**根本不存在的清理动作**。
+   界面上真发生的是：那条任务仍然出现在「全部 / 今天 / 最近 7 天 / 日历 / 时间线」
+   （`@heyta/domain#task-filter` 那几个分支不看 `projectId`），只是行上的归属徽章没了
+   （`listNameFor` 查不到 ⇒ `null`，不猜）。
+2. 删一条**文件夹**还有第二种后果，比"任务失去归属"更大：`toOrganizerTree` 对"父 id 指向一条已删除的清单"
+   的取舍是**整支不画**，所以底下的子清单会**从侧栏消失**（开不开「显示已归档」都救不了它 —— 那个开关管的是归档）。
+3. 而这两句后果，界面上**一句都没说过**：`OrganizerList` 的两步确认此前只有标签那一节接了线，
+   清单那一节两个宿主都没接 ⇒ 删一条装着几十条任务、底下还挂着子清单的东西，代价是**一次点击**。
+
+交付（四件事，逐件说清是"哪一种后果"）：
+
+| 落点 | 这一枚管什么 | 为什么它在这一层 |
+|---|---|---|
+| `@heyta/domain#liveTaskCountsByProject`（新，批处理） | 里面还有几条**活着的**任务（含已完成） | 回收站"彻底删除"那句（`liveTaskCountOfProject`）问的是**同一件事**，而那一头 `apps/node-host` 的 CLI 要读、不能依赖 `@heyta/ui` ⇒ 单条版现在从这张表取数，规则只剩一处 |
+| `@heyta/ui#directChildCountsByProject`（新） | 底下还有几条**子清单**会跟着看不见 | 数的是 `Project` 的父子关系，那一层归共享 UI；**含归档、滤墓碑**（`aliveProjects(p, true)` 在 `includeArchived` 那一档就是原样返回，墓碑得在这里筛） |
+| `OrganizerList` 的 `labels.confirmRemove.impactChildren` + `childRemoveImpact` | 把第二句**画出来** | 只有一句 = 撒谎：数字没撒谎，后果撒了 |
+| `OrganizerList` 的 `askOnlyWhenImpact`（新闸门） | 清单那一档"**有后果才问**" | 见下面那条不对称 |
+
+🔴 **那条不对称是别人的拍板，本线没有推翻它，只把它收窄到它站得住的那一格**。
+`apps/mobile/tests/projects-sections.spec.ts` 原话是"清单那一列**不传** `confirmRemove`（删了能捞，标签不能）"，
+而 `scripts/verify-mobile-trash.sh` 第 50 行给了它真正的理由：标签**不进回收站**（§7.1 P-1），是这一族里唯一
+"删了没地方捞"的那一类。这个理由**成立**，所以新规则是：
+
+- **标签永远问**（数字为 0 也问）—— 它不进回收站，而且重建同名标签拿到的是**一个新 id**，旧引用不会挂回来；
+- **清单有后果才问**（里面有活任务，或底下挂着子清单）—— 它进回收站，捞得回来。
+
+⇒ 那两枚设备级判据**逐字不变、继续成立**（现量：`verify-mobile-trash.sh:105` 的 `LIST_L` 是脚本新建的**空清单**，
+所以第 6 步"点一下就直接删"仍然对；`:594` 的 `TAG_T` 从没挂到任何任务上，所以 6b 的标签数字**恰好就是 0**，
+把闸门也套到标签上会让 W4b 拦的那一下点击放回去）。本线动的只有两处**单测钉子**，且各带原因与正向对照：
+
+- `apps/web/tests/projects-panel.spec.tsx`：那条"清单行不受影响：仍然一次点击直接删"的 fixture 从 p1 换成 p2
+  —— p1 底下挂着 p1a，它现在**正是**有后果那一档（新用例钉的就是这个），而不是绕过断言；
+- `apps/mobile/tests/projects-sections.spec.ts`：`not.toContain('confirmRemove')` 换成
+  "清单接了确认**且带闸门**、标签**不许**带闸门"，另外那条 `onRemove(item)` 只有两个调用点的钉子
+  改成钉两个条件各一段（闸门丢了会红在写明的原因上）。
+
+读数（全部当场现量，非沿用）：`@heyta/domain` **1027** passed / `@heyta/ui` **673** passed /
+`apps/web tests/projects-panel.spec.tsx` **45** passed / `apps/mobile tests/projects-sections.spec.ts` **13** passed /
+`@heyta/i18n` **26** passed；`check:layering` / `check:ui-language` / `check:ui-provider` 各 **rc=0**；
+`check:empty-state` 仍 **rc=1 且只剩自动收集那一枚**（`InboundAutomationSettings.tsx`，本线不动）。
+typecheck：domain / ui / i18n / web / mobile 五包各 rc=0。
+
+🔴 **四臂变异（每一臂只改一处，改完立刻从 `.mut-bak` 还原，且都当场核过变异真进了被测物）**：
+
+| 臂 | 改哪 | 红在 |
+|---|---|---|
+| M1′ | 摘掉 `OrganizerList` 那个闸门条件 | web `2 failed`：**"零后果的清单仍一键直删"** + **"✅ 正向对照：父级清空之后删它就不问了"**（正是这两条，不是别的） |
+| M2 | web 宿主不传 `childRemoveImpact` | web `3 failed`：两步确认、两句都在场、`C/D` 那条 |
+| M3 | `directChildCountsByProject` 不筛墓碑 | ui `1 failed`："归档那支也数、墓碑那支不数"（读数 3 vs 期望 2） |
+| M4 | 闸门摘掉后**先不重建** `@heyta/ui` 的 `dist` 再跑 web | web **45 passed**（假绿）⇒ 见下面那条 |
+
+⚠️ **M4 这一臂是本轮最有用的一条读数**：`apps/web` 的测试消费的是 `packages/ui/**dist**`，
+改 `src` 不重跑 `pnpm --filter @heyta/ui build` 的话，变异**根本没进产物**，判据会绿得像"它没有牙"
+（§7 第 27 条那一族在单测层的第三种面目）。M1 第一次跑就是这么"存活"的，加了 build 之后才红成上面那样。
+⇒ **凡是变异打在 `packages/*` 的 `src`、而判据跑在 `apps/*` 的，必须带一次该包 build**，
+且"红在哪几条"要逐条点名，不许只报 rc。
+
+还欠的两格（不包装成完成）：
+
+- **设备级那一腿没跑**：本轮只证到单测层（jsdom / node）。真模拟器上"有后果的清单要点两下"这一条
+  需要 `pnpm reinstall:mobile` + 一条把任务归进清单的 fixture，属于设备腿，登记在下面。
+- **`toOrganizerTree` 把孤儿子级整支藏起来这件事本线没改**：它是那条注释里写明的**已知取舍**
+  （"孤儿不显示，比冒充一个用户没设过的位置更好"），本线只是**把这句后果告诉用户**并给了出路
+  （词条里点名"到回收站把这条清单还原，它们就会重新出现"）。
+  真正让它可见的改法（把墓碑孤儿子级按顶层画出来）会同时动 web 侧栏、移动端与 `FolderPicker` 三处形状，
+  而且需要一次深浅主题 + 两端的截图验收，不属于这一批。

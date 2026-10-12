@@ -119,6 +119,19 @@ export interface OrganizerListLabels {
     readonly ask: (name: string) => string;
     /** 影响面那句；`removeImpact` 给不出 `> 0` 时**不渲染**（没有数字就不编一句话）。 */
     readonly impact: (count: number) => string;
+    /**
+     * 删一条**文件夹**时的第二句后果：它底下的子清单会整支从侧栏消失。
+     *
+     * 🔴 它**不是** `impact` 的补充说明，是另一种后果，而且比"任务失去归属"更大：
+     * `toOrganizerTree` 对"父 id 指向一条已归档 / 不存在的清单"的取舍就是**不画这一支**
+     * （注释写在 `./model.ts#toOrganizerTree`），所以只报任务条数的确认框
+     * 会在一条装着三条子清单的文件夹上说"里面没有任务" —— 数字没撒谎，
+     * 后果撒了。省略这个槽位 ⇒ 不渲染（标签那节没有子级，不需要它）。
+     *
+     * ⚠️ 措辞必须说清**数据还在**、还原这条清单就会重新出现，否则这一句读起来
+     * 像"子清单会被删掉" —— 那是把一件没发生的事说成发生了。
+     */
+    readonly impactChildren?: (count: number) => string;
     readonly confirm: string;
     readonly cancel: string;
   };
@@ -161,6 +174,23 @@ export interface OrganizerListProps {
    * 只在 `labels.confirmRemove` 存在时被消费；`> 0` 才渲染那句影响面。
    */
   readonly removeImpact?: Readonly<Record<string, number>>;
+  /**
+   * 每一行作为**父级**时的直接子清单条数（删掉它会让这几条从侧栏消失）。
+   *
+   * ⚠️ 与 `removeImpact` 是两种后果，不是同一个数的两种画法：那个数说的是"任务失去归属"，
+   * 这个说的是"子清单整支看不见"。取数只有 `@heyta/ui#directChildCountsByProject` 一处。
+   * 只在 `labels.confirmRemove.impactChildren` 存在时被消费；`> 0` 才渲染。
+   */
+  readonly childRemoveImpact?: Readonly<Record<string, number>>;
+  /**
+   * 「**有后果才问**」：删一行之前先问一句，但只在 `removeImpact` 或
+   * `childRemoveImpact` 里这一行真有数字时问；两者都是 0/缺键 ⇒ 直接删。
+   *
+   * 🔴 这一档**只给清单**（它进回收站，捞得回来，代价只在"里面有东西"）。
+   *   标签**不许**传 —— 标签不进回收站，数字为 0 也要问（详见 `OrganizerRow`
+   *   那个同名 prop 的注释，以及 `scripts/verify-mobile-trash.sh` 第 6b 步）。
+   */
+  readonly askOnlyWhenImpact?: boolean;
   readonly labels: OrganizerListLabels;
   /** 点了某一行（**不是**删除）。不传 = 这些行不可点。 */
   readonly onFilterWith?: (item: OrganizerItem, context: OrganizerRowContext) => void;
@@ -328,6 +358,8 @@ function OrganizerRow({
   pendingRemove,
   setPendingRemove,
   impact,
+  childImpact,
+  askOnlyWhenImpact,
   renderLeading,
   renderItemExtra,
   busy,
@@ -351,6 +383,18 @@ function OrganizerRow({
   readonly setPendingRemove: (id: string | null) => void;
   /** 这一行删除后的影响面（条数）。`undefined` 或 `<= 0` ⇒ **不渲染那句影响面**。 */
   readonly impact: number | undefined;
+  /** 这一行作为父级时的子清单条数。`undefined` 或 `<= 0` ⇒ **不渲染那第二句**。 */
+  readonly childImpact: number | undefined;
+  /**
+   * 「**只有在这一行真有别的东西跟着受影响时才问**」（清单那一档的形状）。
+   *
+   * 🔴 省略 / `false` ⇒ 只要给了确认文案就**永远**问 —— 那是标签要的形态：
+   *   它不进回收站，数字为 0 也不等于"删了没代价"（那条标签本身没了，
+   *   任务上曾经挂过它的历史也没了，而且重建同名标签拿回来的是**一个新 id**）。
+   *   设备级判据 `scripts/verify-mobile-trash.sh` 第 6b 步的标签 fixture 数字**就是 0**，
+   *   把两个条件合成一条会让那一下点击变成直删。
+   */
+  readonly askOnlyWhenImpact: boolean | undefined;
   readonly renderLeading: OrganizerListProps['renderLeading'];
   readonly renderItemExtra: OrganizerListProps['renderItemExtra'];
   readonly busy: boolean;
@@ -361,6 +405,11 @@ function OrganizerRow({
   const key = organizerRowKey(kind, item.id);
   const rename = labels.rename;
   const confirmLabels = labels.confirmRemove;
+  /**
+   * 这一行删掉之后**有没有别的东西跟着受影响**（活任务 or 子清单）。
+   * 只给 `askOnlyWhenImpact` 那一档用；判定只看这两个数，不看名字长短之类的。
+   */
+  const hasConsequence = (impact ?? 0) > 0 || (childImpact ?? 0) > 0;
   // 草稿**留在行里**而不是提到列表里：行按 id 加了 key，所以"改到一半的这条是谁"
   // 天然跟着行走；提到父层就要自己维护 (id → 草稿) 的表，那张表迟早和列表脱节。
   const [draft, setDraft] = useState<string | null>(null);
@@ -532,7 +581,17 @@ function OrganizerRow({
               // "删标签到底要不要确认"会有两个答案，而差异不会让任何测试变红
               // （AGENTS §3.5）。为什么不是 `window.confirm`：移动端没有它，
               // 而且它的文案不受 i18n 管（`check:ui-language` 那条"界面零硬编码"从这儿开始）。
-              if (confirmLabels === undefined) {
+              //
+              // ⚠️ `askOnlyWhenImpact` 是**清单那一档**的形状，不是给标签用的：
+              //    这条链上"要不要问"有两种答案，而且两种都有人拍过板 ——
+              //    标签不进回收站（`§7.1 P-1`），删掉的那一条在界面上没有任何地方能捞，
+              //    所以它**永远**要问，哪怕数字是 0；清单进回收站，捞得回来，
+              //    所以只在**这一行真的有别的东西跟着受影响**时才问
+              //    （里面躺着活任务、或底下挂着子清单）。
+              //    🔴 这两个条件不许合成一条：合并之后"删一条空标签"变成一键直删，
+              //    而那正是 W4b 要拦住的那一下点击（设备级判据在
+              //    `scripts/verify-mobile-trash.sh` 第 6b 步，它的标签 fixture 数字就是 0）。
+              if (confirmLabels === undefined || (askOnlyWhenImpact === true && !hasConsequence)) {
                 onRemove(item);
                 return;
               }
@@ -558,6 +617,16 @@ function OrganizerRow({
           {impact === undefined || impact <= 0 ? null : (
             <Text style={[text.caption, { color: tokens['color.foreground-muted'] }]}>
               {confirmLabels.impact(impact)}
+            </Text>
+          )}
+          {/*
+            第二句：删一条文件夹时**底下那些子清单会整支从侧栏消失**。
+            `childImpact <= 0` 或不给 `impactChildren` 措辞 ⇒ 一个节点都不渲染，
+            所以标签那一节（没有子级）的 DOM 与从前逐字相同。
+          */}
+          {childImpact === undefined || childImpact <= 0 ? null : (
+            <Text style={[text.caption, { color: tokens['color.foreground-muted'] }]}>
+              {confirmLabels.impactChildren?.(childImpact)}
             </Text>
           )}
           <View style={styles.confirmActions}>
@@ -600,6 +669,8 @@ export function OrganizerList({
   items,
   counts,
   removeImpact,
+  childRemoveImpact,
+  askOnlyWhenImpact,
   labels,
   onFilterWith,
   onRemove,
@@ -676,6 +747,8 @@ export function OrganizerList({
             pendingRemove={pendingRemoveId === node.id}
             setPendingRemove={setPendingRemoveId}
             impact={removeImpact?.[node.id]}
+            childImpact={childRemoveImpact?.[node.id]}
+            askOnlyWhenImpact={askOnlyWhenImpact}
             renderLeading={renderLeading}
             renderItemExtra={renderItemExtra}
             busy={busy}
@@ -702,6 +775,8 @@ export function OrganizerList({
                   pendingRemove={pendingRemoveId === child.id}
                   setPendingRemove={setPendingRemoveId}
                   impact={removeImpact?.[child.id]}
+                  childImpact={childRemoveImpact?.[child.id]}
+                  askOnlyWhenImpact={askOnlyWhenImpact}
                   renderLeading={renderLeading}
                   renderItemExtra={renderItemExtra}
                   busy={busy}

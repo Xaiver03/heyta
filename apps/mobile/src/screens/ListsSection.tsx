@@ -63,11 +63,23 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { folderTargetsFor, type Project } from '@heyta/domain';
+import {
+  folderTargetsFor,
+  liveTaskCountsByProject,
+  type Project,
+  type Task,
+} from '@heyta/domain';
 import { useI18n, type MessageKey } from '@heyta/i18n';
-import { createProjectActions, type AppHost, type ProjectActions } from '@heyta/app-host';
+import {
+  createProjectActions,
+  createTaskActions,
+  type AppHost,
+  type ProjectActions,
+  type TaskActions,
+} from '@heyta/app-host';
 import {
   archivedProjects,
+  directChildCountsByProject,
   FolderPicker,
   folderRejectionMessageKey,
   OrganizerList,
@@ -94,6 +106,14 @@ export function ListsSection(): React.JSX.Element {
 
   const [host, setHost] = useState<AppHost | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
+  /**
+   * 只为算**删除确认里那两句影响面**（"里面有几条任务" / "底下还有几条子清单"）。
+   *
+   * 🔴 与 `TagsSection` 同一个来源：`createTaskActions(host).listTasks()`
+   * （已滤墓碑、**含已完成**），不另开一次引擎遍历 —— 两批任务在两次读取之间会漂移，
+   * 而漂移的表现是"确认框里的数字和行上那个对不上"。
+   */
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   /**
@@ -129,8 +149,13 @@ export function ListsSection(): React.JSX.Element {
     [host],
   );
 
+  const taskActions = useMemo<TaskActions | null>(
+    () => (host ? createTaskActions(host) : null),
+    [host],
+  );
+
   const read = useCallback((): void => {
-    if (actions === null) return;
+    if (actions === null || taskActions === null) return;
     // ⚠️ `listAllProjects()` 是**同步**的（读已物化状态），不是 Promise。
     //
     // 🔴 这里**不能**换成 `listProjects()`。W9 之后那条只给可见的（归档被动作层滤掉，
@@ -138,7 +163,8 @@ export function ListsSection(): React.JSX.Element {
     //   都要靠归档那一路的数据。只接一路不会报错 —— 它会表现成
     //   "开关按了什么都没出现"，也就是共享层注释点名的那个**单向门**。
     setProjects(actions.listAllProjects());
-  }, [actions]);
+    setTasks(taskActions.listTasks());
+  }, [actions, taskActions]);
 
   useEffect(read, [read, dataRevision]);
 
@@ -171,6 +197,19 @@ export function ListsSection(): React.JSX.Element {
    * 与 web 侧栏同一个口径，两端不会漂。
    */
   const archivedCount = useMemo(() => archivedProjects(projects).length, [projects]);
+
+  /**
+   * 删除确认那两句话的取数（与 web 侧栏**同一对**共享函数，所以两端不会各数一遍）：
+   * `liveTaskCountsByProject`（@heyta/domain）= 里面还有几条活着的任务（含已完成），
+   * `directChildCountsByProject`（@heyta/ui）= 底下还有几条子清单会跟着看不见。
+   *
+   * ⚠️ 前一枚刻意**不在** `@heyta/ui`：回收站里"彻底删除这条清单"那句
+   *   （`liveTaskCountOfProject`）问的是同一件事，而它必须能被 `apps/node-host`
+   *   的 CLI 读到（那一头不能依赖本包）。两包各画一遍 = 两套裁决标准，
+   *   漂移的症状是"回收站说 3 条、侧栏说 1 条"。
+   */
+  const removeImpact = useMemo(() => liveTaskCountsByProject(tasks), [tasks]);
+  const childRemoveImpact = useMemo(() => directChildCountsByProject(projects), [projects]);
 
   /**
    * 每行"现在能移进哪些清单"。
@@ -220,6 +259,9 @@ export function ListsSection(): React.JSX.Element {
         <OrganizerList
           kind="project"
           items={tree}
+          removeImpact={removeImpact}
+          childRemoveImpact={childRemoveImpact}
+          askOnlyWhenImpact
           labels={{
             removeLabel: (label) => t('mobile.lists.remove', { name: label }),
             rename: {
@@ -230,6 +272,20 @@ export function ListsSection(): React.JSX.Element {
             archive: {
               button: (label) => t('common.organizer.archive.button', { name: label }),
               unarchive: (label) => t('common.organizer.archive.unarchive', { name: label }),
+            },
+            /*
+              移动端此前是**一次点击直接写 op**（`labels.confirmRemove` 没传，
+              共享层规定省略即直接删）。清单进回收站，所以删除不是终局，
+              但"一键就把一条可能有几十条任务、底下还挂着子清单的东西删掉"仍然是错的。
+              两句后果的取数与 web 用的是同一对共享函数 —— 两端各数一遍迟早漂，
+              而漂移的症状是"手机上说 3 条、电脑上说 1 条"。
+            */
+            confirmRemove: {
+              ask: (label) => t('common.organizer.confirm.ask', { name: label }),
+              impact: (count) => t('common.organizer.confirm.impactProjects', { count }),
+              impactChildren: (count) => t('common.organizer.confirm.impactChildren', { count }),
+              confirm: t('common.organizer.confirm.delete'),
+              cancel: t('common.organizer.confirm.cancel'),
             },
             empty: t('common.organizer.lists.empty'),
             emptyHint: t('common.organizer.lists.empty.hint'),

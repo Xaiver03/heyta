@@ -24,6 +24,7 @@ import type { Project, Tag, Task } from '@heyta/domain';
 import {
   aliveProjects,
   childProjects,
+  directChildCountsByProject,
   listNameFor,
   liveTaskCountsByTag,
   openTagCounts,
@@ -35,6 +36,8 @@ import {
   toTagItems,
   topLevelProjects,
 } from '../src/projects/model.js';
+/** 整模块导入只为一条负向判据：本包不许再长出第二份"按清单数任务"的画法。 */
+import * as projectsModel from '../src/projects/model.js';
 
 const NOW = 1_700_000_000_000;
 
@@ -305,5 +308,68 @@ describe('liveTaskCountsByTag：影响面含已完成，`openTagCounts` 不含',
   it('墓碑任务单独存在时不给 0（否则确认框会说"它挂在 0 条任务上"）', () => {
     const onlyTombstone = [task({ id: 't3', tagIds: ['g1'], deletedAt: NOW })];
     expect(liveTaskCountsByTag(onlyTombstone).g1).toBeUndefined();
+  });
+});
+
+/**
+ * 🔴 本包**不许**再长出第二份"这条清单里活着几条任务"。
+ *
+ * 这条不是形式主义：`liveTaskCountsByProject` 一度就写在本文件里，而
+ * `@heyta/domain#liveTaskCountOfProject`（回收站"彻底删除"那句读的）是
+ * **口径逐字相同**的另一份。两份实现不会让任何测试变红，而漂移的表现是
+ * "回收站说 3 条、侧栏说 1 条" —— 用户读成其中一端的数据坏了。
+ * 现在单条版从 domain 的批处理版取数，规则只剩一处；它留在 domain 是因为
+ * `apps/node-host` 的 CLI 也要读同一个数，而那一头不能依赖本包。
+ *
+ * ⚠️ 它和上面 `directChildCountsByProject` 不是同一件事的两个形状：那一枚数的是
+ *   `Project` 的**父子关系**，归共享 UI 层（`toOrganizerTree` 的取舍也在那一层）。
+ */
+describe('清单的任务计数不在本包（同一件事只许一套规则）', () => {
+  it('`projects/model.js` 不导出任何按清单数任务的 `liveTask*` 表', () => {
+    const offenders = Object.keys(projectsModel).filter(
+      (name) => /^liveTask\w*Project/.test(name),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it('✅ 正向对照：本包确实导出子清单那一枚（否则上面那条"没有"是空的）', () => {
+    expect(typeof projectsModel.directChildCountsByProject).toBe('function');
+  });
+});
+
+describe('directChildCountsByProject：删文件夹的第二种后果，含归档那支', () => {
+  const projects = [
+    project({ id: 'p1', name: '工作' }),
+    project({ id: 'p1a', name: '汇报', parentId: 'p1' }),
+    project({ id: 'p1b', name: '周报', parentId: 'p1', archived: true }),
+    project({ id: 'p1c', name: '已删的子级', parentId: 'p1', deletedAt: NOW }),
+    project({ id: 'p2', name: '生活' }),
+  ];
+
+  it('p1 底下算 2 条：归档那支也数（宿主开着「显示已归档」时它们是真看得见的），墓碑那支不数', () => {
+    expect(directChildCountsByProject(projects).p1).toBe(2);
+  });
+
+  /**
+   * 🔴 这一对**数到同一个数字，但不是同一批清单** —— 所以"顺手拿 `childProjects`
+   * 的长度顶替"会在别的 fixture 上出错，而且错了也不红：
+   * `childProjects` 默认**滤归档、不滤墓碑**（p1a + p1c），
+   * 这一枚**数归档、滤墓碑**（p1a + p1b）。
+   * 顶替的那个把已经在回收站里的子清单算进"会被连带看不见"，同时漏掉开着
+   * 「显示已归档」时明明看得见的那一支。
+   */
+  it('🔴 它**不等于** `childProjects(p1)`：同一个 2，两套成员', () => {
+    expect(childProjects(projects, 'p1').map((p) => p.id)).toEqual(['p1a', 'p1c']);
+    expect(directChildCountsByProject(projects).p1).toBe(2);
+    const counted = new Set(
+      projects.filter((p) => p.parentId === 'p1' && p.deletedAt === undefined).map((p) => p.id),
+    );
+    expect([...counted].sort()).toEqual(['p1a', 'p1b']);
+  });
+
+  it('没有子级的清单不给键；没有父级的子清单不进表', () => {
+    const table = directChildCountsByProject(projects);
+    expect(table.p2).toBeUndefined();
+    expect(Object.keys(table)).toEqual(['p1']);
   });
 });

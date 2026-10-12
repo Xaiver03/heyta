@@ -3286,6 +3286,8 @@ export const zhCN = {
   // 那 8 条任务的归属不会自己回来。
   'common.organizer.confirm.ask': '确定要删除「{name}」吗？',
   'common.organizer.confirm.impactTags': '它挂在 {count} 条任务上。这些任务不会被删除，只是不再带这个标签。',
+  'common.organizer.confirm.impactProjects': '里面有 {count} 条任务。这些任务不会被删除，只是不再属于任何清单。',
+  'common.organizer.confirm.impactChildren': '它下面还有 {count} 条子清单。这些子清单不会被删除，但删掉这条之后它们会从侧栏里看不见；到回收站把这条清单还原，它们就会重新出现。',
   'common.organizer.confirm.delete': '确认删除',
   'common.organizer.confirm.cancel': '取消删除',
   // 习惯的改名与删除入口（保存/取消复用上面那两句，不另立一份同义词条）。
