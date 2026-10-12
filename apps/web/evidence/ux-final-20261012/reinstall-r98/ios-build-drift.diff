@@ -1,0 +1,108 @@
+ apps/mobile/ios/Heyta/Info.plist                | 12 ++++++------
+ apps/mobile/ios/HeytaWidgetExtension/Info.plist | 21 ++++-----------------
+ apps/mobile/ios/Podfile.lock                    |  2 +-
+ 3 files changed, 11 insertions(+), 24 deletions(-)
+
+diff --git a/apps/mobile/ios/Heyta/Info.plist b/apps/mobile/ios/Heyta/Info.plist
+index 86c2fc78..7e20289e 100644
+--- a/apps/mobile/ios/Heyta/Info.plist
++++ b/apps/mobile/ios/Heyta/Info.plist
+@@ -12,8 +12,6 @@
+ 	<string>$(EXECUTABLE_NAME)</string>
+ 	<key>CFBundleIdentifier</key>
+ 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+-	<key>HeytaWidgetKeychainAccessGroup</key>
+-	<string>$(HEYTA_WIDGET_KEYCHAIN_ACCESS_GROUP)</string>
+ 	<key>CFBundleInfoDictionaryVersion</key>
+ 	<string>6.0</string>
+ 	<key>CFBundleName</key>
+@@ -26,11 +24,14 @@
+ 	<string>????</string>
+ 	<key>CFBundleVersion</key>
+ 	<string>$(CURRENT_PROJECT_VERSION)</string>
++	<key>HeytaWidgetKeychainAccessGroup</key>
++	<string>$(HEYTA_WIDGET_KEYCHAIN_ACCESS_GROUP)</string>
++	<key>ITSAppUsesNonExemptEncryption</key>
++	<false/>
+ 	<key>LSRequiresIPhoneOS</key>
+ 	<true/>
+ 	<key>NSAppTransportSecurity</key>
+ 	<dict>
+-	  <!-- Do not change NSAllowsArbitraryLoads to true, or you will risk app rejection! -->
+ 		<key>NSAllowsArbitraryLoads</key>
+ 		<false/>
+ 		<key>NSAllowsLocalNetworking</key>
+@@ -38,9 +39,8 @@
+ 	</dict>
+ 	<key>NSUserNotificationsUsageDescription</key>
+ 	<string>heyta 需要通知权限来按时提醒你的任务。</string>
+-	<!-- 只使用标准加密算法（HTTPS/TLS + AES-GCM），属豁免类，免去每次构建的出口合规问询 -->
+-	<key>ITSAppUsesNonExemptEncryption</key>
+-	<false/>
++	<key>RCTNewArchEnabled</key>
++	<true/>
+ 	<key>UIApplicationSceneManifest</key>
+ 	<dict>
+ 		<key>UIApplicationSupportsMultipleScenes</key>
+diff --git a/apps/mobile/ios/HeytaWidgetExtension/Info.plist b/apps/mobile/ios/HeytaWidgetExtension/Info.plist
+index cdfda291..fba3117d 100644
+--- a/apps/mobile/ios/HeytaWidgetExtension/Info.plist
++++ b/apps/mobile/ios/HeytaWidgetExtension/Info.plist
+@@ -1,20 +1,5 @@
+ <?xml version="1.0" encoding="UTF-8"?>
+ <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+-<!--
+-  ⚠️ 这个文件里的键**一个都不能少**：
+- Xcode 的 Info.plist 处理步骤只替换 `$(...)` 占位符，**不会**补上缺失的标准键。
+- 而 `GENERATE_INFOPLIST_FILE = NO` 意味着"生成"那一步被关掉了。
+-
+- 🔴 第一版我只写了 `NSExtension` 一项，症状是：
+- `appintentsnltrainingprocessor` 报 **"Unable to parse Info.plist"**，
+- 而 Swift **编译链接全部成功**、dSYM 也生成了 —— 失败的只有这一个后处理步骤。
+- 如果当时看的是"有没有 error 字样"而不是"BUILD SUCCEEDED"，很容易误判成
+- "差一点就好了"，而去关掉 AppIntents 支持 —— 那会把真正的原因（缺 CFBundle*）藏起来。
+-
+- 版本号用 `$(MARKETING_VERSION)` / `$(CURRENT_PROJECT_VERSION)` 而不是写死：
+- 与 app 用同一套变量，改版本号时不会漏掉扩展（而**扩展版本号必须与 app 一致**，
+- 否则 App Store 校验会拒）。
+--->
+ <plist version="1.0">
+ <dict>
+ 	<key>CFBundleDevelopmentRegion</key>
+@@ -25,8 +10,6 @@
+ 	<string>$(EXECUTABLE_NAME)</string>
+ 	<key>CFBundleIdentifier</key>
+ 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+-	<key>HeytaWidgetKeychainAccessGroup</key>
+-	<string>$(HEYTA_WIDGET_KEYCHAIN_ACCESS_GROUP)</string>
+ 	<key>CFBundleInfoDictionaryVersion</key>
+ 	<string>6.0</string>
+ 	<key>CFBundleName</key>
+@@ -37,10 +20,14 @@
+ 	<string>$(MARKETING_VERSION)</string>
+ 	<key>CFBundleVersion</key>
+ 	<string>$(CURRENT_PROJECT_VERSION)</string>
++	<key>HeytaWidgetKeychainAccessGroup</key>
++	<string>$(HEYTA_WIDGET_KEYCHAIN_ACCESS_GROUP)</string>
+ 	<key>NSExtension</key>
+ 	<dict>
+ 		<key>NSExtensionPointIdentifier</key>
+ 		<string>com.apple.widgetkit-extension</string>
+ 	</dict>
++	<key>RCTNewArchEnabled</key>
++	<true/>
+ </dict>
+ </plist>
+diff --git a/apps/mobile/ios/Podfile.lock b/apps/mobile/ios/Podfile.lock
+index 62d136ef..10c1d9b8 100644
+--- a/apps/mobile/ios/Podfile.lock
++++ b/apps/mobile/ios/Podfile.lock
+@@ -2949,7 +2949,7 @@ SPEC CHECKSUMS:
+   FBLazyVector: baf9d0492aa305444465c798e972f87e6a60dc69
+   fmt: a40bb5bd0294ea969aaaba240a927bd33d878cdd
+   glog: e56ede4028c4b7418e6b1195a36b1656bb35e225
+-  hermes-engine: 208b0dcd96feb98e38846908f00249a932833276
++  hermes-engine: c97c5f882ded240033834f56cc173fa7d340724f
+   op-sqlite: 3687fdaeabf8d91a16a7531f539834bd012c6deb
+   RCT-Folly: 9e4e1ae78413fb0387567f5dc5d5d5672f23f457
+   RCTDeprecation: 7489702d717ceea80e271eeacb3fbca39fa3c056

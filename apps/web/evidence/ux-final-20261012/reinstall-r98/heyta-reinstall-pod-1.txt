@@ -1,0 +1,203 @@
+Ignoring digest-crc-0.7.0 because its extensions are not built. Try: gem pristine digest-crc --version 0.7.0
+Ignoring digest-crc-0.7.0 because its extensions are not built. Try: gem pristine digest-crc --version 0.7.0
+Ignoring digest-crc-0.7.0 because its extensions are not built. Try: gem pristine digest-crc --version 0.7.0
+[34m[OP-SQLITE] Configuration found at /private/tmp/heyta-ux-r98/apps/mobile/package.json[0m
+[34m[OP-SQLITE] using pure SQLite[0m
+Found 5 modules for target `Heyta`
+link_native_modules! {ios_packages: [{configurations: [], name: "@op-engineering/op-sqlite", root: "/private/tmp/heyta-ux-r98/apps/mobile/node_modules/@op-engineering/op-sqlite", path: "../node_modules/@op-engineering/op-sqlite", podspec_path: "/private/tmp/heyta-ux-r98/apps/mobile/node_modules/@op-engineering/op-sqlite/op-sqlite.podspec", script_phases: []}, {configurations: [], name: "@react-native-documents/picker", root: "/private/tmp/heyta-ux-r98/apps/mobile/node_modules/@react-native-documents/picker", path: "../node_modules/@react-native-documents/picker", podspec_path: "/private/tmp/heyta-ux-r98/apps/mobile/node_modules/@react-native-documents/picker/react-native-document-picker.podspec", script_phases: []}, {configurations: [], name: "react-native-get-random-values", root: "/private/tmp/heyta-ux-r98/apps/mobile/node_modules/react-native-get-random-values", path: "../node_modules/react-native-get-random-values", podspec_path: "/private/tmp/heyta-ux-r98/apps/mobile/node_modules/react-native-get-random-values/react-native-get-random-values.podspec", script_phases: []}, {configurations: [], name: "react-native-safe-area-context", root: "/private/tmp/heyta-ux-r98/apps/mobile/node_modules/react-native-safe-area-context", path: "../node_modules/react-native-safe-area-context", podspec_path: "/private/tmp/heyta-ux-r98/apps/mobile/node_modules/react-native-safe-area-context/react-native-safe-area-context.podspec", script_phases: []}, {configurations: [], name: "react-native-svg", root: "/private/tmp/heyta-ux-r98/apps/mobile/node_modules/react-native-svg", path: "../node_modules/react-native-svg", podspec_path: "/private/tmp/heyta-ux-r98/apps/mobile/node_modules/react-native-svg/RNSVG.podspec", script_phases: []}], ios_project_root_path: "/private/tmp/heyta-ux-r98/apps/mobile/ios", react_native_path: "../node_modules/react-native"}
+[34m[OP-SQLITE] Configuration found at /private/tmp/heyta-ux-r98/apps/mobile/package.json[0m
+[34m[OP-SQLITE] using pure SQLite[0m
+Auto-linking React Native modules for target `Heyta`: RNSVG, op-sqlite, react-native-document-picker, react-native-get-random-values, and react-native-safe-area-context
+Framework build type is static library
+[ReactNativeDependencies] Setting up ReactNativeDependencies...
+[ReactNativeDependencies] No prebuilt artifacts found, reverting to building from source.
+[ReactNativeDependencies] Building from source: true
+[ReactNativeDependencies] Source: 
+[ReactNativeCore] Setting up ReactNativeCore...
+[ReactNativeCore] No prebuilt artifacts found, reverting to building from source.
+[ReactNativeCore] Building from source: true
+Configuring the target with the New Architecture
+[36m[1m[Codegen][0m Analyzing /private/tmp/heyta-ux-r98/apps/mobile/package.json[0m
+[36m[1m[Codegen][0m [33mSearching for codegen-enabled libraries in the app.[0m
+[36m[1m[Codegen][0m [33mThe "codegenConfig" field is not defined in package.json. Assuming there is nothing to generate at the app level.[0m
+[36m[1m[Codegen][0m [33mSearching for codegen-enabled libraries in react-native.config.js[0m
+[36m[1m[Codegen][0m Found @op-engineering/op-sqlite[0m
+[36m[1m[Codegen][0m Found @react-native-documents/picker[0m
+[36m[1m[Codegen][0m Found react-native-get-random-values[0m
+[36m[1m[Codegen][0m Found react-native-safe-area-context[0m
+[36m[1m[Codegen][0m Found react-native-svg[0m
+[36m[1m[Codegen][0m Processing OPSQLiteSpec[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios, macos, tvos, visionos for OPSQLiteSpec[0m
+[36m[1m[Codegen][0m Processing rndocumentpickerCGen[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios for rndocumentpickerCGen[0m
+[36m[1m[Codegen][0m Processing RNGetRandomValuesSpec[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios, macos, tvos, visionos for RNGetRandomValuesSpec[0m
+[36m[1m[Codegen][0m Processing safeareacontext[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios, macos, tvos, visionos for safeareacontext[0m
+[36m[1m[Codegen][0m Processing rnsvg[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios, macos, tvos, visionos for rnsvg[0m
+[36m[1m[Codegen][0m Generating Native Code for OPSQLiteSpec - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /private/tmp/heyta-ux-r98/apps/mobile/ios/build/generated/ios/ReactCodegen[0m
+[36m[1m[Codegen][0m Generating Native Code for rndocumentpickerCGen - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /private/tmp/heyta-ux-r98/apps/mobile/ios/build/generated/ios/ReactCodegen[0m
+[36m[1m[Codegen][0m Generating Native Code for RNGetRandomValuesSpec - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /private/tmp/heyta-ux-r98/apps/mobile/ios/build/generated/ios/ReactCodegen[0m
+[36m[1m[Codegen][0m Generating Native Code for safeareacontext - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /private/tmp/heyta-ux-r98/apps/mobile/ios/build/generated/ios/ReactCodegen[0m
+[36m[1m[Codegen][0m Generating Native Code for rnsvg - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /private/tmp/heyta-ux-r98/apps/mobile/ios/build/generated/ios/ReactCodegen[0m
+[36m[1m[Codegen][0m Generating RCTThirdPartyComponentsProvider.h[0m
+[36m[1m[Codegen][0m Generated artifact: /private/tmp/heyta-ux-r98/apps/mobile/ios/build/generated/ios/ReactCodegen/RCTThirdPartyComponentsProvider.h[0m
+[36m[1m[Codegen][0m Generating RCTThirdPartyComponentsProvider.mm[0m
+[36m[1m[Codegen][0m Generated artifact: /private/tmp/heyta-ux-r98/apps/mobile/ios/build/generated/ios/ReactCodegen/RCTThirdPartyComponentsProvider.mm[0m
+[36m[1m[Codegen][0m Generating RCTModulesProvider.h[0m
+[36m[1m[Codegen][0m Generated artifact: /private/tmp/heyta-ux-r98/apps/mobile/ios/build/generated/ios/ReactCodegen/RCTModuleProviders.h[0m
+[36m[1m[Codegen][0m Generating RCTModuleProviders.mm[0m
+[36m[1m[Codegen][0m Generated artifact: /private/tmp/heyta-ux-r98/apps/mobile/ios/build/generated/ios/ReactCodegen/RCTModuleProviders.mm[0m
+[36m[1m[Codegen][0m Generating RCTAppDependencyProvider[0m
+[36m[1m[Codegen][0m Generated artifact: /private/tmp/heyta-ux-r98/apps/mobile/ios/build/generated/ios/ReactAppDependencyProvider/RCTAppDependencyProvider.h[0m
+[36m[1m[Codegen][0m Generated artifact: /private/tmp/heyta-ux-r98/apps/mobile/ios/build/generated/ios/ReactAppDependencyProvider/RCTAppDependencyProvider.mm[0m
+[36m[1m[Codegen][0m Generated podspec: /private/tmp/heyta-ux-r98/apps/mobile/ios/build/generated/ios/ReactAppDependencyProvider/ReactAppDependencyProvider.podspec[0m
+[36m[1m[Codegen][0m Generated podspec: /private/tmp/heyta-ux-r98/apps/mobile/ios/build/generated/ios/ReactCodegen/ReactCodegen.podspec[0m
+[36m[1m[Codegen][0m Generating Package.swift[0m
+[36m[1m[Codegen][0m Generated artifact: /private/tmp/heyta-ux-r98/apps/mobile/ios/build/generated/ios/Package.swift[0m
+[36m[1m[Codegen][0m [33mDone.[0m
+Analyzing dependencies
+Fetching podspec for `DoubleConversion` from `../node_modules/react-native/third-party-podspecs/DoubleConversion.podspec`
+Fetching podspec for `RCT-Folly` from `../node_modules/react-native/third-party-podspecs/RCT-Folly.podspec`
+Fetching podspec for `boost` from `../node_modules/react-native/third-party-podspecs/boost.podspec`
+Fetching podspec for `fast_float` from `../node_modules/react-native/third-party-podspecs/fast_float.podspec`
+Fetching podspec for `fmt` from `../node_modules/react-native/third-party-podspecs/fmt.podspec`
+Fetching podspec for `glog` from `../node_modules/react-native/third-party-podspecs/glog.podspec`
+Fetching podspec for `hermes-engine` from `../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`
+[Hermes] Using release tarball from URL: https://repo1.maven.org/maven2/com/facebook/hermes/hermes-ios/250829098.0.9/hermes-ios-250829098.0.9-hermes-ios-debug.tar.gz
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100   167    0   167    0     0    242      0 --:--:-- --:--:-- --:--:--   242
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0 28.4M    0  130k    0     0  70171      0  0:07:05  0:00:01  0:07:04  138k  5 28.4M    5 1559k    0     0   534k      0  0:00:54  0:00:02  0:00:52  796k 34 28.4M   34 9939k    0     0  2527k      0  0:00:11  0:00:03  0:00:08 3343k 84 28.4M   84 24.1M    0     0  4958k      0  0:00:05  0:00:04  0:00:01 6143k100 28.4M  100 28.4M    0     0  5527k      0  0:00:05  0:00:05 --:--:-- 6757k
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100   167    0   167    0     0    268      0 --:--:-- --:--:-- --:--:--   268100   167    0   167    0     0    268      0 --:--:-- --:--:-- --:--:--   268
+  0 22.3M    0  183k    0     0   115k      0  0:03:19  0:00:01  0:03:18  115k 10 22.3M   10 2511k    0     0   965k      0  0:00:23  0:00:02  0:00:21 2316k 55 22.3M   55 12.3M    0     0  3377k      0  0:00:06  0:00:03  0:00:03 5801k100 22.3M  100 22.3M    0     0  5193k      0  0:00:04  0:00:04 --:--:-- 8073k
+[34m[OP-SQLITE] Configuration found at /private/tmp/heyta-ux-r98/apps/mobile/package.json[0m
+[34m[OP-SQLITE] using pure SQLite[0m
+Downloading dependencies
+Installing DoubleConversion (1.1.6)
+Installing FBLazyVector (0.84.1)
+Installing RCT-Folly (2024.11.18.00)
+Installing RCTDeprecation (0.84.1)
+Installing RCTRequired (0.84.1)
+Installing RCTSwiftUI (0.84.1)
+Installing RCTSwiftUIWrapper (0.84.1)
+Installing RCTTypeSafety (0.84.1)
+Installing RNSVG (15.15.5)
+Installing React (0.84.1)
+Installing React-Core (0.84.1)
+Installing React-CoreModules (0.84.1)
+Installing React-Fabric (0.84.1)
+Installing React-FabricComponents (0.84.1)
+Installing React-FabricImage (0.84.1)
+Installing React-ImageManager (0.84.1)
+Installing React-Mapbuffer (0.84.1)
+Installing React-NativeModulesApple (0.84.1)
+Installing React-RCTActionSheet (0.84.1)
+Installing React-RCTAnimation (0.84.1)
+Installing React-RCTAppDelegate (0.84.1)
+Installing React-RCTBlob (0.84.1)
+Installing React-RCTFBReactNativeSpec (0.84.1)
+Installing React-RCTFabric (0.84.1)
+Installing React-RCTImage (0.84.1)
+Installing React-RCTLinking (0.84.1)
+Installing React-RCTNetwork (0.84.1)
+Installing React-RCTRuntime (0.84.1)
+Installing React-RCTSettings (0.84.1)
+Installing React-RCTText (0.84.1)
+Installing React-RCTVibration (0.84.1)
+Installing React-RuntimeApple (0.84.1)
+Installing React-RuntimeCore (0.84.1)
+Installing React-RuntimeHermes (0.84.1)
+Installing React-callinvoker (0.84.1)
+Installing React-cxxreact (0.84.1)
+Installing React-debug (0.84.1)
+Installing React-defaultsnativemodule (0.84.1)
+Installing React-domnativemodule (0.84.1)
+Installing React-featureflags (0.84.1)
+Installing React-featureflagsnativemodule (0.84.1)
+Installing React-graphics (0.84.1)
+Installing React-hermes (0.84.1)
+Installing React-idlecallbacksnativemodule (0.84.1)
+Installing React-intersectionobservernativemodule (0.84.1)
+Installing React-jserrorhandler (0.84.1)
+Installing React-jsi (0.84.1)
+Installing React-jsiexecutor (0.84.1)
+Installing React-jsinspector (0.84.1)
+Installing React-jsinspectorcdp (0.84.1)
+Installing React-jsinspectornetwork (0.84.1)
+Installing React-jsinspectortracing (0.84.1)
+Installing React-jsitooling (0.84.1)
+Installing React-jsitracing (0.84.1)
+Installing React-logger (0.84.1)
+Installing React-microtasksnativemodule (0.84.1)
+Installing React-networking (0.84.1)
+Installing React-oscompat (0.84.1)
+Installing React-perflogger (0.84.1)
+Installing React-performancecdpmetrics (0.84.1)
+Installing React-performancetimeline (0.84.1)
+Installing React-rendererconsistency (0.84.1)
+Installing React-renderercss (0.84.1)
+Installing React-rendererdebug (0.84.1)
+Installing React-runtimeexecutor (0.84.1)
+Installing React-runtimescheduler (0.84.1)
+Installing React-timing (0.84.1)
+Installing React-utils (0.84.1)
+Installing React-webperformancenativemodule (0.84.1)
+Installing ReactAppDependencyProvider (0.84.1)
+Installing ReactCodegen (0.84.1)
+Installing ReactCommon (0.84.1)
+Installing SocketRocket (0.7.1)
+Installing Yoga (0.0.0)
+Installing boost (1.84.0)
+Installing fast_float (8.0.0)
+Installing fmt (11.0.2)
+Installing glog (0.3.5)
+Installing hermes-engine (250829098.0.9)
+Ignoring digest-crc-0.7.0 because its extensions are not built. Try: gem pristine digest-crc --version 0.7.0
+Ignoring digest-crc-0.7.0 because its extensions are not built. Try: gem pristine digest-crc --version 0.7.0
+Installing op-sqlite (18.2.5)
+Installing react-native-document-picker (12.0.2)
+Installing react-native-get-random-values (2.0.0)
+Installing react-native-safe-area-context (5.10.0)
+Generating Pods project
+Setting USE_HERMES build settings
+Setting REACT_NATIVE_PATH build settings
+Setting SWIFT_ACTIVE_COMPILATION_CONDITIONS build settings
+[Ccache]: Removing Ccache from CC, LD, CXX & LDPLUSPLUS build settings
+[SPM] Cleaning old SPM dependencies from Pods project
+[SPM] Adding SPM dependencies to Pods project
+[Privacy Manifest Aggregation] Appending aggregated reasons to existing PrivacyInfo.xcprivacy file.
+[Privacy Manifest Aggregation] Reading .xcprivacy files to aggregate all used Required Reason APIs.
+Setting CLANG_CXX_LANGUAGE_STANDARD to c++20 on /private/tmp/heyta-ux-r98/apps/mobile/ios/Heyta.xcodeproj
+
+==================== DEPRECATION NOTICE =====================
+Calling `pod install` directly is deprecated in React Native
+because we are moving away from Cocoapods toward alternative
+solutions to build the project.
+* If you are using Expo, please run:
+`npx expo run:ios`
+* If you are using the Community CLI, please run:
+`yarn ios`
+=============================================================
+
+Pod install took 25 [s] to run
+[heyta] 已对 fmt 关闭 consteval（Apple clang 21 兼容）
+Integrating client project
+
+[!] Please close any current Xcode sessions and use `Heyta.xcworkspace` for this project from now on.
+Pod installation complete! There are 84 dependencies from the Podfile and 83 total pods installed.
+
+[!] hermes-engine has added 1 script phase. Please inspect before executing a build. See `https://guides.cocoapods.org/syntax/podspec.html#script_phases` for more information.

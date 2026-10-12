@@ -2795,3 +2795,83 @@ typecheck：domain / ui / i18n / web / mobile 五包各 rc=0。
 - **"父级已归档 ⇒ 子级不画"这条取舍本身没改**：本笔让用户**在按下去之前**知道会发生这件事，
   并给了正确的出路；把它改成"仍画得出来"（按顶层画 / 或在归档那行旁边给个"N 条被收起"的常驻数字）
   是三处形状 + 两端截图验收的活，不属于这一批。
+
+### 2026-10-12 18:3x：#35 那格「产物比源码旧」现量重取 —— 挡它的**只有一枚别人在飞的文件**，而我上一轮记的"会连锁变红"是错的
+
+**这一格的起因**：Goal 第 5 条要求把仍挂在别人未提交批次上的开项逐项确认归属、把状态写回台账。#35 是其中一枚。
+
+**现量读数**（主检出的工作树，`HEAD` 见本笔父提交；跑于 18:2x）：
+
+```
+pnpm check:shell-surfaces
+→ rc=1；判定 6 条 / 5 格：5 绿 / 1 红；未取证 2 栏
+→ 唯一那枚红：🔴 W5 产物比源码旧（dist 2026-10-11T07:35:05.058Z < src 2026-10-12T10:14:53.718Z）
+```
+
+**那一枚 `src` 时间戳是谁**（逐文件取，不是推的）：
+
+```
+find apps/web/src -type f -exec stat -f "%m %Sm %N" -t '%F %T' {} \; | sort -rn | head -3
+→ 2026-10-12 18:14:53  apps/web/src/features/shell/RailNavigation.tsx   ← 与门里那个 src 逐秒相同
+→ 2026-10-12 18:04:26  apps/web/src/features/projects/ProjectsPanel.tsx  （已随 54fb170a 入库）
+→ 2026-10-12 14:43:41  apps/web/src/features/trash/TrashView.tsx
+```
+
+⇒ **W5 的红此刻由且仅由 `RailNavigation.tsx` 这一枚在飞文件触发**，而 `apps/web/dist` 是 10-11 15:35 那次构建。它点名的改动只有一行 hunk：给 `DesktopRailNavigation` 的 `visibleToolTabs` 那组按钮加上 `data-testid={`rail-view-${tab.key}`}`。
+
+**归属：不是本线这一批，也不由我代提交。** 三条现量：
+
+1. **同批还有第二枚**：`e2e/tests/rail-roving.spec.ts`（未跟踪，mtime 18:15:55）写在这枚 hunk 之后 62 秒，且它是 #51 那条 rail 键盘漫游（`8c9541f7`，08:50 入库）的**真浏览器那一半** —— 文件头明写"jsdom 那一半在 `apps/web/tests/tab-roving.spec.tsx`"。⇒ 形状是"rail 那一批还在往下写"，不是"谁漏提交了一枚孤立文件"。
+2. **`HEAD` 里没有任何一条 spec 需要这枚钩子**（找法逐条给了）：`git grep -n "rail-view-" HEAD -- e2e apps scripts` 只命中一份**取证读数 JSON**，不命中源码；工作树里 `grep -rn "rail-view" e2e/tests` 四处 —— `global-responsive-ux.spec.ts:52` 那一条有 `getByRole('tab')` 与 `.ht-rail__more` 两级兜底（钩子在不在都跑得动），`rail-geometry.spec.ts:139/151/156/158` 匹配的是 `HEAD` 就存在的 `SortableRailButton`（`RailNavigation.tsx:111`），而那枚未跟踪的 roving spec 用的是 `nav.ht-rail [role="tab"]`。
+3. `BLOCKED.md` 与 `docs/` 里搜 `rail-view` **零命中** ⇒ 这一格没有现成的归属登记，我不替它编一条。
+
+⇒ 按边界「不代改别线在飞文件」，这枚 hunk **原样留着**（不提交、不回退）。关闭 #35 的动作是：**那批落地之后**在主检出跑一次 `pnpm --filter @heyta/web build`，W5 自己就绿 —— 早于那批构建也能绿，但那样 dist 里会带上一枚未提交的界面改动，`check:shell-surfaces` 接下来那三栏桌面取证就会拿"没入库的字节"作证。这一句是取舍，不是我又造一格红。
+
+🔴 **更正我上一轮记在这里的一句话**（当时写给"W5 与桌面取证是一条链"，两处都写重了，逐条对着源码读回来）：
+
+| 我先前那句 | 源码实际 | 准确说法 |
+|---|---|---|
+| "重建 dist 会把 `desktop-windows` 的 D4 **打成红**" | `scripts/check-shell-surfaces.mjs:1097` —— sha 对不上走的是 `skipped(...)` | **不是红，是「未取证」**（只有 `HEYTA_REQUIRE_PACKAGED_ARTIFACT=1` 那一档才折成红，见同一文件 :180 与 G13 那一臂） |
+| "Windows 那条 D4 不做 sha 对账，只数资源" | :1074 数 chunk 之前，:1089–1092 确实拿 `PAYLOAD_INDEX_SHA` 与本地 `dist/index.html` 逐字比；现量：两棵树的 capture 文件里都有 `PAYLOAD_INDEX_SHA` 这一行 | **Windows/mac/Linux 三端都做 sha 对账**，差别只在包在哪台机上打、取证文件由谁写 |
+
+⇒ 正确的链条是：**重建主检出 dist 会让 W5 变绿，同时让桌面三端 D4 的"本地那一侧"换值**；而三端 capture 里记的 sha 仍是 10-11 那趟的 `3C4764EAAE2F…` ⇒ 结果是三栏**同向落到「未取证」**（mac/linux 本来就已经在这栏），不是"绿转红"。这一格我一天里连错两次方向，📌 记下来：**读门禁的分支是"红/跳过/未跑"三态还是两态，不能靠上一轮的印象**。
+
+**顺手量到一枚真陷阱（新形状，与 #41 那族"固定落点互相覆盖现场"同源但机制不同）**：`scripts/reinstall-all.sh:336` 把 `WIN_OUT="$ROOT/dist/windows"`，即取证文件写在**跑它的那棵树**里。本轮第三趟跑在 `/tmp/heyta-ux-r98`，现量：
+
+```
+diff dist/windows/install-capture.txt /tmp/heyta-ux-r98/dist/windows/install-capture.txt
+→ PAYLOAD_INDEX_SHA  3C4764EA…  →  0DF17C90…
+→ PID 13052 → 27288 / PNG_SAVED bytes 143816 → 149114   （主检出那份 mtime 仍是 Oct 11 15:41）
+```
+
+⇒ 打包机 `windows-pc` 上**此刻装着的是 0DF17C90 那枚包**，而主检出的 `check:shell-surfaces` 读的是自己那棵树的 capture（3C4764EA）与自己的 dist（3C4764EA）—— **两边逐字相符，于是它绿**，但那份绿描述的是**已经不在机器上的那次打包事件**。门禁从不查询打包机现状，它只对比同一棵树里的两个文件。这是 AGENTS §5 那条元规则「测试全绿 ≠ 这是当前产物」的一个具体新造法：**隔离载体上跑重装，会把主检出那一栏桌面取证变成过期证物**。
+
+留给关闭 #35 那一位的两句：① 在主检出重跑一次 Windows 腿（`pnpm reinstall:all --only windows`，或按台账里那条单端命令）就能把主检出的 capture 刷新成"当前机器上真装着的那一枚"；② 结构性缺口（capture 是 per-tree 文件、门禁不校验机器现状）要不要补，归 `scripts/check-shell-surfaces.mjs` 的所有者 —— 本线不改别人的判据口径。
+
+### 2026-10-12 18:4x：四端重装第三趟跑在**只含 `HEAD` 的隔离检出**上 —— 「干净检出可复现」那一格从本趟起有读数
+
+上一格（#35）之后紧接着做的那件事。整趟 `scripts/reinstall-all.sh` 跑在 `git worktree add --detach` 出来的
+`/tmp/heyta-ux-r98`（载体 `a4430f58`，**跑前工作树干净**），逐端判据、四张人看过的图、六份段日志与 `RC=0` 都在
+[`apps/web/evidence/ux-final-20261012/reinstall-r98/RESULT.md`](../../apps/web/evidence/ux-final-20261012/reinstall-r98/RESULT.md)。
+
+**这一格收的是什么、没收的是什么**（这两句是本节的全部要点，别读成"设备验收完了"）：
+
+- ✅ 收的是 §8.4 与「同步与隐私」那行末尾欠的那半句 ——「r93 跑在主检出的工作树上 ⇒ 它不证'干净检出可复现'」。
+  本趟的分子分母都换了：**从已提交的那一份源码**打出四端产物，四端各自那条"装的是当前产物且起得来"的判据全绿。
+- ✅ 顺带证了一格以前只能靠推的：本轮那两笔产品代码（`54fb170a` 归档确认、`7958c18c` 回收站那句不可逆的后果）
+  **确实在装进设备的字节里**（`git merge-base --is-ancestor` 双双为真 + 载体里 `OrganizerList.tsx` 有 6 处 `pendingArchive`）。
+- 🔴 没收的是**交互**：三处新确认框在真壳/真模拟器上"会先问"仍然零读数 —— 四端装好 ≠ 点过那三下。
+  这一格从本笔起是**唯一还挂在本线上、且不需要别人先动手**的设备活。
+
+**本趟带出三条新读数**（都写进 RESULT.md 了，这里只登记结论，不重述证据）：
+
+1. ⚠️ **在只含 `HEAD` 的树上跑 iOS 腿，必然留下三枚被跟踪文件的漂移**（`Podfile.lock` 一枚校验和 + 两枚 `Info.plist`
+   被 CocoaPods 重排键序、补 `RCTNewArchEnabled`、并**丢掉一行"不要把 `NSAllowsArbitraryLoads` 改成 true"的提醒注释**）。
+   ⇒ 以后谁在隔离载体上证 iOS，先知道这三枚不是"有人塞了未提交改动"，也别 `git add -A` 把它提交掉。
+2. 🔴 **`check:shell-surfaces` 的桌面取证格是 per-tree 文件**：本趟把打包机上的包换成了隔离树那一枚（`0DF17C90…`），
+   而主检出的 `dist/windows/install-capture.txt` 仍是 10-11 那趟的 `3C4764EA…` ⇒ 此刻在主检出跑它，Windows 那格会拿
+   "两个本地文件互相对得上"报绿，**描述的是已经不在机器上的那次打包**。机制、现量命令与关闭动作记在上一格（#35 那一节）。
+3. 📌 **我自己的一个漏，同一条已知缺陷被我重新踩了一次**：装置早就有 `HEYTA_REINSTALL_TMP_DIR` 旋钮（`63f93a90` 那版
+   就是为任务 #41 写的，r93 也用了），本趟只设了 `HEYTA_MACOS_DIST_DIR` ⇒ 各段日志/截图仍写共享 `/tmp/heyta-reinstall-*`，
+   把 08:50 那批 `-ios-build.log` / `-ios.png` 覆盖了。**教训不是"旋钮不够"，是"旋钮只挪了包、没挪日志，而我只设了一半"**：
+   隔离一个载体要把**包落点与日志落点一起隔离**，下一次的正确命令行已经写在 RESULT.md 那张载体表里。
