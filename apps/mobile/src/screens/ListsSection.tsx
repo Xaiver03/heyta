@@ -287,6 +287,19 @@ export function ListsSection(): React.JSX.Element {
               confirm: t('common.organizer.confirm.delete'),
               cancel: t('common.organizer.confirm.cancel'),
             },
+            /*
+             * 与 web 侧栏**同一份** `common.organizer.confirm.*` 词条（两端各写一份
+             * 迟早漂，而漂的症状是"手机上说 3 条、电脑上说 1 条"）。
+             * 🔴 出路那句是「显示已归档」，不是删除那格的"到回收站还原"；
+             *   取消那枚写「先不归档」，因为「取消归档」在这个应用里是另一个动作的名字。
+             */
+            confirmArchive: {
+              ask: (label) => t('common.organizer.confirm.askArchive', { name: label }),
+              impactChildren: (count) =>
+                t('common.organizer.confirm.impactChildrenArchive', { count }),
+              confirm: t('common.organizer.confirm.archive'),
+              cancel: t('common.organizer.confirm.notArchive'),
+            },
             empty: t('common.organizer.lists.empty'),
             emptyHint: t('common.organizer.lists.empty.hint'),
           }}

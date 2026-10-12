@@ -135,6 +135,30 @@ export interface OrganizerListLabels {
     readonly confirm: string;
     readonly cancel: string;
   };
+  /**
+   * **归档**一条文件夹时的确认文案（与 `confirmRemove` 同一套形状，但它是**独立一份**，
+   * 不是把上面那份换个动词 —— 那两份说的后果不一样）。
+   *
+   * 🔴 为什么归档要问、而"归档一条叶子清单"不许问：默认视图（没开「显示已归档」）下，
+   * `toOrganizerTree` 只把**未归档**的父级画成顶层行，于是"父级已归档"的子清单
+   * **整支看不见**（`./model.ts#toOrganizerTree` 那条已知取舍）。用户点的是"把这一条收起来"，
+   * 实际发生的却是"这一支都收起来了"—— 那 N 条**他自己没有归档**，也没有打算收起。
+   * ⚠️ 这一族的出路和删除那格**不同**：这里数据既没被删也没被归档，打开「显示已归档」就回来了，
+   *   所以措辞必须给的是那一句，**不许**照抄删除那句里的"到回收站把这条清单还原"。
+   *
+   * 🔴 这一句的**取消按钮不许写成「取消归档」**：在本应用里那正是 un-archive 这个动作自己的名字
+   *   （`archive.unarchive` = '取消归档「X」'）。同一屏上放两个「取消归档」，
+   *   一个是"别归档"、一个是"把已归档的放出来"，用户按哪个都可能对。中文因此写「先不归档」。
+   *
+   * 省略 ⇒ 归档回到**一键直写**（与 `confirmRemove` 省略时同一条规矩）。
+   */
+  readonly confirmArchive?: {
+    readonly ask: (name: string) => string;
+    /** 只会带着 `> 0` 的数字进来（没有子级就不问，也就不渲染这一行）。 */
+    readonly impactChildren: (count: number) => string;
+    readonly confirm: string;
+    readonly cancel: string;
+  };
 }
 
 /** 每一行渲染时给插槽的上下文。 */
@@ -357,6 +381,8 @@ function OrganizerRow({
   setEditing,
   pendingRemove,
   setPendingRemove,
+  pendingArchive,
+  setPendingArchive,
   impact,
   childImpact,
   askOnlyWhenImpact,
@@ -378,9 +404,12 @@ function OrganizerRow({
   readonly onArchive: OrganizerListProps['onArchive'];
   readonly editing: boolean;
   readonly setEditing: (id: string | null) => void;
-  /** 这一行是不是处在"等一下，先确认"的状态。 */
+  /** 这一行是不是处在"等一下，先确认删除"的状态。 */
   readonly pendingRemove: boolean;
   readonly setPendingRemove: (id: string | null) => void;
+  /** 这一行是不是处在"等一下，先确认归档"的状态（只在**真有子级跟着收起**时才会进来）。 */
+  readonly pendingArchive: boolean;
+  readonly setPendingArchive: (id: string | null) => void;
   /** 这一行删除后的影响面（条数）。`undefined` 或 `<= 0` ⇒ **不渲染那句影响面**。 */
   readonly impact: number | undefined;
   /** 这一行作为父级时的子清单条数。`undefined` 或 `<= 0` ⇒ **不渲染那第二句**。 */
@@ -405,6 +434,14 @@ function OrganizerRow({
   const key = organizerRowKey(kind, item.id);
   const rename = labels.rename;
   const confirmLabels = labels.confirmRemove;
+  const archiveLabels = labels.confirmArchive;
+  /**
+   * 归档那一步要报的数，与删除那第二句**是同一个数**（底下那些活着的子清单条数）。
+   *
+   * 🔴 所以这里**不新开一个宿主 prop**：`childRemoveImpact` 已经是这张表，
+   * 让宿主再传一份"归档用的子清单计数"就是同一件事两处取数，迟早漂。
+   */
+  const archiveChildImpact = childImpact ?? 0;
   /**
    * 这一行删掉之后**有没有别的东西跟着受影响**（活任务 or 子清单）。
    * 只给 `askOnlyWhenImpact` 那一档用；判定只看这两个数，不看名字长短之类的。
@@ -525,7 +562,9 @@ function OrganizerRow({
               // 改名与"先确认"互斥：两个状态同时挂在这一行上时，
               // 渲染的是改名分支，那把 armed 的删除确认就变成**看不见但还在**的状态 ——
               // 用户点下一个删除时会以为自己是第一次点。
+              // ⚠️ armed 的**归档**确认同理，所以两把一起收。
               setPendingRemove(null);
+              setPendingArchive(null);
               setEditing(item.id);
             }}
             style={[styles.remove, busy ? styles.busy : null]}
@@ -552,7 +591,26 @@ function OrganizerRow({
             aria-disabled={busy}
             disabled={busy}
             onPress={() => {
-              onArchive(item, item.archived !== true);
+              // 🔴 归档这一格**只有一种形状需要问**：这条是文件夹，而底下真挂着活着的子清单。
+              //
+              // 默认视图里"父级已归档"的子级整支不画（`model.ts#toOrganizerTree` 那条取舍），
+              // 于是用户点"收起这一条"实际收起的是**这一支** —— 那 N 条他自己既没归档、
+              // 也没打算收起来。除此之外一律保持一键：
+              //   · 叶子清单没有跟着消失的东西，问了就是纯摩擦；
+              //   · **取消归档**永远一键（它是把东西放出来，没有隐藏后果，
+              //     给出口加确认等于给逃生门上一把锁）。
+              // 宿主不传 `labels.confirmArchive` ⇒ 与改动前逐字相同（一键直写）。
+              if (
+                item.archived === true ||
+                archiveLabels === undefined ||
+                archiveChildImpact <= 0
+              ) {
+                onArchive(item, item.archived !== true);
+                return;
+              }
+              setEditing(null);
+              setPendingRemove(null);
+              setPendingArchive(item.id);
             }}
             style={[styles.remove, busy ? styles.busy : null]}
             testID={`${key}-archive`}
@@ -596,6 +654,7 @@ function OrganizerRow({
                 return;
               }
               setEditing(null);
+              setPendingArchive(null);
               setPendingRemove(item.id);
             }}
             style={[styles.remove, busy ? styles.busy : null]}
@@ -660,6 +719,52 @@ function OrganizerRow({
           </View>
         </View>
       )}
+
+      {archiveLabels === undefined || onArchive === undefined || !pendingArchive ? null : (
+        // 归档那一行。**只有"这条是文件夹、底下真挂着子清单"时才会出现** ——
+        // 叶子清单与取消归档都不产生这一段，所以那些形状的 DOM 与从前逐字相同。
+        <View
+          style={styles.confirm}
+          accessibilityLiveRegion="polite"
+          testID={`${key}-archive-confirm`}
+        >
+          <Text style={[text['row-meta'], { color: tokens['color.foreground'] }]}>
+            {archiveLabels.ask(item.name)}
+          </Text>
+          <Text style={[text.caption, { color: tokens['color.foreground-muted'] }]}>
+            {archiveLabels.impactChildren(archiveChildImpact)}
+          </Text>
+          <View style={styles.confirmActions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={archiveLabels.confirm}
+              aria-disabled={busy}
+              disabled={busy}
+              onPress={() => {
+                // 与删除那格同一条顺序：先收状态再回调（宿主的 `onArchive` 会让这一行
+                // 从默认视图里整条消失，之后 setState 是对着已卸载的行写）。
+                setPendingArchive(null);
+                onArchive(item, true);
+              }}
+              style={[styles.remove, busy ? styles.busy : null]}
+              testID={`${key}-archive-confirm-yes`}
+            >
+              <HeytaIcon data={Archive} size={tokens['icon.xs']} color={tokens['color.foreground']} />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={archiveLabels.cancel}
+              onPress={() => {
+                setPendingArchive(null);
+              }}
+              style={styles.remove}
+              testID={`${key}-archive-confirm-no`}
+            >
+              <HeytaIcon data={X} size={tokens['icon.xs']} color={tokens['color.foreground-muted']} />
+            </Pressable>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -690,6 +795,9 @@ export function OrganizerList({
   // 同上，另一侧：**同时只有一行在"等一下，先确认"**。两行都 armed 时
   // 「确认删除」落在哪一条只能靠点的顺序猜，而删错了没有回收站可捞（标签不进回收站）。
   const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
+  // 同上，第三把：**同时只有一行在"等一下，先确认归档"**。两行都 armed 时
+  // 「确认归档」落在哪一条只能靠点击顺序猜，而这一格 armed 出行里多了两句话。
+  const [pendingArchiveId, setPendingArchiveId] = useState<string | null>(null);
 
   if (items.length === 0) {
     // 宿主不传 `empty` 就什么都不渲染（web 侧栏迁移前的行为，见文件头）。
@@ -745,6 +853,8 @@ export function OrganizerList({
             editing={editingId === node.id}
             setEditing={setEditingId}
             pendingRemove={pendingRemoveId === node.id}
+            pendingArchive={pendingArchiveId === node.id}
+            setPendingArchive={setPendingArchiveId}
             setPendingRemove={setPendingRemoveId}
             impact={removeImpact?.[node.id]}
             childImpact={childRemoveImpact?.[node.id]}
@@ -773,6 +883,8 @@ export function OrganizerList({
                   editing={editingId === child.id}
                   setEditing={setEditingId}
                   pendingRemove={pendingRemoveId === child.id}
+                  pendingArchive={pendingArchiveId === child.id}
+                  setPendingArchive={setPendingArchiveId}
                   setPendingRemove={setPendingRemoveId}
                   impact={removeImpact?.[child.id]}
                   childImpact={childRemoveImpact?.[child.id]}

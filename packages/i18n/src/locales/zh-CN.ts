@@ -3296,6 +3296,10 @@ export const zhCN = {
   'common.organizer.confirm.impactChildren': '它下面还有 {count} 条子清单。这些子清单不会被删除，但删掉这条之后它们会从侧栏里看不见；到回收站把这条清单还原，它们就会重新出现。',
   'common.organizer.confirm.delete': '确认删除',
   'common.organizer.confirm.cancel': '取消删除',
+  'common.organizer.confirm.askArchive': '确定要归档「{name}」吗？',
+  'common.organizer.confirm.impactChildrenArchive': '它下面还挂着 {count} 条子清单。它们不会被归档，但会跟着一起从侧栏收起；打开「显示已归档」就能再看到它们。',
+  'common.organizer.confirm.archive': '确认归档',
+  'common.organizer.confirm.notArchive': '先不归档',
   // 习惯的改名与删除入口（保存/取消复用上面那两句，不另立一份同义词条）。
   'common.habits.rename.button': '重命名习惯「{name}」',
   'common.habits.rename.label': '习惯名称',

@@ -216,6 +216,37 @@ describe('W4b 标签删除确认：两端都接、且默认形态没被改动', 
     );
   });
 
+  /**
+   * 🔴 归档那一步的接线与形状。
+   *
+   * 这一枚 pin 管的是"零件都在、没人接线"那一类：闸门在共享层，宿主不传
+   * `confirmArchive` 就整格失效，而**界面照样渲染、一行都不报错**。
+   * 标签那一节**不许**接它（标签没有归档，接上就是凭空多一档确认）。
+   */
+  it('归档确认：两端清单宿主都接了、标签那节没接、组件里 `onArchive` 只有两个调用点', () => {
+    for (const file of [
+      'apps/mobile/src/screens/ListsSection.tsx',
+      'apps/web/src/features/projects/ProjectsPanel.tsx',
+    ]) {
+      expect(read(file), `${file} 没打开归档确认`).toContain('confirmArchive:');
+    }
+    expect(readScreen('TagsSection.tsx'), '标签没有归档这一档').not.toContain('confirmArchive:');
+    // 出路那句必须是「显示已归档」那条词条，不是删除那句里的"到回收站还原"。
+    expect(readScreen('ListsSection.tsx')).toContain(
+      'common.organizer.confirm.impactChildrenArchive',
+    );
+    expect(read('apps/web/src/features/projects/ProjectsPanel.tsx')).toContain(
+      'common.organizer.confirm.impactChildrenArchive',
+    );
+    // 直写那一条**必须被条件挡住**：取消归档、叶子清单、宿主没给文案 —— 三种都一键。
+    expect(component).toContain('item.archived === true ||');
+    expect(component, '闸门丢了 ⇒ 归档一条自己的清单也要点两下').toContain(
+      'archiveChildImpact <= 0',
+    );
+    const calls = component.match(/onArchive\(item, /g) ?? [];
+    expect(calls, `onArchive 有 ${calls.length} 个调用点，多出来的那一个不受确认挡`).toHaveLength(2);
+  });
+
   it('🔴 组件里 `onRemove(item)` 只有两个调用点：没后果/没文案时的直删、以及「确认删除」', () => {
     const calls = component.match(/onRemove\(item\)/g) ?? [];
     expect(calls, `onRemove 有 ${calls.length} 个调用点，多出来的那一个不受确认挡`).toHaveLength(2);

@@ -57,6 +57,8 @@ const actions = vi.hoisted(() => ({
   deleteTag: vi.fn(() => Promise.resolve()),
   setProjectColor: vi.fn(() => Promise.resolve()),
   setProjectParent: vi.fn(() => Promise.resolve()),
+  renameProject: vi.fn(() => Promise.resolve()),
+  archiveProject: vi.fn(() => Promise.resolve()),
 }));
 
 const projectsState = vi.hoisted(() => ({
@@ -963,5 +965,92 @@ describe('W4b 标签删除确认：一次点击不许写 op', () => {
     click(byTestId(view, 'project-p1-remove'));
     expect(byTestId(view, 'project-p1-confirm'), '没有子级也没有任务，不该问').toBeNull();
     expect(actions.deleteProject).toHaveBeenCalledWith('p1');
+  });
+
+  /**
+   * 🔴 归档那一格的**出路那句必须是「显示已归档」**，不许照抄删除那句里的"到回收站还原"：
+   * 默认视图只画未归档的父级（`model.ts#toOrganizerTree`），所以归档一条文件夹时，
+   * 它底下那些**用户没有归档**的子清单会跟着整支看不见。
+   * 数据既没被删也没被归档，出路是那枚开关 —— 指错路等于让人去翻回收站找一条没删的清单。
+   */
+  it('归档一条装着子清单的文件夹：先问，句子给的出路是「显示已归档」，第二下才写', () => {
+    seed();
+    const view = render();
+    click(byTestId(view, 'project-p1-archive'));
+    expect(
+      actions.archiveProject,
+      '一次点击就归档 —— 底下那条 p1a 会跟着从默认视图消失',
+    ).not.toHaveBeenCalled();
+
+    const confirmText = byTestId(view, 'project-p1-archive-confirm')?.textContent ?? '';
+    expect(confirmText).toContain('确定要归档「工作」吗？');
+    expect(confirmText).toContain('它下面还挂着 1 条子清单');
+    expect(confirmText).toContain('它们不会被归档');
+    expect(confirmText).toContain('显示已归档');
+    // 出路指错就是撒谎：这条清单和它的孩子都没进回收站。
+    expect(confirmText).not.toContain('回收站');
+
+    click(byTestId(view, 'project-p1-archive-confirm-no'));
+    expect(actions.archiveProject).not.toHaveBeenCalled();
+    expect(byTestId(view, 'project-p1-archive-confirm')).toBeNull();
+    expect(byTestId(view, 'project-p1-archive'), '取消后必须还能再归档').not.toBeNull();
+
+    click(byTestId(view, 'project-p1-archive'));
+    click(byTestId(view, 'project-p1-archive-confirm-yes'));
+    expect(actions.archiveProject).toHaveBeenCalledWith('p1', true);
+  });
+
+  /**
+   * 🔴 与"零后果的清单一键直删"对称：**归档一条叶子清单也一键**。
+   * 这一条防的是另一种改坏法 —— 给所有归档都上确认，
+   * 那会把最常用的那一下（收起一条自己的清单）变成两次点击。
+   */
+  it('归档一条**没有子级**的清单仍然一键直写，且不画归档确认行', () => {
+    seed();
+    const view = render();
+    expect(byTestId(view, 'project-p2-archive-confirm')).toBeNull();
+    click(byTestId(view, 'project-p2-archive'));
+    expect(actions.archiveProject).toHaveBeenCalledWith('p2', true);
+    expect(byTestId(view, 'project-p2-archive-confirm')).toBeNull();
+    // 正向对照：同一趟里 p1（底下挂着 p1a）按下去**就是**两步。
+    click(byTestId(view, 'project-p1-archive'));
+    expect(byTestId(view, 'project-p1-archive-confirm')).not.toBeNull();
+  });
+
+  /**
+   * 🔴 **取消归档永远一键**，哪怕那条已归档的文件夹底下挂着活着的子清单。
+   *
+   * 它是上面那条纪律的直接镜像：给出口加确认等于给逃生门上一把锁。
+   * ⚠️ 而且这一格里两枚东西在屏幕上挨着 —— 已归档那行的按钮叫「取消归档「旧项目」」，
+   *   新确认行的取消那枚若也写「取消归档」，界面上就同时出现"别归档"和"把已归档的放出来"
+   *   两个同名词。中文词条因此特意写成「先不归档」，这一条把这个形状钉住。
+   */
+  it('取消归档一条**装着子清单**的已归档文件夹：一键直写、没有确认行，界面上不出现第二个「取消归档」', () => {
+    seed();
+    projectsState.projects = [
+      ...(projectsState.projects as Project[]),
+      project({ id: 'p9a', name: '旧子', parentId: 'p9' }),
+    ];
+    const view = render();
+    click(view.querySelector('button[aria-label="显示已归档"]'));
+    click(byTestId(view, 'project-p9-archive'));
+    expect(actions.archiveProject).toHaveBeenCalledWith('p9', false);
+    expect(byTestId(view, 'project-p9-archive-confirm')).toBeNull();
+    // 整棵树里「取消归档」只允许出现在"那一行自己的按钮"上，且带清单名。
+    const unarchiveLabels = Array.from(view.querySelectorAll('[aria-label^="取消归档"]'));
+    expect(unarchiveLabels).toHaveLength(1);
+    expect(unarchiveLabels[0]?.getAttribute('aria-label')).toBe('取消归档「旧项目」');
+  });
+
+  it('归档与删除的"先确认"互斥：同一次只 armed 一个动作，两个都不写 op', () => {
+    seed();
+    const view = render();
+    click(byTestId(view, 'project-p1-remove'));
+    expect(byTestId(view, 'project-p1-confirm')).not.toBeNull();
+    click(byTestId(view, 'project-p1-archive'));
+    expect(byTestId(view, 'project-p1-confirm'), '删除那行没收回，第二下会落在错的确认上').toBeNull();
+    expect(byTestId(view, 'project-p1-archive-confirm')).not.toBeNull();
+    expect(actions.deleteProject).not.toHaveBeenCalled();
+    expect(actions.archiveProject).not.toHaveBeenCalled();
   });
 });

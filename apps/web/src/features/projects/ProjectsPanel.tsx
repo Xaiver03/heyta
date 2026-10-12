@@ -298,6 +298,22 @@ export function ProjectsPanel({
                 confirm: t('common.organizer.confirm.delete'),
                 cancel: t('common.organizer.confirm.cancel'),
               },
+              /*
+               * 🔴 归档那一步的确认**措辞与删除那份不同**，所以是独立的一份：
+               * 删除那格给的出路是"到回收站把这条清单还原"，而归档的出路是
+               * 「显示已归档」那枚开关 —— 照抄就是把用户指向一个不存在的路。
+               * 取数不新开：`childRemoveImpact` 那张表就是"底下活着的子清单条数"，
+               * 归档要报的是同一个数（宿主再算一遍就是两份口径）。
+               * ⚠️ 取消按钮写「先不归档」不写「取消归档」：后者在本应用里是
+               *   un-archive 这个动作自己的名字，同屏两个意思会撞。
+               */
+              confirmArchive: {
+                ask: (name) => t('common.organizer.confirm.askArchive', { name }),
+                impactChildren: (count) =>
+                  t('common.organizer.confirm.impactChildrenArchive', { count }),
+                confirm: t('common.organizer.confirm.archive'),
+                cancel: t('common.organizer.confirm.notArchive'),
+              },
               // 空态此前**根本没接线**（共享层注释写着"宿主不传就什么都不渲染"），
               // 于是侧栏里一块空白被当成"这个功能没东西"。词条与移动端同一套
               // （`common.organizer.*`）—— 同一句话不许有两个端各写一份。
