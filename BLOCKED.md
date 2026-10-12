@@ -8628,6 +8628,23 @@ AssertionError: expected [ 'BINDING_EXPIRED', …(15) ] to deeply equal [ 'GRANT
 并发全量那一趟读 `Tests 1 failed | 1022 passed (1023)`，随后**逐包单跑**读回同一个 `1 failed | 1022 passed (1023)`。
 差集仍是那 8 枚，一枚不多一枚不少（日志 `+` 侧逐字点名）。⇒ 本节"待拍"的状态不变。
 
+**✅ 10-12 04:1x 本线自行闭合（`f2a94651`，走的路不是上面那枚"修法"）**：红没有了，
+但**不是**把 8 枚并进域层那张表 —— 而是把 `server/src/entitlement.ts` 里那**一枚混合联合拆成两枚**
+（`EntitlementDenialReason` 只留订阅读取那 8 枚，`AutomationEntitlementDenialReason` 装自动收集那 8 枚，
+`AnyEntitlementDenialReason` 是两者的并）。拆完域层那条臂**逐字未动**就回到 `1023 passed`。
+
+**为什么这条路比上面写的"补进域层表"对**：`ENTITLEMENT_DENIAL_REASONS` 的注释立场是"客户端认识的码"，
+而 8600-8616 那两格现量已经证明这 8 枚**客户端一枚都不消费**（7 枚零命中、`ISSUER_NOT_CONFIGURED` 只在本线
+签发侧映射里），界面 `waiting-entitlement` 也不由 reason 驱动。把它们并进订阅词表，等于让客户端去
+"认识"一批它拿不到、也不该拿去判订阅的码 —— 那才是把两句话并成一句。
+🔴 **代价与边界（不许读成"以后都不用管"）**：以后若真有宿主直接展示自动收集的拒绝原因，
+那一步仍要在域层词表里落一次并同步那条臂 —— 本闭合消掉的是"现在的红"，不是"将来接客户端时的判断"。
+
+**新增的尺（不是只把红压掉）**：`server/tests/automation-denial-vocabulary.spec.ts` 5 条，
+把两张表的成员、两者**不相交**、`QUOTA_EXCEEDED` 两侧都不许出现、以及 `AnyEntitlementDenialReason`
+的组成逐字钉住；三臂变异实测（把 `NO_BINDING` 并回订阅表 ⇒ 本判据 `2 failed` **且**域层那条守卫**同时**红，
+证明两把尺抓的是同一件事）读数在计划文末那节。
+
 ## B151（2026-10-10 23:3x，同一次整包跑量出的第二条本线债）：`packages/legal` 两条臂在 HEAD 长红 —— **都是本线那三张新表造成的**，而修法落点一枚都不在白名单里
 
 **现量（同一隔离副本，单跑复现 ⇒ 确定性红）**：
@@ -9631,3 +9648,51 @@ Python 先求值 `open(p, "w")`（**这一步立刻把文件截成 0 字节**）
    症状链是 `open(p,"w")` 已执行、参数求值抛错 ⇒ 文件 0 字节、随后一批**毫不相关**的编译错误
    （本例 22 条 `is not a module`）。判据：改完全文件写**立刻** `wc -c` 并与改前对数；
    恢复后要用 `git hash-object` 与 `git rev-parse HEAD:<path>` 比 blob，而不是只看命令退出码。
+
+## B181（2026-10-12 06:0x，本会话 · 安静窗单跑第 86 道时抓出来的两格：一格归别线、一格是本线欠的）：**本线的自动收集设置面板挂载即发四枚请求，把别线那枚"不该有非 2xx"的全局臂撞红了**
+
+**这条怎么才被看见**：`pnpm check` 的第 86 道（`check:ai-e2e`）此前每次都在装置的超时里被截断，
+而 Playwright 的 `list` reporter **只在整趟跑完才打印失败正文**。所以那批 ✘ 一直只有编号、没有原因。
+本轮负载 6.82（阈值 12）单跑一遍拿到形状，再拿**两枚用例的子集**（`--retries=0`，断言一字未动）捞正文：
+
+```
+cd .worktrees/inb-t7/e2e && NO_COLOR=1 npx playwright test tests/admin-console.spec.ts \
+  --grep '退款 Tab|403 ⇒ 后台一块都不渲染' --retries=0 --reporter=list
+2 failed
+  › 🔴 403 ⇒ 后台一块都不渲染（普通用户看不见多出来的东西）
+  › 🔴 退款 Tab：投影里每一行都画出来，而只有待批准的那一行给按钮
+```
+
+⇒ **"回归 vs 载体抖动"这一格判完了，结论是两边都有、且各归各家**（B177 的那条待决因此闭合）。
+
+**A 格（别线的一子，本线不代改）**：`退款 Tab` 那条的正文是
+`locator.click: Test timeout of 60000ms exceeded` + `waiting for getByTestId('admin-panel').getByRole('tab', { name: '退款', exact: true })`
+—— 后台面板里**根本没有那枚 tab**。这与收款面那条线台账自己登记的那格缺口是同一件事（"后台没有退款 tab"），
+**用例写在实现之前**。单跑、干净端口（先 `lsof` 确认 `:4318` 空闲，没有盲 kill）、零重试 ⇒ 确定性产品红，不是抖动。
+
+**B 格（🔴 本线造的）**：`403 ⇒ 后台一块都不渲染` 的正文是
+`除已登记缺失外不该有非 2xx：["/api/automation/rules","/api/automation/events","/api/automation/rules","/api/automation/events"]`。
+机制链现量到行：`apps/web/src/features/settings/AiSettings.tsx:1270` 把面板**无条件挂载** →
+`InboundAutomationSettings.tsx:45` 的 `active = true` 是默认值 → `:105` 挂载即 `refresh()` →
+`:88` `Promise.all([remote.list(), remote.listEvents()])` → 服务端按 `automation` capability 闸门对无权益账号回非 2xx
+（e2e 里是假端点回 404）→ 别线 `e2e/tests/admin-console.spec.ts:700` 收集 `res.status() >= 400`、`:712` 断言。
+**与 B150 同族**：本线自己的用例全绿（`inbound-automation.spec.ts` 在这一趟里甚至没被执行到），
+红的是一枚"不是本线命名、却在扫全局"的臂。
+
+**要拍的只有归属，两条都可一子做完**：
+- **A′（别线）**：那枚臂的 `expectedBad` 是**按用例**登记的，同一族他们在同文件 279/323/338 三处注释里处理过
+  （"假端点只实现了模型接口 ⇒ 404 混进不该有非 2xx"）。可直接粘的形状：给 `403 ⇒ 后台一块都不渲染`
+  那条调 `assertNoProblems(problems, ['/api/automation/rules', '/api/automation/events'])`（第二参数 `:708` 已存在，不需要新机制）。
+  ⚠️ 本线**不代改**的理由：那是别人那枚臂的判卷口径。
+- **B′（本线欠的）**：`InboundAutomationSettings.tsx:101` 那个 `catch { setError(t('web.ai.inbound.error.load')) }`
+  把服务端按权益闸门回的非 2xx 说成"加载失败"，而 AC-1 要的是"这台实例还没买到资格"，AC-6 的
+  `waiting-entitlement` 那一档**连词条都还没有**（= **B110** 仍开着）。落点全在本线白名单内，
+  但**要先有** `web.ai.inbound.status.noEntitlement` 那枚中英词条（`packages/i18n` 地界外）——
+  当场硬造一句会撞 `check:ui-language` 与词条对账。⇒ 与 B110 并成一格等词条，词条进去时一并做，
+  并配一条能失败的用例（`apps/web/tests/inbound-*`：403 ⇒ 出未授权文案、**不**出加载失败）。
+
+🔴 **顺带作废三条本台账自己的旧判断**（都因为把"截断点的读数"当成"红集"）：
+① 那句"第 86 道 35 ✘"是**下界**，本轮同一命令、同一副本、更低负载读到 **40 枚不同用例**，差别只在跑到第几条被杀；
+② "本线的 spec 零命中"不能读成"本线 e2e 绿"，只能读成**未执行**（`grep -c 'inbound-automation.spec.ts' 086.log` = 0）；
+③ 第 86 道整道在 `workers: 1` × 383 条 × 每枚失败 60 s×2 之下**一小时跑不完**（`RC=124` 是装置的超时，不是 Playwright 的码）——
+要么抬装置 `--timeout`（那是判卷阈值，须链的主人拍），要么按族拆跑；本线两种都不代改。

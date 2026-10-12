@@ -3008,4 +3008,68 @@ $ tail -3 004.log                                                  → apps/web 
 server 那 1 条走 `DATABASE_URL` 门 —— **本线一行 `.skip`/`.todo` 都没新加**（grep 白名单用例为空）。
 
 **红集因此更新**：链上 19 格里第 4 道已闭合（−1），逐包补跑新读出 domain（本线，已修）与 legal（别线）两格（+2）
-⇒ 当前"待办红"= **19 格**，本线在其中**不再占代码格**，只占三格"修它要动地界外的文件"（50=B171、74=B173、21/23=B172）。
+⇒ 当前"待办红"= **19 格**，本线在其中~~不再占代码格~~，只占三格"修它要动地界外的文件"（50=B171、74=B173、21/23=B172）。
+🔴 **"不再占代码格"这半句已被下面 06:0x 那一节否证**：第 86 道（`check:ai-e2e`）里 `403 ⇒ 后台一块都不渲染`
+那一枚 ✘ 的正文是本线设置面板挂载时发的四枚 `/api/automation/*` 请求 —— 那是**本线代码**撞红别线的臂。
+⇒ 现量改成：19 格里本线占**四**格，其中三格红因在地界外、**一格（86）的代码在本线地界内、修法要等 B110 那枚词条**（详见 B181）。
+
+## 2026-10-12 06:0x · T7 第 86 道在安静窗单跑：3600 秒只走完 188/383，而其中一格是**本线的设置面板撞红了别线的臂**
+
+**为什么单独跑这一道**：链上那趟读到的"35 ✘"没有正文 —— `list` reporter 只在**整趟跑完**才打印失败详情，
+而这一道被超时截断过。B177 留的问题是"这些 ✘ 是回归还是载体抖动"，判它只有一条路：**安静窗单跑 + 拿到正文**。
+
+**命令与读数**（隔离副本 `.worktrees/inb-t7`，起跑时 `vm.loadavg` = 6.82（阈值 12））：
+
+```
+python3 research/tools/verify-inbound-check-chain.py --repo . --logs .chain-logs/single86 --from 86 --to 86 --timeout 3600
+STEP= 86/106 RC=124 SEC= 3600.0 CMD=pnpm check:ai-e2e
+```
+
+`RC=124` 是**装置的超时把这一道杀了**，不是 Playwright 报的码。计数形状（同一份 `086.log`）：
+
+| 量 | 现量命令 | 读数 |
+|---|---|---|
+| 全套规模 | `grep -oE 'Running [0-9]+ test' 086.log` | `Running 383 test`（`workers: 1`、`retries: 1`、`timeout: 60_000`，逐条取自 `e2e/playwright.config.ts`） |
+| 走到哪 | `grep -c '✘' 086.log` / `grep -c '✓' 086.log` | ✘ 行 80（含 retry 重复 ⇒ **40 枚不同用例**）、✓ 106 ⇒ 60 分钟只走完 **188 条尝试 / 383** |
+| 有没有汇总 | `grep -cE '^ *[0-9]+ (passed\|failed)' 086.log` | **0** ⇒ 正文只能在子集跑里捞 |
+| 本线的 spec | `grep -c 'inbound-automation.spec.ts' 086.log` | **0** ⇒ 字母序排在 `detail-*` 之后，**这一趟根本没执行到它** |
+
+🔴 **三条作废的判断**（都因为把"截断点的读数"当成"红集"）：
+① 之前那句"第 86 道 35 ✘"是**下界**，不是全集 —— 本轮同一条命令、同一枚副本、负载更低，读到 40 枚；
+差别不在被测物，在**跑到第几条被杀**。② "本线的 spec 零命中"不能读成"本线 e2e 绿"，只能读成"未执行"。
+③ "整道跑不完"不是载体慢：单跑控制趟（下面）里失败的用例**在干净端口、零重试下照样红**。
+
+**子集控制趟**（诊断用，**不改判卷口径**：`--retries=0` 只为省时间，断言一个字没动；端口 `4318` 先 `lsof` 确认空闲，没有盲 kill）：
+
+```
+cd .worktrees/inb-t7/e2e && NO_COLOR=1 npx playwright test tests/admin-console.spec.ts \
+  --grep '退款 Tab|403 ⇒ 后台一块都不渲染' --retries=0 --reporter=list
+2 failed
+  › 🔴 403 ⇒ 后台一块都不渲染（普通用户看不见多出来的东西）
+  › 🔴 退款 Tab：投影里每一行都画出来，而只有待批准的那一行给按钮
+```
+
+两枚的正文各是一族，且**归属不同**：
+
+1. 🔴 **`退款 Tab` 属收款面**：`locator.click: Test timeout of 60000ms exceeded` + `waiting for
+   getByTestId('admin-panel').getByRole('tab', { name: '退款', exact: true })` —— 后台面板里**没有那枚 tab**。
+   这跟他们那条线台账自己记的那格缺口是同一件事（"后台无退款 tab"），**用例写在实现之前**。
+   ⇒ 确定性产品红，不是抖动；本线不代改。
+2. 🔴 **`403 ⇒ 后台一块都不渲染` 是本线造的**：`除已登记缺失外不该有非 2xx：["/api/automation/rules","/api/automation/events","/api/automation/rules","/api/automation/events"]`。
+   机制链现量到行：`apps/web/src/features/settings/AiSettings.tsx:1270` 把面板**无条件挂载** →
+   `InboundAutomationSettings.tsx:45` 的 `active = true` 是默认值 → `:105` 的 `useEffect(() => { void refresh(); }, [refresh])`
+   挂载即取数 → `:88` `Promise.all([remote.list(), remote.listEvents()])` → 服务端按 `automation` capability
+   闸门对无权益账号回非 2xx（在 e2e 里是假端点回 404）→ 别线 `e2e/tests/admin-console.spec.ts:700` 收集
+   `res.status() >= 400`、`:712` 断言"除已登记缺失外不该有非 2xx"。
+   ⇒ **与 B150 同族**：本线的改动让一枚"不是本线命名、却在扫全局"的臂变红，而本线自己的用例全绿。
+
+**两条出路，各归各的主**（本线不代改别人的判卷口径）：
+- **A（别线那一格）**：`admin-console.spec.ts` 的 `expectedBad` 是按用例登记的，该文件已在 279/323/338 三处注释里
+  处理过同一族（假端点没实现的路径 ⇒ 登记例外）。补登记 `/api/automation/rules`、`/api/automation/events` 是一子的事。
+- **B（本线欠的那格）**：面板对**没有 `automation` 权益的账号**把 403 当"加载失败"（`:101` 那个 `catch`），
+  而不是当"这台实例还没买到资格"（AC-1 要的是后者，AC-6 的 `waiting-entitlement` 那一档至今没有词条 = B110）。
+  这一格是**本线的 UX 缺陷**，与"要不要发这四枚请求"分开：请求本身是面板要渲染的数据，不发就显示不出状态。
+⇒ 两条一起登记成 **B181**，含可直接粘的补丁形状。
+
+**第 86 道要闭合的前置**（都不在本线地界内，只写清怎么量）：`workers: 1` × 383 条 × 每枚失败 60 s×2 ⇒ 整道**一小时内跑不完**；
+要么把装置的 `--timeout` 抬到实测所需（那是**判卷阈值**，须由链的主人拍），要么按族拆开跑。本线两种都不代改。

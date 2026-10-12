@@ -3686,3 +3686,13 @@ B173 就地追记一句：现在缺的**只有**那一行登记，不再有"文�
 - 回归读数（主检出）：server 159/2790+1skip、web 176/2247+13skip、app-host 95/1779、inbound-core 3/47、domain 43/1023 全 rc=0。**跳过逐条查过，本线没新加 `.skip`/`.todo`**。
 - 🔴 一次我自己的事故（B179）：`open(p,'w').write(apply(...))` 里 `open` 先求值 ⇒ `server/src/entitlement.ts` 被截成 **0 字节（809 行）**。`git checkout HEAD --` 恢复 + `git hash-object` 证与 HEAD blob 逐字相同；恢复前查过索引那一路的 blob 与 HEAD 相同 ⇒ 没有"已暂存的别版本"被丢。三条探针/工具教训做成可粘的环境陷阱条目交还文件主人（**B180**）。
 - 红集更新：第 4 道闭合、domain 那格修掉，legal 是新读出的别线格 ⇒ 待办红仍 19 格，本线**不再占代码格**。
+
+## 2026-10-12 06:1x · T7 第 86 道安静窗单跑：**"35 ✘"是截断点的下界**，而两枚被点名成"回归 vs 抖动"的臂各归各家（其中一格是本线造的）
+
+- 装置趟（负载 6.82，`--from 86 --to 86 --timeout 3600`）：`STEP= 86/106 RC=124 SEC= 3600.0` —— `RC=124` 是**装置的超时**，不是 Playwright 的码。`Running 383 test` + `workers: 1` + `retries: 1` ⇒ 一小时只走完 **188 条尝试**（✘ 行 80 = **40 枚不同用例**、✓ 106），`list` reporter 没打印汇总 ⇒ 失败正文一条都捞不到。
+- 🔴 由此作废三句旧判断：① 之前那句"第 86 道 35 ✘"是**下界**（差别只在跑到第几条被杀，不在被测物）；② `grep -c 'inbound-automation.spec.ts' 086.log` = **0** ⇒ 本线的 e2e 在这一趟里**未执行**，不能读成绿；③ 整道闭合要先有"能跑完的预算"（抬装置 `--timeout` = 判卷阈值，须链的主人拍；本线不代改）。
+- B177 那一格（"回归 vs 载体抖动"）**判完了**：两枚用例子集单跑（`--retries=0`、`lsof` 确认 `:4318` 空闲后才跑、断言一字未动）⇒ `2 failed`，正文两族：
+  - `退款 Tab` ⇒ `waiting for getByTestId('admin-panel').getByRole('tab', { name: '退款' })` 60 s 超时 = **后台没有那枚 tab**，属收款面（他们台账自己记着这格缺口），确定性产品红。
+  - `403 ⇒ 后台一块都不渲染` ⇒ `除已登记缺失外不该有非 2xx：["/api/automation/rules","/api/automation/events",…]` = **本线造的**：`AiSettings.tsx:1270` 无条件挂载 → `InboundAutomationSettings.tsx:45` `active=true` → `:105` 挂载即 `refresh()` → `:88` 发 `list()+listEvents()` → 别线 `admin-console.spec.ts:700/:712` 那枚全局臂收到非 2xx。**与 B150 同族**：本线用例全绿，红在别人扫全局的臂上。
+- 🔴 状态更正（改掉上一节那句"不再占代码格"）：19 格里本线占**四**格 —— 三格红因在地界外（50=B171、74=B173、21/23=B172），**第 86 道那一格的代码在本线地界内**，但它要的不是改请求（那是面板要渲染的数据），而是**把"没买到资格"从"加载失败"里分出来** —— 卡在 B110 那枚中英词条还没进去，所以当场不能做（硬造会撞 `check:ui-language`）。两条出路 + 可直接粘的补丁形状都登记进 **B181**。
+- 本线没有动任何人的断言、阈值或 spec：`git diff HEAD --stat` 只有 `docs/plans/inbound-automation.md`、`PROGRESS.md`、`BLOCKED.md` 三份。
