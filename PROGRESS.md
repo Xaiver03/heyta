@@ -3727,3 +3727,15 @@ B173 就地追记一句：现在缺的**只有**那一行登记，不再有"文�
   本线**没有**去动它（它还留着 `.chain-logs/` 与那批证据图），而是新建 `.worktrees/inb-t8`（`git worktree add --detach … 422db1b2`，建完 `status --porcelain` = **0 条**），
   在这棵干净副本上按 install → build → `NO_COLOR=1 pnpm -r --no-bail test` 的顺序跑，三段各自 `echo *_RC=$?` 紧跟其后（AGENTS §7：管道尾会吞退出码）。
 - 读数还没落地：**第 105 道的 per-package 计数与"有 test 脚本的包数 == 打了 `Tests` 汇总行的包数"那条对账，等这一趟跑完再写**；写完前，计划里那句"本线代码债 0 条"只覆盖 B150 那一格，不覆盖整链。
+
+## 2026-10-12 08:3x · 第 105 道**跑完了**：21 个包都有汇总行、合计 13 608 passed / 8 failed / 14 skipped，而**这 8 条没有一条是本线的**
+
+- 载体：`.worktrees/inb-t8`（`worktree add --detach … 422db1b2`，建完脏条目 **0**）。`INSTALL_RC=0`、`BUILD_RC=0`、`TEST_RC=1`，日志 `.worktrees/inb-t8/.run-logs/step105.log`。
+- 对账：**有 `test` 脚本的包 21 == 打了 `Tests` 汇总行的包 21**（18 行全绿 + 3 个红包各一行），所以没有"整层从来没被跑过"那一格。
+- 红集从 11 条降到 **8 条**，降的 3 条各有归属：`packages/domain` 1 条 = **本线 B150 随 `f2a94651` 在全量链上复绿**；`apps/landing` 2 条 = 别线自己收走。
+- 剩下 8 条逐条点过名（`ai` 5 = `capability-manifest.spec.ts` 那张清单产物/分母，`legal` 2 = `email-catalog.spec.ts` 功能邮件枚数，`shared-schema` 1 = `auth-http-contract.spec.ts` 口令路径），
+  **全是别线的判卷口径与产物** ⇒ 本线一行不代改；`TEST_RC=1` 意味着**完成条件里"三条命令 exit 0"这一条不成立**，交付时如实报。
+- 🔴 顺着"哪一枚 eventId 宽度才是对的"查出一条**本线自己的**缺陷并登记 **B183**：协议 §18/§65 写死 1–64 字节、字母数字起头，签发侧/路由/计量层三处都照做，
+  唯独票据 claims 那枚是 `{0,127}`（改前就如此）⇒ claims 层比协议上限宽一倍，且形状那一格**零用例覆盖**。
+  落点在本线白名单内，本该当场改，但那枚文件正被别的会话写着（死规矩：不动别人在写的文件）⇒ 登记 + 给出改法与反向验证形状。
+- AC 勾选数仍是 **0**（`grep -c '^- \[x\] \*\*AC-'` = 0，未勾 8）。静态门复跑：`check-docs-voice` rc=0、`docs-link-check` rc=0。

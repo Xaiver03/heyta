@@ -1894,7 +1894,8 @@ packages/app-host typecheck: tests/login-code.spec.ts(44,5): error TS2578: Unuse
 （「共 38 处级联，覆盖 37 张表」）。闭合人是 `8389b2a3`（账号标准套件线），本线一行没改。
 ⇒ **本线在 `pnpm -r test` 上的债从 3 条降到 1 条**（只剩 B150），
   ↪ 10-12 04:1x 现量：那最后 1 条也已闭合（`f2a94651`，见上面 B150 那格的更正）⇒ **本线在那条链上的代码债现为 0 条**，
-  而 `pnpm -r test` 整链仍红在别线那 10 条上（第 105 道的现量正在取，取到再改这里）。
+  而 `pnpm -r test` 整链仍红在别线那 ~~10 条~~ 上 —— 🔴 10-12 08:2x 全量复跑取到现量：**8 条**（`ai` 5 + `legal` 2 + `shared-schema` 1，逐条点名见文末那一节），
+  比 10-11 那 11 条少 3 = 本线 `domain` 1 条（`f2a94651` 复绿）+ 别线 `apps/landing` 2 条（他们自己收走）。
 而 T6「对外说明」这一格 ~~少了一件要拍的事，硬缺口是那枚新 ADR（地界外，B139）~~
   🔴 **2026-10-12 00:5x 现量：那枚 ADR 就是 `docs/adr/0060` 本身**（它的第 2 条逐字写着"限定取代 ADR-0017 与
   ADR-0020 中『自托管的所有功能都不校验付费资格』的适用范围"，状态行「已接受（2026-10-07 负责人裁决）」）
@@ -3106,3 +3107,43 @@ Error: locator.click: Test timeout of 60000ms exceeded.
 
 **第 86 道要闭合的前置**（都不在本线地界内，只写清怎么量）：`workers: 1` × 383 条 × 每枚失败 60 s×2 ⇒ 整道**一小时内跑不完**；
 要么把装置的 `--timeout` 抬到实测所需（那是**判卷阈值**，须由链的主人拍），要么按族拆开跑。本线两种都不代改。
+
+---
+
+## 2026-10-12 08:2x · 第 105 道在**从零建的干净副本**上跑完：21 个包全部有汇总行、**8 条红里没有一条是本线的**，而 `packages/domain` 那 1 条随 `f2a94651` 复绿
+
+**载体（这次必须换）**：`.worktrees/inb-t8` = `git worktree add --detach … 422db1b2`，建完 `status --porcelain` **0 条**；
+里面 `pnpm install --frozen-lockfile` → `pnpm -r build` → `NO_COLOR=1 pnpm -r --no-bail test`，三段各 `echo *_RC=$?` 紧跟其后。
+日志：`.worktrees/inb-t8/.run-logs/step105.log`（551 KB，不入库）。
+
+| 段 | 读数 |
+|---|---|
+| `pnpm install --frozen-lockfile` | **`INSTALL_RC=0`** |
+| `pnpm -r build` | **`BUILD_RC=0`**（整仓构建在合并态上第一次全绿 —— 这条本身不是 T7 要求的三条之一，但它是"门禁绿≠打得出包"那一族的现量反证） |
+| `pnpm -r --no-bail test` | **`TEST_RC=1`** |
+
+**对账（AGENTS §6 那条"有 test 脚本的包数 == 打了汇总行的包数"）**：两边都是 **21**。
+逐包汇总（`grep 'Tests N passed'` 18 行 + `grep FAIL` 那 3 个包各打一行 `N failed | M passed`）：
+
+- 全绿 18 个：`apps/desktop 12`、`apps/landing 1409`、`apps/mobile 958`、`apps/node-host 198`、`apps/web 2247 | 13 skipped (2260)`、
+  `packages/app-host 1779`、`design-system 527`、**`domain 1023`**、`i18n 26`、**`inbound-core 47`**、`local-api 181`、`op-log 147`、
+  `storage 419`、`sync-client 156`、`sync-core 318`、`ui 665`、`widget-core 195`、`server 2795 | 1 skipped (2796)`
+- 红 3 个包 / **8 条**：`packages/ai 5 failed | 260 passed`、`packages/legal 2 failed | 74 passed`、`packages/shared-schema 1 failed | 172 passed`
+- 合计 `passed 13 608`、`failed 8`、`skipped 14`
+
+**与上一格（10-11 00:5x 那趟 11 条）的差 = 3 条，两条各有归属**：
+① `packages/domain` 那 1 条**没了** ⇒ **本线的 B150 在全量链上复绿**（`f2a94651` 拆词表那步的效果，这一趟是它第一次在合并态全量上被读到）；
+② `apps/landing` 那 2 条**没了** ⇒ 别线自己收走了（落地页页头登记处那格，归属见他们的台账）。
+⇒ **本线在 `pnpm -r test` 上的红：11 条里占 1 → 8 条里占 0**。逐条点名那 8 条都不是本线的文件：
+
+| 包 | 用例 | 红的是什么 | 归属 |
+|---|---|---|---|
+| `packages/ai` | `capability-manifest.spec.ts` × 5（"分母恰好 9 且逐条点名"、"剔除项只有登记过的两个"、"产物与上游逐字节一致"、"工具集合双向相等"、"kind 与目录逐字相同"） | 清单产物与上游目录不同步（AI 工具目录 + `COMMENT` 实体那批） | 别线 |
+| `packages/legal` | `email-catalog.spec.ts` × 2（"N 封功能邮件"逐格对账、悬空守卫） | 登录验证码那封功能邮件没进登记表 | 别线 |
+| `packages/shared-schema` | `auth-http-contract.spec.ts` × 1（口令路径必须相对、不带 `/api`） | auth 线新增口令路由与那张封闭词表不一致 | 别线 |
+
+**跳过 14 条的归属与上次逐字相同**（`server` 1 = `tests/migration-sql.spec.ts:338` 的 `it.skip`，`8f65d4d6` vendored 那批；`apps/web` 13 条不在本线文件里）；
+本线全部 `*inbound*` 测试文件扫 `.skip` / `.todo` / `skip: true` 命中的仍只有那两枚 `describe.skipIf(!DATABASE_URL)`（它们根本不进 `-r test`，见 B153）。
+
+🔴 **这一格不能读成"T7 齐了"**：`TEST_RC=1` ⇒ 完成条件 1 里"三条命令 exit 0"这一条**仍不成立**，而且八条红的**红因全在本线地界外**，
+本线不代改别人的判据（同 B150/B181 的处理）。第 106 道（`reinstall:all`）另说。
