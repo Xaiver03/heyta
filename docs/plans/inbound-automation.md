@@ -3230,7 +3230,7 @@ PKG_PIXELS=OK PKG_BLUE_HITS=3987 PKG_SNAPSHOT=900x523   PKG_RESULT=OK    LINUX_D
 | `verify-inbound-ac-ticks.py`（+ `--self-test`） | 0 / 0 | AC 勾选数 0、未勾 8，反向验证臂齐 |
 | `verify-inbound-doc-tables.py`（+ `--self-test`） | 0 / 0 | 登记表 ∪ 本线四份对账过，三臂自测过 |
 | `verify-inbound-commit-scope.py` | **1** | `越界=1` 点名 `79e8ede1`（**协作线**那笔只提了本线关键词、动的是它自己的计划文件）；装置自己那行写着 `命中段=desc 带本线独占路径=0` ⇒ 归属不是本线动作，口径那一格仍开在 **B169** |
-| `verify-inbound-cjs-require-order.py`（+ `--self-test`） | 0 / 0 | 六臂反向验证过 |
+| `verify-inbound-cjs-require-order.py`（+ `--self-test`） | 0 / 0 | 反向验证过。🔴 这格原先写的"六臂"已作废：臂数以装置 `--self-test` 末行自报为准（本线后来给它补了两臂），往台账里抄数就是漂的入口 —— 详见文末 10:0x–10:1x 那一节 |
 | `verify-inbound-queue-teeth.py`（+ `--self-test`） | 0 / 0 | 全部臂 + 失配负面对照 |
 | `verify-inbound-quota-teeth.py`（+ `--self-test`） | 0 / 0 | 同上 |
 | `verify-inbound-ticket-teeth.py`（+ `--self-test`） | 0 / 0 | 同上 |
@@ -3287,7 +3287,7 @@ SELF_TEST=OK（R4 两半能红、R3/R5/R2 能红、静止臂没跟着红）     
 ```
 
 它补的是"AC-8 那张矩阵表会不会**读起来像有证据**"：矩阵引用的是用例名与文件路径，改名、删文件、维值写漂、
-无尺格没人认领这四种都会安静地烂掉，而 markdown 表格自己永远不会失败。
+无尺格没人认领这四种都会安静地烂掉，而一张表不会因为少了一行就自己叫出来。
 
 ### 顺着它查出的**一类**问题：本线 15 枚装置此前零消费者
 
@@ -3329,3 +3329,48 @@ grep -rn "verify-inbound-\*" scripts/ package.json .github                   →
 
 🔴 **AC 一格未勾**（`AC 行=8　已勾=0　未勾=8`，臂 B 只是取证用的临时变异且已还原）；
 T7 三条命令里 `pnpm check` / `pnpm -r test` 仍因那八条别线红而 rc=1 ⇒ **完成条件 1 的"三条 exit 0"仍不成立**。
+
+## 2026-10-12 10:0x–10:1x · 上一节那 11 条消费者在**合并态主检出**里红了，两条红因都是我这轮的产物；顺带把装置的编译器通道从"会出网"改成"逐字指定"
+
+`cbe9eeaf`（常驻消费者 + B185）落进 `main` 之后按规矩复跑 ⇒ `SPEC_MAIN_RC=1`（`3 failed | 8 passed`）。
+这不是"别人把本线弄红了"：
+
+1. **我 09:4x 追加进本文件的那节逐字重复了一句引言散文**。`verify-inbound-ac8-matrix.py` 的臂 6 是一枚静止对照：
+   它取 AC-8 那张矩阵**表头行紧邻上方、那句引言的结尾**（只用结构位置指代，原因见下面那条自指）当 needle，
+   要求它在本文件**恰好命中 1 处**；临时给它加个括注，判决必须**保持绿** —— 用来证明"只改散文不会把对账改成红"。
+   我的新句子让命中变成 2 处 ⇒ `SELF_TEST_BROKEN：臂 6 的原文命中 2 处，要求恰好 1 处`。
+   动作只有一处：**改掉我自己那句**（`--quiet` 现量 `AC8_RC=0`、`--self-test` `AC8_SELF_RC=0`）。
+   装置判据与那句引言原文都没动 —— 这是"上一节的写作违反了下一节的尺"，不是尺错。
+   🔴 **自指结构（登记 B187）**：本文件既是臂 6 的被审文档，就不能**整句复述**它。而这一趟连
+   "写一条 `grep` 命令来定位它"都不行 —— 命令里必须写出它的一部分，写出来那段就让自己那条 `grep -c` 从 1 变 2
+   （本节第一稿就是这样，当场量出 2 才改掉）。所以这里只给结构位置、不给字符串。
+   根治要改尺（needle 锚到矩阵那一段的行界、而不是整份文件计数），那是验收脚本自己的判据 ⇒ 本线不代改。
+2. **`verify-inbound-cjs-require-order.py` 用 `npx --no-install tsc` 起编译器**：`npx` 判断"本地装没装"要按调用方环境
+   推断项目根，被 vitest 起时那次推断落到了没有 `.bin/tsc` 的位置 ⇒ 它**去 registry 取了那枚真叫 `tsc` 的老包**
+   （`~/.npm/_logs/2026-10-12T02_04_31_525Z-debug-0.log` 第 14 行 `http fetch GET 200 https://registry.npmjs.org/tsc`，逐字四行贴在 **B186**），
+   回 `rc=1 + no YES option`，长得像产品坏了。一道门禁同时有了**随载体漂**与**能出网**两种不该有的性质。
+
+**改掉的（只动白名单内那枚装置，没碰判卷口径）**：编译器逐字指定，`server/node_modules/.bin/tsc` → 根 `.bin/tsc` →
+同一候选集在检出目录上再兜一层，取第一枚可执行的；四枚都找不到 ⇒ `emit()` 返回 `127` 并列出找过的路径；`npx` 通道整个删。
+`--self-test` 补两臂：臂 8 静止那次必须拿到逐字路径且 `argv` 里没有 `npx`；臂 9 把四枚候选（连同兜底所在的 `REPO`）
+全换成空树 ⇒ 必须解析不到，绝不退化成出网。
+🔴 臂 9 **第一版是红的，抓到的是我自己**：只换了临时树、没换兜底 `REPO`，于是照样解析得到 —— 它测的不是我声称的那件事。
+补上之后 `SELF_RC=0`、末行自报 `臂数=10　不成立=0`，臂 8/9 都 `✔`。
+
+**归因边界**：这一趟同时改了起法（从我那条 `npx --prefix server vitest run --root server` 换成真实链路的
+`cd server && pnpm exec vitest run tests/…`）与编译器解析，所以"现在绿"**不能单独归功于其中之一**；
+但日志那行 `http fetch` 独立证明了那条通道存在且会出网，与谁怎么起它无关。
+
+**读数（合并态主检出 `cbe9eeaf`）**：normal 腿 `在册 .ts=119　有产物=119　无产物(未编译)=0　扫过的产物=119　命中=0`、
+`NORMAL_RC=0`；`--self-test` `SELF_RC=0`；
+`cd server && pnpm exec vitest run tests/inbound-lane-rigs-consumers.spec.ts` ⇒ `SPEC_RC=0`、`Tests 11 passed (11)`、跳过 0。
+计划正文被改过 ⇒ 四道便宜尺重取：`LICENSE_RC=0`／`MIGRATIONS_RC=0`／`VOICE_RC=0`／`LINKS_RC=0`；
+`verify-inbound-ac-ticks.py` ⇒ `AC 行=8　已勾=0　未勾=8`；`verify-inbound-doc-tables.py` ⇒ 16 份对账过。
+
+**同一类还剩几处（B186）**：本线三枚变异牙臂（`verify-inbound-{queue,quota,ticket}-teeth.py`）仍是
+`npx --no-install vitest`，改法同形，但要证明它得把变异臂真跑一遍，而主检出此刻有并行写入者（B182）⇒
+排在 B185 那把独占锁之后，不交没跑过的代码。**白名单外那两枚更要紧**：`mutate-credential-sweep.py:93`、
+`mutate-w6.py:129` 用的是**不带 `--no-install` 的 `npx vitest`** ⇒ 本地缺二进制时 npm 会**装包**；本线不代改别人的工具，只交可粘形状。
+
+🔴 本节不改任何 AC 的闭合状态：`已勾=0` 现量未变；AC-6 的界面挂载点（B140/B181）、AC-8 的四端设备腿（B164）
+仍按原登记开着；`pnpm check` / `pnpm -r test` 仍因那八条别线红而 rc=1 ⇒ **完成条件 1 的"三条 exit 0"仍不成立**。

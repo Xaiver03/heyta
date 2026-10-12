@@ -3867,3 +3867,51 @@ $ grep -rnE '\.(skip|todo)\(|\bxit\b|describe\.skip' <本线全部测试文件> 
   `git show HEAD:server/tests/migration-sql.spec.ts | grep -c 'it.skip\|describe.skip\|test.skip\|it.todo'` 现量 **2** ⇒ HEAD 里本来就挂着；
   本线这份 spec 里 `.skip`/`.todo` 现量 **0**。⚠️ 一条代价如实记着：本线这 11 条要 **60.5 s**（占整包 347 s 的 17%），
   因为它们是**真起子进程跑 Python 装置**，这正是"能红"的代价，不改成 mock。
+
+## 2026-10-12 10:0x–10:1x · 我入库的那 11 条在合并态主检出里红了：两条红因都不是别人的代码，一条是我自己写的句子，一条是我自己那枚装置的编译器通道
+
+- **先说清这条的性质**：`cbe9eeaf` 把常驻消费者与 B185 落进 `main` 之后，我按规矩在**合并态主检出**复跑那 11 条 ⇒
+  `SPEC_MAIN_RC=1`（`3 failed | 8 passed`）。这不是"别人把本线弄红了"，两处红因都是我这轮的产物，逐条归清：
+  1. **我 09:4x 追加进计划的那节，逐字重复了一句引言散文** —— `verify-inbound-ac8-matrix.py` 臂 6 是一枚静止对照，
+     它取 AC-8 那张矩阵**表头行紧邻上方、那句引言的结尾**当 needle，要求它在本文件**恰好命中 1 处**；
+     我写进新一节的那句让命中变成 2 处 ⇒ `SELF_TEST_BROKEN：臂 6 的原文命中 2 处`。
+     改的是**我自己那段新句子**（换成"而一张表不会因为少了一行就自己叫出来"），**没动装置的判据、没动原有那句**。
+     现量：`--quiet` 的 `AC8_RC=0`、`--self-test` `AC8_SELF_RC=0`、`SELF_TEST=OK（六臂各自成立…）`。
+  🔴 **这一处我在同一趟里踩了第二次，而且第二次是"想写清楚怎么定位它"造成的**：我先在计划里补了一句
+     "可定位：`grep -n '<那几个字>' docs/plans/inbound-automation.md` 现量 1 处" ⇒ 那条命令自身含有 needle 的一部分，
+     `grep -c` 当场变成 **2**（自证了这句承诺在它自己写下的那一刻就是假的）。
+     ⇒ 台账与计划正文**连定位用的字符串都不要写**，只用结构位置（那张表的表头行上方那句引言结尾）。
+     根治要改尺（needle 锚到矩阵那段行界而非整份文件计数）—— 那是验收脚本的判据，登记 **B187**，本线不代改。
+  2. **`verify-inbound-cjs-require-order.py` 用 `npx --no-install tsc` 起编译器**，被 vitest 起时 npm 推断"本地装没装"
+     跟着调用方环境漂 ⇒ 它没找到 `.bin/tsc`，**去 registry 取了那枚真叫 `tsc` 的老包**（读它在 `~/.npm/_logs/…debug-0.log`
+     的逐字四行，见 **B186**），回 `rc=1 + no YES option`，长得像产品坏了。⇒ 一道门禁同时有了"随载体漂"和"能出网"两种不该有的性质。
+
+- **改掉的（只动本线白名单内那枚装置，没碰判卷口径）**：编译器**逐字指定**，按 `server/node_modules/.bin/tsc` →
+  根 `.bin/tsc` → 检出内同两处兜底，取第一枚可执行的；四枚都找不到 ⇒ `emit()` 直接返回 `127` 并把找过的路径列出来，
+  `npx` 那条通道整个删掉。`--self-test` 补两臂：**臂 8** 静止那次必须拿到逐字路径且 `argv` 里没有 `npx`；
+  **臂 9** 把四枚候选全拿掉（连兜底所在的 `REPO` 一起换成空树）必须解析不到、绝不退化成出网。
+  🔴 臂 9 第一版是**红的**，而它抓到的是我自己：我只换了临时树、没换兜底的 `REPO`，于是它照样解析得到 ——
+  测的根本不是我声称的那件事。改成 `REPO` 也换掉之后：`SELF_RC=0`、`臂数=10　不成立=0`、臂 8/9 都 `✔`。
+  ⚠️ 顺手把 `--self-test` 的 help 里那句写死的"六臂"改成"臂数由本装置自己打印" —— 那枚数已经漂过两次了。
+
+- **归因边界（不许把绿单独归给一个改动）**：这次同时改了**两件事** —— 起法（从我那条
+  `npx --prefix server vitest run --root server` 换成真实链路的 `cd server && pnpm exec vitest run tests/…`）与编译器解析。
+  所以"现在绿"不能单独归功于其中之一；但日志第 14 行 `http fetch GET 200 https://registry.npmjs.org/tsc`
+  已经**独立**证明那条通道存在且会出网，这与谁怎么起它无关。
+
+- **最终读数（合并态主检出 `cbe9eeaf`）**：`verify-inbound-cjs-require-order.py` normal 腿
+  `在册 .ts=119　有产物=119　无产物(未编译)=0　扫过的产物=119　命中=0`、`NORMAL_RC=0`；`--self-test` `SELF_RC=0`；
+  `cd server && pnpm exec vitest run tests/inbound-lane-rigs-consumers.spec.ts`（真实链路那种按包起的起法）⇒
+  `SPEC_RC=0`、`Test Files 1 passed (1)`、`Tests 11 passed (11)`，跳过 0、`.skip`/`.todo` 现量 0。
+  计划正文被改过，所以四道便宜尺**重取**而不是沿用 09:3x 那次：
+  `LICENSE_RC=0`／`MIGRATIONS_RC=0`／`VOICE_RC=0`／`LINKS_RC=0`。
+  `verify-inbound-ac-ticks.py` ⇒ `AC 行=8　已勾=0　未勾=8　状态位未分类=0`、`ACTICKS_RC=0`；
+  `verify-inbound-doc-tables.py` ⇒ `清单 = 登记表 12 份 + 本线追加 4 份 = 16 份`、`16 个文件，列数、断行、"是不是表"与格内反引号配对都一致`。
+- **一条作废**：这个文件 08:5x 那张复账表里 `verify-inbound-cjs-require-order.py` 那格写的"六臂反向验证过"与装置自报不符
+  （现量 `臂数=10`）。臂数一律以装置自己打印的那行为准，别再往台账里抄 —— 抄一次就漂一次。
+
+- **同一类还剩几处（登记成 B186，白名单内 3 枚 / 白名单外 2 枚，行号现量）**：本线三枚变异牙臂
+  （`verify-inbound-{queue,quota,ticket}-teeth.py`）仍是 `npx --no-install vitest`，改法同形，但**证明它要把变异臂真跑一遍**，
+  而主检出此刻有并行写入者（`server/src/automation/entitlement-ticket.ts` 正被人改，B182）⇒ 交"没跑过的代码"不如不交，
+  排在 B185 那把独占锁之后。**白名单外那两枚更要紧**：`mutate-credential-sweep.py:93` 与 `mutate-w6.py:129` 用的是
+  **不带 `--no-install` 的 `npx vitest`** ⇒ 本地缺二进制时 npm 会**装包**；本线不代改别人的工具，只交可粘形状。

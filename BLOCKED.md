@@ -9870,3 +9870,76 @@ B184 只是这个类里恰好被点名的一枚。
 ② 把某枚 AC 在工作树副本里勾上 ⇒ `ac-ticks` 报 `已勾=1 未勾=7` 并带着 spec 红（臂 B 已实跑，还原后现量 `未勾=8 已勾=0 计划脏条目=0`）；
 ③ 定向 `npx tsc --noEmit …tests/inbound-lane-rigs-consumers.spec.ts` `TSC_RC=0` —— 但注意 `server/tsconfig.json` 的 `include`
 只有 `src/**` 与 `scripts/**`，**server 的测试文件本来就在类型层之外**（B175 末段记过），所以这一格今天是我自补的定向检查，不等于链上有。
+## B186（2026-10-12 10:1x，本会话 · 把"编译器通道"收成逐字指定时，顺量出来的同一类还剩几处）：`npx` 起本地二进制这件事在白名单内还有 3 枚、白名单外 2 枚，其中白名单外那两枚**连 `--no-install` 都没有**
+
+**触发点**：`verify-inbound-cjs-require-order.py` 原先用 `npx --no-install tsc` 起编译器。被 vitest 起时 npm 推断
+"本地装了没有"跟着调用方环境漂（它把 global prefix 推成 `<repo>/server`，于是认不出 `.bin/tsc`），
+结果**去 registry 取了那枚真叫 `tsc` 的老包** —— 现量在它自己写的调试日志里：
+
+```
+8  verbose argv "exec" "--yes" "false" "--" "tsc" "-p" "server/tsconfig.json" --outDir …
+14 http fetch GET 200 https://registry.npmjs.org/tsc 1826ms (cache revalidated)
+19 error npx canceled due to missing packages and no YES option: ["tsc@2.0.4"]
+20 verbose cwd /private/var/folders/…/heyta-cjs-order-…/tree
+```
+
+一条门禁因此有了两种它不该有的性质：**读数随载体起法漂**，以及**能出网**。已在这枚装置里改成逐字指定
+（`server/node_modules/.bin/tsc` → 根 `.bin/tsc` → 检出内两处兜底，四枚都找不到就直接退 127 并列出找过的路径，
+`npx` 那条通道整个删掉），并给 `--self-test` 补两臂。⚠️ 一条归因边界要说清：那次红同时改了**两件事**
+（起法从 `npx --prefix server vitest --root server` 换成真实链路的 `cd server && pnpm exec vitest`，以及编译器解析），
+所以"绿"不能单独归给其中一个 —— 但日志第 14 行已经独立证明那条通道存在且会出网，这跟谁怎么起它无关。
+
+**同一类的其余实例**（`grep -n npx research/tools/*.py` 现量，不是印象）：
+
+| 位置 | 形状 | 归谁 |
+|---|---|---|
+| `research/tools/verify-inbound-queue-teeth.py:80` | `npx --no-install vitest run --maxWorkers=1` | **本线白名单内**（`verify-inbound-*.py`） |
+| `research/tools/verify-inbound-quota-teeth.py:105` | 同上 | 同上 |
+| `research/tools/verify-inbound-ticket-teeth.py:108` | 同上 | 同上 |
+| `research/tools/mutate-credential-sweep.py:93` | `npx vitest run` —— **没有 `--no-install`** ⇒ 本地找不到时 npm 会去装 | 白名单外，本线不代改 |
+| `research/tools/mutate-w6.py:129` | 同上 | 白名单外，本线不代改 |
+
+**为什么这三枚本线的没跟着一起改**：改法与刚修那枚同形，但**证明它需要把变异臂真跑一遍**（这三枚的臂临时改写
+被跟踪源文件、备份在 `/private/tmp/…mut-bak`，按 AGENTS §8.9 只能独占跑），而此刻主检出里有并行写入者
+（`server/src/automation/entitlement-ticket.ts` 正被人改，见 B182）⇒ 现在改只能交出"没跑过"的代码。
+排在 **B185 那把独占锁/单独串行载体**之后一起做，谁先落地都行，**别两边都不做**。
+
+**白名单外那两枚更要紧**：不带 `--no-install` 的 `npx` 在缺本地二进制时是**会装包的**，也就是那两枚变异装置在
+一台干净机器上可能顺手往 `node_modules` 里写东西再跑 —— 这不是假设，`npm` 的行为差异就在这一枚参数上。
+本线不代改别人的工具，交可粘形状：把 `['npx','vitest',…]` 换成逐字路径，或至少补 `--no-install`。
+
+## B187（2026-10-12 10:2x，本会话 · 修 B186 那一趟里**同一趟踩第二次**）：`verify-inbound-ac8-matrix.py` 臂 6 的静止对照 needle 是"整文件子串恰好命中 1 处"，而它的被审文档正是我们写台账的那份计划 —— 于是**任何后来描述臂 6 的正文都会把自己打红**
+
+**现象（两次都当场现量）**：
+```
+$ python3 research/tools/verify-inbound-ac8-matrix.py --self-test
+SELF_TEST_BROKEN：臂 6 的原文命中 2 处，要求恰好 1 处 —— 「<矩阵引言末尾那句>」        → rc=1
+```
+第一次：09:4x 那节复述了它；第二次：10:0x 那节**在记录第一次时**又整句复述了它。
+两次都由 `server/tests/inbound-lane-rigs-consumers.spec.ts` 在合并态主检出里抓到（`SPEC_MAIN_RC=1`），
+不是"环境抖了一下"：`grep -c` 那枚串在同一份文件里数得出 2。
+
+**为什么本线不代改**：臂 6 是**验收脚本自己的判据**（任务书："改判卷口径要记 BLOCKED.md"）。
+它现在的语义是"改引言散文 ⇒ 判决必须保持绿"，方向是对的、也确实抓到过东西；
+要动的只是**它数什么**，那是口径裁决，不是 bug 修复。
+
+**可粘的修法（三档，任一种都能拆掉这个自指）**：
+1. 把 needle 的计数域从整份文件收窄到**矩阵那一段的行界**（装置已经从 `表头行=1098` 起在数表体行，
+   引言就在它上面几行 —— 复用同一套行界即可，成本最低）；
+2. 让 needle **不等于**任何可能被引用的散文：把它换成一句刻意不成话的哨兵串（例如带 `⚑` 与随机后缀），
+   注释/台账里没人会去复述它；
+3. 臂 6 改成**在临时副本上**造变异（把引言那句换成别的措辞）而不是"追加一处原文"，
+   这样计数要求从"恰好 1 处"降成"至少 1 处"，正文爱怎么引用都行。
+
+**这一档的普遍形状（值得并进 B185 那一类）**：一台尺如果把它**所审文档里的一句人话**当锚点，
+那句人话就从"内容"变成了"接口" —— 之后所有解释这台尺的文字都不能再提它，否则尺红。
+本线 15 枚装置里还有没有同形的锚点，**没逐枚查**（查法：把各装置 `--self-test` 里"要求恰好 N 处"的
+字符串列出来，与该装置所审文档的正文做交叉）；这一格留在 B185 的接线下一次一并量。
+
+**当下动作**：计划正文与进度台账都改成**只用结构位置**指代那句（"AC-8 那张矩阵表头行紧邻上方、那句引言的结尾"），
+既不整句复述、也不写 `grep` 命令去定位它；臂 6 与它的 needle 原文一个字没动。
+🔴 为什么连"写条 grep 定位它"都不行，本条自己就是第三例现场：这一格第一稿写着
+「用 `grep -n '<needle 的前几个字>' docs/plans/inbound-automation.md` 现量 1 处」⇒ 那条命令自身含有 needle 的一段，
+写进计划正文后 `grep -c` 当场读成 **2** —— 那句承诺在它落笔那一刻就假了。**定位命令会自增自己的分母**，
+而这类自增在"要求恰好 N 处"的尺上必然表现为红。⇒ 修法 1（锚行界）之外还有一条零成本纪律：
+**台账/正文不要用"含被锚字符串的搜索命令"来指代它**，改用结构位置。
