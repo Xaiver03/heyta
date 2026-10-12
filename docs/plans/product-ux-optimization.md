@@ -2156,9 +2156,9 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
   r99（四端重装，只含 HEAD 那棵树打出的包）证的是一条窄声称：**装的是当前产物、起得来、首屏画面对**
   （判据读数 `apps/web/evidence/ux-final-20261012/reinstall-r99/RESULT.md`，Android 那格 `mCurrentFocus=com.heyta/…MainActivity` + 窗口内容判据）；
   本线另在 r98 用当前装置取到**三处确认框的设备腿**读数（`apps/web/evidence/ux-final-20261012/organizer-confirm-r98/`）。
-  🔴 **不包括**：Profile/Settings 那条 23 步旅程在 **r99 那枚 APK** 上重跑 —— 中英两条腿的最近读数是 r85/r86（10-11 00:3x，
-  当时也是当前源码打的那枚），此后 HEAD 又推进了一批。所以这一格关的是"待办 #1 的装置能跑 + 当前安装态已验收"，
-  **不是**"全部旅程都在今天的字节上走过"。
+  🔴 **不包括**：~~Profile/Settings 那条 23 步旅程在 **r99 那枚 APK** 上重跑~~ —— **这句在本格写完后二十分钟就被自己作废**：
+  01:1x–01:3x 真在那枚 APK 上重跑了中英两腿，并且当场撞出一条**界面在对用户说谎**的缺陷（文案与行为相反）＋ 脚本两处形状缺陷，
+  逐条与修法在下面 01:1x 那一格。这一格留下的可用结论是：**Android 当前安装态已验收**（装的是只含 HEAD 那棵树打的包、起得来、首屏画面对）。
   **这组读数出自哪棵树 / 哪个产物**（三句缺一，就会被读成"当前源码验收过"）：
   ① **载体是主检出的工作树，不是 HEAD 干净检出**：取数这几分钟里 `main` 自己走过（同一台机器上别人正收一次 merge，`git status` 一度报 `You have unmerged paths`，几十秒后又 0 冲突）⇒ 复现任何一条都要**重取**，别抄这一句。
   ② **装着的 App 不是这批源码**：`journey.json` 的 `artifact.sha256` = `1a01024e…`（脚本自己拿 `pm path` 那枚文件的 `sha256sum` 与本地 APK 逐字节对账，不一致直接抛 —— 所以它证明的是"装的就是这枚 APK 文件"），而 `apps/mobile/android/app/build/outputs/apk/release/app-release.apk` 的 mtime = **10-09 01:52:50**，比它新的源码 **38 枚**（现量：`find apps/mobile/src packages/*/src apps/web/src -newer apps/mobile/android/app/build/outputs/apk/release/app-release.apk -type f \( -name '*.ts' -o -name '*.tsx' \) | wc -l`）⇒ **"装的是当前产物"那一格仍然开着**。
@@ -2166,6 +2166,11 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
   **装置版本**：`scripts/qa/profile-settings-android.py` sha256 前缀 `5c72fc74e991bb47`。开跑前它是 `3fde063738a3d6e1`（= `ccde0c51` 那枚，工作树逐字等于 HEAD，`git status --porcelain -- <它>` 为空）；这轮只往它加了一个旋钮（下面那条），**默认关，关掉时行为逐字不变**。
   ✅ **英文分支在真机上端到端走通，而且是走产品自己那条路**（这正好是承接 01a11015 会话断掉时正在做的那件事的收尾）：新旋钮 `--in-app-language=en` 在 设置 → 常规 → 语言 里点产品自己的开关，然后**整条旅程 23 步全用英文定位符**跑完 —— `English => Language`、`BACK => Preferences and account`、`Sync and privacy => Privacy consent`、`Data management => Backup & migration`、`View full growth => My growth`、`Lists`、`Countdowns` 一条不缺；报告顶层 `uiLocale: "en"`，几何判据也是英文取的（`tabBar.nodes` = `Tasks/Calendar/Focus/Categories/Profile`，`visibleTitle` 与 `visibleSubtitle` 都在 —— 后者是 `find_exact` **逐字比整句英文副标题**，对不上就抛，所以它不是"没断言"）。读数在 `apps/mobile/evidence/profile-center/android-r65-inapp-en/`。
   **为什么不能靠改设备语言**：那一行的说明写着「选择只在本会话内生效，重开应用会回到设备的语言」，而旅程每次开头都 `am force-stop` 冷启 ⇒ 会话内的开关在下一趟之前就被抹掉，只有**在旅程内切、切完继续走**才量得到。
+  🔴 **10-13 01:3x 就地更正：这句的"所以"是错的，而且错的方向会伤到共享载体。** 实测那枚开关**是持久的**
+  （`force-stop` → `pidof` 空 → `am start -W` 新 pid → 界面仍是英文；设备语言 `zh-Hans-CN`、per-app 覆盖为空），
+  代码注释也写明"冷启动恢复独立设备偏好"是设计 ⇒ 不是"下一趟之前被抹掉"，而是**下一趟开始时它就是上一趟留下的语言**。
+  所以"只有切完继续走才量得到"这半句仍然成立（设备语言确实不该碰），但**必须补一条**：脚本要在末尾用产品自己的开关恢复现场
+  （已落进 `profile-settings-android.py`，见下面 01:1x 那一格第 3 条），否则英文态会留给下一个用这台模拟器的人。
   ✅ **英文分支离线那一半有仓库现成的尺**：`python3 scripts/qa/check-locator-labels.py scripts/qa/profile-settings-android.py` → rc=0，`读到 77 组（含中文 56、T() 同义定位 56 处）`，分母 `zh 3956 键 / en 3956 键` ⇒ 那 56 组英文串**逐字等于词条真源**，没有一份是脚本自己编的。**没有另造装置**（AGENTS §8「同类事故扩充原条 / 不另建孤立入口」）。
   ⚠️ **量到一条，但这一格不下结论**：把 Android 13+ 的 per-app 语言覆盖 `cmd locale set-app-locales com.heyta --locales en-US` 设进去**并回读确认系统记下了**（`get-app-locales` 返回 `[en-US]`），App 里界**仍然全中文** ⇒ 产品读的那个"设备的语言"**不是** per-app override。两种解释今天分不开：① App 未声明 `localeConfig`，系统对它不施加覆盖；② App 自己有一份优先级更高的偏好。分开只需读一次 `常规 → 语言` 面板的当前选中项。取完这趟就把覆盖**逐字改回 `zh-Hans-CN` 并回读**（同台上还有别的会话在用这台模拟器，AGENTS §8.9）。
   ⚠️ **同一趟那条 `hardwareBack` 红不立案，但也没被判成排除**：`android-r61-staleproduct-en` 在 数据管理 面板那一下硬件返回直接落回「我的」、跳过了设置目录（前一步 labels 确实是面板：`['返回','数据管理','关闭','回收站…']`，失败 dump 是「我的」整页）。它**只出现在我改了 per-app 语言覆盖的那一趟**；覆盖改回之后 r60/r62/r63/r64/r65 连五趟同一格全是 `BACK => 偏好与账号` ⇒ 按"我自己的设备改动污染了读数"处理，不写产品缺陷。复发时用 `--timeout` 调大再取，或直接读 `back()` 里 `wait(after, absent)` 的目标写的是什么。
@@ -3148,6 +3153,7 @@ Android 那三下有读数（19:5x 那格），iOS / Windows / macOS 三个壳�
    小组件那侧读它的实现真在（`apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetLocalePreference.kt`）。
    ⇒ **行为是设计，文案是陈的** ⇒ 改的是两表文案（不是行为）：中文「这台设备会记住你的选择，重开应用仍然用它；系统小组件读同一份偏好。」
    ⚠️ 这一格交的是**离线层 + 代码依据**；改完的文案在设备上的读数要重打 APK 才有，落在下一格，**不在这里宣称已见**。
+   ✅ **01:4x 追认：那一格已经补上**（可 grep：`我把新写的那半句也拿去对了一遍真源`）—— 设备读数、图、载体与产物身份都在那里；本格那句"不在这里宣称已见"是当时原话，保留是为了让人看清**哪些格子是当场交的、哪些是隔了一格才交的**。
 3. 🟡 **上一条顺带照出：脚本的英文腿不幂等**（同一个根因的第二层）。`tap('English','Language',absent=T('语言','Language'))`
    里 `T()` 取的是**运行时检测**（`:202`）判定后的语态 —— 当 App 已经是英文，`after` 与 `absent` 变成**同一枚串**，条件恒不满足
    ⇒ 第二次跑必红（实测 RC=1，报告里只有 5 步）。它以前从不现形，只是因为"开关只在本会话内"那句**当时恰好让每次起跑都是中文**。
@@ -3165,3 +3171,29 @@ Android 那三下有读数（19:5x 那格），iOS / Windows / macOS 三个壳�
 
 **离线层读数**（改完文案与脚本之后现取）：`pnpm --filter @heyta/i18n test` **rc=0**（3 files / 26 tests）、
 `pnpm check:ui-language` **rc=0**（词条表 zh/en 各 4002 条、逐键对齐）、`pnpm check:locator-labels` **rc=0**。
+
+### 2026-10-13 01:4x：把上一格欠的那句"设备上的读数"补齐了 —— 顺带把我自己新写的那句话也拿去对了一遍真源
+
+上一格第 2 条末尾写着"改完的文案在设备上的读数要重打 APK 才有，落在下一格，**不在这里宣称已见**"（可 grep：`落在下一格，**不在这里宣称已见**`）。本笔就是那一格，做完了。
+
+**载体与产物身份**（三句齐，缺一就会被读成"当前源码验收过"）：隔离检出 `../heyta-wt-r99` detached @ **`dfeacee3`**（= 当时的 `main`，逐字相等），开工时被跟踪脏枚数 **0** ⇒ **只含已提交内容**。
+`pnpm --filter @heyta/i18n build` RC=0 → `pnpm build:android` RC=0（打包机 `windows-pc`，APK sha256 前缀 `0a1a92dc562979de` / 69,462,968 B / 远端完成 `2026-10-12T17:42:12Z`）。
+`adb install -r -g` Success，**设备侧 `pm path` 那枚 `base.apk` 的 sha256sum 与本地逐字相同**（不是"看着新"）。
+⚠️ 主检出 `apps/mobile/android/.../app-release.apk` 全程没被这趟碰过，仍是 `b731fd26…` / 10-12 19:12 那一枚 —— 要复现别去主检出找。
+
+✅ **设备读数**：新装置 `apps/mobile/evidence/profile-center/android-r100-copy/probe.py`（sha 前缀 `ed13f7aa`）冷启动后走 我的 → 设置 → 常规 → 语言，取可见文本：
+`newHits = ["这台设备会记住你的选择，重开应用仍然用它；系统小组件读同一份偏好。"]`、`oldHits = []`（旧句「选择只在本会话内生效…」在界面上已不存在）、`scrollAttempts = 0`、RC=0。
+判据形状是"新串 ≥1 **且** 旧串 =0 才给 0"，所以它不是一枚只会被动通过的探针 —— 旧句没删干净就会红。
+人图已看（§6.2 规定一）：`language-panel.png` 里那句两行折行、无裁切，下方「中文」实心蓝底选中 + 「English」。
+
+🔴 **本笔真正值得记的一条：改完文案之后，我把新写的那半句也拿去查了，而不是只查被改掉的那句。**
+新句里"系统小组件读同一份偏好"是我自己写进去的断言。它凭什么成立（现量，不是顺着上一句推的）：
+写入 `apps/mobile/src/i18n/locale-preference.tsx:39` 每次 locale 变化都 `void setWidgetLocale(locale)`；
+落到 Android `WidgetModule.setWidgetLocale` → `WidgetLocalePreference.write`（`SharedPreferences` 的 `heyta_widget_preferences/locale`）+ `WidgetRefresh.pushAll`，iOS `HeytaWidgetModule.swift:85-87` 同形；
+**读回 `apps/mobile/src/i18n/locale.ts:69-70`：`preferredLocale` 是第一优先级**，排在 `deviceLocale` / `AppleLanguages` / `localeIdentifier` 之前
+⇒ "同一份偏好"不是修辞，小组件那份存储**就是** App 冷启动读的那份。挡这档优先级的单测**早就在**：`apps/mobile/tests/locale.spec.ts:33-35`「中文偏好覆盖英文系统；英文偏好覆盖中文系统」，另有 `:44` 坏偏好回落。
+⇒ **一般形状（这条比本格有用）**：修一句假话时，新写的那句和旧的那句要受同一道审查 —— 我只查了"被改掉的是不是真错了"，很容易默认"我换上去的一定对"。这次它恰好对，是因为有 `preferredLocale` 那两行；下次不一定。
+
+⚠️ **射程边界（本格不宣称的三件）**：① 小组件卡片切语言后**真的换了字**没有桌面级读数，只有上面那条代码路径 + 那枚单测；② 英文态下这句的渲染只过了词条对账，本趟是中文态；③ **iOS 设备侧这枚键不在本格里** —— iOS 腿在同一枚 `dfeacee3` 上另跑（`scripts/reinstall-all.sh --only ios`，读数落在下一格）。
+📌 顺带一条**装置自身的形状**：`--only ios` 那趟的汇总会自己印「⏭ <端>：不在 --only 范围 —— 这端**没有**验证当前产物」（`scripts/reinstall-all.sh:642`）。所以"跑过某一端"在这套装置里**不会**被读成"四端都验过"，这是它设计得好的一面，记下来免得下一个人以为要自己写限定句。
+

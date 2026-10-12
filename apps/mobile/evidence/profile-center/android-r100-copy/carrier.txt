@@ -1,0 +1,48 @@
+r100 语言面板文案读数 · 出处（三句缺一就会被读成"当前源码验收过"）
+
+载体
+  隔离检出 ../heyta-wt-r99，detached @ dfeacee3（= 取数时的 main，逐字相等）。
+  被跟踪脏枚数 = 0（现量：git -C ../heyta-wt-r99 status --porcelain | grep -cv '^?? '）。
+  ⇒ 这一格是"只含已提交内容"的读数。
+  ⚠️ 取完这趟之后该载体又出现 1 枚被跟踪漂移（apps/mobile/ios/Podfile.lock，iOS 腿的 pod install 重写，
+     与台账 r99 那格同型）。它不影响本格的 APK：APK 在这之前已构建并安装。
+
+产物
+  pnpm --filter @heyta/i18n build → RC=0（日志 ~/heyta-r99-tmp/r100-i18n-build.txt）
+  pnpm build:android → RC=0（日志 ~/heyta-r99-tmp/r100-apk.txt，构建主机 windows-pc）
+  APK = ../heyta-wt-r99/apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+        size 69,462,968 B / sha256 0a1a92dc562979ded712add3d4126547e9ef23ceed6e1549fa89e4a3e7fa47bb
+        远端完成时刻(UTC) 2026-10-12T17:42:12Z
+  安装：adb -s emulator-5554 install -r -g → Success
+  设备侧对账：pm path 那枚 base.apk 的 sha256sum = 同一个值（逐字相同，不是"看起来新"）
+  ⚠️ 主检出的同名 APK 路径没有被这一趟碰过：它仍是 sha256 b731fd26… / 10-12 19:12 那一枚。
+
+装置
+  apps/mobile/evidence/profile-center/android-r100-copy/probe.py（sha256 前缀 ed13f7aa7b604d30）
+  冷启动（force-stop → am start -W com.heyta/com.heytamobile.MainActivity）→ 我的 → 设置 → 常规 → 语言
+  → uiautomator dump 取可见文本 → screencap。RC=0。
+  判据形状：命中新串数 ≥1 且 命中旧串数 =0 才给 0；两种情况任一不满足直接非零退出。
+
+读数（readout.json）
+  newHits = ["这台设备会记住你的选择，重开应用仍然用它；系统小组件读同一份偏好。"]
+  oldHits = []（旧句「选择只在本会话内生效…」在界面上已不存在）
+  scrollAttempts = 0（首屏就在场，不需要滚）
+
+人看图（§6.2 规定一）
+  language-panel.png 已打开看过：常规面，语言卡标题下正是上面那句（两行折行、无裁切），
+  下方两枚选项「中文」(选中，实心蓝底白字) 与「English」，中文态界面。
+
+这半句"系统小组件读同一份偏好"凭什么敢写（不是顺着上一句推的）
+  写入：apps/mobile/src/i18n/locale-preference.tsx:39 每次 locale 变化都 void setWidgetLocale(locale)
+  落到：Android WidgetModule.setWidgetLocale → WidgetLocalePreference.write（SharedPreferences
+        heyta_widget_preferences/locale）+ WidgetRefresh.pushAll；iOS HeytaWidgetModule.swift:85-87 同形。
+  读回：apps/mobile/src/i18n/locale.ts:69-70 —— preferredLocale 是**第一优先级**，
+        排在 deviceLocale / AppleLanguages / localeIdentifier 之前。
+        ⇒ 所以"同一份偏好"不是修辞：小组件那份存储就是 App 冷启动时读的那份。
+  已有单测挡着优先级这一档：apps/mobile/tests/locale.spec.ts:33-35
+        「中文偏好覆盖英文系统；英文偏好覆盖中文系统」，以及 :44 坏偏好回落设备语言。
+
+没证的（别把本格读成这些）
+  ① 小组件卡片在切语言后**真的换了文字**：只有代码路径 + 上面那枚单测，没有桌面截图级读数。
+  ② 英文态下这半句的渲染（en.ts 那条串）：本趟是中文态，英文文案只过了 check:locator-labels 的词条对账。
+  ③ iOS 设备侧的这枚键：本格只覆盖 Android；iOS 腿在同一枚 dfeacee3 上另跑（读数落在台账下一格）。
