@@ -650,7 +650,7 @@ Android 的“快捷开始”及 AI 设置分组前省略号属于分组动作�
 
 | ID | 真实截图问题 | 下一步产品决策与验收 | 状态 |
 |---|---|---|---|
-| UX-S9-97 | Android“我的”首屏截到部分倒数入口，初步怀疑底部导航遮挡 | 先实际滚动测量完整行与底栏位置，再决定是否修改布局 | **当前标准字号未复现遮挡**：完整行 bottom=1899 🔴 **（10-10 02:5x 对账：仓里那枚已跟踪读数交的是 1890，底栏 2169 逐字相同；两个数不在同一枚证据上，引用请取现量命令，别抄这里，见 §8「下一趟的固定顺序」那格）**，底栏 top=2169，标题/副标题均可见，进入/返回成功。初始截图是滚动视口裁切；不盲目增加 padding。大字体仍待专项验收（判据不用另写：装置里那两条 `entryBottom…AboveTabTop` 就是它，一次性配方含 font_scale 还原四步，在同一格） |
+| UX-S9-97 | Android“我的”首屏截到部分倒数入口，初步怀疑底部导航遮挡 | 先实际滚动测量完整行与底栏位置，再决定是否修改布局 | **当前标准字号未复现遮挡**：完整行 bottom=1899 🔴 **（10-10 02:5x 对账：仓里那枚已跟踪读数交的是 1890，底栏 2169 逐字相同；两个数不在同一枚证据上，引用请取现量命令，别抄这里，见 §8「下一趟的固定顺序」那格）**，底栏 top=2169，标题/副标题均可见，进入/返回成功。初始截图是滚动视口裁切；不盲目增加 padding。大字体专项已跑（10-13 03:1x）：`font_scale 1.3` 下同一枚判据**先读到 false**，而那是探针自己滚不动（swipe 锚在入口中心 y=2210，落进底栏带 `[2169,2337]`）；换成锚在内容区的独立探针后**一根滑动即达**（`[42,960][1038,1090]`，strict True），而 `1.0` 未滚时同样在带外（`[42,2123][1038,2169]`）⇒ **"要滚一下"两档共有，不是大字号带来的**；无叠字无截断，padding 裁决维持。四数、机制、装置改法与射程三句见 §8 末格 |
 | UX-S9-98 | 我的页通知/成长/习惯/倒数纪念日仍是文字链接与说明堆叠，和上方状态信息层级不一致 | 统一无描边整行动作组件、图标/主副标题/点击范围，明确目的地；不用加框解决 | **已实现并随当前包安装，Android个人中心旅程通过** |
 | UX-S9-99 | 原生成长空数据态主要依靠文字与数字 | 接入已有共享空状态插画及下一步操作；不伪造统计 | **已实现**；年度热力图来自共享真实投影，补打卡/重新开始显式写入目标量（含0），同步锁防连点，相关动作/UI回归通过 |
 | UX-S9-100 | 原生同步与隐私页的自托管底部入口缺少清楚的首次使用路径 | 保持官方同步优先；自托管主动开启后才出现连接配置与帮助，不扩大默认信息量 | **Android 当前安装态已复核**：默认官方同步；主动开启自托管后才见连接字段；返回官方和取消登录均保留官方路径，未提交凭据。证据 `apps/mobile/evidence/ux-s9-100/android/journey.json`；其他端不外推 |
@@ -1400,6 +1400,7 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
     - 🔴 **10-10 03:1x 复量：一处没变，三条归属读数逐字同值**（HEAD = `39eb92e9`，期间落 25 笔）：`pnpm check:docs` 仍 **rc=1 且仍只那一处**；`apps/desktop-windows/README.md` 仍是 ` M`（它自己最近一笔仍是 `88723e3e`，那一线这两天没再动这份）；`scripts/windows/launch-data-transfer-qa.ps1` 仍 `??` 且 `git cat-file -e HEAD:…` 报无。⇒ **三条出路仍由那一线选**，本线这格继续不打勾；这一行的作用只是让下一位知道"到 03:1x 为止它还没被修，且不是本线能代修的"。
 - [ ] **下一趟的固定顺序**（负载回落且 `pm` 可用之后）：`adb install -r apps/mobile/android/app/build/outputs/apk/release/app-release.apk` → `python3 scripts/qa/profile-settings-android.py --serial emulator-5554 --evidence-dir apps/mobile/evidence/ux-final-20261009/profile-settings-android` → 打开 `journey.json` 的 `uiLocale` 与截图人看一眼；英文态跑完要把设备语言切回 `zh-CN` 再跑一趟，两态分别登记。
     - 🔴 **02:5x 补上顺带能在同一趟关掉的 UX-S9-97"大字体专项"，因为它用的判据已经在这枚脚本里，不要另造一把尺**（现量：`grep -n "tabBar\|AboveTabTop" scripts/qa/profile-settings-android.py` ⇒ `:127-129` 交出 `tabBar.top/bottom` 与两条 `entryBottom…AboveTabTop`，`:255` 在"入口没严格在底栏之上"时抛 `AssertionError`）。配方四步，**第 4 步是承重的**（设备是共享资产，不许把缩放留在 1.3 给别人）：① 先记基线 `adb -s emulator-5554 shell settings get system font_scale`（读数原样抄进台账，`null` 也要抄 —— 那就是"没设过"这一档）；② `adb -s emulator-5554 shell settings put system font_scale 1.3`；③ 上面那条 `python3 …` 逐字重跑，只把 `--evidence-dir` 换成 `…/profile-settings-android-font13`，台账里写进 `geometry.tabBar.top`、`geometry.entry.node.bounds.bottom` 与那两条布尔值四个数；④ **还原并回读**：`settings put system font_scale <①那枚原值>` → `settings get system font_scale` 必须逐字等于①。判据口径：`entryBottomStrictlyAboveTabTop` 在大字号下**仍须为 true**；为 false 就是那一行怀疑的"底栏遮挡"在大字号下真成立，按缺陷登记并带上四个数。⚠️ **射程**：这一趟只关"Android「我的」首屏在大字号下还被不被挡"这一格，**不关 UX-S9-97 整行**（那行还写着"不盲目增加 padding"那条裁决，要这趟读数才能重判），也**不**是 iOS/鸿蒙的大字体（各自的载体与判据都不在这儿）。
+      - ✅ **10-13 03:1x 这一格跑完了，而它那句"为 false 就按缺陷登记"要加一条前置**：四个数确实读到了 false（`tabBar.top=2169`／`entry.top=2251`／`entry.bottom=2169`／strict False），**但按字面登记就会把一次探针故障写成产品缺陷** —— 那根 nudge 的起点是入口自己的中心，1.3 下 y=2210 已落进底栏带，面板根本没滚。⇒ 口径补一句：**false 之前先问"这块屏能不能滚"**（30 行独立探针，起点锚 `tabBar.top-260`，逐轮回读位置；位置连续两轮不变＝探针失效，不是遮挡）。读数、机制、装置改法与射程三句在 §8 末格。
       - 🔴 **顺手对了一次那行里的两个数，其中一个在仓里对不上**（零设备、只读现量）：`apps/mobile/evidence/ux-s9-95/android-final/profile/journey.json`（**已跟踪**）里 `geometry.tabBar.top = 2169` 与正文那句"底栏 top=2169"**逐字相同**，而 `geometry.entry.node.bounds.bottom = **1890**`，正文写的是 **1899**。全仓 `grep -rn 1899 --include='*.json' apps/mobile/evidence` 只命中一枚无关的 sha256 串 ⇒ **"1899" 这枚数在仓里没有机读落点**。本格**不裁决**它是"另一趟的读数"还是"抄错一位"（两种读法我都没有证据），只把口径钉成这条：**以后引用那一行时取 `python3 -c 'import json;g=json.load(open("apps/mobile/evidence/ux-s9-95/android-final/profile/journey.json"))["geometry"];print(g["tabBar"]["top"], g["entry"]["node"]["bounds"]["bottom"])'`，别抄正文** —— 9 px 这种量级正好是"滚动位置不同"与"手误"两种成因共存的区间，从 prose 抄下去就再也分不出来。
     - ⚠️ 这一格 1009 那批 `apps/mobile/evidence/ux-final-20261009/profile-settings-android/`（4 枚 PNG + `journey.json`）**整目录未跟踪**（现量：`git ls-files --error-unmatch …/journey.json` → 未匹配），而它自己交的读数是 `status:"failed"`、`geometry:null`、`steps:[]`、`error` 为一句 `Command '['adb', '-s', 'emulator-5554', 'shell', 'pm', 'path', 'com.heyta']' returned non-zero exit status 1.` ⇒ 它是上面那格第③档（包不在设备上 / `pm` 问不到）的记录，**不是**任何一句"已验证"的支持物。它被本台账点名当**输出路径**用，所以按「正文点名某枚图就得补进仓」那条口径，**要么连读数一起入库、要么把点名改成"未跟踪的失败记录"**；本轮取后者（不替它编造几何数），要入库的时机是下面那趟真跑到绿的时候一起收。
 - [x] **上面那格写的"`cp -al node_modules` 几乎不占新块"这条省法，实测是危险的，别照它建载体**（2026-10-09 08:0x，现量不是推演）。按那句做了：`git worktree add --detach ~/heyta-carriers/heyta-uxhead-1009 faab57c4` 之后 `cp -al node_modules`（34 秒、同 inode 223857345、`du` 仍报 2.8G ⇒ 省地方这件事本身是真的）。**坏在下一步**：那棵载体只有根 `node_modules`，`packages/*/node_modules` 是 gitignore 的、`git worktree add` 不会带过来（现量 `ls -d 载体/packages/*/node_modules` → `no matches found`），于是 `pnpm -r build` **没在构建，而是先自己发起了一趟 install**（输出第一行是 `Scope: all 22 workspace projects` + `Lockfile passes supply-chain policies` + `resolved 1015, reused 952`）。而 pnpm 那趟 install 要写的 `node_modules/.modules.yaml` 与 `.pnpm/**` **正是与主树同 inode 的那批文件** —— 就地一改就连着改掉主树。我在它还在 resolve 阶段时把它停了，所以没造成写入。
@@ -1945,7 +1946,7 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
     没满的是端上。这条判断的可复跑口径就是把上面那段筛出来带"深浅/暗色"的行逐行读状态列。
     **不在那一件事里的，逐条列出来（免得藏进"其它"）**：
     ① 生产 SMTP 真实投递 —— UX-S9-86 / UX-S9-87 两行，且 87 自己写明"属 86 的外部链路"，是一条不是两条；
-    ② 大字体专项 —— UX-S9-97 那一行（"当前标准字号未复现遮挡…大字体仍待专项验收"）；
+    ② 大字体专项 —— UX-S9-97 那一行（"当前标准字号未复现遮挡…大字体仍待专项验收"）；✅ **10-13 03:1x 这一条已经跑完并从本清单划掉**：遮挡没有成立（`1.3` 那枚 false 出自探针自己滚不动），四数、机制与装置改法在 §8 末格。
     🔴 **10-10 02:5x 更正这一条的归类：它其实就在"设备"那一堆里，只是不需要重装**。那一行的被测对象是 **Android「我的」首屏**（行标题自己写的），所以"大字体那一档"要的是设备 + 系统字体缩放，**不是** Web 侧能替代的专项，也**不需要**先跑 `reinstall:all`。判据不用另写：`scripts/qa/profile-settings-android.py:127-129` 已经交出 `tabBar.top/bottom` 与 `entryBottomAboveTabTop` / `entryBottomStrictlyAboveTabTop`，`:255` 在"入口没严格在底栏之上"时抛错 —— 一次性配方与还原步骤写在上面「下一趟的固定顺序」那一格。
     ③ 法务正式审阅与协议生效 —— 不在主表里，在未打勾清单那两格（桶三）。
     ⚠️ **这把尺自己的边界要写清**：它只看每行**最后一个格子**，所以"待"字住在别的格子里的行会被漏
@@ -3328,6 +3329,34 @@ mac `dfeacee3`（r102）/ android `dfeacee3`（r100）/ ios `dfeacee3`（r101）
 ⇒ 四端**进包内容等价**。要"四端同一枚提交"，只需把 mac/android/ios 三腿在 `25f7bef5` 上再各跑一发；
 本笔**不**为此重跑三端 —— 那三腿的判据已经对着一枚"进包内容等价"的提交取到了，重跑只会得到同一批字节。
 🔴 仍然不证的两句：**`origin/main`**（本地未 push，四端都无从验证）；`check:ai-e2e` 整族。
+
+### 2026-10-13 03:1x：UX-S9-97 的"大字体专项"跑完了 —— 结论是**没有遮挡**，而那一趟先红在**本线自己的探针**上（这一格有一处自我更正：我一度准备按那四个数登记缺陷）
+
+**执行**（逐字照上面「下一趟的固定顺序」里 02:5x 那格的 ①②④ 四步，载体 = 隔离检出 `../heyta-wt-r99`，设备上那枚 APK `sha256` 前 8 位 `0a1a92dc`）：
+① 基线 `adb -s emulator-5554 shell settings get system font_scale` = **`1.0`**（不是 `null`，所以"没设过"那一档不是当前状态）；② 设 `1.3`；③ 跑旅程 → **RC=1**；④ 还原并回读 = **`1.0`**（中途报错的两趟也各自回读到了 1.0 —— 独立探针把还原写在 `finally`，不依赖读数成功）。
+**四个数**（`python3 -c 'import json;g=json.load(open("apps/mobile/evidence/profile-center/android-r104-font13/journey.json"))["geometry"];print(g["tabBar"]["top"],g["tabBar"]["bottom"],g["entry"]["node"]["bounds"]["top"],g["entry"]["node"]["bounds"]["bottom"])'`）：
+`tabBar.top=2169`、`tabBar.bottom=2337`、`entry.top=2251`、`entry.bottom=2169`（raw `[42,2251][1038,2169]`；`top>bottom` 是 Android 对"被父容器裁到零可见高度"的报法）⇒ `entryBottomAboveTabTop=True`（那一条用 `<=`，被"相等"放过）、`entryBottomStrictlyAboveTabTop=False`。
+🔴 **照那一格的字面口径，这四个数就该登记成"大字号下底栏遮挡成立"的缺陷。它不是缺陷。** 下面是它为什么不成立的两条现量，不是一句判断。
+
+**为什么那四个数不算缺陷证据（机制，两处独立读数）**：
+1. `scroll_to()`（`scripts/qa/profile-settings-android.py:189-198`）的返回条件是"标签出现在 uiautomator 树里"。**被裁到底栏带下方的节点照样带 `content-desc="倒数纪念日"`** ⇒ 它一下都没滚就返回了。
+2. nudge 那根 swipe 锚在**入口自己的中心**（`(x1+x2)//2,(y1+y2)//2`）。1.0 时入口中心 y=2146 < 2169 ⇒ 起点在内容区 ⇒ 滚得动；1.3 时中心 y=2210 ∈ `[2169,2337]` ⇒ **手势被底栏吃掉** ⇒ 面板没动 ⇒ 下一帧读到同一枚退化矩形 ⇒ 判据红。同一枚 APK、同一棵树，红只由那一枚锚点决定。
+**独立探针**（`apps/mobile/evidence/profile-center/android-r104-font13/scroll-probe.py`：起点固定成 `tabBar.top-260=1909`、终点 520，逐轮回读入口矩形）：
+- `font_scale 1.3`：round0 `[42,2251][1038,2169]`（strict False）→ round1 `[42,960][1038,1090]`（strict **True**），round1..3 逐字相同（已到滚动末端）⇒ **一根滑动就够**。
+- `font_scale 1.0`：round0 `[42,2123][1038,2169]`（strict **也是 False**，只有 46 px 露在带外）→ round1 `[42,995][1038,1111]` True。
+⇒ 第二行是本格最要紧的一句：**"要滚一下才看得到那条入口"在标准字号下本来就成立**，不是 1.3 带来的。所以 UX-S9-97 那句"截到部分倒数入口"到这一趟为止**既没被证实是缺陷，也没被反驳**（1.0 与 1.3 的 round0 都恰好截在带外）；它问的"大字号下还被不被挡"答的是**可达性**，两档都是可达。
+👁 人看图：`android-r105-font13/countdown-centered.png`（1.3）里 通知 / 我的成长 / 习惯 / 倒数纪念日 / AI 助手 / 整理与记录 / 清单 / 标签 / 便签 九行的标题+副标题完整、无截断、无与底栏叠字。
+
+**装置改了什么、判据没动什么**：
+- nudge 不再锚入口中心，改锚 `tabBar.top-260`（内容区），最多三次、每次回读；**连续两轮入口位置逐字不变 ⇒ 抛 `countdown nudge did not move the surface`** —— 把"探针滚不动"与"真的被遮挡"拆成两种失败，前者不再冒充后者。`geometry.nudgeRounds` 一起入库。
+- ✅ **判据一字未改**：`entryBottomStrictlyAboveTabTop` 仍须为 true。要钉一句以免被读成放宽：这条判据**改前改后测的都是"某个滚动位置上入口在不在底栏之上"**（1.0 那趟 round0 就是证据），这次只是让它真的滚一次。
+- 两腿复跑（同一枚 r99 APK）：`1.3` → `android-r105-font13/` **RC=0**，`entry [42,960][1038,1090]`、`nudgeRounds=1`；`1.0` → `android-r105-font10/` **RC=0**，`entry [42,995][1038,1110]`、`nudgeRounds=1`。设备收尾 `font_scale` 回读 **1.0**。`NO_COLOR=1 pnpm check:locator-labels` **RC=0**。
+- 另补 `--apk <path>`：这枚脚本原来把"设备上装的必须等于**主检出**那枚 APK"写死，而本线的"只含 HEAD"读数是在**隔离载体**上装的 ⇒ 第一趟还没进界面就死在 `artifact_identity()`。守卫本身一字未动（不匹配照样拒收），JSON 的 `artifact.apk` 现在记**真源那枚的路径**。
+
+**UX-S9-97 那一行的处置**：撤"大字体仍待专项验收"；"不盲目增加 padding"那条裁决**维持**（1.3 下无叠字、可达）。
+⚠️ **射程三句**：只测了 **Android 一台模拟器 1080×2400、`font_scale` 1.3 一档**；没测 1.5/最大档，也没测 iOS/鸿蒙的大字体；"未复现遮挡"证的是**可达性与可见性**，不证"不滚就能看到"。
+📌 元规则命中一次（§7 的"先怀疑探针"）：这一格的红是探针锚点造成的假红，而它长得**完全像**一个真缺陷（四个数齐全、方向也自洽）。区别只在有没有第二把尺去问"这块屏能不能滚" —— 那把尺是一枚 30 行的独立探针，成本远低于误登记一次布局缺陷。
+
 
 
 

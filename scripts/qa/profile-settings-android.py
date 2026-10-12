@@ -12,6 +12,7 @@ parser.add_argument('--evidence-dir', type=Path, default=Path(__file__).resolve(
 # 字面量当成"界面标签"去词条真源对账，CLI 帮助不是界面文案（同目录的
 # profile-settings-ios.py 的 help= 也一律是英文）。
 parser.add_argument('--in-app-language', choices=['en'], default=None, help='drive the whole journey in English through the app\'s own language switch (Settings > General > Language); does not touch the device locale')
+parser.add_argument('--apk', type=Path, default=None, help='APK file the installed artifact must match byte-for-byte; defaults to this repo\'s release output, point it at another tree when the device was flashed from an isolated carrier')
 args=parser.parse_args()
 out=args.evidence_dir
 out.mkdir(parents=True,exist_ok=True)
@@ -173,12 +174,17 @@ def back(after,absent=None,resource=None):
 
 def shot(name): (out/f'{name}.png').write_bytes(adb('exec-out','screencap','-p'))
 def artifact_identity():
- apk=Path(__file__).resolve().parents[2]/'apps/mobile/android/app/build/outputs/apk/release/app-release.apk'
+ # The APK that actually produced what is on the device may live in another tree (an isolated
+ # carrier is how this line builds "only committed content" readings).  Point --apk at it; the
+ # guard itself is unchanged — it still refuses to record a journey over a mismatched artifact.
+ apk=args.apk or Path(__file__).resolve().parents[2]/'apps/mobile/android/app/build/outputs/apk/release/app-release.apk'
+ apk=apk.resolve()
  expected=hashlib.sha256(apk.read_bytes()).hexdigest()
  installed=adb('shell','pm','path','com.heyta').decode().strip().removeprefix('package:')
  actual=adb('shell','sha256sum',installed).decode().split()[0]
  if actual != expected:raise AssertionError(f'Installed APK differs from current build: {actual} != {expected}')
- return {'sha256':actual,'apk':str(apk.relative_to(Path(__file__).resolve().parents[2]))}
+ repo=Path(__file__).resolve().parents[2]
+ return {'sha256':actual,'apk':str(apk.relative_to(repo)) if apk.is_relative_to(repo) else str(apk)}
 
 def scroll_to(label):
  deadline=time.monotonic()+timeout
@@ -264,17 +270,33 @@ try:
  geometry_before_nudge=profile_geometry(r)
  records.append({'action':'countdownGeometryBeforeNudge','geometry':geometry_before_nudge})
  entry_before_nudge=countdown_entry(r)
- x1,y1,x2,y2=node_bounds(entry_before_nudge)
- adb('shell','input','swipe',str((x1+x2)//2),str((y1+y2)//2),str((x1+x2)//2),str(min(y1+80,(y1+y2)//2-320)),'450')
- time.sleep(.7)
- r=tree()
- geometry=profile_geometry(r)
+ # The nudge has to start inside the scrollable column, not on the entry itself.  Once the
+ # entry sits below the fold its reported centre is already inside the bottom tab band
+ # (measured at font_scale 1.3: centre y=2210 inside the 2169-2337 band), so a swipe anchored
+ # there is handed to the tab bar, the surface never scrolls, and the assertion further down
+ # reports an item a single swipe can reach as an occlusion.
+ tab_top=geometry_before_nudge['tabBar']['top']
+ width=list(map(int,re.findall(r'\d+',next(tree().iter('node')).get('bounds'))))[2]
+ previous=None
+ nudge_rounds=0
+ for _ in range(3):
+  nudge_rounds+=1
+  adb('shell','input','swipe',str(width//2),str(tab_top-260),str(width//2),str(520),'450')
+  time.sleep(.7)
+  r=tree()
+  geometry=profile_geometry(r)
+  position=geometry['entry']['node']['bounds']
+  if previous==(position['top'],position['bottom']):
+   raise AssertionError(('countdown nudge did not move the surface',{'rounds':nudge_rounds,'entry':position,'tabTop':tab_top,'entry_before_nudge':node_bounds(entry_before_nudge)}))
+  previous=(position['top'],position['bottom'])
+  if geometry['entryBottomStrictlyAboveTabTop']:break
  title_node=find_exact(r,countdown_label())
  subtitle_node=find_exact(r,T('记下要盯的日子，看它还有几天','Keep the dates you watch, and see how far off they are'))
  if title_node is None or subtitle_node is None:
   raise AssertionError(('countdown entry text not fully visible after nudge',texts(r)))
  geometry['visibleTitle']=bounds_record(title_node)
  geometry['visibleSubtitle']=bounds_record(subtitle_node)
+ geometry['nudgeRounds']=nudge_rounds
  records.append({'action':'countdownGeometryCentered','geometry':geometry})
  shot('countdown-centered')
  if not geometry['entryBottomStrictlyAboveTabTop']:

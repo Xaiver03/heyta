@@ -84,6 +84,7 @@ df -h /System/Volumes/Data                              # 要不要新开一棵�
 
 | 10 | **`values/` 与 `values-en/` 的 `widget_*` 键集合没有一枚门在对账** —— 一旦不相等，英文用户的小组件静默回落成中文，TS/构建/测试都不响。10-13 02:1x 现量**当前是齐的**（各 20 枚、集合逐枚相等）⇒ 这是"缺门"，不是"有缺陷" | **负责人一句话**：追加进哪条 `check` 链。根 `package.json` 现在有一对重复的 `"check"` 键（本账已登记"哪条算数要所有者拍"），**追加进那枚死键的形状比没门更糟** | 取样：`for d in values values-en; do grep -o 'name="widget_[a-z0-9_]*"' apps/mobile/android/app/src/main/res/$d/strings.xml \| sort -u; done`；接线后由 `check:gate-wiring` 反查 |
 | 11 | ⚠️ **趟号撞了**：本线 10-13 那三趟用了 `r100/r101/r102`，而上面第 8 格 10-11 那趟也叫过 `r102`（install）。**目录能分开**（`apps/web/evidence/ux-final-20261011/` vs `…-20261012/`），但散文里裸写"r102"会指错。以后要么带日期段，要么换号段 | 本线（下一趟起） | 现量：`ls apps/web/evidence \| grep ux-final` |
+| 12 | ~~UX-S9-97「大字体仍待专项验收」~~ ✅ **10-13 03:1x 跑完，结论是没有遮挡**：`font_scale 1.3` 下那枚判据先读 false，而 false 出自旅程探针自己滚不动（nudge 锚在入口中心 y=2210，落进底栏带 `[2169,2337]`）；独立探针一根滑动即达，`1.0` 未滚时同样在带外 ⇒ "要滚一下"两档共有。旅程的 nudge 已改锚内容区并把"滚不动"抛成另一种失败，`artifact_identity()` 加了 `--apk`（隔离载体装的包不在本树）| **无（已闭合）** | 台账 §8 末格；证据 `apps/mobile/evidence/profile-center/android-r104-font13/`（含 `scroll-probe.py` 与两档 JSON）、`…/android-r105-font13/`、`…/android-r105-font10/`。⚠️ 射程只有一台 1080×2400 模拟器与 1.3 一档 |
 
 
 第 4、5 格都做过**同一枚 A/B**：在只含已提交内容的载体上照样红 ⇒ 是 `main` 上的既有红，不是共享检出被写脏的假红。

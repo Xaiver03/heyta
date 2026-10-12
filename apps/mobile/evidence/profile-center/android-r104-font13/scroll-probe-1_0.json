@@ -1,0 +1,81 @@
+{
+ "fontScaleSet": "1.0",
+ "fontScaleBaseline": "1.0",
+ "tabBand": [
+  2169,
+  2337
+ ],
+ "rounds": [
+  {
+   "round": 0,
+   "entry": {
+    "left": 42,
+    "top": 2123,
+    "right": 1038,
+    "bottom": 2169
+   },
+   "tabTop": 2169,
+   "strictlyAbove": false,
+   "contentBottomsBelowEntry": [
+    2308,
+    2337
+   ]
+  },
+  {
+   "round": 1,
+   "entry": {
+    "left": 42,
+    "top": 995,
+    "right": 1038,
+    "bottom": 1111
+   },
+   "tabTop": 2169,
+   "strictlyAbove": true,
+   "contentBottomsBelowEntry": [
+    1854,
+    2308,
+    2337
+   ]
+  },
+  {
+   "round": 2,
+   "entry": {
+    "left": 42,
+    "top": 995,
+    "right": 1038,
+    "bottom": 1111
+   },
+   "tabTop": 2169,
+   "strictlyAbove": true,
+   "contentBottomsBelowEntry": [
+    1854,
+    2308,
+    2337
+   ]
+  },
+  {
+   "round": 3,
+   "entry": {
+    "left": 42,
+    "top": 995,
+    "right": 1038,
+    "bottom": 1111
+   },
+   "tabTop": 2169,
+   "strictlyAbove": true,
+   "contentBottomsBelowEntry": [
+    1854,
+    2308,
+    2337
+   ]
+  }
+ ],
+ "finalEntry": {
+  "left": 42,
+  "top": 995,
+  "right": 1038,
+  "bottom": 1111
+ },
+ "finalStrictlyAbove": true,
+ "reachableByScrolling": true
+}
