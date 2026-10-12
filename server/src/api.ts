@@ -1,6 +1,10 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { AUTH_PASSWORD_PATHS, SuperSyncClientIdSchema, inboundDraftEventIdSchema, inboundDraftDecisionSchema } from '@heyta/shared-schema';
+// 🔴 来源 ID 的形状只有一份，在 `@heyta/inbound-core`（协议里那句"1–64 字节、以字母或数字起头"就是它）。
+// 这个文件里原本有 **8 处**手抄的同一枚正则，加上票据 claims 与计量层共 **十份副本** ——
+// 抄错一处就是一层的裁决与别人不同，而没有任何门禁会红。
+import { INBOUND_EVENT_ID_PATTERN } from '@heyta/inbound-core';
 import { isEmailAllowed } from './email-allowlist';
 import { normalizeEmail } from './account/email-normalize';
 import {
@@ -145,7 +149,7 @@ const AutomationWorkerRevokeSchema = z.object({ workerId: z.string().uuid() }).s
 const AutomationCommitPermitSchema = z.object({
   clientId: SuperSyncClientIdSchema,
   databaseEpoch: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/),
-  eventId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$/),
+  eventId: z.string().regex(INBOUND_EVENT_ID_PATTERN),
   opId: z.string().regex(/^inbound:[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$/),
   ruleId: z.string().uuid(),
   ruleVersion: z.number().int().min(1),
@@ -175,7 +179,7 @@ const AutomationRecipientKeySchema = z.object({
 }).strict();
 const AutomationClaimSchema = z.object({
   clientId: SuperSyncClientIdSchema,
-  eventId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$/).optional(),
+  eventId: z.string().regex(INBOUND_EVENT_ID_PATTERN).optional(),
 }).strict();
 const AutomationLeaseSchema = z.object({
   clientId: SuperSyncClientIdSchema,
@@ -1088,7 +1092,7 @@ export const apiRoutes = async (
     '/automation/events/:eventId/retry',
     { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation' })] },
     async (req, reply) => {
-      const eventId = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$/).safeParse(req.params.eventId);
+      const eventId = z.string().regex(INBOUND_EVENT_ID_PATTERN).safeParse(req.params.eventId);
       const body = z.object({ expectedAttempt: z.number().int().positive(), expectedRuleVersion: z.number().int().positive() }).strict().safeParse(req.body);
       if (!eventId.success || !body.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       try {
@@ -1149,7 +1153,7 @@ export const apiRoutes = async (
     '/automation/events/:eventId/renew',
     { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation' })] },
     async (req, reply) => {
-      const params = z.object({ eventId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$/) }).safeParse(req.params);
+      const params = z.object({ eventId: z.string().regex(INBOUND_EVENT_ID_PATTERN) }).safeParse(req.params);
       const parsed = AutomationLeaseSchema.safeParse(req.body);
       if (!params.success || !parsed.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       const user = getAuthUser(req);
@@ -1166,7 +1170,7 @@ export const apiRoutes = async (
       precheckOnly: true,
       scope: (req) => ({ eventId: String((req.params as { eventId?: unknown }).eventId ?? '') }) })]},
     async (req, reply) => {
-      const params = z.object({ eventId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$/) }).safeParse(req.params);
+      const params = z.object({ eventId: z.string().regex(INBOUND_EVENT_ID_PATTERN) }).safeParse(req.params);
       const parsed = AutomationResultSchema.safeParse(req.body);
       if (!params.success || !parsed.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       const user = getAuthUser(req);
@@ -1210,7 +1214,7 @@ export const apiRoutes = async (
     // permit is still gated separately.
     { preHandler: authenticate },
     async (req, reply) => {
-      const params = z.object({ eventId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$/) }).safeParse(req.params);
+      const params = z.object({ eventId: z.string().regex(INBOUND_EVENT_ID_PATTERN) }).safeParse(req.params);
       if (!params.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       const user = getAuthUser(req);
       const clientId = SuperSyncClientIdSchema.safeParse(req.query.clientId);
@@ -1235,7 +1239,7 @@ export const apiRoutes = async (
     { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation', action: 'ai-reserve',
       scope: (req) => ({ eventId: String((req.params as { eventId?: unknown }).eventId ?? '') }) })]},
     async (req, reply) => {
-      const params = z.object({ eventId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$/) }).safeParse(req.params);
+      const params = z.object({ eventId: z.string().regex(INBOUND_EVENT_ID_PATTERN) }).safeParse(req.params);
       const parsed = AutomationAiReserveSchema.safeParse(req.body);
       if (!params.success || !parsed.success || params.data.eventId.length > 64) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       const user = getAuthUser(req);
@@ -1263,7 +1267,7 @@ export const apiRoutes = async (
     '/automation/events/:eventId/ai-attempt/state',
     { preHandler: [authenticate, createEntitlementGuard({ capability: 'automation' })] },
     async (req, reply) => {
-      const params = z.object({ eventId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$/) }).safeParse(req.params);
+      const params = z.object({ eventId: z.string().regex(INBOUND_EVENT_ID_PATTERN) }).safeParse(req.params);
       const parsed = AutomationAiStateSchema.safeParse(req.body);
       if (!params.success || !parsed.success) return reply.status(400).send({ code: 'validation_failed', message: 'Validation failed' });
       const user = getAuthUser(req);
