@@ -3915,3 +3915,21 @@ $ grep -rnE '\.(skip|todo)\(|\bxit\b|describe\.skip' <本线全部测试文件> 
   而主检出此刻有并行写入者（`server/src/automation/entitlement-ticket.ts` 正被人改，B182）⇒ 交"没跑过的代码"不如不交，
   排在 B185 那把独占锁之后。**白名单外那两枚更要紧**：`mutate-credential-sweep.py:93` 与 `mutate-w6.py:129` 用的是
   **不带 `--no-install` 的 `npx vitest`** ⇒ 本地缺二进制时 npm 会**装包**；本线不代改别人的工具，只交可粘形状。
+
+## 2026-10-12 10:2x–10:3x · `af190b92` 入库；B187 是**同一趟的第三次**红，而第三次抓到的是"我用来自证的那条命令自己"
+
+- **入库**：`af190b92`（4 枚点名字段：`research/tools/verify-inbound-cjs-require-order.py`、`docs/plans/inbound-automation.md`、
+  `PROGRESS.md`、`BLOCKED.md`；`git show --name-only` 现量 4 行）。`BLOCKED.md` 的提交件是 **HEAD + 我这两节**（B186/B187），
+  别线那三节 `B166/B167/B168` **没有**被卷进去（新 HEAD 里现量 0 枚）；提交后共享索引 `git diff --cached --name-only HEAD` = **0**，
+  工作树 `BLOCKED.md` 仍带别人那 162 行未提交段（归他们）。
+- **第三次的形状（值得单独记，因为它与前两次不是一回事）**：为了不再踩臂 6，我在计划里补了一句
+  "可定位：`grep -n '<needle 前几个字>' docs/plans/inbound-automation.md` 现量 1 处" ⇒ **那条命令自身含有 needle 的一段**，
+  写进正文后同一个 `grep -c` 读成 **2** —— 那句承诺在它落笔那一刻就是假的。
+  前两次是"复述判决要抓的话"，第三次是"**用会被抓的话去写抓它的命令**"。
+  ⇒ 纪律收成一句：**指代一把尺的锚点时，给结构位置，不给字符串，也不给含那个字符串的搜索命令**。
+  登记 **B187**（三档可粘修法：锚行界 / 换不成话的哨兵串 / 在临时副本上造变异把"恰好 1 处"降成"至少 1 处"）。
+- **入库前最后一轮读数（合并态主检出）**：`SPEC_RC=0`、`Tests 11 passed (11)`；
+  `AC8_RC=0` + `AC8_SELF_RC=0`（`SELF_TEST=OK（六臂各自成立…）`）；`LICENSE_RC=0`／`MIGRATIONS_RC=0`／`VOICE_RC=0`／`LINKS_RC=0`；
+  `AC 行=8　已勾=0　未勾=8`；`verify-inbound-doc-tables.py` 16 份对账过。
+- **仍不成立的两格照旧如实挂着**：`pnpm check` / `pnpm -r test` 因那八条别线红仍 rc=1 ⇒ 完成条件 1 的"三条 exit 0"没闭合；
+  完成条件 2 那一格（非白名单条目数对开工快照）**不可核**（开工没取基线），只有本会话内两次现量相同。
