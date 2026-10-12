@@ -37,8 +37,14 @@ export function onTabRovingKeyDown(
   event: KeyboardEvent<HTMLElement>,
   orientation: TabRovingOrientation,
 ): void {
-  // 别人已经消费掉的按键不抢：rail 的主标签挂着 dnd-kit 的 KeyboardSensor，
-  // 它在重排模式下用的是同一组方向键。
+  // ⚠️ 这条守卫挡的是"**在 React 树内更早**被消费掉的按键"。
+  // 🔴 **它挡不住 dnd-kit 的键盘传感器** —— 那一档由调用方在**挂 handler 之前**关掉，
+  //    见 `RailNavigation.tsx` 里 `draggedKey === null` 那个闸门。
+  //    第一版注释写的是"rail 的主标签挂着 dnd-kit 的 KeyboardSensor，所以这里不抢"，
+  //    那个前提**实测不成立**：dnd-kit 挂在 document/window 上，**晚于** React 的根委托
+  //    执行 ⇒ 本函数跑的时候 `defaultPrevented` 还是 `false`。
+  //    实测的事件顺序：`nav` 冒泡(false) → `document`(true) → `window`(true)。
+  //    后果：拖拽中按 ArrowDown，焦点被漫游甩到下一枚标签（"一边拖一边跳"）。
   if (event.defaultPrevented) return;
   const target = event.target;
   // 容器里非标签的控件（头像菜单的 `role="menuitem"`、同步条、帮助钮）自己管键盘。
