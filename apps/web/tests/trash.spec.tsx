@@ -411,6 +411,75 @@ describe('W4 清单进回收站', () => {
     // 正向对照：确认框本身在（不然上一条只是因为没打开而"没有那一行"）。
     expect(el.querySelector('[data-testid="trash-confirm"]')).not.toBeNull();
   });
+
+  /**
+   * 🔴 这一组的理由是本轮读源码读出来的一件事：父清单被彻底删除之后
+   *   `restoreProject` 从此抛错，而那些子清单**本身没有被删除** ——
+   *   侧栏按父级画层级（`toOrganizerTree` 对"父级不存在"整支不画），
+   *   回收站又只列带墓碑的，于是它们在界面上**哪儿都不在**：
+   *   数据还在、也照样同步、备份里读得到，就是没有任何入口能打开。
+   *   "彻底删除"这个按钮是唯一一次能警告的机会，而它以前一个字都没说。
+   */
+  it('🔴 彻底删除一条**装着子清单**的文件夹：那句"再也没有任何入口能找到它们"必须在，而且数的是真的', async () => {
+    await useProjectStore.getState().addProject('总公司');
+    const parentId = useProjectStore.getState().projects.find((p) => p.name === '总公司')!.id;
+    await useProjectStore.getState().addProject('分公司甲', parentId);
+    const childB = useProjectStore.getState().projects.find((p) => p.name === '分公司甲')!.id;
+    await useProjectStore.getState().addProject('分公司乙', parentId);
+    // 归档那一支**也要数**：那句说的是"删掉父级会让它们失去入口"，
+    // 而归档态与"有没有入口"是两件事 —— 开着「显示已归档」时它们本来看得见。
+    await useProjectStore.getState().archiveProject(childB);
+    // 一条不相干的顶层清单：挡"把整个侧栏的清单数进来"。
+    await useProjectStore.getState().addProject('与生活有关');
+    await useProjectStore.getState().deleteProject(parentId);
+    await waitFor(() => useProjectStore.getState().trashed.some((p) => p.id === parentId));
+
+    const el = renderTrash();
+    click(el.querySelector(`[data-testid="trash-board-purge-${parentId}"]`));
+
+    const children = el.querySelector('[data-testid="trash-confirm-children"]')?.textContent ?? '';
+    expect(children).toContain('还挂着 2 条子清单');
+    expect(children).toContain('它们没有被删除');
+    expect(children).toContain('再也没有任何入口能找到它们');
+    // 🔴 两句是**两行**，不是一句拼起来的：`impact` 那行说的是"不会被删"，
+    //    这一行说的是"会找不到"，合在一行里改文案时很容易把其中一件丢掉。
+    expect(el.querySelector('[data-testid="trash-confirm-impact"]')?.textContent ?? '').not.toContain(
+      '子清单',
+    );
+  });
+
+  it('底下没有子清单的文件夹**不画**那第三句（宁可少说一句，不编"还挂着 0 条"）', async () => {
+    const id = await seedTrashedProject('光杆的清单');
+    const el = renderTrash();
+    click(el.querySelector(`[data-testid="trash-board-purge-${id}"]`));
+    expect(el.querySelector('[data-testid="trash-confirm-children"]')).toBeNull();
+    // 正向对照：确认框与那句任务影响面都在 ⇒ "没有第三行"是筛出来的，不是没打开。
+    expect(el.querySelector('[data-testid="trash-confirm"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="trash-confirm-impact"]')).not.toBeNull();
+  });
+
+  it('🔴 子清单**自己也进了回收站**时不数它 —— 那句说的是"还活着却找不到入口"的那批', async () => {
+    await useProjectStore.getState().addProject('母体');
+    const parentId = useProjectStore.getState().projects.find((p) => p.name === '母体')!.id;
+    await useProjectStore.getState().addProject('会一起消失的子级', parentId);
+    const childId = useProjectStore.getState().projects.find((p) => p.name === '会一起消失的子级')!.id;
+    await useProjectStore.getState().deleteProject(parentId);
+    await useProjectStore.getState().deleteProject(childId);
+    await waitFor(() => useProjectStore.getState().trashed.length >= 2);
+
+    const el = renderTrash();
+    click(el.querySelector(`[data-testid="trash-board-purge-${parentId}"]`));
+    expect(el.querySelector('[data-testid="trash-confirm-children"]')).toBeNull();
+    // 正向对照：把那条子级还原回"活着"，同一趟里那句就出现了 ——
+    // 否则上面那条"没有"也可能只是取数根本没接上。
+    await useProjectStore.getState().restoreProject(childId);
+    await waitFor(() => useProjectStore.getState().projects.some((p) => p.id === childId));
+    const again = renderTrash();
+    click(again.querySelector(`[data-testid="trash-board-purge-${parentId}"]`));
+    expect(again.querySelector('[data-testid="trash-confirm-children"]')?.textContent ?? '').toContain(
+      '还挂着 1 条子清单',
+    );
+  });
 });
 
 describe('W4 习惯进回收站', () => {

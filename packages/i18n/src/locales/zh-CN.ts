@@ -803,6 +803,12 @@ export const zhCN = {
   'web.trash.confirm.notErasure': '这不是物理擦除：操作日志里仍然留着这条记录，只是界面不再提供恢复。',
   // 与 mobile.trash.confirm.projectTasks 同一句：删清单不级联删任务（`project-actions.ts` 文件头第 2 条）。
   'web.trash.confirm.projectTasks': '里面还有 {count} 条任务，它们不会被删除。',
+  // 🔴 这一条刻意放成 `common.`（两端同一句话只有一个键）：上面那几行是"每个端各存一份同句"的历史形状，
+  //   而同样的句子存两栏，下一次改动只会改到其中一栏 —— 那正是本仓反复吃过的漂移。
+  //   它说的是这一族确认里**唯一不可逆**的那件后果：父清单被彻底删除后 `restoreProject` 会抛错，
+  //   而这些子清单本身**没有删除**，于是它们既不在侧栏（`toOrganizerTree` 对"父级不存在"整支不画）
+  //   也不在回收站（那儿只列带墓碑的）—— 数据还在、也照样同步，就是**没有任何入口能打开它**。
+  'common.trash.confirm.strandChildren': '它下面还挂着 {count} 条子清单。它们没有被删除，但这条清单彻底删除之后，界面上再也没有任何入口能找到它们 —— 侧栏按父级画层级，而回收站里也不会列出它们。',
   'web.trash.confirm.habitLogs': '它已有的打卡记录不会被删除，恢复后连续天数照旧。',
   'web.trash.confirm.submit': '彻底删除',
   'web.trash.confirm.cancel': '取消',

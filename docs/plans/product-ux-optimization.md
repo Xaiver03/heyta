@@ -2658,3 +2658,62 @@ typecheck：domain / ui / i18n / web / mobile 五包各 rc=0。
   （词条里点名"到回收站把这条清单还原，它们就会重新出现"）。
   真正让它可见的改法（把墓碑孤儿子级按顶层画出来）会同时动 web 侧栏、移动端与 `FolderPicker` 三处形状，
   而且需要一次深浅主题 + 两端的截图验收，不属于这一批。
+
+### 2026-10-12 07:5x：上面那两句进了**回收站**，而回收站里那句才是不可逆的那一件
+
+上一节把"删一条清单"的两句后果做到了侧栏确认框里。这一节是它的另一半，而且是**更坏的那一半**：
+同一族后果在"彻底删除"这里不是"到回收站还原就回来了"，而是**没有任何出路**。
+
+**判据（先说结论）**：`purgeProject` 只追加 `purgedAt`，从此 `restoreProject` 一律抛错；
+而那些子清单**自己没有被删除**（`isLive` 为真、照样同步、备份里读得到）。侧栏按父级画层级
+（`toOrganizerTree` 对"父级不存在"整支不画，这是上一节记下的那条已知取舍），回收站又只列带墓碑的
+⇒ **它们哪儿都不在**。这一族里唯一不可逆的就是这一件，而"彻底删除"这颗按钮是**唯一一次**能警告它的机会
+—— 上一节的词条里那句出路（"到回收站把这条清单还原"）在这一格里**是假话**，所以这一节用的是**另一条 key**，
+措辞里不给出路，只给事实。
+
+| 落点 | 内容 |
+|---|---|
+| `packages/i18n` | 新词条 `common.trash.confirm.strandChildren`（**中英各一条、`common.` 前缀**）。🔴 没有按端各写一条：`web.trash.*` / `mobile.trash.*` 那两套同义 key 就是本仓"一份结论写两遍然后漂移"的先例 |
+| `apps/web/src/features/trash/TrashView.tsx` | 第三段 `trash-confirm-children`，取数用 `directChildCountsByProject(allProjects)`；`allProjects` 是 store 里**含归档**的那一路，不是 `trashed` |
+| `apps/mobile/src/lib/trash-display.ts` | `purgeStrandText()` + `PurgeConfirmCopy.strands?`（`undefined` ⇒ 整行不进树，与 `impact` 同规矩） |
+| `apps/mobile/src/screens/TrashScreen.tsx` | 传入 `directChildCountsByProject(projectActions.listAllProjects())` |
+| 计数函数 | **复用上一节刚落的 `@heyta/ui#directChildCountsByProject`**，两端 + 侧栏删除确认同一个 |
+
+**判据读数**（现量，2026-10-12 07:3x–08:0x）：
+
+- `apps/web/tests/trash.spec.tsx`：**22 passed**，其中本批新增 3 条 —— 那句在场且数的是真的（2 条，含 1 条归档子清单）、
+  不并进 `impact` 那一行；叶子清单**不画**第三句（配了正向对照：同一趟里 `confirm`+`impact` 都在）；
+  🔴 **子清单自己也进了回收站时不数它**，把它恢复出来 ⇒ "还挂着 1 条子清单"。
+- `apps/mobile/tests/trash-display.spec.ts`：**23 passed**，本批新增 5 条（中英各半 + `strands` 键形状 + 接线 pin）。
+- 全量：`@heyta/i18n` 26 / `@heyta/domain` 1027 / `@heyta/ui` 673 / `@heyta/mobile` **964** 全过；
+  `@heyta/web` **2273 passed | 13 skipped | 2 failed** —— 那 2 枚是 `calendar-sidebar` 与 `reminder-wake` 的
+  `Test timed out in 5000ms`，**同趟 1 分钟负载 206**（阈值 12），**单跑对照各 15 / 9 全过 rc=0**。
+  ⇒ 按"单跑对照 + 负载读数两条一起"的规矩判为**载体抖动，不是本批回归**（本批只动回收站那两面，两条 spec 与之无交集）。
+- 门禁：`check:layering` / `check:design` / `check:ui-language` / `check:docs` / `check:md-tables` / `check:doc-citations` 逐条 rc=0。
+  🔴 `check:ui-language` **第一次是红的**，而且红得有价值：它报"看起来像词条的行 3997、只解析出 3996"，
+  点的是我这条 —— 我把词条写成了 `key:` 换行再跟值，而那张表要求**一行一条**。
+  这条门禁不是排版洁癖：它的解析器一旦静默漏行就会**假绿**（漏掉的那条 key 照样能编译、照样进 dist，
+  只是没人知道它不在对账范围内）。改成单行后 zh/en 各 3997 条、对称。
+
+**四臂变异**（每臂改前留 `.mut-bak`、只从备份还原，不从 git）：
+
+| 臂 | 注入 | 结果 |
+|---|---|---|
+| A1 | `purgeStrandText` 恒返回 `undefined`（那句"恒不出现"—— 最坏的坏法） | mobile **4 红**（含两条正向对照一起红） |
+| A2 | `TrashScreen` 取数换成 `listTrashedProjects()`（回收站那一路 ⇒ 计数恒 0） | mobile **1 红**，正是那条接线 pin |
+| A3 | web 那段三元改成恒 `null`（算得出但不画） | web **2 红** |
+| A4 | 只从 `en.ts` 删掉这条 key（中英不同步） | `@heyta/i18n` **1 红**（"中英两表的 key 集合完全一致（双向）"） |
+
+🔴 **A2 这一臂是这批存在的理由**：把取数换成回收站那一路，**typecheck 全绿、界面照样渲染、
+`purgeStrandText` 自己的单测全绿** —— 它只是恒收到 0。而那件最该说话的事从此不说，
+症状与"这条清单本来就是叶子"**逐字相同**。所以取数来源必须单独钉一条源码级判据，光测函数不够。
+
+**仍然没做的事，不包装成完成**：
+
+- **设备腿没跑**：这批证到 jsdom / node 两层。真模拟器上"彻底删除一条装着子清单的文件夹时第三句在场"
+  与上一节那条"有后果的清单要点两下"一起欠着，需要 `pnpm reinstall:mobile` + 相应 fixture。
+- **本批只让它被说出来，没有让它被看见**：那些子清单仍然没有入口。真正把它们画出来的改法
+  （`toOrganizerTree` 把"父级是墓碑"的子级按顶层画）在上一节末尾登记过，涉及三处形状 + 两端截图验收，
+  不属于这一批 —— 这条边界是**取舍**，不是遗漏。
+- **`purgeProject` 之后那些子清单的 `parentId` 仍指向一条 `purgedAt` 的清单**（数据层没动，也不该动：
+  动了就是级联改写用户没要求的内容，且要 bump 语义）。本批改的是**界面说不说**，不是**数据动不动**。

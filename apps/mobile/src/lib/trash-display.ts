@@ -75,6 +75,14 @@ export interface PurgeConfirmCopy {
    *   与"这句文案丢了"在界面上长得一样，下一次没人看得出来。
    */
   readonly impact?: string;
+  /**
+   * 第三句：**这条清单彻底删除之后，它底下那些没有被删除的子清单在界面上再也找不到**。
+   *
+   * 🔴 与 `impact` 不是同一种后果（那句说的是"不会被删"，这一句说的是"会找不到"），
+   *   所以它是**另一行**而不是把两句拼成一行。只有清单这一类、且真有子清单时才有；
+   *   `undefined` ⇒ 那一行整段不进树（与 `impact` 同一条规矩）。
+   */
+  readonly strands?: string;
   /** 说清后果：从回收站消失、无法恢复。 */
   body: string;
   /**
@@ -92,11 +100,14 @@ export function purgeConfirmCopy(
   title: string,
   t: Translate,
   impact?: string,
+  strands?: string,
 ): PurgeConfirmCopy {
   return {
     title: t('mobile.trash.confirm.title', { title }),
     // 只有算得出影响面的那两类才带；`undefined` 是"这一类没有这一行"，不是"空行"。
     ...(impact === undefined ? {} : { impact }),
+    // 同一格规矩：彻底删除会把子清单**留在界面上找不到**，那一句也只在真有那件事时出现。
+    ...(strands === undefined ? {} : { strands }),
     body: t('mobile.trash.confirm.body'),
     notErasure: t('mobile.trash.confirm.notErasure'),
     submit: t('mobile.trash.confirm.submit'),
@@ -123,6 +134,28 @@ export function purgeImpactText(
   if (item.kind === 'PROJECT') return t('mobile.trash.confirm.projectTasks', { count: liveTaskCount });
   if (item.kind === 'HABIT') return t('mobile.trash.confirm.habitLogs');
   return undefined;
+}
+
+/**
+ * 第三句：**这条清单底下还挂着几条子清单，彻底删除之后它们在界面上再也找不到**。
+ *
+ * 🔴 它与上面那句**不是同一种后果**，也不是同一句的补充：
+ *   `project-actions.ts#purgeProject` 只加 `purgedAt` 标记，从此 `restoreProject` 一律抛错，
+ *   而那些子清单**本身没有被删除** —— 侧栏按父级画层级（`toOrganizerTree` 对"父级不存在"
+ *   整支不画），回收站又只列带墓碑的，于是它们哪儿都不在：数据还在、也照样同步、
+ *   备份里读得到，就是没有任何入口能打开它。这一族确认里**只有这一件是不可逆的**，
+ *   而"彻底删除"这个按钮恰好是唯一一次能警告它的机会。
+ *
+ * ⚠️ 取数走 `@heyta/ui#directChildCountsByProject`（含归档、滤墓碑），与 web 回收站、
+ *   侧栏删除确认**同一个函数**；`<= 0` 返回 `undefined` ⇒ 那一行整段不进树。
+ */
+export function purgeStrandText(
+  item: TrashItem,
+  t: Translate,
+  directChildCount: number,
+): string | undefined {
+  if (item.kind !== 'PROJECT' || directChildCount <= 0) return undefined;
+  return t('common.trash.confirm.strandChildren', { count: directChildCount });
 }
 
 /**

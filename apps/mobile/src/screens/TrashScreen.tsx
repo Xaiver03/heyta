@@ -56,6 +56,7 @@ import {
 } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import {
+  directChildCountsByProject,
   entityLabelOf,
   TrashBoard,
   type TrashBoardLabels,
@@ -68,6 +69,7 @@ import {
   purgeA11y,
   purgeConfirmCopy,
   purgeImpactText,
+  purgeStrandText,
   restoreA11y,
 } from '../lib/trash-display';
 import { useMobileSync } from '../sync/store';
@@ -273,6 +275,16 @@ export function TrashScreen({ onBack }: { onBack: () => void }): React.JSX.Eleme
               t,
               taskActions === null ? 0 : liveTaskCountOfProject(taskActions.listTasks(), pending.id),
             ),
+            // 🔴 第三句走的是**活着的那一路清单**（`listAllProjects()`：可见 + 已归档），
+            //    不是 `listTrashedProjects()` —— 那些子清单没有被删除，拿回收站那一路去数是恒 0，
+            //    而那正好会让这一句在最该出现的时候不出现。取数函数与 web、与侧栏删除确认同一个。
+            purgeStrandText(
+              pending,
+              t,
+              projectActions === null
+                ? 0
+                : (directChildCountsByProject(projectActions.listAllProjects())[pending.id] ?? 0),
+            ),
           )}
           busy={busyId !== null}
           onCancel={() => {
@@ -351,6 +363,16 @@ function ConfirmPurge({
               {copy.impact === undefined ? null : (
                 <Text variant="caption" tone="muted" selectable>
                   {copy.impact}
+                </Text>
+              )}
+              {/*
+                🔴 第三句：彻底删除这条清单，会让它底下那些**没有被删除**的子清单
+                在界面上彻底失去入口（侧栏按父级画层级、回收站只列带墓碑的）。
+                `undefined` 时整行不进树 —— 与上面那句同一条规矩。
+              */}
+              {copy.strands === undefined ? null : (
+                <Text variant="caption" tone="warning" selectable>
+                  {copy.strands}
                 </Text>
               )}
               {/* 🔴 诚实条款单独一行、用 warning 色：它是这段话里唯一
