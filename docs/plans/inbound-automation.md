@@ -3248,3 +3248,84 @@ PKG_PIXELS=OK PKG_BLUE_HITS=3987 PKG_SNAPSHOT=900x523   PKG_RESULT=OK    LINUX_D
 它改的是"读数新不新"，不改"缺不缺"：AC-3 的装置腿现在是**当前 HEAD + 隔离副本**的读数（原先那格挂的是 10-11 17:5x 在
 `1c166425` 载体上的一趟），AC-6 的界面挂载点、AC-8 的四端设备腿仍按 B140/B181/B164 开着。
 ⚠️ 两处 `rc=3` 与一处 `rc=1`（`commit-scope`）**都不许读成"本线越界"**：前两处是工具自报的退役码，后一处点名的是别线那笔提及。
+
+## 2026-10-12 09:4x–09:5x · 第 105 道那八条红在新 HEAD 上重取（别线动了 `apps/web` 就得重取），以及"15 枚装置零消费者"这一类
+
+**为什么要这一趟**：上一节那句"八条红里没有一条是本线的"取在载体 `422db1b2`，而 `422db1b2 → HEAD` 的差集里
+有 **5 枚别线的 `apps/web` 代码文件**（`RailNavigation.tsx`、`inbox/InboxBell.tsx`、`lib/tab-roving.ts`、
+`styles/app/inbox.css`，外加它们新加的 `tests/tab-roving.spec.tsx`）。⇒ 那句话描述的是"当时的树"，必须在新树上重量。
+载体：`.worktrees/inb-t8` `checkout --detach` 到当前 HEAD `37206879`，起跑脏条目 **0**（只有 `.run-logs/` 未跟踪）。
+
+```
+$ bash .run-logs/recheck-105-set.sh          # 串行，一条跑完立刻 echo RC=$?
+CARRIER_HEAD=372068796dce35ce3a602fe567053339fc38418c   起跑 loadavg { 12.54 12.15 24.52 }
+packages/ai            RC=1  Test Files 1 failed | 10 passed (11) / Tests 5 failed | 260 passed (265)
+packages/legal         RC=1  Test Files 1 failed |  3 passed (4)  / Tests 2 failed |  74 passed (76)
+packages/shared-schema RC=1  Test Files 1 failed | 10 passed (11) / Tests 1 failed | 172 passed (173)
+apps/web               RC=0  Test Files 177 passed | 2 skipped (179) / Tests 2266 passed | 13 skipped (2279)
+e2e 本线两份           RC=1  2 failed / 4 passed (2.3m)
+```
+
+- **八条红的形状逐包与 08:2x 那趟相同**（5 + 2 + 1 = 8，没有一条是本线的文件）；`packages/ai` 那五条的根因行是
+  `Error: Command failed: … scripts/gen-ai-capability-manifest.mjs --check`（清单产物与上游目录不同步，仍属 AI 工具线）。
+- **`apps/web` 从 2247 passed 涨到 2266、失败仍 0、跳过仍 13** ⇒ 别线那笔 rail 键盘只是加了用例；"测试数只许 ≥ 基线"在新树上是涨的一侧。
+- **e2e 那两条红的还是同一格**：`tests/inbound-automation.spec.ts:8:3 encrypted date draft review and Vault invalidation`
+  两档（1280 / 390），`locator.click: Test timeout of 60000ms exceeded`；另外四条（显式重试 ×2 + 面板排版取证 ×2）都过
+  ⇒ AC-6 没有新缺陷，也**仍然**开在 B140 的挂载点上。
+- 🔴 **这一趟自己有一处探针错，如实记**：驱动脚本用 `grep -E '^(Test Files|Tests)'` 收汇总行，而 vitest 那两行
+  **行首带空格**，于是当场什么都没打出来——读数靠重新 grep 磁盘上的 `.out` 才捞回来。被测的几趟本身没受影响，
+  但"判据静默空转"与下面那一类同形；这次的线索是"RC=1 后面没有读数"，当天就发现了。
+
+### `verify-inbound-ac8-matrix.py` 第一次被跑（此前那张 15 行复账表里根本没有它）
+
+```
+$ python3 research/tools/verify-inbound-ac8-matrix.py
+读数　表头行=1098　行数=34　有尺行=27　无尺行=7　尺枚=67　窗=13/13　平台=10/10　权益=9/9　设备状态=9/9
+结论：矩阵与 HEAD 逐格对账成立                                                  → rc=0
+$ python3 research/tools/verify-inbound-ac8-matrix.py --self-test   # 六臂
+SELF_TEST=OK（R4 两半能红、R3/R5/R2 能红、静止臂没跟着红）                      → rc=0
+```
+
+它补的是"AC-8 那张矩阵表会不会**读起来像有证据**"：矩阵引用的是用例名与文件路径，改名、删文件、维值写漂、
+无尺格没人认领这四种都会安静地烂掉，而 markdown 表格自己永远不会失败。
+
+### 顺着它查出的**一类**问题：本线 15 枚装置此前零消费者
+
+数了一遍盘（`ls research/tools | grep -c '^verify-inbound'` = **15**）再量分母：
+
+```
+grep -rn "verify-inbound" --include=package.json . | grep -v node_modules   → 0 行（含各包，一份都没有）
+grep -rln "verify-inbound" scripts/ .github                                  → 0
+根 package.json 的 check 链里正则测 verify-inbound                            → false
+grep -rn "verify-inbound-\*" scripts/ package.json .github                   → 空（没有 glob 循环式消费）
+```
+
+全仓唯一"引用"它们的两处是注释行（`server/tests/integration/inbound-dual-host-fault-windows.integration.spec.ts:23`、
+`server/tests/inbound-ticket-rejection-route.spec.ts:28`）——**提到 ≠ 跑**。对照仓内惯例：`research/tools` 在 `scripts/`
+里有 41 处命中（`scripts/check-linux-shell.mjs:42` 就是这样消费 `research/tools/check-native-lib-registry.mjs` 的）。
+而仓里那枚专门拦"定义过的门禁必须真的在链里跑 / 链外必须有可验消费方"的 `scripts/check-gate-wiring.mjs`
+**拦不到这批** —— 它们从未被声明成门禁，只是躺在 `research/tools/` 里。⇒ **B184 不是孤例，是一个类**（登记成 B185）。
+
+**这一节在本线地界内做掉的那一半**：`server/tests/inbound-lane-rigs-consumers.spec.ts`（新增，白名单内，零新依赖），
+常驻 5 枚对仓库只读的装置（`ac-ticks` / `ac8-matrix` / `doc-tables` / `cjs-require-order` / `producer-seam`）
++ 两条分母自检。**读数**：`SPEC_RC=0`，`11 tests`，整份 59.7 s；定向 `tsc --noEmit` `TSC_RC=0`
+（注意 `server/tsconfig.json` 的 `include` 只有 `src/**` 与 `scripts/**` ⇒ server 的测试文件本来就在类型层之外，这一趟是我自补的）。
+
+两臂反向验证（只在隔离副本里造，全部当场还原）：
+
+```
+臂 A  复制出一枚未登记的 verify-inbound-aa-unregistered-probe.py ⇒ 分母自检 RC=1（expected [ Array(1) ] to deeply equal []）
+      删掉副本 ⇒ RC=0
+臂 B  在这只副本的计划工作树副本上把 AC-1 勾成 [x] ⇒ ac-ticks 打「AC 行=8 已勾=1 未勾=7 … 有 1 枚 AC 被勾上 —— 执行者不许自己勾（R2 红）」、spec RC=1
+      git checkout -- 还原 ⇒ 未勾=8 已勾=0 计划脏条目=0，spec RC=0
+```
+
+两处**在跑之前**就被否证的接线决定（不是等红灯才返工）：① 带引号的 `grep "'--self-test'"` 让我误判 `producer-seam`
+没有反向验证臂，引号无关地重量：除 `worker-identity` 外 **14 枚都支持**；② 三枚变异牙臂（`queue-teeth`/`quota-teeth`/`ticket-teeth`）
+读实现才发现它们的臂**临时改写被跟踪的源文件**（`verify-inbound-queue-teeth.py:33`
+`TARGET = server/src/automation/inbound.routes.ts`，备份 `/private/tmp/heyta-inbound-queue-teeth/inbound.routes.ts.mut-bak`）
+⇒ 挂进并发测试套件等于在共享检出里开一段源码被改坏的窗口，按 AGENTS §8.9 只能手跑，已从常驻名单拿掉并写明理由。
+`producer-seam` 的 `--self-test` 单趟实测 **172 s**（其余四枚合计约 30 s），所以只常驻 normal 那一腿，理由写在文件里而不是默默少跑。
+
+🔴 **AC 一格未勾**（`AC 行=8　已勾=0　未勾=8`，臂 B 只是取证用的临时变异且已还原）；
+T7 三条命令里 `pnpm check` / `pnpm -r test` 仍因那八条别线红而 rc=1 ⇒ **完成条件 1 的"三条 exit 0"仍不成立**。
