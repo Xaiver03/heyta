@@ -211,7 +211,12 @@ try:
  # The current tab is already “我的”; this tap is an explicit assertion that
  # the profile surface is reachable before entering its settings row below.
  if find_resource(r,'profile-entry-settings') is None:
-  tab=find_pressable(r,T('我的','Profile')) or find(r,T('我的','Profile'))
+  # `elem or other` 在 ElementTree 上不是"取第一个存在的节点"：`bool(node)` 今天取决于
+  # **它有没有子节点**，一枚没有子的 `我的` 会被判成假 ⇒ 静默退到不可点的那一枚，
+  # 而 Python 3.12+ 又宣布它恒为真（实测本脚本每跑一趟就吐一条 DeprecationWarning）。
+  # 同一枚脚本在两种解释器下有两种含义，所以这里只按 `is not None` 显式判。
+  tab=find_pressable(r,T('我的','Profile'))
+  if tab is None:tab=find(r,T('我的','Profile'))
   if tab is None:raise AssertionError(('profile tab',texts(r)))
   x1,y1,x2,y2=node_bounds(tab)
   adb('shell','input','tap',str((x1+x2)//2),str((y1+y2)//2))
@@ -221,16 +226,20 @@ try:
  shot('my')
  tap(T('设置','Settings'),T('常规','General'),resource='settings-section-general');shot('settings-directory')
  tap(T('常规','General'),T('语言','Language'));shot('general')
- # 产品的语言开关按它自己的说明只在本会话内生效，所以英文分支可以不动设备语言、
- # 走产品真正那条路验到；开关不开时这一整块跳过，原有行为逐字不变。
+ # 产品的语言开关**会持久**（原生存一份设备偏好，冷启动恢复；10-13 实测：force-stop 后
+ # `am start -W` 起来仍是英文，而设备语言是 zh-Hans-CN）。所以这一支**必须在末尾改回中文**，
+ # 否则会把共享模拟器留给下一趟英文界面。开关不开时这一整块跳过，原有行为逐字不变。
  if args.in_app_language=='en':
-  tap('English','Language',absent=T('语言','Language'))
-  # 开关按它自己的说明只在本会话内生效，所以英文分支可以不动设备语言、
-  # 走产品真正那条路验到；旋钮不开时这一整块跳过，原有行为逐字不变。
-  r=tree()
-  enHint='This choice lasts for the current session only; reopening the app returns to the device language.'
-  if find_exact(r,enHint) is None:raise AssertionError(('in-app language switch took effect?',texts(r)))
-  english=True
+  # 🔴 这一支原来无条件 `tap('English','Language',absent=T('语言','Language'))`。当运行时的
+  #   语言检测（上面第 202 行那格）已经判定 english=True 时，`after` 与 `absent` 变成**同一枚串**
+  #   ⇒ 条件恒不满足 ⇒ 第二次跑必红。它以前从不现形，是因为这枚开关被当成"只在本会话内生效"
+  #   —— 而 10-13 实测它是持久的（冷启动后仍是英文），所以"上一趟留下英文态"这条路真实存在。
+  if english:
+   records.append({'action':'language already english','destination':'Language','labels':texts(tree())})
+   print('Language => already-English (the switch persists; restored at the end of this run)',flush=True)
+  else:
+   tap('English','Language',absent='语言')
+   english=True
   shot('language-panel-en')
  back(T('偏好与账号','Preferences and account'),T('语言','Language'),resource='settings-directory')
  tap(T('同步与隐私','Sync and privacy'),T('隐私同意','Privacy consent'),resource='settings-sheet');shot('sync')
@@ -281,6 +290,16 @@ try:
   raise AssertionError(('countdown screen still present after back',texts(back_result)))
  records.append({'action':'hardwareBack','destination':T('我的','Profile'),'labels':texts(back_result)})
  print('BACK =>',T('我的','Profile'),flush=True)
+ if args.in_app_language=='en':
+  # 收尾必须把共享载体恢复成它本来的语言：这枚开关**会持久**（原生存设备偏好、冷启动恢复，
+  # 10-13 实测 force-stop + `am start -W` 之后仍是英文），不改回来下一趟（含别的会话）
+  # 拿到的就是英文界面。`uiLocale` 不跟着改 —— 它记的是这一趟旅程实际走的语态。
+  tap(T('设置','Settings'),T('常规','General'),resource='settings-section-general')
+  tap(T('常规','General'),T('语言','Language'))
+  tap('中文','语言',absent='Language')
+  restored=tree()
+  records.append({'action':'restore-device-language','destination':'中文','labels':texts(restored)})
+  print('Language => zh restored on the shared carrier',flush=True)
  artifact_identity()
  (out/'journey.json').write_text(json.dumps({'status':'passed','uiLocale':'en' if english else 'zh-CN','artifact':identity,'geometry':geometry,'steps':records},ensure_ascii=False,indent=2))
 except Exception as e:

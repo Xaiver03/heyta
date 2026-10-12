@@ -3243,7 +3243,7 @@ export const en = {
   'mobile.profile.sync.advancedOpen': 'Use a self-hosted server',
   'mobile.profile.sync.advancedClose': 'Back to heyta hosted sync',
   // Stated plainly: a choice that silently resets on restart looks like a bug.
-  'mobile.profile.language.hint': 'This choice lasts for the current session only; reopening the app returns to the device language.',
+  'mobile.profile.language.hint': 'This device remembers your choice, and it still applies after you reopen the app. Your home-screen widgets read the same preference.',
   'mobile.profile.serverUrl.label': 'Server address',
   'mobile.profile.serverUrl.hint': 'On an emulator use 10.0.2.2 (pointing at this computer); on a real device use your LAN address.',
   'mobile.profile.transport.plaintext': 'Plaintext connection, and the target does not look like a local network. The access token travels the network in the clear and can be intercepted. Task contents are still end-to-end encrypted, but use https:// on the public internet.',
