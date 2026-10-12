@@ -1,19 +1,13 @@
 import { createPublicKey, sign, verify, type KeyObject } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
-// 🔴 这枚值导入必须排在首次使用（下方 MAX_TICKET_SECONDS）之前：ESM 会提升 import，所以
-// typecheck 与单测都绿；但 tsc 的 CJS 产物**按源码顺序**落 require ⇒ 用早了就是 `inbound_core_1`
-// 的 TDZ，服务端一加载就崩。
-/**
- * 🔴 票据的**封闭动作词表与作用域档**只有一份，在 `@heyta/inbound-core`（签发侧与宿主侧
- * 共用）；这里原样转出，服务端各调用点保持既有导入路径。`session` 是唯一能建立/续期短期
- * 绑定的动作，其余每一项都必须在它自己要保护的那次写事务里一次性消费 —— 否则一枚票据就成了
- * 一张 30 秒通用通行证，与[协议 §4](../../../docs/reference/inbound-automation-protocol.md) 要求的
- * "票据绑定 action、实例、账号、rule/event、nonce、版本和 expiry，最多 30 秒且一次使用"不符。
- */
+// 🔴 这个 import 必须待在首次使用（下方 MAX_TICKET_SECONDS）之前：ESM 会提升 import，
+// typecheck 与 ESM 运行都绿；但 tsc 的 CJS 产物按源码顺序落 require ⇒ 用早了就是
+// 「inbound_core_1 before initialization」，服务端起不来。
 import {
   AUTOMATION_ENTITLEMENT_ACTIONS,
   AUTOMATION_ENTITLEMENT_MAX_TICKET_LIFETIME_MS,
+  INBOUND_EVENT_ID_PATTERN,
   automationEntitlementScopeMismatch,
   type AutomationEntitlementAction,
 } from '@heyta/inbound-core';
@@ -22,7 +16,11 @@ import { prisma } from '../db';
 const UUID = z.string().uuid();
 const IDENTIFIER = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,254}$/);
 const RULE_ID = z.string().uuid();
-const EVENT_ID = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$/);
+// 🔴 形状的唯一事实源在 `@heyta/inbound-core`（签发侧与宿主侧共用），这里 import 而不是再抄一份。
+// 这里曾经是**第 4 份副本**，而且被放宽到 `^[A-Za-z0-9:_-]{1,127}$` —— 比每一枚生产者都宽
+// （首字符不再要求字母数字、长度仍超 64），于是同一枚 `eventId` 在票据闸门被判"作用域合法"、
+// 到了路由参数层才 400。五份副本 = 五种裁决，见 `INBOUND_EVENT_ID_PATTERN` 的注释。
+const EVENT_ID = z.string().regex(INBOUND_EVENT_ID_PATTERN);
 const TICKET_DOMAIN = 'heyta-automation-entitlement-v1.';
 // 🔴 「最多 30 秒」这一格只有一个事实源：@heyta/inbound-core 的毫秒常量（宿主拿它判"这张票还能不能用"，
 // 服务端拿它判"这张票收不收"）。原来这里是另一枚字面量 30 —— 两份 = 可以从类型上漂开，
@@ -123,6 +121,31 @@ export function signAutomationEntitlementTicket(
   privateKey: string | Buffer | KeyObject,
 ): string {
   const checked = claimsSchema.parse({ ...claims, version: 1 });
+  return signCheckedAutomationEntitlementTicket(checked, privateKey);
+}
+
+/**
+ * 🔴 **只给验收用**：跳过签发侧的形状校验，直接签一枚 claims 形状不合法的票据。
+ *
+ * 存在的理由是一条**判据射程**问题，不是方便：`signAutomationEntitlementTicket` 自己就校验形状，
+ * 于是「收票那一侧到底收不收一枚 `eventId: '-evt'` 的票据」这件事**在测试里问不出来** ——
+ * 票在签发那一刻就抛了，根本到不了闸门。而那正是 B182/B183 要钉的那一格：
+ * 形状一旦在收票侧被放宽，拒绝会从内层（402 + `TICKET_INVALID`）**滑到外层**（400 `validation_failed`），
+ * 而那时**没有任何一层会红**。
+ *
+ * ⚠️ **生产路径不许 import 它**。签名照签、验签路径全真，被绕过的只有"签发时先自查一遍"这一步。
+ */
+export function signAutomationEntitlementTicketUnchecked(
+  claims: AutomationEntitlementTicket,
+  privateKey: string | Buffer | KeyObject,
+): string {
+  return signCheckedAutomationEntitlementTicket(claims, privateKey);
+}
+
+function signCheckedAutomationEntitlementTicket(
+  checked: AutomationEntitlementTicket,
+  privateKey: string | Buffer | KeyObject,
+): string {
   const body = Buffer.from(JSON.stringify(checked), 'utf8');
   const signature = sign(null, Buffer.concat([Buffer.from(TICKET_DOMAIN, 'utf8'), body]), privateKey);
   return `${b64url(body)}.${b64url(signature)}`;
@@ -350,6 +373,7 @@ export async function purgeExpiredAutomationEntitlementTicketUses(now = new Date
   const result = await prisma.automationEntitlementTicketUse.deleteMany({ where: { expiresAt: { lt: cutoff } } });
   return result.count;
 }
+
 /** 只做一件事：发一条 DELETE。清扫用 `$executeRaw` 而不是 deleteMany，
  *  因为"这台 installation 还有没有人引用"要跨两张表判，Prisma 的 where 表达不了 NOT EXISTS。 */
 export type AutomationClockPurgeDatabase = Pick<Prisma.TransactionClient, '$executeRaw'>;

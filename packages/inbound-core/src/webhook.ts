@@ -29,8 +29,29 @@ export class InboundRequestError extends Error {
 }
 
 const reject = (code: InboundRequestError['code']): never => { throw new InboundRequestError(code); };
-const scopedIdPattern = /^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$/;
-const eventIdPattern = /^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$/;
+
+/**
+ * 🔴 **来源 ID 与作用域 ID 的形状只有一份，就是这里。**
+ *
+ * 这两个正则在整条入站边界上曾经有**五份副本**，而且宽度各不相同（实测：签发侧 64、
+ * 票据 claims 128、路由参数 64、计量层 64）—— 同一枚 `eventId` 在一层被判"合法"、
+ * 在另一层被判"非法"，而**没有任何一层会红**（那时的用例只覆盖坏签名与错实例，不覆盖形状）。
+ * 这与 AGENTS §3.5 里 clientId 那两次「抽出了共享实现、旧的那份却没删」是同一个形状。
+ *
+ * 现在服务端的票据 claims、路由参数与计量层都 import 这两枚常量，
+ * 由 `check:crosslang-contract` 的消费者对账钉住"没有第六份副本长出来"。
+ *
+ * 取值不是随手定的，它抄的是我们**自己写的协议**
+ * （`docs/reference/inbound-automation-protocol.md` 身份前置）：
+ * 「来源 ID 必须是 **1–64 字节** ASCII 字母/数字/冒号/下划线/连字符，**以字母或数字起头**」。
+ * ⚠️ `INBOUND_SCOPED_ID_PATTERN`（ruleId / keyId）在协议里没有单独写长度，它沿用 128 ——
+ * 这两枚**不是**同一个数，别把它们合并成一条。
+ */
+export const INBOUND_EVENT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$/;
+export const INBOUND_SCOPED_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$/;
+
+const scopedIdPattern = INBOUND_SCOPED_ID_PATTERN;
+const eventIdPattern = INBOUND_EVENT_ID_PATTERN;
 const encoder = (): TextEncoder => new TextEncoder();
 
 function checkInput(input: WebhookSignatureInput): void {

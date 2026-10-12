@@ -1,3 +1,4 @@
+import { INBOUND_EVENT_ID_PATTERN } from '@heyta/inbound-core';
 import { prisma } from '../db';
 import { createPrismaSqlExecutor, createPrismaSqlRunner, type SqlExecutor, type SqlRunner } from '../billing/pricing-store';
 import { consumeManagedAiRequest, type AiMeteringDenialReason } from '../ai/metering';
@@ -32,8 +33,11 @@ export interface ReservedAutomationAiAttempt extends AutomationAiAttemptKey {
   state: AutomationAiAttemptState;
 }
 
-const validId = /^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$/;
+// 🔴 形状的唯一事实源在 `@heyta/inbound-core`（见 `INBOUND_EVENT_ID_PATTERN` 的注释）——
+// 这里曾经是五份副本里的一份。计量层用的是 eventId，所以取的是**事件**那枚，不是 ruleId 那枚。
+const validId = INBOUND_EVENT_ID_PATTERN;
 const validRule = /^[0-9a-f-]{36}$/;
+
 const assertKey = (key: AutomationAiAttemptKey): void => {
   if (!Number.isSafeInteger(key.userId) || key.userId < 1 || !validRule.test(key.ruleId) || !validId.test(key.eventId) ||
       !Number.isInteger(key.parseVersion) || key.parseVersion < 1 || !Number.isInteger(key.attempt) || key.attempt < 1) {
