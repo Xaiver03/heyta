@@ -22,12 +22,19 @@ import { InboxBell } from '../inbox/InboxBell.js';
 import { SyncBar } from '../sync/SyncBar.js';
 import { clearRailPreference, loadRailPreference, saveRailPreference, type RailPreference } from './rail-pref.js';
 import { anchorRailLabelElement, splitRailTabs, type ViewKey, type ViewTab } from './view-tabs.js';
+import { onTabRovingKeyDown, rovingTabKey } from '../../lib/tab-roving.js';
 import { useNarrowLayout } from './useNarrowLayout.js';
 import { CompactRailNavigation } from './CompactRailNavigation.js';
 
 const REQUIRED_RAIL_KEYS = new Set<ViewKey>(['tasks', 'search']);
 const PRIMARY_ZONE = 'rail-zone-primary';
 const OVERFLOW_ZONE = 'rail-zone-overflow';
+/**
+ * 助手那一格不是 `ViewKey`（它开的是面板，不是一个视图），
+ * 但它在这个标签组里的位置是真的：主标签之后、工具段之前。
+ * 漫游焦点按 DOM 顺序走，所以它得有一个能和 `view` 区分开的标识。
+ */
+const ASSISTANT_TAB_ID = '__assistant__';
 
 const railCollisionDetection: CollisionDetection = (args) => {
   const intersections = pointerWithin(args);
@@ -68,6 +75,7 @@ function tokenPx(name: string): number {
 function SortableRailButton({
   tab,
   active,
+  roving,
   onActivate,
   customize,
   canMoveToMore,
@@ -78,6 +86,7 @@ function SortableRailButton({
 }: {
   tab: ViewTab;
   active: boolean;
+  roving: boolean;
   dropBefore: boolean;
   onActivate: () => void;
   customize: boolean;
@@ -95,13 +104,18 @@ function SortableRailButton({
       <button
         ref={sortable.setActivatorNodeRef}
         type="button"
-        role="tab"
-        aria-selected={active}
-        className={`ht-rail__tab${active ? ' ht-rail__tab--active' : ''}`}
-        data-testid={`rail-view-${tab.key}`}
-        onClick={onActivate}
         {...sortableAttributes}
         {...sortable.listeners}
+        role="tab"
+        aria-selected={active}
+        data-testid={`rail-view-${tab.key}`}
+        onClick={onActivate}
+        // 🔴 必须在 `{...sortableAttributes}` **之后**：dnd-kit 那份 attributes 自带
+        // `tabIndex: 0`，放在它前面会被逐字盖掉 —— 于是 rail 上每一枚可拖标签都各自
+        // 是一个 Tab 停靠点（§8.2 第 13 条记的那个缺陷本体）。
+        // 单测 C 层量的就是渲染出来的 `tabindex`，写反顺序立刻红。
+        tabIndex={roving ? 0 : -1}
+        className={`ht-rail__tab${active ? ' ht-rail__tab--active' : ''}`}
       >
         <tab.Icon size={ICON_SIZE.sm} aria-hidden="true" />
         <span className="ht-rail__label ht-type-caption">{t(tab.labelKey)}</span>
@@ -230,6 +244,15 @@ function DesktopRailNavigation({
   );
 
   const railTabs = splitRailTabs(visibleMainTabs, view, preference);
+
+  // 🔴 这一组是**一个**标签组，尽管它在 DOM 里是两段（`role="tablist"` 里的主标签 + 助手，
+  //    和它外面的工具段）。Tab 停留点只能有一枚，顺序按渲染顺序数。
+  const railTabOrder: readonly string[] = [
+    ...railTabs.primary.map((tab) => tab.key),
+    ...(onOpenAssistant !== undefined ? [ASSISTANT_TAB_ID] : []),
+    ...visibleToolTabs.map((tab) => tab.key),
+  ];
+  const railRovingKey = rovingTabKey(railTabOrder, assistantActive ? ASSISTANT_TAB_ID : view);
 
   const updatePreference = useCallback((next: RailPreference): void => {
     setPreference(next);
@@ -394,6 +417,7 @@ function DesktopRailNavigation({
       aria-label={t('web.shell.nav.aria')}
       onPointerOver={anchorLabel}
       onFocus={anchorLabel}
+      onKeyDown={(event) => onTabRovingKeyDown(event, 'vertical')}
     >
       <div className="ht-rail__top">
       <AccountMenu email={syncEmail} showSignIn={syncNeedsSignIn} onSignIn={onSignIn} onOpenSettings={onOpenSettings} onOpenProfile={onOpenProfile} onOpenProfileCenter={onOpenProfileCenter} onOpenGrowth={onOpenGrowth} growthEnabled={growthEnabled} onSignOut={onSignOut} />
@@ -407,10 +431,10 @@ function DesktopRailNavigation({
           {({ primaryDropRef, overflowDropRef, primaryIsOver, overflowIsOver }) => <div ref={primaryDropRef} role="tablist" aria-label={t('web.shell.views.aria')} className={`ht-rail__tabs${primaryIsOver ? ' ht-rail__tabs--drop-target' : ''}`}>
           <SortableContext items={railTabs.primary.map((tab) => tab.key)} strategy={verticalListSortingStrategy}>
             {railTabs.primary.map((tab) => (
-              <SortableRailButton key={tab.key} tab={tab} dropBefore={draggedKey !== null && draggedKey !== tab.key && dropKey === tab.key} active={!assistantActive && view === tab.key} onActivate={() => activate(tab.key)} customize={customize} canMoveToMore={!REQUIRED_RAIL_KEYS.has(tab.key)} onMoveToMore={() => moveBetween(tab.key, 'overflow')} onMoveUp={() => moveWithin(tab.key, -1, 'primary')} onMoveDown={() => moveWithin(tab.key, 1, 'primary')} />
+              <SortableRailButton key={tab.key} tab={tab} dropBefore={draggedKey !== null && draggedKey !== tab.key && dropKey === tab.key} active={!assistantActive && view === tab.key} roving={railRovingKey === tab.key} onActivate={() => activate(tab.key)} customize={customize} canMoveToMore={!REQUIRED_RAIL_KEYS.has(tab.key)} onMoveToMore={() => moveBetween(tab.key, 'overflow')} onMoveUp={() => moveWithin(tab.key, -1, 'primary')} onMoveDown={() => moveWithin(tab.key, 1, 'primary')} />
             ))}
           </SortableContext>
-          {onOpenAssistant !== undefined ? <button type="button" role="tab" aria-selected={assistantActive} data-testid="rail-assistant" className={`ht-rail__tab${assistantActive ? ' ht-rail__tab--active' : ''}`} onClick={onOpenAssistant}>
+          {onOpenAssistant !== undefined ? <button type="button" role="tab" aria-selected={assistantActive} tabIndex={railRovingKey === ASSISTANT_TAB_ID ? 0 : -1} data-testid="rail-assistant" className={`ht-rail__tab${assistantActive ? ' ht-rail__tab--active' : ''}`} onClick={onOpenAssistant}>
             <AssistantIcon size={ICON_SIZE.sm} aria-hidden="true" />
             <span className="ht-rail__label ht-type-caption">{t('web.ai.assistant.title')}</span>
           </button> : null}
@@ -467,7 +491,7 @@ function DesktopRailNavigation({
           </div> : null}
         </DragOverlay>, document.body)}
       </DndContext>
-      {visibleToolTabs.map((tab, index) => <button key={tab.key} type="button" role="tab" aria-selected={!assistantActive && view === tab.key} className={`ht-rail__tab ht-rail__tab--tool${index === 0 ? ' ht-rail__tab--tool-start' : ''}${!assistantActive && view === tab.key ? ' ht-rail__tab--active' : ''}`} onClick={() => onNavigate(tab.key)}><tab.Icon size={ICON_SIZE.sm} aria-hidden="true" /><span className="ht-rail__label ht-type-caption">{t(tab.labelKey)}</span></button>)}
+      {visibleToolTabs.map((tab, index) => <button key={tab.key} type="button" role="tab" aria-selected={!assistantActive && view === tab.key} tabIndex={railRovingKey === tab.key ? 0 : -1} className={`ht-rail__tab ht-rail__tab--tool${index === 0 ? ' ht-rail__tab--tool-start' : ''}${!assistantActive && view === tab.key ? ' ht-rail__tab--active' : ''}`} onClick={() => onNavigate(tab.key)}><tab.Icon size={ICON_SIZE.sm} aria-hidden="true" /><span className="ht-rail__label ht-type-caption">{t(tab.labelKey)}</span></button>)}
       <InboxBell />
       <button type="button" data-testid="rail-help" className="ht-rail__tab ht-rail__tab--tool" onClick={onOpenHelp}><CircleHelp size={ICON_SIZE.sm} aria-hidden="true" /><span className="ht-rail__label ht-type-caption">{t('web.shell.nav.help')}</span></button>
       <SyncBar />

@@ -378,8 +378,14 @@
  * 工具段**贴底**（rail 下段）。
  *
  * 🔴 用 `margin-top: auto` 而不是插一个 `flex:1` 的 spacer 元素：
- * 工具按钮仍在**同一个 `role="tablist"`** 里（`role=tab` 跑到 tablist 外面是无效结构），
- * 而 tablist 里多一个非 tab 的子元素会让"这一组有几项"变得含糊。
+ * spacer 会作为 `<nav>` 的一个子元素插在回收站和帮助之间，而这一段的
+ * "谁贴底"是靠 flex 分配的，多一个空白元素会让下一段的位置变得含糊。
+ *
+ * ⚠️ **改这段时别信旧版这条注释**：它原先写的是"工具按钮仍在同一个
+ * `role="tablist"` 里" —— 现量是**不在**：`.ht-rail__tabs[role=tablist]` 只包住主标签与助手，
+ * 工具段（`RailNavigation.tsx` 的 `visibleToolTabs`）是 `<nav>` 的直接子元素，
+ * 而它带着 `role="tab"`。这个结构差已经登记在 `docs/plans/goal-layout-audit.md` §8.2 的第 15 行，
+ * 键盘漫游因此挂在 `<nav>` 容器上、按 DOM 顺序把两段当成一组（见 `src/lib/tab-roving.ts`）。
  */
 .ht-rail__tab--tool:first-of-type {
   margin-top: auto;

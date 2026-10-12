@@ -1,4 +1,5 @@
 import { ICON_SIZE } from '@heyta/design-system';
+import { onTabRovingKeyDown } from '../../lib/tab-roving.js';
 /**
  * 通知中心 / 活动 的侧栏入口与面板。
  *
@@ -437,6 +438,7 @@ export function InboxBell({
               role="tablist"
               aria-label={t('web.inbox.tabs.aria')}
               className="ht-inbox__tabs"
+              onKeyDown={(event) => onTabRovingKeyDown(event, 'horizontal')}
             >
               {TABS.map((key) => (
                 <button
@@ -445,6 +447,7 @@ export function InboxBell({
                   role="tab"
                   id={`${testID}-tab-${key}`}
                   aria-selected={tab === key}
+                  tabIndex={tab === key ? 0 : -1}
                   aria-controls={panelId}
                   data-testid={`${testID}-tab-${key}`}
                   className={`ht-inbox__tab${tab === key ? ' ht-inbox__tab--active' : ''}`}
