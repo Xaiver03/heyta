@@ -3780,3 +3780,48 @@ B173 就地追记一句：现在缺的**只有**那一行登记，不再有"文�
   （`dayCount` 由 0 变 1），而这枚 `.ts` 反例件**不在本线白名单**（表里只写 `verify-inbound-*.py`）且没有门禁消费它 ⇒ 登记 **B184**。
 - AC 勾选数仍 **0**（未勾 8）。T7 三条腿里 `pnpm check` / `pnpm -r test` 仍因八条别线红而 rc=1，
   `reinstall:all` 这一条现在是 rc=0 —— 完成条件 1 里"三条命令 exit 0"这一条**仍不成立**，交付时如实报。
+
+## 2026-10-12 09:3x · 停损报告已随交付发出（对话里贴了逐格命令与输出），这一节记"报告说了什么 + 新取的现量 + 下一会话该做什么"
+
+**为什么要有这一节**：报告本身在对话里，新会话看不见它。下面这十行就是报告的骨架，读到这里就能接着谈，不用重跑。
+
+**八格结论（一句话一格，读数与完整证据在计划文末那几个 dated 节）**：
+
+| 格 | 结论 | 差的那一口 |
+|---|---|---|
+| AC-1 | 判定绿（离线 103 / 权益 56 / 额度 3 / 真库 17 / 身份装置 46 / require 八臂） | 生产接线面：票据校验正被别的工作树放宽，五份副本互不相同且**没有一条尺会红**（B182） |
+| AC-2 | 绿（内核 3 文件 47 条 + 牙臂 6 臂，`sha256` 与上一趟逐字相同） | — |
+| AC-3 | 装置腿当前 HEAD 绿（`Windows: 13/13` + 内层 `14 passed` + 五臂反向验证） | 窗口 3 那句"宿主只回报 `empty`"的读法待裁决；这组不含壳与界面 |
+| AC-4 | 绿（跨时区 1 条 + app-host 14 文件 111 条 + 线级出境请求体/请求头） | — |
+| AC-5 | 判定绿（三档 15/16/9），归属尺 rc=1 **红因在外** | 口径归负责人（B169），本线不代改 |
+| AC-6 | 🔴 **不勾**：本线两份 e2e 单跑 `2 failed / 4 passed` | `active` 没人传（B140/B181）——"界面层已入库"≠"界面能用" |
+| AC-7 | 绿（`check-docs-voice` / `docs-link-check` 都 rc=0；开工那句 `docs-link-check rc=1` 已不复现） | — |
+| AC-8 | 矩阵装置绿、五端装机取证绿 | 自动收集在真机上的设备腿没有（B164） |
+
+**这一轮（09:3x）新取的现量**，都是在隔离副本 `.worktrees/inb-t8` 与主检出上**当场**跑的，不是沿用旧表：
+
+```
+$ node research/tools/license-inventory.mjs   → rc=0  「结论：全部依赖均为宽松许可（含已登记的例外）✅」
+$ node scripts/check-migrations.mjs           → rc=0  「✅ 迁移文件全部符合规范。」
+$ python3 research/tools/verify-inbound-ac-ticks.py            → rc=0
+    AC 行=8 已勾=0 未勾=8 状态位未分类=0
+$ python3 research/tools/verify-inbound-ac-ticks.py --self-test → rc=0  「臂数=5，不成立=0」
+$ grep -rnE '\.(skip|todo)\(|\bxit\b|describe\.skip' <本线全部测试文件> | wc -l → 0
+```
+
+🔴 **完成条件 2 里"非白名单条目数与开工快照相同"这一条，本线判为不可核，不是成立**：
+**开工时没取基线快照**（这是执行者的流程缺陷，如实记在这里，不事后补一张假基线）。
+能给的只有两个现量：08:36 那次 total 18 / 白名单 2 / 非白名单 16；09:2x 主检出再次 total 18
+（白名单内被别人改着的两枚 = `BLOCKED.md`、`server/src/automation/entitlement-ticket.ts`；
+其余 16 条逐枚都是别线的：i18n 两份、`packages/legal`、`capability-manifest.generated.ts`、
+`server/src/legal.generated.ts`、`apps/web/evidence/data-transfer-final/*` 六枚、`CategoryCreateDialog.tsx`、
+`account-standard-suite-handoff.md`，另有未跟踪的 `.agents/context/`、`remote-linux-host-and-disk-reclaim.md`、
+`e2e/tests/rail-roving.spec.ts`）。两次数值相同只能说明**这一轮本线没往非白名单里添东西**，不能冒充"与开工基线相同"。
+
+**报告里交给负责人的五件（都在对话里给了正文与推荐，不是文件指针）**：
+① B140/B181 的挂载点归谁（不定则 AC-6 永远差最后一米，用户根本进不到自动收集）；
+② 公网接收与售卖**建议不开**（AC-1 未闭合 + B182 正在被放宽 + AC-6 走不到，任一条都够让"已上线并受管控"变假话）；
+③ B169 判卷口径（改法与反向验证我能给，但口径归他）；④ AC-8 设备腿 B164（要真机与签名账号）；⑤ push（现在推会把别的并行会话未公开的笔一起带出去）。
+
+**状态**：本线全部改动**只本地提交**（`main` 到 `061e690f`），AC 一格未勾，Goal 未自行标完成。
+下一会话开口先读这一节，再读计划文末 `08:2x–08:5x` 那两节；**别重跑四端重装**（读数已入库，重跑要占模拟器与远端打包机）。
