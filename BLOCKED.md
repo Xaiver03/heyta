@@ -9696,3 +9696,56 @@ cd .worktrees/inb-t7/e2e && NO_COLOR=1 npx playwright test tests/admin-console.s
 ② "本线的 spec 零命中"不能读成"本线 e2e 绿"，只能读成**未执行**（`grep -c 'inbound-automation.spec.ts' 086.log` = 0）；
 ③ 第 86 道整道在 `workers: 1` × 383 条 × 每枚失败 60 s×2 之下**一小时跑不完**（`RC=124` 是装置的超时，不是 Playwright 的码）——
 要么抬装置 `--timeout`（那是判卷阈值，须链的主人拍），要么按族拆跑；本线两种都不代改。
+
+## B182（2026-10-12 08:1x，本会话 · **本线白名单内一枚文件正被别人改，改的是校验宽度**）：`server/src/automation/entitlement-ticket.ts` 的 `EVENT_ID` 被放宽到**没有任何生产者发得出来**的形状
+
+🔴 **归属先说清（这条不是本线写的，也没提交）**：现量 `git status --porcelain -- server/src/automation/entitlement-ticket.ts` = `M`，
+工作树 blob `ae96a4b8e1243b3630bfca2419b38b405e1f617c` ≠ `HEAD:…` = `b7dcb14278157a504b7c39d254f04cfcf5e025e0`。
+本线**既不代提交、也不代回滚**（有人在写，回滚会吃掉他的工作）。这里只登记"它正漂出边界"这件事本身。
+
+**改了什么（逐字，`git diff` 原文）**：
+
+```diff
+-const EVENT_ID = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$/);
++const EVENT_ID = z.string().regex(/^[A-Za-z0-9:_-]{1,127}$/);
+```
+
+同批还删掉了那枚 import 上方的 🔴 docstring（"票据的**封闭动作词表与作用域档**只有一份，在 `@heyta/inbound-core`（签发侧与宿主侧共用）"），
+换成只保留 ESM/CJS `require` 顺序提醒的短注释 —— **顺序提醒留下了，"词表唯一事实源"那句约定被删掉**。
+这条不是风格问题：那句约定正是下面那张表里"改前那一行凭什么长那样"的理由。
+
+**同一个字段在整条边界上有五份模式副本，宽度各不相同**（这才是要拍的格子，不是那一行）：
+
+| 位置 | 模式 | 首字符 | 长度上界 |
+|---|---|---|---|
+| `packages/inbound-core/src/webhook.ts:32` `scopedIdPattern`（签发侧，用在 ruleId/keyId） | `^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$` | 必须字母数字 | 128 |
+| `packages/inbound-core/src/webhook.ts:33` `eventIdPattern`（**签发侧对 eventId 的规则**） | `^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$` | 必须字母数字 | 64 |
+| `server/src/automation/entitlement-ticket.ts:18`（**改前**） | `^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$` | 必须字母数字 | 128 |
+| `server/src/automation/entitlement-ticket.ts:18`（**工作树**） | `^[A-Za-z0-9:_-]{1,127}$` | **无约束** | 127 |
+| `server/src/api.ts:1238`（路由参数）与 `server/src/automation/ai-metering.ts:35` `validId` | `^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$` | 必须字母数字 | 64 |
+
+⇒ 改后那一枚**在两个方向上都比每一枚生产者宽**：首字符可以是非字母数字（签发侧三处全禁），长度仍超 64。
+⚠️ **长度那一半不是这次改出来的**：改前那行就已经是 128，而签发与路由都是 64 —— 现量 `node` 对照：
+`'a'.repeat(100)` ⇒ `ticketBefore=true ticketAfter=true meteringAssertKey=false`。
+**新失掉的是首字符那一格**：`'-evt'` / `':evt'` / `'_evt'` 改前 `false`、改后 `true`，而签发侧与计量层两处始终 `false`。
+
+**能不能失败：现在没有任何一层会红**（这是本条真正要登记的缺口）。逐条现量：
+- `grep -rln "TICKET_INVALID" server/tests` 命中的用例只覆盖**坏签名**（`inbound-ticket-rejection-route.spec.ts:214`）与**错实例**（`:219`），
+  没有任何一条拿"形状不合法的 eventId"去过 claims 校验；
+- 该文件里出现的 eventId 字面量（`ev-shared`、`ev-valid`、`ev-leak`、`ev-for-a-different-event`）**五份副本同时接受** ⇒ 收紧或放宽都不会红；
+- `packages/inbound-core/tests/webhook.spec.ts:57` 只测**签名覆盖范围**（换 eventId ⇒ `toThrow`），不测形状。
+⇒ 按 AGENTS §7 元规则 2："一条永远通过的判据比没有判据更糟" —— 这里连那条都还没有。
+
+**可达后果（按代码顺序说，不夸大）**：Ed25519 验签**没动**，所以这不是"伪造票据变得可行"。
+变化的是判层顺序：`createEntitlementGuard` 在 `preHandler` 里用**票据 claims** 判作用域（用的是被放宽的那份），
+严格的 64/首字符检查排在 handler 的 `server/src/api.ts:1238` —— 所以一枚 claim 了 `-evt` 的票据会**先过闸门、再在参数层回 400 `validation_failed`**。
+净效果是"这枚票据的作用域能不能被服务端接受"从**内层（402 + `AUTOMATION_TICKET_INVALID`）挪到了外层（400）**，
+拒绝码与可观测层级都变了；票据消费在业务写事务里（T2 落的那步），所以 400 那条路**不会烧掉一次性票据** —— 这一点本条不记成损失。
+
+**建议下一步（等这枚文件不动了再做；本线不追移动目标，也不替它加判据）**：
+1. 把首字符类与长度上界收成 `@heyta/inbound-core` 导出的**一枚**常量（那已经是动作词表的唯一事实源，被删的 docstring 写的正是这个约定），
+   上面五处 import 它 —— 五份副本 = 五种裁决，与 §3.5 里 clientId 那两次"抽取了但旧的那份没删"同形；
+2. 补一条**能红**的用例：claim `eventId: '-evt'` ⇒ **402 + `AUTOMATION_TICKET_INVALID`**（而不是 400），
+   反向验证形状：把常量首字符类放宽成 `[A-Za-z0-9:_-]` ⇒ 该用例转红；改回 `[A-Za-z0-9]` ⇒ 转绿。
+3. 归属：这一格落在 `server/src/automation/` 与本线白名单内，但**改的是别人正在写的那枚文件**，
+   所以要么由他在同一笔里带上，要么等他落笔后本线另开一笔 —— 谁做都行，**别两边都不做**。

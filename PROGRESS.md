@@ -3703,3 +3703,13 @@ B173 就地追记一句：现在缺的**只有**那一行登记，不再有"文�
 - 基线：总数 `4 → 6`（只增不减）、`skipped` 0、零 mock 界面（route 桩只挡 HTTP）。红的与 10-10 那次逐字同一枚缺陷 ⇒ **AC-6 继续不勾**，没有因为"多跑过几条"就往完成挪。
 - 🔴 跑绿它只要一句 `active={…}`，落点却在 `AiSettings.tsx:1262` / `App.tsx:3143`（地界外），而仓库对"节可见性"**已有一个机制**（同屏 `SyncSettingsPanel`/`PrivacyPanel` 都传 `active`）⇒ 不自造第二套探测，等那一行由挂载点的归属方补（B140）。
 - 端口纪律：`:4468` 先 `lsof` 确认空闲才跑；配置本身 `strictPort` + `reuseExistingServer: false`，不会顶掉别人的 dev server。
+
+## 2026-10-12 08:2x · 收口审计顺手抓到：白名单内一枚文件**正被别人放宽校验宽度**，登记成 B182（本线不代提交、不代回滚）
+
+- 范围审计（`git status --porcelain` 按白名单分类）给出 `porcelain_total 18 | 白名单内 2 | 非白名单 16`；白名单内那两枚是 `BLOCKED.md`（别线未提交的 161 行，预期内）与 **`server/src/automation/entitlement-ticket.ts`** —— 后者不是本线写的，且还没提交。
+- 那一枚 hunk 把票据 claims 的 `EVENT_ID` 从 `^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$` 改成 `^[A-Za-z0-9:_-]{1,127}$`（首字符约束消失），并删掉那段"动作词表唯一事实源在 `@heyta/inbound-core`"的 🔴 docstring。
+- 现量后果与"能不能失败"都在 **B182**：五份模式副本宽度互不相同（`node` 对照 `'-evt'/':evt'/'_evt'` ⇒ 改前 false / 改后 true / 签发侧与计量层始终 false），
+  而 `grep -rn "TICKET_INVALID" server/tests` 只覆盖坏签名（`:214`）与错实例（`:219`）—— **没有任何一条拿形状不合法的 eventId 去过校验**，改宽改窄都不会红。
+- 本线的动作：**只登记**。不代提交（那是别人的 hunk），不代回滚（会吃掉他的在写内容），不加判据去钉一枚移动中的目标；
+  建议下一步（收成 `inbound-core` 一枚常量 + 一条能红的形状用例，含反向验证形状）写在 B182 里，归属双方任一，"别两边都不做"。
+- AC 勾选数不变：`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` = **0**（这一轮没往任何一格挪）。
