@@ -1,0 +1,10 @@
+关臂读数出处（全部现量）
+  臂            : STORAGE_ARM=off，launcher 行 shell_storage_switch=False arm=off
+  页侧产物        : 远端 C:\src\heytapps\web\dist\index.html sha256=0df17c907fa67fc0f65df99c98b163f96845904f411d948f2c6e00e385d00e48（7666 B, mtime 2026-10-12 18:18:11 +08）
+                  与 reinstall-r98/RESULT.md 记的「隔离树 dist sha 前缀 0df17c907fa67fc0」逐字相同 ⇒ 这一趟装的就是 r98 那枚只含 HEAD(a4430f58) 的产物，本机 /tmp 载体已没了也没有回退到旧 dist
+  桥的 bundle      : 远端 native-bridge.js sha256=42f8e4cc3f13c6d3114de4d848799727220ac6452936bf310024019f5ad76d94（r98 推送时由 sync_windows_sources 与本地逐字对账过，但当时没把这枚哈希抄进 RESULT.md ⇒ 这一格只能算「对过账、没留数」）
+  远端 .git HEAD   : fc608b7 —— 本机历史里不存在（远端那份 .git 是旧 clone 残留）。内容以文件哈希为准，不拿它当出处。
+  assets chunk 数  : 远端 7 枚
+  装置版本        : scripts/qa/windows-installed-widget-help.mjs（本笔含两处修：打印带 matched / stdout 钉 UTF-8）
+                  scripts/windows/launch-winui-shell-cdp.ps1 @ HEAD（本笔 scp 推送的那一份）
+  跑的时刻        : 2026-10-12 23:0x–23:5x 本地（一趟 launch + 两趟判据，第二趟是为验这两处修）

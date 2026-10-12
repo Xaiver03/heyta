@@ -1,0 +1,23 @@
+{
+  "stage": "before",
+  "capturedAt": "2026-10-12T15:09:07.3159080Z",
+  "foreground": {
+    "isBrowser": false,
+    "processId": 27992,
+    "hwnd": 47513720,
+    "title": "C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+    "url": ""
+  },
+  "browsers": [
+    {
+      "isBrowser": true,
+      "process": "chrome",
+      "processId": 23168,
+      "hwnd": 5898850,
+      "title": "Qoder��������ƽ̨ - Google Chrome",
+      "url": "https://qoder.cn/device/selectAccounts?challenge=5-WBAXTMfHogamuJvZBE6ukZiLkO81_1eFT6dkUdurs&challenge_method=S256&nonce=7b6ae49e-2530-46bf-945e-261b20a2bdf8&machine_id=39e5e9ce-f1ae-46b2-807f-01f513cbe910&client_id=732aef47-9cf2-46a2-95fe-4cebb5d0d1fa&directLogin=true&directLogin=true",
+      "tabCount": 7
+    }
+  ],
+  "evidence": "Windows UI Automation foreground browser address-bar value"
+}

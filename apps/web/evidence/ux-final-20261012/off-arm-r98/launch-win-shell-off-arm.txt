@@ -1,0 +1,17 @@
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+=== 1. publish (self-contained) ===
+  exe=308736 bytes native-bridge=True
+=== 2. restore XAML resources ===
+  restored: App.xbf, HeytaWindows.pri, MainWindow.xbf, Microsoft.UI.pri, Microsoft.UI.Xaml.Controls.pri, Microsoft.Windows.Workloads.pri, Microsoft.WindowsAppRuntime.pri
+=== 3. web-dist ===
+  index.html=7666 bytes files=26
+  webview profile restored: 329 files
+=== 4. launcher (interactive session) ===
+  cdp_listen=1
+  cdp_browser=Edg/154.0.4258.62
+  target_heyta_local=True
+  shell_storage_switch=False arm=off (default is ON now; =0 disables)
+  window_title=
+RESULT=OK

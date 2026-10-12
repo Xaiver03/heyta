@@ -1,0 +1,44 @@
+✅ Windows 安装态 Widget + 帮助外链验收通过：/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/ux-final-20261012/off-arm-r98/windows
+{
+  "cdp": "http://127.0.0.1:9287",
+  "browser": "Edg/154.0.4258.62",
+  "shellBefore": "https://heyta.local/index.html",
+  "shellAfter": "https://heyta.local/index.html",
+  "widget": {
+    "statusCount": 1,
+    "statusText": "正在原生桌面应用中运行",
+    "capabilityText": "当前桌面应用暂不支持系统小组件。你仍可在应用内查看任务、习惯与专注进度。",
+    "installStepCount": 0,
+    "nativeStepCount": 0,
+    "backend": "sqlite",
+    "shellSignals": {
+      "storagePort": false,
+      "webview2Host": true,
+      "shellMessageHandlers": [],
+      "injectedHandlerKeys": []
+    },
+    "panelText": "桌面小组件查看此桌面应用的小组件支持情况。正在原生桌面应用中运行当前桌面应用暂不支持系统小组件。你仍可在应用内查看任务、习惯与专注进度。"
+  },
+  "external": {
+    "expected": "https://heyta.waytofuture.cn/docs",
+    "before": {
+      "isBrowser": false,
+      "processId": 27992,
+      "hwnd": 47513720,
+      "title": "C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+      "url": ""
+    },
+    "after": {
+      "isBrowser": false,
+      "processId": 14912,
+      "hwnd": 7081524,
+      "title": "C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+      "url": ""
+    },
+    "evidence": "Windows UI Automation foreground browser address-bar value"
+  },
+  "screenshots": [
+    "windows-widget-native.png",
+    "windows-help-shell-unchanged.png"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "stage": "after",
+  "capturedAt": "2026-10-12T15:09:14.7809000Z",
+  "foreground": {
+    "isBrowser": false,
+    "processId": 14912,
+    "hwnd": 7081524,
+    "title": "C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+    "url": ""
+  },
+  "browsers": [
+    {
+      "isBrowser": true,
+      "process": "chrome",
+      "processId": 23168,
+      "hwnd": 5898850,
+      "title": "�������� ���� heyta - Google Chrome",
+      "url": "https://heyta.waytofuture.cn/docs/",
+      "tabCount": 8
+    }
+  ],
+  "evidence": "Windows UI Automation foreground browser address-bar value"
+}

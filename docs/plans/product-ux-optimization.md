@@ -2929,3 +2929,51 @@ diff dist/windows/install-capture.txt /tmp/heyta-ux-r98/dist/windows/install-cap
 
 落盘物：`apps/web/evidence/ux-final-20261012/organizer-confirm-r98/`（`run.txt` + `carrier.txt` + 三张图）。
 `.gitignore:49` 是 `*.log` ⇒ 日志一律收成 `.txt`（r93 同款约定）。落盘时刻 20:4x，晚于读数，只为登记证据本身。
+
+### 2026-10-12 23:5x：Windows 真壳的逃生门 `=0` 臂终于有读数 —— 而它先照出**我自己那枚装置的"报告同形"**
+
+**这一格的两个前置条件其实早就分别齐了，是我没去查**：
+
+1. 任务格里那句"`launch-winui-shell-cdp.ps1` 只能表达 `-ShellStorage`（=1），表达不了 =0"**是旧口径** ——
+   `-ShellStorageOff` 在 `422850ee`（2026-10-12 00:53，"三臂不用开窗口就能读"）就已经进去了，
+   本趟先在远端 `-PlanOnly` 读到 `STORAGE_ARM=off` / `$env:HEYTA_SHELL_STORAGE = '0'` 才动手。
+2. 台账那句"要让真壳那一趟证到逃生门，得先有四端重装后的新包" —— r98（18:1x，`RC=0`）就是那一枚。
+   ⇒ **两条前置都不是"等别人"，是本线自己没回头核。** 记这条是为了下次先查再登记。
+
+**载体身份不靠"远端那份 `.git`"**（它的 `HEAD=fc608b7` 在本机历史里根本不存在，是旧 clone 的残留），
+靠哈希逐字对：远端 `apps/web/dist/index.html` = `0df17c907fa67fc0f65df99c…`，与 `reinstall-r98/RESULT.md`
+记的"隔离树 dist sha 前缀 `0df17c907fa67fc0`"**逐字相同** ⇒ 这趟跑的是 r98 那枚只含 `HEAD`（`a4430f58`）的产物；
+本机 `/tmp` 那棵隔离树已被清走，也**没有**因此退化成旧 dist。桥的 bundle 那一格照实记：
+r98 推送时 `sync_windows_sources` 与本地逐字对过账，但当时没把哈希抄进 RESULT.md ⇒ **"对过账、没留数"**。
+全文与现量命令见 `off-arm-r98/arm.txt`。
+
+**逃生门那一格从本趟起有读数**（两趟复跑，逐字相同）：
+
+| 信号 | 读数 | 含义 |
+|---|---|---|
+| `storagePort` | `false` | 逃生门**确实关着**（这条臂不是"没生效"） |
+| `shellMessageHandlers` / `injectedHandlerKeys` | `[]` / `[]` | 壳没注入任何名单里的 handler |
+| `webview2Host` | `true` | ⇒ 页侧识别成原生壳**只靠第二条信号**，不靠存储端口 |
+| `installStepCount` | `0` | 没有把用户带回 Windows PWA 安装流程 |
+| 状态行 | 「正在原生桌面应用中运行」 | 人看图：两趟 × 两张都看过，画的就是这一行 + 能力边界说明 |
+
+`backend` 那一格读数是 `sqlite`（不是 `'shell'`）—— 记下来，**不参与判定**（装置文件头第 2 条理由说的就是这个坑）。
+
+**顺带把"外链在浏览器里真的渲染"的 Windows 半也取到了**：UIA 读到的地址栏值 = `https://heyta.waytofuture.cn/docs/`，
+`tabCount 8 → 9`（新标签证据），同时壳内 `shellBefore === shellAfter`（`https://heyta.local/index.html`）且帮助面板仍可见。
+⇒ 任务 #44 现在只剩 **macOS** 那一格，而它要一次前台激活，被 `AGENTS §6.2 规定二`（不许抢前台）挡着 —— 那一格仍归负责人点头。
+
+**本趟最该记的是我自己的装置又同形了一次**（两处，都当场修 + 复跑证明）：
+
+1. 🔴 **`✅` 旁边印着 `isBrowser:false` + 空 url**：`external.before/after` 只印 `foreground` 那一条记录，
+   而判据读的是**全部浏览器窗口**（文件头注释里写明了为什么不能只看焦点）。前景恰好是计划任务自己那枚
+   `powershell.exe` 窗口 ⇒ 我在读到 ✅ 之后**一分钟内把它判成了假绿**，还差点去"修"一条不存在的缺陷。
+   这与 #30 那一格（"跳过"与"没命中"在报告里同形）是**同一类缺陷在另一枚装置上的复发**：
+   **报告必须把"真正满足断言的那一条"打出来**，前景只能当上下文。现在多印 `matched` 与 `browserWindowCount`，
+   复跑读到 `matched.title = 帮助中心 —— heyta - Google Chrome`、`url = …/docs/`、`tabCount = 9`。
+2. ⚠️ **中文标题在证据里是 `????????`**：探针写文件用的是 `Set-Content -Encoding UTF8`（没坏），
+   **丢在 PowerShell → stdout 那一跳的控制台代码页**。URL 全 ASCII 所以判据不受影响，坏的是证据可读性。
+   现在显式钉 `[Console]::OutputEncoding = New-Object Text.UTF8Encoding($false)`，复跑标题就正常了。
+
+**没做的事**：这趟只在 Windows 真壳上证了"关掉逃生门也认得壳"；macOS 那半的同类判据是 r96 那趟取的，本趟没重跑。
+共享载体上留下的东西按"只收自己起的"处理：壳进程按 pid 收、`heyta-qa-widget-help` 那枚计划任务按名字注销（它是我这趟建的）。
