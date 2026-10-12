@@ -1,0 +1,8 @@
+读数时刻（run.txt 第 2 行的载体行，脚本内现读 git rev-parse --short HEAD）: 4310b6cd
+本文件写入时刻: 2026-10-12T12:29:33Z（=本地 20:29，晚于读数，只为登记证据本身，不是运行时刻）
+运行时刻: 见 run.txt 里 APK 闸门那一行与截图 mtime（19:51–19:52 本地）
+rig  : scripts/verify-mobile-organizer-confirm.sh  sha256(前12)=91b87bdad47a  行数=290
+APK  : apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+       mtime=2026-10-12 19:12:12  size=69462896 B  sha256(前24)=b731fd260810fb1c095c6c27
+device: emulator-5554  模式=只用本机（离线），不碰服务端
+是否只含 HEAD: 否。跑时共享工作树里有两枚别线未提交源码 —— apps/web/src/features/shell/RailNavigation.tsx（RN 壳不打包 apps/web，与本 APK 无关）与 packages/ai/src/capability-manifest.generated.ts（生成物，mtime 早于 APK）。

@@ -1,0 +1,50 @@
+════ 清单/标签/归档确认：真机读数 ════
+  设备: emulator-5554   载体: 4310b6cd   图: /tmp/heyta-organizer-confirm
+
+════ 0. APK 新鲜度闸门（任何设备侧写动作之前） ════
+   APK 2026-10-12 19:12:12 / 最新源码 2026-10-12 18:11:35
+   （扫的是 /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta 下：现推：apps/mobile/src packages/ai/src packages/app-host/src packages/design-system/src packages/domain/src packages/i18n/src packages/legal/src packages/local-api/src packages/op-log/src packages/storage/src packages/sync-client/src packages/sync-core/src packages/ui/src packages/widget-core/src）
+   ✅ 装的是当前源码的产物
+   ✅ APK 新鲜度闸门通过（文件比源码新）
+
+════ 0b. 把这一枚装上去（闸门只证明文件新，不证明设备上跑的是它） ════
+   Success
+
+════ 1. 冷启动 → 只用本机 → 先离线使用 ════
+     已处理隐私同意面板（点「只用本机」@ 768 1684）
+     已离开欢迎页（点「先离线使用」@ 540 1432）
+   ✅ 离线模式进入主界面（底部导航在位）
+
+════ 2. 进「我的 → 标签」并造一条标签「r98tag」 ════
+   ✅ 标签已建出（列表里读得到「r98tag」）
+
+════ 3. 判据 ①：点删除**只出确认行**，取消后那条还在 ════
+   ✅ 标签那一列**数字为 0 也问**：问句 + 确认删除 + 取消删除 三件齐
+   ✅ 判据 ① 后半：取消之后「r98tag」还在（那一下点击一条 op 都没写）
+
+════ 4. 判据 ②：点「确认删除」才恰好删掉它 ════
+   ✅ 确认之后「r98tag」从列表里消失
+
+════ 5. 进「我的 → 清单」并造一条空清单「r98list」 ════
+   ✅ 清单已建出（列表里读得到「r98list」）
+
+════ 6. 判据 ③：删一条**空**清单不该先问（闸门 askOnlyWhenImpact 在位） ════
+   ✅ 空清单一键直删：没出确认行，且那一行当场消失
+
+════ 7. 造一条待归档的叶子清单「r98arch」 ════
+   ✅ 清单已建出（列表里读得到「r98arch」）
+
+════ 8. 判据 ④：归档一条**叶子**清单不该被问（archiveChildImpact<=0 那一档） ════
+   ✅ 叶子归档一键直写：没有确认行 ⇒ 「有后果才问」这条不对称在归档那一格也成立
+
+════ 9. 未取证那一格（照实报，不折成通过） ════
+   ⚠️ 那两句**带数字**的后果本轮没有读数：
+      · 清单删除确认里「它下面还有 N 条子清单」
+      · 归档确认里「还挂着 N 条子清单 + 整支会跟着收起」
+      · 回收站彻底删除里「那 N 条会永久失去入口」
+      原因：移动端造父子的唯一入口是拖拽（ListsSection 的 dnd），input swipe 不可靠。
+      数字那一半钉在 apps/web/tests/projects-panel.spec.tsx 与 apps/mobile/tests/projects-sections.spec.ts。
+
+════════════════════════════════════════
+  通过 10 项，失败 0 项
+  ✅ 清单/标签/归档确认（离线模式，不碰服务端）：跑到的判据全绿，另有 3 格未取证（见上，别读成「三处确认框都在设备上验过」）
