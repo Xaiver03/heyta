@@ -1649,7 +1649,7 @@ export const en = {
   'web.categories.create.cancel': 'Cancel',
   'web.categories.create.close': 'Close',
   'web.categories.create.creating': 'Creating…',
-  'web.categories.create.empty': 'Enter a name first.',
+  'web.categories.create.nameRequired': 'Enter a name first.',
   'web.categories.create.duplicate': '“{name}” already exists.',
   'web.categories.create.failed': 'Could not create it. Try again.',
   'web.categories.create.project.submit': 'Create list',

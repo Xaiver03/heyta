@@ -1767,7 +1767,7 @@ export const zhCN = {
   'web.categories.create.cancel': '取消',
   'web.categories.create.close': '关闭',
   'web.categories.create.creating': '创建中…',
-  'web.categories.create.empty': '先输入名称。',
+  'web.categories.create.nameRequired': '先输入名称。',
   'web.categories.create.duplicate': '「{name}」已经存在。',
   'web.categories.create.failed': '创建失败，请重试。',
   'web.categories.create.project.submit': '创建清单',
