@@ -4079,3 +4079,30 @@ $ grep -rnE '\.(skip|todo)\(|\bxit\b|describe\.skip' <本线全部测试文件> 
   `2 failed / 4 passed`）跑在**共享主检出**上、含别线在飞 diff，只当佐证、不当 HEAD 读数。
 - **不做的事**：没动 `apps/web/src/App.tsx`、`apps/web/src/features/settings/AiSettings.tsx`、`e2e/tests/helpers.ts`
   任何一枚；没给任何 AC 打勾；没改判卷口径。门禁重取见紧随其后的对话输出；AC 已勾数现量 **0**，不自行关闭 Goal。
+
+## 2026-10-12 19:2x · C29 那格我把判据从"三处逐字一致"改成能到的那一层，顺带量出一条产品事实：**确认不创建任务**
+
+原始任务：AC-8 矩阵里 C29 那格缺"同一日期在列表/详情/编辑三处一致"的取证。开工前那句判据是照台账原文抄的，
+读了源码之后它**不成立成一句话**：三处本来就给三种密度（列表 `12-31`、编辑控件 `2026-12-31`、触发器 `12月31日`），
+而把这天锚住的不是 epoch 是成对的 `dueDateLocal`（`packages/shared-schema/src/task-batch-contract.ts:36-45` 那句
+"Original date-only value; unlike dueDate it is not interpreted in device time"）。
+
+**做了什么**（两枚新取证，都在白名单内，跑完都绿）：
+- `packages/app-host/tests/inbound-draft-date-zone.spec.ts` —— 缝那一层，四档设备时区。三段有牙：
+  ① 探针对照（`TZ` 换不动就先红，防下面两段空转）；② `freezeInboundTaskBatch` 的 item + 两枚摘要四面逐字相同；
+  ③ `dueLocalDateOf` 四面同一天，**反向臂**摘掉配对后 `Etc/GMT+12` 必须读成 `2026-12-30`。
+  读数：`Tests 1 passed (1)`。反向验证：临时副本把输入日挪一天 ⇒ `FALSIFY_RC=1`，红在
+  `Pacific/Kiritimati：date-only 冻结出的 item 与 UTC 基准不同` 那一条，临时臂已删（`ls` 复量 0 枚）。
+- `e2e/tests/inbound-automation.spec.ts` 末尾那一块 —— 浏览器侧两枚时区各一趟，`2 passed`。
+  取证落在 `docs/research/evidence/inbound-automation-review/date-consistency/`（两张 PNG + 两份 JSON）。
+
+**两条我自己的错，都当场改了**：
+1. 第一版判据写成"确认之后列表里必须出现那枚新任务"，两枚全红。红因不是产品缺陷也不是环境，是**我对产品语义的假设错**：
+   确认那一步不建任务。第二版把这块改成浏览器今天真能证的（控件取值 + 发布摘要与 Node 侧对账），
+   并把"为什么列表/详情不在这里"写进注释与 C29 格。
+2. 第一版取证里那枚 `deviceOffset` 读的是 **Node 进程**的偏移，两档时区都显示 `-480` —— 也就是
+   `timezoneId` 若没落进浏览器，这两条会永远通过。补了浏览器侧探针控制（`Intl…resolvedOptions().timeZone` +
+   `getTimezoneOffset()` + 同一 epoch 的本地日）后读数变成 −840/+720 与 31/30，这一对才把"两档真不同"钉住。
+
+**还欠的**：列表与详情两面的浏览器读数卡在 worker 链（B190）；亮暗/窄屏/中英那三档这一对也没跑，
+C29 尺列按 B169 口径保持 `无尺`（升不升由负责人拍）。**没有 push。**

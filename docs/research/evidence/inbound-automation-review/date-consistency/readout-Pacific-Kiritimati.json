@@ -1,0 +1,14 @@
+{
+  "carrier": "共享主检出（含别线在飞 diff）",
+  "zone": "Pacific/Kiritimati",
+  "browserZone": "Pacific/Kiritimati",
+  "browserOffset": -840,
+  "browserDayOfEpoch": 31,
+  "nodeOffset": -480,
+  "editorDateValue": "2026-12-31",
+  "nodeDigest": "ff9e234c102f0a160707dad610cc0593d0b6a40df2909033f8f0e5355014fea2",
+  "publishedDigest": "ff9e234c102f0a160707dad610cc0593d0b6a40df2909033f8f0e5355014fea2",
+  "nodeEpoch": 1798646400000,
+  "nodeLocal": "2026-12-31",
+  "覆盖": "草稿编辑面 + 确认发布；列表/详情两面在 worker 链上，见 C29"
+}

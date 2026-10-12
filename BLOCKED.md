@@ -10068,3 +10068,34 @@ SELF_TEST_BROKEN：臂 6 的原文命中 2 处，要求恰好 1 处 —— 「<�
   `4a691dd52e9862c0d25c814c2e5c18ce3e744a57`（见 `.run-logs/merged-1012-final.log` 第一行 `HEAD=`），而我的隔离载体停在 `7958c18c`。
   本节的读数因此分成两组，**载体那组以链日志里的 `基线 HEAD=` 行为准，合并态那组以同一趟 `.run-logs/merged-1012-final.log` 第一行为准** ——
   两组各记各的基线，不许混着引用，也不许引用本节去答"当前 HEAD 是什么"（要当前值就当场 `git rev-parse HEAD`）。
+
+## B190（2026-10-12 19:2x，本会话 · C29 那格的浏览器读数卡在"确认不创建任务"这条产品事实上）
+
+**事实**：AC-8 矩阵 C29 要的判据是"同一日期在**列表 / 详情 / 编辑**三处一致 × 亮暗/窄屏/中英三档"。
+今天浏览器里只到得了编辑那一处，因为**用户在草稿面板点『确认创建这些任务』并不创建任务**：
+
+- 确认那一步只做再密封 + 发决定 —— `packages/app-host/src/inbound-draft-review.ts:105-131`
+  （`freezeInboundTaskBatch` → `sealInbound` → `remote.decideDraft`），里面没有任何建任务调用；
+- 建任务发生在**处理设备领用**那一趟 —— `packages/app-host/src/task-batch-actions.ts:22` 那句注释
+  "Lease/permit coordination belongs to the worker"；
+- 产品自己也是这么对用户说的：面板顶部文案「任务将等待获授权设备创建」（截图
+  `docs/research/evidence/inbound-automation-review/date-consistency/draft-editor-*.png`）。
+
+**实测形状**（不是推测）：e2e 里点完确认、关掉设置浮层之后，列表探针拿到的快照是
+`heading "收集箱"` + `paragraph: 收集箱是空的`，两枚时区各红一次。
+
+**我已做的部分**（不需要拍板，已落）：编辑那一处的跨时区取证补了两枚 ——
+`packages/app-host/tests/inbound-draft-date-zone.spec.ts`（缝那一层，四档时区，含反向臂）与
+`e2e/tests/inbound-automation.spec.ts` 里那两枚浏览器用例，都绿。所以这一格缺的已经收窄成"列表与详情两处"。
+
+**要谁拍 / 为什么我做不动**：要在浏览器里读到那两面，得让 e2e 把 worker 那条链跑起来
+（注册处理设备 + AI 路由 + claim/permit/receipt 三段桩）。三件事都落在白名单外或口径外：
+① 现有 e2e 夹具里那根 `active` 线还没接（**B140**，接点 `apps/web/src/App.tsx:3197` 与
+`apps/web/src/features/settings/AiSettings.tsx:1270`，两枚文件都在白名单外）；
+② 自建一条"浏览器 + 真 worker"的载体就是本线 §8.9 那把独占验证载体的活，与 B164 设备腿同一前提；
+③ 把 C29 判据就地改成"只核编辑那一处"属于改判卷口径 ⇒ 归 **B169**，我不代改。
+
+**给负责人的两条路**（任选，我这边都能接）：
+A. 先接 B140 那根 `active`（两枚文件各几行），我随后在这条 e2e 上把 worker 三段桩补齐，读列表与详情；
+B. 或明确"列表/详情那两面的跨时区读数归设备腿那一轮"，我就把 C29 判据原文与这格的分层写清（不改尺列），
+   缝那一层那枚 spec 已经是这一条不变量的机械判据。
