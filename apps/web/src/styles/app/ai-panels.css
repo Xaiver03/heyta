@@ -985,12 +985,11 @@ input[type="radio"] {
   outline-offset: var(--ht-space-1);
 }
 
-.ht-ai__history-empty {
-  margin: 0;
-  color: var(--ht-color-foreground-subtle);
-  font-size: var(--ht-font-size-xs);
-}
-
+/*
+ * 原先这里有一条 `.ht-ai__history-empty`（xs + subtle 的一行占位）。
+ * 那个 `<p>` 已收编进共享的 `EmptyState size="line"` —— 骨架与排版都由那一个
+ * 实现给，本文件不再持有它（留着就是一条没有人渲染的死规则）。
+ */
 .ht-ai__main {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
@@ -1018,7 +1017,7 @@ input[type="radio"] {
   gap: var(--ht-space-3);
 }
 
-.ht-ai__chat-body--empty {
+.ht-ai__chat-body--welcome {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1027,7 +1026,10 @@ input[type="radio"] {
   overflow-y: auto;
 }
 
-.ht-ai__empty {
+/* 首屏欢迎页（greeting + composer + 建议按钮）。🔴 它不是空态：里面有可交互的
+ * 内容，收编成共享 `EmptyState` 会把这些一起删掉。原先叫 `__empty`，
+ * 那个名字让 `check:empty-state` 把它读成"又手写了一处空态骨架"。 */
+.ht-ai__welcome {
   display: grid;
   justify-items: center;
   inline-size: min(100%, var(--ht-layout-prose-max));
@@ -1139,12 +1141,12 @@ input[type="radio"] {
 }
 
 @media (max-height: 36rem) {
-  .ht-ai__chat-body--empty {
+  .ht-ai__chat-body--welcome {
     justify-content: start;
     padding-block-start: var(--ht-space-3);
   }
 
-  .ht-ai__empty {
+  .ht-ai__welcome {
     gap: var(--ht-space-2);
   }
 

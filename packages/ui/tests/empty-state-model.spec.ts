@@ -101,7 +101,7 @@ describe('toEmptyStateViewModel —— 根节点 role 是固定的 summary', () 
   });
 });
 
-describe('toEmptyStateViewModel —— size 两档', () => {
+describe('toEmptyStateViewModel —— size 三档', () => {
   it('省略 = page，且现有站点该拿到的还拿到（图标不被这一档误伤）', () => {
     const v = toEmptyStateViewModel({ title: 'x', icon: ICON });
     expect(v.size).toBe('page');
@@ -127,6 +127,44 @@ describe('toEmptyStateViewModel —— size 两档', () => {
 
   it('section 档不豁免 title 必填 —— 空白空态仍然当场响', () => {
     expect(() => toEmptyStateViewModel({ title: '  ', size: 'section' })).toThrow(/title/);
+  });
+
+  /**
+   * `line` 档存在的理由（写在 `model.ts` 的档注释里）是**不改视觉就收编不了**：
+   * 它比 `section` 还轻一档。所以这一档最容易被后来者"顺手"画成 `page` 的形状
+   * —— 而那种错**不会让任何一条既有断言变红**，只会让侧栏里那行灰色占位
+   * 撑出一块居中的大空隙。这三条钉的就是它自己的三条承诺。
+   */
+  it('line 档把图标与插画都归一成 undefined —— 一行里塞不下 32 的字形', () => {
+    const v = toEmptyStateViewModel({
+      title: '今天没有会话',
+      icon: ICON,
+      illustration: 'notes',
+      size: 'line',
+    });
+    expect(v.size).toBe('line');
+    expect(v.icon).toBeUndefined();
+    expect(v.illustration).toBeUndefined();
+  });
+
+  it('line 档不豁免 title 必填', () => {
+    expect(() => toEmptyStateViewModel({ title: '   ', size: 'line' })).toThrow(/title/);
+  });
+
+  it('三档只差图标/插画/居中，其余槽位的归一逐字相同（含 detailRole 与 a11yRole）', () => {
+    const slots = { title: 'x', hint: '  ', detail: '', icon: ICON, illustration: 'tasks' } as const;
+    const page = toEmptyStateViewModel({ ...slots });
+    for (const size of ['section', 'line'] as const) {
+      const v = toEmptyStateViewModel({ ...slots, size });
+      expect([v.hint, v.detail, v.detailTone, v.detailRole, v.a11yRole, v.locale]).toEqual([
+        page.hint,
+        page.detail,
+        page.detailTone,
+        page.detailRole,
+        page.a11yRole,
+        page.locale,
+      ]);
+    }
   });
 
   it('页面档可以挂一枚语义微场景，并默认只播放一次入场动效', () => {

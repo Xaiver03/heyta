@@ -123,21 +123,40 @@ export function EmptyState(props: EmptyStateProps): React.JSX.Element {
         //    所以根节点除了行间距什么都没有 —— 沿用页面档的 `paddingVertical: space.16`
         //    会把设置页撑出一大块空白，那是视觉回归，不是统一。
         rootSection: { gap: tokens['space.2'] },
+        // 🔴 `line` 档：**一行辅助文字**。它住在分组标签下面（侧栏"今天"、
+        //    卡片的小节标题下面），所以它既不能有页面档的大内边距，也不能有
+        //    `section` 档那行 `row-title` + `foreground` 的标题权重 ——
+        //    占位行比重还高的话，它就在跟自己的分组标签争重心（层级倒置）。
+        rootLine: { gap: tokens['space.1'] },
         // 区块档的标题必须和下一步提示拉开层级：标题是事实，提示是行动。
         // 使用语义 `row-title`（base + semibold）并配 foreground，避免空态退化成
         // 两行同权重的灰色说明文字；页面档仍使用 section-title + muted。
         titleSection: { color: tokens['color.foreground'] },
+        // 一行档反过来：整行都是辅助信息，所以颜色与 `hint` 同档。
+        titleLine: { color: tokens['color.foreground-subtle'] },
       }),
     [tokens],
   );
 
-  const section = view.size === 'section';
+  const size = view.size;
+  const rootStyle =
+    size === 'line' ? styles.rootLine : size === 'section' ? styles.rootSection : styles.root;
+  const titleStyle =
+    size === 'line'
+      ? [text['row-meta'], styles.titleLine]
+      : size === 'section'
+        ? [text['row-title'], styles.titleSection]
+        : [text['section-title'], styles.centered, styles.title];
+  const hintStyle =
+    size === 'page'
+      ? [text['row-meta'], styles.centered, styles.hint]
+      : [text['row-meta'], styles.hint];
 
   return (
-    <View style={section ? styles.rootSection : styles.root} accessibilityRole={view.a11yRole} testID={testID}>
+    <View style={rootStyle} accessibilityRole={view.a11yRole} testID={testID}>
       {/* 装饰性图标：**不给 label** —— 读屏不该把"这里有个图标"念一遍，
           它旁边的标题已经说清了一切（与两端既有的 aria-hidden 同义）。
-          `section` 档拿不到图标：那条判断在 `model.ts` 里，不在这里。 */}
+          `section` / `line` 档拿不到图标：那条判断在 `model.ts` 里，不在这里。 */}
       {view.icon === undefined ? null : (
         <HeytaIcon
           data={view.icon}
@@ -156,28 +175,10 @@ export function EmptyState(props: EmptyStateProps): React.JSX.Element {
         />
       )}
 
-      <Text
-        style={
-          section
-            ? [text['row-title'], styles.titleSection]
-            : [text['section-title'], styles.centered, styles.title]
-        }
-      >
-        {view.title}
-      </Text>
+      <Text style={titleStyle}>{view.title}</Text>
 
       {/* `hint` 可以整个省略 —— §1.6 的实测形状就是"居中一句"。 */}
-      {view.hint === undefined ? null : (
-        <Text
-          style={
-            section
-              ? [text['row-meta'], styles.hint]
-              : [text['row-meta'], styles.centered, styles.hint]
-          }
-        >
-          {view.hint}
-        </Text>
-      )}
+      {view.hint === undefined ? null : <Text style={hintStyle}>{view.hint}</Text>}
 
       {view.detail === undefined ? null : (
         <Text
@@ -187,7 +188,7 @@ export function EmptyState(props: EmptyStateProps): React.JSX.Element {
           selectable={view.detailTone === 'danger'}
           style={[
             text.caption,
-            section ? undefined : styles.centered,
+            size === 'page' ? styles.centered : undefined,
             view.detailTone === 'danger' ? styles.detailDanger : styles.detailSubtle,
           ]}
         >
