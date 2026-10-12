@@ -1,0 +1,9 @@
+
+Running 1 test using 1 worker
+
+(node:35625) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+{"requested":"https://heyta.waytofuture.cn/docs","expectedOrigin":"https://heyta.waytofuture.cn","status":200,"gotoError":"","finalUrl":"https://heyta.waytofuture.cn/docs/","h1":"帮助中心","bodyTextLength":2358,"anchorLinkCount":50,"otherDocsRoutes":["/docs/start/","/docs/first-run/","/docs/concepts/","/docs/sync/","/docs/how/","/docs/account/","/docs/passphrase/","/docs/conflict/","/docs/organize/","/docs/views/","/docs/repeat/","/docs/reminders/","/docs/data/","/docs/selfhost/","/docs/automation/","/docs/transfer/","/docs/trash/","/docs/trust/","/docs/privacy/","/docs/loss/"],"navCount":1,"png":{"contentRatio":0.046718243074619414,"colorSpan":228,"width":1280,"height":720},"shotPath":"../apps/web/evidence/help-link-render-1013//help-link-live.png","consoleErrors":[],"pageErrors":[],"judges":{"documentStatus":true,"landsInDocsOrigin":true,"landsInDocsPath":true,"hasSingleNonEmptyH1":true,"bodyHasContent":true,"hasOtherDocsRoute":true,"hasDocsNav":true,"screenshotNotBlank":true,"noRuntimeErrors":true},"judgedFalse":[]}
+  ✓  1 [chromium] › live-site/live-help-link.spec.ts:86:1 › 壳交接的帮助链接在真浏览器里渲染成帮助中心，且没有被营销页顶掉 (1.6s)
+
+  1 passed (2.0s)

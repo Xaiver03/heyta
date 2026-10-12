@@ -1,0 +1,42 @@
+{
+  "requested": "https://heyta.waytofuture.cn:9/docs",
+  "expectedOrigin": "https://heyta.waytofuture.cn",
+  "status": 0,
+  "gotoError": "page.goto: net::ERR_UNSAFE_PORT at https://heyta.waytofuture.cn:9/docs\nCall log:\n\u001b[2m  - navigating to \"https://heyta.waytofuture.cn:9/docs\", waiting until \"networkidle\"\u001b[22m\n",
+  "finalUrl": "chrome-error://chromewebdata/",
+  "h1": "",
+  "bodyTextLength": 0,
+  "anchorLinkCount": 0,
+  "otherDocsRoutes": [],
+  "navCount": 0,
+  "png": {
+    "contentRatio": 0,
+    "colorSpan": 0,
+    "width": 1280,
+    "height": 720
+  },
+  "shotPath": "../apps/web/evidence/help-link-render-1013/arms/C//help-link-live.png",
+  "consoleErrors": [],
+  "pageErrors": [],
+  "judges": {
+    "documentStatus": false,
+    "landsInDocsOrigin": false,
+    "landsInDocsPath": false,
+    "hasSingleNonEmptyH1": false,
+    "bodyHasContent": false,
+    "hasOtherDocsRoute": false,
+    "hasDocsNav": false,
+    "screenshotNotBlank": false,
+    "noRuntimeErrors": true
+  },
+  "judgedFalse": [
+    "documentStatus",
+    "landsInDocsOrigin",
+    "landsInDocsPath",
+    "hasSingleNonEmptyH1",
+    "bodyHasContent",
+    "hasOtherDocsRoute",
+    "hasDocsNav",
+    "screenshotNotBlank"
+  ]
+}

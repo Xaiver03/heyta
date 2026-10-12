@@ -1,0 +1,6 @@
+载体：隔离检出 ../heyta-wt-r99（git worktree add --detach），HEAD=34f7742d8f50ea8c74ae5f9a5c4a9ca1b23e10cd
+跑前工作树：0 枚脏（现量 git status --porcelain | wc -l = 0）
+起壳时刻：2026-10-13 00:22 本地（第一次 00:21 被 HEYTA_REINSTALL_TMP_DIR 的无空格守卫挡下，RC=4）
+完成时刻：2026-10-13 00:44 本地（末行=ios ✅）
+落点：包=~/heyta-macos-dist-r99  日志与截图=~/heyta-r99-tmp（两个旋钮一起设，且必须在**不含空格**的路径下）
+判据形状：本趟用 nohup 起，包装层退出码没记录 ⇒ 读的是日志内 4 条端级 ✅ 与 ❌ 计数=0（现量 grep -c）

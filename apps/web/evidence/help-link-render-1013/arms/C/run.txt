@@ -1,0 +1,43 @@
+
+Running 1 test using 1 worker
+
+(node:36240) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+{"requested":"https://heyta.waytofuture.cn:9/docs","expectedOrigin":"https://heyta.waytofuture.cn","status":0,"gotoError":"page.goto: net::ERR_UNSAFE_PORT at https://heyta.waytofuture.cn:9/docs\nCall log:\n\u001b[2m  - navigating to \"https://heyta.waytofuture.cn:9/docs\", waiting until \"networkidle\"\u001b[22m\n","finalUrl":"chrome-error://chromewebdata/","h1":"","bodyTextLength":0,"anchorLinkCount":0,"otherDocsRoutes":[],"navCount":0,"png":{"contentRatio":0,"colorSpan":0,"width":1280,"height":720},"shotPath":"../apps/web/evidence/help-link-render-1013/arms/C//help-link-live.png","consoleErrors":[],"pageErrors":[],"judges":{"documentStatus":false,"landsInDocsOrigin":false,"landsInDocsPath":false,"hasSingleNonEmptyH1":false,"bodyHasContent":false,"hasOtherDocsRoute":false,"hasDocsNav":false,"screenshotNotBlank":false,"noRuntimeErrors":true},"judgedFalse":["documentStatus","landsInDocsOrigin","landsInDocsPath","hasSingleNonEmptyH1","bodyHasContent","hasOtherDocsRoute","hasDocsNav","screenshotNotBlank"]}
+  ✘  1 [chromium] › live-site/live-help-link.spec.ts:86:1 › 壳交接的帮助链接在真浏览器里渲染成帮助中心，且没有被营销页顶掉 (188ms)
+
+
+  1) [chromium] › live-site/live-help-link.spec.ts:86:1 › 壳交接的帮助链接在真浏览器里渲染成帮助中心，且没有被营销页顶掉 ──────────
+
+    Error: hasSingleNonEmptyH1 为假。本趟判假集合=["documentStatus","landsInDocsOrigin","landsInDocsPath","hasSingleNonEmptyH1","bodyHasContent","hasOtherDocsRoute","hasDocsNav","screenshotNotBlank"] 读数={"requested":"https://heyta.waytofuture.cn:9/docs","expectedOrigin":"https://heyta.waytofuture.cn","status":0,"gotoError":"page.goto: net::ERR_UNSAFE_PORT at https://heyta.waytofuture.cn:9/docs\nCall log:\n\u001b[2m  - navigating to \"https://heyta.waytofuture.cn:9/docs\", waiting until \"networkidle\"\u001b[22m\n","finalUrl":"chrome-error://chromewebdata/"}
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: true
+    Received: false
+
+      184 |   ];
+      185 |   for (const key of order) {
+    > 186 |     expect(judges[key], `${key} 为假。本趟判假集合=${JSON.stringify(evidence.judgedFalse)} 读数=${JSON.stringify(readout)}`).toBe(
+          |                                                                                                                   ^
+      187 |       true,
+      188 |     );
+      189 |   }
+        at /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/e2e/live-site/live-help-link.spec.ts:186:115
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    live-site-results/live-help-link-壳交接的帮助链接在真浏览器里渲染成帮助中心，且没有被营销页顶掉-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: live-site-results/live-help-link-壳交接的帮助链接在真浏览器里渲染成帮助中心，且没有被营销页顶掉-chromium/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    live-site-results/live-help-link-壳交接的帮助链接在真浏览器里渲染成帮助中心，且没有被营销页顶掉-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace live-site-results/live-help-link-壳交接的帮助链接在真浏览器里渲染成帮助中心，且没有被营销页顶掉-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [chromium] › live-site/live-help-link.spec.ts:86:1 › 壳交接的帮助链接在真浏览器里渲染成帮助中心，且没有被营销页顶掉 ───────────

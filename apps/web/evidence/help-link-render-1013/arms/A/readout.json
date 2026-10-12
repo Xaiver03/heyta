@@ -1,0 +1,39 @@
+{
+  "requested": "https://heyta.waytofuture.cn/docs-outside-armA-404/",
+  "expectedOrigin": "https://heyta.waytofuture.cn",
+  "status": 200,
+  "gotoError": "",
+  "finalUrl": "https://heyta.waytofuture.cn/docs-outside-armA-404/",
+  "h1": "",
+  "bodyTextLength": 2768,
+  "anchorLinkCount": 46,
+  "otherDocsRoutes": [
+    "/docs/",
+    "/docs/selfhost/"
+  ],
+  "navCount": 9,
+  "png": {
+    "contentRatio": 0.18103319191415024,
+    "colorSpan": 228,
+    "width": 1280,
+    "height": 720
+  },
+  "shotPath": "../apps/web/evidence/help-link-render-1013/arms/A//help-link-live.png",
+  "consoleErrors": [],
+  "pageErrors": [],
+  "judges": {
+    "documentStatus": true,
+    "landsInDocsOrigin": true,
+    "landsInDocsPath": false,
+    "hasSingleNonEmptyH1": false,
+    "bodyHasContent": true,
+    "hasOtherDocsRoute": true,
+    "hasDocsNav": true,
+    "screenshotNotBlank": true,
+    "noRuntimeErrors": true
+  },
+  "judgedFalse": [
+    "landsInDocsPath",
+    "hasSingleNonEmptyH1"
+  ]
+}

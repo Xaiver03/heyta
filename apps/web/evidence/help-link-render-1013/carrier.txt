@@ -1,0 +1,23 @@
+判据：e2e/live-site/live-help-link.spec.ts（新写，sha256 前 12 = badf50c44c6c；现量 shasum -a 256 e2e/live-site/live-help-link.spec.ts | cut -c1-12）
+载体：e2e/playwright.live-site.config.ts —— 无头 Chromium、--host-resolver-rules=MAP heyta.waytofuture.cn 124.223.13.226、--no-proxy-server、workers=1、retries=0
+命令：cd e2e && NO_COLOR=1 npx playwright test --config playwright.live-site.config.ts live-help-link.spec.ts
+时刻：2026-10-13 01:04–01:05 本地（五趟连跑，串行，未并发同一枚 config）
+树：主检出 HEAD=34f7742d；**是否只含 HEAD = 否** —— 本趟的判据文件本身是新建未提交的一枚，
+    且工作树里有别线 staged 的在飞内容（TaskDetailCard.tsx 那段散文）。
+    射程说明：本条判据**不读任何本地产物**，打的是公网那台服务器，所以上面那些内容不在它的因果链里；
+    但"哪棵树"这一限定照写，别让它以后被读成"只含 HEAD 的读数"。
+五趟 rc：GREEN_RC=0（默认 = 壳交接的 https://heyta.waytofuture.cn/docs）
+         ARM_A_RC=1  /docs-outside-armA-404/         判假=[landsInDocsPath, hasSingleNonEmptyH1]
+         ARM_A2_RC=0 /docs/no-such-article-armA2/    判假=[]（边界：docs 站对不存在文章返回 200 并渲染索引）
+         ARM_B_RC=1  /（营销落地页）                  判假=[landsInDocsPath, hasSingleNonEmptyH1]
+         ARM_C_RC=1  https://heyta.waytofuture.cn:9/docs（连不上） 判假=八条（除 noRuntimeErrors）
+绿趟读数：h1="帮助中心"、正文可见 2358 字符、指向别的文档页的链接 20 枚、navigation 地标 1 枚、
+         png contentRatio=0.046718 colorSpan=228、console/pageerror 均空、/docs → /docs/ 状态 200
+人看图（两张，逐张打开看过）：help-link-live.png = 帮助中心索引（左栏四组导航 + 五张 FAQ 卡 + 搜索框，中文无溢出）；
+         arms/B/help-link-live.png = 营销落地页（"今天该做什么，一眼看见" + 两个 CTA）——
+         这张**很漂亮、有主蓝、有 9 枚导航地标、正文 2768 字符**，所以"被营销页顶掉"这件事只有落点那两条判据抓得住，
+         内容类判据对它全绿。这条是本判据最有信息量的一格。
+未证的牙：noRuntimeErrors 四臂都不红（连不上那一臂也不红）⇒ 本轮没有反臂证明它能红，登记成"其牙未证"，不许读成已验证的守卫。
+射程边界：本条不观测"默认浏览器被壳拉起到前台"那一步（AGENTS §6.2 规定二禁），
+         它证的是「壳交接的那枚 URL 在真浏览器引擎里渲染出的是帮助中心、且没被营销页顶掉」。
+         壳侧"交接哪个 URL、scheme 对不对、壳自己有没有跟着导航"由 r92 那条后台链承担（另一枚判据）。
