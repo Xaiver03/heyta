@@ -9749,3 +9749,30 @@ cd .worktrees/inb-t7/e2e && NO_COLOR=1 npx playwright test tests/admin-console.s
    反向验证形状：把常量首字符类放宽成 `[A-Za-z0-9:_-]` ⇒ 该用例转红；改回 `[A-Za-z0-9]` ⇒ 转绿。
 3. 归属：这一格落在 `server/src/automation/` 与本线白名单内，但**改的是别人正在写的那枚文件**，
    所以要么由他在同一笔里带上，要么等他落笔后本线另开一笔 —— 谁做都行，**别两边都不做**。
+
+## B183（2026-10-12 08:3x，本会话 · 顺着 B182 查"哪一枚才是对的"时查出来的**本线自己的**一格）：票据 claims 的 `eventId` 宽度比我们**自己写的协议**宽一倍，而且地界内没人守着
+
+**这不是别人那枚 hunk 造成的，改前就在**。协议那份（本线白名单内）写死了事件身份的形状：
+
+- `docs/reference/inbound-automation-protocol.md:18`：「来源 ID 必须是 **1–64 字节** ASCII 字母/数字/冒号/下划线/连字符，**以字母或数字起头**」；
+- 同文 `:65`：「任务 ID 固定为 `inbound:<eventId>:<itemIndex>`（**eventId 最多 64 字节**）」。
+
+**代码里五份副本对照（B182 那张表的"哪一枚是对的"就在这里）**：签发侧 `packages/inbound-core/src/webhook.ts:33`、
+路由参数 `server/src/api.ts:148/:178/:1091/:1152/:1169`、计量层 `server/src/automation/ai-metering.ts:35` **全都是** `^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$`，
+与协议逐字一致；**唯独** `server/src/automation/entitlement-ticket.ts` 的 `EVENT_ID` 是 `{0,127}` 那一枚（改前）—— 也就是
+**票据 claims 这一层比协议上限宽一倍**，一枚 claim 了 100 字节 `eventId` 的签名票据在本线服务器上会被判"作用域合法"，
+而它指向的事件在任何其它层都永远不可能存在（公网接收那一步就发不出这种 id）。
+
+**现量**（同一枚 `'a'.repeat(100)`）：`ticketBefore=true ticketAfter=true meteringAssertKey=false`、签发侧 `eventIdPattern=false`。
+
+**为什么这一格是本线的**：落点 `server/src/automation/entitlement-ticket.ts` 与 `server/tests/` **都在本线白名单内**，
+协议那两份文档也在。按"撞见的 bug 当场修完"它该当场改掉，🔴 **但同一枚文件此刻正被别的会话写着**
+（`git status --porcelain` = `M`，见 B182），而"不许动别人在写的文件"是死规矩 ⇒ 只能登记，不能在这一刻改它。
+
+**等那枚文件落笔之后要做的（一步到位，含反向验证）**：
+1. `EVENT_ID` 收成 `/^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$/`，并在旁边注明事实源是协议 §18/§65；
+   更好的形状是从 `@heyta/inbound-core` 导出**一枚**常量给五处 import（B182 建议的第 1 步，两格同一件事）。
+2. `server/tests/` 补一条**能红**的用例：claims 带 `eventId: 'a'.repeat(65)` 与 `eventId: '-evt'` ⇒ **402 + `AUTOMATION_TICKET_INVALID`**
+   （现在 `TICKET_INVALID` 只被"坏签名/错实例"两条覆盖，形状那一格零覆盖 —— B182 已现量）。
+3. 反向验证形状：把上限从 `63` 抬回 `127` ⇒ 那条 65 字节的用例转红；把首字符类放宽 ⇒ `'-evt'` 那半转红。
+   只做第 2 步不做第 3 步的话，这条用例和它想替代的那份"没人守着的宽"没有区别。
