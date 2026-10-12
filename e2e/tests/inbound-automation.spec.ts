@@ -266,3 +266,126 @@ for (const width of [1280, 390]) {
     }
   });
 }
+
+/**
+ * 自动收集草稿里那枚 date-only（只给日历日、不给时刻）在两枚相隔 26 小时的设备时区下各跑一遍：
+ * 浏览器里那枚「截止时间」控件的取值必须逐字是 `2026-12-31`，而它发布出去的确认摘要
+ * 必须等于**同一个输入在 Node 侧算出的摘要** —— 确认那一步若把这天按设备时区重新折过一次，
+ * epoch 就变、摘要就变，这一条当场红。
+ *
+ * 🔴 为什么挑这两枚时区：`Pacific/Kiritimati` 是 UTC+14，`Etc/GMT+12` 是 UTC−12。
+ * 规则时区 `Asia/Shanghai` 把 `2026-12-31` 折成 `2026-12-30T16:00Z`，任何一处绕开
+ * `dueDateLocal` 去按设备时区读那个 epoch，两面会各读成 12-31 与 12-30。
+ *
+ * ⚠️ 这一条只覆盖浏览器今天真能到的那一层（草稿编辑面 + 确认发布）。**确认之后列表与详情
+ * 显示的日不在这里**：任务不是「确认」那一步创建的 —— 确认只做再密封与发决定
+ * （`packages/app-host/src/inbound-draft-review.ts:105-131`），领用与派发协调归 worker
+ * （`packages/app-host/src/task-batch-actions.ts:22`）。那两面的浏览器读数要等 worker 那条链，
+ * 已记进 `docs/plans/inbound-automation.md` C29 与 BLOCKED.md；同一枚不变量在缝那一层的
+ * 逐时区读数由 `packages/app-host/tests/inbound-draft-date-zone.spec.ts` 负责。
+ */
+const zoneList = ['Pacific/Kiritimati', 'Etc/GMT+12'] as const;
+for (const zone of zoneList) {
+  test.describe(`inbound draft date-only under ${zone}`, () => {
+    // 设备时区只能在建上下文时给（`page.emulateTimezone` 这枚 API 在 Playwright 1.63 已不存在）。
+    test.use({ timezoneId: zone });
+    test(`inbound draft editor keeps the date-only literal and digest under ${zone}`, async ({ page }) => {
+      const { sealInbound } = await import('../../packages/inbound-core/dist/index.js');
+      const { prepareInboundAutomationResult } = await import('../../packages/inbound-core/dist/index.js');
+      const evidence = '../docs/research/evidence/inbound-automation-review/date-consistency';
+      // IANA 时区名带 `/`（`Pacific/Kiritimati`），直接拼进文件名会被当成子目录 ⇒ 先做文件名安全的转写。
+      const slug = zone.replace(/[^A-Za-z0-9]+/g, '-');
+      // 🔴 探针控制：`timezoneId` 若没真落进浏览器上下文，下面两档会读出同一枚偏移、
+      // 摘要也当然相同 —— 判据就成了永远通过的那一种。先在浏览器里回读时区与偏移并钉住。
+      const browserClock: Record<(typeof zoneList)[number], { timeZone: string; offset: number }> = {
+        'Pacific/Kiritimati': { timeZone: 'Pacific/Kiritimati', offset: -840 },
+        'Etc/GMT+12': { timeZone: 'Etc/GMT+12', offset: 720 },
+      }[zone];
+      await page.setViewportSize({ width: 1280, height: 1400 });
+      await mkdir(evidence, { recursive: true });
+      await stubLegalRecheck(page); await stubPublicFacts(page);
+      await page.addInitScript((baseUrl) => localStorage.setItem('heyta.sync.credentials', JSON.stringify({ baseUrl,
+        token: 'fixture-token', accountId: '3', email: 'date-zone-fixture@example.test' })), server);
+      const ruleId = '22222222-2222-4222-8222-222222222222';
+      const eventId = 'date-zone';
+      // 参考摘要在**浏览器之外**算：那枚草稿任务只给 `dueDate: '2026-12-31'`，规则时区 Asia/Shanghai。
+      // Node 侧这一趟跑在本机时区，与下面两枚浏览器时区都不同 —— 浏览器若按设备时区重折，摘要必然对不上。
+      const frozen = prepareInboundAutomationResult({ eventId, ruleId, ruleVersion: 1, parseVersion: 1, receivedAt: 1,
+        timezone: 'Asia/Shanghai', modelResult: { tasks: [{ title: 'TZ probe task', dueDate: '2026-12-31' }] } });
+      expect(frozen.payload.tasks[0]).toMatchObject({ dueDateLocal: '2026-12-31', dueDate: Date.UTC(2026, 11, 30, 16) });
+      let recipient: any;
+      let snapshot: any;
+      let state = 'needs-confirmation';
+      const decisions: any[] = [];
+      await page.route(`${server}/**`, async (route) => {
+        const path = new URL(route.request().url()).pathname;
+        let body: unknown = {}; let status = 200;
+        if (path.endsWith('/automation/rules')) body = { rules: [{ id: ruleId, version: 1, enabled: true, keyId: 'hook',
+          createdAt: '2026-10-08T00:00:00Z', deletedAt: null, allowedFields: ['title', 'dueDate'], targetProjectId: null,
+          timezone: 'Asia/Shanghai', parseVersion: 1, authorizationVersion: 1, maxItems: 2 }] };
+        else if (path.endsWith('/automation/events')) body = { events: snapshot ? [{ eventId, ruleId, ruleVersion: 1,
+          status: state, reasonCode: state === 'needs-confirmation' ? 'needs-confirmation' : null, attempt: 1,
+          receivedAt: 1_700_000_000_000 }] : [] };
+        else if (path.endsWith(`/${eventId}/draft`)) body = snapshot;
+        else if (path.endsWith(`/${eventId}/draft/decision`)) {
+          decisions.push(route.request().postDataJSON()); state = 'prepared'; body = { eventId, state };
+        } else if (path.endsWith('/recipient-key')) {
+          if (route.request().method() === 'PUT') {
+            const input = route.request().postDataJSON();
+            recipient = { keyEpoch: input.keyEpoch, publicKey: input.publicKey, packageVersion: input.packageVersion };
+          }
+          if (recipient) body = recipient; else status = 404;
+        } else if (path.endsWith('/key-package')) status = 404;
+        else if (path.endsWith('/devices')) body = { devices: [] };
+        else if (path.endsWith('/ops')) body = { ops: [], hasMore: false, latestSeq: 0 };
+        await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+      });
+      await openApp(page, '/?lang=zh-CN', 'accepted');
+      await page.evaluate(async (baseUrl) => {
+        const vault = await import('/src/lib/vault-session.ts');
+        const runtime = await import('/src/features/settings/inbound-runtime.ts');
+        const session = await vault.getWebVaultSession('3', baseUrl, async () => 'fixture-token');
+        const pending = await session.beginCreation('synthetic-fixture-passphrase');
+        await session.confirmAndPublish(pending, pending.recoveryCode);
+        await runtime.ensureWebInboundRecipientKey({ accountId: '3', baseUrl, token: 'fixture-token' });
+      }, server);
+      const ciphertext = await sealInbound(new TextEncoder().encode(JSON.stringify(frozen.payload)),
+        recipient.publicKey.replace(/-/g, '+').replace(/_/g, '/') + '=',
+        { accountId: 'user-3', serverOrigin: server, eventId, ruleId, purpose: 'result', keyEpoch: recipient.keyEpoch });
+      snapshot = { eventId, ruleId, ruleVersion: 1, parseVersion: 1, attempt: 1,
+        resultDigest: frozen.resultDigest, resultItemCount: 1, resultCiphertext: JSON.stringify(ciphertext) };
+
+      await openSettingsSheet(page); await selectSettingsSection(page, 'ai');
+      const row = page.getByTestId(`inbound-event-${eventId}`);
+      await row.getByRole('button', { name: '查看并编辑草稿', exact: true }).click();
+      const editor = row.getByTestId('inbound-draft-editor');
+      await expect(editor).toBeVisible();
+      const editorDateValue = await editor.getByLabel('截止时间', { exact: true }).inputValue();
+      const clock = await page.evaluate(() => ({ timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        offset: new Date().getTimezoneOffset(), localDay: new Date(1798646400000).getDate() }));
+      await editor.screenshot({ path: `${evidence}/draft-editor-${slug}.png` });
+
+      // 用户一字未改就确认：浏览器发布的摘要必须等于 Node 侧对同一输入算出的那枚。
+      await editor.getByRole('button', { name: '确认创建这些任务', exact: true }).click();
+      await expect(editor).toHaveCount(0);
+      expect(decisions).toHaveLength(1);
+      const publishedDigest = decisions[0].resultDigest;
+      await writeFile(`${evidence}/readout-${slug}.json`, JSON.stringify({
+        carrier: '共享主检出（含别线在飞 diff）', zone, browserZone: clock.timeZone, browserOffset: clock.offset,
+        browserDayOfEpoch: clock.localDay, nodeOffset: new Date().getTimezoneOffset(),
+        editorDateValue, nodeDigest: frozen.resultDigest, publishedDigest,
+        nodeEpoch: frozen.payload.tasks[0].dueDate, nodeLocal: frozen.payload.tasks[0].dueDateLocal,
+        覆盖: '草稿编辑面 + 确认发布；列表/详情两面在 worker 链上，见 C29',
+      }, null, 2) + '\n');
+
+      expect(editorDateValue, `${zone}：草稿里那枚截止时间逐字必须是 2026-12-31`).toBe('2026-12-31');
+      expect(publishedDigest, `${zone}：浏览器确认发布的摘要 ≠ 同一输入在 Node 侧的摘要 ⇒ 这天在浏览器里被按设备时区重折过一次`)
+        .toBe(frozen.resultDigest);
+      expect(decisions[0].resultItemCount).toBe(1);
+      // ① 探针控制那两条：浏览器确实活在那枚时区里，且那个 epoch 在浏览器本地读出来就不是 12-31
+      //（这天全靠配对字段锚住 —— 与 `packages/app-host/tests/inbound-draft-date-zone.spec.ts` 同一件事）。
+      expect(clock.timeZone, `${zone}：test.use 的 timezoneId 没落进浏览器 ⇒ 这两条在空转`).toBe(browserClock.timeZone);
+      expect(clock.offset, `${zone}：浏览器设备偏移 ≠ 请求值（Kiritimati −840 / GMT+12 +720）`).toBe(browserClock.offset);
+    });
+  });
+}
