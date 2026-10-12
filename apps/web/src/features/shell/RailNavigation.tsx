@@ -417,7 +417,22 @@ function DesktopRailNavigation({
       aria-label={t('web.shell.nav.aria')}
       onPointerOver={anchorLabel}
       onFocus={anchorLabel}
-      onKeyDown={(event) => onTabRovingKeyDown(event, 'vertical')}
+      onKeyDown={(event) => {
+        // 🔴 拖拽中**整组让位**给 dnd-kit 的 `KeyboardSensor`（它用同一组方向键重排标签）。
+        //
+        // 为什么不能只靠 `onTabRovingKeyDown` 里那句 `if (event.defaultPrevented) return`：
+        // 实测下来的事件顺序是
+        //   `nav` 冒泡（React 根委托，`defaultPrevented=false`）
+        //   → `document`（`true`）→ `window`（`true`）。
+        // dnd-kit 的键盘传感器挂在**document/window** 上，**晚于** React 的根委托执行 ——
+        // 也就是说漫游跑的时候，那个"别人已经消费掉了"的标志**还没被置上**。
+        // 后果实测：拖拽中按 ArrowDown，焦点被甩到下一枚标签（"一边拖一边跳"），
+        // 而 `rail-roving.spec.ts` 那条共存用例当场红。
+        //
+        // `draggedKey` 是**本组件自己的**拖拽态（`onDragStart` 设、`onDragEnd`/`onDragCancel` 清），
+        // 与 dnd-kit 挂在哪儿无关 ⇒ 用它当闸门才是可靠的。
+        if (draggedKey === null) onTabRovingKeyDown(event, 'vertical');
+      }}
     >
       <div className="ht-rail__top">
       <AccountMenu email={syncEmail} showSignIn={syncNeedsSignIn} onSignIn={onSignIn} onOpenSettings={onOpenSettings} onOpenProfile={onOpenProfile} onOpenProfileCenter={onOpenProfileCenter} onOpenGrowth={onOpenGrowth} growthEnabled={growthEnabled} onSignOut={onSignOut} />
@@ -491,7 +506,7 @@ function DesktopRailNavigation({
           </div> : null}
         </DragOverlay>, document.body)}
       </DndContext>
-      {visibleToolTabs.map((tab, index) => <button key={tab.key} type="button" role="tab" aria-selected={!assistantActive && view === tab.key} tabIndex={railRovingKey === tab.key ? 0 : -1} className={`ht-rail__tab ht-rail__tab--tool${index === 0 ? ' ht-rail__tab--tool-start' : ''}${!assistantActive && view === tab.key ? ' ht-rail__tab--active' : ''}`} onClick={() => onNavigate(tab.key)}><tab.Icon size={ICON_SIZE.sm} aria-hidden="true" /><span className="ht-rail__label ht-type-caption">{t(tab.labelKey)}</span></button>)}
+      {visibleToolTabs.map((tab, index) => <button key={tab.key} type="button" role="tab" aria-selected={!assistantActive && view === tab.key} tabIndex={railRovingKey === tab.key ? 0 : -1} data-testid={`rail-view-${tab.key}`} className={`ht-rail__tab ht-rail__tab--tool${index === 0 ? ' ht-rail__tab--tool-start' : ''}${!assistantActive && view === tab.key ? ' ht-rail__tab--active' : ''}`} onClick={() => onNavigate(tab.key)}><tab.Icon size={ICON_SIZE.sm} aria-hidden="true" /><span className="ht-rail__label ht-type-caption">{t(tab.labelKey)}</span></button>)}
       <InboxBell />
       <button type="button" data-testid="rail-help" className="ht-rail__tab ht-rail__tab--tool" onClick={onOpenHelp}><CircleHelp size={ICON_SIZE.sm} aria-hidden="true" /><span className="ht-rail__label ht-type-caption">{t('web.shell.nav.help')}</span></button>
       <SyncBar />
