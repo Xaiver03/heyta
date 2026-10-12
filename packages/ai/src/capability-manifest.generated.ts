@@ -31,14 +31,15 @@ export type AiCapabilityEntityType =
   'TASK' | 'PROJECT' | 'TAG' | 'NOTE' |
     'HABIT' | 'HABIT_LOG' | 'FOCUS_SESSION' | 'AI_FEEDBACK' |
     'PREFERENCE_CORRECTION' | 'REMINDER' | 'EVENT' | 'ASSISTANT_TURN' |
-    'TASK_REPEAT_CFG' | 'GLOBAL_CONFIG' | 'MIGRATION' | 'RECOVERY' |
-    'ALL';
+    'COMMENT' | 'TASK_REPEAT_CFG' | 'GLOBAL_CONFIG' | 'MIGRATION' |
+    'RECOVERY' | 'ALL';
 
 /** 真的被 `packages/op-log` 物化了领域模型的实体类型。 */
 export type AiCapabilityModeledEntityType =
   'TASK' | 'PROJECT' | 'TAG' | 'NOTE' |
     'HABIT' | 'HABIT_LOG' | 'FOCUS_SESSION' | 'AI_FEEDBACK' |
-    'PREFERENCE_CORRECTION' | 'REMINDER' | 'EVENT' | 'ASSISTANT_TURN';
+    'PREFERENCE_CORRECTION' | 'REMINDER' | 'EVENT' | 'ASSISTANT_TURN' |
+    'COMMENT';
 
 /** 工具的可写性 —— 判定读写只有这两个取值（`@heyta/local-api` 的 `ToolKind`）。 */
 export type AiCapabilityToolKind = 'read' | 'write';
@@ -103,8 +104,8 @@ export const AI_CAPABILITY_MANIFEST =
   },
   'coverage': {
     'covered': 9,
-    'denominator': 9,
-    'ratio': '9/9',
+    'denominator': 10,
+    'ratio': '9/10',
   },
   'userOperableEntityTypes': [
     'TASK',
@@ -116,6 +117,7 @@ export const AI_CAPABILITY_MANIFEST =
     'FOCUS_SESSION',
     'REMINDER',
     'EVENT',
+    'COMMENT',
   ],
   'modelledEntityTypes': [
     'TASK',
@@ -130,6 +132,7 @@ export const AI_CAPABILITY_MANIFEST =
     'REMINDER',
     'EVENT',
     'ASSISTANT_TURN',
+    'COMMENT',
   ],
   'excludedFromDenominator': [
     {
@@ -145,7 +148,9 @@ export const AI_CAPABILITY_MANIFEST =
       'reason': '助手对话的一行记录（ADR-0045 D-4 (ii)）：它是**对话本身**，不是用户可操作的业务实体，而且正文里含 provider 的回复 —— 给 AI 读写它的工具等于让模型改写自己的上下文',
     },
   ],
-  'entityTypesWithoutTools': [] as const,
+  'entityTypesWithoutTools': [
+    'COMMENT',
+  ],
   'entities': [
     {
       'entityType': 'TASK',
@@ -155,11 +160,15 @@ export const AI_CAPABILITY_MANIFEST =
       'readToolNames': [
         'list_tasks',
         'get_task',
+        'get_task_estimate_context',
       ],
       'writeToolNames': [
         'create_task',
         'update_task',
+        'append_task_checklist',
         'complete_task',
+        'set_task_priorities',
+        'set_task_estimate',
       ],
     },
     {
@@ -287,6 +296,14 @@ export const AI_CAPABILITY_MANIFEST =
       'readToolNames': [] as const,
       'writeToolNames': [] as const,
     },
+    {
+      'entityType': 'COMMENT',
+      'materialized': true,
+      'countsTowardCoverage': true,
+      'coverage': 'none',
+      'readToolNames': [] as const,
+      'writeToolNames': [] as const,
+    },
   ],
   'tools': [
     {
@@ -333,6 +350,20 @@ export const AI_CAPABILITY_MANIFEST =
       'kind': 'read',
       'entityType': 'TASK',
       'description': '读取单个任务的完整内容（含备注正文）。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'taskId',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'get_task_estimate_context',
+      'kind': 'read',
+      'entityType': 'TASK',
+      'description': '读取一条任务的估时上下文：标题、可读时的备注、最近至多 20 条有效专注历史和已授权的估时偏好。',
       'schemaRecorded': true,
       'args': [
         {
@@ -518,6 +549,25 @@ export const AI_CAPABILITY_MANIFEST =
       ],
     },
     {
+      'name': 'append_task_checklist',
+      'kind': 'write',
+      'entityType': 'TASK',
+      'description': '把一组未完成清单追加到任务备注末尾，保留已有备注。一次最多 20 条。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'taskId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'items',
+          'type': 'array',
+          'required': true,
+        },
+      ],
+    },
+    {
       'name': 'complete_task',
       'kind': 'write',
       'entityType': 'TASK',
@@ -533,6 +583,39 @@ export const AI_CAPABILITY_MANIFEST =
           'name': 'taskIds',
           'type': 'array',
           'required': false,
+        },
+      ],
+    },
+    {
+      'name': 'set_task_priorities',
+      'kind': 'write',
+      'entityType': 'TASK',
+      'description': '一次给多条任务设置优先级。每条都要给 taskId 与 priority（none / low / medium / high），最多 20 条。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'entries',
+          'type': 'array',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'set_task_estimate',
+      'kind': 'write',
+      'entityType': 'TASK',
+      'description': '设置任务的预计耗时（整数分钟，5–480；超出范围会夹到边界）。这项改动必须确认。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'taskId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'minutes',
+          'type': 'number',
+          'required': true,
         },
       ],
     },
@@ -829,19 +912,23 @@ export const AI_CAPABILITY_MANIFEST =
  */
 export const AI_CAPABILITY_TEXT = [
   'heyta 能力清单（由工具目录与领域实体生成，不是手写的）',
-  '覆盖口径：用户可操作的已物化实体 9 个，其中 9 个**读和写都有**工具（9/9）。',
+  '覆盖口径：用户可操作的已物化实体 10 个，其中 9 个**读和写都有**工具（9/10）。',
   '',
   '🔴 拒绝时两件事必须分开说：我没有这个工具（AI 侧缺工具） ｜ 产品做不到（实体或功能不存在）。',
   '下面标了"没有工具"的实体，在产品里是**真实存在**的：可以说"我没有这个工具"，',
   '不可以说"产品不支持"。',
   '',
   '一、有 AI 工具的实体（9 个）',
-  '- TASK —— 读和写都有（读 2 / 写 3）',
+  '- TASK —— 读和写都有（读 3 / 写 6）',
   '  · [读] list_tasks（projectId:string, completed:boolean, dueOn:string, dueFrom:string, dueTo:string, limit:number）',
   '  · [读] get_task（taskId*:string）',
+  '  · [读] get_task_estimate_context（taskId*:string）',
   '  · [写] create_task（title*:string, dueDate:string, priority:string, projectId:string）',
   '  · [写] update_task（taskId*:string, fields*:object）',
+  '  · [写] append_task_checklist（taskId*:string, items*:array）',
   '  · [写] complete_task（taskId:string, taskIds:array）',
+  '  · [写] set_task_priorities（entries*:array）',
+  '  · [写] set_task_estimate（taskId*:string, minutes*:number）',
   '- PROJECT —— 读和写都有（读 1 / 写 1）',
   '  · [读] list_projects（无参数）',
   '  · [写] create_project（name*:string, parentId:string）',
@@ -872,8 +959,8 @@ export const AI_CAPABILITY_TEXT = [
   '  · [写] create_event（title*:string, date*:string, kind:string, isLunar:boolean, recurrence:string, notes:string）',
   '  · [写] update_event（eventId*:string, fields*:object）',
   '',
-  '二、产品里有、但我没有任何工具的实体（0 个）—— 实体存在，只是我没配工具',
-  '- （无）',
+  '二、产品里有、但我没有任何工具的实体（1 个）—— 实体存在，只是我没配工具',
+  '- COMMENT：产品支持它，但我没有任何工具 —— 别说产品做不到。',
   '',
   '三、不计入上面分母的已物化实体（设计如此，不是遗漏）',
   '- AI_FEEDBACK：AI 建议处置的落库载体（用户不直接创建它）',
