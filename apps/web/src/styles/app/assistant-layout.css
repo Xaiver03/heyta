@@ -94,7 +94,7 @@
 }
 
 .ht-ai__chat-body,
-.ht-ai__empty,
+.ht-ai__welcome,
 .ht-ai__greeting,
 .ht-ai__suggestions {
   min-inline-size: 0;

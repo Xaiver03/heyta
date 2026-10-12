@@ -81,7 +81,7 @@ import type { LocalApiHost } from '@heyta/local-api';
 import { AiDisclosureHost } from './AiDisclosureHost.js';
 import { AiPanelHeadHost } from './AiPanelHeadHost.js';
 import { AiPanelHost } from './AiPanelHost.js';
-import { AiGeneratedLabel } from '@heyta/ui';
+import { AiGeneratedLabel, EmptyState, HeytaUiProvider } from '@heyta/ui';
 import { assistantFailureCopy } from './ai-failure-copy.js';
 import { useAiSettingsNavigation } from './ai-settings-navigation.js';
 import { FailureSettingsAction } from './RouteUnavailable.js';
@@ -549,7 +549,17 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
                 <span>{sessionLabel}</span>
               </button>
             ) : (
-              <p className="ht-ai__history-empty">{t('web.ai.chat.history.empty')}</p>
+              /*
+                收编进**那一个**空态实现（`check-empty-state` 的断言 C / 判据 3）。
+                🔴 用 `line` 档而不是 `section`：这一行住在 `caption` 的分组标签
+                下面，而 `section` 的标题是 `row-title` + `foreground` —— 占位行
+                比分组标签还重就是层级倒置。原来那行手写的 `<p>` 正是这种"每个
+                视图各自回答一次 hint 要不要画"的形状（`EmptyState.tsx` 文件头
+                记的就是这一类事故）。
+              */
+              <HeytaUiProvider>
+                <EmptyState size="line" title={t('web.ai.chat.history.empty')} />
+              </HeytaUiProvider>
             )}
           </div>
         </aside>
@@ -618,13 +628,19 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
               )}
             </div>
           </header>
-      <div className={`ht-ai__chat-body ${!hasConversation ? 'ht-ai__chat-body--empty' : ''}`}>
+      <div className={`ht-ai__chat-body ${!hasConversation ? 'ht-ai__chat-body--welcome' : ''}`}>
       {/*
        * 空会话不应该让用户面对一块“什么都没有”的技术面板。
        * 快捷建议只是把自然语言填入同一个输入框，不创建第二套执行入口；
        * 用户仍然可以编辑后再发送，隐私披露与确认流程也完全不变。
+       *
+       * 🔴 这一块**不是空态**，它是首屏欢迎页 —— 里面挂着输入框和三枚建议
+       * 按钮，是可交互的内容。它原先的类名与定位钩子都带 empty 字样，于是
+       * `check:empty-state` 把它读成"又一处手写空态骨架"（判据没错，是名字在
+       * 撒谎）。改的是**名字**：真收编成共享 `EmptyState` 会把 composer 与
+       * 建议按钮一起删掉，那是产品功能不是骨架。
        */}
-      {!hasConversation && <div className="ht-ai__empty" data-testid="ai-assistant-empty">
+      {!hasConversation && <div className="ht-ai__welcome" data-testid="ai-assistant-welcome">
         <div className="ht-ai__greeting" data-testid="ai-assistant-greeting">
           <h3 className="ht-ai__greeting-title">{t('web.ai.chat.greeting')}</h3>
           <p className="ht-ai__note">{t('web.ai.chat.greetingHint')}</p>

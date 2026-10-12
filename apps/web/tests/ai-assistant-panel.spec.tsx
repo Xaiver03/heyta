@@ -568,6 +568,30 @@ describe('Chatbot IA：历史列与中央空态', () => {
     expect(el.querySelectorAll('[data-testid^="ai-assistant-suggestion-"]')).toHaveLength(3);
     expect(el.querySelector('[data-testid="ai-assistant-input"]')).not.toBeNull();
   });
+
+  /**
+   * 🔴 这一条钉的是"空态只有一个"在**本面**的落地，而不是那句词条本身。
+   *
+   * 这一行原来是一段手写的 `<p className="ht-ai__history-empty">`。手写骨架的
+   * 代价不是多两行代码，是它对"hint 缺失要不要画一行""标题为空画什么"
+   * **各自回答一次**，而两份答案之间的差异不会让任何测试变红
+   * （理由逐字见 `packages/ui/src/empty-state/EmptyState.tsx` 文件头）。
+   *
+   * 所以判据写成两条一起：
+   *   · **正向**：那句话仍然出现，而且带共享实现的 `summary` 角色
+   *     （RN-web 把它映射成 `role="region"`，见 `model.ts` 的 `a11yRole` 注释）
+   *     —— 只有真的走了那一个实现才会有；
+   *   · **反向**：历史列里不再有手写的 `<p>` —— 视图退回自己画骨架时会红，
+   *     而不是只在源码扫描的门禁里红。
+   */
+  it('历史列没有会话时那句占位由共享的那一个空态实现画，视图不再自己写骨架', async () => {
+    const el = await render({ host: fakeHost(), fetchImpl: scriptedFetch([{ kind: 'text', text: '好。' }]).impl });
+    const history = el.querySelector('[data-testid="ai-assistant-history"]');
+    expect(history).not.toBeNull();
+    expect(history?.textContent).toContain('还没有会话');
+    expect(history?.querySelector('[role="region"]')).not.toBeNull();
+    expect(history?.querySelector('p')).toBeNull();
+  });
 });
 
 describe('🔴 写：低风险自动执行，高风险提案确认', () => {

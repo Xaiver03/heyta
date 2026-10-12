@@ -65,9 +65,19 @@ export type EmptyStateDetailTone = 'danger' | 'subtle';
  * `section` 档把"收编"与"不改视觉"这两件事解耦：左对齐、不占页面高度、
  * 不放图标（图标那条判断在 `toEmptyStateViewModel` 里，理由见那里）。
  *
+ * 🔴 但 `section` 仍然**比它要替换的那些占位重**：它的标题是 `row-title`
+ *    + `foreground`。而"分组标签下面那一行『今天没有会话』"是**辅助信息**，
+ *    它上面还有一个 `caption` 的分组标签 —— 用 `section` 画会让占位行
+ *    在字重与颜色上都盖过分组标签，层级倒置。
+ *    于是这类站点收编不了，只能继续手写（或者被登记成债）。
+ * `line` 档补的就是这一格：一行辅助文字，走 `row-meta` + `foreground-subtle`，
+ *    与它上面的 `caption` 分组标签相比**字号大一档、字重轻一档**，
+ *    所以既能读成"这个分组没有内容"，又不跟标签争重心。
+ *    它同样不画图标/插画，理由与 `section` 一致。
+ *
  * ⚠️ 默认 `page` —— 现有站点一个像素都不变。
  */
-export type EmptyStateSize = 'page' | 'section';
+export type EmptyStateSize = 'page' | 'section' | 'line';
 
 /**
  * 四个槽位。
@@ -173,16 +183,17 @@ export function toEmptyStateViewModel(slots: EmptyStateSlots): EmptyStateViewMod
   const size: EmptyStateSize = slots.size ?? 'page';
   const locale = slots.locale ?? 'zh-CN';
 
-  // 🔴 `section` 档**不放图标**，这条判断做在这里而不是组件里写 `if`：
+  // 🔴 `section` / `line` 档**不放图标**，这条判断做在这里而不是组件里写 `if`：
   //    区块级空态住在卡片内部，卡片自己已经有一行标题；再摆一个 `icon.xl`(32)
   //    的字形会和区块标题争视觉重心 —— 而调用方传了 `icon` 却什么都没画，
   //    是最难归因的那类"参数被静默丢弃"。所以这里把它明确成 `undefined`，
   //    组件只负责"有图标就画、没有就不画"。
+  //    `line` 档更不用说是**一行字**，图标会把行高顶坏。
   // 语义微场景已经包含自己的 Lucide 主图形，不能再把旧的通用 icon
   // 叠在上面；否则一个空态会出现两个视觉重心。没有 illustration 时才保留
   // 旧 icon，保证既有调用方的页面形状不变。
-  const visibleIcon = size === 'section' || slots.illustration !== undefined ? undefined : icon;
-  const illustration = size === 'section' ? undefined : slots.illustration;
+  const visibleIcon = size !== 'page' || slots.illustration !== undefined ? undefined : icon;
+  const illustration = size === 'page' ? slots.illustration : undefined;
 
   const hint = nonBlank(slots.hint);
   const detail = nonBlank(slots.detail);
