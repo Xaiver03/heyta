@@ -3238,7 +3238,7 @@ Android 那三下有读数（19:5x 那格），iOS / Windows / macOS 三个壳�
 | mac | **r102**（本笔新跑） | `dfeacee3`（隔离检出 `../heyta-wt-r99`，只含已提交内容） | `✅ 已安装到 /Applications/Heyta.app`、`✅ 安装对账：.app 里的 web-dist 与本机 apps/web/dist 是同一次构建（9 个 chunk）`、`窗口 2318x1508 / 内容占比 100.0% / 主蓝命中 997 —— 是共享 UI`、`MAC_RC=0` |
 | android | **r100** | `dfeacee3`（同一棵载体） | 设备 `pm path` 那枚 `base.apk` 的 `sha256sum` 与 APK **逐字相同**（`0a1a92dc…47bb`） |
 | ios | **r101** | `dfeacee3`（同一棵载体） | `✅ 已装的包比源码新 —— 这一轮装的是当前产物` + 全新安装 + 窗口 1206x2622 / 内容占比 58.8% / 主蓝 4091 |
-| windows | **仍是 r99** | `34f7742d` | 未重跑，见下面第二段 |
+| windows | ~~仍是 r99~~ → **r103 已补跑**（可 grep：`windows 那一腿也跑了`） | `34f7742d` | 未重跑，见下面第二段 |
 
 人看图（§6.2 规定一）：r102 那张 `.webview.png` 已打开看过 —— 暗色收集箱 + 联网同意卡（「在使用联网功能之前」，主蓝按钮「同意并联网」）+ 右侧对话助手面板，与 r99 同一形状；
 证据入库在 `apps/web/evidence/ux-final-20261012/reinstall-r102-mac/`（四枚：两张图 + `.png.txt` 自述 + 链日志）。
@@ -3294,6 +3294,41 @@ Android 那三下有读数（19:5x 那格），iOS / Windows / macOS 三个壳�
    ② 或单独一枚 `check:widget-locale-parity` 并同时过 `check:gate-wiring`（那枚门专抓"写了门没接线"）。
    现成可复用的取样命令（不用重新定位）：
    `for d in values values-en; do grep -o 'name="widget_[a-z0-9_]*"' apps/mobile/android/app/src/main/res/$d/strings.xml | sort -u; done`
+
+### 2026-10-13 02:5x：**windows 那一腿也跑了** —— 上面那张四行表现在四行都是"当前产物"，而我把"等谁点头"改成了"我自己跑完了"
+
+02:0x 那一格把 windows 留在"没重跑，理由是成本与信息量不成比例"。回头看，那句**站不住**：
+负责人 10-10 07:4x 已经一次性授权"可以占用设备与共享载体做验收，不必再逐项回问"，
+而那一腿的产物是这台机器上跑得通的（打包机当晚就回来了，r84 之后一直可用）。
+⇒ 所以这不是"等他拍"，是**我能做而没做**。做了，一次跑通，`WIN_RC=0`。
+
+**载体**：同一棵隔离检出 `../heyta-wt-r99`，这次 `--force --detach` 到 **`25f7bef5`**（= 当时的 `main`），
+被跟踪脏枚数 **0** ⇒ 只含已提交内容。
+⚠️ 开工前那枚 `Podfile.lock` 漂移**已经不在了**（现量 `status --porcelain` 空）—— 是**谁**抹回去的，本笔没查，
+所以只登记"现在干净"这个事实，不写成"它自己好了"。
+
+**读数**（`~/heyta-r99-tmp/r103-windows.txt` + `win103/heyta-reinstall-win.txt`；四枚已入库到 `apps/web/evidence/ux-final-20261012/reinstall-r103-windows/`）：
+`pnpm -r build` ✅ → `@heyta/web build` ✅（web-dist 晚于 workspace dist）→
+源码包 **448M / 清单 8085 条**，远端收到的 tar sha256 `05ce3be0f4f5ac48…` **逐字相同** →
+远端新鲜度对账 `web-dist/index.html=1450e7f7854b79aa…`、`bridge=42f8e4cc3f13c6d3…`、`assets/*.js=7 枚一致` →
+`MSIX_EXISTS=True`、`ADD_APPX=OK`、`INSTALLED_VERSION=1.0.0.0`、`PAYLOAD_WEBDIST=True`、
+`PAYLOAD_CHUNK_PRESENT=2/2`、`SHORTCUT_STARTAPP=True` ⇒ **判据 5 条全在位** →
+打包后界面 `1152x587 / 内容 58.6% / 色阶 255 / 边缘 0.348` ✅「装完的 MSIX 能起来、界面有真实内容」。
+
+人看图（§6.2 规定一）：`packaged-first-run.png` 已打开看过 —— 亮色收集箱 + 联网同意卡（主蓝「同意并联网」）。
+⚠️ **两件事要说，别把这张图读成"干净首屏"**：① 左侧头像菜单是**展开**的（登录账号 / 个人中心 / 应用设置）；
+② 画面左缘有构建机的控制台文字（`部署操… Pro [loa…`）和一条 `C:\WINDOWS\SYSTEM32\cmd.exe` 标题栏。
+① **不是产品缺陷**：r99 那张同形状（两趟一致 ⇒ 更像取证装置自己点开那个菜单；本笔没去查是哪一行点的，所以只登记形状不登记成因）。
+② 是远端截屏把整个桌面拍进来了，不是壳画错了。
+
+📌 **四端口径现在可以这么说了**（说的时候带上"哪一枚提交"）：
+mac `dfeacee3`（r102）/ android `dfeacee3`（r100）/ ios `dfeacee3`（r101）/ windows `25f7bef5`（r103）。
+`dfeacee3..25f7bef5` 的差异现量**全是文档、证据与一枚不进包的测试**
+（`git diff --name-only dfeacee3..25f7bef5` 剔掉 `docs/` 与各端 `evidence/` 只剩 `packages/i18n/tests/language-hint-copy.spec.ts`）
+⇒ 四端**进包内容等价**。要"四端同一枚提交"，只需把 mac/android/ios 三腿在 `25f7bef5` 上再各跑一发；
+本笔**不**为此重跑三端 —— 那三腿的判据已经对着一枚"进包内容等价"的提交取到了，重跑只会得到同一批字节。
+🔴 仍然不证的两句：**`origin/main`**（本地未 push，四端都无从验证）；`check:ai-e2e` 整族。
+
 
 
 

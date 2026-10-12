@@ -1,0 +1,22 @@
+═══ 0. 前置：pnpm -r build ═══
+  ✅ 全仓构建完成（日志 /Users/rocalight/heyta-r99-tmp/win103/heyta-reinstall-build.log）
+═══ 0b. 原生壳前置：@heyta/web build（确保 web-dist 晚于 workspace dist）═══
+  ✅ Web 产物已在 workspace 构建之后刷新（日志 /Users/rocalight/heyta-r99-tmp/win103/heyta-reinstall-web.log）
+
+═══ 2. Windows：同步当前源码 → 清旧包 → 远端打包 + 安装（默认主机 windows-pc）═══
+  esbuild：/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r99/packages/app-host/src/native-bridge.ts → /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r99/packages/app-host/bridge-bundle/native-bridge.js
+  ✅ 源码包 448M（清单 8085 条，含工作树未提交改动 + 构建输入）
+  ✅ 远端收到的是这一包（tar sha256=05ce3be0f4f5ac48… 逐字相同）
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+  ✅ 远端新鲜度对账通过（web-dist/index.html=1450e7f7854b79aa… bridge=42f8e4cc3f13c6d3… assets/*.js=7 枚一致）
+  ✅ 远端打包 + 安装 + 启动截图完成（日志 /Users/rocalight/heyta-r99-tmp/win103/heyta-reinstall-win.log）
+  ✅ 远端取证：判据齐了：5 条全在位
+
+═══ 重装汇总 ═══
+  ⏭ mac：不在 --only 范围 —— 这端**没有**验证当前产物
+  ✅ windows：已清旧包、重打、重装、有当前产物判据
+  ⏭ android：不在 --only 范围 —— 这端**没有**验证当前产物
+  ⏭ ios：不在 --only 范围 —— 这端**没有**验证当前产物
+WIN_RC=0
