@@ -2151,7 +2151,14 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
   - ✅ **闭合步骤①不用新造装置，姊妹脚本里已经有了**：`profile-settings-android.py` 第 198 行是运行时的语言检测 —— 它从**三种首屏面**各探一次英文标签（`Profile` / `Before any network feature runs` / `Use offline for now`），注释还写明"不要只从 Profile 那一面判"，第 268 行再把 `uiLocale` 逐字写进 `journey.json`；而它首屏那两个条件本来就是 `T(中,英)` 双语，**英文下分支会真触发**，不是走 else。⇒ iOS 那一腿要补的就是这两件（语言检测 + 报告带 `uiLocale`），照抄形状即可，不必新设判据。
     🔴 **一条边界，别把这条读成"已经好了"**：已入库那份 `android/profile-rerun-fixed-2/journey.json` 里**没有 `uiLocale`**（现量：顶层只有 `status/artifact/steps`，`artifact` 只有 `sha256/apk`，整串 JSON 里 `uiLocale` 出现 0 次）⇒ 那批证据出自**还没写这个字段之前的脚本版本**。所以这一档现在是"**代码里有、读数里没有**"，是 §7 那条"测试绿 ≠ 装的是当前产物"的**证据侧同型**：下一趟按当前脚本重跑才会带上 `uiLocale`，在那之前任何"报告自带语言"的说法都只对着源码，不对着已入库的读数。
 
-- [ ] 🟡 **待办 #1：放开设备之后真跑成了 —— Android 的 Profile/Settings 旅程中英两条分支都在真模拟器上走通，但装的是旧产物，所以这一格是"装置能跑"，不是"当前源码已验收"**（10-10 18:4x–19:0x 建；负责人 07:4x 授权占用设备之后的第一趟）。
+- [x] 🟡 **待办 #1：放开设备之后真跑成了 —— Android 的 Profile/Settings 旅程中英两条分支都在真模拟器上走通，但装的是旧产物，所以这一格是"装置能跑"，不是"当前源码已验收"**（10-10 18:4x–19:0x 建；负责人 07:4x 授权占用设备之后的第一趟）。
+  ✅ **10-13 01:1x 收口这一格**：上面那句"真正的欠项只剩『Android 当前安装态已验收』这句话可以说了"现在可以说，但**要说准射程** ——
+  r99（四端重装，只含 HEAD 那棵树打出的包）证的是一条窄声称：**装的是当前产物、起得来、首屏画面对**
+  （判据读数 `apps/web/evidence/ux-final-20261012/reinstall-r99/RESULT.md`，Android 那格 `mCurrentFocus=com.heyta/…MainActivity` + 窗口内容判据）；
+  本线另在 r98 用当前装置取到**三处确认框的设备腿**读数（`apps/web/evidence/ux-final-20261012/organizer-confirm-r98/`）。
+  🔴 **不包括**：Profile/Settings 那条 23 步旅程在 **r99 那枚 APK** 上重跑 —— 中英两条腿的最近读数是 r85/r86（10-11 00:3x，
+  当时也是当前源码打的那枚），此后 HEAD 又推进了一批。所以这一格关的是"待办 #1 的装置能跑 + 当前安装态已验收"，
+  **不是**"全部旅程都在今天的字节上走过"。
   **这组读数出自哪棵树 / 哪个产物**（三句缺一，就会被读成"当前源码验收过"）：
   ① **载体是主检出的工作树，不是 HEAD 干净检出**：取数这几分钟里 `main` 自己走过（同一台机器上别人正收一次 merge，`git status` 一度报 `You have unmerged paths`，几十秒后又 0 冲突）⇒ 复现任何一条都要**重取**，别抄这一句。
   ② **装着的 App 不是这批源码**：`journey.json` 的 `artifact.sha256` = `1a01024e…`（脚本自己拿 `pm path` 那枚文件的 `sha256sum` 与本地 APK 逐字节对账，不一致直接抛 —— 所以它证明的是"装的就是这枚 APK 文件"），而 `apps/mobile/android/app/build/outputs/apk/release/app-release.apk` 的 mtime = **10-09 01:52:50**，比它新的源码 **38 枚**（现量：`find apps/mobile/src packages/*/src apps/web/src -newer apps/mobile/android/app/build/outputs/apk/release/app-release.apk -type f \( -name '*.ts' -o -name '*.tsx' \) | wc -l`）⇒ **"装的是当前产物"那一格仍然开着**。
@@ -2166,7 +2173,11 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
   🔴 **共享检出会把我未入库的证据整目录收走再弹回来**（这条比"证据要入库"更硬）：18:4x 那三趟的 `apps/mobile/evidence/profile-center/android-r60/r61/r62` 在 18:51 现量 `[ -d ]` **全部不存在**、18:54 又**全部在**，同一分钟里我写进台账的那一整格也消失过一次。形状与别人跑一次 `git stash -u`（或带 `checkout` 的合流）一致 —— 未跟踪目录会跟着不见再回来， tracked 文件会被回退。⇒ 本线纪律改成：**取证落盘之后第一动作就是逐文件 pathspec 入库，再写别的、再分析**。
   **下一趟的直接入口**（不用重新定位）：~~打包机恢复后 `pnpm -r build && pnpm build:android && adb install -r <那枚新 APK>`，然后 `python3 scripts/qa/profile-settings-android.py …`~~ ✅ **10-11 00:3x 现量：这一格已经做完了，别照旧句再跑一遍**。打包机回来后（r84）四端重装补齐 windows 与 android 两腿，Android 装的是当前源码打出的那枚 APK（设备上 `base.apk` 与 `app-release.apk` 的 sha256 同一个值 `2e559554ad372da3…`），中英两条腿各一趟（r85 `uiLocale=zh-CN`、r86 `uiLocale=en`）。⇒ 这一句现在真正的欠项只剩**"Android 当前安装态已验收"这句话可以说了**，写它的时候把趟号带上。
 
-- [ ] 🟡 **第 4 步的前置拿到了：一份"只含已提交内容"的全量构建清单，它当场照出 `main` 上两枚真缺陷、已各自修完**（10-10 19:0x–19:2x 建；待办 #25 由此闭合，#27/#34 取到的是"载体不给"的读数）。
+- [x] 🟡 **第 4 步的前置拿到了：一份"只含已提交内容"的全量构建清单，它当场照出 `main` 上两枚真缺陷、已各自修完**（10-10 19:0x–19:2x 建；待办 #25 由此闭合，#27/#34 取到的是"载体不给"的读数）。
+  ✅ **10-13 01:1x 收口**：这一格欠的是"第 4 步本身"，而它已经跑过四趟 —— r77+r78（10-10 那批，下面那一子格就是它的读数）、
+  r93、r98、**r99**（只含 HEAD 的隔离载体 `../heyta-wt-r99` @ `34f7742d`，四端全 ✅、日志内 `❌` 计数 0，
+  `apps/web/evidence/ux-final-20261012/reinstall-r99/RESULT.md`）。⚠️ 上面 2178/2179 那两子格（`rc=4 无窗口`、`ScreenCaptureKit 未授权`）
+  是**当时那台载体**的读数，不是本格的结论：macOS 那一腿在 r98/r99 两趟都取到了窗口与 WebView 两张分读图（成因裁定见 10-10 22:4x 那一格）。
   **载体**：隔离检出 `../heyta-wt-reinstall`（开工时脏条目 1 枚、`ps` 查无进程占用），`git checkout --force --detach <main 的当时那一枚>`；先 `pnpm install` 让依赖与当前锁对齐（`Packages: +11 -3`、rc=0），两棵树 `pnpm-lock.yaml` 的 sha256 逐字相同才复用那份 `node_modules`。**为什么不在主检出跑第 4 步**：主检出此刻有别人未提交的源码（`packages/shared-schema/src/*`、`server/src/server.ts`、未跟踪的 `apps/web/src/features/settings/inbound-runtime.ts`），而 `reinstall:all` 送出去的是**整棵工作树**——那等于替别人把半成品装上四端。
   1. ✅ **待办 #25 从此有直接读数**：`pnpm -r --no-bail build` 在 `a195a37f`（只含已提交内容）上 **rc=0、失败清单为空**。同一条命令在修之前是 `Summary: 1 fails, 19 passes`，更前一次是 5 枚红——中间就是下面两条。
   2. 🔴 **修掉的第一枚（`main` 上的真缺陷，起因不在本线）**：`packages/i18n` 的 `en.ts` 与 `zh-CN.ts` 各有一对重复键（`site.platforms.android.body`、`site.platforms.desktop.body`），由 `276ef13b feat(下载页)` 把新文案**追加**在旧文案后面造成 ⇒ tsup 的 dts 阶段报 `TS1117: An object literal cannot have multiple properties with the same name`，并连锁 `packages/legal`（拿不到 i18n 的 dts）与 `apps/web`。删掉的是**前面那枚死条目**（对象字面量后者生效）⇒ **访客看到的字一个都没变**。判据（改后现量）：两表 `grep -oE "^  '[^']+':" <文件> | sort | uniq -d | wc -l` = **0**；留下的四条新串各 =1（`Works on a real device:` / `All three desktop builds exist` / `真机可用：建任务` / `三个平台都打得出包`）；被删的四条旧串合计 =0；`pnpm --filter @heyta/i18n build` rc=0、`@heyta/legal build` rc=0、`check:ui-language` rc=0、`check:entries` rc=0（入口 80 份逐字节一致）。
@@ -3114,3 +3125,43 @@ Android 那三下有读数（19:5x 那格），iOS / Windows / macOS 三个壳�
 
 **顺手把两处旧句子就地钉了更正**（不留旧口径当载体）：上面 r92 那一格末尾那句"要闭它需要负责人允许一次前台激活"，
 与 23:5x 那一格末尾那句"而那一格仍归负责人点头"，各自加了一行指向本节。
+
+### 2026-10-13 01:1x–01:3x：把 Profile/Settings 旅程在 **r99 装的那枚 APK** 上重跑一遍，撞出三件事 —— 其中一条是**界面在对用户说谎**
+
+**为什么要重跑**：上一格收「待办 #1」时我写下"旅程最近的读数停在 r85/r86"。那就是一句可以当场消掉的欠账 ——
+设备空着、载体上装的就是只含 HEAD 那棵树打出的包。跑法就是脚本自己：
+`python3 scripts/qa/profile-settings-android.py [--in-app-language=en] --evidence-dir apps/mobile/evidence/profile-center/<趟号>`。
+
+1. 🔴 **`scripts/qa/profile-settings-android.py:214` 的 `elem or other` 不是"取第一个存在的节点"**：ElementTree 节点的 `bool()`
+   取决于**它有没有子节点**，所以一枚没有子的 `我的` 会被判成假 ⇒ 静默退到不可点的那一枚；而 Python 3.12+ 宣布它**恒为真**
+   （脚本每跑一趟就吐一条 `DeprecationWarning`）。同一份脚本在两种解释器下有两种含义 ⇒ 改成显式 `is not None` 两步判。
+   复跑证明：`python3 -W error::DeprecationWarning …` **RC=0**（告警若还在会直接抛），且该类形状在四份姊妹脚本里现量只有这一处
+   （`grep -n " or find(" scripts/qa/*.py` 只剩 `is not None` 那些正确写法）。
+2. 🔴 **产品的应用内语言开关是持久的，而界面上那句话写着它不持久** —— 这一条是本轮最该记的。
+   实测（三次，形状一致）：`am force-stop com.heyta` → `pidof` 空 → `am start -W` 拿到**新 pid** → 等 9 秒 →
+   底部标签是 `Tasks/Calendar/Focus/Categories/Profile`；设备语言 `settings get system system_locales` = **zh-Hans-CN**、
+   per-app 覆盖 `cmd locale get-app-locales com.heyta` = **空**。⇒ "上一趟留下的英文"是真的会留下来。
+   而 `packages/i18n` 里 `mobile.profile.language.hint` 写的是
+   「选择只在本会话内生效，重开应用会回到设备的语言。」（英文表同义那句）。
+   **哪一侧是设计**：`apps/mobile/src/App.tsx:257-264` 与 `src/i18n/locale-preference.tsx` 的文件头都明写
+   「原生独立保存非敏感设备偏好，**冷启动恢复**，同一偏好也供系统小组件读取」，且 `setWidgetLocale(locale)` 每次变更都下发；
+   小组件那侧读它的实现真在（`apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetLocalePreference.kt`）。
+   ⇒ **行为是设计，文案是陈的** ⇒ 改的是两表文案（不是行为）：中文「这台设备会记住你的选择，重开应用仍然用它；系统小组件读同一份偏好。」
+   ⚠️ 这一格交的是**离线层 + 代码依据**；改完的文案在设备上的读数要重打 APK 才有，落在下一格，**不在这里宣称已见**。
+3. 🟡 **上一条顺带照出：脚本的英文腿不幂等**（同一个根因的第二层）。`tap('English','Language',absent=T('语言','Language'))`
+   里 `T()` 取的是**运行时检测**（`:202`）判定后的语态 —— 当 App 已经是英文，`after` 与 `absent` 变成**同一枚串**，条件恒不满足
+   ⇒ 第二次跑必红（实测 RC=1，报告里只有 5 步）。它以前从不现形，只是因为"开关只在本会话内"那句**当时恰好让每次起跑都是中文**。
+   修：已经英文就记一步 `language already english` 不重复点；并且**在旅程末尾用产品自己的开关恢复成中文**
+   （`tap('中文','语言',absent='Language')` + 报告里 `restore-device-language`）—— 共享载体不能被我留给下一趟英文界面。
+   复跑：**RC=0、27 步、`uiLocale=en`、恢复步在报告里**（`apps/mobile/evidence/profile-center/android-r99-en-idempotent/`）。
+   ⚠️ 诚实标注：这一趟走的是"已经是英文"那一支 ⇒ 它证的是**幂等 + 恢复**，不重复证"从中文切到英文"（那一支由 01:1x 那趟 `android-r99-installed-en` 证，当时 App 是中文）。
+4. 📌 **删掉一处我自己造的文案副本**：脚本原来在切完语言后 `find_exact(r, '<那句英文副标题原文>')` 断言"开关生效了"。
+   那是把 `packages/i18n` 的句子抄第二份进脚本 —— 本线 `check:verify-script-copy` 那枚门抓的就是这个形状，
+   而这次文案一改，抄件会立刻对不上而红。上面第 3 条那一下 `absent='语言'` 已经是"生效"的证明，抄件删掉。
+5. ⚠️ **一条门禁自己教的**：改完脚本后 `pnpm check:locator-labels` **rc=1**，红因是我新加的两条**中文 `print`** ——
+   那枚门的分母是"含汉字的字符串字面量"，**不区分定位符与日志行**，于是日志被当成"必须在词条真源里的中文标签"。
+   处置：日志行改 ASCII（不是放宽门禁）。改后 rc=0，`中文标签在词条真源里不存在` 命中数现量 **0**。
+   ⇒ 记这条是因为它反直觉：**在设备脚本里写一句中文日志就会红一道门**，而报错的话术指向"定位标签"。
+
+**离线层读数**（改完文案与脚本之后现取）：`pnpm --filter @heyta/i18n test` **rc=0**（3 files / 26 tests）、
+`pnpm check:ui-language` **rc=0**（词条表 zh/en 各 4002 条、逐键对齐）、`pnpm check:locator-labels` **rc=0**。
