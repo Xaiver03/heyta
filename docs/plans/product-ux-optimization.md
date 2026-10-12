@@ -2977,3 +2977,19 @@ r98 推送时 `sync_windows_sources` 与本地逐字对过账，但当时没把�
 
 **没做的事**：这趟只在 Windows 真壳上证了"关掉逃生门也认得壳"；macOS 那半的同类判据是 r96 那趟取的，本趟没重跑。
 共享载体上留下的东西按"只收自己起的"处理：壳进程按 pid 收、`heyta-qa-widget-help` 那枚计划任务按名字注销（它是我这趟建的）。
+
+### 2026-10-13 00:0x：#28 那一格我代拍了（维持第三条路），顺手记下"别人挂了 2.5 小时的 merge 会堵掉自己的提交通道"
+
+**#28（定位符门判据一按 pair 还是按 OR-set）不再登记成"等负责人"**：第三条路（不改判据，把 pair 写成
+`T(中,英)`、OR 候选写成 `any_of` 列表）**只动本线名下脚本**，而它已经在 `profile-settings-ios.py` 上走完了
+（12 组单语关掉 7 处）。现量：`pnpm check:locator-labels` **rc=0**（五枚脚本：18/79/40… 组，全部只出"披露不判红"）。
+⇒ 这一格剩下的只有"要不要去动 `tasks-ux-*` 那两枚别线在飞的资产"，那**不是本线能拍的**，也不是"等点头"——
+它归那两个脚本的负责人。判据口径本线一个字没动。**回退**：把 `profile-settings-ios.py` 的 `any_of` 记法还原即可，
+门照样 rc=0（两种写法并存本来就是当前状态）。
+
+🔴 另外记一条一定会复现的（已入环境陷阱 #415）：本线这两笔（`c018ec0e`、`bbce592c`）落地的时间点，
+别线一枚 `feat/detail-pane` 的 merge 已经挂在共享索引里 **2.5 小时、零未解决冲突**，
+于是 `git commit -- <自己的 pathspec>` 报 `cannot do a partial commit during a merge` ——
+**与 pathspec 写得对不对无关**。本线的处置是临时索引 + `commit-tree` + 带 old-value 的 `update-ref`（CAS），
+不等待、不 `git stash`、不裸 `git commit`（那会把别人 staged 的 20 枚文件写进本线这笔）。
+复验三件事的现量命令写在陷阱那条里。

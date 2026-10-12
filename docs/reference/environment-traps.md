@@ -9680,3 +9680,39 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     比假红贵：判"缺样式"的断言永远只会因为探针而满足。
     关联：第 409 条（同族：截图成对产物必须可区分）、第 170 条（窗口截图当载体会同时假红和假绿）、
     第 57 条（探针坏了不报红的检查等于没有检查）。
+
+412. 🔴 **跨机搬运回来的产物必须哈希对账 —— "构建成功"和"文件完整"是两件事。**
+    2026-10-12 在打包机上 `pnpm build:android` 第一趟：**BUILD SUCCESSFUL，但 scp 那一跳 rc=255**，
+    于是规范路径 `apps/mobile/android/app/build/outputs/apk/release/app-release.apk` 上留下一枚
+    **截断的 16 MB APK**（完整那枚是 69,462,896 B）。它的 mtime 比全部源码新 ⇒
+    `scripts/lib/apk-freshness.sh` 那道"装的是当前源码的产物"闸门**会放它过**，
+    然后设备侧报的是"装不上/起来就崩"，看着像被测代码的缺陷。
+    ✅ 处置：搬运失败那趟的产物**当场删掉**，重跑要带**两端哈希比对**（本线第二趟 ssh 超时、第三趟才成）。
+    关联：第 411 条（同一族：探针给的读数正常不等于产物是完整的）。
+
+413. ⚠️ **`server/scripts/migrate-deploy.sh` 在 macOS 上跑不动**（2026-10-12 实测）：
+    它用的是 GNU 形状的 `sed -i "s/…"`（第 630 行），BSD `sed` 的 `-i` 必须带后缀参数 ⇒ 直接报错；
+    本机没装 `gsed`。症状是"库建出来了但一条迁移都没上"，接着 e2e 载体脚本报"库要先存在且已迁移"。
+    🔴 本线**没有改它**（它是迁移线的资产，且那枚 `sed` 是迁移流程的一部分，不该被取证线顺手改）。
+    绕法：要么在 Linux 侧跑迁移，要么用已有的共享库（但见第 414 条：共享库有它自己的坑）。
+
+414. 🔴 **`scripts/lib/mobile-e2e-fresh-account.sh` 的 client 预算前置检查无视 `HEYTA_E2E_DB`**：
+    它自己那条形如 `psql … -d heyta_mobile_smoke` 的连接串是**硬编码**的（现量：
+    `grep -n 'heyta_mobile_smoke' scripts/lib/mobile-e2e-fresh-account.sh`）。
+    于是用私有库跑整套 e2e 时，那道"账号 client 数 < 上限"的检查读的是**别人的库里的账号**，
+    照样会印 ✅ —— 那是**一条与本轮无关的绿灯**，不是"这一格过了"。
+    本线因此**没有动共享的 `heyta_mobile_smoke`**（它有 26 枚待应用迁移、还有别线的空闲连接挂着，
+    在共享库上 `migrate` 是不可逆动作），改走"离线模式、不碰服务端"的设备判据路线。
+
+415. 🔴 **共享工作树里别人那枚没提交的 merge 会把自己的提交通道也堵掉。**
+    2026-10-13 00:0x：别线一枚 `feat/detail-pane` 的 merge 已经挂了 **2.5 小时**、
+    `git diff --name-only --diff-filter=U` = **0 枚**（没有待解决的冲突，只是没人按下提交），
+    于是 `git commit -m … -- <自己的 pathspec>` 直接报
+    **`fatal: cannot do a partial commit during a merge`** —— 与 pathspec 写得对不对**无关**。
+    ❌ 不许做的：等它（时长不可知）、`git stash`（会连别人的合并状态一起卷走）、
+    裸 `git commit`（会把别人 staged 的 20 枚文件写进自己这笔，归属当场错乱）。
+    ✅ 能用的通道：`GIT_INDEX_FILE=<临时索引> git read-tree HEAD` → 只 `git add -f` 自己那几枚 →
+    `git write-tree` → `git commit-tree -p <HEAD>` → `git update-ref refs/heads/main <新> <旧>`
+    （**带 old-value 的 CAS**，抢不过就重做）。跑完复验三件事：`MERGE_HEAD` 仍在、
+    别人 staged 的枚数没变、自己那几枚相对 HEAD 已经干净。
+    关联：第 412 条（同族：一次失败的动作留下的半成品会骗过下一道检查）。
