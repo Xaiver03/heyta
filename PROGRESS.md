@@ -3713,3 +3713,17 @@ B173 就地追记一句：现在缺的**只有**那一行登记，不再有"文�
 - 本线的动作：**只登记**。不代提交（那是别人的 hunk），不代回滚（会吃掉他的在写内容），不加判据去钉一枚移动中的目标；
   建议下一步（收成 `inbound-core` 一枚常量 + 一条能红的形状用例，含反向验证形状）写在 B182 里，归属双方任一，"别两边都不做"。
 - AC 勾选数不变：`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` = **0**（这一轮没往任何一格挪）。
+
+## 2026-10-12 08:2x · B150 闭合后的文档一致性复账（4 处"当前状态"句子改口）+ 第 105 道换到**从零建的隔离副本**上跑
+
+- 计划里 4 处把 B150 说成"还开着/债还剩 1 条"的句子按 AGENTS §8 改口（不删旧文，加带日期的现量更正段）：
+  `docs/plans/inbound-automation.md` 的"这条臂从此长红、以后再加码没人会被它提醒"（→ `f2a94651` 已复绿 + 新增端名的尺）、
+  "这一格本线不自己动手，谁批都能一子做完"（→ 拆词表闭合，没碰域表）、"债从 3 条降到 1 条（只剩 B150）"（→ 本线代码债 0 条）、
+  "白名单外，B150/B151 照旧开着"（→ B151 由 `8389b2a3` 闭合、B150 由 `f2a94651` 闭合）。`git diff --numstat` = **9 增 0 删**，四处 hunk 全是本线写的。
+- 静态门当场复跑：`node scripts/check-docs-voice.mjs` **rc=0**（禁词表 30 项零命中）、`node research/tools/docs-link-check.mjs` **rc=0**（无死链/无失效锚点）。
+- 🔴 载体换了一棵：`.worktrees/inb-t7` 的内容与当前 HEAD **不等价** —— 逐文件对账 `git diff --name-only 422db1b2 -- server packages apps scripts research e2e docs/reference docs/adr` 去掉图片后仍有
+  **34 条**（`apps/web/src/App.tsx`、`features/calendar/CalendarView.tsx`、`features/tasks/{store.ts,TaskActionError.tsx}`、`packages/i18n/src/locales/{zh-CN,en}.ts`、`e2e/tests/auth-panel-esc.spec.ts` 等），
+  那是它停在 `c1901982` 造成的，别的线的提交没进去 ⇒ 在它上面取"HEAD 的第 105 道读数"会读到混合态。
+  本线**没有**去动它（它还留着 `.chain-logs/` 与那批证据图），而是新建 `.worktrees/inb-t8`（`git worktree add --detach … 422db1b2`，建完 `status --porcelain` = **0 条**），
+  在这棵干净副本上按 install → build → `NO_COLOR=1 pnpm -r --no-bail test` 的顺序跑，三段各自 `echo *_RC=$?` 紧跟其后（AGENTS §7：管道尾会吞退出码）。
+- 读数还没落地：**第 105 道的 per-package 计数与"有 test 脚本的包数 == 打了 `Tests` 汇总行的包数"那条对账，等这一趟跑完再写**；写完前，计划里那句"本线代码债 0 条"只覆盖 B150 那一格，不覆盖整链。
