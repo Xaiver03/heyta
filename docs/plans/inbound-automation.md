@@ -1106,7 +1106,7 @@ AC-8 那一格此前的现状是**无产物**（复审表里唯一一处连尺�
 | C7 | W1 未绑定账号出示票据 | server | 自托管带票 | 未绑定 | 绑定字段只取绑定行；未绑定与已撤销都不签；别人的本地账号不能在这里建立绑定 | `server/tests/automation-entitlement-issuer.spec.ts::「绑定字段取自绑定行而不是请求：换账号顶不掉，未绑定与已撤销都不签」；server/tests/integration/inbound-worker-identity.integration.spec.ts::「a ticket for another local account cannot establish the binding here」` | 本线 T1 |
 | C8 | W1 托管额度耗尽 | server | 额度耗尽 | 已绑定 | 拒绝且不落账行、计数器不抬过上限；终态不许被说成可重试 | `server/tests/automation-ai-metering.pglite.spec.ts::「额度用尽时预留被拒，且既不落账行也不把计数器抬过上限」；server/tests/inbound-ai-quota-route.spec.ts::「额度用尽回 402 + QUOTA_EXCEEDED，把 used/limit 给宿主，且不写账行」；server/tests/inbound-ai-quota-route.spec.ts::「反向：数据库故障仍然回 409，不许被一并变成"停止重试"」` | 本线；有牙的反向验证在 `research/tools/verify-inbound-quota-teeth.py` |
 | C9 | W2 已领取、解析前终止 | server | 付费有效 | 已绑定 | 代次抬升、停用规则拒领；结果发布按 owner 与 generation fencing | `server/tests/automation-events.spec.ts::「increments generation and refuses a disabled rule」；server/tests/automation-events.spec.ts::「fences result publication to the lease owner and generation」` | 本线 |
-| C10 | W2 双宿主接手（真终止后另一台恢复/转派） | node-host | 付费有效 | 进程已终止 | 两台独立 SQLite + 独立库：任务数不双、op 数不双、回执与计量逐事件对得上 | 无尺 | 本线 T3：跑 13 枚窗口的双宿主装置**不存在**；前置 = B112 那四处白名单外接缝（HEAD 编不出 app-host 产物）+ B126 两枚类型红 |
+| C10 | W2 双宿主接手（真终止后另一台恢复/转派） | node-host | 付费有效 | 进程已终止 | 两台独立 SQLite + 独立库：任务数不双、op 数不双、回执与计量逐事件对得上 | 无尺 | 本线 T3：🔴 **10-12 18:2x 现量更正**（作废上一句"装置不存在"）：跑 13 枚窗口的双宿主装置在册，现量命令 `git ls-files research/tools/verify-inbound-dual-host.py` 命中一枚；这一趟在合并态回 `Windows: 13/13` 且 `RC=0`，逐窗原文读数落在 `/tmp/heyta-inbound-dual-host.log`（窗口 2/3/4/5 那几档是子进程真 `SIGKILL` 之后由第二台真宿主接手，读的是"gen 抬升、模型仍 1 次、服务端恰好 1 枚、A 本地 0 op 而 B 本地 1 op"）。该格原先写的两条前置（B112 那四处白名单外接缝"HEAD 编不出 app-host 产物"、B126 两枚类型红）同一趟都不成立：`pnpm -r --no-bail typecheck` 对 21 个工程全 `RC=0`。尺那一列我没动 —— 把"无尺"改成有尺属判据口径，按 B169 那一类交负责人裁决。 |
 | C11 | W3 模型已计量、结果响应丢失 | server、node-host | 付费有效 | 已绑定 | sent 租约过期后要对账而不是再买一次；供应商歧义失败不许悄悄发第二个端点 | `server/tests/integration/inbound-worker-identity.integration.spec.ts::「requires reconciliation instead of buying another attempt after a sent lease expires」；packages/app-host/tests/inbound-runner.spec.ts::「does not silently send to a second endpoint after an ambiguous provider failure」` | 本线 T4 |
 | C12 | W3 逐事件计量对账 | server | 额度耗尽 | 已绑定 | 账行按 (规则, 事件, 解析版本, 尝试) 归属；净额与计数器的差分成 short 与 unexplained；重放不二次收费 | `server/tests/automation-ai-metering.pglite.spec.ts::「逐事件明细按 (规则, 事件, 解析版本, 尝试) 归属，状态与来源逐行可见」；server/tests/automation-ai-metering.pglite.spec.ts::「同一枚尝试的重放不因额度耗尽被拒（断链重试不能二次收费）」；server/tests/automation-ai-metering.pglite.spec.ts::「计数器多出来的手工托管用量不算缺陷，只披露成 unexplainedByAutomation」` | 本线 T4 |
 | C13 | W4 结果已冻结、提交前终止 | server、node-host | 付费有效 | 已绑定 | 接手方不许把冻结的确认草稿重新解释成 prepared；旧 input 用当前 epoch 封回 | `server/tests/automation-events.spec.ts::「does not reinterpret a frozen confirmation draft as prepared on an idempotent publish」；packages/app-host/tests/inbound-runner.spec.ts::「decrypts old input, uses the provider secret, and seals the result to the current epoch」` | 服务端半本线已入库；"提交前终止"那一半要两台真宿主 ⇒ 同 C10 前置 |
@@ -3444,3 +3444,31 @@ quota 与 ticket 那两枚的保险丝臂各自报"成立（RESTORE_GUARD 报了
 🔴 本节不改任何 AC 的闭合状态：`已勾=0` 现量未变；AC-6 的界面挂载点（B140/B181）、AC-8 的四端设备腿（B164）
 仍按原登记开着；`pnpm check` / `pnpm -r test` 仍因别线那几格（`packages/ai` 5 条、`packages/legal` 2 条、`packages/shared-schema` 1 条、
 `apps/mobile` 那枚未处理拒绝、`check:reachability` 的 COMMENT）而 rc=1 ⇒ 完成条件 1 的"三条 exit 0"仍不成立。
+
+## 2026-10-12 18:2x–18:3x · 判定内核被别线动过之后重取整条证据；矩阵 C10 那句"装置不存在"当场作废
+
+`c5561959` 把本线白名单内 6 枚文件改了（`packages/inbound-core/src/{index.ts,webhook.ts}`、`server/src/api.ts`、
+`server/src/automation/{ai-metering.ts,entitlement-ticket.ts}`、`server/tests/inbound-ticket-rejection-route.spec.ts` +162 行）。
+本线不解释那次改动的语义（不是我的判断），但**它动过判定，我就不能继续引用改动之前的读数**。这一趟在合并态串行重取，
+日志一份（`.run-logs/ac-reeval.log`，基线写在该文件第一行），逐腿原文落 `.run-logs/ae-*.out`：
+
+- `pnpm -r --no-bail typecheck` ⇒ `RC=0`，`Scope: 21 of 22 workspace projects`。这一条同时否证了 C10 旧句里"HEAD 编不出产物"那类前置。
+- 本线服务端 spec 整片：`cd server && ./node_modules/.bin/vitest run tests/inbound-*.spec.ts` ⇒ `Test Files 6 passed (6)`、
+  `Tests 60 passed (60)`、跳过 **0**，`Duration 17.66s`。逐枚相加 10+12+20+3+4+11=60；
+  `inbound-ticket-rejection-route` 现在是 **20 条** —— 涨的那几枚正是别线加进来的，只增不减，符合"测试数只许 ≥ 基线"。
+- **双宿主故障窗口装置** `verify-inbound-dual-host.py` ⇒ `Windows: 13/13`、`RC=0`，逐窗原文含真子进程 `SIGKILL`
+  （窗口 2/3/4/5/6/7 里"第二台真宿主接手后 gen 抬升、模型仍 1 次、服务端恰好 1 枚 BATCH、A 本地 0 op 而 B 本地 1 op"这类判据都有读数）。
+  `worker-identity`／`producer-seam`／`cjs-require-order` 各 `RC=0`。
+- **三枚非零退出码逐条归清（不猜形状，读的是装置自己打的那一行）**：
+  `api-slice` 与 `host-options-slice` 各退 `3` —— 正文是"本切片已落进 HEAD ⇒ 入库工具退役，不再产出切片"，这是设计退出，不是红；
+  `check-chain` 退 `2` —— `CHAIN_DEVICE_REFUSED --logs is required (readings must be on disk, not stdout only)`，
+  是**我这条命令少带了一个参数**；整条 `pnpm check` 106 道在共享载体上有并行写入者，仍排 B185 那把独占锁，这一趟没补跑；
+  `commit-scope` 退 `1` —— `越界=1`：`docs/plans/goal-collaboration-shared-lists.md`（`79e8ede1`，命中段=desc、带本线独占路径=0），
+  该格口径正等在 B169 裁决，本线不代裁。
+- **我改的只有台账**：C10 的证据归属格此前写着"跑 13 枚窗口的双宿主装置**不存在**"，与这一趟现量直接矛盾，按本文件既有的带时点更正写法作废，
+  并把该格两条前置（B112、B126）标为同一趟不成立。**"尺"那一列没动**：把一格从"无尺"升成"有尺"属于判据口径的变更，
+  与 B169 同类，要负责人点头才做。矩阵对账装置在两腿上都重取过：`--quiet` `RC=0`、`--self-test` `RC=0`（六臂含静止对照臂全成立）。
+
+🔴 本节不改任何 AC 的闭合状态：`已勾=0` 现量未变；C10 从"装置不存在"改成"有读数、但尺仍无"只是**把假话改掉**，不等于那一格闭合；
+AC-6 的界面挂载点（B140/B181）与 AC-8 的四端设备腿（B164）仍按原登记开着；`pnpm check` / `pnpm -r test` 仍因别线那几格 rc=1
+⇒ 完成条件 1 的"三条 exit 0"仍不成立。

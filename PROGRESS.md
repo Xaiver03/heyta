@@ -3977,3 +3977,26 @@ $ grep -rnE '\.(skip|todo)\(|\bxit\b|describe\.skip' <本线全部测试文件> 
   完成条件 2 里"非白名单条目数对开工快照"仍**不可核**（开工没取基线）。AC 已勾数现量 **0**，本线仍未闭合，不自行关闭 Goal。
 - **下一步（顺序）**：① 等负责人对 B140/B181 的挂载点、B164 的四端设备腿、B185/B184 那两格接线裁决；② B188 那三节正文由账号标准套件线自己补；
   ③ 白名单外那两枚不带 `--no-install` 的 `npx`（B186）等点头；④ 只本地提交、不 push。
+
+## 2026-10-12 18:2x–18:3x · 别线改完本线判定代码之后把整条证据重取了一遍：typecheck 21 工程全过、本线 server spec `60 passed`、双宿主装置 `13/13`；顺手把矩阵 C10 那句"装置不存在"作废
+
+- **为什么要重取**：`c5561959` 一次动了本线白名单内 6 枚（`packages/inbound-core/src/webhook.ts`、`server/src/api.ts`、
+  `server/src/automation/{ai-metering.ts,entitlement-ticket.ts}`、`packages/inbound-core/src/index.ts`、
+  `server/tests/inbound-ticket-rejection-route.spec.ts` +162 行）。判定内核被人动过之后还引用旧读数，等于拿昨天的体检报告说今天没病。
+- **读数**（串行一份日志：`.run-logs/ac-reeval.log`，基线写在该文件第一行 `HEAD=`；逐腿原文在 `.run-logs/ae-*.out`）：
+  `pnpm -r --no-bail typecheck` ⇒ `RC=0`（`Scope: 21 of 22 workspace projects`）；
+  `cd server && ./node_modules/.bin/vitest run tests/inbound-*.spec.ts` ⇒ `Test Files 6 passed (6)`、`Tests 60 passed (60)`、跳过 **0**
+  （逐枚 10+12+20+3+4+11=60；`inbound-ticket-rejection-route` 那一枚现在是 **20 条**，涨的正是别线加的 162 行 —— 只增不减，符合"测试数只许 ≥ 基线"）；
+  `verify-inbound-dual-host.py` ⇒ `Windows: 13/13`、`RC=0`；`worker-identity`／`producer-seam`／`cjs-require-order` 各 `RC=0`。
+- **三枚退出码不是红的，逐条归清（不猜形状）**：`api-slice` 与 `host-options-slice` 各退 **3** = 装置自己那句
+  "本切片已落进 HEAD ⇒ 入库工具退役，不再产出切片"；`check-chain` 退 **2** = **我这条命令少带了 `--logs`**，它拒绝"读数只在 stdout"，
+  这一趟没补跑整条（它跑的是 `pnpm check` 全 106 道，共享载体上有并行写入者 ⇒ 仍排 B185 那把独占锁）；
+  `commit-scope` 退 **1** = 越界 **1** 枚 `docs/plans/goal-collaboration-shared-lists.md`（`79e8ede1`，
+  命中段=desc、带本线独占路径=0）—— 这一格的口径正等在 **B169** 裁决，我不代裁。
+- **我改的只有台账，没改判卷口径**：矩阵 **C10** 的证据归属格原先写着"跑 13 枚窗口的双宿主装置**不存在**"，
+  这句今天已经是假话（装置在册、同一趟 `13/13`）。按本文件既有的"带时点更正"写法作废它，并把该格原来那两条前置
+  （B112"HEAD 编不出 app-host 产物"、B126 两枚类型红）也标成同一趟不成立。**"尺"那一列我从无尺改成有尺这种事没做** —— 那是判据口径，进 B169 那一类交负责人。
+- **改完重取的门禁**：`AC8 rc=0`、`AC8_SELF rc=0`（六臂含臂 6 静止对照仍绿）、`TABLES rc=0`、`VOICE rc=0`、`LINKS rc=0`、
+  `TICKS：AC 行=8　已勾=0　未勾=8`。
+- **没变的**：AC-6 挂载面（B140/B181）、AC-8 四端设备腿（B164）、完成条件 1 的三条 exit 0（别线那几格仍红：ai 5／legal 2／shared-schema 1／
+  mobile 那枚未处理拒绝／reachability COMMENT）、完成条件 2 的开工基线仍**不可核**。AC 已勾数现量 **0**，本线仍未闭合，不自行关闭 Goal。
