@@ -64,10 +64,61 @@ goal 的收口条件「iOS 设备腿取到读数」在这一趟**闭合**，包�
 第 7 趟那 8 枚红逐枚的落点表与两处边界（探针毛刺只登记现象、这一趟仍不证的那几样）
 在 **§6.87**。
 
-### 🔴 10-11 05:4x 现状（本文件唯一的「现在」；上面 19:1x 与 02:2x 那两块是过程读数，别当现状照）
+### 🔴 10-11 06:0x 现状（本文件唯一的「现在」；上面 05:4x / 19:1x / 02:2x 那三块是过程读数，别当现状照）
 
-**一句话**：**代码、判据、法务、设备腿、文档门禁都在 `main` 上了；只剩两格 —— ① 关闭 goal 要负责人点头，② 「门禁全绿」只能说本线落点全绿，整条 `pnpm check` 停在别线那枚红上。**
-现量：`git log -1 --format='%h %s'`、`git status --porcelain -- docs/plans/account-standard-suite*.md BLOCKED.md`（最后一命令为空 ⇒ 本线在工作树里没有未提交的东西）。
+**一句话**：**接替会话逐道复跑后，五道红缩成三道（`layering`、`ui-language` 已由别线修绿），那三道仍同属 `e6058120` 一枚；本线自己又抓出一枚"没有尺在守"的版本纪律缺口（B166）并当场收掉。仍只剩两格 —— ① 关闭 goal 要负责人点头，② 「门禁全绿」只能说本线落点全绿。**
+
+**接替会话的现量（`43a1dcc8` 上逐条重跑，别照 05:4x 那张表推断）**：
+
+| 05:4x 说的 | 06:0x 现量 | 读数 |
+|---|---|---|
+| `check:reachability` 红（`COMMENT`） | 🔴 **仍红** | `🔴 断言 B 不通过：1 个已建模的实体零写路径` ⇒ `COMMENT` 已建模、零写路径 |
+| `check:layering` 红（`SHARE_KEY`） | ✅ **已绿** | RC=0（别线已修） |
+| `check:ui-language` 红 | ✅ **已绿** | RC=0（别线已修） |
+| `check:verify-script-copy`（2 枚 needle） | 🔴 **仍红** | `缺失 scripts/lib/mobile-e2e.sh:1475` 与 `scripts/verify-mobile-habits.sh:631`，都是 `"填好服务器地址与访问令牌后才能同步。"` |
+| `check:integration-coverage`（1 枚用例） | 🔴 **仍红** | `inbound-dual-host-fault-windows.integration.spec.ts` 盘上有、`test:integration:postgres` 没点名 |
+| `check:adr-numbering` | ✅ RC=0 | 本线改号那笔仍然有效 |
+
+🔴 **归属复验：剩下三道仍来自同一枚 `e6058120`（10-09 14:35），与本文件 05:4x 那段的一般规律一致** ——
+`git log -S` 逐条取到：`COMMENT` 进 `packages/shared-schema/src/entity-types.ts` 是它、
+`mobile.profile.sync.notConfigured` 被它删掉（`git show e6058120 -- packages/i18n/src/locales/zh-CN.ts` 第 933 行是 `-`）
+⇒ 那两枚 needle 从此悬空。**本线仍然一道都不代修。**
+
+**整条链的断点没变**：`pnpm check` 仍停在**第 6 步 `check:reachability`**（106 步链，第 7–106 步在合并态从未走到，
+含 `check:ai-e2e` 整族与 `pnpm -r test`）⇒ 这一档按 `FULLCHECK-01` 记的是**环境未验**，不是【通过】。
+
+🔴 **接替会话把断点之后那 100 步逐道补跑了 —— 这是本轮最值钱的产出，见 B168**：
+**「合并态共五道红」这个数字是结构性的错。** 逐道单独跑下来，红的**远不止五道**（现量 16 道以上），
+因为"链在第 6 步断"意味着**第 7–106 步的红绿在合并态本来就是未知的**，不是绿。
+逐道读数与归属表在 **B168**；其中 `check:android-gradle-remote`（第 100 步）那四道红
+**单独登记成 B167**（全是证据 JSON 里的路径字符串，是判据形状问题，不是真的构建入口）。
+**本线（账号标准套件）在这些红里一道都不是** —— 归属逐条在 B168，含一条专门为"别冤枉本线"做的取证
+（`check:l4` 点了 `ProfileScreen.tsx`，而本线那两笔新增 `style={{` 行数 = **0**）。
+⚠️ **下一手别再把这 16 道里的任何一道当成"本线登记的"来修**，也**别再引用"五道"这个数**。
+
+**§3.3 那三格「等别人的文件落地」—— 接替会话现量：三格全部已落地（无一格是本线做的）**：
+- **#17** `server/src/password/registration-otp.ts` **已被跟踪**（`git ls-files --error-unmatch` 命中）。
+- **#19** 帮助中心那两问已挂载：`apps/landing/src/site/content.ts:324` `rebind`、`:325` `sessions`，
+  四条 `site.help.{q,a}.{rebind,sessions}` 在 zh/en 各 1 枚（本处现量），文件本身 `git status` 干净。
+- **#5** 法务联合提交那笔**在工作树里已经改好**（`packages/legal/src/documents/third-parties.ts` 脏，4 处），
+  内容正是「十封 → 十一封」＋「Each of the ten → eleven functional e-mails」，与 `check:legal-email-claims`
+  的 `实发 11 封` 对得上 ⇒ 它现在**只欠一次提交**，不再欠内容。
+- ⚠️ **但三格落地 ≠ 本线可以合 goal**：本线自己的那笔脏改动有一处缺陷，见下。
+
+**🔴 接替会话抓出并当场收掉的一枚（B166，本线自己的）**：
+上面 #5 那笔脏改动**只改了正文、没改版本头** —— `third-parties.ts` 仍 `version: '1.5'` / `updatedDate: '2026-10-08'`，
+而这份文件**自己第 781 行**写着 `In every case this file is amended and its version bumped before the release ships`；
+同族的 `privacy.ts` 对**同一件事**做对了（`1.9 → 1.10`）。
+⇒ 已按它自己的规矩改成 `1.6` / `2026-10-10`，并重生成 `server/src/legal.generated.ts`。
+**为什么之前没人发现**：法务八道门禁**逐道 RC=0 放它过去** —— 全仓**没有任何判据**把"正文变了"绑到"版本号动了"。
+（这下一次产品的尺要不要加，已登记回负责人，本线不代改判据口径。）
+
+**顺带复现了 `gen-server-legal` 文件头自己警告过的那件事**：改完 `src` **不 build** 就单独跑 `check:server-legal`，
+它报 **RC=0** 却仍打印 `third-parties@1.5`（它读 `dist/`，旧 dist 喂旧值）⇒ **单独跑这条门禁会读到假绿**。
+先 `pnpm --filter @heyta/legal build` 再看指纹，才作数。
+
+**现量（本段全部读数取自 `43a1dcc8` + 上述工作树改动）**：
+`git log -1 --format='%h %s'`、`git status --porcelain -- packages/legal`（= ` M …third-parties.ts`，本线那笔待提交）。
 
 | 交付标准 | 现在 | 一条现量 |
 |---|---|---|
@@ -75,7 +126,7 @@ goal 的收口条件「iOS 设备腿取到读数」在这一趟**闭合**，包�
 | 每条 🔴 判据都能红（含变异） | ✅ | 本轮三条「告知信永不 settle」判据各做过变异 `MUT_RC=1`，还原只从 `<file>.mut-bak` |
 | 不推翻既有 ADR 结论 | ✅ | 只新写 ADR-0063；`pnpm check:adr-numbering` RC=0 |
 | 不 bump `CURRENT_SCHEMA_VERSION` | ✅ | 换绑与会话走既有列 + payload marker |
-| 门禁全绿 | ⚠️ | 本线落点逐道 RC=0；整条链停在 `check:reachability`（`COMMENT`），共五道红，逐道归属见 §6.88 与 B159/B161 |
+| 门禁全绿 | ⚠️ | 本线落点逐道 RC=0；整条链停在 `check:reachability`（`COMMENT`），06:0x 现量共**三道**红，逐道归属见 §6.88 与 B159/B161/B166 |
 | iOS 设备腿取到读数 | ✅ | 第 8 趟 101/0（§6.87），日志 `~/heyta-carriers/w9-acct-logs/leg-run8.log` |
 
 **本轮（10-11 03:0x–05:4x）落地的三件事**：
@@ -95,18 +146,22 @@ goal 的收口条件「iOS 设备腿取到读数」在这一趟**闭合**，包�
 入站线**刚刚**把 `BLOCKED.md` 里他们自己的 B156/B157/B158 **又插了一遍**（工作树里成对出现，未提交）。
 ⇒ 这两摊本线都不代做：不改别人正在写的文件，不替别人决定他们的账本要不要去重。
 
-**合并态上红的五道，下一手别替它们动手**（逐道理由在 §6.88 那张表、归属在 B161）：
-`check:reachability`（`COMMENT` 已建模零写路径）· `check:layering`（`SHARE_KEY` 在外壳拼 op）·
-`check:ui-language`（`web.share.invite.emailPlaceholder` 里没汉字）· `check:verify-script-copy`（两枚 needle 追不上被改词的词条）·
+**合并态上仍红的三道，下一手别替它们动手**（逐道理由在 §6.88 那张表、归属在 B161；
+05:4x 时是五道，`check:layering` 与 `check:ui-language` 已被别线修绿 —— **数字会动，行动前重跑**）：
+`check:reachability`（`COMMENT` 已建模零写路径）· `check:verify-script-copy`（两枚 needle 追不上被删掉的词条）·
 `check:integration-coverage`（一枚真库用例从建立起没被脚本点名）。
-🔴 其中**三道来自同一枚别线提交 `e6058120`**（10-09 14:35）—— 撞见第一道就该 `git show --stat` 那枚，
+🔴 **这三道全部来自同一枚别线提交 `e6058120`**（10-09 14:35）—— 撞见第一道就该 `git show --stat` 那枚，
 看它还动过哪些**收口面**（词条表、实体登记面、外壳 op 构造面），而不是每道重新查一次归属。
+（06:0x 复验：`COMMENT` 由它进 `entity-types.ts`；`mobile.profile.sync.notConfigured` 由它删除 ⇒ 两枚 needle 悬空。两件事同一枚。）
 
 **下一步（有序，别跳）**：
-1. **请示负责人关闭 goal**（原话「先不合上，等设备腿」＋ goal 收口条件「关闭 goal 前必须先请示负责人」）。
+1. **先提交本线那笔脏改动**（`packages/legal/src/documents/third-parties.ts` + 已重生成的
+   `server/src/legal.generated.ts` + 本段与 B166）。它现在**内容已对、版本号已补**，法务八道 + 文档族五道全 RC=0。
+   提交后用本线 B162 那条判据收尾（账本只许变长 + 自己锚点命中）。
+2. **请示负责人关闭 goal**（原话「先不合上，等设备腿」＋ goal 收口条件「关闭 goal 前必须先请示负责人」）。
    设备腿已闭合 ⇒ 这一条**现在才**变成可问的；在拿到答复前**不许**自行 `UpdateGoal complete`。
-   问的时候要一并交代「门禁全绿」那一格的真实形状（整条链仍红在五道别线落点上），别只报好消息。
-2. **本线自己声明仍然不证的四格**（§6.87 末尾那条原文为准）：
+   问的时候要一并交代「门禁全绿」那一格的真实形状（整条链仍红在**三道**别线落点上，且第 7–106 步从未走到），别只报好消息。
+3. **本线自己声明仍然不证的四格**（§6.87 末尾那条原文为准）：
    ① 邮件里那两条链接由**人/设备**点开的完整旅程（腿是 `curl` 直打服务端，点链接的人手上没有会话）；
    ② 通行密钥那一块；③ Android 那两腿本轮没复跑；④ 真机（本轮全是模拟器）。
    这四格**不是缺陷**，是射程边界；要收哪一格先确认它不在别人的写者窗口里。
@@ -205,7 +260,13 @@ goal 的收口条件「iOS 设备腿取到读数」在这一趟**闭合**，包�
 
 ## 3. 当前停在哪（三格，按可动手顺序）
 
-### 3.1 🔴 #15 iOS 设备腿 —— **goal 的收口条件，今天取不了数**
+### 3.1 ✅ #15 iOS 设备腿 —— **已闭合**（06:0x 现量；本节保留原文只为让下一手认出「当时卡在哪」）
+
+🔴 **跑法以 §5 与 §6.87 为准**：设备腿第 8 趟已取到读数（**101 通过 / 0 失败**、`LEG_RC=0`），
+载体是**新建的 `heyta-ios-isolated17`**（iPhone 17 Pro / iOS 27.0）—— 下面原文里那个 `heyta-ios-isolated`
+是**旧载体**（iPhone-Duo，顶栏最右那格坐在挖孔摄像头下面收不到点击，B155 / 环境陷阱 #404），**别再照它跑**。
+⇒ 本节下面这段是**过程读数**，不是「现在缺什么」。
+
 
 - **要取什么**：换绑邮箱 + 会话撤销 + 改登录密码三块，在**真 iOS 模拟器**上的那一趟。
   脚本已写好并且**不依赖 node-host**：`scripts/verify-mobile-ios-account-email-sessions.sh`
@@ -237,13 +298,18 @@ goal 的收口条件「iOS 设备腿取到读数」在这一趟**闭合**，包�
 🔴 它们**没跑过**，所以「已备好」只等于「文件在」，不等于「能用」—— 跑之前先各自 dry-run 读一遍改哪几行。
 被什么挡着：法务那半要重生成产物 ⇒ 要能构建 ⇒ 撞 §4 那两堵墙。
 
-### 3.3 🟡 #5 / #17 / #19 —— 三格都卡在「等别人的文件落地」
+### 3.3 ✅ #5 / #17 / #19 —— 06:0x 现量：**三格全部已落地**（无一格是本线做的）
 
 | 格 | 内容 | 卡在哪 | 现量命令 |
 |---|---|---|---|
 | #5 | 法务联动那笔**联合提交** | 三条线的文本要一次收拢 | `git status --porcelain -- packages/legal` |
 | #17 | 法务「十封」那两行 | 等**未跟踪**的 `registration-otp.ts` 随它那笔落地 | `git status --porcelain -- '*registration-otp*'` |
 | #19 | 帮助中心两条问答那两行 | 内容**已核对为真**，只欠挂载（`content.ts` 被别人改写中） | `git status --porcelain -- '*help*content.ts'` |
+
+✅ **06:0x 逐条复验**：#17 `server/src/password/registration-otp.ts` 已被跟踪；
+#19 `apps/landing/src/site/content.ts:324-325` 的 `rebind` / `sessions` 已挂载、zh/en 四条键各 1 枚、文件干净；
+#5 那笔法务改动**已在工作树里改好**（`third-parties.ts` 脏，4 处：十封→十一封，中英同步），只欠一次提交。
+🔴 **但 #5 那笔本身有一处缺陷，接替会话已收**：它只改正文没改版本头 ⇒ 见「10-11 06:0x 现状」与 **B166**。
 
 ⚠️ 「等别人提交」是**瞬时事件不是状态** —— 每次动手前重新现量，别照这张表推断。
 
@@ -373,7 +439,7 @@ apps/landing build: src/components/Footer.tsx(148,17): error TS2345:
 | 真浏览器 e2e（改密三块 + 变异） | ✅ | 任务 #14 completed |
 | **iOS 设备腿** | ✅ **取到** | 第 8 趟 `通过 101 项 / 失败 0 项`、`LEG_RC=0`（§6.87），含之前一直没取到的改密成功屏；载体换成 `heyta-ios-isolated17`，旧载体的机型坑见 B155 与环境陷阱 #404 |
 | 变异验证（每条 🔴 判据能红） | ✅ | 任务 #7 completed；逐支读数在过程账 |
-| 门禁全绿 | ⚠️ **本线落点覆盖到的门逐道 RC=0**（含本线自己撞的那枚同号 ADR 已改号收回，§6.88 / B160）；🔴 **整条 `pnpm check` 仍停在 `check:reachability`**，合并态共五道红、逐道归属在 B161 / §6.88，没有一道能由本线修 | — |
+| 门禁全绿 | ⚠️ **本线落点覆盖到的门逐道 RC=0**（含本线自己撞的那枚同号 ADR 已改号收回，§6.88 / B160）；🔴 **整条 `pnpm check` 仍停在 `check:reachability`**（106 步链的第 6 步），06:0x 现量合并态共**三道**红、逐道归属在 B161 / §6.88，没有一道能由本线修 | — |
 
 ---
 
@@ -427,7 +493,7 @@ apps/landing build: src/components/Footer.tsx(148,17): error TS2345:
 - 设备腿脚本：`scripts/verify-mobile-ios-account-email-sessions.sh`（16 步 / 判据 A–O / exit 0·1·**3**）
 - 起栈：`scripts/mobile-e2e-up.sh`
 - 四端重装：`scripts/reinstall-all.sh`（第 0 步 `pnpm -r build`，**无逃生门**）
-- 阻塞账本：`BLOCKED.md`（下一个空号 **B135**）
+- 阻塞账本：`BLOCKED.md`（**下一个空号现量**：`grep -oE '^## B[0-9]+' BLOCKED.md | sed 's/## B//' | sort -n | tail -1` —— 06:0x 读到 **B166**，但**别照抄**，别线随时会插号）
 
 **本机（不在仓内，重启不清但换机器就没有）**：`~/heyta-carriers/w9-acct-logs/`
 - `sync-dirty-to-carrier.sh` —— **整片**在飞叠加装置（头注释写了口径）
