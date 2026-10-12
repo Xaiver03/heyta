@@ -2987,6 +2987,30 @@ r98 推送时 `sync_windows_sources` 与本地逐字对过账，但当时没把�
 它归那两个脚本的负责人。判据口径本线一个字没动。**回退**：把 `profile-settings-ios.py` 的 `any_of` 记法还原即可，
 门照样 rc=0（两种写法并存本来就是当前状态）。
 
+### 2026-10-13 00:1x：主检出的 **web 构建本身**是红的，红不在本线 —— 这决定了第四趟重装只能跑在隔离载体上
+
+收尾时想复跑"从最终源码四端重装"，结果在本检出连构建都起不来。三条现量把归属钉死：
+
+| 量 | 读数 |
+|---|---|
+| `pnpm check:journey-coverage` | **rc=1**，`FAIL tests/signin-entry.spec.tsx` → `Error: Transform failed` → `TaskDetailCard.tsx:243:2: Unexpected "🔴"` |
+| `pnpm --filter @heyta/web build` | **rc=1**，`TaskDetailCard.tsx(244,17)` 与 `(245,3)` `TS1434: Unexpected keyword or identifier` |
+| `git show HEAD:apps/web/src/features/tasks/TaskDetailCard.tsx \| sed -n '243p'` | `/**` —— **HEAD 那一版 esbuild 可解析**，红只在索引/工作树那一份 |
+
+成因是别线在飞的那份内容里有一段中文散文落在注释块**外面**（第 243 行起），而那枚文件就在
+`feat/detail-pane` 那笔挂了 2.5 小时、零未解决冲突、还没按下的 merge 的 staged 清单里
+（`git status --porcelain` 报 `M `＝已 staged、工作树与索引一致）。**本线不改它**（别线在飞文件）。
+
+⚠️ 但要说清后果，别把它读成"本线没做完"：**主检出此刻打不出 web 产物** ⇒ 任务书第 4 步的第四趟
+不能在 main 工作树上跑。两条路：等那条线把散文补回注释，或者跑在只含 `HEAD` 的隔离载体上 ——
+本线走后者（`../heyta-wt-r99` @ `49c4b08b`，跑前 `git status --porcelain` = 0 枚），
+并且这次把 r98 学到的**两个旋钮一起设**（`HEYTA_MACOS_DIST_DIR` + `HEYTA_REINSTALL_TMP_DIR`），
+不再让日志落共享 `/tmp` 互相覆盖。
+
+📌 顺带一条现量：`a4430f58`（r98 的载体）之后**只有一个提交动过产品源码** —— `1a386d76`
+（`packages/ai/src/capability-manifest.generated.ts`，AI 能力清单的生成物）。
+所以 r98 那页逐端读数对这一枚生成物**不成立**，这是跑第四趟的实际理由，不是"再跑一遍看着安心"。
+
 🔴 另外记一条一定会复现的（已入环境陷阱 #415）：本线这两笔（`c018ec0e`、`bbce592c`）落地的时间点，
 别线一枚 `feat/detail-pane` 的 merge 已经挂在共享索引里 **2.5 小时、零未解决冲突**，
 于是 `git commit -- <自己的 pathspec>` 报 `cannot do a partial commit during a merge` ——
