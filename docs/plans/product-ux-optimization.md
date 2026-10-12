@@ -2500,3 +2500,33 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
   `pnpm install --frozen-lockfile` + `pnpm -r build` 之后跑 `bash scripts/reinstall-all.sh`（四端，`--only`/`--skip` 一个都不用）。
   ⚠️ 它的读数出来之前，**"四端都装上了当前源码的产物"这一格对本轮这四笔仍未闭合**；
   第一趟那三端的读数不能被读成"本轮代码已装到四个端"。
+  ✅ **第二趟读数出来了（趟号 r55，10-12 02:0x–02:1x，载体同一棵 @ `3d7b6dec`、点火时 `dirty=0`）** ——
+  门等了 5 轮：前 4 轮 `gate_rc=3 REDS=load`（1 分钟负载 14.4→56.1），第 5 轮 `gate_rc=0`
+  时 `loadavg {8.77 21.60 29.69}`；链 `chain_rc=1`。逐端：
+  - **mac ✅** `.app`+`.dmg`，包内 `web-dist` 与本机 `apps/web/dist` 是**同一次构建**（9 枚 chunk 逐枚对上），
+    安装副本自截屏 `2318x1508`、内容占比 100.0%、**主蓝命中 997**。
+  - **windows ✅** 源码包 432M / 清单 7918 条、tar `sha256=babd4c74a362b1d3…`，远端新鲜度对账
+    `web-dist/index.html=0f8fe9c2572ddf2b…`、`bridge=42f8e4cc3f13c6d3…`、`assets/*.js` 7 枚逐字一致，
+    五条判据（`ADD_APPX=OK` / `RESULT=OK` / `PAYLOAD_WEBDIST=True` / `M2D=OK` / `PAYLOAD_INDEX_SHA`）在位。
+  - **android ✅** APK 81M、`install` 报 `Success`；monkey 起的前台**不是** `com.heyta`，
+    改 `am start -W` 复核才拿到 `mCurrentFocus=Window{… com.heyta/com.heytamobile.MainActivity}`，
+    截图 `1080x2400`、内容 56.0%、主蓝 4042。
+  - 🔴 **ios 仍红，而且第一趟那句归因（"`HOME` 丢了"）不是这一趟的红**：`export HOME` 之后
+    `Error: $HOME must be set to run brew.` 仍然出现（xcodebuild 用 `env -i` 跑 PhaseScript，
+    启动器里 export 的 `HOME` 进不到那一层），但它**下面**那层才是拦路的：
+    这一趟 `pod install` 把 hermes 决议成了**源码构建**（`Podfile.lock` 的 subspecs 从 HEAD 的
+    `hermes-engine/Pre-built` 变成 `cdp` / `Hermes` / `Public`，checksum `dfeeb2d2…` vs `208b0dcd…`），
+    而源码那条与 RN 0.84.1 的 jsi 头不匹配（`no type named 'TypedArray' in namespace 'facebook::jsi'`）
+    ⇒ **失败在任何一份本线代码之前**，且 `Pre-built` 与 `Hermes` 两种形状**不能同时成立**。
+    两条排除了环境以外解释的读数：Maven 那个 URL `curl -L` 回 **200**（不是够不着），
+    且两棵树的 `Pods/hermes-engine-artifacts/` 里**已经躺着** `hermes-ios-250829098.0.9-{debug,release}.tar.gz`。
+  - 🔴 **我自己那条第三趟预检是假绿的，别再照它行动**：`ios-leg-3.sh` 的"hermes 是否 Pre-built"读的是
+    **刚 `git checkout` 回来的锁文件**，而它前面那次 `pod install` 其实 `rc=1`
+    （CocoaPods 在没有 UTF-8 locale 的 shell 里一秒死：`Unicode Normalization not appropriate for ASCII-8BIT`，
+    缺的正是产品脚本自己带的 `LANG=en_US.UTF-8` 与 `env -u NODE_USE_ENV_PROXY`）
+    ⇒ 前置判据读的是"我以为改过的东西"，不是"那次运行留下的东西"。第四趟（`ios-leg-4.sh`）改成
+    **先等门、再让 `reinstall-all.sh` 用它自己那条 pod install 去决议**，把决议读数从它留下的
+    `heyta-reinstall-pod-*.log` 与锁文件差里取 —— 手插一遍 `pod install` 除了把载体弄脏
+    （此后门只能报 `REDS=src`）什么也证明不了。
+  ⇒ **边界如实**：这一趟之后"四端都装上了本轮这批产品代码的产物"仍差 iOS 那一格；
+  三端的读数只覆盖到 `3d7b6dec`，`8c9541f7`（rail 键盘漫游那一笔）**不在任何一端的已装产物里**。
