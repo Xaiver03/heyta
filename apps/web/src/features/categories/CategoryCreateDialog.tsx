@@ -107,7 +107,10 @@ export function CategoryCreateDialog({
     if (busyRef.current) return;
     const trimmed = name.trim();
     if (trimmed === '') {
-      setError(t('web.categories.create.empty'));
+      // 词条键名原先叫 `…create.empty` —— `check-empty-state` 按**段**判空态
+      // （`(^|\.)empty(\.|$)`），于是这句"没填名字"的表单校验被登记成一处手写空态。
+      // 改的是**名字**（它本来就不是空态），不是那条判据。
+      setError(t('web.categories.create.nameRequired'));
       inputRef.current?.focus();
       return;
     }
