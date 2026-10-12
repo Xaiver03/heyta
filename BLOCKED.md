@@ -9551,6 +9551,11 @@ try {
 `src/**/*` 与 `scripts/**/*`，所以 `server/tests/**` 的类型**不进 `tsc`**，只由 vitest 运行时执行 —— 新那枚 spec 也是这个形状。
 `npx tsc --noEmit -p tsconfig.json` 在 server 包 rc=0，但它不覆盖测试文件；要说"测试类型也过了"必须另找载体。
 
+**10-12 18:4x 在当前 HEAD 复量这一格（不改归属，只把读数刷新）**：函数仍在（现量 `grep -n "purgeRetiredAutomationEntitlementClocks" server/src/automation/entitlement-ticket.ts` 命中 `:394`）；
+判据仍在册（`git ls-files server/tests/automation-clock-retirement.pglite.spec.ts` 命中），单独跑 ⇒ `Test Files 1 passed (1)`、`Tests 5 passed (5)`、`SWEEP_RC=0`（真 PGlite 库）；
+**调用方现量仍是 0** —— `grep -rn "purgeRetiredAutomationEntitlementClocks" server/src` 只命中它自己那行 `export`。
+同一小时里别线的 `c5561959` 也动过 `entitlement-ticket.ts`，没有把清扫函数碰掉。要接的仍只有 `server/src/sync/cleanup.ts` 那一句，形状见上面那段代码块，本线不代改。
+
 ## B176（2026-10-12 01:4x，本会话 · **我自己造的事故，如实记在这里**）：我用 `git add <点名文件>` 提交本线那一枚新函数时，把**别线在同一文件里的两处未提交改动**一起公开了 —— 归属不是我的，判断也不该我替
 
 **发生了什么**（不是别人越界，是我越界）：`server/src/automation/entitlement-ticket.ts` 在我追加清扫函数**之前**，

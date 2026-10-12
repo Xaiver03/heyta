@@ -4040,3 +4040,18 @@ $ grep -rnE '\.(skip|todo)\(|\bxit\b|describe\.skip' <本线全部测试文件> 
 - **仍然成立的两格未闭合**：`pnpm -r test` 与 `pnpm check` 因 `packages/ai`／`packages/shared-schema` 那 6 条与 `check:reachability` 的 COMMENT 而 rc=1
   ⇒ **完成条件 1 的"T7 三条 exit 0"仍不成立**（这一趟没有 exit 0，也不许说成 exit 0）；开工基线未取那一格仍**不可核**。
   AC 已勾数现量 **0**，不自行关闭 Goal。
+
+## 2026-10-12 18:4x · T2 最后一项的台账里那句"退役清扫零删除、无尺"是**我的探针造出来的假话**：函数与 5 条判据都在册，真正缺的只有调用方那一句（B175）
+
+- **失手的形状**：我那句"零删除"的现量命令是 `grep -rn "automationEntitlementClock" server/src` —— 它搜的是 **Prisma 委托名**，
+  而那枚清扫走的是**原始 SQL 的 `DELETE FROM "automation_entitlement_clocks"`**，委托名不出现在删除语句里 ⇒ 搜不到不等于没有。
+  正确的那把尺是**表名的 snake_case 与函数名两个方向各搜一次**：
+  `grep -rn "automation_entitlement_clocks" server/src` 命中 `server/src/automation/entitlement-ticket.ts:400`，
+  `grep -n "purgeRetiredAutomationEntitlementClocks" …` 命中定义在 `:394`。
+- **当前 HEAD 的现量**：判据 `server/tests/automation-clock-retirement.pglite.spec.ts` 在册（`git ls-files` 命中），单独跑
+  ⇒ `Test Files 1 passed (1)`／`Tests 5 passed (5)`／`SWEEP_RC=0`（真 PGlite 库，不是 mock）。
+  别线 `c5561959` 同一天也改过这枚文件，清扫函数没被碰掉。
+- **仍然开着的不是实现，是消费者**：`grep -rn "purgeRetiredAutomationEntitlementClocks" server/src` 只命中它自己那行 `export`
+  ⇒ **清扫永远不会自己发生**。要接的位置 `server/src/sync/cleanup.ts` 在白名单外（B175 里给了逐字可粘的那一段和不塞进 `api.ts` 的理由，此处不重复）。
+- 台账改动：矩阵 **C27** 的证据归属格按现量改写（保留带时点的更正写法），"尺"那一列没动；B175 追加一段 18:4x 复量。
+- 门禁重取（正文动过 ⇒ 必跑）：见紧随其后的那条对话输出；AC 已勾数现量 **0**，本节不改任何 AC 的闭合状态。

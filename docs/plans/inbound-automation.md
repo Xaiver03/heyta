@@ -1123,7 +1123,7 @@ AC-8 那一格此前的现状是**无产物**（复审表里唯一一处连尺�
 | C24 | W10 设备丢失、新设备加入、根密钥轮换 | node-host | 付费有效 | 密钥已轮换、新设备 | 旧队列事件的密钥不丢；跨轮换重包裹 worker 令牌与收件密钥；换钥后旧验证钥仍认既有凭据 | `packages/app-host/tests/inbound-key-store.spec.ts::「upgrades legacy records without losing queued-event keys」；packages/app-host/tests/inbound-secret-store.spec.ts::「re-wraps worker token and recipient key across a Vault root rotation」；server/tests/automation-commit-proof.spec.ts::「rotation keeps old verification keys; removing one invalidates only its proofs」` | 共享层本线已入库；"新设备真装出来并读到那条事件"需实机 ⇒ C30/C34 |
 | C25 | W11 提交许可与撤销的两种相反顺序 | server | 自托管带票 | 已绑定 | 票据在账号锁之后、第一笔不可逆写之前消费；业务回滚不烧 nonce；闸门只预检不开事务；只减不增的终态写排在授权之前 | `server/tests/inbound-entitlement-write-tx.spec.ts::「领取那一路：只减不增的终态写故意排在授权之前（保留义务不看权益）」；server/tests/integration/inbound-worker-identity.integration.spec.ts::「写事务回滚不烧 nonce：同一枚票据在业务恢复后仍能用，且只用一次」；server/tests/inbound-entitlement-write-tx.spec.ts::「闸门那一步即使带着合法票据也不开事务」` | 本线 T2；后半（许可先落盘、撤销后到）仍按既有许可语义取证 |
 | C26 | W12 换 keyId 后同事件重试与旧钥查询 | server | 自托管带票 | 已绑定 | 换钥后旧钥仍能验既有提交凭据；吊销清单合并只升不降；重放那一枚撞唯一约束判 USED | `server/tests/automation-commit-proof.spec.ts::「rotation keeps old verification keys; removing one invalidates only its proofs」；server/tests/automation-entitlement-issuer.spec.ts::「吊销清单：验签只认本部署配置的公钥，合并只升不降」；server/tests/inbound-ticket-rejection-route.spec.ts::「重放：nonce 已存在 ⇒ 402 + TICKET_USED（这一枚确实要撞唯一约束）」` | 本线；票据那一半有八臂反向验证 `research/tools/verify-inbound-ticket-teeth.py` |
-| C27 | W12 实例时钟回拨 | server | 自托管带票 | 时钟回拨 | 高水位高于库时钟即停止授权；消费侧被判过期/已用时报 retrying 而不是永久停住 | `server/tests/automation-entitlement-ticket.spec.ts::「stops authorizing when the installation clock rolls backwards」；server/tests/inbound-ticket-rejection-route.spec.ts::「时钟回拨：实例高水位高于数据库时钟 ⇒ 402 + CLOCK_ROLLBACK」；packages/app-host/tests/inbound-session-keepalive.spec.ts::「票据被自己的实例判过期/已用时报 retrying 而不是永久停住」` | 本线 T2；**实例退役清扫仍无尺**：`server/src` 里对 `automationEntitlementClock` 只有读与 upsert，零删除（现量 `grep -rn "automationEntitlementClock" server/src`） |
+| C27 | W12 实例时钟回拨 | server | 自托管带票 | 时钟回拨 | 高水位高于库时钟即停止授权；消费侧被判过期/已用时报 retrying 而不是永久停住 | `server/tests/automation-entitlement-ticket.spec.ts::「stops authorizing when the installation clock rolls backwards」；server/tests/inbound-ticket-rejection-route.spec.ts::「时钟回拨：实例高水位高于数据库时钟 ⇒ 402 + CLOCK_ROLLBACK」；packages/app-host/tests/inbound-session-keepalive.spec.ts::「票据被自己的实例判过期/已用时报 retrying 而不是永久停住」` | 本线 T2；🔴 **10-12 18:4x 现量更正**（作废上一句"退役清扫仍无尺、零删除"）：清扫函数在册（现量 `grep -n "purgeRetiredAutomationEntitlementClocks" server/src/automation/entitlement-ticket.ts` 命中一行），判据也在册（现量 `git ls-files server/tests/automation-clock-retirement.pglite.spec.ts` 命中，单独跑 `SWEEP_RC=0`、`Tests 5 passed (5)`，真 PGlite 库）。**这一格此刻真正缺的换了一件事**：全仓调用方现量为零（`grep -rn "purgeRetiredAutomationEntitlementClocks" server/src` 只有它那行 `export`），所以清扫写了、有人能测，但**永远不会自己发生** —— 消费者要落在每日任务 `server/src/sync/cleanup.ts`（白名单外），这一段的可粘形状与不塞进 `api.ts` 的理由都在 **B175**。 |
 | C28 | W13 date-only 与 start-only 的领域语义 | shared | 付费有效 | 已绑定 | 规则日历日不随处理日/时区漂；无效日期仍可编辑，修正后冻结为 date-only 并按当前钥封装 | `packages/domain/tests/inbound-local-date.spec.ts::「keeps the rule calendar day for today, grouping, urgency and display」；packages/app-host/tests/inbound-draft-review.spec.ts::「keeps invalid dates editable, then freezes corrected date-only values and seals to the current key」` | 本线（共享层）；界面展示与编辑往返那一半见 C29 |
 | C29 | W13 跨时区展示与编辑往返 | web | 付费有效 | 已绑定 | 亮暗、窄屏、中英三档下同一日期在列表/详情/编辑三处逐字一致 | 无尺 | 本线 T5：六枚落点此刻全是 `??`（未跟踪），且 HEAD 的 `apps/` 里代码层零接线（现量：`git status --porcelain -- apps/web/tests/`，以及 `git grep -l inbound HEAD -- apps/` 与 `git grep -l EntitlementTicket HEAD -- apps/` 各自只命中别线那两枚取证 JSON）。🔴 **05:5x 更正：上一轮写"入库这一格本线自己能做"是错的** —— 挂载面（`AiSettings.tsx` +6 行、`features/sync/store.ts` +3 行、`features/ai/route-explanation.ts` +1 行）在未提交且**白名单外**的文件里，那六枚即便入库也没有渲染入口；而 HEAD 又带着 **B129** 那道本线自造的编译红，"入库没让 HEAD 变更差"这句话现在取不了证 ⇒ 入库排在 B129 之后。🔴 **10-11 01:2x 现量更正**：B129 与 B130 都已由 `16da3ecb` 闭合（生产者进了 HEAD，登记已撤），所以这一格**只剩挂载面那一条**：`AiSettings.tsx` +6 行、`features/sync/store.ts` +3 行、`features/ai/route-explanation.ts` +1 行仍在未提交且白名单外 ⇒ 本线六枚即便入库也没有渲染入口。本线自造的那道编译红已不存在。 |
 | C30 | 无注入 当前产物 | web、android、ios、macos、windows、linux | 付费有效 | 已绑定、新设备 | 装出来的必须是当前源码产物：四端清旧包 → 重打 → 重装，每端一条判据 | 无尺 | 本线 T7：`pnpm check` / `-r test` / `reinstall:all` 在隔离副本过不去（B112 四处外接缝 + B126 两枚类型红），需负责人 A/B/C 拍板 |
@@ -3523,3 +3523,23 @@ AC-6 的界面挂载点（B140/B181）与 AC-8 的四端设备腿（B164）仍�
 🔴 本节不改任何 AC 的闭合状态：`已勾=0` 现量未变；AC-6 的界面挂载点（B140/B181）、AC-8 的四端设备腿（B164）仍按原登记开着；
 `pnpm check` / `pnpm -r test` 仍因 `packages/ai`／`packages/shared-schema` 那 6 条别线红与 `check:reachability` 的 COMMENT 而 rc=1
 ⇒ 完成条件 1 的"三条 exit 0"仍不成立，这一趟也确实没有拿到 exit 0。
+
+## 2026-10-12 18:4x · 矩阵 C27 那句"退役清扫零删除、无尺"是我自己的探针造的假话，按现量作废；这一格真正开着的只剩"没人调用它"
+
+写这句更正比写上一节更让人不舒服，因为**错的不是代码，是我取证的那把尺**。矩阵里那句"零删除"的现量命令是
+`grep -rn "automationEntitlementClock" server/src` —— 搜的是 Prisma 的**委托名**。而清扫函数
+`purgeRetiredAutomationEntitlementClocks`（`server/src/automation/entitlement-ticket.ts:394`）删这张表走的是**原始 SQL**
+（同文件 `:400` 的 `DELETE FROM "automation_entitlement_clocks" …`），委托名不会出现在删除语句里 ⇒ 我的搜索**结构性地看不见那一类写入**，
+却输出了一个否定结论。可复用的形状只有一句：**判一张表"没人写"要两个方向各搜一次——ORM 委托名 + 数据库表名的 snake_case**，
+只搜其一得出的"零"是探针的零，不是仓库的零。
+
+当前 HEAD 的三项现量：函数在册；判据在册（`server/tests/automation-clock-retirement.pglite.spec.ts`，
+单独跑 `Test Files 1 passed (1)`／`Tests 5 passed (5)`／`SWEEP_RC=0`，真 PGlite 库）；**调用方为零**
+（`grep -rn "purgeRetiredAutomationEntitlementClocks" server/src` 只命中那行 `export`）。
+所以 T2 这一格的实话是：**清扫写完了、能测、测得过，但它永远不会自己发生** —— 缺的是每日任务里的一句调用，
+而那枚文件 `server/src/sync/cleanup.ts` 在白名单外；逐字可粘的那一段、以及"为什么不塞进白名单内的 `api.ts`"
+（会把一次表级 DELETE 挂到请求路径上、并造出第二套节奏），都在 **B175**，本节不重复也不代裁。
+
+同一趟别线的 `c5561959` 也动过 `entitlement-ticket.ts`，清扫函数没被碰掉 —— 这也是本节重取而不是沿用 01:4x 读数的理由。
+矩阵里我只改了 C27 的证据归属格（写成带时点的更正，原句那两条"零删除／无尺"就此作废，不再被下游引用），**"尺"那一列一个字没动**：
+本线那三枚回拨用例仍在册。🔴 本节不改任何 AC 的闭合状态，`已勾=0` 现量未变。
