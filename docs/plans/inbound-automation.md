@@ -3071,5 +3071,29 @@ cd .worktrees/inb-t7/e2e && NO_COLOR=1 npx playwright test tests/admin-console.s
   这一格是**本线的 UX 缺陷**，与"要不要发这四枚请求"分开：请求本身是面板要渲染的数据，不发就显示不出状态。
 ⇒ 两条一起登记成 **B181**，含可直接粘的补丁形状。
 
+### 补：本线自己那枚 spec 在 `4193dabd` 的执行读数（把上面"未执行"那一格补上）
+
+链上那一趟走不到 `inbound-automation.spec.ts`，所以 AC-6 的界面腿只能单独取。命令与整段读数（同一枚隔离副本；
+`lsof` 先确认 `:4468` 空闲才跑 —— 配置里 `strictPort` + `reuseExistingServer: false`，不会顶掉别人的 dev server）：
+
+```
+cd .worktrees/inb-t7/e2e && NO_COLOR=1 npx playwright test --config playwright.inbound.config.ts --reporter=list
+  2 failed
+    [chromium] › tests/inbound-automation.spec.ts:8:3 › encrypted date draft review and Vault invalidation 1280
+    [chromium] › tests/inbound-automation.spec.ts:8:3 › encrypted date draft review and Vault invalidation 390
+  4 passed (2.2m)
+Error: locator.click: Test timeout of 60000ms exceeded.
+  waiting for getByTestId('inbound-event-date-draft').getByRole('button', { name: '查看并编辑草稿', exact: true })
+```
+
+- **基线判据过了两条**：总数 `6`（上一趟是 `4`：2 failed / 2 passed）⇒ 测试数只增不减；`skipped` 0。
+- **红的是同一枚已知缺陷**：正文与 19:0x 那次逐字相同（同一行 `spec.ts:85:69`、同一个 `查看并编辑草稿` 等不到），
+  归因链（分组只是 `hidden` 从不卸载 ⇒ 挂载期那次 `useEffect` 不会再跑；旋钮 `active` 的**两个挂载点都没传**）写在 **B140**。
+  ⇒ AC-6 这一格**继续不勾**，也**没有**因为"这次多跑过几条"就往完成的方向挪。
+- 🔴 **本线故意没做的**：在 `AiSettings.tsx:1262` / `App.tsx:3143` 补一句 `active={…}` 就能跑绿，但那两枚文件在地界外；
+  而仓库对这件事**已经有一个机制**（同屏的 `SyncSettingsPanel` / `PrivacyPanel` 都传 `active`）——
+  自造第二套可见性探测（`IntersectionObserver` / `closest('section[hidden]')`）正是 B140 第 3 点写明的不该做的事。
+  ⇒ 要拍的还是那一句：**谁**在那两个挂载点补这一行。
+
 **第 86 道要闭合的前置**（都不在本线地界内，只写清怎么量）：`workers: 1` × 383 条 × 每枚失败 60 s×2 ⇒ 整道**一小时内跑不完**；
 要么把装置的 `--timeout` 抬到实测所需（那是**判卷阈值**，须由链的主人拍），要么按族拆开跑。本线两种都不代改。

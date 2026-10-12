@@ -3696,3 +3696,10 @@ B173 就地追记一句：现在缺的**只有**那一行登记，不再有"文�
   - `403 ⇒ 后台一块都不渲染` ⇒ `除已登记缺失外不该有非 2xx：["/api/automation/rules","/api/automation/events",…]` = **本线造的**：`AiSettings.tsx:1270` 无条件挂载 → `InboundAutomationSettings.tsx:45` `active=true` → `:105` 挂载即 `refresh()` → `:88` 发 `list()+listEvents()` → 别线 `admin-console.spec.ts:700/:712` 那枚全局臂收到非 2xx。**与 B150 同族**：本线用例全绿，红在别人扫全局的臂上。
 - 🔴 状态更正（改掉上一节那句"不再占代码格"）：19 格里本线占**四**格 —— 三格红因在地界外（50=B171、74=B173、21/23=B172），**第 86 道那一格的代码在本线地界内**，但它要的不是改请求（那是面板要渲染的数据），而是**把"没买到资格"从"加载失败"里分出来** —— 卡在 B110 那枚中英词条还没进去，所以当场不能做（硬造会撞 `check:ui-language`）。两条出路 + 可直接粘的补丁形状都登记进 **B181**。
 - 本线没有动任何人的断言、阈值或 spec：`git diff HEAD --stat` 只有 `docs/plans/inbound-automation.md`、`PROGRESS.md`、`BLOCKED.md` 三份。
+
+## 2026-10-12 06:1x · AC-6 的界面腿在 `4193dabd` 补跑：**6 条（2 failed / 4 passed）**，红的仍是 B140 那一枚，一格不勾
+
+- 链上那趟走不到本线的 spec，所以单独取：`cd e2e && NO_COLOR=1 npx playwright test --config playwright.inbound.config.ts --reporter=list` ⇒ `2 failed / 4 passed (2.2m)`，正文 `waiting for getByTestId('inbound-event-date-draft').getByRole('button', { name: '查看并编辑草稿' })` 60 s 超时。
+- 基线：总数 `4 → 6`（只增不减）、`skipped` 0、零 mock 界面（route 桩只挡 HTTP）。红的与 10-10 那次逐字同一枚缺陷 ⇒ **AC-6 继续不勾**，没有因为"多跑过几条"就往完成挪。
+- 🔴 跑绿它只要一句 `active={…}`，落点却在 `AiSettings.tsx:1262` / `App.tsx:3143`（地界外），而仓库对"节可见性"**已有一个机制**（同屏 `SyncSettingsPanel`/`PrivacyPanel` 都传 `active`）⇒ 不自造第二套探测，等那一行由挂载点的归属方补（B140）。
+- 端口纪律：`:4468` 先 `lsof` 确认空闲才跑；配置本身 `strictPort` + `reuseExistingServer: false`，不会顶掉别人的 dev server。
