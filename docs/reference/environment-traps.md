@@ -9637,6 +9637,19 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     `grep -c 'styles2.checkboxOn : null' packages/ui/dist/index.js` = **3**、
     `grep -c 'style: \[styles2.checkbox, null\]'` = **0**、源码 `cmp` 与备份相同 ⇒ 用例 8/8 回绿。
 
+    ⚠️ **上面第一枚指纹本身是坏的，10-12 用它误报过一次红**（这次是探针的错，不是产品的错）：
+    `styles2` 是 **bundler 给 `styles` 改的局部名**，同一份产物里 `AuthForm` 的记住密码框、条款勾选框
+    各自也叫 `styles2.checkboxOn` —— 所以那个"3"数的是**三个不相干的组件**，它既不能证明同意面回来了，
+    也没在同意面真的坏了的时候报过红。而当天我按 `styles.checkboxOn`（源码里的名字）去数产物，读到 **0**，
+    差点判成"变异还住在产物里"。
+    ✅ **能用的指纹是形状，不是名字**：
+    `grep -c 'style: \[styles2\.checkbox, dontAskAgain ? styles2\.checkboxOn : null\]'` = **1**（正面，整段属性序列）
+    ＋ `grep -c 'style: \[styles2\.checkbox, null\]'` = **0**（反面，那一臂的坏形状），
+    再加结构性 token 各一枚（`titleHidden`、`share-consent-scopes`、`primary-active`）。
+    📌 **补一句一般规律**：**指纹要锚在"这段代码说的这件事"上，不能锚在标识符上** ——
+    压缩/改名工具恰恰会重命名标识符，任何拿变量名、类名、局部标签当证据的判据，
+    在产物那一层是**可被改名摧毁的**，而它坏的方式是"看起来数得出数"。
+
     📌 **一般规律**：**"还原"的作用对象是"被测系统"，不是"我改过的那个文件"**。
     凡是产物参与被测（`dist/`、bundle、`.deb`、APK、生成物），变异收尾就必须**两层各给一枚指纹**，
     并把"重建 + 再重量一次用例"算进还原这一步，而不是当成下一步。

@@ -686,7 +686,12 @@ package.json   (只加了一行 verify:collab-journey)
 **判据**：新增 `apps/web/tests/share-consent-modal-theme.spec.tsx` 8 条（暗 5 + 亮 1 + 标题 2）。
 六臂变异逐臂读数：A 取消也画实心→2 红；B 主按钮换一枚蓝→2 红；C 披露面退平→1 红；D 摘掉 `titleHidden`→1 红；
 E 勾选后不切实心→1 红；F 主按钮文字配对坏→1 红。还原后**两层各验一次**：源码 `cmp` 与备份相同，
-产物指纹 `grep -c 'styles2.checkboxOn : null' packages/ui/dist/index.js` = 3、臂形状 = 0。
+产物指纹按**形状**取（不是按标识符）：
+`grep -c 'style: \[styles2\.checkbox, dontAskAgain ? styles2\.checkboxOn : null\]' packages/ui/dist/index.js` = 1、
+`grep -c 'style: \[styles2\.checkbox, null\]'` = 0。
+🔴 这一节原来写的产物指纹是 `grep -c 'styles2.checkboxOn : null'` = 3，**那枚是坏尺**（10-12 用它误报过一次红）：
+`styles2` 是 bundler 给 `styles` 改的局部名，同一份产物里另外两个组件的勾选框也叫这个名字，
+那个"3"数的是三个不相干的地方 ⇒ 详见 §7 第 **410** 条的改口段。
 ⚠️ 为什么这里不用 `getComputedStyle`、为什么只认 `r-` 原子类、为什么按 `border-color` 读永远是空
 → §7 第 **411** 条（三个都是本轮实测，每一个的症状都是"用例红了而产品是对的"）。
 
