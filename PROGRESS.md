@@ -4020,3 +4020,23 @@ $ grep -rnE '\.(skip|todo)\(|\bxit\b|describe\.skip' <本线全部测试文件> 
 - **同一副本重建后重取的两腿**：`AC8_RC=0`、`CJS_RC=0`（确认不是产物问题）。
 - **不变**：AC 已勾数现量 **0**；AC-6 挂载面（B140/B181）、AC-8 四端设备腿（B164）仍开着；
   `pnpm check` / `pnpm -r test` 仍因别线那几格 rc=1 ⇒ 完成条件 1 三条 exit 0 仍不成立；开工基线未取那一格仍**不可核**。不自行关闭 Goal。
+
+## 2026-10-12 18:3x · T7 第二腿在**产物新鲜**的副本上重取：21 包全有读数，红只剩别线两包（`packages/ai` 5／`packages/shared-schema` 1）；`packages/legal` 已被别线修绿；`apps/web` 那 3 条当场判成**负载伪红**
+
+- **载体**：`.worktrees/inb-t8`，`CARRIER_HEAD=62f1066f`，与 `main` 只差我这两份台账（`git diff --name-only HEAD main` 现量两行）；
+  跟踪脏度空；重建后七包"源码比产物新"全 0。日志 `.run-logs/rtest-fresh.log`，全量原文 `.run-logs/rtest-fresh.out`。
+- **覆盖审计**：`Scope: 21 of 22 workspace projects`，逐包打印 `Test Files` 汇总的**正好 21 枚** ⇒ 没有哪个包被静默跳过。
+- **红集（这才是能引用的那份）**：`packages/ai` `5 failed | 260 passed`、`packages/shared-schema` `1 failed | 172 passed`；
+  `packages/legal` 这次 `76 passed` **零红**（同一条线那两枚红已由别线修掉，不记在本线名下）；
+  `apps/mobile` `965 passed`（上一腿那枚"全过却 `Errors 1`"的未处理拒绝**这一趟没复现**——我不把它说成已修好，只说这次没出现）；
+  `server` `2811 passed | 1 skipped`（那 1 条 skip 是 HEAD 里既有的 `tests/migration-sql.spec.ts`，不是本线那份）；
+  `packages/inbound-core` `47 passed`、`packages/app-host` `1779 passed`。
+- **`apps/web` 的 3 条红是负载伪红，判别做在前面不下结论**：读数上它是 `3 failed | 2276 passed | 13 skipped (2292)`，
+  三枚形状全是时间敏感（`calendar-sidebar.spec.tsx:236` 与 `:283` 各 `Test timed out in 5000ms`；
+  `reminder-wake.spec.tsx:333` 那句"还没到点就响了"跑的是**真定时器**）。同一副本同一 HEAD 单独重跑这两枚 spec
+  （`cd apps/web && ./node_modules/.bin/vitest run tests/calendar-sidebar.spec.tsx tests/reminder-wake.spec.tsx --maxWorkers=1`）
+  ⇒ `Test Files 2 passed (2)`、`Tests 24 passed (24)`、`RC=0`，而当时 `loadavg` 现量 `{136.90 187.72 117.71}`。
+  ⇒ **三条红是那趟 21 包并行 + 机上别的写入者把 5 秒门限挤爆**，不是代码坏了；本线在 `apps/web` 那 6 枚 inbound spec 全 ✓。
+- **仍然成立的两格未闭合**：`pnpm -r test` 与 `pnpm check` 因 `packages/ai`／`packages/shared-schema` 那 6 条与 `check:reachability` 的 COMMENT 而 rc=1
+  ⇒ **完成条件 1 的"T7 三条 exit 0"仍不成立**（这一趟没有 exit 0，也不许说成 exit 0）；开工基线未取那一格仍**不可核**。
+  AC 已勾数现量 **0**，不自行关闭 Goal。

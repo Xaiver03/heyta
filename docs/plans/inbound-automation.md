@@ -3495,3 +3495,31 @@ AC-6 的界面挂载点（B140/B181）与 AC-8 的四端设备腿（B164）仍�
 
 🔴 本节不改任何 AC 的闭合状态：`已勾=0` 现量未变；AC-6 的界面挂载点（B140/B181）、AC-8 的四端设备腿（B164）仍按原登记开着；
 `pnpm check` / `pnpm -r test` 仍因别线那几格 rc=1 ⇒ 完成条件 1 的"三条 exit 0"仍不成立。
+
+## 2026-10-12 18:3x · T7 第二腿重取（产物新鲜之后才有资格引用）：21 包全有读数，红只剩别线两包；`apps/web` 那 3 条按判别流程判成负载伪红
+
+上一节把"切基线不重建产物 ⇒ 应用层伪红"写成了规矩，这一节是它第一次被完整执行：载体 `.worktrees/inb-t8` 升到 `62f1066f`
+（与 `main` 只差两份台账，`git diff --name-only HEAD main` 现量），重建后七包"源码比产物新"计数全 0，才跑
+`pnpm -r --no-bail test`（日志 `.run-logs/rtest-fresh.log`，全量原文 `.run-logs/rtest-fresh.out`，`RC_RTEST=1`）。
+
+覆盖先审计再引用：`Scope: 21 of 22 workspace projects`，逐包打印 `Test Files` 汇总的行数现量 **21** ⇒ 没有包被静默跳过。
+可引用的红集是：**`packages/ai` `5 failed | 260 passed (265)`、`packages/shared-schema` `1 failed | 172 passed (173)`**。
+其余读数：`packages/legal` 这趟 `76 passed` 零红（那两枚别线的红当天已被别线修掉）；`server` `2811 passed | 1 skipped`
+（那 1 条 skip 是 HEAD 里既有的 `server/tests/migration-sql.spec.ts`，与本线无关）；`packages/inbound-core` `47 passed`；
+`packages/app-host` `1779 passed`；`apps/mobile` `965 passed` —— 上一腿那枚"用例全过却有 1 个未处理拒绝"这趟没复现，
+我只写"这趟没出现"，不写成"修好了"。
+
+**`apps/web` 报 `3 failed | 2276 passed | 13 skipped (2292)` 时我没有直接引用它**，因为三条的形状全是对时间敏感：
+`tests/calendar-sidebar.spec.tsx:236` 与 `:283` 各回 `Test timed out in 5000ms`，
+`tests/reminder-wake.spec.tsx:333` 那句断言是"还没到点就响了"，跑的正是**真定时器**。
+判别只做一件事——把这两枚 spec 在同一副本同一 HEAD 上单独重跑：
+`cd apps/web && ./node_modules/.bin/vitest run tests/calendar-sidebar.spec.tsx tests/reminder-wake.spec.tsx --maxWorkers=1`
+⇒ `Test Files 2 passed (2)`、`Tests 24 passed (24)`、`RC=0`；同一时刻 `sysctl -n vm.loadavg` 现量 `{136.90 187.72 117.71}`。
+结论只有一句：**这三条是那趟 21 个包并行（叠同机上别的写入者）把 5 秒门限挤爆造成的伪红，不是代码坏了。**
+本线自己那 6 枚 `apps/web` inbound spec（`inbound-cycle-display`／`inbound-draft-review`／`inbound-event-retry`／
+`inbound-panel-layout`／`inbound-upload-authorization`／`inbound-worker-lifecycle`）在同趟里全部 `✓`。
+可粘形状：引用并行 `-r test` 的红之前，先看失败的**形状**（超时／真定时器）再单独重跑那几枚；两件事都做完了才写进台账。
+
+🔴 本节不改任何 AC 的闭合状态：`已勾=0` 现量未变；AC-6 的界面挂载点（B140/B181）、AC-8 的四端设备腿（B164）仍按原登记开着；
+`pnpm check` / `pnpm -r test` 仍因 `packages/ai`／`packages/shared-schema` 那 6 条别线红与 `check:reachability` 的 COMMENT 而 rc=1
+⇒ 完成条件 1 的"三条 exit 0"仍不成立，这一趟也确实没有拿到 exit 0。
