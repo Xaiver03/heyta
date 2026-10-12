@@ -3152,3 +3152,99 @@ Error: locator.click: Test timeout of 60000ms exceeded.
 
 🔴 **这一格不能读成"T7 齐了"**：`TEST_RC=1` ⇒ 完成条件 1 里"三条命令 exit 0"这一条**仍不成立**，而且八条红的**红因全在本线地界外**，
 本线不代改别人的判据（同 B150/B181 的处理）。第 106 道（`reinstall:all`）另说。
+
+## 2026-10-12 08:2x–08:5x · T7 第四腿（四端重装）与第五端（Linux `.deb`）取证都在同一只隔离副本上跑完，两端全绿
+
+**载体与"读数算不算 HEAD 的"这条证明**：`.worktrees/inb-t8`（`worktree add --detach … 422db1b2`，起跑脏条目 0）。
+这一趟期间 main 被本线自己推进三笔，差集现量：
+
+```
+$ git diff --name-only 422db1b2 HEAD
+BLOCKED.md
+PROGRESS.md
+docs/plans/inbound-automation.md
+```
+
+⇒ **源文件字节零变化**（三枚都是台账/计划），所以"装上了当前源码的产物"这句话对 HEAD 成立，不只是对 `422db1b2` 成立。
+执行的那枚脚本也钉住：`REINSTALL_BLOB=46167227685128b0474224daf10c4eb7f66e88a9`（= `git rev-parse HEAD:scripts/reinstall-all.sh`）。
+
+**入口等价性**（现读 `package.json:167`，不是推断）：`"reinstall:all": "bash scripts/reinstall-all.sh"` ⇒
+启动器跑的就是 `IOS_DEVICE_NAME=heyta-iphone-17pro bash scripts/reinstall-all.sh`（**不带 `--only`**，四端全跑）。
+带 `IOS_DEVICE_NAME` 不是放宽判据：脚本默认名 `iPhone 17 Pro` 与本机两台已启动模拟器（`heyta-ios-isolated17` /
+`heyta-iphone-17pro`）**一个都不匹配**，而它那一格的行为是"多台不匹配 ⇒ 响亮失败、不猜"（§7 第 169 条那道修）——
+显式指名是把我这一端指向**我自己的**模拟器，另一台别线的设备全程没被 `simctl uninstall` 碰过。
+
+**宿主门**：`GATE_RC=0`（负载 12 ≤ 阈值 12、内存门 free 45%）。
+
+| 端 | 判决 | 一条读数 |
+|---|---|---|
+| mac | ✅ | `.app`+`.dmg` 重打、装入 `/Applications/Heyta.app`、**包内 `web-dist` 与本机 `apps/web/dist` 是同一次构建**（9 个 chunk）；安装副本自截屏 内容 74.6% / **主蓝命中 997** |
+| windows | ✅ | 源码包 432 M（清单 7920 条）→ 远端 tar **sha256 逐字相同** → 新鲜度对账 `web-dist/index.html=0f8fe9c2572ddf2b…`、`bridge=42f8e4cc3f13c6d3…`、`assets/*.js` 7 枚一致；远端 5 条判据全在位：`ADD_APPX=OK` / `RESULT=OK` / `PAYLOAD_WEBDIST=True` / `PAYLOAD_INDEX_SHA=0F8FE9C2572DDF2B…`（与本地那枚逐字同一串）/ `M2D=OK` |
+| android | ✅ | 远端 gradle 出 release APK → `emulator-5554` 全新安装 `Success`；截图 1080x2400、内容 56.1%、**主蓝命中 4042** |
+| ios | ✅ | `pod install` 把 `Podfile.lock` 改了 2 行（`hermes-engine` 那枚 checksum）⇒ **diff 已归档后 `git checkout --` 还原**，载体被跟踪脏回到 0；构建成功、"已装的包比源码新"、截图 1206x2622、内容 58.8%、**主蓝命中 4091** |
+
+汇总四端 `✅`、`REINSTALL_RC=0`。证据（**人打开看过**其中四张：mac 内嵌 WebView、android、ios、windows；
+第五张 mac 窗口级图脚本自己声明"本机常态 WebView 没合成进窗口，不据此判红"，所以它**不是**内容判据）：
+
+```
+heyta-reinstall-mac-installed.png            08:32:16   52 358 B  md5 9866bc83b55b133a9aa531c289d7f14e
+heyta-reinstall-mac-installed.png.webview    08:32:08  382 422 B  md5 6c77d5b6d59ba5b21f82f162c54a2c3e
+heyta-reinstall-android.png                  08:44:08  254 348 B  md5 238e2286a0e615ebe27e37b43e3e5978
+heyta-reinstall-ios.png                      08:50:28  553 516 B  md5 763dc59a714ffea187fc4e7fb0a18218
+dist/windows/packaged-first-run.png          08:38     147 410 B  （载体绝对路径，不在 /tmp）
+```
+
+四张 `/tmp` 那份已同时复制进 `.worktrees/inb-t8/.run-logs/evidence/`（共享路径会被别的会话覆写，看的是私有归档那一份）。
+**图上看到的**：四端都是同一套共享 UI（收集箱 + rail + 四象限 + 清单/标签 + 对话助手），首启弹的都是「在使用联网功能之前」
+同意面（主蓝「同意并联网」+「只用本机」），windows 那张还带着壳的身份菜单（登录账号 / 个人中心 / 应用设置）= `M2D=OK` 那一格。
+
+**第五端（Linux `.deb`）同一只副本上现打现验**：
+
+```
+$ bash apps/desktop-linux/scripts/package-deb.sh linux-dev-lan
+  ✅ heyta_1.0.0_amd64.deb 2012234 字节 / 包内 web-dist 条目: 30
+  ⚠️ 默认档起不来（bwrap: setting up uid map: Permission denied）⇒ 改跑无沙箱档取证   PKG_SANDBOX=off
+  壳侧: SHELL_UI=web-dist   页侧: M2_SETTLED_AFTER=2
+PKG_FRESHNESS=OK  PKG_FRESHNESS_INPACKAGE=OK  PKG_INDEX_SHA=0f8fe9c2572ddf2b…（与 windows 那趟的 PAYLOAD_INDEX_SHA 同一枚）
+PKG_PIXELS=OK PKG_BLUE_HITS=3987 PKG_SNAPSHOT=900x523   PKG_RESULT=OK    LINUX_DEB_RC=0
+```
+
+`dist/linux/packaged-first-run.png` 人也打开看过：同一套共享 UI + 同一张同意面。
+⚠️ 两格边界照 Linux 线原话留着，不包装：**沙箱那一档在这台载体上跑不起来**（`bwrap` 要权限，走的是无沙箱档），
+以及**装出来的 `.deb` 里那份共享 UI 产物的对账判据**仍是 Linux 线的 P4 那一格（本线只证到"包内那份 == 发起方那枚 index.html"）。
+
+🔴 **这一格证到哪、不证到哪**：它回答的是"五个端都装上了**这一批源码**的产物、起得来、画的是共享 UI"（AGENTS §6.1.1 的判据口径），
+**不回答**"自动收集的界面在四端可用"—— 后者仍开在 B140/B181（挂载点那一格）。
+`pnpm check` 那条链的第 106 道在这里由"整链里的一道"变成"单独取过读数的一趟"，
+所以链本身仍然因为上面那八条别线红而 `TEST_RC=1`。
+
+## 2026-10-12 08:4x–08:5x · T8 复账：15 枚本线装置在同一只隔离副本、同一枚 HEAD 上逐条复跑，读数与归属
+
+驱动脚本 `.worktrees/inb-t8/.run-logs/rerun-rigs.sh`（第二趟 `rerun-rigs-pass2.sh`），
+日志 `.run-logs/rigs.log` / `rigs.log.<名字>.out` / `rigs-pass2.log`。
+每条都是 `timeout <n> <命令>` 之后**立刻** `echo RC=$?`（§7 第 179/184 条：管道尾巴与 zsh 会吞码）。
+`CARRIER_HEAD=422db1b2…`（与上面第四腿同一枚；到 HEAD 的差集只有三枚台账/计划文件，源字节零变化）。
+
+| 装置 | rc | 自报读数 / 归因 |
+|---|---|---|
+| `verify-inbound-ac-ticks.py`（+ `--self-test`） | 0 / 0 | AC 勾选数 0、未勾 8，反向验证臂齐 |
+| `verify-inbound-doc-tables.py`（+ `--self-test`） | 0 / 0 | 登记表 ∪ 本线四份对账过，三臂自测过 |
+| `verify-inbound-commit-scope.py` | **1** | `越界=1` 点名 `79e8ede1`（**协作线**那笔只提了本线关键词、动的是它自己的计划文件）；装置自己那行写着 `命中段=desc 带本线独占路径=0` ⇒ 归属不是本线动作，口径那一格仍开在 **B169** |
+| `verify-inbound-cjs-require-order.py`（+ `--self-test`） | 0 / 0 | 六臂反向验证过 |
+| `verify-inbound-queue-teeth.py`（+ `--self-test`） | 0 / 0 | 全部臂 + 失配负面对照 |
+| `verify-inbound-quota-teeth.py`（+ `--self-test`） | 0 / 0 | 同上 |
+| `verify-inbound-ticket-teeth.py`（+ `--self-test`） | 0 / 0 | 同上 |
+| `verify-inbound-producer-seam.py`（+ `--self-test`） | 0 / 0 | 生产者缝对账过 |
+| `verify-inbound-api-slice.py` | **3** | 🔴 **不是失败**：它自己打印"本切片已落进 HEAD（`0b7ff357`）⇒ 入库工具退役，不再产出切片（退 3）"。`--self-test` 臂 rc=0 |
+| `verify-inbound-host-options-slice.py` | **3** | 同上（落进 HEAD 的是 `376d1bc9`），`--self-test` rc=0 |
+| `verify-inbound-worker-identity.py` | 0 | `Test Files 1 passed (1)` / **`Tests 46 passed (46)`**（任务书基线那句是 38/38 ⇒ **只增不减**成立），一次性 PG + loopback 临时库，跑完自停 |
+| `verify-inbound-dual-host.py` | 0 | **`Windows: 13/13`**、内层 `Tests 14 passed (14)`；逐档 PASS 含窗口 8 的六档、窗口 11 后半、真 `SIGKILL`、窗口 13 跨时区往返。日志 `~/.cache/heyta-inbound-rigs/dual-host-1012.log` |
+| `verify-inbound-dual-host.py --self-test` | 0 | 五臂反向验证（不碰库） |
+| `verify-inbound-plan-audit.ts`（两个时区各一次） | **1 / 1** | 🔴 断言 `assert.equal(dayCount, 0)` 现在拿到 **1** —— 这枚是**只读反例件**，它当初证的正是"带 `startDate`+`durationMinutes` 的任务在日/年视图里读不到"。现在日视图读得到了 ⇒ **被审计那条日历行为已被日历线改掉，反例的前提不再成立**。落点 `research/tools/verify-inbound-plan-audit.ts` 是 `.ts`，**不在本线白名单**（那张表只写 `verify-inbound-*.py`），且没有任何门禁消费它 ⇒ 登记 **B184**，本条不代改 |
+| `node research/tools/license-inventory.mjs` | 0 | 完成条件 2 点名那枚 |
+| `check-migrations` / `check-docs-voice` / `docs-link-check` | 0 / 0 / 0 | 死链与语气门复绿 |
+
+🔴 **这一格不勾任何 AC**（`grep -c '^- \[x\] \*\*AC-'` 现量仍是 0）。
+它改的是"读数新不新"，不改"缺不缺"：AC-3 的装置腿现在是**当前 HEAD + 隔离副本**的读数（原先那格挂的是 10-11 17:5x 在
+`1c166425` 载体上的一趟），AC-6 的界面挂载点、AC-8 的四端设备腿仍按 B140/B181/B164 开着。
+⚠️ 两处 `rc=3` 与一处 `rc=1`（`commit-scope`）**都不许读成"本线越界"**：前两处是工具自报的退役码，后一处点名的是别线那笔提及。

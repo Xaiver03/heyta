@@ -9776,3 +9776,51 @@ cd .worktrees/inb-t7/e2e && NO_COLOR=1 npx playwright test tests/admin-console.s
    （现在 `TICKET_INVALID` 只被"坏签名/错实例"两条覆盖，形状那一格零覆盖 —— B182 已现量）。
 3. 反向验证形状：把上限从 `63` 抬回 `127` ⇒ 那条 65 字节的用例转红；把首字符类放宽 ⇒ `'-evt'` 那半转红。
    只做第 2 步不做第 3 步的话，这条用例和它想替代的那份"没人守着的宽"没有区别。
+
+## B184（2026-10-12 09:0x，自动收集线 · T8 复账时撞上的）：审计反例件 `verify-inbound-plan-audit.ts` 的前提已被日历线改掉，而它**不在白名单里、也没有任何门禁消费**——所以"它现在必然红"这件事没人会知道
+
+**形状**：T8 把本线 15 枚装置在同一只隔离副本、同一枚 `CARRIER_HEAD` 上逐条复跑，只有这枚 `.ts` 反例件两个时区各退 **1**：
+
+```
+$ node .run-logs/plan-audit.cjs        # TZ=Asia/Shanghai 与 America/New_York 各一次，两次红在同一点
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+1 !== 0
+    at .../.run-logs/plan-audit.cjs:28866        ← 对应源文件第 33 行
+```
+
+源文件 `research/tools/verify-inbound-plan-audit.ts:25-34`（逐字，`git show HEAD:` 那份与工作树一致）：
+
+```ts
+const timestamp = Date.parse('2026-10-08T09:00:00+08:00');
+const task = { ...duplicate.tasks['task-a']!, startDate: timestamp, durationMinutes: 90 };
+const day = toLocalDate(timestamp);
+const monthCount = groupTasksByCalendarDate([task], day, day).get(day)?.length ?? 0;
+const buckets = calendarDayBuckets([task], day);
+const dayCount = buckets.allDay.length + buckets.hours.flat().length;
+const yearCount = groupTasksByDueDate([task]).get(day)?.length ?? 0;
+assert.equal(monthCount, 1);
+assert.equal(dayCount, 0);
+assert.equal(yearCount, 0);
+```
+
+**这不是回归，是反例的前提没了**：这枚件是 2026-10-07 独立计划审计留下的"可执行反例"，
+它当时证的正是"一条带 `startDate`+`durationMinutes` 的任务在**日视图**里读不到"（`dayCount === 0`）。
+现在日视图读得到了（实际值 `1`）⇒ 日历那条线把行为改成了审计建议的样子。
+同一趟里 `monthCount`、`yearCount`、`duplicate`、`shared` 那几条仍按原样成立（红只有 `dayCount` 一条）。
+
+**为什么这一格本线不代改**（三条都写清，不包装成"待办"）：
+1. 白名单那一栏写的是 `research/tools/verify-inbound-*.py`，这枚是 **`.ts`** ⇒ 严格讲不在地界内；
+2. 把断言从 `0` 改成 `1` 就是改它想证明的那件事，按死规矩（改判卷口径要记本台账）交回所有者；
+3. 它**不在 `pnpm check` 的链里**——现量：`grep -c 'plan-audit' package.json` = **0**、
+   `grep -rl 'plan-audit' scripts/` = **空**。也就是说它坏了没有任何一层会红，
+   正是任务书"凡是坏了没人会知道的判据，补一次反向验证"点名的那一类。
+
+**建议的处置**（归日历线或本线负责人，二选一，都不需要新机制）：
+- 要么把反例改成断言**现在的新行为**（`dayCount === 1`）并在文件头写明"这条反例已被哪一笔消解、留着当回归哨"，
+  它就从"审计快照"变成"防回退的尺"；
+- 要么把它并进一枚**能红**的门（形状照 `verify-inbound-cjs-require-order.py` 的自测臂），
+  否则下一次行为再漂，还是靠人复跑装置才发现。
+- 谁做都要跑的反向验证：把 `calendarDayBuckets` 里 `startDate` 那条分支摘掉 ⇒ 该件必须转红；还原 ⇒ 必须转绿。
+  **只改断言不做这一步，就是把尺改弯。**
+
+本线不动它；读数已如实记在 `docs/plans/inbound-automation.md` 文末「T8 复账」那一节的表里。

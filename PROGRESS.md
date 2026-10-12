@@ -3739,3 +3739,44 @@ B173 就地追记一句：现在缺的**只有**那一行登记，不再有"文�
   唯独票据 claims 那枚是 `{0,127}`（改前就如此）⇒ claims 层比协议上限宽一倍，且形状那一格**零用例覆盖**。
   落点在本线白名单内，本该当场改，但那枚文件正被别的会话写着（死规矩：不动别人在写的文件）⇒ 登记 + 给出改法与反向验证形状。
 - AC 勾选数仍是 **0**（`grep -c '^- \[x\] \*\*AC-'` = 0，未勾 8）。静态门复跑：`check-docs-voice` rc=0、`docs-link-check` rc=0。
+
+## 2026-10-12 08:3x · 第四腿开跑后先钉的两条口径：载体漂移用差集证明、非白名单脏条目数第一次有了可复跑的快照
+
+- 🔴 **载体漂移要在事后证明，不是事前避免**：`.worktrees/inb-t8` 起步在 `422db1b2`，而这一趟期间 main 被我推进了三笔。
+  差集现量 `git diff --name-only 422db1b2 HEAD` = `BLOCKED.md` / `PROGRESS.md` / `docs/plans/inbound-automation.md` 三枚、
+  全部是本线台账与计划 ⇒ **打包输入（`apps/*/src`、`packages/*`、`server/`）的字节与 HEAD 逐字相同**，
+  所以这一趟重装装的仍是当前源码的产物，只是记账 SHA 比载体新。判据（可复跑）：
+  `git diff --name-only <载体 HEAD> HEAD | grep -v '^docs/'` 只剩 `BLOCKED.md` + `PROGRESS.md`。
+- 计划那一行状态摘要按 §8 改口入库（`3bf4167f`，1 文件 6 增 1 删）：原文还停在"第二轮复审完成、基础批语义切片进行中"，
+  那是六个任务之前的摘要；新句把"当前拦路的是什么"写成三格可现量的东西，并写明 AC 一格都没勾、公网接收与售卖仍未开放。
+- **完成条件 2 那条"非白名单条目数与开工快照相同"没有开工快照**（当时没取，不假装取过）。现在的处置：
+  把**分类命令**钉成可复跑的形状，交付时如实报"只能证明'我没往非白名单路径写过任何一枚'，不能证明'总数没变'"：
+  按白名单正则表对 `git status --porcelain` 逐条分类（脚本在本文那段命令里，正则表照任务书白名单逐条展开）。
+  08:36 快照：总 **18** 条 = 白名单 **2**（`BLOCKED.md` 是别线追加的 B166/B167、`server/src/automation/entitlement-ticket.ts`
+  是别线正在写的那枚，两枚都不是我写的）+ 非白名单 **16**（全部属其他并行线）。
+- 第四腿（`reinstall:all` 四端）读数：**mac 段已绿**（`.app`+`.dmg` 打包、装入 `/Applications/Heyta.app`、
+  包内 `web-dist` 与本机 `apps/web/dist` 对账为同一次构建 9 个 chunk、安装副本自截屏内容 74.6% / 主蓝命中 997），
+  windows 段在传源码（432 M / 清单 7920 条）。这一格在 `REINSTALL_RC=` 出现前**不记完成**。
+
+## 2026-10-12 09:0x · 第四腿与第五端都取到读数（四端 `REINSTALL_RC=0` + Linux `PKG_RESULT=OK`），15 枚装置在同一枚 HEAD 上复账完
+
+- **四端全绿**：`REINSTALL_RC=0`，逐端一条判据（mac 主蓝 997 / windows 五条判据含 `M2D=OK` 且远端
+  `PAYLOAD_INDEX_SHA` 与本地 `web-dist/index.html` 的 sha256 逐字同一枚 / android 主蓝 4042 / ios 主蓝 4091 且"已装的包比源码新"）。
+  五枚证据图按 `*.png` + mtime + md5 记进计划文末那一节，其中四张**人打开看过**（都是同一套共享 UI + 首启同意面）。
+  iOS 段 `pod install` 改写了 `Podfile.lock`（`hermes-engine` 那枚 checksum，1 增 1 删）⇒ **diff 归档后 `git checkout --` 还原**，
+  载体被跟踪脏回到 0。
+- **第五端**：`bash apps/desktop-linux/scripts/package-deb.sh linux-dev-lan` ⇒ `LINUX_DEB_RC=0`、
+  `.deb 2 012 234 B`、包内 30 枚 web-dist 条目、`PKG_FRESHNESS=OK` + `PKG_FRESHNESS_INPACKAGE=OK`、
+  解包态真起窗口 `PKG_RESULT=OK`（`SHELL_UI=web-dist`、主蓝命中 3987）。沙箱那一档在这台载体上仍起不来
+  （`bwrap: setting up uid map: Permission denied` ⇒ 走无沙箱档，这是 Linux 线原有的边界，不新写判据）。
+- **15 枚装置复账**（同一只隔离副本、同一枚 `CARRIER_HEAD`）：全部 `--self-test` 臂 rc=0；
+  `worker-identity` `Tests 46 passed (46)`（任务书那句基线是 38/38 ⇒ 只增不减成立）；
+  `dual-host` 自报 **`Windows: 13/13`** + 内层 `Tests 14 passed (14)`；许可门 `license-inventory` rc=0、
+  `check-migrations` rc=0、`check-docs-voice` rc=0、`docs-link-check` rc=0。
+- 🔴 三处非零读数都归清了，**没有一处是本线代码坏**：
+  `api-slice` / `host-options-slice` 各退 **3** = 它们自己打印的"切片已落进 HEAD ⇒ 入库工具退役"（不是失败）；
+  `commit-scope` 退 1 点名 `79e8ede1` = **协作线**那笔只在正文提及本线关键词（装置那行自己写着 `带本线独占路径=0`），口径那一格仍开在 B169；
+  `plan-audit.ts` 两个时区各退 1 = 它当初证的"带 `startDate`+`durationMinutes` 的任务在日视图读不到"这条**前提已被日历线改掉**
+  （`dayCount` 由 0 变 1），而这枚 `.ts` 反例件**不在本线白名单**（表里只写 `verify-inbound-*.py`）且没有门禁消费它 ⇒ 登记 **B184**。
+- AC 勾选数仍 **0**（未勾 8）。T7 三条腿里 `pnpm check` / `pnpm -r test` 仍因八条别线红而 rc=1，
+  `reinstall:all` 这一条现在是 rc=0 —— 完成条件 1 里"三条命令 exit 0"这一条**仍不成立**，交付时如实报。
