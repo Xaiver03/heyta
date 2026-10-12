@@ -7,6 +7,15 @@
   ],
   "oldHits": [],
   "scrollAttempts": 0,
+  "englishLeg": {
+    "newHits": [
+      "This device remembers your choice, and it still applies after you reopen the app. Your home-screen widgets read the same preference."
+    ],
+    "oldHits": [],
+    "restoredZhHits": [
+      "这台设备会记住你的选择，重开应用仍然用它；系统小组件读同一份偏好。"
+    ]
+  },
   "panelTexts": [
     "返回",
     "常规",

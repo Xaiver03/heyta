@@ -12,6 +12,8 @@ from xml.etree import ElementTree as ET
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--serial', default='emulator-5554')
 parser.add_argument('--evidence-dir', type=Path, required=True)
+parser.add_argument('--english-leg', action='store_true',
+                    help='after the zh reading, switch to English through the product switch, read the note again, then restore zh')
 args = parser.parse_args()
 out = args.evidence_dir
 out.mkdir(parents=True, exist_ok=True)
@@ -19,6 +21,8 @@ serial = args.serial
 
 OLD = '选择只在本会话内生效'
 NEW = '这台设备会记住你的选择'
+OLD_EN = 'This choice lasts for the current session only'
+NEW_EN = 'This device remembers your choice'
 
 def adb(*a):
     return subprocess.run(['adb', '-s', serial, *a], capture_output=True, timeout=60, check=True).stdout
@@ -87,6 +91,27 @@ new_hits = [t for t in panel_texts if NEW in t]
 old_hits = [t for t in panel_texts if OLD in t]
 adb('exec-out', 'screencap', '-p')  # warm the transport before writing the real shot
 (out / 'language-panel.png').write_bytes(adb('exec-out', 'screencap', '-p'))
+def wait_for(needle, timeout=10.0):
+    deadline = time.time() + timeout
+    found = []
+    while time.time() < deadline:
+        found = [t for t in texts(tree()) if needle in t]
+        if found:
+            return found
+        time.sleep(0.4)
+    return found
+
+en_leg = None
+if args.english_leg:
+    tap('English')
+    en_new = wait_for(NEW_EN)
+    en_old = [t for t in texts(tree()) if OLD_EN in t]
+    (out / 'language-panel-en.png').write_bytes(adb('exec-out', 'screencap', '-p'))
+    tap('中文')
+    restored = wait_for(NEW)
+    (out / 'language-panel-restored-zh.png').write_bytes(adb('exec-out', 'screencap', '-p'))
+    en_leg = {'newHits': en_new, 'oldHits': en_old, 'restoredZhHits': restored}
+
 (out / 'readout.json').write_text(
     json.dumps({
         'serial': serial,
@@ -95,8 +120,15 @@ adb('exec-out', 'screencap', '-p')  # warm the transport before writing the real
         'newHits': new_hits,
         'oldHits': old_hits,
         'scrollAttempts': attempts,
+        'englishLeg': en_leg,
         'panelTexts': panel_texts,
     }, ensure_ascii=False, indent=2),
     encoding='utf-8')
-print(f'NEW on screen: {len(new_hits)}  OLD on screen: {len(old_hits)}', flush=True)
-sys.exit(0 if (new_hits and not old_hits) else 1)
+ok = bool(new_hits) and not old_hits
+if args.english_leg:
+    ok = ok and bool(en_leg['newHits']) and not en_leg['oldHits'] and bool(en_leg['restoredZhHits'])
+print(f'NEW on screen: {len(new_hits)}  OLD on screen: {len(old_hits)}'
+      + ('' if en_leg is None else
+         f'  | en NEW: {len(en_leg["newHits"])}  en OLD: {len(en_leg["oldHits"])}  zh restored: {len(en_leg["restoredZhHits"])}'),
+      flush=True)
+sys.exit(0 if ok else 1)

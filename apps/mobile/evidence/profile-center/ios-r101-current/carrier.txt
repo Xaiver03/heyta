@@ -1,0 +1,46 @@
+r101 iOS 语言面板文案读数 · 出处
+
+载体
+  隔离检出 ../heyta-wt-r99，detached @ dfeacee3（= 当时的 main）。
+  构建时被跟踪脏枚数 0 ⇒ 只含已提交内容。
+  ⚠️ 跑完 iOS 腿之后该载体有 1 枚被跟踪漂移：apps/mobile/ios/Podfile.lock（pod install 重写，与 HEAD 差 2 行）。
+     这是同一形状的第三次观测（r98 三枚 / r99 一枚 / r101 一枚）⇒ 结论仍是"会不会重写不是确定的"。
+
+构建与安装（scripts/reinstall-all.sh --only ios，日志 ~/heyta-r99-tmp/r101-ios.txt）
+  前置 pnpm -r build ✅
+  pod install：第 1 趟失败 ArgumentError - path name contains null byte，第 2 趟成功（非确定性，装置自己按设计重试并如实报告）
+  xcodebuild Release ✅（重打 JS bundle）→ 全新安装 ✅
+  ✅ 已装的包比源码新 —— 这一轮装的是当前产物
+  窗口 1206x2622 / 内容占比 58.8% / 主蓝命中 4091 ⇒ 是共享 UI
+  汇总自己列出：mac / windows / android 三端"不在 --only 范围 —— 这端没有验证当前产物"
+  （android 那一行读起来像红，但它是**这台装置**的口径：Android 的当前产物判据在 r100 那一格，见
+    ../android-r100-copy/carrier.txt，两格合起来才是"移动端两端都装了当前产物"。）
+
+装置
+  scripts/qa/profile-settings-ios.py（本线现成的 iOS 旅程，没有另造）
+  python3 scripts/qa/profile-settings-ios.py --udid FE195661-B021-4A71-AAD1-1F2F7AE3A102 \
+    --evidence-dir apps/mobile/evidence/profile-center/ios-r101-current
+  报告：settings-ia-journey.json，status=passed，24 步。
+
+读数（这一格只回答"那句说明装进了产物、渲染出来了没有"）
+  AX 树层：新句在报告里出现 2 次（第 7 步 open general、第 9 步 general back to directory 的 labels），
+           旧句 0 次。⚠️ 这是**观测**不是**断言** —— 旅程没把这句话写成判据，文案改回去那 24 步照样全绿；
+           守在文案那一侧的是 packages/i18n/tests/language-hint-copy.spec.ts（四臂实测能红）。
+  产物层（比"界面显示过"更硬的一档）：装出来的 Heyta.app/main.jsbundle 与
+    载体里那枚 APK 的 assets/index.android.bundle **都是 Hermes 字节码**（magic c6 1f bc 03），
+    按 UTF-16LE 搜中文、按 ASCII 搜英文，四枚针逐一对上：
+      zh 新句 iOS=1 Android=1 / zh 旧句 0/0 / en 新句 1/1 / en 旧句 0/0
+    ⇒ 旧句不在产物里，不是"界面上恰好没显示"。
+  main.jsbundle sha256 前缀 b0bb162fbec71a3754e1795f（10,291,998 B）
+
+人看图（§6.2 规定一）
+  general.png 已打开看过：常规面整面中文，语言卡标题下正是新那句（两行折行、无裁切），
+  下方「中文」实心蓝底选中 + English。
+  📌 同一张图顺带量到一条平台差异是活的：iOS 的"如何添加"小组件是 **4 步**
+     （长按桌面空白处，直到图标开始抖动 / 点左上角的「+」/ 搜索 Heyta 选一种尺寸 / 点「添加小组件」），
+     Android 那张是 **3 步**（长按桌面空白处 / 选「小部件」/ 找到 Heyta 长按并拖到桌面）。
+     两壳各说各的加法，不是同一份文案被截断。
+
+没证的
+  ① 英文态在 iOS 上的渲染（Android 那侧已用 --english-leg 证过；iOS 这趟全程中文态）。
+  ② 小组件卡片切语言后真的换了字（两端都只有代码路径 + 词条层判据，没有桌面级读数）。
