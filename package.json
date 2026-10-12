@@ -122,6 +122,7 @@
     "verify:macos-account-erasure": "bash scripts/verify-macos-account-erasure.sh",
     "verify:mobile-aed": "bash scripts/verify-mobile-aed.sh",
     "verify:mobile-reminder-ring": "bash scripts/verify-mobile-reminder-ring.sh",
+    "verify:mobile-organizer-confirm": "bash scripts/verify-mobile-organizer-confirm.sh",
     "verify:android-vault-storage": "bash scripts/verify-android-vault-storage.sh",
     "verify:vault-web": "node scripts/verify-vault-web-journey.mjs",
     "check:vault-diagnostics": "node scripts/check-vault-diagnostics.mjs",
