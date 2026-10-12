@@ -8178,6 +8178,13 @@ Error: locator.click: Test timeout of 60000ms exceeded.
 `App.tsx` 给 `<AiSettings …>` 传当前节是否 `settings-group-ai`，`AiSettings.tsx:1262` 再转给
 `<InboundAutomationSettings active={…} />`。两枚文件都不在本线地界 ⇒ 只登记不代改。
 
+**追记（2026-10-12 19:3x，本会话 · T5 已入库之后的独立复跑，逐字复现本条归因）**：整条 `playwright.inbound.config.ts`
+在 `daa5a75d` 上跑 = `2 failed / 6 passed`，红的仍是这两枚，红点仍在同一处（spec 第 85 行那一次**重进后**的点击），
+失败那一刻的 a11y 快照第 163-164 行仍是 `事件 date-draft` + `等待创建或同步` —— 与本条第 1 点写的同一对字。
+新增的旁证：本会话刚加的两枚跨时区用例（`inbound draft editor keeps the date-only literal and digest under …`）
+走的是**同一个挂载 + 同一次首取**，两枚都过 ⇒ 面板渲染与首取没问题，缺的确实只有"换回这一节时重取"那一格，
+本条第 2/3 点那句"分组只是 `hidden`、从不卸载 ⇒ `refresh` 不会再跑一次"是当前唯一的红因。
+`active = true` 那个默认值（组件第 45 行）也解释了为什么"没接 `active`"不影响首取、只影响换节。
 **要拍的**：① 授权本线接这一根线（只动这两枚文件里的这两个 JSX 调用点，改完复跑那 4 条），
 或 ② 交回 `apps/web` 设置面的所有者（姊妹面板那两枚已经这么接了，他们接本面板是同一件事的收尾）。
 判据不用新写：**这两条用例就是判据**，它们现在红着，接上就该绿。
