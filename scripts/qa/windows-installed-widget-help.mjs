@@ -100,6 +100,10 @@ function remote(stage) {
   const path = `C:\\src\\heyta-widget-help-${stage}.json`;
   const source = [
     '$ErrorActionPreference = "Stop"',
+    // 探针把 JSON 写成 UTF-8（带 BOM），`Get-Content -Raw` 解得对；**丢字符的是下一跳**：
+    // PowerShell 往 stdout 写时按控制台代码页重编码，中文标题就变成 `????????`（实测 2026-10-12）。
+    // URL 全 ASCII 所以判据不受影响，坏的是证据的可读性 —— 这里显式钉成无 BOM 的 UTF-8。
+    '[Console]::OutputEncoding = New-Object Text.UTF8Encoding($false)',
     `$stage = '${stage}'`,
     `$result = '${path}'`,
     'Remove-Item $result -Force -ErrorAction SilentlyContinue',
@@ -304,9 +308,26 @@ const result = {
   widget: widgetFacts,
   external: {
     expected: EXPECTED_HELP,
-    before: beforeBrowser.foreground,
-    after: afterBrowser.foreground,
-    evidence: 'Windows UI Automation foreground browser address-bar value',
+    // 🔴 判据读的是**全部浏览器窗口**，而 `foreground` 经常是别的东西（实测这一趟前台是
+    //    计划任务自己那枚 powershell 窗口）。把两者混在一个格子里印，会让下一个读报告的人
+    //    在 `✅` 旁边看到 `isBrowser:false` + 空 url 就判定这是假绿 —— 我自己在本趟就误判了一次。
+    //    所以这里必须把**真正满足断言的那一条**打出来，前景只当上下文。
+    matched: externalBrowser
+      ? {
+          isBrowser: externalBrowser.isBrowser,
+          title: externalBrowser.title,
+          url: externalBrowser.url,
+          tabCount: externalBrowser.tabCount,
+          hwnd: externalBrowser.hwnd,
+        }
+      : null,
+    foregroundBefore: beforeBrowser.foreground,
+    foregroundAfter: afterBrowser.foreground,
+    browserWindowCount: {
+      before: beforeBrowserRecords.length,
+      after: afterBrowserRecords.length,
+    },
+    evidence: 'Windows UI Automation 地址栏值（按全部浏览器窗口匹配，不依赖焦点）',
   },
   screenshots: ['windows-widget-native.png', 'windows-help-shell-unchanged.png'],
 };
