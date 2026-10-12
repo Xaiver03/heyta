@@ -739,6 +739,14 @@ export const en = {
   'web.trash.confirm.notErasure': 'This is not a physical erase: the operation log still holds this record — the app simply stops offering a restore.',
   // Same sentence as mobile.trash.confirm.projectTasks: deleting a list never cascades into its tasks.
   'web.trash.confirm.projectTasks': 'It still holds {count} task(s) — those will not be deleted.',
+  // 🔴 Deliberately a `common.` key (one sentence, one entry, both ends). The rows above are the
+  //   historical "each side keeps its own copy of the same sentence" shape; two copies of one sentence
+  //   means the next edit lands in one of them. This one names the only *irreversible* consequence in
+  //   this family of confirmations: purging the parent makes `restoreProject` throw, while these
+  //   sublists are NOT deleted — so they are in neither the sidebar (`toOrganizerTree` skips a branch
+  //   whose parent is gone) nor Trash (which only lists tombstones). The data survives and still syncs;
+  //   there is simply no entry point left to open it.
+  'common.trash.confirm.strandChildren': 'It also holds {count} sublist(s). Those lists are not deleted, but once this list is purged there is no entry point left anywhere in the app that can reach them — the sidebar builds levels from the parent, and Trash does not list them either.',
   'web.trash.confirm.habitLogs': 'Its check-in records are kept — restore the habit and the streak continues.',
   'web.trash.confirm.submit': 'Delete permanently',
   'web.trash.confirm.cancel': 'Cancel',

@@ -39,7 +39,7 @@ import {
   type TrashKind,
 } from '@heyta/domain';
 import { useI18n, type Locale } from '@heyta/i18n';
-import { entityLabelOf, HeytaUiProvider, TrashBoard } from '@heyta/ui';
+import { entityLabelOf, directChildCountsByProject, HeytaUiProvider, TrashBoard } from '@heyta/ui';
 
 import { useHabitStore } from '../habits/store.js';
 import { useNoteStore } from '../notes/store.js';
@@ -78,6 +78,12 @@ export function TrashView(): React.JSX.Element {
   const restoreHabit = useHabitStore((s) => s.restoreHabit);
   const purgeHabit = useHabitStore((s) => s.purgeHabit);
   const allTasks = useTaskStore((s) => s.entities.tasks);
+  /**
+   * 🔴 **活着的那一路清单**（可见 + 已归档，`listAllProjects()`），不是回收站那一路。
+   * 算"这条被删掉的清单底下还挂着几条子清单"要用它 —— 那些子清单**没有被删除**，
+   * 它们只在 `trashed` 里找不到，所以拿回收站那一路去数是恒 0。
+   */
+  const allProjects = useProjectStore((s) => s.projects);
 
   /**
    * 🔴 两路数据源**并一处、排一次序**，规则在共享层（`trash/model.ts`）。
@@ -160,6 +166,22 @@ export function TrashView(): React.JSX.Element {
   const affectedTasks =
     pending !== undefined && pending.kind === 'PROJECT'
       ? liveTaskCountOfProject(Object.values(allTasks), pending.id)
+      : 0;
+
+  /**
+   * "它下面还挂着 N 条子清单"里的那个 N —— **这一族确认里唯一不可逆的那件后果**。
+   *
+   * 🔴 父清单一旦被彻底删除，`restoreProject` 从此抛错，而那些子清单**本身没有被删除**：
+   *   侧栏按父级画层级（`toOrganizerTree` 对"父级不存在"整支不画），回收站只列带墓碑的，
+   *   于是它们**哪儿都不在** —— 数据还在、也照样同步、备份里也读得到，就是没有任何入口能打开它。
+   *   这一句以前一个字都没说，而"彻底删除"这个按钮恰好是唯一一次能警告的机会。
+   * ⚠️ 取数走 `@heyta/ui#directChildCountsByProject`（含归档、滤墓碑），
+   *   与侧栏删除确认那一句**同一个函数** —— 两端各数一遍迟早漂，漂了表现为
+   *   "侧栏说有 2 条子清单、回收站说没有"。
+   */
+  const strandedChildren =
+    pending !== undefined && pending.kind === 'PROJECT'
+      ? (directChildCountsByProject(allProjects)[pending.id] ?? 0)
       : 0;
 
   // 条目在确认框开着的时候被恢复（比如另一台设备同步过来）→ 自动关掉，
@@ -256,6 +278,16 @@ export function TrashView(): React.JSX.Element {
                     {pending.kind === 'PROJECT'
                       ? t('web.trash.confirm.projectTasks', { count: affectedTasks })
                       : t('web.trash.confirm.habitLogs')}
+                  </p>
+                )}
+                {/*
+                  🔴 第三句：**这条清单底下还挂着几条子清单，彻底删除之后它们在界面上再也找不到**。
+                  `strandedChildren === 0` 时整段不进 DOM（没有数字就不编一句话），
+                  所以"任务/便签那两类的确认框形状逐字不变"是可证的。
+                */}
+                {strandedChildren === 0 ? null : (
+                  <p className="ht-trash__dialog-text" data-testid="trash-confirm-children">
+                    {t('common.trash.confirm.strandChildren', { count: strandedChildren })}
                   </p>
                 )}
                 {/*

@@ -32,6 +32,7 @@ import {
   pendingPurge,
   purgeA11y,
   purgeConfirmCopy,
+  purgeStrandText,
   restoreA11y,
 } from '../src/lib/trash-display';
 // 徽标那张表在共享层：`lib/` 不能值引入 `@heyta/ui`（会把 react-native 拖进
@@ -191,6 +192,67 @@ describe('W4 影响面那一句（删容器不删内容，界面上要说得出�
   });
 });
 
+/**
+ * 🔴 这一族确认里**唯一不可逆**的那一句。
+ *
+ * 上面那两句说的都是"不会被删除"（任务、打卡记录、子清单本身都没被删），而这一句
+ * 说的是"**再也找不到**"：`purgeProject` 只追加 `purgedAt` 标记，从此 `restoreProject`
+ * 一律抛错，而那些子清单自己还是活着的 —— 侧栏按父级画层级（父级不在 ⇒ 整支不画），
+ * 回收站又只列带墓碑的。数据还在、照样同步、备份里读得到，界面上没有任何入口。
+ *
+ * 所以这句最坏的坏法是"恒不出现"，而恒不出现的现象与"这条清单本来就是叶子"
+ * 一模一样 —— 每条判据都配了正向对照，并且**中英各测一次**（en 表漏 key 时
+ * `translate` 会回落成 key 本身，只测中文看不出来）。
+ */
+describe('彻底删除清单的那第三句：子清单会永久失去入口', () => {
+  it('🔴 清单且真有子清单：中英都把条数带进去，且说出"没有入口能找到它们"', () => {
+    const zh = purgeStrandText(item({ kind: 'PROJECT' }), zhT, 2);
+    const en = purgeStrandText(item({ kind: 'PROJECT' }), enT, 2);
+
+    expect(zh).toContain('还挂着 2 条子清单');
+    expect(en?.toLowerCase()).toContain('2 sublist');
+    expect(zh).toContain('再也没有任何入口能找到它们');
+    expect(en).toContain('no entry point left');
+    // 那句必须同时说"它们没有被删除"，否则它会让人以为要连带丢数据，
+    // 而真正的问题恰恰是数据在、只是没有门。
+    expect(zh).toContain('它们没有被删除');
+  });
+
+  it('🔴 0 条 ⇒ undefined（不渲染"还挂着 0 条子清单"这种编出来的话）', () => {
+    expect(purgeStrandText(item({ kind: 'PROJECT' }), zhT, 0)).toBeUndefined();
+    // 正向对照：同一趟里 1 条必须有，不然上面那条只是函数整体坏了。
+    expect(purgeStrandText(item({ kind: 'PROJECT' }), zhT, 1)).toBeDefined();
+  });
+
+  it('🔴 只有清单这一类有：任务/便签/习惯都是 undefined，而它们各自的第二句照旧', () => {
+    for (const kind of ['TASK', 'NOTE', 'HABIT'] as const) {
+      expect(purgeStrandText(item({ kind }), zhT, 3)).toBeUndefined();
+    }
+    expect(purgeStrandText(item({ kind: 'PROJECT' }), zhT, 3)).toBeDefined();
+  });
+
+  it('中英同一份词条（common.*，不是各端一套）——两表都要有 {count} 占位', () => {
+    const zh = purgeStrandText(item({ kind: 'PROJECT' }), zhT, 7);
+    const en = purgeStrandText(item({ kind: 'PROJECT' }), enT, 7);
+    // 占位符没被插进去的话，界面上会印出字面量 `{count}` —— 两种语言都验一次。
+    expect(zh).toContain('7');
+    expect(en).toContain('7');
+    expect(zh).not.toContain('{count}');
+    expect(en).not.toContain('{count}');
+  });
+
+  it('purgeConfirmCopy：strands 同理 —— 传了才有那个键', () => {
+    const withStrand = purgeConfirmCopy('搬家', zhT, undefined, '还挂着 2 条子清单');
+    expect(withStrand.strands).toBe('还挂着 2 条子清单');
+    // impact 缺席时 strands 照样能单独在场（叶子清单没任务却有子清单，就是这一格）。
+    expect('impact' in withStrand).toBe(false);
+
+    const plain = purgeConfirmCopy('买牛奶', zhT);
+    expect(plain.strands).toBeUndefined();
+    expect('strands' in plain).toBe(false);
+  });
+});
+
 describe('W4 接线：四路都真的连着，且界面用到了影响面那一句', () => {
   const screen = readFileSync(new URL('../src/screens/TrashScreen.tsx', import.meta.url), 'utf8');
 
@@ -217,5 +279,21 @@ describe('W4 接线：四路都真的连着，且界面用到了影响面那一�
     // 界面上**用**到了它（只算不画 = 用户什么都看不见）。
     expect(screen).toContain('copy.impact === undefined ? null');
     expect(screen).toContain('{copy.impact}');
+  });
+
+  /**
+   * 🔴 第三句的取数**必须来自活着的那一路清单**。
+   *
+   * 这一格是这句判据存在的理由：`directChildCountsByProject` 滤掉墓碑（已删除的子清单
+   * 本来就在回收站里、看得见），而它的输入如果是 `listTrashedProjects()`（只有带墓碑的），
+   * 那么"活着的子清单"永远不在这份表里 ⇒ 计数恒 0 ⇒ 这句在最该出现的时候恒不出现。
+   * 症状与"这条清单本来就是叶子"**逐字相同**，而界面照样渲染、什么都不报错。
+   */
+  it('🔴 子清单那句的取数走 listAllProjects()，不是回收站那一路', () => {
+    expect(screen).toContain('purgeStrandText(');
+    expect(screen).toContain('directChildCountsByProject(projectActions.listAllProjects()');
+    expect(screen).not.toContain('directChildCountsByProject(projectActions.listTrashedProjects()');
+    expect(screen).toContain('copy.strands === undefined ? null');
+    expect(screen).toContain('{copy.strands}');
   });
 });
