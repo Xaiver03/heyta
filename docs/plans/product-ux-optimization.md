@@ -3227,5 +3227,42 @@ Android 那三下有读数（19:5x 那格），iOS / Windows / macOS 三个壳�
    ⇒ **一般形状**：任何"产物里含/不含某句"的判据，中英两侧要各按自己的编码口径搜；
    只按一种搜的那一侧**恒 0**，判据就退化成元规则二那种"永远通过的检查"。
 
+### 2026-10-13 02:0x：四端"装的是哪一枚提交"收成一张表（任务书第 4 步的最终口径），以及为什么只有 windows 没重跑
+
+**为什么要有这张表**：r99 那趟四端全绿之后，本线又提交了 `dfeacee3`（改了一枚词条 + 三处脚本）——
+于是"四端重装跑过了"这句话**从那一刻起就变成四句不同的话**。台账里各格只写了自己那一端，
+下一个读者要拼四格才知道全局。这张表就是那个全局，且每行都带"哪一枚提交 + 哪一条判据"。
+
+| 端 | 装的是 | 载体那一枚提交 | 判据（当场印出来的那行，不是我转述） |
+|---|---|---|---|
+| mac | **r102**（本笔新跑） | `dfeacee3`（隔离检出 `../heyta-wt-r99`，只含已提交内容） | `✅ 已安装到 /Applications/Heyta.app`、`✅ 安装对账：.app 里的 web-dist 与本机 apps/web/dist 是同一次构建（9 个 chunk）`、`窗口 2318x1508 / 内容占比 100.0% / 主蓝命中 997 —— 是共享 UI`、`MAC_RC=0` |
+| android | **r100** | `dfeacee3`（同一棵载体） | 设备 `pm path` 那枚 `base.apk` 的 `sha256sum` 与 APK **逐字相同**（`0a1a92dc…47bb`） |
+| ios | **r101** | `dfeacee3`（同一棵载体） | `✅ 已装的包比源码新 —— 这一轮装的是当前产物` + 全新安装 + 窗口 1206x2622 / 内容占比 58.8% / 主蓝 4091 |
+| windows | **仍是 r99** | `34f7742d` | 未重跑，见下面第二段 |
+
+人看图（§6.2 规定一）：r102 那张 `.webview.png` 已打开看过 —— 暗色收集箱 + 联网同意卡（「在使用联网功能之前」，主蓝按钮「同意并联网」）+ 右侧对话助手面板，与 r99 同一形状；
+证据入库在 `apps/web/evidence/ux-final-20261012/reinstall-r102-mac/`（四枚：两张图 + `.png.txt` 自述 + 链日志）。
+⚠️ 窗口那张 `.png` 仍**不能**当 UI 证据（r99 已把成因裁到"抓窗口时 WKWebView 没被合成进去"），判据读的是 `.webview.png` 那一枚 —— 这条口径没变。
+
+🔴 **只有 windows 没重跑，理由要说得经得起反驳，不能是"太麻烦"**：现量 `git diff --name-only 34f7742d..HEAD` 共 **105 枚**，
+剔掉 `docs/`、各端 `evidence/`、`.agents/` 之后只剩 **6 枚**：`e2e/live-site/live-help-link.spec.ts`、`package.json`、
+`packages/i18n/src/locales/{zh-CN,en}.ts`、`packages/i18n/tests/language-hint-copy.spec.ts`、`scripts/qa/profile-settings-android.py`。
+逐枚问"会不会进 windows 那个包"：测试与 e2e 与设备脚本**不进包**；`package.json` 那一枚差异现量是**加了一行 script 注册**
+（`verify:mobile-organizer-confirm`，`git diff 34f7742d..HEAD -- package.json` 只有那一个 `+`）；
+两表那枚改动的键 `mobile.profile.language.hint` 现量**只有 `apps/mobile/src/screens/SettingsScreen.tsx:542` 读它**。
+⇒ 会进 windows 包的差异 = 一条**没有任何 Windows 界面渲染**的字符串。
+⇒ 所以这一格是"**装了旧串、但旧串在 Windows 上不可达**"，不是"Windows 的当前产物已验收"。**要说区别**：
+前者是可复现的静态事实（上面那三条命令就能重取），后者要真跑那一腿。
+⚠️ 为什么没顺手跑：那一腿要走打包机 + 432M 源码包上传（r99 那趟它自己就 `scp: Connection closed` 过），
+跑一次的成本与"一条不可达字符串"的信息量不成比例 —— 但这是**我拍的**，不是不能跑；要字节级等于 HEAD，一条命令就够：
+`cd ../heyta-wt-r99 && HEYTA_REINSTALL_TMP_DIR=~/heyta-r99-tmp/win103 bash scripts/reinstall-all.sh --only windows`。
+
+📌 **一条装置形状，本笔撞实了**：`HEYTA_REINSTALL_TMP_DIR` 指到**不存在**的目录时，脚本按设计**拒绝开跑**并写明
+「先 mkdir -p，别让日志重定向以 No such file 收尾」（第一发我就撞在这，`MAC_RC` 那行根本没写出来）。
+⚠️ 但**包装层的退出码会骗人**：那一发后台任务通知报的是 "exit code 0"，因为我把 `echo "MAC_RC=$?"` 接在重定向后面 ——
+链的最后一步成功，整条链就"成功"。这正是本账与记忆里那条"只认整条链 exit"的同型事故，
+这次是**我自己**又撞一遍：以后后台跑重装，判据要取日志里那一行 `MAC_RC=`/`IOS_RC=`，**不取**任务通知的退出码。
+
+
 
 
