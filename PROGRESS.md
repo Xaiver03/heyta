@@ -4106,3 +4106,70 @@ $ grep -rnE '\.(skip|todo)\(|\bxit\b|describe\.skip' <本线全部测试文件> 
 
 **还欠的**：列表与详情两面的浏览器读数卡在 worker 链（B190）；亮暗/窄屏/中英那三档这一对也没跑，
 C29 尺列按 B169 口径保持 `无尺`（升不升由负责人拍）。**没有 push。**
+
+## 2026-10-12 20:3x · 19:2x 那句"列表与详情没有断言"当天就被我自己作废：组件层补上第三枚取证；B190 里"做不动"的成因我写粗了，改成"可驱动 + 两套前提"
+
+**做了什么**：`apps/web/tests/inbound-due-timezone.spec.tsx` —— 真 `DueBadge`（`mode="date"`）与真 `DueEditor`
+在 `Pacific/Kiritimati`／`Etc/GMT+12`／`UTC`／`Asia/Shanghai` 四档设备时区下各挂一遍，读三处：
+徽标 `12-31`、触发器 `12月31日`、月历里 `aria-selected="true"` 那格的无障碍名 `12月31日`。
+同一枚 epoch（`Date.UTC(2026,11,30,16)` = 规则时区 `Asia/Shanghai` 的 `2026-12-31` 零点）四面必须还是那一天。
+反向臂摘掉 `dueDateLocal` 后，`Etc/GMT+12` 那档徽标读成 `12-30`、选中格变 `12月30日`。
+
+**读数**（逐字）：`Tests 1 passed (1)` → 与本线另一枚 `inbound-draft-review.spec.tsx` 同跑
+`Test Files 2 passed (2) / Tests 5 passed (5)`；`pnpm --filter web typecheck` 无输出退出 0。
+
+**为什么这一族的牙不用改源码变异就成立**：正向四档与反向臂用的是**同一枚 epoch**，只差 `dueDateLocal`
+这一枚字段。谁把 `apps/web/src/features/tasks/DueEditor.tsx:134` 那句
+`task.dueDateLocal ?? toLocalDate(task.dueDate)` 的顺序读反，正向那四档当场一起红 —— 不需要我去碰白名单外的文件
+去做变异靶。另加两道探针防"属性没落到 DOM 上就安静空转"：月历格子数须 > 27、被选中的格子须**有且只有一格**。
+
+**我自己的两次红（同一条验收连败计数 2/3，第三次改成能到的那一层才绿）**：前两版按"编辑面那枚 ISO 日期输入框
+写着 `2026-12-31`"去找，`dateInputValues().length` 恒为 0，红的全是我自己的反空转探针。
+真形状是**编辑面根本没有日期 `<input>`** —— 共享 `DatePicker` 画月历格子
+（`packages/ui/src/date-picker/DatePicker.tsx:269-324`）。错因是把缝那一层的**字段名**当成了**界面形状**，
+没有先去读被钉的组件。已写进 B190 追记第 ③ 条。
+
+**台账改了什么**：
+- C29 格：作废"列表与详情那两面仍然没有断言"，换成三处读数 + 两道探针 + 反向臂的现量；这一格剩下的收窄成
+  ① 那两面的**浏览器**读数（组件层钉不到"徽标有没有被挂进行"）、② 亮暗/窄屏/中英三档这一维（这轮没碰，
+  三枚新取证全在 zh-CN 单档）。尺列仍 `无尺`。
+- 文末「未闭合的那几格」那条同步改。
+- **B190 追记**：那句"要做列表/详情得补三段桩"我把代价写小了。复核 worker 契约后：那条链在浏览器里**可驱动**
+  （`worker/register` → `events/claim` → `events/{id}/result` → `commit-permit`，客户端不校验票据，桩形状现成在
+  `packages/app-host/tests/inbound-process.spec.ts:14-40`），真门槛是**同时**搭 AI 路由 + web 侧密钥存储 + B140
+  那根 `active`，三样都在白名单外。⇒ 不是"不可达"，是"成本与不确定性"，A 路的重估口径写在追记里。
+
+**没做也不该我做的**：`packages/ui`、`apps/web/src/**` 一律没碰；`due-date-edit.spec.tsx` 那族既有判据零改动。
+**没有 push。**
+
+## 2026-10-12 23:5x · 这一笔撞上了别线一场**没收口的 merge**：提交落成旁支 ref `inbound-c29-tz`，`main` 一格没动；顺带量出对方暂存的那份 `TaskDetailCard.tsx` 编译不过（B192）
+
+**先说结论**：C29 那枚新取证**写完了、跑绿了、台账改完了**，但**没有进 `main`** ——
+`main` 上此刻有一场 21:40 起的 `Merge branch 'feat/detail-pane'` 停在"只差一句 `git commit`"，
+`git commit --only` 在这种状态下被 git 直接拒（`fatal: cannot do a partial commit during a merge.`）。
+
+**我的一个副作用，已撤**：按配方先 `git add` 那枚新 spec，add 完才撞上上面那句拒绝 —— 那枚文件当时**已经进了共享索引**
+（`git ls-files -s` 回 stage 0）。就那样放着，他们收口那笔会把本线的 spec 卷进**他们的提交**。
+⇒ `git restore --staged -- <该路径>`，现回 `??`，文件本体在位，索引里别线那 20 条目数没变（撤前撤后各数一次）。
+
+**为什么不硬推 `main`**：`merge --abort` 走 `reset --merge`，它按 **HEAD** 复位。
+在一场未收口的 merge 下把 `main` 往前挪，最坏情况会**冲掉别人已解好的三处冲突**。
+那风险不该由本线替另一条线承担 ⇒ 落成**旁支 ref**：临时索引（放 `.run-logs/`，用完删）以 `1a386d76` 的树为底、
+只叠本线四条落点，`commit-tree` 出父=`1a386d76` 的提交，挂 `refs/heads/inbound-c29-tz`。
+不碰共享索引、不碰工作树、不碰 `main`；撤掉只 `git update-ref -d`。并回来一条命令：`git merge --no-ff inbound-c29-tz`。
+⇒ 那四条落点在工作树里**仍是** ` M`/`??`，这是设计如此（内容已进对象库，覆写也捞得回来），不是漏做。详见 **B191** 追记。
+
+**这一轮新取的两条读数，归属都写清了**：
+- `pnpm --filter web typecheck`：25 条错**全在** `src/features/tasks/TaskDetailCard.tsx`（别线、未提交的 merge 内容），
+  对本线 spec `grep -c inbound` = **0**。⚠️ 我 23:2x 那次同命令是**干净的** —— 两次都对，**分别量的是两棵树**
+  （那枚文件 mtime `21:45`，紧跟 `MERGE_HEAD` 的 `21:40`；本线工作树被别线写过）。
+- `vitest run`（apps/web 全量 23:36）：`Test Files 37 failed | 142 passed | 1 skipped (180)`，
+  `Tests 3 failed | 1926 passed | 12 skipped (1941)`。那 37 枚"failed files"绝大多数是**同一条 transform 错误**
+  在 import 阶段打断的（`ERROR: Unexpected "🔴"`），不是本线的红。本线那枚不在失败名单，单跑两次 `Tests 1 passed (1)`。
+- **B192**（新登记，别线的）：他们**暂存着**的那份就是把一段注释正文插到了模块顶层、**少了 `/**` 开头**，
+  `HEAD` 那版是好的。⇒ 那笔 merge 一提交，`main` 上 `apps/web` 就多了 37 枚跑不起来的测试文件。
+  最小修法是在那行 `🔴 完成态…` 上面补一行 `/**`；**不许**用 `git checkout -- <该文件>`"复原"
+  —— 那会连他们同一枚文件里的功能改动（`statusLineStyle` + 完成态那句 UI）一起抹掉。
+
+**判据没动**：C29 尺列仍 `无尺`（B169 由负责人拍）；`grep -c '^- \[x\] \*\*AC-'` 现量 **0**；
+本线白名单外**一枚字节都没写**；**没有 push**。
