@@ -35,6 +35,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import shutil
 import subprocess
@@ -83,12 +84,31 @@ def tracked_ts(pkg):
     return sorted(x for x in p.stdout.splitlines() if x.endswith('.ts') and not x.endswith('.d.ts'))
 
 
+def tsc_argv(root, pkg):
+    """编译用的 tsc 必须**逐字指定**，不许走 `npx tsc`。
+
+    `npx` 会把包名当成"本地没装就去 registry 取"的候选：npm 推断 project 根的规则会跟着调用方的
+    环境漂（被 vitest 起时它把 global prefix 推成 `<repo>/server`，本地 `.bin/tsc` 就没被认出来），
+    而 registry 上真有一枚叫 `tsc` 的老包（2.0.4）⇒ 一次"编译器找不到"能变成一次**网络请求**，
+    读数是 rc=1 + `no YES option`，看着像产品坏了。门禁不许有这种随载体变的通道。
+    """
+    cands = [Path(root) / pkg / 'node_modules' / '.bin' / 'tsc', Path(root) / 'node_modules' / '.bin' / 'tsc',
+             REPO / pkg / 'node_modules' / '.bin' / 'tsc', REPO / 'node_modules' / '.bin' / 'tsc']
+    for c in cands:
+        if c.is_file() and os.access(c, os.X_OK):
+            return [str(c)], c
+    return None, cands
+
+
 def emit(pkg, cfg, outdir, src_root=None):
     # cfg 已经是"相对那棵树根"的那枚路径，所以 cwd 必须是那棵树的根。
     # 🔴 编译的必须是 **HEAD 的字节**：共享检出里工作树坐着别线在飞的改动，
     # 拿工作树编译会得到"当前恰好没这个形状"的假绿（本尺第一版就栽在这里）。
     root = Path(src_root) if src_root else REPO
-    p = run(['npx', '--no-install', 'tsc', '-p', cfg, '--outDir', str(outdir)], cwd=root)
+    argv, found = tsc_argv(root, pkg)
+    if argv is None:
+        return 127, '本地 tsc 不可解析，找过这几枚路径：' + ' | '.join(str(c) for c in found)
+    p = run([*argv, '-p', cfg, '--outDir', str(outdir)], cwd=root)
     return p.returncode, p.stdout + p.stderr
 
 
@@ -335,6 +355,25 @@ def self_test():
     finally:
         shutil.rmtree(outdir, ignore_errors=True)
 
+    # 编译器解析那一腿（2026-10-12 加）。原来这里走的是 `npx --no-install tsc`：npm 推断"本地装了没有"
+    # 会跟着调用方的环境漂，被 vitest 起时它把 global prefix 推成 `<repo>/server`、认不出本地 `.bin/tsc`，
+    # 于是**去 registry 取那枚叫 `tsc` 的老包（2.0.4）**，读数是 rc=1 + `no YES option` —— 长得像产品坏了。
+    # 一道门禁不该有一条随载体变、还能出网的路径。
+    argv, found = tsc_argv(REPO, 'server')
+    arm('静止：编译用的是逐字指定的本地 tsc，argv 里没有 npx',
+        argv is not None and 'npx' not in ' '.join(argv), str(found)[:160])
+    fake = Path(tempfile.mkdtemp(prefix='heyta-cjs-notsc-'))
+    real_repo = REPO
+    try:
+        # 兜底那两枚路径就在 REPO 里，所以只换 root 是证不出来的（第一版就这么写，臂当场红了 ——
+        # 它抓到的是"我这臂没测到声称的那件事"，不是产品坏）。要连 REPO 一起换成空树。
+        globals()['REPO'] = fake
+        a2, c2 = tsc_argv(fake, 'server')
+        arm('把四枚候选路径全拿掉 ⇒ 必须解析不到（返回 None，绝不退化成 npx 出网）', a2 is None, f'{a2} 候选={c2}')
+    finally:
+        globals()['REPO'] = real_repo
+        shutil.rmtree(fake, ignore_errors=True)
+
     # 真退出码那一腿走子进程（进程内 scan() 里没有 rc 这个词）：
     # 用上面那次静止 scan 的结果算"应有的码"，不重编译第二遍。
     expect = 2 if fatal else (0 if not hits else 1)
@@ -351,7 +390,7 @@ def self_test():
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument('--self-test', action='store_true', help='六臂反向验证')
+    ap.add_argument('--self-test', action='store_true', help='反向验证臂逐条自证（臂数由本装置自己打印，文档里不抄）')
     ap.add_argument('--outdir', help='产物输出目录（默认 mktemp，跑完删除）')
     args = ap.parse_args()
 
