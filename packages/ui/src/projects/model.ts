@@ -162,6 +162,34 @@ export function childProjects(
 }
 
 /**
+ * 每条清单**直接的子清单条数**（删除确认里那句"它下面还有几条子清单"）。
+ *
+ * 🔴 含**已归档**的子级，这一条是刻意的：默认视图里归档行本来就藏着，但宿主开着
+ * 「显示已归档」时它们看得见，而删掉父清单在这些视图里同样会把它们整支摘掉 ——
+ * 那是一条真实发生的后果，不许因为某一档里看不见就不数。
+ * ⚠️ 反过来，**已经进了回收站的那支不数**，而且这一条是这里自己筛的：
+ * `aliveProjects(projects, true)` 在 `includeArchived` 那一档就是**原样返回**
+ * （名字里的 "alive" 说的是归档，不是墓碑 —— 与 `childProjects` / `topLevelProjects`
+ * 同一个前置），所以宿主传进来的数组里如果躺着墓碑，它们会跟着进来。
+ * 那句确认说的是"删掉这条**会让几条子清单看不见**"，而已经在回收站里的那支
+ * 本来就已经不见了 —— 把它算进去等于当着一位用户的面夸大后果。
+ *
+ * ⚠️ 也别拿 `childProjects(projects, id)` 逐条数一遍顶替它：那个默认
+ * `includeArchived = false`，会少掉归档那一支 —— 同一个问题两种答案，
+ * 正是本仓库反复吃过的那类漂移。
+ */
+export function directChildCountsByProject(projects: readonly Project[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const project of aliveProjects(projects, true)) {
+    if (!isLive(project)) continue;
+    const parentId = project.parentId;
+    if (parentId === undefined) continue;
+    counts[parentId] = (counts[parentId] ?? 0) + 1;
+  }
+  return counts;
+}
+
+/**
  * 清单 → 可渲染的树（顶层 + 一层子级），**保持输入顺序**。
  *
  * ⚠️ 默认（不开 `includeArchived`）时，父 id 指向一条**已归档 / 不存在**的清单，
@@ -237,6 +265,26 @@ export function openTaskCounts(tasks: readonly Task[]): Record<string, number> {
   return counts;
 }
 
+/*
+ * 一次遍历算出**所有清单的影响面**（"删掉这条清单会让几条任务失去归属"）
+ * —— **不在这里**，请取 `@heyta/domain#liveTaskCountsByProject`。
+ *
+ * 🔴 原先这一刀就在本文件里，和本仓库另一枚同名的实现隔着一层包：
+ *   `trash-rows.ts` 那枚单条版（`liveTaskCountOfProject`）回答的是**同一个问题**
+ *   （回收站里"彻底删除"那句确认），两者口径逐字相同（`isLive` + `projectId` 命中）。
+ *   两份画法 = 两套裁决标准，而漂移的症状是"回收站说 3 条、侧栏说 1 条"，
+ *   用户会读成其中一端的数据坏了。现在单条版从批处理版取数，只剩一处规则。
+ *
+ * ⚠️ 唯一**留在本文件**的那枚清单计数是 `openTaskCounts`（行右侧的常驻数字），
+ *   它滤掉已完成，**不许**拿去填确认框：一条装满已完成任务的清单上，
+ *   它会当着用户的面说"里面没有任务"，而那些已完成的任务照样会留下一个
+ *   指向墓碑的 `projectId`（`project-actions.ts#removeProject` 只给 `PROJECT`
+ *   打墓碑，一条任务都不碰）。措辞由词条承担（`common.organizer.confirm.impactProjects`），
+ *   而且它必须说真话：那些任务之后仍然出现在「全部 / 今天 / 最近 7 天 / 日历 /
+ *   时间线」里（`@heyta/domain#task-filter` 的那几个分支不看 `projectId`），
+ *   只是行上的归属徽章会消失（见下面 `listNameFor`，查不到就返回 `null`，不猜）。
+ */
+
 /**
  * 这条任务**属于哪条清单**（行内归属徽章的文案）。
  *
@@ -253,8 +301,17 @@ export function openTaskCounts(tasks: readonly Task[]): Record<string, number> {
  *   一样"。那个理由不成立 —— 悬空 id 走下面那条分支给 `null`，两种状态在界面上
  *   本来就分得开（有徽章 / 没徽章），而"收集箱不出现在行上"却让 web 与移动端
  *   都和参照图不一致。**记下来是因为它差点被当成显然的事。**
- * - 查不到（悬空 id）→ `null`：**不猜**。清单被删掉时任务留在收集箱是
- *   `app-host` 的判断，这里不重复它 —— 所以也不给一个"看起来像收集箱"的徽章。
+ * - 查不到（悬空 id）→ `null`：**不猜**。
+ *   ⚠️ **这句原先是空头的**：它写的是"清单被删掉时任务留在收集箱是 `app-host`
+ *   的判断"，而 `project-actions.ts:321` 的 `removeProject` 只给 `PROJECT` 打一枚
+ *   墓碑，**没有任何一处代码**清任务的 `projectId` 或把它归进收集箱
+ *   （`packages/app-host/tests/project-actions.spec.ts:167-182` 那一条的用例名
+ *   写着"任务只是变成无清单"，而它第 181 行断言的恰恰是 `projectId` **仍然等于**
+ *   那条已删清单 —— 标题与断言互相矛盾，读标题会读出一个不存在的清理动作）。
+ *   界面上真实发生的两件事：这条任务**仍然出现**在「全部 / 今天 / 最近 7 天 /
+ *   日历 / 时间线」（`@heyta/domain#task-filter` 那几个分支不看 `projectId`），
+ *   而它行上的归属徽章**消失**。所以这里返回 `null`（不猜），而不是给一个
+ *   "看起来像收集箱"的徽章 —— 那种徽章会在用户读到它时说一件没发生过的事。
  * - 命中但 `name` 是空串 → `null`：一个没有字的徽章只是图标，
  *   而图标在行内没有无障碍名就是噪音。
  *

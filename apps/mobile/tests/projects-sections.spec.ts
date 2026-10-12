@@ -200,15 +200,33 @@ describe('W4b 标签删除确认：两端都接、且默认形态没被改动', 
     expect(read('apps/web/src/features/projects/ProjectsPanel.tsx')).toContain('liveTaskCountsByTag(');
   });
 
-  it('清单那一列**不传** confirmRemove（删了能捞，标签不能 —— 这是拍板的不对称）', () => {
-    expect(readScreen('ListsSection.tsx')).not.toContain('confirmRemove');
+  it('清单那一列**有后果才问**，标签那一列**永远问**（不对称的形状现在由代码承担）', () => {
+    const lists = readScreen('ListsSection.tsx');
+    // 清单进回收站 ⇒ 里面没任务、底下没子清单时仍然一键直删；
+    // 设备级判据 `scripts/verify-mobile-trash.sh` 第 6 步删的是一条**空清单**，
+    // 它必须继续绿 —— 所以这里钉的是"接了确认 + 带上了那一档闸门"，不是"永远问"。
+    expect(lists).toContain('confirmRemove:');
+    expect(lists, '漏了闸门 ⇒ 删空清单也要点两下，第 6 步那发点击会读成"没生效"').toContain(
+      'askOnlyWhenImpact',
+    );
+    // 🔴 标签**不许**跟着沾这个闸门：它不进回收站（§7.1 P-1），数字为 0 也得问，
+    //    而 6b 那一步的标签 fixture 数字恰好就是 0。
+    expect(readScreen('TagsSection.tsx'), '给标签加闸门会把 W4b 拦的那一下点击放回去').not.toContain(
+      'askOnlyWhenImpact',
+    );
   });
 
-  it('🔴 组件里 `onRemove(item)` 只有两个调用点：没确认文案时的直删、以及「确认删除」', () => {
+  it('🔴 组件里 `onRemove(item)` 只有两个调用点：没后果/没文案时的直删、以及「确认删除」', () => {
     const calls = component.match(/onRemove\(item\)/g) ?? [];
     expect(calls, `onRemove 有 ${calls.length} 个调用点，多出来的那一个不受确认挡`).toHaveLength(2);
-    // 直删那一条必须**被文案挡住**（不是"看起来在同一行"）。
-    expect(component).toContain('if (confirmLabels === undefined) {');
+    // 直删那一条必须**被条件挡住**（不是"看起来在同一行"）。两个条件各钉一段：
+    //   · `confirmLabels === undefined` —— 宿主没给确认文案 ⇒ 直删（标签不会走到这里）；
+    //   · `askOnlyWhenImpact === true && !hasConsequence` —— 给了文案但这行没后果 ⇒ 直删
+    //     （清单那一档；设备级判据 `verify-mobile-trash.sh` 第 6 步删的就是这一档）。
+    expect(component).toContain('confirmLabels === undefined');
+    expect(component, '闸门丢了 ⇒ 删一条空清单也要点两下，第 6 步那发点击会读成"没生效"').toContain(
+      'askOnlyWhenImpact === true && !hasConsequence',
+    );
     expect(component).toContain('setPendingRemove(item.id)');
   });
 

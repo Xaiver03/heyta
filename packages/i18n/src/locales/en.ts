@@ -3079,6 +3079,8 @@ export const en = {
   // recreate it" is also false — a new tag has a NEW id, those tasks do not re-attach.
   'common.organizer.confirm.ask': 'Delete "{name}"?',
   'common.organizer.confirm.impactTags': 'It is on {count} task(s). Those tasks will not be deleted — they just lose this tag.',
+  'common.organizer.confirm.impactProjects': 'It holds {count} task(s). Those tasks will not be deleted — they just stop belonging to any list.',
+  'common.organizer.confirm.impactChildren': 'It also holds {count} sublist(s). Those lists are not deleted, but they disappear from the sidebar; restore this list from Trash and they come back.',
   'common.organizer.confirm.delete': 'Confirm deletion',
   'common.organizer.confirm.cancel': 'Cancel deletion',
   'common.habits.rename.button': 'Rename habit "{name}"',

@@ -1272,3 +1272,12 @@ export { AssistantMark } from './ai/AssistantMark.js';
    🔴 它透过 useHeytaTokens / useHeytaText 取 token ⇒ 宿主必须挂在
    <HeytaUiProvider> 之内，已登记进 scripts/check-ui-provider.mjs 的 PROVIDER_DEPENDENT。 */
 export { AiGeneratedLabel, type AiGeneratedLabelProps } from './ai/AiGeneratedLabel.js';
+
+/* 清单删除确认的第二句后果的取数：删一条**文件夹**时，它底下的子清单会整支
+   从侧栏消失（`toOrganizerTree` 的已知取舍，见 `./projects/model.ts` 那里的注释）。
+   🔴 确认框的**第一句**（里面还有几条活任务）不在本包转出 —— 那是
+   `@heyta/domain#liveTaskCountsByProject`，与回收站"彻底删除"那句
+   （`liveTaskCountOfProject`）同一个口径、同一处规则；本包原先有一份逐字
+   相同的副本，已删（两份画法 = 两套裁决标准，漂移表现为两端数字对不上）。
+   这一枚留在本包是因为它数的是 `Project` 的**父子关系**，那一层归共享 UI 层。 */
+export { directChildCountsByProject } from './projects/model.js';

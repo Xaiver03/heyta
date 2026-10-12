@@ -103,6 +103,33 @@ export interface TrashSources {
 }
 
 /**
+ * **所有清单**各自装着几条活的任务（一次遍历出整张表）。
+ *
+ * 🔴 它和下面那枚单条版是**同一个口径的两个形状**，不是两套规则 —— 单条版现在
+ *   就是从这里取数。理由与本仓库反复吃过的那条一致：同一个事实有两种画法时，
+ *   改一处忘另一处不会让任何测试变红，而症状是"回收站的确认框说 3 条、
+ *   侧栏的确认框说 1 条"（用户会当成其中一端数据坏了）。
+ *
+ * ⚠️ 侧栏的删除确认**不许**拿 `openTaskCounts`（@heyta/ui）顶替这一枚：那个数
+ *   滤掉了已完成，回答的是"这条清单里还看得见几条待办"，而这里回答的是
+ *   "删掉这条清单会让几条任务失去归属" —— 已完成的那几条照样会指着一条
+ *   已经不存在的 `projectId`（`project-actions.ts#removeProject` 只给 `PROJECT`
+ *   打墓碑，一条任务都不碰）。
+ *
+ * @returns 只给**至少装着一条活任务**的清单建键；其余是 `undefined`（不是 0）。
+ *   调用方按"`> 0` 才渲染那句影响面"消费 —— 没有数字就不编一句话。
+ */
+export function liveTaskCountsByProject(tasks: readonly Task[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const task of tasks) {
+    const projectId = task.projectId;
+    if (projectId === undefined || !isLive(task)) continue;
+    counts[projectId] = (counts[projectId] ?? 0) + 1;
+  }
+  return counts;
+}
+
+/**
  * 一条（躺在回收站里的）清单**现在装着几条活的任务**。
  *
  * 🔴 这句要出现在"彻底删除这条清单"的确认框里（W4 / P-1）：删清单**不级联删任务**
@@ -111,9 +138,12 @@ export interface TrashSources {
  *
  * ⚠️ 数的是**活的任务**（{@link isLive}）：已删除与已彻底删除的都不算。
  *   用 `!inTrash()` 数会把已彻底删除的那几条算进来（它不在回收站、但也不活着）。
+ * ⚠️ 同一句后果还差**另一种**（删掉父清单会让底下的子清单整支从侧栏消失），
+ *   那一枚的取数在 `@heyta/ui#directChildCountsByProject`，不在这里 ——
+ *   它数的是 `Project` 的父子关系，而那一层归共享 UI 层。
  */
 export function liveTaskCountOfProject(tasks: readonly Task[], projectId: string): number {
-  return tasks.filter((task) => task.projectId === projectId && isLive(task)).length;
+  return liveTaskCountsByProject(tasks)[projectId] ?? 0;
 }
 
 /** 只收"确实带着 `deletedAt`"的那一条 —— 由 {@link inTrash} 的谓词保证。 */

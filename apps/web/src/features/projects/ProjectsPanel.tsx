@@ -50,10 +50,15 @@ import { ICON_SIZE } from '@heyta/design-system';
 import { useEffect, useMemo, useState } from 'react';
 import { cssVar } from '@heyta/design-system';
 import { useI18n, type MessageKey } from '@heyta/i18n';
-import { folderTargetsFor, parseCategorySlot } from '@heyta/domain';
+import {
+  folderTargetsFor,
+  liveTaskCountsByProject,
+  parseCategorySlot,
+} from '@heyta/domain';
 import { Archive, Folder, Plus, Tag as TagIcon, UserPlus } from 'lucide-react';
 import {
   archivedProjects,
+  directChildCountsByProject,
   FolderPicker,
   folderRejectionMessageKey,
   HeytaUiProvider,
@@ -159,6 +164,29 @@ export function ProjectsPanel({
     [tasks.entities.tasks],
   );
   /**
+   * 清单删除确认里的**两句**后果（与标签那节同一条纪律，`tagRemoveImpact` 是它的先例）。
+   *
+   * ⚠️ 两个数的**所有者不同**，各按自己那层归处取：任务那半在
+   *    `@heyta/domain#liveTaskCountsByProject`（与回收站"彻底删除"那句
+   *    `liveTaskCountOfProject` 同一个口径），子清单那半在
+   *    `@heyta/ui#directChildCountsByProject`（父子关系归共享 UI 层）。
+   *
+   * 🔴 两个数都**不是** `counts` 换名字：`counts` 滤掉了已完成，而确认框必须含 ——
+   * 一条装满已完成任务的清单，删它照样会让那些任务失去归属，用 `counts` 顶替
+   * 就会当着用户的面说"里面没有任务"。
+   * ⚠️ 第二个数是**另一种后果**，不是同件事的补充：删一条文件夹时它底下的子清单
+   * 会整支从侧栏消失（`toOrganizerTree` 对孤儿子级的取舍）。只报任务条数的确认框
+   * 在一条装着三条子清单的文件夹上会说"里面没有任务" —— 数字没撒谎，后果撒了。
+   */
+  const projectRemoveImpact = useMemo(
+    () => liveTaskCountsByProject(Object.values(tasks.entities.tasks)),
+    [tasks.entities.tasks],
+  );
+  const projectChildImpact = useMemo(
+    () => directChildCountsByProject(projects.projects),
+    [projects.projects],
+  );
+  /**
    * 标签那一节**此前一个计数都没有**（`OrganizerList` 的 `counts` 是可选项，
    * 清单传了、标签没传）。滴答清单的侧栏每一行右侧都有数字，而我们连取数都不存在 ——
    * 缺口不在"把数字挪位置"，在"这个数字根本没被算出来"（台账 R6）。
@@ -243,6 +271,9 @@ export function ProjectsPanel({
             kind="project"
             items={tree}
             counts={counts}
+            removeImpact={projectRemoveImpact}
+            childRemoveImpact={projectChildImpact}
+            askOnlyWhenImpact
             labels={{
               removeLabel: (name) => t('web.projects.delete', { name }),
               rename: {
@@ -253,6 +284,19 @@ export function ProjectsPanel({
               archive: {
                 button: (name) => t('common.organizer.archive.button', { name }),
                 unarchive: (name) => t('common.organizer.archive.unarchive', { name }),
+              },
+              /*
+                清单**进回收站**（`TRASH_KINDS` 含 PROJECT），所以删除不是终局 ——
+                但"一次点击就写 op"仍然是错的：这条清单里可能躺着几十条任务、
+                底下还挂着子清单。确认这一档住在共享 `OrganizerList` 里（与标签同一份），
+                两句后果的措辞各自对应一个数，`<= 0` 就不画（宁可少说一句，不编一句假的）。
+              */
+              confirmRemove: {
+                ask: (name) => t('common.organizer.confirm.ask', { name }),
+                impact: (count) => t('common.organizer.confirm.impactProjects', { count }),
+                impactChildren: (count) => t('common.organizer.confirm.impactChildren', { count }),
+                confirm: t('common.organizer.confirm.delete'),
+                cancel: t('common.organizer.confirm.cancel'),
               },
               // 空态此前**根本没接线**（共享层注释写着"宿主不传就什么都不渲染"），
               // 于是侧栏里一块空白被当成"这个功能没东西"。词条与移动端同一套

@@ -31,6 +31,7 @@ import { describe, expect, it } from 'vitest';
 import {
   NOTE_EXCERPT_LENGTH,
   liveTaskCountOfProject,
+  liveTaskCountsByProject,
   noteExcerpt,
   toTrashItems,
   type Habit,
@@ -288,6 +289,53 @@ describe('liveTaskCountOfProject（确认框那句「里面还有 N 条任务」
     const tasks: Task[] = [task('t-1', { projectId: 'p-1' }), task('t-2', { projectId: 'p-2' }), task('t-3')];
     expect(liveTaskCountOfProject(tasks, 'p-1')).toBe(1);
     expect(liveTaskCountOfProject(tasks, 'p-9')).toBe(0);
+  });
+});
+
+/**
+ * 批处理版：侧栏删除确认一次要**整张表**（每行一个数字），而单条版逐行调用会把
+ * 复杂度推回 O(清单 × 任务) —— 迁移前 web 的 `countIn` 就是这个形状。
+ *
+ * 🔴 这一整节存在的理由是"同一件事只有一套规则"：确认框那句在**两个地方**要
+ *   （回收站的"彻底删除"与侧栏的"删除"），而它们必须报同一个数。
+ *   `packages/ui` 里曾有第二份逐字相同的画法，已删；下面那条逐键对账就是
+ *   挡它回来的东西 —— 谁再另写一份，只要口径差一点这里就红。
+ */
+describe('liveTaskCountsByProject：整张表，且与单条版逐键同口径', () => {
+  const tasks: Task[] = [
+    task('t-1', { projectId: 'p-1' }),
+    task('t-2', { projectId: 'p-1', completedAt: T0 }),
+    task('t-3', { projectId: 'p-1', deletedAt: T0 - 1 }),
+    task('t-4', { projectId: 'p-1', deletedAt: T0 - 2, purgedAt: T0 - 3 }),
+    task('t-5', { projectId: 'p-2', completedAt: T0 }),
+    task('t-6'),
+  ];
+
+  it('p-1 只数活着的那 2 条（墓碑与已彻底删除都不算），p-2 那条已完成的算 1', () => {
+    const table = liveTaskCountsByProject(tasks);
+    expect(table['p-1']).toBe(2);
+    expect(table['p-2']).toBe(1);
+  });
+
+  it('至少有一条活任务的清单才建键：p-3（没有任务）与无清单任务都是缺键，不是 0', () => {
+    const table = liveTaskCountsByProject(tasks);
+    expect(table['p-3']).toBeUndefined();
+    expect(Object.keys(table)).toEqual(['p-1', 'p-2']);
+  });
+
+  it('🔴 逐键对账：表里每个键都等于单条版的读数，表里没有的键单条版给 0', () => {
+    const table = liveTaskCountsByProject(tasks);
+    for (const [projectId, count] of Object.entries(table)) {
+      expect(liveTaskCountOfProject(tasks, projectId), projectId).toBe(count);
+    }
+    for (const projectId of ['p-3', 'p-9']) {
+      expect(table[projectId], projectId).toBeUndefined();
+      expect(liveTaskCountOfProject(tasks, projectId), projectId).toBe(0);
+    }
+  });
+
+  it('空输入给空表（宿主拿到 `{}` 时那句影响面就不该渲染）', () => {
+    expect(liveTaskCountsByProject([])).toEqual({});
   });
 });
 

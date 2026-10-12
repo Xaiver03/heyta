@@ -226,10 +226,13 @@ describe('C/D 清单：点一行报给宿主，删除走 action', () => {
     expect(selected).toEqual([{ kind: 'project', projectId: 'p1a' }]);
   });
 
-  it('删除按钮 → 调宿主的 `deleteProject`，且**不**触发 onFilterWith', () => {
+  it('删除要**两步**：第一下只出确认行，第二下才调宿主的 `deleteProject`，且全程不触发 onFilterWith', () => {
     seed();
     const view = render();
     click(byTestId(view, 'project-p1-remove'));
+    expect(actions.deleteProject, '一次点击就写 op —— 这条清单底下还挂着子清单').not.toHaveBeenCalled();
+    expect(byTestId(view, 'project-p1-confirm'), '确认行没出现').not.toBeNull();
+    click(byTestId(view, 'project-p1-confirm-yes'));
     expect(actions.deleteProject).toHaveBeenCalledWith('p1');
     expect(selected).toEqual([]);
   });
@@ -869,11 +872,96 @@ describe('W4b 标签删除确认：一次点击不许写 op', () => {
     expect(actions.deleteTag).not.toHaveBeenCalled();
   });
 
-  it('清单行**不受影响**：仍然一次点击直接删，且没有确认行（默认形态逐字相同）', () => {
+  /**
+   * 🔴 这一条**改过**（原话是"清单行不受影响：仍然一次点击直接删，且没有确认行
+   * （默认形态逐字相同）"，用的是 p1「工作」）。那句钉的是**当时的接线状态**，
+   * 而它旁边那句理由（"清单删了能捞回来"）是真的 —— 所以新规则把它**保留成
+   * 零后果那一档**，只把有后果的那一半改成要问：
+   *
+   *   · 标签不进回收站 ⇒ **永远**问，数字为 0 也问（上面那几条用例）；
+   *   · 清单进回收站 ⇒ 里面有活任务、或底下挂着子清单时才问。
+   *
+   * fixture 从 p1 换成 p2 不是为了绕过断言，是因为 p1 底下挂着 p1a ——
+   * 它现在**正是**有后果的那一档（下面第二条就钉这个）。
+   */
+  it('零后果的清单仍然一键直删，且不画确认行（不对称的另一半，设备级判据同这一档）', () => {
     seed();
     const view = render();
-    expect(byTestId(view, 'project-p1-confirm')).toBeNull();
+    expect(byTestId(view, 'project-p2-confirm')).toBeNull();
+    click(byTestId(view, 'project-p2-remove'));
+    expect(actions.deleteProject).toHaveBeenCalledWith('p2');
+    expect(selected).toEqual([]);
+  });
+
+  it('有后果的清单（底下挂着子清单）走两步：第一下不写 op，取消也不写、还能再删', () => {
+    seed();
+    const view = render();
     click(byTestId(view, 'project-p1-remove'));
+    expect(actions.deleteProject, '一次点击就写 op —— 这条清单底下还挂着 p1a').not.toHaveBeenCalled();
+    expect(byTestId(view, 'project-p1-confirm')?.textContent).toContain('确定要删除「工作」吗？');
+    click(byTestId(view, 'project-p1-confirm-no'));
+    expect(actions.deleteProject).not.toHaveBeenCalled();
+    expect(byTestId(view, 'project-p1-confirm')).toBeNull();
+    expect(byTestId(view, 'project-p1-remove'), '取消后必须还能再删').not.toBeNull();
+  });
+
+  /**
+   * 🔴 这一条是本次改动存在的理由：**删一条文件夹有两句后果，缺一句就是撒谎**。
+   *
+   * p1「工作」底下挂着 p1a「汇报」，而它自己身上直接挂了 3 条活任务
+   * （1 未完成 + 2 已完成）与 1 条墓碑。行右侧那个常驻数字是 **1**
+   * （未完成），确认框里那句必须说 **3**（含已完成）—— 拿常驻数顶替就会
+   * 当着用户的面说"里面只有 1 条任务"。子清单那句必须同时在场，
+   * 因为"任务失去归属"和"子清单整支看不见"是两种不同的后果。
+   */
+  it('🔴 删文件夹：3 条活任务 + 1 条子清单两句都在场，同一趟里常驻计数仍是 1', () => {
+    seed([
+      task({ id: 't1', projectId: 'p1' }),
+      task({ id: 't2', projectId: 'p1', completedAt: NOW }),
+      task({ id: 't3', projectId: 'p1', deletedAt: NOW }),
+      task({ id: 't4', projectId: 'p1', completedAt: NOW }),
+    ]);
+    const view = render();
+    expect(byTestId(view, 'project-p1-count')?.textContent).toBe('1');
+    click(byTestId(view, 'project-p1-remove'));
+    const confirmText = byTestId(view, 'project-p1-confirm')?.textContent ?? '';
+    expect(confirmText).toContain('里面有 3 条任务');
+    expect(confirmText).toContain('这些任务不会被删除');
+    expect(confirmText).toContain('它下面还有 1 条子清单');
+    expect(confirmText).toContain('这些子清单不会被删除');
+  });
+
+  it('没有子清单的清单**不画**第二句（宁可少说一句，不编"底下还有 0 条"）', () => {
+    seed([task({ id: 't9', projectId: 'p2' })]);
+    const view = render();
+    click(byTestId(view, 'project-p2-remove'));
+    const confirmText = byTestId(view, 'project-p2-confirm')?.textContent ?? '';
+    expect(confirmText).toContain('里面有 1 条任务');
+    expect(confirmText).not.toContain('它下面还有');
+  });
+
+  it('子清单行：自己挂着任务就要两步、但不跟着父级那第二句；自己没任务没子级就直删', () => {
+    seed([task({ id: 'ta', projectId: 'p1a' })]);
+    const view = render();
+    click(byTestId(view, 'project-p1a-remove'));
+    expect(actions.deleteProject, 'p1a 里有一条活任务，一次点击不许写 op').not.toHaveBeenCalled();
+    const confirmText = byTestId(view, 'project-p1a-confirm')?.textContent ?? '';
+    expect(confirmText).toContain('确定要删除「汇报」吗？');
+    expect(confirmText).toContain('里面有 1 条任务');
+    expect(confirmText, '它是叶子，"底下还有子清单"那句对它不成立').not.toContain('它下面还有');
+  });
+
+  it('✅ 正向对照：**父级清空之后**删它就不问了（否则上面那条"要两步"可能只是恒要两步）', () => {
+    // 把 p1a 的父级摘掉 ⇒ p1 底下不再有子清单，身上也没有任务 ⇒ 直删。
+    // 这一条挡的是"gate 根本没接上、有后果没后果都问"那种假绿。
+    projectsState.projects = [
+      project({ id: 'p1', name: '工作' }),
+      project({ id: 'p1a', name: '汇报' }),
+      project({ id: 'p2', name: '生活' }),
+    ];
+    const view = render();
+    click(byTestId(view, 'project-p1-remove'));
+    expect(byTestId(view, 'project-p1-confirm'), '没有子级也没有任务，不该问').toBeNull();
     expect(actions.deleteProject).toHaveBeenCalledWith('p1');
   });
 });
