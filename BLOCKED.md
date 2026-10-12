@@ -9988,3 +9988,49 @@ SELF_TEST_BROKEN：臂 6 的原文命中 2 处，要求恰好 1 处 —— 「<�
 **本线接下来一律走"临时件 hash、不落工作树"**，这条已经写进 PROGRESS 末节（标题时段 `13:1x–15:4x`，现量：`grep -n '^## ' PROGRESS.md | tail -1`）。
 
 🔴 我不把这一格说成"已恢复"：**正文确实丢了**。这一条存在的意义就是让下一个读到人立刻知道少了什么、谁该补。
+
+## B189（2026-10-12 18:0x–18:1x，本会话 · 取 T7 读数那一趟里量出来的三件事 + 一条边界变动）：隔离副本的 `packages/*/dist` 落后于新检出源码 ⇒ **整包伪红**；`apps/mobile` 全过却 rc=1；本线白名单内被别线提交改了 6 枚文件
+
+**1. 切换 worktree 基线之后不重建产物，应用层会红一大片，而那片红不是产品的。**
+
+- 现象（载体 `.worktrees/inb-t8`，`CARRIER_HEAD=7958c18c`，逐字 `apps/web/node_modules/.bin/vitest`）：
+  `Test Files 35 failed | 142 passed | 2 skipped (179)` / `Tests 268 failed | 2007 passed | 13 skipped (2288)`。
+- 判据（当场造的，不是事后解释）：逐包数"src 里比 `dist` 新的文件" ⇒ 重建前 `packages/i18n: 2`、`packages/ui: 5`、
+  `packages/design-system: 0`、`packages/app-host: 0`、`packages/domain: 1`；`pnpm -r build`（`RC_BUILD=0`）后**五处全部 0**。
+- 同一只载体、同一个 HEAD、同一枚驱动重跑 ⇒ `Test Files 177 passed | 2 skipped (179)` / `Tests 2275 passed | 13 skipped (2288)`、`RC=0`。
+  ⇒ **那 268 条是载体产物陈旧，不是产品坏了**；上一节台账里"apps/web 涨 19 条"那类计数从此不许再引用旧趟。
+- **可粘形状（给下一个用 worktree 量应用层的人）**：切基线后、起跑前，先 `pnpm -r build`，并把逐包
+  `find "$p/src" -type f -newer "$p/dist" | wc -l` 打进日志。这行打印是判据 —— 没有它，伪红与真红在日志里长一样。
+  主检出在 18:11 那趟现量里，我逐枚点到的那几包该计数**全为 0**，
+  所以本线那腿在合并态上取的读数是可信形状；这句是**当时**的读数，要现在的值就重跑上面那条 `find`。
+
+**2. `apps/mobile` 在合并态产物上：964 条全过、`Errors 1 error`、退出码 1。**
+
+- 逐字：`Test Files 76 passed (76)` / `Tests 964 passed (964)` / `Errors 1 error` / `RC=1`；
+  未处理拒绝来自 rolldown 解析失败（被解析文件首行是 `/** * Copyright (c) Meta Platforms, Inc. and affiliates.`，即 RN 的 vendored 件），
+  跑动时机挂在 `tests/auth-flow.spec.ts` 那腿（vitest 自己写明"不代表错误在该文件内"）。
+- **归属：不是本线**（本线在移动端只有 `apps/mobile/src/inbound/` 那枚 worker，没有 spec 参与这枚解析）。
+  后果是 `pnpm -r test` 与 `pnpm check` 会**永久 rc=1**，而"所有用例都过但退出码非零"这一格只有读日志末尾 `Errors` 的人才看得见。
+  修法要么在那份 spec 的解析/依赖形状上，要么在 rolldown 对该 vendored 件的处理上 ⇒ **归移动端线，本线不代改（白名单外）**。
+- 🔴 未证的猜测明确标出来：错误栈里 rolldown 的相对路径被 URL 编码成 `All%20in%20one%20Data`，我只看到"栈这么显示"，
+  **没有**证据说仓库目录里的空格是成因 —— 别把这句当结论传下去。
+
+**3. `npx` 起 playwright 会解析到**家目录**那枚：同一类（B186）的第三例。**
+
+- 载体上 `npx --no-install playwright` 那条腿当场 `RC=127`（载体内没有该二进制），而我此前那些"跑通了"的 e2e 腿其实是
+  顺着祖先目录一路找到 `~/node_modules/playwright` —— 现量存在，版本 `1.63.0`，**恰好等于** `e2e/package.json` 钉的 `1.63.0`。
+  ⇒ 既往 e2e 证据没有版本错配，但通道是**随载体漂**的：家目录那枚一旦被升级/删掉，同一道门禁会无声变成另一枚编译器。
+- 本线已改成逐字指定并自报来源：驱动路径 + `--version` 都打进日志（合并态那腿现量 `e2e/node_modules/.bin/playwright`、`Version 1.63.0`）。
+  白名单外那两枚（B186 里登记的 `mutate-credential-sweep.py:93`、`mutate-w6.py:129`，用的是不带 `--no-install` 的 `npx vitest`）**仍未改**，等负责人点头。
+
+**4. 本线白名单内被别线提交改了（不是我改的，也不该由我解释其语义）**：
+
+- `c5561959 fix(入站 来源 ID 形状)` 一次动了我地界里的 6 枚：`packages/inbound-core/src/{index.ts,webhook.ts}`、
+  `server/src/api.ts`、`server/src/automation/{ai-metering.ts,entitlement-ticket.ts}`，并给
+  `server/tests/inbound-ticket-rejection-route.spec.ts` 加了 162 行。
+- 事实边界：我**没有**参与那次改动，也不代它论证判据；登记它是因为 AC-1 那枚拒绝路由 spec 从现在起是**两线共写**，
+  本线台账里任何按"某 spec 有几条用例"写下的旧计数都不再是稳定量 —— 要引用就当场现量，不许抄上一节。
+- 同一小时里主检出 HEAD 一路在走：本节开头我读到的那笔之后，合并态那趟链自己记下的基线是
+  `4a691dd52e9862c0d25c814c2e5c18ce3e744a57`（见 `.run-logs/merged-1012-final.log` 第一行 `HEAD=`），而我的隔离载体停在 `7958c18c`。
+  本节的读数因此分成两组，**载体那组以链日志里的 `基线 HEAD=` 行为准，合并态那组以同一趟 `.run-logs/merged-1012-final.log` 第一行为准** ——
+  两组各记各的基线，不许混着引用，也不许引用本节去答"当前 HEAD 是什么"（要当前值就当场 `git rev-parse HEAD`）。

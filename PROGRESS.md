@@ -3951,3 +3951,29 @@ $ grep -rnE '\.(skip|todo)\(|\bxit\b|describe\.skip' <本线全部测试文件> 
 - **未完成清单没有变化**：`pnpm check` / `pnpm -r test` 仍因那八条别线绊线 rc=1 ⇒ 完成条件 1 的三条 exit 0 仍不成立；
   完成条件 2 里"非白名单条目数对开工快照"那一格仍**不可核**（开工没取基线）。AC 已勾数仍 0，本线仍未闭合，
   不自行关闭 Goal。
+
+## 2026-10-12 18:0x–18:1x · 挡路那八条红重取之前先抓到我自己的**载体伪红**：`apps/web` 那 268 条是这只副本的 `packages/*/dist` 落后于新检出源码，重建后整包全绿
+
+- **两只载体、两个基线，读数分开记**：隔离副本 `.worktrees/inb-t8` 停在 `.run-logs/rebuild-then-recheck.log` 第一行那笔
+  （`基线 HEAD=7958c18c…`）；合并态那趟以 `.run-logs/merged-1012-final.log` 第一行的 `HEAD=` 为准。本节所有数字都带这两个限定，不互相引用。
+- **判别而不是断言**：副本首跑 `apps/web` 回 `Test Files 35 failed | 142 passed | 2 skipped (179)` / `Tests 268 failed | 2007 passed | 13 skipped (2288)`。
+  我先造了一把尺再解释它 —— 逐包数"src 里比 `dist` 新的文件"：重建前 `i18n 2`、`ui 5`、`domain 1`（另三处 0），
+  `pnpm -r build`（`RC_BUILD=0`）后**五处全部 0**；同一副本、同一 HEAD、同一枚逐字驱动重跑 ⇒
+  `Test Files 177 passed | 2 skipped (179)` / `Tests 2275 passed | 13 skipped (2288)`、`RC=0`。
+  ⇒ **那 268 条不是产品坏了，是我这隻载体的产物陈旧**；规矩落成一句：切基线之后、量应用层之前必须先重建，并把那行计数打进日志。
+- **`apps/mobile` 在合并态产物上：964 条全过、`Errors 1 error`、退出码 1**。未处理拒绝是 rolldown 对一枚 vendored 文件解析失败，
+  跑动时机挂在 `tests/auth-flow.spec.ts` 那腿（vitest 自己写明"不代表错误在该文件内"）⇒ **不是本线**，但它使 `pnpm -r test` 永久 rc=1。细节与可粘形状在 **B189**。
+- **合并态那趟的读数（逐字驱动，串行一条）**：`verify-inbound-ac8-matrix.py --quiet` `RC=0`、`--self-test` `RC=0`（六臂全成立，含臂 6 静止对照仍绿）；
+  `license-inventory`／`check-migrations`／`check-docs-voice`／`docs-link-check` 四道 `RC=0`；
+  `verify-inbound-ac-ticks.py` `AC 行=8　已勾=0　未勾=8`；`verify-inbound-doc-tables.py` `RC=0`；
+  `cd server && ./node_modules/.bin/vitest run tests/inbound-lane-rigs-consumers.spec.ts` ⇒ `RC=0`、`Tests 11 passed (11)`、跳过 0。
+  🔴 提交这一节前我又用同一把尺重取了一次（正文动过 ⇒ 必须重取），读数在下面这条对话里贴出。
+- **本线 e2e 换了逐字驱动再跑一次**：`e2e/node_modules/.bin/playwright`（现量 `Version 1.63.0`）
+  ⇒ `2 failed | 4 passed (2.2m)`，红的仍是 `tests/inbound-automation.spec.ts:8:3` 那两档 `locator.click` 60 s 超时
+  = **B140/B181 那一格（AC-6 的界面挂载点）**，没有新缺陷；此前那腿用过家目录里 `~/node_modules/playwright`（同版本但通道随载体漂），
+  这条也在 **B189** 登记了。
+- **完成条件一格未变**：`pnpm check` / `pnpm -r test` 仍 rc=1（别线：`packages/ai` 5 条、`packages/legal` 2 条、`packages/shared-schema` 1 条，
+  加 `apps/mobile` 那枚未处理拒绝与 `check:reachability` 的 COMMENT），⇒ **完成条件 1 的"T7 三条 exit 0"仍不成立**；
+  完成条件 2 里"非白名单条目数对开工快照"仍**不可核**（开工没取基线）。AC 已勾数现量 **0**，本线仍未闭合，不自行关闭 Goal。
+- **下一步（顺序）**：① 等负责人对 B140/B181 的挂载点、B164 的四端设备腿、B185/B184 那两格接线裁决；② B188 那三节正文由账号标准套件线自己补；
+  ③ 白名单外那两枚不带 `--no-install` 的 `npx`（B186）等点头；④ 只本地提交、不 push。

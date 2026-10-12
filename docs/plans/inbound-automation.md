@@ -3410,3 +3410,37 @@ quota 与 ticket 那两枚的保险丝臂各自报"成立（RESTORE_GUARD 报了
 
 🔴 本节同样不改任何 AC 的闭合状态：`已勾=0` 现量未变；AC-6 的界面挂载点（B140/B181）、AC-8 的四端设备腿（B164）
 仍按原登记开着；`pnpm check` / `pnpm -r test` 仍因那八条别线红而 rc=1 ⇒ 完成条件 1 的"三条 exit 0"仍不成立。
+
+## 2026-10-12 18:0x–18:1x · 重取挡路红之前先抓到我自己这隻载体的伪红：`apps/web` 的 268 条在重建产物之后全绿；合并态上真还红的那几格仍是别线
+
+这一腿有两件事：**把 T7 那两条挡路读数在新 HEAD 上重取**，以及**先证明我上次读到的大片红不是产品**。
+
+**先说第二件**。隔离副本（`.worktrees/inb-t8`，基线记在 `.run-logs/rebuild-then-recheck.log` 第一行）首跑 `apps/web` 回
+`Tests 268 failed | 2007 passed | 13 skipped (2288)`。这个数字太整齐、又不落在本线任何一枚 seam 上，所以我没有直接写成"别线把界面弄红了"，
+而是先造一把尺：逐包数 `src` 里比 `dist` 新的文件 —— 重建前 `packages/i18n 2`、`packages/ui 5`、`packages/domain 1`（另两处 0），
+`pnpm -r build` 拿到 `RC_BUILD=0` 之后**五处全部 0**；同一副本、同一 HEAD、同一枚逐字 `apps/web/node_modules/.bin/vitest` 重跑 ⇒
+`Test Files 177 passed | 2 skipped (179)` / `Tests 2275 passed | 13 skipped (2288)`、`RC=0`。
+结论只有这一句：**切基线不重建产物，应用层会红一大片，而那片红是载体的。** 写进台账的判据也随之固定为一句可重跑的话：
+量应用层之前先 `pnpm -r build`，并把逐包那行计数打进同一份日志 —— 没有这行计数，伪红与真红在日志里长一模一样（登记 **B189**）。
+
+**第一件：合并态（主检出，基线记在 `.run-logs/merged-1012-final.log` 第一行）逐条复账**，驱动一律逐字指定、`NO_COLOR=1`、串行：
+
+- 本线那两枚尺两腿都在：`verify-inbound-ac8-matrix.py --quiet` `RC=0`；同一装置 `--self-test` `RC=0`，六臂逐条成立，
+  静止对照臂（臂 6）在写完本节之后仍然绿 ⇒ **这一节的文字没有把对账改成红**，装置判据一个字没动。
+- 四道便宜门全 `RC=0`：`license-inventory`（许可白名单外默认失败那条）、`check-migrations`、`check-docs-voice`、`docs-link-check`。
+  最后这道在本线之前的登记里是 rc=1（唯一一条不是本线的 `apps/desktop-windows/README.md:89`），这一趟现量已过 —— 那是别线修的，我不记在自己名下。
+- 台账自身的两把尺：`verify-inbound-ac-ticks.py` 回 `AC 行=8　已勾=0　未勾=8　状态位未分类=0`；
+  `verify-inbound-doc-tables.py` 全份对账 `RC=0`（⇒ 本节不许新增表格，事实一律散文书写）。
+- 常驻消费者那条腿：`cd server && ./node_modules/.bin/vitest run tests/inbound-lane-rigs-consumers.spec.ts` ⇒ `RC=0`、
+  `Tests 11 passed (11)`、跳过 **0**、`Duration 17.51s`。这 11 条就是 B185 之前那格"装置有、没人跑"的解药，它在合并态上仍成立。
+- 本线 e2e：驱动从 `npx` 换成逐字 `e2e/node_modules/.bin/playwright`（现量 `Version 1.63.0`，与 `e2e/package.json` 钉的一致），
+  回 `2 failed | 4 passed (2.2m)`，红的仍是 `tests/inbound-automation.spec.ts:8:3` 那两档 `locator.click` 60 s 超时，
+  错误上下文落在 `/tmp/heyta-inbound-ui-results/…` ⇒ **这是 B140/B181 登记过的那格（AC-6 的界面挂载点没有入口），不是新缺陷**。
+
+**一条新形状（不是本线的，但它会让别人误判）**：`apps/mobile` 在合并态产物上回 `Test Files 76 passed (76)` / `Tests 964 passed (964)`
+而 `RC=1` —— 未处理拒绝是 rolldown 对一枚 vendored 文件解析失败，时机挂在 `tests/auth-flow.spec.ts` 那腿。
+"所有用例都过、退出码非零"这一格只有读日志末尾 `Errors` 的人才看得见；归属与不代改的理由在 **B189**。
+
+🔴 本节不改任何 AC 的闭合状态：`已勾=0` 现量未变；AC-6 的界面挂载点（B140/B181）、AC-8 的四端设备腿（B164）
+仍按原登记开着；`pnpm check` / `pnpm -r test` 仍因别线那几格（`packages/ai` 5 条、`packages/legal` 2 条、`packages/shared-schema` 1 条、
+`apps/mobile` 那枚未处理拒绝、`check:reachability` 的 COMMENT）而 rc=1 ⇒ 完成条件 1 的"三条 exit 0"仍不成立。
