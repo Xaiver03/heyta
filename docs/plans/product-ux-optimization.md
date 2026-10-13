@@ -3255,6 +3255,9 @@ Android 那三下有读数（19:5x 那格），iOS / Windows / macOS 三个壳�
 | ios | **r101** | `dfeacee3`（同一棵载体） | `✅ 已装的包比源码新 —— 这一轮装的是当前产物` + 全新安装 + 窗口 1206x2622 / 内容占比 58.8% / 主蓝 4091 |
 | windows | ~~仍是 r99~~ → **r103 已补跑**（可 grep：`windows 那一腿也跑了`） | `34f7742d` | 未重跑，见下面第二段 |
 
+🔴 **本表到此为止是"逐行 pin 提交"那张，它已被 05:3x 起跑的第五趟（r108）取代**：四端全部重打到同一枚 `769e6258` 并各自拿到"装的是当前产物"的判据。
+新表与那处偏离（iOS 腿换了树）在下面「2026-10-13 07:4x：第五趟四端重装跑完」那一格（可 grep：`第五趟四端重装跑完`）。
+
 人看图（§6.2 规定一）：r102 那张 `.webview.png` 已打开看过 —— 暗色收集箱 + 联网同意卡（「在使用联网功能之前」，主蓝按钮「同意并联网」）+ 右侧对话助手面板，与 r99 同一形状；
 证据入库在 `apps/web/evidence/ux-final-20261012/reinstall-r102-mac/`（四枚：两张图 + `.png.txt` 自述 + 链日志）。
 ⚠️ 窗口那张 `.png` 仍**不能**当 UI 证据（r99 已把成因裁到"抓窗口时 WKWebView 没被合成进去"），判据读的是 `.webview.png` 那一枚 —— 这条口径没变。
@@ -3431,6 +3434,39 @@ mac `dfeacee3`（r102）/ android `dfeacee3`（r100）/ ios `dfeacee3`（r101）
 ⚠️ **加固的射程只有一句**：新的 `tap` 守卫挡的是"中心落进底栏带"这一种错位，**不挡**"节点在带上方但被别的浮层盖住" —— 那种要像素层证据，本线没做，别把这一格读成"点不到已被穷尽"。
 
 ⚠️ **这一小时里 `emulator-5554` 不是本线独占的**（现量方式：`git status --porcelain -- apps/mobile/evidence/profile-center` 里出现一枚本线没起过名字的目录 `android-r99-fixed`，时间戳落在两腿之间，`journey.json` 自标 `uiLocale=en`、`sha b731fd26…`；收尾时 `getprop ro.product.locale` 读到 `en-US`）。⇒ 两腿的出处**由装置自己标**：`android-r107-tapprobe/journey.json` 与 `android-r107-font13/journey.json` 里 `uiLocale` 均为 **`zh-CN`**，所以这两枚是中文态读数，英文态那一格**不由本线登记为已跑**。那枚外来的 `android-r99-fixed/` 本线不代提交、也不删（它讲的那件事属于 `dfeacee3` 语言开关那一线）。
+
+### 2026-10-13 07:4x：第五趟四端重装跑完（r108）—— 四端重新等于"当前产物"，以及一处换了树的偏离
+
+🔴 **先把 04:1x 那句"本笔不当场跑第五趟"作废**（它当时的依据是"这棵树每几十分钟落一笔产品代码，第五趟 pin 到的提交很可能跑完前又过期"）。这一格把它推翻的方式正是它自己说的那三条命令：跑之前 `git diff --name-only dfeacee3..HEAD` 剔掉文档/证据/测试之后是 **24 枚打包输入**（`apps/web/src/App.tsx`、`TaskDetailCard.tsx`、`keyboard-cursor.ts`、`packages/i18n` 两表、`sync-client`、`ai` 四枚、`app-host` 四枚、`ui/NotesBoard.tsx`、`mobile/src` 三枚…），**已经不是"一条不可达字符串"那一档**；而 04:1x 担心的漂移这一趟没有发生 —— 起跑与收尾各取一次，`git rev-list --count 769e6258..HEAD` = **0**，所以"当前产物"这句话现在**是**说得出的。
+
+**四行新表**（每行都带"哪一棵树 + 那一枚提交 + 当场印出来的判据"，逐字来自日志，不是我转述）：
+
+| 端 | 装的是 | 载体 | 判据 |
+|---|---|---|---|
+| mac | **r108 / `769e6258`** | 隔离 worktree `/Users/rocalight/heyta-carriers/r108-head`（`git worktree add --detach`，起跑前 `dirty=0`，`pnpm install --frozen-lockfile` rc=0） | `✅ 已安装到 /Applications/Heyta.app`、`✅ 安装对账：.app 里的 web-dist 与本机 apps/web/dist 是同一次构建（9 个 chunk）`、`✅ 窗口 2318x1508、…内容占比 74.6%、主蓝命中 997 —— 是共享 UI` |
+| windows | **r108 / `769e6258`** | 同一棵 | `✅ 远端收到的是这一包（tar sha256=682caf467184ded2… 逐字相同）`、`✅ 远端新鲜度对账通过（web-dist/index.html=1f165d01f677aed1… bridge=4dfc0d2f46524aa7… assets/*.js=7 枚一致）`、五条 `ADD_APPX=OK / PAYLOAD_WEBDIST=True / M2D=OK / RESULT=OK / SHORTCUT_OK=True` |
+| android | **r108 / `769e6258`** | 同一棵（release APK 走远端打包机重打，80M） | `✅ 模拟器 emulator-5554 全新安装成功`、`✅ 前台窗口确认：mCurrentFocus=…com.heytamobile.MainActivity`、`✅ 窗口 1080x2400、内容占比 55.9%、主蓝命中 4042` |
+| ios | **r108 / `769e6258`** | 🔴 **主检出**（不是那棵隔离 worktree，见下面第二段） | `✅ 沙盒已同步（Manifest.lock == Podfile.lock）`、`✅ 构建成功`、`✅ 已安装进模拟器（全新安装）`、`✅ 已装的包比源码新 —— 这一轮装的是当前产物`、`✅ 窗口 1206x2622、内容占比 58.8%、主蓝命中 4091` |
+
+三枚装置身份（三腿共用同一枚 blob ⇒ 判据是同一套）：`RUNNER_BLOB=46167227685128b0474224daf10c4eb7f66e88a9`、`LOCKFILE_BLOB=8359a3ee62455e1b2ca94a5126cec4550e8beea9`、`CARRIER_HEAD=MAIN_HEAD=769e6258e10efc080c412fa94e6fb80964dea42d`。
+退出码取的是日志里的 `DESKTOP_RC=0` / `MOBILE_RC=0` / `IOS_RC=0` 三行，**不取**后台任务通知那个"exit 0"（02:0x 那格记过我自己怎么被它骗过一次）。
+
+🔴 **一处偏离，写成偏离而不是解释成等价**：iOS 腿本来也排在那棵隔离载体上，但它第一步 `pod install` 撞上一条 **567 B/s** 的 `repo1.maven.org` 通道 —— 22.3 MB 的 hermes 包 75 分钟只走了 10%，日志里 `Left Speed` 那列自己印出 ETA ≈ 11 小时。**成因是缓存按树住**（现量，不是猜）：hermes 的 tarball 落在各自那棵树的 `apps/mobile/ios/Pods/hermes-engine-artifacts/`，主检出那目录 debug + release **两枚都在**，而新载体只有一枚 `hermes-ios.download`（半写的下载中文件）+ debug ⇒ 它必须现场重拉。
+处置：按 pid + cwd 认出自己那条链（`chain-r108.sh` 及其子进程）并停掉，把 iOS 腿改跑在**主检出**上 —— 同一枚装置脚本 5 分钟跑完，pod 日志里连"Fetching podspec for hermes-engine"都没有，直接进 `Setting USE_HERMES build settings`。
+⇒ 这一腿的"当前产物"仍然可主张，但它**不是**"只含已提交内容的隔离检出"那一档。差集是现量过的：起跑前 `git status --porcelain -- apps/mobile apps/web/src packages/ apps/desktop-macos apps/desktop-windows server/src` 只有 **1** 枚，且是 `?? apps/mobile/evidence/profile-center/android-r99-fixed/`（上一格那枚外来证据目录，不是打包输入）。
+⚠️ 顺带把本线在册的一条"iOS 腿会写脏受跟踪文件"的形状复量了一遍：`Podfile.lock` 与两枚 `Info.plist` 这一次**都没被改写**（`r108-ios-dirty-baseline.txt` 与 `r108-ios-dirty-after.txt` 都是空文件，两枚都已随证据包入库）。⇒ 那句"每次都会写脏"要按"会写脏的那条分支在 `Pods` 与 lock 不一致时才进"来读，别当常驻事实。
+
+👁 **人看图（§6.2 规定一）**：四张逐张打开看过 —— `mac-webview.png`（亮色收集箱 + 「在使用联网功能之前」同意卡 + 右侧对话助手）、`android.png` 与 `ios.png`（同一张同意卡在全新安装首屏，标题/两条要点/两个链接/两枚按钮完整无截断）、`windows-first-run.png`（同意卡 + 头像菜单展开着「登录账号 / 个人中心 / 应用设置」）。
+⚠️ 两处不许读错的地方：① `windows-first-run.png` 左上角那一小块文字**不属于本应用**（远端交互会话里叠在后面的部署脚本控制台），它不是产品缺陷；② `mac-window.png` 按在册口径**不能**当 UI 证据，判据读的是 `mac-webview.png`。
+
+**证据包**：[`apps/web/evidence/ux-final-20261013/reinstall-r108/`](../../apps/web/evidence/ux-final-20261013/reinstall-r108/RESULT.md)（四张图 + `mac-window.png` + `mac-webview.png.txt` 自述 + 三腿 runner 日志 + 两枚链读数 + 两枚脏基线 + `SHA256.txt`；17 MB 的 `xcodebuild` 日志**不入库**，路径写在 `RESULT.md` 里）。取现量：`cat apps/web/evidence/ux-final-20261013/reinstall-r108/RESULT.md`。
+
+**这一包不证明的三件**：① **不证 `origin/main`**（本线全部提交只在本地 main，没 push）；② **不证深浅两档都装过**（四张图取的是各端首屏默认档，本轮 mac 落在亮色而 r102 落在暗色 —— 主题切换的读数在「深浅主题」那几格）；③ **不证系统小组件卡片在桌面里换了字**（那要桌面级读数，留在 02:1x 那一格的待办里）。
+
+📌 **给下一位的两条装置事实**（都是这一趟新撞的，别再撞）：
+① **新隔离载体的 iOS 腿要先解决 hermes 缓存**，否则 `pod install` 会自己决定这一腿跑多久。可复跑判据：`ls apps/mobile/ios/Pods/hermes-engine-artifacts/`（两枚 `.tar.gz` 齐 ⇒ 秒过；出现 `hermes-ios.download` ⇒ 现场拉，先看速度再决定换树还是等）。
+② 四端"由两趟覆盖"这件事（`--only mac,windows` + `--only android,ios`）**不等于**跑过 `pnpm reinstall:all` 那条命令 —— 记账要写"两趟覆盖四端"，这是 10-05 那格定下的口径，本趟沿用。
+
 
 
 

@@ -1,0 +1,16 @@
+═══ 0. 前置：pnpm -r build ═══
+  ✅ 全仓构建完成（日志 /Users/rocalight/heyta-r108-tmp/mobile/heyta-reinstall-build.log）
+
+═══ 3. Android：清旧包 → release APK → 模拟器卸旧装新 ═══
+  ✅ release APK 已重打（ 80M；日志 /Users/rocalight/heyta-r108-tmp/mobile/heyta-reinstall-apk.log）
+  ✅ 模拟器 emulator-5554 全新安装成功
+  ⚠️ monkey 之后前台不是 com.heyta，用 am start -W 显式拉起再验一次
+  ✅ 前台窗口确认：  mCurrentFocus=Window{7bf1468 u0 com.heyta/com.heytamobile.MainActivity}
+  主蓝采样命中 4042（数的是 heyta-reinstall-android.png）
+  ✅ 窗口 1080x2400、heyta-reinstall-android.png 内容占比 55.9%、主蓝命中 4042 —— 是共享 UI
+  截图证据：/Users/rocalight/heyta-r108-tmp/mobile/heyta-reinstall-android.png
+
+═══ 4. iOS：模拟器卸旧 → Release 重打 → 装新 + 新鲜度判据 ═══
+  模拟器：FE195661-B021-4A71-AAD1-1F2F7AE3A102
+  Pods 沙盒与 Podfile.lock 不一致（或缺 Manifest.lock）→ 跑 pod install…
+/Users/rocalight/heyta-carriers/r108-head/scripts/.reinstall-all.sh.snap.4940: line 536: 58410 Terminated: 15          ( cd "$IOS_IOS_DIR" && env -u NODE_USE_ENV_PROXY LANG=en_US.UTF-8 RCT_USE_PREBUILT_RNCORE=0 RCT_USE_RN_DEP=0 pod install ) > "$POD_LOG" 2>&1
