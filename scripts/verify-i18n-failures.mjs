@@ -1060,6 +1060,10 @@ function groupPreset() {
  * 取词条、`message` 降级成技术详情。这一组证明**"原因码取错词条"能被抓到**：
  * 把 `egress-not-authorized` 指到别的词条上，那四条"提示去逐功能授权"的
  * 面板测试必须变红 —— 用户要做的动作（去授权）从界面里消失了。
+ *
+ * ⚠️ 两臂的 runner **不是同一个**，而且不许合并：`consent-not-granted`（traps #353，
+ * rig52 照出来的那条）只有"只用本机"那一下会渲染，四个面板都不走它 ——
+ * 拿面板 runner 跑这条注入会得到"基线绿、注入也绿"的恒不成立判据。
  */
 function groupAiFailure() {
   const panelsRun = () =>
@@ -1083,6 +1087,29 @@ function groupAiFailure() {
       "  'egress-not-authorized': 'web.ai.failure.cause.egressNotAuthorized',",
       "  'egress-not-authorized': 'web.ai.failure.cause.network',",
       panelsRun,
+    ),
+  );
+
+  // 🔴 第二臂钉的是 rig52 照出来的那一族（traps #353）：`consent-not-granted`（设备级同意没给）
+  // 与 `network`（连不上端点）是**两种用户动作** —— 改隐私档 vs 去查网络。指错词条就是把用户
+  // 支去查一件本来没事的事，而界面上那句"没有批准任何网络请求"整个消失。
+  // 为什么单开一个 runner：四个面板都不渲染这一档（它只在"只用本机"那一下出现），
+  // 拿 panelsRun 跑这条注入会**基线绿、注入也绿** —— 那是一条恒不成立的判据（§7 元规则二）。
+  const copyRun = () =>
+    run(
+      path.join(ROOT, 'apps/web/node_modules/.bin/vitest'),
+      ['run', 'tests/ai-failure-copy.spec.tsx'],
+      path.join(ROOT, 'apps/web'),
+    );
+
+  expectGreen('aifailure', '基线：原因码→词条那张表的原样必须绿', copyRun);
+
+  expectRed('aifailure', '同意闸的原因码指错词条 → 「这台设备设为只用本机」那句从界面消失', () =>
+    withMutation(
+      AI_FAILURE_COPY,
+      "  'consent-not-granted': 'web.ai.failure.cause.consentNotGranted',",
+      "  'consent-not-granted': 'web.ai.failure.cause.network',",
+      copyRun,
     ),
   );
 }

@@ -194,7 +194,55 @@ def label_of(n):
     return (n.get("AXLabel") or n.get("title") or "").strip()
 
 
-def find(nodes, label, want_pressable, want_field, role, exact_only=False, occurrence=0):
+def anchor_of(nodes, within):
+    """`--within` 的锚点节点。锚点**自己**不参与匹配，只提供几何边界。
+
+    🔴 这一档与 Android 的 `xy_in_rid`（`_xy.py` 里"中心落在 resource-id 元素
+    矩形内"）是**同一个语义**，不是另起一把尺：五档功能块各有一枚同名 chip
+    （`ai-feature-<f>` 里都写着端点标签），只按标签找会打到第一次出现的那一枚。
+    为什么用几何而不是 AX 父子树：RN 会把没有无障碍角色的中间 `View` 从树上摘掉，
+    按"后代"筛会整批落空 —— 那会把"载体够不着"读成"界面上没有"（§7 元规则一）。
+    """
+    if not within:
+        return None
+    a = find(nodes, within, False, False, None)
+    if a is None:
+        return None
+    x, y, w, h = frame_of(a)
+    if w <= 0 or h <= 0:
+        return None
+    return (x, y, w, h)
+
+
+def within_error(nodes, within):
+    """锚点取不到 / 锚点零尺寸 ⇒ 一句话说明"这一条判据没有输入"。
+
+    🔴 必须与"锚点在、但块里没有目标"**分成两句话**：前一句说的是探针，
+    后一句才是产品。混成一句就会把桥的失效报成"五档里那一档没渲染"。
+    """
+    if not within:
+        return ""
+    a = find(nodes, within, False, False, None)
+    if a is None:
+        return f"within-anchor-missing:{within}"
+    _x, _y, w, h = frame_of(a)
+    if w <= 0 or h <= 0:
+        return f"within-anchor-zero-frame:{within}"
+    return ""
+
+
+def in_within(n, box):
+    """节点 n 的中心是否落在锚点矩形 box 内（box=None ⇒ 不过滤）。"""
+    if box is None:
+        return True
+    ax, ay, aw, ah = box
+    x, y, w, h = frame_of(n)
+    cx, cy = x + w // 2, y + h // 2
+    return ax <= cx < ax + aw and ay <= cy < ay + ah
+
+
+def find(nodes, label, want_pressable, want_field, role, exact_only=False, occurrence=0,
+         within=None):
     """
     先找**精确标签**，找不到再退化成子串匹配。
 
@@ -204,14 +252,31 @@ def find(nodes, label, want_pressable, want_field, role, exact_only=False, occur
     `exact_only`（--exact）把退化也关掉：当"精确打不中"本身就是判据时
     （composer_open / 关闭确认），子串退化会把撞车元素当成命中 —— 恒真判据
     比没有判据更糟（§7 元规则 2）。
+
+    🔴 **`id:<testID>` 前缀走 `AXUniqueId`，不看标签**（2026-10-06 现量：
+    `idb ui describe-all` 的节点里带 `AXUniqueId`，「我的」页那 11 枚逐字是
+    RN 的 testID —— `profile-entry-settings` / `notes-input` …）。
+    这条通道与 Android 的 `resource-id` 是**同一个约定**（`rid:` / `id:` 前缀），
+    所以两个端可以用**同一份锚点词表**对账源码声明。
+    为什么不能只用标签：文案会跟着 i18n 与 hint 变，而 Android 那侧已经实测过一次
+    "标签被合成成 `"设置, 同步凭据、桌面小组件与语言"` ⇒ 精确匹配恒取空"。
     """
     pool = nodes
+    if within:
+        box = anchor_of(nodes, within)
+        # 锚点取不到 ⇒ 候选集清空（found=False），而**为什么**空由 within_error 单独带出
+        pool = [n for n in pool if in_within(n, box)] if box is not None else []
     if want_field:
         pool = [n for n in pool if is_field(n)]
     elif want_pressable:
         pool = [n for n in pool if is_pressable(n)]
     if role:
         pool = [n for n in pool if (n.get("role") or n.get("type") or "") == role]
+
+    if label and label.startswith("id:"):
+        want_id = label[3:]
+        hits = [n for n in pool if (n.get("AXUniqueId") or "") == want_id]
+        return hits[occurrence] if occurrence < len(hits) else None
 
     if label and label != "-":
         exact = [n for n in pool if label_of(n) == label]
@@ -228,6 +293,20 @@ def find(nodes, label, want_pressable, want_field, role, exact_only=False, occur
     return pool[occurrence] if occurrence < len(pool) else None
 
 
+NO_ID_CHANNEL = "tree-has-no-AXUniqueId"
+
+
+def id_channel_warning(nodes, label):
+    """用了 `id:` 前缀，而**整棵树里一枚 `AXUniqueId` 都没有** ⇒ 这是探针/桥的问题，
+    不是"那个控件没渲染"。不报出来就会把"载体读不到通道"当成产品红（§7 元规则一），
+    也会让第 2 步那类"入口不在树里"的反向判据恒成立。"""
+    if label and label.startswith("id:") and nodes and not any(
+        (n.get("AXUniqueId") or "") for n in nodes
+    ):
+        return NO_ID_CHANNEL
+    return ""
+
+
 def frame_of(n):
     f = n.get("frame") or {}
     return (
@@ -239,6 +318,27 @@ def frame_of(n):
 def center(n):
     x, y, w, h = frame_of(n)
     return x + w // 2, y + h // 2
+
+
+def readback_after_set(fresh, node):
+    """设值之后从**新拉的树**里回读这个字段的值；读不到返回 None（调用方再退到按标签找）。
+
+    🔴 第一档按标识符（`AXUniqueId`），不是按坐标。rig50 现量的形状：
+    `id:tool-input`（RN 的 multiline 输入框）写完之后中文确实在 AXValue 里
+    （事后单独 `--list` 读得到），而按"设值前那圈 frame"在新树里找却找不到 ——
+    弹键盘会把整屏顶上去，字段坐标变了。探针读不到值与"值没写进去"在输出上
+    长得一模一样，而这句话决定红的是产品还是尺子（AGENTS §7 元规则一）。
+    """
+    uid = node.get("AXUniqueId")
+    if uid:
+        for n in fresh:
+            if n.get("AXUniqueId") == uid:
+                return n.get("AXValue")
+    tx, ty, tw, th = frame_of(node)
+    for n in fresh:
+        if is_field(n) and frame_of(n) == (tx, ty, tw, th):
+            return n.get("AXValue")
+    return None
 
 
 def bool_str(v):
@@ -486,7 +586,8 @@ def idb_swipe(idb, companion, udid, x0, y0, x1, y1, duration):
         return -1, str(e)[:120]
 
 
-def scroll_into_view(idb, companion, udid, label, want_pressable, want_field, role, occurrence=0):
+def scroll_into_view(idb, companion, udid, label, want_pressable, want_field, role, occurrence=0,
+                     within=None):
     """
     把 label 指向的元素**真的滚进可见区**。返回 emit 用的 dict。
 
@@ -519,7 +620,7 @@ def scroll_into_view(idb, companion, udid, label, want_pressable, want_field, ro
         for _ in range(5):
             ns = dump_nodes(idb, companion, udid)
             if ns:
-                return find(ns, label, want_pressable, want_field, role, False, occurrence), ns
+                return find(ns, label, want_pressable, want_field, role, False, occurrence, within), ns
             time.sleep(1)
         return None, None
 
@@ -527,6 +628,7 @@ def scroll_into_view(idb, companion, udid, label, want_pressable, want_field, ro
     if node is None and nodes is None:
         out["scrollRc"] = "tree-empty-repeated"
         return out
+    out["detail"] = within_error(nodes or [], within) or id_channel_warning(nodes or [], label)
     swipes = 0
     recoveries = 0
     while node is not None and swipes < 10:
@@ -606,7 +708,8 @@ def scroll_into_view(idb, companion, udid, label, want_pressable, want_field, ro
             node, nodes = locate_now()
             if node is not None:
                 out["scrollRc"] = f"recovered-after-{recoveries}"
-                return scroll_into_view(idb, companion, udid, label, want_pressable, want_field, role, occurrence)
+                return scroll_into_view(idb, companion, udid, label, want_pressable, want_field,
+                                        role, occurrence, within)
             if nodes is None:
                 # 恢复拖拽之后树读空了：停手，绝不能拿着坏数据再拖一次。
                 out["scrollRc"] = "tree-empty-repeated"
@@ -626,7 +729,8 @@ RETURN_KEY_LABELS = ("换行", "return", "Return", "done", "Done", "go", "Go",
                      "发送", "下一步", "完成")
 
 
-def type_text(idb, companion, udid, label, want_pressable, want_field, role, value, occurrence=0):
+def type_text(idb, companion, udid, label, want_pressable, want_field, role, value, occurrence=0,
+              within=None):
     """
     **聚焦输入框 + 模拟键盘输入**。返回 emit 用的 dict。
 
@@ -638,13 +742,14 @@ def type_text(idb, companion, udid, label, want_pressable, want_field, role, val
     """
     out = {"found": "False", "typedRc": "", "detail": ""}
     # 🔴 先滚进可见区：tap 对屏外坐标是空操作（不报错）—— 2026-10-02 实测。
-    vis = scroll_into_view(idb, companion, udid, label, want_pressable, want_field, role, occurrence)
+    vis = scroll_into_view(idb, companion, udid, label, want_pressable, want_field, role, occurrence,
+                           within)
     if vis.get("visible") != "True":
         out["typedRc"] = f"not-visible ({vis.get('found')}/{vis.get('scrollRc')})"
         return out
     node, nodes = locate(argparse.Namespace(
         label=label, pressable=want_pressable, field=want_field, role=role,
-        wait=3, exact=False, occurrence=occurrence,
+        wait=3, exact=False, occurrence=occurrence, within=within,
         idb=idb, companion=companion, udid=udid))
     if node is None:
         out["typedRc"] = "not-found"
@@ -762,7 +867,8 @@ def locate(args):
     deadline = time.time() + max(args.wait, 0)
     while True:
         nodes = dump_nodes(args.idb, args.companion, args.udid)
-        n = find(nodes, args.label, args.pressable, args.field, args.role, args.exact, args.occurrence)
+        n = find(nodes, args.label, args.pressable, args.field, args.role, args.exact,
+                 args.occurrence, getattr(args, "within", None))
         if n is not None:
             return n, nodes
         if time.time() >= deadline:
@@ -786,6 +892,10 @@ def main():
     p.add_argument("--occurrence", type=int, default=0,
                    help="同名 AX 节点按树顺序选择第几个（从 0 开始）")
     p.add_argument("--role")
+    # 🔴 只在**某个 testID 容器的矩形内**匹配（与 Android 的 xy_in_rid 同语义）：
+    #    五档功能块里各有一枚同名 chip（端点标签），只按标签找会打到第一枚。
+    p.add_argument("--within", metavar="ANCHOR",
+                   help="只在该锚点（id:<testID> 或标签）的矩形内匹配")
     p.add_argument("--wait", type=int, default=0)
     p.add_argument("--list", action="store_true")
     p.add_argument("--press", action="store_true")
@@ -817,13 +927,13 @@ def main():
     if args.scroll_into_view:
         emit(scroll_into_view(args.idb, args.companion, args.udid,
                               args.label, args.pressable, args.field, args.role,
-                              args.occurrence))
+                              args.occurrence, args.within))
         return 0
 
     if args.type_text is not None:
         emit(type_text(args.idb, args.companion, args.udid,
                        args.label, args.pressable, args.field, args.role,
-                       args.type_text, args.occurrence))
+                       args.type_text, args.occurrence, args.within))
         return 0
 
     if args.tap is not None:
@@ -849,11 +959,14 @@ def main():
     if node is None:
         # found=False 是**给调用方断言用的**，不是"工具坏了"。
         # 原 AXPRESS 也是这个语义：查询失败不影响退出码，由调用方判。
+        # 🔴 但 `id:` 前缀那一档要再分一层：整棵树都没有 AXUniqueId 时，"没找到"
+        #    说的是桥，不是界面 —— 那句话必须由 detail 带出来（见 id_channel_warning）。
+        warn = within_error(nodes or [], args.within) or id_channel_warning(nodes or [], args.label)
         if args.press:
-            emit({"result": "not-found"})
+            emit({"result": "not-found", "detail": warn})
         else:
             emit({"found": "False", "x": "0", "y": "0",
-                  "width": "0", "height": "0", "enabled": "False", "detail": ""})
+                  "width": "0", "height": "0", "enabled": "False", "detail": warn})
         return 0
 
     x, y, w, h = frame_of(node)
@@ -946,23 +1059,13 @@ def main():
         #    回读拿到的是**服务器地址的值**（http://127.0.0.1:3000）——
         #    脚本于是报"填写访问令牌失败"，而真因是**我读错了框**。
         fresh = dump_nodes(args.idb, args.companion, args.udid)
-        tx, ty, tw, th = frame_of(node)
-        back = None
-        for n in fresh:
-            if not is_field(n):
-                continue
-            if frame_of(n) == (tx, ty, tw, th):
-                back = n.get("AXValue")
-                break
+        back = readback_after_set(fresh, node)
         if back is None:
             kb = dismiss_keyboard(args.idb, args.companion, args.udid)
             if kb.get("present") == "True":
                 time.sleep(0.5)
             fresh = dump_nodes(args.idb, args.companion, args.udid)
-            for n in fresh:
-                if is_field(n) and frame_of(n) == (tx, ty, tw, th):
-                    back = n.get("AXValue")
-                    break
+            back = readback_after_set(fresh, node)
         if back is None:  # 兜底：frame 变了（布局移动）时退回按标签找
             for n in fresh:
                 if is_field(n) and label_of(n) == label_of(node):

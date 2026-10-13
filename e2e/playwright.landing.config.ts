@@ -52,7 +52,13 @@ export default defineConfig({
   forbidOnly: !!process.env['CI'],
   retries: 1,
   workers: 1,
-  reporter: process.env['CI'] ? [['list'], ['github']] : [['list']],
+  // 🔴 必须带载体健康报告器：dev server / preview 中途没了要停下，而不是把剩下的红
+  //    逐条报成产品失败。`check:e2e-carrier` 逐份盯三份进链的配置。
+  reporter: [
+    ['list'],
+    ...(process.env['CI'] ? [['github'] as const] : []),
+    ['./reporters/carrier-health.mjs'],
+  ],
   timeout: 90_000,
   expect: { timeout: 15_000 },
 

@@ -35,6 +35,8 @@ const FALLBACK_SENTENCES: Record<AiFailureReason, string> = {
   'no-route': '没有可用端点能处理这个功能。检查端点是否启用、地址是否合法。',
   'egress-not-authorized': '这个功能还没有授权把数据发到所选端点。去「设置」里逐功能授权。',
   'fallback-needs-consent': '首选端点失败了，而备用端点会把数据发到别处，所以没有自动切换。需要你重新授权。',
+  'consent-not-granted':
+    '这台设备设为「只用本机」，还没有批准任何网络请求，所以一个字都没发出去。要使用它，请在设置里重新选择「同意并联网」。',
   network: '连不上端点。检查它是不是在运行。',
   'http-error': '端点返回了错误。',
   'empty-response': '端点返回了空内容。',

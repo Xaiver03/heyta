@@ -434,7 +434,7 @@ EGRESS_ORDER_NOTE = '顺序：先展示会发送哪些字段 → 用户确认 �
 |---|---|
 | `DEFAULT_TIMEOUT_MS`（私有） | `30_000` |
 | 关闭态返回 | `{ ok:false, reason:'not-configured', message:'AI 未启用。在设置里选择"使用自己的 AI 端点"即可开启。' }` |
-| `AiFailureReason` | `'not-configured' \| 'egress-not-authorized' \| 'network' \| 'http-error' \| 'empty-response' \| 'no-route' \| 'fallback-needs-consent'` |
+| `AiFailureReason` | `'not-configured' \| 'egress-not-authorized' \| 'consent-not-granted' \| 'network' \| 'http-error' \| 'empty-response' \| 'no-route' \| 'fallback-needs-consent'` |
 
 ---
 
@@ -515,6 +515,7 @@ DEFAULT_FEATURE_CAPABILITIES = {
 | `http-error`（400/422） | ✅ | ❌ |
 | `empty-response` | ✅ | ✅ |
 | `egress-not-authorized` | ❌ | ❌ |
+| `consent-not-granted` | ❌ | ❌ |
 | `fallback-needs-consent` | ❌ | ❌ |
 | `not-configured` | ❌ | ❌ |
 | `no-route` | ❌ | ❌ |
@@ -527,6 +528,14 @@ DEFAULT_FEATURE_CAPABILITIES = {
 
 `'egress-not-authorized'` 与 `'fallback-needs-consent'` 换下一个端点**不是"重试"，
 是"换一个目的地偷发"**。
+
+🔴 `'consent-not-granted'` 是 2026-10-06 追加的第 8 枚（traps **#353**，rig52 在 iOS 上照出来）：
+它和 `'egress-not-authorized'` 同为"闸门没放行"，但**挡的位置不同** —— 后者是**逐功能**出境授权
+（目的地已经定了），前者是**设备级**的隐私同意（`createConsentGatedFetch` 在任何 `fetch` 之前就抛
+`PrivacyConsentBlockedError`，回环端点也不例外）。把它归成 `'network'` 会同时骗两个人：
+用户被支去查网络，而一枚从没被访问过的端点挨了一笔熔断锅。契约字符串
+`PRIVACY_CONSENT_BLOCKED_MARKER` 与那个错误类现在住在 `packages/ai/src/egress.ts`
+（失败词表的所有者），`packages/app-host` 只 re-export。
 
 「跳闸」的判据是**连续**失败（默认阈值 3），一次成功立刻清零。
 

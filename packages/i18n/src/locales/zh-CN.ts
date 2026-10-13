@@ -362,6 +362,7 @@ export const zhCN = {
 
   // ── 落地页 · 页脚 ─────────────────────────────────────────
   'landing.footer.tagline': '本地优先的任务管理。数据先落本地，云端只是同步通道。',
+  'landing.footer.disclaimer': '个人项目，与滴答清单 / TickTick 及其关联公司无任何关系。',
   'landing.footer.group.product': '产品',
   'landing.footer.group.gettingStarted': '上手',
   'landing.footer.pricing': '价格',
@@ -847,6 +848,7 @@ export const zhCN = {
   // 「登…」——那等于没有状态。所以那一档显示稳定的控制名，整句仍走 aria-label 与 live region。
   'web.sync.rail.compact': '同步',
   'web.sync.settings.title': '同步设置',
+  'web.sync.settings.close': '关闭同步设置',
   // H9 第 3 刀：这一节说明"同步到底把什么送出去"。原来的「关闭同步设置」随着
   // 那层同级浮层一起删掉了 —— 一节设置没有"关闭"这个动作，退出设置就有出口。
   'web.settings.sync.note': '任务先保存在本机。登录 heyta 后可在设备间自动同步，服务端只接收加密的任务数据。',
@@ -2598,6 +2600,7 @@ export const zhCN = {
   // ⚠️ 别在这里重新概括：同一句用户可见文案有两个来源就一定会漂移（见 §7.10 通道 #5）。
   // ⚠️ 引号照抄 `packages/ai`（ASCII 双引号）—— 有测试逐字比对，别改成「」。
   'web.ai.failure.cause.notConfigured': 'AI 未启用。在设置里选择"使用自己的 AI 端点"即可开启。',
+  'web.ai.failure.cause.consentNotGranted': '这台设备设为「只用本机」，还没有批准任何网络请求，所以这一发一个字都没出去。要使用它，请在设置里重新选择「同意并联网」。',
   'web.ai.failure.cause.egressNotAuthorized': '该功能需要你先批准内容离开本机。',
   'web.ai.failure.cause.noRoute': '没有可用端点能处理这个功能。检查端点是否启用、地址是否合法。',
   'web.ai.failure.cause.fallbackNeedsConsent': '首选端点失败了，而备用端点会把数据发到别处，所以没有自动切换。需要你重新授权。',
