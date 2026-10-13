@@ -10378,3 +10378,57 @@ cd apps/web && ./node_modules/.bin/vitest run                          # 全量
 
 **本线的处置**：不改判据、不改那枚 spec、不动 `packages/ui`。T7 那一腿的"全量绿"读数因此**只能报到 `1 failed`**，
 并把它归到这一格。
+
+**追记（2026-10-14 01:5x @ `c8557604`）：还在红，且红的是同一枚形状 —— 上面那两种读法一种都没被排除。**
+```bash
+cd apps/web && ./node_modules/.bin/vitest run tests/ai-disclosure-parity.spec.tsx
+```
+`× 🔴 「发给谁」那一行的四段之间必须有分隔，不许逐字黏成一串` ⇒
+`AssertionError: expected { '哪些段后面直接粘着下一段': [ '云端首选', …(2) ] } to deeply equal { …: [] }`；
+同文件另一条 `✓ 回退链与 E2EE 警告在每一个入口都必须出现`、汇总 `Tests 1 failed | 1 passed (2)`。
+⇒ 本线 T7 那两条全仓腿的结论**不变**（仍只能报"未闭合，且拦路格不是本线的"）。
+
+## B194（2026-10-14 01:5x，本会话 · 共享树里那 12 枚 `apps/web/evidence/inbound-recovery/*.png`：落点是本线 spec 写死的，可这一批**没有任何一趟读数对得上**）
+
+**为什么这一格值得单独登记（它不是"又有脏文件"这么轻）**：`e2e/tests/inbound-automation.spec.ts:6` 把证据目录
+写成了 `const evidence = '../apps/web/evidence/inbound-recovery'`，而 `:75/:137/:142` 写死的文件名就是现在脏的那 12 枚
+（`draft-{w}-{theme}.png`、`form-*`、`retry-*`）。⇒ **谁在共享树里重跑 AC-6 那条腿，谁就把这批逐名覆掉**，
+覆完既看不出少过什么，也没有任何一层会红（计划 `:1647` 与 PROGRESS `:2691/:3181` 早就写明这趟"故意留脏、不入库"）。
+
+**现量（2026-10-14 01:5x，`c8557604` 这棵树）**
+```bash
+ls -lT apps/web/evidence/inbound-recovery/          # 12 枚的 mtime 全是同一秒 Oct 13 12:21:20
+git status --porcelain -- apps/web/evidence/inbound-recovery/   # 8 枚 ` M` + 4 枚 `??`（draft-*）
+git log --oneline -1 -- apps/web/evidence/inbound-recovery/     # 9fa53ab9（10-08 21:31）—— HEAD 那份是 10-08 的
+grep -rn "inbound-recovery" --include=*.md .        # docs/research/inbound-automation-review.md:355 引用其中两枚
+```
+读得出与读不出的都要写清：
+- **读得出**：这批字节**不是** HEAD 里的那份，而 HEAD 里那份 10-08 之后没被任何一笔动过；
+  `docs/research/inbound-automation-review.md:355` 那两枚链接（`before-retry-390-dark.png`、`retry-390-dark.png`、
+  `form-1280-light.png`）指的是**已提交**的那些字节 ⇒ 现在被引用的字节与工作树里躺着的字节已经不一致。
+- **读不出（这就是"归属不可证"）**：12 枚 mtime **同一秒** ⇒ 这是**一次批量写入**，不是一趟 e2e
+  （那趟要 2.2 分钟，`draft/form/retry` 三组不可能挤在一秒里）。同时段 `.run-logs` 里 12:0x–12:5x 全是
+  别线的 `r107/r108/ux-013b/ux-013c/web-suite-navfix.*`，而 `18efc229` 那场 103 处冲突的 merge 正落在 12:21。
+  两种解释（别线跑过本线那枚 config / 那次 merge 或某次 `cp` 把它们带进共享树）**本线都证不了**。
+
+**本线的处置**：不提交、不覆写、不删除（那 4 枚 `??` 与 8 枚 ` M` 都不是本会话写的，`只对自己创建的对象动手`）。
+本会话也没跑那趟 e2e ⇒ 台账里"AC-6 仍 2 failed / 4 passed"那句**继续按 `4193dabd` 那趟报**，不冒用今天的名义。
+⚠️ 顺带更正两处本线自己写错的归属（PROGRESS `:4241` 与本会话 01:5x 那格曾把这批说成"别线的落点"）：
+**落点是本线 spec 的，写的却不是本线本会话** —— 这两句要分开，否则下一个人会以为重跑无成本。
+
+**要谁做 / 最小动作**（本线无权，三条都不许顺手做）：
+1. 负责人或本线下一趟：若要 AC-6 在**当前 tip** 的读数，**只在隔离副本里跑**（共享树那 12 枚别当输出目录），
+   跑完当场把 `n failed / m passed` + 载体 tip 记进 PROGRESS，别让图再次跑在无读数状态里。
+2. `docs/research/inbound-automation-review.md:355` 那三枚链接要么改指 `docs/research/evidence/inbound-automation-review/`
+   下那批（该目录在白名单内、且是被提交过的），要么把这批脏图按一趟**有读数**的跑重新生成后一并提交 —— 二选一，别两头都不做。
+3. ⚠️ 反作弊提醒：这一格**不是**判据缺陷，别给证据图加哈希尺去"钉住"它们 ——
+   计划 `:2231` 写明复跑产物"载体内，不入库"，加尺等于把一条有意的一次性约定变成一条永真约束。
+
+## B140 追记（2026-10-14 01:5x @ `c8557604`，静态复量：**拦路那句 `active` 仍然没有**）
+
+`grep -n "<InboundAutomationSettings" apps/web/src/features/settings/AiSettings.tsx` →
+`1270:      <InboundAutomationSettings routing={settings.routing} consents={settings.consents} secretStore={secrets} />`
+—— 行号从记初的 `:1262` 漂到 `:1270`（别线在这枚文件里加过东西），**但三个 props 仍是 `routing`/`consents`/`secretStore`，
+没有 `active`** ⇒ AC-6 那 2 枚红的根因原样在位，本线继续不代改（挂载点归属方是 AI 线 / `App.tsx`）。
+判据不变：那两枚红要么由 `active` 一句消，要么由负责人改 AC-6 的口径，两条都不在本线地界内。
+

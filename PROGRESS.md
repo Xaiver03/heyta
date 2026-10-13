@@ -4308,15 +4308,48 @@ B191 那格记的 **37 枚"收集阶段就死"随 B192 闭合一起消失**，�
 **组跑读数（当前 HEAD `8da4ee1a`）**：`apps/web` 那 7 枚 `tests/inbound-*` → `Test Files 7 passed (7)` /
 `Tests 18 passed (18)`，与上一格基线**相等**（只许 ≥ ⇒ 成立，没删也没跳过）。
 
-**边界**：只动了那一枚 spec 与本文件。**别线此刻正在写的落点一枚字节都没碰、也没提交** ——
-`apps/web/evidence/inbound-recovery/*.png`（8 改 4 新）、`apps/mobile/evidence/profile-center/android-r99-fixed/`
-都留在工作树里。⚠️ 上一格还红的 `scripts/qa/reminders-data-responsive.mjs` 这次已不在 `git status --porcelain` 里
+**边界**：只动了那一枚 spec 与本文件。工作树里另有 12 枚 `apps/web/evidence/inbound-recovery/*.png`（8 改 4 新）
+与 `apps/mobile/evidence/profile-center/android-r99-fixed/` 本会话没碰、没提交、没删。
+⚠️ **归属更正（这一句把我上一格那句话说错了，按 §8 就地重述而不是留着一个假口径）**：
+我先前把那 12 枚写成"别线的落点"，**错在落点** —— `e2e/tests/inbound-automation.spec.ts:6` 把证据目录写死成
+`../apps/web/evidence/inbound-recovery`，`:75/:137/:142` 写的文件名就是现在脏的那 12 枚 ⇒ **落点是本线 spec 自己的**，
+计划 `:1647` 与本文件 `:2691/:3181` 早就记过"跑这趟会故意把它留脏、不入库"。
+**但"写的不是本会话"这一半仍然成立**（12 枚 mtime 全挤在同一秒 `Oct 13 12:21:20` ⇒ 一次批量写入，不是那趟要 2.2 分钟的跑），
+两种来源本线都证不了 ⇒ 连同"被引用的字节与树里躺的字节已经不是一份"一起登记成 **B194**。
+⚠️ 上一格还红的 `scripts/qa/reminders-data-responsive.mjs` 这次已不在 `git status --porcelain` 里
 —— 是**别线自己把它提交了**（不是本线动的），所以 porcelain 从 16 变 15，**这条变化不许记成本线的读数**。
-**没有 push。**
 
 **交付不变量（同一戳现量，2026-10-14 01:5x）**：
 `grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` → **0**（未勾仍 **8**）；
 `node research/tools/license-inventory.mjs` → **rc=0**；`node scripts/check-migrations.mjs` → **rc=0**；
 `git status --porcelain | wc -l` → **15**，其中本线只 2 枚（spec + 本文件），其余 12 枚全在白名单外、非本线落点。
+
+**落点**：那笔 spec 的改动以 `c8557604`（父 `ee986bf7`）入库，`git show --stat` = **2 files changed**
+（`PROGRESS.md` + `apps/web/tests/inbound-due-timezone.spec.tsx`），提交前后 `git diff --cached --name-only | wc -l` 都是 **0**。
+⚠️ 提交用的是 `git commit -- <点名路径>` 那种 pathspec 形式（共享索引，`git add` + 裸 `commit` 会把别线暂存的东西一起吃进来）。
+
+## 2026-10-14 02:0x · 两条别线拦路格在新 tip 的复量（B193 仍红、B140 仍缺那句 `active`）+ 为什么这一趟**不重跑** AC-6 的 e2e
+
+**复量了两条，都是一条命令就能判的**：
+- **B193**：`cd apps/web && ./node_modules/.bin/vitest run tests/ai-disclosure-parity.spec.tsx`
+  ⇒ `Tests 1 failed | 1 passed (2)`，正文仍是
+  `expected { '哪些段后面直接粘着下一段': [ '云端首选', …(2) ] } to deeply equal { …: [] }`。
+  ⇒ 第 105 道（`pnpm -r test`）与"全仓绿"那条收口判据**照旧只能报未闭合**，且拦路格不是本线的。
+- **B140**：`grep -n "<InboundAutomationSettings" apps/web/src/features/settings/AiSettings.tsx`
+  ⇒ `1270: <InboundAutomationSettings routing=… consents=… secretStore=… />` —— 行号从 `:1262` 漂到 `:1270`
+  （别线在这枚文件里加过东西），**但三个 props 里没有 `active`** ⇒ AC-6 那 2 枚红的根因原样在位。
+
+**为什么不重跑 AC-6 那条 e2e（这是一次选择，不是遗漏，写清楚免得下一趟以为欠着）**：
+1. 结论已被上面那枚静态复量定住 —— 挂载点仍缺 `active`，跑也是同一枚红，而**AC-6 因此继续不勾**（不许因为"多跑过"就往完成挪）。
+2. **载体不在了**：`.worktrees/inb-t8`（那棵从零建起来、装过依赖也建过产物的隔离副本）现在
+   `git -C .worktrees/inb-t8 rev-parse` → **exit 128**（已被回收）。要跑就得先重造一棵：install + build 的代价全花在一个
+   **已经能静态判出**的读数上。
+3. 🔴 **共享树里跑它会覆掉那批无读数的图**（B194 的第 1 条动作就是这么写的：要当前 tip 的读数**只在隔离副本里跑**）。
+   上一格记的那条纪律同样管用：`:4468` 先 `lsof` 确认空闲（本轮确认过：空闲）、配置 `strictPort` + `reuseExistingServer: false`。
+
+**本轮动的落点**：`apps/web/tests/inbound-due-timezone.spec.tsx`（已入库 `c8557604`）、`PROGRESS.md`、`BLOCKED.md`
+（B193 追记 + B140 追记 + 新增 B194）。**没有 push**；AC 已勾数仍 **0**。
+**还欠的**：B140/B169/B175/B185/B190/B193/B194 都归负责人或别线，本线一行不代改。
+
 
 
