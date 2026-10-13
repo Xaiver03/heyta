@@ -660,13 +660,35 @@ wait_laptop_has() {  # <标题> <轮数>，每轮 5 秒；默认 60 轮 = 300 �
 #    （21:57:47 别人往同一台模拟器重装了 APK，随后的验证量的是清过数据的新实例）。
 #    调用方因此把它当**只报不判**的诊断用（见 `verify-mobile-trash.sh` 第 2 步），
 #    别把它的返回值当"界面上看得见"的判据。
+# 在**当前真正可滚的那块区域**里滑一段（默认向上=内容往上走）。
+# 为什么不写死坐标：见 `_xy.py` 里 `scroll-region` 那段 —— 键盘会把可滚区域的下缘
+# 从 2400 抬到 1580，写死的 1900 起点就落在键盘上，滑动不作用于内容，而调用方只看到
+# "找不到输入框"。找不到可滚容器时**回退到历史常量**（保持旧行为，不静默改成别的几何）。
+swipe_in_view() {  # [up|down]
+  local dir="${1:-up}" g
+  g=$(python3 "$XY_PY" scroll-region "$dir" 0 2>/dev/null)
+  if [ -n "$g" ]; then
+    $ADB shell input swipe $g 250
+  else
+    case "$dir" in
+      down) $ADB shell input swipe 540 1100 540 1900 300 ;;
+      *)    $ADB shell input swipe 540 1900 540 1100 250 ;;
+    esac
+  fi
+}
+# 失败时把几何印进日志：让"找不到"这条红自带原因（节点在不在树里、bounds 是不是退化、
+# 可滚区域现在多大），不需要人为再另起一次探针。
+geom_of() {  # <标签>
+  python3 "$XY_PY" geom "$1" 0 2>/dev/null
+}
+
 scroll_up_until_text() {  # <文本> [最多滚几次=4]
   local want="${1:-}" n="${2:-4}" i
   [ -z "$want" ] && return 1
   for ((i = 0; i <= n; i++)); do
     dump
     [ "$(has_text "$want")" = "1" ] && return 0
-    $ADB shell input swipe 540 1100 540 1900 300; sleep 1.2
+    swipe_in_view down; sleep 1.2
   done
   return 1
 }
@@ -678,7 +700,7 @@ scroll_to_desc() {
     dump
     XY=$(python3 "$XY_PY" desc-sane "$1" 0)
     if [ -n "$XY" ]; then printf '%s' "$XY"; return 0; fi
-    $ADB shell input swipe 540 1900 540 1100 300; sleep 1.5
+    swipe_in_view; sleep 1.5
   done
   return 1
 }
@@ -689,7 +711,7 @@ scroll_to_text() {
     dump
     XY=$(python3 "$XY_PY" text-sane "$1" 0)
     if [ -n "$XY" ]; then printf '%s' "$XY"; return 0; fi
-    $ADB shell input swipe 540 1900 540 1100 250; sleep 1.5
+    swipe_in_view; sleep 1.5
   done
   return 1
 }
@@ -702,7 +724,7 @@ scroll_to_edit() {
     dump
     XY=$(xy_edit_sane "$1")
     if [ -n "$XY" ]; then printf '%s' "$XY"; return 0; fi
-    $ADB shell input swipe 540 1900 540 1100 250; sleep 1.5
+    swipe_in_view; sleep 1.5
   done
   return 1
 }
@@ -1392,6 +1414,53 @@ if mode == 'editval':
     print(vals[nth] if len(vals) > nth else '')
     raise SystemExit
 
+if mode in ('scroll-region', 'geom'):
+    # `scroll-region`：回"该往哪儿滑"的四个数（swipe 的参数），**量的是当前真正可滚
+    #   的那块区域**。写死 `540 1900 → 540 1100` 的两处实测失效（2026-10-14，
+    #   「同步与隐私」的自托管表单）：软键盘起来后可滚区域从 `[0,210][1080,2400]`
+    #   缩到 `[0,210][1080,1580]`，于是 1900 这个起点**落在键盘上**，滑动根本
+    #   不作用在内容上 —— 而调用方只会看到"找不到输入框"。
+    # `geom`：回某个标签所在节点的**原始 bounds**，包括被裁掉时那种 top > bottom
+    #   的退化形状，外加当前可滚区域 —— 让"找不到"这条红自己带上几何，
+    #   不必人为另起一次探针。
+    regions = []
+    label_hit = None
+    for m in re.finditer(r'<node[^>]*?>', s):
+        tag = m.group(0)
+        b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', tag)
+        if not b:
+            continue
+        x1, y1, x2, y2 = map(int, b.groups())
+        if 'scrollable="true"' in tag and y2 > y1:
+            regions.append((y2 - y1, x1, y1, x2, y2))
+        if mode == 'geom' and label_hit is None and want:
+            lab = ((re.search(r'\stext="([^"]*)"', tag) or [None, ''])[1] or '') + \
+                  ((re.search(r'content-desc="([^"]*)"', tag) or [None, ''])[1] or '')
+            if want in lab:
+                label_hit = (x1, y1, x2, y2)
+    if not regions:
+        print('')
+        raise SystemExit
+    regions.sort(reverse=True)
+    _, rx1, ry1, rx2, ry2 = regions[0]
+    cx = (rx1 + rx2) // 2
+    h = ry2 - ry1
+    from_y = ry2 - max(140, int(h * 0.12))
+    to_y = ry1 + int(h * 0.30)
+    if mode == 'scroll-region':
+        if want == 'down':
+            print(f"{cx} {ry1 + max(140, int(h * 0.12))} {cx} {ry2 - int(h * 0.30)}")
+        else:
+            print(f"{cx} {from_y} {cx} {to_y}")
+    else:
+        if label_hit:
+            lx1, ly1, lx2, ly2 = label_hit
+            print(f"标签 bounds=[{lx1},{ly1}][{lx2},{ly2}] 高度{'正' if ly2 > ly1 else '退化(被裁)'}"
+                  f" 可滚区=[{rx1},{ry1}][{rx2},{ry2}]")
+        else:
+            print(f"标签不在树里 可滚区=[{rx1},{ry1}][{rx2},{ry2}]")
+    raise SystemExit
+
 hits = []
 for m in re.finditer(r'<node[^>]*?>', s):
     tag = m.group(0)
@@ -1461,7 +1530,7 @@ scroll_to_rid() {  # <testID> —— 与 `scroll_to_text` 同一形状，只是�
     dump
     XY=$(xy_rid "$1")
     if [ -n "$XY" ]; then printf '%s' "$XY"; return 0; fi
-    $ADB shell input swipe 540 1900 540 1100 250; sleep 1.5
+    swipe_in_view; sleep 1.5
   done
   return 1
 }
@@ -1551,7 +1620,11 @@ configure_sync_credentials() {
     #    中心落在底部标签栏上，而「访问令牌」「端到端加密口令」整枚节点还不在无障碍树里
     #    （折叠线以下）。按旧写法只 dump 一次就找，后两个字段必然"找不到"。
     XY=$(scroll_to_edit "$desc")
-    if [ -z "$XY" ]; then bad "找不到输入框（滚了 5 次也没进可点区）：$desc"; continue; fi
+    if [ -z "$XY" ]; then
+      bad "找不到输入框（滚了 5 次也没进可点区）：$desc"
+      bad "  几何：$(geom_of "$desc")"
+      continue
+    fi
     $ADB shell input tap $XY; sleep 1.2
     # 传标签进去 → `clear_and_type` 会读回、把丢掉的字符补上（高负载下会丢）。
     clear_and_type "$val" "$desc"
