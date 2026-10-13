@@ -75,7 +75,7 @@ goal 的收口条件「iOS 设备腿取到读数」在这一趟**闭合**，包�
 | `check:reachability` 红（`COMMENT`） | 🔴 **仍红** | `🔴 断言 B 不通过：1 个已建模的实体零写路径` ⇒ `COMMENT` 已建模、零写路径 |
 | `check:layering` 红（`SHARE_KEY`） | ✅ **已绿** | RC=0（别线已修） |
 | `check:ui-language` 红 | ✅ **已绿** | RC=0（别线已修） |
-| `check:verify-script-copy`（2 枚 needle） | 🔴 **仍红** | `缺失 scripts/lib/mobile-e2e.sh:1475` 与 `scripts/verify-mobile-habits.sh:631`，都是 `"填好服务器地址与访问令牌后才能同步。"` |
+| `check:verify-script-copy`（2 枚 needle） | ✅ **10-13 19:5x 由产品体验线换完**（本行原先的"仍红"讲的是 `HEAD` 上那两枚旧针，现已不成立） | 现量：`缺失 scripts/verify-mobile-ai.sh:1666 [substr] "AI 只给建议"` + `SUMMARY … 缺失=1`。原先那两枚（`scripts/lib/mobile-e2e.sh` / `scripts/verify-mobile-habits.sh:631`，钉的是 `mobile.profile.sync.notConfigured` 的旧值）已换成该词条的**当前值**，并带真设备正对照 `apps/mobile/evidence/profile-center/android-r108-syncneedle/probe.json`；剩下的那枚归改语义的 `c8f63370` 那一线（判据口径不代改）。取证与边界见 `docs/plans/product-ux-optimization.md` 10-13 19:5x 那两格 |
 | `check:integration-coverage`（1 枚用例） | 🔴 **仍红** | `inbound-dual-host-fault-windows.integration.spec.ts` 盘上有、`test:integration:postgres` 没点名 |
 | `check:adr-numbering` | ✅ RC=0 | 本线改号那笔仍然有效 |
 
