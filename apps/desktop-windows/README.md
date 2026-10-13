@@ -176,7 +176,7 @@ HeytaApp.open 失败：'c' is an invalid start of a value. LineNumber: 0
 |---|---|
 | ~~没有开窗截图~~ | ✅ **已关闭（2026-09-28）**：在真机的**交互式桌面会话**里启动并截图成功 —— `MAIN_WINDOW_HANDLE=328280`、`MAIN_WINDOW_TITLE=heyta`、`1152x587`、`DB_EXISTS=True`。见 [`evidence/`](evidence/)。复现步骤见 §7 |
 | **打包 / 签名 / 安装器** | 未做（MSIX 与签名证书都缺）；目前只能 `dotnet build` 出 exe |
-| **系统小组件** | 未做。widgets 要求 **packaged app** + 一个独立的 `IWidgetProvider` COM exe server；计划 §2.3 W2 |
+| **系统小组件** | 已实现独立 `HeytaWidgetProvider` COM exe、MSIX 注册、四模板与加密数据桥；中间包安装启动及原生数据探针通过。**测试机缺微软 Widgets host，Board 添加和交互仍未验收**，见 [UX-S9-138](../../docs/plans/product-ux-optimization.md)。 |
 | **同步未接线** | facade 故意不传 `serverUrl` ⇒ 不建同步客户端。要接的时候是**在 facade 加一个函数**，不是把同步写进 C# |
 | 🔴 **销毁的「句柄还被占着」那一档，本机验不到** | 驱动侧的 `removeDatabase()` **已实现且有判据**（冒烟 §9/§10：经宿主边界的 `oplog-destroy` 回 `containerRemoved:true`、`target` 是真路径、主文件与 `-wal`/`-shm` 一个不剩、删不掉时报 ASCII 原因而**不抛**）。⚠️ **但 POSIX 上"带着打开的句柄删除"恒成功**，所以"删不掉"这一档在这台机器上**永远不会红**：变异「拿掉 `SqliteConnection.ClearPool()`」本机 34/34 全绿。而 `Microsoft.Data.Sqlite` 默认开连接池，实测 `Close()` 之后 `lsof` 仍看得见那个库（`ClearPool()` 之后才消失）—— Windows 上那是 `ERROR_SHARING_VIOLATION`。**⇒ 这一半只能在真 Windows 上判**（`pnpm check:windows-shell`），本机绿不代表它没问题 |
 | **界面只有任务列表** | 象限 / 清单 / 标签 / 重复 / 备注编辑 / 设置都还没有门面 |

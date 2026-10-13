@@ -148,6 +148,9 @@ importers:
       '@heyta/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
+      '@heyta/legal':
+        specifier: workspace:*
+        version: link:../../packages/legal
       '@heyta/local-api':
         specifier: workspace:*
         version: link:../../packages/local-api
@@ -315,6 +318,9 @@ importers:
       '@heyta/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
+      '@heyta/legal':
+        specifier: workspace:*
+        version: link:../../packages/legal
       '@heyta/local-api':
         specifier: workspace:*
         version: link:../../packages/local-api

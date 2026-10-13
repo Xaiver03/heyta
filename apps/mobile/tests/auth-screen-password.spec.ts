@@ -368,6 +368,22 @@ describe('注册确认密码与强度提示', () => {
   });
 });
 
+describe('注册协议阅读与口令提示', () => {
+  it('官方服务在应用内打开协议弹层，自托管仍打开运营者自己的页面', () => {
+    expect(code).toMatch(/legalDocumentById\(openLegalDocument\)/);
+    expect(code).toMatch(/officialLegalLinks/);
+    expect(code).toMatch(/openLegalDocumentOrLink\('terms'\)/);
+    expect(code).toMatch(/openLegalDocumentOrLink\('privacy'\)/);
+    expect(code).toMatch(/<LegalDocumentSheet/);
+    expect(code).toMatch(/visible/);
+    expect(code).toMatch(/onClose=\{\(\) => setOpenLegalDocument\(null\)\}/);
+  });
+
+  it('密码输入区不再消费无行动价值的 passwordHint', () => {
+    expect(code).not.toMatch(/hint=\{mode === 'register'[^}]*passwordHint/);
+  });
+});
+
 describe('移动端认证请求代际隔离', () => {
   it('切换服务端与卸载时会递增代际，延迟响应不能恢复旧状态', () => {
     expect(code).toMatch(/authGeneration\.current \+= 1/);

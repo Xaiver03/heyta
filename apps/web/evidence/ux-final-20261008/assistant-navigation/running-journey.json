@@ -1,0 +1,16 @@
+{
+  "route": [
+    "任务",
+    "日历",
+    "任务"
+  ],
+  "light": "running",
+  "dark": "running",
+  "stubCalls": 2,
+  "toolSteps": [
+    0,
+    1
+  ],
+  "assistantCountAfterRelease": 1,
+  "result": "completed-after-release"
+}

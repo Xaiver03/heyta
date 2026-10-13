@@ -28,18 +28,19 @@ package com.heytamobile.widget
  * | 没有快照 / 解不开 | 占位："打开 Heyta 以显示小组件" |
  * | 快照过期（过了 `validUntil`） | "数据已过期，打开 Heyta 刷新" |
  * | `active == false` | "没有进行中的专注" |
- * | `active == true` | 会话标题 + **目标时长**（一个不会随时间变的量）+ "在应用里查看" |
+ * | `active == true` 且有 `endsAt` | 会话标题 + **目标时长** + 运行中 |
+ * | `active == true` 且没有 `endsAt` | 会话标题 + **目标时长** + 已暂停 |
  *
  * 目标时长（`targetSeconds`）是**静态事实**，过多久都不会过期；
  * 而"还剩多久"是动态事实，**没有锚点就不该猜**。
  *
- * ## 正确的修法（已记进账本，下一步做）
+ * ## 动态倒计时的后续边界
  *
  * 给 `WidgetFocus` 加一个**绝对**字段 `endsAt`（epoch ms，`FocusState` 里本来就有）。
- * 原生于是能算 `remaining = endsAt - now` —— 那是**它已经有权做的事**
- *（它本来就在判 `now >= validUntil`）。这是一次**契约变更**，
- * 要四端解析器 + 黄金夹具一起动，所以**必须现在做**（iOS / Windows 还没开始，
- * 现在改最便宜），而不是等四端都有实现之后再改。
+ * 原生于是能区分运行与暂停；将来若要显示动态剩余时间，也能算
+ * `remaining = endsAt - now` —— 那是**它已经有权做的事**
+ *（它本来就在判 `now >= validUntil`）。本轮只用它识别运行/暂停；真正把动态倒计时
+ * 画到四端组件仍需同步更新四端渲染器与黄金夹具，不能只改 Android。
  *
  * ⚠️ 在那之前，**宁可少显示一个数字，也不显示一个错的数字**。
  */
@@ -57,14 +58,17 @@ enum class FocusWidgetState {
 
     /** 快照可信，且快照发布时有一场专注在进行。 */
     ACTIVE,
+
+    /** 快照可信，且当前专注已暂停。 */
+    PAUSED,
 }
 
 data class FocusWidgetModel(
     val state: FocusWidgetState,
     val dayStr: String?,
-    /** 仅 [FocusWidgetState.ACTIVE] 时非 `null`。 */
+    /** 仅 [FocusWidgetState.ACTIVE] / [FocusWidgetState.PAUSED] 时非 `null`。 */
     val sessionTitle: String?,
-    /** 本轮目标秒数。仅 ACTIVE 时有意义 —— 它是静态事实，不会随时间变。 */
+    /** 本轮目标秒数。运行中或暂停时有意义 —— 它是静态事实，不会随时间变。 */
     val targetSeconds: Int?,
 ) {
     companion object {
@@ -95,7 +99,10 @@ object FocusWidgetModelBuilder {
         }
 
         return FocusWidgetModel(
-            state = FocusWidgetState.ACTIVE,
+            // 当前发布方只在 running 状态提供 endsAt；暂停后 endsAt 被省略。
+            // 这是向前兼容的可选字段，因此来自旧版本的 active 快照也会落入
+            // PAUSED，显示“已暂停/打开应用查看”，不会伪称正在运行。
+            state = if (focus.endsAt == null) FocusWidgetState.PAUSED else FocusWidgetState.ACTIVE,
             dayStr = content.dayStr,
             // ⚠️ 契约里 `sessionTitle` 可为空（用户常常不填）—— 视图层据此换成
             //    一个通用标题，而不是画一个空字符串（那会看起来像渲染坏了）。

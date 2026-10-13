@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.heytamobile.widget.WidgetStoreTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-08T04:59:39.282Z" hostname="邓湘雷-WIN" time="0.054">
+  <properties/>
+  <testcase name="cleanup prevents stale launcher clicks from recreating state" classname="com.heytamobile.widget.WidgetStoreTest" time="0.033"/>
+  <testcase name="acknowledgement preserves newer click on same task" classname="com.heytamobile.widget.WidgetStoreTest" time="0.007"/>
+  <testcase name="reads never write and failed persistence does not report success" classname="com.heytamobile.widget.WidgetStoreTest" time="0.003"/>
+  <testcase name="concurrent acknowledgements cannot erase another producer click" classname="com.heytamobile.widget.WidgetStoreTest" time="0.007"/>
+  <testcase name="read survives a new store instance until exact acknowledgement" classname="com.heytamobile.widget.WidgetStoreTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

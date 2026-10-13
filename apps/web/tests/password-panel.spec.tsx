@@ -232,6 +232,7 @@ describe('2. 🔴 后果在点之前就看得见', () => {
   it('长度提示念的是 shared-schema 里的那个数，不是写死的 8', () => {
     render();
     expect(text('password-hint')).toContain(String(AUTH_PASSWORD_MIN_CODE_POINTS));
+    expect(text('password-hint')).not.toContain('长一句比加符号有用');
   });
 });
 

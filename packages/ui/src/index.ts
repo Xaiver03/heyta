@@ -957,6 +957,15 @@ export {
   type PasswordStrengthLevel,
   type PasswordStrengthProps,
 } from './auth/PasswordStrength.js';
+export {
+  LegalDocumentSheet,
+  type LegalDocumentBlock,
+  type LegalDocumentLike,
+  type LegalDocumentLocale,
+  type LegalDocumentSection,
+  type LegalDocumentSheetLabels,
+  type LegalDocumentSheetProps,
+} from './auth/LegalDocumentSheet.js';
 
 /**
  * ── W7：失败句子**连同要填的数字**一起交出 ──

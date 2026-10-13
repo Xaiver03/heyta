@@ -169,11 +169,12 @@ export const zhCN = {
   'common.privacy.settings.accepted': '已同意与服务器通信',
   'common.privacy.settings.localOnly': '只用本机（未同意联网）',
   'common.privacy.settings.undecided': '还没有作出选择',
-  'common.privacy.settings.decidedAt': '决定于 {time}',
+  'common.privacy.settings.decidedAt': '决定于 {time}（UTC）',
   'common.privacy.settings.revoke': '撤回同意',
   'common.privacy.settings.revokeHint': '撤回后这台设备立刻停止对外请求（包括已经建立的实时连接），并重新询问一次。本地数据不受影响。',
   // 撤回之后（或从没决定过）界面必须留一条**能重新决定**的路，否则 PIPL 第 15 条
   // 只做到"能撤回"、没做到"撤回后还能方便地再同意"。
+  'common.privacy.settings.chooseHint': '需要同步或登录时，可以在这里重新选择是否联网。打开选择面板不会改变当前权限。',
   'common.privacy.settings.chooseAgain': '重新作出选择',
 
   // ── 落地页 · 通用 ─────────────────────────────────────────
@@ -903,7 +904,7 @@ export const zhCN = {
   'web.auth.email.label': '邮箱',
   'web.auth.email.placeholder': '你的邮箱地址',
   'web.auth.sendLoginLink': '发送登录链接',
-  'web.auth.register': '注册新账号',
+  'web.auth.register': '发送验证码',
   'web.auth.registrationCode.title': '验证邮箱',
   'web.auth.registrationCode.sent': '验证码已发送到 {email}，输入邮件中的 6 位数字完成注册。',
   'web.auth.registrationCode.label': '邮箱验证码',
@@ -918,7 +919,7 @@ export const zhCN = {
   'web.auth.passkey.unavailable': '这个浏览器或设备不支持通行密钥，用上面的邮箱方式即可。',
   'web.auth.passkey.waiting': '请在系统弹窗里完成通行密钥操作…',
   'web.auth.recovery.request': '丢失了通行密钥？发一封找回链接',
-  'web.auth.terms.label': '我同意该服务端提供的服务条款与隐私政策',
+  'web.auth.terms.label': '我同意服务条款与隐私政策，并允许本机联网',
   // ⚠️ 「或者」去掉了：这一栏现在住在自己的展开区里，前面没有并列项，
   // "或者"指向的是上一版把它放在表单末尾当兜底的形态。
   'web.auth.paste.label': '粘贴登录链接 / 令牌',
@@ -1219,10 +1220,15 @@ export const zhCN = {
   'web.widgetPush.title': '小组件后台刷新',
 
   // ── Web/Windows 的小组件旅程（先装成应用，卡片才会出现在面板里）──────
+  'web.widgetJourney.intro.nativeAvailable': '把今日任务、四象限、习惯与专注放进系统小组件。',
+  'web.widgetJourney.note.nativeAvailable': '从系统的小组件列表中添加 Heyta。添加后打开一次应用，即可刷新本机数据。',
+  'web.widgetJourney.native.macos.step1': '右键点按桌面空白处，选择「编辑小组件」；也可以在通知中心底部编辑小组件。',
+  'web.widgetJourney.native.windows.step1': '按 Win+W 打开小组件面板，进入添加小组件。',
+  'web.widgetJourney.native.choose': '搜索 Heyta，选择需要的卡片与尺寸后添加。',
   'web.widgetJourney.sectionTitle': '桌面小组件',
   'web.widgetJourney.intro': '在 Windows 上通过 Edge 安装网页版后，可在系统小组件面板中检查是否支持添加 heyta。',
   'web.widgetJourney.intro.native': '查看此桌面应用的小组件支持情况。',
-  'web.widgetJourney.intro.unsupported': '查看此设备的小组件支持情况。',
+  'web.widgetJourney.intro.unsupported': '在桌面或主屏幕快速查看任务与进度。',
   'web.widgetJourney.status.native': '正在原生桌面应用中运行',
   'web.widgetJourney.status.standalone': '已作为应用运行',
   'web.widgetJourney.status.browser': '正在浏览器标签页里运行',
@@ -1236,7 +1242,7 @@ export const zhCN = {
   'web.widgetJourney.other.step2': '装好后从应用列表里打开它',
   'web.widgetJourney.note.widgetSource': '卡片只来自已安装的应用 —— 一个没安装的网页不会出现在小组件面板里。',
   'web.widgetJourney.note.nativeShell': '当前桌面应用暂不支持系统小组件。你仍可在应用内查看任务、习惯与专注进度。',
-  'web.widgetJourney.note.unsupportedPlatform': '当前浏览器环境没有 Windows 小组件面板，但任务功能仍可正常使用。',
+  'web.widgetJourney.note.unsupportedPlatform': '浏览器页面不能直接添加系统小组件。请安装对应平台的 heyta 客户端，再从系统小组件列表添加。',
   'web.widgetPush.description': '开启后，任务在别的设备上发生变化时，Windows 上 pin 的 heyta 小组件会自动更新；关闭时只有打开 Heyta 才会刷新。',
   'web.widgetPush.rowLabel': '允许后台刷新小组件',
   'web.widgetPush.status.subscribed': '已开启',
@@ -3229,7 +3235,7 @@ export const zhCN = {
   'mobile.auth.email.placeholder': '你的邮箱地址',
   'mobile.auth.selfHost.open': '使用自建服务端',
   'mobile.auth.selfHost.close': '收起自建服务端设置',
-  'mobile.auth.terms.label': '我同意该服务端提供的服务条款与隐私政策',
+  'mobile.auth.terms.label': '我同意服务条款与隐私政策，并允许本机联网',
   // 🔴 服务端对 `termsAccepted` 用的是 `z.literal(true)`（规范 §2-A4）——
   //    "同意"这件事只能由用户做出。这句话是给用户的交代，不是客套。
   'mobile.auth.terms.hint': '这一项必须由你自己勾选——我们不会替你同意。',
@@ -3238,7 +3244,7 @@ export const zhCN = {
   'mobile.auth.link.unopenable': '这台设备上打不开网页，所以条款没能显示出来。',
   // 🔴 口令这条路是**主路**，摆在"别的方式"之上。两句不许写成「注册成功」/
   //    「登录成功」—— 点击只是**发出请求**，结果由状态区那一句说。
-  'mobile.auth.password.register': '用邮箱和密码注册',
+  'mobile.auth.password.register': '发送验证码',
   'mobile.auth.password.login': '用邮箱和密码登录',
   // 两条并列的路，不是同一条的快捷方式：邮件链接要多一步"去邮箱"。
   'mobile.auth.magicLink.login': '用邮件链接登录',
@@ -3417,6 +3423,9 @@ export const zhCN = {
   'mobile.vault.errorRotation': '服务端要求先完成全部加密数据迁移，才能更换这把钥匙。',
   'mobile.vault.logoutCleanupFailed': '加密钥匙未能从这台设备清除。凭据已清掉；请先重试清理，再使用这个账号。',
   'mobile.vault.retryCleanup': '重试清除加密钥匙',
+  'mobile.widgetCleanup.failed': '已退出登录，但这台设备上的小组件还没有清除。请重试。',
+  'mobile.widgetCleanup.retry': '重试清除小组件',
+  'mobile.widgetCleanup.retrying': '正在重试…',
   // 🔴 这句是**面向用户的陈述**，说错了就是应用在骗人 —— 迁移时可以"只搬不改"，
   // 但每做完一个功能就必须回来改它。原句是"日历、专注、清单与标签管理尚未实现"：
   //   日历（`CalendarScreen`）、专注（`FocusScreen`）先做完 → 去掉；
@@ -3674,20 +3683,23 @@ export const zhCN = {
   'mobile.trash.confirm.submit': '彻底删除',
   'mobile.trash.confirm.cancel': '取消',
 
-  // ── 导出（移动端第二层，入口在「我的」）──────────────────
+  // ── 备份与迁移（移动端第二层，入口在「我的」）──────────────
   // 🔴 导出文档本身的措辞、以及「不能导回来」这条诚实条款，**复用 Web 端
   // `web.export.*` 词条** —— 它们是「导出这件事」的措辞，不是 Web 壳的措辞。
   // 两端读同一批 key，就不可能出现「网页说不能导回来、手机没说」这种分歧。
   // 这里只新增移动端**独有**的：入口、按钮动词（分享而非下载）、分享提示。
-  'mobile.export.entry': '导出数据',
-  'mobile.export.entry.hint': '把数据带走（目前还不能导回来）',
+  'mobile.export.entry': '备份与迁移',
+  'mobile.export.entry.hint': '导出备份、恢复数据，或导入滴答清单',
+  'mobile.export.title': '备份与迁移',
+  'mobile.export.intro': '在这台设备上导出、恢复或迁移数据。导出在本机完成，不经过服务器。',
   'mobile.export.json.button': '分享 JSON',
   'mobile.export.markdown.button': '分享任务清单',
   'mobile.export.shareHint': '导出内容会交给系统分享面板，由你选择保存或发送到哪里。',
   'mobile.import.pasteLabel': '粘贴 CSV 文本',
+  'mobile.import.label': '导入滴答清单',
   'mobile.import.pastePlaceholder': '在这里长按粘贴滴答清单导出的 CSV',
   'mobile.import.preview': '预览',
-  'mobile.import.pasteNotFile': '手机上这一格贴的是**文本**，不是选文件——要选文件得先接一个原生依赖，还没做。',
+  'mobile.import.pasteNotFile': '粘贴滴答清单导出的 CSV；先预览，确认后才会添加到任务清单。',
   'mobile.export.shareTitle': 'heyta 导出',
   'mobile.export.shareFailed': '系统分享面板没有打开，导出内容没有送出。',
 
@@ -3823,11 +3835,11 @@ export const zhCN = {
   'site.platforms.web.name': 'Web',
   'site.platforms.web.body': '完整产品，不是演示。断网也能照常记，恢复后自动补传；数据就存在你自己的浏览器里。',
   'site.platforms.android.name': 'Android',
-  'site.platforms.android.body': '真机可用：建任务、改期、优先级、清单、标签、重复、专注、冲突解决、回收站都能用。桌面小组件与发布签名还在路上。',
+  'site.platforms.android.body': '当前版本已在真机运行，主要任务流程和 Android 小组件路径已有验证。已有签名测试安装包可供下载；跨平台小组件覆盖和完整交互验收仍在继续。',
   'site.platforms.ios.name': 'iOS',
-  'site.platforms.ios.body': '在模拟器上完整跑通：安装、建库、同步到另一台设备。还差真机测试与开发者签名。',
+  'site.platforms.ios.body': '主要任务与同步流程已在模拟器跑通。测试版本已关联现有内部测试组；目前没有公开邀请，实体 iPhone 验收仍待完成。',
   'site.platforms.desktop.name': '桌面（Windows / macOS / Linux）',
-  'site.platforms.desktop.body': '三个平台都能打包出应用。尚未签名与公证 —— macOS 上首次打开需要右键，界面也还在打磨。',
+  'site.platforms.desktop.body': 'Windows 应用已可安装运行；macOS 有已签名并完成公证的版本；Linux 也已有测试安装包。桌面交互和小组件覆盖仍按平台分别验收。',
   'site.platforms.harmony.name': '鸿蒙',
   'site.platforms.harmony.body': '构建链已经打通，能打出安装包，但应用还跑不起来 —— 卡在模拟器镜像与签名。',
   'site.platforms.selfhost.name': '自建服务器',

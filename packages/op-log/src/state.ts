@@ -42,6 +42,9 @@ import {
   parseTaskBatchOperation,
   hasTaskPriorityBatchMarker,
   parseTaskPriorityBatchOperation,
+  hasTaskRepeatCompletionMarker,
+  parseTaskRepeatCompletionOperation,
+  reminderOwnerFromId,
   type HeytaFullStatePayload,
 } from '@heyta/shared-schema';
 import type { Operation, VectorClock } from '@heyta/sync-core';
@@ -307,12 +310,14 @@ function materializeVersions(
   entityId: string,
   entityVersions: OperationMeta[],
   fieldVersions: Record<string, FieldVersion[]>,
+  immutableOwner?: string,
 ): InternalEntity {
   const next: InternalEntity = { id: entityId };
   for (const [key, versions] of Object.entries(fieldVersions)) {
     const winner = selectVersion(versions);
     if (winner !== undefined && !winner.deleted) next[key] = winner.value;
   }
+  if (immutableOwner !== undefined) next.taskId = immutableOwner;
   const winner = selectVersion(entityVersions.map((meta) => ({ meta })));
   if (winner !== undefined) {
     next.updatedAt = winner.meta.timestamp;
@@ -361,7 +366,12 @@ function applyFullState(state: MaterializedState, op: Operation<string>): Materi
           addUnique(existing, candidate);
         }
       }
-      target[id] = materializeVersions(id, versions, fields);
+      target[id] = materializeVersions(
+        id,
+        versions,
+        fields,
+        bucketName === 'reminders' ? reminderOwnerFromId(id) : undefined,
+      );
     }
     (merged as unknown as Record<string, unknown>)[bucketName] = target;
   }
@@ -441,6 +451,15 @@ export function deserializeMaterializedState(value: unknown): MaterializedState 
       }
       const entity = { ...(record.data as Record<string, unknown>) } as InternalEntity;
       entity.id = entityId;
+      // A checkpoint may have been produced by an older writer that accepted
+      // a canonical reminder id with the wrong taskId.  Normalize the visible
+      // owner while retaining the version frontier for deterministic future
+      // merges; hydration must never turn that historical row into a restart
+      // poison pill.
+      if (entityType === 'REMINDER') {
+        const owner = reminderOwnerFromId(entityId);
+        if (owner !== undefined) entity.taskId = owner;
+      }
       attachMetadata(
         entity,
         record.entityVersions.map((meta) => ({ ...meta, clock: { ...meta.clock } })),
@@ -571,7 +590,12 @@ function applyOperationToEntity(
   // Soft deletion changes visibility via deletedAt, never removes content.
   // Keep fields for trash, restore and export, including when their operations
   // arrive after the tombstone. Older field writes cannot clear deletedAt.
-  const materialized = materializeVersions(entityId, entityVersions, fieldVersions);
+  const materialized = materializeVersions(
+    entityId,
+    entityVersions,
+    fieldVersions,
+    op.entityType === 'REMINDER' ? reminderOwnerFromId(entityId) : undefined,
+  );
 
   return {
     ...state,
@@ -591,6 +615,31 @@ export function applyOperation(
   state: MaterializedState,
   op: Operation<string>,
 ): MaterializedState {
+  if (hasTaskRepeatCompletionMarker(op.payload)) {
+    const completion = parseTaskRepeatCompletionOperation(op);
+    const taskId = op.entityId;
+    if (taskId === undefined) throw new Error('Task repeat completion missing task scope');
+    let next = applyOperationToEntity(
+      state,
+      { ...op, payload: completion.task },
+      taskId,
+    );
+    for (const reminder of completion.reminders) {
+      const { id, ...fields } = reminder;
+      next = applyOperationToEntity(
+        next,
+        {
+          ...op,
+          entityType: 'REMINDER',
+          entityId: id,
+          opType: OpType.Update,
+          payload: { taskId, ...fields },
+        },
+        id,
+      );
+    }
+    return next;
+  }
   if (hasTaskBatchMarker(op.payload)) {
     // Validate every member and the complete scope before changing any state.
     // Synthetic per-member views preserve the one original operation's metadata.

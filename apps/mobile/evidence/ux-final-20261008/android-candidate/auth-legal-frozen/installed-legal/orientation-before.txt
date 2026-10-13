@@ -1,0 +1,3 @@
+accelerometer_rotation=1
+user_rotation=0
+display=Physical size: 1080x2400

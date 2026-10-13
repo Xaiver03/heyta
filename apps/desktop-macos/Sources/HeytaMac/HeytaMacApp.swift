@@ -462,7 +462,14 @@ struct SharedWebView: NSViewRepresentable {
             context.coordinator.storageHost = host
         }
 
+        config.userContentController.addScriptMessageHandler(
+            context.coordinator.widgetBridge, contentWorld: .page, name: "heytaWidget"
+        )
+        config.userContentController.addUserScript(WKUserScript(
+            source: ShellWidgetBridge.shim, injectionTime: .atDocumentStart, forMainFrameOnly: true
+        ))
         let webView = WKWebView(frame: .zero, configuration: config)
+        context.coordinator.widgetBridge.webView = webView
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
         // 回推消息要 `evaluateJavaScript` ⇒ Coordinator 得握着这个 WebView。
@@ -483,6 +490,7 @@ struct SharedWebView: NSViewRepresentable {
         let onProbe: (String) -> Void
         let onStorageFact: (String) -> Void
         /// 存储宿主（`nil` = 不当宿主）。见 `ShellStorageHost.decide()`。
+        let widgetBridge = ShellWidgetBridge()
         var storageHost: ShellStorageHost?
         /// 🔴 **weak**：见 `makeNSView` 里的说明（强引用会成环）。
         weak var webView: WKWebView?

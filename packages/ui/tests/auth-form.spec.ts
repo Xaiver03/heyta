@@ -65,7 +65,9 @@ describe('AuthForm —— 不该存在的形状', () => {
     const registrationStage = code.slice(registrationStageStart, registrationStageEnd);
     expect(registrationStage).toMatch(/disabled=\{busy \|\| registrationExpired \|\| registrationCode\.length !== registrationCodeLabel\.codeLength\}/);
 
-    const disabledMatches = [...code.matchAll(/\bdisabled=/g)];
+    // `aria-disabled` is an accessibility description of the same control, not a
+    // second native disabled prop. Keep the count scoped to the actual attribute.
+    const disabledMatches = [...code.matchAll(/(?<!aria-)\bdisabled=/g)];
     expect(disabledMatches, '普通登录/注册提交不应重新长出 disabled').toHaveLength(1);
     expect(disabledMatches[0]?.index).toBeGreaterThan(registrationStageStart);
     expect(disabledMatches[0]?.index).toBeLessThan(registrationStageEnd);

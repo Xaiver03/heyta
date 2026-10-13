@@ -542,13 +542,13 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     // legacy E2EE password path. Re-authentication is the only operation that
     // may establish a new hosted account scope.
     const accountId = authBindingChanged ? undefined : previous.accountId;
+    const email = authBindingChanged ? undefined : previous.email;
     // 🔴 草稿跟着走：「保存并同步」之后，那一节的输入框与配置**必须是同一份值**。
     // 不写这一半的话，症状是配置已经生效、框里还留着上一次的内容 ——
     // 那是 2026-09-30 那条"框与配置两套真相"缺陷的镜像版本。
-    set({ baseUrl, token, password, accountId, status: { kind: 'idle' }, syncDraft: { baseUrl, token, password } });
+    set({ baseUrl, token, password, accountId, email, status: { kind: 'idle' }, syncDraft: { baseUrl, token, password } });
     // 🔴 W4：口令**不进** saveCredentials 的参数 —— 它只在内存。
-    // ⚠️ 邮箱**保留已有的那个**：手填凭据这条路径不知道账号是谁，
-    //    而它不该把上一次登录留下的标签抹掉。
+    // 手填新凭据没有核验账号身份，不能继承上一枚令牌的邮箱标签。
     if (baseUrl !== '' && token !== '') {
       saveCredentials({ baseUrl, token, email: get().email, accountId: get().accountId });
     }
@@ -560,15 +560,19 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
 
   applyAuthToken: (baseUrl, token, email, accountId) => {
     invalidateWebVaultSession();
+    const previous = get();
+    const sameBinding = previous.baseUrl === baseUrl && previous.token === token;
+    const nextEmail = email ?? (sameBinding ? previous.email : undefined);
+    const nextAccountId = accountId ?? (sameBinding ? previous.accountId : undefined);
     // 口令与上次同步时间原样保留 —— 见接口上的说明。
     //
-    // ⚠️ `email` 是**可选**的：手填凭据那条路径没有邮箱，此时**保留已有的那个**
-    //（`email ?? get().email`）—— 否则重新登录一次会把头像的标签抹掉。
+    // 认证入口提供核验后的 email/accountId。缺少身份的调用只有同一凭据可以
+    // 保留标签；换地址或令牌不能借用上一位账号的身份。
     set({
       baseUrl,
       token,
-      email: email ?? get().email,
-      accountId: accountId ?? get().accountId,
+      email: nextEmail,
+      accountId: nextAccountId,
       status: { kind: 'idle' },
       // 🔴 登录成功时**那一节可能正开着**（头像 → 登录，设置浮层还在下面）。
       // 地址与令牌要一起对齐，否则用户登录完看到的还是两个空框 ——
@@ -581,8 +585,8 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     saveCredentials({
       baseUrl,
       token,
-      email: email ?? get().email,
-      accountId: accountId ?? get().accountId,
+      email: nextEmail,
+      accountId: nextAccountId,
     });
     // 🔴 登录后**先问补签状态，再**建实时连接（顺序有意义：`refresh()` 同步把闸门
     // 置成 `checking`，于是新连接不会在"还没问到答案"的窗口里建立起来）。

@@ -663,12 +663,16 @@ input[type="radio"] {
 
 .ht-ai__conversation {
   min-block-size: 0;
+  min-inline-size: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 
 .ht-ai__items--chat > .ht-ai__item {
   flex-shrink: 0;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  overflow-wrap: anywhere;
 }
 
 /* ⚠️ 两种角色各写**一整块**，不写成"两个选择器共用一块"：面板 spec 里那条
@@ -842,6 +846,7 @@ input[type="radio"] {
   border: 0;
   border-radius: var(--ht-radius-md);
   background: var(--ht-color-surface-sunken);
+  box-shadow: var(--ht-shadow-sm);
 }
 
 .ht-ai__input {

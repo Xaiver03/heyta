@@ -1,6 +1,7 @@
 /** Web 的本地历史适配；解析、账号隔离及未确认提案失效规则只在 app-host。 */
 import {
   clearAssistantHistory as clear,
+  scopeAssistantHistoryStorage,
   loadAssistantHistory as load,
   saveAssistantHistory as save,
   type HistoryStorage,
@@ -22,6 +23,13 @@ function defaultStorage(): HistoryStorage | null {
   } catch {
     return null;
   }
+}
+
+/** 未传表示启用当前账号的本机历史；显式 null 表示禁用，不回退默认存储。 */
+export function assistantSessionStorage(account: string | null, supplied?: HistoryStorage | null): HistoryStorage | null {
+  if (supplied !== undefined) return supplied;
+  const storage = defaultStorage();
+  return storage === null ? null : scopeAssistantHistoryStorage(storage, account);
 }
 
 export function saveAssistantHistory(

@@ -27,8 +27,10 @@ $ErrorActionPreference = 'Continue'
 
 $repo    = 'C:\src\heyta'
 $proj    = Join-Path $repo 'apps\desktop-windows\HeytaWindows\HeytaWindows.csproj'
+$widgetProj = Join-Path $repo 'apps\desktop-windows\HeytaWidgetProvider\HeytaWidgetProvider.csproj'
 $build   = 'C:\src\heyta-msix'
 $pubDir  = Join-Path $build 'publish'
+$widgetPubDir = Join-Path $build 'widget-provider-publish'
 $stage   = Join-Path $build 'stage'
 $msix    = Join-Path $build 'heyta.msix'
 $cerPath = Join-Path $build 'heyta-selfsigned.cer'
@@ -47,12 +49,28 @@ New-Item -ItemType Directory -Path $build, $stage -Force | Out-Null
 
 # ---- 1. publish -------------------------------------------------------------
 $facts += '=== 1. dotnet publish ==='
-$pub = dotnet publish $proj -c Release -p:Platform=x64 -p:RuntimeIdentifier=win-x64 --self-contained true -o $pubDir 2>&1
+$pub = dotnet publish $proj -c Release --no-restore -p:NuGetAudit=false -p:Platform=x64 -p:RuntimeIdentifier=win-x64 --self-contained true -o $pubDir 2>&1
 $pub | Select-String -Pattern 'error|Build succeeded|warning' | Select-Object -First 6 | ForEach-Object { $facts += ('  ' + $_.Line) }
 $exe = Join-Path $pubDir 'HeytaWindows.exe'
 if (-not (Test-Path $exe)) { $facts += 'RESULT=PUBLISH_FAILED'; $facts | Set-Content $manifestOut -Encoding ASCII; $facts | Write-Output; exit 1 }
 $facts += ('  exe = ' + (Get-Item $exe).Length + ' bytes')
 $facts += ('  publish files = ' + (Get-ChildItem $pubDir -Recurse -File | Measure-Object).Count)
+
+# The Widgets Board starts this COM local server on demand. It is a separate
+# executable on purpose: the provider must remain responsive while the main
+# WinUI window is closed, and it is forbidden from opening SQLite or writing
+# task operations. The two processes meet only through the encrypted snapshot
+# and the intent queue in LocalState.
+$facts += '=== 1a. Windows widget provider publish ==='
+$providerPub = dotnet publish $widgetProj -c Release --no-restore -p:NuGetAudit=false -p:Platform=x64 -p:RuntimeIdentifier=win-x64 --self-contained true -o $widgetPubDir 2>&1
+$providerPub | Select-String -Pattern 'error|Build succeeded|warning' | Select-Object -First 8 | ForEach-Object { $facts += ('  ' + $_.Line) }
+$providerExe = Join-Path $widgetPubDir 'HeytaWidgetProvider.exe'
+if (-not (Test-Path $providerExe)) { $facts += 'RESULT=WIDGET_PROVIDER_PUBLISH_FAILED'; $facts | Set-Content $manifestOut -Encoding ASCII; $facts | Write-Output; exit 1 }
+$widgetStage = Join-Path $pubDir 'WidgetProvider'
+New-Item -ItemType Directory -Path $widgetStage -Force | Out-Null
+Copy-Item (Join-Path $widgetPubDir '*') $widgetStage -Recurse -Force
+$facts += ('  provider exe = ' + (Get-Item $providerExe).Length + ' bytes')
+$facts += ('  provider files = ' + (Get-ChildItem $widgetStage -Recurse -File | Measure-Object).Count)
 
 # The shell loads native-bridge.js next to the exe; publish must carry it.
 $bundle = Join-Path $pubDir 'native-bridge.js'
@@ -169,6 +187,17 @@ if ($missing.Count -gt 0 -or $wrongSize.Count -gt 0) {
 }
 $facts += ('  copied = ' + (($need.Keys | Sort-Object) -join ', ') + ' (all IHDR sizes verified)')
 
+# Provider assets are intentionally package-local. The Widgets Board requires
+# picker artwork even when the live Adaptive Card is generated on demand.
+$providerAssets = Join-Path $stage 'ProviderAssets'
+New-Item -ItemType Directory -Path $providerAssets -Force | Out-Null
+Copy-Item (Join-Path $assetDst 'StoreLogo.png') (Join-Path $providerAssets 'StoreLogo.png') -Force
+Copy-Item (Join-Path $assetDst 'Square150x150Logo.png') (Join-Path $providerAssets 'Today.png') -Force
+Copy-Item (Join-Path $assetDst 'Square150x150Logo.png') (Join-Path $providerAssets 'Quadrant.png') -Force
+Copy-Item (Join-Path $assetDst 'Square150x150Logo.png') (Join-Path $providerAssets 'Habits.png') -Force
+Copy-Item (Join-Path $assetDst 'Square150x150Logo.png') (Join-Path $providerAssets 'Focus.png') -Force
+$facts += '  provider picker assets copied (StoreLogo + four screenshots)'
+
 
 # ---- 3. manifest ------------------------------------------------------------
 $facts += '=== 3. AppxManifest.xml ==='
@@ -177,8 +206,10 @@ $manifest = @"
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap rescap">
+  IgnorableNamespaces="uap uap3 com rescap">
 
   <Identity Name="$identityName" Publisher="$publisher" Version="$version" ProcessorArchitecture="x64" />
 
@@ -208,6 +239,50 @@ $manifest = @"
         AppListEntry="default">
         <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
       </uap:VisualElements>
+      <Extensions>
+        <com:Extension Category="windows.comServer">
+          <com:ComServer>
+            <com:ExeServer Executable="WidgetProvider\HeytaWidgetProvider.exe" DisplayName="heyta Widgets">
+              <com:Class Id="B5E3EAF7-9B4A-4A3C-9A8E-7E6E0BEA2B14" DisplayName="heyta Widgets" />
+            </com:ExeServer>
+          </com:ComServer>
+        </com:Extension>
+        <uap3:Extension Category="windows.appExtension">
+          <uap3:AppExtension Name="com.microsoft.windows.widgets" DisplayName="heyta" Id="HeytaWidgets" PublicFolder="Public">
+            <uap3:Properties>
+              <WidgetProvider>
+                <ProviderIcons>
+                  <Icon Path="ProviderAssets\StoreLogo.png" />
+                </ProviderIcons>
+                <Activation>
+                  <CreateInstance ClassId="B5E3EAF7-9B4A-4A3C-9A8E-7E6E0BEA2B14" />
+                </Activation>
+                <TrustedPackageFamilyNames>
+                  <TrustedPackageFamilyName>Microsoft.MicrosoftEdge.Stable_8wekyb3d8bbwe</TrustedPackageFamilyName>
+                </TrustedPackageFamilyNames>
+                <Definitions>
+                  <Definition Id="today" DisplayName="Today" Description="See and complete today's tasks" AllowMultiple="true">
+                    <Capabilities><Capability><Size Name="small" /></Capability><Capability><Size Name="medium" /></Capability><Capability><Size Name="large" /></Capability></Capabilities>
+                    <ThemeResources><Icons><Icon Path="ProviderAssets\StoreLogo.png" /></Icons><Screenshots><Screenshot Path="ProviderAssets\Today.png" DisplayAltText="Today tasks widget" /></Screenshots><LightMode /><DarkMode /></ThemeResources>
+                  </Definition>
+                  <Definition Id="quadrant" DisplayName="Quadrants" Description="See tasks by importance and urgency" AllowMultiple="true">
+                    <Capabilities><Capability><Size Name="medium" /></Capability><Capability><Size Name="large" /></Capability></Capabilities>
+                    <ThemeResources><Icons><Icon Path="ProviderAssets\StoreLogo.png" /></Icons><Screenshots><Screenshot Path="ProviderAssets\Quadrant.png" DisplayAltText="Quadrants widget" /></Screenshots><LightMode /><DarkMode /></ThemeResources>
+                  </Definition>
+                  <Definition Id="habits" DisplayName="Habits" Description="See today's habit progress" AllowMultiple="true">
+                    <Capabilities><Capability><Size Name="small" /></Capability><Capability><Size Name="medium" /></Capability><Capability><Size Name="large" /></Capability></Capabilities>
+                    <ThemeResources><Icons><Icon Path="ProviderAssets\StoreLogo.png" /></Icons><Screenshots><Screenshot Path="ProviderAssets\Habits.png" DisplayAltText="Habits widget" /></Screenshots><LightMode /><DarkMode /></ThemeResources>
+                  </Definition>
+                  <Definition Id="focus" DisplayName="Focus" Description="See your current focus session" AllowMultiple="true">
+                    <Capabilities><Capability><Size Name="small" /></Capability><Capability><Size Name="medium" /></Capability></Capabilities>
+                    <ThemeResources><Icons><Icon Path="ProviderAssets\StoreLogo.png" /></Icons><Screenshots><Screenshot Path="ProviderAssets\Focus.png" DisplayAltText="Focus widget" /></Screenshots><LightMode /><DarkMode /></ThemeResources>
+                  </Definition>
+                </Definitions>
+              </WidgetProvider>
+            </uap3:Properties>
+          </uap3:AppExtension>
+        </uap3:Extension>
+      </Extensions>
     </Application>
   </Applications>
 

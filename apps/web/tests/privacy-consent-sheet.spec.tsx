@@ -202,6 +202,36 @@ describe('面板的基本形状：一句话要说清"这个决定只决定能不
 });
 
 describe('🔴 关掉不等于同意（不许把"没选"记成"选了"）', () => {
+  it('Tab 留在面板内，Escape 只关闭顶层并返回触发按钮', async () => {
+    const el = await mount(<><button data-testid="privacy-trigger" onClick={() => usePrivacyStore.getState().openSheet('settings')}>选择</button><PrivacyConsentSheet /></>);
+    const trigger = el.querySelector<HTMLButtonElement>('[data-testid="privacy-trigger"]')!;
+    trigger.focus();
+    await click(trigger);
+    expect(document.activeElement).toBe(el.querySelector(DIALOG));
+    const key = async (value: string, shiftKey = false): Promise<void> => {
+      await act(async () => {
+        document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: value, shiftKey, bubbles: true, cancelable: true }));
+      });
+    };
+    await key('Tab', true);
+    expect(document.activeElement).toBe(el.querySelector(LOCAL_ONLY));
+    await key('Tab');
+    expect(document.activeElement).toBe(el.querySelector(CLOSE));
+    await key('Tab', true);
+    expect(document.activeElement).toBe(el.querySelector(LOCAL_ONLY));
+    const backgroundEscape = vi.fn();
+    window.addEventListener('keydown', backgroundEscape);
+    try {
+      await key('Escape');
+      expect(el.querySelector(DIALOG)).toBeNull();
+      expect(document.activeElement).toBe(trigger);
+      expect(backgroundEscape).not.toHaveBeenCalled();
+      expect(privacyConsent.networkAllowed()).toBe(false);
+    } finally {
+      window.removeEventListener('keydown', backgroundEscape);
+    }
+  });
+
   it('按 Esc 关掉：闸门仍然关着，而且磁盘上一条记录都没多', async () => {
     const el = await openSheet();
     await act(async () => {

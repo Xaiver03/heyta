@@ -56,4 +56,5 @@
     <string name="widget_focus_untitled">专注中</string>
     <string name="widget_focus_target">目标 %1$d 分钟</string>
     <string name="widget_focus_idle">没有进行中的专注</string>
+    <string name="widget_focus_paused">已暂停，打开 Heyta 继续</string>
 </resources>

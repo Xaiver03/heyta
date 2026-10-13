@@ -15,13 +15,12 @@
  * 因为它要给非 React 层读）。这里唯一的消费者是「我的」屏，而它本来就在
  * React 树里 —— `useState` + `useMemo` 就够了，多一层订阅只会多一处能漂移的代码。
  *
- * 🔴 **语言只在内存里**：重启回到设备语言。与 `sync/config.ts` 的
- * 「凭据刻意不落盘」是同一条纪律 —— 不把用户偏好写进我们自己的存储。
- * 代价是每次冷启动都要重选一次，而目前的证据（单用户、单语言设备）
- * 还不支持为它引入一个持久化通道。
+ * 语言由 App 的 React state 驱动；原生独立保存非敏感设备偏好，冷启动恢复，
+ * 同一偏好也供系统小组件读取。它不属于账号数据，不进入 op-log 或任务快照。
  */
 
-import React, { createContext, useContext, useMemo, type ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
+import { setWidgetLocale } from '../widgets/widget-bridge';
 import type { Locale } from '@heyta/i18n';
 
 export interface LocalePreferenceValue {
@@ -36,6 +35,8 @@ export function LocalePreferenceProvider({
   setLocale,
   children,
 }: LocalePreferenceValue & { children: ReactNode }): React.JSX.Element {
+  // 独立设备偏好同步给系统组件；不产生任务 op，也不受账号清理影响。
+  useEffect(() => { void setWidgetLocale(locale); }, [locale]);
   // `setLocale` 是 React 的稳定 setter，`locale` 变才需要新对象。
   const value = useMemo<LocalePreferenceValue>(() => ({ locale, setLocale }), [locale, setLocale]);
   return (

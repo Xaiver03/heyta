@@ -44,6 +44,22 @@ describe('本机助手历史按账号保存', () => {
     expect(loadAssistantHistory(null, scopeAssistantHistoryStorage(storage, null))?.items[0]).toMatchObject({ role: 'user', text: '离线' });
   });
 
+  it('同域不同路径的自托管实例隔离历史，规范化路径及尾斜杠等价', () => {
+    const identity = { accountId: 'alice-1', email: 'alice@example.com' };
+    const a = assistantHistoryAccount({ ...identity, serverUrl: 'https://selfhost.example/team-a' });
+    const b = assistantHistoryAccount({ ...identity, serverUrl: 'https://selfhost.example/team-b/' });
+    expect(a).not.toBe(b);
+    expect(assistantHistoryAccount({ ...identity, serverUrl: 'https://SELFHOST.example:443/other/../team-a///' })).toBe(a);
+    expect(assistantHistoryAccount({ ...identity, serverUrl: 'https://selfhost.example/' }))
+      .toBe(assistantHistoryAccount({ ...identity, serverUrl: 'https://selfhost.example' }));
+    const storage = memory();
+    saveAssistantHistory(conversation(a, '仅属于路径 A 的私密会话'), scopeAssistantHistoryStorage(storage, a));
+    expect(loadAssistantHistory(b, scopeAssistantHistoryStorage(storage, b))).toBeNull();
+    saveAssistantHistory(conversation(b, '路径 B'), scopeAssistantHistoryStorage(storage, b));
+    clearAssistantHistory(scopeAssistantHistoryStorage(storage, b));
+    expect(loadAssistantHistory(a, scopeAssistantHistoryStorage(storage, a))?.items[0]).toMatchObject({ text: '仅属于路径 A 的私密会话' });
+  });
+
   it('手动凭据缺少已核验身份时必须有独立会话域，不回落到共用账号', () => {
     const base = { serverUrl: 'https://selfhost.example' };
     expect(() => assistantHistoryAccount(base)).toThrow('identity');

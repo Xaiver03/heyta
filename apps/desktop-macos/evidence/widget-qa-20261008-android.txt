@@ -1,0 +1,140 @@
+HEYTA ANDROID WIDGET QA — 2026-10-08
+
+Scope: installed Android Release APK + real emulator AppWidget registration/instances.
+This evidence does not claim manual launcher add/drag or tap-through of every widget.
+
+[1] Build artifact
+apk=/Users/rocalight/.codex/worktrees/ux-final-verification/heyta/apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+size_bytes=68272740
+mtime=2026-10-08T13:28:06+0800
+sha256=381203459ba9da1c85d4d5215fba8a32ce1b63992d87ef915a3e53de82c34ba3
+remote_build_log=/tmp/heyta-widget-current-android-build.log
+remote_build_size_bytes=68272740
+pulled_installed_sha256=381203459ba9da1c85d4d5215fba8a32ce1b63992d87ef915a3e53de82c34ba3
+local_installed_byte_equal=true
+
+[2] Package / signing
+<?xml version="1.0" encoding="utf-8"?>
+<manifest
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:versionCode="1"
+    android:versionName="1.0"
+    android:compileSdkVersion="36"
+    android:compileSdkVersionCodename="16"
+    package="com.heyta"
+    platformBuildVersionCode="36"
+    platformBuildVersionName="16">
+
+    <uses-sdk
+        android:minSdkVersion="24"
+        android:targetSdkVersion="36" />
+
+    <uses-permission
+        android:name="android.permission.INTERNET" />
+
+    <uses-permission
+        android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <uses-permission
+        android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
+    <permission
+        android:name="com.heyta.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+        android:protectionLevel="0x2" />
+
+    <uses-permission
+        android:name="com.heyta.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+
+    <application
+        android:theme="@ref/0x7f0e0007"
+        android:label="@ref/0x7f0d001d"
+        android:icon="@ref/0x7f0c0000"
+        android:name="com.heytamobile.MainApplication"
+        android:allowBackup="false"
+        android:supportsRtl="true"
+        android:extractNativeLibs="false"
+        android:usesCleartextTraffic="true"
+        android:roundIcon="@ref/0x7f0c0002"
+        android:appComponentFactory="androidx.core.app.CoreComponentFactory">
+
+        <activity
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::loadLibrary has been called by org.conscrypt.NativeLibraryUtil in an unnamed module (file:/opt/homebrew/share/android-commandlinetools/build-tools/36.0.0/lib/apksigner.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+Signer #1 certificate DN: CN=heyta, OU=Mobile, O=Xiaoli Creativity Culture Industry, L=Hangzhou, ST=Zhejiang, C=CN
+Signer #1 certificate SHA-256 digest: c46d0386179c3cef12582d1347ed2f871eb03a64aaa2bff96511c1cb76062556
+Signer #1 certificate SHA-1 digest: 54b70e9213ce92397a6ff0eefe395f2baa0b9a3a
+Signer #1 certificate MD5 digest: 228708966ffd3f96a92d5c879fe7b2a9
+
+[3] APK manifest widget providers
+            android:name="com.heytamobile.widget.TodayWidgetProvider"
+                    android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            android:name="com.heytamobile.widget.QuadrantWidgetProvider"
+                    android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            android:name="com.heytamobile.widget.HabitsWidgetProvider"
+                    android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            android:name="com.heytamobile.widget.FocusWidgetProvider"
+                    android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+
+[4] Real emulator installation
+serial=emulator-5554
+installed_path=/data/app/~~Skc1S6zBgud6ztvkir8OEA==/com.heyta-Q9JC3vYEjD2gg9NvdYdrMA==/base.apk
+    codePath=/data/app/~~Skc1S6zBgud6ztvkir8OEA==/com.heyta-Q9JC3vYEjD2gg9NvdYdrMA==
+    versionCode=1 minSdk=24 targetSdk=36
+    versionName=1.0
+    lastUpdateTime=2026-10-08 13:32:09
+    signatures=PackageSignatures{f43a1a2 version:2, signatures:[1359ad40], past signatures:[]}
+      firstInstallTime=2026-10-08 10:20:41
+
+[5] Real emulator AppWidgetManager state
+The following four Heyta provider registrations and four active launcher instances were read from dumpsys appwidget.
+    min=(57345x12801)   minResize=(48641x12801) updatePeriodMillis=72000000 resizeMode=3 widgetCategory=1 autoAdvanceViewId=-1 initialLayout=#7f0e0070 initialKeyguardLayout=#0   zombie=false
+  [34] provider ProviderId{user:0, app:10340, cmp:ComponentInfo{com.heyta/com.heytamobile.widget.TodayWidgetProvider}}
+    min=(46081x28161)   minResize=(46081x28161) updatePeriodMillis=1800000 resizeMode=3 widgetCategory=1 autoAdvanceViewId=-1 initialLayout=#7f0b0034 initialKeyguardLayout=#0   zombie=false
+  [35] provider ProviderId{user:0, app:10340, cmp:ComponentInfo{com.heyta/com.heytamobile.widget.QuadrantWidgetProvider}}
+    min=(46081x46081)   minResize=(46081x46081) updatePeriodMillis=1800000 resizeMode=3 widgetCategory=1 autoAdvanceViewId=-1 initialLayout=#7f0b0033 initialKeyguardLayout=#0   zombie=false
+  [36] provider ProviderId{user:0, app:10340, cmp:ComponentInfo{com.heyta/com.heytamobile.widget.HabitsWidgetProvider}}
+    min=(46081x28161)   minResize=(46081x28161) updatePeriodMillis=1800000 resizeMode=3 widgetCategory=1 autoAdvanceViewId=-1 initialLayout=#7f0b0032 initialKeyguardLayout=#0   zombie=false
+  [37] provider ProviderId{user:0, app:10340, cmp:ComponentInfo{com.heyta/com.heytamobile.widget.FocusWidgetProvider}}
+    min=(46081x19457)   minResize=(46081x19457) updatePeriodMillis=1800000 resizeMode=3 widgetCategory=1 autoAdvanceViewId=-1 initialLayout=#7f0b0031 initialKeyguardLayout=#0   zombie=false
+ 
+Widgets:
+  [0] id=2
+    host=HostId{user:0, app:10185, hostId:1024, pkg:com.google.android.apps.nexuslauncher}
+    provider=ProviderId{user:0, app:10340, cmp:ComponentInfo{com.heyta/com.heytamobile.widget.FocusWidgetProvider}}
+    host.callbacks=com.android.internal.appwidget.IAppWidgetHost$Stub$Proxy@a2c9d41
+    views=android.widget.RemoteViews@362e7b4
+    views_bitmap_memory=0
+  [1] id=3
+    host=HostId{user:0, app:10185, hostId:1024, pkg:com.google.android.apps.nexuslauncher}
+    provider=ProviderId{user:0, app:10340, cmp:ComponentInfo{com.heyta/com.heytamobile.widget.HabitsWidgetProvider}}
+    host.callbacks=com.android.internal.appwidget.IAppWidgetHost$Stub$Proxy@a2c9d41
+    views=android.widget.RemoteViews@cedafdd
+    views_bitmap_memory=0
+  [2] id=4
+    host=HostId{user:0, app:10185, hostId:1024, pkg:com.google.android.apps.nexuslauncher}
+    provider=ProviderId{user:0, app:10340, cmp:ComponentInfo{com.heyta/com.heytamobile.widget.TodayWidgetProvider}}
+    host.callbacks=com.android.internal.appwidget.IAppWidgetHost$Stub$Proxy@a2c9d41
+    views=android.widget.RemoteViews@eb76752
+    views_bitmap_memory=0
+  [3] id=5
+    host=HostId{user:0, app:10185, hostId:1024, pkg:com.google.android.apps.nexuslauncher}
+    provider=ProviderId{user:0, app:10340, cmp:ComponentInfo{com.heyta/com.heytamobile.widget.QuadrantWidgetProvider}}
+    host.callbacks=com.android.internal.appwidget.IAppWidgetHost$Stub$Proxy@a2c9d41
+    views=android.widget.RemoteViews@fe2a23
+    views_bitmap_memory=0
+ 
+Hosts:
+  [0] hostId=HostId{user:0, app:10185, hostId:1024, pkg:com.google.android.apps.nexuslauncher}
+    callbacks=com.android.internal.appwidget.IAppWidgetHost$Stub$Proxy@a2c9d41
+
+[6] Visual evidence
+screenshot=apps/desktop-macos/evidence/widget-qa-20261008-android-launcher.png
+/Users/rocalight/.codex/worktrees/ux-final-verification/heyta/apps/desktop-macos/evidence/widget-qa-20261008-android-launcher.png: PNG image data, 1080 x 2400, 8-bit/color RGBA, non-interlaced
+Observed screenshot: real Pixel Launcher home screen displaying Heyta Focus widget with current date and empty-focus state.
+
+[7] Boundary
+Android system Gallery manual add/drag flow was not automated in this pass.
+The emulator already contained all four active Heyta widget instances; no uninstall or data wipe was performed.

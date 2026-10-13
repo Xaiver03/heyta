@@ -1,0 +1,13 @@
+{
+  "path": [
+    "https://history.example/team-a",
+    "https://history.example/team-b/",
+    "real-signout",
+    "https://history.example/team-a"
+  ],
+  "loggedOut": true,
+  "historyKeys": [
+    "heyta.ai.assistant.history:account:%5B%22https%3A%2F%2Fhistory.example%2Fteam-a%22%2C%22id%22%2C%22history-qa-account%22%5D"
+  ],
+  "modelCalls": 2
+}

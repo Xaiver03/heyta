@@ -1,0 +1,20 @@
+{
+  "name": "installed-dpi-full.png",
+  "width": 1440,
+  "height": 734,
+  "bytes": 192613,
+  "colorType": 6,
+  "bitDepth": 8,
+  "hasAlpha": true,
+  "hasTransparency": false,
+  "colorSpan": 228,
+  "contentRatio": 0.6896738328331775,
+  "edgePairs": 20326,
+  "modalLuminance": 140,
+  "contentOnModalRatio": 0.4316918384414818,
+  "edgeOnContent": 0.38256410256410256,
+  "hash": "a689207f8d0d0c189516950514afb10f5ac340a3a283b5f8f572bc4e0b58f635",
+  "looksBlank": false,
+  "looksSmeared": false,
+  "primaryPixels": 1246
+}

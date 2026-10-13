@@ -61,7 +61,7 @@ const zh = [
     blocks: [
       {
         kind: 'p',
-        text: '注册只需要**一个邮箱地址**和一组**通行密钥**。我们不需要你的手机号、姓名、身份证号，也不向你索取任何身份证件。账户的作用只有一个：让服务器知道哪些密文有权被送到哪些设备。',
+        text: '官方服务使用**邮箱地址、登录密码和邮箱验证码**完成注册，也支持**通行密钥**等其他认证方式。我们不需要你的手机号、姓名、身份证号，也不向你索取任何身份证件。账户的作用只有一个：让服务器知道哪些密文有权被送到哪些设备。',
       },
       {
         kind: 'ul',
@@ -479,7 +479,7 @@ const en = [
     blocks: [
       {
         kind: 'p',
-        text: 'Registration requires **one email address** and **one passkey**. We do not require your phone number, your name, your national identification number, and we ask you for no identity document of any kind. The account has exactly one purpose: to tell the server which ciphertext is permitted to be delivered to which device.',
+        text: 'Registration with the official service uses **an email address, a sign-in password and an email verification code**. Other authentication methods, including **passkeys**, are also supported. We do not require your phone number, your name, your national identification number, and we ask you for no identity document of any kind. The account has exactly one purpose: to tell the server which ciphertext is permitted to be delivered to which device.',
       },
       {
         kind: 'ul',

@@ -1,0 +1,7 @@
+{
+  "archiveSha256": "0887137202ee38e1ee0de9864b964489a01cecfbf20792c3df22a0f421ddcee6",
+  "archiveBytes": 311246013,
+  "source": "current controlled tree via scripts/lib/sync-windows-sources.sh sync_windows_sources",
+  "indexSha256": "07a7ab6521c102a1ae06b69bad9242dde1d58d2675388e22d8cc0351612fb151",
+  "bridgeSha256": "5ec4b488cac4b4844a7686e04a5d14d34ec8b26029924a0c9e27d0e726bd1610"
+}

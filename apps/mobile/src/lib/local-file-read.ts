@@ -57,7 +57,8 @@ export function nativeModule(): LocalFsNative | undefined {
       NativeModules?: Record<string, unknown>;
       TurboModuleRegistry?: unknown;
     };
-    return rn.NativeModules?.[MODULE_NAME] as LocalFsNative | undefined;
+    // TurboModule-backed NativeModules returns null for an unregistered module.
+    return (rn.NativeModules?.[MODULE_NAME] ?? undefined) as LocalFsNative | undefined;
   } catch {
     // 测试环境（node）里没有 react-native —— 这里是"没有原生模块"，不是错误。
     return undefined;
@@ -98,7 +99,7 @@ async function readViaRnBlob(uri: string): Promise<string> {
     TurboModuleRegistry?: { get(name: string): unknown };
   };
   const reader = rn.TurboModuleRegistry?.get('FileReaderModule') as CoreFileReader | undefined;
-  if (reader === undefined || typeof reader.readAsText !== 'function') {
+  if (reader == null || typeof reader.readAsText !== 'function') {
     throw new Error('本机没有 FileReaderModule');
   }
   return await reader.readAsText(await xhrBlobHandle(uri), 'UTF-8');

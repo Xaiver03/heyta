@@ -58,6 +58,7 @@ import {
 import { maybeHandOffToShell } from './desktop-handoff.js';
 import { useSyncStore } from '../sync/store.js';
 import { usePrivacyStore } from '../privacy/store.js';
+import { privacyConsent } from '../privacy/consent-gate.js';
 import { applyLocale, currentLocale, hasStoredLocalePreference } from '../../lib/locale.js';
 import {
   createPasskeyCredential,
@@ -420,6 +421,12 @@ function failedFrom(outcome: HostedAuthFailure): AuthStatus {
  * 三条注册路（邮箱+口令 / 魔法链接 / 通行密钥）都过这里 —— 与 `failedFrom`
  * 同一个理由：谎话修在两处、漏在一处，就是下一次漂移的开始。
  */
+function acceptRegistrationNetworking(termsAccepted: boolean): void {
+  // The registration agreement explicitly includes device networking.
+  // Opening or editing the form must never make this decision.
+  if (termsAccepted && !privacyConsent.networkAllowed()) usePrivacyStore.getState().accept();
+}
+
 function registeredFrom(outcome: { emailDelivered?: false }): AuthStatus {
   return outcome.emailDelivered === undefined
     ? { kind: 'registered' }
@@ -462,6 +469,7 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
 
   registerAccount: async (baseUrl, email, termsAccepted, inviteCode) => {
     const generation = ++authGeneration;
+    acceptRegistrationNetworking(termsAccepted);
     set({ status: { kind: 'busy', action: 'register' } });
     const outcome = await registerWithMagicLink(
       { baseUrl, locale: currentLocale() },
@@ -511,6 +519,7 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
       return;
     }
 
+    acceptRegistrationNetworking(termsAccepted);
     set({ status: { kind: 'busy', action: 'passkey-register' } });
 
     // ① 取 options（协议在 app-host）。带上界面语言：verify 那步要发验证邮件。
@@ -628,6 +637,7 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
 
   registerWithPassword: async (baseUrl, email, password, termsAccepted, options) => {
     const generation = ++authGeneration;
+    acceptRegistrationNetworking(termsAccepted);
     const inviteCode = options?.inviteCode;
     set({ status: { kind: 'busy', action: 'password-register' }, registrationChallenge: undefined });
     const outcome = await registerWithEmailPassword(
@@ -650,6 +660,7 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
 
   requestRegistrationCode: async (baseUrl, email, password, termsAccepted, options) => {
     const generation = ++authGeneration;
+    acceptRegistrationNetworking(termsAccepted);
     set({ status: { kind: 'busy', action: 'password-register' } });
     const outcome = await requestEmailPasswordRegistrationCode(
       { baseUrl, locale: currentLocale() },

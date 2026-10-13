@@ -9,11 +9,13 @@
  *   3. 在模块缺失时**明确地**降级，而不是让 `undefined is not a function` 在某个
  *      后台路径上炸出来。
  *
- * ## 🔴 为什么每个导出函数都**不抛异常**
+ * ## 后台刷新降级，显式清理必须报告失败
  *
  * 这些函数的调用点都在"应用已经在正常工作了"的路径上（写入之后刷新快照、
  * 启动时 drain 意图）。在那里抛异常只会让一个**已经工作的应用**因为小组件而崩 ——
  * 而小组件是**附属功能**，它不该有这种权力。
+ *
+ * 清理是例外：失败必须传播给登出流程，不能把仍存有快照报告为已清除。
  *
  * 代价是失败会变安静。所以每次失败都 `console.warn` 带上原生侧的**错误码**
  *（`E_WIDGET_INVALID_ENVELOPE` 等，定义在 `WidgetModule.kt`），
@@ -31,9 +33,15 @@
 /** 与 `WidgetModule.kt` 的 `WidgetModule.NAME` **必须一致**。 */
 const MODULE_NAME = 'HeytaWidget';
 
+import type { Locale } from '@heyta/i18n';
+import { beginWidgetCleanup } from './publish-coordinator';
+
 interface WidgetNativeModule {
+  /** 非敏感设备语言，与账号快照分开存储。 */
+  setWidgetLocale?(locale: string): Promise<boolean>;
   setWidgetSnapshot(envelopeJson: string): Promise<boolean>;
   drainIntentQueue(): Promise<string | null>;
+  ackIntentQueue(processedJson: string): Promise<number>;
   /** 把失败意图**合并**回容器（不是覆盖），返回写回后的队列长度。 */
   mergeIntentQueue(pendingJson: string): Promise<number>;
   clearWidgetState(): Promise<boolean>;
@@ -81,7 +89,7 @@ function readWidgetModule(): WidgetNativeModule | undefined {
   try {
     const modules = (require('react-native') as { NativeModules?: Record<string, unknown> })
       .NativeModules;
-    return modules?.[MODULE_NAME] as WidgetNativeModule | undefined;
+    return (modules?.[MODULE_NAME] ?? undefined) as WidgetNativeModule | undefined;
   } catch {
     // 测试环境（node）没有 react-native —— 走到这里只是"没有原生模块"，不是错误。
     return undefined;
@@ -160,6 +168,14 @@ export function resetMissingModuleWarningForTests(): void {
   warnedAboutMissingModule = false;
 }
 
+/** 非敏感设备语言，原生保存成功后重绘全部系统模板。 */
+export async function setWidgetLocale(locale: Locale): Promise<boolean> {
+  const native = readWidgetModule();
+  const write = native?.setWidgetLocale;
+  if (write === undefined) return false;
+  return callNativeSafely('同步小组件语言', () => write.call(native, locale), false);
+}
+
 /**
  * 写入一份**已加密**的快照信封。
  *
@@ -205,7 +221,7 @@ export async function sealWidgetSnapshot(
 }
 
 /**
- * 取出意图队列的**原始 JSON** 并清空。`null` = 没有待处理的点击，或模块不可用。
+ * 读取意图队列的**原始 JSON**，成功处理并 ack 前保留在原生容器。`null` = 没有待处理的点击，或模块不可用。
  *
  * ⚠️ 返回的是**原始字符串**，调用方必须用 `@heyta/widget-core` 的
  * `parseIntentQueueJson`（它收字符串、永不抛）解析 —— 队列语义只有那一份真源。
@@ -220,6 +236,13 @@ export async function drainIntentQueue(): Promise<string | null> {
     return null;
   }
   return callNativeSafely('读取意图队列', () => native.drainIntentQueue(), null);
+}
+
+/** Acknowledge only exact processed clicks; newer clicks remain in native storage. */
+export async function ackIntentQueue(processedJson: string): Promise<number | null> {
+  const native = readWidgetModule();
+  if (native === undefined) { noteMissingModule(); return null; }
+  return callNativeSafely('确认组件操作', () => native.ackIntentQueue(processedJson), null);
 }
 
 /**
@@ -295,11 +318,20 @@ export async function syncFocusActivity(): Promise<string> {
 }
 
 /** 登出 / 切换账号：清掉快照、意图队列与设备密钥（D6）。 */
-export async function clearWidgetState(): Promise<void> {
-  const native = readWidgetModule();
+export async function clearWidgetState(
+  native: Pick<WidgetNativeModule, 'clearWidgetState'> | undefined = readWidgetModule(),
+): Promise<void> {
+  const lease = await beginWidgetCleanup();
   if (native === undefined) {
     noteMissingModule();
+    lease.release(true);
     return;
   }
-  await callNativeSafely('清理小组件状态', () => native.clearWidgetState(), false);
+  try {
+    if (!await native.clearWidgetState()) throw new Error('Widget state could not be cleared');
+    lease.release(true);
+  } catch (error) {
+    lease.release(false);
+    throw error;
+  }
 }

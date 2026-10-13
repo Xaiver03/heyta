@@ -396,8 +396,7 @@ export function PasswordPanel(): React.JSX.Element {
             inputRef={setRef}
           />
           <p className="ht-settings__hint" data-testid="password-set-hint">
-            {t('web.settings.password.minLength', { min: AUTH_PASSWORD_MIN_CODE_POINTS })}{' '}
-            {t('common.auth.form.passwordHint')}
+            {t('web.settings.password.minLength', { min: AUTH_PASSWORD_MIN_CODE_POINTS })}
           </p>
 
           <div className="ht-settings__actions">
@@ -495,8 +494,7 @@ export function PasswordPanel(): React.JSX.Element {
             inputRef={nextRef}
           />
           <p className="ht-settings__hint" data-testid="password-hint">
-            {t('web.settings.password.minLength', { min: AUTH_PASSWORD_MIN_CODE_POINTS })}{' '}
-            {t('common.auth.form.passwordHint')}
+            {t('web.settings.password.minLength', { min: AUTH_PASSWORD_MIN_CODE_POINTS })}
           </p>
 
           <div className="ht-settings__actions">

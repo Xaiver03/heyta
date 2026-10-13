@@ -31,6 +31,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider, translate, type Locale, type MessageKey } from '@heyta/i18n';
 import { OFFICIAL_SITE_ORIGIN, type HostedAuthSession } from '@heyta/app-host';
+import { legalDocumentById, legalDocumentPresentation } from '@heyta/legal';
 
 import { AuthPanel } from '../src/features/auth/AuthPanel.js';
 import { __resetAuthForTests, useAuthStore } from '../src/features/auth/store.js';
@@ -200,6 +201,21 @@ async function renderPanelAtBaseUrl(
 /** 面板里的条款链接，按文档顺序返回 `[《服务条款》, 《隐私政策》]`。 */
 function legalAnchors(el: HTMLElement): HTMLAnchorElement[] {
   return [...el.querySelectorAll('a[href]')] as HTMLAnchorElement[];
+}
+
+async function readOfficialLegal(el: HTMLElement, kind: 'terms' | 'privacy', locale: Locale): Promise<HTMLElement> {
+  await tap(el, `auth-form-legal-${kind}`);
+  // React Native Web Modal mounts a portal; the reader is outside AuthPanel's container.
+  const sheet = byTestId(document.body, 'auth-legal-document');
+  const legalDoc = legalDocumentById(kind);
+  expect(sheet.textContent).toContain(legalDoc.title[locale]);
+  expect(sheet.textContent).toContain(legalDoc.sections[locale][0]!.title);
+  expect(sheet.textContent).toContain(legalDocumentPresentation(legalDoc).summary[locale]);
+  if (legalDoc.status === 'draft') {
+    expect(sheet.textContent).toContain(translate(locale, 'site.legal.draft.banner').replace(/\*\*/g, ''));
+    expect(sheet.textContent).not.toContain('**');
+  }
+  return sheet;
 }
 
 function button(el: HTMLElement, key: MessageKey): HTMLButtonElement {
@@ -895,9 +911,8 @@ describe('显隐默认档由**壳**覆盖（共享层只能按 Platform 判）',
  *      于是"我想先读条款"这个动作**本身就构成了同意**。这个形状在 DOM 上
  *      只差一层嵌套，肉眼看不出来，只能这样钉。
  *
- * ⚠️ 2026-10-02：这两条链接现在由**共享表单**渲染（`labels.legal.hrefs` 给出地址 ⇒
- * web 上落真的 `<a href target=_blank rel=noopener>`）。三条坏法一条没放松，
- * 只是每一轮都要先走到**注册档**（同意项在那一档，链接跟着它）。
+ * 官方服务在注册弹窗中离线阅读唯一法律事实源；自托管仍提供真实服务端链接。
+ * 两种入口均不嵌入同意项，阅读不会代替用户勾选，也不清空认证草稿。
  */
 describe('条款链接：按连的那台服务端分流', () => {
   const OFFICIAL = 'https://heyta.waytofuture.cn';
@@ -917,13 +932,18 @@ describe('条款链接：按连的那台服务端分流', () => {
     expect(anchors.every((a) => a.rel.includes('noopener'))).toBe(true);
   });
 
-  it('连官方域时落在落地页 `/legal/*`，**不是** `<baseUrl>/privacy.html`（那条是 404）', async () => {
+  it('连官方域时两份协议在应用内打开完整正文，阅读不代表同意', async () => {
+    stubFetch(200, REGISTRATION_CHALLENGE);
     const el = await renderPanelAtBaseUrl(OFFICIAL);
     await toRegister(el);
-    expect(legalAnchors(el).map((a) => a.getAttribute('href'))).toEqual([
-      `${OFFICIAL}/legal/terms/`,
-      `${OFFICIAL}/legal/privacy/`,
-    ]);
+    expect(legalAnchors(el)).toEqual([]);
+    for (const kind of ['terms', 'privacy'] as const) {
+      await readOfficialLegal(el, kind, 'zh-CN');
+      await tap(document.body, 'auth-legal-document-close');
+      expect(document.body.querySelector('[data-testid="auth-legal-document"]')).toBeNull();
+      expect(termsChecked(el)).toBe('false');
+    }
+    expect(calls).toEqual([]);
   });
 
   it('官方地址带尾斜杠时仍按官方服务处理', async () => {
@@ -931,10 +951,13 @@ describe('条款链接：按连的那台服务端分流', () => {
     expect(el.textContent ?? '').not.toContain(translate('zh-CN', 'web.auth.server.custom'));
   });
 
-  it('英文界面落到 `/en/legal/*`', async () => {
+  it('英文界面阅读英文官方正文', async () => {
+    stubFetch(200, REGISTRATION_CHALLENGE);
     const el = await renderPanelAtBaseUrl(OFFICIAL, 'en');
     await toRegister(el);
-    expect(legalAnchors(el)[0]!.getAttribute('href')).toBe(`${OFFICIAL}/en/legal/terms/`);
+    await readOfficialLegal(el, 'terms', 'en');
+    await tap(document.body, 'auth-legal-document-close');
+    expect(calls).toEqual([]);
   });
 
   /**
@@ -942,31 +965,63 @@ describe('条款链接：按连的那台服务端分流', () => {
    *
    * 原文是「地址还没填时**不渲染链接**」—— 它当时的世界里"没填地址"是一个**停留状态**
    * （面板上挂着一个空的必填框，所以确实没有任何一台服务端可以解析条款）。
-   * 现在那个状态不存在了：未配置时地址解析成**本机来源**（`lib/auth-endpoint.ts`），
-   * 于是"没有链接"变成了"明明有目标却不给"，正好是这条链第 1 种坏法要拦的东西。
+   * 现在那个状态不存在了：未配置时地址解析成官方服务（`lib/auth-endpoint.ts`），
+   * 因此没有手填地址也必须能在应用内读到官方正文。
    *
-   * 所以判据换形而**意图更严**：未配置时链接必须落在**当前来源**上，
-   * 而且在官方托管的部署里那个来源就是官方域 ⇒ 落 `/legal/*`（下一条钉住它）。
+   * 判据要求从默认官方入口打开完整正文；不能只渲染两个无效入口。
    * 勾选框照常存在那一半**原样保留**。
    */
-  it('未配置时链接落在**当前来源**（不再有"没有地址"这个停留状态）', async () => {
+  it('未配置地址时可在应用内阅读默认官方协议', async () => {
+    stubFetch(200, REGISTRATION_CHALLENGE);
     const el = await renderPanelAtBaseUrl('');
     await toRegister(el);
-    expect(legalAnchors(el).map((a) => a.getAttribute('href'))).toEqual([
-      `${OFFICIAL_SITE_ORIGIN}/legal/terms/`,
-      `${OFFICIAL_SITE_ORIGIN}/legal/privacy/`,
-    ]);
     expect(el.querySelector('[role="checkbox"]')).not.toBeNull();
+    await readOfficialLegal(el, 'privacy', 'zh-CN');
+    await tap(document.body, 'auth-legal-document-close');
+    expect(calls).toEqual([]);
   });
 
-  it('在面板里现敲一个官方地址，链接跟着换过去（分流读的是 `effectiveBaseUrl`）', async () => {
+  it('在面板里现敲官方地址后切换为应用内官方正文', async () => {
+    stubFetch(200, REGISTRATION_CHALLENGE);
     const el = await renderPanelAtBaseUrl('', 'zh-CN', true);
     await tap(el, 'auth-form-advanced-toggle');
     await typeInto(el, 'input[inputmode="url"]', `${OFFICIAL}/`);
     await toRegister(el);
 
-    expect(legalAnchors(el)[0]!.getAttribute('href')).toBe(`${OFFICIAL}/legal/terms/`);
+    expect(legalAnchors(el)).toEqual([]);
+    await readOfficialLegal(el, 'terms', 'zh-CN');
+    await tap(document.body, 'auth-legal-document-close');
+    expect(calls).toEqual([]);
   });
+
+  for (const locale of ['zh-CN', 'en'] as const) {
+    it(`${locale} 两协议及文内引用可阅读，关闭保留全部注册草稿且零请求`, async () => {
+      stubFetch(200, REGISTRATION_CHALLENGE);
+      const el = await renderPanelAtBaseUrl(OFFICIAL, locale);
+      await toRegister(el);
+      await typeById(el, 'auth-form-password', PASSWORD);
+      await typeById(el, 'auth-form-password-confirmation', PASSWORD);
+      await tap(el, 'auth-form-terms');
+
+      for (const kind of ['terms', 'privacy'] as const) {
+        const sheet = await readOfficialLegal(el, kind, locale);
+        const reference = sheet.querySelector<HTMLElement>('[data-testid="auth-legal-document-ref-privacy"]');
+        if (kind === 'terms') {
+          expect(reference, '条款到隐私政策的文内引用必须存在').not.toBeNull();
+          await tap(document.body, 'auth-legal-document-ref-privacy');
+          const referenced = byTestId(document.body, 'auth-legal-document');
+          expect(referenced.textContent).toContain(legalDocumentById('privacy').title[locale]);
+          expect(referenced.textContent).toContain(legalDocumentById('privacy').sections[locale][0]!.title);
+        }
+        await tap(document.body, 'auth-legal-document-close');
+        expect((byTestId(el, 'auth-form-email') as HTMLInputElement).value).toBe(EMAIL);
+        expect((byTestId(el, 'auth-form-password') as HTMLInputElement).value).toBe(PASSWORD);
+        expect((byTestId(el, 'auth-form-password-confirmation') as HTMLInputElement).value).toBe(PASSWORD);
+        expect(termsChecked(el)).toBe('true');
+        expect(calls).toEqual([]);
+      }
+    });
+  }
 
   it('🔴 链接不在同意项里面 —— 点链接不能切换同意', async () => {
     const el = await renderPanelAtBaseUrl(BASE_URL);

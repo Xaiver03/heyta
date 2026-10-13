@@ -247,7 +247,7 @@ export default function App(): React.JSX.Element {
 }
 
 /**
- * 语言宿主：**只在内存里**持有 locale（重启回到设备语言）。
+ * 语言宿主：React 驱动当前 locale；冷启动优先恢复独立设备偏好。
  *
  * 🔴 `I18nProvider` 必须在**所有**调 `useI18n()` 的组件之上 ——
  * 也就是在这里，而不是更靠下的某个屏幕。`useState(resolveDeviceLocale)`

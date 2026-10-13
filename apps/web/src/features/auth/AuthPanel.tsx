@@ -80,9 +80,11 @@ import {
   normalizeInviteCode,
 } from '@heyta/domain';
 import { useI18n, type MessageKey } from '@heyta/i18n';
+import { legalDocumentById, legalDocumentPresentation } from '@heyta/legal';
 import { OFFICIAL_SITE_ORIGIN, resolveLegalLinks, type HostedAuthSession } from '@heyta/app-host';
 import {
   AuthForm,
+  LegalDocumentSheet,
   HeytaUiProvider,
   authFailureMessage,
   type AuthFormLabels,
@@ -189,6 +191,7 @@ export function AuthPanel({
    * 一个 effect 会多渲染一帧，而那一帧里用户看到的还是旧地址。
    */
   const [addressDraft, setAddressDraft] = useState(() => authBaseUrl(baseUrl));
+  const [openLegalDocument, setOpenLegalDocument] = useState<string | null>(null);
   const [previousBaseUrl, setPreviousBaseUrl] = useState(baseUrl);
   const baseUrlRef = useRef(baseUrl);
   if (previousBaseUrl !== baseUrl) {
@@ -378,7 +381,7 @@ export function AuthPanel({
           legal: {
             terms: t('common.legal.termsDoc'),
             privacy: t('common.legal.privacyDoc'),
-            hrefs: legalLinks,
+            ...(isOfficialService ? {} : { hrefs: legalLinks }),
           },
         }),
     localErrors: {
@@ -550,10 +553,32 @@ export function AuthPanel({
             }}
             onOpenLegal={(kind) => {
               if (legalLinks === null) return;
+              if (isOfficialService) {
+                setOpenLegalDocument(kind);
+                return;
+              }
               const href = kind === 'terms' ? legalLinks.terms : legalLinks.privacy;
               window.open(href, '_blank', 'noopener,noreferrer');
             }}
             testID="auth-form"
+          />
+          <LegalDocumentSheet
+            document={legalDocumentPresentation(legalDocumentById(openLegalDocument ?? 'terms'))}
+            locale={locale}
+            labels={{
+              close: t('web.auth.close'),
+              meta: t('site.legal.meta', {
+                version: legalDocumentById(openLegalDocument ?? 'terms').version,
+                date: legalDocumentById(openLegalDocument ?? 'terms').updatedDate,
+              }),
+              ...(legalDocumentById(openLegalDocument ?? 'terms').status === 'draft'
+                ? { status: t('site.legal.draft.banner') }
+                : {}),
+            }}
+            visible={openLegalDocument !== null}
+            onClose={() => setOpenLegalDocument(null)}
+            onDocumentReference={setOpenLegalDocument}
+            testID="auth-legal-document"
           />
         </HeytaUiProvider>
         </div>

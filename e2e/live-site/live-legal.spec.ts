@@ -535,3 +535,26 @@ test('未命中的 /legal/* 答的是双语品牌 404 页；状态码仍是 404�
   const hard = hardErrors(logs);
   expect(hard, `404 页抛了未捕获异常：\n${hard.join('\n')}`).toEqual([]);
 });
+
+test('线上法律页页脚在平板和手机宽度不塌陷、不横向溢出', async ({ page }) => {
+  for (const viewport of [
+    { width: 1024, height: 900, columns: 2 },
+    { width: 768, height: 900, columns: 2 },
+    { width: 390, height: 844, columns: 1 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto(`${ORIGIN}/legal/terms/`, { waitUntil: 'networkidle' });
+    const columns = await page.locator('.lp-footer__grid').evaluate((element) =>
+      getComputedStyle(element).gridTemplateColumns.split(' ').filter(Boolean).length,
+    );
+    expect(columns, `${viewport.width}px 页脚列数不符合响应式规则`).toBe(viewport.columns);
+    const width = await page.evaluate(() => ({
+      body: document.documentElement.scrollWidth,
+      viewport: window.innerWidth,
+    }));
+    expect(width.body, `${viewport.width}px 页面横向溢出`).toBeLessThanOrEqual(width.viewport);
+    if (viewport.width === 390) {
+      await page.screenshot({ path: `${SHOT_DIR}/live-terms-footer-390.png`, fullPage: true });
+    }
+  }
+});

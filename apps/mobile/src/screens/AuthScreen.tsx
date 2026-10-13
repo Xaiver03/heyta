@@ -55,6 +55,7 @@ import {
   requestPasswordReset,
   requestMagicLink,
   registerWithMagicLink,
+  OFFICIAL_SITE_ORIGIN,
   resolveLegalLinks,
   verifyEmailAddress,
   verifyMagicLink,
@@ -63,6 +64,7 @@ import {
   type HostedAuthSession,
   type HostedPasskeyCredential,
 } from '@heyta/app-host';
+import { legalDocumentById, legalDocumentPresentation } from '@heyta/legal';
 import { useI18n, type MessageKey, type MessageVars } from '@heyta/i18n';
 
 import { Button, Card, Checkbox, Screen, SectionHeader, Text, TextField } from '../ui/kit';
@@ -76,13 +78,14 @@ import {
   defaultPasswordRevealed,
   firstAuthErrorField,
   PasswordStrength,
+  LegalDocumentSheet,
   type AuthFormMode,
   type AuthFormField,
 } from '@heyta/ui';
 import { describePasskeyError, resolvePasskeyProvider } from '../auth/passkey-host';
 import { redeemPastedAuthToken } from '../auth/paste';
 import { saveAuthSession } from '../auth/session';
-import { requireNetworkConsent } from '../privacy/consent-ui';
+import { acceptNetworkConsent, requireNetworkConsent } from '../privacy/consent-ui';
 
 /** 正在跑的那件事。只为了在按钮上画菊花 + 让"哪一步在忙"可读。 */
 type AuthAction =
@@ -257,6 +260,9 @@ export function AuthScreen({
    * ——「哪份文本适用于这台服务端」是协议知识，四个壳各写一遍必然漂移（AGENTS §3.5）。
    */
   const legalLinks = resolveLegalLinks(serverUrl, locale);
+  const officialLegalLinks =
+    legalLinks !== null && legalLinks.terms.startsWith(`${OFFICIAL_SITE_ORIGIN}/`);
+  const [openLegalDocument, setOpenLegalDocument] = useState<string | null>(null);
 
   /**
    * 打开一条外部链接。
@@ -273,6 +279,16 @@ export function AuthScreen({
     Linking.openURL(href).catch(() => {
       failWithKey('mobile.auth.link.unopenable');
     });
+  };
+
+  /** 官方文本在应用内可读；自托管文本只能由自托管运营者发布，交给浏览器打开。 */
+  const openLegalDocumentOrLink = (kind: 'terms' | 'privacy'): void => {
+    if (officialLegalLinks) {
+      setOpenLegalDocument(kind);
+      return;
+    }
+    const href = kind === 'terms' ? legalLinks?.terms : legalLinks?.privacy;
+    if (href !== undefined) openLegalLink(href);
   };
 
   const fail = (reason: HostedAuthFailureReason): void => {
@@ -359,6 +375,8 @@ export function AuthScreen({
     if (confirmLoginPassword !== loginPassword) {
       return failWithKey('common.auth.form.passwordMismatch');
     }
+    // The checked registration agreement also explicitly authorizes networking.
+    acceptNetworkConsent();
     if (!requireNetworkConsent()) return;
     setPhase({ kind: 'busy', action: 'password-register' });
     const result = await requestEmailPasswordRegistrationCode(options, {
@@ -466,6 +484,7 @@ export function AuthScreen({
     const generation = beginAuthAction();
     // 🔴 未勾同意项 → **一个请求都不发**，并说清原因。
     if (!termsAccepted) return failWithKey(AUTH_TERMS_REQUIRED_KEY);
+    acceptNetworkConsent();
     if (!requireNetworkConsent()) return;
     setPhase({ kind: 'busy', action: 'magic-register' });
     const result = await registerWithMagicLink(options, { email, termsAccepted: true });
@@ -504,6 +523,7 @@ export function AuthScreen({
     const generation = beginAuthAction();
     if (!termsAccepted) return failWithKey(AUTH_TERMS_REQUIRED_KEY);
     if (passkeyProvider === undefined) return fail('passkey-unsupported');
+    acceptNetworkConsent();
     if (!requireNetworkConsent()) return;
     setPhase({ kind: 'busy', action: 'passkey-register' });
     const begun = await beginPasskeyRegistration(options, { email, termsAccepted: true });
@@ -686,7 +706,6 @@ export function AuthScreen({
               value={loginPassword}
               onChangeText={setLoginPassword}
               secure={!passwordRevealed}
-              hint={mode === 'register' ? t('common.auth.form.passwordHint') : undefined}
             />
             <Pressable
               accessibilityRole="button"
@@ -760,52 +779,52 @@ export function AuthScreen({
       </Card>
 
       {/* 同意项（规范 §2-A4）。**必须由用户自己勾**，初值 false。 */}
-      {mode === 'register' ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.2'] }}>
-        <Checkbox
-          checked={termsAccepted}
-          onToggle={() => {
-            setTermsAccepted((current) => !current);
-          }}
-          label={t('mobile.auth.terms.label')}
-        />
-      </View> : null}
+      {mode === 'register' ? (
+        <View style={{ gap: tokens['space.2'] }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.2'] }}>
+            <Checkbox
+              checked={termsAccepted}
+              onToggle={() => {
+                setTermsAccepted((current) => !current);
+              }}
+              label={t('mobile.auth.terms.label')}
+            />
+          </View>
 
-      {/*
-        条款的**落点**。这句"我同意该服务端提供的服务条款与隐私政策"长期没有
-        任何地方能读到那份东西 —— 要求同意一份读不到的文本，PIPL 第 17 条的"公开"
-        就没做到。链接放在勾选行**外面**：整行都是 Checkbox 的触控区，
-        嵌进去会让"我想先读条款"变成"我已经同意了"。
-      */}
-      {mode === 'register' && legalLinks !== null ? (
-        <View style={{ flexDirection: 'row', gap: tokens['space.4'] }}>
-          <Pressable
-            accessibilityRole="link"
-            hitSlop={tokens['gesture.hit-slop']}
-            onPress={() => {
-              openLegalLink(legalLinks.terms);
-            }}
-          >
-            <Text variant="caption" tone="primary">
-              {t('common.legal.termsDoc')}
-            </Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="link"
-            hitSlop={tokens['gesture.hit-slop']}
-            onPress={() => {
-              openLegalLink(legalLinks.privacy);
-            }}
-          >
-            <Text variant="caption" tone="primary">
-              {t('common.legal.privacyDoc')}
-            </Text>
-          </Pressable>
+          {/* 链接与勾选项保持紧凑，但仍是 checkbox 行的兄弟，避免点链接误触同意。 */}
+          {legalLinks !== null ? (
+            <View style={{ flexDirection: 'row', gap: tokens['space.4'] }}>
+              <Pressable
+                accessibilityRole="link"
+                hitSlop={tokens['gesture.hit-slop']}
+                onPress={() => {
+                  openLegalDocumentOrLink('terms');
+                }}
+                testID="mobile-auth-legal-terms"
+              >
+                <Text variant="caption" tone="primary">
+                  {t('common.legal.termsDoc')}
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="link"
+                hitSlop={tokens['gesture.hit-slop']}
+                onPress={() => {
+                  openLegalDocumentOrLink('privacy');
+                }}
+                testID="mobile-auth-legal-privacy"
+              >
+                <Text variant="caption" tone="primary">
+                  {t('common.legal.privacyDoc')}
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
+          <Text variant="caption" tone="subtle">
+            {t('mobile.auth.terms.hint')}
+          </Text>
         </View>
       ) : null}
-
-      {mode === 'register' ? <Text variant="caption" tone="subtle">
-        {t('mobile.auth.terms.hint')}
-      </Text> : null}
 
       {/*
         口令这条路（规范 §3.2 的主路）。**登录在前**：它是唯一直接产出会话的按钮，
@@ -919,6 +938,24 @@ export function AuthScreen({
         </>
       ) : null}
       </View>
+      {openLegalDocument !== null ? (() => {
+        const document = legalDocumentPresentation(legalDocumentById(openLegalDocument));
+        return (
+          <LegalDocumentSheet
+            document={document}
+            locale={locale}
+            labels={{
+              close: t('web.auth.close'),
+              meta: t('site.legal.meta', { version: document.version, date: document.updatedDate }),
+              status: document.status === 'draft' ? t('site.legal.draft.banner') : undefined,
+            }}
+            visible
+            onClose={() => setOpenLegalDocument(null)}
+            onDocumentReference={setOpenLegalDocument}
+            testID="mobile-auth-legal-sheet"
+          />
+        );
+      })() : null}
     </Screen>
   );
 }

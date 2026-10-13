@@ -1,0 +1,49 @@
+{
+  "date": "2026-10-08",
+  "device": "emulator-5554",
+  "apkSha256": "26d39bc0ca06d13e6000a363649cdf56f42d52d9a4fc0e6f2c3e4d0dbb36d115",
+  "package": "com.heyta",
+  "existingWidgetIds": {
+    "focus": 2,
+    "habits": 3,
+    "today": 4,
+    "quadrant": 5
+  },
+  "scope": {
+    "startedNewEmulator": false,
+    "ranGradleOnMac": false,
+    "clearedAppData": false,
+    "uninstalledApp": false
+  },
+  "focus": {
+    "idleSelector": "pass",
+    "rowStartWithRealTaskId": "pass",
+    "appPause": "pass",
+    "appResume": "pass",
+    "appEnd": "pass",
+    "widgetStartVisible": "pass",
+    "widgetPauseVisible": "limited_same_active_render",
+    "widgetResumeVisible": "limited_same_active_render",
+    "widgetEndVisible": "pass",
+    "latestQaSession": {
+      "entityId": "focus-muzftntw-1-42pjsn59",
+      "taskId": "task-muz6597n-1-l09iibt4",
+      "completed": false,
+      "ended": true
+    }
+  },
+  "widgetInteractions": {
+    "emptyBodyOpensApp": "fail",
+    "emptyDateHeaderOpensApp": "pass"
+  },
+  "language": {
+    "setZhCnAndColdStarted": "fail_visible_ui_still_english",
+    "restoredAppLocalePreference": []
+  },
+  "sourceFilesInspected": [
+    "apps/mobile/android/app/src/main/java/com/heytamobile/widget/FocusWidgetModel.kt",
+    "apps/mobile/android/app/src/main/java/com/heytamobile/widget/FocusWidgetViews.kt",
+    "apps/mobile/src/screens/FocusScreen.tsx",
+    "apps/mobile/src/lib/focus-timer.ts"
+  ]
+}

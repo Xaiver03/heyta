@@ -979,6 +979,7 @@ export function App(): React.JSX.Element {
     const previous = document.activeElement;
     pane?.querySelector<HTMLTextAreaElement>('textarea')?.focus();
     const onKey = (event: KeyboardEvent) => {
+      if (usePrivacyStore.getState().open) return;
       if (event.key === 'Escape') { event.preventDefault(); setCompactAssistantOpen(false); }
       if (event.key !== 'Tab') return;
       const items = focusable();
@@ -1937,12 +1938,13 @@ export function App(): React.JSX.Element {
    * 时的按键（输入框 autoFocus，那正是常态）。实测：keyup 能到 window、
    * keydown 到不了。捕获阶段在下传时先于目标处理器触发，才拦得到。
    *
-   * ⚠️ 代价：捕获意味着"浮层里若有别的 Esc 消费者（嵌套下拉）"，外层会先关。
-   * 当前设置页里没有嵌套的 Esc 面（唯一的例外是确认框，它自己会先关），所以成立。
+   * 隐私面板可能在设置之上打开，且它的 window 捕获监听注册得更晚。
+   * 底层必须主动让路；顶层 stopImmediatePropagation 阻止不了已经执行的监听。
    */
   useEffect(() => {
     if (view !== 'search' && view !== 'settings') return;
     const onKey = (event: KeyboardEvent) => {
+      if (usePrivacyStore.getState().open) return;
       if (event.key === 'Escape') closeSecondarySurface();
     };
     window.addEventListener('keydown', onKey, true);
@@ -2447,18 +2449,9 @@ export function App(): React.JSX.Element {
               语言与主题搬进 设置 → 显示 —— 裁决见 §9.3/§9.6），
               而"同步"在滴答里是左下角的东西。裁决与现量：
               `docs/plans/goal-layout-audit.md` §9.1 第 1 行。
-              ⚠️ `ConflictDialog` 与两张首启面板**留在页头这一层**：它们是
-              `position: fixed` + `z.modal` 的顶层浮层，挂在哪一个 flex 容器里都不影响
-              渲染位置，而"同意之前不许发请求"必须在应用之上（G-11 / G-27 两段原注释）。
+              全局冲突、隐私与补签面板挂在应用根层；助手工作区会隐藏主内容，
+              `position: fixed` 仍受隐藏祖先影响，不能把全局决定放在页头里。
             */}
-            <ConflictDialog />
-            {/* G-11：首启隐私同意面板。与 `ConflictDialog` 同一处挂载 ——
-                两者都是 `position: fixed` + `z.modal` 的顶层浮层，
-                而"同意之前不许发请求"这件事必须在应用之上，不能在某个视图里面。 */}
-            <PrivacyConsentSheet />
-            {/* 🔴 G-27：账号级补签面板。挂在隐私面板**之后** —— 两道闸同时成立时，
-                "这台设备还没被问过"是更前置的那句话，界面不许同时摆两个模态。 */}
-            <LegalReconfirmSheet />
             {/*
               详情列的开关（工单 W4 ②的第一条路径）。
               与主题按钮同一档位：**纯图标 + 自带可访问名**，名字说的是"点下去会怎样"
@@ -3309,6 +3302,11 @@ export function App(): React.JSX.Element {
         ) : null}
       </aside>
       </div>
+      {/* Keep global decisions outside the view grid: hidden views must not
+          hide them, and mobile grid order must not put authentication above them. */}
+      <ConflictDialog />
+      <PrivacyConsentSheet />
+      <LegalReconfirmSheet />
       </AiSettingsNavigationContext.Provider>
       </PanelEphemeralProvider>
     </HeytaUiProvider>

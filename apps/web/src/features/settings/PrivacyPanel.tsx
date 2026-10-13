@@ -26,7 +26,7 @@ import { useEffect, useState } from 'react';
 import { useI18n } from '@heyta/i18n';
 import { formatPrivacyDecisionTime, type PrivacyConsentRecord } from '@heyta/app-host';
 
-import { privacyConsent, privacyConsentActions, subscribePrivacyConsent } from '../privacy/consent-gate.js';
+import { privacyConsent, privacyConsentActions, readPrivacyConsentPersistence, subscribePrivacyConsent } from '../privacy/consent-gate.js';
 import { usePrivacyStore } from '../privacy/store.js';
 import { SettingsNotice } from './SettingsNotice.js';
 import './privacy-settings.css';
@@ -42,11 +42,18 @@ export function PrivacyPanel({ active = true }: { active?: boolean }): React.JSX
    * 界面与事实不一致，正是这一类缺陷最难查的形状。
    */
   const [record, setRecord] = useState<PrivacyConsentRecord | null>(() => privacyConsent.current());
-  const [revokeNotPersisted, setRevokeNotPersisted] = useState(false);
+  const [consentNotPersisted, setConsentNotPersisted] = useState(() => !readPrivacyConsentPersistence());
 
   useEffect(() => {
     if (!active) return undefined;
-    return subscribePrivacyConsent(() => setRecord(privacyConsent.current()));
+    setRecord(privacyConsent.current());
+    // 隐藏期间不订阅，恢复时读取最后一次真实保存回执；切换页面不能抹去失败。
+    setConsentNotPersisted(!readPrivacyConsentPersistence());
+    return subscribePrivacyConsent(({ persisted }) => {
+      setRecord(privacyConsent.current());
+      // 只有新的决定确实写入设备后，才清掉上一条失败提示；再次失败时保留提示。
+      setConsentNotPersisted(!persisted);
+    });
   }, [active]);
 
   const stateKey =
@@ -76,16 +83,16 @@ export function PrivacyPanel({ active = true }: { active?: boolean }): React.JSX
 
       <fieldset className="privacy-settings__fieldset" aria-labelledby="privacy-action-title">
         <legend id="privacy-action-title" className="privacy-settings__legend">{t('common.privacy.settings.actionTitle')}</legend>
-        <p className="privacy-settings__hint">{t('common.privacy.settings.revokeHint')}</p>
+        <p className="privacy-settings__hint">{t(record?.decision === 'accepted' ? 'common.privacy.settings.revokeHint' : 'common.privacy.settings.chooseHint')}</p>
         <div className="privacy-settings__actions">
-          {record === null ? (
-            // 没决定过（首次装、或刚撤回）：把同意面板再打开一次。
+          {record?.decision !== 'accepted' ? (
+            // 尚未同意联网（包括明确只用本机）：把同意面板再打开一次。
             // ⚠️ 这里开的是**同一张**面板，不是第二份"同意界面"（AGENTS §3.5）。
             <button
               type="button"
               className="ht-btn ht-btn--primary"
               data-testid="privacy-choose-again"
-              onClick={() => usePrivacyStore.getState().openSheet('revoked')}
+              onClick={() => usePrivacyStore.getState().openSheet('settings')}
             >
               {t('common.privacy.settings.chooseAgain')}
             </button>
@@ -94,10 +101,7 @@ export function PrivacyPanel({ active = true }: { active?: boolean }): React.JSX
               type="button"
               className="ht-btn ht-btn--ghost"
               data-testid="privacy-revoke"
-              onClick={() => {
-                const { persisted } = privacyConsentActions.revoke();
-                setRevokeNotPersisted(!persisted);
-              }}
+              onClick={() => privacyConsentActions.revoke()}
             >
               {t('common.privacy.settings.revoke')}
             </button>
@@ -105,7 +109,7 @@ export function PrivacyPanel({ active = true }: { active?: boolean }): React.JSX
         </div>
 
         {/* 撤回没能落盘时必须说出口：会话闸门已关，但下次冷启动仍会再问。 */}
-        {revokeNotPersisted ? (
+        {consentNotPersisted ? (
           <SettingsNotice tone="warning" live testId="privacy-revoke-not-persisted" title={t('common.privacy.consent.notPersisted')} />
         ) : null}
       </fieldset>

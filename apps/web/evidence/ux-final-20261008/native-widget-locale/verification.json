@@ -1,0 +1,24 @@
+{
+  "date": "2026-10-08",
+  "checklist": "UX-S9-143",
+  "webTests": {
+    "files": 2,
+    "passed": 17
+  },
+  "webTypecheckExitCode": 0,
+  "macReleaseBuildExitCode": 0,
+  "mobileFullTests": {
+    "files": 72,
+    "passed": 900
+  },
+  "installedNativeLocaleSwitch": "pending-new-package",
+  "sourceSha256": {
+    "apps/mobile/src/db/open-host.ts": "ad0c132392bd72904726b9576532a0623a213fc9ffc6080ec6fce46ee90c6987",
+    "apps/mobile/tests/open-host-generation.spec.ts": "d143d89c5c21505eb34c00b7f454e51ae048236b1f230e882f0ec2ddc741231c",
+    "apps/mobile/src/ai/chat-composer.tsx": "b90f2ff69767abfdad26831974a0de1ae34f0bd25f066a35318ab9ea6ef2a10a",
+    "apps/web/src/lib/native-widgets.ts": "d647a635142b415d3ae7ce1a95be61c34f2b6dc18ed0346fe8e46f0f5827881e",
+    "apps/web/tests/native-widget-locale.spec.ts": "14e99efac54ffae9f11d6c96fc8d80debc74ab5c53f73030fe4d6f4641ca98f0",
+    "packages/app-host/src/native-widget-session.ts": "a011253f660b213fe9143faee4bbf924e5a7a9b0d85501920315bfe75d39a2b8",
+    "apps/desktop-macos/Sources/HeytaMac/ShellWidgetBridge.swift": "0ae3086a251e0b469d493d9382a645a9ef08951046a63e1f3cd8fd06091cc5a5"
+  }
+}

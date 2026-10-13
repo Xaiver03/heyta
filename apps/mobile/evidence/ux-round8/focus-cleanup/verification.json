@@ -1,0 +1,30 @@
+{
+  "issue": "UX-S9-142",
+  "date": "2026-10-08",
+  "sourceSha256": {
+    "apps/mobile/src/widgets/lifecycle.ts": "17fe7ed70e2093daf95c303555be8a27c6f4623aa527d4303377602782e06ecb",
+    "apps/mobile/src/widgets/publish-coordinator.ts": "5e702ac91e8c8d266ea54c5cc6314e950a8ab9c486bfda8a19bc078e01b159c4",
+    "apps/mobile/src/lib/focus-task-source.ts": "278d9885e53cf133d2ae8b226b8e0115c74b161ac40488c0e000fcae6d029080",
+    "apps/mobile/src/screens/FocusScreen.tsx": "6c8c5aba0a9c1cf60c39884d05b1fb66520232f6a85b5e742f55db454b3a68f4",
+    "apps/mobile/tests/focus-widget-lifecycle.spec.ts": "2ce496d0971dfa9738c5c019127836140726f8a0e40c092b9f0e67f499e3dcf5",
+    "apps/mobile/tests/widget-publish-coordinator.spec.ts": "6db57103dc862a4321280b0f1b2831f4b8c80f8250f822d68fab9d65b21b7be9",
+    "apps/mobile/tests/focus-task-source.spec.ts": "b0e7852e23a559780379b03c94b750f7484a8c3aa2289ea64ec2fe2a370b549b",
+    "apps/mobile/ios/Heyta/HeytaWidgetModule.swift": "b062dab7e77d70b6839fcf54a466efff6e33ff3baef812356c42347def17dcd9"
+  },
+  "before": {
+    "testFilesFailed": 1,
+    "passed": 5,
+    "failed": 3
+  },
+  "after": {
+    "testFilesPassed": 5,
+    "passed": 50,
+    "failed": 0
+  },
+  "mobileTypecheckExitCode": 0,
+  "iosSimulatorReleaseAppAndExtensionBuildExitCode": 0,
+  "iosBuildOutput": "/tmp/heyta-widget-qa-20261008/ios-derived/Build/Products/Release-iphonesimulator/Heyta.app",
+  "installedThisCandidate": false,
+  "liveActivityDeviceInteractionVerified": false,
+  "fourPlatformFrozenSourceReleaseVerified": false
+}

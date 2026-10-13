@@ -18,6 +18,15 @@ export {
   hasTaskPriorityBatchMarker, parseTaskPriorityBatchOperation,
   type TaskPriorityBatchItem, type HeytaTaskPriorityBatchPayload,
 } from './task-priority-batch-contract';
+export {
+  heytaTaskRepeatCompletionPayloadSchema,
+  hasTaskRepeatCompletionMarker,
+  parseTaskRepeatCompletionOperation,
+  type TaskRepeatCompletionTaskPatch,
+  type TaskRepeatCompletionReminderPatch,
+  type HeytaTaskRepeatCompletionPayload,
+} from './task-repeat-completion-contract';
+export { reminderOwnerFromId, validateReminderOwnerOperation } from './reminder-owner-contract';
 export { isHeytaFullStatePayload, type HeytaFullStatePayload } from './full-state-payload';
 export {
   CURRENT_SCHEMA_VERSION,

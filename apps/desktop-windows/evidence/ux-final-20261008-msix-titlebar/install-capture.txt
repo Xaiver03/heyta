@@ -1,0 +1,26 @@
+CONTEXT IsAdmin=False SessionId=2
+MSIX_EXISTS=True
+ADD_APPX=OK
+INSTALLED_VERSION=1.0.0.0
+INSTALL_LOCATION=C:\Program Files\WindowsApps\cloud.finlaw.heyta.desktop_1.0.0.0_x64__d8ndx02bjp3sw
+PAYLOAD_PRI=True
+PAYLOAD_XBF=2
+PAYLOAD_WEBDIST=True
+PAYLOAD_INDEX_SHA=EE60CB88921AC46B662BA82AB665B6B0FDBFABF90CE8086819FB27DC9636A94B
+PAYLOAD_CHUNK_TOTAL=2
+PAYLOAD_CHUNK_PRESENT=2
+SHORTCUT_STARTAPP=True  cloud.finlaw.heyta.desktop_d8ndx02bjp3sw!App
+SHORTCUT_ICON=C:\Program Files\WindowsApps\cloud.finlaw.heyta.desktop_1.0.0.0_x64__d8ndx02bjp3sw\heyta.ico
+SHORTCUT_PATH=C:\Users\41478\Desktop\heyta.lnk
+SHORTCUT_CREATED=True
+SHORTCUT_ARGS=shell:AppsFolder\cloud.finlaw.heyta.desktop_d8ndx02bjp3sw!App
+SHORTCUT_RESOLVES=True
+APP_ID=cloud.finlaw.heyta.desktop_d8ndx02bjp3sw!App
+M2D=OK
+PID=24960
+WINDOW_TITLE=heyta
+WINDOW_RECT=1152x587
+PNG_SAVED=True bytes=146585
+RESULT=OK
+SHORTCUT_OK=True
+DONE

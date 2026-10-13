@@ -1,0 +1,25 @@
+{
+  "states": [
+    {
+      "theme": "light",
+      "innerWidth": 1152,
+      "scrollWidth": 1152,
+      "bodyScrollWidth": 1152,
+      "overflow": true
+    },
+    {
+      "theme": "dark",
+      "innerWidth": 1152,
+      "scrollWidth": 1152,
+      "bodyScrollWidth": 1152,
+      "overflow": true
+    }
+  ],
+  "narrow": {
+    "innerWidth": 390,
+    "innerHeight": 844,
+    "scrollWidth": 390,
+    "bodyScrollWidth": 390,
+    "overflow": true
+  }
+}

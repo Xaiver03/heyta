@@ -63,7 +63,7 @@ import { writeDurationIntoNote } from './duration-note.js';
  * ⚠️ 这**不构成运行时循环依赖**：`reminder-actions.ts` 对 `./actions.js` 的引用是
  * `import type`（编译后被抹掉），所以运行时只有一条边 `actions → reminder-actions`。
  */
-import { rescheduleRemindersForRepeat } from './reminder-actions.js';
+import { planRepeatReminderUpdates } from './reminder-actions.js';
 import { mergeChecklistIntoNote } from './ai-breakdown.js';
 
 /**
@@ -140,6 +140,15 @@ export interface TaskActionsOptions {
   newTaskId?: () => string;
 }
 
+/**
+ * 完成动作的可选幂等上下文。
+ *
+ * 只有系统小组件 drain 会传 receipt；普通界面调用保持原有语义。
+ */
+export interface TaskCompletionOptions {
+  widgetReceipt?: string;
+}
+
 export interface TaskActions {
   /**
    * 新建任务。返回新实体 id。
@@ -152,7 +161,7 @@ export interface TaskActions {
   /** 改标题。 */
   rename(entityId: string, title: string): Promise<void>;
   /** 显式设置完成态（幂等，不像 `toggle` 依赖当前状态）。 */
-  setCompleted(entityId: string, completed: boolean): Promise<void>;
+  setCompleted(entityId: string, completed: boolean, options?: TaskCompletionOptions): Promise<void>;
   /** 批量设置完成态：一个用户意图、一个带 entityIds 的 BATCH op。 */
   bulkSetCompleted(entityIds: readonly string[], completed: boolean): Promise<void>;
   /** 在完成/未完成之间切换。 */
@@ -444,39 +453,61 @@ export function createTaskActions(
    * 规则已经走到尽头（`UNTIL`/`COUNT` 用尽 → `nextOccurrence` 返回 `undefined`）时
    * **退回普通完成**：这一次是最后一件，之后就没有了。
    */
-  const completeTask = async (entityId: string, task: Task): Promise<void> => {
+  const widgetReceiptsOf = (task: Task): string[] =>
+    Array.isArray(task.widgetCompletionReceipts)
+      ? task.widgetCompletionReceipts.filter((value): value is string => typeof value === 'string')
+      : [];
+
+  const withWidgetReceipt = (
+    task: Task,
+    receipt: string | undefined,
+    payload: Record<string, unknown>,
+  ): Record<string, unknown> => {
+    if (receipt === undefined) return payload;
+    // The active native queue is capped at 50 intents. Retain twice that
+    // window durably without allowing a task record to grow without bound.
+    const next = [...widgetReceiptsOf(task).filter((value) => value !== receipt), receipt].slice(-100);
+    return { ...payload, widgetCompletionReceipts: next };
+  };
+
+  const completeTask = async (
+    entityId: string,
+    task: Task,
+    options: TaskCompletionOptions = {},
+  ): Promise<void> => {
+    const receipt = options.widgetReceipt;
+    if (receipt !== undefined) {
+      if (widgetReceiptsOf(task).includes(receipt)) {
+        // The TASK op already committed before a previous drain was interrupted.
+        // Its reminder patches were part of that same operation, so replay is
+        // a durable no-op and never advances the occurrence again.
+        return;
+      }
+    }
+
     const repeat = repeatOf(task);
     if (repeat === undefined) {
-      await update(entityId, { completedAt: now() });
+      await update(entityId, withWidgetReceipt(task, receipt, { completedAt: now() }));
       return;
     }
 
     const from = task.dueDate !== undefined ? toLocalDate(task.dueDate) : repeat.dtstart;
     const next = nextOccurrence(repeat.rule, repeat.dtstart, from);
     if (next === undefined) {
-      await update(entityId, { completedAt: now() });
+      await update(entityId, withWidgetReceipt(task, receipt, { completedAt: now() }));
       return;
     }
 
     // 只动到期日：`completedAt` 保持不存在，任务仍然是"待办"。
     // 要把它标成完成必须显式清掉规则，否则两种状态会互相打架。
     const nextDueMs = parseLocalDate(next).getTime();
-    await update(entityId, { dueDate: nextDueMs });
+    const reminderUpdates = planRepeatReminderUpdates(ctx, entityId, nextDueMs);
+    await update(entityId, {
+      heytaTaskRepeatCompletion: 1,
+      task: withWidgetReceipt(task, receipt, { dueDate: nextDueMs }),
+      reminders: reminderUpdates,
+    });
 
-    /**
-     * 🔴 **提醒必须跟着新的截止走** —— 见 `reminder-actions.ts` 的
-     * `rescheduleRemindersForRepeat`。
-     *
-     * 带 `offsetMs` 的提醒重置到"新截止 − 提前量"；**绝对时刻**的提醒不动
-     * （"每天 9 点提醒我"里的 9 点是绝对时间，跟着 `dueDate` 漂移反而是错的）。
-     * 这两句话就是 `nextTriggerAfterRepeat` 的定义，这里**不重写**它 —— 只调用。
-     *
-     * 不接这一步的后果（本仓"最后一米"的又一个实例）：用户给"每周一的会"
-     * 挂了"提前 30 分钟"，勾掉之后任务顺延到下周，而那条提醒**仍然钉在上一个周一**
-     * —— 到点弹一条通知，点进去是下周的任务。而所有 op 都是对的、
-     * 相关单测也是绿的，因为"任务顺延"与"提醒顺延"之间**没有任何调用边**。
-     */
-    await rescheduleRemindersForRepeat(ctx, entityId, nextDueMs);
   };
 
   return {
@@ -501,15 +532,17 @@ export function createTaskActions(
       await update(entityId, { title: trimmed });
     },
 
-    async setCompleted(entityId, completed) {
+    async setCompleted(entityId, completed, options) {
       const task = taskOf(entityId);
       if (task === undefined) throw new Error(`找不到任务「${entityId}」`);
       if (completed) {
-        await completeTask(entityId, task);
+        await completeTask(entityId, task, options);
         return;
       }
       // null 而不是 undefined —— 见文件头第 2 条。
-      await update(entityId, { completedAt: null });
+      const receipt = options?.widgetReceipt;
+      if (receipt !== undefined && widgetReceiptsOf(task).includes(receipt)) return;
+      await update(entityId, withWidgetReceipt(task, receipt, { completedAt: null }));
     },
 
     async bulkSetCompleted(entityIds, completed) {

@@ -1,0 +1,30 @@
+{
+  "time": "2026-10-08T05:37:43.646828+00:00",
+  "target": "existing iOS 27 simulator",
+  "udid": "FE195661-B021-4A71-AAD1-1F2F7AE3A102",
+  "install": "simctl install; preserved existing data",
+  "candidate": "/tmp/heyta-widget-qa-20261008/ios-derived/Build/Products/Release-iphonesimulator/Heyta.app",
+  "installed": "/Users/rocalight/Library/Developer/CoreSimulator/Devices/FE195661-B021-4A71-AAD1-1F2F7AE3A102/data/Containers/Bundle/Application/A35F540D-7C3B-4E8E-87D6-17EBA9D7AD51/Heyta.app",
+  "files": {
+    "Heyta": {
+      "installedSha256": "fb37e8218926a3c3270d5d442181d6e8fff6deaa41571871f8bc25947848fdf0",
+      "candidateSha256": "fb37e8218926a3c3270d5d442181d6e8fff6deaa41571871f8bc25947848fdf0",
+      "equal": true
+    },
+    "PlugIns/HeytaWidgetExtension.appex/HeytaWidgetExtension": {
+      "installedSha256": "a8c988906bc9ad5c4c87e03d70bccefa63d2eeeb1e43575678e288a2c9535beb",
+      "candidateSha256": "a8c988906bc9ad5c4c87e03d70bccefa63d2eeeb1e43575678e288a2c9535beb",
+      "equal": true
+    },
+    "main.jsbundle": {
+      "installedSha256": "7c57bd27feeb127ddf873d11c0615b86aef57cfd770e4f3a788d16faff38cd25",
+      "candidateSha256": "7c57bd27feeb127ddf873d11c0615b86aef57cfd770e4f3a788d16faff38cd25",
+      "equal": true
+    }
+  },
+  "limits": [
+    "No physical iPhone available",
+    "Other widget templates system addition, theme and click checks pending",
+    "Simulator GUI application unavailable; installation does not prove GUI acceptance"
+  ]
+}

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- HEYTA-ANDROID-WIDGET-COLORS:BEGIN 生成物，请勿手改 —— scripts/gen-android-widget-colors.mjs -->
+<!-- source: packages/design-system/src/tokens.css; theme: dark; qualifier: values-night -->
+<resources>
+    <!-- color.surface / color.foreground / color.foreground-muted -->
+    <color name="heyta_widget_surface">#FF0D1526</color>
+    <color name="heyta_widget_foreground">#FFF1F5F9</color>
+    <color name="heyta_widget_foreground_muted">#FFCBD5E1</color>
+</resources>
+<!-- HEYTA-ANDROID-WIDGET-COLORS:END -->

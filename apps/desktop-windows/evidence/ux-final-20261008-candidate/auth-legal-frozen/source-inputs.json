@@ -1,0 +1,340 @@
+{
+  "scope": "capture superset; no each-file-linked claim",
+  "files": [
+    {
+      "path": "apps/desktop-windows/.gitignore",
+      "bytes": 31,
+      "sha256": "835c656bdf369a87a0b63bad34ed6fb8dde5bc00955e852c696427f04046faa0"
+    },
+    {
+      "path": "apps/desktop-windows/Heyta.Windows.Core/AppApi.cs",
+      "bytes": 4706,
+      "sha256": "0b478c9af841169a8e43d8475065b8fbe2ff5e0ebfe62478ba4175ff63ccf903"
+    },
+    {
+      "path": "apps/desktop-windows/Heyta.Windows.Core/Heyta.Windows.Core.csproj",
+      "bytes": 1474,
+      "sha256": "ed321b234d90c226c255b0d309b0db23322503b8c745c3beaaf2035ee365559b"
+    },
+    {
+      "path": "apps/desktop-windows/Heyta.Windows.Core/ScriptHost.cs",
+      "bytes": 4892,
+      "sha256": "130a4c0a1bbadfe2608c03ea4a0014456da392df12ffdb7199e1d4cf5adae775"
+    },
+    {
+      "path": "apps/desktop-windows/Heyta.Windows.Core/SqliteBridge.cs",
+      "bytes": 8205,
+      "sha256": "a6e98d6020cd7d147e457945fd9921ad1d15c4fdad050522736528e869a1c553"
+    },
+    {
+      "path": "apps/desktop-windows/Heyta.Windows.Core/SqliteContainer.cs",
+      "bytes": 4501,
+      "sha256": "81f5f3c974e593bc5de3593f7df949e73f7a3605d06abc7b9b070acf4accff8d"
+    },
+    {
+      "path": "apps/desktop-windows/Heyta.Windows.Core/WidgetCardTemplates.cs",
+      "bytes": 10310,
+      "sha256": "d4b69ba435d4d1eaa0be5867054046c6665907f86a51b3f787c89d6a809d469a"
+    },
+    {
+      "path": "apps/desktop-windows/Heyta.Windows.Core/WindowsDataPaths.cs",
+      "bytes": 2592,
+      "sha256": "6d404c62843014aa90ea49b8b4a0f787c4f8bbb4e755a4318dec01cf884be6a6"
+    },
+    {
+      "path": "apps/desktop-windows/Heyta.Windows.Core/WindowsWidgetStore.cs",
+      "bytes": 18559,
+      "sha256": "7e605fd4b50a13180659f905277931feb2db03f639cf56ce9e621393c0857f06"
+    },
+    {
+      "path": "apps/desktop-windows/Heyta.Windows.Core/WindowsWidgetStrings.cs",
+      "bytes": 1311,
+      "sha256": "2fbdc74cb9186d9e3b0b5ba4c8ac7c76c4171ebce362092be068dbce5dd1aee9"
+    },
+    {
+      "path": "apps/desktop-windows/Heyta.Windows.Core/widget-strings.generated.json",
+      "bytes": 3422,
+      "sha256": "d5512bfb855a89f8731d602e79f7107b4412487b201f883cb95737ce3f3ad0ef"
+    },
+    {
+      "path": "apps/desktop-windows/HeytaWidgetProvider/HeytaWidgetProvider.cs",
+      "bytes": 5119,
+      "sha256": "d3095980055cc2be4865928cbd4e34a4e14a7e9d04ab973f6380f7a72249c21b"
+    },
+    {
+      "path": "apps/desktop-windows/HeytaWidgetProvider/HeytaWidgetProvider.csproj",
+      "bytes": 805,
+      "sha256": "30335c7ec80cb7d7fba979c9ed0f4ba4ae335c41975686835ed9fd41837d6617"
+    },
+    {
+      "path": "apps/desktop-windows/HeytaWidgetProvider/Program.cs",
+      "bytes": 2253,
+      "sha256": "028946260fb4308e4b270009c4b9c0368cb1465a5555fd1e615b07c8066fda17"
+    },
+    {
+      "path": "apps/desktop-windows/HeytaWidgetProvider/README.md",
+      "bytes": 1807,
+      "sha256": "4eea210f74c96e4de9b4440803bbac5bee230fe1ad2d2500359d1a1f5771f124"
+    },
+    {
+      "path": "apps/desktop-windows/HeytaWindows/App.xaml",
+      "bytes": 927,
+      "sha256": "c6587d8252fe65b0172413cd05c38672ac7b87280e7a2c5db65c2608271716ee"
+    },
+    {
+      "path": "apps/desktop-windows/HeytaWindows/App.xaml.cs",
+      "bytes": 476,
+      "sha256": "0d81f4df485a5395526a2ea213a4c89bf93b29257a088df32f5f1baaeb9d28aa"
+    },
+    {
+      "path": "apps/desktop-windows/HeytaWindows/HeytaWindows.csproj",
+      "bytes": 4525,
+      "sha256": "027806d57208f6773756f8413f584eebed112007bab04c6c3c0b29b4308f7e84"
+    },
+    {
+      "path": "apps/desktop-windows/HeytaWindows/MainWindow.xaml",
+      "bytes": 4399,
+      "sha256": "04300182c48f162715c17abd7f73c1847e8b08107dddd89f94d8df1dab411ec0"
+    },
+    {
+      "path": "apps/desktop-windows/HeytaWindows/MainWindow.xaml.cs",
+      "bytes": 53823,
+      "sha256": "aed7288725752b23435890580dd480fb1998fbb66b7188b4fc4b049c52dcafc1"
+    },
+    {
+      "path": "apps/desktop-windows/HeytaWindows/TaskItem.cs",
+      "bytes": 549,
+      "sha256": "8035e1a74aec06e4d9b065c3072b8bb2137777c485555ae916a7b6167cbfd1c5"
+    },
+    {
+      "path": "apps/desktop-windows/HeytaWindows/WindowsWidgetBridge.cs",
+      "bytes": 6143,
+      "sha256": "d0023d54706473c85d51ba5803e9583ca6cab4c05538b9ed1f44c0d4a79ba1db"
+    },
+    {
+      "path": "apps/desktop-windows/HeytaWindows/app.manifest",
+      "bytes": 585,
+      "sha256": "202f3b79fa2f67a4ce925df79b2ef569814d17123ac886c350c6f24b6f3ceb4a"
+    },
+    {
+      "path": "apps/desktop-windows/README.md",
+      "bytes": 18257,
+      "sha256": "b0bfc3e0537f2fcad5a2b737b433690b4fa9e39d934dbf7343d6d74425494d2c"
+    },
+    {
+      "path": "apps/desktop-windows/assets/heyta.ico",
+      "bytes": 9529,
+      "sha256": "30f412a9a29bdae9ba3045bfa111a3d8cc3f9488360fcefcc7fb1dd68c66008b"
+    },
+    {
+      "path": "apps/desktop-windows/assets/msix/Square150x150Logo.png",
+      "bytes": 1012,
+      "sha256": "33cdf3f101147dea464c61d1239f640e3d012705f16a517a1f13ce4dd0c0b024"
+    },
+    {
+      "path": "apps/desktop-windows/assets/msix/Square44x44Logo.png",
+      "bytes": 394,
+      "sha256": "7a7546ebaa7ae446839040faec60afdff56c46a762634060cfad0436cf075539"
+    },
+    {
+      "path": "apps/desktop-windows/assets/msix/Square44x44Logo.targetsize-24_altform-unplated.png",
+      "bytes": 464,
+      "sha256": "66197c30b7aeaaace0c0cd0f9afa3458070e0425491cc9977e551bfa01c49405"
+    },
+    {
+      "path": "apps/desktop-windows/assets/msix/Square44x44Logo.targetsize-48_altform-unplated.png",
+      "bytes": 869,
+      "sha256": "98d8abdff9f4a89c2761c26731a73ed504e727a621e44d25b2b9b3dfa5fc7d40"
+    },
+    {
+      "path": "apps/desktop-windows/assets/msix/StoreLogo.png",
+      "bytes": 425,
+      "sha256": "e5fac439b0bb7e9ed8fdcbee4090671cc072f24918d6f2c231ac58865ae45209"
+    },
+    {
+      "path": "apps/desktop-windows/assets/msix/Wide310x150Logo.png",
+      "bytes": 1118,
+      "sha256": "f83f4ad8e7d7dd19b00a3e863f6a8eb2c3b005ae967a82f9b924419ace2c4e2a"
+    },
+    {
+      "path": "apps/desktop-windows/scripts/capture-window.ps1",
+      "bytes": 3555,
+      "sha256": "2cbe01c785dccfdd9c4be8d6bab2c7ae8c1b4ebc8a05160381b5b9347d43fc59"
+    },
+    {
+      "path": "apps/desktop-windows/scripts/capture-window.sh",
+      "bytes": 3867,
+      "sha256": "5fbd3d72235502b04e0db644b0e20046ab48c223536efccc8ecfea6a8a1f47fc"
+    },
+    {
+      "path": "apps/desktop-windows/scripts/install-and-capture.ps1",
+      "bytes": 14282,
+      "sha256": "cf87d34c9f91cbc06ccf9ca0deaa38a797248db073ecb4cabc5e077d49ec65ec"
+    },
+    {
+      "path": "apps/desktop-windows/scripts/package-msix.ps1",
+      "bytes": 22045,
+      "sha256": "b1cffeff2b84cd68da2e1d3d8db539d618bafe9af9296a8823d05c69ebc8c105"
+    },
+    {
+      "path": "apps/desktop-windows/scripts/package-msix.sh",
+      "bytes": 6439,
+      "sha256": "d3ec60182014b3890feb9b13f44aecbddf3f0eb288f47eaa75ee895505deebd6"
+    },
+    {
+      "path": "apps/desktop-windows/smoke/Program.cs",
+      "bytes": 19177,
+      "sha256": "0da2c1e85c6d90100bdbcb2efbcc8369e1756787016dfa2dfc8050157c10d7a2"
+    },
+    {
+      "path": "apps/desktop-windows/smoke/Smoke.csproj",
+      "bytes": 819,
+      "sha256": "9e1b840a16081f7370ec9c1e4e07b2758c82a80a24f7541631368b72f2f8a3cf"
+    },
+    {
+      "path": "apps/desktop-windows/widget-smoke/Program.cs",
+      "bytes": 5352,
+      "sha256": "242a9e91997281bdd7c55ee14b7c88db6f834bd8141804da04780f7c11d21d03"
+    },
+    {
+      "path": "apps/desktop-windows/widget-smoke/WidgetSmoke.csproj",
+      "bytes": 406,
+      "sha256": "1fd2752de94fd9bc5c3de3f7ce56d11a35764f3358db23ceb5ca68c2b5fcc983"
+    },
+    {
+      "path": "apps/web/dist/assets/index-4SmZxIai.css",
+      "bytes": 144404,
+      "sha256": "d20fef84d2c739a0bfc5eb1a02bb30447b16117364cd50f9922b4e9727b097e7"
+    },
+    {
+      "path": "apps/web/dist/assets/index-C5eTWZMU.js",
+      "bytes": 3879041,
+      "sha256": "6f71bbe651998d80f91e97ab9d1f32b55e2c9f90b501a285c7b4432055d69052"
+    },
+    {
+      "path": "apps/web/dist/assets/index-CYIBHm27.js",
+      "bytes": 215099,
+      "sha256": "5079a1751cf86798d507dda2f1a060b32ca2b5d20d65c98e3c310b84c9bc3728"
+    },
+    {
+      "path": "apps/web/dist/assets/shell-host-O6eZFKzn.js",
+      "bytes": 1601,
+      "sha256": "a0da5f6d82eada5d1665efdb5aabe0c2c1f63b2a0d8c3c4f2f093897808d0bd7"
+    },
+    {
+      "path": "apps/web/dist/assets/sqlite3-Con_VOcu.wasm",
+      "bytes": 868907,
+      "sha256": "2ee8f3dab694532afc8840e07703127287662d08b74e6ff50491ce63f00d5752"
+    },
+    {
+      "path": "apps/web/dist/assets/sqlite3-opfs-async-proxy-Ck-yCayi.js",
+      "bytes": 32505,
+      "sha256": "9f1970e05ee07a79332498858740b705eeb1dcee03bc150f6f690bc0fb5f0a06"
+    },
+    {
+      "path": "apps/web/dist/assets/sqlite3-worker1-DdwV2TBQ.js",
+      "bytes": 213124,
+      "sha256": "b87a19bcff4d2bb09cf06e5a6018ac40d28ac084d27c56fa2cd489e86fbdff1b"
+    },
+    {
+      "path": "apps/web/dist/assets/storage.worker-DkqSoDYv.js",
+      "bytes": 238353,
+      "sha256": "f1a5d0f522fe22e03f6ba9dc6d34b6d6bce8f6856368ebebfeced66b6e2c4f3a"
+    },
+    {
+      "path": "apps/web/dist/assets/universal-slice-CMWUhCAV.js",
+      "bytes": 1051,
+      "sha256": "bca7aaf1d565123feae3595fa5cb40a8faa2628a6b54f1113465ed1f0ec3d1b0"
+    },
+    {
+      "path": "apps/web/dist/icons/apple-touch-icon.png",
+      "bytes": 3019,
+      "sha256": "993efc029da10850bbc06fcdae8faa1c61d38b23e1290255e11b8da7099dae0e"
+    },
+    {
+      "path": "apps/web/dist/icons/icon-192.png",
+      "bytes": 3267,
+      "sha256": "bbbffd64651d96cb35f7cb3c0d1cb3a7dc2444ed9035c74b01f9c48266475885"
+    },
+    {
+      "path": "apps/web/dist/icons/icon-512.png",
+      "bytes": 8961,
+      "sha256": "607f85bf71c5a3922ce932ed0f442401dacfbb45a13405c1530a5f426bc97223"
+    },
+    {
+      "path": "apps/web/dist/icons/icon-maskable-512.png",
+      "bytes": 3476,
+      "sha256": "8232a43189f77124f90717f68927a962ef9acf7e25307beb62b965f0e1e4e93e"
+    },
+    {
+      "path": "apps/web/dist/icons/icon-maskable.svg",
+      "bytes": 444,
+      "sha256": "18d879f635883819ca5493e6b58a27e1d2f845b5c781235041923f3a8ce6926e"
+    },
+    {
+      "path": "apps/web/dist/icons/icon.svg",
+      "bytes": 392,
+      "sha256": "85ec6e5860aae6fc291494f64097587167ffde07ca1247b52648cbadb323ccd2"
+    },
+    {
+      "path": "apps/web/dist/index.html",
+      "bytes": 7666,
+      "sha256": "7c3a2668eaa7abd4e328a5e5b18209cdcb500b914bef7227440974781672d5cb"
+    },
+    {
+      "path": "apps/web/dist/manifest.webmanifest",
+      "bytes": 2361,
+      "sha256": "370339d9feca29a43ddae21df169017d45d65afd6a75ad5b97ed4e3e74182780"
+    },
+    {
+      "path": "apps/web/dist/sw.js",
+      "bytes": 17422,
+      "sha256": "31b43b30a3edba4e556da5cae041f57273431aee08f736d7c9bad17608270240"
+    },
+    {
+      "path": "apps/web/dist/widgets/focus.data.json",
+      "bytes": 315,
+      "sha256": "fee42b9609a58fac53cca57ec7866fb1fc7f3c87745c170c3c8edd06e2283253"
+    },
+    {
+      "path": "apps/web/dist/widgets/focus.json",
+      "bytes": 1733,
+      "sha256": "3784cfcce3569ba13fd3675f98be04d832eb12c26ddd6945de36389d8cc6ec4c"
+    },
+    {
+      "path": "apps/web/dist/widgets/habits.data.json",
+      "bytes": 257,
+      "sha256": "a04ea8b3fd908b6daa19ac5bddf81ecc015033a34812498dc970cf054add20fe"
+    },
+    {
+      "path": "apps/web/dist/widgets/habits.json",
+      "bytes": 2650,
+      "sha256": "8209e3a2845aedb7cfe939b2c23feb97d0bb3e3129c0ec0ddf4cdff81b68e3ac"
+    },
+    {
+      "path": "apps/web/dist/widgets/quadrant.data.json",
+      "bytes": 167,
+      "sha256": "833f8bbb0e31aaf165f977d391cfe28106274b705b23b70958d69c45c22c3b58"
+    },
+    {
+      "path": "apps/web/dist/widgets/quadrant.json",
+      "bytes": 12777,
+      "sha256": "4ecf29869b8e37d380050cfd083d408ba6ac73be6ec42c3282df7000cca77f77"
+    },
+    {
+      "path": "apps/web/dist/widgets/today.data.json",
+      "bytes": 303,
+      "sha256": "204ecbea81b1a06241a675b318589cd9562929099d1fd69dc90c1e0eb4a891a6"
+    },
+    {
+      "path": "apps/web/dist/widgets/today.json",
+      "bytes": 3176,
+      "sha256": "303fa1ef2a0fa2a06b75c30d527c1d74595e1a23e2593090a1ec43848ca3f961"
+    },
+    {
+      "path": "packages/app-host/bridge-bundle/native-bridge.js",
+      "bytes": 1633116,
+      "sha256": "5ec4b488cac4b4844a7686e04a5d14d34ec8b26029924a0c9e27d0e726bd1610"
+    }
+  ]
+}

@@ -161,17 +161,12 @@ abstract class BaseWidgetProvider : AppWidgetProvider() {
         val targetIsDone = intent.getBooleanExtra(WidgetClicks.EXTRA_TARGET_IS_DONE, false)
         val store = WidgetStore(SharedPreferencesWidgetStore(context))
 
-        // 读改写必须**原子** —— 否则应用此刻 drain 掉的意图会被这次写回"复活"，
-        // 结果是同一次点击被执行两遍。见 `WidgetStore.updateIntents`。
-        store.updateIntents { queue ->
-            WidgetIntentQueues.merge(
-                queue,
-                WidgetIntent(
-                    taskId = taskId,
-                    targetIsDone = targetIsDone,
-                    at = System.currentTimeMillis(),
-                ),
-            )
+        // Persist before returning to the launcher; reject stale clicks after cleanup.
+        try {
+            if (!store.appendIntentIfSnapshot(WidgetIntent(taskId, targetIsDone, System.currentTimeMillis()))) return
+        } catch (error: Exception) {
+            android.util.Log.w("HeytaWidget", "Could not persist widget click", error)
+            return
         }
 
         // 🔴 只重画**收到广播的那个组件**，不是全部。

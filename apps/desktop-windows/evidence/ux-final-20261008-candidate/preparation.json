@@ -1,0 +1,20 @@
+{
+  "state": "prepared-not-packaged",
+  "installedIdentity": "cloud.finlaw.heyta.desktop",
+  "installedVersion": "1.0.0.0",
+  "installedPublisher": "CN=heyta local build",
+  "existingDefaultFileCount": 1277,
+  "nativeSourceFilesMatched": 7,
+  "nativeWidgetSmoke": {
+    "passed": 35,
+    "failed": 0,
+    "rc": 0
+  },
+  "temporaryInstallerParsed": true,
+  "temporaryPipelineParsed": true,
+  "installStrategy": "same identity / publisher Add-AppxPackage -ForceUpdateFromAnyVersion; no Remove-AppxPackage",
+  "processFilter": "exact registered InstallLocation; excludes three independent profile QA exe processes",
+  "awaiting": "root auth and shared web-dist freeze",
+  "widgetsBoardVerified": false,
+  "fourPlatformFrozenSource": false
+}

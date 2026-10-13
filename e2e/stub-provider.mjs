@@ -49,6 +49,21 @@ const ROUTES = [
 const calls = [];
 
 /**
+ * 可由浏览器验收控制的响应屏障。
+ *
+ * 运行中状态必须在请求真的飞行时观测，不能用 sleep 猜竞态。验收先打开
+ * `/__barrier/hold`，等请求进入 `calls` 后跨视图，再用 `/__barrier/release`
+ * 放行。仅暂停模型响应，不改变请求计数或请求体。
+ */
+let barrierHeld = false;
+const heldResponses = [];
+
+function releaseHeldResponses() {
+  const pending = heldResponses.splice(0, heldResponses.length);
+  for (const respond of pending) respond();
+}
+
+/**
  * 各功能的确定性响应。
  *
  * ⚠️ 形状必须与 `packages/app-host/src/ai-*.ts` 的解析器严格一致 ——
@@ -228,6 +243,26 @@ const server = createServer((req, res) => {
     return;
   }
 
+  // 真浏览器验收用它锁住/放行模型响应，避免以固定等待时间猜请求竞态。
+  if (url.startsWith('/__barrier/')) {
+    const action = url.slice('/__barrier/'.length).split('?')[0];
+    if (action === 'hold') barrierHeld = true;
+    else if (action === 'release') {
+      barrierHeld = false;
+      releaseHeldResponses();
+    } else if (action === 'reset') {
+      barrierHeld = false;
+      releaseHeldResponses();
+    } else {
+      res.writeHead(404, { ...cors, 'content-type': 'application/json' });
+      res.end('{"error":"未知屏障动作"}');
+      return;
+    }
+    res.writeHead(200, { ...cors, 'content-type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, held: barrierHeld, pending: heldResponses.length }));
+    return;
+  }
+
   if (!url.includes('/chat/completions')) {
     res.writeHead(404, { ...cors, 'content-type': 'application/json' });
     res.end('{"error":"只实现了 /v1/chat/completions"}');
@@ -341,22 +376,26 @@ const server = createServer((req, res) => {
             }
           : { role: 'assistant', content: respond(feature, user) };
 
-    res.writeHead(200, { ...cors, 'content-type': 'application/json' });
-    res.end(
-      JSON.stringify({
-        id: 'stub',
-        object: 'chat.completion',
-        model: parsed?.model ?? 'stub',
-        choices: [
-          {
-            index: 0,
-            message,
-            finish_reason: message.tool_calls === undefined ? 'stop' : 'tool_calls',
-          },
-        ],
-        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
-      }),
-    );
+    const responseBody = JSON.stringify({
+      id: 'stub',
+      object: 'chat.completion',
+      model: parsed?.model ?? 'stub',
+      choices: [
+        {
+          index: 0,
+          message,
+          finish_reason: message.tool_calls === undefined ? 'stop' : 'tool_calls',
+        },
+      ],
+      usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+    });
+    const finish = () => {
+      if (res.writableEnded) return;
+      res.writeHead(200, { ...cors, 'content-type': 'application/json' });
+      res.end(responseBody);
+    };
+    if (barrierHeld) heldResponses.push(finish);
+    else finish();
   });
 });
 

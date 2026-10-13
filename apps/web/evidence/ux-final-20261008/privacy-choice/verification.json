@@ -1,0 +1,52 @@
+{
+  "date": "2026-10-08",
+  "scope": "controlled-source browser privacy choice; mobile gate behavior only",
+  "origin": "http://127.0.0.1:4381",
+  "ui": {
+    "localOnlyShowsChooseAgain": true,
+    "reselectDoesNotClaimRevoked": true,
+    "cancelPreservesLocalOnly": true,
+    "shiftTabWrapsToLastAction": true,
+    "tabWrapsToClose": true,
+    "escapePreservesSettings": true,
+    "focusReturnsToTrigger": true,
+    "themes": [
+      "light",
+      "dark"
+    ],
+    "narrowViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "viewportReset": true,
+    "themeRestored": "light",
+    "utcReceiptLabel": true
+  },
+  "tests": {
+    "nestedAppAndPrivacy": {
+      "files": 3,
+      "passed": 32
+    },
+    "mobileConsent": {
+      "files": 1,
+      "passed": 37
+    },
+    "dataDestruction": {
+      "files": 2,
+      "passed": 20
+    }
+  },
+  "limitations": [
+    "No native mobile UI claim for this source change",
+    "No final four-platform rebuild/reinstall from this source yet",
+    "Reminder full-suite load failure remains unclassified; isolated reminder suite passed",
+    "Legal acceptance and remote login not exercised in this browser journey"
+  ],
+  "sourceSha256": {
+    "apps/web/src/features/settings/PrivacyPanel.tsx": "3919f422b8a572f4343653e0236f8eb4e39e9628dc70fc05f26fcd6b4626a3c3",
+    "apps/web/src/features/privacy/PrivacyConsentSheet.tsx": "075637cda329e6e6236d68add7f65b206c2ceb4a8440743f8f48e85e8338da3a",
+    "apps/web/src/features/privacy/consent-gate.ts": "a620f44fce4804c9b25548e40c67fb86227bdc67896375b7b8592f520568b8cb",
+    "apps/mobile/src/screens/SettingsScreen.tsx": "461b03b5db5bf6d922793213e94fef5468ba033f53e26c55c1c16109910d5ff1",
+    "apps/mobile/src/privacy/consent-gate.ts": "040178a0755e4ba6d1a86430ff19d3b526fa122ddacdd448c38f9b066aa2ef80"
+  }
+}

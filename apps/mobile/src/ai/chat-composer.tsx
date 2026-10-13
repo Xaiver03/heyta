@@ -33,7 +33,14 @@ export function ChatComposer({
         backgroundColor: tokens['color.background'],
       }}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: tokens['space.2'] }}>
+      <View style={{
+        flexDirection: 'row', alignItems: 'flex-end', gap: tokens['space.2'],
+        backgroundColor: tokens['color.surface'], borderRadius: tokens['radius.lg'],
+        padding: tokens['space.2'],
+        // RN's boxShadow renders the same theme token on iOS and Android.
+        // Give the whole composer depth; the input and send control stay flat.
+        boxShadow: tokens['shadow.sm'],
+      }}>
         <TextInput
           value={value}
           onChangeText={onChangeText}
@@ -57,7 +64,6 @@ export function ChatComposer({
               minHeight: tokens['size.field-height'],
               paddingHorizontal: tokens['space.3'],
               paddingVertical: tokens['space.2'],
-              borderRadius: tokens['radius.lg'],
               backgroundColor: tokens['color.surface'],
               color: tokens['color.foreground'],
               fontFamily: native.fontSans,

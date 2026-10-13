@@ -1,6 +1,7 @@
 package com.heytamobile
 
 import android.app.Application
+import android.content.res.Configuration
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
@@ -9,6 +10,7 @@ import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import com.heytamobile.fs.CardExportPackage
 import com.heytamobile.fs.LocalFsPackage
 import com.heytamobile.widget.WidgetPackage
+import com.heytamobile.widget.WidgetRefresh
 import com.heytamobile.reminder.ReminderPackage
 import com.heytamobile.vault.VaultSecureStoragePackage
 
@@ -52,5 +54,29 @@ class MainApplication : Application(), ReactApplication {
   override fun onCreate() {
     super.onCreate()
     loadReactNative(this)
+  }
+
+  /**
+   * 小组件颜色资源由 `values/` 与 `values-night/` 提供。
+   *
+   * Android 官方说明见 `https://developer.android.com/reference/android/content/Intent#ACTION_CONFIGURATION_CHANGED`：
+   * 这是只能由系统发送的受保护 intent，不能把它当成 manifest receiver 的可靠刷新入口。
+   * Application 配置回调的官方契约见
+   * `https://developer.android.com/reference/android/app/Application#onConfigurationChanged(android.content.res.Configuration)`：
+   * Application 的配置
+   * 回调是应用进程已经存活时的可靠入口；组件本身则在宿主重新充气 RemoteViews
+   * 时按宿主当前 configuration 重新解析应用资源。两条路径合起来覆盖：
+   *   1. heyta 进程存活：这里立即把四款现有实例重画；
+   *   2. 进程未存活：宿主重充气 RemoteViews 时直接选 values-night 资源。
+   *
+   * 这里不把业务数据或 op 写入小组件，只复用已有的 WidgetRefresh 渲染管线。
+   */
+  override fun onConfigurationChanged(newConfig: Configuration) {
+    super.onConfigurationChanged(newConfig)
+    try {
+      WidgetRefresh.pushAll(this)
+    } catch (_: Throwable) {
+      // 配置变化不能让应用进程因为小组件刷新失败而崩溃；下一次应用写入或宿主刷新会重试。
+    }
   }
 }

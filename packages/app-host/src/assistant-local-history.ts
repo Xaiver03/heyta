@@ -87,7 +87,11 @@ export function assistantHistoryAccount(identity: {
 } | undefined): string | null {
   if (identity === undefined) return null;
   let server = identity.serverUrl.trim().replace(/\/+$/, '');
-  try { server = new URL(server).origin; } catch { /* 未完成配置仍保留服务器隔离。 */ }
+  try {
+    const url = new URL(server);
+    // 自托管实例可部署在同一域名的不同路径；根路径仍保持 hosted 原有身份。
+    server = `${url.origin}${url.pathname.replace(/\/+$/, '')}`;
+  } catch { /* 未完成配置仍保留服务器隔离。 */ }
   const accountId = identity.accountId?.trim();
   const email = identity.email?.trim();
   const sessionId = identity.sessionId?.trim();

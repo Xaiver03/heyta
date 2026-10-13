@@ -156,3 +156,12 @@ describe('resolveWidgetJourneyHost', () => {
     });
   });
 });
+
+describe('native widget capability', () => {
+  it('requires an actual bridge in the native shell, not just an installed window', () => {
+    expect(resolveWidgetJourneyHost('MacIntel', true, true, true).provider).toBe('native');
+    expect(resolveWidgetJourneyHost('Windows', true, true, true).provider).toBe('native');
+    expect(resolveWidgetJourneyHost('MacIntel', true, true, false).provider).toBe('none');
+    expect(resolveWidgetJourneyHost('MacIntel', false, false, true).provider).toBe('none');
+  });
+});

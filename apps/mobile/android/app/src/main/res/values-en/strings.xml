@@ -39,4 +39,5 @@
     <string name="widget_focus_untitled">Focusing</string>
     <string name="widget_focus_target">Target %1$d min</string>
     <string name="widget_focus_idle">No focus session running</string>
+    <string name="widget_focus_paused">Paused — open Heyta to continue</string>
 </resources>

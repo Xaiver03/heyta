@@ -28,6 +28,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   ScrollView,
@@ -40,7 +41,11 @@ import {
   resolveSettingAvailability,
   type SettingsRowModel,
 } from '@heyta/ui';
-import { formatPrivacyDecisionTime, type PrivacyConsentRecord } from '@heyta/app-host';
+import {
+  OFFICIAL_SITE_ORIGIN,
+  formatPrivacyDecisionTime,
+  type PrivacyConsentRecord,
+} from '@heyta/app-host';
 
 import {
   Button,
@@ -63,6 +68,7 @@ import { AiSettingsSection } from '../ai/AiSettingsSection';
 import {
   privacyConsent,
   privacyConsentActions,
+  readPrivacyConsentPersistence,
   subscribePrivacyConsent,
 } from '../privacy/consent-gate';
 import { openPrivacySheet } from '../privacy/consent-ui';
@@ -96,6 +102,9 @@ export function SettingsScreen({
   vaultCleanupPending,
   onRetryVaultCleanup,
   onVaultCleanupPending,
+  widgetCleanupPending,
+  widgetCleanupRetrying,
+  onRetryWidgetCleanup,
   profileEditor,
   dataActions,
   securityActions,
@@ -115,6 +124,10 @@ export function SettingsScreen({
   vaultCleanupPending?: boolean;
   onRetryVaultCleanup?: () => void;
   onVaultCleanupPending?: (scope: import('../lib/vault-secure-storage').VaultSecureStorageScope) => void;
+  /** 小组件清理与加密数据钥匙是两条独立的设备清理状态。 */
+  widgetCleanupPending?: boolean;
+  widgetCleanupRetrying?: boolean;
+  onRetryWidgetCleanup?: () => void;
   /** 资料编辑器由 ProfileScreen 持有；设置面只提供唯一入口，不复制表单。 */
   profileEditor?: React.ReactNode;
   /** 数据管理入口由父屏提供，避免在设置面复制整屏路由状态。 */
@@ -148,6 +161,7 @@ export function SettingsScreen({
   const [hideTitles, setHideTitles] = useState<boolean | null>(null);
   const [widgetBridgeAvailable] = useState(() => isWidgetBridgeAvailable());
   const [privacyFailed, setPrivacyFailed] = useState(false);
+  const [helpLinkFailed, setHelpLinkFailed] = useState(false);
   const [privacyBusy, setPrivacyBusy] = useState(false);
   const [section, setSection] = useState<SettingsSectionKey | undefined>(initialSection);
   const [advancedSync, setAdvancedSync] = useState(
@@ -177,9 +191,17 @@ export function SettingsScreen({
   const [consentRecord, setConsentRecord] = useState<PrivacyConsentRecord | null>(() =>
     privacyConsent.current(),
   );
-  const [revokeNotPersisted, setRevokeNotPersisted] = useState(false);
+  const [consentNotPersisted, setConsentNotPersisted] = useState(() => !readPrivacyConsentPersistence());
 
-  useEffect(() => subscribePrivacyConsent(() => setConsentRecord(privacyConsent.current())), []);
+  useEffect(
+    () =>
+      subscribePrivacyConsent(({ persisted }) => {
+        setConsentRecord(privacyConsent.current());
+        // 只有新的决定确实写入设备后，才清掉上一条失败提示；再次失败时保留提示。
+        setConsentNotPersisted(!persisted);
+      }),
+    [],
+  );
 
   useEffect(() => {
     let alive = true;
@@ -221,8 +243,7 @@ export function SettingsScreen({
    * 里闸门确实关了，但下次冷启动磁盘上还是旧决定 —— 不说这一句，用户以为撤回是永久的。
    */
   const revokeConsent = useCallback((): void => {
-    const { persisted } = privacyConsentActions.revoke();
-    setRevokeNotPersisted(!persisted);
+    privacyConsentActions.revoke();
   }, []);
 
   /**
@@ -237,7 +258,7 @@ export function SettingsScreen({
    */
   const chooseAgain = useCallback((): void => {
     closeParent();
-    openPrivacySheet('revoked');
+    openPrivacySheet('settings');
   }, [closeParent]);
 
   /**
@@ -336,6 +357,19 @@ export function SettingsScreen({
   // outer ProfileScreen ownership of the sheet.
   const onClose = handleRequestClose;
 
+  /**
+   * 帮助中心是设置目录底部的支持入口，不再把帮助文章伪装成一个设置分组。
+   * 官方站点沿用应用语言：中文走默认路径，英文走 `/en` 前缀。
+   * 直接调用 Linking，失败时复用已有的外链失败提示，不做 canOpenURL 预检。
+   */
+  const openHelpCenter = useCallback((): void => {
+    setHelpLinkFailed(false);
+    const path = locale === 'en' ? '/en/docs/' : '/docs/';
+    void Linking.openURL(`${OFFICIAL_SITE_ORIGIN}${path}`).catch(() => {
+      setHelpLinkFailed(true);
+    });
+  }, [locale]);
+
   useEffect(() => {
     navigation.setBackHandler(visible ? handleRequestClose : null);
     return () => navigation.setBackHandler(null);
@@ -357,11 +391,11 @@ export function SettingsScreen({
             </Text>
           )}
           <Text variant="caption" tone="subtle">
-            {t('common.privacy.settings.revokeHint')}
+            {t(consentRecord?.decision === 'accepted' ? 'common.privacy.settings.revokeHint' : 'common.privacy.settings.chooseHint')}
           </Text>
         </Stack>
       </Card>
-      {consentRecord === null ? (
+      {consentRecord?.decision !== 'accepted' ? (
         <Button
           label={t('common.privacy.settings.chooseAgain')}
           onPress={chooseAgain}
@@ -376,7 +410,7 @@ export function SettingsScreen({
           style={{ alignSelf: 'flex-start' }}
         />
       )}
-      {revokeNotPersisted ? (
+      {consentNotPersisted ? (
         <Text variant="caption" tone="warning">
           {t('common.privacy.consent.notPersisted')}
         </Text>
@@ -538,6 +572,24 @@ export function SettingsScreen({
           </Stack>
         </Card>
       ) : null}
+      {widgetCleanupPending && onRetryWidgetCleanup !== undefined ? (
+        <View testID="widget-cleanup-pending">
+          <Card>
+            <Stack>
+              <Text variant="caption" tone="danger">
+                {t('mobile.widgetCleanup.failed')}
+              </Text>
+              <Button
+                label={widgetCleanupRetrying ? t('mobile.widgetCleanup.retrying') : t('mobile.widgetCleanup.retry')}
+                onPress={onRetryWidgetCleanup}
+                tone="ghost"
+                disabled={widgetCleanupRetrying}
+                loading={widgetCleanupRetrying}
+              />
+            </Stack>
+          </Card>
+        </View>
+      ) : null}
       <Button
         label={t('mobile.profile.clearCredentials')}
         onPress={onClearCredentials}
@@ -562,8 +614,6 @@ export function SettingsScreen({
           <SettingsSection
             variant="card"
             testID="settings-data-actions"
-            title={sectionLabels.data}
-            leading={<Icon name="action.share" size="sm" color={tokens['color.foreground-muted']} />}
             rows={dataActions ?? []}
           />
         );
@@ -571,13 +621,33 @@ export function SettingsScreen({
         return renderSecurity();
       case undefined:
         return (
-          <SettingsSection
-            variant="card"
-            testID="settings-directory"
-            title={t('mobile.settings.directory.title')}
-            note={t('mobile.settings.directory.hint')}
-            rows={sectionRows}
-          />
+          <>
+            <SettingsSection
+              variant="card"
+              testID="settings-directory"
+              title={t('mobile.settings.directory.title')}
+              note={t('mobile.settings.directory.hint')}
+              rows={sectionRows}
+            />
+            <SettingsSection
+              variant="card"
+              testID="settings-support"
+              title={t('site.docs.nav.title')}
+              rows={[
+                {
+                  kind: 'action' as const,
+                  testID: 'settings-help-center',
+                  label: t('site.docs.shell.title'),
+                  onPress: openHelpCenter,
+                },
+              ]}
+            />
+            {helpLinkFailed ? (
+              <Text variant="caption" tone="warning">
+                {t('mobile.auth.link.unopenable')}
+              </Text>
+            ) : null}
+          </>
         );
     }
   };

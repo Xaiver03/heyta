@@ -135,9 +135,10 @@ export const en = {
   'common.privacy.settings.accepted': 'You allowed this device to talk to the server',
   'common.privacy.settings.localOnly': 'This device only (network not agreed to)',
   'common.privacy.settings.undecided': 'You have not chosen yet',
-  'common.privacy.settings.decidedAt': 'Decided on {time}',
+  'common.privacy.settings.decidedAt': 'Decided on {time} (UTC)',
   'common.privacy.settings.revoke': 'Withdraw consent',
   'common.privacy.settings.revokeHint': 'Withdrawing stops every outbound request from this device immediately (including the live sync connection) and asks you again. Your local data is unaffected.',
+  'common.privacy.settings.chooseHint': 'Choose whether to go online when you need sync or sign-in. Opening the choice panel does not change your current permission.',
   'common.privacy.settings.chooseAgain': 'Choose again',
 
   // ── Landing · generic ─────────────────────────────────────
@@ -829,7 +830,7 @@ export const en = {
   'web.auth.email.label': 'Email',
   'web.auth.email.placeholder': 'you@example.com',
   'web.auth.sendLoginLink': 'Send login link',
-  'web.auth.register': 'Create account',
+  'web.auth.register': 'Send verification code',
   'web.auth.registrationCode.title': 'Verify your email',
   'web.auth.registrationCode.sent': 'A code was sent to {email}. Enter the 6-digit code from the email to finish signing up.',
   'web.auth.registrationCode.label': 'Email verification code',
@@ -844,7 +845,7 @@ export const en = {
   'web.auth.passkey.unavailable': 'This browser or device does not support passkeys — use the email option above.',
   'web.auth.passkey.waiting': 'Complete the passkey step in the system prompt…',
   'web.auth.recovery.request': 'Lost your passkey? Email me a recovery link',
-  'web.auth.terms.label': 'I agree to the terms of service and privacy policy published by this server',
+  'web.auth.terms.label': 'I agree to the terms and privacy policy, and allow this device to connect',
   'web.auth.paste.label': 'Paste a login link / token',
   'web.auth.paste.placeholder': 'Paste the link from your email, or the token itself',
   'web.auth.verify': 'Finish signing in',
@@ -1121,10 +1122,15 @@ export const en = {
   'web.widgetPush.title': 'Widget background refresh',
 
   // ── Web/Windows widget journey (install the app first, then cards appear) ──
+  'web.widgetJourney.intro.nativeAvailable': 'Keep today’s tasks, quadrants, habits and focus in your system widgets.',
+  'web.widgetJourney.note.nativeAvailable': 'Add Heyta from the system widget gallery, then open the app once to refresh data from this device.',
+  'web.widgetJourney.native.macos.step1': 'Right-click an empty area of the desktop and choose Edit Widgets, or edit widgets at the bottom of Notification Center.',
+  'web.widgetJourney.native.windows.step1': 'Press Win+W to open the widget board, then open the widget gallery.',
+  'web.widgetJourney.native.choose': 'Search for Heyta, choose a card and size, then add it.',
   'web.widgetJourney.sectionTitle': 'Desktop widgets',
   'web.widgetJourney.intro': 'On Windows, install the web app in Edge, then check the system widget board to see whether heyta can be added.',
   'web.widgetJourney.intro.native': 'Check widget support for this desktop app.',
-  'web.widgetJourney.intro.unsupported': 'Check widget support on this device.',
+  'web.widgetJourney.intro.unsupported': 'See tasks and progress on your desktop or home screen.',
   'web.widgetJourney.status.native': 'Running in the native desktop app',
   'web.widgetJourney.status.standalone': 'Running as an app',
   'web.widgetJourney.status.browser': 'Running in a browser tab',
@@ -1138,7 +1144,7 @@ export const en = {
   'web.widgetJourney.other.step2': 'Then open it from your app list',
   'web.widgetJourney.note.widgetSource': 'Cards only come from an installed app — a website you have not installed will not appear in the widget board.',
   'web.widgetJourney.note.nativeShell': 'This desktop app does not support system widgets yet. You can still view tasks, habits and focus progress in the app.',
-  'web.widgetJourney.note.unsupportedPlatform': 'The Windows widget board is not available in this browser environment. Your tasks continue to work normally here.',
+  'web.widgetJourney.note.unsupportedPlatform': 'A browser page cannot add system widgets directly. Install the heyta app for your platform, then add heyta from the system widget gallery.',
   'web.widgetPush.description': 'When on, the heyta widget pinned on Windows updates by itself when your tasks change on another device. When off, it only refreshes after you open Heyta.',
   'web.widgetPush.rowLabel': 'Allow background widget refresh',
   'web.widgetPush.status.subscribed': 'On',
@@ -3010,7 +3016,7 @@ export const en = {
   'mobile.auth.email.placeholder': 'Your email address',
   'mobile.auth.selfHost.open': 'Use a self-hosted server',
   'mobile.auth.selfHost.close': 'Hide self-hosted server settings',
-  'mobile.auth.terms.label': 'I accept the terms of service and privacy policy offered by this server',
+  'mobile.auth.terms.label': 'I agree to the terms and privacy policy, and allow this device to connect',
   'mobile.auth.terms.hint': 'You have to check this yourself - we will not accept on your behalf.',
   // Spoken when a terms link **cannot be opened**. Having no app able to show a web page
   // really happens (headless Linux, browser-less test images), and "nothing happened when I
@@ -3019,7 +3025,7 @@ export const en = {
   // 🔴 The password path is the **primary** route, listed above "another way".
   //    Neither label may read "signed up" / "signed in": a tap only **sends the request**;
   //    the outcome is spoken by the status line above the fields.
-  'mobile.auth.password.register': 'Register with email and password',
+  'mobile.auth.password.register': 'Send verification code',
   'mobile.auth.password.login': 'Sign in with email and password',
   'mobile.auth.magicLink.login': 'Sign in with an email link',
   'mobile.auth.magicLink.register': 'Register a new account',
@@ -3203,6 +3209,9 @@ export const en = {
   'mobile.vault.errorRotation': 'The server requires the full encrypted data migration before this key can be changed.',
   'mobile.vault.logoutCleanupFailed': 'The encrypted key could not be removed from this device. Credentials are cleared; retry removal before using this account again.',
   'mobile.vault.retryCleanup': 'Retry encrypted key cleanup',
+  'mobile.widgetCleanup.failed': 'You are signed out, but widgets on this device have not been cleared yet. Please retry.',
+  'mobile.widgetCleanup.retry': 'Retry clearing widgets',
+  'mobile.widgetCleanup.retrying': 'Retrying…',
   'mobile.profile.footnote': 'Credentials are kept in memory only and must be re-entered after the app fully exits.',
   'mobile.profile.conflict.body': 'Both sides changed these places, and heyta will not choose for you - picking one automatically would silently drop the other side. Nothing is lost, but nothing uploads until you choose.',
   'mobile.profile.conflict.open': 'Review one by one',
@@ -3447,20 +3456,23 @@ export const en = {
   'mobile.trash.confirm.submit': 'Delete permanently',
   'mobile.trash.confirm.cancel': 'Cancel',
 
-  // ── Export (mobile second level, entered from Profile) ─────
+  // ── Backup & migration (mobile second level, entered from Profile) ─
   // The export document's own wording and the "you cannot import it back"
   // clause reuse the web `web.export.*` entries — that wording belongs to the
   // export, not to the web shell, and both hosts reading the same keys is what
   // keeps them from ever disagreeing. Only mobile-specific bits live here.
-  'mobile.export.entry': 'Export data',
-  'mobile.export.entry.hint': 'Take your data out (no import back yet)',
+  'mobile.export.entry': 'Backup & migration',
+  'mobile.export.entry.hint': 'Export a backup, restore data, or import from TickTick',
+  'mobile.export.title': 'Backup & migration',
+  'mobile.export.intro': 'Export, restore, or migrate data on this device. Export runs locally and never touches a server.',
   'mobile.export.json.button': 'Share JSON',
   'mobile.export.markdown.button': 'Share task list',
   'mobile.export.shareHint': 'The export is handed to the system share sheet, where you choose where it goes.',
   'mobile.import.pasteLabel': 'Paste the CSV text',
+  'mobile.import.label': 'Import from TickTick',
   'mobile.import.pastePlaceholder': 'Long-press here to paste the CSV exported from TickTick',
   'mobile.import.preview': 'Preview',
-  'mobile.import.pasteNotFile': 'On mobile this field takes **text**, not a chosen file - picking a file would need a native dependency we have not added.',
+  'mobile.import.pasteNotFile': 'Paste the CSV exported from TickTick. Preview it first; nothing is added until you confirm.',
   'mobile.export.shareTitle': 'heyta export',
   'mobile.export.shareFailed': 'The system share sheet did not open, so nothing was sent.',
 
@@ -3585,11 +3597,11 @@ export const en = {
   'site.platforms.web.name': 'Web',
   'site.platforms.web.body': 'The full product, not a demo. It keeps working when you are offline and syncs when the connection returns — your data lives in your own browser.',
   'site.platforms.android.name': 'Android',
-  'site.platforms.android.body': 'Works on a real device: creating tasks, rescheduling, priorities, lists, tags, recurrence, focus, conflict resolution and trash all work. Widgets and a release signature are on the way.',
+  'site.platforms.android.body': 'The current build runs on a real device, with the main task flows and Android widget path exercised. A signed test package is available; cross-platform widget coverage and full interaction validation are still being completed.',
   'site.platforms.ios.name': 'iOS',
-  'site.platforms.ios.body': 'Fully working in the simulator: install, create the local database, sync to another device. Real-device testing and a developer signature are still missing.',
+  'site.platforms.ios.body': 'The main task and sync flows work in the simulator. A test build is available to the existing internal group; public invitations are not open, and physical iPhone testing is still pending.',
   'site.platforms.desktop.name': 'Desktop (Windows / macOS / Linux)',
-  'site.platforms.desktop.body': 'Builds on all three desktop platforms. Not yet signed or notarized — on macOS the first open needs a right-click — and the interface is still being polished.',
+  'site.platforms.desktop.body': 'Windows can be installed and runs; macOS has a signed and notarized build; a Linux test package is available too. Desktop interactions and widget coverage are still being verified per platform.',
   'site.platforms.harmony.name': 'HarmonyOS',
   'site.platforms.harmony.body': 'The build chain works and produces an installer package, but the app does not run yet — blocked on an emulator image and signing.',
   'site.platforms.selfhost.name': 'Self-hosting',

@@ -1,0 +1,109 @@
+{
+  "date": "2026-10-08",
+  "browserTests": {
+    "passed": 6,
+    "retries": 0,
+    "viewports": [
+      1440,
+      390
+    ],
+    "realClicks": true,
+    "durationSeconds": 17.2,
+    "postFreezeRun": true
+  },
+  "unitTests": {
+    "passed": 79,
+    "postReaderLayoutRun": true
+  },
+  "liveOtpRoutesPresent": true,
+  "productionEmailDeliveryVerified": false,
+  "nativeInstalledUpdatedAuthVerified": false,
+  "source": {
+    "apps/web/src/App.tsx": "521f735aa274e74fce94ff94acc19a8b8332b972e80cb714854765da01794404",
+    "apps/web/src/features/auth/store.ts": "0d8d0b5d679e7534b4d44d3f9966a247f5b4beb81d383a60cee72953950ab330",
+    "apps/mobile/src/screens/AuthScreen.tsx": "f741e9f41aed8b39c7e0970decef48c3e25b96edd4177215e41e321d7b0e1936",
+    "packages/i18n/src/locales/zh-CN.ts": "f8adfb16cea4c32ff3660c6e3db731d34f5ae327b42eca69fa11d7a8711893d6",
+    "packages/i18n/src/locales/en.ts": "d0d2061118a60371b639d75a65398e398fa12000954efed151121e0d0f876f21",
+    "e2e/tests/auth-consent-registration.spec.ts": "0dc4910b9298130a8d7967653b3d8041cf48a269f8cbfe7c641e094a33ef8d06",
+    "apps/web/src/features/auth/AuthPanel.tsx": "d49c1262a004ac10c9db8394845d0dded6d5fa0482d96a7cedff00500edff99b",
+    "packages/ui/src/auth/AuthForm.tsx": "dfd99462ea359ebca2020a93ae2f9c7dd49bb11c2d619a174b102bacc9c3b7f2",
+    "packages/ui/src/auth/LegalDocumentSheet.tsx": "95d5c54415938e23137a7a6006dc058420c518ea03d89d32397ae034bf539d13",
+    "packages/ui/tests/legal-document-sheet.spec.ts": "17fe2272f8da5085da8e4f30af7bd2b14b6de80b81e5119b740855e96a5a6c8c"
+  },
+  "legalDocumentReaderVerifiedInBrowser": true,
+  "registrationDraftPreservedAfterLegalReader": true,
+  "mobileAuthUnitTests": {
+    "passed": 57,
+    "runtimeInteraction": false
+  },
+  "legalTableLabelsVerified": true,
+  "frozenBuild": {
+    "log": "frozen-build.log",
+    "webIndexSha256": "7c3a2668eaa7abd4e328a5e5b18209cdcb500b914bef7227440974781672d5cb"
+  },
+  "sharedLegalReaderTests": {
+    "passed": 7
+  },
+  "artifacts": {
+    "macOS": {
+      "notarized": true,
+      "installed": false,
+      "sha256": "1f25713f10ea0df32ff83f555accb309ecd7e74a650014fc0d743ebbfea4e435"
+    },
+    "iosSimulator": {
+      "releaseBuildSucceeded": true,
+      "physicalIphoneVerified": false,
+      "installedBundleMatchesCandidate": true,
+      "jsBundleSha256": "4b37a620b44baec8fdb7856f90e6f12a0bcc985880de477b60d59a0056834da3",
+      "launchSucceeded": true
+    },
+    "android": {
+      "installedWithDataPreservingUpgrade": true,
+      "launchSucceeded": true,
+      "installedReaderInteractionVerified": true
+    },
+    "windows": {
+      "installedVersion": "1.0.0.1",
+      "dataSummaryUnchanged": true,
+      "fullWebDistShaMatched": true,
+      "readerInteractionVerified": false
+    }
+  },
+  "review": {
+    "readerInteractionIssues": 0,
+    "draftLegalStatusPreserved": true,
+    "formalLegalApprovalNotClaimed": true,
+    "renderedBannerTestCorrected": true
+  },
+  "liveWeb": {
+    "deployed": true,
+    "url": "https://heyta.waytofuture.cn/app/",
+    "matchingIndexBytes": true,
+    "remoteFilesShaMatched": 26,
+    "liveSuitePassed": 32,
+    "legalReaderViewports": [
+      390,
+      1440
+    ],
+    "backup": "/tmp/heyta-app-backup-auth-legal-20261008.tgz",
+    "finalSuiteAfterLegalSiteUpdate": 32
+  },
+  "testflight": {
+    "buildNumber": "7",
+    "buildId": "8b857f09-de7b-4bb9-83ae-e6b9fac196fb",
+    "processingState": "VALID",
+    "existingInternalGroupReadback": true,
+    "physicalIphoneInstallVerified": false
+  },
+  "legalSite": {
+    "deployed": true,
+    "remoteFilesShaMatched": 97,
+    "operationalBackendReplaced": false
+  },
+  "publicTestRelease": {
+    "url": "https://github.com/Xaiver03/heyta/releases/tag/v1.0.1-test.20261008.5",
+    "assetCount": 4,
+    "allAssetSizesAndDigestsMatched": true,
+    "allGoalItemsComplete": false
+  }
+}

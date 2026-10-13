@@ -1,0 +1,26 @@
+{
+  "status": "passed_with_fixture_drift",
+  "date": "2026-10-08",
+  "udid": "FE195661-B021-4A71-AAD1-1F2F7AE3A102",
+  "bundleId": "com.heyta",
+  "version": "1.0",
+  "build": "1",
+  "networkOrRegistration": "not performed",
+  "reader": {
+    "terms": {"openedByNativeTap": true, "closedByNativeTap": true, "returnsToRegistration": true},
+    "privacy": {"openedByNativeTap": true, "closedByNativeTap": true, "returnsToRegistration": true},
+    "darkAppearance": {"privacyReaderOpened": true, "restoredToLight": true},
+    "draftEmailRetained": "native-reader-check@example.invalid"
+  },
+  "profileSettings": {
+    "profileToSettings": true,
+    "general": true,
+    "syncAndPrivacy": true,
+    "dataManagementActualEntry": "备份与迁移",
+    "backupMigration": true,
+    "returnToProfile": true
+  },
+  "fixtureDrift": "profile-settings-ios.py expects 导出数据; installed/current UI exposes 备份与迁移",
+  "helpCenter": "not_present_in_mobile_profile_or_settings",
+  "narrowLandscape": "not_run_device_geometry_unavailable"
+}

@@ -1,0 +1,76 @@
+{
+  "task": "原生小组件闭环20261008",
+  "beforeIntentOpCount": 2,
+  "afterIntentOpCount": 3,
+  "afterRepeatedIntentOpCount": 3,
+  "ops": [
+    {
+      "op": {
+        "opType": "CRT",
+        "schemaVersion": 1,
+        "actionType": "CRT_TASK",
+        "id": "muz0qu38-1-i846ccys-1791432648935-1",
+        "clientId": "muz0qu38-1-i846ccys",
+        "payload": {
+          "title": "原生小组件闭环20261008",
+          "priority": 0
+        },
+        "entityId": "task-8230ec03-63a2-46dc-9a1b-e441664bddf6",
+        "timestamp": 1791432648935,
+        "entityType": "TASK",
+        "vectorClock": {
+          "muz0qu38-1-i846ccys": 1
+        }
+      },
+      "source": "local",
+      "applyStatus": "applied",
+      "uploadStatus": "pending",
+      "seq": 1
+    },
+    {
+      "op": {
+        "actionType": "UPD_TASK",
+        "opType": "UPD",
+        "schemaVersion": 1,
+        "id": "muz0qu38-1-i846ccys-1791432690714-2",
+        "entityId": "task-8230ec03-63a2-46dc-9a1b-e441664bddf6",
+        "payload": {
+          "dueDate": 1791388800000
+        },
+        "clientId": "muz0qu38-1-i846ccys",
+        "entityType": "TASK",
+        "vectorClock": {
+          "muz0qu38-1-i846ccys": 2
+        },
+        "timestamp": 1791432690714
+      },
+      "source": "local",
+      "applyStatus": "applied",
+      "uploadStatus": "pending",
+      "seq": 2
+    },
+    {
+      "op": {
+        "actionType": "UPD_TASK",
+        "schemaVersion": 1,
+        "opType": "UPD",
+        "id": "muz0qu38-1-i846ccys-1791432741302-3",
+        "entityId": "task-8230ec03-63a2-46dc-9a1b-e441664bddf6",
+        "clientId": "muz0qu38-1-i846ccys",
+        "payload": {
+          "completedAt": 1791432741302
+        },
+        "entityType": "TASK",
+        "vectorClock": {
+          "muz0qu38-1-i846ccys": 3
+        },
+        "timestamp": 1791432741302
+      },
+      "source": "local",
+      "applyStatus": "applied",
+      "uploadStatus": "pending",
+      "seq": 3
+    }
+  ],
+  "systemGalleryClickVerified": false
+}

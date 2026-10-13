@@ -1,0 +1,31 @@
+Windows Widgets host 环境检查（windows-pc，2026-10-08）
+======================================================
+
+系统：Windows 10 Pro 25H2，Build 26200.9457，x64
+
+本机安装状态：
+- MicrosoftWindows.Client.WebExperience：未安装
+- Microsoft.WindowsStore：22608.1401.5.0，状态 Ok
+- Microsoft.DesktopAppInstaller：1.29.380.0，状态 Ok；winget 可执行文件存在但未加入 PATH
+- WpnService / StateRepository / AppXSvc：Running
+- wuauserv：扫描前 Stopped，扫描后恢复 Stopped
+- bits：扫描前 Running，扫描后保持 Running
+
+策略检查：
+- HKLM/HKCU Windows Feeds 与 HKLM Dsh 没有 DisableWidgets、AllowNewsAndInterests 等禁用值
+- HKCU Feeds 只有 EdgeMUID；不是策略禁用导致
+
+官方可用性查询：
+- Microsoft Display Catalog 官方接口返回 HTTP 200
+- ProductId：9MSSGKG348SP
+- ProductTitle：Windows Web Experience Pack
+- PackageFamilyName：MicrosoftWindows.Client.WebExperience_cw5n1h2txyewy
+- 目录中当前 Widgets 包：526.21100.40.0，x64/arm64 AppxBundle
+- FulfillmentType：WindowsUpdate；最大下载约 93,396,693 bytes
+
+实际尝试：
+- winget msstore 查询/安装：失败，WinHTTP 12029 / 0x80072efd（远端网络链路拒绝）
+- 临时切换 WinHTTP 到本机 Clash 7890/7891 后重试，仍未能打开 winget msstore 源；结束后已恢复 WinHTTP 为 Direct
+- 通过 UsoClient StartScan 触发一次官方 Windows Update 扫描，扫描后 Web Experience 仍 absent
+
+结论：官方目录确认组件可安装，但当前 Windows 测试机未安装 Widgets host，且官方安装通道受远端网络链路限制。没有把 Provider 注册或应用内卡片当作系统 Widgets Board 添加成功。需要在有 Widgets host 的 Windows 11 机器完成 Win+W → 添加 heyta → 点击回写的最后验收。

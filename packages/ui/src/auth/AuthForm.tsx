@@ -125,8 +125,13 @@ export interface AuthFormLabels {
   readonly signUp: string;
   readonly showPassword: string;
   readonly hidePassword: string;
-  /** 「长一句比加符号有用」那一句。 */
-  readonly passwordHint: string;
+  /**
+   * 旧宿主仍可能传入的密码说明。认证表单不再展示它：密码策略应由长度、
+   * 泄露检查与强度组件表达，避免把一条未经操作指引的解释塞在输入框下面。
+   * 保留为可选字段只是为了让宿主可以分批升级，不让中英词条或旧适配器成为
+   * 运行时依赖；它不是界面消费点。
+   */
+  readonly passwordHint?: string;
   readonly forgotPassword: string;
   readonly switchToRegister: string;
   readonly switchToSignIn: string;
@@ -451,9 +456,6 @@ export function AuthForm({
 
   const invalidFor = (field: AuthFormField): boolean => errorField === field;
   const missing = (field: AuthFormField): boolean => missingField === field;
-  const showPasswordHint =
-    mode === 'register' ||
-    (status?.tone === 'error' && (status.field === 'password' || localField === 'password'));
 
   /**
    * in-flight guard：有请求在路上就**不响应**。
@@ -805,10 +807,6 @@ export function AuthForm({
           {missing('password') ? (
             <Text style={[text['caption'], styles.danger]}>{labels.localErrors.password}</Text>
           ) : null}
-          {showPasswordHint ? (
-            <Text style={[text['caption'], styles.muted]}>{labels.passwordHint}</Text>
-          ) : null}
-
           {mode === 'register' ? (
             <>
               {labels.passwordStrength !== undefined ? (

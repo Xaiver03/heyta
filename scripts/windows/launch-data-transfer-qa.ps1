@@ -300,11 +300,19 @@ $manifestObject = [ordered]@{
 }
 WriteManifest $manifestObject $Manifest
 
-$start = (Get-Date).AddMinutes(1)
-& schtasks.exe /Create /TN $task /TR ("powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$launcher`"") /SC ONCE /SD $start.ToString('yyyy/MM/dd') /ST $start.ToString('HH:mm') /RU $env:USERNAME /IT /F 2>$null | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "Could not create scheduled task: $task" }
-& schtasks.exe /Run /TN $task 2>$null | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "Could not run scheduled task: $task" }
+# The task is a one-shot interactive launcher, not a second scheduled launch.
+# Put the fallback date far enough ahead and remove our own task immediately
+# after /Run; deleting a task does not stop its already-running process.
+$start = (Get-Date).AddDays(1)
+try {
+  & schtasks.exe /Create /TN $task /TR ("powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$launcher`"") /SC ONCE /SD $start.ToString('yyyy/MM/dd') /ST $start.ToString('HH:mm') /RU $env:USERNAME /IT /F 2>$null | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw "Could not create scheduled task: $task" }
+  & schtasks.exe /Run /TN $task 2>$null | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw "Could not run scheduled task: $task" }
+} finally {
+  & schtasks.exe /Delete /TN $task /F 2>$null | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw "Could not remove one-shot QA task: $task" }
+}
 
 $target = $false
 for ($i = 0; $i -lt 45; $i++) {

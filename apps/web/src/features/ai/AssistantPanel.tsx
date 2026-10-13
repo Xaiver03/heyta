@@ -90,12 +90,13 @@ import { intentText } from './AiToolRun.js';
 import { createAiToolHost } from '../tasks/store.js';
 import {
   clearAssistantHistory,
+  assistantSessionStorage,
   type HistoryStorage,
   loadAssistantHistory,
   saveAssistantHistory,
 } from './assistant-history.js';
 import type { ChatItem, WithoutId } from './assistant-transcript.js';
-import { currentAccount, usePanelEphemeral } from './panel-ephemeral.js';
+import { currentAccount, usePanelEphemeral, usePanelSession } from './panel-ephemeral.js';
 
 export interface AssistantPanelProps {
   routing: AiRoutingConfig;
@@ -139,13 +140,7 @@ export interface AssistantPanelProps {
 
 /** 界面上的一条消息（类型定义在 `assistant-transcript.ts`，落盘层共用它）。 */
 
-/**
- * 未决状态的形状与**初始值**（初始值必须是模块级常量：`usePanelEphemeral` 的
- * `write` 把它列进依赖，render 里现造字面量会让每次渲染都换一个新回调）。
- *
- * ⚠️ 这三样原来住在组件里（`type Phase` + 三个 `useState`）—— 那正是缺陷本身：
- * 住在组件里就要跟着组件一起被重挂载。
- */
+/** 活会话由 Provider 拥有；页面重挂载只能换视图，不能更换请求的结果接收者。 */
 type AssistantPhase = 'idle' | 'disclose' | 'running';
 
 interface AssistantEphemeralShape {
@@ -153,16 +148,24 @@ interface AssistantEphemeralShape {
   pending: string | undefined;
   phase: AssistantPhase;
   confirmationErrors: Readonly<Record<number, string>>;
+  items: readonly ChatItem[];
+  disclosed: boolean;
+  /** 同步闸门跟会话一起保存，旧请求和新挂载的面板必须看到同一份。 */
+  controls: {
+    phase: AssistantPhase;
+    epoch: number;
+    nextId: number;
+    confirming: boolean;
+    tier: AssistantTier;
+  };
 }
 
-const ASSISTANT_EPHEMERAL: AssistantEphemeralShape = {
-  draft: '',
-  pending: undefined,
-  phase: 'idle',
-  confirmationErrors: {},
-};
-
 export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
+  const session = usePanelSession();
+  return <AssistantSessionPanel key={session.generation} {...props} account={session.account} />;
+}
+
+function AssistantSessionPanel(props: AssistantPanelProps & { account: string | null }): React.JSX.Element {
   const { t, locale } = useI18n();
   /**
    * 挂载时从本机读一次。
@@ -173,37 +176,33 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
    * 就绕过了 `assistant-history.ts` 文件头第 3 条那道绑定。
    */
   const [session] = useState(() => {
-    const account = currentAccount();
-    return { account, history: loadAssistantHistory(account, props.historyStorage ?? null) };
+    const account = props.account;
+    const storage = assistantSessionStorage(account, props.historyStorage);
+    return { account, storage, history: loadAssistantHistory(account, storage) };
   });
-  const restored = session.history;
-  const [items, setItems] = useState<readonly ChatItem[]>(restored?.items ?? []);
-  /** 本段会话是否已经看过一次性披露。`新会话` 把它清掉。 */
-  const [disclosed, setDisclosed] = useState(restored?.disclosed ?? false);
-  /**
-   * 🔴 未决的三样（草稿 / 等披露确认的那一句 / 阶段指示）**不住在这里**。
-   *
-   * 理由在 `panel-ephemeral.tsx` 文件头：AI 面在右栏与中间列之间换挂载点
-   * = 换子树 = 重挂载，而重挂载会把**已经摆在用户眼前的出境披露**连同他打了一半
-   * 的那句一起收回初始态（等于替他取消一次同意请求）。那三样提到挂载点之上的
-   * Provider 里，重挂载就不再是用户的一次损失。
-   * 账号绑定（读写两侧都查）也在那一层，两个面板共用同一份实现。
-   */
-  const ephemeral = usePanelEphemeral('assistant', session.account, ASSISTANT_EPHEMERAL);
-  const { draft, phase, confirmationErrors = {} } = ephemeral.value;
-  /**
-   * 事件处理器可能在同一轮 React flush 内被连续触发（快速双击、回车），
-   * 不能只读 render 时捕获的 `phase`。这个 ref 让发送入口在状态提交前也有
-   * 同步的阶段闸门；同一枚闸门也挡住披露确认的重复点击。
-   */
-  const phaseRef = useRef<AssistantPhase>(phase);
-  phaseRef.current = phase;
-  /** 新会话递增；旧请求仍可自然完成，但结果不再有资格写入新会话。 */
-  const requestEpochRef = useRef(0);
-  /** Chat 内的选择只影响当前会话；父级可选地把它写回自己的设置事实源。 */
-  const [selectedTier, setSelectedTier] = useState<AssistantTier>(props.tier);
-  const selectedTierRef = useRef(selectedTier);
-  selectedTierRef.current = selectedTier;
+  const [initialSession] = useState<AssistantEphemeralShape>(() => ({
+    draft: '',
+    pending: undefined,
+    phase: 'idle',
+    confirmationErrors: {},
+    items: session.history?.items ?? [],
+    disclosed: session.history?.disclosed ?? false,
+    controls: {
+      phase: 'idle', epoch: 0, nextId: session.history?.items.length ?? 0,
+      confirming: false, tier: props.tier,
+    },
+  }));
+  const ephemeral = usePanelEphemeral('assistant', session.account, initialSession);
+  const { draft, phase, confirmationErrors, items, disclosed, controls } = ephemeral.value;
+  const setItems = (next: readonly ChatItem[] | ((previous: readonly ChatItem[]) => readonly ChatItem[])): void => {
+    ephemeral.write(session.account, (previous) => ({
+      items: typeof next === 'function' ? next(previous.items) : next,
+    }));
+  };
+  const setDisclosed = (value: boolean): void => ephemeral.write(session.account, { disclosed: value });
+  /** 档位本身跨挂载保留；父级设置变化仍由下面的 effect 接入。 */
+  const [selectedTier, setSelectedTier] = useState<AssistantTier>(controls.tier);
+  controls.tier = selectedTier;
   const [historyOpen, setHistoryOpen] = useState(false);
   const historyToggleRef = useRef<HTMLButtonElement>(null);
   const historyCloseRef = useRef<HTMLButtonElement>(null);
@@ -259,17 +258,13 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
    */
   const setDraft = (value: string): void => ephemeral.write(session.account, { draft: value });
   const setPhase = (value: AssistantPhase): void => {
-    phaseRef.current = value;
+    controls.phase = value;
     ephemeral.write(session.account, { phase: value });
   };
   const setPending = (value: string | undefined): void =>
     ephemeral.write(session.account, { pending: value });
   const setConfirmationErrors = (value: Readonly<Record<number, string>>): void =>
     ephemeral.write(session.account, { confirmationErrors: value });
-  // 恢复出来的条目占用了 1..n（见 `assistant-history.ts` 的重新编号），
-  // 计数器必须从 n 之后接着走，否则第一条新消息会和恢复出来的一条撞 key。
-  const idRef = useRef(restored?.items.length ?? 0);
-  const confirmInFlight = useRef(false);
 
   const host = useMemo(
     () => props.host ?? createAiToolHost({
@@ -312,24 +307,25 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
   // 为什么在这儿写而不是在 `append` 里写：`append` 有两处会改状态却不改历史
   // （提案被确认、用户点忽略），漏一处就是"存的那份与看见的那份不一样"。
   useEffect(() => {
+    if (!ephemeral.isCurrent() || currentAccount() !== session.account) return;
     if (items.length === 0) {
-      clearAssistantHistory(props.historyStorage ?? null);
+      clearAssistantHistory(session.storage);
       return;
     }
     saveAssistantHistory(
-      { items, disclosed, account: currentAccount() },
-      props.historyStorage ?? null,
+      { items, disclosed, account: session.account },
+      session.storage,
     );
-  }, [items, disclosed, props.historyStorage]);
+  }, [items, disclosed, session.storage, session.account]);
 
   /** 追加一条并返回它（`id` 由 ref 递增，不用数组长度 —— 长度会在同批两次追加时撞号）。 */
   function append(item: WithoutId<ChatItem>): void {
-    idRef.current += 1;
-    setItems((previous) => [...previous, { ...item, id: idRef.current } as ChatItem]);
+    const id = ++controls.nextId;
+    setItems((previous) => [...previous, { ...item, id } as ChatItem]);
   }
 
-  async function turn(text: string, epoch = requestEpochRef.current): Promise<void> {
-    if (epoch !== requestEpochRef.current) return;
+  async function turn(text: string, epoch = controls.epoch): Promise<void> {
+    if (!ephemeral.isCurrent() || epoch !== controls.epoch) return;
     setPhase('running');
     const outcome = await requestAssistantTurn(
       { text },
@@ -339,11 +335,11 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
         tier: selectedTier,
         host,
         getGrants: () =>
-          epoch === requestEpochRef.current && currentAccount() === session.account
-            ? assistantGrants(selectedTierRef.current)
+          ephemeral.isCurrent() && epoch === controls.epoch && currentAccount() === session.account
+            ? assistantGrants(controls.tier)
             : {},
         localize: (key, vars) => t(key as MessageKey, vars),
-        executionId: `web:${session.account}:${String(idRef.current)}`,
+        executionId: `web:${session.account}:${String(controls.nextId)}`,
         history,
         routed: {
           secretStore: props.secrets,
@@ -353,7 +349,7 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
     );
     // 请求可能跨过了「新会话」才回包；它不能结束新会话的运行态，
     // 也不能把旧回答追加到新会话。
-    if (epoch !== requestEpochRef.current) return;
+    if (!ephemeral.isCurrent() || epoch !== controls.epoch || currentAccount() !== session.account) return;
     // 🔴 熔断状态回写：失败那一次通常正是计数器刚 +1 的时候。
     if (outcome.health !== undefined && props.onHealth !== undefined) props.onHealth(outcome.health);
     setPhase('idle');
@@ -384,7 +380,7 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
   function send(): void {
     // 发送按钮的 disabled 只覆盖真实点击；Enter 和同一轮的重复事件也必须
     // 经过同一阶段闸门。披露阶段同样不能再追加第二条待发送消息。
-    if (phaseRef.current !== 'idle') return;
+    if (controls.phase !== 'idle') return;
     const text = draft.trim();
     if (text === '') return;
     append({ role: 'user', text });
@@ -425,25 +421,28 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
 
   /** 用户在披露块上按「发送」。写"已披露"这件事只在这里发生。 */
   function confirmDisclosure(): void {
-    if (phaseRef.current !== 'disclose') return;
+    if (controls.phase !== 'disclose') return;
     const text = pending ?? '';
     setDisclosed(true);
     setPending(undefined);
     if (text !== '') {
-      void turn(text, requestEpochRef.current);
+      void turn(text, controls.epoch);
     } else {
       setPhase('idle');
     }
   }
 
   async function confirm(item: ChatItem & { role: 'proposal' }): Promise<void> {
-    if (confirmInFlight.current) return;
-    confirmInFlight.current = true;
+    if (controls.confirming) return;
+    controls.confirming = true;
+    const epoch = controls.epoch;
     try {
       const result = await confirmAiToolProposal(host, item.proposal, {
         getGrants: () =>
-          currentAccount() === session.account ? assistantGrants(selectedTierRef.current) : {},
+          ephemeral.isCurrent() && epoch === controls.epoch && currentAccount() === session.account
+            ? assistantGrants(controls.tier) : {},
       });
+      if (!ephemeral.isCurrent() || epoch !== controls.epoch || currentAccount() !== session.account) return;
       if (result.ok) {
         setItems((previous) => previous.map((x) => (x === item ? { ...x, confirmed: result } : x)));
         const next = { ...confirmationErrors };
@@ -453,15 +452,15 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
         setConfirmationErrors({ ...confirmationErrors, [item.id]: result.message });
       }
     } finally {
-      confirmInFlight.current = false;
+      controls.confirming = false;
     }
   }
 
   function newSession(): void {
     // `requestAssistantTurn` 没有贯穿整个 app-host 管道的取消协议；运行中切走
     // 只会隐藏旧结果，不能阻止低风险写入落库。因此必须等这一轮结束后再开新会话。
-    if (phaseRef.current === 'running') return;
-    requestEpochRef.current += 1;
+    if (controls.phase === 'running') return;
+    controls.epoch += 1;
     setHistoryOpen(false);
     requestAnimationFrame(() => composerRef.current?.focus());
     setItems([]);
@@ -822,9 +821,9 @@ function ProposalCard(props: {
   const { item } = props;
   return (
     <>
-      {item.text !== '' && <p className="ht-ai__note">{item.text}</p>}
+      {item.expired !== true && item.confirmed === undefined && item.text !== '' && <p className="ht-ai__note">{item.text}</p>}
       <p className="ht-ai__row" data-testid="ai-chat-proposal">
-        {t('web.ai.tools.proposalLead')}
+        {item.expired !== true && item.confirmed === undefined && t('web.ai.tools.proposalLead')}
         <strong>{intentText(item.proposal.intent, t, locale)}</strong>
       </p>
       {item.expired === true ? (

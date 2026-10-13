@@ -1,0 +1,12 @@
+{
+  "utcNow": "2026-10-08T07:40:30.5141676Z",
+  "pids": [
+    30840
+  ],
+  "processCount": 1,
+  "taskPresent": false,
+  "sourceRunnerSha256": "8B22FD4B49893F925550D1DED6EAFB59C0B9C4537DA54FE23B97E29703DA17FC",
+  "creationDateKind": "Local",
+  "createdUtc": "2026-10-08T07:39:14.9325950Z",
+  "elapsedSeconds": 76.69053079999999
+}

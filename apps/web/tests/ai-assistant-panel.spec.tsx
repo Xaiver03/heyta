@@ -212,6 +212,7 @@ async function click(el: HTMLDivElement, testId: string): Promise<void> {
 const CJK = /[㐀-䶿一-鿿]/;
 
 beforeEach(() => {
+  localStorage.clear();
   container = undefined;
   root = undefined;
 });

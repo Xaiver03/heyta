@@ -68,6 +68,18 @@
   background: var(--ht-color-background);
 }
 
+/* Windows caption controls share the application canvas. Insets come from
+   AppWindow.TitleBar, not a second full-width header or a guessed pixel size. */
+html.heyta-windows-shell .ht-header[data-heyta-caption-safe] {
+  padding-inline-end: calc(var(--ht-shell-caption-right, var(--ht-space-0)) + var(--ht-space-6));
+}
+
+/* The detail column can host arbitrary editors. Keep only that local caption
+   corner clear; the rail and main page header stay flush with the top edge. */
+html.heyta-windows-shell .ht-app__detail:not([hidden]) {
+  padding-block-start: var(--ht-shell-caption-height, var(--ht-space-8));
+}
+
 /*
  * 有范围的视图（目前只有 `tasks`）—— 多一列。
  *

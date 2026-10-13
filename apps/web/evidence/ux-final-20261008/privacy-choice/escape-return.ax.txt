@@ -1,0 +1,66 @@
+Browser tab: 16, Title: "heyta", URL: "http://127.0.0.1:4381/?lang=zh-CN".
+1 AXWebArea heyta, URL: 127.0.0.1:4381/?lang=zh-CN
+	2 container root
+		3 container 主导航
+			4 pop up button (collapsed) Description: 账号, Secondary Actions: Expand
+			5 tab group 视图
+				6 sortable (selectable, settable, boolean) 任务, Value: 0
+				7 sortable (selectable, settable, boolean) 日历, Value: 0
+				8 sortable (selectable, settable, boolean) 习惯, Value: 0
+				9 sortable (selectable, settable, boolean) 搜索, Value: 0
+				10 tab (selectable, settable, boolean) 对话助手, Value: 0
+				11 pop up button (collapsed) 更多, Secondary Actions: Expand
+			12 tab (selectable, settable, boolean) 回收站, Value: 0
+			13 pop up button (collapsed) Description: 通知, Secondary Actions: Expand
+			14 button 帮助
+			15 container
+				16 button 同步，当前状态：登录以同步
+				17 text 登录以同步
+		18 container
+			19 heading 设置, Value: 1
+				20 text 设置
+			21 container
+				22 text field (settable) 新任务标题
+				23 button (disabled) 添加
+					24 image
+					25 text 添加
+			26 text 收集箱是空的
+			27 text 在上面输入框添加第一个任务
+			28 container 设置
+				29 button 关闭设置
+				30 container 设置
+					31 button 个人资料
+					32 button 任务与显示
+					33 button 同步与隐私
+					34 button AI 与集成
+					35 button 数据管理
+					36 button 账号与安全
+					37 button 关于与帮助
+				38 container 同步与隐私, ID: settings-group-sync
+					39 heading 同步与隐私, Value: 2, ID: settings-group-sync-title
+						40 text 同步与隐私
+					41 container Description: 同步设置, ID: settings-sync
+						42 heading 同步设置, Value: 2
+							43 text 同步设置
+						44 text 任务先保存在本机。登录 heyta 后可在设备间自动同步，服务端只接收加密的任务数据。
+						45 container heyta 云同步
+							46 text heyta 云同步
+							47 container
+								48 text 登录 登录后，你的任务会在设备间自动同步。无需填写服务器地址。
+								49 button 登录
+						50 button (collapsed) 高级：自托管与手动连接, Secondary Actions: Expand
+							51 text 高级：自托管与手动连接
+					52 container 隐私同意
+						53 heading 隐私同意, Value: 2, ID: privacy-settings-title
+							54 text 隐私同意
+						55 container 联网权限状态
+							56 text 联网权限状态
+							57 text 这项选择只控制本机是否允许 heyta 与服务器通信，不会删除或改变本地数据。
+							58 text 只用本机（未同意联网）
+							59 text 决定于 2026-10-08 05:52（UTC）
+						60 container 更改选择
+							61 text 更改选择
+							62 text 需要同步或登录时，可以在这里重新选择是否联网。打开选择面板不会改变当前权限。
+							63 button 重新作出选择
+
+The focused UI element is 63 button 重新作出选择

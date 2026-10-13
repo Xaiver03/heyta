@@ -1,0 +1,26 @@
+{
+  "date": "2026-10-08",
+  "scope": "Web shared assistant composer, empty state",
+  "css": "apps/web/src/styles/app/ai-panels.css",
+  "token": "--ht-shadow-sm",
+  "themes": [
+    "light",
+    "dark"
+  ],
+  "borderWidth": "0px",
+  "visualInspection": true,
+  "nativeInstalledArtifactVerified": true,
+  "sourceSha256": "11afb551e050256555673361faebddccd89e9353125071f105efd5f74d237f69",
+  "nativeScope": {
+    "platform": "macOS",
+    "themes": [
+      "light",
+      "dark"
+    ],
+    "screenshots": [
+      "macos-installed.png",
+      "macos-installed-dark.png"
+    ],
+    "otherPlatformsVerified": false
+  }
+}

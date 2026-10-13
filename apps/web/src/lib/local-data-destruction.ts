@@ -256,6 +256,14 @@ async function clearServiceWorkerLayer(): Promise<DbDestroyReport> {
  */
 export async function eraseWebLocalData(): Promise<DbDestroyReport[]> {
   const reports: DbDestroyReport[] = [];
+  // Stop native widget writers before destroying the database; report a failure honestly.
+  try {
+    const { clearNativeWidgets } = await import('./native-widgets.js');
+    await clearNativeWidgets();
+  } catch (error) {
+    reports.push(report('native-widgets', false, { reason: String(error) }));
+  }
+
 
   // 1. 主库走**适配器自己的 destroy**（`DbAdapter.destroy` 契约的调用方就是这里；
   //    它此前零调用方，是 §10.2 那条取证点名的洞）。

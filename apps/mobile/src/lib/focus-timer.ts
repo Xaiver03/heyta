@@ -16,9 +16,8 @@
  * ─────────────────────────────────────────────────────────────────────────
  * 为什么是**模块级单例**而不是组件内 `useState`：
  *
- * 移动端的标签栏（`App.tsx`）是**条件渲染** —— 切到「任务」时 `FocusScreen`
- * 会被卸载。计时状态放组件里，用户去「任务」看一眼再切回来，番茄钟就归零了。
- * 这是"计时器能日常用"的底线，不是锦上添花。
+ * 计时状态必须独立于页面是否显示或挂载。当前主标签用 `display: none` 保留页面，
+ * 但导航与屏幕生命周期不应决定计时器是否继续运行。
  *
  * 为什么不用 zustand（Web 端用的是它）：Web 那份 store 的存在理由之一是
  * 它有跨 feature 的订阅需求；这里只有一个订阅者、一个状态对象。
@@ -93,6 +92,8 @@ export interface FocusTimerSnapshot {
 
 let snapshot: FocusTimerSnapshot = { state: initialFocusState(), now: Date.now() };
 const listeners = new Set<() => void>();
+/** 快照发布者只订阅状态机变化，不能跟随显示秒每秒封包写盘。 */
+const stateListeners = new Set<() => void>();
 let tickHandle: ReturnType<typeof setInterval> | undefined;
 
 /** 防重入：落盘是异步的，定时器可能在它完成前再触发一次。 */
@@ -125,9 +126,13 @@ function displayedSecond(state: FocusState, now: number): number {
 function publish(patch: Partial<FocusTimerSnapshot>): void {
   // 🔴 必须是**新对象**。`useSyncExternalStore` 用引用相等判断是否需要重绘，
   // 原地改字段会让 React 认为"没变"，界面就永远不动。
+  const previousState = snapshot.state;
   snapshot = { ...snapshot, ...patch };
   lastPublishedSecond = displayedSecond(snapshot.state, snapshot.now);
   for (const listener of listeners) listener();
+  if (snapshot.state !== previousState) {
+    for (const listener of stateListeners) listener();
+  }
 }
 
 function subscribe(listener: () => void): () => void {
@@ -159,6 +164,12 @@ export function useFocusTimer(): FocusTimerSnapshot {
  */
 export function currentFocusState(): FocusState {
   return snapshot.state;
+}
+
+/** 订阅开始/暂停/恢复/结束等状态变化；计时显示与保存回执不触发此信号。 */
+export function onFocusStateChange(listener: () => void): () => void {
+  stateListeners.add(listener);
+  return () => { stateListeners.delete(listener); };
 }
 
 /** 当前配置。界面要用它显示"这一轮多长"。 */

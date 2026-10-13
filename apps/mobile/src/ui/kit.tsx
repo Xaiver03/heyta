@@ -705,6 +705,8 @@ export interface ButtonProps {
   icon?: IconName;
   disabled?: boolean;
   loading?: boolean;
+  /** 展开/收起状态，供无边框的渐进展开按钮向读屏器暴露。 */
+  expanded?: boolean;
   style?: StyleProp<ViewStyle>;
   /**
    * 设备级验收的锚点 id（真模拟器 AX 探针按它找控件）。
@@ -728,6 +730,7 @@ export function Button({
   icon,
   disabled,
   loading,
+  expanded,
   style,
   testID,
   accessibilityLabel,
@@ -755,7 +758,7 @@ export function Button({
       testID={testID}
       disabled={isDisabled}
       accessibilityRole="button"
-      accessibilityState={{ disabled: isDisabled, busy: loading === true }}
+      accessibilityState={{ disabled: isDisabled, busy: loading === true, expanded }}
       accessibilityLabel={accessibilityLabel ?? label}
       style={({ pressed }) => [
         {

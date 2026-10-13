@@ -1,0 +1,2537 @@
+{
+  "archiveSha256": "3de6e414aaa9243f6b5bffa9b6176f21b2d47777f24548a3fe2afb1e44e4c371",
+  "archiveBytes": 317175809,
+  "scope": "actual sync archive input capture superset; not each-file-linked claim",
+  "files": [
+    {
+      "path": "apps/mobile/.gitignore",
+      "bytes": 1609,
+      "sha256": "594beda4eef430ecb4017a1653dd5fe903c8c3738dce5272cde3b757e9916330"
+    },
+    {
+      "path": "apps/mobile/.prettierrc.js",
+      "bytes": 91,
+      "sha256": "ed7c5f7f2f0f21950c2acbb7425d212bbcf0d7ecd3bdd440af42c67cbb8d6851"
+    },
+    {
+      "path": "apps/mobile/.watchmanconfig",
+      "bytes": 3,
+      "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+    },
+    {
+      "path": "apps/mobile/android/app/build.gradle",
+      "bytes": 19650,
+      "sha256": "ea7fbbcc470838e45a56fef9398d2fff7b8eeaa3c797813abc3906d2bc2555af"
+    },
+    {
+      "path": "apps/mobile/android/app/debug.keystore",
+      "bytes": 2257,
+      "sha256": "221e0a3106aa4c3ccc154e0a418b55020b3f9ea6e84f92e8749cd9e2f39f5e58"
+    },
+    {
+      "path": "apps/mobile/android/app/proguard-rules.pro",
+      "bytes": 435,
+      "sha256": "426b908d7c5dac3db6648e2b21e3762ad9639e4976f7a2eb4e72d60d51b08ef2"
+    },
+    {
+      "path": "apps/mobile/android/app/src/androidTest/java/com/heytamobile/vault/VaultSecureStorageDeviceTest.kt",
+      "bytes": 5002,
+      "sha256": "6064b200273cd9b0ebe3c58b129af08f1c38e4b04c15147c318c112d3e234ede"
+    },
+    {
+      "path": "apps/mobile/android/app/src/androidTest/java/com/heytamobile/widget/KeystoreDeviceTest.kt",
+      "bytes": 5999,
+      "sha256": "8caa791f38832e0657a6c1fae988a941f896ed127ab8f8c68a13cff537797d29"
+    },
+    {
+      "path": "apps/mobile/android/app/src/androidTest/java/com/heytamobile/widget/RenderDeviceTest.kt",
+      "bytes": 6376,
+      "sha256": "69fff21a5f96797b752e36aa795de94bfabba2da74d96708fb41d79ef5249253"
+    },
+    {
+      "path": "apps/mobile/android/app/src/androidTest/java/com/heytamobile/widget/WidgetClickLoopDeviceTest.kt",
+      "bytes": 5113,
+      "sha256": "b121dd568cc98e39e82c464b44481afaab4131aee28854ccd025845242fe9214"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/AndroidManifest.xml",
+      "bytes": 8222,
+      "sha256": "04060b6aa8c903482677038e6e479af10280d266773e9bb889d66d8a140549b3"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/MainActivity.kt",
+      "bytes": 1142,
+      "sha256": "85fc85e2fc87f6e4b65b7fb761389b452888cd867ee7f291ffcd467b05780f81"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/MainApplication.kt",
+      "bytes": 4125,
+      "sha256": "8ae3c20ce10f731f9adda3393cbc9356a5b88613fca3daa81e8f16e3b09c4a22"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/fs/CardExportModule.kt",
+      "bytes": 5039,
+      "sha256": "9db35c591253fb060124f91310a0b93f7b56a85d747aa1934903860dd7455ee4"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/fs/CardExportPackage.kt",
+      "bytes": 1649,
+      "sha256": "c14d07f3e1be0b2924b4997e6b727057fe63fbb90ff8ea2e949126c27dd43a0b"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/fs/LocalFsModule.kt",
+      "bytes": 7083,
+      "sha256": "0389e14dd6baa6b4ea4e68a84e05b78f80eb15231c76fc9f824f3a0727a16285"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/fs/LocalFsPackage.kt",
+      "bytes": 1458,
+      "sha256": "0474dbdeb24a2e05b851c65e72e279003fa5be6d52cd74c7b6ac177542fc9679"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/reminder/ReminderModule.kt",
+      "bytes": 12152,
+      "sha256": "b6fa90f04c99ad3fce2bcbb5a1d7637ad4fbedf007f00b7f5151f90fba833c3a"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/reminder/ReminderPackage.kt",
+      "bytes": 789,
+      "sha256": "8134aaa577ef1ee2e12370a2351d8e468ff17b91c1455506f717a62bd71525c8"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/vault/VaultSecureStorageModule.kt",
+      "bytes": 9849,
+      "sha256": "61149a506f0cfa407dd76e6e605a01e5dd9c9c2ddfb816485257d60cb42b2002"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/vault/VaultSecureStoragePackage.kt",
+      "bytes": 1041,
+      "sha256": "ba13e13eabd05d4fdc27ec249195f9b8f10b1f5fbc9bc916ffb85059c1f0bcc7"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/widget/FocusWidgetModel.kt",
+      "bytes": 4947,
+      "sha256": "ea04c07426567a83ab57fbbadd401aaaa1330c5ada2ea542e595eca862742c38"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/widget/FocusWidgetProvider.kt",
+      "bytes": 829,
+      "sha256": "efc79f57886bf8545418e2f3e6f275a365f7cfaac06383b184f1fbf356b37a1d"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/widget/FocusWidgetViews.kt",
+      "bytes": 4382,
+      "sha256": "9b30dbd0b4811bf864364bef1c94375fc80760bab243091f2cc10ce613629fb6"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/widget/HabitsWidgetModel.kt",
+      "bytes": 4004,
+      "sha256": "a30db0783af197f70e1be1c9ce7c9c9a39d6636d289997a87d2e24794e1476d8"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/widget/HabitsWidgetProvider.kt",
+      "bytes": 831,
+      "sha256": "1c38a9d7d18b3409d924dfdf0c65591279a3416ad0e13ba3170c30f2396e0275"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/widget/HabitsWidgetViews.kt",
+      "bytes": 2432,
+      "sha256": "08e3ad99d4c78af6c2caba9b04f32308f515b42d74bd507e7fc9bae7f2febef6"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/widget/QuadrantWidgetModel.kt",
+      "bytes": 3636,
+      "sha256": "fbaf95c76e8490d683351d42052e93cbbb091e910c4e96ba3c904b020dafd1e3"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/widget/QuadrantWidgetProvider.kt",
+      "bytes": 832,
+      "sha256": "17a6cd7b995b4bc45fda7ff70f5848a43eb8164a29bbd15325d85ae1472ae5b8"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/widget/QuadrantWidgetViews.kt",
+      "bytes": 3942,
+      "sha256": "d500c7b883dc63dfc389bed8d11d0f07b7524cb85a8b96885a8cdfeda39ddf1e"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/widget/TodayWidgetModel.kt",
+      "bytes": 2879,
+      "sha256": "42152ac7ca6645df29969bbd302a7da0385588295e980ead9f7aecf311bb330b"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/widget/TodayWidgetProvider.kt",
+      "bytes": 829,
+      "sha256": "ff1015aa75eef29f02523cd2de06afaaaebccf510e86fa241355daebc4cde582"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/widget/TodayWidgetViews.kt",
+      "bytes": 2512,
+      "sha256": "938a41c863bef9bd490dba0c1fbe4a1089e7c9bb9e9700086c573d4f49c1dbc5"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetAead.kt",
+      "bytes": 11641,
+      "sha256": "c30bde1f753ab4e9f1540811c4958733d8ed2ecc9aa876cb15530af29b38b5a2"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetClicks.kt",
+      "bytes": 8277,
+      "sha256": "6ceb36b3033404dc06934c45b6b2d975eeb48b2507c5020f866113cc4dbd6ac7"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetContract.kt",
+      "bytes": 5751,
+      "sha256": "0a4acd1a14b1013a72c87e14d8124026489f7546b60d677f1950d0e1da50f581"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetGate.kt",
+      "bytes": 6484,
+      "sha256": "d62646b591c954125df4c44fdde836a64a859b24c74d2a60f90209d5c2a629c4"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetIntentQueue.kt",
+      "bytes": 9920,
+      "sha256": "fb9118d7d100a64fe23210ab77d495e43b79a28637e9514e5d853ff300680d22"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetJson.kt",
+      "bytes": 3491,
+      "sha256": "45f8df8597ae02d5c6b010a13a00e28a61d9dece87e9579b266e5453ecedd77c"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetKeyValueStore.kt",
+      "bytes": 2876,
+      "sha256": "d9a34f885d52e03af52038f521d286c2a2e226e7c1839a08f424549202fed290"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetModule.kt",
+      "bytes": 11994,
+      "sha256": "cc8b6dd3ed9915a803b6bdc1b9f510aab06788f803229b3584bee5dd5456d22d"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetPackage.kt",
+      "bytes": 1932,
+      "sha256": "0435d67a6a8fa83e9c0d1cd5a1430013f521c599ce654bf412132580d5abf8a5"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetRefresh.kt",
+      "bytes": 7363,
+      "sha256": "177c48f15a0a84529914b167348bf57cc921f367afecd40162d269159e97d3e3"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetSnapshotCipher.kt",
+      "bytes": 8238,
+      "sha256": "3ce573e60b37564d4016d30ae5cf041e2d5d8fb41476e984de929eea98914580"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetSnapshotParser.kt",
+      "bytes": 19929,
+      "sha256": "95b9e1b58e2f47d8283251ea3c7059aaac1dc4ff3714b6f9926a46d553576bf5"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetStore.kt",
+      "bytes": 7437,
+      "sha256": "301193bf5cc7ee0a4b91b9e725ae77b0e6f9504381cffe350c77cd8fae1b9f7c"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetViewParts.kt",
+      "bytes": 8299,
+      "sha256": "718e5d7779ba47eabb31e56a80b74c90072fef6080925bf5408d15822dc1f04e"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/drawable/rn_edit_text_material.xml",
+      "bytes": 1917,
+      "sha256": "738e3aaad53180caba1419a6d5db8465a0742662fe59a4bbaf05f1061cbc3390"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/layout/widget_focus.xml",
+      "bytes": 2761,
+      "sha256": "9c8149387dd22ebeff140f07cc0071c5ae8a0f1066664c73edc9eee817a6a115"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/layout/widget_habits.xml",
+      "bytes": 3456,
+      "sha256": "d61087b2cd741b9c84275341b4d5cb84a298b285469ee34380e22c3b5c8f6914"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/layout/widget_quadrant.xml",
+      "bytes": 4084,
+      "sha256": "85a20c62c0720156786e7dcb55050987ffc0586f328522c7d9bb27fd6a7e92c7"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/layout/widget_today.xml",
+      "bytes": 3090,
+      "sha256": "adf61b2fca490c1af48a1b9c5c7aadb2f949e722ad403e4cb12740e5f8cd15e2"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml",
+      "bytes": 953,
+      "sha256": "f685867a41d63794c7acda5504c2d130077970cad7758835be7a4aed09157e1a"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml",
+      "bytes": 953,
+      "sha256": "f685867a41d63794c7acda5504c2d130077970cad7758835be7a4aed09157e1a"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/mipmap-hdpi/ic_launcher.png",
+      "bytes": 1263,
+      "sha256": "0dcafbc8f62156df8842c3593fa74c0f5808636859fcf0ac287596811a5fb0c0"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/mipmap-hdpi/ic_launcher_foreground.png",
+      "bytes": 702,
+      "sha256": "d8d448eafd6e11d5c3942424eeaaf35ab670656ea194b96ae7a04871a5811b04"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png",
+      "bytes": 1953,
+      "sha256": "e7afaa48a6aa87923fbf51614d3a4051d97bf8b6c7cc98a91cbefbc803ad2417"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/mipmap-mdpi/ic_launcher.png",
+      "bytes": 869,
+      "sha256": "98d8abdff9f4a89c2761c26731a73ed504e727a621e44d25b2b9b3dfa5fc7d40"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/mipmap-mdpi/ic_launcher_foreground.png",
+      "bytes": 503,
+      "sha256": "08aa9895689cf5c7fb12519283efeac98945a089b6185d72762a3bf7eba84fb5"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png",
+      "bytes": 1296,
+      "sha256": "76d4336ca8b5ec2f50dd0ae89ff4734145e2888a29d4438ff39caad7144fb75d"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/mipmap-xhdpi/ic_launcher.png",
+      "bytes": 1606,
+      "sha256": "b2095d2b261901762c1d91b6f604383583ffb829d83bba51d04e1a82676450cf"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.png",
+      "bytes": 904,
+      "sha256": "f65cc9ea8429d12f85681998b8b93c406a8340904c66cca992f7d9fad5bc5f2e"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png",
+      "bytes": 2548,
+      "sha256": "906b8c68f7ec5003cc53cb2f30eaae9dd940006739bc2b2b5d8b5b18ecdbc14f"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png",
+      "bytes": 2445,
+      "sha256": "f37cb96777670daa28d331d6283a5b4f93fc341fb1744dc29b81359eb141b286"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.png",
+      "bytes": 1376,
+      "sha256": "aadb7cabb3c3601d308c6ac0e6cf417721738f3b11dc45605352b62803b1a8fe"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png",
+      "bytes": 3837,
+      "sha256": "c3ad43ccb314a0eb71ebef7f283ddb7b939ce9756373dd84b17786c08d851406"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png",
+      "bytes": 3267,
+      "sha256": "bbbffd64651d96cb35f7cb3c0d1cb3a7dc2444ed9035c74b01f9c48266475885"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png",
+      "bytes": 1998,
+      "sha256": "c1e496b5bd6ffa4354e729ce941575eef0e8573958eca2adb81342d073f9f99b"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png",
+      "bytes": 5186,
+      "sha256": "80ef75e9d602560d2193b054538e11ce46afbef0a50c199b363927022ba05e6d"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/values-en/strings.xml",
+      "bytes": 2167,
+      "sha256": "68637f6b1ec828d1d894cbf76ef5fcf1c93e8663366478b0f4833916f75adad2"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/values-v31/styles.xml",
+      "bytes": 1167,
+      "sha256": "317321e72e90f53da673a0938d6b8a6e2e223477453bc416674ffbdd6519fb6f"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/values/heyta_splash.xml",
+      "bytes": 507,
+      "sha256": "d5b014a18d352d360a7c1ef4010ace382526d7be8f73601b56c77eaf1df95851"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/values/ic_launcher_background.xml",
+      "bytes": 226,
+      "sha256": "6ee0a843ec5ebebc5446befe0b4e35dc25964ce8b405b12fc0cba80e442b3a4a"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/values/strings.xml",
+      "bytes": 3177,
+      "sha256": "045d6c200f4b8bfaa6869a23414081679c9f88f43b5b2782224d5c9b45a95b21"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/values/styles.xml",
+      "bytes": 3133,
+      "sha256": "df385a6bb403e1a5523bb961c06a4541a940561765a09a6222b6f8f145ddd296"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/xml/card_export_paths.xml",
+      "bytes": 963,
+      "sha256": "c58749aa891abcc7d3d5fd16c8f8774e8e3409192bebd13774a45709a50ff462"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/xml/widget_focus_info.xml",
+      "bytes": 1823,
+      "sha256": "acaa3dba618cfb55bf18422cfaa5783cd84268faaa517a45ccb8d4d106ebbf39"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/xml/widget_habits_info.xml",
+      "bytes": 1827,
+      "sha256": "1988d6f3d9e0cd5ce59cc0178f648935be8894a51dc99c5b9dc30721b8999dd4"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/xml/widget_quadrant_info.xml",
+      "bytes": 1830,
+      "sha256": "aaa0a38611ce84d6f8e616cab547ac032a15b664a4e237680a90673d3aed497a"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/xml/widget_today_info.xml",
+      "bytes": 1878,
+      "sha256": "afbea3f4862785133eb9113a272ee0b5fc64e0b08781d93a65d012d585f4db73"
+    },
+    {
+      "path": "apps/mobile/android/app/src/test/java/android/util/Base64.kt",
+      "bytes": 3112,
+      "sha256": "1f9d10d92bde92dfdc703d60badd6dc667a4ef6c5b51aad0275fc8b770144be2"
+    },
+    {
+      "path": "apps/mobile/android/app/src/test/java/com/heytamobile/widget/FocusWidgetModelTest.kt",
+      "bytes": 4927,
+      "sha256": "625ba24b310b4bedb240b1bf3e619c64ed771491d018de85c72c5fa94b7d7658"
+    },
+    {
+      "path": "apps/mobile/android/app/src/test/java/com/heytamobile/widget/GoldenFixtureSmokeTest.kt",
+      "bytes": 4838,
+      "sha256": "f0b223f9e2ccef594e5203de9a68f513ceda2d8d14a1a671acc2157b1d41dbcb"
+    },
+    {
+      "path": "apps/mobile/android/app/src/test/java/com/heytamobile/widget/HabitsWidgetModelTest.kt",
+      "bytes": 4880,
+      "sha256": "7b439a2fe215a23b669f7f824cfd5778bed534fc80cdda9e7eaada7fec24e69f"
+    },
+    {
+      "path": "apps/mobile/android/app/src/test/java/com/heytamobile/widget/QuadrantWidgetModelTest.kt",
+      "bytes": 7156,
+      "sha256": "17a4c193ad60247682f1956657edb6c3059f58701ee34c54acb7541a9eeaff64"
+    },
+    {
+      "path": "apps/mobile/android/app/src/test/java/com/heytamobile/widget/TodayWidgetModelTest.kt",
+      "bytes": 11576,
+      "sha256": "60109a4ae83322b18d2e533dfeacca330e35ae8b27d577de852be53dedbffc3e"
+    },
+    {
+      "path": "apps/mobile/android/app/src/test/java/com/heytamobile/widget/WidgetGoldenFixtureTest.kt",
+      "bytes": 16245,
+      "sha256": "54f8ed98f93e71d70ccc0e2aa2c94035eb42be8678a13f220a920683762be7ab"
+    },
+    {
+      "path": "apps/mobile/android/app/src/test/java/com/heytamobile/widget/WidgetIntentQueueTest.kt",
+      "bytes": 18861,
+      "sha256": "8d7e9221d534afaae8e6d756f7c24e7ebf46aecd6983bcf16aefe9ab7d5d6193"
+    },
+    {
+      "path": "apps/mobile/android/app/src/test/java/com/heytamobile/widget/WidgetRefreshPipelineTest.kt",
+      "bytes": 14407,
+      "sha256": "a1997d2683713b6463f794ca264797ae7020e96e6139f1b8f8d24616cec36d73"
+    },
+    {
+      "path": "apps/mobile/android/app/src/test/java/com/heytamobile/widget/WidgetSnapshotParserTest.kt",
+      "bytes": 19186,
+      "sha256": "0be657390894f8000ae1d922187c5fa823a95b281585c83f6bf38b96d0361ef4"
+    },
+    {
+      "path": "apps/mobile/android/app/src/test/java/com/heytamobile/widget/WidgetStoreTest.kt",
+      "bytes": 3579,
+      "sha256": "0a5113bd614c3cc7ea8fe96dbdcb35d062b4290761982723ff3b111eec8a688e"
+    },
+    {
+      "path": "apps/mobile/android/build.gradle",
+      "bytes": 547,
+      "sha256": "c5d4ef364977093ec11064d503daa5eed1c7dbcab7630ed74908256bf8cc45f1"
+    },
+    {
+      "path": "apps/mobile/android/gradle.properties",
+      "bytes": 1975,
+      "sha256": "3929f4440d293d286ea7a3e92d2b1a5d318bd99641aadc90a6365260ac0fe34d"
+    },
+    {
+      "path": "apps/mobile/android/gradle/wrapper/gradle-wrapper.jar",
+      "bytes": 45457,
+      "sha256": "76805e32c009c0cf0dd5d206bddc9fb22ea42e84db904b764f3047de095493f3"
+    },
+    {
+      "path": "apps/mobile/android/gradle/wrapper/gradle-wrapper.properties",
+      "bytes": 252,
+      "sha256": "3e402c9f5eea1b468cf81ffe552757b0190d0a3ade2ee723e65b643109e9d987"
+    },
+    {
+      "path": "apps/mobile/android/gradlew",
+      "bytes": 8728,
+      "sha256": "3238afb2aed5cb16eb7d6718077e7138059108f007b54179e9cc157c5a6e0e89"
+    },
+    {
+      "path": "apps/mobile/android/gradlew.bat",
+      "bytes": 3134,
+      "sha256": "07a4bb3ec77dcc9f4b486423e6ec45f4d7d9523787b95681726c30dbba3079cd"
+    },
+    {
+      "path": "apps/mobile/android/hermes-aed-probe.init.gradle",
+      "bytes": 456,
+      "sha256": "d566cdec14e1ed12a19aa91dc08f1d43d1078ef21dbe9aee151f7cc1b363c220"
+    },
+    {
+      "path": "apps/mobile/android/scripts/generate-release-keystore.sh",
+      "bytes": 3917,
+      "sha256": "9668a40ac24fba77e7f7b247e22b68c5a44faa85f475fe8c68fa0f3f2a1fc6e1"
+    },
+    {
+      "path": "apps/mobile/android/settings.gradle",
+      "bytes": 336,
+      "sha256": "be470298be2677ecbe9cdf6ddd2bd238c13a64caf48b17c4f1f612fddca56ff4"
+    },
+    {
+      "path": "apps/mobile/app.json",
+      "bytes": 48,
+      "sha256": "70c79a18edd63f18e481e74ad5936323d61c06168d52dc24f7f869b4bda7488e"
+    },
+    {
+      "path": "apps/mobile/babel.config.js",
+      "bytes": 920,
+      "sha256": "ac797326b6188af79d693126a31fc249230c4cfc4d26095c63b08188f12fd91e"
+    },
+    {
+      "path": "apps/mobile/harmony/AppScope/app.json5",
+      "bytes": 201,
+      "sha256": "69b6b4d71ce3594a458c1d762c8277f49b2872f1776f442c9332cfc9b9c8e324"
+    },
+    {
+      "path": "apps/mobile/harmony/AppScope/resources/base/element/string.json",
+      "bytes": 83,
+      "sha256": "5ac247bcd97fa2b50b36a558bd93d6afc0c8adfd9148e4a400ca493b29863dd8"
+    },
+    {
+      "path": "apps/mobile/harmony/AppScope/resources/base/media/background.png",
+      "bytes": 91942,
+      "sha256": "497edeafc51af043c73e72ee8c4fbac4663357ef1ba275c0289f31a366b26239"
+    },
+    {
+      "path": "apps/mobile/harmony/AppScope/resources/base/media/foreground.png",
+      "bytes": 8805,
+      "sha256": "57e549283f255505a649042f36a1d6793c307a69a94c9fa7e27a38af38ddbe8c"
+    },
+    {
+      "path": "apps/mobile/harmony/AppScope/resources/base/media/layered_image.json",
+      "bytes": 109,
+      "sha256": "3d18dcd7ed9e7d3d2c54c20cb80a44eb4877c661131c68a46e20b6e19d0bb476"
+    },
+    {
+      "path": "apps/mobile/harmony/build-profile.json5",
+      "bytes": 603,
+      "sha256": "1cdcef3694eb83337f3d9f6d65cd15eadbf638e03977afc8e7559b3ffe2dd8f4"
+    },
+    {
+      "path": "apps/mobile/harmony/code-linter.json5",
+      "bytes": 854,
+      "sha256": "f557c3bcdb40c64c986bffed9628310cc7a79fb7d2642c1c8b8d265fd92e25ad"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/build-profile.json5",
+      "bytes": 422,
+      "sha256": "598213469051291bf8ebc822b615085470b3bdb50fb607956c8b5dde28b5d3fe"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/hvigorfile.ts",
+      "bytes": 234,
+      "sha256": "089ad556731810afc10dd845a6a83176f56280c47fded7b3a85cd3461d7f039b"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/obfuscation-rules.txt",
+      "bytes": 1008,
+      "sha256": "0091c5622ede377a9ae1260f2499815afc3bcc5d1ab79a3d910ff7b456c98518"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/oh-package.json5",
+      "bytes": 173,
+      "sha256": "c3ab4a8122311d19a890ceb7d6717fd06e1e2f6ab496aa1fc61e98a95a50a7cc"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/main/ets/entryability/EntryAbility.ets",
+      "bytes": 1580,
+      "sha256": "50553f54f294707623dca6ac618b78066b5dc5cd54e4f04215166bd4e443f772"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/main/ets/entrybackupability/EntryBackupAbility.ets",
+      "bytes": 507,
+      "sha256": "e005230e90b4751995be7cfbbaca8efe9c353ab3ced3f6584d9ab19894cd0906"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/main/ets/pages/Index.ets",
+      "bytes": 7577,
+      "sha256": "2754061381d42735b127968ed449d1611d6ef4486ec8b19978d2f2027898cd78"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/main/ets/widget/EntryFormAbility.ets",
+      "bytes": 5702,
+      "sha256": "b1330b735f1a717280266418a9cd6f0408896f55d12691e5994008737e4d085d"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/main/ets/widget/FocusCard.ets",
+      "bytes": 873,
+      "sha256": "aaf2abeac02e86a811c7f18c07f48be519d1f6cd3ac59acd7578c538bb9861c1"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/main/ets/widget/HabitsCard.ets",
+      "bytes": 876,
+      "sha256": "670f1d3578ae58cd4052c3eb3c071712de79eff1d3ddcb27583e3a9c57a94b28"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/main/ets/widget/QuadrantCard.ets",
+      "bytes": 882,
+      "sha256": "96446cdc6a3bf0045c72e17dc6ffc41594ccdc58001a86ada525f466223add8a"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/main/ets/widget/SamplePayload.ets",
+      "bytes": 3643,
+      "sha256": "d109ad2bf6b392ba485e87054ee420975c2a44e7dd120ed4a6b9237ed54848f1"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/main/ets/widget/TodayCard.ets",
+      "bytes": 873,
+      "sha256": "feef701c25669c647a3f9749a994bec822a0f3bdd4321041b6c03fbcf59565a2"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/main/ets/widget/WidgetCardParts.ets",
+      "bytes": 3522,
+      "sha256": "713af767e95836defee47a89ed2d50e7771765a2b49f0cf27e2eea5555a344a9"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/main/ets/widget/WidgetCardRoot.ets",
+      "bytes": 8415,
+      "sha256": "fe78fff57e98b2393eb7e4108037bd5933dd95feaa8f8f65be3e0c0b1615183c"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/main/ets/widget/WidgetForms.ets",
+      "bytes": 7365,
+      "sha256": "8853dbaccf29c9d840259c8b0eff406a3f71eea7a0384cbf2f3afea0c8fa7c14"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/main/ets/widget/WidgetIntents.ets",
+      "bytes": 4133,
+      "sha256": "c10e7d469067beb41bb8fd5da6c1394b33e6f3595ce56d253cf510070207aa33"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/main/ets/widget/WidgetKey.ets",
+      "bytes": 14190,
+      "sha256": "dd80ccafe2ce3ae4d32b7260f4772701398cbc39af557f010e188474d8f839ef"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/main/ets/widget/WidgetModels.ts",
+      "bytes": 9943,
+      "sha256": "e53de549e56370001e979ca960c9526a81fcffdfb5495acb4f4a55ef27a08fe4"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/main/ets/widget/WidgetParse.ts",
+      "bytes": 16897,
+      "sha256": "8aa8cfa136520ac1cdff9f32dc2eb5b4e43e175d4cafd600e53c93ed39cf6d5e"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/main/ets/widget/WidgetStore.ets",
+      "bytes": 12893,
+      "sha256": "ccb1f4648d2272509d70f69339947515c4d7ab883bb72c09d6f6cfe304d3c667"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/main/ets/widget/WidgetStrings.ets",
+      "bytes": 4251,
+      "sha256": "f7d4fb412ce07bb1f61a62804caea927dbeedb2cad43c2b64b703d4aa7a4a247"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/main/module.json5",
+      "bytes": 2019,
+      "sha256": "677a6798966042823df5e52bcea3c52ef471bb99b28b6550539aad8b9ad1d1bb"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/main/resources/base/element/color.json",
+      "bytes": 98,
+      "sha256": "4e028f6e8a847f8a98cfee6d37309def0e7e2e7290041d89e22ba3ac38a802b8"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/main/resources/base/element/float.json",
+      "bytes": 92,
+      "sha256": "8db02f7a08f7b7b73d6eb95b09a6643463d10258b757901e70f255de0a2c83ef"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/main/resources/base/element/string.json",
+      "bytes": 740,
+      "sha256": "9d1f393bb18396c00032ede17b032958a98da8ff846d13d738753d06a9161b0b"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/main/resources/base/media/background.png",
+      "bytes": 91942,
+      "sha256": "497edeafc51af043c73e72ee8c4fbac4663357ef1ba275c0289f31a366b26239"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/main/resources/base/media/foreground.png",
+      "bytes": 8805,
+      "sha256": "57e549283f255505a649042f36a1d6793c307a69a94c9fa7e27a38af38ddbe8c"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/main/resources/base/media/layered_image.json",
+      "bytes": 109,
+      "sha256": "3d18dcd7ed9e7d3d2c54c20cb80a44eb4877c661131c68a46e20b6e19d0bb476"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/main/resources/base/media/startIcon.png",
+      "bytes": 20093,
+      "sha256": "567c7c0c7a321ca180e010ad880f0f7519f6d351ac2b9665e2ee710e7cfe7778"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/main/resources/base/profile/backup_config.json",
+      "bytes": 34,
+      "sha256": "467a97321341fba6872a6c79a25d89b16eded554c94dae3d4a2faa0d99e59358"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/main/resources/base/profile/form_config.json",
+      "bytes": 1795,
+      "sha256": "66cd6330f6e4c7b572e457eb5c34b2c720aec0bf0098d4abd778f9f341919549"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/main/resources/base/profile/main_pages.json",
+      "bytes": 37,
+      "sha256": "f21984fb1d5096f0db41314da0bb94c573e7ad018e5afae3044f8d5ff71b0bfc"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/main/resources/dark/element/color.json",
+      "bytes": 98,
+      "sha256": "f26f3f1e47165ae79ebe6f295a3e12593f01e90079d03fc7ff61e47ce0b366a6"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/main/resources/en_US/element/string.json",
+      "bytes": 737,
+      "sha256": "b1a45511abb516a039d837236a8aa78845fdde599c26ef36dcaa7b4bf49278ad"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/ohosTest/ets/test/Ability.test.ets",
+      "bytes": 1734,
+      "sha256": "8600c6681413e2ee3283671c6a67c2bb1421726559163aca8596ff17d2a389d6"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/ohosTest/ets/test/List.test.ets",
+      "bytes": 99,
+      "sha256": "c2300b6cb78c4e2469e72ce7d0d79f5207bc5004f14cdac0bbf859da248dad15"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/ohosTest/module.json5",
+      "bytes": 224,
+      "sha256": "fe786a07032e24236ab11485a1692effc99f266d317638bed1de8c28b7de9208"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/test/List.test.ets",
+      "bytes": 105,
+      "sha256": "268e4980ef2fdfe0c7ff6a19402bc214ab90f25807998098d2513cc50e9dd86b"
+    },
+    {
+      "path": "apps/mobile/harmony/entry/src/test/LocalUnit.test.ets",
+      "bytes": 1624,
+      "sha256": "ab72e1fa03e7c61ec51a52fe56fd366f66aa1a4415e18c7953daf5be14f488b7"
+    },
+    {
+      "path": "apps/mobile/harmony/hvigor/hvigor-config.json5",
+      "bytes": 1301,
+      "sha256": "4fd0fc81d16ac843df22e2eb14b8fb8cfc9708c55fcb9c900f34c1ffffdbcb00"
+    },
+    {
+      "path": "apps/mobile/harmony/hvigorfile.ts",
+      "bytes": 234,
+      "sha256": "9ca94b6bbcde128ff770af9a4c958de6a67f483759bed146a0cae6eef314021c"
+    },
+    {
+      "path": "apps/mobile/harmony/oh-package-lock.json5",
+      "bytes": 222,
+      "sha256": "5500c36628eeea27b50c20d4171a1b865fee713df1521ee023e83d65dd17c068"
+    },
+    {
+      "path": "apps/mobile/harmony/oh-package.json5",
+      "bytes": 142,
+      "sha256": "b76c08d26386e0016b17997af2b7d1ee6a06d4e10090cc13951f6bad98b8c11b"
+    },
+    {
+      "path": "apps/mobile/harmony/phoneSettingConfig_Phone.json",
+      "bytes": 737,
+      "sha256": "db0b269a1c435bb89a73a9c6b1073a4854e834d5c7428618989cd0a0c3eb08e6"
+    },
+    {
+      "path": "apps/mobile/hermes-aed-probe-entry.js",
+      "bytes": 5618,
+      "sha256": "7f82e92ecc3e83ba507e4256245f71a0fdcece384c835d9f54da02589aa15fc4"
+    },
+    {
+      "path": "apps/mobile/index.js",
+      "bytes": 3214,
+      "sha256": "52df76f868fe39dc73143380e86eee3f70c323d7f56f064527d516cbb4730d17"
+    },
+    {
+      "path": "apps/mobile/metro.config.js",
+      "bytes": 8015,
+      "sha256": "f0177aa1fd3514353840bc0fb277b2adbc51f6a54a485a30823c287a08fa27c9"
+    },
+    {
+      "path": "apps/mobile/package.json",
+      "bytes": 2482,
+      "sha256": "f3925d4e457fb4b63b5c8b1e7e95963790f68290929494c1f803a42f5831822d"
+    },
+    {
+      "path": "apps/mobile/scripts/verify-harmonyos.sh",
+      "bytes": 1939,
+      "sha256": "d5472437d84865d5550c1b3e837b8c677623df70c325329e6cf04b709897de52"
+    },
+    {
+      "path": "apps/mobile/scripts/verify-release-builds.sh",
+      "bytes": 6894,
+      "sha256": "39a244eafa027935095ea871b763170d66c5e704d7a4d855e20ac96d1e26f3b4"
+    },
+    {
+      "path": "apps/mobile/src/App.tsx",
+      "bytes": 14832,
+      "sha256": "dfdf7edbe1c9c59ee9a23d53e34cbf438472b3d7a97970391ea2702a7be1c36a"
+    },
+    {
+      "path": "apps/mobile/src/ai/AiSettingsSection.tsx",
+      "bytes": 22704,
+      "sha256": "485c1eeeb4b1ff02be7fa17d67837bc2814b6b309e3beaf9e4cff5281b07c365"
+    },
+    {
+      "path": "apps/mobile/src/ai/AssistantScreen.tsx",
+      "bytes": 16475,
+      "sha256": "3ea6b99962b437616a30147912e0e5025abd6907af2fefd3765b1d6d81e95547"
+    },
+    {
+      "path": "apps/mobile/src/ai/chat-composer.tsx",
+      "bytes": 3694,
+      "sha256": "b90f2ff69767abfdad26831974a0de1ae34f0bd25f066a35318ab9ea6ef2a10a"
+    },
+    {
+      "path": "apps/mobile/src/ai/chat-controller.ts",
+      "bytes": 15098,
+      "sha256": "68a8ab5520c2390725faef243a92d52d739b5808485f752e63f584cfdcbc38d0"
+    },
+    {
+      "path": "apps/mobile/src/ai/chat-transcript.tsx",
+      "bytes": 1669,
+      "sha256": "6c47e4ea44ac3fe0bcfcab8e38774730256e1588d28b0660f66e65bbe04bd257"
+    },
+    {
+      "path": "apps/mobile/src/ai/copy.ts",
+      "bytes": 9600,
+      "sha256": "10986310ad63b6d091fac57ccc5d3bf72ad98ec4b564ab9fa1b3d12046de2122"
+    },
+    {
+      "path": "apps/mobile/src/ai/disclosure.tsx",
+      "bytes": 3859,
+      "sha256": "6d50781e867d1459b0db1786a7fc8420143205eb253cc4e285c8a2378b439e8a"
+    },
+    {
+      "path": "apps/mobile/src/ai/execution-gate.ts",
+      "bytes": 1016,
+      "sha256": "db7936cedeafefa564867ffb48df74a7aaa15931c8e131292a062feb59c883f8"
+    },
+    {
+      "path": "apps/mobile/src/ai/intent-copy.ts",
+      "bytes": 6614,
+      "sha256": "080fd8700929e9dad04e7ca6d61fdaff1acb563de64d0b442794f643fd07dcae"
+    },
+    {
+      "path": "apps/mobile/src/ai/settings-store.ts",
+      "bytes": 6871,
+      "sha256": "8dac96ed7041133a532392ce505b18d594099d464b082824363ea40471b356b6"
+    },
+    {
+      "path": "apps/mobile/src/auth/passkey-host.ts",
+      "bytes": 3848,
+      "sha256": "9576b251d3b902560b16b849c71e10a3c59155bbdc1bf5120c6b6f6251a6ba77"
+    },
+    {
+      "path": "apps/mobile/src/auth/paste.ts",
+      "bytes": 4154,
+      "sha256": "5a681290baea97c9f39c8783cc078905ff89abdff368069e080b3b63ec38f4ff"
+    },
+    {
+      "path": "apps/mobile/src/auth/session.ts",
+      "bytes": 4915,
+      "sha256": "dd49278b6d209f3c67d2ab1fa1f3b72b7065752d26b42ec49aaddea2f081f28d"
+    },
+    {
+      "path": "apps/mobile/src/db/op-sqlite-driver.ts",
+      "bytes": 6994,
+      "sha256": "4d05722098eabb5b70a827d11343c7918208389adc4c3eb08b3e06ea9befaedc"
+    },
+    {
+      "path": "apps/mobile/src/db/open-host.ts",
+      "bytes": 7978,
+      "sha256": "ad0c132392bd72904726b9576532a0623a213fc9ffc6080ec6fce46ee90c6987"
+    },
+    {
+      "path": "apps/mobile/src/i18n/locale-preference.tsx",
+      "bytes": 2476,
+      "sha256": "c46056f92f980101200190b2ca708b3856115c60b08565cea02067cc628bb0ad"
+    },
+    {
+      "path": "apps/mobile/src/i18n/locale.ts",
+      "bytes": 4847,
+      "sha256": "17d726ccc013214944d963e8a778d7a8d0a91695da0fe989dc09936d7544c890"
+    },
+    {
+      "path": "apps/mobile/src/i18n/translate.ts",
+      "bytes": 661,
+      "sha256": "50664d96f0e8b4966b9bff14113404367b4c7b79c06df985de4316e4a72e2e5f"
+    },
+    {
+      "path": "apps/mobile/src/legal-recheck/gate.ts",
+      "bytes": 3725,
+      "sha256": "ea22ec48f49143c9538c019848d25a89ae1606e09be7597134da02a00799dcea"
+    },
+    {
+      "path": "apps/mobile/src/legal-recheck/reconfirm-ui.ts",
+      "bytes": 6910,
+      "sha256": "f9990fcf44d02f19f221a02cada4402d840478f7b598189ba9415566b4a0291b"
+    },
+    {
+      "path": "apps/mobile/src/lib/avatar-prepare.ts",
+      "bytes": 3706,
+      "sha256": "24f778f1f7c82377d2a6f2ecd43e0692b15cc264a29013708f957430528c5a83"
+    },
+    {
+      "path": "apps/mobile/src/lib/capture-labels.ts",
+      "bytes": 3489,
+      "sha256": "72f65e991a882d25495da06dc71630fe9a8989ecac05cdb4e5a4afb98a25dfc2"
+    },
+    {
+      "path": "apps/mobile/src/lib/card-export-native.ts",
+      "bytes": 3712,
+      "sha256": "21047ccdd734f3162e939876f88e2c6e9b9bf13d9aa63a99275b55f355efc0d7"
+    },
+    {
+      "path": "apps/mobile/src/lib/card-export-units.ts",
+      "bytes": 8646,
+      "sha256": "1dffc46ebe49cad7c2e9e86b0d97110fb12568200e1f6a17eca106defa5644a4"
+    },
+    {
+      "path": "apps/mobile/src/lib/card-export.tsx",
+      "bytes": 10757,
+      "sha256": "4d1854d8d8804b5bba1f3465cc672e164562598164a9f1ec9e106f40dd881239"
+    },
+    {
+      "path": "apps/mobile/src/lib/category-display.ts",
+      "bytes": 4224,
+      "sha256": "ce898ab9a64f4fff625ba49bd7ef56186d1c4c8eefaa5b292ffe6531a191ab95"
+    },
+    {
+      "path": "apps/mobile/src/lib/countdown-display.ts",
+      "bytes": 9255,
+      "sha256": "53ea221e6d2b030574ab45af777ef23d89fc0d3599cb3342a1b06b63bec270cf"
+    },
+    {
+      "path": "apps/mobile/src/lib/date-picker-labels.ts",
+      "bytes": 2280,
+      "sha256": "ac39dbc3ef630d6ff1098371b12181bbb9dde6100a7172a0de4ab28d707b2d0a"
+    },
+    {
+      "path": "apps/mobile/src/lib/date.ts",
+      "bytes": 3947,
+      "sha256": "11db797b1d433b6aece391d072a3beeb5f622f50a6a31d4fb608d5b6bf512add"
+    },
+    {
+      "path": "apps/mobile/src/lib/device-revocation-guidance.ts",
+      "bytes": 2274,
+      "sha256": "e45b5b643251a49c1afc5c68350b2cb14ea891305870082aea782007ec4b13f0"
+    },
+    {
+      "path": "apps/mobile/src/lib/due-display.ts",
+      "bytes": 4449,
+      "sha256": "affc45f7af04922eea9fcf19b57bb777a1c0019e4f543b40faa599dce953d3ab"
+    },
+    {
+      "path": "apps/mobile/src/lib/export-copy.ts",
+      "bytes": 2553,
+      "sha256": "cc68a02758d418241f4545d034193bec5e682bac3b6f9e5ddb3caaa863c721a1"
+    },
+    {
+      "path": "apps/mobile/src/lib/focus-display.ts",
+      "bytes": 3854,
+      "sha256": "bcfff702229e3162482dc4a822cb0fe7b7c0518d566b02ac9f0f247b91a0ab75"
+    },
+    {
+      "path": "apps/mobile/src/lib/focus-timer.ts",
+      "bytes": 12817,
+      "sha256": "0ffebf9d05f5e7256480a4c4c76edb0583ce5f8eb63c98feebce0580880126ca"
+    },
+    {
+      "path": "apps/mobile/src/lib/growth-display.ts",
+      "bytes": 15413,
+      "sha256": "959596214fed62e3bceed5b71d6d03ef91c9fbaa6f0058d3596cee35de286bed"
+    },
+    {
+      "path": "apps/mobile/src/lib/habits-display.ts",
+      "bytes": 14714,
+      "sha256": "fb1dcb8504e5538ade3e708dd62f6178288fcdcf44b258353167d796aeec1534"
+    },
+    {
+      "path": "apps/mobile/src/lib/inbox-display.ts",
+      "bytes": 1449,
+      "sha256": "ffa4101df7402fab47a25134890e55c4973c932b73cc260c28bc1c17f5af0108"
+    },
+    {
+      "path": "apps/mobile/src/lib/local-file-read.ts",
+      "bytes": 5418,
+      "sha256": "5ce708b76078844deb598719d50547fa6f40276be11cf59c83bf0553dadb5159"
+    },
+    {
+      "path": "apps/mobile/src/lib/native-reminder-plan.ts",
+      "bytes": 80,
+      "sha256": "840d563c56273bc306d4afb2be87b6727d6d0cccfc18a0de1ba7eacbde7940aa"
+    },
+    {
+      "path": "apps/mobile/src/lib/native-reminder-scheduler.ts",
+      "bytes": 2614,
+      "sha256": "92237f8a55604350119b3096d5217618b2f4ac6ef20366394702055c9c418fc5"
+    },
+    {
+      "path": "apps/mobile/src/lib/notes-display.ts",
+      "bytes": 3306,
+      "sha256": "c7edafd580c0a0e08afeddb203bdc9cfb3fb3f18e4396df2747b51e0c9d3544c"
+    },
+    {
+      "path": "apps/mobile/src/lib/priority.ts",
+      "bytes": 2927,
+      "sha256": "7a45c85dd4f5fcbdc882d446b9706835fda5dc1db46ac457fe5e7d2504638baa"
+    },
+    {
+      "path": "apps/mobile/src/lib/quadrant-display.ts",
+      "bytes": 5417,
+      "sha256": "14498371e5d7cdb96dfd63ff0bf068696b210a4e6e5c7839a289820ede96a18a"
+    },
+    {
+      "path": "apps/mobile/src/lib/quick-dates.ts",
+      "bytes": 1673,
+      "sha256": "f40ce6f257cb14b027220ab49bbf103eb4b9b1231dc3af15f5ad56fe87ae6849"
+    },
+    {
+      "path": "apps/mobile/src/lib/recurrence-display.ts",
+      "bytes": 8389,
+      "sha256": "5d09c1f29d9989015a0a1afaaefcd2b49ca46cb7d877e736bbae1887af68593b"
+    },
+    {
+      "path": "apps/mobile/src/lib/reminder-native.ts",
+      "bytes": 4181,
+      "sha256": "9e08e091206020941163de5fb7191221938766f5b3566b6a7a4436af11d72b55"
+    },
+    {
+      "path": "apps/mobile/src/lib/reminders-display.ts",
+      "bytes": 7204,
+      "sha256": "54e2ee41bdb89413f3a75c54fc7fd00a7a0a8c3f9a78580dc311c36b0f187011"
+    },
+    {
+      "path": "apps/mobile/src/lib/reminders.ts",
+      "bytes": 9273,
+      "sha256": "160677650d047ba5c565cc5246c9eed0393df6deb784d8a6124d8c18dfd3a399"
+    },
+    {
+      "path": "apps/mobile/src/lib/search-display.ts",
+      "bytes": 2680,
+      "sha256": "73be58f8a22410bcbf4a299cd2115b5641765a0cbb76044ec7a6341ca33c6b88"
+    },
+    {
+      "path": "apps/mobile/src/lib/selection.ts",
+      "bytes": 2594,
+      "sha256": "6b9fb03799ee478c397ef58223a9ad3f008f19d130e2af67a899d84803270445"
+    },
+    {
+      "path": "apps/mobile/src/lib/task-sort.ts",
+      "bytes": 6354,
+      "sha256": "0c06ef5d340a7157b937828c77733e749307bc7e1a3c7a72382993decf5f1beb"
+    },
+    {
+      "path": "apps/mobile/src/lib/ticktick-import.ts",
+      "bytes": 3724,
+      "sha256": "05d7a0a4aa9596d94caea3a1a0f18f304a728179465d7ca9f2a30245f1368b10"
+    },
+    {
+      "path": "apps/mobile/src/lib/timeline-labels.ts",
+      "bytes": 4700,
+      "sha256": "678a3c3c1b2ee52b7d024b6704f6ae00132f31f2906299a144fd233fc3d786e8"
+    },
+    {
+      "path": "apps/mobile/src/lib/trash-display.ts",
+      "bytes": 6694,
+      "sha256": "1eab717d0a0420ef035069adacd0cabf16b384b585e7cf7c1a6897b1a7abbe62"
+    },
+    {
+      "path": "apps/mobile/src/lib/use-today.ts",
+      "bytes": 3875,
+      "sha256": "f3ca28c394e4d5c2799b3405e7db3b83cdac425836a16fe1803517199bf2c670"
+    },
+    {
+      "path": "apps/mobile/src/lib/vault-secure-storage.ts",
+      "bytes": 10730,
+      "sha256": "aa1ec494eca3ed53efe811ecf6bb3ab50e8078562ec41c71bf43b597e56c69c5"
+    },
+    {
+      "path": "apps/mobile/src/lib/vault-session-cleanup.ts",
+      "bytes": 2184,
+      "sha256": "fc0518cdba3f2a5cde4aa381eec77a7893541df054dee04f6568873fe0476059"
+    },
+    {
+      "path": "apps/mobile/src/nav/TabBar.tsx",
+      "bytes": 9313,
+      "sha256": "d23628ec229abc7f6432d4c59b2a51c7f05b9abaa765e01507db13997055bd1b"
+    },
+    {
+      "path": "apps/mobile/src/nav/feature-entries.ts",
+      "bytes": 5575,
+      "sha256": "1377de437d3cc4c7fa8a65c98f70e3d0ce1c0f6a2e6eb02cdb63fccb00e60be4"
+    },
+    {
+      "path": "apps/mobile/src/nav/navigation-state.ts",
+      "bytes": 1009,
+      "sha256": "4a696ff1f2215fb653c89b152db4e8182c23ec44d15897de5ea163209962f800"
+    },
+    {
+      "path": "apps/mobile/src/nav/navigation.tsx",
+      "bytes": 2885,
+      "sha256": "0fb2a11fedef6131b95008aa7bb1a06f289c33775d203b642bffed760ec895d3"
+    },
+    {
+      "path": "apps/mobile/src/prefs/device-prefs.ts",
+      "bytes": 7651,
+      "sha256": "f1bf09db3b1910cd66640f0f34a86fdfae53a0e0bf578e31b94e03dbda998e51"
+    },
+    {
+      "path": "apps/mobile/src/privacy/consent-gate.ts",
+      "bytes": 6984,
+      "sha256": "040178a0755e4ba6d1a86430ff19d3b526fa122ddacdd448c38f9b066aa2ef80"
+    },
+    {
+      "path": "apps/mobile/src/privacy/consent-ui.ts",
+      "bytes": 5807,
+      "sha256": "978f0cb81dfc28cd18cde1372cdc4993692cf87999ac219cdc2ad85f7235750e"
+    },
+    {
+      "path": "apps/mobile/src/privacy/startup.ts",
+      "bytes": 2644,
+      "sha256": "1b390361997f45eae3793066f62a561d14b6c283cbe0ccdfebe1bbebe8954569"
+    },
+    {
+      "path": "apps/mobile/src/screens/AccountClosureScreen.tsx",
+      "bytes": 11861,
+      "sha256": "b35664568029f9932d8c47e3a39dd3ef28966775bb363c9f1b0322f0fccdc49b"
+    },
+    {
+      "path": "apps/mobile/src/screens/AuthScreen.tsx",
+      "bytes": 41417,
+      "sha256": "f741e9f41aed8b39c7e0970decef48c3e25b96edd4177215e41e321d7b0e1936"
+    },
+    {
+      "path": "apps/mobile/src/screens/CalendarScreen.tsx",
+      "bytes": 19634,
+      "sha256": "82fbe86fa75dbce3f18d35ab8e138301573258e4643d12911c05fff3a517469a"
+    },
+    {
+      "path": "apps/mobile/src/screens/CategoriesScreen.tsx",
+      "bytes": 7675,
+      "sha256": "accb1ab13daafb02d6c71334271c289ca375d6f03711086b419bf5c65b0a6053"
+    },
+    {
+      "path": "apps/mobile/src/screens/ConflictSheet.tsx",
+      "bytes": 10028,
+      "sha256": "8f7ffd6e193280e61ce0a089a264f6cfe2cdc8a972afc1c1666824fb7eda2404"
+    },
+    {
+      "path": "apps/mobile/src/screens/CountdownScreen.tsx",
+      "bytes": 14489,
+      "sha256": "aabd4c2db0de325b11907cdc15262b85f19c258da6261a0d20b0c44840ae590c"
+    },
+    {
+      "path": "apps/mobile/src/screens/EntitlementSection.tsx",
+      "bytes": 5286,
+      "sha256": "23198ee383528eb78bf3c749d883c9b4885ad4ff5b6221c5297d68a23cdde6ed"
+    },
+    {
+      "path": "apps/mobile/src/screens/ExportScreen.tsx",
+      "bytes": 28262,
+      "sha256": "265414ef49d6b34c57c1104101bbe0c85f631c15d10e46e9c72163e63923de9f"
+    },
+    {
+      "path": "apps/mobile/src/screens/FocusScreen.tsx",
+      "bytes": 15379,
+      "sha256": "6c8c5aba0a9c1cf60c39884d05b1fb66520232f6a85b5e742f55db454b3a68f4"
+    },
+    {
+      "path": "apps/mobile/src/screens/GrowthScreen.tsx",
+      "bytes": 17545,
+      "sha256": "22c14285e173c5a2340d5f67989218f062224265a212692013222f668ba293ac"
+    },
+    {
+      "path": "apps/mobile/src/screens/HabitsScreen.tsx",
+      "bytes": 25347,
+      "sha256": "06c1ffce7ee4600b0df6f622e69419c9652c1da117904bf69bf5b06eabe972cc"
+    },
+    {
+      "path": "apps/mobile/src/screens/LegalReconfirmSheet.tsx",
+      "bytes": 10115,
+      "sha256": "f1c96bac4b0d9166cdb491412522049aa9ac0f493fa4de291226633e271c18f6"
+    },
+    {
+      "path": "apps/mobile/src/screens/ListsSection.tsx",
+      "bytes": 16298,
+      "sha256": "aa57c1fcfa408697b4f39edbb16d764260da80b660c1912f87c7cb10b94623b1"
+    },
+    {
+      "path": "apps/mobile/src/screens/NoteEditScreen.tsx",
+      "bytes": 7188,
+      "sha256": "593faf53fe4e2520137d9910f47a8d3029fbc94c6c3acfadcd3b18c531b6a96f"
+    },
+    {
+      "path": "apps/mobile/src/screens/NotesSection.tsx",
+      "bytes": 10163,
+      "sha256": "ec96294a98e889b848a636d56527f7935331b8671b750257cd872cf7ddf31457"
+    },
+    {
+      "path": "apps/mobile/src/screens/NotificationsScreen.tsx",
+      "bytes": 14833,
+      "sha256": "33ceb12ac91dbdf5f365bd4fa513ca1ab92c9c95f8ca553d6dea6d95c88ec9de"
+    },
+    {
+      "path": "apps/mobile/src/screens/PrivacyConsentSheet.tsx",
+      "bytes": 13597,
+      "sha256": "9497260cc7e4d2d6247f7cf7a4212f49703db39910aa64d719aad5982086f6d6"
+    },
+    {
+      "path": "apps/mobile/src/screens/ProfileProgressSummary.tsx",
+      "bytes": 4896,
+      "sha256": "c23f6a87aa79601f7e2b01312de954639f601ca328cef1aa9b2b5bf8664c191c"
+    },
+    {
+      "path": "apps/mobile/src/screens/ProfileScreen.tsx",
+      "bytes": 61435,
+      "sha256": "f055450311552b22cd68149083596913f5d40c5532a46099423a05770b26934e"
+    },
+    {
+      "path": "apps/mobile/src/screens/QuadrantScreen.tsx",
+      "bytes": 7013,
+      "sha256": "3dfafbbdb89e63866ce07fb46ca32001135515b423e7633c02aa2e37378eecc9"
+    },
+    {
+      "path": "apps/mobile/src/screens/RenewSection.tsx",
+      "bytes": 4735,
+      "sha256": "22898e06e0c8b600ebe583d04e524f57ce2e80b59966b055e036d42066e407f0"
+    },
+    {
+      "path": "apps/mobile/src/screens/SearchScreen.tsx",
+      "bytes": 10422,
+      "sha256": "66aff4ed9069567ce1a583b96c8b20a3738d675012373d4a5ed04216a2228cf5"
+    },
+    {
+      "path": "apps/mobile/src/screens/SecurityScreen.tsx",
+      "bytes": 14383,
+      "sha256": "bbe73aca1e64d74e8e2957bdefdd7e3ef574c34f793d21625cfd3add3db5003f"
+    },
+    {
+      "path": "apps/mobile/src/screens/SettingsScreen.tsx",
+      "bytes": 25412,
+      "sha256": "461b03b5db5bf6d922793213e94fef5468ba033f53e26c55c1c16109910d5ff1"
+    },
+    {
+      "path": "apps/mobile/src/screens/TagsSection.tsx",
+      "bytes": 9705,
+      "sha256": "77c7b5e146699f76439f1130da852bced4dc11aedc361c19eb6b0d2ea3b48ac1"
+    },
+    {
+      "path": "apps/mobile/src/screens/TaskDetailSheet.tsx",
+      "bytes": 48460,
+      "sha256": "92c9f4e75e8f2308758a81db45e9ffdd807a96b64192fe1689b3c54a207350e9"
+    },
+    {
+      "path": "apps/mobile/src/screens/TasksScreen.tsx",
+      "bytes": 75623,
+      "sha256": "9a84d33dadf76d66206e28c90287b608e5b28959bb8d43e094496a17d0ef90e4"
+    },
+    {
+      "path": "apps/mobile/src/screens/TimelineScreen.tsx",
+      "bytes": 3153,
+      "sha256": "f253260be84e001fc9e06ebe4cb0402834cb6a05b54a34e7f8a2217f262a5822"
+    },
+    {
+      "path": "apps/mobile/src/screens/TrashScreen.tsx",
+      "bytes": 14599,
+      "sha256": "a1f728ec2d46a929e4201c7c293892cb37f8ef175f2fa4d96a9333902305269a"
+    },
+    {
+      "path": "apps/mobile/src/screens/VaultSettingsSection.tsx",
+      "bytes": 25140,
+      "sha256": "b731e69986e8c5799f758442d7f1e24185ea28bf3e74426e9ca5ddeeafbaf2ba"
+    },
+    {
+      "path": "apps/mobile/src/screens/WelcomeScreen.tsx",
+      "bytes": 4601,
+      "sha256": "3620d6fab9ef66382636ccd33dcd3a48620b99fafe5d41feacb48baec3d2a8a7"
+    },
+    {
+      "path": "apps/mobile/src/sync/auto-sync-core.ts",
+      "bytes": 8438,
+      "sha256": "cb972a7e15ec075790aca33183c89bff42b0f392d861ebfb541108e1c5033a40"
+    },
+    {
+      "path": "apps/mobile/src/sync/auto-sync.ts",
+      "bytes": 13468,
+      "sha256": "f86597eb9488b1d5b43ca904588f3a164236ea6e9b95d5b76106da7f766d9302"
+    },
+    {
+      "path": "apps/mobile/src/sync/config.ts",
+      "bytes": 4971,
+      "sha256": "a19c4c8fd6d9e120ca7448f1c61885313ef1401f5d0653fe9dc523e1a58963a6"
+    },
+    {
+      "path": "apps/mobile/src/sync/credential-form.ts",
+      "bytes": 6099,
+      "sha256": "d469bc6c3a1271899b3b072f1b12bb4571244e02b59e2ffad0f9006b1e791179"
+    },
+    {
+      "path": "apps/mobile/src/sync/realtime.ts",
+      "bytes": 10503,
+      "sha256": "e61d87177035f73502fba907b6f8304227093ae32c34fc6f3ccaa64375cbe9a2"
+    },
+    {
+      "path": "apps/mobile/src/sync/status-text.ts",
+      "bytes": 9472,
+      "sha256": "86b9df214f9bd4c792fd341d5592b133d51ac2b049d7627ca56185488a9238e8"
+    },
+    {
+      "path": "apps/mobile/src/sync/store.ts",
+      "bytes": 13219,
+      "sha256": "cc3bc53d33d0ef73a3443d3cd1586758e47d6f3e72b6773a9b34c7835dd47022"
+    },
+    {
+      "path": "apps/mobile/src/sync/write-signal.ts",
+      "bytes": 1811,
+      "sha256": "943c851485baef5446f0ca10fcb6963c8e987765d60f113bb46f23b0483122d8"
+    },
+    {
+      "path": "apps/mobile/src/theme.tsx",
+      "bytes": 2110,
+      "sha256": "b41da3ff705ab68e44466bc8a0eb19d74933dd32025469cb994d76658c225786"
+    },
+    {
+      "path": "apps/mobile/src/ui/avatar.tsx",
+      "bytes": 3830,
+      "sha256": "079d5178588711ce1f0f25feb7ad80e8eed4ebad710914838649d67e4488af23"
+    },
+    {
+      "path": "apps/mobile/src/ui/habit-frequency-slot.tsx",
+      "bytes": 9689,
+      "sha256": "600182950e64f3bf60da5d1935a1a67c3c6d6f9da75b08e5df9d77927a6dd0ac"
+    },
+    {
+      "path": "apps/mobile/src/ui/habit-goal-slot.tsx",
+      "bytes": 6169,
+      "sha256": "24e7c17b1cc0eaaa0c9e5b29e26d93c323ab6130a856fcfb8002fd35125592ab"
+    },
+    {
+      "path": "apps/mobile/src/ui/habit-icon-slot.tsx",
+      "bytes": 8431,
+      "sha256": "3012c0ec3e2d89763e01ccee567f5fb46c17982307b8f0935ed05f00f8dd3baa"
+    },
+    {
+      "path": "apps/mobile/src/ui/icons.tsx",
+      "bytes": 9464,
+      "sha256": "1976e3d0b2e61cc366b87b1003e521a8ac83d0b958d639f90e25d35cf2c418a4"
+    },
+    {
+      "path": "apps/mobile/src/ui/kit.tsx",
+      "bytes": 38928,
+      "sha256": "3d543874eb685b48a1be52650a91c08a854807ea424792830b17eb834cea6440"
+    },
+    {
+      "path": "apps/mobile/src/ui/slot-picker.tsx",
+      "bytes": 7231,
+      "sha256": "5a9386e33c9b3edf429babec03755f8c35430686b0e1d0eaa1de4a98f4ed20d1"
+    },
+    {
+      "path": "apps/mobile/src/widgets/credential-wipe.ts",
+      "bytes": 4007,
+      "sha256": "4bced6f88400e84e8acfb8ff13c26f777b12d3c691bec15cef6525f68d3e7158"
+    },
+    {
+      "path": "apps/mobile/src/widgets/drain.ts",
+      "bytes": 2529,
+      "sha256": "f80b922530ad4b25c62da02007fddd297124a702d9a42c9b24f0cbef7c39f7ee"
+    },
+    {
+      "path": "apps/mobile/src/widgets/lifecycle.ts",
+      "bytes": 8932,
+      "sha256": "17fe7ed70e2093daf95c303555be8a27c6f4623aa527d4303377602782e06ecb"
+    },
+    {
+      "path": "apps/mobile/src/widgets/publish-source.ts",
+      "bytes": 1669,
+      "sha256": "f58113a01a5afc915fe20a06c3ea1f739022e9dcd39306349a53b5d42fdc7661"
+    },
+    {
+      "path": "apps/mobile/src/widgets/publish.ts",
+      "bytes": 8183,
+      "sha256": "76c78709f7977ac9f2ac817a0dfbb85e2e78af40c46d1c6178e40b77780cfd52"
+    },
+    {
+      "path": "apps/mobile/src/widgets/snapshot-sealer.ts",
+      "bytes": 4061,
+      "sha256": "6ce304730584e90266c33d048ea97ce867432571e6b02cf1b1275e26e68ac5ee"
+    },
+    {
+      "path": "apps/mobile/src/widgets/widget-bridge.ts",
+      "bytes": 14255,
+      "sha256": "f4822ecc84ef60c9e85af3967b81e1aee262e7277462f19dd4dd66f86ac873ef"
+    },
+    {
+      "path": "apps/mobile/src/widgets/widget-journey.ts",
+      "bytes": 4597,
+      "sha256": "c9af8fe56a78f5ee7a4ce0340a811d5ee9c1ee01767d69e5cb765474580dd038"
+    },
+    {
+      "path": "apps/mobile/tests/account-closure-entry.spec.ts",
+      "bytes": 10023,
+      "sha256": "3aa0cd5f8606ccdc6355f229fe04adc766c924a785d542802908c99f2eba554b"
+    },
+    {
+      "path": "apps/mobile/tests/ai-assistant-concurrency.spec.ts",
+      "bytes": 1519,
+      "sha256": "7513ac662aa87a7adebf74870140f656152d1180edc792c52ae9c020204af449"
+    },
+    {
+      "path": "apps/mobile/tests/ai-panel-local-selection.spec.ts",
+      "bytes": 1243,
+      "sha256": "a31b6275d15a864804fb0d09517205862d958b0bb86245aba27d8145b640b1b8"
+    },
+    {
+      "path": "apps/mobile/tests/assistant-local-history.spec.ts",
+      "bytes": 4224,
+      "sha256": "1c44ddc67c54b2a6ee1046d4a507d235310f66bb128e80fef1b3710b08fe2fbf"
+    },
+    {
+      "path": "apps/mobile/tests/auth-flow.spec.ts",
+      "bytes": 9434,
+      "sha256": "c65f78446b0128001fc1c0ce5f7418f31ac2975003342921cc393481509d0ecb"
+    },
+    {
+      "path": "apps/mobile/tests/auth-screen-password.spec.ts",
+      "bytes": 20030,
+      "sha256": "94c36931d2b3b1058bfab7c90278f637202991d92caa287e2f1d6e32b360fa74"
+    },
+    {
+      "path": "apps/mobile/tests/auto-sync.spec.ts",
+      "bytes": 10174,
+      "sha256": "51f437a859a7f715cdd69195c168e7049816ba9d2ba7d7728b5268ae1dcf35da"
+    },
+    {
+      "path": "apps/mobile/tests/calendar-event-source.spec.ts",
+      "bytes": 19204,
+      "sha256": "e4b63d6dba843786ff0d78fe07f0693fb5ddabadfa3dcccb01278b2900d94d28"
+    },
+    {
+      "path": "apps/mobile/tests/calendar-view-entry.spec.ts",
+      "bytes": 10643,
+      "sha256": "d844d62d78502327d32078b91a5551bbd5c159b684536714e178797733dd1b09"
+    },
+    {
+      "path": "apps/mobile/tests/card-export.spec.ts",
+      "bytes": 24094,
+      "sha256": "c5c836166fbb350f830927b9ceb53b82467fefaed43a9a67b6458850319d4b25"
+    },
+    {
+      "path": "apps/mobile/tests/category-display.spec.ts",
+      "bytes": 6626,
+      "sha256": "77f0dd7b5428525f155ff386bb72d071b3c4f348515d913466a1a2d9d8f3af1f"
+    },
+    {
+      "path": "apps/mobile/tests/chat-controller.spec.ts",
+      "bytes": 17930,
+      "sha256": "bcaa791b28248d383047ca0584f003822fdfe6c6c0736b8d2a78c0a596b558f0"
+    },
+    {
+      "path": "apps/mobile/tests/chat-session-primitives.spec.ts",
+      "bytes": 1382,
+      "sha256": "b54a23def7f9f7efaf2e3c0c8ea87f4b0518ee9d1e17f2a73050ff949d164002"
+    },
+    {
+      "path": "apps/mobile/tests/conflict-keys.spec.ts",
+      "bytes": 10964,
+      "sha256": "45385b748ab6611ba0f3a0599613d8081240a16fcb7391a511fb8673a5adc23e"
+    },
+    {
+      "path": "apps/mobile/tests/credential-wipe.spec.ts",
+      "bytes": 4966,
+      "sha256": "a13478a1d1e04b1af0ca40cffd8e26efe4254a67881fdebd7660dbc388436c9a"
+    },
+    {
+      "path": "apps/mobile/tests/date.spec.ts",
+      "bytes": 8712,
+      "sha256": "8f6f7ff79994fbc8f71f2a6f9b4ff3259652d28b80da31d045119c40b4edeb4f"
+    },
+    {
+      "path": "apps/mobile/tests/device-revocation-behavior.spec.ts",
+      "bytes": 3640,
+      "sha256": "0113b6fc81cf85e30dfc1fb577db400dc3978569c255bd17defcc9883cc8152d"
+    },
+    {
+      "path": "apps/mobile/tests/export-copy.spec.ts",
+      "bytes": 3152,
+      "sha256": "5777ed914418e62f548b96aa4102b5de7105ab00b58e7a5755f60c046e8855b3"
+    },
+    {
+      "path": "apps/mobile/tests/feature-entries.spec.ts",
+      "bytes": 14413,
+      "sha256": "6e973674c5f64194d0961d0d23fd63c4ade4265b1c0f54f278d4dd451f443817"
+    },
+    {
+      "path": "apps/mobile/tests/growth-display.spec.ts",
+      "bytes": 21538,
+      "sha256": "d5c0302287b270045f6d568eb4004297c6b44b33d59f4325e9244ae8668c30de"
+    },
+    {
+      "path": "apps/mobile/tests/growth-share-summary.spec.ts",
+      "bytes": 11703,
+      "sha256": "a145df317ccdd035e171ca26be35c513e90e1b6ff73b4ed43c14523fe8fc6966"
+    },
+    {
+      "path": "apps/mobile/tests/habit-create-entry.spec.ts",
+      "bytes": 13674,
+      "sha256": "58f7cae82aea073a8d940f72beed7c5c4d75c6b0f232365904ab867af4e1d67b"
+    },
+    {
+      "path": "apps/mobile/tests/habit-frequency-entry.spec.ts",
+      "bytes": 9952,
+      "sha256": "8d02b483222c364069aba0c34440cae750f2a2512d1677968a8f17865e58ee60"
+    },
+    {
+      "path": "apps/mobile/tests/habit-goal-entry.spec.ts",
+      "bytes": 3004,
+      "sha256": "05ea50df048bfc4a29f1f91e995997ccd9ca473bd0194ce0154b99c1e5f37bcc"
+    },
+    {
+      "path": "apps/mobile/tests/habit-icon-picker.spec.ts",
+      "bytes": 12624,
+      "sha256": "3e89f0b4af3811c0aa5e4fe384f945ecb452efd4df3c8c03df6926665b70ba6c"
+    },
+    {
+      "path": "apps/mobile/tests/habit-month-entry.spec.ts",
+      "bytes": 9217,
+      "sha256": "5ed42b8e46809c9cee880abbb5a3f49318f4d9804c1a8fad384a824c560d4599"
+    },
+    {
+      "path": "apps/mobile/tests/habit-trend-entry.spec.ts",
+      "bytes": 4274,
+      "sha256": "b30165d27dd3e33ec1ef408fbc2880567a4f9df19dd216cc3d4410ffdd0fabef"
+    },
+    {
+      "path": "apps/mobile/tests/habits-display.spec.ts",
+      "bytes": 16932,
+      "sha256": "a7998105acdde58a8b66cc15d2edaa27177a8a4274da9e22e311d1272f6e4f00"
+    },
+    {
+      "path": "apps/mobile/tests/harmony-widget.spec.ts",
+      "bytes": 18695,
+      "sha256": "5eeedb1dd643e740fa823dac60b4bec95718ab385ff5ff8051fbfddb5c8b88b6"
+    },
+    {
+      "path": "apps/mobile/tests/inbox-display.spec.ts",
+      "bytes": 2187,
+      "sha256": "500b5a4176329cb91e4732b8d76d156b2705c2a32f5631e23e57dcedcd1c935b"
+    },
+    {
+      "path": "apps/mobile/tests/legal-recheck-mobile.spec.ts",
+      "bytes": 33781,
+      "sha256": "f14378ab800dcffed7520aa1a12ebd076f1788d1c71400e3e7da5e2996f7758b"
+    },
+    {
+      "path": "apps/mobile/tests/locale.spec.ts",
+      "bytes": 2724,
+      "sha256": "061e495374b76af1347c278a24acff52fb458e76e2e66e4f5db360458f7fe10e"
+    },
+    {
+      "path": "apps/mobile/tests/native-reminder-authorization.spec.ts",
+      "bytes": 4427,
+      "sha256": "4c0d4abad4ca67060a525bee3048217abb6d5ea6c3d200493bf7de828c8fd3f9"
+    },
+    {
+      "path": "apps/mobile/tests/native-reminder-plan.spec.ts",
+      "bytes": 2718,
+      "sha256": "b491eadf291fa75ee17e42d8e9f8cd87dc9f94b763a089d3cb42db23af6d7025"
+    },
+    {
+      "path": "apps/mobile/tests/navigation-stack.spec.ts",
+      "bytes": 3593,
+      "sha256": "864ef753451c57713fd1518a3cbb21f23d8d50b379e26cbe556dd346eab2002f"
+    },
+    {
+      "path": "apps/mobile/tests/note-edit.spec.ts",
+      "bytes": 10078,
+      "sha256": "0fd2473739ef090ff67b70f0f0700de968b90b66e0d9f992a906da27319b4f2a"
+    },
+    {
+      "path": "apps/mobile/tests/op-sqlite-container-removal.spec.ts",
+      "bytes": 5074,
+      "sha256": "ff9866f09216275d03e67046ddbe7c95b182b2aff70718c4b1082d7536a602c8"
+    },
+    {
+      "path": "apps/mobile/tests/organizer-rename.spec.ts",
+      "bytes": 18831,
+      "sha256": "e75b262841e3e4d3fa22deeb348c7ef1e7f1c1d66d6582248e977530211313dd"
+    },
+    {
+      "path": "apps/mobile/tests/plural-keys.spec.ts",
+      "bytes": 4693,
+      "sha256": "404f1549238793dddf145e063c5a63db972b3565e1018f4020e64a3f9dda0252"
+    },
+    {
+      "path": "apps/mobile/tests/privacy-consent-gate.spec.ts",
+      "bytes": 31323,
+      "sha256": "5ec28219597fa62bf7201ada059f46efa0a74ded3169459d9c0196614e6b2240"
+    },
+    {
+      "path": "apps/mobile/tests/profile-avatar-entry.spec.ts",
+      "bytes": 9720,
+      "sha256": "966c9fa61379e3f6227527b71f516855cfc7c3d52a9ebaf9d94fbcfbd2ad5e14"
+    },
+    {
+      "path": "apps/mobile/tests/profile-nickname-entry.spec.ts",
+      "bytes": 9993,
+      "sha256": "53c30020efda75618c76ba0ab95cd4bade9484fb9156411fa14e743fe893e2cc"
+    },
+    {
+      "path": "apps/mobile/tests/profile-progress-summary.spec.ts",
+      "bytes": 2059,
+      "sha256": "b1f65762c4b4341cd17166d2ad03216bc2f99a4c547a3bf77b0abfa9c23d5984"
+    },
+    {
+      "path": "apps/mobile/tests/profile-settings-ia.spec.ts",
+      "bytes": 6283,
+      "sha256": "356aeae7b9e8b8bd46ccba96c4f52561c61ad3291daa9d0568de9b604b252772"
+    },
+    {
+      "path": "apps/mobile/tests/projects-sections.spec.ts",
+      "bytes": 10592,
+      "sha256": "8c7b4785ae0cf7660f252d1f74d3b558b625c45e2c68bb242dfde3d24bbedfaf"
+    },
+    {
+      "path": "apps/mobile/tests/quadrant-display.spec.ts",
+      "bytes": 4171,
+      "sha256": "0fa31badeaa6473a550f07606c0d5a559408b5670ec3d073d1ecdcde71790159"
+    },
+    {
+      "path": "apps/mobile/tests/realtime-wiring.spec.ts",
+      "bytes": 18146,
+      "sha256": "449222092a6954f71d81c757a71cb93164fea969909cfa105a28f40c665ae67a"
+    },
+    {
+      "path": "apps/mobile/tests/recurrence-display.spec.ts",
+      "bytes": 10878,
+      "sha256": "6f372dee841aba3a3b16c3c478d67a5130bcbe1c1ed95bdbf4f519b3708b1480"
+    },
+    {
+      "path": "apps/mobile/tests/reminders-notes-display.spec.ts",
+      "bytes": 14661,
+      "sha256": "60c418602464591cfa948138f23087718ad3bb2c6935686c82fa471dbdbcbd99"
+    },
+    {
+      "path": "apps/mobile/tests/renew-entry.spec.ts",
+      "bytes": 4901,
+      "sha256": "bd660292fb2ba4ba79c284e75cc03513840e2d5f81b688f87ede44b6e3f977c8"
+    },
+    {
+      "path": "apps/mobile/tests/restore-preview-source.spec.ts",
+      "bytes": 4803,
+      "sha256": "a747c4d84ece242b6be01a49c151b4042484b7ac7a0961020ff2b8b90f79c7d8"
+    },
+    {
+      "path": "apps/mobile/tests/search-display.spec.ts",
+      "bytes": 3779,
+      "sha256": "5169c4d2a0212e03dc5286b4100aaac405ca723a8d61d4ccd5601dd48eb56fe0"
+    },
+    {
+      "path": "apps/mobile/tests/selection-single-owner.spec.ts",
+      "bytes": 12794,
+      "sha256": "e0699256b7e3c62e7343f5266e33871c780572f23b878eb4c15b53c292cc38fa"
+    },
+    {
+      "path": "apps/mobile/tests/source-reading.ts",
+      "bytes": 2281,
+      "sha256": "fa9df886870635b60acb30932372031ac2c3ce72bb7a0e7301070473902312d3"
+    },
+    {
+      "path": "apps/mobile/tests/subtask-entry.spec.ts",
+      "bytes": 4074,
+      "sha256": "81730286f2f1269f139c449f51725049a8a797a63258092cbf9a551ec79e150f"
+    },
+    {
+      "path": "apps/mobile/tests/sync-status-text.spec.ts",
+      "bytes": 11958,
+      "sha256": "d8d299817853600c4159ba901174c730135d7a5d43808f42d1d221864f296aaf"
+    },
+    {
+      "path": "apps/mobile/tests/task-detail-keyboard-back.spec.ts",
+      "bytes": 1022,
+      "sha256": "9bd50cf258533046856cdcaaf5b8333509856b9fa661d74d7f859fb5e6cb6283"
+    },
+    {
+      "path": "apps/mobile/tests/task-due-time.spec.ts",
+      "bytes": 9661,
+      "sha256": "bacd9e3a2040e3802c9881543cf784b2a566cd869b813812227f92d699f2b6ce"
+    },
+    {
+      "path": "apps/mobile/tests/task-fields.spec.ts",
+      "bytes": 8170,
+      "sha256": "3dcdb2f621f0230c359f576db74645ba514c72ad6d2fb0b58dd498f0f3102fb5"
+    },
+    {
+      "path": "apps/mobile/tests/task-sort.spec.ts",
+      "bytes": 10425,
+      "sha256": "a78114a580d8644a7dfff83bd4842e398c10a010a847830aea008aafa65e6b30"
+    },
+    {
+      "path": "apps/mobile/tests/ticktick-import.spec.ts",
+      "bytes": 5992,
+      "sha256": "bbe26ce03c7296f7a810bdb0726618efeb4a3890e157a1d2c39e27d9396ed803"
+    },
+    {
+      "path": "apps/mobile/tests/trash-display.spec.ts",
+      "bytes": 9611,
+      "sha256": "5a5e1c8c02e87b7872b3121ca470b802b7cde60df82ab7cb60b1920f5a3ce9a2"
+    },
+    {
+      "path": "apps/mobile/tests/vault-secure-storage.spec.ts",
+      "bytes": 9304,
+      "sha256": "303f4725200a46f393e433b60a218d605e41469b84a5b31431ffad9d262b6369"
+    },
+    {
+      "path": "apps/mobile/tests/widget-bridge.spec.ts",
+      "bytes": 9276,
+      "sha256": "c7739dcf610295366233b46b245498c7a376c53a014412267408c3f3d3f1d570"
+    },
+    {
+      "path": "apps/mobile/tests/widget-drain.spec.ts",
+      "bytes": 3058,
+      "sha256": "236cc1e7cf50dac956d0e89c0985568f275418e9cb27234e4da2bcfe2e59da19"
+    },
+    {
+      "path": "apps/mobile/tests/widget-journey.spec.ts",
+      "bytes": 3866,
+      "sha256": "6e18680d293df5ceb2c2e26acccaec03a0c28e3332e9faec42a4444f6a8d49a6"
+    },
+    {
+      "path": "apps/mobile/tests/widget-publish.spec.ts",
+      "bytes": 16490,
+      "sha256": "b9be25bcccf4838791c360a039cc632c93776f592d2d504b2f064108caed85bc"
+    },
+    {
+      "path": "apps/mobile/tests/widget-snapshot-sealer.spec.ts",
+      "bytes": 9850,
+      "sha256": "b86a30d1cbe6a2a3e59c740783f6b1189e529419857909f84d14a47e148af5c6"
+    },
+    {
+      "path": "apps/mobile/tsconfig.json",
+      "bytes": 378,
+      "sha256": "204de2fafc50407c66698d11d4e158e563dfb8f153162ecbe2b9a96f291806a1"
+    },
+    {
+      "path": "package.json",
+      "bytes": 16344,
+      "sha256": "751a60c18a4bb977c3178398413c984bc507b61ad95853d4f1e16515abd25995"
+    },
+    {
+      "path": "packages/widget-core/fixtures/v1.golden.json",
+      "bytes": 2181,
+      "sha256": "bd4617db17c0d8a272e7dcf1e847e2d4df4aa6782f2d3af17aa844bbe412ac92"
+    },
+    {
+      "path": "packages/widget-core/fixtures/v1.golden.plaintext.json",
+      "bytes": 2476,
+      "sha256": "ceea4c0af4fa86088fa91975874157eb9967249c32f9b8c1dde7f810f56d5f65"
+    },
+    {
+      "path": "packages/widget-core/fixtures/v99.unknown.golden.json",
+      "bytes": 2182,
+      "sha256": "72cc7c2d756c25f91cdd598e9f7a68534770b5fb28c5a1796d5a7050bab988ed"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "bytes": 363627,
+      "sha256": "a280bd338b3e36c193bba916dafa8003fa272a345fba50774aabb4b679a83b07"
+    },
+    {
+      "path": "pnpm-workspace.yaml",
+      "bytes": 3830,
+      "sha256": "ba922c086123ecdf92cfc0d02342a5fb1b63f55da17fd0d9587b30a93a3d4b01"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetLocalePreference.kt",
+      "bytes": 1386,
+      "sha256": "e4160be2d0aaa278a79f87e2b4b8888314f0c830cc7196a628d16e881b1cad42"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/values-night/colors.xml",
+      "bytes": 565,
+      "sha256": "8e860ca97cbadec821650e3f255dde57eb2132aa711deaa8351ba63955065de3"
+    },
+    {
+      "path": "apps/mobile/android/app/src/main/res/values/colors.xml",
+      "bytes": 560,
+      "sha256": "78a421218e3cbfe8ad1653bfdea9122b73c1522dc6ea99f61c741e836ddcbccc"
+    },
+    {
+      "path": "apps/mobile/android/app/src/test/java/com/heytamobile/widget/WidgetLocalePreferenceTest.kt",
+      "bytes": 514,
+      "sha256": "8a719e1d9c293ae5f9e482e0ba824156028c8836cb1f3e5c99cc89d33a9decc6"
+    },
+    {
+      "path": "apps/mobile/src/lib/focus-task-source.ts",
+      "bytes": 590,
+      "sha256": "278d9885e53cf133d2ae8b226b8e0115c74b161ac40488c0e000fcae6d029080"
+    },
+    {
+      "path": "apps/mobile/src/widgets/publish-coordinator.ts",
+      "bytes": 3881,
+      "sha256": "5e702ac91e8c8d266ea54c5cc6314e950a8ab9c486bfda8a19bc078e01b159c4"
+    },
+    {
+      "path": "apps/mobile/tests/focus-task-source.spec.ts",
+      "bytes": 2202,
+      "sha256": "b0e7852e23a559780379b03c94b750f7484a8c3aa2289ea64ec2fe2a370b549b"
+    },
+    {
+      "path": "apps/mobile/tests/focus-widget-lifecycle.spec.ts",
+      "bytes": 8202,
+      "sha256": "2ce496d0971dfa9738c5c019127836140726f8a0e40c092b9f0e67f499e3dcf5"
+    },
+    {
+      "path": "apps/mobile/tests/local-file-read.spec.ts",
+      "bytes": 2167,
+      "sha256": "22c3e31de8836e43fc742aff158582f8fdfb7a178b8451e656d74f1885eee5a1"
+    },
+    {
+      "path": "apps/mobile/tests/open-host-generation.spec.ts",
+      "bytes": 3612,
+      "sha256": "d143d89c5c21505eb34c00b7f454e51ae048236b1f230e882f0ec2ddc741231c"
+    },
+    {
+      "path": "apps/mobile/tests/widget-publish-coordinator.spec.ts",
+      "bytes": 2081,
+      "sha256": "6db57103dc862a4321280b0f1b2831f4b8c80f8250f822d68fab9d65b21b7be9"
+    },
+    {
+      "path": "packages/ai/dist/index.d.cts",
+      "bytes": 97348,
+      "sha256": "e0f5e8970a31470e35af8fccdf0b72d8777f5f4ab63fbad6a14f0cadd4555e88"
+    },
+    {
+      "path": "packages/ai/dist/index.js",
+      "bytes": 48094,
+      "sha256": "754b050e2539edda998f6eaa15fe4fe7d3de38015be8a14a36718f8ce70c673c"
+    },
+    {
+      "path": "packages/ai/dist/index.cjs.map",
+      "bytes": 196780,
+      "sha256": "6b9235e5bd1ebf08fe88cc22f874d97c93e34ce3bd6da69f4e40b1fc60171243"
+    },
+    {
+      "path": "packages/ai/dist/index.cjs",
+      "bytes": 52160,
+      "sha256": "8637414938386455e2bc83f9107dd50e38ab2519657bb1a71feab0de46ebe6be"
+    },
+    {
+      "path": "packages/ai/dist/index.js.map",
+      "bytes": 189491,
+      "sha256": "5a24b5236d1df0f581fa38bdd56f7622a3614eaf4a033cc527b8a7fc48c9bcc3"
+    },
+    {
+      "path": "packages/ai/dist/index.d.ts",
+      "bytes": 97348,
+      "sha256": "e0f5e8970a31470e35af8fccdf0b72d8777f5f4ab63fbad6a14f0cadd4555e88"
+    },
+    {
+      "path": "packages/app-host/dist/index.js",
+      "bytes": 441831,
+      "sha256": "cf79bbbb5e7ae1425e5711caed34f6442871c3e3925498cbe3b3af5a7a4576eb"
+    },
+    {
+      "path": "packages/app-host/dist/index.js.map",
+      "bytes": 1336636,
+      "sha256": "f1c6e272c5b45c779fcad6e6054bbccf3948f5676e451db6b6448a4854a1b966"
+    },
+    {
+      "path": "packages/app-host/dist/index.d.ts",
+      "bytes": 474514,
+      "sha256": "a42f186d8dfe6ac25ed412fa05491fd88aebaeeb49e9ff48e429f7a819c69d4e"
+    },
+    {
+      "path": "packages/design-system/dist/chunk-NURYBWLD.js.map",
+      "bytes": 71141,
+      "sha256": "e7a61319b0916b57ea7836256335ff3a8da4cd473fc1e45fa67cf8a502dc9b4a"
+    },
+    {
+      "path": "packages/design-system/dist/native.js.map",
+      "bytes": 71,
+      "sha256": "cba81f7ad4d5b1b629bf43823f1082e73a10d0c3114c937515e7f8c1047629b3"
+    },
+    {
+      "path": "packages/design-system/dist/native.js",
+      "bytes": 473,
+      "sha256": "37fad1f05e4273194704b6dbd7bc6e2c2ea3b11968502b689d7bdccd000d7f8a"
+    },
+    {
+      "path": "packages/design-system/dist/native.d.cts",
+      "bytes": 16430,
+      "sha256": "aca2616999f9b06a739c1464ab255fb2b2ffe0d5bac3ba16f46a90b390461241"
+    },
+    {
+      "path": "packages/design-system/dist/index.d.cts",
+      "bytes": 42934,
+      "sha256": "d8a3a7e11a796b79ff27d17e715ede6b33f1d7d922b090b937f3f7776244aaca"
+    },
+    {
+      "path": "packages/design-system/dist/index.js",
+      "bytes": 5849,
+      "sha256": "205945fdc8fcc10482b10fb724bb647cb3ec5756178ff1474906c91c4b4e4d53"
+    },
+    {
+      "path": "packages/design-system/dist/chunk-NURYBWLD.js",
+      "bytes": 29783,
+      "sha256": "4e258de8c330947856aeab316b7a8167326bbdf18e3bb7cef7fd21721cd1b0a7"
+    },
+    {
+      "path": "packages/design-system/dist/native.d.ts",
+      "bytes": 16430,
+      "sha256": "aca2616999f9b06a739c1464ab255fb2b2ffe0d5bac3ba16f46a90b390461241"
+    },
+    {
+      "path": "packages/design-system/dist/chunk-BGWX5KD6.js",
+      "bytes": 14971,
+      "sha256": "e5cddddebf0e9371f017729b3ac75abc2e118955e1e67fd533c72b1c2fd284f2"
+    },
+    {
+      "path": "packages/design-system/dist/index.cjs.map",
+      "bytes": 130838,
+      "sha256": "a978afba126a83462c68aac08e9f393669b7f63935ef67b9dd7c88a904ffe840"
+    },
+    {
+      "path": "packages/design-system/dist/generate-cli.d.ts",
+      "bytes": 13,
+      "sha256": "6caa0b04bdc10582a3729dae9244f21c5bec0b9ffe7e2a84999c2f868f5dd9be"
+    },
+    {
+      "path": "packages/design-system/dist/generate-cli.js.map",
+      "bytes": 59877,
+      "sha256": "9c0690f8ee765efb5273df2abe4b51dd6e5cebbccbe2ee1cf8d0aa4c1cf11930"
+    },
+    {
+      "path": "packages/design-system/dist/index.cjs",
+      "bytes": 50327,
+      "sha256": "0e830d61926a32d1b64a5f512399cb6efa6c0c2eb1a69057a7d5348ce187fccc"
+    },
+    {
+      "path": "packages/design-system/dist/index.js.map",
+      "bytes": 15726,
+      "sha256": "d62ac14c6ac0698f433ffe6b7726a86eb6943b9fded62bf3ed29ff8468b631d0"
+    },
+    {
+      "path": "packages/design-system/dist/native.cjs.map",
+      "bytes": 40401,
+      "sha256": "7703d59160f01a7d3c2c6cc764aa0374e9ad2af09125970c62a110702baa0f64"
+    },
+    {
+      "path": "packages/design-system/dist/generate-cli.js",
+      "bytes": 27664,
+      "sha256": "558ce3159dc453cd93bf48898bcef996f6405c897ccc0e85869a67da78b56e4d"
+    },
+    {
+      "path": "packages/design-system/dist/index.d.ts",
+      "bytes": 42932,
+      "sha256": "ab06b74c1981cc04695a0f4bb6db135a49b4da017df083a299c698111fddc612"
+    },
+    {
+      "path": "packages/design-system/dist/chunk-BGWX5KD6.js.map",
+      "bytes": 40315,
+      "sha256": "15b54815579480fe209d640c07c28c9fe0611d434a346e8158dc4ceee57b551a"
+    },
+    {
+      "path": "packages/design-system/dist/native.cjs",
+      "bytes": 16388,
+      "sha256": "c9e5b5560b36c4b9223e798ae6e6afe24400d45a03d49afa90d9f0a59e85046b"
+    },
+    {
+      "path": "packages/design-system/dist/generate-cli.cjs",
+      "bytes": 47883,
+      "sha256": "21c99cc7ef07372d8c3ead3e05711cc879bb5e99737763c58cdcea77fb71b5a4"
+    },
+    {
+      "path": "packages/design-system/dist/generate-cli.d.cts",
+      "bytes": 13,
+      "sha256": "6caa0b04bdc10582a3729dae9244f21c5bec0b9ffe7e2a84999c2f868f5dd9be"
+    },
+    {
+      "path": "packages/design-system/dist/generate-cli.cjs.map",
+      "bytes": 114745,
+      "sha256": "6e99d39901233ecaf770b876b7b736db2192fd40daf81f0726cfce121a5a7bbe"
+    },
+    {
+      "path": "packages/domain/dist/index.d.cts",
+      "bytes": 352456,
+      "sha256": "067a2cb164e92083947c513cad7aa08854cdf959875b2e4793791488df265c3e"
+    },
+    {
+      "path": "packages/domain/dist/index.js",
+      "bytes": 200571,
+      "sha256": "712cdc07a646bdd02e12291ebfcdd28b66c328a39c5e9da339e5478ece8bd307"
+    },
+    {
+      "path": "packages/domain/dist/index.cjs.map",
+      "bytes": 770246,
+      "sha256": "15d925ae163f5f14d0782536e740edaa8c990689ab84b24aded1a1e161814464"
+    },
+    {
+      "path": "packages/domain/dist/index.cjs",
+      "bytes": 217965,
+      "sha256": "58ea9e0178055edda383a33c5f62b409c8309c721d5122c97f2b19d8f8b7f06b"
+    },
+    {
+      "path": "packages/domain/dist/index.js.map",
+      "bytes": 765825,
+      "sha256": "918bef600059f79cf1571fbdc3541c95172b5325759f7820996e6222bbaca09f"
+    },
+    {
+      "path": "packages/domain/dist/index.d.ts",
+      "bytes": 352456,
+      "sha256": "067a2cb164e92083947c513cad7aa08854cdf959875b2e4793791488df265c3e"
+    },
+    {
+      "path": "packages/i18n/dist/chunk-LU2SGYGS.js",
+      "bytes": 585526,
+      "sha256": "a402c7c05a145b8c5d25fa95c67056771dedb98c57513385047cdadcf40dc010"
+    },
+    {
+      "path": "packages/i18n/dist/provider.js.map",
+      "bytes": 71,
+      "sha256": "cba81f7ad4d5b1b629bf43823f1082e73a10d0c3114c937515e7f8c1047629b3"
+    },
+    {
+      "path": "packages/i18n/dist/provider.js",
+      "bytes": 335,
+      "sha256": "de6aafb3440ebfab1ee9133e0566f4e1d2d1fae9fc751d75fefe4954a26ebc84"
+    },
+    {
+      "path": "packages/i18n/dist/index.js",
+      "bytes": 1970,
+      "sha256": "3a1a4854060ecc4c80d31a54925cfc75e3b9172314a2aeb110ce4e399edefd7b"
+    },
+    {
+      "path": "packages/i18n/dist/chunk-37FPVETC.js.map",
+      "bytes": 471845,
+      "sha256": "78e0e97eeb669be663ec9f60f3ef909de2395b9ba7f4bb6a471c0722f2308937"
+    },
+    {
+      "path": "packages/i18n/dist/chunk-37FPVETC.js",
+      "bytes": 394450,
+      "sha256": "057d7eaf1f4c9161c504ea69140b59d5838b5402e17b09164b1f1f2876d93753"
+    },
+    {
+      "path": "packages/i18n/dist/index.js.map",
+      "bytes": 9243,
+      "sha256": "97291bc5065bf063afbff01a3f67f191371e3ddcc078d6129d25fd502734d511"
+    },
+    {
+      "path": "packages/i18n/dist/chunk-LU2SGYGS.js.map",
+      "bytes": 500549,
+      "sha256": "42edc35d31875ff8cb51b032d5b77ebed113222f93fb0e90c8faf7d9b2237d44"
+    },
+    {
+      "path": "packages/i18n/dist/provider.d.ts",
+      "bytes": 6769,
+      "sha256": "80128e7191f16ef2fe565498d821ae5e6f6ea2ce7d32977babea7544cc9ee675"
+    },
+    {
+      "path": "packages/i18n/dist/chunk-6ZDM2JGK.js",
+      "bytes": 2170,
+      "sha256": "b323b017039c3fd01c05ce9f437ae37682dec8b738adee982b39ea1b79752ce1"
+    },
+    {
+      "path": "packages/i18n/dist/index.d.ts",
+      "bytes": 551000,
+      "sha256": "9145533eefd56072010570af4892c3d50e30e9079e74f4d81b77d95ae531f3a1"
+    },
+    {
+      "path": "packages/i18n/dist/chunk-6ZDM2JGK.js.map",
+      "bytes": 12140,
+      "sha256": "46092fe7f83acc5cfb387cb7c36cb5afa61799622251f2fa066114ed4c206dee"
+    },
+    {
+      "path": "packages/i18n/dist/locales/zh-CN.d.ts",
+      "bytes": 363265,
+      "sha256": "75bee50e303015bd65f20d3b088df8f5fdcd0cbead2cabe4f6cec5261524b0b7"
+    },
+    {
+      "path": "packages/i18n/dist/locales/en.d.ts",
+      "bytes": 159565,
+      "sha256": "77e078c182c76580cf4db441f8809c1ef5912f8baaa4632adb487275f64811d7"
+    },
+    {
+      "path": "packages/i18n/dist/locales/zh-CN.js.map",
+      "bytes": 71,
+      "sha256": "cba81f7ad4d5b1b629bf43823f1082e73a10d0c3114c937515e7f8c1047629b3"
+    },
+    {
+      "path": "packages/i18n/dist/locales/zh-CN.js",
+      "bytes": 99,
+      "sha256": "d4c5cba0ddf31d6d2cdce692fe39dcd95ded8985a240b0ac95728f39ac634749"
+    },
+    {
+      "path": "packages/i18n/dist/locales/en.js",
+      "bytes": 92,
+      "sha256": "5fa374a1740ab2a01b2dd4ebbf2defe59966a9b868a0550aeb9530bc9bf7493d"
+    },
+    {
+      "path": "packages/i18n/dist/locales/en.js.map",
+      "bytes": 71,
+      "sha256": "cba81f7ad4d5b1b629bf43823f1082e73a10d0c3114c937515e7f8c1047629b3"
+    },
+    {
+      "path": "packages/inbound-core/dist/index.d.cts",
+      "bytes": 4370,
+      "sha256": "eaa95c74f07e4c2109ce48e4a62c299dba3843bf51b2e5ab9a14773c6177812f"
+    },
+    {
+      "path": "packages/inbound-core/dist/index.js",
+      "bytes": 17400,
+      "sha256": "b1c1abbc57f67727b2d17f342f853f1ec894953d638acbc8ddea9a4d494f09f1"
+    },
+    {
+      "path": "packages/inbound-core/dist/index.cjs.map",
+      "bytes": 33269,
+      "sha256": "d98e10d469fc939b0215ced213bedb9ec6cb3886845f767852a47b2b0f9e4e84"
+    },
+    {
+      "path": "packages/inbound-core/dist/index.cjs",
+      "bytes": 20264,
+      "sha256": "d26c844410fe426e51eb05b2fcd863765e36880ddbb5614eb3f738100d5bd306"
+    },
+    {
+      "path": "packages/inbound-core/dist/index.js.map",
+      "bytes": 32414,
+      "sha256": "56c98f83976dafba5a08262e47eebb70d93a007a85d049c41e78b054cd9414a9"
+    },
+    {
+      "path": "packages/inbound-core/dist/index.d.ts",
+      "bytes": 4370,
+      "sha256": "eaa95c74f07e4c2109ce48e4a62c299dba3843bf51b2e5ab9a14773c6177812f"
+    },
+    {
+      "path": "packages/legal/dist/index.d.cts",
+      "bytes": 11352,
+      "sha256": "5d1a15b99461090fa297d5965590fecc64d137ccb63d3122b79380fd40ade213"
+    },
+    {
+      "path": "packages/legal/dist/index.js",
+      "bytes": 811784,
+      "sha256": "7bb6070730829902fe8e23ea4972f7ba8bd4dc28892b3618cb5a182dbd089f8e"
+    },
+    {
+      "path": "packages/legal/dist/index.cjs.map",
+      "bytes": 733517,
+      "sha256": "2b1ed557f453e329785841069553ca626acabefe9efd092d49a1d6ff850ee287"
+    },
+    {
+      "path": "packages/legal/dist/index.cjs",
+      "bytes": 813014,
+      "sha256": "baf1292a0d707a64ea45e4b3aedec4f72d05aa1541a2b5b9e847734860fa9f1f"
+    },
+    {
+      "path": "packages/legal/dist/index.js.map",
+      "bytes": 733446,
+      "sha256": "40c6f5468282356dc6d4fd1622532b2b4477e843c3a975c1a64ed6f5493eb8fa"
+    },
+    {
+      "path": "packages/legal/dist/index.d.ts",
+      "bytes": 11352,
+      "sha256": "5d1a15b99461090fa297d5965590fecc64d137ccb63d3122b79380fd40ade213"
+    },
+    {
+      "path": "packages/local-api/dist/index.d.cts",
+      "bytes": 72395,
+      "sha256": "a418c6a14fa9ae4684df2565d36b1055f28dd29ba52afbd88f202256e1db6343"
+    },
+    {
+      "path": "packages/local-api/dist/index.js",
+      "bytes": 83250,
+      "sha256": "fd7e2c858293cb58301dff5f1f767b9e5c8c15c64478c9cf01532a93892d9836"
+    },
+    {
+      "path": "packages/local-api/dist/index.cjs.map",
+      "bytes": 230992,
+      "sha256": "ff1b9ceeb08ddd7691bcacde24315b7c6fbf25ae1003bd2d61c0f3f5baae8ee0"
+    },
+    {
+      "path": "packages/local-api/dist/index.cjs",
+      "bytes": 86408,
+      "sha256": "ee98f87c2fc5ad3d179dd44ac06d60009dfd53d28e473aa21b538ec37d755b04"
+    },
+    {
+      "path": "packages/local-api/dist/index.js.map",
+      "bytes": 226047,
+      "sha256": "3716a396a9ed4b22e36d5e5e4d8aea5d6e3e42fdf330baeeb2991cb373ca79ad"
+    },
+    {
+      "path": "packages/local-api/dist/index.d.ts",
+      "bytes": 72395,
+      "sha256": "a418c6a14fa9ae4684df2565d36b1055f28dd29ba52afbd88f202256e1db6343"
+    },
+    {
+      "path": "packages/op-log/dist/index.d.cts",
+      "bytes": 23910,
+      "sha256": "432c6407da0698ae2abd2f72408af4fdcb625d2709318260825df94e7c2ac663"
+    },
+    {
+      "path": "packages/op-log/dist/index.js",
+      "bytes": 43692,
+      "sha256": "6651ecefc7eb9ce3603976a1230f029aa1d5c4e133fe8d298278e0c1245b1190"
+    },
+    {
+      "path": "packages/op-log/dist/index.cjs.map",
+      "bytes": 94846,
+      "sha256": "19b88d34e2835f202c329bc23439f361feff8b48a659f0feb21681da7fe0786a"
+    },
+    {
+      "path": "packages/op-log/dist/index.cjs",
+      "bytes": 45583,
+      "sha256": "f5bacff4bce6d7cacb09503d38378fafea4dd450a3e73e44e9a3fc6e1dde08c6"
+    },
+    {
+      "path": "packages/op-log/dist/index.js.map",
+      "bytes": 95020,
+      "sha256": "eb509c508700e2f1f61a02234fb846953b9a5344223c9df81576583ab60c5225"
+    },
+    {
+      "path": "packages/op-log/dist/index.d.ts",
+      "bytes": 23910,
+      "sha256": "432c6407da0698ae2abd2f72408af4fdcb625d2709318260825df94e7c2ac663"
+    },
+    {
+      "path": "packages/shared-schema/dist/index.d.mts",
+      "bytes": 90310,
+      "sha256": "c36be67ebebeb3ad7da29fa871db5e5b5b1b9ace5ffbec73163cc65819b47152"
+    },
+    {
+      "path": "packages/shared-schema/dist/index.js",
+      "bytes": 73685,
+      "sha256": "e8a2b4d571a203846ce4b0769b3ee65179ed4e89041a1209e09464238b330d42"
+    },
+    {
+      "path": "packages/shared-schema/dist/index.mjs.map",
+      "bytes": 142018,
+      "sha256": "f4ad7138af79bbca81278b6f3a6f61ca1aa16705f13879967cf2a0835c6e95dc"
+    },
+    {
+      "path": "packages/shared-schema/dist/index.mjs",
+      "bytes": 60457,
+      "sha256": "29d958c799bafe2b9e704ad910f641c48fd36ed0da18cce9423d5f220ce6f4f8"
+    },
+    {
+      "path": "packages/shared-schema/dist/index.js.map",
+      "bytes": 152292,
+      "sha256": "10eed6aec7e7bcf9821d9c359771f2c3b7d756daa24f08b3d952d0762e3a50f3"
+    },
+    {
+      "path": "packages/shared-schema/dist/index.d.ts",
+      "bytes": 90310,
+      "sha256": "c36be67ebebeb3ad7da29fa871db5e5b5b1b9ace5ffbec73163cc65819b47152"
+    },
+    {
+      "path": "packages/storage/dist/sqlite-driver-DBOWTgRZ.d.cts",
+      "bytes": 4704,
+      "sha256": "1fef49fb0faac59ea79c2cca4dfbb871967af6c28004ef1a714c9d4c2662db55"
+    },
+    {
+      "path": "packages/storage/dist/index.d.cts",
+      "bytes": 83572,
+      "sha256": "a376f8eb0f36bb7abc358f793d24ee14705d372c335862fad0c8784aa7c6f65d"
+    },
+    {
+      "path": "packages/storage/dist/index.js",
+      "bytes": 97966,
+      "sha256": "cb9f96c2a606d0da37e8cb73142490aa6afb5e9d6f72897ef86023372036a163"
+    },
+    {
+      "path": "packages/storage/dist/index.cjs.map",
+      "bytes": 262941,
+      "sha256": "d6fad740328445526b979298105f6de02ccdc627b1422d7b673543c30938d265"
+    },
+    {
+      "path": "packages/storage/dist/index.cjs",
+      "bytes": 100429,
+      "sha256": "df64e6e852df98c599c0aa9a769480ae19d247844550a585b722fd8c091e6f47"
+    },
+    {
+      "path": "packages/storage/dist/sqlite-driver-DBOWTgRZ.d.ts",
+      "bytes": 4704,
+      "sha256": "1fef49fb0faac59ea79c2cca4dfbb871967af6c28004ef1a714c9d4c2662db55"
+    },
+    {
+      "path": "packages/storage/dist/index.js.map",
+      "bytes": 261787,
+      "sha256": "732d6b7e756855422cc677737d4c7350326965b35fadb1140b0fe3e3e5de8195"
+    },
+    {
+      "path": "packages/storage/dist/index.d.ts",
+      "bytes": 83570,
+      "sha256": "fb5d3753fe5589a510f8ea490a04de4c11e11e13ba4da6c88e2eb6eae9d58940"
+    },
+    {
+      "path": "packages/storage/dist/sqlite/node-sqlite-driver.cjs",
+      "bytes": 3053,
+      "sha256": "8a96dd2aa9b11db9cfec8aa33bbb725f1188b85f78ff6080f3e415be2f326d78"
+    },
+    {
+      "path": "packages/storage/dist/sqlite/sqlite-wasm-driver.js.map",
+      "bytes": 21285,
+      "sha256": "024facefd099984789ada7ff683a43d6b148f89fdd6baff403cf2efdc3d59d66"
+    },
+    {
+      "path": "packages/storage/dist/sqlite/node-sqlite-driver.d.ts",
+      "bytes": 1730,
+      "sha256": "7a9d66d65678ed96c43f9b20597b20a6b38b64f9fcb30156685353a9d0374734"
+    },
+    {
+      "path": "packages/storage/dist/sqlite/sqlite-wasm-driver.cjs",
+      "bytes": 8148,
+      "sha256": "306b8d1a20da355391df5aa7ee9a60a1a83dffd1903948f980e8c50814d615d8"
+    },
+    {
+      "path": "packages/storage/dist/sqlite/node-sqlite-driver.d.cts",
+      "bytes": 1731,
+      "sha256": "7ffc9723fb4fbec023ccb05e62595099899e6c836cdb29cec1587afd90842e7b"
+    },
+    {
+      "path": "packages/storage/dist/sqlite/sqlite-wasm-driver.d.cts",
+      "bytes": 12309,
+      "sha256": "e971f3e38e15729b43644ba6c70a335df672e39908540210f2c885872c93376a"
+    },
+    {
+      "path": "packages/storage/dist/sqlite/node-sqlite-driver.js.map",
+      "bytes": 4257,
+      "sha256": "dfde8bf7a1a1098019b4c2ab6ce9483938e8101d9114f33a10c472c60478a85f"
+    },
+    {
+      "path": "packages/storage/dist/sqlite/node-sqlite-driver.js",
+      "bytes": 1940,
+      "sha256": "129c5f2b07ddda70aa8b7f5c9a158e4dd7711a0bf49efde0a8318b870e16b08e"
+    },
+    {
+      "path": "packages/storage/dist/sqlite/sqlite-wasm-driver.cjs.map",
+      "bytes": 21354,
+      "sha256": "ea675b487e61eb30d92b904b5d50e836c102e4e7048ff68095eed5b64d9c93a9"
+    },
+    {
+      "path": "packages/storage/dist/sqlite/node-sqlite-driver.cjs.map",
+      "bytes": 4295,
+      "sha256": "294f006c86b6e469260cca29859821e94f642030c3f88af2a00c10e35c8363a3"
+    },
+    {
+      "path": "packages/storage/dist/sqlite/sqlite-wasm-driver.d.ts",
+      "bytes": 12308,
+      "sha256": "fac65b8d14eefba39f979eef0751cf0fb1ff34936f8b60572e8d0d9c29fbeff9"
+    },
+    {
+      "path": "packages/storage/dist/sqlite/sqlite-wasm-driver.js",
+      "bytes": 6317,
+      "sha256": "e4dc9e7a099d4ab6bb524bc000986701c06392d00fe9ea3397744b15f2f2b902"
+    },
+    {
+      "path": "packages/sync-client/dist/index.d.cts",
+      "bytes": 46224,
+      "sha256": "a7ff988a35d197c2f668a45cc988742501d5902e24cdb0f56fa4e7a7e7c433cb"
+    },
+    {
+      "path": "packages/sync-client/dist/index.js",
+      "bytes": 47226,
+      "sha256": "49d74171e9424179092fbc1623b1590699e7f2ae580c0503ae41d31fc2051e86"
+    },
+    {
+      "path": "packages/sync-client/dist/index.cjs.map",
+      "bytes": 151810,
+      "sha256": "f173bd80e6395a6c423d0debdd92f1a2502da6e537dcce6fdd8a68e864e2bdba"
+    },
+    {
+      "path": "packages/sync-client/dist/index.cjs",
+      "bytes": 49484,
+      "sha256": "0621af65abd09f288c55d64c302a4c591100145e98b9188a24244115ea62c4f2"
+    },
+    {
+      "path": "packages/sync-client/dist/index.js.map",
+      "bytes": 150759,
+      "sha256": "8dfed49a26aa695f6f8f14f6d335a8bad5e387b8a79db702d32e4e689e709023"
+    },
+    {
+      "path": "packages/sync-client/dist/index.d.ts",
+      "bytes": 46224,
+      "sha256": "a7ff988a35d197c2f668a45cc988742501d5902e24cdb0f56fa4e7a7e7c433cb"
+    },
+    {
+      "path": "packages/sync-core/dist/index.d.mts",
+      "bytes": 72449,
+      "sha256": "67d293096f93559491cfcd3f55060b82ac680f0979fd664aa7ea06e6f8e8b7c4"
+    },
+    {
+      "path": "packages/sync-core/dist/index.js",
+      "bytes": 84694,
+      "sha256": "4daf3fed3f68cb8887970eed0f363b0714579ca368c3f1d714bb064139ae3778"
+    },
+    {
+      "path": "packages/sync-core/dist/index.mjs.map",
+      "bytes": 221229,
+      "sha256": "0f445c50ac978934a5b42ff74ca1a7c75429a7f4ae3d49f82b8095f7253c3f9d"
+    },
+    {
+      "path": "packages/sync-core/dist/index.mjs",
+      "bytes": 78671,
+      "sha256": "f7ed095e555f63e99611de87f617fce34fa35307e5533b01d70acb134aaebc65"
+    },
+    {
+      "path": "packages/sync-core/dist/index.js.map",
+      "bytes": 229431,
+      "sha256": "7a186e0910cd570575d764eb226ce1bfee9a3761cab2904ff988212d6ae25ad3"
+    },
+    {
+      "path": "packages/sync-core/dist/index.d.ts",
+      "bytes": 72449,
+      "sha256": "67d293096f93559491cfcd3f55060b82ac680f0979fd664aa7ea06e6f8e8b7c4"
+    },
+    {
+      "path": "packages/ui/dist/node.cjs",
+      "bytes": 11614,
+      "sha256": "10810471331a808f41374a00ecc356e1ea607bc79d50b470ff892dcfd3f19f41"
+    },
+    {
+      "path": "packages/ui/dist/node.js.map",
+      "bytes": 71,
+      "sha256": "cba81f7ad4d5b1b629bf43823f1082e73a10d0c3114c937515e7f8c1047629b3"
+    },
+    {
+      "path": "packages/ui/dist/node-Mub2B2gk.d.cts",
+      "bytes": 92301,
+      "sha256": "9d475c5eb9294c3dfe86076ce14a39d13afb1763deeeba53ccc7424c8fb3573a"
+    },
+    {
+      "path": "packages/ui/dist/index.d.cts",
+      "bytes": 502285,
+      "sha256": "e4f95403d6acfee6c34ded8697888cb348a6fbdd9696b44a8fb7fa7028783f6f"
+    },
+    {
+      "path": "packages/ui/dist/node-Mub2B2gk.d.ts",
+      "bytes": 92301,
+      "sha256": "9d475c5eb9294c3dfe86076ce14a39d13afb1763deeeba53ccc7424c8fb3573a"
+    },
+    {
+      "path": "packages/ui/dist/node.cjs.map",
+      "bytes": 116079,
+      "sha256": "081988e78ba839f254ff8331eb56ae3490ba0180c0aa0184da523d5b53eb7b45"
+    },
+    {
+      "path": "packages/ui/dist/index.js",
+      "bytes": 842591,
+      "sha256": "25a6aa24aa3065f64eff1eec9c4b89dfdc9bbe8cac2cba8f7a09efbf509b35a0"
+    },
+    {
+      "path": "packages/ui/dist/node.d.cts",
+      "bytes": 780,
+      "sha256": "200936407cd0f319052eee5e7052e0395338af6e41fd2e1dec18a76ebe037f0b"
+    },
+    {
+      "path": "packages/ui/dist/index.cjs.map",
+      "bytes": 1933808,
+      "sha256": "9e3634cddf3945b9350e0be8d28944b42006d57c0a7ec00a7b55529b320a43a2"
+    },
+    {
+      "path": "packages/ui/dist/node.js",
+      "bytes": 737,
+      "sha256": "824cb033537efd0cd8e337e5b7f1c69541efa1502403d07af17078802ff47cff"
+    },
+    {
+      "path": "packages/ui/dist/index.cjs",
+      "bytes": 928452,
+      "sha256": "48b04c4040af6fbdf432facde9c2f5f415a2ac7b3a58dbf55997dcebd49ec6dd"
+    },
+    {
+      "path": "packages/ui/dist/index.js.map",
+      "bytes": 1777763,
+      "sha256": "1f178818a560b998947f7b4cd12508f6852f5a51923053bc81761dd7d479a84c"
+    },
+    {
+      "path": "packages/ui/dist/chunk-ADNCLAHQ.js",
+      "bytes": 28929,
+      "sha256": "4e1d217e6b817c16bca103ad39dd5f58a7295eeea42de6404b521ba3ae8275c7"
+    },
+    {
+      "path": "packages/ui/dist/chunk-ADNCLAHQ.js.map",
+      "bytes": 126517,
+      "sha256": "29165ff99f27fb3f9dc027fa14dce117a7918508c72f6f7e21d2728066b36e32"
+    },
+    {
+      "path": "packages/ui/dist/index.d.ts",
+      "bytes": 502283,
+      "sha256": "24886a1a1caf1f438d0b010bed864b7dce8e3642920686c9cf4f88e23bbd0043"
+    },
+    {
+      "path": "packages/ui/dist/node.d.ts",
+      "bytes": 779,
+      "sha256": "484ff52e252ae92ff35d4b16df3b387d3b3b4b0dcafe27744b7be5adc98173c3"
+    },
+    {
+      "path": "packages/widget-core/dist/index.d.cts",
+      "bytes": 51181,
+      "sha256": "b8873cbd9b736f66b512b296df97ff180f8c4c58a2a3787ead9d36f0682f96e5"
+    },
+    {
+      "path": "packages/widget-core/dist/index.js",
+      "bytes": 30172,
+      "sha256": "f6c5b9a2b0d7c0a5d004b87ef1212649420f284d675837ddb32782eb0c751d41"
+    },
+    {
+      "path": "packages/widget-core/dist/index.cjs.map",
+      "bytes": 113037,
+      "sha256": "43d9d4ac36be3a22091c5c549a10af7f400e743f2ede9410d4ffca35ee01c6f5"
+    },
+    {
+      "path": "packages/widget-core/dist/index.cjs",
+      "bytes": 33121,
+      "sha256": "238234cc3e226fd0b75e9e11fd15e5b2b9324f4e17aad0c92acb9b5a8bcbb970"
+    },
+    {
+      "path": "packages/widget-core/dist/index.js.map",
+      "bytes": 110259,
+      "sha256": "7aa500fb707a7986551337b7fa83459fb40b1a741eb4313bb3e3734a53c26896"
+    },
+    {
+      "path": "packages/widget-core/dist/index.d.ts",
+      "bytes": 51181,
+      "sha256": "b8873cbd9b736f66b512b296df97ff180f8c4c58a2a3787ead9d36f0682f96e5"
+    }
+  ]
+}

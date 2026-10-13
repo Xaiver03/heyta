@@ -1,0 +1,26 @@
+{
+  "date": "2026-10-08",
+  "candidateSigned": true,
+  "notarized": false,
+  "installedAppMatchesCandidate": {
+    "Contents/MacOS/HeytaMac": {
+      "candidateSha256": "8adcc44e4618bbb4824af2485fff4190fd3bc9e74dd4a69111d2e7d0fcf632e8",
+      "installedSha256": "8adcc44e4618bbb4824af2485fff4190fd3bc9e74dd4a69111d2e7d0fcf632e8",
+      "match": true
+    },
+    "Contents/Resources/web-dist/index.html": {
+      "candidateSha256": "f85e88070548bf6f30a528268b310105818f2b584442b0239243dea608875c87",
+      "installedSha256": "f85e88070548bf6f30a528268b310105818f2b584442b0239243dea608875c87",
+      "match": true
+    },
+    "Contents/PlugIns/HeytaMacWidget.appex/Contents/MacOS/HeytaMacWidget": {
+      "candidateSha256": "e4959642d97e5e7ad4a3ec3aee757adb98e666198b5d36f0719f10bb7747180c",
+      "installedSha256": "e4959642d97e5e7ad4a3ec3aee757adb98e666198b5d36f0719f10bb7747180c",
+      "match": true
+    }
+  },
+  "install": "application-bundle-replaced-data-retained",
+  "QA_DatabaseUsedForCapture": true,
+  "systemGalleryInteraction": "pending",
+  "fourPlatformFrozenSourceRelease": false
+}

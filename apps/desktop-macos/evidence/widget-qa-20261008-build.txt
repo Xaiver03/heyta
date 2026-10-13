@@ -1,0 +1,59 @@
+macOS / iOS Widget QA build evidence — 2026-10-08
+=================================================
+
+Source tree
+  /Users/rocalight/.codex/worktrees/ux-final-verification/heyta
+
+macOS build
+  Command: HEYTA_SKIP_NOTARIZE=1 bash apps/desktop-macos/scripts/package-app.sh /tmp/heyta-widget-qa-20261008
+  Output:  /tmp/heyta-widget-qa-20261008/Heyta.app
+  QA install: ~/Applications/HeytaWidgetQA.app
+  Notarization: intentionally skipped for QA; this is not a notarization claim.
+  Host bundle ID: cloud.finlaw.heyta.desktop
+  Widget bundle ID: cloud.finlaw.heyta.desktop.widgets
+  Version: 1.0.0 (1)
+  Team: V5S2LT9YV8
+  Host and nested widget: codesign --verify --deep/--strict passed
+  Signature: Developer ID Application: Xiaoli Creativity Culture Industry Development (beijing) Co., Ltd. (V5S2LT9YV8)
+  Native bridge startup: WEBVIEW_SNAPSHOT_BYTES=244891; WINDOW_SIZE=1159x754; CAPTURE_METHOD=screencapturekit
+  Installed WebView snapshot: widget-qa-20261008-installed.webview.png
+  Installed WebView stats: 2318x1508; contentRatio=0.0778496765; blank=false; primaryBlue=48
+
+macOS SHA-256 (installed QA app)
+  82f70bc554b0a1073d53e925646b3fb70e72c407a6fc06e6199e02dd120286dc  Contents/MacOS/HeytaMac
+  73fcd860d03390ed5b8dfb52233f1169d3674441aa7f0dc63c208221bf4443f3  Contents/PlugIns/HeytaMacWidget.appex/Contents/MacOS/HeytaMacWidget
+  5ec4b488cac4b4844a7686e04a5d14d34ec8b26029924a0c9e27d0e726bd1610  Contents/Resources/native-bridge.js
+  ee60cb88921ac46b662ba82ab665b6b0fdbfabf90ce8086819fb27dc9636a94b  Contents/Resources/web-dist/index.html
+
+macOS previous QA app
+  Moved to /tmp/HeytaWidgetQA.app.previous-20261008 before installing the new QA app.
+  Default /Applications/Heyta.app and its user data were not touched.
+
+iOS Simulator Release build
+  Command: xcodebuild -workspace apps/mobile/ios/Heyta.xcworkspace -scheme Heyta -configuration Release -sdk iphonesimulator -derivedDataPath /tmp/heyta-widget-qa-20261008/ios-derived -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+  Result: BUILD SUCCEEDED
+  App bundle ID: com.heyta; version 1.0 (1)
+  Widget extension bundle ID: com.heyta.WidgetExtension
+  AppIntents metadata: present (extract.actionsdata)
+  Output: /tmp/heyta-widget-qa-20261008/ios-derived/Build/Products/Release-iphonesimulator/Heyta.app
+  iOS app SHA-256: fb37e8218926a3c3270d5d442181d6e8fff6deaa41571871f8bc25947848fdf0
+  iOS widget SHA-256: a8c988906bc9ad5c4c87e03d70bccefa63d2eeeb1e43575678e288a2c9535beb
+
+Boundary
+  These are current QA candidates. They are not final uploads and have not been claimed as
+  system Gallery add/click acceptance. Existing simulator data was not erased and no new
+  simulator was started.
+
+Correction after installed-run audit
+  The original package self-capture did not pass HEYTA_SHELL_DB_DIR.
+  A differently named QA.app does NOT isolate SQLite by itself.
+  The earlier statement about untouched default user data was not established by the build invocation.
+  Root removed only its own temporary task/habit entries via UI; normal op/tombstone history remains.
+  package-app.sh now creates an absolute mktemp directory for its self-capture subprocess.
+  Equivalent installed-binary self-capture was actually run with that environment on 2026-10-08:
+    WEBVIEW_SNAPSHOT_BYTES=244891
+    WINDOW_SIZE=1159x754
+    PNG_BYTES=221767
+    SMOKE_DB_CREATED=yes
+  See widget-qa-20261008-isolated-smoke{,.webview}.png.
+  This establishes isolated SQLite startup, not complete App Group/Keychain isolation or system Gallery acceptance.

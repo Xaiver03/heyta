@@ -1,0 +1,45 @@
+{
+  "release": "1.0.1-test.20261008.5",
+  "sourceRole": "本轮受控冻结源码，文档和测试的后续归档不改变已打包产品代码",
+  "source": {
+    "packages/ui/src/auth/LegalDocumentSheet.tsx": "95d5c54415938e23137a7a6006dc058420c518ea03d89d32397ae034bf539d13",
+    "packages/ui/src/auth/AuthForm.tsx": "dfd99462ea359ebca2020a93ae2f9c7dd49bb11c2d619a174b102bacc9c3b7f2",
+    "apps/web/src/features/auth/AuthPanel.tsx": "d49c1262a004ac10c9db8394845d0dded6d5fa0482d96a7cedff00500edff99b",
+    "apps/web/src/features/auth/store.ts": "0d8d0b5d679e7534b4d44d3f9966a247f5b4beb81d383a60cee72953950ab330",
+    "apps/mobile/src/screens/AuthScreen.tsx": "f741e9f41aed8b39c7e0970decef48c3e25b96edd4177215e41e321d7b0e1936",
+    "packages/legal/src/documents/terms.ts": "8b6d51fa190e1d739dcb20a046c290bd00b64e49da8b15cc7f7b081d340a7558"
+  },
+  "files": {
+    "heyta-1.0.1-test.20261008.5-android.apk": {
+      "sha256": "26d39bc0ca06d13e6000a363649cdf56f42d52d9a4fc0e6f2c3e4d0dbb36d115",
+      "size": 68878328
+    },
+    "heyta-1.0.1-test.20261008.5-macos.dmg": {
+      "sha256": "1f25713f10ea0df32ff83f555accb309ecd7e74a650014fc0d743ebbfea4e435",
+      "size": 3859459
+    },
+    "heyta-1.0.1-test.20261008.5-windows.zip": {
+      "sha256": "ff7e2a8a3e9aa5ba3eaa0617995913c34a16286d346363e2e5c683d997a3cc26",
+      "size": 193610738
+    }
+  },
+  "web": "https://heyta.waytofuture.cn/app/",
+  "testflight": {
+    "version": "1.0",
+    "build": "7",
+    "state": "VALID",
+    "internalGroupReadback": true
+  },
+  "installation": {
+    "windows": "1.0.0.1，原位升级与数据摘要一致",
+    "android": "保数据升级，安装包SHA与候选一致，协议实际阅读与系统返回通过",
+    "iosSimulator": "保数据安装，bundle字节与候选一致，实体iPhone未验证",
+    "macos": "已签名公证；本机当前锁屏，保留注册表单的安装更新仍待完成"
+  },
+  "remainingBoundaries": [
+    "不代表全部UX清单关闭",
+    "Mac本机更新与实体iPhone仍待验",
+    "小组件系统添加与全尺寸主题矩阵仍未全部验证",
+    "生产邮件收件仍待验证"
+  ]
+}

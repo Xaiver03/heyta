@@ -1,0 +1,140 @@
+﻿{
+    "tests":  135,
+    "failures":  0,
+    "errors":  0,
+    "skipped":  0,
+    "suites":  [
+                   {
+                       "name":  "com.heytamobile.widget.FocusWidgetModelTest",
+                       "tests":  9,
+                       "failures":  0,
+                       "errors":  0,
+                       "skipped":  0,
+                       "lastWriteUtc":  "2026-10-08T08:18:02.5844573Z",
+                       "sha256":  "538137DE9395DD338BBD0DA16B6A14372D563B1BB431EED2D9019A14027CF9C8",
+                       "failureMessages":  [
+
+                                           ]
+                   },
+                   {
+                       "name":  "com.heytamobile.widget.GoldenFixtureSmokeTest",
+                       "tests":  4,
+                       "failures":  0,
+                       "errors":  0,
+                       "skipped":  0,
+                       "lastWriteUtc":  "2026-10-08T08:18:02.5834583Z",
+                       "sha256":  "B26434CC89D764C6ACAA8C4342B6A3F6759439C11C17D6F55661523F9352B700",
+                       "failureMessages":  [
+
+                                           ]
+                   },
+                   {
+                       "name":  "com.heytamobile.widget.HabitsWidgetModelTest",
+                       "tests":  8,
+                       "failures":  0,
+                       "errors":  0,
+                       "skipped":  0,
+                       "lastWriteUtc":  "2026-10-08T08:18:02.5824586Z",
+                       "sha256":  "E523E24C548E11B1AC595CA628BFC0F1E2A6FB4794F6413AFD5A6D70CB39D118",
+                       "failureMessages":  [
+
+                                           ]
+                   },
+                   {
+                       "name":  "com.heytamobile.widget.QuadrantWidgetModelTest",
+                       "tests":  12,
+                       "failures":  0,
+                       "errors":  0,
+                       "skipped":  0,
+                       "lastWriteUtc":  "2026-10-08T08:18:02.5844573Z",
+                       "sha256":  "5D1AC0666C5062593FB97EA21BACDD48D3DB5BB0829C7516FC50F5C4ADB1E91B",
+                       "failureMessages":  [
+
+                                           ]
+                   },
+                   {
+                       "name":  "com.heytamobile.widget.TodayWidgetModelTest",
+                       "tests":  18,
+                       "failures":  0,
+                       "errors":  0,
+                       "skipped":  0,
+                       "lastWriteUtc":  "2026-10-08T08:18:02.5854573Z",
+                       "sha256":  "771E7D3AED449C02FCA337F244D63617FC6140F6AD0EE876F733DF2BC0D007D2",
+                       "failureMessages":  [
+
+                                           ]
+                   },
+                   {
+                       "name":  "com.heytamobile.widget.WidgetGoldenFixtureTest",
+                       "tests":  11,
+                       "failures":  0,
+                       "errors":  0,
+                       "skipped":  0,
+                       "lastWriteUtc":  "2026-10-08T08:18:02.5854573Z",
+                       "sha256":  "BB751E9E5A861AC6EA1AF5879F3290886EF59AB20582F8C99AF53EADF9D3FF21",
+                       "failureMessages":  [
+
+                                           ]
+                   },
+                   {
+                       "name":  "com.heytamobile.widget.WidgetIntentQueueTest",
+                       "tests":  26,
+                       "failures":  0,
+                       "errors":  0,
+                       "skipped":  0,
+                       "lastWriteUtc":  "2026-10-08T08:18:02.5854573Z",
+                       "sha256":  "B9596C02078DD6508E9DC448D5CB5059BFE8D859D05F17464040F97E7B206311",
+                       "failureMessages":  [
+
+                                           ]
+                   },
+                   {
+                       "name":  "com.heytamobile.widget.WidgetLocalePreferenceTest",
+                       "tests":  1,
+                       "failures":  0,
+                       "errors":  0,
+                       "skipped":  0,
+                       "lastWriteUtc":  "2026-10-08T08:18:02.5824586Z",
+                       "sha256":  "02D6A1D9886E0E547DD7B79C4ED71AD6A4D86063206F7129608B73F33EC5A9F0",
+                       "failureMessages":  [
+
+                                           ]
+                   },
+                   {
+                       "name":  "com.heytamobile.widget.WidgetRefreshPipelineTest",
+                       "tests":  17,
+                       "failures":  0,
+                       "errors":  0,
+                       "skipped":  0,
+                       "lastWriteUtc":  "2026-10-08T08:18:02.5844573Z",
+                       "sha256":  "0EF6A79B94F276A4B171E3B1A1FC56CD245D72B04396B9B2C094050BBC0B3859",
+                       "failureMessages":  [
+
+                                           ]
+                   },
+                   {
+                       "name":  "com.heytamobile.widget.WidgetSnapshotParserTest",
+                       "tests":  24,
+                       "failures":  0,
+                       "errors":  0,
+                       "skipped":  0,
+                       "lastWriteUtc":  "2026-10-08T08:18:02.5844573Z",
+                       "sha256":  "C6D37D843FEF1D1D8BE83694752D7DE8F42E8D4C32BAA22DB324A8837AC04A0B",
+                       "failureMessages":  [
+
+                                           ]
+                   },
+                   {
+                       "name":  "com.heytamobile.widget.WidgetStoreTest",
+                       "tests":  5,
+                       "failures":  0,
+                       "errors":  0,
+                       "skipped":  0,
+                       "lastWriteUtc":  "2026-10-08T08:18:02.5834583Z",
+                       "sha256":  "9FEBC6418B22D25E4A664E7819EE7FD0998AD56BE725D580C478B20AC6BE1E12",
+                       "failureMessages":  [
+
+                                           ]
+                   }
+               ]
+}

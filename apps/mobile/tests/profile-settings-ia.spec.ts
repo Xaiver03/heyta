@@ -45,6 +45,16 @@ describe('移动端个人中心与设置的 IA 接线', () => {
     expect(settings).toContain('setSection(undefined)');
   });
 
+  it('设置目录底部提供按语言直达官方帮助中心的支持入口', () => {
+    expect(settings).toContain('testID="settings-support"');
+    expect(settings).toContain('testID: \'settings-help-center\'');
+    expect(settings).toContain("t('site.docs.nav.title')");
+    expect(settings).toContain("t('site.docs.shell.title')");
+    expect(settings).toContain("Linking.openURL(`${OFFICIAL_SITE_ORIGIN}${path}`)");
+    expect(settings).toContain("locale === 'en' ? '/en/docs/' : '/docs/'");
+    expect(settings).toContain("t('mobile.auth.link.unopenable')");
+  });
+
   it('设置入口位于账号卡之后，资料编辑入口进入 profile 分组', () => {
     const home = between(profile, 'return (\n    <Screen', '<SettingsScreen');
     const accountEnd = home.indexOf("<SettingsRow row={settingsRow} />");

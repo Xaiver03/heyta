@@ -11,7 +11,7 @@ import com.heytamobile.R
  * 🔴 **这里没有倒计时** —— 理由见 [FocusWidgetModel] 的类注释：
  * 契约里的 `remainingSeconds` 是**发布那一刻**的快照值，没有绝对时间锚点，
  * 画出来就是"看起来对、其实是错的"。所以这里只画**不会随时间变**的事实：
- * 会话标题 + 目标时长。
+ * 会话标题 + 目标时长；暂停时另加明确状态文案。
  */
 object FocusWidgetViews {
 
@@ -29,7 +29,7 @@ object FocusWidgetViews {
         )
 
         when (model.state) {
-            FocusWidgetState.ACTIVE -> {
+            FocusWidgetState.ACTIVE, FocusWidgetState.PAUSED -> {
                 // 会话标题：契约里可为空（用户常常不填）—— 给一条通用标题，
                 // 而不是画一个空字符串（那看起来像渲染坏了）。
                 views.setViewVisibility(R.id.widget_focus_title, View.VISIBLE)
@@ -79,9 +79,10 @@ object FocusWidgetViews {
                 FocusWidgetState.PLACEHOLDER -> R.string.widget_message_open_app
                 FocusWidgetState.STALE -> R.string.widget_message_stale
                 FocusWidgetState.IDLE -> R.string.widget_focus_idle
-                // ACTIVE 时只有在"目标时长那一行被隐藏"的情况下才有话可说 ——
-                // 而那时正文已经够清楚了，所以不给消息。
+                // 运行中正文已经足够清楚，不重复加状态消息；暂停必须明确告诉用户
+                // 当前不会继续计时，并给出打开应用继续的路径。
                 FocusWidgetState.ACTIVE -> null
+                FocusWidgetState.PAUSED -> R.string.widget_focus_paused
             },
         )
 

@@ -31,6 +31,8 @@ import {
   Copy,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   CircleCheckBig,
   Coffee,
   Ellipsis,
@@ -175,6 +177,8 @@ const ICONS = {
    * 把主路之外还剩的路摆出来。`Plus` 会读成"点这里加一条"。
    */
   'action.more': Ellipsis,
+  'action.expand': ChevronDown,
+  'action.collapse': ChevronUp,
   /**
    * 导出 / 分享。
    *

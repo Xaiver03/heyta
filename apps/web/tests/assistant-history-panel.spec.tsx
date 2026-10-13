@@ -186,6 +186,7 @@ function countingFetch(): { impl: typeof fetch; calls: () => number } {
 }
 
 beforeEach(() => {
+  localStorage.clear();
   container = undefined;
   root = undefined;
 });

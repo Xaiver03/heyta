@@ -126,6 +126,9 @@ export function ProfileScreen(): React.JSX.Element {
    * `credential-form.ts` 文件头）。设置面拿的是值与回调。
    */
   const [vaultCleanupPending, setVaultCleanupPending] = useState<VaultSecureStorageScope>();
+  /** 小组件清理失败必须留在界面上，直到一次显式重试成功。 */
+  const [widgetCleanupPending, setWidgetCleanupPending] = useState(false);
+  const [widgetCleanupRetrying, setWidgetCleanupRetrying] = useState(false);
   const form = useSyncCredentialForm(setVaultCleanupPending);
 
   // 🔴 冲突界面的可见性只是**界面状态**，不进 store。
@@ -224,6 +227,8 @@ export function ProfileScreen(): React.JSX.Element {
     setProfileRevision((revision) => revision + 1);
     const config = readSyncConfig();
     const accountId = config?.accountId?.trim();
+    setWidgetCleanupPending(false);
+    setWidgetCleanupRetrying(false);
     let scope: VaultSecureStorageScope | undefined;
     if (config !== undefined && accountId !== undefined && accountId !== '') {
       try {
@@ -252,7 +257,10 @@ export function ProfileScreen(): React.JSX.Element {
       });
       form.clear();
       forgetSignedInUser();
-      await wipePromise;
+      const wipe = await wipePromise;
+      // 账号凭据已经清掉，但小组件可能仍留着上一个账号的快照。
+      // 这条状态与 Vault 清理分开呈现，且必须保留到重试成功。
+      setWidgetCleanupPending(!wipe.widgetsCleared);
       const cleanup = await cleanupPromise;
       if (cleanup.secureStorageError !== undefined) {
         setVaultCleanupPending(scope);
@@ -262,6 +270,22 @@ export function ProfileScreen(): React.JSX.Element {
       }
     })();
   };
+
+  const retryWidgetCleanup = useCallback((): void => {
+    if (!widgetCleanupPending || widgetCleanupRetrying) return;
+    setWidgetCleanupRetrying(true);
+    void clearWidgetState()
+      .then(() => {
+        setWidgetCleanupPending(false);
+      })
+      .catch((error: unknown) => {
+        setWidgetCleanupPending(true);
+        console.warn('[widgets] 重试清理小组件状态失败', error);
+      })
+      .finally(() => {
+        setWidgetCleanupRetrying(false);
+      });
+  }, [widgetCleanupPending, widgetCleanupRetrying]);
 
   const retryVaultCleanup = useCallback((): void => {
     const scope = vaultCleanupPending;
@@ -1263,6 +1287,9 @@ export function ProfileScreen(): React.JSX.Element {
         vaultCleanupPending={vaultCleanupPending !== undefined}
         onRetryVaultCleanup={retryVaultCleanup}
         onVaultCleanupPending={setVaultCleanupPending}
+        widgetCleanupPending={widgetCleanupPending}
+        widgetCleanupRetrying={widgetCleanupRetrying}
+        onRetryWidgetCleanup={retryWidgetCleanup}
       />
     </Screen>
   );

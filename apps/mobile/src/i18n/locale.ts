@@ -60,27 +60,32 @@ function readNativeModules(): Record<string, unknown> | undefined {
  * 那挡不住"属性 getter 自己抛"这一类。
  */
 export function resolveDeviceLocale(): Locale {
+  return resolveNativeLocale(readNativeModules());
+}
+
+/** 平台输入的优先级可独立验证；已选设备偏好优先于系统语言。 */
+export function resolveNativeLocale(modules: Record<string, unknown> | undefined): Locale {
   try {
-    const modules = readNativeModules();
+    const widget = modules?.HeytaWidget as { preferredLocale?: unknown; deviceLocale?: unknown } | undefined;
+    if (widget?.preferredLocale === 'zh-CN' || widget?.preferredLocale === 'en') return widget.preferredLocale;
+    if (typeof widget?.deviceLocale === 'string' && widget.deviceLocale !== '') {
+      return matchLocale(widget.deviceLocale);
+    }
     if (modules !== undefined) {
       const settings = modules.SettingsManager as { settings?: AppleSettings } | undefined;
       const appleLocale = settings?.settings?.AppleLocale;
       if (typeof appleLocale === 'string' && appleLocale !== '') return matchLocale(appleLocale);
-
       const appleLanguages = settings?.settings?.AppleLanguages;
       if (Array.isArray(appleLanguages)) {
         const first = appleLanguages[0];
         if (typeof first === 'string' && first !== '') return matchLocale(first);
       }
-
       const i18nManager = modules.I18nManager as { localeIdentifier?: unknown } | undefined;
       const androidLocale = i18nManager?.localeIdentifier;
-      if (typeof androidLocale === 'string' && androidLocale !== '') {
-        return matchLocale(androidLocale);
-      }
+      if (typeof androidLocale === 'string' && androidLocale !== '') return matchLocale(androidLocale);
     }
   } catch {
-    // 见文件头：系统语言的读取失败不是致命错误，默认语言是安全的落点。
+    // 原生常量 getter 失败时仍可启动应用。
   }
   return DEFAULT_LOCALE;
 }

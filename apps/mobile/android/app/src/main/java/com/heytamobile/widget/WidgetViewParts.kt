@@ -174,6 +174,8 @@ object WidgetViewParts {
         } else {
             views.setViewVisibility(R.id.widget_message, View.VISIBLE)
             views.setTextViewText(R.id.widget_message, context.getString(messageRes))
+            // 空态/过期时内容行已隐藏，提示本身就是返回应用的可见入口。
+            views.setOnClickPendingIntent(R.id.widget_message, WidgetClicks.openApp(context))
         }
     }
 

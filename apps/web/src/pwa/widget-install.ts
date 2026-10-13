@@ -34,7 +34,7 @@ export type WidgetHostKind = 'native-shell' | 'windows-pwa' | 'standalone' | 'br
  * `windows-pwa-candidate` 只表示当前平台有一条可能的 PWA 入口；它不证明
  * manifest 已注册、Edge 已安装或 Widget Board 已经能读到卡片。
  */
-export type WidgetProviderKind = 'windows-pwa' | 'windows-pwa-candidate' | 'none';
+export type WidgetProviderKind = 'native' | 'windows-pwa' | 'windows-pwa-candidate' | 'none';
 
 export interface WidgetJourneyHostState {
   readonly platform: InstallPlatform;
@@ -72,14 +72,14 @@ export function resolveInstallPlatform(platform: string | null | undefined): Ins
 /**
  * 解析设置页应该告诉用户的真实宿主能力。
  *
- * 目前只有 Windows PWA 提供桌面 Widget 这条链路；原生桌面壳已经是安装态，
- * 但不能因此宣称它有系统 Widget。macOS / Linux / 其它浏览器也保持明确的
- * `provider: 'none'`，不显示一条用户无法完成的 Windows 安装步骤。
+ * 原生壳必须实际注入 Widget IO 桥才提供原生添加引导。安装状态本身不证明
+ * 小组件支持；桥存在也不代表用户已经在系统中添加了小组件。
  */
 export function resolveWidgetJourneyHost(
   platformName: string | null | undefined,
   standalone: boolean,
   nativeShell: boolean,
+  nativeWidgetsAvailable = false,
 ): WidgetJourneyHostState {
   const platform = resolveInstallPlatform(platformName);
 
@@ -87,7 +87,7 @@ export function resolveWidgetJourneyHost(
     return {
       platform,
       host: 'native-shell',
-      provider: 'none',
+      provider: nativeWidgetsAvailable ? 'native' : 'none',
       standalone: true,
       showInstallGuide: false,
     };
@@ -170,4 +170,11 @@ export function isRunningStandalone(matches: (query: string) => boolean): boolea
  */
 export function shouldShowInstallGuide(standalone: boolean): boolean {
   return !standalone;
+}
+
+/** OS-specific entry, shown only when the installed shell provides native widget IO. */
+export function nativeWidgetSteps(platform: InstallPlatform): readonly ('web.widgetJourney.native.macos.step1' | 'web.widgetJourney.native.windows.step1' | 'web.widgetJourney.native.choose')[] {
+  if (platform === 'macos') return ['web.widgetJourney.native.macos.step1', 'web.widgetJourney.native.choose'];
+  if (platform === 'windows') return ['web.widgetJourney.native.windows.step1', 'web.widgetJourney.native.choose'];
+  return [];
 }

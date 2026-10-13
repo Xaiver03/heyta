@@ -1,0 +1,166 @@
+{
+  "status": "installed-files-match-candidate",
+  "signature": "valid",
+  "gatekeeper": "accepted",
+  "oldUserProcessRetained": 55162,
+  "userDraftNotReadOrModified": true,
+  "backup": "/tmp/heyta-pre-b5-installed-preserved-20261008.app",
+  "candidate": "/tmp/heyta-auth-legal-final-20261008-mac/Heyta.app",
+  "installed": "/Applications/Heyta.app",
+  "files": [
+    {
+      "path": "Contents/embedded.provisionprofile",
+      "sha256": "5b7697c5cc4e9238f4092a5900495bf740116144e1dea0dd7b72fffa85eda279"
+    },
+    {
+      "path": "Contents/Info.plist",
+      "sha256": "f4effdeba6466fc53ea7695b0d874d7d599c9b885380b7e10ff9c3929d6e515b"
+    },
+    {
+      "path": "Contents/_CodeSignature/CodeResources",
+      "sha256": "d74184b3b76bc0f7723032ea6dfdce132d08e4db25c76418d03a2268b6492a89"
+    },
+    {
+      "path": "Contents/MacOS/HeytaMac",
+      "sha256": "cf69f180453e7b25a4f5c37b77bbdc361e7478f57c1d7138d52ff9a9dd4876b8"
+    },
+    {
+      "path": "Contents/Resources/Heyta.icns",
+      "sha256": "cc4170c20b776d8a0780d7f66bba938fee80cd89efb1be378c0381d5dd7f2cee"
+    },
+    {
+      "path": "Contents/Resources/native-bridge.js",
+      "sha256": "5ec4b488cac4b4844a7686e04a5d14d34ec8b26029924a0c9e27d0e726bd1610"
+    },
+    {
+      "path": "Contents/PlugIns/HeytaMacWidget.appex/Contents/embedded.provisionprofile",
+      "sha256": "8e28f94ad8c6166d27f9209216c4e5a9868ce7a7cdbc9c9accb818388029d481"
+    },
+    {
+      "path": "Contents/PlugIns/HeytaMacWidget.appex/Contents/Info.plist",
+      "sha256": "968c29e362fbb9e4fbdd0ac55f695721a3b415d337ddcc6a585718ba98c6d9f5"
+    },
+    {
+      "path": "Contents/PlugIns/HeytaMacWidget.appex/Contents/_CodeSignature/CodeResources",
+      "sha256": "b108139a3d86708ae787a0f52d24536291d89856b8582f63a0004e4106623459"
+    },
+    {
+      "path": "Contents/PlugIns/HeytaMacWidget.appex/Contents/MacOS/HeytaMacWidget",
+      "sha256": "371aa07e0fa2c6db7c1fb4fbaac58166464962ffb9d927f6d9c8b126ec796fe8"
+    },
+    {
+      "path": "Contents/PlugIns/HeytaMacWidget.appex/Contents/Resources/Metadata.appintents/version.json",
+      "sha256": "3940f1530d00561b32387dbc299f7dab36b517962e6e0d3887791d16e1c6a916"
+    },
+    {
+      "path": "Contents/PlugIns/HeytaMacWidget.appex/Contents/Resources/Metadata.appintents/extract.actionsdata",
+      "sha256": "e85d816beedcba6f50e59b0961e8e91a345700575d1fe692d934361d72de53d0"
+    },
+    {
+      "path": "Contents/Resources/web-dist/index.html",
+      "sha256": "7c3a2668eaa7abd4e328a5e5b18209cdcb500b914bef7227440974781672d5cb"
+    },
+    {
+      "path": "Contents/Resources/web-dist/manifest.webmanifest",
+      "sha256": "370339d9feca29a43ddae21df169017d45d65afd6a75ad5b97ed4e3e74182780"
+    },
+    {
+      "path": "Contents/Resources/web-dist/sw.js",
+      "sha256": "31b43b30a3edba4e556da5cae041f57273431aee08f736d7c9bad17608270240"
+    },
+    {
+      "path": "Contents/Resources/web-dist/icons/apple-touch-icon.png",
+      "sha256": "993efc029da10850bbc06fcdae8faa1c61d38b23e1290255e11b8da7099dae0e"
+    },
+    {
+      "path": "Contents/Resources/web-dist/icons/icon-192.png",
+      "sha256": "bbbffd64651d96cb35f7cb3c0d1cb3a7dc2444ed9035c74b01f9c48266475885"
+    },
+    {
+      "path": "Contents/Resources/web-dist/icons/icon.svg",
+      "sha256": "85ec6e5860aae6fc291494f64097587167ffde07ca1247b52648cbadb323ccd2"
+    },
+    {
+      "path": "Contents/Resources/web-dist/icons/icon-maskable-512.png",
+      "sha256": "8232a43189f77124f90717f68927a962ef9acf7e25307beb62b965f0e1e4e93e"
+    },
+    {
+      "path": "Contents/Resources/web-dist/icons/icon-maskable.svg",
+      "sha256": "18d879f635883819ca5493e6b58a27e1d2f845b5c781235041923f3a8ce6926e"
+    },
+    {
+      "path": "Contents/Resources/web-dist/icons/icon-512.png",
+      "sha256": "607f85bf71c5a3922ce932ed0f442401dacfbb45a13405c1530a5f426bc97223"
+    },
+    {
+      "path": "Contents/Resources/web-dist/assets/shell-host-O6eZFKzn.js",
+      "sha256": "a0da5f6d82eada5d1665efdb5aabe0c2c1f63b2a0d8c3c4f2f093897808d0bd7"
+    },
+    {
+      "path": "Contents/Resources/web-dist/assets/sqlite3-worker1-DdwV2TBQ.js",
+      "sha256": "b87a19bcff4d2bb09cf06e5a6018ac40d28ac084d27c56fa2cd489e86fbdff1b"
+    },
+    {
+      "path": "Contents/Resources/web-dist/assets/index-C5eTWZMU.js",
+      "sha256": "6f71bbe651998d80f91e97ab9d1f32b55e2c9f90b501a285c7b4432055d69052"
+    },
+    {
+      "path": "Contents/Resources/web-dist/assets/sqlite3-opfs-async-proxy-Ck-yCayi.js",
+      "sha256": "9f1970e05ee07a79332498858740b705eeb1dcee03bc150f6f690bc0fb5f0a06"
+    },
+    {
+      "path": "Contents/Resources/web-dist/assets/index-4SmZxIai.css",
+      "sha256": "d20fef84d2c739a0bfc5eb1a02bb30447b16117364cd50f9922b4e9727b097e7"
+    },
+    {
+      "path": "Contents/Resources/web-dist/assets/index-CYIBHm27.js",
+      "sha256": "5079a1751cf86798d507dda2f1a060b32ca2b5d20d65c98e3c310b84c9bc3728"
+    },
+    {
+      "path": "Contents/Resources/web-dist/assets/storage.worker-DkqSoDYv.js",
+      "sha256": "f1a5d0f522fe22e03f6ba9dc6d34b6d6bce8f6856368ebebfeced66b6e2c4f3a"
+    },
+    {
+      "path": "Contents/Resources/web-dist/assets/sqlite3-Con_VOcu.wasm",
+      "sha256": "2ee8f3dab694532afc8840e07703127287662d08b74e6ff50491ce63f00d5752"
+    },
+    {
+      "path": "Contents/Resources/web-dist/assets/universal-slice-CMWUhCAV.js",
+      "sha256": "bca7aaf1d565123feae3595fa5cb40a8faa2628a6b54f1113465ed1f0ec3d1b0"
+    },
+    {
+      "path": "Contents/Resources/web-dist/widgets/focus.json",
+      "sha256": "3784cfcce3569ba13fd3675f98be04d832eb12c26ddd6945de36389d8cc6ec4c"
+    },
+    {
+      "path": "Contents/Resources/web-dist/widgets/today.data.json",
+      "sha256": "204ecbea81b1a06241a675b318589cd9562929099d1fd69dc90c1e0eb4a891a6"
+    },
+    {
+      "path": "Contents/Resources/web-dist/widgets/quadrant.json",
+      "sha256": "4ecf29869b8e37d380050cfd083d408ba6ac73be6ec42c3282df7000cca77f77"
+    },
+    {
+      "path": "Contents/Resources/web-dist/widgets/habits.data.json",
+      "sha256": "a04ea8b3fd908b6daa19ac5bddf81ecc015033a34812498dc970cf054add20fe"
+    },
+    {
+      "path": "Contents/Resources/web-dist/widgets/today.json",
+      "sha256": "303fa1ef2a0fa2a06b75c30d527c1d74595e1a23e2593090a1ec43848ca3f961"
+    },
+    {
+      "path": "Contents/Resources/web-dist/widgets/quadrant.data.json",
+      "sha256": "833f8bbb0e31aaf165f977d391cfe28106274b705b23b70958d69c45c22c3b58"
+    },
+    {
+      "path": "Contents/Resources/web-dist/widgets/habits.json",
+      "sha256": "8209e3a2845aedb7cfe939b2c23feb97d0bb3e3129c0ec0ddf4cdff81b68e3ac"
+    },
+    {
+      "path": "Contents/Resources/web-dist/widgets/focus.data.json",
+      "sha256": "fee42b9609a58fac53cca57ec7866fb1fc7f3c87745c170c3c8edd06e2283253"
+    }
+  ],
+  "failedMergeRetained": "/tmp/heyta-b5-merged-install-failed-20261008.app",
+  "repair": "exact directory replacement after merged copy failed signature verification"
+}

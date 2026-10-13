@@ -143,6 +143,15 @@ export interface ReminderActions {
   rescheduleForRepeat(taskId: string, nextDueDate: number | undefined): Promise<number>;
 }
 
+/** A validated field patch for one reminder in a repeating occurrence. */
+export interface RepeatReminderUpdate {
+  id: string;
+  triggerAt: number;
+  dismissedAt: null;
+  snoozedUntil: null;
+  firedForTriggerAt?: number;
+}
+
 /**
  * 提醒实体的主键：任务 + 触发时刻。
  *
@@ -496,33 +505,49 @@ export async function rescheduleRemindersForRepeat(
   taskId: string,
   nextDueDate: number | undefined,
 ): Promise<number> {
-  /**
-   * 只看**存活**的提醒：墓碑不占名额，也不该被"顺延"——那会白写一条 op
-   * （见文件头第 3 条与 `aliveReminders`）。
-   */
+  const updates = planRepeatReminderUpdates(ctx, taskId, nextDueDate);
+  for (const { id, ...payload } of updates) {
+    await ctx.dispatch({
+      entityType: 'REMINDER' as EntityType,
+      entityId: id,
+      opType: OpType.Update,
+      payload,
+    });
+  }
+  return updates.length;
+}
+
+/**
+ * Plan the reminder tail once. Repeating task completion uses this shared
+ * planner to put task and reminder patches in one versioned operation; the
+ * public ReminderActions method above retains its per-reminder write API.
+ */
+export function planRepeatReminderUpdates(
+  ctx: ActionContext,
+  taskId: string,
+  nextDueDate: number | undefined,
+): RepeatReminderUpdate[] {
   const alive = aliveReminders(
     Object.values(ctx.getState().reminders).filter((reminder) => reminder.taskId === taskId),
   );
-
-  let moved = 0;
+  const updates: RepeatReminderUpdate[] = [];
   for (const reminder of alive) {
     const next = nextTriggerAfterRepeat(reminder, nextDueDate);
     if (next === undefined) continue;
-    await ctx.dispatch({
-      entityType: 'REMINDER' as EntityType,
-      entityId: reminder.id,
-      opType: OpType.Update,
-      payload: {
-        triggerAt: next,
-        // 新周期重置：上一个周期的投递/关闭/推迟对新周期没有意义（文件头第 5 条）。
-        dismissedAt: null,
-        snoozedUntil: null,
-        ...(reminder.firedAt !== undefined && reminder.firedForTriggerAt === undefined
-          ? { firedForTriggerAt: reminderEffectiveAt(reminder) }
-          : {}),
-      },
+    if (
+      reminder.triggerAt === next &&
+      reminder.dismissedAt === undefined &&
+      reminder.snoozedUntil === undefined
+    ) continue;
+    updates.push({
+      id: reminder.id,
+      triggerAt: next,
+      dismissedAt: null,
+      snoozedUntil: null,
+      ...(reminder.firedAt !== undefined && reminder.firedForTriggerAt === undefined
+        ? { firedForTriggerAt: reminderEffectiveAt(reminder) }
+        : {}),
     });
-    moved += 1;
   }
-  return moved;
+  return updates;
 }

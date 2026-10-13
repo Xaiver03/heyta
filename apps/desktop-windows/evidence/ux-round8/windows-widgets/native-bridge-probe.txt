@@ -1,0 +1,13 @@
+Windows 原生小组件桥接探针（windows-pc，交互会话）
+====================================================
+
+SNAPSHOT_ENCRYPT_DECRYPT=OK
+INTENT_READ_NONDESTRUCTIVE=OK
+INTENT_EXACT_ACK_PRESERVES_NEW=OK
+CLEANUP_FAILURE_PROPAGATES=OK
+STALE_CLICK_BLOCKED_AFTER_CLEAR=OK
+NATIVE_WIDGET_PROBE=OK
+EXIT=0
+
+探针路径：原生 DPAPI 设备密钥 → AES-GCM 快照封装/解封 → 意图写入 → 读取后模拟新点击到达 → 精确确认旧批次 → 新意图保留；另验证设备密钥被占用时清理失败会抛错，清理完成后旧卡片点击不能重新写入。
+这证明桥接存储和回写链路可用；它不冒充 Widgets Board 的系统按钮验收。该验收机仍缺少 Microsoft Windows Web Experience / Widgets host。

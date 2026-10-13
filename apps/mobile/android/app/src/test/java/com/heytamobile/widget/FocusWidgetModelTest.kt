@@ -66,11 +66,30 @@ class FocusWidgetModelTest {
     fun `active 为 true 时带出标题与目标时长`() {
         val model = build(
             envelope = envelope(),
-            payload = payload(WidgetFocus(active = true, targetSeconds = 1500.0, sessionTitle = "写方案")),
+            payload = payload(WidgetFocus(active = true, targetSeconds = 1500.0, sessionTitle = "写方案", endsAt = 2_000L)),
         )
         assertEquals(FocusWidgetState.ACTIVE, model.state)
         assertEquals("写方案", model.sessionTitle)
         assertEquals(1500, model.targetSeconds)
+    }
+
+    @Test
+    fun `active 没有 endsAt 时显示为已暂停`() {
+        val model = build(
+            envelope = envelope(),
+            payload = payload(WidgetFocus(active = true, targetSeconds = 1500.0, sessionTitle = "写方案")),
+        )
+        assertEquals(FocusWidgetState.PAUSED, model.state)
+        assertEquals("写方案", model.sessionTitle)
+    }
+
+    @Test
+    fun `active 有 endsAt 时显示为运行中`() {
+        val model = build(
+            envelope = envelope(),
+            payload = payload(WidgetFocus(active = true, targetSeconds = 1500.0, endsAt = 2_000L)),
+        )
+        assertEquals(FocusWidgetState.ACTIVE, model.state)
     }
 
     @Test
@@ -92,14 +111,14 @@ class FocusWidgetModelTest {
         //    变得无法区分；那是视图层的事。
         val model = build(
             envelope = envelope(),
-            payload = payload(WidgetFocus(active = true, sessionTitle = "")),
+            payload = payload(WidgetFocus(active = true, sessionTitle = "", endsAt = 2_000L)),
         )
         assertEquals("", model.sessionTitle)
     }
 
     @Test
     fun `没有标题也没有目标时长时仍然是 ACTIVE`() {
-        val model = build(envelope = envelope(), payload = payload(WidgetFocus(active = true)))
+        val model = build(envelope = envelope(), payload = payload(WidgetFocus(active = true, endsAt = 2_000L)))
         assertEquals(FocusWidgetState.ACTIVE, model.state)
         assertNull(model.sessionTitle)
         assertNull(model.targetSeconds)

@@ -1,0 +1,18 @@
+QA=msix-titlebar-current
+QA_ROOT=C:\Users\41478\heyta-msix-qa-20261008-titlebar
+DATA_DIR=C:\Users\41478\heyta-msix-qa-20261008-titlebar\data
+CONTEXT IsAdmin=False SessionId=2
+APP_ID=cloud.finlaw.heyta.desktop_d8ndx02bjp3sw!App
+INSTALLED_LOCATION=C:\Program Files\WindowsApps\cloud.finlaw.heyta.desktop_1.0.0.0_x64__d8ndx02bjp3sw
+INSTALLED_VERSION=1.0.0.0
+REQUESTED_WEBVIEW_PROFILE=C:\Users\41478\heyta-msix-qa-20261008-titlebar\webview-profile
+EXE=C:\Program Files\WindowsApps\cloud.finlaw.heyta.desktop_1.0.0.0_x64__d8ndx02bjp3sw\HeytaWindows.exe
+PID=16296
+HWND=32771226
+WINDOW_TITLE=heyta
+WINDOW_RECT=78,78,1152x587
+FOREGROUND=True
+DB_EXISTS=True
+WEBVIEW_PROFILE=C:\Users\41478\AppData\Local\Packages\cloud.finlaw.heyta.desktop_d8ndx02bjp3sw\LocalState
+PNG_SAVED=True bytes=156096
+RESULT=OK

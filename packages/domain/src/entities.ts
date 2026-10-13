@@ -243,6 +243,16 @@ export interface Task extends EntityBase {
   /** 完成时间。存在即表示已完成（不另设 completed 布尔，避免两者不一致）。 */
   completedAt?: number;
   /**
+   * 已经由系统小组件消费过的完成意图 receipt。
+   *
+   * 这是一个可选的、可同步的幂等记录，不是完成状态的第二个来源。
+   * 小组件的消费发生在独立进程里：如果任务 op 已落盘、队列确认删除前应用被杀，
+   * 下一次启动会再次领取同一意图。普通任务可以靠 `completedAt` 避免重复，
+   * 但重复任务完成后仍是未完成态，必须把 receipt 与顺延放在同一枚 TASK op 里。
+   * 旧数据没有它时按空数组处理；不需要 schema bump。
+   */
+  widgetCompletionReceipts?: string[];
+  /**
    * 排期起点（epoch ms）。可选；**运行时默认 `undefined` = 未排期起点**
    * （AGENTS.md §3.3：已落盘的数据没有这个字段，hydration 不得炸）。
    *

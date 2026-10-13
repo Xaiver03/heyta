@@ -207,8 +207,8 @@ type SettingsStyles = ReturnType<typeof makeStyles>;
  * ====================================================================== */
 
 export interface SettingsSectionProps {
-  /** 分组标题。 */
-  readonly title: string;
+  /** 分组标题。二级页面已经在顶栏显示分组名时可以省略，避免重复层级。 */
+  readonly title?: string;
   /** 标题下面那一整句说明。省略则不渲染。 */
   readonly note?: string;
   /**
@@ -263,12 +263,16 @@ export function SettingsSection({
 
   return (
     <View style={[styles.root, variant === 'card' ? styles.card : null]} testID={testID}>
-      <View style={styles.sectionHead}>
-        {leading === undefined ? null : leading}
-        <Text style={[text['section-title'], styles.dynamic, { color: tokens['color.foreground'] }]}>
-          {title}
-        </Text>
-      </View>
+      {title === undefined && leading === undefined ? null : (
+        <View style={styles.sectionHead}>
+          {leading === undefined ? null : leading}
+          {title === undefined ? null : (
+            <Text style={[text['section-title'], styles.dynamic, { color: tokens['color.foreground'] }]}>
+              {title}
+            </Text>
+          )}
+        </View>
+      )}
 
       {note === undefined ? null : (
         <Text style={[text.caption, { color: tokens['color.foreground-muted'] }]}>{note}</Text>

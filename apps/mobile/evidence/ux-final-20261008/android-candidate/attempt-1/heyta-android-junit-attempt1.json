@@ -1,0 +1,140 @@
+﻿{
+    "tests":  135,
+    "failures":  1,
+    "errors":  0,
+    "skipped":  0,
+    "suites":  [
+                   {
+                       "name":  "com.heytamobile.widget.FocusWidgetModelTest",
+                       "tests":  9,
+                       "failures":  0,
+                       "errors":  0,
+                       "skipped":  0,
+                       "lastWriteUtc":  "2026-10-08T08:12:47.3597072Z",
+                       "sha256":  "A04BBF0B4534EB40317AFC53275CA687E170DCD4AB235AAC5D257D5930AEB3C0",
+                       "failureMessages":  [
+
+                                           ]
+                   },
+                   {
+                       "name":  "com.heytamobile.widget.GoldenFixtureSmokeTest",
+                       "tests":  4,
+                       "failures":  1,
+                       "errors":  0,
+                       "skipped":  0,
+                       "lastWriteUtc":  "2026-10-08T08:12:47.3632013Z",
+                       "sha256":  "4F6D0C44FA62494DC083AC7CA5733859FD93876F8B44A296AB0E4DC55A61FF2C",
+                       "failureMessages":  [
+                                               "java.lang.AssertionError: 夹具目录不在 packages/widget-core/fixtures 下：C:\\src\\heyta\\packages\\widget-core\\fixtures"
+                                           ]
+                   },
+                   {
+                       "name":  "com.heytamobile.widget.HabitsWidgetModelTest",
+                       "tests":  8,
+                       "failures":  0,
+                       "errors":  0,
+                       "skipped":  0,
+                       "lastWriteUtc":  "2026-10-08T08:12:47.3587068Z",
+                       "sha256":  "9FDC780CCF2AE2BF9458967206DD2487D1C00D930DBF035EB0CEBB9ED36B394B",
+                       "failureMessages":  [
+
+                                           ]
+                   },
+                   {
+                       "name":  "com.heytamobile.widget.QuadrantWidgetModelTest",
+                       "tests":  12,
+                       "failures":  0,
+                       "errors":  0,
+                       "skipped":  0,
+                       "lastWriteUtc":  "2026-10-08T08:12:47.3597072Z",
+                       "sha256":  "47B2B85CC5E60683B40488E0FAF01EA1CF1EED70F727B00F1DEBD47AC5D84FB4",
+                       "failureMessages":  [
+
+                                           ]
+                   },
+                   {
+                       "name":  "com.heytamobile.widget.TodayWidgetModelTest",
+                       "tests":  18,
+                       "failures":  0,
+                       "errors":  0,
+                       "skipped":  0,
+                       "lastWriteUtc":  "2026-10-08T08:12:47.3609706Z",
+                       "sha256":  "FFBD816585AC951267D1921965B3F2C71AF7C045E583F06ACFD449A9DF37934C",
+                       "failureMessages":  [
+
+                                           ]
+                   },
+                   {
+                       "name":  "com.heytamobile.widget.WidgetGoldenFixtureTest",
+                       "tests":  11,
+                       "failures":  0,
+                       "errors":  0,
+                       "skipped":  0,
+                       "lastWriteUtc":  "2026-10-08T08:12:47.3597072Z",
+                       "sha256":  "9B3C65A731015ADB2417C97C117EFEBF1A9D3D2C52C4256F82E70E646FA3B964",
+                       "failureMessages":  [
+
+                                           ]
+                   },
+                   {
+                       "name":  "com.heytamobile.widget.WidgetIntentQueueTest",
+                       "tests":  26,
+                       "failures":  0,
+                       "errors":  0,
+                       "skipped":  0,
+                       "lastWriteUtc":  "2026-10-08T08:12:47.3609706Z",
+                       "sha256":  "58741F015FA10F836ABF7869C9DE379657F97DA361C4453B233C2B88728700C2",
+                       "failureMessages":  [
+
+                                           ]
+                   },
+                   {
+                       "name":  "com.heytamobile.widget.WidgetLocalePreferenceTest",
+                       "tests":  1,
+                       "failures":  0,
+                       "errors":  0,
+                       "skipped":  0,
+                       "lastWriteUtc":  "2026-10-08T08:12:47.3597072Z",
+                       "sha256":  "F63BEC5D5BE6EFFD2F5042AF4E7D891AE19AD5CEEC1EE6ACC89D8A2019451DA4",
+                       "failureMessages":  [
+
+                                           ]
+                   },
+                   {
+                       "name":  "com.heytamobile.widget.WidgetRefreshPipelineTest",
+                       "tests":  17,
+                       "failures":  0,
+                       "errors":  0,
+                       "skipped":  0,
+                       "lastWriteUtc":  "2026-10-08T08:12:47.3609706Z",
+                       "sha256":  "B92C9A3AA2A43977E308A96E6FAAF0236FF1A6D3D5ADAF1C47B16C528FC7B628",
+                       "failureMessages":  [
+
+                                           ]
+                   },
+                   {
+                       "name":  "com.heytamobile.widget.WidgetSnapshotParserTest",
+                       "tests":  24,
+                       "failures":  0,
+                       "errors":  0,
+                       "skipped":  0,
+                       "lastWriteUtc":  "2026-10-08T08:12:47.3609706Z",
+                       "sha256":  "F179A790FA7BF9BB132B7C3AFBEF0E2C335D49328D0940A08D3B39496F8DD3CA",
+                       "failureMessages":  [
+
+                                           ]
+                   },
+                   {
+                       "name":  "com.heytamobile.widget.WidgetStoreTest",
+                       "tests":  5,
+                       "failures":  0,
+                       "errors":  0,
+                       "skipped":  0,
+                       "lastWriteUtc":  "2026-10-08T08:12:47.3587068Z",
+                       "sha256":  "28246F40B7F5254D9AB2F69891C4FF1AE12FC14CB6EE42BB91D8AFCD5FF40F13",
+                       "failureMessages":  [
+
+                                           ]
+                   }
+               ]
+}

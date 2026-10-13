@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 2,
+  "lifecycle": "finalized",
+  "processId": 31996,
+  "finalizedUtc": "2026-10-08T07:17:19.2707435Z",
+  "processStop": {
+    "pid": 31996,
+    "state": "stopped"
+  },
+  "defaultFilesBeforeCount": 1277,
+  "defaultFilesAfterCount": 1277,
+  "defaultComparison": {
+    "unchanged": true,
+    "differences": []
+  },
+  "scheduledTaskPresent": false,
+  "qaProcessCount": 0,
+  "copiedDllSha256": "C0504F8B7ADABBB77984DB900C54D78F88FE703DAC85820EDD1C449331126C5C",
+  "webIndexSha256": "3B86137CC615F63BFE07C7E2128CC206CD3AC441E8F704981FEB1B661E8553C3",
+  "sourceSha256": {
+    "base.css": "C54DF2D641E3C2140D69493CD01C51C427ED1EA6A75113E3F35FDC03CE149327",
+    "MainWindow.xaml": "04300182C48F162715C17ABD7F73C1847E8B08107DDDD89F94D8DF1DAB411EC0",
+    "runner": "1166656062C884CCE632E659079CA7F75A2DA4E40549F3DC9AB3D32BC73F2C7F",
+    "MainWindow.xaml.cs": "AED7288725752B23435890580DD480FB1998FBB66B7188B4FC4B049C52DCAFC1"
+  },
+  "verificationScope": "Unpackaged Debug QA copy, isolated SQLite and WebView2 profile. Not a final MSIX release.",
+  "elapsedSecondsDiscarded": "Previous identity log subtracted an ambiguous local timestamp from UTC, producing a negative duration; duration is not used as evidence."
+}

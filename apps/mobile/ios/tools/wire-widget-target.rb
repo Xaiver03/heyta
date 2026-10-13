@@ -148,6 +148,7 @@ app.build_configurations.each do |config|
   #    两处写死 + 一条能在本机跑的校验（见 verify 脚本）比"继承"更难配错。
   config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'com.heyta'
   config.build_settings['CODE_SIGN_ENTITLEMENTS'] = "#{APP_GROUP}/#{APP_GROUP}.entitlements"
+  config.build_settings['HEYTA_WIDGET_KEYCHAIN_ACCESS_GROUP'] = '$(DEVELOPMENT_TEAM).com.heyta.shared'
 end
 puts '＋ app：bundle id = com.heyta，entitlements 已接'
 
@@ -202,6 +203,7 @@ ext.build_configurations.each do |config|
   bs['INFOPLIST_FILE'] = "#{EXT_GROUP}/Info.plist"
   bs['GENERATE_INFOPLIST_FILE'] = 'NO'
   bs['CODE_SIGN_ENTITLEMENTS'] = "#{EXT_GROUP}/#{EXT_GROUP}.entitlements"
+  bs['HEYTA_WIDGET_KEYCHAIN_ACCESS_GROUP'] = '$(DEVELOPMENT_TEAM).com.heyta.shared'
   bs['IPHONEOS_DEPLOYMENT_TARGET'] = '17.0'
   bs['SWIFT_VERSION'] = '6.0'
   bs['TARGETED_DEVICE_FAMILY'] = '1,2'

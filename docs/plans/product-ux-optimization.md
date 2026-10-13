@@ -1,7 +1,7 @@
 # 产品 UI / UX / IA 优化计划
 
-> 状态：**第三批测试发布已完成；B3 四端重建安装完成，Web 与官网已部署。活动 Goal 仍有跨端交互矩阵、原生通知投递、Widget Gallery/Board 添加、桌面外链、真人读屏和 UX-S9-106 等未验边界。**（2026-10-08）
-> 当前产物与验收状态以文末“当前行动表（B3）”和 [`release-2026-10-08-b3/release.json`](../../apps/web/evidence/ux-closeout/release-2026-10-08-b3/release.json) 为准；此前各批次的“待重装”描述均为历史记录，不代表当前尚未安装。
+> 状态：**已公开分发第五批测试版 B5，协议阅读已部署 Web 并在 Android 安装包点验；完整跨端交互验收仍未完成。**（2026-10-08）
+> 最新发布见 [B5测试版](https://github.com/Xaiver03/heyta/releases/tag/v1.0.1-test.20261008.5) 与 [资产对账](../../apps/web/evidence/ux-final-20261008/auth-consent-registration/release-b5-asset-verification.json)：macOS、Windows、Android 附件已发布，iOS 为已关联内部组的 TestFlight 1.0(7)。Mac本机安装待解锁，实体 iPhone 未验；COS下载清单与Linux仍为B4。B4来源边界仍见 [`release.json`](../../apps/web/evidence/ux-closeout/release-2026-10-08-b4/release.json)，不能外推为同一冻结源码。系统组件验收见 UX-S9-138，最新协议验收见 UX-S9-148；更早发布及“待重装”文字为历史快照。
 > 依据：[`../research/product-level-ia-ux-audit.md`](../research/product-level-ia-ux-audit.md)（合并裁决稿）；补充基线：[`../research/product-ux-ia-aesthetic-audit.md`](../research/product-ux-ia-aesthetic-audit.md)  
 > 目标：把产品从“功能面过宽的精致后台”收敛成“本地优先、执行优先的任务工作台”。
 
@@ -696,7 +696,7 @@ TestFlight build3 已新增 `zh-Hans` 测试说明；内部组已有1名测试�
 
 第三批四端重打重装已全部通过，iOS TestFlight 1.0 (5) 为VALID且加入既有内部测试组；第五轮已经用真实截图确认“今日任务”小组件实际添加并退出编辑态，仍缺其余模板、点击回应用、数据刷新、实体 iPhone、真人读屏和生产邮件收件等边界。源码快照与包验收详见 `apps/web/evidence/ux-closeout/release-2026-10-08-b3/release.json`。未部署另一任务的入站自动化服务端。
 
-## 当前行动表（B3，2026-10-08）
+## 历史行动表（B3，2026-10-08）
 
 本表只覆盖本轮活动 Goal：同步/隐私、数据管理、提醒、原生 Widget、Profile/账号、AI、帮助交互。B3 发布事实为：`status: published`、服务端快照 `3880bdd1fd5e8fe3710bd19c5f753947ea89c468`、TestFlight build `5` 为 `VALID` 且已关联内部测试组、`fourPlatformReinstall: true`。四端重装证明产物进入安装态，不自动证明每个交互矩阵已经在 B3 逐项重跑。
 
@@ -813,3 +813,192 @@ Windows 数据隔离验收补齐：共享 SQLite 路径 override 不再假称能
 iOS最终安装包首启补验：协议链接无下划线、AX角色为Link、44点触摸高度；实际点击服务条款进入Safari并回读完整 `/legal/terms/` 地址。见 `apps/mobile/evidence/ux-round7/ios-first-run/verification.json`。键盘焦点和真人读屏仍未由这些证据覆盖。
 
 iOS最终包的底栏返回补验通过：助手输入 `QADraftB4`，切换任务页后再回“我的”，自动恢复助手页面且草稿逐字一致。证据 `apps/mobile/evidence/ux-round7/ios-tab-return/verification.json`；此项只补草稿路径，不代替待确认提案/运行中请求矩阵。
+
+
+### 第八轮接续：窗口融合与数据管理
+
+| 编号 | 发现 / 用户要求 | 决策与验收状态 |
+|---|---|---|
+| UX-S9-135 | Windows 系统标题栏有独立浅色底、图标与名称，与应用顶部割裂；用户截图明确要求融入应用 | 源码及独立 Debug 真机矩阵完成：深浅顶部融合、弹层遮罩贯通、原生拖动/双击最大化、头像与详情按钮命中、800×680 窄窗 document 无横溢出。新增独立 QA 原生最小化/最大化/还原/关闭已真点通过；最终同源码 MSIX 重建重装及 Snap 悬停仍待验。完整截图及默认数据不变证据见 `apps/desktop-windows/evidence/ux-final-20261008-integrated-titlebar/RESULT.md`。 |
+| UX-S9-136 | iOS 数据管理重复页标题；入口仍称不能还原；导出、还原、迁移堆叠成长页，粘贴技术文本默认占据大量空间 | 安装态已确认。调整为清晰的数据操作入口与按需显示输入，纠正中英文说明；保留空库还原限制。文件选择、取消、坏JSON、真实还原与分享仍须逐项验收。 |
+
+macOS B4 已安装应用补验：实际AX点击账号→应用设置，正确识别原生桌面环境且不展示PWA指引；帮助中心由系统Chrome打开 `/docs/`，应用仍保留本地URL与存活窗口。证据 [安装态小组件与帮助验收](../../apps/desktop-macos/evidence/ux-round8/b4-installed-widget-help-ax.md)。该记录只关闭环境识别与外链路径，不替代全部视觉验收。
+
+UX-S9-137：iOS B4 安装态真实选择备份后报 `readTextUri of null`。RN缺失模块返回null，原实现只判undefined，导致blob退路根本没有机会执行；已规范化缺失值，待新包真实文件选择验证。不能以粘贴JSON成功代替文件路径验收。
+
+Android B4安装态补验完成：默认执行/首次授权后，通过受控模型fixture实际操作追加清单、两任务优先级、估时上限预览、多字段修改、批量完成；13个步骤通过，op计数3→8，各写入意图1条op。APK签名与SHA256再次核验，证据 `apps/mobile/evidence/ux-round6/tool-journey-android/journey.json`。没有重建APK；不把该旅程扩大为实时模型、读屏或运行中请求跨页恢复验收。
+
+
+#### 四端系统小组件交付要求（用户再次明确，2026-10-08）
+
+UX-S9-138：Windows、macOS、Android、iOS **全部必须支持原生系统小组件**。应用内卡片、PWA小组件、提示“当前不支持”，以及仅识别平台都不构成交付。此前UX-S9-109和macOS帮助/能力识别证据仍有效，但只证明提示真实，绝不代表系统小组件能力完成。
+
+| 端 | 当前确认事实 | 必须补齐 |
+|---|---|---|
+| Windows | 已补独立 IWidgetProvider COM 服务、共享桥和 MSIX 注册，构建安装通过 | 最新接线包、真实 Board 添加、快照刷新、操作回写、缩放/主题；测试机缺微软 Widgets host，正在检查官方恢复路径 |
+| macOS | 已新增原生 WidgetKit 扩展并签名注册；隔离安装验证过跨进程意图 | 系统 Gallery 添加、真实按钮、四模板尺寸与主题；现有探针不代替系统界面 |
+| Android | 四个AppWidgetProvider和Manifest注册均存在 | 当前Release实际系统添加及四模板数据、交互、尺寸/主题复验；不以provider单测代替 |
+| iOS | 四模板扩展存在；模拟器今日模板已添加且勾选1条op、再次回前台0条 | 其余模板与完整交互/尺寸/主题矩阵；实体iPhone需单独取证，不能用模拟器替代 |
+
+统一判据：从操作系统入口添加 → 显示真实任务/习惯/专注数据 → App修改后刷新 → 小组件操作经共享app-host写入口落一次op → 冷启动/多次恢复不重复 → 删除/重新添加与亮暗/尺寸正常。组件数据继续遵守本地优先、加密快照与唯一op写入口；不为各端复制领域逻辑。当前四端完整验收**未完成**。
+
+
+#### UX-S9-138 四端小组件实测进展（2026-10-08 12:20）
+
+| 平台 | 已证事实 | 仍须完成 |
+|---|---|---|
+| Android | 现有 Release 安装包在系统 Launcher 显示四模板，全部实际添加；四象限显示真实任务、调整宽度、点击回应用成功；系统组件操作只增加一条 UPD_TASK（8→9） | 发现系统深色模式下卡片仍为浅色，已分派修复；新包复验及其余模板非空数据、冷启动/跨日/重加仍待补 |
+| macOS | 新原生 WidgetKit 扩展已签名并被 pluginkit 注册；真实 UI 新增任务→加密快照→独立签名扩展身份读取→共享 ToggleTaskIntent→宿主写入一条 op（2→3）；重复意图后仍为3 | 该操作通过扩展身份探针执行，**不等于系统 Gallery 添加/实际 Widget 按钮点击**；系统界面添加和尺寸/主题仍待验 |
+| iOS | 已有 WidgetKit 四个 enabled descriptor；此前通过系统界面添加今日任务并点击回应用 | 其余三模板系统添加、非空数据刷新及真机仍待验；模拟器证据不作为实体 iPhone 证据 |
+| Windows | 已实现 COM Provider、MSIX 注册与共享桥，独立 Provider 和宿主构建、打包安装启动已通过 | 最新修复须重包；测试机的微软 Widgets host 尚不可用，继续官方恢复与系统添加验收 |
+
+共享实现：快照规划已从 mobile 提取到 `packages/app-host/src/widget-publish.ts` 并删除移动壳副本；桌面通过共享 `native-widget-session.ts` 串行发布、排空意图与清数据。Web 仅在真实原生 Widget 桥存在时展示系统添加步骤。当前已通过共享 session/写入行为测试16项、移动发布回归16项、宿主能力分支19项、Web类型检查与依赖构建。它们不替代上表系统层验收。
+
+证据：[Android 系统四模板报告](../../apps/mobile/evidence/ux-round8/android-widgets/RESULT.md)、[macOS 原生运行记录](../../apps/desktop-macos/evidence/native-widgets/2026-10-08.txt)、[macOS 真实单op记录](../../apps/desktop-macos/evidence/native-widgets/real-intent-oplog.json)。本轮新实现尚未作为统一四端测试版本发布，UX-S9-138继续进行中。
+
+
+UX-S9-138 接续验收清单（未完成项不得随构建成功关闭）：
+
+- [x] Android 四模板从系统 Launcher 实际添加；四象限调整尺寸、返回应用、单次任务操作一次 op。
+- [x] Android 主题根因定位，四模板改为 design-system 生成的明暗资源；删去无效的 manifest 配置广播路径，应用配置变化刷新。生成资源已纳入对账。
+- [ ] Android 修复后 Windows 重打 APK，原有四组件实际切换明暗复验；其它模板填入非空真实数据。
+- [x] macOS WidgetKit 扩展、签名、加密数据和真实任务跨进程意图链路实现。
+- [ ] macOS 系统 Gallery 添加、实际系统按钮点击、四模板尺寸/主题；探针不能替代。
+- [ ] iOS 其余模板系统添加与非空数据、实体 iPhone 验收；现有今日小组件模拟器记录保留。
+- [ ] Windows 原生 Provider 与主应用接线、最终包注册、系统 Widgets host 可用性和实际添加。Provider 独立构建/打包已经通过，主应用最终接线仍在进行。
+- [x] 共享 session 改为非破坏读与成功项精确 ack；查找状态/写入/ack 失败保留队列，错误上报异常不拒绝后台任务。原 drain/merge 恢复设计已替换。
+- [ ] 跨进程崩溃恢复最终安装态：四端已实现非破坏读取与精确 ack，尚须新包验证“落 op 后、ack 前退出”重投不重复。
+- [x] 重复任务跨 drain 幂等：receipt 与任务/相对提醒同枚 op；SQLite、重复回放、重启与乱序覆盖。最终系统点击新包仍在各端矩阵中单独验收。
+- [ ] Apple 显式共享 Keychain group 与可报告失败的清理路径修复/验证。当前 iOS entitlement 的首组就是共享组，不能把 Info.plist 未指定 group 直接写成“已经发生解密失败”；需核验签名运行结果。
+- [ ] 最终冻结源码四端重建、重装与测试版上传；本轮未发布。
+
+
+UX-S9-138 后续核对（2026-10-08）：Apple 20 个有界文件已逐文件 SHA-256 对账，主树与受控树一致；共享 Swift 测试 108 项、macOS 宿主构建与两端 WidgetKit 扩展 Release 编译通过。这不代表系统组件库验收通过。Android/iOS 移动桥另发现清理错误被转换为成功的问题，现已传播原生 reject/false 给清理结果；Android 清理后主动刷新系统缓存。移动桥、凭据清理、意图消费与快照规划定向 4 文件/45 项通过。Apple/Windows 清理后的系统缓存刷新另行核对。
+
+- [ ] 清理数据后系统小组件不继续展示旧任务；验证原生拒绝/刷新失败有真实失败结果。
+- [x] 重复任务与相对提醒同一枚总 op；新增范围契约，跨任务/多 scope 新写入落盘前拒绝，旧日志与 checkpoint 恢复不产生毒丸，独立复审已通过。
+
+Apple 清理刷新补验：共享清理服务在密钥及容器成功清理后发起系统 timeline reload，macOS 删除重复刷新；Swift 最新 109 项通过，主/受控树有界文件 SHA 一致。macOS 系统 Gallery 验收收到操作系统“电脑已锁定，自动解锁失败”；已请求手动解锁，未标记通过。Windows 新探针验证 DPAPI 加解密、非破坏读取与精确 ack，Provider 增加快照文件监听以刷新清理后的卡片；官方 Widgets host 获取仍在排查网络通道。
+
+补充复审与环境记录：重复完成 marker 的提醒范围曾只判断字符串前缀，独立复现 `task` 可误改 `task:child` 的提醒，已退回修复并要求 local/remote/import 与乱序反例；该项未关闭。Android Kotlin 本轮测试在 Windows 配置阶段失败：实际 SDK 目录仅余 platform-tools，NDK 缺失，正在定位/恢复工具链；没有回退到 Mac 构建。Windows 标题栏旧隔离会话 Finalize 因 manifest PID 与进程证据 PID 不同被安全拒绝；当前已无 HeytaWindows 进程，未改写证据冒充通过，最终包须新建隔离验收。Mac 已由用户解锁，系统界面验收继续。
+
+Android 队列修复原生验证已补：恢复官方 SDK 后，Windows `:app:testDebugUnitTest --tests com.heytamobile.widget.WidgetStoreTest` 成功，JUnit XML 回读 5 项、0 失败/错误/跳过，覆盖非破坏读取、精确确认、并发点击、清理后旧卡片回写拒绝、持久化失败。此命令没有生成新 APK，系统主题复验仍未关闭。移动并发清理补正后定向 4 文件/51 项通过，新增失败清理的独立界面提示与重试。
+
+本轮复审收口：提醒的 canonical ID 决定不可变任务归属，入口拒绝不一致的新写入与 REMINDER CRT/UPD 多 scope；历史日志、full-state 与 checkpoint 物化确定性归一归属，opaque legacy ID 保持旧语义。独立复审确认前述范围与恢复问题关闭、无新增具体 P1/P2。受控树 `pnpm -r build` 成功，app-host 全套 87 文件/1632 项通过。Android Release 新包开始构建；Apple 新候选包并行重打。尚未作为最终多端版本发布。
+
+
+UX-S9-138 安装身份与验收边界更新（2026-10-08 下午）：
+
+- Android 当前 Release 已由 Windows 完成构建（14分12秒），回传与远端逐字对账。已保留数据升级现有 emulator-5554，设备内 APK 与候选包 SHA-256 相同：`381203459ba9da1c85d4d5215fba8a32ce1b63992d87ef915a3e53de82c34ba3`；发布证书主体 CN=heyta，四个既有系统组件实例保留。新截图确认专注空状态卡片已呈深色；四模板逐个切换主题/非空数据/点击矩阵仍未完成。证据：`apps/desktop-macos/evidence/widget-qa-20261008-android.txt`（历史存放位置）。
+- iOS 最新候选 Release 已安装到既有模拟器，未清除数据；宿主可执行文件、扩展可执行文件、main.jsbundle 均与候选逐字相同。证据：`apps/mobile/evidence/ux-round8/widget-ack-cleanup/ios-candidate-install.json`。安装身份通过不代表其余三个模板系统验收通过，也不代表实体 iPhone 已验。
+- mobile 全量回归的 5 个 unhandled rejection 已定位为 Node 测试意外加载 RN Flow 入口。测试隔离修正后 68 文件/879 项通过、Errors 0；产品代码没有为了测试吞错。
+- Windows 官方 Web Experience Pack 安装器已取到并验证 Microsoft Corporation 有效签名，Mac/Windows SHA 一致。真实执行退出1612，Store/WU连接报0x80072EFD，系统仍无 Widgets host。未降低证书校验；证据 `apps/desktop-windows/evidence/ux-round8/windows-widgets/install-attempt.log`。不能把这一格勾为完成。
+- Mac 已解锁，CUA 可操作应用，但尚未取得系统 Gallery 面板；此前请求用户仅打开“编辑小组件”面板仍待完成。独立命名 QA.app 并不隔离数据库：CUA重新启动时未带目录环境变量，曾新建本轮两个测试任务与一个测试习惯，已通过UI仅移除这些测试条目，保留正常op/墓碑历史，没有恢复或覆盖默认数据库。之后显式以 `HEYTA_SHELL_DB_DIR=/tmp/heyta-widget-qa-20261008/mac-data` 启动，lsof确认 QA PID 打开该独立目录。不得继续引用“QA副本自动保护默认数据”的错误推断；仅指定路径启动且核实进程才构成隔离证据。
+- [x] 发布前校正 landing 平台介绍中“Android小组件/签名还在路上、iOS缺开发签名、桌面未签名公证”的旧中英文文案，再构建 landing；复核发现旧文案沿用了 B3 截面，遗漏 B4 已发布测试资产，因而错误写成 Android 尚未公开、Linux 仅本地构建。现改为 Android 已提供签名测试安装包、Linux 已提供测试安装包，同时保留全端交互与小组件覆盖仍在验收、iOS 仅内部测试且无公开邀请的边界。证据：[`release-2026-10-08-b4/release.json`](../../apps/web/evidence/ux-closeout/release-2026-10-08-b4/release.json)、[`release-2026-10-08-b4/github-verification.json`](../../apps/web/evidence/ux-closeout/release-2026-10-08-b4/github-verification.json)；实际消费字段为 `site.platforms.android.body`、`site.platforms.ios.body`、`site.platforms.desktop.body`。
+
+后续校正：认证测试mock已收窄到auth-flow.spec.ts内，删除本轮全局Vitest setup，独立只读复审通过；最终mobile复跑仍为68文件/879项通过、退出0。Mac打包自截屏脚本改用绝对临时数据库目录；以同一启动形状真实运行安装候选，独立数据库已生成且WebView截图244891字节、窗口1159×754。数据库隔离不等于系统App Group/Keychain整体隔离；系统Gallery验收仍未关闭。
+
+Windows 最新候选 MSIX 已签名安装，SHA-256 `c1cad48eb0aaf1ca2221a5c84295d3cf2733e11a9a849144ead2a667ab406c3f`，ADD_APPX/RESULT/PAYLOAD_WEBDIST/M2D/SHORTCUT 均通过。初次标题栏截图裁切错误被主线程退回，补用DPI-aware完整窗口截图（1440×734）确认边界及系统三个按钮均入图；这关闭截图错误，不代表标题栏审美与窄窗矩阵全部完成。SQLite采用新隔离QA目录，但WebView2仍回退包LocalState，不能声称完整配置隔离，未执行注销/清理。证据目录 `apps/desktop-windows/evidence/ux-final-20261008-msix-titlebar/`。Windows系统Widgets host失败边界不变。
+
+
+### 第九轮接续：隐私重选、弹窗键盘与助手跨页（2026-10-08）
+
+| 编号 | 实际发现 | 修复与当前验收边界 |
+|---|---|---|
+| UX-S9-139 | 只用本机却显示“撤回同意”；主动重选冒充已撤回；成功新选择后旧保存失败提示残留；UTC收据无时区说明；弹窗Shift+Tab落到背后、Escape同时关闭设置 | 两端只对accepted展示撤回，其余展示重新选择；settings reason不改决定；界面读取最后一次真实保存回执，隐藏/重挂载不吞掉失败，新保存成功才清除旧警告；收据标明UTC。Web弹窗圈定键盘焦点，底层设置/搜索/助手让出事件，关闭回到触发按钮。真实浏览器亮/暗、390×844窄屏、取消不变local-only、Tab循环和Escape只关一层已验证；3文件32项Web回归、37项移动闸门回归及两端类型检查通过。移动原生UI与最终安装包仍待本次源码重建验收。 |
+| UX-S9-140 | AI运行中任务→日历→任务，等待仍在但回包丢失；长连续消息向左溢出气泡 | 共享会话保留请求结果与等待阶段，文本按容器换行；Provider身份代际阻止同slot换号、ABA旧回包与迟回确认串入新会话，默认按账号持久化并让危险提案刷新失效。最终复审新增身份真源/自托管路径/手填凭据问题也已修复，见UX-S9-144；Web最终6文件80项、共享历史7项、真实浏览器9项无重试、类型检查通过。原生新包跨端矩阵仍待验。 |
+
+UX-S9-139 证据：[verification.json](../../apps/web/evidence/ux-final-20261008/privacy-choice/verification.json)、[亮色](../../apps/web/evidence/ux-final-20261008/privacy-choice/light-local-only.jpg)、[暗色](../../apps/web/evidence/ux-final-20261008/privacy-choice/dark-local-only.jpg)、[窄屏弹窗](../../apps/web/evidence/ux-final-20261008/privacy-choice/dark-narrow-dialog.jpg)。已逐文件/词条镜像主树，App.tsx仅合入两处键盘处理及注释，保留主树独立的dueDateLocal变更，没有覆盖他人的后端或入站自动化工作。
+
+数据管理补验：原“清理报告应有10条”的猜测不成立。原生小组件只有失败才追加报告；原测试模拟数据库模块遗漏原生生命周期接口，导致额外一条失败报告。现针对平台桥建成功/拒绝夹具，保留成功9类、验证先停止组件再销毁数据库且失败仍清其余数据，2文件20项通过。提醒到点用例单独复跑通过；全套负载下的一次失败尚未充分归因，不标为完整提醒矩阵通过。
+
+UX-S9-135 接续：最新已安装候选SHA `5E3C6904997D4BB48E5C7173EAD7025D24F5A99F31E4BB0243DC5ACCA89622B3` 早于本轮共享UI。其后在独立 Debug 副本完成完整深浅/窄窗/拖动/双击与顶部按钮矩阵，实图已无空顶栏，exact finalize 核对1277默认文件不变；详见 `apps/desktop-windows/evidence/ux-final-20261008-integrated-titlebar/RESULT.md`。单次启动生命周期补丁已独立运行验收：超过原1分钟触发窗仍只有1实例、计划任务已删除，原生最小化/最大化/还原/关闭全部真点通过，exact finalize再次核对1277默认文件不变；最终 MSIX 统一产物仍待重建重装，Snap悬停未验。
+
+四端系统小组件完整矩阵与最终同源码重建/重装/上传继续沿用UX-S9-138清单，未被上述局部完成项替代。
+
+
+### UX-S9-141：助手输入容器的轻阴影（2026-10-08）
+
+- [x] 登记用户裁决：无边框不等于无层次；助手对话输入区域允许浅阴影，内部文本输入和发送按钮不叠加装饰框。
+- [x] 共享 Web 助手输入容器消费现有 `--ht-shadow-sm`，空态与会话态复用，规范同步至设计系统 MASTER；移动输入容器也消费同一 `shadow.sm`，仅整体投影，内部控件保持扁平。移动候选已重包，安装态输入视觉仍待验。
+- [x] 真实浏览器空态深浅主题已实看，计算样式确认容器边框为零、投影来自主题对应的轻阴影；截图与记录见 [验收目录](../../apps/web/evidence/ux-final-20261008/composer-shadow/verification.json)。
+- [ ] 最终四端安装产物随 UX-S9-138 统一重建验收。
+
+
+### UX-S9-142：专注选择器与系统小组件即时更新（2026-10-08）
+
+- [x] 真实 Android 发现并定位：本机新增任务后专注选择器仍显示无任务，开始专注后系统卡片继续空态，直到另一枚本地 op 才刷新。
+- [x] 专注页订阅成功落库的本地写信号，继续复用共享任务动作的待办口径；隐藏标签无需重新挂载或等待同步。
+- [x] 计时器区分状态机变化与显示 tick，组件生命周期订阅开始/暂停/恢复/结束；沿用快照合并和账号清理屏障，并在发布后推进 iOS 实时活动。开始/暂停不造 op，结束仍只记一枚专注记录。
+- [x] 修复前集成回归 3 项失败，修复后状态/发布/原生桥 3 文件 44 项通过；移动类型检查通过。覆盖即时发布、不随显示 tick 写盘、自然完成、卸载/重启监听唯一性、账号清理屏障。
+- [x] Android 共用空态/过期提示绑定返回应用，避免内容行隐藏后只剩日期能点。
+- [ ] 最终 Windows 重打 APK、iOS 重建后，原生界面新增任务立即可选、开始/暂停/恢复/结束即时更新系统组件、空态提示实际可点；测试结果不能替代安装态验收。
+
+
+### UX-S9-143：应用与系统小组件的语言一致性（2026-10-08）
+
+- [x] 实际Android矩阵确认：系统en_US、app locales为空时应用主体中文、四模板系统文案英文。现有中英资源完整，问题是语言选择的接线。
+- [x] Android/iOS共享既有中英资源，独立非敏感设备偏好持久化；应用初次/切换同步、独立扩展唤醒读取、账号清理保留语言。移动语言/桥22项、Swift偏好3项通过。
+- [x] macOS桥接同一Apple偏好；Web发送当前语言并串行处理快速切换/会话重启，不把语言写进任务或凭据。Web两文件17项及类型检查、macOS Release编译通过；证据见 `apps/web/evidence/ux-final-20261008/native-widget-locale/`。
+- [x] Windows新增同名原生语言桥、独立设备偏好与Provider监听；四模板文案消费i18n生成资源，没有独立手写词条表。macOS/Windows各35项真实文件和跨进程冒烟、Windows Provider及壳Debug编译通过。系统Board安装态语言切换仍待验。
+- [ ] 最终安装包实测中文/英文切换、冷启动/组件独立唤醒一致；不通过改变整个系统语言规避。源码测试不替代系统卡片。
+
+### UX-S9-144：助手历史与运行身份的最终隔离复审（2026-10-08）
+
+- [x] 登录凭据存储配额失败时，运行身份仍来自真实sync store，持久化失败不否定成功登录。
+- [x] 同域不同自托管路径单独分槽，规范化尾斜杠保持等价。
+- [x] 手填更换服务器/token清旧邮箱和账号标签，仅改本机E2EE口令保留；退出后同token重登仍产生新的临时身份，避免复用未核验会话。
+- [x] Web 6文件80项、共享历史7项、真实浏览器9项且无重试、Web类型检查通过；账号/草稿/ABA/迟回确认/刷新危险提案覆盖。证据见 [最终复审记录](../../apps/web/evidence/ux-final-20261008/assistant-navigation/RESULT.md)。
+- [x] 有界镜像主树；sync/store仅替换configure和applyAuthToken段，保留主树他人的inbound授权接线；没有覆盖App.tsx或后端。
+- [ ] 当前原生桌面/移动安装产物与最终统一发布矩阵；源码和浏览器结果不能外推。
+
+Android四模板明暗/非空矩阵已取证：[RESULT.md](../../apps/mobile/evidence/ux-final-20261008/android-widget-matrix/RESULT.md)。今日/习惯/四象限直接通过，专注卡片只有无关QA任务op后才非空，开始即时发布仍失败，因此不能勾UX-S9-142安装态。系统night=yes及QA任务未完成/习惯未打卡已恢复，真实自然完成/放弃的QA专注记录保留，没有清用户数据库。
+
+
+专注清理复审接续（2026-10-08 16:03）：UX-S9-142新增真实时序回归，旧wake跨清理领取新代际、在途Live Activity未被清理等待的问题均已先复现再修复；原生清理会等待结束实时活动，失败继续返回失败。移动宿主打开也补代际，迟回旧连接关闭并拒绝、不污染新库，当前打开失败可重试；修前2失败/2通过，修后与注销入口两文件16项通过。最新移动全套72文件900项通过、无unhandled rejection。原生重包后仍须实际退出/刷新验收，暂不勾安装态。
+
+Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5文件50项通过、iOS App及扩展Release真实编译通过、8源码SHA逐项匹配。范围以 `apps/mobile/evidence/ux-round8/focus-cleanup/RESULT.md` 为准；没有用这些结果声称实体iPhone已验、注销瞬间所有屏幕已清空或所有在途drain已取消。
+
+
+### 交付验证接续（2026-10-08 16:18）
+
+- UX-S9-145：macOS打包自检日志中变量紧接全角括号，被Bash 3.2当成变量名的一部分。已显式加花括号，重打Developer ID签名候选、安装副本哈希一致且成功自截屏；没有把旧构建日志当成功。此候选未公证，实际Gallery与完整交互仍待验。
+- UX-S9-146：Windows Android原生单测的夹具目录判断使用正斜杠字符串，实际Windows路径含反斜杠。第一趟135项仅此1失败，没有产出APK；改为原生Path分段后远程重打成功，11套135项全部通过；APK远近SHA一致、发布证书CN=heyta验签通过，失败日志与JUnit保留。
+- iOS新候选Release已保留数据升级到既有模拟器，宿主/扩展/JS三份已装字节与新产物SHA一致并启动；见 `apps/mobile/evidence/ux-final-20261008/ios-new-candidate/install.json`。不是实体iPhone验收，也不是最终清旧四端发布。
+- macOS新候选已安装，旧.app保留独立备份，数据库未清；启动验收使用显式QA数据库。签名/宿主/扩展/共享web-dist身份见 `apps/desktop-macos/evidence/ux-final-20261008-candidate/verification.json`。签名不代表公证，自截屏不代表Gallery按钮已验。
+- 59-C共享生图入口补验：image-artifact-core与gpt-image在Codex/Agents/Claude等全局入口可发现，共9个链接定向验证通过；已删除遗留的“本次整理任务”临时dry-run限定。系统imagegen源码未改、未收费出图，凭据与私有路由未复制到仓库。安全共享记录在 `~/.skill-catalog/provenance/image-artifact-core-sharing-20261008.json`；全量技能治理原有graphify登记与gpt-image provenance问题保留，未伪报全量通过。
+
+本轮继续按未完成安装交互矩阵推进。打包过程中补了两处专端脚本/测试修复，先前广义源码冻结清单已经变化；仍不主张“四端同一冻结树且全部交互验收完成”，各候选实际消费输入和已装字节分别记录。
+
+
+### UX-S9-147：助手工作区注册授权与邮箱验证码（2026-10-08）
+
+- [x] 登记真实用户失败：注册已勾协议仍提示未同意隐私规则，要求操作的面板不可见；验证码阶段没有出现。
+- [x] 定位原因：助手工作区隐藏 `.ht-main`，三张全局决定面板却挂在内部页头；`fixed` 不能逃离 `display:none`。本机联网授权与注册条款是两份未融合的决定，失败在出站前发生。
+- [x] 官方OTP请求/验证/重发接口以不带个人数据的空请求确认可用；没有向真实邮箱发信。
+- [x] 实施：三张全局面板移到页面布局网格外；注册勾选文案明确涵盖协议与本机联网，明确提交后经既有授权动作放行；主按钮改为“发送验证码”，成功进入6位验证码阶段，验证后完成注册。未勾选、登录与AI出站权限不被自动放行。
+- [x] 1440/390真实Chromium六条全部通过、无重试：未勾零请求、勾后验证码阶段、隐私按钮真实可点、输入保留且同意不自动登录；首轮旧i18n dist与移动网格遮挡失败证据保留。见 [验收记录](../../apps/web/evidence/ux-final-20261008/auth-consent-registration/RESULT.md)。
+- [x] 更新后四端候选已重建；Windows、Android和iOS模拟器已更新，Web已部署。具体发布与安装边界见UX-S9-148。
+- [ ] Mac本机安装、原生完整注册与实际邮件收取闭环仍待验。
+
+### UX-S9-148：注册密码说明与协议阅读（2026-10-08）
+
+- [x] 登记用户裁决：删除“长一句比加符号有用…”；协议应能点击阅读，Web与移动优先弹窗，关闭后保留注册表单。
+- [x] 保留密码强度反馈，Web/移动移除冗余解释。
+- [x] 官方协议弹窗消费既有法律文档事实源，中英一致；自托管阅读实际服务端政策。无边框/下划线，仅浅阴影；表格采用字段标签对应值；摘要、草案状态及版本随正文滚动，固定标题与关闭。
+- [x] Web 1440/390 实际点击两份协议及文内引用、关闭返回、全部注册输入及勾选保留，6条浏览器回归通过。Web认证/隐私79项、移动认证57项通过；原生源码已接入共享阅读器。
+- [x] Web及站点法律页部署、更新后线上真实浏览器32项通过；Android新包实际点击两协议并系统返回注册页通过。补验已安装暗色状态及2400×1080横屏：标题/关闭固定、正文可滚动，关闭保留临时邮箱草稿，原方向策略已恢复；协议未勾选、注册未提交。见 [Android阅读验收](../../apps/mobile/evidence/ux-final-20261008/android-candidate/auth-legal-frozen/installed-legal/RESULT.md)。
+- [x] Windows1.0.0.1保数据升级及资源SHA对账；Android发布证书新包保数据安装；iOS模拟器新bundle匹配，TestFlight1.0(7) VALID及内部组回读；macOS最新候选签名公证通过。
+- [ ] Mac本机解锁后保留注册输入完成更新；Windows/iOS原生实际协议阅读、实体iPhone及生产邮件收取继续待验，不以Web/模拟器替代。
+- [x] B5公开测试包已上传，四个附件大小与GitHub SHA摘要逐一相等；iOS使用TestFlight1.0(7)，未创建公开邀请或发送邀请。[测试版下载](https://github.com/Xaiver03/heyta/releases/tag/v1.0.1-test.20261008.5)。本批不声称全部Goal清单关闭，COS下载清单及Linux仍为前一批产物。
+- [x] 独立复审：读取/关闭/返回/小视口未发现交互缺陷；修正草案提示测试为实际渲染文本，最终认证/隐私79项通过。法律文档原有草案状态保留，本轮不宣称正式运营协议已生效；正式运营的协议批准与版本留痕继续沿既有法律流程处理。
+
+### UX-S9-149：协议法律表述与窄视口页脚（2026-10-08）
+
+- [x] 调研并登记正式协议语言规则：采用“定义—权利义务—责任边界—程序—通知—争议解决”的顺序，使用“应/须/不得/有权/不承担”等可执行动词；事实、例外、期限和处理方式分项列明，避免口语连接词和绝对化宣传。依据已写入 [`docs/standards/legal-language.md`](../../docs/standards/legal-language.md)。
+- [x] 九份协议共用 `legalDocumentPresentation` 的正式措辞投影：统一处理“换句话说”“一句必须说清的边界”“你能做的补救只有”等明显口语表达，并移除暂停符号等装饰性状态符；不改变正文事实源、版本、锚点或同意指纹。
+- [x] 协议摘要现在进入可滚动正文，固定头部只保留标题与关闭；Web、移动共享阅读器与官网法律页均消费同一份中英摘要和章节投影。
+- [x] 页脚在 768/1024px 使用两列、640px 以下使用单列；品牌列在平板跨两列，避免截图中的单列堆叠和右侧大面积空白。法律页 1440/1024/768/320 四档无横向溢出。
+- [x] 验证：法律包 70 项、共享阅读器 12 项、Landing 协议与页脚 Playwright 6 项通过；Web认证定向测试因本机内存闸门曾拒绝一次，待下一次资源窗口复跑，不把构建绿当作运行验收。
+- [x] 已部署 Web 与站点产物，服务器保留 `heyta-app.before-ux149-20261008T121001Z` 与 `heyta-landing.before-ux149-20261008T121001Z` 回滚副本；应用 26/26、站点 97/97 文件 SHA 对账一致。线上九份中英法律页、404、API 反向判据和 390/768/1024 页脚真实浏览器共 14 项通过，证据含 `e2e/live-site-results/live-terms-footer-390.png`。
+- [ ] 法务正式审阅与协议生效批准仍是发布前独立门槛；本轮只调整展示措辞和排版，不把草案标记为已生效。

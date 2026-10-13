@@ -18,6 +18,10 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+// 只隔离本文件的认证保存副作用；其它套件仍可加载真实自动同步模块。
+// RN 平台入口包含 Flow，不能由 Node 测试运行器解析。
+vi.mock('../src/sync/auto-sync', () => ({ notifyConfigured: vi.fn() }));
+
 import { redeemPastedAuthToken } from '../src/auth/paste';
 import { describePasskeyError, resolvePasskeyProvider } from '../src/auth/passkey-host';
 import {

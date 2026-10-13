@@ -1,0 +1,18 @@
+Verifies
+Verified using v1 scheme (JAR signing): false
+Verified using v2 scheme (APK Signature Scheme v2): true
+Verified using v3 scheme (APK Signature Scheme v3): false
+Verified using v3.1 scheme (APK Signature Scheme v3.1): false
+Verified using v4 scheme (APK Signature Scheme v4): false
+Verified for SourceStamp: false
+Number of signers: 1
+Signer #1 certificate DN: CN=heyta, OU=Mobile, O=Xiaoli Creativity Culture Industry, L=Hangzhou, ST=Zhejiang, C=CN
+Signer #1 certificate SHA-256 digest: c46d0386179c3cef12582d1347ed2f871eb03a64aaa2bff96511c1cb76062556
+Signer #1 certificate SHA-1 digest: 54b70e9213ce92397a6ff0eefe395f2baa0b9a3a
+Signer #1 certificate MD5 digest: 228708966ffd3f96a92d5c879fe7b2a9
+Signer #1 key algorithm: RSA
+Signer #1 key size (bits): 4096
+Signer #1 public key SHA-256 digest: f6e24f4ac2610c5ea60abec03aa1a74fd23bc8a643dc02f210a897a30b56b4d8
+Signer #1 public key SHA-1 digest: 59efe6b70ab0ed3abcfdf01d9e28c4dd2f09d3ce
+Signer #1 public key MD5 digest: 23ac47c59ca0d52eefd778dd873720df
+SIGN_VERIFY_RC=0

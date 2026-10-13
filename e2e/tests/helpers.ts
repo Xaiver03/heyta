@@ -75,6 +75,16 @@ export async function resetStub(request: APIRequestContext): Promise<void> {
   expect(res.ok(), '假端点的 /__reset 应该可用').toBe(true);
 }
 
+/** 控制假端点的响应屏障；用它等待真实请求进入飞行态，不用 sleep 猜竞态。 */
+export async function setStubBarrier(
+  request: APIRequestContext,
+  action: 'hold' | 'release' | 'reset',
+): Promise<{ readonly held: boolean; readonly pending: number }> {
+  const res = await request.get(`${STUB_ORIGIN}/__barrier/${action}`);
+  expect(res.ok(), `假端点的 /__barrier/${action} 应该可用`).toBe(true);
+  return (await res.json()) as { readonly held: boolean; readonly pending: number };
+}
+
 export async function stubLog(request: APIRequestContext): Promise<StubLog> {
   const res = await request.get(`${STUB_ORIGIN}/__requests`);
   expect(res.ok(), '假端点的 /__requests 应该可用').toBe(true);

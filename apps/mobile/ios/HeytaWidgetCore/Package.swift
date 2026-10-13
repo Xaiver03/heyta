@@ -98,6 +98,6 @@ let package = Package(
         // 这样它能在 `swift test` 里跑，而 app target 里只剩十行转发。
         .target(name: "HeytaWidgetBridge", dependencies: ["HeytaWidgetCore"]),
 
-        .testTarget(name: "HeytaWidgetCoreTests", dependencies: ["HeytaWidgetCore", "HeytaWidgetBridge"]),
+        .testTarget(name: "HeytaWidgetCoreTests", dependencies: ["HeytaWidgetCore", "HeytaWidgetBridge", "HeytaWidgetUI"]),
     ]
 )

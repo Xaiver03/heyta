@@ -721,6 +721,7 @@ export {
  */
 export {
   drainWidgetIntents,
+  widgetIntentReceipt,
   type WidgetDrainResult,
   type WidgetDrainTasks,
 } from './widget-actions.js';
@@ -907,3 +908,6 @@ export {
   type InboundRecipientRegistration,
 } from './inbound-recipient-remote.js';
 export { createInboundRulesRemote, InboundRulesRemoteError, type InboundAutomationRule, type InboundAutomationRuleConfig, type InboundAutomationField } from './inbound-rules-remote.js';
+
+export { planWidgetPublish, type WidgetPublishStateSlice, type WidgetPublishPlan } from './widget-publish.js';
+export { createNativeWidgetSession, type NativeWidgetBridge } from './native-widget-session.js';

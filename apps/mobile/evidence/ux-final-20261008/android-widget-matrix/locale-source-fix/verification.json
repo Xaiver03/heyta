@@ -1,0 +1,46 @@
+{
+  "checklistId": "UX-S9-143",
+  "date": "2026-10-08",
+  "stage": "source-fixed-native-install-regression-pending",
+  "sourceSha256": {
+    "apps/mobile/src/i18n/locale.ts": "17d726ccc013214944d963e8a778d7a8d0a91695da0fe989dc09936d7544c890",
+    "apps/mobile/src/i18n/locale-preference.tsx": "c46056f92f980101200190b2ca708b3856115c60b08565cea02067cc628bb0ad",
+    "apps/mobile/src/widgets/widget-bridge.ts": "f4822ecc84ef60c9e85af3967b81e1aee262e7277462f19dd4dd66f86ac873ef",
+    "apps/mobile/src/App.tsx": "dfdf7edbe1c9c59ee9a23d53e34cbf438472b3d7a97970391ea2702a7be1c36a",
+    "apps/mobile/tests/locale.spec.ts": "061e495374b76af1347c278a24acff52fb458e76e2e66e4f5db360458f7fe10e",
+    "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetLocalePreference.kt": "e4160be2d0aaa278a79f87e2b4b8888314f0c830cc7196a628d16e881b1cad42",
+    "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetModule.kt": "cc8b6dd3ed9915a803b6bdc1b9f510aab06788f803229b3584bee5dd5456d22d",
+    "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetRefresh.kt": "177c48f15a0a84529914b167348bf57cc921f367afecd40162d269159e97d3e3",
+    "apps/mobile/android/app/src/test/java/com/heytamobile/widget/WidgetLocalePreferenceTest.kt": "8a719e1d9c293ae5f9e482e0ba824156028c8836cb1f3e5c99cc89d33a9decc6",
+    "apps/mobile/ios/Heyta/HeytaWidgetModule.swift": "b062dab7e77d70b6839fcf54a466efff6e33ff3baef812356c42347def17dcd9",
+    "apps/mobile/ios/Heyta/HeytaWidgetModuleBridge.m": "53b4bb1e281af6dca2847c524a6b6164e8bc1c6e134994b1ff9413b1c96ebcc5",
+    "apps/mobile/ios/HeytaWidgetCore/Package.swift": "8b48f87f22a6bba088b3c452d00122adc361776bd92d8230e5c4aae6f70063c6",
+    "apps/mobile/ios/HeytaWidgetCore/Sources/HeytaWidgetCore/WidgetLocalePreference.swift": "17dd29c8fc387e297bec55720b082d4a2d501bc40ff7774da9a84dedb7e6ec4a",
+    "apps/mobile/ios/HeytaWidgetCore/Sources/HeytaWidgetUI/WidgetChrome.swift": "9ea3fa66a0a7c1c64deea86b4596288c00e1ef69f53be98757628b06ed6ace53",
+    "apps/mobile/ios/HeytaWidgetCore/Tests/HeytaWidgetCoreTests/WidgetLocalePreferenceTests.swift": "9b5b67812fbe4999a1f327c1d8d37957668d2d4338471294377f12503ff83233"
+  },
+  "validation": {
+    "mobileLocaleAndWidgetBridgeTests": {
+      "files": 2,
+      "passed": 22
+    },
+    "swiftWidgetLocalePreferenceTests": {
+      "passed": 3,
+      "buildTargets": [
+        "HeytaWidgetCore",
+        "HeytaWidgetUI",
+        "HeytaWidgetKit"
+      ]
+    },
+    "mobileTypecheck": {
+      "exitCode": 0
+    },
+    "gitDiffCheck": {
+      "exitCode": 0
+    },
+    "androidNativeCompilation": "pending-final-build-on-windows",
+    "iOSReactBridgeCompilation": "pending-final-app-build",
+    "macHostLocaleBridge": "root-owned-pending",
+    "installedWidgetChineseEnglishSwitch": "not-yet-reverified"
+  }
+}

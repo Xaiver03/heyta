@@ -1,0 +1,2537 @@
+{
+  "archiveSha256": "f12b56cd1149b59e20ed7fa512f24b3d52e56fc7d783b1b30deeee5659df36b3",
+  "archiveSize": 315817025,
+  "inputs": {
+    "apps/mobile/.gitignore": {
+      "sha256": "594beda4eef430ecb4017a1653dd5fe903c8c3738dce5272cde3b757e9916330",
+      "size": 1609,
+      "sourceMtime": 1791427676.0055919
+    },
+    "apps/mobile/.prettierrc.js": {
+      "sha256": "ed7c5f7f2f0f21950c2acbb7425d212bbcf0d7ecd3bdd440af42c67cbb8d6851",
+      "size": 91,
+      "sourceMtime": 1791427676.0056398
+    },
+    "apps/mobile/.watchmanconfig": {
+      "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+      "size": 3,
+      "sourceMtime": 1791427676.0056934
+    },
+    "apps/mobile/android/app/build.gradle": {
+      "sha256": "ea7fbbcc470838e45a56fef9398d2fff7b8eeaa3c797813abc3906d2bc2555af",
+      "size": 19650,
+      "sourceMtime": 1791427676.005818
+    },
+    "apps/mobile/android/app/debug.keystore": {
+      "sha256": "221e0a3106aa4c3ccc154e0a418b55020b3f9ea6e84f92e8749cd9e2f39f5e58",
+      "size": 2257,
+      "sourceMtime": 1791427676.0058765
+    },
+    "apps/mobile/android/app/proguard-rules.pro": {
+      "sha256": "426b908d7c5dac3db6648e2b21e3762ad9639e4976f7a2eb4e72d60d51b08ef2",
+      "size": 435,
+      "sourceMtime": 1791427676.005928
+    },
+    "apps/mobile/android/app/src/androidTest/java/com/heytamobile/vault/VaultSecureStorageDeviceTest.kt": {
+      "sha256": "6064b200273cd9b0ebe3c58b129af08f1c38e4b04c15147c318c112d3e234ede",
+      "size": 5002,
+      "sourceMtime": 1791427676.006178
+    },
+    "apps/mobile/android/app/src/androidTest/java/com/heytamobile/widget/KeystoreDeviceTest.kt": {
+      "sha256": "8caa791f38832e0657a6c1fae988a941f896ed127ab8f8c68a13cff537797d29",
+      "size": 5999,
+      "sourceMtime": 1791427676.00627
+    },
+    "apps/mobile/android/app/src/androidTest/java/com/heytamobile/widget/RenderDeviceTest.kt": {
+      "sha256": "69fff21a5f96797b752e36aa795de94bfabba2da74d96708fb41d79ef5249253",
+      "size": 6376,
+      "sourceMtime": 1791427676.0063581
+    },
+    "apps/mobile/android/app/src/androidTest/java/com/heytamobile/widget/WidgetClickLoopDeviceTest.kt": {
+      "sha256": "b121dd568cc98e39e82c464b44481afaab4131aee28854ccd025845242fe9214",
+      "size": 5113,
+      "sourceMtime": 1791427676.0064185
+    },
+    "apps/mobile/android/app/src/main/AndroidManifest.xml": {
+      "sha256": "04060b6aa8c903482677038e6e479af10280d266773e9bb889d66d8a140549b3",
+      "size": 8222,
+      "sourceMtime": 1791433130.4067926
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/MainActivity.kt": {
+      "sha256": "85fc85e2fc87f6e4b65b7fb761389b452888cd867ee7f291ffcd467b05780f81",
+      "size": 1142,
+      "sourceMtime": 1791427676.0066414
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/MainApplication.kt": {
+      "sha256": "8ae3c20ce10f731f9adda3393cbc9356a5b88613fca3daa81e8f16e3b09c4a22",
+      "size": 4125,
+      "sourceMtime": 1791433300.473805
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/fs/CardExportModule.kt": {
+      "sha256": "9db35c591253fb060124f91310a0b93f7b56a85d747aa1934903860dd7455ee4",
+      "size": 5039,
+      "sourceMtime": 1791427676.0067892
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/fs/CardExportPackage.kt": {
+      "sha256": "c14d07f3e1be0b2924b4997e6b727057fe63fbb90ff8ea2e949126c27dd43a0b",
+      "size": 1649,
+      "sourceMtime": 1791427676.0068495
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/fs/LocalFsModule.kt": {
+      "sha256": "0389e14dd6baa6b4ea4e68a84e05b78f80eb15231c76fc9f824f3a0727a16285",
+      "size": 7083,
+      "sourceMtime": 1791427676.0070264
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/fs/LocalFsPackage.kt": {
+      "sha256": "0474dbdeb24a2e05b851c65e72e279003fa5be6d52cd74c7b6ac177542fc9679",
+      "size": 1458,
+      "sourceMtime": 1791427676.0072088
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/reminder/ReminderModule.kt": {
+      "sha256": "b6fa90f04c99ad3fce2bcbb5a1d7637ad4fbedf007f00b7f5151f90fba833c3a",
+      "size": 12152,
+      "sourceMtime": 1791427676.0072963
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/reminder/ReminderPackage.kt": {
+      "sha256": "8134aaa577ef1ee2e12370a2351d8e468ff17b91c1455506f717a62bd71525c8",
+      "size": 789,
+      "sourceMtime": 1791427676.0073493
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/vault/VaultSecureStorageModule.kt": {
+      "sha256": "61149a506f0cfa407dd76e6e605a01e5dd9c9c2ddfb816485257d60cb42b2002",
+      "size": 9849,
+      "sourceMtime": 1791427676.007438
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/vault/VaultSecureStoragePackage.kt": {
+      "sha256": "ba13e13eabd05d4fdc27ec249195f9b8f10b1f5fbc9bc916ffb85059c1f0bcc7",
+      "size": 1041,
+      "sourceMtime": 1791427676.007494
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/widget/FocusWidgetModel.kt": {
+      "sha256": "ea04c07426567a83ab57fbbadd401aaaa1330c5ada2ea542e595eca862742c38",
+      "size": 4947,
+      "sourceMtime": 1791427676.0076778
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/widget/FocusWidgetProvider.kt": {
+      "sha256": "efc79f57886bf8545418e2f3e6f275a365f7cfaac06383b184f1fbf356b37a1d",
+      "size": 829,
+      "sourceMtime": 1791427676.007733
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/widget/FocusWidgetViews.kt": {
+      "sha256": "9b30dbd0b4811bf864364bef1c94375fc80760bab243091f2cc10ce613629fb6",
+      "size": 4382,
+      "sourceMtime": 1791427676.0077906
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/widget/HabitsWidgetModel.kt": {
+      "sha256": "a30db0783af197f70e1be1c9ce7c9c9a39d6636d289997a87d2e24794e1476d8",
+      "size": 4004,
+      "sourceMtime": 1791427676.0078444
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/widget/HabitsWidgetProvider.kt": {
+      "sha256": "1c38a9d7d18b3409d924dfdf0c65591279a3416ad0e13ba3170c30f2396e0275",
+      "size": 831,
+      "sourceMtime": 1791427676.007893
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/widget/HabitsWidgetViews.kt": {
+      "sha256": "08e3ad99d4c78af6c2caba9b04f32308f515b42d74bd507e7fc9bae7f2febef6",
+      "size": 2432,
+      "sourceMtime": 1791427676.0080755
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/widget/QuadrantWidgetModel.kt": {
+      "sha256": "fbaf95c76e8490d683351d42052e93cbbb091e910c4e96ba3c904b020dafd1e3",
+      "size": 3636,
+      "sourceMtime": 1791427676.0081317
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/widget/QuadrantWidgetProvider.kt": {
+      "sha256": "17a6cd7b995b4bc45fda7ff70f5848a43eb8164a29bbd15325d85ae1472ae5b8",
+      "size": 832,
+      "sourceMtime": 1791427676.0081818
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/widget/QuadrantWidgetViews.kt": {
+      "sha256": "d500c7b883dc63dfc389bed8d11d0f07b7524cb85a8b96885a8cdfeda39ddf1e",
+      "size": 3942,
+      "sourceMtime": 1791427676.0082395
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/widget/TodayWidgetModel.kt": {
+      "sha256": "42152ac7ca6645df29969bbd302a7da0385588295e980ead9f7aecf311bb330b",
+      "size": 2879,
+      "sourceMtime": 1791427676.0082865
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/widget/TodayWidgetProvider.kt": {
+      "sha256": "ff1015aa75eef29f02523cd2de06afaaaebccf510e86fa241355daebc4cde582",
+      "size": 829,
+      "sourceMtime": 1791427676.0083342
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/widget/TodayWidgetViews.kt": {
+      "sha256": "938a41c863bef9bd490dba0c1fbe4a1089e7c9bb9e9700086c573d4f49c1dbc5",
+      "size": 2512,
+      "sourceMtime": 1791427676.0083916
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetAead.kt": {
+      "sha256": "c30bde1f753ab4e9f1540811c4958733d8ed2ecc9aa876cb15530af29b38b5a2",
+      "size": 11641,
+      "sourceMtime": 1791427676.0084493
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetClicks.kt": {
+      "sha256": "6ceb36b3033404dc06934c45b6b2d975eeb48b2507c5020f866113cc4dbd6ac7",
+      "size": 8277,
+      "sourceMtime": 1791433744.82429
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetContract.kt": {
+      "sha256": "0a4acd1a14b1013a72c87e14d8124026489f7546b60d677f1950d0e1da50f581",
+      "size": 5751,
+      "sourceMtime": 1791427676.008571
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetGate.kt": {
+      "sha256": "d62646b591c954125df4c44fdde836a64a859b24c74d2a60f90209d5c2a629c4",
+      "size": 6484,
+      "sourceMtime": 1791427676.0087435
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetIntentQueue.kt": {
+      "sha256": "fb9118d7d100a64fe23210ab77d495e43b79a28637e9514e5d853ff300680d22",
+      "size": 9920,
+      "sourceMtime": 1791427676.0088513
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetJson.kt": {
+      "sha256": "45f8df8597ae02d5c6b010a13a00e28a61d9dece87e9579b266e5453ecedd77c",
+      "size": 3491,
+      "sourceMtime": 1791427676.0089233
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetKeyValueStore.kt": {
+      "sha256": "d9a34f885d52e03af52038f521d286c2a2e226e7c1839a08f424549202fed290",
+      "size": 2876,
+      "sourceMtime": 1791433744.823785
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetModule.kt": {
+      "sha256": "cc8b6dd3ed9915a803b6bdc1b9f510aab06788f803229b3584bee5dd5456d22d",
+      "size": 11994,
+      "sourceMtime": 1791445925.0609176
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetPackage.kt": {
+      "sha256": "0435d67a6a8fa83e9c0d1cd5a1430013f521c599ce654bf412132580d5abf8a5",
+      "size": 1932,
+      "sourceMtime": 1791427676.009101
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetRefresh.kt": {
+      "sha256": "177c48f15a0a84529914b167348bf57cc921f367afecd40162d269159e97d3e3",
+      "size": 7363,
+      "sourceMtime": 1791445925.0605438
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetSnapshotCipher.kt": {
+      "sha256": "3ce573e60b37564d4016d30ae5cf041e2d5d8fb41476e984de929eea98914580",
+      "size": 8238,
+      "sourceMtime": 1791427676.0092177
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetSnapshotParser.kt": {
+      "sha256": "95b9e1b58e2f47d8283251ea3c7059aaac1dc4ff3714b6f9926a46d553576bf5",
+      "size": 19929,
+      "sourceMtime": 1791427676.009287
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetStore.kt": {
+      "sha256": "301193bf5cc7ee0a4b91b9e725ae77b0e6f9504381cffe350c77cd8fae1b9f7c",
+      "size": 7437,
+      "sourceMtime": 1791433744.823475
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetViewParts.kt": {
+      "sha256": "718e5d7779ba47eabb31e56a80b74c90072fef6080925bf5408d15822dc1f04e",
+      "size": 8299,
+      "sourceMtime": 1791445164.2695665
+    },
+    "apps/mobile/android/app/src/main/res/drawable/rn_edit_text_material.xml": {
+      "sha256": "738e3aaad53180caba1419a6d5db8465a0742662fe59a4bbaf05f1061cbc3390",
+      "size": 1917,
+      "sourceMtime": 1791427676.0095356
+    },
+    "apps/mobile/android/app/src/main/res/layout/widget_focus.xml": {
+      "sha256": "9c8149387dd22ebeff140f07cc0071c5ae8a0f1066664c73edc9eee817a6a115",
+      "size": 2761,
+      "sourceMtime": 1791433006.6597106
+    },
+    "apps/mobile/android/app/src/main/res/layout/widget_habits.xml": {
+      "sha256": "d61087b2cd741b9c84275341b4d5cb84a298b285469ee34380e22c3b5c8f6914",
+      "size": 3456,
+      "sourceMtime": 1791433006.6595356
+    },
+    "apps/mobile/android/app/src/main/res/layout/widget_quadrant.xml": {
+      "sha256": "85a20c62c0720156786e7dcb55050987ffc0586f328522c7d9bb27fd6a7e92c7",
+      "size": 4084,
+      "sourceMtime": 1791433006.659329
+    },
+    "apps/mobile/android/app/src/main/res/layout/widget_today.xml": {
+      "sha256": "adf61b2fca490c1af48a1b9c5c7aadb2f949e722ad403e4cb12740e5f8cd15e2",
+      "size": 3090,
+      "sourceMtime": 1791433006.6590612
+    },
+    "apps/mobile/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml": {
+      "sha256": "f685867a41d63794c7acda5504c2d130077970cad7758835be7a4aed09157e1a",
+      "size": 953,
+      "sourceMtime": 1791427676.010006
+    },
+    "apps/mobile/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml": {
+      "sha256": "f685867a41d63794c7acda5504c2d130077970cad7758835be7a4aed09157e1a",
+      "size": 953,
+      "sourceMtime": 1791427676.010063
+    },
+    "apps/mobile/android/app/src/main/res/mipmap-hdpi/ic_launcher.png": {
+      "sha256": "0dcafbc8f62156df8842c3593fa74c0f5808636859fcf0ac287596811a5fb0c0",
+      "size": 1263,
+      "sourceMtime": 1791427676.0101588
+    },
+    "apps/mobile/android/app/src/main/res/mipmap-hdpi/ic_launcher_foreground.png": {
+      "sha256": "d8d448eafd6e11d5c3942424eeaaf35ab670656ea194b96ae7a04871a5811b04",
+      "size": 702,
+      "sourceMtime": 1791427676.010225
+    },
+    "apps/mobile/android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png": {
+      "sha256": "e7afaa48a6aa87923fbf51614d3a4051d97bf8b6c7cc98a91cbefbc803ad2417",
+      "size": 1953,
+      "sourceMtime": 1791427676.0102892
+    },
+    "apps/mobile/android/app/src/main/res/mipmap-mdpi/ic_launcher.png": {
+      "sha256": "98d8abdff9f4a89c2761c26731a73ed504e727a621e44d25b2b9b3dfa5fc7d40",
+      "size": 869,
+      "sourceMtime": 1791427676.0103865
+    },
+    "apps/mobile/android/app/src/main/res/mipmap-mdpi/ic_launcher_foreground.png": {
+      "sha256": "08aa9895689cf5c7fb12519283efeac98945a089b6185d72762a3bf7eba84fb5",
+      "size": 503,
+      "sourceMtime": 1791427676.0104508
+    },
+    "apps/mobile/android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png": {
+      "sha256": "76d4336ca8b5ec2f50dd0ae89ff4734145e2888a29d4438ff39caad7144fb75d",
+      "size": 1296,
+      "sourceMtime": 1791427676.010667
+    },
+    "apps/mobile/android/app/src/main/res/mipmap-xhdpi/ic_launcher.png": {
+      "sha256": "b2095d2b261901762c1d91b6f604383583ffb829d83bba51d04e1a82676450cf",
+      "size": 1606,
+      "sourceMtime": 1791427676.0107806
+    },
+    "apps/mobile/android/app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.png": {
+      "sha256": "f65cc9ea8429d12f85681998b8b93c406a8340904c66cca992f7d9fad5bc5f2e",
+      "size": 904,
+      "sourceMtime": 1791427676.010847
+    },
+    "apps/mobile/android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png": {
+      "sha256": "906b8c68f7ec5003cc53cb2f30eaae9dd940006739bc2b2b5d8b5b18ecdbc14f",
+      "size": 2548,
+      "sourceMtime": 1791427676.0109112
+    },
+    "apps/mobile/android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png": {
+      "sha256": "f37cb96777670daa28d331d6283a5b4f93fc341fb1744dc29b81359eb141b286",
+      "size": 2445,
+      "sourceMtime": 1791427676.0110142
+    },
+    "apps/mobile/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.png": {
+      "sha256": "aadb7cabb3c3601d308c6ac0e6cf417721738f3b11dc45605352b62803b1a8fe",
+      "size": 1376,
+      "sourceMtime": 1791427676.0110862
+    },
+    "apps/mobile/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png": {
+      "sha256": "c3ad43ccb314a0eb71ebef7f283ddb7b939ce9756373dd84b17786c08d851406",
+      "size": 3837,
+      "sourceMtime": 1791427676.0111465
+    },
+    "apps/mobile/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png": {
+      "sha256": "bbbffd64651d96cb35f7cb3c0d1cb3a7dc2444ed9035c74b01f9c48266475885",
+      "size": 3267,
+      "sourceMtime": 1791427676.0112383
+    },
+    "apps/mobile/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png": {
+      "sha256": "c1e496b5bd6ffa4354e729ce941575eef0e8573958eca2adb81342d073f9f99b",
+      "size": 1998,
+      "sourceMtime": 1791427676.011295
+    },
+    "apps/mobile/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png": {
+      "sha256": "80ef75e9d602560d2193b054538e11ce46afbef0a50c199b363927022ba05e6d",
+      "size": 5186,
+      "sourceMtime": 1791427676.0114484
+    },
+    "apps/mobile/android/app/src/main/res/values-en/strings.xml": {
+      "sha256": "68637f6b1ec828d1d894cbf76ef5fcf1c93e8663366478b0f4833916f75adad2",
+      "size": 2167,
+      "sourceMtime": 1791427676.011544
+    },
+    "apps/mobile/android/app/src/main/res/values-v31/styles.xml": {
+      "sha256": "317321e72e90f53da673a0938d6b8a6e2e223477453bc416674ffbdd6519fb6f",
+      "size": 1167,
+      "sourceMtime": 1791427676.0116353
+    },
+    "apps/mobile/android/app/src/main/res/values/heyta_splash.xml": {
+      "sha256": "d5b014a18d352d360a7c1ef4010ace382526d7be8f73601b56c77eaf1df95851",
+      "size": 507,
+      "sourceMtime": 1791427676.0117276
+    },
+    "apps/mobile/android/app/src/main/res/values/ic_launcher_background.xml": {
+      "sha256": "6ee0a843ec5ebebc5446befe0b4e35dc25964ce8b405b12fc0cba80e442b3a4a",
+      "size": 226,
+      "sourceMtime": 1791427676.0117846
+    },
+    "apps/mobile/android/app/src/main/res/values/strings.xml": {
+      "sha256": "045d6c200f4b8bfaa6869a23414081679c9f88f43b5b2782224d5c9b45a95b21",
+      "size": 3177,
+      "sourceMtime": 1791427676.0119886
+    },
+    "apps/mobile/android/app/src/main/res/values/styles.xml": {
+      "sha256": "df385a6bb403e1a5523bb961c06a4541a940561765a09a6222b6f8f145ddd296",
+      "size": 3133,
+      "sourceMtime": 1791432993.7523468
+    },
+    "apps/mobile/android/app/src/main/res/xml/card_export_paths.xml": {
+      "sha256": "c58749aa891abcc7d3d5fd16c8f8774e8e3409192bebd13774a45709a50ff462",
+      "size": 963,
+      "sourceMtime": 1791427676.0121715
+    },
+    "apps/mobile/android/app/src/main/res/xml/widget_focus_info.xml": {
+      "sha256": "acaa3dba618cfb55bf18422cfaa5783cd84268faaa517a45ccb8d4d106ebbf39",
+      "size": 1823,
+      "sourceMtime": 1791427676.012237
+    },
+    "apps/mobile/android/app/src/main/res/xml/widget_habits_info.xml": {
+      "sha256": "1988d6f3d9e0cd5ce59cc0178f648935be8894a51dc99c5b9dc30721b8999dd4",
+      "size": 1827,
+      "sourceMtime": 1791427676.0122993
+    },
+    "apps/mobile/android/app/src/main/res/xml/widget_quadrant_info.xml": {
+      "sha256": "aaa0a38611ce84d6f8e616cab547ac032a15b664a4e237680a90673d3aed497a",
+      "size": 1830,
+      "sourceMtime": 1791427676.012362
+    },
+    "apps/mobile/android/app/src/main/res/xml/widget_today_info.xml": {
+      "sha256": "afbea3f4862785133eb9113a272ee0b5fc64e0b08781d93a65d012d585f4db73",
+      "size": 1878,
+      "sourceMtime": 1791427676.0124204
+    },
+    "apps/mobile/android/app/src/test/java/android/util/Base64.kt": {
+      "sha256": "1f9d10d92bde92dfdc703d60badd6dc667a4ef6c5b51aad0275fc8b770144be2",
+      "size": 3112,
+      "sourceMtime": 1791427676.0126317
+    },
+    "apps/mobile/android/app/src/test/java/com/heytamobile/widget/FocusWidgetModelTest.kt": {
+      "sha256": "625ba24b310b4bedb240b1bf3e619c64ed771491d018de85c72c5fa94b7d7658",
+      "size": 4927,
+      "sourceMtime": 1791427676.0129573
+    },
+    "apps/mobile/android/app/src/test/java/com/heytamobile/widget/GoldenFixtureSmokeTest.kt": {
+      "sha256": "f0b223f9e2ccef594e5203de9a68f513ceda2d8d14a1a671acc2157b1d41dbcb",
+      "size": 4838,
+      "sourceMtime": 1791447277.9423647
+    },
+    "apps/mobile/android/app/src/test/java/com/heytamobile/widget/HabitsWidgetModelTest.kt": {
+      "sha256": "7b439a2fe215a23b669f7f824cfd5778bed534fc80cdda9e7eaada7fec24e69f",
+      "size": 4880,
+      "sourceMtime": 1791427676.0130844
+    },
+    "apps/mobile/android/app/src/test/java/com/heytamobile/widget/QuadrantWidgetModelTest.kt": {
+      "sha256": "17a4c193ad60247682f1956657edb6c3059f58701ee34c54acb7541a9eeaff64",
+      "size": 7156,
+      "sourceMtime": 1791427676.0131457
+    },
+    "apps/mobile/android/app/src/test/java/com/heytamobile/widget/TodayWidgetModelTest.kt": {
+      "sha256": "60109a4ae83322b18d2e533dfeacca330e35ae8b27d577de852be53dedbffc3e",
+      "size": 11576,
+      "sourceMtime": 1791427676.0132086
+    },
+    "apps/mobile/android/app/src/test/java/com/heytamobile/widget/WidgetGoldenFixtureTest.kt": {
+      "sha256": "54f8ed98f93e71d70ccc0e2aa2c94035eb42be8678a13f220a920683762be7ab",
+      "size": 16245,
+      "sourceMtime": 1791427676.0133104
+    },
+    "apps/mobile/android/app/src/test/java/com/heytamobile/widget/WidgetIntentQueueTest.kt": {
+      "sha256": "8d7e9221d534afaae8e6d756f7c24e7ebf46aecd6983bcf16aefe9ab7d5d6193",
+      "size": 18861,
+      "sourceMtime": 1791427676.013378
+    },
+    "apps/mobile/android/app/src/test/java/com/heytamobile/widget/WidgetRefreshPipelineTest.kt": {
+      "sha256": "a1997d2683713b6463f794ca264797ae7020e96e6139f1b8f8d24616cec36d73",
+      "size": 14407,
+      "sourceMtime": 1791427676.0134776
+    },
+    "apps/mobile/android/app/src/test/java/com/heytamobile/widget/WidgetSnapshotParserTest.kt": {
+      "sha256": "0be657390894f8000ae1d922187c5fa823a95b281585c83f6bf38b96d0361ef4",
+      "size": 19186,
+      "sourceMtime": 1791427676.0135458
+    },
+    "apps/mobile/android/app/src/test/java/com/heytamobile/widget/WidgetStoreTest.kt": {
+      "sha256": "0a5113bd614c3cc7ea8fe96dbdcb35d062b4290761982723ff3b111eec8a688e",
+      "size": 3579,
+      "sourceMtime": 1791433824.6007855
+    },
+    "apps/mobile/android/build.gradle": {
+      "sha256": "c5d4ef364977093ec11064d503daa5eed1c7dbcab7630ed74908256bf8cc45f1",
+      "size": 547,
+      "sourceMtime": 1791427676.013675
+    },
+    "apps/mobile/android/gradle.properties": {
+      "sha256": "3929f4440d293d286ea7a3e92d2b1a5d318bd99641aadc90a6365260ac0fe34d",
+      "size": 1975,
+      "sourceMtime": 1791427676.013731
+    },
+    "apps/mobile/android/gradle/wrapper/gradle-wrapper.jar": {
+      "sha256": "76805e32c009c0cf0dd5d206bddc9fb22ea42e84db904b764f3047de095493f3",
+      "size": 45457,
+      "sourceMtime": 1791427676.0139225
+    },
+    "apps/mobile/android/gradle/wrapper/gradle-wrapper.properties": {
+      "sha256": "3e402c9f5eea1b468cf81ffe552757b0190d0a3ade2ee723e65b643109e9d987",
+      "size": 252,
+      "sourceMtime": 1791427676.013994
+    },
+    "apps/mobile/android/gradlew": {
+      "sha256": "3238afb2aed5cb16eb7d6718077e7138059108f007b54179e9cc157c5a6e0e89",
+      "size": 8728,
+      "sourceMtime": 1791427676.0140576
+    },
+    "apps/mobile/android/gradlew.bat": {
+      "sha256": "07a4bb3ec77dcc9f4b486423e6ec45f4d7d9523787b95681726c30dbba3079cd",
+      "size": 3134,
+      "sourceMtime": 1791427676.014118
+    },
+    "apps/mobile/android/hermes-aed-probe.init.gradle": {
+      "sha256": "d566cdec14e1ed12a19aa91dc08f1d43d1078ef21dbe9aee151f7cc1b363c220",
+      "size": 456,
+      "sourceMtime": 1791427676.0141814
+    },
+    "apps/mobile/android/scripts/generate-release-keystore.sh": {
+      "sha256": "9668a40ac24fba77e7f7b247e22b68c5a44faa85f475fe8c68fa0f3f2a1fc6e1",
+      "size": 3917,
+      "sourceMtime": 1791427676.0142746
+    },
+    "apps/mobile/android/settings.gradle": {
+      "sha256": "be470298be2677ecbe9cdf6ddd2bd238c13a64caf48b17c4f1f612fddca56ff4",
+      "size": 336,
+      "sourceMtime": 1791427676.014358
+    },
+    "apps/mobile/app.json": {
+      "sha256": "70c79a18edd63f18e481e74ad5936323d61c06168d52dc24f7f869b4bda7488e",
+      "size": 48,
+      "sourceMtime": 1791427676.0144227
+    },
+    "apps/mobile/babel.config.js": {
+      "sha256": "ac797326b6188af79d693126a31fc249230c4cfc4d26095c63b08188f12fd91e",
+      "size": 920,
+      "sourceMtime": 1791427676.0144897
+    },
+    "apps/mobile/harmony/AppScope/app.json5": {
+      "sha256": "69b6b4d71ce3594a458c1d762c8277f49b2872f1776f442c9332cfc9b9c8e324",
+      "size": 201,
+      "sourceMtime": 1791427676.6629455
+    },
+    "apps/mobile/harmony/AppScope/resources/base/element/string.json": {
+      "sha256": "5ac247bcd97fa2b50b36a558bd93d6afc0c8adfd9148e4a400ca493b29863dd8",
+      "size": 83,
+      "sourceMtime": 1791427676.6631074
+    },
+    "apps/mobile/harmony/AppScope/resources/base/media/background.png": {
+      "sha256": "497edeafc51af043c73e72ee8c4fbac4663357ef1ba275c0289f31a366b26239",
+      "size": 91942,
+      "sourceMtime": 1791427676.6634355
+    },
+    "apps/mobile/harmony/AppScope/resources/base/media/foreground.png": {
+      "sha256": "57e549283f255505a649042f36a1d6793c307a69a94c9fa7e27a38af38ddbe8c",
+      "size": 8805,
+      "sourceMtime": 1791427676.6635132
+    },
+    "apps/mobile/harmony/AppScope/resources/base/media/layered_image.json": {
+      "sha256": "3d18dcd7ed9e7d3d2c54c20cb80a44eb4877c661131c68a46e20b6e19d0bb476",
+      "size": 109,
+      "sourceMtime": 1791427676.6635664
+    },
+    "apps/mobile/harmony/build-profile.json5": {
+      "sha256": "1cdcef3694eb83337f3d9f6d65cd15eadbf638e03977afc8e7559b3ffe2dd8f4",
+      "size": 603,
+      "sourceMtime": 1791427676.6636183
+    },
+    "apps/mobile/harmony/code-linter.json5": {
+      "sha256": "f557c3bcdb40c64c986bffed9628310cc7a79fb7d2642c1c8b8d265fd92e25ad",
+      "size": 854,
+      "sourceMtime": 1791427676.6636786
+    },
+    "apps/mobile/harmony/entry/build-profile.json5": {
+      "sha256": "598213469051291bf8ebc822b615085470b3bdb50fb607956c8b5dde28b5d3fe",
+      "size": 422,
+      "sourceMtime": 1791427676.6637752
+    },
+    "apps/mobile/harmony/entry/hvigorfile.ts": {
+      "sha256": "089ad556731810afc10dd845a6a83176f56280c47fded7b3a85cd3461d7f039b",
+      "size": 234,
+      "sourceMtime": 1791427676.6638308
+    },
+    "apps/mobile/harmony/entry/obfuscation-rules.txt": {
+      "sha256": "0091c5622ede377a9ae1260f2499815afc3bcc5d1ab79a3d910ff7b456c98518",
+      "size": 1008,
+      "sourceMtime": 1791427676.6638906
+    },
+    "apps/mobile/harmony/entry/oh-package.json5": {
+      "sha256": "c3ab4a8122311d19a890ceb7d6717fd06e1e2f6ab496aa1fc61e98a95a50a7cc",
+      "size": 173,
+      "sourceMtime": 1791427676.663942
+    },
+    "apps/mobile/harmony/entry/src/main/ets/entryability/EntryAbility.ets": {
+      "sha256": "50553f54f294707623dca6ac618b78066b5dc5cd54e4f04215166bd4e443f772",
+      "size": 1580,
+      "sourceMtime": 1791427676.6641333
+    },
+    "apps/mobile/harmony/entry/src/main/ets/entrybackupability/EntryBackupAbility.ets": {
+      "sha256": "e005230e90b4751995be7cfbbaca8efe9c353ab3ced3f6584d9ab19894cd0906",
+      "size": 507,
+      "sourceMtime": 1791427676.6642165
+    },
+    "apps/mobile/harmony/entry/src/main/ets/pages/Index.ets": {
+      "sha256": "2754061381d42735b127968ed449d1611d6ef4486ec8b19978d2f2027898cd78",
+      "size": 7577,
+      "sourceMtime": 1791427676.6642985
+    },
+    "apps/mobile/harmony/entry/src/main/ets/widget/EntryFormAbility.ets": {
+      "sha256": "b1330b735f1a717280266418a9cd6f0408896f55d12691e5994008737e4d085d",
+      "size": 5702,
+      "sourceMtime": 1791427676.6643956
+    },
+    "apps/mobile/harmony/entry/src/main/ets/widget/FocusCard.ets": {
+      "sha256": "aaf2abeac02e86a811c7f18c07f48be519d1f6cd3ac59acd7578c538bb9861c1",
+      "size": 873,
+      "sourceMtime": 1791427676.6644511
+    },
+    "apps/mobile/harmony/entry/src/main/ets/widget/HabitsCard.ets": {
+      "sha256": "670f1d3578ae58cd4052c3eb3c071712de79eff1d3ddcb27583e3a9c57a94b28",
+      "size": 876,
+      "sourceMtime": 1791427676.6645067
+    },
+    "apps/mobile/harmony/entry/src/main/ets/widget/QuadrantCard.ets": {
+      "sha256": "96446cdc6a3bf0045c72e17dc6ffc41594ccdc58001a86ada525f466223add8a",
+      "size": 882,
+      "sourceMtime": 1791427676.6645632
+    },
+    "apps/mobile/harmony/entry/src/main/ets/widget/SamplePayload.ets": {
+      "sha256": "d109ad2bf6b392ba485e87054ee420975c2a44e7dd120ed4a6b9237ed54848f1",
+      "size": 3643,
+      "sourceMtime": 1791427676.6646223
+    },
+    "apps/mobile/harmony/entry/src/main/ets/widget/TodayCard.ets": {
+      "sha256": "feef701c25669c647a3f9749a994bec822a0f3bdd4321041b6c03fbcf59565a2",
+      "size": 873,
+      "sourceMtime": 1791427676.6646998
+    },
+    "apps/mobile/harmony/entry/src/main/ets/widget/WidgetCardParts.ets": {
+      "sha256": "713af767e95836defee47a89ed2d50e7771765a2b49f0cf27e2eea5555a344a9",
+      "size": 3522,
+      "sourceMtime": 1791427676.6647613
+    },
+    "apps/mobile/harmony/entry/src/main/ets/widget/WidgetCardRoot.ets": {
+      "sha256": "fe78fff57e98b2393eb7e4108037bd5933dd95feaa8f8f65be3e0c0b1615183c",
+      "size": 8415,
+      "sourceMtime": 1791427676.6649451
+    },
+    "apps/mobile/harmony/entry/src/main/ets/widget/WidgetForms.ets": {
+      "sha256": "8853dbaccf29c9d840259c8b0eff406a3f71eea7a0384cbf2f3afea0c8fa7c14",
+      "size": 7365,
+      "sourceMtime": 1791427676.6650043
+    },
+    "apps/mobile/harmony/entry/src/main/ets/widget/WidgetIntents.ets": {
+      "sha256": "c10e7d469067beb41bb8fd5da6c1394b33e6f3595ce56d253cf510070207aa33",
+      "size": 4133,
+      "sourceMtime": 1791427676.6650648
+    },
+    "apps/mobile/harmony/entry/src/main/ets/widget/WidgetKey.ets": {
+      "sha256": "dd80ccafe2ce3ae4d32b7260f4772701398cbc39af557f010e188474d8f839ef",
+      "size": 14190,
+      "sourceMtime": 1791427676.6651597
+    },
+    "apps/mobile/harmony/entry/src/main/ets/widget/WidgetModels.ts": {
+      "sha256": "e53de549e56370001e979ca960c9526a81fcffdfb5495acb4f4a55ef27a08fe4",
+      "size": 9943,
+      "sourceMtime": 1791427676.6653402
+    },
+    "apps/mobile/harmony/entry/src/main/ets/widget/WidgetParse.ts": {
+      "sha256": "8aa8cfa136520ac1cdff9f32dc2eb5b4e43e175d4cafd600e53c93ed39cf6d5e",
+      "size": 16897,
+      "sourceMtime": 1791427676.6654088
+    },
+    "apps/mobile/harmony/entry/src/main/ets/widget/WidgetStore.ets": {
+      "sha256": "ccb1f4648d2272509d70f69339947515c4d7ab883bb72c09d6f6cfe304d3c667",
+      "size": 12893,
+      "sourceMtime": 1791427676.6655142
+    },
+    "apps/mobile/harmony/entry/src/main/ets/widget/WidgetStrings.ets": {
+      "sha256": "f7d4fb412ce07bb1f61a62804caea927dbeedb2cad43c2b64b703d4aa7a4a247",
+      "size": 4251,
+      "sourceMtime": 1791427676.6655698
+    },
+    "apps/mobile/harmony/entry/src/main/module.json5": {
+      "sha256": "677a6798966042823df5e52bcea3c52ef471bb99b28b6550539aad8b9ad1d1bb",
+      "size": 2019,
+      "sourceMtime": 1791427676.6656246
+    },
+    "apps/mobile/harmony/entry/src/main/resources/base/element/color.json": {
+      "sha256": "4e028f6e8a847f8a98cfee6d37309def0e7e2e7290041d89e22ba3ac38a802b8",
+      "size": 98,
+      "sourceMtime": 1791427676.6659024
+    },
+    "apps/mobile/harmony/entry/src/main/resources/base/element/float.json": {
+      "sha256": "8db02f7a08f7b7b73d6eb95b09a6643463d10258b757901e70f255de0a2c83ef",
+      "size": 92,
+      "sourceMtime": 1791427676.6659803
+    },
+    "apps/mobile/harmony/entry/src/main/resources/base/element/string.json": {
+      "sha256": "9d1f393bb18396c00032ede17b032958a98da8ff846d13d738753d06a9161b0b",
+      "size": 740,
+      "sourceMtime": 1791427676.666126
+    },
+    "apps/mobile/harmony/entry/src/main/resources/base/media/background.png": {
+      "sha256": "497edeafc51af043c73e72ee8c4fbac4663357ef1ba275c0289f31a366b26239",
+      "size": 91942,
+      "sourceMtime": 1791427676.666268
+    },
+    "apps/mobile/harmony/entry/src/main/resources/base/media/foreground.png": {
+      "sha256": "57e549283f255505a649042f36a1d6793c307a69a94c9fa7e27a38af38ddbe8c",
+      "size": 8805,
+      "sourceMtime": 1791427676.666348
+    },
+    "apps/mobile/harmony/entry/src/main/resources/base/media/layered_image.json": {
+      "sha256": "3d18dcd7ed9e7d3d2c54c20cb80a44eb4877c661131c68a46e20b6e19d0bb476",
+      "size": 109,
+      "sourceMtime": 1791427676.6663995
+    },
+    "apps/mobile/harmony/entry/src/main/resources/base/media/startIcon.png": {
+      "sha256": "567c7c0c7a321ca180e010ad880f0f7519f6d351ac2b9665e2ee710e7cfe7778",
+      "size": 20093,
+      "sourceMtime": 1791427676.666463
+    },
+    "apps/mobile/harmony/entry/src/main/resources/base/profile/backup_config.json": {
+      "sha256": "467a97321341fba6872a6c79a25d89b16eded554c94dae3d4a2faa0d99e59358",
+      "size": 34,
+      "sourceMtime": 1791427676.6665578
+    },
+    "apps/mobile/harmony/entry/src/main/resources/base/profile/form_config.json": {
+      "sha256": "66cd6330f6e4c7b572e457eb5c34b2c720aec0bf0098d4abd778f9f341919549",
+      "size": 1795,
+      "sourceMtime": 1791427676.6666121
+    },
+    "apps/mobile/harmony/entry/src/main/resources/base/profile/main_pages.json": {
+      "sha256": "f21984fb1d5096f0db41314da0bb94c573e7ad018e5afae3044f8d5ff71b0bfc",
+      "size": 37,
+      "sourceMtime": 1791427676.666666
+    },
+    "apps/mobile/harmony/entry/src/main/resources/dark/element/color.json": {
+      "sha256": "f26f3f1e47165ae79ebe6f295a3e12593f01e90079d03fc7ff61e47ce0b366a6",
+      "size": 98,
+      "sourceMtime": 1791427676.6667829
+    },
+    "apps/mobile/harmony/entry/src/main/resources/en_US/element/string.json": {
+      "sha256": "b1a45511abb516a039d837236a8aa78845fdde599c26ef36dcaa7b4bf49278ad",
+      "size": 737,
+      "sourceMtime": 1791427676.6669018
+    },
+    "apps/mobile/harmony/entry/src/ohosTest/ets/test/Ability.test.ets": {
+      "sha256": "8600c6681413e2ee3283671c6a67c2bb1421726559163aca8596ff17d2a389d6",
+      "size": 1734,
+      "sourceMtime": 1791427676.6670575
+    },
+    "apps/mobile/harmony/entry/src/ohosTest/ets/test/List.test.ets": {
+      "sha256": "c2300b6cb78c4e2469e72ce7d0d79f5207bc5004f14cdac0bbf859da248dad15",
+      "size": 99,
+      "sourceMtime": 1791427676.6671195
+    },
+    "apps/mobile/harmony/entry/src/ohosTest/module.json5": {
+      "sha256": "fe786a07032e24236ab11485a1692effc99f266d317638bed1de8c28b7de9208",
+      "size": 224,
+      "sourceMtime": 1791427676.6671848
+    },
+    "apps/mobile/harmony/entry/src/test/List.test.ets": {
+      "sha256": "268e4980ef2fdfe0c7ff6a19402bc214ab90f25807998098d2513cc50e9dd86b",
+      "size": 105,
+      "sourceMtime": 1791427676.6672752
+    },
+    "apps/mobile/harmony/entry/src/test/LocalUnit.test.ets": {
+      "sha256": "ab72e1fa03e7c61ec51a52fe56fd366f66aa1a4415e18c7953daf5be14f488b7",
+      "size": 1624,
+      "sourceMtime": 1791427676.6674542
+    },
+    "apps/mobile/harmony/hvigor/hvigor-config.json5": {
+      "sha256": "4fd0fc81d16ac843df22e2eb14b8fb8cfc9708c55fcb9c900f34c1ffffdbcb00",
+      "size": 1301,
+      "sourceMtime": 1791427676.6675527
+    },
+    "apps/mobile/harmony/hvigorfile.ts": {
+      "sha256": "9ca94b6bbcde128ff770af9a4c958de6a67f483759bed146a0cae6eef314021c",
+      "size": 234,
+      "sourceMtime": 1791427676.6676147
+    },
+    "apps/mobile/harmony/oh-package-lock.json5": {
+      "sha256": "5500c36628eeea27b50c20d4171a1b865fee713df1521ee023e83d65dd17c068",
+      "size": 222,
+      "sourceMtime": 1791427676.6676702
+    },
+    "apps/mobile/harmony/oh-package.json5": {
+      "sha256": "b76c08d26386e0016b17997af2b7d1ee6a06d4e10090cc13951f6bad98b8c11b",
+      "size": 142,
+      "sourceMtime": 1791427676.6677504
+    },
+    "apps/mobile/harmony/phoneSettingConfig_Phone.json": {
+      "sha256": "db0b269a1c435bb89a73a9c6b1073a4854e834d5c7428618989cd0a0c3eb08e6",
+      "size": 737,
+      "sourceMtime": 1791427676.6678314
+    },
+    "apps/mobile/hermes-aed-probe-entry.js": {
+      "sha256": "7f82e92ecc3e83ba507e4256245f71a0fdcece384c835d9f54da02589aa15fc4",
+      "size": 5618,
+      "sourceMtime": 1791427676.667907
+    },
+    "apps/mobile/index.js": {
+      "sha256": "52df76f868fe39dc73143380e86eee3f70c323d7f56f064527d516cbb4730d17",
+      "size": 3214,
+      "sourceMtime": 1791427676.6679714
+    },
+    "apps/mobile/metro.config.js": {
+      "sha256": "f0177aa1fd3514353840bc0fb277b2adbc51f6a54a485a30823c287a08fa27c9",
+      "size": 8015,
+      "sourceMtime": 1791427676.6774197
+    },
+    "apps/mobile/package.json": {
+      "sha256": "1500725ee4575ff5ac6d441a537258643219d9f2aa31fdf1ec65fc6b795ae266",
+      "size": 2447,
+      "sourceMtime": 1791427676.677602
+    },
+    "apps/mobile/scripts/verify-harmonyos.sh": {
+      "sha256": "d5472437d84865d5550c1b3e837b8c677623df70c325329e6cf04b709897de52",
+      "size": 1939,
+      "sourceMtime": 1791427676.6776946
+    },
+    "apps/mobile/scripts/verify-release-builds.sh": {
+      "sha256": "39a244eafa027935095ea871b763170d66c5e704d7a4d855e20ac96d1e26f3b4",
+      "size": 6894,
+      "sourceMtime": 1791427676.6777513
+    },
+    "apps/mobile/src/App.tsx": {
+      "sha256": "dfdf7edbe1c9c59ee9a23d53e34cbf438472b3d7a97970391ea2702a7be1c36a",
+      "size": 14832,
+      "sourceMtime": 1791445925.0628777
+    },
+    "apps/mobile/src/ai/AiSettingsSection.tsx": {
+      "sha256": "485c1eeeb4b1ff02be7fa17d67837bc2814b6b309e3beaf9e4cff5281b07c365",
+      "size": 22704,
+      "sourceMtime": 1791427676.678407
+    },
+    "apps/mobile/src/ai/AssistantScreen.tsx": {
+      "sha256": "3ea6b99962b437616a30147912e0e5025abd6907af2fefd3765b1d6d81e95547",
+      "size": 16475,
+      "sourceMtime": 1791427676.6787539
+    },
+    "apps/mobile/src/ai/chat-composer.tsx": {
+      "sha256": "b90f2ff69767abfdad26831974a0de1ae34f0bd25f066a35318ab9ea6ef2a10a",
+      "size": 3694,
+      "sourceMtime": 1791446420.1553032
+    },
+    "apps/mobile/src/ai/chat-controller.ts": {
+      "sha256": "68a8ab5520c2390725faef243a92d52d739b5808485f752e63f584cfdcbc38d0",
+      "size": 15098,
+      "sourceMtime": 1791427676.6791446
+    },
+    "apps/mobile/src/ai/chat-transcript.tsx": {
+      "sha256": "6c47e4ea44ac3fe0bcfcab8e38774730256e1588d28b0660f66e65bbe04bd257",
+      "size": 1669,
+      "sourceMtime": 1791427676.679312
+    },
+    "apps/mobile/src/ai/copy.ts": {
+      "sha256": "10986310ad63b6d091fac57ccc5d3bf72ad98ec4b564ab9fa1b3d12046de2122",
+      "size": 9600,
+      "sourceMtime": 1791427676.679525
+    },
+    "apps/mobile/src/ai/disclosure.tsx": {
+      "sha256": "6d50781e867d1459b0db1786a7fc8420143205eb253cc4e285c8a2378b439e8a",
+      "size": 3859,
+      "sourceMtime": 1791427676.6797025
+    },
+    "apps/mobile/src/ai/execution-gate.ts": {
+      "sha256": "db7936cedeafefa564867ffb48df74a7aaa15931c8e131292a062feb59c883f8",
+      "size": 1016,
+      "sourceMtime": 1791427676.679887
+    },
+    "apps/mobile/src/ai/intent-copy.ts": {
+      "sha256": "080fd8700929e9dad04e7ca6d61fdaff1acb563de64d0b442794f643fd07dcae",
+      "size": 6614,
+      "sourceMtime": 1791427676.680274
+    },
+    "apps/mobile/src/ai/settings-store.ts": {
+      "sha256": "8dac96ed7041133a532392ce505b18d594099d464b082824363ea40471b356b6",
+      "size": 6871,
+      "sourceMtime": 1791427676.6804206
+    },
+    "apps/mobile/src/auth/passkey-host.ts": {
+      "sha256": "9576b251d3b902560b16b849c71e10a3c59155bbdc1bf5120c6b6f6251a6ba77",
+      "size": 3848,
+      "sourceMtime": 1791427676.6805055
+    },
+    "apps/mobile/src/auth/paste.ts": {
+      "sha256": "5a681290baea97c9f39c8783cc078905ff89abdff368069e080b3b63ec38f4ff",
+      "size": 4154,
+      "sourceMtime": 1791427676.6805575
+    },
+    "apps/mobile/src/auth/session.ts": {
+      "sha256": "dd49278b6d209f3c67d2ab1fa1f3b72b7065752d26b42ec49aaddea2f081f28d",
+      "size": 4915,
+      "sourceMtime": 1791427676.6806064
+    },
+    "apps/mobile/src/db/op-sqlite-driver.ts": {
+      "sha256": "4d05722098eabb5b70a827d11343c7918208389adc4c3eb08b3e06ea9befaedc",
+      "size": 6994,
+      "sourceMtime": 1791427676.6808558
+    },
+    "apps/mobile/src/db/open-host.ts": {
+      "sha256": "ad0c132392bd72904726b9576532a0623a213fc9ffc6080ec6fce46ee90c6987",
+      "size": 7978,
+      "sourceMtime": 1791446338.9326227
+    },
+    "apps/mobile/src/i18n/locale-preference.tsx": {
+      "sha256": "c46056f92f980101200190b2ca708b3856115c60b08565cea02067cc628bb0ad",
+      "size": 2476,
+      "sourceMtime": 1791445925.0618417
+    },
+    "apps/mobile/src/i18n/locale.ts": {
+      "sha256": "17d726ccc013214944d963e8a778d7a8d0a91695da0fe989dc09936d7544c890",
+      "size": 4847,
+      "sourceMtime": 1791445925.0621903
+    },
+    "apps/mobile/src/i18n/translate.ts": {
+      "sha256": "50664d96f0e8b4966b9bff14113404367b4c7b79c06df985de4316e4a72e2e5f",
+      "size": 661,
+      "sourceMtime": 1791427676.6811502
+    },
+    "apps/mobile/src/legal-recheck/gate.ts": {
+      "sha256": "ea22ec48f49143c9538c019848d25a89ae1606e09be7597134da02a00799dcea",
+      "size": 3725,
+      "sourceMtime": 1791427676.6812649
+    },
+    "apps/mobile/src/legal-recheck/reconfirm-ui.ts": {
+      "sha256": "f9990fcf44d02f19f221a02cada4402d840478f7b598189ba9415566b4a0291b",
+      "size": 6910,
+      "sourceMtime": 1791427676.6815126
+    },
+    "apps/mobile/src/lib/avatar-prepare.ts": {
+      "sha256": "24f778f1f7c82377d2a6f2ecd43e0692b15cc264a29013708f957430528c5a83",
+      "size": 3706,
+      "sourceMtime": 1791427676.6816444
+    },
+    "apps/mobile/src/lib/capture-labels.ts": {
+      "sha256": "72f65e991a882d25495da06dc71630fe9a8989ecac05cdb4e5a4afb98a25dfc2",
+      "size": 3489,
+      "sourceMtime": 1791427676.681697
+    },
+    "apps/mobile/src/lib/card-export-native.ts": {
+      "sha256": "21047ccdd734f3162e939876f88e2c6e9b9bf13d9aa63a99275b55f355efc0d7",
+      "size": 3712,
+      "sourceMtime": 1791427676.6817493
+    },
+    "apps/mobile/src/lib/card-export-units.ts": {
+      "sha256": "1dffc46ebe49cad7c2e9e86b0d97110fb12568200e1f6a17eca106defa5644a4",
+      "size": 8646,
+      "sourceMtime": 1791427676.6818078
+    },
+    "apps/mobile/src/lib/card-export.tsx": {
+      "sha256": "4d1854d8d8804b5bba1f3465cc672e164562598164a9f1ec9e106f40dd881239",
+      "size": 10757,
+      "sourceMtime": 1791427676.6818626
+    },
+    "apps/mobile/src/lib/category-display.ts": {
+      "sha256": "ce898ab9a64f4fff625ba49bd7ef56186d1c4c8eefaa5b292ffe6531a191ab95",
+      "size": 4224,
+      "sourceMtime": 1791427676.6820557
+    },
+    "apps/mobile/src/lib/countdown-display.ts": {
+      "sha256": "53ea221e6d2b030574ab45af777ef23d89fc0d3599cb3342a1b06b63bec270cf",
+      "size": 9255,
+      "sourceMtime": 1791427676.6821172
+    },
+    "apps/mobile/src/lib/date-picker-labels.ts": {
+      "sha256": "ac39dbc3ef630d6ff1098371b12181bbb9dde6100a7172a0de4ab28d707b2d0a",
+      "size": 2280,
+      "sourceMtime": 1791427676.6821964
+    },
+    "apps/mobile/src/lib/date.ts": {
+      "sha256": "11db797b1d433b6aece391d072a3beeb5f622f50a6a31d4fb608d5b6bf512add",
+      "size": 3947,
+      "sourceMtime": 1791427676.6823554
+    },
+    "apps/mobile/src/lib/device-revocation-guidance.ts": {
+      "sha256": "e45b5b643251a49c1afc5c68350b2cb14ea891305870082aea782007ec4b13f0",
+      "size": 2274,
+      "sourceMtime": 1791427676.6824424
+    },
+    "apps/mobile/src/lib/due-display.ts": {
+      "sha256": "affc45f7af04922eea9fcf19b57bb777a1c0019e4f543b40faa599dce953d3ab",
+      "size": 4449,
+      "sourceMtime": 1791427676.682529
+    },
+    "apps/mobile/src/lib/export-copy.ts": {
+      "sha256": "cc68a02758d418241f4545d034193bec5e682bac3b6f9e5ddb3caaa863c721a1",
+      "size": 2553,
+      "sourceMtime": 1791427676.682599
+    },
+    "apps/mobile/src/lib/focus-display.ts": {
+      "sha256": "bcfff702229e3162482dc4a822cb0fe7b7c0518d566b02ac9f0f247b91a0ab75",
+      "size": 3854,
+      "sourceMtime": 1791427676.6826518
+    },
+    "apps/mobile/src/lib/focus-timer.ts": {
+      "sha256": "0ffebf9d05f5e7256480a4c4c76edb0583ce5f8eb63c98feebce0580880126ca",
+      "size": 12817,
+      "sourceMtime": 1791444912.530736
+    },
+    "apps/mobile/src/lib/growth-display.ts": {
+      "sha256": "959596214fed62e3bceed5b71d6d03ef91c9fbaa6f0058d3596cee35de286bed",
+      "size": 15413,
+      "sourceMtime": 1791427676.6829994
+    },
+    "apps/mobile/src/lib/habits-display.ts": {
+      "sha256": "fb1dcb8504e5538ade3e708dd62f6178288fcdcf44b258353167d796aeec1534",
+      "size": 14714,
+      "sourceMtime": 1791427676.683127
+    },
+    "apps/mobile/src/lib/inbox-display.ts": {
+      "sha256": "ffa4101df7402fab47a25134890e55c4973c932b73cc260c28bc1c17f5af0108",
+      "size": 1449,
+      "sourceMtime": 1791427676.6832013
+    },
+    "apps/mobile/src/lib/local-file-read.ts": {
+      "sha256": "5ce708b76078844deb598719d50547fa6f40276be11cf59c83bf0553dadb5159",
+      "size": 5418,
+      "sourceMtime": 1791428559.2687976
+    },
+    "apps/mobile/src/lib/native-reminder-plan.ts": {
+      "sha256": "840d563c56273bc306d4afb2be87b6727d6d0cccfc18a0de1ba7eacbde7940aa",
+      "size": 80,
+      "sourceMtime": 1791427676.6835158
+    },
+    "apps/mobile/src/lib/native-reminder-scheduler.ts": {
+      "sha256": "92237f8a55604350119b3096d5217618b2f4ac6ef20366394702055c9c418fc5",
+      "size": 2614,
+      "sourceMtime": 1791427676.6836007
+    },
+    "apps/mobile/src/lib/notes-display.ts": {
+      "sha256": "c7edafd580c0a0e08afeddb203bdc9cfb3fb3f18e4396df2747b51e0c9d3544c",
+      "size": 3306,
+      "sourceMtime": 1791427676.6837935
+    },
+    "apps/mobile/src/lib/priority.ts": {
+      "sha256": "7a45c85dd4f5fcbdc882d446b9706835fda5dc1db46ac457fe5e7d2504638baa",
+      "size": 2927,
+      "sourceMtime": 1791427676.6839778
+    },
+    "apps/mobile/src/lib/quadrant-display.ts": {
+      "sha256": "14498371e5d7cdb96dfd63ff0bf068696b210a4e6e5c7839a289820ede96a18a",
+      "size": 5417,
+      "sourceMtime": 1791427676.6840532
+    },
+    "apps/mobile/src/lib/quick-dates.ts": {
+      "sha256": "f40ce6f257cb14b027220ab49bbf103eb4b9b1231dc3af15f5ad56fe87ae6849",
+      "size": 1673,
+      "sourceMtime": 1791427676.6841094
+    },
+    "apps/mobile/src/lib/recurrence-display.ts": {
+      "sha256": "5d09c1f29d9989015a0a1afaaefcd2b49ca46cb7d877e736bbae1887af68593b",
+      "size": 8389,
+      "sourceMtime": 1791427676.6841772
+    },
+    "apps/mobile/src/lib/reminder-native.ts": {
+      "sha256": "9e08e091206020941163de5fb7191221938766f5b3566b6a7a4436af11d72b55",
+      "size": 4181,
+      "sourceMtime": 1791427676.6842527
+    },
+    "apps/mobile/src/lib/reminders-display.ts": {
+      "sha256": "54e2ee41bdb89413f3a75c54fc7fd00a7a0a8c3f9a78580dc311c36b0f187011",
+      "size": 7204,
+      "sourceMtime": 1791427676.684322
+    },
+    "apps/mobile/src/lib/reminders.ts": {
+      "sha256": "160677650d047ba5c565cc5246c9eed0393df6deb784d8a6124d8c18dfd3a399",
+      "size": 9273,
+      "sourceMtime": 1791427676.6843855
+    },
+    "apps/mobile/src/lib/search-display.ts": {
+      "sha256": "73be58f8a22410bcbf4a299cd2115b5641765a0cbb76044ec7a6341ca33c6b88",
+      "size": 2680,
+      "sourceMtime": 1791427676.6844378
+    },
+    "apps/mobile/src/lib/selection.ts": {
+      "sha256": "6b9fb03799ee478c397ef58223a9ad3f008f19d130e2af67a899d84803270445",
+      "size": 2594,
+      "sourceMtime": 1791427676.6844957
+    },
+    "apps/mobile/src/lib/task-sort.ts": {
+      "sha256": "0c06ef5d340a7157b937828c77733e749307bc7e1a3c7a72382993decf5f1beb",
+      "size": 6354,
+      "sourceMtime": 1791427676.6845577
+    },
+    "apps/mobile/src/lib/ticktick-import.ts": {
+      "sha256": "05d7a0a4aa9596d94caea3a1a0f18f304a728179465d7ca9f2a30245f1368b10",
+      "size": 3724,
+      "sourceMtime": 1791427676.6846187
+    },
+    "apps/mobile/src/lib/timeline-labels.ts": {
+      "sha256": "678a3c3c1b2ee52b7d024b6704f6ae00132f31f2906299a144fd233fc3d786e8",
+      "size": 4700,
+      "sourceMtime": 1791427676.6848505
+    },
+    "apps/mobile/src/lib/trash-display.ts": {
+      "sha256": "1eab717d0a0420ef035069adacd0cabf16b384b585e7cf7c1a6897b1a7abbe62",
+      "size": 6694,
+      "sourceMtime": 1791427676.6849337
+    },
+    "apps/mobile/src/lib/use-today.ts": {
+      "sha256": "f3ca28c394e4d5c2799b3405e7db3b83cdac425836a16fe1803517199bf2c670",
+      "size": 3875,
+      "sourceMtime": 1791427676.6849859
+    },
+    "apps/mobile/src/lib/vault-secure-storage.ts": {
+      "sha256": "aa1ec494eca3ed53efe811ecf6bb3ab50e8078562ec41c71bf43b597e56c69c5",
+      "size": 10730,
+      "sourceMtime": 1791427676.685045
+    },
+    "apps/mobile/src/lib/vault-session-cleanup.ts": {
+      "sha256": "fc0518cdba3f2a5cde4aa381eec77a7893541df054dee04f6568873fe0476059",
+      "size": 2184,
+      "sourceMtime": 1791427676.6851034
+    },
+    "apps/mobile/src/nav/TabBar.tsx": {
+      "sha256": "d23628ec229abc7f6432d4c59b2a51c7f05b9abaa765e01507db13997055bd1b",
+      "size": 9313,
+      "sourceMtime": 1791427676.685355
+    },
+    "apps/mobile/src/nav/feature-entries.ts": {
+      "sha256": "1377de437d3cc4c7fa8a65c98f70e3d0ce1c0f6a2e6eb02cdb63fccb00e60be4",
+      "size": 5575,
+      "sourceMtime": 1791427676.6854126
+    },
+    "apps/mobile/src/nav/navigation-state.ts": {
+      "sha256": "4a696ff1f2215fb653c89b152db4e8182c23ec44d15897de5ea163209962f800",
+      "size": 1009,
+      "sourceMtime": 1791427676.6855135
+    },
+    "apps/mobile/src/nav/navigation.tsx": {
+      "sha256": "0fb2a11fedef6131b95008aa7bb1a06f289c33775d203b642bffed760ec895d3",
+      "size": 2885,
+      "sourceMtime": 1791427676.685609
+    },
+    "apps/mobile/src/prefs/device-prefs.ts": {
+      "sha256": "f1bf09db3b1910cd66640f0f34a86fdfae53a0e0bf578e31b94e03dbda998e51",
+      "size": 7651,
+      "sourceMtime": 1791427676.6857069
+    },
+    "apps/mobile/src/privacy/consent-gate.ts": {
+      "sha256": "040178a0755e4ba6d1a86430ff19d3b526fa122ddacdd448c38f9b066aa2ef80",
+      "size": 6984,
+      "sourceMtime": 1791440412.064029
+    },
+    "apps/mobile/src/privacy/consent-ui.ts": {
+      "sha256": "978f0cb81dfc28cd18cde1372cdc4993692cf87999ac219cdc2ad85f7235750e",
+      "size": 5807,
+      "sourceMtime": 1791439349.9384208
+    },
+    "apps/mobile/src/privacy/startup.ts": {
+      "sha256": "1b390361997f45eae3793066f62a561d14b6c283cbe0ccdfebe1bbebe8954569",
+      "size": 2644,
+      "sourceMtime": 1791427676.6861076
+    },
+    "apps/mobile/src/screens/AccountClosureScreen.tsx": {
+      "sha256": "b35664568029f9932d8c47e3a39dd3ef28966775bb363c9f1b0322f0fccdc49b",
+      "size": 11861,
+      "sourceMtime": 1791427676.6861968
+    },
+    "apps/mobile/src/screens/AuthScreen.tsx": {
+      "sha256": "88b8c2fa046df6451f7603ac3958c9314616fba332421932b7d19e6ebc645f5e",
+      "size": 39928,
+      "sourceMtime": 1791427676.6867146
+    },
+    "apps/mobile/src/screens/CalendarScreen.tsx": {
+      "sha256": "82fbe86fa75dbce3f18d35ab8e138301573258e4643d12911c05fff3a517469a",
+      "size": 19634,
+      "sourceMtime": 1791427676.6869364
+    },
+    "apps/mobile/src/screens/CategoriesScreen.tsx": {
+      "sha256": "accb1ab13daafb02d6c71334271c289ca375d6f03711086b419bf5c65b0a6053",
+      "size": 7675,
+      "sourceMtime": 1791427676.6870055
+    },
+    "apps/mobile/src/screens/ConflictSheet.tsx": {
+      "sha256": "8f7ffd6e193280e61ce0a089a264f6cfe2cdc8a972afc1c1666824fb7eda2404",
+      "size": 10028,
+      "sourceMtime": 1791427676.6870682
+    },
+    "apps/mobile/src/screens/CountdownScreen.tsx": {
+      "sha256": "aabd4c2db0de325b11907cdc15262b85f19c258da6261a0d20b0c44840ae590c",
+      "size": 14489,
+      "sourceMtime": 1791427676.6872957
+    },
+    "apps/mobile/src/screens/EntitlementSection.tsx": {
+      "sha256": "23198ee383528eb78bf3c749d883c9b4885ad4ff5b6221c5297d68a23cdde6ed",
+      "size": 5286,
+      "sourceMtime": 1791427676.687348
+    },
+    "apps/mobile/src/screens/ExportScreen.tsx": {
+      "sha256": "265414ef49d6b34c57c1104101bbe0c85f631c15d10e46e9c72163e63923de9f",
+      "size": 28262,
+      "sourceMtime": 1791430394.5017333
+    },
+    "apps/mobile/src/screens/FocusScreen.tsx": {
+      "sha256": "6c8c5aba0a9c1cf60c39884d05b1fb66520232f6a85b5e742f55db454b3a68f4",
+      "size": 15379,
+      "sourceMtime": 1791446403.213224
+    },
+    "apps/mobile/src/screens/GrowthScreen.tsx": {
+      "sha256": "22c14285e173c5a2340d5f67989218f062224265a212692013222f668ba293ac",
+      "size": 17545,
+      "sourceMtime": 1791427676.6879401
+    },
+    "apps/mobile/src/screens/HabitsScreen.tsx": {
+      "sha256": "06c1ffce7ee4600b0df6f622e69419c9652c1da117904bf69bf5b06eabe972cc",
+      "size": 25347,
+      "sourceMtime": 1791427676.6880403
+    },
+    "apps/mobile/src/screens/LegalReconfirmSheet.tsx": {
+      "sha256": "f1c96bac4b0d9166cdb491412522049aa9ac0f493fa4de291226633e271c18f6",
+      "size": 10115,
+      "sourceMtime": 1791427676.688254
+    },
+    "apps/mobile/src/screens/ListsSection.tsx": {
+      "sha256": "aa57c1fcfa408697b4f39edbb16d764260da80b660c1912f87c7cb10b94623b1",
+      "size": 16298,
+      "sourceMtime": 1791427676.6883574
+    },
+    "apps/mobile/src/screens/NoteEditScreen.tsx": {
+      "sha256": "593faf53fe4e2520137d9910f47a8d3029fbc94c6c3acfadcd3b18c531b6a96f",
+      "size": 7188,
+      "sourceMtime": 1791427676.6885328
+    },
+    "apps/mobile/src/screens/NotesSection.tsx": {
+      "sha256": "ec96294a98e889b848a636d56527f7935331b8671b750257cd872cf7ddf31457",
+      "size": 10163,
+      "sourceMtime": 1791427676.6885905
+    },
+    "apps/mobile/src/screens/NotificationsScreen.tsx": {
+      "sha256": "33ceb12ac91dbdf5f365bd4fa513ca1ab92c9c95f8ca553d6dea6d95c88ec9de",
+      "size": 14833,
+      "sourceMtime": 1791427676.6886642
+    },
+    "apps/mobile/src/screens/PrivacyConsentSheet.tsx": {
+      "sha256": "9497260cc7e4d2d6247f7cf7a4212f49703db39910aa64d719aad5982086f6d6",
+      "size": 13597,
+      "sourceMtime": 1791427676.6888964
+    },
+    "apps/mobile/src/screens/ProfileProgressSummary.tsx": {
+      "sha256": "c23f6a87aa79601f7e2b01312de954639f601ca328cef1aa9b2b5bf8664c191c",
+      "size": 4896,
+      "sourceMtime": 1791427676.6890461
+    },
+    "apps/mobile/src/screens/ProfileScreen.tsx": {
+      "sha256": "f055450311552b22cd68149083596913f5d40c5532a46099423a05770b26934e",
+      "size": 61435,
+      "sourceMtime": 1791435472.7625065
+    },
+    "apps/mobile/src/screens/QuadrantScreen.tsx": {
+      "sha256": "3dfafbbdb89e63866ce07fb46ca32001135515b423e7633c02aa2e37378eecc9",
+      "size": 7013,
+      "sourceMtime": 1791427676.6899827
+    },
+    "apps/mobile/src/screens/RenewSection.tsx": {
+      "sha256": "22898e06e0c8b600ebe583d04e524f57ce2e80b59966b055e036d42066e407f0",
+      "size": 4735,
+      "sourceMtime": 1791427676.6900659
+    },
+    "apps/mobile/src/screens/SearchScreen.tsx": {
+      "sha256": "66aff4ed9069567ce1a583b96c8b20a3738d675012373d4a5ed04216a2228cf5",
+      "size": 10422,
+      "sourceMtime": 1791427676.6901302
+    },
+    "apps/mobile/src/screens/SecurityScreen.tsx": {
+      "sha256": "bbe73aca1e64d74e8e2957bdefdd7e3ef574c34f793d21625cfd3add3db5003f",
+      "size": 14383,
+      "sourceMtime": 1791427676.6902142
+    },
+    "apps/mobile/src/screens/SettingsScreen.tsx": {
+      "sha256": "461b03b5db5bf6d922793213e94fef5468ba033f53e26c55c1c16109910d5ff1",
+      "size": 25412,
+      "sourceMtime": 1791440438.6779804
+    },
+    "apps/mobile/src/screens/TagsSection.tsx": {
+      "sha256": "77c7b5e146699f76439f1130da852bced4dc11aedc361c19eb6b0d2ea3b48ac1",
+      "size": 9705,
+      "sourceMtime": 1791427676.6906404
+    },
+    "apps/mobile/src/screens/TaskDetailSheet.tsx": {
+      "sha256": "92c9f4e75e8f2308758a81db45e9ffdd807a96b64192fe1689b3c54a207350e9",
+      "size": 48460,
+      "sourceMtime": 1791427676.6911445
+    },
+    "apps/mobile/src/screens/TasksScreen.tsx": {
+      "sha256": "9a84d33dadf76d66206e28c90287b608e5b28959bb8d43e094496a17d0ef90e4",
+      "size": 75623,
+      "sourceMtime": 1791427676.6916893
+    },
+    "apps/mobile/src/screens/TimelineScreen.tsx": {
+      "sha256": "f253260be84e001fc9e06ebe4cb0402834cb6a05b54a34e7f8a2217f262a5822",
+      "size": 3153,
+      "sourceMtime": 1791427676.6920254
+    },
+    "apps/mobile/src/screens/TrashScreen.tsx": {
+      "sha256": "a1f728ec2d46a929e4201c7c293892cb37f8ef175f2fa4d96a9333902305269a",
+      "size": 14599,
+      "sourceMtime": 1791427676.6921194
+    },
+    "apps/mobile/src/screens/VaultSettingsSection.tsx": {
+      "sha256": "b731e69986e8c5799f758442d7f1e24185ea28bf3e74426e9ca5ddeeafbaf2ba",
+      "size": 25140,
+      "sourceMtime": 1791427676.6921957
+    },
+    "apps/mobile/src/screens/WelcomeScreen.tsx": {
+      "sha256": "3620d6fab9ef66382636ccd33dcd3a48620b99fafe5d41feacb48baec3d2a8a7",
+      "size": 4601,
+      "sourceMtime": 1791427676.6926196
+    },
+    "apps/mobile/src/sync/auto-sync-core.ts": {
+      "sha256": "cb972a7e15ec075790aca33183c89bff42b0f392d861ebfb541108e1c5033a40",
+      "size": 8438,
+      "sourceMtime": 1791427676.692744
+    },
+    "apps/mobile/src/sync/auto-sync.ts": {
+      "sha256": "f86597eb9488b1d5b43ca904588f3a164236ea6e9b95d5b76106da7f766d9302",
+      "size": 13468,
+      "sourceMtime": 1791427676.6928346
+    },
+    "apps/mobile/src/sync/config.ts": {
+      "sha256": "a19c4c8fd6d9e120ca7448f1c61885313ef1401f5d0653fe9dc523e1a58963a6",
+      "size": 4971,
+      "sourceMtime": 1791427676.6930108
+    },
+    "apps/mobile/src/sync/credential-form.ts": {
+      "sha256": "d469bc6c3a1271899b3b072f1b12bb4571244e02b59e2ffad0f9006b1e791179",
+      "size": 6099,
+      "sourceMtime": 1791427676.693473
+    },
+    "apps/mobile/src/sync/realtime.ts": {
+      "sha256": "e61d87177035f73502fba907b6f8304227093ae32c34fc6f3ccaa64375cbe9a2",
+      "size": 10503,
+      "sourceMtime": 1791427676.6935508
+    },
+    "apps/mobile/src/sync/status-text.ts": {
+      "sha256": "86b9df214f9bd4c792fd341d5592b133d51ac2b049d7627ca56185488a9238e8",
+      "size": 9472,
+      "sourceMtime": 1791427676.6936388
+    },
+    "apps/mobile/src/sync/store.ts": {
+      "sha256": "cc3bc53d33d0ef73a3443d3cd1586758e47d6f3e72b6773a9b34c7835dd47022",
+      "size": 13219,
+      "sourceMtime": 1791427676.6937256
+    },
+    "apps/mobile/src/sync/write-signal.ts": {
+      "sha256": "943c851485baef5446f0ca10fcb6963c8e987765d60f113bb46f23b0483122d8",
+      "size": 1811,
+      "sourceMtime": 1791427676.6937833
+    },
+    "apps/mobile/src/theme.tsx": {
+      "sha256": "b41da3ff705ab68e44466bc8a0eb19d74933dd32025469cb994d76658c225786",
+      "size": 2110,
+      "sourceMtime": 1791427676.6939487
+    },
+    "apps/mobile/src/ui/avatar.tsx": {
+      "sha256": "079d5178588711ce1f0f25feb7ad80e8eed4ebad710914838649d67e4488af23",
+      "size": 3830,
+      "sourceMtime": 1791427676.6943855
+    },
+    "apps/mobile/src/ui/habit-frequency-slot.tsx": {
+      "sha256": "600182950e64f3bf60da5d1935a1a67c3c6d6f9da75b08e5df9d77927a6dd0ac",
+      "size": 9689,
+      "sourceMtime": 1791427676.6946
+    },
+    "apps/mobile/src/ui/habit-goal-slot.tsx": {
+      "sha256": "24e7c17b1cc0eaaa0c9e5b29e26d93c323ab6130a856fcfb8002fd35125592ab",
+      "size": 6169,
+      "sourceMtime": 1791427676.6947172
+    },
+    "apps/mobile/src/ui/habit-icon-slot.tsx": {
+      "sha256": "3012c0ec3e2d89763e01ccee567f5fb46c17982307b8f0935ed05f00f8dd3baa",
+      "size": 8431,
+      "sourceMtime": 1791427676.6948998
+    },
+    "apps/mobile/src/ui/icons.tsx": {
+      "sha256": "1976e3d0b2e61cc366b87b1003e521a8ac83d0b958d639f90e25d35cf2c418a4",
+      "size": 9464,
+      "sourceMtime": 1791429418.2335153
+    },
+    "apps/mobile/src/ui/kit.tsx": {
+      "sha256": "3d543874eb685b48a1be52650a91c08a854807ea424792830b17eb834cea6440",
+      "size": 38928,
+      "sourceMtime": 1791429418.2326431
+    },
+    "apps/mobile/src/ui/slot-picker.tsx": {
+      "sha256": "5a9386e33c9b3edf429babec03755f8c35430686b0e1d0eaa1de4a98f4ed20d1",
+      "size": 7231,
+      "sourceMtime": 1791427676.6958137
+    },
+    "apps/mobile/src/widgets/credential-wipe.ts": {
+      "sha256": "4bced6f88400e84e8acfb8ff13c26f777b12d3c691bec15cef6525f68d3e7158",
+      "size": 4007,
+      "sourceMtime": 1791427676.696211
+    },
+    "apps/mobile/src/widgets/drain.ts": {
+      "sha256": "f80b922530ad4b25c62da02007fddd297124a702d9a42c9b24f0cbef7c39f7ee",
+      "size": 2529,
+      "sourceMtime": 1791433675.0960903
+    },
+    "apps/mobile/src/widgets/lifecycle.ts": {
+      "sha256": "17fe7ed70e2093daf95c303555be8a27c6f4623aa527d4303377602782e06ecb",
+      "size": 8932,
+      "sourceMtime": 1791446124.181271
+    },
+    "apps/mobile/src/widgets/publish-source.ts": {
+      "sha256": "f58113a01a5afc915fe20a06c3ea1f739022e9dcd39306349a53b5d42fdc7661",
+      "size": 1669,
+      "sourceMtime": 1791427676.696373
+    },
+    "apps/mobile/src/widgets/publish.ts": {
+      "sha256": "76c78709f7977ac9f2ac817a0dfbb85e2e78af40c46d1c6178e40b77780cfd52",
+      "size": 8183,
+      "sourceMtime": 1791434770.3327463
+    },
+    "apps/mobile/src/widgets/snapshot-sealer.ts": {
+      "sha256": "6ce304730584e90266c33d048ea97ce867432571e6b02cf1b1275e26e68ac5ee",
+      "size": 4061,
+      "sourceMtime": 1791427676.696602
+    },
+    "apps/mobile/src/widgets/widget-bridge.ts": {
+      "sha256": "f4822ecc84ef60c9e85af3967b81e1aee262e7277462f19dd4dd66f86ac873ef",
+      "size": 14255,
+      "sourceMtime": 1791446118.3101575
+    },
+    "apps/mobile/src/widgets/widget-journey.ts": {
+      "sha256": "c9af8fe56a78f5ee7a4ce0340a811d5ee9c1ee01767d69e5cb765474580dd038",
+      "size": 4597,
+      "sourceMtime": 1791427676.6967325
+    },
+    "apps/mobile/tests/account-closure-entry.spec.ts": {
+      "sha256": "3aa0cd5f8606ccdc6355f229fe04adc766c924a785d542802908c99f2eba554b",
+      "size": 10023,
+      "sourceMtime": 1791427676.6968348
+    },
+    "apps/mobile/tests/ai-assistant-concurrency.spec.ts": {
+      "sha256": "7513ac662aa87a7adebf74870140f656152d1180edc792c52ae9c020204af449",
+      "size": 1519,
+      "sourceMtime": 1791427676.6970217
+    },
+    "apps/mobile/tests/ai-panel-local-selection.spec.ts": {
+      "sha256": "a31b6275d15a864804fb0d09517205862d958b0bb86245aba27d8145b640b1b8",
+      "size": 1243,
+      "sourceMtime": 1791427676.6973436
+    },
+    "apps/mobile/tests/assistant-local-history.spec.ts": {
+      "sha256": "1c44ddc67c54b2a6ee1046d4a507d235310f66bb128e80fef1b3710b08fe2fbf",
+      "size": 4224,
+      "sourceMtime": 1791427676.697538
+    },
+    "apps/mobile/tests/auth-flow.spec.ts": {
+      "sha256": "c65f78446b0128001fc1c0ce5f7418f31ac2975003342921cc393481509d0ecb",
+      "size": 9434,
+      "sourceMtime": 1791438040.618728
+    },
+    "apps/mobile/tests/auth-screen-password.spec.ts": {
+      "sha256": "7b49977023fb9e321f8515a90c7504b13d4a1795cdd98f023d309cc085036091",
+      "size": 19292,
+      "sourceMtime": 1791427676.697883
+    },
+    "apps/mobile/tests/auto-sync.spec.ts": {
+      "sha256": "51f437a859a7f715cdd69195c168e7049816ba9d2ba7d7728b5268ae1dcf35da",
+      "size": 10174,
+      "sourceMtime": 1791427676.6979702
+    },
+    "apps/mobile/tests/calendar-event-source.spec.ts": {
+      "sha256": "e4b63d6dba843786ff0d78fe07f0693fb5ddabadfa3dcccb01278b2900d94d28",
+      "size": 19204,
+      "sourceMtime": 1791427676.6980586
+    },
+    "apps/mobile/tests/calendar-view-entry.spec.ts": {
+      "sha256": "d844d62d78502327d32078b91a5551bbd5c159b684536714e178797733dd1b09",
+      "size": 10643,
+      "sourceMtime": 1791427676.6982782
+    },
+    "apps/mobile/tests/card-export.spec.ts": {
+      "sha256": "c5c836166fbb350f830927b9ceb53b82467fefaed43a9a67b6458850319d4b25",
+      "size": 24094,
+      "sourceMtime": 1791427676.6983776
+    },
+    "apps/mobile/tests/category-display.spec.ts": {
+      "sha256": "77f0dd7b5428525f155ff386bb72d071b3c4f348515d913466a1a2d9d8f3af1f",
+      "size": 6626,
+      "sourceMtime": 1791427676.6984513
+    },
+    "apps/mobile/tests/chat-controller.spec.ts": {
+      "sha256": "bcaa791b28248d383047ca0584f003822fdfe6c6c0736b8d2a78c0a596b558f0",
+      "size": 17930,
+      "sourceMtime": 1791427676.6987517
+    },
+    "apps/mobile/tests/chat-session-primitives.spec.ts": {
+      "sha256": "b54a23def7f9f7efaf2e3c0c8ea87f4b0518ee9d1e17f2a73050ff949d164002",
+      "size": 1382,
+      "sourceMtime": 1791427676.6991677
+    },
+    "apps/mobile/tests/conflict-keys.spec.ts": {
+      "sha256": "45385b748ab6611ba0f3a0599613d8081240a16fcb7391a511fb8673a5adc23e",
+      "size": 10964,
+      "sourceMtime": 1791427676.6994534
+    },
+    "apps/mobile/tests/credential-wipe.spec.ts": {
+      "sha256": "a13478a1d1e04b1af0ca40cffd8e26efe4254a67881fdebd7660dbc388436c9a",
+      "size": 4966,
+      "sourceMtime": 1791427676.699684
+    },
+    "apps/mobile/tests/date.spec.ts": {
+      "sha256": "8f6f7ff79994fbc8f71f2a6f9b4ff3259652d28b80da31d045119c40b4edeb4f",
+      "size": 8712,
+      "sourceMtime": 1791427676.6997957
+    },
+    "apps/mobile/tests/device-revocation-behavior.spec.ts": {
+      "sha256": "0113b6fc81cf85e30dfc1fb577db400dc3978569c255bd17defcc9883cc8152d",
+      "size": 3640,
+      "sourceMtime": 1791427676.699881
+    },
+    "apps/mobile/tests/export-copy.spec.ts": {
+      "sha256": "5777ed914418e62f548b96aa4102b5de7105ab00b58e7a5755f60c046e8855b3",
+      "size": 3152,
+      "sourceMtime": 1791427676.6999588
+    },
+    "apps/mobile/tests/feature-entries.spec.ts": {
+      "sha256": "6e973674c5f64194d0961d0d23fd63c4ade4265b1c0f54f278d4dd451f443817",
+      "size": 14413,
+      "sourceMtime": 1791427676.7000566
+    },
+    "apps/mobile/tests/growth-display.spec.ts": {
+      "sha256": "d5c0302287b270045f6d568eb4004297c6b44b33d59f4325e9244ae8668c30de",
+      "size": 21538,
+      "sourceMtime": 1791427676.7004607
+    },
+    "apps/mobile/tests/growth-share-summary.spec.ts": {
+      "sha256": "a145df317ccdd035e171ca26be35c513e90e1b6ff73b4ed43c14523fe8fc6966",
+      "size": 11703,
+      "sourceMtime": 1791427676.70073
+    },
+    "apps/mobile/tests/habit-create-entry.spec.ts": {
+      "sha256": "58f7cae82aea073a8d940f72beed7c5c4d75c6b0f232365904ab867af4e1d67b",
+      "size": 13674,
+      "sourceMtime": 1791427676.7008495
+    },
+    "apps/mobile/tests/habit-frequency-entry.spec.ts": {
+      "sha256": "8d02b483222c364069aba0c34440cae750f2a2512d1677968a8f17865e58ee60",
+      "size": 9952,
+      "sourceMtime": 1791427676.7010965
+    },
+    "apps/mobile/tests/habit-goal-entry.spec.ts": {
+      "sha256": "05ea50df048bfc4a29f1f91e995997ccd9ca473bd0194ce0154b99c1e5f37bcc",
+      "size": 3004,
+      "sourceMtime": 1791427676.7013834
+    },
+    "apps/mobile/tests/habit-icon-picker.spec.ts": {
+      "sha256": "3e89f0b4af3811c0aa5e4fe384f945ecb452efd4df3c8c03df6926665b70ba6c",
+      "size": 12624,
+      "sourceMtime": 1791427676.7016325
+    },
+    "apps/mobile/tests/habit-month-entry.spec.ts": {
+      "sha256": "5ed42b8e46809c9cee880abbb5a3f49318f4d9804c1a8fad384a824c560d4599",
+      "size": 9217,
+      "sourceMtime": 1791427676.7018826
+    },
+    "apps/mobile/tests/habit-trend-entry.spec.ts": {
+      "sha256": "b30165d27dd3e33ec1ef408fbc2880567a4f9df19dd216cc3d4410ffdd0fabef",
+      "size": 4274,
+      "sourceMtime": 1791427676.7019591
+    },
+    "apps/mobile/tests/habits-display.spec.ts": {
+      "sha256": "a7998105acdde58a8b66cc15d2edaa27177a8a4274da9e22e311d1272f6e4f00",
+      "size": 16932,
+      "sourceMtime": 1791427676.7020342
+    },
+    "apps/mobile/tests/harmony-widget.spec.ts": {
+      "sha256": "5eeedb1dd643e740fa823dac60b4bec95718ab385ff5ff8051fbfddb5c8b88b6",
+      "size": 18695,
+      "sourceMtime": 1791427676.7021134
+    },
+    "apps/mobile/tests/inbox-display.spec.ts": {
+      "sha256": "500b5a4176329cb91e4732b8d76d156b2705c2a32f5631e23e57dcedcd1c935b",
+      "size": 2187,
+      "sourceMtime": 1791427676.702187
+    },
+    "apps/mobile/tests/legal-recheck-mobile.spec.ts": {
+      "sha256": "f14378ab800dcffed7520aa1a12ebd076f1788d1c71400e3e7da5e2996f7758b",
+      "size": 33781,
+      "sourceMtime": 1791427676.7022576
+    },
+    "apps/mobile/tests/locale.spec.ts": {
+      "sha256": "061e495374b76af1347c278a24acff52fb458e76e2e66e4f5db360458f7fe10e",
+      "size": 2724,
+      "sourceMtime": 1791446118.3105242
+    },
+    "apps/mobile/tests/native-reminder-authorization.spec.ts": {
+      "sha256": "4c0d4abad4ca67060a525bee3048217abb6d5ea6c3d200493bf7de828c8fd3f9",
+      "size": 4427,
+      "sourceMtime": 1791427676.7023845
+    },
+    "apps/mobile/tests/native-reminder-plan.spec.ts": {
+      "sha256": "b491eadf291fa75ee17e42d8e9f8cd87dc9f94b763a089d3cb42db23af6d7025",
+      "size": 2718,
+      "sourceMtime": 1791427676.7024379
+    },
+    "apps/mobile/tests/navigation-stack.spec.ts": {
+      "sha256": "864ef753451c57713fd1518a3cbb21f23d8d50b379e26cbe556dd346eab2002f",
+      "size": 3593,
+      "sourceMtime": 1791427676.7026665
+    },
+    "apps/mobile/tests/note-edit.spec.ts": {
+      "sha256": "0fd2473739ef090ff67b70f0f0700de968b90b66e0d9f992a906da27319b4f2a",
+      "size": 10078,
+      "sourceMtime": 1791427676.703037
+    },
+    "apps/mobile/tests/op-sqlite-container-removal.spec.ts": {
+      "sha256": "ff9866f09216275d03e67046ddbe7c95b182b2aff70718c4b1082d7536a602c8",
+      "size": 5074,
+      "sourceMtime": 1791427676.7031105
+    },
+    "apps/mobile/tests/organizer-rename.spec.ts": {
+      "sha256": "e75b262841e3e4d3fa22deeb348c7ef1e7f1c1d66d6582248e977530211313dd",
+      "size": 18831,
+      "sourceMtime": 1791427676.7031734
+    },
+    "apps/mobile/tests/plural-keys.spec.ts": {
+      "sha256": "404f1549238793dddf145e063c5a63db972b3565e1018f4020e64a3f9dda0252",
+      "size": 4693,
+      "sourceMtime": 1791427676.703243
+    },
+    "apps/mobile/tests/privacy-consent-gate.spec.ts": {
+      "sha256": "5ec28219597fa62bf7201ada059f46efa0a74ded3169459d9c0196614e6b2240",
+      "size": 31323,
+      "sourceMtime": 1791441003.0599165
+    },
+    "apps/mobile/tests/profile-avatar-entry.spec.ts": {
+      "sha256": "966c9fa61379e3f6227527b71f516855cfc7c3d52a9ebaf9d94fbcfbd2ad5e14",
+      "size": 9720,
+      "sourceMtime": 1791427676.703527
+    },
+    "apps/mobile/tests/profile-nickname-entry.spec.ts": {
+      "sha256": "53c30020efda75618c76ba0ab95cd4bade9484fb9156411fa14e743fe893e2cc",
+      "size": 9993,
+      "sourceMtime": 1791427676.7036
+    },
+    "apps/mobile/tests/profile-progress-summary.spec.ts": {
+      "sha256": "b1f65762c4b4341cd17166d2ad03216bc2f99a4c547a3bf77b0abfa9c23d5984",
+      "size": 2059,
+      "sourceMtime": 1791427676.703891
+    },
+    "apps/mobile/tests/profile-settings-ia.spec.ts": {
+      "sha256": "356aeae7b9e8b8bd46ccba96c4f52561c61ad3291daa9d0568de9b604b252772",
+      "size": 6283,
+      "sourceMtime": 1791427676.7041261
+    },
+    "apps/mobile/tests/projects-sections.spec.ts": {
+      "sha256": "8c7b4785ae0cf7660f252d1f74d3b558b625c45e2c68bb242dfde3d24bbedfaf",
+      "size": 10592,
+      "sourceMtime": 1791427676.7043445
+    },
+    "apps/mobile/tests/quadrant-display.spec.ts": {
+      "sha256": "0fa31badeaa6473a550f07606c0d5a559408b5670ec3d073d1ecdcde71790159",
+      "size": 4171,
+      "sourceMtime": 1791427676.7044103
+    },
+    "apps/mobile/tests/realtime-wiring.spec.ts": {
+      "sha256": "449222092a6954f71d81c757a71cb93164fea969909cfa105a28f40c665ae67a",
+      "size": 18146,
+      "sourceMtime": 1791427676.7044783
+    },
+    "apps/mobile/tests/recurrence-display.spec.ts": {
+      "sha256": "6f372dee841aba3a3b16c3c478d67a5130bcbe1c1ed95bdbf4f519b3708b1480",
+      "size": 10878,
+      "sourceMtime": 1791427676.7045505
+    },
+    "apps/mobile/tests/reminders-notes-display.spec.ts": {
+      "sha256": "60c418602464591cfa948138f23087718ad3bb2c6935686c82fa471dbdbcbd99",
+      "size": 14661,
+      "sourceMtime": 1791427676.7046432
+    },
+    "apps/mobile/tests/renew-entry.spec.ts": {
+      "sha256": "bd660292fb2ba4ba79c284e75cc03513840e2d5f81b688f87ede44b6e3f977c8",
+      "size": 4901,
+      "sourceMtime": 1791427676.7047076
+    },
+    "apps/mobile/tests/restore-preview-source.spec.ts": {
+      "sha256": "a747c4d84ece242b6be01a49c151b4042484b7ac7a0961020ff2b8b90f79c7d8",
+      "size": 4803,
+      "sourceMtime": 1791427676.7047627
+    },
+    "apps/mobile/tests/search-display.spec.ts": {
+      "sha256": "5169c4d2a0212e03dc5286b4100aaac405ca723a8d61d4ccd5601dd48eb56fe0",
+      "size": 3779,
+      "sourceMtime": 1791427676.7048156
+    },
+    "apps/mobile/tests/selection-single-owner.spec.ts": {
+      "sha256": "e0699256b7e3c62e7343f5266e33871c780572f23b878eb4c15b53c292cc38fa",
+      "size": 12794,
+      "sourceMtime": 1791427676.7048965
+    },
+    "apps/mobile/tests/source-reading.ts": {
+      "sha256": "fa9df886870635b60acb30932372031ac2c3ce72bb7a0e7301070473902312d3",
+      "size": 2281,
+      "sourceMtime": 1791427676.7049615
+    },
+    "apps/mobile/tests/subtask-entry.spec.ts": {
+      "sha256": "81730286f2f1269f139c449f51725049a8a797a63258092cbf9a551ec79e150f",
+      "size": 4074,
+      "sourceMtime": 1791427676.7050219
+    },
+    "apps/mobile/tests/sync-status-text.spec.ts": {
+      "sha256": "d8d299817853600c4159ba901174c730135d7a5d43808f42d1d221864f296aaf",
+      "size": 11958,
+      "sourceMtime": 1791427676.7050927
+    },
+    "apps/mobile/tests/task-detail-keyboard-back.spec.ts": {
+      "sha256": "9bd50cf258533046856cdcaaf5b8333509856b9fa661d74d7f859fb5e6cb6283",
+      "size": 1022,
+      "sourceMtime": 1791427676.7052677
+    },
+    "apps/mobile/tests/task-due-time.spec.ts": {
+      "sha256": "bacd9e3a2040e3802c9881543cf784b2a566cd869b813812227f92d699f2b6ce",
+      "size": 9661,
+      "sourceMtime": 1791427676.7054868
+    },
+    "apps/mobile/tests/task-fields.spec.ts": {
+      "sha256": "3dcdb2f621f0230c359f576db74645ba514c72ad6d2fb0b58dd498f0f3102fb5",
+      "size": 8170,
+      "sourceMtime": 1791427676.7058268
+    },
+    "apps/mobile/tests/task-sort.spec.ts": {
+      "sha256": "a78114a580d8644a7dfff83bd4842e398c10a010a847830aea008aafa65e6b30",
+      "size": 10425,
+      "sourceMtime": 1791427676.7058995
+    },
+    "apps/mobile/tests/ticktick-import.spec.ts": {
+      "sha256": "bbe26ce03c7296f7a810bdb0726618efeb4a3890e157a1d2c39e27d9396ed803",
+      "size": 5992,
+      "sourceMtime": 1791427676.705957
+    },
+    "apps/mobile/tests/trash-display.spec.ts": {
+      "sha256": "5a5e1c8c02e87b7872b3121ca470b802b7cde60df82ab7cb60b1920f5a3ce9a2",
+      "size": 9611,
+      "sourceMtime": 1791427676.7060213
+    },
+    "apps/mobile/tests/vault-secure-storage.spec.ts": {
+      "sha256": "303f4725200a46f393e433b60a218d605e41469b84a5b31431ffad9d262b6369",
+      "size": 9304,
+      "sourceMtime": 1791427676.7060778
+    },
+    "apps/mobile/tests/widget-bridge.spec.ts": {
+      "sha256": "c7739dcf610295366233b46b245498c7a376c53a014412267408c3f3d3f1d570",
+      "size": 9276,
+      "sourceMtime": 1791434460.1297662
+    },
+    "apps/mobile/tests/widget-drain.spec.ts": {
+      "sha256": "236cc1e7cf50dac956d0e89c0985568f275418e9cb27234e4da2bcfe2e59da19",
+      "size": 3058,
+      "sourceMtime": 1791433786.366167
+    },
+    "apps/mobile/tests/widget-journey.spec.ts": {
+      "sha256": "6e18680d293df5ceb2c2e26acccaec03a0c28e3332e9faec42a4444f6a8d49a6",
+      "size": 3866,
+      "sourceMtime": 1791427676.7062378
+    },
+    "apps/mobile/tests/widget-publish.spec.ts": {
+      "sha256": "b9be25bcccf4838791c360a039cc632c93776f592d2d504b2f064108caed85bc",
+      "size": 16490,
+      "sourceMtime": 1791435297.4238608
+    },
+    "apps/mobile/tests/widget-snapshot-sealer.spec.ts": {
+      "sha256": "b86a30d1cbe6a2a3e59c740783f6b1189e529419857909f84d14a47e148af5c6",
+      "size": 9850,
+      "sourceMtime": 1791427676.7063625
+    },
+    "apps/mobile/tsconfig.json": {
+      "sha256": "204de2fafc50407c66698d11d4e158e563dfb8f153162ecbe2b9a96f291806a1",
+      "size": 378,
+      "sourceMtime": 1791427676.706523
+    },
+    "package.json": {
+      "sha256": "751a60c18a4bb977c3178398413c984bc507b61ad95853d4f1e16515abd25995",
+      "size": 16344,
+      "sourceMtime": 1791433284.603406
+    },
+    "packages/widget-core/fixtures/v1.golden.json": {
+      "sha256": "bd4617db17c0d8a272e7dcf1e847e2d4df4aa6782f2d3af17aa844bbe412ac92",
+      "size": 2181,
+      "sourceMtime": 1791427677.6075134
+    },
+    "packages/widget-core/fixtures/v1.golden.plaintext.json": {
+      "sha256": "ceea4c0af4fa86088fa91975874157eb9967249c32f9b8c1dde7f810f56d5f65",
+      "size": 2476,
+      "sourceMtime": 1791427677.6075666
+    },
+    "packages/widget-core/fixtures/v99.unknown.golden.json": {
+      "sha256": "72cc7c2d756c25f91cdd598e9f7a68534770b5fb28c5a1796d5a7050bab988ed",
+      "size": 2182,
+      "sourceMtime": 1791427677.6076179
+    },
+    "pnpm-lock.yaml": {
+      "sha256": "c840fef3a70fc2ea0e5c037c879629358032039585559989bf410b3d1a7c99b1",
+      "size": 363435,
+      "sourceMtime": 1791427677.6107328
+    },
+    "pnpm-workspace.yaml": {
+      "sha256": "ba922c086123ecdf92cfc0d02342a5fb1b63f55da17fd0d9587b30a93a3d4b01",
+      "size": 3830,
+      "sourceMtime": 1791427677.6109564
+    },
+    "apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetLocalePreference.kt": {
+      "sha256": "e4160be2d0aaa278a79f87e2b4b8888314f0c830cc7196a628d16e881b1cad42",
+      "size": 1386,
+      "sourceMtime": 1791445925.0601463
+    },
+    "apps/mobile/android/app/src/main/res/values-night/colors.xml": {
+      "sha256": "8e860ca97cbadec821650e3f255dde57eb2132aa711deaa8351ba63955065de3",
+      "size": 565,
+      "sourceMtime": 1791433174.864746
+    },
+    "apps/mobile/android/app/src/main/res/values/colors.xml": {
+      "sha256": "78a421218e3cbfe8ad1653bfdea9122b73c1522dc6ea99f61c741e836ddcbccc",
+      "size": 560,
+      "sourceMtime": 1791433174.8646042
+    },
+    "apps/mobile/android/app/src/test/java/com/heytamobile/widget/WidgetLocalePreferenceTest.kt": {
+      "sha256": "8a719e1d9c293ae5f9e482e0ba824156028c8836cb1f3e5c99cc89d33a9decc6",
+      "size": 514,
+      "sourceMtime": 1791446118.3108168
+    },
+    "apps/mobile/src/lib/focus-task-source.ts": {
+      "sha256": "278d9885e53cf133d2ae8b226b8e0115c74b161ac40488c0e000fcae6d029080",
+      "size": 590,
+      "sourceMtime": 1791446403.2129984
+    },
+    "apps/mobile/src/widgets/publish-coordinator.ts": {
+      "sha256": "5e702ac91e8c8d266ea54c5cc6314e950a8ab9c486bfda8a19bc078e01b159c4",
+      "size": 3881,
+      "sourceMtime": 1791446124.1809344
+    },
+    "apps/mobile/tests/focus-task-source.spec.ts": {
+      "sha256": "b0e7852e23a559780379b03c94b750f7484a8c3aa2289ea64ec2fe2a370b549b",
+      "size": 2202,
+      "sourceMtime": 1791446431.9214718
+    },
+    "apps/mobile/tests/focus-widget-lifecycle.spec.ts": {
+      "sha256": "2ce496d0971dfa9738c5c019127836140726f8a0e40c092b9f0e67f499e3dcf5",
+      "size": 8202,
+      "sourceMtime": 1791446003.1222665
+    },
+    "apps/mobile/tests/local-file-read.spec.ts": {
+      "sha256": "22c3e31de8836e43fc742aff158582f8fdfb7a178b8451e656d74f1885eee5a1",
+      "size": 2167,
+      "sourceMtime": 1791428596.2478647
+    },
+    "apps/mobile/tests/open-host-generation.spec.ts": {
+      "sha256": "d143d89c5c21505eb34c00b7f454e51ae048236b1f230e882f0ec2ddc741231c",
+      "size": 3612,
+      "sourceMtime": 1791446321.6523767
+    },
+    "apps/mobile/tests/widget-publish-coordinator.spec.ts": {
+      "sha256": "6db57103dc862a4321280b0f1b2831f4b8c80f8250f822d68fab9d65b21b7be9",
+      "size": 2081,
+      "sourceMtime": 1791446403.2135222
+    },
+    "packages/ai/dist/index.d.cts": {
+      "sha256": "e0f5e8970a31470e35af8fccdf0b72d8777f5f4ab63fbad6a14f0cadd4555e88",
+      "size": 97348,
+      "sourceMtime": 1791446736.020432
+    },
+    "packages/ai/dist/index.js": {
+      "sha256": "754b050e2539edda998f6eaa15fe4fe7d3de38015be8a14a36718f8ce70c673c",
+      "size": 48094,
+      "sourceMtime": 1791446735.3710155
+    },
+    "packages/ai/dist/index.cjs.map": {
+      "sha256": "6b9235e5bd1ebf08fe88cc22f874d97c93e34ce3bd6da69f4e40b1fc60171243",
+      "size": 196780,
+      "sourceMtime": 1791446735.3734925
+    },
+    "packages/ai/dist/index.cjs": {
+      "sha256": "8637414938386455e2bc83f9107dd50e38ab2519657bb1a71feab0de46ebe6be",
+      "size": 52160,
+      "sourceMtime": 1791446735.370998
+    },
+    "packages/ai/dist/index.js.map": {
+      "sha256": "5a24b5236d1df0f581fa38bdd56f7622a3614eaf4a033cc527b8a7fc48c9bcc3",
+      "size": 189491,
+      "sourceMtime": 1791446735.3736296
+    },
+    "packages/ai/dist/index.d.ts": {
+      "sha256": "e0f5e8970a31470e35af8fccdf0b72d8777f5f4ab63fbad6a14f0cadd4555e88",
+      "size": 97348,
+      "sourceMtime": 1791446736.0204334
+    },
+    "packages/app-host/dist/index.js": {
+      "sha256": "cf79bbbb5e7ae1425e5711caed34f6442871c3e3925498cbe3b3af5a7a4576eb",
+      "size": 441831,
+      "sourceMtime": 1791446741.466284
+    },
+    "packages/app-host/dist/index.js.map": {
+      "sha256": "f1c6e272c5b45c779fcad6e6054bbccf3948f5676e451db6b6448a4854a1b966",
+      "size": 1336636,
+      "sourceMtime": 1791446741.4726255
+    },
+    "packages/app-host/dist/index.d.ts": {
+      "sha256": "a42f186d8dfe6ac25ed412fa05491fd88aebaeeb49e9ff48e429f7a819c69d4e",
+      "size": 474514,
+      "sourceMtime": 1791446742.5075753
+    },
+    "packages/design-system/dist/chunk-NURYBWLD.js.map": {
+      "sha256": "e7a61319b0916b57ea7836256335ff3a8da4cd473fc1e45fa67cf8a502dc9b4a",
+      "size": 71141,
+      "sourceMtime": 1791446735.3800578
+    },
+    "packages/design-system/dist/native.js.map": {
+      "sha256": "cba81f7ad4d5b1b629bf43823f1082e73a10d0c3114c937515e7f8c1047629b3",
+      "size": 71,
+      "sourceMtime": 1791446735.3800483
+    },
+    "packages/design-system/dist/native.js": {
+      "sha256": "37fad1f05e4273194704b6dbd7bc6e2c2ea3b11968502b689d7bdccd000d7f8a",
+      "size": 473,
+      "sourceMtime": 1791446735.377606
+    },
+    "packages/design-system/dist/native.d.cts": {
+      "sha256": "aca2616999f9b06a739c1464ab255fb2b2ffe0d5bac3ba16f46a90b390461241",
+      "size": 16430,
+      "sourceMtime": 1791446736.2786138
+    },
+    "packages/design-system/dist/index.d.cts": {
+      "sha256": "d8a3a7e11a796b79ff27d17e715ede6b33f1d7d922b090b937f3f7776244aaca",
+      "size": 42934,
+      "sourceMtime": 1791446736.2785923
+    },
+    "packages/design-system/dist/index.js": {
+      "sha256": "205945fdc8fcc10482b10fb724bb647cb3ec5756178ff1474906c91c4b4e4d53",
+      "size": 5849,
+      "sourceMtime": 1791446735.3775675
+    },
+    "packages/design-system/dist/chunk-NURYBWLD.js": {
+      "sha256": "4e258de8c330947856aeab316b7a8167326bbdf18e3bb7cef7fd21721cd1b0a7",
+      "size": 29783,
+      "sourceMtime": 1791446735.3775833
+    },
+    "packages/design-system/dist/native.d.ts": {
+      "sha256": "aca2616999f9b06a739c1464ab255fb2b2ffe0d5bac3ba16f46a90b390461241",
+      "size": 16430,
+      "sourceMtime": 1791446736.278588
+    },
+    "packages/design-system/dist/chunk-BGWX5KD6.js": {
+      "sha256": "e5cddddebf0e9371f017729b3ac75abc2e118955e1e67fd533c72b1c2fd284f2",
+      "size": 14971,
+      "sourceMtime": 1791446735.377572
+    },
+    "packages/design-system/dist/index.cjs.map": {
+      "sha256": "a978afba126a83462c68aac08e9f393669b7f63935ef67b9dd7c88a904ffe840",
+      "size": 130838,
+      "sourceMtime": 1791446735.380109
+    },
+    "packages/design-system/dist/generate-cli.d.ts": {
+      "sha256": "6caa0b04bdc10582a3729dae9244f21c5bec0b9ffe7e2a84999c2f868f5dd9be",
+      "size": 13,
+      "sourceMtime": 1791446736.2785578
+    },
+    "packages/design-system/dist/generate-cli.js.map": {
+      "sha256": "9c0690f8ee765efb5273df2abe4b51dd6e5cebbccbe2ee1cf8d0aa4c1cf11930",
+      "size": 59877,
+      "sourceMtime": 1791446735.3801184
+    },
+    "packages/design-system/dist/index.cjs": {
+      "sha256": "0e830d61926a32d1b64a5f512399cb6efa6c0c2eb1a69057a7d5348ce187fccc",
+      "size": 50327,
+      "sourceMtime": 1791446735.3776145
+    },
+    "packages/design-system/dist/index.js.map": {
+      "sha256": "d62ac14c6ac0698f433ffe6b7726a86eb6943b9fded62bf3ed29ff8468b631d0",
+      "size": 15726,
+      "sourceMtime": 1791446735.3799772
+    },
+    "packages/design-system/dist/native.cjs.map": {
+      "sha256": "7703d59160f01a7d3c2c6cc764aa0374e9ad2af09125970c62a110702baa0f64",
+      "size": 40401,
+      "sourceMtime": 1791446735.3801203
+    },
+    "packages/design-system/dist/generate-cli.js": {
+      "sha256": "558ce3159dc453cd93bf48898bcef996f6405c897ccc0e85869a67da78b56e4d",
+      "size": 27664,
+      "sourceMtime": 1791446735.3776188
+    },
+    "packages/design-system/dist/index.d.ts": {
+      "sha256": "ab06b74c1981cc04695a0f4bb6db135a49b4da017df083a299c698111fddc612",
+      "size": 42932,
+      "sourceMtime": 1791446736.278576
+    },
+    "packages/design-system/dist/chunk-BGWX5KD6.js.map": {
+      "sha256": "15b54815579480fe209d640c07c28c9fe0611d434a346e8158dc4ceee57b551a",
+      "size": 40315,
+      "sourceMtime": 1791446735.380084
+    },
+    "packages/design-system/dist/native.cjs": {
+      "sha256": "c9e5b5560b36c4b9223e798ae6e6afe24400d45a03d49afa90d9f0a59e85046b",
+      "size": 16388,
+      "sourceMtime": 1791446735.3776283
+    },
+    "packages/design-system/dist/generate-cli.cjs": {
+      "sha256": "21c99cc7ef07372d8c3ead3e05711cc879bb5e99737763c58cdcea77fb71b5a4",
+      "size": 47883,
+      "sourceMtime": 1791446735.377597
+    },
+    "packages/design-system/dist/generate-cli.d.cts": {
+      "sha256": "6caa0b04bdc10582a3729dae9244f21c5bec0b9ffe7e2a84999c2f868f5dd9be",
+      "size": 13,
+      "sourceMtime": 1791446736.2785575
+    },
+    "packages/design-system/dist/generate-cli.cjs.map": {
+      "sha256": "6e99d39901233ecaf770b876b7b736db2192fd40daf81f0726cfce121a5a7bbe",
+      "size": 114745,
+      "sourceMtime": 1791446735.380097
+    },
+    "packages/domain/dist/index.d.cts": {
+      "sha256": "067a2cb164e92083947c513cad7aa08854cdf959875b2e4793791488df265c3e",
+      "size": 352456,
+      "sourceMtime": 1791446738.1258864
+    },
+    "packages/domain/dist/index.js": {
+      "sha256": "712cdc07a646bdd02e12291ebfcdd28b66c328a39c5e9da339e5478ece8bd307",
+      "size": 200571,
+      "sourceMtime": 1791446737.213548
+    },
+    "packages/domain/dist/index.cjs.map": {
+      "sha256": "15d925ae163f5f14d0782536e740edaa8c990689ab84b24aded1a1e161814464",
+      "size": 770246,
+      "sourceMtime": 1791446737.2212098
+    },
+    "packages/domain/dist/index.cjs": {
+      "sha256": "58ea9e0178055edda383a33c5f62b409c8309c721d5122c97f2b19d8f8b7f06b",
+      "size": 217965,
+      "sourceMtime": 1791446737.2135575
+    },
+    "packages/domain/dist/index.js.map": {
+      "sha256": "918bef600059f79cf1571fbdc3541c95172b5325759f7820996e6222bbaca09f",
+      "size": 765825,
+      "sourceMtime": 1791446737.2212481
+    },
+    "packages/domain/dist/index.d.ts": {
+      "sha256": "067a2cb164e92083947c513cad7aa08854cdf959875b2e4793791488df265c3e",
+      "size": 352456,
+      "sourceMtime": 1791446738.125875
+    },
+    "packages/i18n/dist/chunk-7GCJQIEH.js": {
+      "sha256": "2a0295f7442fc358ceba2f211c6bd06648e4b610a3aa1d4d7c43b3fb4a50a4e8",
+      "size": 585532,
+      "sourceMtime": 1791446735.3774705
+    },
+    "packages/i18n/dist/provider.js.map": {
+      "sha256": "cba81f7ad4d5b1b629bf43823f1082e73a10d0c3114c937515e7f8c1047629b3",
+      "size": 71,
+      "sourceMtime": 1791446735.3822443
+    },
+    "packages/i18n/dist/provider.js": {
+      "sha256": "de6aafb3440ebfab1ee9133e0566f4e1d2d1fae9fc751d75fefe4954a26ebc84",
+      "size": 335,
+      "sourceMtime": 1791446735.3773193
+    },
+    "packages/i18n/dist/index.js": {
+      "sha256": "21ab54136bbeed52b7661004a39abe12cff53c9481d03073acb8b70169d5ecaf",
+      "size": 1970,
+      "sourceMtime": 1791446735.377281
+    },
+    "packages/i18n/dist/chunk-7GCJQIEH.js.map": {
+      "sha256": "c5305fe55dbfdf7fec8368b0f95636e42abcbb549293f37813d2d9368d85c47d",
+      "size": 500552,
+      "sourceMtime": 1791446735.3824534
+    },
+    "packages/i18n/dist/chunk-7ZPARMRY.js": {
+      "sha256": "252675c9c87625a4779e8f0d7fa9debba38f4a13861481ccd2d8353625e16f8d",
+      "size": 394452,
+      "sourceMtime": 1791446735.3773515
+    },
+    "packages/i18n/dist/index.js.map": {
+      "sha256": "97291bc5065bf063afbff01a3f67f191371e3ddcc078d6129d25fd502734d511",
+      "size": 9243,
+      "sourceMtime": 1791446735.3822412
+    },
+    "packages/i18n/dist/provider.d.ts": {
+      "sha256": "80128e7191f16ef2fe565498d821ae5e6f6ea2ce7d32977babea7544cc9ee675",
+      "size": 6769,
+      "sourceMtime": 1791446736.516258
+    },
+    "packages/i18n/dist/chunk-6ZDM2JGK.js": {
+      "sha256": "b323b017039c3fd01c05ce9f437ae37682dec8b738adee982b39ea1b79752ce1",
+      "size": 2170,
+      "sourceMtime": 1791446735.377295
+    },
+    "packages/i18n/dist/index.d.ts": {
+      "sha256": "6a452ae8e8b7bd3bcefb5391cb83640cb08e75cfa1ffacde75a1824ea232ef32",
+      "size": 551003,
+      "sourceMtime": 1791446736.5165405
+    },
+    "packages/i18n/dist/chunk-6ZDM2JGK.js.map": {
+      "sha256": "46092fe7f83acc5cfb387cb7c36cb5afa61799622251f2fa066114ed4c206dee",
+      "size": 12140,
+      "sourceMtime": 1791446735.381575
+    },
+    "packages/i18n/dist/chunk-7ZPARMRY.js.map": {
+      "sha256": "0d0da60f42e8a9461c11f6eedea604ccbeae447b2a299a6379dc0b5a7f74193f",
+      "size": 471847,
+      "sourceMtime": 1791446735.3823295
+    },
+    "packages/i18n/dist/locales/zh-CN.d.ts": {
+      "sha256": "ac3942058a68900ba873a00a099d45e7ee1fdcf7995fa7bb270910248715a2bc",
+      "size": 363268,
+      "sourceMtime": 1791446736.5164042
+    },
+    "packages/i18n/dist/locales/en.d.ts": {
+      "sha256": "77e078c182c76580cf4db441f8809c1ef5912f8baaa4632adb487275f64811d7",
+      "size": 159565,
+      "sourceMtime": 1791446736.5164437
+    },
+    "packages/i18n/dist/locales/zh-CN.js.map": {
+      "sha256": "cba81f7ad4d5b1b629bf43823f1082e73a10d0c3114c937515e7f8c1047629b3",
+      "size": 71,
+      "sourceMtime": 1791446735.3815548
+    },
+    "packages/i18n/dist/locales/zh-CN.js": {
+      "sha256": "9dca2df2375b2b7ba4522a9b3de14b8f7e70e461bad6b62c229185b2f2df0787",
+      "size": 99,
+      "sourceMtime": 1791446735.377291
+    },
+    "packages/i18n/dist/locales/en.js": {
+      "sha256": "77a2ac286790798893a0467c883f671c0632a03fa9616e784ab1fca05dea685d",
+      "size": 92,
+      "sourceMtime": 1791446735.377267
+    },
+    "packages/i18n/dist/locales/en.js.map": {
+      "sha256": "cba81f7ad4d5b1b629bf43823f1082e73a10d0c3114c937515e7f8c1047629b3",
+      "size": 71,
+      "sourceMtime": 1791446735.3822296
+    },
+    "packages/inbound-core/dist/index.d.cts": {
+      "sha256": "eaa95c74f07e4c2109ce48e4a62c299dba3843bf51b2e5ab9a14773c6177812f",
+      "size": 4370,
+      "sourceMtime": 1791446737.8096728
+    },
+    "packages/inbound-core/dist/index.js": {
+      "sha256": "b1c1abbc57f67727b2d17f342f853f1ec894953d638acbc8ddea9a4d494f09f1",
+      "size": 17400,
+      "sourceMtime": 1791446737.1788821
+    },
+    "packages/inbound-core/dist/index.cjs.map": {
+      "sha256": "d98e10d469fc939b0215ced213bedb9ec6cb3886845f767852a47b2b0f9e4e84",
+      "size": 33269,
+      "sourceMtime": 1791446737.180208
+    },
+    "packages/inbound-core/dist/index.cjs": {
+      "sha256": "d26c844410fe426e51eb05b2fcd863765e36880ddbb5614eb3f738100d5bd306",
+      "size": 20264,
+      "sourceMtime": 1791446737.1789029
+    },
+    "packages/inbound-core/dist/index.js.map": {
+      "sha256": "56c98f83976dafba5a08262e47eebb70d93a007a85d049c41e78b054cd9414a9",
+      "size": 32414,
+      "sourceMtime": 1791446737.1802077
+    },
+    "packages/inbound-core/dist/index.d.ts": {
+      "sha256": "eaa95c74f07e4c2109ce48e4a62c299dba3843bf51b2e5ab9a14773c6177812f",
+      "size": 4370,
+      "sourceMtime": 1791446737.8096728
+    },
+    "packages/legal/dist/index.d.cts": {
+      "sha256": "5d1a15b99461090fa297d5965590fecc64d137ccb63d3122b79380fd40ade213",
+      "size": 11352,
+      "sourceMtime": 1791446737.844075
+    },
+    "packages/legal/dist/index.js": {
+      "sha256": "f7404c63b310a318eaf701c8be6db5e30cc961caedaf5f4dc1c9d11ec431dbb3",
+      "size": 811526,
+      "sourceMtime": 1791446737.2071671
+    },
+    "packages/legal/dist/index.cjs.map": {
+      "sha256": "c849204f5b271811ce2dd23d6a2b6d9b3bbae858a070f10b4c489b3f874aab03",
+      "size": 733325,
+      "sourceMtime": 1791446737.2145362
+    },
+    "packages/legal/dist/index.cjs": {
+      "sha256": "46b759c0653eed45e61879353c7a148b53ae5ac19a0deb08afaf38e996aed58c",
+      "size": 812756,
+      "sourceMtime": 1791446737.2072895
+    },
+    "packages/legal/dist/index.js.map": {
+      "sha256": "0558bb776522dd1f1e7b5f2c6cb7d1df4c27c0c1199e6069e289c032e7534cfe",
+      "size": 733254,
+      "sourceMtime": 1791446737.2144842
+    },
+    "packages/legal/dist/index.d.ts": {
+      "sha256": "5d1a15b99461090fa297d5965590fecc64d137ccb63d3122b79380fd40ade213",
+      "size": 11352,
+      "sourceMtime": 1791446737.8440857
+    },
+    "packages/local-api/dist/index.d.cts": {
+      "sha256": "a418c6a14fa9ae4684df2565d36b1055f28dd29ba52afbd88f202256e1db6343",
+      "size": 72395,
+      "sourceMtime": 1791446736.01267
+    },
+    "packages/local-api/dist/index.js": {
+      "sha256": "fd7e2c858293cb58301dff5f1f767b9e5c8c15c64478c9cf01532a93892d9836",
+      "size": 83250,
+      "sourceMtime": 1791446735.3677957
+    },
+    "packages/local-api/dist/index.cjs.map": {
+      "sha256": "ff1b9ceeb08ddd7691bcacde24315b7c6fbf25ae1003bd2d61c0f3f5baae8ee0",
+      "size": 230992,
+      "sourceMtime": 1791446735.373101
+    },
+    "packages/local-api/dist/index.cjs": {
+      "sha256": "ee98f87c2fc5ad3d179dd44ac06d60009dfd53d28e473aa21b538ec37d755b04",
+      "size": 86408,
+      "sourceMtime": 1791446735.3709853
+    },
+    "packages/local-api/dist/index.js.map": {
+      "sha256": "3716a396a9ed4b22e36d5e5e4d8aea5d6e3e42fdf330baeeb2991cb373ca79ad",
+      "size": 226047,
+      "sourceMtime": 1791446735.3702178
+    },
+    "packages/local-api/dist/index.d.ts": {
+      "sha256": "a418c6a14fa9ae4684df2565d36b1055f28dd29ba52afbd88f202256e1db6343",
+      "size": 72395,
+      "sourceMtime": 1791446736.0126708
+    },
+    "packages/op-log/dist/index.d.cts": {
+      "sha256": "432c6407da0698ae2abd2f72408af4fdcb625d2709318260825df94e7c2ac663",
+      "size": 23910,
+      "sourceMtime": 1791446739.5622602
+    },
+    "packages/op-log/dist/index.js": {
+      "sha256": "6651ecefc7eb9ce3603976a1230f029aa1d5c4e133fe8d298278e0c1245b1190",
+      "size": 43692,
+      "sourceMtime": 1791446738.882411
+    },
+    "packages/op-log/dist/index.cjs.map": {
+      "sha256": "19b88d34e2835f202c329bc23439f361feff8b48a659f0feb21681da7fe0786a",
+      "size": 94846,
+      "sourceMtime": 1791446738.8881938
+    },
+    "packages/op-log/dist/index.cjs": {
+      "sha256": "f5bacff4bce6d7cacb09503d38378fafea4dd450a3e73e44e9a3fc6e1dde08c6",
+      "size": 45583,
+      "sourceMtime": 1791446738.8833344
+    },
+    "packages/op-log/dist/index.js.map": {
+      "sha256": "eb509c508700e2f1f61a02234fb846953b9a5344223c9df81576583ab60c5225",
+      "size": 95020,
+      "sourceMtime": 1791446738.884501
+    },
+    "packages/op-log/dist/index.d.ts": {
+      "sha256": "432c6407da0698ae2abd2f72408af4fdcb625d2709318260825df94e7c2ac663",
+      "size": 23910,
+      "sourceMtime": 1791446739.5622451
+    },
+    "packages/shared-schema/dist/index.d.mts": {
+      "sha256": "c36be67ebebeb3ad7da29fa871db5e5b5b1b9ace5ffbec73163cc65819b47152",
+      "size": 90310,
+      "sourceMtime": 1791446736.8926
+    },
+    "packages/shared-schema/dist/index.js": {
+      "sha256": "e8a2b4d571a203846ce4b0769b3ee65179ed4e89041a1209e09464238b330d42",
+      "size": 73685,
+      "sourceMtime": 1791446736.2662008
+    },
+    "packages/shared-schema/dist/index.mjs.map": {
+      "sha256": "f4ad7138af79bbca81278b6f3a6f61ca1aa16705f13879967cf2a0835c6e95dc",
+      "size": 142018,
+      "sourceMtime": 1791446736.2692196
+    },
+    "packages/shared-schema/dist/index.mjs": {
+      "sha256": "29d958c799bafe2b9e704ad910f641c48fd36ed0da18cce9423d5f220ce6f4f8",
+      "size": 60457,
+      "sourceMtime": 1791446736.266217
+    },
+    "packages/shared-schema/dist/index.js.map": {
+      "sha256": "10eed6aec7e7bcf9821d9c359771f2c3b7d756daa24f08b3d952d0762e3a50f3",
+      "size": 152292,
+      "sourceMtime": 1791446736.269613
+    },
+    "packages/shared-schema/dist/index.d.ts": {
+      "sha256": "c36be67ebebeb3ad7da29fa871db5e5b5b1b9ace5ffbec73163cc65819b47152",
+      "size": 90310,
+      "sourceMtime": 1791446736.8926013
+    },
+    "packages/storage/dist/sqlite-driver-DBOWTgRZ.d.cts": {
+      "sha256": "1fef49fb0faac59ea79c2cca4dfbb871967af6c28004ef1a714c9d4c2662db55",
+      "size": 4704,
+      "sourceMtime": 1791446738.1169968
+    },
+    "packages/storage/dist/index.d.cts": {
+      "sha256": "a376f8eb0f36bb7abc358f793d24ee14705d372c335862fad0c8784aa7c6f65d",
+      "size": 83572,
+      "sourceMtime": 1791446738.116967
+    },
+    "packages/storage/dist/index.js": {
+      "sha256": "cb9f96c2a606d0da37e8cb73142490aa6afb5e9d6f72897ef86023372036a163",
+      "size": 97966,
+      "sourceMtime": 1791446737.189044
+    },
+    "packages/storage/dist/index.cjs.map": {
+      "sha256": "d6fad740328445526b979298105f6de02ccdc627b1422d7b673543c30938d265",
+      "size": 262941,
+      "sourceMtime": 1791446737.1941106
+    },
+    "packages/storage/dist/index.cjs": {
+      "sha256": "df64e6e852df98c599c0aa9a769480ae19d247844550a585b722fd8c091e6f47",
+      "size": 100429,
+      "sourceMtime": 1791446737.190549
+    },
+    "packages/storage/dist/sqlite-driver-DBOWTgRZ.d.ts": {
+      "sha256": "1fef49fb0faac59ea79c2cca4dfbb871967af6c28004ef1a714c9d4c2662db55",
+      "size": 4704,
+      "sourceMtime": 1791446738.1169982
+    },
+    "packages/storage/dist/index.js.map": {
+      "sha256": "732d6b7e756855422cc677737d4c7350326965b35fadb1140b0fe3e3e5de8195",
+      "size": 261787,
+      "sourceMtime": 1791446737.1924589
+    },
+    "packages/storage/dist/index.d.ts": {
+      "sha256": "fb5d3753fe5589a510f8ea490a04de4c11e11e13ba4da6c88e2eb6eae9d58940",
+      "size": 83570,
+      "sourceMtime": 1791446738.1169584
+    },
+    "packages/storage/dist/sqlite/node-sqlite-driver.cjs": {
+      "sha256": "8a96dd2aa9b11db9cfec8aa33bbb725f1188b85f78ff6080f3e415be2f326d78",
+      "size": 3053,
+      "sourceMtime": 1791446737.1905692
+    },
+    "packages/storage/dist/sqlite/sqlite-wasm-driver.js.map": {
+      "sha256": "024facefd099984789ada7ff683a43d6b148f89fdd6baff403cf2efdc3d59d66",
+      "size": 21285,
+      "sourceMtime": 1791446737.1924202
+    },
+    "packages/storage/dist/sqlite/node-sqlite-driver.d.ts": {
+      "sha256": "7a9d66d65678ed96c43f9b20597b20a6b38b64f9fcb30156685353a9d0374734",
+      "size": 1730,
+      "sourceMtime": 1791446738.117006
+    },
+    "packages/storage/dist/sqlite/sqlite-wasm-driver.cjs": {
+      "sha256": "306b8d1a20da355391df5aa7ee9a60a1a83dffd1903948f980e8c50814d615d8",
+      "size": 8148,
+      "sourceMtime": 1791446737.1905837
+    },
+    "packages/storage/dist/sqlite/node-sqlite-driver.d.cts": {
+      "sha256": "7ffc9723fb4fbec023ccb05e62595099899e6c836cdb29cec1587afd90842e7b",
+      "size": 1731,
+      "sourceMtime": 1791446738.1169696
+    },
+    "packages/storage/dist/sqlite/sqlite-wasm-driver.d.cts": {
+      "sha256": "e971f3e38e15729b43644ba6c70a335df672e39908540210f2c885872c93376a",
+      "size": 12309,
+      "sourceMtime": 1791446738.116998
+    },
+    "packages/storage/dist/sqlite/node-sqlite-driver.js.map": {
+      "sha256": "dfde8bf7a1a1098019b4c2ab6ce9483938e8101d9114f33a10c472c60478a85f",
+      "size": 4257,
+      "sourceMtime": 1791446737.192258
+    },
+    "packages/storage/dist/sqlite/node-sqlite-driver.js": {
+      "sha256": "129c5f2b07ddda70aa8b7f5c9a158e4dd7711a0bf49efde0a8318b870e16b08e",
+      "size": 1940,
+      "sourceMtime": 1791446737.1890354
+    },
+    "packages/storage/dist/sqlite/sqlite-wasm-driver.cjs.map": {
+      "sha256": "ea675b487e61eb30d92b904b5d50e836c102e4e7048ff68095eed5b64d9c93a9",
+      "size": 21354,
+      "sourceMtime": 1791446737.1946654
+    },
+    "packages/storage/dist/sqlite/node-sqlite-driver.cjs.map": {
+      "sha256": "294f006c86b6e469260cca29859821e94f642030c3f88af2a00c10e35c8363a3",
+      "size": 4295,
+      "sourceMtime": 1791446737.1940432
+    },
+    "packages/storage/dist/sqlite/sqlite-wasm-driver.d.ts": {
+      "sha256": "fac65b8d14eefba39f979eef0751cf0fb1ff34936f8b60572e8d0d9c29fbeff9",
+      "size": 12308,
+      "sourceMtime": 1791446738.1169667
+    },
+    "packages/storage/dist/sqlite/sqlite-wasm-driver.js": {
+      "sha256": "e4dc9e7a099d4ab6bb524bc000986701c06392d00fe9ea3397744b15f2f2b902",
+      "size": 6317,
+      "sourceMtime": 1791446737.1890366
+    },
+    "packages/sync-client/dist/index.d.cts": {
+      "sha256": "a7ff988a35d197c2f668a45cc988742501d5902e24cdb0f56fa4e7a7e7c433cb",
+      "size": 46224,
+      "sourceMtime": 1791446738.615899
+    },
+    "packages/sync-client/dist/index.js": {
+      "sha256": "49d74171e9424179092fbc1623b1590699e7f2ae580c0503ae41d31fc2051e86",
+      "size": 47226,
+      "sourceMtime": 1791446738.0633914
+    },
+    "packages/sync-client/dist/index.cjs.map": {
+      "sha256": "f173bd80e6395a6c423d0debdd92f1a2502da6e537dcce6fdd8a68e864e2bdba",
+      "size": 151810,
+      "sourceMtime": 1791446738.065489
+    },
+    "packages/sync-client/dist/index.cjs": {
+      "sha256": "0621af65abd09f288c55d64c302a4c591100145e98b9188a24244115ea62c4f2",
+      "size": 49484,
+      "sourceMtime": 1791446738.063398
+    },
+    "packages/sync-client/dist/index.js.map": {
+      "sha256": "8dfed49a26aa695f6f8f14f6d335a8bad5e387b8a79db702d32e4e689e709023",
+      "size": 150759,
+      "sourceMtime": 1791446738.0653906
+    },
+    "packages/sync-client/dist/index.d.ts": {
+      "sha256": "a7ff988a35d197c2f668a45cc988742501d5902e24cdb0f56fa4e7a7e7c433cb",
+      "size": 46224,
+      "sourceMtime": 1791446738.6158972
+    },
+    "packages/sync-core/dist/index.d.mts": {
+      "sha256": "67d293096f93559491cfcd3f55060b82ac680f0979fd664aa7ea06e6f8e8b7c4",
+      "size": 72449,
+      "sourceMtime": 1791446736.9488041
+    },
+    "packages/sync-core/dist/index.js": {
+      "sha256": "4daf3fed3f68cb8887970eed0f363b0714579ca368c3f1d714bb064139ae3778",
+      "size": 84694,
+      "sourceMtime": 1791446736.2730174
+    },
+    "packages/sync-core/dist/index.mjs.map": {
+      "sha256": "0f445c50ac978934a5b42ff74ca1a7c75429a7f4ae3d49f82b8095f7253c3f9d",
+      "size": 221229,
+      "sourceMtime": 1791446736.2740262
+    },
+    "packages/sync-core/dist/index.mjs": {
+      "sha256": "f7ed095e555f63e99611de87f617fce34fa35307e5533b01d70acb134aaebc65",
+      "size": 78671,
+      "sourceMtime": 1791446736.2718167
+    },
+    "packages/sync-core/dist/index.js.map": {
+      "sha256": "7a186e0910cd570575d764eb226ce1bfee9a3761cab2904ff988212d6ae25ad3",
+      "size": 229431,
+      "sourceMtime": 1791446736.274829
+    },
+    "packages/sync-core/dist/index.d.ts": {
+      "sha256": "67d293096f93559491cfcd3f55060b82ac680f0979fd664aa7ea06e6f8e8b7c4",
+      "size": 72449,
+      "sourceMtime": 1791446736.9488187
+    },
+    "packages/ui/dist/node.cjs": {
+      "sha256": "10810471331a808f41374a00ecc356e1ea607bc79d50b470ff892dcfd3f19f41",
+      "size": 11614,
+      "sourceMtime": 1791446738.9931955
+    },
+    "packages/ui/dist/node.js.map": {
+      "sha256": "cba81f7ad4d5b1b629bf43823f1082e73a10d0c3114c937515e7f8c1047629b3",
+      "size": 71,
+      "sourceMtime": 1791446739.0077074
+    },
+    "packages/ui/dist/node-Mub2B2gk.d.cts": {
+      "sha256": "9d475c5eb9294c3dfe86076ce14a39d13afb1763deeeba53ccc7424c8fb3573a",
+      "size": 92301,
+      "sourceMtime": 1791446741.2324665
+    },
+    "packages/ui/dist/index.d.cts": {
+      "sha256": "c889fca6d92e9b514cadcaa9b028ebc0f9bf2c0ab4d17f933ae72c0faead4d82",
+      "size": 499006,
+      "sourceMtime": 1791446741.2324812
+    },
+    "packages/ui/dist/node-Mub2B2gk.d.ts": {
+      "sha256": "9d475c5eb9294c3dfe86076ce14a39d13afb1763deeeba53ccc7424c8fb3573a",
+      "size": 92301,
+      "sourceMtime": 1791446741.232487
+    },
+    "packages/ui/dist/node.cjs.map": {
+      "sha256": "081988e78ba839f254ff8331eb56ae3490ba0180c0aa0184da523d5b53eb7b45",
+      "size": 116079,
+      "sourceMtime": 1791446739.0077243
+    },
+    "packages/ui/dist/index.js": {
+      "sha256": "98c4fbcdb76231cc98994e16b98ffdabc9a8e7ad02314733cd7c27bff741ae28",
+      "size": 832459,
+      "sourceMtime": 1791446738.9942596
+    },
+    "packages/ui/dist/node.d.cts": {
+      "sha256": "200936407cd0f319052eee5e7052e0395338af6e41fd2e1dec18a76ebe037f0b",
+      "size": 780,
+      "sourceMtime": 1791446741.2324533
+    },
+    "packages/ui/dist/index.cjs.map": {
+      "sha256": "cd89d33846b89c799bb17fa3f17a5e8cd7738b3b60a2e2df0a18a8af65796586",
+      "size": 1913865,
+      "sourceMtime": 1791446739.0129745
+    },
+    "packages/ui/dist/node.js": {
+      "sha256": "824cb033537efd0cd8e337e5b7f1c69541efa1502403d07af17078802ff47cff",
+      "size": 737,
+      "sourceMtime": 1791446738.9934266
+    },
+    "packages/ui/dist/index.cjs": {
+      "sha256": "4d19942511448fd8755dc400656f2f590880335fee934732eeb571bf139b75a3",
+      "size": 916829,
+      "sourceMtime": 1791446738.9936168
+    },
+    "packages/ui/dist/index.js.map": {
+      "sha256": "4eeb0acf9b2f428118fd361a05fe03acfb6537f22c19ad0f9c7cbe1b4f7981ba",
+      "size": 1757438,
+      "sourceMtime": 1791446739.0130208
+    },
+    "packages/ui/dist/chunk-ADNCLAHQ.js": {
+      "sha256": "4e1d217e6b817c16bca103ad39dd5f58a7295eeea42de6404b521ba3ae8275c7",
+      "size": 28929,
+      "sourceMtime": 1791446738.9934597
+    },
+    "packages/ui/dist/chunk-ADNCLAHQ.js.map": {
+      "sha256": "29165ff99f27fb3f9dc027fa14dce117a7918508c72f6f7e21d2728066b36e32",
+      "size": 126517,
+      "sourceMtime": 1791446739.0126963
+    },
+    "packages/ui/dist/index.d.ts": {
+      "sha256": "1cafccf8333a45b2905a430648e3f14b55d4eaf9e85113a170a5f2dfa18c52ed",
+      "size": 499004,
+      "sourceMtime": 1791446741.232489
+    },
+    "packages/ui/dist/node.d.ts": {
+      "sha256": "484ff52e252ae92ff35d4b16df3b387d3b3b4b0dcafe27744b7be5adc98173c3",
+      "size": 779,
+      "sourceMtime": 1791446741.232436
+    },
+    "packages/widget-core/dist/index.d.cts": {
+      "sha256": "b8873cbd9b736f66b512b296df97ff180f8c4c58a2a3787ead9d36f0682f96e5",
+      "size": 51181,
+      "sourceMtime": 1791446739.4621289
+    },
+    "packages/widget-core/dist/index.js": {
+      "sha256": "f6c5b9a2b0d7c0a5d004b87ef1212649420f284d675837ddb32782eb0c751d41",
+      "size": 30172,
+      "sourceMtime": 1791446738.8826902
+    },
+    "packages/widget-core/dist/index.cjs.map": {
+      "sha256": "43d9d4ac36be3a22091c5c549a10af7f400e743f2ede9410d4ffca35ee01c6f5",
+      "size": 113037,
+      "sourceMtime": 1791446738.8833296
+    },
+    "packages/widget-core/dist/index.cjs": {
+      "sha256": "238234cc3e226fd0b75e9e11fd15e5b2b9324f4e17aad0c92acb9b5a8bcbb970",
+      "size": 33121,
+      "sourceMtime": 1791446738.8817828
+    },
+    "packages/widget-core/dist/index.js.map": {
+      "sha256": "7aa500fb707a7986551337b7fa83459fb40b1a741eb4313bb3e3734a53c26896",
+      "size": 110259,
+      "sourceMtime": 1791446738.8841965
+    },
+    "packages/widget-core/dist/index.d.ts": {
+      "sha256": "b8873cbd9b736f66b512b296df97ff180f8c4c58a2a3787ead9d36f0682f96e5",
+      "size": 51181,
+      "sourceMtime": 1791446739.462178
+    }
+  },
+  "scope": "Candidate inputs captured from actual archive: mobile sources/config/assets excluding iOS/evidence, all workspace dist, package manifests and widget golden fixtures. This is a captured input superset, not a claim every file is linked into APK."
+}

@@ -22,6 +22,7 @@
     "@heyta/design-system": "workspace:*",
     "@heyta/domain": "workspace:*",
     "@heyta/i18n": "workspace:*",
+    "@heyta/legal": "workspace:*",
     "@heyta/local-api": "workspace:*",
     "@heyta/op-log": "workspace:*",
     "@heyta/storage": "workspace:*",

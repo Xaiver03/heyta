@@ -22,8 +22,9 @@
       小组件里的一行任务。
 
       ⚠️ 只放**结构**属性（行高、字号、省略），不放任何颜色：
-      颜色全部走布局里的 `?android:attr/...` 主题属性，这样组件跟着**启动器**的明暗走。
-      详见 widget_today.xml 顶部的注释。
+      颜色使用应用自有的 `@color/heyta_widget_*` 资源，并由
+      `values-night/colors.xml` 选择系统暗色档。RemoteViews 由启动器进程充气，
+      不能依赖启动器自己的 `?android:attr/...` 主题属性；详见 widget_today.xml 顶部注释。
 
       `singleLine` 而不是 `maxLines`：行槽的高度必须**固定**，
       否则 5 个槽会随着长标题各自换行，把布局撑成高低不齐的样子。
@@ -32,7 +33,7 @@
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:textSize">13sp</item>
-        <item name="android:textColor">?android:attr/textColorPrimary</item>
+        <item name="android:textColor">@color/heyta_widget_foreground</item>
         <item name="android:singleLine">true</item>
         <item name="android:ellipsize">end</item>
         <item name="android:paddingTop">3dp</item>
@@ -53,7 +54,7 @@
         <item name="android:layout_height">wrap_content</item>
         <item name="android:textSize">12sp</item>
         <item name="android:textStyle">bold</item>
-        <item name="android:textColor">?android:attr/textColorPrimary</item>
+        <item name="android:textColor">@color/heyta_widget_foreground</item>
         <item name="android:singleLine">true</item>
         <item name="android:ellipsize">end</item>
         <item name="android:paddingTop">6dp</item>

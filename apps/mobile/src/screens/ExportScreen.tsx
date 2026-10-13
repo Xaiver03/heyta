@@ -12,7 +12,7 @@
  *
  *   1. 从本地 op-log 读数据（宿主职责，`exportDocumentFromHost`）；
  *   2. **把文本交给平台**（移动端是系统分享面板，不是 `<a download>`）；
- *   3. 用词条表说清楚「这是导出、还不能导回来」。
+ *   3. 用词条表说清楚「这是导出；JSON 只能还原到空库」。
  *
  * 🔴 **移动端没有 `<a download>`，也没有内建文件系统。**
  * 不引新第三方依赖的前提下，平台上真实可用的方式只有 RN 核心的
@@ -198,6 +198,9 @@ export function ExportScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
     { importedOps: number; entities: number } | undefined
   >(undefined);
   const [restoreError, setRestoreError] = useState<FailureMessage | undefined>(undefined);
+  // 低频输入默认收起；选择文件仍是恢复备份的主入口。
+  const [restorePasteOpen, setRestorePasteOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   /** 还原失败原因 → 词条（reason 集合由 app-host 的返回类型穷尽界定）。 */
   const restoreReasonMessage = useCallback(
@@ -416,11 +419,11 @@ export function ExportScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
 
   return (
     <Screen
-      title={t('web.export.title')}
+      title={t('mobile.export.title')}
       actions={[{ icon: 'action.back', label: t('mobile.growth.back'), onPress: onBack }]}
     >
       <Text variant="row-meta" tone="subtle">
-        {t('web.export.intro')}
+        {t('mobile.export.intro')}
       </Text>
 
       {error !== undefined ? (
@@ -465,8 +468,7 @@ export function ExportScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
 
       {/* ── 从备份还原（批五，多端覆盖审计 P1-2）───────────────────────────
           🔴 它是**导出**的逆操作，不是"滴答导入"的另一半：认的是 heyta 自己
-          导出的 JSON，而且**只进空库**。所以警示句（lead）与两条入口
-          （选文件 / 粘贴）都常驻，不做"看起来能覆盖"的暗示。 */}
+          导出的 JSON，而且**只进空库**。选择文件是主路径，JSON 粘贴只是按需展开的兜底。 */}
       <Card gap="loose">
         <Text variant="row-title">{t('mobile.restore.title')}</Text>
         <Text variant="caption" tone="muted">
@@ -480,6 +482,15 @@ export function ExportScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
           onPress={pickBackupFile}
         />
 
+        <Button
+          label={t('mobile.restore.pasteLabel')}
+          tone="ghost"
+          icon={restorePasteOpen ? 'action.collapse' : 'action.expand'}
+          expanded={restorePasteOpen}
+          onPress={() => setRestorePasteOpen((open) => !open)}
+        />
+
+        {restorePasteOpen ? <>
         <TextField
           label={t('mobile.restore.pasteLabel')}
           value={restoreText}
@@ -504,6 +515,7 @@ export function ExportScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
             handleRestoreText(restoreText);
           }}
         />
+        </> : null}
 
         {restoreError === undefined ? null : (
           <Text variant="caption" tone="danger" selectable>
@@ -541,8 +553,16 @@ export function ExportScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
       {/* ── 从滴答清单导入（方案 §5.5 第 7 项的移动端那一半）───────────────
           🔴 与上面那几张卡是**不同的承诺**：还原认的是 heyta 自己的 JSON，
           导入认的是**滴答清单的 CSV**。所以下面单独说"只认滴答清单"。 */}
-      <Card gap="loose">
-        <Text variant="row-title">{t('web.ticktick.title')}</Text>
+      <Card gap="tight">
+        <Button
+          label={t('mobile.import.label')}
+          accessibilityLabel={t('web.ticktick.title')}
+          tone="ghost"
+          icon={importOpen ? 'action.collapse' : 'action.expand'}
+          expanded={importOpen}
+          onPress={() => setImportOpen((open) => !open)}
+        />
+        {importOpen ? <>
         <Text variant="caption" tone="muted">
           {t('web.ticktick.intro')}
         </Text>
@@ -578,6 +598,7 @@ export function ExportScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
           loading={importBusy && preview === undefined && importResult === undefined}
           onPress={runPreview}
         />
+        </> : null}
 
         {preview === undefined ? null : preview.ok ? (
           <Stack>
@@ -652,7 +673,7 @@ export function ExportScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
         {t('mobile.export.shareHint')}
       </Text>
 
-      {/* 🔴 诚实条款，与 Web 端同一句词条：这是导出，还不能导回来。 */}
+      {/* 诚实条款，与 Web 端同一句词条：JSON 只支持导入到空库。 */}
       <Text variant="caption" tone="warning">
         {t('web.export.notRestorePoint')}
       </Text>

@@ -1,0 +1,57 @@
+{
+  "cdp": "http://127.0.0.1:9287",
+  "browser": "Edg/154.0.4258.62",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36 Edg/154.0.0.0",
+  "page": "https://heyta.local/index.html",
+  "ai": {
+    "assistantPanels": 1,
+    "assistantInputs": 1,
+    "roleTabs": [
+      {
+        "text": "任务",
+        "selected": "true",
+        "testid": "rail-view-tasks"
+      },
+      {
+        "text": "日历",
+        "selected": "false",
+        "testid": "rail-view-calendar"
+      },
+      {
+        "text": "习惯",
+        "selected": "false",
+        "testid": "rail-view-habits"
+      },
+      {
+        "text": "搜索",
+        "selected": "false",
+        "testid": "rail-view-search"
+      },
+      {
+        "text": "对话助手",
+        "selected": "false",
+        "testid": "rail-assistant"
+      },
+      {
+        "text": "回收站",
+        "selected": "false",
+        "testid": null
+      }
+    ],
+    "independentToolTabs": 0,
+    "independentToolWords": 0,
+    "assistantHeading": "会话新会话今天还没有会话对话助手历史助手权限只读执行今天想先完成什么？把想法变成下一步。发送今天有什么记一件任务总结待办AI 可能出错，请核对重要信息。"
+  },
+  "settings": {
+    "activeCount": 1,
+    "activeText": "任务与显示",
+    "activeBackground": "rgb(239, 246, 255)",
+    "activeBorder": "rgba(0, 0, 0, 0)",
+    "activeClass": "ht-settings__nav-link"
+  },
+  "consoleErrors": [],
+  "screenshots": [
+    "windows-chatbot.png",
+    "windows-settings.png"
+  ]
+}

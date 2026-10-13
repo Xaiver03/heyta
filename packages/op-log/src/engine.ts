@@ -24,6 +24,9 @@ import {
   taskBatchOperationId,
   hasTaskPriorityBatchMarker,
   parseTaskPriorityBatchOperation,
+  hasTaskRepeatCompletionMarker,
+  parseTaskRepeatCompletionOperation,
+  validateReminderOwnerOperation,
   type HeytaTaskBatchPayload,
 } from '@heyta/shared-schema';
 import type { Operation, VectorClock } from '@heyta/sync-core';
@@ -455,8 +458,15 @@ export class OpLogEngine {
 
   private async dispatchLocked(intent: OpIntent, validate?: (state: MaterializedState) => void): Promise<DispatchResult> {
     intent = cloneIntent(intent);
+    // Ingress-only validation.  The reducer itself must remain able to replay
+    // historical operations written before the canonical reminder owner
+    // contract existed; otherwise an old log becomes a restart poison pill.
+    validateReminderOwnerOperation(intent);
     if (hasTaskPriorityBatchMarker(intent.payload)) {
       parseTaskPriorityBatchOperation({ ...intent, payload: intent.payload });
+    }
+    if (hasTaskRepeatCompletionMarker(intent.payload)) {
+      parseTaskRepeatCompletionOperation({ ...intent, payload: intent.payload });
     }
     const batch = hasTaskBatchMarker(intent.payload)
       ? parseTaskBatchOperation({ ...intent, payload: intent.payload })
@@ -587,7 +597,9 @@ export class OpLogEngine {
   private async applyRemoteLocked(ops: Operation<string>[]): Promise<RemoteApplyResult> {
     if (ops.length === 0) return { applied: [], skipped: 0, overwritten: [] };
     for (const op of ops) {
-      if (isFullStateOperation(op) || hasTaskBatchMarker(op.payload) || hasTaskPriorityBatchMarker(op.payload)) {
+      validateReminderOwnerOperation(op);
+      if (isFullStateOperation(op) || hasTaskBatchMarker(op.payload) || hasTaskPriorityBatchMarker(op.payload) ||
+          hasTaskRepeatCompletionMarker(op.payload)) {
         applyOperation(emptyState(), op);
       }
     }
@@ -669,7 +681,9 @@ export class OpLogEngine {
     // Imported snapshots follow the same pre-persistence validation as remote
     // snapshots. Otherwise a bad backup poisons every subsequent cold start.
     for (const op of ops) {
-      if (isFullStateOperation(op) || hasTaskBatchMarker(op.payload) || hasTaskPriorityBatchMarker(op.payload)) {
+      validateReminderOwnerOperation(op);
+      if (isFullStateOperation(op) || hasTaskBatchMarker(op.payload) || hasTaskPriorityBatchMarker(op.payload) ||
+          hasTaskRepeatCompletionMarker(op.payload)) {
         applyOperation(emptyState(), op);
       }
     }
