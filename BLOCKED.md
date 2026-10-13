@@ -10326,3 +10326,55 @@ const statusLineStyle: CSSProperties = {
 `docs/plans/detail-pane-alignment.md` 里那 26 行"行首 `🔴`"是 **markdown 正文**不是坏代码 ——
 **判"裸注释"要按语言层判，不能按字形判**；以及我第一次用 `grep -c` 数同一枚文件的正文出现次数时，
 分支版与合并版都只回 **1**，光看这个数会误判"两边一样"，差别全在**它上面那一行**有没有 `/*`。
+
+---
+
+## B193（2026-10-13 01:1x，本会话 · `apps/web` 全量单测现在只剩一枚红，而它**不是本线的**：`ai-disclosure-parity.spec.tsx` 那条"四段不许黏成一串"在 `18efc229` 那次 merge 之后与它测的形状脱钩了）
+
+**本线一枚字节没动它**（`packages/ui/**` 与 `apps/web/tests/ai-*` 都在白名单外）。记下来只因为它现在坐在
+`pnpm -r test` 第 105 道的红名单里，会顶住本线 T7 那条"全量绿"的收口判据。
+
+**现量（三条，都在 `a158ca9d` 这棵树上取的）**
+```bash
+cd apps/web && ./node_modules/.bin/vitest run                          # 全量
+./node_modules/.bin/vitest run tests/ai-disclosure-parity.spec.tsx     # 单跑（判归属）
+```
+- 全量：`Test Files 1 failed | 178 passed | 2 skipped (181)`，`Tests 1 failed | 2293 passed | 13 skipped (2307)`。
+  ⚠️ 对比 B191 那一格 23:36 的读数（`37 failed files | 3 failed tests`）：**那 37 枚随 B192 闭合一起消失**，
+  本线因此可以按"apps/web 只剩这一枚别线红"来报，而不是"一片红"。
+- 单跑同样红 ⇒ **与本线那枚新 spec 无关**（不同文件、不同 jsdom 环境；而且本线那笔只动了 `inbound-*` 与两枚台账）。
+- 红的形状（`apps/web/tests/ai-disclosure-parity.spec.tsx:360`）：
+  `expected { 哪些段后面直接粘着下一段: [] } to deeply equal …`，实取 `['云端首选', 'https://primary.example.com/v1', 'model-primary']`。
+
+**成因链（这是重点，别线可以直接照着核）**
+| 笔 | 时间 | 现量 |
+|---|---|---|
+| `63ddf3e0 fix(共享披露组件): …补分隔` | 10-06 18:14 | 该文件里 `{separator}` 枚数 = **3**（连同那段"相邻 `<Text>` 在 RN/RNW 逐字拼接"的注释） |
+| `18efc229 merge(AI 收口台账 merge/20261005): 103 处冲突逐类裁决` | 10-13 12:21 | **双亲各带一副形状**：`7f678146` 侧枚数 = **3**，`83b72349` 侧枚数 = **0** |
+| `HEAD` | 现在 | 枚数 = **0** —— 裁决取的是 `83b72349` 那一侧 |
+| `16da3ecb^`（`83b72349` 那一支上的旧点） | 10-10 18:48 | 枚数也是 **0** ⇒ 那一支**从来没有过**这枚 fix，它是把「发给谁」那一行**重写成了另一种形状** |
+
+被取用的那一侧现在的形状（`packages/ui/src/ai/AiDisclosure.tsx` 现 HEAD）：四枚 `<Text>` 是**一枚 `<View style={styles.content}>`
+的四个子节点**（`styles.content = { flex: 1, minWidth: 0, gap: tokens['space.1'] }`），不再是同一枚 `<Text>` 里的四个内联子节点。
+
+**🔴 所以这枚红有两种读法，本线不替他们拍**：
+1. **判据过期**（本线更倾向这个）：那条断言当初防的是"四段挤在**同一行**里逐字黏"，它用的尺是 `textContent` 的
+   相邻字符 —— 而 `textContent` **看不见布局**。四段各占一行时，`textContent` 照样是无缝拼接，于是这条判据会**永远红**。
+   这一读法下**没有用户可见缺陷复发**，要动的是判据本身（改成结构/几何尺，比如四段各自的盒子是否在四个不同的行上）。
+2. **修法被 merge 吃掉了**：若他们认定四段仍该在同一行内并用 `separator` 分开，那 `18efc229` 就是把交付行吃掉的那一笔，
+   **与 B192 同族**（同一场 merge 裁决丢内容；本线今天已记到两处）。
+
+**要谁做 / 最小动作**：AI 线（或负责人）先分清是哪一种。能一票判出的最省动作是**看一眼真的形状**：
+起 web 端、打开 AI 面板那条「发给谁」，看四段是**四行**还是**一行黏着**（本线不做 —— 那要么改他们那枚 spec、
+要么在 `apps/web/tests/` 里新落一枚本线无权落的文件，两条都越界）。
+- 四行 ⇒ 是读法 1：他们的判据要换成结构尺；顺手把 `docs/plans/ai-assistant-closure.md` **那一格**（写"真缺陷，已修"、
+  并把修法描述成"段与段之间用 `separator`"）按现在的形状重述 —— 现在代码里根本没有 `separator` 参与那一行。
+- 一行黏着 ⇒ 是读法 2：把 `{separator}` 三行补回去（照 `git show 63ddf3e0 -- packages/ui/src/ai/AiDisclosure.tsx` 里那三行），
+  **判据** = `vitest run tests/ai-disclosure-parity.spec.tsx` 回到 `2 passed`。
+⚠️ 两种读法**都不许**用 `git checkout 7f678146 -- packages/ui/src/ai/AiDisclosure.tsx` 去"复原" ——
+那一侧有 `separator`，但**没有**另一侧后来落的字段折叠那三项功能（`canCollapse`、`AI_DISCLOSURE_FIELD_GROUPS`、
+`fieldsExpanded` 与 `showFields`/`hideFields`/`fieldGroups` 三枚词条位）；整枚文件覆回去等于把那项交付抹掉，
+**和 B192 那格警告的是同一件事**。
+
+**本线的处置**：不改判据、不改那枚 spec、不动 `packages/ui`。T7 那一腿的"全量绿"读数因此**只能报到 `1 failed`**，
+并把它归到这一格。

@@ -4239,3 +4239,11 @@ spec 的 blob 与 22:5x 落在旁支 ref 的那枚**逐字节相同**（`4cd2dde
 旁支 ref `inbound-c29-tz` 不删，作为本格上面承认过的那条恢复路径留着，⚠️ 但它那两笔里的两枚台账比 `main` 旧，别当账本真源。
 `git status --porcelain | wc -l` 现为 **16**，逐条看过**没有一枚是本线的**（`apps/mobile/src/screens/SettingsScreen.tsx`
 是刚冒出来的 —— 别线**此刻正在写**；`apps/web/evidence/inbound-recovery/*.png` 与 `scripts/lib/*` 也都不是本线的落点，本线没碰）。
+
+**01:2x 顺手把 apps/web 全量重取了一遍（为 T7 那一腿取现量，不是为了找别人的错）**：
+`Test Files 1 failed | 178 passed | 2 skipped (181)`，`Tests 1 failed | 2293 passed | 13 skipped (2307)` ——
+B191 那格记的 **37 枚"收集阶段就死"随 B192 闭合一起消失**，本线可以按"只剩一枚别线红"来报。
+那唯一一枚红的归属与两种读法都写进 **B193**（`ai-disclosure-parity.spec.tsx` 那条"四段不许黏成一串"，
+在 10-13 12:21 那场 103 处冲突的 merge `18efc229` 取走了「四段各占一行」那一副形状之后，
+与它自己用的尺（`textContent` 相邻字符，看不见布局）脱钩了）。单跑同样红 ⇒ 不是本线那枚新 spec 带的。
+**本线没动它一个字节**，也没改任何判据。
