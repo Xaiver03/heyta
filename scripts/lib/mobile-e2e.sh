@@ -353,6 +353,26 @@ settle_for() {  # <界面上应当出现的串> [轮数=8] [间隔秒=2]
 xy_desc() {
   python3 "$XY_PY" desc "$1" 0
 }
+# 按 testID（线上传成 `resource-id`）定位任意节点。
+#
+# 🔴 与 `xy_desc` 的分工不是"两种写法任选"：content-desc 在 RN 里是
+#    **合成串**（label + ", " + hint，实测 `SettingsRow` 的「设置」在树里是
+#    `"设置, 同步凭据、桌面小组件与语言"`），改了 hint 或 i18n 文案，
+#    拿它当标记的判据就**悄悄恒假**了 —— 而"恒假的标记"在 tap_tab 里
+#    打印的是"点了但没渲染出来"，把探针坏了说成界面坏了。
+#    所以：**凡"切过去之后应当出现"的标记一律走这个通道**，
+#    只有需要模拟用户视角（判面上真看得见的字）才用 desc。
+xy_rid() {
+  python3 "$XY_PY" rid "$1" 0
+}
+# 标记取值的分发：`rid:<testID>` 走 resource-id，裸名走 content-desc。
+# 只在这一处判前缀 —— 各调用方不许各自 `case` 一遍（两处判断就是漂移起点）。
+xy_marker() {
+  case "$1" in
+    rid:*) xy_rid "${1#rid:}" ;;
+    *)     xy_desc "$1" ;;
+  esac
+}
 # 🔴 只认输入框：标签和输入框的 desc 相同，必须靠 class 区分
 xy_edit() {
   python3 "$XY_PY" edit "$1" 0
@@ -972,6 +992,19 @@ PY
 
 clear_and_type() {  # <值> [标签] —— 先全选删除再输入，绝不循环 DEL（会 ANR）
   local want=$1 label=${2:-} i=0 cur
+
+  # 🔴 **空格必须发成 `%s`**（2026-10-06 现量，同一枚输入框、同一次会话的 A/B）：
+  #   `input text "list all tasks"` ⇒ 框里只剩 `list`，**退出码 0、无任何报错**；
+  #   `input text "list%sall%stasks"` ⇒ 框里是 `list all tasks`。
+  #   空格在 adb→device shell 那一跳被当成语界，后半串根本没进 `input` 的参数。
+  #   这条约定本仓库早就写在 `verify-mobile-capture.sh:129`，却没写进这枚**共用** helper
+  #   —— 同一个判断写两遍、漏了一遍，就是从这种地方开始的（AGENTS §3.5 那条教训的形状）。
+  #   ⚠️ 值里若本身含字面 `%`，`input text` 会把它当转义起点；目前全部调用点的值
+  #   （令牌 / URL / ASCII 标题 / 口令）都不含 `%`，含 `%` 的输入要走别的通道，别照这里加。
+  _adb_text() {  # <字符串> —— 走 `input text` 的唯一出口
+    $ADB shell input text "${1// /%s}"
+  }
+
   $ADB shell input keycombination 113 29; sleep 0.6
   $ADB shell input keyevent 67; sleep 0.8
 
@@ -984,7 +1017,7 @@ clear_and_type() {  # <值> [标签] —— 先全选删除再输入，绝不循
   local n=${#want} chunk=40 off=0 piece
   while [ "$off" -lt "$n" ]; do
     piece=$(python3 -c "import sys;print(sys.argv[1][int(sys.argv[2]):int(sys.argv[2])+40])" "$want" "$off")
-    $ADB shell input text "$piece"
+    _adb_text "$piece"
     off=$((off + chunk))
     sleep 0.7
   done
@@ -1008,7 +1041,7 @@ clear_and_type() {  # <值> [标签] —— 先全选删除再输入，绝不循
         # `${#中文}` 在非 UTF-8 locale 下数的是**字节**（8 个汉字报 24），
         # 于是偏移量错位、补上去的是乱码，而且看不出原因。
         piece=$(python3 -c "import sys;print(sys.argv[1][len(sys.argv[2]):])" "$want" "$cur")
-        $ADB shell input text "$piece" >/dev/null 2>&1
+        _adb_text "$piece" >/dev/null 2>&1
         ;;
       *)
         # 不是前缀（中间丢了、或残留了旧值）→ 全选重来，别在脏状态上叠加。
@@ -1030,7 +1063,7 @@ clear_and_type() {  # <值> [标签] —— 先全选删除再输入，绝不循
         fi
         $ADB shell input keycombination 113 29; sleep 0.6
         $ADB shell input keyevent 67; sleep 0.8
-        $ADB shell input text "$want" >/dev/null 2>&1
+        _adb_text "$want" >/dev/null 2>&1
         ;;
     esac
     sleep 1.5
@@ -1369,10 +1402,19 @@ for m in re.finditer(r'<node[^>]*?>', s):
     cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
     is_edit = 'class="android.widget.EditText"' in tag
     d = re.search(r'content-desc="([^"]*)"', tag)
+    r = re.search(r'resource-id="([^"]*)"', tag)
     t = re.search(r'\stext="([^"]*)"', tag)
     desc = d.group(1) if d else None
+    rid = r.group(1) if r else None
     text = t.group(1) if t else None
     if mode == 'desc' and desc == want:
+        hits.append((cx, cy))
+    elif mode == 'rid' and rid == want:
+        # 🔴 稳定锚点通道：RN 的 `accessibilityLabel` 会被合成进 content-desc
+        #    （实测 `SettingsRow` 的 label「设置」在树里是
+        #    `"设置, 同步凭据、桌面小组件与语言"` —— label + ", " + hint），
+        #    所以**任何"标记 = 某个文案"的判据都可能悄悄失效**。
+        #    `testID` → `resource-id` 不经过这套合成，是唯一不受文案改动影响的通道。
         hits.append((cx, cy))
     elif mode == 'edit' and is_edit and desc == want:
         hits.append((cx, cy))
@@ -1418,17 +1460,7 @@ configure_sync_credentials() {
   #    的每一轮。先按**稳定锚点**（resource-id，不走文字）打开 Modal 再填。
   dump
   local settings_xy
-  settings_xy=$(python3 - <<'PY'
-import os, re, sys
-try:
-    s = open(os.environ['UI_XML']).read()
-except OSError:
-    sys.exit(0)
-m = re.search(r'resource-id="profile-entry-settings"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', s)
-if m:
-    print((int(m.group(1)) + int(m.group(3))) // 2, (int(m.group(2)) + int(m.group(4))) // 2)
-PY
-)
+  settings_xy=$(xy_rid "profile-entry-settings")
   if [ -n "$settings_xy" ]; then
     $ADB shell input tap $settings_xy; sleep 3
   else
@@ -1557,7 +1589,7 @@ summary() {  # <验收名> [结尾语] [退出码]
 #
 # 坐标现取的另一半理由：这台模拟器 1080×2400，标签文字下沿实测
 # `bounds=[78,2271][137,2308]`，写死的 2253 落在文字**上方**的图标区。
-tap_tab() {  # <标签无障碍名> <切过去之后应当出现的无障碍名>
+tap_tab() {  # <标签无障碍名> <切过去之后应当出现的标记：裸名 = content-desc，`rid:` 前缀 = testID>
   local name=$1 marker=$2 i xy
   for i in 1 2 3; do
     dump || true
@@ -1565,9 +1597,14 @@ tap_tab() {  # <标签无障碍名> <切过去之后应当出现的无障碍名>
     if [ -n "$xy" ]; then
       $ADB shell input tap $xy; sleep 3
       dump || true
-      if [ -n "$(xy_desc "$marker")" ]; then return 0; fi
+      if [ -n "$(xy_marker "$marker")" ]; then return 0; fi
+      echo "   ↻ 点了「${name}」但标记「${marker}」没出现（第 ${i} 次）" >&2
+    else
+      # 🔴 两种失败以前打印同一句话，于是"标签根本不在树里"（最常见的成因：**前台不是
+      #    这个应用**，比如刚按了一次 BACK 把 App 退到桌面）被读成"切过去了但没渲染出来"。
+      #    2026-10-06 那条实测就绕在这上面：三次重试打印的全是"标记没出现"。
+      echo "   ↻ 「${name}」不在树里（第 ${i} 次）—— 先核对前台是不是本应用，别当成界面坏了" >&2
     fi
-    echo "   ↻ 没切到「${name}」（第 ${i} 次，标记「${marker}」没出现）" >&2
   done
   return 1
 }

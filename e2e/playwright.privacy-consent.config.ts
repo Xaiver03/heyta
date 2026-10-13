@@ -24,7 +24,9 @@ export default defineConfig({
   fullyParallel: false,
   retries: 0,
   workers: 1,
-  reporter: [['list']],
+  // 🔴 第三份必须是载体健康报告器（理由见 carrier-health.mjs 文件头），
+  //    由 `check:e2e-carrier` 逐份盯着三份进链的配置。
+  reporter: [['list'], ['./reporters/carrier-health.mjs']],
   timeout: 90_000,
   expect: { timeout: 15_000 },
   // 固定路径，跑完可以直接打开那张图看（§6.2 规定一第 2 条）。

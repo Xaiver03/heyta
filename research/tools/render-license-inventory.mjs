@@ -140,6 +140,23 @@ try {
 const data = JSON.parse(raw);
 const { total, byKind, reviewedOther, unreviewedOther, failing, all } = data;
 
+// 🔴 清点输入集不干净就**不写产物**。这条判据存在的理由是一条现量的假绿：
+//   2026-10-06，主检出的 store 比当前 lockfile 多 132 枚（expo 整棵子树 —— 当前
+//   lockfile 里 `expo` 命中 0），在它上面渲染出的清单印成 1093 枚，
+//   而**同一把锁**（sha256 逐字相同）在全新安装的检出上只有 961 枚。
+//   `--check-stamp` 只比 lockfile 指纹，两种渲染它都判"对得上"。
+//   也就是说：陈旧安装会把许可证登记表面**印胖** —— 而登记表的承诺是"逐项"，
+//   多出来的每一枚都是永远不会出现在产品里的东西，读它的人会以为那些许可被审过。
+if (data.inputSet && data.inputSet.stale.length) {
+  console.error(
+    `🔴 拒绝渲染：这一轮的清点输入集不干净 —— store 里有 ${data.inputSet.stale.length} 枚` +
+      `在当前 lockfile 里查不到（例：${data.inputSet.stale.slice(0, 3).join('、')}）。\n` +
+      '   先 `pnpm install --frozen-lockfile`（e2e 另需 `cd e2e && pnpm install`）再重跑；\n' +
+      '   **不许**为了出产物而绕这一格 —— 那等于把一棵陈旧树写成对外登记表。',
+  );
+  process.exit(1);
+}
+
 /** 表里包名一律用行内代码包起来，避免 `@scope/x` 被当成别的东西。 */
 const row = (p, extra) =>
   `| \`${p.name}\` | ${p.version} | ${p.license} |${extra === undefined ? '' : ` ${extra} |`}`;
@@ -153,6 +170,12 @@ lines.push('> 重新生成：`node research/tools/render-license-inventory.mjs`'
 lines.push('> 数据来源：**实际安装的依赖树**（pnpm store），不是 lockfile 的声明。');
 lines.push('> 去重口径：`包名@版本`（同名多版本分别登记）。');
 lines.push(`> ${stampLine()}`);
+// 这一行由**数据**生成，不是手抄的声称：能写出来就说明输入集对账过（上面那一格会拒掉
+// 任何"store 里有当前 lockfile 查不到的枚"的渲染），所以它不会像"人记得量过一次"那样漂。
+lines.push(
+  `> 渲染输入集：pnpm store 去重后 **${data.inputSet.scanned}** 枚，逐枚都能在当前 lockfile 里查到` +
+    '（对账：`node research/tools/license-inventory.mjs`，它同时是 `pnpm check:licenses`）。',
+);
 lines.push('');
 lines.push(`生成时间：${DATE}`);
 lines.push('');

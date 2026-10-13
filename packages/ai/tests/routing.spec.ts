@@ -27,6 +27,8 @@ import {
   findPreset,
   invokeRouted,
   isAvailable,
+  PRIVACY_CONSENT_BLOCKED_MARKER,
+  PrivacyConsentBlockedError,
   recordOutcome,
   presetDestinations,
   requiredCapabilities,
@@ -353,13 +355,23 @@ describe('熔断 —— 只有端点的锅才算', () => {
   });
 
   it('计数表逐项钉死（改了这张表就要改测试）', () => {
-    expect(countsAsEndpointFailure('network')).toBe(true);
-    expect(countsAsEndpointFailure('http-error')).toBe(true);
-    expect(countsAsEndpointFailure('empty-response')).toBe(true);
-    expect(countsAsEndpointFailure('egress-not-authorized')).toBe(false);
-    expect(countsAsEndpointFailure('fallback-needs-consent')).toBe(false);
-    expect(countsAsEndpointFailure('not-configured')).toBe(false);
-    expect(countsAsEndpointFailure('no-route')).toBe(false);
+    // 🔴 写成 `Record<AiFailureReason, boolean>` 而不是逐行 `expect`：
+    // 逐行写法在词表新增一档时会**静默漏测**（本仓库在 web 那份里记过同一件事）。
+    // 这张表就是 `countsAsEndpointFailure` 的期望值本身 —— 少一条是编译错误，
+    // 改一条而不改这里也是编译错误。
+    const EXPECTED: Record<AiFailureReason, boolean> = {
+      network: true,
+      'http-error': true,
+      'empty-response': true,
+      'egress-not-authorized': false,
+      'consent-not-granted': false,
+      'fallback-needs-consent': false,
+      'not-configured': false,
+      'no-route': false,
+    };
+    for (const [reason, counted] of Object.entries(EXPECTED) as [AiFailureReason, boolean][]) {
+      expect(countsAsEndpointFailure(reason), reason).toBe(counted);
+    }
   });
 });
 
@@ -390,10 +402,11 @@ describe('shouldTryNextEndpoint —— "换个端点有可能成功吗"', () => 
     expect(shouldTryNextEndpoint(fail('http-error', 422))).toBe(false);
   });
 
-  it('🔴 没授权 / 回退被隐私拦住 —— **绝不能**"换下一个"', () => {
+  it('🔴 没授权 / 回退被隐私拦住 / 设备级同意没给 —— **绝不能**"换下一个"', () => {
     // 换下一个端点不是重试，是换一个目的地偷发。
     expect(shouldTryNextEndpoint(fail('egress-not-authorized'))).toBe(false);
     expect(shouldTryNextEndpoint(fail('fallback-needs-consent'))).toBe(false);
+    expect(shouldTryNextEndpoint(fail('consent-not-granted'))).toBe(false);
   });
 });
 
@@ -492,6 +505,36 @@ describe('invokeRouted —— 闸门与短路', () => {
       expect(out.result.suggestion.destination).toBe('none');
     }
     expect(calls).toHaveLength(1);
+  });
+
+  it('🔴 设备级同意闸抛的拒绝 → consent-not-granted，不是 network，也不给端点记一笔', async () => {
+    // 实测换来的：那道闸在 `fetchImpl` 里抛 `PrivacyConsentBlockedError`，
+    // 而 `attemptOnce` 的 catch 一律归成 `network` —— 于是界面说"检查网络"，
+    // 端点还白挨一笔熔断计数（真机上一轮跑到 consecutiveFailures=2 / lastError=network，
+    // 而它一次都没被访问过）。两条都是这一条断言要挡的。
+    const { impl, calls } = countingFetch((url) => {
+      throw new PrivacyConsentBlockedError(url);
+    });
+    const out = await invokeRouted(config(), INVOCATION, [], DEFAULT_ROUTING_POLICY, { fetchImpl: impl });
+    expect(out.result.ok).toBe(false);
+    if (!out.result.ok) {
+      expect(out.result.reason).toBe('consent-not-granted');
+      expect(out.result.message).toContain(PRIVACY_CONSENT_BLOCKED_MARKER);
+    }
+    // 端点没被访问过 ⇒ 健康表里不该多出这一笔。
+    expect(out.health['local']).toBeUndefined();
+    expect(calls).toHaveLength(1);
+  });
+
+  it('对照：真的连不上仍然是 network，而且**会**记一笔', async () => {
+    // 上一那条若被写成"所有异常都不记账"，这一条会红。
+    const { impl } = countingFetch(() => {
+      throw new TypeError('Failed to fetch');
+    });
+    const out = await invokeRouted(config(), INVOCATION, [], DEFAULT_ROUTING_POLICY, { fetchImpl: impl });
+    expect(out.result.ok).toBe(false);
+    if (!out.result.ok) expect(out.result.reason).toBe('network');
+    expect(out.health['local']?.consecutiveFailures).toBe(1);
   });
 });
 

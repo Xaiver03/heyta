@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { STUB_ORIGIN } from '../ports';
 import { openApp } from './helpers';
 
 /**
@@ -32,8 +33,8 @@ test.describe('冒烟：验收链路本身', () => {
   });
 
   test('假端点活着，且计数接口可用', async ({ request }) => {
-    await request.get('http://127.0.0.1:4319/__reset');
-    const res = await request.get('http://127.0.0.1:4319/__requests');
+    await request.get(`${STUB_ORIGIN}/__reset`);
+    const res = await request.get(`${STUB_ORIGIN}/__requests`);
     expect(res.ok()).toBe(true);
 
     const body = (await res.json()) as { count: number };

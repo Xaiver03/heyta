@@ -161,6 +161,7 @@ const missing = [];
 const duplicated = [];
 const contradicted = [];
 const mismatched = [];
+const exempted = [];
 const ok = [];
 let cleared = 0;
 
@@ -191,10 +192,18 @@ for (const file of files) {
   // "闸门在正确地拦"那种红（看着像产品坏了）。零误报的依据见文件头「判据 4」。
   const pinsLocal = /^\s*CONSENT_GATE_PREFERRED=(?:"?(只用本机|以后再说)"?)/m.test(code);
   const needsNetwork = /\b(configure_sync_credentials|wait_laptop_has|heyta_e2e_ensure_account)\b|\$CLI sync|laptop\(\)/.test(code);
-  if (pinsLocal && needsNetwork) {
+  // 🔴 豁免只有一种形状，而且是**窄**的：脚本在后面**自己按行首改点了「同意并联网」**
+  //    ⇒ 那颗本地按钮是**起点态**（先验"隐私层关着时连回环都不许出门"），不是全程态。
+  //    没有那次改点就仍然红 —— 判据 4 原本要拦的形状（本地类脚本被塞进一条同步判据）
+  //    一个字都没松。2026-10-06 由 `verify-mobile-ai.sh` 照出来：它第 0 步钉本地、
+  //    第 6 步切联网，静态一行看不出先后。
+  const regrantsNetworkLater = /^\s*handle_privacy_consent\s+"同意并联网"/m.test(code);
+  if (pinsLocal && needsNetwork && !regrantsNetworkLater) {
     mismatched.push(
       `${file}  点名了本地按钮（不授予联网），但脚本里有用得着出门的动作 ⇒ 那句"不需要联网"是假的`,
     );
+  } else if (pinsLocal && needsNetwork) {
+    exempted.push(`${file}  起点钉本地 + 后面**自己改点「同意并联网」**⇒ 本地是起点态不是全程态，判据 4 不适用`);
   }
 
   if (namesLocalButton && viaWelcome && !pinsItsOwnChoice) {
@@ -227,6 +236,7 @@ if (missing.length) {
   console.log(`\n❌ 判据 1 —— 没走到共享处置（${missing.length} 个）：`);
   for (const line of missing) console.log(`  ${line}`);
 }
+for (const line of exempted) console.log(`  ⓘ ${line}`);
 if (duplicated.length || missing.length || contradicted.length || mismatched.length) {
   console.log('\n处置：调用 scripts/lib/mobile-e2e.sh 的 handle_privacy_consent <按钮优先级…>，');
   console.log('      或在冷启动后调 dismiss_welcome_if_present（它会先收这块面板）。');

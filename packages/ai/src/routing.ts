@@ -50,7 +50,12 @@ import {
   describeDestination,
   type EgressDestination,
 } from './supply.js';
-import { authorizeEgress, type AiFeature, type EgressConsent } from './egress.js';
+import {
+  authorizeEgress,
+  isPrivacyConsentBlocked,
+  type AiFeature,
+  type EgressConsent,
+} from './egress.js';
 import {
   buildChatRequestBody,
   chatCompletionsUrl,
@@ -143,6 +148,21 @@ export type AiCapability =
   | 'vision'
   | 'long_context'
   | 'tool_calling';
+
+/**
+ * 能力在界面上的呈现顺序。**唯一事实源**：web 壳与移动壳共用这一份，谁都不许再抄一遍。
+ *
+ * 为什么从 `apps/web` 提到这里：移动侧此前**压根没有能力这一格**，于是用户在手机上建出来的
+ * 端点永远只拿基线 `structured_output` ⇒ `tool-calling`（要 `tool_calling`）与 `breakdown`
+ * （要 `long_context`）在手机上结构上不可用，而界面只表现为"发送按钮一直灰着"
+ * （排除原因 `capability-missing` 从不递给人）。顺序表抄两处，下次就是"只有一处补了新能力"。
+ */
+export const CAPABILITY_ORDER: readonly AiCapability[] = [
+  'structured_output',
+  'long_context',
+  'vision',
+  'tool_calling',
+];
 
 /**
  * 每个功能**至少**需要哪些能力。
@@ -286,6 +306,7 @@ export function isAvailable(health: EndpointHealth | undefined, now: number): bo
  * |---|---|---|
  * | `network` / `http-error` / `empty-response` | ✅ 计入 | 端点确实没给出可用结果 |
  * | `egress-not-authorized` | ❌ **不计入** | 是**我们没获授权**，与端点无关 |
+ * | `consent-not-granted` | ❌ **不计入** | 设备级同意闸在 `fetch` 门口就拦了，端点**一次都没被访问** |
  * | `not-configured` | ❌ 不计入 | 配置问题 |
  * | `fallback-needs-consent` | ❌ **不计入** | 同上，而且它是**回退被隐私拦住**，端点本身是好的 |
  *
@@ -338,6 +359,7 @@ export function countsAsEndpointFailure(reason: AiFailure['reason']): boolean {
     case 'not-configured':
     case 'egress-not-authorized':
     case 'fallback-needs-consent':
+    case 'consent-not-granted':
     case 'no-route':
       return false;
   }
@@ -369,11 +391,13 @@ export function shouldTryNextEndpoint(failure: AiFailure): boolean {
       //  401/403 凭据、402 余额、404 模型名、429 限流、5xx 上游故障
       return true;
     }
-    // 🔴 这两个**必须**是 false：
+    // 🔴 这三个**必须**是 false：
     //  - 没授权 → 换下一个端点不是"重试"，是**换一个目的地偷发**
     //  - 回退被隐私拦住 → 正是我们要停下来问用户的那一刻
+    //  - 设备级同意没给 → 换哪个端点都出不去，偷换等于绕过那道闸
     case 'egress-not-authorized':
     case 'fallback-needs-consent':
+    case 'consent-not-granted':
       return false;
     case 'not-configured':
     case 'no-route':
@@ -905,6 +929,17 @@ async function attemptOnce(
       ...(toolCalls === undefined ? {} : { toolCalls }),
     };
   } catch (error) {
+    // 🔴 设备级同意闸的拒绝**不是**网络故障：一个字节都没出去，端点没被访问过。
+    // 归成 `network` 会让界面说"检查网络"，还会给端点记一笔熔断锅
+    // （见 `countsAsEndpointFailure` 那张表 —— 它本来就写着这类不算端点的错）。
+    if (isPrivacyConsentBlocked(error)) {
+      return {
+        ok: false,
+        reason: 'consent-not-granted',
+        endpointUrl: candidate.endpointConfig.endpoint,
+        message: error.message,
+      };
+    }
     const aborted = error instanceof Error && error.name === 'AbortError';
     return {
       ok: false,

@@ -32,6 +32,7 @@ const CJK = /[\u3400-\u4DBF\u4E00-\u9FFF]/;
 const ALL_CAUSES: Record<AiFailureReason, true> = {
   'not-configured': true,
   'egress-not-authorized': true,
+  'consent-not-granted': true,
   network: true,
   'http-error': true,
   'empty-response': true,
@@ -50,6 +51,18 @@ describe('路由层失败原因 → 词条', () => {
       expect(CJK.test(en), `${cause} 的英文词条里有汉字：${en}`).toBe(false);
       expect(en, `${cause} 的英文词条与中文一模一样`).not.toBe(zh);
     }
+  });
+
+  it('🔴 设备级同意没给 ≠ 端点连不上 —— 那句红字不许把用户支去查网络', () => {
+    // 实测换来的：闸门拒绝被归成 `network`，于是失败面写着「连不上端点。检查网络，
+    // 以及端点地址是否可达。」，而真相是这台设备设为「只用本机」、一个字都没发。
+    // 判据写成"必须点名那道开关 + 不许出现'检查网络'"，而不是只断言"有文案"。
+    const key = causeKey('consent-not-granted');
+    const zh = translate('zh-CN', key);
+    expect(key).toBe('web.ai.failure.cause.consentNotGranted');
+    expect(zh).not.toBe(translate('zh-CN', causeKey('network')));
+    expect(zh).toContain('同意并联网');
+    expect(zh).not.toMatch(/检查网络|端点地址是否可达/);
   });
 
   it('🔴 没有原因码时退回通用那句，而不是空白或崩溃', () => {

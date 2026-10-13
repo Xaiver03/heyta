@@ -201,6 +201,7 @@ const TOOL_RUN_KEY: Record<ToolCallFailureReason, MessageKey> = {
 const CAUSE_KEY: Record<AiFailureReason, MessageKey> = {
   'not-configured': 'web.ai.failure.cause.notConfigured',
   'egress-not-authorized': 'web.ai.failure.cause.egressNotAuthorized',
+  'consent-not-granted': 'web.ai.failure.cause.consentNotGranted',
   network: 'web.ai.failure.cause.network',
   'http-error': 'web.ai.failure.cause.httpError',
   'empty-response': 'web.ai.failure.cause.emptyResponse',
@@ -246,6 +247,10 @@ const CAUSE_SETTINGS_TARGET: Record<AiFailureReason, SettingsTarget | undefined>
   'no-route': 'endpoints',
   // 回退端点要另一次授权：同样是逐功能授权那一块。
   'fallback-needs-consent': 'consent',
+  // 🔴 设备级联网同意没给：能修它的那道开关**不在 AI 设置区**，在设置页顶部的
+  // 隐私同意段（`SettingsTarget` 里根本没有那一档）。指到 `consent` 会把用户
+  // 领到一张他点了也没用的"逐功能授权"表 —— 那是第二种说谎。
+  'consent-not-granted': undefined,
 };
 
 /** 原因码 → "去设置"目标区块。`undefined` = 设置里没有能修它的控件。 */

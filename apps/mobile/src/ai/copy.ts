@@ -61,8 +61,33 @@ export const AI_FEATURE_LABEL_KEY: Record<AiFeature, MessageKey> = {
   'inbound-automation': 'web.ai.feature.inboundAutomation',
 };
 
-/** "这个功能压根没配路由"那一句（与"配了但全被排除"必须分开）。 */
-export const AI_NO_TARGET_KEY: Record<AiFeature, MessageKey> = {
+/**
+ * 端点预设 → 词条 key。
+ *
+ * 🔴 界面**不许**直接渲染 `AI_ENDPOINT_PRESETS` 里的 `label` / `prerequisite`：
+ * 那是 `packages/ai` 里的中文字面量，英文模式下会整句露出中文，而
+ * `check:ui-language` 看不见它（它只扫 `apps/*`）。web 侧同一件事住在
+ * `presetText()`，本端这份是那条分工的对应物 —— key 的选择按设计留在壳里
+ * （`packages/app-host` 刻意不依赖 `@heyta/i18n`，理由见本文件头）。
+ *
+ * 查不到就回落到 **id**，不回落到 `preset.label`：宁可显示一个英文短码，
+ * 也不替用户渲染一句他读不懂的、跨包塞进来的中文。
+ */
+export const AI_PRESET_COPY_KEY: Record<
+  string,
+  { readonly label: MessageKey; readonly prerequisite: MessageKey }
+> = {
+  ollama: {
+    label: 'web.ai.settings.preset.ollama.label',
+    prerequisite: 'web.ai.settings.preset.ollama.prerequisite',
+  },
+  'lm-studio': {
+    label: 'web.ai.settings.preset.lmStudio.label',
+    prerequisite: 'web.ai.settings.preset.lmStudio.prerequisite',
+  },
+};
+
+/** "这个功能压根没配路由"那一句（与"配了但全被排除"必须分开）。 */export const AI_NO_TARGET_KEY: Record<AiFeature, MessageKey> = {
   capture: 'web.ai.noTarget.capture',
   breakdown: 'web.ai.noTarget.breakdown',
   prioritize: 'web.ai.noTarget.prioritize',
@@ -113,6 +138,7 @@ export const AI_CAUSE_KEY: Record<AiFailureReason, MessageKey> = {
   'not-configured': 'web.ai.failure.cause.notConfigured',
   'no-route': 'web.ai.failure.cause.noRoute',
   'egress-not-authorized': 'web.ai.failure.cause.egressNotAuthorized',
+  'consent-not-granted': 'web.ai.failure.cause.consentNotGranted',
   'fallback-needs-consent': 'web.ai.failure.cause.fallbackNeedsConsent',
   network: 'web.ai.failure.cause.network',
   'http-error': 'web.ai.failure.cause.httpError',
