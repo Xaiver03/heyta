@@ -3541,6 +3541,18 @@ mac `dfeacee3`（r102）/ android `dfeacee3`（r100）/ ios `dfeacee3`（r101）
 两分钟出四臂读数，且不读真令牌、不覆盖并行会话正在读的那份快照。装置本体：
 [`apps/mobile/evidence/profile-center/android-r108-syncneedle/RESULT.md`](../../apps/mobile/evidence/profile-center/android-r108-syncneedle/RESULT.md)。
 
+⚠️ **要不要跑第六趟四端重装：不要，而且这句话现在有现量。** 上面这两笔提交（`071e09fd`、`b7338307`）改的全是
+门禁脚本、设备腿装置与文档 —— 判据是这条：
+
+```sh
+git diff --name-only 769e6258..HEAD -- apps/web/src apps/mobile/src packages server/src \
+  apps/desktop-macos apps/desktop-windows scripts/reinstall-all.sh pnpm-lock.yaml | wc -l
+```
+
+读数 **0** ⇒ r108 那一趟打进四端包里的源码与**当前 HEAD 逐字相同**，"四端等于当前产物"这句不必重跑也还成立
+（`769e6258` 正是 r108 那趟的载体 `HEAD`）。下一位要是这条读数不再是 0，那才是重跑的理由 —— 别用"再跑一遍看着安心"当理由。
+
+
 
 
 
