@@ -158,3 +158,14 @@ if (typeof Element !== 'undefined' && typeof Element.prototype.scrollIntoView !=
     // jsdom 没有布局引擎：滚不动，也不该假装滚动了什么。
   };
 }
+/**
+ * 同一族的另一半：`Element.prototype.scrollTo` 在 jsdom 里同样不存在。
+ * 设置浮层"换一档 ⇒ 回到顶部"用的就是它，而那条规则现在挂在
+ * `activeSettingsSection` 的 effect 上 ⇒ **任何打开过设置的用例**都会碰它。
+ * 取舍与上面一条完全相同（补在测试这边，不把宿主代码写成可选调用）。
+ */
+if (typeof Element !== 'undefined' && typeof Element.prototype.scrollTo !== 'function') {
+  Element.prototype.scrollTo = function (): void {
+    // 同上：jsdom 没有滚动位置可言。
+  };
+}

@@ -47,6 +47,7 @@ const { App } = await import('../src/App.js');
 
 type Scroll = { target: string; options: unknown };
 const scrolls: Scroll[] = [];
+const sheetScrolls: Scroll[] = [];
 const originalScrollIntoView = Element.prototype.scrollIntoView;
 const originalScrollTo = Element.prototype.scrollTo;
 
@@ -75,16 +76,20 @@ const click = (el: Element): void => {
 
 beforeEach(async () => {
   scrolls.length = 0;
+  sheetScrolls.length = 0;
   Element.prototype.scrollIntoView = function (this: Element, options?: unknown): void {
     scrolls.push({ target: scrollTarget(this), options });
   };
   /**
    * 换档时 `onSelect` 还会把浮层滚回顶部（`document.querySelector('.ht-sheet')?.scrollTo(...)`），
-   * 而 jsdom 同样**不实现** `scrollTo`。不补这一层，点按钮那条路会崩在宿主代码里，
-   * 报错指不到产品行为 —— 补法与上面 `scrollIntoView` 同理：补在测试这边。
+   * 而 jsdom 同样**不实现** `scrollTo`。顺手把它变成真判据：记下滚的是哪个容器 ——
+   * 那条规则现在挂在 `activeSettingsSection` 的 effect 上，四条路都要走它。
+   * 补法与上面 `scrollIntoView` 同理：补在测试这边（`tests/setup.ts` 里有同一取舍的记录）。
    */
   Object.defineProperty(Element.prototype, 'scrollTo', {
-    value: (): void => undefined,
+    value: function (this: Element, options?: unknown): void {
+      sheetScrolls.push({ target: this.matches('.ht-sheet') ? 'settings-sheet' : scrollTarget(this), options });
+    },
     configurable: true,
     writable: true,
   });
@@ -181,5 +186,35 @@ describe('设置分组导航的当前项要被滚进可视窗口', () => {
     ).toBe(true);
     expect(el.querySelector('.ht-settings__nav [aria-current="page"]')?.getAttribute('aria-controls'))
       .toBe('settings-group-sync');
+  });
+
+  /**
+   * 🔴 同一族的**第二处**：「换一档 ⇒ 浮层回到顶部」以前也只挂在导航按钮的 `onSelect` 上。
+   * 可达性不是推测 —— 助手浮层 `.ht-app__assistant-backdrop` 是 `--ht-z-overlay`(300)、
+   * 面板 `--ht-z-modal`(400)，设置浮层 `.ht-sheet` 只有 `--ht-z-dropdown`(200)，
+   * 所以**设置开着时助手那颗「去授权」点得到**（它经 `openAiSettings` 换档，不碰 `onSelect`）。
+   * 于是"在设置里滚到长列表中间 → 从助手跳档"会停在原地，新那一节的标题在屏幕上沿外。
+   */
+  it('程序化换档也要把浮层带回顶部（这条规则同样不属于"谁点的"）', async () => {
+    const el = container!;
+    click(el.querySelector('[data-testid="rail-help"]')!);
+
+    expect(
+      sheetScrolls.some((s) => s.target === 'settings-sheet'),
+      `浮层没有被带回顶部（本趟滚到的：${JSON.stringify(sheetScrolls.map((s) => s.target))}）`,
+    ).toBe(true);
+    expect(sheetScrolls.at(-1)?.options).toEqual({ top: 0 });
+  });
+
+  it('点导航换档同样回到顶部（挪成 effect 之后别把这条丢了）', async () => {
+    const el = container!;
+    click(el.querySelector('[data-testid="rail-help"]')!);
+    sheetScrolls.length = 0;
+
+    click(el.querySelector('[aria-controls="settings-group-data"]')!);
+    expect(
+      sheetScrolls.some((s) => s.target === 'settings-sheet'),
+      '点导航换档后浮层没有回到顶部',
+    ).toBe(true);
   });
 });
