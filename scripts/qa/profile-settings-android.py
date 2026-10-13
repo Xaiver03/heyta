@@ -112,6 +112,13 @@ def tab_label(node):
   if value==label or value.startswith(label+',') or value.startswith(label+'，'):return label
  return None
 
+def tab_band_top(root):
+ # The bottom tab bar is the region a content gesture must never be aimed into: a swipe or tap
+ # starting inside it is consumed by the bar, so the surface does not move and the target stays
+ # clipped.  None means "this screen has no tab bar" (a child page), where the check is skipped.
+ tops=[node_bounds(n)[1] for n in root.iter('node') if n.get('clickable')=='true' and tab_label(n)]
+ return min(tops) if tops else None
+
 def profile_geometry(root):
  entry=countdown_entry(root)
  tabs=[]
@@ -161,7 +168,14 @@ def tap(label,after,absent=None,resource=None):
  if find_pressable(r,label) is not None: n=find_pressable(r,label)
  if n is None: raise AssertionError(('pressable target',label,texts(r)))
  time.sleep(.5)
- x1,y1,x2,y2=map(int,re.findall(r'\d+',n.get('bounds')))
+ x1,y1,x2,y2=node_bounds(n)
+ band_top=tab_band_top(r)
+ # A row clipped below the fold still carries its label in the accessibility tree, so "found it"
+ # is not "can be pressed".  Tapping such a node hands the gesture to whatever is really at those
+ # coordinates — usually the bottom tab bar — and the next wait then reads as "the app has no such
+ # screen" instead of "the probe aimed outside the content surface".
+ if y2<=y1 or (band_top is not None and (y1+y2)//2>=band_top):
+  raise AssertionError(('tap target is not on the visible content surface',label,{'bounds':[x1,y1,x2,y2],'tabBandTop':band_top}))
  adb('shell','input','tap',str((x1+x2)//2),str((y1+y2)//2))
  r=wait(after,absent,resource);records.append({'action':label,'destination':after,'labels':texts(r)})
  print(label,'=>',after,flush=True)
@@ -187,15 +201,24 @@ def artifact_identity():
  return {'sha256':actual,'apk':str(apk.relative_to(repo)) if apk.is_relative_to(repo) else str(apk)}
 
 def scroll_to(label):
+ # "The label is in the tree" is not "the row can be reached": a row clipped below the fold keeps
+ # its content-desc, so the old loop returned on the first dump without ever scrolling and every
+ # gesture after it was aimed at a rectangle that is not on screen.
  deadline=time.monotonic()+timeout
+ seen=None
  while time.monotonic() < deadline:
   r=tree()
-  if find(r,label) is not None:return
-  bounds=list(map(int,re.findall(r'\d+',next(r.iter('node')).get('bounds'))))
-  _,_,width,height=bounds
-  adb('shell','input','swipe',str(width//2),str(height*3//4),str(width//2),str(height//3),'350')
+  band_top=tab_band_top(r)
+  n=find(r,label)
+  if n is not None:
+   x1,y1,x2,y2=node_bounds(n)
+   seen=[x1,y1,x2,y2]
+   if y2>y1 and (band_top is None or y2<=band_top):return
+  _,_,width,height=node_bounds(next(r.iter('node')))
+  start=band_top-260 if band_top is not None else height*3//4
+  adb('shell','input','swipe',str(width//2),str(max(start,height//2)),str(width//2),str(height//3),'350')
   time.sleep(.4)
- raise AssertionError(('scroll target',label,texts(r)))
+ raise AssertionError(('scroll target',label,{'lastTargetBounds':seen,'tabBandTop':band_top,'texts':texts(r)}))
 geometry=None
 try:
  identity=artifact_identity()

@@ -3402,6 +3402,26 @@ mac `dfeacee3`（r102）/ android `dfeacee3`（r100）/ ios `dfeacee3`（r101）
 1. **共享检出里有别的写入者时，"链尾的红集"不许在主检出取** —— 要么等对方落笔之后，要么按 `AGENTS.md` §8 第 9 条固定到隔离副本并记基线哈希。这一格是那条规矩的**实例**。
 2. **"全红"和"全绿"一样是尺坏的信号**。逐道取 rc 的批跑，收尾先打一行 `grep -c 'RC=0'`：**0 或全数都先按尺坏处理**，再去看日志原文。这批若只看"有没有红"，我就会去登记 54 条不存在的欠项（§7 元规则一）。
 
+### 2026-10-13 04:3x：那枚假红其实有**两个**成因 —— 03:1x 只修了其中一个；这一格把"在树里"和"点得到"彻底拆成两件事
+
+**先枚举分母**（`for f in scripts/qa/*.py` 数含 `swipe|dragfromto|scroll|input tap` 的行）：`profile-settings-android.py` 12、`tasks-ux-android.py` 17、`tasks-ux-ios.py` 24、`ai-assistant-atomic-android.py` 5、`profile-settings-ios.py` 4 —— 五枚逐枚读过，问的是同一个形状：**手势坐标是不是取自"可能已被裁切"的节点自身**。
+
+**命中两处，都在本线这枚 `profile-settings-android.py`**：
+1. `scroll_to`（`:189`）—— 判据是"标签在 uiautomator 树里"，而被裁到底栏带下方的节点照样带 `content-desc` ⇒ 一次都不滚就返回。
+2. `tap`（`:159`）—— 坐标取节点自身中心。节点被裁到带外时，**手势交给底栏**，随后的 `wait(after)` 超时会被读成"界面没这个功能"，而不是"探针点错了位置"。
+ 03:1x 那一格只修了 nudge 的锚点，**第 2 处当时没看见** —— 它是同一族的第二个开火点，也是更危险的那个（nudge 失败会抛错，`tap` 失败会伪装成产品缺失）。
+
+**改法**：新增 `tab_band_top(root)`（读不到底栏 ⇒ 返回 `None` = 子页，跳过检查）；`scroll_to` 只有当目标矩形 `y2>y1` **且** `y2<=band_top` 才算到达，滑动起点锚 `band_top-260`（不再用节点中心）；`tap` 在中心落进/低于底栏带时抛 `tap target is not on the visible content surface`，并把 `bounds` 与 `tabBandTop` 一起打出来。
+
+**同族其余三枚没有这个形状**（所以本格不改它们）：`tasks-ux-android.py:145/:341` 与 `ai-assistant-atomic-android.py:290` 的滑动起点是**屏幕高度分数**（`bottom*.75`、`height*3//4`、硬编 `1850`）而不是节点中心；`tasks-ux-ios.py:195-232` 的注释显示那一线已经把自己的反向滑动钉在容器内部了。⇒ 这一行是"查过分母"的记录，不是欠项。
+
+**牙的证明**（夹具 `apps/mobile/evidence/profile-center/android-r107-tapprobe/tap-guard.py`：它把出厂代码里那行谓词**逐字 grep 回来比对**，夹具自己漂移会报 `predicate_matches_source: false`）：1.3 冷启动那一帧实测 `tabBandTop=2169`、目标 `[42,2251][1038,2169]`、中心 `2210` ⇒ `guardRejectsTarget=true`、`labelPresentInTreeWhileClipped=true`、`predicate_matches_source=true`，夹具 **RC=0**（它就该在这个几何上开火）。
+
+**两腿复跑**（⚠️ **载体换回主检出**：`adb install -r` 装了 `apps/mobile/android/app/build/outputs/apk/release/app-release.apk`，`sha256 b731fd26…`；设备上原来那枚 `0a1a92dc…` 随隔离载体一起被别的会话清走了 ⇒ 这一趟的出处比今晚前三腿更硬）：`1.0` → `android-r107-tapprobe/` **RC=0**（`entry [42,995][1038,1110]`、strict True、`nudgeRounds=1`）；`1.3` → `android-r107-font13/` **RC=0**（`entry [42,960][1038,1089]`、strict True、`nudgeRounds=1`）。设备收尾 `font_scale` 回读 **1.0**。`NO_COLOR=1 pnpm check:locator-labels` **RC=0**。
+⚠️ **加固的射程只有一句**：新的 `tap` 守卫挡的是"中心落进底栏带"这一种错位，**不挡**"节点在带上方但被别的浮层盖住" —— 那种要像素层证据，本线没做，别把这一格读成"点不到已被穷尽"。
+
+⚠️ **这一小时里 `emulator-5554` 不是本线独占的**（现量方式：`git status --porcelain -- apps/mobile/evidence/profile-center` 里出现一枚本线没起过名字的目录 `android-r99-fixed`，时间戳落在两腿之间，`journey.json` 自标 `uiLocale=en`、`sha b731fd26…`；收尾时 `getprop ro.product.locale` 读到 `en-US`）。⇒ 两腿的出处**由装置自己标**：`android-r107-tapprobe/journey.json` 与 `android-r107-font13/journey.json` 里 `uiLocale` 均为 **`zh-CN`**，所以这两枚是中文态读数，英文态那一格**不由本线登记为已跑**。那枚外来的 `android-r99-fixed/` 本线不代提交、也不删（它讲的那件事属于 `dfeacee3` 语言开关那一线）。
+
 
 
 

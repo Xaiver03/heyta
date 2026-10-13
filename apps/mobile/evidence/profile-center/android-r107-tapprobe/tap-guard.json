@@ -1,0 +1,15 @@
+{
+ "fontScale": "1.3",
+ "baselineFontScale": "1.0",
+ "tabBandTop": 2169,
+ "targetBounds": [
+  42,
+  2251,
+  1038,
+  2169
+ ],
+ "targetCenterY": 2210,
+ "predicate_matches_source": true,
+ "guardRejectsTarget": true,
+ "labelPresentInTreeWhileClipped": true
+}
