@@ -10106,3 +10106,209 @@ SELF_TEST_BROKEN：臂 6 的原文命中 2 处，要求恰好 1 处 —— 「<�
 A. 先接 B140 那根 `active`（两枚文件各几行），我随后在这条 e2e 上把 worker 三段桩补齐，读列表与详情；
 B. 或明确"列表/详情那两面的跨时区读数归设备腿那一轮"，我就把 C29 判据原文与这格的分层写清（不改尺列），
    缝那一层那枚 spec 已经是这一条不变量的机械判据。
+
+### 追记（2026-10-12 20:3x，同一会话）：这格有两句我当时写粗了，逐字更正
+
+**① "今天浏览器里只到得了编辑那一处" ⇒ 现在列表与详情两处**有组件层断言了**，只是层次不同。**
+新落 `apps/web/tests/inbound-due-timezone.spec.tsx`：真 `DueBadge`（`mode="date"`）+ 真 `DueEditor` 在四档设备
+时区下各挂一遍，三处读数 = 徽标 `12-31` / 触发器 `12月31日` / 月历 `aria-selected="true"` 那格的无障碍名
+`12月31日`；两道探针（月历格子数 > 27、被选中格恰一枚）+ 反向臂（摘掉 `dueDateLocal` 后 `Etc/GMT+12` 那档
+徽标必须读 `12-30`、选中格必须变 `12月30日`）。它钉的是"读的那一侧优先用 `dueDateLocal`"这条约定本身，
+**钉不到**"徽标有没有被挂进行"—— 那一层仍归 `e2e/`（同 `apps/web/tests/due-date-edit.spec.tsx` 文件头那套分工）。
+
+**② "我做不动"这句的成因写错了：不是不可达，是成本与不确定性。** 复核 worker 契约后：那条链在浏览器里
+**可驱动** —— `POST /api/automation/worker/register` 拿 `workerId`/`workerToken`/`syncClientId`/`databaseEpoch`，
+再 `events/claim` → `events/{id}/result` → `commit-permit`，而**客户端不校验票据**（票据对它是 opaque，
+`ticketFor` 在 `getTicket` 缺失时直接回 `{}`），桩形状现成在 `packages/app-host/tests/inbound-process.spec.ts:14-40`。
+真正的门槛是**要同时把两套前提搭起来**：AI 路由（ claim 之后那趟解析要有人答）与 web 侧密钥存储
+（建任务落进真 SQLite 得能解密），外加 B140 那根 `active`。这三样都在白名单外，所以本线不自建。
+⇒ **A/B 两条路不变**，但 A 的代价请按"补 e2e 载体 + 两套前提"估，不要按"补三段桩"估；我之前那句把它写小了。
+
+**③ 一处我自己踩的坑，登记以防下一个人重踩**：编辑面**没有** ISO 日期 `<input>` —— 共享 `DatePicker` 画的是
+月历格子（`packages/ui/src/date-picker/DatePicker.tsx:269-324`）。我按"输入框里写着 `2026-12-31`"去读，
+连红两次，红的都是**我自己的反空转探针**（`面板没打开/没取到日期输入 = 探针空转`），不是产品。
+教训：那一句"编辑控件取值"是从缝那一层的字段名推的，不是从界面实际形状取的。
+
+---
+
+## B191（2026-10-12 22:5x，本会话 · `main` 上有一场**别线开的、只差收口的 merge**，本线这一笔提交因此挂起）
+
+**现量**（22:5x，全部是这一分钟取的）：
+
+| 项 | 读数 |
+|---|---|
+| `main` | `1a386d76`（我前两笔 `daa5a75d`、`4310b6cd` 都在它祖先里，`git merge-base --is-ancestor` 各退 0） |
+| `.git/MERGE_HEAD` | `bd4e4f87` = `fix(§8.154 证据守卫): 第三档…` ⇒ 合的是 **`feat/detail-pane`**（别线，详情栏 §8.15x 那一族） |
+| `.git/MERGE_MSG` 里的冲突清单 | `apps/web/src/features/tasks/TaskDetailCard.tsx`、`apps/web/tests/task-detail-card.spec.tsx`、`docs/plans/detail-pane-alignment.md` |
+| `git ls-files -u \| sort -u \| wc -l` | **0** —— 三处冲突**都已解好并暂存**，只剩那一笔 merge 提交 |
+| `.git/index.lock` | 不存在；`ps` 里没有活的 `git commit/merge`、`vitest`、`playwright` 进程 |
+
+**我这一个动作对它的贡献**：我按配方 `git add -- apps/web/tests/inbound-due-timezone.spec.tsx` 之后才撞上
+`git commit --only` 报 `fatal: cannot do a partial commit during a merge.`。那枚新文件当时确实进了**共享索引**
+（`git ls-files -s` 回 stage 0）。若就那样放着，他们那一笔 merge 提交会把本线这枚 spec 卷进**他们的提交**里。
+⇒ 已 `git restore --staged -- apps/web/tests/inbound-due-timezone.spec.tsx` 撤出，现回 `??`，文件本体 137 行在位，
+索引里别线的 20 条目数**没变**（撤出前后各数一次）。
+
+**为什么我不用 plumbing 硬推 main**：`merge --abort` 走的是 `reset --merge`，它按 **HEAD** 复位。
+我在半收口的 merge 下把 `main` 往前挪，等于把他们的复位目标改成我那一笔 —— 最坏情况**冲掉别人已解的三处冲突**。
+那不是我该替别人承担的风险（本线纪律：只对自己创建的对象动手）。
+
+**等谁做 / 一条命令**：这一格红的不是判定，是"载体上有人正在写"。等那笔 merge 提交落地后
+（判据：`.git/MERGE_HEAD` 消失），本线这一笔直接按点名字段提交即可，**内容我已写完并验过**，不需要重做：
+
+```bash
+test -f .git/MERGE_HEAD && echo "还在 merge 中，先别提交" || \
+git add -- apps/web/tests/inbound-due-timezone.spec.tsx && \
+git commit --only -F - -- PROGRESS.md BLOCKED.md docs/plans/inbound-automation.md \
+  apps/web/tests/inbound-due-timezone.spec.tsx <<'MSG'
+test(自动收集 C29): 列表徽标与详情编辑面补上组件层跨时区取证（三处读数×四档时区+两道探针+反向臂）
+MSG
+```
+
+**验过的读数**（提交不依赖它们，但它们是我这一笔的全部内容）：
+`vitest run tests/inbound-due-timezone.spec.tsx` → `Tests 1 passed (1)`；
+与 `inbound-draft-review.spec.tsx` 同跑 → `Test Files 2 passed (2) / Tests 5 passed (5)`；
+`pnpm --filter web typecheck` 无输出退出 0；`node scripts/check-docs-voice.mjs` rc=0；
+`node research/tools/docs-link-check.mjs` rc=0；`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` = **0**。
+
+### 追记（同日 23:4x）：等了 8 分钟那笔 merge 没收口；这一笔落成不动 `main` 的旁支 ref，等它落地再并回来
+
+**等待读数**：`.run-logs/wait-merge-close-2254.sh`（5 秒一轮、上限 480 秒、纯只读轮询 `.git/MERGE_HEAD`）
+**跑满退出 rc=3** —— `STILL_MERGING after 480s`。从 21:40 落 `MERGE_HEAD` 起到现在约 120 分钟，
+`git ls-files -u` 仍是 0（三处冲突都已解好并暂存），`.git/index.lock` 不存在，`ps` 里没有活的
+`git commit/merge/rebase` 进程 ⇒ 它是**停在"只差一句 `git commit`"** 的状态，不是我该替它决定的事。
+
+**所以这一笔现在落成旁支 ref，不推进 `main`**（理由见上面"为什么我不用 plumbing 硬推 main"那段）：
+用一枚**临时索引**（落在 gitignore 的 `.run-logs/` 里，用完删）以 `1a386d76` 的树为底，只叠本线四条落点，
+`commit-tree` 出一个父=`1a386d76` 的提交，挂到 **`refs/heads/inbound-c29-tz`**。
+不碰共享索引、不碰工作树、不碰 `main`；撤掉它只要 `git update-ref -d refs/heads/inbound-c29-tz`。
+⇒ 那四条落点**在工作树里仍是 ` M` / `??`**（这是设计如此，不是漏做）：内容已进 git 对象库、有名字可取，
+就算随后有人在工作树上覆写这四枚，也能用 `git show inbound-c29-tz:BLOCKED.md` 逐枚捞回来。
+
+**并回来的那一步**（别线 merge 落地之后，谁做都行，一条命令）：
+
+```bash
+git merge --no-ff inbound-c29-tz   # 四条落点与详情栏那条线零路径重叠，不该产生冲突
+# 或者他们收口后我这边直接：git add -- apps/web/tests/inbound-due-timezone.spec.tsx &&
+#   git commit --only -F - -- 那四条路径   （B191 上面那条命令仍有效）
+```
+
+🔴 **23:5x 到次日 01:0x 之间现场变了两次，这段是把两次都写完的终稿（作废了上面那条"并回来"的命令）**：
+
+1. 等的那 8 分钟里 `main` 被**第三条线**推进了一枚 —— `bbce592c test(产品体验线 Windows 真壳 逃生门臂)`，16 枚文件
+   全是他们自己的证据图/JSON + `docs/plans/product-ux-optimization.md` + `scripts/qa/windows-installed-widget-help.mjs`。
+   逐条查过：`git diff 1a386d76 bbce592c --stat -- PROGRESS.md BLOCKED.md docs/plans/inbound-automation.md`
+   **输出为空** ⇒ 他们那笔**没有**碰本线三条台账，也**没有**把本线未提交的字节卷进他们的提交
+   （我 22:5x 把那枚新 spec 从共享索引撤出来这一步在这里兑现了）。
+2. 我随即决定把旁支 ref 的父从 `1a386d76` 重接到 `bbce592c`（两笔都要用新 main 的树**重造**，不是简单改父 ——
+   旧树里带着 `1a386d76` 的 16 枚旧文件，直接换父会把他们刚提交的东西回退掉）。
+   ⚠️ **这一笔最终没做成**：plumbing 脚本里用了 `rm -f $IDX` 这种变量形式，被本机"危险 rm"守卫在**执行前**拦下
+   （它无法在展开前判断删的是什么 ⇒ 变量形式的 `rm` 一律拒）。我还没来得及换成字面路径重发，现场就自己变了（下一段），
+   于是这件事作废，**旁支 ref 一直停在 `05c7c2df`（父链 `e64c5cfc` → `1a386d76`），没有被重写**。
+   留下这条是因为它是可复用的事实：**同一条 plumbing 链里的临时文件要写死名，不要写 `$VAR`**，否则会白跑一轮。
+3. `10-13 01:0x` 现量：详情栏那笔 merge **已被他们自己收口**（`ls .git/MERGE_HEAD` → `No such file or directory`、
+   `git diff --cached --name-only | wc -l` → **0**），`main` 又往前走了一枚到 `a68cd81e`。
+   ⇒ 挂起本线这笔的前提（合并态 + 别线暂存内容）都不在了，**正确动作变成"在当前 main tip 上点名提交"，
+   旁支 ref 只是同一批字节的临时落脚点，不再需要重接父、也不需要 merge。**
+   ⚠️ 不要用 `git diff --name-only <新 tip> inbound-c29-tz` 去"验证只动了四枚" —— 旁支的树基于 `1a386d76`，
+   那条命令会把别线在中间落地的文件也列进来，列出来的是**他们的**改动，不是本线的。
+   要核的是**字节**：`git rev-parse <落地的提交>:<路径>` 与 `inbound-c29-tz:<路径>` 逐个比 blob（见本格末尾的落账现量）。
+
+**判据口径**（本线这笔落地后的复跑，别照抄上面任何一枚 SHA —— 一小时里 `main` 漂了两次，写死的 tip 一定是旧值）：
+
+```bash
+git log --oneline -1 --grep='C29 时区' BLOCKED.md   # 或按下面的路径查
+git diff --name-only HEAD~1 HEAD                    # 必须只列本线那 4 枚路径
+```
+
+⚠️ 顺带记一条共享检出的新事实：**一场未收口的 merge 挡不住别的线推进 `main`** ——
+`MERGE_HEAD`（详情栏那笔）当时还在，而 `main` 已经往前走了两枚。
+⇒ 判断"我能不能提交"不能只看 `MERGE_HEAD` 在不在，还要看 **`main` 有没有漂**：
+只看前者会让人以为现场没动，于是把旧树当新树用，那才是真出事的路径。
+反过来也成立：**`MERGE_HEAD` 消失 + 索引空** 才是"可以点名提交"的信号，两者要一起看。
+
+**现量（这一轮新取的两条，都要看清归属）**：
+- `pnpm --filter web typecheck` 现在**红**：25 条错全在 **`src/features/tasks/TaskDetailCard.tsx`（别线，未提交的 merge 内容）**，
+  `grep -c inbound` 对本线那枚 spec = **0**。⚠️ 我 23:2x 那次同命令是**干净的** —— 同一轮里工作树被别线写过
+  （那枚文件 mtime 21:45，`MERGE_HEAD` 21:40），两次读数都对，只是**分别量的是两棵树**。⇒ 报"我这枚 spec 编译过"要引用
+  那一次；现在这棵树上这一包的 typecheck 是红的，红因不是我。见 **B192**。
+- `vitest run`（apps/web 全量，23:36）：**`Test Files 37 failed | 142 passed | 1 skipped (180)`，`Tests 3 failed | 1926 passed | 12 skipped (1941)`**。
+  那 37 枚"失败的测试文件"里绝大多数根本没跑起来 —— 是同一条 transform 错误（`ERROR: Unexpected "🔴"`）在
+  import 阶段打断的；具名的 3 条红是 `focus-detail-pane.spec.tsx` ×2 与 `reminder-wake.spec.tsx` ×1，也都走那枚文件。
+  本线那枚 `inbound-due-timezone.spec.tsx` 不在失败名单里（它只 import `DueBadge`/`DueEditor`，不碰 `TaskDetailCard`），
+  单独跑两次都是 `Tests 1 passed (1)`。**跳过数 12 是既有的，本线没有新增 skip。**
+
+---
+
+## B192（2026-10-12 23:5x，本会话 · 详情栏那条线**暂存着的**那份 `TaskDetailCard.tsx` 编译不过 —— 它一旦被提交，`apps/web` 有 37 枚测试文件跑不起来）
+
+**这不是本线的文件，也不是本线改的**；我在白名单外一枚字节都没写。记在这里只因为**它此刻在共享索引里**，
+而那笔 merge 一提交就会把它带进 `main`，届时"全仓测试"这一格会突然多出一大片红，没人知道红从哪来。
+
+**现量（23:5x，全部一条命令可复跑）**：
+
+```bash
+git show :apps/web/src/features/tasks/TaskDetailCard.tsx | sed -n '240,248p'   # 索引里那份（= 会被提交的那份）
+pnpm --filter web typecheck                                                     # 25 条错，全在这一枚
+cd apps/web && ./node_modules/.bin/vitest run                                   # 37 failed files / 3 failed tests
+```
+
+**坏的形状**（`git diff HEAD` 那一枚文件的第一段新增块，行界 `@@ -240,6 +240,17 @@`）：一段**注释正文**被插到了模块顶层，
+而它**少了开头的 `/*` 那一行**，还带着结尾的 `*/`：
+
+```
+  );
+}
+
+  🔴 完成态那一句**不能**借用 `blockLabelStyle`：…      ← 没有 `/*` 开头那一行
+  而不是"这条任务的状态"。…
+*/
+const statusLineStyle: CSSProperties = {
+```
+
+⇒ `tsc` 报 25 条（`TS1127 Invalid character` / `TS1434` / `TS1109`，全在 243–247 行），
+`esbuild` 报 `Unexpected "🔴"`，于是凡 import 到它的测试文件在**收集阶段**就死（37 枚），
+具名的 3 条红（`focus-detail-pane.spec.tsx` ×2、`reminder-wake.spec.tsx` ×1）是同一根因的另一副形状。
+
+✅ **B192 闭合（2026-10-13 01:0x 现量，本线未动那枚文件一个字节）**：坏形状**确实被提交了**，随后他们自己补了一行修掉 ——
+两笔都在 `main` 上：
+
+| 笔 | 现量 | 含义 |
+|---|---|---|
+| `4c97b9de merge(详情面 feat/detail-pane)` | `git show 4c97b9de:…TaskDetailCard.tsx` 第 243 行仍是裸的 `  🔴 完成态那一句…`，上面**没有** `/*` | 本格那句"它一旦被提交，`apps/web` 有 37 枚测试文件跑不起来"**成了事实**，不是假设 |
+| `e51b92c2 fix(详情面 面单): 我上一笔合并把 \`/*\` 漏在了提交外` | `git show --stat` = **`1 file changed, 1 insertion(+)`**，`+` 那行逐字是 `/*` | 修的动作**正是本格写的那一行**，而且**没有**用我警告过的 `git checkout --`（那会把他们自己的 `statusLineStyle` 功能改动一起抹掉） |
+
+**现在的 HEAD 复量（只跑本线用得着的两条）**：
+`pnpm --filter web typecheck` → **rc=0**；
+`vitest run tests/inbound-due-timezone.spec.tsx tests/focus-detail-pane.spec.tsx tests/reminder-wake.spec.tsx`
+→ **`Test Files 3 passed (3)` / `Tests 19 passed (19)`**，那两枚曾经具名红的文件恢复绿。
+⇒ 本格下面"要谁做 / 最小动作"那一格**作废**（活干完了），留在原位只作为归因证据。
+⚠️ 一句不夸大的话：**他们是不是看了这条记录才修的，本线不可证** —— 他们那笔的提交消息里
+写的是"我上一笔合并把 `/*` 漏在了提交外"，是从自己的合并自查出来的；本线的贡献只到"在坏还只在索引里、
+没进 `main` 的时候把它记下来了"。
+
+🔴 **定位更正（23:5x，这句把责任落在哪一层说准了）：坏不来自他们那条分支，只来自这次合并的结果。**
+同一句注释正文在三个版本里的形状，逐版现量：
+
+| 版本 | 正文所在行 | 它上面该有什么 | 判定 |
+|---|---|---|---|
+| `git show bd4e4f87:apps/web/src/features/tasks/TaskDetailCard.tsx` | 第 70 行起 | **第 69 行是 `/*`**，结尾 `*/` 在 | **合法** —— 他们分支自己没问题 |
+| `git show :apps/web/src/features/tasks/TaskDetailCard.tsx`（索引，= 会被提交的那份） | 第 243 行起 | 第 242 行应是 `/*`，**那一行不存在** | **坏了** —— 只剩收尾 `*/` |
+| `git show HEAD:…`（`1a386d76`） | 这句**根本没有** | —— | `statusLineStyle` 与完成态那句是他们的新代码，**HEAD 不是复原源** |
+
+⇒ 成因就是**解冲突时把 `/*` 那一行丢了**（`git ls-files -u` 现在 0，说明他们已经"选好了一边"，选的那边少一行）。
+`mtime 21:45:06` 紧跟 `MERGE_HEAD 21:40` 也是同一件事的旁证。
+
+**为什么不我修**：① `apps/web/src/features/tasks/` 不在本线白名单；② 它正被另一条线握在手里（同一次 merge 的暂存内容），
+我改了会跟他们接下来的收口撞；③ 任务书写明"顺手修别线的红一律进 BLOCKED.md"。
+
+**要谁做 / 最小动作**：详情栏那条线（或负责人）在索引那份的 `  🔴 完成态那一句…` 那行**上面补一行 `/*`** 即可 ——
+逐字抄 `git show bd4e4f87:…` 第 68–73 行那一版（它就是对的，`/*` 起、`*/` 收，不带 ` * ` 前缀）。
+**判据**：补完 `pnpm --filter web typecheck` 应回到零错，`vitest run` 里那 37 枚"failed files"应消失，
+剩下的才是这条线自己的真红。
+⚠️ **不要用 `git checkout -- <该文件>` 或 `--theirs` 整枚复原**：`HEAD` 那版里**没有**他们的新代码
+（`statusLineStyle` 与完成态那句 UI 就是这一批的交付物），退回等于抹掉别人的交付。
+⚠️ 另有两条我自己踩过的探针坑，写在这是防下一个人重扫一遍：
+`docs/plans/detail-pane-alignment.md` 里那 26 行"行首 `🔴`"是 **markdown 正文**不是坏代码 ——
+**判"裸注释"要按语言层判，不能按字形判**；以及我第一次用 `grep -c` 数同一枚文件的正文出现次数时，
+分支版与合并版都只回 **1**，光看这个数会误判"两边一样"，差别全在**它上面那一行**有没有 `/*`。

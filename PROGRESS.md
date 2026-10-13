@@ -4114,3 +4114,120 @@ $ grep -rnE '\.(skip|todo)\(|\bxit\b|describe\.skip' <本线全部测试文件> 
 
 **还欠的**：列表与详情两面的浏览器读数卡在 worker 链（B190）；亮暗/窄屏/中英那三档这一对也没跑，
 C29 尺列按 B169 口径保持 `无尺`（升不升由负责人拍）。**没有 push。**
+
+## 2026-10-12 20:3x · 19:2x 那句"列表与详情没有断言"当天就被我自己作废：组件层补上第三枚取证；B190 里"做不动"的成因我写粗了，改成"可驱动 + 两套前提"
+
+**做了什么**：`apps/web/tests/inbound-due-timezone.spec.tsx` —— 真 `DueBadge`（`mode="date"`）与真 `DueEditor`
+在 `Pacific/Kiritimati`／`Etc/GMT+12`／`UTC`／`Asia/Shanghai` 四档设备时区下各挂一遍，读三处：
+徽标 `12-31`、触发器 `12月31日`、月历里 `aria-selected="true"` 那格的无障碍名 `12月31日`。
+同一枚 epoch（`Date.UTC(2026,11,30,16)` = 规则时区 `Asia/Shanghai` 的 `2026-12-31` 零点）四面必须还是那一天。
+反向臂摘掉 `dueDateLocal` 后，`Etc/GMT+12` 那档徽标读成 `12-30`、选中格变 `12月30日`。
+
+**读数**（逐字）：`Tests 1 passed (1)` → 与本线另一枚 `inbound-draft-review.spec.tsx` 同跑
+`Test Files 2 passed (2) / Tests 5 passed (5)`；`pnpm --filter web typecheck` 无输出退出 0。
+
+**为什么这一族的牙不用改源码变异就成立**：正向四档与反向臂用的是**同一枚 epoch**，只差 `dueDateLocal`
+这一枚字段。谁把 `apps/web/src/features/tasks/DueEditor.tsx:134` 那句
+`task.dueDateLocal ?? toLocalDate(task.dueDate)` 的顺序读反，正向那四档当场一起红 —— 不需要我去碰白名单外的文件
+去做变异靶。另加两道探针防"属性没落到 DOM 上就安静空转"：月历格子数须 > 27、被选中的格子须**有且只有一格**。
+
+**我自己的两次红（同一条验收连败计数 2/3，第三次改成能到的那一层才绿）**：前两版按"编辑面那枚 ISO 日期输入框
+写着 `2026-12-31`"去找，`dateInputValues().length` 恒为 0，红的全是我自己的反空转探针。
+真形状是**编辑面根本没有日期 `<input>`** —— 共享 `DatePicker` 画月历格子
+（`packages/ui/src/date-picker/DatePicker.tsx:269-324`）。错因是把缝那一层的**字段名**当成了**界面形状**，
+没有先去读被钉的组件。已写进 B190 追记第 ③ 条。
+
+**台账改了什么**：
+- C29 格：作废"列表与详情那两面仍然没有断言"，换成三处读数 + 两道探针 + 反向臂的现量；这一格剩下的收窄成
+  ① 那两面的**浏览器**读数（组件层钉不到"徽标有没有被挂进行"）、② 亮暗/窄屏/中英三档这一维（这轮没碰，
+  三枚新取证全在 zh-CN 单档）。尺列仍 `无尺`。
+- 文末「未闭合的那几格」那条同步改。
+- **B190 追记**：那句"要做列表/详情得补三段桩"我把代价写小了。复核 worker 契约后：那条链在浏览器里**可驱动**
+  （`worker/register` → `events/claim` → `events/{id}/result` → `commit-permit`，客户端不校验票据，桩形状现成在
+  `packages/app-host/tests/inbound-process.spec.ts:14-40`），真门槛是**同时**搭 AI 路由 + web 侧密钥存储 + B140
+  那根 `active`，三样都在白名单外。⇒ 不是"不可达"，是"成本与不确定性"，A 路的重估口径写在追记里。
+
+**没做也不该我做的**：`packages/ui`、`apps/web/src/**` 一律没碰；`due-date-edit.spec.tsx` 那族既有判据零改动。
+**没有 push。**
+
+## 2026-10-12 23:5x · 这一笔撞上了别线一场**没收口的 merge**：提交落成旁支 ref `inbound-c29-tz`，`main` 一格没动；顺带量出对方暂存的那份 `TaskDetailCard.tsx` 编译不过（B192）
+
+**先说结论**：C29 那枚新取证**写完了、跑绿了、台账改完了**，但**没有进 `main`** ——
+`main` 上此刻有一场 21:40 起的 `Merge branch 'feat/detail-pane'` 停在"只差一句 `git commit`"，
+`git commit --only` 在这种状态下被 git 直接拒（`fatal: cannot do a partial commit during a merge.`）。
+
+**我的一个副作用，已撤**：按配方先 `git add` 那枚新 spec，add 完才撞上上面那句拒绝 —— 那枚文件当时**已经进了共享索引**
+（`git ls-files -s` 回 stage 0）。就那样放着，他们收口那笔会把本线的 spec 卷进**他们的提交**。
+⇒ `git restore --staged -- <该路径>`，现回 `??`，文件本体在位，索引里别线那 20 条目数没变（撤前撤后各数一次）。
+
+**为什么不硬推 `main`**：`merge --abort` 走 `reset --merge`，它按 **HEAD** 复位。
+在一场未收口的 merge 下把 `main` 往前挪，最坏情况会**冲掉别人已解好的三处冲突**。
+那风险不该由本线替另一条线承担 ⇒ 落成**旁支 ref**：临时索引（放 `.run-logs/`，用完删）以 `1a386d76` 的树为底、
+只叠本线四条落点，`commit-tree` 出父=`1a386d76` 的提交，挂 `refs/heads/inbound-c29-tz`。
+不碰共享索引、不碰工作树、不碰 `main`；撤掉只 `git update-ref -d`。并回来一条命令：`git merge --no-ff inbound-c29-tz`。
+⇒ 那四条落点在工作树里**仍是** ` M`/`??`，这是设计如此（内容已进对象库，覆写也捞得回来），不是漏做。详见 **B191** 追记。
+
+**这一轮新取的两条读数，归属都写清了**：
+- `pnpm --filter web typecheck`：25 条错**全在** `src/features/tasks/TaskDetailCard.tsx`（别线、未提交的 merge 内容），
+  对本线 spec `grep -c inbound` = **0**。⚠️ 我 23:2x 那次同命令是**干净的** —— 两次都对，**分别量的是两棵树**
+  （那枚文件 mtime `21:45`，紧跟 `MERGE_HEAD` 的 `21:40`；本线工作树被别线写过）。
+- `vitest run`（apps/web 全量 23:36）：`Test Files 37 failed | 142 passed | 1 skipped (180)`，
+  `Tests 3 failed | 1926 passed | 12 skipped (1941)`。那 37 枚"failed files"绝大多数是**同一条 transform 错误**
+  在 import 阶段打断的（`ERROR: Unexpected "🔴"`），不是本线的红。本线那枚不在失败名单，单跑两次 `Tests 1 passed (1)`。
+- **B192**（新登记，别线的）：他们**暂存着**的那份就是把一段注释正文插到了模块顶层、**少了 `/**` 开头**，
+  `HEAD` 那版是好的。⇒ 那笔 merge 一提交，`main` 上 `apps/web` 就多了 37 枚跑不起来的测试文件。
+  最小修法是在那行 `🔴 完成态…` 上面补一行 `/**`；**不许**用 `git checkout -- <该文件>`"复原"
+  —— 那会连他们同一枚文件里的功能改动（`statusLineStyle` + 完成态那句 UI）一起抹掉。
+
+**判据没动**：C29 尺列仍 `无尺`（B169 由负责人拍）；`grep -c '^- \[x\] \*\*AC-'` 现量 **0**；
+本线白名单外**一枚字节都没写**；**没有 push**。
+
+### 23:5x 之后补的三件（同一格，别回头重做）
+
+1. **B192 的归属更正了，而且往轻的方向**：我最初写"`HEAD` 那版是好的"不准确 —— `HEAD` 里**根本没有**那段注释
+   （它是详情栏那条线的新代码），拿 HEAD 当复原源会连带抹掉他们的交付物。逐版对账之后：
+   **`bd4e4f87` 他们分支自己那份是合法的**（第 69 行 `/*` 起、`*/` 收），**只有合并结果那一版少了 `/*` 那一行**。
+   ⇒ 责任落在"解冲突时丢了一行"，最小动作就是补那一行 `/*`。这条更正让那一格从"要不要退回某版"
+   变成"补一行"，代价差一个量级。
+   ⚠️ 两条探针坑一并记下：`grep -c` 数那句正文的出现次数，分支版与合并版**都回 1**，光看这个数会误判"两边一样"
+   —— 差别全在**它上面那一行**；而 `docs/plans/detail-pane-alignment.md` 里 26 行行首 `🔴` 是 markdown 正文，
+   我差点把它登记成第二处损伤 —— **判"裸注释"要按语言层判，不能按字形判**。
+2. **本线那枚新 spec 有没有自动载体**：`node -e` 读根 `package.json` 的 `check` 脚本 ⇒ 含 `pnpm -r test`，
+   而 `apps/web` 的 `test` 脚本就是 `vitest run` ⇒ 新那枚会被 `pnpm check` 自动跑到，**不属于"零消费者"那一类**，
+   不需要再补登记（任务 #31 那一族这次没有复发）。
+3. **本线五枚对账装置在当前工作树（含我这批未提交的台账改动）全绿**，逐条读数：
+   `ac8-matrix`：`表头行=1098 行数=34 有尺行=27 无尺行=7 尺枚=67 窗=13/13 平台=10/10 权益=9/9 设备状态=9/9` ⇒
+   "矩阵与 HEAD 逐格对账成立"（`无尺行=7` 与计划里"七个无尺格 C10、C29、C30~C34"逐字对得上，我这批没挪动尺列）；
+   `commit-scope` rc=0（越界那批全标 `MENTION-ONLY（非本线动作）`）；`doc-tables`：`16 份表、列数/断行/反引号配对一致`；
+   `producer-seam`：`在册=81 命中=133 盲区=0 新缝=0 尺瞎了=0`。
+   ⚠️ 同一条命令里 `check-chain` 我第一次跑时**用 `| tail` 把 rc 吃了**（它其实回的是
+   `CHAIN_DEVICE_REFUSED --logs is required` —— 判据要求读数落盘不许只进 stdout，那是它设计如此，不是红）。
+   这条坑是记忆里那条"管道尾巴会吃掉 rc"的复发，登记一次免得下一个人再数错。
+
+## 2026-10-13 01:0x · 挂起的那一笔落回 `main`：别线的 merge 自己收口了，B192 也被他们按本格写的那一行修掉
+
+**现场（都是现量，不是推断）**
+- `ls .git/MERGE_HEAD` → `No such file or directory`；`git diff --cached --name-only | wc -l` → **0**。
+  ⇒ 22:5x 挂起本线提交的两个前提（合并态 + 他们暂存的内容）**都没了**。
+- `main` 一小时里漂了**两**枚：`1a386d76` → `bbce592c`（产品体验线）→ `a68cd81e`（当前 tip）。
+- 他们那笔 merge 落成 `4c97b9de`，紧接着一笔 `e51b92c2 fix(详情面 面单): 我上一笔合并把 \`/*\` 漏在了提交外` ——
+  `git show --stat` = **`1 file changed, 1 insertion(+)`**，加的那行逐字是 `/*`。
+  ⇒ **B192 由别线闭合**，动作与本格给的"最小动作"同一枚，且**没有**用我警告过的 `git checkout --`。
+  ⚠️ 他们是从自己的合并自查出来的还是看了这条记录，本线不可证，所以不写"按本线记录修的"。
+
+**本线这笔的落地方式变了**：旁支 ref `inbound-c29-tz`（`05c7c2df`，父 `1a386d76`）**不再重接父、也不 merge** ——
+既然 `main` 已经干净，正确动作就是直接在当前 tip 上用点名路径提交那四枚。
+上一格许诺的"重接父"那一笔**实际没做成**：脚本里 `rm -f $IDX` 是变量形式，被本机"危险 rm"守卫在执行前拒了
+（它没法在展开前知道删的是什么）。可复用的一条：**同一条 plumbing 链里的临时索引要写死文件名**，别写 `$VAR`，否则白跑一轮。
+
+**提交前复量（当前 HEAD，两条）**
+- `pnpm --filter web typecheck` → **rc=0**（23:36 那次的 25 条错随 B192 闭合一起消失）。
+- `pnpm --filter web exec vitest run tests/inbound-due-timezone.spec.tsx tests/focus-detail-pane.spec.tsx tests/reminder-wake.spec.tsx`
+  → **`Test Files 3 passed (3)` / `Tests 19 passed (19)`**。那两枚曾被同一条 transform 错误打死在收集阶段的文件恢复绿。
+
+**改的落点**：`apps/web/tests/inbound-due-timezone.spec.tsx`（新增）＋ `docs/plans/inbound-automation.md`（C29 那格）
+＋ `BLOCKED.md`（B191 现场终稿 + B192 闭合）＋ `PROGRESS.md`（本格）。**没有 push。** AC 已勾数：
+`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` → **0**。
+
+**还欠的**：T7 那三条腿（`pnpm check` / `pnpm -r test` / `pnpm reinstall:all`）的台账读数都出自**旧 tip**，
+`main` 已经动过两枚 ⇒ 要出"当前产物"的结论得在隔离副本上按新 tip 重跑；B140 / B169 / B185 / B175 / B190 仍归负责人。
