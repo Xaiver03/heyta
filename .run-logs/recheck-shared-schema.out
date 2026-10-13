@@ -1,0 +1,56 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/packages/shared-schema
+
+ ❯ tests/auth-http-contract.spec.ts (9 tests | 1 failed) 11ms
+     ✓ 八个码，逐字锁定（新增一个码要在这里显式承认） 2ms
+     ✓ 四个策略码，逐字锁定 0ms
+     ✓ 两张表无交集，且每张表内部无重复 0ms
+     ✓ 每个码都是小写下划线形状（白名单查表的前提） 1ms
+     ✓ 下限 8、上限 256 0ms
+     ✓ 下限 < 上限（两者相等就是没人能设口令） 0ms
+     × 所有口令路径都是相对路径，不带 /api 前缀、不带结尾斜杠 6ms
+     ✓ 路径互不相同 0ms
+     ✓ set 与 change 是两条独立的路由 1ms
+ ✓ tests/released-client-compatibility-policy.spec.ts (5 tests) 1454ms
+     ✓ accepts a tag, commit, source path, and blob from one real Git provenance chain  363ms
+     ✓ rejects fake and all-zero release provenance pins  979ms
+ ✓ tests/supersync-http-contract.spec.ts (45 tests) 30ms
+ ✓ tests/holiday-adjustment-contract.spec.ts (37 tests) 20ms
+ ✓ tests/task-batch-contract.spec.ts (15 tests) 14ms
+ ✓ tests/account-avatar-plan.spec.ts (15 tests) 9ms
+ ✓ tests/task-repeat-completion-contract.spec.ts (6 tests) 7ms
+ ✓ tests/task-priority-batch-contract.spec.ts (4 tests) 6ms
+ ✓ tests/vault-key-contract.spec.ts (4 tests) 10ms
+ ✓ tests/migrate.spec.ts (22 tests) 9ms
+ ✓ tests/full-state-payload.spec.ts (11 tests) 9ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/auth-http-contract.spec.ts > 路径 > 所有口令路径都是相对路径，不带 /api 前缀、不带结尾斜杠
+AssertionError: expected [ '/register/email-password', …(11) ] to have a length of 9 but got 12
+
+- Expected
++ Received
+
+- 9
++ 12
+
+ ❯ tests/auth-http-contract.spec.ts:83:20
+     81|   it('所有口令路径都是相对路径，不带 /api 前缀、不带结尾斜杠', () => {
+     82|     const values = Object.values(AUTH_PASSWORD_PATHS);
+     83|     expect(values).toHaveLength(9);
+       |                    ^
+     84|     for (const path of values) {
+     85|       expect(path.startsWith('/api')).toBe(false);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 10 passed (11)
+      Tests  1 failed | 172 passed (173)
+   Start at  09:31:54
+   Duration  3.65s (transform 174ms, setup 0ms, import 701ms, tests 1.58s, environment 1ms)
+

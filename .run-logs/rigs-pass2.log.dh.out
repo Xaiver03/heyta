@@ -1,0 +1,16 @@
+Planned windows (现量自 docs/plans/inbound-automation.md): [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+  WINDOW=1   PASS 响应丢失后仍有 1 行 queued 且密文非空；原键重试 202 仍 1 行；异体重试 409（409）
+  WINDOW=2   PASS 子进程 claim 之后 SIGKILL（signal=SIGKILL）⇒ gen=1、模型 0 次；过期转派给第二台真宿主 ⇒ gen=2、模型 1 次、1 op、1 许可
+  WINDOW=3   PASS 响应丢失 ⇒ attempt 1=unknown、零 op；同设备再跑读成"没活"且模型仍 1 次、账本仍 1 行；租约到期后**另一台真宿主**领取被拒 ⇒ 事件收成为 needs-confirmation + model-result-
+  WINDOW=4   PASS 发布之后 SIGKILL ⇒ prepared 且 0 许可；第二台真宿主走恢复腿（模型调用仍 1 次）、本地 op 里是冻结那条标题而非 REEXPLAINED
+  WINDOW=5   PASS ACK 在途 SIGKILL ⇒ 同库重开从 META 读回**同一枚** clientId（没传固定值）、本地仍 1 op、再跑一次仍 1 op；补传后服务端恰好 1 枚（两标题在同一 op 里）
+  WINDOW=6   PASS A 未上传时 B 领取后 0 op；A 带 owner receipt 补传 ⇒ 服务端恰好 1 枚 BATCH（两个 entityId 在同一 op 内，没降级成两枚），B 收敛到同一条
+  WINDOW=7   PASS B 拿到 gen=2 后，A 用 gen=1 的 renew / publish / commit-permit 三条全拒；许可总数仍 1，A 本地 0 op、B 本地 1 op
+  WINDOW=8   PASS 六档都有读数：①a 派发前权益到期 ⇒ waiting-entitlement、真模型 0 次、A 零 op（恢复后同一事件补跑得 submitted、1 op）；①b 解析中权益到期（模型已买）⇒ waiting-entitlement、
+  WINDOW=9   PASS 编辑后再跑不覆盖（仍 "user edited"）、删除后再跑不复活（活动列表读不到、物化状态里 deletedAt 仍在），三趟都只 1 枚 op、模型仍 1 次；实测状态词：编辑后=submitted、删除后=submitted；正文清
+  WINDOW=10  PASS 无钥新设备响亮拒（"recovery is required"）且 0 op、没把事件抢走；root 轮换后 worker 凭据与收件私钥重包成功，第二件事照样落 1 op
+  WINDOW=11  PASS 许可先落 ⇒ 规则暂停后 owner receipt 仍补传成功（服务端 1 op）；暂停中的规则公网接收回 403、B 领不到新格
+  WINDOW=12  PASS 换 keyId 后新钥重试命中同一行（仍 1 行）、旧钥接收 403、旧钥查询 403 / 新钥查询 200
+  WINDOW=13  PASS date-only 在 Asia/Shanghai 规则下锚回 2026-11-30（UTC 读成 11-29，证明跟规则不跟机器）；换 America/Los_Angeles 规则仍回 2026-11-30 且 epoch 不同；star
+Windows: 13/13
+Results: /Users/rocalight/.cache/heyta-inbound-rigs/dual-host-1012.log

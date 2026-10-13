@@ -1,0 +1,14 @@
+全部臂　目标=2 枚：server/src/api.ts、server/src/entitlement.ts
+  server/src/api.ts　开局 sha256=df0d2f4f30169d22　备份=/private/tmp/heyta-inbound-ticket-teeth/api.ts.mut-bak
+  server/src/entitlement.ts　开局 sha256=4b97418c02779df8　备份=/private/tmp/heyta-inbound-ticket-teeth/entitlement.ts.mut-bak
+  终态被说成可重试（402 改成 409）: 成立　rc=1 命中用例=True
+  响应装配不再带 ticketCode: 成立　rc=1 命中用例=True
+  预检那一路把上游拒绝码丢掉（两条分支各写一遍就会有一处漏）: 成立　rc=1 命中用例=True
+  消费那一路把上游拒绝码丢掉: 成立　rc=1 命中用例=True
+  审计里丢码（运营者只看到"有人被拒"）: 成立　rc=1 命中用例=True
+  把票据正文写进响应（违背"只回码不回显"那一格）: 成立　rc=1 命中用例=True
+  关闭规则也要票（`when` 那半判据失效）: 成立　rc=1 命中用例=True
+  静止对照：注释改动不许让任何用例变红: 成立　rc=0 红=0（静止臂要求 rc=0 且 0 红）
+  末次 sha256 server/src/api.ts = df0d2f4f30169d22（须等于开局那枚）
+  末次 sha256 server/src/entitlement.ts = 4b97418c02779df8（须等于开局那枚）
+臂数=8　不成立=0

@@ -1,0 +1,13 @@
+全部臂　目标=2 枚：server/src/api.ts、server/src/automation/ai-metering.ts
+  server/src/api.ts　开局 sha256=6747e4dab9a4dbea　备份=/private/tmp/heyta-inbound-quota-teeth/api.ts.mut-bak
+  server/src/automation/ai-metering.ts　开局 sha256=5e9da227946f41af　备份=/private/tmp/heyta-inbound-quota-teeth/ai-metering.ts.mut-bak
+  额度裁决整句摘掉（超额照单收下）: 成立　rc=1 命中用例=True
+  拒绝时把 used/limit 抹成 0（界面说不出用了多少）: 成立　rc=1 命中用例=True
+  类型化拒绝退化成普通 Error（路由认不出 ⇒ 402 变 409）: 成立　rc=1 命中用例=True
+  已有行短路失效（同一枚重放二次收费）: 成立　rc=1 命中用例=True
+  路由的 402 收口摘掉（终态被说成可重试）: 成立　rc=1 命中用例=True
+  额度判定挪到 managed 分支之前（本机/自带端点也被拦）: 成立　rc=1 命中用例=True
+  静止对照：注释改动不许让任何用例变红: 成立　rc=0 红=0（静止臂要求 rc=0 且 0 红）
+  末次 sha256 server/src/api.ts = 6747e4dab9a4dbea（须等于开局那枚）
+  末次 sha256 server/src/automation/ai-metering.ts = 5e9da227946f41af（须等于开局那枚）
+臂数=7　不成立=0

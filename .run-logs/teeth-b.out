@@ -1,0 +1,53 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90m/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/server[39m
+
+ [31m❯[39m tests/inbound-lane-rigs-consumers.spec.ts [2m([22m[2m11 tests[22m[2m | [22m[31m1 failed[39m[2m | [22m[33m10 skipped[39m[2m)[22m[32m 117[2mms[22m[39m
+     [2m[90m↓[39m[22m research/tools 里没有"造出来却没人消费"的新装置
+     [2m[90m↓[39m[22m 接进来的每一枚要么有 self-test 腿，要么写下这一腿为什么不跑
+[31m     [31m×[31m verify-inbound-ac-ticks.py 退出 0[39m[32m 86[2mms[22m[39m
+     [2m[90m↓[39m[22m verify-inbound-ac8-matrix.py 退出 0
+     [2m[90m↓[39m[22m verify-inbound-doc-tables.py 退出 0
+     [2m[90m↓[39m[22m verify-inbound-cjs-require-order.py 退出 0
+     [2m[90m↓[39m[22m verify-inbound-producer-seam.py 退出 0
+     [2m[90m↓[39m[22m verify-inbound-ac-ticks.py --self-test 的反向验证臂全成立
+     [2m[90m↓[39m[22m verify-inbound-ac8-matrix.py --self-test 的反向验证臂全成立
+     [2m[90m↓[39m[22m verify-inbound-doc-tables.py --self-test 的反向验证臂全成立
+     [2m[90m↓[39m[22m verify-inbound-cjs-require-order.py --self-test 的反向验证臂全成立
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/inbound-lane-rigs-consumers.spec.ts[2m > [22m本线装置的自动消费者[2m > [22mverify-inbound-ac-ticks.py 退出 0
+[31m[1mAssertionError[22m: verify-inbound-ac-ticks.py 
+--- stdout ---
+文档 `docs/plans/inbound-automation.md`　AC 行=8　已勾=1　未勾=7　状态位未分类=0
+  🔴 已勾：AC-1
+结论：有 1 枚 AC 被勾上 —— 执行者不许自己勾（R2 红）
+
+--- stderr ---
+: expected 1 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 1[39m
+
+[36m [2m❯[22m tests/inbound-lane-rigs-consumers.spec.ts:[2m92:50[22m[39m
+    [90m 90|[39m     [34mit[39m([32m`[39m[36m${[39mfile[36m}[39m[32m 退出 0`[39m[33m,[39m () [33m=>[39m {
+    [90m 91|[39m       [35mconst[39m r [33m=[39m [34mrunRig[39m(file)[33m;[39m
+    [90m 92|[39m       [34mexpect[39m(r[33m.[39mstatus[33m,[39m [34mdescribeRun[39m(file[33m,[39m [][33m,[39m r))[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   |[39m                                                  [31m^[39m
+    [90m 93|[39m       expect((r.stdout ?? '').trim().length, describeRun(file, [], r))…
+    [90m 94|[39m     }[33m,[39m [34m300_000[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[33m10 skipped[39m[90m (11)[39m
+[2m   Start at [22m 09:48:19
+[2m   Duration [22m 470ms[2m (transform 98ms, setup 108ms, import 16ms, tests 117ms, environment 0ms)[22m
+

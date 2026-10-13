@@ -1,0 +1,53 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90m/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/server[39m
+
+ [31m❯[39m tests/inbound-lane-rigs-consumers.spec.ts [2m([22m[2m11 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 220096[2mms[22m[39m
+     [32m✓[39m research/tools 里没有"造出来却没人消费"的新装置[32m 3[2mms[22m[39m
+     [32m✓[39m verify-inbound-ac-ticks.py 退出 0[32m 82[2mms[22m[39m
+     [32m✓[39m verify-inbound-ac-ticks.py --self-test 的反向验证臂全成立[32m 121[2mms[22m[39m
+     [33m[2m✓[22m[39m verify-inbound-ac8-matrix.py 退出 0 [33m 1025[2mms[22m[39m
+[31m     [31m×[31m verify-inbound-ac8-matrix.py --self-test 的反向验证臂全成立[39m[33m 5931[2mms[22m[39m
+     [33m[2m✓[22m[39m verify-inbound-doc-tables.py 退出 0 [33m 338[2mms[22m[39m
+     [33m[2m✓[22m[39m verify-inbound-doc-tables.py --self-test 的反向验证臂全成立 [33m 671[2mms[22m[39m
+     [33m[2m✓[22m[39m verify-inbound-cjs-require-order.py 退出 0 [33m 11565[2mms[22m[39m
+     [33m[2m✓[22m[39m verify-inbound-cjs-require-order.py --self-test 的反向验证臂全成立 [33m 22676[2mms[22m[39m
+     [33m[2m✓[22m[39m verify-inbound-producer-seam.py 退出 0 [33m 4984[2mms[22m[39m
+     [33m[2m✓[22m[39m verify-inbound-producer-seam.py --self-test 的反向验证臂全成立 [33m 172660[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/inbound-lane-rigs-consumers.spec.ts[2m > [22m本线装置的自动消费者[2m > [22mverify-inbound-ac8-matrix.py --self-test 的反向验证臂全成立
+[31m[1mAssertionError[22m: expected '  臂 1 把尺的路径换成不存在的文件 ⇒ 该红: 成立　rc=1（要求 …' to match /不成立=0|臂数/[39m
+
+[32m- Expected:[39m
+/不成立=0|臂数/
+
+[31m+ Received:[39m
+"  臂 1 把尺的路径换成不存在的文件 ⇒ 该红: 成立　rc=1（要求 1）　命中 R4 的红=R4 第 1100 行：`server/tests/__no_such__.spec.ts` 在 HEAD 里没有被跟踪 —— 工作树里有不算证据
+  臂 2 把尺的用例名换成源码里没有的文字 ⇒ 该红: 成立　rc=1（要求 1）　命中 R4 的红=R4 第 1100 行：`server/tests/inbound-automation.routes.spec.ts` 在 HEAD 里没有逐字命中那句用例 ——「这句用例名在源码里不存在」
+  臂 3 删掉 W13 那 2 行 ⇒ 该红: 成立　rc=1（要求 1）　命中 R3 的红=R3 缺窗：W13 没有用例行
+  臂 4 把那格的证据归属掏成占位 ⇒ 该红: 成立　rc=1（要求 1）　命中 R5 的红=R5 第 1109 行：无尺格的证据归属是占位 `—` —— 等于这一格没人守
+  臂 5 把平台写成词表外的散文值 ⇒ 该红: 成立　rc=1（要求 1）　命中 R2 的红=R2 第 1131 行：平台 值 `桌面端` 在封闭词表外（表内 server、node-host、shared、web、android、ios、harmony、macos、windows、linux）
+  臂 6 静止对照：只改引言散文 ⇒ 必须保持绿: 成立　rc=0（要求 0）　红行数=0
+SELF_TEST=OK（六臂各自成立：R4 两半能红、R3/R5/R2 能红、静止臂没跟着红）
+"
+
+[36m [2m❯[22m tests/inbound-lane-rigs-consumers.spec.ts:[2m75:52[22m[39m
+    [90m 73|[39m       [35mconst[39m r [33m=[39m [34mrunRig[39m(file[33m,[39m [[32m'--self-test'[39m])[33m;[39m
+    [90m 74|[39m       expect(r.status, `${file} --self-test stdout=${r.stdout ?? ''} s…
+    [90m 75|[39m       [34mexpect[39m([32m`[39m[36m${[39mr[33m.[39mstdout [33m??[39m [32m''[39m[36m}[39m[32m[39m[36m${[39mr[33m.[39mstderr [33m??[39m [32m''[39m[36m}[39m[32m`[39m)[33m.[39m[34mtoMatch[39m([36m/不成立=0|臂数/[39m)[33m;[39m
+    [90m   |[39m                                                    [31m^[39m
+    [90m 76|[39m     }[33m,[39m [34m180_000[39m)[33m;[39m
+    [90m 77|[39m   }
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m10 passed[39m[22m[90m (11)[39m
+[2m   Start at [22m 09:41:26
+[2m   Duration [22m 220.50s[2m (transform 123ms, setup 140ms, import 18ms, tests 220.10s, environment 0ms)[22m
+

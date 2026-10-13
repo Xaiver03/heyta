@@ -1,0 +1,213 @@
+
+ RUN  v5.0.1 /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/apps/mobile
+
+ ✓ tests/trash-display.spec.ts (23 tests) 4ms
+stderr | tests/privacy-consent-gate.spec.ts > 决定变更要通知订阅者（自动同步与实时通道靠它） > 🔴 一个订阅者抛错，不许把其余的饿死
+[privacy] 决定变更的订阅者抛错（不影响同意本身）： Error: 重建实时通道时炸了
+    at /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/apps/mobile/tests/privacy-consent-gate.spec.ts:343:13
+    at notify (/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/apps/mobile/src/privacy/consent-gate.ts:97:7)
+    at Object.accept (/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/apps/mobile/src/privacy/consent-gate.ts:125:5)
+    at /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/apps/mobile/tests/privacy-consent-gate.spec.ts:347:45
+    at Proxy.assertThrows (file:///Users/rocalight/Desktop/All%20in%20one%20Data/01_PROJECTS/heyta/.worktrees/inb-t8/node_modules/.pnpm/chai@6.2.2/node_modules/chai/index.js:2798:5)
+    at Proxy.methodWrapper (file:///Users/rocalight/Desktop/All%20in%20one%20Data/01_PROJECTS/heyta/.worktrees/inb-t8/node_modules/.pnpm/chai@6.2.2/node_modules/chai/index.js:1700:25)
+    at Proxy.<anonymous> (file:///Users/rocalight/Desktop/All%20in%20one%20Data/01_PROJECTS/heyta/.worktrees/inb-t8/node_modules/.pnpm/vitest@5.0.1_@types+node@24.19.0_jsdom@27.4.0_@noble+hashes@2.4.0__vite@8.3.1_@types+no_caae56af872c1db96991670353f286d7/node_modules/vitest/dist/chunks/index.m3L2HgmY.js:1980:12)
+    at Proxy.overwritingMethodWrapper (file:///Users/rocalight/Desktop/All%20in%20one%20Data/01_PROJECTS/heyta/.worktrees/inb-t8/node_modules/.pnpm/chai@6.2.2/node_modules/chai/index.js:1750:33)
+    at Proxy.<anonymous> (file:///Users/rocalight/Desktop/All%20in%20one%20Data/01_PROJECTS/heyta/.worktrees/inb-t8/node_modules/.pnpm/vitest@5.0.1_@types+node@24.19.0_jsdom@27.4.0_@noble+hashes@2.4.0__vite@8.3.1_@types+no_caae56af872c1db96991670353f286d7/node_modules/vitest/dist/chunks/index.m3L2HgmY.js:2277:114)
+    at Proxy.<anonymous> (file:///Users/rocalight/Desktop/All%20in%20one%20Data/01_PROJECTS/heyta/.worktrees/inb-t8/node_modules/.pnpm/vitest@5.0.1_@types+node@24.19.0_jsdom@27.4.0_@noble+hashes@2.4.0__vite@8.3.1_@types+no_caae56af872c1db96991670353f286d7/node_modules/vitest/dist/chunks/index.m3L2HgmY.js:1934:14)
+
+ ✓ tests/privacy-consent-gate.spec.ts (37 tests) 595ms
+   ✓ consentFetch：闸门关闭时底层一次都不调 (3)
+     ✓ 🔴 未同意 ⇒ 底层 0 次，抛的是 PrivacyConsentBlockedError 363ms
+ ✓ tests/legal-recheck-mobile.spec.ts (29 tests) 344ms
+ ✓ tests/focus-widget-lifecycle.spec.ts (8 tests) 99ms
+(node:17358) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/habit-icon-picker.spec.ts (11 tests) 44ms
+(node:17397) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/organizer-rename.spec.ts (26 tests) 22ms
+ ✓ tests/local-file-read.spec.ts (3 tests) 54ms
+ ✓ tests/task-due-time.spec.ts (8 tests) 10ms
+ ✓ tests/card-export.spec.ts (30 tests) 12ms
+ ✓ tests/widget-snapshot-sealer.spec.ts (17 tests) 9ms
+stderr | tests/widget-bridge.spec.ts > W5 新增方法的降级路径 > 🔴 读不到原生模块时给 null，不能给 false
+[widget] 原生模块 HeytaWidget 不存在 —— 小组件不会更新。Android 上通常是忘了在 MainApplication 里 add(WidgetPackage())；其它平台则可能只是还没实现。
+
+stderr | tests/widget-bridge.spec.ts > W5 新增方法的降级路径 > 写不了时返回 false（而不是假装成功）
+[widget] 原生模块 HeytaWidget 不存在 —— 小组件不会更新。Android 上通常是忘了在 MainApplication 里 add(WidgetPackage())；其它平台则可能只是还没实现。
+
+stderr | tests/widget-bridge.spec.ts > W5 新增方法的降级路径 > 推进灵动岛拿不到结局时给 none 这个字符串
+[widget] 原生模块 HeytaWidget 不存在 —— 小组件不会更新。Android 上通常是忘了在 MainApplication 里 add(WidgetPackage())；其它平台则可能只是还没实现。
+
+stderr | tests/widget-bridge.spec.ts > W5 新增方法的降级路径 > 🔴 原生缺这个方法时也要回落（同步 TypeError 不能让调用方拿到）
+[widget] 读锁屏隐私偏好失败： nativeWithoutMethod.readWidgetPrivacy is not a function
+
+stderr | tests/widget-bridge.spec.ts > W5 新增方法的降级路径 > 永不抛（三个都是）
+[widget] 原生模块 HeytaWidget 不存在 —— 小组件不会更新。Android 上通常是忘了在 MainApplication 里 add(WidgetPackage())；其它平台则可能只是还没实现。
+
+ ✓ tests/widget-bridge.spec.ts (17 tests) 12ms
+ ✓ tests/renew-entry.spec.ts (7 tests) 5ms
+ ✓ tests/habit-trend-entry.spec.ts (5 tests) 23ms
+ ✓ tests/habit-frequency-entry.spec.ts (9 tests) 50ms
+(node:17675) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/native-reminder-authorization.spec.ts (4 tests) 73ms
+(node:17754) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/calendar-event-source.spec.ts (13 tests) 21ms
+ ✓ tests/auth-screen-password.spec.ts (41 tests) 9ms
+ ✓ tests/reminders-notes-display.spec.ts (18 tests) 18ms
+ ✓ tests/habit-month-entry.spec.ts (7 tests) 44ms
+ ✓ tests/profile-settings-ia.spec.ts (8 tests) 3ms
+ ✓ tests/widget-publish.spec.ts (22 tests) 69ms
+ ✓ tests/account-closure-entry.spec.ts (12 tests) 13ms
+ ✓ tests/projects-sections.spec.ts (13 tests) 14ms
+ ✓ tests/subtask-entry.spec.ts (5 tests) 9ms
+ ✓ tests/feedback-entry.spec.ts (7 tests) 11ms
+ ✓ tests/profile-avatar-entry.spec.ts (13 tests) 28ms
+ ✓ tests/harmony-widget.spec.ts (36 tests) 8ms
+ ✓ tests/account-security-wiring.spec.ts (20 tests) 4ms
+(node:18047) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/habit-create-entry.spec.ts (11 tests) 18ms
+ ✓ tests/ai-assistant-concurrency.spec.ts (2 tests) 2ms
+ ✓ tests/category-display.spec.ts (11 tests) 5ms
+ ✓ tests/search-display.spec.ts (5 tests) 2ms
+(node:18095) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/note-edit.spec.ts (15 tests) 13ms
+ ✓ tests/assistant-local-history.spec.ts (4 tests) 2ms
+ ✓ tests/op-sqlite-container-removal.spec.ts (4 tests) 3ms
+stderr | tests/realtime-wiring.spec.ts > 同意闸门拦得住实时通道（WebSocket 绕开 consentFetch） > 🔴 **不注入** `networkAllowed` 时默认读那一道真闸门（默认值不能是放行）
+[prefs] 设备本地偏好库不可用，偏好将不会跨启动保留： Error: Cannot find module '/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/node_modules/.pnpm/@op-engineering+op-sqlite@18.2.5_react-native@0.84.1_@babel+core@7.29.7_@react-native-c_a0a3e3833bf173b60d43be9f6e22e9fe/node_modules/@op-engineering/op-sqlite/node/dist/database' imported from /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/node_modules/.pnpm/@op-engineering+op-sqlite@18.2.5_react-native@0.84.1_@babel+core@7.29.7_@react-native-c_a0a3e3833bf173b60d43be9f6e22e9fe/node_modules/@op-engineering/op-sqlite/node/dist/index.js
+    at finalizeResolution (node:internal/modules/esm/resolve:274:11)
+    at moduleResolve (node:internal/modules/esm/resolve:859:10)
+    at defaultResolve (node:internal/modules/esm/resolve:983:11)
+    at ModuleLoader.#cachedDefaultResolve (node:internal/modules/esm/loader:731:20)
+    at ModuleLoader.#resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:767:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:790:52)
+    at ModuleLoader.#cachedResolveSync (node:internal/modules/esm/loader:750:25)
+    at ModuleLoader.getModuleJobForRequire (node:internal/modules/esm/loader:459:50)
+    at new ModuleJobSync (node:internal/modules/esm/module_job:392:34)
+    at ModuleLoader.importSyncForRequire (node:internal/modules/esm/loader:432:11) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///Users/rocalight/Desktop/All%20in%20one%20Data/01_PROJECTS/heyta/.worktrees/inb-t8/node_modules/.pnpm/@op-engineering+op-sqlite@18.2.5_react-native@0.84.1_@babel+core@7.29.7_@react-native-c_a0a3e3833bf173b60d43be9f6e22e9fe/node_modules/@op-engineering/op-sqlite/node/dist/database'
+}
+
+ ✓ tests/realtime-wiring.spec.ts (17 tests) 11ms
+ ✓ tests/growth-display.spec.ts (33 tests) 10ms
+ ✓ tests/ticktick-import.spec.ts (7 tests) 6ms
+ ✓ tests/profile-nickname-entry.spec.ts (10 tests) 7ms
+stderr | tests/chat-controller.spec.ts
+[prefs] 设备本地偏好库不可用，偏好将不会跨启动保留： Error: Cannot find module '/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/node_modules/.pnpm/@op-engineering+op-sqlite@18.2.5_react-native@0.84.1_@babel+core@7.29.7_@react-native-c_a0a3e3833bf173b60d43be9f6e22e9fe/node_modules/@op-engineering/op-sqlite/node/dist/database' imported from /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/node_modules/.pnpm/@op-engineering+op-sqlite@18.2.5_react-native@0.84.1_@babel+core@7.29.7_@react-native-c_a0a3e3833bf173b60d43be9f6e22e9fe/node_modules/@op-engineering/op-sqlite/node/dist/index.js
+    at finalizeResolution (node:internal/modules/esm/resolve:274:11)
+    at moduleResolve (node:internal/modules/esm/resolve:859:10)
+    at defaultResolve (node:internal/modules/esm/resolve:983:11)
+    at ModuleLoader.#cachedDefaultResolve (node:internal/modules/esm/loader:731:20)
+    at ModuleLoader.#resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:767:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:790:52)
+    at ModuleLoader.#cachedResolveSync (node:internal/modules/esm/loader:750:25)
+    at ModuleLoader.getModuleJobForRequire (node:internal/modules/esm/loader:459:50)
+    at new ModuleJobSync (node:internal/modules/esm/module_job:392:34)
+    at ModuleLoader.importSyncForRequire (node:internal/modules/esm/loader:432:11) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///Users/rocalight/Desktop/All%20in%20one%20Data/01_PROJECTS/heyta/.worktrees/inb-t8/node_modules/.pnpm/@op-engineering+op-sqlite@18.2.5_react-native@0.84.1_@babel+core@7.29.7_@react-native-c_a0a3e3833bf173b60d43be9f6e22e9fe/node_modules/@op-engineering/op-sqlite/node/dist/database'
+}
+
+ ✓ tests/chat-controller.spec.ts (14 tests) 10ms
+ ✓ tests/growth-share-summary.spec.ts (13 tests) 6ms
+ ✓ tests/auto-sync.spec.ts (16 tests) 10ms
+ ✓ tests/vault-secure-storage.spec.ts (12 tests) 6ms
+ ✓ tests/ai-panel-local-selection.spec.ts (4 tests) 2ms
+ ✓ tests/date.spec.ts (14 tests) 4ms
+ ✓ tests/credential-wipe.spec.ts (6 tests) 3ms
+(node:18152) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/focus-task-source.spec.ts (1 test) 7ms
+ ✓ tests/calendar-view-entry.spec.ts (12 tests) 7ms
+ ✓ tests/recurrence-display.spec.ts (67 tests) 7ms
+ ✓ tests/locale.spec.ts (5 tests) 4ms
+ ✓ tests/account-security-copy.spec.ts (15 tests) 3ms
+ ✓ tests/profile-progress-summary.spec.ts (4 tests) 2ms
+stderr | tests/auth-flow.spec.ts > 设备本地偏好（node 里 op-sqlite 不在） > 读不到就是 undefined / false —— 宁可多显示一次欢迎页，也不静默跳过
+[prefs] 设备本地偏好库不可用，偏好将不会跨启动保留： Error: Cannot find module '/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/node_modules/.pnpm/@op-engineering+op-sqlite@18.2.5_react-native@0.84.1_@babel+core@7.29.7_@react-native-c_a0a3e3833bf173b60d43be9f6e22e9fe/node_modules/@op-engineering/op-sqlite/node/dist/database' imported from /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/node_modules/.pnpm/@op-engineering+op-sqlite@18.2.5_react-native@0.84.1_@babel+core@7.29.7_@react-native-c_a0a3e3833bf173b60d43be9f6e22e9fe/node_modules/@op-engineering/op-sqlite/node/dist/index.js
+    at finalizeResolution (node:internal/modules/esm/resolve:274:11)
+    at moduleResolve (node:internal/modules/esm/resolve:859:10)
+    at defaultResolve (node:internal/modules/esm/resolve:983:11)
+    at ModuleLoader.#cachedDefaultResolve (node:internal/modules/esm/loader:731:20)
+    at ModuleLoader.#resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:767:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:790:52)
+    at ModuleLoader.#cachedResolveSync (node:internal/modules/esm/loader:750:25)
+    at ModuleLoader.getModuleJobForRequire (node:internal/modules/esm/loader:459:50)
+    at new ModuleJobSync (node:internal/modules/esm/module_job:392:34)
+    at ModuleLoader.importSyncForRequire (node:internal/modules/esm/loader:432:11) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///Users/rocalight/Desktop/All%20in%20one%20Data/01_PROJECTS/heyta/.worktrees/inb-t8/node_modules/.pnpm/@op-engineering+op-sqlite@18.2.5_react-native@0.84.1_@babel+core@7.29.7_@react-native-c_a0a3e3833bf173b60d43be9f6e22e9fe/node_modules/@op-engineering/op-sqlite/node/dist/database'
+}
+
+ ✓ tests/auth-flow.spec.ts (17 tests) 6ms
+ ✓ tests/conflict-keys.spec.ts (17 tests) 4ms
+ ✓ tests/habits-display.spec.ts (18 tests) 6ms
+ ✓ tests/feature-entries.spec.ts (9 tests) 5ms
+ ✓ tests/device-revocation-behavior.spec.ts (4 tests) 3ms
+stderr | tests/widget-drain.spec.ts > widget read/apply/acknowledge > does not crash application startup when the native module is absent
+[widget] 原生模块 HeytaWidget 不存在 —— 小组件不会更新。Android 上通常是忘了在 MainApplication 里 add(WidgetPackage())；其它平台则可能只是还没实现。
+
+ ✓ tests/widget-drain.spec.ts (6 tests) 6ms
+ ✓ tests/task-sort.spec.ts (16 tests) 4ms
+ ✓ tests/sync-status-text.spec.ts (26 tests) 5ms
+ ✓ tests/task-fields.spec.ts (16 tests) 4ms
+ ✓ tests/quadrant-display.spec.ts (6 tests) 2ms
+ ✓ tests/task-detail-keyboard-back.spec.ts (1 test) 1ms
+ ✓ tests/widget-journey.spec.ts (12 tests) 4ms
+ ✓ tests/sign-out-flow.spec.ts (10 tests) 4ms
+ ✓ tests/chat-session-primitives.spec.ts (2 tests) 2ms
+ ✓ tests/selection-single-owner.spec.ts (14 tests) 4ms
+ ✓ tests/export-copy.spec.ts (4 tests) 3ms
+ ✓ tests/navigation-stack.spec.ts (7 tests) 2ms
+ ✓ tests/open-host-generation.spec.ts (4 tests) 3ms
+ ✓ tests/restore-preview-source.spec.ts (3 tests) 2ms
+ ✓ tests/plural-keys.spec.ts (6 tests) 2ms
+ ✓ tests/native-reminder-plan.spec.ts (4 tests) 3ms
+ ✓ tests/habit-goal-entry.spec.ts (5 tests) 2ms
+ ✓ tests/inbox-display.spec.ts (4 tests) 2ms
+ ✓ tests/widget-publish-coordinator.spec.ts (2 tests) 2ms
+⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯
+
+Vitest caught 1 unhandled error during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+RolldownError: Parse failure: Parse failed with 1 error:
+Flow is not supported
+1: /**
+   ^
+2:  * Copyright (c) Meta Platforms, Inc. and affiliates.
+3:  *
+At file: /@fs/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/node_modules/.pnpm/react-native@0.84.1_@babel+core@7.29.7_@react-native-community+cli@20.1.0_typescript@5._67cc6a65c09f1b9b86673aa4dcca1dc7/node_modules/react-native/index.js:1:0
+  File: /@fs/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/node_modules/.pnpm/react-native@0.84.1_@babel+core@7.29.7_@react-native-community+cli@20.1.0_typescript@5._67cc6a65c09f1b9b86673aa4dcca1dc7/node_modules/react-native/index.js:1:0
+  1  |  /**
+     |  ^
+  2  |   * Copyright (c) Meta Platforms, Inc. and affiliates.
+  3  |   *
+ ❯ error ../../../../../../../All%20in%20one%20Data/01_PROJECTS/heyta/.worktrees/inb-t8/node_modules/.pnpm/rolldown@1.2.11/node_modules/rolldown/dist/shared/logs-D6uA606S.mjs:166:24
+ ❯ normalizeParseError ../../../../../../../All%20in%20one%20Data/01_PROJECTS/heyta/.worktrees/inb-t8/node_modules/.pnpm/rolldown@1.2.11/node_modules/rolldown/dist/parse-ast-index.mjs:25:9
+ ❯ wrap ../../../../../../../All%20in%20one%20Data/01_PROJECTS/heyta/.worktrees/inb-t8/node_modules/.pnpm/rolldown@1.2.11/node_modules/rolldown/dist/parse-ast-index.mjs:5:39
+ ❯ parseAstAsync ../../../../../../../All%20in%20one%20Data/01_PROJECTS/heyta/.worktrees/inb-t8/node_modules/.pnpm/rolldown@1.2.11/node_modules/rolldown/dist/parse-ast-index.mjs:54:9
+ ❯ ssrTransformScript ../../../../../../../All%20in%20one%20Data/01_PROJECTS/heyta/.worktrees/inb-t8/node_modules/.pnpm/vite@8.3.1_@types+node@24.19.0_esbuild@0.27.7_terser@5.51.2_yaml@2.9.1/node_modules/vite/dist/node/chunks/node.js:16392:9
+ ❯ loadAndTransform ../../../../../../../All%20in%20one%20Data/01_PROJECTS/heyta/.worktrees/inb-t8/node_modules/.pnpm/vite@8.3.1_@types+node@24.19.0_esbuild@0.27.7_terser@5.51.2_yaml@2.9.1/node_modules/vite/dist/node/chunks/node.js:20032:64
+
+This error originated in "tests/auth-flow.spec.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+
+ Test Files  76 passed (76)
+      Tests  964 passed (964)
+     Errors  1 error
+   Start at  18:10:19
+   Duration  12.00s (import 60%, tests 25%, transform 12%, worker 2%)
+
+     Import  181 modules were evaluated 295 times · 4.34s total, 60% of tracked time
+             ~1.68s faster with isolate: false — shared modules are evaluated once per worker instead of once per file
+             learn more: https://vitest.dev/guide/improving-performance#test-isolation
+

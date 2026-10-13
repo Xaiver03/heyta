@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/research/tools/verify-inbound-worker-identity.py", line 65, in <module>
+    main()
+    ~~~~^^
+  File "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/research/tools/verify-inbound-worker-identity.py", line 36, in main
+    with open(args.log, 'w') as log:
+         ~~~~^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/Users/rocalight/.cache/heyta-inbound-rigs/worker-identity-1012.log'

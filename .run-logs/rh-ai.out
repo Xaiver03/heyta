@@ -1,0 +1,229 @@
+
+ RUN  v5.0.1 /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/packages/ai
+
+ ❯ tests/capability-manifest.spec.ts (31 tests | 5 failed) 437ms
+   ❯ 产物是生成物：与上游逐字节一致 (3)
+     × `--check` 退出码 0 且 stderr 为空 —— 改了工具目录/实体清单而没重新生成，这里就红 172ms
+     ✓ 上游读出来是**空的**必须失败 —— 探针够不着 ≠ 一切正常 17ms
+     ✓ 重复的工具名 / 不是 read|write 的 kind 都会让生成失败 1ms
+   ❯ 每一个工具都在清单里，且 kind 与目录一致 (4)
+     × 产物里的工具集合与上游目录**双向**相等（少一条红、多一条红） 203ms
+     × 每个工具的 kind 与目录逐字相同（读写标反 = 模型会说错"我能不能改"） 6ms
+     ✓ 每个工具都归到了一个**已物化**实体，且实体条目与工具条目互相对账 4ms
+     ✓ 参数字段搬的是**模型真会收到的那份投影**（含必填标记） 4ms
+   ❯ 分母恰好 9（W2 物化 EVENT 之后），且逐条点名 (7)
+     × 分母成员逐条点名（多一个少一个都红 —— 这条挡住"顺手把视图加进分母"） 7ms
+     ✓ 分母的每个成员都**必须**在 `MODELED_ENTITY_TYPES` 里 —— 视图不是实体 4ms
+     × 剔除项只有登记过的两个落库载体，且它们**确实**是已物化实体、都写明了理由 4ms
+     ✓ `TASK_REPEAT_CFG` 算"动作"：不进分母、不进"有实体没工具"那句（§2.7 易混点之二） 0ms
+     ✓ 四象限 / 今天 / 日历 / 搜索只以"视图"身份出现，且都不是实体类型（§2.7 易混点之一） 5ms
+     ✓ 现状基线 9/9：分母里每个实体读写都有工具（以后少一个就要在这里重新判断） 0ms
+     ✓ 🔴 EVENT 的四个工具**读写都有**，且归因走的是名字（不是 override 名单） 1ms
+   ✓ 注入一个工具，清单里必须出现它（证明"生成"而不是抄） (9)
+     ✓ fixture 目录加 create_reminder ⇒ 清单出现它、归到 REMINDER、算 write 1ms
+     ✓ 🔴 补齐读 + 写两个工具，覆盖面才 +1 —— 「读得到也改得动」这条口径有牙齿 1ms
+     ✓ 文本投影里也必须出现它（投影与结构化清单是同一次生成的产物） 1ms
+     ✓ 判不出实体的新工具 ⇒ 生成**当场失败**，不是静默少一条 1ms
+     ✓ 工具归到**没有领域模型**的实体（EVENT 未落地就先上工具）⇒ 失败并点名"同批" 1ms
+     ✓ 往输入里塞一个视图名（QUADRANT）⇒ 失败，报的是"视图不建实体" 1ms
+     ✓ 登记过的剔除项一旦不在 `EntityModelMap` 里 ⇒ 失败（口径要重拍，不是删一行） 1ms
+     ✓ 工具名归因规则逐条对账（防止规则被改名后无人发现） 1ms
+     ✓ 没登记参数 schema 的工具：清单照出，但**明说**字段可能不完整（不谎报"无参数"） 1ms
+   ✓ 文本投影表达的是三个状态，不是一句"不支持" (5)
+     ✓ 每个"没有工具"的实体都在投影里点名，且同一行写清"产品里有它" 0ms
+     ✓ 投影里出现了"两件事必须分开说"这条纪律，并点名它的出处 0ms
+     ✓ 有工具的实体在投影里**逐个**列出读写与字段（模型要能引用字段名） 0ms
+     ✓ 投影里的工具行数 == 清单里的工具数（一条不许多、一条不许少） 0ms
+     ✓ 开头两句同时写出"由代码生成"与覆盖口径（滴答那句谎话的反面） 0ms
+   ✓ 产物文件头把"改上游而不是改这里"写死 (3)
+     ✓ 点名生成器、--check、以及"这是 prompt 数据不是界面文案" 0ms
+     ✓ 刻意**不含**时间戳 —— 有时间戳的生成物每次 --check 都会红，那条门禁就废了 0ms
+     ✓ 结构化清单与文本投影都导出了（接线方不必再解析文件） 0ms
+ ✓ tests/endpoint-address.spec.ts (18 tests) 8ms
+ ✓ tests/assistant-limits.spec.ts (13 tests) 4ms
+ ✓ tests/managed-allowlist.spec.ts (23 tests) 5ms
+ ✓ tests/routing.spec.ts (53 tests) 8ms
+ ✓ tests/egress.spec.ts (49 tests) 7ms
+ ✓ tests/tool-wire.spec.ts (11 tests) 5ms
+ ✓ tests/health-store.spec.ts (40 tests) 5ms
+ ✓ tests/wire.spec.ts (11 tests) 5ms
+ ✓ tests/disclosure-shape.spec.ts (9 tests) 3ms
+ ✓ tests/diagnose.spec.ts (7 tests) 4ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/capability-manifest.spec.ts > 产物是生成物：与上游逐字节一致 > `--check` 退出码 0 且 stderr 为空 —— 改了工具目录/实体清单而没重新生成，这里就红
+Error: Command failed: /Users/rocalight/.nvm/versions/node/v22.22.0/bin/node /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/scripts/gen-ai-capability-manifest.mjs --check
+🔴 能力清单产物与上游不一致：packages/ai/src/capability-manifest.generated.ts
+   第 34 行起不一致（产物 892 行 / 应为 979 行）。
+   🔴 仓库里现在是：
+     - 'TASK_REPEAT_CFG' | 'GLOBAL_CONFIG' | 'MIGRATION' | 'RECOVERY' |
+     - 'ALL';
+     - 
+     - /** 真的被 `packages/op-log` 物化了领域模型的实体类型。 */
+     - export type AiCapabilityModeledEntityType =
+     - 'TASK' | 'PROJECT' | 'TAG' | 'NOTE' |
+     - 'HABIT' | 'HABIT_LOG' | 'FOCUS_SESSION' | 'AI_FEEDBACK' |
+     - 'PREFERENCE_CORRECTION' | 'REMINDER' | 'EVENT' | 'ASSISTANT_TURN';
+     - 
+     - /** 工具的可写性 —— 判定读写只有这两个取值（`@heyta/local-api` 的 `ToolKind`）。 */
+     - export type AiCapabilityToolKind = 'read' | 'write';
+     - 
+     - /** 某个实体上 AI 工具的形状。`none` 是"产品有它、我没有工具"，不是"没有这个东西"。 */
+     - export type AiCapabilityCoverage = 'none' | 'read-only' | 'write-only' | 'read-write';
+     - … 还有 829 行
+   ✅ 由上游重新生成应该是：
+     + 'COMMENT' | 'TASK_REPEAT_CFG' | 'GLOBAL_CONFIG' | 'MIGRATION' |
+     + 'RECOVERY' | 'ALL';
+     + 
+     + /** 真的被 `packages/op-log` 物化了领域模型的实体类型。 */
+     + export type AiCapabilityModeledEntityType =
+     + 'TASK' | 'PROJECT' | 'TAG' | 'NOTE' |
+     + 'HABIT' | 'HABIT_LOG' | 'FOCUS_SESSION' | 'AI_FEEDBACK' |
+     + 'PREFERENCE_CORRECTION' | 'REMINDER' | 'EVENT' | 'ASSISTANT_TURN' |
+     + 'COMMENT';
+     + 
+     + /** 工具的可写性 —— 判定读写只有这两个取值（`@heyta/local-api` 的 `ToolKind`）。 */
+     + export type AiCapabilityToolKind = 'read' | 'write';
+     + 
+     + /** 某个实体上 AI 工具的形状。`none` 是"产品有它、我没有工具"，不是"没有这个东西"。 */
+     + … 还有 916 行
+   产物是**生成物**：跑 `node scripts/gen-ai-capability-manifest.mjs` 重新生成并一起提交。
+   ⚠️ 手改产物 = 给模型写一句谎话（ADR-0045 §2.6 纪律一）。要改的是上游。
+
+ ❯ tests/capability-manifest.spec.ts:207:20
+    205|   it('`--check` 退出码 0 且 stderr 为空 —— 改了工具目录/实体清单而没重新生成，这里就红', () => {
+    206|     // 变异实测：手改产物一个字节 ⇒ 本条红，stderr 打印首个差异行与两侧内容。
+    207|     const stdout = execFileSync(process.execPath, [SCRIPT, '--check'],…
+       |                    ^
+    208|       cwd: REPO,
+    209|       encoding: 'utf8',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  tests/capability-manifest.spec.ts > 每一个工具都在清单里，且 kind 与目录一致 > 产物里的工具集合与上游目录**双向**相等（少一条红、多一条红）
+AssertionError: expected [ 'complete_task', …(25) ] to deeply equal [ 'append_task_checklist', …(29) ]
+
+- Expected
++ Received
+
+@@ -1,7 +1,6 @@
+  [
+-   "append_task_checklist",
+    "complete_task",
+    "create_event",
+    "create_habit",
+    "create_note",
+    "create_project",
+@@ -9,11 +8,10 @@
+    "create_tag",
+    "create_task",
+    "get_event",
+    "get_note",
+    "get_task",
+-   "get_task_estimate_context",
+    "list_checkins",
+    "list_events",
+    "list_focuses",
+    "list_habits",
+    "list_notes",
+@@ -21,12 +19,10 @@
+    "list_reminders",
+    "list_tags",
+    "list_tasks",
+    "log_focus",
+    "record_checkin",
+-   "set_task_estimate",
+-   "set_task_priorities",
+    "set_task_tags",
+    "update_event",
+    "update_note",
+    "update_task",
+  ]
+
+ ❯ tests/capability-manifest.spec.ts:258:36
+    256|     const names = upstream.tools.map((t) => t.name);
+    257|     const inArtifact = manifest.tools.map((t) => t.name);
+    258|     expect([...inArtifact].sort()).toEqual([...names].sort());
+       |                                    ^
+    259|   });
+    260|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  tests/capability-manifest.spec.ts > 每一个工具都在清单里，且 kind 与目录一致 > 每个工具的 kind 与目录逐字相同（读写标反 = 模型会说错"我能不能改"）
+AssertionError: expected 26 to be 30 // Object.is equality
+
+- Expected
++ Received
+
+- 30
++ 26
+
+ ❯ tests/capability-manifest.spec.ts:264:35
+    262|     const upstream = await upstreamDirectory();
+    263|     const expected = new Map(upstream.tools.map((t) => [t.name, t.kind…
+    264|     expect(manifest.tools.length).toBe(expected.size);
+       |                                   ^
+    265|     for (const tool of manifest.tools) {
+    266|       expect(expected.has(tool.name), `清单里多了一个目录没有的工具 ${tool.name}`).t…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  tests/capability-manifest.spec.ts > 分母恰好 9（W2 物化 EVENT 之后），且逐条点名 > 分母成员逐条点名（多一个少一个都红 —— 这条挡住"顺手把视图加进分母"）
+AssertionError: expected [ 'TASK', 'PROJECT', 'TAG', …(6) ] to deeply equal [ 'TASK', 'PROJECT', 'TAG', …(7) ]
+
+- Expected
++ Received
+
+@@ -6,7 +6,6 @@
+    "HABIT",
+    "HABIT_LOG",
+    "FOCUS_SESSION",
+    "REMINDER",
+    "EVENT",
+-   "COMMENT",
+  ]
+
+ ❯ tests/capability-manifest.spec.ts:326:51
+    324|       (t) => !excludedNames.includes(t) && !gen.NON_ENTITY_VIEWS.inclu…
+    325|     );
+    326|     expect([...manifest.userOperableEntityTypes]).toEqual(expected);
+       |                                                   ^
+    327|     expect(manifest.userOperableEntityTypes.length).toBe(9);
+    328|     expect(manifest.coverage.denominator).toBe(9);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  tests/capability-manifest.spec.ts > 分母恰好 9（W2 物化 EVENT 之后），且逐条点名 > 剔除项只有登记过的两个落库载体，且它们**确实**是已物化实体、都写明了理由
+AssertionError: expected [ 'AI_FEEDBACK', …(3) ] to deeply equal [ 'AI_FEEDBACK', …(2) ]
+
+- Expected
++ Received
+
+  [
+    "AI_FEEDBACK",
+    "ASSISTANT_TURN",
++   "COMMENT",
+    "PREFERENCE_CORRECTION",
+  ]
+
+ ❯ tests/capability-manifest.spec.ts:351:34
+    349|       (t) => !manifest.userOperableEntityTypes.includes(t),
+    350|     );
+    351|     expect([...excluded].sort()).toEqual([...gen.DENOMINATOR_EXCLUSION…
+       |                                  ^
+    352|     for (const exclusion of manifest.excludedFromDenominator) {
+    353|       expect(upstream.modeledEntityTypes).toContain(exclusion.entityTy…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  1 failed | 10 passed (11)
+      Tests  5 failed | 260 passed (265)
+   Start at  17:59:56
+   Duration  1.39s (tests 65%, import 17%, transform 16%, worker 3%)
+
+    Isolate  11 workers spawned · ~54ms startup each (spawn + environment, per file)
+             at least ~543ms faster with isolate: false — reuses workers across files instead of one per file
+

@@ -1,0 +1,132 @@
+$ node scripts/check-reachability.mjs
+──────────────────────────────────────────────────────────────────────────────
+「已建模 ≠ 可达」门禁（C-8）：实体有模型，就必须有写路径，也必须有人接
+   ROOT = .
+   范围 = packages/app-host/src + apps 下各宿主的 src/
+──────────────────────────────────────────────────────────────────────────────
+
+【断言 A】判据锚点必须真的扫得到（扫不到 = 判据失效，不是通过）
+
+   ✅ EntityModelMap（领域模型映射（编译期））：13 个实体
+   ✅ MODELED_ENTITY_TYPES（领域层运行时可读清单）：13 个实体
+   ✅ BUCKET_BY_ENTITY（op-log 实体 → 桶 映射）：13 个实体
+   ✅ UNMODELED_ENTITY_TYPES（合法但未物化的实体清单）：5 项
+   ✅ 三处登记相等（集合相等）：AI_FEEDBACK, ASSISTANT_TURN, COMMENT, EVENT, FOCUS_SESSION, HABIT, HABIT_LOG, NOTE, PREFERENCE_CORRECTION, PROJECT, REMINDER, TAG, TASK
+   ✅ packages/app-host/src：83 个实现文件
+   ✅ action 家族锚点：10 族（createTaskActions, createProjectActions, createHabitActions, createFocusActions, createAiFeedbackActions, createPreferenceCorrectionActions, createReminderActions, createNoteActions, createEventActions, createAssistantSessionActions）
+   ✅ 宿主扫描面：6 个宿主（desktop, desktop-linux, landing, mobile, node-host, web），422 个源文件
+
+   ✅ 断言 A 通过：判据的输入（实体清单三处 + 未建模清单 + 两个扫描面）都真的在。
+
+【断言 B】已建模的实体，必须在 app-host 里有一条写路径
+             （判据：源码里 entityType 指向该实体的真实出现，注释不算）
+
+   ✅ AI_FEEDBACK               1 处：packages/app-host/src/ai-feedback-actions.ts
+   ✅ ASSISTANT_TURN            1 处：packages/app-host/src/assistant-session-actions.ts
+   🔴 COMMENT                  0 处写路径
+   ✅ EVENT                     2 处：packages/app-host/src/event-actions.ts, packages/app-host/src/local-api-host.ts
+   ✅ FOCUS_SESSION             2 处：packages/app-host/src/focus-actions.ts, packages/app-host/src/local-api-host.ts
+   ✅ HABIT                     2 处：packages/app-host/src/habit-actions.ts, packages/app-host/src/local-api-host.ts
+   ✅ HABIT_LOG                 2 处：packages/app-host/src/habit-actions.ts, packages/app-host/src/local-api-host.ts
+   ✅ NOTE                      2 处：packages/app-host/src/local-api-host.ts, packages/app-host/src/note-actions.ts
+   ✅ PREFERENCE_CORRECTION     1 处：packages/app-host/src/ai-feedback-actions.ts
+   ✅ PROJECT                   3 处：packages/app-host/src/local-api-host.ts, packages/app-host/src/project-actions.ts, packages/app-host/src/ticktick-import-actions.ts
+   ✅ REMINDER                  2 处：packages/app-host/src/local-api-host.ts, packages/app-host/src/reminder-actions.ts
+   ✅ TAG                       3 处：packages/app-host/src/local-api-host.ts, packages/app-host/src/project-actions.ts, packages/app-host/src/ticktick-import-actions.ts
+   ✅ TASK                      3 处：packages/app-host/src/actions.ts, packages/app-host/src/task-batch-actions.ts, packages/app-host/src/ticktick-import-actions.ts
+🔴 断言 B 不通过：1 个已建模的实体**零写路径**
+
+   · COMMENT —— 已建模，但 app-host 里**一处写 op 的地方都没有**。
+       登记齐全（EntityModelMap + MODELED_ENTITY_TYPES + BUCKET_BY_ENTITY），桶存在、会被 export-dump 导出、op 能同步到所有设备，
+       但**没有任何 action 能生成它**（三问的第 1 问：有没有 app-host 的 action？）。
+       ⚠️ 它在 packages/ui/src/sync/model.ts 里出现，但那是**实体名标签映射（显示用途）**，不是可达路径 ——
+          把它算作"调用点"会让本门禁在这里变绿，那是假的完备。
+       修法：在 app-host 里补一族 action（照 `habit-actions.ts` 的形状），
+             并在宿主（apps/web 或 apps/mobile）里接上真实入口。
+             ⚠️ **不要**把 COMMENT 从 EntityModelMap 里删掉来"修绿" —— 那会让合法的历史 op
+                变成未知实体而被静默丢弃（op-log 对未知实体的处理就是跳过）。
+
+   ⇒ 判据出处：site-and-parity-alignment.md §C-8（「基础设施做完了、最后一米没接」）。
+      这不是 13 个实例里的某一个的问题，是**产生它们的机制**：实体登记与
+      可用性之间没有任何门禁。本门禁不修这些实体，它只让"下一个"无法再发生。
+
+
+【断言 C】有写路径的实体，必须有**宿主**（各宿主 src/）的真实调用点
+             （测试与共享层定义不算 —— 理由见文件头「刻意排除」）
+
+   ✅ AI_FEEDBACK              createAiFeedbackActions：1 处宿主调用点
+        · apps/web/src/features/tasks/store.ts
+   ✅ ASSISTANT_TURN           createAssistantSessionActions：1 处宿主调用点
+        · apps/node-host/src/host.ts
+   ✅ EVENT                    createEventActions：3 处宿主调用点
+        · apps/mobile/src/screens/CalendarScreen.tsx
+        · apps/mobile/src/screens/CountdownScreen.tsx
+        · apps/web/src/features/countdown/store.ts
+   ✅ FOCUS_SESSION            createFocusActions：2 处宿主调用点
+        · apps/mobile/src/lib/focus-timer.ts
+        · apps/web/src/features/focus/store.ts
+   ✅ HABIT                    createHabitActions：6 处宿主调用点
+        · apps/mobile/src/screens/CategoriesScreen.tsx
+        · apps/mobile/src/screens/GrowthScreen.tsx
+        · apps/mobile/src/screens/HabitsScreen.tsx
+        · apps/mobile/src/screens/TrashScreen.tsx
+        · …另有 2 处
+   ✅ HABIT_LOG                createHabitActions：6 处宿主调用点
+        · apps/mobile/src/screens/CategoriesScreen.tsx
+        · apps/mobile/src/screens/GrowthScreen.tsx
+        · apps/mobile/src/screens/HabitsScreen.tsx
+        · apps/mobile/src/screens/TrashScreen.tsx
+        · …另有 2 处
+   ✅ NOTE                     createNoteActions：7 处宿主调用点
+        · apps/mobile/src/screens/NoteEditScreen.tsx
+        · apps/mobile/src/screens/NotesSection.tsx
+        · apps/mobile/src/screens/SearchScreen.tsx
+        · apps/mobile/src/screens/TasksScreen.tsx
+        · …另有 3 处
+   ✅ PREFERENCE_CORRECTION    createPreferenceCorrectionActions：1 处宿主调用点
+        · apps/web/src/features/tasks/store.ts
+   ✅ PROJECT                  createProjectActions：7 处宿主调用点
+        · apps/mobile/src/screens/CategoriesScreen.tsx
+        · apps/mobile/src/screens/ListsSection.tsx
+        · apps/mobile/src/screens/TagsSection.tsx
+        · apps/mobile/src/screens/TasksScreen.tsx
+        · …另有 3 处
+   ✅ REMINDER                 createReminderActions：2 处宿主调用点
+        · apps/mobile/src/lib/reminders.ts
+        · apps/web/src/features/reminders/store.ts
+   ✅ TAG                      createProjectActions：7 处宿主调用点
+        · apps/mobile/src/screens/CategoriesScreen.tsx
+        · apps/mobile/src/screens/ListsSection.tsx
+        · apps/mobile/src/screens/TagsSection.tsx
+        · apps/mobile/src/screens/TasksScreen.tsx
+        · …另有 3 处
+   ✅ TASK                     createTaskActions：11 处宿主调用点
+        · apps/mobile/src/ai/AssistantScreen.tsx
+        · apps/mobile/src/lib/focus-task-source.ts
+        · apps/mobile/src/screens/CalendarScreen.tsx
+        · apps/mobile/src/screens/ListsSection.tsx
+        · …另有 7 处
+
+   ✅ 断言 C 通过：有写路径的实体全部有宿主调用点。
+
+【断言 D】UNMODELED_ENTITY_TYPES 里"尚未开始"的项，必须有人接
+             （"决定不用"的项豁免 —— 豁免读自 reason 自身，不写死在本脚本）
+
+   ⏭️  TASK_REPEAT_CFG          豁免（reason 表明是"决定不用/不属于用户数据"）
+   ⏭️  GLOBAL_CONFIG            豁免（reason 表明是"决定不用/不属于用户数据"）
+   ⏭️  MIGRATION                豁免（reason 表明是"决定不用/不属于用户数据"）
+   ⏭️  RECOVERY                 豁免（reason 表明是"决定不用/不属于用户数据"）
+   ⏭️  ALL                      豁免（reason 表明是"决定不用/不属于用户数据"）
+
+   ✅ 断言 D 通过：未建模的项要么已决定不做，要么有引用。
+
+──────────────────────────────────────────────────────────────────────────────
+🔴 「已建模 ≠ 可达」门禁未通过。
+
+   ⚠️ 门禁红了本身也是有效产出：它抓到的每一条都是真的"最后一米没接"。
+      **不要**用下列任一手法修绿（都会被下一个人复制）：
+        · 把实体从 EntityModelMap / BUCKET_BY_ENTITY 删掉；
+        · 把 action 家族补进本脚本的 ACTION_FAMILIES 而不写 action；
+        · 把测试或 e2e 当成调用点。
+
+[ELIFECYCLE] Command failed with exit code 1.

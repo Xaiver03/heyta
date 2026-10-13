@@ -1,0 +1,8 @@
+全部臂　目标=server/src/automation/inbound.routes.ts　开局 sha256=52c3fd707977a03e　备份=/private/tmp/heyta-inbound-queue-teeth/inbound.routes.ts.mut-bak
+  队列条数上限: 成立　rc=1 命中用例=True
+  队列字节上限: 成立　rc=1 命中用例=True
+  写失败仍报 accepted: 成立　rc=1 命中用例=True
+  插入竞态不重读赢家（直接漏 500）: 成立　rc=1 命中用例=True
+  插入竞态不比内容（赢家照单收下）: 成立　rc=1 命中用例=True
+  静止对照：注释改动不许让任何用例变红: 成立　rc=0 红=0（静止臂要求 rc=0 且 0 红）
+臂数=6　不成立=0　末次 sha256=52c3fd707977a03e（须等于开局那枚）

@@ -1,0 +1,3704 @@
+
+ RUN  v5.0.1 /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/apps/web
+
+stderr | tests/reminder-wake.spec.tsx > 1–2. 到点自醒 + 恰好一次（假时钟，之后不再有任何 op） > 🔴 醒的路径与写的路径分离：定时器只触发投递，`firedAt` 由**投递成功**那一层落库
+An update to Probe inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Probe inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ tests/reminder-wake.spec.tsx (9 tests) 5760ms
+   ✓ 4. 真实应用树里这个钟确实挂着（真时钟 + 真 <App />） (1)
+     ✓ 🔴 不点任何东西、不产生第二条 op，一条 1.2 秒后的提醒自己响了恰好一次 5712ms
+ ✓ tests/focus-detail-pane.spec.tsx (9 tests) 381ms
+stderr | tests/trash.spec.tsx > 回收站里的便签 > 🔴 动作失败必须说出来：store 抛错时界面出现错误行，而不是"点了没反应"
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/trash.spec.tsx > W4 清单进回收站 > 🔴 子清单**自己也进了回收站**时不数它 —— 那句说的是"还活着却找不到入口"的那批
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/trash.spec.tsx > W4 清单进回收站 > 🔴 子清单**自己也进了回收站**时不数它 —— 那句说的是"还活着却找不到入口"的那批
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/trash.spec.tsx > W4 习惯进回收站 > 徽标是「习惯」，确认框说的是打卡记录不会被删
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/trash.spec.tsx > W4 习惯进回收站 > 徽标是「习惯」，确认框说的是打卡记录不会被删
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/trash.spec.tsx > W4 习惯进回收站 > 徽标是「习惯」，确认框说的是打卡记录不会被删
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/trash.spec.tsx > W4 习惯进回收站 > 徽标是「习惯」，确认框说的是打卡记录不会被删
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/trash.spec.tsx > W4 习惯进回收站 > 徽标是「习惯」，确认框说的是打卡记录不会被删
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/trash.spec.tsx > W4 习惯进回收站 > 徽标是「习惯」，确认框说的是打卡记录不会被删
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/trash.spec.tsx > W4 习惯进回收站 > 🔴 四路都在时列表按删除时间排（新删的在前），而不是按传参顺序
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/trash.spec.tsx > W4 习惯进回收站 > 🔴 四路都在时列表按删除时间排（新删的在前），而不是按传参顺序
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/trash.spec.tsx > W4 习惯进回收站 > 🔴 四路都在时列表按删除时间排（新删的在前），而不是按传参顺序
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/trash.spec.tsx > W4 习惯进回收站 > 🔴 四路都在时列表按删除时间排（新删的在前），而不是按传参顺序
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/trash.spec.tsx > W4 习惯进回收站 > 🔴 四路都在时列表按删除时间排（新删的在前），而不是按传参顺序
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/trash.spec.tsx > W4 习惯进回收站 > 🔴 四路都在时列表按删除时间排（新删的在前），而不是按传参顺序
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/trash.spec.tsx > W4 习惯进回收站 > 🔴 四路都在时列表按删除时间排（新删的在前），而不是按传参顺序
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/trash.spec.tsx > W4 习惯进回收站 > 🔴 四路都在时列表按删除时间排（新删的在前），而不是按传参顺序
+An update to TrashView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ tests/trash.spec.tsx (22 tests) 262ms
+ ✓ tests/app-mount.spec.tsx (24 tests) 1670ms
+ ✓ tests/calendar-sidebar.spec.tsx (15 tests) 3468ms
+   ✓ 日历侧栏（Web） (15)
+     ✓ 🔴 迷你月历的格子与 `monthGrid` **逐格对齐**，列头是**周一开头** 471ms
+     ✓ 🔴 侧栏与主区**共用同一份**月与日（翻月 / 点补白格 / 回到今天） 323ms
+ ✓ tests/gantt-chart.spec.tsx (42 tests) 310ms
+stderr | tests/signin-entry.spec.tsx > J1：注册/登录在冷启动后可达，且身份入口唯一 > 🔴 再点一次就打开注册/登录表单（合计 2 次点击，这就是"前置"的全部含义）
+"shadow*" style props are deprecated. Use "boxShadow".
+
+ ✓ tests/signin-entry.spec.tsx (9 tests) 397ms
+stderr | tests/language-switcher.spec.tsx > 🔴 <StrictMode>：首启推断不落盘，明确选择落盘 > 英文浏览器首启：界面是英文，但 localStorage 里没有任何偏好（账号语言那道门还开着）
+An update to SubscriptionNotice inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SubscriptionNotice inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/language-switcher.spec.tsx > 🔴 <StrictMode>：首启推断不落盘，明确选择落盘 > 带 ?lang= 进来同样不落盘（参数是一次性带来，不是本机选择）
+An update to SubscriptionNotice inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SubscriptionNotice inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/language-switcher.spec.tsx > 🔴 <StrictMode>：首启推断不落盘，明确选择落盘 > 未受支持的系统语言（ja-JP）落回中文兜底，同样不落盘
+An update to SubscriptionNotice inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SubscriptionNotice inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ tests/language-switcher.spec.tsx (14 tests) 807ms
+stderr | tests/motivation-view.spec.tsx > 成长视图（L3）真的能点到 > 年度热力图用一个键盘焦点承载方向键，并支持触屏点选日期
+An update to ActivityHeatmap inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/motivation-view.spec.tsx > 成长视图（L3）真的能点到 > 年度热力图用一个键盘焦点承载方向键，并支持触屏点选日期
+An update to ActivityHeatmap inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/motivation-view.spec.tsx > 成长视图（L3）真的能点到 > 年度热力图用一个键盘焦点承载方向键，并支持触屏点选日期
+An update to ActivityHeatmap inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ tests/motivation-view.spec.tsx (12 tests) 1505ms
+ ✓ tests/search-panel.spec.tsx (11 tests) 1152ms
+ ✓ tests/calendar-view.spec.tsx (15 tests) 1834ms
+ ✓ tests/calendar-day-view.spec.tsx (13 tests) 1997ms
+stderr | tests/privacy-consent-sheet.spec.tsx > 🔴 接到 App 上：首启真的会弹（G-11 的判据只能在整棵树上成立） > 全新设备（什么都没决定过）挂载后，面板就在
+"shadow*" style props are deprecated. Use "boxShadow".
+
+ ✓ tests/privacy-consent-sheet.spec.tsx (18 tests) 748ms
+ ✓ tests/detail-pane-collapse.spec.tsx (16 tests) 1608ms
+   ✓ C. 设置里那一项（恢复路径②） (3)
+     ✓ 🔴 从"收起"状态进设置，选「常驻」⇒ 属性翻回 open 且落盘 306ms
+ ✓ tests/task-sort.spec.tsx (8 tests) 3920ms
+   ✓ 任务列表的排序控件 (8)
+     ✓ 🔴 控件带**可见的文字标签**，且长在页头（不是列表上方另起一条） 727ms
+     ✓ 默认档就是领域的 display：插入顺序（无截止 ⇒ 组内稳定原序） 408ms
+     ✓ 🔴 三档排出**三个不同**的顺序（`sort` 被忽略时这条必红） 542ms
+     ✓ 🔴 重挂之后还是选的那一档（设备本地持久化，不是内存态） 558ms
+     ✓ 批量选择入口只在任务列表里出现，完成后退出选择态 640ms
+     ✓ Esc 退出批量选择态并清除已选任务 680ms
+ ✓ tests/calendar-wheel-month.spec.tsx (19 tests) 3167ms
+   ✓ 滚轮翻月（接线） (8)
+     ✓ 指针停在主区月历格子上：下滚翻到 10 月，两列一起走 691ms
+     ✓ 上滚翻到 8 月（而不是也翻到 10 月） 442ms
+     ✓ 侧栏迷你月历上滚同样翻月，主区跟着走 392ms
+     ✓ 🔴 指针在月历之外：滚轮不归月历（不翻、也不吃掉页面滚动） 322ms
+     ✓ 触控板横向手势不翻月 328ms
+     ✓ ⌘ + 滚轮（缩放）不翻月 352ms
+     ✓ 不够一格的轻推不翻月（阈值在渲染路径上同样生效） 326ms
+     ✓ 选中的那一天不跟月份走（翻月 ≠ 翻日子） 307ms
+ ✓ tests/task-repeat.spec.tsx (7 tests) 549ms
+stderr | tests/calendar-capture.spec.tsx > 日历上的「往选中那天加一条」 > 🔴 输入里写了「明天」⇒ **以输入为准**，不是以选中那格为准
+An update to CalendarSidebar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to CalendarHeaderToolbar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to CalendarView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ tests/calendar-capture.spec.tsx (7 tests) 2479ms
+   ✓ 日历上的「往选中那天加一条」 (7)
+     ✓ 🔴 页头那个 `+` 一点，输入框出现，而 placeholder **说出落点是哪一天** 579ms
+     ✓ 🔴 只写标题 ⇒ 任务落在**选中的那一格**（本地零点，与 `Task.dueDate` 同一约定） 437ms
+     ✓ 🔴 输入里写了「明天」⇒ **以输入为准**，不是以选中那格为准 302ms
+     ✓ 🔴 全程**零出站**：这一条是规则解析，不是 AI（不许顺手打模型） 312ms
+     ✓ 🔴 选中格换了，落点跟着换（**不是**"第一次打开时算好的那一天"） 317ms
+ ✓ tests/reminder-notify-wiring.spec.tsx (6 tests) 1454ms
+   ✓ 提醒投递的接线（真 App） (6)
+     ✓ 🔴 到点的提醒会**真的**产出一条系统通知 —— 而且调用点是存在的那一个 404ms
+     ✓ 🔴 投递成功后 `firedAt` 落进物化状态，且它从 `due` 里消失 308ms
+ ✓ tests/nav-next7-days.spec.tsx (5 tests) 1144ms
+   ✓ 侧栏的「最近 7 天」 (5)
+     ✓ 🔴 点侧栏那一行：列表只剩窗口内的两条，逾期/第八天/无截止都不在 409ms
+stderr | tests/calendar-event-source.spec.tsx > 倒数日进日历（Web 宿主接线） > 归档的倒数日不进日历（面板不显示的东西，日历也不许显示）
+An update to App inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to CalendarSidebar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to CalendarView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to App inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to CalendarSidebar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to CalendarHeaderToolbar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to CalendarHeaderToolbar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to CalendarSidebar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to CalendarView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to App inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to App inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/calendar-event-source.spec.tsx > 倒数日进日历（Web 宿主接线） > 归档的倒数日不进日历（面板不显示的东西，日历也不许显示）
+An update to CalendarSidebar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to CalendarView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ tests/calendar-event-source.spec.tsx (8 tests) 1093ms
+stderr | tests/auth-panel-modal-dismiss.spec.tsx > B：认证面板在真入口下的模态行为 > 打开后面板在场，且焦点在面板内部
+"shadow*" style props are deprecated. Use "boxShadow".
+
+stderr | tests/auth-panel-modal-dismiss.spec.tsx > B：认证面板在真入口下的模态行为 > 关面板只是关面板：已保存的同步凭据一个字都不动
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to ProjectsPanel inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SignOutNotice inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SubscriptionNotice inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SubscriptionNotice inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to PrivacyConsentSheet inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to LegalReconfirmSheet inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to PanelEphemeralProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to PanelEphemeralProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to App inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to App inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to App inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ tests/auth-panel-modal-dismiss.spec.tsx (8 tests) 308ms
+stderr | tests/account-profile-entry.spec.tsx > 头像菜单里的「个人中心」 > 展示身份、近期状态与成就摘要，并把编辑动作交回设置
+An update to EmailChangePanel inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to ProfilePanel inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to ProfilePanel inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to ProfilePanel inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ tests/account-profile-entry.spec.tsx (5 tests) 414ms
+ ✓ tests/task-groups.spec.tsx (5 tests) 808ms
+stderr | tests/auth-deep-link.spec.tsx > 🔴 带 `?signin` 冷启动 = 登录界面直接出现 > 地址里有那个参数：登录表单出现在屏幕上
+"shadow*" style props are deprecated. Use "boxShadow".
+
+ ✓ tests/auth-deep-link.spec.tsx (6 tests) 330ms
+ ✓ tests/settings-sheet-ia.spec.tsx (5 tests) 514ms
+ ✓ tests/calendar-view-family.spec.tsx (5 tests) 856ms
+stderr | tests/shell-more-and-settings.spec.tsx > W1：rail 主段 + 更多菜单（接线层） > 🔴 8 个模块全开 ⇒ tablist 只有 ≤4 枚 tab + 1 枚「更多」（不平铺）
+An update to SubscriptionNotice inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/shell-more-and-settings.spec.tsx > W1：rail 主段 + 更多菜单（接线层） > 🔴 目的地不足五个 ⇒ 不渲染「更多」（没有空菜单）
+An update to SubscriptionNotice inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/shell-more-and-settings.spec.tsx > W1：rail 主段 + 更多菜单（接线层） > 🔴 打开聚焦第一项；Esc 关闭并把焦点还给「更多」按钮；点菜单项切视图并收起
+An update to VirtualizedList inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to VirtualizedList inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to VirtualizedList inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to VirtualizedList inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/shell-more-and-settings.spec.tsx > W2：设置浮层遮蔽详情列 > 🔴 设置开着 ⇒ 详情列 hidden + 轨道归零属性；关闭 ⇒ 原选中恢复
+An update to VirtualizedList inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/shell-more-and-settings.spec.tsx > W2：设置浮层遮蔽详情列 > 🔴 设置开着 ⇒ 详情列 hidden + 轨道归零属性；关闭 ⇒ 原选中恢复
+An update to App inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/shell-more-and-settings.spec.tsx > W2：设置浮层遮蔽详情列 > 🔴 设置开着 ⇒ 详情列 hidden + 轨道归零属性；关闭 ⇒ 原选中恢复
+An update to VirtualizedList inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/shell-more-and-settings.spec.tsx > W2：设置浮层遮蔽详情列 > 🔴 设置开着 ⇒ 详情列 hidden + 轨道归零属性；关闭 ⇒ 原选中恢复
+An update to VirtualizedList inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/shell-more-and-settings.spec.tsx > W3：任务视图只有一个 AI Agent / Chatbot 入口 > 🔴 任务视图首屏：显示单一 Chatbot，工具调用不作为并列入口出现
+An update to SubscriptionNotice inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ tests/shell-more-and-settings.spec.tsx (5 tests) 768ms
+   ✓ W2：设置浮层遮蔽详情列 (1)
+     ✓ 🔴 设置开着 ⇒ 详情列 hidden + 轨道归零属性；关闭 ⇒ 原选中恢复 402ms
+ ✓ tests/theme-boot-no-persist.spec.tsx (4 tests) 256ms
+ ✓ tests/search-overlay-ia.spec.tsx (4 tests) 535ms
+ ✓ tests/category-colors-flow.spec.tsx (3 tests) 774ms
+   ✓ 从界面选一个色槽，最后真的出现在成长视图里 (3)
+     ✓ 习惯卡片上的取色器 → op → 物化 → 成长视图那一行带上槽位号 400ms
+stderr | tests/settings-anchor-focus.spec.tsx > 设置浮层的落位与焦点 > 头像 →「编辑个人信息」⇒ 焦点真的进了昵称框（此前只滚不聚焦）
+An update to EmailChangePanel inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to ProfilePanel inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to ProfilePanel inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to ProfilePanel inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ tests/settings-anchor-focus.spec.tsx (4 tests) 510ms
+ ✓ tests/memory-gate-no-read.spec.tsx (2 tests) 175ms
+ ✓ tests/projects-panel.spec.tsx (45 tests) 630ms
+stderr | tests/bulk-repeat-guard.spec.tsx > 批量完成的重复任务保护 > 混选重复任务时禁用批量完成并解释逐条完成规则
+An update to App inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/bulk-repeat-guard.spec.tsx > 批量完成的重复任务保护 > 混选重复任务时禁用批量完成并解释逐条完成规则
+An update to App inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to App inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/bulk-repeat-guard.spec.tsx > 批量完成的重复任务保护 > 混选重复任务时禁用批量完成并解释逐条完成规则
+An update to VirtualizedList inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to VirtualizedList inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ tests/bulk-repeat-guard.spec.tsx (1 test) 351ms
+   ✓ 批量完成的重复任务保护 (1)
+     ✓ 混选重复任务时禁用批量完成并解释逐条完成规则 351ms
+stderr | tests/task-detail-card.spec.tsx > 子任务这一字段此刻归谁（§8.144） > 🔴 在栏里改父 ⇒ 真的写进 op-log（不是只改内存里那一条）
+An update to SubtaskField inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TaskDetailCard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to OrganizerField inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to ReminderField inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/task-detail-card.spec.tsx > 子任务这一字段此刻归谁（§8.144） > 🔴 在栏里改父 ⇒ 真的写进 op-log（不是只改内存里那一条）
+An update to TaskDetailCard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/task-detail-card.spec.tsx > 提醒这一字段此刻归谁（§8.145） > 🔴 在栏里点「1 小时后提醒」⇒ 真的落 `REMINDER` op（不是只改内存里那一条）
+An update to SubtaskField inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TaskDetailCard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to OrganizerField inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to ReminderField inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/task-detail-card.spec.tsx > 截止这一字段此刻归谁（§8.146） > 🔴 在栏里点日子 ⇒ 真的写进物化状态（不是只改内存里那一条）
+An update to SubtaskField inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TaskDetailCard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to OrganizerField inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to ReminderField inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to DatePicker inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TaskDetailCard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/task-detail-card.spec.tsx > 清单 + 标签这一字段此刻归谁（§8.147） > 🔴 在栏里选清单 ⇒ 真的写进物化状态（不是只改内存里那一条）
+An update to SubtaskField inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TaskDetailCard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to OrganizerField inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to ReminderField inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/task-detail-card.spec.tsx > 清单 + 标签这一字段此刻归谁（§8.147） > 🔴 在栏里选清单 ⇒ 真的写进物化状态（不是只改内存里那一条）
+An update to TaskDetailCard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/task-detail-card.spec.tsx > 清单 + 标签这一字段此刻归谁（§8.147） > 🔴 在栏里勾标签 ⇒ 整组写进 tagIds（一条交互 = 一条 op）
+An update to SubtaskField inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TaskDetailCard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to OrganizerField inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to ReminderField inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/task-detail-card.spec.tsx > 清单 + 标签这一字段此刻归谁（§8.147） > 🔴 在栏里勾标签 ⇒ 整组写进 tagIds（一条交互 = 一条 op）
+An update to TaskDetailCard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/task-detail-card.spec.tsx > 清单 + 标签这一字段此刻归谁（§8.147） > 宿主两支读同一枚布尔（源码形状）
+An update to TagChips inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TagChips inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ tests/task-detail-card.spec.tsx (36 tests) 4802ms
+   ✓ 子任务这一字段此刻归谁（§8.144） (5)
+     ✓ 🔴 在栏里改父 ⇒ 真的写进 op-log（不是只改内存里那一条） 412ms
+   ✓ 清单 + 标签这一字段此刻归谁（§8.147） (7)
+     ✓ 🔴 换选中 ⇒ 栏里的下拉与勾选跟着换人（这一格不挂 key 的成立条件） 396ms
+stderr | tests/auth-panel.spec.tsx > 未登录 / 未配置时是明确的空状态 > 把认证收敛成一个计划入口，主路径可见且高级能力不抢首屏
+"shadow*" style props are deprecated. Use "boxShadow".
+
+stderr | tests/auth-panel.spec.tsx > 🔴 口令这条路在界面上**可达**（此前它是"做了但点不到"） > 切换服务端时延迟的注册 challenge 响应不会覆盖当前认证状态
+An update to AuthPanel inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ tests/auth-panel.spec.tsx (40 tests) 1644ms
+ ✓ tests/habits-list-pane.spec.tsx (22 tests) 688ms
+ ✓ tests/calendar-year-board.spec.tsx (15 tests) 940ms
+stderr | tests/task-detail-edit.spec.tsx > 标题改名（点 h2 进入，失焦/Enter 提交，Esc 还原） > 🔴 改字后失焦 ⇒ store.renameTask(id, 新标题) 被调（含 trim），且真的落到物化状态
+An update to SubtaskField inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TaskDetailCard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to ReminderField inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to OrganizerField inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/task-detail-edit.spec.tsx > 标题改名（点 h2 进入，失焦/Enter 提交，Esc 还原） > 🔴 改字后失焦 ⇒ store.renameTask(id, 新标题) 被调（含 trim），且真的落到物化状态
+An update to TaskDetailCard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/task-detail-edit.spec.tsx > 标题改名（点 h2 进入，失焦/Enter 提交，Esc 还原） > 🔴 Enter 也走同一条提交路（不是只有失焦一条）
+An update to SubtaskField inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TaskDetailCard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to ReminderField inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to OrganizerField inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/task-detail-edit.spec.tsx > 标题改名（点 h2 进入，失焦/Enter 提交，Esc 还原） > 🔴 Enter 也走同一条提交路（不是只有失焦一条）
+An update to TaskDetailCard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/task-detail-edit.spec.tsx > 手动优先级（原生 select，此前只有 AI 批量写入一个调用方） > 🔴 选「高」⇒ store.setPriority(id, Priority.High) 被调，且真的落到物化状态
+An update to SubtaskField inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TaskDetailCard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to ReminderField inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to OrganizerField inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/task-detail-edit.spec.tsx > 手动优先级（原生 select，此前只有 AI 批量写入一个调用方） > 🔴 选「高」⇒ store.setPriority(id, Priority.High) 被调，且真的落到物化状态
+An update to TaskDetailCard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ tests/task-detail-edit.spec.tsx (8 tests) 1549ms
+   ✓ 标题改名（点 h2 进入，失焦/Enter 提交，Esc 还原） (5)
+     ✓ 🔴 换选中 ⇒ 编辑会话作废：未提交的草稿不跟着人走，换回来也是待机态（且 DOM 里只有一只 h2） 318ms
+ ✓ tests/local-data-destruction.spec.ts (16 tests) 3129ms
+   ✓ E2 —— OPFS 那一类：先关持句柄的 worker，再删（有界重试） (3)
+     ✓ 🔴 一直删不掉 ⇒ 如实报 false，且**重试有上界**（不许热循环） 2755ms
+stderr | tests/due-date-edit.spec.tsx > 🔴 批一判据 ①：选截止日 → 恰好一条只带 dueDate 的 UPD op > 快捷项「今天」⇒ +1 条 UPD、dueDate = 今天的本地零点
+An update to DueEditor inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/due-date-edit.spec.tsx > 🔴 R14 时刻：输入、搬运、全天、无日期四档 > 🔴 在输入框敲 16:00 ⇒ 恰好一条 UPD，payload 落在**本地 16:00**
+An update to DueEditor inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ tests/due-date-edit.spec.tsx (16 tests) 624ms
+ ✓ tests/auth-form.spec.tsx (53 tests) 632ms
+ ✓ tests/ai-assistant-panel.spec.tsx (30 tests) 505ms
+ ✓ tests/profile-panel.spec.tsx (16 tests) 606ms
+   ✓ 个人信息面板（R10） (16)
+     ✓ 有口令 + 上传 ⇒ 发 PUT 头像、预览出现，服务端拿到的是**解不开的密文** 350ms
+ ✓ tests/task-detail-groups.spec.tsx (4 tests) 511ms
+ ✓ tests/share-key-store.spec.ts (10 tests) 582ms
+ ✓ tests/ai-settings.spec.tsx (71 tests) 369ms
+ ✓ tests/ai-capture.spec.tsx (47 tests) 306ms
+stderr | tests/auth-journey.spec.tsx > 墙一：注册不许依赖"你知道自己的同步域名吗" > 🔴 什么都没配置时走完注册，请求**真的发出去**，目标就是本机来源
+"shadow*" style props are deprecated. Use "boxShadow".
+
+ ✓ tests/auth-journey.spec.tsx (11 tests) 321ms
+ ✓ tests/habits-board.spec.tsx (33 tests) 351ms
+stderr | tests/ticktick-import.spec.tsx > TickTickImportPanel > 🔴 选完文件只出现预览 —— op-log 一条都不许动
+An update to TickTickImportPanel inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TickTickImportPanel inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/ticktick-import.spec.tsx > TickTickImportPanel > 确认后任务真的落进 op-log，且报告里"带不进来"的条数不减
+An update to TickTickImportPanel inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TickTickImportPanel inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/ticktick-import.spec.tsx > TickTickImportPanel > 确认后任务真的落进 op-log，且报告里"带不进来"的条数不减
+An update to TickTickImportPanel inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TickTickImportPanel inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/ticktick-import.spec.tsx > TickTickImportPanel > 🔴 同一份文件导第二次：预览说"不会写入"，确认后 op 数不变
+An update to TickTickImportPanel inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TickTickImportPanel inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/ticktick-import.spec.tsx > TickTickImportPanel > 🔴 同一份文件导第二次：预览说"不会写入"，确认后 op 数不变
+An update to TickTickImportPanel inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TickTickImportPanel inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/ticktick-import.spec.tsx > TickTickImportPanel > 🔴 同一份文件导第二次：预览说"不会写入"，确认后 op 数不变
+An update to TickTickImportPanel inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TickTickImportPanel inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/ticktick-import.spec.tsx > TickTickImportPanel > 不是滴答的 CSV → 说清是"没找到表头"，而不是静默通过
+An update to TickTickImportPanel inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TickTickImportPanel inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ tests/ticktick-import.spec.tsx (5 tests) 353ms
+ ✓ tests/reminders-panel.spec.tsx (6 tests) 334ms
+ ✓ tests/habits-detail-card.spec.tsx (13 tests) 324ms
+ ✓ tests/admin-panel.spec.tsx (29 tests) 329ms
+ ✓ tests/countdown-board.spec.tsx (12 tests) 254ms
+ ✓ tests/growth-view-derived-memoized.spec.tsx (2 tests) 283ms
+ ✓ tests/ai-panel-remount.spec.tsx (16 tests) 317ms
+ ✓ tests/ai-breakdown.spec.tsx (55 tests) 260ms
+stderr | tests/timeline-board.spec.tsx > 选中：时间线这一种投影也跟随 > 排期条被 touchcancel 打断后清掉预览，抬手不会写入排期
+Cannot find single active touch.
+
+ ✓ tests/timeline-board.spec.tsx (27 tests) 253ms
+ ✓ tests/habit-trend-board.spec.tsx (8 tests) 258ms
+ ✓ tests/password-panel.spec.tsx (35 tests) 211ms
+ ✓ tests/reminder-tiers.spec.tsx (10 tests) 266ms
+ ✓ tests/ai-duration.spec.tsx (36 tests) 580ms
+ ✓ tests/habit-month-board.spec.tsx (12 tests) 1171ms
+ ✓ tests/account-security.spec.tsx (42 tests) 752ms
+ ✓ tests/ai-prioritize.spec.tsx (28 tests) 668ms
+ ✓ tests/stores.spec.ts (26 tests) 489ms
+stderr | tests/notes-view.spec.tsx > 便签：正在编辑哪一条 = 选中的那一条 > 🔴 选中里有一条便签 ⇒ 挂上视图就打开**那一条**的编辑器
+An update to NoteEditorCard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to NotesView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/notes-view.spec.tsx > 便签：正在编辑哪一条 = 选中的那一条 > 🔴 选中的那条在别处没了 ⇒ 面板自己关，不留指向空 id 的输入框
+An update to NoteEditorCard inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to NotesView inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ tests/notes-view.spec.tsx (7 tests) 551ms
+ ✓ tests/passkey-panel.spec.tsx (23 tests) 743ms
+ ✓ tests/quadrant-row-parity.spec.tsx (10 tests) 633ms
+ ✓ tests/inbox.spec.tsx (23 tests) 503ms
+ ✓ tests/tab-roving.spec.tsx (19 tests) 584ms
+ ✓ tests/auth-entry-default.spec.tsx (10 tests) 803ms
+   ✓ C 主提交按钮与上方输入框的间距 (2)
+     ✓ 🔴 实测间距是表单节奏 12px，不是一个控件内部的 4px 305ms
+ ✓ tests/native-widget-locale.spec.ts (5 tests) 374ms
+ ✓ tests/growth-board.spec.tsx (5 tests) 181ms
+ ✓ tests/notes-selection-trace.spec.tsx (9 tests) 176ms
+stderr | tests/keyboard-cursor.spec.tsx > 键盘光标按渲染顺序走 > 🔴 没选中时 ↓ 选中的是**文档序第一行**，不是 id 序、不是 store 序
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > 键盘光标按渲染顺序走 > 连按 ↓ 逐项到底，再按**停在最后一行**
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > 键盘光标按渲染顺序走 > ↑ 从中间往回走
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > 键盘光标按渲染顺序走 > 同一批 id 被两处渲染时**不重复走**（按 id 去重）
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > 跨视图通用（工单 W1 的那条硬要求） > tasks：↓ 走一行、↑ 回一行，写进的是 task 那一格
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > 跨视图通用（工单 W1 的那条硬要求） > quadrant：↓ 走一行、↑ 回一行，写进的是 task 那一格
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > 跨视图通用（工单 W1 的那条硬要求） > timeline：↓ 走一行、↑ 回一行，写进的是 task 那一格
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > 跨视图通用（工单 W1 的那条硬要求） > habits：↓ 走一行、↑ 回一行，写进的是 habit 那一格
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > 跨视图通用（工单 W1 的那条硬要求） > notes：↓ 走一行、↑ 回一行，写进的是 note 那一格
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > 跨视图通用（工单 W1 的那条硬要求） > 🔴 表里没有的视图不绑光标 —— 清单**从两处真源推出来**，不是手抄
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > 跨视图通用（工单 W1 的那条硬要求） > 🔴 表里没有的视图不绑光标 —— 清单**从两处真源推出来**，不是手抄
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > 跨视图通用（工单 W1 的那条硬要求） > 🔴 表里没有的视图不绑光标 —— 清单**从两处真源推出来**，不是手抄
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > 跨视图通用（工单 W1 的那条硬要求） > 🔴 表里没有的视图不绑光标 —— 清单**从两处真源推出来**，不是手抄
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > 跨视图通用（工单 W1 的那条硬要求） > 🔴 表里没有的视图不绑光标 —— 清单**从两处真源推出来**，不是手抄
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > 跨视图通用（工单 W1 的那条硬要求） > 🔴 表里没有的视图不绑光标 —— 清单**从两处真源推出来**，不是手抄
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > 跨视图通用（工单 W1 的那条硬要求） > 🔴 表里没有的视图不绑光标 —— 清单**从两处真源推出来**，不是手抄
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > 跨视图通用（工单 W1 的那条硬要求） > 🔴 表里没有的视图不绑光标 —— 清单**从两处真源推出来**，不是手抄
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > 三种"不响应"，各挡一种坏 > 焦点在输入框里（正在打字）⇒ 不动选中
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > 三种"不响应"，各挡一种坏 > `role="textbox"` 也算正在打字（RNW 的输入格不是原生 input）
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > 三种"不响应"，各挡一种坏 > 🔴 浮层开着（设置是 sheet 不是路由，底下那一栏还挂着）⇒ 不动选中
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > 三种"不响应"，各挡一种坏 > 🔴 `role="dialog"` 那种浮层（搜索面板）也算开着
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > 三种"不响应"，各挡一种坏 > 🔴 焦点在带子菜单的触发器上（头像那颗 ↓ = 打开菜单）⇒ 列表光标让开
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > 三种"不响应"，各挡一种坏 > 🔴 焦点在展开的菜单里（`role="menu"` 的后代，它既不是 sheet 也不是 dialog）⇒ 让开
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > 三种"不响应"，各挡一种坏 > 带修饰键（⌘/Ctrl/Alt/Shift + 方向）不抢
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > 三种"不响应"，各挡一种坏 > 别的键不抢（也不 preventDefault）
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > 接线的三个细节 > 🔴 端点上再按仍然吞掉按键（否则页面跟着滚而选中不动 = "键坏了"）
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > 接线的三个细节 > 走到的那一行被带进视野（scrollIntoView 的 block 是 nearest）
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > 接线的三个细节 > 🔴 ↓ 走一行 ⇒ DOM 焦点跟着落到**那一行里那颗可聚焦控件**（§8.143）
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > 接线的三个细节 > 🔴 端点上再按（选中不动）也要把焦点**带进那一行**（从 body 起步）
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > 接线的三个细节 > 列表是空的 ⇒ 什么都不做，也不吞键
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > Enter 把焦点交给这一格（W1b 第 3 条腿） > 🔴 焦点在**带痕迹那一行**上 ⇒ 焦点交给这一格、吞掉按键，且选中一个字都没动
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > Enter 把焦点交给这一格（W1b 第 3 条腿） > 🔴 焦点在**没选中**的那一行上 ⇒ 不接管（那是"选它"那一下，不是"打开"）
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > Enter 把焦点交给这一格（W1b 第 3 条腿） > 这一格不在 DOM 里（没渲染面单）⇒ 什么都不做，也**不吞键**
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > Enter 把焦点交给这一格（W1b 第 3 条腿） > 🔴 任务那一族的落点是**栏里那只正文框**（§8.138 拍完"行内展开 vs 栏里编辑"之后才存在）
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > Enter 把焦点交给这一格（W1b 第 3 条腿） > 🔴 窄档（栏没在画 ⇒ 正文框住在行尾那颗 chip 里，DOM 里没有登记的落点）⇒ 不接管、**不吞键**
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/keyboard-cursor.spec.tsx > Enter 把焦点交给这一格（W1b 第 3 条腿） > Enter 走的是**同一套闸门**：正在打字 / 浮层开着 / 焦点在菜单里，都不接管
+An update to Root inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ tests/keyboard-cursor.spec.tsx (34 tests) 95ms
+stderr | tests/auth-recovery.spec.tsx > 面板：入口按钮真的存在，而且真的接上了 store > 面板里有恢复入口按钮（不是"功能做了但没入口"）
+"shadow*" style props are deprecated. Use "boxShadow".
+
+ ✓ tests/auth-recovery.spec.tsx (9 tests) 118ms
+ ✓ tests/quadrant-empty-state.spec.tsx (7 tests) 184ms
+ ✓ tests/capture-composer.spec.tsx (22 tests) 119ms
+stderr | tests/sync-settings-prefill.spec.tsx > 设置 → 同步 那一节的输入框对齐 > 切走同步分类再回来时保留未保存地址，登录入口也使用这份草稿
+"shadow*" style props are deprecated. Use "boxShadow".
+
+ ✓ tests/sync-settings-prefill.spec.tsx (7 tests) 126ms
+ ✓ tests/consent-gate.spec.ts (8 tests) 151ms
+ ✓ tests/ai-failure-locale.spec.tsx (7 tests) 95ms
+ ✓ tests/task-selection.spec.tsx (16 tests) 141ms
+ ✓ tests/row-meta-shared.spec.tsx (26 tests) 137ms
+ ✓ tests/renew-panel.spec.tsx (15 tests) 95ms
+ ✓ tests/import-panel.spec.tsx (5 tests) 164ms
+ ✓ tests/focus-timer-config.spec.tsx (8 tests) 104ms
+ ✓ tests/legal-reconfirm-sheet.spec.tsx (11 tests) 96ms
+ ✓ tests/export-panel.spec.tsx (4 tests) 60ms
+stderr | tests/subtask-picker.spec.tsx > SubtaskPicker —— 用户真的能造出子任务 > 选中一个合法父 ⇒ **真的写进 op-log**，且重开仍在
+An update to SubtaskField inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SubtaskPicker inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/subtask-picker.spec.tsx > SubtaskPicker —— 用户真的能造出子任务 > 选中一个合法父 ⇒ **真的写进 op-log**，且重开仍在
+An update to SubtaskField inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SubtaskPicker inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ tests/subtask-picker.spec.tsx (6 tests) 54ms
+ ✓ tests/note-editor-placement.spec.tsx (11 tests) 75ms
+ ✓ tests/ai-assistant-tier.spec.tsx (14 tests) 84ms
+ ✓ tests/ai-route-explanation.spec.tsx (21 tests) 102ms
+ ✓ tests/memory-panel.spec.tsx (29 tests) 83ms
+stderr | tests/vault-settings-panel.spec.tsx > web encrypted data key settings > creates a key only after recovery confirmation and never sends the plaintext code
+An update to VaultSettingsPanel inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/vault-settings-panel.spec.tsx > web encrypted data key settings > creates a key only after recovery confirmation and never sends the plaintext code
+An update to VaultSettingsPanel inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ tests/vault-settings-panel.spec.tsx (1 test) 160ms
+ ✓ tests/ai-endpoint-disabled.spec.tsx (11 tests) 156ms
+ ✓ tests/date-picker-months-memoized.spec.tsx (2 tests) 137ms
+ ✓ tests/close-account-panel.spec.tsx (15 tests) 80ms
+ ✓ tests/note-editor.spec.tsx (5 tests) 52ms
+ ✓ tests/task-action-error.spec.tsx (6 tests) 25ms
+ ✓ tests/categories.spec.tsx (12 tests) 84ms
+ ✓ tests/assistant-history-panel.spec.tsx (8 tests) 93ms
+ ✓ tests/inbound-draft-review.spec.tsx (4 tests) 82ms
+ ✓ tests/inbound-cycle-display.spec.tsx (3 tests) 56ms
+ ✓ tests/realtime-wiring.spec.ts (11 tests) 40ms
+ ✓ tests/calendar-view-tabs.spec.tsx (11 tests) 70ms
+stderr | tests/store-copy.spec.tsx > sync store 只带数据 > 🔴 每一种已知失败原因都翻成英文，且与中文**不同**（跨包中文不许漏进来）
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/store-copy.spec.tsx > sync store 只带数据 > 🔴 每一种已知失败原因都翻成英文，且与中文**不同**（跨包中文不许漏进来）
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/store-copy.spec.tsx > sync store 只带数据 > 其他错误把原始技术信息带进句子里（不吞也不编）
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/store-copy.spec.tsx > sync store 只带数据 > 其他错误把原始技术信息带进句子里（不吞也不编）
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/store-copy.spec.tsx > focus store 只带原因 > 🔴 落盘失败：store 里是 `{ reason }`，句子在 FocusTimer 里拼（en）
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/store-copy.spec.tsx > focus store 只带原因 > 中文界面拿到同一份数据，拼出中文句子
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/store-copy.spec.tsx > focus store 只带原因 > 没有错误时不渲染错误行（reason 不会被当成 falsy 而漏掉空串检查）
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to SyncBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ tests/store-copy.spec.tsx (7 tests) 80ms
+ ✓ tests/inbound-panel-layout.spec.tsx (6 tests) 72ms
+ ✓ tests/ai-panel-chrome.spec.tsx (12 tests) 64ms
+ ✓ tests/ai-failure-origin-hint.spec.tsx (14 tests) 48ms
+ ✓ tests/privacy-settings-panel.spec.tsx (9 tests) 59ms
+ ✓ tests/ai-disclosure-parity.spec.tsx (1 test) 70ms
+stderr | tests/account-identity.spec.tsx > useAccountIdentity > 隐私决定未通过时保持 idle 且零出站；同意改变后重新读取
+An update to Probe inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | tests/account-identity.spec.tsx > useAccountIdentity > 账号切换时终止旧请求，旧响应不能写回新账号
+An update to Probe inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Probe inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ tests/account-identity.spec.tsx (5 tests) 76ms
+ ✓ tests/habit-frequency-editor.spec.tsx (11 tests) 213ms
+ ✓ tests/boot-splash-dismiss.spec.ts (6 tests) 63ms
+ ✓ tests/ai-failure-settings-navigation.spec.tsx (3 tests) 53ms
+ ✓ tests/ai-tool-run.spec.tsx (6 tests) 79ms
+ ✓ tests/error-screen.spec.tsx (11 tests) 33ms
+ ✓ tests/store.spec.ts (12 tests) 21ms
+ ✓ tests/local-destroy-live-adapter.spec.ts (4 tests) 35ms
+ ✓ tests/inbound-event-retry.spec.tsx (2 tests) 50ms
+ ✓ tests/share-consent-modal-theme.spec.tsx (8 tests) 57ms
+ ✓ tests/plural-keys.spec.tsx (12 tests) 36ms
+ ✓ tests/ai-duration-basis-locale.spec.tsx (5 tests) 76ms
+ ✓ tests/timeline-schedule.spec.tsx (3 tests) 13ms
+ ✓ tests/subscription-notice.spec.tsx (13 tests) 47ms
+ ✓ tests/conflict-dialog.spec.tsx (11 tests) 91ms
+ ✓ tests/habit-goal-editor.spec.tsx (6 tests) 56ms
+ ✓ tests/inbound-worker-lifecycle.spec.tsx (1 test) 56ms
+ ✓ tests/subscription-downgrade.spec.ts (9 tests) 111ms
+ ✓ tests/due-display.spec.tsx (11 tests) 68ms
+ ✓ tests/calendar-drag-day.spec.tsx (11 tests) 55ms
+ ✓ tests/ai-retention-locale.spec.tsx (4 tests) 54ms
+ ✓ tests/share-panel-transfer.spec.tsx (7 tests) 90ms
+ ✓ tests/state-artwork-locale.spec.tsx (1 test) 48ms
+ ✓ tests/legal-recheck-gate.spec.ts (7 tests) 86ms
+ ✓ tests/inbound-upload-authorization.spec.ts (1 test) 87ms
+ ✓ tests/pwa.spec.ts (36 tests) 45ms
+stderr | tests/close-account-pending.spec.tsx > Web 注销面板的未同步条数 > 取数抛错 ⇒ 整句不进树，且不落成一个 0
+[account-closure] 读未上传条数失败 Error: 读不到
+    at Object.countPendingUpload (/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/apps/web/tests/close-account-pending.spec.tsx:29:37)
+    at read (/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/apps/web/src/features/settings/CloseAccountPanel.tsx:91:45)
+    at /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/apps/web/src/features/settings/CloseAccountPanel.tsx:98:10
+    at Object.react_stack_bottom_frame (/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/node_modules/.pnpm/react-dom@19.3.0_react@19.3.0/node_modules/react-dom/cjs/react-dom-client.development.js:28656:20)
+    at runWithFiberInDEV (/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/node_modules/.pnpm/react-dom@19.3.0_react@19.3.0/node_modules/react-dom/cjs/react-dom-client.development.js:1048:13)
+    at commitHookEffectListMount (/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/node_modules/.pnpm/react-dom@19.3.0_react@19.3.0/node_modules/react-dom/cjs/react-dom-client.development.js:13748:29)
+    at commitHookPassiveMountEffects (/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/node_modules/.pnpm/react-dom@19.3.0_react@19.3.0/node_modules/react-dom/cjs/react-dom-client.development.js:13835:11)
+    at commitPassiveMountOnFiber (/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/node_modules/.pnpm/react-dom@19.3.0_react@19.3.0/node_modules/react-dom/cjs/react-dom-client.development.js:16906:13)
+    at recursivelyTraversePassiveMountEffects (/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/node_modules/.pnpm/react-dom@19.3.0_react@19.3.0/node_modules/react-dom/cjs/react-dom-client.development.js:16851:13)
+    at commitPassiveMountOnFiber (/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/node_modules/.pnpm/react-dom@19.3.0_react@19.3.0/node_modules/react-dom/cjs/react-dom-client.development.js:17183:11)
+
+ ✓ tests/close-account-pending.spec.tsx (4 tests) 137ms
+ ✓ tests/ai-disclosure-summary.spec.tsx (1 test) 41ms
+ ✓ tests/auth-passkey.spec.tsx (12 tests) 33ms
+ ✓ tests/public-facts-wiring.spec.ts (7 tests) 40ms
+ ✓ tests/desktop-handoff.spec.ts (8 tests) 18ms
+ ✓ tests/locale-account.spec.tsx (5 tests) 37ms
+ ✓ tests/auth-store-password.spec.ts (21 tests) 38ms
+ ✓ tests/vault-session-concurrency.spec.ts (3 tests) 47ms
+ ✓ tests/rail-more-menu.spec.ts (6 tests) 5ms
+ ✓ tests/preference-copy.spec.tsx (9 tests) 16ms
+ ✓ tests/push-subscribe.spec.ts (38 tests) 8ms
+ ✓ tests/locale.spec.ts (12 tests) 11ms
+ ✓ tests/credential-storage.spec.ts (11 tests) 6ms
+ ✓ tests/assistant-history.spec.ts (18 tests) 18ms
+ ✓ tests/passkey-browser.spec.ts (33 tests) 13ms
+ ✓ tests/pending-login.spec.ts (19 tests) 22ms
+ ✓ tests/ai-failure-parity.spec.tsx (6 tests) 12ms
+ ✓ tests/motivation.spec.ts (12 tests) 8ms
+stderr | tests/storage-backend-shell.spec.ts > 页侧传输：initOpLog 能在宿主端口上完成 > 🔴 交握成功、后端上报为 shell、clientId 由壳侧给出、且恢复期真的走了端口
+[heyta] 旧 OPFS SQLite 迁移失败，将从空库开始 ReferenceError: Worker is not defined
+    at /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/apps/web/src/lib/oplog.ts:349:20
+    at importIntoEmptyTarget (/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/apps/web/src/lib/oplog.ts:423:26)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at migrateLegacyOpfsSqlite (/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/apps/web/src/lib/oplog.ts:348:3)
+    at openStorage (/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/apps/web/src/lib/oplog.ts:206:7)
+    at /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/apps/web/src/lib/oplog.ts:453:20
+    at /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/apps/web/tests/storage-backend-shell.spec.ts:140:5
+    at file:///Users/rocalight/Desktop/All%20in%20one%20Data/01_PROJECTS/heyta/.worktrees/inb-t8/node_modules/.pnpm/vitest@5.0.1_@types+node@24.19.0_jsdom@27.4.0_@noble+hashes@2.4.0__vite@7.3.6_@types+no_3e82e8f2629ce074e59a6a327d70e9c7/node_modules/vitest/dist/chunks/run.C5UmxDPh.js:2783:20
+
+ ✓ tests/storage-backend-shell.spec.ts (3 tests) 6ms
+ ✓ tests/pwa-register-readystate.spec.ts (4 tests) 5ms
+ ✓ tests/countdown-card-export.spec.ts (16 tests) 7ms
+ ✓ tests/legacy-opfs-worker-failure.spec.ts (1 test) 4ms
+ ✓ tests/startup-network.spec.ts (12 tests) 4ms
+ ✓ tests/ai-tool-intent-text.spec.ts (6 tests) 2ms
+ ✓ tests/ai-failure-copy.spec.tsx (3 tests) 2ms
+ ✓ tests/sync-reason-coverage.spec.ts (7 tests) 3ms
+ ✓ tests/site-url.spec.ts (7 tests) 3ms
+ ✓ tests/focus-config.spec.ts (12 tests) 4ms
+ ✓ tests/reminder-notify.spec.ts (19 tests) 4ms
+ ✓ tests/auth-endpoint.spec.ts (12 tests) 3ms
+ ✓ tests/widget-install.spec.ts (23 tests) 4ms
+ ✓ tests/focus-pause-stops-ticking.spec.ts (2 tests) 4ms
+ ✓ tests/focus-log-failure-parity.spec.ts (6 tests) 3ms
+ ✓ tests/task-row-title-floor.spec.tsx (8 tests) 3ms
+ ✓ tests/project-sort-pref.spec.ts (2 tests) 2ms
+ ✓ tests/join-link.spec.ts (8 tests) 3ms
+ ✓ tests/rail-pref.spec.ts (3 tests) 7ms
+ ↓ tests/e2e-sync.integration.spec.ts (12 tests | 12 skipped)
+stderr | tests/journey-ai-memory.integration.spec.tsx
+[journey-ai-memory] ⚠️ 本套用例这一轮**没有跑**（唯一碰真模型的 web 旅程）。
+   缺少真端点配置：/tmp/heyta-ai-live/provider.json
+   要跑：HEYTA_AI_LIVE_CONFIG=<path> pnpm --filter @heyta/web test（需要真模型，本机 Ollama 即可）
+
+ ↓ tests/journey-ai-memory.integration.spec.tsx (1 test | 1 skipped)
+
+ Test Files  177 passed | 2 skipped (179)
+      Tests  2275 passed | 13 skipped (2288)
+   Start at  18:06:07
+   Duration  250.72s (import 34%, tests 33%, environment 27%, transform 4%, setup 1%)
+
+Environment  jsdom was created 179 times · 63.53s total, 27% of tracked time
+             create it once per worker with pool: 'vmThreads' (keeps per-file isolation) or isolate: false (shares it across files)
+             learn more: https://vitest.dev/guide/improving-performance#test-environments
+

@@ -1,0 +1,54 @@
+CARRIER_HEAD=62f1066f2c292dddf5a93710316e1a3f4bdc5016
+main=b23c1b14ed976bdd28bdfb5e9242c7779a16d1f6
+载体与 main 的差异（应只有台账两份文件）:
+  PROGRESS.md
+  docs/plans/inbound-automation.md
+跟踪脏度=[]
+产物新旧自检:
+  packages/i18n: 0 枚比 dist 新
+  packages/ui: 0 枚比 dist 新
+  packages/design-system: 0 枚比 dist 新
+  packages/app-host: 0 枚比 dist 新
+  packages/domain: 0 枚比 dist 新
+  packages/shared-schema: 0 枚比 dist 新
+  packages/inbound-core: 0 枚比 dist 新
+
+==== pnpm -r --no-bail test 18:33:09
+RC_RTEST=1
+==== 覆盖审计
+Scope 行: Scope: 21 of 22 workspace projects
+打印了 Test Files 汇总的行数=21
+失败的包:
+  server test: stdout | tests/passkey-routes.spec.ts > 通行密钥自助管理（HTTP） > 缺口 B：/api/login/passkey/verify 的可判别 401 > 凭据验签失败 → code = passkey_verification_failed
+  server test: stdout | tests/passkey-routes.spec.ts > 通行密钥自助管理（HTTP） > 缺口 B：/api/login/passkey/verify 的可判别 401 > 凭据验签失败 → code = passkey_verification_failed
+  server test: stderr | tests/passkey-routes.spec.ts > 通行密钥自助管理（HTTP） > 缺口 B：/api/login/passkey/verify 的可判别 401 > 凭据验签失败 → code = passkey_verification_failed
+  server test: 2026-10-12T10:34:42.194Z [WARN] Passkey authentication verification failed (userId: 1): Error: bad signature
+  server test: stderr | tests/passkey-routes.spec.ts > 通行密钥自助管理（HTTP） > 缺口 B：/api/login/passkey/verify 的可判别 401 > 凭据验签失败 → code = passkey_verification_failed
+  server test: 2026-10-12T10:34:42.313Z [WARN] Passkey authentication verification failed (userId: 1): Error: bad signature
+  server test: 2026-10-12T10:34:43.021Z [WARN] User passkey registration verification failed (userId: 1): Error: bad attestation
+  server test: 2026-10-12T10:34:43.021Z [ERROR] User passkey registration error: Passkey verification failed
+  server test: 2026-10-12T10:34:43.203Z [WARN] User passkey registration verification failed (userId: 1): Error: bad attestation
+  server test: 2026-10-12T10:34:43.203Z [ERROR] User passkey registration error: Passkey verification failed
+  server test: 2026-10-12T10:34:43.278Z [ERROR] Authenticator-added notice failed (ID: 1): smtp exploded
+  server test: 2026-10-12T10:34:46.915Z [ERROR] Cleanup [old-ops]: drain failed for user 1 (boundary 121, 50 ops deleted before the error); their prefix may be truncated until the next run: Error: simulated transient DB failure
+  server test: 2026-10-12T10:34:46.916Z [WARN] Cleanup [old-ops]: 1 user(s) failed mid-drain and were skipped; the run continued for the remaining users.
+  server test: 2026-10-12T10:34:49.040Z [WARN] [user:1] generateSnapshot cache-delta hook failed: counter down
+  server test: 2026-10-12T10:34:49.062Z [ERROR] Transaction failed for user 1: Operation insert skipped by non-id unique constraint (userId=1, opId=seq-conflict-op, serverSeq=1)
+  server test: 2026-10-12T10:34:50.370Z [WARN] Request failed 400 POST /echo: FastifyError: Body is not valid JSON but content-type is set to 'application/json'
+  server test: 2026-10-12T10:34:50.373Z [ERROR] Request failed 500 POST /boom: Error: 数据库主机名 db.internal 不可达 Error: 数据库主机名 db.internal 不可达
+  server test: 2026-10-12T10:34:50.375Z [WARN] Request failed 409 GET /conflicted: Error: version bumped concurrently
+  server test: stdout | tests/passkey-management.spec.ts > 缺口 B：陈旧凭据与验签失败是两个不同的码 > 认得凭据但验签失败 → passkey_verification_failed
+  server test: stdout | tests/passkey-management.spec.ts > 缺口 B：陈旧凭据与验签失败是两个不同的码 > 认得凭据但验签失败 → passkey_verification_failed
+  server test: stderr | tests/passkey-management.spec.ts > 缺口 B：陈旧凭据与验签失败是两个不同的码 > 认得凭据但验签失败 → passkey_verification_failed
+  server test: 2026-10-12T10:34:50.740Z [WARN] Passkey authentication verification failed (userId: 1): Error: bad signature
+  server test: 2026-10-12T10:34:50.740Z [WARN] Passkey authentication verification failed (userId: 1): Error: bad signature
+  server test: stdout | tests/passkey.spec.ts > Passkey Authentication > Registration Flow > should keep a failed-delivery credential pending and inactive
+  server test: stdout | tests/passkey.spec.ts > Passkey Authentication > Registration Flow > should keep a failed-delivery credential pending and inactive
+  server test: stdout | tests/passkey.spec.ts > Passkey Authentication > Registration Flow > should keep a failed-delivery credential pending and inactive
+  server test: 2026-10-12T10:34:52.089Z [WARN] Passkey registration verification failed: Error: Verification failed
+  apps/web test:  ❯ tests/calendar-sidebar.spec.tsx (15 tests | 2 failed) 43901ms
+  apps/web test:  Test Files  2 failed | 175 passed | 2 skipped (179)
+  apps/web test:       Tests  3 failed | 2276 passed | 13 skipped (2292)
+每包读数（包名 + Test Files + Tests）:
+grep: empty (sub)expression
+ALL_DONE 18:35:31

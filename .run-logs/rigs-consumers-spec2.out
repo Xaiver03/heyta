@@ -1,0 +1,19 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90m/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/server[39m
+
+ [32m✓[39m tests/inbound-lane-rigs-consumers.spec.ts [2m([22m[2m11 tests[22m[2m)[22m[33m 59670[2mms[22m[39m
+     [33m[2m✓[22m[39m verify-inbound-ac8-matrix.py 退出 0 [33m 1176[2mms[22m[39m
+     [33m[2m✓[22m[39m verify-inbound-cjs-require-order.py 退出 0 [33m 13929[2mms[22m[39m
+     [33m[2m✓[22m[39m verify-inbound-producer-seam.py 退出 0 [33m 7350[2mms[22m[39m
+     [33m[2m✓[22m[39m verify-inbound-ac8-matrix.py --self-test 的反向验证臂全成立 [33m 9459[2mms[22m[39m
+     [33m[2m✓[22m[39m verify-inbound-doc-tables.py --self-test 的反向验证臂全成立 [33m 599[2mms[22m[39m
+     [33m[2m✓[22m[39m verify-inbound-cjs-require-order.py --self-test 的反向验证臂全成立 [33m 26527[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m11 passed[39m[22m[90m (11)[39m
+[2m   Start at [22m 09:47:01
+[2m   Duration [22m 60.06s[2m (transform 130ms, setup 154ms, import 30ms, tests 59.67s, environment 0ms)[22m
+

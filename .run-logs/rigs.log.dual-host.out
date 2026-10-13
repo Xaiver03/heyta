@@ -1,0 +1,9 @@
+Planned windows (现量自 docs/plans/inbound-automation.md): [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+Traceback (most recent call last):
+  File "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/research/tools/verify-inbound-dual-host.py", line 353, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/research/tools/verify-inbound-dual-host.py", line 319, in main
+    with open(args.log, 'w') as log:
+         ~~~~^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/Users/rocalight/.cache/heyta-inbound-rigs/dual-host-1012.log'

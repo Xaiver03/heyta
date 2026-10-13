@@ -1,0 +1,25 @@
+
+依赖树许可证清点（去重后 961 个包）
+
+  宽松许可（可闭源商用） : 960
+
+  ── 许可证分布（前 12）──
+      810  MIT
+       49  ISC
+       32  Apache-2.0
+       31  BSD-3-Clause
+       19  BSD-2-Clause
+        5  BlueOak-1.0.0
+        3  MIT-0
+        3  MPL-2.0
+        3  0BSD
+        2  CC0-1.0
+        1  Python-2.0
+        1  CC-BY-4.0
+
+  ☑️  白名单外、已逐项登记 : 1
+     caniuse-lite@1.0.30001812  →  CC-BY-4.0
+       理由：caniuse-lite@1.0.30001812：browserslist 的**构建期数据包**，不进入运行时产物；CC-BY 是署名许可（不是禁用的 CC-BY-NC），归属已在 THIRD_PARTY_LICENSES.md §2 登记。
+
+结论：全部依赖均为宽松许可（含已登记的例外）✅
+

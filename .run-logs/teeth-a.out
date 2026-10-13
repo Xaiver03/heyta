@@ -1,0 +1,48 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90m/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/server[39m
+
+ [31m❯[39m tests/inbound-lane-rigs-consumers.spec.ts [2m([22m[2m11 tests[22m[2m | [22m[31m1 failed[39m[2m | [22m[33m10 skipped[39m[2m)[22m[32m 69[2mms[22m[39m
+[31m     [31m×[31m research/tools 里没有"造出来却没人消费"的新装置[39m[32m 9[2mms[22m[39m
+     [2m[90m↓[39m[22m 接进来的每一枚要么有 self-test 腿，要么写下这一腿为什么不跑
+     [2m[90m↓[39m[22m verify-inbound-ac-ticks.py 退出 0
+     [2m[90m↓[39m[22m verify-inbound-ac8-matrix.py 退出 0
+     [2m[90m↓[39m[22m verify-inbound-doc-tables.py 退出 0
+     [2m[90m↓[39m[22m verify-inbound-cjs-require-order.py 退出 0
+     [2m[90m↓[39m[22m verify-inbound-producer-seam.py 退出 0
+     [2m[90m↓[39m[22m verify-inbound-ac-ticks.py --self-test 的反向验证臂全成立
+     [2m[90m↓[39m[22m verify-inbound-ac8-matrix.py --self-test 的反向验证臂全成立
+     [2m[90m↓[39m[22m verify-inbound-doc-tables.py --self-test 的反向验证臂全成立
+     [2m[90m↓[39m[22m verify-inbound-cjs-require-order.py --self-test 的反向验证臂全成立
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/inbound-lane-rigs-consumers.spec.ts[2m > [22m本线装置的自动消费者[2m > [22mresearch/tools 里没有"造出来却没人消费"的新装置
+[31m[1mAssertionError[22m: expected [ Array(1) ] to deeply equal [][39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- [][39m
+[31m+ [[39m
+[31m+   "verify-inbound-aa-unregistered-probe.py",[39m
+[31m+ ][39m
+
+[36m [2m❯[22m tests/inbound-lane-rigs-consumers.spec.ts:[2m79:56[22m[39m
+    [90m 77|[39m       [33m.[39m[34msort[39m()[33m;[39m
+    [90m 78|[39m     const accounted = new Set([...WIRED, ...Object.keys(DELIBERATELY_N…
+    [90m 79|[39m     [34mexpect[39m(all[33m.[39m[34mfilter[39m((name) [33m=>[39m [33m![39maccounted[33m.[39m[34mhas[39m(name)))[33m.[39m[34mtoEqual[39m([])[33m;[39m
+    [90m   |[39m                                                        [31m^[39m
+    [90m 80|[39m     [90m// 名单里也不许留着盘上已经不存在的装置 —— 那会让上面那条判据的分母悄悄缩小[39m
+    [90m 81|[39m     expect([...accounted].filter((name) => !all.includes(name))).toEqu…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[33m10 skipped[39m[90m (11)[39m
+[2m   Start at [22m 09:48:14
+[2m   Duration [22m 618ms[2m (transform 167ms, setup 186ms, import 22ms, tests 69ms, environment 0ms)[22m
+

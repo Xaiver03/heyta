@@ -1,0 +1,76 @@
+
+ RUN  v5.0.1 /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/packages/legal
+
+ ❯ tests/email-catalog.spec.ts (5 tests | 2 failed) 36ms
+   ❯ 功能邮件的封闭词表与代码对账 (5)
+     ✓ 🔴 探针读到了实现（0 枚 = 这个模块改形或路径漂了，不能报"全部合规"） 1ms
+     ✓ 🔴 每一枚实现都在登记表里有一个人类可读的名字，一个都不许多 1ms
+     × 🔴 九份文档 × 中英两栏里每一处"N 封功能邮件"都等于代码数到的枚数，逐类点名的格子点得齐 12ms
+     × 🔴 悬空守卫：登记表每个名字都真在语料里、数量词形状真命中过 19ms
+     ✓ 🔴 承重对照：数字写错与枚举漏一类，这两样都真的会让上面那条转红 1ms
+ ✓ tests/structure.spec.ts (63 tests) 111ms
+ ✓ tests/presentation.spec.ts (4 tests) 103ms
+ ✓ tests/retention-claim.spec.ts (4 tests) 7ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/email-catalog.spec.ts > 功能邮件的封闭词表与代码对账 > 🔴 九份文档 × 中英两栏里每一处"N 封功能邮件"都等于代码数到的枚数，逐类点名的格子点得齐
+AssertionError: 
+third-parties/zh-CN：写的是 10 封，而代码里有 11 枚 send*Email 导出
+third-parties/zh-CN：写的是 10 封，而代码里有 11 枚 send*Email 导出
+third-parties/zh-CN：那一格在逐类点名（已点 10 类），但漏了 1 类：登录验证码
+third-parties/en：写的是 10 封，而代码里有 11 枚 send*Email 导出
+third-parties/en：写的是 10 封，而代码里有 11 枚 send*Email 导出
+third-parties/en：那一格在逐类点名（已点 10 类），但漏了 1 类：sign-in code: expected [ …(6) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "third-parties/zh-CN：写的是 10 封，而代码里有 11 枚 send*Email 导出",
++   "third-parties/zh-CN：写的是 10 封，而代码里有 11 枚 send*Email 导出",
++   "third-parties/zh-CN：那一格在逐类点名（已点 10 类），但漏了 1 类：登录验证码",
++   "third-parties/en：写的是 10 封，而代码里有 11 枚 send*Email 导出",
++   "third-parties/en：写的是 10 封，而代码里有 11 枚 send*Email 导出",
++   "third-parties/en：那一格在逐类点名（已点 10 类），但漏了 1 类：sign-in code",
++ ]
+
+ ❯ tests/email-catalog.spec.ts:195:52
+    193|   it('🔴 九份文档 × 中英两栏里每一处"N 封功能邮件"都等于代码数到的枚数，逐类点名的格子点得齐', () => {
+    194|     const offenders = auditCorpus(LEGAL_DOCUMENTS as unknown as LegalD…
+    195|     expect(offenders, '\n' + offenders.join('\n')).toEqual([]);
+       |                                                    ^
+    196|   });
+    197|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/email-catalog.spec.ts > 功能邮件的封闭词表与代码对账 > 🔴 悬空守卫：登记表每个名字都真在语料里、数量词形状真命中过
+AssertionError: 排除变更表之后仍有不符项，与上面那条判据矛盾: expected 6 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 6
+
+ ❯ tests/email-catalog.spec.ts:220:46
+    218|     const judged = auditCorpus(docs, senders.length, true).length;
+    219|     const naive = auditCorpus(docs, senders.length, false).length;
+    220|     expect(judged, '排除变更表之后仍有不符项，与上面那条判据矛盾').toBe(0);
+       |                                              ^
+    221|     expect(naive, '把变更表也扫进来之后命中数没变 —— 排除那条腿没起作用（现量：两样都是 0）').toBeGreat…
+    222|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed | 3 passed (4)
+      Tests  2 failed | 74 passed (76)
+   Start at  09:31:52
+   Duration  1.09s (tests 39%, transform 35%, import 24%, worker 2%)
+
+    Isolate  4 workers spawned · ~99ms startup each (spawn + environment, per file)
+             at least ~296ms faster with isolate: false — reuses workers across files instead of one per file
+

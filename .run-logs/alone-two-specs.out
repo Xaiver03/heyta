@@ -1,0 +1,39 @@
+
+ RUN  v5.0.1 /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/apps/web
+
+ ✓ tests/calendar-sidebar.spec.tsx (15 tests) 3444ms
+   ✓ 日历侧栏（Web） (15)
+     ✓ 🔴 迷你月历的格子与 `monthGrid` **逐格对齐**，列头是**周一开头** 475ms
+     ✓ 🔴 侧栏与主区**共用同一份**月与日（翻月 / 点补白格 / 回到今天） 336ms
+     ✓ 范围不落盘：刷新回到今天与全部 354ms
+stderr | tests/reminder-wake.spec.tsx > 1–2. 到点自醒 + 恰好一次（假时钟，之后不再有任何 op） > 🔴 醒的路径与写的路径分离：定时器只触发投递，`firedAt` 由**投递成功**那一层落库
+An update to Probe inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to Probe inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ tests/reminder-wake.spec.tsx (9 tests) 4713ms
+   ✓ 4. 真实应用树里这个钟确实挂着（真时钟 + 真 <App />） (1)
+     ✓ 🔴 不点任何东西、不产生第二条 op，一条 1.2 秒后的提醒自己响了恰好一次 4676ms
+
+ Test Files  2 passed (2)
+      Tests  24 passed (24)
+   Start at  18:36:53
+   Duration  10.81s (tests 76%, transform 13%, import 7%, environment 4%)
+

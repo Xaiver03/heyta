@@ -1,0 +1,8 @@
+自测一：失配必须响亮拒绝　目标=1 枚：server/src/entitlement.ts
+  server/src/entitlement.ts　开局 sha256=4b97418c02779df8　备份=/private/tmp/heyta-inbound-ticket-teeth/entitlement.ts.mut-bak
+  不存在的裁决（负面对照）: PATTERN_MISS(命中 0 处，要求恰好 1 处)
+  末次 sha256 server/src/entitlement.ts = 4b97418c02779df8（须等于开局那枚）
+臂数=1　不成立=1
+  失配臂：被拒（真臂的绿只有在模式确实命中时才算数）
+  保险丝臂：成立（RESTORE_GUARD 报了，且落回开局那份 4b97418c02779df8）
+SELF_TEST=OK（失配臂被拒 + 保险丝会触发）

@@ -1,0 +1,47 @@
+Planned windows (现量自 docs/plans/inbound-automation.md): [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+臂 1 静止对照：期望 rc=0 —— 实得 rc=0
+     WINDOW=1   PASS synthetic
+     WINDOW=2   PASS synthetic
+     WINDOW=3   PASS synthetic
+     WINDOW=4   PASS synthetic
+     WINDOW=5   PASS synthetic
+     WINDOW=6   PASS synthetic
+     WINDOW=7   PASS synthetic
+     WINDOW=8   PASS synthetic
+     WINDOW=9   PASS synthetic
+     WINDOW=10  PASS synthetic
+     WINDOW=11  PASS synthetic
+     WINDOW=12  PASS synthetic
+     WINDOW=13  PASS synthetic
+臂 2 注入缺失（抽掉 WINDOW=13 那一行）：期望 rc=1 且点名该格 —— 实得 rc=1，点名=True
+   R4 计划列了 13 格，套件没报这几格：[13] ⇒ 覆盖不全，判红。
+     WINDOW=1   PASS synthetic
+     WINDOW=2   PASS synthetic
+     WINDOW=3   PASS synthetic
+     WINDOW=4   PASS synthetic
+     WINDOW=5   PASS synthetic
+     WINDOW=6   PASS synthetic
+     WINDOW=7   PASS synthetic
+     WINDOW=8   PASS synthetic
+     WINDOW=9   PASS synthetic
+     WINDOW=10  PASS synthetic
+     WINDOW=11  PASS synthetic
+     WINDOW=12  PASS synthetic
+臂 3 注入 0/0（汇总行没有 passed 数）：期望 rc=1 —— 实得 rc=1
+   R2 用例汇总 passed=0（skipped=0）⇒ 0/0 不算证据，判红。
+     WINDOW=1   PASS x
+     WINDOW=2   PASS x
+     WINDOW=3   PASS x
+     WINDOW=4   PASS x
+     WINDOW=5   PASS x
+     WINDOW=6   PASS x
+     WINDOW=7   PASS x
+     WINDOW=8   PASS x
+     WINDOW=9   PASS x
+     WINDOW=10  PASS x
+     WINDOW=11  PASS x
+     WINDOW=12  PASS x
+     WINDOW=13  PASS x
+   R7 套件没回传 VITEST_RC ⇒ 判卷走的是进程内的读数，不是真退出码那一条腿。
+臂 4 注入重复报号：期望非零退出 —— 实得 SystemExit(R4 同一格报了两遍：WINDOW=1（窗口号必须唯一，否则分母对账是假的）)
+臂 5 注入"主表读不到"的计划文本：期望非零退出 —— 实得 SystemExit(R0 分母现量不成：读到 [11]，缺 [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] ⇒ 窗口编号本该从 1 连续，缺号只可能是解析没读到（尺瞎了），不是清单少了格)

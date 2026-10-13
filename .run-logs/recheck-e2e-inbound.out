@@ -1,0 +1,66 @@
+[WebServer] (node:4320) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:4934) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 6 tests using 1 worker
+
+(node:5569) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] [BABEL] Note: The code generator has deoptimised the styling of /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/packages/ui/dist/index.js as it exceeds the max of 500KB.
+  ✘  1 [chromium] › tests/inbound-automation.spec.ts:8:3 › encrypted date draft review and Vault invalidation 1280 (1.0m)
+(node:9379) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  2 [chromium] › tests/inbound-automation.spec.ts:8:3 › encrypted date draft review and Vault invalidation 390 (1.0m)
+(node:26126) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  3 [chromium] › tests/inbound-automation.spec.ts:96:3 › inbound explicit retry and themes 1280 (3.8s)
+  ✓  4 [chromium] › tests/inbound-automation.spec.ts:96:3 › inbound explicit retry and themes 390 (3.4s)
+  ✓  5 [chromium] › tests/inbound-automation.spec.ts:161:3 › inbound settings panel layout evidence 1280 (2.9s)
+  ✓  6 [chromium] › tests/inbound-automation.spec.ts:161:3 › inbound settings panel layout evidence 390 (3.1s)
+
+
+  1) [chromium] › tests/inbound-automation.spec.ts:8:3 › encrypted date draft review and Vault invalidation 1280 
+
+    Test timeout of 60000ms exceeded.
+
+    Error: locator.click: Test timeout of 60000ms exceeded.
+    Call log:
+      - waiting for getByTestId('inbound-event-date-draft').getByRole('button', { name: '查看并编辑草稿', exact: true })
+
+
+      83 |     state = 'needs-confirmation';
+      84 |     await selectSettingsSection(page, 'sync'); await selectSettingsSection(page, 'ai');
+    > 85 |     await row.getByRole('button', { name: '查看并编辑草稿', exact: true }).click();
+         |                                                                     ^
+      86 |     await expect(editor).toBeVisible();
+      87 |     await page.evaluate(async (baseUrl) => {
+      88 |       const vault = await import('/src/lib/vault-session.ts');
+        at /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/e2e/tests/inbound-automation.spec.ts:85:69
+
+    Error Context: ../../../../../../../../../tmp/heyta-inbound-ui-results/inbound-automation-encrypt-418a5-and-Vault-invalidation-1280-chromium/error-context.md
+
+  2) [chromium] › tests/inbound-automation.spec.ts:8:3 › encrypted date draft review and Vault invalidation 390 
+
+    Test timeout of 60000ms exceeded.
+
+    Error: locator.click: Test timeout of 60000ms exceeded.
+    Call log:
+      - waiting for getByTestId('inbound-event-date-draft').getByRole('button', { name: '查看并编辑草稿', exact: true })
+
+
+      83 |     state = 'needs-confirmation';
+      84 |     await selectSettingsSection(page, 'sync'); await selectSettingsSection(page, 'ai');
+    > 85 |     await row.getByRole('button', { name: '查看并编辑草稿', exact: true }).click();
+         |                                                                     ^
+      86 |     await expect(editor).toBeVisible();
+      87 |     await page.evaluate(async (baseUrl) => {
+      88 |       const vault = await import('/src/lib/vault-session.ts');
+        at /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8/e2e/tests/inbound-automation.spec.ts:85:69
+
+    Error Context: ../../../../../../../../../tmp/heyta-inbound-ui-results/inbound-automation-encrypt-d08df--and-Vault-invalidation-390-chromium/error-context.md
+
+  2 failed
+    [chromium] › tests/inbound-automation.spec.ts:8:3 › encrypted date draft review and Vault invalidation 1280 
+    [chromium] › tests/inbound-automation.spec.ts:8:3 › encrypted date draft review and Vault invalidation 390 
+  4 passed (2.3m)

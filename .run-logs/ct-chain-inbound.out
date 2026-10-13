@@ -1,0 +1,3 @@
+CHAIN carrier=/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/.worktrees/inb-t8 total_steps=106 requested=106 selected=0 timeout=1800s
+HEAD=62f1066f
+CHAIN_DEVICE_NO_STEPS_RAN selected=0 (refusing to report a green for an empty run)
