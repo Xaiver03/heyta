@@ -570,6 +570,20 @@ export type SyncClientOptions = SyncEncryptionOptions & {
 
   /** 本设备的 clientId。 */
   clientId: string;
+  /**
+   * 本外壳的**裸 semver**（`0.1.0`），随下载请求以 `appVersion` 上报。
+   *
+   * 服务端拿它做 checkpoint 闸门（`server/src/sync/checkpoint-gate.ts`，#9962）：
+   * 闸门是**纯结构比较** —— 缺省与"低于 cut"算同一档（都判 old），所以上报真版本
+   * 不会放开任何裁历史的口子；反过来，**占位值**（`0.0.0`）会把假版本写进
+   * 运营面那份设备清单，所以宁可不传。
+   *
+   * 🔴 正常路径下**不要由宿主传**：真源是仓库根 `package.json`，经
+   * `scripts/gen-app-version.mjs` 生成到 `@heyta/app-host`，由 `createSyncClient()` 统一给
+   * （AGENTS §3.5：版本号不是平台差异）。这个参数留着，是给**自己另构建一份客户端**
+   * 的人覆盖用的。缺省 = 一个字都不发，与"沉默"同形。
+   */
+  appVersion?: string;
   /** E2EE 口令。未配置时必须**拒绝同步**而不是降级成明文。 */
   getPassword: () => Promise<string | undefined>;
 
@@ -1589,6 +1603,12 @@ export class SyncClient {
       url.searchParams.set('limit', String(DOWNLOAD_PAGE_SIZE));
       // 排除自己：我们的 op 已经应用过了，拉回来纯属浪费
       url.searchParams.set('excludeClient', this.options.clientId);
+      // `appVersion` 只搭在下载段这**一个**参数上：服务端 `touchDevice` 的触发条件就是
+      // `excludeClient` 在（`server/src/sync/sync.routes.ts`），所以缺了 clientId 那次连版本都不会记。
+      // 缺省不传 = 一个字都不发（沉默与"低于 cut"同档，见 options.appVersion 的注释）。
+      if (this.options.appVersion) {
+        url.searchParams.set('appVersion', this.options.appVersion);
+      }
 
       const res = await this.fetchImpl(url.toString(), {
         headers: { authorization: `Bearer ${token}` },

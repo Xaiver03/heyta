@@ -491,19 +491,26 @@ Why there is no "N-1 works" or "same major only" promise yet — stated plainly 
 policy that cannot be enforced is decoration:
 
 - Nothing has been released, so there is no older version to be compatible with.
-- The server can already see a client's version (`appVersion` on the download request is
-  parsed and recorded per device in `server/src/sync/checkpoint-gate.ts` /
-  `sync.routes.ts`), but **no heyta client sends it today**: the one place that builds the
-  download query (`packages/sync-client/src/client.ts`) sets `sinceSeq`, `limit` and
-  `excludeClient` and nothing else, and every host goes through it. A version gate would
-  therefore match nothing, and a "supported versions" table would be unreadable by the
-  software it describes.
+- The server sees a client's version (`appVersion` on the download request is parsed and
+  recorded per device in `server/src/sync/checkpoint-gate.ts` / `sync.routes.ts`), and **every
+  heyta client sends it**: the one place that builds the download query
+  (`packages/sync-client/src/client.ts`) sets `sinceSeq`, `limit`, `excludeClient` and
+  `appVersion`, and every host goes through it — `createSyncClient()` in
+  `packages/app-host/src/sync-wiring.ts` supplies the value, so no shell has to remember to.
+  The client version source of truth is the repository root `package.json` — currently `0.1.0`
+  (`scripts/gen-app-version.mjs` generates the constant that wiring passes; `check:app-version`
+  pins the two together, and `version-coupling.spec.ts` re-checks the value against the
+  server's own parser, because a version the server cannot parse is recorded as silence).
+  What a reported version still cannot do is express compatibility: it lives in heyta's `0.x`
+  space, which the gate reads as "old", so a "supported versions" table would remain
+  unreadable by the software it describes.
 
 The trigger to revisit this: the first time images are published (see
 `docs/research/self-host-distribution-audit.md` §7 G-40⑤/⑥). Reporting `appVersion` is
 **one** prerequisite, not the pair the sentence used to claim — the full chain is:
 
 1. a **version source** for client builds (G-40⑤) whose space matches the gate's constant.
+   The source now exists (root `package.json`, see above); the *space* does not.
    `MIN_CHECKPOINT_SAFE_APP_VERSION` is `18.21.2`, a *Super Productivity* release number, and
    heyta versions are `0.x` — so a heyta-space value always compares as "old" and reporting
    it changes nothing except the wording an operator reads.

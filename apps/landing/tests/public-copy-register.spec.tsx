@@ -722,4 +722,61 @@ describe('公页指向的仓库文档', () => {
       `公页上有链接直连内部 P0 验收手册（它开头是一张内部机器表）：${internal.join(', ')}`,
     ).toEqual([]);
   });
+
+  /**
+   * G-62：这一页教访客"一条命令起全套"，却从没说**起完打开哪里**。
+   *
+   * 界面已经由服务端容器在 `/app/` 同域提供（台账 §8.137 的现量：能力成立、说明没跟上），
+   * 而"说明没跟上"这一族的失效形态不是写错，是**读起来句句都对、说的却是能力变之前那个世界**
+   * —— 那一节的排查顺序整段停在"你自己另托管一份前端"那一档。
+   *
+   * 🔴 判 DOM 而不是只判词条表：新加一条正文却没登记进 `docs.ts` 的分区清单，
+   * 字典里读得到、页面上读不到 —— 那正是这一格要防的形状，只有渲染能挡住它。
+   *
+   * 🔴 needle 取的是**那一句独有的片段**，不是满页都有的标识符：`/app/` 这种词别处也出现，
+   * 拿它当判据的话"整段删掉这一句"照样绿，判据就成了装饰。每份语言三条，一条对应
+   * G-62 的一项要求：①起完打开哪个地址（`s7p4`）②同域那一档先查什么（`s6p3`）
+   * ③CORS 那段被限定到它自己那一档（`s6p1` 的分叉首句）。
+   * 三条都是**各自承重**的：第三条测试臂逐个把对应的正文摘掉，必须各自打红一次。
+   * 阳性对照取本节**本来就在场**的那个文件名（入口命令的 override），它在待验状态之外：
+   * 整块没渲染时它同样是 0，此时上面那三条不算证据。
+   */
+  it('站内自建指南必须说清"起完打开 /app/ 就能用"（中英两份、渲染后的正文）', () => {
+    const CASES: Array<{ locale: Locale; needles: string[] }> = [
+      {
+        locale: 'zh-CN',
+        needles: ['https://你的域名/app/', 'https://你的域名/health', '先分清是哪一档'],
+      },
+      {
+        locale: 'en',
+        needles: [
+          'https://your-domain/app/',
+          'https://your-domain/health',
+          'First work out which setup you are in',
+        ],
+      },
+    ];
+    const CONTROL = 'docker-compose.migrate-once.yml';
+    for (const { locale, needles } of CASES) {
+      const view = renderPage('selfhost', locale);
+      const text = (view.textContent ?? '').replace(/\s+/g, ' ');
+      const count = (needle: string) => text.split(needle).length - 1;
+      console.log(
+        `自建指南正文（${locale}）：${needles.map((n) => `${n} → ${String(count(n))}`).join('  |  ')}` +
+          `  ||  对照 ${CONTROL} → ${String(count(CONTROL))}`,
+      );
+      expect(
+        count(CONTROL),
+        `${locale} 版正文里连入口命令的 override 文件名「${CONTROL}」都没有 ⇒ 这一页压根没渲染完，` +
+          '下面那三条命中数不算证据',
+      ).toBeGreaterThan(0);
+      for (const needle of needles) {
+        expect(
+          count(needle),
+          `${locale} 版自建指南正文读不到「${needle}」：栈起来之后界面由同一个容器挂在 /app/、` +
+            '与 API 同域，访客照这一页走完却不知道打开哪个地址（G-62）',
+        ).toBeGreaterThan(0);
+      }
+    }
+  });
 });

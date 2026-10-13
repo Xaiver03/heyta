@@ -502,6 +502,7 @@ const DOCS_ENTRIES: Record<DocsArticleId, DocsEntry> = {
           'site.docs.selfhost.s7p1',
           'site.docs.selfhost.s7p2',
           'site.docs.selfhost.s7p3',
+          'site.docs.selfhost.s7p4',
         ],
         itemKeys: [
           'site.docs.selfhost.s7i1',
@@ -561,7 +562,7 @@ const DOCS_ENTRIES: Record<DocsArticleId, DocsEntry> = {
       {
         id: 'why-offline',
         titleKey: 'site.docs.selfhost.s6',
-        bodyKeys: ['site.docs.selfhost.s6p1', 'site.docs.selfhost.s6p2'],
+        bodyKeys: ['site.docs.selfhost.s6p1', 'site.docs.selfhost.s6p2', 'site.docs.selfhost.s6p3'],
         itemKeys: ['site.docs.selfhost.s6i1'],
       },
       {
