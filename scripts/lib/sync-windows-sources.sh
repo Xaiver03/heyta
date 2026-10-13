@@ -73,11 +73,29 @@ _heyta_windows_sync_push() {
     echo "  🔴 没有 git —— 列不出清单"
     return 1
   fi
+  # 🔴 `-c core.quotepath=false`：`git ls-files` 默认给**非 ASCII 名**加引号并转义
+  #    （`"screenshots/landing/L01-\345\256\230\347\275\221\351\246\226\345\261\217.png"`），
+  #    而下一句是 `[ -e "$f" ]` —— 那个带引号和反斜杠的字符串**不是路径**，于是这 108 枚
+  #    文件在旧写法里**一条都进不了包，而且不报任何错**（现量：旧清单里 `grep -c '"'` = 0，
+  #    `git ls-files | grep -c '"'` = 108）。这不只是取证图：`screenshots/**` 里那 24 枚
+  #    中文名像素是 `apps/landing` 帮助图的**复制源**（`screenshots/` 不在构建根里，
+  #    `public/` 才是，见 `apps/landing/src/site/helpFigures.ts` 的注释），
+  #    远端构建若跑那一步复制就会**静默少图** —— 打进产物的东西少了一组，界面上不报错。
   # 清单：跟踪的 + 未跟踪且未忽略的（= **当前工作树**，含未提交改动），过滤成实际存在；
   # 再追加调用方指定的构建输入（它们被 gitignore，`git ls-files` 一条都抓不到）。
+  #
+  # 🔴 `evidence/` 那一片**不进包**（2026-10-14 现量后加的过滤）：清单 8263 条里
+  #    4027 条是 `apps/*/evidence/**`、`e2e/**/evidence/**`、`docs/research/**/evidence/**`
+  #    —— 它们是取证**输出**，没有一条是构建输入（判据：`grep -rIn --include=*.gradle
+  #    --include=vite.config.* --include=tauri.conf.json --include=package.json "evidence"
+  #    apps/ packages/ server/` ⇒ 空）。而这一族图包还在随每趟验收**只增**，于是包体
+  #    一路涨到 **486 MB**：2026-10-14 00:0x 那条 Android 腿的 `scp -q` 就在 99.3%
+  #    （483,446,127 / 486,746,666）上僵死 —— 5 分钟 10 次采样一字节没长，而 `scp -q`
+  #    **没有超时**，构建会永远挂在步骤 2。这一步红不是远端故障，是**取证把构建通道吃掉了**。
   {
-    { git ls-files; git ls-files --others --exclude-standard; } |
-      while IFS= read -r f; do [ -e "$f" ] && printf '%s\n' "$f"; done
+    { git -c core.quotepath=false ls-files; git -c core.quotepath=false ls-files --others --exclude-standard; } |
+      while IFS= read -r f; do [ -e "$f" ] && printf '%s\n' "$f"; done |
+      grep -vE '(^|/)evidence/'
     local p
     for p in $extra_list; do
       if [ ! -e "$p" ]; then
