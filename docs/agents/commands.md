@@ -77,6 +77,11 @@ pnpm check                      # 全部门禁 + **全量单元测试**：类型
 pnpm check:design               # 只跑设计变量硬编码检查
 pnpm check:layering             # 只跑分层边界检查（apps/* 不得重新长出业务/接线）
 pnpm check:ui-language          # 界面文案必须全是中文（见 §5）
+pnpm check:android-widget-copy-parity
+                                # Android 小组件那批 `widget_*` 原生资源的中英两表对账：键集合相等 +
+                                #   英文表不许残留中文。它存在是因为小组件的文字**不走 `packages/i18n`**
+                                #   （原生 `Context` 渲染），所以上面那条和词条对账都摸不到它。
+                                #   三条判据各自的注入臂写在脚本头部，实测 `A/B/C_RC=1`。
 pnpm check:adr-numbering        # ADR 编号唯一 + 裸写的 `ADR-NNNN` 只指向一枚文件
                                 #   🔴 它挡的是 2026-10-05 那次"两条会话同一天各占 0053"：
                                 #      文件名不同 ⇒ git 不报冲突，死链检查也不报（链接各指各的），
