@@ -4247,3 +4247,40 @@ B191 那格记的 **37 枚"收集阶段就死"随 B192 闭合一起消失**，�
 在 10-13 12:21 那场 103 处冲突的 merge `18efc229` 取走了「四段各占一行」那一副形状之后，
 与它自己用的尺（`textContent` 相邻字符，看不见布局）脱钩了）。单跑同样红 ⇒ 不是本线那枚新 spec 带的。
 **本线没动它一个字节**，也没改任何判据。
+
+## 2026-10-14 01:2x · 本线全部装置与四条测试腿在 `1707dbe5` 重取一遍（⚠️ 读数**只在那一枚 tip 上成立** —— 写这格时 `main` 又被人推到 `56cc8443`）
+
+**为什么要重取**：`git diff --name-only 62f1066f HEAD` 在本线白名单代码路径上有 **13 枚**改动，逐笔查过归属：
+其中 `packages/app-host/src/sync-wiring.ts`（别线的自托管分发 merge `8dcd22c7` 带进来的）、
+`apps/web/src/features/settings/export-copy.ts`（别线）、`packages/app-host/tests/inbound-draft-date-zone.spec.ts`
+与本线 `e2e/tests/inbound-automation.spec.ts`（本线 19:3x / 20:3x 那两笔）都落在上一读数**之后**才进 main。
+⇒ 台账里那句"读数出自 `62f1066f`"对新 tip 不再成立，必须重跑（不是"顺手复跑"，是它真的被改动过）。
+
+**Python 装置 14 枚（`for f in research/tools/verify-inbound-*.py` 逐枚跑）**
+| 读数 | 装置 |
+|---|---|
+| `rc=0` | `ac-ticks`（已勾=0、未勾=8，8 行全落进两把尺之一）、`ac8-matrix`（矩阵与 HEAD 逐格对账成立）、`cjs-require-order`、`doc-tables`（16 份表）、`dual-host`、`producer-seam`（登记档在册 0 枚）、`queue-teeth`（臂=6 不成立=0）、`quota-teeth`（臂=7 不成立=0）、`ticket-teeth`（臂=8 不成立=0）、`worker-identity` |
+| `rc=3` ×2 | `api-slice` / `host-options-slice` —— 正文都是"本切片已落进 HEAD ⇒ 入库工具退役"，**设计退出**，不是红 |
+| `rc=1` | `commit-scope`：`本线笔数=115 仅正文提及=13 涉及路径=103 越界=1`，点名的还是 `79e8ede1`（**协作线**那笔，正文里提了一句"自动收集"就被拉进本线分母，装置那行自己写着 `带本线独占路径=0`）—— 与台账既有读数同形，口径那一格仍开在 **B169**，本线没动尺 |
+| `rc=2` | `check-chain`：`CHAIN_DEVICE_REFUSED --logs is required` —— 它要求读数落盘，**本轮没重跑全仓腿所以没给它日志**，这是拒绝而不是失败 |
+
+**双宿主装置现量**：日志里 `RESULT=PASS` **13 行**、`RESULT=FAIL` **0 行**（窗口 10/11/12/13 逐条有正文，
+窗口 13 那条仍是 date-only 跟规则不跟机器：`Asia/Shanghai` 锚回 `2026-11-30`，换 `America/Los_Angeles` 仍回 `2026-11-30` 而 epoch 不同）。
+**worker-identity**：`✓ tests/integration/inbound-worker-identity.integration.spec.ts (46 tests) 1482ms`（基线 38，只许 ≥ ⇒ 成立）。
+
+**四条 JS/TS 腿（当前 HEAD，串行跑）**
+- `packages/inbound-core`：`Test Files 3 passed` / `Tests 47 passed`（基线 47）
+- `packages/app-host`：`Test Files 97 passed` / `Tests 1783 passed`
+- `server`（本线六枚 spec 点名跑）：`Test Files 6 passed` / `Tests 60 passed`（基线 60）
+- `apps/web` 的 `tests/inbound-*`（**7 枚**，含这一轮新落的那枚时区取证）：`Test Files 7 passed` / `Tests 18 passed`
+- 另有 `pnpm --filter web typecheck` `rc=0`（见 01:0x 那格）
+
+**还没重取的（不是遗漏，是它需要独占载体）**：`e2e` 那条本线浏览器腿、`pnpm check` 106 道、`pnpm -r test` 全量、`pnpm reinstall:all` 四端。
+上一格已量的到这一点：**apps/web 全量现在只剩一枚红，且是别线的（B193）** ⇒ 全仓腿即便重跑也**不可能 exit 0**，
+在 B193 与 B140 有人动之前，"T7 三条命令 exit 0"这一格只能报**未闭合**，不是我没跑。
+
+⚠️ 但这三枚 SHA 的关系要写清，否则下一趟会白跑：`main` 在这格落笔时又被人推到了 `56cc8443`
+（`808c1344`/`3efc17c5`/`56cc8443` 三笔都是**产品体验线与设备腿**的），而
+`git diff --name-only 1707dbe5 HEAD -- <本线白名单全部路径>` 现量 = **0** ⇒ 上面这些读数对本线代码而言
+**在新 tip 上照样成立**，别为此重跑；只有 `apps/web` 全量那一格（`1 failed`）是**别人**改的东西，
+要复它得看 B193 有没有被动过。
