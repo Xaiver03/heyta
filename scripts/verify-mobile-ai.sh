@@ -1436,8 +1436,10 @@ open_ai_settings() {
   #      rid 锚点在（它比的是源码里的 testID 声明）。
   #    同屏其余各格同理都是「label, hint」形状：
   #    通知 / 账号与安全 / 我的成长 / 习惯 / 倒数纪念日。
-  tap_rid profile-entry-settings || { echo "   ❌ 点不到「我的 → 设置」那一格（testID=profile-entry-settings）"; screen_txt; return 1; }
-  sleep 2
+  # 🔴 10-13 实测：设置面在目录层那一刀之后**开出来是分组列表**，「AI 设置」区块在
+  #    「AI 与集成」那一组里 ⇒ 只点入口会在目录层滚 5 次然后报"区块没打开"。
+  #    走共享库的 `open_settings_section`（rid 锚点 `settings-section-ai`）。
+  open_settings_section ai || return 1
   # 「AI 设置」区块在设置页**下方**，是内联区块不是可点的入口 ——
   # 原先这里还去点了一次标题（点了什么也不会发生）。要的是"滚到它进树"。
   local i

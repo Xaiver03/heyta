@@ -194,8 +194,11 @@ configure_sync_credentials
 
 step "3. 判据：设置面的「个人资料」里有「更换登录邮箱」这块"
 $ADB shell input tap 945 2253; sleep 3
-XY=$(scroll_to_id "profile-entry-settings"); [ -z "$XY" ] && XY=$(xy_text "设置")
-[ -n "$XY" ] && { $ADB shell input tap $XY; sleep 3; }
+# 🔴 10-13 实测：设置面开出来是**分组目录**（10-07 `6d868af0` 那一刀），这块在
+#    「个人资料」组里（`ProfileScreen.tsx:1240-1249` 的注释自己写明"由 profileEditor
+#    摆进设置面的 profile 分组"）⇒ 只点入口会在目录层滚，然后报"找不到区块"。
+#    走共享库的 `open_settings_section`。
+open_settings_section profile
 if [ -z "$(scroll_to_id "email-change-current-row")" ]; then
   bad "设置面里找不到「更换登录邮箱」区块"; screen_txt
 else
@@ -312,9 +315,12 @@ else
   bad "旧侧确认 HTTP $CODE：$(head -c 200 /tmp/acc-confirm-old.json)"
 fi
 # 切走再回来：Modal 卸载重挂 ⇒ 组件只能重新读服务端（本地压根没有「阶段」可留）。
-$ADB shell input keyevent KEYCODE_BACK; sleep 2
+# 🔴 目录层那一刀之后**一发返回只退到目录**，面并没有关（`SettingsScreen.tsx:364-373`
+#    的 handleRequestClose）—— 而这条读数的 premise 恰好是"卸载重挂"，面没关就等于
+#    组件没重挂，那样打出来的 ✅ 讲的是另一件事。用 `close_settings_sheet` 确认它真没了。
+close_settings_sheet
 $ADB shell input tap 945 2253; sleep 3
-XY=$(scroll_to_id "profile-entry-settings"); [ -n "$XY" ] && { $ADB shell input tap $XY; sleep 3; }
+open_settings_section profile
 STAGE=0
 for i in $(seq 1 20); do
   dump
@@ -350,7 +356,7 @@ TOKEN="$NEWTOKEN"
 $ADB shell input keyevent KEYCODE_BACK; sleep 1
 configure_sync_credentials
 $ADB shell input tap 945 2253; sleep 3
-XY=$(scroll_to_id "profile-entry-settings"); [ -n "$XY" ] && { $ADB shell input tap $XY; sleep 3; }
+open_settings_section profile
 scroll_to_id "email-change-current-row" >/dev/null; sleep 1
 dump
 grep -qF -- "$NEW_EMAIL" "$UI_XML" && ok "当前邮箱那一行已经是新地址" || bad "当前邮箱那一行没显示新地址"

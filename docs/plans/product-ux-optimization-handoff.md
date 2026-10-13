@@ -80,7 +80,7 @@ df -h /System/Volumes/Data                              # 要不要新开一棵�
 | 4 | ~~#35 `check:shell-surfaces` 的 W5 产物比源码旧~~ ✅ **10-13 05:1x 按台账那一格自己指定的动作闭合**：那批（协作 web 宿主 `a923f7fa` 等）已落地、`RailNavigation.tsx` 不在 `git status` 里，随后 `NO_COLOR=1 pnpm --dir apps/web build` ⇒ **rc=0**，紧接着 `NO_COLOR=1 pnpm check:shell-surfaces` ⇒ **rc=0**。**没有代改任何人在飞的文件** | **无（已闭合）** | `NO_COLOR=1 pnpm check:shell-surfaces`。⚠️ 那句绿只说**通道在**，不说装出来的包里有什么 —— 3 栏桌面取证那格在第四节四端重装里 |
 | 5 | #39 `check:image-license` rc=1（`@noble/hashes` 一处钉死、一处范围） | **`packages/inbound-core` 的所有者**（或运营侧统一 `resolutions`） | `pnpm check:image-license`；两枚声明的现量：`grep -n '@noble/hashes' packages/inbound-core/package.json packages/sync-core/package.json` |
 | 6 | r93 当场量到的红：`check:integration-coverage` rc=1 —— 一枚已提交的集成 spec 没被任何入口点名 | **自动收集 / inbound 那一线**（`0eea4c0f` 带进来的那枚） | `pnpm check:integration-coverage`；现量：`grep -c 'inbound-dual-host' server/package.json`（0）对 `node scripts/check-integration-coverage.mjs` 点名的那一行 |
-| 7 | `check:verify-script-copy` rc=1 —— 🔴 **10-13 05:1x 复量：针从 2 枚变 3 枚，而归属拆开看是两家**：①②（`scripts/lib/mobile-e2e.sh` / `scripts/verify-mobile-habits.sh`）钉的旧值是本线那笔代提交 `e6058120` 弄掉的 ⇒ **本线的债**；③（`scripts/verify-mobile-ai.sh:1664`）改语义的是 `c8f63370`，那行的前提已经不成立 ⇒ **判据口径不代改** | ①② **本线**（落点是设备腿：换针要「已配置态」的真设备读数，未登录态取不到那一半）；③ 托管AI/对外披露那一线 | `NO_COLOR=1 pnpm check:verify-script-copy`；现量：`grep -rn "填好服务器地址与访问令牌后才能同步" packages/i18n/src/locales/zh-CN.ts`（0）。🔴 **别直接换新串**：那句新文案在「同步与隐私」屏上根本不渲染（`android-r107-tapprobe/journey.json` 现量），换完门绿而断言永不成立。分母另有门扫不到的一处：`scripts/verify-mobile-ios-account-erasure.sh:678` ⇒ 共 **4 处** |
+| 7 | ~~`check:verify-script-copy` rc=1，两枚本线欠针~~ ✅ **10-13 19:5x 本线那两处（①②）连同门扫不到的第四处一起换完**：三处现在钉的是 `mobile.profile.sync.notConfigured` 的**当前值**，门 `SUMMARY … 缺失=1`（3→1），剩下的那枚是 `scripts/verify-mobile-ai.sh:1666 "AI 只给建议"` | ③ 托管AI/对外披露那一线（`c8f63370` 改的是语义，**判据口径不代改**）；①②④ 本线已了结 | `NO_COLOR=1 pnpm check:verify-script-copy`。🔴 **上面那一版给的"别直接换新串"的理由要按状态重读**：那句 `notConfigured` 不是"根本不渲染"，而是**只在 `advancedSync && !form.configured` 时渲染**（`SettingsScreen.tsx:515-520` 的 `syncStatusVisible` 决定了外面那层 `syncStatus` 画不画，`ProfileScreen.tsx:1099-1103` 再按 `!form.configured` 决定这句画不画）⇒ r107 那次读到的「登录 heyta 后，任务会自动在设备间同步…」是**同一张卡的另一代文案**（未点开自托管时的那一面），两句都对，只是取读数的状态不同。断言点在"表单开着 + 凭据填过"，所以"这句应当消失"是真的在判事；正对照现量见下一行那格 |
 | 8 | ✅ **10-11 20:3x 本线欠的这一格闭合**：干净检出那一档的读数取到了（r102 install + 全量 build、r103 那八枚整族 20 条全绿、r104 三端 + r105 iOS 段四端重装），载体是一棵 `dirty=0` 的隔离检出、`HEAD=3e34ce98`（含本线那笔装置修复 `ff2efe5b`）。🔴 **它不证 `origin/main`**（本地未 push），也不证 `check:ai-e2e` 整族 | **无（已闭合）** | 台账「r102」「r103」「r104」「r105」那四格；四端包 [`apps/web/evidence/clean-carrier-reinstall-20261011/RESULT.md`](../../apps/web/evidence/clean-carrier-reinstall-20261011/RESULT.md) |
 | 9 | ~~windows 那一端装的是上一趟的包~~ ✅ **10-13 02:5x 本线自己跑掉了**（`WIN_RC=0`，载体 `25f7bef5` 只含已提交内容，远端 tar sha 逐字对账 + 判据 5 条全在位 + 图人眼看过）。⚠️ 本格原先那句"成本与信息量不成比例"站不住 —— 负责人 10-10 已一次性授权占用共享载体，那是**我能做而没做**，不是等他拍 | **无（已闭合）** | 台账「windows 那一腿也跑了」那格；证据包 `apps/web/evidence/ux-final-20261012/reinstall-r103-windows/`。🔴 四端仍**不证 `origin/main`**（本地未 push） |
 
@@ -89,10 +89,11 @@ df -h /System/Volumes/Data                              # 要不要新开一棵�
 | 12 | ~~UX-S9-97「大字体仍待专项验收」~~ ✅ **10-13 03:1x 跑完，结论是没有遮挡**：`font_scale 1.3` 下那枚判据先读 false，而 false 出自旅程探针自己滚不动（nudge 锚在入口中心 y=2210，落进底栏带 `[2169,2337]`）；独立探针一根滑动即达，`1.0` 未滚时同样在带外 ⇒ "要滚一下"两档共有。旅程的 nudge 已改锚内容区并把"滚不动"抛成另一种失败，`artifact_identity()` 加了 `--apk`（隔离载体装的包不在本树）| **无（已闭合）** | 台账 §8 末格；证据 `apps/mobile/evidence/profile-center/android-r104-font13/`（含 `scroll-probe.py` 与两档 JSON）、`…/android-r105-font13/`、`…/android-r105-font10/`。⚠️ 射程只有一台 1080×2400 模拟器与 1.3 一档。⚠️ **第 13 格把这格的成因数量改了**：假红有两个开火点，这格当时只修了 nudge 那一个 |
 | 13 | ~~旅程探针"在树里"当成"点得到"这一族只剩一处已修~~ ✅ **10-13 04:3x 整族查过分母并修完第二处**：`scroll_to`（判据是标签在 uiautomator 树里，被裁节点照样带 `content-desc` ⇒ 一次不滚就返回）与 `tap`（坐标取节点自身中心，被裁时手势交给底栏）两处都在 `scripts/qa/profile-settings-android.py`；新增 `tab_band_top(root)` 后二者都以"矩形可见且中心在带上方"为到达判据。同族另外三枚（`tasks-ux-android.py:145/:341`、`ai-assistant-atomic-android.py:290`、`tasks-ux-ios.py:195-232`）滑动起点是屏幕分数，不带这个形状 ⇒ 不是欠项 | **无（已闭合）**；未穷尽的是**浮层遮挡**（守卫只挡"中心落进底栏带"，那种要像素层证据） | 牙：`android-r107-tapprobe/tap-guard.py` RC=0（在 1.3 冷启动那帧开火，`predicate_matches_source=true` 防夹具漂移）；两腿复跑 RC=0（载体换回主检出 `b731fd26…`，`uiLocale` 装置自标 `zh-CN`）。⚠️ 同一小时里设备被别的会话共用，落了一枚外来的 `android-r99-fixed/`（`uiLocale=en`，属 `dfeacee3` 语言开关那一线）—— 本线不代提交、不删 |
 | 14 | ~~窄屏从 rail「帮助」进设置，当前分类画在导航可视窗口外（选中态等于白给）~~ ✅ **10-13 04:5x 产品代码改完**，并在 05:0x **按"一类不是一个"把同一族扫完、修掉第二处**（"换一档 ⇒ 浮层回到顶部"同样只挂在 `onSelect` 上；可达性由三行 z-index 现量给出：助手浮层 400 > 设置浮层 200 ⇒ 设置开着时那颗「去授权」点得到）。两处的改法同形：从点击处理器挪成 `activeSettingsSection` 的 effect（一份规则、四条路共用；台账当年写的"本线不代改"的前置条件已消失——两栏 IA 现在在 HEAD 里，现量 `git show HEAD:apps/web/src/App.tsx \| grep -c activeSettingsSection` = 16） | 剩后半句：**可见的"还能滚"提示**没做（要新 token + 那是两栏 IA 那一线的样式；主症状已消，降级成美观问题）。第二处的**真浏览器**场景没跑（要先造 AI 授权态），依据是 jsdom 记录 + z-index 现量 | 两头有牙：`apps/web/tests/settings-nav-reveal.spec.tsx` 5/5 绿，且**不对称读数**取到了 —— 换回上一笔 `App.tsx` 后"程序化换档回顶部"红（`本趟滚到的：[]`）而"点导航回顶部"绿，换完按 sha 还原。几何判据钉进 `e2e/tests/help-entry-ux.spec.ts`，红臂读到 `窗口 x=0..315 / 当前项 x=630.625..736.625`。⚠️ 连带：effect 一挂上，jsdom 里任何打开过设置的用例都崩（**8 枚文件 / 34 条**），已按 `apps/web/tests/setup.ts` 自己的规矩补成"jsdom 补齐之四"（`scrollIntoView` + `scrollTo`），**没有**把宿主代码改成可选调用。全量 `pnpm --dir apps/web test` = 2293 passed / **1 failed**（那枚是别线已登记的 `ai-disclosure-parity`），`typecheck` rc=0 |
+| 15 | ~~设备腿在设置面停在目录层~~ ✅ **10-13 19:5x 一族三处一并修完**：`6d868af0` 给设置面加了分组目录（`settings-directory` + 每组一行 `settings-section-<key>`），而导航代码还按"点设置就直接找内容"写 —— 共用 `configure_sync_credentials` 的 **20+ 份**腿、`verify-mobile-ai.sh` 的 AI 设置区块、`verify-mobile-account-email-sessions.sh` 的「更换登录邮箱」三处，全部停在目录层 | **本线的债**（目录层是本线那一刀加的，lib 最后一次动是 10-06），已修完 | 四臂现量在 `apps/mobile/evidence/profile-center/android-r108-syncneedle/`：`ab-before.txt`＝入库那版**四枚红 + 一条恒真的"已配置"**（缺席断言在目录层空转），`ab-after-nav-only.txt`＝补进组后仍缺两枚（折叠线以下的输入框**整枚不在树里** ⇒ 裸 `xy_edit` 拿不到可点坐标），`ab-final.txt`＝最终代码**冷启动整条路 5✅0❌**，`ab-sections.txt`＝五组各按组内独有 testID 落对 + `close_settings_sheet` 每趟关得掉。🔴 第三条成因要记住：`handleRequestClose` 让**一发返回只退到目录**，"按了返回=面关了"这种前提在好几条腿里都成立不了 |
 
 
 第 4、5 格都做过**同一枚 A/B**：在只含已提交内容的载体上照样红 ⇒ 是 `main` 上的既有红，不是共享检出被写脏的假红。
-第 6、7 格做的是**同一条判据的窄版**（没有另起一棵载体）：这四枚文件 `git diff --stat HEAD -- server/package.json scripts/lib/mobile-e2e.sh scripts/verify-mobile-habits.sh packages/i18n/src/locales/zh-CN.ts` **无输出**（逐字等于 `HEAD`），且 `git show HEAD:packages/i18n/src/locales/zh-CN.ts` 里那句旧文案命中 **0** ⇒ 红不依赖任何未提交改动。
+第 6、7 格做的是**同一条判据的窄版**（没有另起一棵载体）：这四枚文件 `git diff --stat HEAD -- server/package.json scripts/lib/mobile-e2e.sh scripts/verify-mobile-habits.sh packages/i18n/src/locales/zh-CN.ts` **无输出**（逐字等于 `HEAD`），且 `git show HEAD:packages/i18n/src/locales/zh-CN.ts` 里那句旧文案命中 **0** ⇒ 红不依赖任何未提交改动。⚠️ 那句"无输出"是**当时那一格的 A/B 读数**，不是常驻状态：10-13 19:5x 之后 `scripts/lib/mobile-e2e.sh`、`scripts/verify-mobile-habits.sh`、`scripts/verify-mobile-ios-account-erasure.sh` 三枚已被本线改过（换针 + 目录层导航），要现量请重跑上面那条 `git diff --stat`。
 
 ---
 
@@ -145,7 +146,11 @@ df -h /System/Volumes/Data                              # 要不要新开一棵�
 5. **不要靠放宽判据消红**（`check:image-license`、`check:locator-labels`、`check:layering` 三处本轮都有人提议过加豁免）。
    本线自己造的紅（CLI help 写成中文被定位符门当界面标签）改的是**自己的字符串落点**，不是门。
 6. **不要把门禁报出的"缺失针"直接换成新文案**（10-13 05:1x 差点这么修 `check:verify-script-copy`）：门只验"串在不在词条表里"，
-   它**验不到"这句话在被测那一屏渲染不渲染"**。当前产物的真设备读数证明新串不在「同步与隐私」屏上 ⇒ 换针会得到一枚绿门 + 一条永不成立的断言。
+   它**验不到"这句话在被测那一屏渲染不渲染"**。🔴 上面那句"新串不在「同步与隐私」屏上"要按**状态**重读（10-13 19:5x 的
+   设备现量把它限死了）：那句 `notConfigured` 只在 `advancedSync && !form.configured` 这一格渲染 —— 表单开着、凭据还没生效。
+   未点开自托管那一行时画的是另一句（`sync.officialHint`），所以 r107 那一趟和 r108 这一趟都没错，只是取的屏层不同。
+   ⇒ 规则本身仍然成立：**换针之前必须先取"这句话在该断言点的那一屏确实渲染"的正对照**，否则绿门 + 一条永不成立的断言。
+   这一条本轮照做后收口了（正对照 `android-r108-syncneedle/probe.json`，bounds `[42,945][1038,993]`）。
    先取真屏读数，再决定换什么。
 7. **不要 `git push`。** 本地 main 领先 origin 的枚数现量见第三节，里面绝大多数是别的并行会话未公开的笔。
 
@@ -162,9 +167,14 @@ df -h /System/Volumes/Data                              # 要不要新开一棵�
   hermes tarball 按树缓存）⇒ 那一腿不是"只含已提交内容的隔离检出"那一档，差集现量写在 `RESULT.md` 里。
 - 10-13 05:1x 另取到三枚读数（都记在台账对应格）：`pnpm --dir apps/web typecheck` **rc=0**、`pnpm --dir apps/web build` **rc=0**、
   `pnpm check:shell-surfaces` **rc=0**；`pnpm check:verify-script-copy` 仍 **rc=1**（3 枚针，见第五节第 7 行）。
+- 10-13 19:5x 这三枚重取过：`pnpm check:verify-script-copy` ⇒ **rc=1，`SUMMARY … 缺失=1`**（3→1，本线那两枚 + 门扫不到的第四枚已换完），
+  `pnpm check:mobile-settings` ⇒ **rc=0**，`pnpm check:mobile-ai-anchors` ⇒ **rc=2**。最后那枚**不归本趟那笔改动**：
+  把 `scripts/verify-mobile-ai.sh` 换成 `HEAD` 那一版复跑同一道门，`SUMMARY … 脚本锚点=19 按字面命中=9 按模式命中=4 未匹配=6`
+  与改后**逐字相同**、退出码同为 2，六枚未匹配全在 1678–2078 行（`tool-input / ai-tool-send / breakdown-*`），没一枚在本趟动过的那一段。
 - 在册红：#39（`check:image-license`，不在本线射程）、`packages/i18n` 那枚"中文表每条都含汉字"对专名（`macOS`/`iOS`/`Android`）的红、
-  根 `package.json` 那对重复 `"check"` 键（口径归所有者）；🔴 `check:verify-script-copy` 里**有两枚针是本线自己的债**，
-  它在第五节第 7 行，不算"不在射程"。
+  根 `package.json` 那对重复 `"check"` 键（口径归所有者）、`check:mobile-ai-anchors` rc=2（那六枚未匹配 + `AssistantScreen` 取不到发送锚点，归对话式 AI 助手那一线）、
+  `check:verify-script-copy` 剩下的那枚 `verify-mobile-ai.sh:1666`（`c8f63370` 改了语义，判据口径不代改）；
+  🔴 ~~`check:verify-script-copy` 里有两枚针是本线自己的债~~ —— **10-13 19:5x 已了结**（见第五节第 7、15 行），别再照抄这句。
 
 ---
 
