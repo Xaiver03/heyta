@@ -111,8 +111,23 @@ _heyta_windows_sync_push() {
     return 1
   fi
   echo "  ✅ 源码包 $(du -h "$tarball" | cut -f1)（清单 $(wc -l < "$list" | tr -d ' ') 条，含工作树未提交改动 + 构建输入）"
-  if ! scp -q "$tarball" "$host:$remote_tar_scp"; then
-    echo "  🔴 源码包送不过去（$host 不可达？）"
+  # 🔴 `scp` **默认没有超时**：2026-10-14 那趟 486 MB 的包就在 99.3% 上僵死（5 分钟 10 次
+  #    采样一字节没长），整条远程构建永远挂在步骤 2 —— `-q` 只静音进度条，不会让它在
+  #    通道断掉时退出。`ServerAlive*` 是给这条通道装一根"探到死就断"的线：15s 一发、
+  #    连续 4 次没回应就退出 ⇒ 卡死变成**可重试的失败**，而不是无限等待。
+  if ! scp -q -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 \
+       "$tarball" "$host:$remote_tar_scp"; then
+    # 🔴 旧文案在这里写的是「$host 不可达？」——那是把**没查过的事当疑问句印出来**，
+    #    而答案代码当场就能取（2026-10-14 现量：同一趟的步骤 1 刚把 ssh 探测跑通过，
+    #    8 分钟后 scp 断，而 ping 与 22 端口都还活着 ⇒ 是链路断，不是主机下线。
+    #    当时只能人工 ping/nc 才知道这件事）。
+    echo "  🔴 源码包送不过去（scp 失败）—— 当场分诊 $host 到底可达不可达"
+    if ssh -o ConnectTimeout=10 -o BatchMode=yes "$host" 'echo ok' >/dev/null 2>&1; then
+      echo "     ⇒ **ssh 现在建得起来** ⇒ 不是主机下线，是**传输通道**断了（链路抖动或拥塞）。"
+      echo "       按瞬时网络重试即可；不要去动远端树，也不要动本机的网络配置。"
+    else
+      echo "     ⇒ **连 ssh 都建不起来** ⇒ 主机确实不可达（下线 / 网络不通），重试也不会好。"
+    fi
     return 1
   fi
   # 🔴 先对账**这一整包**的哈希，再解包：远端拿到的一半是"上一个包"时，

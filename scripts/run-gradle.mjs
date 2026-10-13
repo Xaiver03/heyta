@@ -609,7 +609,20 @@ function runRemote() {
     mkdirSync(dirname(localPath), { recursive: true });
     const remoteSrc = `${HOST}:${remotePathOf(rel)}`;
     console.log(`  步骤 6：scp 回本地**消费者原本期望的路径** ${rel}`);
-    const got = runLogged('scp', ['-q', remoteSrc, localPath]);
+    // 🔴 与 `sync-windows-sources.sh` 那一步同族（AGENTS §7：一类不是一个）：`scp` 默认**没有
+    //    传输超时**，2026-10-14 就在 486 MB 那趟上于 99.3% 僵死过，而这里的产物是 **69 MB**。
+    //    挂在这一步比挂在步骤 2 更难查 —— 远端已经构建成功，看上去"就该完了"。
+    const got = runLogged('scp', [
+      '-q',
+      '-o',
+      'ConnectTimeout=20',
+      '-o',
+      'ServerAliveInterval=15',
+      '-o',
+      'ServerAliveCountMax=4',
+      remoteSrc,
+      localPath,
+    ]);
     if (got.status !== 0 || !existsSync(localPath)) {
       die(
         '步骤 6（产物拉回）',
