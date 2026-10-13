@@ -3364,6 +3364,32 @@ mac `dfeacee3`（r102）/ android `dfeacee3`（r100）/ ios `dfeacee3`（r101）
 ⚠️ **射程三句**：只测了 **Android 一台模拟器 1080×2400、`font_scale` 1.3 一档**；没测 1.5/最大档，也没测 iOS/鸿蒙的大字体；"未复现遮挡"证的是**可达性与可见性**，不证"不滚就能看到"。
 📌 元规则命中一次（§7 的"先怀疑探针"）：这一格的红是探针锚点造成的假红，而它长得**完全像**一个真缺陷（四个数齐全、方向也自洽）。区别只在有没有第二把尺去问"这块屏能不能滚" —— 那把尺是一枚 30 行的独立探针，成本远低于误登记一次布局缺陷。
 
+### 2026-10-13 04:1x：上面那张四行表的"进包内容等价"到这一格**过期了** —— 详情面那条线刚把产品代码合进 HEAD，而 r99 那枚隔离载体已被别的会话清走
+
+**现量**（同一把尺，两个基点）：`git diff --name-only dfeacee3..HEAD` 与 `… 25f7bef5..HEAD` 各自剔掉 `^docs/|evidence/|^scripts/|^research/|\.md$|tests/|\.spec\.` 之后**都是同样 6 枚**：
+`apps/web/src/features/tasks/TaskDetailCard.tsx`、`apps/web/src/lib/keyboard-cursor.ts`、`packages/ui/src/notes/NotesBoard.tsx`、`packages/i18n/src/locales/{en,zh-CN}.ts`、`package.json`。
+归属可以点到具体一笔：**`4c97b9de merge(详情面 feat/detail-pane)`** —— 那一笔把他们挂了两天的 20 枚暂存连同 `MERGE_HEAD bd4e4f87` 一起收掉了（`git merge-base --is-ancestor bd4e4f87 HEAD` = **YES**，本线的 `9c1f39e2` 逐笔复验只含自己那 5 枚路径，没有夹带也没有回退他们的内容）。
+
+⇒ **02:5x 那格为"四端进包内容等价"给的论证不再成立**。它当时的依据是 `dfeacee3..25f7bef5` 的差异"全是文档、证据与一枚不进包的测试"，而 04:0x 之后这 6 枚里 `packages/i18n` 两份是**四端都进包**的词条真源、另三枚进 web 与各桌面壳。
+⇒ 那张表的**现口径**改钉成一句：**每一行装的是"那一行点名的那枚提交"的产物，不是"当前 HEAD"**。要恢复"当前产物"这句需要第五趟，固定顺序（本线已撞过的两个坑都写进去）：新载体 `git archive HEAD` 解到**不含空格**的路径 → `pnpm install --frozen-lockfile` → `HEYTA_REINSTALL_TMP_DIR=~/heyta-r107-tmp/<端> bash scripts/reinstall-all.sh --only <端>`，且那枚 tmp 目录**必须先 `mkdir -p`**（指到不存在的目录时脚本按设计拒绝开跑，RC=4）。
+
+⚠️ **一条已经发生的副作用，登记免得下一位照抄命令**：`ls -d ../heyta-wt-*` 现在只剩 `../heyta-wt-logs`，`git worktree list` 只有主检出 ⇒ r99 那枚从来不是注册 worktree（它是 archive 副本），**已被别的会话清走**。所以今晚设备腿里那句 `--apk ../heyta-wt-r99/…/app-release.apk` **路径不可复跑**，可复跑的是它们各自记进 `journey.json` 的 `artifact.sha256`（`0a1a92dc…`）。
+📌 这恰好是"读数必须带哪棵树 + 装置版本 + 是否只含 HEAD"那条判据在 12 小时内兑现了一次：**没带路径的读数此刻已经无从对账**，带了 sha 的还能。
+
+🔴 **为什么本笔不当场跑第五趟**（这不是"等人"，是本线代拍的判断，依据与代价都摆在这）：这棵树现在**每几十分钟落一笔产品代码**（`4c97b9de` 距那张表成型不到 90 分钟），第五趟 pin 到的提交很可能在它跑完之前又过期一次；而这张表的持久形态本来就是"逐行 pin 提交 + 一条 drift 现量命令"，不是"永远等于 HEAD"。⇒ 第五趟该排在**树冻住之后**（发布前那道），而不是本轮 UX 验收里。要推翻这一句只需跑上面那三条命令，不需要新装置。
+
+### 2026-10-13 04:1x：本轮第一次把整条 `pnpm check` 跑完 —— 它**停在第 6 道**，所以"本轮红集"这句不能说，能说的只有下面这些
+
+现量（HEAD = `9c1f39e2`，`NO_COLOR=1 pnpm check`，日志 `.run-logs/full-check-r106.log`）：**`FULL_CHECK_RC=1`**，断点在 **`check:reachability`**（链上第 6 道：`check:gate-wiring` ✅ → `build` ✅ → `landing check:entries` ✅ → `typecheck` ✅ → `check:claims` ✅ → `reachability` 🔴）。
+红的内容：`【断言 B】已建模的实体必须在 app-host 里有一条写路径 → 🔴 COMMENT 0 处写路径`（`assert C` 那一条是过的）。
+🔴 **归属与"是不是本线该修的"两件分开说**：
+- 那枚 `'COMMENT',` 在 `packages/shared-schema/src/entity-types.ts:114`，`git log -S` 把它带进 HEAD 的那一笔是 **`e6058120`（10-09 14:35，消息写的是「docs(产品体验线 台账 §UX-S9-153)…」）** —— 也就是本账 1386 行登记的那次**归属违规**：内容是协作/入站那一线的 42 枚在制品，笔挂在本线名下。⇒ **消息是我的，功能不是我的**。
+- 修法只有两条真出路：给 `COMMENT` 长出一条 app-host 写路径 + 宿主调用点（那是评论/入站那条线的产品决定），或按那枚门自己的口径把它登记进"已决定不做 + 引用"（`check-reachability.mjs` 头部点名禁止的三种手法是：删实体、把 action 家族补进 `ACTION_FAMILIES` 而不写 action、把测试/e2e 当调用点）。**两条都不在本线射程内**：第一条要别人的产品决定，第二条动的是别人的判据口径。
+- 而且它**不是新红**：`docs/plans/account-standard-suite.md:453` 与 `account-standard-suite-handoff.md:75` 早已逐字登记同一条（`COMMENT 0 处写路径`，并写明"整条链停在第 6 步"），`BLOCKED.md` 里也有一条。⇒ 本线这一格只补"今晚又复量了一次、位置没变"，不重复立案、不代修。
+
+⚠️ **这一格真正要钉住的是那句"本轮红集"**：链在第 6 道 `&&` 退出，**第 7–107 道今晚整条没有跑过**。所以本线点名的那几道是**逐道单跑**取的，不是从这条链读出来的：`check:gate-wiring` RC=0、`check:android-widget-copy-parity` RC=0（+ 三条注入臂各 RC=1）、`check:locator-labels` RC=0、`check:docs` RC=0、`check:md-tables` RC=0。
+⇒ 下一位要"链尾的红集"，得先把 `COMMENT` 那一格解掉（或让那一线把它登记进"决定不做 + 引用"），否则第 6 道后面全是黑的 —— **这句话本身就是本轮的验证边界**，别把它读成"门禁全绿"。
+
 
 
 
