@@ -3541,7 +3541,7 @@ mac `dfeacee3`（r102）/ android `dfeacee3`（r100）/ ios `dfeacee3`（r101）
 两分钟出四臂读数，且不读真令牌、不覆盖并行会话正在读的那份快照。装置本体：
 [`apps/mobile/evidence/profile-center/android-r108-syncneedle/RESULT.md`](../../apps/mobile/evidence/profile-center/android-r108-syncneedle/RESULT.md)。
 
-⚠️ **要不要跑第六趟四端重装：不要，而且这句话现在有现量。** 上面这两笔提交（`071e09fd`、`b7338307`）改的全是
+⚠️ **要不要跑第六趟四端重装：当时不要，现在要了 —— 而这句话两边都有现量。** 上面这两笔提交（`071e09fd`、`b7338307`）改的全是
 门禁脚本、设备腿装置与文档 —— 判据是这条：
 
 ```sh
@@ -3549,8 +3549,39 @@ git diff --name-only 769e6258..HEAD -- apps/web/src apps/mobile/src packages ser
   apps/desktop-macos apps/desktop-windows scripts/reinstall-all.sh pnpm-lock.yaml | wc -l
 ```
 
-读数 **0** ⇒ r108 那一趟打进四端包里的源码与**当前 HEAD 逐字相同**，"四端等于当前产物"这句不必重跑也还成立
-（`769e6258` 正是 r108 那趟的载体 `HEAD`）。下一位要是这条读数不再是 0，那才是重跑的理由 —— 别用"再跑一遍看着安心"当理由。
+写下那一段时的读数 **0** ⇒ r108 那一趟打进四端包里的源码与当时的 HEAD 逐字相同。
+**2026-10-14 01:2x 同一条命令读数 = 1**，唯一那一枚是 `apps/mobile/src/screens/SettingsScreen.tsx`（本线 `808c1344`，
+展开自托管表单后把它滚进视野）⇒ 这条尺现在指着一个**真的会进包的源码改动**，"四端等于当前产物"这句已经不再成立，
+第六趟重装是本线的欠项（见下一节末尾）。别用"再跑一遍看着安心"当理由，也别反过来拿旧的 0 当免跑的理由 —— 尺没变，是现实变了。
+
+### 2026-10-14 00:0x–01:2x：一条没跑绿的设备腿，交出的却是四处能改的坏 —— 几何、包体、误报的门、和一个真产品缺陷
+
+这一趟的目标本来是"用一条完整 Android 腿验新导航 + 新针"。**它没有跑绿**（结局与逐份工件在
+[`apps/mobile/evidence/profile-center/android-r109-habits-leg/RESULT.md`](../../apps/mobile/evidence/profile-center/android-r109-habits-leg/RESULT.md)）。
+按撞到的顺序，四处各自当场修完（提交逐笔带 pathspec，五笔 `af2157fd`／`80102924`／`c5b224d5`／`808c1344`／`3efc17c5`）：
+
+| # | 撞到的 | 现量 | 落点 |
+|---|---|---|---|
+| 1 | 默认名 `heyta_mobile_smoke` 那个库**根本不够**，而 `up.sh` 不建库 | 25/51 张表，缺 `access_sessions` 等 27 张；`fail "建号失败（服务端是否以 TEST_MODE 运行？）"` 把一切 JSON 响应都归成"没开 TEST_MODE"（判据反了：能返回 JSON 就说明开着）。⚠️ 同一个默认库还挂在**另一会话**的常驻 server（pid 26623 / 端口 3000）上 ⇒ "顺手起来看看"不是只读动作 | 环境陷阱 §7 **#435**（修法：私有库 + 从 schema 完整的库 `pg_dump --schema-only`，注意 pg_dump 大版本要与 server 一致、`CREATE SCHEMA public` 会撞 `ON_ERROR_STOP`） |
+| 2 | 远程构建的包体**吃掉了构建通道** | 清单 8263 条里 4027 条是 `**/evidence/**`（判据：全仓构建配置里 grep `evidence` ⇒ 空），包涨到 486 MB，`scp -q` 在 **99.3%** 僵死 5 分钟一字节没长且**没有超时**；另一处：`git ls-files` 给非 ASCII 名加引号转义，`[ -e ]` 认不出那串 ⇒ **108 枚跟踪文件一条都没进包且不报错**（其中 `screenshots/**` 那 24 枚是 `apps/landing` 帮助图的复制源） | `scripts/lib/sync-windows-sources.sh`：清单过滤 `(^|/)evidence/` + `-c core.quotepath=false` ⇒ 3923 条 / 45.8 MB，传输完成 |
+| 3 | 门把自己的**取证记录**当成调用 | `check:android-gradle-remote` 真树 rc=1，四条 G1 全在已提交的 evidence 清单里（内容是把 `apps/mobile/android/gradlew` 记成路径/哈希）。该文件头 G1 自己写的是"全仓**可执行文件**里……" | 只放行 `evidence/` 下的 `.json`（记录），同目录的 `.sh/.py/.mjs` 留在扫描面；`--self-test` 补臂 **13 正照 / 13b 非 evidence 的 .json 照红 / 13c evidence 下的脚本照红** ⇒ 真树 rc=0、自检 rc=0 |
+| 4 | 设备腿那句"找不到输入框"**红在产品** | 键盘起立后可滚区 `[0,210][1080,1580]`（`KeyboardAvoidingView behavior='height'` 缩了 820 px），而五处 helper 的 swipe 起点写死 **y=1900 = 键盘上**；展开后第一格 `EditText` 落在 `[84,2125][996,2243]`（贴底边），后两格在树里是 `top > bottom` 的退化形状 | harness：`swipe_in_view` 按当前 dump 那台 `scrollable` 节点实算 + 失败时把 `geom` 写进报告（`scripts/lib/mobile-e2e.sh`，五处一起收）；**产品**：`SettingsScreen.tsx` 展开后补滚溢出那段（偏移记账在 `section` 变化时归零，不挂在导航按钮上 —— 同 fea48d09 那条教训） |
+
+**这一格不证明的事**（照旧写出来，别读成"已验收"）：
+① **没有任何一条完整设备腿跑绿** —— `check:mobile-settings` rc=0、mobile typecheck rc=0、`bash -n` 全过都只是静态层，
+`SettingsScreen` 那一改现在是"几何 + 静态门"，还不是"模拟器上看它滚进来了"；
+② 第二次尝试全程没进设备步骤 —— `wait_for_quiet_host` 24 次采样 load1=19…34（阈值 12 = `hw.ncpu*3/4`），
+负载按两次采样的 CPU 时间差量是 qemu 610% / DeepSeek Harness 273% / OrbStack 108%（客户机内 idle），**没为了放行调阈值**；
+③ `tree-C-keyboard-dismissed.xml` 与 B **逐字节同哈希** ⇒ 那次"收起键盘"没改变界面，**不能**当 KAV 不回写高度的证据（C 是废样，留档是为了让下一位补 `mInputShown` 那一拍）；
+④ 凭据填充是"往旧值里追加"而不是"先清空"（B/C 里那枚 `EditText` 的 text 长成
+`https://heyta.waytofutuhttp：／／10。0。。22：3111re.cn`，且 `input text` 把 `:` `/.` 打成全角）—— 只记录，本批没动；
+⑤ APK 与 r108 那枚**逐字节相同**（sha256 `c150b73993a5c309…`、69,480,004 B）这一条只说明"那次同步的打包输入等于 r108"，
+它**不**说明 `808c1344` 之后还相等 —— 上面那把尺现在读 1。
+
+**下一步（顺序固定，别跳）**：负载门放开（`uptime` load1 ≤ 12）⇒
+`bash apps/mobile/evidence/profile-center/android-r109-habits-leg/run-leg.sh` 取"表单自己滚进视野"的真机读数并补 `mInputShown` 那一拍 ⇒
+再跑第六趟 `pnpm reinstall:all`（这一趟有真的包内源码改动，判据是上面那条读数 = 1）⇒ 四端各留一条"装的是当前产物且起得来"。
+
 
 
 
