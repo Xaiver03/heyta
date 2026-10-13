@@ -39,6 +39,17 @@
 #    互相覆盖 `/tmp/heyta-src.tar.gz` 和远端 `C:/src/heyta-src.tar.gz`。
 HEYTA_WINDOWS_REPO_ROOT="${HEYTA_WINDOWS_REPO_ROOT:-C:\\src\\heyta}"
 
+# 🔴 本地的**临时落点**可覆盖（`HEYTA_SYNC_TMP_DIR`，默认 `/tmp` ⇒ 单会话时路径**逐字不变**）。
+#    为什么现在补：本文件把 tar 包 / 清单 / 打包日志三处写成固定 `/tmp` 路径，而
+#    仓库 2026-10 起的固定做法是**在隔离检出里并行跑**（四端重装 / Android 远程构建），
+#    两条会话同时送源码就会互相覆盖；更要紧的是它产出的 `heyta-src*.tar.gz` 是
+#    **456M 级**的中间物，而**没有任何一层会清它**（`rm` 只在成功路径上、且不清 tar）。
+#    同族先例与清理入口：`HEYTA_REINSTALL_TMP_DIR`（`reinstall-all.sh`）、
+#    `HEYTA_IOS_DERIVED`（`verify-mobile-ios*.sh`）、`HEYTA_MACOS_DIST_DIR`，
+#    以及 `scripts/clean-build-tmp.sh`（按年龄 + 分类清 `/tmp` 的 heyta 残留）。
+#    ⚠️ 换落点后远端那两枚 tar 名**不受影响**（它们由 `$suffix` 决定，与本地目录无关）。
+HEYTA_SYNC_TMP_DIR="${HEYTA_SYNC_TMP_DIR:-/tmp}"
+
 # ── 内部实现：清单 → tar → scp → tar 哈希对账 → 远端先清后解 ──────────────
 # $1 = host
 # $2 = extra_list：必须本地存在、额外写进清单的**构建输入**（空格分隔，可为空串）
@@ -51,8 +62,8 @@ _heyta_windows_sync_push() {
   local tag="${4:-}"
   local suffix=""
   [ -n "$tag" ] && suffix="-$tag"
-  local tarball="/tmp/heyta-src${suffix}.tar.gz"
-  local list="/tmp/heyta-src${suffix}-files.txt"
+  local tarball="${HEYTA_SYNC_TMP_DIR%/}/heyta-src${suffix}.tar.gz"
+  local list="${HEYTA_SYNC_TMP_DIR%/}/heyta-src${suffix}-files.txt"
   # 同一个包有两种路径形状：scp 走 SFTP，用正斜杠；cmd/tar 在 Windows 上，用反斜杠。
   # 默认（tag 为空）时这两个值**逐字等于本文件历史上硬编码的那两个**。
   local remote_tar_scp="C:/src/heyta-src${suffix}.tar.gz"
@@ -77,8 +88,8 @@ _heyta_windows_sync_push() {
     done
   } > "$list"
   # COPYFILE_DISABLE：不带 AppleDouble（`._*`）过去，远端解包才干净。
-  if ! COPYFILE_DISABLE=1 tar -czf "$tarball" -T "$list" > /tmp/heyta-src-tar.log 2>&1; then
-    echo "  🔴 打源码包失败（/tmp/heyta-src-tar.log）"
+  if ! COPYFILE_DISABLE=1 tar -czf "$tarball" -T "$list" > "${HEYTA_SYNC_TMP_DIR%/}/heyta-src-tar.log" 2>&1; then
+    echo "  🔴 打源码包失败（${HEYTA_SYNC_TMP_DIR%/}/heyta-src-tar.log）"
     return 1
   fi
   echo "  ✅ 源码包 $(du -h "$tarball" | cut -f1)（清单 $(wc -l < "$list" | tr -d ' ') 条，含工作树未提交改动 + 构建输入）"

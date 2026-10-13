@@ -89,4 +89,19 @@ pnpm check:adr-numbering        # ADR 编号唯一 + 裸写的 `ADR-NNNN` 只指
 pnpm check:tokens               # 原生 token 产物（Swift/ArkTS/JSON/RN）是否与 tokens.css 同步
 pnpm check:arkts                # 用**真 ArkTS 编译器**编译生成的 .ets 产物
 pnpm check:native-deps          # iOS 原生依赖对账（package.json ↔ Podfile.lock，见 §7 第 32 条）
+
+# ── 构建残留清理（`/tmp` 里 heyta 的中间物） ──────────────────────────────
+# 各验收/重装装置把 iOS 派生数据、macOS 分发目录、跨机源码包、归档产物写在 `/tmp`，
+# 路径**各自有旋钮**（HEYTA_REINSTALL_TMP_DIR / HEYTA_IOS_DERIVED / HEYTA_MACOS_DIST_DIR），
+# 但默认值都指向共享 `/tmp`（**默认值逐字不变**是硬纪律），于是**没有任何一层会清它**。
+# 本入口就是补上"无人清理"这一环 —— 不是门禁，不进 `check` 链。
+bash scripts/clean-build-tmp.sh                    # 🔴 默认 dry-run：只列可清项与体量，不动任何文件
+bash scripts/clean-build-tmp.sh --apply            # 真删（凭据与证据仍受保护）
+bash scripts/clean-build-tmp.sh --age-hours 1      # 只算 1 小时未改的（默认 24）
+bash scripts/clean-build-tmp.sh --dir /tmp/heyta-knob   # 换落点目录
+bash scripts/clean-build-tmp.sh --self-test        # 分类器 + **端到端**自检（臂数由它自己打印）
+                                #   三条安全边界：默认 dry-run / 凭据白名单永不删且**显式列出**
+                                #   （不静默跳过 —— 静默跳过在读数上和"没扫到"一样）/
+                                #   证据类 `*.png` 默认保留（界面验收的唯一证据载体，§6.2 规定一）
+                                #   ⚠️ 见 §7 第 434 条：macOS 上 `find` 有两个会**安静**出错的地方
 ```
