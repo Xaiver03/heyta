@@ -55,6 +55,30 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+# 🔴 落点可覆盖（`HEYTA_REINSTALL_TMP_DIR`，默认 `/tmp` ⇒ 单会话时全部路径**逐字不变**）。
+#    为什么现在补：本文件的 ios / windows / android 三段把派生数据目录、日志、截图写成固定
+#    /tmp 路径，而仓库 2026-10 起的固定做法是**在隔离检出里并行跑四端重装** ⇒ 两条会话同时跑
+#    必然互相覆盖现场。2026-10-10 实测吃掉的是本线自己的现场：ios 腿判据过了（含新鲜度判据），
+#    那张 `$RT/heyta-reinstall-ios.png` 在 20:41 被另一条会话的同一步骤盖掉。
+#    同族先例：本文件 mac 段的 `HEYTA_MACOS_DIST_DIR`（注释里写的就是同一个 `rm -rf` 事故），
+#    以及 `scripts/verify-mobile-ios.sh` 的 `HEYTA_IOS_DERIVED` / `HEYTA_IOS_BUILD_LOG`。
+#    ⚠️ 换私有落点后，`research/tools/b-batch-reconcile.sh` 的 `IOS_LOCAL_APP` 默认仍指旧路径，
+#    它自己会**响亮地**报"本机没有可比的 iOS 产物"（return 3，不计入红）—— 要继续可比，
+#    把同一枚值一并传给它，别让它拿旧路径的残留做对账。
+RT="${HEYTA_REINSTALL_TMP_DIR:-/tmp}"
+# 空格里插进来的落点会把重定向和 xcodebuild 参数拆成两个词 —— 那是"跑绿了但写到了别处"的形状，
+# 所以按探针那族的规矩：形状不对当场拒，不猜。
+case "$RT" in
+  *[[:space:]]*)
+    echo "🔴 HEYTA_REINSTALL_TMP_DIR 不能含空格（读到：$RT）" >&2
+    exit 4
+    ;;
+esac
+if [ ! -d "$RT" ]; then
+  echo "🔴 HEYTA_REINSTALL_TMP_DIR 指向的目录不存在：$RT（先 mkdir -p，别让日志重定向以 No such file 收尾）" >&2
+  exit 4
+fi
+
 # 🔴 封装运行时里 PATH 最前面的 `pnpm` 可能是不能独立 spawn 的私有垫片
 #    （AGENTS §7 第 35 条同源）。按候选列表解析真的能跑的那个。
 resolve_pnpm() {
@@ -202,11 +226,11 @@ RESULT_mac="" ; RESULT_windows="" ; RESULT_android="" ; RESULT_ios=""
 
 # ── ① 前置：全仓构建（AGENTS §6.1：打包前必须先跑，APK/.app 里打的是 packages/*/dist）──
 echo "═══ 0. 前置：pnpm -r build ═══"
-if "$PNPM" -r build > /tmp/heyta-reinstall-build.log 2>&1; then
-  echo "  ✅ 全仓构建完成（日志 /tmp/heyta-reinstall-build.log）"
+if "$PNPM" -r build > $RT/heyta-reinstall-build.log 2>&1; then
+  echo "  ✅ 全仓构建完成（日志 $RT/heyta-reinstall-build.log）"
 else
   echo "  🔴 全仓构建失败 —— 打包必然打进旧产物，停下（日志末尾：）"
-  tail -15 /tmp/heyta-reinstall-build.log | sed 's/^/     /'
+  tail -15 $RT/heyta-reinstall-build.log | sed 's/^/     /'
   exit 1
 fi
 
@@ -216,11 +240,11 @@ fi
 # 当前依赖产物对应的 UI，因此在跨端收口前再按同一 pnpm 入口重建一次 web。
 if printf '%s' "$WANT" | grep -Eq 'mac|windows'; then
   echo "═══ 0b. 原生壳前置：@heyta/web build（确保 web-dist 晚于 workspace dist）═══"
-  if "$PNPM" --filter @heyta/web build > /tmp/heyta-reinstall-web.log 2>&1; then
-    echo "  ✅ Web 产物已在 workspace 构建之后刷新（日志 /tmp/heyta-reinstall-web.log）"
+  if "$PNPM" --filter @heyta/web build > $RT/heyta-reinstall-web.log 2>&1; then
+    echo "  ✅ Web 产物已在 workspace 构建之后刷新（日志 $RT/heyta-reinstall-web.log）"
   else
     echo "  🔴 Web 产物刷新失败 —— 原生壳不能安全打包（日志末尾：）"
-    tail -15 /tmp/heyta-reinstall-web.log | sed 's/^/     /'
+    tail -15 $RT/heyta-reinstall-web.log | sed 's/^/     /'
     exit 1
   fi
 fi
@@ -234,7 +258,7 @@ if printf '%s' "$WANT" | grep -q "mac"; then
   #    本脚本一跑就会把**别人的现场**整个删掉 —— 当时靠起跑前手动改名保住，
   #    而"我记得先改名"不是判据（AGENTS §8 第 9 条：共享资源要先定所有者与运行窗口）。
   #    旋钮的默认值逐字不变，所以不带 env 的行为与今天完全一致。
-  MAC_OUT="${HEYTA_MACOS_DIST_DIR:-/tmp/heyta-macos-dist}"
+  MAC_OUT="${HEYTA_MACOS_DIST_DIR:-$RT/heyta-macos-dist}"
   INSTALLED_APP="/Applications/Heyta.app"
   RESULT_mac=FAIL
   # 🔴 删之前把"删的是哪个目录、里面有什么"打进日志：这一句的失败模式是**安静**，
@@ -247,8 +271,8 @@ if printf '%s' "$WANT" | grep -q "mac"; then
     echo "  清空前该目录不存在（首次运行）"
   fi
   rm -rf "$MAC_OUT"                                   # 清掉旧安装包
-  if bash apps/desktop-macos/scripts/package-app.sh "$MAC_OUT" > /tmp/heyta-reinstall-mac.log 2>&1; then
-    echo "  ✅ 打包完成（.app + .dmg，含打包即启动的自截屏验证；日志 /tmp/heyta-reinstall-mac.log）"
+  if bash apps/desktop-macos/scripts/package-app.sh "$MAC_OUT" > $RT/heyta-reinstall-mac.log 2>&1; then
+    echo "  ✅ 打包完成（.app + .dmg，含打包即启动的自截屏验证；日志 $RT/heyta-reinstall-mac.log）"
     rm -rf "$INSTALLED_APP"                           # 卸旧：不留"上一次的包"
     if cp -R "$MAC_OUT/Heyta.app" "$INSTALLED_APP"; then
       echo "  ✅ 已安装到 $INSTALLED_APP"
@@ -283,7 +307,7 @@ if printf '%s' "$WANT" | grep -q "mac"; then
              "$HOME/Library/Caches/cloud.finlaw.heyta.desktop" 2>/dev/null || true
       # 判据用**安装副本**本身：能起来、能自截屏、截出来非空白。
       # 🔴 主蓝数的是 `.webview.png` 那一份（壳自己的规定，见 shot_ok 文件头）。
-      MAC_SELFIE="/tmp/heyta-reinstall-mac-installed.png"
+      MAC_SELFIE="$RT/heyta-reinstall-mac-installed.png"
       MAC_SELFIE_WV="$MAC_SELFIE.webview.png"
       rm -f "$MAC_SELFIE" "$MAC_SELFIE_WV"
       HEYTA_NO_FOCUS=1 HEYTA_SELF_CAPTURE="$MAC_SELFIE" \
@@ -300,7 +324,7 @@ if printf '%s' "$WANT" | grep -q "mac"; then
       echo "  🔴 拷进 /Applications 失败"
     fi
   else
-    echo "  🔴 打包失败（日志末尾：）"; tail -15 /tmp/heyta-reinstall-mac.log | sed 's/^/     /'
+    echo "  🔴 打包失败（日志末尾：）"; tail -15 $RT/heyta-reinstall-mac.log | sed 's/^/     /'
   fi
 fi
 
@@ -314,8 +338,8 @@ if printf '%s' "$WANT" | grep -q "windows"; then
   if sync_windows_sources "$WIN_HOST"; then
     rm -rf "$WIN_OUT"                                 # 清掉旧安装包（msix/cer/取证）
     if bash apps/desktop-windows/scripts/package-msix.sh "$WIN_HOST" "$WIN_OUT" \
-        > /tmp/heyta-reinstall-win.log 2>&1; then
-      echo "  ✅ 远端打包 + 安装 + 启动截图完成（日志 /tmp/heyta-reinstall-win.log）"
+        > $RT/heyta-reinstall-win.log 2>&1; then
+      echo "  ✅ 远端打包 + 安装 + 启动截图完成（日志 $RT/heyta-reinstall-win.log）"
       FACTS="$WIN_OUT/install-capture.txt"
       # 判据清单的单一所有者：`scripts/lib/msix-install-facts.sh`
       # （打包脚本 `package-msix.sh` 现在也调同一条，所以两处不会漂成两套标准）
@@ -328,7 +352,7 @@ if printf '%s' "$WANT" | grep -q "windows"; then
       fi
     else
       echo "  🔴 打包/安装失败 —— 主机不可达属于**环境**，如实报告不要硬装（日志末尾：）"
-      tail -10 /tmp/heyta-reinstall-win.log | sed 's/^/     /'
+      tail -10 $RT/heyta-reinstall-win.log | sed 's/^/     /'
     fi
   else
     echo "  🔴 源码同步没通过 —— **不打包**（宁可不装，也不装旧产物）"
@@ -347,8 +371,8 @@ if printf '%s' "$WANT" | grep -q "android"; then
     echo "  🔴 模拟器 $SERIAL 不可达（adb devices 里没有/离线）—— 先起模拟器"
   else
     rm -f "$APK"                                      # 清掉旧安装包
-    if "$PNPM" build:android > /tmp/heyta-reinstall-apk.log 2>&1 && [ -f "$APK" ]; then
-      echo "  ✅ release APK 已重打（$(du -h "$APK" | cut -f1)；日志 /tmp/heyta-reinstall-apk.log）"
+    if "$PNPM" build:android > $RT/heyta-reinstall-apk.log 2>&1 && [ -f "$APK" ]; then
+      echo "  ✅ release APK 已重打（$(du -h "$APK" | cut -f1)；日志 $RT/heyta-reinstall-apk.log）"
       # 🔴 卸旧装新（不是 install -r）：清掉旧数据与旧容器，"重装"必须是干净的。
       adb -s "$SERIAL" uninstall "$PKG" >/dev/null 2>&1 || true
       # Do not pipe adb directly into grep under pipefail: grep exits as soon
@@ -359,7 +383,7 @@ if printf '%s' "$WANT" | grep -q "android"; then
         echo "  ✅ 模拟器 $SERIAL 全新安装成功"
         adb -s "$SERIAL" shell monkey -p "$PKG" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1
         sleep 8
-        ANDROID_SHOT="/tmp/heyta-reinstall-android.png"
+        ANDROID_SHOT="$RT/heyta-reinstall-android.png"
         # 🔴 截图之前必须先证明"屏上这个窗口就是我们的 App"，否则**不打分**。
         #    实测过的假绿（2026-10-03，emulator-5556 / AVD heyta-w3-yearly）：monkey 之后
         #    `mCurrentFocus` 仍是 launcher，而截图判据两条全过 ——
@@ -404,7 +428,7 @@ if printf '%s' "$WANT" | grep -q "android"; then
         echo "  🔴 adb install 失败"
       fi
     else
-      echo "  🔴 APK 构建失败（日志末尾：）"; tail -10 /tmp/heyta-reinstall-apk.log | sed 's/^/     /'
+      echo "  🔴 APK 构建失败（日志末尾：）"; tail -10 $RT/heyta-reinstall-apk.log | sed 's/^/     /'
     fi
   fi
 fi
@@ -510,7 +534,7 @@ if printf '%s' "$WANT" | grep -q "ios"; then
       #    这不是降级判据：三趟都失败仍然整腿判红，每一趟的日志都留着。
       POD_OK=0
       for POD_TRI in 1 2 3 4 5 6; do
-        POD_LOG="/tmp/heyta-reinstall-pod-$POD_TRI.log"
+        POD_LOG="$RT/heyta-reinstall-pod-$POD_TRI.log"
         if (cd "$IOS_IOS_DIR" && env -u NODE_USE_ENV_PROXY LANG=en_US.UTF-8 \
             RCT_USE_PREBUILT_RNCORE=0 RCT_USE_RN_DEP=0 pod install) \
             >"$POD_LOG" 2>&1; then
@@ -519,7 +543,7 @@ if printf '%s' "$WANT" | grep -q "ios"; then
         fi
         echo "    ⚠️ 第 ${POD_TRI} 趟失败：$(grep -m1 -oE "ArgumentError - [^\"]*|\[!\] [^\"]*" "$POD_LOG" | head -1)（日志 ${POD_LOG}）"
       done
-      cp -f "$POD_LOG" /tmp/heyta-reinstall-pod.log 2>/dev/null || true
+      cp -f "$POD_LOG" $RT/heyta-reinstall-pod.log 2>/dev/null || true
       if [ "$POD_OK" = 1 ]; then
         [ "$POD_TRI" -gt 1 ] && echo "    （第 ${POD_TRI} 趟才成功 —— 与上面那条非确定性记录一致）"
         MANI_SHA="$(shasum -a 256 "$IOS_IOS_DIR/Pods/Manifest.lock" 2>/dev/null | cut -d' ' -f1)"
@@ -546,14 +570,14 @@ if printf '%s' "$WANT" | grep -q "ios"; then
     fi
     # 清两样：模拟器里的旧 app + 旧构建产物
     xcrun simctl uninstall "$UDID" "$BID" >/dev/null 2>&1 || true
-    rm -rf /tmp/heyta-ios-release
+    rm -rf $RT/heyta-ios-release
     echo "  正在 xcodebuild Release（重打 JS bundle，数分钟）…"
     if [ "$PODS_SYNC" = OK ] && xcodebuild -workspace "$ROOT/apps/mobile/ios/Heyta.xcworkspace" \
         -scheme Heyta -configuration Release -sdk iphonesimulator \
-        -destination "id=$UDID" -derivedDataPath /tmp/heyta-ios-release build \
-        >/tmp/heyta-reinstall-ios-build.log 2>&1; then
-      echo "  ✅ 构建成功（日志 /tmp/heyta-reinstall-ios-build.log）"
-      IOS_APP_DIR="/tmp/heyta-ios-release/Build/Products/Release-iphonesimulator/Heyta.app"
+        -destination "id=$UDID" -derivedDataPath $RT/heyta-ios-release build \
+        >$RT/heyta-reinstall-ios-build.log 2>&1; then
+      echo "  ✅ 构建成功（日志 $RT/heyta-reinstall-ios-build.log）"
+      IOS_APP_DIR="$RT/heyta-ios-release/Build/Products/Release-iphonesimulator/Heyta.app"
       if xcrun simctl install "$UDID" "$IOS_APP_DIR" >/dev/null 2>&1; then
         echo "  ✅ 已安装进模拟器（全新安装）"
         # 🔴 新鲜度判据（沿用 verify-mobile-ios.sh 那次事故的产物）：
@@ -576,7 +600,7 @@ if printf '%s' "$WANT" | grep -q "ios"; then
         if [ "$FRESH" = "1" ]; then
           xcrun simctl launch "$UDID" "$BID" >/dev/null 2>&1
           sleep 10
-          IOS_SHOT="/tmp/heyta-reinstall-ios.png"
+          IOS_SHOT="$RT/heyta-reinstall-ios.png"
           xcrun simctl io "$UDID" screenshot "$IOS_SHOT" >/dev/null 2>&1
           if [ -s "$IOS_SHOT" ] && shot_ok_logged "$IOS_SHOT"; then
             echo "  截图证据：$IOS_SHOT"
@@ -594,7 +618,7 @@ if printf '%s' "$WANT" | grep -q "ios"; then
         #    打出旧日志的尾巴会把人引向一个不存在的产品故障。
         echo "  🔴 沙盒未同步 ⇒ 这一轮**没有跑** xcodebuild（原因见上面的 pod 段）"
       else
-        echo "  🔴 xcodebuild 失败（日志末尾：）"; tail -10 /tmp/heyta-reinstall-ios-build.log | sed 's/^/     /'
+        echo "  🔴 xcodebuild 失败（日志末尾：）"; tail -10 $RT/heyta-reinstall-ios-build.log | sed 's/^/     /'
       fi
     fi
   fi
