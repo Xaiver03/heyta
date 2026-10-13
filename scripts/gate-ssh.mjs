@@ -235,7 +235,20 @@ if (!DRY) {
         '   清历史遗留：ssh ' + HOST + " 'sudo chown -R 1000:1000 ~/heyta-gate/runs ~/heyta-gate/logs'");
   }
 }
-const scp = run('scp', ['-q', '-o', 'ConnectTimeout=20', tarPath, `${HOST}:${RUN_DIR}/src.tar.gz`]);
+// 🔴 同族第三处（AGENTS §7：一类不是一个）：`ConnectTimeout` 只管**握手**，管不了
+//    半途断流 —— 2026-10-14 远程构建就在 486 MB 那趟上于 99.3% 僵死，`scp -q` 不退出。
+//    加一对 `ServerAlive*` 让"探到死就断"，卡死变成可重试的失败。
+const scp = run('scp', [
+  '-q',
+  '-o',
+  'ConnectTimeout=20',
+  '-o',
+  'ServerAliveInterval=15',
+  '-o',
+  'ServerAliveCountMax=4',
+  tarPath,
+  `${HOST}:${RUN_DIR}/src.tar.gz`,
+]);
 if (scp.status !== 0) die('步骤 4（传输）', `scp 失败 rc=${scp.status}`, scp.stderr.slice(0, 300));
 const remoteShaCmd = `cd ${RUN_DIR} && sha256sum src.tar.gz | cut -d" " -f1 && stat -c%s src.tar.gz`;
 const rs = ssh(remoteShaCmd);
