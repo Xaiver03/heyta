@@ -240,6 +240,7 @@ function TitleField({ task, onRename }: { task: Task; onRename: (title: string) 
   );
 }
 
+/*
   🔴 完成态那一句**不能**借用 `blockLabelStyle`：看图时它和紧接其下的「备注」「子任务」
   区块头一模一样（同档同色），用户读到的是"这里有一个叫『已完成』的区块"，
   而不是"这条任务的状态"。所以它走辅助档（AGENTS §5：辅助/说明 = xs/sm + muted），
