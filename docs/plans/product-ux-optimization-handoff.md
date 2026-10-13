@@ -37,7 +37,7 @@
 | #27 macOS 空窗定性 | 🔴 **改成"间歇"**：r77 那张窗口图主蓝 0，r93 同一枚装置的窗口图主蓝 994（人打开看过=完整共享 UI）。判据一行没动 ⇒ **不能写成已修** | 台账「r93」那格末尾带一条现量命令；两张图都在库 |
 | #34 探针改进 | ✅ 两枚：按 pid 锁死寻址 + 窗口数为 0 时分辨两种成因；顺带去掉一处会冷启动 Safari 抢焦点的写法 | `scripts/qa/macos-installed-widget-help.sh`，提交 `630fb57e` `1f00bb59` |
 | #34 壳级两格 | ✅ **闭了**（后台诊断链，零前台激活、零录屏权限） | 提交 `91c6da3a`；读数 `apps/desktop-macos/evidence/widget-help-dom-20261011-r92.txt`；复跑 `bash scripts/verify-macos-widget-help.sh` |
-| 第 4 步 四端重装 | ✅ **跑过多趟；"现在每一端装的是哪一枚提交"只有一个地方说得出，就是台账那张四行表**（可 grep：`四端"装的是哪一枚提交"收成一张表`）。要点：mac/android/ios 三端已重跑到本线最后一枚产品改动那一枚提交，**windows 仍是上一趟** —— 而这不是遗漏，是"会进包的差异只剩一条没有任何 Windows 界面渲染的字符串"，那一格把静态依据和重跑命令都写在一起了 | 上面那格台账；证据包 `apps/web/evidence/ux-final-20261012/reinstall-r102-mac/`、`apps/mobile/evidence/profile-center/android-r100-copy/`、`…/ios-r101-current/`、`…/reinstall-r99/`。🔴 全部**不证 `origin/main`**（本地未 push） |
+| 第 4 步 四端重装 | ✅ **第五趟（r108）跑完，四端重新等于"当前产物"**：mac / windows / android 在隔离 worktree `heyta-carriers/r108-head` @ `769e6258`、iOS 在**主检出**同一枚提交（新载体的 `pod install` 撞上一条 567 B/s 的 maven 通道，成因是 hermes tarball 按树缓存 —— 偏离与差集现量都记在台账那一格）。`DESKTOP_RC=0 / MOBILE_RC=0 / IOS_RC=0`，四张图人打开看过，起跑与收尾 `git rev-list --count 769e6258..HEAD` = **0** ⇒ 这一趟没有发生 04:1x 担心的那种漂移 | 台账「第五趟四端重装跑完」那一格；证据包 [`apps/web/evidence/ux-final-20261013/reinstall-r108/`](../../apps/web/evidence/ux-final-20261013/reinstall-r108/RESULT.md)。🔴 全部**不证 `origin/main`**（本地未 push）、**不证深浅两档都装过**、**不证小组件卡片在桌面里换了字** |
 
 | 逃生门那一格（§8.2 前提） | ✅ **macOS 半已有真壳读数**（r96 关臂 + r97 默认臂配对，两臂都 `DIRTY_PATHS=clean`）：门关掉后 `storagePort` 与 `heytaStorage` 双双为 false，而 `heytaWidget` 仍在 ⇒ 面板仍是原生形状、0 行安装引导 | 台账「逃生门关掉后还认得壳」那格；两臂各一条命令：`HEYTA_SHELL_STORAGE=0 …` 与去掉前缀的同一句。⚠️ **Windows 真实 WebView2 那一半仍开**（那条 e2e 注入的是合成信号） |
 | 第 5 步 归属对账 | ✅ #26/#29/#31 已闭合、#28 留口径、#39 归 inbound-core；🔴 **#35 那句"归 apps/web 在飞那批"已被 10-13 05:1x 的现量取代**（那批落地后按台账指定动作闭合，见第五节第 4 行），第 5 步到这里**没有"仍挂在别人未提交批次上"的欠项** | 台账「第 5 步跑完」「check:image-license」「W5 那格 05:1x 闭合」三格 |
@@ -156,6 +156,10 @@ df -h /System/Volumes/Data                              # 要不要新开一棵�
 - 本轮跑过的：`check:locator-labels` rc=0（五枚脚本全过）、四道文档门绿、`pnpm -r typecheck` 本线范围内绿。
 - 🔴 **整条 `pnpm check` 本轮没有在合并态载体上重跑**（负载与 e2e 抢端口那两档原因记在台账），
   所以"全链绿"这句话**不成立**，不许照抄。
+- 10-13 07:4x **第五趟四端重装（r108）跑完**：`DESKTOP_RC=0 / MOBILE_RC=0 / IOS_RC=0`，四端重新钉在 `769e6258`；
+  证据包 `apps/web/evidence/ux-final-20261013/reinstall-r108/`（含 `RESULT.md` 与 `SHA256.txt`）。
+  🔴 一处偏离要一起读：**iOS 腿跑在主检出**（新载体的 `pod install` 撞上一条 567 B/s 的 maven 通道，
+  hermes tarball 按树缓存）⇒ 那一腿不是"只含已提交内容的隔离检出"那一档，差集现量写在 `RESULT.md` 里。
 - 10-13 05:1x 另取到三枚读数（都记在台账对应格）：`pnpm --dir apps/web typecheck` **rc=0**、`pnpm --dir apps/web build` **rc=0**、
   `pnpm check:shell-surfaces` **rc=0**；`pnpm check:verify-script-copy` 仍 **rc=1**（3 枚针，见第五节第 7 行）。
 - 在册红：#39（`check:image-license`，不在本线射程）、`packages/i18n` 那枚"中文表每条都含汉字"对专名（`macOS`/`iOS`/`Android`）的红、
