@@ -19,7 +19,10 @@
  *
  *   G1 全仓**可执行文件**里，"非注释行提到 gradlew"的落点只允许出现在一枚白名单文件里。
  *      （文档 `.md` 不在扫描面：runbook 要如实写出远端那条 `gradlew.bat` 命令；
- *        `.ps1` 也不在：PowerShell 只会跑在 Windows 上，那里本机执行就是正解。）
+ *        `.ps1` 也不在：PowerShell 只会跑在 Windows 上，那里本机执行就是正解；
+ *        `evidence/` 下的 `.json` 清单按**数据记录**放行 —— 它们只是记下哪些文件进了包，
+ *         那一行不执行任何东西，但同一个 `evidence/` 目录下的 `.sh` 仍在扫描面里。
+ *         两条反向腿由 `--self-test` 的臂 13b／13c 钉住，理由见 EVIDENCE_RECORD。）
  *   G2 白名单**不许比现实宽**：每条登记的落点必须在现量扫描里仍然存在。
  *      拿掉那一行而白名单还留着 ⇒ 红。（不这么写的话，白名单就是一张会越攒越长的通行证，
  *      正是 `check:licenses` 与 `check:gate-wiring` 各自修过的形状。）
@@ -165,6 +168,22 @@ const CHECKER_FILE = /^scripts\/check-[^/]+\.mjs$/;
 const EXECUTION_SHAPE = /spawnSync\(|execSync\(|execFile\(|fork\(|child_process/;
 
 /**
+ * 取证目录下的 **`.json` 清单 = 数据记录**，不是构建入口。2026-10-14 加，同样是实测逼出来的：
+ * G1 在真树上报了 4 条红，四条全在已提交的 evidence 清单里，内容是把
+ * `apps/mobile/android/gradlew(.bat)` 当作**被记录的输入文件**登记了路径与 sha256：
+ *   · `apps/mobile/evidence/ux-final-20261008/android-candidate/auth-legal-frozen/source-inputs.json:482,487`
+ *   · `apps/web/evidence/ux-final-20261008/source-candidate/source-manifest.json:171,172`
+ * 本文件头 G1 自己写的口径是「全仓**可执行文件**里……」，而一行 `"path": "apps/mobile/android/gradlew",`
+ * 不执行任何东西 —— 命中它等于让取证**记录**了哪些文件这件事变成违规。
+ *
+ * 🔴 豁免只给 `.json`，**不给整个 `evidence/` 目录**：跑验收的脚本（`run-leg.sh` 那一类）
+ * 确实住在 `evidence/` 下，而它会真的把进程交出去。所以同目录下的 `.sh/.py/.mjs`
+ * 仍留在扫描面里 —— 由 `--self-test` 的臂 13c 钉住（臂 13 = 记录不红，13b = 非 evidence 的
+ * 同名 `.json` 照红，13c = evidence 里的可执行脚本照红）。
+ */
+const EVIDENCE_RECORD = /(^|\/)evidence\/.*\.json$/;
+
+/**
  * G2 的基线：**规则生效之前**就存在的直接 gradlew 入口。每条都要写清"为什么还留着"，
  * 而且必须仍然在现量扫描里命中，否则红。
  *
@@ -197,6 +216,7 @@ function isCommentLine(line) {
 export function findGradlewSites(baseRoot) {
   const sites = [];
   const exempted = [];
+  const records = [];
   const walk = (dir) => {
     let entries;
     try {
@@ -221,6 +241,16 @@ export function findGradlewSites(baseRoot) {
       if (!text.includes('gradlew')) continue;
       const relFile = relative(baseRoot, abs).split(/[\\/]/).join('/');
       if (relFile === SELF_FILE) continue; // 扫描器自己的 needle 与输出文本，理由见 SELF_FILE
+      // 取证目录下的 `.json` 是**被记录的文件清单**，不是会执行的东西（理由见 EVIDENCE_RECORD）。
+      if (EVIDENCE_RECORD.test(relFile)) {
+        const linesRec = text.split('\n');
+        for (let i = 0; i < linesRec.length; i += 1) {
+          if (!linesRec[i].includes('gradlew')) continue;
+          if (isCommentLine(linesRec[i])) continue;
+          records.push(`${relFile}:${i + 1}`);
+        }
+        continue;
+      }
       // 门禁同类文件：只**描述**命令的行豁免；同一行有执行形状则**不豁免**（反向判据）。
       if (CHECKER_FILE.test(relFile)) {
         const linesPre = text.split('\n');
@@ -244,7 +274,7 @@ export function findGradlewSites(baseRoot) {
     }
   };
   walk(baseRoot);
-  return { sites, exempted };
+  return { sites, exempted, records };
 }
 
 /* ── 判据 ─────────────────────────────────────────────────────────────── */
@@ -254,7 +284,7 @@ const readings = [];
 
 /** G1 + G2：现量扫描 vs 白名单 + 基线。 */
 function checkGradlewSites(baseRoot) {
-  const { sites, exempted } = findGradlewSites(baseRoot);
+  const { sites, exempted, records } = findGradlewSites(baseRoot);
   const allowed = sites.filter((s) => s.file === ALLOWED_FILE);
   const baselineHits = new Map();
   const offenders = [];
@@ -296,6 +326,13 @@ function checkGradlewSites(baseRoot) {
     readings.push(
       `G1 形状豁免 ${exempted.length} 处（都是 scripts/check-*.mjs 里**只描述不执行**的 needle 行；` +
         `同一行出现 spawnSync/execSync/execFile/fork/child_process 就照红）：${exempted.join(', ')}`,
+    );
+  }
+  if (records.length > 0) {
+    readings.push(
+      `G1 取证记录豁免 ${records.length} 处（只放行 evidence/ 下的 **.json 清单**：它们把 gradlew 当作被记录的输入文件` +
+        `登记路径或 sha256，那一行不执行任何东西；同一目录下的 .sh/.py/.mjs 仍在扫描面里 —— ` +
+        `由 --self-test 臂 13／13b／13c 三条腿钉住）：${records.slice(0, 8).join(', ')}${records.length > 8 ? ' …' : ''}`,
     );
   }
   readings.push(`G1 扫描器自身（${SELF_FILE}）按夹具豁免 —— 它的形状由 --self-test 的豁免两腿守，不在扫描面里`);
@@ -892,6 +929,43 @@ function selfTest() {
         console.log(`   🔴 臂 ${arm.name} 存活：G10 报了 ${countRed(msgs, 'G10 ')} 条（应当恰好 ${want}）`);
         fail = 1;
       }
+    }
+
+    /* 臂 13 / 13b / 13c：G1 的「取证记录豁免」三条腿（一条正照、两条反向）。
+     * 施加理由是真树现状，不是假想：G1 曾把 4 行**已提交的 evidence 清单**——它们只是把
+     * `apps/mobile/android/gradlew` 当条目登记了路径与 sha256——报成"直接调用 gradlew"，
+     * 于是这扇门恒红且给出的修法（删掉取证记录）根本不该做。
+     *   13 = 记录不红；
+     *   13b = 同一行在非 evidence 的 `.json` 里照红 ⇒ 豁免不是"整个 .json 放行"
+     *          （`apps/mobile/package.json` 的 android 脚本正是靠 `.json` 进扫描面的，臂 4）；
+     *   13c = 同一行放进 evidence/ 下的 `.sh` 里照红 ⇒ 豁免不是"整个目录放行"
+     *          （跑设备验收的腿脚本住的正是 evidence/，它真的会把进程交出去）。 */
+    const recordLine = '{\n  "path": "apps/mobile/android/gradlew",\n  "sha256": "3238afb2"\n}\n';
+    seed();
+    write('apps/mobile/evidence/ux-final-20261008/android-candidate/source-inputs.json', recordLine);
+    msgs = checkGradlewSites(dir);
+    if (countRed(msgs, 'G1 ') === 0) console.log('   ✅ 臂 13 正照：evidence 清单里的 gradlew 记录不判红（记录 ≠ 入口）');
+    else {
+      console.log(`   🔴 臂 13 坏了：取证记录被判成红（${countRed(msgs, 'G1 ')} 条）—— 记录豁免没生效`);
+      fail = 1;
+    }
+
+    seed();
+    write('apps/desktop/evidence-x/manifest.json', recordLine);
+    msgs = checkGradlewSites(dir);
+    if (countRed(msgs, 'G1 ') === 1) console.log('   ✅ 臂 13b 转红：同一行落在非 evidence 的 .json 里照红（恰好 1 条）');
+    else {
+      console.log(`   🔴 臂 13b 存活：非 evidence 的 .json 只报了 ${countRed(msgs, 'G1 ')} 条（应当恰好 1）—— 豁免宽到了整个 .json`);
+      fail = 1;
+    }
+
+    seed();
+    write('apps/mobile/evidence/ux-final-20261008/run-leg.sh', '#!/bin/bash\ncd apps/mobile/android && ./gradlew assembleRelease\n');
+    msgs = checkGradlewSites(dir);
+    if (countRed(msgs, 'G1 ') === 1) console.log('   ✅ 臂 13c 转红：evidence 目录下的可执行脚本照红（恰好 1 条，不吞整个目录）');
+    else {
+      console.log(`   🔴 臂 13c 存活：evidence 下真跑 gradlew 的 .sh 只报了 ${countRed(msgs, 'G1 ')} 条（应当恰好 1）—— 豁免按目录放行了`);
+      fail = 1;
     }
   } finally {
     rmSync(dir, { recursive: true, force: true });
