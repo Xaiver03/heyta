@@ -2253,6 +2253,19 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
     - 🔴 **10-13 05:1x 复量：针从 2 枚变 3 枚，归属查清了，而"顺手换个字符串"这条路被现量堵死**。三枚缺失（`NO_COLOR=1 pnpm check:verify-script-copy` ⇒ rc=1，`SUMMARY … 缺失=3`）：① `scripts/lib/mobile-e2e.sh:1507` 与 ② `scripts/verify-mobile-habits.sh:631` 钉的是 `mobile.profile.sync.notConfigured` 的**旧值**，而 `git log -S "填好服务器地址与访问令牌后才能同步"` 指到 **`e6058120`** —— 也就是本线那笔代提交（同一枚提交已经在 `check:ui-language` 上欠过一次，见上面 12:5x 那格）⇒ **这两枚是本线的债**，不是别线欠项；③ `scripts/verify-mobile-ai.sh:1664` 钉 `mobile.ai.proposalNeverAuto` 的旧值「AI 只给建议…」，改文案的是 **`c8f63370` fix(托管AI/对外披露)`**，而且它**改的是语义**（新值明写"执行档会自动完成低风险写入"）—— 那枚脚本注释还写着这句是"唯一对用户承诺『确认前不写』的文案"，前提已经不成立 ⇒ 要重挑判据的是那一线，**判据口径永不代改**。
       ⚠️ **为什么本线不当场把①②换成新值**：换字符串会让门禁变绿而断言变成**永不成立**，那是最坏的一种修。现量两条 —— 源码里 `ProfileScreen.tsx:1101` 确实还渲染这枚词条，但**当前产物（`b731fd26…`、中文态、30 分钟前那趟 `android-r107-tapprobe/journey.json`）在「同步与隐私」那一屏上没有这句话**，屏上画的是另一句「登录 heyta 后，任务会自动在设备间同步，不需要填写服务器地址或手抄令牌。」；同一条结论另一线已经用真设备量过并写在 `scripts/verify-mobile-ios-account-email-sessions.sh` 的判据 J 注释里（"旧那句 needle… 在同步分组这一屏根本不渲染 ⇒ 一条永不成立的断言，第 6/7 趟两枚红都是它"），他们的修法是换成**同一屏的两面判据**（"有 B 且没有 A"）。⇒ ①② 的正确修法要的是**已配置态**的设备读数（那两处断言跑在填完凭据之后，上面那趟是未登录态，取不到这一半），落点是设备腿，不是编辑器。
       顺带一条同族未报实例（门禁扫不到它，因为它不在门的输入集里）：`scripts/verify-mobile-ios-account-erasure.sh:678` 也钉着同一句旧值 ⇒ 分母是 **4 处**，不是门报的 3 处（`grep -rn "填好服务器地址与访问令牌后才能同步" scripts` 现量；另有 4 枚 `scripts/.verify-mobile-habits.sh.snap.*` 命中，那是 `.gitignore:202` 忽略的快照残渣，不算实例）。
+    - ✅ **10-13 19:5x 这一格收口：三枚本线名下的针换完了，而且换之前先取到了缺的那个信号**。
+      先更正上面那句判据形状 —— 它把要的东西说反了：两处断言都是**缺席**断言（填完凭据后这句应当消失），
+      所以缺的不是"已配置态读数"，是**未配置态的正对照**：这句得确实在被测那一屏渲染，否则"它不在"永远成立 ⇒ 假绿。
+      正对照现量（`apps/mobile/evidence/profile-center/android-r108-syncneedle/probe.json`，设备 `emulator-5554`、
+      装的是 r108 产物 `c150b73993a5…648410e`、未配置态）：`mobile.profile.sync.notConfigured` 的当前值
+      「登录 heyta，让任务在设备间自动同步。」在「同步与隐私」那一屏渲染，bounds `[42,945][1038,993]`，
+      同屏旧那句 `old_needle_present=false`，`立即同步` 在（bounds `[42,788][356,904]`）。⇒ 三处按当前值换针：
+      ① `scripts/lib/mobile-e2e.sh`、② `scripts/verify-mobile-habits.sh:631`、③门扫不到的那第四处
+      `scripts/verify-mobile-ios-account-erasure.sh:678`（旧针让它**静默恒真**，注释里写明了）。
+      现量：`NO_COLOR=1 pnpm check:verify-script-copy` ⇒ `SUMMARY … 缺失=1`（3→1），剩下的那一枚
+      `scripts/verify-mobile-ai.sh:1666 "AI 只给建议"` **不是本线的**（`c8f63370` 改的是语义，判据口径不代改）。
+      三处都过 `bash -n`；`grep -rn "填好服务器地址与访问令牌后才能同步" scripts` 除 `.snap` 残渣外零命中。
+      ⚠️ 边界：**没有跑任何一条完整腿**（换针只是把针指向当前值，跑腿要另一套前提，见下面 19:5x 那一节的第四趟）。
   ✅ **两枚都做过 A/B，而且用的是窄版**（没有另起一棵载体）：涉及的**四枚文件逐字等于 `HEAD`**
   （`git diff --stat HEAD -- server/package.json scripts/lib/mobile-e2e.sh scripts/verify-mobile-habits.sh packages/i18n/src/locales/zh-CN.ts` 无输出），
   且 `git show HEAD:packages/i18n/src/locales/zh-CN.ts` 里那句旧文案命中 **0** ⇒ 这两枚红**不依赖任何未提交改动**，
@@ -3049,6 +3062,13 @@ r98 推送时 `sync_windows_sources` 与本地逐字对过账，但当时没把�
 并且这次把 r98 学到的**两个旋钮一起设**（`HEYTA_MACOS_DIST_DIR` + `HEYTA_REINSTALL_TMP_DIR`），
 不再让日志落共享 `/tmp` 互相覆盖。
 
+✅ **10-13 07:5x 两半都在主检出复量成绿，本格作废**（不是"等别人补回注释"这一格还挂着）：
+那批（`feat/detail-pane`）已经以 `4c97b9de` 落下，`TaskDetailCard.tsx` 现在不在 `git status` 里。
+读数：`NO_COLOR=1 pnpm --dir apps/web build` **rc=0**（05:1x 那格）与 `NO_COLOR=1 pnpm check:journey-coverage` **rc=0**
+（07:5x，末尾那句 `✅ web 旅程验收跑通` 就是它自己的抽查）。
+📌 这一格留着有用的部分是**归因形状**：一枚"红在索引/工作树、不红在 HEAD"的缺陷，判据是
+`git show HEAD:<文件> | sed -n '<行>p'` 逐字比那一行 —— 下一位撞见同类红时先做这一步，再决定是不是要绕。
+
 📌 顺带一条现量：`a4430f58`（r98 的载体）之后**只有一个提交动过产品源码** —— `1a386d76`
 （`packages/ai/src/capability-manifest.generated.ts`，AI 能力清单的生成物）。
 所以 r98 那页逐端读数对这一枚生成物**不成立**，这是跑第四趟的实际理由，不是"再跑一遍看着安心"。
@@ -3466,6 +3486,61 @@ mac `dfeacee3`（r102）/ android `dfeacee3`（r100）/ ios `dfeacee3`（r101）
 📌 **给下一位的两条装置事实**（都是这一趟新撞的，别再撞）：
 ① **新隔离载体的 iOS 腿要先解决 hermes 缓存**，否则 `pod install` 会自己决定这一腿跑多久。可复跑判据：`ls apps/mobile/ios/Pods/hermes-engine-artifacts/`（两枚 `.tar.gz` 齐 ⇒ 秒过；出现 `hermes-ios.download` ⇒ 现场拉，先看速度再决定换树还是等）。
 ② 四端"由两趟覆盖"这件事（`--only mac,windows` + `--only android,ios`）**不等于**跑过 `pnpm reinstall:all` 那条命令 —— 记账要写"两趟覆盖四端"，这是 10-05 那格定下的口径，本趟沿用。
+
+### 2026-10-13 19:5x：换针换出一条**同族缺陷** —— 设置面的目录层把 20+ 份 Android 设备腿的导航全停在目录层，而其中一条假绿正是这条导航造成的
+
+上面那一格（`verify-script-copy` 收口）本来是"把三枚旧针换成当前值"。动手前必须先回答"换了之后那条缺席断言还管不管用"，
+于是就撞见了缺的那个信号本身：**针没坏，路坏了**。
+
+四臂读数（设备 `emulator-5554`，装的是 r108 产物 `c150b73993a5…648410e`；源码 `071e09fd`；每臂日志都打
+`HEAD` 与 `LIB_BLOB=git rev-parse HEAD:scripts/lib/mobile-e2e.sh`，用来证明"改前臂"跑的确实是入库那一版）：
+
+| 臂 | 跑的是什么 | 读数 |
+|---|---|---|
+| `ab-before.txt` | **入库那版** `configure_sync_credentials` | `❌ 找不到输入框：服务器地址 / 访问令牌 / 端到端加密口令`、`❌ 这些字段丢了…`，而第五枚是 **`✅ 界面认为已配置`** —— 设备上一条凭据都没填，这句却成立 |
+| `ab-after-nav-only.txt` | 只补"进组"这一刀 | `✅ 已填 服务器地址`，后两枚仍找不到 |
+| `ab-after-nav-scroll.txt` | 再把裸 `xy_edit` 换成 `scroll_to_edit` | 三枚全 `✅`、终态三值同时仍在 |
+| `ab-final.txt` | 最终代码，**冷启动**整条路（起应用 → 过首屏两道闸 → 我的 → 设置 → 目录 → 同步与隐私 → 使用自托管服务器 → 三个字段） | **5✅ 0❌** |
+| `ab-sections.txt` | 共享的 `open_settings_section` 逐组验（`general/sync/ai/data/security` 各拿一枚**组内独有** testID） | 五组 `anchor_in_tree=1`、`dir_row_found=0`（= 已经不在目录层），`close_settings_sheet` 每趟 `sheet_open_after_close=0` |
+
+**成因分三层，都各自是一条现量，不是推测**：
+
+1. **目录层**。`6d868af0`（本线 10-07 那一刀）给设置面加了分组目录：Modal 开出来是 `testID="settings-directory"` 的列表，
+   每组一行 `settings-section-<key>`。凭据表单在 `sync` 那一组**里面**。旧写法点完入口就在目录层找输入框 ⇒ 三个字段整枚不在树里。
+   `probe-nav-check.json` 是那一步的直接读数：只点「设置」时 `服务器地址/访问令牌/端到端加密口令/使用自托管服务器` **全部 `false`**，屏上只有目录那几行。
+2. **折叠线**。表单展开后 `服务器地址` 在 `[84,2125][996,2243]` —— 中心落在底部标签栏上，而后两枚字段**整枚不在无障碍树里**。
+   所以 `xy_edit`（不做几何守卫）一发拿不到可点坐标；这一层是 04:3x 那一格那条纪律的镜像面：**"不在树里"也不等于"不存在"**。
+3. **关闭契约**。`SettingsScreen.tsx:364-373` 的 `handleRequestClose` 是"有 section 就退回目录，没有才关面" ⇒
+   **一发返回只退到目录**。`configure_sync_credentials` 结尾原本按"一发就关了"写，调用方的下一步（建任务、点入口）其实落在设置目录上。
+   `verify-mobile-account-email-sessions.sh` 里那句"切走再回来：Modal 卸载重挂"读的就是这个前提，面没关 = 组件没重挂 = 那条 ✅ 讲的是另一件事。
+
+**那条假绿的机制值得单独记**：`界面认为已配置` 是**缺席**断言（`notConfigured` 那句应当消失），而目录层根本不渲染那句话 ⇒
+它在任何状态下都成立。这跟 `check:verify-script-copy` 那两枚旧针是同一个成因的两种表现：**针指的是当前值，路走不到那一屏，断言照样空转**。
+
+代码落点（四枚文件，全是导航与探针，没有动任何判据口径）：
+`scripts/lib/mobile-e2e.sh` 新增 `scroll_to_rid` / `open_settings_section` / `close_settings_sheet` 三枚共享 helper，
+`configure_sync_credentials` 改成"进组 → 需要时点开自托管那一行 → 逐字段 `scroll_to_edit` → 终态三值 → `close_settings_sheet`"；
+同族另外两处一并走这条通道：`scripts/verify-mobile-ai.sh` 的 `open_ai_settings`（`ai` 组）与
+`scripts/verify-mobile-account-email-sessions.sh` 的三处（`profile` 组 + 那两处"切走再回来"改用 `close_settings_sheet`）。
+四枚文件 `bash -n` 全过。归属：目录层是本线 `6d868af0` 加的，而这条 lib 最后一次动是 10-06 ⇒ **本线欠项，不是别线的账**。
+
+门禁现量（序列化跑的，一臂一条）：
+`NO_COLOR=1 pnpm check:verify-script-copy` ⇒ `SUMMARY … 缺失=1`（只剩 `verify-mobile-ai.sh:1666 "AI 只给建议"`，那枚归改语义的 `c8f63370`，不代改）；
+`NO_COLOR=1 pnpm check:mobile-settings` ⇒ **rc=0**；
+`NO_COLOR=1 pnpm check:mobile-ai-anchors` ⇒ **rc=2**，但这一枚**不归本改**：把 `verify-mobile-ai.sh` 换成 `HEAD` 那一版复跑同一道门，
+`SUMMARY 源码文件=128 字面testID=117 模式=15 脚本锚点=19 按字面命中=9 按模式命中=4 未匹配=6` 与改后**逐字相同**、退出码同为 2，
+而六枚未匹配全在 1678–2078 行（`tool-input / ai-tool-send / breakdown-*`），没有一枚在本趟动过的那一段。
+
+**这一格不证明的三件事**：① **没有跑任何一条完整设备腿** —— 只把"导航 + 填字段"这一段单独跑通，填的是假凭据、一次同步都没发；
+② **iOS 那一侧没重取读数**（iOS 的同类导航在 `verify-mobile-ios-account-email-sessions.sh:799-831` 早已自己适配过目录层）；
+③ **`settings-section-profile` 没在设备上验到** —— 那组只在账号存在时渲染（`SettingsScreen.tsx:351-355` 的 filter），这台设备上没账号。
+邮箱腿那三处改的是同一条已验证的 helper 换了 key，前提（有账号 ⇒ 那一行在）来自源码不是现量；真跑时若那一行不在，会按 helper 里的 `bad` 响亮失败，不会静默。
+
+📌 装置事实：**验证一条共享设备 lib 函数不必跑整条腿**。把 lib source 进一个临时 shell、
+`HEYTA_E2E_*_FILE` 指到私有假凭据、`HEYTA_E2E_UI_XML` / `HEYTA_E2E_XY_PY` 指到私有现场，再直接调那一个函数 ——
+两分钟出四臂读数，且不读真令牌、不覆盖并行会话正在读的那份快照。装置本体：
+[`apps/mobile/evidence/profile-center/android-r108-syncneedle/RESULT.md`](../../apps/mobile/evidence/profile-center/android-r108-syncneedle/RESULT.md)。
+
 
 
 

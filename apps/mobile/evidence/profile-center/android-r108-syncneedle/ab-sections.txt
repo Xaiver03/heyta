@@ -1,0 +1,16 @@
+HEAD=071e09fd SERIAL=emulator-5554
+KEY=general dir_row_found=0 anchor=profile-language anchor_in_tree=1 sheet_open=1
+  SHEET_CLOSED
+  sheet_open_after_close=0
+KEY=sync dir_row_found=0 anchor=privacy-consent-section anchor_in_tree=1 sheet_open=1
+  SHEET_CLOSED
+  sheet_open_after_close=0
+KEY=ai dir_row_found=0 anchor=ai-settings-section anchor_in_tree=1 sheet_open=1
+  SHEET_CLOSED
+  sheet_open_after_close=0
+KEY=data dir_row_found=0 anchor=settings-data-actions anchor_in_tree=1 sheet_open=1
+  SHEET_CLOSED
+  sheet_open_after_close=0
+KEY=security dir_row_found=0 anchor=settings-security-actions anchor_in_tree=1 sheet_open=1
+  SHEET_CLOSED
+  sheet_open_after_close=0

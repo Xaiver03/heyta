@@ -1447,6 +1447,64 @@ if len(hits) > nth:
     print(f"{hits[nth][0]} {hits[nth][1]}")
 PY
 
+# ── 流程：进设置面的某一组 ──────────────────────────────────
+# 🔴 设置面在 10-07 `6d868af0` 那一刀之后**有两层**：Modal 开出来是分组目录
+#    （`testID="settings-directory"`，每组的行是 `settings-section-<key>`），
+#    要的东西在某一组**里面**。所以"点了「设置」就直接找内容"的写法全部停在目录层 ——
+#    这是一族不是一个：设备腿 `configure_sync_credentials`（20+ 份共用）、
+#    `verify-mobile-ai.sh` 的 AI 设置区块、`verify-mobile-account-email-sessions.sh`
+#    的「更换登录邮箱」都各踩一次。改前读数四枚红在同趟证据
+#    `apps/mobile/evidence/profile-center/android-r108-syncneedle/ab-before.txt`。
+#    锚点按 **rid** 走（testID 不跟着 i18n 合成变，文字会）。
+scroll_to_rid() {  # <testID> —— 与 `scroll_to_text` 同一形状，只是限定 resource-id
+  for _ in 1 2 3 4 5; do
+    dump
+    XY=$(xy_rid "$1")
+    if [ -n "$XY" ]; then printf '%s' "$XY"; return 0; fi
+    $ADB shell input swipe 540 1900 540 1100 250; sleep 1.5
+  done
+  return 1
+}
+
+open_settings_section() {  # <key: profile|general|sync|ai|data|security>
+  local row
+  dump
+  # 「已经在设置面里」的判据 = 目录容器在树上。第二次调用时入口不在树上，按只认入口的
+  # 写法会去滚 5 次找它 —— 那 5 下滚的是面里的内容，反而把目标滚过折叠线。
+  if [ -z "$(xy_rid "settings-directory")" ]; then
+    row=$(scroll_to_rid "profile-entry-settings")
+    if [ -z "$row" ]; then
+      bad "找不到「我的 → 设置」那一格（testID=profile-entry-settings，滚 5 次也不在可点区）"
+      return 1
+    fi
+    $ADB shell input tap $row; sleep 3
+    dump
+  fi
+  row=$(xy_rid "settings-section-$1")
+  if [ -z "$row" ]; then
+    bad "设置面里没有「settings-section-$1」这一行 —— 要么没落在分组目录，要么那一组按当前状态根本没渲染（例如没有账号时没有「个人资料」组）"
+    return 1
+  fi
+  $ADB shell input tap $row; sleep 2
+}
+
+# 把设置面**整个**关掉。
+# 🔴 目录层那一刀之后一发返回只退到目录（`SettingsScreen.tsx:364-373` 的
+#    `handleRequestClose`：有 section 就退回目录，没有才关面）。旧写法按一发就当
+#    面没了 ⇒ 调用方的下一步其实落在设置目录上；而有的腿**故意**要"卸载重挂"
+#    （`verify-mobile-account-email-sessions.sh` 那句"切走再回来：Modal 卸载重挂"），
+#    面没关 = 组件没重挂 = 那条读数的 premise 没了却照样打 ✅。
+close_settings_sheet() {
+  local n=0
+  while [ "$n" -lt 4 ]; do
+    dump
+    [ -z "$(xy_rid "settings-sheet")" ] && return 0
+    $ADB shell input keyevent 4; sleep 2; n=$((n + 1))
+  done
+  bad "设置面关不掉（按了 4 次返回，testID=settings-sheet 还在树上）"
+  return 1
+}
+
 # ── 流程：填同步凭据 ────────────────────────────────────────
 # 填同步凭据（服务器地址 / 访问令牌 / 端到端加密口令）。两个验收脚本都要用，
 # 所以放在共享库里 —— 这段里踩过的坑很密（见内注释），复制一份就等于
@@ -1454,17 +1512,27 @@ PY
 configure_sync_credentials() {
   disable_ime; sleep 2
   $ADB shell input tap 945 2253; sleep 3   # 「我的」
-  # 🔴 凭据表单在「设置」Modal 里，不在「我的」滚动流上（设置 IA 收进
-  #    `SettingsScreen` 那一刀搬进去的）。旧写法直接在我的页找输入框，
-  #    三个字段全部"找不到"，而页面明明就在 —— 实测卡过 verify-mobile-inbox
-  #    的每一轮。先按**稳定锚点**（resource-id，不走文字）打开 Modal 再填。
+  # 🔴 凭据表单在「设置」Modal 的「同步与隐私」组里，不在「我的」滚动流上（设置 IA
+  #    收进 `SettingsScreen` 那一刀搬进去的，之后又加了目录层）。旧写法直接在
+  #    我的页 / 目录层找输入框，三个字段全部"找不到"，而页面明明就在 ——
+  #    实测卡过 verify-mobile-inbox 的每一轮，改前四枚红见 `ab-before.txt`。
+  open_settings_section sync || return 1
+  # 表单还要 `advancedSync` 为真才渲染（`SettingsScreen.tsx:163-165`：初值 = 令牌与
+  # 地址都非空且地址不是默认值）。三种落点都过一遍现量：
+  #   ① 未配置自托管 ⇒ 组内第一屏就能看到那一行（实测 `[84,756][501,871]`）；
+  #   ② 地址+令牌已填过 ⇒ 初值为真，表单直接展开（那一行换成「返回 heyta 官方同步」）；
+  #   ③ 官方账号已登录 ⇒ 表单排在状态卡与隐私卡之后，落在折叠线以下 —— 实测折叠线以下的
+  #      节点**整枚不在无障碍树里**，所以不能只按当前 dump 判断"没有那一行"，要滚。
   dump
-  local settings_xy
-  settings_xy=$(xy_rid "profile-entry-settings")
-  if [ -n "$settings_xy" ]; then
-    $ADB shell input tap $settings_xy; sleep 3
-  else
-    echo "   ⚠️ 没找到「设置」入口（profile-entry-settings）—— 若凭据表单已在本页可见则继续"
+  local advanced_xy
+  if [ -z "$(xy_edit_sane "服务器地址")" ]; then
+    advanced_xy=$(scroll_to_text "使用自托管服务器")
+    if [ -n "$advanced_xy" ]; then
+      $ADB shell input tap $advanced_xy; sleep 2
+    else
+      bad "「同步与隐私」组里既没有凭据输入框，滚 5 次也没有「使用自托管服务器」那一行 —— 后面的读数都不算"
+      return 1
+    fi
   fi
   dump
   # 🔴 每填完一个字段**立刻收起键盘**，理由有两条，都实测踩过：
@@ -1478,9 +1546,12 @@ configure_sync_credentials() {
   # 局部断言抓不住这种"后一步破坏前一步"，所以下面还有一条**三个值同时仍在**的终态断言。
   for pair in "服务器地址|$SERVER" "访问令牌|$TOKEN" "端到端加密口令|$E2EE"; do
     desc="${pair%%|*}"; val="${pair#*|}"
-    dump
-    XY=$(xy_edit "$desc")
-    if [ -z "$XY" ]; then bad "找不到输入框：$desc"; continue; fi
+    # 🔴 用 `scroll_to_edit`（内部是 `edit-sane`：高度为正且中心 <2100），不用裸 `xy_edit`：
+    #    这一屏放不下三个输入框 —— 实测未滚动时「服务器地址」在 `[84,2125][996,2243]`，
+    #    中心落在底部标签栏上，而「访问令牌」「端到端加密口令」整枚节点还不在无障碍树里
+    #    （折叠线以下）。按旧写法只 dump 一次就找，后两个字段必然"找不到"。
+    XY=$(scroll_to_edit "$desc")
+    if [ -z "$XY" ]; then bad "找不到输入框（滚了 5 次也没进可点区）：$desc"; continue; fi
     $ADB shell input tap $XY; sleep 1.2
     # 传标签进去 → `clear_and_type` 会读回、把丢掉的字符补上（高负载下会丢）。
     clear_and_type "$val" "$desc"
@@ -1504,10 +1575,14 @@ configure_sync_credentials() {
   [ "$(has_secure)" = "1" ] || MISSING="$MISSING 端到端加密口令"
   if [ -z "$MISSING" ]; then ok "三个凭据字段同时都在（没有被后一步清掉）"
   else bad "这些字段丢了：$MISSING"; fi
-  [ "$(has_text "填好服务器地址与访问令牌后才能同步。")" = "1" ] \
+  # 这句是 `mobile.profile.sync.notConfigured` 的**当前值**（渲染点 `ProfileScreen.tsx:1101`，
+  # 条件是 `!form.configured`）。换文案时这句要跟着换 —— 正对照读数在
+  # `apps/mobile/evidence/profile-center/android-r108-syncneedle/probe.json`。
+  [ "$(has_text "登录 heyta，让任务在设备间自动同步。")" = "1" ] \
     && bad "界面仍认为未配置（凭据没生效）" || ok "界面认为已配置"
-  # 关掉设置 Modal，回到「我的」—— 调用方的下一步（建任务/点入口）都从这页出发。
-  $ADB shell input keyevent 4; sleep 2
+  # 关掉设置面，回到「我的」—— 调用方的下一步（建任务/点入口）都从这页出发。
+  # 🔴 目录层那一刀之后一发关不掉，见上面 `close_settings_sheet` 的注释。
+  close_settings_sheet
 }
 
 # ── 收尾 ────────────────────────────────────────────────────

@@ -1,0 +1,10 @@
+ARM=after2 HEAD=071e09fd LIB_BLOB=39f023e426c9 LIB_DIRTY=1 SERIAL=emulator-5554
+APK_SHA_ON_DEVICE=adb shell sha256sum -> 
+   ⚠️ 没找到「设置」入口（profile-entry-settings）—— 若凭据表单已在本页可见则继续
+   ✅ 已填 服务器地址
+   ✅ 已填 访问令牌
+   ✅ 已填 端到端加密口令（安全字段，dump 看不到内容；由首次同步成功来证明）
+   ✅ 三个凭据字段同时都在（没有被后一步清掉）
+   ✅ 界面认为已配置
+RESULT arm=after2 pass=5 fail=0 needle_after=0
+CLEANUP_DONE

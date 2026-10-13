@@ -1,0 +1,79 @@
+{
+  "serial": "emulator-5554",
+  "steps": [
+    {
+      "step": "dismiss-consent",
+      "via": null
+    },
+    {
+      "step": "dismiss-welcome",
+      "via": null
+    },
+    {
+      "step": "open-me",
+      "via": "我的",
+      "bounds": "[42,110][1038,163]"
+    },
+    {
+      "step": "open-settings-modal",
+      "via": "profile-entry-settings",
+      "bounds": "[42,802][1038,918]"
+    },
+    {
+      "step": "open-sync-group",
+      "via": "同步与隐私",
+      "bounds": "[84,582][996,697]"
+    },
+    {
+      "step": "open-self-host-form",
+      "via": "使用自托管服务器",
+      "bounds": "[84,756][501,871]"
+    }
+  ],
+  "artifact": {
+    "device_apk_path": "/data/app/~~egzNPpau7hYpHct9xUZx6w==/com.heyta-XRwQ_2b3IrF4N4o5ERUtKw==/base.apk",
+    "device_apk_sha256": "c150b73993a5c3097193109cc1806c255701fad2e61097aa3f05f8d36648410e",
+    "ui_locale": "en-US"
+  },
+  "visible_texts": [
+    "同步与隐私",
+    "状态",
+    "尚未同步",
+    "待上传",
+    "已全部上传",
+    "上次成功同步",
+    "从未",
+    "立即同步",
+    "登录 heyta，让任务在设备间自动同步。",
+    "隐私同意",
+    "只用本机（未同意联网）",
+    "决定于 2026-10-13 07:59（UTC）",
+    "需要同步或登录时，可以在这里重新选择是否联网。打开选择面板不会改变当前权限。",
+    "重新作出选择",
+    "同步",
+    "自托管同步",
+    "只有在你运行自己的 heyta 服务端并已有访问令牌时，才使用这条路径。",
+    "服务器地址",
+    "https://heyta.waytofuture.cn",
+    "模拟器填 10.0.2.2（指向这台电脑）；真机填局域网地址。",
+    "访问令牌"
+  ],
+  "readings": {
+    "new_needle_present": true,
+    "new_needle_bounds": [
+      "[42,945][1038,993]"
+    ],
+    "old_needle_present": false,
+    "sync_button_present": true,
+    "sync_button_bounds": [
+      "[42,788][356,904]",
+      "[147,819][314,872]"
+    ],
+    "credential_fields_present": {
+      "服务器地址": true,
+      "访问令牌": true,
+      "端到端加密口令": false
+    }
+  },
+  "verdict": "PASS"
+}

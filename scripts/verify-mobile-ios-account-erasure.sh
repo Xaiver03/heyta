@@ -675,7 +675,9 @@ fill_three_credentials() {  # <令牌>
   [ "$(jget "$(ax "端到端加密口令" --role AXTextField --list --json)" found)" = "True" ] || miss="${miss} 端到端加密口令"
   if [ -n "$miss" ]; then bad "填完之后这些字段反而不在了：${miss# }"; return 1; fi
   ok "三个凭据字段同时就位"
-  if [ "$(jget "$(ax "填好服务器地址与访问令牌后才能同步。" --list --json)" found)" = "True" ]; then
+  # 这句是 `mobile.profile.sync.notConfigured` 的当前值（`ProfileScreen.tsx:1101`，两端共用）。
+  # 旧值失效后这条断言不会红，只会**静默恒真** —— 所以它必须跟着文案走。
+  if [ "$(jget "$(ax "登录 heyta，让任务在设备间自动同步。" --list --json)" found)" = "True" ]; then
     bad "界面仍认为未配置（填进去的没生效）"
     return 1
   fi

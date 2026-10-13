@@ -1,0 +1,9 @@
+ARM=before HEAD=071e09fd LIB_BLOB=39f023e426c9 LIB_DIRTY=1 SERIAL=emulator-5554
+APK_SHA_ON_DEVICE=adb shell sha256sum -> 
+   ❌ 找不到输入框：服务器地址
+   ❌ 找不到输入框：访问令牌
+   ❌ 找不到输入框：端到端加密口令
+   ❌ 这些字段丢了： 服务器地址 访问令牌 端到端加密口令
+   ✅ 界面认为已配置
+RESULT arm=before pass=1 fail=4 needle_after=0
+CLEANUP_DONE
