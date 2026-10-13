@@ -1,0 +1,16 @@
+{
+ "total_steps": 106,
+ "selected": 1,
+ "reds": [
+  86
+ ],
+ "rows": [
+  {
+   "step": 86,
+   "cmd": "pnpm check:ai-e2e",
+   "rc": 124,
+   "sec": 3600.0,
+   "log": ".chain-logs/single86/086.log"
+  }
+ ]
+}

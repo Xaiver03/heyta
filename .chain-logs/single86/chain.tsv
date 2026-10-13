@@ -1,0 +1,2 @@
+step	cmd	rc	sec	log
+86	pnpm check:ai-e2e	124	3600.0	.chain-logs/single86/086.log
