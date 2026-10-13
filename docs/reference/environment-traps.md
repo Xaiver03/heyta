@@ -9763,3 +9763,55 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     ⚠️ 同一条对**取证装置**也成立：任何"产物里含/不含某句"的判据，中英两侧要各用自己的编码口径搜，
     否则中文那一侧**恒为 0**，那枚判据就变成 §7 元规则二那种"永远通过的检查"。
 
+
+431. 🔴 **`git checkout --ours/--theirs` 是整文件操作，而两侧的"独有内容"常在同一文件的不同位置 —— 且方向会反转。**
+    2026-10-12 合并三条老分支（`feat/detail-pane` / `feat/self-host-distribution` / `merge/20261005`）时，
+    对 14 个文本冲突用了"批量取 main 侧 + 少数并集"的做法，`pnpm -r typecheck` 连报三处，
+    **每一处都是我丢掉的真实内容**：
+
+    | 症状 | 我丢了什么 | 当时的动作 |
+    |---|---|---|
+    | `packages/ai` 引用的 4 个符号不存在 | 分支 `egress.ts` 的 `PrivacyConsentBlockedError` / `PRIVACY_CONSENT_BLOCKED_MARKER` / `..._ERROR_NAME` / `isPrivacyConsentBlocked` | 该文件取了 main 侧 |
+    | `en.ts` 的 `web.ai.failure.cause.consentNotGranted` 不在类型里 | 分支 i18n 的 3 个键 | 同上 |
+    | `routing.ts` 的 `'inbound-automation'` 不在 `AiFeature` 里 | **main** 的 `AiFeature` 多了这一个值，分支没有 | 修上一条时改成取**分支**侧 ⇒ 这次**反向**丢了 main 的 |
+
+    🔴 **两个必须记住的形状**：
+    ① **"某侧是超集"必须逐符号/逐键量**，不能凭文件整体印象。可复用的尺：
+    `diff <(git show A:f | grep -oE 'export (const|function|class|interface) [A-Za-z_]+' | sort) <(git show B:f | ...)`；
+    键集用 `comm`（两侧各自 grep 出 `'key':` 再 sort）。
+    ② **auto-merge 成功 ≠ 语义完整**。上面 `index.ts`/`provider.ts`/`routing.ts`/`en.ts`
+    全是"Auto-merging、零冲突"——它们**引用的东西**在我裁决掉的另一侧。
+    **冲突数少不代表丢得少**；冲突 103 处的那条分支反而只丢了 3 处（因为 89 处是二进制）。
+    ✅ 处置：解完 merge **先 `pnpm -r build` 再 `pnpm -r typecheck`**（包间经 `dist` 类型互引），
+    红了就按"这个符号/键从哪来"回溯到**具体文件**，再判那一侧是超集还是各有独有。
+
+432. 🔴 **`git update-ref` 的 ref 名不许含空格、不许以 `.` 开头 —— 而那些写法失败时不报错（若你没查返回码）。**
+    2026-10-12 归档 16 个待删 worktree 的未提交现场（`add -A` → `write-tree` → `commit-tree` →
+    `update-ref refs/archive/worktrees/<名字>`）时，第一版用
+    `sed 's|/|__|g'` 把斜杠换掉了却**保留了路径里的空格**，含空格的那 12 个 ref 全部失败：
+    `fatal: update_ref failed for ref '…': refusing to update ref with bad name`。
+    🔴 **而我的循环没查 `update-ref` 的返回码，还打印了 ✅** ——
+    读数只有 4 个 ref 存在（`for-each-ref | wc -l`），而日志里有 16 行"成功"。
+    第二版把空格换成 `-`，又以 `.` 开头失败（`.codex-…`）——**ref 组件不许以点开头**。
+
+    ✅ 处置：① ref 名先 `sed 's|[ /]|-|g'` 再把开头那个点换掉；
+    ② **`update-ref` 必须查返回码并回读**（`[ "$(git rev-parse --verify $ref)" = "$c" ]`），
+    否则那行 ✅ 是 §7 元规则二那种"永远通过的检查"；
+    ③ 归档完**抽样比对 sha256**（`git show $ref:$f | shasum` vs 盘上）——
+    ⚠️ 抽样时别选 `node_modules` 这类软链/目录，`shasum` 读不了会让一条好归档看起来像坏的
+    （本笔就这样误报了一次，换普通文件复验才通过）。
+    ④ 删除前**逐个查脏**：`git worktree list --porcelain` 的路径**可以含空格**，
+    用 `awk '{print $2}'` 会截断 ⇒ 读数全错（本笔第一版就把 19 个 worktree 全读成"干净"，
+    实际只有 3 个干净）。用 `awk '/^worktree /{sub(/^worktree /,""); print}'`。
+
+433. 🔴 **"工作树绿"与"提交绿"是两件事 —— 在共享检出上尤其。**
+    2026-10-12 我在一次 merge 里手工补了一行 `/*`（那处漏了会导致 20 余处 `TS1127`），
+    跑 `tsc` ⇒ rc=0，然后在提交信息里写"typecheck rc=0"。**而提交进去的那一份没有 `/*`** ——
+    事后 `git show HEAD:<file>` 一看，语法是坏的（去掉 `/*` 跑 `tsc` 复现 rc=2）。
+    根因：`git add` 之前有**并行写入者**把那个文件覆盖回去了，而 `M` 状态在我操作期间变过。
+
+    ⇒ 凡在提交信息里写"验证通过"，必须明确它验的是**哪个载体**：
+    验工作树就写工作树；要主张**提交绿**，就得在 `git stash` 之后、或在干净检出上再跑一次。
+    ✅ 可复用的收尾：`git show HEAD:<被验证的文件> | shasum -a 256` 与盘上比对，
+    不一致就说明"我改的那份"和"我提交的那份"不是一份。
+    这条与元规则三（"测试全绿 ≠ 这是当前产物"）同族，但在**共享检出 + 多会话并发**下更容易中招。
