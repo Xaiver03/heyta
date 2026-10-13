@@ -4284,3 +4284,39 @@ B191 那格记的 **37 枚"收集阶段就死"随 B192 闭合一起消失**，�
 `git diff --name-only 1707dbe5 HEAD -- <本线白名单全部路径>` 现量 = **0** ⇒ 上面这些读数对本线代码而言
 **在新 tip 上照样成立**，别为此重跑；只有 `apps/web` 全量那一格（`1 failed`）是**别人**改的东西，
 要复它得看 B193 有没有被动过。
+
+## 2026-10-14 01:5x · 那枚时区取证的 locale 臂：把悬在工作树里的那一笔落回 `main`（提交前复量抓到一条真红）
+
+**现场**：`apps/web/tests/inbound-due-timezone.spec.tsx`（白名单内）在工作树里是 ` M`，上一轮给它加了
+**中英两档 locale** 那条腿（判据改成按形状认月历格子、触发器必须包含被选中那格那一串，不再抄界面措辞），
+但没有提交、也没有留下"提交前复量"的读数。这一格补的就是那一步。
+
+**抓到的红（这就是"spec 绿"不能代替 typecheck 的那一枚）**：
+`pnpm --filter web typecheck` → `tests/inbound-due-timezone.spec.tsx(134,11): error TS18047: 'summary' is possibly 'null'`。
+`vitest run` 同一枚文件却是 `Tests 1 passed (1)` —— 因为 vitest 只转译不查类型。
+⇒ **新加的 `triggerLabel()` 里 `expect(summary, …).not.toBeNull()` 不缩窄类型**（`tsconfig.spec.json` 下照样红），
+按同文件 `openPanel()` 既有的写法补成 `summary!.textContent`。改后 typecheck `rc=0`。
+⚠️ 可复用的一条：本仓 spec 的类型尺走的是 `tsconfig.spec.json`，**它比 vitest 严**，所以白名单里那枚
+"提交前跑相关的 typecheck 与单测"不是形式，两次都跑才算。
+
+**反向验证（这次是复现，不是转述文件里那句话）**：把 `locales` 里那档英文换成目录表里并不存在的 `'en-US'`
+（`I18nProvider` 对查无此值的 locale 是 `CATALOGS[locale] ?? CATALOGS[DEFAULT_LOCALE]`，静默回退默认档）⇒
+⑤ 当场红，报的正是文件头记的那句：
+`AssertionError: 两档 locale 产出的月历无障碍名一模一样（实取 12月31日）= locale 臂空转: expected [ '12月31日' ] to have a length of 2 but got 1`
+还原后 `Tests 1 passed (1)`，`grep -c "en-US' : locale"` 现量 **0**（无残留）。
+
+**组跑读数（当前 HEAD `8da4ee1a`）**：`apps/web` 那 7 枚 `tests/inbound-*` → `Test Files 7 passed (7)` /
+`Tests 18 passed (18)`，与上一格基线**相等**（只许 ≥ ⇒ 成立，没删也没跳过）。
+
+**边界**：只动了那一枚 spec 与本文件。**别线此刻正在写的落点一枚字节都没碰、也没提交** ——
+`apps/web/evidence/inbound-recovery/*.png`（8 改 4 新）、`apps/mobile/evidence/profile-center/android-r99-fixed/`
+都留在工作树里。⚠️ 上一格还红的 `scripts/qa/reminders-data-responsive.mjs` 这次已不在 `git status --porcelain` 里
+—— 是**别线自己把它提交了**（不是本线动的），所以 porcelain 从 16 变 15，**这条变化不许记成本线的读数**。
+**没有 push。**
+
+**交付不变量（同一戳现量，2026-10-14 01:5x）**：
+`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` → **0**（未勾仍 **8**）；
+`node research/tools/license-inventory.mjs` → **rc=0**；`node scripts/check-migrations.mjs` → **rc=0**；
+`git status --porcelain | wc -l` → **15**，其中本线只 2 枚（spec + 本文件），其余 12 枚全在白名单外、非本线落点。
+
+
