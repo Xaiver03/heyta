@@ -4631,6 +4631,7 @@ export const en = {
   //    `REMINDER_OFFSET_PRESETS_MS` — the shared component reads
   //    `labels.offsets[i]` for `presets[i]`.
   'reminder.title': 'Reminders',
+  'task.pane.completed': 'Completed',
   'reminder.empty': 'No reminders yet',
   'reminder.add': 'Add reminder',
   'reminder.offset.0': 'At due time',

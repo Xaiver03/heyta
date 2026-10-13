@@ -520,6 +520,98 @@ describe('接线的三个细节', () => {
     expect(document.activeElement?.getAttribute('data-testid')).toBe('row-box-only');
   });
 
+  /**
+   * 与 `rowsWithControl` 的区别只有一件事：**行里有两颗**可聚焦控件，而且顺序照真生产者摆
+   * （现量 `e2e` 一趟取回：任务行里 FOCUSABLE 命中的第一颗是
+   * `<div role="checkbox" tabindex="0" data-testid="task-toggle-<id>">`，第二颗才是行体那颗
+   * `<button data-testid="task-row-<id>">`）。
+   *
+   * 🔴 `rowsWithControl` 那颗是**唯一**一颗且正好是 `<button>` —— 所以臂 F3（把 `FOCUSABLE`
+   * 缩成只认 `button`）在它上面永远看不出来：夹具长成了答案的形状（§8.148 要补的就是这一格）。
+   */
+  function rowsWithRealOrder(ids: string[]): void {
+    for (const el of Array.from(document.querySelectorAll('[data-testid^="task-item-"]'))) {
+      el.remove();
+    }
+    document.body.insertAdjacentHTML(
+      'beforeend',
+      ids
+        .map(
+          (id) =>
+            `<div data-testid="task-item-${id}">` +
+            `<div role="checkbox" tabindex="0" aria-checked="false" data-testid="task-toggle-${id}"></div>` +
+            `<button type="button" tabindex="0" data-testid="task-row-${id}"></button>` +
+            `</div>`,
+        )
+        .join(''),
+    );
+  }
+
+  it('🔴 ↓ 之后焦点落的是那颗**复选框**，不是同一行里的第二颗可聚焦控件（§8.148 补边界 ②）', async () => {
+    rowsWithRealOrder(['g1', 'g2']);
+    selection.select('task', 'g1');
+    await mount('tasks');
+    await press('ArrowDown');
+    expect(
+      document.activeElement?.getAttribute('data-testid'),
+      '焦点落在了同一行的另一颗控件上 ⇒ "只认 button"那一类坏在行级读数里是隐身的（臂 F3 的原病根）',
+    ).toBe('task-toggle-g2');
+  });
+
+  it('🔴 Space 落在行里那颗 `div[role=checkbox]` ⇒ 替它按一次并吞键（react-native-web 的形状，§8.148 边界 ③）', async () => {
+    rowsWithRealOrder(['s1']);
+    const toggle = document.querySelector('[data-testid="task-toggle-s1"]') as HTMLElement;
+    const clicks = vi.fn();
+    toggle.addEventListener('click', clicks);
+    toggle.focus();
+    selection.select('task', 's1');
+    await mount('tasks');
+
+    let defaultPrevented: boolean | null = null;
+    await act(async () => {
+      const e = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
+      toggle.dispatchEvent(e);
+      defaultPrevented = e.defaultPrevented;
+    });
+
+    expect(clicks).toHaveBeenCalledTimes(1);
+    expect(
+      defaultPrevented,
+      '没吞这一下 ⇒ Chromium 会拿它去滚页面，而勾选什么都没发生（真浏览器现量：改之前 `aria-checked` 两次读数都是 false）',
+    ).toBe(true);
+  });
+
+  it('🔴 Space 落在**原生可激活**的控件上 ⇒ 一次都不许多按（`<button role=checkbox>` 不接管）', async () => {
+    // 🔴 这颗按钮**摆在进行里**：不这么摆，臂 F5（摘掉 `instanceof HTMLButtonElement` 那道
+    // 守卫）就只会红在"不在本视图的任何一行上"那一档，而不是它要问的那一档 ——
+    // 真生产者今天恰好有两种复选框形状（`div[role=checkbox]` 与原生 `<button>`），
+    // 判据必须能区分它们。
+    rowsWithRealOrder(['n1']);
+    const row = document.querySelector('[data-testid="task-item-n1"]') as HTMLElement;
+    const el = document.createElement('button');
+    el.setAttribute('role', 'checkbox');
+    el.setAttribute('data-testid', 'native-box');
+    row.appendChild(el);
+    const clicks = vi.fn();
+    el.addEventListener('click', clicks);
+    el.focus();
+    await mount('tasks');
+
+    let defaultPrevented: boolean | null = null;
+    await act(async () => {
+      const e = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
+      el.dispatchEvent(e);
+      defaultPrevented = e.defaultPrevented;
+    });
+
+    expect(
+      clicks,
+      '替原生按钮合成了一次 click ⇒ 浏览器自己那一下 + 我们这一下 = **双份 op**',
+    ).not.toHaveBeenCalled();
+    expect(defaultPrevented).toBe(false);
+    el.remove();
+  });
+
   it('列表是空的 ⇒ 什么都不做，也不吞键', async () => {
     await mount('tasks');
     let defaultPrevented: boolean | null = null;
