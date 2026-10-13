@@ -4231,3 +4231,11 @@ C29 尺列按 B169 口径保持 `无尺`（升不升由负责人拍）。**没�
 
 **还欠的**：T7 那三条腿（`pnpm check` / `pnpm -r test` / `pnpm reinstall:all`）的台账读数都出自**旧 tip**，
 `main` 已经动过两枚 ⇒ 要出"当前产物"的结论得在隔离副本上按新 tip 重跑；B140 / B169 / B185 / B175 / B190 仍归负责人。
+
+**01:1x 落账（这一笔进了 `main`）**：`git rev-parse --short main` → **`0a24fe60`**（父 `a68cd81e`），
+`git diff --name-only HEAD~1 HEAD` → **4 枚，全在本线白名单内**，`--stat` = `4 files changed, 462 insertions(+), 2 deletions(-)`；
+提交后 `git diff --cached --name-only | wc -l` → **0**（那枚新 spec 只在提交的一瞬间进过共享索引，没给别线留坑）。
+spec 的 blob 与 22:5x 落在旁支 ref 的那枚**逐字节相同**（`4cd2dde1…`），中途没人覆写过；
+旁支 ref `inbound-c29-tz` 不删，作为本格上面承认过的那条恢复路径留着，⚠️ 但它那两笔里的两枚台账比 `main` 旧，别当账本真源。
+`git status --porcelain | wc -l` 现为 **16**，逐条看过**没有一枚是本线的**（`apps/mobile/src/screens/SettingsScreen.tsx`
+是刚冒出来的 —— 别线**此刻正在写**；`apps/web/evidence/inbound-recovery/*.png` 与 `scripts/lib/*` 也都不是本线的落点，本线没碰）。

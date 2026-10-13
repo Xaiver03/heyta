@@ -10238,6 +10238,20 @@ git diff --name-only HEAD~1 HEAD                    # 必须只列本线那 4 �
   本线那枚 `inbound-due-timezone.spec.tsx` 不在失败名单里（它只 import `DueBadge`/`DueEditor`，不碰 `TaskDetailCard`），
   单独跑两次都是 `Tests 1 passed (1)`。**跳过数 12 是既有的，本线没有新增 skip。**
 
+**落账现量（2026-10-13 01:1x，这笔在 `main` 上落地之后逐条回读）**：
+- `git rev-parse --short main` → **`0a24fe60`**（父 = `a68cd81e`，即落地时的 tip）。
+- `git diff --name-only HEAD~1 HEAD` → `BLOCKED.md`、`PROGRESS.md`、`apps/web/tests/inbound-due-timezone.spec.tsx`、
+  `docs/plans/inbound-automation.md` —— **4 枚，全是本线白名单路径，零越界**。`--stat` 读数 `4 files changed, 462 insertions(+), 2 deletions(-)`。
+- `git diff --cached --name-only | wc -l` → **0**：那枚新 spec 只在提交的瞬间进过索引，提交后索引是干净的
+  （别线随后可以正常 add，本线没给他们留坑）。
+- **spec 字节对账**：`git rev-parse main:apps/web/tests/inbound-due-timezone.spec.tsx` = `4cd2dde1…`
+  = `git rev-parse inbound-c29-tz:apps/web/tests/inbound-due-timezone.spec.tsx` —— 同一枚 blob，
+  22:5x 落在旁支上的那份与 01:1x 落进 `main` 的那份**逐字节相同**，中途没有谁覆写过。
+- 旁支 ref `inbound-c29-tz` **故意留着不删**：本格上面那句"就算随后有人在工作树上覆写这四枚，也能用
+  `git show inbound-c29-tz:BLOCKED.md` 逐枚捞回来"是本线承认过的恢复路径，ref 在就在。⚠️ 但它只等于**当时**的那批字节 —— 它这两笔里的 `BLOCKED.md`/`PROGRESS.md` 比 `main` 旧
+  （本格的 B192 闭合、01:0x/01:1x 两格都只在 `main` 上），**别拿它当台账真源**。
+  `git log --oneline main..inbound-c29-tz` → `05c7c2df`、`e64c5cfc`（两笔，都已被 `main` 的等价内容取代，除那两枚台账）。
+
 ---
 
 ## B192（2026-10-12 23:5x，本会话 · 详情栏那条线**暂存着的**那份 `TaskDetailCard.tsx` 编译不过 —— 它一旦被提交，`apps/web` 有 37 枚测试文件跑不起来）
