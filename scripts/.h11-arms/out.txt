@@ -1,0 +1,13 @@
+ARM A-min-height -> RC=1 |     test-results/shell-no-document-scroll-外-8bb94-半）-W3-四个视图逐个量：没有任何一栏可以把文档顶长-chromium/test-failed-1.png     test-results/shell-no-document-scroll-滚-182b6--点最靠下一行的整理触发器-→-编辑器可见且能滚到完整-chromium/test-failed-1.png   3 failed 
+    RED ✘  1 [chromium] › tests/shell-no-document-scroll.spec.ts:86:3 › 外壳不滚（H11 桌面那一半） › W1 文档一屏封顶；rail 与详情栏不跟着内容滚走 (3.0s)
+    RED ✘  2 [chromium] › tests/shell-no-document-scroll.spec.ts:154:3 › 外壳不滚（H11 桌面那一半） › W3 四个视图逐个量：没有任何一栏可以把文档顶长 (3.3s)
+    RED ✘  3 [chromium] › tests/shell-no-document-scroll.spec.ts:180:3 › 滚到底之后，行尾整理编辑器仍够得着（B95 那一档） › W2 真手势：滚到底 → 点最靠下一行的整理触发器 → 编辑器可见且能滚到完整 (3.4s)
+ARM B-auto-row -> RC=1 |     test-results/shell-no-document-scroll-外-8bb94-半）-W3-四个视图逐个量：没有任何一栏可以把文档顶长-chromium/test-failed-1.png     test-results/shell-no-document-scroll-滚-182b6--点最靠下一行的整理触发器-→-编辑器可见且能滚到完整-chromium/test-failed-1.png   3 failed 
+    RED ✘  1 [chromium] › tests/shell-no-document-scroll.spec.ts:86:3 › 外壳不滚（H11 桌面那一半） › W1 文档一屏封顶；rail 与详情栏不跟着内容滚走 (2.9s)
+    RED ✘  2 [chromium] › tests/shell-no-document-scroll.spec.ts:154:3 › 外壳不滚（H11 桌面那一半） › W3 四个视图逐个量：没有任何一栏可以把文档顶长 (3.2s)
+    RED ✘  3 [chromium] › tests/shell-no-document-scroll.spec.ts:180:3 › 滚到底之后，行尾整理编辑器仍够得着（B95 那一档） › W2 真手势：滚到底 → 点最靠下一行的整理触发器 → 编辑器可见且能滚到完整 (3.3s)
+ARM C-no-min -> RC=0 |   3 passed (10.1s) 
+ARM D-scroll-on-main -> RC=1 |     test-results/shell-no-document-scroll-滚-182b6--点最靠下一行的整理触发器-→-编辑器可见且能滚到完整-chromium/test-failed-1.png   2 failed   4 passed (15.7s) 
+    RED ✘  4 [chromium] › tests/shell-no-document-scroll.spec.ts:86:3 › 外壳不滚（H11 桌面那一半） › W1 文档一屏封顶；rail 与详情栏不跟着内容滚走 (2.3s)
+    RED ✘  6 [chromium] › tests/shell-no-document-scroll.spec.ts:180:3 › 滚到底之后，行尾整理编辑器仍够得着（B95 那一档） › W2 真手势：滚到底 → 点最靠下一行的整理触发器 → 编辑器可见且能滚到完整 (3.3s)
+ARMS_DONE

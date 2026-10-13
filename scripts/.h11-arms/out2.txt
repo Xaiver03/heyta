@@ -1,0 +1,9 @@
+── 探针：修好的形态（滚动挂在 .ht-content）
+ARM P-fixed -> RC=0 |   1 passed (5.6s) 
+PROBE_RESIZER {"missing":false,"mainOverflowX":"visible","mainOverflowY":"visible","resizerLeft":924,"resizerRight":932,"mainRight":928,"overhangRight":4,"hitTag":"DIV.ht-app__detail-resizer","hitIsResizer":true,"mainScrollW":628,"mainClientW":624,"detailLeft":928}
+── 探针：臂 D 形态（滚动搬到 .ht-main）
+ARM P-armD -> RC=0 |   1 passed (3.9s) 
+PROBE_RESIZER {"missing":false,"mainOverflowX":"auto","mainOverflowY":"auto","resizerLeft":924,"resizerRight":932,"mainRight":928,"overhangRight":4,"hitTag":"DIV.ht-app__detail-resizer","hitIsResizer":true,"mainScrollW":628,"mainClientW":624,"detailLeft":928}
+── 臂 C：拿掉 min-block-size:0，跑其余几何判据
+ARM C-geometry -> RC=0 |   13 passed (31.4s) 
+ARMS2_DONE

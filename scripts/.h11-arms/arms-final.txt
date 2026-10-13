@@ -1,0 +1,23 @@
+=== H11 臂台（每臂都应当**红**；哪一臂全绿就说明那一格判据是装饰）===
+── 臂 A-min-height -> RC=1
+     3 failed
+     1 passed (24.3s)
+   RED ✘  1 [chromium] › tests/shell-no-document-scroll.spec.ts:94:3 › 外壳不滚（H11 桌面那一半） › W1 文档一屏封顶；rail 与详情栏不跟着内容滚走 (4.9s)
+   RED ✘  2 [chromium] › tests/shell-no-document-scroll.spec.ts:162:3 › 外壳不滚（H11 桌面那一半） › W3 四个视图逐个量：没有任何一栏可以把文档顶长 (4.3s)
+   RED ✘  4 [chromium] › tests/shell-no-document-scroll.spec.ts:272:3 › 滚到底之后，行尾整理编辑器仍够得着（B95 那一档） › W2 真手势：滚到底 → 点最靠下一行的整理触发器 → 编辑器可见且能滚到完整 (4.6s)
+── 臂 B-auto-row -> RC=1
+     3 failed
+     1 passed (17.1s)
+   RED ✘  1 [chromium] › tests/shell-no-document-scroll.spec.ts:94:3 › 外壳不滚（H11 桌面那一半） › W1 文档一屏封顶；rail 与详情栏不跟着内容滚走 (4.6s)
+   RED ✘  2 [chromium] › tests/shell-no-document-scroll.spec.ts:162:3 › 外壳不滚（H11 桌面那一半） › W3 四个视图逐个量：没有任何一栏可以把文档顶长 (3.4s)
+   RED ✘  4 [chromium] › tests/shell-no-document-scroll.spec.ts:272:3 › 滚到底之后，行尾整理编辑器仍够得着（B95 那一档） › W2 真手势：滚到底 → 点最靠下一行的整理触发器 → 编辑器可见且能滚到完整 (3.4s)
+── 臂 D-scroll-on-main -> RC=1
+     3 failed
+     4 passed (19.2s)
+   RED ✘  4 [chromium] › tests/shell-no-document-scroll.spec.ts:94:3 › 外壳不滚（H11 桌面那一半） › W1 文档一屏封顶；rail 与详情栏不跟着内容滚走 (2.3s)
+   RED ✘  6 [chromium] › tests/shell-no-document-scroll.spec.ts:195:3 › 外壳不滚（H11 桌面那一半） › W4 `.ht-main` 不是滚动宿主，把手那 4px 也不成为横向滚动范围 (2.5s)
+   RED ✘  7 [chromium] › tests/shell-no-document-scroll.spec.ts:272:3 › 滚到底之后，行尾整理编辑器仍够得着（B95 那一档） › W2 真手势：滚到底 → 点最靠下一行的整理触发器 → 编辑器可见且能滚到完整 (3.4s)
+=== 还原后跑一次阳性对照（四臂之外必须全绿，否则臂台自己坏了）===
+── 臂 RESTORED-POSITIVE -> RC=0
+     4 passed (12.7s)
+ARMS_DONE
