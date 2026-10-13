@@ -242,15 +242,29 @@ function SettingsSectionNav({ active, onSelect }: {
   onSelect: (id: SettingsSectionId) => void;
 }): React.JSX.Element {
   const { t } = useI18n();
+  const navRef = useRef<HTMLElement>(null);
+  /**
+   * 🔴 **一份规则，四条路共用**。窄屏这根导航是横向可滚的条，七项总宽远超可视窗口，
+   * 所以"当前项要被带进视野"属于**当前项**，不属于**谁把它变成当前项**。
+   *
+   * 原先那行 `scrollIntoView` 挂在按钮自己的 `onClick` 上，于是从 rail「帮助」/
+   * rail「个人信息」/ `openAiSettings` 这些锚点进来时**根本不经过它**：内容面已经换成
+   * 那一节，导航却还停在最左边，`aria-current="page"` 那条选中态整个画在窗口外
+   * （实测 375：当前项落在文档 x `631..737`，窗口只到 `x=315`）。
+   *
+   * 判据在 `apps/web/tests/settings-nav-reveal.spec.tsx`（先红后绿，记的是"滚的是谁"）。
+   */
+  useEffect(() => {
+    navRef.current
+      ?.querySelector<HTMLElement>('[aria-current="page"]')
+      ?.scrollIntoView({ block: 'nearest', inline: 'center' });
+  }, [active]);
   return (
-    <nav className="ht-settings__nav" aria-label={t('web.shell.views.settings')}>
+    <nav ref={navRef} className="ht-settings__nav" aria-label={t('web.shell.views.settings')}>
       {SETTINGS_NAV_ITEMS.map((item) => (
         <button key={item.id} type="button" className="ht-settings__nav-link"
           aria-current={active === item.id ? 'page' : undefined}
-          aria-controls={item.id} onClick={(event) => {
-            onSelect(item.id);
-            event.currentTarget.scrollIntoView({ block: 'nearest', inline: 'center' });
-          }}>
+          aria-controls={item.id} onClick={() => onSelect(item.id)}>
           {t(item.labelKey)}
         </button>
       ))}

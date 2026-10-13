@@ -134,3 +134,27 @@ Object.defineProperty(window.navigator, 'language', {
   get: () => 'zh-CN',
   configurable: true,
 });
+
+/**
+ * jsdom 补齐之四：`Element.prototype.scrollIntoView`
+ *
+ * 🔴 起因是一枚具体的崩溃，不是"以后可能用得到"：设置分组导航把"当前项要被滚进
+ * 可视窗口"做成了 `active` 的 effect（窄屏那根条横向可滚，而选这一档有四条路，
+ * 旧代码的 `scrollIntoView` 只挂在导航按钮自己的 `onClick` 上 ⇒ 从 rail「帮助」
+ * 进来时选中态整个画在窗口外）。effect 一挂上，**任何打开过设置的用例**都会崩在
+ * `scrollIntoView is not a function` —— 实测 8 枚测试文件、34 条用例同时红，
+ * 报错指不到产品行为。
+ *
+ * ⚠️ 补在**测试这边**，不把宿主代码改成 `?.scrollIntoView?.()`：后者等于给生产代码
+ * 开一条"环境不支持就什么都不做"的旁路，而那正是这条规则唯一需要被看见的失败形状。
+ * 同一取舍在 `settings-anchor-focus.spec.tsx` / `search-panel.spec.tsx` 的文件头里
+ * 已经写过一次，本文件是把它收在一处。
+ *
+ * 要拿它当判据的用例（`settings-nav-reveal.spec.tsx`）在自己的 `beforeEach` 里覆写成
+ * 记录器、`afterEach` 还原 —— 还原到的就是这里这枚空函数，用例间不泄漏。
+ */
+if (typeof Element !== 'undefined' && typeof Element.prototype.scrollIntoView !== 'function') {
+  Element.prototype.scrollIntoView = function (): void {
+    // jsdom 没有布局引擎：滚不动，也不该假装滚动了什么。
+  };
+}
