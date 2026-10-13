@@ -25,6 +25,25 @@ for (const width of [375, 1440]) {
       // 下层视图叠上来的**过渡帧**（`waitForOverlaySettled` 的注释里记着同一前科）。
       // 下面那些断言量的是 DOM/CSS/几何，不受影响；受影响的是给人打开看的那张图。
       await waitForOverlaySettled(page, 'settings-sheet');
+      /**
+       * 🔴 **导航里的当前项必须落在可视窗口内**。窄屏那根分组导航是横向可滚的条（七项总宽
+       * 远超窗口），而这一条路径**不经过导航按钮自己的 `onClick`** —— 旧代码把 `scrollIntoView`
+       * 只挂在那个 `onClick` 上，于是内容面已经换成帮助、导航还停在最左边，`aria-current="page"`
+       * 那条选中态整个画在窗口外（台账实测 375：当前项在文档 x `631..737`，窗口只到 `x=315`）。
+       * 同一规则的 jsdom 版判据在 `apps/web/tests/settings-nav-reveal.spec.tsx`；这一条量**几何**，
+       * 因为它要回答的是用户那一问 —— "我看得见我被选中了吗"。
+       */
+      const settingsNav = page.locator('.ht-settings__nav');
+      const currentNav = settingsNav.locator('[aria-current="page"]');
+      await expect(currentNav, '设置导航里必须有一项被标成当前档').toHaveCount(1);
+      const navBox = await settingsNav.boundingBox();
+      const currentBox = await currentNav.boundingBox();
+      expect(navBox, '设置导航必须在布局里').not.toBeNull();
+      expect(currentBox, '当前项必须在布局里').not.toBeNull();
+      expect(
+        currentBox!.x >= navBox!.x - 0.5 && currentBox!.x + currentBox!.width <= navBox!.x + navBox!.width + 0.5,
+        `当前项落在导航可视窗口外：窗口 x=${navBox!.x}..${navBox!.x + navBox!.width}，当前项 x=${currentBox!.x}..${currentBox!.x + currentBox!.width}`,
+      ).toBe(true);
       await expect(page.getByTestId('settings-sheet').getByRole('heading')).toHaveCount(1);
       await expect(page.getByTestId('detail-pane-toggle')).toHaveCount(0);
       const links = page.getByTestId('about-links').getByRole('link');
