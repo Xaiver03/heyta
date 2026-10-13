@@ -1,0 +1,10 @@
+=== 打开表单后：输入框 / 滚动容器 / 面板按钮的几何 ===
+SCROLL cls=ScrollView rid=                               bounds=[0,210][1080,2400]
+=== 屏幕 / 键盘 / 焦点 ===
+Physical size: 1080x2400
+      mInputShown=false
+  mCurrentFocus=Window{542ac6f u0 com.heyta/com.heytamobile.MainActivity}
+=== 现在的 scroll_to_edit 走到哪一步失败（逐步复量） ===
+  服务器地址  xy=[无]  bounds=[84,502][996,598] cy=550 下缘未超2100 clickable=None
+  访问令牌     xy=[无]  节点不在树里
+  端到端加密口令 xy=[无]  节点不在树里
