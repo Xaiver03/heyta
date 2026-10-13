@@ -3390,6 +3390,18 @@ mac `dfeacee3`（r102）/ android `dfeacee3`（r100）/ ios `dfeacee3`（r101）
 ⚠️ **这一格真正要钉住的是那句"本轮红集"**：链在第 6 道 `&&` 退出，**第 7–107 道今晚整条没有跑过**。所以本线点名的那几道是**逐道单跑**取的，不是从这条链读出来的：`check:gate-wiring` RC=0、`check:android-widget-copy-parity` RC=0（+ 三条注入臂各 RC=1）、`check:locator-labels` RC=0、`check:docs` RC=0、`check:md-tables` RC=0。
 ⇒ 下一位要"链尾的红集"，得先把 `COMMENT` 那一格解掉（或让那一线把它登记进"决定不做 + 引用"），否则第 6 道后面全是黑的 —— **这句话本身就是本轮的验证边界**，别把它读成"门禁全绿"。
 
+### 2026-10-13 04:2x：我想把那句"第 7–107 道是黑的"补成现量，结果拿到一批**"54 道门全红"** —— 那是尺坏，不是红集
+
+**做了什么**：`pnpm check` 在第 6 道退出之后，我把链上第 7 道往后的 **54 道静态门**逐条单跑（清单 `.run-logs/tail-gates.txt`，每道一份日志 `.run-logs/gate-check:*.log`），想把"本轮红集"读出来。
+**读数**：**54/54 全部 `RC=1`**。这个分布本身就不可信 —— 同一批里 `check:theme` 与 `check:docs` 在两分钟前才各自 `RC=0`。
+**根因（现量，不是推论）**：那批跑在 **04:15:59–04:16:36**，而那时共享检出里有一枚**别的会话刚起的在飞 merge**：`MERGE_HEAD = 7f678146`（tip 是 10-07 00:02 那笔 `docs(AI 收口台账)…`）、`git diff --name-only --diff-filter=U` 读出 **≥ 20 枚未合并**（`AGENTS.md`、`apps/mobile/src/ai/{AiSettingsSection,AssistantScreen}.tsx`、`apps/mobile/src/ui/kit.tsx`、一批 `apps/web/evidence/**.png`），而 `package.json` 是坏的：pnpm 打 `Invalid package.json in package.json`，`python3 -c 'import json;json.load(open("package.json"))'` 报 `line 50 column 1`。
+⇒ **每一道门都死在 pnpm 解析 `package.json` 那一步**，报的是同一个退出码，与各自判据无关。
+**复量（04:18:0x，同一枚门）**：`package.json` 现在解析通过，`pnpm check:theme` **RC=0**，`--diff-filter=U` 现在 **0 枚**（那一线把冲突解完了，64 枚暂存等他们落笔）。⇒ **上面那 54 个 `RC=1` 整批作废，一条都不许引用**，包括我名下那四枚旧登记（#35/#42/#43/#39）—— 它们这一趟**没有**被重判。
+
+📌 **钉成两句可复用的口径（都是从这一格长出来的，不是新规矩）**：
+1. **共享检出里有别的写入者时，"链尾的红集"不许在主检出取** —— 要么等对方落笔之后，要么按 `AGENTS.md` §8 第 9 条固定到隔离副本并记基线哈希。这一格是那条规矩的**实例**。
+2. **"全红"和"全绿"一样是尺坏的信号**。逐道取 rc 的批跑，收尾先打一行 `grep -c 'RC=0'`：**0 或全数都先按尺坏处理**，再去看日志原文。这批若只看"有没有红"，我就会去登记 54 条不存在的欠项（§7 元规则一）。
+
 
 
 
