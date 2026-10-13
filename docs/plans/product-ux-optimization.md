@@ -3573,8 +3573,10 @@ git diff --name-only 769e6258..HEAD -- apps/web/src apps/mobile/src packages ser
 ② 第二次尝试全程没进设备步骤 —— `wait_for_quiet_host` 24 次采样 load1=19…34（阈值 12 = `hw.ncpu*3/4`），
 负载按两次采样的 CPU 时间差量是 qemu 610% / DeepSeek Harness 273% / OrbStack 108%（客户机内 idle），**没为了放行调阈值**；
 ③ `tree-C-keyboard-dismissed.xml` 与 B **逐字节同哈希** ⇒ 那次"收起键盘"没改变界面，**不能**当 KAV 不回写高度的证据（C 是废样，留档是为了让下一位补 `mInputShown` 那一拍）；
-④ 凭据填充是"往旧值里追加"而不是"先清空"（B/C 里那枚 `EditText` 的 text 长成
-`https://heyta.waytofutuhttp：／／10。0。。22：3111re.cn`，且 `input text` 把 `:` `/.` 打成全角）—— 只记录，本批没动；
+④ 那枚 `EditText` 里 `https://heyta.waytofutuhttp：／／10。0。。22：3111re.cn` **不是设备腿的缺陷** ——
+它是探针自己的裸 `input text`（没走 `clear_and_type` 的 CTRL+A + DEL + 读回）。**真正没排除的风险是另一件事**：
+`:` `/` `.` 在这台设备的输入法状态下落地成了全角，而 `clear_and_type` 同样只用 `input text`，
+所以下一趟若读回对不上，要先分辨"全角化"与"丢字符"两种形状再动手；
 ⑤ APK 与 r108 那枚**逐字节相同**（sha256 `c150b73993a5c309…`、69,480,004 B）这一条只说明"那次同步的打包输入等于 r108"，
 它**不**说明 `808c1344` 之后还相等 —— 上面那把尺现在读 1。
 
