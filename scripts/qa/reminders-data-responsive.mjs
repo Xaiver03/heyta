@@ -794,21 +794,25 @@ if (LEGS.includes('data')) {
  *
  * 那两条裁决（🔴 「已同意」只给「撤回」、「还没选择」只给「重新选择」；以及「重新选择」开的是
  * **同一张**同意面板而不是第二份同意界面）以前只在写它的那天被手工点过。
- * 🔴 这句"仓里没有任何一层在守"要**分树读**（10-10 01:4x 现量）：`grep -rn privacy-revoke e2e/tests apps/web/tests`
- * 在 **`HEAD` 里仍旧 0 处**，而**工作树 15 处**，全部在未跟踪的 `apps/web/tests/privacy-settings-panel.spec.tsx`
- * （第 58-77 行断言 `openSheet` 后 `reason === 'settings'`，第 84-102 行用 `privacy-revoke-not-persisted`
- * 守"最后一次真实保存回执"）⇒ **已提交的树上确实没人守，而那两条判据已经写好了、只欠入库**。
- * 所以一次改文案在干净检附上仍能把它悄悄反过来，而界面看起来仍然"有个按钮能点"。
  *
- * 🔴 **「只用本机」那一档该显示哪枚按钮，两棵树不一样**（10-09 15:0x 现量，别当成契约）：
- * `git show HEAD:apps/web/src/features/settings/PrivacyPanel.tsx` 的分叉条件是
- * `record === null` ⇒ 只要有过任何决定（含"只用本机"）就给「撤回」；
- * 工作树那版给的是 `record?.decision !== 'accepted'` ⇒ "只用本机"落到「重新选择」。
- * 🔴 **10-10 01:4x 现量更正支撑件那一半**：原先写的"`SettingsNotice.tsx` 与 `privacy-settings.css`
- * 在 HEAD 里不存在（双双 rc≠0）"现在**只对一枚** —— `git cat-file -e HEAD:apps/web/src/features/settings/SettingsNotice.tsx`
- * 成立（那一线 10-09 23:28 的 `3dd210bd` 带进来的，25 行新增），只有 `privacy-settings.css` 还是 `??`。
- * ⇒ "工作树那一版没入库"这个结论不变，但它欠的支撑件从两枚降到一枚。
- * ⇒ 这一格**只入读数、不作判据**；下面的走查按界面上实际在场的那枚按钮走，两种形状都走得完。
+ * 🔴 **这句"仓里没有任何一层在守"已经作废**（2026-10-14 01:3x 现量，别照旧文行动）：
+ *   · `git grep -l privacy-revoke HEAD -- 'apps/web/tests/*'` 现在**命中** ——
+ *     `apps/web/tests/privacy-settings-panel.spec.tsx` 已入库，两条裁决都被它钉住
+ *     （「只用本机」断言 `privacy-revoke` 为 null；「已同意」点撤回后断言回到"还没有作出选择"
+ *     且 `privacy-choose-again` 在场；「重新选择」断言 `reason === 'settings'`）。
+ *   · 它**有人跑**：根 `package.json` 的 `check` 链里有 `pnpm -r test`，而 `apps/web` 的
+ *     `test` 是 `vitest run`；单文件复量
+ *     `pnpm --dir apps/web exec vitest run tests/privacy-settings-panel.spec.tsx` ⇒ rc=0。
+ *   · 原先说的两枚缺失支撑件也都在 HEAD（`git cat-file -e HEAD:…SettingsNotice.tsx`、
+ *     `…/privacy-settings.css` 两条都成立）。
+ *   ⇒ 当年那句"一次改文案在干净检出上能悄悄把它反过来"不再成立，别再引用它。
+ *
+ * 🔴 **当年那条"两棵树的分叉条件不一样"同样已经收敛**：`PrivacyPanel.tsx` 现在
+ * **HEAD 与工作树逐字节相同**（两版 shasum 相同），落定的那一支是
+ * `record?.decision !== 'accepted'` ⇒ "只用本机"给「重新选择」、「已同意」才给「撤回」。
+ * 复量：`git show HEAD:apps/web/src/features/settings/PrivacyPanel.tsx | shasum -a 256` 对 `shasum -a 256` 同文件。
+ * ⇒ 本装置仍然**只入读数、不作判据**，但这是这一趟浏览器走查自己的射程选择
+ *   （它按界面上实际在场的那枚按钮走），**不再是**"仓库里没人守"的替代物。
  *
  * 一趟走完三态：**只用本机 / 已同意 / 还没选择**，每态各读一次 DOM 并各拍一张图。
  * 🔴 三态都要**真到达**：只测当前那一态的话，「已同意只给撤回」「没选择只给重新选择」这两条
