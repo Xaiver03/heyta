@@ -850,4 +850,126 @@ test.describe('键盘光标（↑↓ 移动选中）', () => {
 
     await page.screenshot({ path: SHOT('k12-arrows-then-enter-focuses-pane') });
   });
+
+  /**
+   * K13 = 工单 §8.143 边界 ②：把"焦点落在行里**哪一颗**"从印象变成读数。
+   *
+   * 🔴 为什么行级判据不够：K12 与 jsdom 那两条比的都是"**焦点在哪一行**"（§8.143 臂 F3
+   * 因此两层全盲）。现量（三张面的真生产者，2026-10-06 一趟取回）：
+   * - 任务行 `task-item-*` 里 FOCUSABLE 命中五颗，文档序第一颗是
+   *   `task-toggle-<id>`（`<div role="checkbox" tabindex="0">`），第二颗才是行体那颗
+   *   `<button role="button" data-testid="task-row-<id>">` —— **两者同属一行**，
+   *   所以"只认 button"那种坏在行级读数上完全看不出来；
+   * - 习惯行 `habit-row-<id>` 行内**零颗**独立可聚焦控件，行自己就是可聚焦的那一颗；
+   * - 便签行 `note-row-<id>` 里第一颗是 `note-edit-<id>`（另有 `note-pin-*` / `note-remove-*`）。
+   * ⇒ 三面身份各不相同，所以这一条**逐面点名**，不写成"行里第一颗"这种推给读者的话。
+   */
+  test('K13 ↓ 之后焦点落的是行里**哪一颗**（三面各自点名，§8.148）', async ({ page }) => {
+    const activeTestid = (p: Page) =>
+      p.evaluate(() => document.activeElement?.getAttribute('data-testid') ?? null);
+
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '任务');
+    await addTask(page, '身份甲');
+    await addTask(page, '身份乙');
+    const taskRowId = await page.locator(ROWS).first().getAttribute('data-testid');
+    await releaseFocus(page);
+    await page.keyboard.press('ArrowDown');
+    expect(
+      await activeTestid(page),
+      '任务面：焦点没落在那颗复选框上 ⇒ 纯键盘用户接不到"勾选"那一下（§8.148 边界②的现量身份）',
+    ).toBe(`task-toggle-${String(taskRowId?.replace(/^task-item-/, ''))}`);
+
+    await switchView(page, '习惯');
+    await addHabit(page, '身份习惯甲');
+    await addHabit(page, '身份习惯乙');
+    const habitRowId = await page
+      .locator('[data-testid^="habit-row-"]')
+      .first()
+      .getAttribute('data-testid');
+    await releaseFocus(page);
+    await page.keyboard.press('ArrowDown');
+    expect(
+      await activeTestid(page),
+      '习惯面：那一行的可聚焦的是**行自己**（行内没有独立控件），焦点却跳到了别处',
+    ).toBe(habitRowId);
+
+    await switchView(page, '便签');
+    await addNote(page, '身份便签甲');
+    await addNote(page, '身份便签乙');
+    const noteRowId = await page
+      .locator('[data-testid^="note-row-"]')
+      .first()
+      .getAttribute('data-testid');
+    await releaseFocus(page);
+    await page.keyboard.press('ArrowDown');
+    expect(
+      await activeTestid(page),
+      '便签面：焦点应落在行里第一颗 `note-edit-*`（入口在那颗按钮上，不是外层那只裸 View）',
+    ).toBe(`note-edit-${String(noteRowId?.replace(/^note-row-/, ''))}`);
+
+    await parkCursor(page);
+    await page.screenshot({ path: SHOT('k13-focus-identity-three-faces') });
+  });
+
+  /**
+   * K14 = 工单 §8.143 边界 ③：**焦点已在复选框上按 Space ⇒ 勾选**。
+   *
+   * 🔴 这一条落地前，界面上的真相是"按 Space 什么都不发生"（2026-10-06 现量：
+   * `react-native-web` 把 `accessibilityRole="checkbox"` 落成
+   * `<div role="checkbox" tabindex="0">`，而 Chromium **不会**把 Space 合成成这种节点的激活
+   * —— 原生 `<button>` / `<input>` 才会）。所以纯键盘用户当时**勾选不了任何一条任务**，
+   * 而 §8.143 把它写成"这条新可达面没有判据"，读起来像"大概是通的，只是没人量"。
+   *
+   * ⚠️ 判据刻意**不读 `aria-checked`**：完成的那一条会从收集箱那一列里整行消失
+   * （两趟现量：当场裸 evaluate 还看得见、几秒后 locator 就找不到了）。
+   * 所以这里用的是**差分**：两条同批建的任务，只在那一下 Space 上分家 ——
+   * 甲那一行不见了而乙那一行还在，再刷新一次仍然如此。
+   * 后半句（reload）负责的是"那一下真走了一条 op"，不是本地态。
+   */
+  test('K14 焦点在复选框上按 Space ⇒ 那条任务被勾选（差分 + 刷新仍在，§8.148）', async ({ page }) => {
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '任务');
+    await addTask(page, '勾选甲');
+    await addTask(page, '勾选乙');
+
+    const taskRowId = await page.locator(ROWS).first().getAttribute('data-testid');
+    const toggled = `task-toggle-${String(taskRowId?.replace(/^task-item-/, ''))}`;
+    await expect(page.getByTestId(toggled)).toHaveCount(1);
+
+    // 焦点由机制自己带进行里那颗复选框（K12/K13 已经钉过这件事，这里是它的前提）
+    await releaseFocus(page);
+    await page.keyboard.press('ArrowDown');
+    await expect(page.getByTestId(toggled)).toBeFocused();
+
+    await page.keyboard.press('Space');
+
+    // 差分：被 Space 的那一条离开收集箱，没被碰的那一条还在。
+    // 🔴 两句都圈在 `ROWS` 里：`getByText('勾选乙')` 整页会命中**两处**（行 + 栏里那张面单的标题），
+    //    第一版就是这么红的 —— 报的是 "Expected 1, Received 2"，看着像"少了一行没生效"，
+    //    实际是尺子量到了隔壁那一格。
+    await expect(page.locator(ROWS)).toHaveCount(1);
+    await expect(page.locator(ROWS).filter({ hasText: '勾选甲' })).toHaveCount(0);
+    await expect(page.locator(ROWS).filter({ hasText: '勾选乙' })).toHaveCount(1);
+
+    /*
+      🔴 §8.150：差分证明了"行没了"，而这一格**还画着它** —— 所以那一格必须自己说清这条已完成，
+      否则用户读到的是"选中了一条看不见的任务"（§8.148 边界 ② 看图照出来的形状）。
+      ⚠️ 这里**不**把选中回落掉：回落只认"实体还在不在"，认"当前筛不筛得到"会让用户切一下筛选
+      就把正在编辑的那条判成不存在、面板自己关掉（`packages/app-host/src/selection.ts:127-131`，
+      判据钉在 `packages/app-host/tests/selection.spec.ts:170`）。
+    */
+    await expect(page.getByTestId('task-pane-status'), '栏里那格没写明「已完成」').toHaveText('已完成');
+
+    await page.screenshot({ path: SHOT('k14-space-toggles-from-keyboard') });
+
+    await page.reload();
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '任务');
+    await expect(
+      page.locator(ROWS).filter({ hasText: '勾选甲' }),
+      '刷新后「勾选甲」又回来了 ⇒ 那一下 Space 只改了本地态，没走 op',
+    ).toHaveCount(0);
+    await expect(page.locator(ROWS).filter({ hasText: '勾选乙' })).toHaveCount(1);
+  });
 });

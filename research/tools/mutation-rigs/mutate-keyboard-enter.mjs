@@ -88,6 +88,10 @@ const JS_ENDPOINT = '也要把焦点';
  */
 const JS_ALLFIVE = '每一面都登记了落点';
 const JS_TASKPANE = '栏里那只正文框';
+/** §8.148 那三条（焦点落哪一颗 + Space 那一档的正反两腿）。 */
+const JS_IDENTITY = '焦点落的是那颗';
+const JS_SPACE = '替它按一次并吞键';
+const JS_SPACE_NATIVE = '一次都不许多按';
 
 const ARMS = [
   {
@@ -215,17 +219,42 @@ const ARMS = [
     expectE: ['K12'],
   },
   {
-    name: 'F3 可聚焦的口径缩成只认 `<button>`（两层都盲 ⇒ 这份宽度今天不承重）',
+    name: 'F3 可聚焦的口径缩成只认 `<button>`（§8.148 之后：两层都有牙了）',
     file: CURSOR,
     from: `const FOCUSABLE =
   '[tabindex]:not([tabindex="-1"]), button, a[href], input, select, textarea, [role="checkbox"], [role="button"], [role="link"]';`,
     to: `const FOCUSABLE = 'button';`,
-    /* 🔴 读数与我的预判**相反**。预判写的是"真渲染里那颗是 `div[role=checkbox]`，只认 `button`
-       就会只红浏览器层"；实测**两层全绿** —— 真实那一行里确实还有一颗 `<button>`（行尾那颗删除），
-       所以 `querySelector('button')` 照样能找到可聚焦的东西。
-       ⇒ `FOCUSABLE` 那份宽度今天**没有消费者**，它是保险不是被观察到的行为；这一臂的用处
-       就是把这句话钉成读数。而"预判写反了"本身与 §8.141 边界① 是同一条教训：**先跑再写**。 */
-    expectJs: [],
+    /* 🔴 这一臂的**预期红集**在 §8.148 变了，而判据本身一个字没动 —— 变的是射程。
+       §8.143 那趟记的是"两层全绿 ⇒ `FOCUSABLE` 那份宽度不承重"，成因有两条，各是一半：
+       ① jsdom 夹具 `rowsWithControl` 行里唯一那颗可聚焦控件**正好是 `<button>`**
+          （夹具长成了答案的形状）；② 浏览器层比的都是"焦点在**哪一行**"，
+          而真实那一行里除复选框外还有行体那颗 `<button>`（行尾还有删除），
+          同属一行 ⇒ 行级读数分不出两种坏。
+       §8.148 补的是这两半：夹具按真生产者顺序摆两颗（复选框在前），
+       浏览器层新增 K13（**逐面点名那颗**）。⇒ 这一臂现在按预期转红，
+       而它红的是"宽度确实承重"这句话。 */
+    expectJs: [JS_IDENTITY],
+    // K14 也跟着红：焦点落到行体那颗原生 `<button>` 上之后，Space 被浏览器自己拿去
+    // "按下这一行"（= 选中），勾选那条 op 根本不会发生。
+    expectE: ['K13', 'K14'],
+  },
+  {
+    name: 'F4 摘掉 Space 那一支（回到 §8.148 之前的形状：焦点在复选框上按 Space 什么都不发生）',
+    file: CURSOR,
+    from: `      const space = event.key === ' ';`,
+    to: `      const space = false; // F4`,
+    expectJs: [JS_SPACE],
+    expectE: ['K14'],
+  },
+  {
+    name: 'F5 不分原生与否，Space 一律替它按一次（`<button role=checkbox>` 被合成双份 click）',
+    file: CURSOR,
+    from: `        if (el instanceof HTMLButtonElement || el instanceof HTMLInputElement) return;`,
+    to: `        // F5：不区分形状，一律合成`,
+    /* 只红 jsdom 那一条负向腿：真浏览器里今天**没有** `button[role=checkbox]` 这种生产者
+       （现量：任务行那颗是 `div[role=checkbox]`，便签行那三颗是 `role=button`），
+       所以这一臂在 e2e 层不可观察 —— 它是**契约**那条路的牙，不是观感那条路的牙。 */
+    expectJs: [JS_SPACE_NATIVE],
     expectE: [],
   },
 ];
@@ -347,10 +376,10 @@ const b = build();
 if (b.rc !== 0) fail(`干净态打不出包：\n${b.out.slice(-1500)}`);
 const cleanDigest = distDigest();
 const bj = jsdom();
-if (bj.rc !== 0 || bj.passed < 34) fail(`干净态 jsdom 层不干净（要 >=34 passed）：${bj.line}`);
+if (bj.rc !== 0 || bj.passed < 37) fail(`干净态 jsdom 层不干净（要 >=37 passed）：${bj.line}`);
 const be = e2e();
-if (be.rc !== 0 || be.passed < 12 || be.failed > 0) {
-  fail(`干净态 e2e 层不干净（要 >=11 passed / 0 failed）：${be.line}｜红集=${titlesOf(be.out, 'K').join(' ｜ ')}`);
+if (be.rc !== 0 || be.passed < 14 || be.failed > 0) {
+  fail(`干净态 e2e 层不干净（要 >=14 passed / 0 failed）：${be.line}｜红集=${titlesOf(be.out, 'K').join(' ｜ ')}`);
 }
 console.log(`基线：jsdom=${bj.line}｜e2e=${be.line}（K1..K11）｜dist=${cleanDigest}`);
 

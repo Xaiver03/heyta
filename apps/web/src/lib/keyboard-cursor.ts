@@ -242,9 +242,28 @@ export function useSelectionKeyboardCursor(view: ViewKey): void {
 
     const onKeyDown = (event: KeyboardEvent): void => {
       const arrows = event.key === 'ArrowUp' || event.key === 'ArrowDown';
-      if (!arrows && event.key !== 'Enter') return;
+      const space = event.key === ' ';
+      if (!arrows && !space && event.key !== 'Enter') return;
       if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
       if (isTypingTarget(event.target) || isOverlayOpen() || targetOwnsArrowKeys(event.target)) {
+        return;
+      }
+
+      if (space) {
+        /**
+         * 🔴 只补一种：`<div role="checkbox" tabindex="0">` —— 那是 react-native-web 把
+         * `accessibilityRole="checkbox"` 落出来的形状（现量：任务行里第一颗可聚焦控件就是它，
+         * `task-toggle-<id>`）。Chromium **不会**把 Space 合成成这种节点的激活，
+         * 2026-10-06 现量的症状是"焦点已经在复选框上、按 Space 两次读数都是 `aria-checked=false`"
+         * ⇒ 纯键盘用户勾选不了任何一条任务。
+         * 原生能自己激活的（`<button>` / `<input>`）一次都不许替它按 —— 替了就是双份 op。
+         */
+        const el = event.target;
+        if (!(el instanceof HTMLElement) || el.getAttribute('role') !== 'checkbox') return;
+        if (el instanceof HTMLButtonElement || el instanceof HTMLInputElement) return;
+        if (el.closest(`[data-testid^="${target.prefix}-"]`) === null) return;
+        event.preventDefault(); // 不拦的话这一下被 Chromium 拿去滚页面
+        el.click();
         return;
       }
 

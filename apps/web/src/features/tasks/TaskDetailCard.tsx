@@ -240,6 +240,17 @@ function TitleField({ task, onRename }: { task: Task; onRename: (title: string) 
   );
 }
 
+  🔴 完成态那一句**不能**借用 `blockLabelStyle`：看图时它和紧接其下的「备注」「子任务」
+  区块头一模一样（同档同色），用户读到的是"这里有一个叫『已完成』的区块"，
+  而不是"这条任务的状态"。所以它走辅助档（AGENTS §5：辅助/说明 = xs/sm + muted），
+  并且**不**带区块头那点上边距 —— 它属于标题，不属于下一个区块。
+*/
+const statusLineStyle: CSSProperties = {
+  ...text('caption'),
+  color: cssVar('color.foreground-muted'),
+  marginBottom: cssVar('space.1'),
+};
+
 /**
  * 详情列里的任务面单。
  *
@@ -296,6 +307,22 @@ export function TaskDetailCard(): React.JSX.Element | null {
       <h3 style={groupHeaderStyle} data-testid="task-detail-group">
         {t('web.tasks.detail.section.basic')}
       </h3>
+
+      {/*
+        🔴 完成态在栏里要有**一句只读的话**，不能只靠"列表里那行没了"来传达。
+        §8.148 边界 ② 看图照出来的形状：收集箱勾掉一条 ⇒ 行从这一列消失，而这一格继续画着它，
+        且和未完成时长得一模一样 —— 用户读到的是"选中了一条看不见的任务"。
+        为什么不是"把选中回落掉"：`packages/app-host/src/selection.ts:127-131` 那条红线
+        （判据钉在 `packages/app-host/tests/selection.spec.ts:170`）写明回落只认"实体还在不在"，
+        认"当前筛不筛得到"会让用户切一下筛选就把正在编辑的那条判成不存在、面板自己关掉。
+        ⚠️ 这一行**不是第二颗编辑器**：完成态的编辑器仍是行尾那颗复选框（§8.138 那条不变量），
+        所以这里既没有 `onClick` 也不是 `button`，摘掉它只会让这一格少一句话、不会少一个入口。
+      */}
+      {task.completedAt !== undefined ? (
+        <p data-testid="task-pane-status" style={statusLineStyle}>
+          {t('task.pane.completed')}
+        </p>
+      ) : null}
 
       {/*
         区块头复用词条表里已有的那一句「备注」：占位符复用 composer 那句是同一个理由

@@ -318,7 +318,7 @@ describe('重复这一字段此刻归谁（§8.141）', () => {
     await flush();
   }
 
-  const pane = () => document.querySelector('[data-testid="task-pane"]');
+  const pane = () => document.querySelector<HTMLElement>('[data-testid="task-pane"]');
 
   it('🔴 栏里那一格画着重复的**编辑本体**，且整栏只有一份', async () => {
     const a = await addTask('重复甲');
@@ -404,7 +404,7 @@ describe('子任务这一字段此刻归谁（§8.144）', () => {
     return { a, b, c };
   }
 
-  const pane = () => document.querySelector('[data-testid="task-pane"]');
+  const pane = () => document.querySelector<HTMLElement>('[data-testid="task-pane"]');
 
   it('🔴 栏里画的是子任务的**编辑本体**，且整栏只有一只 `<select>`', async () => {
     const { a } = await makeChain();
@@ -597,7 +597,7 @@ describe('提醒这一字段此刻归谁（§8.145）', () => {
 });
 
 describe('截止这一字段此刻归谁（§8.146）', () => {
-  const pane = () => document.querySelector('[data-testid="task-pane"]');
+  const pane = () => document.querySelector<HTMLElement>('[data-testid="task-pane"]');
   /** 月历里那一格的可访问名 = `{month}月{day}日`（词条 `web.due.dayLabel`）。 */
   const dayCell = (label: string): string => `[role="button"][aria-label="${label}"]`;
   /* 🔴 月份从 store 那个冻结的"现在"推，不写死 10 月：写死的月份在跨月那天会变成
@@ -704,7 +704,7 @@ describe('截止这一字段此刻归谁（§8.146）', () => {
  *    所以下面那条判据量的是**换选中后值跟着换人** —— 一旦有人把它改成非受控草稿，那条就红。
  */
 describe('清单 + 标签这一字段此刻归谁（§8.147）', () => {
-  const pane = () => document.querySelector('[data-testid="task-pane"]');
+  const pane = () => document.querySelector<HTMLElement>('[data-testid="task-pane"]');
   const selectIn = (root: Element | null | undefined): HTMLSelectElement | null =>
     root?.querySelector<HTMLSelectElement>('[data-testid="organize-project-select"]') ?? null;
   /** 数某一档区块头：只数**叶子文本节点所在的那个元素**，不数 aria-label。 */
@@ -887,5 +887,61 @@ describe('清单 + 标签这一字段此刻归谁（§8.147）', () => {
       /taskPaneInColumn\s*\?\s*<TaskOrganizer/.test(stripComments(src)),
       '宽档行尾还挂着整块 TaskOrganizer ⇒ 整理长出第二个编辑器',
     ).toBe(false);
+  });
+});
+
+describe('完成态在栏里那句话（§8.150）', () => {
+  const paneBox = () => document.querySelector<HTMLElement>('[data-testid="task-pane"]');
+
+  it('🔴 勾选完成 ⇒ 栏里写明「已完成」（不是只让那一行从列表里消失）', async () => {
+    const id = await addTask('完成态甲');
+    selection.select('task', id);
+    mount();
+    await act(async () => {
+      await useTaskStore.getState().toggleComplete(id);
+    });
+    const box = paneBox();
+    if (box === null) throw new Error('栏里没画面单 ⇒ 这条判据在空转');
+    expect(box.textContent, '完成之后那一格不写状态，读起来像一条还没做的任务').toContain(
+      zhCN['task.pane.completed'],
+    );
+  });
+
+  it('没完成的那条不许出现那句话（这一格不许自己说完成）', async () => {
+    const id = await addTask('未态乙');
+    selection.select('task', id);
+    mount();
+    const box = paneBox();
+    if (box === null) throw new Error('栏里没画面单 ⇒ 这条判据在空转');
+    expect(box.textContent).not.toContain(zhCN['task.pane.completed']);
+  });
+
+  it('🔴 那句话**不是第二颗编辑器**：它不是按钮、也不套在按钮里', async () => {
+    const id = await addTask('编辑器归属丙');
+    selection.select('task', id);
+    mount();
+    await act(async () => {
+      await useTaskStore.getState().toggleComplete(id);
+    });
+    const status = document.querySelector<HTMLElement>('[data-testid="task-pane-status"]');
+    if (status === null) throw new Error('那句话没画出来 ⇒ 这一条在空转');
+    expect(status.tagName, '状态句长成了按钮 ⇒ 完成态有了第二个编辑器').not.toBe('BUTTON');
+    expect(status.closest('button'), '状态句被包进按钮 ⇒ 同一件事两颗编辑器').toBeNull();
+  });
+
+  it('🔴 那句话与区块头**不同档**（同档会被读成"一个叫已完成的区块"，看图照出来的）', async () => {
+    const id = await addTask('档位丁');
+    selection.select('task', id);
+    mount();
+    await act(async () => {
+      await useTaskStore.getState().toggleComplete(id);
+    });
+    const status = document.querySelector<HTMLElement>('[data-testid="task-pane-status"]');
+    const blockHeader = document.querySelector<HTMLElement>('[data-testid="task-pane"] h3');
+    if (status === null || blockHeader === null) {
+      throw new Error('状态句或区块头没画出来 ⇒ 这一条在空转');
+    }
+    expect(status.style.fontSize, '状态句与区块头同字号 ⇒ 层级塌了').not.toBe(blockHeader.style.fontSize);
+    expect(status.style.fontWeight, '状态句与区块头同字重 ⇒ 层级塌了').not.toBe(blockHeader.style.fontWeight);
   });
 });
