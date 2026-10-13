@@ -396,8 +396,21 @@ for (const { end, journeySpecs, shellSpecs, covers } of ENDPOINTS) {
 if (!bad) {
   console.log('');
   console.log('   —— 抽查：web 的旅程验收真的能跑 ——');
+  /**
+   🔴 **三种结局要分开，原来是两种**（2026-10-04 实测撞出来的）。
+   `stdio:'inherit'` 让这段除了"退 0 / 退非 0"之外什么都不知道，于是
+   **内存闸门拒绝启动**（tfa-shield 在 /tmp/tfa-test.lock 上挡下 vitest，根本没跑一条用例）
+   被报成「旅程验收跑不过 —— 入口在，但它不成立」——
+   而那句是一个**产品断言**，它当时的依据只是一次没跑成的启动。
+   ⇒ 现在把输出接回来自己分类：跑通 / **没跑成（环境，退 3）** / 跑了而不成立（退 1）。
+   ⚠️ 这不是放松：环境档照样非零退出，`pnpm check` 的 `&&` 一样会停 ——
+      变的只是**它说什么**，不是**它拦不拦**。
+   */
+  let out = '';
+  let ran = true;
+  let refusal = false;
   try {
-    execFileSync(
+    out = execFileSync(
       'pnpm',
       [
         '--dir',
@@ -410,11 +423,27 @@ if (!bad) {
         'tests/credential-storage.spec.ts',
         '--reporter=dot',
       ],
-      { cwd: ROOT, stdio: 'inherit' },
+      {
+        cwd: ROOT,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
     );
+  } catch (e) {
+    out = String((e && e.stdout) || '') + String((e && e.stderr) || '') + String((e && e.message) || '');
+    ran = false;
+  }
+  refusal = /内存闸门拒绝启动|tfa-test\.lock/.test(out);
+  if (ran) {
     console.log('   ✅ web 旅程验收跑通。');
-  } catch {
+  } else if (refusal) {
+    console.error('⏸ web 的旅程抽查**没跑成**：内存闸门拒绝启动（有别的测试在跑，锁 /tmp/tfa-test.lock）。');
+    console.error('   ⇒ 这是环境条件，不构成"旅程不成立"的读数；静态对账（每端有入口或有登记）仍然成立。');
+    console.error('   重跑：等那趟测试结束后 `pnpm check:journey-coverage`。退出码 3 = 本轮没有读数。');
+    process.exit(3);
+  } else {
     console.error('❌ web 的旅程验收**跑不过** —— 入口在，但它不成立。');
+    console.error(out.split('\n').slice(-25).join('\n'));
     bad = true;
   }
 }

@@ -1369,10 +1369,35 @@ grant_network_consent_if_asked() {
 
 CREDS_OK=0
 
+# The auth entry is a bottom-tab child after the preceding reachability probe.
+# A viewport-only press can race the tab transition and report `not-found` even
+# though the same button is visible after the next AX frame.  Normalize to the
+# Profile tab, scroll the exact entry into view, and only then press it.  The
+# postcondition remains the real auth field, so this cannot turn a failed
+# navigation into a pass.
+press_auth_entry_until_email() {
+  local _try _my _entry _press _email
+  for _try in 1 2 3 4 5; do
+    _my=$(ax "我的" --pressable --list --json)
+    if [ "$(jget "$_my" found)" = "True" ]; then
+      ax "我的" --pressable --press --json >/dev/null 2>&1 || true
+    fi
+    sleep 1
+    _entry=$(ax "注册 / 登录" --pressable --scroll-into-view --exact --json)
+    if [ "$(jget "$_entry" found)" = "True" ] && [ "$(jget "$_entry" visible)" = "True" ]; then
+      _press=$(ax "注册 / 登录" --pressable --press --exact --json)
+      sleep 2
+      _email=$(ax "邮箱" --list --json)
+      if [ "$(jget "$_email" found)" = "True" ]; then return 0; fi
+    fi
+  done
+  return 1
+}
+
 # 🔴 **回读"认证页真的出现了吗"**（判据是「邮箱」框，不是 press 的返回值）。
 #    5 次：这台折叠屏上 RN 的按压**时灵时不灵**（第 8 轮实测 3 次全落空，
 #    第 9 轮第一次即中）—— 3 次的预算在它上面不够分辨"夹具抖"和"产品坏了"。
-if press_until "注册 / 登录" "邮箱" 5; then
+if press_auth_entry_until_email; then
   ok "已进入认证页（**回读到「邮箱」才判成功**）"
 else
   bad "「注册 / 登录」按了 5 次都没进认证页 —— 夹具问题，不是产品问题"
@@ -1434,6 +1459,7 @@ if [ "$(jget "$(ax "验证并登录" --pressable --list --json)" found)" = "True
     # returned session is a separate user action; waiting for Profile's
     # "立即同步" before pressing it makes a successful token exchange look
     # like an auth failure and silently sends the run to the legacy fallback.
+    _save_done=0
     for _i in $(seq 1 20); do
       # The AuthScreen is longer than one iPhone viewport.  After token
       # redemption the session action is rendered below the paste field, so a
@@ -1441,19 +1467,25 @@ if [ "$(jget "$(ax "验证并登录" --pressable --list --json)" found)" = "True
       # manual fallback.  Scroll and require visibility in the same frame
       # before treating the stage as present.
       _save_stage=$(ax "保存并启用同步" --scroll-into-view --exact --json)
-      _save_button=$(ax "保存并启用同步" --pressable --list --exact --json)
+      _save_button=$(ax "保存并启用同步" --pressable --scroll-into-view --exact --json)
       if [ "$(jget "$_save_stage" found)" = "True" ] && [ "$(jget "$_save_stage" visible)" = "True" ] \
-        && [ "$(jget "$_save_button" found)" = "True" ]; then
+        && [ "$(jget "$_save_button" found)" = "True" ] \
+        && [ "$(jget "$_save_button" visible)" = "True" ]; then
         ok "登录令牌已兑换，回读到「保存并启用同步」阶段"
         _save_press=$(ax "保存并启用同步" --pressable --press --exact --json)
         if [ "$(jget "$_save_press" result)" != "success" ]; then
           bad "「保存并启用同步」按压未确认成功（result=$(jget "$_save_press" result)）"
+        else
+          _save_done=1
         fi
         sleep 3
         break
       fi
       sleep 3
     done
+    if [ "$_save_done" -ne 1 ]; then
+      bad "登录令牌已兑换，但 60 秒内未能把「保存并启用同步」滚入并按下 —— 主路径未完成"
+    fi
     # 首次同步含纯 JS Argon2id 派生，实测约 50 秒 —— 给足时间，并轮询而不是定长 sleep。
     # 🔴 轮询期间**顺路处理两个会悄悄盖住页面的东西**：
     #    · 首启隐私同意门（登录也要联网）；
