@@ -61,8 +61,16 @@ trap 'rm -f -- "$0" "${PHONE_DB:-}" "${UI_XML:-}" "${UI_XML:+$UI_XML.dump-err}";
 # 用法：bash scripts/verify-mobile-account-erasure.sh
 # 前置（**都不由本脚本创建**，与 verify-mobile-* 全族一致）：
 #   · 一台在跑的 Android 模拟器，且**没有别的移动端验收在抢它**（第 0 步当场判）
-#   · `PORT=3100`（或由调用方 export `E2E_PORT`）指向一个 TEST_MODE 服务端
-#   · `/tmp/heyta_mobile_e2ee.txt`（E2EE 口令）与 `/tmp/heyta_e2e_token.txt`
+#   · 一个 TEST_MODE 服务端，端口由 `PORT=<n>` 传（不传时 lib 的默认值是 **3000**，
+#     `scripts/lib/mobile-e2e.sh:144` 的 `E2E_PORT="${PORT:-3000}"`）。
+#     🔴 上一版这里写的是「`PORT=3100`（或由调用方 export `E2E_PORT`）」，两句都不实：
+#     3100 只是我随手举的一枚，而 `E2E_PORT` **不是**入口 —— 它是 lib 从 `PORT` 派生出来的，
+#     在外面 export 它会被 `:144` 直接覆盖。按这个错前置起栈的下一趟，症状是
+#     「服务端在跑、脚本却说 create-user 没走通」，而那条判据是 `bad`（产品形状的红灯），
+#     不是环境无效。⇒ 传 `PORT=`，别 export `E2E_PORT=`。
+#   · 只有一枚文件是真前置：`/tmp/heyta_mobile_e2ee.txt`（E2EE 口令，`lib:134` 读它）。
+#     上一版还列了 `/tmp/heyta_e2e_token.txt` —— **本脚本从不读它**：账号是第 1 步现建的
+#     （下面 `create-user` 那一发），令牌从响应里取。列出来会让人以为要先备好一份凭据。
 # 🔴 负载不是硬门，只作读数打印（traps #235）；这条链跑不跑得起来由**设备归属**决定。
 
 # 当场自检（判据，不是注释）：最后一行 trap 必须**排在 source 之后**且含 `$0`。
@@ -122,6 +130,25 @@ echo ""
 echo "=== 移动端注销销毁验收（真模拟器 + 真服务端，零 mock）==="
 echo "  设备: $E2E_SERIAL   服务端: $SERVER   负载(记录值): $LOAD1"
 echo "  账号: $EMAIL"
+
+# 🔴 服务端可达性预检（与 verify-mobile-trash.sh 同一条纪律，2026-10-04 补）
+#    这里**必须**用 `$HOST_SERVER` 而不是 `$SERVER`：后者是 `http://10.0.2.2:$E2E_PORT`，
+#    那个地址只有模拟器内核认得，从宿主机 curl 它根本连不上 ⇒ 服务端在跑也报"没就绪"。
+#    `--noproxy '*'` 也不是装饰：这台机器的代理会接管普通流量，代理回一个 200 形状的
+#    页面就能让这一发改成假绿（traps 同族）。
+#    为什么排在第 0 步**之前**：第 0 步是 `adb uninstall` + `pm clear`，
+#    没就绪也跑它等于白清一遍设备状态。
+#    为什么以 exit 3 而不是 bad() 收尾：判据 A–E 全都在答"注销有没有清掉明文"，
+#    而 create-user 打不通时那条 `bad` 会把"环境没起"打印成一次产品失败 ——
+#    这一格证的恰恰是"账号已注销"这个信号，服务端不在场时**信号根本发不出来**。
+HEALTH=$(curl -s --noproxy '*' -m 5 "${HOST_SERVER}/health" 2>/dev/null)
+if ! printf '%s' "$HEALTH" | grep -q '"status":"ok"'; then
+  echo "❌ 服务端没在 ${HOST_SERVER}（/health 返回：${HEALTH:-空}）—— 环境未就绪，**不是产品失败**"
+  echo "   起栈：bash scripts/mobile-e2e-up.sh（端口用 PORT=… 传；不传时脚本看的是 3000）"
+  echo "   ⚠️ 别把这一条记成「注销没清库」：判据 D 要的是真服务端真发过 ACCOUNT_CLOSED，这里先替它把门。"
+  exit 3
+fi
+echo "   服务端就绪：${HOST_SERVER}（负载只作读数，不是硬门）"
 
 # 设备侧读库目录（release 包不可调试 ⇒ 用 adb root，不用 run-as；见 verify-mobile-lists.sh 同条纪律）
 db_ls() {

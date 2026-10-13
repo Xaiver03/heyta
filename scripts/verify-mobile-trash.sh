@@ -115,6 +115,22 @@ echo "  🔴 本轮**不会**点击任何同步按钮 —— 这是本验收的�
 if [ "${#TOKEN}" -lt 100 ]; then
   echo "❌ 令牌看起来不对（长度 ${#TOKEN}）—— 先跑建号脚本"; exit 1
 fi
+
+# 🔴 服务端可达性前置（23:4x 补，形状照 `verify-mobile-due-time.sh:350`）。
+#    本脚本原来**没有**这一道，而另外四枚 rig 都有 —— 后果不是"少一句报错"：
+#    服务端没起时，第 4 步那 120 秒会一条 `Upload|Download` 都数不到，
+#    于是它按自己的措辞报 **"自动同步没有触发"** —— 一条**产品缺陷形状**的红，
+#    实际是环境没起。设备窗口 30–45 分钟才开一次，这一道在 2 秒内把它挡住，
+#    并且**退 3**（环境无效 ≠ 产品失败），看守那条按 3 继续等窗口、不记成失败。
+HEALTH=$(curl -s --noproxy '*' -m 5 "${HOST_SERVER}/health" 2>/dev/null)
+if ! printf '%s' "$HEALTH" | grep -q '"status":"ok"'; then
+  echo "❌ 服务端没在 ${HOST_SERVER}（/health 返回：${HEALTH:-空}）—— 环境未就绪，**不是产品失败**"
+  echo "   起栈：bash scripts/mobile-e2e-up.sh（端口用 PORT=… 传，本脚本跟着 ${E2E_PORT}）"
+  echo "   ⚠️ 别把这一条记成「自动同步没触发」：那条判据要的是服务端在跑，这里先替它把门。"
+  exit 3
+fi
+echo "   服务端就绪：${HOST_SERVER}"
+
 if [ ! -f "$SERVER_LOG" ]; then
   echo "❌ 判据 ① 的证据来源不存在：$SERVER_LOG —— **这一条不许跳过，它不是六条里的一条，它是承重的**："
   echo "   第 0.5 步那条元判据（脚本自己数自己有没有点同步按钮）挡不住"手点出来的同步"，"
@@ -155,23 +171,46 @@ latest_payload() {  # <entityType> <opType>
       ORDER BY json_extract(data,'\$.seq') DESC LIMIT 1;" 2>/dev/null
 }
 
+# 🔴 找一个标签控件的坐标，**四个方向都要试**（先不滚 → 往下滚 → 往上滚）。
+#    22:31 那次真跑第 5 步红在"找不到「回收站」入口"，我第一反应是"标签落在 text 不在
+#    content-desc"（共享动作行 `Settings.tsx:527-536` 只有 `accessibilityRole="button"`
+#    没有 `accessibilityLabel`）—— **这个假设被现量否证了**：把那枚 dump 逐节点拆开数，
+#    96 枚节点里 11 枚 clickable 全是**当时可见**的控件，「回收站」「导出数据」
+#    「注销账号」三个名字**两种载具一个都没有**，而「我的」在（tab 栏）。
+#    ⇒ 真的原因是那些入口行**在折叠线以上、根本没进无障碍树**：第 2 步为了够到
+#    「清单名称」输入框已经把页面**往下滚**了，之后 120 秒只等服务端日志、不碰界面，
+#    所以入口在上方。现成的 `scroll_to_desc` / `scroll_to_text` **只会往下滚**
+#    （swipe 1900→1100 = 内容上移 = 露出下面的行），够不到上面的东西。
+#    ⚠️ 这也说明"滚动方向"是这一族探针的**第三个维度**（前两个：载具 desc/text、
+#    裁掉与否）—— 三个都得试，只补其一照样假红。
+xy_either() {  # <标签> → 坐标（找不到回空）
+  local xy label=$1
+  xy=$(xy_desc "$label")
+  [ -z "$xy" ] && xy=$(xy_text_sane "$label")
+  [ -z "$xy" ] && xy=$(scroll_to_desc "$label")        # 往下滚找（desc）
+  [ -z "$xy" ] && xy=$(scroll_to_text "$label")        # 往下滚找（text）
+  if [ -z "$xy" ] && scroll_up_until_text "$label" 6; then
+    xy=$(xy_text_sane "$label")                        # 往上滚把它露出来之后再取
+    [ -z "$xy" ] && xy=$(xy_desc "$label")
+  fi
+  printf '%s' "$xy"
+}
+
 go_profile() {
-  local xy; xy=$(xy_desc "我的")
-  [ -z "$xy" ] && xy=$(scroll_to_desc "我的")
-  if [ -z "$xy" ]; then bad "找不到底部标签「我的」"; screen_txt; return 1; fi
+  local xy; xy=$(xy_either "我的")
+  if [ -z "$xy" ]; then bad "找不到底部标签「我的」（desc 与 text 两种载具都没命中）"; screen_txt; return 1; fi
   $ADB shell input tap $xy; sleep $TAB_WAIT; return 0
 }
 
 open_trash() {
-  local xy; xy=$(xy_desc "回收站")
-  [ -z "$xy" ] && xy=$(scroll_to_desc "回收站")
-  if [ -z "$xy" ]; then bad "找不到「回收站」入口（mobile.trash.entry）"; screen_txt; return 1; fi
+  local xy; xy=$(xy_either "回收站")
+  if [ -z "$xy" ]; then bad "找不到「回收站」入口（mobile.trash.entry；desc 与 text 两种载具都没命中）"; screen_txt; return 1; fi
   $ADB shell input tap $xy; sleep $TAB_WAIT; return 0
 }
 
 back_from_trash() {
-  local xy; xy=$(xy_desc "返回")
-  if [ -z "$xy" ]; then bad "回收站屏上没有「返回」（mobile.growth.back）"; screen_txt; return 1; fi
+  local xy; xy=$(xy_either "返回")
+  if [ -z "$xy" ]; then bad "回收站屏上没有「返回」（mobile.growth.back；两种载具都没命中）"; screen_txt; return 1; fi
   $ADB shell input tap $xy; sleep $TAB_WAIT; return 0
 }
 
@@ -270,6 +309,37 @@ dismiss_permission_dialog
 LOG_BASE=0
 [ -f "$SERVER_LOG" ] && LOG_BASE=$(wc -l < "$SERVER_LOG" | tr -d ' ')
 
+# 🔴 行载具探针（2026-10-04 21:46 那趟假红的正解，也是 #55 的取证装置）。
+#    界面上"这一行在不在"有两种可证形状：
+#      · 按钮的 `content-desc`（产品自己给的无障碍名，如「删除清单「X」」「恢复：X」）
+#      · 行名的 `text` 节点
+#    21:46 的真实现量到 **desc 在而 text 不在**（整行 `bounds` 高 3 = 被 ScrollView 裁掉）
+#    ⇒ 只拿 `text` 判存在，会把"存在但被裁掉"读成"没建出来"（那趟就是这么红的）。
+#    但反过来只拿 `desc` 判也不对：回收站那一行的具名形状**本轮还没在设备上量过**，
+#    拿没量过的形状当唯一判据 = 赌下一趟窗口。
+#    ⇒ 存在性：两种任一命中即成立，并把**命中的那一种**交给调用方；
+#      配对的"消失"判据必须复用同一个载体 —— 否则"没了"可能只是"这种载体本来就不存在"，
+#      那是一条永远为真的判据（AGENTS §7 元规则二：一条永远通过的判据比没有判据更糟）。
+row_carrier() {  # <desc needle> <行名 text> → stdout: desc|text；两者都没有则返回 1
+  if [ "$(has_desc_sub "$1")" = "1" ]; then printf 'desc'; return 0; fi
+  if [ "$(has_text "$2")" = "1" ]; then printf 'text'; return 0; fi
+  return 1
+}
+# 用**上一步刚证明存在的那个载具**判"还在不在"。
+# stdout：0=还在 / 1=确实没了 / 2=上一步没拿到载具（这一档无从判起，调用方必须响亮处理）
+_row_there() {  # <载具 desc|text> <desc 中缀> <行名 text>
+  if [ -z "$1" ]; then printf '2'; return 0; fi
+  case "$1" in
+    desc) if [ "$(has_desc_sub "$2")" = "1" ]; then printf '0'; else printf '1'; fi ;;
+    text) if [ "$(has_text "$3")" = "1" ]; then printf '0'; else printf '1'; fi ;;
+    *) printf '2' ;;
+  esac
+}
+# 三个"命中的载具"各自记一份（`set -u` 下必须先声明，未命中时下游要能区分"没命中"和"没跑"）
+NOTE_CAR=""
+LIST_CAR=""
+TRASH_NOTE_CAR=""
+
 step "2. 建一条便签与一条清单（两类各一个载体）"
 go_profile || exit 1
 XY=$(scroll_to_desc "写点什么…")
@@ -280,11 +350,13 @@ XY=$(scroll_to_desc "添加便签")
 if [ -z "$XY" ]; then bad "找不到「添加便签」按钮"; screen_txt; exit 1; fi
 $ADB shell input tap $XY; sleep 3
 dump
-if [ "$(has_text "$NOTE_A")" != "1" ]; then
-  blame_crash "点「添加便签」" || bad "便签没出现在列表里"
+# 存在性按两种载具**任一**命中即成立，并把命中的那种记进 `NOTE_CAR`
+# —— 第 3 步那句"消失了"要用同一个载具判，否则那条判据可能永远为真。
+if ! NOTE_CAR=$(row_carrier "删除便签「${NOTE_A}」" "$NOTE_A"); then
+  blame_crash "点「添加便签」" || bad "便签没出现在列表里（按钮无障碍名与行名 text 两种载具都没命中）"
   screen_txt; exit 1
 fi
-ok "便签已建出：$NOTE_A"
+ok "便签已建出：${NOTE_A}（载具=${NOTE_CAR}）"
 
 XY=$(scroll_to_desc "清单名称")
 if [ -z "$XY" ]; then bad "找不到清单名称输入框（滚动到清单段也没找到）"; screen_txt; exit 1; fi
@@ -294,11 +366,25 @@ XY=$(scroll_to_desc "新建清单")
 if [ -z "$XY" ]; then bad "找不到「新建清单」按钮"; screen_txt; exit 1; fi
 $ADB shell input tap $XY; sleep 3
 dump
-if [ "$(has_text "$LIST_L")" != "1" ]; then
-  blame_crash "点「新建清单」" || bad "清单没出现在列表里"
+# 🔴 两条判据分开写，因为它们的**失效原因不同**（21:46 那趟假红的教训记在 lib 的 helper 注释里）：
+#   存在性 = 那一行的按钮无障碍名在树里（「删除清单「X」」是产品自己给的标签，不是探针起的名）
+#   可见性 = 把内容往上滚回来之后，行名的 `text` 节点出现
+# 原来只有第二条的一半（不滚就断言 `has_text`），于是"建出来了但在折叠线上面"被读成"没建出来"。
+if [ "$(has_desc_sub "「${LIST_L}」")" != "1" ]; then
+  blame_crash "点「新建清单」" || bad "清单没建出来（整行不在 AX 树里，四个按钮名一个都没出现）"
   screen_txt; exit 1
 fi
-ok "清单已建出：$LIST_L"
+# 存在性这一档走的是 desc，而 21:46 实测过 desc **在被裁形状下仍然在树里**
+# ⇒ 把载具固定成 desc，第 6 步的"消失了"就复用它（不许换一把尺去判"没了"）。
+LIST_CAR="desc"
+# ⚠️ 这一档**只报不判**：21:46 那趟的现场量到"行存在、但行名没有 text 节点、整行 bounds 高 3"，
+#    而"往上滚就能看见"这件事**没验成** —— 21:57:47 别人往这台模拟器重装了 APK（`am_kill … installPackageLI`），
+#    我那五下滚动量到的是**被清过数据的新实例**，不构成证据。所以这里打印读数、不改判据强度，
+#    真正的可见性/无障碍那一档挂在计划 §10.83 的未决项上，等一趟干净的跑再定。
+if ! scroll_up_until_text "$LIST_L" 4; then
+  echo "   ⚠️ 行名 text 节点没滚出来（存在性已按按钮无障碍名成立）⇒ 界面可见性这一档未定，见计划 §10.83"
+fi
+ok "清单已建出：${LIST_L}（判据=那一行四个按钮的无障碍名在树里；可见性只报不判）"
 
 step "3. 手机上删便签：先证「点了」，再证「生效了」"
 XY=$(scroll_to_desc "删除便签「${NOTE_A}」")
@@ -307,10 +393,16 @@ if [ -z "$XY" ]; then
 fi
 $ADB shell input tap $XY; sleep 3
 dump
-if [ "$(has_text "$NOTE_A")" = "1" ]; then
-  bad "点了删除，便签却还在活体列表里（未生效）"; screen_txt
+# 🔴 用第 2 步**刚证明存在的那个载具**判"消失了"（见 `row_still_there`）。
+#    原来这里用 `has_text`，而"行名 text 本来就不在树里"（21:46 实测过那种形状）
+#    会让这条判据**无条件为真** —— 删没删成功都报"消失了"，是假绿不是假红。
+THERE=$(_row_there "$NOTE_CAR" "删除便签「${NOTE_A}」" "$NOTE_A")
+if [ "$THERE" = "2" ]; then
+  bad "上一档没拿到行载具 ⇒ 「消失了」这一档无从判起（探针问题，不是产品缺陷）"; screen_txt; exit 1
+elif [ "$THERE" = "0" ]; then
+  bad "点了删除，便签却还在活体列表里（未生效；载具=${NOTE_CAR}）"; screen_txt
 else
-  ok "点了删除并且生效：便签从活体列表消失"
+  ok "点了删除并且生效：便签从活体列表消失（按载具 $NOTE_CAR 复判）"
 fi
 phone_db_pull_trash
 DEL_N=$(entity_op_count NOTE DEL)
@@ -333,7 +425,7 @@ step "4. 判据 ①：没点按钮，服务端也该收到请求（自动同步�
 #    现在基线为 0 是**合法输入**（从头数整个文件），只有"读出来不是数字"才当探针坏了。
 case "$LOG_BASE" in
   ''|*[!0-9]*)
-    bad "判据 ① 的日志基线不是数字（LOG_BASE=${LOG_BASE}）—— 探针没读到，不许当成"没请求""
+    bad "判据 ① 的日志基线不是数字（LOG_BASE=${LOG_BASE}）—— 探针没读到，不许当成「没请求」"
     LOG_BASE=0
     ;;
 esac
@@ -359,27 +451,37 @@ fi
 step "5. 判据 ②：手机回收站列出它，点「恢复」后那一行消失、便签回到活体列表"
 open_trash || exit 1
 dump
-if [ "$(has_text "$NOTE_A")" = "1" ]; then ok "回收站里有那条便签"; else bad "回收站里看不到刚删的便签"; screen_txt; fi
+# 回收站那一行的具名形状**本轮第一次在设备上量**（以前一步都没走到过这里）⇒ 两种载具任一
+# 命中都算"列出"，并把命中的那种留给下面"那一行消失了"复判；两种都没有才是真没列出。
+TRASH_NOTE_CAR=$(row_carrier "恢复：${NOTE_A}" "$NOTE_A") || TRASH_NOTE_CAR=""
+if [ -n "$TRASH_NOTE_CAR" ]; then
+  ok "回收站里有那条便签（载具=${TRASH_NOTE_CAR}）"
+else
+  bad "回收站里看不到刚删的便签（恢复按钮无障碍名与行名 text 两种载具都没命中）"; screen_txt
+fi
 $ADB exec-out screencap -p > "$EVIDENCE/android-trash-1-phone-note.png" 2>/dev/null
 
-XY=$(scroll_to_desc "恢复：${NOTE_A}")
+XY=$(xy_either "恢复：${NOTE_A}")
 if [ -z "$XY" ]; then
   bad "回收站那一行上没有「恢复：${NOTE_A}」（可访问名来自 mobile.trash.restoreA11y）"
   screen_txt; exit 1
 fi
 $ADB shell input tap $XY; sleep 3
 dump
-if [ "$(has_text "$NOTE_A")" = "1" ]; then
-  bad "点了恢复，那一行却还留在回收站里（未生效）"; screen_txt
+THERE=$(_row_there "$TRASH_NOTE_CAR" "恢复：${NOTE_A}" "$NOTE_A")
+if [ "$THERE" = "2" ]; then
+  bad "上面那档没回收站载具 ⇒ 「那一行消失了」无从判起（探针问题）"; screen_txt; exit 1
+elif [ "$THERE" = "0" ]; then
+  bad "点了恢复，那一行却还留在回收站里（未生效；载具=${TRASH_NOTE_CAR}）"; screen_txt
 else
-  ok "点了恢复并且生效：那一行从回收站消失"
+  ok "点了恢复并且生效：那一行从回收站消失（按载具 $TRASH_NOTE_CAR 复判）"
 fi
 $ADB exec-out screencap -p > "$EVIDENCE/android-trash-2-phone-restored.png" 2>/dev/null
 
 back_from_trash || exit 1
 dump
-if [ "$(has_text "$NOTE_A")" = "1" ]; then
-  ok "便签回到了活体列表（还原不是只把行藏起来）"
+if RET_CAR=$(row_carrier "删除便签「${NOTE_A}」" "$NOTE_A"); then
+  ok "便签回到了活体列表（还原不是只把行藏起来；载具=${RET_CAR}）"
 else
   bad "回收站里没了，活体列表里也没有 —— 还原把这条便签弄丢了"
   screen_txt
@@ -418,16 +520,21 @@ fi
 
 step "6. 判据 ④ 的手机侧：删一条清单，回收站里也要列出它"
 go_profile || exit 1
-XY=$(scroll_to_desc "删除清单「${LIST_L}」")
+XY=$(xy_either "删除清单「${LIST_L}」")
 if [ -z "$XY" ]; then
   bad "清单行上没有删除入口（找不到「删除清单「${LIST_L}」」）"; screen_txt; exit 1
 fi
 $ADB shell input tap $XY; sleep 3
 dump
-if [ "$(has_text "$LIST_L")" = "1" ]; then
-  bad "点了删除，清单却还在活体列表里（未生效）"; screen_txt
+# 同第 3 步：消失必须用**建出来那一档证明过的载具**（LIST_CAR 在那里被钉成 desc，
+# 而 21:46 实测 desc 在被裁形状下仍在树里 ⇒ 它归零才真的等于"行没了"）。
+THERE=$(_row_there "$LIST_CAR" "「${LIST_L}」" "$LIST_L")
+if [ "$THERE" = "2" ]; then
+  bad "清单那档没拿到载具 ⇒ 「消失了」无从判起（探针问题）"; screen_txt; exit 1
+elif [ "$THERE" = "0" ]; then
+  bad "点了删除，清单却还在活体列表里（未生效；载具=${LIST_CAR}）"; screen_txt
 else
-  ok "点了删除并且生效：清单从活体列表消失"
+  ok "点了删除并且生效：清单从活体列表消失（按载具 $LIST_CAR 复判）"
 fi
 phone_db_pull_trash
 PDEL=$(entity_op_count PROJECT DEL)
@@ -440,10 +547,11 @@ else
 fi
 open_trash || exit 1
 dump
-if [ "$(has_text "$LIST_L")" = "1" ]; then
-  ok "手机回收站列出了那条清单（W4 的四路在设备端成立）"
+# PROJECT 那一行在回收站里的形状同样是**第一次量** ⇒ 两种载具任一命中都算"列出"
+if LIST_TRASH_CAR=$(row_carrier "恢复：${LIST_L}" "$LIST_L"); then
+  ok "手机回收站列出了那条清单（W4 的四路在设备端成立；载具=${LIST_TRASH_CAR}）"
 else
-  bad "手机回收站里没有那条清单 —— 四路合并缺 PROJECT 这一路"
+  bad "手机回收站里没有那条清单 —— 四路合并缺 PROJECT 这一路（恢复按钮名与行名 text 都没命中）"
   screen_txt
 fi
 $ADB exec-out screencap -p > "$EVIDENCE/android-trash-3-phone-list.png" 2>/dev/null
@@ -476,7 +584,7 @@ if ! printf '%s' "$BEFORE_TAG" | grep -qE '^[0-9]+$'; then
 fi
 
 # ── 第一步：点删除，只许出确认行，一条 op 都不许多写 ──────────
-XY=$(scroll_to_desc "删除标签「${TAG_T}」")
+XY=$(xy_either "删除标签「${TAG_T}」")
 if [ -z "$XY" ]; then bad "标签行上没有删除入口"; screen_txt; exit 1; fi
 $ADB shell input tap $XY; sleep 3
 dump
@@ -501,7 +609,7 @@ fi
 $ADB exec-out screencap -p > "$EVIDENCE/android-trash-4-tag-confirm.png" 2>/dev/null
 
 # ── 第二步：取消，同样一条都不写，且那条标签必须还在 ──────────
-XY=$(scroll_to_desc "取消删除")
+XY=$(xy_either "取消删除")
 if [ -z "$XY" ]; then bad "确认行里没有「取消删除」入口"; screen_txt; exit 1; fi
 $ADB shell input tap $XY; sleep 3
 dump
@@ -521,10 +629,10 @@ else
 fi
 
 # ── 第三步：确认才真的写，且恰好一条 ──────────────────────────
-XY=$(scroll_to_desc "删除标签「${TAG_T}」")
+XY=$(xy_either "删除标签「${TAG_T}」")
 if [ -z "$XY" ]; then bad "第二次找不到那条标签的删除入口"; screen_txt; exit 1; fi
 $ADB shell input tap $XY; sleep 3
-XY=$(scroll_to_desc "确认删除")
+XY=$(xy_either "确认删除")
 if [ -z "$XY" ]; then bad "第二次点删除后确认行没出来"; screen_txt; exit 1; fi
 $ADB shell input tap $XY; sleep 3
 phone_db_pull_trash
@@ -579,10 +687,10 @@ fi
 step "8. 手机上「待上传」应已归零（队列真的排空了）"
 go_profile || exit 1
 dump
-if [ "$(has_text "已全部上传")" = "1" ]; then
+if [ "$(has_text "已全部上传")" = "1" ] || [ "$(has_desc_sub "已全部上传")" = "1" ]; then
   ok "待上传队列已排空（不是「拉下来了但没推上去」）"
 elif has_sub "项"; then
-  PENDING_TXT=$(grep -oE 'text="[^"]*项"' /tmp/ui.xml | head -1)
+  PENDING_TXT=$(grep -oE 'text="[^"]*项"' "$UI_XML" | head -1)
   bad "待上传没有归零 —— 删除/还原没全部推出去（${PENDING_TXT}）"
 else
   bad "读不到待上传状态"; screen_txt

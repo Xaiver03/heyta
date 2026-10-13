@@ -231,10 +231,25 @@ if [ "$NEWEST" -lt "$SRC_MTIME" ]; then
   exit 3
 fi
 
-if curl -sf "$HOST_SERVER/health" >/dev/null 2>&1 || curl -sf "$HOST_SERVER/api/health" >/dev/null 2>&1; then
-  ok "服务端在 $HOST_SERVER 可达"
+# 🔴 这一发 2026-10-04 改过形状，两处都不是装饰：
+#    ① `--noproxy '*'`：这台机器的代理配置是"关掉但留着 127.0.0.1:7890"
+#       （`networksetup -getwebproxy Wi-Fi` 现量 Enabled: No）。curl 只在 `no_proxy`
+#       环境变量里点名了主机才绕开代理，而 `127.0.0.1` **不在**默认豁免里 ⇒ 代理一开，
+#       这一发会拿到代理回的 200 而不是服务端的 ⇒ "服务端就绪"假绿，后面 create-user 才炸，
+#       而那里是产品形状的红灯。与 verify-mobile-trash.sh / verify-mobile-account-erasure.sh 同一条纪律。
+#    ② 判 body 不判 2xx：现量服务端 `/health` 回 `{"status":"ok","db":"connected","wsConnections":0}`，
+#       而 `/api/health` 回 **404**（`{"message":"Route GET:/api/health not found"}`）——
+#       原来的 `curl -sf` 只要求 2xx，任何一份回 200 HTML 的东西都算"就绪"。
+#       保留 `/api/health` 那一腿是因为它是挂载路径的兜底，但同样要求 body。
+HEALTH_BODY=$(curl -s --noproxy '*' -m 5 "$HOST_SERVER/health" 2>/dev/null)
+if printf '%s' "$HEALTH_BODY" | grep -q '"status":"ok"'; then
+  ok "服务端在 $HOST_SERVER 可达（/health: ${HEALTH_BODY:0:60}）"
+elif curl -s --noproxy '*' -m 5 "$HOST_SERVER/api/health" 2>/dev/null | grep -q '"status":"ok"'; then
+  ok "服务端在 $HOST_SERVER 可达（经 /api/health）"
 else
   echo "   ❌ 服务端不可达 —— 注销信号送不到设备，B/C/D 全部无从判起 ⇒ exit 3"
+  echo "   现量：${HOST_SERVER}/health 返回「${HEALTH_BODY:-空}」"
+  echo "   这不是产品失败：这一格证的正是「账号已注销」这个信号有没有送到，服务端不在场时信号根本发不出来。"
   exit 3
 fi
 SRV_PID=$(lsof -ti "tcp:${E2E_PORT}" -sTCP:LISTEN 2>/dev/null | head -1)

@@ -141,6 +141,14 @@ function collect(dir, prefix, sink) {
   for (const entry of entries) {
     if (entry.name === '.git' || entry.name === 'node_modules') continue;
     const rel = prefix === '' ? entry.name : `${prefix}/${entry.name}`;
+    // 🔴 **嵌套检出**（linked worktree / 另一次 clone）不属于本检出，判据不能建在目录名上。
+    //    现量：本仓根下同时躺着 `.worktrees/detail-pane`（`.git` 是**文件**）和
+    //    `.qoder/worktrees/agent-general-purpose-*`（`.git` 是**目录**）—— 名单漏一个就吃进一整棵树。
+    //    ⚠️ 这一条门的**失效方向和别处相反**：`check:shell-unicode` 那类是"多扫了别人的文件 ⇒ 报假红"，
+    //    这里索引是**接受集**（`pathHits > 0` 就放行），别人的检出里有**还没进 main 的新文件**
+    //    ⇒ 引用那些路径的文档在**本机判绿、在干净检出判红**。同一族里的第三种面目：
+    //    "门禁绿 ≠ 干净检出绿"（§7 那张表里 #191 的近亲）。
+    if (entry.isDirectory() && existsSync(join(dir, entry.name, '.git'))) continue;
     // 🔴 目录也进索引：本文有一批引用是**目录**形状（`apps/web`、`packages/ui/src`），
     //   只收文件会把它们全报成不存在 —— 那是一条会为一百个真东西报假的红。
     sink.push(rel);

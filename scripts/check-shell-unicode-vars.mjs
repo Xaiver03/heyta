@@ -39,7 +39,7 @@
  *     python3 research/tools/fix-shell-unicode-vars.py --write
  */
 
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -164,8 +164,16 @@ function walk(dir, out = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (SKIP_DIRS.has(entry.name)) continue;
     const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) walk(full, out);
-    else if (entry.isFile() && entry.name.endsWith('.sh')) out.push(full);
+    if (entry.isDirectory()) {
+      // 🔴 排除条件用**不变量**，不用目录名名单。名单里写着 `.worktrees`，
+      //    而并行 agent 的嵌套检出落在 `.qoder/worktrees/<id>` —— 实测本门禁
+      //    报的"扫了 242 个 .sh"里有 **160 枚**根本不是本工作树的脚本，
+      //    别人的检出里任何一处违规都会把这里的 `pnpm check` 判红，
+      //    而那行路径没人能在这棵树里修（同族事故见 `docs/plans/trash-and-archive.md` §10.85）。
+      //    `.git` 对 linked worktree 是**文件**、对 clone 是目录 ⇒ 判存在，不判类型。
+      if (existsSync(path.join(full, '.git'))) continue;
+      walk(full, out);
+    } else if (entry.isFile() && entry.name.endsWith('.sh')) out.push(full);
   }
   return out;
 }
