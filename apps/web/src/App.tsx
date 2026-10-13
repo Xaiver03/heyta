@@ -705,6 +705,24 @@ export function App(): React.JSX.Element {
     if (view === 'settings') sheetRef.current?.focus();
   }, [secondaryAccountSurface, view]);
   /**
+   * 换一档 ⇒ 浮层回到顶部。**这条规则以前只挂在导航按钮的 `onSelect` 上**，
+   * 而换档一共有四条路（点导航 / rail「帮助」/ rail「个人信息」/ 助手面板那颗
+   * 「去授权」经 `openAiSettings`）—— 与上一条刚修的是**同一个族**。
+   *
+   * 🔴 可达性不是推测：助手浮层 `.ht-app__assistant-backdrop` 是
+   * `--ht-z-overlay`(300)、面板本体 `--ht-z-modal`(400)，而设置浮层 `.ht-sheet`
+   * 只有 `--ht-z-dropdown`(200) ⇒ **设置开着时，助手那颗按钮点得到**。于是"在设置里
+   * 滚到长列表中间 → 从助手面板跳到 AI 档"会停在原地，新那一节的标题在屏幕上方外。
+   *
+   * ⚠️ **声明位置是承重的**：必须排在下面那条落位 effect **之前**。effect 按声明顺序跑，
+   * 落位那条要的是 `scrollIntoView({block:'start'})` 到指定那一节；反过来写的话
+   * "回顶部"会把刚定位好的位置抹掉（同一文件里 `sheetRef.current?.focus()` 那条
+   * 抢焦点的事故就是这个形状，注释在上一条）。
+   */
+  useEffect(() => {
+    document.querySelector('.ht-sheet')?.scrollTo({ top: 0 });
+  }, [activeSettingsSection]);
+  /**
    * 设置浮层落位：**等 `view` 真的变成 `settings` 之后**再滚、再聚焦，然后清掉请求。
    *
    * ⚠️ 必须在 `view` 真的变了之后再滚 —— 设置页那棵树还没渲染时
@@ -3027,7 +3045,6 @@ export function App(): React.JSX.Element {
                 setSettingsAnchor(undefined);
                 setSettingsFocus(undefined);
                 setSettingsSection(id);
-                document.querySelector('.ht-sheet')?.scrollTo({ top: 0 });
               }} />
               <div className="ht-settings__content">
 
