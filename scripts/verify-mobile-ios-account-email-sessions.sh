@@ -90,7 +90,7 @@ trap 'rm -f -- "$0" "${IDB_DUMP_FILE:-}" "${HEYTA_E2E_TOKEN_FILE}" "${HEYTA_E2E_
 #| G | 换绑之后界面上当前邮箱那一行 = 新地址，而「待绑邮箱」那一行**没了** | 只看库会把"界面没刷新"读成成功 |
 #| **H** | 会话列表：当前那枚带「这台设备」标记 **且旁边有「这一台就是你正在用的设备」那句**，另有 ≥2 枚各带自己的「退出这一台：<设备>」 | 少了那句实话，"当前那台没有按钮"就只是**沉默地少一个按钮** |
 #| **I** | 真点目标那枚「退出这一台」→ 系统 Alert（标题「退出这一台设备？」）里选 destructive → 库里少一枚、**被撤的那一枚**当场 401、手上这枚仍 200、界面上可撤行数跟着掉 | 🔴 `Alert.alert` 在 jsdom 里根本没有；撤错一台 = 撤销没落到认证边界，而列表照样能画得很像话 |
-#| **J** | 「退出所有设备」→ 库里 0 枚、**事先证明回 200 的那一枚新会话**当场 401、「我的」页同步卡回到 `notConfigured` 那句（现文案「登录 heyta，让任务在设备间自动同步。」，它挂在 `ProfileScreen.tsx:1099` 的 `!form.configured` 分支） | 「包括这台」不是话术。⚠️ **没有那一次 200 的阳性对照**，"这枚令牌现在 401"永远分不清是"全撤销成了"还是"它从来就不通" |
+#| **J** | 「退出所有设备」→ 库里 0 枚、**事先证明回 200 的那一枚新会话**当场 401、同步分组那一屏回到**官方同步那一代**（两面判据：「使用自托管服务器」那行在 **且** 「服务器地址」表单不在） | 「包括这台」不是话术。⚠️ **没有那一次 200 的阳性对照**，"这枚令牌现在 401"永远分不清是"全撤销成了"还是"它从来就不通"。🔴 旧那半句判据读的是 `notConfigured` 那句（词条在册但这一代**根层不渲染**）⇒ 一条永不成立的断言，已换成上面这双面尺 |
 #| K | 退出所有设备之后**仍能**用新邮箱 + 旧密码重新签出会话并同步成；本机明文库仍在盘上 | 本地优先：退出登录不是注销，它**不许**销毁本机数据（销毁只有「注销账号」那一条路，由 `verify-mobile-ios-account-erasure.sh` 证） |
 #| **L** | 改密块（**Android 那份没测的那一块**）：点之前「登录密码」卡的两段说明在、成功句**不在**；「设第一个密码」那张表是**收起的**（两个「新密码」不许同时在树上）；两个 secure 框填进去；按「修改密码」→ 界面出「登录密码已修改。」 | 🔴 `SecurityScreen.tsx:397` 与 `:456` 用的是**同一个 label**「新密码」⇒ 不先确认那张表收起，填的就是另一个框，而两条路的后果完全相反（`set` 不 bump、`change` bump）。secure 框的值**永远不进 AX dump**，所以这里**不断言框里的值** —— 成功证据在服务端与令牌那一侧 |
 #| **M** | 改密的协议级后果：旧令牌 401 / 用新密码换的令牌 200 / 库里 `token_version` **真的涨了** | 只量界面那句成功文案，就是一条"界面说谎而没人发现"的路 |
@@ -228,7 +228,26 @@ db() { psql -h 127.0.0.1 -p 5432 -U "$E2E_DB_USER" -d "$DB_NAME" -tAc "$1" 2>&1;
 # ── iOS 侧的载体（每个设备脚本自带一份 helper，这是本仓的既有做法）────────
 ax() { python3 "$SHIM" "$@" --udid "$UDID" --idb "$IDB_BIN" --companion "$IDB_COMPANION" --json; }
 jget() { printf '%s' "$1" | python3 -c "import json,sys;print(json.load(sys.stdin).get('$2',''))" 2>/dev/null; }
-ax_press() { ax "$1" --pressable --press --json >/dev/null 2>&1; }
+# 🔴 2026-10-11 实测改的两件事（同一条陷阱的两种面目，`docs/reference/environment-traps.md`
+#    明写过「`--scroll-into-view` 只返回 found/visible，不会替调用方执行 --press」）：
+#    1. **拆成两次调用**：旧那行 `ax … --scroll-into-view --press` 走的是 shim 里
+#       `--scroll-into-view` 那一支 —— 它 `return 0` 在 `--press` **之前**，所以一下都没按；
+#       而 shim 退出码是 0，调用方那句 `|| ax_press` 兜底也就永远不触发。
+#       「立即同步」在分组页的滚动位置是 y=-343（屏外上方），正中这一枪。
+#    2. **不许把没落地当过去**：旧那行 `>/dev/null` 把 `not-found` /
+#       `tap-outside-screen` / `tap-blocked-by-tab-bar` 全吞了，症状与"按成功了"一样。
+#       现在非 success 一律进日志（返回值仍保持 0：几十处调用点没准备接非零，
+#       而"按没按上"的判据在各步自己的回读里，不在这里）。
+ax_press() {
+  local r
+  ax "$1" --pressable --scroll-into-view --json >/dev/null 2>&1
+  r=$(ax "$1" --pressable --press --json 2>/dev/null)
+  case "$r" in
+    *'"result": "success"'*) true ;;
+    *) echo "     [press] 「$1」没落地：${r:-无输出}" >&2 ;;
+  esac
+  return 0
+}
 dismiss_keyboard() { ax --dismiss-keyboard --json >/dev/null 2>&1 || true; }
 # 与 `lib` 的 `idb_ui` 同一条传输规则（`IDB_COMPANION` 含 `:` 且不以 `/` 开头 ⇒ TCP `--companion`；
 # 否则 `--companion-path`）。screenshot / list 不在 `ui` 子命令下，所以 lib 没有封装它。
@@ -751,14 +770,24 @@ open_profile_tab() {
 # leave_settings_sheet：**判据 E 的载体**（切走再回来 = 第二层屏 + Modal 一起卸载）。
 # 🔴 分组目录里那一屏要按**两下**才出得去（第一下「返回」= 回目录，第二下「关闭」= 关面板），
 #    所以这里是一个循环，而不是一条 `ax_press "关闭"`。
+# 🔴 2026-10-10 第二趟实测：`idb_has` 的语义是"精确标签**或值**"（lib 注释 293 行），
+#    而「我的」页上有一枚**值单元格**就叫「关闭」（自动同步那一行的当前值）⇒
+#    设置面明明关了，`idb_has "关闭"` 仍然真，两个关面函数把 6/8 次尝试全烧在空气上，
+#    然后判"关不上"，后面每一步都从脏起点开始（第一趟 10 枚红里有一半是这条连带）。
+#    修法：开/关的判据只认**可点节点**（✕ 与顶栏返回都是 button），值单元格不可点 ⇒ 不再误命中。
+sheet_open() {
+  [ "$(jget "$(ax "关闭" --pressable --list --json)" found)" = "True" ] && return 0
+  [ "$(jget "$(ax "返回" --pressable --list --json)" found)" = "True" ] && return 0
+  return 1
+}
+
 leave_settings_sheet() {
   local i
   unwind_second_level
   for i in $(seq 1 8); do
     dismiss_keyboard
-    idb_dump
-    if ! idb_has "关闭" && ! idb_has "返回"; then return 0; fi
-    if idb_has "关闭"; then ax_press "关闭"; else ax_press "返回"; fi
+    if ! sheet_open; then return 0; fi
+    if [ "$(jget "$(ax "关闭" --pressable --list --json)" found)" = "True" ]; then ax_press "关闭"; else ax_press "返回"; fi
     sleep 2
   done
   return 1
@@ -810,16 +839,36 @@ open_settings_sheet() {
 
 close_settings_sheet() {
   local i
+  # 🔴 2026-10-11 只读取数把旧那版的两个错都照出来了（在这台隔离模拟器上逐次按、逐次回读）：
+  #    · 旧版只按「关闭」，而**第二层那枚右上的 ✕ 按了没反应** —— 同一屏上左边的「返回」
+  #      一发就退层（实测：`--press` 返回 success、树上的「服务器地址」照旧在；换按「返回」
+  #      后「服务器地址」与「返回」同时消失，只剩目录层那枚 ✕）；
+  #    · 目录层那枚 ✕ 在**左边**（x=16），按它面板真的关 —— 所以顺序必须是
+  #      **先退层再关面板**，而不是对着 ✕ 连按六次。
+  #    实测两次按压走完两层（1 返回 + 1 关闭 → 树上既无「返回」也无「关闭」）。
+  #    🔴 判据没放松，反而更严：每一轮都重新读**可点**节点（`idb_has` 的"标签或值"语义
+  #    会把值单元格「关闭」也算命中，第一趟就是被它骗的），六轮走完仍在 ⇒ 照旧判红。
+  dismiss_keyboard
   for i in $(seq 1 6); do
-    idb_dump
-    if ! idb_has "关闭"; then
-      ok "设置面已关（第 ${i} 次检查）"
+    if [ "$(jget "$(ax "关闭" --pressable --list --json)" found)" != "True" ] &&
+       [ "$(jget "$(ax "返回" --pressable --list --json)" found)" != "True" ]; then
+      ok "设置面已关（第 ${i} 轮，树上既无可点的「关闭」也无可点的「返回」）"
       return 0
     fi
-    ax_press "关闭"
+    if [ "$(jget "$(ax "返回" --pressable --list --json)" found)" = "True" ]; then
+      ax_press "返回"
+    else
+      ax_press "关闭"
+    fi
     sleep 2
   done
-  bad "设置面关不上（点了 6 次「关闭」它还在）—— 下一轮起点会脏"
+  if [ "$(jget "$(ax "关闭" --pressable --list --json)" found)" != "True" ] &&
+     [ "$(jget "$(ax "返回" --pressable --list --json)" found)" != "True" ]; then
+    ok "设置面已关（第 6 轮之后读到的）"
+    return 0
+  fi
+  bad "设置面关不上（收键盘 + 退层再关面板各按了一轮，可点的「关闭」或「返回」还在树上）—— 下一轮起点会脏"
+  return 1
 }
 
 # fill_three_credentials <令牌> —— **手抄令牌**那条路（设置 → 同步 → 自托管表单）。
@@ -850,21 +899,22 @@ fill_three_credentials() {  # <令牌>
   [ "$(jget "$(ax "端到端加密口令" --role AXTextField --list --json)" found)" = "True" ] || miss="${miss} 端到端加密口令"
   if [ -n "$miss" ]; then bad "填完之后这些字段反而不在了：${miss# }"; return 1; fi
   ok "三个凭据字段同时就位（令牌只打指纹 $(tok_fp "$1")）"
-  close_settings_sheet
-  # 🔴 "本机认下了"这一句要回**「我的」页的同步卡**上判：`notConfigured` 挂在
-  #    `ProfileScreen.tsx:1099` 的 `!form.configured` 分支里，设置面里根本没有它。
-  #    15:0x 现量：旧那句「填好服务器地址与访问令牌后才能同步。」在当前词条表里**已经不存在**
-  #    （`grep -c` 命中 0），装着的产物里按 UTF-16LE 也数到 0 ⇒ 拿它当判据是一条**永不成立**的断言
-  #    （"永远通过的那条判据比没有更糟"，§7 元规则二）。
-  #    ⚠️ 同一句旧文案还留在 `scripts/lib/mobile-e2e.sh:1475` 与
-  #    `verify-mobile-ios-account-erasure.sh:678` 的负向检查上 —— 那是别人的装置，
-  #    已登记进台账，不在这里代改。
-  open_profile_tab
-  if needle_state "登录 heyta，让任务在设备间自动同步。" >/dev/null 2>&1; then
-    bad "界面仍认为未配置（填进去的没生效）"
+  # 🔴 "本机认下了"要落在**这一屏**才有的正面证据上：自托管那一代才会画那行
+  #    「返回 heyta 官方同步」（实测：填好三件之后它在树上；未配置那一代画的是
+  #    「使用自托管服务器」，见步骤 13 的两面判据）。
+  #    原先这一格是关完面板去根层找 `notConfigured` 那句 —— 现量：那句挂在
+  #    `ProfileScreen.tsx:1099` 的同步段里，而那一段 10-09 起作为 prop 交进了设置面，
+  #    **根层从来不画它** ⇒ 那条 `if … then bad` 是一条永不成立的断言（假绿）。
+  if needle_state "返回 heyta 官方同步" >/dev/null 2>&1; then
+    ok "同步分组已在「自托管」那一代（那行「返回 heyta 官方同步」在）⇒ 本机认下这三件凭据"
+  else
+    bad "三件字段在，但界面没切到自托管那一代（没有「返回 heyta 官方同步」那行）⇒ 不算认下"
     return 1
   fi
-  ok "「我的」页那句『未配置』已经不在了 ⇒ 本机认下这三件凭据"
+  close_settings_sheet
+  # 关完面板**不再**回根层找任何"未配置/已配置"句子：这一代的根层没有这个载体。
+  # "凭据真能用"这件事由后面的同步终态判据承担（步骤 2 的终态、步骤 14 的对照基线）。
+  open_profile_tab
 }
 
 # sign_in_with_password <邮箱> <登录密码> <E2EE 口令>
@@ -1088,22 +1138,16 @@ sign_in_with_password() {
   fi
   ok "「保存并启用同步」按掉并且这一栏已经从树上消失（AuthScreen 已退出）"
 
-  # ── 终态断言①：「我的」页那句『未配置』必须不在 ─────────────────────────
-  #    挂在 `ProfileScreen.tsx:1099` 的 `!form.configured` 分支，设置面里没有它。
-  #    🔴 所以这一条**必须先证明"此刻站在「我的」根层"**：不证到达，"那句不在"
-  #       有两种读数（已配置 / 压根不在这一屏），而第六趟实测撞上的正是第二种。
-  open_profile_tab || { bad "没站到「我的」根层 ⇒ 终态①没有载体，不能算登录走通"; dump_screen_text; shot "02-not-on-profile-tab.png"; return 1; }
-  needle_state "登录 heyta，让任务在设备间自动同步。" >/dev/null 2>&1; rc=$?
-  if [ "$rc" = "0" ]; then
-    bad "界面仍认为未配置 ⇒ 登录产出的凭据没被本机认下（'onSignedIn' 那三处回填没生效？）"
-    dump_screen_text; shot "02-still-not-configured.png"
-    return 1
-  fi
-  if [ "$rc" = "2" ]; then
-    bad "读不出这一棵树 —— 不拿「没读到」当「那句已经不在了」"
-    return 1
-  fi
-  ok "「我的」页那句『未配置』已经不在了 ⇒ 本机认下了这次登录"
+  # ── 终态断言①（**已撤**，留形状说明为什么撤）──────────────────────────
+  #    旧这一格是"站到「我的」根层 → 断言 `notConfigured` 那句不在"。现量：那句挂在
+  #    `ProfileScreen.tsx:1099` 的同步段里，而那一段 10-09 起作为 prop 交进设置面，
+  #    **根层从来不画它** ⇒ 那条 `if 在 then bad` 永不成立，是一枚**假绿**
+  #    （§7 元规则二："一条永远通过的判据比没有判据更糟"）。
+  #    到达性证明保留（它挡的是"量错屏"），"本机认下了这次登录"这一句改由两条**真有载体**的
+  #    判据承担：① 上面刚等到的**同步终态**（没有活凭据跑不出这个终态）；
+  #    ② 下面的「当前邮箱」那一行 = `signedInEmail`。
+  open_profile_tab || { bad "没站到「我的」根层 ⇒ 终态②没有载体，不能算登录走通"; dump_screen_text; shot "02-not-on-profile-tab.png"; return 1; }
+  echo "     [note] 终态①（根层那句『未配置』）已撤：那一代根层没有这个载体，见上面注释"
   needle_state "切换账号" >/dev/null 2>&1; rc=$?
   if [ "$rc" = "0" ]; then
     ok "账号卡那枚按钮已换成「切换账号」那一代（'accountHasCredential' 成立）"
@@ -1195,8 +1239,39 @@ sync_now_states() {
   done
 }
 
+# 🔴 2026-10-10 第五趟实测：凭据变更（含"退出所有设备"之后重贴令牌）之后，应用**按设计**
+#    弹出法务重新询问面（`LegalReconfirmSheet.tsx`，标题「条款文本已经更新」），
+#    在确认之前**一切对外请求被闸住** ⇒ 「立即同步」按了也没有任何反应，
+#    签名里「上次成功同步」停在「从未」。第三、五趟的 step 14/15 都死在这里。
+#    首启同意（「同意并联网」）腿早就接了；这一张是**第二张**同意面，之前没人接。
+#    判据没放松：确认面按三次还在 = 判红（那意味着确认提交失败，不是"没有这张面"）。
+accept_legal_reconfirm() {
+  local i
+  for i in 1 2 3; do
+    idb_dump
+    if ! idb_has "条款文本已经更新"; then
+      [ "$i" = "1" ] || ok "法务重新询问已确认（第 $((i-1)) 次按压生效）"
+      return 0
+    fi
+    echo "     命中法务重新询问面 ⇒ 按「我已读完并确认」"
+    # 🔴 走 `ax_press`（滚入 + 按压**两次调用**）。旧那行把两个 flag 合成一次调用，
+    #    而 shim 的 `--scroll-into-view` 分支在 `--press` 之前就 return —— 一下都没按，
+    #    退出码还是 0，所以连 `|| ax_press` 兜底都不会触发（2026-10-11 实测）。
+    ax_press "我已读完并确认"
+    sleep 3
+  done
+  idb_dump
+  if idb_has "条款文本已经更新"; then
+    bad "法务重新询问面按了 3 次还在 ⇒ 确认没提交成功（同步会继续被闸住）"
+    return 1
+  fi
+  ok "法务重新询问已确认"
+  return 0
+}
+
 sync_now() {  # 点「立即同步」：忙时它会改名叫「正在同步…」，所以先等它回到空闲名
   dismiss_keyboard
+  accept_legal_reconfirm || true
   ax_press "我的"; sleep 3
   if ! idb_wait_label "立即同步" 90; then
     echo "     第一轮没等到 ⇒ 先按系统弹窗处置一遍再等第二轮"
@@ -1228,10 +1303,20 @@ sync_now() {  # 点「立即同步」：忙时它会改名叫「正在同步…�
         # ⚠️ `_rc=2`（这一棵树读不出）也走这一支 —— 那是**响亮失败**，不是把它读成
         #    "不在忙态所以按钮应该在"。下面的 `sync_now_states` 会把每一档标成
         #    在 / 不在 / 读不出，人一眼能分"界面不在这颗按钮上"与"探针够不着"。
+        # 🔴 2026-10-10 第一趟实测（leg-run3.log 215 行）：「我的」根层等 90+90 秒等不到，
+        #    而[态]清单里树上只有根 tab —— 分组目录那一代把「立即同步」放在
+        #    **设置面→同步与隐私**里（`SettingsScreen` 的 renderSync），根层从来没有它。
+        #    所以判红之前先走一遍 `open_settings_sheet`（它自己量三代 IA，不静默选一条），
+        #    在那一层再等一轮。**判据没放松**：等不到的仍然红，只是多量一层界面。
+        echo "     诊断：根层没有这颗按钮 ⇒ 进设置面的同步分组再等一轮（分组目录那一代它在那里）"
+        if open_settings_sheet && idb_wait_label "立即同步" 60; then
+          echo "     在同步分组里等到 ⇒ IA 代际腿成立（按钮不在根层，在设置面里）"
+        else
         bad "90+90 秒内仍没等到「立即同步」，且此刻也不在忙态（忙态读数 rc=${_rc}）—— 这一次同步没被触发，后面的读数不作数"
         sync_now_states
         dump_screen_text
         return 1
+        fi
       fi
     fi
   fi
@@ -1260,8 +1345,11 @@ sync_now() {  # 点「立即同步」：忙时它会改名叫「正在同步…�
 # 因为**新账号首次同步要走纯 JS 的 Argon2id 派生**（Hermes 没有 WASM，实测 30–40 秒起）。
 wait_sync_terminal() {  # <这一档在等什么> → 0=已同步 / 1=凭据已失效 / 2=超时
   local what="$1" i
+  # 凭据变更后这张面可能在等待中途才弹（闸门是请求级的）；不接它就会干等满 4 分钟。
+  accept_legal_reconfirm || true
   for i in $(seq 1 60); do
     idb_dump
+    if idb_has "条款文本已经更新"; then accept_legal_reconfirm || true; fi
     if needle_state "已是最新" >/dev/null 2>&1 || needle_state "其余数据已同步" >/dev/null 2>&1; then
       echo "     ${what}：已到已同步态（第 $((i * 4)) 秒）"
       return 0
@@ -1356,6 +1444,28 @@ shot() {  # <文件名> [<这一张在证什么>]
   fi
   bad "截图判据红（主蓝那一半）：$name 里既数不出启用态主蓝（${blue} < ${BLUE_MIN}），也数不出禁用态主蓝（${bdisabled} < ${BLUE_DISABLED_MIN}）${why:+（$why）} —— 非空白只回答「有没有东西」，回答不了「是不是这个界面」（§7 第 82 条）"
   return 1
+}
+
+# frame_email_change_action —— 拍等待态之前把「发起更换」那颗按钮**滚进取景框**。
+#
+# 🔴 2026-10-11 逐像素读数（不是猜的）：run 6 那两张判红的图（1398×2034）整屏
+#    精确主蓝 #2563EB = **0**、禁用态混合色 #ACC4F7 = **0**；同一屏在按钮进了取景框的
+#    那两张（03 / 10）里 #ACC4F7 有 **154 257** 枚。差别不是颜色判据错了，是**取景框**：
+#    `EmailChangeSection.tsx:305-311` 那颗 `tone="primary"` 的按钮在等待态是
+#    `disabled`（草稿为空），按 `state.disabled-opacity`=0.38 叠在白底上正是 #ACC4F7，
+#    而它当时在折叠线**以下**。
+#    ⇒ 所以修的是"把要拍的东西拍进来"，**不是**放宽 §7 第 82 条那道主蓝闸。
+#    滚不到（树上没有这颗按钮）只记一行诊断，不判红：判红留给截图自己那条读数，
+#    免得出现"探针说没找到、判据却说画面对了"两套口径。
+frame_email_change_action() {
+  dismiss_keyboard
+  local r
+  r=$(ax "发起更换" --pressable --scroll-into-view --json 2>/dev/null)
+  case "$r" in
+    *'"visible": "True"'*) true ;;
+    *) echo "     [frame] 「发起更换」没滚进取景框（截图的主蓝读数会自己说这件事）：${r:-无输出}" >&2 ;;
+  esac
+  sleep 1
 }
 
 # ── 邮件那两发（照 Android `:254-304`：从日志的 Ethereal 预览里取**整条链接**）──
@@ -1816,7 +1926,8 @@ needle_state "待绑邮箱" >/dev/null 2>&1 \
   && ok "「待绑邮箱」那一行在" || bad "没有待绑邮箱行（pendingEmail 没画出来）"
 needle_state "$NEW_EMAIL" >/dev/null 2>&1 \
   && ok "待绑那一行的值就是新地址" || bad "待绑行里看不到新地址"
-shot "04-awaiting-both.png" "判据 B：等待态三句"
+frame_email_change_action
+shot "04-awaiting-both.png" "判据 B：等待态三句（取景含那颗按钮）"
 
 # ── 5. 服务端读数 ───────────────────────────────────────────────────────────
 step "5. 判据 C：服务端那张活请求 —— 只存哈希、两侧互不相同、两边都没点"
@@ -1934,7 +2045,8 @@ else
 fi
 needle_state "当前邮箱那一边已经确认" >/dev/null 2>&1 \
   && ok "句子说清了哪一边已经点过" || bad "阶段句没写清哪一边已确认"
-shot "08-awaiting-new.png" "判据 E：重挂之后读回来的实话"
+frame_email_change_action
+shot "08-awaiting-new.png" "判据 E：重挂之后读回来的实话（取景含那颗按钮）"
 
 # ── 9. 点新那半：换绑生效 ───────────────────────────────────────────────────
 step "9. 判据 F：点新那半 → 库里地址改了、活请求没留下、换绑前那枚令牌全局失效"
@@ -2206,21 +2318,31 @@ else
   open_profile_tab
   press_row "设置" || { bad "判据 J：读本机凭据时打不开设置面"; shot "13-no-settings-sheet.png"; summary "iOS 换绑·会话·改密" "" 1; }
   CLEARED=0
-  for i in $(seq 1 2); do
+  # 🔴 判据换成**同一屏的两面**（第 7 趟 00:4x 现量）：
+  #     · 已配置 ⇒ 屏上有「服务器地址」输入框（自托管表单那一代）；
+  #     · 未配置 ⇒ 表单不在，而「使用自托管服务器」那一行在（官方同步卡那一代）。
+  #   旧那句 needle「登录 heyta，让任务在设备间自动同步。」是词条
+  #   `mobile.profile.sync.notConfigured`（zh-CN:3447，**在册**），但它在同步分组这一屏
+  #   **根本不渲染** —— 它住在 `ProfileScreen` 的 `syncStatus` 里，而那一整段 10-09 起搬走了。
+  #   ⇒ 那条判据是一条**永不成立**的断言：第 6/7 趟两枚红都是它，而屏幕上画的恰恰就是"未配置"
+  #     （「heyta 官方同步」＋「登录 heyta 后,任务会自动在设备间同步…」）。
+  #   两面判据比单句更严：单句只证"有 A"，这里要求"有 B **且** 没有 A"。
+  for i in 1 2; do
+    # 只在**可点**的那一枚存在时才进分组：进去之后同一屏上「同步与隐私」只剩标题 `StaticText`，
+    # 再按一次必然报"没有可点节点"（第 7 趟那枚红就是这个自撞，不是产品少接导航）。
+    if [ "$(jget "$(ax "同步与隐私" --pressable --list --json)" found)" = "True" ]; then
+      press_row "同步与隐私" || bad "判据 J：进不去「同步与隐私」那一代"
+      sleep 2
+    fi
     for _ in $(seq 1 8); do
-      needle_state "登录 heyta，让任务在设备间自动同步。" >/dev/null 2>&1 && { CLEARED=1; break; }
+      if [ "$(jget "$(ax "服务器地址" --role AXTextField --list --json)" found)" != "True" ] &&
+         needle_state "使用自托管服务器" >/dev/null 2>&1; then CLEARED=1; break; fi
       sleep 1
     done
     [ "$CLEARED" = "1" ] && break
-    if needle_state "同步与隐私" >/dev/null 2>&1; then
-      press_row "同步与隐私" || bad "判据 J：进不去「同步与隐私」那一代"
-      sleep 2
-    else
-      break
-    fi
   done
   if [ "$CLEARED" = "1" ]; then
-    ok "界面回到「未配置」那句 ⇒ 本机凭据确实被清了（不只是服务端删了行）"
+    ok "同步分组回到「官方同步」那一代（自托管表单不在、「使用自托管服务器」那行在）⇒ 本机凭据确实被清了（不只是服务端删了行）"
   else
     bad "界面还认为已配置 ⇒ 退出所有设备没清本机凭据（下一次同步会拿一枚死令牌打）"
     dump_screen_text

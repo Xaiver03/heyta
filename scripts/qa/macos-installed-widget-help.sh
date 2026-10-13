@@ -109,17 +109,20 @@ on run argv
 
   -- Capture the browser state before the click. Checking only the final URL can
   -- pass because an old tab was already on the help page.
+  -- 🔴 `is running` 是 Standard Additions 的谓词，**不会**把没开的浏览器叫起来；
+  --    直接 `tell application "Safari" to …` 在 Safari 没跑时**会把它启动并带到前台**
+  --    （AGENTS §6.2 规定二：验收不得抢走用户的输入焦点）。所以先问一句在不在跑。
   set beforeBrowserUrl to ""
-  try
+  if application "Safari" is running then try
     tell application "Safari" to set beforeBrowserUrl to URL of current tab of front window
   end try
-  if beforeBrowserUrl is "" then try
+  if beforeBrowserUrl is "" and application "Google Chrome" is running then try
     tell application "Google Chrome" to set beforeBrowserUrl to URL of active tab of front window
   end try
-  if beforeBrowserUrl is "" then try
+  if beforeBrowserUrl is "" and application "Microsoft Edge" is running then try
     tell application "Microsoft Edge" to set beforeBrowserUrl to URL of active tab of front window
   end try
-  if beforeBrowserUrl is "" then try
+  if beforeBrowserUrl is "" and application "Arc" is running then try
     tell application "Arc" to set beforeBrowserUrl to URL of active tab of front window
   end try
   set end of lines to "BROWSER_URL_BEFORE=" & beforeBrowserUrl

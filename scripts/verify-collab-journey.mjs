@@ -167,7 +167,7 @@ const EXPECTED = [
   '07-owner-sees-bob.png',
 ];
 const missing = EXPECTED.filter((name) => !shots.includes(name));
-if (missing.length > 0) fail(`证据图缺：${missing.join('、')}（拍了才算，路径固定）');
+if (missing.length > 0) fail(`证据图缺：${missing.join('、')}（拍了才算，路径固定）`);
 console.log(`STEP 3 OK 证据齐（${shots.length} 张）`);
 console.log(`📸 人要看图：${join(ROOT, 'e2e/test-results/collab-journey')}`);
 

@@ -8191,3 +8191,38 @@ Error: locator.click: Test timeout of 60000ms exceeded.
 2. 新增 **ARM-4**（两半：已知提及件不许进本线桶 + 它的外线路径不许从打印集合里消失），并把 `self_test()` 从"首败即返回"改成"每臂都跑完再汇总 rc"—— 否则前一臂长红时后面那几枚臂**根本没有读数**。变异证明：把 `partition` 改成全部归本线桶 ⇒ `ARM-4 … 坏 731cc2e2 被当成本线笔; 6e813df9 被当成本线笔; docs/plans/account-standard-suite.md 的证据被分流丢了; docs/plans/product-ux-optimization.md 的证据被分流丢了`、`不成立=2 → ARM-3, ARM-4`；从 `.mut-bak` 还原后回到基线（`不成立=1 → ARM-3`）。
 
 **要拍的只有一件**：ARM-3 那句"动了独占路径却没被计入必须为 0"在共享检出下有两种真实成因 ——（甲）本线自己某笔没带主题词（这条臂当初就是为了它写的）；（乙）别线把本线路径提交了（今天的实际成因）。三种读法：① 保持长红，把它当"跨线提交"的告警器，每次由本线确认成因后在台账记一行；② 让 ARM-3 只认**主题里没有任何别线标记**的漏网（要给它一张别的线的主题词表，会随线的增减漂）；③ 把独占路径的归属判据从"笔"改成"内容"（HEAD 里那枚文件的内容等于本线台账登记的那一版就算闭合）。本线按纪律**没有**自己挑一种 —— 这是判卷口径，不是代码 bug。
+
+## B144（2026-10-10 19:3x，本会话 · 在隔离副本上取 T7 第一条读数时量出的）：`pnpm -r typecheck` 在 HEAD 上仍红，但**分母换了一族** —— 23 条错没有一条在本线地界，全在 `share-*` 那族测试里
+
+**为什么这一格值得单独登记**：B103 原来写的是"16 条 `apps/web` 类型错挡死 `pnpm check`"。那个数既不是全集也不是当前值 ——
+第一次跑 `pnpm -r typecheck` 时它在 `@heyta/sync-core` 就**中止**（`ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL`），
+后面的包根本没跑到，所以当时看到的 1 条错**不是分母**。加 `--no-bail` 让每一层都跑完才拿到全集。
+
+**现量（载体：隔离副本 `.worktrees/inb-t7` @ `8962927d`，dirty=0，`pnpm -r build` rc=0，`prisma generate` rc=0）**：
+
+```
+pnpm -r --no-bail typecheck   ⇒  NB_RC=1　error TS 行数=23
+失败的包：apps/web、packages/sync-client、packages/sync-core、packages/ui
+```
+
+按成因分三族（条数之和 = 23）：
+
+| 族 | 条数 | 形状 | 落点 |
+|---|---|---|---|
+| A：`Storage` 桩缺成员 | **13** | `Type '{ getItem; setItem; removeItem; _map }' is missing the following properties from type 'Storage': length, clear, key` | `apps/web/tests/share-key-store.spec.ts`（36/37/44/52/53/54/56/57/64/68/74/78/80 行） |
+| B：`Object is possibly 'undefined'` | **9** | TS2532 | `apps/web/tests/app-mount.spec.tsx`（796/801/803）、`packages/ui/tests/share-model.spec.ts`（43/44/45/53）、`packages/sync-client/tests/share-api-client.spec.ts`（82）、`…/share-payload-cipher.spec.ts`（50） |
+| C：新增必填实参没传 | **1** | TS2345 `Property 'identity' is missing` | `packages/sync-core/tests/share-keys.spec.ts:234`（同一段里前一次调用传了 `identity: mkIdentity('op-1')`，第二次"同键异绑定"那次没传） |
+
+**归属**：这五枚文件最近一笔都是 `e6058120`（10-09 14:35，产品体验线台账那一笔）带的，`app-mount.spec.tsx` 是 `63e61f23`（10-10 18:49，同一条线）。
+**本线地界内命中 0**：`grep -E "error TS" | grep -c inbound` ⇒ **0**（现量见上）。所以这不是本线的红，本线也不去代改 —— 死规矩写着不动别人的文件，而这五枚路径一枚都不在本线白名单里。
+
+**对 T7 与本线交付的直接影响**：完成条件第 1 条要 `pnpm check` 在隔离副本 exit 0，而 `check` 的第一道就是 typecheck ⇒
+**只要这三族还在，T7 那条命令到不了 0**，与本线做了多少无关。`pnpm -r test`（运行时）**不**被它挡：vitest 不做类型检查，
+所以测试那一条仍可独立取读数（本会话已另跑一趟，读数见 PROGRESS 那一节）。
+
+**要拍的（都能闭合，任选其一）**：① 由产品体验线把这三族修掉（A 族是给桩补 `length/clear/key`，B 族是按 `noUncheckedIndexedAccess` 取值前先判，C 族是补 `identity` 一枚实参 —— 全是测试侧，一子一因）；
+② 负责人授权本线代改这五枚文件（要逐条过"一子可删／运行时形状逐字段等于改前／一条命令可回退"三条，本线不自行判定通过）；
+③ 承认 `pnpm check` 的可达性由**别的线的在飞改动**决定，把 T7 那一条改写成"除 B144 列出的三族之外全绿"—— 那是改判卷口径，必须由负责人点头，本线不自己改。
+
+⚠️ 给下一位：判"web 已经干净"之前先确认那趟 typecheck **有没有中止**。`pnpm -r` 的首败中止会把后面的包整段抹掉，
+而中止时打印的错误条数看起来像是"就这一条"。要么 `--no-bail`，要么逐包跑并核对"有 typecheck 脚本的包数 == 打印了结果的包数"。
