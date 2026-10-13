@@ -9838,3 +9838,40 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     ⚠️ 那条臂的临时目录**刻意**保留 `heyta-` 前缀，否则它自己不会触发第②个坑、等于白写。
     这与 §7 元规则二同族（"一条永远通过的判据比没有判据更糟"），
     但形状更阴：**判据不是恒真，而是"根本没走到被测的那一步"**（也见 #191、#176）。
+
+435. 🔴 **移动端 E2E 栈的默认库会悄悄过期，而建号那一步的失败文案把人指向另一个原因。**
+    2026-10-13 深夜跑 `scripts/verify-mobile-habits.sh` 时撞的，三层叠在一起：
+
+    ① **`scripts/mobile-e2e-up.sh` 不建库、不迁移**（头部只写"库必须已存在"），而它的默认库
+       `heyta_mobile_smoke` 现量**只剩 25 张表**，`schema.prisma` 那侧 `@@map` 是 **51** 张
+       ⇒ 缺 27 张，包括 `access_sessions`、`automation_*`、`email_login_challenges`。
+       服务端起来是**正常**的（`/health` 返回 `db:connected`），红在下一步：
+       `POST /api/test/create-user` ⇒ `P2021 The table public.access_sessions does not exist`。
+
+    ② 但 `heyta_e2e_ensure_account || fail "建号失败（服务端是否以 TEST_MODE 运行？）"`
+       把**已经响应过的路由**解释成"TEST_MODE 没开"。真实响应体就在上一行印着
+       （那句 P2021），所以取证不缺信息 —— 缺的是**别把两句并排读成一个结论**。
+       判据：`/api/test/create-user` 有**任何** JSON 响应 ⇒ TEST_MODE 是开的，红一定是别的。
+
+    ③ 🔴 这枚默认库**同时被另一个会话的常驻服务连着**（现量：pid 26623 在 3000，
+       `DATABASE_URL=…/heyta_mobile_smoke`）。所以"先起来看一眼"不是只读动作 ——
+       服务端一启动就挂清理任务，日志里的活路径含 `DELETE FROM users / sync_devices /
+       pending_passkey_registrations`。本趟实测**受影响行数全为 0**（另有 4 条清理因缺表
+       直接失败，也没删成），但那是运气不是设计：**给别人的库做 schema 变更、或让第二个
+       实例连上同一枚库，都不算"我只是跑个测试"。**
+
+    ✅ 形状（当场用通的一条）：自建私有库 + 从一枚 schema 齐全的库**只导结构**。
+       两个坑都是静默的：
+       - `pg_dump` 的主版本必须**等于** server 版本（本机 `PATH` 上是 14.18、server 是 15.13
+         ⇒ 直接拒，报 "aborting because of server version mismatch"）。取
+         `/opt/homebrew/opt/postgresql@15/bin/pg_dump`。
+       - `--schema-only` 的 dump 里带 `CREATE SCHEMA public;`，新建的库里它**必然已存在**
+         ⇒ 配 `ON_ERROR_STOP=1` 时 psql 就在第 23 行停下，**后面 51 张表一张都不建**，
+         而退出码非 0 很容易被读成"复制失败/网络问题"。剥掉那一句再灌：
+         `sed '/^CREATE SCHEMA public;/d'`。
+       - 现量的可用源库判据（别猜）：逐枚比 `select count(*) from pg_tables where schemaname='public'`
+         与 `_prisma_migrations` 末条是否等于 `prisma/migrations` 目录里最新那则 ——
+         本趟 `heyta_sync_smoke` 是齐的（52 张、缺 0、末条 = `20261020000000_add_email_login_challenges`）。
+       灌完再拿 `schema.prisma` 的 `@@map` 集合做一次**逐表对账**（现量：52 张、缺 0、索引 147），
+       然后 `HEYTA_E2E_DB=<私有库> PORT=<私有端口> bash scripts/mobile-e2e-up.sh` 才会出
+       `✅ 全新账号` + `✅ 账号 client 数 0 < 20`。
