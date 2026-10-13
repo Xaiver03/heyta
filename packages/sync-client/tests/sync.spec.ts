@@ -60,6 +60,11 @@ interface HarnessOptions {
   failHistoryMarker?: boolean;
   /** Omit the durable snapshot frontier hook to exercise fail-closed behavior. */
   withoutMergeRemoteClock?: boolean;
+  /**
+   * 随下载请求上报的客户端版本号。**缺省不给** = 走"沉默"那一档 ——
+   * 两腿成对：给了必须带、没给一个字都不发（`appVersion=undefined` 尤其不许出现）。
+   */
+  appVersion?: string;
 }
 
 function makeHarness(
@@ -89,6 +94,7 @@ function makeHarness(
   const client = new SyncClient({
     baseUrl: BASE,
     clientId: 'device-a',
+    ...(opts.appVersion === undefined ? {} : { appVersion: opts.appVersion }),
     getToken: async () => 'test-token',
     getPassword: async () => ('password' in opts ? opts.password : PASSWORD),
     ...(opts.getPayloadCipher ? { encryptionMode: 'vault' as const, getPayloadCipher: opts.getPayloadCipher } : { encryptionMode: 'password' as const }),
@@ -798,6 +804,41 @@ describe('同步客户端 — 上传与游标', () => {
     expect(h.downloads).toHaveLength(1);
     expect(h.downloads[0]).toContain('excludeClient=device-a');
     expect(h.downloads[0]).toContain('sinceSeq=0');
+  });
+
+  /**
+   * G-44：`appVersion` 这条查询参数**有消费者没有生产者**已经很久了 —— 服务端逐设备记它
+   * （`server/src/sync/sync.routes.ts` 的 `touchDevice`，条件是 `excludeClient` 在），
+   * 运营面那张设备清单读它，而全仓库没有一处发过。这两腿把"发"与"沉默"钉成两种可判的形状。
+   */
+  it('宿主给了版本号 ⇒ 下载请求带上 appVersion（服务端逐设备记它）', async () => {
+    const h = makeHarness(() => okJson({ ops: [], hasMore: false, latestSeq: 0 }), {
+      appVersion: '0.1.0',
+    });
+    await h.client.sync();
+
+    expect(h.downloads).toHaveLength(1);
+    expect(h.downloads[0]).toContain('appVersion=0.1.0');
+    // 版本只搭在 excludeClient 那一个参数上：两者必须同一条请求里都在。
+    expect(h.downloads[0]).toContain('excludeClient=device-a');
+  });
+
+  it('宿主没给版本号 ⇒ 一个字都不发（沉默 ≠ 占位值，也不许出现 appVersion=undefined）', async () => {
+    const h = makeHarness(() => okJson({ ops: [], hasMore: false, latestSeq: 0 }));
+    await h.client.sync();
+
+    expect(h.downloads).toHaveLength(1);
+    expect(h.downloads[0]).not.toContain('appVersion=');
+    // 判**键集合**而不是判"没有那个词"：`searchParams.set('appVersion', undefined)`
+    // 会留下 `appVersion=undefined`，而只查 `appVersion=` 的写法能抓到它、抓不到
+    // "多发了一个别的键"。集合相等才是"沉默 = 与改动前同形"。
+    expect([...new URL(String(h.downloads[0])).searchParams.keys()].sort()).toEqual([
+      'excludeClient',
+      'limit',
+      'sinceSeq',
+    ]);
+    // 阳性对照：这条请求真的在（否则上面的判据全是恒真）。
+    expect(h.downloads[0]).toContain('excludeClient=device-a');
   });
 });
 

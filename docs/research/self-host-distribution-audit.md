@@ -14103,6 +14103,481 @@ docs 那半已绿（§8.264）；替换成"main 红在 `apps/web/tests/admin-pan
 另一层双保险在 `:104` 的注释里写明：裁判不是看守，而是 lander 自己那七道闸门（含 `gate(3,'负载可用')`），
 所以即便看守的判断被什么顶掉，真跑之前还有一道负载闸。停止方式仍然只有一条：kill 那个 pid，不按名字乱杀。
 
+### 8.268 22:5x 现量：**本批已被别线合进 main**，而 main 现在打不出镜像 —— 断在 apps/web 的一处合流残留（不是本批造成的，且它挡着第 2 与第 8 项）
+
+先说落地那一格：**它由别人达成了，不是我那一发 ff-only。**
+- `git merge-base --is-ancestor feat/self-host-distribution main` ⇒ **是祖先**；
+  `git rev-list --left-right --count main...feat/self-host-distribution` = **main 独有 1321 / 本批独有 0**。
+  通道是 `9651a4ac merge: 合并载体 consolidate/20261005 进 main`（+ 顶上 `acce5fd3 fix(合流)`）。
+- **内容级对账**（不是"分支名对上"就算）：本批写集 92 枚 = **逐字相同 78 / 内容不同 14 / 真缺 0**。
+  🔴 那"真缺 7 枚"是**我的探针错**：`git diff --name-only` 会把非 ASCII 路径**加引号再转义**，
+  我把带引号的串当路径喂给 `git rev-parse main:"…"` ⇒ 必然查不到。改 `-c core.quotePath=false` + `-z` 重判即归零。
+- 14 枚"内容不同"里最要紧的两格都活着：**门禁** `check:selfhost-entry-command` / `check:image-license` /
+  `check:gate-wiring` / `check:web-artifact:app` / `check:android-gradle-remote` 在 main 的 `package.json` 各命中 1；
+  **对外错话词条**（本批在 zh 表改过的 2 枚键）在 main 上**逐字等于本批版**，en 表两侧都在。
+  ⚠️ `server/docker-compose.migrate-once.yml` 我先前报"main 无"也是路径错（真实路径带 `server/` 前缀），现量 main 有。
+
+**然后是新的硬阻塞（本会话取到，归属已判）**：22:54 在载体树上前进到 `acce5fd3`、
+`pnpm install --frozen-lockfile` rc=0（锁 `d340e576`）、起跑时 1 分钟负载 8.44，跑 `pnpm verify:selfhost-stack` ⇒
+**rc=1，死在镜像构建的 apps/web 那一步**（Dockerfile:206 `RUN HEYTA_WEB_BASE=/app/ pnpm --filter "@heyta/web..." run build`）：
+
+- `src/features/calendar/CalendarView.tsx(83,9) 和 (145,9)` ⇒ **TS2451 Cannot redeclare block-scoped variable 'events'**
+  （提交态 `main` 那一版里 83 与 145 两行**都**写着 `const events = useCountdownStore((s) => s.events);`，全文 275 行）
+- `(268,11)` ⇒ **TS17001 JSX elements cannot have multiple attributes with the same name**
+
+**形状就是合流时两段都留下了**，不是平台/依赖/缓存问题：同一次运行里 `packages/app-host build: Done`、
+`apps/web build: Failed` 紧跟着三个 TS 码。归属：本批写集里 **apps/web 下 0 枚**（`git diff --name-only <基线> e8a6eb4e -- apps/web` 计数 0），
+这枚文件的改动来自日历那条线；主检出此刻对它还有一个未提交状态（索引标志 `M `，索引版重复声明计数 `1`）——
+**那是别人正在写的东西，我不动、不代提交、也不替他们判口径**。
+
+⇒ 对目标的影响要说白：**第 1 项"main 前进到该载体"实质已达成，但第 2 项与第 8 项现在被这处合流残留挡着** ——
+main 打不出前端产物，`verify:selfhost-stack` 走不到真镜像那一段，`reinstall:all` 四端装的也会是打不出来的产物。
+这条不是我能在"不动主检出、不替别人提交"的边界内清掉的：它要么由日历那条线把自己那份裁掉，
+要么由负责人授权我在**独立副本**上做一次"删掉重复那一段 + 回读 83/145 只剩一处 + 构建转绿"的修复再走合流通道。
+证据目录 ``（`summary.txt` 带 PREV/AT/INSTALL_RC/VERIFY_RC，`verify.log` 有原文三个 TS 码），
+载体已按 trap 还原回 `6921ac77`（`RESTORE_RC` 见 summary）。
+
+### 8.269 23:4x 真跑通：**自托管整套三条判据全过 rc=0**，但代价是先挖出并修掉两处 —— 一处是 main 的合流残留，一处是**判据自己没驱动外人必经的那条路**
+
+先给结论读数（载体树 `fix/selfhost-e2ee-first-run-key` @ `9535f8b8`，证据 `~/.heyta-evidence/selfhost-stack-clean-1005-234719/`）：
+
+```
+VERIFY_RC=0
+✓ S1 `/app/` 打开就是应用，且 service worker 在 /app/ scope 下注册上 (835ms)
+✓ S2 在这台实例上注册并登录，凭据落在本机自己那台服务器 (4.3s)
+✓ S3 建一条任务同步出去，全新设备只能从服务端读到它 (23.8s)
+3 passed (29.6s)   ✅ 自托管整套：三条判据全过
+```
+镜像内依赖对账 145=126+16+3、入口命令九条 R 判据、产物自洽（`/app/` + 256 个 `--ht-*`）在同趟**各自复现**。
+四张截图都是本趟的（23:48/23:49），**人打开看过**：`s2-signed-in.png` 顶栏「已同步」+ 账号菜单里是本次邮箱
+`selfhost-5336084-1@example.test`；`s3-device-b-recovered.png` 里全新设备读到了 `selfhost-task-5336084-2`
+（序号与本次账号一致，不是上一轮剩的）。
+
+**修掉的两处，缺一不可：**
+
+1. 🔴 **main 打不出产物**（`acce5fd3` 提交态）：`apps/web/src/features/calendar/CalendarView.tsx` 里
+   `const events` 在 83 与 145 行**各写了一遍**、268 行那个 JSX 带重名属性 ⇒ `tsc -b` 三个 TS 码 ⇒
+   Dockerfile:206 那步 `pnpm --filter "@heyta/web..." run build` 失败 ⇒ 镜像建不出来，验收连 docker 段都没走到。
+   修法：取日历那条线**已经在它自己索引里**的那份成品入库（`ff56bcab`，删 17 行），
+   **没有动他们的工作树**、没有替他们提交他们的其它文件。归属：本批写集里 apps/web 0 枚（§8.265 同一把尺）。
+2. 🔴 **判据没驱动外人第一次自建必经的那条路**（这才是本批真正的缺口）：`setE2eePassword` 只认
+   「已有钥匙」那一档的 label `端到端加密口令`，而干净实例上同步设置里给的是
+   **`vault-create-form`（创建钥匙）→ `vault-pending`（含恢复码）→ 把恢复码逐字抄进 `vault-recovery-confirm`
+   → `vault-publish`（确认并发布）**。`vault-publish` 的禁用条件是
+   `disabled={busy || pendingCode.length === 0 || remote === undefined}` —— **不抄恢复码就永远点不动**，
+   Playwright 那句 `waiting for element to be visible, enabled and stable` 就是这个意思。
+   还有一层：那张卡是**异步**的（先 `vault-loading`），用瞬时 `isVisible()` 判档位会静默走错分支。
+   改完（`9535f8b8`）S2 从 **3.0 分钟超时**变 **4.3 秒过**、S3 从 **9.0 分钟**变 **23.8 秒**。
+   ⚠️ 这条要读准：**产品没有坏，是验收从来没走过外人要走的那条路**。上一版"三条判据全过"的历史读数
+   （§8.252）是在**旧界面档位**下取的，合流之后那一档变了，判据没跟上 —— 这正是 §7 元规则第 2 条的形状。
+
+**过程中我自己造的三枚错，都记下来挡后来者：**
+
+- 在**正在跑的**验证中途改了它读的 spec ⇒ 那一趟的 S2/S3 属**混修订**，读数作废重跑（同族：改在跑的 bash 脚本要换副本重启）。
+- 第二发 `--filter @heyta/web`（少写 `...`）拿旧 dist 判新源码，凭空报出 4 枚"缺导出/缺词条"TS 码；
+  换成生产那行的形状 `--filter "@heyta/web..."` 同一条命令 rc=0（已固化进记忆）。
+- 起第二发时撞上自己的**内存闸门**（`/tmp/tfa-test.lock` 被我上一发 Playwright 占着）⇒ 那一趟 e2e **整段没跑**、
+  只留下 rc=1。没有用 `TFA_ALLOW_CONCURRENT_TEST=1` 绕它。
+
+**仍然没闭合的（不包装成完成）**：
+① 这两处修复现在只在 `fix/selfhost-e2ee-first-run-key`（`acce5fd3` 的后代 ⇒ 对 main 是**快进**），
+   main 本身还打不出产物；把它并进 main 要动主检出（硬约束禁止），所以**这一格要负责人点头**。
+② 第 8 项 `pnpm reinstall:all` 仍未起 —— 它现在被 ① 挡着：从 main 装会装到打不出来的产物，
+   从这条分支装则产物不等于 main。
+③ 落地页那 5 枚 live 红（#20）与 G-44b（#64）不变。
+
+### 8.270 00:2x 交接态读数：main 上 S2/S3 仍红，而**唯一原因是那份测试文件本身**；补好三条腿的分支已在当前 main 上验到 rc=0
+
+- main=`d05b12e0` 现量含我第一版 `ff56bcab`（有 `vault-create-form` 那一档），但**缺三条腿**：
+  `vault-recovery-confirm` 命中 0、`waitFor({ state: 'visible'` 命中 0、`vault-unlock-form` 命中 0。
+  同一把尺在 main 上跑 ⇒ `VERIFY_RC=1`，S1 ✓ 693ms，S2 ✘ 3.0m、S3 ✘ 9.0m，
+  两枚错误行逐字都是 `waiting for getByRole('dialog', { name: '同步设置' }).getByLabel('端到端加密口令')`
+  （证据 `~/.heyta-evidence/verify-at-current-main-1006-000632/`）。
+- 补好三条腿的分支 = **`de761797`（从当前 main 起，只改 `e2e/selfhost-stack/selfhost-web.spec.ts`）**，
+  同一把尺实测 `VERIFY_RC=0`、S1 815ms / **S2 3.3s** / **S3 23.9s**、`3 passed`
+  （证据 `~/.heyta-evidence/verify-at-judge-branch-1006-002424/`）。
+- 🔴 交接要点：`git diff --name-only main de761797` 只有那一枚 **测试文件** ⇒
+  这一格并进 main 之前，四端产物与 main **等价**（没有任何打包输入读 `e2e/selfhost-stack`），
+  所以第 8 项不必等这次合并；但"验收在 main 上是红的"这件事必须记成真话：
+  **main 现在自称可用，而它自己的自托管判据不认** —— 这正是 §7 元规则第 2 条的形状，别读成"只是测试没更新"。
+- 我这一班**没有**动主检出：原本授权的是一次 `ff-only`，而 main 与 fix 分支已分叉
+  （`main 独有=27 / fix 独有=2`），ff 的前提不成立，所以我把它换成"交一条可直接 merge 的分支 + 现量读数"，
+  并把 CalendarView 那处的成因与修法留在 §8.269（它已由合流那条线自己进 main，blob `10d18c28` 逐字同一）。
+
+### 8.271 就地更正 §8.270 的两句（我写得太快，两枚都是方向性错误）
+
+1. ❌ "`git diff --name-only main de761797` 只有那一枚测试文件" —— 现量是**两枚**：
+   `e2e/selfhost-stack/selfhost-web.spec.ts` **和** `research/licenses-inventory.generated.md`。
+   第二枚的成因不是我的分支带了它，而是**我分支之后 main 又前进了**，于是 `diff main..de761797`
+   在那个文件上表示的是"从 main 退回我这版"。⇒ 正确说法：**我这侧只前进了一枚测试文件**，
+   另一枚是别人在 main 上的新内容；所以并回 main 必须走 **merge**（不是 checkout/reset 那棵树），
+   否则会把人家那一笔生成物**revert 掉**。判"差集"之前要先确认差在哪一侧 —— 裸 `diff A B` 不区分。
+2. ❌ "没有任何打包输入读 `e2e/selfhost-stack`" —— `grep` 实际命中了 `scripts/verify-selfhost-stack.sh`。
+   它读这份 spec 是**设计如此**（它就是那条验收尺的运行时），不是打包输入。
+   准确口径：**四端产物（.app/.dmg/APK/MSIX/HAP 与镜像）不读它；链外的自托管验收读它**，
+   所以"这一格没并进 main 时四端产物仍与 main 等价"成立，而"没人读它"不成立。
+
+结论不变的那半：第 8 项 `reinstall:all` 不被这次合并挡着（它装的是产物，不是判据）。
+
+### 8.272 00:4x 第 8 项 `pnpm reinstall:all` 真跑：四端里 **2 端拿到当前产物判据、2 端各被一个具体成因挡住**（不包装成完成，也不记成产品失败）
+
+起跑树 `/tmp/heyta-merge-carrier` @ `de761797`（= 当前 main 的产品源码；差集只有那枚测试文件，见 §8.271）。
+
+| 端 | 结果 | 判据读数 |
+|---|---|---|
+| **mac** | ✅ | `.app + .dmg` 重打并装进 `/Applications/Heyta.app`；**安装对账**：包内 `web-dist` 与本机 `apps/web/dist` 是同一次构建（9 个 chunk）；安装副本自截屏 2164x1432、内容占比 100.0%、**主蓝命中 1127** ⇒ 是共享 UI（不是 §7 第 82 条那种错误屏） |
+| **windows** | ✅ | 源码包 61M / 清单 3633 条 → 远端 tar sha256 `ce195bbe0069f2a7…` **逐字相同** → 远端新鲜度对账（`web-dist/index.html=cef8573b…`、`bridge=ab129bee…`、`assets/*.js` 7 枚一致）→ 远端打包+安装+启动截图完成 → 取证"判据齐了：5 条全在位" |
+| **android** | 🔴 环境/主机态 | 远端打包机的 `node_modules` 落后于锁。脚本自己印的修法：`ssh windows-pc "cd /d C:\src\heyta && pnpm install --frozen-lockfile"`。**我没有执行它** —— 那是共享打包机、别线可能正在那里构建，属"影响别人系统的单动作"，要一次点名授权。脚本也明确**不自动退回本机**（§6.1 新规），所以这一格没有降级读数 |
+| **ios** | 🔴 网络面 | `pod install` **三趟**都在同一步失败：`Installing hermes-engine (250829098.0.9)` ⇒ `git clone https://github.com/facebook/hermes.git` ⇒ `fatal: unable to access …: LibreSSL SSL_connect: SSL_ERROR_SYSCALL in connection to github.com:443`。⇒ 前置的 `pnpm -r build` ✅、但**沙盒未同步 ⇒ 这一轮没有跑 xcodebuild**，所以 iOS 端**没有**当前产物判据。设备面我自己那台 `heyta-selfhost-reinstall` 已 boot（脚本原本要 `iPhone 17 Pro`，本机没有该名字的设备，我用自建那台并显式传 `IOS_DEVICE_NAME`，没动别人建的两台） |
+
+🔴 **一条顺带被证实的旧疑点**：§8.264 里我登记过"`git fetch --quiet` 带回空、本地 `origin/main` 与 main 两条血缘（595/57）未判成因"。
+今晚这发把同一台机器对 `github.com:443` 的 TLS 连接失败**直接照出来了** ⇒ 那次 fetch 静默无进展与它同源。
+仍然**不动本机网络环境**（硬规则），所以 `不推远端` 这一条今晚在物理上也不是我能选的。
+
+**第 8 项的诚实口径**：四端里两端有"装上的是当前产物且起得来"的判据（mac / windows），
+两端各被一个**具体、可复现、非产品**的成因挡着（远端依赖落后 / GitHub TLS）。
+汇总行按脚本自己的设计大字列出了没装的端 —— 这不是"跑过了就算"。
+
+### 8.273 09:3x 复核：判据修复**已被更强的那份取代**，我的分支删除；android 的成因已消失但撞上两条规则互相矛盾的那一格
+
+- 主检出里 `e2e/selfhost-stack/selfhost-web.spec.ts` 正被日历/回收站那条线改着（工作树 blob `7e43c263`，未提交）。
+  它那版**比我的强**：两档各等各的锚点用 `Promise.race`，**两档都没出现就点名报错**，
+  而我那版（`84a097e6`）是"没等到就静默走 else"。⇒ 我尝试并回 main 时 git 以
+  `Your local changes to the following files would be overwritten by merge` **正确拒绝**（主检出 211 枚脏）。
+  **我没有强推、没有 stash 别人的东西**，改为：`de761797` 标成 superseded 并删除，
+  免得后来人把弱的那份并进去。main 提交态仍是 `e415f6ce`（缺 `vault-recovery-confirm`/`Promise.race`），
+  所以"main 的自托管验收仍红"这一格**由他们那一笔提交关闭**，不由我抢。
+- android 那格的成因**已消失**：`ssh windows-pc "cd /d C:\src\heyta && pnpm install --frozen-lockfile"`
+  ⇒ `Scope: all 21 workspace projects / Already up to date`（起跑前远端 `java.exe` 计数 0，没撞别人的构建）。
+- 🔴 但这一端暴露出**两条既有规则的互相矛盾**：§6.1 新规把 Android 构建与模拟器都移出这台 Mac
+  （"headless 模拟器 3.6G+ 常驻 / 90% CPU、SDK+AVD+Gradle 缓存 20G+"），
+  而 §6.1.1 的四端固定收尾要求 android **装机判据**（`install 输出 Success` + 启动截图主蓝命中）。
+  现量：`adb devices` 列表为空 ⇒ 这台 Mac 现在**没有设备面**，而 Windows 侧按 runbook 明确没有安卓模拟器。
+  ⇒ 第 8 项的 android 一格不是"我没跑"，是**当前规则下没有任何一台机器同时具备打包面与设备面**。
+  要闭合只有两条路：(a) 在 windows-pc 上装一次 Android emulator（runbook 要改），
+  (b) 显式豁免一次"在这台 Mac 起模拟器"（就是 §6.1 那条新规要挡的）。我没有自己选，因为两条都改既有决定。
+- iOS：`git ls-remote https://github.com/facebook/hermes.git` 单发有界探测见本条上方输出；
+  00:39 那三趟 `pod install` 死在 `SSL_ERROR_SYSCALL in connection to github.com:443`。
+  仍**不动本机网络环境**（硬规则）。
+- 载体树 `/tmp/heyta-merge-carrier` 已不在（`/tmp` 那批被清），所以今晚那些跑过的树不再可复用；
+  要再跑验收需重建（`git worktree add` + `pnpm install`）。
+
+### 8.274 就地补正 §8.273 的一句 + 收尾自己留下的残留
+
+§8.273 写"载体树已不在"是对的，但**注册项还在**（`git worktree list` 里 5 枚 `/tmp/heyta-merge-carrier*` 全标 `prunable`），
+所以 `git branch -D fix/selfhost-e2ee-judge-on-main` 第一趟报
+`cannot delete branch … used by worktree at '/private/tmp/heyta-merge-carrier'`。
+处理：`git worktree prune`（只清工作树目录**已经不存在**的注册项，不动任何还在的树），然后分支删净。
+⚠️ 记这一条是因为它的**症状**很容易读成"分支被别人占用，不能动"——实际是元数据残留，
+判法：`git worktree list` 里那一行带不带 `prunable`。
+
+### 8.275 10:1x 第 8 项补齐：**四端各自都有"装上的是当前产物"的判据**，同时撤回我 §8.273 那条否定结论
+
+| 端 | 结果 | 判据读数（人打开看过图） |
+|---|---|---|
+| mac | ✅ | 装入 `/Applications/Heyta.app`；包内 `web-dist` 与本机 `apps/web/dist` 同一次构建（9 chunk）；自截屏 2164x1432、内容占比 100.0%、**主蓝命中 1127** |
+| windows | ✅ | 远端 tar sha256 逐字相同 + 新鲜度对账（`index.html`/`bridge`/7 枚 assets）+ 取证"5 条全在位" |
+| android | ✅ | 远端 gradle 打出 release APK **65M** → `emulator-5554` 全新安装成功 → 前台窗口 `com.heyta/com.heytamobile.MainActivity` → 截图 1080x2400、内容占比 56.7%、**主蓝命中 4001** |
+| ios | ✅ | `pod install` 沙盒同步 → 构建成功 → 全新安装 → **新鲜度判据过**（已装包比源码新）→ 截图 1206x2622、内容占比 60.1%、**主蓝命中 4152** |
+
+🔴 **撤回 §8.273 的一句**："当前规则下没有任何一台机器同时具备打包面与设备面" **是错的**。
+现量：`/opt/homebrew/share/android-commandlinetools/emulator` **装着**（只是不在 PATH 上），
+系统镜像 `system-images/android-36/google_apis/arm64-v8a` 与 AVD `heyta-w3-yearly` 都在，
+起出来就是 `emulator-5554`（Android 16、`sys.boot_completed=1`）。
+我只查了 `which emulator` 与 `~/Library/Android/sdk` 就下了否定结论 —— 正是我自己那条
+**"否定结论也要枚举分母"** 要拦的形状，而且是同一天第二次（第一次是 §8.270 的差集方向）。
+
+⚠️ **三处边界，别读成"一轮四端同一棵树跑完"**：
+① 四端**不是同一棵树/同一刻**：mac+windows 起跑于 `de761797`（00:3x），android 于 `7473aa63`，ios 于 `ebcf529a` ——
+   main 在两次跑之间又前进了，所以这是"四端各自对当时的 main 有判据"，不是"一批产物同源于一个 commit"。
+② 两张移动端截图的内容都是**首启隐私同意闸**（真共享 UI、中文、主蓝按钮、服务条款/隐私政策在位），
+   它们证到"装上了、起得来、画的是我们的界面"，**不**证到移动端能建任务/同步（那是 `verify:mobile-*` 与自托管三条判据那一层）。
+③ iOS 那趟 `pod install` **改动了 `apps/mobile/ios/Podfile.lock`（与 HEAD 差 4 行）** ⇒ 提交态那份锁与
+   一次干净 `pod install` 的结果不一致。这不是装机判据的失败（脚本把它当警告），但它是一格真实的账：
+   要么把这份锁提交，要么写清"锁允许被 pod install 就地更新"。我没有代提交别人的文件。
+
+**为什么 iOS 端先前红、现在绿（两格成因不同，别并成一条）**：
+00:39 三趟死在 `git clone github.com/facebook/hermes` 的 `SSL_ERROR_SYSCALL:443`（网络面，我没动本机网络）；
+09:5x 换到 `All in one Data/…` 这棵树后红在 `ArgumentError - path name contains null byte`
+（CocoaPods × pnpm 符号链接 × **含空格路径** 的已知崩溃，脚本自己也印了这条 issue 链接）；
+把树放到 `/tmp/heyta-ios-reinstall`（无空格）后同一趟就过了。⇒ 教训：**iOS 原生链路的树必须住在无空格路径**，
+这台机器的工作区根路径带空格，所以 iOS 端只能跑在 `/tmp` 或同级的无空格 worktree 里。
+
+### 8.276 G-62（#39）落完：指南现在说"起完打开 `/app/` 就能用"，而 CORS 那两段被限定回它们自己那一档（2026-10-07 00:2x–00:5x）
+
+§8.137 登记时留了三条"可直接执行的改法"。三条都做了，载体是**从当时 main tip `82e0ee6b` 新开的
+worktree**（`~/heyta-carriers/heyta-g62-1007`，分支 `feat/selfhost-g62-g44b`）—— 不是那棵 1411 笔
+落后的批次树：并回必须 merge，否则会把别人的生成物 revert 掉（§8.270 那条账）。
+
+**正文改动**（`packages/i18n`，中英各四处，逐条对应 §8.137 的那三条）：
+
+| 键 | 动什么 | 为什么是这个形状 |
+|---|---|---|
+| `s7p4`（新） | 起完直接开 `https://你的域名/app/`；界面与 API 同域同一个容器；**不需要另托管前端**；本机是 `http://127.0.0.1:1900/app/`；判据是启动日志那行 `[web-app] 共享 UI 挂在 /app/`；挪挂载点要 `WEB_APP_PATH`+`WEB_APP_DIR` 一起改且要与构建 base 一致 | 事实全取自 `server/README.md:144-152` 与 `docs/runbooks/self-host.md:184-186`，**没有新造任何承诺** |
+| `s6p1` | **只加分叉首句**，原句逐字保留在后面 | §8.137 明写"不删，删了等于把真踩过的坑抹掉" |
+| `s6p3`（新） | 同域那一档先查这三件：真 https 地址通不通（容器全 `healthy` 也照样坏，证书签不出来时它安静重试三十天）→ 日志里那行 `[web-app]` → 挂载旋钮有没有被单独动过 | 三条都在 runbook 里有实测出处，不是推测 |
+| `s8i5` | 把"**自建必须改成自己的**"限定成"**你自己另托管一份前端时**必须改"，并补一句"同域那一档它参与不了判断" | 原句在默认形态下是**假**的（同域请求不走 CORS）—— 这一格属于"停对外错话"，不属于"补便利信息" |
+
+`apps/landing/src/site/docs.ts` 把两条新正文登记进分区清单（`install-and-update` / `why-offline`）。
+🔴 **这一步不是收尾仪式**：词条加了却没进清单 = 字典里读得到、页面上读不到，而**没有任何一层会报**
+（`check:ui-language` 只判中英齐不齐，`check:docs-voice` 整篇豁免自托管）。所以判据必须判**渲染后的 DOM**。
+
+**两条新判据 + 四枚臂**（离线那条在 `apps/landing/tests/public-copy-register.spec.tsx`）：
+
+- needle 取的是**那一句独有的片段**，不是满页都有的标识符。第一版我写成 `['/app/','WEB_APP_PATH','WEB_APP_DIR']`，
+  当场自查出**它没有牙**：`/app/` 在别处也出现，把 `s7p4` 整段删掉照样绿。换成
+  `https://你的域名/app/`（=s7p4）、`https://你的域名/health`（=s6p3）、`先分清是哪一档`（=s6p1）三条，
+  **一条对应一项要求**。阳性对照取入口命令的 override 文件名（待验状态之外，整块没渲染时它同为 0）。
+- 四臂逐条实测：摘 `s7p4` 的分区登记 ⇒ 红（真 rc=1）；摘 `s6p3` ⇒ 红；把 `s6p1` 退回改前 ⇒ 红；
+  摘 `s7p2` ⇒ **阳性对照自己先红**（证明它不是装饰）。
+- 🔴 第三臂**第一次跑是假的**：我改了词条源文件却没重 build `@heyta/i18n`，测试读的是 `dist` ⇒
+  变异没进被测代码 ⇒ rc=0。重跑（改完先 `pnpm --filter @heyta/i18n build`）才红。
+  这是 §7 第 79 条（"i18n 改完必须 build"）的**第三种面目**：以前它坑的是运行时的界面，这次坑的是
+  "验证判据能不能红"这件事本身 —— 臂的 rc=0 会被读成"判据没牙"，而真相是"臂没打到东西"。
+  **判"某条变异没生效"之前，先证明它进得了被测代码**（与 §7 第 273 条同族）。
+
+线上那条（`e2e/live-site/live-domain.spec.ts` 新增 `test('自建指南（线上）…')`）**现在是红的，而且它该红**：
+现量 `zh 三条 needle=0/0/0、对照=1` ⇒ 探针没坏，缺的是那一发重发。它随 §8.278 那趟发布**不**转绿
+（那发刻意只发 main 的内容），关闭条件挂在任务 #68。
+
+读数：`check:ui-language`（zh/en 各 3257 条，齐）/ `check:entries`（76 份入口一致）/ `check:docs-voice`
+（豁免自托管 124 条）/ `check:selfhost-entry-command`（R1–R9 全过，新正文没多造一份入口命令抄件）各 rc=0；
+`@heyta/landing` 全量 **22 文件 / 1318 条**通过；`--filter "@heyta/landing..." typecheck` rc=0
+（第一次红在 `@heyta/shared-schema` 没 build —— 新开载体的必做步骤，不是代码问题）。
+
+### 8.277 G-44b（#64）四件套同趟落地：版本真源定在仓库根 `package.json`（`0.0.0`→`0.1.0`），生产者接上，README 与 C3 一起翻面（2026-10-07 00:5x–01:0x）
+
+§8.258 留下的结论是"**这四样必须一起动，缺一即红**"。这一笔就是那四样，提交 `bfe4497c`（在
+`feat/selfhost-g62-g44b` 上，与 §8.276 同一棵载体）。
+
+**先记拍板的那一步**（原先挂在"要人拍板"那一档，本轮由产品负责人一句"你能做的全部做掉"授权代拍）：
+
+| 决定 | 取值 | 理由与不选的那一侧 |
+|---|---|---|
+| 真源在哪 | 仓库根 `package.json` 的 `version` | 版本号**不是平台差异**（AGENTS §3.5 里 `apps/*` 只许有一处差异 = 注入哪个 SQLite 驱动），它是产品语义。不选"各宿主自己传"：那正是这件事烂在原地的成因 —— `b467e758` 把机制补成"宿主注入"之后**停在原地**，因为每个宿主都得记得传、而没有一个宿主有值可传 |
+| 第一个值 | `0.1.0` | 不选 `0.0.0`：那是"还没有版本"，不是版本 `0.0.0`，发出去就是把假版本写进运营面那张设备清单（`admin.routes.ts:340/394` 在读它）。不选 `git describe`/提交号：服务端那条形状是 `x.y.z[-prerelease]`，把 sha 塞进 prerelease 位会让"预发布"语义说谎，而逐构建对账另有 `org.opencontainers.image.revision` 那条路 |
+| 怎么到运行时 | `scripts/gen-app-version.mjs` → 生成物 `packages/app-host/src/app-version.generated.ts` → `createSyncClient()` 的**默认值** | 沿用本仓"唯一真源 + 生成物 + 门禁"那一族（`check:server-copy` / `check:legal-copy` / `check:entries` 同形）。宿主仍可覆盖，留给**自己另构建一份客户端**的人 |
+
+**C2 那一枚扫描集的洞（顺手补掉，属于"判据恰好放过它该管的那一枚"）**：C2 判的是
+"本仓库任何工作区的版本都不满足闸门"，而它的 `manifestRels` 只走 `packages/*`、`apps/*`、
+`server/package.json` —— **根 `package.json` 从来不在里面**。以前无所谓，因为真源还不存在；
+这一笔把真源定在根之后，它就是**唯一一枚要紧的那份**，漏在扫描集外等于让 C2 恰好放过它该管的。
+⇒ 补进 `manifestRels`，现量 `workspaceCount` 由 20 变 **21**、`workspaceVersions` 读出
+`["0.0.0","0.1.0","1.0.0"]`。
+
+**C3 翻面**：原先钉"没有 heyta 客户端发它 + 查询串只有那三个键"，现在钉四件新事实 ——
+① 构造点**恰好一处**（0 = 生产者又没了；>1 = 多了一条会漂的第二来源）；
+② 值必须来自注入（`this.options.appVersion`），客户端里写死字面量即红；
+③ 真源→生成物→接线三段每接错一处都红，且真源必须过服务端**自己的** `parseAppVersion`
+（解不开 = 记进设备清单的是沉默，而代码看起来"在发版本" —— 最难归因的那种假信号）；
+④ README 必须正面说出这件事、不许留着那句旧否定、并印着当前真源值（抄件恰好 1 处 + 阳性对照）。
+注入臂从 1 枚换成 **6 枚**，逐臂 `expectIds` 精确（`firedIds` 必须等于期望集，多响一枚也算臂坏）。
+
+**`checkpoint-gate.ts` 那句上游前提**（§8.258 留的第四条）：原文 "every release that reports one is
+newer than the cut, so silence can only mean a pre-reporting client" 在 heyta 一发 `0.x` 之后**不成立**。
+注释改成：本叉里"沉默"与"`0.1.0`"同判 old（闸门结果一样），但在 `unversionedDevices` 那一栏仍各归各 ——
+**别把低版本读成"旧的上游发布"，也别把沉默读成安全**。
+
+**顺带清掉的一份第二抄件**：`scripts/package-desktop.mjs:183` 原来写着 `appVersion: '0.0.0'`，
+现在读真源。它以前只是"Electron 包的字段"，现在同一列值会随同步上报进设备清单，
+那份字面量就从"无害"变成"会漂的第二来源"。
+
+读数：`server/tests/version-coupling.spec.ts` **17/17**（基线干净 + 全部臂各只让它该响的那几条响）；
+`@heyta/sync-client` **134/134**（含新两腿：给了必须带 / 没给一个字都不发 —— 第二腿判**键集合相等**，
+因为 `set('appVersion', undefined)` 会留下 `appVersion=undefined`，只查"不含那个词"抓不到多发的键）；
+`@heyta/app-host` **1526/1526**（含新那份 `sync-wiring-app-version.spec.ts` 3 条）；
+`check:app-version` / `check:gate-wiring` / `check:docs` / `check:claims` 各 rc=0。
+四枚链外臂另测：真源退回 `0.0.0` ⇒ 门禁红；手改生成物 ⇒ 门禁红；摘掉下载段的发送 ⇒ 那条腿红（rc=1）；
+接线不给默认值 ⇒ 那条腿红（rc=1）。
+
+⚠️ 三条边界，不写成"前置条件成立了"：
+① **翻面 ≠ 成立** —— README 前置条件 1 讲的是**版本空间**（heyta 的 `0.x` 对不上 `18.21.2` 那个上游号），
+   那一半仍不成立，自动 checkpoint 节奏对 heyta 账号仍然不可达；
+② **移动端打包里还有第二份版本声称**：`versionName "1.0"` / `MARKETING_VERSION = 1.0`，
+   连服务端那条 `x.y.z` 形状都不合（发出去会被 `parseAppVersion` 判成沉默）。它归各端打包链，
+   登记为 **G-74**；
+③ 本趟没跑 `pnpm -r test` 全量（载体上单跑的是那三个包 + server 那一份 spec），
+   全量那一格仍归 §8.266 的"落地时同一把尺复跑"。
+
+### 8.278 #20/#61：落地页重发真的做了，5 枚对外错话的 live 判据当场转绿（2026-10-07 00:5x–01:1x）
+
+**#61 那句"发布节奏要拍"当场判掉，选 A 的现量版**：它当初的形态是"第①句已在 origin/main、
+第②句还在未落地的那 75 笔里"，所以 A/B 之争实质是"要不要为第①句单发一趟"。
+本批已经落地（§8.264 那格闭合），**两句现在都在 main 里** ⇒ A 与 B 的差别消失，
+剩下的只是"发不发"。⇒ 发。
+
+**发的是 `82e0ee6b`（main tip）的内容，不是我这棵分支的内容。** 这一步是刻意的，
+理由正是本批反复付账的那一族：**线上不许比仓库新**。分支上那两笔（G-62 的正文、G-44b 的版本）
+还没落地，如果跟着这一发出去，就会出现"live 判据绿、而 main 上找不到让它绿的字节"——
+下一次谁从 main 重发，那句说明会**静默消失**。所以：
+`git checkout --detach 82e0ee6b` → 重 build 依赖闭包（🔴 不能省：分支状态下 `@heyta/i18n` 的 `dist`
+里带着我新写的正文，直接 build 会把没落地的那段烘进产物）→ 发。
+
+**发布前用产物自己先判一次**（这是 §8.247 那条阳性对照的正用）：把 `apps/landing/dist`
+用 `python3 -m http.server` 起在本机 `127.0.0.1:4457`，把 `HEYTA_LIVE_ORIGIN` 指过去跑
+`live-install-claim.spec.ts` ⇒ **4/4 绿**。这一步把"发出去会不会变绿"从推测变成读数，
+而它只花 1.3 秒。同时反向核对：产物里 `先分清是哪一档` / `同域这一档先查这三件` / `起完之后`
+命中数全为 **0** ⇒ 证明发的确实是 main 的内容，不是我的分支。
+
+**动作序列**（与 §8.11x 那几发同一条，逐字沿用 runbook）：
+
+```
+ssh ubuntu-jcli 'tar czf /tmp/heyta-landing-backup-pre-82e0ee6b.tgz -C /var/www heyta-landing'   # 1.26 MB
+VITE_SITE_URL=https://heyta.waytofuture.cn VITE_APP_URL=https://heyta.waytofuture.cn/app/ \
+  pnpm --filter @heyta/landing build                                                              # rc=0
+rsync -az --delete --itemize-changes apps/landing/dist/ ubuntu-jcli:/var/www/heyta-landing/       # rc=0，180 行变更
+```
+
+**发布前后各一趟整条 live 套件**（同一棵树、同一把尺，只差那一发）：
+
+| | 结果 | 红的分别是哪几条 |
+|---|---|---|
+| 发布前（01:0x） | **6 failed / 25 passed**（rc=1） | `live-install-claim` 四条（「可安装」×2 + G-71「每句都对得上」×2）、`live-domain` 的 CTA `?lang=` 一条、以及**我这趟新加的** `自建指南（线上）/app/` 一条 |
+| 发布后（01:1x） | **1 failed / 30 passed**（rc=1） | 只剩那条新判据 —— 它要的是**分支上那句还没落地的正文**，挂在任务 #68 |
+
+⇒ **#20 关闭**（§8.255 那 5 枚红全部转绿，逐条腿名在日志里），**#61 关闭**（节奏已判并已执行）。
+ 那条新判据**仍然红，而且这是它当前唯一正确的颜色**：它判的是"线上读得到那句说明"，
+而那句说明此刻确实不在生产上。写在这里是为了让下一班**别把它当测试坏了**去放宽。
+
+⚠️ 边界：这一发没有回滚验证（备份在 `/tmp/heyta-landing-backup-pre-82e0ee6b.tgz`，
+恢复命令 = 解回 `/var/www/`），也没动服务端容器 —— 本批改的只有落地页产物。
+
+### 8.279 #66 闭合：更强的那份判据已经进了 main，自托管验收在 `82e0ee6b` 上 rc=0（2026-10-07 01:2x）
+
+那条"等日历/回收站线提交更强的判据"的前提**已经消失**：`98c9c8c8` 把
+`e2e/selfhost-stack/selfhost-web.spec.ts` 换成了 `Promise.race` 分档 + 两档都没出现就点名报错那份
+（比我那版 `waitFor().then(()=>true)` 强，§8.274 已把它标 superseded 并删掉我的分支）。
+所以这一格欠的**只剩读数**，而读数不要窗口 —— 负载 9 时起的一趟直接过。
+
+两趟同载体同尺（都是 detached `82e0ee6b`，`VCS_REF=82e0ee6b`）：
+
+| 趟 | 结果 | 备注 |
+|---|---|---|
+| 01:20 | 三条判据全过、四张截图 `FRESH=4/4` | 🔴 **退出码没接到**：`nohup … > log &` 之后我读的是包装命令的状态。日志里 `❌/FAIL/failed` 计数为 0，但那**不等于 rc=0** —— 这是 traps #164/#179 那一族在我自己手上又中一次 |
+| 01:25 | **`VERIFY_RC=0`**（退出码由被测命令自己写进 `rc.txt`） | 同形状重跑，读数一致；四张截图换成本趟，人已打开看过（`s3-device-b-recovered.png`：全新设备从服务端读到 `selfhost-task-7531573-2`，四象限"不重要不紧急 1"） |
+
+⇒ 证据入库 `8b4aaacb`（四张截图），#66 关闭。
+📌 一般规律（这次是自己踩的，写下来挡后来人）：**"日志看起来全绿"与"命令退出码 0"是两件事**，
+后台跑法必须把 rc 从被测命令自己那里取，而且第一趟就该做对 —— 否则要么补一趟，要么这条读数只能记弱。
+
+### 8.280 收尾清账：我欠的现场清理做完了，两枚新登记（G-73 / G-74），以及"这一批还欠什么"的一张表（2026-10-07 01:2x）
+
+**我造的现场，逐条清**：
+
+| 对象 | 处置 | 判据 / 为什么这么处置 |
+|---|---|---|
+| worktree `/tmp/heyta-ios-reinstall`（我建的，iOS 端跑在无空格路径） | 先 `git diff -- apps/mobile/ios > ~/.heyta-evidence/selfhost-closeout-1007/ios-worktree-mutations.diff`（84 行）留档，再 `worktree remove --force` | 那三处未提交改动（两份 `Info.plist` + `Podfile.lock`）是**我这趟的构建副作用**，不是交付物；但"删掉一个脏树"要先把它的内容留得下来 |
+| worktree `heyta-wt-ios-reinstall`（我建的） | `worktree remove`（先 `status --porcelain` 取到**空**才动） | 干净 ⇒ 没有可丢的东西 |
+| 模拟器设备 `heyta-selfhost-reinstall`（`ED4589E9…`，§8.266 写明"是我的，落地做完由我删"） | `shutdown` → 确认状态变 `Shutdown` → `delete` | 它唯一用途（iOS 端当前产物判据）的读数已入 §8.275 与 `reinstall-ios3-*` |
+| 模拟器 `heyta-iphone-17pro`（`FE195661…`，Booted） | **不动** | 名字对应 `verify:mobile-ios` 那条线用的设备，**不是我建的**；"看起来像旧的、可能在挡路"不构成动手理由（AGENTS §8 第 9 条：共享资源先认所有者） |
+| Android 模拟器 `qemu-system-aarch64-headless -avd heyta-w3-yearly`（PID 35743） | **不动** | 我起跑时记的 PID 是 **21712**，它已经不在了；现在这台是 **09:30 由别人起的**（`ps -o lstart`）。按 PID 认人，不按进程名认人 |
+| 主检出 `apps/mobile/ios/Podfile.lock`（`M`，mtime Oct 6 **23:15**） | **不动、不代提交** | 我那趟 pod install 在 `/tmp` 那棵树里（mtime 21:06）。主检出这份是**别人 23:15 那一趟**留下的 |
+
+**G-73（新登记，归 iOS/mobile 那条线）：`PODFILE CHECKSUM` 的漂是**可复现的仓库不自洽**，不是谁的脏改动。**
+两棵互不相干的树（主检出 / 我从干净提交新建的 `/tmp` 树）各自跑 `pod install`，得到
+**同一个新值** `75d7db42…`，而提交里那份 lock 写的是 `4b316b80…` ⇒ 结论只能是
+**committed `Podfile.lock` 的 checksum 与 committed `Podfile` 本来就不对得上**（干净检出 + `pod install` 必漂）。
+同一份 diff 里的 `hermes-engine` 那一行**两棵树得到不同值**（`208b0dcd…` vs `41c0eb35…`）
+⇒ 那一行依环境，与 checksum 是**两个不同成因**，别并成一条"pod 会改 lock"。
+射程：`check:native-deps` 对的是 `package.json ↔ Podfile.lock`，**不覆盖 `PODFILE CHECKSUM`**，
+所以这件事没有任何一层会报。复现命令（不写"我试了一台所以做不到"那种否定结论）：
+
+```
+git -C <干净检出> status --porcelain -- apps/mobile/ios/Podfile.lock   # 起跑前应为空
+cd apps/mobile/ios && pod install && git diff -- Podfile.lock          # 必然漂出 75d7db42…
+```
+
+**G-74（新登记，归各端打包链）：移动端打包里那份版本声称与真源不是同一个空间。**
+`apps/mobile/android/app/build.gradle:140` 是 `versionName "1.0"`、`Heyta.xcodeproj` 三处
+`MARKETING_VERSION = 1.0`。G-44b 之后，`0.1.0` 才是随同步上报进设备清单的那个值；
+而 `"1.0"` 连服务端 `APP_VERSION_RE`（`x.y.z[-prerelease]`）都不合 ⇒ 若哪天移动端改走打包里那份，
+上报会被 `parseAppVersion` 判成**沉默**。要么两处对齐真源，要么在 README 里写明"打包版本 ≠ 上报版本"。
+不在本批：动它要重打 APK（远端打包机）与重跑 iOS 构建，而本批对移动端零改动。
+
+**这一批还欠什么（一张表，别再散在正文里）**：
+
+| 还欠 | 卡在谁手上 | 关闭判据 |
+|---|---|---|
+| 三笔（`324b9e45` / `bfe4497c` / `8b4aaacb`）进 main | **外部**：落地要在主检出里 `git merge --ff-only`，而主检出此刻被别的会话占着（68 枚未提交 + 每两三分钟挪一笔）；且 `--confirm` 要求先在载体上真跑一次完整 `pnpm check`（负载窗口） | `git merge-base --is-ancestor` 成立 + 落地那一刻按 §8.266 那三步复跑 |
+| G-62 那句对外可见（任务 #68） | 上一行的下游 | 落地后**再发一发**，`live-site/live-domain.spec.ts` 那条「自建指南（线上）」由红转绿 |
+| `check:md-tables` 在本载体上红 | **不归本批**：红在 `docs/plans/trash-and-archive.md:744`，该文件本批一字未动（`git status` 干净）⇒ 归回收站/归档那条线 | 那条线自己修完，`check:md-tables` rc=0 |
+| G-73 / G-74 | iOS/mobile 线、各端打包线 | 见上面两段各自写的判据 |
+
+
+### 8.281 01:4x 抓到自己交出去的一次静默丢失：那三笔代码根本不在落地链默认读的那枚分支上
+
+**发现方式不是审代码，是准备交接班时把落地链的默认输入读了一遍。** 本批的三笔代码
+（`324b9e45` G-62 词条 / `bfe4497c` G-44b 四件套 / `8b4aaacb` #66 证据图，合计 20 枚文件）
+提交在 `feat/selfhost-g62-g44b`（载体 `~/heyta-carriers/heyta-g62-1007`），而落地链的两个入口
+**默认只读 `feat/self-host-distribution`**：
+
+- `research/tools/selfhost-land-main.mjs:48` — `const BRANCH_REF = process.env.HEYTA_LAND_BRANCH ?? 'feat/self-host-distribution';`
+- `research/tools/selfhost-merge-carrier.mjs:158` — `const SOURCE = process.env.HEYTA_SOURCE_REF || 'feat/self-host-distribution';`
+
+⇒ 窗口打开、有人（或未来的我）照默认跑落地时，**那 20 枚文件一笔都不会进 main**，而这件事
+没有任何一层会报：台账分支上 5 笔全是 docs 笔，读起来像"这批只剩文档没落地"，
+于是"代码没落地"这一格看起来已经闭合了。env 覆盖（`HEYTA_SOURCE_REF`）能救，但它要求
+**下一个人知道要用它** —— 依赖后人记得的开关不是判据。这与我这一批反复写的那条同族：
+**交付物的落点必须挂在执行者默认会读的地方，不是挂在文档里的说明上。**
+
+**做法**：把代码分支合进落地源分支（一次 `git merge --no-ff`，在本批 worktree
+`heyta-wt-selfhost`，合并前 tip `03829d50` ⇒ 回退就是 `git reset --hard 03829d50`）。
+只有一族冲突，正是那个已收口过的形状：
+
+| 项 | 读数（由工具自己拼出，不由我复述） |
+|---|---|
+| 冲突文件 | 仅 `docs/research/self-host-distribution-audit.md`（追加型台账） |
+| 解法 | 它自己的单一所有者 `research/tools/selfhost-audit-union.mjs` 的 `unionAudit({base, main: theirs, src: ours})` |
+| main 侧独有 | 55 行原样保留，带那张"下面这块不是本批写的"的哨兵 |
+| 本批独有 | 283 行 |
+| 四条无损断言 | `lostMain=0 / lostSrc=0 / droppedBase=0 / invented=0`，`markers=false`，`missingBanner=false` |
+| 其余合进来的 | 1622 枚 = main 从 `9651a4ac` 走到 `82e0ee6b` 那一段（986 A / 634 M / 2 D），是"分支落后于 main"的正常收敛，不是本批新写的东西 |
+
+**合并后新长出一条可复核的纯度判据**（落地那一刻也能拿它对着别人问"本批动了哪些文件"）：
+
+```bash
+git diff --name-only 82e0ee6b..feat/self-host-distribution   # 应当恰好 21 枚 = 本批 20 枚代码/e2e 文件 + 这份台账
+```
+
+三笔代码 SHAs 现在都是落地源分支的祖先（`git merge-base --is-ancestor` 三枚都 YES），
+`feat/selfhost-g62-g44b` 不必再单独落地。
+
+🔴 **边界，不包装成完成**：**合并后的这棵树没有跑过任何门禁**。取读数时 1 分钟负载 **47.73**
+（阈值 12）⇒ 环境无效，现在跑出来的读数不作数；落地那一刻本来就要在载体上跑完整链
+（`selfhost-land-main.mjs --confirm`），这一笔不替代它。要现量的最小集写在合并提交信息里。
+
+⚠️ **我自己这一趟又中了本仓已入档的那条 rc 陷阱，而且是同一 session 内第二次**：
+`git commit … | tail -5` 之后 `echo $?` 报的是 `tail` 的 0，而 git 其实**没提交**
+（选项写错：`--no-verify=false` 不是合法取值）。发现它靠的不是那个 0，是随后
+`git log` 仍显示 `03829d50`。同一族的还有本节上面那步的 `MERGE_RC=0`。
+⇒ **判"命令成没成"要拿它自己的 rc**：别接管线，或用 `bash -c 'cmd; echo RC=$?'` 的单引号形式。
+这不是新条（环境陷阱 #179 与 §7 第 45 条就是这个），是"知道规则仍会在顺手写命令时中招"的取证 ——
+所以合并这一步的**在场判据**我全部改成了内容核对（三枚 SHAs 的 `--is-ancestor`、21 枚纯度差集、
+关键符号 grep），而不是只看退出码。
+
+### 8.282 01:5x 把 §8.281 那句"没有任何一层会报"过一遍分母，并把修法登记成 G-75（不 today 建）
+
+我在 §8.281 写了一句否定结论：**"那 20 枚文件一笔都进不了 main，而没有任何一层会报这件事。"**
+按"否定结论也要枚举分母"的规矩，这句得有一条读数，不然它和随手写的悲观话没有区别。
+唯一有可能报它的层是落地链自带的**写集归属**检查，读到了它本体：
+
+- `research/tools/selfhost-merge-carrier.mjs:1039` — `const writeSet = git(['diff', '--name-only', baseSha, srcSha])`
+- 同文件 `:1041` `ownershipVerdict({ writeSet, mergedSet })` / `:1046` 打印"写 N 枚 / 集外 0 / 写集里未被改到 N 枚"
+
+⇒ **写集是"由源分支自己算出来的"**，不是外面声明的清单。我的 20 枚文件不在 `feat/self-host-distribution` 上时，
+它们**不在这次的写集里**，于是那三条判据对它们的缺席毫无感知（分母里没有，`⊆` 空洞成立，"集外 0"照样打印）。
+这就是"没有任何一层会报"的具体机制 —— **不是缺一道检查，是那道检查的输入就是被检查对象自己**。
+同一族的还有 §8.281 那条纯度判据：`git diff --name-only 82e0ee6b..feat/self-host-distribution = 21 枚`
+是我**从外部算的**，所以它有意义；链里那个是**从内部算的**，所以它没有。
+
+📌 **G-75（新登记，本批不做）**：落地那一刻应有一条**外部声明的应落清单**与合并结果对账 ——
+判据形状是"清单里每一枚路径必须在落地后的 main 里等于源分支那一版；缺席 ⇒ 红"，
+方向与 `check:image-license` 那类"由提交物派生再对账"同族。
+为什么这一批不建它：① 需要一条能红的判据，而建+变异验证要在载体上跑链（现在 1 分钟负载 47.73，阈值 12，环境无效）；
+② 清单本身要落在哪儿、谁维护、批次结束时怎么作废，是产品负责人那一层的取舍 —— 登记而不是顺手拍。
+③ 它挂在落地链上，**必须与落地同一趟做**才有第一次真读数；单独先建会让它带着"从未在合并态跑过"入链（§7 第 191 条那一族）。
+
+<!-- ↓↓ 载体并集：以下 55 行来自 main 侧（其他人已提交的节），逐行原样保留 ↓↓ -->
 <!-- ↓↓ 载体并集：以下 50 行来自 main 侧（其他人已提交的节），逐行原样保留 ↓↓ -->
 ## 9. 交还一条现场：`reinstall:all` 的 mac 段不是"慢"，是不朽（2026-10-04 06:0x 现量）
 本节写在这里而不是 `BLOCKED.md` / `environment-traps.md`，因为那两个文件此刻都有别的会话
@@ -14154,40 +14629,6 @@ stat -f '%z 字节' /tmp/heyta-reinstall/apps/desktop-macos/scripts/package-app.
 **"判某个进程是否持有某文件"时，路径必须按对方那棵树的绝对路径解析（逐 pid 取 `cwd` 再拼），
 从自己这棵树解析同名相对路径会命中另一枚 inode，探针于是把"活着"报成"没了"。**
 镜像面已经在本节上面（不带 `-a` 的 `lsof -p PID -i` 是并集）。
-### 8.268 22:5x 现量：**本批已被别线合进 main**，而 main 现在打不出镜像 —— 断在 apps/web 的一处合流残留（不是本批造成的，且它挡着第 2 与第 8 项）
-
-先说落地那一格：**它由别人达成了，不是我那一发 ff-only。**
-- `git merge-base --is-ancestor feat/self-host-distribution main` ⇒ **是祖先**；
-  `git rev-list --left-right --count main...feat/self-host-distribution` = **main 独有 1321 / 本批独有 0**。
-  通道是 `9651a4ac merge: 合并载体 consolidate/20261005 进 main`（+ 顶上 `acce5fd3 fix(合流)`）。
-- **内容级对账**（不是"分支名对上"就算）：本批写集 92 枚 = **逐字相同 78 / 内容不同 14 / 真缺 0**。
-  🔴 那"真缺 7 枚"是**我的探针错**：`git diff --name-only` 会把非 ASCII 路径**加引号再转义**，
-  我把带引号的串当路径喂给 `git rev-parse main:"…"` ⇒ 必然查不到。改 `-c core.quotePath=false` + `-z` 重判即归零。
-- 14 枚"内容不同"里最要紧的两格都活着：**门禁** `check:selfhost-entry-command` / `check:image-license` /
-  `check:gate-wiring` / `check:web-artifact:app` / `check:android-gradle-remote` 在 main 的 `package.json` 各命中 1；
-  **对外错话词条**（本批在 zh 表改过的 2 枚键）在 main 上**逐字等于本批版**，en 表两侧都在。
-  ⚠️ `server/docker-compose.migrate-once.yml` 我先前报"main 无"也是路径错（真实路径带 `server/` 前缀），现量 main 有。
-
-**然后是新的硬阻塞（本会话取到，归属已判）**：22:54 在载体树上前进到 `acce5fd3`、
-`pnpm install --frozen-lockfile` rc=0（锁 `d340e576`）、起跑时 1 分钟负载 8.44，跑 `pnpm verify:selfhost-stack` ⇒
-**rc=1，死在镜像构建的 apps/web 那一步**（Dockerfile:206 `RUN HEYTA_WEB_BASE=/app/ pnpm --filter "@heyta/web..." run build`）：
-
-- `src/features/calendar/CalendarView.tsx(83,9) 和 (145,9)` ⇒ **TS2451 Cannot redeclare block-scoped variable 'events'**
-  （提交态 `main` 那一版里 83 与 145 两行**都**写着 `const events = useCountdownStore((s) => s.events);`，全文 275 行）
-- `(268,11)` ⇒ **TS17001 JSX elements cannot have multiple attributes with the same name**
-
-**形状就是合流时两段都留下了**，不是平台/依赖/缓存问题：同一次运行里 `packages/app-host build: Done`、
-`apps/web build: Failed` 紧跟着三个 TS 码。归属：本批写集里 **apps/web 下 0 枚**（`git diff --name-only <基线> e8a6eb4e -- apps/web` 计数 0），
-这枚文件的改动来自日历那条线；主检出此刻对它还有一个未提交状态（索引标志 `M `，索引版重复声明计数 `1`）——
-**那是别人正在写的东西，我不动、不代提交、也不替他们判口径**。
-
-⇒ 对目标的影响要说白：**第 1 项"main 前进到该载体"实质已达成，但第 2 项与第 8 项现在被这处合流残留挡着** ——
-main 打不出前端产物，`verify:selfhost-stack` 走不到真镜像那一段，`reinstall:all` 四端装的也会是打不出来的产物。
-这条不是我能在"不动主检出、不替别人提交"的边界内清掉的：它要么由日历那条线把自己那份裁掉，
-要么由负责人授权我在**独立副本**上做一次"删掉重复那一段 + 回读 83/145 只剩一处 + 构建转绿"的修复再走合流通道。
-证据目录 ``（`summary.txt` 带 PREV/AT/INSTALL_RC/VERIFY_RC，`verify.log` 有原文三个 TS 码），
-载体已按 trap 还原回 `6921ac77`（`RESTORE_RC` 见 summary）。
-
 ⇒ **这一格的阻塞已被合流会话关掉（10-05 23:5x 现量，归属：日历那条线自己那份重复声明随"取载体那一代"消掉）**：
 `grep -c "const events = useCountdownStore" apps/web/src/features/calendar/CalendarView.tsx` = **1**（原报的是 83/145 两处），
 冲突标记计数 **0**，`pnpm -r build` **rc=0**（`apps/web` 在内）。上面那句"main 打不出前端产物"是 22:54 的真读数，

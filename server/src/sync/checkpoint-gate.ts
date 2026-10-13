@@ -11,9 +11,17 @@
  * release at or above that cut.
  *
  * Clients report their bare semver as the `appVersion` query parameter on the
- * download path (sync.routes.ts → DeviceService.touchDevice). A device with
- * no reported version counts as old: every release that reports one is newer
- * than the cut, so silence can only mean a pre-reporting client.
+ * download path (sync.routes.ts → DeviceService.touchDevice). A device with no
+ * reported version counts as old.
+ *
+ * ⚠️ That last inference is an **upstream premise, and this fork no longer has it**:
+ * heyta clients do report a version now (root `package.json` → generated constant →
+ * `createSyncClient()`, see server/README.md "Clients and version coupling"), and heyta
+ * lives in a `0.x` space below the cut. So here "silence" and "0.1.0" carry the same
+ * verdict — *not known new enough* — while still meaning different things in the
+ * fleet roll-up, where `unversionedDevices` counts silence only. Read a low version as
+ * "this fork's own space", never as "an old upstream release", and never read silence
+ * as safety.
  *
  * Pure functions only; the per-account and fleet-wide queries live in
  * DeviceService.

@@ -42,7 +42,7 @@
  * 影响所有人）。这里选前者。
  */
 
-import { existsSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -180,7 +180,10 @@ async function main() {
       asar: true,
       prune: true,
       ignore: IGNORE,
-      appVersion: '0.0.0',
+      // 版本号取**真源**（仓库根 package.json），不在这里留第二份字面量：
+      // 原来这里写着 '0.0.0'，而 `appVersion` 现在会随同步上报进运营面那份设备清单
+      // （G-44b）—— 第二份抄件漂起来的时候，撒谎的是那张清单。
+      appVersion: JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version,
       /**
        * ⚠️ 不设 `icon`：仓库里还没有桌面端图标（那是设计系统的活）。
        * 设一个不存在的路径会让打包器直接报错，而不是"用默认图标"。
