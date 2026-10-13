@@ -26,6 +26,7 @@ import { IDBFactory, IDBKeyRange as FakeIDBKeyRange } from 'fake-indexeddb';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { INDEXEDDB_SCHEMA, IndexedDbAdapter } from '../src/indexeddb/indexeddb-adapter.js';
+import { AdapterDestroyedError } from '../src/errors.js';
 import { MemoryDbAdapter } from '../src/memory/memory-adapter.js';
 import { NodeSqliteDriver } from '../src/sqlite/node-sqlite-driver.js';
 import { SqliteAdapter } from '../src/sqlite/sqlite-adapter.js';
@@ -170,6 +171,46 @@ describe('destroy —— 磁盘上的字节', () => {
     expect(readdirSync(dir)).toEqual([]);
   });
 
+  /**
+   * 🔴 这一条是 iOS 设备级那枚残留（计划 §10.146/§10.147）的**常驻**版本。
+   *
+   * 那趟真机验收量到"注销后 5 秒 `heyta.sqlite` 又以 6 张空表回来"，字节数 73728，
+   * 与这条共享层路径产出的**逐字相同** —— 归因因此从"iOS 原生桥没删干净"
+   * 改成了"销毁后一次普通读把容器建回来"。而设备一趟 8 分钟、要抢模拟器窗口，
+   * 不可能挂进 `pnpm check`。这条不开设备、不起模拟器，把同一件事钉成常驻判据：
+   * **销毁之后连"想重开"这条路都不许存在**。
+   *
+   * 两半缺一条都不算数：
+   *  · 只断言抛错 ⇒ 实现可以"照样重开、再把读改成抛"，文件仍会被建回来；
+   *  · 只断言目录为空 ⇒ 实现可以"答应读但返回空"，那正是把明文泄漏
+   *    伪装成"库是空的"的那一种。
+   */
+  it('🔴 销毁后在同一次运行里**任何一次普通读**都不许把库建回来（抛错 + 目录仍为空）', async () => {
+    const dir = tempDir();
+    const path = join(dir, 'heyta.sqlite');
+    const db = await openFileDb(path);
+    await db.add(STORES.OPS, opRecord('op-1'));
+
+    const report = await db.destroy();
+    expect(report.containerRemoved, JSON.stringify(report)).toBe(true);
+    // 前提腿：销毁那一步之后目录必须真的空 —— 否则下面"还是空"这句话是白捡的。
+    expect(readdirSync(dir), '销毁那一步就没删干净').toEqual([]);
+
+    for (const store of ALL_STORES) {
+      await expect(
+        db.count(store),
+        `销毁后「${store}」还答应读 —— 这条读会顺手把容器建回来`,
+      ).rejects.toBeInstanceOf(AdapterDestroyedError);
+    }
+    await expect(db.init(), '销毁后还答应重开').rejects.toBeInstanceOf(AdapterDestroyedError);
+
+    // 那一发被拒绝的读**没有**留下任何东西：这才是"文件级残留 0 枚"的完整形状。
+    expect(
+      readdirSync(dir),
+      `销毁后一次被拒绝的读把库建了回来：${readdirSync(dir).join(', ')}`,
+    ).toEqual([]);
+  });
+
   it('🔴 驱动**没有** removeDatabase 时（原生桥那一档），必须报"文件仍在"而不是静默成功', async () => {
     const dir = tempDir();
     const path = join(dir, 'heyta.sqlite');
@@ -273,6 +314,43 @@ describe('destroy —— IndexedDB 不许伪造成功', () => {
     await expect(promise).resolves.toMatchObject({ containerRemoved: true });
   });
 
+  /**
+   * 🔴 这一条钉的是**我们自己**：上一条用一枚"不接 `versionchange` 的裸连接"证明
+   * "不让位 ⇒ `deleteDatabase` 永久 blocked"；而注销那条路径上的活连接**就是这个类开的**
+   * （`apps/web/src/lib/oplog.ts:135` 的主库、`apps/web/src/lib/vault-session.ts:69` 的
+   * `heyta-vault`），销毁器开的却是**另一个实例**（`local-data-destruction.ts:262`，
+   * 另有 `WEB_DATABASE_NAMES = ['heyta','heyta-vault','heyta-widget']` 那三个名字走裸 `deleteDatabase`）。
+   * ⇒ 没有 `onversionchange` 那三行，Web 的"当场清掉本机明文"会**挂住不返回**，
+   * 而挂住不返回在界面上长得和"正在注销"一模一样，日志里一行都不留。
+   *
+   * 判据不许用计时器断言（这台机器负载能到 100+）：排空固定轮数任务队列后**必须已决议**。
+   */
+  it('🔴 本适配器自己**不许挡住**那次删除：活连接要在 versionchange 时让位', async () => {
+    freshIdb();
+
+    // 应用那一侧：正常在用的一份连接（不是测试手写的裸 `indexedDB.open`）。
+    const app = new IndexedDbAdapter('heyta-e2-yields-adapter');
+    await app.init();
+    await app.add(STORES.OPS, opRecord('op-1'));
+
+    // 销毁器那一侧：真实注销就是这个形状 —— 另开一个实例去删**同一个库名**。
+    const eraser = new IndexedDbAdapter('heyta-e2-yields-adapter');
+    const destroy = track(eraser.destroy());
+    await drainTaskQueues();
+
+    expect(
+      destroy.done,
+      '应用自己的连接把 deleteDatabase 挡成了永久 blocked ⇒ 那句"当场清掉本机明文"从没返回过',
+    ).toBe(true);
+    expect(destroy.value?.containerRemoved, JSON.stringify(destroy.value)).toBe(true);
+
+    // 让位之后那份连接确实不在了（下一次读会重开成空库 —— 注意这**不是**"销毁"：
+    // 注销之后由宿主自己作废缓存，见计划 §10.188/§10.189，这里只钉"没把删除挡住"）。
+    expect(await app.count(STORES.OPS)).toBe(0);
+    app.close();
+    eraser.close();
+  });
+
   it('正向对照：占着的连接**让位**后 destroy 真的完成（证明上一条不是永远 pending）', async () => {
     freshIdb();
 
@@ -291,7 +369,7 @@ describe('destroy —— IndexedDB 不许伪造成功', () => {
 });
 
 describe('destroy —— 内存实现', () => {
-  it('清空后适配器仍可用，且报告如实写明"没有持久容器"', async () => {
+  it('销毁即死路：报告如实写明"没有持久容器"，而这个实例从此拒绝读写', async () => {
     const db = new MemoryDbAdapter(INDEXEDDB_SCHEMA);
     await db.init();
     await db.add(STORES.OPS, opRecord('op-1'));
@@ -301,10 +379,23 @@ describe('destroy —— 内存实现', () => {
     // 内存这一档的"销毁"没有容器可删，所以它**必须自己说清楚**，
     // 否则下游会把"清空了 Map"读成"磁盘上没了"。
     expect(report.reason).toBeTruthy();
-    expect(await db.count(STORES.OPS)).toBe(0);
-    // 自增计数器一并归零：不归零的话，下一份数据接着旧 id，
+
+    // 🔴 这一条改过口径：原先它断言"清空后适配器仍可用，而且自增计数器归零"，
+    // 也就是把 `destroy` 当成 `clear`。那样四份实现里只有内存是"作废"的、
+    // 其余三份是"能继续用"的，而共享契约无法区分 —— 于是"销毁之后一次普通读
+    // 把容器建回盘"这件事在判据层面是**不可见**的（同上一条 SQLite 那段的说明）。
+    // 自增计数器归零那个诉求由**新实例**满足：注销后重新注册的宿主用的就是新实例。
+    await expect(db.count(STORES.OPS)).rejects.toBeInstanceOf(AdapterDestroyedError);
+    await expect(db.add(STORES.OPS, opRecord('op-2'))).rejects.toBeInstanceOf(
+      AdapterDestroyedError,
+    );
+
+    const fresh = new MemoryDbAdapter(INDEXEDDB_SCHEMA);
+    await fresh.init();
+    expect(await fresh.count(STORES.OPS)).toBe(0);
+    // 新实例的自增从 1 起：不归零的话，下一份数据接着旧 id，
     // 而"注销后重新注册"正是要走这条路。
-    expect(await db.add(STORES.OPS, opRecord('op-2'))).toBe(1);
-    db.close();
+    expect(await fresh.add(STORES.OPS, opRecord('op-2'))).toBe(1);
+    fresh.close();
   });
 });

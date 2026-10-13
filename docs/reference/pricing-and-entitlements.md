@@ -175,9 +175,29 @@ SKU 与折扣，实现在 `settleOrderPaid`。
 1. 🔴 **这台实例没有配真实支付通道。** 只有 `noop` 时收银台回
    `503 BILLING_PROVIDER_NOT_CONFIGURED` —— 卡在支付商的资质 / 凭证，
    不在我们的代码里。
-2. 🔴 **客户端还没有「付款」按钮**（web + 移动端）。它应当**和支付通道一起**落地：
-   现在加，必然回上面那个 503，正好造出落地页明确反对的那个东西 ——
-   一个点了没反应的「立即购买」（见 `apps/landing/src/components/Pricing.tsx` 文件头）。
+2. ~~**客户端还没有「付款」按钮**（web + 移动端）。~~
+   ✅ **2026-10-05 已落地**：web 设置页的 `RenewPanel` 与移动壳「我的」页里的
+   `RenewSection`（`apps/mobile/src/screens/RenewSection.tsx`，由「我的」页 `ProfileScreen` 渲染）
+   走的是 `packages/app-host` **同一份**接线（报价 → 冻结 → 下单 → 拿支付串）。
+   🔴 它**仍然**受上面第 1 条约束：`WECHAT_PAY_ENABLED=false` 时点下去拿到的是那个 503，
+   而 `check:payment-entry` 钉的就是"按钮存在 ⇔ 开关状态"这一对 ——
+   所以这不是"点了没反应的立即购买"（那条立场仍然成立，落地页依旧没有购买按钮）。
+
+### 5.1.1 退款：有临时政策，还没有对外承诺（2026-10-05）
+
+本文此前只写过"退款侧有意不接"。那句话由 [ADR-0053](../adr/0053-refunds-only-for-countable-segments.md)
+收窄成一句可执行的口径，**数字的唯一来源是代码里的两个常量**（本文不复制第二份）：
+
+| 问题 | 当前答案 | 住在哪 |
+|---|---|---|
+| 哪些单能退 | 只有**收银台一次性单**（`checkout_orders` 里有 `out_trade_no`、金额已核实） | `refund-policy.ts#decideRefundEligibility` |
+| 退多少 | **结算时冻下的实付**（用了券就是实付，不是原价） | 同上；`refunds.amount_minor` 冻结 |
+| 权益怎么回 | 只回收**这一单授予的那一段**；已消费的天数不追回；多来源权益取并集那条纪律不变 | `refund-policy.ts#retractGrantedPeriod` |
+| 例外（超窗） | 只走运营后台的**接口**（`/api/admin/refunds*`），且**必须带理由**，否则 400。🔴 后台**没有**退款 tab —— 今天能点的人是拿令牌敲接口的人（ADR-0053 §5 第 10 条） | `admin.routes.ts` 的 `operatorApproved` + refine |
+| 通道没配时 | 批准照落库，发通道那步如实失败（`refunds.status='failed'` + 审计），**不报 500** | `refund-store.ts#submitRefundToChannel` |
+
+🔴 **对外说法未改**：这句临时口径目前只在代码与 ADR-0053 里。
+写进服务条款 / 界面承诺属对外法律表征，需业主拍板（ADR-0053 §5 第 7 条）。
 
 [`subscription-handoff.md`](../plans/subscription-handoff.md) §4 把「客户端按权益降级」
 与「真实支付测试模式门禁」列为未完成。

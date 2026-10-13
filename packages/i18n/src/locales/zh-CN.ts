@@ -2012,6 +2012,38 @@ export const zhCN = {
   'web.subscription.notice.localData': '这台设备上的全部数据仍然可以正常查看、编辑和导出，不需要续费。',
   'web.subscription.notice.selfHost': '改用你自己的服务器',
   'web.subscription.notice.a11y': '托管同步状态提示',
+  // ── 托管同步续费入口（临时方案：再次下单 = 在当前到期日之后叠加 30 天）────
+  // 🔴 措辞里不许出现"自动续费"：全仓库没有任何签约/代扣（ADR-0017 的通道选型
+  // 与 `wechat.adapter.ts` 都只有单次 Native 支付）。承诺了就是假话。
+  'web.subscription.renew.title': '托管同步续费',
+  'web.subscription.renew.intro': '一次性购买 30 天，直接叠加在你当前的到期日之后；不会自动扣款，到期了数据也一个字都不动。',
+  'web.subscription.renew.couponPlaceholder': '促销码（可选）',
+  'web.subscription.renew.action': '下单续费',
+  'web.subscription.renew.busy': '正在下单…',
+  'web.subscription.renew.amount': '应付金额 {amount}',
+  'web.subscription.renew.validUntil': '这一单在 {time} 之前有效',
+  'web.subscription.renew.payLinkLabel': '支付链接',
+  'web.subscription.renew.payHint': '用手机微信打开这个链接就能完成付款。桌面端的二维码渲染还没接入（零新依赖约束），先用链接这条路。',
+  'web.subscription.renew.copy': '复制链接',
+  'web.subscription.renew.copied': '已复制',
+  'web.subscription.renew.rejected': '这个码没有生效：{code}',
+  'web.subscription.renew.fail.provider': '这台实例没有配置收款通道，现在买不了。',
+  'web.subscription.renew.fail.unauthorized': '先登录你的 heyta 账号，才能下单。',
+  'web.subscription.renew.fail.unconfigured': '还没有填写同步服务器地址，先在同步设置里配好。',
+  'web.subscription.renew.fail.sellable': '这一档现在还不能卖，服务端拒绝了这笔下单。',
+  'web.subscription.renew.fail.network': '连不上服务端，这一单没有下成。',
+  'web.subscription.renew.fail.unknown': '下单失败（{code}）。',
+  'mobile.entitlement.renew.action': '下单续费',
+  'mobile.entitlement.renew.busy': '正在下单…',
+  'mobile.entitlement.renew.opened': '已为你打开付款页',
+  'mobile.entitlement.renew.payHint': '如果微信没有自动打开，复制这条链接后用手机浏览器打开它。',
+  'mobile.entitlement.renew.payLinkLabel': '支付链接',
+  'mobile.entitlement.renew.copy': '复制',
+  'mobile.entitlement.renew.copied': '已复制',
+  'mobile.entitlement.renew.fail.provider': '这台实例没有配置收款通道，现在买不了。',
+  'mobile.entitlement.renew.fail.unauthorized': '先登录你的 heyta 账号，才能下单。',
+  'mobile.entitlement.renew.fail.network': '连不上服务端，这一单没有下成。',
+  'mobile.entitlement.renew.fail.unknown': '下单失败（{code}）。',
   // ── AI 面板的失败态（第 18 轮）───────────────────────────────
   // 🔴 这 11 条原来住在 `packages/app-host` 里（`*Outcome.message`），
   // 四个面板整句渲染它 → 英文界面露中文。现在壳**按 `reason` 取词条**，
@@ -2215,7 +2247,7 @@ export const zhCN = {
   //    只支持空库；这个是从另一个产品迁进来、走普通 op、可与既有数据共存。
   //    两套承诺必须在界面上分开说，所以是两组词条。
   'web.ticktick.title': '从滴答清单导入',
-  'web.ticktick.intro': '选一份滴答清单导出的 CSV 备份。**先看预览，确认后才写入** —— 预览里的数字与真的写进去的是同一次解析。',
+  'web.ticktick.intro': '选一份滴答清单导出的 CSV 备份。先看预览，确认后才写入 —— 预览里的数字与真的写进去的是同一次解析。',
   'web.ticktick.fileLabel': '滴答清单 CSV 备份',
   'web.ticktick.picked': '已选择：{name}',
   'web.ticktick.ticktickOnly': '目前只认滴答清单导出的 CSV。Todoist 的解析还没做，界面上不写"支持"两个字。',

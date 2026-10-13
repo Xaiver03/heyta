@@ -129,3 +129,27 @@
   而仓库声明的下限是 **16**（`operations-autovacuum-reloptions` 断言
   `server_version_num >= 160000`，本机因此失败）。所以任何"在真库上验过"的说法
   都带这条环境注解。
+
+## 7. 勘误（2026-10-05）
+
+**只追加，正文一字未改。** 触发它的是 [ADR-0053](0053-refunds-only-for-countable-segments.md)
+落地时的三处实测，其中第 1 条是**正文里的断言已被证伪**（规则 1a 的第①类）：
+
+1. **§3 第 3 条「`reverseOrderOnRefund` 继续零生产调用方」已经不成立。**
+   它现在有生产调用方：`server/src/billing/refund-store.ts` 的
+   `retractEntitlementInTx` 经
+   `reverseOrderOnRefundInTransaction` 在**通道确认 `success` 之后**调它
+   （`grep -n "reverseOrderOnRefundInTransaction" server/src/billing/refund-store.ts` 现量）。
+   洞 2 因此关闭，且关闭的方式**不是**选项 A：权益回收与订单反转在同一个事务里，
+   所以没有留下"订单已退款而权益还在"那半格。
+2. **洞 1 的 401 已按 §5 第 2 条的形状改掉**：`wechat.adapter.ts` 现在归一化
+   `REFUND.SUCCESS / ABNORMAL / CLOSED`，退款通知不再被拒收。
+   归一化出来的事件带 `oneTimeGrant: null` + `userId: null`，
+   即 §5 第 2 条要求的"显式退款声明"。
+3. **§1 那条硬约束本身没有被推翻**（`subscriptions` 仍然记不下"哪一笔买了哪一段"），
+   被收窄的是**适用范围**：ADR-0053 只在"经收银台下的单"这个可数域里按笔回收，
+   域外（没有 `out_trade_no` 的旧兼容到账）照本 ADR 的结论**拒发**。
+   §5 第 1 条（决定权益粒度）因此**仍未完成** —— 它现在是 ADR-0053 §6 第 1 条那个终点。
+4. **§5 第 5 条（退款政策写进法务条款）也仍未完成**：临时口径
+   （`server/src/billing/refund-policy.ts` 的 7×24 小时全额）只在代码与 ADR-0053 里，
+   对外文案要业主确认后才动（`AGENTS.md §8` 工作流第 18 条）。

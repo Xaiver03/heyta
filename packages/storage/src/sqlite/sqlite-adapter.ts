@@ -44,6 +44,7 @@ import {
   type StoreSchema,
 } from '../db.types.js';
 import type { SqlValue, SqliteDriver } from './sqlite-driver.js';
+import { AdapterDestroyedError } from '../errors.js';
 
 /** 落进 SQLite 的键分量。 */
 type KeyValue = string | number;
@@ -200,6 +201,20 @@ class SqliteAdapter implements DbAdapter {
   private opening: Promise<SqliteDriver> | undefined;
 
   /**
+   * 销毁即死路（批次 E2 口径 B）。
+   *
+   * 🔴 挡的是这一条：`destroy()` 把连接关掉并把文件删了，而此后**任何一次普通读**
+   * 都会走 `ensureOpen()` 的重开路径 —— 于是刚删掉的容器被重新建成一张空壳
+   * （实测 73728 字节 / 6 张空表，字节数与 iOS 设备级那枚残留逐字相同，见计划 §10.146）。
+   * 那一趟里"销毁成功"的报告和"盘上又有库了"是**同一秒**打印的，而读出来的内容
+   * 确实是空的 ⇒ 每一层都觉得自己没说谎。
+   */
+  private destroyed = false;
+
+  /** 第二次 `destroy()` 走这份缓存，而不是把"删一遍"再跑一次（那需要先重开）。 */
+  private destroying: Promise<DbDestroyReport> | undefined;
+
+  /**
    * FIFO 队列。单连接 SQLite 不能并发跑事务，所以适配器自己排队 ——
    * 这正是 `DbAdapter` 契约"调用方不需要加锁"的落地方式。
    */
@@ -253,6 +268,10 @@ class SqliteAdapter implements DbAdapter {
    *  那时报告已经说了"销毁成功"，而数据还在。这是本条契约唯一真正要防的竞态。
    */
   async destroy(): Promise<DbDestroyReport> {
+    // 幂等：第二次销毁**不许**重开这份库（那正是上面那枚空壳的来路），
+    // 而是把第一次的书面凭据原样交回去。
+    if (this.destroying !== undefined) return this.destroying;
+
     const run = async (): Promise<DbDestroyReport> => {
       // 即使这份库这次从没开过也要开一下：文件可能由上一次运行留下，
       // 而"销毁一份没打开过的库"必须是**幂等成功**，不是空操作。
@@ -274,6 +293,9 @@ class SqliteAdapter implements DbAdapter {
       driver.exec('VACUUM');
 
       this.close();
+      // 从这一行起这个实例就是死路：`close()` 的契约是"后续操作透明重开"，
+      // 而销毁的契约是**不许**重开（见上面 `destroyed` 那段）。
+      this.destroyed = true;
 
       if (driver.removeDatabase === undefined) {
         return {
@@ -288,15 +310,27 @@ class SqliteAdapter implements DbAdapter {
     };
 
     const result = this.queue.then(run, run);
+    // 🔴 销毁**失败**不许把这个实例永久锁死：被堵住/删文件报错时库还在盘上，
+    // 调用方的正确处置是重试，而不是从此每次读都抛"已销毁"。
+    // 成功时才留下缓存（第二次 destroy 直接复用第一次的书面凭据）。
+    this.destroying = result.catch((error: unknown) => {
+      this.destroying = undefined;
+      this.destroyed = false;
+      throw error;
+    });
     this.queue = result.then(
       () => undefined,
       () => undefined,
     );
-    return result;
+    return this.destroying;
   }
 
   /** 打开连接并建 schema。幂等（`CREATE ... IF NOT EXISTS`），可并发调用。 */
   private ensureOpen(): Promise<SqliteDriver> {
+    // 🔴 这一行是 E2 口径 B 的全部落点：销毁之后**没有**"透明重开"这条路。
+    // 抛错而不是返回空结果 —— 后者会让上层把"读到 0 条"当成"库是空的"，
+    // 而真正发生的事情是容器刚刚被重建。
+    if (this.destroyed) return Promise.reject(new AdapterDestroyedError('sqlite'));
     if (this.driver !== undefined) return Promise.resolve(this.driver);
     if (this.opening !== undefined) return this.opening;
     this.opening = Promise.resolve().then(() => {

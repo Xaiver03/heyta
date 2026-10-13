@@ -42,7 +42,7 @@ import { useI18n } from '@heyta/i18n';
 import { accountClosureMessageKey } from '@heyta/ui';
 import type { HeytaNativeTokens } from '@heyta/design-system';
 
-import { openTaskHost } from '../db/open-host';
+import { openTaskHost, resetTaskHostCache } from '../db/open-host';
 import { consentFetch } from '../privacy/consent-gate';
 import { readSyncConfig } from '../sync/config';
 import { useTheme, useTokens } from '../theme';
@@ -140,7 +140,16 @@ export function AccountClosureScreen({
         token,
       );
       setResult(closure);
-      if (closure.disposition !== 'not-closed') onClosed();
+      if (closure.disposition !== 'not-closed') {
+        // 🔴 本机明文已经销毁 ⇒ 移动端那个**模块级单例**（`open-host.ts` 的 `resolvedHost`，
+        // 全部屏共用一个 `AppHost`）此刻持着一个已经作废的 adapter。
+        // 不把它换掉的话，下一屏的 `openTaskHost()` 会把同一个死实例再交出去：
+        // 批次 E2 口径 B 之后那会当场抛 `AdapterDestroyedError`，而在此之前它是
+        // **"静默把刚删掉的空壳建回盘上"**（计划 §10.146 那枚 73728 字节）。
+        // 两者都不是注销完该有的样子 —— 政策承诺的是这台设备回到**全新空库**。
+        resetTaskHostCache();
+        onClosed();
+      }
     } finally {
       setBusy(false);
     }

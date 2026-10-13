@@ -91,3 +91,69 @@ export const MINIMAL_SUBSCRIPTIONS_DDL = `
 `;
 
 export const PAYMENT_EVENTS_SCHEMA_DDL = `${MINIMAL_SUBSCRIPTIONS_DDL}\n${paymentEventsDdlFromMigration()}`;
+
+/**
+ * 退款那一次迁移的目录名。同样：**唯一**允许写死它的地方。
+ *
+ * 它单独成一个 export 是因为 `billing-refund-store.pglite.spec.ts` 的锚点报错信息
+ * 要引用同一个名字 —— 两处各写一份就会在迁移改名那天分成两个版本。
+ */
+export const REFUND_MIGRATION_DIR = '20261014000000_add_refunds';
+
+/**
+ * 退款表必须存在的东西：一张表 + 三条 CHECK + 唯一索引 + 外键。
+ *
+ * 🔴 这里列的是**约束名**，因为退款用例的一半判据是"某个坏值必须被库拒掉"。
+ * 约束被改名或删掉时，那些用例会变成"拒不掉、而断言的正则也找不到东西"——
+ * 那是最贵的一种假绿，所以宁可 setup 阶段就炸。
+ */
+const REQUIRED_REFUND_CONSTRAINTS = [
+  'CREATE TABLE "refunds"',
+  'refunds_out_refund_no_key',
+  'refunds_order_id_fkey',
+  'refunds_amount_positive',
+  'refunds_period_days_range',
+  'refunds_success_needs_refunded_at',
+] as const;
+
+export const refundDdlFromMigration = (): string => {
+  const sql = readFileSync(join(migrationsDir, REFUND_MIGRATION_DIR, 'migration.sql'), 'utf8');
+  const missing = REQUIRED_REFUND_CONSTRAINTS.filter((t) => !sql.includes(t));
+  if (missing.length > 0) {
+    throw new Error(
+      `${REFUND_MIGRATION_DIR}/migration.sql 里找不到这些东西：${missing.join(', ')}。\n` +
+        '   🔴 这通常意味着迁移被改名/重构/删了约束 —— 请更新本 helper 的锚点，' +
+        '而不是把检查删掉：这三条 CHECK 是"钱退了而权益没回"那类半真状态的最后一道防线。',
+    );
+  }
+  return sql;
+};
+
+/**
+ * `subscriptions` 的**替身**：只保留退款回收路径真的读写的七列
+ * （`grants` / `price_id` / `external_subscription_id` 一概没有）。
+ *
+ * ⚠️ 与上面那个 `MINIMAL_SUBSCRIPTIONS_DDL` 不是同一个东西，也不该合并：
+ * 那一个只为 `payment_events` 的外键提供主键，这一个要被真的 `UPDATE`。
+ * 合并的结果是"对账用例莫名其妙多出一堆列"，而两边各自的"不可能漂移"依赖的
+ * 正是**只带自己用到的列**这件事。
+ */
+export const SUBSCRIPTIONS_FOR_REFUND_STAND_IN_DDL = `
+  CREATE TABLE subscriptions (
+    id                 serial PRIMARY KEY,
+    user_id            integer NOT NULL,
+    provider           text,
+    status             text,
+    current_period_end bigint,
+    last_event_at      bigint,
+    updated_at         bigint NOT NULL DEFAULT 0
+  );
+`;
+
+/**
+ * 退款主题需要的两张表：`refunds`（读发布物）+ 可被回收的 `subscriptions` 替身。
+ *
+ * 调用方必须先建 `checkout_orders`（`refunds` 的外键指向它），
+ * 所以正确用法是 `${PRICING_SCHEMA_DDL}\\n${REFUND_SCHEMA_DDL}`。
+ */
+export const REFUND_SCHEMA_DDL = `${refundDdlFromMigration()}\n${SUBSCRIPTIONS_FOR_REFUND_STAND_IN_DDL}`;

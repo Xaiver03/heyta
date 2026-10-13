@@ -531,12 +531,12 @@ def scroll_into_view(idb, companion, udid, label, want_pressable, want_field, ro
     recoveries = 0
     while node is not None and swipes < 10:
         x, y, ww, hh = frame_of(node)
-        if hh > 0 and (y + hh // 2) < vis_limit and y + hh > 0:
+        if hh > 0 and y >= 0 and (y + hh // 2) < vis_limit and y + hh > 0:
             out.update({"found": "True", "x": str(x), "y": str(y),
                         "width": str(ww), "height": str(hh),
                         "visible": "True", "swipes": str(swipes)})
             return out
-        if y + hh <= 0:
+        if y < 0:
             # 元素在视口上方（被滚过头了）：向下拖，让它落回 y≈140 处。
             # 起点必须在**上部**找（那里才有向下的行程），行程不够就分段。
             dist = max(140 - y, 80)
@@ -860,6 +860,26 @@ def main():
 
     if args.press:
         cx, cy = center(node)
+        # AX can report a stale Link frame directly on top of the bottom tab
+        # row.  idb still returns a successful tap in that case, but the
+        # product receives the tab action (the iOS auth run once switched to
+        # Focus when it meant to press "保存并启用同步").  Treat geometry as
+        # part of the click contract: a non-tab target must be fully on-screen
+        # and must not overlap a detected tab bar.  The caller must scroll and
+        # read a fresh frame before retrying; never guess a coordinate.
+        _w, _h = screen_size(nodes)
+        if _w and (_w <= cx < 0 or cx < 0 or cx >= _w or cy < 0 or (_h is not None and cy >= _h)):
+            emit({"result": "tap-outside-screen", "cx": str(cx), "cy": str(cy)})
+            return 0
+        _tab_top = tab_bar_top(nodes)
+        _target_in_tab = bool(_tab_top is not None and _h is not None and
+                              frame_of(node)[1] >= _tab_top and
+                              frame_of(node)[1] + frame_of(node)[3] <= _h + 2 and
+                              frame_of(node)[2] <= _w / 3)
+        if _tab_top is not None and not _target_in_tab and cy >= _tab_top:
+            emit({"result": "tap-blocked-by-tab-bar", "tabTop": str(int(_tab_top)),
+                  "cx": str(cx), "cy": str(cy)})
+            return 0
         # 🔴 点击之前先问一句"这个点真的能到达吗" —— 见上面「键盘遮挡」那段。
         kt = keyboard_top(nodes)
         if kt is not None and cy >= kt:

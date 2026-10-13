@@ -125,7 +125,18 @@ function openDb(): Promise<IDBDatabase> {
         db.createObjectStore(STORE_DATA);
       }
     };
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      const db = request.result;
+      // 🔴 让位挂在**连接**上：`versionchange` 由 `IDBDatabase` 派发，`IDBOpenDBRequest` 上
+      //    压根没有这个属性（写错对象时 tsc 会报 TS2339，而运行时那个处理器永不触发）。
+      //    注销时那一次 `deleteDatabase('heyta-widget')` 会给**每个活连接**发这个事件，
+      //    没人让位 = 删除永远停在 `blocked`（不报错、不超时）。
+      //    而这里的连接**不是**用完就还：`tx()` 只在 `oncomplete` 里 `close()`，
+      //    请求失败走 `onerror`，那条路上连接是悬着的。
+      //    同一个形状在 `IndexedDbAdapter.open()` 里已经抓出过一次（陷阱 #297）。
+      db.onversionchange = () => db.close();
+      resolve(db);
+    };
     request.onerror = () => reject(request.error ?? new Error('indexedDB.open 失败'));
   });
 }

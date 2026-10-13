@@ -171,9 +171,9 @@ const EXECUTION_SHAPE = /spawnSync\(|execSync\(|execFile\(|fork\(|child_process/
  * 🔴 这两条都不是"合法的新入口"，是**待迁的存量**：
  *   · `verify-mobile-aed.sh` 用 `-I hermes-aed-probe.init.gradle` 注入 init 脚本，
  *     且产物是"探针 + APK"两件事，本批没做真机构建 ⇒ 不能盲改它的路由；
- *   · `verify-android-vault-storage.sh` 要 `assembleDebugAndroidTest`（instrumentation APK），
- *     形状不在推导规则里（见 run-gradle.mjs 的例外那条），改路由要先验一次装机链路。
- * 迁移它们是下一批的活；**这两条从基线里消失之前，任何第三条都不许加进来** ——
+ *   · `verify-android-vault-storage.sh` 已迁移到 `run-gradle.mjs`，其
+ *     `assembleDebugAndroidTest` 是路由器中唯一登记的 instrumentation APK 例外。
+ * 迁移存量时必须同步删除基线；**当前只剩 AED 这一条，任何第三条都不许加进来** ——
  * 基线的价值就在于它会因为"现实变了"而红。
  */
 const BASELINE = [
@@ -181,11 +181,6 @@ const BASELINE = [
     file: 'scripts/verify-mobile-aed.sh',
     needle: './gradlew --no-daemon --console=plain',
     reason: '存量：Hermes AED 探针用 -I init 脚本，且需要探针与 APK 两件事一起迁；本批未做真机构建，不盲改路由。',
-  },
-  {
-    file: 'scripts/verify-android-vault-storage.sh',
-    needle: './gradlew :app:assembleDebug :app:assembleDebugAndroidTest',
-    reason: '存量：instrumentation APK 的形状不在产物推导规则里，迁路由前要先验一次装机链路。',
   },
 ];
 
@@ -623,7 +618,6 @@ function selfTest() {
     const mobilePkg = readFileSync(join(DEFAULT_ROOT, 'apps/mobile/package.json'), 'utf8');
     const rootPkg = readFileSync(join(DEFAULT_ROOT, 'package.json'), 'utf8');
     const baselineA = readFileSync(join(DEFAULT_ROOT, 'scripts/verify-mobile-aed.sh'), 'utf8');
-    const baselineB = readFileSync(join(DEFAULT_ROOT, 'scripts/verify-android-vault-storage.sh'), 'utf8');
     const wsYaml = readFileSync(join(DEFAULT_ROOT, 'pnpm-workspace.yaml'), 'utf8');
 
     const seed = (tweaks = {}) => {
@@ -633,7 +627,6 @@ function selfTest() {
       write('scripts/lib/sync-windows-sources.sh', tweaks.lib ?? lib);
       write('scripts/reinstall-all.sh', tweaks.reinstall ?? reinstall);
       write('scripts/verify-mobile-aed.sh', tweaks.baselineA ?? baselineA);
-      write('scripts/verify-android-vault-storage.sh', tweaks.baselineB ?? baselineB);
       write('apps/mobile/package.json', tweaks.mobilePkg ?? mobilePkg);
       write('package.json', tweaks.rootPkg ?? rootPkg);
       write('pnpm-workspace.yaml', tweaks.wsYaml ?? wsYaml);

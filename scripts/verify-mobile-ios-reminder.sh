@@ -61,7 +61,11 @@ MODE_BEFORE_SCREENSHOT=${HEYTA_IOS_MODE_BEFORE_SCREENSHOT:-$ROOT/apps/mobile/evi
 MODE_AFTER_SCREENSHOT=${HEYTA_IOS_MODE_AFTER_SCREENSHOT:-$ROOT/apps/mobile/evidence/ios-reminder-${IOS_MODE}-after.png}
 WINDOW_AFTER_SCREENSHOT=${HEYTA_IOS_WINDOW_AFTER_SCREENSHOT:-$ROOT/apps/mobile/evidence/ios-reminder-window-after.png}
 PROBE_PATH=""
-PROBE_DELAY_MS=${HEYTA_IOS_PROBE_DELAY_MS:-500}
+# Recovery modes perform a cold OS probe and may spend time traversing Settings;
+# keep the occurrence comfortably in the future while retaining a short default
+# for the ordinary full journey. The value is test-only timing, never reminder
+# semantics or a relaxed success condition.
+TRIGGER_OFFSET_MINUTES=${HEYTA_IOS_TRIGGER_OFFSET_MINUTES:-3}
 COMPANION_PID=""
 APP_CONSOLE_PID=""
 APP_CONSOLE_LOG="/tmp/heyta-ios-reminder-console.$$"
@@ -168,8 +172,22 @@ press_scroll() {
   for _i in 1 2 3 4 5; do
     out=$(ax "$label" --scroll-into-view --pressable --exact --occurrence "$occurrence" --json)
     if [ "$(jget "$out" found)" = "True" ] && [ "$(jget "$out" visible)" = "True" ]; then
+      local scrolled="$out"
       out=$(ax "$label" --pressable --press --exact --occurrence "$occurrence" --json)
       [ "$(jget "$out" result)" = "success" ] && return 0
+      # iOS Settings can reset the sidebar scroll position between two AX
+      # requests. The first response is nevertheless a fresh, fully-visible
+      # frame; tap that exact frame once instead of reusing an old coordinate
+      # or guessing a new one. This path is still bounded by the shim's
+      # on-screen geometry checks.
+      local cx cy tap sx sy sw sh
+      sx="$(jget "$scrolled" x)"; sy="$(jget "$scrolled" y)"
+      sw="$(jget "$scrolled" width)"; sh="$(jget "$scrolled" height)"
+      cx=$((sx + sw / 2)); cy=$((sy + sh / 2))
+      if [ -n "$cx" ] && [ -n "$cy" ]; then
+        tap="$(ax --tap "$cx" "$cy" --json 2>/dev/null || true)"
+        [ "$(jget "$tap" result)" = "success" ] && return 0
+      fi
     fi
     sleep 1
   done
@@ -218,6 +236,12 @@ clear_task_search() {
   done
   return 1
 }
+privacy_destination_visible() {
+  # A fresh installation reaches Welcome before Tasks. Require an observable
+  # destination and the absence of both consent actions in the settled tree.
+  (has "先离线使用" || has "新建任务") &&
+    ! has "只用本机" && ! has "同意并联网"
+}
 dismiss_privacy_gate() {
   local _i
   # The first-run privacy sheet leaves the underlying task tree in AX, so
@@ -228,19 +252,26 @@ dismiss_privacy_gate() {
     if has "只用本机"; then
       press "只用本机" >/dev/null 2>&1 || true
       sleep 2
+      # A transient empty AX tree can make the consent button look gone while
+      # the modal is still on screen. Require the destination task page in the
+      # same settled window before accepting the dismissal.
+      privacy_destination_visible && return 0
       continue
     fi
     if has "同意并联网"; then
       press "只用本机" >/dev/null 2>&1 || true
       sleep 2
+      privacy_destination_visible && return 0
       continue
     fi
     if has "以后再说"; then
       press "以后再说" >/dev/null 2>&1 || true
       sleep 2
+      privacy_destination_visible && return 0
       continue
     fi
-    return 0
+    # No consent button is not enough: the page must be observable.
+    privacy_destination_visible && return 0
   done
   return 1
 }
@@ -375,7 +406,16 @@ run_probe() {
   # distinguish a missing probe from a slow notification service.
   local max_wait="${HEYTA_IOS_PROBE_WAIT_SECONDS:-240}"
   for _i in $(seq 1 $((max_wait * 4))); do
-    [ -s "$PROBE_PATH" ] && { cat "$PROBE_PATH"; return 0; }
+    if [ -s "$PROBE_PATH" ]; then
+      cat "$PROBE_PATH"
+      # The probe keeps its process alive briefly after writing so the delayed
+      # callback can finish. Stop that diagnostic process before the next real
+      # RN launch; otherwise simctl launch may reuse it and leave a black
+      # screen, making the recovery journey observe the probe rather than the
+      # product.
+      xcrun simctl terminate "$UDID" "$BID" >/dev/null 2>&1 || true
+      return 0
+    fi
     sleep 0.25
   done
   return 1
@@ -449,17 +489,34 @@ restore_notification_permission() {
   # on iOS 27 and may leave the root page visible while returning success.
   xcrun simctl launch "$UDID" com.apple.Preferences >/dev/null 2>&1 || return 1
   sleep 2
-  for label in "App" "heyta" "通知、横幅、声音、标记"; do
-    if ! press_scroll "$label"; then
-      return 1
-    fi
+  # iOS 27 presents the Settings sidebar at its previous scroll offset. The
+  # Apps row is below the first viewport and may not be discoverable by an AX
+  # query until the sidebar has received a real downward gesture. Use the same
+  # companion transport as the rest of this journey, then let press_scroll
+  # re-read bounds before tapping.
+  for _i in 1 2 3 4 5 6 7 8; do
+    idb_current ui scroll down --udid "$UDID" >/dev/null 2>&1 || true
+  done
+  for label in "App" "heyta"; do
+    if ! press_scroll "$label"; then return 1; fi
     sleep 2
   done
+  # The iOS 27 Settings row is width-truncated in the AX tree on some
+  # simulator sizes (`通知、关`), while older runtimes expose the full label.
+  # Both labels are the same real notification settings row; accept only an
+  # exact match to one of these observed labels.
+  if ! press_scroll "通知、横幅、声音、标记" && ! press_scroll "通知、关"; then
+    return 1
+  fi
+  sleep 2
   out="$(ax "允许通知" --pressable --list --exact --json 2>/dev/null || true)"
   [ "$(jget "$out" found)" = "True" ] || return 1
   detail="$(jget "$out" detail)"
   if [ "$detail" != 1 ]; then
-    press "允许通知" >/dev/null 2>&1 || return 1
+    # The Settings switch is a system AXCheckBox. HID coordinate taps return
+    # rc=0 on iOS 27 but do not toggle it; use the companion's AX bridge for
+    # this system control and read its value back before proceeding.
+    idb_current ui tap "允许通知" --api axbridge --udid "$UDID" >/dev/null 2>&1 || return 1
     sleep 2
   fi
   out="$(ax "允许通知" --pressable --list --exact --json 2>/dev/null || true)"
@@ -877,9 +934,10 @@ TITLE="ios-reminder-delivery-$(date +%H%M%S)-$$"
 # 先由宿主计算一个合法的未来 occurrence。HID 只能稳定输入 ASCII，
 # 所以 Composer 只创建标题；日期与时刻随后通过详情页的真实快捷项和
 # 截止时刻输入框设置，避免把中文/斜杠塞进键盘夹具而改变产品状态。
-DUE_PAIR="$(python3 - <<'PY'
+DUE_PAIR="$(python3 - "$TRIGGER_OFFSET_MINUTES" <<'PY'
+import sys
 from datetime import datetime, timedelta
-now = datetime.now().astimezone() + timedelta(minutes=3)
+now = datetime.now().astimezone() + timedelta(minutes=int(sys.argv[1]))
 print(f'{now.date().isoformat()}|{now.month}/{now.day}|{now:%H:%M}')
 PY
 )"
@@ -1048,9 +1106,8 @@ if [ "$IOS_MODE" = permission-recovery ] || [ "$IOS_MODE" = restart-recovery ]; 
     bad "恢复前截图为空白或不可解析：$MODE_BEFORE_SCREENSHOT"
   fi
   [ "$(sqlite_fired_count)" = 0 ] && ok "跨过 trigger 前未伪造 firedAt" || bad "跨过 trigger 后已有 firedAt"
-  # run_probe deliberately leaves its probe process alive so the delayed file
-  # cannot be mistaken for a stale artifact. Stop that read-only process before
-  # starting the real RN app for recovery.
+  # Ensure the diagnostic process is stopped before starting the real RN app.
+  # run_probe normally terminates it after reading the fresh snapshot.
   xcrun simctl terminate "$UDID" "$BID" >/dev/null 2>&1 || true
   if [ "$IOS_MODE" = permission-recovery ]; then
     if restore_notification_permission; then

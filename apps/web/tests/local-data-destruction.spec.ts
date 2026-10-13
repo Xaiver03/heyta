@@ -217,6 +217,52 @@ describe('E2 —— 清单与真源逐字对账（抄件一定会漂）', () => 
     expect([...names].sort()).toEqual([...WEB_DATABASE_NAMES].sort());
   });
 
+  it('🔴 每一处 `indexedDB.open` 都必须接 `versionchange` 让位（销毁才不会被自己的活连接挡住）', () => {
+    // 行为那一腿在 `packages/storage/tests/destroy.spec.ts`（活连接挡住 deleteDatabase
+    // ⇒ 那次销毁永远停在 blocked，陷阱 #297）。**那一腿只-cover 它自己那个适配器**：
+    // 一个不在 `IndexedDbAdapter` 里的连接持有者（如 service worker）挡住删除时，
+    // 那条行为判据照样全绿。所以这里要一条**扫全部产品代码**的配对判据。
+    // 比的是**数量**而不是"文件里出现过这个词"：同一个文件里第二次 open 忘了接，
+    // 布尔判据会放过去，数量对不上就红。
+    const roots = [join(REPO_ROOT, 'apps'), join(REPO_ROOT, 'packages')];
+    const SKIP_DIRS = new Set(['node_modules', 'dist', 'generated', 'public', 'evidence', 'build']);
+    const offenders: string[] = [];
+    const scanned: Array<[string, number]> = [];
+
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir)) {
+        if (SKIP_DIRS.has(entry)) continue;
+        const path = join(dir, entry);
+        if (statSync(path).isDirectory()) {
+          walk(path);
+          continue;
+        }
+        if (!/\.(?:ts|tsx)$/.test(entry) || entry.endsWith('.spec.ts') || entry.includes('.test.')) {
+          continue;
+        }
+        const source = readFileSync(path, 'utf8');
+        const opens = [...source.matchAll(/indexedDB\.open\(/g)].length;
+        if (opens === 0) continue;
+        const yields = [...source.matchAll(/\.onversionchange\s*=/g)].length;
+        scanned.push([relative(REPO_ROOT, path), opens]);
+        if (yields !== opens) {
+          offenders.push(`${relative(REPO_ROOT, path)}：${opens} 处 open，${yields} 处让位`);
+        }
+      }
+    };
+    for (const root of roots) walk(root);
+
+    // 两个根各自都要扫到东西 —— 只要求总数 >0 的话，其中一棵树整个走空也不会红。
+    const perRoot = roots.map(
+      (root) => scanned.filter(([path]) => path.startsWith(relative(REPO_ROOT, root))).length,
+    );
+    expect(scanned.length, `一处 indexedDB.open 都没扫到 ⇒ 遍历坏了`).toBeGreaterThan(0);
+    expect(perRoot.filter((n) => n > 0).length, `roots=${String(perRoot)} ⇒ 有一棵树没扫到`).toBe(
+      roots.length,
+    );
+    expect(offenders, offenders.join('\n')).toEqual([]);
+  });
+
   it('令牌四键与 `pending-login.ts` 的导出常量同一集合', () => {
     const source = readFileSync(join(WEB_SRC, 'features/auth/pending-login.ts'), 'utf8');
     const keys = [...source.matchAll(/export const PENDING_\w+_KEY = '([^']+)'/g)].map(

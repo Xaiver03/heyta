@@ -24,7 +24,10 @@ RUN_DIR="$(mktemp -d /tmp/heyta-vault-storage.XXXXXX)"
 mkdir -p "$(dirname "$EVIDENCE")"
 printf 'Android vault storage: pending\n' > "$EVIDENCE"
 
-(cd "$ROOT/apps/mobile/android" && ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest) > "$RUN_DIR/build.log" 2>&1
+# Android builds on macOS/Linux must use the single remote router. It returns
+# both the app and instrumentation APK to the paths consumed below; Windows
+# executes the same tasks locally through the router.
+(cd "$ROOT" && node scripts/run-gradle.mjs :app:assembleDebug :app:assembleDebugAndroidTest) > "$RUN_DIR/build.log" 2>&1
 APP_APK="$ROOT/apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk"
 TEST_APK="$ROOT/apps/mobile/android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
 # This dedicated QA device may contain a Release package signed differently.

@@ -144,7 +144,7 @@ node scripts/check-android-gradle-remote.mjs --root <候选树>   # 注入验证
 | 真树 | `rc=0`，`G1/G2 扫描到 gradlew 落点 5 处（白名单 3 ／ 基线命中 2 ／ 违规 0）` |
 | `--self-test` | `rc=0`：臂 0 阳性对照 0 红，臂 1–6 各恰好 1 条红，臂 7/8 是豁免的正反两腿，臂 9 是 G7，臂 10/10b/10c 是 G8 的三条腿，臂 11/11b/11c 是 G9 的三条腿（01:54 现量：**16 枚 ✅ 臂、0 枚存活**；臂数以它自己打印的逐条为准，别抄进别的文档） |
 | 喂旧内容 | `git show 0858032e^:scripts/run-gradle.mjs`（分流之前那份）放进候选树 ⇒ `rc=1`、🔴 4 条（G5 三条 + G6 一条） |
-| 存量基线 | `scripts/verify-mobile-aed.sh`、`scripts/verify-android-vault-storage.sh` 两条**待迁**，各自登记了"为什么还留着"；迁走而基线不撤 ⇒ G2 红 |
+| 存量基线 | `scripts/verify-mobile-aed.sh` 仍是唯一待迁基线；`verify-android-vault-storage.sh` 已经通过 `run-gradle.mjs` 迁到 Windows 构建路由，instrumentation APK 路径由路由器的显式例外登记 |
 | 扫描面 | 不含 `.md` 与 `.ps1`；`scripts/check-*.mjs` 里**只描述命令**的行按形状豁免（每一处都点名到 `file:line` 打进读数） |
 
 ⚠️ 两次**门禁抓到它自己/同类**的实测，都留在这里：
@@ -348,4 +348,3 @@ node scripts/check-android-build-host.mjs --root <候选树>   # 注入验证用
 | `--self-test` | `rc=0`，六臂：臂 0 阳性对照 0 红；臂 1 新开 `emulator -avd` 入口 ⇒ H1 恰好 1 条；臂 2 撤掉基线那一行而登记还在 ⇒ H1 反向恰好 1 条；臂 3 往手册 fence 里塞一条 gradle ⇒ H2 恰好 1 条；臂 4 删掉本手册 ⇒ H3 ≥3 条；臂 5 从允许表里摘掉本门禁 ⇒ H4 恰好 1 条 |
 | 登记面 | H1 一条：`research/tools/r14c-window-retry.sh` 里那句 `pgrep -f 'emulator -avd'`（它**不启动**模拟器，只是不叠加别人的）；H2 一条：`multi-platform-build.md` §Android"第三个实例"里那段**报错复现** |
 | 变异载体 | 六臂全部施在 `mkdtemp` 出来的**临时夹具**里（`--root` 指过去），工作树一个字节都不写 —— 这是多人共用的检出，往 `scripts/` 塞一个真文件就是给别人的验收丢雷 |
-

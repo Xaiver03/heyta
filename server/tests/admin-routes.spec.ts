@@ -96,6 +96,12 @@ const ALL_ROUTES: readonly (readonly [string, string])[] = [
   ['GET', '/api/admin/holiday-adjustments'],
   ['PUT', '/api/admin/holiday-adjustments/years'],
   ['DELETE', '/api/admin/holiday-adjustments/years?year=2027'],
+  // ADR-0053 退款那四条（判据细节在 `billing-refund-admin-routes.spec.ts`，
+  // 这里只管一件事：**它们进不了闸门就没有任何别的地方在守**）。
+  ['GET', '/api/admin/refunds'],
+  ['POST', '/api/admin/refunds'],
+  ['POST', '/api/admin/refunds/1/approve'],
+  ['POST', '/api/admin/refunds/1/reject'],
 ];
 
 /**

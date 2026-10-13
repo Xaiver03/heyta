@@ -589,7 +589,14 @@ export const createServer = (
       //
       // 🔴 闸门在插件内部（`admin.routes.ts` 的 `addHook('preHandler', requireAdmin)`），
       //    不是在这里 —— 这样"新增一条 admin 路由忘了加鉴权"是不可能的。
-      await fastifyServer.register(adminRoutes, { prefix: '/api/admin' });
+      await fastifyServer.register(adminRoutes, {
+        prefix: '/api/admin',
+        // 退款那三条要挑通道：按**订单当初的 provider** 挑，所以这里给的是
+        // 与收银台/回调**同一份** adapter 列表（同一个构造函数、同一个配置源）。
+        // 另起一份 `createWechatBillingAdapter(...)` 会造出"下单能通、退款说没配"
+        // 这种分叉 —— 两处配置迟早漂移，而漂移的第一现场总是钱。
+        adapters: createBillingAdaptersFromConfig(fullConfig),
+      });
 
       // Test Routes (only in test mode)
       if (fullConfig.testMode?.enabled) {

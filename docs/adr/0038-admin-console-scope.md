@@ -198,3 +198,26 @@ heyta 的 web 是**单页 + 视图切换**（`App.tsx` 的视图状态机），
 对照 `server/src/push/push.routes.ts:127` 那条挂了鉴权的先例）；
 契约在 `packages/shared-schema/src/holiday-adjustment-contract.ts`（`papers` ≥1、整年替换、`PUBLIC_FACT_SHAPES`）。
 ⚠️ `pnpm check:public-facts` 那条门禁**尚未接进 `pnpm check`** —— 别把本文读成它已存在。
+
+## 6. 勘误（2026-10-05）
+
+**只追加，正文一字未改。** 触发它的实测：`grep -n "'/refunds" server/src/admin/admin.routes.ts`
+现量四条路由（列表 / 申请 / approve / reject），全部在插件级 `addHook('preHandler', requireAdmin)` 之后。
+
+**§2 第三条「不做：改订阅／退款／发券／群发通知」里的"退款"一项已被
+[ADR-0053](0053-refunds-only-for-countable-segments.md) 修订** —— 那一项当时的理由是
+"它需要一份逐笔支付权益账本才能算对"，而 ADR-0053 把可退范围收窄到
+**不需要改权益模型也能数对**的那个子域（只退经收银台下过、且 `checkout_orders` 里有自己那一行的单），
+所以它现在是一句已知为假的话，必须留指路而不是留着让人照它做决定。
+
+**没破的三条（逐条核过，不是"应该没破"）**：
+① **仍然不做 RBAC** —— 四条退款路由走的是**同一个** `requireAdmin`，
+"新增路由忘了鉴权是不可能的"那条结构性保证继续成立；
+② **仍然不做改订阅** —— 后台没有任何一处直接写 `subscriptions`，
+权益变动只由 `refund-store.ts` 的回收那一步做（且只在通道确认到账之后）；
+③ **仍然不做发券与群发通知** —— 没新增通知 `kind`，没新增券写入面。
+
+⚠️ 一个 §2 当时没有的概念现在出现了：退款是这四个动作里**唯一真的动钱**的，
+而它带的闸门是"单级 `isAdmin` + 批准必须带非空理由"（`refundRequestSchema` 的
+`.refine`），不是四眼原则。这仍然落在 §3「只有一位运营者」的前提内 ——
+**出现第二个运营者时该重判的是 §2 第二条，触发条件与 ADR-0053 无关。**

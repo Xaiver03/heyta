@@ -164,4 +164,48 @@ describe('openAppHost：非 Web 宿主的真销毁凭据（§10.2）', () => {
     expect(eraser).toHaveBeenCalledTimes(1);
     expect(existsSync(dbPath), '宿主自己的销毁器被兜底那条顶掉了').toBe(true);
   });
+
+  /**
+   * 🔴 批次 E2 口径 B 的另一半（计划 §10.189）。
+   *
+   * 宿主常常把 adapter 缓存成**单例**（移动端 `open-host.ts` 的 `pending`/`resolvedHost`
+   * 是全部屏共用的那一个）。`destroy()` 之后再把同一个实例交出去：
+   * 加守卫**之前**是"静默把刚删掉的空壳建回盘上"（§10.146 那枚 73728 字节 / 6 张空表），
+   * 加了守卫**之后**是"下一次读当场抛"。两种都不是"这台设备回到全新空库"，
+   * 而修法必须是宿主自己作废缓存 —— 共享层不知道宿主缓存了什么（AGENTS §3.5）。
+   *
+   * 所以这里钉的是那条**通知**的两个方向：销毁成功必须通知一次；销毁没成功一次都不许通知。
+   * 后半句防的是"库还在盘上，宿主却已经把自己的缓存丢了" —— 那会让界面显示"全新空库"，
+   * 而那份明文一条都没少。
+   */
+  it('销毁成功才通知宿主作废它的单例；销毁失败一次都不通知', async () => {
+    const onErased = vi.fn();
+    host = await openAppHost({
+      dbPath,
+      driverFactory: driverFor(dbPath),
+      onLocalDataErased: onErased,
+    });
+    expect(onErased, '只是建了个宿主就通知"已销毁"').toHaveBeenCalledTimes(0);
+
+    await eraseLocalData();
+    expect(onErased, '销毁成功了却没通知宿主 ⇒ 下一屏还会拿到那个死实例').toHaveBeenCalledTimes(1);
+
+    // 反方向：把 `removeDatabase` 换成一定抛错的实现 ⇒ 销毁失败 ⇒ 不许通知。
+    registerLocalEraser(undefined);
+    const stubborn = driverFor(dbPath)();
+    (stubborn as unknown as { removeDatabase(): unknown }).removeDatabase = () => {
+      throw new Error('故意删不掉');
+    };
+    const onErasedAfterFailure = vi.fn();
+    host = await openAppHost({
+      dbPath,
+      driverFactory: () => stubborn,
+      onLocalDataErased: onErasedAfterFailure,
+    });
+    await expect(eraseLocalData()).rejects.toThrow(/故意删不掉/);
+    expect(
+      onErasedAfterFailure,
+      '销毁明明失败了却通知了宿主 ⇒ 界面会显示"全新空库"而明文一条没少'
+    ).toHaveBeenCalledTimes(0);
+  });
 });
