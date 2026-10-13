@@ -353,11 +353,17 @@ pnpm check:native-deps          # iOS 原生依赖对账（package.json ↔ Podf
 
 ```bash
 pnpm -r build                   # 🔴 打包前**必须**先跑：APK/.app 里打的是 packages/*/dist
-pnpm build:android              # Android Release APK（Mac 或 Windows 打包机）
+pnpm build:android              # Android Release APK（🔵 2026-10-04 起统一 windows-pc 打包机，见下方注）
 pnpm build:android:debug        # Android Debug APK
 pnpm build:ios                  # iOS Release（仅 macOS）
 pnpm --filter @heyta/mobile run build:android:bundle   # 上架用 AAB
 ```
+
+> 🔵 **2026-10-04 Android 构建迁移启动**：统一到 `windows-pc` 打包机。实测 SSH 已通，远端已就绪：
+> JDK 21 + Android SDK（platform-36 / build-tools 35+36 / NDK / licenses）+ `C:\src\heyta` 工作树。
+> **构建一律 `ssh windows-pc` 执行**（产物 scp 拉回）；Mac 本机的 Gradle 与模拟器只作迁移验收前的
+> e2e 兜底，不再起新的本机构建。步骤、验收判据、验收后的 Mac 清理清单见根目录
+> `ANDROID_BUILD_ON_WINDOWS.md`。windows 侧模拟器镜像未装，`reinstall:mobile` 的 android 段暂维持 Mac 模拟器。
 
 ### 6.1.1 🔴 固定收尾流程：清旧包 → 重打 → **四端重装**（每轮交付必须）
 
