@@ -33,6 +33,7 @@ import {
   Platform,
   ScrollView,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LOCALES, useI18n } from '@heyta/i18n';
@@ -168,6 +169,40 @@ export function SettingsScreen({
     sectionRef.current = next;
     setSection(next);
   }, []);
+
+  const sheetScrollRef = useRef<ScrollView | null>(null);
+  const sheetOffsetRef = useRef(0);
+  const syncFormRef = useRef<View | null>(null);
+  const { height: windowHeight } = useWindowDimensions();
+
+  // 浮层换一档时那台 ScrollView 整棵重挂（key={section}），滚动位置回到顶部；
+  // 记账的偏移要跟着归零，否则下一次展开表单会按上一档的旧偏移多滚一截。
+  useEffect(() => {
+    sheetOffsetRef.current = 0;
+  }, [section]);
+
+  /*
+    ── 展开自托管表单后，把它滚进视野 ────────────────────────────
+    点「使用自托管服务器」是在**已经很长**的一屏中间往下插三格输入框。
+    现量（emulator-5554 1080×2400，2026-10-14 00:5x，只含当前 HEAD 内容的包）：
+    展开后第一格 `EditText` 落在 `[84,2125][996,2243]`（贴住屏幕最底边），
+    第二、三格只在折叠线以上露出标签（树里 bounds 的 top > bottom）。
+    也就是说：用户点了"展开"，看到的还是上面那段说明文字，要**自己往下滚**
+    才够得着刚被叫出来的表单 —— 设备腿那句"找不到输入框"量的就是这件事。
+
+    只补**溢出的那一段**，不把用户刚点的那一行推出屏幕：目标位置留一格余量。
+  */
+  useEffect(() => {
+    if (!advancedSync) return;
+    const node = syncFormRef.current;
+    if (node === null) return;
+    node.measureInWindow((_x, y, _width, height) => {
+      const visibleBottom = windowHeight - insets.bottom - tokens['space.4'];
+      const overflow = y + height - visibleBottom;
+      if (overflow <= 0) return;
+      sheetScrollRef.current?.scrollTo({ y: sheetOffsetRef.current + overflow, animated: true });
+    });
+  }, [advancedSync, insets.bottom, windowHeight]);
 
   /*
     ── 对外投诉/举报入口 ──────────────────────────────────────────
@@ -429,7 +464,7 @@ export function SettingsScreen({
       <SectionHeader icon="action.sync" title={t('mobile.profile.section.sync')} />
       <Card>
         {advancedSync ? (
-          <View style={{ gap: tokens['space.4'] }}>
+          <View ref={syncFormRef} style={{ gap: tokens['space.4'] }}>
             <Stack>
               <Text variant="row-title">{t('mobile.profile.sync.advancedTitle')}</Text>
               <Text variant="caption" tone="subtle">
@@ -710,9 +745,14 @@ export function SettingsScreen({
 
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <ScrollView
+            ref={sheetScrollRef}
             key={section ?? 'directory'}
             style={{ flex: 1 }}
             keyboardShouldPersistTaps="handled"
+            onScroll={(event) => {
+              sheetOffsetRef.current = event.nativeEvent.contentOffset.y;
+            }}
+            scrollEventThrottle={16}
             contentContainerStyle={{
               padding: tokens['screen.gutter'],
               gap: tokens['space.4'],
