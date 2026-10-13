@@ -33,15 +33,7 @@
  */
 
 import type { I18nValue, MessageKey } from '@heyta/i18n';
-import type { HabitDayState } from '@heyta/domain';
-import {
-  WEEKDAY_MESSAGE_KEYS,
-  formatDayTitleText,
-  formatMonthTitleText,
-  type HabitBoardLabels,
-  type HabitMonthLabels,
-  type HabitProgressListLabels,
-} from '@heyta/ui';
+import type { HabitBoardLabels, HabitProgressListLabels } from '@heyta/ui';
 
 /**
  * 月份词条 key（1 月 → 12 月，下标 = 月份 − 1）。
@@ -208,45 +200,5 @@ export function habitListLabels(t: I18nValue['t']): HabitProgressListLabels {
     streakCurrent: (count) => currentStreakText(count, t),
     streakLongest: (count) => longestStreakText(count, t),
     streakTotal: (count) => totalCheckInText(count, t),
-  };
-}
-
-/**
- * 构造共享 `HabitMonthBoard`（月历 + 可点补打卡，工单 H4）需要的文案。
- *
- * 🔴 六档句子与 web 用的是**同一批 `web.habits.month.*` key**（本文件开头那条
- * "命名残差"在这里继续成立）：月历格子上说的是"这天能不能补"，四端同一个事实。
- * 在移动端另开一组 `mobile.habits.month.*` 会出现"同一个 too-old，
- * web 说『已超过补打卡窗口』、手机说『太久了』"，而词条表多几条同义键不会让
- * 任何测试变红。
- *
- * ⚠️ 移动端**不注入** `cellTitle`：那是悬停提示，触屏没有悬停
- * （与 `HabitBoard` 的 `cellTooltip` 同一条约定 —— 不传就完全不产出属性）。
- */
-const MONTH_STATE_KEYS = {
-  logged: 'web.habits.month.logged',
-  today: 'web.habits.month.today',
-  backfillable: 'web.habits.month.backfillable',
-  'not-scheduled': 'web.habits.month.notScheduled',
-  future: 'web.habits.month.future',
-  'too-old': 'web.habits.month.tooOld',
-} as const satisfies Record<HabitDayState, MessageKey>;
-
-export function habitMonthLabels(t: I18nValue['t']): HabitMonthLabels {
-  return {
-    grid: ({ name, month }) => t('web.habits.month.grid', { name, month }),
-    weekdays: WEEKDAY_MESSAGE_KEYS.map((key) => t(key)),
-    monthTitle: (date) => formatMonthTitleText(date, t),
-    prevMonth: t('mobile.common.prevMonth'),
-    nextMonth: t('mobile.common.nextMonth'),
-    windowHint: (days) => t('web.habits.month.window', { n: days }),
-    // 每档的句子**自带 `{date}`**（与 web 那份同一个形状）：这里只把日期用共享的
-    // `formatDayTitleText` 说出来，不参与拼装。
-    day: ({ date, state }) =>
-      t(MONTH_STATE_KEYS[state], { date: formatDayTitleText(date, t) }),
-    // 补白格另有一句：上一月视图里"今天"是一格尾随补白，按状态念会变成
-    // "今天还没打卡"而点不动 —— 那句话必须是"它不在这个月里"。
-    outOfMonth: ({ date }) =>
-      t('web.habits.month.outOfMonth', { date: formatDayTitleText(date, t) }),
   };
 }
