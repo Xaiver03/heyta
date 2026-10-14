@@ -2421,7 +2421,7 @@ $ sysctl -n kern.boottime
 | AC-5 三档 | `task-batch-contract` / `task-batch` / `task-batch-actions` | `15 passed` / `16 passed` / `9 passed`，各 rc=0 | `ac5-{contract,reducer,entry}.log` |
 | AC-5 范围尺 | `python3 research/tools/verify-inbound-commit-scope.py` | 🔴 **rc=1**，见下 | `ac5-scope.log` |
 | 整包 | `cd packages/app-host && npx --no-install vitest run --maxWorkers=1` | `Test Files 95 passed (95)` / `Tests 1779 passed (1779)`，`APPHOST_ALL_RC=0` | `apphost-all.log` |
-| AC-3 双宿主 | `python3 research/tools/verify-inbound-dual-host.py` | `Windows: 13/13`、`Tests 14 passed (14)`、`SKIP` 命中 **0**、`RC=0` | `ac3-dualhost-52d7ba85.log`；装置自报的第二份 `/private/tmp/heyta-inbound-dual-host.log`（36,383 B，**这枚住 /tmp，重启即没**，耐久份是前者） |
+| AC-3 双宿主 | `python3 research/tools/verify-inbound-dual-host.py` | `Windows: 13/13`、`Tests 14 passed (14)`、`SKIP` 命中 **0**、`RC=0` | `ac3-dualhost-52d7ba85.log`；装置自报的第二份 `/private/tmp/heyta-inbound-dual-host.log`（36,383 B，**这枚住 /tmp，重启即没**，耐久份是前者）。⚠️ **2026-10-14 11:3x 现量补一句**：这一格闭合的是**那枚 Python 装置**的读数；同批 T3 产物里 `server/tests/integration/inbound-dual-host-fault-windows.integration.spec.ts` **没被任何 `test:integration*` 脚本点名**（`pnpm check:integration-coverage` 当场点名它，见 B197）⇒ 它此刻只被本线手工单点跑过、**不被链跑**，所以 AC-3 不许读成"这 13 个窗口的真库证据每天都有人在跑" |
 
 **AC-3 因此换成了"与其余各格同一枚 HEAD"的读数** —— 上一节那份取在 `1c166425`，当时靠一枚 scoped diff 说明可迁移；
 现在不需要那个论证了（同一载体、同一 SHA、13/13）。分母仍是计划现量（`grep -oE '^[0-9]+\.' docs/plans/inbound-automation.md` 在故障窗口那一节里取）。
@@ -3574,3 +3574,30 @@ AC-6 的界面挂载点（B140/B181）与 AC-8 的四端设备腿（B164）仍�
 🔴 **本节不改任何 AC 的闭合状态**：`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` 仍 **0**，未勾仍 8。
 完成条件 1 那句"T7 三条命令在隔离副本上 exit 0"这一腿**仍不成立**（`TEST_RC=1`），AC-8 的 C30 与矩阵里那句"`-r test` 在隔离副本仍红"因此**继续不作废**；
 `pnpm check`（第 86 道）与 `reinstall:all` 两腿在**当前 tip** 上仍无新读数（各自读数出自 10-12 载体 `422db1b2`）。
+
+## 2026-10-14 11:2x · T7 第一腿（`pnpm check`）在当前 tip 的整链读数：**111 步 / 84 绿 27 红**，而本线占其中三格
+
+AC-8 那一行（`:705`）与腿表（`:2172`）里的"check / `-r test` 在隔离副本仍红"这条**不作废**，本节把它从"10-11 的 6 段停红"升级成**整链逐格读数**：
+
+```bash
+python3 research/tools/verify-inbound-check-chain.py --repo .worktrees/inb-t9 \
+  --logs .worktrees/inb-t9/.run-logs/check-current --from 1 --to 0 --timeout 900
+# CHAIN ran=111/111 of 111  RED=27  steps=[1, 6, 20, 21, 22, 23, 42, 43, 45, 51, 54, 65, 75, 84, 85, 86, 87, 88, 89, 90, 100, 102, 104, 106, 109, 110, 111]
+```
+
+三件事要在这一节说清，它们各挡一层：
+
+1. **第 1 步 `check:gate-wiring` 就红，红的是链自己**：链引用了 `check:gate-ssh` / `check:e2e-helper-exports` / `check:ai-e2e` / `check:e2e-carrier`
+   四枚脚本，而 `package.json` 里没有定义（定义在 `422db1b2` 有、HEAD 没有，改动笔 = `18efc229` 那场 merge）。
+   ⇒ `pnpm check` 的 `&&` 在第 1 步断掉，**当前 tip 上"exit 0"是结构上不可达**，不只是"还红着几格"。见 **B196**。
+2. **本线在三格里是红因**（对 27 份红日志逐份 `grep -i inbound`，只命中这三份）：
+   `check:selection-single-source` 点名 `InboundAutomationSettings.tsx` 的 4 枚瞬态 `…Id` 未登记、
+   `check:empty-state` 点名我手写的那 1 处空态、
+   🔴 `check:integration-coverage` 点名 **`server/tests/integration/inbound-dual-host-fault-windows.integration.spec.ts` 盘上有、没被任何 `test:integration*` 脚本点名**
+   ——这正是 AC-3/T3 那条"13 个故障窗口的真库证据"：**代码在册、本线手工单点跑过，但不被链跑**。见 **B197**（三格的落点全在白名单外，逐格给了一行补丁形状）。
+3. **链里第 106 步那条 `pnpm -r test` 不能当作任务书那条 `-r test` 的读数**：它 1.2 s 就 rc=1，
+   日志只到 `Scope: 21 of 22` + 四个包的汇总 + `[ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL]` ⇒ pnpm 并发跑到第一个失败包就整腿退出，其余 17 包没跑。
+   全仓单测读数以本线自己那趟 `pnpm -r --no-bail test`（21 == 21、13 722 / 8 / 14，见上一节）为准。
+
+`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` = **0**（本节不勾任何一格）。矩阵里 C30 与腿表那句"桌面两端 + Linux 取证 ✅、移动两端未点"**未变**——
+`reinstall:all` 在**当前 tip** 上仍没有新读数（旧读数出自载体 `422db1b2`）。

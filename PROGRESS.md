@@ -4461,3 +4461,29 @@ AC 已勾数仍 **0**（`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automatio
 - 同 tip 的静态门现量（写在同一格里，免得下游沿用旧读数）：`node scripts/check-docs-voice.mjs` **rc=0**（禁词表 30 项零命中）、
   `node research/tools/docs-link-check.mjs` **rc=0** —— 任务 0 那句"link-check rc=1，唯一一条是 `apps/desktop-windows/README.md:89`"**已被别线收走**，
   这条更正按 §8 加在这里，原句不删。
+
+## 2026-10-14 11:2x–11:3x · 第 86 道（`pnpm check`）在**新 tip** 上整链跑完：111 步 / **84 绿 27 红** / 3 分 47 秒，而本线在这 27 格里占**三格**（这是本轮最难听的一句）
+
+- 载体：`.worktrees/inb-t9`（`checkout 0fe3d16b`，脏条目 0）。装置 = 本线自己的 `research/tools/verify-inbound-check-chain.py --from 1 --to 0 --timeout 900`
+  （起跑前 `--self-test` rc=0，6 条臂全过；含"步超时必须报 124"那条）。日志 `.worktrees/inb-t9/.run-logs/check-current/`（逐步 001…111.log）与 `.run-logs/check-current.out`。
+- 分母现量：`node -e 'require("./package.json").scripts.check.split(" && ").length'` = **111**（10-12 那趟是 106 ⇒ 区间内别线加了 5 步）。
+- 红名单（装置自报）：`RED=27 steps=[1, 6, 20, 21, 22, 23, 42, 43, 45, 51, 54, 65, 75, 84, 85, 86, 87, 88, 89, 90, 100, 102, 104, 106, 109, 110, 111]`。
+- 🔴 **第 1 步就红，红的是链本身**：`check:gate-wiring` 打印"链里引用了 `pnpm check:gate-ssh` / `check:e2e-helper-exports` / `check:ai-e2e` / `check:e2e-carrier`，
+  但 package.json 里没有这个脚本定义"；逐步实测 85/86/87/110 全 `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL Command "…" not found`（0.3 s）。
+  现量归属：这四枚定义**在 `422db1b2` 有**（`git show 422db1b2:package.json | grep -cE '"check:ai-e2e":'` = 1），**HEAD 没有**（= 0），
+  而 `-m` 搜到的改动笔正是 **`18efc229` 那场 merge** ⇒ 与 B195 同族（半收合并），这次丢的是链的**脚本定义**，
+  后果是那四道门禁**从此不在 `pnpm check` 里执行**（`check:gate-wiring` 挡住了这件事，它红 = 这条判据有效）。登记 **B196**。
+- 🔴 **本线占三格**（`grep -i inbound` 在 27 份红日志里只命中这三份，其余 24 格不含本线字样）：见 **B197** ——
+  step 21 `check:selection-single-source`（断言 G 点名我那枚文件里 4 枚 `…Id` 未语义登记）、
+  step 23 `check:empty-state`（我手写了 1 处空态，而那格给的合法出路是"先造 web 侧共享 `EmptyState`"）、
+  step 51 `check:integration-coverage`（**`server/tests/integration/inbound-dual-host-fault-windows.integration.spec.ts` 盘上有、没被任何 `test:integration*` 脚本点名 ⇒ 从落地那天起一次都没被链跑过**）。
+  三格的落点分别需要 `scripts/check-selection-single-source.mjs`、`packages/ui`、`server/package.json` —— **全在白名单外**，
+  所以这一轮本线**不代改**，逐格的一行补丁形状写在 B197。
+- ⚠️ 两枚 e2e 腿（88 `check:privacy-consent-e2e`、89 `check:landing-e2e`）的红正文是 `error: unknown command 'test'`（4.9 s / 0.9 s）——
+  同样是"链指向一个不存在的通道"，不是那两个界面坏了；84 `check:vault-diagnostics` 打印的是它自己的取不到测试报告分支。
+- 🔴 **链里第 106 步那条 `pnpm -r test` 不等于任务书要的 `pnpm -r test`**：它 1.2 s 就 rc=1，日志正文只有
+  `Scope: 21 of 22`、local-api/i18n/design-system/ai 四包的汇总，末行 `[ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL] @heyta/ai … test`
+  ⇒ pnpm 并发跑到**第一个失败包就整腿退出**，其余 17 包压根没跑（与 B195/10-12 那格 FIRST_FAIL 同族）。
+  所以全仓单测的读数以本线自己那趟 `pnpm -r --no-bail test`（11:0x，21 == 21、13 722/8/14）为准，**不要**引用链里这一腿。
+- 结论照旧不粉：**完成条件 1 里"T7 三条命令 exit 0"在当前 tip 上不成立**，而且现在**结构上不成立** —— 第 1 步就红，
+  `&&` 链后面 110 步不会被 `pnpm check` 自己跑到；要它绿必须先补回那四枚定义（B196，别线一笔）+ 本线那三格（B197）。

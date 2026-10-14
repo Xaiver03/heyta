@@ -10497,3 +10497,43 @@ git diff --numstat 6ded0725 HEAD -- apps/mobile/src/ai/AssistantScreen.tsx      
 把它 `it.skip` 掉、或把 `expectSameFamily` 的默认"完全一致"放宽成"允许 web 单边多出"，
 就正好把"门进来了、源码没进来"这一格永久消音 —— 而那两枚门是 `30482038` 那笔注释里点名"早就承诺却从不存在的对账装置"，
 刚补上就被撤，下一位读不到任何痕迹。
+
+## B196（2026-10-14 11:2x @ `0fe3d16b`，本会话 · `pnpm check` 链里引用的**四枚脚本定义**被 `18efc229` 那场 merge 弄丢了 ⇒ 链第 1 步就红，后面 110 步永远轮不到）
+
+**现量（三条命令）**
+```bash
+node -e 'const p=require("./package.json").scripts;for(const k of ["check:gate-ssh","check:e2e-helper-exports","check:ai-e2e","check:e2e-carrier"])console.log(k, k in p)'
+#  四枚全 false；而链里它们分别在第 85/86/87/110 步（node -e 'require("./package.json").scripts.check.split(" && ")' 现量）
+git show 422db1b2:package.json | grep -cE '"check:ai-e2e":'   # 1（旧载体有定义）
+git show HEAD:package.json     | grep -cE '"check:ai-e2e":'   # 0（当前 tip 没有）
+git log --all -m -S '"check:ai-e2e":' --format='%h %s' -- package.json | head   # 定义行的改动笔 = 18efc229（merge）
+```
+实测后果（隔离副本 `.worktrees/inb-t9` 整链 111 步）：第 1 步 `check:gate-wiring` **rc=1** 并逐名打印这四条"链里引用了但没有定义"；
+第 85/86/87/110 步各 0.3 s `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL Command "…" not found`；
+同族还有两枚 e2e 腿（88 `check:privacy-consent-e2e`、89 `check:landing-e2e`）正文是 `error: unknown command 'test'`。
+⇒ **`pnpm check` 现在结构上不可能 exit 0**：`&&` 链在第 1 步断掉，而那四道 e2e/载体门禁已不在链里执行。
+
+**与 B195 同一场合并、同一族形状**：B195 是"收了 mobile 的门、没收门钉的源码"，这里是"链的引用留在一侧、脚本定义在另一侧被丢掉"。
+`check:gate-wiring` 挡住这件事 ⇒ **这条判据是有牙的**，别看它红就以为它坏了。
+
+**给谁做 / 最小动作**：`18efc229` 的执行方（AI 收口线）。`package.json` 在白名单外，本线不代改。一行可粘的形状：
+把那四枚定义按 `422db1b2` 那份原样补回（`git show 422db1b2:package.json` 里逐枚可取），
+补回后第 1 步与 85/86/110 会转绿，而 87（`check:ai-e2e`）会把那条真 e2e 腿放回链里 —— 那条腿自带 4318/4319 端口与 preflight，
+**跑它之前先 `lsof` 看端口**（见 `docs/reference/environment-traps.md` #87 与本文件 B194）。
+⚠️ 反作弊提醒：出路**不是**把链里那四个引用删掉 —— 那等于把四道门禁静默退役，而 `check:gate-wiring` 会立刻不再报红。
+
+## B197（2026-10-14 11:3x @ `0fe3d16b`，本会话 · 当前 tip 的 `pnpm check` 那 27 格里**本线占三格**，三格的落点全在白名单外）
+
+现量口径：对装置留下的 27 份红日志逐份 `grep -i inbound` ⇒ 命中三份（step 21、23、51），其余 24 格不含本线字样。
+逐格"我测过什么 / 为什么本线不能自己做完 / 一行可粘的补丁形状"：
+
+| 步 | 门禁 | 它点名本线的什么 | 本线的判断 | 落点（都在地界外） |
+|---|---|---|---|---|
+| 21 | `check:selection-single-source`（断言 G） | `apps/web/src/features/settings/InboundAutomationSettings.tsx` 里 4 枚本地 `…Id` useState 未语义登记：`retryEventId`、`editingRuleId`、`keyId`、`targetProjectId`（同格另有 2 枚是别线的 `busyHabitId`、`quadrantMoveTaskId`） | 这四枚**不是第二个选中所有者**：分别是"正在重试哪条事件"（in-flight）、"正在编辑哪条规则"（form-draft）、"表单里的 keyId"（form-draft）、"目标清单"（form-draft 选中值）——判据给的出路正是"5 类瞬态之一 ⇒ 在 `ROW_ID_EXEMPT` 登记一行并写明哪一类" | `scripts/check-selection-single-source.mjs`（验收脚本的登记表＝判卷口径，死规矩不许本线动） |
+| 23 | `check:empty-state` | 同一枚文件手写了 1 处空态（`rules.length===0` 时直接渲染空态词条），而"空态只有一个" | 该脚本自己写着：web 侧**目前没有**可复用空态组件（壳里那个没 export，`packages/ui` 只有 `TaskList.emptyMessage`，装不下 title+hint+icon），且"**正确的动作是先造共享组件**，而不是把 EMPTY_SITES 加一行——加一行=把这笔债合法化" | `packages/ui`（共享组件）或 `scripts/check-empty-state.mjs` 的 `EMPTY_SITES` ——**这一格要负责人拍**：造共享件 vs 登记例外 |
+| 51 | `check:integration-coverage` | `server/tests/integration/inbound-dual-host-fault-windows.integration.spec.ts` **盘上有、没被任何 `test:integration*` 脚本点名** | 这条门禁就是为本仓库那次事故写的（`ai-metering-race` 写完 8 天没进任何脚本，"代码在"与"跑过"同时成立）。T3 那 13 个故障窗口的真库证据此刻**不被链跑**，只被本线手工单点跑过 | `server/package.json` 里加一条 `test:integration:*`（白名单只含 `server/tests/`、`server/src/…`，不含 `server/package.json`）。一行形状：`"test:integration:inbound-dual-host": "vitest run tests/integration/inbound-dual-host-fault-windows.integration.spec.ts"` |
+
+**本线的判断与请求**：三格都不是"还差工时"，是"要动的文件不在本线地界内"。
+step 51 这一格请负责人点头后**由 server 包归属方补**（或给本线一次单动作授权改 `server/package.json` 那一行）；
+step 21/23 要的是**别人的判卷口径登记表**或**共享层组件**，本线不代改、不自造第二套空态。
+🔴 不做的事写清楚：不改 `ROW_ID_EXEMPT`、不改 `EMPTY_SITES`、不改 `server/package.json`、不把那枚 integration spec 改名去蒙混过 `exclude`。
