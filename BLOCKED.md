@@ -10537,3 +10537,62 @@ git log --all -m -S '"check:ai-e2e":' --format='%h %s' -- package.json | head   
 step 51 这一格请负责人点头后**由 server 包归属方补**（或给本线一次单动作授权改 `server/package.json` 那一行）；
 step 21/23 要的是**别人的判卷口径登记表**或**共享层组件**，本线不代改、不自造第二套空态。
 🔴 不做的事写清楚：不改 `ROW_ID_EXEMPT`、不改 `EMPTY_SITES`、不改 `server/package.json`、不把那枚 integration spec 改名去蒙混过 `exclude`。
+
+---
+
+## B198（2026-10-14 16:2x，本会话 · `scripts/reinstall-all.sh` 的 `--skip` 是**单值赋值**：重复传第二次会**覆盖**第一次 ⇒ 本线按"跳两端"传的那串只跳掉了一端，iOS 段照常起跑）
+
+**怎么撞上的**：本线这一趟要在当前 tip 只取桌面两端 + Linux，于是传了
+`bash scripts/reinstall-all.sh --skip ios --skip android`。汇总打出来的是——
+
+```
+  ✅ mac：已清旧包、重打、重装、有当前产物判据
+  ✅ windows：已清旧包、重打、重装、有当前产物判据
+  ⏭ android：本轮显式跳过（--skip）—— 这端**没有**验证当前产物
+  🔴 ios：失败 —— 见上文
+```
+
+`⏭`（跳过）与 `🔴`（跑过且失败）**同时出现**，就是这一格的现量证据：iOS 没有被跳过。
+
+**病根在解析那五行**（现读 `scripts/reinstall-all.sh`）：
+
+```
+207: ONLY="" ; SKIP="" ; SKIPPED=""
+210:   --only) ONLY="${2:-}"; shift 2 ;;
+211:   --skip) SKIP="${2:-}"; shift 2 ;;
+219:   if [ -n "$SKIP" ] && printf '%s' ",$SKIP," | grep -q ",$seg,"; then
+```
+
+`--skip` 走的是**赋值**不是累加 ⇒ 第二次出现把第一次整个盖掉；`219` 那行按逗号切，所以
+**正确形状是一参逗号表**（`--skip ios,android`），而文档 26 行只给了单个端的例子。
+
+**可复跑的臂**（零副作用：只把 206–221 的段选择抽出来，不打包、不装机、不碰设备）——
+`bash .run-logs/skip-arm.sh <参数串>`（⚠️ `.run-logs/` 被 gitignore，**这枚臂只在本机这份检出里**，
+干净检出请照上面那五行自己贴一份并以 `#!/bin/bash` 开头），四臂现量：
+
+| 传的 | WANT | SKIPPED |
+|---|---|---|
+| `--skip ios --skip android` | mac windows **ios** | android |
+| `--skip ios,android` | mac windows | android ios |
+| `--only mac,windows` | mac windows | （空） |
+| 不传 | mac windows android ios | （空） |
+
+🔴 **造这臂时自己踩了一次空臂，必须写下来**：第一版是把那段解析直接贴在会话的默认 shell（zsh）里跑的，
+而 **zsh 不对 `$ALL` 做隐式词分割** ⇒ `for seg in $ALL` 只循环一次、`seg` 等于整串 `"mac windows android ios"`，
+四臂**全部**打印 `WANT=[ mac windows android ios] SKIPPED=[]`。那形状看着像"参数完全没生效"，
+其实臂本身永远不可能命中任何端 ⇒ **一把不会红的臂**（AGENTS §7 那条元规则）。改 `#!/bin/bash` 后才有区分度。
+⇒ 结论：**这类抽出来的臂必须显式指定解释器**，`bash <file>`，不要贴在 zsh 里跑。
+
+**这一格的后果边界（要说清没发生什么）**：iOS 段起跑后撞的是它自己的设备名门——
+两台 `Booted`（`heyta-ios-isolated17` / `heyta-iphone-17pro`）没有一台名含默认 `iPhone 17 Pro` ⇒ 脚本按
+"多台不匹配 ⇒ 响亮失败、不猜"停在 `simctl uninstall` **之前**，**没有任何一台模拟器被卸装过**（现量：
+两台仍 `Booted`，`adb -s emulator-5554 emu avd name` 仍是 `heyta-w3-yearly`）。所以这一格是**读数污染**
+（"我跳过了两端"这句当时不成立），不是设备越界。
+
+**要改的落点在本线地界外**（`scripts/reinstall-all.sh` 是别线资产，本线不代改）：
+① `--only` / `--skip` 改累加（`SKIP="$SKIP,${2:-}"`）并去掉重复传时的静默覆盖；
+② 解析完对 `ONLY`/`SKIP` 里的**每个名字**对照 `ALL` 校验，不认识的端名（含拼错、大写）现在同样是
+**静默不跳**——`212` 行只对未知**参数名**响亮失败，管不到参数值。
+
+🔴 台账里那句"`--skip` 是显式的（汇总仍列出被跳过的端）"**要加限定**：显式只对**被认出的那一端**成立，
+一次传一个端时，只有最后一个端被跳过，其余仍会起跑。下一位要么写逗号表，要么一端一趟。

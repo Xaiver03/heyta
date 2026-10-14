@@ -3601,3 +3601,75 @@ python3 research/tools/verify-inbound-check-chain.py --repo .worktrees/inb-t9 \
 
 `grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` = **0**（本节不勾任何一格）。矩阵里 C30 与腿表那句"桌面两端 + Linux 取证 ✅、移动两端未点"**未变**——
 `reinstall:all` 在**当前 tip** 上仍没有新读数（旧读数出自载体 `422db1b2`）。
+
+---
+
+## 2026-10-14 16:1x–16:2x · T7 第三条腿在当前 tip 取到读数：mac / windows / Linux 三端全绿，移动两端各有一句实话
+
+**上面那格末句「`reinstall:all` 在当前 tip 上仍没有新读数」已被本节取代**（旧句留着，因为它是那一戳的真实读数）。
+
+**载体与"这读数算不算 HEAD 的"**：`.worktrees/inb-t9`（`git worktree add --detach … 0fe3d16b`，起跑脏条目现量 **0**）。
+到当前 tip 的差集按路径集合现量：
+
+```
+$ git diff --name-only 0fe3d16b HEAD | grep -vE '^(BLOCKED|PROGRESS)\.md$|^docs/' | wc -l
+       0
+```
+
+⇒ 三枚差集文件全是台账/计划，**源字节零变化** ⇒ "装的是当前源码的产物"这句话对 HEAD 成立，不只是对 `0fe3d16b`。
+执行的两枚脚本钉住（不是照抄上一节）：`REINSTALL_BLOB=46167227685128b0474224daf10c4eb7f66e88a9`
+（与 10-12 那趟**同一枚** ⇒ 重装脚本本身没动过）、`DEB_SCRIPT_BLOB=82473146901638b582ae8f97ad961cbe380230c6`。
+
+| 端 | 命令 | 判决 | 一条读数 |
+|---|---|---|---|
+| mac | `bash scripts/reinstall-all.sh --skip ios --skip android` | ✅ | `.app`+`.dmg` 重打 → 装 `/Applications/Heyta.app` → **安装对账**：包内 `web-dist` 与本机 `apps/web/dist` 同一次构建（**9 个 chunk**）；窗口 2318×1508、`.webview.png` 内容 **74.6%**、主蓝命中 **997** |
+| windows | 同上 | ✅ | 源码包 39M（清单 **3924** 条）→ 远端 tar `sha256=b7bc035edc1e7dd2…` **逐字相同** → 新鲜度对账 `web-dist/index.html=1f165d01f677aed1…`、`bridge=4dfc0d2f46524aa7…`、`assets/*.js` **7 枚一致** → 脚本自己数："判据齐了：**5 条全在位**" |
+| linux | `bash apps/desktop-linux/scripts/package-deb.sh linux-dev` | ✅ `DEB_RC=0` | `heyta_1.0.0_amd64.deb` **2 016 520 B** / 包内 web-dist 条目 **30**；`PKG_FRESHNESS=OK files=26`、`PKG_FRESHNESS_INPACKAGE=OK`、`PKG_SANDBOX=off`、`PKG_RUN_RC=0`、`PKG_SHELL_UI=web-dist`、`PKG_SETTLED=OK`、`PKG_PIXELS=OK` 窗口 **900x523** 内容 **53.777** 主蓝 **3987**、**`PKG_RESULT=OK`** |
+| android | **未点** | ⏭ | 现量：`adb -s emulator-5554 emu avd name` ⇒ `heyta-w3-yearly`，`emulator -list-avds` 本机只有这一枚 ⇒ **B62/B164 那格仍开着**（这台 AVD 是并行会话在用的设备，`adb uninstall` 会卸掉对方正在验收的现场） |
+| ios | **没跳成**（见下） | 🔴 响亮失败 | 两台 `Booted`（`heyta-ios-isolated17` / `heyta-iphone-17pro`）无一名含默认 `iPhone 17 Pro` ⇒ 脚本按"多台不匹配 ⇒ 不猜"停在 `simctl uninstall` **之前** ⇒ **没有任何一台模拟器被卸装过**（跑后现量：两台仍 `Booted`） |
+
+🔴 **这一趟有两处必须写下来的"我以为是 A、其实是 B"，都指向 BLOCKED.md，不粉饰**：
+
+1. **`--skip` 传两次只算最后一次**（详见 **B198**）。我传的是 `--skip ios --skip android`，本意"移动两端都不点"，
+   实际只有 android 被跳过，**iOS 段照常起跑**（它撞的是自己的设备名门，所以什么都没动）。
+   汇总同时打出 `⏭ android` 与 `🔴 ios` 就是这一格的现量证据。正确形状是一参逗号表 `--skip ios,android`。
+   ⇒ 台账里"`--skip` 是显式的"那句已加限定。
+2. **整趟的退出码没量到**：这趟用 `nohup … > 文件 2>&1 &` 起的，包装里没有 `echo $?`。
+   按脚本自己的契约（`scripts/reinstall-all.sh:48`："任一端失败 ⇒ 整体退出 1"）加汇总里那行 `🔴 ios`，**应为 1** ——
+   但这句是**按契约推的，不是取到的读数**，下一位要 1 还是 0 就照"命令 + `echo RC=$?`"重跑一次。
+
+🔴 **Linux 这一趟换了路线，不是照抄台账**：10-12 那节写的目标是 `linux-dev-lan`，本次第一趟照抄 ⇒
+
+```
+ssh: connect to host 192.168.1.8 port 22: Operation timed out
+rsync(66990): error: unexpected end of file
+DEB_RC=255
+```
+
+分母现量：`ping -c 2 192.168.1.8` ⇒ **100.0% packet loss**；`nc -z -G 3 192.168.1.8 22` ⇒ rc=1；
+而 `ssh linux-dev` / `linux-dev-mdns` / `linux-dev-oob` 三枚别名**都通**，回 `Xaiver-linux`、`up 1 week, 23 hours, 51 minutes`
+⇒ **机器活着，是 `~/.ssh/config:136` 那枚 LAN 别名的 DHCP 地址漂了**（该别名自己的注释就写着"DHCP 会漂；ZeroTier 地址到位后改用 linux-dev"）。
+⇒ 这一格换 `linux-dev` 后取到上面的绿读数。**runbook 里那批 `linux-dev-lan` 命令现在会撞同一堵墙**（那是 Linux 线的文档，本线不代改，只在此登记）。
+
+🟢 **跨端"同一次构建"对账（这一趟最硬的一条）**：三端各自回传的指纹是同一枚 ——
+windows 段 `web-dist/index.html=1f165d01f677aed1…` == Linux 段 `PKG_INDEX_SHA=1f165d01f677aed1891ec0eef8af7ed4be26153c336caa1f4bfe5813b680b4c5`，
+mac 段的对账判据是"包内 `web-dist` 与本机 `apps/web/dist` 同一次构建（9 chunk）"。
+
+⚠️ **截图字节逐字相同不等于这趟跑过 —— 判据得看 mtime**。mac 那两枚的 md5 与 10-12 那趟**完全相同**
+（窗口 `9866bc83b55b133a9aa531c289d7f14e` / `.webview` `6c77d5b6d59ba5b21f82f162c54a2c3e`，字节数也同为 52 358 / 382 422），
+而 `ls -lT` 现量 mtime 是 **Oct 14 16:14:58 / 16:14:49** ⇒ 这趟真跑了，两批构建画出的首启同意面**像素级同一张**
+（静态文案、同窗口尺寸、无时钟）。⇒ 反向结论要记住：**"截图和上次一样"不能当"输出没变"的证据，也不能当"这趟跑过"的证据**，
+能当证据的只有 mtime 与那枚 `index.html` 指纹。
+
+**人打开看过的三张**（不是只数了像素）：mac `.webview.png`、windows `dist/windows/packaged-first-run.png`、
+linux `dist/linux/packaged-first-run.png` —— 三张都是同一套共享 UI（收集箱 + rail + 四象限 + 清单/标签 + 对话助手）
++ 同一张「在使用联网功能之前」同意面（主蓝「同意并联网」+「只用本机」）；windows 那张还带着壳的身份菜单
+（登录账号 / 个人中心 / 应用设置）= `M2D=OK` 那一格的肉眼证据。私有归档 `.worktrees/inb-t9/.run-logs/evidence-1014/`
+（`/tmp` 那份会被别的会话覆写，看的是副本）。
+
+🔴 **这一格证到哪、不证到哪**：它回答的是"三个端装/打上了**当前这批源码**的产物、起得来、画的是共享 UI"（AGENTS §6.1.1 口径）。
+**不回答**"自动收集的界面在五端可用"——那一格仍开在 B140/B181（挂载点）。
+也**不闭合 AC-8 的 C30**：那一格按定义要的是**四端**当前产物，android 那端因 B164 不可点 ⇒
+**C30 仍记无尺**，但"无尺"的理由从"桌面两端也没量"收窄成了"**只剩 android（+ ios 的设备名旋钮）这一格**"。
+
+`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` = **0**（本节同样不勾任何一格）。

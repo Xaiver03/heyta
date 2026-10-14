@@ -4512,3 +4512,36 @@ AC 已勾数仍 **0**（`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automatio
 
 **本线自查口径没变**：AC 已勾 **0**、未勾 **8**；四道静态门（voice / link / migrations / license-inventory）当前 tip 全 **rc=0**；
 非白名单脏条目仍 **13**（与 B194 那批同一份，本线一枚没动）；测试数只增（`13 608 → 13 722`）。
+
+---
+
+## 2026-10-14 16:1x–16:2x · T7 第三条腿在当前 tip 取到读数（三端绿），路上撞出两枚自己的错
+
+**做了什么**：B197 第 23 格那枚现量更正先入库（`2192b0c4`，1 文件），随后在隔离副本
+`.worktrees/inb-t9`（`--detach @ 0fe3d16b`，脏条目 **0**，到 HEAD 的差集**源字节 0 枚**）跑完
+`reinstall-all` 与 `package-deb`。读数与逐条边界都在计划文末「2026-10-14 16:1x–16:2x」那一节：
+**mac ✅ / windows ✅（5 判据齐）/ linux ✅ `DEB_RC=0` `PKG_RESULT=OK`**，三端回传的 `index.html` 指纹是同一枚
+`1f165d01f677aed1…`；android **未点**（`heyta-w3-yearly` 仍是别线在用的那枚 AVD，B62/B164 未闭）；
+截图三张**人打开看过**（同一套共享 UI + 同一张同意面，windows 那张带身份菜单）。
+
+**自己撞的两枚错，都写进台账而不是抹掉**：
+
+1. **`--skip ios --skip android` 只跳掉了 android**（`--skip` 是单值赋值，第二次覆盖第一次）⇒ iOS 段实际起跑，
+   撞自己的设备名门响亮失败（**没碰任何一台模拟器**，跑后现量两台仍 `Booted`）。登记为 **B198**，
+   含一把零副作用的四臂台架（`bash .run-logs/skip-arm.sh`）与"正确形状是 `--skip ios,android`"。
+   🔴 造那把臂时第一版贴在 zsh 里跑，**zsh 不对 `$ALL` 做隐式词分割** ⇒ 四臂全部打印同一句、永远不会红；
+   改 `#!/bin/bash` 后才有区分度 —— 这条按"臂必须能红"那一族记着。
+2. **Linux 那趟照抄了台账里的 `linux-dev-lan`，第一趟 `DEB_RC=255`**（`ssh: connect … timed out` + rsync EOF）。
+   分母现量：`ping` 100% 丢包 / `nc 22` 不通，而 `linux-dev`（ZeroTier）等三枚别名都通、机器 `up 1 week, 23 h`
+   ⇒ **机器活着，是 LAN 别名的 DHCP 地址漂了**（那枚别名自己的注释就预告过）。换 `linux-dev` 后取到绿读数。
+   ⚠️ `docs/runbooks/linux-dev-box.md` 里那批 `linux-dev-lan` 命令会撞同一堵墙 —— 那是 Linux 线的文档，本线不代改。
+
+**还有一格是"推的、不是量到的"，标明**：整趟 `reinstall-all` 的退出码**没取到**（`nohup` 包装里没接 `$?`）。
+按脚本契约（`reinstall-all.sh:48`：任一端失败 ⇒ 1）+ 汇总里那行 `🔴 ios`，**应为 1**；这一句是推的。
+
+**现量口径**（本会话内，写这段之前）：`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` = **0**；
+未勾 **8**；`node scripts/check-docs-voice.mjs` 与 `node research/tools/docs-link-check.mjs` 在含 B197/B198 与本节的
+工作树上**都 rc=0**（⚠️ 那句任务书里"docs-link-check rc=1，唯一一条是 `apps/desktop-windows/README.md:89`"已过期——
+**别线自己把那枚死链修了**，本线没动它）。共享树 `git status --porcelain` 本线落点就**这三枚**（`BLOCKED.md` / `PROGRESS.md` /
+本计划），随本节一起入库；其余 **13** 枚逐条看过全是别线的（android 证据目录 / `scripts/lib/mobile-e2e.sh` /
+那 12 枚 `inbound-recovery` 图 = B194 那批），本线一枚没动、也没代提交。
