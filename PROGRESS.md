@@ -4487,3 +4487,28 @@ AC 已勾数仍 **0**（`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automatio
   所以全仓单测的读数以本线自己那趟 `pnpm -r --no-bail test`（11:0x，21 == 21、13 722/8/14）为准，**不要**引用链里这一腿。
 - 结论照旧不粉：**完成条件 1 里"T7 三条命令 exit 0"在当前 tip 上不成立**，而且现在**结构上不成立** —— 第 1 步就红，
   `&&` 链后面 110 步不会被 `pnpm check` 自己跑到；要它绿必须先补回那四枚定义（B196，别线一笔）+ 本线那三格（B197）。
+
+## 2026-10-14 11:4x · 本段收尾：四笔入库、一处我自己验错的探针、以及**要负责人点头的那几格逐条列在这里**
+
+- 🔴 **自曝一条**：我在提交说明里写"改前现量 step 6 那句 COMMENT 仍在册"，用的却是 `sed -n '1,3p' 006.log | grep -c COMMENT` ⇒ **只看了前三行，读出 0**。
+  整文件重测：`grep -c 'COMMENT' .run-logs/check-current/006.log` = **4**，`🔴 COMMENT 0 处写路径` 确实在册 ⇒ 那句话**成立**，但**我的验证方法当时不成立**。
+  一般规律（本文件已有多条同族）：**"证据还在不在"这类负向/存在性判断，作用域必须是整份文件**，`head -3` 只能证明"前三行没有"。
+- 本段三笔（都只点名本线路径，提交前后索引都 0，**没有 push**）：
+  `0fe3d16b`（第 105 道新 tip 读数 + B195）、`696ace2b`（第 86 道整链 111 步 + B196/B197 + AC-3 行补句）、`7c211cf4`（AC-8 行改口）。
+  加本段之前落地的 `c8557604` / `7d25b73a` / `bc2097b3` / `dfde0bb1` ⇒ 本会话共 7 笔。
+- `reinstall:all` 那一腿**在当前 tip 上没有新读数**（旧读数出自载体 `422db1b2`，10-12 那趟：桌面两端 + Linux 取证全绿、移动两端按 §8.9 未点）。
+  为什么本段没跑它：四端重装要**同时**空出两枚设备面并往本机 `/Applications` 装机，属于"要人拍时机的宿主级动作"，不在能自主推进的那几格里。
+
+**要负责人点头的，逐格（每格都能现量复跑）**
+| 格 | 一句话 | 拍什么 | 复跑 |
+|---|---|---|---|
+| B140 | 自动收集那节没 `active` 闸门 ⇒ 面板在无资格时照样发请求，AC-6 那 2 枚红由它来 | 补那一句 `active` 还是改 AC-6 口径（挂载点在 `AiSettings.tsx` / `App.tsx`，地界外） | `cd e2e && npx playwright test --config playwright.inbound.config.ts` |
+| B110 | `web.ai.inbound.process.waiting-entitlement` 词条不存在，"等资格"这档在界面上没法显示 | 加词条（`packages/i18n`，死规矩不许本线动） | `grep -n "web\\.ai\\.inbound\\.process\\." packages/i18n/src/locales/zh-CN.ts` |
+| B196 | `pnpm check` 链引用四枚已不存在的脚本定义，第 1 步就红 ⇒ **T7 三条命令 exit 0 结构上不可达**；那四道 e2e 门禁已不在链里执行 | 把四枚定义补回 `package.json`（**别删链里那四个引用**） | `git show 422db1b2:package.json \| grep -E '"check:(ai-e2e\|gate-ssh\|e2e-carrier\|e2e-helper-exports)"'` |
+| B197（三格） | 当前 tip 的 `pnpm check` 里**本线是红因**：①我那 4 枚瞬态 `…Id` 要进 `ROW_ID_EXEMPT`、②我那 1 处手写空态要么先造 web 共享 `EmptyState` 要么进 `EMPTY_SITES`、③那枚双宿主 integration spec 没被任何 `test:integration*` 点名 | ①②要动别人的门禁登记表或共享层；③要动 `server/package.json`（一行形状在 B197） | `node scripts/check-selection-single-source.mjs; node scripts/check-empty-state.mjs; node scripts/check-integration-coverage.mjs` |
+| B194 | 共享树里 12 枚 `inbound-recovery` 证据图归属不可证（`docs/research/inbound-automation-review.md:355` 引用的还是已提交那批字节） | 要么改链接指向白名单内那批，要么用一趟**有读数**的跑重出并提交 | `git status --porcelain -- apps/web/evidence/inbound-recovery/` |
+| B195 | `18efc229` 那场 merge 收了 mobile 两枚门、没收门钉的源码（`AssistantScreen.tsx` 1564 → 325 行）⇒ `-r test` 上 4 枚红 | 把分支那代源码一起收进来，还是撤门——二选一 | `git diff --numstat 6ded0725 HEAD -- apps/mobile/src/ai/AssistantScreen.tsx` |
+| B169/B175/B185/B190/B193 | 各自一格外前提（退役清扫没有调用方、清理任务在地界外、别线判卷口径、别线红） | 已在各自条目里写了"谁做 / 一行可粘" | 见各条 |
+
+**本线自查口径没变**：AC 已勾 **0**、未勾 **8**；四道静态门（voice / link / migrations / license-inventory）当前 tip 全 **rc=0**；
+非白名单脏条目仍 **13**（与 B194 那批同一份，本线一枚没动）；测试数只增（`13 608 → 13 722`）。
