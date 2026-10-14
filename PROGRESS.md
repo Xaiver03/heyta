@@ -4399,6 +4399,36 @@ Running 8 tests using 1 worker
 `check-docs-voice` rc=0、`docs-link-check` rc=0。**没有 push**；
 AC 已勾数仍 **0**（`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md`）。
 
+## 2026-10-14 10:5x · 交付不变量在当前 tip 的逐条打勾（`bc2097b3`，本会话三笔落完之后）
+
+| 完成条件那一格 | 命令 | 现量 | 判 |
+|---|---|---|---|
+| license 门 | `node research/tools/license-inventory.mjs` | `rc=0` | ✅ |
+| 迁移门 | `node scripts/check-migrations.mjs` | `rc=0` | ✅ |
+| AC 不许自己勾 | `grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` | **0**（未勾 **8**） | ✅ |
+| 白名单内不许留未提交 | 按任务书白名单逐条展开的正则表分类 `git status --porcelain` | 总 **13**、白名单内 **0**、白名单外 **13** | ✅ |
+| 测试数只许 ≥ 基线 | `verify-inbound-worker-identity.py` | `Test Files 1 passed` / **`Tests 46 passed (46)`**（基线 38） | ✅ |
+| 三臂牙装置 | `verify-inbound-{ticket,queue,quota}-teeth.py` | `臂数=8 不成立=0`／`臂=6 不成立=0 末次 sha256=52c3fd70…（须等于开局）`／`臂=7 不成立=0` | ✅ |
+| 矩阵逐格对账 | `verify-inbound-ac8-matrix.py` | `rc=0`，`无尺行=7` 仍等于计划里那七格（C10、C29、C30~C34），本会话没挪尺列 | ✅ |
+| BLOCKED 随交付提交 | `git show --stat bc2097b3` | 3 枚全在白名单内（`BLOCKED.md`＋`PROGRESS.md`＋计划） | ✅ |
+
+**本会话三笔**（都只点名本线路径，`git diff --cached` 提交前后都是 0）：
+`c8557604`（时区取证 locale 臂 + typecheck 那条真红）、`7d25b73a`（B193/B140 新 tip 复量 + B194）、
+`bc2097b3`（AC-6 当前 tip 真跑读数 + 先存后还配方）。**没有 push。**
+
+**不成立的那一条要如实说，不许被上面这张表遮住**：完成条件 1 的后半句
+"**T7 三条命令在隔离副本上 exit 0**"**不成立** —— 第 105 道（`pnpm -r test`）里 `apps/web` 那枚红是 **B193**（别线），
+今天在同 tip 逐字复现；第 86 道（`check:ai-e2e`）里有两枚别线红（B171/B172/B173 那族）加**本线占的一格**（B181 的 B 格），
+而那一格要的是 `packages/i18n` 里那枚还不存在的 `web.ai.inbound.process.waiting-entitlement`
+（**B110 今天静态复量仍开**：`grep -n "web\.ai\.inbound\.process\." packages/i18n/src/locales/zh-CN.ts` 只回
+`submitted/empty/needs-confirmation/failed` 四条，en 侧同形）⇒ 地界外，本线不代加、不硬造。
+`reinstall:all` 四端那格的读数仍出自 10-12 那趟（载体 `422db1b2`），差集证明过打包输入与当时 HEAD 逐字相同，
+但**当前 tip 上没重跑**。
+
+**结论**：本线能自主推进的格已经推完；剩下每一条都点名到了具体的一格外部前提（B140 / B110 / B169 / B171-173 / B193 / B194），
+不是"还差工时"。等负责人点头的是那几格的归属与口径，不是交付本身。
+
+
 
 
 
