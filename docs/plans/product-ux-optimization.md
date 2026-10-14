@@ -1184,7 +1184,23 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
     `check:locator-labels` 对该脚本 rc=0 且它已在 `pnpm check` 链里）。⇒ 这条给本账补一句口径：
     **"已补"只有配上"在 HEAD 里"才算补**，装置类改动写完不落笔，台账那句话就是在给下一个人在一棵不存在的树上标路径。
     ⚠️ 本格仍然不打勾：旅程本身没跑（模拟器此刻不在，`adb devices` 空列表），这一笔改的是"下次那趟能正确判语言"。⚠️ **09 13:1x 现量：载体已经退到更早的一格 —— 模拟器本身没了**：`adb devices` 返回空列表（`emulator-5554` not found），所以那一趟连 `pm` 都问不到，不是包管理服务坏了没恢复。取现量：`adb devices`；`ls -l apps/mobile/android/app/build/outputs/apk/release/app-release.apk`（当前这份是 09 01:52 打的）。起模拟器要吃 3.6G+ 常驻与近满 CPU，按 AGENTS §6.1 那条新规 Android **构建**已改走 `windows-pc`，但**设备侧验收仍在这台 Mac** ⇒ 这一趟要负责人给一个明确窗口，不是我该擅自起的。
-- [ ] **共享设备证据**：同一台 `emulator-5554` 上 11:00:26 与 11:12:54 两次 `pm_clear_app_data_caller`（uid 1000 = adb）；同时在跑的还有另一条线的 `scripts/verify-mobile-account-email-sessions.sh` 与 Playwright `tests/ai-assistant.spec.ts`。整机 1 分钟负载在 **73 ↔ 622** 之间震荡（阈值 12），内存 62G/63G 占满。按 AGENTS §8.9，这一段要的是**独占窗口**，不是重试。
+- [x] 🔴 **共享设备证据（10-14 08:2x 本格按现量重述，原来那句"要独占窗口"已不是拦路项）**：原记录是同一台 `emulator-5554` 上
+    11:00:26 与 11:12:54 两次 `pm_clear_app_data_caller`（uid 1000 = adb），同时另一条线在跑 `scripts/verify-mobile-account-email-sessions.sh`
+    与 Playwright `tests/ai-assistant.spec.ts`，整机 1 分钟负载 73 ↔ 622 震荡（阈值 12）、内存 62G/63G 占满 ⇒ 当时写的是
+    "按 AGENTS §8.9 这一段要的是**独占窗口**，不是重试"。
+    **两句要分开重读**：① 窗口这件事负责人 10-10 07:4x 已经一次性授权（可占用设备与共享载体做验收，不必逐项回问）
+    ⇒ "等一个明确窗口"不再是拦路项，本格因此打勾；② 但**负载门不是被授权取消的那道**，它照旧开火：10-13 晚那第二次尝试
+    全程没进设备步骤（`wait_for_quiet_host` 24 次采样 load1=19…34，累计 720s 后本线主动停腿），**没有为了让腿过去调低阈值** ——
+    这条是本格现在真正留下的教训：**共享的是设备，拦路的是本机负载，两者不是同一件事**。
+    ⚠️ 三条仍然活着的边界，别读成"随便用"：这台 AVD（pid 61554，已跑 3 天）**不是本线起的，不重启不关停**；
+    外来 `pm clear` 那两次是别的会话干的，本线只清自己那趟新建的账号所在库（私有 `heyta_ux_r109` + 私有端口 3111，
+    3000 那台常驻 server / pid 26623 没碰）；装包用 `HEYTA_ALLOW_STALE_APK=1` 放行旧包时脚本会**自己把"本轮结论不适用于当前源码"打印成取证**。
+    🔴 **§8.9 那条规则本身没被这次授权取消**，它剩下的半句仍然算数：「不得并行覆盖」+「安装脚本须核对真实
+    applicationId 和退出码，安装失败立即停止，**不能拿旧包继续验收**」⇒ 上一格第 5 条那种放行旧包的跑法，
+    打的勾只能打在"手势/导航"那半，不能打在"当前源码的界面行为"上。
+    取现量：`adb devices`、`sysctl -n hw.ncpu`（阈值 = ncpu*3/4）、`uptime`、`ps -eo pid,lstart,etime,command | grep -E 'emulator|verify-mobile' | grep -v grep`。
+
+
 - [x] ✅ **`pnpm --filter @heyta/web typecheck` rc=2，红点不在本线**：13 条 `error TS` 全部落在 `apps/web/tests/share-key-store.spec.ts`（`git status` 为 `A`、从未提交、mock 的 `Storage` 缺 `length/clear/key`），本线三个文件零错误。该文件属另一条在册的线，**不代改**。取现量：`grep -cE 'error TS' <该命令日志>`。
     ⇒ **这一格作为待办已被下面 08:5x 那格的复量取代**（那枚测试文件此刻已在 HEAD 里，"从未提交"那句不再成立），
     活着的债与它的分文件计数记在那一格。13:4x 复量：红一条没少、`git show HEAD:e2e/tests/helpers.ts | grep -c selectSettingsSection` = **0**
