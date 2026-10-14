@@ -4432,3 +4432,32 @@ AC 已勾数仍 **0**（`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automatio
 
 
 
+
+## 2026-10-14 11:0x · 第 105 道（`pnpm -r test`）在新隔离副本 `.worktrees/inb-t9` 上重取：**21 == 21、`passed 13 722 / failed 8 / skipped 14`**，而"红集成员换了"这一句我差点读成"新回归"
+
+- 载体：`git worktree add --detach .worktrees/inb-t9 dfde0bb1`（= 当时 main HEAD，建完脏条目 0）。链脚本 `.run-logs/chain.sh`，每步 `echo *_RC=$?` 紧跟其后：
+  `INSTALL_RC=0`（11:00:05→12）→ `BUILD_RC=0`（→11:00:35）→ `GEN_RC=0` → `LOAD_GATE=OPEN one_min_load=11.28 threshold=12 waited=3` → **`TEST_RC=1`**（11:02:06→11:03:12）；
+  pnpm 自报 `Summary: 4 fails, 17 passes`。日志 `.worktrees/inb-t9/.run-logs/chain.log`（867 224 B，不入库）。
+- 🔴 **对账那把尺先错过一次**（这条比读数更值得留）：我第一版用 `grep -E '^[a-z/-]+ test: +Tests '` 数"打了汇总行的包"，得 **20**，
+  与分母 21 不等 ⇒ 差的那枚是 **`packages/i18n`** —— 字符类 `[a-z/-]` **不含数字**，包名里的 `18` 让它整行没进统计。
+  改成逐字面名循环（`grep -cE "^<pkg> test: +Tests "`）后 **21 == 21，零枚"整层从来没被跑过"**。
+  ⇒ 一般规律：**用名字模式数包之前，先按分母逐名点一遍**；否则"少一枚"会读成"有一层没跑"，而它只是正则没匹配上。
+- 红集 8 条逐条点名（`grep -c "FAIL"` 全日志 15 行，其中 8 行是判定行、7 行是 diff 上下文；**没有一条含 `inbound`**）：
+  | 包 | 用例 | 红的是什么 |
+  |---|---|---|
+  | `packages/ai` | `capability-manifest.spec.ts` ×2（"分母恰好 9 且逐条点名"、"现状基线 9/9 每个实体读写都有工具"） | 清单产物/分母，别线判卷口径 |
+  | `packages/shared-schema` | `auth-http-contract.spec.ts` ×1（口令路径必须相对、不带 `/api`） | auth 线路由与那张封闭词表不一致，别线 |
+  | `apps/mobile` | `ai-copy-parity.spec.ts` ×1 | web 侧多出 `web.ai.disclosure.hideFields` / `showFields` 两枚 key 未逐字登记 |
+  | `apps/mobile` | `selection-single-owner.spec.ts` ×3（助手屏喂全集 / 五屏不再 `useState` 选中 id / 三屏卸载清理） | 结构正则读 `ai/AssistantScreen.tsx` 等六枚源码文本 |
+  | `apps/web` | `ai-disclosure-parity.spec.tsx` ×1 | **B193**（"发给谁"四段之间没分隔），别线，今日在同 tip 逐字复现 |
+- 🔴 **那 4 枚 mobile 红不是"新回归"**：`git rev-list --count 422db1b2..dfde0bb1` 现量 —— 两枚 spec 各 **1**，
+  而它们断言的六枚源码文件（`ai/AssistantScreen.tsx`、`lib/selection.ts`、四张屏）**全 0**；`packages/i18n/src/locales` 在区间内 **13**。
+  两枚 spec 的最后一次提交是 10-06 的 `6ded0725` / `30482038`，它们**经 `18efc229` 那场 103 处冲突的 merge 才进 main**
+  ⇒ 实话是"**这两枚门刚进 main 就在 main 上红**"，不是"源码漂了"。归属与给谁做写在 **B195**，本线一行不代改。
+- 与 10-12 基线（载体 `422db1b2`）对账：`passed 13 608 → 13 722`（**+114，只增不减成立**）、`failed 8 → 8`、`skipped 14 → 14`；
+  **总数相同但成员换了**（`packages/ai` 5→2、`packages/legal` 2→0、`apps/mobile` 0→4）——所以"failed 计数没变"这句话**不能**读成"同一批红"。
+- 🔴 不成立的那条照旧如实说：`TEST_RC=1` ⇒ 完成条件 1 后半句"T7 三条命令在隔离副本上 exit 0"**仍不成立**，
+  且八条红的红因**全在本线地界外**（`apps/*/tests`、`packages/{ai,legal,shared-schema}/tests`）。本线在 `-r test` 上占的红仍是 **0 格**。
+- 同 tip 的静态门现量（写在同一格里，免得下游沿用旧读数）：`node scripts/check-docs-voice.mjs` **rc=0**（禁词表 30 项零命中）、
+  `node research/tools/docs-link-check.mjs` **rc=0** —— 任务 0 那句"link-check rc=1，唯一一条是 `apps/desktop-windows/README.md:89`"**已被别线收走**，
+  这条更正按 §8 加在这里，原句不删。

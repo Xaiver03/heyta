@@ -10464,3 +10464,36 @@ Running 8 tests using 1 worker
 - 日志：`.run-logs/inb-e2e-20261014-104316.out`（`.run-logs/` 被 ignore，没给共享树留新脏）。
 
 
+
+## B195（2026-10-14 11:0x @ `dfde0bb1`，本会话 · `apps/mobile` 那 4 枚红不是"新回归"，是 **`18efc229` 那场 merge 把判卷口径收进 main、把口径所钉的源码留在了门外**）
+
+**为什么这一格值得单独登记（它挡住的是 T7 与 AC-8 的闭合条件，不是一句"又有红"）**
+第 105 道（隔离副本 `.worktrees/inb-t9`，`pnpm -r --no-bail test`）里 `apps/mobile` 报 4 条红：
+`tests/ai-copy-parity.spec.ts` ×1（披露块两端同一条口径）、`tests/selection-single-owner.spec.ts` ×3（助手屏喂全集 / 五屏不再 `useState` 选中 id / 三屏卸载清理）。
+`TEST_RC=1` ⇒ 完成条件 1 后半句"T7 三条命令 exit 0"、以及矩阵里 C30 那格都因此继续不成立。
+
+**现量（四条命令，谁都能复跑）**
+```bash
+git rev-list --count 422db1b2..dfde0bb1 -- apps/mobile/tests/selection-single-owner.spec.ts   # 1
+git rev-list --count 422db1b2..dfde0bb1 -- apps/mobile/src/ai/AssistantScreen.tsx \
+                                             apps/mobile/src/lib/selection.ts                  # 0 / 0
+grep -c 'const aliveTasks' apps/mobile/src/ai/AssistantScreen.tsx                              # 0
+git show 6ded0725:apps/mobile/src/ai/AssistantScreen.tsx | grep -c 'const aliveTasks'          # 1
+git diff --numstat 6ded0725 HEAD -- apps/mobile/src/ai/AssistantScreen.tsx                     # 248 增 / 1487 删（1564 行 → 325 行）
+```
+读法：那两枚 spec 的最后一次提交都是 **10-06**（`6ded0725` 改源码**并**加门、`30482038` 加对账装置），
+它们**在 `422db1b2` 之后才经 `18efc229 merge(AI 收口台账 merge/20261005)` 进 main**（所以区间内各计 1 次）；
+而被它们钉的那批源码在区间内**一次都没被改动**，且 `6ded0725` 那份 1564 行的 `AssistantScreen.tsx`
+与 HEAD 那 325 行**不是同一代** —— 那句 `const aliveTasks = actions.listTasks();` 只在 `6ded0725` 那份里。
+⇒ **main 里有门、没有门所守的东西**：merge 的冲突裁决对这枚文件取了 main 侧，spec 取了分支侧。
+同一族的第二例：`ai-copy-parity` 报"web 多出 `web.ai.disclosure.hideFields` / `showFields`"（日志正文的 Received 数组），
+即 web 侧那两句的载体也不在 mobile 侧 —— 两条红指向**同一场半收合并**，不是四个独立缺陷。
+
+**给谁做（本线无权，四条都不许顺手做）**
+- **`18efc229` 那场 merge 的执行方（AI 收口线 / 移动壳线）**，且 `d49f77e3`（10-10）也动过同一枚 `AssistantScreen.tsx` ⇒ 要拍的是"**把分支那代源码一起收进来**"还是"**撤掉/降级这两枚门**"，二选一。
+- 本线动作：**只登记**。`apps/mobile/tests/**` 与 `apps/mobile/src/**`（白名单只含 `apps/mobile/src/inbound/`）一行不碰，不代改别人的判卷口径（同 B150/B181/B182 的处理）。
+
+🔴 **反作弊提醒（这一格最容易被"顺手做绿"）**：这 4 条红是**合并完整性**的读数，不是 mobile 的界面坏了。
+把它 `it.skip` 掉、或把 `expectSameFamily` 的默认"完全一致"放宽成"允许 web 单边多出"，
+就正好把"门进来了、源码没进来"这一格永久消音 —— 而那两枚门是 `30482038` 那笔注释里点名"早就承诺却从不存在的对账装置"，
+刚补上就被撤，下一位读不到任何痕迹。

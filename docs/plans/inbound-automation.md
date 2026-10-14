@@ -3552,3 +3552,25 @@ AC-6 的界面挂载点（B140/B181）与 AC-8 的四端设备腿（B164）仍�
 同一趟别线的 `c5561959` 也动过 `entitlement-ticket.ts`，清扫函数没被碰掉 —— 这也是本节重取而不是沿用 01:4x 读数的理由。
 矩阵里我只改了 C27 的证据归属格（写成带时点的更正，原句那两条"零删除／无尺"就此作废，不再被下游引用），**"尺"那一列一个字没动**：
 本线那三枚回拨用例仍在册。🔴 本节不改任何 AC 的闭合状态，`已勾=0` 现量未变。
+
+## 2026-10-14 11:0x · 第 105 道（`pnpm -r test`）读数**在新 tip 上重取了一遍**：`21 == 21`、`13 722 / 8 / 14`，八条红仍无一在本线地界
+
+上面 10-12 08:2x 那一节描述的是载体 `422db1b2` 的读数，而 main 到本会话已经推进 198 笔 —— 那一节的**红集成员**因此不能当"当前 tip 的红集"引用。
+这一节是在 `.worktrees/inb-t9`（`worktree add --detach … dfde0bb1`，建完脏条目 0）上从零取的一次，链与退出码见 PROGRESS 同期那格。
+
+| 项 | 现量 | 尺 |
+|---|---|---|
+| 有 `test` 脚本的包 | **21** | node 扫 `packages/*`、`apps/*` **加裸 `server` 条目**（只 glob 会漏掉 `server`，分母就成了 20） |
+| 打了 `Tests` 汇总行的包 | **21** | 逐字面名 `grep -cE "^<pkg> test: +Tests "`；⚠️ 用 `^[a-z/-]+ test:` 这类名字模式会**漏掉 `packages/i18n`**（字符类不含数字），读数变成假是的 20 |
+| 合计 | `passed 13 722` / `failed 8` / `skipped 14` | 21 行汇总逐包相加（我手工复核过：`181+527+265+172+318+76+47+1027+419+158+195+147+673+1410+1783+975+198+2293+2816+12+30 = 13 722`） |
+| 与基线（`422db1b2`：13 608 / 8 / 14） | passed **+114**（≥ 基线成立）；failed/skipped **计数相同但成员不同** | `ai` 5→2、`legal` 2→0、`mobile` 0→4、`web` 0→1 |
+| 红集里含 `inbound` 的条数 | **0** | `grep -E "FAIL" .run-logs/chain.log` 共 15 行（8 行判定 + 7 行 diff 上下文），`… \| grep -ci inbound` = 0 |
+
+八条红的逐条归属写在 PROGRESS `2026-10-14 11:0x` 那张表里，本文件不抄第二份。🔴 其中 `apps/mobile` 那 4 条的**定性**要留在这里，因为它改变下游怎么读"failed 计数没变"这句：
+`git rev-list --count 422db1b2..dfde0bb1 -- <那两枚 spec>` = **1 / 1**，而它们断言的六枚源码文件（`apps/mobile/src/ai/AssistantScreen.tsx`、
+`src/lib/selection.ts`、`screens/{TasksScreen,HabitsScreen,NotesSection,SearchScreen}.tsx`）= **0/0/0/0/0/0**
+⇒ 被测物字节没动，是**这两枚判卷口径经 `18efc229` 那场 merge 才进 main、一进 main 就红**。⇒ 记 **B195**，本线不动别人的门也不动它读的那批源码。
+
+🔴 **本节不改任何 AC 的闭合状态**：`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` 仍 **0**，未勾仍 8。
+完成条件 1 那句"T7 三条命令在隔离副本上 exit 0"这一腿**仍不成立**（`TEST_RC=1`），AC-8 的 C30 与矩阵里那句"`-r test` 在隔离副本仍红"因此**继续不作废**；
+`pnpm check`（第 86 道）与 `reinstall:all` 两腿在**当前 tip** 上仍无新读数（各自读数出自 10-12 载体 `422db1b2`）。
