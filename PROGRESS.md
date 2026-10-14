@@ -4351,5 +4351,54 @@ B191 那格记的 **37 枚"收集阶段就死"随 B192 闭合一起消失**，�
 （B193 追记 + B140 追记 + 新增 B194）。**没有 push**；AC 已勾数仍 **0**。
 **还欠的**：B140/B169/B175/B185/B190/B193/B194 都归负责人或别线，本线一行不代改。
 
+## 2026-10-14 10:4x · AC-6 那条 e2e 腿在 `7d25b73a` 取到**当前 tip 的读数**（8 枚 / 2 红，红仍是 B140 那一枚），共享树净变化 **0**
+
+**为什么敢在共享树里跑**（上一格说过"不重跑"，那一格的前提这一趟被我自己解决了）：隔离载体确实不存在
+（`git worktree list` 现量只有主检出这一条），但拦路的那句"跑它会覆掉无读数的图"可以**先存后还**地绕开 ——
+代价比"AC-6 的读数停在 `4193dabd`（两天前）"低。
+
+**跑前存证（16 枚，含 4 枚 `before-*`）**
+```bash
+d=.run-logs/inb-e2e-protect-$(date +%Y%m%d-%H%M%S); mkdir -p "$d"
+cp apps/web/evidence/inbound-recovery/*.png "$d/"
+(cd "$d" && shasum -a 256 *.png > …/protect-<ts>.sha)      # 16 枚全在册
+lsof -nP -iTCP:4468 -sTCP:LISTEN | wc -l                    # 0 ⇒ 端口空闲才跑
+```
+
+**读数（`cd e2e && NO_COLOR=1 ./node_modules/.bin/playwright test --config playwright.inbound.config.ts --reporter=list`，日志 `.run-logs/inb-e2e-20261014-104316.out`）**
+```
+Running 8 tests using 1 worker
+  ✘  1 › encrypted date draft review and Vault invalidation 1280 (1.0m)
+  ✘  2 › encrypted date draft review and Vault invalidation 390 (1.0m)
+  ✓  3-6 › inbound explicit retry and themes / inbound settings panel layout evidence（1280 与 390 各两枚）
+  ✓  7-8 › inbound draft editor keeps the date-only literal and digest（`Pacific/Kiritimati`、`Etc/GMT+12`）
+  2 failed
+  6 passed (2.2m)
+```
+- 总数 `6 → 8`（只增不减成立），**新增那两枚正是本线的 date-only 跨时区取证腿，都绿**；`skipped` 0、零 mock 界面。
+- 失败正文与 10-12 那次**逐字同一枚**：`Error: locator.click: Test timeout of 60000ms exceeded. — waiting for getByTestId('inbound-event-date-draft').getByRole('button', { name: '查看并编辑草稿', exact: true })`
+  ⇒ 归 **B140**（挂载点缺 `active`，本行今天静态复量在 `AiSettings.tsx:1270`）。**AC-6 因此继续不勾**，
+  这一格只把它的读数从两天前挪到当前 tip，没往完成挪半步。
+
+**还原（这就是"敢跑"的下半条，缺了它整趟是不合格的）**
+- 12 枚 `apps/web/evidence/inbound-recovery/*.png`：`cp` 回快照 ⇒ `shasum -a 256 -c` 现量 **16/16 OK**。
+- 🔴 **这一趟还写第三枚证据根**，而上一格只量了第一枚：`docs/research/evidence/inbound-automation-review/panel-layout/`
+  两枚（`panel-1280-dark.png`、`panel-390-dark.png`）也变脏了。这两枚**跑前不在 porcelain 里**（⇒ 与 HEAD 等字节），
+  所以精确还原的动作是 `git checkout HEAD -- <点名那两枚>`，不是批量 `git checkout --`。
+  `…/date-consistency/` 那批回来是**逐字同字节**（没出现在 porcelain）⇒ 那部分输出是确定性的。
+- 净效果现量：`git status --porcelain | wc -l` 回到 **13**，13 条**逐字是那 13 条**（8 枚 ` M` + 4 枚 `??` 那批图 + 1 枚别线的 android 目录）；
+  快照目录与 sha 清单已删（它们住 `.run-logs/`，本来就被 ignore，没给共享树留新脏）。
+
+**顺带把两格旧话作废**：① 上一格"共享树里跑它会覆掉那批无读数的图"——**加了先存后还就不成立**，已在 B194 追记；
+② 那句"这一趟会让那 12 枚 PNG 变脏"**不完整**（实际三枚根），同样在 B194 里更正。
+
+**本轮动的落点**：`PROGRESS.md`、`BLOCKED.md`（B194 追记 + B140 追记二）与 `docs/plans/inbound-automation.md`
+（T8 表里 AC-6 那一格补上当前 tip 的读数）—— 三枚都在白名单内；**e2e 产生的字节一枚不入库**（先存后还，净变化 0）。
+改完复跑四把尺同戳全绿：`verify-inbound-doc-tables` rc=0、`verify-inbound-ac8-matrix` rc=0
+（`表头行=1098 行数=34 有尺行=27 无尺行=7 尺枚=67 窗=13/13 平台=10/10 权益=9/9 设备状态=9/9`）、
+`check-docs-voice` rc=0、`docs-link-check` rc=0。**没有 push**；
+AC 已勾数仍 **0**（`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md`）。
+
+
 
 

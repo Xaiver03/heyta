@@ -10412,7 +10412,22 @@ grep -rn "inbound-recovery" --include=*.md .        # docs/research/inbound-auto
   两种解释（别线跑过本线那枚 config / 那次 merge 或某次 `cp` 把它们带进共享树）**本线都证不了**。
 
 **本线的处置**：不提交、不覆写、不删除（那 4 枚 `??` 与 8 枚 ` M` 都不是本会话写的，`只对自己创建的对象动手`）。
-本会话也没跑那趟 e2e ⇒ 台账里"AC-6 仍 2 failed / 4 passed"那句**继续按 `4193dabd` 那趟报**，不冒用今天的名义。
+⚠️ 本格原来那句"本会话也没跑那趟 e2e"到 **2026-10-14 10:4x 已经不成立**（见下面 B140 追记二：本线**跑了**，
+用"先存后还"绕开了覆写风险，共享树净变化 0）。**这批图的归属仍然不可证** —— 跑一趟不会让它变得可证，
+只会多出一份"有读数的最新产物"，而那正是 AC-6 现在有的东西。
+
+**🔴 追记（2026-10-14 10:4x）：本格上面那句"这一趟会让那 12 枚 PNG 变脏"是不完整的 —— 实为三枚证据根。**
+现量（跑完看 `git status --porcelain`）：
+| 根 | 在白名单内？ | 这一趟的结果 |
+|---|---|---|
+| `apps/web/evidence/inbound-recovery/`（`spec:6/75/137/142`） | ❌ 不在 | 12 枚被重写 ⇒ 跑前先 `cp` 进 `.run-logs/inb-e2e-protect-<ts>/` 并 `shasum -a 256` 造册，跑后 `cp` 回、`shasum -c` **16/16 OK** |
+| `docs/research/evidence/inbound-automation-review/panel-layout/`（`spec:166/265`） | ✅ 在 | `panel-1280-dark.png`、`panel-390-dark.png` 两枚变脏；另两枚同字节。这两枚**跑前与 HEAD 等字节** ⇒ 还原动作是 `git checkout HEAD -- <点名那两枚>`，**不是**批量 `git checkout --` |
+| `docs/research/evidence/inbound-automation-review/date-consistency/`（`spec:295-373`） | ✅ 在 | **没出现在 porcelain** ⇒ 那批输出是确定性的（同一棵树上重打逐字相同） |
+
+净效果现量：`git status --porcelain | wc -l` 跑前 **13** → 跑后（含还原）仍 **13**，13 条逐字是那 13 条。
+⇒ 上面"最小动作 1"那句"**只在隔离副本里跑**"从**必须**降级为**建议**：真正承重的是"先存后还 + 逐枚 sha 验收"，
+而不是"必须新开一棵树"（这一台机器现在根本没有可复用的隔离载体：`git worktree list` 只有主检出）。
+
 ⚠️ 顺带更正两处本线自己写错的归属（PROGRESS `:4241` 与本会话 01:5x 那格曾把这批说成"别线的落点"）：
 **落点是本线 spec 的，写的却不是本线本会话** —— 这两句要分开，否则下一个人会以为重跑无成本。
 
@@ -10431,4 +10446,21 @@ grep -rn "inbound-recovery" --include=*.md .        # docs/research/inbound-auto
 —— 行号从记初的 `:1262` 漂到 `:1270`（别线在这枚文件里加过东西），**但三个 props 仍是 `routing`/`consents`/`secretStore`，
 没有 `active`** ⇒ AC-6 那 2 枚红的根因原样在位，本线继续不代改（挂载点归属方是 AI 线 / `App.tsx`）。
 判据不变：那两枚红要么由 `active` 一句消，要么由负责人改 AC-6 的口径，两条都不在本线地界内。
+
+**追记二（2026-10-14 10:4x @ `7d25b73a`，真跑了一次 —— 静态复量升级成了带正文的读数）**
+```bash
+cd e2e && NO_COLOR=1 ./node_modules/.bin/playwright test --config playwright.inbound.config.ts --reporter=list
+Running 8 tests using 1 worker
+  ✘  1 › encrypted date draft review and Vault invalidation 1280 (1.0m)
+  ✘  2 › encrypted date draft review and Vault invalidation 390 (1.0m)
+  ✓  3-6 › inbound explicit retry and themes / inbound settings panel layout evidence
+  ✓  7-8 › inbound draft editor keeps the date-only literal and digest（Pacific/Kiritimati、Etc/GMT+12）
+  2 failed
+  6 passed (2.2m)
+```
+- 失败正文逐字与 `4193dabd` 那次同一枚：`waiting for getByTestId('inbound-event-date-draft').getByRole('button', { name: '查看并编辑草稿', exact: true })` 60 s 超时。
+- 总数 `6 → 8`（只增不减），新增两枚是本线的 date-only 时区腿且**都绿**；`skipped` 0。
+  ⇒ **AC-6 在这一格仍然不勾**：拦路的是 `active`，不是覆盖不够。跑法、还原与安全验收见 **B194** 追记。
+- 日志：`.run-logs/inb-e2e-20261014-104316.out`（`.run-logs/` 被 ignore，没给共享树留新脏）。
+
 
