@@ -1462,6 +1462,23 @@ if mode in ('scroll-region', 'geom'):
     raise SystemExit
 
 hits = []
+# 🔴 底部那道 `cy < 2100` 的守卫量的是**主屏**那一排底部标签（实测带 [2169,2337]）：
+#    在主屏上，被 ScrollView 裁掉的节点照样在无障碍树里，它的"中心"落进那一排 ⇒ 点下去
+#    会切走标签页（实测「我的」屏的「逐条处理」一点就跳去「专注」），所以必须挡。
+#    但**设置面是一张盖住整屏的 Modal**（现量 2026-10-14 08:0x：rid=`settings-sheet`
+#    的 bounds=`[0,0][1080,2400]`），那一排在它**下面**，点 y=2173 落进的是浮层里的输入框。
+#    2026-10-14 01:47 那条腿就是被这道常量挡掉的：那一拍可滚区 `[0,210][1080,2400]`、
+#    「端到端加密口令」标签在 `[84,2049][996,2105]`（高度正），它下面那格 EditText 的
+#    中心 ≈2173 ⇒ `xy_edit_sane` 返回空，滚 5 次也白滚（内容已在浮层可视底，不是没滚到）。
+#    ⇒ 浮层开着时上限换成**浮层自己的下沿**；浮层不在树上时照旧 2100，原保护一格不缩。
+SHEET_BOTTOM = 0
+for m in re.finditer(r'<node[^>]*?>', s):
+    _t = m.group(0)
+    if 'resource-id="settings-sheet"' in _t:
+        _b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', _t)
+        if _b and int(_b.group(4)) > SHEET_BOTTOM:
+            SHEET_BOTTOM = int(_b.group(4))
+TAP_LIMIT = SHEET_BOTTOM if SHEET_BOTTOM > 2100 else 2100
 for m in re.finditer(r'<node[^>]*?>', s):
     tag = m.group(0)
     b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', tag)
@@ -1489,7 +1506,7 @@ for m in re.finditer(r'<node[^>]*?>', s):
         hits.append((cx, cy))
     elif mode == 'edit-sane' and is_edit and desc == want:
         # 与 desc-sane 同一条守卫（理由见上面）—— 只是限定在 EditText 上。
-        if y2 > y1 and cy < 2100:
+        if y2 > y1 and cy < TAP_LIMIT:
             hits.append((cx, cy))
     elif mode == 'editany' and is_edit:
         hits.append((cx, cy))
@@ -1501,15 +1518,15 @@ for m in re.finditer(r'<node[^>]*?>', s):
         # 实测：任务详情面板里的「优先级」芯片是 [426,2141][531,2100]，
         # 按 desc 取到的"中心点"(478,2120) 落在裁掉的区域 —— 点下去什么都不会发生，
         # 而调用方看到坐标拿到了、以为点成功了。
-        if y2 > y1 and cy < 2100:
+        if y2 > y1 and cy < TAP_LIMIT:
             hits.append((cx, cy))
     elif mode == 'text-sane' and text == want:
         # 🔴 「在 dump 里」不等于「可点」。ScrollView 折叠线以下的节点**仍然会**
         # 出现在无障碍树里，但 `bounds` 的 top 会大于 bottom（负高度）——
         # 它的"中心点"落在**底部标签栏**上，按坐标点下去会切到别的标签页。
         # 实测：「我的」屏的「逐条处理」就是这样，一点就跳去了「专注」。
-        # 所以只有高度为正、且中心在标签栏之上（<2100）才算数。
-        if y2 > y1 and cy < 2100:
+        # 所以只有高度为正、且中心在可点下沿之上（`TAP_LIMIT`，理由见上面那一段）才算数。
+        if y2 > y1 and cy < TAP_LIMIT:
             hits.append((cx, cy))
 hits.sort()
 if len(hits) > nth:
