@@ -1969,6 +1969,19 @@ packages/app-host typecheck: tests/login-code.spec.ts(44,5): error TS2578: Unuse
 所以上一节那句"共享树的 `server/dist` 比 119 枚源码旧"里的**枚数不能当"陈旧源码枚数"读** ——
 判据要落到逐源文件与其产物比 mtime（本轮四枚各比，产物都比源新）。"产物是上一代"那个结论本身另有逐文件依据，不撤。
 
+🔴 **01:3x 戳号更正（旧句不改，只补读法）**：上面那句「`e2160c44` **就是**共享检出现在的 `main`」只在**取数那一戳**成立 —— 并行会话几分钟就推一枚 tip，
+现量 `git rev-parse --short HEAD` 已是 `f7712df7`（`git log --oneline e2160c44..HEAD` = 别线 `b5e5ab71` docs + 本线 `f7712df7` docs）。
+**读数不撤**：`git diff --name-only e2160c44..f7712df7 -- server packages apps e2e research/tools scripts | grep -vE '/evidence/|\.png$|\.json$|\.txt$|\.sh$|\.md$'` → **空**
+（那段区间 45 枚变更**全**在 `apps/web/evidence/` 下，逐枚核对：45/45），判定层字节与取数时同一份 ⇒ ②③④⑤ 四档仍算到当前 tip，只是 tip 号要按现量取。
+
+🔴 **01:4x T7 前两腿在 `f7712df7` 复量的戳（改的是 AC-1 那格里"链停在哪"那一半）**：`pnpm check` 现在停在**第 1 道** `check:gate-wiring`
+（`共 7 处`：缺定义四枚 `check:gate-ssh`/`e2e-helper-exports`/`ai-e2e`/`e2e-carrier` + 三枚无定义引用的实现），
+⇒ AC-1 那格原句"整链仍停在一枚别线类型错（**B144**）"要按这一戳读成"停在**B196** 那七处"，**都不是本线的红**。
+`pnpm -r --no-bail test` 全量红集 = **5 包 / 9 枚 spec**，逐枚点名与归属写在 `BLOCKED.md` 的 B195/B196 追记（本线**零枚**：
+`grep FAIL` 里含 `inbound|automation` 的枚数 = 0，而 `✓ tests/(inbound|automation)…` 结果行 = 41 枚）。
+⚠️ 那一节里我还自造过一次假红（`pnpm -r test --no-bail` 把 flag 转给了每包 vitest ⇒ `CACError: option --bail value is missing`，
+"红"了 i18n/design-system/ai/local-api 四枚包）—— 正确形状 `pnpm -r --no-bail test`，那四枚实际全绿（对照：i18n `Tests 30 passed (30)` rc=0）。
+
 ### 1. AC-1～AC-8 逐格：证据命令 + 贴出的输出 + 结论
 
 | AC | 证据命令（都在上面那枚载体里跑） | 贴出的输出（10-11 01:5x–02:3x · `9fb9eed2`） | 结论 |

@@ -5069,3 +5069,71 @@ AC 已勾数仍为 **0**（`verify-inbound-ac-ticks.py`：`AC 行=8　已勾=0�
    判据要不要把"套件压根没起来"归到 rc=2（它 docstring 本来就写了 vitest 没跑起来算 2，代码里判卷函数 `grade()` 末尾却是 `return out, (1 if red else 0)`）
    是**验收脚本的判卷口径**，我不代改 ⇒ 已记 `BLOCKED.md` **B200**。
    ⚠️ 诚实边界：那一发是被 `nohup` 起了、退出码没采到，"它落 rc=1"是**读代码路径**得出的，不是我量出来的；量到的是它打印的那四行。
+
+## 2026-10-16 01:3x · 🔴 现量更正：上一节里那两句"`e2160c44` 就是共享检出现在的 `main`"用错了时态 —— 它只在取数那一戳成立
+
+上一节（以及 `BLOCKED.md` B200 末节那条载体更正）各有一句同样形状的话：「`e2160c44` **就是**共享检出现在的 `main`」。
+**取数那一刻成立，写完两分钟就不成立了**：现量 `git log --oneline e2160c44..HEAD` 现在是两枚 ——
+`b5e5ab71`「docs(产品体验线 台账)…」（01:26，**别线**）与 `f7712df7`「docs(自动收集 T8 读数戳)…」（01:27，本线那枚入库件），
+`git rev-parse --short HEAD` = **`f7712df7`**。
+
+但这更正**不撤销任何读数**，因为判定层字节没动（现量，逐条可跑）：
+`git diff --name-only e2160c44..f7712df7 -- server packages apps e2e research/tools scripts | grep -vE '/evidence/|\.png$|\.json$|\.txt$|\.sh$|\.md$'`
+→ **空**；那 45 枚变更全住 `apps/web/evidence/…`（别线把当日窗日志从 `*.log` 挪进了库，正是 B199 末节挂着的那条口径决定，他们自己拍了）。
+⇒ ②双宿主 13/13、③21 臂、⑤产物加载级尺这三档新读数，以及 ④ 那条"输入面零变更"的等式，
+**仍然算到当前 tip**，只是"tip 的号"从 `e2160c44` 变成 `f7712df7`。载具也已同步快进（`git checkout --detach f7712df7` rc=0，脏条目仍 15）。
+
+**教训写死一句**：正文里"现在是 X"「X 就是当前的 main」这类**位置／tip 断言**要么直接用现量命令写（`git rev-parse --short HEAD`），
+要么标成"取数那一戳"，**不许用现在时** —— 这台机器上并行会话平均几分钟推一枚 tip，现在时的句子写完即过期。
+（同一族的旧错：AGENTS 那条"本文件不写条数（写过一次 83 条，六天后就漂了）"，那是**计数**会漂；这条是**位置**会漂，同一味药。）
+
+## 2026-10-16 01:4x · T7 前两腿在载具 `f7712df7` 上复量：腿1 停第 1 道（别线 7 处），腿2 红集 5 包 9 枚 spec、本线零红 —— 但腿2 第一发是我自己把 flag 放错位置造的假红
+
+载体仍是 `.worktrees/inb-t9`（快进到 `f7712df7`，`tip=f7712df7 脏条目=15`），编排与日志 `.run-logs/t7-legs.sh` / `t7-rtest2.sh`（**没住 /tmp**）。
+
+**腿1 `pnpm check`** → `rc=1`，**停在第 1 道** `check:gate-wiring`（23 行日志，`内存闸门` 命中 **0** 行 ⇒ 不是环境挡路）。尺头与七处逐字：
+
+```
+门禁定义 106 道 ｜ 链里被引用 111 段 ｜ 链外 3 道（允许表 3 道）
+   · 实现文件判了 104 段、跳过 14 段（带 cd / --filter / 非 node|bash|sh 的形状）
+🔴 链里引用了 pnpm check:gate-ssh，但 package.json 里没有这个脚本定义。
+🔴 链里引用了 pnpm check:e2e-helper-exports，但 package.json 里没有这个脚本定义。
+🔴 链里引用了 pnpm check:ai-e2e，但 package.json 里没有这个脚本定义。
+🔴 链里引用了 pnpm check:e2e-carrier，但 package.json 里没有这个脚本定义。
+🔴 scripts/check-e2e-carrier.mjs: 这枚门禁实现**没有任何 package.json 定义引用它** ⇒ 0 次执行，而链照样绿。…
+🔴 scripts/check-e2e-helper-exports.mjs: …
+🔴 scripts/check-gate-ssh.mjs: …
+共 7 处。
+```
+
+⇒ **B196 到今天没被修**（那四枚名字一枚没变），且 `门禁定义` 从上一戳的 101 涨到 106 —— 别线补了定义，唯独这四枚没补。
+这条挡的是**全仓任何人**的 `pnpm check`（第 1 道就断），不是本线的红；完成条件 1 那句"T7 三条命令 exit 0"因此在腿1 就不成立。
+
+**腿2 `pnpm -r test`** —— 🔴 第一发是我写的探针错，先记下来免得下一个人以为那是产品红：
+我写成 `pnpm -r test --no-bail`，pnpm 把 `--no-bail` **转给了每包的 `vitest run`**，vitest 5 把它当 `--bail <number>` 解析 ⇒
+`CACError: option \`--bail <number>\` value is missing`，当场 4 枚包"Failed"（`packages/i18n`、`packages/design-system`、`packages/ai`、`packages/local-api`）。
+对照实量（把 flag 放到 script 名**之前**）：`pnpm --filter @heyta/i18n --no-bail test` → `rc=0`、`Test Files 4 passed (4)` / `Tests 30 passed (30)`，
+且日志里 `vitest run --no-bail` 命中 **0** 枚 ⇒ i18n 那包本来是全绿的，那四枚红**纯属我这把探针的形状**。
+（记进环境陷阱的那一族的形状：**给 monorepo 递归命令加 flag，flag 在 script 名前后是两条不同的路**，发出去之前先用一枚小包验"脚本本身收到的是什么"。）
+
+第二发 `pnpm -r --no-bail test` → `rc=1`，红集 **5 枚包 / 9 枚 spec**，`内存闸门` 命中 **0** 行；逐包汇总：
+
+| 包 | 汇总行（逐字） | 红的 spec |
+|---|---|---|
+| `packages/ai` | `Test Files 1 failed \| 10 passed (11)` | `tests/capability-manifest.spec.ts`（分母 9 vs 现量 10，`expected '9/10' to be '9/9'`） |
+| `packages/shared-schema` | `Test Files 1 failed \| 10 passed (11)` / `Tests 1 failed \| 172 passed (173)` | `tests/auth-http-contract.spec.ts`（`toHaveLength(9)`，现量 12） |
+| `apps/mobile` | `Test Files 2 failed \| 75 passed (77)` | `ai-copy-parity.spec.ts` ×1 + `selection-single-owner.spec.ts` ×3 —— **B195 那 4 条原样复现** |
+| `server` | `Test Files 1 failed \| 160 passed (161)` | `tests/restore-script.spec.ts`（口令错那一枚，1971ms） |
+| `apps/web` | `Test Files 4 failed \| 175 passed \| 2 skipped (181)` / `Tests 5 failed \| 2289 passed \| 13 skipped (2307)` | `ai-disclosure-parity`、`reminder-wake`、`task-sort`、`calendar-sidebar` |
+
+**这九枚里没有一枚是本线的**（现量：剥 ANSI 后 `grep FAIL` 里含 `inbound\|automation` 的枚数 = **0**；
+而全量里 `✓ tests/(inbound\|automation)…` 的结果行 = **41 枚**，含 apps/web 那 7 枚 jsdom（`1+6+2+1+4+3+1 = 18` 条，与 16:3x 那格的 18 持平））。
+逐枚归属只查了最容易被误认成我的那一枚：`auth-http-contract.spec.ts` 读的数源是 `packages/shared-schema/src/auth-http-contract.ts`，
+该文件最近一笔是 `1c067174`（10-10 19:43「全局错误信封契约 + 邮箱验证码登录契约」），
+`git log --oneline -- <那枚文件> | grep -c 自动收集` = **0** ⇒ 是注册登录线加了 3 枚路径、没同步它那把 9 的尺，不是本线碰的。
+`apps/web` 那 `2 skipped / 13 skipped` 是**别线既有基线**（B140 追记里 apps/web 全量就是 `2 skipped / 13 skipped`），
+本线的用例跳过枚数仍是 0；`Tests 2289 passed` ≥ 那一戳的 `2216` ⇒ 只增不减这条在 apps/web 也成立。
+
+⇒ 完成条件 1 的现量口径写清：**AC-1～AC-8 每条都有可复跑命令 + 贴出的输出**这一半成立（今天四档 ⛔ 也清零了）；
+**"T7 那三条命令 exit 0"这一半不成立** —— 腿1 卡在别线的 `check:gate-wiring`（B196，第 1 道），
+腿2 全量红集 5 包 9 枚全在别线（B195 + ai/shared-schema/server/web 各一枚归属），腿3（`reinstall:all` + Linux 交付取证）仍要四枚真人设备/装机窗口。

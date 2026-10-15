@@ -10956,3 +10956,27 @@ Windows: 0/13
 共享检出没被这些改写碰过。
 ⚠️ 另有两枚 `.unexpected-*.save` 躺在 `/private/tmp/heyta-inbound-{quota,ticket}-teeth/`，mtime **Oct 12 13:15** —— 那是 10-12 在共享树上那次的 RESTORE_GUARD 残留，
 **不是本轮的**（本轮两发只留 `.mut-bak`，输出里也没有 `RESTORE_GUARD` 行）。别把它读成"今天又有并行写入者"。
+
+## B195/B196 追记（2026-10-16 01:4x @`f7712df7`）：T7 前两腿在私有载具复量完了 —— 腿1 仍停第 1 道那 7 处，腿2 红集 5 包 9 枚 spec 且**零枚是本线的**
+
+两条待裁决项各自在当前 tip 上重取了一次，逐字读数、逐包汇总与归属都在 `PROGRESS.md` 的
+「2026-10-16 01:4x · T7 前两腿在载具 `f7712df7` 上复量…」那一节。这里只记"要不要点头"的那几行：
+
+- **B196 没被修**：`pnpm check` 仍在**第 1 道** `check:gate-wiring` 断，`共 7 处`，缺定义的四枚名字一枚没变
+  （`check:gate-ssh` / `check:e2e-helper-exports` / `check:ai-e2e` / `check:e2e-carrier`）。
+  尺头那行倒是从 `101` 涨到 **`门禁定义 106 道 ｜ 链里被引用 111 段`** ⇒ 别的定义补进来了、这四枚漏了。
+  **B196 追记里已经写好四行可直接粘的定义**，改的是别人的 `package.json` ⇒ 仍归那条线的负责人，我不代改。
+- **B195 原样复现**：`apps/mobile` 那 4 条（`ai-copy-parity` ×1 + `selection-single-owner` ×3）在 `f7712df7` 还是这 4 条，
+  没涨没落 —— 它的判卷口径合并那场没做完，本线不动。
+- **三枚新点名（都不在本线地界，请转给对应线）**：
+  ① `packages/shared-schema` 的 `tests/auth-http-contract.spec.ts` 里 `toHaveLength(9)` 对上现量 12，
+     数源是 `packages/shared-schema/src/auth-http-contract.ts`（最近一笔 `1c067174`「全局错误信封契约 + 邮箱验证码登录契约」，
+     该文件历史里带「自动收集」的枚数 = 0）⇒ 注册登录线加了路径没同步那把 9 的尺；
+  ② `packages/ai` 的 `capability-manifest.spec.ts` 分母 9 vs 现量 10（`expected '9/10' to be '9/9'`）⇒ AI 收口线自己那把分母尺；
+  ③ `server` 的 `restore-script.spec.ts`（"口令错 ⇒ exit 2、库不碰"那一枚，1971ms）⇒ 备份/恢复线。
+  这三枚以前混在"全量红集"里没逐枚点名过，这次有了汇总行与用例名。
+- ⚠️ **一条本线自造的假红，写在这里防下一个人重踩**：我第一发把递归 flag 写成了 `pnpm -r test --no-bail`，
+  pnpm 把它转给了每包的 `vitest run`，vitest 5 当 `--bail <number>` 解析 ⇒ `CACError: option \`--bail <number>\` value is missing`，
+  当场"红"了 4 枚包（`packages/i18n`、`design-system`、`ai`、`local-api`）。正确形状是 `pnpm -r --no-bail test`（flag 在 script 名**之前**）；
+  对照实量 `pnpm --filter @heyta/i18n --no-bail test` → `rc=0`、`Tests 30 passed (30)`，且日志里 `vitest run --no-bail` 命中 0 枚。
+  **这四枚红不是任何人的缺陷**，别照那一发的日志去开单。
