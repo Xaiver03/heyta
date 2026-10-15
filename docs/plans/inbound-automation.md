@@ -4046,5 +4046,5 @@ grep -n "ticketPath" packages/app-host/src/inbound-entitlement-tickets.ts
    `ac8-matrix` ⇒ `结论：矩阵与 HEAD 逐格对账成立`；
    `producer-seam` ⇒ `结论：已入库的消费者不再依赖任何未入库的生产者`；
    `queue-teeth` ⇒ `臂数=6　不成立=0　末次 sha256=52c3fd707977a03e（须等于开局那枚）`，末次那枚与 AC-2 格里记的逐字相同。
-4. 变异臂跑完之后的**还原**验收（这一格才是那 5 枚的牙）：`git status --porcelain` 总数仍是 **14**；`git status --porcelain -- server/src/automation/inbound.routes.ts server/src/entitlement.ts packages/app-host/src apps/web/src/features/settings` 对这四路**空** ⇒ 队列臂改写又还原，没在被跟踪路径上留脏态。
+4. 变异臂跑完之后的**还原**验收（这一格才是那 5 枚的牙）：`git status --porcelain` 总数仍是 **14**（**这是 04:1x 那一戳的读数**；04:3x 复量已经是 **15**，多出来的是并行会话正在写的 ` M docs/reference/environment-traps.md`，mtime `04:21:48`、`+10/−2`、内容讲 Launcher 与 `dumpsys appwidget`，与本文无关，本线没碰也不代提交——细节与判据在 `PROGRESS.md` 的「2026-10-16 04:3x」那一节）；`git status --porcelain -- server/src/automation/inbound.routes.ts server/src/entitlement.ts packages/app-host/src apps/web/src/features/settings` 对这四路**空** ⇒ 队列臂改写又还原，没在被跟踪路径上留脏态。
 5. 以后要隔离副本：按本文 §早期"隔离副本复跑"那条配方现造（`git worktree add --detach <仓库外的路径> HEAD`，只把 `node_modules` 符号链接过去），**别去找 `inb-t7`** —— 它现在是一个历史载体号，不是一个可进入的目录。
