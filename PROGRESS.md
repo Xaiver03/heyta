@@ -4857,3 +4857,38 @@ C29/C31 那两处假话是手抓的。任务书要求"凡是坏了没人会知�
 **已入库的那把 AC-7 端点尺为什么能建**：它的判据对象是**端点字符串 + 挂载前缀**，两边都是机械量，没有"散文宾语"这一维。
 这一格的处置因此是：改准两处句子（已入库 `e99ab2eb`）+ 把"为什么不建尺"连分母一起写在这里，
 而不是留一把会天天误伤的尺。探针脚本 `.run-logs/scan-head-claims.mjs`（按 B199 那条口径，这是**当日原件指针**，不在册）。
+
+## 2026-10-15 16:3x · T8 的 AC-1/2/4/5 与 AC-6 的 jsdom 腿还停在 10-11 那枚 tip，今天在同一枚 tip 上重取一遍
+
+计划里那张 T8 表（AC-1～AC-8 逐格）写的是 **10-11 01:5x–02:3x @ `9fb9eed2`** 的读数 —— 五天、几十个 tip 之后，
+"这张表能复跑"这件事本身没人证过。今天在本线地界干净的共享检出（`tip=eaae5c0d`、`git status --porcelain -- server packages research/tools docs/plans/inbound-automation.md PROGRESS.md BLOCKED.md` **空**、
+`vm.loadavg` 1 分钟 8.95 ≤ 阈值 12）串行重跑了一遍，逐档对基线：
+
+| 档 | 今天的读数 | 基线 | 判定 |
+|---|---|---|---|
+| AC-1 server 离线 11 枚 | `11 passed (11)` / `103 passed (103)` rc=0 | 11 / 103 | 持平 |
+| AC-1 权益三档 + 额度 HTTP + pglite 真库对账 | `5 passed (5)` / `76 passed (76)` rc=0 | 56 + 3 + 17 = 76 | 持平 |
+| AC-2 `packages/inbound-core` 全量 | `3 passed (3)` / `47 passed (47)` rc=0 | 3 / 47 | 持平 |
+| AC-3 授权接缝 `sync-client` | `1 passed (1)` / `6 passed (6)` rc=0 | 6 | 持平 |
+| AC-4 `domain` 本地时区 | `1 passed (1)` / `1 passed (1)` rc=0 | 1 | 持平 |
+| AC-4/5 `app-host` inbound + task-batch-actions | `16 passed (16)` / `121 passed (121)` rc=0 | 14/111 + 1/9 | **涨 1 枚**：`inbound-draft-date-zone.spec.ts`（`daa5a75d`，10-12 入库）⇒ inbound 那批现为 15 枚 / 112 条 |
+| AC-5 `shared-schema` 契约 | `1 passed (1)` / `15 passed (15)` rc=0 | 15 | 持平 |
+| AC-5 `op-log` reducer | `1 passed (1)` / `16 passed (16)` rc=0 | 16 | 持平 |
+| AC-5 范围尺 `verify-inbound-commit-scope.py` | **rc=1**，逐枚打的是 `MENTION-ONLY（非本线动作）`（`packages/ui/**`、`scripts/check-legal-email-claims.mjs`，指向别线 SHA） | B169 原样 | 红因仍**不在本线**，未代改 |
+| AC-6 `apps/web` jsdom 单测 | `7 passed (7)` / `18 passed (18)` rc=0 | 5 / 11 | **涨 2 枚文件、+7 条**（T5 界面那批入库后分母就变了，只增不减） |
+
+**今天这 9 档 vitest 合计 `403 passed`、0 failed、0 skipped**（逐档相加：103+76+47+6+1+121+15+16+18）。测试数只增不减这条成立。
+
+🔴 **这一轮没重跑的档要写清，别让"复跑过"读成"全复跑过"**：
+① 真库身份腿（`verify-inbound-worker-identity.py`，要起一次性 PostgreSQL，上一枚读数 46/46）；
+② 双宿主 13 窗口（`verify-inbound-dual-host.py`，要隔离副本，上一枚读数 `Windows: 13/13`）；
+③ 三枚牙臂（queue / quota / ticket —— 判据是**临时改写被跟踪源文件再还原**，共享检出里不许跑；
+    `server/tests/inbound-lane-rigs-consumers.spec.ts` 的 `DELIBERATELY_NOT_WIRED` 那一格逐枚写了为什么不接），
+    本轮没跑，读数沿用台账里最近一次手跑那一节；
+④ 界面层 e2e（`e2e/tests/inbound-automation.spec.ts` 那两条红 —— 今天 14:2x 已在隔离副本按当时 tip 重取过，
+    红仍在同一句等待；`apps/web` 的 jsdom 单测**在本轮的第 9 档里，已取到 `eaae5c0d` 现量**，不在这一条）。
+这四档不是"我判断不用重跑"，是**载体或前提不在这台机器的共享树上**，读数按它们各自那一枚 tip 报。
+
+⇒ 所以 T8 那张表现在的口径是：**AC-1/2/4/5 的判定层读数 + AC-6 的 jsdom 腿 = `eaae5c0d` 现量**，
+AC-3 的 13 窗口与真库腿、AC-6 的浏览器腿、AC-7 的端点尺（今天 15:0x）、AC-8 的矩阵（今天 16:2x）各带自己的 tip 戳。
+**结论没变**：没有一格因为重跑而变绿或变红，AC 已勾仍 **0**。
