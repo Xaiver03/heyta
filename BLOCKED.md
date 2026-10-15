@@ -10980,3 +10980,62 @@ Windows: 0/13
   当场"红"了 4 枚包（`packages/i18n`、`design-system`、`ai`、`local-api`）。正确形状是 `pnpm -r --no-bail test`（flag 在 script 名**之前**）；
   对照实量 `pnpm --filter @heyta/i18n --no-bail test` → `rc=0`、`Tests 30 passed (30)`，且日志里 `vitest run --no-bail` 命中 0 枚。
   **这四枚红不是任何人的缺陷**，别照那一发的日志去开单。
+
+## B196 第二次追记（2026-10-16 02:1x，本会话 · 私有载具 `.worktrees/inb-t9` @`f7712df7`）：**补那四行确实把尺跑绿了**，且链第 1 道后面的红集第一次有了数
+
+上一节只做到"复量确认它还没修"。这一节把"补完会不会绿"证成，并顺手把 111 段逐段跑完取码。
+
+```
+载具改动（未入库）：cp package.json .run-logs/package.json.b196.mut-bak（开局 sha256 前缀 267520dc0d64f14e）
+                  在 "check:gate-wiring" 那行之后插四行定义
+pnpm check:gate-wiring  → RC=0
+   读数：门禁定义 110 道 ｜ 链里被引用 111 段 ｜ 链外 3 道（允许表 3 道）
+        ✅ check 链与门禁定义对上了
+   对照：01:4x 在共享检出上同一条命令 RC=1、共 7 处
+逐段取码：.run-logs/b196-chain.sh（bash -c "<段>" 单独取 $?，不经管道；trap restore EXIT）
+   → .run-logs/b196-chain-summary.txt：绿 88 段 / 红 23 段（现量：grep -c ' rc=0 ::' 与 grep -c ' rc=' 相减）
+还原校验：RESTORE_RC=0 267520dc0d64f14e expect=267520dc0d64f14e
+         git -C .worktrees/inb-t9 status --porcelain -- package.json 为空
+```
+
+⇒ 那句"要么给它加定义并接进链（正确出路）"**在字节上成立**：四行一加，那把尺就从 7 处红变成 ✅。
+我没有把这四行入库 —— 那四枚定义坐在 AI 收口线那批文件里，代改别人的登记面不是本线权限。
+
+🔴 **一处要替后来人拆的雷**：我给 `check:ai-e2e` 猜的定义后半段是 `pnpm --dir e2e run test`，
+这趟它红（087），但那**不是这行定义写错**，也不是链的红：
+```
+$ node scripts/check-ai-e2e-preflight.mjs && pnpm --dir e2e run test
+  ✅ 4318 / 4319 都是空的
+$ playwright test
+error: unknown command 'test'
+[WARN] Local package.json exists, but node_modules missing, did you mean to install?
+```
+现量 `ls -d .worktrees/inb-t9/e2e/node_modules/.pnpm` = **不在场**（共享检出那枚在场），
+所以 pnpm 落到了远处的 playwright。既有定义 `check:privacy-consent-e2e`、`check:landing-e2e` 报**同一串**，同一枚因。
+⇒ **给 B196 的出路补一句前置**：这四道接进链之前，先在"装了全部 workspace"的检出上取一次读数
+（`cd e2e && pnpm install`），否则新接的那道会把"载具没装依赖"报成仓库的红 —— 042 `check:licenses` 是同一件事的第二种形状，
+它靠自带那句"请先运行 pnpm install"才让人看出来；084 `check:vault-diagnostics` 也在载具红、在共享检出 **RC=0**。
+
+## B201（2026-10-16 02:1x，本会话 · 上面那趟逐段取码量出来的）：**链第 1 道后面的 23 枚红里，有 4 枚是本线自己造的**，而四枚的修法落点全在白名单外
+
+先说清"不是新长的"：`licenses:stamp`、`image-license` 两枚在 BLOCKED 里 `187057bb`（10-04）那张 8 枚红表里就有，
+`public-facts` 那枚是 **B173**；这趟的增量是它们仍红、并且**逐枚查到了归属那笔提交**，外加一枚谁都没登记过的 `integration-coverage`。
+
+| 段 | 门禁 | 本线的哪一步造成的（现量命令） | 修法落点 | 为什么我不代改 |
+|---|---|---|---|---|
+| 051 | `check:integration-coverage` | 盘上 35 枚 `*.integration.spec.ts`、被点名 34，缺的那枚是本线的 `server/tests/integration/inbound-dual-host-fault-windows.integration.spec.ts`（10-10 为 T3 加的）⇒ **它从建立起没被任何 `test:integration*` 脚本点过名** | `server/package.json` 的 `test:integration*` 那一串参数 | 白名单只给了 `server/tests/`，没有 `server/package.json`；这族是 B153 记过的"登记层/执行层"缺口，加点名要改别人的包清单 |
+| 043 | `check:licenses:stamp` | 章 `847802a22a36e0bb` vs 现 lockfile `a7570a479cf64c7f`；`git log --oneline -1 -- pnpm-lock.yaml` = **`fee83a90`（本线）**，而生成件最后一次动是 `16da3ecb` ⇒ 本线那笔 lockfile 把章判旧了 | `node research/tools/render-license-inventory.mjs`（重写 `research/licenses-inventory.generated.md`） | 那枚生成件不在白名单；重渲染会带进**别线的依赖**，那份对外许可证清单的口径不由本线定 |
+| 045 | `check:image-license` | `packages/inbound-core/package.json:23` 写死 `"@noble/hashes": "2.4.0"`（`git log --no-merges --reverse -S'"@noble/hashes": "2.4.0"'` 唯一命中 = **`fee83a90`，本线**），对面 `packages/sync-core/package.json:33` 是 `^2.4.0`（`dc278733`，vendored） | 两条：把本线那枚改成 `^2.4.0`（我这枚文件在白名单内）**但** lockfile 记的 specifier 要跟着重生成（`pnpm-lock.yaml` 在白名单外）；或在根 `package.json` 加 `resolutions`（也在白名单外） | 单独改我这一侧会让 `pnpm-lock.yaml` 与包清单不一致，那撞的是 B196 同款"改一半"的坑；依赖范围收敛属依赖管理口径，交负责人点头后我一条命令做完 |
+| 075 | `check:public-facts` | 判据 4 点名的匿名下行 `GET /api/automation/entitlement/revocations` 是本线 T1 开的（`dc1750ab`） | 在 `scripts/check-public-facts.mjs` 的 `REVIEWED_ANONYMOUS_GET` 写一句它为什么可以匿名 | 登记面在 `scripts/`，白名单外；**B173 已经把逐字要写的那句拟好了**，点头即可粘 |
+
+⇒ 这四枚里 045 与 043 严格说是**同一个成因的两种形状**（`fee83a90` 加了 workspace 包、动了 lockfile，没重渲染许可证清单；
+其中 045 那枚还多撞了一次"两处范围不一致"的镜像规则）。要一次清掉，最小动作集是：
+`packages/inbound-core/package.json` 那枚 pin 统一成 `^2.4.0` → `pnpm install`（更新 lockfile）→ `node research/tools/render-license-inventory.mjs` →
+把 051 那枚 spec 加进 `server/package.json` 的 `test:integration` → 粘 B173 那句进 `REVIEWED_ANONYMOUS_GET`。
+**后四步的落点全在本线白名单外** ⇒ 只登记不代改；前一步（改我这枚 pin）单独做会让 lockfile 与包清单不一致，所以不自作。
+
+⚠️ 另 14 枚别线红（006 reachability 的 `COMMENT` 零写路径、020-023 那四道 UI 门、054、065、090、100、102、106、109、110、111）
+逐枚原文都留在 `.worktrees/inb-t9/.run-logs/b196-seglogs/`（载具本地、`.gitignore:256` 排除，**当日原件指针**，同 B 里那句载体口径）；
+其中 `110 check:e2e-carrier` 值得单独说一句：它的**自检 13 臂里臂 11 断**（4 处抄了字面量：`e2e/playwright.habit-final.config.ts:14`、
+`e2e/playwright.rail.config.ts:14`、`e2e/tests/renew-panel.spec.ts:21-22`）⇒ 说明 B196 那枚"没有定义引用 ⇒ 0 次执行"的门禁实现**本身是有牙的**，
+补上定义之后它立刻咬到四枚真实问题，不是接进去当装饰。

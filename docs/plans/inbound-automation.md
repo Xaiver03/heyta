@@ -1982,6 +1982,16 @@ packages/app-host typecheck: tests/login-code.spec.ts(44,5): error TS2578: Unuse
 ⚠️ 那一节里我还自造过一次假红（`pnpm -r test --no-bail` 把 flag 转给了每包 vitest ⇒ `CACError: option --bail value is missing`，
 "红"了 i18n/design-system/ai/local-api 四枚包）—— 正确形状 `pnpm -r --no-bail test`，那四枚实际全绿（对照：i18n `Tests 30 passed (30)` rc=0）。
 
+🔴 **02:1x 「第 1 道后面到底几枚红」第一次有了数（载具 `.worktrees/inb-t9` @`f7712df7`；逐字读数在 `PROGRESS.md` 的 02:0x 那节与 `BLOCKED.md` 的 B196 第二次追记）**：
+先把上面那句"停在第 1 道"的**出路**证成 —— 在载具里把那四枚缺失定义补上，`pnpm check:gate-wiring` 从 `RC=1／共 7 处` 变 **`RC=0`／`✅ check 链与门禁定义对上了`**（四行只在载具存在过，跑完按 sha256 逐字还原，没入库）。
+再把链切成 111 段逐段取码：**绿 88 ／红 23**，而 23 枚分成三层 ——
+**5 枚是载具本身缺 `e2e/node_modules/.pnpm` 造的假红**（042/084/087/088/089；其中 042 与 084 在共享检出复量 `RC=0`），
+**4 枚是本线自己造的**（051 少点名本线那枚 `inbound-dual-host-fault-windows.integration.spec.ts`、043 许可证清单的 lockfile 章被 `fee83a90` 判旧、
+045 `@noble/hashes` 两处范围不一致有一处正是本线那枚精确 pin、075 即 B173 那枚匿名下行 —— 四枚修法落点全在白名单外，逐条登记为 **B201**），
+其余 **14 枚是别线**（含新点名的 006 `reachability`：`COMMENT` 实体登记齐全而 app-host 零写路径，现量归属 `e6058120`）。
+⇒ 这一格从此不写"整链停在一枚别线的错"，改写成有数的形状：**挡路的 18 枚真红里本线占 4 枚**；
+完成条件 1 那句"T7 三条命令 exit 0"仍不成立，但现在说得出差哪些、每枚归谁。
+
 ### 1. AC-1～AC-8 逐格：证据命令 + 贴出的输出 + 结论
 
 | AC | 证据命令（都在上面那枚载体里跑） | 贴出的输出（10-11 01:5x–02:3x · `9fb9eed2`） | 结论 |

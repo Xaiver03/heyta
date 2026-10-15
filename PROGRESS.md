@@ -5137,3 +5137,42 @@ AC 已勾数仍为 **0**（`verify-inbound-ac-ticks.py`：`AC 行=8　已勾=0�
 ⇒ 完成条件 1 的现量口径写清：**AC-1～AC-8 每条都有可复跑命令 + 贴出的输出**这一半成立（今天四档 ⛔ 也清零了）；
 **"T7 那三条命令 exit 0"这一半不成立** —— 腿1 卡在别线的 `check:gate-wiring`（B196，第 1 道），
 腿2 全量红集 5 包 9 枚全在别线（B195 + ai/shared-schema/server/web 各一枚归属），腿3（`reinstall:all` + Linux 交付取证）仍要四枚真人设备/装机窗口。
+
+## 2026-10-16 02:0x · B196 那四枚定义在私有载具上补上了：那把尺从 rc=1 变 rc=0，111 段逐段取码量出"第 1 道后面"的真红集 —— 里面有四枚是本线自己造的
+
+上一节的腿1 只能报"停在第 1 道"，因为链是 `&&` 串，第 1 道一红后面 110 段一次都没被执行过 ——
+**"第 1 道后面还有几枚红"这个数今天之前没人量过**。这一趟在私有载具上把它量完，并且先证了 B196 那句"补四行确实绿"。
+
+**载具与改动边界**：`.worktrees/inb-t9`（tip `f7712df7`；取数戳 `git -C .worktrees/inb-t9 rev-parse --short HEAD`，
+共享检出那侧同一时刻的 `main` 用 `git rev-parse --short main` 取，两数当天相同）。
+先 `cp package.json .run-logs/package.json.b196.mut-bak`（开局 sha256 前缀 `267520dc0d64f14e`），
+再在 `"check:gate-wiring"` 那一行之后插四行定义（`check:gate-ssh` / `check:e2e-helper-exports` / `check:ai-e2e` / `check:e2e-carrier`）。
+**这四行只在载具里存在过，没有入库**：`.worktrees/` 被 `.git/info/exclude:9` 排除，且还原后 `git -C .worktrees/inb-t9 status --porcelain -- package.json` 为空。
+
+1. 单跑那把尺（四行在册时）：`pnpm check:gate-wiring` → **RC=0**，读数 `门禁定义 110 道 ｜ 链里被引用 111 段 ｜ 链外 3 道（允许表 3 道）` + `✅ check 链与门禁定义对上了`。
+   对照：01:4x 那趟在共享检出上同一条命令是 RC=1、共 7 处。⇒ B196 那句出路**证成了**（不是推断）。
+2. 逐段取码（不经管道，§7 那一族的做法）：
+   `node -e '…scripts.check.split(" && ")…'` 把链切成 **111** 段落 `.run-logs/b196-segments.txt`，
+   `.run-logs/b196-chain.sh` 对每段 `bash -c "<段>"` 单独取 `$?` 写 `.run-logs/b196-chain-summary.txt`（每段全文另落 `b196-seglogs/NNN.log`），
+   脚本 `trap restore EXIT` 保证退出即还原。结果：**绿 88 段 / 红 23 段**（现量：`grep -c ' rc=0 ::' 与 grep -c ' rc=' 两数相减`）。
+   还原校验逐字：`RESTORE_RC=0 267520dc0d64f14e expect=267520dc0d64f14e`。
+3. 23 枚红按"谁的红"分三层，**每层都给了独立证据**：
+
+| 层 | 枚数 | 段号 | 独立证据 |
+|---|---|---|---|
+| 🔴 **载具环境造的假红**（不是链的红） | 5 | 042 `licenses`、084 `vault-diagnostics`、087/088/089 三道 e2e | 现量 `ls -d .worktrees/inb-t9/e2e/node_modules/.pnpm` = **不在场**（共享树那枚在场）；087 原文 `$ playwright test` → `error: unknown command 'test'` + `[WARN] Local package.json exists, but node_modules missing` ⇒ 落到了远处的 playwright；042 与 084 在共享检出复量 **RC=0**（042 四臂全 ✅、084 `PASS: …` 两条）。088/089 报同一串错误、同一枚缺装配的因，**没在共享树复跑**（它们先 `pnpm --filter @heyta/web build` 重打产物），按同因报 |
+| 🔴 **本线自己造的**（登记 B201，修法落点四枚全在白名单外） | 4 | 043 `licenses:stamp`、045 `image-license`、051 `integration-coverage`、075 `public-facts` | 043：章 `847802a22a36e0bb` vs 现 lockfile `a7570a479cf64c7f`，而 `git log --oneline -1 -- pnpm-lock.yaml` = **`fee83a90`（本线）**；045：`packages/inbound-core/package.json:23` 的精确 pin `2.4.0` 由 `fee83a90`（本线）写入，对面 `packages/sync-core/package.json:33` 的 `^2.4.0` 是 `dc278733`；051：盘上 35 枚被点名 34，缺的那枚正是本线的 `inbound-dual-host-fault-windows.integration.spec.ts`，而点名面是 `server/package.json` 的 `test:integration*`（白名单外）；075 早由 **B173** 登记，这趟只是第 4 次在同一条链上复现 |
+| ⚠️ 别线的 | 14 | 006、020、021、022、023、054、065、090、100、102、106、109、110、111 | 每枚的原文第一行红因都贴在 `b196-seglogs/`；**这 14 枚只在载具 tip `f7712df7` 上取到，没逐枚在共享树复量**（106 那枚与腿2 同源：5 包 9 枚 spec） |
+
+4. 与旧账的对照（这族红不是今天新长的）：BLOCKED 里 `187057bb`（10-04）那张 8 枚红，今天**仍在**的是
+   `selection-single-source`、`licenses:stamp`、`image-license`、`shell-unicode`、`pnpm -r test` 五枚；
+   `check:ui-provider` 与 `check:legal-permissions` 今天**绿**（被别线修掉了），`landing-e2e` 今天落进"载具假红"那一层，不是同一件事。
+   `reachability`（006）那张表里没有 ⇒ 新点名：`COMMENT` 实体登记齐全但 app-host 零写路径，
+   现量 `git log --no-merges --reverse -S'COMMENT' -- packages/shared-schema/src/entity-types.ts | head -1` = `e6058120`（协作/共享清单那批），非本线。
+5. 🔴 **我自己那行 `check:ai-e2e` 的定义形状要更正**：我给它的后半段是 `pnpm --dir e2e run test`，
+   与既有 088/089 用的是同一条通道（`pnpm --dir e2e run <script>`），所以 087 的红**不能算这行定义写错**、也不能算链的红 ——
+   它算的是"这棵载具没装 e2e 工作区依赖"。给 B196 的出路因此要补一句：**接进链之前先在装了全部 workspace 的检出上取一次读数**，
+   否则新接的那道会把"载具没装依赖"报成仓库的红（042 那枚就是同一件事的第二种形状，它自带 `请先运行 pnpm install` 才让人看出来）。
+
+⇒ 这一趟改变了什么：**腿1 从"只知道停在第 1 道"变成"第 1 道后面有 18 枚真红（本线 4 + 别线 14），另 5 枚是载具没装 e2e 装配造的假红"**；
+而完成条件 1 那一半（T7 三条命令 exit 0）因此更明确地不成立 —— 挡路的枚数现在是有数的，不再是"不知道卡在哪"。
