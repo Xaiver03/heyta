@@ -283,9 +283,10 @@ $ADB shell input tap $TAB_PROFILE $TAB_Y
 #    /tmp/ui.xml 截成空文件并打一行警告 —— 于是 `tap_label "立即同步"` 报"找不到"，
 #    看着像界面没这个按钮。实测两种时刻：负载 100+ 时 dump 连续 10 次抓不到；
 #    而手点同一个坐标、安静一点时再 dump，「立即同步」就在屏上。那是假红。
-#    改成"见到为止"（上限 8 轮 × 2s，见 lib 的 `settle_for`）。
-settle_for "立即同步"
-if XY=$(tap_label "立即同步"); then
+#    改成"见到为止"（上限 8 轮 × 2s）。🔴 10-15 这一处收进 `ensure_phone_sync`：
+#    "见到为止"现在发生在**按钮所在的那一面**上（设置浮层·同步与隐私），
+#    而不是在主屏上空转 8 轮 —— 主屏上它本来就不在，那 8 轮只会把假红写成"找不到按钮"。
+if ensure_phone_sync; then
   echo "     首次同步含密钥派生，等待中…（最长等 900 秒）"
   T=$(wait_synced 180)
   if [ -n "$T" ]; then ok "首次同步成功（耗时约 $T 秒）"; else bad "首次同步未完成"; fi
@@ -319,9 +320,10 @@ $ADB shell input tap $TAB_PROFILE $TAB_Y
 #    /tmp/ui.xml 截成空文件并打一行警告 —— 于是 `tap_label "立即同步"` 报"找不到"，
 #    看着像界面没这个按钮。实测两种时刻：负载 100+ 时 dump 连续 10 次抓不到；
 #    而手点同一个坐标、安静一点时再 dump，「立即同步」就在屏上。那是假红。
-#    改成"见到为止"（上限 8 轮 × 2s，见 lib 的 `settle_for`）。
-settle_for "立即同步"
-if XY=$(tap_label "立即同步"); then
+#    改成"见到为止"（上限 8 轮 × 2s）。🔴 10-15 这一处收进 `ensure_phone_sync`：
+#    "见到为止"现在发生在**按钮所在的那一面**上（设置浮层·同步与隐私），
+#    而不是在主屏上空转 8 轮 —— 主屏上它本来就不在，那 8 轮只会把假红写成"找不到按钮"。
+if ensure_phone_sync; then
   T=$(wait_synced 180)
   if [ -n "$T" ]; then ok "手机同步完成（约 $T 秒）"; else bad "手机同步未完成"; fi
 else
@@ -471,9 +473,10 @@ $ADB shell input tap $TAB_PROFILE $TAB_Y
 #    /tmp/ui.xml 截成空文件并打一行警告 —— 于是 `tap_label "立即同步"` 报"找不到"，
 #    看着像界面没这个按钮。实测两种时刻：负载 100+ 时 dump 连续 10 次抓不到；
 #    而手点同一个坐标、安静一点时再 dump，「立即同步」就在屏上。那是假红。
-#    改成"见到为止"（上限 8 轮 × 2s，见 lib 的 `settle_for`）。
-settle_for "立即同步"
-if XY=$(tap_label "立即同步"); then
+#    改成"见到为止"（上限 8 轮 × 2s）。🔴 10-15 这一处收进 `ensure_phone_sync`：
+#    "见到为止"现在发生在**按钮所在的那一面**上（设置浮层·同步与隐私），
+#    而不是在主屏上空转 8 轮 —— 主屏上它本来就不在，那 8 轮只会把假红写成"找不到按钮"。
+if ensure_phone_sync; then
   T=$(wait_synced 180)
   if [ -n "$T" ]; then ok "手机同步完成（约 $T 秒）"; else bad "手机同步未完成"; fi
 else
@@ -532,9 +535,10 @@ $ADB shell input tap $TAB_PROFILE $TAB_Y
 #    /tmp/ui.xml 截成空文件并打一行警告 —— 于是 `tap_label "立即同步"` 报"找不到"，
 #    看着像界面没这个按钮。实测两种时刻：负载 100+ 时 dump 连续 10 次抓不到；
 #    而手点同一个坐标、安静一点时再 dump，「立即同步」就在屏上。那是假红。
-#    改成"见到为止"（上限 8 轮 × 2s，见 lib 的 `settle_for`）。
-settle_for "立即同步"
-if XY=$(tap_label "立即同步"); then
+#    改成"见到为止"（上限 8 轮 × 2s）。🔴 10-15 这一处收进 `ensure_phone_sync`：
+#    "见到为止"现在发生在**按钮所在的那一面**上（设置浮层·同步与隐私），
+#    而不是在主屏上空转 8 轮 —— 主屏上它本来就不在，那 8 轮只会把假红写成"找不到按钮"。
+if ensure_phone_sync; then
   T=$(wait_synced 180)
   if [ -n "$T" ]; then ok "手机同步完成（约 $T 秒）"; else bad "手机同步未完成"; fi
 else
@@ -581,9 +585,10 @@ $ADB shell input tap $TAB_PROFILE $TAB_Y
 #    /tmp/ui.xml 截成空文件并打一行警告 —— 于是 `tap_label "立即同步"` 报"找不到"，
 #    看着像界面没这个按钮。实测两种时刻：负载 100+ 时 dump 连续 10 次抓不到；
 #    而手点同一个坐标、安静一点时再 dump，「立即同步」就在屏上。那是假红。
-#    改成"见到为止"（上限 8 轮 × 2s，见 lib 的 `settle_for`）。
-settle_for "立即同步"
-if XY=$(tap_label "立即同步"); then
+#    改成"见到为止"（上限 8 轮 × 2s）。🔴 10-15 这一处收进 `ensure_phone_sync`：
+#    "见到为止"现在发生在**按钮所在的那一面**上（设置浮层·同步与隐私），
+#    而不是在主屏上空转 8 轮 —— 主屏上它本来就不在，那 8 轮只会把假红写成"找不到按钮"。
+if ensure_phone_sync; then
   T=$(wait_synced 180)
   if [ -n "$T" ]; then ok "手机同步完成（约 $T 秒）"; else bad "手机同步未完成"; fi
 else
@@ -689,12 +694,11 @@ print(d.isoformat(), d.month, d.day)
       # 🔴 跨设备：规则是数据，不是这台设备的属性。第 13/14 步为 WEEKLY 证过这件事，
       # 这一档也得单独证 —— 因为它换的是 BYMONTH/BYMONTHDAY 这对新参数。
       $ADB shell input tap $TAB_PROFILE $TAB_Y
-      settle_for "立即同步"
-      if XY=$(tap_label "立即同步"); then
+      if ensure_phone_sync; then
         T=$(wait_synced 180)
         if [ -n "$T" ]; then ok "手机同步完成（约 $T 秒）"; else bad "手机同步未完成"; fi
       else
-        bad "找不到「立即同步」按钮"
+        bad "没能发起同步 —— 主屏还是设置面「同步与隐私」那一组没见到按钮，看上一行 lib 自己打的那一条"
       fi
       if laptop_pull; then
         L_Y_RULE=$(laptop_field "$TASK_ID" repeatRule)

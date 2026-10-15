@@ -221,8 +221,7 @@ configure_sync_credentials
 
 step "3. 首次同步（含一次纯 JS 的 Argon2id 派生）"
 $ADB shell input tap $TAB_PROFILE $TAB_Y; sleep 3
-dump
-if XY=$(tap_label "立即同步"); then
+if ensure_phone_sync; then
   echo "     首次同步含密钥派生，等待中…（最长等 900 秒）"
   T=$(wait_synced 180)
   if [ -n "$T" ]; then ok "首次同步成功（耗时约 $T 秒）"; else bad "首次同步未完成"; fi
@@ -256,8 +255,7 @@ fi
 
 step "5. 手机同步，拿到笔记本那条任务"
 $ADB shell input tap $TAB_PROFILE $TAB_Y; sleep 3
-dump
-if XY=$(tap_label "立即同步"); then
+if ensure_phone_sync; then
   T=$(wait_synced 180)
   if [ -n "$T" ]; then ok "手机同步完成（约 $T 秒）"; else bad "手机同步未完成"; fi
 else
@@ -404,8 +402,7 @@ step "12. 🔴 跨设备回传：笔记本同步后必须看到它已完成"
 # 这是"能多端"的最终判据：手机上的一次日历操作，经 op-log → 服务端 →
 # 笔记本的真 SQLite，另一端读到的 `completedAt` 不再是 null。
 $ADB shell input tap $TAB_PROFILE $TAB_Y; sleep 3
-dump
-if XY=$(tap_label "立即同步"); then
+if ensure_phone_sync; then
   T=$(wait_synced 180)
   if [ -n "$T" ]; then ok "手机第二次同步完成（约 $T 秒）"; else bad "手机第二次同步未完成"; fi
 fi

@@ -398,8 +398,7 @@ configure_sync_credentials || exit 1
 #    （`verify-mobile-calendar.sh` 的第 3 步就是这一档）。少了它，下面等的
 #    就不是"派生慢"而是"根本没人发起"，而两者的输出长得一样（§7 元规则一）。
 $ADB shell input tap "$TAB_PROFILE" "$TAB_Y"; sleep 3
-dump
-if XY=$(tap_label "立即同步"); then
+if ensure_phone_sync; then
   echo "     首次同步含一次纯 JS 的 Argon2id 派生，实测 30–900 秒 ⇒ 18 段 × 10 轮 × 5s"
   # 🔴 分段的唯一理由：**首启的隐私同意面板可以晚于开机那一次检查才出现**。
   #    实测 07 01:3x：启动时 `handle_privacy_consent` 等满 10 秒没见到面板（它只在
@@ -433,7 +432,7 @@ if XY=$(tap_label "立即同步"); then
     exit 1
   fi
 else
-  bad "找不到「立即同步」按钮 —— 凭据面板没走完，不是同步慢"
+  bad "没能发起同步 —— 具体是主屏还是设置面「同步与隐私」那一组没见到按钮，看上一行 `ensure_phone_sync` 自己打的那一条"
   exit 1
 fi
 
