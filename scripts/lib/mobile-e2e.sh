@@ -876,18 +876,31 @@ launch_app() {
 # 用 `launch_app`（它先解析出**真正的组件名**，`am start` 是确定的）——
 # 而不是 `am start -n $PKG/.MainActivity`，后者在改名之后指向一个不存在的类。
 ensure_app_foreground() {
-  local cur
-  cur=$($ADB shell dumpsys activity activities 2>/dev/null | grep -m1 topResumedActivity | sed 's/.*u0 //;s/ .*//')
-  case "$cur" in
-    "$PKG"/*) return 0 ;;
-  esac
-  echo "   ↻ 前台是 ${cur}，把 $PKG 拉回来" >&2
-  # 🔴 用 `monkey`（见 `launch_app` 的注释）：`am start -n "$PKG/.MainActivity"`
-  #    在改名之后指向一个不存在的类，会**静默失败**并把前台留在旧包上。
-  launch_app
-
-  sleep 2
-  return 0
+  local cur n=0
+  while : ; do
+    cur=$($ADB shell dumpsys activity activities 2>/dev/null | grep -m1 topResumedActivity | sed 's/.*u0 //;s/ .*//')
+    case "$cur" in
+      "$PKG"/*) return 0 ;;
+    esac
+    if [ "$n" -ge 4 ]; then
+      # 🔴 走到这里**必须报红**，见上面那段：旧写法重拉之后不再看一眼就 `return 0`，
+      #    于是"前台仍是桌面"这条形状在这台机上根本开不了火 —— 调用方那两条
+      #    （`ensure_app_foreground || blame_crash`、`if ! ensure_app_foreground; then bad …`）
+      #    是写好了等它的，而它一次都没收到过。后面每一发 `input tap` 都打在启动器上。
+      echo "   🔴 重拉 4 次之后前台仍是 ${cur:-读不到} —— 这一趟后续读数都不作数（不在应用里）" >&2
+      return 1
+    fi
+    if [ "$n" = 0 ]; then
+      echo "   ↻ 前台是 ${cur:-读不到}，把 $PKG 拉回来" >&2
+    else
+      echo "   ↻ 第 $n 次重拉之后前台仍是 ${cur:-读不到}，再拉一次" >&2
+    fi
+    # 🔴 用 `launch_app`（见它自己的注释）而不是 `am start -n "$PKG/.MainActivity"`：
+    #    后者在改名之后指向一个不存在的类，会**静默失败**并把前台留在旧包上。
+    launch_app
+    sleep 3
+    n=$((n + 1))
+  done
 }
 
 # 欢迎页（首次启动覆盖层，规范 §3.1）—— 点「先离线使用」离开它。

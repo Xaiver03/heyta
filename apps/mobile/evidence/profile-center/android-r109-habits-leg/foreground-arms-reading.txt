@@ -1,0 +1,10 @@
+foreground-arms.sh 的读数（夹具的暂存输出在同目录 foreground-arms-run/，那枚目录不入库；复跑：bash apps/mobile/evidence/profile-center/android-r109-habits-leg/foreground-arms.sh）
+跑的时间：2026-10-15 14:00:42 +0800  树：5bc1b9fe（主检出）  被测：scripts/lib/mobile-e2e.sh 的 ensure_app_foreground
+
+   臂 0（桩自证）              → 给得出 topResumedActivity
+── 三条读数 ──
+   臂 1（前台=应用，改后）      → RC=0 重拉 0 次
+   臂 2（前台=启动器，改后）    → RC=1 重拉 4 次
+   臂 3（前台=启动器，改前形状）→ RC=0 重拉 4 次
+✅ 三条合预期：应用在前台⇒0 且不重拉；启动器占前台⇒1 且真重拉过 4 次；同一夹具在改前形状下仍返回 0（这一刀就是把红开得了火的那一刀）
+ARMS_RC=0
