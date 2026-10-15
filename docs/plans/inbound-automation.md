@@ -3708,6 +3708,8 @@ linux `dist/linux/packaged-first-run.png` —— 三张都是同一套共享 UI�
 判据就是这一行 —— `git diff --name-only fa5ae75b HEAD | grep -vE '^(BLOCKED|PROGRESS)\.md$|^docs/'` 现量 **0 枚**
 ⇒ **源字节零变化** ⇒ 上面那 14 枚装置与四道门的读数、以及 10-14 那两腿（链 111 步 / `-r test` 全量 / 三端重装）
 **对当前 HEAD 仍然成立**，不必为"tip 变了"重跑。下一位要复核就跑这一行；它一旦非空，本节的顺延立刻作废。
+⚠️ **它已经红过一次（同一天 13:2x，现量 20 枚）** —— 作废与重取都记在本节末尾那小节「那条顺延尺在 13:2x 自己变红了」，
+别把这段当"仍然成立"读。
 
 ### AC-6 那两枚红的根因，10-15 用那趟自己留下的现场重取了一遍（**结论不变，措辞要收窄**）
 
@@ -3730,3 +3732,39 @@ linux `dist/linux/packaged-first-run.png` —— 三张都是同一套共享 UI�
 
 🔴 本节**不改任何 AC 的闭合状态**：AC-6 仍不勾，仍开在那两枚白名单外的挂载点上；
 `grep -c '^- \[x\] \*\*AC-'` 这条尺的读数不因本节改变。
+
+#### 🔴 那条顺延尺在 13:2x 自己变红了 —— 记翻转、当场重取到的、以及故意没重取的
+
+`git diff --name-only fa5ae75b HEAD | grep -vE '^(BLOCKED|PROGRESS)\.md$|^docs/'` 现量 **20 枚**（13:0x 还是 0）。
+两笔都来自**设备腿取证线**，不是本线：`0a8cc24c`（13:09 改 `scripts/lib/mobile-e2e.sh` + 四枚 `scripts/verify-mobile-*.sh`）
+与 `fd5c2fb1`（13:10 落 `apps/mobile/evidence/**` 那 15 枚图与 r109/r110 读数）。
+⇒ 上面那段"顺延成立"**立刻作废**，这正是它被写成一条命令、而不是写成一句人话的原因。
+
+**当场重取到的**（同一枚 tip `4e0215f6`；把隔离副本 `.worktrees/inb-t9` 快进过去，整套 **60 秒**）：
+`cd .worktrees/inb-t9 && bash .run-logs/rerun-rigs-1015d.sh`（驱动 = 12:4x 那份只换了日志目录），
+逐枚 rc 与 12:4x **一模一样**：
+```
+CARRIER_HEAD=4e0215f639bce838e4aff9b5911604ba9caa135a   CARRIER_DIRTY=0
+RIG ac-ticks 0 | ac8-matrix 0 | api-slice 3 | check-chain 0 | cjs-require-order 0 | commit-scope 1
+    | doc-tables 0 | dual-host 0 | host-options-slice 3 | producer-seam 0 | queue-teeth 0
+    | quota-teeth 0 | ticket-teeth 0 | worker-identity 0
+GATE check-migrations 0 | license-inventory 1（载体缺 e2e 安装，同 12:4x）| check-docs-voice 0 | docs-link-check 0
+AC_TICKED=0  AC_UNTICKED=8  DIRTY_AFTER=0
+```
+那两枚 `3` 仍是"切片已入库"的退役臂，那枚 `1` 仍是 B169 的假红 + 载体缺件 ⇒ **三档读法一条没变**。
+快进前另取一条：`git diff --name-only fa5ae75b HEAD -- '*pnpm-lock.yaml' 'package.json' '*/package.json'` ⇒ **0 枚**，
+所以这 60 秒不是拿旧依赖凑的读数。
+
+**故意没重取的（写清"我测了什么、为什么这趟不做"）**：T7 第 1 腿（111 步逐道）与第 2 腿（`pnpm -r --no-bail test` 全量）
+在新 tip 上**没有读数**。两层原因不许混：
+1. **挡路的确实是这两笔**：被改的那四枚 `scripts/verify-mobile-*.sh` + `scripts/lib/mobile-e2e.sh` 正好喂给链里第
+   **52 / 80 / 104 / 111** 道（`node -e` 从 `scripts.check` 里自己解析现量），那四道归**设备腿线**所有
+   ⇒ 上一趟那句"111 步 / 84 绿 27 红"在新 tip 上**不许引用**；本线占的那三格不受影响（它们的输入路径一枚没变）。
+2. **这趟为什么不当场取**：`sysctl -n vm.loadavg` 现量 **1 分钟 15.51 / 5 分钟 12.22 / 15 分钟 12.34**，
+   链驱动自己的门是 `NCPU*3/4 = 12` ⇒ 会先等（最多 40 分钟），而短窗**高于**长窗说明本机此刻正被别的会话用着
+   （那两笔才落地 20 分钟）。往那个窗口里再塞一趟全量构建+全量测试，取到的数也不干净。
+   ⇒ 重取命令挂在这里：`cd .worktrees/inb-t9 && bash .run-logs/chain.sh`（载体已快进到 `4e0215f6`，装好依赖）。
+
+🟢 **给下一位的判据学**：顺延尺红了 **≠** "三腿全量都要重跑"。这 20 枚里 15 枚是图片、5 枚是别线的 shell，
+再按**谁消费这些路径**分一层（链步数用 `node -e` 从 `check` 里解析，别手写），就能把"必须重取的范围"收到
+"链里那四道 + 两腿全量"，而 60 秒那一套装置本来就该重取 —— 这次也确实重取了，且读数没变。
