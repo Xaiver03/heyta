@@ -24,6 +24,20 @@ $txtPath = 'C:\src\heyta-window.txt'
 $lines   = @()
 $lines  += ('=== capture in session ' + (Get-Process -Id $PID).SessionId + ' ===')
 
+# DPI awareness -- see install-and-capture.ps1 for the measured reason (a capture
+# without it is a top-left CROP of the window at 125% scale, not the window).
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public class WCAPDpi {
+  [DllImport("user32.dll")] public static extern bool SetProcessDpiAwarenessContext(IntPtr c);
+  [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+  [DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr h);
+}
+"@
+$dpiCtx = [WCAPDpi]::SetProcessDpiAwarenessContext([IntPtr](-4))
+if (-not $dpiCtx) { $dpiCtx = [WCAPDpi]::SetProcessDPIAware() }
+
 # The app loads native-bridge.js from AppContext.BaseDirectory, so it must sit next to the exe.
 Copy-Item $bundle (Join-Path $exeDir 'native-bridge.js') -Force
 $lines += ('BUNDLE_COPIED=' + (Test-Path (Join-Path $exeDir 'native-bridge.js')))
@@ -65,6 +79,7 @@ if ($hwnd -eq [IntPtr]::Zero) {
   $lines += ('MAIN_WINDOW_HANDLE=' + $hwnd)
   $lines += ('MAIN_WINDOW_TITLE=' + $proc.MainWindowTitle)
   $lines += ('WINDOW_RECT=' + $rect.Left + ',' + $rect.Top + ',' + $w + 'x' + $h)
+  $lines += ('WINDOW_DPI=' + [WCAPDpi]::GetDpiForWindow($hwnd) + ' DPI_CTX=' + $dpiCtx)
 
   Add-Type -AssemblyName System.Drawing
   $bmp = New-Object System.Drawing.Bitmap($w, $h)

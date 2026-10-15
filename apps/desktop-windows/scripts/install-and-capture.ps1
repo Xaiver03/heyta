@@ -32,6 +32,27 @@ $png          = Join-Path $build 'packaged-first-run.png'
 $factsFile    = Join-Path $build 'install-capture.txt'
 $lines        = @()
 
+# DPI awareness -- without it this script's coordinate space is the virtualized
+# (system-scale) one, so GetWindowRect and CopyFromScreen agree with EACH OTHER and
+# both describe only the top-left 1/scale of the real window. The saved PNG is then a
+# silent CROP of the app window, not the app window.
+# Measured on the packaging box 2026-10-15: the same installed window is 1440x734 when
+# the capture declares PER_MONITOR_AWARE_V2 and 1152x587 when it does not (125% display
+# scale). The truncated image put the assistant header's last glyph exactly on the image
+# edge, which reads as "the UI is clipped by the window" while the layout has 242px of
+# clearance at that width. Must be set before any window/GDI use, hence at the very top.
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public class WCAPDpi {
+  [DllImport("user32.dll")] public static extern bool SetProcessDpiAwarenessContext(IntPtr c);
+  [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+  [DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr h);
+}
+"@
+$dpiCtx = [WCAPDpi]::SetProcessDpiAwarenessContext([IntPtr](-4))
+if (-not $dpiCtx) { $dpiCtx = [WCAPDpi]::SetProcessDPIAware() }
+
 $elevated = (New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 $lines += ('CONTEXT IsAdmin=' + $elevated + ' SessionId=' + (Get-Process -Id $PID).SessionId)
 $lines += ('MSIX_EXISTS=' + (Test-Path $msix))
@@ -269,6 +290,9 @@ if ($fail) {
   $w = $rect.Right - $rect.Left
   $h = $rect.Bottom - $rect.Top
   $lines += ('WINDOW_RECT=' + $w + 'x' + $h)
+  # If DPI_CTX is False the awareness call was refused (the host process already had
+  # one) and WINDOW_RECT is back to being a crop -- read the PNG width against this line.
+  $lines += ('WINDOW_DPI=' + [WCAPDpi]::GetDpiForWindow($hwnd) + ' DPI_CTX=' + $dpiCtx)
   if ($w -le 0 -or $h -le 0) {
     $lines += 'RESULT=NO_WINDOW (window rect is empty)'
   } else {
