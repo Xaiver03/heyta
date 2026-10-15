@@ -11087,3 +11087,60 @@ ls -l                                  → Oct 8 06:41（并行会话留在共�
 
 ⇒ 这条待拍的**只剩一个动作**：在 `packages/i18n` 两颗词条（中英各一句"这台实例还没有自动收集资格…"）落进来，本线随后只加一行映射。
 `packages/i18n` 按死规矩不许本线动 ⇒ 措辞是对外文案，请负责人给两句原文（或授权我按 `web.ai.inbound.status.*` 那族现有语气起草，再由他过一遍）。
+
+## B196 追记（2026-10-16 05:1x，本会话 · 把那四枚缺失定义收成"点头即贴"的逐字面，并更正一句我说窄了的因果）
+
+**先更正**：我在待拍板上写的是"补这四枚定义 ⇒ `pnpm check` 那道尺能从第 1 道跑下去"。这句只对**第 1 道**（`check:gate-wiring` 那 7 处：缺定义四枚 + 无定义引用的实现三枚）成立；**不等于补完 `pnpm check` 就 exit 0**。这一趟直接把它证出来了——四枚的实现文件全在 HEAD，绕开缺失定义单独跑它们：
+
+```
+node scripts/check-e2e-helper-exports.mjs   rc=1   🔴 它给的修法：把「生产者」补进同一笔提交（e2e/ 不在 pnpm 的过滤面里）
+node scripts/check-e2e-carrier.mjs          rc=1   点名 e2e/tests/renew-panel.spec.ts:21-22 等 4 处抄了字面量
+node scripts/check-e2e-carrier.mjs --self-test  rc=1  自检 13 臂 ｜ 失败 1 臂（臂 11，即 B202 那一格）
+```
+
+⇒ 所以点头时请按这个账：**B196 只清第 1 道**；第 1 道之后仍要 B201（本线那 4 枚）＋ 别线那 14 枚（含上面这两枚的内容红）各自归位，`pnpm check` 才会 0。
+
+**逐字面（都是 git 里的权威原文，不是我拟的）**，取法一并留在这里，别按我抄的字改标点：
+
+```
+git show 8dcd22c7:package.json | grep -E '"check:(gate-ssh|e2e-helper-exports|ai-e2e)"'
+git show 951bcbea:package.json | grep -E '"check:e2e-carrier"'
+```
+
+```
+    "check:gate-ssh": "node scripts/check-gate-ssh.mjs",
+    "check:e2e-helper-exports": "node scripts/check-e2e-helper-exports.mjs",
+    "check:ai-e2e": "node scripts/check-ai-e2e-preflight.mjs && pnpm --dir e2e run test",
+    "check:e2e-carrier": "node scripts/check-e2e-carrier.mjs --self-test && node scripts/check-e2e-carrier.mjs",
+```
+
+逐枚核验（2026-10-16 现量，四行都能落到真东西上）：
+
+| 定义 | 目标实现 | 核验 |
+|---|---|---|
+| `check:gate-ssh` | `scripts/check-gate-ssh.mjs` | `git cat-file -e HEAD:` 有、盘上有；这枚要走网络，本趟**没跑**，它的行为按载具那趟（`72216513`：补完四行后 `check:gate-wiring` 从 7 处跑到 ✅）报 |
+| `check:e2e-helper-exports` | `scripts/check-e2e-helper-exports.mjs` | HEAD 有、盘上有；直跑 **rc=1**（内容红，见上）|
+| `check:ai-e2e` | `scripts/check-ai-e2e-preflight.mjs` | HEAD 有、盘上有；**不传端口参数**这点验过了：`node scripts/check-ai-e2e-preflight.mjs` → rc=0、`✅ 4318 / 4319 都是空的`，且脚本自己的注释第 40 行就写着"默认值仍是主套件的两个端口，所以 `check:ai-e2e` 的调用不用改"（同族两枚 `check:privacy-consent-e2e`／`check:landing-e2e` 现在带 4322／4320，是各自要抢的端口不同，不是这行漏了参数）|
+| `check:e2e-carrier` | `scripts/check-e2e-carrier.mjs` | HEAD 有、盘上有；直跑 **rc=1**、`--self-test` **rc=1（13 臂失败 1 臂 = 臂 11）** ⇒ 这枚连自检都不过，属于 B202/B201 已登记那一格，落点 `scripts/check-e2e-carrier.mjs`（白名单外，本线不代改）|
+
+另外，`git show HEAD:package.json` 的 `scripts.check` 链里这四枚**确实被点名调用**（`pnpm check:gate-ssh`／`check:e2e-helper-exports`／`check:ai-e2e`／`check:e2e-carrier` 四段都在），所以这不是"没人用的死定义"，是链在叫、定义没了。取法：
+
+```
+node -e 'const c=require("./package.json").scripts.check.split("&&");for(const s of c){if(/gate-ssh|e2e-helper-exports|ai-e2e|e2e-carrier/.test(s))console.log(s.trim())}'
+```
+
+## B203（2026-10-16 05:1x，本会话 · `docs-link-check` 转红，唯一一条不是本线；顺带证明"四道门全 0"这类话只能按戳念）
+
+`node research/tools/docs-link-check.mjs` 在 05:1x 交回 **rc=1**，点名一条：
+
+```
+docs/plans/product-ux-optimization.md:935
+   -> ../../apps/mobile/evidence/ux-final-20261016/android-widget-data-r114/RESULT.md
+      （本机存在，但 git 没有跟踪它）
+```
+
+**归属＝产品体验线，不是本线**，三条独立证据：⑴ 出问题那枚文件 `docs/plans/product-ux-optimization.md` 不在本线白名单里；⑵ 链接目标那枚目录正是本会话前面逐枚量过的**活写入者**（`ux-final-20261016/android-widget-data-r114/`，最新文件 mtime 02:49:22，同一圈里 `docs/reference/environment-traps.md` 也在 04:21:48 被写过 `+10/−2`）；⑶ 那条链接讲的是桌面插件（widget）那趟的 `RESULT.md`，本线零相关（`git status --porcelain` 里那枚目录一直是 `??`，本线没 add 过）。
+
+**本线不代改**，因为门禁自己给了三条出路（① 该入库就 `git add`，② 不该有链接就改纯文字，③ 刻意只活本机就进 `UNTRACKED_LINK_OK` 登记＋理由），**这三条的取舍取决于那趟证据要不要留给 CI**——那是那条线的口径，不是我的手。等它自己收口。
+
+🔴 这一节真正值得留的是**判据的形状**：同一把 `docs-link-check` 本会话从 02:3x 到 04:3x 我跑了 **5 次，全部 rc=0**（最后一次是 04:3x 那批四道门一起跑，`LINK_RC=0`），05:1x 这一批交回 **rc=1** —— 也就是说台账里那句"四道全仓门这一批全 0"是**那一戳的读数**，不是当前状态，而且它会因为**别人正在写**而翻面。⇒ 凡是报"门全绿"的句子，旁边要留：哪一把尺、哪个时刻、以及"这条红可能是别人在飞的写入造成的"这句读法；复核失败与目标坏了分两格记。
