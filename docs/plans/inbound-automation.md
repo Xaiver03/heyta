@@ -4035,3 +4035,16 @@ grep -n "ticketPath" packages/app-host/src/inbound-entitlement-tickets.ts
 
 ⚠️ 这一格仍**不勾**，且这枚尺只覆盖 AC-7 那句"端点与权限真实"里**形状**那一半：
 它判的是"文档写的 URL 在当前挂载下可达不、方法注册没注册"，**不判**"照文档真能不能跑通一次"（那要部署实例）。
+
+## 2026-10-16 04:2x · 台账里那枚已经消失的载具：把"复跑入口"和"历史执行记录"分开（自动收集线）
+
+1. 现量：`grep -c 'inb-t7' docs/plans/inbound-automation.md` = **36** 枚提及；其中**以可复制命令行形状**出现的（行首是 `$ cd .worktrees/inb-t7`）= **3** 枚。`git worktree list` 现量只剩 `.worktrees/inb-t9`（detached 在 `f7712df7`），主检出在 `83feab4d` ⇒ `inb-t7` 已经不在盘上，那 3 行今天照抄会 `cd` 失败。
+2. 那 36 枚里落在 T8 那张表内的只有 **2** 枚，逐枚读过都是**历史叙述**（"那一趟跑在 `.worktrees/inb-t7`，载体是 `1c166425`／`a599545d`"），不是当前复跑入口 ⇒ 八格里的命令**不用改**，旧行**也不删**（它们是那一趟的证据）。
+3. 这一节真正值钱的是它把一条判据从推断变成实测：**本线 15 枚 `research/tools/verify-inbound-*.py` 在共享检出直接可跑，不依赖任何载具**。这一趟点名跑了 5 枚，逐枚 rc=0，结论行照贴——
+   `worker-identity` ⇒ `Results: /private/tmp/heyta-inbound-worker-identity.log`；
+   `ac-ticks` ⇒ `结论：已勾=0、未勾=8，且 8 行全部落入两把尺之一（成立）`；
+   `ac8-matrix` ⇒ `结论：矩阵与 HEAD 逐格对账成立`；
+   `producer-seam` ⇒ `结论：已入库的消费者不再依赖任何未入库的生产者`；
+   `queue-teeth` ⇒ `臂数=6　不成立=0　末次 sha256=52c3fd707977a03e（须等于开局那枚）`，末次那枚与 AC-2 格里记的逐字相同。
+4. 变异臂跑完之后的**还原**验收（这一格才是那 5 枚的牙）：`git status --porcelain` 总数仍是 **14**；`git status --porcelain -- server/src/automation/inbound.routes.ts server/src/entitlement.ts packages/app-host/src apps/web/src/features/settings` 对这四路**空** ⇒ 队列臂改写又还原，没在被跟踪路径上留脏态。
+5. 以后要隔离副本：按本文 §早期"隔离副本复跑"那条配方现造（`git worktree add --detach <仓库外的路径> HEAD`，只把 `node_modules` 符号链接过去），**别去找 `inb-t7`** —— 它现在是一个历史载体号，不是一个可进入的目录。
