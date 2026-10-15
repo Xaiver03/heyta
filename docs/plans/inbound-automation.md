@@ -3755,16 +3755,35 @@ AC_TICKED=0  AC_UNTICKED=8  DIRTY_AFTER=0
 快进前另取一条：`git diff --name-only fa5ae75b HEAD -- '*pnpm-lock.yaml' 'package.json' '*/package.json'` ⇒ **0 枚**，
 所以这 60 秒不是拿旧依赖凑的读数。
 
-**故意没重取的（写清"我测了什么、为什么这趟不做"）**：T7 第 1 腿（111 步逐道）与第 2 腿（`pnpm -r --no-bail test` 全量）
-在新 tip 上**没有读数**。两层原因不许混：
-1. **挡路的确实是这两笔**：被改的那四枚 `scripts/verify-mobile-*.sh` + `scripts/lib/mobile-e2e.sh` 正好喂给链里第
-   **52 / 80 / 104 / 111** 道（`node -e` 从 `scripts.check` 里自己解析现量），那四道归**设备腿线**所有
-   ⇒ 上一趟那句"111 步 / 84 绿 27 红"在新 tip 上**不许引用**；本线占的那三格不受影响（它们的输入路径一枚没变）。
-2. **这趟为什么不当场取**：`sysctl -n vm.loadavg` 现量 **1 分钟 15.51 / 5 分钟 12.22 / 15 分钟 12.34**，
-   链驱动自己的门是 `NCPU*3/4 = 12` ⇒ 会先等（最多 40 分钟），而短窗**高于**长窗说明本机此刻正被别的会话用着
-   （那两笔才落地 20 分钟）。往那个窗口里再塞一趟全量构建+全量测试，取到的数也不干净。
-   ⇒ 重取命令挂在这里：`cd .worktrees/inb-t9 && bash .run-logs/chain.sh`（载体已快进到 `4e0215f6`，装好依赖）。
+**没重跑的，以及一句要撤回的话**：T7 第 1 腿（111 步逐道）与第 2 腿（`pnpm -r --no-bail test` 全量）这趟没重跑。
+🔴 本小节 13:4x 第一版写的是"那四枚脚本正好喂给链里第 52/80/104/111 道"—— **那句是错的，是按步骤名猜的，现按消费者解析撤回并重述**
+（错的方向保守，但下一位若照它去等设备腿线收口，就等错了对象）。
 
-🟢 **给下一位的判据学**：顺延尺红了 **≠** "三腿全量都要重跑"。这 20 枚里 15 枚是图片、5 枚是别线的 shell，
-再按**谁消费这些路径**分一层（链步数用 `node -e` 从 `check` 里解析，别手写），就能把"必须重取的范围"收到
-"链里那四道 + 两腿全量"，而 60 秒那一套装置本来就该重取 —— 这次也确实重取了，且读数没变。
+**现量：那 20 枚改动，T7 三条腿一枚都不消费**
+```bash
+node -e 'const p=require("./package.json").scripts;const chain=p.check.split(" && ");
+const want=["verify-mobile-calendar","verify-mobile-habits","verify-mobile-repeat","verify-mobile-restore","lib/mobile-e2e"];
+let hits=0;chain.forEach((s,i)=>{const m=s.match(/^pnpm ([\w:-]+)$/);const body=(m&&p[m[1]])?p[m[1]]:s;
+  for(const w of want) if(body.includes(w)){hits++;console.log((i+1)+") "+s);} });
+console.log("链内命中="+hits);'
+#  链内命中=0  ← 承重在这一步必须把 `pnpm <名字>` 再解到它自己的定义正文：
+#     第 52/80/104/111 道（check:mobile-settings / -bundle / -first-run-gate / -ai-anchors）
+#     跑的是 scripts/check-mobile-*.mjs，与被改的 scripts/verify-mobile-*.sh **不是同一批文件**。
+grep -rln "android-habits" apps packages e2e scripts research server      # 只有 scripts/verify-mobile-habits.sh 与 scripts/h12-shot-set-arms.sh
+grep -n "mobile-e2e\|verify-mobile" scripts/reinstall-all.sh               # 3 处命中全在注释里（第 34/64/583 行）
+grep -c "mobile-e2e\|verify-mobile" apps/desktop-linux/scripts/package-deb.sh   # 0
+```
+（`e2e/auth-journey/auth-journey.spec.ts:23` 那次命中也是注释，而且它点的是另一枚 `mobile-e2e-fresh-account.sh`。）
+再叠上两条已经量到的：**依赖清单零变化**（`git diff --name-only fa5ae75b HEAD -- '*pnpm-lock.yaml' 'package.json' '*/package.json'` ⇒ 0 枚）
+与 **14 枚装置 + 四道门在新 tip 上逐枚退码一模一样**。
+
+⇒ **结论**：那条粗尺红是真的红，但按消费者量完这一层后，第 1、2、3 腿的读数**对 `4e0215f6` 仍然成立**——
+靠的不是重跑，是"它们执行的输入一枚没变"。
+⚠️ 边界必须写明：**消费者分析弱于一次重跑**。它证"没有输入变化"，证不了"重跑一定同数"（负载、时序、外部设备都能变）。
+所以重跑命令仍挂在台账：`cd .worktrees/inb-t9 && bash .run-logs/chain.sh`（载体已快进到 `4e0215f6`、依赖已装）。
+这趟没取的理由是现量的：`vm.loadavg` 1 分钟从 15.51 涨到 **18.14**，而链驱动自己的门是 `NCPU*3/4 = 12`，
+短窗高于长窗说明本机正被设备腿那个会话用着 ⇒ 往那个窗口塞全量构建只会拿到被争用的数。
+
+🔴 **这一格留下的判据学（比结论有用）**：判"某个改动会不会影响某个读数"，**不许按名字相似匹配**，要按**解析后的消费者**匹配。
+两条我都踩了：只匹配步骤名 ⇒ 假命中 4 道；没区分注释与调用 ⇒ 又差点把 `reinstall-all.sh` 算成消费者。
+所以这把尺的形状是：`pnpm <名字>` 解到定义正文 + grep 命中要回读那一行是不是注释。
