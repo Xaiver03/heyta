@@ -9967,3 +9967,27 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     并且**造完必须回读**（本腿在清单上按标题逐条对，对不上就整条报失败），
     否则后面所有以"这条数据存在"为前提的读数都是空的。
     同族：#438（本机 shell 的 locale 是空 ⇒ 对照实验要在**被测那一侧**换档）。
+441. 🔴 **plumbing 提交之后，共享索引里仍然没有那批文件 —— 拿 `git ls-files` 判"跟没跟踪"的门禁会把已入库的证据包报成死链。**
+    现量（10-16 04:1x）：r114 那 91 枚证据文件**已经在 HEAD 里**
+    （`git ls-tree HEAD -- apps/mobile/evidence/.../RESULT.md` 有那枚 blob），
+    而 `pnpm check:docs` 仍然报「本机有、仓库里没有」，因为它那句判据取自
+    `git ls-files -z`（`research/tools/docs-link-check.mjs` 的 `TRACKED` 集合）—— **读的是索引，不是 HEAD**。
+    私有索引（`GIT_INDEX_FILE=… write-tree`）天生不动共享索引，所以这条红**每次 plumbing 提交新文件都会出现**。
+    ⇒ 补一步：对同一批 pathspec 再跑一次 `git update-index --add --stdin < 那份清单`
+    （只对齐索引、不 commit、不碰别的文件），跑完 `git status --porcelain <那批>` 应当**为空** ——
+    为空就等于"索引与 HEAD 对这批一致"。
+    ⚠️ 这不是门禁坏了：它判的是**干净检出上会不会是死链**，而索引就是本机检出的形态。
+    放宽判据会让真死链跟着一起绿（那三条出路里 ②③ 各有其适用场景，但都不适用于"文件确实该入库"）。
+442. 🔴 **共享工作树里 `read-tree` 与 `commit-tree` 之间 HEAD 会移动 —— 拿"提交那一刻的 HEAD"当 parent 去接一棵旧树上，
+    等于**静默回退别人刚提交的那几枚文件**。**
+    现量（10-16 04:2x，本线自己犯的）：`read-tree` 时 `OLD=59a36654`，中间别线提交了 `97ccf15c`
+    （给 `BLOCKED.md` +57 行、`PROGRESS.md` +6 行），我提交前重新 `git rev-parse HEAD` 拿到 `97ccf15c`
+    就把它当 parent —— 树却是从 `59a36654` 长出来的 ⇒ 那 63 行在新提交里**消失了**，
+    而 `commit-tree`/`update-ref` 全都 rc=0，一点动静没有。
+    是"提交后 `git diff --name-status <parent> HEAD` 复验"这一步抓到的（那两枚文件出现在改动列表里＝越界）。
+    ⇒ 三条写法，缺一不可：① `OLD` **只取一次**，`read-tree $OLD` 与 `commit-tree -p $OLD` 用**同一枚**；
+    ② `update-ref refs/heads/main $NEW $OLD` 的 CAS 基准必须是那同一枚 `$OLD` —— HEAD 动了就让它在
+    **写之前**响亮失败，而不是把别人的内容盖掉；③ 提交后拿 `NEW` 的**真实 parent** 复验一次
+    `git diff --name-status <parent> <NEW>`，除我那批 pathspec 之外**应当一行都没有**。
+    修复形状：不要 `reset`（会动别人的现场），用同一棵树重 `commit-tree -p $正确的OLD` 再
+    `update-ref … $错的那枚` CAS 顶掉 —— CAS 成功即说明那一头没人接上去。
