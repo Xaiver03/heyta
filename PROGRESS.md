@@ -4822,3 +4822,16 @@ AC-7 另一半"官方与自托管样例分别**可运行**"仍要真部署实例
 门：`verify-inbound-ac8-matrix.py` 主判据 rc=0（`行数=34　有尺行=27　无尺行=7　尺枚=67　窗=13/13　平台=10/10　权益=9/9　设备状态=9/9`）
 且 `--self-test` rc=0（`SELF_TEST=OK（六臂各自成立：R4 两半能红、R3/R5/R2 能红、静止臂没跟着红）`）、
 `doc-tables` / `docs-link-check` / `check:doc-citations` / `ac-ticks` 各 rc=0（表格列数与格内反引号配对没被我的改动打坏）。
+
+## 2026-10-15 16:3x · 16:0x 那条"条目数对上了也不作数"从推断升级成现量，而且成因比"有人删"常见得多
+
+`porcelain` 提交后从 14 涨到 **17**（新增三枚全是别线文件：`docs/plans/product-ux-optimization*.md`、
+`docs/reference/environment-traps.md`，本线一枚不脏），顺手去核上午记的那条"成员换了、数量没换"到底怎么发生的：
+
+- `ls -ldT` 现量 `apps/web/evidence/ux-final-20261015/probe-assistant-header` **还在盘上**（目录 mtime `Oct 15 14:39:11`），
+  可它已经从 `porcelain` 里消失了 —— `git ls-files` 该目录 **3 枚在册**，入库它的是**别线那一笔 `2dbfdba6`**（产品体验线台账）。
+- 同一时刻作为新 `??` 进来的 `…/reinstall-r111/`，`git ls-files` 在册 **0** 枚。
+
+🔴 ⇒ **一条 `??` 从 `porcelain` 消失不需要任何人删东西，只需要别人把它 commit 掉。**
+所以完成条件 2 那把按条目数的尺，连"数变少"都不能读成"共享树变干净"——最普通的成因反而是**别的线交付了一笔**。
+这条已经写进 `BLOCKED.md` 的 B199（那一格仍是判卷口径，等负责人点头，本线没代改）。
