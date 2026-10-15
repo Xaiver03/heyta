@@ -1,0 +1,12 @@
+被测包 1.0 / lastUpdateTime=2026-10-15 13:39:08 / HEAD=f7712df7
+Traceback (most recent call last):
+  File "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/mobile/evidence/ux-final-20261016/android-widget-data-r114/widget-data-leg.py", line 514, in <module>
+    seed_tasks()
+    ~~~~~~~~~~^^
+  File "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/mobile/evidence/ux-final-20261016/android-widget-data-r114/widget-data-leg.py", line 257, in seed_tasks
+    create_task(spec)
+    ~~~~~~~~~~~^^^^^^
+  File "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/mobile/evidence/ux-final-20261016/android-widget-data-r114/widget-data-leg.py", line 211, in create_task
+    tap(pick(dump("tab"), desc="任务", clickable=True)[0])
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^
+IndexError: list index out of range

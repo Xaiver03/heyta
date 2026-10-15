@@ -1,0 +1,23 @@
+被测包 1.0 / lastUpdateTime=2026-10-15 13:39:08 / HEAD=83feab4d
+  专注这一档活着：读到 ['已暂停', '继续']（running/paused 两档都算 active）
+[今日专注] 落点=(540,700) 新表行=[7]
+[今天的任务] 落点=(540,700) 被拒（favorites 表没新增行）
+[今天的任务] 落点=(540,1150) 被拒（favorites 表没新增行）
+[今天的任务] 落点=(540,380) 被拒（favorites 表没新增行）
+[今天的任务] 落点=(540,1600) 新表行=[8]
+  长按 (540,1300) 没出「微件」菜单（可能被已放下的组件占了），换下一个点
+[四象限] 落点=(540,700) 新表行=[9]
+[今日习惯] 落点=(540,700) 新表行=[10]
+[同屏] host widgets.size=4 绑到的 provider=['com.heytamobile.widget.FocusWidgetProvider', 'com.heytamobile.widget.HabitsWidgetProvider', 'com.heytamobile.widget.QuadrantWidgetProvider', 'com.heytamobile.widget.TodayWidgetProvider'] ids=['16', '20', '21', '22'] 缺=[]
+[light p0] 命中=['专注中', '○ L114UrgentImportant', '○ L114Urgent'] 空态残留=[] 图=四枚同屏-p0-light.png
+[light p1] 命中=['○ L114Habit', '○ L114UrgentImportant', '○ L114Important', '○ L114Urgent', '○ L114Plain'] 空态残留=[] 图=四枚同屏-p1-light.png
+[light p2] 命中=['○ L114Habit', '○ L114UrgentImportant', '○ L114Important', '○ L114Urgent', '○ L114Plain'] 空态残留=[] 图=四枚同屏-p2-light.png
+[light] 第 2 页与上一页文字集合相同 ⇒ 到头被弹回，停止翻页
+[dark p0] 命中=['专注中', '○ L114UrgentImportant', '○ L114Urgent'] 空态残留=[] 图=四枚同屏-p0-dark.png
+[dark p1] 命中=['○ L114Habit', '○ L114UrgentImportant', '○ L114Important', '○ L114Urgent', '○ L114Plain'] 空态残留=[] 图=四枚同屏-p1-dark.png
+[dark p2] 命中=['○ L114Habit', '○ L114UrgentImportant', '○ L114Important', '○ L114Urgent', '○ L114Plain'] 空态残留=[] 图=四枚同屏-p2-dark.png
+[dark] 第 2 页与上一页文字集合相同 ⇒ 到头被弹回，停止翻页
+[light] 本趟数据缺=[] 空态残留=[] 走了 3 页
+[dark] 本趟数据缺=[] 空态残留=[] 走了 3 页
+[同屏] 结束：4 枚实例已收掉，残留 (0, [], [])
+SIZE AFTER ALL: (0, [], [])

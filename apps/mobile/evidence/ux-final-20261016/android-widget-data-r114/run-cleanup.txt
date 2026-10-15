@@ -1,0 +1,4 @@
+被测包 1.0 / lastUpdateTime=2026-10-15 13:39:08 / HEAD=6ad8aa25
+  先删掉 4 行旧的同族数据
+清理结果 {'tasks': ['删除任务：L114Urgent', '删除任务：L114UrgentImportant', '删除任务：L114Plain', '删除任务：L114Important'], 'habit': True, 'focus': 'not-running'}
+SIZE AFTER ALL: (0, [], [])

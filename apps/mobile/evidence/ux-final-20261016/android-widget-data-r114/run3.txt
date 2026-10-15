@@ -1,0 +1,2 @@
+被测包 1.0 / lastUpdateTime=2026-10-15 13:39:08 / HEAD=f7712df7
+输入框回读不等于要写的值（期望 'L114-urgent-important !1'）

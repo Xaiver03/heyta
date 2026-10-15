@@ -1,0 +1,4 @@
+被测包 1.0 / lastUpdateTime=2026-10-15 13:39:08 / HEAD=cf89ce45
+  上一轮停在暂停态：先点「继续」把它带回 running，再做往返判据
+FAILED adb shell ('cat', '/sdcard/focus-tab2.xml'): cat: /sdcard/focus-tab2.xml: No such file or directory
+

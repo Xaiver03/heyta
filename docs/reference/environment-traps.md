@@ -9924,11 +9924,19 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     ⚠️ 顺带一条同族的读数陷阱：`dumpsys appwidget` 的 `Providers:` 段把**注册的全部** provider 列出来（本机四枚恒在列），
     拿它判"桌面上那枚绑的是哪一个"**永远为真** —— 只有 `Widgets:` 段（`id=` + `provider=`）说的是已绑定实例。
     🔴 还有一条会吃掉一整趟跑法的物理约束：模拟器桌面 6 列 × 5 行、图标占掉第 4 行 ⇒ **一页放不下两枚 3×2**，
-    而 Launcher 对被拒的落点**什么都不做**（不挪页、不报错、`widgets.size` 原地不动），
-    所以多枚只能"逐枚绑 → 取图 → 逐枚收"；收掉走启动器自己那张表
+    而 Launcher 对被当前页拒掉的落点**什么都不做**（不报错、那一趟里 `widgets.size` 原地不动），
+    所以那一趟只能"逐枚绑 → 取图 → 逐枚收"；收掉走启动器自己那张表
     （`adb root` 后 `content delete --uri content://com.google.android.apps.nexuslauncher.settings/favorites --where '_id=<本趟新增那行>'`
     + `am force-stop com.google.android.apps.nexuslauncher`），只删自己新建的那一行。
     跑通的装置与读数在 `apps/mobile/evidence/ux-final-20261015/android-widget-pair-r112/`。
+    ⚠️ **但"只能逐枚"是那一趟的推论，不是这条约束本身 —— 10-16 04:0x 已被 r114 否证**：
+    同一台模拟器上把四枚**同时**绑住是做得到的（现量 `dumpsys appwidget` 的 `Widgets:` 段
+    `widgets.size=4`、四个不同 provider、`ids=[16,20,21,22]`），只是**放不下在同一页**：
+    启动器把它们分到两页（第 0 页 专注+今日任务、第 1 页 习惯+四象限），
+    而被拒的那几次是**同一页的落点不够**（同一枚换落点就成功：「今天的任务」在
+    `(540,700)`/`(540,1150)`/`(540,380)` 三点被拒、`(540,1600)` 放下）。
+    ⇒ 写"多枚不能同时在场"之前先分清问的是**同时绑定**还是**同一页**；装置见
+    `apps/mobile/evidence/ux-final-20261016/android-widget-data-r114/`（`simult` 档）。
 438. 🔴 **本机 shell 的 `LANG`/`LC_ALL` 都是空 —— 用它做 locale 相关形状的对照实验，会当场把真 bug 判成"没事"。**
     `check:shell-unicode-vars` 那条形状（`$var` 紧跟全角字符 ⇒ bash 把全角字节算进变量名）在空 locale 下**不发作**：
     实测同一行 `echo "不是「$name」（得到 x）"` —— `LANG=en_US.UTF-8` 与 `zh_CN.UTF-8` 下都是
@@ -9937,3 +9945,25 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     ⇒ **判这类形状时必须显式换档跑**（`LANG=zh_CN.UTF-8 bash x.sh`），只在自己这一档看到 `SAME` 不构成"没有这个坑"；
     而设备腿那批脚本（`scripts/verify-mobile-*.sh` 全链）里**没有任何一层设过 `LANG`/`LC_ALL`**
     ⇒ 同一条腿在不同调用方手里可以一个跑得完、一个半路死，且死的通常是 `set -u` 下的 `ok`/`bad` 消息行。
+439. 🔴 **`uiautomator dump` 取不到 idle 态时打的是 `ERROR: could not get idle state.`，而退出码仍然是 0 ——
+    只看 rc 的装置会**读到上一枚同名文件的陈旧内容**，并把"没生效"当成结论。**
+    现量（10-16 02:0x，`emulator-5554`）：专注进度环在转的时候
+    `adb shell uiautomator dump /sdcard/x.xml` ⇒ `rc=0` + stdout 那行 ERROR，`/sdcard/x.xml` **根本没被写**；
+    下一次 `cat` 同一枚文件名拿到的就是**上一屏**。本腿第一次跑就是被这条骗的：
+    真实状态是「已暂停」（环在动时读不到树），装置却读到了旧屏并写下"开始没生效"，
+    差一点把一次成功的操作判成失败。
+    ⇒ 三条写法：① `dump()` 显式认 stdout 里的 `ERROR` / `could not get idle state`，命中就返回空；
+    ② `cat` 之后还要验 `"<node" in xml`（另一种失败形状是既没报 ERROR 也没落盘）；
+    ③ **每次调用换 tag**（本腿按 `focus-while-running` / `simult-p0-light` 这样的屏名分文件），
+    复用同名文件等于把这条陷阱常驻装置里。
+    同族：#164（后台任务的 exit 0 是包装命令的）、#291（拿绿行形状数红行）。
+440. 🔴 **这台模拟器上 `adb shell input text` 会把 `-` 和 `!` 打成全角 `－` `！`，而且与 IME 开关无关 ——
+    用它造的数据从第一步就不是你想造的那一条。**
+    现量三档 A/B（关 IME + 冷启动 / 开 IME + 冷启动 / 再关一次 + 冷启动）：
+    打 `x-y!z` 三档读回的都是 `x－！yz`。⚠️ **机制没量清**（没分清是 `input` 的键码映射还是系统的中文标点层），
+    但"能不能用来造这两类字符"这一档已经量清了：**不能**。
+    ⇒ 设备腿造数据**只用字母和数字**（本腿的标题一律 `L114UrgentImportant` 这种形状），
+    需要优先级/紧急度这类"原本能用快速添加语法 `!1` 表达"的字段，改走**详情里的点选控件**；
+    并且**造完必须回读**（本腿在清单上按标题逐条对，对不上就整条报失败），
+    否则后面所有以"这条数据存在"为前提的读数都是空的。
+    同族：#438（本机 shell 的 locale 是空 ⇒ 对照实验要在**被测那一侧**换档）。

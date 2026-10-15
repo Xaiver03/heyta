@@ -1,0 +1,92 @@
+{
+  "serial": "emulator-5554",
+  "phase": "capture,focus",
+  "seed": {
+    "tasks": [
+      "L114UrgentImportant",
+      "L114Urgent",
+      "L114Important",
+      "L114Plain"
+    ],
+    "habit": "L114Habit",
+    "focus": "started"
+  },
+  "cases": [
+    {
+      "name": "今日专注",
+      "provider": "FocusWidgetProvider",
+      "new_fav_ids": [
+        7
+      ],
+      "data_marks": [
+        "专注中"
+      ],
+      "empty_leftovers": [],
+      "light": "今日专注-data-light.png",
+      "dark": "今日专注-data-dark.png"
+    },
+    {
+      "name": "今天的任务",
+      "provider": "TodayWidgetProvider",
+      "new_fav_ids": [
+        7
+      ],
+      "data_marks": [
+        "○ L114UrgentImportant",
+        "○ L114Urgent"
+      ],
+      "empty_leftovers": [],
+      "light": "今天的任务-data-light.png",
+      "dark": "今天的任务-data-dark.png"
+    },
+    {
+      "name": "四象限",
+      "provider": "QuadrantWidgetProvider",
+      "new_fav_ids": [
+        7
+      ],
+      "data_marks": [
+        "○ L114UrgentImportant",
+        "○ L114Important",
+        "○ L114Urgent",
+        "○ L114Plain"
+      ],
+      "empty_leftovers": [],
+      "light": "四象限-data-light.png",
+      "dark": "四象限-data-dark.png"
+    },
+    {
+      "name": "今日习惯",
+      "provider": "HabitsWidgetProvider",
+      "new_fav_ids": [
+        7
+      ],
+      "data_marks": [
+        "○ L114Habit"
+      ],
+      "empty_leftovers": [],
+      "light": "今日习惯-data-light.png",
+      "dark": "今日习惯-data-dark.png"
+    }
+  ],
+  "device": {
+    "versionName": "1.0",
+    "lastUpdateTime": "2026-10-15 13:39:08",
+    "release": "16",
+    "system_locales": "zh-Hans-CN",
+    "head": "d6055a5315ccfb5ddc1e243b16f8402e8b2bd898",
+    "imes_disabled": []
+  },
+  "log": [
+    "被测包 1.0 / lastUpdateTime=2026-10-15 13:39:08 / HEAD=d6055a53",
+    "  这一轮停在「已暂停」（主按钮=继续）。`selectFocus` 的 active = phase !== 'idle'，暂停档同样算 active ⇒ 不再强推 running，照这一档取图并如实记下档位",
+    "[今日专注] 预览格中心=(781,1017) 落点=(540, 700)",
+    "[今日专注] host widgets.size=1 provider=['com.heytamobile.widget.FocusWidgetProvider'] 新表行=[7] 命中=['专注中'] 空态残留=[]",
+    "[今天的任务] 预览格中心=(299,1757) 落点=(540, 700)",
+    "[今天的任务] host widgets.size=1 provider=['com.heytamobile.widget.TodayWidgetProvider'] 新表行=[7] 命中=['○ L114UrgentImportant', '○ L114Urgent'] 空态残留=[]",
+    "[四象限] 预览格中心=(781,1757) 落点=(540, 700)",
+    "[四象限] host widgets.size=1 provider=['com.heytamobile.widget.QuadrantWidgetProvider'] 新表行=[7] 命中=['○ L114UrgentImportant', '○ L114Important', '○ L114Urgent', '○ L114Plain'] 空态残留=[]",
+    "[今日习惯] 预览格中心=(299,1017) 落点=(540, 700)",
+    "[今日习惯] host widgets.size=1 provider=['com.heytamobile.widget.HabitsWidgetProvider'] 新表行=[7] 命中=['○ L114Habit'] 空态残留=[]"
+  ]
+}

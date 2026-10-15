@@ -1,0 +1,11 @@
+被测包 1.0 / lastUpdateTime=2026-10-15 13:39:08 / HEAD=9096c1cd
+  先删掉 4 行旧的同族数据
+  建好 L114UrgentImportant
+  建好 L114Urgent
+  建好 L114Important
+  建好 L114Plain
+  改过 L114UrgentImportant: due=today,important；回读片段=['任务详情', '时刻', '时:分', '排期', '重复', '不重复', '每天', '每周']
+  改过 L114Urgent: due=today；回读片段=['任务详情', '标题', 'L114Urgent', '备注', '写点什么（支持 Markdown）', '离开输入框或关闭面板时保存', '清单', '收集箱']
+  改过 L114Important: important；回读片段=['任务详情', '时:分', '排期', '重复', '不重复', '每天', '每周', '工作日']
+  清单回读：['打开任务：L114Important', '打开任务：L114Plain', '打开任务：L114Urgent', '打开任务：L114UrgentImportant']
+等不到：「我的」里的「习惯」入口

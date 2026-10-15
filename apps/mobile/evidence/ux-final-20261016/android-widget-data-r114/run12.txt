@@ -1,0 +1,11 @@
+被测包 1.0 / lastUpdateTime=2026-10-15 13:39:08 / HEAD=d6055a53
+  这一轮停在「已暂停」（主按钮=继续）。`selectFocus` 的 active = phase !== 'idle'，暂停档同样算 active ⇒ 不再强推 running，照这一档取图并如实记下档位
+[今日专注] 预览格中心=(781,1017) 落点=(540, 700)
+[今日专注] host widgets.size=1 provider=['com.heytamobile.widget.FocusWidgetProvider'] 新表行=[7] 命中=['专注中'] 空态残留=[]
+[今天的任务] 预览格中心=(299,1757) 落点=(540, 700)
+[今天的任务] host widgets.size=1 provider=['com.heytamobile.widget.TodayWidgetProvider'] 新表行=[7] 命中=['○ L114UrgentImportant', '○ L114Urgent'] 空态残留=[]
+[四象限] 预览格中心=(781,1757) 落点=(540, 700)
+[四象限] host widgets.size=1 provider=['com.heytamobile.widget.QuadrantWidgetProvider'] 新表行=[7] 命中=['○ L114UrgentImportant', '○ L114Important', '○ L114Urgent', '○ L114Plain'] 空态残留=[]
+[今日习惯] 预览格中心=(299,1017) 落点=(540, 700)
+[今日习惯] host widgets.size=1 provider=['com.heytamobile.widget.HabitsWidgetProvider'] 新表行=[7] 命中=['○ L114Habit'] 空态残留=[]
+SIZE AFTER ALL: (0, [], [])

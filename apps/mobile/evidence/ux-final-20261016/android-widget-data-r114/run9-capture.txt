@@ -1,0 +1,16 @@
+被测包 1.0 / lastUpdateTime=2026-10-15 13:39:08 / HEAD=9bdf5e2c
+Traceback (most recent call last):
+  File "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/mobile/evidence/ux-final-20261016/android-widget-data-r114/widget-data-leg.py", line 612, in <module>
+    cases = capture()
+  File "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/mobile/evidence/ux-final-20261016/android-widget-data-r114/widget-data-leg.py", line 496, in capture
+    ns, cells = open_group()
+                ~~~~~~~~~~^^
+  File "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/mobile/evidence/ux-final-20261016/android-widget-data-r114/widget-data-leg.py", line 438, in open_group
+    ns = nodes_of(xml)
+  File "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/mobile/evidence/ux-final-20261016/android-widget-data-r114/widget-data-leg.py", line 86, in nodes_of
+    for m in re.finditer(r"<node ([^>]*?)(/?)>", xml):
+             ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rocalight/miniconda3/lib/python3.13/re/__init__.py", line 285, in finditer
+    return _compile(pattern, flags).finditer(string)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^
+TypeError: expected string or bytes-like object, got 'list'

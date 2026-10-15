@@ -1,0 +1,6 @@
+被测包 1.0 / lastUpdateTime=2026-10-15 13:39:08 / HEAD=f7712df7
+  建好 L114-urgent-important（!1）
+  建好 L114-urgent（无优先级标记）
+  建好 L114-important（!1）
+  建好 L114-plain（无优先级标记）
+L114-urgent-important：详情里没有可点的「今天」快捷（截止设不上，这一趟的读数会缺）
