@@ -3673,3 +3673,28 @@ linux `dist/linux/packaged-first-run.png` —— 三张都是同一套共享 UI�
 **C30 仍记无尺**，但"无尺"的理由从"桌面两端也没量"收窄成了"**只剩 android（+ ios 的设备名旋钮）这一格**"。
 
 `grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` = **0**（本节同样不勾任何一格）。
+
+---
+
+## 2026-10-15 12:4x · T8 复账：14 枚本线装置 + 四道静态门在同一枚 tip 上一次跑完，每一枚非 0 都有归属
+
+**载体**：`.worktrees/inb-t9` 已 `checkout --detach` 到主树同一枚 tip `fa5ae75b`，跟踪文件脏条目 **0**，
+与主树 `git diff --name-only` **空** ⇒ 这一轮的读数与"当前 tip"逐字对齐（上一节那批是 `0fe3d16b` 起的）。
+驱动 `.worktrees/inb-t9/.run-logs/rerun-rigs-1015.sh`，日志同目录 `rigs-1015/`；
+每条都是 `timeout … <命令>` 之后**立刻**取 `$?`（管道尾巴与 zsh 会吞码），跑完 `DIRTY_AFTER=0` ⇒ 全程只读。
+
+| 枚 | 退码 | 这一枚的非 0 是什么意思 |
+|---|---|---|
+| ac-ticks / ac8-matrix / check-chain（`--self-test`）/ cjs-require-order / doc-tables / dual-host / producer-seam / queue-teeth / quota-teeth / ticket-teeth / worker-identity | **0** | 11 枚绿。`dual-host` 12 s、三枚 teeth 各 4–14 s、`worker-identity` 4 s |
+| api-slice | **3** | **按设计退役**：它自己打印"本切片已落进 HEAD（`0b7ff357`）⇒ 入库工具退役，不再产出切片（退 3）"。⚠️ 下一位别把它当回归——`3` 在这两枚里是"活儿干完、工具下班"，不是失败 |
+| host-options-slice | **3** | 同上（落进 `376d1bc9`） |
+| commit-scope | **1** | `本线笔数=127 仅正文提及=13 涉及路径=103 越界=1`，那一枚是 `79e8ede1`（**协作线** 10-11 的台账笔，主题里顺带列了"…账号套件/**自动收集**/产品体验…"）。装置那行自己写着 `命中段=desc 带本线独占路径=0` ⇒ 归属不是本线。**这一格不新**：`PROGRESS.md` 里 10-13 就登记过同一形状（"翻红那一格"那节 + `B169` 待裁决口径），本轮只是复量到同一个数 |
+| `check-migrations` / `check-docs-voice` / `docs-link-check` | **0** | 三道门在副本里也绿 |
+| `license-inventory` | 副本 **1** / 主树 **0** | 🔴 **载体条件，不是回归**：副本没跑过 `cd e2e && pnpm install` ⇒ `e2e/node_modules/.pnpm` 缺席，工具按它自己的规矩**拒绝少算**（"清点结果必然少算，不出数"）。主树现量：`清点输入集：store 去重后 964 枚，逐枚都能在当前 lockfile 里查到` ⇒ **rc=0**。⇒ 在隔离副本上跑这道门前先补 `e2e` 的安装，否则读数不可用 |
+
+ **不变量这一轮也复量了**：`AC_TICKED=0`、`AC_UNTICKED=8`、副本 `DIRTY_AFTER=0`；
+主树非白名单脏条目按 `git status --porcelain` 现量筛白名单（本线那三枚台账/计划除外）全是别线在飞的（B194 那批 + android 证据 + `scripts/lib/`），本线一枚没动。
+
+⚠️ **一处要改的口径（不改判卷，只改文档）**：这两枚"退 3"的切片工具与 `license-inventory` 的"载体缺件就拒出数"，
+都说明**"退码非 0"在本线不是一句话能判红绿的**。T8 的逐格复审表以后按本表这三档写：
+`0` = 成立 / `3` = 工具已退役（切片已入库）/ 其它非 0 = 必须逐枚读日志定性并写归属，不许汇总成"红了"。

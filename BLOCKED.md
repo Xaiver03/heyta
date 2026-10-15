@@ -10522,6 +10522,28 @@ git log --all -m -S '"check:ai-e2e":' --format='%h %s' -- package.json | head   
 **跑它之前先 `lsof` 看端口**（见 `docs/reference/environment-traps.md` #87 与本文件 B194）。
 ⚠️ 反作弊提醒：出路**不是**把链里那四个引用删掉 —— 那等于把四道门禁静默退役，而 `check:gate-wiring` 会立刻不再报红。
 
+### 追记（2026-10-15 12:4x @ `fa5ae75b`）：把"还开着吗"换成一把不写死名字的尺
+
+上面那三条命令**写死了四枚名字** ⇒ 如果哪天又有一枚定义被丢（第五枚），它们照样全绿。改成**从链里自己解析**：
+
+```bash
+node -e '
+const p=require("./package.json").scripts;
+const chain=p.check.split(" && ");
+const names=new Set(Object.keys(p));
+const refs=[...new Set(chain.map(s=>{const m=s.match(/^pnpm (check:[\w:-]+|[\w:-]+)$/);return m?m[1]:null}).filter(Boolean))];
+const missing=refs.filter(r=>!names.has(r));
+console.log("链步数="+chain.length+"  引用名枚数="+refs.length+"  package.json 里没定义的="+missing.length);
+if(missing.length) console.log("缺的定义: "+missing.join(", "));
+'
+# 2026-10-15 现量：链步数=111  引用名枚数=109  package.json 里没定义的=4
+#   缺的定义: check:gate-ssh, check:e2e-helper-exports, check:ai-e2e, check:e2e-carrier   ⇒ 本格仍开着
+```
+
+⇒ 判"这一格闭没闭"只有一条：**最后一行的枚数变 0**。名字集合自己从链里取，别线补回哪一枚、漂进哪一枚都躲不过这把尺。
+（本会话第一版探针我就是照 B196 那四枚名字手抄的，抄错了三枚 —— 抄错没被发现，是因为它同样打印"无定义"。
+这正是"写死清单"的失效形状：**错了也红得一样**。）
+
 ## B197（2026-10-14 11:3x @ `0fe3d16b`，本会话 · 当前 tip 的 `pnpm check` 那 27 格里**本线占三格**，三格的落点全在白名单外）
 
 现量口径：对装置留下的 27 份红日志逐份 `grep -i inbound` ⇒ 命中三份（step 21、23、51），其余 24 格不含本线字样。
