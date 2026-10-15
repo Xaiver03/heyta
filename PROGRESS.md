@@ -4774,3 +4774,28 @@ AC-7 要求"端点与权限真实"。之前那一格写的是"那两份文档**�
 
 🔴 **这一格不因此往完成挪**：装置判的是"文档写的 URL 在当前挂载下可达不、方法注册没注册"，
 AC-7 另一半"官方与自托管样例分别**可运行**"仍要真部署实例（公网接收未开），仍**无尺**。
+
+## 2026-10-15 16:0x · 尺入库后回头量"证据本身还取不取到"，量出两条要登记的边界
+
+那枚常驻尺已随 `56faafd3` 入库（`git show --stat` 读回 **4 files**：新装置 + 载体 spec + 本台账 + 计划）。
+提交前跑的相关门全绿：`pnpm -r typecheck` rc=0、载体 spec `Tests 13 passed (13)`（跳过 0）、
+`check-migrations` / `check-docs-voice` / `docs-link-check` / `license-inventory` / `ac-ticks` / `doc-tables` /
+`check:doc-citations` / `check:md-tables` 各 rc=0，`grep -c '^- \[x\] \*\*AC-'` 仍 **0**。
+
+接着量一件一直没量过的事：**台账说"读数见某文件"，那个文件今天还取不取到。**
+
+① 🔴 **私有载体的存续**：现量 `.worktrees/inb-t7` 与 `inb-t8` **已经不在**（只剩 `inb-t9`，脏 **15** 条、全是它自己跑测写的私有残件）。
+而三处文档往这类路径里指了 **58 条**（计划 21 / 台账 24 / BLOCKED 13），里面 `.worktrees/inb-t[78]/.run-logs/**` 与 `/tmp/inb-*.log` 那批**原件已不可取**。
+排除规则也确认了不是"忘了入库"：`.worktrees/` 由 `.git/info/exclude:9` 排除、`.run-logs/` 由 `.gitignore:256` 排除。
+🟢 判卷真身没丢：**能复跑的是已入库的装置**（`research/tools/verify-inbound-*`，盘上现量 16 枚），
+**要看图有已跟踪的证据件**（`git ls-files docs/research/evidence/inbound-automation-review/` 现量 **58** 份），
+读数正文本身是逐段**贴进计划**的 —— 所以这一条不推翻任何 AC 格，但"日志落点"那类句子**不能读成"随时可取"**，已在 B199 写明口径。
+
+② 🔴 **完成条件 2 那把尺按"条目数"判，对"成员被换"是瞎的**：`porcelain` 现在 **14** 条，和 14:3x 记的那个 14 **数量相同、内容不同** ——
+上午那枚 `?? apps/web/evidence/ux-final-20261015/probe-assistant-header/` 已经不在了，现在同位置是
+`?? apps/web/evidence/ux-final-20261015/reinstall-r111/`。所以"非白名单条目数与开工快照相同"这句**即使成立也不证明没人动过**。
+这条不是我能改的（那句是任务书给的判卷口径），按规矩登记 **B199**，本线只把现量与反例留在这里。
+
+③ 顺带把 B194 那批证据图再量一遍：16 枚 mtime **仍是 `Oct 14 10:46:49` 同一秒**（与 14:1x 那趟相同，今天没有第三次覆写），
+其中四枚 `draft-{1280,390}-{dark,light}.png` 经 `git ls-tree HEAD` 核过**根本不在 HEAD**（sha `61543d98` / `d2ebc3b6` / `41ce5d87` / `59c08d59`）
+⇒ 它们是那次跑测留在共享树的**未入库残件**，不是"被人改了入库件"。归属仍不可证，维持 B194 待裁决原判。

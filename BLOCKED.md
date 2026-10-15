@@ -10755,3 +10755,36 @@ grep -n "<AiSettings$" apps/web/src/App.tsx                                     
 
 ⇒ 要拍板的还是那三处 `active`（`App.tsx:3228` 传、`AiSettings.tsx:1270` 转、`AiSettingsProps` 声明在 `:343`），
 **归属没变、仍在地界外**；这趟只把"照着能打开文件"这件事修对了。
+
+## B194 追记（2026-10-15 16:0x @`56faafd3`）：那批今天**没有第三次覆写**，而且其中四枚从来就不在 HEAD
+
+`ls -lT apps/web/evidence/inbound-recovery/*.png` 现量：**16 枚 mtime 仍全是 `Oct 14 10:46:49` 同一秒**
+（与 14:1x 那趟逐字相同）⇒ 10-15 下午这一段时间里没有人再覆过这批。
+新的不是"被覆"，是"被问错了对象"：`git ls-tree HEAD -- apps/web/evidence/inbound-recovery/draft-1280-dark.png` 等四枚
+**在 HEAD 里根本没有条目**（盘上 sha `61543d98` / `d2ebc3b6` / `41ce5d87` / `59c08d59`）
+⇒ `draft-{1280,390}-{dark,light}.png` 是**未入库残件**，不是"有人改了已入库的证据图"。
+本线入库的那批草稿图在 `docs/research/evidence/inbound-automation-review/`（跟踪中，`git ls-files` 现量 58 份），两者别混。
+🔴 归属仍不可证，B194 待裁决**维持原判**；这一趟只是把"16 枚都该拿 HEAD 去比"这条错用法挑出来 ——
+先 `git ls-tree` 确认它在不在册，再谈"覆写"。
+
+## B199（2026-10-15 16:0x）：完成条件 2 那句"非白名单条目数与开工快照相同"**对"成员被换"是瞎的**
+
+**问题（判卷口径，不是本线代码）**：任务书完成条件 2 用 `git status --porcelain` 里非白名单路径的**条目数**当作
+"没人动过共享树"的尺。现量给了反例：14:3x 记的 14 条与 16:0x 的 14 条**数量相同、成员不同** ——
+上午那条 `?? apps/web/evidence/ux-final-20261015/probe-assistant-header/` 已消失，同位置换成
+`?? apps/web/evidence/ux-final-20261015/reinstall-r111/`（两枚都是产品体验线的证据目录）。
+⇒ 这一格即使"数对上"也**不成立它想证的事**；它既挡不住"删一条 + 加一条"，也挡不住同一条从 `M` 变成 `??`。
+
+**为什么不自己改**：那句是本线之外的**判卷口径**（任务书给的完成条件），按死规矩「不许改判卷口径 —— 要改记 BLOCKED.md」，
+我只登记不代改。**建议的替代口径**（要负责人点头才生效）：把"条目数相同"换成
+**逐条名单比对** —— `git status --porcelain | sort` 的整张集合与快照做集合差，且快照必须**开工时就取**
+（本线这条一直判"不可核"正是因为开工没取基线；B140/B197 记过）。
+
+**同一趟量到的载体边界（不是红，是读法坑）**：台账里 58 条"日志落点/读数见 …"指向
+`.worktrees/inb-t*/.run-logs/**` 与 `/tmp/inb-*.log`。现量：`git worktree list` 在册的只有主检出、
+`.worktrees/inb-t9`（detached @ `5bc1b9fe`，不是当前 tip）与仓外那两枚 `heyta-wt-r110` / `heyta-wt-r111` ——
+**`inb-t7`、`inb-t8` 两枚目录已不在盘上**，而 `.worktrees/` 由 `.git/info/exclude:9` 排除、`.run-logs/` 由 `.gitignore:256` 排除，
+所以那批原件**本来就不可能入库，现在也取不回了**。
+不推翻任何 AC 格：可复跑判据是已入库的装置（`research/tools/verify-inbound-*`，盘上现量 16 枚），图是已跟踪的 58 份证据件，
+读数正文逐段贴在计划里。要请负责人知道的只有一句：**"日志落点"这类句子要读成"当日原件指针"，不要读成"随时可取"**；
+若要把这类原件也留住，那是一条新的口径决定（要不要把 `.run-logs` 里被台账引用的那几枚复制进 `docs/research/evidence/`），不在我能自决的范围。
