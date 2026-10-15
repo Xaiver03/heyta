@@ -9878,10 +9878,20 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
 436. 🔴 **Windows 装机取证图是窗口的「左上角裁切」，不是窗口 —— 因为抓取进程没声明 DPI 感知。**
     打包机与这台开发机之间，"带 DPI 声明 / 不带"两条抓取路径差一个 **1.25** 的因子
     （同一个窗口：不带声明记 `1152x587`，带声明记 `1440x734`）。
-    ⚠️ **别把这句读成"系统缩放 125%"** —— 那是本条落地当天先写下的归因，随后被
-    `r111` 那趟的现量否证：声明成功之后（`DPI_CTX=True`）`GetDpiForWindow` 报的是 **96**。
-    因子可复现、修法有效，但**机制归属未量清**（要那台机器在线才能读 `AppliedDpi`，
-    现量 `ssh windows-pc` 当时已报 `Host is down`）。
+    ✅ **机制量清了（2026-10-16 00:3x，那台机重新在线）**：`HKCU:\Control Panel\Desktop\WindowMetrics`
+    的 `AppliedDPI` = **120** = 96 × **1.25** —— 和上面那个因子逐值对上，缩放档位就是 125%。
+    🔴 **上一版这里写的是"被 r111 的 `GetDpiForWindow=96` 否证"，那是一次射程错，本条就地更正**：
+    那个 96 量的是**取证进程自己所在会话的桌面**，不是窗口所在的那张桌面。同一台机、同一个
+    `ssh windows-pc`，两次连进去的桌面可以不同 —— 00:3x 现量那张：`Screen::AllScreens` =
+    `1024x768`、`deviceName=WinDisc`（会话没挂物理显示器时给的丢弃桌面）、`SM_CXSCREEN=1024`、
+    `GetDeviceCaps(LOGPIXELSX)=96`，且 `SetProcessDpiAwarenessContext(-4)` 在那里**返回 `False`**
+    （r111 那趟记的是 `DPI_CTX=True`）⇒ 两枚读数讲的是两张桌面，互不否证。
+    ✅ r111 那张图本身没问题（不必重取）：图 1440 宽，而 x=1100/1300/1439 三列各有
+    14/6/28 种颜色、不是空白 ⇒ 抓取发生在一张 ≥1440 宽的桌面上，不是这张 1024 的 WinDisc。
+    ⚠️ 由此新增一条**读法边界**：`WINDOW_DPI` 那枚读数量的是取证进程所在会话的显示器 DPI，
+    换一次 ssh 就可能换一张桌面，所以**它不能用来推"用户机器上的缩放"**；要判因子从哪来，
+    读注册表 `AppliedDPI`：
+    `ssh windows-pc 'powershell -NoProfile -Command (Get-ItemProperty "HKCU:\Control Panel\Desktop\WindowMetrics").AppliedDPI'`。
     `apps/desktop-windows/scripts/install-and-capture.ps1` 与
     `capture-window.ps1` 用 `GetWindowRect` + `Graphics.CopyFromScreen` 抓屏，而 PowerShell
     进程跑在**虚拟化坐标**里：两个调用互相自洽（都按 1/1.25 报数），于是 `WINDOW_RECT=1152x587`
