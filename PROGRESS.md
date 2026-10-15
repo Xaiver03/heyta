@@ -5006,3 +5006,66 @@ $ find server/src server/scripts -name '*.ts' -newer server/dist | wc -l
 是 `git diff` 里出现"删除行"才发现的。
 ⇒ 改散文段落时 `old_string` 要**覆盖到被改单元完整一句/一整段**，改完用 `git diff --numstat` 看"该有 0 删除"的那格
 （这次应是纯新增），别只看门。已按原顺序复原，最终入库 diff = **9 行纯新增、0 删除**。
+
+## 2026-10-16 01:2x · 那四档 ⛔ 全在私有载具上取到了当前 tip 的读数，其中一档是"证明输入面零变更"而不是重跑
+
+载体是本线自己的 `.worktrees/inb-t9`（detached 到 `e2160c44`，而 `e2160c44` **就是**共享检出现在的 `main`，
+现量 `git -C .worktrees/inb-t9 rev-parse --short HEAD` 与 `git rev-parse --short HEAD` 相同 ⇒ 下面的读数直接算到当前 tip）。
+牙臂那三枚必须在这种私有树上跑（判据是临时改写被跟踪源文件），双宿主与产物尺也顺手一起搬过来，
+不再往共享树的 `dist/` 里写。逐档命令与贴出的输出（编排脚本落在载具的 `.run-logs/rerun-carrier-legs.sh`，**没住 /tmp**）：
+
+**③ 三枚变异牙臂（AC-1/2/4 的反向验证）** —— 三枚都在载具跑，臂数与台账基线**逐枚持平**
+（基线现量：`grep -nE 'verify-inbound-(queue|quota|ticket)-teeth' docs/plans/inbound-automation.md` 那几格的枚数列 = 6 / 7 / 8）：
+
+| 装置 | 读数 | 目标文件还原对账 |
+|---|---|---|
+| `verify-inbound-queue-teeth.py` | `臂数=6　不成立=0` rc=0 | `末次 sha256=52c3fd707977a03e` = 开局那枚 |
+| `verify-inbound-quota-teeth.py` | `臂数=7　不成立=0` rc=0 | `api.ts 6747e4dab9a4dbea`、`ai-metering.ts 5e9da227946f41af` 各自末次=开局 |
+| `verify-inbound-ticket-teeth.py` | `臂数=8　不成立=0` rc=0 | `api.ts 6747e4dab9a4dbea`、`entitlement.ts 4b97418c02779df8` 各自末次=开局 |
+
+跑完四枚被改写过的文件 `git status --porcelain -- server/src/api.ts server/src/entitlement.ts server/src/automation/ai-metering.ts server/src/automation/inbound.routes.ts` **空**，
+载具脏条目数仍是推进 tip 之前的 **15**（一批 carry-over 的 PNG，零丢弃）。
+🔴 顺带一条**加分**：ticket 那枚的历史读数是 `api.ts 4e15ad3302b864c1` / `entitlement.ts c2e345026a924651`，
+今天换成 `6747e4dab…` / `4b97418c0…` —— 目标文件的字节**已经换了代**（别线在动 `server/src/api.ts`），
+而八臂仍逐臂成立、没一枚报 `PATTERN_MISS` ⇒ 变异的锚点没漂。这一格以前只是"跑过"，现在证到"在当前字节上还能红"。
+
+**② 双宿主 13 窗口（AC-3）** —— `$ python3 research/tools/verify-inbound-dual-host.py --no-build --log .run-logs/dual-host-e2160c44-try1.log`
+→ rc=0，`Planned windows (现量自 docs/plans/inbound-automation.md): [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]`、
+**`Windows: 13/13`**，内层 `Test Files 1 passed (1)` / `Tests 14 passed (14)`（与 10-11 那格 14 持平，SKIP 0），逐格 PASS 见日志。
+`--no-build` 站得住的现量：`packages/app-host/dist` mtime = **Oct 16 01:17:34**（今天这一轮里构建的，早于本档所有读数），
+`packages/app-host/src` = Oct 15 13:59:01，`find packages/app-host/src -newer packages/app-host/dist | wc -l` = **0**。
+
+**⑤ 产物加载级尺（AC-1 那句"服务端产物能加载"）** —— 载具内 `cd server && npx --no-install tsc` → `TSC_RC=0`，再
+`$ python3 research/tools/verify-inbound-cjs-require-order.py`
+→ `读数　CJS 包=1　在册 .ts=119　有产物=119　无产物(未编译)=0　扫过的产物=119　命中=0` rc=0；
+`--self-test` → **`臂数=10　不成立=0`** rc=0。这一格从 `9fb9eed2` 的旧戳翻成当前 tip 的读数。
+
+**④ 界面层 e2e（AC-6）——这一档我没重跑，但给的不是"沿用旧读数"，是一条能自证的等式**：
+`git diff --name-only 7d25b73a..e2160c44 -- apps packages e2e`（`7d25b73a` = 那枚 `2 failed / 6 passed` 读数的 tip）
+共 **76 枚**文件（现量命令同上一条，只加 `| wc -l`），其中**非证据件只有 2 枚**
+（现量：`… | grep -vc '/evidence/'` → `2`）：`apps/desktop-windows/scripts/capture-window.ps1` 与 `install-and-capture.ps1`
+（Windows 打包脚本，界面层 e2e 不 import；`playwright.inbound.config.ts` 的 `webServer` 只起 `pnpm --filter @heyta/web exec vite`）。
+逐路现量：`apps/web/src`、`packages/i18n`、`packages/design-system`、`packages/app-host/src`、`packages/shared-schema/src`、
+`e2e/`、`pnpm-lock.yaml` 在那段区间的变更文件数**全为 0** ⇒ 那一趟的输入面与当前 tip 逐字节相同，
+**"B140 仍在同一句等待"这一格按当前 HEAD 报是有依据的**，不需要在一台内存正紧的机器上再跑一遍去拿同一个红。
+
+⇒ 上一节那张 **⛔ 四档（②③④⑤）现在清零**：②③⑤ 有当前 tip 的新读数，④ 有"输入面零变更"的等式。
+AC 已勾数仍为 **0**（`verify-inbound-ac-ticks.py`：`AC 行=8　已勾=0　未勾=8`）。
+
+🔴 两条自我更正，都是探针自己的错，不是产品的：
+
+1. **"目录 mtime 当产物新鲜度尺"会虚报枚数。** 载具 `server/dist` 顶层目录 mtime 是 **Oct 14 11:00:28**（tsc 只重写里面的文件、
+   没增删顶层条目，目录 mtime 就不动），所以 `find server/src server/scripts -name '*.ts' -newer server/dist | wc -l`
+   在**刚重打完**之后仍报 **4** —— 而那 4 枚恰好是牙臂改写过又还原的 `api.ts` / `entitlement.ts` / `ai-metering.ts` / `inbound.routes.ts`。
+   逐文件对才是判据：四枚各自的产物（`server/dist/src/api.js` 等）**都比源文件新**，且 `find server/dist -name '*.js' -newermt '2026-10-16 01:20' | wc -l` = **133**。
+   ⇒ 上一节那句"共享树的 `server/dist` 比 **119** 枚源码旧"里的**枚数不能当"陈旧源码枚数"读**（同一把尺刚重打完也报 4）；
+   它只配当"要不要重打"的信号。那一节"产物是上一代"的**结论**仍成立（那是逐文件比出 dist mtime 00:40:53 < 源码 01:51:13 那一格），
+   但以后这条判据一律写成逐文件对，别拿目录那枚数当分母。
+2. **本机内存闸门挡路时，双宿主装置报的是 rc=1 + R1/R2/R4，与"13 格真没跑"同形。** 第一发（01:17，带构建那趟）就这样：
+   日志逐字 `内存闸门拒绝启动：立即可用 114MB < 这一档要求的 384MB（改这一维是 TFA_LIGHT_NEED_MB）（浏览器那一趟在跑：pid=75101 …）`、
+   `这不是产品红；是这台机器此刻不该再多起一趟测试。（已在门内等过 60s）`，外面就是 `R1 一格都没报` / `R2 用例汇总 passed=0` / `R4 … [1..13]` / `Windows: 0/13`。
+   挡路的是**另一个会话**（`ps -p 75101` → 在 `01_PROJECTS/ssos` 那仓跑 `node --test scripts/__tests__/*.test.mjs`，还挂着四枚 playwright headless）。
+   第二发同一条件没了，`Windows: 13/13` rc=0 —— 也就是说这格的红**由机器消，不由产品消**。
+   判据要不要把"套件压根没起来"归到 rc=2（它 docstring 本来就写了 vitest 没跑起来算 2，代码里判卷函数 `grade()` 末尾却是 `return out, (1 if red else 0)`）
+   是**验收脚本的判卷口径**，我不代改 ⇒ 已记 `BLOCKED.md` **B200**。
+   ⚠️ 诚实边界：那一发是被 `nohup` 起了、退出码没采到，"它落 rc=1"是**读代码路径**得出的，不是我量出来的；量到的是它打印的那四行。

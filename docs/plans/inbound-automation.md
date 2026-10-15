@@ -1953,6 +1953,22 @@ packages/app-host typecheck: tests/login-code.spec.ts(44,5): error TS2578: Unuse
 ⇒ 更正后的枚数：**⛔ 四档**（②双宿主 13 窗口、③三枚变异臂、④界面层 e2e、⑤产物加载级尺），
 而 AC-1 那格里"服务端产物能加载"这句因此仍是 `9fb9eed2` 的读数，不是今天的。
 
+🔴 **10-16 01:2x 再追：上面那 ⛔ 四档清零 —— 三档取了当前 tip 的新读数，第四档给的是"输入面零变更"的等式而不是重跑。**
+载体是本线私有的 `.worktrees/inb-t9`，已 detached 到 `e2160c44`，而 `e2160c44` **就是**共享检出现在的 `main`
+⇒ 这些读数算到当前 tip。逐档命令与贴出的输出在 `PROGRESS.md` 的「2026-10-16 01:2x · 那四档 ⛔ 全在私有载具上取到了当前 tip 的读数…」那一节：
+
+| 档 | 现在的读数与它凭什么算当前 tip |
+|---|---|
+| ③ 三枚变异牙臂（AC-1/2/4） | `queue-teeth` `臂数=6　不成立=0`、`quota-teeth` `臂数=7　不成立=0`、`ticket-teeth` `臂数=8　不成立=0`，三枚 rc=0；四枚被改写的目标文件末次 sha256 各等于开局那枚，跑完 `git status --porcelain` 对那四路**空**。加分：`ticket-teeth` 目标文件字节已换代（`api.ts` 由 `4e15ad3302b864c1` 变 `6747e4dab9a4dbea`）而八臂仍逐臂成立、无 `PATTERN_MISS` ⇒ 变异锚点没漂 |
+| ② 双宿主 13 窗口（AC-3） | `Windows: 13/13` rc=0，内层 `Test Files 1 passed (1)` / `Tests 14 passed (14)`（与 10-11 那格 14 持平、SKIP 0）；`--no-build` 的前提是现量核过的：`packages/app-host/dist` mtime `Oct 16 01:17:34` 比 `src`（`Oct 15 13:59:01`）新、`find packages/app-host/src -newer packages/app-host/dist \| wc -l` = **0** |
+| ⑤ 产物加载级尺（AC-1） | 载具内 `npx --no-install tsc` `TSC_RC=0` 后 `verify-inbound-cjs-require-order.py` → `在册 .ts=119　有产物=119　无产物(未编译)=0　扫过的产物=119　命中=0` rc=0，`--self-test` `臂数=10　不成立=0` ⇒ 那句"服务端产物能加载"从 `9fb9eed2` 翻成当前 tip |
+| ④ 界面层 e2e（AC-6） | **没重跑**，依据是 `git diff --name-only 7d25b73a..e2160c44 -- apps packages e2e` 那 76 枚里非证据件只有 2 枚（`grep -vc '/evidence/'` = 2），且是 Windows 打包脚本，而那趟 `webServer` 只起 `@heyta/web` 的 vite；`apps/web/src`、`packages/i18n`、`packages/design-system`、`packages/app-host/src`、`packages/shared-schema/src`、`e2e/`、`pnpm-lock.yaml` 变更数**逐路 0** ⇒ 10-14 那枚 `2 failed / 6 passed`（红在 `inbound-automation.spec.ts:85` 同一句等待）**就是当前 tip 的读数**，**B140 仍按当前 HEAD 报** |
+
+⚠️ 同戳抓到一条**我这把尺的错**（细节在 PROGRESS 同一节）：`find server/src server/scripts -name '*.ts' -newer server/dist`
+拿的是 `server/dist` **顶层目录** mtime，它只在该目录增删条目时才动（载具里刚重打完仍报 4，而那 4 枚正是牙臂改写又还原的四份），
+所以上一节那句"共享树的 `server/dist` 比 119 枚源码旧"里的**枚数不能当"陈旧源码枚数"读** ——
+判据要落到逐源文件与其产物比 mtime（本轮四枚各比，产物都比源新）。"产物是上一代"那个结论本身另有逐文件依据，不撤。
+
 ### 1. AC-1～AC-8 逐格：证据命令 + 贴出的输出 + 结论
 
 | AC | 证据命令（都在上面那枚载体里跑） | 贴出的输出（10-11 01:5x–02:3x · `9fb9eed2`） | 结论 |

@@ -10909,3 +10909,50 @@ grep -n "<AiSettings$" apps/web/src/App.tsx                                     
 不推翻任何 AC 格：可复跑判据是已入库的装置（`research/tools/verify-inbound-*`，盘上现量 16 枚），图是已跟踪的 58 份证据件，
 读数正文逐段贴在计划里。要请负责人知道的只有一句：**"日志落点"这类句子要读成"当日原件指针"，不要读成"随时可取"**；
 若要把这类原件也留住，那是一条新的口径决定（要不要把 `.run-logs` 里被台账引用的那几枚复制进 `docs/research/evidence/`），不在我能自决的范围。
+
+## B200（2026-10-16 01:2x，本会话 · 双宿主装置被本机内存闸门挡那一发时量出来的）：这类挡路落的是 rc=1 + `Windows: 0/13`，与"13 格真没跑"同形 ⇒ 判据要不要归 rc=2 是验收脚本的判卷口径，我不代改
+
+**事实（逐字）**：在私有载具 `.worktrees/inb-t9` 跑 `python3 research/tools/verify-inbound-dual-host.py --log …`，
+内层 vitest 被本机的内存闸门拒了，日志正文两行：
+
+```
+内存闸门拒绝启动：立即可用 114MB < 这一档要求的 384MB（改这一维是 TFA_LIGHT_NEED_MB）（浏览器那一趟在跑：pid=75101 etime=01:18 cpu=0:00.01 它是：/bin/sh /Users/rocalight/.tfa-shield/bin/node --test scripts/__tests__/*.test.mjs）
+这不是产品红；是这台机器此刻不该再多起一趟测试。（已在门内等过 60s）
+```
+
+装置外层当时打印的是：
+
+```
+R1 一格都没报：套件没打印任何 WINDOW= 行 ⇒ "跑了"和"没跑"在这里长得一样，判红。
+R2 用例汇总 passed=0（skipped=0）⇒ 0/0 不算证据，判红。
+R4 计划列了 13 格，套件没报这几格：[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13] ⇒ 覆盖不全，判红。
+Windows: 0/13
+```
+
+**为什么这是个问题**：这台机器上同时跑着别会话的活（现量 `ps -p 75101` → 在 `01_PROJECTS/ssos` 那仓跑 `node --test scripts/__tests__/*.test.mjs`，另有四枚 playwright headless 在册），
+内存不足是**常态底噪**而不是罕见事件。这一格的红由**机器消，不由产品消** —— 同一条件过去后第二发就 `Windows: 13/13` rc=0（读数已入计划与 PROGRESS 的 01:2x 那节）。
+于是下一位读到 `Windows: 0/13` 时，**无法从装置自报分辨**"13 个窗口的判据真没了"还是"这台机器刚才不让我起测试"。
+
+**装置的 docstring 自己写的口径与代码不一致**（这是我要请负责人拍的那一点）：
+文件头退出码说明逐字是「退出码：0 全绿 / 1 有窗口缺证据或判红 / **2 装置自身前置不成立（PG 起不来、构建没产出、 产物比源码旧、分母现量为 0 或不连续、vitest 没跑起来）**或自测有臂不成立」，
+但判卷函数末尾是 `return out, (1 if red else 0)`，而 `red` 由 R1/R2/R4 这类"没报窗口"点亮；
+`return 2` 现量 9 处（`grep -c 'return 2' research/tools/verify-inbound-dual-host.py`），落点是自测臂、PG/迁移、构建、产物新鲜度、夹具缺失那几类，
+**"vitest 压根没起来"没有分支** —— 调用处拿到 `vitest_rc` 后只把它当一行 `VITEST_RC=…` 拼进待判卷的文本，随后 `return code`（那就是 1）。
+⚠️ 诚实边界：挡路那一发是 `nohup` 起的、退出码**没采到**，"它落 rc=1"是我**读代码路径**得到的（现量命令：`grep -n 'return out, (1 if red else 0)' research/tools/verify-inbound-dual-host.py`）；
+量到的只有它打印的那四行。要把它测成实物，得造一次内存不足或用 `--only` 那枚排障旋钮，两条都不算验收，我没跑。
+
+**建议的修法（要点头才动，因为这是改验收脚本的判据）**：在采集结果里认出"套件没起来"的形状（日志含 `内存闸门拒绝启动` 或 `vitest` 子进程非零而 `WINDOW=` 行为零），
+归到 rc=2 并单独打一行 `R8 前置不成立：套件没起来（原因 …），这不是一次窗口判定`；同时补一臂反向验证（喂一份"有 WINDOW 行但内层 0 passed"的样本必须红），
+免得新分支变成永不触发的死码。**这属"改判卷口径"，本线不许自决** ⇒ 我只登记。
+
+**不受影响的部分（已做完，不欠账）**：这一档最终在 `e2160c44`（= 当时的 `main`）取到 `Windows: 13/13` rc=0、
+内层 `Test Files 1 passed (1)` / `Tests 14 passed (14)`、SKIP 0；日志与编排脚本当日原件在
+`.worktrees/inb-t9/.run-logs/`（`rerun-carrier-legs.sh` / `dual-host-e2160c44-try1.log` / `cjs-order.out`）。
+
+**B199 末节那句载体清单的现量更正（旧文不删，按当日戳改读法）**：那一节写 `.worktrees/inb-t9`「detached @ `5bc1b9fe`，不是当前 tip」——
+01:2x 之后它是 `git checkout --detach e2160c44`（rc=0）后的 **`e2160c44`**，而 `e2160c44` 就是共享检出现在的 `main`
+（现量：`git -C .worktrees/inb-t9 rev-parse --short HEAD` 与 `git rev-parse --short HEAD` 相同）。
+牙臂那三枚的临时改写全部发生在载具里、还原对账通过（四枚目标文件 `git status --porcelain` 空、载具脏条目数仍是推进前的 **15**，零丢弃），
+共享检出没被这些改写碰过。
+⚠️ 另有两枚 `.unexpected-*.save` 躺在 `/private/tmp/heyta-inbound-{quota,ticket}-teeth/`，mtime **Oct 12 13:15** —— 那是 10-12 在共享树上那次的 RESTORE_GUARD 残留，
+**不是本轮的**（本轮两发只留 `.mut-bak`，输出里也没有 `RESTORE_GUARD` 行）。别把它读成"今天又有并行写入者"。
