@@ -9929,3 +9929,11 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     （`adb root` 后 `content delete --uri content://com.google.android.apps.nexuslauncher.settings/favorites --where '_id=<本趟新增那行>'`
     + `am force-stop com.google.android.apps.nexuslauncher`），只删自己新建的那一行。
     跑通的装置与读数在 `apps/mobile/evidence/ux-final-20261015/android-widget-pair-r112/`。
+438. 🔴 **本机 shell 的 `LANG`/`LC_ALL` 都是空 —— 用它做 locale 相关形状的对照实验，会当场把真 bug 判成"没事"。**
+    `check:shell-unicode-vars` 那条形状（`$var` 紧跟全角字符 ⇒ bash 把全角字节算进变量名）在空 locale 下**不发作**：
+    实测同一行 `echo "不是「$name」（得到 x）"` —— `LANG=en_US.UTF-8` 与 `zh_CN.UTF-8` 下都是
+    `name\ufffd: unbound variable`、rc=1、输出为空；而 `LANG`/`LC_ALL` 都空时它打印正常、rc=0。
+    现量本机：`echo "[$LANG]/[$LC_ALL]"` ⇒ `[/]`（本 agent 的 Bash 工具就是这个环境）。
+    ⇒ **判这类形状时必须显式换档跑**（`LANG=zh_CN.UTF-8 bash x.sh`），只在自己这一档看到 `SAME` 不构成"没有这个坑"；
+    而设备腿那批脚本（`scripts/verify-mobile-*.sh` 全链）里**没有任何一层设过 `LANG`/`LC_ALL`**
+    ⇒ 同一条腿在不同调用方手里可以一个跑得完、一个半路死，且死的通常是 `set -u` 下的 `ok`/`bad` 消息行。

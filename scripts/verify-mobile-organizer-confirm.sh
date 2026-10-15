@@ -103,9 +103,9 @@ open_section() {
   #    —— 它给得出坐标（甚至是个负高度矩形的中心），点上等于什么都没点。
   #    `scroll_to_desc` 会自己滚到"滚进可点区域"为止（desc-sane）。
   xy=$(scroll_to_desc "$want"); [ -z "$xy" ] && xy=$(xy_desc "$want")
-  [ -z "$xy" ] && { echo "     · 滚过 5 次也没把「$want」那一行滚进可点区域" >&2; return 1; }
+  [ -z "$xy" ] && { echo "     · 滚过 5 次也没把「${want}」那一行滚进可点区域" >&2; return 1; }
   $ADB shell input tap $xy; sleep 2
-  settle_for "$anchor" 8 2 >/dev/null || { echo "     · 点了「$want」却没等到锚点「$anchor」" >&2; return 1; }
+  settle_for "$anchor" 8 2 >/dev/null || { echo "     · 点了「${want}」却没等到锚点「${anchor}」" >&2; return 1; }
 }
 
 # 造一条行：<名称> <输入框标签> <提交按钮文案>；成功回 0。
@@ -113,7 +113,7 @@ create_row() {
   local name=$1 label=$2 submit=$3
   clear_and_type "$name" "$label"
   if [ "$(edit_value "$label")" != "$name" ]; then
-    echo "   · 输入框读回的不是「$name」（得到 [$(edit_value "$label")]）" >&2
+    echo "   · 输入框读回的不是「${name}」（得到 [$(edit_value "$label")]）" >&2
     return 1
   fi
   tap_label "$submit" >/dev/null 2>&1
@@ -153,7 +153,7 @@ else
 fi
 
 # ── 第 2 步：标签 ────────────────────────────────────────────
-step "2. 进「我的 → 标签」并造一条标签「$TAG」"
+step "2. 进「我的 → 标签」并造一条标签「${TAG}」"
 TAG_OK=0
 if ! open_section "标签" "标签名称"; then
   echo "   · 进不去标签那一节（锚点「标签名称」没等到）" >&2
@@ -161,7 +161,7 @@ else
   create_row "$TAG" "标签名称" "新建标签" && TAG_OK=1
 fi
 if [ "$TAG_OK" = "1" ]; then
-  ok "标签已建出（列表里读得到「$TAG」）"
+  ok "标签已建出（列表里读得到「${TAG}」）"
 else
   echo "   ⚠️ 前置塌了：标签没建出来 ⇒ 判据 ①② 本轮**不打分**（见文件头那条纪律）"
   SKIP=$((SKIP + 1))
@@ -169,7 +169,7 @@ fi
 
 if [ "$TAG_OK" = "1" ]; then
   step "3. 判据 ①：点删除**只出确认行**，取消后那条还在"
-  if tap_desc "删除标签「$TAG」"; then
+  if tap_desc "删除标签「${TAG}」"; then
     sleep 2; dump; require_screen
     $ADB exec-out screencap -p > "$SHOTS/1-tag-confirm.png" 2>/dev/null
     if [ "$(has_sub "确定要删除「$TAG")" = "1" ] \
@@ -182,7 +182,7 @@ if [ "$TAG_OK" = "1" ]; then
     tap_desc '取消删除' >/dev/null 2>&1; sleep 2
     settle_for "$TAG" 6 2 >/dev/null
     if [ "$(has_sub "$TAG")" = "1" ]; then
-      ok "判据 ① 后半：取消之后「$TAG」还在（那一下点击一条 op 都没写）"
+      ok "判据 ① 后半：取消之后「${TAG}」还在（那一下点击一条 op 都没写）"
     else
       bad "取消却把标签删了 ⇒ 确认框不是一等公民的形状又回来了"
     fi
@@ -196,16 +196,16 @@ if [ "$TAG_OK" = "1" ]; then
   # 上一格刚点过「取消删除」，列表状态会挪，直接连点会打空靶（实测第一轮就是这样）。
   ARM=0
   for _try in 1 2; do
-    tap_desc "删除标签「$TAG」" || break
+    tap_desc "删除标签「${TAG}」" || break
     sleep 2; dump
     [ "$(has_desc '确认删除')" = "1" ] && { ARM=1; break; }
   done
   if [ "$ARM" = "1" ] && tap_desc '确认删除'; then
     sleep 3; dump; require_screen
     if [ "$(has_sub "$TAG")" = "0" ]; then
-      ok "确认之后「$TAG」从列表里消失"
+      ok "确认之后「${TAG}」从列表里消失"
     else
-      bad "点了确认删除，「$TAG」却还在 ⇒ 确认行没接上写路径"
+      bad "点了确认删除，「${TAG}」却还在 ⇒ 确认行没接上写路径"
     fi
   else
     echo "   ⚠️ 那两下点击没打出去 ⇒ 判据 ② 本轮**不打分**"
@@ -214,7 +214,7 @@ if [ "$TAG_OK" = "1" ]; then
 fi
 
 # ── 第 5 步：清单（空的那一行**不该**问）────────────────────
-step "5. 进「我的 → 清单」并造一条空清单「$LIST」"
+step "5. 进「我的 → 清单」并造一条空清单「${LIST}」"
 LIST_OK=0
 $ADB shell input keyevent 4 >/dev/null 2>&1; sleep 2
 # 上一节可能停在"确认行"上：再按一次 BACK 只把它收掉，不会退出这一节。
@@ -223,7 +223,7 @@ if open_section "清单" "清单名称"; then
   create_row "$LIST" "清单名称" "新建清单" && LIST_OK=1
 fi
 if [ "$LIST_OK" = "1" ]; then
-  ok "清单已建出（列表里读得到「$LIST」）"
+  ok "清单已建出（列表里读得到「${LIST}」）"
 else
   echo "   ⚠️ 前置塌了：清单没建出来 ⇒ 判据 ③ 本轮**不打分**"
   SKIP=$((SKIP + 1))
@@ -231,7 +231,7 @@ fi
 
 if [ "$LIST_OK" = "1" ]; then
   step "6. 判据 ③：删一条**空**清单不该先问（闸门 askOnlyWhenImpact 在位）"
-  if tap_desc "删除清单「$LIST」"; then
+  if tap_desc "删除清单「${LIST}」"; then
     sleep 2; dump; require_screen
     $ADB exec-out screencap -p > "$SHOTS/2-list-direct-remove.png" 2>/dev/null
     if [ "$(has_sub "确定要删除「$LIST")" = "0" ] && [ "$(has_sub "$LIST")" = "0" ]; then
@@ -248,11 +248,11 @@ if [ "$LIST_OK" = "1" ]; then
 fi
 
 # ── 第 7 步：归档（叶子那一行**不该**被问）──────────────────
-step "7. 造一条待归档的叶子清单「$ARCH」"
+step "7. 造一条待归档的叶子清单「${ARCH}」"
 ARCH_OK=0
 create_row "$ARCH" "清单名称" "新建清单" && ARCH_OK=1
 if [ "$ARCH_OK" = "1" ]; then
-  ok "清单已建出（列表里读得到「$ARCH」）"
+  ok "清单已建出（列表里读得到「${ARCH}」）"
 else
   echo "   ⚠️ 前置塌了：清单没建出来 ⇒ 判据 ④ 本轮**不打分**"
   SKIP=$((SKIP + 1))
@@ -260,7 +260,7 @@ fi
 
 if [ "$ARCH_OK" = "1" ]; then
   step "8. 判据 ④：归档一条**叶子**清单不该被问（archiveChildImpact<=0 那一档）"
-  if tap_desc "归档「$ARCH」"; then
+  if tap_desc "归档「${ARCH}」"; then
     sleep 2; dump; require_screen
     $ADB exec-out screencap -p > "$SHOTS/3-archive-leaf-direct.png" 2>/dev/null
     if [ "$(has_sub "确定要归档「$ARCH")" = "0" ]; then
