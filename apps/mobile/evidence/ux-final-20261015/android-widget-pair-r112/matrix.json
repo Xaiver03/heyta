@@ -1,0 +1,50 @@
+{
+  "serial": "emulator-5554",
+  "want": [
+    "今天的任务",
+    "四象限"
+  ],
+  "cases": [
+    {
+      "name": "今日习惯",
+      "provider": "com.heytamobile.widget.HabitsWidgetProvider",
+      "bound_widget_id": "7",
+      "fav_row": 7,
+      "light": "今日习惯-light.png",
+      "dark": "今日习惯-dark.png"
+    },
+    {
+      "name": "今日专注",
+      "provider": "com.heytamobile.widget.FocusWidgetProvider",
+      "bound_widget_id": "8",
+      "fav_row": 7,
+      "light": "今日专注-light.png",
+      "dark": "今日专注-dark.png"
+    },
+    {
+      "name": "今天的任务",
+      "provider": "com.heytamobile.widget.TodayWidgetProvider",
+      "bound_widget_id": "10",
+      "fav_row": 7,
+      "light": "今天的任务-light.png",
+      "dark": "今天的任务-dark.png"
+    },
+    {
+      "name": "四象限",
+      "provider": "com.heytamobile.widget.QuadrantWidgetProvider",
+      "bound_widget_id": "11",
+      "fav_row": 7,
+      "light": "四象限-light.png",
+      "dark": "四象限-dark.png"
+    }
+  ],
+  "device_locale": "zh-Hans-CN",
+  "release": "16",
+  "apk": "1.0",
+  "lastUpdateTime": "2026-10-15",
+  "runs": [
+    "00:53-00:54 趟：今日习惯、今日专注（那时 cell_of 的说明行配对还没修）",
+    "00:55-00:56 趟：今天的任务、四象限（配对修好后）"
+  ],
+  "note": "matrix.json 由两趟合并而成；脚本原先会整份覆盖，已记在本 RESULT 的边界里"
+}

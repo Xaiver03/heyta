@@ -9914,3 +9914,18 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     读数与跑法在 `apps/web/evidence/ux-final-20261015/reinstall-r111/`。
     🔴 推论（读旧图时都要带着）：**常规路径抓过的每一张 windows 装机图都少了右边约 20%**，
     按它们判过"右侧有没有被截"的格子要重看。
+437. 🔴 **重装卸载重装会把 Launcher 绑好的 AppWidget 实例一起带走 —— 而"装机态组件复验"的旧账看起来还是绿的。**
+    Android 的桌面小组件实例属于**宿主（Launcher）那张表**，不属于 APK；`pm install -r` 保留，
+    **卸载重装（四端重装那一趟就是这么做的）随包一起删**。现量：10-15 13:39 那趟重装之后
+    `adb -s emulator-5554 shell dumpsys appwidget` 的 `Hosts:` 段报 `widgets.size=0`，
+    而台账里那两轮"四组件明暗复验"（10-08 / 10-09）的 RESULT 自己写着「**未重新添加实例**」——
+    它们复用的是更早绑好的实例 ⇒ **旧读数对当前安装包什么都不证**，可账面上那行"已复验"读起来像还成立。
+    ⇒ 判据形状：凡是"装机态组件"的复验，先现量 `widgets.size`，为 0 就是**没有对象**，不许拿旧图代替。
+    ⚠️ 顺带一条同族的读数陷阱：`dumpsys appwidget` 的 `Providers:` 段把**注册的全部** provider 列出来（本机四枚恒在列），
+    拿它判"桌面上那枚绑的是哪一个"**永远为真** —— 只有 `Widgets:` 段（`id=` + `provider=`）说的是已绑定实例。
+    🔴 还有一条会吃掉一整趟跑法的物理约束：模拟器桌面 6 列 × 5 行、图标占掉第 4 行 ⇒ **一页放不下两枚 3×2**，
+    而 Launcher 对被拒的落点**什么都不做**（不挪页、不报错、`widgets.size` 原地不动），
+    所以多枚只能"逐枚绑 → 取图 → 逐枚收"；收掉走启动器自己那张表
+    （`adb root` 后 `content delete --uri content://com.google.android.apps.nexuslauncher.settings/favorites --where '_id=<本趟新增那行>'`
+    + `am force-stop com.google.android.apps.nexuslauncher`），只删自己新建的那一行。
+    跑通的装置与读数在 `apps/mobile/evidence/ux-final-20261015/android-widget-pair-r112/`。
