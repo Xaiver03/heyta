@@ -4892,3 +4892,54 @@ C29/C31 那两处假话是手抓的。任务书要求"凡是坏了没人会知�
 ⇒ 所以 T8 那张表现在的口径是：**AC-1/2/4/5 的判定层读数 + AC-6 的 jsdom 腿 = `eaae5c0d` 现量**，
 AC-3 的 13 窗口与真库腿、AC-6 的浏览器腿、AC-7 的端点尺（今天 15:0x）、AC-8 的矩阵（今天 16:2x）各带自己的 tip 戳。
 **结论没变**：没有一格因为重跑而变绿或变红，AC 已勾仍 **0**。
+
+## 2026-10-15 16:4x · 🔴 现量更正：上一节那句"① 真库身份腿的前提不在共享树上"是没量就写的，作废
+
+紧接上一节（`840b95c4` 入库）我在"这一轮没重跑的档"里写了：
+
+> ① 真库身份腿（`verify-inbound-worker-identity.py`，要起一次性 PostgreSQL，上一枚读数 46/46）；
+> …这四档不是"我判断不用重跑"，是**载体或前提不在这台机器的共享树上**。
+
+〔原句保留。〕**这句里"前提不在共享树上"对①不成立**，我落笔前没量过它的前提。现量：
+
+```
+$ which initdb pg_ctl createdb psql
+/opt/homebrew/opt/postgresql@14/bin/initdb
+/opt/homebrew/opt/postgresql@14/bin/pg_ctl
+/opt/homebrew/opt/postgresql@14/bin/createdb
+/opt/homebrew/opt/postgresql@14/bin/psql
+```
+
+装置的 docstring 也写明它自己起一次性库：`TemporaryDirectory` + 随机回环端口 + `-A trust`，
+**从不读生产 DATABASE_URL**，`finally` 里 `pg_ctl -m fast -w stop`，不落任何被跟踪文件
+（日志走 `--log`）⇒ 它本来就能在共享检出上跑。跑完了（`sysctl -n vm.loadavg` 当时 `{ 9.18 … }` ≤ 阈值 12）：
+
+```
+$ python3 research/tools/verify-inbound-worker-identity.py --log .run-logs/wi-1015-1642.log
+rc=0
+Results: …/.run-logs/wi-1015-1642.log
+（日志末两行，逐字）
+ Test Files  1 passed (1)
+      Tests  46 passed (46)
+```
+
+**46/46 = 与 10-11 那枚基线持平、0 skipped**。这一腿跑在 `840b95c4`（比上一节那批 vitest 的 `eaae5c0d` 晚两枚提交），
+所以先量了这两枚之间有没有代码变化，答案是没有 ⇒ 两组读数指的是同一份代码：
+
+```
+$ git diff --stat eaae5c0d..840b95c4 -- server packages apps e2e research/tools docs/reference
+ .../ux-final-20261015/reinstall-r111/RESULT.md       | 20 ++++++++++++++------   ← 别线的台账文档
+ docs/reference/environment-traps.md                  | 18 ++++++++++++++----     ← 别线的陷阱正文
+```
+（这两枚提交只动 `.md`，`server|packages|apps|e2e|research/tools` 那几路一条没有 ⇒ 判定层字节同一。）
+
+所以"没重跑"那张清单要改口径：不是四档，是**三档** —— ②双宿主、③三枚牙臂、④界面层 e2e。
+②③跑不了的理由是真的（②要重建 `@heyta/app-host` 的 `dist/`，共享树上有并行写入者；
+③判据是临时改写被跟踪源文件再还原），④要真浏览器窗口。
+**教训不是"少写一条"，是：把某档标成"前提不在这台机器上"之前，得先跑那条前提的现量命令**
+（这台机器上是 `which initdb`）—— 我这次是拿"它以前在别处跑过"当"它在这儿跑不了"的证据，那是两回事。
+
+⇒ T8 表口径更新为：**AC-1/2/4/5 的判定层读数 + AC-6 的 jsdom 腿 + AC-1/AC-3 的真库身份腿，
+全部指同一份判定层字节**（vitest 那九档取于 `eaae5c0d`、真库腿取于 `840b95c4`，
+上面那条 `git diff --stat` 证明这两枚之间 `server|packages|apps|e2e|research/tools` 一条没动）；
+其余三档各带自己的 tip 戳。AC 已勾仍 **0**（`verify-inbound-ac-ticks.py` 本轮复跑：`AC 行=8　已勾=0　未勾=8`）。

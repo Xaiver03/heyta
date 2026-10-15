@@ -1927,6 +1927,23 @@ packages/app-host typecheck: tests/login-code.spec.ts(44,5): error TS2578: Unuse
 （dist mtime 00:40:53 < 源码 mtime 01:51:13）⇒ 拿它判 HEAD 会读到**上一枚 HEAD 的产物**。
 先 `npx --no-install tsc` 重打（`TSC_RC=0`）再取加载读数。
 
+🔴 **2026-10-15 16:3x–16:4x 读数戳（下面这张表的"贴出的输出"那一栏写的是 10-11 @ `9fb9eed2`，本节不改它，只补一层戳）**：
+表里那批判定层读数五天没被复跑过，"这张表能复跑"这件事本身当时没人证过。今天在本线地界干净的**共享检出**上串行重取了一遍，
+逐格结论**没有一格因此变绿或变红**：
+
+| 这一格今天有没有新读数 | 档 |
+|---|---|
+| ✅ 已在 `eaae5c0d` 重取（九档 vitest：103 + 76 + 47 + 6 + 1 + 121 + 15 + 16 + 18 = **403 passed、0 failed、0 skipped**） | AC-1 离线判定 + 权益三档/额度/pglite、AC-2、AC-3 授权接缝、AC-4、AC-5 契约/reducer、AC-6 的 jsdom 腿 |
+| ✅ 已在 `840b95c4` 重取（`Tests 46 passed (46)` rc=0，一次性回环 PG，不落被跟踪文件） | AC-1/AC-3 的真库身份腿 |
+| ⚠️ 唯一一枚红，红因不在本线（逐枚打 `MENTION-ONLY（非本线动作）`，指向别线 SHA）⇒ **B169 原样** | AC-5 范围尺 `verify-inbound-commit-scope.py` |
+| ⛔ 今天没重跑，读数仍按各自那一枚 tip 报：②双宿主 13 窗口 @`1c166425`（要重建 `@heyta/app-host` 的 `dist/`，共享树上有并行写入者）、③三枚变异臂（`ticket` / `queue` / `quota`，判据是临时改写被跟踪源文件再还原，`server/tests/inbound-lane-rigs-consumers.spec.ts` 的 `DELIBERATELY_NOT_WIRED` 逐枚写了为什么不接）、④界面层 e2e @`7d25b73a`（`2 failed / 6 passed`，红仍在同一句等待 ⇒ **B140**） | AC-3 的窗口腿、AC-1/2/4 各自的变异臂、AC-6 的浏览器腿 |
+
+`eaae5c0d` 与 `840b95c4` 之间只落了两枚文档提交（`git diff --stat eaae5c0d..840b95c4 -- server packages apps e2e research/tools` 里
+`server|packages|apps|e2e|research/tools` 那几路一条没有）⇒ 上面两行 ✅ 指的是**同一份判定层字节**。
+逐档命令、贴出的输出与那枚"前提我量了吗"的自我更正都在 `PROGRESS.md` 的
+「2026-10-15 16:3x · T8 的 AC-1/2/4/5 与 AC-6 的 jsdom 腿…」和紧随的「16:4x · 🔴 现量更正」那两节。
+**AC 已勾数仍为 0**（`verify-inbound-ac-ticks.py`：`AC 行=8　已勾=0　未勾=8`，勾由负责人点）。
+
 ### 1. AC-1～AC-8 逐格：证据命令 + 贴出的输出 + 结论
 
 | AC | 证据命令（都在上面那枚载体里跑） | 贴出的输出（10-11 01:5x–02:3x · `9fb9eed2`） | 结论 |
