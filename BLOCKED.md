@@ -11039,3 +11039,33 @@ error: unknown command 'test'
 其中 `110 check:e2e-carrier` 值得单独说一句：它的**自检 13 臂里臂 11 断**（4 处抄了字面量：`e2e/playwright.habit-final.config.ts:14`、
 `e2e/playwright.rail.config.ts:14`、`e2e/tests/renew-panel.spec.ts:21-22`）⇒ 说明 B196 那枚"没有定义引用 ⇒ 0 次执行"的门禁实现**本身是有牙的**，
 补上定义之后它立刻咬到四枚真实问题，不是接进去当装饰。
+
+## B202（2026-10-16 02:2x，本会话 · 双量那圈里撞上的）：`check:e2e-carrier` 臂 11 的分母**扫文件系统而不是 HEAD** ⇒ 别人没入库的 gitignore 临时件也能让它红
+
+同一道门禁在两棵树上报的枚数不同（逐字）：
+
+```
+载具 .worktrees/inb-t9 @f7712df7：  ❌ 臂 11 …… 这 4 处抄了字面量：e2e/playwright.habit-final.config.ts:14, e2e/playwright.rail.config.ts:14, e2e/tests/renew-panel.spec.ts:21, e2e/tests/renew-panel.spec.ts:22
+共享检出 @72216513：                ❌ 臂 11 …… 这 5 处抄了字面量：e2e/_probe/goal-ai-flow.config.ts:8,（其余四枚同上）
+```
+
+多出来那枚不是任何人的提交。现量三条：
+
+```
+git ls-files e2e/_probe | wc -l        → 0        # 不在 HEAD
+git check-ignore -v e2e/_probe/goal-ai-flow.config.ts → .gitignore:216:e2e/_probe/   # 被忽略
+ls -l                                  → Oct 8 06:41（并行会话留在共享检出上的探针）
+```
+
+⇒ 这一格要说的不是"那四枚抄字面量的问题"（那归 e2e 那批文件的属主），而是**判据的分母形状**：
+臂 11 走的是文件系统遍历，所以同一枚门禁在不同工作树里可以给出不同枚数，
+而它自带的臂 12/13（阳性对照）证明判据本身是对的 —— 红的是"扫哪些文件"这一层。
+要不要改成只按 `git ls-files`（HEAD 面）判，是**判卷口径**，我不代改；
+若要改，落点是 `scripts/check-e2e-carrier.mjs`（白名单外）。
+另附一条读法坑：`pnpm check:e2e-carrier` 在共享检出回的是 `[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command "check:e2e-carrier" not found` ——
+**那是 B196 缺定义本身，不是这道门禁的红**；别把 "rc=1" 直接读成"门禁复现了"，要读原文（我这一圈就先差点读错）。
+
+**B201 双量追记（同戳）**：那四枚本线红在共享检出复量**全部复现同码同因** ——
+`check:integration-coverage`（`盘上 35 个，被点名 34 个`）、`check:licenses:stamp`（`lockfile \`847802a22a36e0bb\``）、
+`check:image-license`（`@noble/hashes 在两处`）、`check:public-facts`（判据 4 那枚匿名下行）各 `rc=1`。
+⇒ 四枚的归属不依赖载具，白名单外那四处落点照旧只登记不代改。
