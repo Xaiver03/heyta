@@ -10725,3 +10725,33 @@ git status --porcelain -- apps/web/evidence/inbound-recovery/   # 仍是 8 枚 `
 3. **被引用的字节仍然是"已提交那一份"**：`git log -1 -- 该目录` 仍指 `9fa53ab9`（10-08），
    工作树里躺着的是覆过的 —— 这条差异本身没变，仍是**待裁决**（入库 / 丢弃 / 改 spec 的输出落点到 `.run-logs` 之类被 ignore 的目录）。
    本线不自行动手：`apps/web/evidence/**` 不在白名单里，而那 12 枚脏件不是本线本轮生成的。
+
+## B140/B197 追记（2026-10-15 14:3x @6c297e39）：那两枚"补一句 `active` 就绿"的坐标漂了 8 行，顺手把四份白名单文档的 90 枚 `path:行` 锚点全量了一遍
+
+**为什么现在动这个**：B140/B197 要交给别的线去做，他们照台账里的坐标打开文件。台账 3117 那行写的是
+`AiSettings.tsx:1262` / `App.tsx:3143`（10-11 的坐标），而当前 tip 上：
+
+```bash
+grep -n "<InboundAutomationSettings" apps/web/src/features/settings/AiSettings.tsx   #  → 1270
+grep -n "<AiSettings$" apps/web/src/App.tsx                                          #  → 3228
+```
+
+3143 那行现在是 `</div>`，1262 也不是那句挂载。⇒ **计划 3117 那两枚坐标各漂了 8 行 / 85 行**。
+已按**名字锚 + 当日现量行号**改写（`<InboundAutomationSettings …>` 那一处 / `<AiSettings` 那一处），
+`BLOCKED.md` 里 10-11 那几条历史记录写的 `:1262` **保留不动**（那是当时的观测，改掉就把"坐标会漂"这件事的证据抹了）。
+
+**同一趟的整表读数**（把 90 枚锚点逐条对到 `git ls-files` 解析出的真文件）：
+
+```
+锚点总数=90　在界=86　越界=0　追不到=0　歧义=4
+```
+
+那 4 枚"歧义"里 **两枚是我的尺太贪**（`inbound/lifecycle.ts` 全仓只有一枚，`git ls-files | grep -c 'inbound/lifecycle\.ts$'` = 1；
+我的匹配式把 `widgets/lifecycle.ts`、`pwa/lifecycle.ts` 也吸进来了），另外两枚是真歧义并已消掉：
+`App.tsx:129`（C31 行，同格另一枚写的是全路径）→ 补成 `apps/mobile/src/App.tsx:129`，
+`privacy.ts:404`（与 `e2e/vault/privacy.ts` 撞名）→ 补成 `packages/legal/src/documents/privacy.ts:404`（zh）／`:999`（en）。
+**内容复核都成立**：`:129` 正是 `useEffect(() => startMobileInboundWorker(), [])`，`:15` 正是那枚函数声明，
+`:404` 那一串注销级联清单里逐字含"自动收集额度启用记录、自动收集额度关联、自动收集额度主体"。
+
+⇒ 要拍板的还是那三处 `active`（`App.tsx:3228` 传、`AiSettings.tsx:1270` 转、`AiSettingsProps` 声明在 `:343`），
+**归属没变、仍在地界外**；这趟只把"照着能打开文件"这件事修对了。
