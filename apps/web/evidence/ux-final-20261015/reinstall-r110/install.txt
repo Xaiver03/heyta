@@ -1,0 +1,38 @@
+Scope: all 22 workspace projects
+✓ Lockfile passes supply-chain policies (verified 2d ago)
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +975
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+   ╭───────────────────────────────────────────────╮
+   │                                               │
+   │      Update available! 11.8.0 → 12.11.2.      │
+   │     Changelog: https://pnpm.io/v/12.11.2      │
+   │   To update, run: corepack use pnpm@12.11.2   │
+   │                                               │
+   ╰───────────────────────────────────────────────╯
+
+Progress: resolved 975, reused 961, downloaded 0, added 553
+Progress: resolved 975, reused 961, downloaded 0, added 843
+Progress: resolved 975, reused 961, downloaded 0, added 968
+Progress: resolved 975, reused 961, downloaded 0, added 972
+Progress: resolved 975, reused 961, downloaded 0, added 974
+Progress: resolved 975, reused 961, downloaded 0, added 975, done
+.../prisma@5.22.0/node_modules/prisma preinstall$ node scripts/preinstall-entry.js
+.../prisma@5.22.0/node_modules/prisma preinstall: Done
+.../node_modules/@prisma/client postinstall$ node scripts/postinstall.js
+.../node_modules/@prisma/client postinstall: prisma:warn We could not find your Prisma schema in the default locations (see: https://pris.ly/d/prisma-schema-location).
+.../node_modules/@prisma/client postinstall: If you have a Prisma schema file in a custom path, you will need to run
+.../node_modules/@prisma/client postinstall: `prisma generate --schema=./path/to/your/schema.prisma` to generate Prisma Client.
+.../node_modules/@prisma/client postinstall: If you do not have a Prisma schema file yet, you can ignore this message.
+.../node_modules/@prisma/client postinstall: Done
+
+devDependencies:
++ @heyta/shared-schema 1.0.0 <- packages/shared-schema
++ @heyta/sync-core 1.0.0 <- packages/sync-core
++ @types/node 20.19.43
++ lunar-typescript 1.8.6
+
+Done in 7.3s using pnpm v11.8.0
+INSTALL_RC=0

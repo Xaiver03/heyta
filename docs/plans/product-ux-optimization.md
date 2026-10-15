@@ -3667,6 +3667,95 @@ Button `bounds=[42,905][356,1020]`、`clickable=true`、`content-desc="立即同
 "KAV 收起键盘后回不回 2400"这一格还是空的；④ `TAP_LIMIT` 只认 `settings-sheet` 一枚 rid，
 别的浮层里落在 2100 以下的格仍按主屏挡（既有行为，未动未量）。
 
+### 2026-10-15 05:3x：上一格"11 处收拢"漏掉的 7 处**旧结论复述**，和一条 mac 窗口取证换形状的新读数
+
+**同类没扫干净。** 上一格换的是**发起**那条路（`ensure_phone_sync`），而腿里 `else` 分支还在替它
+复述旧结论 `bad "找不到「立即同步」按钮"`：habits 那一处上一格顺手改了，
+`scripts/verify-mobile-calendar.sh` 两处、`scripts/verify-mobile-repeat.sh` 五处没改。
+那句为什么值得改 —— 这一族真实的三种成因（忙态只渲染菊花不写文案 / 停在目录层没进那一组 /
+键盘把格盖住）都会被读成"按钮不存在"，而 lib 现在打的是"既不空闲也不在忙……两棵树上、滚到为止都没见到"，
+**它自己会说是哪一种**。复述句把这条信息又抹平了。
+分母现量：`grep -rn '找不到「立即同步」按钮"' scripts/verify-mobile-*.sh | grep -v '\.snap\.'` ⇒ 空（改前 7 处）。
+改后：`bash -n` 两文件过；`NO_COLOR=1 pnpm check:locator-labels` RC=0（⚠️ 那把尺**只扫 5 份 `scripts/qa/*` 脚本**，
+这两份 `verify-mobile-*.sh` 根本不在它射程里 —— 所以它的绿不为本格背书）；
+`NO_COLOR=1 pnpm check:verify-script-copy` 仍 `SUMMARY … 缺失=1`，缺的是
+`scripts/verify-mobile-ai.sh` 里 `"AI 只给建议"` 那枚针（语义归托管 AI/对外披露那一线，判据口径不代改）。
+提交 `49d45680`。
+
+**顺带量到一条同族、但这一格不裁决的形状。** 写死的「我的」tab 坐标：
+现量 `grep -rn 'input tap 945 2253' scripts/verify-mobile-*.sh | grep -v '\.snap\.'` = **21 处 / 9 份脚本**；
+而 `scripts/verify-mobile-calendar.sh` 用的是**另一枚常数**（现量 `grep -n 'TAB_PROFILE=' scripts/verify-mobile-calendar.sh` ⇒ `972`），
+`scripts/lib/mobile-e2e.sh` 里那句注释走的是 `945`。两枚都没有出处，谁也不比谁更对。
+#62 那一族修的是 **y** 落进底栏带 `[2169,2337]`，**x** 这一半从来没人量过。
+要裁它得先在设备上 dump 一次那枚节点的 bounds —— 而这一趟重装正在用 `emulator-5554` 做卸旧装新，
+**不在它跑的时候碰 adb**（本账那条"共享载体先看谁在用"）。登记成待办，不写成结论。
+
+**macOS 那条"窗口图不能当 UI 证据"，今夜多了一对同实例、同瞬间的读数**（r110 mac 段，载体 `fd5c2fb1`，
+打包 `.app` 的首跑自截屏 + 安装副本自截屏，两张的像素读数逐字相同）：
+
+| 载体 | 尺寸 | contentRatio | 色阶差 | looksBlank | 主蓝命中 |
+|---|---|---|---|---|---|
+| 窗口那张 `heyta-reinstall-mac-installed.png` | 2318x1508 | **0.0%** | 58 | **true** | 不参与判定 |
+| WebView 快照那张 `.webview.png`（壳自己 `takeSnapshot`） | 2318x1508 | **74.6%** | 229 | false | **997** |
+
+⇒ 与 r77 那对合起来读：**装出来的壳确实画了**（快照两次同量级），没画进**窗口服务器那张**是载体性质；
+而且窗口那张的"空"在 r77（均匀暗底、contentRatio 1、looksBlank **false**）与今夜（contentRatio 0.0%、
+looksBlank **true**）之间**还会换形状** ⇒ "窗口截图非空"这一档既不能当 UI 证据，也不是恒绿的一档。
+⚠️ **本格不证的那半**：`scripts/check-macos-window.mjs` 里那条对**窗口图**打 `looksBlank` 的断言
+为什么在本机没红 —— 按 `apps/desktop-macos/Sources/HeytaMac/HeytaMacApp.swift` 里那句
+「诊断用的一句话；`webNote` 为空时什么都不占位」，**推测**是裸可执行文件那一跑窗口里有一行诊断文字托着它，
+打包 `.app` 那一跑没有。**这是推测，不是读数**：要坐实得跑一次 `NO_COLOR=1 pnpm check:macos-window`
+并把它当场那张窗口图的 contentRatio / looksBlank 现量出来。
+**本账不因这条推测去动那道门的判据口径**（也不动重装脚本里那句"窗口 0.0% 不据此判红"）。
+
+### 2026-10-15 05:5x：第六趟四端重装跑绿（r110）+ 一条"重拉完不再看一眼"的前台守卫
+
+**r110 = 本线第一次带着"真的会进包的产品改动"跑完四端**，`REINSTALL_RC=0`。
+载体是隔离 worktree `../heyta-wt-r110` @ `fd5c2fb1`、起跑 `dirty=0`、`pnpm install --frozen-lockfile` `INSTALL_RC=0`、
+起跑 `load1=42.18`（**没有**为了让哪一端过去而调阈值）。逐端判据、五张图各自看到什么、
+以及六条"这一趟不证的事"都在 [`apps/web/evidence/ux-final-20261015/reinstall-r110/RESULT.md`](../../apps/web/evidence/ux-final-20261015/reinstall-r110/RESULT.md)。
+三处必须一起读的偏离：
+
+1. **ios 那一腿被 `pod install` 写脏了一行**（`apps/mobile/ios/Podfile.lock` 里 `hermes-engine` 的哈希），
+   逐字在证据包 `podfile-lock-delta.txt` ⇒ 那一腿装的是"CocoaPods 按当前 `Podfile` 解析出来的那一版"，
+   **不完全等于 `fd5c2fb1` 那份 lock**；跑完那棵树的 `git status --porcelain` 只剩这一枚文件（`carrier-state.txt`）。
+2. **四端跑出来全是浅色** —— 壳跟随宿主系统外观。所以"深浅两档都装过"这句**仍然不成立**，
+   暗色那一档的证据只有浏览器与设备腿。
+3. 收尾时主检出比 `fd5c2fb1` 多 3 个文件的差集，**逐枚量过都不是构建输入**
+   （现量 `git diff --name-only fd5c2fb1..HEAD`；判据形状照 `scripts/lib/sync-windows-sources.sh` 里那条
+   `grep -rIn --include=…` 的尺，命中的唯一一处是 `apps/desktop/vite.config.ts` 的**一句注释**）。
+   ⚠️ 这句是**这一格的读数**，不是常驻状态 —— 上面 04:1x 那一格讲的正是它怎么过期。
+
+**撞上的同族形状，这次是前台。** android 那一格的日志自己说了：
+`⚠️ monkey 之后前台不是 com.heyta，用 am start -W 显式拉起再验一次` —— 重装脚本自带这条兜底。
+顺着它量了分母：`grep -rln 'shell monkey -p' scripts/verify-mobile-*.sh scripts/reinstall-all.sh | grep -v '\.snap\.'`
+= **15 份脚本**，其中**没有一份**调用 `ensure_app_foreground`。
+⇒ "拉起 ≠ 在前台"这一族仍有 15 个开火点，**本线不代改**（运行时形状不等，"代改别线要三条齐"过不了第二条）。
+
+**但 lib 里那一枚守卫自己是真的坏了，这一刀归本线。** `ensure_app_foreground` 改前的形状是
+"查一次 → 不在前台就 `launch_app` → `sleep 2` → **`return 0`**"：重拉之后**一眼都不再看**。
+于是调用方那两条写好了等它的红路径一次都开不了火 ——
+`scripts/verify-mobile-habits.sh` 的 `ensure_app_foreground || blame_crash`、
+`scripts/verify-mobile-account-erasure.sh` 的 `if ! ensure_app_foreground; then bad "三次都没到前台"`。
+这正是本线昨夜在自己探针上撞过的那次（前台是 nexuslauncher，前两格填进了启动器的搜索框）。
+现在改成"拉一次 → **再看一眼**"最多四圈，仍不在前台就 `return 1` 并把最后一眼 `topResumedActivity` 打出来。
+**牙**：[`apps/mobile/evidence/profile-center/android-r109-habits-leg/foreground-arms.sh`](../../apps/mobile/evidence/profile-center/android-r109-habits-leg/foreground-arms.sh)
+（`bash` 它一条命令，`ARMS_RC=0`，全程不碰真设备 —— `adb` 换成同名 shell 函数桩）：
+
+| 臂 | 夹具给的前台 | 期望 | 实测 |
+|---|---|---|---|
+| 0 桩自证 | 应用 | 给得出 `topResumedActivity` | ✅（**这条是必需的**：第一版桩"没匹配就 return"，三条臂全读成"前台为空"，臂 1 假红、臂 2 一次都没重拉） |
+| 1 | `com.heyta/…` | RC=0 且**一次都不重拉**（重拉会把后台路径上的内存凭据洗掉） | RC=0 重拉 0 |
+| 2 | nexuslauncher | **RC≠0** 且真重拉过 4 次 | RC=1 重拉 4 |
+| 3 | 同一夹具，把那句 `return 1` 换成 `return 0`（从 lib 正文里摘出函数再变异） | 仍 RC=0 ⇒ 证明"能红"来自这一刀 | RC=0 重拉 4 |
+
+读数原文在同目录 `foreground-arms-reading.txt`（自带时间戳与"跑在哪一棵树上"；夹具的暂存输出
+`foreground-arms-run/` **不入库**）。
+
+⚠️ 这一格**不证**的：改完之后没有再跑一条真设备腿（设备刚被重装用完、`load1` 仍在 100+ 那一档），
+所以"它现在真的会把某条腿判红"是**夹具读数**，不是设备读数。第一次在设备上撞见这条红时，
+先按臂 0 那条教训怀疑量具，再怀疑产品。
+
 
 
 

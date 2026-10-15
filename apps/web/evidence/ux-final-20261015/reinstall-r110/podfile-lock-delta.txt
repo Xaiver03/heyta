@@ -1,0 +1,13 @@
+diff --git a/apps/mobile/ios/Podfile.lock b/apps/mobile/ios/Podfile.lock
+index 62d136ef..02ff9456 100644
+--- a/apps/mobile/ios/Podfile.lock
++++ b/apps/mobile/ios/Podfile.lock
+@@ -2949,7 +2949,7 @@ SPEC CHECKSUMS:
+   FBLazyVector: baf9d0492aa305444465c798e972f87e6a60dc69
+   fmt: a40bb5bd0294ea969aaaba240a927bd33d878cdd
+   glog: e56ede4028c4b7418e6b1195a36b1656bb35e225
+-  hermes-engine: 208b0dcd96feb98e38846908f00249a932833276
++  hermes-engine: ccb9f0d99a8679290f20d70bd79b64dd55ae84d8
+   op-sqlite: 3687fdaeabf8d91a16a7531f539834bd012c6deb
+   RCT-Folly: 9e4e1ae78413fb0387567f5dc5d5d5672f23f457
+   RCTDeprecation: 7489702d717ceea80e271eeacb3fbca39fa3c056

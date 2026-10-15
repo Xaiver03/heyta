@@ -1,0 +1,10 @@
+=== 出处（跑之前）===
+2026-10-15T05:12:37Z
+carrier=/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r110
+HEAD=fd5c2fb17ed001d7ec23f1feeeed1fcdf0874050
+dirty=0
+load1={ 42.18 21.51 14.64 }
+落点=/Users/rocalight/heyta-r110-reinstall
+=== 出处（跑之后）===
+2026-10-15T05:45:56Z
+REINSTALL_RC=0

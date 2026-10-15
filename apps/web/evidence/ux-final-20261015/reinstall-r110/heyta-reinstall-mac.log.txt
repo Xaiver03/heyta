@@ -1,0 +1,75 @@
+=== ① 构建 release ===
+✅ 已同步 token 生成物 → /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r110/apps/desktop-macos/Sources/HeytaMac/Generated/HeytaTokens.swift
+  Build complete! (15.79秒)
+  可执行：/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r110/apps/desktop-macos/.build/out/Products/Release/HeytaMac (994536 字节)
+  esbuild：/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r110/packages/app-host/src/native-bridge.ts → /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r110/packages/app-host/bridge-bundle/native-bridge.js
+  ✅ web-dist 新鲜度对账通过（不比 apps/web 与 packages/* 的任何输入旧）
+
+=== ② 组装 Heyta.app ===
+  ✅ web-dist 已进包（5.7M）
+  ✅ 应用图标已生成（Heyta.icns，104408 字节）
+/Users/rocalight/heyta-r110-reinstall/heyta-macos-dist/Heyta.app/Contents/PlugIns/HeytaMacWidget.appex: replacing existing signature
+WIDGET_EXTENSION=embedded-native-macos
+  ✅ Info.plist 合法
+
+=== ③ 签名 ===
+  身份：Developer ID Application: Xiaoli Creativity Culture Industry Development (beijing) Co., Ltd. (V5S2LT9YV8)
+/Users/rocalight/heyta-r110-reinstall/heyta-macos-dist/Heyta.app: replacing existing signature
+  /Users/rocalight/heyta-r110-reinstall/heyta-macos-dist/Heyta.app: valid on disk
+  /Users/rocalight/heyta-r110-reinstall/heyta-macos-dist/Heyta.app: satisfies its Designated Requirement
+  --- 展开确认 ---
+  Identifier=cloud.finlaw.heyta.desktop
+  CodeDirectory v=20500 size=2310 flags=0x10000(runtime) hashes=61+7 location=embedded
+  Authority=Developer ID Application: Xiaoli Creativity Culture Industry Development (beijing) Co., Ltd. (V5S2LT9YV8)
+  Authority=Developer ID Certification Authority
+  Authority=Apple Root CA
+  TeamIdentifier=V5S2LT9YV8
+
+=== ④ 启动验证（.app 里那一个，不是 .build 里那个）===
+  自检数据库：/var/folders/5n/zvn6lsb5265d19khvqwp6fsc0000gn/T//heyta-package-smoke.V03Eja（保留供验收）
+  WEBVIEW_SNAPSHOT_BYTES=382422
+  WINDOW_SIZE=1159x754
+  WINDOW_TITLE=heyta
+  PNG_BYTES=52358
+  CAPTURE_METHOD=screencapturekit
+  窗口截图 2318x1508  内容 0.0%  色阶 58  边缘 5.333
+  内容载体 packaged-first-run.png.webview.png  内容 74.6%  色阶 229
+  ⚠️ 窗口截图本身是空的 —— 本机常态：WebView 内容没合成进窗口，不据此判红
+  主蓝采样命中 997（数的是 packaged-first-run.png.webview.png）
+  ✅ 打包后的 .app 能起来、界面有真实内容（且确实是共享 UI）
+
+=== ⑤ 生成 .dmg ===
+  created: /Users/rocalight/heyta-r110-reinstall/heyta-macos-dist/Heyta-1.0.0.dmghdiutil: WARNING: 'hdiutil create -volname -format ...' is deprecated. Please use 'diskutil image create from/blank --volumeName --format ...' instead.
+  
+  ✅ .dmg 也已签名
+  Heyta-1.0.0.dmg  3939014 字节
+
+=== ⑥ 公证 ===
+  用 key：AuthKey_T2H876K8MJ.p8（内容不打印）
+  Successfully uploaded file
+    id: 57099ff3-d867-45e8-a1e1-53ff7a0b8d6e
+    path: /Users/rocalight/heyta-r110-reinstall/heyta-macos-dist/Heyta-1.0.0.dmg
+  Waiting for processing to complete.
+  Current status: In Progress...Current status: In Progress....Current status: Accepted.....Processing complete
+    id: 57099ff3-d867-45e8-a1e1-53ff7a0b8d6e
+    status: Accepted
+  
+  ✅ 公证通过，开始装订票据
+  Processing: /Users/rocalight/heyta-r110-reinstall/heyta-macos-dist/Heyta-1.0.0.dmg
+  The staple and validate action worked!
+  Processing: /Users/rocalight/heyta-r110-reinstall/heyta-macos-dist/Heyta-1.0.0.dmg
+  The validate action worked!
+
+=== 产物 ===
+  total 10616
+  drwxr-xr-x@  9 rocalight  staff      288 Oct 15 13:15 .
+  drwxr-xr-x@ 11 rocalight  staff      352 Oct 15 13:13 ..
+  -rw-r--r--@  1 rocalight  staff  3940746 Oct 15 13:15 Heyta-1.0.0.dmg
+  drwxr-xr-x@  3 rocalight  staff       96 Oct 15 13:13 Heyta.app
+  -rw-r--r--@  1 rocalight  staff      795 Oct 15 13:13 entitlements.plist
+  -rw-r--r--@  1 rocalight  staff    52358 Oct 15 13:14 packaged-first-run.png
+  -rw-r--r--@  1 rocalight  staff       87 Oct 15 13:14 packaged-first-run.png.txt
+  -rw-r--r--@  1 rocalight  staff   382422 Oct 15 13:14 packaged-first-run.png.webview.png
+  drwxr-xr-x@ 12 rocalight  staff      384 Oct 15 13:13 widget-build
+
+  签名档位：developer-id
