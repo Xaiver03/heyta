@@ -3856,6 +3856,59 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
 这一格**不证**的：没在这台设备上重跑 organizer-confirm 那条腿（它自己的真机读数在 #56 那一格），
 改的是静态调用形状 ⇒ 门的 RC 变化是直接读数，设备行为没有任何新读数。
 
+### 2026-10-15 06:5x：那条「windows 壳把对话助手截了」是**量具在骗人** —— 装机取证图是窗口的左上角裁切
+
+起因是待办 #69 那格候选缺陷：r110 的 `packaged-first-run.png` 里右栏标题「对话助手」最后一个字
+正好贴在图的右沿。裁它要一个几何读数，所以先量**界面本身**。
+
+**浏览器侧（同源码、无头 Chromium、vite dev、亮色）**。装置 `e2e/_probe/assistant-header-narrow.mjs`
+（一次性量具，`e2e/_probe/` 整目录 gitignore，跑法两行写在文件头），三档视口各一趟：
+
+| 视口 CSS px | `docScrollWidth` | 横向溢出元素数 | 详情列 x→right | 标题「对话助手」x→right | 标题 `scrollW/clientW` |
+|---|---|---|---|---|---|
+| 1152 | 1152 | **0** | 806 → 1152 | 844 → 915 | 71 / 71 |
+| 1280 | 1280 | **0** | 928 → 1280 | 966 → 1037 | 71 / 71 |
+| 1440 | 1440 | **0** | 1088 → 1440 | 1126 → 1197 | 71 / 71 |
+
+⇒ **网页侧没有任何裁切**：1152 档标题右沿离视口右沿还有 237px，`white-space: nowrap` 但那枚盒子
+`scrollWidth == clientWidth`（不需要省略号，因为它根本没被压）。三张图落在
+`apps/web/evidence/ux-final-20261015/probe-assistant-header/`（与上表同一趟）。
+
+**图侧**：同一张 r110 装机图里标题墨迹 x=1051..1151（贴到图右沿），墨迹行簇高 13px ——
+与浏览器那张的 12px 同一档 ⇒ 两图的字号尺子一致，x 可以直接比。839 与 1051 差 212px，
+这不是布局能造出来的差，是**图少了一块**。
+
+**决定性对照不用上机，仓里就有**：同仓 `apps/desktop-windows/evidence/ux-final-20261008-candidate/auth-legal-frozen/attempt-3-upgraded/installed-dpi-full.json`
+记 `{"width":1440,"height":734,"dpiAware":true}`，而常规路径（重装链用的那份）记 `WINDOW_RECT=1152x587`。
+`1440/1152 = 734/587 = 1.25` ⇒ 打包机是 **125% 缩放**，抓取进程没声明 DPI 感知，
+跑在**虚拟化坐标**里：`GetWindowRect` 与 `CopyFromScreen` 互相自洽（都按 1/1.25 报数），
+于是 png 只覆盖真实窗口（1440×734）的左上角，**右边 288 物理 px（=230 CSS px）从来没进图**。
+两处读数正好对上：标题 CSS 839 → 物理 1049 → 图上 1051；图右沿 = 物理 1152 = CSS 921 ⇒
+被切的是**图的边界**，不是窗口的边界。
+
+**当场修的是量具**（两份脚本同一族，`apps/desktop-windows/scripts/install-and-capture.ps1` 与
+`capture-window.ps1`）：动窗口/GDI 之前声明 `SetProcessDpiAwarenessContext(-4)`（PER_MONITOR_AWARE_V2），
+失败退 `SetProcessDPIAware()`，并各加一行 `WINDOW_DPI=<n> DPI_CTX=<True|False>` 读数，
+让下一张图自己说清它是不是全窗口。形状抄自同仓那枚**已跑通**的 `capture-installed-dpi.ps1`
+（它产出过 1440×734 那张，`dpiAware:true` 就是它的运行时证据）。两份文件保持纯 ASCII
+（它们文件头各自写着为什么）：`LC_ALL=C grep -n '[^ -~\t]'` 两份均空。
+
+⚠️ **本机不验**：这台 Mac 没有 pwsh（`command -v pwsh` 空）⇒ 两份 .ps1 的语法与行为**没在 Windows 上跑过**。
+第一验点是下一趟 windows 腿，判据两条：`WINDOW_DPI=120`（125% 那台）与 **png 宽 == 真窗口宽**。
+"脚本改了"不等于"图修好了"，这一格按这条边界收，不按完成收。
+
+🔴 **连带更正（比这一格本身更值钱）**：常规路径抓过的每一张 windows 装机图都少了右边约 20% ——
+本轮 r110 那张在其列，而我读它读出的就是这桩假案。已按 AGENTS §6 第 4 条立案到
+[环境陷阱](../reference/environment-traps.md) 末条（现量条数：
+`grep -cE '^[0-9]+\. ' docs/reference/environment-traps.md`），含"读旧图时要带着的推论"那一句。
+
+顺带一枚不裁决的观察：`NO_COLOR=1 pnpm check:shell-unicode` 现量 **RC=1**，点名 9 份脚本
+（分母现量 `… | grep -c '❌'`），其中含本线 `scripts/verify-mobile-organizer-confirm.sh` 4 处
+`"$var"` 紧跟中文。这枚红不是本趟改出来的（本趟在那份文件里只改了两行调用形状，纯 ASCII），
+且它的分母里有一枚**未跟踪**文件 `.run-logs/ac-reeval.sh`（现量 `git ls-files .run-logs` ⇒ 空）
+⇒ 别的会话在飞的量具进了门禁射程。登记给该门的所有者与本线下一趟，不代改、不顺手批量修
+（批量修会把 8 份别人名下的脚本一次拖进 diff）。
+
 
 
 

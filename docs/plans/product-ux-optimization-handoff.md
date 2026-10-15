@@ -95,7 +95,7 @@ df -h /System/Volumes/Data                              # 要不要新开一棵�
 | 17 | ✅ **10-15 06:3x 量掉，裁决是"两枚都不是缺陷"**：真模拟器上 dump 到底栏五枚 bounds，「我的」= `[864,2169][1080,2337]`，几何中心 (972,2253)；`945` 距左沿 81px、在同一个节点内 ⇒ 那 21 处点击**全部打中同一枚节点**，换常数不改变行为 ⇒ **不 bulk-edit 那 9 份脚本**（一份今天刚被别的会话动过，其余分属注册登录/数据管理两线，零行为收益的跨线改动只有漂移风险）。同一次 dump 还量到：同意面板与欢迎页立着时**底部 tab 栏整条不在无障碍树里**——而这条**早有门在守**（`scripts/check-mobile-first-run-gate.mjs` 文件头就是这句话），不是新缺口 | 本线（已了结） | 三态表与五枚 bounds 在台账「2026-10-15 06:3x」那一格。分母现量：`grep -rn 'input tap 945 2253' scripts/verify-mobile-*.sh \| grep -v '\.snap\.'` 与 `grep -n 'TAB_PROFILE=' scripts/verify-mobile-calendar.sh`。真要把坐标换掉，改法是走 lib 的 desc 定位（`open_settings_section` 那条），不是统一常数 |
 | 20 | 在案红（**本线自造**，10-15 已修）：`check:mobile-first-run-gate` 从 2026-10-12 起 RC=1，唯一 offender 是本线 `c018ec0e` 新建的 `scripts/verify-mobile-organizer-confirm.sh` —— 它把隐私处置写成内联 env 前缀那一形（`VAR=x helper`），而门的 `callsFunction()` 是**行首**匹配 ⇒ 读成"没走到共享处置" | 本线（已了结，**判据口径一个字没动** —— 那枚门归注册登录线） | 复跑 `NO_COLOR=1 node scripts/check-mobile-first-run-gate.mjs` ⇒ RC=0。两头有牙：臂 E 删行首调用 ⇒ 红且指名本脚本；臂 F 还原成内联旧形 ⇒ 同样红（证这枚红是形状而非别的原因）。同类分母（内联前缀写法全仓只此一处）在那一格里现量。⚠️ 这枚红在 `pnpm check` 大链里而**重装链不含它**，所以别把"六趟重装绿"读成"`pnpm check` 绿" |
 | 18 | ~~`check:macos-window` 那条对**窗口图**打的 `looksBlank` 的绿是靠什么托着~~ ✅ **10-15 06:1x 量掉了，且不改口径**：那条门本机实跑 **RC=0**，它当场那张窗口图是 `2240x1440 / 内容 5.4% / 色阶差 196`，**人打开看过 = 近白空窗 + 三个红绿灯点 + 底部一行 `M2-macOS ✅ …` 诊断标签**（没有应用）。⇒ 托着它的是**壳自己那行 `webNote`**；而打包 `.app` 那一跑 `webNote` 为空 ⇒ 同一把尺读到 `0.0% / looksBlank=true`。所以"macOS 窗口图间歇空白"要拆成**两条轴**读（裸可执行文件＝从不合成、有标签托着；打包＝真的会换），两轴上都没有判据依赖窗口图 | 本线（已了结） | 复跑：`NO_COLOR=1 pnpm check:macos-window`（读数在台账「2026-10-15 05:3x」那一格末尾的两轴表）。⚠️ 别拿 r77 那格的 `contentRatio=1` 与今夜的 `0.0%` 比大小 —— 那两枚数**没连着同一条命令**，不可比 |
-| 19 | 候选界面缺陷（**未裁决**）：windows 壳 1152×587 那张里右栏标题「对话助手」末字贴着窗口右边缘，macOS 2318 宽那张同一处右侧还有个展开图标 | 本线（要 windows 真壳 + CDP） | 图在 `apps/web/evidence/ux-final-20261015/reinstall-r110/packaged-first-run.png`；判据：同宽度量那栏标题容器的 `scrollWidth` 与 `clientWidth`（通道 `scripts/qa/windows-installed-widget-help.mjs`）。相等⇒只是视觉紧；不等⇒按 #63 那一族扫其它面板标题 |
+| 19 | ✅ **10-15 06:5x 裁掉：界面没有截，是取证图少了右边一块。** 同一份源码在无头浏览器 1152/1280/1440 三档量：`docScrollWidth == innerWidth`、横向溢出元素数 **0**、标题「对话助手」x=844→915（右侧还有 237px 余量）。而装机图里同一枚标题墨迹在 x=1051→1151 —— 差 212px。差的来源：打包机 125% 缩放，抓取进程没声明 DPI 感知，`GetWindowRect` 与 `CopyFromScreen` 都在虚拟化坐标里自洽 ⇒ png 只是真实窗口（1440×734）的左上 1152×587，**右边 230 CSS px 从没进图**。现量对照证据不必上机：同仓 `apps/desktop-windows/evidence/ux-final-20261008-candidate/auth-legal-frozen/attempt-3-upgraded/installed-dpi-full.json` 记 `1440x734 / dpiAware:true`，常规路径记 `WINDOW_RECT=1152x587`，比值 1.25 | 本线（改的是量具，**第一验点在 Windows**） | 已把 DPI 感知声明与 `WINDOW_DPI=` 读数落进 `apps/desktop-windows/scripts/{install-and-capture,capture-window}.ps1`（形状抄自同仓跑通过的 `capture-installed-dpi.ps1`；两份仍纯 ASCII）。下一趟 windows 腿的判据两条：`WINDOW_DPI=120` 与 png 宽 == 真窗口宽。⚠️ 本机无 pwsh ⇒ 脚本未跑过，别把"改了"读成"修好了"。连带推论已立案到环境陷阱末条：**常规路径抓过的每张 windows 装机图都少右边约 20%**，按它们判过"右侧是否被截"的格子要重看 |
 
 
 第 4、5 格都做过**同一枚 A/B**：在只含已提交内容的载体上照样红 ⇒ 是 `main` 上的既有红，不是共享检出被写脏的假红。
@@ -181,6 +181,11 @@ df -h /System/Volumes/Data                              # 要不要新开一棵�
 - 10-15 06:3x 又取到两枚：`NO_COLOR=1 node scripts/check-mobile-first-run-gate.mjs` 由 **RC=1 转 RC=0**（唯一 offender 是本线自己的
   `scripts/verify-mobile-organizer-confirm.sh`，红因是调用形状不是缺处置 —— 两头有牙见第四节第 20 行）；
   🔴 **同一条链的覆盖边界**：这枚门在 `pnpm check` 大链里而**不在重装链里**，所以它红了六趟重装一次都没照出来。
+- 10-15 06:5x 边界读数：`NO_COLOR=1 pnpm check:shell-unicode` **RC=1**，点名 9 份脚本（分母现量：那条命令自己 `| grep -c '❌'`），
+  🔴 **本趟不是它红的原因**（本趟只动了两行调用形状 + 两份纯 ASCII 的 `.ps1`，两份都不在这枚门射程里）。
+  它自己的分母里含一枚**未跟踪**文件 `.run-logs/ac-reeval.sh`（现量 `git ls-files .run-logs` ⇒ 空）
+  ⇒ 别的会话在飞的量具进了门禁射程；本线名下那 4 处（`verify-mobile-organizer-confirm.sh`）留作下一趟顺带项，
+  不在这轮批量修（一次会把 8 份别人名下的脚本拖进 diff）。同批 `check:shell-exit-chain` **RC=0**。
 - 10-13 05:1x 另取到三枚读数（都记在台账对应格）：`pnpm --dir apps/web typecheck` **rc=0**、`pnpm --dir apps/web build` **rc=0**、
   `pnpm check:shell-surfaces` **rc=0**；`pnpm check:verify-script-copy` 仍 **rc=1**（3 枚针，见第五节第 7 行）。
 - 10-13 19:5x 这三枚重取过：`pnpm check:verify-script-copy` ⇒ **rc=1，`SUMMARY … 缺失=1`**（3→1，本线那两枚 + 门扫不到的第四枚已换完），
