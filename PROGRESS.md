@@ -5324,3 +5324,11 @@ AC 已勾数仍为 **0**（`verify-inbound-ac-ticks.py`：`AC 行=8　已勾=0�
 1. **B196 收成逐字面了**（BLOCKED 的「B196 追记」）：四枚缺失定义的字面**不是我拟的**，是从 git 取的权威原文——三枚在 `8dcd22c7`、第四枚在 `951bcbea`，取法命令也写在旁边。四枚指向的实现文件**逐枚验过 HEAD 有、盘上有**（我上一轮说"两枚实现不存在"是**把文件名猜错了**：真名是 `check-e2e-helper-exports.mjs`、`check-ai-e2e-preflight.mjs`）。`check:ai-e2e` 那枚不传端口的写法也验了：直跑 rc=0（`✅ 4318 / 4319 都是空的`），且脚本自己注释就写着"默认值仍是主套件的两个端口，所以 `check:ai-e2e` 的调用不用改"。
 2. 🔴 更正一句我说窄了的因果：待拍板上写的是"补这四枚 ⇒ 尺能跑下去"。**这只对第 1 道成立**——绕开缺失定义直跑那两枚安全的：`check-e2e-helper-exports` **rc=1**（它自己给的修法是把生产者补进同一笔提交）、`check-e2e-carrier` **rc=1** 且 `--self-test` **rc=1（自检 13 臂｜失败 1 臂，就是 B202 那格）**。⇒ **B196 补完 `pnpm check` 仍不会 0**；要 0 还得 B201（本线 4 枚）＋别线那批各自归位。这条已经写进 B196 追记，别让下一位（或负责人）按"点一次头全绿"来估。
 3. **B203 新登记一条不是本线的红**：`docs-link-check` 在 05:1x 从 rc=0 翻成 **rc=1**，唯一一条是 `docs/plans/product-ux-optimization.md:935` 链到没被 git 跟踪的 `apps/mobile/evidence/ux-final-20261016/android-widget-data-r114/RESULT.md`——正是本会话 04:2x 那节量到的**活写入者**目录。它的三条出路（入库／改文字／登记 `UNTRACKED_LINK_OK`）取决于那趟证据要不要留给 CI，**是那条线的口径，本线不动**。同节留下一条判据形状：同一把尺我这一夜跑过 5 次全 0、第 6 次红，所以"四道门全绿"这类句子只能按戳念。
+
+## 2026-10-16 05:5x · AC-3 那 13 个故障窗口在**共享检出**跑到了，私有载具这条依赖拆掉（自动收集线）
+
+1. **做了什么**：把 `python3 research/tools/verify-inbound-dual-host.py --log <路径>` 直接在共享检出连跑两趟（05:19:57 与 05:29:43 各一趟，第二趟特意把退出码接出来）。两趟都自报 **`Windows: 13/13`**，第二趟 `RC=0`；内层都是 `Test Files 1 passed (1)` / `Tests 14 passed (14)`，`grep -ci skipped` 与 `RESULT=FAIL` 计数各回 **0**。读数已写进 AC-3 那格。
+2. **为什么这一趟有价值**：AC-3 那格从 10-11 起每一戳都写着"在某枚私有副本上跑"，而 `.worktrees/inb-t7` 已经不在盘上（`git worktree list` 现量只剩 `inb-t9` = `f7712df7`）——上一节（04:2x）普查到的"照抄那三条命令会 cd 失败"这一形，在 AC-3 这格是**最贵的一处**，因为它就是 T3 的验收本身。现在同一套读数在共享检出一次拿到，`Windows: 13/13` 的可复跑性不再挂任何载具。
+3. **"载体=共享检出"这句怎么证的**（不是顺口说的）：`git diff --name-only 97ccf15c -- server packages apps e2e research/tools scripts` 回 **8 枚**，逐枚都是 `apps/web/evidence/inbound-recovery/` 下的 png，**源码 0 枚** ⇒ 这两趟跑的源码字节等于 tip；而 tip `97ccf15c` 是本线自己那笔（`git show --name-only --format='' 97ccf15c` 只列 BLOCKED.md 与 PROGRESS.md）。
+4. **脱敏按规矩走了一遍**：两份 /tmp 日志都不入库；落盘后扫密钥/口令形状（`PRIVATE KEY` 头、`api_key`、`password`、`Bearer ` + 20 位以上长串）**0 命中**，≥40 字符 base64 连续串 8 枚逐枚看是 `/var/folders/…` 与 `…/heyta/server/…` 这类**文件路径**。⇒ 这一格往台账里搬的只有装置自报的那几行结论，没有正文。
+5. **一句自我约束**：这一趟**没有**改装置、没有改判卷口径、没有勾任何 AC（`grep -c '^- [x] **AC-'` 现量仍 0）；改的只有 AC-3 那枚单元格正文（表格单元，加行 0）。
