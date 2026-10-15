@@ -8142,6 +8142,42 @@ node -e 'const fs=require("fs");for(const p of ["packages/i18n/src/locales/en.ts
 剩下唯一仍归负责人的是那件**不是地界问题**的事：什么时候宣布可交付（= AC-1～AC-8 逐格点头 + 公网接收与售卖开关）。
 本节保留是为了让下一位不再重犯"按 ADR 最大号推断那枚 ADR 还没写"。
 
+### 追记（2026-10-16 01:0x @ `1fdf28c9`）：上面那张"今日现量"表里，两格在今天的 HEAD 上要说得更细
+
+复账只跑三条命令：
+
+```bash
+$ grep -rl 自动收集 packages/legal/src/documents/ | sed 's|.*/||' | sort | tr '\n' ' '
+data-rights.ts personal-info-list.ts privacy.ts        ← 枚数 = 3（该目录共 9 份）
+$ git log --oneline -S'自动收集' -- packages/legal/src/documents/ai-and-transfer.ts | wc -l | tr -d ' '
+0        ← 那枚串在该文件的历史里**一次都没出现过**，不是最近被删的
+$ grep -rln "自动收集" apps/landing/src | wc -l | tr -d ' '      # 10-12 那格用的就是这条
+0
+$ grep -n "site.docs.automation.\(title\|sum\)" packages/i18n/src/locales/zh-CN.ts
+  "site.docs.automation.title": "自动化与外部数据接入",
+  "site.docs.automation.sum": "了解现有本机 API、MCP 与 JSON 导入；查看规划中的付费回调、AI 自动收集与适用场景。",
+```
+
+**① 「中英条款四份都含自动收集条目」→ 现量是 3 份**（`privacy` / `data-rights` / `personal-info-list`）。
+第 4 份 `ai-and-transfer.ts`（《AI 与自动决策 / 数据出境》那一侧）从来没有这个串。
+⇒ 要拍的**不是文件缺不缺**，而是一条披露范围口径：**自动收集的解析会把用户内容交给第三方 provider 出境，这件事要不要在那份里单列一条？**
+本线不代改（`packages/legal` 在白名单外，且它有自己的中英同步与 `check:legal-copy` 对账纪律），交 legal 线拍。
+⚠️ 这不是"发现了违规"：三份已含条目，缺的那份是否必须，取决于那份的自我范围界定 —— 我只把 4 这个数字改成 3，并把问题挂出来。
+
+**② 「帮助中心 0 命中 ⇒ 没有正是 ADR-0060 §发布门槛要求的形状」这句的分母太窄。**
+`grep -rln … apps/landing/src` 只扫 landing 的**源码**，而这个站点的文案事实源在 `packages/i18n`。
+现量：`/docs/automation` 这枚导航项**在册**（`apps/landing/src/site/pages.ts` 里 `id:'automation'`），
+其摘要那句**逐字提到「AI 自动收集」**，只是限定语是**「规划中的」**。
+⇒ 正确说法不是"对外没提"，而是**"对外提了，写成规划中"**。
+按 ADR-0060 §发布门槛的字面（「自动收集尚未达到可交付条件时，价格与帮助页面不得承诺**已经包含**可用的…」），
+"规划中的"不承诺已包含 ⇒ **按字面不违规**；但这一句是**对外陈述**，要不要保留、要不要更明确写"尚未开通"，
+归负责人在 T6 整包里过一遍 —— 这一格从"没有文件要拍"改回**有一件要拍**，拍的不是文件而是那句话。
+
+⚠️ **一条探针陷阱（本次当场踩到，可复用）**：`grep -rlc`（`-l` 与 `-c` 同时给）在本机 BSD grep 上
+**两种输出都打**，还会把**不匹配的 `路径:0` 行**一起打出来 —— 同一目录实测 `grep -rl` 回 **3** 行、`grep -rlc` 回 **12** 行。
+拿它的行数当"含某串的份数"会凭空涨四倍。差点把"12 份 legal 文档披露了自动收集"写进这张表，
+是两条命令互相打脸才发现的。判份数只许 `grep -rl … | wc -l`，或 `grep -rc … | grep -v ':0$'`。
+
 ## B140（2026-10-10 19:0x，本会话 · 第一次真跑界面层 e2e 量出的）：设置分组是 `hidden` 不是卸载，而 `InboundAutomationSettings` 的 `active` **从来没人接** ⇒ 换回那一节不会重取列表，两条用例当场红
 
 命令与读数（真浏览器、零 mock 界面、route 桩只挡 HTTP）：
