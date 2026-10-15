@@ -3637,6 +3637,11 @@ $ git diff --name-only 0fe3d16b HEAD | grep -vE '^(BLOCKED|PROGRESS)\.md$|^docs/
 2. **整趟的退出码没量到**：这趟用 `nohup … > 文件 2>&1 &` 起的，包装里没有 `echo $?`。
    按脚本自己的契约（`scripts/reinstall-all.sh:48`："任一端失败 ⇒ 整体退出 1"）加汇总里那行 `🔴 ios`，**应为 1** ——
    但这句是**按契约推的，不是取到的读数**，下一位要 1 还是 0 就照"命令 + `echo RC=$?`"重跑一次。
+   ✅ **2026-10-15 12:5x 补上了这一臂**（同一只副本、同一枚 tip，`--only ios` 让它撞自己的设备名门，秒级返回）：
+   `bash scripts/reinstall-all.sh --only ios; echo "REINSTALL_RC=$?"` ⇒ 汇总三端 `⏭ 不在 --only 范围` + `🔴 ios：失败` +
+   **`REINSTALL_RC=1`**；跑后现量 `xcrun simctl list devices booted | grep -c "(Booted)"` 仍是 **2** ⇒ 没有任何一台被卸装。
+   ⚠️ 边界要说清：这取到的是**"有一端失败 ⇒ 整趟退 1"这条契约的实测**，
+   10-14 那一趟（`--skip ios --skip android`，含 mac/windows 两腿）**自身的 rc 仍没单独取过** —— 别再拿这一枚当那一枚。
 
 🔴 **Linux 这一趟换了路线，不是照抄台账**：10-12 那节写的目标是 `linux-dev-lan`，本次第一趟照抄 ⇒
 

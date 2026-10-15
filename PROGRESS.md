@@ -4570,3 +4570,8 @@ AC 已勾数仍 **0**（`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automatio
 
 **不变量现量**：`AC_TICKED=0` / `AC_UNTICKED=8`；`check-migrations`、`check-docs-voice`、`docs-link-check` 全 rc=0；
 `license-inventory` 主树 rc=0；副本跑完 `DIRTY_AFTER=0`（全程只读）。
+
+🟢 **顺手把 10-14 那格"推的"换成了量到的**：`bash scripts/reinstall-all.sh --only ios; echo "REINSTALL_RC=$?"`
+在同一只副本上 ⇒ `🔴 ios：失败` + **`REINSTALL_RC=1`**，跑后 `xcrun simctl list devices booted` 仍 **2 台**（没卸装任何一台）。
+⚠️ 但这枚实测的是**"有一端失败 ⇒ 整趟退 1"这条契约**，不是 10-14 那一趟（含 mac/windows 两腿）自己的 rc —— 后者仍未单独取过，
+两件事不许混成一句（细节与边界写在计划「2026-10-14 16:1x–16:2x」那节的第 2 条下面）。
