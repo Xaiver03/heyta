@@ -1960,7 +1960,7 @@ packages/app-host typecheck: tests/login-code.spec.ts(44,5): error TS2578: Unuse
 | 档 | 现在的读数与它凭什么算当前 tip |
 |---|---|
 | ③ 三枚变异牙臂（AC-1/2/4） | `queue-teeth` `臂数=6　不成立=0`、`quota-teeth` `臂数=7　不成立=0`、`ticket-teeth` `臂数=8　不成立=0`，三枚 rc=0；四枚被改写的目标文件末次 sha256 各等于开局那枚，跑完 `git status --porcelain` 对那四路**空**。加分：`ticket-teeth` 目标文件字节已换代（`api.ts` 由 `4e15ad3302b864c1` 变 `6747e4dab9a4dbea`）而八臂仍逐臂成立、无 `PATTERN_MISS` ⇒ 变异锚点没漂 |
-| ② 双宿主 13 窗口（AC-3） | `Windows: 13/13` rc=0，内层 `Test Files 1 passed (1)` / `Tests 14 passed (14)`（与 10-11 那格 14 持平、SKIP 0）；`--no-build` 的前提是现量核过的：`packages/app-host/dist` mtime `Oct 16 01:17:34` 比 `src`（`Oct 15 13:59:01`）新、`find packages/app-host/src -newer packages/app-host/dist \| wc -l` = **0** |
+| ② 双宿主 13 窗口（AC-3） | `Windows: 13/13` rc=0，内层 `Test Files 1 passed (1)` / `Tests 14 passed (14)`（与 10-11 那格 14 持平、SKIP 0）；`--no-build` 的前提是现量核过的：`packages/app-host/dist` mtime `Oct 16 01:17:34` 比 `src`（`Oct 15 13:59:01`）新、`find packages/app-host/src -newer packages/app-host/dist`（列出来的就是比产物旧的源码，**空列即 0**；这里原先写成 `… \| wc -l`，那个转义竖线照抄进 shell 跑不通，10-16 03:5x 换成无竖线形状） |
 | ⑤ 产物加载级尺（AC-1） | 载具内 `npx --no-install tsc` `TSC_RC=0` 后 `verify-inbound-cjs-require-order.py` → `在册 .ts=119　有产物=119　无产物(未编译)=0　扫过的产物=119　命中=0` rc=0，`--self-test` `臂数=10　不成立=0` ⇒ 那句"服务端产物能加载"从 `9fb9eed2` 翻成当前 tip |
 | ④ 界面层 e2e（AC-6） | **没重跑**，依据是 `git diff --name-only 7d25b73a..e2160c44 -- apps packages e2e` 那 76 枚里非证据件只有 2 枚（`grep -vc '/evidence/'` = 2），且是 Windows 打包脚本，而那趟 `webServer` 只起 `@heyta/web` 的 vite；`apps/web/src`、`packages/i18n`、`packages/design-system`、`packages/app-host/src`、`packages/shared-schema/src`、`e2e/`、`pnpm-lock.yaml` 变更数**逐路 0** ⇒ 10-14 那枚 `2 failed / 6 passed`（红在 `inbound-automation.spec.ts:85` 同一句等待）**就是当前 tip 的读数**，**B140 仍按当前 HEAD 报** |
 
