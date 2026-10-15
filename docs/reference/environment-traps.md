@@ -9875,3 +9875,24 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
        灌完再拿 `schema.prisma` 的 `@@map` 集合做一次**逐表对账**（现量：52 张、缺 0、索引 147），
        然后 `HEYTA_E2E_DB=<私有库> PORT=<私有端口> bash scripts/mobile-e2e-up.sh` 才会出
        `✅ 全新账号` + `✅ 账号 client 数 0 < 20`。
+436. 🔴 **Windows 装机取证图是窗口的「左上角裁切」，不是窗口 —— 因为抓取进程没声明 DPI 感知。**
+    打包机是 125% 缩放。`apps/desktop-windows/scripts/install-and-capture.ps1` 与
+    `capture-window.ps1` 用 `GetWindowRect` + `Graphics.CopyFromScreen` 抓屏，而 PowerShell
+    进程跑在**虚拟化坐标**里：两个调用互相自洽（都按 1/1.25 报数），于是 `WINDOW_RECT=1152x587`
+    与那张 1152×587 的 png 都只覆盖真实窗口（1440×734）的左上角 —— **右边 288 物理 px（=230 CSS px）
+    从来没进图**，而且图上没有任何东西说明这一点。
+    症状形状：界面右侧那一格（本轮是右栏标题「对话助手」）的最后一个字**正好贴在图的右沿被切**，
+    读起来就像"界面被窗口截了"，而同一份源码在无头浏览器里按 1152 CSS 量是零横向溢出、
+    标题右侧还有 237px 余量。两边都对得上：标题 CSS x=839 → 物理 1049 → 图上 1051；
+    图右沿 = 物理 1152 = CSS 921，切的是**图的边界**，不是窗口的。
+    现量的对照证据（不必再上机）：同仓 `apps/desktop-windows/evidence/ux-final-20261008-candidate/`
+    `auth-legal-frozen/attempt-3-upgraded/installed-dpi-full.json` 记的是
+    `{"width":1440,"height":734,"dpiAware":true}`，而常规路径记 `WINDOW_RECT=1152x587`，
+    1440/1152 = 734/587 = 1.25。
+    ✅ 形状（2026-10-15 落进两份脚本）：动窗口/GDI **之前**声明
+    `SetProcessDpiAwarenessContext(-4)`（PER_MONITOR_AWARE_V2），失败退 `SetProcessDPIAware()`；
+    并各新增一行 `WINDOW_DPI=<n> DPI_CTX=<True|False>` 读数 —— 下一张图自己说清是不是全窗口。
+    ⚠️ 这条改动的**第一验点在 Windows 上**：本机没有 pwsh，脚本语法与行为都没跑过；
+    判据是 `WINDOW_DPI=120`（125%）且 png 宽 == 真窗口宽。别把"脚本改了"读成"图修好了"。
+    🔴 推论（读旧图时都要带着）：**常规路径抓过的每一张 windows 装机图都少了右边约 20%**，
+    按它们判过"右侧有没有被截"的格子要重看。
