@@ -96,7 +96,8 @@ df -h /System/Volumes/Data                              # 要不要新开一棵�
 | 20 | 在案红（**本线自造**，10-15 已修）：`check:mobile-first-run-gate` 从 2026-10-12 起 RC=1，唯一 offender 是本线 `c018ec0e` 新建的 `scripts/verify-mobile-organizer-confirm.sh` —— 它把隐私处置写成内联 env 前缀那一形（`VAR=x helper`），而门的 `callsFunction()` 是**行首**匹配 ⇒ 读成"没走到共享处置" | 本线（已了结，**判据口径一个字没动** —— 那枚门归注册登录线） | 复跑 `NO_COLOR=1 node scripts/check-mobile-first-run-gate.mjs` ⇒ RC=0。两头有牙：臂 E 删行首调用 ⇒ 红且指名本脚本；臂 F 还原成内联旧形 ⇒ 同样红（证这枚红是形状而非别的原因）。同类分母（内联前缀写法全仓只此一处）在那一格里现量。⚠️ 这枚红在 `pnpm check` 大链里而**重装链不含它**，所以别把"六趟重装绿"读成"`pnpm check` 绿" |
 | 18 | ~~`check:macos-window` 那条对**窗口图**打的 `looksBlank` 的绿是靠什么托着~~ ✅ **10-15 06:1x 量掉了，且不改口径**：那条门本机实跑 **RC=0**，它当场那张窗口图是 `2240x1440 / 内容 5.4% / 色阶差 196`，**人打开看过 = 近白空窗 + 三个红绿灯点 + 底部一行 `M2-macOS ✅ …` 诊断标签**（没有应用）。⇒ 托着它的是**壳自己那行 `webNote`**；而打包 `.app` 那一跑 `webNote` 为空 ⇒ 同一把尺读到 `0.0% / looksBlank=true`。所以"macOS 窗口图间歇空白"要拆成**两条轴**读（裸可执行文件＝从不合成、有标签托着；打包＝真的会换），两轴上都没有判据依赖窗口图 | 本线（已了结） | 复跑：`NO_COLOR=1 pnpm check:macos-window`（读数在台账「2026-10-15 05:3x」那一格末尾的两轴表）。⚠️ 别拿 r77 那格的 `contentRatio=1` 与今夜的 `0.0%` 比大小 —— 那两枚数**没连着同一条命令**，不可比 |
 | 19 | ✅ **10-15 06:5x 裁掉、07:5x 在 Windows 上验完：界面没有截，是取证图少了右边一块。** 同一份源码在无头浏览器 1152/1280/1440 三档量：`docScrollWidth == innerWidth`、横向溢出元素数 **0**、标题「对话助手」x=844→915（右侧还有 237px 余量）；而旧装机图里同一枚标题墨迹在 x=1051→1151。差的来源不在界面：抓取进程没声明 DPI 感知，`GetWindowRect` 与 `CopyFromScreen` 互相自洽但只覆盖窗口左上角 ⇒ 旧 png 是真实窗口的**裁切**。**r111 现量已修**：`WINDOW_DPI=96 DPI_CTX=True`、`WINDOW_RECT=1440x734`、png 实测 (1440, 734) 逐字相等，标题完整可读 | 本线（已了结；机制归属在 10-16 00:3x 量清） | 证据包 `apps/web/evidence/ux-final-20261015/reinstall-r111/`（`RESULT.md` 有两条判据的读数，以及那枚"125% 缩放"归因**翻了两个来回的全过程**：我先前写"打包机 125% 缩放"，被 r111 的 `GetDpiForWindow=96` 判成不成立，而 00:3x 现量注册表 `AppliedDPI=120` = 96×1.25 ⇒ **125% 那句其实是对的**，那枚 96 量的是取证进程自己会话的桌面（那张是 `WinDisc 1024x768 @96`），不是窗口那张 🔴 读法边界：**别用 `WINDOW_DPI` 推用户机器的缩放**）。🔴 连带推论已立案到环境陷阱末条：**常规路径抓过的每张 windows 装机图都少右边约 20%**，按它们判过"右侧是否被截"的格子要重看。另：这张图右缘还贴着一枚**不属于本应用**的红色小标签 —— 抓取是按窗口矩形抓屏幕区域，压在那块屏幕上的 toast 会进图（r110 左上角那枚「部署探… Pro」同族），读图时带着这条 |
-| 21 | ✅ **10-16 00:5x 装机态 Android 四枚组件的明暗复验做完了（台账 912 那一行的前半句）**：10-08/10-09 那两轮复验**都在复用早已绑好的桌面实例**（它们的 RESULT 自己写着「未重新添加实例」），而 10-15 13:39 那趟四端重装把 APK 卸载重装 ⇒ `dumpsys appwidget` 现量 `widgets.size=0` —— 当前包的四组件在 00:4x 之前**一张图都没有**。这一趟逐枚从系统微件面板真的拖到桌面、各取亮/暗两档：四枚 provider 逐个对上（`Habits`/`Focus`/`Today`/`Quadrant`），卡内底色亮 `(255,255,255)`／暗 `(13,21,38)`，逐枚等于 `values/`＋`values-night/` 那对生成 token（`#FFFFFFFF`/`#FF0D1526`）；两张四合一对照表都人眼看过 | 本线（前半句闭合；**后半句「其它模板填入非空真实数据」仍开**，四枚本次都是 `0/0`／空态，已另立一行） | 证据包 `apps/mobile/evidence/ux-final-20261015/android-widget-pair-r112/`（`RESULT.md` 有跑法、判据两条、以及这趟照出来的两条装置事实：① 模拟器桌面一页放不下两枚 3×2，而 Launcher 对被拒落点**什么都不做**（不挪页不报错）⇒ 只能逐枚绑＋逐枚收；② 收掉走启动器自己那张表 `content delete` 本趟新增的 `_id` + `am force-stop`，只删自己新建的那一行）。⚠️ 装置两处毛病当场认：`cell_of` 第一版把"下方任意说明行"配给第一格 ⇒ 第三枚绑成了 `Habits`，被"provider 只认 `Widgets:` 段"那条判据拦下并响亮失败（`Providers:` 段把四枚全列出来，拿它判会永远为真）；`matrix.json` 是两趟合并的（脚本原先整份覆盖，吃掉过前两枚的记录） |
+| 21 | ✅ **10-16 00:5x 装机态 Android 四枚组件的明暗复验做完了（台账 912 那一行的前半句）**：10-08/10-09 那两轮复验**都在复用早已绑好的桌面实例**（它们的 RESULT 自己写着「未重新添加实例」），而 10-15 13:39 那趟四端重装把 APK 卸载重装 ⇒ `dumpsys appwidget` 现量 `widgets.size=0` —— 当前包的四组件在 00:4x 之前**一张图都没有**。这一趟逐枚从系统微件面板真的拖到桌面、各取亮/暗两档：四枚 provider 逐个对上（`Habits`/`Focus`/`Today`/`Quadrant`），卡内底色亮 `(255,255,255)`／暗 `(13,21,38)`，逐枚等于 `values/`＋`values-night/` 那对生成 token（`#FFFFFFFF`/`#FF0D1526`）；两张四合一对照表都人眼看过 | 本线（前半句闭合；后半句「其它模板填入非空真实数据」+ 括号里的「四枚同时在场」**也已闭合**，见下面第 22 格 —— 本趟那四枚确实都是 `0/0`／空态，那句话照旧成立） | 证据包 `apps/mobile/evidence/ux-final-20261015/android-widget-pair-r112/`（`RESULT.md` 有跑法、判据两条、以及这趟照出来的两条装置事实：① 模拟器桌面一页放不下两枚 3×2，而 Launcher 对被拒落点**什么都不做**（不挪页不报错）⇒ 只能逐枚绑＋逐枚收；② 收掉走启动器自己那张表 `content delete` 本趟新增的 `_id` + `am force-stop`，只删自己新建的那一行）。⚠️ 装置两处毛病当场认：`cell_of` 第一版把"下方任意说明行"配给第一格 ⇒ 第三枚绑成了 `Habits`，被"provider 只认 `Widgets:` 段"那条判据拦下并响亮失败（`Providers:` 段把四枚全列出来，拿它判会永远为真）；`matrix.json` 是两趟合并的（脚本原先整份覆盖，吃掉过前两枚的记录） |
+| 22 | ✅ **10-16 04:0x 台账 912 那行的后半句与括号里那半句都做完了：装机态四枚 Android 组件「填入非空真实数据」+「四枚同时在场」**。数据全走应用自己的界面造（4 条任务分别铺满四象限四个桶 + 1 条习惯 + 一轮专注），一个字节没往 app 存储里写 —— 手写会绕开 `planWidgetPublish` 那条密封链。读数：逐枚绑时四枚分别命中 `专注中`／`○ L114UrgentImportant`+`○ L114Urgent`（表头 `2026-10-16 · 0/2`）／四象限四条**各自落对桶**／`○ L114Habit`，r112 那批空态串一枚不剩；`simult` 档四枚同时绑住（`dumpsys appwidget` 的 `Widgets:` 段 `widgets.size=4` + 四个不同 provider），亮/暗两档各逐页走完，两档都是 `本趟数据缺=[]`、`空态残留=[]`。八张单卡图 + 六张同屏图**一张不剩**都打开看过 | 本线 | 证据包 `apps/mobile/evidence/ux-final-20261016/android-widget-data-r114/`（`RESULT.md` 有跑法、造数据↔判据对应表、八条装置事实、以及这一格仍不证的四项）。🔴 两条形状已入环境陷阱 **#439**（`uiautomator dump` 打 `ERROR: could not get idle state.` 而 **rc=0** ⇒ 只看 rc 会读到上一枚同名文件的陈旧内容，本腿第一次就是这么把一次成功的「开始专注」判成失败的）与 **#440**（这台模拟器 `input text` 把 `-`/`!` 打成全角 `－`/`！`、与 IME 开关无关 ⇒ 造数据只用字母数字、造完按标题回读）。⚠️ 同时把 **#437 末段重述**了：那句「多枚只能逐枚绑」是 r112 那一趟的推论 —— 现量是**同时绑定放得下、同一页放不下**（四枚分在两页、每页两枚），别把两件事混成一件 |
 
 
 第 4、5 格都做过**同一枚 A/B**：在只含已提交内容的载体上照样红 ⇒ 是 `main` 上的既有红，不是共享检出被写脏的假红。
@@ -152,17 +153,28 @@ df -h /System/Volumes/Data                              # 要不要新开一棵�
   外加 `noteFacts.clientRectCount` 恒为 1 那条**改名后仍然会骗人**的形状）。
   🔴 那一趟 `legs=[sync,reminders]` ⇒ **不是整族读数**，`notJudged` 里那 14 枚是 data/groups/help 三档，别读成"这些判据坏了"。
 
-**6) ⏳ 台账 912 那行的后半句「其它模板填入非空真实数据」正在这台模拟器上做**（承接上面第 21 格）：
-r112 那四枚是**空态**（`0/0`／「今天没有任务」），这一趟要走**应用自己的界面**造出真数据（任务 + 习惯 + 专注），
-让四枚卡各自渲染非空内容态，再逐枚取亮/暗两档。
+**6) ✅ 台账 912 那行的后半句「其它模板填入非空真实数据」+ 括号里的「四枚同时在场」都做完了（10-16 04:0x）**
+（承接上面第 21 格）：走**应用自己的界面**造出真数据（4 条任务 + 1 条习惯 + 一轮专注），
+四枚卡各自渲染出非空内容态，逐枚取亮/暗两档，另外又一档把**四枚同时绑住**逐页取两档。
+证据包 `apps/mobile/evidence/ux-final-20261016/android-widget-data-r114/`（`RESULT.md` 有跑法与读数）。
 - 🔴 只许走 UI 造数据：快照是 `materializedState(host) + currentFocusState()` 经 `planWidgetPublish` 算出、
   由应用侧密封（`apps/mobile/src/widgets/publish-source.ts`、`apps/mobile/src/widgets/publish.ts`）。
-  往 app 存储里手写文件会绕开整条管线，那种图不能叫"装机态非空数据"。
+  往 app 存储里手写文件会绕开整条管线，那种图不能叫"装机态非空数据"。这一趟一个字节都没往存储里写。
+- 装置分档可重入：`python3 widget-data-leg.py emulator-5554 . seed` / `focus` / `capture` / `simult` / `cleanup`。
+  ⚠️ **`capture` 与 `simult` 不许 `fresh` 重启应用**（专注轮的 running 只在内存里；paused 档是持久的）。
 - 现成的手（别重推导）：`scripts/qa/tasks-ux-android.py` 已经有 `create_task(title)`、`task_quadrant(...)`、
   `scroll_find`、`tap_label` 这套 uiautomator 定位；绑定/取图/收掉那一段在
   `apps/mobile/evidence/ux-final-20261015/android-widget-pair-r112/widget-theme-matrix.py`。
+  这一趟把两段合进了一份脚本，并补了 `find_control`（可点的是 `Button(content-desc)`、可见文字在里面的
+  非可点 `TextView` 上）与 `has_text`（相位标签「已暂停」不可点，`find_control` 找不到它）。
 - 动手前必查两条：`adb devices -l`（这枚模拟器有没有别的会话在用）与 `dumpsys package com.heyta` 的 `lastUpdateTime`
   —— r112 证的包是 10-15 13:39 那枚，本机 `app-release.apk` 比它旧，**别拿旧 APK 静默测非当前产物**。
+- 🔴 两条会让人白跑一整趟的形状已入环境陷阱 **#439**（`uiautomator dump` 打 `ERROR: could not get idle state.`
+  而 **rc=0** ⇒ 只看 rc 会读到上一枚同名文件的陈旧内容）与 **#440**（这台模拟器 `input text` 把 `-`/`!`
+  打成全角 `－`/`！`，与 IME 开关无关 ⇒ 造数据只用字母数字，且造完必须按标题回读）。
+- ⚠️ 这一格**仍不证**：行数上限截断、跨零点过期态、点卡片回写、习惯"今天已完成"那一档
+  （详情里没读到 `habit-checkin-<id>`），以及一条**未裁决**的观察（组件写「专注中」而同一时刻应用页写「已暂停」，
+  指向"暂停/继续不重新发布快照"）—— 要判它得先有一条**不依赖无障碍树**的读数。
 
 ---
 
