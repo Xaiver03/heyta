@@ -700,7 +700,7 @@ T2 那句话里"每 30 秒续票据"这一格，此前是**一整套零件都在
 
 | AC | 原句 | 现状 | 为什么做不了 |
 |---|---|---|---|
-| AC-6 | 「用户**独立完成**"启用 → 测试发送 → 等待 → 打开/解锁 → 自动处理 → 查看结果"」 | **半尺**：真浏览器那份 `e2e/tests/inbound-automation.spec.ts` 有 4 条（两个模板 × 1280/390 两窄宽），且**它走的是 route 桩**（文件头自述 "Real browser/UI with HTTP fixtures; database authorization is tested separately"），量的是界面形状，不是这条旅程 | 旅程需要公网接收 + 有权益的宿主在跑，两者都关着。✅ **2026-10-10 19:0x 现量更正，把本行原来那两句划掉**：① "本轮没有复跑"已过期 —— 复跑了，`cd e2e && npx --no-install playwright test --config playwright.inbound.config.ts` ⇒ **`2 failed / 2 passed`**，两条红是**产品缺一格**（换回设置那一节不重取事件列表：分组是 `hidden` 不是卸载，而组件备好的 `active` 旋钮在 `App.tsx`/`AiSettings.tsx` 两处都没接），归因与一句修法记在 **B140**，断言**没有**为了变绿而放松；10-11 12:4x 在最新 HEAD 上复跑，红仍在同一行、四张图逐字节相同；② "这份 e2e 连入库都做不到"也已过期 —— 那份 spec 与它 import 的 `selectSettingsSection` 都在 HEAD（现量 `git show HEAD:e2e/tests/helpers.ts \| grep -c selectSettingsSection` = **4**）。四张草稿态截图人已看过：`docs/research/evidence/inbound-automation-review/ui-draft/draft-{1280,390}-{light,dark}.png`，10-11 复跑那四张在 `ui-retry/`（逐张说明与 sha256 在同目录 `README.md`）。**仍不勾**：那一格红没修（B140 那句 `active` 没接，10-11 在最新 HEAD 上逐字复量仍在）、"各壳入口可用"这半没证（这趟只有 web）、整条旅程要开公网接收才能走 |
+| AC-6 | 「用户**独立完成**"启用 → 测试发送 → 等待 → 打开/解锁 → 自动处理 → 查看结果"」 | **半尺**：真浏览器那份 `e2e/tests/inbound-automation.spec.ts` 有 4 条（两个模板 × 1280/390 两窄宽），且**它走的是 route 桩**（文件头自述 "Real browser/UI with HTTP fixtures; database authorization is tested separately"），量的是界面形状，不是这条旅程 | 旅程需要公网接收 + 有权益的宿主在跑，两者都关着。✅ **2026-10-10 19:0x 现量更正，把本行原来那两句划掉**：① "本轮没有复跑"已过期 —— 复跑了，`cd e2e && npx --no-install playwright test --config playwright.inbound.config.ts` ⇒ **`2 failed / 2 passed`**，两条红是**产品缺一格**（换回设置那一节不重取事件列表：分组是 `hidden` 不是卸载，而组件备好的 `active` 旋钮在 `App.tsx`/`AiSettings.tsx` 两处都没接），归因与一句修法记在 **B140**，断言**没有**为了变绿而放松；10-11 12:4x 在最新 HEAD 上复跑，红仍在同一行、四张图逐字节相同；② "这份 e2e 连入库都做不到"也已过期 —— 那份 spec 与它 import 的 `selectSettingsSection` 都在 HEAD（现量 `git show HEAD:e2e/tests/helpers.ts \| grep -c selectSettingsSection` = **4**）。四张草稿态截图人已看过：`docs/research/evidence/inbound-automation-review/ui-draft/draft-{1280,390}-{light,dark}.png`，10-11 复跑那四张在 `ui-retry/`（逐张说明与 sha256 在同目录 `README.md`）。**仍不勾**：那一格红没修（B140 那句 `active` 没接，10-11 在最新 HEAD 上逐字复量仍在）、"各壳入口可用"这半没证（这趟只有 web）、整条旅程要开公网接收才能走。🔴 **10-15 14:2x 在当前 tip 复跑**（载体 `5bc1b9fe`，先核 `:4468` 空闲）：单测 `7 passed (7)` `rc=0`、e2e `2 failed / 6 passed`、`skipped` **0**、总数 `8` 与上一趟同，两枚红**逐字同一句**（`查看并编辑草稿` 等不到）⇒ "红没修"这句到当前 tip 仍成立、本线**不勾**这一格；命令与日志落点见文末「2026-10-15 14:2x」一节 |
 | AC-7 | 「官方与自托管样例分别**可运行**，端点与权限真实」 | **无尺**（帮助中心/中英条款的落点也在白名单外，B118） | 半尺有：`docs/reference/` 那两份当日已按 HEAD 更正过措辞（协议 + 定价） |
 | AC-8 | 「平台 × 权益 × 设备状态 × 失败阶段的具体用例表」 | ⚠️ **本行已被文末「2026-10-10 05:2x · AC-8 用例矩阵」一节取代**（当日现量：矩阵已落成 34 行、逐格带尺或带归属，`python3 research/tools/verify-inbound-ac8-matrix.py` rc=0）。原先写的"**无产物**：矩阵文件不存在"在 10-10 05:0x 之前是真的，留着是为了让人认出"表格类交付物最容易糊过去的是它自己" | 剩余的那半仍然过不去：`pnpm check` / `-r test` 两条在隔离副本上仍红（10-11 11:4x 新读数：check 停在第 6 段 `COMMENT 0 处写路径`、`-r test` 停在 `@heyta/ai` 的清单产物缝，两条都在别线地界，见文末「T7 三条腿的合并态读数」）；`reinstall:all` 桌面两端 + Linux 取证已绿、移动两端按 §8.9 未点 ⇒ 矩阵里 C30~C34 五格仍记无尺（C30 要的是**四端**当前产物）。🔴 **2026-10-14 11:3x 整链复量后改口（原句不删）**：`pnpm check` 现在停在**第 1 步** `check:gate-wiring`（链引用四枚已不存在的脚本定义，`18efc229` 那场 merge 丢的，见 B196），整链 111 步 **84 绿 27 红**；那句"两条都在别线地界"**不再成立**——27 格里**三格的红因在本线**（`check:selection-single-source` / `check:empty-state` / `check:integration-coverage`，逐格见 B197，三格的落点都在白名单外）。`-r test` 一侧：**🔴 10-15 14:0x 两条腿都取到硬读数，不再只是消费者分析** —— 整链 111 道**逐道退码与上一枚有逐道读数的 tip `0fe3d16b` 全同**（红集 27 枚逐枚相同、超时冒充红 **0** 枚、`LEG1_RC=1`），`-r --no-bail test` 21 枚包 `4 fails 17 passes`、逐包 Tests 行求和 `8 failed / 13722 passed / 14 skipped`（与留档趟同为），含 `inbound` 的失败行 **0** ⇒ 两条腿各自 `rc=1` 依旧 ⇒ 本行那半仍过不去。逐道对照与日志落点见文末「2026-10-15 14:0x」一节 |
 
@@ -3853,3 +3853,45 @@ verify-inbound-doc-tables rc=0  16 个文件表格一致
   但这条腿要的是**真装真机**，上一节"不许拿旧包验收"那条仍然适用 ⇒ 仍按负载与设备窗口取。
 - 日志落点（`.run-logs/` 被 ignore，没给共享树留新脏）：载体 `.worktrees/inb-t9/.run-logs/legs-1015b.status`、
   `leg1-1015b.out`、`check-1015b/001…111.log`；留档对比件 `chain-1015a.log` / `chain-1015a.status`（本趟正文从该行号之后追加，未覆盖旧件）。
+
+## 2026-10-15 14:2x · AC-6 那格在当前 tip 的 e2e 复跑，与一个"要不要顺手刷证据图"的判断
+
+载体（`.worktrees/inb-t9`，`5bc1b9fe`；此后共享树只多了三笔**纯文档**提交 ⇒ 运行时输入等同当前 tip）空着，端口 `:4468` 现量 `LISTENERS=0`，
+所以这趟是在本线自己的副本上取的。
+
+```bash
+cd apps/web && NO_COLOR=1 npx --no-install vitest run --maxWorkers=1 \
+     tests/inbound-cycle-display.spec.tsx tests/inbound-draft-review.spec.tsx
+#   Test Files 2 passed (2)   Tests 7 passed (7)   rc=0
+
+cd e2e && NO_COLOR=1 npx playwright test --config playwright.inbound.config.ts --reporter=list
+#   2 failed
+#     [chromium] › tests/inbound-automation.spec.ts:8:3 › encrypted date draft review and Vault invalidation 1280
+#     [chromium] › tests/inbound-automation.spec.ts:8:3 › encrypted date draft review and Vault invalidation 390
+#   6 passed (2.2m)        skipped 行：无（0）
+#   失败原文（两枚逐字同）：waiting for getByTestId('inbound-event-date-draft')
+#         .getByRole('button', { name: '查看并编辑草稿', exact: true })
+#   日志：.run-logs/inb-e2e-20261015-1418.out
+```
+
+**基线判据**：总数 `8`（上一趟同为 `8`，只增不减成立）、`skipped` 0、红的两枚是**同一枚已知缺陷**（B140 追记三：
+`active` 在两个挂载点都没接 ⇒ 分组只是 `hidden` 从不卸载 ⇒ 挂载期那次 `useEffect` 不再跑）。
+⇒ **AC-6 这一格继续不勾**，也没有因为这趟"多跑过一次"就往完成方向挪。
+
+**顺带做一个判断，结论是不动手**：这趟把 `docs/research/evidence/inbound-automation-review/panel-layout/` 里三枚图重画了
+（该目录在本线白名单内，所以"要不要把它们刷进仓库"是本线能自决的事）：
+
+```
+panel-1280-dark  共享树 123877B → 载体 124009B   （±132 B）
+panel-390-dark   共享树 119541B → 载体 119465B   （± 76 B）
+panel-390-light  共享树 115073B → 载体 115021B   （± 52 B）
+panel-1280-light 逐字节相同（所以它不显脏）
+尺寸两侧同为 624×1161；布局用例在 1280/390 × 亮/暗 四组都过
+```
+
+⇒ 这是 **PNG 渲染微差**（同尺寸、亚千分比字节差、一枚完全相同），不是面板布局变了。
+**不把这三枚刷进仓库** —— 刷了以后，下一位读到的 diff 形状和"布局真被谁改过"那次完全一样，
+反而把"布局未变"这件事的证据弄成噪声。台账改记这条判据：**判"证据图是不是过期"看尺寸 + 布局用例 + 字节量级，不看 mtime，也不看逐字节 diff。**
+
+同时确认：这趟**没碰共享树**那 12 枚 `apps/web/evidence/inbound-recovery/*.png`（`ls -lT` 仍是 `Oct 14 10:46:49` 那一秒，`git status` 仍 12 枚）
+⇒ B194 的"归属不可证"维持原判。载体自己现在脏 15 枚，全部是本趟 e2e 在**私有副本**里写的证据图（不是交付件）。
