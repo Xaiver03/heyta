@@ -4575,3 +4575,32 @@ AC 已勾数仍 **0**（`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automatio
 在同一只副本上 ⇒ `🔴 ios：失败` + **`REINSTALL_RC=1`**，跑后 `xcrun simctl list devices booted` 仍 **2 台**（没卸装任何一台）。
 ⚠️ 但这枚实测的是**"有一端失败 ⇒ 整趟退 1"这条契约**，不是 10-14 那一趟（含 mac/windows 两腿）自己的 rc —— 后者仍未单独取过，
 两件事不许混成一句（细节与边界写在计划「2026-10-14 16:1x–16:2x」那节的第 2 条下面）。
+
+## 2026-10-15 13:1x · AC-6 那两枚红的根因**用上一趟自己留下的现场重取**，台账里那句"缺 active"被收窄成一句能直接照着做的话
+
+**先说结论**：AC-6 仍然不勾，卡点仍然在那两枚白名单外的挂载文件上，**但之前那句措辞会让接手的白做一次**。
+
+**这一格的证据没花一趟新的浏览器跑** —— 上一趟（10-14 10:4x）Playwright 自己写下的两件东西都还在：
+1. `.run-logs/inb-e2e-20261014-104316.out` 里那枚栈指的**行号**：`grep -n '> 85 |' …` ⇒ 两枚宽的栈都指 `spec:85`
+   那**第二次**点「查看并编辑草稿」，不是 `:66` 那一次 ⇒ 草稿打开、编辑、确认那半段是过的。
+2. 同一份日志第 43 行给出的 **error-context 路径**（`outputDir` 指 `/tmp`，重启即没 ⇒ 承重那三行已经抄进 **B140 追记三**）：
+   那一枚事件卡**渲染出来了**，内容是 `事件 date-draft` + `等待创建或同步`，**卡里零枚按钮**。
+   `等待创建或同步` 反查词条 = `web.ai.inbound.events.prepared` ⇒ **界面停在确认那一刻的旧状态**，
+   而 `spec:83` 早已把服务端翻回 `needs-confirmation` ⇒ `canReview` 不成立 ⇒ 按钮那一支整段不画。
+
+**为什么"没重取"**：`grep -c setInterval InboundAutomationSettings.tsx` = **0**，取数只有一次
+`useEffect(() => { void refresh(); }, [refresh])`，而 `active` 在 `refresh` 的依赖里；设置各节是 `hidden=` **不卸载**。
+⚠️ **这就是那句要收窄的话**：本组件签名里 `active` 带**默认值 `true`**（别线 `63e61f23` 10-10 带进来的），
+所以"补一句 `active`"如果接成常量 `true`，与现状**逐字等价 ⇒ 一次也不重取 ⇒ 那两枚红原样留着**。
+能转绿的形状是本仓现成那一族表达式：`grep -rn "active={activeSettingsSection" apps/web/src` ⇒ App.tsx 8 处都这么接
+（`<AiSettings` 那枚不在其中），要的就是 `active={activeSettingsSection === 'settings-group-ai'}` 从 `App.tsx` 传进 `<AiSettings`、
+再由 `AiSettings.tsx` 透给 `<InboundAutomationSettings>`。**两枚文件都在本线地界外，仍然不代改。**
+🔴 我也没在本线组件里自造可见性探测（`IntersectionObserver` / 读祖先 `hidden`）—— 那是绕过仓库约定去猜父层 DOM 形状，
+`计划 :3119` 早就把这条写成"本线故意不做"。
+
+**顺带把两处会漂的东西换成会红的**：① 上一段那句"本节之后落的两笔"是**计数**，我再多落一笔它就假了 ⇒ 改成只留那条判据命令
+（非 `docs/BLOCKED/PROGRESS` 的路径枚数 = 0）；② 计划 `:3117` 那两个落点行号已漂（`1262`/`3143` ⇒ 现量 `1270`/`3228`）
+⇒ 台账里改挂**取法命令**，不挂数。
+
+**不变量现量**：`AC_TICKED=0` / `AC_UNTICKED=8`；`check-docs-voice`、`docs-link-check`、`verify-inbound-doc-tables` 三把都 rc=0；
+主检出 `git status --porcelain | wc -l` = **28**，逐条都是别线未提交的 `apps/*/evidence/`、`scripts/`（本线一枚没动、没代提交）。

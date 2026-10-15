@@ -10461,7 +10461,61 @@ Running 8 tests using 1 worker
 - 失败正文逐字与 `4193dabd` 那次同一枚：`waiting for getByTestId('inbound-event-date-draft').getByRole('button', { name: '查看并编辑草稿', exact: true })` 60 s 超时。
 - 总数 `6 → 8`（只增不减），新增两枚是本线的 date-only 时区腿且**都绿**；`skipped` 0。
   ⇒ **AC-6 在这一格仍然不勾**：拦路的是 `active`，不是覆盖不够。跑法、还原与安全验收见 **B194** 追记。
+  ⚠️ 这句"拦路的是 `active`"到 10-15 被**追记三**收窄成一句更具体的话：**接的必须是一个会随节变化的表达式**，
+  接成常量会静默什么也不修（见下面第 5 条）。
 - 日志：`.run-logs/inb-e2e-20261014-104316.out`（`.run-logs/` 被 ignore，没给共享树留新脏）。
+
+## B140 追记三（2026-10-15 13:0x @ `83f0dc34`，本会话 · 把那两枚红的根因**从源码与那趟留下的现场**重取了一遍 —— 上面那句"缺 active"要给下一位讲清是哪一种缺）
+
+**为什么这一格值得再写（它不是"又确认了一次没修"）**：上面两节把根因写成"挂载面没接 `active`"，
+而本组件的签名里 `active` **带默认值 `true`**（`git show HEAD:apps/web/src/features/settings/InboundAutomationSettings.tsx`
+取第 45 行 ⇒ `export function InboundAutomationSettings({ active = true, … }: { active?: boolean; … })`；
+那枚默认值是别线 `63e61f23`（10-10 18:49）带进来的）。
+⇒ 谁按字面读"没接 active"，最自然的两种做法是**不接**（现状，等于 `true`）或**接成常量 `true`**，
+**两种都是 no-op**，而那两枚红会原样留着。这一格现在要的是"怎么接才真的能红转绿"，不是"接没接"。
+
+**现量（四条命令 + 那趟自己留下的现场，全都不依赖重跑）**
+```bash
+grep -n "<InboundAutomationSettings" apps/web/src/features/settings/AiSettings.tsx
+#  1270:      <InboundAutomationSettings routing={settings.routing} consents={settings.consents} secretStore={secrets} />
+grep -n '> 85 |' .run-logs/inb-e2e-20261014-104316.out
+#  36: 与 56: 各一行 `> 85 |  await row.getByRole('button', { name: '查看并编辑草稿', exact: true }).click();`
+#      ← 两枚宽的栈都指**第二次**点（:85），不是 :66 那一次
+grep -n 'web.ai.inbound.events.prepared' packages/i18n/src/locales/zh-CN.ts
+#  5378:  "web.ai.inbound.events.prepared": "等待创建或同步"
+grep -c "setInterval" apps/web/src/features/settings/InboundAutomationSettings.tsx        # 0
+```
+那趟失败时 Playwright 自己写的 DOM 快照还在（`outputDir` 指 `/tmp`，重启即没，所以**本节把承重那三行抄进台账**）：
+`/tmp/heyta-inbound-ui-results/inbound-automation-encrypt-418a5-and-Vault-invalidation-1280-chromium/error-context.md`
+里那一枚事件卡是 `article → paragraph "事件 date-draft" → strong "等待创建或同步"`，**卡里零枚 button**。
+
+**读法（三跳，每跳都有上面一条锚点）**
+1. 栈指 `spec:85` ⇒ 第一次点（`:66`）与草稿编辑、确认那半段**是过的**，坏的只有"换走再换回来之后"。
+2. 界面停在 `等待创建或同步` = `events.prepared` = 服务端在确认那一刻的状态；而 `spec:83` 已把它翻回
+   `needs-confirmation`。组件里 `canReview = status==='needs-confirmation' && reasonCode==='needs-confirmation'`，
+   状态不是它 ⇒ **按钮那一支整段不渲染** ⇒ `:85` 等 60 s 超时。
+3. 为什么不重取：`refresh` 只在 `[refresh] 身份变化`时被调（`:105 useEffect(() => { void refresh(); }, [refresh])`），
+   而 `active` 在 `refresh` 的依赖里（`:103`）。设置页各节是 `hidden=` **不卸载**（`grep -rn "active={activeSettingsSection" apps/web/src`
+   现量 8 处：App.tsx `:3066 :3189 :3208 :3222 :3260 :3282 :3290` 等，**`<AiSettings` 那枚不在这一族里**）⇒
+   换节既不卸载、`active` 又是常量 `true` 不变 ⇒ `refresh` 身份不变 ⇒ **一次也不重取**。
+
+**所以真正的修法形状**（两枚文件都在本线白名单外，本线不代改；这就是 10-10 那节记的"三处两处文件"）：
+`App.tsx` 里那枚 `<AiSettings` 按本仓现成的逐节表达式接 `active={activeSettingsSection === 'settings-group-ai'}`
+（落点行号用现量命令取，别抄这里的数：`grep -rn "<AiSettings" apps/web/src/App.tsx` ⇒ 10-15 现量 `:3228`，
+记初那句 `:3197` 已经漂了），`AiSettings.tsx:1270` 再把它透给 `<InboundAutomationSettings>`。
+值会随节变 ⇒ `refresh` 身份变 ⇒ 换回来就重取。
+10-10 那节已经在**隔离副本里实测过**这一族改法能让整套转绿（`4 passed`＋typecheck＋apps/web 全量单测一条不掉），
+本节给的是"为什么它能转绿"，不是"它能不能转绿"。
+
+⚠️ **两种看着像修法的动作，做完全白做**（下一位最容易踩）：
+① 只把 `active` 补成常量 `true` —— 默认本来就是 `true`，值不变 ⇒ 永不重取；
+② 在本线组件里挂 `focus`/`visibilitychange` 去重取 —— 那两个监听（`:325-327`）现在只 `wake()` worker、不调 `refresh`，
+  而**同一标签页内换节根本不触发这两个事件**，挂上也等不到那一次重取。
+⇒ 本线组件里唯一能自洽做的替代是"观察自己那棵子树从 `hidden` 变回可见"（MutationObserver 读祖先节），
+  那是**绕过**本仓 `active` 约定去猜父层的 DOM 形状，本线不做，留给挂载面按约定接。
+
+**判据不变**：AC-6 这一格仍不勾。改的这一条只是**定性**：根因从"缺 `active` 这一行"改成
+"缺一个会随节变化的 `active` 表达式"。要拍的还是那两选一（给本线一次只动那两枚文件的单动作授权 / 交回挂载面所有者按约定接）。
 
 
 

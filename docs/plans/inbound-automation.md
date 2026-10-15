@@ -3704,7 +3704,29 @@ linux `dist/linux/packaged-first-run.png` —— 三张都是同一套共享 UI�
 都说明**"退码非 0"在本线不是一句话能判红绿的**。T8 的逐格复审表以后按本表这三档写：
 `0` = 成立 / `3` = 工具已退役（切片已入库）/ 其它非 0 = 必须逐枚读日志定性并写归属，不许汇总成"红了"。
 
-🟢 **本节读数往后的顺延证明（一条命令，别重跑全量）**：本节之后落的两笔都是本线台账笔，
-`git diff --name-only fa5ae75b HEAD | grep -vE '^(BLOCKED|PROGRESS)\.md$|^docs/'` 现量 **0 枚**
+🟢 **本节读数往后的顺延证明（一条命令，别重跑全量）**：本节之后落的笔都该是本线台账笔，
+判据就是这一行 —— `git diff --name-only fa5ae75b HEAD | grep -vE '^(BLOCKED|PROGRESS)\.md$|^docs/'` 现量 **0 枚**
 ⇒ **源字节零变化** ⇒ 上面那 14 枚装置与四道门的读数、以及 10-14 那两腿（链 111 步 / `-r test` 全量 / 三端重装）
 **对当前 HEAD 仍然成立**，不必为"tip 变了"重跑。下一位要复核就跑这一行；它一旦非空，本节的顺延立刻作废。
+
+### AC-6 那两枚红的根因，10-15 用那趟自己留下的现场重取了一遍（**结论不变，措辞要收窄**）
+
+上面 `:3113` 那段归因（分组只 `hidden` 不卸载 ⇒ 挂载期那次 `useEffect` 不再跑）today 补两点，
+一条是**新证据**，一条是**这句不说就会让人白做一次**：
+
+- **新证据**（那趟 Playwright 自己写的 DOM 快照，`.run-logs/inb-e2e-20261014-104316.out` 第 43 行给了路径；
+  `/tmp` 里的原件重启即没，所以承重那三行抄进 **B140 追记三**）：失败时那一枚事件卡**在**，
+  内容是 `事件 date-draft` + `等待创建或同步`（`grep -n 'web.ai.inbound.events.prepared' packages/i18n/src/locales/zh-CN.ts`），
+  卡里**零枚按钮**。⇒ 坏的不是渲染入口，是**列表停在确认那一刻的旧状态**：`spec:83` 已把服务端翻回
+  `needs-confirmation`，而组件只在 `refresh` 身份变化时取一次（`InboundAutomationSettings.tsx` 里 `grep -c setInterval` = **0**）。
+- ⚠️ **`active` 必须接成一个会随节变的表达式**。本组件签名里 `active` **带默认值 `true`**（别线 `63e61f23` 10-10 带进来的），
+  所以"补一句 `active`"接成常量 `true` 与现状**完全等价**：值不变 ⇒ `refresh` 身份不变 ⇒ 一次也不重取。
+  真正能转绿的形状是本仓现成那一族（`grep -rn "active={activeSettingsSection" apps/web/src` ⇒ App.tsx 8 处，
+  `<AiSettings` 那枚不在其中）：`active={activeSettingsSection === 'settings-group-ai'}` 从 `App.tsx` 传进 `<AiSettings`，
+  再由 `AiSettings.tsx` 透给 `<InboundAutomationSettings>`。
+- 上面 `:3117` 写的两枚落点行号已漂（那句里的 `1262`/`3143` ⇒ 10-15 现量 `1270`/`3228`）。**取法用命令，别抄数**：
+  `grep -n "<InboundAutomationSettings" apps/web/src/features/settings/AiSettings.tsx`、
+  `grep -rn "<AiSettings" apps/web/src/App.tsx`。
+
+🔴 本节**不改任何 AC 的闭合状态**：AC-6 仍不勾，仍开在那两枚白名单外的挂载点上；
+`grep -c '^- \[x\] \*\*AC-'` 这条尺的读数不因本节改变。
