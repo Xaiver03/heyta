@@ -5269,3 +5269,23 @@ AC 已勾数仍为 **0**（`verify-inbound-ac-ticks.py`：`AC 行=8　已勾=0�
 3. 🔴 本线自造的一道红，当场修完：`verify-inbound-doc-tables.py` 在 02:3x 报 rc=1，点名 `docs/plans/inbound-automation.md:2006`（列数 5 与 7）与 `:2013`——**红因是我今天往这两行单元格里写了 `grep -cE 'a|b'` 与 `grep … | tail -5` 这种带竖线的命令**，表格解析把竖线当列分隔符。修法不是改判卷口径，是把命令换成等价且不含竖线的形状（AC-1 那枚改成 `for d in gate-ssh e2e-helper-exports ai-e2e e2e-carrier; do grep -c "\"check:$d\"" package.json; done`，照抄跑过一遍回四枚 0；AC-8 那枚去掉管道，改成"命中最后几条即最近几趟"），复跑 `rc=0`，结论文案逐字：`✔ markdown 表格行：16 个文件，列数、断行、"是不是表"与格内反引号配对都一致`。**这条不落 BLOCKED**：白名单内、成因清楚、已修完。
 4. 通用判据（供下一位抄）：**往这张 AC 表里写任何命令之前，先问它含不含竖线**；含就换形状，别指望用反斜杠转义——装置同时检查"格内反引号配对"，转义写法在它自己的报错文案里虽然被提及，但粘进命令会改变 grep 的语义（`-E` 下 `\|` 是字面竖线，交替失效），等于交一条跑不通的现量命令。
 5. AC-7 的另一枚文档尺同戳复跑 `rc=0`，结论行照旧成立。四道全仓门（`check-migrations`、`license-inventory`、`check-docs-voice`、`docs-link-check`）这一批全 0。
+
+## 2026-10-16 02:5x · 完成条件2 那 14 枚逐枚归位，抓到一枚"条目数没变、成员被换"的现场证据（自动收集线）
+
+⇒ 这一节只动 PROGRESS，不改判卷口径；起因是复量完成条件2 时逐枚看那 14 条，发现里面有一枚今天新出现、账上从没归因过。
+
+1. 现量（02:5x，tip = 02:36 那一笔）：`git status --porcelain` = **14 条**，逐枚归位如下 ——
+   - `apps/web/evidence/inbound-recovery/` 共 12 枚（8 枚 ` M` + 4 枚 `??` 的 draft-*）：B194 已逐枚归因（本线 spec 写死的落点，16 枚 mtime 现在仍全是 10-14 10:46:49 同一秒，没有新的写入）；
+   - `apps/mobile/evidence/profile-center/android-r99-fixed/`：本会话没碰、没提交、没删（4312 行那条已记，目录 mtime 10-13 12:21:20）；
+   - `apps/mobile/evidence/ux-final-20261016/`：**今天新出现，此前账上无归属，这一节补上**。
+2. 第三枚的归属＝**不是本线**。我第一版在这里写了一句"本线代码里根本没有这个落点 ⇒ `grep -rn 'ux-final' …` = 0 命中"，**那句被现量否证了，先更正再往下**：按目录级重取（`grep -rn --exclude-dir=node_modules --exclude-dir=dist 'ux-final' research/tools e2e apps/web/tests packages/app-host/tests apps/web/src/features/settings`）实际是 **5 命中**，错因是我原来那把尺只喂了 `e2e/*.ts` 这一层，没喂 `e2e/tests/`，作用域比主张窄。5 命中逐枚读出来是这样的：
+   - `e2e/tests/assistant-expanded-ux.spec.ts:5`、`e2e/tests/assistant-navigation-acceptance.spec.ts:31`、`e2e/tests/widget-journey-host.spec.ts:6`、`e2e/_probe/assistant-header-narrow.mjs:17`、`e2e/_probe/settings-narrow-nav-overlap.mjs:18` —— **全在别线的文件里**（本线在 `e2e/` 下只有 `playwright.inbound.config.ts` 与 `tests/inbound-automation.spec.ts` 两枚可写），且它们写的落点是 `apps/web/evidence/ux-final*`，**不是今天这枚 `apps/mobile/evidence/ux-final-20261016/`**；
+   - 本线自己名下逐枚点名里 `grep -l 'ux-final'` = **0 枚**。这堆文件是 39 枚（现量：`ls research/tools/verify-inbound-*.py apps/web/tests/inbound-* packages/app-host/tests/inbound-* e2e/playwright.inbound.config.ts e2e/tests/inbound-automation.spec.ts | wc -l`；分档 `15 + 7 + 15 + 2`，取法就是这四段各自 `ls | wc -l`）。**我第一版把这里写成"16 枚装置、合计 33 枚"，两个数都是错的**——是复量时才发现的，不是读出来的；按本页老规矩，数旁边必须留取法命令，否则下一位只能信我。
+   - `grep -rn 'apps/mobile/evidence'` 在上述五个目录里只有 1 命中，且是 `research/tools/check-evidence-pins.mjs:13` 的**用法注释**（教人换目录），不是写入者；`android-widget-data` 在 `research/tools/` 里 **0 命中**；
+   - 内容也不是本线的：目录内 68 个文件 `find -iname '*inbound*'` = **0 枚**，其余命名全是安卓桌面插件的界面证据（widget / sheet / 今日专注 / 四象限），里面还躺着一枚自带装置 `widget-data-leg.py`——**写入者是把装置放在证据目录里的另一条线**。
+   ⇒ 归属结论不变（不是本线），但**证据要按这一版念**：靠的是"白名单没有这个落点 + 本线 39 枚文件零命中 + 那 5 枚命中的是别人文件且写的是另一个目录"，不是"全仓搜不到这个词"。
+3. 🔴 顺手抓到一条比"归属"更有用的读数：**这枚目录此刻还活着**。`stat` 现取最新一枚文件是 02:49:22，我上一笔提交是 02:36:03，取数那一刻墙上时间 02:53:43 —— 写入发生在我提交**之后**，所以这是一个正在跑的并行写入者，不是历史遗留。共享检出上有活写者这件事本线早就登记过（任务书写明"共享载体上有并行写入者"），新的是**这一趟量到了它正在写**。
+4. 这一枚把 B199 那格往下压了一层：我此前记的 14 枚里，`??` 那枚是 20261015 那批（现在已不在同一位置），今天同一位置换成了 20261016 这批 —— **条目数一点没变，成员整个换了一枚**。所以「非白名单路径的条目数与开工快照相同」这句判据即便哪天能核，它也只拦得住"条目数变了"这一种，拦不住"别人往共享树里放了一批新证据 / 收走了一批旧证据"。这一格仍按 B199 判**不可核**（开工快照没取），但反证现在是**量出来的**，不是推理出来的。
+5. 通用判据（供下一位抄）两条：① 判"共享树里没别人写的东西"不能只比条目数，要**逐枚点名成员**（路径 + `ls -ldT` 的 mtime），再用本线自己的三条证据收口——白名单里有没有这个落点、本线名下文件 grep 得到这个词吗、那几枚命中是不是别人文件且写的是另一个目录。只看数会把"成员被换"读成"一切如常"。② 报"搜不到"之前要确认**尺的作用域不小于主张的作用域**：我原来那把尺只喂 `e2e/*.ts` 就下了"本线代码里没有这个落点"这种全称结论，而 `e2e/tests/` 那一层根本没进分母——同一趟改成目录级重取，就多出来 5 枚命中。**否定结论的分母要逐枚点名**（这里已有的老规矩，这次是自己踩）。
+6. 同一趟复量完成条件2 的另外三格：`node research/tools/license-inventory.mjs` **rc=0**（结论行：全部依赖均为宽松许可，清点输入集对得上当前 lockfile）、`node scripts/check-migrations.mjs` **rc=0**（迁移文件全部符合规范）、`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` = **0** 且 `grep -c '^- \[ \] \*\*AC-'` = **8**（没勾、也没人替我勾）。
+7. 本趟另一次自曝（形状不同但同族）：我把 `verify-inbound-doc-tables.py` 用 `node` 跑了一遍，读到 **rc=1** 加尾巴一行 `Node.js v22.22.0`——那是**装置被喂错解释器**的崩溃，不是判据红。换 `python3` 同戳复跑 **rc=0**，结论行逐字：`✔ markdown 表格行：16 个文件，列数、断行、"是不是表"与格内反引号配对都一致（第四类基线 3 行，只许减）`；`verify-inbound-doc-endpoints.py` 同法 **rc=0**（结论：文档里每一枚端点都落在按挂载前缀算出的可达集合上，方法也对得上）。⇒ 本线这 15 枚 `research/tools/verify-inbound-*.py` 一律 `python3` 起跑；读到非 0 先看输出**是不是判决行的形状**（本线装置会打结论行），堆栈尾巴一律按"我这发没量到东西"处理。
