@@ -7,14 +7,16 @@ import { beforeAll, describe, expect, it } from 'vitest';
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const TOOLS = join(REPO_ROOT, 'research', 'tools');
 
-// `research/tools/verify-inbound-*` 那 15 枚装置此前没有任何自动载体：
+// `research/tools/verify-inbound-*` 那批装置此前没有任何自动载体：
 // 所有 package.json（含各包）、scripts/、.github、根 check 链、glob 循环 五路分母现量全 0，
 // 唯一的"引用"是两枚测试里的注释行 —— 装置坏了不会有人知道。这个文件接住其中能安全常驻的那些。
+// 枚数不在这里写死：盘上多一枚而名单里没它 ⇒ 第一条用例红（分母自检）。
 // 只接"对仓库只读"的：写盘目标全在 TemporaryDirectory / mkdtemp 里，或根本不写。
 const WIRED = [
   'verify-inbound-ac-ticks.py',
   'verify-inbound-ac8-matrix.py',
   'verify-inbound-doc-tables.py',
+  'verify-inbound-doc-endpoints.py',
   'verify-inbound-cjs-require-order.py',
   'verify-inbound-producer-seam.py',
 ];
@@ -24,6 +26,7 @@ const SELF_TEST_LINE: Record<string, string> = {
   'verify-inbound-ac-ticks.py': '臂数=5，不成立=0',
   'verify-inbound-ac8-matrix.py': 'SELF_TEST=OK',
   'verify-inbound-doc-tables.py': '臂数=3，全部成立=True',
+  'verify-inbound-doc-endpoints.py': '臂数=6，不成立=0',
   'verify-inbound-cjs-require-order.py': '不成立=0',
 };
 
