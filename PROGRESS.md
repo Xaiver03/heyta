@@ -4604,3 +4604,21 @@ AC 已勾数仍 **0**（`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automatio
 
 **不变量现量**：`AC_TICKED=0` / `AC_UNTICKED=8`；`check-docs-voice`、`docs-link-check`、`verify-inbound-doc-tables` 三把都 rc=0；
 主检出 `git status --porcelain | wc -l` = **28**，逐条都是别线未提交的 `apps/*/evidence/`、`scripts/`（本线一枚没动、没代提交）。
+
+🟢 **改完台账之后，把会读这三份文档的那五枚装置在本树重跑了一遍**（不是例行复跑，是因为这一节动的就是它们读的东西）：
+```bash
+for n in verify-inbound-ac-ticks verify-inbound-ac8-matrix verify-inbound-producer-seam \
+         verify-inbound-ticket-teeth verify-inbound-commit-scope; do
+  python3 research/tools/$n.py > .run-logs/rigs-1015c/$n.out 2>&1; echo "RIG $n RC=$?"; done
+#  RIG verify-inbound-ac-ticks RC=0
+#  RIG verify-inbound-ac8-matrix RC=0
+#  RIG verify-inbound-producer-seam RC=0
+#  RIG verify-inbound-ticket-teeth RC=0
+#  RIG verify-inbound-commit-scope RC=1   ← 仍是 B169 那一格：越界=1，命中的是别线 79e8ede1（命中段=desc、带本线独占路径=0）
+```
+读法：**四枚 0、一枚还是那枚已登记的假红**，而且它第 1 行那三个数与 12:4x 那格能逐笔对上：
+`本线笔数 127 → 131`（差的 4 笔 = `3f884ec2`/`aede9728`/`83f0dc34`/`8ef56c50`，逐笔 `--stat` 全是 docs/BLOCKED/PROGRESS）、
+`涉及路径 103 → 103`（没进任何新路径）、`越界 1 → 1`（还是 `79e8ede1`）
+⇒ 这两节的措辞改动没往范围尺里塞新东西。
+⚠️ 上面这些是**主检出**的读数（本树有别线未提交的证据图）；14 枚装置那份"整套在同一枚 tip 上一次跑完"的读数仍以
+`.worktrees/inb-t9` 副本那趟为准，两棵树别混着引。
