@@ -185,8 +185,9 @@ df -h /System/Volumes/Data                              # 要不要新开一棵�
 - 10-15 06:5x 边界读数：`NO_COLOR=1 pnpm check:shell-unicode` **RC=1**，点名 9 份脚本（分母现量：那条命令自己 `| grep -c '❌'`），
   🔴 **本趟不是它红的原因**（本趟只动了两行调用形状 + 两份纯 ASCII 的 `.ps1`，两份都不在这枚门射程里）。
   它自己的分母里含一枚**未跟踪**文件 `.run-logs/ac-reeval.sh`（现量 `git ls-files .run-logs` ⇒ 空）
-  ⇒ 别的会话在飞的量具进了门禁射程；本线名下那 4 处（`verify-mobile-organizer-confirm.sh`）留作下一趟顺带项，
-  不在这轮批量修（一次会把 8 份别人名下的脚本拖进 diff）。同批 `check:shell-exit-chain` **RC=0**。
+  ⇒ 别的会话在飞的量具进了门禁射程；本线名下那处（`verify-mobile-organizer-confirm.sh`）✅ 已在 10-16 01:0x 清完 —— 现量不是 4 处而是 **17 处**
+  （当时只看了门禁打印的前几行，它末尾写着"…还有 12 处"，我没数完分母就写了数）；剩下 6 个文件 + 那枚未跟踪文件仍归别线，不代改。
+  同批 `check:shell-exit-chain` **RC=0**。
 - 10-15 07:5x **第七趟 r111（只跑 windows 一端）`REINSTALL_RC=0`**：载体 `../heyta-wt-r111` @ `2dbfdba6`、`dirty=0`。
   取证量具那笔 DPI 改动由此拿到运行时读数：`WINDOW_DPI=96 DPI_CTX=True`、`WINDOW_RECT=1440x734`、png 实测 (1440, 734)。
   证据包 `apps/web/evidence/ux-final-20261015/reinstall-r111/`。⚠️ 那枚"125% 缩放"归因在 00:3x 翻回原处（见下一条）；
