@@ -1992,6 +1992,13 @@ packages/app-host typecheck: tests/login-code.spec.ts(44,5): error TS2578: Unuse
 ⇒ 这一格从此不写"整链停在一枚别线的错"，改写成有数的形状：**挡路的 18 枚真红里本线占 4 枚**；
 完成条件 1 那句"T7 三条命令 exit 0"仍不成立，但现在说得出差哪些、每枚归谁。
 
+🔴 **02:3x AC-6 那格末尾那句「另两格照旧：waiting-entitlement 的词条缺（B110，i18n 不许动）」按现量改精确**（旧句不删，读成这一戳的形状）：
+本线界面引用的 72 枚字面键在 `en.ts` / `zh-CN.ts` 两侧**零缺**（反向臂成立：拿 `web.ai.inbound.bogus.absent` 查判为缺；
+且 `MessageKey` 由各 locale `satisfies Record<MessageKey, string>` 钉着，少一条就编译不过）。
+那一格缺的只是 i18n 里**还没写**的那颗词条；`PROCESS_COPY` 的接口行、带 `data-inbound-cycle-state` 的渲染节点、
+以及 `apps/web/tests/inbound-cycle-display.spec.tsx` 那条双向对账（词条进来而映射漏加 ⇒ 当场红）都已就位。
+⇒ 待拍项收敛成「给两句对外原文」，见 BLOCKED 的 B110 追记；现量命令与我自己那两把坏探针都记在 `PROGRESS.md` 的 02:3x 那节。
+
 ### 1. AC-1～AC-8 逐格：证据命令 + 贴出的输出 + 结论
 
 | AC | 证据命令（都在上面那枚载体里跑） | 贴出的输出（10-11 01:5x–02:3x · `9fb9eed2`） | 结论 |

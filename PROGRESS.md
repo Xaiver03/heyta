@@ -5200,3 +5200,26 @@ AC 已勾数仍为 **0**（`verify-inbound-ac-ticks.py`：`AC 行=8　已勾=0�
 ⚠️ 复量的树况要说明白：共享检出当时挂着 **14 枚非白名单脏条目**（全是别线的证据 PNG 与两枚证据目录）。
 这 17 道读的是 `apps/`、`packages/`、`scripts/`、`server/` 的源码与清单，我没有逐道验证过它们是否也去读证据件 ——
 所以这圈复量的成立条件是"树 tip 相同 + 红因逐枚同码"，**不是**"树完全干净"。
+
+## 2026-10-16 02:3x · 负责人拍板那句（"界面用到的 72 个词条键两侧都已齐"）实测成立，B110 那句话因此要改精确 —— 它缺的只有一颗词条，而"半落地"已经被用例钉住
+
+**现量（键的覆盖面）**：从本线四件界面源文件（`InboundAutomationSettings.tsx`、`inbound-runtime.ts`、`apps/mobile/src/inbound/*`、`e2e/tests/inbound-automation.spec.ts`）
+抽出 `t('web.…')` 字面键 → 去重 **72 枚**（与拍板那句逐字对上），逐枚按**扁平点键**在 `packages/i18n/src/locales/en.ts` 与 `zh-CN.ts` 两侧查：
+`键数=72 缺枚数=0`。反向臂：故意拿 `web.ai.inbound.bogus.absent` 查 ⇒ 判为缺（臂成立，不是恒绿）。
+两侧结构上还被类型钉着：`MessageKey` 由 `zh-CN.js` 导出、各 locale `satisfies Record<MessageKey,string>` ⇒ 少一条就编译不过（`packages/i18n/src/index.ts:7`）。
+
+🔴 **我这一趟的头两把探针都是坏的，靠反向对照抓回来**（记下来免得再犯）：
+第一把按**嵌套对象**走 `key.split('.')` 去查 ⇒ 72 枚全报缺（目录其实是扁平点键，`en.ts:5095` 那种 `"web.ai.inbound.draft.open": …`）；
+第二把用 `grep -F "'$k'"` 只认**单引号** ⇒ 报了 16 枚缺，而我刚刚亲眼在文件里见到其中一枚写着双引号。
+⇒ 判"缺什么"之前先拿一枚**已知在册**的键跑一遍尺子：尺报它缺，就是尺坏，不是目录缺。
+
+**B110 的形状因此要说精确**（台账原来只写"词条缺"，读起来像"这格没人管、坏了没人知道"）：
+`PROCESS_COPY`（`InboundAutomationSettings.tsx:37`）现在映射 4 个状态，`waiting-entitlement` **刻意不在表里** ——
+挪用 `failed` 那句会把"这台实例还没买到资格"说成"处理失败"。渲染面已经把节点备好了：
+`:428` 那句 `<p role="status" data-inbound-cycle-state={processState}>` 只要状态不是 `idle` 就出现，
+`processCopyKey === undefined` 时**留空句子而不改口**。而"词条进去了、映射忘了加"这一族有尺钉着：
+`apps/web/tests/inbound-cycle-display.spec.tsx` 那条**双向对账**（正头：表里每行两侧都必须存在，缺键会让 `translateIn` 抛、整块面板当场崩；
+反头：词条表里每个 `web.ai.inbound.process.*` 后缀都必须有人接）—— 这条用例在 01:4x 那趟 apps/web 全量绿集里。
+⇒ 本线这一格真正等的只有 **i18n 里那一颗词条**（`packages/i18n` 按死规矩不许我动），落进来之后我这边只加一行映射，
+且忘了加会被那条用例当场判红，不会悄悄显示成空句子。拍板那句"见到就顺手改写"改的是这个：
+**B110 不是"词条坐在别人索引里"，是"词条还没写 + 接口与守卫都已就位"**。

@@ -11069,3 +11069,16 @@ ls -l                                  → Oct 8 06:41（并行会话留在共�
 `check:integration-coverage`（`盘上 35 个，被点名 34 个`）、`check:licenses:stamp`（`lockfile \`847802a22a36e0bb\``）、
 `check:image-license`（`@noble/hashes 在两处`）、`check:public-facts`（判据 4 那枚匿名下行）各 `rc=1`。
 ⇒ 四枚的归属不依赖载具，白名单外那四处落点照旧只登记不代改。
+
+## B110 追记（2026-10-16 02:3x，本会话 · 按负责人拍板那句复账）：缺的不是"索引位置"，是 i18n 里那一颗词条；接口行与防半落地的守卫都已就位
+
+现量三条（细节与两把坏探针都记在 `PROGRESS.md` 的 02:3x 那节）：
+
+- 本线界面引用的 `web.*` 字面键去重 **72 枚**，在 `en.ts` 与 `zh-CN.ts` 两侧逐枚查 ⇒ **缺 0 枚**（反向臂：拿 `web.ai.inbound.bogus.absent` 查判为缺）。
+- 两侧结构还被类型钉着：`MessageKey` 由 `zh-CN` 导出、各 locale `satisfies Record<MessageKey, string>`（`packages/i18n/src/index.ts:7`）⇒ 少一条编译不过。
+- `waiting-entitlement` 这一格：`PROCESS_COPY`（`apps/web/src/features/settings/InboundAutomationSettings.tsx:37`）刻意不映射它（挪用 `failed` 会把"这台实例还没买到资格"说成"处理失败"），
+  渲染节点已经带状态属性（同文件 `:428` 的 `data-inbound-cycle-state`），未映射时**留空句子而不改口**；
+  "词条进去、映射漏加"这一族由 `apps/web/tests/inbound-cycle-display.spec.tsx` 的**双向对账**钉住（反头：每个 `web.ai.inbound.process.*` 后缀都必须有人接）。
+
+⇒ 这条待拍的**只剩一个动作**：在 `packages/i18n` 两颗词条（中英各一句"这台实例还没有自动收集资格…"）落进来，本线随后只加一行映射。
+`packages/i18n` 按死规矩不许本线动 ⇒ 措辞是对外文案，请负责人给两句原文（或授权我按 `web.ai.inbound.status.*` 那族现有语气起草，再由他过一遍）。
