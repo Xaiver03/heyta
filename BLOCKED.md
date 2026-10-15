@@ -10628,6 +10628,85 @@ if(missing.length) console.log("缺的定义: "+missing.join(", "));
 （本会话第一版探针我就是照 B196 那四枚名字手抄的，抄错了三枚 —— 抄错没被发现，是因为它同样打印"无定义"。
 这正是"写死清单"的失效形状：**错了也红得一样**。）
 
+### 追记（2026-10-15 16:5x @ `c5719f52`）：四枚定义可以逐字粘回来了 —— 实现脚本一枚都没丢
+
+上面那把尺今天在同一枚 tip 上再跑一遍，枚数仍 **4**（本格还开着）。尺写成不依赖载体的内联式（`.run-logs/` 会被清，见 B199）：
+
+```bash
+$ node -e 'const s=JSON.parse(require("fs").readFileSync("package.json","utf8")).scripts;
+> const defined=new Set(Object.keys(s));
+> const refs=[...new Set((s.check.match(/check:[a-z0-9-]+/g)||[]))].sort();
+> const missing=refs.filter(r=>!defined.has(r));
+> console.log(`check 链引用=  ${refs.length}   有定义的=  ${refs.length-missing.length}   缺定义=  ${missing.length}`);
+> for(const m of missing) console.log("  · "+m);'
+check 链引用=  105   有定义的=  101   缺定义=  4
+  · check:ai-e2e
+  · check:e2e-carrier
+  · check:e2e-helper-exports
+  · check:gate-ssh
+```
+🔴 枚数与 12:4x 那格（`引用名枚数=109`）不同不是漂移，是**两把尺取的引用集不同**：那把用
+`/^pnpm (check:…|…)$/` 只认"整步就是一条 `pnpm <名>`"的步；我这把用 `match(/check:[a-z0-9-]+/g)`，
+把复合步里的名字也收进来了。**判"闭没闭"仍然只看最后一行的枚数**，两把在这件事上一致（都 = 4、同一组名字）。
+
+新的那两件是**能直接粘的东西**（10595 那一格当时只说"按 `422db1b2` 原样补回"，没核过实现还在不在）：
+
+```bash
+$ for n in check:ai-e2e check:e2e-carrier check:e2e-helper-exports check:gate-ssh; do pnpm "$n"; echo rc=$?; done
+[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command "check:ai-e2e" not found            rc=1
+[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command "check:e2e-carrier" not found        rc=1
+[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command "check:e2e-helper-exports" not found rc=1
+[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command "check:gate-ssh" not found           rc=1
+# 四枚的实现脚本现在都在盘上且在册：
+#   scripts/check-gate-ssh.mjs            在册=yes
+#   scripts/check-e2e-helper-exports.mjs  在册=yes
+#   scripts/check-ai-e2e-preflight.mjs    在册=yes
+#   scripts/check-e2e-carrier.mjs         在册=yes
+```
+⇒ **修这一格只需要 `package.json` 里四行**，没有代码要重写。逐字取法与内容（前三枚自 `8dcd22c7`，第四枚自 `951bcbea`）：
+
+```bash
+git show 8dcd22c7:package.json | grep -E '"check:(gate-ssh|e2e-helper-exports|ai-e2e)"'
+git show 951bcbea:package.json | grep -E '"check:e2e-carrier"'
+```
+```json
+"check:e2e-helper-exports": "node scripts/check-e2e-helper-exports.mjs",
+"check:gate-ssh": "node scripts/check-gate-ssh.mjs",
+"check:ai-e2e": "node scripts/check-ai-e2e-preflight.mjs && pnpm --dir e2e run test",
+"check:e2e-carrier": "node scripts/check-e2e-carrier.mjs --self-test && node scripts/check-e2e-carrier.mjs",
+```
+
+丢失形状这次按**枚**归到了父提交上（不是 `git log -S` 那种会被 merge 历史简化漏掉的查法，而是逐枚读两枚父的 `package.json` blob）：
+
+```bash
+$ git log --format='%h parents=[%p]' -1 18efc229
+18efc229 parents=[83b72349 7f678146] merge(AI 收口台账 merge/20261005): 103 处冲突逐类裁决 —— 并带回 2…
+$ for n in check:gate-ssh check:e2e-helper-exports check:ai-e2e check:e2e-carrier; do
+    printf '%-26s' "$n"
+    printf ' 父1=%s 父2=%s 合并后=%s\n' \
+      "$(git show 83b72349:package.json | grep -cE "\"$n\":")" \
+      "$(git show 7f678146:package.json | grep -cE "\"$n\":")" \
+      "$(git show 18efc229:package.json | grep -cE "\"$n\":")"
+  done
+check:gate-ssh              父1=1 父2=0 合并后=0
+check:e2e-helper-exports    父1=1 父2=0 合并后=0
+check:ai-e2e                父1=1 父2=1 合并后=0      ← 🔴 两边都有，结果里没有
+check:e2e-carrier           父1=0 父2=1 合并后=0
+```
+
+⇒ 三件事，比上一版那句"四枚定义被弄丢"更可执行：
+1. **没有任何一枚父同时带着这四条定义**（父1 少 `e2e-carrier`、父2 少前两枚）⇒ 谁想用 `--ours` / `--theirs` 一把解决都还会丢；
+   要补的是**两枚父的并集**，也就是上面那四行。
+2. `check:ai-e2e` **两枚父都有定义而合并结果没有** ⇒ 那一块 `scripts` 是被手写裁决掉的，不是"选错侧"。
+   这枚最值得回头看一眼裁决时依据的是哪份文本。
+3. 链里那四个引用（85/86/87/110 步，B196 上面现量过）都在结果里活着 ⇒ 那场 merge 收了引用、没收定义。
+`package.json` 在白名单外，本线不代改；反作弊提醒照 10607 那句仍然有效（别删引用来"修红"）。
+
+⚠️ 顺手记一条我自己那把尺的错，免得下一个人照信我的步号表：第一版打印把第 **105**（`pnpm screenshot:verify`）
+和 **106**（`pnpm -r test`）也标成了 `⛔无定义` —— 那是我的匹配式只认 `check:` 前缀，非该族的步**落进了红分支却没被量过**。
+`grep -rl '"screenshot:verify"' --include=package.json` 回 `./package.json` ⇒ 它一直有定义。已按形状改正叙述，
+判"缺定义"只认逐枚 `pnpm <名>` 的真实退出码那一档。
+
 ## B197（2026-10-14 11:3x @ `0fe3d16b`，本会话 · 当前 tip 的 `pnpm check` 那 27 格里**本线占三格**，三格的落点全在白名单外）
 
 现量口径：对装置留下的 27 份红日志逐份 `grep -i inbound` ⇒ 命中三份（step 21、23、51），其余 24 格不含本线字样。

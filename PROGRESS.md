@@ -4943,3 +4943,25 @@ $ git diff --stat eaae5c0d..840b95c4 -- server packages apps e2e research/tools 
 全部指同一份判定层字节**（vitest 那九档取于 `eaae5c0d`、真库腿取于 `840b95c4`，
 上面那条 `git diff --stat` 证明这两枚之间 `server|packages|apps|e2e|research/tools` 一条没动）；
 其余三档各带自己的 tip 戳。AC 已勾仍 **0**（`verify-inbound-ac-ticks.py` 本轮复跑：`AC 行=8　已勾=0　未勾=8`）。
+
+## 2026-10-15 16:5x · T7 第一腿那枚挡路项（B196）从"四枚定义丢了"升级成"该粘哪四行、为什么只能粘并集"
+
+完成条件 1 要"T7 那三条命令 exit 0"，而第一条 `pnpm check` 至今卡在同一枚结构项上（B196）。
+今天不是重跑它，是把那格**补成别人一行就能修的形状**，同时抓到一处比原叙述更准的归因：
+
+- 逐枚 `pnpm <名>` 真实退出码（不靠任何尺）：四枚各 rc=1、逐条打印 `Command "…" not found`；
+  四枚的**实现脚本都在盘上且在册**（`scripts/check-gate-ssh.mjs`、`check-e2e-helper-exports.mjs`、
+  `check-ai-e2e-preflight.mjs`、`check-e2e-carrier.mjs`）⇒ 修这一格 = `package.json` 里补四行，没有代码要重写。
+  四行原文连同取法（前三枚 `8dcd22c7`、第四枚 `951bcbea`）逐字写进 B196 追记。
+- 🔴 归因更正（我追记**草稿**的第一版写过"三枚是丢定义、一枚是加引用时没写定义"，那是按前一个 tip 推的 ——
+  没入库就被当场换成下面这段实测，所以台账里找不到那句，别以为漏了）：
+  读 `18efc229` 两枚父的 `package.json` blob 逐枚比 ⇒ `gate-ssh`/`e2e-helper-exports` 只在**父1**有、
+  `e2e-carrier` 只在**父2**有、**`ai-e2e` 两枚父都有而合并结果没有**。
+  ⇒ 没有任何一枚父同时带这四条定义 ⇒ **谁用 `--ours`/`--theirs` 一把解决都还会丢，要补的是两枚父的并集**；
+  而 `ai-e2e` 那枚说明那块 `scripts` 是手写裁决掉的，不是选错侧 —— 这条最值得回头看依据的是哪份文本。
+- ⚠️ 我自己那把尺的一处错也记进追记了：第一版打印把链第 105（`pnpm screenshot:verify`）、106（`pnpm -r test`）
+  两步标成 `⛔无定义` —— 匹配式只认 `check:` 前缀，**非该族的步落进红分支却没被量过**。
+  `grep -rl '"screenshot:verify"' --include=package.json` 回 `./package.json` ⇒ 一直有定义。
+  判"缺定义"往回只认逐枚 `pnpm <名>` 的真实退出码那一档。
+- 尺改写成不依赖载体的内联式（`.run-logs/` 会被清，正是 B199 登记的那件事），并且**照抄粘进台账的那条命令我当场跑过一遍**，
+  输出与台账里贴的逐字一致：`check 链引用= 105　有定义的= 101　缺定义= 4`。
