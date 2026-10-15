@@ -1944,6 +1944,15 @@ packages/app-host typecheck: tests/login-code.spec.ts(44,5): error TS2578: Unuse
 「2026-10-15 16:3x · T8 的 AC-1/2/4/5 与 AC-6 的 jsdom 腿…」和紧随的「16:4x · 🔴 现量更正」那两节。
 **AC 已勾数仍为 0**（`verify-inbound-ac-ticks.py`：`AC 行=8　已勾=0　未勾=8`，勾由负责人点）。
 
+🔴 **16:5x 追记：上面那张戳里 ⛔ 那一行少列了一档 —— 是四档不是三档。**
+`verify-inbound-cjs-require-order.py`（AC-1 那一格的**产物加载级**尺，10-11 @ `9fb9eed2` 那枚读数）今天也没重跑，
+理由与②同因：它判的是**产物**，而共享检出的 `server/dist` 现量比源码旧 ——
+`find server/src server/scripts -name '*.ts' -newer server/dist | wc -l` = **119** ⇒
+拿它跑出来的绿说的是上一代产物，不是 HEAD。要取 HEAD 的读数得先重打 `server/dist`（写共享树的构建产物，并行写入者正在树上），
+所以这一档连同②③④一起按"各带自己的 tip 戳"报。
+⇒ 更正后的枚数：**⛔ 四档**（②双宿主 13 窗口、③三枚变异臂、④界面层 e2e、⑤产物加载级尺），
+而 AC-1 那格里"服务端产物能加载"这句因此仍是 `9fb9eed2` 的读数，不是今天的。
+
 ### 1. AC-1～AC-8 逐格：证据命令 + 贴出的输出 + 结论
 
 | AC | 证据命令（都在上面那枚载体里跑） | 贴出的输出（10-11 01:5x–02:3x · `9fb9eed2`） | 结论 |
