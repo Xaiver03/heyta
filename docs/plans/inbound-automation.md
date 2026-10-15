@@ -413,7 +413,7 @@ Web 设置页已接入生成/轮换、一次性展示与复制、活动凭据元
 - **活码与兑换都发生在官方实例**：协议 §4 那句「首次绑定需要官方账号登录授权和本地账号认证」里的「官方账号」只能是官方实例上的账号，所以 `POST …/activations` 与 `…/activations/redeem` 都要求官方实例的 JWT。兑换成功后写 `automation_entitlement_links` 并**删掉**那张活码行；自托管那一侧的绑定不变量仍是 `SUBJECT_CONFLICT`（一枚主体顶不掉别人在同一台实例上的绑定，换主体必须先撤销）。
 - **`session` 票据的三个绑定字段一律取自 `links` 行**，请求体不参与任何一个 —— 这就是「现在 `localAccountUuid` 仍由客户端自报」那一格被消掉的方式：客户端仍然提交一个本地账号 UUID，但它只在**兑换活码**那一次进入服务端记录，之后每次签票由服务端读回。
 - **活码存 SHA-256 且域分隔**（`heyta-automation-activation-v1.`），明文只出现在它那一次签发响应里（`Cache-Control: no-store`）；主键 `(userId, installationId)` ⇒ 一台实例最多一张活码，重发有节流与次数上限。
-- **吊销下限 = max(环境变量手配的那一个, 库里在线刷新的那一个)**，合并单调只升。公开清单 `GET /automation/entitlement/revocations` 由官方实例签（域 `heyta-automation-revocation-v1.`，寿命 ≤24h），自托管实例经 `POST …/revocations/refresh` 转述，**验签只用本部署配置的公钥环** —— 换一把钥伪造的清单进不来。抬下限本身要管理员（`requireAdmin`），而 `refresh` 只要登录：恰恰在绑定被吊销或过期之后才需要它。
+- **吊销下限 = max(环境变量手配的那一个, 库里在线刷新的那一个)**，合并单调只升。公开清单 `GET /api/automation/entitlement/revocations` 由官方实例签（域 `heyta-automation-revocation-v1.`，寿命 ≤24h），自托管实例经 `POST …/revocations/refresh` 转述，**验签只用本部署配置的公钥环** —— 换一把钥伪造的清单进不来。抬下限本身要管理员（`requireAdmin`），而 `refresh` 只要登录：恰恰在绑定被吊销或过期之后才需要它。
 
 判据（6 条单元 + 5 条真库集成，都带反向验证）：
 
@@ -701,7 +701,7 @@ T2 那句话里"每 30 秒续票据"这一格，此前是**一整套零件都在
 | AC | 原句 | 现状 | 为什么做不了 |
 |---|---|---|---|
 | AC-6 | 「用户**独立完成**"启用 → 测试发送 → 等待 → 打开/解锁 → 自动处理 → 查看结果"」 | **半尺**：真浏览器那份 `e2e/tests/inbound-automation.spec.ts` 有 4 条（两个模板 × 1280/390 两窄宽），且**它走的是 route 桩**（文件头自述 "Real browser/UI with HTTP fixtures; database authorization is tested separately"），量的是界面形状，不是这条旅程 | 旅程需要公网接收 + 有权益的宿主在跑，两者都关着。✅ **2026-10-10 19:0x 现量更正，把本行原来那两句划掉**：① "本轮没有复跑"已过期 —— 复跑了，`cd e2e && npx --no-install playwright test --config playwright.inbound.config.ts` ⇒ **`2 failed / 2 passed`**，两条红是**产品缺一格**（换回设置那一节不重取事件列表：分组是 `hidden` 不是卸载，而组件备好的 `active` 旋钮在 `App.tsx`/`AiSettings.tsx` 两处都没接），归因与一句修法记在 **B140**，断言**没有**为了变绿而放松；10-11 12:4x 在最新 HEAD 上复跑，红仍在同一行、四张图逐字节相同；② "这份 e2e 连入库都做不到"也已过期 —— 那份 spec 与它 import 的 `selectSettingsSection` 都在 HEAD（现量 `git show HEAD:e2e/tests/helpers.ts \| grep -c selectSettingsSection` = **4**）。四张草稿态截图人已看过：`docs/research/evidence/inbound-automation-review/ui-draft/draft-{1280,390}-{light,dark}.png`，10-11 复跑那四张在 `ui-retry/`（逐张说明与 sha256 在同目录 `README.md`）。**仍不勾**：那一格红没修（B140 那句 `active` 没接，10-11 在最新 HEAD 上逐字复量仍在）、"各壳入口可用"这半没证（这趟只有 web）、整条旅程要开公网接收才能走。🔴 **10-15 14:2x 在当前 tip 复跑**（载体 `5bc1b9fe`，先核 `:4468` 空闲）：单测 `7 passed (7)` `rc=0`、e2e `2 failed / 6 passed`、`skipped` **0**、总数 `8` 与上一趟同，两枚红**逐字同一句**（`查看并编辑草稿` 等不到）⇒ "红没修"这句到当前 tip 仍成立、本线**不勾**这一格；命令与日志落点见文末「2026-10-15 14:2x」一节 |
-| AC-7 | 「官方与自托管样例分别**可运行**，端点与权限真实」 | **无尺**（帮助中心/中英条款的落点也在白名单外，B118） | 半尺有：`docs/reference/` 那两份当日已按 HEAD 更正过措辞（协议 + 定价） |
+| AC-7 | 「官方与自托管样例分别**可运行**，端点与权限真实」 | 🔴 **10-15 14:3x 起这一行分两半**：可机械判的那半（协议文档里每枚端点的可达形状 + 每枚 `path:行` 代码锚点）**有尺了**，另一半"样例真的能跑"仍**无尺**（帮助中心/中英条款的落点也在白名单外，B118；真部署实例未开公网接收） | 量那一趟**抓到两处错并已修**：协议文档 86/90 行把三枚端点写成不带挂载前缀 `/api` 的形状（运维照粘会 404），115 行的 `server/src/api.ts:660-664` 锚点漂到注册代码上（真判据在 `:703`，已改成按函数名锚）。⚠️ 原句"那两份**当日**已按 HEAD 更正过措辞"本身就是问题——"当日"没有任何命令能复核，这次连它一起换掉了。四条仍成立的代码声称（客户端只有 `verify` 一枚出口、`purge…` 函数在位、清扫判据 5 条、`cleanup.ts` 里那一次调用仍缺＝B175）也一并复核过。尺与读数见文末「2026-10-15 14:3x」一节；**仍不勾** |
 | AC-8 | 「平台 × 权益 × 设备状态 × 失败阶段的具体用例表」 | ⚠️ **本行已被文末「2026-10-10 05:2x · AC-8 用例矩阵」一节取代**（当日现量：矩阵已落成 34 行、逐格带尺或带归属，`python3 research/tools/verify-inbound-ac8-matrix.py` rc=0）。原先写的"**无产物**：矩阵文件不存在"在 10-10 05:0x 之前是真的，留着是为了让人认出"表格类交付物最容易糊过去的是它自己" | 剩余的那半仍然过不去：`pnpm check` / `-r test` 两条在隔离副本上仍红（10-11 11:4x 新读数：check 停在第 6 段 `COMMENT 0 处写路径`、`-r test` 停在 `@heyta/ai` 的清单产物缝，两条都在别线地界，见文末「T7 三条腿的合并态读数」）；`reinstall:all` 桌面两端 + Linux 取证已绿、移动两端按 §8.9 未点 ⇒ 矩阵里 C30~C34 五格仍记无尺（C30 要的是**四端**当前产物）。🔴 **2026-10-14 11:3x 整链复量后改口（原句不删）**：`pnpm check` 现在停在**第 1 步** `check:gate-wiring`（链引用四枚已不存在的脚本定义，`18efc229` 那场 merge 丢的，见 B196），整链 111 步 **84 绿 27 红**；那句"两条都在别线地界"**不再成立**——27 格里**三格的红因在本线**（`check:selection-single-source` / `check:empty-state` / `check:integration-coverage`，逐格见 B197，三格的落点都在白名单外）。`-r test` 一侧：**🔴 10-15 14:0x 两条腿都取到硬读数，不再只是消费者分析** —— 整链 111 道**逐道退码与上一枚有逐道读数的 tip `0fe3d16b` 全同**（红集 27 枚逐枚相同、超时冒充红 **0** 枚、`LEG1_RC=1`），`-r --no-bail test` 21 枚包 `4 fails 17 passes`、逐包 Tests 行求和 `8 failed / 13722 passed / 14 skipped`（与留档趟同为），含 `inbound` 的失败行 **0** ⇒ 两条腿各自 `rc=1` 依旧 ⇒ 本行那半仍过不去。逐道对照与日志落点见文末「2026-10-15 14:0x」一节 |
 
 ⇒ **逐格结论**（10-11 17:5x 复账）：AC-1 / AC-2 / AC-4 / AC-5 的句子有尺（AC-4 出境那一半是 10-11 补到线级的）；
@@ -3895,3 +3895,44 @@ panel-1280-light 逐字节相同（所以它不显脏）
 
 同时确认：这趟**没碰共享树**那 12 枚 `apps/web/evidence/inbound-recovery/*.png`（`ls -lT` 仍是 `Oct 14 10:46:49` 那一秒，`git status` 仍 12 枚）
 ⇒ B194 的"归属不可证"维持原判。载体自己现在脏 15 枚，全部是本趟 e2e 在**私有副本**里写的证据图（不是交付件）。
+
+## 2026-10-15 14:3x · AC-7 那句"端点与权限真实"原来一直是无尺的 —— 量一次就抓到两处
+
+AC-7 要求"**官方与自托管样例分别可运行，端点与权限真实**"。此前那一格记的是"无尺 + 半尺有：`docs/reference/` 那两份当日已按 HEAD 更正过措辞"
+—— 那句"当日"没有命令能复核，等于没证据。这趟把可机械判的那半（**协议文档里每一枚端点与每一枚 `path:行` 锚点，逐条对到当前源码**）量了：
+
+```bash
+# 尺 1：可达 URL 形状。被守的那串字节 = 挂载前缀
+grep -n "prefix: '/api'" server/src/server.ts
+#  469: await fastifyServer.register(apiRoutes, {   470:   prefix: '/api',
+#  477: await fastifyServer.register(inboundAutomationRoutes, {   478:   prefix: '/api',
+grep -n "const post = (path" server/tests/integration/inbound-worker-identity.integration.spec.ts
+#  1117: fetch(`${base}/api${path}`)   ← 所以测试里写 '/automation/entitlement/ticket' 打出去是 /api/automation/…
+grep -n "ticketPath" packages/app-host/src/inbound-entitlement-tickets.ts
+#  11: const ticketPath = '/api/automation/entitlement/ticket'   ← 生产客户端用的就是带前缀那串
+```
+
+🔴 **量到的两处错（都在 `docs/reference/inbound-automation-protocol.md`，本线白名单内，已改）**：
+1. 86 / 90 两行把三枚端点写成 `GET /automation/entitlement/revocations`、`POST /automation/entitlement/revocations/refresh`、
+   `POST /automation/entitlement/ticket` —— **少了挂载前缀 `/api`**。同文档另外五枚端点（`/api/automation/v1/hooks/…`、
+   `/api/automation/recipient-key`、`/api/automation/rules/:ruleId/sender-credentials`、`/api/automation/events/:eventId/draft[/decision]`）
+   全都带前缀，且文档里**没有任何一句说明"以下路径省略前缀"**（`grep -n "前缀\|挂载\|省略"` 命中 **0**）。
+   ⇒ 自托管运维照文档粘出来的地址会 404。这就是 AC-7 那句"端点与权限真实"的字面反例。
+2. 115 那行的代码锚点 `server/src/api.ts:660-664` **漂了**：10-10 写它时那几行是签发端的部署模式分流，
+   当前 tip 上 660-664 是 `RegistrationChallengeRequestSchema`（注册用的），真判据在 `:703`
+   `if (resolveAutomationEntitlementMode() !== 'official') return { code: … NOT_ON_THIS_INSTANCE }`。
+   已改成**按名字锚、行号只作当日现量**（"名字找得到、行号只是那一天的坐标"）。
+
+**这趟同时复核、仍然成立的四条**（都改不了结论，但记下来免得下一位重测）：
+`packages/app-host/src/inbound-entitlement-remote.ts` 的出口仍只有 `verifyAutomationEntitlementTicket` 一枚（115 那句"客户端没有签发方 URL 这个概念"仍真）；
+`purgeRetiredAutomationEntitlementClocks` 仍在 `server/src/automation/entitlement-ticket.ts:394`，
+`server/tests/automation-clock-retirement.pglite.spec.ts` 判据条数仍 **5**，而 `grep -c purgeRetired server/src/sync/cleanup.ts` 仍 **0**
+⇒ 文档那句"缺的是每日清扫里那一次调用"（B175）到当前 tip 仍成立；`entitlement-issuer.ts:323-324` 仍是缺绑定/已吊销 ⇒ `LINK_NOT_BOUND`。
+
+**一条要留给下一位的区分**（我这次差点用错尺）：`server/src/api.ts` 注册的是 `/automation/…`，可达 URL 是 `/api/automation/…`。
+所以**"文档里出现不带 `/api` 的路径"本身不是错**——只有当那句话是在教人怎么调它。
+本计划 427 与 486 两行的 `PUT /automation/recipient-key`、`POST /automation/entitlement/ticket` 是在**描述 api.ts 里注册的那条路由**，
+按注册字面抄才是对的，**没改**；改的是协议文档那两行（面向运维）与计划 416（同一句"公开清单 GET …"是在讲对外可达的那枚清单）。
+
+⇒ **AC-7 这一格现在的状态**：可机械判的那半（端点形状 + 代码锚点）有了上面两条尺、两处错已修；
+**仍不勾**：另两半"官方/自托管样例分别**可运行**"要有真部署实例（公网接收未开），"未上线能力继续标规划中"要逐界面回读。
