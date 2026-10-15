@@ -4650,3 +4650,22 @@ for n in verify-inbound-ac-ticks verify-inbound-ac8-matrix verify-inbound-produc
 🟢 **本轮真正的收获是那条尺的判据学**：尺红 ≠ 全量重跑，也 ≠ 可以按名字划出"必须重取的范围"。
 把 20 枚按"谁消费这些路径"分一层，这把尺的正确形状是 **`pnpm <名字>` 解到定义正文 + grep 命中回读那一行是不是注释**；
 我两条都踩了（只匹配步骤名 ⇒ 假命中 4 道；没分注释与调用 ⇒ 又差点把 `reinstall-all.sh` 算成消费者）。
+
+## 2026-10-15 14:0x · 上一节留下的那句"弱于重跑"当场补上：T7 第 1、2 腿在 `5bc1b9fe` 都是硬读数
+
+载体快进 `4e0215f6 → 5bc1b9fe`（先验锁文件与 `package.json` 改动 **0 枚**）。尺先自证：
+`verify-inbound-check-chain.py --self-test` ⇒ `ARMS=6 FAILED=0`，再单步探针确认调用形状 ⇒ `HEAD=5bc1b9fe / STEP=1/111 RC=1`。
+串行后台跑两腿（`.worktrees/inb-t9/.run-logs/legs-1015b.status`），负载门各放行 11.36 / 11.95（≤ 12）。
+
+- **第 1 腿**：`CHAIN ran=111/111 RED=27`、`LEG1_RC=1`。与**上一枚有逐道读数的 tip `0fe3d16b`**（注意：对照基准不是我先前以为的 `4e0215f6` ——
+  `check-current.out` 自报 `HEAD=0fe3d16b`，它到当前 tip 跨 20 枚提交 / 53 枚路径）比：**逐道退码 111 道全同、红集逐枚相同、超时冒充红 0 枚**。
+  ⇒ 上一节"消费者分析"的预测被真重跑支持，且它跨的比我说的那一段更长。
+- **第 2 腿**：`Summary: 4 fails, 17 passes`（21 枚包）、逐包 `Tests` 行求和 `8 failed / 13722 passed / 14 skipped`、
+  含 `inbound` 的失败行 **0**；本线自己的包全绿（`inbound-core` 3、`app-host` 97、`domain` 43、`sync-client` 12、`server` 161 文件 2817 用例）。
+- 顺带在共享树按当前 tip 取了三枚**直接读我这两笔文档提交改过的文件**的装置：`ac-ticks` / `ac8-matrix` / `doc-tables` 全 `rc=0`。
+
+🔴 **两条腿各自 `rc=1` 依旧 ⇒ 完成条件 1 那一格没有往完成挪**：第 1 道红因是 B196（四枚脚本定义被 merge 丢掉，地界外），
+八条测试红无一含 `inbound`（归属早登记在册）。第 3 腿 `reinstall:all` 在这一枚 tip 上仍无新读数（它要真装真机，"不许拿旧包验收"那条仍适用）。
+
+⚠️ 一处自己差点糊过去的：**"逐道同码 111"这句话我第一次算错了对照件** —— 我先按"上一趟 = `4e0215f6`"写，
+`head -2 check-current.out` 打出 `HEAD=0fe3d16b` 才发现那份逐道日志出自更远一枚 tip。落笔前把对照件的自报 HEAD 读了一遍才改准。

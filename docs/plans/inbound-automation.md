@@ -702,7 +702,7 @@ T2 那句话里"每 30 秒续票据"这一格，此前是**一整套零件都在
 |---|---|---|---|
 | AC-6 | 「用户**独立完成**"启用 → 测试发送 → 等待 → 打开/解锁 → 自动处理 → 查看结果"」 | **半尺**：真浏览器那份 `e2e/tests/inbound-automation.spec.ts` 有 4 条（两个模板 × 1280/390 两窄宽），且**它走的是 route 桩**（文件头自述 "Real browser/UI with HTTP fixtures; database authorization is tested separately"），量的是界面形状，不是这条旅程 | 旅程需要公网接收 + 有权益的宿主在跑，两者都关着。✅ **2026-10-10 19:0x 现量更正，把本行原来那两句划掉**：① "本轮没有复跑"已过期 —— 复跑了，`cd e2e && npx --no-install playwright test --config playwright.inbound.config.ts` ⇒ **`2 failed / 2 passed`**，两条红是**产品缺一格**（换回设置那一节不重取事件列表：分组是 `hidden` 不是卸载，而组件备好的 `active` 旋钮在 `App.tsx`/`AiSettings.tsx` 两处都没接），归因与一句修法记在 **B140**，断言**没有**为了变绿而放松；10-11 12:4x 在最新 HEAD 上复跑，红仍在同一行、四张图逐字节相同；② "这份 e2e 连入库都做不到"也已过期 —— 那份 spec 与它 import 的 `selectSettingsSection` 都在 HEAD（现量 `git show HEAD:e2e/tests/helpers.ts \| grep -c selectSettingsSection` = **4**）。四张草稿态截图人已看过：`docs/research/evidence/inbound-automation-review/ui-draft/draft-{1280,390}-{light,dark}.png`，10-11 复跑那四张在 `ui-retry/`（逐张说明与 sha256 在同目录 `README.md`）。**仍不勾**：那一格红没修（B140 那句 `active` 没接，10-11 在最新 HEAD 上逐字复量仍在）、"各壳入口可用"这半没证（这趟只有 web）、整条旅程要开公网接收才能走 |
 | AC-7 | 「官方与自托管样例分别**可运行**，端点与权限真实」 | **无尺**（帮助中心/中英条款的落点也在白名单外，B118） | 半尺有：`docs/reference/` 那两份当日已按 HEAD 更正过措辞（协议 + 定价） |
-| AC-8 | 「平台 × 权益 × 设备状态 × 失败阶段的具体用例表」 | ⚠️ **本行已被文末「2026-10-10 05:2x · AC-8 用例矩阵」一节取代**（当日现量：矩阵已落成 34 行、逐格带尺或带归属，`python3 research/tools/verify-inbound-ac8-matrix.py` rc=0）。原先写的"**无产物**：矩阵文件不存在"在 10-10 05:0x 之前是真的，留着是为了让人认出"表格类交付物最容易糊过去的是它自己" | 剩余的那半仍然过不去：`pnpm check` / `-r test` 两条在隔离副本上仍红（10-11 11:4x 新读数：check 停在第 6 段 `COMMENT 0 处写路径`、`-r test` 停在 `@heyta/ai` 的清单产物缝，两条都在别线地界，见文末「T7 三条腿的合并态读数」）；`reinstall:all` 桌面两端 + Linux 取证已绿、移动两端按 §8.9 未点 ⇒ 矩阵里 C30~C34 五格仍记无尺（C30 要的是**四端**当前产物）。🔴 **2026-10-14 11:3x 整链复量后改口（原句不删）**：`pnpm check` 现在停在**第 1 步** `check:gate-wiring`（链引用四枚已不存在的脚本定义，`18efc229` 那场 merge 丢的，见 B196），整链 111 步 **84 绿 27 红**；那句"两条都在别线地界"**不再成立**——27 格里**三格的红因在本线**（`check:selection-single-source` / `check:empty-state` / `check:integration-coverage`，逐格见 B197，三格的落点都在白名单外）。`-r test` 一侧仍以本线自己那趟 `--no-bail` 为准：21 == 21、`13 722 / 8 failed / 14 skipped`，八条红无一含 `inbound` |
+| AC-8 | 「平台 × 权益 × 设备状态 × 失败阶段的具体用例表」 | ⚠️ **本行已被文末「2026-10-10 05:2x · AC-8 用例矩阵」一节取代**（当日现量：矩阵已落成 34 行、逐格带尺或带归属，`python3 research/tools/verify-inbound-ac8-matrix.py` rc=0）。原先写的"**无产物**：矩阵文件不存在"在 10-10 05:0x 之前是真的，留着是为了让人认出"表格类交付物最容易糊过去的是它自己" | 剩余的那半仍然过不去：`pnpm check` / `-r test` 两条在隔离副本上仍红（10-11 11:4x 新读数：check 停在第 6 段 `COMMENT 0 处写路径`、`-r test` 停在 `@heyta/ai` 的清单产物缝，两条都在别线地界，见文末「T7 三条腿的合并态读数」）；`reinstall:all` 桌面两端 + Linux 取证已绿、移动两端按 §8.9 未点 ⇒ 矩阵里 C30~C34 五格仍记无尺（C30 要的是**四端**当前产物）。🔴 **2026-10-14 11:3x 整链复量后改口（原句不删）**：`pnpm check` 现在停在**第 1 步** `check:gate-wiring`（链引用四枚已不存在的脚本定义，`18efc229` 那场 merge 丢的，见 B196），整链 111 步 **84 绿 27 红**；那句"两条都在别线地界"**不再成立**——27 格里**三格的红因在本线**（`check:selection-single-source` / `check:empty-state` / `check:integration-coverage`，逐格见 B197，三格的落点都在白名单外）。`-r test` 一侧：**🔴 10-15 14:0x 两条腿都取到硬读数，不再只是消费者分析** —— 整链 111 道**逐道退码与上一枚有逐道读数的 tip `0fe3d16b` 全同**（红集 27 枚逐枚相同、超时冒充红 **0** 枚、`LEG1_RC=1`），`-r --no-bail test` 21 枚包 `4 fails 17 passes`、逐包 Tests 行求和 `8 failed / 13722 passed / 14 skipped`（与留档趟同为），含 `inbound` 的失败行 **0** ⇒ 两条腿各自 `rc=1` 依旧 ⇒ 本行那半仍过不去。逐道对照与日志落点见文末「2026-10-15 14:0x」一节 |
 
 ⇒ **逐格结论**（10-11 17:5x 复账）：AC-1 / AC-2 / AC-4 / AC-5 的句子有尺（AC-4 出境那一半是 10-11 补到线级的）；
 **AC-3 不在这张表里** = 双宿主那一半当天就有装置，10-11 又在隔离副本上取到**带磁盘产物**的读数（见文末那一节）；
@@ -3781,9 +3781,75 @@ grep -c "mobile-e2e\|verify-mobile" apps/desktop-linux/scripts/package-deb.sh   
 靠的不是重跑，是"它们执行的输入一枚没变"。
 ⚠️ 边界必须写明：**消费者分析弱于一次重跑**。它证"没有输入变化"，证不了"重跑一定同数"（负载、时序、外部设备都能变）。
 所以重跑命令仍挂在台账：`cd .worktrees/inb-t9 && bash .run-logs/chain.sh`（载体已快进到 `4e0215f6`、依赖已装）。
+👉 **这句欠账在 14:0x 已还**：两腿的重跑都在 `5bc1b9fe` 取到硬读数（第 1 腿用 `verify-inbound-check-chain.py` 逐道、第 2 腿用 `chain.sh`），
+逐道退码与上一枚有逐道读数的 tip `0fe3d16b` 全同 —— 见文末「2026-10-15 14:0x」一节。原句留着，因为"消费者分析弱于重跑"这条边界本身就是那一节要教的事。
 这趟没取的理由是现量的：`vm.loadavg` 1 分钟从 15.51 涨到 **18.14**，而链驱动自己的门是 `NCPU*3/4 = 12`，
 短窗高于长窗说明本机正被设备腿那个会话用着 ⇒ 往那个窗口塞全量构建只会拿到被争用的数。
 
 🔴 **这一格留下的判据学（比结论有用）**：判"某个改动会不会影响某个读数"，**不许按名字相似匹配**，要按**解析后的消费者**匹配。
 两条我都踩了：只匹配步骤名 ⇒ 假命中 4 道；没区分注释与调用 ⇒ 又差点把 `reinstall-all.sh` 算成消费者。
 所以这把尺的形状是：`pnpm <名字>` 解到定义正文 + grep 命中要回读那一行是不是注释。
+
+## 2026-10-15 14:0x · 上一节那句"消费者分析弱于一次重跑"当场补上了：第 1、2 腿在 `5bc1b9fe` 都是硬读数
+
+上一节把结论放在"输入一枚没变"上，并自己写明了它的边界（弱于重跑）。这一节把那条重跑取到了。
+
+**前置**：载体 `.worktrees/inb-t9` 从 `4e0215f6` 快进到 `5bc1b9fe`（先验 `git diff --name-only 4e0215f6..HEAD -- '*pnpm-lock.yaml' 'package.json' '*/package.json'` ⇒ **0 枚**，
+所以没拿旧依赖凑数）。起跑前先验那把尺自己：`python3 research/tools/verify-inbound-check-chain.py --self-test` ⇒ `ARMS=6 FAILED=0`，
+再用单步探针确认调用形状（`--from 1 --to 1`）⇒ `HEAD=5bc1b9fe / STEP=1/111 RC=1`。
+
+### 第 1 腿 `pnpm check` 整链（111 道逐道）
+
+```
+LOAD_GATE=OPEN leg=leg1 one_min_load=11.36 threshold=12 waited=2   STEP=leg1 BEGIN 13:58:05
+CHAIN ran=111/111 of 111  RED=27
+  steps=[1, 6, 20, 21, 22, 23, 42, 43, 45, 51, 54, 65, 75, 84, 85, 86, 87, 88, 89, 90, 100, 102, 104, 106, 109, 110, 111]
+LEG1_RC=1
+```
+
+**与本线上一枚有整链逐道读数的 tip 对账**（对照基准不是 `4e0215f6` —— 那份逐道日志 `check-current.out` 自报 `HEAD=0fe3d16b`，
+从它到 `5bc1b9fe` 跨 **20 枚提交 / 53 枚路径**，其中锁文件与 `package.json` **0 枚**，落在"链会执行的输入"上的只有 5 枚 `scripts/{lib/mobile-e2e.sh,verify-mobile-*.sh}`）：
+
+```
+本趟 RC=124（超时冒充红）的道数 = 0
+逐道退码对比：同码道数=111 / DIFF=0
+红集对比（对台账登记的那 27 枚）：新增红=无，转绿=无，逐枚相同
+```
+
+⇒ 上一节的**预测被真重跑支持**：那批设备腿脚本确实不是任何一道链步骤的消费者，所以整链形状一枚没动。
+⚠️ 但"支持"只覆盖这一对 tip —— 它是"这一跨没有输入变化"的读数，不是"这类改动永远不影响链"的定理。
+`LEG1_RC=1` ⇒ **完成条件 1 里"三条命令 exit 0"这一腿仍不成立**，且第 1 道 `check:gate-wiring` 的红因是 B196（四枚脚本定义被 merge 丢掉），不在本线地界。
+
+### 第 2 腿 `pnpm -r --no-bail test`
+
+```
+INSTALL_RC=0  BUILD_RC=0  GEN_RC=0  LOAD_GATE=OPEN one_min_load=11.95 waited=0
+STEP=step105 BEGIN 14:01:59 → END 14:03:06   TEST_RC=1
+Summary: 4 fails, 17 passes                      ← 21 枚包，与基线 21 == 21
+逐包 Tests 行相加：failed=8  passed=13722  skipped=14
+含 inbound 的失败行：0
+```
+
+红的 4 枚包**逐枚与留档趟（`dfde0bb1`）同形状**：`packages/ai` 1 failed/10 passed(11)、`packages/shared-schema` 1/10(11)、
+`apps/mobile` 2 failed/75 passed(77)、`apps/web` 1 failed/178 passed/2 skipped(181)；
+逐包 Tests 求和两趟**同为 `8 / 13722 / 14`**。本线自己的包全绿：`packages/inbound-core` 3、`packages/app-host` 97、
+`packages/domain` 43、`packages/sync-client` 12、`server` 161 文件 / 2817 用例（1 枚 skip 是既有 postgres 通道那条）。
+
+⇒ 第 2 腿这一格**没有往完成的方向挪**：`TEST_RC=1` 是真的，且八条红无一含 `inbound`（逐条归属早登记在册，未变）。
+
+### 顺带在当前 tip 取到的三枚秒级装置（共享树，`HEAD=5bc1b9fe`）
+
+```
+verify-inbound-ac-ticks   rc=0  已勾=0、未勾=8
+verify-inbound-ac8-matrix rc=0  矩阵与 HEAD 逐格对账成立
+verify-inbound-doc-tables rc=0  16 个文件表格一致
+```
+
+这三枚**直接读本线那两笔文档提交改过的两份文件**，所以它们把"输入没变"换成了读数。
+
+### 这一节欠下的、以及为什么仍欠
+
+- **第 3 腿 `reinstall:all` + Linux 取证在 `5bc1b9fe` 上没有新读数**：它的输入是四端打包与设备面，本跨的 5 枚脚本改动虽被 `reinstall-all.sh` 的注释提到（消费者 0 枚），
+  但这条腿要的是**真装真机**，上一节"不许拿旧包验收"那条仍然适用 ⇒ 仍按负载与设备窗口取。
+- 日志落点（`.run-logs/` 被 ignore，没给共享树留新脏）：载体 `.worktrees/inb-t9/.run-logs/legs-1015b.status`、
+  `leg1-1015b.out`、`check-1015b/001…111.log`；留档对比件 `chain-1015a.log` / `chain-1015a.status`（本趟正文从该行号之后追加，未覆盖旧件）。
