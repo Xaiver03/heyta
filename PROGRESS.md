@@ -4689,3 +4689,10 @@ for n in verify-inbound-ac-ticks verify-inbound-ac8-matrix verify-inbound-produc
 
 ⚠️ 上一节还留了一条：那 5 枚 `scripts/verify-mobile-*.sh` 里我只变异过"点名"这一枚问题上的形状，
 **没有**去验设备腿那条线自己的判据 —— 那不是本线的事，也不许我代改。
+
+## 2026-10-15 14:1x · B194 复量：那批证据图又被同一秒覆了一次，并量到一条读法坑
+
+`ls -lT` 现量：共享树 `apps/web/evidence/inbound-recovery/` 里 **16 枚 mtime 全在 `Oct 14 10:46:49` 同一秒**（10-14 登记那次是 12 枚、`Oct 13 12:21:20`）。
+`porcelain` 只显 12 枚 ⇒ 另 4 枚 `before-retry-*.png` 被覆成了**与 HEAD 逐字节相同**（`git hash-object` 对 `HEAD:` 四枚全等）才不显脏。
+🔴 **判"有没有人动过这批证据"要用 mtime，不能用 `git status`** —— 同字节覆写只动时间戳。
+本线当天两趟 e2e 都在隔离副本里跑（spec 的 `evidence` 是相对路径），所以 10-15 本线没碰过共享树那批；那次批量写的归属仍不可证，维持待裁决。
