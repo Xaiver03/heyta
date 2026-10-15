@@ -616,10 +616,10 @@ require_keyboard_down "进「设置」填凭据之前"
 read_ops > "$OPS_BEFORE"
 ok "同步前服务端 op 数 = $(wc -l < "$OPS_BEFORE" | tr -d ' ')"
 EMAIL="$EMAIL" TOKEN="$TOKEN" configure_sync_credentials
-$ADB shell input tap 945 2253; sleep 2
-XY=$(xy_text "立即同步")
-[ -z "$XY" ] && XY=$(xy_desc "立即同步")
-if [ -n "$XY" ]; then $ADB shell input tap $XY; fi
+# 🔴 这三行删掉的理由：`input tap 945 2253` 是**写死的坐标**（本库注释里那条
+#    "拿着别的页面的坐标去点"的形状），而它下面紧跟着的 `ensure_phone_sync` 已经
+#    会把"找按钮→点下去→已忙就只等"做完，现在还多会一层：按钮在设置浮层那一组里时
+#    自己进组、见到为止。留着一发盲点 = 同一发同步可能被点两次，而日志分不出是哪一次。
 ensure_phone_sync
 # 🔴 判据④a 断的是**"还原有没有毒化同步队列"**，不是"备份里的 op 有没有传上去"。
 #

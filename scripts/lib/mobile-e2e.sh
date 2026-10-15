@@ -528,20 +528,52 @@ phone_sync() {
 # ⚠️ 这也意味着：在自动同步已经抢跑的情形下，"首次同步成功"这条断言
 #    验的是**自动同步**而不是那个按钮。日志会明确打印是哪一种，
 #    不会让读者以为按钮被测过。
-ensure_phone_sync() {
-  dump
+#
+# 🔴 **它还得知道按钮在哪个面上。** `6d868af0` 把同步状态那一段（含这枚按钮）整块搬进
+#    设置浮层的「同步与隐私」那一组，主屏（「我的」）只剩一行状态文字。现量（10-15 04:4x，
+#    同一台 emulator-5554、当前源码打的包）：
+#      · 主屏 dump 里 `立即同步` 命中 **0** 处（`content-desc` 与 `text` 都没有），
+#        那行「还没设置端到端加密口令，同步已停止」在 `[42,1724][1038,1850]`；
+#      · 进浮层那一组后 Button 节点 `bounds=[42,905][356,1020]`、`clickable=true`、
+#        `content-desc="立即同步"` 与 `text` **同时**在场。
+#    ⇒ 只在主屏找按钮的写法，报的"找不到按钮"其实是**探针停在错误的面上**，
+#      与产品坏没关系。这一族里还有 4 个调用点在按旧形状找（见台账那一格）。
+_sync_button_on_this_surface() {  # <面名>；0=已发起或已在跑，1=这棵树上没有
   if [ "$(has_desc "立即同步")" = "1" ]; then
     local xy; xy=$(xy_desc "立即同步")
     if [ -z "$xy" ]; then bad "「立即同步」的 desc 在但取不到坐标"; return 1; fi
     $ADB shell input tap $xy
-    echo "     已点「立即同步」@ $xy"
+    echo "     已点「立即同步」@ $xy（在「$1」这一面上）"
     return 0
   fi
   if [ "$(has_desc_sub "正在同步")" = "1" ]; then
     echo "     （自动同步已经在跑：按钮处于 loading，只渲染菊花 —— 所以这里查的是 content-desc）"
     return 0
   fi
-  bad "同步按钮既不空闲也不在忙（desc 里既没有「立即同步」也没有「正在同步…」）"
+  return 1
+}
+
+ensure_phone_sync() {
+  dump
+  _sync_button_on_this_surface "当前面" && return 0
+  # 这一棵树上没有 ⇒ 按当前源码的形状进浮层那一组再试（不静默：成功会打印是哪一面）。
+  # ⚠️ 进组之后**必须"见到为止"而不是单次判定**：高负载时 `dump()` 会抓空
+  #    （lib 里 `settle_for` 那段记的就是这个形状 —— 抓空那次读到的"没有按钮"是假红）。
+  if ! open_settings_section sync; then
+    bad "同步按钮既不空闲也不在忙（desc 里既没有「立即同步」也没有「正在同步…」），而进设置面「同步与隐私」那一组这一步也没做成"
+    return 1
+  fi
+  local n=0
+  while [ "$n" -lt 8 ]; do
+    dump
+    if _sync_button_on_this_surface "设置浮层·同步与隐私"; then
+      # 按钮是**借道**进的浮层；调用方回来时应当还在主屏，别让下一眼落在面里
+      close_settings_sheet
+      return 0
+    fi
+    n=$((n + 1)); sleep 2
+  done
+  bad "同步按钮既不空闲也不在忙（desc 里既没有「立即同步」也没有「正在同步…」）—— 主屏与设置面「同步与隐私」那一组两棵树上、滚到为止都没见到"
   return 1
 }
 
