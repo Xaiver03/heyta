@@ -4669,3 +4669,23 @@ for n in verify-inbound-ac-ticks verify-inbound-ac8-matrix verify-inbound-produc
 
 ⚠️ 一处自己差点糊过去的：**"逐道同码 111"这句话我第一次算错了对照件** —— 我先按"上一趟 = `4e0215f6`"写，
 `head -2 check-current.out` 打出 `HEAD=0fe3d16b` 才发现那份逐道日志出自更远一枚 tip。落笔前把对照件的自报 HEAD 读了一遍才改准。
+
+## 2026-10-15 14:1x · B171 那格"补一行就转绿"我也去证了一遍，顺带量到一件全仓没人写下来的事
+
+上一段给负责人的"要拍的"里，修法是**推断**（把它补进 `test:integration:postgres` 那串就转绿）。
+按"递给决策者的修法承诺要回一次实验"，我在**本线私有的隔离载体**上做了一次可回退变异（`.run-logs/b171-naming-experiment.sh`，带 `trap` 还原）：
+
+- 改前 `node scripts/check-integration-coverage.mjs` ⇒ `rc=1`，正文逐字点名本线那枚 `inbound-dual-host-fault-windows.integration.spec.ts`；
+- 变异 = 新增一行独立 key（**不改那串 postgres 列表**）：`"test:integration:inbound-dual-host": "vitest run tests/integration/inbound-dual-host-fault-windows.integration.spec.ts"`
+  ⇒ `JSON_VALID=yes`、行数 89→90、**`rc=0`**「盘上 35 个，全部被三条 `test:integration*` 点名」；
+- 对照臂：`check-gate-wiring` 改前后同为 `rc=1`，且"没有任何 package.json 定义引用它"命中数 **3 → 3** ⇒ 这行新增定义不招新红；
+- 还原：`RESTORED_HASH` 与 `PRE_HASH` 逐字相同（`694ea31f…`）、该文件 `git status` 干净、`CARRIER_DIRTY=0`、`.mut-bak` 已删。
+  **本线没有代改** `server/package.json`（不在白名单），这一趟只证形状。
+
+🔴 顺带量到、且仓库里从没写下来的一件：**点名 ≠ 有人调用**。`grep -rn "test:integration" .github scripts` 只命中门禁实现自己；
+`.github/workflows/ci.yml` 跑的是 `pnpm check`(:101) 与 `pnpm test`(:104) —— **没有任何地方调用 `test:integration*`**。
+⇒ 所以那一行补上去只消第 51 道的红，**不会**把"13 个窗口的真库证据"变成每天有人在跑；要变成事实还得配一个调用方（CI 层，同样在地界外，且本仓 CI 当前因流量额度暂停）。
+⇒ 交给负责人的是**两子**，不是一子：甲=新 key（取证支持）、乙=调用方（未证、且不属于本线）。
+
+⚠️ 上一节还留了一条：那 5 枚 `scripts/verify-mobile-*.sh` 里我只变异过"点名"这一枚问题上的形状，
+**没有**去验设备腿那条线自己的判据 —— 那不是本线的事，也不许我代改。

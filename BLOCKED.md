@@ -9384,6 +9384,36 @@ T3 那些 `Windows: 13/13` 读数就是这么取的。
 补它不会引入新依赖、不改任何断言内容，只是让已有的 13 窗口进集成通道。
 ⚠️ **不要**按门里那句反面提示把它塞进 `pnpm -r test`（那些用例要真实 PostgreSQL，默认通道跑不了）。
 
+### B171 追记（2026-10-15 14:1x @`c8c3cb8d`）：形状我证过了，但**这句"要拍的"里有一处该改，还有一处全仓没人知道**
+
+上一段把"修法"写成推断（补进 `test:integration:postgres` 那串就转绿）。按"递给决策者的修法承诺要回一次可回退实验"这条，
+我在**本线私有的隔离载体** `.worktrees/inb-t9` 上做完了这一趟（脚本 `.run-logs/b171-naming-experiment.sh`，带 `trap` 还原）：
+
+```
+PRE_HASH=694ea31f45f38ebfe676c1259170e252f45250d2   ANCHOR_HITS=1
+改前  node scripts/check-integration-coverage.mjs  rc=1  ⇒「盘上有、没有脚本点名（1 个，它们从建立起一次都不会跑）：inbound-dual-host-fault-windows.integration.spec.ts」
+变异  在 test:integration:postgres 之后新增一行（不是改那串）：
+      "test:integration:inbound-dual-host": "vitest run tests/integration/inbound-dual-host-fault-windows.integration.spec.ts"
+      JSON_VALID=yes  LINE_DELTA=89 → 90
+改后  check-integration-coverage rc=0  ⇒「盘上 35 个，全部被 test:integration:postgres / test:integration:inbound-dual-host / test:integration:email-live 点名」
+对照  check-gate-wiring 改前后同为 rc=1，且「没有任何 package.json 定义引用它」命中数 3 → 3 ⇒ 这行新增定义**不会再招一条红**
+还原  RESTORED_HASH=694ea31f…（与 PRE 同）· git status 对该文件干净 · CARRIER_DIRTY=0 · .mut-bak 已删
+```
+
+**⇒ 该改的那处**：别把文件名补进 `test:integration:postgres` 那串。那条脚本带 `--config vitest.integration.config.ts` 且和 31 枚 PostgreSQL 用例同串，
+而本线这 13 个窗口是 **两个独立真实 SQLite 宿主**，不需要 PostgreSQL。塞进那一串的后果是：本线的故障窗口证据，
+从此**只在 PostgreSQL 被备好时才跑得动**。门自己也允许另一种形状（"另开一条 `test:integration:<名字>` 也算点名"），
+上面证的就是那一枚 —— 一条独立 key、与手工跑过的那条命令逐字同形（`cd server && npx vitest run tests/integration/…`）。
+
+**🔴 全仓没人知道的那处**：点名**不等于有人调用**。现量 —— `grep -rn "test:integration" .github scripts` 只命中门禁实现自己，
+`.github/workflows/ci.yml` 里跑的是 `pnpm check`（:101）与 `pnpm test`（:104），**没有任何一处调用 `test:integration*`**。
+所以那一行补上去之后：第 51 道会转绿（已证），但这条通道仍然只在**人手动跑**时被跑。
+"有没有运行通道"这句话，在这个仓库当前的形状下其实是**门禁自己的一个前提**，不是被 CI 执行的事实。
+⇒ 要拍的不是一子而是两子：**（甲）** 新增那枚 key（本线取证支持它转绿、且不招新红）；
+**（乙）** 要不要给它配一个调用方（CI job 或既有的 SSH 构建通道）—— 那是 CI 层与别人地界，且本仓 CI 目前因流量额度暂停（另条线在册）。
+**（乙）不做，（甲）单独落地也不会让这 13 个窗口变成"每天都有人跑"。** 本线两样都不代改：`server/package.json` 不在白名单，
+`.github/workflows/*` 更不在。
+
 ## B172（2026-10-12 00:5x，本会话 · T7 全链第一腿）：**第 21/23 两道门点名本线那枚面板文件，但那几行不是本线写的，而两处修法一个落在判卷口径、一个属顺手活**
 
 现量（隔离载体 `1a8de6fd` 全链，`021.log` / `023.log`）：
