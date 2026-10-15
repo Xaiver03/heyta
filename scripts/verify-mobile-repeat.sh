@@ -291,7 +291,7 @@ if ensure_phone_sync; then
   T=$(wait_synced 180)
   if [ -n "$T" ]; then ok "首次同步成功（耗时约 $T 秒）"; else bad "首次同步未完成"; fi
 else
-  bad "找不到「立即同步」按钮"
+  bad "没能发起同步 —— 具体是主屏还是设置面「同步与隐私」那一组没见到按钮，看上一行 `ensure_phone_sync` 自己打的那一条"
 fi
 
 step "4. 笔记本建一个**有截止日**的任务并同步（跨设备的起点）"
@@ -327,7 +327,7 @@ if ensure_phone_sync; then
   T=$(wait_synced 180)
   if [ -n "$T" ]; then ok "手机同步完成（约 $T 秒）"; else bad "手机同步未完成"; fi
 else
-  bad "找不到「立即同步」按钮"
+  bad "没能发起同步 —— 具体是主屏还是设置面「同步与隐私」那一组没见到按钮，看上一行 `ensure_phone_sync` 自己打的那一条"
 fi
 
 step "6. 任务页出现该任务，且**还没有**重复标记（反向基线）"
@@ -480,7 +480,7 @@ if ensure_phone_sync; then
   T=$(wait_synced 180)
   if [ -n "$T" ]; then ok "手机同步完成（约 $T 秒）"; else bad "手机同步未完成"; fi
 else
-  bad "找不到「立即同步」按钮"
+  bad "没能发起同步 —— 具体是主屏还是设置面「同步与隐私」那一组没见到按钮，看上一行 `ensure_phone_sync` 自己打的那一条"
 fi
 # 🔴 先下载再读。少了这一步，下面两条断言读的是笔记本**同步前**的旧状态。
 if laptop_pull; then ok "笔记本已下载（读到手机上传的变更）"; else bad "笔记本下载失败"; fi
@@ -542,7 +542,7 @@ if ensure_phone_sync; then
   T=$(wait_synced 180)
   if [ -n "$T" ]; then ok "手机同步完成（约 $T 秒）"; else bad "手机同步未完成"; fi
 else
-  bad "找不到「立即同步」按钮"
+  bad "没能发起同步 —— 具体是主屏还是设置面「同步与隐私」那一组没见到按钮，看上一行 `ensure_phone_sync` 自己打的那一条"
 fi
 if laptop_pull; then ok "笔记本已下载（读到手机推进后的到期日）"; else bad "笔记本下载失败"; fi
 L_DUE=$(laptop_field "$TASK_ID" dueDate)
@@ -592,7 +592,7 @@ if ensure_phone_sync; then
   T=$(wait_synced 180)
   if [ -n "$T" ]; then ok "手机同步完成（约 $T 秒）"; else bad "手机同步未完成"; fi
 else
-  bad "找不到「立即同步」按钮"
+  bad "没能发起同步 —— 具体是主屏还是设置面「同步与隐私」那一组没见到按钮，看上一行 `ensure_phone_sync` 自己打的那一条"
 fi
 phone_db_pull
 GOT_DUE2=$(phone_field "$PHONE_DB" "$TASK_ID" dueDate)

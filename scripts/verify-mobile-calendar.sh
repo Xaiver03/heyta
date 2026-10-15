@@ -226,7 +226,7 @@ if ensure_phone_sync; then
   T=$(wait_synced 180)
   if [ -n "$T" ]; then ok "首次同步成功（耗时约 $T 秒）"; else bad "首次同步未完成"; fi
 else
-  bad "找不到「立即同步」按钮"
+  bad "没能发起同步 —— 具体是主屏还是设置面「同步与隐私」那一组没见到按钮，看上一行 `ensure_phone_sync` 自己打的那一条"
 fi
 
 step "4. 🔴 笔记本建一个**有截止时间**的任务并同步（跨设备的起点）"
@@ -259,7 +259,7 @@ if ensure_phone_sync; then
   T=$(wait_synced 180)
   if [ -n "$T" ]; then ok "手机同步完成（约 $T 秒）"; else bad "手机同步未完成"; fi
 else
-  bad "找不到「立即同步」按钮"
+  bad "没能发起同步 —— 具体是主屏还是设置面「同步与隐私」那一组没见到按钮，看上一行 `ensure_phone_sync` 自己打的那一条"
 fi
 
 step "6. 日历渲染：月份标题必须与独立算出的日历一致"
