@@ -140,6 +140,30 @@ df -h /System/Volumes/Data                              # 要不要新开一棵�
 新文件先 `git add`，提交后 `git show --name-only` 复验；不 push。文档门：`pnpm check:docs`、`check:md-tables`、
 `check:doc-citations`、`check:docs-voice`、`node research/tools/docs-link-check.mjs`。
 
+**5) ✅ 那扇窗已经关掉、三件读数已经入库（10-16 01:2x，`RESULT=OK rig_rc=0`）**：
+`apps/web/evidence/sync-privacy-leg-1016-r113-note-sample/`（`wait-and-run.sh` + `waiter.txt` + `report.json` + 42 枚图都在这一格里）。
+读法留给下一位用别的窗时照抄：`grep -E 'GO try|NO_GO|RIG_RC|RESULT=' <那枚目录>/waiter.txt`
+⇒ 有 `GO` 且有 `RESULT=ran` ⇒ 同一落点里应当长出 `report.json`；只有 `NO_GO` 或 `RESULT=window-closed-without-run`
+⇒ **照实登记"没跑"**，不许折进"这一族没红"。🔴 窗**不许住 `/tmp`**（陷阱里"重启清走载体"那条本轮自己踩过），日志与落点都写进库里。
+- 起跑条件两条：`load1 < 12` **且** 自动化浏览器进程 = 0；上限 60 × 30 秒。
+  🔴 `load1` 取法是 `sysctl -n vm.loadavg | tr -d '{}'`，**删除集里不许带空格**（带了会把三个数粘成一枚 ⇒ `NaN < 12` 恒假 ⇒ 结构上永远等不到，见环境陷阱里 06:43 那一格）。
+  本轮实际拦路的是**别的项目的无头批**（`pgrep` 命中 `screenshot-software-copyright` 那一族，不属于本线、本线不动它），14 枚 `NO_GO` 之后自己降下来。
+- 三件读数与射程在台账「2026-10-16 01:2x」那一格（页眉两枚判据 / 配对尺反臂 / `carrier.themeRulerSampled` 的第二个值，
+  外加 `noteFacts.clientRectCount` 恒为 1 那条**改名后仍然会骗人**的形状）。
+  🔴 那一趟 `legs=[sync,reminders]` ⇒ **不是整族读数**，`notJudged` 里那 14 枚是 data/groups/help 三档，别读成"这些判据坏了"。
+
+**6) ⏳ 台账 912 那行的后半句「其它模板填入非空真实数据」正在这台模拟器上做**（承接上面第 21 格）：
+r112 那四枚是**空态**（`0/0`／「今天没有任务」），这一趟要走**应用自己的界面**造出真数据（任务 + 习惯 + 专注），
+让四枚卡各自渲染非空内容态，再逐枚取亮/暗两档。
+- 🔴 只许走 UI 造数据：快照是 `materializedState(host) + currentFocusState()` 经 `planWidgetPublish` 算出、
+  由应用侧密封（`apps/mobile/src/widgets/publish-source.ts`、`apps/mobile/src/widgets/publish.ts`）。
+  往 app 存储里手写文件会绕开整条管线，那种图不能叫"装机态非空数据"。
+- 现成的手（别重推导）：`scripts/qa/tasks-ux-android.py` 已经有 `create_task(title)`、`task_quadrant(...)`、
+  `scroll_find`、`tap_label` 这套 uiautomator 定位；绑定/取图/收掉那一段在
+  `apps/mobile/evidence/ux-final-20261015/android-widget-pair-r112/widget-theme-matrix.py`。
+- 动手前必查两条：`adb devices -l`（这枚模拟器有没有别的会话在用）与 `dumpsys package com.heyta` 的 `lastUpdateTime`
+  —— r112 证的包是 10-15 13:39 那枚，本机 `app-release.apk` 比它旧，**别拿旧 APK 静默测非当前产物**。
+
 ---
 
 ## 六、死过的手（本轮实测，别再试一遍）

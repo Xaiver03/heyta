@@ -4047,3 +4047,50 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
 `.run-logs/ac-reeval.sh` 那枚未跟踪文件，归属照旧不代改）；`check:mobile-first-run-gate` **RC=0**（这条腿在它的分母里）；
 `check:script-snapshot` **RC=0**。这条改动**没有**跑真设备腿 —— 它改的是消息行的展开形状，
 `bash -n` + 上面那张三档对照表就是它的证据；腿本身下一次真跑会顺带经过这些行。
+
+### 2026-10-16 01:2x：那三件浏览器读数在**当前这一版装置**上重取完了 —— 不是"以前没拿过"，是拿过的那两版已经不是现在这版
+
+交接文件 §五第 5 步留的那扇窗（`apps/web/evidence/sync-privacy-leg-1016-r113-note-sample/wait-and-run.sh`，
+**日志与落点都在库里**，不住 `/tmp`）在 `GO try=15 load1=6.76 auto=0`（01:17:13）起跑，
+`RESULT=OK rig_rc=0 port_released=yes evidence=45 枚`（01:21:09 收尾）。
+前面 14 枚 `NO_GO` 全是 `busy=7` 拦的 —— 现量那 7 枚是**别的项目**的无头批
+（`pgrep` 命中 `litopia12/scripts/screenshot-software-copyright.cjs` 那一族的 chrome-headless-shell），不是本线的进程，本线不动它；
+`load1` 一路从 15.63 自己降到 6.76。⇒ 这一格是"等得到"的那一种，和 06:43 那格"探针自己坏的假红"不是一回事。
+⚠️ 顺手一条**落点命名**的坑：窗的日志原先叫 `waiter.log`，而 `.gitignore:49` 是整族 `*.log` ⇒
+它**根本进不了库**，"日志与落点都在库里"这句话当时只成立了一半。已改名 `waiter.txt`（脚本里 `LOG=` 那行同步改掉）。
+⇒ 以后凡是"下一位要能读到"的窗日志，落点一律用 `.txt`，别指望 `git add -f`。
+
+**为什么要重取**（这条别说糊）：那三件读数 10-10 就取到过（07:09 的 r58、08:33 的 r59），
+但它们各自钉的是 `rigSha256Prefix=00b62047ff93` / `b54c773c17a2` 两版装置，而 #38 换牙与
+`noteFacts.lineRects` 改名**都发生在之后** —— 现量 `shasum -a 256 scripts/qa/reminders-data-responsive.mjs | cut -c1-12` = `122e283f37a6`。
+这一趟报告里的 `carrier.tree` 逐字对得上：`headSha=e2160c44…`、`rigSha256Prefix=122e283f37a6`、
+`rigWorktreeMatchesHead=true`、`dirtyFiles{apps/web/src:0, packages/ui/src:0}`、`legs=[sync,reminders]`、
+`legCells={reminders:30, sync:3}`。
+
+**三件读数**：
+
+| 欠的那格 | 这一趟的读数 |
+|---|---|
+| ① 两枚页眉判据在当前装置上 | `syncPrivacyHeaderNoteInsideViewport=true`、`syncPrivacyHeaderNoteBadArmFlipsIt=true`；逐格 `noteFacts`：`found/visible` 三格全 true、`rightBeyondViewport` 三格全 false、`scrollWidth === clientWidth`（623/623、623/623、311/311）、`clientRectCount` 三格都是 **1**（🔴 这就是改名后那枚字段：块级 `<p>` 上它**恒为 1**，它是"边框盒数"不是折行数，谁再把它当折行数读就会上当） |
+| ② 配对尺的反臂（有样本时两枚深浅档判据回到 judged） | `darkTierReachesBothThemeLayers=true`、`themeLayerRulerSwitchesWithTier=true`，两枚**都不在** `notJudged` 里 ⇒ 04:32 那笔"零样本标未判"不是永久缴械 |
+| ③ `carrier.themeRulerSampled` 的第二个值 | `true`，且 `themeRulerMeasuredCells=30`、`themeRulerSampleCells=30`（提醒腿 30 格**每一格**都取到了共享层样本） |
+
+顺带把 #38 那枚换好的牙又量了一遍形状：三格 `tookEffect=true`、`plantedWhiteSpace=nowrap`、
+`boxWidthMaxContent` 三格都是 **470**、`boxWidthNatural` = 623 / 623 / **311** ⇒ `plantedClipped` = false / false / **true**。
+也就是"1440 那两格种 `nowrap` 不会溢出"这件事在**新牙**下是**被承认的**（牙改成了"生效 + 至少一格真溢出"），
+不再是上一版那种恒假。
+
+**人眼看过（AGENTS §6.2 规定一）**：`sync-privacy-1-accepted-light-375.png`（页眉那句
+「这项选择只控制本机是否允许 heyta 与服务器通信，不会删除或改变本地数据。」在 311px 盒子里**折成两行、右缘不出面板**，
+底下「已同意与服务器通信 / 决定于 2026-10-15 17:21（UTC）」完整；顶部目录条被横向滚掉半截是那条滚动条自己的常态，
+底部六枚 tab 里「对话…」是**带省略号的合法截断**，不是溢出）与
+`sync-privacy-1-accepted-dark-1440.png`（整页暗档：标题、两枚卡片、页眉说明单行完整、「撤回同意」在位，
+左 rail 六枚图标齐全）两张都打开看过。
+
+🔴 **射程（三条，别让读数读多）**：① 这一趟 `legs=[sync,reminders]`，`skippedLegs=[data,groups,help]`，
+所以报告里 `notJudged` 有 14 枚（`dataRefusalCardsCaptured`、`everyCaseCoversEverySweepGroup` 那一族）——
+**它不是整族读数**，整族那格仍指 10-10 的 r46/r35 系；② 页眉那枚量是四态走完后每格一次，
+不守 `2-undecided` 那张图里的那一瞬（"过渡帧"那一档照旧）；③ `screenshotAnchorResolvableInRepo=false` /
+`evidenceDirTrackedFiles=0` 是**写报告那一刻**的自述（那批图当时还没入库），随本笔提交一起消失，
+别拿它当"锚点坏了"。上面 10-10 那两格（07:09 / 08:33）的读数**没有被作废**，
+但引用"当前装置上的这三件"时请指这一格。

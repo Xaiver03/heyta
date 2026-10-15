@@ -1,0 +1,93 @@
+waiter start 2026-10-16 01:10:12 pid=6089
+NO_GO try=1 load1=15.63 busy=7 01:10:12
+NO_GO try=2 load1=13.34 busy=7 01:10:43
+NO_GO try=3 load1=11.65 busy=7 01:11:13
+NO_GO try=4 load1=10.11 busy=7 01:11:43
+NO_GO try=5 load1=9.73 busy=7 01:12:13
+NO_GO try=6 load1=9.65 busy=7 01:12:43
+NO_GO try=7 load1=9.41 busy=7 01:13:13
+NO_GO try=8 load1=9.27 busy=7 01:13:43
+NO_GO try=9 load1=8.73 busy=7 01:14:13
+NO_GO try=10 load1=8.10 busy=7 01:14:43
+NO_GO try=11 load1=7.20 busy=7 01:15:13
+NO_GO try=12 load1=8.26 busy=7 01:15:43
+NO_GO try=13 load1=7.85 busy=7 01:16:13
+NO_GO try=14 load1=8.32 busy=7 01:16:43
+GO try=15 load1=6.76 auto=0 01:17:13
+{
+  "legs": [
+    "sync",
+    "reminders"
+  ],
+  "skippedLegs": [
+    "data",
+    "groups",
+    "help"
+  ],
+  "assertions": {
+    "everySelectedLegProducedItsCells": true,
+    "unselectedLegsReportEmpty": true,
+    "noHorizontalOverflow": true,
+    "allPermissionStatesRendered": true,
+    "dataFailurePreserved": true,
+    "dataRefusalCardsCaptured": false,
+    "existingDataRefusedWithoutLoss": true,
+    "cancelPreserved": true,
+    "everyCaseCoversEverySelectedMode": true,
+    "reminderPermissionProvenanceIsLabeled": true,
+    "darkTierReachesBothThemeLayers": true,
+    "themeLayerRulerSwitchesWithTier": true,
+    "plantedThemeSampleTookEffect": true,
+    "themeRulerScopesAllMatched": true,
+    "everyCaseCoversEverySweepGroup": false,
+    "groupSweepThemeApplied": true,
+    "groupSweepTitleMatchesNav": true,
+    "groupSweepActionable": true,
+    "groupSweepNoHorizontalOverflow": true,
+    "groupSweepNothingPushedOffViewport": true,
+    "groupSweepOffViewportRulerHasTeeth": true,
+    "helpWrapFourRowsMeasured": true,
+    "helpWrapInjectionTookEffect": true,
+    "helpLongTitleWraps": true,
+    "helpLongTitleStaysInContentColumn": true,
+    "helpLongTitleRowInsideViewport": true,
+    "helpLongTitleNoHorizontalOverflow": true,
+    "helpLongTitleBadArmsFlipTheJudgment": true,
+    "syncPrivacyThreeStatesReached": true,
+    "syncPrivacyPanelVisibleAndThemeApplied": true,
+    "syncPrivacyExactlyOneActionPerState": true,
+    "syncPrivacyAcceptedShowsOnlyRevoke": true,
+    "syncPrivacyRevokeReturnsToChooseAgain": true,
+    "syncPrivacyReopenUsesOneAndOnlyOneDialog": true,
+    "syncPrivacyEveryStateSettled": true,
+    "syncPrivacyConsentDialogUnmountedAfterDecide": true,
+    "syncPrivacyDecisionButtonsPointerReachable": true,
+    "syncPrivacyBadArmsFlipTheRuler": true,
+    "syncPrivacyHeaderNoteInsideViewport": true,
+    "syncPrivacyHeaderNoteBadArmFlipsIt": true
+  },
+  "notJudged": [
+    "dataFailurePreserved",
+    "dataRefusalCardsCaptured",
+    "existingDataRefusedWithoutLoss",
+    "cancelPreserved",
+    "everyCaseCoversEverySweepGroup",
+    "groupSweepThemeApplied",
+    "groupSweepTitleMatchesNav",
+    "groupSweepActionable",
+    "groupSweepNoHorizontalOverflow",
+    "groupSweepNothingPushedOffViewport",
+    "groupSweepOffViewportRulerHasTeeth",
+    "helpWrapFourRowsMeasured",
+    "helpWrapInjectionTookEffect",
+    "helpLongTitleWraps",
+    "helpLongTitleStaysInContentColumn",
+    "helpLongTitleRowInsideViewport",
+    "helpLongTitleNoHorizontalOverflow",
+    "helpLongTitleBadArmsFlipTheJudgment"
+  ]
+}
+[入口] vite 退出 code=143（若在装置之后，属正常收尾）
+RESULT=OK rig_rc=0 origin=http://127.0.0.1:60549 port_released=yes evidence=45 枚
+RIG_RC=0 2026-10-16 01:21:09
+RESULT=ran
