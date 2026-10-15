@@ -3687,8 +3687,9 @@ Button `bounds=[42,905][356,1020]`、`clickable=true`、`content-desc="立即同
 而 `scripts/verify-mobile-calendar.sh` 用的是**另一枚常数**（现量 `grep -n 'TAB_PROFILE=' scripts/verify-mobile-calendar.sh` ⇒ `972`），
 `scripts/lib/mobile-e2e.sh` 里那句注释走的是 `945`。两枚都没有出处，谁也不比谁更对。
 #62 那一族修的是 **y** 落进底栏带 `[2169,2337]`，**x** 这一半从来没人量过。
-要裁它得先在设备上 dump 一次那枚节点的 bounds —— 而这一趟重装正在用 `emulator-5554` 做卸旧装新，
-**不在它跑的时候碰 adb**（本账那条"共享载体先看谁在用"）。登记成待办，不写成结论。
+当时没裁它的原因是真的没装置：这一趟重装正在用 `emulator-5554` 做卸旧装新，
+**不在它跑的时候碰 adb**（本账那条"共享载体先看谁在用"）。
+**重装跑完之后量到了**，裁决与它照出来的另一枚在案红在下面的 06:3x 那一格。
 
 **macOS 那条"窗口图不能当 UI 证据"，今夜多了一对同实例、同瞬间的读数**（r110 mac 段，载体 `fd5c2fb1`，
 打包 `.app` 的首跑自截屏 + 安装副本自截屏，两张的像素读数逐字相同）：
@@ -3768,6 +3769,92 @@ Button `bounds=[42,905][356,1020]`、`clickable=true`、`content-desc="立即同
 ⚠️ 这一格**不证**的：改完之后没有再跑一条真设备腿（设备刚被重装用完、`load1` 仍在 100+ 那一档），
 所以"它现在真的会把某条腿判红"是**夹具读数**，不是设备读数。第一次在设备上撞见这条红时，
 先按臂 0 那条教训怀疑量具，再怀疑产品。
+
+### 2026-10-15 06:3x：把「945 vs 972」量到答得动 —— 它顺手照出本线一枚从 10-12 就挂在整链上的红
+
+装置与时机：r110 交完之后 `emulator-5554` 空闲。现量（命令，不是抄数）：
+`adb devices` 只有那一台、`pgrep -fl 'verify-mobile|reinstall-all'` 空、
+`topResumedActivity` 落在 `com.heyta/com.heytamobile.MainActivity`。**满足本账那条"共享载体先看谁在用"。**
+
+**三态各 dump 一次**（`dump /sdcard/ui.xml` 后 `cat`，走 lib 那一形状）：
+
+| 界面状态 | 节点数 | 底部 tab 栏在不在无障碍树里 |
+|---|---|---|
+| 首启隐私同意面板立着 | 34 | **不在**（面板根 `[42,607][1038,1793]`，`desc='以后再说'` 在 `[871,660][987,776]`） |
+| 欢迎页（点掉面板之后） | 15 | **不在**（只有「注册 / 登录」`[42,1216][1038,1331]` 与「先离线使用」`[42,1374][1038,1490]`） |
+| 主界面（点「先离线使用」之后） | 完整 | **在**（见下表） |
+
+底栏五枚 bounds（1080 宽，每枚 216px）：
+
+| tab | bounds | 中心 |
+|---|---|---|
+| 任务 | `[0,2169][216,2337]` | (108,2253) |
+| 日历 | `[216,2169][432,2337]` | (324,2253) |
+| 专注 | `[432,2169][648,2337]` | (540,2253) |
+| 分类 | `[648,2169][864,2337]` | (756,2253) |
+| **我的** | `[864,2169][1080,2337]` | **(972,2253)** |
+
+**裁决 945 vs 972：两枚都不是缺陷。** 972 是「我的」那一枚的几何中心；945 距左沿 81px，
+在同一个节点内（宽 216 ⇒ `[864,1080]` 整段都是它）⇒ 那 21 处写死的点击**全部打中同一枚节点**，
+换常数不改变任何行为。所以**不 bulk-edit 那 9 份脚本**：分母现量
+`grep -rl 'input tap 945 2253' scripts/verify-mobile-*.sh | grep -v '\.snap\.'`，
+其中 `verify-mobile-restore.sh` 是今天另一会话刚动过的（`git log -1 -- …` 现读），
+account/conflict/inbox 等归注册登录与数据管理那两线 —— 一个不改变行为的改动去动别人名下的验收脚本，
+代价是漂移风险而收益是零。
+真要改，改法不是"统一常数"而是"坐标换成 desc 定位"（本线 `open_settings_section` 已经走 desc），
+而 desc 定位的**成立条件**正是下面那条。
+
+**这一族真正的暴露不是 x，而是"tab 栏在两种首启状态下根本不在树里"** —— 任何打底栏坐标的脚本在那两种状态下都是空点。
+但这条**早就有门在守**，不是今夜新发现的缺口：`scripts/check-mobile-first-run-gate.mjs` 文件头原话
+"它立着的时候，**欢迎页与主界面的节点根本不在无障碍树里**"，判据 1 要求凡 `pm clear` 之后靠无障碍树驱动界面的脚本
+必须走到共享处置（`handle_privacy_consent` 或 `dismiss_welcome_if_present`）。
+今夜这三发 dump 是那枚门的存在理由的一次**独立复现**（不同日期、不同机器状态、手工敲的而不是脚本跑的）。
+
+**但它顺手照出一枚真红，而且 offender 是本线自己的脚本。** `NO_COLOR=1 node scripts/check-mobile-first-run-gate.mjs`
+改前 **RC=1**，扫 36 份安卓验收脚本、冷启动驱动界面 30 份，唯一红的是
+`scripts/verify-mobile-organizer-confirm.sh` —— 本线 2026-10-12 `c018ec0e`（待办 #56 那条腿）新建它的时候落下的。
+
+归因**不是"没处置"**：它第 144 行就调了 helper，但写成了内联 env 前缀那一形
+（`CONSENT_GATE_PREFERRED="只用本机" dismiss_welcome_if_present`），而门的 `callsFunction()` 是
+`^\s*${name}\b` 的**行首**匹配 ⇒ 读成"没有任何一处走到共享处置"。
+全仓其余点名本地按钮的 6 份（quadrant-fill / reminder-ring / schedule / sort-sheet / task-row / timeline）
+用的都是"pin 单独一行 + 行首调用"，所以只有这一份漂在外面。
+
+修法只动调用方，**不碰那枚门的判据口径**（它归注册登录标准套件那一线）：
+
+```diff
+-CONSENT_GATE_PREFERRED="只用本机" dismiss_welcome_if_present
++CONSENT_GATE_PREFERRED=只用本机
++dismiss_welcome_if_present
+```
+
+行为等价：这枚变量在本脚本里只被那一行读（改后 `grep -n CONSENT_GATE_PREFERRED` 现量仍只 1 处命中），
+lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时赋值改成脚本级赋值不影响任何后续步骤。
+
+两头有牙（还原只从 `.mut-bak`，sha 逐字对上 `6ff4710a…` 后把 bak 删掉）：
+
+| 臂 | 做了什么 | 期望 | 读数 |
+|---|---|---|---|
+| E | 删掉行首那一次 `dismiss_welcome_if_present` | 判据 1 红且**指名本脚本** | RC=1，第 33 行指名 |
+| F | 把两行还原成旧的内联写法 | 同上 —— 证这枚红确实是**形状**造成而不是别的原因 | RC=1，第 33 行指名 |
+| 终态 | 都不做 | 绿 | RC=0，`✅ scripts/verify-mobile-organizer-confirm.sh  经 dismiss_welcome_if_present` |
+
+同类分母：`grep -rnE '^[[:space:]]*[A-Z_]+=[^ ]+[[:space:]]+(handle_privacy_consent|dismiss_welcome_if_present)\b' --include='*.sh' scripts/ apps/`
+（排 `.snap.`）⇒ **只此一处**，本类已闭合。
+
+⚠️ **这枚红为什么六趟重装都没照出来**：它在 `pnpm check` 那条大链里
+（现量 `grep -n 'check:mobile-first-run-gate' package.json` ⇒ 一处定义在 `scripts:` 段、一处被 `check` 那条大链点名），
+而重装链不含这枚门（现量 `grep -rn 'first-run-gate' scripts/reinstall-all.sh` ⇒ 空）。
+所以"重装跑绿"从来不等价于"`pnpm check` 跑绿" —— 这一格把它记成一条边界，不是记成一条成绩。
+
+**探针副作用，照实记**：这三发 dump 里有两发是**写动作**，落在 `emulator-5554` 上 ——
+点了「以后再说」把同意面板收掉、点了「先离线使用」进了主界面。**没有 `pm clear`**，
+没有建/删任何用户数据。下一趟设备腿本来就是"清数据再冷启动"的形状（`handle_privacy_consent` 会先探面板在不在），
+所以不需要复位；但**如果某一趟不 `pm clear`，它读到的是"同意面板已经答过"的机器**，
+别把那种状态读成首跑 —— 本账「共享设备证据」那一格记过外来 `pm clear`，同一个方向的反向误读。
+
+这一格**不证**的：没在这台设备上重跑 organizer-confirm 那条腿（它自己的真机读数在 #56 那一格），
+改的是静态调用形状 ⇒ 门的 RC 变化是直接读数，设备行为没有任何新读数。
 
 
 
