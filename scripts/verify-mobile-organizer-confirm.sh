@@ -141,7 +141,8 @@ sleep 6
 # 🔴 走共享库那一条路径，不在这里抄一份"点同意卡"的代码：库里那段注释记着
 #    五枚脚本各抄一份、各自等的时长与点的按钮不一样，第六个要用的脚本没抄到就整轮假红。
 #    「只用本机」是**本脚本**的选择（三条判据全是本地行为），所以只换首选按钮，不换流程。
-CONSENT_GATE_PREFERRED="只用本机" dismiss_welcome_if_present
+CONSENT_GATE_PREFERRED=只用本机
+dismiss_welcome_if_present
 sleep 3
 dump; require_screen
 if [ "$(has_desc '我的')" = "1" ]; then
