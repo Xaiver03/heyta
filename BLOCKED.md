@@ -11034,6 +11034,11 @@ error: unknown command 'test'
 把 051 那枚 spec 加进 `server/package.json` 的 `test:integration` → 粘 B173 那句进 `REVIEWED_ANONYMOUS_GET`。
 **后四步的落点全在本线白名单外** ⇒ 只登记不代改；前一步（改我这枚 pin）单独做会让 lockfile 与包清单不一致，所以不自作。
 
+⇒ 051 那枚**没有白名单内的替代修法**，这一趟查过才敢这么说：`grep -n 'test:integration' server/package.json` 只回两条
+（`:postgres`、`:email-live`），两条都是**逐个文件点名的显式列表**，没有一条用通配或目录参数 ⇒ 把 spec 改名或挪到别的目录都进不了点名面；
+而把它挪出 `server/tests/integration/` 只是让门禁的分母**看不见**它，红是没了、缺口还在原地，那等于绕判卷口径（本线不许，同 B202 一条病根）。
+所以这一枚只能等点头，没有"我自己先凑一个"的版本。
+
 ⚠️ 另 14 枚别线红（006 reachability 的 `COMMENT` 零写路径、020-023 那四道 UI 门、054、065、090、100、102、106、109、110、111）
 逐枚原文都留在 `.worktrees/inb-t9/.run-logs/b196-seglogs/`（载具本地、`.gitignore:256` 排除，**当日原件指针**，同 B 里那句载体口径）；
 其中 `110 check:e2e-carrier` 值得单独说一句：它的**自检 13 臂里臂 11 断**（4 处抄了字面量：`e2e/playwright.habit-final.config.ts:14`、
