@@ -1,0 +1,37 @@
+════ 移动端 E2E 栈 ════
+   ✅ 服务端已启动（pid 75113）：{"status":"ok","db":"connected","wsConnections":0}
+   ✅ 全新账号：mobile-e2e-1791966285@example.com（令牌 279 字符）
+   ✅ 账号 client 数 0 < 20（向量时钟不会被裁剪）
+
+   ✅ 栈就绪。下一步：
+      bash scripts/verify-mobile-conflict.sh
+   ✅ 全新账号：mobile-e2e-1791966285@example.com（令牌 279 字符）
+
+════ 负载门 ════
+   内存门：free 71%（阈值 10%）· 可回收 23687.0MB / 共 65536MB · 宿主 kill 线 LIMIT_MB=〈读不到〉 ⇒ 过
+   负载 load1=8（原始 8.71） ≤ 12，内存门也过 ⇒ 开始
+   服务端就绪：http://127.0.0.1:3111
+
+=== 移动端习惯屏装机验收（零 mock）===
+  设备: emulator-5554   服务端: http://10.0.2.2:3111   账号: mobile-e2e-1791966285@example.com
+     （没记到开局安装身份，跳过并发检测）
+
+════ 1. 装包并启动（① 装的是这一批源码） ════
+   APK 2026-10-14 16:23:47 / 最新源码 2026-10-14 01:18:50
+   （扫的是 /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta 下：现推：apps/mobile/src packages/ai/src packages/app-host/src packages/design-system/src packages/domain/src packages/i18n/src packages/legal/src packages/local-api/src packages/op-log/src packages/storage/src packages/sync-client/src packages/sync-core/src packages/ui/src packages/widget-core/src）
+   ✅ 装的是当前源码的产物
+   ✅ 全新安装：Success
+     开局安装身份：[lastUpdateTime=2026-10-14 16:24:46 firstInstallTime=2026-10-14 16:24:46 ]
+     已处理隐私同意面板（点「同意并联网」@ 312 1684）
+     已离开欢迎页（点「先离线使用」@ 540 1432）
+
+════ 2. 配置同步凭据并首次同步 ════
+   ✅ 已填 服务器地址
+   ✅ 已填 访问令牌
+   ✅ 已填 端到端加密口令（安全字段，dump 看不到内容；由首次同步成功来证明）
+   ✅ 三个凭据字段同时都在（没有被后一步清掉）
+   ✅ 界面认为已配置
+   ❌ 找不到「立即同步」按钮 —— 凭据面板没走完，不是同步慢
+LEG_RC=1
+   ✅ 服务端已停止（pid 75113）
+LEG_RC=1
