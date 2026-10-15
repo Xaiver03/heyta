@@ -9876,7 +9876,13 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
        然后 `HEYTA_E2E_DB=<私有库> PORT=<私有端口> bash scripts/mobile-e2e-up.sh` 才会出
        `✅ 全新账号` + `✅ 账号 client 数 0 < 20`。
 436. 🔴 **Windows 装机取证图是窗口的「左上角裁切」，不是窗口 —— 因为抓取进程没声明 DPI 感知。**
-    打包机是 125% 缩放。`apps/desktop-windows/scripts/install-and-capture.ps1` 与
+    打包机与这台开发机之间，"带 DPI 声明 / 不带"两条抓取路径差一个 **1.25** 的因子
+    （同一个窗口：不带声明记 `1152x587`，带声明记 `1440x734`）。
+    ⚠️ **别把这句读成"系统缩放 125%"** —— 那是本条落地当天先写下的归因，随后被
+    `r111` 那趟的现量否证：声明成功之后（`DPI_CTX=True`）`GetDpiForWindow` 报的是 **96**。
+    因子可复现、修法有效，但**机制归属未量清**（要那台机器在线才能读 `AppliedDpi`，
+    现量 `ssh windows-pc` 当时已报 `Host is down`）。
+    `apps/desktop-windows/scripts/install-and-capture.ps1` 与
     `capture-window.ps1` 用 `GetWindowRect` + `Graphics.CopyFromScreen` 抓屏，而 PowerShell
     进程跑在**虚拟化坐标**里：两个调用互相自洽（都按 1/1.25 报数），于是 `WINDOW_RECT=1152x587`
     与那张 1152×587 的 png 都只覆盖真实窗口（1440×734）的左上角 —— **右边 288 物理 px（=230 CSS px）
@@ -9893,6 +9899,8 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     `SetProcessDpiAwarenessContext(-4)`（PER_MONITOR_AWARE_V2），失败退 `SetProcessDPIAware()`；
     并各新增一行 `WINDOW_DPI=<n> DPI_CTX=<True|False>` 读数 —— 下一张图自己说清是不是全窗口。
     ⚠️ 这条改动的**第一验点在 Windows 上**：本机没有 pwsh，脚本语法与行为都没跑过；
-    判据是 `WINDOW_DPI=120`（125%）且 png 宽 == 真窗口宽。别把"脚本改了"读成"图修好了"。
+    ✅ 已验（2026-10-15 r111，只跑 windows 那一端）：`WINDOW_DPI=96 DPI_CTX=True`、
+    `WINDOW_RECT=1440x734` 且 png 实测 **(1440, 734)** —— 判据"png 宽 == 窗口矩形宽"成立。
+    读数与跑法在 `apps/web/evidence/ux-final-20261015/reinstall-r111/`。
     🔴 推论（读旧图时都要带着）：**常规路径抓过的每一张 windows 装机图都少了右边约 20%**，
     按它们判过"右侧有没有被截"的格子要重看。
