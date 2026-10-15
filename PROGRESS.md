@@ -5241,3 +5241,5 @@ AC 已勾数仍为 **0**（`verify-inbound-ac-ticks.py`：`AC 行=8　已勾=0�
 没变的：B200 那格仍挂着（装置被本机内存闸门挡时落 rc=1 + `Windows: 0/13`，与"13 格真没跑"同形——要不要把它归 rc=2 是验收脚本的判卷口径，不代改）；本趟这一戳是 rc=0/13 13，正好给那把尺补了一次"真跑通长什么样"的对照。
 
 原件指针（载具本地、`.gitignore` 排除，不入库）：`.worktrees/inb-t9/.run-logs/dual-host-20261016.log`（服务端日志 755 行）／`.out`／`-selftest.out`／`-header.txt`（起数那行写了载体、HEAD、脏枚数、dist 落后计数）。
+
+补两行（同戳 02:2x）：AC-2 那枚 `inbound-core` 全量与 AC-3 那枚 sync-client 授权接缝也在载具上复跑了一遍，`47 passed (47)`、rc=0 与 `6 passed (6)`、rc=0，逐字等于旧戳 ⇒ 这两格里没有一处还挂着五天前的读数。反向臂也顺手重跑了一枚：`python3 research/tools/verify-inbound-queue-teeth.py` rc=0、`臂数=6　不成立=0`、`末次 sha256=52c3fd707977a03e` 仍等于开局那枚（同一台机、同一天里第二次取到相同末次哈希）。
