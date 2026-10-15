@@ -70,6 +70,12 @@ NO_COLOR=1 HEYTA_REINSTALL_TMP_DIR="$RT" IOS_DEVICE_NAME=heyta-iphone-17pro \
 ⚠️ `HEYTA_REINSTALL_TMP_DIR` **必须先 `mkdir`**（不给目录它会 `RC=4`），且路径**不许含空格**。
 载体那一棵是本次用完的 `../heyta-wt-r110`（`git worktree list` 现量），要新开一棵照台账那几格的步骤。
 
+**那棵载体现在的状态**（写给要收磁盘的人）：`du -sh` 现量 **2.3G**，`git status --porcelain` 只剩
+`apps/mobile/ios/Podfile.lock` 那一行 ` M`（`pod install` 造的，见 `carrier-state.txt`），
+`dist/windows/` 里还留着本次取回的 `heyta.msix`（≈99 MB）与首跑图。
+本机数据卷 `df -h /System/Volumes/Data` 现量 78Gi 可用 ⇒ **本线不删它**（留着复跑与查物）；
+要收磁盘的人：`git worktree remove --force "../heyta-wt-r110"` 一条即可，删了不影响本页任何读数。
+
 ## 包内名册（每一枚都在这一页里点名，别留"页在、件不在库"的那一格）
 
 > ⚠️ 为什么这些日志叫 `*.log.txt` 而不是 `*.log`：仓库根 `.gitignore` 里 `*.log` 是**测试与构建产物**那一档，
