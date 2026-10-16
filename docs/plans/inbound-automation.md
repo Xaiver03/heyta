@@ -2071,6 +2071,17 @@ packages/app-host typecheck: tests/login-code.spec.ts(44,5): error TS2578: Unuse
 `git -C .worktrees/inb-t9 status --porcelain` 的**非 png 条目数现量 = 0**（14:36 量；那 15 条脏目逐枚都是
 `*/evidence/*.png` 截图，没有一枚是源码）。
 
+🔴 **10-16 14:41 在同一节里抓到第二枚"关于工具属性"的句子：那枚产物尺的臂数。**
+上面那张表给 `verify-inbound-cjs-require-order.py` 记的臂数是 **8**，小节标题也叫「**八臂**产物级尺」。现量（载具 `f7712df7`）：
+**主跑根本不印臂数** —— 对它那趟落盘输出 `grep -c 臂数` = **0**，它只印 `读数　CJS 包=1　在册 .ts=119　有产物=119　无产物(未编译)=0　扫过的产物=119　命中=0`
+与结论行；而 `--self-test` 在 14:41:41 回 **`臂数=10　不成立=0`**、rc=0。那两枚加出来的臂来自**本线自己**那笔 `af190b92`（10-12 13:09，
+逐枚现量 `git log --format='%h %ad %s' --date=format:'%m-%d %H:%M' -1 -- research/tools/verify-inbound-cjs-require-order.py`）。
+
+⇒ **这一处的修法不是把 8 改成 10，也不是把标题里的"八臂"改成"十臂"**（那正是本页反复登记的那一族：一句关于工具当前属性的话，改对一次只是把漂移起点往后挪一次）。
+正文只留取法：**`python3 research/tools/verify-inbound-cjs-require-order.py --self-test`** —— 它自报 `臂数=N　不成立=0`，N 每次现读。
+⚠️ 一句边界，别把这条推广过头：表里另外三枚牙臂的 `6 / 8 / 7` 今天**同戳逐字复现**（见上面 14:3x 那节），
+所以本节过期的是**产物尺那一行的臂数**与**还原对账那一句**；标题「三枚变异臂」仍然成立 —— 确实只有三枚臂会临时改写被跟踪源文件。
+
 ### 3. 本批当场查出的一条生产缺陷（属于本线，已修并有尺）
 
 **形状**：`server` 的 tsconfig 是 `"module": "commonjs"`，TypeScript 把每枚 `require` 落在它对应
