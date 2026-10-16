@@ -1566,7 +1566,11 @@ if [ -z "$APP_CONTAINER" ] || [ ! -d "$APP_CONTAINER" ]; then
   exit 3
 fi
 BUNDLE_JS="${APP_CONTAINER}/main.jsbundle"
-JS_MTIME=$(stat -f %m "$BUNDLE_JS" 2>/dev/null || echo 0)
+# 🔴 mtime 一律用 `date -r 文件 +%s` 取（不写 `stat`）：GNU 与 BSD 的 `stat` 把同一个 `-f`
+#    读成两件不同的事（GNU 那侧 stdout 吐一整块文件系统统计，§7 第 364 条），而 `date -r`
+#    两侧同形同值（macOS 现量：BSD `date -r` == BSD `stat` 的 `%m` == GNU `date -r`
+#    == GNU `stat` 的 `%Y`）。
+JS_MTIME=$(date -r "$BUNDLE_JS" +%s 2>/dev/null || echo 0)
 if [ "$JS_MTIME" = "0" ]; then
   echo "   ❌ 读不到 ${BUNDLE_JS} 的 mtime（产物形状变了？）⇒ 新鲜度无从判起，本趟不作数。exit 3"
   exit 3
@@ -1583,7 +1587,7 @@ FRESH_VIOL=""
 FRESH_MISS=""
 for _f in "${FRESH_FILES[@]}"; do
   if [ ! -f "$_f" ]; then FRESH_MISS="${FRESH_MISS} $(basename "$_f")"; continue; fi
-  _m=$(stat -f %m "$_f" 2>/dev/null || echo 0)
+  _m=$(date -r "$_f" +%s 2>/dev/null || echo 0)
   if [ "$_m" -gt "$JS_MTIME" ]; then FRESH_VIOL="${FRESH_VIOL} $(basename "$_f")"; fi
 done
 # ② 内容存在性：这三块界面要判的那几句中文，按 UTF-16LE 在 bundle 里数得到。
@@ -1642,7 +1646,7 @@ SRV_PID=$(lsof -ti "tcp:${E2E_PORT}" -sTCP:LISTEN 2>/dev/null | head -1)
 #    这里只做取证打印：pid 对得上就一起打，对不上**不判红** —— 端口上真有一位监听者
 #    就已经满足这一腿的前提，pidfile 只是它"是谁"的额外线索。
 SRV_PIDFILE="${HEYTA_E2E_PIDFILE:-/tmp/heyta-e2e-server.pid}"
-echo "   服务端归属: pid=${SRV_PID:-未识别} pidfile=$(cat "$SRV_PIDFILE" 2>/dev/null || echo 无) HEAD=$(git -C "$HEYTA_REPO_ROOT" rev-parse --short HEAD 2>/dev/null) dist=$(stat -f '%Sm' "$HEYTA_REPO_ROOT/server/dist/src/index.js" 2>/dev/null || echo 缺)"
+echo "   服务端归属: pid=${SRV_PID:-未识别} pidfile=$(cat "$SRV_PIDFILE" 2>/dev/null || echo 无) HEAD=$(git -C "$HEYTA_REPO_ROOT" rev-parse --short HEAD 2>/dev/null) dist=$(date -r "$HEYTA_REPO_ROOT/server/dist/src/index.js" '+%b %e %T %Y' 2>/dev/null || echo 缺)"
 
 if ! resolve_idb; then
   echo "   ❌ 找不到 idb —— iOS 验收要从设备内部驱动界面 ⇒ exit 3"

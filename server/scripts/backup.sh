@@ -134,17 +134,22 @@ if [ "$ENCRYPTED" = "1" ]; then
     echo "    Nothing was written."
     exit 1
   fi
-  KEY_MODE=$(stat -f '%Lp' "$BACKUP_ENCRYPTION_PASSPHRASE_FILE" 2>/dev/null \
-    || stat -c '%a' "$BACKUP_ENCRYPTION_PASSPHRASE_FILE" 2>/dev/null || echo "")
-  if [ -z "$KEY_MODE" ]; then
+  # 🔴 读权限位用 `ls -ld` 的**符号模式**（POSIX 把这 10 列定死了），不读八进制：八进制只有
+  #    一侧的 `stat` 给得出 —— BSD 用 `-f`，GNU 用 `-c`，而同一个 `-f` 在 GNU 上读的是**文件
+  #    系统状态**（rc 非零但 stdout 非空，§7 第 364 条）⇒ 那种"两侧各一支再 `||` 串起来"
+  #    的形状不可能两侧都对。符号模式里第 1 列是类型、后 9 列是 owner/group/other 三组 rwx。
+  KEY_MODE_SYM=$(ls -ld "$BACKUP_ENCRYPTION_PASSPHRASE_FILE" 2>/dev/null | cut -c1-10)
+  KEY_BEYOND=${KEY_MODE_SYM#????}   # 去掉"类型 + owner 三列"⇒ 只剩 group/other 六列
+  if [ -z "$KEY_MODE_SYM" ] || [ "${#KEY_BEYOND}" -ne 6 ]; then
     echo "BACKUP=KEY_MODE_UNKNOWN"
     echo "    Could not read the mode of $BACKUP_ENCRYPTION_PASSPHRASE_FILE; refusing to assume it is safe."
     exit 1
   fi
-  # 🔴 用位运算判，不用字符串比"是不是 600"：0400/0600/0700 都合格，0644 不合格。
-  if [ "$(( 0$KEY_MODE & 077 ))" -ne 0 ]; then
+  # 🔴 判的仍是**位**、不是字符串："越出所有者"== group/other 六列里全 '-'（0400/0600/0700 都
+  #    合格，0644 不合格）—— 与原来那句 `(mode & 077) != 0` 逐位等价，只是换成两侧都读得到的尺。
+  if [ "$KEY_BEYOND" != "------" ]; then
     echo "BACKUP=KEY_PERMS"
-    echo "    Passphrase file is readable beyond its owner: mode $KEY_MODE (need group/other bits 0)."
+    echo "    Passphrase file is readable beyond its owner: mode $KEY_MODE_SYM (need group/other bits 0)."
     echo "    A key any local account can read does not encrypt the artifact against that account."
     exit 1
   fi
@@ -159,7 +164,7 @@ if [ "$ENCRYPTED" = "1" ]; then
       exit 1
       ;;
   esac
-  echo "==> Encryption: AES-256-CBC + PBKDF2 (1M iterations), key $BACKUP_ENCRYPTION_PASSPHRASE_FILE mode $KEY_MODE"
+  echo "==> Encryption: AES-256-CBC + PBKDF2 (1M iterations), key $BACKUP_ENCRYPTION_PASSPHRASE_FILE mode $KEY_MODE_SYM"
 else
   echo "==> ⚠️ BACKUP_ALLOW_PLAINTEXT=1 — writing UNENCRYPTED dumps (they contain password hashes)"
 fi

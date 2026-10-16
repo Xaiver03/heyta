@@ -28,6 +28,15 @@ RIG="$REAL_R/$RIG_REL"
 WORK="$REAL_R/tmp/w6-dry-arms.$$"
 SRCREL="packages/app-host/src/note-actions.ts"
 
+# 🔴 取指纹用 `openssl dgst`，**不写 `md5`** —— 后者只有 macOS/BSD 有，GNU 那边根本没有这枚命令，
+#    命令替换于是**静默读成空串**（§7 第 370 条）：那一刻"前后一致"这类断言恒真、臂从有牙变成
+#    永远通过，而它的输出一个字都不变。`openssl dgst -md5` 两侧同值（实测 LibreSSL 3.3.6 打
+#    `hash`、OpenSSL 3.5.6 打 `(stdin)= hash`，取最后一列即同一串），走 stdin 也不吃"文件名里有空格"。
+#    下面这发前置自证是**同一族纪律**：探针工具不在就响亮停，不拿"读成空串"冒充"读过"。
+command -v openssl >/dev/null 2>&1 \
+  || { echo "❌ 这台上没有 openssl ⇒ md5 探针会静默取到空串（§7 第 370 条）⇒ 本装置不跑"; exit 1; }
+md5_of() { openssl dgst -md5 < "$1" | awk '{print $NF}'; }
+
 # 三份夹具：干净版含变异锚点；残留版含本臂针脚；别人的版两者都不含。
 # 🔴 缩进必须和装置里那两条字面量**逐格**一致（payload 前 8 格、`});` 与 `return true;` 前 6 格）——
 #    写成 4 格时针脚判不出"本臂残留"，臂 1/2/4 会一起被归因成"别人的改动"，而那不是装置的判断。
@@ -91,7 +100,7 @@ new_sandbox() {
   else
     [ -n "$dirty_now" ] || { say "$tag 夹具失败：$content 起始却报干净"; return 1; }
   fi
-  say "$tag  $sb  START_MD5=$(md5 -q "$sb/$SRCREL")  DIRTY=${dirty_now:+yes}${dirty_now:-no}"
+  say "$tag  $sb  START_MD5=$(md5_of "$sb/$SRCREL")  DIRTY=${dirty_now:+yes}${dirty_now:-no}"
 }
 
 # 假工具：mode=ok 让前置 2/3 通过（DRY 摘要才会打印）；mode=fail 让臂停在构建之前；
@@ -131,9 +140,9 @@ say "沙盒根：$WORK"
 say "=== 臂 0：DRY + 源码本来干净 ⇒ 摘要该说干净，不该说有残留 ==="
 arm_start
 new_sandbox a0 "$CLEAN" || exit 1
-SB="$WORK/a0"; BEFORE=$(md5 -q "$SB/$SRCREL")
+SB="$WORK/a0"; BEFORE=$(md5_of "$SB/$SRCREL")
 OUT=$(cd "$SB" && PATH="$FB_OK:$PATH" bash "research/tools/mutation-rigs/w6-note-restore-device-arm.sh" --dry-run 2>&1); RC0=$?
-[ "$BEFORE" = "$(md5 -q "$SB/$SRCREL")" ] && ok "md5 不变" || bad "臂 0 不该写字节"
+[ "$BEFORE" = "$(md5_of "$SB/$SRCREL")" ] && ok "md5 不变" || bad "臂 0 不该写字节"
 if echo "$OUT" | grep -q 'PREFLIGHTS=OK（载体自证 / 源码干净'; then ok "走了「源码干净」那一档"; else bad "干净源码没走正常摘要（RC0=${RC0}）"; fi
 echo "$OUT" | grep -q 'OK-WITH-RESIDUE' && bad "无残留却印了 OK-WITH-RESIDUE ⇒ 臂 1 那条断言恒真" || ok "没误报残留"
 
@@ -141,9 +150,9 @@ echo "$OUT" | grep -q 'OK-WITH-RESIDUE' && bad "无残留却印了 OK-WITH-RESID
 say "=== 臂 1：--dry-run 遇到本臂残留，必须一个字节都不改 ==="
 arm_start
 new_sandbox a1 "$RESIDUE" || exit 1
-SB="$WORK/a1"; BEFORE=$(md5 -q "$SB/$SRCREL")
+SB="$WORK/a1"; BEFORE=$(md5_of "$SB/$SRCREL")
 OUT=$(cd "$SB" && PATH="$FB_OK:$PATH" bash "research/tools/mutation-rigs/w6-note-restore-device-arm.sh" --dry-run 2>&1); RC1=$?
-AFTER=$(md5 -q "$SB/$SRCREL")
+AFTER=$(md5_of "$SB/$SRCREL")
 [ "$BEFORE" = "$AFTER" ] && ok "md5 前后逐字相同（${AFTER}）" || bad "md5 变了（$BEFORE → ${AFTER}）—— --dry-run 仍在写文件"
 echo "$OUT" | grep -q 'DRY=HEAL-SKIPPED' && ok "打印了 DRY=HEAL-SKIPPED" || bad "没打印 DRY=HEAL-SKIPPED（残留被悄悄处理或根本没报告）"
 if echo "$OUT" | grep -q '源码干净'; then bad "摘要仍印「源码干净」—— 有残留时这是假的"; else ok "摘要没把残留说成干净"; fi
@@ -163,9 +172,9 @@ if git -C "$SB" show "HEAD:$SRCREL" | diff -q - "$SB/$SRCREL" >/dev/null; then o
 say "=== 臂 3：DRY 遇到**别人的**改动，必须让路且不写 ==="
 arm_start
 new_sandbox a3 "$OTHERS" || exit 1
-SB="$WORK/a3"; BEFORE=$(md5 -q "$SB/$SRCREL")
+SB="$WORK/a3"; BEFORE=$(md5_of "$SB/$SRCREL")
 OUT=$(cd "$SB" && PATH="$FB_OK:$PATH" bash "research/tools/mutation-rigs/w6-note-restore-device-arm.sh" --dry-run 2>&1); RC3=$?
-AFTER=$(md5 -q "$SB/$SRCREL")
+AFTER=$(md5_of "$SB/$SRCREL")
 [ "$BEFORE" = "$AFTER" ] && ok "md5 不变（${AFTER}）" || bad "动了别人的文件（$BEFORE → ${AFTER}）"
 echo "$OUT" | grep -q '不是\*\*本臂那发针脚' && ok "die3 只声明「不是本臂针脚」，并把现量归属的命令一并交出去" || bad "没按非针脚的未提交 diff 拒绝（RC3=${RC3}）：$(echo "$OUT"|head -3)"
 echo "$OUT" | grep -q '别人的' && bad "🔴 装置又把归属写死了：它只能判「是不是本臂针脚」，判不出这枚 diff 是谁的 —— 10-06 实测它把**本线自己**未提交的 G-8 批次报成「别人的」，读台账的人会照着等错的人" || ok "没有冒充归属"
@@ -176,9 +185,9 @@ echo "$OUT" | grep -q 'DRY=HEAL-SKIPPED' && bad "别人的改动被当成了本�
 say "=== 臂 4：拿 HEAD 里那版旧脚本跑臂 1 的同一场景，判据必须能红 ==="
 arm_start
 if new_sandbox a4 "$RESIDUE" 1; then
-  SB="$WORK/a4"; BEFORE=$(md5 -q "$SB/$SRCREL")
+  SB="$WORK/a4"; BEFORE=$(md5_of "$SB/$SRCREL")
   (cd "$SB" && PATH="$FB_OK:$PATH" bash "research/tools/mutation-rigs/w6-note-restore-device-arm.sh" --dry-run >/dev/null 2>&1)
-  AFTER=$(md5 -q "$SB/$SRCREL")
+  AFTER=$(md5_of "$SB/$SRCREL")
   [ "$BEFORE" != "$AFTER" ] && say "  ✅ 旧脚本在同样场景下**改了字节**（$BEFORE → ${AFTER}）⇒ 臂 1 的 md5 判据有牙" \
     || bad "旧脚本也没改字节 ⇒ 臂 1 恒真，这条判据没有价值"
 else
@@ -189,9 +198,9 @@ fi
 say "=== 臂 5：另一趟 verify-mobile-* 在跑 ⇒ 必须让路，且 adb/curl/ssh 全活着（归因只可能是前置 2）==="
 arm_start
 new_sandbox a5 "$CLEAN" || exit 1
-SB="$WORK/a5"; BEFORE=$(md5 -q "$SB/$SRCREL")
+SB="$WORK/a5"; BEFORE=$(md5_of "$SB/$SRCREL")
 OUT=$(cd "$SB" && PATH="$FB_BUSY:$PATH" bash "research/tools/mutation-rigs/w6-note-restore-device-arm.sh" --dry-run 2>&1); RC5=$?
-[ "$BEFORE" = "$(md5 -q "$SB/$SRCREL")" ] && ok "md5 不变（让路时不写字节）" || bad "臂 5 不该写字节"
+[ "$BEFORE" = "$(md5_of "$SB/$SRCREL")" ] && ok "md5 不变（让路时不写字节）" || bad "臂 5 不该写字节"
 echo "$OUT" | grep -q 'ARM=ENV-INVALID reason=另一趟 verify-mobile' && ok "停在设备窗口独占那一格，并把占用者写进 reason" \
   || bad "没走前置 2 那一支（RC5=${RC5}）：$(echo "$OUT" | head -3)"
 # 🔴 这一条才是本臂存在的理由：busy 假 PATH 里 adb/curl/ssh 全部**成功**，所以摘要一旦打印出来，

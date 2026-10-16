@@ -148,9 +148,17 @@ default_state() {
   n=$(ls "$DEFAULT_DB_DIR" 2>/dev/null | grep -c '^heyta\.sqlite' || true)
   if [ -f "$DEFAULT_DB_DIR/heyta.sqlite" ]; then
     exists=1
-    sz=$(stat -f '%z' "$DEFAULT_DB_DIR/heyta.sqlite" 2>/dev/null || echo 取不到)
-    mt=$(stat -f '%m' "$DEFAULT_DB_DIR/heyta.sqlite" 2>/dev/null || echo 取不到)
-    dig=$(md5 -q "$DEFAULT_DB_DIR/heyta.sqlite" 2>/dev/null || echo 取不到)
+    # 🔴 三把尺都写成**两侧同形**的（不写 `stat` / `md5`）：
+    #    · 字节数：`wc -c < 文件`（BSD 会补前导空格 ⇒ 去掉，好让两侧读数逐字相同）
+    #    · mtime：`date -r 文件 +%s`（BSD 与 GNU 都按文件取；GNU 把 `stat` 的 `-f` 读成
+    #      文件系统状态 ⇒ §7 第 364 条）
+    #    · md5：`openssl dgst -md5`（BSD 那枚 `md5` 在 GNU 上命令不存在 ⇒ 命令替换静默读成
+    #      空串，§7 第 370 条）
+    sz=$(wc -c < "$DEFAULT_DB_DIR/heyta.sqlite" 2>/dev/null | tr -d '[:space:]')
+    [ -n "$sz" ] || sz=取不到
+    mt=$(date -r "$DEFAULT_DB_DIR/heyta.sqlite" +%s 2>/dev/null) || mt=取不到
+    dig=$(openssl dgst -md5 < "$DEFAULT_DB_DIR/heyta.sqlite" 2>/dev/null | awk '{print $NF}')
+    [ -n "$dig" ] || dig=取不到
   else
     exists=0; sz=无; mt=无; dig=无
   fi
@@ -250,7 +258,7 @@ else
   printf '   DIRTY_PATHS=未提交改动在场（读数不只含 HEAD）：\n%s\n' "$(printf '%s\n' "$DIRTY" | sed 's/^/     | /')"
 fi
 printf '   WEB_DIST_SHA=%s\n' "$(shasum -a 256 "$WEB_DIST/index.html" 2>/dev/null | cut -c1-16 || echo 取不到)"
-printf '   SHELL_BINARY=%s mtime=%s\n' "$(basename "$BIN")" "$(stat -f '%Sm' "$BIN" 2>/dev/null || echo 取不到)"
+printf '   SHELL_BINARY=%s mtime=%s\n' "$(basename "$BIN")" "$(date -r "$BIN" '+%b %e %T %Y' 2>/dev/null || echo 取不到)"
 printf '   RUN_DIR=%s\n' "$RUN_DIR"
 printf '   PROVENANCE_FILE=%s\n' "$RUN_DIR/provenance.txt"
 {

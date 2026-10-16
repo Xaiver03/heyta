@@ -513,9 +513,12 @@ fi
 JSB="$APP_SRC/main.jsbundle"
 [ -f "$JSB" ] || { echo "❌ $JSB 不在（装了个没有 bundle 的东西？）⇒ 本轮无效"; exit 3; }
 newest_src() {
+  # 🔴 mtime 用 `date -r 文件 +%s` 逐枚取（不写 `stat`）：GNU 与 BSD 的 `stat` 把同一个 `-f`
+  #    读成两件不同的事（GNU 那侧 stdout 吐一整块文件系统统计，§7 第 364 条）；而 `date -r`
+  #    两侧同形同值。`find … -exec … {} +` 把文件**批量**交给一个 `sh` 循环，省下逐枚起进程。
   find "$HEYTA_REPO_ROOT/apps/mobile/src" "$HEYTA_REPO_ROOT/packages"/*/src \
-    -type f \( -name '*.ts' -o -name '*.tsx' \) -print0 2>/dev/null \
-    | xargs -0 stat -f '%m' 2>/dev/null | sort -rn | head -1
+    -type f \( -name '*.ts' -o -name '*.tsx' \) \
+    -exec sh -c 'for f; do date -r "$f" +%s; done' sh {} + 2>/dev/null | sort -rn | head -1
 }
 # 「这批源码最后一次被**改变**」的时刻 —— 尺住在 `lib/apk-freshness.sh`（单一所有者），
 #   本载体只是消费者。为什么不能是裸 mtime（rig47b 现量，记在 traps #346）：变异门禁
@@ -538,7 +541,7 @@ fi
 #   这一档没有旋钮可绕：没有章就是"不知道是谁的"，而不是"大概是新的"。
 heyta_ios_owner_check "$IOS_DERIVED" "$HEYTA_REPO_ROOT" || exit 3
 DIRTY_SRC=$(git -C "$HEYTA_REPO_ROOT" status --porcelain -- apps/mobile/src packages 2>/dev/null | wc -l | tr -d ' ')
-JSB_M=$(stat -f %m "$JSB")
+JSB_M=$(date -r "$JSB" +%s)
 SRC_M=$(newest_src)
 SRC_C=$(heyta_src_content_stamp "$HEYTA_REPO_ROOT") || { echo "❌ 内容章取不到（git log 没有该路径集的提交？）⇒ 本轮无效"; exit 3; }
 [ -n "$SRC_M" ] || { echo "❌ 新鲜度门没有输入（源码目录扫不到 .ts/.tsx？）⇒ 本轮无效"; exit 3; }

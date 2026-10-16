@@ -68,14 +68,16 @@ heyta_apk_dirs_for() { # <root?> -> 本次比较实际扫的目录（覆盖口�
 HEYTA_APK_SOURCE_DIRS="${HEYTA_APK_SOURCE_DIRS:-}"
 
 _mtime() { # <file> -> 回显 mtime（整数）；失败回显空
-  # 🔴 顺序是 GNU 在前，不是 BSD 在前 —— 实测：Linux 上 `stat -f %m 文件` 把 `-f` 读成
-  # "文件系统状态"，stdout 吐一堆块数而**退出码仍是 0**（错误只走 stderr，这里丢掉它）。
-  # 旧顺序下 `|| v=""` 永不触发，下面那句 `stat -c %Y` 兜底在 Linux 上是死代码，
-  # 于是新鲜度拿磁盘块数去和 mtime 比（臂 2/5/8 全坏，2026-10-06 在 Ubuntu 24.04 实测）。
-  # macOS 的 stat 不认 `-c`（illegal option，rc=1）⇒ 落到第二条，读数与改前逐字相同。
+  # 🔴 只写**一个形状**：`date -r 文件 +%s` —— GNU 与 BSD 都按**文件**取 mtime，回同一个整数。
+  #
+  # 为什么不用 `stat`：GNU 把同一个 `-f` 读成**文件系统状态**（stdout 吐一整块块数、rc 非零，
+  # 错误只走 stderr，这里丢掉它）—— §7 第 364 条的实测表。于是"一支 GNU、一支 BSD 再用 `||`
+  # 串起来"这种形状**在管道里**那一支是死代码：06 那版 `find … -exec` 就是这样拿磁盘块数去和
+  # mtime 比（臂 2/5/8 全坏，2026-10-06 在 Ubuntu 24.04 实量）。
+  # `date -r 文件 +%s` 没有这个分叉，四个形状同值（macOS 现量：BSD `date -r` == BSD `stat` 的
+  # `%m` == GNU `date -r` == GNU `stat` 的 `%Y`）。
   local v
-  v=$(stat -c %Y "$1" 2>/dev/null) || v=""
-  [ -n "$v" ] || v=$(stat -f %m "$1" 2>/dev/null) || v=""
+  v=$(date -r "$1" +%s 2>/dev/null) || v=""
   printf '%s' "$v"
 }
 
@@ -87,14 +89,11 @@ heyta_apk_pair() {
   dirs=$(heyta_apk_dirs_for "$root")
   [ -f "$apk" ] && am=$(_mtime "$apk") || am=""
   [ -n "$dirs" ] || { printf '%s %s\n' "${am:-}" ""; return 0; }
-  # 同一枚 GNU-先 的顺序理由见 _mtime 上方那段：`stat -f %m` 在 Linux 上退 0 并吐块数，
-  # 反过来写会让第二条永远不执行。
+  # mtime 那条尺的可移植理由见 _mtime 上方那段（GNU 把同一个 `-f` 读成文件系统状态，管道里
+  # 那一支兜底就是死代码）。这里用 `date -r` 逐枚取、再排序取最大：一个形状、两侧同值。
   sm=$(cd "$root" 2>/dev/null && find $dirs \
     -type f \( -name '*.ts' -o -name '*.tsx' \) -not -path '*/node_modules/*' \
-    -exec stat -c %Y {} + 2>/dev/null | sort -rn | head -1)
-  [ -n "$sm" ] || sm=$(cd "$root" 2>/dev/null && find $dirs \
-    -type f \( -name '*.ts' -o -name '*.tsx' \) -not -path '*/node_modules/*' \
-    -exec stat -f %m {} + 2>/dev/null | sort -rn | head -1)
+    -exec sh -c 'for f; do date -r "$f" +%s; done' sh {} + 2>/dev/null | sort -rn | head -1)
   printf '%s %s\n' "${am:-}" "${sm:-}"
 }
 
@@ -137,7 +136,7 @@ heyta_src_content_stamp() { # <root?> -> 回显 epoch；取不到回 rc 1
   # `s/^.* -> //` 让改名行取**新路径**；被删的那枚 stat 不到，自然跳过。
   while IFS= read -r f; do
     [ -n "$f" ] || continue
-    c=$(stat -f %m "$root/$f" 2>/dev/null) || c=$(stat -c %Y "$root/$f" 2>/dev/null) || c=""
+    c=$(date -r "$root/$f" +%s 2>/dev/null) || c=""
     case "$c" in (''|*[!0-9]*) continue ;; esac
     [ "$c" -gt "$newest" ] && newest="$c"
   done <<EOF2
