@@ -5364,3 +5364,14 @@ AC 已勾数仍为 **0**（`verify-inbound-ac-ticks.py`：`AC 行=8　已勾=0�
 10. **完成条件 2 那一格的形状，14:44 又往前走了一格**（不撤"不可核"这个判，但把可归因的部分钉下来）：共享检出的非白名单脏目现量 **15 枚**，按**被谁写**分两堆而不是报一个总数：
     - **12 枚**是 `apps/web/evidence/inbound-recovery/*.png`，逐枚 mtime **同为 `10-14 10:46`** ⇒ 是 10-14 那趟 AC-6 真浏览器跑由 Playwright 自己重写的截图，不是谁手改的；这一堆落在**白名单外**（`apps/web/evidence/` 不在地界内），所以我**既不提交也不还原**，处置要点头（挂在 B199 那一格旁边）。
     - **3 枚**是别线此刻正在写的 `apps/mobile/evidence/**`（`widget-data-leg.py` mtime **14:39**、`android-widget-click-r115/` **14:39/14:43**、`profile-center/android-r99-fixed/` 10-13 12:21）⇒ 这个总数**在我这一趟里还在涨**，所以任何"与开工快照相同"的说法在这里没有对应物；取法只认逐枚 `stat -f '%Sm %N'`＋`git log --diff-filter=A -1 -- <那枚路径>`，别拿总数当结论（同 B199）。
+
+## 2026-10-16 14:4x–14:5x · AC-6 的真浏览器腿补到"当前 tip 今天实测仍红"（自动收集线）
+
+写前先跑 `date`（起飞 14:45:40、落 14:47:58，本机 CST）。
+
+1. **AC-6 那一格原来最弱的一环补上了**：它的 jsdom 腿有今天的读数，但**真浏览器腿只有 10-14 @`7d25b73a` 那一戳**（而 tip 之后动过）。今天在私有载具 `.worktrees/inb-t9`（`f7712df7`）重跑：`cd e2e && npx --no-install playwright test --config playwright.inbound.config.ts` ⇒ **`2 failed / 6 passed (2.3m)`、E2E_RC=1**，两枚红**同一行同一句等待**（`inbound-automation.spec.ts:85` 那句 `查看并编辑草稿`，60 s 超时），红在 1280／390 两枚视口 ⇒ 与 10-14 那格形状逐字相同，只是这一趟是今天的。
+2. **载具身份现量，不靠那句话**：`git diff --name-only f7712df7 HEAD -- server/src server/tests packages apps/web/src apps/mobile/src e2e research/tools scripts` 回**空列** ⇒ 这枚读数算到当前 tip 的同源源码。
+3. **B140 的静态半边同戳复量**：把 `git show HEAD:apps/web/src/features/settings/AiSettings.tsx` 落盘后读 —— 第 1270 行仍只传 `routing`／`consents`／`secretStore`，全文 `active` 命中 **0** ⇒ 动态红＋静态成因两头都对上，**AC-6 继续不勾**，修法落在 `App.tsx` + `AiSettings.tsx`（白名单外，配方与"接上就 4 passed"的反向验证早记在 B140 追记，仍等点头）。
+4. 🔴 **退码取法照老规矩走通了**：这趟 `E2E_RC=1` 是先 `> 文件 2>&1` 再 `echo $?`，输出里没有 `2 failed` 时我也读不到码——**没接 `|| true`**，红就是红。
+5. **一句读数边界（防止下一位把 15 当常量抄）**：跑完载具的脏目**非 png = 0**（这条是这一格真正守的），而 png 总数从 15 变 14。变化的那一枚我没逐枚定位（不影响任何结论），但这说明**截图分堆的总数不是恒定量**，重跑一次就可能少一枚 ⇒ 报"分堆 + 取法"，不报总数。
+6. **没动的**：判卷口径 0 处、AC 已勾仍 **0**；改动只在 `docs/plans/inbound-automation.md`（AC-6 那一格）与 PROGRESS。本戳 `doc-tables`／`docs-voice`／`check-migrations`／`license-inventory`／`ac-ticks` 全 **rc=0**（这一节写完连同上一节一起跑）。
