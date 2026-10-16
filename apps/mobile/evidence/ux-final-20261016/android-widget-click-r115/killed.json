@@ -1,0 +1,77 @@
+{
+  "serial": "emulator-5554",
+  "device": {
+    "versionName": "1.0",
+    "lastUpdateTime": "2026-10-15 13:39:08",
+    "release": "16",
+    "system_locales": "zh-Hans-CN",
+    "head": "f6419c051b2f726255e16809c5c0c7056eae7edf",
+    "imes_disabled": [
+      "com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME",
+      "com.google.android.tts/com.google.android.apps.speech.tts.googletts.settings.asr.voiceime.VoiceInputMethodService"
+    ]
+  },
+  "log": [
+    "被测包 1.0 / lastUpdateTime=2026-10-15 13:39:08 / HEAD=f6419c05",
+    "[已杀腿] 起点：host widgets.size=1 provider=['com.heytamobile.widget.TodayWidgetProvider'] 实例 id=['23']",
+    "  杀之前读到的行：[]（进程在不在：False）",
+    "  桌面上读不到行 ⇒ 用 ① 那屏的坐标：['○ L115Urgent']",
+    "  14:49:23 force-stop 之后（进程在=False，实例仍在=1）组件读到 0 行：[]",
+    "  原地空点 (371,599) ← 杀之前那一行 '○ L115Urgent'",
+    "  空点 6s 后读到 2 行：['✓ L115UrgentImportant', '○ L115Urgent']",
+    "  应用起来之后 14:49:48：等了约 3s，组件恢复成 2 行：['○ L115Urgent', '✓ L115UrgentImportant']",
+    "  b) 那一次空点的结果：未生效（恢复时那一行仍是 ○ 或整族没读到）",
+    "  点了 (371,533) ← 行 '○ L115Urgent' bounds=(346, 500, 981, 566)",
+    "  [killed-alive] 约 3s 时出现 ✓：['✓ L115Urgent', '✓ L115UrgentImportant']"
+  ],
+  "tap_point": {
+    "row": "○ L115Urgent",
+    "bounds": [
+      346,
+      566,
+      981,
+      632
+    ],
+    "x": 371,
+    "y": 599
+  },
+  "blank": {
+    "t0": "14:49:23",
+    "proc": false,
+    "rows": [],
+    "host": 1
+  },
+  "blind_tap": {
+    "rows": [
+      "✓ L115UrgentImportant",
+      "○ L115Urgent"
+    ]
+  },
+  "restore": {
+    "seconds": 3,
+    "t1": "14:49:48",
+    "rows": [
+      "○ L115Urgent",
+      "✓ L115UrgentImportant"
+    ]
+  },
+  "blind_tap_effect": "未生效（恢复时那一行仍是 ○ 或整族没读到）",
+  "after_restore_click": {
+    "tap": {
+      "x": 371,
+      "y": 533,
+      "row": "○ L115Urgent",
+      "bounds": [
+        346,
+        500,
+        981,
+        566
+      ]
+    },
+    "tick": 3,
+    "rows": [
+      "✓ L115Urgent",
+      "✓ L115UrgentImportant"
+    ]
+  }
+}

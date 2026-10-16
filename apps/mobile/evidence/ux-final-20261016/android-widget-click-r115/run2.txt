@@ -1,0 +1,7 @@
+被测包 1.0 / lastUpdateTime=2026-10-15 13:39:08 / HEAD=56cd857f
+  先删掉 4 行旧的同族数据
+  建好 L115UrgentImportant
+  建好 L115Urgent
+  建好 L115Important
+  建好 L115Plain
+等不到：清单里那行「打开任务：L115UrgentImportant」

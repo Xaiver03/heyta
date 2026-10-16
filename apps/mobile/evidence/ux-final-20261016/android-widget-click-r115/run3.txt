@@ -1,0 +1,19 @@
+被测包 1.0 / lastUpdateTime=2026-10-15 13:39:08 / HEAD=8feec99d
+  整族删掉 4 行；清单顶部「N 项待办」4 → None
+  建好 L115UrgentImportant
+  建好 L115Urgent
+  建好 L115Important
+  建好 L115Plain
+  改过 L115UrgentImportant: due=today,important；回读片段=['任务详情', '时刻', '时:分', '排期', '重复', '不重复', '每天', '每周']
+  改过 L115Urgent: due=today；回读片段=['任务详情', '标题', 'L115Urgent', '备注', '写点什么（支持 Markdown）', '离开输入框或关闭面板时保存', '清单', '收集箱']
+  改过 L115Important: important；回读片段=['任务详情', '时刻', '时:分', '排期', '重复', '不重复', '每天', '每周']
+  清单回读：['打开任务：L115Important', '打开任务：L115Plain', '打开任务：L115Urgent', '打开任务：L115UrgentImportant']
+  建好习惯 L115Habit（行 habit-row-habit-mvaloi0w-5-v9kcwfv2）
+  ⚠️ 详情里没有 habit-checkin-<id>，打卡这半步没做（不影响『习惯非空』，影响的是『今天已完成』那一档）
+[今天的任务] 绑住 落点=(540,700) 新表行=[7] host widgets.size=1 provider=['com.heytamobile.widget.TodayWidgetProvider']
+[点卡片] 未点：['○ L115UrgentImportant', '○ L115Urgent']
+  点之前 com.heyta 进程在不在：True
+  点了 (371,533) ← 行 '○ L115UrgentImportant' bounds=(346, 500, 981, 566)
+  [click-alive] 约 3s 时出现 ✓：['✓ L115UrgentImportant', '○ L115Urgent']
+  force-stop 之后 com.heyta 进程在不在：False
+②已杀：这一屏没有以「L115Urgent」结尾的行：[]

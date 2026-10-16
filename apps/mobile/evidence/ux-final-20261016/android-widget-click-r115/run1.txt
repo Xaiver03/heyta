@@ -1,0 +1,16 @@
+被测包 1.0 / lastUpdateTime=2026-10-15 13:39:08 / HEAD=7305a0f1
+  建好 L115UrgentImportant
+  建好 L115Urgent
+  建好 L115Important
+  建好 L115Plain
+Traceback (most recent call last):
+  File "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/mobile/evidence/ux-final-20261016/android-widget-click-r115/widget-data-leg.py", line 837, in <module>
+    seed_tasks()
+    ~~~~~~~~~~^^
+  File "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/mobile/evidence/ux-final-20261016/android-widget-click-r115/widget-data-leg.py", line 327, in seed_tasks
+    edit_task(spec)
+    ~~~~~~~~~^^^^^^
+  File "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/mobile/evidence/ux-final-20261016/android-widget-click-r115/widget-data-leg.py", line 297, in edit_task
+    tap(pick(dump("open"), desc=f"打开任务：{title}", clickable=True)[0])
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^
+IndexError: list index out of range

@@ -1,0 +1,4 @@
+被测包 1.0 / lastUpdateTime=2026-10-15 13:39:08 / HEAD=d2dd3dc6
+  整族删掉 4 行；清单顶部「N 项待办」2 → None
+清理结果 {'tasks': 4, 'habit': True, 'focus': 'not-running'}
+SIZE AFTER ALL: (1, ['com.heytamobile.widget.TodayWidgetProvider'], ['23'])

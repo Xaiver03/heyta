@@ -9991,3 +9991,26 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     `git diff --name-status <parent> <NEW>`，除我那批 pathspec 之外**应当一行都没有**。
     修复形状：不要 `reset`（会动别人的现场），用同一棵树重 `commit-tree -p $正确的OLD` 再
     `update-ref … $错的那枚` CAS 顶掉 —— CAS 成功即说明那一头没人接上去。
+443. 🔴 **`am force-stop` 与 `am kill` 在装机态 Android 小组件上不是同一件事 —— 拿前者当"进程死了"会量出一间空房子。**
+    现量（`emulator-5554`，10-16 14:4x-15:0x，包 `1.0 / lastUpdateTime=2026-10-15 13:39:08`）：
+    **`am force-stop com.heyta`** 之后，桌面上那枚**仍然绑定**的实例（`dumpsys appwidget` 的 `Widgets:` 段
+    `id=23`、`widgets.size=1`、`zombie=false`）渲染成**一张只有居中应用图标的空白卡** ——
+    无障碍树里那一块 **0 个文本节点**，空白**至少持续 6 分钟**（14:43 杀 → 14:49 仍读到 0 行），
+    对照臂证明"不点只等 20s"不会自己回来，**点一下**（走的是卡片整体意图）才把应用带起来、读数才回来。
+    而 **`am kill com.heyta`**（只杀进程、不把包放进 stopped 态）之后，同一枚实例**照常渲染、照常可点**，
+    点那一行的符号位约 5s 出现 `✓`，进程被广播带起（pid `None`→`16164`），`mCurrentFocus` 全程是启动器
+    ⇒ **意图队列那一档只有走 `am kill` 才量得到**；用 force-stop 那一档的问题是**根本没有可点的行**，
+    而且 stopped 包收不到广播（那是平台规则，不是这一趟测出来的）。
+    ⇒ 判据形状：任何"进程没了组件会怎样"的断言，必须先写清**是哪一种杀法**；
+    跑法与全部读数在 `apps/mobile/evidence/ux-final-20261016/android-widget-click-r115/RESULT.md`。
+444. 🔴 **自己新写的一次性探针，有两种失法会把"读不到"静默写成"没有"—— 两种都不报错。**
+    同一趟里连撞两次（都是本线自己的装置，不是被测物）：
+    ① `subprocess.run(["adb","-s",serial] + args)` **漏了 `shell`** ⇒ adb 打的是 `adb: unknown command uiautomator`，
+    那串里既没有 `ERROR` 也没有 `<node`，于是按"这两种形状判失败"的代码把**每一格**都读成 `None`，整趟静默作废；
+    ② `uiautomator dump` 的 bounds 字面是 **`[346,454][981,500]`（逗号后没有空格）**，
+    按 `[x, y]` 写正则 ⇒ 一行都匹配不上，读成 `[]`，**看起来完全像"组件真的空了"** ——
+    而同一时刻的截图里两行明明都在。
+    ⇒ 判据形状：**新装置的第一趟必须先跟一枚已知状态对账**（这里是对着 `diag-now.png` 那张图才发现是尺坏了），
+    并且把"读不到"和"读到零"写成**两个不同的返回值**（本条 ① 就是把两者合并成 `None`/`[]` 才静默的）。
+    与 **#439**（`dump` 报 `ERROR: could not get idle state.` 而 rc=0 ⇒ 读到上一枚同名文件的陈旧内容）同族：
+    三条都是**探针自己造读数**，不是被测物变了。
