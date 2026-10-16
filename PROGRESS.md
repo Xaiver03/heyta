@@ -5424,3 +5424,16 @@ AC 已勾数仍为 **0**（`verify-inbound-ac-ticks.py`：`AC 行=8　已勾=0�
 5. **AC 一格没勾**：现量 `python3 research/tools/verify-inbound-ac-ticks.py` ⇒ `已勾=0、未勾=8`。AC-6 今天可以说"真浏览器腿在当前代码上绿、并有一条能红的用例钉住后台收集不跟节走"，不能替负责人说"AC-6 完成"。
 6. **下一步只剩第 2 步**：按上面「14:5x 第 6–7 条」那份配方，在隔离副本里把 `pnpm reinstall:all` **整条**跑到固定收尾（权威口径 `docs/agents/multi-end-build.md` §6.1.1），再做 Linux 交付取证。起跑前四条现场读数是瞬时值，**必须当下重量**（`adb devices`、`xcrun simctl list devices booted`、`sysctl -n vm.loadavg`、`ps Axo command` 里有没有别人的 `verify-mobile`／`reinstall-all`）。红线照旧：不许半跑、不许只跑一端。"人真打开看过截图"那一格在负责人手上。
 7. **待点头清单**（本线只登记，不代拍）：范围尺 `WHITELIST` 要不要收这两枚（新）；B196 四枚缺失 `check:*`；B201 五阶链；B110 `waiting-entitlement` 词条；AC-7 那句对外措辞；12 枚 `apps/web/evidence/inbound-recovery/*.png` 的处置；B199 完成条件2 无开工快照；`.worktrees/inb-t9` 的处置。B203 已自结（见 BLOCKED）。
+
+## 2026-10-16 16:57–17:5x · T7 第三条腿整条跑完了：四端全绿 + Linux 取证绿，前两腿当日重取且红集仍零枚在本线（自动收集线）
+
+写前先跑 `date`（本机 17:58）。上一节第 6–7 条那份配方与红线，这一趟是照它跑完的，不是另起一路。
+
+1. **第三腿（设备面）= 本线欠了几天的那一格，现在齐了**：`IOS_DEVICE_NAME=heyta-multiend-reinstall pnpm reinstall:all` 在隔离副本 `.worktrees/inb-t9` 从 16:57:25 跑到 17:44:44，**`REINSTALL_RC=0`**、首尾 HEAD 同为 `da657603`、四端汇总四行全 ✅；Linux 那一格另跑 `bash apps/desktop-linux/scripts/package-deb.sh linux-dev` ⇒ `LINUX_DEB_RC=0`／`PKG_RESULT=OK`。逐端"清旧 → 重打 → 卸旧装新 → 当前产物判据"的读数、C30 与 C31 的分界、载体别名换法的先例、`pod install` 非确定性那两条，都在 `docs/plans/inbound-automation.md` 文末那一节，**这里不抄第二遍**（抄件会漂）。
+2. 🔴 **红线守住了**：没有 `--only`、没有 `--skip`、没有中途停。这一格值钱的地方在于"要么整条跑到 §6.1.1 配方并留下逐端判据，要么一行都不动"，而上一代的做法是半跑 ⇒ 装机态里新旧产物混着且没有一层会红。
+3. **AC 逐格当日复跑**（同载体同 HEAD，14 条命令串行，逐条落盘 rc）：全部 **rc=0**，且每格分母与台账此前那戳**逐字相同**（11／103、3／56、1／3、1／17、3／47、13/13、1／6、1、15／112、15、16、9、8／19 + docs-voice 零命中）⇒ 这趟说的是"到当前 tip 仍成立"，不是"涨了所以好看"。
+4. **前两腿当日重取**：第 2 腿 `pnpm -r --no-bail test` rc=**1**、`Scope: 21 of 22`、21 枚包各有汇总行、红集 5 包 7 枚 spec；那 7 枚**孤立重跑两头对照**之后，2 枚转绿（`reminder-wake`／`task-sort`＝负载形状，整串里那两条 21.9 s／16.1 s 的耗时就是它的形状），5 枚照红且**逐枚按名字判没有一枚是本线的**；与 01:4x 那戳比，`apps/mobile` 那 4 条一模一样没涨没落，另三枚的断言原话当日取到并贴进计划。第 1 腿逐道跑完 ⇒ `CHAIN ran=111/111`、**`RED=26`**、`LEG1_RC=1`：与最后一次留下逐道名单那趟（10-15 14:0x 的 `RED=27`）**逐号对账零枚新增**，唯一差集是第 104 道转绿（原因本趟没查，但它静态扫源码、本线从没碰过，不可能被我这趟弄绿）。🔴 **这句话不许写成"链上本线零枚红"**：26 道里 **043／045／051／075 那四枚是本线自己造的**（成因、逐枚现量与修法落点全在 **B201** 那张表里），这一趟**原样复现、没涨没落**，四枚的修法落点全在白名单外 ⇒ 仍只登记不代改；001 是 **B196**，084／087／088／089 是**载具没装 workspace 依赖**那一族（现量 `ls -d .worktrees/inb-t9/e2e/node_modules/.pnpm` 不在场而共享检出在场），其余归别线。逐道号位与道号→命令映射在计划文末那一节第 18 条。
+5. **我自己这一趟造的两条假读数**（不作数，已就地更正）：① 照任务书字面跑 `pnpm -r test`（没有 `--no-bail`）⇒ 它在第一枚红包处 bail、只有 5 枚包有读数，那件不引用；这与计划里 `:1982` 记的那次同一族。② 取 vitest 汇总行用 `grep 'Tests +数字'` 回零命中，成因是那一行夹着 ANSI 转义序列 ⇒ 必须先剥色或开跑时 `NO_COLOR=1`；"读不到"和"没有"是两件事（第 444 条那句元规则第二次命中，本条已并进第 445 条那一族）。
+6. **新增两枚待点头**（都写进 `BLOCKED.md` 了，正文在那儿，不在这里复述）：**B205** 范围尺 `WHITELIST` 要不要收这次授权过的两枚路径 + 本线刚写进去的 `docs/reference/environment-traps.md`；**B206** 载具里那次 `pod install` 改的 `Podfile.lock`（差 2 行）与 `.worktrees/inb-t9` 本身的处置。
+7. **交给负责人的一件事（本线做不了的那一格）**：五枚截图的绝对路径已在计划文末那一节第 11 条列全，**"人真打开看过"只能由他做**，我不代勾；AC 已勾数现量仍 **0**（`python3 research/tools/verify-inbound-ac-ticks.py` ⇒ `已勾=0、未勾=8`）。
+8. **没动的**：判卷口径 0 处、`packages/i18n` 0 处、迁移 0 处、依赖 0 枚新增；`node research/tools/license-inventory.mjs` 与 `pnpm check:migrations` 当日各 rc=0（后者校验 73 个迁移文件、9 个含 CONCURRENTLY；现量命令逐条写在计划文末那一节第 14 条的指针件里）。⚠️ 任务书那行字面 `pnpm check-migrations` **在本仓不存在**（pnpm 回 `Did you mean "pnpm check:migrations"?`），真尺是带冒号那枚。
