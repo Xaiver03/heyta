@@ -62,6 +62,9 @@ DROP = (540, 700)
 DROP_POINTS = [(540, 700), (540, 1150), (540, 380), (540, 1600)]
 FAV = "content://com.google.android.apps.nexuslauncher.settings/favorites"
 LAUNCHER = "com.google.android.apps.nexuslauncher"
+# 组件类名按 manifest 的 `namespace`（com.heytamobile）解析，applicationId 是 com.heyta：
+# `android:name=".widget.TodayWidgetProvider"` ⇒ com.heytamobile.widget.TodayWidgetProvider
+WIDGET_COMPONENT = "com.heyta/com.heytamobile.widget.TodayWidgetProvider"
 log = []
 
 
@@ -199,7 +202,15 @@ def wait_for(pred, what, tries=10, delay=1.5):
 
 
 def focus_owner():
-    return adb("dumpsys", "window", check=False)
+    """**只取 `mCurrentFocus` 那一行**。
+    🔴 第一版返回整份 `dumpsys window`：那里面列着**所有**窗口，桌面的包名永远在场，
+    于是任何"前台是不是桌面"的判断都会**恒真** —— 一条永远通过的判据比没有判据更糟
+    （AGENTS §7 元规则第二条）。读不到那一行就返回空串，让调用方响亮失败。"""
+    out = adb("dumpsys", "window", check=False)
+    for line in out.splitlines():
+        if line.strip().startswith("mCurrentFocus="):
+            return line.strip()
+    return ""
 
 
 def launch_app(fresh=True):
@@ -883,6 +894,223 @@ def killed_leg():
     return res
 
 
+def find_any(ns, rids=(), texts=()):
+    """rid 优先 —— **文本会随语言换，resource-id 不会**。这是语言档能走通的关键。"""
+    for r in rids:
+        hit = [n for n in ns if n["rid"].endswith(r) and n["b"]]
+        if hit:
+            return hit[0], f"rid:{r}"
+    for t in texts:
+        hit = [n for n in ns if (n["text"] == t or n["desc"] == t) and n["b"]]
+        if hit:
+            return hit[0], f"text:{t}"
+    return None, None
+
+
+def to_main_screen(tries=5, tag="main"):
+    """把应用带回**有底部 tab 的那一屏**。🔴 不能只 `am start` 就算数：
+    这枚壳会把"上一次停在哪个面"恢复回来 —— 实测 run2 起来直接落在「常规」设置页，
+    那里既没有底部 tab 也没有「我的」，于是任何按 tab 词判的探针都恒读成"两个都没有"。"""
+    for i in range(tries):
+        ns = dump(f"{tag}-{i}")
+        if any(n["text"] in ("我的", "Profile") or n["desc"] in ("我的", "Profile") for n in ns):
+            return ns
+        adb("input", "keyevent", "KEYCODE_BACK")
+        time.sleep(1.5)
+    raise SystemExit(f"退 {tries} 次也没回到有底部 tab 的那一屏："
+                     f"{[n['text'] for n in dump(tag + '-end') if n['text']][:10]}")
+
+
+def current_app_language(tag="lang-cur"):
+    """应用当前显示的语言 —— **必须在应用的主屏上读**（底部那排 tab 是唯一稳定的探针）。
+    🔴 第一版在语言页上读"有没有『我的』"，那页根本没有底部 tab，
+    于是恒读成"两个都没有"⇒ 每次都被判成"读不清当前语言"而退（本目录 run1 就是它）。"""
+    launch_app(fresh=False)
+    dismiss_gates()
+    ns = to_main_screen(tag=tag)
+    blob = " | ".join(n["text"] + "#" + n["desc"] for n in ns)
+    zh, en = "我的" in blob, "Profile" in blob
+    if zh and not en:
+        return "zh"
+    if en and not zh:
+        return "en"
+    raise SystemExit(f"读不出应用语言（zh={zh} en={en}）：屏上文字={[n['text'] for n in ns if n['text']][:12]}")
+
+
+def goto_language_page():
+    """走到应用**自己的**语言开关那一格。🔴 全程不碰系统语言
+    （台账那一格明写"不通过改变整个系统语言规避"）。
+    导航沿用 `scripts/qa/profile-settings-android.py` 那条已验过的路，按 rid 走 ——
+    文本会随语言换，rid 不会。⚠️ 「语言」不是独立一页，它是「常规」页里的一节，
+    两枚芯片（`中文` / `English`，都是 clickable 且 desc 就是语言名）就在这一页上。"""
+    launch_app(fresh=False)
+    dismiss_gates()
+    tab, how = find_any(to_main_screen(tag="lang-tab"), (), (("我的", "Profile")))
+    if not tab:
+        raise SystemExit("[语言腿] 底部没有「我的/Profile」那一枚（to_main_screen 已经响亮失败，不该走到这）")
+    tap(tab)
+    time.sleep(2)
+    for rid, words, tag in (("profile-entry-settings", ("设置", "Settings"), "lang-profile"),
+                            ("settings-section-general", ("常规", "General"), "lang-dir")):
+        node, how = find_any(dump(tag), (rid,), words)
+        if not node:
+            raise SystemExit(f"走不到语言那一格（停在 {tag}）：rid={rid} 与 {words} 都没命中，"
+                             f"屏上文字={[n['text'] for n in dump(tag + '-miss') if n['text']][:10]}")
+        note(f"  {tag} → {how}")
+        tap(node)
+        time.sleep(2)
+    ns = dump("lang-page")
+    row = [n for n in ns if n["text"] == "语言" or n["text"] == "Language"]
+    if row:
+        tap(row[0])
+        time.sleep(2)
+        ns = dump("lang-page2")
+    return ns
+
+
+def set_language(target):
+    """target: 'en' / 'zh'。**已经是目标语言就什么都不点** ——
+    这枚开关是持久的（界面上那句原话：「这台设备会记住你的选择，重开应用仍然用它」），
+    而 `中文` 与 `English` 两枚**同时在场**，按文本点会把它切回去。"""
+    cur = current_app_language()
+    ns = goto_language_page()
+    want = "English" if target == "en" else "中文"
+    if cur == target:
+        note(f"  已经是 {target}（开关持久）⇒ 不点，避免把它切回去")
+        adb("input", "keyevent", "KEYCODE_HOME")
+        time.sleep(2)
+        return {"from": cur, "tapped": None}
+    node, how = find_any(ns, (), (want,))
+    if not node:
+        raise SystemExit(f"语言那一格上没有「{want}」那枚芯片：{[n['desc'] or n['text'] for n in ns if n['desc'] or n['text']][:12]}")
+    tap(node)
+    time.sleep(4)
+    after = current_app_language("lang-after-switch")
+    note(f"  点了 {how} ⇒ 应用语言现在读成 {after}")
+    adb("input", "keyevent", "KEYCODE_HOME")
+    time.sleep(3)
+    if after != target:
+        raise SystemExit(f"点了「{want}」之后应用语言读成 {after}，不是 {target}")
+    return {"from": cur, "tapped": how}
+
+
+def card_area_texts(tag):
+    """桌面那一屏上**落在组件矩形里**的文字（组件住在 x≈346-981、y<1100；
+    图标与 dock 都在这个矩形之外）。返回逐字文本，不做任何"是不是中文"的判断 ——
+    判语言由 `has_cjk` 那一枚单独给。
+    🔴 先验前台是桌面：这枚矩形是**坐标过滤**，任何一屏上只要文字落进这个框就会被当成卡。
+    run3 的起点读数读回 `['注册 / 登录', '0']` —— 那是应用的登录页，不是卡，
+    而它当时正好好在 `current_app_language` 把应用拉到前台之后。"""
+    require_launcher(tag)
+    ns = dump(tag)
+    out = []
+    for n in ns:
+        if not (n["text"] and n["b"]):
+            continue
+        x1, y1, x2, y2 = n["b"]
+        if x1 >= 300 and y2 <= 1200:
+            out.append(n["text"])
+    return out
+
+
+def require_launcher(tag):
+    owner = focus_owner()
+    if LAUNCHER not in owner:
+        raise SystemExit(f"{tag}: 前台不是桌面（{owner.strip()[:140]}）—— "
+                         f"读卡之前必须先 HOME，否则读到的是应用自己那一屏")
+
+
+def has_cjk(items):
+    """真 CJK。🔴 第一版写的是 `[㐀-]`（`-` 紧挨 `]` 是**字面连字符**），
+    于是它匹配的是日期里的 `-`，把英文态那句 `2026-10-16 · 0/0` 报成"仍带汉字"。"""
+    return [s for s in items if re.search(r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]", s)]
+
+
+def widget_update_broadcast(tag):
+    """只给 provider 发显式 `APPWIDGET_UPDATE` —— RN/JS 那一层不参与。
+    `-f 32` = `FLAG_INCLUDE_STOPPED_PACKAGES`：force-stop 之后包在 stopped 态，
+    不带这一位广播会被**静默丢弃**，那就会把"装置没送达"读成"产品不会自己重画"。"""
+    out = adb("am", "broadcast", "-n", WIDGET_COMPONENT,
+              "-a", "android.appwidget.action.APPWIDGET_UPDATE", "-f", "32")
+    tail = [l for l in out.splitlines() if l.strip()]
+    note(f"  {tag} 广播回执：{tail[-1] if tail else '(无输出)'}")
+    return out
+
+
+def wake_leg(tag):
+    """**组件独立唤醒**那一半：先把卡片打成占位（force-stop 的已知形状，见陷阱 #443），
+    再只叫 provider 一次。读回来的卡如果是**有内容且语言正确**，那张卡就是它自己画的 ——
+    因为底是空的，不存在"上一帧残留"这种解释。"""
+    res = {}
+    adb("am", "force-stop", "com.heyta")
+    time.sleep(3)
+    adb("input", "keyevent", "KEYCODE_HOME")
+    time.sleep(2)
+    res["proc_before"] = "com.heyta" in adb("ps", "-A")
+    res["blank"] = card_area_texts(f"wake-{tag}-blank")
+    note(f"  [{tag}] force-stop 后：进程在={res['proc_before']} 卡上={res['blank']}")
+    res["broadcast"] = widget_update_broadcast(f"wake-{tag}")
+    time.sleep(6)
+    res["proc_after"] = "com.heyta" in adb("ps", "-A")
+    adb("input", "keyevent", "KEYCODE_HOME")
+    time.sleep(2)
+    res["after"] = card_area_texts(f"wake-{tag}-after")
+    res["after_cjk"] = has_cjk(res["after"])
+    res["focus_after"] = focus_owner().strip()[:120]
+    note(f"  [{tag}] 广播后：进程被拉起={res['proc_after']} 卡上={res['after']}（前台={res['focus_after']}）")
+    shot(f"wake-{tag}-after.png")
+    return res
+
+
+def lang_leg():
+    """装机态上**应用内切中英文**，量那一枚已绑好的组件跟着不跟着换，
+    以及三种"之后"是否一致：**立刻**、**冷启动之后**、**组件独立唤醒之后**（=RN 层不参与，
+    只叫 provider）。用的是空态卡（本趟不造数据）—— 空态那句才是本地化串，有数据时卡上全是用户自己写的标题。"""
+    res = {}
+    size, cmps, aw_ids = bound_provider()
+    if any("TodayWidgetProvider" in c for c in cmps):
+        ids = sorted(widget_ids())
+        note(f"[语言腿] 复用桌面上已绑好的那枚：fav 行={ids}（appwidget id={aw_ids}）")
+    else:
+        ids = bind_one("今天的任务")
+    res["fav_ids"] = ids
+    res["start_language"] = current_app_language("lang-start-app")
+    adb("input", "keyevent", "KEYCODE_HOME")
+    time.sleep(2)
+    zh_texts = card_area_texts("lang-card-zh")
+    res["card_zh"] = zh_texts
+    note(f"[语言腿] 起点：应用语言={res['start_language']} 组件卡上读到={zh_texts}")
+    shot("lang-card-1-zh.png")
+
+    res["switch_en"] = set_language("en")
+    time.sleep(2)
+    en_texts = card_area_texts("lang-card-en")
+    res["card_en"] = en_texts
+    res["en_has_cjk"] = has_cjk(en_texts)
+    note(f"  切到英文之后组件卡上读到={en_texts}")
+    if res["en_has_cjk"]:
+        note(f"  ⚠️ 英文态卡上仍带汉字的行={res['en_has_cjk']}")
+    shot("lang-card-2-en.png")
+    res["wake_en"] = wake_leg("en")
+
+    res["switch_back"] = set_language("zh")
+    time.sleep(2)
+    back = card_area_texts("lang-card-back")
+    res["card_back_zh"] = back
+    note(f"  切回中文之后卡上={back}")
+    shot("lang-card-4-back-zh.png")
+    res["wake_zh"] = wake_leg("zh")
+    res["restored"] = current_app_language("lang-end-app")
+    note(f"  收尾：应用语言读成 {res['restored']}（共享载体必须留回中文）")
+    for fav_id in ids:
+        adb("content", "delete", "--uri", FAV, "--where", f"_id={fav_id}")
+    adb("am", "force-stop", LAUNCHER)
+    time.sleep(3)
+    res["widget_left"] = bound_provider()
+    note(f"  收掉本趟那枚实例之后残留 {res['widget_left']}")
+    return res
+
+
 def cleanup():
     """把本趟造的数据删掉 —— 这台模拟器是共享的，别的设备腿会按名字数自己的记录。"""
     done = {"tasks": [], "habit": False, "focus": None}
@@ -987,6 +1215,13 @@ try:
         killed = killed_leg()
         with open(f"{OUT}/killed.json", "w", encoding="utf-8") as fh:
             json.dump({"serial": SERIAL, "device": info, "log": log, **killed}, fh,
+                      ensure_ascii=False, indent=2)
+    if "lang" in PHASES:
+        adb("input", "keyevent", "KEYCODE_HOME")
+        time.sleep(2)
+        lang = lang_leg()
+        with open(f"{OUT}/lang.json", "w", encoding="utf-8") as fh:
+            json.dump({"serial": SERIAL, "device": info, "log": log, **lang}, fh,
                       ensure_ascii=False, indent=2)
     if "simult" in PHASES:
         adb("input", "keyevent", "KEYCODE_HOME")

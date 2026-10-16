@@ -1,0 +1,16 @@
+被测包 1.0 / lastUpdateTime=2026-10-16 17:08:39 / HEAD=27ab3c91
+[语言腿] 复用桌面上已绑好的那枚：fav 行=[7]（appwidget id=['24']）
+[语言腿] 起点：应用语言=zh 组件卡上读到=['注册 / 登录', '0']
+  lang-profile → rid:profile-entry-settings
+  lang-dir → rid:settings-section-general
+  点了 text:English ⇒ 应用语言现在读成 en
+  切到英文之后组件卡上读到=['2026-10-16 · 0/0', 'Nothing for today']
+  ⚠️ 英文态卡上仍带汉字的行=['2026-10-16 · 0/0']
+  force-stop（组件没重新发布）之后卡上=[]
+  lang-profile → rid:profile-entry-settings
+  lang-dir → rid:settings-section-general
+  点了 text:中文 ⇒ 应用语言现在读成 zh
+  切回中文之后卡上=['2026-10-16 · 0/0', '今天没有任务']
+  收尾：应用语言读成 zh（共享载体必须留回中文）
+  收掉本趟那枚实例之后残留 (0, [], [])
+SIZE AFTER ALL: (0, [], [])

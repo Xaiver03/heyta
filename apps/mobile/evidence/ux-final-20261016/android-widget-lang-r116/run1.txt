@@ -1,0 +1,8 @@
+被测包 1.0 / lastUpdateTime=2026-10-16 17:08:39 / HEAD=850ef792
+[今天的任务] 绑住 落点=(540,700) 新表行=[7] host widgets.size=1 provider=['com.heytamobile.widget.TodayWidgetProvider']
+[语言腿] 起点：应用语言=读不出(zh=False,en=False) 组件卡上读到=['2026-10-16 · 0/0', '今天没有任务']
+  进「我的」← text:我的
+  lang-profile → rid:profile-entry-settings
+  lang-dir → rid:settings-section-general
+  lang-general → rid:language
+切语言之前先读不清当前语言：读不出(zh=False,en=False)

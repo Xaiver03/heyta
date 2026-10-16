@@ -1097,6 +1097,20 @@ Android 主题刷新补强（2026-10-08 21:18）：四个 `RemoteViews` 渲染�
 - [x] macOS桥接同一Apple偏好；Web发送当前语言并串行处理快速切换/会话重启，不把语言写进任务或凭据。Web两文件17项及类型检查、macOS Release编译通过；证据见 `apps/web/evidence/ux-final-20261008/native-widget-locale/`。
 - [x] Windows新增同名原生语言桥、独立设备偏好与Provider监听；四模板文案消费i18n生成资源，没有独立手写词条表。macOS/Windows各35项真实文件和跨进程冒烟、Windows Provider及壳Debug编译通过。系统Board安装态语言切换仍待验。
 - [ ] 最终安装包实测中文/英文切换、冷启动/组件独立唤醒一致；不通过改变整个系统语言规避。源码测试不替代系统卡片。
+    - ✅ **10-16 20:2x：Android 那一档换成装机态读数了**（`apps/mobile/evidence/ux-final-20261016/android-widget-lang-r116/`，
+      被测包 `lastUpdateTime=2026-10-16 17:08:39` 那一枚，`HEAD=4e4515fd`）。走的是**应用自己的语言开关**
+      （我的 → 设置 → 常规 → 语言），四张截图的状态栏日期一直是中文「10月16日周五」而卡内是英文
+      ⇒ "不通过改变整个系统语言规避"这半句有正面凭据了。逐档：中文空态「今天没有任务」→ 切英文立刻变
+      「Nothing for today」（英文态残留中文 **0 行**）→ `force-stop` 后卡上 0 行 → **只给 provider 发一次显式
+      `APPWIDGET_UPDATE`** 就把卡画回来且是英文（进程被拉起、没有 Activity 起来 ⇒ RN/JS 一层没跑）→ 切回中文同理。
+      冷启动那一档也在这趟里：`force-stop` 之后重新起应用仍读成英文 ⇒ 语言是持久偏好，不是内存里那份。
+    - ⚠️ **这一格仍然不开，欠的是另外三端与另外两样东西**：① iOS / macOS / Windows 的装机态语言一致性没有读数；
+      ② Android 只测了「今日任务」一枚 provider 的**空态那一句**，四象限／习惯／专注三枚在英文态的卡内文案、
+      以及有数据时表头与桶名都没测；③ 真实用户路径上的"独立唤醒"是 30 分钟系统定时器
+      （`widget_today_info.xml` 的 `updatePeriodMillis="1800000"`），本趟是**把广播直接送给 provider**，
+      两者进的是同一段 `BaseWidgetProvider.onUpdate → WidgetRefresh.pushAll`，
+      所以"定时器到点自己重画且语言正确"那半句是代码同段推出来的，**不是观测到的**。
+      跨日过期那句「数据已过期，打开 Heyta 刷新」在英文态长什么样也没测。
 
 ### UX-S9-144：助手历史与运行身份的最终隔离复审（2026-10-08）
 

@@ -31,7 +31,7 @@ OUT = (sys.argv[2] if len(sys.argv) > 2 else ".").rstrip("/")
 PHASES = set((sys.argv[3] if len(sys.argv) > 3 else "all").split(","))
 PHASE = "all" if "all" in PHASES else ",".join(sorted(PHASES))
 
-PREFIX = "L114"
+PREFIX = os.environ.get("LEG_PREFIX", "L114")  # 换一趟就改这个环境变量，别改标题形状
 # 🔴 标题里**不许有 `-` 与 `!`**：这台模拟器（`system_locales=zh-Hans-CN`）上 `input text`
 #    会把它们打成全角 `－` `！`，而且**与 IME 开关无关** ——
 #    现量三档 A/B（关 IME + 冷启动 / 开 IME + 冷启动 / 再关一次 + 冷启动）打的都是
@@ -245,26 +245,60 @@ def dismiss_gates():
             ns = dump("gates")
 
 
+def todo_count(ns):
+    """清单顶部那句「N 项待办，M 项已完成」—— 这是**独立于逐行**的一把尺。"""
+    for n in ns:
+        m = re.match(r"(\d+) 项待办", n["text"] or "")
+        if m:
+            return int(m.group(1))
+    return None
+
+
 def delete_prefix_rows():
-    """删掉**所有**标题里带 L114 的行（含上一趟打歪成 `L114－urgent－important ！1` 的那些）。
+    """删掉**所有**标题里带本趟前缀的行（含上一趟打歪成 `L114－urgent－important ！1` 的那些）。
     🔴 必须按前缀整族删，不能只删本趟要建的那几个名字 —— 上一趟留下的行会一起进组件卡，
-    那一张图就不是"本趟造的数"了。"""
-    deleted = []
-    for _ in range(12):
-        ns = dump("pre-clean")
+    那一张图就不是"本趟造的数"了。
+    🔴 而且**必须滚着删**：r115 第一次跑照出这一枚只删"当前一屏可见的那几行"，
+    于是 r114 那趟的清理只删掉了 4 行、清单顶部仍写着「8 项待办」——
+    残留的同族行会一起进组件卡，那才是这条判据要防的事。"""
+    start = todo_count(dump("pre-clean-top"))
+    deleted = 0
+    idle = 0
+    for i in range(60):
+        ns = dump(f"pre-clean-{i}")
         hit = [n for n in ns if n["desc"].startswith("删除任务：") and PREFIX in n["desc"]]
-        if not hit:
-            break
-        tap(hit[0])
-        time.sleep(1.5)
-        ns = dump("confirm")
-        btn = find_control(ns, "删除")
-        if btn:
-            tap(btn[0])
+        if hit:
+            idle = 0
+            tap(hit[0])
             time.sleep(1.5)
-        deleted.append(hit[0]["desc"])
-    if deleted:
-        note(f"  先删掉 {len(deleted)} 行旧的同族数据")
+            btn = find_control(dump(f"confirm-{i}"), "删除")
+            if btn:
+                tap(btn[0])
+                time.sleep(1.5)
+            # 🔴 计数要记在**点了那一行**上，不是记在"确认按钮找到了"上：
+            #    这枚控件在很多形状下是**直接删**（没有确认框），r115 现量过一次 ——
+            #    当时这里写成"只有找到确认框才 +1"，于是删掉 4 行却报 0，
+            #    是旁边那把「N 项待办」的尺（8 → 4）把这条报出来的。
+            deleted += 1
+            continue
+        seen = {n["desc"] for n in ns if n["desc"].startswith("删除任务：")}
+        adb("input", "swipe", "540", "1700", "540", "700", "600")
+        time.sleep(1.2)
+        after = dump(f"pre-clean-s{i}")
+        if {n["desc"] for n in after if n["desc"].startswith("删除任务：")} == seen:
+            idle += 1
+            if idle >= 3:
+                break
+        else:
+            idle = 0
+    for _ in range(4):
+        adb("input", "swipe", "540", "700", "540", "1700", "400")
+        time.sleep(0.8)
+    left = todo_count(dump("pre-clean-end"))
+    note(f"  整族删掉 {deleted} 行；清单顶部「N 项待办」{start} → {left}")
+    if deleted and start is not None and left is not None and start - deleted != left:
+        note(f"  ⚠️ 两把尺对不上：删了 {deleted} 行但总数只少了 {start - left} —— "
+             "要么有一行没真删掉，要么顶部那句数的不是同一件事")
     return deleted
 
 
@@ -294,7 +328,16 @@ def create_task(spec):
 def edit_task(spec):
     """进详情：需要的话把截止设成今天、勾上重要，然后返回。"""
     title = spec["title"]
-    tap(pick(dump("open"), desc=f"打开任务：{title}", clickable=True)[0])
+    # 🔴 单次 `dump` + `[0]` 是这枚装置的旧伤：dump 失败时返回空列表 ⇒ 抛 IndexError，
+    #    报出来的栈完全看不出"其实那一屏没读到"（现量：r115 第一次跑就死在这里）。
+    #    换成有界的 `wait_for`，等不到就报**它等不到什么**。
+    node, steps = scroll_find(f"打开任务：{title}", "open-scroll")
+    if node is None:
+        raise SystemExit(f"滚了 {steps} 次仍找不到「打开任务：{title}」——"
+                         "清单里那一行不在可视区之外，或它根本没建成")
+    if steps:
+        note(f"  （滚了 {steps} 下才到「{title}」）")
+    tap(node)
     time.sleep(2)
     touched = []
     if spec.get("due_today"):
@@ -640,6 +683,122 @@ def simult():
     return {"placed": placed, "tiers": out}
 
 
+def bind_one(name):
+    """绑一枚并**留着不删**（点卡片那一档要它一直在桌面上）。"""
+    for (dx, dy) in DROP_POINTS:
+        before = widget_ids()
+        ns, cells = open_group()
+        cx, cy = cell_of(name, ns, cells)
+        adb("input", "draganddrop", str(cx), str(cy), str(dx), str(dy), "2500")
+        time.sleep(4)
+        new = sorted(widget_ids() - before)
+        if not new:
+            note(f"[{name}] 落点=({dx},{dy}) 被拒（favorites 表没新增行）")
+            continue
+        size, cmps, ids = bound_provider()
+        if not any(c.endswith(PROVIDER[name]) for c in cmps):
+            raise SystemExit(f"{name} 绑到了别的 provider：{cmps}")
+        note(f"[{name}] 绑住 落点=({dx},{dy}) 新表行={new} host widgets.size={size} provider={cmps}")
+        return new
+    raise SystemExit(f"{name} 在 {DROP_POINTS} 四个落点上都没放下")
+
+
+def card_rows(tag):
+    ns = dump(tag)
+    return [(n["text"], n["b"]) for n in ns if n["text"] and PREFIX in n["text"]]
+
+
+def tap_row(rows, title, tag):
+    """点那一行**最左边 25px**（`○`/`✓` 那枚符号住在那儿）。
+    ⚠️ 点标题会走另一条意图（打开应用），那一档要量的正是这两条分不分得开。"""
+    hit = next(((t, b) for t, b in rows if t.endswith(title)), None)
+    if not hit:
+        raise SystemExit(f"{tag}：这一屏没有以「{title}」结尾的行：{[t for t, _ in rows]}")
+    x = hit[1][0] + 25
+    y = (hit[1][1] + hit[1][3]) // 2
+    adb("input", "tap", str(x), str(y))
+    note(f"  点了 ({x},{y}) ← 行 {hit[0]!r} bounds={hit[1]}")
+    return {"x": x, "y": y, "row": hit[0], "bounds": list(hit[1])}
+
+
+def poll_rows(tag, tries, first=3):
+    """每次读数**换 tag**（同一条腿被 #439 咬过：同名文件读到的是上一屏）。
+    读数节奏：第一次等 3s，之后每 5s 一次，共 `tries` 次。"""
+    rows, waited = [], 0
+    for i in range(tries):
+        step = first if i == 0 else 5
+        time.sleep(step)
+        waited += step
+        rows = card_rows(f"{tag}-{i}")
+        if any(t.startswith("✓") for t, _ in rows):
+            note(f"  [{tag}] 约 {waited}s 时出现 ✓：{[t for t, _ in rows]}")
+            return waited, rows
+    note(f"  [{tag}] {tries} 次读数（累计约 {waited}s）都没出现 ✓：{[t for t, _ in rows]}")
+    return None, rows
+
+
+def click_leg():
+    """装机态上**真的用手指点卡片那一行**，量两条：
+    ① 应用进程活着时，点一下多久回写（卡上 `○`→`✓`）；
+    ② 应用被 `am force-stop` 之后点同一枚控件，队列是不是**留着等应用起来**再排空。
+    """
+    res = {}
+    fav = bind_one("今天的任务")
+    res["fav_ids"] = fav
+    adb("input", "keyevent", "KEYCODE_HOME")
+    time.sleep(2)
+    before = card_rows("click-before")
+    note(f"[点卡片] 未点：{[t for t, _ in before]}")
+    res["before"] = [t for t, _ in before]
+
+    # ① 进程活着（seed 刚跑完，按 HOME 只是退到桌面）
+    ps = adb("ps", "-A")
+    res["app_alive_before"] = "com.heyta" in ps
+    note(f"  点之前 com.heyta 进程在不在：{res['app_alive_before']}")
+    tap = tap_row(before, TASKS[0]["title"], "①活着")
+    tick, rows = poll_rows("click-alive", 5)
+    res["alive"] = {"tap": tap, "tick": tick, "rows": [t for t, _ in rows]}
+    shot("click-alive-after.png")
+
+    # ② 进程被杀掉
+    adb("am", "force-stop", "com.heyta")
+    time.sleep(2)
+    res["app_alive_before2"] = "com.heyta" in adb("ps", "-A")
+    note(f"  force-stop 之后 com.heyta 进程在不在：{res['app_alive_before2']}")
+    rows2 = card_rows("click-killed-before")
+    tap2 = tap_row(rows2, TASKS[1]["title"], "②已杀")
+    tick2, rows3 = poll_rows("click-killed", 3)
+    res["killed"] = {"tap": tap2, "tick": tick2, "rows": [t for t, _ in rows3]}
+    shot("click-killed-after.png")
+
+    # ③ 把应用叫起来，看那条排不排空
+    launch_app(fresh=False)
+    time.sleep(6)
+    adb("input", "keyevent", "KEYCODE_HOME")
+    time.sleep(3)
+    rows4 = card_rows("click-woken")
+    res["woken"] = [t for t, _ in rows4]
+    note(f"  应用起来之后：{res['woken']}")
+    shot("click-woken-after.png")
+
+    # ④ 应用自己的清单是不是也认这两条已完成
+    launch_app(fresh=False)
+    dismiss_gates()
+    go_tab("任务")
+    time.sleep(2)
+    ns = dump("click-applist")
+    res["applist_rows"] = [n["desc"] or n["text"] for n in ns if (n["desc"] or n["text"]).startswith("打开任务")]
+    note(f"  应用清单里那几条：{res['applist_rows']}")
+    shot("click-applist.png")
+    for fav_id in fav:
+        adb("content", "delete", "--uri", FAV, "--where", f"_id={fav_id}")
+    adb("am", "force-stop", LAUNCHER)
+    time.sleep(3)
+    res["widget_left"] = bound_provider()
+    note(f"[点卡片] 收掉本趟实例之后残留 {res['widget_left']}")
+    return res
+
+
 def cleanup():
     """把本趟造的数据删掉 —— 这台模拟器是共享的，别的设备腿会按名字数自己的记录。"""
     done = {"tasks": [], "habit": False, "focus": None}
@@ -731,6 +890,13 @@ try:
         cases = capture()
     else:
         cases = []
+    if "click" in PHASES:
+        adb("input", "keyevent", "KEYCODE_HOME")
+        time.sleep(2)
+        clicked = click_leg()
+        with open(f"{OUT}/click.json", "w", encoding="utf-8") as fh:
+            json.dump({"serial": SERIAL, "device": info, "log": log, **clicked}, fh,
+                      ensure_ascii=False, indent=2)
     if "simult" in PHASES:
         adb("input", "keyevent", "KEYCODE_HOME")
         time.sleep(2)

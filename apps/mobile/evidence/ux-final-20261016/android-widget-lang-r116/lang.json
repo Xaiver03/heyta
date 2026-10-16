@@ -1,0 +1,92 @@
+{
+  "serial": "emulator-5554",
+  "device": {
+    "versionName": "1.0",
+    "lastUpdateTime": "2026-10-16 17:08:39",
+    "release": "16",
+    "system_locales": "zh-Hans-CN",
+    "head": "4e4515fd59bbf058def9b53f8487fe333c8834f9",
+    "imes_disabled": [
+      "com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME",
+      "com.google.android.tts/com.google.android.apps.speech.tts.googletts.settings.asr.voiceime.VoiceInputMethodService"
+    ]
+  },
+  "log": [
+    "被测包 1.0 / lastUpdateTime=2026-10-16 17:08:39 / HEAD=4e4515fd",
+    "[今天的任务] 绑住 落点=(540,700) 新表行=[7] host widgets.size=1 provider=['com.heytamobile.widget.TodayWidgetProvider']",
+    "[语言腿] 起点：应用语言=zh 组件卡上读到=['2026-10-16 · 0/0', '今天没有任务']",
+    "  lang-profile → rid:profile-entry-settings",
+    "  lang-dir → rid:settings-section-general",
+    "  点了 text:English ⇒ 应用语言现在读成 en",
+    "  切到英文之后组件卡上读到=['2026-10-16 · 0/0', 'Nothing for today']",
+    "  [en] force-stop 后：进程在=False 卡上=[]",
+    "  wake-en 广播回执：Broadcast completed: result=0",
+    "  [en] 广播后：进程被拉起=True 卡上=['2026-10-16 · 0/0', 'Nothing for today']（前台=WINDOW MANAGER LAST ANR (dumpsys window lastanr)\n  <no ANR has occurred since boot>\n\nWINDOW MANAGER POLICY STATE (dumpsy）",
+    "  lang-profile → rid:profile-entry-settings",
+    "  lang-dir → rid:settings-section-general",
+    "  点了 text:中文 ⇒ 应用语言现在读成 zh",
+    "  切回中文之后卡上=['2026-10-16 · 0/0', '今天没有任务']",
+    "  [zh] force-stop 后：进程在=False 卡上=[]",
+    "  wake-zh 广播回执：Broadcast completed: result=0",
+    "  [zh] 广播后：进程被拉起=True 卡上=['2026-10-16 · 0/0', '今天没有任务']（前台=WINDOW MANAGER LAST ANR (dumpsys window lastanr)\n  <no ANR has occurred since boot>\n\nWINDOW MANAGER POLICY STATE (dumpsy）",
+    "  收尾：应用语言读成 zh（共享载体必须留回中文）",
+    "  收掉本趟那枚实例之后残留 (0, [], [])"
+  ],
+  "fav_ids": [
+    7
+  ],
+  "start_language": "zh",
+  "card_zh": [
+    "2026-10-16 · 0/0",
+    "今天没有任务"
+  ],
+  "switch_en": {
+    "from": "zh",
+    "tapped": "text:English"
+  },
+  "card_en": [
+    "2026-10-16 · 0/0",
+    "Nothing for today"
+  ],
+  "en_has_cjk": [],
+  "wake_en": {
+    "proc_before": false,
+    "blank": [],
+    "broadcast": "Broadcasting: Intent { act=android.appwidget.action.APPWIDGET_UPDATE flg=0x400020 cmp=com.heyta/com.heytamobile.widget.TodayWidgetProvider }\nBroadcast completed: result=0\n",
+    "proc_after": true,
+    "after": [
+      "2026-10-16 · 0/0",
+      "Nothing for today"
+    ],
+    "after_cjk": [],
+    "focus_after": "WINDOW MANAGER LAST ANR (dumpsys window lastanr)\n  <no ANR has occurred since boot>\n\nWINDOW MANAGER POLICY STATE (dumpsy"
+  },
+  "switch_back": {
+    "from": "en",
+    "tapped": "text:中文"
+  },
+  "card_back_zh": [
+    "2026-10-16 · 0/0",
+    "今天没有任务"
+  ],
+  "wake_zh": {
+    "proc_before": false,
+    "blank": [],
+    "broadcast": "Broadcasting: Intent { act=android.appwidget.action.APPWIDGET_UPDATE flg=0x400020 cmp=com.heyta/com.heytamobile.widget.TodayWidgetProvider }\nBroadcast completed: result=0\n",
+    "proc_after": true,
+    "after": [
+      "2026-10-16 · 0/0",
+      "今天没有任务"
+    ],
+    "after_cjk": [
+      "今天没有任务"
+    ],
+    "focus_after": "WINDOW MANAGER LAST ANR (dumpsys window lastanr)\n  <no ANR has occurred since boot>\n\nWINDOW MANAGER POLICY STATE (dumpsy"
+  },
+  "restored": "zh",
+  "widget_left": [
+    0,
+    [],
+    []
+  ]
+}
