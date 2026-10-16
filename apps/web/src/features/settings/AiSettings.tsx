@@ -341,6 +341,14 @@ function presetText(
 }
 
 export interface AiSettingsProps {
+  /**
+   * 本节点当前是否真的显示给用户（设置面板是"全部挂载 + hidden 切换"，不是按需挂载）。
+   *
+   * 🔴 必须往下传给 `InboundAutomationSettings`：它是那里事件列表刷新与草稿编辑器渲染的轴
+   * （`active` 在 `refresh` 的依赖里）。不传时它默认 `true`，于是"切走再切回来"不会重新拉列表，
+   * 面板把上一次的状态原样留着显示。它**不**参与后台处理是否可跑 —— 那一条只看页面开着没。
+   */
+  active?: boolean;
   initial: PersistedAiSettings;
   secrets: SessionSecretStore;
   /** 配置变化时回调（外部持久化）。默认直接存 localStorage。 */
@@ -366,7 +374,7 @@ export interface AiSettingsProps {
   focusTarget?: SettingsTarget | undefined;
 }
 
-export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget }: AiSettingsProps) {
+export function AiSettings({ active = true, initial, secrets, onChange, memorySlot, focusTarget }: AiSettingsProps) {
   const [settings, setSettings] = useState<PersistedAiSettings>(initial);
   const [keyDraft, setKeyDraft] = useState<Record<string, string>>({});
   const [localTokenVisible, setLocalTokenVisible] = useState(false);
@@ -1267,7 +1275,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget
         )}
       </section>
 
-      <InboundAutomationSettings routing={settings.routing} consents={settings.consents} secretStore={secrets} />
+      <InboundAutomationSettings active={active} routing={settings.routing} consents={settings.consents} secretStore={secrets} />
 
       <p className="ht-settings__notice" data-testid="key-notice">
         <Lock size={ICON_SIZE.xs} aria-hidden="true" />

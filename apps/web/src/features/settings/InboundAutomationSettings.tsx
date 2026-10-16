@@ -82,13 +82,22 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
     : undefined, [baseUrl, signedIn, token]);
 
   const refresh = useCallback(async (): Promise<void> => {
-    if (!active || remote === undefined) { setRules([]); setEvents([]); return; }
+    if (remote === undefined) { setRules([]); setEvents([]); return; }
     setLoading(true); setError(undefined);
     try {
-      const [nextRules, nextEvents] = await Promise.all([remote.list(), remote.listEvents()]);
-      setRules(nextRules); setEvents(nextEvents);
-      const credentialResults = await Promise.allSettled(nextRules.filter((rule) => rule.deletedAt === null).map(async (rule) => [rule.id, await remote.listSenderCredentials(rule.id)] as const));
-      setCredentials(Object.fromEntries(credentialResults.flatMap((result) => result.status === 'fulfilled' ? [result.value] : [])));
+      /**
+       * 🔴 规则、收件包、worker 在册这三项**不看 `active`**：页内那条循环是 web 端唯一的后台处理通道
+       * （`registerWebInboundWorker` 注册的是服务端凭据，仓里没有浏览器 ServiceWorker 那条腿），而协议里
+       * 承诺的边界是"页面开着就处理"，不是"这一节正显示才处理"。`active` 只管下面那两样显示态。
+       */
+      const nextRules = await remote.list();
+      setRules(nextRules);
+      if (active) {
+        const nextEvents = await remote.listEvents();
+        setEvents(nextEvents);
+        const credentialResults = await Promise.allSettled(nextRules.filter((rule) => rule.deletedAt === null).map(async (rule) => [rule.id, await remote.listSenderCredentials(rule.id)] as const));
+        setCredentials(Object.fromEntries(credentialResults.flatMap((result) => result.status === 'fulfilled' ? [result.value] : [])));
+      } else setEvents([]);
       if (accountId !== undefined && token !== undefined) {
         const response = await consentFetch(new URL('/api/automation/recipient-key', baseUrl), { headers: { authorization: `Bearer ${token}` } });
         if (response.ok) {
@@ -114,7 +123,9 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
     closeDraft();
     setOneTimeSecret(undefined); setSecretCopied(false); setTestSendState(undefined);
     return () => { draftGeneration.current++; draftDisposer.current?.(); draftDisposer.current = undefined; };
-  }, [draftBinding, active, closeDraft]);
+    // 🔴 依赖里没有 `active`：切到别的设置节不该丢掉一份没提交的草稿编辑（面板是 hidden 不是卸载）。
+    // 换账号/换服务端才清；真过期了由 CAS 与 `onInvalidated` 那条路清。
+  }, [draftBinding, closeDraft]);
 
   const reviewer = () => {
     if (!accountId || !token) throw new Error('Inbound account is unavailable');
@@ -312,8 +323,9 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
 
   const liveWorker = useRef({ processOne, runnable: false });
   useEffect(() => {
-    liveWorker.current = { processOne, runnable: active && workerRegistered && recipient !== undefined && routing.enabled && rules.some((item) => item.enabled) };
-  }, [active, processOne, recipient, routing.enabled, rules, workerRegistered]);
+    // 🔴 这里刻意不吃 `active`：离开这一节只让列表停显示，不该让收集停摆（见 refresh 上面那段）。
+    liveWorker.current = { processOne, runnable: workerRegistered && recipient !== undefined && routing.enabled && rules.some((item) => item.enabled) };
+  }, [processOne, recipient, routing.enabled, rules, workerRegistered]);
 
   useEffect(() => {
     const stop = startInboundWorkerLoop({
