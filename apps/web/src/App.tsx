@@ -3226,6 +3226,7 @@ export function App(): React.JSX.Element {
                 {t('web.settings.nav.aiIntegrations')}
               </h2>
               <AiSettings
+                active={activeSettingsSection === 'settings-group-ai'}
                 initial={aiSettings}
                 secrets={aiSecrets}
                 focusTarget={settingsFocus}
