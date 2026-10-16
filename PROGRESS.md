@@ -5412,3 +5412,15 @@ AC 已勾数仍为 **0**（`verify-inbound-ac-ticks.py`：`AC 行=8　已勾=0�
 - **别重做这些**（今天已量到当前 tip）：T8 表八格＋下面 12 档分母＋真库腿 46＋双宿主 13/13＋四把变异/产物尺＋矩阵与生产者缝＋AC-6 真浏览器腿（当日实测仍红 2 枚）。三节台账按序是 `14:2x`、`14:3x–14:5x`、`14:5x 第 6–7 条`。
 - **本会话最后一枚提交**（tip 请现量 `git rev-parse --short HEAD`，别抄这行的号）：`91654a87` 之前依次为 `63469262`、`bd4152da`、`424beed0`、`c197be66`、`f6419c05`、`675b7b92`、`8feec99d`。全部只本地、没 push、每笔点名字段并读回文件数。
 - 🔴 **下一趟开头先防的三个坑（今天全踩过）**：① 表格单元里出现竖线（含照抄命令字面）会被 `verify-inbound-doc-tables.py` 当列分隔符；② 🔴 戳号**下笔前跑一次 `date`**，跨空闲段用落盘件 mtime；③ **"这一档要 X 才能做"里的 X 是需要实测的负结论**——今天两次把推测登记成阻塞（真库腿 12 秒、设备面其实就在册）。
+
+## 2026-10-16 16:4x · B140 落库了，而"接上 active"里藏着一条会把产品说反的岔路（自动收集线）
+
+写前先跑 `date`（本机 16:43）。负责人回「同意」之后，第 1 步（B140）已经做完并入库（`git show --name-only <那一笔>` 读回 4 枚；tip 现量 `git rev-parse --short HEAD`）。
+
+1. **落点**：接线三处（`App.tsx` 把节名给 `<AiSettings>` → `AiSettings.tsx` props 加可选 `active`、解构处默认 `true` → 同文件转发给 `<InboundAutomationSettings>`）**之外**多了面板内三处：`refresh` 里把"离开这一节"从"清 rules+events 并早退"改成"只清 events"；worker 的 `runnable` 去掉 `active`；关草稿那条 effect 的依赖去掉 `active`。**为什么不能照点头时说的样子接**：`active` 同时挂在 worker 闸门与关草稿上，照原样接等于把协议那句「桌面关闭应用与浏览器关闭页面都不保证处理」降级成「坐在 设置 › AI 集成 那一节才处理」，还会每次切节丢掉未提交的草稿编辑；而 `grep -rlE 'inbound|automation' apps/web/src/pwa/` 回 **0 枚** ⇒ 页内循环是 web 端唯一后台通道，这一格没有第二条腿兜得住。
+2. **两头读数（红与绿都取到了）**：`cd e2e && npx --no-install playwright test --config playwright.inbound.config.ts` ⇒ 改前 `2 failed / 6 passed` rc=1（14:45 那戳，靠窄尺 `git diff --name-only d2dd3dc6 HEAD` 排除 `docs/` 与 `*/evidence/` 回 0 行确认对本次仍有效），改后 **`8 passed` rc=0**（15:38、16:35 两趟）。新用例 `apps/web/tests/inbound-section-active.spec.tsx` 带改动 rc=0、把面板撤到旧代码 rc=1（**能失败**才登记）。typecheck rc=0；jsdom inbound 批 `8 files / 19 tests` rc=0（基线 7/18，只涨本线那一枚）；生产者缝 rc=0。
+3. 🔴 **这一节最该带走的一条读数纪律**：apps/web 整串在 5 分钟负载 152 那一戳报 **11 枚红／7 枚文件**，而低负载（`sysctl -n vm.loadavg` 现量 1 分钟 7.5）同一棵树只报 **1 枚**。定性办法不是"我猜是负载"，是**两头对照**：把红的那 7 枚孤立重跑，带改动与撤掉改动两边逐字相同（1 红 6 绿）⇒ 其余 6 枚是整串并发下的负载形状。**别拿整串并发读数当因果证据**，也别据此登记阻塞。剩下那一枚是别线提交态既存红，已按"顺手活不代改"登记成 **B204**（三条指认在正文里，含单枚孤立命令）。
+4. **范围尺要说准**：`verify-inbound-commit-scope.py` 现在 rc=1、越界=3，**但它在本笔之前已经是 1**（第三枚指 `79e8ede1` 10-11 那笔别线提交，B169 那格口径）。本线是把 1 变成 3。要不要把这两枚授权过的路径写进它的 `WHITELIST` **等负责人点头**（判据口径不代改；这枚装置 `grep -rn "verify-inbound-commit-scope" package.json docs/agents` 回 **0 处**，没有自动消费者、不拦链）。
+5. **AC 一格没勾**：现量 `python3 research/tools/verify-inbound-ac-ticks.py` ⇒ `已勾=0、未勾=8`。AC-6 今天可以说"真浏览器腿在当前代码上绿、并有一条能红的用例钉住后台收集不跟节走"，不能替负责人说"AC-6 完成"。
+6. **下一步只剩第 2 步**：按上面「14:5x 第 6–7 条」那份配方，在隔离副本里把 `pnpm reinstall:all` **整条**跑到固定收尾（权威口径 `docs/agents/multi-end-build.md` §6.1.1），再做 Linux 交付取证。起跑前四条现场读数是瞬时值，**必须当下重量**（`adb devices`、`xcrun simctl list devices booted`、`sysctl -n vm.loadavg`、`ps Axo command` 里有没有别人的 `verify-mobile`／`reinstall-all`）。红线照旧：不许半跑、不许只跑一端。"人真打开看过截图"那一格在负责人手上。
+7. **待点头清单**（本线只登记，不代拍）：范围尺 `WHITELIST` 要不要收这两枚（新）；B196 四枚缺失 `check:*`；B201 五阶链；B110 `waiting-entitlement` 词条；AC-7 那句对外措辞；12 枚 `apps/web/evidence/inbound-recovery/*.png` 的处置；B199 完成条件2 无开工快照；`.worktrees/inb-t9` 的处置。B203 已自结（见 BLOCKED）。
