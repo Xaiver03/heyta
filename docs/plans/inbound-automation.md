@@ -2035,6 +2035,42 @@ packages/app-host typecheck: tests/login-code.spec.ts(44,5): error TS2578: Unuse
 `server/src/automation/entitlement-ticket.ts` / `packages/inbound-core/src/webhook.ts` / `server/src/entitlement.ts`
 的工作树 sha256 与 `git show HEAD:<路径>` 的 sha256 **逐字相同**（前 16 位 `16e0be2bd9c0859a` / `3e19ec5e63ef86b8` / `954506a226d929a8`）。
 
+🔴 **10-16 14:3x 复量：上面那句有两处不成立，第二处比第一处坏；而正确的修法不是换一批前缀。**
+（本节写前先跑 `date` = 14:31 / 14:36 CST；旧句一字未改，留着当 10-11 那一戳的证据。）
+
+**同戳读数**（四把尺都在私有载具 `.worktrees/inb-t9` = 载体 `f7712df7`；载具身份用窄尺现量
+`git diff --name-only f7712df7 HEAD -- server/src server/tests packages apps/web/src apps/mobile/src e2e research/tools scripts`
+= **0 行** ⇒ 这四枚读数算到当前 tip）：
+
+- `verify-inbound-queue-teeth.py` 14:35:50–14:35:54 **rc=0**，`臂数=6　不成立=0　末次 sha256=52c3fd707977a03e（须等于开局那枚）`
+- `verify-inbound-ticket-teeth.py` 14:28:58 **rc=0**，`臂数=8　不成立=0`
+- `verify-inbound-quota-teeth.py` 14:29:15 **rc=0**，`臂数=7　不成立=0`
+- `verify-inbound-cjs-require-order.py` 14:29:19 **rc=0**，结论行照旧（"产物一加载就崩"这一类没有）
+
+**① 值漂**：那三枚前缀在当前 tip `56cd857f` 上已是 `8202b23b7638e111` / `1881a0e1b94b421b` / `4b97418c02779df8`
+（现量：`for p in server/src/automation/entitlement-ticket.ts packages/inbound-core/src/webhook.ts server/src/entitlement.ts; do printf '%s HEAD=%s 工作树=%s\n' "$p" "$(git show HEAD:$p | shasum -a 256 | cut -c1-16)" "$(shasum -a 256 $p | cut -c1-16)"; done`
+—— 同戳两侧逐枚相等，说明工作树没有残留，但**相等的那一枚已不是正文里那三枚**）。
+推掉它们是**本线自己** 10-12 那两笔：`c5561959 10-12 18:04`（一笔同时推了前两枚）、`f2a94651 10-12 04:11`（推第三枚），
+逐枚归因取法 `git log --format='%h %ad %s' --date=format:'%m-%d %H:%M' -1 -- <那枚路径>`。
+⚠ 上面那条现量命令**带竖线，只能住在正文段落里**，写进表格单元会被 `verify-inbound-doc-tables.py` 当成列分隔符（同一形状在 AC-1 那格已登记过）。
+
+**② 集合漂（这一形没有任何一层会响）**：那两枚文件 `entitlement-ticket.ts`、`packages/inbound-core/src/webhook.ts`
+**今天的三枚变异臂根本不打开**。装置本体在 `44749ddd`（10-12 16:11）重写过（现量
+`git log --format='%h %ad %s' --date=format:'%m-%d %H:%M' -1 -- research/tools/verify-inbound-ticket-teeth.py`），
+当下自报的被临时改写对象是**四枚**、逐枚都在本线白名单内：`server/src/api.ts` 与 `server/src/entitlement.ts`（ticket 臂）、
+`server/src/api.ts` 与 `server/src/automation/ai-metering.ts`（quota 臂）、`server/src/automation/inbound.routes.ts`（queue 臂）。
+所以"那三枚文件"这句描述的**对象集合**已经不存在，而不只是数值过期 —— 它不会让任何东西变红，
+只会把下一位去对账的人引到两枚从没被这轮臂碰过的文件上。
+
+**⇒ 这一栏的职能交回装置自己，正文只留取法**：三枚臂都印 `开局 sha256=…` 与 `末次 sha256=…（须等于开局那枚）`，
+还原失配就 `RESTORE_FAILED 开局 … 现量 …` 并 **exit 3**（读被调本体确认过，不是从输出反推），
+所以"改回来没有"这件事**本来就有执行者**，不需要正文里那串手抄前缀。取法：跑完读那趟落盘日志的自报两行
+（`grep -n 'sha256' <那趟的 .out>`），本戳四枚自报值 `6747e4dab9a4dbea` / `4b97418c02779df8` /
+`5e9da227946f41af` / `52c3fd707977a03e` 与 **HEAD、共享检出工作树、载具工作树** 三处逐枚相等（14:34 同戳量）。
+再加一条外部对账，防"开局＝末次"是在一份**起跑前就脏着**的副本上成立的：跑完后
+`git -C .worktrees/inb-t9 status --porcelain` 的**非 png 条目数现量 = 0**（14:36 量；那 15 条脏目逐枚都是
+`*/evidence/*.png` 截图，没有一枚是源码）。
+
 ### 3. 本批当场查出的一条生产缺陷（属于本线，已修并有尺）
 
 **形状**：`server` 的 tsconfig 是 `"module": "commonjs"`，TypeScript 把每枚 `require` 落在它对应
