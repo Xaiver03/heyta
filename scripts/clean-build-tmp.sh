@@ -102,10 +102,15 @@ classify() {
   echo unknown
 }
 
-# 文件/目录的年龄（小时，整数）。macOS 与 GNU 的 `stat` 参数不同，两路都试。
+# 文件/目录的年龄（小时，整数）。
+# 🔴 mtime 用 `date -r 文件 +%s` 取，**不写 `stat`**：GNU 与 BSD 的 `stat` 把同一个 `-f` 读成
+#    两件不同的事 —— GNU 那侧 rc 非零但 **stdout 非空**（吐一整块文件系统统计，§7 第 364 条的
+#    实测表），所以"两侧各写一支再靠 `||` 串起来"这种形状在**管道里**那条兜底是死代码。
+#    `date -r 文件 +%s` 两侧同形同值（macOS 现量：BSD `date -r` == BSD `stat` 的 `%m`
+#    == GNU `date -r` == GNU `stat` 的 `%Y`，四者都是同一串整数）。
 age_hours_of() {
   local p="$1" mtime now
-  mtime=$(stat -f %m "$p" 2>/dev/null || stat -c %Y "$p" 2>/dev/null) || return 1
+  mtime=$(date -r "$p" +%s 2>/dev/null) || return 1
   now=$(date +%s)
   echo $(( (now - mtime) / 3600 ))
 }
