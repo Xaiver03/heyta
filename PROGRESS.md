@@ -5424,6 +5424,7 @@ AC 已勾数仍为 **0**（`verify-inbound-ac-ticks.py`：`AC 行=8　已勾=0�
 5. **AC 一格没勾**：现量 `python3 research/tools/verify-inbound-ac-ticks.py` ⇒ `已勾=0、未勾=8`。AC-6 今天可以说"真浏览器腿在当前代码上绿、并有一条能红的用例钉住后台收集不跟节走"，不能替负责人说"AC-6 完成"。
 6. **下一步只剩第 2 步**：按上面「14:5x 第 6–7 条」那份配方，在隔离副本里把 `pnpm reinstall:all` **整条**跑到固定收尾（权威口径 `docs/agents/multi-end-build.md` §6.1.1），再做 Linux 交付取证。起跑前四条现场读数是瞬时值，**必须当下重量**（`adb devices`、`xcrun simctl list devices booted`、`sysctl -n vm.loadavg`、`ps Axo command` 里有没有别人的 `verify-mobile`／`reinstall-all`）。红线照旧：不许半跑、不许只跑一端。"人真打开看过截图"那一格在负责人手上。
 7. **待点头清单**（本线只登记，不代拍）：范围尺 `WHITELIST` 要不要收这两枚（新）；B196 四枚缺失 `check:*`；B201 五阶链；B110 `waiting-entitlement` 词条；AC-7 那句对外措辞；12 枚 `apps/web/evidence/inbound-recovery/*.png` 的处置；B199 完成条件2 无开工快照；`.worktrees/inb-t9` 的处置。B203 已自结（见 BLOCKED）。
+8. 🔴 **18:36 追加（旧文一个字不改）——本节第 6 条与上一节「2026-10-16 14:5x · 停损与交接」开头那句「一句话状态」，都被紧随本节之后的那一节（16:57–17:5x）顶掉**：第 6 条说的"下一步只剩第 2 步"已做完：`pnpm reinstall:all` 在隔离副本 `.worktrees/inb-t9` **整条**跑到固定收尾，`REINSTALL_RC=0`，四端各有"清旧 → 重打 → 卸旧装新 → 装上的是当前产物"读数（android 装 `emulator-5554`、ios 装 `heyta-multiend-reinstall`，两台这次真装上了），Linux 另加 `LINUX_DEB_RC=0`／`PKG_RESULT=OK`。⇒ 那句「一句话状态：…唯一未闭合的结果类条件是 T7 第三条腿：**移动两端没跑到**」住在上一节（14:5x 停损与交接）开头，现量定位 `grep -n '一句话状态' PROGRESS.md`（这里特意不写行号——这份账每往上追加一条它就漂），它到这一戳是假话；这一格现在欠的是**人真打开看过那五枚截图**（绝对路径在计划文末那一节第 11 条），不再欠"跑没跑"。现量：`grep -n 'REINSTALL_RC' PROGRESS.md docs/plans/inbound-automation.md`。前两腿（链与 `-r --no-bail test`）到这一戳仍不是 0，那一句没被顶掉，逐枚归属与"哪些是本线自造的"在计划文末那一节第 17–19 条。
 
 ## 2026-10-16 16:57–17:5x · T7 第三条腿整条跑完了：四端全绿 + Linux 取证绿，前两腿当日重取且红集仍零枚在本线（自动收集线）
 
