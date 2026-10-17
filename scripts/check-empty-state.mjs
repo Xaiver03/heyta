@@ -322,7 +322,21 @@ const EMPTY_SITES = {
   ],
   空槽位类: [],
   '空态 testid': [
-    'apps/web/src/features/settings/ImportPanel.tsx',
+    /**
+     * ⚠️ `apps/web/src/features/settings/ImportPanel.tsx` 曾登记在这里，**已移除**
+     * （2026-10-17，按本门禁自己打印的"登记站点已消失"提示做的对账）。
+     *
+     * 🔴 移除的依据不是"它看起来没问题"，是**逐行看过渲染路径**：
+     * 那条 `<SettingsNotice>`（`features/settings/SettingsNotice.tsx`）**仍然**
+     * 收到 `testId="import-empty-only"`，DOM 上的 `data-testid` 一个都没少
+     * （`apps/web/tests/import-panel.spec.tsx:137` 还在按它断言）。消失的只是
+     * **源码里的字面形态** —— 它从写在 `<footer>` 上的 `data-testid=` 变成了
+     * 传给共享组件的 `testId=` prop。本栏 marker（`data-testid\s*=`）只认前者，
+     * 所以这条登记成了**过期条目**而不是被还掉的债。
+     * ⇒ 判据一点没松：把字面 `data-testid="…empty"` 写回这个文件，本栏立刻
+     *   按「空态 testid」重新点名它（2026-10-17 在 `HEYTA_CHECK_ROOT` 副本上
+     *   实测：写回 ⇒ rc=1 且点名 `ImportPanel.tsx`）。
+     */
     'apps/web/src/features/settings/MemoryPanel.tsx',
     'apps/web/src/features/settings/PasskeyPanel.tsx',
     // 2026-10-02：TrashView 的手抄 testid 已随骨架一起被壳层组件收编（删账）；
@@ -336,7 +350,21 @@ const EMPTY_SITES = {
     'apps/mobile/src/screens/TasksScreen.tsx',
     'apps/mobile/src/screens/TrashScreen.tsx',
     'apps/web/src/features/ai/AiToolRun.tsx',
-    'apps/web/src/features/auth/AuthPanel.tsx',
+    /**
+     * ⚠️ `apps/web/src/features/auth/AuthPanel.tsx` 曾登记在这里，**已移除**
+     * （2026-10-17，按本门禁自己打印的"登记站点已消失"提示做的对账）。
+     *
+     * 🔴 移除的依据同样是**逐行看过**：`AuthPanel` 传给共享认证面板的
+     * `emptyTitle` / `emptyBody` 现在是**空字符串字面量**
+     * （`features/auth/AuthPanel.tsx:378-379`，`git log -S"emptyTitle: ''"` 指向
+     * `63e61f23`）—— 那两处 `t('web.auth.empty.…')` 调用已经不在源码里，
+     * 也就没有"空态词条在视图里被直接渲染"这件事了。词条本身
+     * （`packages/i18n/src/locales/zh-CN.ts:948-949`）还留着、但**全仓零引用**，
+     * 属于 i18n 那条线的死词条，不是本门禁的债。
+     * ⇒ 判据一点没松：把它写回 `emptyTitle: t('web.auth.empty.title')`，本栏立刻
+     *   按「直接渲染空态词条」重新点名该文件（2026-10-17 在 `HEYTA_CHECK_ROOT`
+     *   副本上实测：写回 ⇒ rc=1 且点名 `AuthPanel.tsx`）。
+     */
     /**
      * 2026-10-02 登记（新债入账）：`ProjectsPanel` 把清单/标签的空态文案作为
      * `empty` / `emptyHint` 标签传给共享 `OrganizerList` —— 共享层不许

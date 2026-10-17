@@ -17,7 +17,7 @@ echo "  删之前：$($ADB shell "content query --uri $FAV --projection _id:appW
 $ADB shell "content delete --uri $FAV --where \"_id=7 AND appWidgetId=27\"" 2>&1 | tr -d '\r'
 $ADB shell am force-stop com.google.android.apps.nexuslauncher; sleep 4
 LEFT=$($ADB shell "content query --uri $FAV --projection _id:appWidgetId" 2>&1 | tr -d '\r' | grep -c "appWidgetId=27")
-echo "  删之后 appWidgetId=27 命中 $LEFT（要的是 0）"
+echo "  删之后 appWidgetId=27 命中 ${LEFT}（要的是 0）"
 
 echo "════ 2. 把设备级隐私同意恢复到"全新安装后没点过任何一边"那一档 ════"
 echo "  注销之后它**还在**（这一条本身是读数，写进 RESULT.md）："

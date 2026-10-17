@@ -70,12 +70,12 @@ RT="${HEYTA_REINSTALL_TMP_DIR:-/tmp}"
 # 所以按探针那族的规矩：形状不对当场拒，不猜。
 case "$RT" in
   *[[:space:]]*)
-    echo "🔴 HEYTA_REINSTALL_TMP_DIR 不能含空格（读到：$RT）" >&2
+    echo "🔴 HEYTA_REINSTALL_TMP_DIR 不能含空格（读到：${RT}）" >&2
     exit 4
     ;;
 esac
 if [ ! -d "$RT" ]; then
-  echo "🔴 HEYTA_REINSTALL_TMP_DIR 指向的目录不存在：$RT（先 mkdir -p，别让日志重定向以 No such file 收尾）" >&2
+  echo "🔴 HEYTA_REINSTALL_TMP_DIR 指向的目录不存在：${RT}（先 mkdir -p，别让日志重定向以 No such file 收尾）" >&2
   exit 4
 fi
 
@@ -577,6 +577,23 @@ if printf '%s' "$WANT" | grep -q "ios"; then
         -destination "id=$UDID" -derivedDataPath $RT/heyta-ios-release build \
         >$RT/heyta-reinstall-ios-build.log 2>&1; then
       echo "  ✅ 构建成功（日志 $RT/heyta-reinstall-ios-build.log）"
+      # 🔴 归属章（与 `verify-mobile-ios.sh` 同一把尺、同一个文件）：构建目录默认
+      #    `/tmp/heyta-ios-release`，它是**跨树共享**的，而下游消费者
+      #    （`verify-mobile-ios-ai.sh` 的第 3 道、`apk-freshness` 自检臂 11–14）判
+      #    「这枚产物是不是本树打的」要靠它 —— 时间戳只回答「新不新」，回答不了「是谁的」。
+      #    写不成本身不判红：它只意味着下一位消费者会**响亮地拒绝**这枚产物
+      #    （那一路判定全在 `heyta_ios_owner_check` 里）。
+      if [ -f "$ROOT/scripts/lib/apk-freshness.sh" ]; then
+        # shellcheck source=lib/apk-freshness.sh
+        . "$ROOT/scripts/lib/apk-freshness.sh"
+        if heyta_ios_owner_write "$RT/heyta-ios-release" "$ROOT"; then
+          echo "  ✅ 已写产物归属章（$RT/heyta-ios-release/.heyta-build-owner）"
+        else
+          echo "  ⓘ 归属章没写成（内容章取不到？）⇒ 下游验收会拒绝拿这枚产物取读数"
+        fi
+      else
+        echo "  ⓘ 没有 scripts/lib/apk-freshness.sh ⇒ 这一趟写不了归属章"
+      fi
       IOS_APP_DIR="$RT/heyta-ios-release/Build/Products/Release-iphonesimulator/Heyta.app"
       if xcrun simctl install "$UDID" "$IOS_APP_DIR" >/dev/null 2>&1; then
         echo "  ✅ 已安装进模拟器（全新安装）"

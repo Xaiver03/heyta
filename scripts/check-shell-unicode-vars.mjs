@@ -39,9 +39,44 @@
  *     python3 research/tools/fix-shell-unicode-vars.py --write
  */
 
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+/** 逐臂证明这道门禁**真的会红**。返回失败臂数。 */
+function selfTest() {
+  const arms = [];
+  const arm = (name, ok, detail) => arms.push({ name, ok, detail });
+
+  // 臂 1：**本命形状必须红** —— `$var` 紧跟全角字符（bash 会把那个字符吞进变量名）
+  arm('$var + 全角逗号 ⇒ 报', findOffenders('echo "pid=$PID，done"').length === 1,
+    `${findOffenders('echo "pid=$PID，done"').length} 处`);
+  arm('$var + 全角右括号 ⇒ 报', findOffenders('echo "x=$V）"').length === 1, '1 处');
+
+  // 臂 2：**正面对照** —— `$var` 后面是 ASCII 或行尾，不许报
+  arm('正面对照：$var 后跟 ASCII ⇒ 不报', findOffenders('echo "pid=$PID done"').length === 0, '0 处');
+  arm('正面对照：$var 在行尾 ⇒ 不报', findOffenders('echo "$PID"').length === 0, '0 处');
+
+  // 臂 3：**修好的写法不许报** —— `${var}` 是全角字符前的正确写法
+  arm('修好的写法 ${var} + 全角 ⇒ 不报', findOffenders('echo "pid=${PID}，done"').length === 0, '0 处');
+
+  // 臂 4：**单引号里的不算**（那里不展开）
+  arm('单引号里不展开 ⇒ 不报', findOffenders("echo 'pid=$PID，done'").length === 0, '0 处');
+
+  // 臂 5：**位置要准**（行号与片段），否则人找不到
+  const one = findOffenders('echo ok\necho "x=$V）"\n');
+  arm('报出的行号是对的', one[0]?.line === 2, JSON.stringify(one[0]));
+
+  let failed = 0;
+  for (const a of arms) {
+    if (!a.ok) failed += 1;
+    console.log(`  ${a.ok ? '✅' : '🔴'} ${a.name} —— ${a.detail}`);
+  }
+  console.log(`\n臂数 ${arms.length}（由本脚本自己打印），失败 ${failed}`);
+  return failed;
+}
+
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -178,10 +213,43 @@ function walk(dir, out = []) {
   return out;
 }
 
+/**
+ * 扫描面 = **git 看得见的 `.sh`**（已跟踪 + 未跟踪但未被忽略）。
+ *
+ * 为什么不继续靠目录名名单：这条判据自己撞过两次同一形状 —— `tmp/` 下那 4 枚草稿
+ * （登记在 `SKIP_DIRS` 的注释里），以及 `.run-logs/` 这类被 `.gitignore` 排除的运行日志目录
+ * （2026-10-16 实测：`.run-logs/ac-reeval.sh` 让门禁判红，而它既不在交付面、也永远不会出现在 CI）。
+ * 名单只能一个个补，而「git 看不见的草稿不该判红」是一条**不变量**：判据判交付面。
+ * 与 `scripts/gate-ssh.mjs`「只有被 git 看见的文件进包」同口径。
+ * 被跳过的枚数显式打印（静默跳过在读数上和"没扫到"一样，§7 元规则 2）。
+ */
+function gitVisibleShellScripts() {
+  const walked = walk(ROOT);
+  let listed;
+  try {
+    listed = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '--', '*.sh'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+    })
+      .split('\n')
+      .filter(Boolean)
+      .map((rel) => path.resolve(ROOT, rel));
+  } catch {
+    return { files: walked, skipped: 0, degraded: true };
+  }
+  const visible = new Set(listed);
+  const files = walked.filter((abs) => visible.has(abs));
+  return { files, skipped: walked.length - files.length, degraded: false };
+}
+
 // ── 只在**直接运行**时执行扫描；被 import（自测）时不执行 ──────────────
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 if (isMain) {
-  const files = walk(ROOT);
+  // 🔴 **必须放在扫描之前**：否则 `--self-test` 会先扫全仓、再跑臂（慢且输出混杂）。
+  //    2026-10-16 加：起因见对账件 B25 —— 这条门禁当时落到"脚本里没有任何会失败的证明"那一档，
+  //    而它**是真的会红**（第 68 轮我手工变异验证过）。现在把那次人工证明变成**可复跑**。
+  if (process.argv.includes('--self-test')) process.exit(selfTest());
+  const { files, skipped, degraded } = gitVisibleShellScripts();
   /** @type {string[]} */
   const problems = [];
 
@@ -208,5 +276,9 @@ if (isMain) {
     process.exit(1);
   }
 
-  console.log(`   ✅ shell 脚本没有「变量名被非 ASCII 吞掉」的写法（扫了 ${files.length} 个 .sh）`);
+  const denominator = degraded
+    ? `⚠️ git 不可用 ⇒ 退回文件系统遍历 ${files.length} 个 .sh`
+    : `扫了 git 看得见的 ${files.length} 个 .sh，跳过 git 看不见的 ${skipped} 枚草稿`;
+  console.log(`   ✅ shell 脚本没有「变量名被非 ASCII 吞掉」的写法（${denominator}）`);
 }
+
