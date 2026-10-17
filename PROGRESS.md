@@ -5475,6 +5475,16 @@ AC 已勾数仍为 **0**（`verify-inbound-ac-ticks.py`：`AC 行=8　已勾=0�
 26. **C30 那一格补了一条"指向今天证据"的现量指针**（`docs/plans/inbound-automation.md` 矩阵 C30 行尾，尺列仍 `无尺`）：写进去的三条都换成**不用管道的单命令**，因为表格门禁按裸 `|` 拆格，`git show … | grep -c` 那种形状会把这一行拆成两格（第 15 条那条 for 循环因此不能进表格）。现量形状：把 `NAME` 依次换成 `clean-build-tmp`、`apk-freshness`、`verify-macos-widget-help`、`verify-mobile-ios-account-email-sessions`、`verify-mobile-ios-ai`、`w6-dry-run-arms`、`shell-portability-baseline`、`heyta_ios_owner_write` 跑 `git grep -c NAME HEAD -- scripts/reinstall-all.sh` ⇒ 8 枚全回退出码 1（＝HEAD 那份零引用，与第 15 条同一件事，只是换了能在表格里写的形状）。**这一趟我自己踩了一次"管道吃 rc"**：第一遍把五枚文档尺接在 `| tail -4` 后面再 `echo $?`，打印的是 `tail` 的退出码，看着像全绿其实没取到尺的 rc ⇒ 第二遍改成重定向进文件再 `echo $?`，读数落在 `~/.heyta-evidence/inb-t7-1017-0902/doc-gates/`（现量：`doc-tables`／`ac8-matrix`／`ac-ticks`／`doc-endpoints`／`producer-seam`／`docs-link`／`check-md-tables`／`check-docs` 八份各回 `rc=0`）。
 27. **上一条里那两枚现量命令按字面试跑过，试出一枚会漂的值和一处会断的依赖**（这是「证据能复跑」那一档的活，不是新读数）：① `bash ~/.heyta-evidence/inb-t7-1017-0902/freshness-shape-parity.sh` 不需要外部环境变量就能跑，09:51 复跑回 `PARITY_RC=0`，但它自己那行 `COUNTS` 从 09:10 的 488 变成 491（别的会话在 `packages/ai/src` 与 `apps/mobile/src` 里动过文件），而**上一条刚写进矩阵格正文的那句把 488 钉死了** —— 一个当前声称的格子里躺着一枚当天就会过期的数，正是仓规「正文不存会漂的值」要防的形状 ⇒ 改成让读者去读同一命令的 `COUNTS` 行，正文不钉数。② `shasum -a 256 .worktrees/inb-t9/apps/web/dist/index.html` 此刻跑得通、全串与本文 Linux 段那枚 `PKG_INDEX_SHA` 逐字相等，但它的可用性挂在载具上，而载具的处置（B206）还在负责人手里 —— 载具一旦被清，这条比对就没东西可读 ⇒ 把那枚原件复制成 `~/.heyta-evidence/inb-t7-1017-0902/carrier-apps-web-dist-index.html` 并登记进同目录 `INDEX.txt`（现量 `wc -l < ~/.heyta-evidence/inb-t7-1017-0902/INDEX.txt`；大小与哈希现量 `wc -c < …` 与 `shasum -a 256 …`），矩阵格里的命令改读副本、载具路径降级成"来源"。本节第 7 条与台账第 18 条里那条载具路径按旧文留着不动，后来人读 C30 行尾那一句为准。
 28. **完成条件里那枚命令名照抄会红，红在名字不在产品**（这条只管"下一个人怎么复跑"，判卷口径我一个字没动）：口径写的是 `pnpm check-migrations`，而现量 `node -e 'const p=require("./package.json");console.log(Object.keys(p.scripts).filter(s=>/migration/.test(s)).join(" "))'` 只回 `check:migrations` 与 `check:web-migration` ⇒ 照抄那串退 **1** 并打 `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL Command "check-migrations" not found`。同一道门两种真跑法都在这一轮的最终 tip 取到 rc=0，各存一份原样输出（`~/.heyta-evidence/inb-t7-1017-0902/doc-gates/`）：`check-migrations-final.txt` 是 `pnpm check:migrations`，`check-migrations-node-shape.txt` 是 `node scripts/check-migrations.mjs` —— 后者才是计划正文一直在用的那枚形状（现量 `grep -c 'node scripts/check-migrations.mjs' docs/plans/inbound-automation.md`）。⚠️ 顺手自曝一处探针险：`check-migrations.txt` 那份是我用「A 或 B」兜底写的，同一个文件里既躺着"名字不存在"的报错也躺着 B 的绿末行，而链条报出来的 rc=0 属于 B —— 拿它当"照口径那串也跑通了"的证据就会读错，所以这轮改成一种形状一份件。另记一枚与判断无关的事实：命令索引 `docs/agents/commands.md` 里 grep 不到这枚门（现量 `grep -c 'check:migrations' docs/agents/commands.md` 回 0），那是规则文件、本线不代改。
+29. 🔴 **第 1 腿那 22 道红逐道读正文，量出来本线在链上的自造红是五枚不是四枚**：昨天 18 条那句「其余归别线」在**第 21 道**这一格是错的，按改口不删旧文处理（落点 **B211**；给读矩阵的人指的指针在计划文末那一节第 11 条）。形状三件：① HEAD 态 `cd .worktrees/inb-t9 && node scripts/check-selection-single-source.mjs` 回 **rc=1**，断言 G 那 6 处违例里 **4 处住在本线的 `apps/web/src/features/settings/InboundAutomationSettings.tsx`**；② 同一命令在共享检出回 **rc=0** —— 差的是别人那枚未提交的 `ROW_ID_EXEMPT` 登记（现量 `git grep -c InboundAutomationSettings HEAD -- scripts/check-selection-single-source.mjs` 退 1，而 `grep -c InboundAutomationSettings scripts/check-selection-single-source.mjs` 回 4）；③ 那四行的类别由**这枚文件的所有者**复核过并认可（`retryEventId` 是两步式确认 ⇒ `confirm-gate`；`editingRuleId` 是编辑表单绑定的那条规则、`keyId` 与 `targetProjectId` 是表单字段本身 ⇒ `form-draft`；现量 `grep -nE 'const \[(retryEventId|editingRuleId|keyId|targetProjectId)' apps/web/src/features/settings/InboundAutomationSettings.tsx`）。⇒ 修法落点在白名单外那枚门禁件，本线不代改、不碰那枚脏文件，也不替别人提交；那笔登记进 main 之后第 21 道会自己转绿，届时复跑 ① ② 两条命令看两棵树同绿。顺带把"其余归别线"这句话做成一把可复跑的筛子：`python3 research/tools/verify-inbound-chain-ownership.py --log <链装置日志>`（`--self-test` 自报臂数，这一轮 8/8，其中臂 6 兜"别线提交正文里提了一句自动收集就不许算进本线归属"、臂 8 兜"`package.json` 这种通用名不许按名匹配" —— 这两条都是今天真踩过的假命中）。🔴 **这把尺的边界要连同它一起读**：它看的是"红正文里引用了本线路径"，所以 **043／045 那种"我动了 workspace 包与 lockfile 没重渲染"的因果型自造红它筛不出来**，`rc=0` 不等于"本线零枚红"，B201 那张表仍是权威清单。今天在 `@30397e71` 的命中是 4 道：021／051／075 为本线真命中，023 是噪声（命中打在 `✅ 共享层的空态权威实现` 那行打印上，而那枚件是靠 `16da3ecb` 那种把三件事捆成一笔的提交进的本线归属集）。
+
+30. **上一条那枚筛子接进了常驻载体，接的是臂不是判决腿**（10:2x，写前先跑 `date`）：`server/tests/inbound-lane-rigs-consumers.spec.ts` 新增一张 `SELF_TEST_ONLY` 名册（与 `WIRED`／`SELF_TEST_OMITTED`／`DELIBERATELY_NOT_WIRED` 并列，`accounted` 集合同并扩了它），于是那枚装置的自报分母测试从此把它算在内，八条臂随 `pnpm -r test` 常驻复跑。判据腿（`--log <链装置日志>`）**故意不接**，理由写进名册注释：它今天要一枚链装置产物，而那枚产物如实回 rc=1（就是 B211 那枚本线自造红，别人那笔门禁改动还没提交），把它常驻化等于替别线的未提交状态预告失败。⇒ 这一格读法是**臂常驻、判决手跑**（B211 里"10-17 10:2x 追记"那一节写了复跑命令与转绿条件）。常驻化的验收：`cd server && npx --no-install vitest run tests/inbound-lane-rigs-consumers.spec.ts` ⇒ 末行 `Tests 14 passed (14)`、`Test Files 1 passed (1)`，原件 `~/.heyta-evidence/inb-t7-1017-0902/doc-gates/consumers-spec-1017-1021.txt`。**这个 14 不是要人信的数，是三张名单的行数加出来的**：2 枚静态用例（分母自检 + self-test 覆盖自检）+ `WIRED` 枚数 + `SELF_TEST_LINE` 枚数 + `SELF_TEST_ONLY` 枚数。现量（末行自报四枚数，读数应与 `Tests` 那行相等）：
+`node -e 'const s=require("fs").readFileSync("server/tests/inbound-lane-rigs-consumers.spec.ts","utf8");const blk=(n)=>{const i=s.indexOf("const "+n);const j=s.indexOf(n==="WIRED"?"];\n":"};\n",i);return s.slice(i,j)};const c=(n,re)=>(blk(n).match(re)||[]).length;const w=c("WIRED",/^  \x27[^\x27]+\.py\x27,$/gm),a=c("SELF_TEST_LINE",/^  \x27[^\x27]+\.py\x27:/gm),o=c("SELF_TEST_ONLY",/^  \x27[^\x27]+\.py\x27:/gm);console.log("WIRED="+w+" SELF_TEST_LINE="+a+" SELF_TEST_ONLY="+o+" 用例数="+(w+a+o+2));'`
+⚠️ **这条现量我写了三版才立住，两枚错都在探针自己身上、都不长红**：第一版用 `};` 当段尾哨兵，而 `WIRED` 是数组、段尾是 `];` ⇒ 切片一路吞到下一张表，读出 `WIRED=11`（真值 6）；第二版数对了但把 `"合计腿="+12+2` 写成连加，JS 从左往右先转字符串 ⇒ 打印 `122` 而不是 `14`。两版都能 rc=0、都"看着像一条命令"，**判据是它报的数与那把尺自己报的数相等**（这里就是 `用例数=` 必须等于 vitest 的 `Tests`）。这条加法也说明：**别把用例数钉进正文** —— 名单加一枚，这个数就变。
+    同一趟把这轮所有静态门重取了一遍，全部按第 26 条那条规矩取 rc（重定向进文件再 `echo $?`，不接管道）：`verify-inbound-doc-tables`／`ac8-matrix`／`ac-ticks`／`doc-endpoints`／`producer-seam` 五枚与 `pnpm check:md-tables`／`pnpm check:docs`／`node research/tools/license-inventory.mjs`／`pnpm check:migrations` 各回 rc=0，`verify-inbound-ac-ticks` 末行仍是「已勾=0、未勾=8」，`check:docs` 末行「无死链、无"本机有仓库里没有"的链接、无失效章节引用、无失效锚点」，件都落在同一枚 `doc-gates/` 目录、文件名带 `1017-1025`／`1017-1030` 时间戳。⚠️ **本条自曝一枚探针错**：`docs-link` 那一腿我第一次写成 `node docs/research/docs-link-check.mjs`，回 rc=1 且正文是 node 的 `MODULE_NOT_FOUND` —— 真路径是 `research/tools/docs-link-check.mjs`（现量 `ls research/tools/docs-link-check.mjs`）。这不是尺红是手滑，而形状上很危险：如果这一轮我用了第 26 条之前那种 `| tail` 接法，rc=1 会被吞掉、日志里只剩"检查通过"的错觉。**判据是 rc，rc 之前先确认调起的是那枚件本身。**
+31. 🔴 **本线今天那两枚"零改动"不变量被这一笔按设计破掉，先把话说在前面再提交**（不是回补，是记账）：第 20 条立的两条尺 ——`git log --format=%s 30397e71..HEAD | grep -vc '^docs(自动收集'` 回 **0**、`git diff --name-only 30397e71 HEAD -- server/src server/tests packages apps/web/src apps/mobile/src e2e research/tools scripts` 回 **0 行** —— 从第 30 条这一笔（改 `server/tests/` 里那枚 spec + 新增 `research/tools/` 里那枚筛子）起**不再是 0**。这两条尺本来记的就是"这一天的笔只落在文档"，而今天确实落了一笔非文档：**它全部是本线白名单内的验证装置与它的常驻消费者，零枚产品代码、零枚 schema/线协议/迁移/i18n**（现量 `python3 research/tools/verify-inbound-commit-scope.py --since '2026-10-17 08:50'` 末行 `越界=0`）。所以第 20 条那句"这两枚重新立住了"从现在起要读成**到 `f89d7e38` 为止的读数**，后面来的人拿这两条尺量到非 0 不是坏消息，是这一笔；别去改第 20 条的旧文，改口不删旧文。
+
+32. 🔴 **共享账本撞号了：工作树里同时躺着两枚 `B210`，处理是"改自己的号、别人那节逐字节不动"**（11:5x，写前先跑 `date`）。现量三件：① HEAD 里最大节号是 `B209`（`git show HEAD:BLOCKED.md | grep -oE '\*\*B[0-9]{3}' | sort -u | tail -1`）；② 本线这枚 10:1x（链第 21 道归属那件）落笔时占的是 `B210`；③ 另一会话 10:2x 也写了一枚 `B210`，讲的是 `e2e/playwright.auth-simple.config.ts` 孤儿配置与 AI 真浏览器验收 —— 两枚不同内容同号，都还没提交。**为什么不能"就这么提交"**：本线这笔带 pathspec 会把他们那一节一起带走，他们下次 `git diff` 那一段就再无差异，**重复号于是永久地静默留在历史里**，而别人只按号引用它，读到的是我那一节。⇒ 仓规是别人的正文不许代改，所以动自己那半边：把本线这枚改成 **`B211`** 并整节移到文件末尾，让"节号顺序＝追加顺序"重新成立；本线那五处引用同步改指（台账 29／30 条共 3 处、计划文末那一节第 11 条 1 处、`server/tests/inbound-lane-rigs-consumers.spec.ts` 的名册注释与用例名 2 处）。改完的判据（各 1 枚）：`grep -c "🟡 \*\*B210" BLOCKED.md` 与 `grep -c "🟡 \*\*B211" BLOCKED.md`。
+    ⚠️ **这一格里我自己造的三枚探针错，全数靠断言拦下、没落到盘上，但形状值得记**：第一版移动脚本写成 `theirs[:-1] + [my_block] + [theirs[-1]]`，把别人最后一行放到了 EOF —— 内容一行没丢、位置错了，而脚本 rc=0、看着"写完了"；同一版那两条"复核"又拿 `marker→EOF` 去比移动前的哈希，而移动后那段区间**定义上**已经包含我的新节，所以 `False` 是探针坏、不是数据坏。第二、三版的前置断言两次把"节与节之间那枚空行"算漏（`b==a+1` 应为 `a+2`），当场抛 `AssertionError`，写文件那行根本没执行 ⇒ **正是断言保住了别人那一节**。⇒ 移动别人的正文这类活，**判据只用"与 HEAD 的删除行数＝0"这一枚**（现量 `git diff --numstat -- BLOCKED.md` 回 `32 0`；`git diff -- BLOCKED.md | grep -c \'^-[^-]\'` 回 0），别用自己现构造的哈希对比；前置断言要比**行首内容**而不是比索引。
 
 ## 2026-10-17 · `pnpm check` 门禁收口：26 枚红逐道定位并逐道复跑（自动收集线之外的一轮独立工作）
 
@@ -5512,3 +5522,202 @@ steps=[1, 6, 20, 21, 22, 23, 43, 45, 48, 49, 51, 53, 54, 65, 75, 85, 86, 87, 89,
 | **87** | 主浏览器套件（393 条） | `admin-console.spec.ts` 8 条：① 设置早已是"左侧分类 + 右侧内容"的 IA，spec 只打开浮层**没选「数据」那一组** ⇒ `AdminPanel` 的 `active` 闸是关的（九条一起 `element(s) not found`）② 选中后新暴露两个未补位的 404（`/api/automation/{rules,events}`，入站自动化面板一挂载就拉） | 该 spec **8 passed rc=0**；整道读数见本节末尾追加 |
 
 **仍未闭合的一格（第 6 道 `check:reachability`）**：`COMMENT` 的"最后一米"。这一轮落了**领域层 + app-host 写路径**（`packages/domain/src/comments.ts`、`packages/app-host/src/comment-actions.ts`：建/改/删/还原 + 读，路由判断落在 `shareIdForTask`，个人清单写评论直接抛类型化错误；29 + 12 枚新测 + 3 条变异臂），并把 `COMMENT` 登记进 `ACTION_FAMILIES`。⇒ 断言 B **已绿**，断言 C 仍红且**如实**：`COMMENT（家族 createCommentActions）在 apps 下各宿主的 src/ 里零调用点`。缺的那一半是 ADR-0062 的 W4/W5 **客户端共享平面**（`deriveShareOperationKey` / `signShareOperation` / `createSharePayloadCipher` 三枚原语与 `uploadOps` / `downloadOps` 两条传输**都没有任何消费者**）—— 那是功能级工作量，不是"补一行接线"，详见 `BLOCKED.md` B209。
+
+### 2026-10-17 续：第 87 道（主浏览器套件）的四件事 + 两处装置缺陷
+
+第 87 道在上一节里只记了 `admin-console` 那一格。整道复跑之后又量出三件事，全部按"先定位真因、再决定是产品还是判据"处理：
+
+| 现象 | 真因（现量） | 处置 |
+|---|---|---|
+| `auth-consent-registration.spec.ts:122` 两条 × 两视口红：`getByText('这份政策管什么、不管什么', { exact: true })` 回 **0 元素**（报 `element(s) not found`，读起来像"文档没切过去"） | **判据把标题钉成了"不带序号的标题"**：`LegalDocumentSheet.tsx:341` 渲出的顶层小节是 `1. 这份政策管什么、不管什么`（序号按 depth/索引生成）。用探针量到 `headingExactCount=0 / headingLooseCount=1 / hasRaw=true` | 改成子串匹配（**不**把序号抄进判据：序号是生成物）；复跑 **6 passed rc=0** |
+| 整轮跑了几十分钟后 **`RC=160`（载体判定"这一轮作废"）**，停在 49/393 | 🔴 **报告器把"用例私有端口被拒"当成了"载体死了"**：`auth-simple-ux.spec.ts` 自带 4341/4342（它有自己的 `playwright.auth-simple.config.ts`），却被主配置收着；它那句 `connect ECONNREFUSED 127.0.0.1:4342` 命中了签名表里的 `ECONNREFUSED` | 两处一起修：① `carrier-signature.mjs` / `carrier-health.mjs` 改成**按主载体端口归因**（端口从 `config.webServer` 现取，取不到就不归因）；② `playwright.config.ts` 的 `testIgnore` 收进这一支（它本来就不该进主配置）。新增自检臂 14–17（含两条走**报告器本体**的注入），`--self-test` **17 臂 0 失** |
+| 8 份 AI spec 在真浏览器里点不到入口（`element is not visible`） | 🔴 **是另一条线的在途改版**：行内动作被收进每行那枚 `details.ht-compose-actions` 的「更多」披露（**HEAD 上这套披露不存在**：`git show HEAD:apps/web/src/App.tsx \| grep -c ht-compose-actions` = **0**），而 `apps/web/src/features/ai/*`（含 `AiToolRun` / `AssistantPanel` / 新增 `managed-transport.ts`）在 `git status` 里全是 **staged-modified** | `e2e/tests/ai-entry.ts`（新）给"披露型入口"加了一条**两种形态都能跑**的 `revealRowActions`（有披露就打开、没有就原样；点不到仍然红），`ai-breakdown` / `ai-unavailable` / `ai-duration` 三份接上 ⇒ 现量 `ai-breakdown` 2/2、`ai-unavailable` 3/3、`ai-duration` 4/5 绿；**其余（工具面板那一族）等那条线把面板落定**，不在本轮代改 |
+
+**同一批要留的读法纪律**：我自己在整轮跑到一半时另起了一次 Playwright —— 新的一次会在开跑时**清空 `e2e/test-results/`**，于是整轮那两条正在写 trace 的用例当场 `ENOENT` 红（`browserContext.close: ENOENT … -recording20.trace`）。⇒ **整轮在跑时不许再起第二把 Playwright**，这条比"读数会抖"更硬。
+
+### 2026-10-17 第 87 道的**最后一格**：在共享树被别线大改的窗口里，主套件的读数不可归因（现状与复跑条件）
+
+本轮在把上面三处修完之后，对主套件跑了一趟**非 AI 子集**（约 100 份 spec，排除 8 份 AI 活的）：`done=156/393 failed=51` 时我停手了 —— 不是因为跑不动，是因为**这 51 枚的分布把成因写在了脸上**：
+
+```
+12 detail-pane-habit.spec.ts      10 assistant-navigation-acceptance.spec.ts
+ 4 detail-pane-collapse.spec.ts    4 calendar-week.spec.ts     4 calendar-sidebar.spec.ts
+ 3 countdown-calendar.spec.ts      2 detail-column-slot.spec.ts  2 countdown.spec.ts
+ 2 collab-journey.spec.ts（需要真服务端） 2 category-dialog-ux.spec.ts  2 categories.spec.ts
+ 2 calendar-capture.spec.ts        2 ai-assistant-atomic-tools.spec.ts  1 admin-console.spec.ts
+```
+
+三条独立指认都指向**同一个在飞改版**（不是 51 个独立缺陷）：
+1. `detail-pane-*` / `assistant-*` / `ai-tool-*` 这一族正是 `apps/web/src/App.tsx`（**staged-modified**）与 `apps/web/src/features/ai/*`（全 staged）那一笔改版的地界；`ht-compose-actions`「更多」披露在 **HEAD 上不存在**。
+2. 运行途中被另一条会话的**活写**打断过一次，形状是 vite 报 `packages/legal/dist/index.js does not provide an export named 'operatorFilingLine'` + `Failed to reload /src/features/settings/HelpPanel.tsx`（当时 `packages/legal/src` 与 `HelpPanel.tsx` 的 mtime 就在那几分钟里）⇒ 那一窗之后的用例（calendar-* 那几条）读的是"页面加载失败"，不是产品。
+3. `categories.spec.ts` 那条红是**文案断言**（`颜色由你自己赋义` 不在 DOM 里），而 `packages/i18n/src/locales/{en,zh-CN}.ts` 是 **staged-modified** —— 同一族：改版方还没同步它们自己的 spec。
+
+**⇒ 第 87 道的复跑条件（写给下一位）**：等 `App.tsx` / `features/ai/*` / `packages/i18n/*` / `packages/legal/*` 那几笔**提交**之后（或在一个**不含未提交改动**的隔离检出里）跑整轮；在那之前跑出来的红**只能按"谁的地界"归因，不能当仓库读数**。我这轮已经先把**判据侧的兼容**落地了（`e2e/tests/ai-entry.ts` 的 `revealRowActions` 两种 IA 都能跑、`auth-simple-ux` 从主配置里摘出、载体报告器按主载体端口归因、`auth-consent` 那条 `exact:true` 修正），所以那一趟复跑**不需要再修判据**，直接跑即可。
+
+**同一轮的读数纪律补一条（第 106 道）**：11:2x 复跑 `pnpm -r --no-bail test` 报 `apps/web 6 failed` + `apps/mobile 2 failed`（`calendar-sidebar` / `nav-next7-days` / `reminder-wake` / `legal-recheck-mobile`，全是本线一行未碰的 spec），而**逐枚孤立重跑全部通过**（15 / 14 / 29 passed），且那一戳的 `sysctl -n vm.loadavg` = **152.11**。⇒ 与 §7 第 408 条同族：**整串在多会话高负载下会多报红**，第 106 道的口径仍是"孤立复跑 + 对数审计"两件事一起做，别拿整串那一趟当读数。
+
+### 2026-10-17 加一条**装置**（不是判据）：共享树被别线大改时，整轮 e2e 要跑在「冻结副本」里
+
+**起因**：第 87 道这一轮跑了四趟，前三趟都被"另一条会话正在写"污染：一趟撞上 `packages/legal` 的活写（vite 报 `does not provide an export named 'operatorFilingLine'` + `HelpPanel.tsx` 重载失败，其后所有走设置面的用例读的是"页面加载失败"）；一趟撞上 `packages/app-host`/`i18n` 的 dist 重建（页面只画出一张 logo）；还有一趟被**我自己**另起的一把 Playwright 清空了 `test-results/`（正在写 trace 的用例当场 `ENOENT`）。
+
+**做法（可复跑，本轮实测有效）**：
+```bash
+SNAP=/tmp/heyta-frozen; rm -rf "$SNAP"; mkdir -p "$SNAP"
+rsync -a --exclude node_modules --exclude .git --exclude .run-logs --exclude .worktrees \
+      --exclude test-results --exclude '*-results' --exclude evidence --exclude tmp --exclude screenshots \
+      ./ "$SNAP"/
+# ① node_modules 用**硬链接**（cp -al）搬进去，别用软链：
+#    软链时 vite 认为那些文件在 root 之外 ⇒ 不按 fs.allow 服务 ⇒ sqlite 的 .wasm 拿到的是
+#    index.html，报 `expected magic word 00 61 73 6d, found 0a 20 20 20`，应用起不来。
+# ② 冻结副本的 e2e/playwright.config.ts 里给 vite 那条 webServer 命令加
+#    `--config.verify-deps-before-run=false`（副本里 pnpm 的 deps 状态检查会想 purge modules）
+#    与 `--force`（避开共享的 .vite 优化缓存）。
+# ③ 用 4418/4419 这对**不与人冲突**的槽：`HEYTA_E2E_APP_PORT=4418 HEYTA_E2E_STUB_PORT=4419 npx playwright test -c playwright.config.ts`
+```
+读数：冻结副本里 `smoke` + `account-menu` **4 passed / 1 failed**（失败那条是真差异：`.ht-rail__tabs` 的 tab 数 **5 ≠ 判据的 4**，属另一条线新加的那一格）；共享树同一时刻同一批是"页面只画出一张 logo"。⇒ **冻结副本读的是"这一时刻的树"，而共享树读的是"这一时刻 + 别人手上正在写的东西"**；在多会话并行时，整轮 e2e 的读数只认前者。
+
+### 2026-10-17 第 87 道在**冻结副本**上的读数（现量，跑到 234/393 时记；装置与配方见上一节）
+
+```
+冻结副本 @ /tmp/heyta-frozen（= 11:4x 那一刻的共享树，硬链接 node_modules，4418/4419 槽）
+done=234/393  failed=81
+```
+失败按 spec 家族分组（前 20）：
+
+```
+16 detail-pane-task      16 detail-pane-habit     4 glass-materials    4 detail-pane-collapse
+ 4 calendar-week          4 calendar-sidebar       4 ai-tool-run        4 ai-row-layout
+ 3 habit-frequency        2 global-responsive-ux   2 focus-detail-pane  2 due-date-edit
+ 2 detail-pane-overlay    2 detail-column-slot     2 countdown          2 countdown-calendar
+ 2 collab-journey         2 categories             2 calendar-capture    2 ai-duration
+```
+**归因（三类，不混着报）**
+1. **另一条线正在飞的同一笔改版**：`detail-pane-*`（16+16+4+2+2 = 40 枚）、`ai-tool-run`/`ai-row-layout`/`ai-duration`（12）、`glass-materials`（4）、`global-responsive-ux`（2）、`focus-detail-pane`（2）、`due-date-edit`/`habit-frequency`（5）—— 这些家族的被测对象要么是 `apps/web/src/App.tsx`（**staged-modified**）、要么是 `apps/web/src/features/ai/*`（全 staged），要么是同一层壳的材质/响应式（`ht-compose-actions` 那套披露 **HEAD 上不存在**）。
+2. **文案位移**：`categories`（2）—— 断言 `颜色由你自己赋义` 不在 DOM 里，而 `packages/i18n/src/locales/{en,zh-CN}.ts` 是 staged-modified（同一条线还没同步它们自己的 spec）。
+3. **需要真服务端**：`collab-journey`（2）—— `TypeError: fetch failed`，这一支要真实例（同 `verify:collab-*` 那一族的载体）。
+4. ⚠️ `calendar-week` / `countdown*` 那 8 枚**这一趟没查到底**：它们的断言是行为型的（"周档格子里只画了 8 条，上限是 6" / "格子里有它，点进去的清单里没有"），而 `apps/web/src/features/calendar/` 与 `countdown/` 在 `git status` 里**干净** ⇒ 要么是壳的可用高度变了导致"上限"随之变（属第 1 类），要么是一枚真红。**这一格留给下一轮**：在**HEAD + 只带本线改动**的检出里跑这 8 枚就能一刀切开（配方同上：HEAD 快照 + 硬链接 node_modules + `--force` + 不冲突的端口槽）。
+
+### 2026-10-17 第 87 道续：两枚**既存真红**当场修掉，并把"日历那 8 枚"从"归因未定"钉成"与别线改版无关"
+
+**一、把"归因未定"切成"已定"的实验（配方可复跑）**：`cp -al` 一份冻结副本 ⇒ 用 `git show HEAD:<path>` 把**别线在飞的整层**逐个回 HEAD —— `apps/web/src/App.tsx` + `apps/web/src/styles/app/{borderless-controls,controls,habits,inbox,profile,rail}.css` —— 再跑那 6 份 spec：
+
+```
+结果：8 failed / 14 passed（与未回滚前**逐条相同**：calendar-sidebar ×2、calendar-week ×2、countdown ×1、countdown-calendar ×1、categories ×1、smoke ×1）
+⇒ 这些红**不是**那笔 App.tsx / CSS 改版造成的；它们在"壳层已回 HEAD"的树上照样红。
+```
+其中两枚当场查明并修好（都是**判据钉了不存在的东西**，属既存真红）：
+| spec | 红是什么 | 真因（现量） | 修法 | 复跑 |
+|---|---|---|---|---|
+| `smoke.spec.ts:30` | 数 `.ht-rail__tabs button[role="tab"]:not(.ht-rail__tab--tool)` 期望 **4**、现量 **5** | 多出来那枚是**助手入口**（`RailNavigation.tsx:452`，`data-testid="rail-assistant"`），它的 class 只有 `ht-rail__tab`（无 `--tool`、也无别的修饰类）⇒ 被 `:not(--tool)` 当成主段数进去 | 改成按主段**自己的 testid 命名空间**数（`[data-testid^="rail-view-"]:not(.ht-rail__tab--tool)`），并把助手入口**显式**钉一枚 | **2 passed rc=0** |
+| `categories.spec.ts:64` | 断言 `.ht-categories` 里有 `颜色由你自己赋义` | 这句只在 `mobile.categories.note` 里；`web.categories.note` 现量是 `统计近 12 周的专注与打卡时间。`（**HEAD 与工作树逐字相同**）⇒ 判据要的那句话在 web 侧**从来没有过**。而判据自述的本义（"说明里要写明颜色是用户自己赋义的"）与 mobile 同一条口径 | **补文案**：`web.categories.note` 中英各补一句，与 `mobile.categories.note` 同口径（`颜色由你自己赋义，这一页不做任何评价。` / `You decide what each color means; this page does not judge it.`）；另把同一条里那句过期 needle（`还没有可以归类的时间记录` → 现量 `先给任务归类，或记录一次习惯时长。`）换成现量，**本义（"说清楚怎么才会有"）一格没少** | **5 passed rc=0**；连带 `check:ui-language` / `check:i18n-vars` / `check:licenses` / `check:docs-voice` / `check:ui-provider` / `i18n typecheck` 全 rc=0 |
+
+⚠️ 一条**必须记下的坑**：改 `packages/i18n/src` 之后不重建 `packages/i18n/dist`，e2e 读到的仍是旧文案（我第一次跑 categories 就撞了：`Expected "颜色由你自己赋义" / Received "统计近 12 周的专注与打卡时间。"`）⇒ **文案改动要先 `pnpm --filter @heyta/i18n build` 再跑真浏览器**。
+
+**二、下一轮的具体剩余清单（都已两面取证，不再是"归因未定"）**
+1. `calendar-sidebar.spec.ts:111`（迷你月历七列对齐/今天那颗点的主色与尺寸）、`:226`（显示范围勾选与把手）—— 2 枚，与别线改版无关；
+2. `calendar-week.spec.ts:114`（一屏 7 格 + 那行不许随视口长高）、`:165`（周档格子里"上限 6"而现量 8）—— 2 枚；
+3. `countdown.spec.ts`、`countdown-calendar.spec.ts` 各 1 枚（"格子里有它、点进去的清单里没有 —— 同一屏两份当天的账"）；
+4. `collab-journey.spec.ts`（2）—— `TypeError: fetch failed`，这一支要**真实例**（同 `verify:collab-*` 的载体），属环境；
+5. `detail-pane-*` / `assistant-*` / `ai-tool-*` / `glass-materials` / `global-responsive-ux` / `focus-detail-pane` / `due-date-edit` / `habit-frequency` —— 属别线那笔未落库的壳/面板改版（`App.tsx` 与 `features/ai/*` 现在都还是 ` M`）。
+
+**三、`calendar-week` 那两枚的机制已经查到根（差一步"产品还是判据"的裁决）**
+现量链条：`apps/web/src/features/calendar/CalendarView.tsx:255` **无条件**传 `fillMonth` ⇒ `packages/ui/src/calendar/CalendarBoard.tsx:637` 用 `styles.weekRowFill`（那一行随高度长高）、`:658-665` 把这一格的条数上限从 `MAX_WEEK_CALENDAR_BARS = 6`（`model.ts:80`）换成 **`cellTasks.length + events`（动态、无上限）** ⇒
+- `calendar-week.spec.ts:114`（"那一行**不许**随视口长高"）与 `:165`（"上限 6"、现量画了 **8**）双双变红，且**同一根因**；
+- `packages/ui/src/calendar/*` 在 `git status` 里**干净**，`fillMonth` 这条接线出自 `63e61f23`（产品体验线 + 全局响应式）⇒ **不是**在途改动、是**已提交**的行为。
+⇒ 这一步要的是**二选一**（我停在门口，因为两边都有道理、且其中一边是产品口径）：
+ **(a) 产品口径**：`CalendarView.tsx:255` 的 `fillMonth` 应当有条件（例如只在月档 / 只在"内容不足以填满"时），周档那一行仍然不许随视口长高 —— 那两枚 spec 就是对的，修的是**宿主那一行**；
+ **(b) 判据口径**：产品**有意**让日历填满高度、上限随之动态 —— 那两枚 spec（以及它们钉的 `MAX_WEEK_CALENDAR_BARS` 契约）要改写，并把"上限"重新表述成"按可用高度"。
+`calendar-sidebar:111/:226` 与 `countdown*` 那 4 枚**同族**（都是"日历/倒数日的可用高度与列宽"这一层），下一轮可以按同一把尺一起查。
+
+### 2026-10-17 第 87 道续二：**按产品修**（不是改判据），`calendar-week` 两枚真红转绿 + `calendar-sidebar` 推进一格
+
+**一、`calendar-week.spec.ts` 两枚（`:114` 那一行随视口长高、`:165` 上限 6 却画了 8）—— 修的是产品，且三处修法全部有文件内**既存契约**背书**
+
+落点全在 `packages/ui/src/calendar/CalendarBoard.tsx`（一处根因：`fillMonth` 被当成"全档"用）：
+
+| # | 位置 | 原来 | 现在 | 依据（都在同文件里，不是我编的） |
+|---|---|---|---|---|
+| 1 | `weekRowBody` 那行的 style | `fillMonth ? weekRowFill : null` | `fillMonth && view !== 'week' ? … : null` | 同一份 `makeStyles` 里**现成写着**的结论：「两档共用同一条：行只许"不许被压"，不许"跟着涨"」+ 解释了"批三第一版给周档加 `flexGrow` 而判据全绿、图是错的（772px 纯蓝立柱）" |
+| 2 | 那一格的条数上限 | `fillMonth ? 不限 : (周档 ? 6 : 月档 3)` | `view === 'week' ? 6 : fillMonth ? 不限 : 3` | `fillMonth` 的 prop 文档逐字写着「**月档**是否填满宿主传下来的可用高度」——周档不该吃它 |
+| 3 | `DayCell` 的 `fitHeight` | `fillMonth` | `fillMonth && view !== 'week'` | `DayCell` 里 `slots = floor(可用高 / 行高)` 是**按量到的格高再切一刀**；周档那一行按设计不随视口长高 ⇒ 只量得出 4 条，而它的上限是 6（这才是"画了 4 条"的直接成因；`calendarCellBars` 早已按档位切好，不需要第二刀） |
+
+复跑：`calendar-week.spec.ts` **5 passed rc=0**（此前 2 枚红）。`packages/ui` typecheck + build 均 rc=0。
+⚠️ 记一条踩坑：改 `packages/ui/src` 后**必须重建 `packages/ui/dist`**（真浏览器读的是 dist），否则看到的还是旧行为。
+
+**二、`calendar-sidebar.spec.ts` 推进一格（顺手接上同一族的两形态 helper）**
+原来两枚都卡在 `locator.click: waiting for element to be visible, enabled and stable`，而 locator **已经解析到** `task-organize-summary` —— 真因是那枚摘要住进了每行「更多」披露（`details.ht-compose-actions`，折叠时在 DOM 里但不可见）。接上 `revealRowActions(page, IN_LIST)` 之后这一步过了，红**向后移动**到下一处真断言：
+```
+Error: 未筛时：挂进清单的任务在当天列表里
+  locator('[data-testid="calendar-board-day-list"]').getByRole('checkbox', {name: '完成：侧栏在内-…'}) → element(s) not found
+```
+⇒ 这是**下一枚要查的真红**（"刚挂进清单的任务应当还出现在当天列表里"），不是点击/披露那一类问题了。
+
+### 2026-10-17 第 87 道续三：`calendar-sidebar` 两枚的锚点已换正，红**落到一处功能性断言**上（疑似真回归，留给下一轮）
+
+**① 换锚点（不是放宽）**：`calendar-sidebar.spec.ts:45` 的 `DAY_LIST = '[data-testid="calendar-board-day-list"]'` 在**产品里已经不存在** —— 现量：
+```
+$ grep -rn "calendar-board-day-list" packages/ui/src apps/web/src e2e/tests   # 只有 spec 自己那一行
+```
+那份"选中那天的清单"现在的 testid 是 `${testID}-day-section`（`CalendarBoard.tsx:734`），代码段自称「**移动端兼容段**」，由 `showSelectedDayList` 控制；而 prop 文档逐字写着「Web 使用格内任务条，移动端保留清单」，宿主 `CalendarView.tsx:254` 传的是 `false` ⇒ **Web 月档根本不该有那份清单**，任务由格内任务条表达（截图现量：17 号那格里两条都在）。
+⇒ 把该 spec 里"未筛时两条都在"的载体从"清单里的 checkbox"换成"格内那两条任务条"（`calendar-cell-<date>-bar`）。**判据本义未动**：仍是"未筛时两条都在、勾上清单后另一条必须消失"。换完复跑，**前提两条通过**（`toHaveCount(1)` 两枚都过）。
+
+**② 红现在落在这一句上（这才是真问题）**：
+```
+Error: 勾选后别的任务必须消失（只筛主区不筛点 = 界面在说谎）
+Locator: locator('[data-testid="calendar-cell-2026-10-17-bar"]').filter({ hasText: '侧栏在外-…' })
+Expected: 0   Received: 1
+```
+即：勾上「在日历上显示清单「X」的任务」之后，**不属于 X 的那条任务条仍然画在主区格里**。两条可能，下一轮先用一刀切开：
+- **(a) 真回归**：范围筛选没接到主区（`CalendarView.tsx:82` 处的 `scopeTasks(…, view.scope)` 与侧栏那枚 checkbox 之间的接线断了）—— 若如此，这是"筛选器不筛选"的产品缺陷；
+- **(b) 判据的交互过期**：新 IA 下要先展开/点别的东西才生效（同一族里 `calendar-board-day-list` 那次就是这类）。
+切开办法：真浏览器里勾上之后**读一次 store/DOM**（主区格子的 `-bar` 数与侧栏点数各是多少），再对照 `view.scope` 的现值 —— 两处读数一致就归 (b)，不一致就归 (a)。
+
+**③ `calendar-sidebar.spec.ts:117`（迷你月历七列对齐）** 仍然红，但它前面那一步（`task-organize-summary` 的点击）已经被 `revealRowActions` 修通 ⇒ 它的红也向后移动了，下一轮读它当前的错误即可（本轮预算用尽，没有继续）。
+
+**④ `:117` 的那条现量错误（同族，不是新的）**：
+```
+Locator: [data-testid="calendar-board-day-title"]  Expected substring: "10月1日"
+```
+`calendar-board-day-title` 同样住在 `${testID}-day-section` 那一份「移动端兼容段」里（`CalendarBoard.tsx:722`）⇒ Web 传 `showSelectedDayList={false}` 时不渲染。**所以 `calendar-sidebar` 这两枚的红是同一个成因**：判据把"选中那天的清单/它的标题"当成了 Web 月档的载体，而产品（已提交）在 Web 上刻意用**格内任务条**表达。
+⇒ 下一轮的修法已经唯一化：把这两处断言改挂到 Web 真正在画的载体上（`calendar-cell-<date>-bar` 的条数/文字、迷你月历的点 `calendar-mini-day-<date> .ht-sidebar__day-dots > i`、页头的月份），**本义一格不动**（"同一天两份账 = 界面在说谎" "七列对齐" "筛一个清单主区与点同时变"）。②里那枚"勾选后另一条仍在"要先按 (a)/(b) 切开——那是**筛选器到底有没有接上主区**，不是载体问题。
+
+### 2026-10-17 第 87 道续四：**B211 撤回**（产品是对的）+ 顺带把 helper 的一个真缺陷修掉
+
+**一、决定性读数（宿主 memo 插桩，跑完逐字撤回）**：勾上清单之后
+```
+tasks=2 all=2 projects=1 tags=0
+pids=project-0e9a…|project-0e9a…   ← 两条任务的 projectId 是同一个
+scopeIds=project-0e9a…             ← 范围也正指着它
+```
+⇒ `scopeTasks()` 行为正确（两条本来都在那个清单里）；**判据的前提**才是错的：`seed()` 先建清单（建完侧栏选中它），随后两条快速捕获**都写进了新清单** ⇒ "会消失的那一条"不存在，那条断言是**恒真的假判据**。
+修法（已落地）：`seed()` 里显式把第二条归位收集箱（`value=""`）并断言它不含清单名 —— 前提由"假设"改成"建立"。**B211 已撤回**（我先前"疑似宿主接线断了"的判定作废；静态链核验本来就显示宿主是对的，是真数据推翻了我的推断）。
+
+**二、顺带修掉 helper 的一个真缺陷**：`revealRowActions` 原来 `page.locator('[data-testid^="task-item-"]')` **不带 `:visible`** —— 同一份行标记在隐藏分支里也可能有一份，`.first()` 会选中不可见的那份：于是"展开的是它，而真正要点的 `task-organize-summary` 还是折叠的"，症状是 `locator.click: element is not visible` 一路重试到超时。已改成 `[data-testid^="task-item-"]:visible`（四个用它的人一起受益）。
+
+**三、剩下的那一格（下一轮）**：`calendar-sidebar` 里**第二条**（收集箱那条）的 `更多` 披露仍然展不开 —— 同一段代码对**第一条**（在清单里的那条）是好用的：
+```
+waiting for …filter({has: checkbox 完成：侧栏在外-…}).getByTestId('task-organize-summary')
+  locator resolved to <summary data-testid="task-organize-summary">…</summary>
+  element is not visible      ← 它的 details 还是折叠的
+```
+⇒ 下一轮要先问一句：**这一行在"清单已筛选"的视图里是不是换了容器/换了一套行标记**（IN_LIST 那条能展开、OUT_LIST 这条不能，差异就是这个），再决定是 helper 要继续找对的 `details`、还是那个容器根本不渲染披露。
+
+### 2026-10-17 第 87 道续五：`calendar-sidebar` 的"显示范围"那条**通过了它全部的范围断言**，红只剩最后一段把手几何
+
+**一、前提改由顺序建立（已落地并复跑）**：`seed()` 把"留在收集箱"的那条**放到建清单之前**播 —— 新建清单会让侧栏选中它，之后再捕获就会落进那个清单（这正是上一轮插桩读到的 `pids=…|…` 两条同 id 的成因）。改法是把那段捕获抽成 `capture(title)`，顺序变成 `capture(OUT_LIST)` → 建清单 → `capture(IN_LIST)`，并删掉上一轮那段"再点一次更多去归位收集箱"（那条路还会踩到非受控 `<details>` 的重渲染丢 `open`）。注释里把"顺序即前提"与那次插桩读数一起记下了。
+
+**二、复跑读数（现量）**：`日历侧栏` 那条用例现在**一路过了**它的范围断言 —— 前提两条任务条都在（`toHaveCount(1)` ×2）✓、勾上清单后另一条**真的消失**（`toHaveCount(0)`）✓、"所有"复位后它回来（`toHaveCount(1)`）✓、迷你月历的点跟着变 ✓。**红只剩最后一段**：
+```
+Error: 对着把手几何中心按下去，命中的必须是把手自己
+  Expected substring: "ht-sidebar__resizer"
+  Received string:    "ht-content"
+```
+即：**把手几何中心那一点上，最上面的元素是主内容列 `ht-content`** ⇒ 判据注释里点名的那种缺陷形状（"把手在那儿、按下去拖不动"）又出现了，只是这次不是 `overflow-y` 裁掉的（那两条断言 `bodyOverflowY==='auto'`、`columnOverflowY!=='auto'` **都过了**），而是**被内容列盖住/压在下面**。
+⚠️ 这一段的归属要小心：`ht-content` / 侧栏几何正是**别线那笔未落库的壳改版**（`App.tsx` + `styles/app/*.css`）的地界 ⇒ 下一轮先做那个已知能切开的一刀（把 `App.tsx` + 六个 CSS 回 HEAD 后复跑这一条），**是他们的改版造成的就归他们，不是就改产品**。
+
+**三、另一条（迷你月历）**：它的红仍是"等 `calendar-board-day-title` 里的 `10月1日`"，而那个 testid 住在 `showSelectedDayList` 那一段（Web 传 `false` ⇒ 不渲染）—— 与上一轮同一个成因，下一轮把这条也换到 Web 真正在画的载体（页头月份 `calendar-toolbar-month` / 迷你月历自身的状态）。
+
+**把手几何那一段的现量收窄（下一轮从这里接）**：`.ht-sidebar__resizer`（`styles/app/sidebar.css:61-72`，**该文件干净 = 已提交**）是 `position: absolute; inline-size: 8px; inset-inline-end: -4px`（骑在列右边缘，各一半），**没有 `z-index`**；`.ht-content` 是 `flex: 1`（`main-area.css:230`，非定位元素）。判据打的那一点正好是**列的右边缘那一像素**：
+- 要命中把手，需要**两个条件同时成立**：① 骑在外面的那 4px **没被任何祖先裁掉**（判据已经查了列自己的 `overflowY`，但没查祖先链）；② 把手的绘制顺序**在内容列之上**。
+- 现量 `elementFromPoint(把手中心) === "ht-content"` ⇒ 至少有一个不成立。下一轮的两步：先 `getComputedStyle` 逐级读祖先链的 `overflow-x/y`（找裁点），再读 `z-index`/`isolation`/`backdrop-filter` 造成的层叠上下文（别线那笔壳改版把面板做成 `ht-material`，很容易在这里多出一个上下文）。
+- ⚠️ 判据本身**是对的**（"按下去拖不动"是用户真会遇到的），所以这一格**不要**改判据；是产品侧给把手一个层叠顺序、或者把裁点去掉。

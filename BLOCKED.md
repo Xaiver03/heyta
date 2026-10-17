@@ -11214,3 +11214,89 @@ COMMENT  action ✅  1 处   家族 createCommentActions   宿主调用点 0 处
 `pnpm check` 也就 STRUCTURALLY 不可能 exit 0——这一格是**如实**的红，不是"没人管"。本轮**没有**在
 `check-reachability.mjs` 里加任何"欠账登记"通道来把它洗绿（本门禁唯一豁免通道是断言 D 的
 `UNMODELED_ENTITY_TYPES`，而它管的是"合法但未物化"，COMMENT 已物化，不适用）。
+
+🟡 **B210（2026-10-17 10:2x · 两件"结构上跑不绿、但都不是本轮的仓库缺陷"的事，交给对应线/负责人定）**
+
+**一、`e2e/playwright.auth-simple.config.ts` 是一份没有消费者的孤儿配置，而它那两条用例在本机是真红**
+现量三条：
+```
+$ grep -rn "auth-simple" package.json scripts/*.sh scripts/*.mjs e2e/*.ts   # 除该 config 自己，0 命中
+$ grep -n "testMatch" e2e/playwright.auth-simple.config.ts                  # /auth-simple-ux\.spec\.ts/
+$ npx playwright test --config playwright.auth-simple.config.ts             # 2 failed / 1 passed (2.2m)
+    两条都卡在 `waiting for locator('.ht-sheet__auth')`（test timeout 60s）
+```
+它有自己的 web/stub 端口（4341/4342，文件头写了理由），但**没有任何入口跑它**；而主配置 `playwright.config.ts` 又把它收着 ⇒ 它在主配置下必红（本配置的 stub 在 4319，4342 上什么都没有）。
+本轮做了两件事：① 主配置 `testIgnore` 收进它（**已落地**，附理由）；② 报告器改成按主载体端口归因（**已落地**，见 `carrier-signature.mjs`）—— 在那之前，它那句 `ECONNREFUSED 127.0.0.1:4342` 会让**整轮 393 条当场作废（退出码 160）**，本轮实测丢掉了一整趟几十钟的读数。
+**仍开着的一格**：那两条用例（"Chatbot：执行、只读与批量确认是真实写入语义"两个分支）**谁也不跑**，且用自己那份配置复跑也是红。要哪一档请负责人拍：① 把这份配置接进链（新增一道 `check:*`，顺带把那两条修绿；从失败形状看是"认证面已经搬到助手面板里"那一族）；② 判定这一支作废并删掉 spec + config（**不是为了变绿而删**：它是 2026-10-06 那批"精简认证与 AI 行为验收"的产物，删之前要看那批验收是否已有别的载体）；③ 只留档不接链（现状 + 这条登记）。
+
+**二、AI 真浏览器验收那 8 份 spec 与"行内动作收进更多披露"的在途改版错代**
+现量（三条独立指认）：① `git show HEAD:apps/web/src/App.tsx | grep -c ht-compose-actions` = **0**，而工作树里那枚 `details.ht-compose-actions` 正是 `ai-breakdown-*` / `duration-run-*` 的祖先（探针逐级 dump 的祖先链）；② 把它打开之后同一条 `ai-breakdown-*` 立刻 `isVisible=true`（探针两头读数）；③ `git status --porcelain -- apps/web/src/features/ai/` 全是 **staged-modified**（`AiBreakdown/AiCapture/AiDuration/AiPrioritize/AiToolRun/AssistantPanel` + 新增 `managed-transport.ts`）。
+本轮只做了**判据侧的兼容**（`e2e/tests/ai-entry.ts` 的 `revealRowActions`：有披露就打开、没有就原样返回 —— 两种 IA 都能跑，点不到仍然红），并把 `ai-breakdown` / `ai-unavailable` / `ai-duration` 三份接上（现量 2/2、3/3、4/5）。**`ai-tool-run` / `ai-row-layout` / `ai-assistant` / `ai-prioritize` / `ai-capture` 仍红**，形状是 `ai-tool-input` / `ai-tool-run-button` / `ai-tool-run` **根本不在 DOM 里**（`element(s) not found`）⇒ 那是那条线把工具面板挪去别处之后要做的接线 + 规格更新，**不在本轮代改**（我改会与他们的在途 diff 撞车）。
+给那条线的两个落点：① 工具面板若搬进助手面板/详情列，spec 需要先走到那一屏（`ai-tool-*` 的挂载点）；② `ai-duration:95`（端点连不上 + 手动兜底）在披露打开之后**又关上了**（点击时 `element is not visible`）—— 这一条不像父级折叠，像是该用例里那次 `configureEndpoint(DEAD_ENDPOINT)` 触发了重渲染把 `details` 的 open 态丢掉，建议他们在实现侧确认披露的开态是不是**受控**的。
+
+🟡 **B211（2026-10-17 10:1x，本会话 · 链第 21 道里有四枚红是本线文件造的，昨天那句"其余归别线"作废；修法落点在别线的门禁件，本线不代改）**：把第 1 腿那 22 道红**逐道**读正文（不是按聚合主张读）之后量到的。现量三件：
+① **HEAD 态**：`cd .worktrees/inb-t9 && node scripts/check-selection-single-source.mjs` ⇒ **rc=1**，断言 G 点名 6 处里 **4 处住在 `apps/web/src/features/settings/InboundAutomationSettings.tsx`**（`retryEventId`／`editingRuleId`／`keyId`／`targetProjectId`），原件 `~/.heyta-evidence/inb-t7-1017-0902/doc-gates/step021-carrier-HEAD.txt`。
+② **共享脏树态**：同一条命令 ⇒ **rc=0**（`…/step021-shared-dirty.txt`）。差的不是我的代码，是别人手里那枚未提交的门禁改动：`git status --porcelain -- scripts/check-selection-single-source.mjs` 回 ` M`，而 `git grep -c InboundAutomationSettings HEAD -- scripts/check-selection-single-source.mjs` 退 1（HEAD 里零登记），盘上那四行登记在 `ROW_ID_EXEMPT` 的「2026-10-16 逐处读代码补登的 6 处」那一节里。
+③ **类别复核（我是那枚文件的所有者，这一格该我答）**：`retryEventId` 只用于 `retryEventId === event.eventId` 那两枚「确认重试／取消重试」按钮 ⇒ `confirm-gate` 对；`editingRuleId` 是编辑表单绑定的那条规则（`remote.update(editingRuleId, …)`、按钮文案在 create 与 saveEdit 之间切）⇒ `form-draft` 对；`keyId`（初值 `'default'`）与 `targetProjectId`（初值 `''`）都是表单字段本身 ⇒ `form-draft` 对。**四行登记与代码语义相符，本线认可**（现量 `grep -nE 'const \[(retryEventId|editingRuleId|keyId|targetProjectId)' apps/web/src/features/settings/InboundAutomationSettings.tsx`）。
+
+⇒ 三件事要写在明面上：**（一）本线在链上的自造红不止 B201 那四枚**，第 21 道这一枚是第五枚，昨天 18 条那句「其余（006、020–023…）归别线」在这一格是错的，按改口不删旧文处理；**（二）修法不在本线地界** —— 要么把那四枚改成 `@heyta/app-host` 的 selection（那是行为变更，且这四枚按代码语义**不是**选中态，改了反而错），要么在 `scripts/check-selection-single-source.mjs` 里登记（白名单外，且别人已经在做）⇒ 本线不动那枚脏文件、不代提交；**（三）等那笔登记进 main，第 21 道会自己转绿**，本线读数届时应复跑第 ① ② 两条命令确认两棵树同绿。
+
+配套装置（新增，在本线白名单内）：`research/tools/verify-inbound-chain-ownership.py` —— 把"其余都归别线"这句话变成一把逐道可复跑的筛子：`--log <链装置日志>` 打印每道红正文里引用的本线路径，命中即 rc=1；`--self-test` 的臂数由它自己末行打印（这一轮 8/8 通过，其中臂 6 兜"别线提交正文里提了一句自动收集就不许算进本线归属"，臂 8 兜"`package.json` 这种通用名不许按名匹配"）。🔴 **它的边界写在 docstring 里，读的人也要读**：043／045 那两枚 B201 自造红它**筛不出来**（红正文点名的是许可证渲染器与镜像合同件，成因是我动了 workspace 包与 lockfile 没重渲染 —— 引用型筛子看不见这种因果）。所以 **rc=0 不等于"本线零枚红"，B201 那张表仍是权威清单**。今天这道筛子在 `@30397e71` 的读数：命中 4 道 = 021（本线，真）、051（本线，真）、075（本线，真）、023（噪声，命中在 `✅ 共享层的空态权威实现` 那行打印上，且该件是靠 `16da3ecb` 那种把三件事捆成一笔的提交进的本线归属集）。
+
+**10-17 10:2x 追记（这一格多了常驻消费者，判据腿仍留手跑）**：这枚筛子已接进 `server/tests/inbound-lane-rigs-consumers.spec.ts` 新增的那张 `SELF_TEST_ONLY` 名册 —— 该 spec 的自报分母（"盘上有名册没登记的装置就红"）从此把它算在内，`--self-test` 的八臂随 `pnpm -r test` 常驻复跑（现量：`cd server && npx --no-install vitest run tests/inbound-lane-rigs-consumers.spec.ts` 末行 `Tests 14 passed (14)`，原件 `~/.heyta-evidence/inb-t7-1017-0902/doc-gates/consumers-spec-1017-1021.txt`）。**接进来的只有臂，判据腿没接**，原因写进那枚名册的注释里：`--log` 要一枚 `verify-inbound-check-chain.py` 的产物，而它今天**如实回 rc=1**（就是上面第 21 道那枚本线自造红，B211 未清）——把它挂成常驻断言等于替别人那笔未提交的门禁改动预告失败。所以这一格读法是：**臂常驻、判决手跑**，`python3 research/tools/verify-inbound-chain-ownership.py --log <链装置日志>` 何时转 rc=0 由那笔登记进 main 决定，届时第 ① ② 两条命令与这把筛子一起复跑。
+
+⚠️ **号段撞车与这一枚为什么改号（11:5x）**：本枚落笔时把节号占成了 `B210`，而另一会话在 10:2x 也写了一枚 `B210`（讲的是 `e2e/playwright.auth-simple.config.ts` 孤儿配置与 AI 真浏览器验收那两件，不是本会话写的，就在下面一节）。仓规是别人的正文不许代改，所以**改自己的号、不动别人的**：本枚改为 `B211` 并整节移到文件末尾，让节号与追加顺序重新对上；本线所有引用（台账 29／30 条、计划文末那一节第 11 条、`server/tests/inbound-lane-rigs-consumers.spec.ts` 的名册注释与用例名）已同步改指 `B211`。现量（撞号次数应为 0，各一枚）：`grep -c "🟡 \*\*B210" BLOCKED.md` 与 `grep -c "🟡 \*\*B211" BLOCKED.md`；末节号仍要现取，别按位置推：`grep -oE "\*\*B[0-9]{3}" BLOCKED.md | sort -u | tail -1`。
+
+✅ **B211 撤回（2026-10-17 同日，第三轮查证）：不是产品缺陷，是判据的**前提**没建立 —— 产品那一步是对的。**
+
+宿主 memo 里的插桩（`console.log`，跑完已撤回）给出了决定性读数：
+```
+勾上清单之后：tasks=2 all=2 projects=1 tags=0
+              pids=project-0e9a…|project-0e9a…      ← 🔴 两条任务的 projectId **是同一个**
+              scopeIds=project-0e9a…                ← 范围也正指着它
+```
+⇒ `scopeTasks()` **行为正确**：两条本来都在那个清单里，所以"只剩这一条清单"自然还是两条。
+真因在**判据的前提**：`seed()` 先建清单（建完侧栏就选中了它），随后的快速捕获把**两条都写进了那个新清单** —— 于是"会消失的那一条"根本不存在，那条断言成了**恒真的假判据**（§7 元规则 2）。
+已落地的修法（`e2e/tests/calendar-sidebar.spec.ts` 的 `seed()`）：显式把第二条归位到收集箱（`TaskOrganizer.tsx:160` 的 `value=""`），并断言 `metaFor(OUT_LIST)` **不含** 清单名 —— 前提由"假设"改成"建立"。
+⚠️ 我先前那条"疑似宿主接线断了"的判定**作废**（静态链逐跳核验本来就显示它是对的，是真数据推翻了我的推断）。
+
+🟡 **B211（2026-10-17 · 日历的"清单范围"筛选：侧栏变了、主区没变 —— 疑似宿主接线断了，一行探针就能复现）**
+
+**现量（真浏览器，探针留在 `e2e/tests/calendar-sidebar.spec.ts` 的那次临时插桩里，读数如下）**：
+```
+勾上「在日历上显示清单「侧栏清单-…」的任务」之后：
+  checked= true      ← 勾选真的生效了
+  allPressed= false  ← store 里的 scope **不是空的**（isScopeEmpty(view.scope) === false）
+  bars= 2            ← 🔴 主区那一天格里**两条都还在**（不在该清单里的那条没消失）
+```
+而 `@heyta/domain` 的 `scopeTasks()` 语义是清楚的（`task-filter.ts:341-351`）：scope 非空 ⇒ 只留 `projectId ∈ projectIds` 或 tag 命中的任务；而 `seed()` 结束时**逐字断言过**归属只落在那一条上：
+```
+await expect(metaFor(page, IN_LIST)).toContainText(LIST);   // e2e/tests/calendar-sidebar.spec.ts:110
+```
+⇒ 另一条是收集箱里的（`projectId === undefined`），按语义**必须消失**。
+
+**结论**：**主区那条路没有吃到 scope**（侧栏与 store 是对的）。真因待定，但已经把范围收窄到"宿主把 scope 接给板子的那一跳"：
+- `apps/web/src/features/calendar/CalendarView.tsx:81-84` 是唯一一处：`useMemo(() => scopeTasks(Object.values(store.entities.tasks), view.scope), [store.entities.tasks, view.scope])`；
+- `packages/ui/src/calendar/CalendarBoard.tsx:444-450` 的 `calendarTasksByDate` 只从 `tasks` **prop** 建（板子本身没问题）；
+- ⇒ 要么那一跳的 `view.scope` 是**陈旧/未订阅**的（宿主若用带 selector 的 `useCalendarViewStore(…)` 就会这样：侧栏订阅了 scope、主区没订阅），要么 `tasks` 这一层在别处被**覆盖**。
+**复现（一分钟）**：把这段探针插在 `e2e/tests/calendar-sidebar.spec.ts` 里 `.check()` 之后，跑 `npx playwright test -c playwright.config.ts tests/calendar-sidebar.spec.ts --grep 显示范围`：
+```ts
+console.log('checked=', await page.getByRole('checkbox', {name: `在日历上显示清单「${LIST}」的任务`}).isChecked(),
+  'bars=', await page.locator(`[data-testid="calendar-cell-${today}-bar"]`).count(),
+  'allPressed=', await page.getByTestId('calendar-scope-all').getAttribute('aria-pressed'));
+```
+**为什么它算"界面在说谎"**：判据自己的注释就写着这条 —— "只筛主区不筛点 = 界面在说谎"；现在是反过来：**筛了点、主区照旧**。用户勾了一个清单，格子里的任务却没少。
+⚠️ 我**没有**动产品那一行：它要么是订阅形状的问题、要么是上层覆盖，改之前得先看一眼 `CalendarView.tsx` 里 `useCalendarViewStore` 的调用形状（我这一轮预算用尽）。判据侧我只做了两件不改变本义的事：① 把"当天列表"锚点换到 Web 真正在画的**格内任务条**（`calendar-board-day-list` 在产品里已不存在，见 PROGRESS 同日续三）；② `task-organize-summary` 那枚点击先走两形态 helper（披露折叠着时它不可见）。
+
+**B211 追加（2026-10-17 第二轮查证：静态链是干净的，缺陷在动态那一侧）**
+逐段核过宿主→板子的整条链，**每一跳都对**：
+```
+CalendarView.tsx:69   const view = useCalendarViewStore();        // 无 selector ⇒ 订阅整个 state，scope 变了必重渲染
+CalendarView.tsx:81   useMemo(() => scopeTasks(tasks, view.scope), [store.entities.tasks, view.scope])   // deps 含 scope
+CalendarView.tsx:236  <SharedCalendarBoard tasks={tasks} …>        // 只有这一处传 tasks（grep "tasks={" 只此一行）
+CalendarBoard.tsx:444 const calendarTasksByDate = useMemo(…, [tasks, weeks])   // 只从 prop 建，板子侧无第二份来源
+```
+`@heyta/domain/task-filter.ts:341-351` 的语义也核过：scope 非空 ⇒ 只留 `projectId ∈ projectIds` 或 tag 命中。
+⇒ **静态链任意一跳都不该出这个症状**，所以真因只可能在"运行时那一侧的替换/覆盖"（例如另有一条渲染分支或缓存层把 `tasks` 覆盖回去）。
+⚠️ 尝试过的**动态**取证：往宿主的板子外面挂探针属性（`data-probe-tasks` / `data-probe-projects`）再读 —— 那次**插桩本身把板子弄坏了**（首条断言变成"未进主区"，即一条任务条都不画），说明我插的 `<div>` 包层破坏了 `SharedCalendarBoard` 的父级布局/尺寸前提（它的高度来自父级）。**两处探针已逐字撤回**（`grep -c "data-probe"` = 0、`grep -c "PROBE\|host="` = 0），撤回后 `pnpm --filter @heyta/web typecheck` rc=0，且 `smoke` + `calendar-week` 复跑 **6 passed / 0 failed**（树没被我弄坏）。
+⇒ 下一轮的正确取法（**不要**再包 div）：在 `CalendarView` 的 `tasks` memo 里 `console.log`，用**真浏览器里听 page console 的探针 spec**（`page.on('console')`）读它；或把 `tasks.length` 写进板子**已有的**某个 `data-*`（不改结构）。
