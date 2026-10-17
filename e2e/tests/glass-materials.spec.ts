@@ -141,7 +141,18 @@ const SURFACES: Surface[] = [
        * 还开着 ⇒ 判据 `…关干净再拍下一个（不可见即关闭）` 读到 `.ht-material`
        * 仍然 visible（现量：`Expected: hidden, Received: visible`）。
        * 这里按"点外层 summary 收起"来关（它本来就是 toggle），再按 Esc 兜底。
+       *
+       * 🔴 2026-10-17（第六个读数，**这一条是本轮真因**）：只收外层**不够**。
+       * 在真实流程里插桩量到：下一面点 chip 时，命中点是 `label`，而它属于
+       * **同一行**的另一个 `.ht-material__row-pop` 面板（`popRow == chipRow`）——
+       * 也就是**这一面的整理面板并没有随外层披露一起消失**，它压在下一面的目标上
+       * （探针里单任务、干净状态量不到）。
+       * ⇒ 关法改成**先关内层、再收外层**（内层还可见时才点它，避免"关掉又打开"）。
+       * ⚠️ 应用侧仍有一个真问题留在台账里：**同一时刻只允许一个行内浮层**这条不变量
+       * 现在没有谁在保证（行内浮层彼此重叠是真实存在的），它不该靠用例的关闭顺序兜住。
        */
+      const chip = page.locator('[data-testid="task-organize-summary"]').first();
+      if (await chip.isVisible().catch(() => false)) await chip.click();
       const more = page.locator('[data-testid^="task-actions-summary-"]').first();
       if ((await more.count()) > 0) {
         const outer = more.locator('xpath=ancestor::details[1]');
