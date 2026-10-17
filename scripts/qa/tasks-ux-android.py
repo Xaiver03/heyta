@@ -39,6 +39,52 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+ENGLISH = False
+
+
+def T(zh: str, en: str) -> str:
+    """Pick the column the installed app is actually rendering.
+
+    `packages/i18n` carries both; the emulator's system locale decides which one
+    the shell renders, so every locator has to hold both spellings.
+    """
+    return en if ENGLISH else zh
+
+
+def open_task_label(title: str) -> str:
+    return T("打开任务：{title}", "Open task: {title}").format(title=title)
+
+
+def view_options_label(view: str) -> str:
+    return T("视图选项：{view}", "View options: {view}").format(view=view)
+
+
+def move_task_template() -> str:
+    return T("移动「{title}」到其他象限", "Move “{title}” to another quadrant")
+
+
+def move_task_label(title: str) -> str:
+    return move_task_template().format(title=title)
+
+
+def move_task_pattern() -> str:
+    """Same i18n template with its placeholder turned into a capture group."""
+    return move_task_template().replace("{title}", "(.+)")
+
+
+def move_sheet_marker() -> str:
+    """Head of the move sheet's title, cut from the template instead of copied."""
+    return move_task_template().split("{", 1)[0]
+
+
+def moved_feedback_marker() -> str:
+    return T("任务已移动到「{quadrant}」", "Task moved to “{quadrant}”").split("{", 1)[0]
+
+
+def selected_label(count: int) -> str:
+    return T("已选 {count} 项", "{count} selected").format(count=count)
+
+
 class AndroidProbe:
     def __init__(self, args: argparse.Namespace) -> None:
         self.serial = args.serial
@@ -46,6 +92,7 @@ class AndroidProbe:
         self.out = args.evidence_dir
         self.out.mkdir(parents=True, exist_ok=True)
         self.steps: list[dict[str, Any]] = []
+        self.ui_locale: str | None = None
         self.screenshot_index = 0
 
     def adb(self, *args: str, check: bool = True) -> str:
@@ -181,15 +228,15 @@ class AndroidProbe:
 
     def open_view_options(self, view: str) -> None:
         """Open the task view menu through its stateful AX label."""
-        self.tap_label(f"视图选项：{view}")
-        self.wait_label("视图选项")
+        self.tap_label(view_options_label(view))
+        self.wait_label(T("视图选项", "View options"))
 
     def choose_view(self, current_view: str, target_view: str) -> None:
         """Choose a view from the menu; the native chip closes it after selection."""
-        self.scroll_to_top(f"视图选项：{current_view}")
+        self.scroll_to_top(view_options_label(current_view))
         self.open_view_options(current_view)
         self.tap_label(target_view)
-        self.wait_no_label("视图选项")
+        self.wait_no_label(T("视图选项", "View options"))
 
     def screenshot(self, name: str) -> None:
         path = self.out / f"{name}.png"
@@ -220,19 +267,27 @@ class AndroidProbe:
         self.adb("shell", "am", "start", "-W", "-n", "com.heyta/com.heytamobile.MainActivity")
         time.sleep(2)
         nodes = self.nodes()
-        if self.find(nodes, label="只用本机", clickable=True):
-            self.tap_label("只用本机")
-            self.wait_label("先离线使用", clickable=True)
-        if self.find(self.nodes(), label="先离线使用", clickable=True):
-            self.tap_label("先离线使用")
-        self.wait_label("任务", clickable=True)
+        # 语言判定走三种首屏面：已同意联网时只有底部 tab，全新安装时先是隐私同意卡、
+        # 再是离线欢迎卡（与同目录 profile-settings-android.py 的判定同形）。
+        global ENGLISH
+        ENGLISH = any(
+            self.find(nodes, label=candidate, clickable=True)
+            for candidate in ("This device only", "Use offline for now", "Tasks")
+        )
+        self.ui_locale = "en" if ENGLISH else "zh-CN"
+        if self.find(nodes, label=T("只用本机", "This device only"), clickable=True):
+            self.tap_label(T("只用本机", "This device only"))
+            self.wait_label(T("先离线使用", "Use offline for now"), clickable=True)
+        if self.find(self.nodes(), label=T("先离线使用", "Use offline for now"), clickable=True):
+            self.tap_label(T("先离线使用", "Use offline for now"))
+        self.wait_label(T("任务", "Tasks"), clickable=True)
 
     def create_task(self, title: str) -> None:
-        self.tap_label("新建任务")
+        self.tap_label(T("新建任务", "New task"))
         field = self.wait_resource("capture-input")
         self.tap_node(field)
         self.adb("shell", "input", "text", title)
-        add = self.wait_label("添加", clickable=True)
+        add = self.wait_label(T("添加", "Add"), clickable=True)
         if add.get("enabled") != "true":
             raise ProbeError("capture submit stayed disabled after real text input")
         self.tap_node(add)
@@ -250,7 +305,7 @@ class AndroidProbe:
         return resource[index + len(prefix) :]
 
     def task_row_for_title(self, title: str) -> ET.Element:
-        expected = f"打开任务：{title}"
+        expected = open_task_label(title)
         return self.wait(
             lambda nodes: next(
                 (
@@ -304,7 +359,7 @@ class AndroidProbe:
                 node
                 for node in nodes
                 if node.get("resource-id", "").startswith("task-row-")
-                and self.label(node) == f"打开任务：{title}"
+                and self.label(node) == open_task_label(title)
             ),
             None,
         )
@@ -345,7 +400,7 @@ class AndroidProbe:
 
         first = self.task_row_for_title(task_a)
         self.long_press(first)
-        self.wait_label("退出选择", clickable=True)
+        self.wait_label(T("退出选择", "Exit selection"), clickable=True)
         self.record("04-long-press-enters-selection")
         second = self.scroll_find(
             lambda nodes: next(
@@ -353,61 +408,61 @@ class AndroidProbe:
                     node
                     for node in nodes
                     if node.get("resource-id", "").find("task-row-") >= 0
-                    and self.label(node) == f"打开任务：{task_b}"
+                    and self.label(node) == open_task_label(task_b)
                 ),
                 None,
             ),
             f"second test task row {task_b!r}",
         )
         self.tap_node(second)
-        selected = self.wait_label("已选 2 项")
+        selected = self.wait_label(selected_label(2))
         if selected is None:
             raise ProbeError("second task was not added to multi-select")
         self.record("05-multi-select-second-task")
-        self.tap_label("退出选择")
-        self.wait_no_label("退出选择")
+        self.tap_label(T("退出选择", "Exit selection"))
+        self.wait_no_label(T("退出选择", "Exit selection"))
         self.record("06-exit-selection")
 
-        self.tap_label("选择任务")
+        self.tap_label(T("选择任务", "Select tasks"))
         self.tap_node(self.scroll_find(
             lambda nodes: next(
                 (
                     node
                     for node in nodes
                     if node.get("resource-id", "").find("task-row-") >= 0
-                    and self.label(node) == f"打开任务：{task_a}"
+                    and self.label(node) == open_task_label(task_a)
                 ),
                 None,
             ),
             f"timeline selection task row {task_a!r}",
         ))
-        self.choose_view("列表", "时间线")
-        self.wait_no_label("退出选择")
-        self.wait_no_label("已选 1 项")
+        self.choose_view(T("列表", "List"), T("时间线", "Timeline"))
+        self.wait_no_label(T("退出选择", "Exit selection"))
+        self.wait_no_label(selected_label(1))
         self.record("06b-timeline-clears-selection")
-        self.choose_view("时间线", "列表")
+        self.choose_view(T("时间线", "Timeline"), T("列表", "List"))
 
         # View, date and sort controls are intentionally behind one explicit
         # entry point.  Exercise the list menu before changing views so a
         # regression cannot silently restore the old row of always-visible
         # controls.
-        self.open_view_options("列表")
-        self.wait_label("日期显示")
-        self.wait_label("选择排序方式")
-        for sort_label in ("默认（按截止时间）", "按添加时间", "按优先级"):
+        self.open_view_options(T("列表", "List"))
+        self.wait_label(T("日期显示", "Date display"))
+        self.wait_label(T("选择排序方式", "Choose sort order"))
+        for sort_label in (T("默认（按截止时间）", "Default (due date)"), T("按添加时间", "Date added"), T("按优先级", "Priority")):
             self.wait_label(sort_label, clickable=True)
-        self.tap_label("按优先级")
-        self.wait_no_label("视图选项")
-        self.open_view_options("列表")
-        self.tap_label("倒计时")
+        self.tap_label(T("按优先级", "Priority"))
+        self.wait_no_label(T("视图选项", "View options"))
+        self.open_view_options(T("列表", "List"))
+        self.tap_label(T("倒计时", "Countdown"))
         # Date chips keep the panel open for a second choice; Android Back is
         # the documented dismissal path and is itself part of the UX contract.
-        self.wait_label("视图选项")
+        self.wait_label(T("视图选项", "View options"))
         self.adb("shell", "input", "keyevent", "4")
-        self.wait_no_label("视图选项")
+        self.wait_no_label(T("视图选项", "View options"))
         self.record("07-view-options-sort-and-date")
 
-        self.choose_view("列表", "四象限")
+        self.choose_view(T("列表", "List"), T("四象限", "Quadrants"))
         self.wait_resource("quadrant-board")
         more = self.scroll_find(
             lambda nodes: next(
@@ -415,14 +470,14 @@ class AndroidProbe:
                     n
                     for n in nodes
                     if n.get("clickable") == "true"
-                    and (n.get("content-desc") or "") == f"移动「{task_a}」到其他象限"
+                    and (n.get("content-desc") or "") == move_task_label(task_a)
                 ),
                 None,
             ),
             f"quadrant more action for {task_a!r}",
         )
         move_label = more.get("content-desc", "")
-        match = re.fullmatch(r"移动「(.+)」到其他象限", move_label)
+        match = re.fullmatch(move_task_pattern(), move_label)
         if match is None:
             raise ProbeError(f"could not derive task title from quadrant move action: {move_label!r}")
         moved_title = match.group(1)
@@ -432,9 +487,9 @@ class AndroidProbe:
         if source_quadrant is None:
             raise ProbeError(f"could not locate source quadrant for {moved_title!r}")
         self.tap_node(more)
-        self.wait(lambda nodes: next((n for n in nodes if "移动「" in self.label(n) and n.get("clickable") != "true"), None), "quadrant move sheet title")
+        self.wait(lambda nodes: next((n for n in nodes if move_sheet_marker() in self.label(n) and n.get("clickable") != "true"), None), "quadrant move sheet title")
         self.record("08-open-quadrant-move-sheet")
-        quadrant_names = ("马上做", "计划做", "交给别人", "先不做")
+        quadrant_names = (T("马上做", "Do now"), T("计划做", "Schedule"), T("交给别人", "Delegate"), T("先不做", "Drop"))
         options = [n for n in self.nodes() if self.is_visible(n) and self.label(n) in quadrant_names and n.get("clickable") == "true" and n.get("enabled") == "true"]
         options = [
             node
@@ -446,8 +501,8 @@ class AndroidProbe:
         target_quadrant = f"quadrant-cell-{quadrant_names.index(self.label(options[0])) + 1}"
         self.tap_node(options[0])
         def feedback_and_undo(nodes: list[ET.Element]) -> tuple[ET.Element, ET.Element] | None:
-            feedback = next((node for node in nodes if "任务已移动到" in self.label(node)), None)
-            undo = next((node for node in nodes if self.label(node) == "撤销移动" and node.get("clickable") == "true"), None)
+            feedback = next((node for node in nodes if moved_feedback_marker() in self.label(node)), None)
+            undo = next((node for node in nodes if self.label(node) == T("撤销移动", "Undo move") and node.get("clickable") == "true"), None)
             return None if feedback is None or undo is None else (feedback, undo)
 
         feedback, undo = self.wait(feedback_and_undo, "quadrant move feedback and undo action")
@@ -469,15 +524,15 @@ class AndroidProbe:
         )
         self.record("10-quadrant-undo", sourceQuadrant=source_quadrant)
 
-        self.choose_view("四象限", "时间线")
+        self.choose_view(T("四象限", "Quadrants"), T("时间线", "Timeline"))
         self.wait_resource("timeline-view")
         # Timeline has its own geometry, so date display and list sorting do
         # not belong in its menu.
-        self.open_view_options("时间线")
-        self.wait_no_label("日期显示")
-        self.wait_no_label("选择排序方式")
+        self.open_view_options(T("时间线", "Timeline"))
+        self.wait_no_label(T("日期显示", "Date display"))
+        self.wait_no_label(T("选择排序方式", "Choose sort order"))
         self.adb("shell", "input", "keyevent", "4")
-        self.wait_no_label("视图选项")
+        self.wait_no_label(T("视图选项", "View options"))
         self.record("11-timeline-view-options")
         timeline_row = self.wait(
             lambda nodes: next(
@@ -495,22 +550,22 @@ class AndroidProbe:
             f"timeline task row {task_a!r}",
         )
         self.tap_node(timeline_row)
-        self.wait_label("任务详情")
+        self.wait_label(T("任务详情", "Task details"))
         self.tap_node(self.scroll_find(
             lambda nodes: next(
-                (node for node in nodes if self.label(node) == "展开排期" and node.get("clickable") == "true"),
+                (node for node in nodes if self.label(node) == T("展开排期", "Show scheduling") and node.get("clickable") == "true"),
                 None,
             ),
             "expand schedule control",
         ))
-        self.wait_label("收起排期", clickable=True)
-        self.tap_label("收起排期")
-        self.wait_label("展开排期", clickable=True)
-        self.scroll_to_top("标题", clickable=False)
+        self.wait_label(T("收起排期", "Hide scheduling"), clickable=True)
+        self.tap_label(T("收起排期", "Hide scheduling"))
+        self.wait_label(T("展开排期", "Show scheduling"), clickable=True)
+        self.scroll_to_top(T("标题", "Title"), clickable=False)
         self.record("12-timeline-row-opens-detail")
         title_field = self.wait(
             lambda nodes: next(
-                (n for n in nodes if n.get("class", "").endswith("EditText") and self.label(n) == "标题"),
+                (n for n in nodes if n.get("class", "").endswith("EditText") and self.label(n) == T("标题", "Title")),
                 None,
             ),
             "editable task title field",
@@ -525,7 +580,7 @@ class AndroidProbe:
         self.adb("shell", "input", "keyevent", "4")
         self.wait(
             lambda nodes: (
-                next((node for node in nodes if self.label(node) == "任务详情"), None)
+                next((node for node in nodes if self.label(node) == T("任务详情", "Task details")), None)
                 if not self.keyboard_visible()
                 else None
             ),
@@ -533,7 +588,7 @@ class AndroidProbe:
         )
         self.record("14-detail-keyboard-dismissed")
         self.adb("shell", "input", "keyevent", "4")
-        self.wait_no_label("任务详情")
+        self.wait_no_label(T("任务详情", "Task details"))
         self.wait_resource("timeline-view")
         self.record("15-detail-closes-after-second-back")
 
@@ -557,15 +612,15 @@ def main() -> int:
     report = args.evidence_dir / "tasks-ux-journey.json"
     try:
         probe.run(args.skip_profile)
-        report.write_text(json.dumps({"status": "passed", "serial": args.serial, "steps": probe.steps}, ensure_ascii=False, indent=2))
-        print(json.dumps({"status": "passed", "report": str(report)}, ensure_ascii=False))
+        report.write_text(json.dumps({"status": "passed", "serial": args.serial, "uiLocale": probe.ui_locale, "steps": probe.steps}, ensure_ascii=False, indent=2))
+        print(json.dumps({"status": "passed", "report": str(report), "uiLocale": probe.ui_locale}, ensure_ascii=False))
         return 0
     except Exception as error:
         try:
             probe.screenshot("failure")
         except Exception:
             pass
-        report.write_text(json.dumps({"status": "failed", "serial": args.serial, "error": str(error), "steps": probe.steps}, ensure_ascii=False, indent=2))
+        report.write_text(json.dumps({"status": "failed", "serial": args.serial, "uiLocale": probe.ui_locale, "error": str(error), "steps": probe.steps}, ensure_ascii=False, indent=2))
         print(json.dumps({"status": "failed", "report": str(report), "error": str(error)}, ensure_ascii=False))
         return 1
 
