@@ -6596,3 +6596,22 @@ python3 research/tools/verify-inbound-check-chain.py --logs /tmp/chain56 --from 
 门禁侧的前提（"点下去不会有任何结果"）**对这个设计不成立**。
 **这不是我该单方面改的**：改门禁＝放宽判据（明令禁止）；改产品＝要不要放弃"如实告知"这条已提交口径。
 **两侧的原话都已留在上面的读数里**，等那条线/产品拍一句即可落地。
+
+### 2026-10-17 装置扫出的第 88 道红：**是我自己的 bug，被 DTS 构建抓住**（已修）
+
+**装置读数**：`--from 88 --to 99` ⇒ `CHAIN ran=12/12 RED=1 steps=[88]`（`check:privacy-consent-e2e`）。
+**真因链（一步步量出来的）**：
+```
+第 88 道 → apps/web 的 `tsc -b` 报 TS7016：找不到 '@heyta/app-host' 的声明文件
+        → 查 dist：只有 index.js / index.js.map，**没有 index.d.ts**（我此前那次"构建成功"产出过它）
+        → 手动重建：`pnpm --filter @heyta/app-host build` **失败**（tsup 退出 1）
+        → DTS 那一步逐字：src/share-comments.ts(102,36) error TS2304: Cannot find name 'ShareCommentRecord' × 5 处
+```
+**根因是我第 42 轮的一次补丁**：给 `share-comments.ts` 插 `ShareCommentRecord` 接口时，
+Python 的 `s.replace` **锚点没匹配、我又没断言** ⇒ **静默没落**；而 `vitest` 不做类型检查、
+`tsc -p tsconfig.spec.json` 也没拦住（它按 spec 配置跑，没覆盖到这条 DTS 路径）⇒ 一路隐身。
+**修法**：把接口补上（`extends CommentLike` + 作者的三个字段），并把它**为什么会有这次事故**写进接口注释。
+**复跑**：`pnpm --filter @heyta/app-host build` ✅（`DTS dist/index.d.ts 346.86 KB`）；
+第 88 道 `check:privacy-consent-e2e` **rc=0** ✅。
+**两条教训（写进注释与台账）**：① 补丁**必须断言**（`assert old in s`），否则静默不落；
+② "验证"要跑到**会做类型检查的那一步**（DTS 构建、`tsc -b`），`vitest` 绿不等于类型对。
