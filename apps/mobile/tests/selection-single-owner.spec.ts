@@ -79,13 +79,30 @@ describe('1. 回落喂的是活跃全集，不是筛后的那一截', () => {
    * 拿候选集当谓词的后果不是崩溃，是"用户在另一台设备上勾掉那条任务 ⇒ 这边
    * 正在给它的提案面板凭空关掉，而那条任务只是完成了、没有消失"。
    */
-  it('助手屏：喂的是 `listTasks()` 全集，不是它那份"待办候选集"', () => {
-    expect(AI).toMatch(/const aliveTasks = actions\.listTasks\(\);/);
-    expect(AI).toMatch(/pruneSelectionAgainst\(\{\s*task:\s*aliveTasks\.map\(/);
-    expect(AI).toMatch(/actions\.listPendingTasks\(\)/);
-    // 🔴 反向（单独成一条的理由见下面便签那条）：候选集不许进谓词。
-    expect(AI).not.toMatch(/pruneSelectionAgainst\(\{\s*task:\s*tasks/);
-    expect(AI).not.toMatch(/pruneSelectionAgainst\(\{\s*task:\s*props\.tasks/);
+  it('助手屏：不再持选中态（2026-10-10 重写成单一对话助手后）', () => {
+    /**
+     * 🔴 **旧文不删，按现量改口（2026-10-17）**：这一格原来是一条**正向**形状
+     * （`const aliveTasks = actions.listTasks();` + `pruneSelectionAgainst({ task: aliveTasks.map(…) })`
+     * + 反向"候选集不许进谓词"）。那套形状属于**多模式助手**（1564 行那代：
+     * 工具调用 / 捕获 / 拆解三个模式 + 一条"给 AI 挑条目标任务"的提案面板），
+     * 它会往共享选中里写 `task`，所以有"喂全集还是喂候选集"这一问。
+     *
+     * 现量：`d49f77e3`（2026-10-10，**main 侧**）把这一屏重写成**单一对话助手**（325 行），
+     * 提案面板改由 `chat-controller.ts` 的 `confirmAiToolProposal` 驱动、**不再选中任何任务**。
+     * 三条独立指认：① `grep -rn "lib/selection|pruneSelectionAgainst|listTasks" apps/mobile/src/ai/`
+     * 回 **0 命中**；② `git show 6ded0725:apps/mobile/src/ai/AssistantScreen.tsx` 里那三行**在**，
+     * 现文件里**不在**；③ `git log --oneline -- apps/mobile/src/ai/AssistantScreen.tsx` 指向
+     * `d49f77e3` 那笔重写（1564 → 325 行）。
+     *
+     * ⇒ 这一格从正向改判成**负向不变量**：它既然不再是选中态的读方，就**不许**再长出一个。
+     *    不是"少测一格"：本文件判据 4 号那条枚举规则说的是按"**谁在读这一类**"枚举，
+     *    而继续把它留在一张正向名单里只能得到一条**恒假**的断言 —— 恒红的判据与没有判据
+     *    等价（§7 元规则 2）。哪天助手屏重新接了"给提案挑目标任务"（那是产品决定），
+     *    这一条会当场变红，逼动手的人回来把它改回正向形状并重新取证。
+     */
+    expect(AI, '助手屏又接回了选中态 —— 请把这一格改回「喂 listTasks() 全集」的正向形状').not.toMatch(
+      /lib\/selection|pruneSelectionAgainst|actions\.listTasks\(\)/,
+    );
   });
 
   /**
@@ -166,7 +183,10 @@ describe('2. 旧的本地选中态确实删掉了（不是"又加了一份新的
     expect(TASKS).toContain("from '../lib/selection'");
     expect(HABITS).toContain("from '../lib/selection'");
     expect(NOTES).toContain("from '../lib/selection'");
-    expect(AI).toContain("from '../lib/selection'");
+    // 🔴 助手屏这一行 2026-10-17 由 `toContain` 翻成 `not.toContain`（同一笔重写，
+    //    理由与上面那一格逐字相同）：它不再是选中态的读方 ⇒ **不许**引共享选中。
+    //    这就是"旧的所有者确实删掉了"这句话在它身上的形状 —— 读方 0，落点 0。
+    expect(AI).not.toContain("from '../lib/selection'");
   });
 
   it('选中态只在 `lib/selection.ts` 里实例化一次', () => {
@@ -182,12 +202,19 @@ describe('3. 离开这一屏时收起详情层', () => {
     expect(TASKS).toMatch(/useEffect\(\s*\(\) => \(\) => \{\s*selection\.select\('task', null\);/);
     expect(HABITS).toMatch(/useEffect\(\s*\(\) => \(\) => \{\s*selection\.select\('habit', null\);/);
     /**
-     * 🔴 助手屏这一条**不是**"照抄任务屏的做法"，是新读方带来的**反向**后果：
+     * 🔴 助手屏这一条**不是**"照抄任务屏的做法"，是旧读方带来的**反向**后果：
      * 任务屏的详情浮层 `visible={detailTaskId !== null}` 直接读共享选中，
-     * 而助手屏在它之前写进了同一个 key。少了这条清理，"给 AI 挑一条目标任务 →
+     * 而旧助手屏在它之前写进了同一个 key。少了那条清理，"给 AI 挑一条目标任务 →
      * 返回 → 切到「任务」标签"就会**凭空弹出**那条任务的详情 —— 用户没点过它。
+     *
+     * 🔴 **2026-10-17 改口**：写方已经不在了（`d49f77e3` 的单一对话助手，
+     * 见判据 1 那一格的取证）⇒ "少了这条清理会凭空弹详情"这个后果**随之消失**，
+     * 因为没有任何一条路径会再往 `task` 这个 key 里写。所以这一条翻成负向：
+     * 它**不许**再出现写选中态 + 卸载清理这套（出现 = 那个凭空弹详情的老风险回来了）。
      */
-    expect(AI).toMatch(/useEffect\(\s*\(\) => \(\) => \{\s*selection\.select\('task', null\);/);
+    expect(AI, '助手屏又开始写共享选中了 —— 请把这一格改回"卸载时清 task"的正向形状').not.toMatch(
+      /selection\.select\('task',\s*null\)|selection\.select\('task',\s*[A-Za-z_$]/,
+    );
   });
 
   /**
