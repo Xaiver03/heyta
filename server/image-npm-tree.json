@@ -1,6 +1,6 @@
 {
   "_what": "镜像生产阶段（`server/Dockerfile` 的 FROM … AS production）会装的那棵依赖树，**由提交物锁 `server/package-lock.json` 导出**。不是清单、不是许可判定 —— 判定在 research/tools/check-image-license-coverage.mjs。",
-  "generatedAt": "2026-10-03T23:21:43Z",
+  "generatedAt": "2026-10-17T01:11:02Z",
   "generator": "research/tools/gen-image-npm-tree.mjs",
   "inputs": {
     "targetPlatform": {
@@ -9,25 +9,28 @@
       "libc": "musl"
     },
     "registry": "https://registry.npmjs.org/",
-    "serverInstallInputSha256": "59836b4113b0aa2837bbe451d45dd4d882483ac3816fc132d54e7c305ad0e1dc",
-    "installShapeSha256": "4b555c29f4aab19827e73338bb4ef15b24ce5fb33443799d7c76504424b89f12",
+    "serverInstallInputSha256": "95f86e09d871eb1735853a4ef03af56d4a8f8f14e985bef09dbc460dcf2decfb",
+    "installShapeSha256": "86e45f6a837d3a92b8617f5cad9ef125f465337cb2c8a6995d4f64282a9eaf94",
     "packedWorkspaceDeps": [
+      "@heyta/inbound-core",
       "@heyta/domain",
       "@heyta/shared-schema",
       "@heyta/sync-core"
     ],
     "packedPackageJsonSha256": {
+      "packages/inbound-core/package.json": "3c1c28d70c6c7fe7ad40adce5085eb23a827c2bbb41d040511e25b50d8413647",
       "packages/domain/package.json": "4850bf55b5c40bb37f183f238fdfbf7cddad19b802fd41c9c211b8b1ac7809e7",
       "packages/shared-schema/package.json": "3f21a18ae57c4ba63d7db591af29d7fb99a3a8784cfddb049661cf37f7821e69",
-      "packages/sync-core/package.json": "657cd7991fb4bef709c4bdf5e11e275abc9b6ee99c6b987e6fcecca4b7a6face"
+      "packages/sync-core/package.json": "fcb6c2dbe1a0f2abf03923510a2a656fdf588646392f8f6f9b4b24aaa3f8a149"
     },
-    "packageLockSha256": "d2f9ab857b8e9570680d888c0260683ba375f7b5afdcd6d654966d11057371f1",
+    "packageLockSha256": "667180dd6274134d0c74b53b8024c28b12e89096286a58b21c3287e78940fbc8",
     "localTarballs": [
       "./sync-core.tgz",
       "./shared-schema.tgz",
-      "./domain.tgz"
+      "./domain.tgz",
+      "./inbound-core.tgz"
     ],
-    "registryResolvedDeps": 23,
+    "registryResolvedDeps": 24,
     "skippedForOtherPlatform": 12
   },
   "packages": [
@@ -122,6 +125,12 @@
       "license": "MIT"
     },
     {
+      "name": "@heyta/inbound-core",
+      "version": "0.0.0",
+      "optional": false,
+      "license": "MIT"
+    },
+    {
       "name": "@heyta/shared-schema",
       "version": "1.0.0",
       "optional": false,
@@ -147,6 +156,12 @@
     },
     {
       "name": "@noble/ciphers",
+      "version": "2.4.0",
+      "optional": false,
+      "license": "MIT"
+    },
+    {
+      "name": "@noble/curves",
       "version": "2.4.0",
       "optional": false,
       "license": "MIT"

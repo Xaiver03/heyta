@@ -20,7 +20,7 @@
     "@heyta/shared-schema": "workspace:*",
     "@heyta/sync-core": "workspace:*",
     "@noble/curves": "2.4.0",
-    "@noble/hashes": "2.4.0"
+    "@noble/hashes": "^2.4.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

@@ -61,6 +61,7 @@ COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.base.json ./
 COPY packages/sync-core/package.json ./packages/sync-core/
 COPY packages/shared-schema/package.json ./packages/shared-schema/
 COPY packages/domain/package.json ./packages/domain/
+COPY packages/inbound-core/package.json ./packages/inbound-core/
 COPY server/package.json ./server/
 
 # 安装整个工作区的依赖。
@@ -87,6 +88,7 @@ RUN pnpm config set registry "$NPM_REGISTRY" \
 COPY packages/sync-core/ ./packages/sync-core/
 COPY packages/shared-schema/ ./packages/shared-schema/
 COPY packages/domain/ ./packages/domain/
+COPY packages/inbound-core/ ./packages/inbound-core/
 COPY server/ ./server/
 
 # 先构建 sync-core，再构建 shared-schema，最后 domain —— 顺序不能反，每个都依赖前一个
@@ -113,6 +115,20 @@ RUN pnpm pack
 # 直到 billing 开始用 `@heyta/domain`，**镜像就再也构建不出来了**，
 # 而本地 `pnpm -r build`（工作区全都在）完全看不出问题 —— 典型的"只有换台机器才炸"。
 WORKDIR /repo/packages/domain
+RUN pnpm run build
+RUN pnpm pack
+
+# 🔧 heyta 改动：inbound-core 也必须在这里构建并打包。
+#
+# 与 domain 那一段同一个形状、同一个成因：`server/src` 有 8 个文件在运行时 import
+# `@heyta/inbound-core`（`entitlement-ticket` / `entitlement-issuer` / `ai-metering` /
+# `entitlement` / `api` / `automation/{rules,events,inbound.routes}`），
+# 而它是 `server/package.json` 的 `dependencies` 里的一枚工作区包。
+# 少了这一段，`tsc` 会报 `TS2307: Cannot find module '@heyta/inbound-core'`
+# —— 和上面 domain 那条**逐字同形**，是同一族事故的第三次现形。
+# ⚠️ 顺序：inbound-core 的构建要解析 `@heyta/sync-core` 与 `@heyta/shared-schema`，
+# 所以它必须排在那两枚之后；domain 与它互不依赖，排在这里只是为了保持"四枚打完再打服务端"的读法。
+WORKDIR /repo/packages/inbound-core
 RUN pnpm run build
 RUN pnpm pack
 
@@ -164,10 +180,18 @@ RUN corepack enable && corepack prepare pnpm@11.8.0 --activate
 
 # 先只拷清单，让依赖层可缓存（与 builder 阶段同一套做法）。
 #
-# 🔴 下面这 13 个包**就是 `@heyta/web` 的工作区依赖闭包**，不是"顺手多拷几个"：
+# 🔴 下面这 15 个包**就是 `@heyta/web` 的工作区依赖闭包**，不是"顺手多拷几个"：
 # `pnpm install --frozen-lockfile` 看到 `@heyta/ui: workspace:*` 而 `packages/ui/package.json`
 # 不在，会直接报找不到 workspace 清单。少一个包 = 构建红，且红得看不出来为什么。
-# `packages/legal` 不在列表里 —— web 不依赖它。
+# ⚠️ 这份清单**不能凭印象维护**，现量算法就是上面那句话：从 `apps/web/package.json` 的
+# `dependencies` 出发，沿每个 `@heyta/*` 的 `dependencies` 递归闭包。
+# 2026-10-16 按这个算法逐条对过一次，补回来两枚（它们都不是"顺手加的"）：
+#  · `inbound-core` —— `@heyta/app-host` 依赖它
+#    （`packages/app-host/src/index.ts` 里 `export { generateInboundKeyPair, inboundPublicKey } from '@heyta/inbound-core'`）；
+#  · `legal` —— `apps/web` 自己直接依赖它
+#    （`src/features/auth/AuthPanel.tsx` 与 `src/features/settings/HelpPanel.tsx` 各有一行 `from '@heyta/legal'`）。
+# 🔴 这两枚在这里的缺口就是"构建红，且红得看不出来为什么"的现成例子：`legal` 那一处以前
+# 还配着一句"`packages/legal` 不在列表里 —— web 不依赖它"，而那时这句话**已经是错的**。
 #
 # ⚠️ 新增 `@heyta/*` 依赖时必须同时在这里加两行（清单 + 源码）。
 # 这条约束的失败方向是**构建失败**（不是静默产出坏界面），所以没有配门禁；
@@ -178,6 +202,8 @@ COPY packages/app-host/package.json ./packages/app-host/
 COPY packages/design-system/package.json ./packages/design-system/
 COPY packages/domain/package.json ./packages/domain/
 COPY packages/i18n/package.json ./packages/i18n/
+COPY packages/inbound-core/package.json ./packages/inbound-core/
+COPY packages/legal/package.json ./packages/legal/
 COPY packages/local-api/package.json ./packages/local-api/
 COPY packages/op-log/package.json ./packages/op-log/
 COPY packages/shared-schema/package.json ./packages/shared-schema/
@@ -200,6 +226,8 @@ COPY packages/app-host/ ./packages/app-host/
 COPY packages/design-system/ ./packages/design-system/
 COPY packages/domain/ ./packages/domain/
 COPY packages/i18n/ ./packages/i18n/
+COPY packages/inbound-core/ ./packages/inbound-core/
+COPY packages/legal/ ./packages/legal/
 COPY packages/local-api/ ./packages/local-api/
 COPY packages/op-log/ ./packages/op-log/
 COPY packages/shared-schema/ ./packages/shared-schema/
@@ -263,13 +291,14 @@ COPY --from=builder --chown=supersync:nodejs /repo/server/package.json ./package
 # 而下面那三条安装命令**一个字都不改**（仍是 `npm install`，不是 `npm ci`）。
 # 为什么不换成朴素大家都写的 `npm ci` —— 三档实测（审计 §8.46 的表）：
 #  · `npm install` 认锁：锁里钉 2.1.2、范围内有 2.1.3 ⇒ 装的就是 2.1.2，也不改写锁；
-#  · 锁里那三枚 `file:` 条目的 integrity 过期时，`npm install` 装的是**当前 tarball 的字节**（rc=0）；
+#  · 锁里那四枚 `file:` 条目的 integrity 过期时，`npm install` 装的是**当前 tarball 的字节**（rc=0）；
 #  · 同样条件下 `npm ci` 两样都不成立：冷缓存 `EINTEGRITY` 当场炸，热缓存 rc=0 却**静默装上一版**
 #    —— 后者是 §7 第 27 那族（旧 bundle 进包）在依赖层的翻版，而且它不报错。
 # ⇒ 收益是"老 tag 晚半年 build 也解析出同一棵树"（对自建者是可用性，不只是整洁）。
-# ⚠️ 这把锁取自**构建产物** `/app/package-lock.json`，不是宿主机另解一份：它的根条目里那三枚
-#    依赖写的是 `file:*.tgz`，而仓库 `server/package.json` 声明的是 `"*"` —— 因为下面第一条
-#    install 本来就会把 package.json 改写成那个形状。读着别扭是真的，但它与镜像里实际生效那次
+# ⚠️ 这把锁取自**构建产物** `/app/package-lock.json`，不是宿主机另解一份：它的根条目里那四枚
+#    依赖写的是 `file:*.tgz`，而仓库 `server/package.json` 里三枚声明的是 `"*"` —— 因为下面第一条
+#    install 本来就会把 package.json 改写成那个形状（第四枚 `@heyta/inbound-core` 声明的是
+#    `workspace:*`，同样在这一步被改写成 `file:`；见下面那一段）。读着别扭是真的，但它与镜像里实际生效那次
 #    解析逐字同源；手工"归一"成看起来干净的样子就会造出第二事实源。
 #    防它腐烂的门禁在 `research/tools/check-image-install-contract.mjs`。
 COPY --chown=supersync:nodejs server/package-lock.json ./package-lock.json
@@ -285,20 +314,38 @@ COPY --from=web --chown=supersync:nodejs /repo/apps/web/dist ./web-dist
 COPY --from=builder --chown=supersync:nodejs /repo/packages/sync-core/heyta-sync-core-*.tgz ./sync-core.tgz
 COPY --from=builder --chown=supersync:nodejs /repo/packages/shared-schema/heyta-shared-schema-*.tgz ./shared-schema.tgz
 COPY --from=builder --chown=supersync:nodejs /repo/packages/domain/heyta-domain-*.tgz ./domain.tgz
+COPY --from=builder --chown=supersync:nodejs /repo/packages/inbound-core/heyta-inbound-core-*.tgz ./inbound-core.tgz
 
 # Install dependencies and generate Prisma client in single layer
 # Note: prisma CLI installed explicitly for runtime migrate deploy
 # IMPORTANT: prisma version must match @prisma/client in package.json
 #
 # 这里仍然是 npm（不是 pnpm），**刻意的**：
-# 服务端 package.json 里**运行时**那三个工作区依赖（domain / shared-schema / sync-core）
-# 都写成 `"*"`，npm 能用上面三个 tarball 满足它们；写成 `workspace:*` 的话 npm 会直接报错。
-# 这一点很容易踩，别改。⚠️ 但"三个"只数了 `dependencies` —— `devDependencies` 里还有
+# 服务端 package.json 里**运行时**那四个工作区依赖（domain / shared-schema / sync-core /
+# inbound-core）都由上面四枚 tarball 供给；npm 根本不认识 `workspace:` 协议，
+# 所以这四枚必须**在同一批**里给出来。这一点很容易踩，别改。
+# ⚠️ 但"四个"只数了 `dependencies` —— `devDependencies` 里还有
 # 三枚同名族的 workspace 包，而 npm 会连它们一起解析，所以下面那步剪枝不能省。
+#
+# ⚠️ 那四条的**声明形态目前并不统一**（2026-10-16 现量）：domain / shared-schema /
+# sync-core 写的是 `"*"`，而 `@heyta/inbound-core` 写的是 `workspace:*`。
+# 它现在装得上，靠的是"命令行点名"这一步会把该条声明改写成 `file:inbound-core.tgz`
+# —— 与声明本身无关。两条臂都在 node:24-alpine / npm 11.19.0 上量过：
+#   · `workspace:*` + 命令行给 `./inbound-core.tgz` ⇒ rc=0，`package.json` 被改写成 `file:`；
+#   · 同一条声明但**不给** tarball ⇒ rc=1 `EUNSUPPORTEDPROTOCOL: Unsupported URL Type "workspace:": workspace:*`。
+# ⇒ 谁把 `./inbound-core.tgz` 从下面那条 install 的实参里摘掉，红点会当场出现。
+#   把声明也归成 `"*"`（与另外三枚一致）是更整齐的形态，但那会同时改动
+#   `pnpm-lock.yaml` 里 server importer 的 specifier，属于另一笔改动，这里没顺手做。
 #
 # ⚠️ `domain.tgz` 必须一起装：它自己还依赖 `@heyta/shared-schema`，
 # 而 `pnpm pack` 会把 domain 的 `workspace:*` 改写成真实版本号 ——
 # 所以两个 tarball 要在**同一条** `npm install` 里给，npm 才能就地满足它。
+# 🔴 `inbound-core.tgz` 进**同一条**命令的理由与 domain 同族、而且更强：
+# `@heyta/inbound-core` 自己依赖 `@heyta/shared-schema` **与** `@heyta/sync-core` 两枚
+# （`pnpm pack` 把它的 `workspace:*` 改写成真实版本号），所以它必须在
+# "两枚供货 tarball 已经在这条命令里"的那一批里 —— 与 domain 一模一样的就地满足。
+# 还有一条独立的：它是本文件四枚里唯一声明成 `workspace:*` 的那一枚，
+# 而这一批 install 是唯一会把它改写成 `file:` 的地方（不给 ⇒ `EUNSUPPORTEDPROTOCOL`，上面量过）。
 #
 # 🔧 heyta 改动（G-54，2026-10-04）：`npm pkg delete devDependencies` 必须是**第一条 install 之前**的一步。
 # 这不是整洁，是**装不上**：npm 在 `--omit=dev` 下仍然会**解析** devDependencies 的每一枚 spec，
@@ -326,11 +373,11 @@ ARG NPM_REGISTRY=https://registry.npmjs.org/
 ARG PRISMA_ENGINES_MIRROR=https://binaries.prisma.sh
 ENV PRISMA_ENGINES_MIRROR=${PRISMA_ENGINES_MIRROR}
 RUN npm pkg delete devDependencies && \
-    npm install ./sync-core.tgz ./shared-schema.tgz ./domain.tgz --registry="$NPM_REGISTRY" --ignore-scripts --omit=dev && \
+    npm install ./sync-core.tgz ./shared-schema.tgz ./domain.tgz ./inbound-core.tgz --registry="$NPM_REGISTRY" --ignore-scripts --omit=dev && \
     npm install --registry="$NPM_REGISTRY" --ignore-scripts --omit=dev && \
     npm install prisma@5.22.0 --registry="$NPM_REGISTRY" --ignore-scripts --omit=dev && \
     npx prisma generate && \
-    rm -f sync-core.tgz shared-schema.tgz domain.tgz && \
+    rm -f sync-core.tgz shared-schema.tgz domain.tgz inbound-core.tgz && \
     npm cache clean --force
 
 USER supersync
