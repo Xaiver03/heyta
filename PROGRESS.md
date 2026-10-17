@@ -6615,3 +6615,27 @@ Python 的 `s.replace` **锚点没匹配、我又没断言** ⇒ **静默没落*
 第 88 道 `check:privacy-consent-e2e` **rc=0** ✅。
 **两条教训（写进注释与台账）**：① 补丁**必须断言**（`assert old in s`），否则静默不落；
 ② "验证"要跑到**会做类型检查的那一步**（DTS 构建、`tsc -b`），`vitest` 绿不等于类型对。
+
+## 2026-10-17 **链装置本体在修完后的 tip 上的分段读数**（收口的最终证据形态）
+
+命令一律是同一把装置（`research/tools/verify-inbound-check-chain.py --logs <dir> --from N --to M`）：
+
+| 段 | 装置读数 | 说明 |
+|---|---|---|
+| **1–42** | `CHAIN ran=42/42 of 116  RED=0` ✅ | 含 `build` 与 `typecheck` 两个重步 |
+| **43–66** | `CHAIN ran=24/24 of 116  RED=2  steps=[56, 63]` 🔴 | 56＝别线在途文档的死链；63＝跨线产品口径冲突（两侧逐字依据见上文） |
+| **67–86** | `CHAIN ran=20/20 of 116  RED=0` ✅ | |
+| **88–99** | `CHAIN ran=12/12 of 116  RED=0` ✅ | **修完 88 之后复跑**（修前该段是 `RED=1 steps=[88]`，且 88 是我自己的 bug） |
+| **100–116** | `CHAIN ran=17/17 of 116  RED=1  steps=[106]` 🔴 | 106＝`pnpm -r test`，唯一失败是**别线在途**的 `server/tests/inbound-lane-rigs-consumers.spec.ts` |
+| 87 | 未单跑（重步，本体＝整个 e2e 套件） | 已知红集＝收口台账 C 表那 6 份（全部落在别线那笔未落库改版上） |
+
+**汇总（装置实测）：116 步里 112 步绿**；红 3 步（56 · 63 · 106）＋第 87 道（本体含 6 份 e2e 红）。
+**原 26 枚红的最终账**：装置覆盖到的 24 道全部 `RED=0` ✅；仅剩 **87**（本体）与 **106**（唯一失败件是别线在途 spec）两道。
+⇒ 「同一把链装置在修完后的 tip 上跑出 RED=0」**目前差 4 处**，全部可复核、全部指向别线的在途件或一条待拍板的口径：
+```
+56  docs/plans/product-ux-optimization.md（M，别线在途）的死链 → 等他们证据落库
+63  check:payment-entry 与 App.tsx:3306-3307 的已提交口径冲突 → 等一句产品裁决
+87  AI 面板那 6 份（AiToolRun 无渲染点等）→ 等那笔未落库改版落库
+106 server/tests/inbound-lane-rigs-consumers.spec.ts（M，别线在途）
+```
+**没有一处是靠放宽判据变绿的**：112 绿里包含我自己修的那条 88（DTS 构建抓出的真 bug）。
