@@ -36,6 +36,14 @@ const SELF_TEST_OMITTED: Record<string, string> = {
     '它的 --self-test 单趟实测 172 秒（其余四枚合计约 30 秒），常驻不合算；六臂已在 2026-10-12 手跑并贴进台账读数',
 };
 
+// 🔴 **只常驻反向验证臂**的那几枚：它们的 no-arg 判据要外部输入（链装置的日志），
+// 而且在当前 HEAD 上如实就是 rc=1（第 21 道那四处真命中，见 BLOCKED.md B211）。
+// 把一条"如实的红"接成常驻的"退出 0"用例，等于自己把它洗成假绿 —— 所以判据腿留手跑，
+// 而臂本身（不依赖外部输入、测的是分类器有没有牙）天天跑。
+const SELF_TEST_ONLY: Record<string, string> = {
+  'verify-inbound-chain-ownership.py': 'failed=0',
+};
+
 // 不接进来的每一枚都要写下"为什么不接"，否则分母自检那条用例会把它们当成漏网。
 const DELIBERATELY_NOT_WIRED: Record<string, string> = {
   // 三枚牙臂的判据是"临时改写被跟踪的源文件、再从不带 git 的备份还原"（queue-teeth 的 TARGET
@@ -78,7 +86,7 @@ describe('本线装置的自动消费者', () => {
     const all = readdirSync(TOOLS)
       .filter((name) => /^verify-inbound-.+\.(py|ts)$/.test(name))
       .sort();
-    const accounted = new Set([...WIRED, ...Object.keys(DELIBERATELY_NOT_WIRED)]);
+    const accounted = new Set([...WIRED, ...Object.keys(SELF_TEST_ONLY), ...Object.keys(DELIBERATELY_NOT_WIRED)]);
     expect(all.filter((name) => !accounted.has(name))).toEqual([]);
     // 名单里也不许留着盘上已经不存在的装置 —— 那会让上面那条判据的分母悄悄缩小
     expect([...accounted].filter((name) => !all.includes(name))).toEqual([]);
@@ -99,6 +107,14 @@ describe('本线装置的自动消费者', () => {
 
   for (const [file, okLine] of Object.entries(SELF_TEST_LINE)) {
     it(`${file} --self-test 的反向验证臂全成立`, () => {
+      const r = runRig(file, ['--self-test']);
+      expect(r.status, describeRun(file, ['--self-test'], r)).toBe(0);
+      expect(r.stdout ?? '', describeRun(file, ['--self-test'], r)).toContain(okLine);
+    }, 300_000);
+  }
+
+  for (const [file, okLine] of Object.entries(SELF_TEST_ONLY)) {
+    it(`${file} --self-test 的臂常驻成立（判据腿按 B211 留手跑）`, () => {
       const r = runRig(file, ['--self-test']);
       expect(r.status, describeRun(file, ['--self-test'], r)).toBe(0);
       expect(r.stdout ?? '', describeRun(file, ['--self-test'], r)).toContain(okLine);
