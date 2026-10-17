@@ -18,13 +18,17 @@ from urllib.parse import quote
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--pg-bin', help='Directory containing initdb/pg_ctl/psql/createdb')
-    parser.add_argument('--log', default='/tmp/heyta-inbound-worker-identity.log')
+    # 🔴 默认落点必须在被检出的仓库里（`.run-logs/` 已被 .gitignore 挡住）：这台机上那份
+    # 读数原先只活在 /tmp，重启即消失，克隆仓库的人复跑这条腿拿得到 rc 却拿不到日志。
+    parser.add_argument('--log', default=None)
     args = parser.parse_args()
     found = shutil.which('initdb')
     if not args.pg_bin and not found:
         parser.error('PostgreSQL tools not on PATH; provide --pg-bin')
     pg = Path(args.pg_bin or str(Path(found).parent))
     root = Path(__file__).resolve().parents[2]
+    log_path = Path(args.log) if args.log else root / '.run-logs' / 'heyta-inbound-worker-identity.log'
+    log_path.parent.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
     with tempfile.TemporaryDirectory(prefix='heyta-inbound-pg-') as temporary:
         base = Path(temporary)
@@ -33,7 +37,7 @@ def main():
             sock.bind(('127.0.0.1', 0))
             port = sock.getsockname()[1]
         env['DATABASE_URL'] = f'postgresql://{quote(getpass.getuser())}@127.0.0.1:{port}/heyta_inbound'
-        with open(args.log, 'w') as log:
+        with open(log_path, 'w') as log:
             def run(command, cwd=None):
                 subprocess.run(command, cwd=cwd, env=env, stdout=log,
                                stderr=subprocess.STDOUT, check=True)
@@ -58,7 +62,7 @@ def main():
                 server_log = base / 'postgres.log'
                 if server_log.exists():
                     log.write('\n--- Disposable PostgreSQL server log ---\n' + server_log.read_text())
-    print(f'Results: {Path(args.log).resolve()}')
+    print(f'Results: {log_path.resolve()}')
 
 
 if __name__ == '__main__':

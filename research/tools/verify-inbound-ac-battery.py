@@ -72,7 +72,7 @@ LEGS: list[tuple[str, str, str]] = [
 JUDGING_DOC = "docs/plans/inbound-automation.md"
 AC_IN_DOC_RE = re.compile(r"^- \[.\] \*\*AC-(\d+)\b", re.MULTILINE)
 
-SUMMARY_RE = re.compile(r"Test Files|^ *Tests |臂数|读数|结论|已勾|passed|failed")
+SUMMARY_RE = re.compile(r"Test Files|^ *Tests |臂数|读数|结论|已勾|passed|failed|Results:")
 # 命令串里出现的仓内路径前缀：臂 A3 拿它们回查文件在不在（改名必红）。
 PATH_TOKEN_RE = re.compile(r"(?:tests|research/tools|scripts|apps/[a-z-]+|packages/[a-z-]+|e2e)/[A-Za-z0-9_./*-]+")
 EVIDENCE_GLOB = "apps/web/evidence/inbound-recovery/*.png"

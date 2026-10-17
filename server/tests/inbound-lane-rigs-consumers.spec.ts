@@ -19,6 +19,9 @@ const WIRED = [
   'verify-inbound-doc-endpoints.py',
   'verify-inbound-cjs-require-order.py',
   'verify-inbound-producer-seam.py',
+  // 八处失法各起一次电池的 self_test，本机器实测整趟 2 秒 ⇒ 便宜到可以常驻。
+  // 它只写临时副本，被跟踪的那份电池一个字不改。
+  'verify-inbound-ac-battery-negctl.py',
 ];
 
 // 反向验证臂的收尾行，逐字取自本 HEAD 上的一次真实运行（判据是退出码，这一行只挡"装置退化成什么都不判还是 0"）。
@@ -34,6 +37,9 @@ const SELF_TEST_LINE: Record<string, string> = {
 const SELF_TEST_OMITTED: Record<string, string> = {
   'verify-inbound-producer-seam.py':
     '它的 --self-test 单趟实测 172 秒（其余四枚合计约 30 秒），常驻不合算；六臂已在 2026-10-12 手跑并贴进台账读数',
+  // 它自己就是"给别人的臂做反向验证"的那一枚 —— 八处对照就是它的全部判据，
+  // 再给它加一层 self-test 只能是把同一件事套两遍。
+  'verify-inbound-ac-battery-negctl.py': '元装置：八处失法各起一次电池的 self-test，没有自己的 self-test 腿',
 };
 
 // 🔴 **只常驻反向验证臂**的那几枚：它们的判据腿要么要外部输入、要么本身就是一整串重活，
