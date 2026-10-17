@@ -11151,7 +11151,7 @@ docs/plans/product-ux-optimization.md:935
 
 🟡 **B204（2026-10-16 16:3x，本会话量到 · 别线的提交态既存红，登记不代改）**：`apps/web/tests/ai-disclosure-parity.spec.tsx` 那条「『发给谁』那一行的四段之间必须有分隔，不许逐字黏成一串」在**当前 HEAD 上就是红的**，三条指认：① 孤立跑也红（`cd apps/web && npx --no-install vitest run --maxWorkers=1 tests/ai-disclosure-parity.spec.tsx`）；② **与本线改动无关**——两头对照，带本线那几行与把 `App.tsx`／`AiSettings.tsx`／`InboundAutomationSettings.tsx` 全撤到 HEAD 旧版，这一枚都是同一条红、同一个断言（`AssertionError: expected {…} to deeply equal {哪些段后面直接粘着下一段: []}`，实测三段 `云端首选`／端点／模型名直接相黏，命中在 `tests/ai-disclosure-parity.spec.tsx:360`）；③ **不是别人在飞的未提交改动**——`git status --porcelain -- apps/web/tests/ai-disclosure-parity.spec.tsx apps/web/src/features/ai` 回 **0 枚**（16:3x 现量）。最近一笔相关改动是 `63ddf3e0 fix(共享披露组件)`，那一笔声称修的正是这一格。⇒ 归属共享披露/RN 文本拼接那条线，**本线不代改**（不在白名单，且改判据口径不是本线权限）。⚠️ 顺带一条给下一位的读数纪律：apps/web 整串在高负载（现量 `sysctl -n vm.loadavg` 那一戳 5 分钟均值 152）下会多报 **6 枚**红文件，把红的那批孤立重跑两头都只剩这一枚——**别把负载红当成本线红**，也别把负载红登记成阻塞；两头对照的命令与三趟读数都在计划文末那一节的第 7 条。
 
-🟡 **B205（2026-10-16 17:5x，本会话 · 待负责人点头，判据口径不代改）**：范围尺 `research/tools/verify-inbound-commit-scope.py` 的 `WHITELIST` 要不要收进**这次授权代改的那两枚路径**（`apps/web/src/App.tsx`、`apps/web/src/features/settings/AiSettings.tsx`），以及本线刚写进去的 `docs/reference/environment-traps.md`（第 445 条落在那份文件里，路径不在白名单）。现量口径：`python3 research/tools/verify-inbound-commit-scope.py` ⇒ rc=**1**，17:27 那戳首行 `窗口起 2026-10-09 16:52　本线笔数=184　仅正文提及=14　涉及路径=107　越界=3`（越界逐枚 = 上述两枚 + 别线 `79e8ede1` 那笔的 `docs/plans/goal-collaboration-shared-lists.md`），**本线文档笔入库之后同日 18:06:31 复量：`窗口起 2026-10-09 16:52　本线笔数=185　仅正文提及=14　涉及路径=108　越界=4`** —— 涨出来的那一枚就是 `docs/reference/environment-traps.md`（指 `b7627b5e`），装置第一行自己写着 `OOB apps/web/src/App.tsx ['d36fce58']` 逐枚点名 ⇒ 四枚越界 = 两枚授权文件 + traps 那份 + 别线那枚。**本线是把 1 变成 4，不是把 0 变成 1**（口径与逐枚归属现量都在 B169 与 `PROGRESS.md` 那行范围尺读数里）。三点要说在前面：① 这枚装置**没有自动消费者**（现量 `grep -rn "verify-inbound-commit-scope" package.json docs/agents` 回 **0 处**），所以它不拦任何链，收不收都只影响这一枚尺自己报什么；② 白名单是**它的判据**，改它=改判卷口径 ⇒ 本线不代改，只登记（同 B140 那次的分界：动文件要点头，动判据更要点头）；③ 收成"授权一次记一次"会让尺失去"本线不该碰别人文件"这条本义，所以我的建议是**不收路径、改成给装置加一个显式的授权登记表**（每笔授权一行：提交号 + 被授权路径 + 哪一轮点的头）——但这是它的判据形状，**由负责人定**，本线两种都不动。
+🟡 **B205（2026-10-16 17:5x，本会话 · 待负责人点头，判据口径不代改）**：范围尺 `research/tools/verify-inbound-commit-scope.py` 的 `WHITELIST` 要不要收进**这次授权代改的那两枚路径**（`apps/web/src/App.tsx`、`apps/web/src/features/settings/AiSettings.tsx`），以及本线刚写进去的 `docs/reference/environment-traps.md`（第 445 条落在那份文件里，路径不在白名单）。现量口径：`python3 research/tools/verify-inbound-commit-scope.py` ⇒ rc=**1**，17:27 那戳首行 `窗口起 2026-10-09 16:52　本线笔数=184　仅正文提及=14　涉及路径=107　越界=3`（越界逐枚 = 上述两枚 + 别线 `79e8ede1` 那笔的 `docs/plans/goal-collaboration-shared-lists.md`），**本线文档笔入库之后同日 18:06:31 复量：`窗口起 2026-10-09 16:52　本线笔数=185　仅正文提及=14　涉及路径=108　越界=4`** —— 涨出来的那一枚就是 `docs/reference/environment-traps.md`（指 `b7627b5e`），装置第一行自己写着 `OOB apps/web/src/App.tsx ['d36fce58']` 逐枚点名 ⇒ 四枚越界 = 两枚授权文件 + traps 那份 + 别线那枚。**本线是把 1 变成 4，不是把 0 变成 1**（口径与逐枚归属现量都在 B169 与 `PROGRESS.md` 那行范围尺读数里）。三点要说在前面：① 这枚装置**没有自动消费者**（现量 `grep -rn "verify-inbound-commit-scope" package.json docs/agents` 回 **0 处**），所以它不拦任何链，收不收都只影响这一枚尺自己报什么；② 白名单是**它的判据**，改它=改判卷口径 ⇒ 本线不代改，只登记（同 B140 那次的分界：动文件要点头，动判据更要点头）；③ 收成"授权一次记一次"会让尺失去"本线不该碰别人文件"这条本义，所以我的建议是**不收路径、改成给装置加一个显式的授权登记表**（每笔授权一行：提交号 + 被授权路径 + 哪一轮点的头）——但这是它的判据形状，**由负责人定**，本线两种都不动。🔴 **10-17 09:3x 追记：这一格今天多了一枚新形状，比"收不收白名单"更要紧** —— 今天现量 `python3 research/tools/verify-inbound-commit-scope.py` 回 **rc=1、`越界=92`**，其中 **89 枚不在本线文件名下，全在同一枚别线的笔 `f9084821`（10-16 22:38「docs(自动收集 r116 语言腿入库) …」，装的是 `apps/mobile/evidence/ux-final-20261016/**` 那批）**：那枚笔的**标题借了「自动收集」这四个字**，而这把尺是按标题关键字认笔的 ⇒ 别线的取证件被算到本线头上。现量：`grep '^  OOB ' | grep -oE "\['[^]]*\]" | sort | uniq -c` ⇒ 89/2/1/1（`f9084821`／`d36fce58`＝本线那两枚已授权路径／`b7627b5e`／`79e8ede1`）。本线今天那四笔（`30397e71`、`86dc82cb`、`aa3c9574`、`5205328c`）在这张表里 **OOB 命中 0**（现量逐枚 `grep -c` 对 `^  OOB ` 那些行）。⇒ 要出路的只有两件事，都归负责人：**①**「自动收集」这个标题词是不是本线独占的归属凭据（若是，别线那类笔得换词；换别人的提交不归我）；**②** 白名单收不收本线这次授权过的路径（原有那一问）。**判据口径我不代改，也不去动别人的提交。**
 
 🟡 **B206（2026-10-16 17:5x，本会话 · 待负责人点头，两件都是别人/共享资产）**：装完四端之后，隔离副本 `.worktrees/inb-t9` 里留了两样不属于本线的东西：① `apps/mobile/ios/Podfile.lock` 被链里那次 `pod install` 改动（现量 `git -C .worktrees/inb-t9 diff --stat -- apps/mobile/ios/Podfile.lock` ⇒ 与 HEAD 差 **2 行**，成因是 Pods 沙盒与 `Manifest.lock` 不一致，脚本自己打的这行）；② 载体本身（`git worktree list` 现量只剩它一枚）。**我既没提交 ① 也没擅自 `git checkout --` 还原**：① 属移动端壳那条线的文件，而还原它会让下一趟 iOS 又跑一次 `pod install`（非确定性那条已在计划里记过），② 是若干条线共用的取证载体。要哪一挡请负责人说一句：还原 ①／保留 ① 并在移动端线里追记／整枚载体连同未提交改动一起退役。
 
@@ -11169,3 +11169,48 @@ docs/plans/product-ux-optimization.md:935
 | **B199** 完成条件 2 那句"条目数与开工快照相同" | 已给反例：两戳同为 14 条而成员不同 ⇒ 数对上也不成立它想证的事 | **换成逐条列成员做集合对账**（比"数"多两件事：能看见谁进谁出、能把 `M` 变 `??` 也显形） | 点头后：把这一格的口径写进交付台账并给出可复跑形状（`git status --porcelain` 输出排序后与开工件做集合差）。⚠️ 这是**判卷口径**，改它要负责人明确说"就这么改"，我连"数改集合"都不代拍 |
 
 🟡 **B208（2026-10-17 09:2x，本会话 · 别线在制品：链上第 102 道 `check:apk-freshness` 的红住在"归属章接线尚未提交"这件事上）**：臂 15 判的是**三处调用点在不在**（`reinstall-all.sh` 与 `verify-mobile-ios.sh` 里的 `heyta_ios_owner_write`、`verify-mobile-ios-ai.sh` 里的 `heyta_ios_owner_check`），现量两棵树各跑一次同一把尺：`.worktrees/inb-t9`（HEAD 干净）里 `env -u HEYTA_REPO_ROOT bash scripts/lib/apk-freshness.sh --self-test` ⇒ 「🔴 臂 15 断了：reinstall-all.sh 没写归属章」；共享检出同一条命令 ⇒ 「✅ 臂 15 两枚写方 + 一枚读方确有调用点」。**差的就是那一枚未提交的改动**：`git status --porcelain -- scripts/reinstall-all.sh` 在共享检出回 ` M`（`git diff --stat` = **+19/−2**），而 `git show HEAD:scripts/reinstall-all.sh | grep -c heyta_ios_owner_write` = **0**。⇒ ① 这一枚红**不是本线造的**，也不是昨天那趟造成的（昨天 16:57 那趟也红在同一臂，现量 `sed -n '18p' ~/.heyta-evidence/inb-t7-1016-1657/chain-logs/102.log`）；② 它会在**那笔改动进 main 的那一刻**自己转绿，本线**不碰那枚脏文件、不代改、不替别人提交**（那是别人手里的在制品，动了就等于把别人的半成品搬进本线提交）；③ 与交付的关系要写准：臂 15 缺的那一环（产物归属章）在 HEAD 上**从来没接进 `reinstall-all.sh`**，所以昨天四端读数里的"装的是当前产物"靠的是脚本里那句 mtime 对账，而不是归属章——这与 C30 那格的判据口径有关，**口径仍不代改**，要改由负责人拍。
+
+🟡 **B209（2026-10-17 09:3x · 链第 6 道 `check:reachability` 的 `COMMENT` 格：写路径已落地，缺的是 ADR-0062 的 W4/W5 客户端共享平面；不是"补一行接线"）**
+
+**现量（两条命令，谁都能复跑）**
+```
+$ node scripts/check-reachability.mjs --entity=COMMENT
+   ✅ COMMENT                   1 处：packages/app-host/src/comment-actions.ts      ← 断言 B 已绿
+🔴 断言 C 不通过：1 项
+   · COMMENT（家族 createCommentActions）在 apps 下各宿主的 src/ 里**零调用点**。
+RC=1
+$ node scripts/check-reachability.mjs --list | grep COMMENT
+COMMENT  action ✅  1 处   家族 createCommentActions   宿主调用点 0 处
+```
+**这一轮已经落下的（产品口径，不是补登记）**：`packages/domain/src/comments.ts`（`commentRejection` /
+`aliveCommentsForTask` / `COMMENT_MAX_LENGTH` 的唯一一份定义）、`packages/app-host/src/comment-actions.ts`
+（`addComment` / `editComment` / `removeComment` / `restoreComment` / `commentsForTask`；**写入路由**落在
+它内部的 `shareIdForTask`，未共享清单抛 `ListNotSharedError` 且零 op；四条写动作只走注入端口
+`dispatchShareOp`，`ctx.dispatch` 全文件 0 次 —— 评论绝不进个人 op-log，见 `packages/op-log/src/state.ts:98-101`）。
+读数：`packages/app-host/tests/comment-actions.spec.ts` **29 passed**、`packages/domain/tests/comments.spec.ts`
+**12 passed**、`packages/ui/tests/comments-model.spec.ts` 7 passed 仍绿；三条变异臂（未共享放行 / 删改成无墓碑 /
+清墓碑被 JSON 丢掉）各自 `rc=1`。
+
+**为什么断言 C 只能保持红（三条独立指认）**
+1. 共享平面的**原语**在 `packages/sync-core/src/share-keys.ts`（`deriveShareOperationKey:226` /
+   `signShareOperation:543` / `verifyShareOperationSignature:552`），**传输**在
+   `packages/sync-client/src/share-api-client.ts`（`uploadOps:224` / `downloadOps:228`）——
+   两者在全 `packages/*/src` 与 `apps/*/src` 里**零消费者**（`grep -rn "deriveShareOperationKey\|signShareOperation\|uploadOps" packages/*/src apps/*/src` 只命中定义处）。
+2. `packages/op-log` 只有一个引擎、一个 `OpLogStore`（`DbOpLogStore` 绑死单一逻辑 op 日志，**没有 per-share
+   命名空间旋钮**）⇒ "每个 share log 各自 replay"（`docs/plans/collaboration-shared-lists.md:72`）需要新的
+   存储面 + `ShareOperation` 落盘 + listKey 解出后喂解密引擎 + 因果前沿游标。
+3. ADR-0062 §4 把"写入路由"指派给 `packages/app-host`（这一轮已落），但 §5 的密钥分发与 W4/W5 的
+   UI 挂载（`docs/plans/collaboration-shared-lists.md` 的 W4/W5 两节）尚未建 ⇒ 没有宿主能给
+   `createCommentActions` 提供一个**真的会到达其他成员**的 `dispatchShareOp`。
+
+**为什么不选另外两条路**（都被否掉，理由写在这里免得下一位重推）
+- **在 app-host 里补一个假的 / 只落本地的 `dispatchShareOp` 再挂 UI** ⇒ 界面能打字、发不出去，正是本门禁
+  要挡的"碰不到的 AI 功能不是功能"的同一形状；而且会让断言 C 变绿而产品没变。
+- **把 `COMMENT` 从 `EntityModelMap` 摘掉 / 挪进 `UNMODELED_ENTITY_TYPES`** ⇒ 历史 COMMENT op 会被当未知
+  实体**静默丢弃**（`packages/op-log` 对未知实体的处理就是跳过），这正是判据文件头点名的禁止修法。
+
+**建议（要负责人拍一次）**：把"多用户共享"收口的那条线（ADR-0062 W4/W5）正式排进批次，范围就是上面 1/2/3
+（原语接线 + per-share op-log 落盘 + 挂载 `CommentThread` + `purgeComment`）；**在那之前第 6 道保持红**，
+`pnpm check` 也就 STRUCTURALLY 不可能 exit 0——这一格是**如实**的红，不是"没人管"。本轮**没有**在
+`check-reachability.mjs` 里加任何"欠账登记"通道来把它洗绿（本门禁唯一豁免通道是断言 D 的
+`UNMODELED_ENTITY_TYPES`，而它管的是"合法但未物化"，COMMENT 已物化，不适用）。

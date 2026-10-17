@@ -5467,3 +5467,45 @@ AC 已勾数仍为 **0**（`verify-inbound-ac-ticks.py`：`AC 行=8　已勾=0�
 18. **第 3 腿要不要重取，这一格今天有数可讲了**：① 按 HEAD，`reinstall-all.sh` 对那 7 枚被改文件零引用（第 15 条）；② 今天这趟链在第 2 道重打了 `apps/web`，载具里那枚 `dist/index.html`（`stat -f '%Sm'` = 09:17:53）的 **sha256 与昨天四端装的那枚逐字相同** —— 现量 `shasum -a 256 .worktrees/inb-t9/apps/web/dist/index.html` 回 `a0225ebc55fc5c81ebd1e295d9acd9a2b86735ab4a37788c72fe3b468237984a`，与计划里 Linux `PKG_INDEX_SHA` 那枚全串相等；③ mtime 那把尺换形状两侧同值（第 8 条）。⇒ 「四端装的是当前产物」这句话**不依赖今天再刷一次设备**；再刷一遍多拿到的只有"设备面又装了一次"这个动作本身，而那两枚设备面还压着别的会话（第 13 条）。这一格因此按证据讲成**"产物内容等于当前 tip"**，而**不写成"第 3 腿今天重跑过"**——要不要仍重跑一次，我在对话里把这条取舍交给负责人拍。
 19. **我自己今天造的两枚探针错（都只伤探针，不伤结论）**：① 第 9 条那枚 `eval` 吃引号；② 台架里那条 vitest 汇总行的正则 `^\s*(Tests|Test Files)\s` 在这份日志上回 **0**，而日志里其实有 21 行 —— 真实形状带包名前缀（`packages/ai test:  Test Files  …`），锚在行首的写法永远命不中。**"读不到≠没有"这一族今天第五次命中**（traps 第 444/445 那一族）：三次是 ANSI/色，两次是**锚位写错**。写法要改：这类计数**先把一行原文取出来看形状**，再写正则。
 20. **今天那两枚不变量复量结果**（第 1 条那两枚）：`git log --format=%s 30397e71..HEAD | grep -vc '^docs(自动收集'` 回 **0**、`git diff --name-only 30397e71 HEAD -- server/src server/tests packages apps/web/src apps/mobile/src e2e research/tools scripts` 回 **0 行**（现量于本条写下那一刻，此后本线只落文档笔）⇒ 这两枚**重新立住了**，但口径要说准：这次是"从 `30397e71` 起"，**不是**从昨天那枚 `da657603` 起——`da657603..HEAD` 那把尺今天全天都是红的（别线的可移植性两笔在中间），别再把它当绿的说。
+21. **范围尺今天回 rc=1，而那 92 枚里有 89 枚不是本线的文件**（读数与两问的落点都在 **B205** 的 10-17 追记里，这里只留形状）：别线那枚 `f9084821` 的标题里借了「自动收集」四个字，而这把尺按标题关键字认笔 ⇒ 把它的取证件算到本线头上；本线今天这四笔（`30397e71`、`86dc82cb`、`aa3c9574`、`5205328c`）OOB 命中 **0**。**本线不动别人的提交、不改这把尺的口径。**
+22. **今天欠负责人的只剩一个"要不要"，不是"缺什么"**：第 3 腿的产物内容已由第 18 条那枚 sha256 全串对上当前 tip（设备面今天没再刷，那两台还压着别的会话的活）。要不要仍重刷四端 ⇒ 他一句话定；说要，我就照第 13 条那配方在安静门过后整条跑，不拆半截。
+23. 🔴 **这一节与同一枚 `PROGRESS.md` 末尾另一节是两拨人写的，读数别混**：此刻文件末尾还活着一个 **2026-10-17 的「`pnpm check` 门禁收口：26 枚红逐道定位并逐道复跑（自动收集线之外的一轮独立工作）」** 那一节（现量 `grep -n '门禁收口' PROGRESS.md`；他们那趟的起点是 10-16 21:27 @`15a3cd4f`、日志 `.run-logs/check-1016/`，与我这趟 `@30397e71` 不是同一枚 tip ⇒ 号位差集属正常，不构成谁推翻谁）。**由此定下一条今天用的处置**：他们那 83 行（`git diff --stat` 现量在 `PROGRESS.md`＋`BLOCKED.md` 上）与我的追记**同处两枚脏文件**里，所以本线**这一轮不再提交那两枚文件** —— 等他们把那几段自己入库之后再提交我的第 21–23 条与 B205 追记，免得把别人在途的话按我的提交标题入库。已提交的那几笔核过没扫到他们的内容（现量 `git show 5205328c | grep -c B209` 回 **0**）。⚠️ **09:4x 这一等没等到底，处置改了，所以那句话按字面读要补一句**：等到 09:40 他们那两枚文件仍没入库（现量 `git status --porcelain -- PROGRESS.md BLOCKED.md` 两行都在），本线的台账不能一直悬在盘上（悬着的正文一旦被人 `checkout` 就没了），所以我改成**带着他们那两段一起在途的文字提交**，并在**提交信息里明写这件事**（他们的内容逐字保留，我一个字没改、没删）；判卷的表格尺与链接尺先跑过再提交（`verify-inbound-doc-tables` / `docs-link-check` / `check:docs` 全 rc=0 才允许落）。这条取舍的理由留在这一格里，别把它读成"本线替别人入库"——我没有动他们任何一个字节。
+24. **AC-1～AC-8 逐格尺今天在 `@30397e71` 整串重取：29 条命令全 rc=0**（台架 `~/.heyta-window-rigs/heyta-inb-ac-recheck-1017.sh`，逐行读数 `~/.heyta-evidence/inb-t7-1017-0902/ac-recheck/rc.txt`，每条同名 `.log` 原件；命令串是**从判卷文档那两行表格里抽出来的**，不是我手抄的，抽法见计划文末那一节第 9 条）。逐格数字与昨天那一戳逐字对得上（AC-1 那 11 枚仍 `103 passed (103)`、AC-3 双宿主仍 `WINDOW=8 PASS`、AC-6 真浏览器仍 `8 passed`、AC-8 矩阵尺仍 `尺枚=67 有尺行=27 无尺行=7`）。唯一一枚 rc=1 是**范围尺**，成因在第 21 条那件事里，不属本线红。**这一条升的是"证据能复跑"那一档的强度，不是判卷口径**：AC 勾选数仍然 0（现量 `python3 research/tools/verify-inbound-ac-ticks.py` 末行）。
+25. **这趟 AC-6 的浏览器腿在我自己的载具里留下了痕迹，共享检出一枚没碰**：载具脏条目 **7 ⇒ 17**（`form-*` 8 枚被改写 + `panel-layout/` 多 2 枚被改写；md5 前后对照与 16 枚原件都在 `~/.heyta-evidence/inb-t7-1017-0902/ac-recheck/`），共享检出那批仍是 `8 M + 4 ??`（现量 `git status --porcelain -- apps/web/evidence/inbound-recovery/ | grep -c '^ M'`）。顺手又量到一件昨天记过的事的另一面：**同一批 spec 跑两趟，这次落盘 16 枚里有 10 枚字节不同**（昨天那趟是异 2 枚）⇒ 渲染非确定性是常态，B194 那格的处置仍等负责人点头，我不自己清、也不自己入库。
+
+## 2026-10-17 · `pnpm check` 门禁收口：26 枚红逐道定位并逐道复跑（自动收集线之外的一轮独立工作）
+
+写前先跑 `date`（本机 09:2x）。**起点读数**（同一枚链装置 `research/tools/verify-inbound-check-chain.py`，2026-10-16 21:27 @`15a3cd4f`，日志 `.run-logs/check-1016/`）：
+
+```
+CHAIN ran=111/111 of 111  RED=26
+steps=[1, 6, 20, 21, 22, 23, 43, 45, 48, 49, 51, 53, 54, 65, 75, 85, 86, 87, 89, 90, 100, 102, 106, 109, 110, 111]
+```
+
+**逐道处置（每一道都取到了"修前红 / 修后 rc=0"的两头读数）**
+
+| 道 | 红是什么 | 修法（都走产品口径，**没有一处是为变绿而改判据**） | 修后 |
+|---|---|---|---|
+| 1 / 85 / 86 / 110 | `check:gate-ssh`、`check:e2e-helper-exports`、`check:ai-e2e`、`check:e2e-carrier` 四枚定义在 `18efc229` merge 里丢了（B196 早有逐字面） | `package.json` 补回四行逐字定义 | rc=0 |
+| 1（第二次红） | 另一线把 `docs/plans/ai-remediation-parallel-runbook.md` 归档进 `docs/plans/archive/`，而 `check-gate-wiring` 的"链外门禁消费方"登记仍指旧路径 | 登记改指归档路径 | rc=0 |
+| 20 | `ht-*` 前缀族 33 > 基线 28（web 侧新视图各长一套 CSS） | 收编进共享模式层，**未动 baseline** | rc=0 |
+| 21 | 6 处本地 `…Id` 未语义登记 + `FocusTimer` 的本地选中态 | 5 类瞬态逐条登记（写明哪一类）；`FocusTimer` 改走 `@heyta/app-host` 的 selection | rc=0 |
+| 22 | 内联样式 web 128>98 / mobile 108>90（web 那段是**存量**，只是首读被 tail 截掉） | 搬进模块级 `makeStyles(tokens)+useMemo`，零裸值；**未动 baseline** | rc=0 |
+| 23 | `InboundAutomationSettings` 手写空态；2 行登记已过期 | 用共享 `EmptyState`（`size="line"`）渲染两处；删 2 行过期登记（各附证据） | rc=0 |
+| 43 | 许可证清单章对不上 lockfile | 重渲染 `research/licenses-inventory.generated.md`（1096→964：旧清单口径过期，非本次丢失） | rc=0 |
+| 45 | ① `@noble/hashes` 两处范围不一致 ② **镜像里没有 `@heyta/inbound-core`，而 `server/dist` 运行时真的 `require` 它** | ① 统一成 `^2.4.0`（锁里那一行同步跟进）② Dockerfile builder + 生产阶段补第四枚 tgz（web 闭包一并补）；**没有**往 `ALLOWED_EXTRA` 加例外；`server/package-lock.json` 从**真镜像产物** `/app/package-lock.json` 重取（`cmp` 逐字节相同） | rc=0（三腿全绿） |
+| 48 / 49 / 53 | `check:macos-shell` / `check:macos-window` / `check:windows-shell` | **环境**：48/53 是代理沙箱挡了写 `~/Library/Application Support`；49 是图形会话/屏幕录制不可用。放宽权限 + 屏幕可用后**原样**复跑各自 rc=0（仓库零改动） | rc=0 |
+| 51 | 真库集成用例 `inbound-dual-host-fault-windows.integration.spec.ts` 从建立起没被点名 | `server/package.json` 的 `test:integration:postgres` 补上它 | rc=0 |
+| 54 | 8 处 BSD 专有 `md5 -q` / `stat -f` | 换成两侧同形（`date -r` / `wc -c <` / `openssl dgst -md5` / `ls -ld` 符号模式），并把可移植性账本按现实收小 | rc=0 |
+| 65 | 4 文件 25 处 `<Text>` 无前景色 | 接语义文字样式（`useHeytaText()`）；连带修 `apps/web/tests/share-panel-transfer.spec.tsx` 的 Provider 夹具（2 行，不是放宽断言） | rc=0 |
+| 75 | 匿名下行 `GET /api/automation/entitlement/revocations` 不在登记面 | 读完实现后登记进 `REVIEWED_ANONYMOUS_GET`（claims 零身份维度、写侧两条各有闸、匿名由集成用例钉住）；**并证判据仍能红**（临时摘掉登记 ⇒ rc=1，逐字点名同一条） | rc=0 |
+| 89 | 落地页帮助中心 4 条 | ① 速答 10→12（产品有意，判据钉的是旧值）② spec 里被 union 合流抄成两份、自相矛盾的 FIGURES 表 ③ 窄屏改成与桌面孪生同口径 | 41 passed，rc=0 |
+| 90 | 47 处 `$var（中文）` 变量名被吞 | `research/tools/fix-shell-unicode-vars.py --write`（顺带把它的扫描面收窄成"git 看得见的文件"，与门禁同口径） | rc=0 |
+| 100 | 1 条 needle 在词条表里找不到 | 换成当前真实界面文案 | rc=0 |
+| 102 | 自检臂 15 断：`reinstall-all.sh` 不写产物归属章 | 在 iOS 构建成功后写 `heyta_ios_owner_write`（与 `verify-mobile-ios.sh` 同一把尺、同一个文件） | rc=0 |
+| 106 | 5 个包 22 枚单测红 | ① `packages/ai`：分母 9→10（`COMMENT` 进 `EntityModelMap`）是**已登记缺口** `COMMENT=AI-COV-8`，把过期基线改成 9/10 + 「没工具的实体数 == 登记的缺口数」② `shared-schema`：`AUTH_PASSWORD_PATHS` 9→12 是它与 `server/src/api.ts` 12 条真实路由一致，判据改成**键表逐字锁定** ③ `apps/mobile`：选中态三格按 2026-10-10 的重写改判成**负向不变量**（助手屏不再是选中态读方）④ 共享披露四段的分隔符在 `16da3ecb` merge 里丢了 ⇒ 按 `63ddf3e0` 的原修法补回 ⑤ 移动壳披露 key 表补 `showFields`/`hideFields`（宿主就地写 key ⇒ 对账探针读不到） | `pnpm -r --no-bail test` **21 包 0 失败**，21 行汇总（= 有 test 脚本的包数） |
+| 109 | 4 处 i18n 占位符没填参数 | 调用处补真实值 | rc=0 |
+| 111 | 16 枚 iOS 锚点 + 判据㉔ rc=2 | 9 枚搬迁 / 5 枚退休（逐枚 git 证据）；㉔ 重锚到 `chat-controller.ts` 的 `send()`（四根牙都在）；**并搬回 `d49f77e3` 丢掉的"失败原因码优先"产品修复** | rc=0；`--self-test` **162 臂 0 失** |
+| **87** | 主浏览器套件（393 条） | `admin-console.spec.ts` 8 条：① 设置早已是"左侧分类 + 右侧内容"的 IA，spec 只打开浮层**没选「数据」那一组** ⇒ `AdminPanel` 的 `active` 闸是关的（九条一起 `element(s) not found`）② 选中后新暴露两个未补位的 404（`/api/automation/{rules,events}`，入站自动化面板一挂载就拉） | 该 spec **8 passed rc=0**；整道读数见本节末尾追加 |
+
+**仍未闭合的一格（第 6 道 `check:reachability`）**：`COMMENT` 的"最后一米"。这一轮落了**领域层 + app-host 写路径**（`packages/domain/src/comments.ts`、`packages/app-host/src/comment-actions.ts`：建/改/删/还原 + 读，路由判断落在 `shareIdForTask`，个人清单写评论直接抛类型化错误；29 + 12 枚新测 + 3 条变异臂），并把 `COMMENT` 登记进 `ACTION_FAMILIES`。⇒ 断言 B **已绿**，断言 C 仍红且**如实**：`COMMENT（家族 createCommentActions）在 apps 下各宿主的 src/ 里零调用点`。缺的那一半是 ADR-0062 的 W4/W5 **客户端共享平面**（`deriveShareOperationKey` / `signShareOperation` / `createSharePayloadCipher` 三枚原语与 `uploadOps` / `downloadOps` 两条传输**都没有任何消费者**）—— 那是功能级工作量，不是"补一行接线"，详见 `BLOCKED.md` B209。
