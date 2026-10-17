@@ -323,6 +323,30 @@ const ACTION_FAMILIES = [
    * **别把这行读成 D-4 (ii) 对用户可用了**。
    */
   { entity: 'ASSISTANT_TURN', family: 'createAssistantSessionActions' },
+  /**
+   * 共享清单里的任务评论（`app-host/src/comment-actions.ts`，2026-10-17）。
+   *
+   * 🔴 这一行与 `ASSISTANT_TURN` 那条同一个来路：**本门禁当场抓出来的**。
+   * `COMMENT` 在此之前是"三处登记齐全、桶存在、会被 export-dump 导出、op 能同步，
+   * 但没有任何 action 能生成它"（判据 B 红着，`BLOCKED.md` 的 B195/B201 那族记过它）。
+   * 2026-10-17 补了领域层（`@heyta/domain` 的 `aliveCommentsForTask` / `commentRejection`）
+   * 与动作层（`createCommentActions`：建/改/删/还原 + 读，路由判断落在它内部的
+   * `shareIdForTask`，ADR-0062 决策 4 要求的"写入路由住 app-host"就落在那一处）。
+   *
+   * 合法性按 `REMINDER` / `NOTE` / `ASSISTANT_TURN` 的同一条纪律核过：
+   * `createCommentActions` 在 `comment-actions.ts:219` **真的存在**（全仓定义 1 处）、
+   * `index.ts` 导出 1 处；该文件的 `ctx.dispatch` 出现 **0 次**（评论绝不进个人 op-log，
+   * 见 `packages/op-log/src/state.ts:98-101`），四条写动作全部只走注入端口 `dispatchShareOp`。
+   *
+   * ⚠️ **这一行只回答"实体有没有写路径"，不回答"用户碰得到吗"** —— 现量：
+   * `--list` 那一行的宿主调用点是 **0 处**，所以判据 C 仍然红（这是**如实**的红，不是假绿）。
+   * 缺的那一半是 `docs/plans/collaboration-shared-lists.md` 的 W4/W5 客户端共享平面：
+   * `packages/sync-core` 已有原语（`deriveShareOperationKey` / `signShareOperation` /
+   * `createSharePayloadCipher`），`packages/sync-client` 已有传输（`uploadOps` / `downloadOps`），
+   * 但**没有任何消费者** —— per-share op-log 引擎、`ShareOperation` 落盘、listKey 解密回放
+   * 一律还没建。⇒ 别把这行读成"评论对用户可用了"，它是"写路径已存在、只等接线"。
+   */
+  { entity: 'COMMENT', family: 'createCommentActions' },
 ];
 
 /** 写 op 的锚点：`entityType: 'X'` 后允许 `as EntityType` 之类的类型断言。 */

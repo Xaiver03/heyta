@@ -29,6 +29,7 @@ bash 解析 `$name` 时，**会把紧跟其后的非 ASCII 字节算进变量名
     python3 research/tools/fix-shell-unicode-vars.py --write    # 真改
 """
 
+import subprocess
 import sys
 from pathlib import Path
 
@@ -138,14 +139,34 @@ def fix_text(text):
     return ''.join(out), fixes
 
 
+def shell_scripts(root):
+    """扫描面 = **git 看得见的 `.sh`**（已跟踪 + 未跟踪但未被忽略）。
+
+    与门禁 `scripts/check-shell-unicode-vars.mjs` 同一条口径：判据判**交付面**。
+    本工具早先按 `rglob('*.sh')` 走全树，于是会去改 `.worktrees/`（别人的检出）、
+    `.run-logs/` 与 `tmp/`（运行草稿）里的脚本 —— 那些文件既不在交付面，改了也无人复核。
+    git 不可用时退回全树遍历（跳过与门禁同一份目录名单）。
+    """
+    try:
+        out = subprocess.run(
+            ['git', 'ls-files', '--cached', '--others', '--exclude-standard', '--', '*.sh'],
+            cwd=root, capture_output=True, text=True, check=True,
+        ).stdout
+        listed = [root / line for line in out.splitlines() if line.strip()]
+        if listed:
+            return sorted(listed)
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pass
+    skip = {'node_modules', '.git', '.worktrees', 'dist', 'build', '.pnpm-store', 'release', 'tmp', '.run-logs'}
+    return sorted(p for p in root.rglob('*.sh') if not (skip & set(p.relative_to(root).parts)))
+
+
 def main():
     write = '--write' in sys.argv
     root = Path(__file__).resolve().parents[2]
     total_files, total_fixes = 0, 0
 
-    for p in sorted(root.rglob('*.sh')):
-        if 'node_modules' in p.parts:
-            continue
+    for p in shell_scripts(root):
         try:
             text = p.read_text(encoding='utf-8')
         except Exception:

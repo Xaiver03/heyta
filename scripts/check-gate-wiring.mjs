@@ -179,7 +179,7 @@ const ALLOWED_UNREFERENCED_IMPL = new Map([
         '放进 `pnpm check` 那条无参数的链里它没有可判的对象。⇒ 判它的载体是"照着并行开工手册跑那一趟"。',
       consumers: [
         {
-          file: 'docs/plans/ai-remediation-parallel-runbook.md',
+          file: 'docs/plans/archive/ai-remediation-parallel-runbook.md',
           needle: 'node scripts/check-module-boundaries.mjs --module 2 --rev ai-remediation-fork',
           role: '手册里"开工前 / 合流前"各跑一次的那条命令（§开工门 与 §合流门 两处代码块）',
         },

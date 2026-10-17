@@ -57,6 +57,7 @@
  * 并把 `pnpm check:e2e-helper-exports` 插进 `check` 链（`check:gate-wiring` 会自己验接线，
  * 只加定义不接线它就直接红）。
  */
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -99,6 +100,33 @@ function listTsFiles(dir) {
     else if (/\.(ts|tsx|mjs|js)$/.test(name)) out.push(p);
   }
   return out;
+}
+
+/**
+ * 真树那一趟的**分母**：git 看得见的 e2e 文件（已跟踪 + 未跟踪但未被忽略）。
+ *
+ * 为什么不直接遍历文件系统（B202 那格量出来的）：`e2e/_probe/` 是 `.gitignore` 排除的探针目录，
+ * 里面是并行会话的草稿（2026-10-16 实测：同一枚门禁的射程 190 份里，那一族占 42 份），
+ * 它们不随交付走 —— 判据该判交付面。与 `scripts/gate-ssh.mjs`「只有被 git 看见的文件进包」同口径。
+ * 自检臂**不走这条**：它喂的是 `tmp/` 下的临时夹具（本身就被忽略），仍用遍历。
+ * 被跳过的枚数显式打印：静默在读数上和"没扫到"一样（§7 元规则 2）。
+ */
+function gitVisibleE2eFiles() {
+  const walked = listTsFiles(join(ROOT, 'e2e'));
+  let listed;
+  try {
+    listed = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '--', 'e2e'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+    })
+      .split('\n')
+      .filter(Boolean);
+  } catch {
+    return { files: walked, skipped: 0, degraded: true };
+  }
+  const visible = new Set(listed.map((rel) => resolve(ROOT, rel)));
+  const files = walked.filter((abs) => visible.has(abs));
+  return { files, skipped: walked.length - files.length, degraded: false };
 }
 
 /** 解析一条相对说明符到实际文件；解析不到返回 `null`（= 目标缺失）。 */
@@ -168,11 +196,11 @@ function exportedNames(file, seen = new Set()) {
 /** 一条 import 的形状：`import [default][, {named}][* as ns] from 'spec'` 或 `import 'spec'`。 */
 const IMPORT_RE = /\bimport\s+(?:type\s+)?([\s\S]*?)\s*from\s*['"]([^'"]+)['"]/g;
 
-function scan(rootDir) {
+function scan(rootDir, onlyFiles = null) {
   const findings = [];
   let consumerFiles = 0;
   let checkedNames = 0;
-  for (const file of listTsFiles(rootDir)) {
+  for (const file of onlyFiles ?? listTsFiles(rootDir)) {
     consumerFiles += 1;
     const src = stripComments(readFileSync(file, 'utf8'));
     for (const m of src.matchAll(IMPORT_RE)) {
@@ -208,8 +236,8 @@ function scan(rootDir) {
   return { findings, consumerFiles, checkedNames };
 }
 
-function report(label, result) {
-  console.log(`${label}：射程 ${result.consumerFiles} 份文件 / 对账 ${result.checkedNames} 个导入名 / 缺失 ${result.findings.length} 个`);
+function report(label, result, denominatorNote = '') {
+  console.log(`${label}：射程 ${result.consumerFiles} 份文件 / 对账 ${result.checkedNames} 个导入名 / 缺失 ${result.findings.length} 个${denominatorNote}`);
   for (const f of result.findings) {
     console.log(`  🔴 ${relative(ROOT, f.file)}  →  ${f.spec}  ${f.name === null ? '(整条)' : f.name}：${f.reason}`);
   }
@@ -312,7 +340,9 @@ function selfTest() {
 
 if (process.argv.includes('--self-test')) selfTest();
 else {
-  const ok = report('e2e 命名导入对账', scan(join(ROOT, 'e2e')));
+  const { files, skipped, degraded } = gitVisibleE2eFiles();
+  const note = degraded ? '（⚠️ git 不可用 ⇒ 退回文件系统遍历）' : `（分母=git 看得见的文件，跳过 git 看不见的 ${skipped} 枚草稿）`;
+  const ok = report('e2e 命名导入对账', scan(join(ROOT, 'e2e'), files), note);
   if (!ok) {
     console.log('🔴 修法：把**生产者**补进同一笔提交（`e2e/` 不在 pnpm 工作区内，`pnpm -r typecheck` 看不见这一族）。');
     process.exit(1);
