@@ -92,7 +92,14 @@ describe('share-client（W2-T1）', () => {
 
     const result = await dispatcher.dispatch('share-9', { entityType: 'COMMENT', entityId: 'c-9', opType: 'UPD', payload: { body: 'edited' } });
 
-    expect(result).toEqual({ opId: 'op-42', skipped: false });
+    // 2026-10-17：返回值多了**有文档**的 `op`（本地物化要复用同一条 op 的身份字段，
+    // 免得第二份线 op 形状出现）⇒ 这里不再用 `toEqual` 钉整个对象，改成逐字段**加强**断言：
+    // 既钉住原来那两个字段，又钉住新字段真的把线 op 交回来了。
+    expect(result.opId).toBe('op-42');
+    expect(result.skipped).toBe(false);
+    expect(result.op, '要把装配好的线 op 交回来').toBeDefined();
+    expect(result.op?.id, '交回来的就是上线的那一条').toBe('op-42');
+    expect(result.op?.payload, '交回来的是密文（本地要换明文，见 share-comments）').toBe('ct:{"body":"edited"}');
     expect(calls).toHaveLength(1);
     expect(calls[0]!.url).toContain('/api/shares/share-9/ops');
     expect(calls[0]!.method).toBe('POST');
