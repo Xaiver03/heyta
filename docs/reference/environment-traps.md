@@ -10197,3 +10197,5 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     `| while … done | git update-index …` 这种管道尾巴上，**退出码会被管道吃掉**（#179 那一族），
     症状就变成"提交成功了，可门禁还是报那几枚缺"。⇒ 收尾对账别只跑 `git ls-files`，
     要跑 `git diff --cached --name-only HEAD -- <本批路径>`：**空**才叫索引跟上了提交态。
+
+460. **变异对照的锚点若是别的串的片段，它会一次改掉两处，而报告照样像有牙**。`research/tools/verify-inbound-ac-battery-negctl.py` 给电池 `--self-test` 的七臂造八处失法，其中"通配针下无件"那一枚原先把锚点写成裸串 `tests/inbound-*.spec.ts` 并要求"出现 1 次"，但它是同仓另一条腿里 `tests/inbound-*.spec.tsx` 的**子串** ⇒ 真实命中 2 次（现量 `grep -n 'tests/inbound-\*' research/tools/verify-inbound-ac-battery.py` 回 2 行）。按 `str.replace(old, new, 1)` 的写法它只会改掉**第一处**，于是那处对照测的并不是它声称的那件事；按"枚数≠预期即作废"的规则它又必然报废。两种写法都会咬人，区别只在症状是"假有牙"还是"假作废"。⇒ **三条一起做**：⑴ 锚点要选**唯一命中**的形状（这里换成带结尾引号的正则 `tests/inbound-\*\.spec\.ts"`，现量 `grep -c 'tests/inbound-\*\.spec\.ts"' research/tools/verify-inbound-ac-battery.py` 回 1）；⑵ **替换前当场数一遍命中次数**，不符就记"对照作废"并让整枚装置退非 0，不许静默继续；⑶ 报告要把三种结局分开 —— 臂红（有牙）／`rc=0`（这臂对这处失法是盲的）／装置崩或对照作废（**这不算有牙，也不许算过**）。同一族的元规则见 `AGENTS.md` §6 第 3 条与 §7 那三条（一条永远通过的判据比没有判据更糟；先怀疑探针）。
