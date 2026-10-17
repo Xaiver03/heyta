@@ -11302,7 +11302,61 @@ CalendarBoard.tsx:444 const calendarTasksByDate = useMemo(…, [tasks, weeks])  
 ⚠️ 尝试过的**动态**取证：往宿主的板子外面挂探针属性（`data-probe-tasks` / `data-probe-projects`）再读 —— 那次**插桩本身把板子弄坏了**（首条断言变成"未进主区"，即一条任务条都不画），说明我插的 `<div>` 包层破坏了 `SharedCalendarBoard` 的父级布局/尺寸前提（它的高度来自父级）。**两处探针已逐字撤回**（`grep -c "data-probe"` = 0、`grep -c "PROBE\|host="` = 0），撤回后 `pnpm --filter @heyta/web typecheck` rc=0，且 `smoke` + `calendar-week` 复跑 **6 passed / 0 failed**（树没被我弄坏）。
 ⇒ 下一轮的正确取法（**不要**再包 div）：在 `CalendarView` 的 `tasks` memo 里 `console.log`，用**真浏览器里听 page console 的探针 spec**（`page.on('console')`）读它；或把 `tasks.length` 写进板子**已有的**某个 `data-*`（不改结构）。
 
+🟡 **B213（2026-10-17 · `collab-journey` 的 rig 存在但**不在链里** —— 主套件里那一支已被摘出，链上这一格的覆盖是空的）**
+
+现量：
+```
+e2e/tests/collab-journey.spec.ts:31   const API_BASE = process.env['HEYTA_COLLAB_BASE'] ?? 'http://127.0.0.1:3217';
+                                      :51  fetch(`${API_BASE}/api/test/create-user`)   ← 需要**真实例**
+                                      （文件头**没有** `test.skip` 保护）
+e2e/playwright.config.ts              webServer 只有「假端点 4319 + vite 4318」⇒ 本配置下必然 `TypeError: fetch failed`
+scripts/verify-collab-journey.mjs:147 用**自己那套** `playwright.collab.config.ts` 起真服务端（3217）+ web（4327）
+                                       命令行：`pnpm verify:collab-journey`
+```
+**本轮已落地**：`playwright.config.ts` 的 `testIgnore` 收进 `collab-journey.spec.ts`（与本文件开头 `privacy-consent` / `auth-simple-ux` 同一条理由），并复验 `check:e2e-carrier` / `check:gate-wiring` 都 rc=0、显式传该文件跑主配置会得到"没有匹配的测试文件"。
+**仍开着的一格**：`verify:collab-journey` **不在 `pnpm check` 链里**（`node -e` 查 `scripts.check` 里 `indexOf('verify:collab-journey')` = -1）⇒ 共享清单全旅程的 e2e 覆盖在链上是**空的**；而共享清单正是 `check:reachability` 第 6 道点名的 W4/W5 那一块（见 B209）。要哪一档请负责人拍：① 把这套 rig 接进链（它要起真服务端 + prisma，链的时长/依赖会变）；② 明确"共享清单的 e2e 只在专项验收里跑"，并把这句写进 `docs/agents/`（现在**没有任何地方**写着它的覆盖归属）；③ 只留档不接链（现状 + 这条登记）。
+⚠️ 本轮**没有**跑 `pnpm verify:collab-journey` 本身（要起真服务端与数据库），所以"这套 rig 现在是绿的"**未经复验**，别把它当成已证事实。
+
 🟡 **B214（2026-10-17 15:4x，本会话 · 本线按 AGENTS §6 往环境陷阱写事故，被本线自己的范围尺记成一枚越界；要不要把那条路径算进本线地界是判卷口径，等负责人点头）**：现量一条 —— `python3 research/tools/verify-inbound-commit-scope.py --since '2026-10-17 08:50'` 回 **rc=1**，头两行是「本线笔数=14　仅正文提及=1　涉及路径=7　越界=1」，点名行是 `OOB docs/reference/environment-traps.md ['7ccbea8c']`，下面那行写着 `← 7ccbea8c 命中段=scope 带本线独占路径=0`（原件 `~/.heyta-evidence/inb-t7-1017-0902/doc-gates/scope-1544.txt`）。
 两件必须并着读，别只挑顺耳的那件：**（一）这一枚与 B205 追记那 89 枚不是同一个名目** —— 那 89 枚的成因是别人那枚借用「自动收集」标题的提交，这一枚是**本线自己写的路径不在自己的白名单里**。所以 10-17 台账里那句"唯一一枚 rc=1，成因不属本线"从这一笔起要按**两枚**读（一枚别线名下、一枚本线名下），`PROGRESS.md` 第 36 条④ 已按改口不删旧文处理。**（二）本线不动这枚尺** —— 往 `verify-inbound-commit-scope.py` 的 `WHITELIST` 里加一条 `^docs/reference/environment-traps\.md$` 就是"为了让自己的套件绿去放宽自己的判据"，那条纪律在这仓里被写进 AGENTS §6 第 3 条，本轮不做。
 成因不在本线可两全：AGENTS §6 第 4 条要求"具体事故追加到环境陷阱"（那条文件是全仓共用的编号台账，`grep -cE '^[0-9]+\. ' docs/reference/environment-traps.md` 现量条数），而本线的范围尺把"本线笔"限定在一小组路径上；今天这轮踩的那枚 zsh 修饰符坑（`$S1:PROGRESS.md` 里的 `:P`/`:t`/`:r` 把 plumbing 参数改了形，落成一枚只含 1 处改动的半截提交）正是"会复现的事故"，按规则**必须**写进 traps，写了就越界。
 三条出路，请负责人选一条：**①** 把 `docs/reference/environment-traps.md` 加进本线白名单 —— 等于承认"给全仓登记事故"是本线地界内的动作，代价是这枚尺对"本线到底动了哪些面"的约束少一格；**②** traps 那类改动**单独成笔**，且那一笔的标题不挂本线关键字（让归属尺看不见它）—— 不用改尺，但改的是提交习惯，而且这笔与主线的关联就不再能从标题读出来；**③** 维持现状，本线每次写 traps 都带一枚**如实的 rc=1**，并把 `OOB` 那行逐条贴进读数 —— 判据最不动，代价是范围尺这一条腿的 rc 不再能一眼归层，读它的人必须连 OOB 行一起读。**我的推荐是 ③**（这一轮已经这么做了：读数原件与 OOB 行都在上面那条路径里）。本轮不 push、不改尺、不替负责人勾。
+
+
+🔴 **B214（2026-10-17 · 真实缺陷：行尾「更多」面板里的**提醒入口被一个 `<label>` 盖住，用户点不开**）**
+
+**取证（真浏览器，逐字）**：
+```
+$ npx playwright test -c playwright.config.ts tests/glass-materials.spec.ts --grep "玻璃三态 · light"
+Error: locator.click: Test timeout of 60000ms exceeded.
+Call log:
+  - waiting for locator('details.ht-compose--popover > summary').first()
+    - locator resolved to <summary class="ht-chip" aria-label="「玻璃三态判据的锚点任务·甲」的提醒">
+  - attempting click action
+      - element is visible, enabled and stable        ← 元素本身可见、稳定
+      - scrolling into view if needed
+      - <label>…</label> from <span>…</span> subtree intercepts pointer events   ← 🔴 被一个 label 拦下
+```
+**决定性的一刀**（分清"探针比现实严"还是"产品真坏"）：把点击换成**真实鼠标坐标**（`page.mouse.click(盒子中心)`）之后
+```
+Error: reminder-dropdown：面板应当出现
+  Locator: locator('details.ht-compose--popover .ht-material').first()
+  Expected: visible   Received: hidden
+```
+⇒ **真用户也点不开**（点在那块坐标上命中的是那个 `<label>`，不是提醒 chip）⇒ **产品缺陷**，不是判据过严。
+**归属**：提醒 chip 现在住在**每行那枚「更多」披露的 panel**（`App.tsx:1338` 那一层 `ht-compose-actions__panel ht-material`）里，而某个 `<label>`（行体/元信息那一族）压在同一个坐标上。要谁改：谁拥有那块 panel 的层级/命中区（本项已在台账 `PROGRESS.md` 续二十三里与本轮其它读数一起记）。
+**判据侧**：`glass-materials.spec.ts` 的 `reminder-dropdown` 这一面**不该被删**（它正是抓住这条缺陷的那条判据）；本轮已把它的点击改成**真实鼠标坐标**（这样红的是"用户点不开"这条事实，而不是"Playwright 的 actionability 更严"）。
+
+**B214 追加（2026-10-17 第二轮取证：更准的机制 —— 不是"label 恶意盖住"，是**那一刻那一点上根本没有那个 chip**）**
+同一处再量一次（先建数据、先开「更多」），把 chip 的盒子与"那一点上最上面的元素"一起打出来：
+```
+PROBE chipBox=862,283 54x25          ← chip 自己的盒子（非零）
+PROBE hit=DIV.ht-content             ← 🔴 那一坐标上**最上面的是主区**（不是 chip）
+PROBE hitChain div.ht-content → main.ht-main → div.ht-app → …
+```
+⇒ 与上一条 `<label>…intercepts pointer events` **不矛盾**：两次都是"那一点上画的不是 chip"。合起来看，形状是**这一族自己注释里预言过的那件事**——
+> `.ht-compose-actions__panel` …（`e2e/tests/glass-materials.spec.ts` 里那段）"`position: absolute` 的行尾面板开在**滚动容器**里 ⇒ 朝下开就被容器底裁掉"。
+
+即：900×600 下锚点行在列表末尾，**面板朝下开、被滚动容器裁掉**，chip 的坐标落在容器外的内容列上 ⇒ 用户点不到（`page.mouse` 真点也点不开，面板保持 hidden）。
+**归属**：面板的**开向/夹取**逻辑（朝下开但没有"贴底翻上"或没有被容器容纳）—— 归拥有该 panel 的那条线；判据是对的，**不删**。
+（另记一条方法：`scrollIntoViewIfNeeded()` **救不了**"被非滚动祖先裁掉"的元素 —— 8 号那一趟就是加了它仍红；能证明它的只有"那一点上最上面是谁"这个读数。）

@@ -5524,6 +5524,7 @@ AC 已勾数仍为 **0**（`verify-inbound-ac-ticks.py`：`AC 行=8　已勾=0�
     ⑧ **这一轮我自己造的两枚探针错**（都只伤探针，都不长红）：⑴ 第一发把 `playwright … --list` 接在 `| tail -8` 后面再 `echo $?`，打出来的是 `tail` 的退出码 —— 第 28 条登记过的「管道吃 rc」在我自己身上第二次命中；重取改成重定向进文件再取 `$?`，`PLAYWRIGHT_LIST_RC=0`、`grep -c '\[chromium\]'` 回 **8**、末行 `Total: 8 tests in 1 file`。**这一枚预检挡的是"零枚用例被发现也报绿"**（昨天那趟这条腿红过一枚成因就是 `e2e` 工作区不在场）。⑵ 判那枚 png 是否等于 HEAD 时，把 `shasum -a 256` 与 `git rev-parse HEAD:<路径>`（sha‑1）并排打印当成比对 —— **两把尺不同名**，看着像"不同"。真判据只有 `git diff --quiet -- <路径>` 退 0 **且**它不再出现在 `status --porcelain` 里。
     ⑨ **载具脏条目 17→16 的成因要说准**：少的那一枚是 `docs/research/evidence/inbound-automation-review/panel-layout/panel-1280-light.png` —— 这趟浏览器腿重渲染出的字节**恰好等于** HEAD 已提交那版，于是它从脏表里消失。**没有文件被删、没有被 `checkout` 还原**（差集现量只有这一枚；同一族现象第 25 条记的是另一面 —— 昨天那趟是 16 枚里 10 枚字节不同）。顺带把「脱敏在写盘那一步」这格做成读数：本轮 28 份腿日志 ＋ 那枚 683 行库日志，按八枚形状（`eyJ` 头、40 位十六进制、PEM 私钥块、`password=`、`Bearer` 实值、`refresh/session token` 实值、`postgres://` 连接串、URL 内嵌 `user:pass@`）全扫一遍，命中 **0**（现量：那两份 `runlogs*/*.log` 与 `AC1-worker-identity.target.log` 逐枚 `read_text` 后 `findall`）。这把筛子的正向对照臂第一次跑有一枚没命中，是我造的样本本身只有 38 个字符而不是 40 —— **对照臂自己先要能命中**，否则"扫过全 0"就是一把永不命中的尺的读数。
 
+
 ## 2026-10-17 · `pnpm check` 门禁收口：26 枚红逐道定位并逐道复跑（自动收集线之外的一轮独立工作）
 
 写前先跑 `date`（本机 09:2x）。**起点读数**（同一枚链装置 `research/tools/verify-inbound-check-chain.py`，2026-10-16 21:27 @`15a3cd4f`，日志 `.run-logs/check-1016/`）：
@@ -5788,3 +5789,338 @@ Error: 对着把手几何中心按下去，命中的必须是把手自己
 **三、⑤ 那条判据换载体（不是放宽）**：原来读 `calendar-board-day-title`（住在 `showSelectedDayList` 那一段，代码自称「移动端兼容段」，Web 宿主传 `false` ⇒ 不渲染）。改成钉**板子那一格**的 `aria-selected`（`CalendarBoard.tsx:277` 平铺出来就是为了判据能直接问）＋"同时只有一格选中" —— 这比读一句日标题**更直接**地表达⑤的本义（两列必须指同一天）。顺带删掉不再使用的 `BOARD_DAY` 常量（留理由）。
 
 **四、复跑读数**：`calendar-sidebar` **2 passed rc=0**；同族回归一起跑 `calendar-sidebar + global-sidebar-resize + calendar-week + smoke` = **9 passed / 0 failed**；设计系统那几道门 `check:design` / `check:tokens` / `check:token-hashing` / `check:server-design` / `check:ui-provider` **全 rc=0**。
+
+### 2026-10-17 第 87 道续七：**倒数日那一族也收口了**（`countdown` 6 passed、`countdown-calendar` 3 passed），日历/倒数日全家复跑 **18 passed rc=0**
+
+**① `countdown.spec.ts:73`（6 passed rc=0）** —— 判据原来钉"它在主段里是一枚 tab"，而 W1（2026-10-06，审计 §3.2-1）之后 rail 收成「主段 ≤4 + 更多」，低频目的地（时间线/番茄钟/**倒数纪念日**…）住在**「更多」菜单**里（`role=menuitem`）。现量 `getByRole('tab', {name:'倒数纪念日'})` = **0**；而 `switchView` 走的正是那条真路径（点「更多」→ 点那一项，点完会被提升进主段）。本义是"入口在、切得过去" ⇒ 让它按**真路径**去证明（`switchView` 找不到就会红），比"主段必须有一枚 tab"更直接。
+
+**② `countdown-calendar.spec.ts:122`（3 passed rc=0）** —— 两处 testid（`calendar-board-day-event-*`、`calendar-board-day-empty`）都住在 `showSelectedDayList` 那一段（移动端兼容段，Web 传 `false` ⇒ 不渲染）。换到 Web 真正在画的载体：**月格里的那条事件条**（`calendar-cell-<date>-event`，`DayCell` 用 `-event` 区分倒数日）＋**点过之后那一格的 `aria-selected`**（"点进去"在 Web 上的可见后果）。另外**删掉一条恒真的断言**（`calendar-board-day-empty` `toHaveCount(0)`：那个 testid 在 Web 上根本不渲染 ⇒ 永远为真，§7 元规则 2）——它的本义由日档那一段**正面**表达（`calendar-board-day-all-day-event-*` 必须存在且写着这条纪念日）。
+
+**③ 全家复跑（回归）**：`calendar-sidebar + calendar-week + countdown + countdown-calendar + global-sidebar-resize + smoke` = **18 passed / 0 failed，rc=0**。
+
+**日历/倒数日这一族的账到此清完**：`calendar-week`（2 枚，产品修）、`calendar-sidebar`（2 枚，产品修 + 载体换正）、`countdown`（1 枚，载体换真路径）、`countdown-calendar`（1 枚，载体换 + 删恒真断言）。第 87 道剩下的就只是**别线那笔未落库的壳/面板改版**（`detail-pane-*`/`assistant-*`/`ai-tool-*`/`glass-materials`/`global-responsive-ux`/`focus-detail-pane`/`due-date-edit`/`habit-frequency`）与需要真实例的 `collab-journey`。
+
+### 2026-10-17 收口前的一次全量核对：**我这批改动的门全绿**，`pnpm -r test` 那一趟是**负载过报**（loadavg 532）
+
+**① 我改过的东西，相关门逐条复跑（全 rc=0）**：
+```
+check:gate-wiring ✓   check:e2e-carrier ✓   check:empty-state ✓   check:public-facts ✓
+check:docs ✓          check:e2e-helper-exports ✓   check:shell-unicode ✓（扫 189 个 .sh）
+check:design ✓  check:tokens ✓  check:token-hashing ✓  check:server-design ✓  check:ui-provider ✓
+pnpm typecheck（工作区）✓
+```
+（`check:shell-unicode-vars` 那次 rc=1 是**我自己敲错了脚本名**，正名是 `check:shell-unicode`；正名 rc=0。这条一并记下：**敲错名字的 rc≠0 不是红**。）
+
+**② `pnpm -r --no-bail test` 那一趟报**：domain 2 / storage 2 / ui 2 / mobile 3 / **web 34** 失。**但那一戳 `sysctl -n vm.loadavg` = 532.23** —— 与今天早些（load 152 时多报 6 枚）同族：**高负载整串会多报红**。逐枚孤立复跑反证：
+- `apps/web` 的三份（`calendar-sidebar.spec.tsx` / `task-sort.spec.tsx` / `calendar-event-source.spec.tsx`）**31 passed**；
+- `packages/domain` 整包 **1043 passed**。
+（storage/ui/mobile 那 7 枚同族、未逐一复跑 —— 按纪律**不当成真红记**，也不当成已修：它们的形状与今天已复跑过的那批一致。）
+⚠️ 这条纪律本来就在台账里（"孤立复跑 + 对数审计"），这次是它在 load 532 下的又一次现量。
+
+**③ 第 87 道剩下那部分仍卡在别线**：15:12 现量 `apps/web/src/App.tsx` 与 `apps/web/src/features/ai/*` **仍是 ` M`**（未落库）⇒ `detail-pane-*` / `assistant-*` / `ai-tool-*` / `glass-materials` / `global-responsive-ux` / `focus-detail-pane` / `due-date-edit` / `habit-frequency` 这一族的复跑仍然只能等它落库（或在一个不含未提交改动的检出里跑）。
+
+### 2026-10-17 第 87 道续八：**安静窗口下的真读数**（那一族其实只有 3 份 spec 红），并给 `detail-pane-task` 接上"按可访问名"的披露 helper
+
+**① 安静窗口（loadavg 37）冻结副本上的重测** —— ⚠️ **这一节我先前写窄了，现按作废点之前的完整读数更正**（那一趟末尾因为我**又**在运行中 rsync 了同一份副本而回 `FAM2_RC=160`，所以只取**作废点之前**那 60 条结果；它没有被我碰到）：
+```
+作废点之前  失败: ai-row-layout 4、ai-tool-run 4、detail-pane-task 16、glass-materials 4、global-responsive-ux 2、habit-frequency 13
+            通过: assistant-navigation-acceptance 9、detail-pane-task 7、glass-materials 1
+```
+⇒ 真红的是**这 6 份**（不是我先写的 3 份；那个数是某一帧的早期快照，我读得太早、写得太满）。`assistant-navigation-acceptance` 那一份在安静窗口里是**全绿**（9 条全过），它在早先"173 枚红"里出现属污染。
+⚠️ 另一条纪律再记一次：**我又在整轮运行中 rsync 了同一份冻结副本** ⇒ 那一趟末尾作废。冻结副本"不许动"这条我同一个下午犯了两次，下一轮开始前先把这条当作硬约束写进脚本注释。
+
+**② `detail-pane-task`：两处行内入口接上披露 helper（载体类，不是产品）**
+真因：`「窄档提醒乙」的提醒`（那颗 chip 自己是个 `<details>`）与 `把「窄档子任务子」移到别的任务下面` 都**嵌在每行的「更多」披露里面** ⇒ 折叠时"在 DOM 里但不画"，`click()` 一路重试到超时。
+新增 `e2e/tests/ai-entry.ts` 的 **`revealRowActionsBy(page, innerAriaLabel)`**：按**可访问名**反查"包含它的那一枚 `details.ht-compose-actions`"再点它自己的 summary —— 因为本用例的注释明写 `task-item-*` + `hasText` 在这一族里**不安全**（窄档那枚 `<select>` 会把别的任务标题写进 `option`，两行都命中）：`selection-projections.spec.ts` 文件头第 1 条与 T9 的注释都记着这件事。
+复跑（冻结副本）：**9 passed / 6 failed** —— 红**换了形状**，现在是：
+```
+Error: 窄档行尾没有整理入口 ⇒ 回落丢了，这一档根本归不了类
+Locator: [data-testid^="task-item-"].filter({ hasText: '整理窄档乙' }).first().getByTestId('task-organize-summary')
+Expected: 1  Received: 0
+```
+即"窄档下整理的入口必须回落到行尾那颗触发器"这条**判据自己**在按 `hasText` 找行 ⇒ 与本轮修的那个 helper 缺陷**同一个病**（`.first()` 命中了不可见/非目标的那一份）。⇒ 下一轮把这一族 spec 里同形状的定位（`[data-testid^="task-item-"]` + `hasText` + `.first()`）统一加 `:visible` 或改走可访问名，**判据本义一格不动**。
+⚠️ 主树同一份 spec 那次跑回了 **rc=160（载体判定作废）**：签名 `net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4318/` —— 别线正在写 `features/ai/*`，vite 中途死了。**这类读数不作数**（也正是要跑冻结副本的理由）。
+
+### 2026-10-17 第 87 道续九：`detail-pane-task` 的**两处真因**查清（一处是我们的判据找错行/丢了视图，一处是设计口径）
+
+**① 判据找错行（已修，属"定位精度"）**：`rowItemOf` 原来用 `hasText` —— 这一族里会**过匹配**（窄档那颗 `<select>` 把**别的任务标题**写进 option，`selection-projections.spec.ts` 文件头第 1 条与 T9 注释都记着）。改成按**本行自己的完成框**（`完成：<title>`）锚定；断言对象/阈值/本义不变。
+**② 判据在被问到一条"不在屏上"的行（已修，属"建立前提"）**：`seedListAndTag` 会**新建清单**，而新建清单让侧栏选中它 ⇒ 视图被筛到那个**空清单**。900×600（与 T15 同视口）探针逐字读数：
+```
+afterSeedList.rowCount = 0      afterSeedList.allRows = 0   ← 一条任务都不在屏上
+backToTasks.rowCount   = 1      closed.organize = 1         ← 切回「任务」后它回来，整理入口在
+moreByLabel = 1                 opened.organize = 1 / visible = true
+```
+⇒ 两处 `seedListAndTag` 之后各补一步 `switchView(page, '任务')`（附上述读数）。
+**③ 修完这两处，红**换成了真问题**（这一格归设计口径，不是载体）**：
+```
+Error: 界面上找不到这个元素
+Locator: …filter({ has: checkbox 完成：整理窄档乙 }).first().getByTestId('task-organize-summary')
+Expected: visible          ← 数到了 1（我的两处修法生效），但它**不可见**
+```
+即：`§8.138` 那条判据要的是**"窄档下整理的编辑入口回到行尾那颗触发器"（可见）**，而别线那笔改版把它放进了每行的**「更多」披露**里 ⇒ 在 DOM 里（`count=1`）、但折叠着不画。**这与 `ai-tool-*` 那一族是同一类**（IA 变了、判据钉的是"可见的入口"）——**要不要接受"入口进菜单"是设计口径问题，归他们**；我不改判据去迎合（那会把"入口被收进菜单"这件用户可见的变化悄悄放过）。
+（探针文件只写在冻结副本里、已删；主树与冻结副本都没有留下临时文件。）
+
+### 2026-10-17 第 87 道续十：`detail-pane-task` 剩下的红**收敛成同一个成因**（一行入口被收进「更多」菜单）
+
+复跑（冻结副本 4428/4429，已带我这两处修法）：`--grep "T6 |T13|T14"` → **1 passed / 2 failed**，加上 T15，失败形状**只有一张脸**：
+```
+T15  Expected: visible   Locator: …完成：整理窄档乙….getByTestId('task-organize-summary')   ← 在 DOM（count=1）、折叠着不画
+T13  Locator: getByLabel('设置任务「窄档截止乙」的截止日期').first()                        ← 截止日期的入口找不到
+T6/T14  locator.fill: Test timeout                                                        ← 栏里那格编辑器的输入框不见
+```
+⇒ 与 T15 那条**同一根因**：别线那笔改版把**行尾那几枚编辑入口**（整理 / 截止 / 提醒 / 子任务）收进了**每行的「更多」披露**（现量：`details.ht-compose-actions`，**HEAD 上不存在**），而 `detail-pane-task.spec.ts` 钉的是 `§8.138` 那套设计——**"窄档下编辑入口回到行尾那颗触发器"（可见）**、"宽档下编辑本体在栏里那一格、行尾只剩只读徽标"。
+⇒ 这是**一次设计口径变更**（入口从"行尾常驻/栏内常驻"改成"进菜单"），**归他们**：要么保持 §8.138（把那几枚留在行尾/栏里），要么改 §8.138 并同步这一族 spec。我这边**只做了两件不改本义的事**（定位精度 + 建立前提），**没有**去迎合"先展开披露再看"——那会把"入口被收进菜单"这件用户可见的变化悄悄放过。
+（另：这两处修法对**冻结副本之外的**同名缺陷也有效 —— `revealRowActions`/`revealRowActionsBy` 现在覆盖"按标题"与"按可访问名"两种定位，四个 spec 共用。）
+
+### 2026-10-17 第 87 道续十一：**安静窗口（loadavg 7）下把剩余那一族量全了**，逐份给出形状与归属
+
+取样 10 份（冻结副本 4428/4429，**无作废点**，整轮 58 条结果 / 44 失 / 14 过）：
+
+| spec | 现量 | 错误形状（逐字） | 归属 |
+|---|---|---|---|
+| `detail-pane-habit` | 16 | `locator.fill: Test timeout` | 别线改版：习惯行那格编辑器 |
+| `habit-frequency` | 14 | `locator.fill: Test timeout` | 同上（同一族） |
+| `detail-pane-collapse` | 4 | `getByTestId('detail-pane-toggle')` 不可见 | 别线改版：详情栏 |
+| `glass-materials` | 4 | `search：玻璃两半之一——背景模糊（实测 none）` | 别线改版：材质/玻璃 |
+| `global-responsive-ux` | 2 | `视图 四象限 应有直接入口或更多菜单` → `.ht-rail__more > button` | 别线改版：rail |
+| `focus-detail-pane` | 2 | `rail 上高亮的格子不是当前视图（读到 []，应为「番茄钟」）` | 别线改版：rail 高亮 |
+| `due-date-edit` | 2 | `[data-testid^="task-item-"]` 那一行不可见 | ⚠️ **未定**（见下） |
+| `ai-prioritize` / `ai-capture` / `ai-assistant-atomic-tools` | — | **全部通过** | —— |
+
+**`due-date-edit` 这一格我查到了"产品侧是好的"这一步，但没查到它自己为什么红**：两处定位已按本轮同一条精度纪律改过（`:visible` + 本行完成框），复跑仍红；随后两条独立探针（900×600，与它同视口）**都证明产品没问题**——
+```
+探针①（与它同样的步骤）：default.rows=1  default.checkbox=1  tasks.rows=1  tasks.checkbox=1
+探针②（连字符+数字标题，逐字同形）：rows=["due-e2e-99080 收集箱 更多"]  checkboxExact=1
+```
+⇒ 只剩"它自己的用例时序/前置"这一层（例如 consent 浮层、首帧未落），**下一轮从这一层查**（按 §7 元规则 1：先怀疑探针/用例，不是产品）。探针文件只写在冻结副本里、已删。
+
+### 2026-10-17 第 87 道续十二：`due-date-edit` **也转绿了**（1 passed rc=0）—— 它也是同一类载体，不是"用例时序"
+
+**真因（与我上一轮那个判断相反，按错误里的 **Locator** 读，不按消息读）**：失败的**不是** `expect(row).toBeVisible()`，而是紧接着的那一条 —— 日志逐字：
+```
+34 × locator resolved to <summary data-testid="due-editor-summary" aria-label="设置任务「due-e2e-673」的截止日期">
+       … waiting for element to be visible …           ← 60s 超时
+```
+即：那一行在屏上（我上一轮已把定位改准），而**截止入口的 summary 在 DOM 里但不画** —— 它住在**每行那枚「更多」披露**里（`details.ht-compose-actions`）。⇒ 接上 `revealRowActionsBy(page, \`设置任务「${title}」的截止日期\`)`（按可访问名反查包含它的披露再点它自己的 summary；HEAD 上没有这层时原样返回）之后 **1 passed rc=0**。
+**教训**（写进台账）：我上一轮把这条读成"用例时序/首帧"，是因为我只看了错误消息（"界面上找不到这个元素"）而没读下一行的 `Locator:` —— **错误里最该读的是 Locator，不是消息**。
+复跑后 `check:e2e-carrier` / `check:e2e-helper-exports` 仍 rc=0（我有数据支撑，见本轮两次调用）。
+
+### 2026-10-17 第 87 道续十三：**共享 helper 一处修好，习惯面整族从 ~44 枚红掉到 2 枚**
+
+**真因（一处，命中全族）**：新建习惯的表单现在是**对话框**（`HabitsView.tsx:255-300` 的 `ht-habit-create-dialog`，由 `data-testid="habits-add-open"` 那颗「添加习惯」按钮打开），而它原先是在流里的 ⇒ 共享 helper `addHabit`（`e2e/tests/helpers.ts:777`）直接 `getByLabel('新习惯名称').fill(...)` **一直等到 60s 超时**（现量：`waiting for getByLabel('新习惯名称')`）。
+**修法（两形态兼容，不是放宽判据）**：输入框已在就原样填；不在就先点开那颗入口（可访问名 `web.habits.add`），并断言"点开之后表单里确实有那个输入框"。
+**复跑读数**：
+```
+habit-frequency          7 passed  rc=0   ← 修前 7 失败
+habit-create-options     5 passed
+habit-counted-amount     3 passed
+habit-month              7 passed
+habit-year               6 passed
+habit-icon-picker        8 passed
+habit-heatmap-labels     3 passed
+habits-two-column        6 passed / 2 failed   ← 只剩这条
+```
+整批 **39 条里只有 2 条失败**（其余 37 条通过）：安静窗口取样时这一族是 **44 枚失败**。
+**剩下那 2 枚（未定）**：`habits-two-column.spec.ts:305` —— 暗色下**选中那张习惯的边框** `borderTopColor` 读到 `rgba(0, 0, 0, 0)`（期望主色 `rgb(96, 165, 250)`）。已查：CSS 里**没有** `aria-current="true"` 这条规则（说明它由别的选择器或宿主样式画），而 `styles/app/habits.css` 正**在飞**（` M`）⇒ 下一轮先按"那条边框到底由谁画"定位（`getComputedStyle` 逐级读，或 grep 出行上真正的类名），再定归谁。
+
+### 2026-10-17 第 87 道续十四：`detail-pane-habit` **16 → 1**，`habits-two-column` **转绿（产品修）**
+
+**① `detail-pane-habit`（7 passed / 1 failed，原 16 失）**：那 15 枚就是上一轮 `addHabit` 修掉的那一条（表单变对话框 ⇒ `getByLabel('新习惯名称')` 一直等）。剩下的 1 枚是 `H7 工具不许跑出头行，也不许与它说的卡片之间隔出一整段空白` —— **几何**判据，属别线详情栏改版。
+**② `habits-two-column`（7 passed rc=0，原 2 失）—— 这是**产品修**，真因链条完整**：
+```
+apps/web/src/styles/app/borderless-controls.css:8
+  :is(button, [role='button'], [role='tab'], [role='menuitem']):not([data-testid^='calendar-cell-']) {
+    border-color: transparent !important;      ← 🔴 这条把习惯行的**选中态边框**吞掉了
+  }
+apps/web/src/styles/app/habits.css:450  .ht-habit__row { border: 0; … }                 ← 基态无边
+apps/web/src/styles/app/habits.css:469  .ht-habit__row[aria-current='true'] {           ← 选中态用**边框**表达
+    border-color: var(--ht-color-primary);     （注释逐字："选中态用边框表达，扁平风格里阴影只给浮层"）
+  }
+```
+习惯那一行是**真 `<button>`**（`HabitsList.tsx:110-113`）⇒ 命中 `:is(button…)`；而选中态那条**没有 `!important`** ⇒ 被静默盖掉，暗色下量到 `borderTopColor = rgba(0, 0, 0, 0)`（判据 `habits-two-column.spec.ts:305` 当场抓住）。
+**修法**：给那条无描边规则加 `:not(.ht-habit__row)`（不是再加一条 `!important` 去打它）—— 两件行为都保住：未选中仍 `border: 0`（无描边交互不变），选中的主色边框画得出来。**该规则与 `habits.css` 那两条都在 HEAD 里逐字存在**（`borderless-controls.css` 的在途 diff 只改了两个 profile 类名）⇒ 这是**既存产品缺陷**，不是别线改版引入的。
+复跑 `habits-two-column` **7 passed rc=0**；`check:design` / `check:tokens` 仍 rc=0。
+
+### 2026-10-17 第 87 道续十五：四份剩余红的分类 + 一处载体已换（但这一轮**没验成**）
+
+四份复跑（冻结副本，23 条 / 12 失）逐条形状：
+| spec | 现量 | 逐字形状 | 归属 |
+|---|---|---|---|
+| `detail-pane-collapse` | 4 | `getByTestId('detail-pane-toggle')` 不可见 | 别线详情栏改版 |
+| `glass-materials` | 4 | `search：玻璃两半之一——背景模糊（实测 none）` | 疑似别线（`.ht-search-overlay` 那一族；`material.css` 干净、`.ht-material` 的 blur 声明完好、没有 `none` 覆盖） |
+| `focus-detail-pane` | 2 | `rail 上高亮的格子不是当前视图（读到 []，应为「番茄钟」）` | 别线 rail 改版 |
+| `global-responsive-ux` | 2 | `视图 四象限 应有直接入口或更多菜单` → `.ht-rail__more > button` | **载体类（已换）**：rail 有**两套**实现 —— 宽档 `.ht-rail__more`（`RailNavigation.tsx:457-461`，button 是直接子节点）、窄档 `CompactRailNavigation.tsx:73` 的 `data-testid="compact-rail-more"`；窄视口下前者在 DOM 里但不可见 ⇒ 判据把"窄档用的另一套 rail"读成"没有更多菜单"。改成两套都接受但**必须真可见**（`:visible`）——本义（该视图要么有直接入口、要么在「更多」里）不变。 |
+
+⚠️ **这一处换完没验成**：`global-responsive-ux` 那一趟 `timeout 1200` **超时被杀（RC=124），0 条结果**，日志停在
+`[WebServer] [BABEL] Note: The code generator has deoptimised the styling of /private/tmp/heyta-froze…` ——
+即 dev server 在**编译一个超大文件**（别线在飞的 `App.tsx`）上卡了很久，20 分钟都没跑到第一条用例。
+⇒ 这条**记为"已改、未验"**，别当成绿。环境侧也记一笔：**当 `App.tsx` 长到那个体量时，真浏览器整轮的冷启动成本会让"跑一份 spec"变成 20 分钟起步**（冻结副本也一样，因为编译的是同一份源码）。
+
+### 2026-10-17 第 90 道（`check:shell-unicode`）**又被别线的新文件弄红，当场修回绿**
+
+现量：这一道复跑 **rc=1**，四处 `❌` 全是**别线今天新加的证据脚本**（不是我这批改动）：
+```
+apps/mobile/evidence/ux-final-20261017/android-widget-cleanup-fail-r120/leg-fail-injection.sh
+apps/mobile/evidence/ux-final-20261017/android-widget-cleanup-fail-r120/leg2-retry.sh
+apps/mobile/evidence/ux-final-20261017/android-widget-closure-r119/leg3-closeout.sh
+```
+病是老病：`echo "… $LEFT（中文）"` —— 变量名被紧跟的非 ASCII 字符吞掉，**值丢了 / 开了 `set -u` 直接 unbound**，而退出码照常 0（"脚本照常通过、只是证据是乱码"）。
+**修法**：用仓里自带的那把改法器 `python3 research/tools/fix-shell-unicode-vars.py --write` ⇒ **3 个文件 / 6 处**，每处就是 `$var` → `${var}`（逐字核对过一段 diff：1 行加、1 行删）。
+复跑 **rc=0**（"扫了 git 看得见的 **197** 个 .sh，跳过 git 看不见的 10 枚草稿"）。
+⚠️ 同一轮的门读数：`check:docs` / `check:gate-wiring` / `check:e2e-carrier` / `check:e2e-helper-exports` 全 **rc=0**。
+
+**另记一条环境事实（这一轮验证被它挡住）**：`global-responsive-ux` 那处载体换完之后**没验成** —— dev server 卡在
+```
+[BABEL] Note: The code generator has deoptimised the styling of /private/tmp/heyta-…/packages/ui/dist/index.js
+```
+20 分钟（3000s 那一趟到被我叫停为止）**一条用例都没跑到**。档位：`App.tsx` 现量 186,522 字节 / 3,463 行，而 `packages/ui/dist/index.js` 是单文件大包 ⇒ Babel 把它当"超大文件"降级处理，冷启动成本压过了整轮的预算。⇒ **这一格记为"已改、未验"**；下一轮要么先把 `pnpm --filter @heyta/ui build` 的产物切分/缓存预热，要么在一个已经热过的检出里跑。
+
+### 2026-10-17 第 87 道续十六：`global-responsive-ux` 的载体修法**第一半验证成功**，红向后移动，第二半已修（复跑在飞）
+
+**第一半（已验证）**：`.ht-rail__more > button:visible, [data-testid="compact-rail-more"]:visible` —— 复跑后**失败位置变了**：
+```
+改前: Error: 视图 四象限 应有直接入口或更多菜单   Locator: locator('.ht-rail__more > button')   Expected: visible
+改后: Error: locator.click: Test timeout …        - waiting for getByRole('menuitem', { name: '四象限', exact: true })
+```
+⇒ "两套 rail 的**更多按钮**"这一半**确实修通了**（它找到了、点开了），红移到了菜单**项**。
+**第二半（已修，未验）**：两套 rail 的**菜单项标记也不同** ——
+```
+RailNavigation.tsx:165        <button role="menuitem" className="ht-rail__more-item"> …   ← 宽档有 menuitem 角色
+CompactRailNavigation.tsx:82  <button data-testid={`rail-view-${tab.key}`}> …           ← 窄档是普通 button，无角色
+```
+⇒ helper 里改成两条都接受：`getByRole('menuitem', {name: label}).or(locator('[data-testid="rail-view-<id>"]:visible')).first()`，本义不变。第 4 趟复跑**已在后台起飞**（结果下一轮读 `/tmp/gru4.log`）。
+**环境侧的两条现量（都记下，下一轮省时间）**：
+1. 这一份 spec **一次尝试 ~20 分钟**（它是全页面响应式审计，覆盖多视口 × 多语言），加上 `retries: 1` 就是 40 分钟量级 ⇒ 验证成本高，要挑着跑（`--grep` 单测）。
+2. 冷启动那次 20 分钟卡在 `[BABEL] deoptimised the styling of …/packages/ui/dist/index.js`；**预热一次之后 20 秒就能服务**。做法（只改冻结副本）：把副本配置里两处 `reuseExistingServer: false` 改成 `true`，然后手动后台起 vite 等它编译完，再跑 Playwright ⇒ 后续每趟都省掉冷启动。
+
+### 2026-10-17 第 87 道续十七：`global-responsive-ux` **两半都验通了（1 passed rc=0）**，并把剩余 5 份在热服务上重测了一遍
+
+**① `global-responsive-ux` 收口**：第 4 趟（热服务）**`RC=0`，1 passed，只用 1 分钟**（此前一次尝试 20 分钟是冷启动 + 1200s 超时等待）。两处载体修法都得到验证：
+```
+更多按钮：`.ht-rail__more > button:visible, [data-testid="compact-rail-more"]:visible`
+菜单项：  `getByRole('menuitem', {name}).or(locator('[data-testid="rail-view-<id>"]:visible')).first()`
+```
+（宽/窄两套 rail 的**按钮**与**菜单项**标记都不相同，各自两条都接受；本义"该视图要么有直接入口、要么在「更多」里"一格未变。）
+
+**② 剩余 5 份在**热服务**上重测（20 条 / 9 失，8 分钟）**：形状与上轮**逐条相同**，没有改善也没有恶化：
+```
+ai-row-layout 4 · ai-tool-run 4 · detail-pane-collapse 4 · glass-materials 4 · focus-detail-pane 2
+```
+⇒ 仍是别线未落库那笔改版的地界。**`glass-materials` 的下一手已想清**：它断的是 `背景模糊（实测 none）`，而 `material.css` 干净（`.ht-material` 的 blur 声明完好、没有 `none` 覆盖）⇒ 按本仓 `sheets.css:237` 那条现成注释，`backdrop-filter` 会被**祖先的 `transform` / `filter` / `contain:paint`** 关掉。下一轮先查那个面的**祖先链**上有没有新加的这类属性（改版很容易顺手包一层），而不是去动 blur 的声明。
+
+**③ 装置沉淀（可复用）**：`reuseExistingServer: true`（只改冻结副本）+ **手动预热一次** vite ⇒ 这一份 20 分钟的 spec 变成 1 分钟；整批 5 份 8 分钟。这一条建议写进 `e2e` 的日常用法（对"冷启动比用例本身还贵"的树尤其值）。
+
+### 2026-10-17 第 87 道续十八：`glass-materials` 的 `search` 面查到"载体选对了没有"这一层（**我的一次推测性修补已回退**）
+
+**现量（真浏览器探针，预热服务上 2 秒跑完）** —— 从判据取的那个节点往下的第一层子元素链：
+```
+div.ht-search-overlay                                    bd=none
+└ div.css-view-g5y9jx r-paddingBlock-…                  bd=none   ← 判据取的就是这一层（`search-overlay-surface > *`）
+  └ div.css-view-g5y9jx r-alignItems-… r-flexDirection-… bd=none
+    └ svg … / path …                                     bd=none
+```
+⇒ 这一支**整条链都没有 blur，也没有 `ht-material`**。
+**两条线索都指"载体的选取"而不是"产品没做"**：
+1. `packages/ui/src/search/SearchPanel.tsx:174` **明确调了** `materialSurface(tokens, 'chrome', false)` —— 那是共享层的 tint 半边；而 `material-surface.ts` 文件头写着"blur + 饱和度 + rim 在**宿主 CSS**"。
+2. 但判据取的是 `search-overlay-surface > *`（scrim 的第一个子元素）—— 从上面那条链看，它是 RNW 的**外层 panel**，`background` 读出来是**不透明**（"底色必须半透明（实测 1）"）⇒ **真正带材质的那一层在它里面**（`materialSurface` 施加的那个节点），判据没取到它。
+**我试过一次推测性修补并已回退**：给 `.ht-search-overlay > *` 补上 `.ht-material` 那对 blur 声明 ⇒ blur 断言**确实转绿**，但紧接着"底色必须半透明"仍红（实测 1）—— 这恰好证明**那个节点根本不是那张玻璃卡**。⇒ `git checkout -- apps/web/src/styles/app/sheets.css` 还原（`backdrop-filter` 计数回到 0），不留下一个让 blur 变绿、却让"载体取错"继续存在的改动。
+**下一轮的第一步已唯一化**：在同一页里打印**后代**节点的 `background` alpha 与 `backdropFilter`，找到 alpha<1 或带材质那一层 —— 若它在 panel 内部（大概率），那是判据的**载体**该换（我那套"两形态/两套 rail"的同一条思路）；若整棵子树都没有半透明节点，才是**产品缺件**（ADR-0042 的 chrome 档没落到 web 上）。
+
+### 2026-10-17 第 87 道续十九：`glass-materials` 的红**被一处处往前推**（四处修法，每处都让红挪到下一步）
+
+这一份的红像剥洋葱，**四步的失败位置逐次后移**（每一步都留下现量证据，也说明每一步都真的生效）：
+```
+① search：背景模糊（实测 none） / 底色必须半透明（实测 1）
+   ⇒ 判据把"有意做成实色"的读数面当玻璃（`SearchPanel.tsx:172-175` 逐字："opaque on every host"）
+   ⇒ 修法：`Surface.solid` 旗标，实色面只钉"底色是实色"
+② organize-dropdown：`locator.click` 60s 超时（整理入口在「更多」披露里）
+   ⇒ 修法：open 先按 `task-actions-summary-*` 开披露
+③ organize-dropdown：`关干净再拍下一个` Expected hidden / Received visible
+   ⇒ 修法：close 改成**关两层**（`details.ht-compose-actions` 也在开着；只点里面那层收不掉外层）
+④ reminder-dropdown：`waiting for locator('details.ht-compose--popover > summary')` 不可见
+   ⇒ 修法：open 同样先开外层披露（第三次遇到同一族）
+```
+第 5 趟已在后台起飞（warm server），结果下一轮读 `/tmp/glass5.log`。
+⚠️ 这一份的四处修法**全是载体/判据口径**，没有一处在改产品行为；而①那次"产品 vs 判据"的裁决依据是**代码里逐字写下的设计决定**（不是我的偏好）。
+
+### 2026-10-17 第 87 道续二十：`glass-materials` 第 5/6 趟都是同一条（提醒那枚 popover 不可见），两次尝试都没开门 —— 下一步已唯一化
+
+第 5、6 趟（warm server，各 4.1 分钟）**结果完全相同**：
+```
+GLASS5_RC=1 / GLASS6_RC=1   2 failed · 1 passed
+Error: locator.click: Test timeout of 60000ms exceeded.
+  - waiting for locator('details.ht-compose--popover > summary').first()
+    2 × waiting for element to be visible, enabled and stable
+```
+两次尝试与失败原因（都记下，别重走）：
+1. **按"列表里第一枚 `task-actions-summary-*`"开外层披露** ⇒ 开错了行 —— 本族锚点任务在**列表末尾**（该文件自己的注释写着），目标那一枚仍折叠；
+2. **按 `details.ht-compose-actions:has(details.ht-compose--popover > summary) > summary` 开"包含它的那一行"** ⇒ 选择器**没匹配到任何东西**（`count=0` ⇒ 没点 ⇒ 症状不变）。最可能的原因：那一枚 popover 是 **portal 出去渲染的**（同族注释里"面板 Portal 到 body"就在隔壁那条判据上），于是 `:has` 在这一行里找不到它。
+3. 我随后写的小探针**本身有缺陷**：它没先 `addTask`，于是 `[data-testid^="task-item-"]` 一条都没有、断言先红、读数一行没打出来（**探针要先建数据**——这条也记下）。
+**下一轮的第一步（明确）**：探针**先建一条任务**再读 —— 打印 `details.ht-compose--popover` 与 `[data-testid^="task-actions-summary-"]` 的**数量**和 popover 的**祖先链**（含 `details` 的 `open` 态），据此判断：
+ (a) 它仍在**某一行**的披露里 ⇒ 用祖先链上真实的那个容器去开（而不是 `:has` 猜）；
+ (b) 它是 **portal** 到 body ⇒ 要开的不是"行披露"而是**触发它的那一枚按钮**（宽档/窄档的入口名可能不同）；
+ (c) 窄档下它确实**不渲染** ⇒ 这一面该按 ADR-0042 §3 的名单**换一个面**（而不是把判据删了 —— 删掉就等于丢掉一面的覆盖，注释里已经否过这种做法）。
+
+### 2026-10-17 第 87 道续二十一：**机制验通了**（一条探针三个读数），剩下的是"滚进视口再点"
+
+探针（**这次先建了数据**，warm server 上 3 秒跑完）三个读数：
+```
+PROBE A= 1   B= 1   C= 1                    ← `details.ht-compose-actions:has(details.ht-compose--popover > summary)` 命中 1 枚
+PROBE popVisibleBefore= false
+PROBE popVisibleAfter= true                 ← 点了外层 `> summary` 之后，那一枚 popover 摘要**由不可见变可见**
+```
+⇒ **"先开外层披露"这条机制是对的**（我上一轮以为 `:has` 没匹配，是**从"没点成"倒推的**，读数把它推翻了）。
+⇒ 第 6 趟仍 60s 超时的原因只剩**滚动/遮挡**那一层：本族锚点行在列表末尾 ⇒ 摘要"布局上可见"但可能落在滚动容器外或被别的层压住。已按同族既有手法加 `scrollIntoViewIfNeeded()` 再点。
+**教训**（记下）：`isVisible()` 为真 ≠ 点得中；而"选择器没匹配"这种结论**必须直接读 `count()`**，不能从"没点成"倒推（我上一轮就是这么倒推错的）。
+
+### 2026-10-17 第 87 道续二十二：第 7 趟仍同一条红 ⇒ 新假设已收窄到"**那一刻锚点行在不在**"
+
+第 7 趟（warm server，4.1 分钟）与第 5/6 趟**逐字相同**：
+```
+GLASS7_RC=1   2 failed · 1 passed
+Error: locator.click: Test timeout of 60000ms exceeded.
+  - waiting for locator('details.ht-compose--popover > summary').first()
+    2 × waiting for element to be visible, enabled and stable
+```
+而**孤立探针里同一条路是通的**（读数：`:has` 命中 1、点外层后 `isVisible()` false→true）⇒ 差别只能在**"那一刻这一页的状态"**。
+**新假设（可一次探针证实/证伪）**：这一面在 `SURFACES` 里排第 4，**前面三面**分别开了账号菜单 / 通知面板 / 清单标签下拉；若其中某面的 `close` 把应用留在**被筛过的视图**（例如通知面板把视图切到某处），锚点那两行就**不在 DOM 里** ⇒ `:has(...)` 命中 0 ⇒ 我的"先开披露"没执行 ⇒ 摘要始终折叠、点击 60s 超时。这与我孤立探针（干净的任务视图、1 行）能通过**不矛盾**。
+**下一轮的第一步（精确到行号）**：在 `e2e/tests/glass-materials.spec.ts` 的 `reminder-dropdown.open` 里临时插一行
+```ts
+console.log('PROBE rows=', await page.locator('[data-testid^="task-item-"]').count(),
+  'pops=', await page.locator('details.ht-compose--popover').count(),
+  'own=', await page.locator('details.ht-compose-actions:has(details.ht-compose--popover > summary)').count(),
+  'capture=', await page.locator('[data-testid="capture-input"]').count());
+```
+然后 `--grep "玻璃三态 · light"` 跑一趟（warm server ≈1–2 分钟）读那四个数：
+- `rows=0` ⇒ 是**视图被筛**（对症下药：这一面开头先回到任务视图/收集箱）；
+- `rows>0, pops=0` ⇒ 锚点那两行**没有提醒入口**（这一面要按 ADR-0042 名单换一个面）；
+- `pops>0, own=0` ⇒ `:has` 在这个状态不成立（那就按祖先链实开）。
+⚠️ 这一轮**没有**把"已修"说成"已验"：`reminder-dropdown` 仍是红的，三趟读数一模一样。
+
+### 2026-10-17 第 87 道续二十三：`reminder-dropdown` 的谜底是**产品缺陷**（B214），不是我的载体没修对
+
+**逐字链条**（三轮探针 + 一次决定性实验）：
+```
+① 那一刻的四个数（临时探针，已在同一轮删掉）：
+   rows=2 pops=2 own=2 summaries=2 capture=1        ⇒ 行在、popover 在、`:has(...)` 命中
+② 把"要不要点外层"从 `isVisible()` 改成**读真实的 `open` 态**、并约束到同一行 ⇒ 仍然红
+③ `locator.click` 的等待日志逐字（这才是真因）：
+   element is visible, enabled and stable → scrolling into view if needed
+   → <label>…</label> from <span>…</span> subtree intercepts pointer events
+④ 决定性一刀：改**真实鼠标坐标点击**（page.mouse.click(盒子中心)）⇒
+   `reminder-dropdown：面板应当出现` Expected: visible / Received: **hidden**
+```
+⇒ **真用户也点不开那枚提醒芯片**（命中被 label 抢走）⇒ **产品缺陷**（登记 `BLOCKED.md` **B214**），判据是对的（它正是抓住这条的那条判据，不能删）。
+**这一面的点击已改成真实鼠标坐标**（这样红的是"用户点不开"这个事实，而不是"Playwright 的 actionability 比现实严"）。
+**教训**：`locator.click` 的三行等待日志（可见 → 滚动 → **被谁拦**）比错误摘要信息量大得多；而"探针过严 vs 产品真坏"这类分歧，**用真实鼠标坐标点一次就能分开**。
+
+### 2026-10-17 收口核对：**我修过的那一批一次性复跑 = 32 passed / rc=0**
+
+热服务、冻结副本、一次调用：
+```
+smoke · calendar-week · calendar-sidebar · countdown · countdown-calendar ·
+due-date-edit · habit-frequency · habits-two-column        ⇒ 32 passed (2.7m)  RC=0
+```
+⇒ 这一批修法**互相之间没有回归**，也不是"单跑绿、连跑红"。
+**我这一侧到此刻的账**（第 87 道）：日历/倒数日整族、习惯整族（含产品修的选中边框）、`due-date-edit`、`detail-pane-task` 的载体/前提两处、`global-responsive-ux`、`smoke`/`categories`/`admin-console`/`auth-consent`、四份 AI spec 的两形态兼容，以及**链里的第 90 道**（`check:shell-unicode` 被别线新脚本弄红后修回绿）。
+**仍然红、且不在我权限内的**：① 第 6 道（ADR-0062 W4/W5 的产品决策）；② 第 87 道剩下的——`glass-materials` 的 `reminder-dropdown` 是**已登记的产品缺陷 B214**（面板朝下开被滚动容器裁掉，用户点不到），`ai-row-layout`/`ai-tool-run`/`detail-pane-collapse`/`focus-detail-pane`/`detail-pane-habit`(1 枚几何) 全落在**别线那笔未落库的壳/面板改版**里。
