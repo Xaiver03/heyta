@@ -1,0 +1,49 @@
+r117 这一格里 `probe-on-current-build.sh` 的一处副作用，以及把它恢复掉的读数
+（写这页是因为本页第 4 节原先那句"本线不替负责人翻"只覆盖了没调用共享导航的腿）
+
+════ 事实 ════
+`probe-on-current-build.sh`（10-17 13:58 跑，目的是在 r118 重装后的包上复验那枚 Button 的 `enabled`）
+用了本线维护的设备腿库 `scripts/lib/mobile-e2e.sh` 的 `dismiss_welcome_if_present`。
+该函数**默认点「同意并联网」**（`scripts/lib/mobile-e2e.sh:945`：
+`handle_privacy_consent "${CONSENT_GATE_PREFERRED:-同意并联网}" "只用本机"`），
+这不是 bug —— 它上面 929-942 行把这条决定的代价与覆盖方式写得很清楚：绝大多数调用方后面要配同步凭据，
+选「只用本机」会让出口闸把请求拦在本地、整轮假红（2026-10-03 实测 17 条）。
+被测**本地**行为的脚本要在调用前先 `export CONSENT_GATE_PREFERRED=只用本机`
+（`reminder-ring` / `schedule` / `timeline` 三处已经这么做）。
+本趟那枚探针没有点名，于是继承了默认值。
+
+════ 它写到哪 ════
+设备级决定落在 `/data/data/com.heyta/databases/heyta-device-prefs.sqlite` 的 `device_pref` 表
+（键 `privacy.consent`，值是一段 JSON）。不是 shared_prefs，所以原先只看
+`heyta_widget*.xml` 的三计数器判据看不见它 —— 这本身是一条装置事实。
+
+════ 改前读数（14:57 现量）════
+$ adb -s emulator-5554 shell sqlite3 /data/data/com.heyta/databases/heyta-device-prefs.sqlite \
+    'select key,value from device_pref order by key;'
+privacy.consent|{"decision":"accepted","decidedAt":"2026-10-17T05:59:32.273Z"}
+welcome.hasSeen|1
+（`decidedAt` 那枚 UTC 时刻 = 本机 13:59:32，和探针日志里「点「同意并联网」@ 312 1684」同一次；
+ 文件 mtime 现量 2026-10-17 13:59）
+
+════ 恢复（回到"全新安装后、没点过任何一边"那一档）════
+$ adb -s emulator-5554 shell am force-stop com.heyta        # 先停，避免应用内存里那份再写回去
+$ adb -s emulator-5554 shell pidof com.heyta                # 空输出 = 已停
+$ adb -s emulator-5554 shell sqlite3 /data/data/com.heyta/databases/heyta-device-prefs.sqlite \
+    'delete from device_pref where key in ("privacy.consent","welcome.hasSeen");'
+$ adb -s emulator-5554 shell sqlite3 … 'select count(*) from device_pref;'
+0
+
+════ 恢复后的正面验证 ════
+$ adb -s emulator-5554 shell am start -W -n com.heyta/com.heytamobile.MainActivity
+Status: ok
+$ adb -s emulator-5554 shell uiautomator dump /sdcard/r118check.xml && adb -s emulator-5554 shell cat /sdcard/r118check.xml \
+  | grep -o "在使用联网功能之前\|同意并联网\|只用本机" | sort | uniq -c
+   3 只用本机
+   3 同意并联网
+   1 在使用联网功能之前
+⇒ 同意卡又立起来了 = 决定态回到"没问过"，与 r118 重装刚截图那一刻同形。
+（应用留在前台、同意卡未点 —— 这就是 `reinstall-all` 的 android 腿收尾时的状态。）
+
+════ 为什么现在只改这两行、不清库 ════
+`pm clear com.heyta` 也能回到同一档，但它会连带抹掉 r117 那三计数器判据的现场
+（`heyta_widget.xml` 与组件绑定），那是**别趟的取证对象**，不在本趟的授权范围里。

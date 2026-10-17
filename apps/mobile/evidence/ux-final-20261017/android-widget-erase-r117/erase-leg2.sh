@@ -93,7 +93,7 @@ $ADB logcat -c
 : > "$LOGCAT"
 $ADB logcat -v time > "$LOGCAT" 2>&1 &
 LOGCAT_PID=$!
-ok "logcat 已起（pid=$LOGCAT_PID，落点 $LOGCAT）"
+ok "logcat 已起（pid=${LOGCAT_PID}，落点 ${LOGCAT}）"
 
 step "2. 走到「账号与安全」，点之前先取三个计数器的初值"
 launch_app

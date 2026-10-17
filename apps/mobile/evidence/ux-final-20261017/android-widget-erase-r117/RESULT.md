@@ -98,7 +98,38 @@ ls apps/mobile/evidence/ux-final-20261017/android-widget-erase-r117/*.sh
 
 ⇒ **正面**：未同意时它一个请求都不发、不动本机数据，而且把这件事说在明面上（不是静默失败）。
 ⇒ **未证**：`eraseLocalData()` 之后组件到底清不清 —— 本趟没走到那一步（要把这台设备的隐私同意
-从「只用本机」翻成同意联网；那是对外合规口径的一格，本线不替负责人翻）。
+从"没问过"翻成同意联网；那是对外合规口径的一格，**本趟那几条腿没翻**）。
+⚠️ 这句"没翻"只覆盖上面那几条腿：本线当天晚些时候那枚复验探针**替我翻了**，因为它调了共享导航里
+默认点「同意并联网」的那一支。逐字见下面第 5 节与 [`consent-side-effect.txt`](consent-side-effect.txt)。
+
+### 5. 在**当前产物**上复验那一枚按钮（r118 重装之后，`probe-on-current-build.sh`）
+
+上面第 2/3 节的读数是在 10-16 17:08 那枚包上取的。第七趟四端重装（`25f544bd` 载体，`REINSTALL_RC=0`，
+见 `apps/web/evidence/ux-final-20261017/reinstall-r118/`）把 Android 换成了当前产物，这枚探针专门去复验一句话：
+**"冷启动后这一枚是 disabled"是不是旧包的读数。**
+
+被测物身份（探针日志第一段，现量）：
+```
+versionName=1.0   lastUpdateTime=2026-10-17 13:26:21   HEAD=25f544bd
+组件存储：2026-10-17 13:26:30.895032696 +0800|501
+```
+读数（同一枚 `button_state()`，走的是本线维护的 `scripts/lib/mobile-e2e.sh` 导航）：
+```
+[当前包 / 冷启动 / 未登录] class=Button enabled=false clickable=true
+[当前包 / 冷启动 / 未登录] class=TextView enabled=true clickable=false
+这一屏的身份锚（有「注销账号」这一行才说明真到了安全组）：1
+```
+⇒ **不是旧包读数**：当前产物上同样 `enabled=false`，而锚点证明真走到了安全组那一屏。
+⇒ 台账那一格"可达态成立、入口够不到"这半句，在 r118 的包上照样成立。
+⇒ 顺带一条：全新安装之后组件存储**又有了 501 B**（`13:26:30`，装机那一刻），
+与第 3 节那条"每次冷启动只要本机有任务就重发布"是同一个方向。
+
+⚠️ 这一趟的**副作用**（我原先没料到，所以本页第 4 节那句话当时写窄了）：探针调了
+`dismiss_welcome_if_present`，而它**默认点「同意并联网」**（`scripts/lib/mobile-e2e.sh:945`，
+上面 929-942 行把这条默认值的理由与覆盖方式写清楚了 —— 不是 bug，是我这枚探针该点名没点名）。
+于是这台共享模拟器被写进了一条设备级隐私决定。改前/改后读数、恢复命令与正面验证在
+[`consent-side-effect.txt`](consent-side-effect.txt)；恢复之后已量到 `device_pref` 行数 **0**、
+重新起应用**同意卡又立起来了**（与刚装完那一刻同形）。
 
 ## 收尾（共享载体与本机都回到原状）
 
@@ -113,6 +144,9 @@ ls apps/mobile/evidence/ux-final-20261017/android-widget-erase-r117/*.sh
   `/tmp/heyta-r117-*` 与本趟 pidfile 已删、应用 `force-stop`。
 - 中途那枚抢焦点的 Google 相机权限弹窗点了「不允许」—— 那是**别的应用**的弹窗，
   本趟没有为 heyta 申请或改动任何权限。
+- ⚠️ 更正一条：上面那句"没有改动任何权限/决定"**不覆盖设备级隐私同意**。第 5 节那枚复验探针
+  经共享导航的默认值把 `privacy.consent` 写成了 `accepted`，已在 14:57 删行恢复
+  （`device_pref` 现读 0 行、重起应用同意卡再立），逐字见 `consent-side-effect.txt`。
 
 ## 这一格现在还不证的四件事
 
@@ -138,6 +172,16 @@ ls apps/mobile/evidence/ux-final-20261017/android-widget-erase-r117/*.sh
    （`widget-data-leg.py` 的 `focus_owner()` 已经是这个形状），别拿"树里没有"当结论。
 3. ⚠️ **`scroll_to_rid` 只滑 5 下**（`scripts/lib/mobile-e2e.sh`）。本趟把预算放到 12 下之后
    **第 1 下就命中** —— 所以"5 下不够"这个假设被本趟自己的读数否证了，真因是第 2 条。
+4. 🔴 **设备级隐私同意不在 `shared_prefs` 里，在三计数器判据看不见的地方**：
+   它是 `/data/data/com.heyta/databases/heyta-device-prefs.sqlite` 的 `device_pref` 表里
+   那枚 `privacy.consent` 行（值是一段 JSON，键名来自 `packages/app-host/src/privacy-consent.ts`
+   的 `PRIVACY_CONSENT_KEY`）。本趟那套"存储文件 mtime/大小/键"三计数器只盯 `heyta_widget.xml`，
+   所以**它写没被写过，本趟的判据一个都读不到** —— 这条要在任何"我没动过设备状态"的自述之前先量一次
+   `select key,value from device_pref`。
+5. 🔴 **共享导航 `dismiss_welcome_if_present` 默认点「同意并联网」**（`scripts/lib/mobile-e2e.sh:945`
+   的 `${CONSENT_GATE_PREFERRED:-同意并联网}`）。被测**本地**行为的腿要在调用它之前
+   `export CONSENT_GATE_PREFERRED=只用本机`（`reminder-ring` / `schedule` / `timeline` 三处已经这么点名了）。
+   本趟第 5 节那枚探针没点名，于是替这台共享设备做了一次隐私决定，事后按 `consent-side-effect.txt` 恢复。
    登记这条是为了别让下一趟照抄我这次的错误归因。
 4. ⚠️ `configure_sync_credentials` 第一行是按**写死坐标** `945 2253` 点「我的」，
    既不 `dismiss_welcome_if_present` 也不回读切过去没有。冷启动落在同意层/任务页时那一下打在别处，
