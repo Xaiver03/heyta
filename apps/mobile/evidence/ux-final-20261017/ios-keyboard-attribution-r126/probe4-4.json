@@ -1,0 +1,170 @@
+{
+  "startedAt": 1792257294.3150132,
+  "udid": "EAAD1B66-80A3-4A51-957C-298DAF22F057",
+  "arms": [
+    {
+      "arm": 4,
+      "source": "timeline-row",
+      "scheduleToggle": true,
+      "task": "KbProbe41792256972",
+      "viewBeforeArm": "列表",
+      "detailOpened": true,
+      "geometryAtOpen": {
+        "screen": [
+          402,
+          874
+        ],
+        "titleNodes": [
+          {
+            "occurrence": 0,
+            "isField": false,
+            "pressable": false,
+            "frame": [
+              16,
+              159,
+              370,
+              21
+            ],
+            "center": [
+              201,
+              169
+            ],
+            "insideViewport": true
+          },
+          {
+            "occurrence": 1,
+            "isField": true,
+            "pressable": false,
+            "frame": [
+              16,
+              184,
+              370,
+              44
+            ],
+            "center": [
+              201,
+              206
+            ],
+            "insideViewport": true
+          }
+        ]
+      },
+      "expandVisibleAtOpen": true,
+      "toggled": true,
+      "geometryAfterToggle": {
+        "screen": [
+          402,
+          874
+        ],
+        "titleNodes": [
+          {
+            "occurrence": 0,
+            "isField": false,
+            "pressable": false,
+            "frame": [
+              16,
+              -618,
+              370,
+              21
+            ],
+            "center": [
+              201,
+              -608
+            ],
+            "insideViewport": false
+          },
+          {
+            "occurrence": 1,
+            "isField": true,
+            "pressable": false,
+            "frame": [
+              16,
+              -593,
+              370,
+              44
+            ],
+            "center": [
+              201,
+              -571
+            ],
+            "insideViewport": false
+          }
+        ]
+      },
+      "recoverReturnedFrame": [
+        16,
+        184,
+        370,
+        44
+      ],
+      "recoverReturnedCenter": [
+        201,
+        206
+      ],
+      "scrollIntoView": {
+        "found": "True",
+        "x": "16",
+        "y": "184",
+        "width": "370",
+        "height": "44",
+        "visible": "True",
+        "scrollRc": "",
+        "swipes": "0",
+        "detail": ""
+      },
+      "keyboardTop": 545,
+      "detailStillOpen": true,
+      "geometryAfterTap": {
+        "screen": [
+          402,
+          874
+        ],
+        "titleNodes": [
+          {
+            "occurrence": 0,
+            "isField": false,
+            "pressable": false,
+            "frame": [
+              16,
+              126,
+              370,
+              21
+            ],
+            "center": [
+              201,
+              136
+            ],
+            "insideViewport": true
+          },
+          {
+            "occurrence": 1,
+            "isField": true,
+            "pressable": false,
+            "frame": [
+              16,
+              151,
+              370,
+              44
+            ],
+            "center": [
+              201,
+              173
+            ],
+            "insideViewport": true
+          }
+        ]
+      },
+      "focusedLabel": null,
+      "outcome": "keyboard",
+      "seconds": 32.3
+    }
+  ],
+  "uiLocale": "zh-CN",
+  "reused": [
+    "KbProbe11792256972",
+    "KbProbe21792256972",
+    "KbProbe31792256972",
+    "KbProbe41792256972"
+  ],
+  "finishedAt": 1792257337.66316
+}

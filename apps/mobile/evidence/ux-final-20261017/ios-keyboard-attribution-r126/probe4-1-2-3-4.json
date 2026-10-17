@@ -1,0 +1,303 @@
+{
+  "startedAt": 1792256972.2226272,
+  "udid": "EAAD1B66-80A3-4A51-957C-298DAF22F057",
+  "arms": [
+    {
+      "arm": 1,
+      "source": "list-row",
+      "scheduleToggle": false,
+      "task": "KbProbe11792256972",
+      "detailOpened": true,
+      "geometryAtOpen": {
+        "screen": [
+          402,
+          874
+        ],
+        "titleNodes": [
+          {
+            "occurrence": 0,
+            "isField": false,
+            "pressable": false,
+            "frame": [
+              16,
+              159,
+              370,
+              21
+            ],
+            "center": [
+              201,
+              169
+            ],
+            "insideViewport": true
+          },
+          {
+            "occurrence": 1,
+            "isField": true,
+            "pressable": false,
+            "frame": [
+              16,
+              184,
+              370,
+              44
+            ],
+            "center": [
+              201,
+              206
+            ],
+            "insideViewport": true
+          }
+        ]
+      },
+      "expandVisibleAtOpen": true,
+      "recoverReturnedFrame": [
+        16,
+        184,
+        370,
+        44
+      ],
+      "recoverReturnedCenter": [
+        201,
+        206
+      ],
+      "scrollIntoView": {
+        "found": "True",
+        "x": "16",
+        "y": "184",
+        "width": "370",
+        "height": "44",
+        "visible": "True",
+        "scrollRc": "",
+        "swipes": "0",
+        "detail": ""
+      },
+      "keyboardTop": 545,
+      "detailStillOpen": true,
+      "geometryAfterTap": {
+        "screen": [
+          402,
+          874
+        ],
+        "titleNodes": [
+          {
+            "occurrence": 0,
+            "isField": false,
+            "pressable": false,
+            "frame": [
+              16,
+              126,
+              370,
+              21
+            ],
+            "center": [
+              201,
+              136
+            ],
+            "insideViewport": true
+          },
+          {
+            "occurrence": 1,
+            "isField": true,
+            "pressable": false,
+            "frame": [
+              16,
+              151,
+              370,
+              44
+            ],
+            "center": [
+              201,
+              173
+            ],
+            "insideViewport": true
+          }
+        ]
+      },
+      "focusedLabel": null,
+      "outcome": "keyboard",
+      "seconds": 10.8
+    },
+    {
+      "arm": 2,
+      "source": "list-row",
+      "scheduleToggle": true,
+      "task": "KbProbe21792256972",
+      "detailOpened": true,
+      "geometryAtOpen": {
+        "screen": [
+          402,
+          874
+        ],
+        "titleNodes": [
+          {
+            "occurrence": 0,
+            "isField": false,
+            "pressable": false,
+            "frame": [
+              16,
+              159,
+              370,
+              21
+            ],
+            "center": [
+              201,
+              169
+            ],
+            "insideViewport": true
+          },
+          {
+            "occurrence": 1,
+            "isField": true,
+            "pressable": false,
+            "frame": [
+              16,
+              184,
+              370,
+              44
+            ],
+            "center": [
+              201,
+              206
+            ],
+            "insideViewport": true
+          }
+        ]
+      },
+      "expandVisibleAtOpen": true,
+      "toggled": true,
+      "geometryAfterToggle": {
+        "screen": [
+          402,
+          874
+        ],
+        "titleNodes": [
+          {
+            "occurrence": 0,
+            "isField": false,
+            "pressable": false,
+            "frame": [
+              16,
+              -587,
+              370,
+              21
+            ],
+            "center": [
+              201,
+              -577
+            ],
+            "insideViewport": false
+          },
+          {
+            "occurrence": 1,
+            "isField": true,
+            "pressable": false,
+            "frame": [
+              16,
+              -562,
+              370,
+              44
+            ],
+            "center": [
+              201,
+              -540
+            ],
+            "insideViewport": false
+          }
+        ]
+      },
+      "recoverReturnedFrame": [
+        16,
+        184,
+        370,
+        44
+      ],
+      "recoverReturnedCenter": [
+        201,
+        206
+      ],
+      "scrollIntoView": {
+        "found": "True",
+        "x": "16",
+        "y": "184",
+        "width": "370",
+        "height": "44",
+        "visible": "True",
+        "scrollRc": "",
+        "swipes": "0",
+        "detail": ""
+      },
+      "keyboardTop": 545,
+      "detailStillOpen": true,
+      "geometryAfterTap": {
+        "screen": [
+          402,
+          874
+        ],
+        "titleNodes": [
+          {
+            "occurrence": 0,
+            "isField": false,
+            "pressable": false,
+            "frame": [
+              16,
+              126,
+              370,
+              21
+            ],
+            "center": [
+              201,
+              136
+            ],
+            "insideViewport": true
+          },
+          {
+            "occurrence": 1,
+            "isField": true,
+            "pressable": false,
+            "frame": [
+              16,
+              151,
+              370,
+              44
+            ],
+            "center": [
+              201,
+              173
+            ],
+            "insideViewport": true
+          }
+        ]
+      },
+      "focusedLabel": null,
+      "outcome": "keyboard",
+      "seconds": 31.4
+    },
+    {
+      "arm": 3,
+      "source": "timeline-row",
+      "scheduleToggle": false,
+      "task": "KbProbe31792256972",
+      "outcome": "error",
+      "error": "ProbeError: timed out waiting for labels ('视图选项：四象限',); visible=['heyta', '打开搜索', '同步', '任务', '10月18日 星期日', '4 项待办，0 项已完成', '搜索任务（标题与备注）', '视图选项：列表', '选择任务', '收集箱', '4', '打开任务：KbProbe41792256972', '完成：KbProbe41792256972', '删除任务：KbProbe41792256972', '打开任务：KbProbe31792256972', '完成：KbProbe31792256972', '删除任务：KbProbe31792256972', '打开任务：KbProbe21792256972', '完成：KbProbe21792256972', '删除任务：KbProbe21792256972', '打开任务：KbProbe11792256972', '完成：KbProbe11792256972', '删除任务：KbProbe11792256972', '新建任务', '任务', '日历', '专注', '分类', '我的']",
+      "traceback": "Traceback (most recent call last):\n  File \"/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/mobile/evidence/ux-final-20261017/ios-keyboard-attribution-r126/probe4-keyboard-attribution.py\", line 114, in main\n    probe.choose_view(T(\"四象限\", \"Quadrants\"), T(\"时间线\", \"Timeline\"))\n    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/scripts/qa/tasks-ux-ios.py\", line 171, in choose_view\n    self.open_view_options(current_view)\n    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^\n  File \"/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/scripts/qa/tasks-ux-ios.py\", line 166, in open_view_options\n    self.tap((view_options_label(view),), f\"open view options for {view}\")\n    ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nheyta_tasks_ux_ios.ProbeError: timed out waiting for labels ('视图选项：四象限',); visible=['heyta', '打开搜索', '同步', '任务', '10月18日 星期日', '4 项待办，0 项已完成', '搜索任务（标题与备注）', '视图选项：列表', '选择任务', '收集箱', '4', '打开任务：KbProbe41792256972', '完成：KbProbe41792256972', '删除任务：KbProbe41792256972', '打开任务：KbProbe31792256972', '完成：KbProbe31792256972', '删除任务：KbProbe31792256972', '打开任务：KbProbe21792256972', '完成：KbProbe21792256972', '删除任务：KbProbe21792256972', '打开任务：KbProbe11792256972', '完成：KbProbe11792256972', '删除任务：KbProbe11792256972', '新建任务', '任务', '日历', '专注', '分类', '我的']\n",
+      "seconds": 12.9
+    },
+    {
+      "arm": 4,
+      "source": "timeline-row",
+      "scheduleToggle": true,
+      "task": "KbProbe41792256972",
+      "outcome": "error",
+      "error": "ProbeError: timed out waiting for labels ('视图选项：四象限',); visible=['heyta', '打开搜索', '同步', '任务', '10月18日 星期日', '4 项待办，0 项已完成', '搜索任务（标题与备注）', '视图选项：列表', '选择任务', '收集箱', '4', '打开任务：KbProbe41792256972', '完成：KbProbe41792256972', '删除任务：KbProbe41792256972', '打开任务：KbProbe31792256972', '完成：KbProbe31792256972', '删除任务：KbProbe31792256972', '打开任务：KbProbe21792256972', '完成：KbProbe21792256972', '删除任务：KbProbe21792256972', '打开任务：KbProbe11792256972', '完成：KbProbe11792256972', '删除任务：KbProbe11792256972', '新建任务', '任务', '日历', '专注', '分类', '我的']",
+      "traceback": "Traceback (most recent call last):\n  File \"/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/mobile/evidence/ux-final-20261017/ios-keyboard-attribution-r126/probe4-keyboard-attribution.py\", line 114, in main\n    probe.choose_view(T(\"四象限\", \"Quadrants\"), T(\"时间线\", \"Timeline\"))\n    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/scripts/qa/tasks-ux-ios.py\", line 171, in choose_view\n    self.open_view_options(current_view)\n    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^\n  File \"/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/scripts/qa/tasks-ux-ios.py\", line 166, in open_view_options\n    self.tap((view_options_label(view),), f\"open view options for {view}\")\n    ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nheyta_tasks_ux_ios.ProbeError: timed out waiting for labels ('视图选项：四象限',); visible=['heyta', '打开搜索', '同步', '任务', '10月18日 星期日', '4 项待办，0 项已完成', '搜索任务（标题与备注）', '视图选项：列表', '选择任务', '收集箱', '4', '打开任务：KbProbe41792256972', '完成：KbProbe41792256972', '删除任务：KbProbe41792256972', '打开任务：KbProbe31792256972', '完成：KbProbe31792256972', '删除任务：KbProbe31792256972', '打开任务：KbProbe21792256972', '完成：KbProbe21792256972', '删除任务：KbProbe21792256972', '打开任务：KbProbe11792256972', '完成：KbProbe11792256972', '删除任务：KbProbe11792256972', '新建任务', '任务', '日历', '专注', '分类', '我的']\n",
+      "seconds": 13.2
+    }
+  ],
+  "uiLocale": "zh-CN",
+  "created": [
+    "KbProbe11792256972",
+    "KbProbe21792256972",
+    "KbProbe31792256972",
+    "KbProbe41792256972"
+  ],
+  "finishedAt": 1792257095.346451
+}

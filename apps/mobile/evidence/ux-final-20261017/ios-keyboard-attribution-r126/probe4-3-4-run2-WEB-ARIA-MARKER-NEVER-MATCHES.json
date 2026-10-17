@@ -1,0 +1,38 @@
+{
+  "startedAt": 1792257401.659532,
+  "udid": "EAAD1B66-80A3-4A51-957C-298DAF22F057",
+  "arms": [
+    {
+      "arm": 3,
+      "source": "timeline-row",
+      "scheduleToggle": false,
+      "task": "KbProbe31792256972",
+      "viewBeforeArm": "列表",
+      "viewAfterSwitch": "时间线",
+      "outcome": "error",
+      "error": "ProbeError: timed out waiting for 时间线：共 … group header (proves the timeline view is on screen); visible=['heyta', '打开搜索', '同步', '任务', '10月18日 星期日', '4 项待办，0 项已完成', '搜索任务（标题与备注）', '视图选项：时间线', '未排期（4）', 'KbProbe11792256972', 'KbProbe21792256972', 'KbProbe31792256972', 'KbProbe41792256972', '新建任务', '任务', '日历', '专注', '分类', '我的']",
+      "traceback": "Traceback (most recent call last):\n  File \"/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/mobile/evidence/ux-final-20261017/ios-keyboard-attribution-r126/probe4-keyboard-attribution.py\", line 161, in main\n    reading[\"timelineMarker\"] = timeline_group_marker()\n                                ~~~~~~~~~~~~~~~~~~~~~^^\n  File \"/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/mobile/evidence/ux-final-20261017/ios-keyboard-attribution-r126/probe4-keyboard-attribution.py\", line 145, in timeline_group_marker\n    return probe.wait(read, f\"{prefix}… group header (proves the timeline view is on screen)\")\n           ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/scripts/qa/tasks-ux-ios.py\", line 106, in wait\n    raise ProbeError(f\"timed out waiting for {description}; visible={labels(last)[:100]!r}\")\nheyta_tasks_ux_ios.ProbeError: timed out waiting for 时间线：共 … group header (proves the timeline view is on screen); visible=['heyta', '打开搜索', '同步', '任务', '10月18日 星期日', '4 项待办，0 项已完成', '搜索任务（标题与备注）', '视图选项：时间线', '未排期（4）', 'KbProbe11792256972', 'KbProbe21792256972', 'KbProbe31792256972', 'KbProbe41792256972', '新建任务', '任务', '日历', '专注', '分类', '我的']\n",
+      "seconds": 18.6
+    },
+    {
+      "arm": 4,
+      "source": "timeline-row",
+      "scheduleToggle": true,
+      "task": "KbProbe41792256972",
+      "viewBeforeArm": "时间线",
+      "viewAfterSwitch": "时间线",
+      "outcome": "error",
+      "error": "ProbeError: timed out waiting for 时间线：共 … group header (proves the timeline view is on screen); visible=['heyta', '打开搜索', '同步', '任务', '10月18日 星期日', '4 项待办，0 项已完成', '搜索任务（标题与备注）', '视图选项：时间线', '未排期（4）', 'KbProbe11792256972', 'KbProbe21792256972', 'KbProbe31792256972', 'KbProbe41792256972', '新建任务', '任务', '日历', '专注', '分类', '我的']",
+      "traceback": "Traceback (most recent call last):\n  File \"/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/mobile/evidence/ux-final-20261017/ios-keyboard-attribution-r126/probe4-keyboard-attribution.py\", line 161, in main\n    reading[\"timelineMarker\"] = timeline_group_marker()\n                                ~~~~~~~~~~~~~~~~~~~~~^^\n  File \"/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/mobile/evidence/ux-final-20261017/ios-keyboard-attribution-r126/probe4-keyboard-attribution.py\", line 145, in timeline_group_marker\n    return probe.wait(read, f\"{prefix}… group header (proves the timeline view is on screen)\")\n           ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/scripts/qa/tasks-ux-ios.py\", line 106, in wait\n    raise ProbeError(f\"timed out waiting for {description}; visible={labels(last)[:100]!r}\")\nheyta_tasks_ux_ios.ProbeError: timed out waiting for 时间线：共 … group header (proves the timeline view is on screen); visible=['heyta', '打开搜索', '同步', '任务', '10月18日 星期日', '4 项待办，0 项已完成', '搜索任务（标题与备注）', '视图选项：时间线', '未排期（4）', 'KbProbe11792256972', 'KbProbe21792256972', 'KbProbe31792256972', 'KbProbe41792256972', '新建任务', '任务', '日历', '专注', '分类', '我的']\n",
+      "seconds": 13.5
+    }
+  ],
+  "uiLocale": "zh-CN",
+  "reused": [
+    "KbProbe11792256972",
+    "KbProbe21792256972",
+    "KbProbe31792256972",
+    "KbProbe41792256972"
+  ],
+  "finishedAt": 1792257437.415822
+}

@@ -1,0 +1,289 @@
+{
+  "startedAt": 1792257581.3914392,
+  "udid": "EAAD1B66-80A3-4A51-957C-298DAF22F057",
+  "arms": [
+    {
+      "arm": 3,
+      "source": "timeline-row",
+      "scheduleToggle": false,
+      "task": "KbProbe31792256972",
+      "viewBeforeArm": "列表",
+      "viewAfterSwitch": "时间线",
+      "timelineMarker": "未排期（4）",
+      "detailOpened": true,
+      "geometryAtOpen": {
+        "screen": [
+          402,
+          874
+        ],
+        "titleNodes": [
+          {
+            "occurrence": 0,
+            "isField": false,
+            "pressable": false,
+            "frame": [
+              16,
+              159,
+              370,
+              21
+            ],
+            "center": [
+              201,
+              169
+            ],
+            "insideViewport": true
+          },
+          {
+            "occurrence": 1,
+            "isField": true,
+            "pressable": false,
+            "frame": [
+              16,
+              184,
+              370,
+              44
+            ],
+            "center": [
+              201,
+              206
+            ],
+            "insideViewport": true
+          }
+        ]
+      },
+      "expandVisibleAtOpen": true,
+      "recoverReturnedFrame": [
+        16,
+        184,
+        370,
+        44
+      ],
+      "recoverReturnedCenter": [
+        201,
+        206
+      ],
+      "scrollIntoView": {
+        "found": "True",
+        "x": "16",
+        "y": "184",
+        "width": "370",
+        "height": "44",
+        "visible": "True",
+        "scrollRc": "",
+        "swipes": "0",
+        "detail": ""
+      },
+      "keyboardTop": 545,
+      "detailStillOpen": true,
+      "geometryAfterTap": {
+        "screen": [
+          402,
+          874
+        ],
+        "titleNodes": [
+          {
+            "occurrence": 0,
+            "isField": false,
+            "pressable": false,
+            "frame": [
+              16,
+              126,
+              370,
+              21
+            ],
+            "center": [
+              201,
+              136
+            ],
+            "insideViewport": true
+          },
+          {
+            "occurrence": 1,
+            "isField": true,
+            "pressable": false,
+            "frame": [
+              16,
+              151,
+              370,
+              44
+            ],
+            "center": [
+              201,
+              173
+            ],
+            "insideViewport": true
+          }
+        ]
+      },
+      "focusedLabel": null,
+      "outcome": "keyboard",
+      "seconds": 28.1
+    },
+    {
+      "arm": 4,
+      "source": "timeline-row",
+      "scheduleToggle": true,
+      "task": "KbProbe41792256972",
+      "viewBeforeArm": "时间线",
+      "viewAfterSwitch": "时间线",
+      "timelineMarker": "未排期（4）",
+      "detailOpened": true,
+      "geometryAtOpen": {
+        "screen": [
+          402,
+          874
+        ],
+        "titleNodes": [
+          {
+            "occurrence": 0,
+            "isField": false,
+            "pressable": false,
+            "frame": [
+              16,
+              159,
+              370,
+              21
+            ],
+            "center": [
+              201,
+              169
+            ],
+            "insideViewport": true
+          },
+          {
+            "occurrence": 1,
+            "isField": true,
+            "pressable": false,
+            "frame": [
+              16,
+              184,
+              370,
+              44
+            ],
+            "center": [
+              201,
+              206
+            ],
+            "insideViewport": true
+          }
+        ]
+      },
+      "expandVisibleAtOpen": true,
+      "toggled": true,
+      "geometryAfterToggle": {
+        "screen": [
+          402,
+          874
+        ],
+        "titleNodes": [
+          {
+            "occurrence": 0,
+            "isField": false,
+            "pressable": false,
+            "frame": [
+              16,
+              -604,
+              370,
+              21
+            ],
+            "center": [
+              201,
+              -594
+            ],
+            "insideViewport": false
+          },
+          {
+            "occurrence": 1,
+            "isField": true,
+            "pressable": false,
+            "frame": [
+              16,
+              -579,
+              370,
+              44
+            ],
+            "center": [
+              201,
+              -557
+            ],
+            "insideViewport": false
+          }
+        ]
+      },
+      "recoverReturnedFrame": [
+        16,
+        184,
+        370,
+        44
+      ],
+      "recoverReturnedCenter": [
+        201,
+        206
+      ],
+      "scrollIntoView": {
+        "found": "True",
+        "x": "16",
+        "y": "184",
+        "width": "370",
+        "height": "44",
+        "visible": "True",
+        "scrollRc": "",
+        "swipes": "0",
+        "detail": ""
+      },
+      "keyboardTop": 545,
+      "detailStillOpen": true,
+      "geometryAfterTap": {
+        "screen": [
+          402,
+          874
+        ],
+        "titleNodes": [
+          {
+            "occurrence": 0,
+            "isField": false,
+            "pressable": false,
+            "frame": [
+              16,
+              126,
+              370,
+              21
+            ],
+            "center": [
+              201,
+              136
+            ],
+            "insideViewport": true
+          },
+          {
+            "occurrence": 1,
+            "isField": true,
+            "pressable": false,
+            "frame": [
+              16,
+              151,
+              370,
+              44
+            ],
+            "center": [
+              201,
+              173
+            ],
+            "insideViewport": true
+          }
+        ]
+      },
+      "focusedLabel": null,
+      "outcome": "keyboard",
+      "seconds": 36.7
+    }
+  ],
+  "uiLocale": "zh-CN",
+  "reused": [
+    "KbProbe11792256972",
+    "KbProbe21792256972",
+    "KbProbe31792256972",
+    "KbProbe41792256972"
+  ],
+  "finishedAt": 1792257668.542403
+}

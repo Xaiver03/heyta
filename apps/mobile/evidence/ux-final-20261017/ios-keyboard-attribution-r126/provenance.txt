@@ -1,0 +1,16 @@
+# r126 探针读数的出处（每一格都是现量，别抄进别处）
+取数时刻: 2026-10-18 01:11:28 +0800
+那一刻负载: { 12.52 17.28 22.72 }（本线门槛 load1<12 在这一刻不成立）⇒ 这一趟的绿可用（负载不改变「弹出了键盘」这种正向读数）；任何红都不能就地归因到产品，要等低负载复跑或改成只读几何的判据
+那一刻 scripts/qa 在产进程: 0 枚（探针自己走 python3，不在该名单里）
+本地 HEAD: eea6986e9cf4554530ff1222ca925b01081e337b
+载体: heyta-multiend-reinstall / EAAD1B66-80A3-4A51-957C-298DAF22F057 / state=Booted
+安装包: /Users/rocalight/Library/Developer/CoreSimulator/Devices/EAAD1B66-80A3-4A51-957C-298DAF22F057/data/Containers/Bundle/Application/C064A4E3-26D8-42A7-B220-FA5E74A96AA8/Heyta.app
+  bundle 版本: 1.0.2
+  打包时刻(包内最新 mtime): 2026-10-17 13:39:12
+  装的那棵提交: 25f544bd 2026-10-17T12:15:54+08:00
+  ⇒ 距当前 HEAD 落后 72 笔 ⇒ 这批读数证的是那一棵的运行时行为，不证 HEAD
+装置 scripts/qa/tasks-ux-ios.py（探针 import 的就是这一枚）:
+  工作树 vs HEAD 脏行数: 0（0=装置只含 HEAD 那版）
+  工作树 sha256 前 12: bd8105240b76
+  HEAD 版 sha256 前 12: bd8105240b76
+探针自身 sha256 前 12: 26324166d3f8

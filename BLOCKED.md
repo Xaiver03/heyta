@@ -11495,3 +11495,33 @@ PROBE hitChain div.ht-content → main.ht-main → div.ht-app → …
 🟢 **B221 闭合（2026-10-18 01:4x–02:0x，本会话复量 · 由它的主人落的笔，不是本线改的）**：现量 `git cat-file -e HEAD:packages/app-host/src/ai-managed-transport.ts` 与 `…/src/managed-ai-usage.ts` 各回 **rc=0**（01:45 那戳），而本线那把生产者缝尺 `NO_COLOR=1 python3 research/tools/verify-inbound-producer-seam.py` 从 **rc=1 / 2 条红** 翻成 **rc=0 / RED 行 0 条**。⚠️ 剩一格没闭合、但**不再是缝**：那两枚的**配套用例** `packages/app-host/tests/ai-managed-transport.spec.ts`、`…/managed-ai-usage.spec.ts` 仍各回 `at_HEAD_rc=128` —— 缝尺看不见它（消费者与生产者都齐了），代价是**那两枚测试在任何干净检出上都跑不到**。这一格归它的主人，本线不代写别人的用例。
 
 🔴 **B216 追记（2026-10-18 01:4x–02:0x，本会话 · 挡路清单从三处收到一处，且"就这一行"有四条现量）**：今晚 01:45 之后第 3 腿（四端 `reinstall:all`）与 `apps/web` 那两把判据**只剩 B216 这一处**在挡（B221 见上面那条闭合追记）。决定性读数：在已 ff 到 `d651b4e0` 的隔离载具里 `pnpm --filter @heyta/ui build` 回 **rc=1**，报的就是同一枚 `src/sync/CommentThread.tsx(67,24): error TS2339: Property 'id' does not exist on type 'CommentView'`（原件 `~/.heyta-evidence/inb-t7-1017-0902/ui-build-0158.txt`）。**"补那一行就是全部"不是印象，是这四条**：① `git show HEAD:packages/domain/src/index.ts | grep -c comments.js` 回 **0**（barrel 没导出）；② `git cat-file -e HEAD:packages/domain/src/comments.ts` 回 **rc=0**（那枚文件本身在库里）；③ `git show HEAD:packages/domain/src/comments.ts` 里 `CommentLike` 带着 `id: string;`（字段在，没丢）；④ `packages/ui/src/sync/comments-model.ts` 第 **28** 行按 `type CommentLike` 从包入口导入、第 **36** 行写 `CommentView extends CommentLike` ⇒ 入口不转发 ⇒ `CommentView` 里那一格 `id` 消失 ⇒ 就是上面那枚 TS2339。⇒ **交给补那一行的人：改动面是一枚文件的一行（`export * from './comments.js';`），不需要动 ui、不需要动 CommentThread。** 本线照旧**不代改、不修补载具**（补进载具跑出来的 exit 0 在任何提交态复现不出来，见本条旧文）。复刷命令逐字不变：`cd .worktrees/inb-t9 && git merge --ff-only <含那一行的新 tip> && IOS_DEVICE_NAME=heyta-multiend-reinstall pnpm reinstall:all`。⚠️ 载具今晚已实际 ff 到 `d651b4e0`（`ff_rc=0`、脏 16 枚＝15 枚 `*/evidence/*.png` ＋ 一枚 `apps/mobile/ios/Podfile.lock`、与待快进区间的碰撞 **0** 枚）⇒ 那一行一进库，起跑前**不用再重装依赖**。
+
+**B224（01:5x，本会话 · 产品体验线）B222 那枚 iOS 键盘步红：两处剩下的差别各自作用完，都不是原因；同一枚 bundle 上整条旅程在两台载体（含 B222 点名的旧载体）各 14/14 绿 ⇒ 状态改成"复现不出来 + 成因未定"**
+
+B222 收在"剩下的未分开差别只有两处"。这一趟（r126）把这两处各自作用一次，装置与读数在
+`apps/mobile/evidence/ux-final-20261017/ios-keyboard-attribution-r126/`（`RESULT.md` §2/§3/§5）。
+
+- **2×2 四格全绿**（每格 `keyboardTop=545`、详情仍在场、留图）：清单行±展开排期→收起排期、时间线行±同一处 toggle。
+  臂 4 就是旅程原形。⇒ **A（排期折叠把详情面滚走）与 B（详情从时间线行开）都不是原因，合起来也不是。**
+  两处都被**真作用过**有几何为证：收起排期之后两枚「标题」的 y 变成 -579~-618（滚到顶边以上），
+  `recover_detail_title` 的反向滑动把它带回 `[16,184,370,44]`。
+- **整条旅程复跑两台载体都绿**：`EAAD1B66…`（共享 reinstall 载体，接手时 Booted）与
+  `FE195661…`（**B222 那批红里点名的旧载体**，接手时 Shutdown ⇒ 本趟 boot + 装同一枚 bundle + 跑完还原 Shutdown），
+  各 14 步全过、`uiLocale zh-CN`、键盘步 `keyboardTop=545`。被测包是包内 mtime `2026-10-17 13:39:12` 那枚
+  （对应提交 `25f544bd`，距当时 HEAD 落后 72 笔），与 B222 那批**同一枚 bundle** ⇒ "差在包"从一开始就不成立。
+- 🔴 **这一趟自己踩掉两枚探针坑，前两批读数因此不作数（都留在目录里，文件名带原因）**：
+  ① 把当前视图名硬写成「四象限」，而这台载体的当前视图是「列表」⇒ 臂 3/4 卡在换视图；
+  ② 更贵的一枚：改对之后我拿"任务标题在树里"当"已在时间线视图"的证据，**而它在列表视图里也在**
+  ⇒ 那两臂其实还在列表视图却给了两枚绿。发现契机是复读数时看到下一臂的当前视图回到了「列表」。
+  第三批换成移动端独有的分组表头 `未排期（4）` 才算把这一档钉住。
+- ⚠️ **成因未定的那一档不许被写成结论**：唯一还站得住的方向是"B222 那一批的运行条件"，
+  但那几臂**没把 `loadavg` 入册**（现量 `grep -n "load\|负载" bilingual-locators-ios-r124/{RESULT.md,closeout.txt,setup.log}` 输出为空）
+  ⇒ 这条假设无法从既有记录判真假。本线既不写"已修"、也不写"环境抖动"（没有能区分两者的读数），
+  判据本身**保留不动**：它能红（B222 就是它红的），这一趟绿是因为键盘真弹出来了。
+- **顺手照出来一条别人名下的空断言（登记，不改）**：`scripts/qa/tasks-ux-ios.py:75` 的
+  `timeline_group_label(count)` 取的是 **web 的 aria 键** `web.timeline.aria.group`（「时间线：共 {count} 条任务」），
+  而移动端时间线的分组表头走 `web.board.unscheduledLane`（「未排期（{count}）」，`apps/mobile/src/lib/timeline-labels.ts:97`）；
+  它全篇只出现在 `tasks-ux-ios.py:467` 的 `wait_labels((task_a, task_b, timeline_group_label(2)))`，
+  而 `wait_labels` 是 ANY-of、同列表里两枚任务标题本来就在树里
+  ⇒ 这一枚候选在 iOS 上**永不成立也不影响那一步过**，"已经切到时间线视图"在 iOS 旅程里没有任何一层在断。
+  改法两条（换成移动端那枚表头 / 从 ANY-of 挪成独立断言）都是**任务旅程线的判据口径**，本线不代改。

@@ -1,0 +1,22 @@
+# r126 收尾现量 2026-10-18 01:32:13 +0800
+FE195661 现态: Shutdown（接手时=Shutdown，已恢复）
+EAAD1B66 现态: Booted（接手时=Booted，未改）
+companion 数: 现 4 / 起跑前 3（本趟没新建 companion，探针复用现成的）
+本趟新起的 companion（按 udid 认人，只收自己那枚）:
+  31182 /Users/rocalight/.heyta-tools/idb/idb_companion --udid FE195661-B021-4A71-AAD1-1F2F7AE3A102 --grpc-domain-sock /tmp/idb/FE195661-B021-4A71-AAD1-1F2F7AE3A102_companion.sock --only simulator
+  33756 /Users/rocalight/.heyta-tools/idb/idb_companion --udid 1EDCFA59-6A9C-428D-8FE2-160B11318648 --grpc-domain-sock /tmp/idb/1EDCFA59-6A9C-428D-8FE2-160B11318648_companion.sock --only simulator
+  50329 /Users/rocalight/.local/bin/idb_companion --udid 3BB27787-9C22-452E-A62C-6BD650D35E27 --grpc-domain-sock /tmp/idb/3BB27787-9C22-452E-A62C-6BD650D35E27_companion.sock --only simulator
+  90435 /Users/rocalight/.heyta-tools/idb/idb_companion --udid EAAD1B66-80A3-4A51-957C-298DAF22F057 --grpc-domain-sock /tmp/idb/EAAD1B66-80A3-4A51-957C-298DAF22F057_companion.sock --only simulator
+负载: { 52.92 168.00 113.01 }
+两趟旅程的判据读数:
+  journey-on-shared-carrier -> passed locale zh-CN 步数 14 键盘步 12-detail-keyboard-visible-and-unobstructed passed 545
+  journey-on-legacy-carrier -> passed locale zh-CN 步数 14 键盘步 12-detail-keyboard-visible-and-unobstructed passed 545
+旅程在两台载体上各留下 2 行 UxTask*<stamp> 残迹（与既往每趟同形状，本线不代删）:
+        "title": "UxTaskA1792258003"
+        "title": "UxTaskB1792258003"
+收尾补记 01:39:52：本线起跑时自动拉起的那枚 companion（pid 90435，--udid EAAD1B66…）已按 pid 收掉；整机数回到 3（起跑前 3）
+别人那三枚（FE195661 / 1EDCFA59 / 3BB27787）逐字未动：
+  31182 /Users/rocalight/.heyta-tools/idb/idb_companion --udid FE195661-B021-4A71-AAD1-1F2F7AE3A102 --grpc-domain-sock /tmp/idb/FE195661-B021-4A71-AAD1-1F2F7AE3A102_companion.sock --only simulator
+  33756 /Users/rocalight/.heyta-tools/idb/idb_companion --udid 1EDCFA59-6A9C-428D-8FE2-160B11318648 --grpc-domain-sock /tmp/idb/1EDCFA59-6A9C-428D-8FE2-160B11318648_companion.sock --only simulator
+  50329 /Users/rocalight/.local/bin/idb_companion --udid 3BB27787-9C22-452E-A62C-6BD650D35E27 --grpc-domain-sock /tmp/idb/3BB27787-9C22-452E-A62C-6BD650D35E27_companion.sock --only simulator
+⚠️ 收这一刻的负载 { 10.74 57.41 79.25 } —— 比本线两趟绿跑（load1 9.5~13）高一档，场上有别的会话在跑重活；这条只入读数，不改上面任何一趟的判定。

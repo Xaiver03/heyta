@@ -1,0 +1,81 @@
+{
+  "status": "passed",
+  "udid": "EAAD1B66-80A3-4A51-957C-298DAF22F057",
+  "uiLocale": "zh-CN",
+  "steps": [
+    {
+      "name": "01-created-task-a",
+      "status": "passed",
+      "at": 1792257693.076341,
+      "title": "UxTaskA1792257683"
+    },
+    {
+      "name": "02-created-task-b",
+      "status": "passed",
+      "at": 1792257701.793196,
+      "title": "UxTaskB1792257683"
+    },
+    {
+      "name": "03-list-scroll",
+      "status": "passed",
+      "at": 1792257704.1461172
+    },
+    {
+      "name": "04-long-press-enters-selection",
+      "status": "passed",
+      "at": 1792257706.744031
+    },
+    {
+      "name": "05-multi-select-second-task",
+      "status": "passed",
+      "at": 1792257708.831071
+    },
+    {
+      "name": "06-exit-selection",
+      "status": "passed",
+      "at": 1792257710.9471118
+    },
+    {
+      "name": "06b-timeline-clears-selection",
+      "status": "passed",
+      "at": 1792257717.1357272
+    },
+    {
+      "name": "07-view-options-sort-and-date",
+      "status": "passed",
+      "at": 1792257788.348763
+    },
+    {
+      "name": "08-quadrant-move-feedback",
+      "status": "passed",
+      "at": 1792257802.5060549,
+      "destination": "马上做"
+    },
+    {
+      "name": "09-quadrant-undo",
+      "status": "passed",
+      "at": 1792257805.835333
+    },
+    {
+      "name": "10-timeline-view-options",
+      "status": "passed",
+      "at": 1792257817.359374
+    },
+    {
+      "name": "11-timeline-row-opens-detail",
+      "status": "passed",
+      "at": 1792257836.855893
+    },
+    {
+      "name": "12-detail-keyboard-visible-and-unobstructed",
+      "status": "passed",
+      "at": 1792257852.276839,
+      "keyboardTop": 545
+    },
+    {
+      "name": "13-detail-recovers-after-keyboard",
+      "status": "passed",
+      "at": 1792257861.989129
+    }
+  ]
+}
