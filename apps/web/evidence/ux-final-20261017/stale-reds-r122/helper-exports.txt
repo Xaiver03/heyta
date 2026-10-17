@@ -1,0 +1,22 @@
+HEAD=90bafb871252a555af7a7d5f60f81ce84f608451  跑于 2026-10-17 23:13:10
+解包范围：e2e + scripts + packages/sync-core/src（⚠️ packages/sync-core/dist 是构建产物，git archive 解不出来 ⇒ 两臂都会各报一条 ai-egress.spec.ts 的『目标文件不存在』，与本格无关）
+BASE_RC=1  MUT_RC=1 ⇒ 判读只能取两臂差集，不能拿 rc 当结论（§7 #460 那一族）。
+基线臂汇总行：射程 177 份文件 / 对账 567 个导入名 / 缺失 5 个（⚠️ git 不可用 ⇒ 退回文件系统遍历）
+变异臂汇总行：射程 177 份文件 / 对账 567 个导入名 / 缺失 16 个（同上）
+── 基线（未变异）里的 selectSettingsSection 命中数 = 0
+── 变异后的 selectSettingsSection 命中数 = 11
+── 差集（只在变异臂出现的行）：
+  e2e 命名导入对账：射程 177 份文件 / 对账 567 个导入名 / 缺失 16 个（⚠️ git 不可用 ⇒ 退回文件系统遍历）
+    🔴 e2e/tests/account-email-change-and-sessions.spec.ts  →  ./helpers  selectSettingsSection：目标文件没有这个导出
+    🔴 e2e/tests/admin-console.spec.ts  →  ./helpers  selectSettingsSection：目标文件没有这个导出
+    🔴 e2e/tests/ai-assistant.spec.ts  →  ./helpers.js  selectSettingsSection：目标文件没有这个导出
+    🔴 e2e/tests/assistant-expanded-ux.spec.ts  →  ./helpers  selectSettingsSection：目标文件没有这个导出
+    🔴 e2e/tests/assistant-hosted-ux.spec.ts  →  ./helpers  selectSettingsSection：目标文件没有这个导出
+    🔴 e2e/tests/auth-simple-ux.spec.ts  →  ./helpers.js  selectSettingsSection：目标文件没有这个导出
+    🔴 e2e/tests/borderless-surfaces.spec.ts  →  ./helpers  selectSettingsSection：目标文件没有这个导出
+    🔴 e2e/tests/collab-journey.spec.ts  →  ./helpers  selectSettingsSection：目标文件没有这个导出
+    🔴 e2e/tests/inbound-automation.spec.ts  →  ./helpers  selectSettingsSection：目标文件没有这个导出
+    🔴 e2e/tests/profile-avatar-e2ee.spec.ts  →  ./helpers  selectSettingsSection：目标文件没有这个导出
+    🔴 e2e/tests/reminder-permission-final.spec.ts  →  ./helpers.js  selectSettingsSection：目标文件没有这个导出
+── 两臂共同的那条 dist 噪声（证它不是变异带进来的）：
+  e2e 命名导入对账：射程 177 份文件 / 对账 567 个导入名 / 缺失 5 个（⚠️ git 不可用 ⇒ 退回文件系统遍历）
