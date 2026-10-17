@@ -66,6 +66,7 @@ import { useI18n } from '@heyta/i18n';
 import { Priority, type Task } from '@heyta/domain';
 
 import { useSelected } from '../../lib/selection.js';
+import { ShareCommentsSection } from '../share/ShareCommentsSection.js';
 import { text } from '../../lib/text.js';
 import { NoteField } from './NoteEditor.js';
 import { RepeatField } from './TaskRepeat.js';
@@ -483,6 +484,22 @@ export function TaskDetailCard(): React.JSX.Element | null {
           void store.setRepeat(task.id, rule);
         }}
       />
+
+      {/*
+        ══ 协作区：评论（W4）═══════════════════════════════════════════
+        🔴 它**刻意不是第五个「分组」**：`task-detail-group` 那四枚（基本 / 时间 / 组织 /
+        自动化）是被审计 §4.6 钉死的**任务属性**分组，而评论不是任务属性 ——
+        它是协作线索（只存在于共享清单）。按产品定义推导：属性分组之下另起一块区域，
+        标题视觉上同款（同一枚 `groupHeaderStyle`）但**不冒充分组**（不挂那个 testid）。
+        `tests/task-detail-groups.spec.tsx` 数的正是 `task-detail-group`，它继续钉那四枚。
+        是否给协作单独立「区」的口径写回台账，等审计更新时一并收。
+      */}
+      <h3 style={groupHeaderStyle} data-testid="task-detail-collaboration">
+        {t('common.entity.COMMENT')}
+      </h3>
+      <div data-testid="task-detail-comments">
+        <ShareCommentsSection taskId={task.id} />
+      </div>
     </div>
   );
 }

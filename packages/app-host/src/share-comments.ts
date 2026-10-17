@@ -99,7 +99,7 @@ export interface ShareCommentsHost {
   /** 评论的四个写动作（建/改/删/还原）—— 宿主递进来的只有"对哪条任务说什么"。 */
   readonly actions: CommentActions;
   /** 从**重放出来的**共享域状态读某条任务的活评论（墓碑已滤、按评论序排好）。 */
-  commentsForTask(taskId: string): CommentLike[];
+  commentsForTask(taskId: string): ShareCommentRecord[];
   /** 某一份 share 的物化状态（宿主合并/调试用；未加载时是空状态）。 */
   stateFor(shareId: string): MaterializedState;
 }
@@ -116,7 +116,7 @@ export function createShareCommentDispatch(
   options: Omit<ShareCommentsHostOptions, 'ctx' | 'newCommentId'>,
 ): {
   dispatchShareOp: (shareId: string, intent: ShareOpIntent) => Promise<void>;
-  commentsForTask: (taskId: string) => CommentLike[];
+  commentsForTask: (taskId: string) => ShareCommentRecord[];
   stateFor: (shareId: string) => MaterializedState;
 } {
   const cache = new Map<string, { log: ShareLogState; state: MaterializedState; shareId: string }>();
@@ -171,12 +171,12 @@ export function createShareCommentDispatch(
     options.storage.save(shareId, log);
   };
 
-  const commentsForTask = (taskId: string): CommentLike[] => {
-    const rows: CommentLike[] = [];
+  const commentsForTask = (taskId: string): ShareCommentRecord[] => {
+    const rows: ShareCommentRecord[] = [];
     // 先确保**存储里已有的每一份 share 都进了缓存**（冷启动那条判据钉的就是这里）。
     for (const shareId of options.storage.list()) entryFor(shareId);
     for (const { state } of cache.values()) {
-      const bucket = (state as unknown as { comments?: Record<string, CommentLike> }).comments ?? {};
+      const bucket = (state as unknown as { comments?: Record<string, ShareCommentRecord> }).comments ?? {};
       rows.push(...Object.values(bucket));
     }
     return aliveCommentsForTask(rows, taskId);
