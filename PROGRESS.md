@@ -6471,3 +6471,26 @@ button.duration-run(99x44) → span.ht-ai → …__items → …__panel(op=0.68)
 2. 全量 e2e（`--retries=0`）在干净副本上取得**完整红集**（`/tmp/full4.log` 正在跑）；
 3. 之后用同一把链装置在修完后的 tip 上跑 `pnpm check` 全链（现为 116 步）取 `RED=0` —— **现在无法达成**，因为第 87 道本体仍含上面那 6 份；
 4. 环境性红（48/49/53 那类）已在本会话前几轮用放宽权限/可用屏幕证明过**不是仓库缺陷**（rc=0，仓库零改动）。
+
+### 2026-10-17 逐道读数（第三、四批 17 道，全 rc=0）——含**环境性红在放宽权限下的复跑证明**
+
+**第三批（11 道）**：`check:l4` · `check:licenses:stamp` · **`check:macos-shell`** · **`check:macos-window`** ·
+**`check:windows-shell`** · `check:linux-shell` · `check:text-color` · `check:gate-ssh` · `check:landing-e2e` ·
+`check:verify-script-copy` · `check:app-version` —— **11/11 rc=0**。
+🔴 其中加粗的三道就是目标里点名的**环境性红（链步 48/49/53）**：本次在**当前 tip** 上、
+本会话文件策略为 `danger-full-access`（"DSH 文件沙箱不限制文件修改"）的条件下**全部 rc=0、仓库零改动**
+⇒ 目标要求的"在放宽权限下复跑证明它不是仓库缺陷"这一条，当场兑现。
+**第四批（6 道）**：`check:apk-freshness` · `check:version-declarations` · `check:checkpoint-cadence` ·
+`check:retention-window-parity` · `check:windows-signing-posture` · `check:release-version-guard` —— **6/6 rc=0**。
+
+⇒ 累计**本会话实跑并 rc=0 的链步：39 + 17 = 56 步**（另加 `check-ai-e2e-preflight.mjs`）。
+链上尚未在本会话实跑的是那几道重步（`build` / `typecheck` / 截图 / `pnpm -r test` / 镜像那几条 /
+`check:ai-e2e` 的 e2e 本体）—— 它们的读数要么在别处已经取过（`-r test` 的逐包复跑），
+要么正卡在 C 表那 6 份上。
+
+**逐道映射（原 26 枚红的链步原文，备忘）**：1 gate-wiring · 6 reachability · 20 row-single-source ·
+21 selection-single-source · 22 l4 · 23 empty-state · 43 licenses:stamp · 45 image-license · 48 macos-shell ·
+49 macos-window · 51 integration-coverage · 53 windows-shell · 54 linux-shell · 65 text-color ·
+75 public-facts · 85 gate-ssh · 86 e2e-helper-exports · 87 ai-e2e · 89 landing-e2e · 90 shell-unicode ·
+100 verify-script-copy · 102 apk-freshness · 106 -r test · 109 app-version · 110 version-declarations ·
+111 checkpoint-cadence。**除 106（重步）与 87（本体含 C 表那 6 份）外，其余 24 道在本会话内都已实跑 rc=0。**
