@@ -63,7 +63,7 @@ CJK = re.compile(r"[一-鿿]")
 CJK_GROUP_FLOOR = {
     "profile-settings-android.py": 56,
     "profile-settings-ios.py": 44,
-    "tasks-ux-android.py": 2,
+    "tasks-ux-android.py": 58,
     "tasks-ux-ios.py": 42,
     "ai-assistant-atomic-android.py": 14,
 }

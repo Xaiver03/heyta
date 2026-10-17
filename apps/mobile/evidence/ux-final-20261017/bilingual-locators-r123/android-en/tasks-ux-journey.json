@@ -1,0 +1,100 @@
+{
+  "status": "passed",
+  "serial": "emulator-5554",
+  "uiLocale": "en",
+  "steps": [
+    {
+      "name": "01-created-task-a",
+      "status": "passed",
+      "at": 1792251821.1539881,
+      "title": "UxTaskA1792251810"
+    },
+    {
+      "name": "02-created-task-b",
+      "status": "passed",
+      "at": 1792251837.925343,
+      "title": "UxTaskB1792251810"
+    },
+    {
+      "name": "03-list-scroll",
+      "status": "passed",
+      "at": 1792251847.813924,
+      "rowCount": 4
+    },
+    {
+      "name": "04-long-press-enters-selection",
+      "status": "passed",
+      "at": 1792251853.315592
+    },
+    {
+      "name": "05-multi-select-second-task",
+      "status": "passed",
+      "at": 1792251857.815999
+    },
+    {
+      "name": "06-exit-selection",
+      "status": "passed",
+      "at": 1792251862.166559
+    },
+    {
+      "name": "06b-timeline-clears-selection",
+      "status": "passed",
+      "at": 1792251883.349178
+    },
+    {
+      "name": "07-view-options-sort-and-date",
+      "status": "passed",
+      "at": 1792251927.866814
+    },
+    {
+      "name": "08-open-quadrant-move-sheet",
+      "status": "passed",
+      "at": 1792251955.767214
+    },
+    {
+      "name": "09-quadrant-move-feedback",
+      "status": "passed",
+      "at": 1792251961.219279,
+      "sourceQuadrant": "quadrant-cell-4",
+      "targetQuadrant": "quadrant-cell-1",
+      "feedback": "Task moved to “Do now”; due time adjusted",
+      "undoBounds": [
+        714,
+        1634,
+        1007,
+        1749
+      ]
+    },
+    {
+      "name": "10-quadrant-undo",
+      "status": "passed",
+      "at": 1792251963.668179,
+      "sourceQuadrant": "quadrant-cell-4"
+    },
+    {
+      "name": "11-timeline-view-options",
+      "status": "passed",
+      "at": 1792251994.467357
+    },
+    {
+      "name": "12-timeline-row-opens-detail",
+      "status": "passed",
+      "at": 1792252029.402105
+    },
+    {
+      "name": "13-detail-keyboard-visible",
+      "status": "passed",
+      "at": 1792252033.410238
+    },
+    {
+      "name": "14-detail-keyboard-dismissed",
+      "status": "passed",
+      "at": 1792252037.443795
+    },
+    {
+      "name": "15-detail-closes-after-second-back",
+      "status": "passed",
+      "at": 1792252042.6095371
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "status": "failed",
+  "serial": "emulator-5554",
+  "error": "timed out waiting for label '任务'; visible=['Tasks', 'Open search', 'Sync', 'Sat, 10/17', '2 to do, 0 done', 'Search tasks (title and note)', 'View options: List', 'List', 'Select tasks', 'Select tasks', 'Inbox', '2', 'Complete: UxTaskA1792251360', 'Open task: UxTaskA1792251360', 'UxTaskA1792251360', 'Inbox', 'Delete task: UxTaskA1792251360', 'Complete: UxTaskB1792251360', 'Open task: UxTaskB1792251360', 'UxTaskB1792251360', 'Inbox', 'Delete task: UxTaskB1792251360', 'New task', 'Tasks', '2 items', '2', 'Tasks', 'Calendar', 'Calendar', 'Focus', 'Focus', 'Categories', 'Categories', 'Profile', 'Profile']",
+  "steps": []
+}
