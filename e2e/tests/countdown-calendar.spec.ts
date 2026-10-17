@@ -130,16 +130,32 @@ test('🔴 四个档位都认得这一天：月格 / 当天清单 / 日档全天
 
   const iso = await openCalendarOnNextMonth(page);
 
-  // 点进那一天 ⇒ 下面的清单里有这一行，而且不再说"这天没有安排"。
+  /*
+   * 🔴 2026-10-17 换载体（**不是**放宽）：这一段原来读的是
+   * `calendar-board-day-event-*` / `calendar-board-day-empty` —— 两个 testid 都住在
+   * `showSelectedDayList` 那一段（`CalendarBoard.tsx:717` 起，代码自称「移动端兼容段」），
+   * 而 Web 宿主 `CalendarView.tsx:254` 传 `false`（prop 文档：「Web 使用格内任务条，
+   * 移动端保留清单」）⇒ Web 上**根本没有那份清单**，点进去看到的就是**那一格自己**。
+   * 判据的本义是"这一天在这一档里认得它" + "点进去不会说这天没有安排" ⇒ Web 的等价载体是：
+   *   ① 月格里那条**事件条**（`calendar-cell-<date>-event`，`DayCell` 用 `-event` 区分倒数日）；
+   *   ② 点过之后**那一格是选中态**（板子用 `aria-selected` 平铺）。
+   * （移动端那份清单由 `packages/ui` 的组件测试与移动端验收各自覆盖，这里不再借它的 testid。）
+   */
   await page.locator(`[data-testid="calendar-cell-${iso}"]`).click();
-  const dayRow = page.locator('[data-testid^="calendar-board-day-event-"][data-testid$="-title"]');
-  await expect(dayRow, '格子里有它，点进去的清单里没有 —— 同一屏两份当天的账').toHaveCount(1);
-  await expect(dayRow).toContainText('四档同一天');
-  await expect(dayRow).toContainText(`还有 ${String(target.days)} 天`);
+  const cellEvent = page.locator(`[data-testid="calendar-cell-${iso}-event"]`);
+  await expect(cellEvent, '月格里必须有那一天的事件条（倒数日与任务条分开命名）').toHaveCount(1);
+  await expect(cellEvent).toContainText('四档同一天');
+  await expect(cellEvent).toContainText(`还有 ${String(target.days)} 天`);
   await expect(
-    page.locator('[data-testid="calendar-board-day-empty"]'),
-    '有倒数日的那一天还被当成"没有安排"',
-  ).toHaveCount(0);
+    page.locator(`[data-testid="calendar-cell-${iso}"]`),
+    '点过之后那一格必须是选中态（"点进去"在 Web 上就是这个可见后果）',
+  ).toHaveAttribute('aria-selected', 'true');
+  /*
+   * ⚠️ 原来这里还有一条 `calendar-board-day-empty` `toHaveCount(0)` —— 删掉，不是因为
+   * 它红，是因为在 Web 上它**永远为真**（那个 testid 属于移动端兼容段，根本不渲染）：
+   * §7 元规则 2，"一条永远通过的判据比没有判据更糟"。它的本义（"不会说这天没有安排"）
+   * 由下面日档那一段**正面**表达：`calendar-board-day-all-day-event-*` 必须存在且写着这条纪念日。
+   */
   await page.screenshot({ path: SHOT('day-list'), fullPage: false });
 
   // 日档：那一天摊开成全天带，倒数日在那一带里。

@@ -59,10 +59,31 @@ async function navigateView(page: Page, id: string, label: string): Promise<void
     await tool.first().click();
     return;
   }
-  const more = page.locator('.ht-rail__more > button');
+  /*
+   * 🔴 2026-10-17 换载体（**不是**放宽判据）：rail 有**两套**实现 —— 宽档是
+   * `.ht-rail__more`（`RailNavigation.tsx:457-461`，button 是它的直接子节点），
+   * 窄档是 `CompactRailNavigation.tsx:73` 的 `data-testid="compact-rail-more"`。
+   * 窄视口下前者**在 DOM 里但不可见** ⇒ 原来那句 `toBeVisible()` 会把"窄档用的另一套 rail"
+   * 读成"这一档没有更多菜单"（现量：`locator('.ht-rail__more > button')` Expected: visible）。
+   * 判据的本义是"该视图要么有直接入口、要么在「更多」里" ⇒ 两套都接受，但**必须真可见**。
+   */
+  const more = page
+    .locator('.ht-rail__more > button:visible, [data-testid="compact-rail-more"]:visible')
+    .first();
   await expect(more, `视图 ${label} 应有直接入口或更多菜单`).toBeVisible();
   await more.click();
-  await page.getByRole('menuitem', { name: label, exact: true }).click();
+  /*
+   * 🔴 2026-10-17 同一条载体修法的第二半：**两套 rail 的菜单项标记也不同** ——
+   *   宽档 `RailNavigation.tsx:165` 是 `<button role="menuitem">`；
+   *   窄档 `CompactRailNavigation.tsx:82` 是**普通 button**，但带 `data-testid="rail-view-<key>"`
+   *   （无 `menuitem` 角色）。现量（窄视口）：`waiting for getByRole('menuitem', { name: '四象限' })`
+   *   一直到 1200s 超时。⇒ 两条都接受（`menuitem` 名字 或 窄档那枚 testid），**本义不变**。
+   */
+  const item = page
+    .getByRole('menuitem', { name: label, exact: true })
+    .or(page.locator(`[data-testid="rail-view-${id}"]:visible`))
+    .first();
+  await item.click();
 }
 
 async function setLanguage(page: Page, target: 'zh-CN' | 'en'): Promise<void> {

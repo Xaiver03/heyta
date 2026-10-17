@@ -28,6 +28,7 @@
 
 import { expect, test } from '@playwright/test';
 
+import { revealRowActions } from './ai-entry.js';
 import {
   addTask,
   CAP_LONG_CONTEXT,
@@ -50,6 +51,7 @@ test.describe('AI 不可用：一次请求都不许发出去', () => {
 
     // 「优先级建议」只在有任务时出现。
     await addTask(page, '写周报');
+    await revealRowActions(page, '写周报');
 
     // ── 拆解 ────────────────────────────────────────────────────────────
     await page.locator('[data-testid^="ai-breakdown-"]').click();
@@ -107,6 +109,7 @@ test.describe('AI 不可用：一次请求都不许发出去', () => {
     });
     await switchView(page, '任务');
     await addTask(page, '把新版本发到生产环境');
+    await revealRowActions(page, '把新版本发到生产环境');
 
     await page.locator('[data-testid^="ai-breakdown-"]').click();
     await expect(page.locator('[data-testid="ai-no-target"]')).toContainText(
@@ -135,6 +138,7 @@ test.describe('AI 不可用：一次请求都不许发出去', () => {
 
     await switchView(page, '任务');
     await addTask(page, '把新版本发到生产环境');
+    await revealRowActions(page, '把新版本发到生产环境');
 
     await page.locator('[data-testid^="ai-breakdown-"]').click();
     const note = page.locator('[data-testid="ai-no-target"]');
@@ -176,6 +180,7 @@ test.describe('AI 不可用：一次请求都不许发出去', () => {
 
     await switchView(page, '任务');
     await addTask(page, '重构同步引擎的冲突解决');
+    await revealRowActions(page, '重构同步引擎的冲突解决');
 
     await page.locator('[data-testid^="duration-run-"]').click();
     await expect(page.locator('[data-testid="duration-disclosure"]')).toBeVisible();

@@ -775,7 +775,18 @@ export async function parkCursor(page: Page): Promise<void> {
  * 提交走 `Enter`（那是一个真 `<form onSubmit>`，`HabitsView.tsx:268-273`）。
  */
 export async function addHabit(page: Page, name: string): Promise<void> {
+  /*
+   * 🔴 2026-10-17 加一步（**建立前提**，不是放宽判据）：新建习惯的表单现在是**对话框**
+   *（`HabitsView.tsx:255-300` 的 `ht-habit-create-dialog`，由 `data-testid="habits-add-open"`
+   * 那颗「添加习惯」按钮打开），而它原先是在流里的 —— 于是 `getByLabel('新习惯名称')`
+   * 在没点开时**一直等**（现量：`waiting for getByLabel('新习惯名称')` 到 60s 超时）。
+   * 两种形态都兼容：输入框已经在就原样填；不在就先点开那颗入口（可访问名 `web.habits.add`）。
+   */
   const input = page.getByLabel('新习惯名称');
+  if ((await input.count()) === 0) {
+    await page.getByTestId('habits-add-open').click();
+    await expect(input, '点开「添加习惯」之后表单里应当有那个名字输入框').toHaveCount(1);
+  }
   await input.fill(name);
   await input.press('Enter');
   await expect(

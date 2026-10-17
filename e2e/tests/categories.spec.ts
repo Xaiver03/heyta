@@ -62,8 +62,13 @@ test.describe('分类着色：真浏览器契约', () => {
     await expect(section, '分类区块必须真的挂进成长页（不是只在 jsdom 里能 mount）').toHaveCount(1);
     await expect(section).toContainText('分类时长');
     await expect(section, '说明里要写明颜色是用户自己赋义的').toContainText('颜色由你自己赋义');
+    // 🔴 2026-10-17：这一条原来钉的是 `还没有可以归类的时间记录`，而 web 的词条是
+    // `web.categories.empty.hint`（现量「先给任务归类，或记录一次习惯时长。」）——
+    // 判据**这一条的本义**在它的自述里写得很清楚：「没有记录时要说清楚"**怎么才会有**"」，
+    // 句子的措辞不是它要钉的对象（那是另一条 parity 判据的活）。⇒ 换成现量那句，
+    // 本义一格没少。
     await expect(section, '没有记录时要说清楚"怎么才会有"').toContainText(
-      '还没有可以归类的时间记录',
+      '先给任务归类，或记录一次习惯时长。',
     );
     // 空状态也不许出现百分号：这个页面**从不**用占比表达任何东西
     expect(await categoryText(page), '分类区块里不该出现百分号').not.toContain('%');

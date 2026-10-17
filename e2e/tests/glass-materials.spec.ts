@@ -34,6 +34,18 @@ const APP_URL = '/?lang=zh-CN';
 
 interface Surface {
   name: string;
+  /**
+   * 🔴 这一面是不是**实色面**（"玻璃"不成立、也不该成立）。
+   *
+   * 2026-10-17 加：`search` 就是这种面 —— 共享层 `packages/ui/src/search/SearchPanel.tsx:172-175`
+   * 逐字写着 "Search is a reading surface: **opaque on every host** so underlying task titles
+   * never compete with results or the query"，并据此传 `materialSurface(tokens, 'chrome', false)`
+   * （第三个实参就是"不是玻璃"）。而这条判据原来对**所有**面都要求"背景模糊 + 底色半透明"，
+   * 于是它把一条**产品明确写下来的决定**读成了缺陷（现量：`search` 那一面
+   * `backdrop=none`、`bg=rgb(255,255,255)` 不透明）。⇒ 实色面只钉"底色是实色"，
+   * 不钉"必须有模糊"；玻璃面（其余四面）照旧两条都钉。
+   */
+  solid?: boolean;
   /** 打开这个悬浮层，返回**面板本体**的定位器（计算样式从它身上取）。 */
   open: (page: import('@playwright/test').Page) => Promise<import('@playwright/test').Locator>;
   /** 关掉（下一个面打开前必须干净，否则截图互相污染）。 */
@@ -49,6 +61,8 @@ async function addTask(page: import('@playwright/test').Page, title: string): Pr
 const SURFACES: Surface[] = [
   {
     name: 'search',
+    // 实色面（理由见 `Surface.solid` 的注释：共享层逐字写着 "opaque on every host"）。
+    solid: true,
     open: async (page) => {
       await page.getByRole('tab', { name: '搜索' }).click();
       return page.getByTestId('search-overlay-surface').locator('> *').first();
@@ -91,14 +105,42 @@ const SURFACES: Surface[] = [
     name: 'organize-dropdown',
     open: async (page) => {
       await page.setViewportSize({ width: 900, height: 600 });
+      /*
+       * 🔴 2026-10-17：整理入口现在住在**每行那枚「更多」披露**里（`details.ht-compose-actions`）
+       * —— 折叠时它在 DOM 里但不画，直接点会一路
+       * `waiting for element to be visible` 到 60s 超时（现量）。先把披露打开（按它自己的
+       * `task-actions-summary-*` 定位，不需要知道任务标题），再点整理入口。
+       */
+      const more = page.locator('[data-testid^="task-actions-summary-"]').first();
+      if (
+        (await more.count()) > 0 &&
+        !(await page
+          .locator('[data-testid="task-organize-summary"]')
+          .first()
+          .isVisible()
+          .catch(() => false))
+      ) {
+        await more.click();
+      }
       await page.locator('[data-testid="task-organize-summary"]').first().click();
       return page
         .locator('details:has([data-testid="task-organize-summary"]) .ht-material')
         .first();
     },
     close: async (page) => {
-      await page.locator('[data-testid="task-organize-summary"]').first().click();
-      await page.setViewportSize({ width: 1440, height: 900 });
+      /*
+       * 🔴 2026-10-17：**关**两层 —— 整理入口住在每行那枚「更多」披露里，
+       * 只点整理入口只会把里面那层收起来，外层 `details.ht-compose-actions`
+       * 还开着 ⇒ 判据 `…关干净再拍下一个（不可见即关闭）` 读到 `.ht-material`
+       * 仍然 visible（现量：`Expected: hidden, Received: visible`）。
+       * 这里按"点外层 summary 收起"来关（它本来就是 toggle），再按 Esc 兜底。
+       */
+      const more = page.locator('[data-testid^="task-actions-summary-"]').first();
+      if ((await more.count()) > 0) {
+        const outer = more.locator('xpath=ancestor::details[1]');
+        if ((await outer.getAttribute('open')) !== null) await more.click();
+      }
+      await page.keyboard.press('Escape');
     },
   },
   {
@@ -123,7 +165,58 @@ const SURFACES: Surface[] = [
     name: 'reminder-dropdown',
     open: async (page) => {
       await page.setViewportSize({ width: 900, height: 600 });
-      await page.locator('details.ht-compose--popover > summary').first().click();
+      /*
+       * 🔴 2026-10-17：提醒那枚 `summary` 现在也住在**每行那枚「更多」披露**里
+       *（`details.ht-compose-actions`）—— 折叠时它在 DOM 里但不画，直接点会一路
+       * `waiting for element to be visible` 到 60s 超时（现量，第三次遇到同一族）。
+       * 先按 `task-actions-summary-*` 把外层披露打开，再点提醒那一枚。
+       */
+      /*
+       * ⚠️ 必须开**包含这一枚 popover 的那一行**的外层披露 —— 不能按"列表里第一枚
+       * `task-actions-summary-*`"去开：本族的锚点任务落在**列表末尾**（上面那段注释写着），
+       * 于是会开错行、目标那一枚仍然折叠着（第 5 趟实测：`waiting for
+       * locator('details.ht-compose--popover > summary')` 照样 60s 超时）。
+       * 用 `:has(...)` 把外层披露与目标绑在同一行。
+       */
+      /*
+       * 2026-10-17 由**直接读数**定稿：在规格的真实流程里那一刻现量是
+       *   `rows=2 pops=2 own=2 summaries=2 capture=1`
+       * ⇒ 行在、popover 在、`:has(...)` 也命中 ⇒ 不是"元素不在"，而是**我判断"要不要点"
+       * 用错了量**：先前用 `popoverSummary.isVisible()` —— 它在**外层披露关着**时也可能读到 true
+       * （元素在布局里存在但被折叠祖先压住），于是那一次 click 根本没发；`ownRowActions` 的
+       * `.first()` 也可能指向另一行。⇒ 改成**读那一行外层披露真实的 `open` 态**再决定，
+       * 并且**约束到同一行**（`details.ht-compose-actions:has(details.ht-compose--popover)`）。
+       */
+      const ownRowSummary = page
+        .locator('details.ht-compose-actions:has(details.ht-compose--popover) > summary')
+        .first();
+      if ((await ownRowSummary.count()) > 0) {
+        const outerOpen = await ownRowSummary.evaluate(
+          (el) => (el.parentElement as HTMLDetailsElement).open,
+        );
+        if (!outerOpen) await ownRowSummary.click();
+      }
+      /*
+       * 探针（先建数据）实测：点开外层 `details.ht-compose-actions` 之后，
+       * `details.ht-compose--popover > summary` 的 `isVisible()` 从 **false 变 true**
+       * （探针读数：A=1 选择器命中、before=false、after=true）⇒ "开门"这一步是对的；
+       * 而第 6 趟仍然 60s 超时 ⇒ 剩下的是**滚动/遮挡**那一层：这一族的锚点行在列表末尾，
+       * 摘要虽"在布局上可见"，却可能落在滚动容器之外或被别的层压住。先把它滚进视口再点。
+       */
+      /*
+       * 🔴 2026-10-17 逐字读数定案：`locator.click` 的等待日志是
+       *   `element is visible, enabled and stable` → `scrolling into view if needed`
+       *   → **`<label>…</label> from <span>…</span> subtree intercepts pointer events`**
+       * ⇒ 元素**可见**、可点性被一个 `<label>` 拦下（不是"没画出来"）。
+       * 这里用**真实鼠标坐标点击**（`page.mouse`）来分清两件事：
+       *   · 真用户点得开 ⇒ Playwright 的 actionability 比现实严，判据该走坐标；
+       *   · 真用户也点不开 ⇒ 那是**产品缺陷**（有 label 盖住提醒入口），该改产品。
+       */
+      const popSummary = page.locator('details.ht-compose--popover > summary').first();
+      await popSummary.scrollIntoViewIfNeeded();
+      const popBox = await popSummary.boundingBox();
+      expect(popBox, '提醒入口量不到盒子').not.toBeNull();
+      await page.mouse.click(popBox!.x + popBox!.width / 2, popBox!.y + popBox!.height / 2);
       const panel = page.locator('details.ht-compose--popover .ht-material').first();
       // 🔴 把锚点那一行滚到可视区中部再量：这一族的锚点任务落在列表末尾，而
       //   `position: absolute` 的行尾面板开在**滚动容器**里 ⇒ 朝下开就被容器底裁掉。
@@ -227,10 +320,10 @@ for (const state of ['light', 'dark', 'reduced-transparency'] as const) {
       await page.screenshot({ path: shot, fullPage: false });
 
       const material = await materialOf(panel);
-      if (state === 'reduced-transparency') {
+      if (state === 'reduced-transparency' || surface.solid === true) {
         expect(
           material.bgAlpha,
-          `${surface.name}：减少透明度时底色必须退成实色（${material.bgAlpha}）`,
+          `${surface.name}：${surface.solid === true ? '这是实色面，底色必须是实色' : '减少透明度时底色必须退成实色'}（${material.bgAlpha}）`,
         ).toBe(1);
       } else {
         expect(

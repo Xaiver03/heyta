@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { openApp, openSettingsView, stubLegalRecheck, stubPublicFacts } from './helpers';
+import { openApp, openSettingsView, selectSettingsSection, stubLegalRecheck, stubPublicFacts } from './helpers';
 import { STUB_ORIGIN, STUB_PORT } from '../ports';
 
 /**
@@ -332,6 +332,36 @@ async function seed({
     });
   });
 
+  /**
+   * 🔴 同一条补位纪律，2026-10-17 又多两条 —— 而这两条是**上面那一步
+   * （`selectSettingsSection(page, 'data')`）带出来的**，不是新功能：
+   * 「数据」那一组里除了后台卡片，还住着**入站自动化**面板（`InboundAutomationSettings`），
+   * 它一挂载就拉 `/api/automation/rules` 与 `/api/automation/events`；
+   * 假端点只实现了模型接口 ⇒ 404 混进"不该有非 2xx"，八条用例一起红。
+   * 形状逐字抄**别人那条线**的同名补位（`account-email-change-and-sessions.spec.ts:239-247`
+   * 与 `profile-avatar-e2ee.spec.ts:209`），空但合法：两条都必须回**数组**
+   * （`packages/app-host/src/inbound-rules-remote.ts` 读到非数组会判 `malformed-response`）。
+   * ⚠️ 这里刻意只答**读侧**、且只答"没有规则/没有事件"：本支用例不验自动化，
+   *    写侧一律 `fallback()` 交回 catch-all，让"本套件不该发的写请求"仍然计入红集
+   *    （与 `helpers.ts` 的 `stubPublicFacts` 同一条纪律）。
+   * ⚠️ 抽取欠账：这一族补位现在有 4 处（本文件、`account-email-change-and-sessions`、
+   *    `profile-avatar-e2ee`、`inbound-automation` 的自家夹具），下次动它时按仓规
+   *    "一次抽干净"（抽进 `helpers.ts` 并删掉旧的那几份）。
+   */
+  for (const [path, key] of [
+    ['rules', 'rules'],
+    ['events', 'events'],
+  ] as const) {
+    await page.route(`${SERVER}/api/automation/${path}**`, async (route) => {
+      if (route.request().method() !== 'GET') return route.fallback();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ [key]: [] }),
+      });
+    });
+  }
+
 
   const adminCalls: string[] = [];
 
@@ -639,6 +669,18 @@ async function seed({
   // 被调用 —— 面板空着，症状长得像"后台坏了"。
   await openApp(page, '/', 'accepted');
   await openSettingsView(page);
+  /**
+   * 🔴 2026-10-17 补这一步：设置早已不是"一条长页面往下滚"的 IA，而是
+   * **左侧分类 + 右侧内容**（`SettingsSectionNav`），而 `App.tsx:3261` 是
+   * `<DataSettingsPanel active={activeSettingsSection === 'settings-group-data'} />`
+   * —— `AdminPanel` 只有在**选中「数据」那一组**时才会去探测、才会渲染
+   * （`AdminPanel.tsx:139` 的 `active` 闸）。
+   * 本文件此前只 `openSettingsView()`，于是 `getByTestId('admin-panel')` 连元素都没有：
+   * 九条用例一起报 `element(s) not found`，读起来像"后台坏了"，其实是**探针没走到那一片**。
+   * 与 `helpers.ts` 那条 `selectSettingsSection` 的文件头同一句话：打开浮层只负责打开设置，
+   * **不能偷偷改变分类**，调用方必须声明自己要操作哪一组。
+   */
+  await selectSettingsSection(page, 'data');
 
   return { adminCalls };
 }
@@ -1058,6 +1100,11 @@ test.describe('运营管理后台（真浏览器）', () => {
     // 把闸门打开，唯一还能拦住请求的就只剩"没有配置"。
     await openApp(page, '/', 'accepted');
     await openSettingsView(page);
+    // 🔴 与 `seed()` 同一条理由（2026-10-17）：不选中「数据」那一组，`AdminPanel` 的
+    //    `active` 闸就是关的 —— 那样下面那句 `toHaveCount(0)` 会**恒真**，
+    //    它证的是"我们没走到那一片"，而不是"没登录 ⇒ 不发请求"。
+    //    选中之后，唯一还能拦住请求的才只剩"没有配置"。
+    await selectSettingsSection(page, 'data');
     await page.waitForTimeout(500); // 给"该发而没发"的请求一点时间冒出来
 
     await expect(page.getByTestId('admin-panel')).toHaveCount(0);

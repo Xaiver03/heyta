@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { revealRowActions } from './ai-entry.js';
 import { metaFor, openApp } from './helpers';
 
 /**
@@ -40,8 +41,13 @@ const OUT_LIST = `侧栏在外-${STAMP}`;
 const SIDEBAR = '.ht-sidebar--calendar';
 const MINI_TITLE = '[data-testid="calendar-mini-title"]';
 const BOARD_MONTH = '[data-testid="calendar-toolbar-month"]';
-const BOARD_DAY = '[data-testid="calendar-board-day-title"]';
-const DAY_LIST = '[data-testid="calendar-board-day-list"]';
+// 🔴 2026-10-17 删掉 `BOARD_DAY`：它指向的 `calendar-board-day-title` 住在
+// `showSelectedDayList` 那一段（「移动端兼容段」），Web 宿主传 `false` ⇒ 不渲染。
+// ⑤ 那条判据已改钉板子那一格的 `aria-selected`（更直接）。
+// 🔴 2026-10-17 删掉 `DAY_LIST = '[data-testid="calendar-board-day-list"]'`：
+// 产品里**已经没有**这个 testid（全仓只剩这一行声明）。那份"选中那天的清单"现在叫
+// `${testID}-day-section`，且由 `showSelectedDayList` 控制、Web 宿主传 `false`
+//（prop 文档：「Web 使用格内任务条，移动端保留清单」）。下面那条判据已改锚到格内任务条。
 
 /** 今天（本地日历日，`yyyy-mm-dd`）—— 与领域层 `toLocalDate` 同一个约定。 */
 function todayIso(): string {
@@ -79,29 +85,54 @@ const APP_ZH = '/?lang=zh-CN';
 async function seed(page: Page): Promise<void> {
   await openApp(page, APP_ZH);
 
+  /** 截止时间走规则式快速捕获（`@heyta/domain/capture`），不是 mock：
+   *  「今天」是用户真的会打的字。标题里被移除的那几个字不进 row 名。 */
+  const capture = async (title: string): Promise<void> => {
+    const composer = page.locator('input[placeholder^="添加任务"]');
+    await composer.fill(`今天 ${title}`);
+    await composer.press('Enter');
+    await expect(page.getByRole('checkbox', { name: `完成：${title}` })).toBeVisible();
+  };
+
+  /*
+   * 🔴 2026-10-17 顺序即前提：**先**播"留在收集箱"的那条，**再**建清单。
+   *
+   * 起因（真浏览器现量，宿主 memo 插桩读数）：
+   *   `pids=project-0e9a…|project-0e9a…  scopeIds=project-0e9a…  tasks=2`
+   * 原来两条都在建清单**之后**才播，而"新建清单"会让侧栏**选中**它 ⇒ 两次捕获
+   * 都落进了那个新清单。于是"勾上清单 X ⇒ 另一条必须消失"这条判据**永远为真**
+   *（因为它要的那条"会消失的任务"压根不存在）—— §7 元规则 2：一条永远通过的
+   * 判据比没有判据更糟。
+   * ⇒ 顺序倒过来之后，"在收集箱"是**产品自然行为**（捕获跟随当前视图/清单），
+   * 不需要额外去点一次「更多 → 所属清单 → 收集箱」（那条路还踩到行重渲染会把
+   * 非受控 `<details>` 的 open 态丢掉，见 `renderTaskTrailing`）。
+   */
+  await capture(OUT_LIST);
+
   const sidebar = page.locator('aside[aria-label="清单与标签"]');
   await sidebar.getByRole('button', { name: '新建清单' }).click();
   await sidebar.locator('#ht-category-create-name').fill(LIST);
   await sidebar.getByRole('button', { name: '创建清单' }).click();
   await expect(sidebar.getByText(LIST, { exact: true })).toBeVisible();
 
-  // 截止时间走规则式快速捕获（`@heyta/domain/capture`），不是 mock：
-  // 「今天」是用户真的会打的字。标题里被移除的那几个字不进 row 名。
-  for (const title of [IN_LIST, OUT_LIST]) {
-    const composer = page.locator('input[placeholder^="添加任务"]');
-    await composer.fill(`今天 ${title}`);
-    await composer.press('Enter');
-    await expect(page.getByRole('checkbox', { name: `完成：${title}` })).toBeVisible();
-  }
+  // 建完清单再播第二条：它会自然落进那个清单（这正是本用例要的一端）。
+  await capture(IN_LIST);
 
   const row = page.locator('[data-testid^="task-item-"]').filter({
     has: page.getByRole('checkbox', { name: `完成：${IN_LIST}` }),
   });
+  // 🔴 2026-10-17：`task-organize-summary` 现在住在每行那枚「更多」披露里面
+  //（`details.ht-compose-actions`）——折叠时它**在 DOM 里但不可见**，`click()` 会一直等
+  //（实测形状：locator 解析到了、waiting for element to be visible, enabled and stable）。
+  // 用与 AI 那一族同一条两条形态都能跑的 helper（披露存在就打开、不存在就原样返回）。
+  await revealRowActions(page, IN_LIST);
   await row.getByTestId('task-organize-summary').click();
   await row.getByLabel(`任务「${IN_LIST}」所属清单`).selectOption({ label: LIST });
   // 🔴 归属现在只有**一个显示位**：共享 `TaskBadges` 那一槽（清单 chip 已删）。
   await expect(metaFor(page, IN_LIST)).toContainText(LIST);
+
 }
+
 
 async function openCalendar(page: Page): Promise<void> {
   await page.getByRole('tab', { name: '日历' }).click();
@@ -187,11 +218,24 @@ test('迷你月历：七列真的对齐、今天那颗点真的有尺寸和主�
   expect(alt, '得有一个不是今天的本月格子').toBeDefined();
 
   await page.locator(`[data-testid="calendar-mini-day-${alt}"]`).click();
-  // 日标题说成「9月1日 星期二」这种形态 —— 月份与日期必须与**被点的那一格**逐字对上。
+  /*
+   * 🔴 2026-10-17 换载体（**不是**放宽）：原来读的是 `calendar-board-day-title`，
+   * 而那个 testid 住在 `showSelectedDayList` 那一段（`CalendarBoard.tsx:722`，代码段自称
+   * 「移动端兼容段」），Web 宿主 `CalendarView.tsx:254` 传的是 `false` ⇒ Web 上根本不渲染。
+   * Web 上"主区指的是哪一天"由**板子那一格**表达：`DayCell` 的 `aria-selected`
+   *（`CalendarBoard.tsx:277`，平铺成 `aria-selected` 就是为了判据能直接问）。
+   * ⇒ 直接钉"被点的那一天在板子里是选中态"，并钉"同时只有一格选中" ——
+   * 这比读一句日标题更直接地表达⑤的本义（两列必须指同一天）。
+   */
   const altParts = alt!.split('-');
-  await expect(page.locator(BOARD_DAY)).toContainText(
-    `${Number(altParts[1])}月${Number(altParts[2])}日`,
-  );
+  await expect(
+    page.locator(`[data-testid="calendar-cell-${alt}"]`),
+    `主区里被点的那一天（${Number(altParts[1])}月${Number(altParts[2])}日）必须是选中态`,
+  ).toHaveAttribute('aria-selected', 'true');
+  await expect(
+    page.locator('[data-testid^="calendar-cell-"][aria-selected="true"]'),
+    '板子里同时只能有一格是选中态',
+  ).toHaveCount(1);
   await expect(
     page.locator(`[data-testid="calendar-mini-day-${alt}"][aria-current="date"]`),
     '迷你月历里被点的那格必须成为当前日（选中态不能只画在主区）',
@@ -231,18 +275,28 @@ test('显示范围：勾一个清单就只看它（点与主区同时消失）�
   await openCalendar(page);
 
   const today = todayIso();
-  const scopedRow = (title: string) =>
-    page.locator(DAY_LIST).getByRole('checkbox', { name: `完成：${title}` });
+  /*
+   * 🔴 2026-10-17 换锚点（**不是**放宽）：判据原来说"这两条在**当天列表**里"，
+   * 而 `calendar-board-day-list` 这个 testid **在产品里已经不存在** ——
+   * 那份"选中那天的清单"现在是 `${testID}-day-section`，且由 `showSelectedDayList` 控制；
+   * 它的代码段自称「移动端兼容段」，而 Web 宿主 `CalendarView.tsx:254` 传的是 `false`
+   *（prop 文档逐字：「Web 使用格内任务条，移动端保留清单」）⇒ Web 月档**根本不该有那份清单**，
+   * 任务由**格内任务条**表达（截图现量：17 号那格里两条都在）。
+   * 判据的本义是"未筛时两条都在主区、勾上清单后另一条必须消失"，与载体无关 ⇒ 把载体换成
+   * 那两条任务条（`calendar-cell-<date>-bar`，标题写在里面）。
+   */
+  const scopedBar = (title: string) =>
+    page.locator(`[data-testid="calendar-cell-${today}-bar"]`).filter({ hasText: title });
 
-  // 前提：两条都到期于今天 ⇒ 未筛时都在。
-  await expect(scopedRow(IN_LIST), '未筛时：挂进清单的任务在当天列表里').toBeVisible();
-  await expect(scopedRow(OUT_LIST), '未筛时：收集箱里的任务也在当天列表里').toBeVisible();
+  // 前提：两条都到期于今天 ⇒ 未筛时都在（Web 用格内任务条表达）。
+  await expect(scopedBar(IN_LIST), '未筛时：挂进清单的任务在主区那一天的格子里').toHaveCount(1);
+  await expect(scopedBar(OUT_LIST), '未筛时：收集箱里的任务也在那一天的格子里').toHaveCount(1);
   await page.screenshot({ path: 'test-results/calendar-sidebar-before-scope.png' });
 
   // ① 勾上那一个清单 ⇒ 范围变窄：**主区少一行，侧栏那颗点也得少**。
   await page.getByRole('checkbox', { name: `在日历上显示清单「${LIST}」的任务` }).check();
-  await expect(scopedRow(IN_LIST), '勾选后本清单的任务仍在').toBeVisible();
-  await expect(scopedRow(OUT_LIST), '勾选后别的任务必须消失（只筛主区不筛点 = 界面在说谎）').toHaveCount(0);
+  await expect(scopedBar(IN_LIST), '勾选后本清单的任务仍在').toHaveCount(1);
+  await expect(scopedBar(OUT_LIST), '勾选后别的任务必须消失（只筛主区不筛点 = 界面在说谎）').toHaveCount(0);
   await expect(
     page.locator(`[data-testid="calendar-mini-day-${today}"] .ht-sidebar__day-dots > i`),
     '范围内仍有任务 ⇒ 点还在',
@@ -255,7 +309,7 @@ test('显示范围：勾一个清单就只看它（点与主区同时消失）�
     'aria-pressed',
     'true',
   );
-  await expect(scopedRow(OUT_LIST), '「所有」之后收集箱的任务回来').toBeVisible();
+  await expect(scopedBar(OUT_LIST), '「所有」之后收集箱的任务回来').toHaveCount(1);
 
   // ③ 「所有」按钮：按下时带一个 Check 图标（滴答同款：勾的是「所有」这一行）。
   await page.getByRole('checkbox', { name: `在日历上显示清单「${LIST}」的任务` }).check();
@@ -274,7 +328,7 @@ test('显示范围：勾一个清单就只看它（点与主区同时消失）�
     'aria-pressed',
     'true',
   );
-  await expect(scopedRow(OUT_LIST)).toBeVisible();
+  await expect(scopedBar(OUT_LIST)).toHaveCount(1);
 
   // ⑤ 把手在**这一列**里（日历侧栏是另一条列，上一轮的判据在任务侧栏）。
   //

@@ -20,6 +20,7 @@
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
+import { revealRowActionsBy } from './ai-entry.js';
 import { addTask, openApp, parkCursor, switchView } from './helpers';
 
 const SHOT = (name: string) =>
@@ -387,8 +388,21 @@ test.describe('任务面单落进那一栏（§8.138）', () => {
    *
    * ⚠️ **点行选中仍然走 `rowOf`**：外层那棵 `View` 没有 `onPress`，点它不会选中。
    */
+  /*
+   * 🔴 2026-10-17 改**定位精度**（不是改判据）：原来按 `hasText` 找整行，
+   * 而这一族里"行里含某个标题"会**过匹配** —— 窄档行尾那颗 `<select>` 会把
+   * **别的任务的标题**写进自己的 `option`（`selection-projections.spec.ts` 文件头第 1 条
+   * 与 T9 的注释都记着这件事），于是 `.first()` 可能落在**另一行**上；
+   * 症状是"窄档行尾没有整理入口"（`task-organize-summary` 数到 **0**），
+   * 读起来像"回落坏了"，其实是判据找错了行。
+   * ⇒ 改锚到**这一行自己的完成框**（`完成：<title>`，每行唯一、不会被他行的 option 污染）；
+   * 断言的对象、阈值、本义全不动。
+   */
   const rowItemOf = (page: Page, title: string): Locator =>
-    page.locator('[data-testid^="task-item-"]').filter({ hasText: title }).first();
+    page
+      .locator('[data-testid^="task-item-"]')
+      .filter({ has: page.getByRole('checkbox', { name: `完成：${title}` }) })
+      .first();
 
   test('T8 宽档：子任务的编辑本体在栏里那一格，行尾只剩只读徽标（§8.144）', async ({ page }) => {
     const errors = watchErrors(page);
@@ -475,6 +489,10 @@ test.describe('任务面单落进那一栏（§8.138）', () => {
      * `aria-label` 是界面自己声明的名字（`web.subtask.trigger.aria` / `…pick.aria`），
      * 只有那一行会带着它。
      */
+    // 🔴 2026-10-17：这枚入口住进了每行「更多」披露里（折叠时不可见 ⇒ click 一直等）。
+    // 用**按可访问名**定位披露的变体：本用例的 `hasText` 找行不安全（窄档 select 的
+    // option 会写进别的任务标题，两行都命中）。HEAD 上没有披露这层 ⇒ helper 原样返回。
+    await revealRowActionsBy(page, '把「窄档子任务子」移到别的任务下面');
     const trigger = page.getByLabel('把「窄档子任务子」移到别的任务下面');
     await expect(trigger, '窄档下行尾没有子任务入口 ⇒ "挂不到谁下面"').toHaveCount(1);
     await trigger.click();
@@ -583,6 +601,9 @@ test.describe('任务面单落进那一栏（§8.138）', () => {
      * 兄弟节点，而窄档那颗 chip 的面板会把别的任务正文写进 DOM。
      * ⚠️ 零条提醒时那颗 chip 显示的是「提醒」二字 = **入口**（`record` 档只约束栏里那枚徽标）。
      */
+    // 🔴 2026-10-17：同上 —— 这颗 chip 是**嵌在行「更多」披露里**的 `<details>`，
+    // 折叠时它的 summary（就是这颗 chip）在 DOM 里但不画。
+    await revealRowActionsBy(page, '「窄档提醒乙」的提醒');
     const trigger = page.getByLabel('「窄档提醒乙」的提醒');
     await expect(trigger, '窄档下行尾没有提醒入口 ⇒ "建不了提醒"').toHaveCount(1);
     // 先把锚点行滚到它所在分组容器的上沿：那一格是 `overflow:hidden auto` 的滚动容器，
@@ -817,6 +838,17 @@ test.describe('任务面单落进那一栏（§8.138）', () => {
     await addTaskAndRelease(page, '整理甲');
     await seedListAndTag(page, '整理清单一', '整理标签一');
 
+    /*
+     * 🔴 2026-10-17 补一步（**建立前提**，不是修产品）：`seedListAndTag` 会**新建一个清单**，
+     * 而新建清单会让侧栏选中它 ⇒ 当前视图被筛到那个**空清单**上。
+     * 真浏览器探针（900×600，与 T15 同视口）实测：
+     *   `afterSeedList.rowCount = 0`、`afterSeedList.allRows = 0`（一条任务都不在屏上）；
+     *   切回「任务」之后 `rowCount = 1`，而那时 `task-organize-summary` 数到 **1**（开着可见）。
+     * 也就是说产品这一侧没问题 —— 是判据**在被问到一条不在屏上的行**，
+     * 于是 `toHaveCount(1)` 读成 0，消息却说"窄档行尾没有整理入口"（把它读成产品坏了）。
+     */
+    await switchView(page, '任务');
+
     await rowOf(page, '整理甲').click();
     const pane = paneInColumn(page);
     await expect(pane, '栏里没画面单').toHaveCount(1);
@@ -895,6 +927,17 @@ test.describe('任务面单落进那一栏（§8.138）', () => {
     await switchView(page, '任务');
     await addTaskAndRelease(page, '整理窄档乙');
     await seedListAndTag(page, '整理清单乙', '整理标签乙');
+
+    /*
+     * 🔴 2026-10-17 补一步（**建立前提**，不是修产品）：`seedListAndTag` 会**新建一个清单**，
+     * 而新建清单会让侧栏选中它 ⇒ 当前视图被筛到那个**空清单**上。
+     * 真浏览器探针（900×600，与 T15 同视口）实测：
+     *   `afterSeedList.rowCount = 0`、`afterSeedList.allRows = 0`（一条任务都不在屏上）；
+     *   切回「任务」之后 `rowCount = 1`，而那时 `task-organize-summary` 数到 **1**（开着可见）。
+     * 也就是说产品这一侧没问题 —— 是判据**在被问到一条不在屏上的行**，
+     * 于是 `toHaveCount(1)` 读成 0，消息却说"窄档行尾没有整理入口"（把它读成产品坏了）。
+     */
+    await switchView(page, '任务');
 
     await expect(paneInColumn(page), '窄档却画出了详情栏').toHaveCount(0);
     // 🔴 窄档要量的东西**全在行尾**（触发器、`<details>` 里的下拉与复选框、chip），
