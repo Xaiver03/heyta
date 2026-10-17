@@ -6418,3 +6418,16 @@ button.duration-run(99x44) → span.ht-ai → …__items → …__panel(op=0.68)
   旁证：同仓另一条判据 `ai-assistant.spec.ts:86` 现在明确断言"默认 **`ai-tool-run` 计数为 0**"，
   也就是说"默认不挂载"是**这次设计变更的一部分**，不是坏了。
 ⇒ 这两条**不是我能单方面收的**（要么那条线落库并给出入口口径，要么产品定"默认挂载"）。已如实登记。
+
+### 2026-10-17 逐道读数（补第二批 15 道，全 rc=0）
+
+`check:crosslang-contract` · `check:journey-coverage` · `check:integration-coverage` ·
+`check:mobile-ai-anchors` · `check:legal-copy` · `check:legal-permissions` · `check:legal-host` ·
+`check:server-copy` · `check:server-design` · `check:brand-assets` · `check:calendar` ·
+`check:holiday` · `check:card-export` · `check:ai-tools` · `check:ai-quota` —— **15/15 rc=0**。
+
+⇒ 累计已实跑并 rc=0 的链步：**第一批 8 + 第二 16 + 这一批 15 = 39 步**（另加第 87 道前半的
+`check-ai-e2e-preflight.mjs` rc=0）。第 87 道的 e2e 本体正在跑全量盘点（`--retries=0`，日志 `/tmp/full4.log`），
+读数下一轮；剩下的红已知全在**别线未落库那笔壳/面板改版**的地界（`ai-row-layout` / `detail-pane-task` /
+`detail-pane-collapse` / `focus-detail-pane` / `detail-pane-habit` / `ai-tool-run`，其中 `detail-pane-task`
+有差分证据、`ai-row-layout` 有"testid 仍在但默认不挂载 = 设计变更"的旁证）。
