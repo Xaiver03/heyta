@@ -27,7 +27,22 @@ test.describe('冒烟：验收链路本身', () => {
     // tablist 里 = 主段 4 + 工具段（回收站）= **5**；其余 6 个目的地在「更多」菜单
     // （role=menuitem，不是 tab）。「默认只开几个模块」由 `motivation.spec.ts` 专门钉。
     // ⚠️ rail 形状的逐字契约（含菜单序）在 `motivation.spec.ts`，这里只钉"骨架在"。
-    await expect(page.locator('.ht-rail__tabs button[role="tab"]:not(.ht-rail__tab--tool)')).toHaveCount(4);
+    //
+    // 🔴 2026-10-17 改口：原来这条数的是 `.ht-rail__tabs button[role="tab"]:not(.ht-rail__tab--tool)`，
+    // 期望 4、现量 **5** —— 多出来的那枚是**助手入口**（`RailNavigation.tsx:452`，
+    // `data-testid="rail-assistant"`），它的 class 只有 `ht-rail__tab`：既没有 `--tool`、
+    // 也没有别的修饰类 ⇒ 被那条 `:not(--tool)` 当成"主段的一枚"数了进去。
+    // 判据的本义是"**主段 4 个 section**"，所以改成按主段**自己的 testid 命名空间**数
+    // （主段每枚都是 `rail-view-<key>`，见 `RailNavigation.tsx:111`；工具段那几枚带 `--tool`），
+    // 并把这枚助手入口**显式**钉住 —— 它正是被误数进来的那一枚，写出来才不会下次又滑进去。
+    await expect(
+      page.locator('.ht-rail__tabs [data-testid^="rail-view-"]:not(.ht-rail__tab--tool)'),
+      '主段 section tab 应当恰好 4 枚',
+    ).toHaveCount(4);
+    await expect(
+      page.locator('.ht-rail__tabs [data-testid="rail-assistant"]'),
+      '助手入口是独立的一枚（它不是 section tab，别被算进主段）',
+    ).toHaveCount(1);
     await expect(page.locator('.ht-rail__more button')).toBeVisible();
     await expect(page.getByRole('tab', { name: '回收站' })).toHaveCount(1);
   });

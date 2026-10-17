@@ -15,6 +15,7 @@
 
 import { expect, test } from '@playwright/test';
 
+import { revealRowActions } from './ai-entry.js';
 import {
   addTask,
   CAP_LONG_CONTEXT,
@@ -50,6 +51,7 @@ test.describe('AI 拆解：真浏览器端到端旅程', () => {
 
     // ══ 2. 建一条任务（走真 CaptureComposer → op-log）══════════════════
     await addTask(page, '把新版本发到生产环境');
+    await revealRowActions(page, '把新版本发到生产环境');
 
     const openButton = page.locator('[data-testid^="ai-breakdown-"]');
     await expect(openButton).toBeVisible();
@@ -96,6 +98,7 @@ test.describe('AI 拆解：真浏览器端到端旅程', () => {
     // 有备注 → 字段列表变成 `title、note`；没落库则仍是 `title`。
     await page.reload();
     await expect(rowFor(page, '把新版本发到生产环境')).toBeVisible();
+    await revealRowActions(page, '把新版本发到生产环境');
     await page.locator('[data-testid^="ai-breakdown-"]').click();
     await expect(page.locator('[data-testid="ai-field-list"]')).toHaveText('today、title、note');
 

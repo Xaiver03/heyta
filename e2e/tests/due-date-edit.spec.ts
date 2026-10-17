@@ -15,6 +15,8 @@
 
 import { expect, test, type Page } from '@playwright/test';
 
+import { revealRowActionsBy } from './ai-entry.js';
+
 const SHOT = (name: string): string => `test-results/due-date-edit-${name}.png`;
 
 /** 桌面载荷的统一入口：清理首启面板，落到任务页。 */
@@ -66,8 +68,26 @@ test('行尾「截止」：点开 → 选日 → DueBadge 变化 → 刷新后�
   const title = `due-e2e-${Date.now() % 100000}`;
   await addTaskViaComposer(page, title);
 
-  const row = page.locator('[data-testid^="task-item-"]', { hasText: title }).first();
+  /*
+   * 🔴 2026-10-17 改**定位精度**（不是改判据）：`hasText` 在这一族会命中**不可见的那一份**
+   * （同一份行标记在隐藏分支里也有一份）⇒ `.first()` 可能落在它上面，`toBeVisible()` 就红。
+   * 改成"只看可见行 + 用本行自己的完成框锚定"。
+   */
+  const row = page
+    .locator('[data-testid^="task-item-"]:visible')
+    .filter({ has: page.getByRole('checkbox', { name: `完成：${title}` }) })
+    .first();
   await expect(row).toBeVisible();
+
+  /*
+   * 🔴 2026-10-17 补：这一行的截止入口现在住在**每行那枚「更多」披露**里
+   *（`details.ht-compose-actions`）——折叠时 `<summary data-testid="due-editor-summary">`
+   * **在 DOM 里但不画**（现量：`locator resolved to <summary …>` 然后一路
+   * `waiting for element to be visible` 到 60s 超时，30+ 次重试）。
+   * 按可访问名（`设置任务「…」的截止日期`）反查"包含它的那一枚披露"再点它自己的 summary；
+   * HEAD 上没有披露这层时 helper 原样返回。判据问的三件事一件没变。
+   */
+  await revealRowActionsBy(page, `设置任务「${title}」的截止日期`);
 
   // 🔴 先截图再断言：失败时也要有图。
   await page.screenshot({ path: SHOT('1-row'), fullPage: false });
@@ -129,7 +149,10 @@ test('行尾「截止」：点开 → 选日 → DueBadge 变化 → 刷新后�
   // ⑤ 刷新后仍在（本地优先：重放 op，字段还在）。
   await page.reload({ waitUntil: 'networkidle' });
   await dismissConsentIfPresent(page); // 同意面板未做选择时每次加载都回来，先关掉再取证
-  const rowAfter = page.locator('[data-testid^="task-item-"]', { hasText: title }).first();
+  const rowAfter = page
+    .locator('[data-testid^="task-item-"]:visible')
+    .filter({ has: page.getByRole('checkbox', { name: `完成：${title}` }) })
+    .first();
   await expect(rowAfter).toBeVisible();
   await page.screenshot({ path: SHOT('4-after-reload'), fullPage: false });
   await expect(rowAfter.getByTestId('task-meta')).toContainText(compact);

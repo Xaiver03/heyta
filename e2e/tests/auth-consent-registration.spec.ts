@@ -142,7 +142,17 @@ for (const viewport of [
         await reader.getByTestId('auth-legal-document-ref-privacy').first().click();
         await expect(reader).toContainText('隐私政策');
         // 切换文档应从正文开头读起，不能继承前一份文档的底部滚动位置。
-        await expect(reader.getByText('这份政策管什么、不管什么', { exact: true })).toBeInViewport();
+        //
+        // 🔴 2026-10-17：这里原来是 `{ exact: true }`，而**产品给顶层小节加了序号**
+        // （现量 `LegalDocumentSheet.tsx:341` 渲出的是 `1. 这份政策管什么、不管什么`，
+        // 序号按 depth/索引生成）。`exact: true` 要求"元素整段文本**逐字相等**"，
+        // 于是一个都匹配不到 —— 报 `element(s) not found`，读起来像"文档没切过去"，
+        // 其实判据把"小节标题"钉成了"不带序号的标题"。
+        // ⇒ 改成子串匹配。**不**把序号抄进判据：序号是生成物，抄进来等于把下标当承诺。
+        await expect(
+          reader.getByText('这份政策管什么、不管什么', { exact: false }),
+          '切到隐私政策后第一小节应当已经滚进视口（而不是停在上一份文档的底部）',
+        ).toBeInViewport();
       }
       await reader.getByTestId('auth-legal-document-close').click();
       await expect(reader).toBeHidden();

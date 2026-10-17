@@ -15,6 +15,7 @@
 
 import { expect, test } from '@playwright/test';
 
+import { revealRowActions } from './ai-entry.js';
 import {
   addTask,
   CAP_STRUCTURED_OUTPUT,
@@ -47,6 +48,7 @@ test.describe('AI 耗时估计：真浏览器端到端旅程', () => {
     await switchView(page, '任务');
 
     await addTask(page, '重构同步引擎的冲突解决');
+    await revealRowActions(page, '重构同步引擎的冲突解决');
 
     // ══ 1. 披露：只算不发，且**发送前**就要说明依据 ════════════════════
     const openButton = page.locator('[data-testid^="duration-run-"]');
@@ -83,6 +85,7 @@ test.describe('AI 耗时估计：真浏览器端到端旅程', () => {
     // ══ 5. 刷新：断言备注真的落库 ══════════════════════════════════════
     await page.reload();
     await expect(rowFor(page, '重构同步引擎的冲突解决')).toBeVisible();
+    await revealRowActions(page, '重构同步引擎的冲突解决');
     await page.locator('[data-testid^="duration-run-"]').click();
     await expect(page.locator('[data-testid="duration-field-list"]')).toHaveText('today、title、note');
     // 重新打开面板不算发送。
@@ -101,6 +104,7 @@ test.describe('AI 耗时估计：真浏览器端到端旅程', () => {
     await switchView(page, '任务');
 
     await addTask(page, '整理季度预算表');
+    await revealRowActions(page, '整理季度预算表');
 
     await page.locator('[data-testid^="duration-run-"]').click();
     await expect(page.locator('[data-testid="duration-disclosure"]')).toBeVisible();

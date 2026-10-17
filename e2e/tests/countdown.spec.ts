@@ -74,7 +74,15 @@ test.describe('倒数纪念日：真浏览器契约（W5）', () => {
     const errors = await collectErrors(page);
     await openApp(page);
 
-    await expect(page.getByRole('tab', { name: TAB })).toHaveCount(1);
+    /*
+     * 🔴 2026-10-17 换载体（**不是**放宽）：原来钉的是"它在主段里是一枚 tab"，
+     * 而 W1（2026-10-06，审计 §3.2-1）之后 rail 收成「主段 ≤4 + 更多」——
+     * 低频目的地（时间线/番茄钟/倒数纪念日…）住在**「更多」菜单**里，`role=menuitem`。
+     * 现量：`getByRole('tab', { name: '倒数纪念日' })` = **0**，而 `switchView` 走的正是
+     * 那条真路径（点「更多」→ 点那一项，点完它会被提升进主段）。
+     * 判据的本义是"入口在、切得过去" ⇒ 让它按**真路径**去证明：`switchView` 找不到就会红，
+     * 这比"主段里必须有一枚 tab"更直接地表达"用户点得到"。
+     */
     await switchView(page, TAB);
     await expect(page.locator(BOARD)).toHaveCount(1);
     await expect(page.locator('.ht-header__title')).toHaveText(TAB);
