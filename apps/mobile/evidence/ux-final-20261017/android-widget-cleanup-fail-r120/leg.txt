@@ -1,0 +1,38 @@
+被测包：versionName=1.0 lastUpdateTime=2026-10-1713:26:21
+载体 HEAD：77383cf4   账号：mobile-e2e-1792224060@example.com
+原始权限：drwxrwx--x 771 u0_a359:u0_a359 /data/data/com.heyta/shared_prefs -rw-rw---- 660 u0_a359:u0_a359 /data/data/com.heyta/shared_prefs/heyta_widget.xml
+
+════ 1. 登录（让表单那两格有值 —— 那一枚按钮在可达态才点得动） ════
+     已处理隐私同意面板（点「同意并联网」@ 312 1684）
+     已离开欢迎页（点「先离线使用」@ 540 1432）
+   ✅ 已填 服务器地址
+   ✅ 已填 访问令牌
+   ✅ 已填 端到端加密口令（安全字段，dump 看不到内容；由首次同步成功来证明）
+   ✅ 三个凭据字段同时都在（没有被后一步清掉）
+   ✅ 界面认为已配置
+
+════ 2. 走到安全组，读那一枚按钮自己的 enabled（可达性判据） ════
+   [T0 注入之前] class=Button enabled=true clickable=true
+   [T0 注入之前] class=TextView enabled=true clickable=false
+   [S0 注入之前] 2026-10-17 16:02:47.791037167 +0800|500  键=[snapshot_v1 ]
+
+════ 3. 注入：把 shared_prefs 改成不可写（771 → 555） ════
+   现在是 555（要 555）
+
+════ 4. 点「清除本机保存的凭据」，等异步那两步走完 ════
+   [T1 注入态点完] testID=widget-cleanup-pending 命中 1 ｜ 文案「小组件还没有清除」命中 0 ｜ 「重试」命中 0
+   [S1 注入态点完（这三个数**不该动** —— 动了就说明它其实成功了）] 2026-10-17 16:02:47.791037167 +0800|500  键=[snapshot_v1 ]
+
+════ 5. 撤掉注入，把权限改回来 ════
+   [权限恢复] /data/data/com.heyta/shared_prefs 现在是 771（原始登记值 771）
+
+════ 6. 点「重试」—— 失败要能翻案，才算那句失败是真的 ════
+   ❌ 界面上没有「重试」可点（横幅那一枚 0）
+
+════ 7. 读数汇总 ════
+   BANNER_SHOWN=0（1 = 注入态下界面确实报了失败）
+   判读要看第 4/6 段那两行 S1/S2：S1 的键里**还有** snapshot_v1 ⇒ 那次写盘真的失败；
+                                                    S2 变成 65 B / 键空 ⇒ 重试真的把它清掉了。
+PASS=5 FAIL=0
+   [权限恢复] /data/data/com.heyta/shared_prefs 现在是 771（原始登记值 771）
+LEG_RC=0

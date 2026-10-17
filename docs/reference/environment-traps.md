@@ -10148,3 +10148,37 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     （`content://com.google.android.apps.nexuslauncher.settings/favorites`），收组件实例也走它：
     `content delete --where "_id=7 AND appWidgetId=27"` → 再查命中 0。⇒ 按文件名猜库名会读成一棵空表。
 
+456. 🔴 **同一屏上两枚探针互相打脸时，先怀疑探针 —— 哪怕那枚探针的警告就写在它下面四行**。
+    2026-10-17 装机态注失败那一趟（`apps/mobile/evidence/ux-final-20261017/android-widget-cleanup-fail-r120/`），
+    第 4 段打出的是 `testID=widget-cleanup-pending 命中 1 ｜ 文案「小组件还没有清除」命中 0 ｜ 「重试」命中 0`。
+    锚点在、文案"不在" —— 这形状看着像"渲染了锚点却没渲染内容"的产品缺陷，实际是**我用错了探针**：
+    `scripts/lib/mobile-e2e.sh` 的 `has_text` 是 `grep -q "text=\"$1\""`，**整节点精确匹配**（闭合引号在模式里），
+    而 411-417 行**自己写着**这条警告（"状态行是「有 1 处冲突待你选择」这种拼接过的句子，用精确匹配永远查不到
+    —— 那会让一条**已经出现**的冲突被记成'没出现'"），子串要走 `has_sub`。
+    同一条错在定位符上又犯一次：`xy_text "重试"` 找不到，因为按钮实际标签是 i18n 整值
+    `mobile.widgetCleanup.retry` = 「重试清除小组件」（`packages/i18n/src/locales/zh-CN.ts:3557`）。
+    ⇒ 可复用的两句：**① 传进 `has_text` / `xy_text` 的必须是界面上的整值**（去 i18n 里抄，别凭印象截一句）；
+    **② 只要有一枚探针命中、另一枚说"没有"，那一趟的结论就先按"探针错位"处理**，
+    把 dump 存下来（`ui.*.xml`）用正则按节点逐条读原文，比再猜一轮快得多 ——
+    那一趟就是靠 `ui.step6.xml` 里那行 `text='已退出登录，但这台设备上的小组件还没有清除。请重试。'`
+    在 30 秒内翻的案，而按当时那行汇总读数写台账会写成一条**假红**。
+457. 🔴 **设备腿里那句"❌ …"如果走的是裸 `echo`，它就不进 `FAIL` 计数**，于是脚本末尾照打
+    `PASS=5 FAIL=0`、`$?` 也是 0 —— 汇总行会说这一趟全绿，而**它唯一那枚决定性判据根本没跑**。
+    2026-10-17 同一趟（`…/android-widget-cleanup-fail-r120/leg.txt`）第 6 段就是这个形状：
+    `❌ 界面上没有「重试」可点（横幅那一枚 0）` → `PASS=5 FAIL=0` → `LEG_RC=0`。
+    根因是 `scripts/lib/mobile-e2e.sh` 里 `bad` 才做 `FAIL=$((FAIL+1))`，而 `echo` 只是打字。
+    写脚本时"这里失败也算红"的那条判断**很容易被"我已经打了 ❌"顶替**。
+    ⇒ 两句判据：**① 腿里任何一行以 ❌／⚠️ 开头的分支必须走 `bad`**（要出坐标或原文，别只写结论）；
+    **② 收腿先看 `PASS/FAIL` 那一行对不对得上段数** —— 段数比 FAIL 计数大很多就说明有分支在偷偷 `echo`。
+    同族：#452（假绿的那句「界面认为已配置」）、§7 元规则二"一条永远通过的判据比没有判据更糟"。
+458. ✅ **要证"原生那一步真的失败了"，别 mock，把失败注进设备侧文件权限**（2026-10-17 实测可用，
+    零代码改动、零重装、跑完净改动 = 0）。形状：`apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetStore.kt:115-119`
+    是 `check(store.commit()) { … }`，而 `SharedPreferences.commit()` 写盘失败返回 false ⇒
+    把 `/data/data/com.heyta/shared_prefs` 从 `771` 临时 `chmod 555`，点一次清除就真的抛、
+    桥接层就真的把错误传回 `onWidgetError`、界面上那枚 `widget-cleanup-pending` 横幅就真的出现。
+    🔴 **三条不许省**：① **原始权限先登记再还原**，恢复挂在 `trap 'restore_perms' EXIT` 上
+    （中途红也要还原），收尾腿再**独立复量一次** `stat -c '%a'`，别只信 trap；
+    ② **失败必须留下可数的痕迹** —— 注入态点完之后存储的 `mtime|size|键` 三个数要**一个都没动**，
+    否则那声"失败"是假的（只看横幅 = 只证明了它会喊）；
+    ③ **撤销注入后要点「重试」把案翻回来**（那一趟：`500 B / [snapshot_v1]` → `65 B / 键=（空）`、锚点消失），
+    只量前两半等于证明了"会喊失败"，没证明"那句失败是真的、而且这条路能走通"。

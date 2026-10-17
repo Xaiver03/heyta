@@ -1,0 +1,32 @@
+════ 1. 注入用的那枚权限：必须回到登记的原始值 771 ════
+     目录 = drwxrwx--x 771 u0_a359:u0_a359
+     文件 = -rw-rw---- 660|65
+   ✅ 权限已还原（这趟留下的唯一设备侧改动是写盘权限，且只在注入那 8 秒）
+════ 2. 桌面绑定：这趟没绑新实例，读数证一下（r119 收尾时已解绑）════
+     组件行 0（favorites 共 6 行，其余 appWidgetId=-1 是图标）
+════ 3. 设备级隐私同意：本趟又被共享 helper 点成 accepted，按 r119 同一档恢复 ════
+  恢复前 device_pref：
+     privacy.consent|{"decision":"accepted","decidedAt":"2026-10-17T08:02:54.489Z"}
+     welcome.hasSeen|1
+  删行之后 device_pref 行数 = 0
+════ 4. 应用留在冷启动态（下次谁用都和刚装完一样：先看到同意卡）════
+     Starting: Intent { cmp=com.heyta/com.heytamobile.MainActivity }
+     Status: ok
+     Activity: com.heyta/com.heytamobile.MainActivity
+        3 只用本机
+        3 同意并联网
+        1 在使用联网功能之前
+     应用进程 pidof = ''（空 = 已停）
+════ 5. 停掉本趟那台栈、删掉本趟那枚库与本趟那批凭据文件 ════
+        ✅ 服务端已停止（pid 77096）
+     残留 uxr 库数 = 0
+     4520 监听 = 0
+     待删：e2ee.txt
+     待删：email.txt
+     待删：token.txt
+     待删：ui.step6.xml
+     待删：ui.xml
+     待删：ui.xml.dump-err
+     待删：up.log
+     待删：xy.py
+     /Users/rocalight/heyta-r120-leg 还在吗：已删

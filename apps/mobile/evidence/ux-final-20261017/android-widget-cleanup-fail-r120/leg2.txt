@@ -1,0 +1,24 @@
+app 进程：18968
+目录权限：771 /data/data/com.heyta/shared_prefs（第一腿登记的原始值 771）
+
+════ 1. 重试之前：横幅在场（用 has_sub / 整值，不用第一腿那个碎片） ════
+   ✅ 注入态留下的锚点 widget-cleanup-pending 仍在场
+   ✅ 整句文案用子串探针命中（has_sub）
+   ✅ 整句文案按整值也命中
+   截图：/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/mobile/evidence/ux-final-20261017/android-widget-cleanup-fail-r120/settings-banner-injected.png（  186193 字节）
+   ✅ 按钮定位到 540 1211，节点状态：class=TextView enabled=true clickable=false bounds=[394,1185][686,1238]
+   [S0 重试之前（该还是 500 B / snapshot_v1 还在）] 2026-10-17 16:02:47.791037167 +0800|500  键=[snapshot_v1 ]
+
+════ 2. 点「重试清除小组件」，等原生那一步回来 ════
+
+════ 3. 重试之后：锚点要消失、存储要变空 ════
+   ✅ 重试之后锚点消失
+   ✅ 重试之后横幅文案不在
+   [S1 重试之后（要 65 B / 键空）] 2026-10-17 18:21:04.079001210 +0800|65  键=[（空）]
+   ✅ 存储大小回到 65 B（空壳）
+   ✅ snapshot_v1 键已消失
+
+════ 4. 组件卡面读数（翻案后卡片该是空态） ════
+   截图：/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/mobile/evidence/ux-final-20261017/android-widget-cleanup-fail-r120/settings-after-retry.png（  154990 字节）
+   截图：/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/mobile/evidence/ux-final-20261017/android-widget-cleanup-fail-r120/home-after-retry.png（ 1385578 字节）
+PASS=7 FAIL=0
