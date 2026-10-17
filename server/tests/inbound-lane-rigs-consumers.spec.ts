@@ -37,7 +37,7 @@ const SELF_TEST_OMITTED: Record<string, string> = {
 };
 
 // 🔴 **只常驻反向验证臂**的那几枚：它们的 no-arg 判据要外部输入（链装置的日志），
-// 而且在当前 HEAD 上如实就是 rc=1（第 21 道那四处真命中，见 BLOCKED.md B211）。
+// 而且在当前 HEAD 上如实就是 rc=1（第 21 道那四处真命中，见 BLOCKED.md B212）。
 // 把一条"如实的红"接成常驻的"退出 0"用例，等于自己把它洗成假绿 —— 所以判据腿留手跑，
 // 而臂本身（不依赖外部输入、测的是分类器有没有牙）天天跑。
 const SELF_TEST_ONLY: Record<string, string> = {
@@ -114,7 +114,7 @@ describe('本线装置的自动消费者', () => {
   }
 
   for (const [file, okLine] of Object.entries(SELF_TEST_ONLY)) {
-    it(`${file} --self-test 的臂常驻成立（判据腿按 B211 留手跑）`, () => {
+    it(`${file} --self-test 的臂常驻成立（判据腿按 B212 留手跑）`, () => {
       const r = runRig(file, ['--self-test']);
       expect(r.status, describeRun(file, ['--self-test'], r)).toBe(0);
       expect(r.stdout ?? '', describeRun(file, ['--self-test'], r)).toContain(okLine);
