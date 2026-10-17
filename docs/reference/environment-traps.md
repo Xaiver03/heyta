@@ -10182,3 +10182,18 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     否则那声"失败"是假的（只看横幅 = 只证明了它会喊）；
     ③ **撤销注入后要点「重试」把案翻回来**（那一趟：`500 B / [snapshot_v1]` → `65 B / 键=（空）`、锚点消失），
     只量前两半等于证明了"会喊失败"，没证明"那句失败是真的、而且这条路能走通"。
+459. 🔴 **`git update-index --stdin` 吃的是"路径列表"，不是 cacheinfo 三元组** —— 2026-10-17 本机实测
+    （`git version 2.54.0 (Apple Git-157)`，四写法各跑一遍，私有索引 + `read-tree HEAD`，不碰真实索引）：
+    ① `printf '100644 <sha> <路径>\n' | git update-index --add --stdin` ⇒ **退 128**，
+    报的是把**整行当路径**：`error: 100644 2bb7250… docs/README.md: does not exist and --remove not passed`。
+    ② `git update-index --add --cacheinfo "100644,<sha>,<路径>"`（**逗号**）⇒ 退 0。
+    ③ `printf '<路径>\n' | git update-index --add --stdin` ⇒ 退 0（它按工作树内容去取 blob）。
+    ④ `… | git update-index --add --cacheinfo --stdin` ⇒ 退 129 `option 'cacheinfo' expects <mode>,<sha1>,<path>`。
+    ⑤ `printf '100644 <sha>\t<路径>\n' | git update-index --add --index-info`（**sha 与路径之间是 TAB**）⇒ 退 0，
+    这才是批量按 sha 刷索引的那条路（`--stdin` 与 `--index-info` 是两枚不同的开关，名字像但不通用）。
+    ⚠️ **为什么这条会咬到本仓的人**：#451 结尾写的收尾动作是"把已入库的文件刷进真实索引，
+    否则读 `git ls-files` 的门禁会报缺"，而 plumbing 提交里已经算好每枚 blob 的 sha，
+    于是最自然的写法就是 ① —— 它**失败得很大声**（128），但如果那一步被挂在
+    `| while … done | git update-index …` 这种管道尾巴上，**退出码会被管道吃掉**（#179 那一族），
+    症状就变成"提交成功了，可门禁还是报那几枚缺"。⇒ 收尾对账别只跑 `git ls-files`，
+    要跑 `git diff --cached --name-only HEAD -- <本批路径>`：**空**才叫索引跟上了提交态。
