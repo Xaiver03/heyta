@@ -5490,6 +5490,14 @@ AC 已勾数仍为 **0**（`verify-inbound-ac-ticks.py`：`AC 行=8　已勾=0�
     ⚠️ **同时自曝本线在这一格里造的两枚破坏，都当场补回了**：① 上条那条 `Edit` 把 `## 2026-10-17 · pnpm check 门禁收口…` 那枚**节标题整行吃掉**了（`new_string` 里没带它）——现量 `grep -c '^## 2026-10-17 · \`pnpm check\` 门禁收口' PROGRESS.md` 当时回 0，已补回并复量回 1；这类坏法特别阴，因为正文一行没丢、`pnpm check:docs` 只在有人用旧号引用那节时才报。② 上一轮那枚"取下一空号"的现量命令我先写成 `python3 -c` 里塞 `chr()` 转义，读起来是一坨乱码——**能跑不等于能给人复跑**，已换成两条直读的（`grep … | sort | uniq -d` 判撞号、`node -e …matchAll…` 取空号），两条都在本轮真跑过。**教训**：往账本里写"复跑命令"时，判据是**另一个人照字面敲能出预期形状**，不是我自己这一趟跑通了。
     🟠 **留给负责人拍的一条（本线不代拍、也不登记成"他没答"）**：共享账本要不要配一枚"节号唯一"的门禁。我这趟能给的证据是：两次撞号都发生在同一枚共享工作树上、都由 `git diff` 看不见；现成的落点是 `pnpm check:docs` 那一族静态门（它已经会扫全仓 Markdown），只需一条"标题行里的 `B[0-9]{3}` 不许重复"的判据，成本≈十几行。要不要建、归哪条线，请他点头。
 
+34. **那 29 条 AC 读数的戳要不要跟着 tip 走，量成两条集合判据，不量成印象**（14:5x，写前先跑 `date`）。昨天那整串读数的戳是 `30397e71`，到刚才 HEAD 已前移若干笔（现量 `git rev-list --count 30397e71..HEAD`）。判"要不要整串重跑"用的是差集：
+    ① **区间变的路径全集**（现量 `git diff --name-only 30397e71 HEAD | wc -l`）分六类：`docs/` 四枚、`PROGRESS.md`＋`BLOCKED.md` 两枚账本、`apps/mobile/evidence/**` 83 枚、`server/scripts/migrate-deploy.sh` 一枚（别线那笔 `fix(迁移)`）、`server/tests/inbound-lane-rigs-consumers.spec.ts` 一枚（今天新接的名册）、`research/tools/verify-inbound-chain-ownership.py` 一枚（今天新增的装置）。
+    ② 🔴 **代码腿的被测物一个都没动**：现量 `git diff --name-only 30397e71 HEAD -- packages server/src apps/web/src apps/mobile/src e2e | wc -l` 回 **0** ⇒ 那 21 条 vitest／playwright／python 腿不必重跑。这句话的分量在"差集为空"，不在"我判断没影响"。
+    ③ 会读到 ① 里那几枚的腿，改在**隔离的 HEAD 检出**里逐条重取：`git worktree add --detach .worktrees/inb-ac-head-1017 HEAD`（跑完 `git worktree remove` 撤掉，那棵树已经不在，重建就这一行；取证只落 `~/.heyta-evidence`，不落在仓内路径上）。**提交态读数九条各回 rc=0**：`verify-inbound-doc-tables`／`verify-inbound-doc-endpoints`／`verify-inbound-ac-ticks`（末行「已勾=0、未勾=8」）／`verify-inbound-ac8-matrix`／`verify-inbound-producer-seam`／`node research/tools/docs-link-check.mjs`／`node scripts/check-md-table-rows.mjs`／`node scripts/check-migrations.mjs`／带 `--since '2026-10-17 08:50'` 的 `verify-inbound-commit-scope.py`（`越界=0`）。原件现量 `ls ~/.heyta-evidence/inb-t7-1017-0902/doc-gates/head-*.txt | wc -l` 回 12 份 —— 12 减 9 那三份各有名目，不是漏：`license-inventory` rc=1 是"找不到任何 pnpm store"的前置、`verify-inbound-cjs-require-order.py` rc=2 是"编译 server 没产出 .js（`tsc` rc=127）"的前置、`verify-inbound-commit-scope.py` **不带** `--since` 时回 rc=1 是它默认窗口的在册状态（B169）。
+    ④ 这两枚取不到提交态读数的腿，**装置都是响亮拒绝、没有假绿**（在未装依赖的检出上直接点名缺什么），这是装置对的行为。于是 license 那一格改配一条窄尺而不是硬凑：主检出工作树与 HEAD 在清单上的差只有四枚（`package.json`、`server/package.json`、`packages/inbound-core/package.json`、`pnpm-lock.yaml`），而差的内容是 `scripts` 别名加一枚版本范围的插入符（`@noble/hashes` 由 `2.4.0`→`^2.4.0`，解析版本仍是 `2.4.0`）⇒ **依赖集合相同**，所以那一趟 `rc=0` 覆盖到提交态（现量 `git diff HEAD -- package.json packages/inbound-core/package.json server/package.json pnpm-lock.yaml`）。⚠️ 这句话的作用域是"集合相同"，**不是**"我在 HEAD 上跑过 license"。
+    ⑤ 顺手量到、不代改的一件别线在途事实：`server/package.json` 的 `test:integration:postgres` 在工作树里多列了本线那枚 `tests/integration/inbound-dual-host-fault-windows.integration.spec.ts`（现量 `grep -c inbound-dual-host-fault-windows server/package.json` 回 1，而 `git show HEAD:server/package.json | grep -c …` 回 0）。登记给那条线的提交，本线不碰那枚清单、也不替它落库。
+    ⑥ **本线提交那一刻 `docs-link-check` 与 `check:docs` 回 rc=1，红不在 HEAD、也不在本线**：是体验线正在写的那枚 `apps/mobile/evidence/ux-final-20261017/android-widget-erase-r117/RESULT.md`（工作树 mtime 就在刚才，` M`）新增了一枚指向同目录 `consent-side-effect.txt` 的链接，而那枚 txt 还没 `git add`（现量 `git cat-file -e HEAD:apps/mobile/evidence/ux-final-20261017/android-widget-erase-r117/consent-side-effect.txt` 回 NO，`git status --porcelain -- <那个目录>` 里它是 `??`）。同一把尺在 ③ 那枚隔离 HEAD 检出里回 **rc=0**（原件 `head-docs-link-check.txt`）⇒ 这是**别线在途的瞬时形状**，不登记成状态、不代改、更不为了让自己绿去放宽判据；下一位照 `node research/tools/docs-link-check.mjs` 重跑，看到的是他那一刻的形状。
+
 ## 2026-10-17 · `pnpm check` 门禁收口：26 枚红逐道定位并逐道复跑（自动收集线之外的一轮独立工作）
 
 写前先跑 `date`（本机 09:2x）。**起点读数**（同一枚链装置 `research/tools/verify-inbound-check-chain.py`，2026-10-16 21:27 @`15a3cd4f`，日志 `.run-logs/check-1016/`）：
@@ -5725,3 +5733,32 @@ Error: 对着把手几何中心按下去，命中的必须是把手自己
 - 要命中把手，需要**两个条件同时成立**：① 骑在外面的那 4px **没被任何祖先裁掉**（判据已经查了列自己的 `overflowY`，但没查祖先链）；② 把手的绘制顺序**在内容列之上**。
 - 现量 `elementFromPoint(把手中心) === "ht-content"` ⇒ 至少有一个不成立。下一轮的两步：先 `getComputedStyle` 逐级读祖先链的 `overflow-x/y`（找裁点），再读 `z-index`/`isolation`/`backdrop-filter` 造成的层叠上下文（别线那笔壳改版把面板做成 `ht-material`，很容易在这里多出一个上下文）。
 - ⚠️ 判据本身**是对的**（"按下去拖不动"是用户真会遇到的），所以这一格**不要**改判据；是产品侧给把手一个层叠顺序、或者把裁点去掉。
+
+**把手几何：已归因（下一轮直接改，不必再查）** —— 现量链条：
+1. 日历那一列现在是 `<ScopeDrawer><CalendarSidebar /></ScopeDrawer>`（`App.tsx:2322-2325`，而 **`App.tsx` 正是在途的 staged 改版**）；任务侧栏**没有**这层包裹；
+2. `ScopeDrawer`（`apps/web/src/features/shell/ScopeDrawer.tsx:44`）渲的是一个 `<dialog class="ht-scope-drawer">`，而 `styles/app/scope-drawer.css:34` 写着 **`overflow: hidden`**；
+3. `.ht-sidebar__resizer`（`sidebar.css:61-72`）按设计**骑在列右边缘外 4px**（`inline-size: 8px; inset-inline-end: -4px`，无 `z-index`）；
+⇒ 外面那半截被 `<dialog>` 的 `overflow: hidden` **裁掉**，于是"几何中心"那一像素只剩主区（`elementFromPoint` 回 `ht-content`）。判据自己查的是**列自己**的 `overflowY`（那条过了），没查 `dialog` 祖先 —— 所以它报的形状与 2026-10-06 那次（列自己 `overflow-y: auto` 连带 `overflow-x: clip`）**同一个病、换了宿主**。
+**归属**：`App.tsx` 的把侧栏塞进 `ScopeDrawer` 是**别线在途改版**（`scope-drawer.css` 本身是干净的、`overflow: hidden` 早就写着，是"谁把它套在这一列外面"变了）⇒ 这格归他们接线：要么日历侧栏不吃那层 `overflow: hidden`，要么把手改成不骑出列（`inset-inline-end: 0` + 命中区仍在列内）。
+⚠️ **同时记一条"别再做"的实验**：把 `App.tsx` + 6 张 CSS 回 HEAD 再跑这份 spec **证明不了什么** —— HEAD 上还没有「更多」披露这套 IA，用例更早就在 `task-organize-submary` 那一步红（`element is not visible`），**根本走不到把手那一段**。要切归属只能按上面三步读 DOM/CSS，不能靠回滚壳层。
+
+### 2026-10-17 一条**作废读数**与它的教训（冻结副本那一趟整轮）
+
+`/tmp/heyta-frozen` 那一趟整轮最后回 **`FROZEN2_RC=160`（载体判定作废）**，`ran=379/393 failed=173`，家族分布看着像"习惯面全崩"（`habit-icon-picker` 16、`habits-two-column` 14、`habit-month` 14、`habit-frequency` 14、`habit-year` 12、`keyboard-cursor` 10…）。
+**这一趟的条数一律不得当读数用**，原因是我自己造成的：做"壳层回 HEAD"那个实验时，我**在它还在跑的时候 `rsync` 覆盖了那个副本的源码** ⇒ vite 在跑动中重载/报错，后半段的红回答的是"我动了正在跑的那棵树"，不是产品。
+⇒ 与上一节那条纪律并成一条：**冻结副本的价值全在"冻结"二字** —— ①整轮在跑时不许另起 Playwright（会清 `test-results/`）；②**更不许改那棵树**（包括 rsync 覆盖）。要做"回 HEAD"这类实验，**另开一份**（`cp -al` 秒级），别动正在跑的那份。
+
+### 2026-10-17 第 87 道续六：`calendar-sidebar` **整份转绿**（2 passed rc=0），其中一处是**改产品**
+
+**一、产品修法（不是改判据）**：`styles/app/sidebar.css` 新增
+```css
+.ht-sidebar--calendar .ht-sidebar__resizer { inset-inline-end: 0; }   /* 原来骑着列外 4px */
+```
+真因（1280×720 现量）：日历那一列是 `position: sticky`（= 一个层叠上下文），`.ht-main` 是 `position: relative` 且 DOM 里**排在它后面** ⇒ 主区那一层盖在侧栏这一层之上；把手原来 `inset-inline-end: -4px`，几何中心正好落在列的右边缘那一像素上，那一点被判给主区（`elementFromPoint(把手中心) === "ht-content"`）⇒ 用户症状是"把手在那儿、按下去拖不动"。
+注释里同时写了两条**不要**：① 不要给这一列加 `z-index`（会把整列抬到主区之上，主区里会伸出到侧栏上的浮层——行尾「更多」面板——会被盖住，换一个更贵的病）；② 不要加在基类上（任务侧栏那条同族判据 `global-sidebar-resize.spec.ts` 现在就是绿的，容器不同）。
+
+**二、我上一轮那条归因作废（自己纠正）**：`ScopeDrawer` 在桌面宽度下**不包裹任何东西**（`if (!narrow) return <>{children}</>`），而它那句 `overflow: hidden` 写在 `@media (max-width: 768px)` 里 ⇒ 与 1280×720 的失败无关。（同时确认：`ScopeDrawer` 的包裹**在 HEAD 里就有**，不是别线在途。）
+
+**三、⑤ 那条判据换载体（不是放宽）**：原来读 `calendar-board-day-title`（住在 `showSelectedDayList` 那一段，代码自称「移动端兼容段」，Web 宿主传 `false` ⇒ 不渲染）。改成钉**板子那一格**的 `aria-selected`（`CalendarBoard.tsx:277` 平铺出来就是为了判据能直接问）＋"同时只有一格选中" —— 这比读一句日标题**更直接**地表达⑤的本义（两列必须指同一天）。顺带删掉不再使用的 `BOARD_DAY` 常量（留理由）。
+
+**四、复跑读数**：`calendar-sidebar` **2 passed rc=0**；同族回归一起跑 `calendar-sidebar + global-sidebar-resize + calendar-week + smoke` = **9 passed / 0 failed**；设计系统那几道门 `check:design` / `check:tokens` / `check:token-hashing` / `check:server-design` / `check:ui-provider` **全 rc=0**。
