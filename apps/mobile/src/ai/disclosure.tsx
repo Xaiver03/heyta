@@ -53,8 +53,12 @@ export function AiDisclosureBlock({
     retentionDisclosure === undefined ? undefined : retentionMessage(retentionDisclosure);
 
   const labels: AiDisclosureLabels = {
-    showFields: t('web.ai.disclosure.showFields'),
-    hideFields: t('web.ai.disclosure.hideFields'),
+    // 🔴 这两条也走 `AI_DISCLOSURE_KEYS`（2026-10-17 起）：本轮之前它们在这里就地
+    //    写死了 `'web.ai.disclosure.showFields'`，于是 key 表里没有它们，而
+    //    `apps/mobile/tests/ai-copy-parity.spec.ts` 的探针只读 `copy.ts` ⇒
+    //    对账把 web 读成"多出两条"。文案这一端的**唯一**落点是那张表。
+    showFields: t(AI_DISCLOSURE_KEYS.showFields),
+    hideFields: t(AI_DISCLOSURE_KEYS.hideFields),
     fieldGroups: Object.fromEntries(AI_DISCLOSURE_FIELD_GROUPS.map((group) => [group, t(`web.ai.disclosure.group.${group}`)])),
     destinationLead: t(AI_DISCLOSURE_KEYS.destinationLead),
     local: t(AI_DISCLOSURE_KEYS.local),

@@ -47,6 +47,7 @@ import type {
   BreakdownFailureReason,
   CaptureFailureReason,
   DurationFailureReason,
+  ManagedAiUsageReading,
   PrioritizeFailureReason,
   ToolCallFailureReason,
 } from '@heyta/app-host';
@@ -145,6 +146,43 @@ export const AI_CAUSE_KEY: Record<AiFailureReason, MessageKey> = {
   'empty-response': 'web.ai.failure.cause.emptyResponse',
 };
 
+/**
+ * 服务端**稳定码** → 词条。**只登记"有下一步"的那两个**（与 web 侧同一张表）。
+ *
+ * 🔴 这两个码都落在 `http-error` 一档里，而修复动作相反：
+ * `SUBSCRIPTION_REQUIRED` ⇒ 去买；`AI_QUOTA_EXCEEDED` ⇒ 等下一周期。
+ * 按 `cause` 取词条会把它们说成同一句"端点返回了错误"，指不出该做什么。
+ *
+ * ⚠️ 其余码（`AI_UPSTREAM_NOT_DOMESTIC` 等）**不登记**：它们没有对应的用户动作，
+ * 落回按 `cause` 说话才对 —— 给一个没有下一步的错误硬配一句，
+ * 等于教用户去一个没有答案的地方找答案。
+ */
+/**
+ * 托管档的用量读数 → 词条（+ 插值）。**三分支分开**，返回 `undefined` 表示不渲染。
+ *
+ * 🔴 它值得抽成函数是因为**这个分支里最容易说反话**：
+ *   · `ok + entitled`     ⇒ 报数（法务 §5.3 承诺的那句）
+ *   · `ok + !entitled`    ⇒ **"没有这一期"** —— 渲染成「已用 0 / 300」就是说反话
+ *   · `unavailable`       ⇒ 如实说"读不到" —— 拿 0 顶上同样是说反话
+ *   · `unconfigured`      ⇒ `undefined`：那句由"先去同步填地址"承担，不重复
+ *
+ * ⚠️ 抽出来还有一个现实理由：移动端**没有 RN 渲染测试设施**（`tests/` 下零 `.tsx`），
+ * 组件本身测不了；把它做成纯函数，这条判断才有判据。
+ */
+export function managedUsageCopy(
+  reading: ManagedAiUsageReading | undefined,
+): { key: MessageKey; vars?: Readonly<Record<string, number>> } | undefined {
+  if (reading === undefined || reading.kind === 'unconfigured') return undefined;
+  if (reading.kind === 'unavailable') return { key: 'web.ai.settings.usage.unavailable' };
+  if (!reading.entitled) return { key: 'web.ai.settings.usage.notEntitled' };
+  return { key: 'web.ai.settings.usage.used', vars: { used: reading.used, limit: reading.limit } };
+}
+
+export const SERVER_CODE_KEY: Readonly<Record<string, MessageKey>> = {
+  SUBSCRIPTION_REQUIRED: 'web.ai.failure.serverCode.subscriptionRequired',
+  AI_QUOTA_EXCEEDED: 'web.ai.failure.serverCode.quotaExceeded',
+};
+
 export const CAPTURE_FAILURE_KEY: Record<CaptureFailureReason, MessageKey> = {
   'ai-unavailable': 'web.ai.failure.aiUnavailable',
   unparseable: 'web.ai.failure.capture.unparseable',
@@ -191,7 +229,16 @@ export const ASSISTANT_FAILURE_KEY: Record<AssistantFailureReason, MessageKey> =
   'egress-outside-disclosed-set': 'web.ai.assistant.failure.egressOutsideDisclosedSet',
 };
 
-/** 披露块需要的九个 key（`@heyta/ui` 的 `AiDisclosure` 只认已经翻好的整句）。 */
+/**
+ * 披露块需要的十一个 key（`@heyta/ui` 的 `AiDisclosure` 只认已经翻好的整句）。
+ *
+ * 🔴 `showFields` / `hideFields` 是 2026-10-17 补的：共享组件"查看 / 收起具体字段"
+ * 那一档要求这两个 label（见 `AiDisclosure.tsx` 的 `canCollapse`），而移动壳的宿主
+ * 一直在 `disclosure.tsx` 里**就地**写 `t('web.ai.disclosure.showFields')` ——
+ * 于是这两条 key 不在本表里，而 `apps/mobile/tests/ai-copy-parity.spec.ts` 的探针
+ * 按设计只读本文件 ⇒ 它把 web 那侧读成"多出两条"，那条对账因此一直红着。
+ * 现在与另外九条同一条纪律：**这一端说哪句话只写在本表里**，宿主只负责 `t(...)`。
+ */
 export const AI_DISCLOSURE_KEYS = {
   destinationLead: 'web.ai.disclosure.destinationLead',
   local: 'web.ai.disclosure.local',
@@ -202,6 +249,8 @@ export const AI_DISCLOSURE_KEYS = {
   fieldsLead: 'web.ai.disclosure.fieldsLead',
   e2eeLead: 'web.ai.disclosure.e2eeLead',
   e2eeStrong: 'web.ai.disclosure.e2eeStrong',
+  showFields: 'web.ai.disclosure.showFields',
+  hideFields: 'web.ai.disclosure.hideFields',
 } as const satisfies Record<string, MessageKey>;
 
 /**

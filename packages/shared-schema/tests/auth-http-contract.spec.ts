@@ -77,10 +77,34 @@ describe('路径', () => {
   /**
    * 服务端注册的是**相对**形状（它挂在 `prefix: '/api'` 下）。这里不许出现 `/api`：
    * 出现了就等于两边各持有一份完整路径，而换挂载点时只有客户端会跟着改。
+   *
+   * 🔴 2026-10-17：这里原来是一条光秃秃的 `toHaveLength(9)`，而现量是 12 ——
+   * 注册那条路在 `1c067174`（全局错误信封契约 + 邮箱验证码登录契约）里多了
+   * `registerRequest/Verify/Resend`，登录那条路在 2026-10-10 多了
+   * `loginCodeRequest/Verify/Resend`（邮箱验证码登录，无口令账号的主登录路）。
+   * 两边各多三条（注册侧 `registerRequest/Verify/Resend`、登录侧 `loginCodeRequest/Verify/Resend`，
+   * 共六条）**都不是漂移**：逐条都能在 `server/src/api.ts` 找到被注册的路由
+   * （`:2315` / `:2354` / `:2381` / `:2408` / `:2445` / `:2473`）。
+   * ⇒ 照本文件上面「八个码，逐字锁定（新增一个码要在这里显式承认）」那条的同一套纪律，
+   * 把"数枚数"换成**逐字锁定的键表**：往后加一条路径必须在这里显式承认，
+   * 而不是把常数从 12 改成 13 就过去。
    */
-  it('所有口令路径都是相对路径，不带 /api 前缀、不带结尾斜杠', () => {
+  it('所有口令路径都是相对路径，不带 /api 前缀、不带结尾斜杠，且键表逐字锁定', () => {
+    expect(Object.keys(AUTH_PASSWORD_PATHS)).toEqual([
+      'register',
+      'registerRequest',
+      'registerVerify',
+      'registerResend',
+      'login',
+      'loginCodeRequest',
+      'loginCodeVerify',
+      'loginCodeResend',
+      'forgot',
+      'reset',
+      'change',
+      'set',
+    ]);
     const values = Object.values(AUTH_PASSWORD_PATHS);
-    expect(values).toHaveLength(9);
     for (const path of values) {
       expect(path.startsWith('/api')).toBe(false);
       expect(path.startsWith('/')).toBe(true);

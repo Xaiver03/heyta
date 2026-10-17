@@ -27,7 +27,22 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { translate } from '@heyta/i18n';
-import { SharePanel, type SharePanelLabels, type SharePanelProps } from '@heyta/ui';
+import {
+  HeytaUiProvider,
+  SharePanel,
+  resolveHeytaUiTheme,
+  type SharePanelLabels,
+  type SharePanelProps,
+} from '@heyta/ui';
+
+/**
+ * 主题上下文：`SharePanel` 的角色文字样式走 `useHeytaText()`（`packages/ui/src/theme.js`），
+ * 而它必须在 `HeytaUiProvider` 里取值 —— 宿主真实交出去的就是这一层（见 `apps/web/src/App.tsx`）。
+ * 本文件只判「转让两步确认」的交互，颜色不在判据里，用默认亮色即可。
+ * 夹具必须照宿主形状包一层：不包时本文件 7 条会一起报
+ * `useHeytaUiTheme 必须在 <HeytaUiProvider> 内使用。`
+ */
+const THEME = resolveHeytaUiTheme({ scheme: 'light' });
 
 // 走真实词条（编译期查键）：确认句里有没有说清后果，词条本身就是判据的一部分。
 const CONFIRM_HINT = translate('zh-CN', 'web.share.transfer.confirmHint');
@@ -90,7 +105,11 @@ function renderPanel(data: SharePanelProps['data']) {
   const nextRoot = createRoot(container);
   root = nextRoot;
   act(() => {
-    nextRoot.render(<SharePanel data={data} labels={LABELS} callbacks={callbacks} />);
+    nextRoot.render(
+      <HeytaUiProvider value={THEME}>
+        <SharePanel data={data} labels={LABELS} callbacks={callbacks} />
+      </HeytaUiProvider>,
+    );
   });
   return callbacks;
 }

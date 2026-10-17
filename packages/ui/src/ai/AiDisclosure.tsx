@@ -189,9 +189,33 @@ export function AiDisclosure({
           color={tokens['color.foreground-muted']}
         />
         <View style={styles.content}>
-          <Text style={text['row-title']}>{labels.destinationLead}{view.label}</Text>
-          <Text style={[text['row-meta'], styles.subtle]}>{view.endpoint}</Text>
-          <Text style={text['row-meta']}>{labels.model}</Text>
+          {/*
+            🔴 段与段之间必须**有分隔**（`{separator}`）—— 相邻 `<Text>` 在 RN / RNW 里是
+            逐字拼接、不插任何空白，`row.textContent` 于是长成
+            「将发往：stub-remotehttps://192.0.2.1/v1模型 stub-model数据会离开设备」。
+            这不是理论：`63ddf3e0`（2026-10-06）就是因为 rig57 那张
+            `ios-ai-3-disclosure.png` 上人眼看见四段黏成一串才补的这四枚分隔符，
+            而同趟的 iOS 判据 `found_label "192.0.2.1"` **照样绿**（子串匹配对
+            "段与段有没有分开"完全无感）。
+            ⚠️ 那四枚在 `16da3ecb`（跨会话合流那笔 merge）里被丢掉了 ——
+            与 B195 同一场半收合并的形状（收了断言、没收断言所钉的那几行），
+            而 `apps/web/tests/ai-disclosure-parity.spec.tsx` 那条断言一直红着。
+            分隔符用 props 里**已经在的那一枚** `separator`（宿主传正字法分隔符），
+            不新造标点常量、不把空格塞进词条（词条是文案事实源）。
+          */}
+          <Text style={text['row-title']}>
+            {labels.destinationLead}
+            {view.label}
+            {separator}
+          </Text>
+          <Text style={[text['row-meta'], styles.subtle]}>
+            {view.endpoint}
+            {separator}
+          </Text>
+          <Text style={text['row-meta']}>
+            {labels.model}
+            {separator}
+          </Text>
           <Text style={[text['row-meta'], styles.tag]} testID={ids.destinationKind}>
             {view.isLocal ? labels.local : labels.remote}
           </Text>
