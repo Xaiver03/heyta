@@ -78,8 +78,13 @@ export interface ShareCommentsHostOptions {
   /** 路由数据（任务 → 清单 → `shareId`）从它读；判断本体在 `comment-actions.ts`。 */
   readonly ctx: ActionContext;
   readonly api: ShareOpUploadPort;
-  /** 按 shareId 取加解密端口；**没解锁就返回 undefined**（不要在这里造钥匙）。 */
-  readonly cipherFor: (shareId: string) => SharePayloadCipherPort | undefined;
+  /**
+   * 按 shareId 取加解密端口；**没解锁就返回 undefined**（不要在这里造钥匙）。
+   *
+   * 声明成异步是因为真实现要**解包** listKey（`unwrapShareListKey` 走 vault，本来异步）；
+   * 早先写成同步会把实现逼成"先塞进一个内存缓存再读"，那是第二条真相来源。
+   */
+  readonly cipherFor: (shareId: string) => Promise<SharePayloadCipherPort | undefined>;
   readonly storage: ShareLogStorage;
   readonly currentUserId: () => string;
   readonly clientId: string;
@@ -99,7 +104,21 @@ export interface ShareCommentsHost {
   stateFor(shareId: string): MaterializedState;
 }
 
-export function createShareCommentsHost(options: ShareCommentsHostOptions): ShareCommentsHost {
+/**
+ * `dispatchShareOp` 的**唯一实现**（端壳装配 `createCommentActions` 时直接拿它用）。
+ *
+ * 抽出来是因为端壳必须**自己**调用 `createCommentActions(ctx, …)` —— 判据 C
+ * （`check-reachability.mjs` 的宿主调用点）只在 `apps/<端>/src/**` 里数那个调用。
+ * 如果让端壳自己再写一份 dispatch，就会出现第二份"什么条件下发、发到哪、怎么落本地"，
+ * 那正是这条线一直在防的漂移。⇒ 端壳装配、app-host 定逻辑。
+ */
+export function createShareCommentDispatch(
+  options: Omit<ShareCommentsHostOptions, 'ctx' | 'newCommentId'>,
+): {
+  dispatchShareOp: (shareId: string, intent: ShareOpIntent) => Promise<void>;
+  commentsForTask: (taskId: string) => CommentLike[];
+  stateFor: (shareId: string) => MaterializedState;
+} {
   const cache = new Map<string, { log: ShareLogState; state: MaterializedState; shareId: string }>();
 
   const entryFor = (shareId: string): { log: ShareLogState; state: MaterializedState } => {
@@ -116,7 +135,7 @@ export function createShareCommentsHost(options: ShareCommentsHostOptions): Shar
 
   const dispatchShareOp = async (shareId: string, intent: ShareOpIntent): Promise<void> => {
     if (!options.isSignedIn()) throw new ShareNotSignedInError();
-    const cipher = options.cipherFor(shareId);
+    const cipher = await options.cipherFor(shareId);
     if (cipher === undefined) throw new ShareKeyUnavailableError(shareId);
 
     const dispatcher = createShareOpDispatcher({
@@ -152,24 +171,34 @@ export function createShareCommentsHost(options: ShareCommentsHostOptions): Shar
     options.storage.save(shareId, log);
   };
 
+  const commentsForTask = (taskId: string): CommentLike[] => {
+    const rows: CommentLike[] = [];
+    // 先确保**存储里已有的每一份 share 都进了缓存**（冷启动那条判据钉的就是这里）。
+    for (const shareId of options.storage.list()) entryFor(shareId);
+    for (const { state } of cache.values()) {
+      const bucket = (state as unknown as { comments?: Record<string, CommentLike> }).comments ?? {};
+      rows.push(...Object.values(bucket));
+    }
+    return aliveCommentsForTask(rows, taskId);
+  };
+
+  const stateFor = (shareId: string): MaterializedState => entryFor(shareId).state;
+
+  return { dispatchShareOp, commentsForTask, stateFor };
+}
+
+export function createShareCommentsHost(options: ShareCommentsHostOptions): ShareCommentsHost {
+  const inner = createShareCommentDispatch(options);
+
   const actions = createCommentActions(options.ctx, {
-    dispatchShareOp,
+    dispatchShareOp: inner.dispatchShareOp,
     currentUserId: options.currentUserId,
     ...(options.newCommentId === undefined ? {} : { newCommentId: options.newCommentId }),
   });
 
   return {
     actions,
-    commentsForTask: (taskId) => {
-      const rows: CommentLike[] = [];
-      // 先确保**存储里已有的每一份 share 都进了缓存**（冷启动那条判据钉的就是这里）。
-      for (const shareId of options.storage.list()) entryFor(shareId);
-      for (const { state } of cache.values()) {
-        const bucket = (state as unknown as { comments?: Record<string, CommentLike> }).comments ?? {};
-        rows.push(...Object.values(bucket));
-      }
-      return aliveCommentsForTask(rows, taskId);
-    },
-    stateFor: (shareId) => entryFor(shareId).state,
+    commentsForTask: inner.commentsForTask,
+    stateFor: inner.stateFor,
   };
 }

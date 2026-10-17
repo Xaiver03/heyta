@@ -82,7 +82,7 @@ function makeHost(over: Partial<ShareCommentsHostOptions> = {}): {
   const host = createShareCommentsHost({
     ctx: makeCtx(),
     api,
-    cipherFor: () => ({ encrypt: async (payload: string) => `ct:${payload}` }),
+    cipherFor: async () => ({ encrypt: async (payload: string) => `ct:${payload}` }),
     storage,
     currentUserId: () => 'u-me',
     clientId: 'device-A',
@@ -133,7 +133,7 @@ describe('share-comments 宿主（W3-T2）', () => {
   });
 
   it('密钥没解锁 ⇒ ShareKeyUnavailableError，零请求、零落盘', async () => {
-    const { host, calls, saved } = makeHost({ cipherFor: () => undefined });
+    const { host, calls, saved } = makeHost({ cipherFor: async () => undefined });
     await expect(host.actions.addComment(SHARED_TASK, '钥匙没到')).rejects.toBeInstanceOf(ShareKeyUnavailableError);
     expect(calls).toHaveLength(0);
     expect(saved.size).toBe(0);
@@ -150,7 +150,7 @@ describe('share-comments 宿主（W3-T2）', () => {
     const second = createShareCommentsHost({
       ctx: makeCtx(),
       api,
-      cipherFor: () => ({ encrypt: async (payload: string) => `ct:${payload}` }),
+      cipherFor: async () => ({ encrypt: async (payload: string) => `ct:${payload}` }),
       storage: { load: () => persisted, save: () => undefined, list: () => ['share-1'] },
       currentUserId: () => 'u-me',
       clientId: 'device-A',
