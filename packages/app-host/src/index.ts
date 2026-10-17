@@ -152,6 +152,33 @@ export {
   type NoteActions,
   type NoteActionsOptions,
 } from './note-actions.js';
+
+/**
+ * 共享清单里的**任务评论**（ADR-0062 W3/W4）。与 `createNoteActions` 同一个理由：
+ * **op 的构造只能有一份** —— 而且这一族还多一层：**写入路由**（"这条任务所属清单
+ * 在不在共享册里"）也住在这里，ADR-0062 决策 4 原文是
+ * 「写入路由住在 `packages/app-host`（AGENTS §3.5），`apps/*` 不出现这个判断」。
+ *
+ * 🔴 `apps/*` 里**不得出现 `entityType: 'COMMENT'` 的字面量**（同
+ * `no-op-construction-in-apps` 规则），也**不得**出现"这条清单是不是共享的"
+ * 这个判断 —— 后者一旦有两份就会漂移，症状是"一个入口能发评论、另一个静默失败"。
+ *
+ * 🔴 **它不走 `ctx.dispatch`**：COMMENT 在个人 op-log 上会被永久拒绝
+ * （白名单 + role 门都在服务端，见 `op-log/src/state.ts` 的 `comments` 桶注释），
+ * 所以写入经注入端口 `CommentActionsOptions.dispatchShareOp` 出去。
+ * 本段只定义那个端口并调用，**不实现传输**（share 引擎/加密/签名是下一段）。
+ *
+ * 排序、"软删不进线程"、正文上限与空白拒绝全在 `@heyta/domain` 的 `comments.ts`。
+ */
+export {
+  ListNotSharedError,
+  createCommentActions,
+  type CommentActions,
+  type CommentActionsOptions,
+  type ShareOpIntent,
+  type SharedCommentEntityType,
+  type UnsharedListReason,
+} from './comment-actions.js';
 export {
   createEventActions,
   type EventActions,
@@ -609,7 +636,22 @@ export {
   type AiNoCandidateReason,
   type AiRouteTarget,
 } from './ai-route-target.js';
-export { destinationForFeature, recomputeConsents } from './ai-settings-shared.js';
+export {
+  destinationForFeature,
+  isAiSupplyUsable,
+  recomputeConsents,
+} from './ai-settings-shared.js';
+export {
+  createManagedTransport,
+  type ManagedTransport,
+  type ManagedTransportSource,
+} from './ai-managed-transport.js';
+export {
+  MANAGED_AI_USAGE_PATH,
+  fetchManagedAiUsage,
+  type ManagedAiUsageProbeOptions,
+  type ManagedAiUsageReading,
+} from './managed-ai-usage.js';
 export {
   CALENDAR_ANCHOR_RULES,
   calendarAnchor,
@@ -797,6 +839,7 @@ export {
   LEGAL_SITE_PATHS,
   OFFICIAL_SITE_ORIGIN,
   OPERATOR_LEGAL_PATHS,
+  isOfficialHostedInstance,
   resolveLegalLinks,
   type LegalLinks,
 } from './legal-links.js';
@@ -974,3 +1017,7 @@ export type { InboundDraftTask } from '@heyta/shared-schema';
 
 export { planWidgetPublish, type WidgetPublishStateSlice, type WidgetPublishPlan } from './widget-publish.js';
 export { createNativeWidgetSession, type NativeWidgetBridge } from './native-widget-session.js';
+export * from './share-client.js';
+export * from './share-op-log.js';
+export * from './share-replay.js';
+export * from './share-comments.js';

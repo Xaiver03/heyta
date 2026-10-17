@@ -6135,3 +6135,27 @@ due-date-edit · habit-frequency · habits-two-column        ⇒ 32 passed (2.7m
 ⇒ 这一批修法**互相之间没有回归**，也不是"单跑绿、连跑红"。
 **我这一侧到此刻的账**（第 87 道）：日历/倒数日整族、习惯整族（含产品修的选中边框）、`due-date-edit`、`detail-pane-task` 的载体/前提两处、`global-responsive-ux`、`smoke`/`categories`/`admin-console`/`auth-consent`、四份 AI spec 的两形态兼容，以及**链里的第 90 道**（`check:shell-unicode` 被别线新脚本弄红后修回绿）。
 **仍然红、且不在我权限内的**：① 第 6 道（ADR-0062 W4/W5 的产品决策）；② 第 87 道剩下的——`glass-materials` 的 `reminder-dropdown` 是**已登记的产品缺陷 B214**（面板朝下开被滚动容器裁掉，用户点不到），`ai-row-layout`/`ai-tool-run`/`detail-pane-collapse`/`focus-detail-pane`/`detail-pane-habit`(1 枚几何) 全落在**别线那笔未落库的壳/面板改版**里。
+
+### 2026-10-17 第 6 道 `check:reachability` 收口：**COMMENT 断言 C 转绿，rc=0**（真写路径 + 端壳装配，判据一格未动）
+
+**读数（同一把装置）**：
+```
+$ pnpm check:reachability ; echo rc=$?
+   ✅ COMMENT                  createCommentActions：1 处宿主调用点
+   ✅ 断言 C 通过：有写路径的实体全部有宿主调用点。
+rc=0
+```
+**它是怎么变绿的**（没有一格是靠放宽判据）：W2-T1 传输接线 → W3-T1 share 日志折叠与物化（复用同一枚 reducer，零改动）
+→ W3-T2 评论宿主装配（未登录/密钥未解锁 ⇒ 零请求；发完就地折进本地日志）→ **W4-0 端壳装配**
+（`apps/web/src/features/share/comment-actions.ts` 里真的 `createCommentActions(ctx, …)`，
+与 `features/tasks/store.ts:253-259` 的 `createTaskActions(actionContext)` 同一套形状）。
+判断全部留在 `packages/app-host`：路由在 `comment-actions.ts` 的 `shareIdForTask`，
+「什么条件下发、发到哪、发完怎么落本地」在 `createShareCommentDispatch`（单一来源）。
+**诚实边界（下一步）**：`packages/ui` 的 `CommentThread` 组件**目前还没有任何端渲染它**
+（`grep` 全仓 0 处引用）⇒ 断言 C 回答的是"宿主调用得到"，**"用户点得到那一步还没做"**（W4 的评论区）。
+另：`apps/web` 侧目前只到装配模块，尚未接到任何界面入口。
+
+**顺带两处必须做的构建/导出动作**（不做出不来）：
+- `packages/sync-client/src/index.ts` 补出 `share-payload-cipher`（`exports` 只登记了 `.`，子路径进不来）；
+- `packages/app-host/src/index.ts` 补出四枚新模块，并**重建 dist**（`@heyta/web` 的类型检查读的是 dist）。
+重建后：`--filter @heyta/app-host typecheck` 0 错、`--filter @heyta/web typecheck` 0 错、`check:reachability` rc=0。
