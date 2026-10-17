@@ -6280,3 +6280,28 @@ scrollable overflow）⇒ 修法必须在流内。
    但"前面的面会把视图切走"这件事在 `inbox-panel` 之后是真的，留着比不备好）。
 
 **仍未绿**：整份 `glass-materials` 2 败 1 过（失败点从"找不到/不可见"推进到"可见但被 label 拦"）。
+
+### 2026-10-17 B214 层叠那半**已修**（几何 + 层叠两处都有决定性读数）；剩下的是**上一条面的浮层没关干净**
+
+**层叠那半的读数与修法**：
+```
+修前：panel=div.ht-compose-actions__panel ht-material pos=static z=auto   ← 完全不参与层叠
+      chip 中心 elementFromPoint → span.（= 行内那块整行命中区的一部分）
+修后：panel=relative z=500（= --ht-z-popover）
+      chip 中心 elementFromPoint → span.，**isChipOrInside=true** ✓
+```
+修法**不另造值**：仓库里同一问题的正典解法就在 `material.css` 的 `.ht-material__row-pop`
+（"行内那几枚用"：`position: relative` + `z-index: var(--ht-z-popover)`），我用了同一对、同一个 token；
+与它唯一的差别是"右对齐怎么表达"（那边 `margin-inline-start: auto`，而这一枚的容器宽度由它自己撑出
+⇒ 用 `calc(100% - 面板宽)`）。两条都写进了 `controls.css` 的注释。
+
+**真实流程里的第五个读数（仍未解决）**：在 `glass-materials` 的流程里插桩量到 —— 点击那一刻
+```
+chip=540..594   命中=label.（rect 525..769）  它属于 div.ht-material.ht-material__row-pop（513..781）
+```
+⇒ **上一条面（`organize-dropdown`）的行内浮层还没关干净，正压在这一枚 chip 上**。
+探针（单任务、干净状态）量不到这一条 —— 这就是"同一段代码在探针里过、在流程里不过"的差别所在。
+**下一手**：查 `organize-dropdown` 的 `close` 是否真的把它的 `.ht-material__row-pop` 关掉；
+或按产品定义决定"同一时刻只允许一个行内浮层"（若如此，这条也该由应用层保证，而不是靠用例的 close 顺序）。
+
+**仍未绿**：整份 `glass-materials` 2 败 1 过（失败点已从"找不到/不可见"推进到"被**另一个**行内浮层压住"）。

@@ -321,4 +321,18 @@
    * 本义（不越界）不变、循环依赖断掉。 */
   max-inline-size: var(--ht-compose-panel-inline);
   margin-inline-start: calc(100% - var(--ht-compose-panel-inline));
+  /*
+   * 🔴 2026-10-17（B214 的**层叠那一半**）：这一枚在流内是 `position: static; z-index: auto`
+   * （现量：`panel=div.ht-compose-actions__panel ht-material pos=static z=auto`），
+   * 于是行里那块**整行命中区**（`detail-pane-note-editor/n6-whole-row-is-the-hit-area.png`
+   * 说的那个模式）把它压住：chip 中心那一点 `elementFromPoint` 命中的是一个 `span`，
+   * 而 `locator.click` 的日志写着 `<label>…</label> … intercepts pointer events`（重试 113 次）。
+   * ⇒ 补上"参与层叠"这一对声明，**不另造值**：仓库里同一问题的正典解法就在 `material.css` 的
+   * `.ht-material__row-pop`（"行内那几枚用"：`position: relative` + `z-index: var(--ht-z-popover)`），
+   * 这里用同一对、同一个 token。
+   * ⚠️ 与它唯一的差别是"右对齐怎么表达"：那边靠 `margin-inline-start: auto`，而这一枚的容器宽度
+   * 本来由它自己撑出（`auto` 无从解析）⇒ 用上面的 `calc(100% - 面板宽)`。
+   */
+  position: relative;
+  z-index: var(--ht-z-popover);
 }
