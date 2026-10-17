@@ -11422,3 +11422,12 @@ PROBE hitChain div.ht-content → main.ht-main → div.ht-app → …
 **为什么这格本线不代修**：那两枚生产件是 **AI 那条线的在途文件**（盘上刚写出来、已被暂存但没提交），而消费者是**共享清单那条线**整枚提交 `index.ts` 时一起卷进 HEAD 的 —— 修它有两条路，都超出本线地界：要么 AI 线把那两枚文件正式提交（一条命令可验：提交后本尺应转绿），要么把那两行 import 从 `index.ts` 撤回（那是别人的业务接线）。本线**不碰 `packages/app-host`、不改那把尺**。
 
 **连带影响要说全（这条比 AC-3 本身更要紧）**：B216 那条「`@heyta/domain` 少一行 `export * from './comments.js'`」是同一族的**第一枚**，现在同一族**又多了两枚**，所以 `pnpm reinstall:all` 与 apps/web 那两把判据的挡路清单从 1 项变成 **3 项**（现量三条：`git show HEAD:packages/domain/src/index.ts | grep -c comments` 回 `0`；上面 ② 的两枚 `cat-file -e` 各回 `128`）。台账那句「等他们把那笔落进链再复刷」要按这三项读，别只盯 domain 那一行。
+
+**B221 再追一条（00:3x，本会话 · 写前先跑 `date`）：这枚红不是只有本线的电池看得到 —— 全仓标准单测车道当场就抓到**：上面那条「本机门禁全绿、干净检出解析不了」的失法，现在**有了自动消费者**，所以它不会再靠"没人跑"混过去。三条现量：
+
+1. **装置本体**：`NO_COLOR=1 python3 research/tools/verify-inbound-producer-seam.py` ⇒ `rc=1`，末行 `结论：2 条红`，两枚红分别是 `./ai-managed-transport.js` 与 `./managed-ai-usage.js`；同戳读数行 `在册文件=81 跨包成员访问=133 命中=133 盲区(生产包无 .ts)=0 盲区(命名空间)=0 停用=0 登记缝=0 新缝=0` 与 `相对导入=237 模块在 HEAD=235 登记模块缝=0 新模块缝=2 非导入的相对串=15 尺瞎了=0`（`新模块缝=2` 就是这两枚；现量这行的命令即左边的 `python3 …` 本体，别抄数）。
+2. **消费者**：`server/tests/inbound-lane-rigs-consumers.spec.ts` 的 `WIRED` 名单含 `verify-inbound-producer-seam.py`，而 `for (const file of WIRED)` 那一圈跑的是 `runRig(file)`（**不带任何参数**）且判据是 `expect(r.status).toBe(0)` ⇒ 常驻判据腿就是这个装置的 plain run。`SELF_TEST_OMITTED` 里那句「它的 `--self-test` 单趟实测 172 秒…常驻不合算」只免掉**反向验证臂**那一腿，**不**免掉 plain 腿 —— 这是本条能被读到的关键区别，别读成"它没被常驻"。
+3. **实跑**：`cd server && ./node_modules/.bin/vitest run --maxWorkers=1 tests/inbound-lane-rigs-consumers.spec.ts` ⇒ `SPEC_RC=1`、`Test Files 1 failed (1)`、`Tests 1 failed | 15 passed (16)`，失败的那一枚逐字叫 `verify-inbound-producer-seam.py 退出 0`（原件 `~/.heyta-evidence/inb-t7-1017-0902/b221-consumer-0035/spec.txt`）。用例总数 16 **不写死、按名单推**：`2 + len(WIRED)=7 + len(SELF_TEST_LINE)=5 + len(SELF_TEST_ONLY)=2 = 16`，枚数现量 `grep -c "^  '" server/tests/inbound-lane-rigs-consumers.spec.ts` 不可用（名单里有的带注释行），要数就逐名单点。
+   这枚 spec 会被谁跑到：`server/vitest.config.ts` 只有 `exclude` 名单（现量 `grep -n 'inbound-lane-rigs' server/vitest.config.ts` 回空 ⇒ 它没被排除），默认 `include` 收它 ⇒ `cd server && pnpm test` 收到，`pnpm -r test`（= `pnpm check` 链里那道全量单测，道数现量见 `pnpm check` 的链日志）也收到。
+
+⇒ **对本条的实际影响**：修法只剩两条，且都不必等谁点头 —— 要么把那两枚生产件提交进 `packages/app-host/`，要么回退 `packages/app-host/src/index.ts` 里那两行 import。把这条常驻用例改绿没有第三条路（`.skip`、放宽判据、mock 装置都算作弊，见任务纪律）。本线**仍然不代修**：那两枚文件是 AI 那条线的在途工作，本线没有它们的作者意图，代提交等于替别人决定接口形状。**待办归属不变**（负责人 2026-10-16 已把"谁修"列进待拍板项）。
