@@ -95,6 +95,25 @@ export interface ShareCommentsHostOptions {
   readonly newOpId?: (() => string) | undefined;
 }
 
+/**
+ * 重放出来的**一条评论**（读路径给界面的形状）。
+ *
+ * ⚠️ 它比 `CommentLike`（领域层的过滤器只认 id/taskId/墓碑）多了界面真正要画的三样：
+ * 作者、正文、编辑时刻。少一样界面就只能"猜"，而猜出来的作者名一旦不对，
+ * 是那种没人会报的错。类型定义在 app-host（不是 UI 包），因为读路径住这里。
+ *
+ * 🔴 2026-10-17：这个接口在上一批**漏插**过一次（`s.replace` 的锚点没匹配、又没断言 ⇒ 静默没落），
+ * 而 `vitest` 不做类型检查、`tsc -p tsconfig.spec.json` 也没拦住 ⇒ 一路隐身，
+ * **最后由 `tsup` 的 DTS 构建抓住**（`error TS2304: Cannot find name 'ShareCommentRecord'`，
+ * 连带把第 88 道 `check:privacy-consent-e2e` 弄红——因为 web 的 `tsc -b` 读不到 app-host 的 `index.d.ts`）。
+ * 教训：**补丁要断言**（Python 里用 `assert old in s`），**验证要跑到会做类型检查的那一步**。
+ */
+export interface ShareCommentRecord extends CommentLike {
+  readonly authorUserId: string;
+  readonly body: string;
+  readonly editedAt?: number;
+}
+
 export interface ShareCommentsHost {
   /** 评论的四个写动作（建/改/删/还原）—— 宿主递进来的只有"对哪条任务说什么"。 */
   readonly actions: CommentActions;
