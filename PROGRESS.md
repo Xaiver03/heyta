@@ -6341,3 +6341,19 @@ due-date-edit · detail-pane-task · habit-frequency · habits-two-column · cal
 （这比"我觉得是他们的问题"强：它是一条可复现的对照。）
 **顺带说明**：此前我对这批红的归类（"落在别线那笔未落库的壳/面板改版里"）这次第一次拿到了**差分证据**，
 而不只是形状相似。
+
+### 2026-10-17 `check:empty-state` 又被抓出新账（**这次抓的是我自己**）：按门禁写明的出口登记并写明理由
+
+**读数**：当前 tip 上复跑我修过的那批门禁 ⇒ 7 道 rc=0，**`check:empty-state` rc=1**：
+```
+🔴 有 1 处**新的**手写空态：apps/web/src/features/share/ShareCommentsSection.tsx
+   形态：直接渲染空态词条
+```
+**逐行看过之后再决定**（不是直接往账上加一行）：这个文件里**没有一行空态 DOM** ——
+骨架/布局/`emptyThread` 的渲染全在共享层的 `packages/ui/src/sync/CommentThread.tsx:81`
+（它只读 `props.labels.emptyThread`、自己不做词条查找 ⇒ 它不在这张账上，也不该在）。
+本文件做的是"把共享组件要的文案从 i18n 取出来"，与账上原有的 `AuthPanel.tsx`
+（往共享认证面板传 `emptyTitle` / `emptyBody`）**逐字同类**。
+⇒ 按门禁自己写明的出口登记，并在账上写清"为什么这里没有债可合法化"，
+以及真正的收敛方向（让共享组件自己拥有文案 —— 要动 `packages/ui` 的 API 与其测试，属下批）。
+复跑：`check:empty-state` **rc=0**（三道断言全过）。
