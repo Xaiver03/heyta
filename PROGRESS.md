@@ -6565,3 +6565,34 @@ git show HEAD:apps/web/src/App.tsx | grep -c AiToolRun   → 0
 要么产品定义新的入口形状。**这不是我能单方面收的**：凭空造一个入口既不是载体修法、也不是产品修法。
 **旁证（同族）**：`AiToolRun` 是那族里唯一漏改的（`ai-failure-copy.ts:181` 逐字记着"另外四个面板改造时
 漏了 `AiToolRun`"）⇒ 与"整片 ` M`、改到一半"的形状自洽。
+
+### 2026-10-17 用**链装置本体**取到一段权威读数：`CHAIN ran=24/24 of 116 RED=2 steps=[56, 63]`
+
+命令（装置自己就是执行器，且支持分段）：
+```
+python3 research/tools/verify-inbound-check-chain.py --logs /tmp/chain56 --from 43 --to 66
+⇒ CHAIN ran=24/24 of 116  RED=2  steps=[56, 63]
+```
+**这两步都不在原 26 枚清单里** ⇒ 是之后变红的（装置的价值正在这里）。逐条查清：
+
+**56 `check:docs`（rc=1）—— 别线在途文档里的死链**
+```
+🔴 docs/plans/product-ux-optimization.md:2041
+   -> ../../apps/mobile/evidence/ux-final-20261017/ios-keyboard-attribution-r126/RESULT.md
+```
+`docs/plans/product-ux-optimization.md` 现在是 **` M`**（别线正在改），而链接指向一个**新证据目录** ⇒
+属他们的在途件（等他们的证据落库即消失）。**我不动别人的在途文档**。
+
+**63 `check:payment-entry`（rc=1）—— 跨线的产品口径冲突（两侧都有逐字依据）**
+```
+门禁侧（本笔的判词）：生产 compose 没配支付渠道，但客户端出现了付款入口：
+  apps/web/src/features/subscription/RenewPanel.tsx:99
+  apps/mobile/src/screens/RenewSection.tsx:61
+  理由："也就是**点下去不会有任何结果**。不放按钮比放一个没反应的按钮好。"
+产品侧（App.tsx:3306-3307 的**已提交**注释）："入口与支付渠道由 `check:payment-entry` 钉成同一件事：
+  渠道没配时这里的请求会拿到 503，界面**如实说**'这台实例没配收款通道'。"
+```
+⇒ 产品侧的设计里那个按钮**不是死的**（它会如实告诉用户"这台实例没配收款通道"）；
+门禁侧的前提（"点下去不会有任何结果"）**对这个设计不成立**。
+**这不是我该单方面改的**：改门禁＝放宽判据（明令禁止）；改产品＝要不要放弃"如实告知"这条已提交口径。
+**两侧的原话都已留在上面的读数里**，等那条线/产品拍一句即可落地。
