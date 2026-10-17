@@ -1,0 +1,18 @@
+════ r124 收尾现量（2026-10-18 00:37:33）════
+──── 1. 只收本线起的那枚 idb_companion（按 udid 参数认人，不批量 kill）────
+68711 /Users/rocalight/.heyta-tools/idb/idb_companion --udid 468CFAD2-74F2-4CBB-8183-E21C1A6C0C84 --grpc-domain-sock /tmp/idb/468CFAD2-74F2-4CBB-8183-E21C1A6C0C84_companion.sock --only simulator
+  收完后整机在跑的 idb_companion 数 = 4（进本趟前是 3）
+──── 2. 共享那台 heyta-multiend-reinstall 全程没被本线改过 ────
+    heyta-multiend-reinstall (EAAD1B66-80A3-4A51-957C-298DAF22F057) (Booted) 
+  它的 heyta 数据目录 mtime = Oct 17 13:39:33 2026
+──── 3. 旧载体 FE195661 恢复成接手时的档位 ────
+    heyta-iphone-17pro (FE195661-B021-4A71-AAD1-1F2F7AE3A102) (Shutdown) 
+──── 4. 收掉本线自建的那台（只删自己造的）────
+  删之后在册 = 0（要 0）
+──── 5. 磁盘余量 ────
+/dev/disk3s1   926Gi   761Gi   114Gi    88%     11M  1.2G    1%   /System/Volumes/Data
+──── 补：那枚 companion 是第一遍现量还活着的（模拟器已删，它成孤儿）────
+  按 --udid 认人取到 pid=68711，lstart 见上；kill 之后在跑的 idb_companion 数 = 3（要 3，即进本趟前的数）
+  31182 /Users/rocalight/.heyta-tools/idb/idb_companion --udid FE195661-B021-4A71-AAD1-1F2F7AE3A102 --grpc-domain-sock /tmp/idb/FE195661-B021-4A71-AAD1-1F2F7AE3A102_companion.sock --only simulator
+  33756 /Users/rocalight/.heyta-tools/idb/idb_companion --udid 1EDCFA59-6A9C-428D-8FE2-160B11318648 --grpc-domain-sock /tmp/idb/1EDCFA59-6A9C-428D-8FE2-160B11318648_companion.sock --only simulator
+  50329 /Users/rocalight/.local/bin/idb_companion --udid 3BB27787-9C22-452E-A62C-6BD650D35E27 --grpc-domain-sock /tmp/idb/3BB27787-9C22-452E-A62C-6BD650D35E27_companion.sock --only simulator

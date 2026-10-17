@@ -1,0 +1,71 @@
+{
+  "status": "failed",
+  "udid": "468CFAD2-74F2-4CBB-8183-E21C1A6C0C84",
+  "uiLocale": "en",
+  "error": "timed out waiting for iOS keyboard; visible=['heyta', 'Open search', 'Sync', 'Tasks', 'Sun, 10/18', '2 to do, 0 done', 'Search tasks (title and note)', 'View options: Timeline', 'Unscheduled (2)', 'UxTaskA1792253748', 'UxTaskB1792253748', 'New task', 'Tasks', 'Calendar', 'Focus', 'Categories', 'Profile']",
+  "steps": [
+    {
+      "name": "01-created-task-a",
+      "status": "passed",
+      "at": 1792253754.7509062,
+      "title": "UxTaskA1792253748"
+    },
+    {
+      "name": "02-created-task-b",
+      "status": "passed",
+      "at": 1792253763.472335,
+      "title": "UxTaskB1792253748"
+    },
+    {
+      "name": "03-list-scroll",
+      "status": "passed",
+      "at": 1792253765.875639
+    },
+    {
+      "name": "04-long-press-enters-selection",
+      "status": "passed",
+      "at": 1792253768.512733
+    },
+    {
+      "name": "05-multi-select-second-task",
+      "status": "passed",
+      "at": 1792253770.831135
+    },
+    {
+      "name": "06-exit-selection",
+      "status": "passed",
+      "at": 1792253773.0023239
+    },
+    {
+      "name": "06b-timeline-clears-selection",
+      "status": "passed",
+      "at": 1792253779.2065
+    },
+    {
+      "name": "07-view-options-sort-and-date",
+      "status": "passed",
+      "at": 1792253791.8069172
+    },
+    {
+      "name": "08-quadrant-move-feedback",
+      "status": "passed",
+      "at": 1792253803.7088299,
+      "destination": "Do now"
+    },
+    {
+      "name": "09-quadrant-undo",
+      "status": "passed",
+      "at": 1792253806.85753
+    },
+    {
+      "name": "10-timeline-view-options",
+      "status": "passed",
+      "at": 1792253817.3005161
+    },
+    {
+      "name": "11-timeline-row-opens-detail",
+      "status": "passed",
+      "at": 1792253833.5448508
+    }
+  ]
+}

@@ -64,7 +64,7 @@ CJK_GROUP_FLOOR = {
     "profile-settings-android.py": 56,
     "profile-settings-ios.py": 44,
     "tasks-ux-android.py": 58,
-    "tasks-ux-ios.py": 42,
+    "tasks-ux-ios.py": 67,
     "ai-assistant-atomic-android.py": 14,
 }
 # TS 源码不是 Python，不能用 ast 扫；这里抓所有引号里的"像键名"的串，再和真源的键集合取交集。

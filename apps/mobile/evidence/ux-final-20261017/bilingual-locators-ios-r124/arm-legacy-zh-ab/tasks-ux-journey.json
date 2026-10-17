@@ -1,0 +1,30 @@
+{
+  "status": "failed",
+  "udid": "FE195661-B021-4A71-AAD1-1F2F7AE3A102",
+  "uiLocale": "zh-CN",
+  "error": "timed out waiting for two selected tasks; visible=['heyta', '打开搜索', '同步', '任务', '退出选择', '已选 1 项', '批量完成', '移动到清单', '批量删除', '10月18日 星期日', '4 项待办，0 项已完成', '搜索任务（标题与备注）', '视图选项：列表', '收集箱', '4', '打开任务：UxTaskA1792254466', '选择：UxTaskA1792254466', '打开任务：UxTaskB1792254466', '选择：UxTaskB1792254466', '打开任务：UxTaskA1792254721', '取消选择：UxTaskA1792254721', '打开任务：UxTaskB1792254721', '选择：UxTaskB1792254721', '任务', '日历', '专注', '分类', '我的']",
+  "steps": [
+    {
+      "name": "01-created-task-a",
+      "status": "passed",
+      "at": 1792254731.152054,
+      "title": "UxTaskA1792254721"
+    },
+    {
+      "name": "02-created-task-b",
+      "status": "passed",
+      "at": 1792254740.432055,
+      "title": "UxTaskB1792254721"
+    },
+    {
+      "name": "03-list-scroll",
+      "status": "passed",
+      "at": 1792254743.030495
+    },
+    {
+      "name": "04-long-press-enters-selection",
+      "status": "passed",
+      "at": 1792254745.742773
+    }
+  ]
+}

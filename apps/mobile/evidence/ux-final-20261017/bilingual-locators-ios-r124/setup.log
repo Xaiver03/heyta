@@ -1,0 +1,17 @@
+src bundle exists: yes
+ 50M	/Users/rocalight/Library/Developer/CoreSimulator/Devices/EAAD1B66-80A3-4A51-957C-298DAF22F057/data/Containers/Bundle/Application/C064A4E3-26D8-42A7-B220-FA5E74A96AA8/Heyta.app
+UDID=468CFAD2-74F2-4CBB-8183-E21C1A6C0C84
+Error: Unexpected argument zh-Hans-CN; leaving defaults unchanged.
+INSTALL_OK
+Error: Domain 'AppleLanguages' not found.
+WRITE_RC=0
+--- global:
+(
+    en,
+    "zh-Hans-CN"
+)
+--- app domain:
+(
+    en,
+    "zh-Hans-CN"
+)

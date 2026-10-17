@@ -44,6 +44,42 @@ def labels(nodes: Iterable[dict[str, Any]]) -> list[str]:
     return [value for node in nodes if (value := AX.label_of(node))]
 
 
+ENGLISH = False
+
+
+def T(zh: str, en: str) -> str:
+    """Pick the column the installed app is actually rendering.
+
+    `packages/i18n` carries both; the simulator's app language decides which one
+    the shell renders, so every locator has to hold both spellings.
+    """
+    return en if ENGLISH else zh
+
+
+def open_task_label(title: str) -> str:
+    return T("打开任务：{title}", "Open task: {title}").format(title=title)
+
+
+def select_task_label(title: str) -> str:
+    return T("选择：{title}", "Select: {title}").format(title=title)
+
+
+def view_options_label(view: str) -> str:
+    return T("视图选项：{view}", "View options: {view}").format(view=view)
+
+
+def move_task_label(title: str) -> str:
+    return T("移动「{title}」到其他象限", "Move “{title}” to another quadrant").format(title=title)
+
+
+def timeline_group_label(count: int) -> str:
+    return T("时间线：共 {count} 条任务", "Timeline: {count} tasks").format(count=count)
+
+
+def selected_label(count: int) -> str:
+    return T("已选 {count} 项", "{count} selected").format(count=count)
+
+
 class Probe:
     def __init__(self, args: argparse.Namespace) -> None:
         self.idb = args.idb
@@ -53,6 +89,7 @@ class Probe:
         self.out = Path(args.evidence_dir)
         self.out.mkdir(parents=True, exist_ok=True)
         self.steps: list[dict[str, Any]] = []
+        self.ui_locale: str | None = None
 
     def tree(self) -> list[dict[str, Any]]:
         return AX.dump_nodes(self.idb, self.companion, self.udid, attempts=3)
@@ -95,7 +132,7 @@ class Probe:
                 if not allow_view_sheet:
                     raise ProbeError(f"{description} is not in the tappable viewport: {visible}")
                 nodes = self.tree()
-                close = AX.find(nodes, "关闭视图选项", True, False, None, False, 0)
+                close = AX.find(nodes, T("关闭视图选项", "Close view options"), True, False, None, False, 0)
                 refreshed = AX.find(nodes, label, True, want_field, None, False, 0)
                 width, height = AX.screen_size(nodes)
                 if close is None or refreshed is None or width is None or height is None:
@@ -126,14 +163,14 @@ class Probe:
 
     def open_view_options(self, view: str) -> None:
         """Open the task view menu through its stateful accessibility label."""
-        self.tap((f"视图选项：{view}",), f"open view options for {view}")
-        self.wait_labels(("视图选项",), "view options sheet")
+        self.tap((view_options_label(view),), f"open view options for {view}")
+        self.wait_labels((T("视图选项", "View options"),), "view options sheet")
 
     def choose_view(self, current_view: str, target_view: str) -> None:
         """Choose a view from the menu; selecting a chip closes the sheet."""
         self.open_view_options(current_view)
         self.tap_view_sheet((target_view,), f"choose {target_view} view")
-        self.wait_absent(("视图选项",), "view options sheet closed")
+        self.wait_absent((T("视图选项", "View options"),), "view options sheet closed")
 
     def wait_labels(self, candidates: Iterable[str], description: str) -> list[dict[str, Any]]:
         wanted = tuple(candidates)
@@ -287,10 +324,10 @@ class Probe:
         raise ProbeError(f"{description} did not enter the list viewport")
 
     def create_task(self, title: str) -> None:
-        self.tap(("新建任务",), "open composer")
-        self.node(("新任务标题",), pressable=False)
-        self.type_text("新任务标题", title)
-        add = self.node(("添加",), pressable=True)
+        self.tap((T("新建任务", "New task"),), "open composer")
+        self.node((T("新任务标题", "New task title"),), pressable=False)
+        self.type_text(T("新任务标题", "New task title"), title)
+        add = self.node((T("添加", "Add"),), pressable=True)
         keyboard_top = AX.keyboard_top(self.tree())
         if keyboard_top is not None and AX.center(add)[1] >= keyboard_top:
             # KeyboardAvoidingView should keep the CTA above the IME. If a
@@ -299,7 +336,7 @@ class Probe:
             AX.dismiss_keyboard(self.idb, self.companion, self.udid)
             if AX.find(self.tree(), title, False, False, None, False, 0) is not None:
                 return
-            add = self.node(("添加",), pressable=True)
+            add = self.node((T("添加", "Add"),), pressable=True)
         self.tap_node(add, "submit task")
         self.wait_labels((title,), f"created task {title}")
 
@@ -310,12 +347,32 @@ class Probe:
             raise ProbeError(f"could not launch com.heyta: {(launch.stderr or launch.stdout).strip()[:300]}")
         # Welcome copy also contains “任务”; wait for an actual workspace control.
         # Privacy and welcome screens arrive in separate native render passes.
+        state = self.tree()
+        # 语言判定走三种首屏面：已同意联网时只有底部 tab，全新安装时先是隐私同意卡、
+        # 再是离线欢迎卡（与 scripts/qa/profile-settings-android.py 的判定同形）。
+        global ENGLISH
+        ENGLISH = any(
+            AX.find(state, candidate, True, False, None, True, 0) is not None
+            for candidate in ("This device only", "Use offline for now", "New task")
+        )
+        self.ui_locale = "en" if ENGLISH else "zh-CN"
         deadline = time.monotonic() + self.timeout
         while time.monotonic() < deadline:
             state = self.tree()
-            if AX.find(state, "新建任务", True, False, None, True, 0) is not None:
+            # 🔴 判定**不许只读一次快照**：companion 的 axbridge 会间歇返回空树（见 ios-ax-shim
+            # 里那条重试注释），首启那两屏又是分几次 render 到的 —— 一次读空就把英文设备判成
+            # zh-CN，后面每一枚 `T(中,英)` 都取中文那一列，英文界面上一枚也点不中，红在
+            # "workspace did not open after onboarding"（2026-10-18 r124 英文臂实测到的形状）。
+            # ⇒ 每轮重判，一旦判成英文就粘住（`not ENGLISH` 才重算，中文态零额外开销）。
+            if not ENGLISH:
+                ENGLISH = any(
+                    AX.find(state, candidate, True, False, None, True, 0) is not None
+                    for candidate in ("This device only", "Use offline for now", "New task")
+                )
+                self.ui_locale = "en" if ENGLISH else "zh-CN"
+            if AX.find(state, T("新建任务", "New task"), True, False, None, True, 0) is not None:
                 return
-            for label in ("只用本机", "先离线使用"):
+            for label in (T("只用本机", "This device only"), T("先离线使用", "Use offline for now")):
                 node = AX.find(state, label, True, False, None, True, 0)
                 if node is not None:
                     self.tap_node(node, "complete onboarding")
@@ -333,8 +390,8 @@ class Probe:
         self.create_task(task_b)
         self.record("02-created-task-b", title=task_b)
 
-        task_open_a = f"打开任务：{task_a}"
-        task_open_b = f"打开任务：{task_b}"
+        task_open_a = open_task_label(task_a)
+        task_open_b = open_task_label(task_b)
         width, height = AX.screen_size(self.tree())
         if width is None or height is None:
             raise ProbeError("missing native screen geometry")
@@ -352,83 +409,83 @@ class Probe:
         rc, detail = AX.idb_swipe(self.idb, self.companion, self.udid, x, y, x, y, 1.2)
         if rc != 0:
             raise ProbeError(f"long press transport failed: {detail}")
-        self.wait_labels(("退出选择",), "long-press selection mode")
+        self.wait_labels((T("退出选择", "Exit selection"),), "long-press selection mode")
         self.record("04-long-press-enters-selection")
 
-        select_b = f"选择：{task_b}"
+        select_b = select_task_label(task_b)
         self.tap_list_target((select_b, task_open_b), "select second task")
-        self.wait_labels(("已选 2 项",), "two selected tasks")
+        self.wait_labels((selected_label(2),), "two selected tasks")
         self.record("05-multi-select-second-task")
-        self.tap(("退出选择",), "exit selection")
-        self.wait_absent(("退出选择",), "selection mode exit")
+        self.tap((T("退出选择", "Exit selection"),), "exit selection")
+        self.wait_absent((T("退出选择", "Exit selection"),), "selection mode exit")
         self.record("06-exit-selection")
 
-        self.tap_list_control(("选择任务",), "start explicit selection")
-        self.tap_list_target((f"选择：{task_a}", task_open_a), "select task before changing view")
-        self.choose_view("列表", "时间线")
-        self.wait_absent(("退出选择", "已选 1 项"), "timeline clears hidden bulk selection")
+        self.tap_list_control((T("选择任务", "Select tasks"),), "start explicit selection")
+        self.tap_list_target((select_task_label(task_a), task_open_a), "select task before changing view")
+        self.choose_view(T("列表", "List"), T("时间线", "Timeline"))
+        self.wait_absent((T("退出选择", "Exit selection"), selected_label(1)), "timeline clears hidden bulk selection")
         self.record("06b-timeline-clears-selection")
-        self.choose_view("时间线", "列表")
+        self.choose_view(T("时间线", "Timeline"), T("列表", "List"))
 
         # The current view is the single entry point for date and sort
         # preferences. Keep this assertion explicit so the old always-on row
         # of controls cannot quietly return to the first screen.
-        self.open_view_options("列表")
-        self.wait_labels(("日期显示",), "date display options")
-        self.wait_labels(("选择排序方式",), "sort options heading")
-        for sort_label in ("默认（按截止时间）", "按添加时间", "按优先级"):
+        self.open_view_options(T("列表", "List"))
+        self.wait_labels((T("日期显示", "Date display"),), "date display options")
+        self.wait_labels((T("选择排序方式", "Choose sort order"),), "sort options heading")
+        for sort_label in (T("默认（按截止时间）", "Default (due date)"), T("按添加时间", "Date added"), T("按优先级", "Priority")):
             self.wait_labels((sort_label,), f"sort option {sort_label}")
-        self.tap_view_sheet(("按优先级",), "choose priority sort")
-        self.wait_absent(("视图选项",), "view options after sort selection")
-        self.open_view_options("列表")
-        self.tap_view_sheet(("倒计时",), "choose countdown date display")
-        self.wait_labels(("视图选项",), "view options remains open after date selection")
-        self.tap(("关闭视图选项",), "close view options")
-        self.wait_absent(("视图选项",), "view options closed")
+        self.tap_view_sheet((T("按优先级", "Priority"),), "choose priority sort")
+        self.wait_absent((T("视图选项", "View options"),), "view options after sort selection")
+        self.open_view_options(T("列表", "List"))
+        self.tap_view_sheet((T("倒计时", "Countdown"),), "choose countdown date display")
+        self.wait_labels((T("视图选项", "View options"),), "view options remains open after date selection")
+        self.tap((T("关闭视图选项", "Close view options"),), "close view options")
+        self.wait_absent((T("视图选项", "View options"),), "view options closed")
         self.record("07-view-options-sort-and-date")
 
-        self.choose_view("列表", "四象限")
+        self.choose_view(T("列表", "List"), T("四象限", "Quadrants"))
         self.wait_labels((task_open_a, task_open_b), "quadrant task rows")
-        AX.scroll_into_view(self.idb, self.companion, self.udid, f"移动「{task_a}」到其他象限", True, False, None)
-        more = self.node((f"移动「{task_a}」到其他象限", f"移动「{task_b}」到其他象限"), pressable=True)
+        AX.scroll_into_view(self.idb, self.companion, self.udid, move_task_label(task_a), True, False, None)
+        more = self.node((move_task_label(task_a), move_task_label(task_b)), pressable=True)
         self.tap_node(more, "open quadrant move sheet")
-        self.wait_labels((f"移动「{task_a}」到其他象限", f"移动「{task_b}」到其他象限"), "quadrant move sheet")
-        destinations = ("马上做", "计划做", "交给别人", "先不做")
+        self.wait_labels((move_task_label(task_a), move_task_label(task_b)), "quadrant move sheet")
+        destinations = (T("马上做", "Do now"), T("计划做", "Schedule"), T("交给别人", "Delegate"), T("先不做", "Drop"))
         destination_node = self.wait(
             lambda nodes: next((n for label in destinations for n in [AX.find(nodes, label, True, False, None, False, 0)] if n is not None and AX.is_enabled(n)), None),
             "enabled quadrant destination",
         )
         destination = AX.label_of(destination_node)
         self.tap_node(destination_node, "choose quadrant destination")
-        self.wait_labels(("撤销移动",), "quadrant move feedback")
+        self.wait_labels((T("撤销移动", "Undo move"),), "quadrant move feedback")
         self.record("08-quadrant-move-feedback", destination=destination)
-        self.tap(("撤销移动",), "undo quadrant move")
-        self.wait_absent(("撤销移动",), "quadrant undo")
+        self.tap((T("撤销移动", "Undo move"),), "undo quadrant move")
+        self.wait_absent((T("撤销移动", "Undo move"),), "quadrant undo")
         self.record("09-quadrant-undo")
 
-        self.choose_view("四象限", "时间线")
-        self.wait_labels((task_a, task_b, "时间线：共 2 条任务"), "timeline view")
-        self.open_view_options("时间线")
-        self.wait_absent(("日期显示",), "timeline hides date display options")
-        self.wait_absent(("选择排序方式",), "timeline hides sort options")
-        self.tap(("关闭视图选项",), "close timeline view options")
-        self.wait_absent(("视图选项",), "timeline view options closed")
+        self.choose_view(T("四象限", "Quadrants"), T("时间线", "Timeline"))
+        self.wait_labels((task_a, task_b, timeline_group_label(2)), "timeline view")
+        self.open_view_options(T("时间线", "Timeline"))
+        self.wait_absent((T("日期显示", "Date display"),), "timeline hides date display options")
+        self.wait_absent((T("选择排序方式", "Choose sort order"),), "timeline hides sort options")
+        self.tap((T("关闭视图选项", "Close view options"),), "close timeline view options")
+        self.wait_absent((T("视图选项", "View options"),), "timeline view options closed")
         self.record("10-timeline-view-options")
         timeline_task = self.node((task_a, task_b), pressable=False)
         self.tap_node(timeline_task, "open timeline task row")
-        self.wait_labels(("任务详情",), "timeline row detail")
-        self.wait_labels(("展开排期",), "schedule collapsed by default")
-        self.tap(("展开排期",), "expand schedule")
-        self.wait_labels(("收起排期",), "schedule expanded")
-        self.tap(("收起排期",), "collapse schedule")
-        self.wait_labels(("展开排期",), "schedule collapsed again")
+        self.wait_labels((T("任务详情", "Task details"),), "timeline row detail")
+        self.wait_labels((T("展开排期", "Show scheduling"),), "schedule collapsed by default")
+        self.tap((T("展开排期", "Show scheduling"),), "expand schedule")
+        self.wait_labels((T("收起排期", "Hide scheduling"),), "schedule expanded")
+        self.tap((T("收起排期", "Hide scheduling"),), "collapse schedule")
+        self.wait_labels((T("展开排期", "Show scheduling"),), "schedule collapsed again")
         self.record("11-timeline-row-opens-detail")
 
-        title_field = self.recover_detail_title("标题")
+        title_field = self.recover_detail_title(T("标题", "Title"))
         self.tap_node(title_field, "focus task title field")
         keyboard = self.wait(lambda nodes: AX.keyboard_top(nodes), "iOS keyboard")
-        title_now = self.node(("标题",), field=True)
-        close_now = self.node(("关闭任务详情",), pressable=True)
+        title_now = self.node((T("标题", "Title"),), field=True)
+        close_now = self.node((T("关闭任务详情", "Close task details"),), pressable=True)
         keyboard_top = int(keyboard)
         if AX.center(title_now)[1] >= keyboard_top:
             raise ProbeError(f"title field is covered by keyboard: center={AX.center(title_now)}, top={keyboard_top}")
@@ -436,9 +493,9 @@ class Probe:
             raise ProbeError(f"detail close action is covered by keyboard: center={AX.center(close_now)}, top={keyboard_top}")
         self.record("12-detail-keyboard-visible-and-unobstructed", keyboardTop=keyboard_top)
         AX.dismiss_keyboard(self.idb, self.companion, self.udid)
-        self.wait_labels(("任务详情",), "detail after keyboard dismiss")
-        self.tap(("关闭任务详情",), "close task detail")
-        self.wait_absent(("任务详情",), "task detail closed")
+        self.wait_labels((T("任务详情", "Task details"),), "detail after keyboard dismiss")
+        self.tap((T("关闭任务详情", "Close task details"),), "close task detail")
+        self.wait_absent((T("任务详情", "Task details"),), "task detail closed")
         self.record("13-detail-recovers-after-keyboard")
 
         if not skip_profile:
@@ -472,7 +529,7 @@ def main() -> int:
     report = Path(args.evidence_dir) / "tasks-ux-journey.json"
     try:
         probe.run(args.skip_profile)
-        report.write_text(json.dumps({"status": "passed", "udid": args.udid, "steps": probe.steps}, ensure_ascii=False, indent=2))
+        report.write_text(json.dumps({"status": "passed", "udid": args.udid, "uiLocale": probe.ui_locale, "steps": probe.steps}, ensure_ascii=False, indent=2))
         print(json.dumps({"status": "passed", "report": str(report)}, ensure_ascii=False))
         return 0
     except Exception as error:
@@ -480,7 +537,7 @@ def main() -> int:
             probe.screenshot("failure")
         except Exception:
             pass
-        report.write_text(json.dumps({"status": "failed", "udid": args.udid, "error": str(error), "steps": probe.steps}, ensure_ascii=False, indent=2))
+        report.write_text(json.dumps({"status": "failed", "udid": args.udid, "uiLocale": probe.ui_locale, "error": str(error), "steps": probe.steps}, ensure_ascii=False, indent=2))
         print(json.dumps({"status": "failed", "report": str(report), "error": str(error)}, ensure_ascii=False))
         return 1
 

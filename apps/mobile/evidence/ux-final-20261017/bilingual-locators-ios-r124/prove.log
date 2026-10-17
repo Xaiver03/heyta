@@ -1,0 +1,21 @@
+A. 含中文面：HEAD 36 枚去重 / 改后 34 枚去重
+   HEAD 有而改后没有：['」到其他象限', '已选 1 项', '已选 2 项', '打开任务：', '时间线：共 2 条任务', '移动「', '视图选项：', '选择：']
+   改后新出现：['已选 {count} 项', '打开任务：{title}', '时间线：共 {count} 条任务', '移动「{title}」到其他象限', '视图选项：{view}', '选择：{title}']
+   VERDICT A: 差集全部由 8 枚组合标签换成 i18n 模板解释，其余中文面逐字未变
+B. ENGLISH=False 逐枚求值（改前那台设备看到的串）：
+   = open_task_label: '打开任务：UxTaskA1'  (want '打开任务：UxTaskA1')
+   = select_task_label: '选择：UxTaskB2'  (want '选择：UxTaskB2')
+   = view_options_label: '视图选项：列表'  (want '视图选项：列表')
+   = move_task_label: '移动「UxTaskA1」到其他象限'  (want '移动「UxTaskA1」到其他象限')
+   = timeline_group_label: '时间线：共 2 条任务'  (want '时间线：共 2 条任务')
+   = selected 2: '已选 2 项'  (want '已选 2 项')
+   = selected 1: '已选 1 项'  (want '已选 1 项')
+C. ENGLISH=True 逐枚求值（英文系统下应当渲染的串，逐枚取自 en.ts）：
+   = open_task_label: 'Open task: UxTaskA1'  (want 'Open task: UxTaskA1')
+   = select_task_label: 'Select: UxTaskB2'  (want 'Select: UxTaskB2')
+   = view_options_label: 'View options: List'  (want 'View options: List')
+   = move_task_label: 'Move “UxTaskA1” to another quadrant'  (want 'Move “UxTaskA1” to another quadrant')
+   = timeline_group_label: 'Timeline: 2 tasks'  (want 'Timeline: 2 tasks')
+   = selected 2: '2 selected'  (want '2 selected')
+   = selected 1: '1 selected'  (want '1 selected')
+VERDICT B/C: 中文态运行时形状逐字等于改前，英文态等于词条真源

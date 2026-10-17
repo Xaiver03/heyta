@@ -11433,3 +11433,24 @@ PROBE hitChain div.ht-content → main.ht-main → div.ht-app → …
 ⇒ **对本条的实际影响**：修法只剩两条，且都不必等谁点头 —— 要么把那两枚生产件提交进 `packages/app-host/`，要么回退 `packages/app-host/src/index.ts` 里那两行 import。把这条常驻用例改绿没有第三条路（`.skip`、放宽判据、mock 装置都算作弊，见任务纪律）。本线**仍然不代修**：那两枚文件是 AI 那条线的在途工作，本线没有它们的作者意图，代提交等于替别人决定接口形状。**待办归属不变**（负责人 2026-10-16 已把"谁修"列进待拍板项）。
 
 **B221 修法的射程实测（00:3x，本会话 · 只读，给接手的人省一次判断）**：那两枚盘上文件的**导入深度只有 1 层，且那一层已在 HEAD**，所以修复动作就是"提交这两枚"，不会露出新缝。现量（原件 `~/.heyta-evidence/inb-t7-1017-0902/b221-shape-0038/probe.txt`，探针 `probe.py` 同目录，只 `git show`＋`os.path.exists`，零写）：`ai-managed-transport.ts` 行数 71、import 说明符 **0 枚**；`managed-ai-usage.ts` 行数 126、说明符 **1 枚** = `./endpoint-url.js` → `packages/app-host/src/endpoint-url.ts`，**盘上 True、HEAD True**。探针的抽取用独立一把尺交叉验过（`grep -n "import" 两枚文件` 只回 `managed-ai-usage.ts:24` 那一行）⇒ "0 枚"不是探针瞎了。对照 B216 那一族另一枚的形状不同：`packages/domain/src/comments.ts` **本来就在 HEAD**（`git cat-file -e HEAD:packages/domain/src/comments.ts` 回 `rc=0`），缺的只是 `index.ts` 那一行 —— 两枚缺口都是**一次小提交**的量级，没有需要设计的部分。⚠️ 这不改变"本线不代修"的结论，只是把"要不要等设计对齐"这一格从清单里划掉。
+
+**B222（00:4x，本会话 · UX 任务旅程线）iOS 任务旅程第 13 枚 `12-detail-keyboard-visible-and-unobstructed`：两种语态、两台载体、全新安装态都红，而"字段点不动"这一解释已被否证**
+
+现量（装置 = 工作树里 r124 改后的 `scripts/qa/tasks-ux-ios.py`；证据目录 `apps/mobile/evidence/ux-final-20261017/bilingual-locators-ios-r124/`）：
+
+| 臂 | 载体 | 语态 | 结果 |
+|---|---|---|---|
+| `arm-patched-en2` | 自建 `heyta-r124-ios-en`（iPhone 17 Pro / iOS 27.0，装第七趟四端重装那枚 `1.0/build 2` bundle） | en（`uiLocale en`） | 前 12 枚全过，红在键盘那一步 |
+| `arm-patched-zh` / `arm-fresh-zh-ab` | 同一台，切回 `zh-Hans-CN` 后 `uninstall`+`install` | zh-CN | 同样前 12 枚全过，红在同一步 |
+| `arm-patched-zh-legacy` | **旧载体 `FE195661`**（历史两枚 `passed` 读数、`keyboardTop=545` 就是它） | zh-CN | 同样红在同一步 |
+
+已排掉的（都是读数，不是推测）：① 不是载体不弹键盘 —— `probe-keyboard.py` 在 composer 上读到 `keyboard_top=545`；
+② 不是"详情面标题字段拿不到焦点" —— `probe-detail-title-focus.py` 定位同一枚字段（树里两枚叫 `标题`：非字段那枚 frame `(16,159,370,21)`、字段那枚 `(16,184,370,44)`）**单次直接点** ⇒ `keyboard_top=519`、详情在场、1.5/3/5 秒三次一致；
+③ 不是语言，也不是 r124 那笔双语改动（中文臂同形红）。
+
+🔴 **试过并否证的一条解释，别再照它做**：怀疑 `tap_node` 先跑的通用 `AX.scroll_into_view`（那是用滑动找元素）把详情面拖走 ——
+把这一步换成"直接点 `recover_detail_title` 已确认在视口内的那枚中心"再跑全新安装态 ⇒ **仍然红**（`arm-fresh-zh-ab`）。
+那笔改动**已整笔还原**，仓里没有留 `tap_center`/`tap_at`。
+
+剩下的未分开差别只有两处：这一步前面还做了**展开排期→收起排期**（`probe-step12-split.py` 量到：折叠后"收起排期"那枚控件落在折线以下，不先滚就 `not found`），
+以及详情是从**时间线行**开的（探针从列表行开）。⇒ 下一次做 A/B 的人从这两处切，别重跑上面那三臂。
