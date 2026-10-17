@@ -105,6 +105,25 @@ export interface ShareOpDispatchResult {
   readonly opId: string;
   /** 未登录短路：没构造 op、没发请求。 */
   readonly skipped: boolean;
+  /**
+   * 真的上线了的那一条 op（`skipped` 时为 undefined）。
+   *
+   * 🔴 交回来是为了**不让第二份线 op 形状出现**：本地物化也要同一条 op 的身份字段
+   * （id/clientId/actionType/opType/entityType/entityId/timestamp/schemaVersion），
+   * 而这些字段一旦在别处重新拼一遍，就迟早和线上那份漂移。
+   *
+   * ⚠️ 这里的 `payload` 是**密文**。本地 share 日志要存**明文**
+   * （物化不可能拿密文去过 reducer）—— 所以调用方用**同一条 op**、把 `payload`
+   * 换成 `intent.payload` 再落本地（见 `share-comments.ts`）。
+   */
+  readonly op?: ShareOpWire | undefined;
+}
+
+/** 装配好的线 op（身份 + 密文 + 向量时钟）。 */
+export interface ShareOpWire extends ShareOpWireIdentity {
+  readonly payload: string;
+  readonly vectorClock: Record<string, number>;
+  readonly isPayloadEncrypted: boolean;
 }
 
 let fallbackSeq = 0;
@@ -147,7 +166,7 @@ export function createShareOpDispatcher(options: ShareOpDispatcherOptions): {
         isPayloadEncrypted: true,
       };
       await options.api.uploadOps(shareId, [op]);
-      return { opId: identity.id, skipped: false };
+      return { opId: identity.id, skipped: false, op };
     },
   };
 }
