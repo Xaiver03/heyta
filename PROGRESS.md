@@ -6545,3 +6545,19 @@ ai-row-layout 2                                                                 
 **装置教训（同类第二次）**：我按 `grep playwright`/`grep heyta-frozen3` 找残留进程时，
 **又匹配到自己的 `bash -c` 命令行**（它整条都含这两个词）⇒ 读数上多出两条"残留"。
 判据要写成"**排除自身**"（`grep -v "bash -c"`，或先记下自己的 PID/PPID）。
+
+### 2026-10-17 把 `ai-tool-run` / `ai-row-layout` 的归属**钉成可复核的事实**（不是形状相似）
+
+查法（谁渲染它）：
+```
+grep -rn "AiToolRun" apps/web/src --include=*.ts --include=*.tsx | grep -v "^apps/web/src/features/ai/AiToolRun.tsx"
+  → 只剩三处**注释/字符串**与一处 `import { intentText } from './AiToolRun.js'`（AssistantPanel.tsx:91）
+  → **没有任何 JSX 渲染它**（`<AiToolRun` 计数 0）
+git show HEAD:apps/web/src/App.tsx | grep -c AiToolRun   → 0
+```
+⇒ **单步工具面板在当前工作树里没有挂载点**（`panel-ephemeral.tsx` 只在文件头注释里提到它）。
+所以 `ai-tool-run.spec.ts`（直接 `getByTestId('ai-tool-input')`）与 `ai-row-layout.spec.ts`
+（`getByTestId('ai-tool-run')`）**不是"载体要换正"，而是"入口不存在"** —— 要么那条线把挂载与入口补上，
+要么产品定义新的入口形状。**这不是我能单方面收的**：凭空造一个入口既不是载体修法、也不是产品修法。
+**旁证（同族）**：`AiToolRun` 是那族里唯一漏改的（`ai-failure-copy.ts:181` 逐字记着"另外四个面板改造时
+漏了 `AiToolRun`"）⇒ 与"整片 ` M`、改到一半"的形状自洽。
