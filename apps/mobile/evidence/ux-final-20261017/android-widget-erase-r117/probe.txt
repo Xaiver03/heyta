@@ -1,0 +1,8 @@
+
+════ A. 同步与隐私那一组现在长什么样（凭据在不在） ════
+   返回⟨cd⟩ | 同步与隐私 | 关闭⟨cd⟩ | 同步 | heyta 官方同步 | 登录 heyta 后，任务会自动在设备间同步，不需要填写服务器地址或手抄令牌。 | 注册 / 登录⟨cd⟩ | 注册 / 登录 | 使用自托管服务器⟨cd⟩ | 使用自托管服务器 | 隐私同意 | 只用本机（未同意联网） | 决定于 2026-10-16 10:33（UTC） | 需要同步或登录时，可以在这里重新选择是否联网。打开选择面板不会改变当前权限。 | 重新作出选择⟨cd⟩ | 重新作出选择
+
+════ B. 组件自己重画一次之后，卡上还剩什么（分开 B 与 C） ════
+   重画前：[读卡 before-repaint] 卡上文字=['2026-10-17 · 0/2', '○ L117UrgentImportant', '○ L117Urgent'] 在场实例=1 ['com.heytamobile.widget.TodayWidgetProvider']
+Broadcast completed: result=0
+   重画后：[读卡 after-repaint] 卡上文字=['2026-10-17 · 0/2', '○ L117UrgentImportant', '○ L117Urgent'] 在场实例=1 ['com.heytamobile.widget.TodayWidgetProvider']

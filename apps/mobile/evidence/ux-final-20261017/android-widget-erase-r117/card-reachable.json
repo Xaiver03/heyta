@@ -1,0 +1,30 @@
+{
+  "serial": "emulator-5554",
+  "device": {
+    "versionName": "1.0",
+    "lastUpdateTime": "2026-10-16 17:08:39",
+    "release": "16",
+    "system_locales": "zh-Hans-CN",
+    "head": "f89d7e386266173cf7075ed3f74c4ca096b8a4ac",
+    "imes_disabled": []
+  },
+  "log": [
+    "被测包 1.0 / lastUpdateTime=2026-10-16 17:08:39 / HEAD=f89d7e38"
+  ],
+  "tag": "reachable",
+  "card_texts": [
+    "打开 Heyta 以显示内容"
+  ],
+  "card_cjk": [
+    "打开 Heyta 以显示内容"
+  ],
+  "bound": {
+    "size": 1,
+    "providers": [
+      "com.heytamobile.widget.TodayWidgetProvider"
+    ],
+    "appwidget_ids": [
+      "26"
+    ]
+  }
+}

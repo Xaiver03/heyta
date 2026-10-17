@@ -1,0 +1,68 @@
+
+════ 0. 先把应用杀干净，读一次存储文件的初值 ════
+   [S0 冷启动前] 2026-10-17 09:48:35.447026461 +0800|1271  键=[snapshot_v1 ]
+
+════ 1. 起 logcat（自己起的，收尾自己停） ════
+   ✅ logcat 已起（pid=48900，落点 /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/mobile/evidence/ux-final-20261017/android-widget-erase-r117/logcat.txt）
+
+════ 2. 走到「账号与安全」，点之前先取三个计数器的初值 ════
+   [T0 点之前] 按钮 enabled=true clickable=false bounds=[352,1074][727,1127]
+   [S1 点之前（启动器发布之后）] 2026-10-17 09:51:00.631026530 +0800|1279  键=[snapshot_v1 ]
+
+════ 3. 点「清除本机保存的凭据」，等 8 秒让异步那两步都走完 ════
+   点下去之后屏上：返回⟨可点⟩ | 账号安全 | 关闭⟨可点⟩ | 账号安全 | 账号与安全, 登录密码、通行密钥、登录设备与退出登录⟨可点⟩ | 账号与安全 | 登录密码、通行密钥、登录设备与退出登录 | 注销账号, 删除云端账号，并清除这台设备上的数据⟨可点⟩ | 注销账号 | 删除云端账号，并清除这台设备上的数据 | 加密数据钥匙 | 这把钥匙用于解锁已同步的数据。它与登录密码分开，口令和恢复码只留在这台设备上。 | 请先登录，再管理这个账号的加密数据钥匙。 | 清除本机保存的凭据⟨可点⟩ | 清除本机保存的凭据
+   [T1 点之后] 按钮 enabled=true clickable=false bounds=[352,1074][727,1127]
+   [S2 点之后] 2026-10-17 09:51:00.631026530 +0800|1279  键=[snapshot_v1 ]
+   界面上没有「小组件还没有清除」
+
+════ 4. 再等 10 秒，看有没有第二次写回（假设 C 的形状是 空→又填上） ════
+   [S3 点之后 +18s] 2026-10-17 09:51:00.631026530 +0800|1279  键=[snapshot_v1 ]
+
+════ 5. 组件卡读数 ════
+被测包 1.0 / lastUpdateTime=2026-10-16 17:08:39 / HEAD=ab9a4228
+[读卡 wipe2] 卡上文字=['2026-10-17 · 0/2', '○ L117UrgentImportant', '○ L117Urgent'] 在场实例=1 ['com.heytamobile.widget.TodayWidgetProvider']
+SIZE AFTER ALL: (1, ['com.heytamobile.widget.TodayWidgetProvider'], ['26'])
+
+════ 6. 停掉自己起的 logcat，把相关行挑出来 ════
+   logcat 行数=9859
+10-17 09:51:52.692 I/GoogleInputMethodService( 1441): GoogleInputMethodService.onStartInput():1293 onStartInput(EditorInfo{EditorInfo{packageName=com.heyta, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+10-17 09:51:52.693 W/PackageConfigPersister(  664): App-specific configuration not found for packageName: com.heyta and userId: 0
+10-17 09:51:55.747 I/AconfigPackage(32420): com.android.settingslib.widget.flags is mapped to system
+10-17 09:51:55.747 I/AconfigPackage(32420): com.android.settingslib.widget.selectorwithwidgetpreference.flags is mapped to system
+10-17 09:51:55.747 I/AconfigPackage(32420): android.widget.flags is mapped to system
+10-17 09:51:55.747 I/AconfigPackage(32420): android.credentials.flags is mapped to system
+10-17 09:51:55.747 I/AconfigPackage(32420): android.appwidget.flags is mapped to system
+10-17 09:51:59.811 I/AconfigPackage(32445): com.android.settingslib.widget.flags is mapped to system
+10-17 09:51:59.811 I/AconfigPackage(32445): com.android.settingslib.widget.selectorwithwidgetpreference.flags is mapped to system
+10-17 09:51:59.811 I/AconfigPackage(32445): android.widget.flags is mapped to system
+10-17 09:51:59.811 I/AconfigPackage(32445): android.credentials.flags is mapped to system
+10-17 09:51:59.811 I/AconfigPackage(32445): android.appwidget.flags is mapped to system
+10-17 09:52:01.916 I/AconfigPackage(32467): com.android.settingslib.widget.flags is mapped to system
+10-17 09:52:01.916 I/AconfigPackage(32467): com.android.settingslib.widget.selectorwithwidgetpreference.flags is mapped to system
+10-17 09:52:01.916 I/AconfigPackage(32467): android.widget.flags is mapped to system
+10-17 09:52:01.916 I/AconfigPackage(32467): android.credentials.flags is mapped to system
+10-17 09:52:01.916 I/AconfigPackage(32467): android.appwidget.flags is mapped to system
+10-17 09:52:12.015 I/AconfigPackage(32489): com.android.settingslib.widget.flags is mapped to system
+10-17 09:52:12.015 I/AconfigPackage(32489): com.android.settingslib.widget.selectorwithwidgetpreference.flags is mapped to system
+10-17 09:52:12.015 I/AconfigPackage(32489): android.widget.flags is mapped to system
+10-17 09:52:12.015 I/AconfigPackage(32489): android.credentials.flags is mapped to system
+10-17 09:52:12.015 I/AconfigPackage(32489): android.appwidget.flags is mapped to system
+10-17 09:52:24.133 I/AppWidgetServiceImpl(  664): startListening() 0
+10-17 09:52:24.174 V/WindowManager(  664):         {WCT{RemoteToken{dd00b23 Task{eddf16 #523 type=standard A=10358:com.heyta}}} m=TO_BACK f=NONE leash=Surface(name=Task=523)/@0xe091d87 sb=Rect(0, 0 - 1080, 2400) eb=Rect(0, 0 - 1080, 2400) epz=Point(1080, 2400) d=0 taskParent=-1},
+10-17 09:52:24.580 D/CoreBackPreview(  664): Window{cad9b5a u0 com.heyta/com.heytamobile.MainActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@28a1a67, mPriority=-1, mIsAnimationCallback=false, mOverrideBehavior=0}
+10-17 09:52:26.334 I/artd    (32524): GetBestInfo: odex next to the dex file (/data/app/~~hv77k50dkGHecjAR7snwiA==/com.heyta-VAzgMWpAFemWgxOLbvT3bw==/oat/arm64/base.odex) is kOatUpToDate with filter 'verify' executable 'false'
+10-17 09:52:26.513 I/com.heyta(32043): AssetManager2(0xb400007353f0a198) locale list changing from [] to [zh-CN]
+10-17 09:52:26.515 I/AppWidgetServiceImpl(  664): updateAppWidgetProvider() 0
+10-17 09:52:26.515 D/AppWidgetServiceImpl(  664): Trying to notify widget update for package com.heyta with widget id: 26
+10-17 09:52:26.517 I/AppWidgetServiceImpl(  664): updateAppWidgetProvider() 0
+10-17 09:52:26.518 I/AppWidgetServiceImpl(  664): updateAppWidgetProvider() 0
+10-17 09:52:26.518 I/AppWidgetServiceImpl(  664): updateAppWidgetProvider() 0
+10-17 09:52:26.533 D/AlphabeticIndexCompat(22615): computeSectionName: cs: heyta sectionName: H
+10-17 09:52:28.694 I/AconfigPackage(32563): com.android.settingslib.widget.flags is mapped to system
+10-17 09:52:28.694 I/AconfigPackage(32563): com.android.settingslib.widget.selectorwithwidgetpreference.flags is mapped to system
+10-17 09:52:28.694 I/AconfigPackage(32563): android.widget.flags is mapped to system
+10-17 09:52:28.694 I/AconfigPackage(32563): android.credentials.flags is mapped to system
+10-17 09:52:28.694 I/AconfigPackage(32563): android.appwidget.flags is mapped to system
+10-17 09:52:30.624 W/dumpsys (32580): Thread Pool max thread count is 0. Cannot cache binder as linkToDeath cannot be implemented. serviceName: appwidget
+10-17 09:52:31.079 W/dumpsys (32587): Thread Pool max thread count is 0. Cannot cache binder as linkToDeath cannot be implemented. serviceName: appwidget
+PASS=1 FAIL=0

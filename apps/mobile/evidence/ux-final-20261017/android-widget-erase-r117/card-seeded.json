@@ -1,0 +1,43 @@
+{
+  "serial": "emulator-5554",
+  "device": {
+    "versionName": "1.0",
+    "lastUpdateTime": "2026-10-16 17:08:39",
+    "release": "16",
+    "system_locales": "zh-Hans-CN",
+    "head": "86dc82cbe89d6c00f9cd087fea18c1fac6004067",
+    "imes_disabled": []
+  },
+  "log": [
+    "被测包 1.0 / lastUpdateTime=2026-10-16 17:08:39 / HEAD=86dc82cb",
+    "  整族删掉 0 行；清单顶部「N 项待办」None → None",
+    "  建好 L117UrgentImportant",
+    "  建好 L117Urgent",
+    "  建好 L117Important",
+    "  建好 L117Plain",
+    "  改过 L117UrgentImportant: due=today,important；回读片段=['任务详情', '排期', '重复', '不重复', '每天', '每周', '工作日', '每月']",
+    "  改过 L117Urgent: due=today；回读片段=['任务详情', '标题', 'L117Urgent', '备注', '写点什么（支持 Markdown）', '离开输入框或关闭面板时保存', '清单', '收集箱']",
+    "  改过 L117Important: important；回读片段=['任务详情', '2', '3', '4', '5', '6', '7', '8']",
+    "  清单回读：['打开任务：L117Important', '打开任务：L117Plain', '打开任务：L117Urgent', '打开任务：L117UrgentImportant']",
+    "  建好习惯 L117Habit（行 habit-row-habit-mvbpjvha-5-0qc42wn7）",
+    "  ⚠️ 详情里没有 habit-checkin-<id>，打卡这半步没做（不影响『习惯非空』，影响的是『今天已完成』那一档）",
+    "[今天的任务] 绑住 落点=(540,700) 新表行=[7] host widgets.size=1 provider=['com.heytamobile.widget.TodayWidgetProvider']",
+    "[绑卡] 新绑一枚 Today：fav 行=[7] 现在=(1, ['com.heytamobile.widget.TodayWidgetProvider'], ['26'])"
+  ],
+  "tag": "seeded",
+  "card_texts": [
+    "2026-10-17 · 0/2",
+    "○ L117UrgentImportant",
+    "○ L117Urgent"
+  ],
+  "card_cjk": [],
+  "bound": {
+    "size": 1,
+    "providers": [
+      "com.heytamobile.widget.TodayWidgetProvider"
+    ],
+    "appwidget_ids": [
+      "26"
+    ]
+  }
+}

@@ -10052,3 +10052,45 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     这是 §7 元规则第二条（一条永远通过的判据比没有判据更糟）在 **dumpsys 层**的实例。
     与 **#439**（`uiautomator dump` 打 `ERROR: could not get idle state.` 而 rc=0）同族而方向相反：
     那条是**读不到**却当读到了，本条是**读得太多**、多到被过滤条件全收下。
+448. 🔴 **一枚被 `disabled` 的 React Native 按钮在 `uiautomator` 里仍然是 `clickable="true"`，而它内层的
+    `TextView` 永远是 `enabled="true"` —— 拿"可点"当读数会把灰掉的按钮读成能点。**
+    实测（r117 装机态设备腿）：那一枚「清除本机保存的凭据」的屏面打印给出
+    `清除本机保存的凭据⟨可点⟩`，本线那套打印的判据就是 `clickable="true"`；据此我**作废过一次
+    "这一枚够不到"的正确怀疑**，并把整趟读数当成"D6 那条契约失败"。
+    同一棵树里逐节点打出来才是真相，而且是**两枚**同名节点：
+    `class=Button enabled=false clickable=true bounds=[42,1043][1038,1159]`（控件本体，灰的）
+    与 `class=TextView enabled=true clickable=false bounds=[352,1074][727,1127]`（标签，永远"enabled"）。
+    而 `scroll_to_text` 回的是**后者**的中心 ⇒ 点下去什么也不会发生。
+    ⇒ 判据形状：要判"这一枚能不能点"，必须按 `class` 挑出**控件本体**再读它的 `enabled`
+    （`android.widget.Button` / `…ViewGroup`，**不是** `TextView`），
+    并且把 `enabled` 与 `clickable` **两个数一起打出来** —— 只看其中一个各会漏一半。
+    与 **#447** 同族（都是"探针的形状看着对、读数不成立"），也与 §7 元规则一（先怀疑探针）同源：
+    这次是探针把一个产品**可达性缺陷**误记成了行为缺陷，方向正好相反但同样贵。
+449. ⚠️ **共享模拟器上，别的应用会中途抢走前台并把系统权限弹窗顶上来；此后 `uiautomator dump`
+    回的是那个弹窗的树，于是"应用里找不到那一格"长得完全像产品缺这一格。**
+    实测（r117 同一趟连红三发）：`mCurrentFocus` 是
+    `com.google.android.permissioncontroller/…GrantPermissionsActivity`（Google 在要相机权限），
+    当时那份 dump 有 189 枚节点、整棵树里**没有「设置」两个字**，而滑 12 下屏面一字不变；
+    三条腿（切 tab、找设置入口、找目录层那一格）全部报"找不到"，看起来像设置入口被谁删了。
+    点掉「不允许」并 `am start -n com.heyta/com.heytamobile.MainActivity` 之后，
+    同一枚入口**第 1 下就命中** —— 产品那一格从头到尾都在。
+    ⇒ 判据形状：设备腿在报"这一格里没有那一行 / 这一页没有这个入口"**之前**，
+    先读 `mCurrentFocus` 那一行确认前台是本应用（#447 那把尺），
+    并把"弹窗坐标 + 点掉它"写进腿里而不是靠人重跑；
+    否则一次系统弹窗能把三条腿的结论同时污染成产品缺陷。
+    ⚠️ 反面教训同值：这次我先给出的归因是「`scroll_to_rid` 只滑 5 下、预算不够」，
+    把预算放到 12 下之后**第 1 下就中** ⇒ 那条归因被本趟自己的读数否证了。
+    改探针之前先量"是不是根本没在这棵树上"，别先假设是滚得不够。
+
+450. **块注释里写通配路径 `packages/*/src` 会把注释提前闭合。**
+    2026-10-16 实测：在 `server/src/billing/wechat.adapter.ts` 的 JSDoc 里写
+    `` `packages/*/src`、`apps/*/src` `` 描述"这三个目录零命中"，
+    其中的 **`*/`** 恰好是块注释的结束符 ⇒ 注释从那里断了，
+    后面的中文被当成代码解析，`tsc` 报
+    `TS1443: Module declaration names may only use ' or " quoted strings`
+    （指到**注释中间那一行**，而不是我真正改的那一行，所以第一眼容易看错）。
+    ⇒ 写"某几个目录"时用 `packages/<pkg>/src` 这种占位写法，
+    或把 `*` 和 `/` 分开（`packages/＊/src`）。
+    ⚠️ 它与 `/\*/` 这种**合法正则**在同一份 grep 里长得一样 ——
+    本仓现量 7 处 `*/` 命中，逐个看过之后**只有这一处**是真的提前闭合。
+    所以别按 grep 计数直接下结论：要看它**在不在注释里**。

@@ -1,0 +1,26 @@
+
+════ 1. 在本次会话里配好凭据（让表单那两格有值，D6 那一枚才可达） ════
+   ✅ 已填 服务器地址
+   ❌ 访问令牌 没填进去
+   ✅ 已填 端到端加密口令（安全字段，dump 看不到内容；由首次同步成功来证明）
+   ❌ 这些字段丢了： 访问令牌
+   ✅ 界面认为已配置
+   ✅ 已配凭据
+
+════ 2. 进「账号与安全」，先读那一枚按钮自己的 enabled ════
+   [T0 点之前] class=Button enabled=true clickable=true bounds=[42,1043][1038,1159]
+   [T0 点之前] class=TextView enabled=true clickable=false bounds=[352,1074][727,1127]
+   [S1 点之前] 2026-10-17 10:16:51.827027270 +0800|1275  键=[snapshot_v1 ]
+
+════ 3. 点下去，等异步那两步（清存储 + pushAll）走完 ════
+   [T1 点之后] class=Button enabled=false clickable=true bounds=[42,1043][1038,1159]
+   [T1 点之后] class=TextView enabled=true clickable=false bounds=[352,1074][727,1127]
+   [S2 点之后] 2026-10-17 10:24:43.851027495 +0800|65  键=[（空）]
+   没有出现「小组件还没有清除」
+
+════ 4. 组件卡与在场实例（D6 的主读数） ════
+被测包 1.0 / lastUpdateTime=2026-10-16 17:08:39 / HEAD=f89d7e38
+[读卡 reachable] 卡上文字=['打开 Heyta 以显示内容'] 在场实例=1 ['com.heytamobile.widget.TodayWidgetProvider']
+SIZE AFTER ALL: (1, ['com.heytamobile.widget.TodayWidgetProvider'], ['26'])
+   [S3 收尾再读一次（有没有被重新发布）] 2026-10-17 10:24:43.851027495 +0800|65  键=[（空）]
+PASS=4 FAIL=2
