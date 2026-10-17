@@ -6394,3 +6394,22 @@ button.duration-run(99x44) → span.ht-ai → …__items → …__panel(op=0.68)
 2. `ai-duration` 的 4 处（3 处入口 + **刷新之后那一处**）全部改用它 —— 刷新后披露本来就是收起的。
 
 **读数**：`ai-duration.spec.ts` **2 passed / rc=0（11.5 秒）**（此前 2 failed、每次 60s 超时）。
+
+### 2026-10-17 AI 家族盘点：3 份**全绿**、`ai-row-layout` 归到别线那笔未落库的面板改版
+
+同族四份在当前 tip 上跑（`--retries=0`）：**3 passed / 2 failed（50.8 秒）**
+```
+✅ ai-breakdown ✅ ai-prioritize ✅ ai-capture      （都不需要上一轮那处"按可访问名开披露"）
+🔴 ai-row-layout × 2（17 秒即挂 = 真断言失败，不是超时）
+```
+`ai-row-layout` 的两条都是同一个形状：`getByTestId('ai-tool-run')` → **`element(s) not found`**。
+逐项核过：
+- `ai-tool-run` 这个 testid **还在**（`apps/web/src/features/ai/AiToolRun.tsx:361` 的 `<section>`）——
+  所以不是"名字被改掉"这种载体问题；
+- 但 `apps/web/src/features/ai/` **整片都在别线的未落库改动里**（`git status` 逐条 ` M`：`AiToolRun.tsx`、
+  `AssistantPanel.tsx`、`AiBreakdown/Capture/Duration/Prioritize` …），而新设计是
+  **面板随账号 ephemeral**（`panel-ephemeral.tsx`：`PanelEphemeralProvider` / `usePanelEphemeral`）
+  ⇒ **AI 工具面板默认不再挂载**，要用例走**新的入口**去打开它 —— 那个入口的口径属于那条线。
+  旁证：同仓另一条判据 `ai-assistant.spec.ts:86` 现在明确断言"默认 **`ai-tool-run` 计数为 0**"，
+  也就是说"默认不挂载"是**这次设计变更的一部分**，不是坏了。
+⇒ 这两条**不是我能单方面收的**（要么那条线落库并给出入口口径，要么产品定"默认挂载"）。已如实登记。
