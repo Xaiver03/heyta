@@ -1626,7 +1626,7 @@ export const en = {
   // 🔴 Facts only: how long each category ran, and how that time was counted.
   //    No "most/least/imbalanced", no ranking, no share-of-total percentage.
   'web.categories.title': 'Time by category',
-  'web.categories.note': 'Focus and check-in time over the last 12 weeks.',
+  'web.categories.note': 'Focus and check-in time over the last 12 weeks. You decide what each color means; this page does not judge it.',
   'web.categories.empty': 'Nothing to show yet. Add a list to a task or track a habit in minutes.',
   'web.categories.empty.title': 'Nothing to show yet',
   'web.categories.empty.hint': 'Add a list to a task or track a habit in minutes.',
@@ -2128,6 +2128,14 @@ export const en = {
   'web.ai.settings.remote.lead': 'Remote endpoints can see your task content in plaintext. This path is ',
   'web.ai.settings.remote.strong': 'not protected by end-to-end encryption',
   'web.ai.settings.remote.tail': ', and it is a different channel from task sync. Each feature needs separate consent.',
+  'web.ai.settings.supply.title': 'Where these requests go',
+  'web.ai.settings.supply.own': 'An endpoint I configured myself',
+  'web.ai.settings.supply.managed': 'heyta hosted (our cloud AI, billed with your subscription)',
+  'web.ai.settings.supply.note': 'The hosted option uses the server address you entered under Sync — change the server and this follows, no need to edit it here. ⚠️ On the hosted path your task content is decrypted on our server before it reaches the model (end-to-end encryption does not cover that path); my own endpoint never goes through us.',
+  'web.ai.settings.supply.managedPending': 'The hosted option still needs a working sync server: set the address under Sync and sign in before this can take effect.',
+  'web.ai.settings.usage.used': 'Used {used} of {limit} this billing period.',
+  'web.ai.settings.usage.notEntitled': 'This account has no hosted AI entitlement right now (not subscribed, or it has lapsed).',
+  'web.ai.settings.usage.unavailable': 'Usage is unavailable right now — check again later.',
   'web.ai.settings.endpoints.title': 'Endpoints',
   // The leading `heyta` comes from `common.brand`, so this starts at the verb.
   // 🔴 2026-10-05 (ADR-0054): the *reason* changed, the *conclusion* did not. The server
@@ -2444,6 +2452,10 @@ export const en = {
   'web.ai.failure.cause.noRoute': 'No available endpoint can handle this feature. Check that an endpoint is enabled with a valid address.',
   'web.ai.failure.cause.fallbackNeedsConsent': 'The first endpoint failed, and the fallback would send your data elsewhere, so no automatic switch was made. It needs your permission again.',
   'web.ai.failure.cause.network': 'Could not reach the endpoint. Check your network and that the address is reachable.',
+  // Driven by the server's stable code, not by `cause`: both codes land in the same
+  // `http-error` bucket, yet the repair actions are opposite (subscribe vs wait).
+  'web.ai.failure.serverCode.subscriptionRequired': 'The hosted tier needs a subscription. Your tasks and sync are unaffected — only heyta hosted AI requires one.',
+  'web.ai.failure.serverCode.quotaExceeded': 'All 300 requests for this billing period are used; it resets next period. To keep going now, switch to your own AI endpoint in settings.',
   // Shares the transport-level `network` reason with the line above; the diagnosis is
   // what separates them. The browser only ever surfaces `Failed to fetch` here — the
   // status code is invisible, so this sentence is inferred, not observed.

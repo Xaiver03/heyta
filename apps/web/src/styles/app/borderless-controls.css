@@ -5,7 +5,17 @@
 a[href], a[href]:hover, a[href]:focus-visible {
   text-decoration: none;
 }
-:is(button, [role='button'], [role='tab'], [role='menuitem']):not([data-testid^='calendar-cell-']) {
+/*
+ * 🔴 2026-10-17：把**习惯那一行**排出去 —— 它不是"装饰性描边"，而是**选中态的线索**：
+ *   `habits.css:450` 的基态是 `border: 0`，选中态 `.ht-habit__row[aria-current='true']`
+ *   才用 `border-color: var(--ht-color-primary)` 画那圈主色边框（注释逐字写着
+ *   "选中态用**边框**表达（扁平风格里阴影只给真正的浮层）"）。
+ *   这条 `!important` 的"无描边"规则会把它**静默吞掉** ⇒ 暗色下量到
+ *   `borderTopColor = rgba(0, 0, 0, 0)`（判据 `habits-two-column.spec.ts:305` 当场抓住）。
+ *   排除之后两件行为都保持：未选中仍是 `border: 0`（无描边），选中的主色边框画得出来
+ *   —— 不需要再加一条 `!important` 去打这条 `!important`。
+ */
+:is(button, [role='button'], [role='tab'], [role='menuitem']):not([data-testid^='calendar-cell-']):not(.ht-habit__row) {
   border-color: transparent !important;
   box-shadow: none !important;
 }
@@ -30,8 +40,8 @@ a[href], a[href]:hover, a[href]:focus-visible {
 .ht-ai__composer,
 .ht-ai-agent-surface,
 .ht-search-overlay > *,
-.ht-profile-overview__identity,
-.ht-profile-overview__achievement,
+.ht-settings__profile-identity,
+.ht-settings__profile-achievement,
 .ht-inbox__card,
 .ht-rail__more-menu,
 .ht-category-create-dialog__dialog,

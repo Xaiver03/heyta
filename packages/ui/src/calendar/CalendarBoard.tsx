@@ -634,7 +634,15 @@ export function CalendarBoard({
         {weeks.map((week) => (
           <View
             key={week[0]!.date}
-            style={[styles.weekRow, styles.weekRowBody, fillMonth ? styles.weekRowFill : null]}
+            style={[
+              styles.weekRow,
+              styles.weekRowBody,
+              // 🔴 2026-10-17 修：`weekRowFill` 是 `flexGrow: 1` —— 它让这一行随视口长高。
+              // `fillMonth` 的契约只讲**月档**（见 prop 文档），而宿主无条件传 `true`，
+              // 于是**周档**那一行也跟着长高，判据 `calendar-week.spec.ts:114`
+              //（"那一行**不许**随视口长高"）当场红。⇒ 周档这一行不再吃 `weekRowFill`。
+              fillMonth && view !== 'week' ? styles.weekRowFill : null,
+            ]}
           >
             {/* 周次列（滴答式"31周"）：宿主给格式化，周一是网格开头，
                 同一行任何一天的 ISO 周数都相同 —— 取第一天的即可。 */}
@@ -657,9 +665,18 @@ export function CalendarBoard({
                 today,
                 cell.date,
                 // 档位决定"这一格画得下几条"（理由见常量本身）。
-                fillMonth
-                  ? cellTasks.length + (eventsByDate?.get(cell.date)?.length ?? 0)
-                  : view === 'week' ? MAX_WEEK_CALENDAR_BARS : MAX_CALENDAR_BARS,
+                //
+                // 🔴 2026-10-17 修：原来这里是 `fillMonth ? 不设上限 : (周档 ? 6 : 月档上限)`，
+                // 而 `fillMonth` 的契约（见它的 prop 文档）**只讲月档** ——
+                // 宿主 `CalendarView.tsx` 无条件传 `true`，于是**周档**也走了"不设上限"那一支：
+                // 现量那一格画了 8 条（上限常量是 6）。判据 `calendar-week.spec.ts:165`
+                //（"超出上限的折成 +N"）钉的就是这条上限。
+                // ⇒ 先把**周档**钉回它自己的常量，`fillMonth` 只再对月档（非周档）生效。
+                view === 'week'
+                  ? MAX_WEEK_CALENDAR_BARS
+                  : fillMonth
+                    ? cellTasks.length + (eventsByDate?.get(cell.date)?.length ?? 0)
+                    : MAX_CALENDAR_BARS,
                 eventsByDate?.get(cell.date),
                 eventLabels,
               );
@@ -674,7 +691,18 @@ export function CalendarBoard({
                   tone={calendarDayTone(cellTasks, today, cell.date)}
                   bars={bars}
                   hidden={hidden}
-                  fitHeight={fillMonth}
+                  /*
+                   * 🔴 2026-10-17 修：`fitHeight` 让 `DayCell` **按量到的格高**再切一刀
+                   * （`DayCell` 里 `slots = floor(availableHeight / rowHeight)`）——
+                   * 那是**月档网格**要的（格子高度决定画得下几条）。
+                   * 周档不是这个形状：那一行按设计**不随视口长高**（见 `weekRowBody` 那段
+                   * 现成的结论），于是量出来的高度只放得下 4 条，而它的上限是
+                   * `MAX_WEEK_CALENDAR_BARS = 6` ⇒ 现量"画了 4 条、上限 6"，
+                   * 判据 `calendar-week.spec.ts:165` 红。
+                   * ⇒ 周档不吃这一刀：`bars` 已经由 `calendarCellBars` 按档位上限切好，
+                   * `DayCell` 原样画完并把余量交给 `+N`。
+                   */
+                  fitHeight={fillMonth && view !== 'week'}
                   labels={labels}
                   dayMarker={dayMarker}
                   dayMarkerLabels={dayMarkerLabels}

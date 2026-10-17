@@ -71,6 +71,26 @@
   touch-action: none;
 }
 
+/*
+ * 🔴 2026-10-17：**日历那一列**的把手不再骑出列外（`inset-inline-end: 0`）。
+ *
+ * 真因（真浏览器现量，1280×720）：这一列是 `position: sticky`（= 一个层叠上下文），
+ * 而 `.ht-main` 是 `position: relative` 且在 DOM 里**排在它后面** ⇒ 主区那一层的绘制
+ * **盖在侧栏这一层之上**。把手原来 `inset-inline-end: -4px`（骑出去 4px，各让一半），
+ * 于是"几何中心"正好落在列的右边缘那一像素上 —— 那一点被判给主区：
+ *   `elementFromPoint(把手中心) === "ht-content"`
+ * 判据 `calendar-sidebar.spec.ts`「对着把手几何中心按下去，命中的必须是把手自己」
+ * 就是当场抓这个的（用户症状：把手在那儿、按下去拖不动）。
+ * ⚠️ 不要用"给这一列加 z-index"来解：那会把整列抬到主区之上，主区里那些
+ *    **会伸出到侧栏上的浮层**（行尾「更多」面板就是）会被盖住 —— 换一个更贵的病。
+ * ⚠️ 也不要把这条加到基类上：任务侧栏那条同族判据（`global-sidebar-resize.spec.ts`）
+ *    现在是绿的，它们的容器不是同一种（那一列没有这条覆盖）。
+ * 拿掉的只是"外面那 4px"，命中区仍是整列高 × 8px，贴着右边缘 —— 手感不变。
+ */
+.ht-sidebar--calendar .ht-sidebar__resizer {
+  inset-inline-end: 0;
+}
+
 .ht-sidebar__resizer::after {
   content: '';
   position: absolute;
