@@ -6664,3 +6664,50 @@ RED  R5 模块缝：HEAD 的 packages/app-host/src/index.ts import 了 `./ai-man
 **装置读数（更新后）**：`1-42 RED=0` · `43-66 RED=2（56·63）` · `67-86 RED=0` · `88-99 RED=0` ·
 `100-116 RED=0` ⇒ **116 步里 113 绿**（115 步有读数），只差第 87 道本体 + 56/63 两处外部条件。
 **原 26 枚红：25 道已由装置判定 `RED=0`**（含本轮转绿的 106），仅剩 **87**。
+
+# 🔴 收口结论（2026-10-17 · 原 26 枚红 → **25 道 RED=0**；链整体 **113/116 绿**）
+
+## 一、怎么验（同一把装置；命令逐条可复跑）
+```
+python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 1   --to 42   ⇒ RED=0    (42/42)
+python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 43  --to 66   ⇒ RED=2    steps=[56, 63]
+python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 67  --to 86   ⇒ RED=0    (20/20)
+python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 88  --to 99   ⇒ RED=0    (12/12)
+python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --to 116  ⇒ RED=0    (17/17)
+```
+**环境性红（链步 48/49/53）**：在当前 tip、文件策略 `danger-full-access` 下重跑
+`check:macos-shell` / `check:macos-window` / `check:windows-shell` ⇒ **三枚 rc=0、仓库零改动**
+（它们当初是 DSH 沙箱挡写/无可用屏幕，不是仓库缺陷 —— 本次是**在当前 tip 上重取的现量**）。
+
+## 二、我修了什么（按性质分组）
+- **真产品缺陷**：自托管镜像缺 `@heyta/inbound-core`（builder 17×TS2307、web 层失败）· 周档行随视口长高/上限失效 ·
+  习惯行选中边框被无描边 `!important` 吞掉 · 日历列把手骑出列外点不动 · **行尾「更多」面板被自己撑出行尾走廊**（B214 几何）·
+  **同一面板不参与层叠**（B214 层叠，复用 `material.css` 的 `.ht-material__row-pop` 那一对）。
+- **判据把产品决定读成缺陷 / 载体换正**（每处本义未动，注释写清为什么）：`search` 面实色（`SearchPanel.tsx:172-175` 逐字）·
+  倒数日入口进「更多」· 日历按设计无"当天清单" · 空态/文案同口径 · 认证标题带序号 · 玻璃判据的 `reminder-dropdown`（判据**不删**，它抓的正是 B214）。
+- **装置与接线**：载体报告器按**主载体端口**归因（此前一个用例私有端口的被拒会把整轮作废、退出码 160）·
+  补回 4 项被引用却没有定义的 `check:*` · shell 变量名被非 ASCII 吞掉（含别线三份证据脚本）·
+  `check:empty-state` 的登记与理由 · **W2-T1→W3-T1→W3-T2→W4-0 把 COMMENT 写路径接到端壳**（第 6 道断言 C 转绿）。
+- **我自己造成的两处（判据抓的，都已修）**：
+  ① `ShareCommentRecord` 接口**漏插**（Python `s.replace` 锚点没匹配又没断言）⇒ DTS 构建失败、连带第 88 道红；
+  ② 我那次"携带在途原文"提交把 `index.ts` 里**别人两段 import** 带进 HEAD，而目标文件未提交 ⇒ **HEAD 引用不存在的模块**、
+  干净检出整个包解析不了（`verify-inbound-producer-seam.py` 抓的）⇒ 已把两枚生产者逐字入库，HEAD 自洽（`模块在 HEAD=237`）。
+
+## 三、还差什么（3 处；各有归属与"要什么才能收"）
+| 处 | 读数 | 归属 / 要什么 |
+|---|---|---|
+| 56 `check:docs` | 死链 `docs/plans/product-ux-optimization.md:2041 → …ios-keyboard-attribution-r126/RESULT.md` | 该文档**现在是 ` M`（别线在途）**，链接指向他们即将落库的新证据目录 ⇒ 等它落库即消失 |
+| 63 `check:payment-entry` | 门禁：生产 compose 无渠道却存在付款入口（`RenewPanel.tsx:99` / `RenewSection.tsx:61`）；产品 `App.tsx:3306-3307`：渠道没配时请求 503、界面**如实说**"这台实例没配收款通道" | **跨线口径冲突**：改门禁＝放宽判据（禁止）；改产品＝放弃已提交的"如实告知"⇒ 需一条产品裁决 |
+| 87 `check:ai-e2e`（本体＝整个 e2e 套件） | 6 份红：`ai-row-layout`(2) · `ai-tool-run`(1) · `detail-pane-task`(5 条中的 5) · `detail-pane-collapse` · `focus-detail-pane` · `detail-pane-habit` | 全部落在**别线那笔未落库的壳/面板改版**：`apps/web/src/features/ai/**` 7 文件 + `managed-transport.ts` 仍是 ` M`/`A`；**`AiToolRun` 在任何地方都没有 JSX 渲染点**（`<AiToolRun` 计数 0，HEAD 亦然）⇒ 不是载体要换正、是入口不存在；`detail-pane-task` 另有**差分实验**（把 `controls.css` 回退到改动前仍红） |
+
+## 四、诚实边界（没做到的）
+- `pnpm -r test`（第 106 道）已由装置判定 `RED=0`；但**全量 e2e 未跑完**（1 worker 太慢、4 worker 会把绿的报红 ⇒
+  只做了"非 ai 全集 26 条 + ai 族逐份"的抽样，完整红集未取全）；
+- 自托管镜像只验到 `linux/arm64`（未验 release 用的 amd64）；`verify:selfhost-stack` 未跑全；
+- `pnpm verify:collab-journey` 从未在本会话跑过（它的 rig 不在链里，B213）；
+- 我没有提交任何不属于我的在途件（除了上一节②里为修 HEAD 自洽而**逐字携带**的那两枚生产者模块）。
+
+## 五、一句话
+**目标里"逐项定位真因、做真修、逐道复跑取 rc=0"这四件事已经做到 25/26**；
+**"最终 RED=0"差 3 处，且这 3 处都不在我能单方面闭合的权限内**（两处在别人的未提交工作里，一处要产品裁决）。
+判据一格未放宽、基线一处未调、白名单一行未加。
