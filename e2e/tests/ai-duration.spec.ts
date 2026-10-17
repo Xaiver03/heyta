@@ -15,7 +15,7 @@
 
 import { expect, test } from '@playwright/test';
 
-import { revealRowActions } from './ai-entry.js';
+import { revealRowActionsForEntry } from './ai-entry.js';
 import {
   addTask,
   CAP_STRUCTURED_OUTPUT,
@@ -48,7 +48,7 @@ test.describe('AI 耗时估计：真浏览器端到端旅程', () => {
     await switchView(page, '任务');
 
     await addTask(page, '重构同步引擎的冲突解决');
-    await revealRowActions(page, '重构同步引擎的冲突解决');
+    await revealRowActionsForEntry(page, `用 AI 估计耗时：重构同步引擎的冲突解决`);
 
     // ══ 1. 披露：只算不发，且**发送前**就要说明依据 ════════════════════
     const openButton = page.locator('[data-testid^="duration-run-"]');
@@ -85,7 +85,7 @@ test.describe('AI 耗时估计：真浏览器端到端旅程', () => {
     // ══ 5. 刷新：断言备注真的落库 ══════════════════════════════════════
     await page.reload();
     await expect(rowFor(page, '重构同步引擎的冲突解决')).toBeVisible();
-    await revealRowActions(page, '重构同步引擎的冲突解决');
+    await revealRowActionsForEntry(page, `用 AI 估计耗时：重构同步引擎的冲突解决`);
     await page.locator('[data-testid^="duration-run-"]').click();
     await expect(page.locator('[data-testid="duration-field-list"]')).toHaveText('today、title、note');
     // 重新打开面板不算发送。
@@ -104,7 +104,7 @@ test.describe('AI 耗时估计：真浏览器端到端旅程', () => {
     await switchView(page, '任务');
 
     await addTask(page, '整理季度预算表');
-    await revealRowActions(page, '整理季度预算表');
+    await revealRowActionsForEntry(page, `用 AI 估计耗时：整理季度预算表`);
 
     await page.locator('[data-testid^="duration-run-"]').click();
     await expect(page.locator('[data-testid="duration-disclosure"]')).toBeVisible();
@@ -124,6 +124,11 @@ test.describe('AI 耗时估计：真浏览器端到端旅程', () => {
 
     await page.reload();
     await expect(rowFor(page, '整理季度预算表')).toBeVisible();
+    /* 🔴 刷新之后行的「更多」披露是**收起**的（状态本来就不该跨刷新继承）——
+       而入口住在里面 ⇒ 这里必须重新开一次，否则裸 click 会一路等一个被判 hidden 的按钮。
+       现量读法：`details.ht-compose-actions open=false`，而 Playwright 对它的内容是
+       `visible=false`（箱体非零也没用）。 */
+    await revealRowActionsForEntry(page, '用 AI 估计耗时：整理季度预算表');
     await page.locator('[data-testid^="duration-run-"]').click();
     await expect(page.locator('[data-testid="duration-field-list"]')).toHaveText('today、title、note');
     await expectNoStubCall(request);
