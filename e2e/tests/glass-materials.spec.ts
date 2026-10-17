@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { openApp } from './helpers';
+import { openApp, switchView } from './helpers';
 
 /**
  * 🔴 玻璃材质三态验收（ADR-0042 / P1）—— 只有真浏览器能证的那一半
@@ -104,6 +104,13 @@ const SURFACES: Surface[] = [
     //   ⚠️ `close` 里把视口还回 1440×900：本套件其余四面按宽档拍，继承窄档 = 截图互相污染。
     name: 'organize-dropdown',
     open: async (page) => {
+      /*
+       * 🔴 2026-10-17（第二个坑，已复现）：这一面在 `SURFACES` 里排第 4，**前面 `inbox-panel`
+       * 会把视图切到收集箱**（它的 `close` 只关面板、不还视图）⇒ 锚点那两行根本不在屏上，
+       * 于是后面所有"找那一行/那一枚"的动作一律走到 60s 超时（第 33 轮在 `detail-pane-task`
+       * 上踩过同一个坑）。⇒ 打开之前先切回任务视图（同族既有手法，`switchView` 在 helpers 里）。
+       */
+      await switchView(page, '任务');
       await page.setViewportSize({ width: 900, height: 600 });
       /*
        * 🔴 2026-10-17：整理入口现在住在**每行那枚「更多」披露**里（`details.ht-compose-actions`）
@@ -164,6 +171,8 @@ const SURFACES: Surface[] = [
     //   让下一腿继承窄档 = 截图互相污染（同一循环里已经有一条"关干净再拍下一个"的判据）。
     name: 'reminder-dropdown',
     open: async (page) => {
+      /* 🔴 同 `organize-dropdown`：这一面排第 5，前面的面会把视图切走 ⇒ 先切回任务视图。 */
+      await switchView(page, '任务');
       await page.setViewportSize({ width: 900, height: 600 });
       /*
        * 🔴 2026-10-17：提醒那枚 `summary` 现在也住在**每行那枚「更多」披露**里
@@ -183,9 +192,20 @@ const SURFACES: Surface[] = [
         const outer = el.closest('details.ht-compose-actions');
         if (outer !== null && !outer.open) outer.open = true;
       });
-      await expect(popSummary, '外层披露打开后目标那一枚必须真的可见').toBeVisible();
-      await popSummary.scrollIntoViewIfNeeded();
-      await popSummary.click();
+      /*
+       * 🔴 2026-10-17（第四个坑，逐行读数定位）：`expect(...).toBeVisible()` 与下一句
+       * `locator.click()` **各自重新解析一次 `.first()`**，而 popover 打开之后 DOM 里有两个
+       * 实例（现量 `matches=2`）⇒ 两次解析之间可能指向**另一枚（折叠的）**元素：
+       * 现量就是"可见断言过了、紧接着 click 报 `waiting for element to be visible`"，
+       * 失败行精确落在 `await popSummary.click();`。
+       * ⇒ 把目标**绑成同一个元素句柄**再断言/滚动/点击（不再重解析）。
+       * 点击本身仍是 `elementHandle.click()`（真实 actionability，能抓住"看得见点不着"）。
+       */
+      const chip = await popSummary.elementHandle();
+      expect(chip, '要找得到提醒那一枚').not.toBeNull();
+      await chip!.waitForElementState('visible');
+      await chip!.scrollIntoViewIfNeeded();
+      await chip!.click();
       const panel = page.locator('details.ht-compose--popover .ht-material').first();
       // 🔴 把锚点那一行滚到可视区中部再量：这一族的锚点任务落在列表末尾，而
       //   `position: absolute` 的行尾面板开在**滚动容器**里 ⇒ 朝下开就被容器底裁掉。
@@ -196,7 +216,22 @@ const SURFACES: Surface[] = [
       return panel;
     },
     close: async (page) => {
-      await page.locator('details.ht-compose--popover > summary').first().click();
+      /*
+       * 🔴 2026-10-17（第三个坑，已用读数定位）：这里原来又去点
+       * `details.ht-compose--popover > summary` 的 `.first()` —— 而**popover 打开之后
+       * DOM 里多出一个实例**（现量：`matches=2`，两枚都 visible、各挂在一条 task-item 行上），
+       * 于是 `close` 的 `.first()` 已经指向**另一个（折叠的）**元素 ⇒
+       * `waiting for element to be visible` 一路 60s（而 `open` 里同一句是好的，因为它发生在
+       * 打开之前、那时只有一个实例）。
+       * ⇒ 关法改成**不依赖"第几个实例"**：Esc（这一族的面板本来就是 Esc 关，`organize-dropdown`
+       * 的 close 也是这么兜的）+ 把外层披露收回去（按行自己那枚「更多」的状态决定要不要点）。
+       */
+      await page.keyboard.press('Escape');
+      const more = page.locator('[data-testid^="task-actions-summary-"]').first();
+      if ((await more.count()) > 0) {
+        const outer = more.locator('xpath=ancestor::details[1]');
+        if ((await outer.getAttribute('open')) !== null) await more.click();
+      }
       await page.setViewportSize({ width: 1440, height: 900 });
     },
   },

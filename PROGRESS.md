@@ -6250,3 +6250,29 @@ scrollable overflow）⇒ 修法必须在流内。
 修法同族既有：`await switchView(page, '任务')`（helpers 里有，`calendar-sidebar.spec.ts` 在用）。
 ⚠️ 本轮我用 Python 打这个补丁时**断言失败（regex 没匹配到 helpers 的 import 形态）**，
 补丁没落盘 —— 下一轮改用 `edit` 工具做（第 3 次栽在 shell heredoc 的 Python 上了，已记）。
+
+### 2026-10-17 B214 是**两半**：几何（已修）+ 层叠（未修）—— 三个"懒解析/多实例"坑也一并定位
+
+**这一轮的逐行读数（每一条都是现量，不是推断）**：
+1. **几何那半已修好**：宽 1440 `panel=680..1064 chip=998..1052`、窄 900 `panel=492..876 chip=810..864`，
+   都在走廊内（走廊 304..1088 / 304..900）；探针里**普通 `click()` 能打开 popover**（`open=true matVisible=true`）。
+2. **层叠那半仍在**：整份跑失败行精确落在 `await chip!.click()`，`elementHandle.click` 的调用日志逐字是
+   `element is visible, enabled and stable` → `scrolling into view if needed` → `done scrolling` →
+   **`<label>…</label> from <span>…</span> subtree intercepts pointer events`**（113 次重试）。
+   ⇒ 行内有一个**整行命中区的 `<label>`**（仓里 `detail-pane-note-editor/n6-whole-row-is-the-hit-area.png`
+   那条判据说的就是这个模式）盖住了行尾面板里的控件 —— 面板虽然带 `ht-material`
+   （`material.css:57-59` 有 `position: relative; z-index: var(--ht-z-popover)`），
+   仍然被它压住。**下一手的判据**：`elementFromPoint(chip 中心)` 必须返回 chip 自己（现在返回的是 label/内容）。
+3. **三个"懒解析 / 多实例"坑**（都已修或已绕开，且都写进注释）：
+   a. `reminder-dropdown` 的 `close` 原来又点 `details.ht-compose--popover > summary` 的 `.first()` ——
+      而 **popover 打开后 DOM 里有两个实例**（现量 `matches=2`，两枚都 visible、分属两条行）⇒
+      `.first()` 已经指向另一枚（折叠的）⇒ 60s 超时。改成 Esc + 收外层披露（不依赖"第几个实例"）。
+   b. `open` 里 `expect(...).toBeVisible()` 与紧跟的 `locator.click()` **各自重新解析 `.first()`**，
+      两次之间 DOM 重排就可能换元素 ⇒ 现量"可见断言过了、紧接着 click 报不可见"。
+      改成**绑同一个元素句柄**（`elementHandle()` + `waitForElementState` + `click`）。
+   c. 「先开外层披露」原来点的是"包含 popover 的第一行"那枚按钮，与本行不一定是同一行 ⇒
+      改成**按目标元素自己的祖先置位**（`evaluate`），点击本身仍是真实 actionability 点击。
+4. 两个面（第 4/5 面）打开前补了 `await switchView(page, '任务')`（虽然本轮证明它不是这次红的主因，
+   但"前面的面会把视图切走"这件事在 `inbox-panel` 之后是真的，留着比不备好）。
+
+**仍未绿**：整份 `glass-materials` 2 败 1 过（失败点从"找不到/不可见"推进到"可见但被 label 拦"）。
