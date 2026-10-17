@@ -11454,3 +11454,19 @@ PROBE hitChain div.ht-content → main.ht-main → div.ht-app → …
 
 剩下的未分开差别只有两处：这一步前面还做了**展开排期→收起排期**（`probe-step12-split.py` 量到：折叠后"收起排期"那枚控件落在折线以下，不先滚就 `not found`），
 以及详情是从**时间线行**开的（探针从列表行开）。⇒ 下一次做 A/B 的人从这两处切，别重跑上面那三臂。
+
+
+🔴 **B223（2026-10-18 00:5x，本会话 · 顺链查出一枚"卖得出、那一腿还没复出来"的不一致；本线那份计划的头部被它说反了，已按代码事实重写）**：起因只是逐格复问计划头部那句「公网接收与售卖仍未开放」今天还成立吗。**不成立，且错在"售卖"这一半。** 四条现量：
+
+1. `node scripts/check-ai-quota-consistency.mjs` ⇒ **rc=0**，结论行逐字 `✅ 托管 AI 额度五处一致：300 次 / 计费周期；状态 已实现（server/src/ai/metering.ts）`（枚数与状态都由这把尺自报，别抄数）。
+2. `git show HEAD:server/src/billing/price-book.ts` ⇒ `export const NOT_YET_DELIVERABLE_SKUS: Readonly<Record<string, string>> = {};`，而 `notSellableReason = (priceId) => NOT_YET_DELIVERABLE_SKUS[priceId] ?? null` ⇒ 清单为空 ⇒ **对任何 priceId 都回 `null`（= 能卖）**。
+3. 同一文件 `SKU_GRANTS` ⇒ `'hosted-ai-monthly': ['hosting', 'ai', 'automation']`。**这一条是本项成立的桥**：¥12 那档给的能力里就有 `automation`，也就是自动收集本身，不是"另一档无关的服务"。
+4. 执行侧不是推测，是跑过的：`cd server && ./node_modules/.bin/vitest run --maxWorkers=1 tests/billing-checkout.routes.spec.ts` ⇒ `SPEC_RC=0`、`Test Files 1 passed (1)` / `Tests 14 passed (14)`；该文件第 198 行那条用例的名字逐字是「🟢 ¥12 那一档现在**可以下单**（ADR-0054 解除禁售：计量与代理路由都在了）」，且第 204 行注释自己说明这条断言有牙（把 `hosted-ai-monthly` 再塞回清单它就红）。
+
+**成因与时间**：翻面发生在 **2026-10-05** —— price-book 里 `NOT_YET_DELIVERABLE_SKUS` 上方那段注释标题就是"为什么现在是**空的**（2026-10-05）"，理由是代理路由与原子计量都在了，ADR-0054 **取代** ADR-0023 §5 那张最小清单的第 1–3 条。⇒ 这不是回归，是本线的句子一直抄着 ADR-0023 时代那句"不得被售卖"，而它的前置条件早已解除。
+
+**为什么这一格是要点头的，不是本线能自决的**：本任务书的前提是"负责人在对外售卖前要在 AC-1～AC-8 上点头"。现在代码层"先别收这一档钱"的门 10-05 就开了，而中间没有任何东西拦着这个形状：**用户付 ¥12 拿到 `automation` 权益，可"四端当前产物 + AC-3 那格"在当前提交态还复不出来**（被 B216 那一行与 B221 那两枚文件挡着）。要点的不是"要不要写代码"，是这三问：① 在 AC 未勾、那一腿未复出来的这段时间里，收银台要不要**先把这一档放回清单**（一个 entry，机制与调用点都不动，`check:ai-quota` 的 §3 明确要求调用点留着）；② 还是接受"卖得出但交付证据按戳念"；③ 生产上这一档现在**是否真的可下单**是运营事实，本线没取过生产侧证据（价目表在库里是否生效、微信通道是否接通都未证），所以本条**不**写成"已在售"，也**不**写成"未在售"。
+
+**本线做了什么**：只重写自己那份计划（`docs/plans/inbound-automation.md`）头部那两行，改成按代码事实的句子并列出三处真门。**没做什么**：不动 `AGENTS.md` §7 那句（入口文件的规则句按仓规不由本线改；而且它讲的"之前"确实已经过去，只是新读者会以为现在还拦着 —— 这一句留给入口文件的负责人）；不动价目表、不动清单、不动 `packages/i18n` 的对外文案（站点那句"规划中的…AI 自动收集"属 B110 与 AC-7 那一格）；不复跑别人那条收银台链。
+
+⚠️ **一条并发事实（这段是本条自己的一部分，不是脚注）**：起草本条时别线的 **B222** 还躺在工作树里没入库，我原本准备用「HEAD 那份 `BLOCKED.md` + 本段」构造 blob 来把它隔开；等真到提交那一步，他们那 21 行已经进了 `e5128746`（现量 `git show HEAD:BLOCKED.md | grep -c 'B222'` 回 **1**），那套手法没用上。所以本笔对 `BLOCKED.md` 的差异是 **+16 行、全是本段**（现量：写这段之前 `git diff --numstat -- BLOCKED.md` 回 `16 0`；提交后读 `git show --name-only --format= HEAD` 与 `git show --numstat --format= HEAD`）。
