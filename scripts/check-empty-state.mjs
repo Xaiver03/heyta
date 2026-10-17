@@ -351,6 +351,19 @@ const EMPTY_SITES = {
     'apps/mobile/src/screens/TrashScreen.tsx',
     'apps/web/src/features/ai/AiToolRun.tsx',
     /**
+     * 2026-10-17（W4 评论区上线时被本门禁抓出来的，**按本门禁自己写明的出口登记**）：
+     * `ShareCommentsSection.tsx` 里**没有一行空态 DOM** —— 骨架、布局与 `emptyThread`
+     * 的渲染全在共享层的 `packages/ui/src/sync/CommentThread.tsx:81`
+     * （它只读 `props.labels.emptyThread`、自己不做词条查找，所以它不在账上、也不该在）。
+     * 本文件做的是"把共享组件要的文案从 i18n 取出来"这一件事，形态与账上原有的
+     * `AuthPanel.tsx`（往共享认证面板传 `emptyTitle` / `emptyBody`）逐字同类。
+     * ⚠️ 本门禁文件头说"加一行 = 把这笔债合法化"，**这一行不是**：这里没有债可合法化
+     * （不存在第二份空态实现），登记的是"词条查找落在视图里"这个**已被门禁识别的形态**。
+     * 真正该收的方向与本门禁给 `AuthPanel` 的同一句话：**让共享组件自己拥有文案**、
+     * 视图不再传 —— 那要动 `packages/ui` 的组件 API 与其测试，属下一批（已记台账）。
+     */
+    'apps/web/src/features/share/ShareCommentsSection.tsx',
+    /**
      * ⚠️ `apps/web/src/features/auth/AuthPanel.tsx` 曾登记在这里，**已移除**
      * （2026-10-17，按本门禁自己打印的"登记站点已消失"提示做的对账）。
      *
