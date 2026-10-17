@@ -49,8 +49,14 @@ export interface ShareLogState {
 
 export const emptyShareLogState = (): ShareLogState => ({ ops: [], clock: {}, duplicates: 0 });
 
-/** 把线上 op 的 `vectorClock: unknown` 收成 `VectorClock`（形状不对的维度**直接丢**，不折成 0）。 */
-function normalizeClock(value: unknown): VectorClock {
+/**
+ * 把线上 op 的 `vectorClock: unknown` 收成 `VectorClock`（形状不对的维度**直接丢**，不折成 0）。
+ *
+ * 导出给同一族的回放用（`share-replay.ts`）：喂 reducer 的 `vectorClock` 必须是
+ * **有索引签名**的 `VectorClock`，`{}` 那种空对象字面量不满足它（TS 会拒），
+ * 而"归一"这件事只该有一份实现。
+ */
+export function shareLogClock(value: unknown): VectorClock {
   if (value === null || typeof value !== 'object') return {};
   const out: Record<string, number> = {};
   for (const [clientId, count] of Object.entries(value as Record<string, unknown>)) {
@@ -102,7 +108,7 @@ export function foldShareOps(state: ShareLogState, incoming: readonly ShareLogOp
   if (added.length === 0 && duplicates === state.duplicates) return state;
 
   let clock = state.clock;
-  for (const op of added) clock = mergeVectorClocks(clock, normalizeClock(op.vectorClock));
+  for (const op of added) clock = mergeVectorClocks(clock, shareLogClock(op.vectorClock));
   return { ops: shareReplayOrder([...state.ops, ...added]), clock, duplicates };
 }
 
