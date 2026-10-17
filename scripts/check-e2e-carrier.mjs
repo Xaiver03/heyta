@@ -21,6 +21,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -67,15 +68,24 @@ function configsReferenceReporter(root) {
 /**
  * 真跑一次报告器：命中签名 ⇒ 退出码必须非零且带那句"这一轮作废"；
  * 普通断言失败 ⇒ 不许退出（回 0 表示"继续跑，这些红是真的"）。
+ *
+ * `withCarrier` 让探针先走一次 `onBegin`（喂一份**合成的主载体配置**：4318/4319）。
+ * 它是 2026-10-17 那条归因的注入点：不给它，报告器拿不到"主载体端口"，
+ * 归因那一条分支就永远走不到 —— 那样新加的臂会变成恒真（§7 元规则 2）。
  */
-function probeReporter(message, expectExit) {
+function probeReporter(message, expectExit, withCarrier = false) {
   const child = spawnSync(
     process.execPath,
     ['-e', PROBE_CHILD],
     {
       cwd: ROOT,
       encoding: 'utf8',
-      env: { ...process.env, HEYTA_PROBE_MESSAGE: message, HEYTA_PROBE_FILE: join(ROOT, REPORTER_FILE) },
+      env: {
+        ...process.env,
+        HEYTA_PROBE_MESSAGE: message,
+        HEYTA_PROBE_FILE: join(ROOT, REPORTER_FILE),
+        ...(withCarrier ? { HEYTA_PROBE_CARRIER: '1' } : {}),
+      },
     },
   );
   const out = `${child.stdout ?? ''}${child.stderr ?? ''}`;
@@ -93,6 +103,12 @@ const PROBE_CHILD = `
 import(process.env.HEYTA_PROBE_FILE)
   .then((mod) => {
     const reporter = new mod.default();
+    if (process.env.HEYTA_PROBE_CARRIER === '1') {
+      reporter.onBegin({ webServer: [
+        { url: 'http://127.0.0.1:4318/' },
+        { url: 'http://127.0.0.1:4319/__requests' },
+      ] });
+    }
     const test = { titlePath: () => ['探针', '合成用例'] };
     const result = { error: { message: process.env.HEYTA_PROBE_MESSAGE }, errors: [] };
     reporter.onTestEnd(test, result);
@@ -186,11 +202,13 @@ function selfTest() {
 
   // 臂 11：分母自检 —— 真扫到的文件数必须远大于零，且真实树上零违规。
   // （臂 9/10 证的是"会抓/不冤枉"，这一臂证的是"它真的抓了整棵树"。）
-  check('扫描的分母非零且真实树干净', (() => {
-    const files = e2eSourceFiles();
+  check('扫描的分母非零且 git 看得见的树干净', (() => {
+    const { files, skipped } = e2eSourceFiles();
     if (files.length < 30) return `只扫到 ${files.length} 份 e2e 源文件 ⇒ 遍历大概率漏了目录`;
     const violations = portLiteralViolations(realRead, files);
-    return violations.length ? `这 ${violations.length} 处抄了字面量：${violations.join(', ')}` : null;
+    return violations.length
+      ? `这 ${violations.length} 处抄了字面量：${violations.join(', ')}（另有 ${skipped} 枚 git 看不见的草稿未计入）`
+      : null;
   })());
 
   // 臂 12：主配置必须从所有者拿端口（自己写死一枚就是第二个所有者）。
@@ -207,6 +225,33 @@ function selfTest() {
     const problems = mainConfigSlotProblems(broken);
     return problems.length === 2 ? null : `改坏之后回的是 ${JSON.stringify(problems)}`;
   })());
+
+  /* ── 臂 14–17：载体签名的**归因**（2026-10-17 补，起因记在下面那条注释里） ──────
+   * 起因（本轮实测）：`auth-simple-ux.spec.ts` 自带一套 4341/4342（它有自己的配置），
+   * 却被主配置收着；它那条 `connect ECONNREFUSED 127.0.0.1:4342` 命中签名表的
+   * `ECONNREFUSED` ⇒ 报告器判"载体死了" ⇒ **整轮 393 条当场作废**（退出码 160）。
+   * 这四条臂钉的是"归因只看主载体端口"，其中两条走**报告器本体**（`onBegin` 喂合成载体），
+   * 所以它证的是接线，不只是那个纯函数。 */
+  check('载体签名：主载体端口被拒 ⇒ 判载体（阳性对照，走报告器本体）', probeReporter(
+    'net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4318/',
+    true,
+    true,
+  ));
+  check('载体签名：**用例私有**端口被拒 ⇒ 不判载体（这一条正是本轮那场 160）', probeReporter(
+    'apiRequestContext.get: connect ECONNREFUSED 127.0.0.1:4342',
+    false,
+    true,
+  ));
+  check('载体签名：不点名端口的签名仍判载体（保守，不是"一律放过"）', probeReporter(
+    'Error: read ECONNRESET',
+    true,
+    true,
+  ));
+  check('载体签名：报告器没拿到主载体端口时保持旧口径（不归因）', probeReporter(
+    'apiRequestContext.get: connect ECONNREFUSED 127.0.0.1:4342',
+    true,
+    false,
+  ));
 
   console.log(`\n自检 ${arms} 臂 ｜ 失败 ${bad} 臂`);
   process.exit(bad ? 1 : 0);
@@ -256,16 +301,44 @@ function codePartOf(line) {
   return line;
 }
 
-function e2eSourceFiles(dir = join(ROOT, 'e2e'), base = 'e2e') {
+function walkE2eSourceFiles(dir = join(ROOT, 'e2e'), base = 'e2e') {
   const out = [];
   for (const name of readdirSync(dir)) {
     if (NAME_SKIP.has(name)) continue;
     const abs = join(dir, name);
     const rel = `${base}/${name}`;
-    if (statSync(abs).isDirectory()) out.push(...e2eSourceFiles(abs, rel));
+    if (statSync(abs).isDirectory()) out.push(...walkE2eSourceFiles(abs, rel));
     else if (/\.(ts|mjs)$/.test(name)) out.push(rel);
   }
   return out;
+}
+
+/**
+ * 扫描的分母 = **git 看得见的 e2e 源文件**（已跟踪 + 未跟踪但未被忽略）。
+ *
+ * 为什么不直接遍历文件系统（B202 那格量出来的）：`e2e/_probe/` 这类被 `.gitignore` 排除的
+ * 探针目录是并行会话的草稿，**不随交付走**。2026-10-16 实测同一枚门禁在两棵树上报的枚数不同
+ * （载具 4 处 / 共享检出 5 处），多出来那枚正是这种草稿件 —— 判据该判交付面，不是判某个人的暂存区。
+ * 这与本仓既有口径一致（`scripts/gate-ssh.mjs`：只有被 git 看见的文件进包）。
+ * 被跳过的枚数**显式打印**：静默在读数上和"没扫到"一样（§7 元规则 2）。
+ */
+function e2eSourceFiles() {
+  const walked = walkE2eSourceFiles();
+  let listed;
+  try {
+    listed = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '--', 'e2e'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+    })
+      .split('\n')
+      .filter(Boolean);
+  } catch {
+    /* 不是 git 检出（比如从 tarball 里跑）：退回遍历，并在读数里说明这一档。 */
+    return { files: walked, skipped: 0, degraded: true };
+  }
+  const visible = new Set(listed);
+  const files = walked.filter((rel) => visible.has(rel));
+  return { files, skipped: walked.length - files.length, degraded: false };
 }
 
 /**
@@ -338,7 +411,8 @@ function realCheck() {
     fail(`主配置：${problem}`);
     bad += 1;
   }
-  const violations = portLiteralViolations((p) => readFileSync(p, 'utf8'), e2eSourceFiles());
+  const scan = e2eSourceFiles();
+  const violations = portLiteralViolations((p) => readFileSync(p, 'utf8'), scan.files);
   if (violations.length) {
     fail(
       `这 ${violations.length} 处代码行把主族端口写成了字面量（槽的唯一所有者是 ${PORT_OWNER}）：\n   ` +
@@ -349,9 +423,12 @@ function realCheck() {
   }
 
   if (bad) process.exit(1);
+  const denominator = scan.degraded
+    ? `⚠️ git 不可用 ⇒ 退回文件系统遍历 ${scan.files.length} 份`
+    : `扫 git 看得见的 ${scan.files.length} 份 e2e 源文件，跳过 git 看不见的 ${scan.skipped} 枚草稿`;
   console.log(
     `✅ e2e 载体判定在场：${CHAINED_CONFIGS.length} 份进链配置各引用 ${relative(ROOT, join(ROOT, REPORTER_FILE))}，` +
-      `签名表 ${CARRIER_SIGNATURES.length} 枚，端口槽唯一所有者 ${PORT_OWNER}（扫描 ${e2eSourceFiles().length} 份 e2e 源文件）` +
+      `签名表 ${CARRIER_SIGNATURES.length} 枚，端口槽唯一所有者 ${PORT_OWNER}（${denominator}）` +
       ' —— 分母自检由 --self-test 逐臂证明',
   );
 }
