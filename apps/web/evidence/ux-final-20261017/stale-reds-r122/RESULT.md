@@ -78,3 +78,36 @@ git grep -n "viewOptions" HEAD -- apps/mobile/src
 3. 不证 `check` 整链在干净检出上全绿 —— 台账里那几格"装不起来 / 打不出包 / `check:layering`"
    的归属没变，本趟没重测它们。
 4. 变异只在临时树里做，主检出与真实索引没被改（`git status` 那两枚文件不在本批里）。
+
+## 追加：同一趟又复量掉两格（1439 与 1517）
+
+同一把尺（现量 + 出处提交），载体仍是主检出，`HEAD` 在两次取数之间被别人推进过（`9e45aac5` → `86fccb66`），
+所以下面每条都带自己的取数命令，不沿用上面那节的 HEAD。
+
+### 格 C：`docs/plans/product-ux-optimization.md:1439`（`check:layering` 红在 share-key 那枚字面量）
+
+| 取法 | 登记时 | 现在 |
+|---|---|---|
+| `NO_COLOR=1 pnpm check:layering` | `rc=1`，报 `apps/web/src/features/share/share-key-store.ts:56`「外壳里自己拼 op」 | **`rc=0`**：`✅ apps/* 分层边界完好（扫描 443 个文件，10 条规则）` |
+| `git grep -nw SHARE_KEY HEAD -- packages` | 空 | **2 枚命中**（`packages/app-host/src/share-key-identity.ts` 的注释与 `entityType: 'SHARE_KEY'`） |
+| `git show HEAD:apps/web/src/features/share/share-key-store.ts \| grep -n shareKeyStoreIdentity` | — | `22:import { shareKeyStoreIdentity } from '@heyta/app-host';` |
+
+⇒ 这一格的红**不是被豁免消掉的**，是走了本格当时自己写的那条出路：那组"决定别的端能不能解开同一份密文"的字节
+被提进共享层（`packages/app-host/src/share-key-identity.ts`），外壳改成 import。落地那笔：
+`2485edde feat(协作共享清单 W4/W6 接线): 入群链接落点 + 所有权转让 + 外壳密钥信封分层，journey 链接断言钉进判据`
+（`git log --diff-filter=A -- packages/app-host/src/share-key-identity.ts` 现量）。
+⇒ 当时那句"本线不代改别人的密码学形状"由协作那条线自己收了，本线只补复量。
+
+### 格 D：`docs/plans/product-ux-optimization.md:1517`（"取证口比产品事实先进仓库"那一族）
+
+| 取法 | 登记时 | 现在 |
+|---|---|---|
+| `git grep -c reminder-notify-request-failed HEAD -- apps/web/src` | 0（testId 只在**工作树**里） | **1 枚命中**：`apps/web/src/features/reminders/ReminderNotifyPanel.tsx` |
+| `git status --porcelain -- …/ReminderNotifyPanel.tsx …/notify.ts` | ` M`（未提交） | **空**（两枚都已提交） |
+
+⇒ 挡住"从 HEAD 复现那批注入态图"的前提**已经进仓库**了，进的那笔是 `63e61f23`。
+⚠️ **这一格只关掉"前提不在仓库"这一半，不关掉"已复现"**：本趟没有重跑那批图与逐格读数，
+要声称复现得按 `scripts/qa/settings-group-theme-sweep` 那一族再跑一趟。这条限定写进台账，
+免得下一个读者把"代码入库了"读成"证据复现了"（§7 元规则三那一族：测试绿 ≠ 这是当前产物）。
+
+台账未打勾数：这一趟从 31 降到 **27**（现量 `grep -c '^- \[ \]' docs/plans/product-ux-optimization.md`）。
