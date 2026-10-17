@@ -1742,7 +1742,7 @@ export const zhCN = {
   // 🔴 这一组里**只许有事实句**：某类做了多久、这些时间怎么算出来的。
   //    没有"最多/最少/失衡/超标"，也没有排名与占比（见计划 §2 反需求）。
   'web.categories.title': '分类时长',
-  'web.categories.note': '统计近 12 周的专注与打卡时间。',
+  'web.categories.note': '统计近 12 周的专注与打卡时间。颜色由你自己赋义，这一页不做任何评价。',
   'web.categories.empty': '还没有可展示的记录。先给任务归类或记录一次习惯时长。',
   'web.categories.empty.title': '还没有可展示的记录',
   'web.categories.empty.hint': '先给任务归类，或记录一次习惯时长。',
@@ -2257,6 +2257,14 @@ export const zhCN = {
   'web.ai.settings.remote.lead': '远端端点能看到你的任务内容明文。这条路径',
   'web.ai.settings.remote.strong': '不受端到端加密保护',
   'web.ai.settings.remote.tail': '，与任务同步是不同的通道。每个功能需要单独授权。',
+  'web.ai.settings.supply.title': '这些请求发给谁',
+  'web.ai.settings.supply.own': '我自己配置的端点',
+  'web.ai.settings.supply.managed': 'heyta 托管（用我们的云端 AI，按订阅计费）',
+  'web.ai.settings.supply.note': '托管档的地址来自你在「同步」里填的服务器 —— 换服务器，这一档跟着换，不用在这里改。⚠️ 走托管时你的任务内容会在我们的服务器上解开明文再送模型（端到端加密不覆盖这条路）；我自己的端点则完全不经过我们。',
+  'web.ai.settings.supply.managedPending': '托管档还需要一个可用的同步服务器：先去「同步」填好地址并登录，这里才能生效。',
+  'web.ai.settings.usage.used': '本周期已用 {used} / {limit} 次。',
+  'web.ai.settings.usage.notEntitled': '这个账号现在没有托管 AI 权益（还没订阅，或已经到期）。',
+  'web.ai.settings.usage.unavailable': '现在读不到用量 —— 稍后再看。',
   'web.ai.settings.endpoints.title': '端点',
   // 首词 `heyta` 走 `common.brand`，所以这里从动词起。
   // 🔴 2026-10-05（ADR-0054）把理由从"仍在开发中"换成"界面还没那个开关"：
@@ -2605,6 +2613,10 @@ export const zhCN = {
   'web.ai.failure.cause.noRoute': '没有可用端点能处理这个功能。检查端点是否启用、地址是否合法。',
   'web.ai.failure.cause.fallbackNeedsConsent': '首选端点失败了，而备用端点会把数据发到别处，所以没有自动切换。需要你重新授权。',
   'web.ai.failure.cause.network': '连不上端点。检查网络，以及端点地址是否可达。',
+  // 🔴 下面两条按**服务端稳定码**取，不按 `cause`：这两个码都落在 `http-error` 一档里，
+  // 而它们的修复动作相反（去买 / 等下一周期）—— 合成一句就指不出该做什么。
+  'web.ai.failure.serverCode.subscriptionRequired': '这一档要订阅才能用。你的任务与同步不受影响 —— 只有 heyta 托管 AI 需要订阅。',
+  'web.ai.failure.serverCode.quotaExceeded': '这个计费周期的 300 次已经用完，下个周期自动恢复。想现在继续用，可以在设置里改用自己的 AI 端点。',
   // 🔴 这一条与上面那句**共用同一个传输层原因码**（`network`），分开靠的是诊断：
   // 端点在你自己机器上、而它拒绝了当前页面所在的来源。浏览器在这一步只会给
   // `Failed to fetch`，**状态码根本看不见**，所以这句话是推出来的、不是读到的。
