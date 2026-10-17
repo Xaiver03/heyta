@@ -1,0 +1,47 @@
+被测包：versionName=1.0 lastUpdateTime=2026-10-1713:26:21
+载体 HEAD（读数当时那枚）：96baa43a
+服务端：http://127.0.0.1:4520   账号：mobile-e2e-1792221162@example.com
+
+════ 0. 起点态（同意 = 未决定，存储 = 装机后那份） ════
+   [T0 隐私同意] 
+   [S0 组件存储] 2026-10-17 14:56:25.751035268 +0800|499  键=[snapshot_v1 ]
+
+════ 1. 冷启动 → 同意联网（本趟的被测前提，故意点这一边）→ 切到「我的」 ════
+     已处理隐私同意面板（点「同意并联网」@ 312 1684）
+     已离开欢迎页（点「先离线使用」@ 540 1432）
+   [T1 同意之后] 
+
+════ 2. 配凭据并登录 ════
+   ✅ 已填 服务器地址
+   ❌ 访问令牌 没填进去
+   ✅ 已填 端到端加密口令（安全字段，dump 看不到内容；由首次同步成功来证明）
+   ❌ 这些字段丢了： 访问令牌
+   ✅ 界面认为已配置
+   ✅ 已配凭据
+
+════ 3. 造两条今天的任务并把 Today 卡绑上桌面 ════
+被测包 1.0 / lastUpdateTime=2026-10-17 13:26:21 / HEAD=96baa43a
+  整族删掉 0 行；清单顶部「N 项待办」None → None
+  建好 L119UrgentImportant
+  建好 L119Urgent
+  建好 L119Important
+  建好 L119Plain
+  改过 L119UrgentImportant: due=today,important；回读片段=['任务详情', '重复', '不重复', '每天', '每周', '工作日', '每月', '每年']
+  改过 L119Urgent: due=today；回读片段=['任务详情', '标题', 'L119Urgent', '备注', '写点什么（支持 Markdown）', '离开输入框或关闭面板时保存', '清单', '收集箱']
+  改过 L119Important: important；回读片段=['任务详情', '排期', '重复', '不重复', '每天', '每周', '工作日', '每月']
+  清单回读：['打开任务：L119Important', '打开任务：L119Plain', '打开任务：L119Urgent', '打开任务：L119UrgentImportant']
+  建好习惯 L119Habit（行 habit-row-habit-mvc2mgtl-5-5fes5ucx）
+  ⚠️ 详情里没有 habit-checkin-<id>，打卡这半步没做（不影响『习惯非空』，影响的是『今天已完成』那一档）
+[今天的任务] 落点=(540,700) 被拒（favorites 表没新增行）
+[今天的任务] 绑住 落点=(540,1150) 新表行=[7] host widgets.size=1 provider=['com.heytamobile.widget.TodayWidgetProvider']
+[绑卡] 新绑一枚 Today：fav 行=[7] 现在=(1, ['com.heytamobile.widget.TodayWidgetProvider'], ['27'])
+SIZE AFTER ALL: (1, ['com.heytamobile.widget.TodayWidgetProvider'], ['27'])
+   [S1 绑卡之后] 2026-10-17 15:24:24.135036068 +0800|1278  键=[snapshot_v1 ]
+
+════ 4. 读卡（注销之前的 C1 —— 后面要有东西可清） ════
+被测包 1.0 / lastUpdateTime=2026-10-17 13:26:21 / HEAD=96baa43a
+[读卡 before] 卡上文字=['2026-10-17 · 0/2', '○ L119UrgentImportant', '○ L119Urgent'] 在场实例=1 ['com.heytamobile.widget.TodayWidgetProvider']
+SIZE AFTER ALL: (1, ['com.heytamobile.widget.TodayWidgetProvider'], ['27'])
+   [S2 读卡之后] 2026-10-17 15:24:24.135036068 +0800|1278  键=[snapshot_v1 ]
+PASS=4 FAIL=2
+LEG1_RC=0

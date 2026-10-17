@@ -1,0 +1,33 @@
+{
+  "serial": "emulator-5554",
+  "device": {
+    "versionName": "1.0",
+    "lastUpdateTime": "2026-10-17 13:26:21",
+    "release": "16",
+    "system_locales": "zh-Hans-CN",
+    "head": "7ccbea8c65f44a1a9ab95162a71ac9947dd7c572",
+    "imes_disabled": [
+      "com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME",
+      "com.google.android.tts/com.google.android.apps.speech.tts.googletts.settings.asr.voiceime.VoiceInputMethodService"
+    ]
+  },
+  "log": [
+    "被测包 1.0 / lastUpdateTime=2026-10-17 13:26:21 / HEAD=7ccbea8c"
+  ],
+  "tag": "after",
+  "card_texts": [
+    "打开 Heyta 以显示内容"
+  ],
+  "card_cjk": [
+    "打开 Heyta 以显示内容"
+  ],
+  "bound": {
+    "size": 1,
+    "providers": [
+      "com.heytamobile.widget.TodayWidgetProvider"
+    ],
+    "appwidget_ids": [
+      "27"
+    ]
+  }
+}

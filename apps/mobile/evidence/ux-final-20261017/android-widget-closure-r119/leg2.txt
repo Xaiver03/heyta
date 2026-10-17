@@ -1,0 +1,28 @@
+
+════ 0. 注销之前：三枚独立计数器 ════
+   [S0 组件存储] 2026-10-17 15:40:36.539036532 +0800|1269  键=[snapshot_v1 ]
+   [S0 本机库] 本机库 mtime=2026-10-17 15:41:18.507036552 +0800 size=81920
+   [S0 服务端] operations=9 sync_state=1 users=1 tombstones=0
+
+════ 1. 走到「账号与安全」→「注销账号」那一屏 ════
+   ✅ 注销屏已开
+
+════ 2. 勾确认项 → 提交 → 第二层确认（写法抄在册脚本） ════
+   第二层确认：树里 1 枚同名，点第 1 枚
+
+════ 3. 等结果文案（最多 20 轮 × 2s） ════
+   ✅ 界面回的是「本地副本也已清除」
+
+════ 4. 注销之后：同样那三枚计数器 + 卡面 ════
+   [S1 注销后] 2026-10-17 15:42:58.215036600 +0800|65  键=[（空）]
+   [S1 注销后] 本机库 
+   [S1 服务端] operations=0 sync_state=0 users=0 tombstones=1
+被测包 1.0 / lastUpdateTime=2026-10-17 13:26:21 / HEAD=7ccbea8c
+[读卡 after] 卡上文字=['打开 Heyta 以显示内容'] 在场实例=1 ['com.heytamobile.widget.TodayWidgetProvider']
+SIZE AFTER ALL: (1, ['com.heytamobile.widget.TodayWidgetProvider'], ['27'])
+   [S2 再读一次（有没有被重新发布）] 2026-10-17 15:42:58.215036600 +0800|65  键=[（空）]
+   [S2 本机库] 本机库 
+   [S2 服务端] operations=0 sync_state=0 users=0 tombstones=1
+DONE_BRANCH=1
+PASS=2 FAIL=0
+LEG2_RC=0

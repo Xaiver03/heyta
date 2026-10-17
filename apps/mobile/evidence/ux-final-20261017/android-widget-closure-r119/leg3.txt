@@ -1,0 +1,20 @@
+════ 1. 收掉本趟绑的那枚桌面实例（_id=7 / appWidgetId=27）════
+  删之前：组件行 1（共 7 行，其余是 appWidgetId=-1 的系统图标）
+  删之后 appWidgetId=27 命中 0（要的是 0）
+════ 2. 把设备级隐私同意恢复到全新安装后没点过任何一边那一档 ════
+  注销之后它**还在**（这一条本身是读数，写进 RESULT.md）：
+     privacy.consent|{"decision":"accepted","decidedAt":"2026-10-17T07:14:54.910Z"}
+     welcome.hasSeen|1
+  删行之后 device_pref 行数 = 0
+════ 3. 应用留在冷启动态（下次谁用都和刚装完一样：会先看到同意卡）════
+     Starting: Intent { cmp=com.heyta/com.heytamobile.MainActivity }
+     Status: ok
+     Activity: com.heyta/com.heytamobile.MainActivity
+        3 只用本机
+        3 同意并联网
+        1 在使用联网功能之前
+════ 4. 停掉本趟那台栈、删掉本趟那枚库 ════
+        ✅ 服务端已停止（pid 96371）
+     残留 uxr 库数 = 0
+     4520 监听 = 0
+     应用进程 pidof = ''（空 = 已停）

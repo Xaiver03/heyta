@@ -1,0 +1,27 @@
+
+════ 0. 起点：服务端收到多少东西 ════
+     operations=0  sync_devices=0
+
+════ 1. 走到「设置 → 同步与隐私」并重填三枚凭据 ════
+   ✅ 已填 服务器地址
+   ✅ 已填 访问令牌
+   ✅ 已填 端到端加密口令（安全字段，dump 看不到内容；由首次同步成功来证明）
+   ✅ 三个凭据字段同时都在（没有被后一步清掉）
+   ✅ 界面认为已配置
+
+════ 2. 服务端判据：等 operations 从 0 涨起来（最多 12 轮 × 5s） ════
+     第 1 轮：operations=0
+     第 2 轮：operations=0
+     第 3 轮：operations=0
+     第 4 轮：operations=0
+     第 5 轮：operations=0
+     第 6 轮：operations=0
+     第 7 轮：operations=0
+     第 8 轮：operations=0
+     第 9 轮：operations=0
+     第 10 轮：operations=0
+     第 11 轮：operations=0
+     第 12 轮：operations=0
+   ❌ 60 秒内服务端一枚 op 都没收到 ⇒ 这台设备**没有真的登录上**。
+   界面上现在有什么：
+LEG1B_RC=1

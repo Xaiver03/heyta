@@ -10122,3 +10122,29 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     `git update-index --add --cacheinfo` 刷进真实索引，否则读 `git ls-files` 的门禁
     （`research/tools/docs-link-check.mjs`）会把已入库的件报成缺。
 
+452. 🔴 **`configure_sync_credentials` 那句「✅ 界面认为已配置」是假绿：它判的是表单态，不是"这台设备
+    有没有真的登录上 / 同步上"**（2026-10-17 装机腿 `apps/mobile/evidence/ux-final-20261017/android-widget-closure-r119/` 实测）。
+    两次现量都同形：一次它和「❌ 访问令牌 没填进去」**同时**打印出来，另一次三枚字段全绿，
+    而服务端 `select count(*) from operations` 仍是 **0**、`user_sync_state` 仍是 0。
+    它那句 green 的判据是"界面上没有 `mobile.profile.sync.notConfigured` 那行字"（`scripts/lib/mobile-e2e.sh:1716`），
+    而那行字的条件是 `!form.configured` —— **表单填了就不出现**，跟会话成不成立无关。
+    ⇒ 换判据只有一条可靠：**去服务端数东西**。`operations` 从 0 涨到 9 那一刻，
+    「我的」页那行同步状态同时从「还没设置端到端加密口令，同步已停止」变成「已是最新」——
+    两边对上才算登录成功。这一条适用于**所有**依赖这枚 helper 的 `verify-mobile-*` 腿：
+    它们当中任何一条以"已登录态"为前提的读数，都要先自己数一次服务端。
+453. ⚠️ **端到端口令按设计只放内存，所以"造已同步态"的那几腿一律不许 `force-stop` / `pm clear`**
+    （同一趟实测；界面上那行原话是「只存在内存里，应用重启后需要重新输入」，
+    代码侧是 `apps/mobile/src/sync/config.ts` 文件头那条取舍）。
+    杀进程之后三个输入框**看着都还是满的**（表单草稿在，口令不在），症状是同步停在
+    `no-encryption-password` —— 形状与"产品同步坏了"一模一样，实际是探针把被测前提抹了。
+    同族还有一条：口令那格是 `secureTextEntry`，`uiautomator` 里只有 `•••••`，
+    **能证明"字段里有内容"，证明不了"内容对"**。
+454. ⚠️ **同步不是填完立刻发生的**：上面那趟里 `operations` 在 60 秒轮询窗口内一直是 0，
+    窗口过后才涨到 9（同一枚设备、没有再点任何东西）。⇒ 拿"等 60 秒没动静"当"没登录上"的判据会**误红**；
+    窗口要么放到分钟级，要么主动触发一次同步再看。
+455. ⚠️ **桌面 favorites 表不在 `launcher.db` 里**：`sqlite3 /data/data/com.google.android.apps.nexuslauncher/databases/launcher.db`
+    查 `favorites` 报 `no such table`（那台 Pixel 模拟器上工作区表在 `launcher_4_by_5.db`）。
+    在册的 `widget-data-leg.py` 走的是 content provider
+    （`content://com.google.android.apps.nexuslauncher.settings/favorites`），收组件实例也走它：
+    `content delete --where "_id=7 AND appWidgetId=27"` → 再查命中 0。⇒ 按文件名猜库名会读成一棵空表。
+
