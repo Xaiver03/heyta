@@ -324,16 +324,23 @@ describe('分母恰好 9（W2 物化 EVENT 之后），且逐条点名', () => {
       (t) => !excludedNames.includes(t) && !gen.NON_ENTITY_VIEWS.includes(t),
     );
     expect([...manifest.userOperableEntityTypes]).toEqual(expected);
-    expect(manifest.userOperableEntityTypes.length).toBe(9);
-    expect(manifest.coverage.denominator).toBe(9);
+    // 2026-10-17 由 9 改成 10：`COMMENT`（共享清单的任务评论，ADR-0062 于 2026-10-08 进
+    // `EntityModelMap`）进了分母。**这是已登记的产品决定，不是漂移**：缺口走唯一豁免通道
+    // `ENTITY_COVERAGE_DEBT` 登记为 `COMMENT = AI-COV-8`（`scripts/check-ai-coverage.mjs:932`，
+    // 台账 `docs/plans/ai-event-tool-contract.md` §5.1），理由写在登记里 ——
+    // 评论的可读性依赖 share 域上下文（成员身份 + 清单密钥解密后的任务视图），
+    // 单做目录工具会造出一个 AI 碰不到的假功能。
+    expect(manifest.userOperableEntityTypes.length).toBe(10);
+    expect(manifest.coverage.denominator).toBe(10);
     // 🔴 W10 **之前**这里是 `toContain('EVENT')` —— 清单的职责就是把"实体有了、
     // 工具还没接"这件事显形。W10 做完之后它必须**不再**出现（这条改向就是那件事
     // 做完了的机器化证据；反向漏做 ⇒ 这条与上面 3/9 那条一起红）。
     expect(manifest.entityTypesWithoutTools).not.toContain('EVENT');
-    // 2026-10-03 合流后 9/9 全覆盖：分母里的实体**全部**有工具，
-    // 所以"有实体没工具"那句点名现在必须是空的。哪天目录丢了一个实体的工具，
-    // 这里会重新出现名字 —— 那就是这条判据重新开始咬人的时候。
-    expect([...manifest.entityTypesWithoutTools].sort()).toEqual([]);
+    // 2026-10-03 合流后 9/9 全覆盖；2026-10-17 起加一个限定：被点名的**只能是已登记的那一格**
+    // （`COMMENT` / AI-COV-8）。⇒ 这条判据现在同时管两件事：目录**不许**再长出"没工具又没登记"
+    // 的实体（多一个就红），而 AI-COV-8 一旦补上工具（或 `ENTITY_COVERAGE_DEBT` 摘掉它），
+    // 这句也会立刻红，逼下一个动目录的人回来重新判断。
+    expect([...manifest.entityTypesWithoutTools].sort()).toEqual(['COMMENT']);
   });
 
   it('分母的每个成员都**必须**在 `MODELED_ENTITY_TYPES` 里 —— 视图不是实体', async () => {
@@ -375,11 +382,16 @@ describe('分母恰好 9（W2 物化 EVENT 之后），且逐条点名', () => {
     }
   });
 
-  it('现状基线 9/9：分母里每个实体读写都有工具（以后少一个就要在这里重新判断）', () => {
+  it('现状基线 9/10：分母里除已登记缺口外每个实体读写都有工具（以后少一个就要在这里重新判断）', () => {
     // 2026-10-03 两次搬这条基线，都在这里重新判断过：
     // ① PROJECT 补 `create_project`、HABIT 补 `list_habits` + `create_habit`（3/8）；
     // ② 补齐 TAG / NOTE / HABIT_LOG / FOCUS_SESSION / REMINDER 的读写工具（8/8）。
     // 下一个动目录的人同样必须在这里重新判断一次 —— 改成从上游推导就是永真判据。
+    //
+    // ⚠️ 2026-10-17 第三次搬：分母 9 → 10（`COMMENT` 进 `EntityModelMap`），
+    // 基线从 9/9 变成 **9/10 + 已登记缺口 1**（`ENTITY_COVERAGE_DEBT` 的 `COMMENT = AI-COV-8`，
+    // 见 `scripts/check-ai-coverage.mjs:932`）。`withTools` 名单**一格没变** ——
+    // 变的只是分母，这正是"登记缺口而不是放假工具"的形状。
     //
     // ⚠️ 现在这个数已经顶到分母，**它不再能靠"加实体"变红**：往后新实体进了分母却没工具时，
     // 报的是 `check-ai-coverage` 那条门禁，不是这个常数。
@@ -398,13 +410,18 @@ describe('分母恰好 9（W2 物化 EVENT 之后），且逐条点名', () => {
       'TASK',
     ]);
     // 2026-10-03 合流：EVENT 的四条工具随 W10 移植进 pack 目录（读 2 / 写 2），
-    // 基线从 8/8（W11 批次）与 3/9（批次二当时的中间态）收拢为 9/9。
+    // 基线从 8/8（W11 批次）与 3/9（批次二当时的中间态）收拢为 9/9；
+    // 2026-10-17 起读作 9/10（COMMENT 进分母、无工具，缺口按 AI-COV-8 登记）。
     expect(manifest.coverage.covered).toBe(9);
-    expect(manifest.coverage.ratio).toBe('9/9');
+    expect(manifest.coverage.denominator).toBe(10);
+    expect(manifest.coverage.ratio).toBe('9/10');
     // `covered` 是分母名单的**统计结果**，`userOperableEntityTypes.length` 是名单本身：
-    // 两个数取自生成器里两条不同的路径，这里要求它们当下确实相等 ——
-    // 不等就是那两条口径漂了（比如覆盖率把某个已剔除的视图又算了进去）。
-    expect(manifest.coverage.covered).toBe(manifest.userOperableEntityTypes.length);
+    // 两个数取自生成器里两条不同的路径。2026-10-17 之前这里要求它们相等（= 分母全有工具）；
+    // 现在把等式改成"**每个没工具的实体都必须有一张登记的欠账**"，
+    // 于是这条依然是**有牙**的：既挡住"少算一个分母成员"，也挡住"漏登记一格缺口"。
+    const withoutTools = manifest.entityTypesWithoutTools.length;
+    expect(withoutTools, '没工具的实体数必须与登记的缺口数一致（现量 1：AI-COV-8）').toBe(1);
+    expect(manifest.coverage.covered + withoutTools).toBe(manifest.userOperableEntityTypes.length);
   });
 
   it('🔴 EVENT 的四个工具**读写都有**，且归因走的是名字（不是 override 名单）', async () => {
