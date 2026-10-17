@@ -1,0 +1,34 @@
+{
+  "status": "failed",
+  "udid": "2E39F4CE-6141-4053-AD75-E721F7BF78C1",
+  "idb": "/Users/rocalight/.heyta-tools/idb/venv/bin/idb",
+  "companion": "/Users/rocalight/.heyta-tools/idb/idb_companion",
+  "journey": "offline-profile-settings-ia",
+  "steps": [
+    {
+      "name": "onboarding already complete",
+      "status": "home-labels-absent",
+      "at": 1792249015.443857,
+      "labels": [
+        "heyta",
+        "Before any network feature runs",
+        "Decide later",
+        "heyta is local-first: your tasks, lists, notes and history are written to this device first. This choice decides one thing only - whether this device may talk to a server.",
+        "With \"This device only\", everything still works: creating, editing, calendar, quadrants, focus timer, habits and export. Nothing is synced, no account is used, and no server push notifications are received. Local reminders on mobile remain available after you grant system notification permission.",
+        "Allow networking to sign in to heyta and sync across devices. Task data is end-to-end encrypted before upload; the server cannot read your tasks.",
+        "Read the full text before deciding:",
+        "Terms of Service",
+        "Privacy Policy",
+        "Agree and connect",
+        "This device only"
+      ]
+    },
+    {
+      "name": "journey",
+      "status": "failed",
+      "error": "onboarding labels were not found and the home tab is not visible either; visible labels=['heyta', 'Before any network feature runs', 'Decide later', 'heyta is local-first: your tasks, lists, notes and history are written to this device first. This choice decides one thing only - whether this device may talk to a server.', 'With \"This device only\", everything still works: creating, editing, calendar, quadrants, focus timer, habits and export. Nothing is synced, no account is used, and no server push notifications are received. Local reminders on mobile remain available after you grant system notification permission.', 'Allow networking to sign in to heyta and sync across devices. Task data is end-to-end encrypted before upload; the server cannot read your tasks.', 'Read the full text before deciding:', 'Terms of Service', 'Privacy Policy', 'Agree and connect', 'This device only']",
+      "at": 1792249015.443882
+    }
+  ],
+  "error": "onboarding labels were not found and the home tab is not visible either; visible labels=['heyta', 'Before any network feature runs', 'Decide later', 'heyta is local-first: your tasks, lists, notes and history are written to this device first. This choice decides one thing only - whether this device may talk to a server.', 'With \"This device only\", everything still works: creating, editing, calendar, quadrants, focus timer, habits and export. Nothing is synced, no account is used, and no server push notifications are received. Local reminders on mobile remain available after you grant system notification permission.', 'Allow networking to sign in to heyta and sync across devices. Task data is end-to-end encrypted before upload; the server cannot read your tasks.', 'Read the full text before deciding:', 'Terms of Service', 'Privacy Policy', 'Agree and connect', 'This device only']"
+}

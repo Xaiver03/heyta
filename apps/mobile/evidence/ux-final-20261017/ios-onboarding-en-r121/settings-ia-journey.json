@@ -1,0 +1,16 @@
+{
+  "status": "failed",
+  "udid": "2E39F4CE-6141-4053-AD75-E721F7BF78C1",
+  "idb": "/Users/rocalight/.heyta-tools/idb/venv/bin/idb",
+  "companion": "/Users/rocalight/.heyta-tools/idb/idb_companion",
+  "journey": "offline-profile-settings-ia",
+  "steps": [
+    {
+      "name": "journey",
+      "status": "failed",
+      "error": "timed out waiting for ('先离线使用',); pressable=False; visible labels=['heyta', 'Plan your day', 'Local-first task management: offline still works, data is end-to-end encrypted, and the server can be your own.', 'Sign in or register', 'Use offline for now', 'You can create tasks, check in and focus without signing in; you can sign in later from the Profile tab.']",
+      "at": 1792248843.92703
+    }
+  ],
+  "error": "timed out waiting for ('先离线使用',); pressable=False; visible labels=['heyta', 'Plan your day', 'Local-first task management: offline still works, data is end-to-end encrypted, and the server can be your own.', 'Sign in or register', 'Use offline for now', 'You can create tasks, check in and focus without signing in; you can sign in later from the Profile tab.']"
+}
