@@ -6372,3 +6372,25 @@ due-date-edit · detail-pane-task · habit-frequency · habits-two-column · cal
 `check:ui-provider` ✅ · `check:theme` ✅。
 **第 87 道前半**：`node scripts/check-ai-e2e-preflight.mjs` **rc=0** ✅（"4318 / 4319 都是空的"）。
 ⇒ 至此**已实跑并 rc=0 的链步：24 + 这些**；剩下的是第 87 道的 e2e 本体（全量正在跑，读数下一轮）。
+
+### 2026-10-17 `ai-duration` 收口 **2 passed / rc=0**；顺带解开了那条**自相矛盾的读数**
+
+**矛盾**：Playwright 报 `Expected: visible / Received: hidden`，而我从页面里量到的是
+`box=99x44`、`visibility=visible`、`display=flex`、`opacity=1`、祖先没有隐藏项 —— **同一个元素**。
+**谜底（祖先链逐层读数）**：
+```
+button.duration-run(99x44) → span.ht-ai → …__items → …__panel(op=0.68)
+→ details.ht-compose-actions   rect=60x44   open=false     ← 🔴 关着的「更多」披露
+```
+⇒ **关着的 `<details>`：内容仍在 DOM、`getBoundingClientRect()` 也非零，但 Playwright 判它 `hidden`**。
+（仓里那条"`<details>` 收起时内容留在 DOM（只是不可见）"的注释说的就是这个形状；我此前把它记成
+"拿 count=0 断 details 会永远红"，这次补上了另一半：**拿箱体/样式断可见性也会永远红**。）
+
+**两处实修**（都在 `e2e/tests/ai-entry.ts`）：
+1. 新增 `revealRowActionsForEntry(page, entryAriaLabel)` —— **按入口自己的可访问名**
+   （`用 AI 估计耗时：<标题>`）反查它所在的披露并置位 ⇒ 不猜行、不做文本匹配
+   （`revealRowActions` 按标题找行在这条路上会选错行：同一标题也会出现在窄档行尾 `<select>` 的 `option` 里）。
+   置位只是"取出元素"，随后的 `locator.click()` 仍是真实 actionability 点击。
+2. `ai-duration` 的 4 处（3 处入口 + **刷新之后那一处**）全部改用它 —— 刷新后披露本来就是收起的。
+
+**读数**：`ai-duration.spec.ts` **2 passed / rc=0（11.5 秒）**（此前 2 failed、每次 60s 超时）。

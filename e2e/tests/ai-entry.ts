@@ -62,3 +62,48 @@ export async function revealRowActionsBy(page: Page, innerAriaLabel: string): Pr
   await disclosure.locator('> summary').click();
   await expect(disclosure, '「更多」披露必须真的打开').toHaveAttribute('open', '');
 }
+
+/**
+ * 打开某条任务的**详情栏**（`task-pane`）。
+ *
+ * 🔴 2026-10-17 加：AI 的几枚入口（**估时** / 拆解 / 优先级）现在挂在
+ * `apps/web/src/App.tsx:1534` 的 `<AiDuration task={task} …/>` 那一族里 ——
+ * 也就是**详情栏的 AI 段**，不再住在行尾那枚「更多」披露里。
+ * 于是 `revealRowActions`（开行尾披露）对这些入口是**开错了门**：
+ * 症状是 `locator('[data-testid^="duration-run-"]')` 一路
+ * `waiting for element to be visible` 到 60s 超时 —— 元素**根本不在那一层**。
+ *
+ * 选中机制照 `detail-pane-task.spec.ts:378` 的同一条：点**行体**那一棵
+ * （`[data-testid^="task-row-"]`，尾部动作是它的兄弟节点），然后等 `task-pane` 出现。
+ */
+export async function openTaskDetail(page: Page, title: string): Promise<void> {
+  const row = page.locator('[data-testid^="task-row-"]').filter({ hasText: title }).first();
+  await expect(row, `找不到标题为「${title}」的那一行`).toBeVisible();
+  await row.click();
+  await expect(page.getByTestId('task-pane'), '点了行体之后详情栏必须出现').toBeVisible();
+}
+
+/**
+ * 按**入口自己的可访问名**打开它所在的「更多」披露 —— 比按标题找行更稳。
+ *
+ * 🔴 2026-10-17（`ai-duration` 两个读数教出来的）：
+ * 1. 那枚入口（`duration-run-*`）**确实住在行尾 `details.ht-compose-actions` 里** ——
+ *    祖先链现量：`button.duration-run(99x44) → span.ht-ai → …__items → …__panel(op=0.68)
+ *    → details.ht-compose-actions open=false`。**关着的 `<details>` 内容虽然还在 DOM、
+ *    `getBoundingClientRect()` 也非零，但 Playwright 判它 `visible=false`**（这就是
+ *    "箱体非零、样式 visible，却报 hidden"那条自相矛盾读数的谜底）。
+ * 2. 按标题找行在这条路上会**选错行**（同一标题可能落进窄档行尾 `<select>` 的 `option` 里
+ *    —— `revealRowActions` 的函数注释早就记着这件事），于是"开的是别人那一行"，
+ *    目标入口始终折叠。
+ * ⇒ 直接拿入口自己的 `aria-label` 反查它所在的披露并置位：不猜行、不做文本匹配。
+ *    置位是**取出元素**的仪器动作；随后那次 `locator.click()` 仍是真实 actionability 点击。
+ */
+export async function revealRowActionsForEntry(page: Page, entryAriaLabel: string): Promise<void> {
+  const entry = page.getByLabel(entryAriaLabel, { exact: true }).first();
+  await expect(entry, `找不到可访问名为「${entryAriaLabel}」的那枚入口`).toBeAttached();
+  await entry.evaluate((el) => {
+    const disclosure = el.closest('details.ht-compose-actions');
+    if (disclosure !== null && !disclosure.open) disclosure.open = true;
+  });
+  await expect(entry, '开披露之后那枚入口必须真的可见').toBeVisible();
+}
