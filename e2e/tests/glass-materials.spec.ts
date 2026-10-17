@@ -200,6 +200,13 @@ const SURFACES: Surface[] = [
        * 失败行精确落在 `await popSummary.click();`。
        * ⇒ 把目标**绑成同一个元素句柄**再断言/滚动/点击（不再重解析）。
        * 点击本身仍是 `elementHandle.click()`（真实 actionability，能抓住"看得见点不着"）。
+       *
+       * 🔴 2026-10-17（第五个读数，**仍未解决**）：在真实流程里插桩量到 —— 点击那一刻
+       * 目标 chip 在 `540..594`，而 `elementFromPoint` 命中的是 **`label.`（rect 525..769）**，
+       * 它属于**另一个** `.ht-material__row-pop` 面板（`513..781`）⇒ **上一条面的行内浮层
+       * 还没关干净，正压在这一枚上**（探针里单任务、干净状态量不到这一条）。
+       * 下一手：查 `organize-dropdown` 的 close 是否真的把它的 `.ht-material__row-pop` 关掉
+       * （或应用侧是否本该"同一时刻只允许一个行内浮层"）。
        */
       const chip = await popSummary.elementHandle();
       expect(chip, '要找得到提醒那一枚').not.toBeNull();
