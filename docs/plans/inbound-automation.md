@@ -4208,5 +4208,9 @@ grep -n "ticketPath" packages/app-host/src/inbound-entitlement-tickets.ts
 12. 🔴 **第 9 条那串 AC 读数的复跑装置现在在仓库里**（15:2x）。原先它只活在 `~/.heyta-window-rigs/heyta-inb-ac-recheck-1017.sh` —— 一枚这台机器上、仓库外的 bash 台架，本文件与 `PROGRESS.md` 把它当"可复跑"引过三回，而克隆这份仓库的人拿不到那枚文件。现搬进被跟踪的 `research/tools/verify-inbound-ac-battery.py`，28 条腿的命令串逐字照抄（现量 `python3 research/tools/verify-inbound-ac-battery.py --list | tail -1` 回 `legs=28`），一条不加一条不减：
     - `--list` 只列不开火；无参＝整串串行（几十分钟）；`--only 标签[,标签]` 跑子集（标签不在册回 rc=2，不会静默跑零条还报绿）；`--self-test` 只测这把尺有没有牙（七臂，末行臂数是数出来的，另有一条 `arms=0 ⇒ 非 0` 的闸）。
     - 常驻消费者：臂接在 `server/tests/inbound-lane-rigs-consumers.spec.ts` 的 `SELF_TEST_ONLY` 里天天跑，判据腿留手跑（整串太重，且 `AC6-browser` 会重写 `apps/web/evidence/inbound-recovery/` 的取证图）。
-    - 🔴 **它不外推成任何新结论**：第 9 条那批逐格数字仍是 `@30397e71` 那一趟的读数，本装置只是让它们**在别的机器上也跑得起来**；而"rc 非 0 条数"仍不等于本线红数（AC-5 那一枚在别线名下，B205 追记）。读数落 `<root>/.run-logs/inb-ac-battery-<时刻>/`（被 `.gitignore` 那条挡住，不进提交）。
+    - 🔴 **它不外推成任何新结论**：第 9 条那批逐格数字仍是 `@30397e71` 那一趟的读数，本装置只是让它们**在别的机器上也跑得起来**；而"rc 非 0 条数"仍不等于本线红数（AC-5 那一枚在别线名下，B205 追记）。读数落 `<root>/.run-logs/inb-ac-battery-<时刻>/`（被 `.gitignore` 那条挡住，不进提交）。⚠️ 这一句的"仍是 `@30397e71`"从 16:0x 起是旧的：那批数字已在提交态整串重取过两戳，见下一节第 13 条。
+13. 🔴 **那 28 条腿第一次由仓库里的装置在提交态跑完，读数分两戳**（17:5x，写前先跑 `date`）。跑法与逐行读数都在 `PROGRESS.md` 第 37 条，这里只登记判卷口径要用的三件：
+    - **两戳的分工**：28 条腿全串 `@8473fa74`（`legs=28 rc0=27 rc_nonzero=1`，原件 `~/.heyta-evidence/inb-t7-1017-0902/battery-8473fa74/runlogs/`），随后 tip 被别线推进一枚，读文档的 10 枚便宜腿在 `@77383cf4` 复量（`legs=10 rc0=9 rc_nonzero=1`，原件同目录 `runlogs-77383cf4/`）；重跑范围由差集定 —— 代码腿被测物零改动（现量 `git diff --name-only 8473fa74 77383cf4 -- packages server/src apps/web/src apps/mobile/src e2e | wc -l` 回 0）。**不许把这两戳读成"28 腿 @当前 tip"**。
+    - **AC-1～AC-8 每格的命令与输出这一档从此有唯一入口**：`python3 research/tools/verify-inbound-ac-battery.py --list`（列）／无参（整串）／`--only 标签`（子集）／`--self-test`（牙）。逐格 ↔ 腿的双向对账原件 `~/.heyta-evidence/inb-t7-1017-0902/battery-8473fa74/ac-leg-map.txt`（文档有格而无腿 `[]`、有腿而文档无格 `[]`，腿总数 28）。
+    - **口径没动**：勾选尺仍「已勾=0、未勾=8」（现量 `python3 research/tools/verify-inbound-ac-ticks.py` 末行），AC 格子一枚没勾；唯一那枚 rc=1 仍是范围尺，构成是**别线名下 91 枚 + 本线名下 1 枚**（本线那枚见 B214，等负责人在三条出路里点头）。
 
