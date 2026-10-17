@@ -3730,6 +3730,8 @@ python3 research/tools/verify-inbound-check-chain.py --repo .worktrees/inb-t9 \
 `grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` = **0**（本节不勾任何一格）。矩阵里 C30 与腿表那句"桌面两端 + Linux 取证 ✅、移动两端未点"**未变**——
 `reinstall:all` 在**当前 tip** 上仍没有新读数（旧读数出自载体 `422db1b2`）。
 
+🟡 **2026-10-17 23:5x 现量改口不删旧文（上面这三件里有两件已被别线在提交态收掉）**：本节的第 1 件（四枚 `check:*` 缺定义 ⇒「`pnpm check` 的 `&&` 在第 1 步断掉，当前 tip 上 exit 0 是结构上不可达」）与第 2 件里 step 51 那格，**本戳已不成立**，逐枚读数与归属都在 `BLOCKED.md` 的 **B217**：现量 `pnpm -s check:gate-wiring` **rc=0**；`node -e 'const s=require("./package.json").scripts;["check:gate-ssh","check:e2e-helper-exports","check:ai-e2e","check:e2e-carrier"].forEach(k=>console.log(k,k in s?"有定义":"缺定义"))'` 四枚全回有定义（归属 `3007e28d` 10-17 22:33，`git status --porcelain -- package.json` 回空 ⇒ 提交态而非脏工作树）。step 51 那格：`server/tests/integration/inbound-dual-host-fault-windows.integration.spec.ts` 已进点名（现量 `git show HEAD:server/package.json | grep -c inbound-dual-host-fault-windows` 回 1）。第 2 件里 step 21 那格 `pnpm -s check:selection-single-source` **rc=0**；step 23 `check:empty-state` **仍 rc=1，但点名的已不是本线那枚文件**（现量点名 `apps/web/src/features/share/ShareCommentsSection.tsx`）⇒ 那句"本线在三格里是红因"从现在起要按**一格半**读：只剩 step 23 那格的红因换了人。上面那句「`reinstall:all` 在当前 tip 上仍没有新读数」也已过时期：10-16 那趟在隔离副本整条跑到 §6.1.1 固定收尾 `REINSTALL_RC=0`（见「2026-10-16 16:57–17:5x」那一节），10-17 又另拿到 Linux 交付取证 `PKG_RESULT=OK`；**今天四端那一格重刷被 B216 挡在构建前置上**，那句话是本戳的实情。**判卷口径本线一处没动。**
+
 ---
 
 ## 2026-10-14 16:1x–16:2x · T7 第三条腿在当前 tip 取到读数：mac / windows / Linux 三端全绿，移动两端各有一句实话
