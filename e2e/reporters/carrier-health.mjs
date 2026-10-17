@@ -35,17 +35,38 @@ export default class CarrierHealthReporter {
    *  所以作废判定里不许写死号，必须报出真的那一枚，否则换槽之后这句话会把人指到别人的端口上。 */
   #carrier = '（取不到 webServer.url）';
 
+  /**
+   * 主载体的**端口**（从上面那些 url 里现取）。
+   *
+   * 🔴 它只用于一件事：把"载体死了"与"**这条用例自己的**某个辅助端口没人应答"分开。
+   * 2026-10-17 实测：`auth-simple-ux.spec.ts` 自带 4341/4342（它有自己的配置
+   * `playwright.auth-simple.config.ts`），却被主配置收着；那条用例的
+   * `connect ECONNREFUSED 127.0.0.1:4342` 命中签名表里的 `ECONNREFUSED`
+   * ⇒ 报告器判"载体死了" ⇒ **整轮 393 条当场作废**（退出码 160），几十分钟的读数全丢。
+   * 取不到 url 时保持空数组 = 不做归因（旧口径）：宁可少判，也不误判。
+   */
+  #carrierPorts = [];
+
   onBegin(config) {
     const urls = []
       .concat(config?.webServer ?? [])
       .map((entry) => String(entry?.url ?? ''))
       .filter((u) => u.length > 0);
     if (urls.length > 0) this.#carrier = urls.join(' / ');
+    this.#carrierPorts = urls
+      .map((u) => {
+        try {
+          return Number(new URL(u).port);
+        } catch {
+          return NaN;
+        }
+      })
+      .filter((p) => Number.isInteger(p) && p > 0);
   }
 
   onTestEnd(test, result) {
     const text = errorTextOf(result);
-    const verdict = carrierFailureReason(text);
+    const verdict = carrierFailureReason(text, this.#carrierPorts);
     if (!verdict) return;
 
     const firstLine = text.split('\n').find((l) => l.trim().length > 0) ?? text;

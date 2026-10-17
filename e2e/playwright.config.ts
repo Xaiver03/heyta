@@ -32,7 +32,35 @@ export default defineConfig({
   // 在 `vite dev`（本配置起的 4318）下那条正向对照永远拿不到非零，
   // 于是整套"零出站"会变成**恒真的判据**（§7 元规则 2）。
   // 它需要生产构建，跑法：`npx playwright test -c playwright.privacy-consent.config.ts`。
-  testIgnore: /privacy-consent-zero-egress\.spec\.ts/,
+  //
+  // 🔴 第二条 2026-10-17 补：`auth-simple-ux.spec.ts` **有自己的配置**
+  // （`playwright.auth-simple.config.ts`：web 4341 + stub 4342，文件头写了理由）。
+  // 而它同时被本配置收进来 ⇒ 两条后果，都是本轮实测的：
+  //   ① 它那两条用例在本配置下**必红**（本配置的 stub 在 4319，4342 上什么都没有，
+  //      `apiRequestContext.get: connect ECONNREFUSED 127.0.0.1:4342`）；
+  //   ② 🔴 更贵的一条：那个 `ECONNREFUSED` 会被**载体健康报告器**认成"载体死了"，
+  //      于是整轮 393 条**当场作废**（退出码 160），跑了几十分钟的读数全丢
+  //      （本轮实测：`NON_AI2_RC=160`，停在 49/393）。
+  //      ⇒ 报告器那一侧也一起修了（`carrier-signature.mjs` 现在按**主载体端口**判，
+  //      不是"任何 ECONNREFUSED 都算"），这里是第二道：这一支就不该进本配置。
+  // ⚠️ 它自己的配置**目前没有任何消费者**（`grep -rn auth-simple package.json scripts/`
+  //    回 0 处）⇒ 它那两条用例当前**谁都不跑**，且在本机用自己那份配置复跑也是红
+  //    （2 failed / 1 passed，卡在 `waiting for locator('.ht-sheet__auth')`）。
+  //    这一格已登记进 `BLOCKED.md`（孤儿配置 + 两条真红），接线是一次独立决定。
+  // 🔴 第三条 2026-10-17 补：`collab-journey.spec.ts` 要**真实例**（`HEYTA_COLLAB_BASE`，
+  // 默认 `http://127.0.0.1:3217` 的 `/api/test/create-user`、`/api/shares`），而本配置只起
+  // 「假端点 4319 + vite 4318」⇒ 在本配置下它**必然红**：`TypeError: fetch failed`
+  //（本轮冻结副本整轮里也量到同一形状）。
+  // 它属于**自己那套 rig**：`pnpm verify:collab-journey`
+  //（`scripts/verify-collab-journey.mjs`，用 `playwright.collab.config.ts`，自带真服务端与 4327 的 web）。
+  // ⇒ 与本文件开头 `privacy-consent` / `auth-simple-ux` 同一条理由：**它不该进本配置**。
+  // ⚠️ 同 `auth-simple-ux`：那套 rig **不在 `pnpm check` 链里**（已登记 `BLOCKED.md`），
+  //    所以这一支的覆盖在链上是空的 —— 摘出本配置只是让**本套件的读数不再说谎**。
+  testIgnore: [
+    /privacy-consent-zero-egress\.spec\.ts/,
+    /auth-simple-ux\.spec\.ts/,
+    /collab-journey\.spec\.ts/,
+  ],
   fullyParallel: false,
 
   // 🔴 不许 `.only` 混进主分支：它会让整个套件悄悄退化成"只跑一条"。
