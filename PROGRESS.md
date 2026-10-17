@@ -5598,6 +5598,8 @@ AC 已勾数仍为 **0**（`verify-inbound-ac-ticks.py`：`AC 行=8　已勾=0�
 
 68. 🔴 **完成条件 2 那三格今天的读数，外加一条会误报的门名**（03:5x–04:1x，写前先跑 `date`）。三格都过：`node research/tools/license-inventory.mjs` 回 **rc=0**（原件 `~/.heyta-evidence/inb-t7-1017-0902/final-gates-0318.log`，它自报的依赖数与白名单例外数以那份日志为准），迁移门回 **rc=0**（原件同目录 `final-gates-0318-migrations.log`，它自报的"校验 N 个迁移文件，其中 M 个含 CONCURRENTLY"同样只在那份日志里读，别抄进正文），`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` 回 **0**。🔴 **过程里咬到的一枚探针坑要留下**：任务书那行字面写的是 `pnpm check-migrations`，而仓里**没有这个脚本** —— 现量 `git show HEAD:package.json | grep -n migrat` 只登记 `"check:migrations": "node scripts/check-migrations.mjs"` 这一枚；按字面跑回 `rc=1`，正文是 `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL Command "check-migrations" not found`，pnpm 自己接着提示 `Did you mean "pnpm check:migrations"?`。⇒ **那一枚 rc=1 报的是门名不存在，不是迁移规范没过**；把冒号那枚跑对之后才是 rc=0。下一位照任务书字面跑，会以为交付被迁移门拦住，实际上什么都没测。
 
+69. 🔴 **第 3 腿缺的那一行，别线已经写在盘上了——差的不是代码，是一次提交；本线不代提交**（04:5x，写前先跑 `date`）。两把尺一起拿才看得见：工作树尺 `grep -c comments packages/domain/src/index.ts` 回 **1**，提交态尺 `git show HEAD:packages/domain/src/index.ts | grep -c comments` 回 **0**，`git diff -- packages/domain/src/index.ts` 回 **3 行新增**（那一行连同 ADR-0062 W3 的两行注释，写法与 B216 追记一给的修法逐字相同）。⇒ 第 66 条那句"只剩 B216 那一行"仍然成立，但**性质变了**：不再是"要有人去写这一行"，而是"这一行已写好、还没人按提交"。本线照任务书不代提交别人的在途件（同一根问题的反向事故是第 64 条），转绿条件与复刷命令都不变，逐字写在 `BLOCKED.md` 的 **B216 追记二**。⚠️ 这一格为什么此刻才落到 BLOCKED.md 而不是 02:3x：那一趟 `git diff --numstat -- BLOCKED.md` 回 **+30/−0，逐行都是别线未提交的追记**，而本线的 plumbing 提交按整枚文件 `hash-object`，那时提交会把他们那 30 行一起带进本线的笔；到本戳他们那笔已入库（现量 `git status --porcelain -- BLOCKED.md` 回空）才动这格。
+
 
 
 
