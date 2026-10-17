@@ -6508,3 +6508,20 @@ button.duration-run(99x44) → span.ht-ai → …__items → …__panel(op=0.68)
 范围里若含重步（`build` / `typecheck` / 截图 / `pnpm -r test` / 镜像几条）耗时会很长。
 ⚠️ **不要与正在跑的 e2e 并行**：仓里那条"高负载会让 `pnpm -r test` 多报 phantom 失败"的现量
 （loadavg 152→6 枚、532→43 枚）就是这条纪律的来路。
+
+### 2026-10-17 e2e 全量盘点：慢跑取到的 3 条红 + 改成 4 worker 重开（只为枚举，不用于认证）
+
+**1-worker 慢跑（`--retries=0`，1 个多小时才 30 条）取到的红**：
+```
+ai-row-layout.spec.ts:115 · ai-row-layout.spec.ts:124   （element not found：ai-tool-run）
+ai-tool-run.spec.ts:99    （1.0m = 超时）
+```
+⇒ 三条**同一个根因**：AI 那几块面板在新的"随账号 ephemeral"设计下**默认不挂载**
+（`ai-assistant.spec.ts:86` 现在明确断言默认计数 0 ✓，即这是设计变更的一部分）—— 与收口台账 C 表一致。
+**改成 `--workers=4 --retries=0` 重开**（日志 `/tmp/full5.log`）：目的是**尽快拿到完整红集**，
+不用于认证（并行 + 高负载会引入 phantom 失败 —— 这条仓里已有现量：loadavg 152→6 枚、532→43 枚）。
+拿到清单后会**逐条在 1-worker 下复核**再写结论。
+
+**装置侧一条自我教训（记下）**：我用 `ps | grep playwright | kill` 清残留时，
+**把自己的 shell 也杀了**（那条 `bash -c` 的命令行里含 "playwright"）⇒ 重启那一步整段没执行。
+以后按"**排除自身命令行**"的方式定位（`grep -v "bash -c"` 或按 PID 白名单），或直接用 `job_kill`。
