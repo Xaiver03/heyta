@@ -10094,3 +10094,31 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     ⚠️ 它与 `/\*/` 这种**合法正则**在同一份 grep 里长得一样 ——
     本仓现量 7 处 `*/` 命中，逐个看过之后**只有这一处**是真的提前闭合。
     所以别按 grep 计数直接下结论：要看它**在不在注释里**。
+451. 🔴 **zsh 会把 `$变量:字母` 里的冒号当成历史修饰符，plumbing 脚本里那串
+    `"<blob-sha>:<路径>"` 就这样被改写**（2026-10-17 本机实测，`/bin/zsh`）。
+    写法是把四条 `git update-index --add --cacheinfo 100644,<sha>,<路径>` 用一个
+    `for e in "$S1:PROGRESS.md" …` 的循环配 `${e%%:*}` / `${e#*:}` 拼出来。三条失败，
+    报的是 `option 'cacheinfo' expects <mode>,<sha1>,<path>`，而 `echo "$e"` 打出来的**根本不是**
+    我写的那串：`<cwd>/<sha>ROGRESS.md`（`:P` ＝取绝对路径，把 `P` 一起吃掉）、
+    `<sha>sts/inbound-…`（`:t` ＝取文件名尾部）、`<sha>esearch/…`（`:r` ＝去扩展名）。
+    ⇒ 同一条 shell 语法差异会同时制造**三种不同的静默变形**，所以别拿其中一种去推断其余。
+    正确写法两选一：`${S1}:PROGRESS.md`（**带上花括号**，修饰符就不再套用），
+    或者 sha 与路径**分成两个变量**传。更稳的是把这种多步链落成一枚 `.bash` 文件用
+    `bash <脚本>` 跑 —— POSIX 没有这套修饰符，行为与 `sh`/CI 一致。
+    ⚠️ **这条本身不是最贵的，最贵的是它的下位后果**：那三条失败被循环里的
+    `|| echo "UPDATE_INDEX_FAIL …"` 吞成"打印了一行但还是继续"，`&&` 链照走到
+    `write-tree` → `commit-tree` → `update-ref`，于是 **HEAD 落成一枚只含 1 处改动的半截提交**
+    （本该 4 枚）。⇒ 判据只有一句，且必须在**换 ref 之后**跑：
+    `git show --name-only HEAD | wc -l` 必须等于"我心里那批"的枚数；不等就是半截，当场换掉。
+    换掉自己刚造的那笔**不碰工作树也不碰共享索引**：先确认 tip 仍是自己那笔
+    （`[ "$(git rev-parse HEAD)" = "$MINE" ]`；⚠️ 这句要拿**全长 sha** 比 ——
+    我第一版脚本用 8 位缩写去比 40 位全长，把自己那枚读成了"别人在上面落笔了"，
+    白 STOP 一次），再从**同一枚父**重建树，`git update-ref refs/heads/main <新> <旧>`（CAS 只换自己）。
+    换完两条判据：`git merge-base --is-ancestor <半截那笔> HEAD` **退 1**（它已不在历史里），
+    `git show --numstat HEAD` 的删除行只来自我自己改写的那几行。
+    收尾另有一条（与 #88 同族）：共享索引里当时有**别人 50 枚暂存条目**
+    （现量 `git diff --cached --name-only | wc -l`），所以本轮整条绕开 `git commit`，
+    走私有索引 + CAS；提交完要把自己那几枚**文件**（别列目录，见 #14）
+    `git update-index --add --cacheinfo` 刷进真实索引，否则读 `git ls-files` 的门禁
+    （`research/tools/docs-link-check.mjs`）会把已入库的件报成缺。
+
