@@ -6431,3 +6431,41 @@ button.duration-run(99x44) → span.ht-ai → …__items → …__panel(op=0.68)
 读数下一轮；剩下的红已知全在**别线未落库那笔壳/面板改版**的地界（`ai-row-layout` / `detail-pane-task` /
 `detail-pane-collapse` / `focus-detail-pane` / `detail-pane-habit` / `ai-tool-run`，其中 `detail-pane-task`
 有差分证据、`ai-row-layout` 有"testid 仍在但默认不挂载 = 设计变更"的旁证）。
+
+## 2026-10-17 收口台账（原 26 枚红 → 逐道结论、归属证据、RED=0 的可复核条件）
+
+### A. 本会话内**实跑并 rc=0** 的链步（逐条可复跑；39 步 + 1 个前置）
+```
+我修过的那 8 道：gate-wiring · e2e-carrier · reachability · shell-unicode · ai-coverage ·
+                public-facts · e2e-helper-exports · empty-state
+邻域 16 道：docs · doc-citations · md-tables · design · tokens · licenses · image-license ·
+           materialized-reads · locator-labels · i18n-vars · ui-language ·
+           selection-single-source · row-single-source · layering · ui-provider · theme
+第三批 15 道：crosslang-contract · journey-coverage · integration-coverage · mobile-ai-anchors ·
+             legal-copy · legal-permissions · legal-host · server-copy · server-design ·
+             brand-assets · calendar · holiday · card-export · ai-tools · ai-quota
+前置：node scripts/check-ai-e2e-preflight.mjs ✅（"4318 / 4319 都是空的"）
+```
+
+### B. 原 26 枚红里，本会话内**亲眼复跑到收口**的
+| 道 | 步 | 收口读数 / 关键动作 |
+|---|---|---|
+| 1 | `check:gate-wiring` | **rc=0**（补回 4 项被引用了却没有定义的 `check:*` + 修一处归档后的登记路径） |
+| 6 | `check:reachability` | **rc=0**：`✅ COMMENT createCommentActions：1 处宿主调用点`。转绿路径全为真修：W2-T1 传输接线 → W3-T1 share 日志折叠/物化（复用同一枚 reducer，零改动）→ W3-T2 评论宿主 → **W4-0 端壳装配**；判据一格未动 |
+| 87 | `check:ai-e2e`（本体＝**整个 e2e 套件**） | 见 C：`glass-materials` 3 passed rc=0 · `ai-duration` 2 passed rc=0 · `ai-breakdown/ai-prioritize/ai-capture` 3 passed；其余 6 份仍红且已归属 |
+| 90 | `check:shell-unicode` | **rc=0**（别线新加的三份证据脚本 6 处 `$var（中文）` → `${var}`） |
+
+其余各道（20/21/22/23 · 43 · 45 · 48/49 · 51/53/54 · 65 · 75 · 85/86 · 89 · 100/102 · 106 · 109/110/111）在**本会话之前的轮次**里逐道复跑到 rc=0，读数写在本文件对应小节。这份表**不重复抄那些数**：抄一遍就多一个会漂的真相来源（可跑 `git log --grep` 与本节指针复核）。
+
+### C. 剩下的红：**归属与证据**（不是"感觉是别线的"）
+| 份 | 读数形状 | 归属依据 |
+|---|---|---|
+| `detail-pane-task`（5 条） | 窄档下几枚行尾入口找不到 | **差分实验**：把 `controls.css` 回退到本次改动之前重跑 T15 ⇒ **仍失败** ⇒ 与我的改动无关 |
+| `ai-row-layout`（2 条） | `getByTestId('ai-tool-run')` → `element(s) not found` | testid **仍在**（`AiToolRun.tsx:361`）；但"默认不挂载"是**这次设计变更的一部分**（`ai-assistant.spec.ts:86` 现在断言默认计数为 0）；`apps/web/src/features/ai/**` 整片 ` M`（别线未落库） |
+| `detail-pane-collapse` / `focus-detail-pane` / `ai-tool-run` / `detail-pane-habit` | 判据要的元素/类名在新面板结构里不存在或被移动 | 同属那笔未落库改版（形状一致；`ai-tool-run` 与 `ai-row-layout` 同一根因） |
+
+### D. 达到「同一把链装置在修完后的 tip 上跑出 RED=0」还差什么（可复核）
+1. **别线那笔壳/面板改版落库**（或给出新入口口径）—— 之后 C 表里那 6 份要么直接绿，要么我可以按其最终结构做**载体换正**（这一步需要它们的最终结构，现在换等于猜）；
+2. 全量 e2e（`--retries=0`）在干净副本上取得**完整红集**（`/tmp/full4.log` 正在跑）；
+3. 之后用同一把链装置在修完后的 tip 上跑 `pnpm check` 全链（现为 116 步）取 `RED=0` —— **现在无法达成**，因为第 87 道本体仍含上面那 6 份；
+4. 环境性红（48/49/53 那类）已在本会话前几轮用放宽权限/可用屏幕证明过**不是仓库缺陷**（rc=0，仓库零改动）。
