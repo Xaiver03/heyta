@@ -6213,3 +6213,36 @@ rc=0
 **读数**：`--filter @heyta/web test` **180 文件 / 2307 枚通过**（另 2 文件 13 枚 skipped）、`typecheck` 0 错、
 `check:i18n-vars` rc=0、`check:ui-language` rc=0、`check:reachability` rc=0。
 （i18n 补了三枚 key × 中英，并**重建 `@heyta/i18n` 的 dist** —— `t()` 的键联合类型是生成的，不重建就编不过。）
+
+### 2026-10-17 B214 定案：**是"这一格被自己的面板撑出行尾走廊"，不是"被裁"**（产品修已落，规格流程侧仍红）
+
+**逐层现量**（900×600，打开「更多」，`getBoundingClientRect` 左..右）：
+```
+任务行                          328..876      ← 走廊
+details.ht-compose-actions      544..928      ← 🔴 这一格比走廊宽出 52px（被 24rem 面板撑大）
+  └ .ht-compose-actions__panel  544..928
+     └ details.ht-compose--popover > summary（提醒那枚） 862..916
+```
+⇒ `elementFromPoint(chip 中心)` 落到 `div.ht-content`：**看得见点不着**（Playwright 日志逐字：
+`element is visible, enabled and stable` → `<label>…intercepts pointer events`）。
+`material.css:32-33` 明写**不许**改回 `position: absolute`（绝对定位的后代不计入滚动宿主的
+scrollable overflow）⇒ 修法必须在流内。
+
+**产品修（已落 `controls.css`）**：面板宽度抽成变量（两档媒体查询与原值逐字相同），
+起点 `margin-inline-start: calc(100% - <面板宽>)` ⇒ **贴本格右边缘、往左长**；
+并把原规则里 `max-inline-size: 100%` 换成同一个变量（它在"格宽由面板撑出"时解析成循环，现量把面板夹成 60px）。
+**两档几何复验**：
+```
+宽 1440：list=304..1088  cell=1004..1064  panel=680..1064  chip=998..1052   ✓ 全在走廊内
+窄  900：list=304..900   cell=816..876    panel=492..876   chip=810..864    ✓ 全在走廊内
+```
+并且**普通 `locator.click()` 就能打开 popover**（探针：`open=true matVisible=true`）⇒
+规格里那个 `page.mouse.click(坐标)` 绕法**已拆掉**（它是给产品缺陷打的补丁；拆掉同时把
+"用户真的点得着"这一条判据强度还回来）。
+
+**仍红的机制（下一轮的第一件事，已定位）**：`glass-materials.spec.ts` 的 `organize-dropdown`（第 4 面）
+与 `reminder-dropdown`（第 5 面）**在打开前没有回到任务视图** —— 前面的 `inbox-panel` 会把视图切走，
+于是锚点那两行不在屏上，后面所有"找那一行/那一枚"的动作一律走到 60s 超时（第 33 轮同一坑）。
+修法同族既有：`await switchView(page, '任务')`（helpers 里有，`calendar-sidebar.spec.ts` 在用）。
+⚠️ 本轮我用 Python 打这个补丁时**断言失败（regex 没匹配到 helpers 的 import 形态）**，
+补丁没落盘 —— 下一轮改用 `edit` 工具做（第 3 次栽在 shell heredoc 的 Python 上了，已记）。

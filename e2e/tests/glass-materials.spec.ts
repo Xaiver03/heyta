@@ -172,51 +172,20 @@ const SURFACES: Surface[] = [
        * 先按 `task-actions-summary-*` 把外层披露打开，再点提醒那一枚。
        */
       /*
-       * ⚠️ 必须开**包含这一枚 popover 的那一行**的外层披露 —— 不能按"列表里第一枚
-       * `task-actions-summary-*`"去开：本族的锚点任务落在**列表末尾**（上面那段注释写着），
-       * 于是会开错行、目标那一枚仍然折叠着（第 5 趟实测：`waiting for
-       * locator('details.ht-compose--popover > summary')` 照样 60s 超时）。
-       * 用 `:has(...)` 把外层披露与目标绑在同一行。
-       */
-      /*
-       * 2026-10-17 由**直接读数**定稿：在规格的真实流程里那一刻现量是
-       *   `rows=2 pops=2 own=2 summaries=2 capture=1`
-       * ⇒ 行在、popover 在、`:has(...)` 也命中 ⇒ 不是"元素不在"，而是**我判断"要不要点"
-       * 用错了量**：先前用 `popoverSummary.isVisible()` —— 它在**外层披露关着**时也可能读到 true
-       * （元素在布局里存在但被折叠祖先压住），于是那一次 click 根本没发；`ownRowActions` 的
-       * `.first()` 也可能指向另一行。⇒ 改成**读那一行外层披露真实的 `open` 态**再决定，
-       * 并且**约束到同一行**（`details.ht-compose-actions:has(details.ht-compose--popover)`）。
-       */
-      const ownRowSummary = page
-        .locator('details.ht-compose-actions:has(details.ht-compose--popover) > summary')
-        .first();
-      if ((await ownRowSummary.count()) > 0) {
-        const outerOpen = await ownRowSummary.evaluate(
-          (el) => (el.parentElement as HTMLDetailsElement).open,
-        );
-        if (!outerOpen) await ownRowSummary.click();
-      }
-      /*
-       * 探针（先建数据）实测：点开外层 `details.ht-compose-actions` 之后，
-       * `details.ht-compose--popover > summary` 的 `isVisible()` 从 **false 变 true**
-       * （探针读数：A=1 选择器命中、before=false、after=true）⇒ "开门"这一步是对的；
-       * 而第 6 趟仍然 60s 超时 ⇒ 剩下的是**滚动/遮挡**那一层：这一族的锚点行在列表末尾，
-       * 摘要虽"在布局上可见"，却可能落在滚动容器之外或被别的层压住。先把它滚进视口再点。
-       */
-      /*
-       * 🔴 2026-10-17 逐字读数定案：`locator.click` 的等待日志是
-       *   `element is visible, enabled and stable` → `scrolling into view if needed`
-       *   → **`<label>…</label> from <span>…</span> subtree intercepts pointer events`**
-       * ⇒ 元素**可见**、可点性被一个 `<label>` 拦下（不是"没画出来"）。
-       * 这里用**真实鼠标坐标点击**（`page.mouse`）来分清两件事：
-       *   · 真用户点得开 ⇒ Playwright 的 actionability 比现实严，判据该走坐标；
-       *   · 真用户也点不开 ⇒ 那是**产品缺陷**（有 label 盖住提醒入口），该改产品。
+       * 先把**目标那一枚自己的祖先披露**打开 —— 用 `evaluate` 按元素自己置位，
+       * 而不是去点"包含 popover 的第一行"那枚按钮：后者与本行不一定是同一行
+       * （现量教训：点了另一行 ⇒ 目标那枚始终折叠 ⇒ `waiting for element to be visible` 一路 60s）。
+       * 点开披露只是**取出元素**的仪器动作；真正要被检验的是下面那一次对 chip 的
+       * `locator.click()`（actionability 比 `mouse.click` 严，能抓住"看得见点不着"）。
        */
       const popSummary = page.locator('details.ht-compose--popover > summary').first();
+      await popSummary.evaluate((el) => {
+        const outer = el.closest('details.ht-compose-actions');
+        if (outer !== null && !outer.open) outer.open = true;
+      });
+      await expect(popSummary, '外层披露打开后目标那一枚必须真的可见').toBeVisible();
       await popSummary.scrollIntoViewIfNeeded();
-      const popBox = await popSummary.boundingBox();
-      expect(popBox, '提醒入口量不到盒子').not.toBeNull();
-      await page.mouse.click(popBox!.x + popBox!.width / 2, popBox!.y + popBox!.height / 2);
+      await popSummary.click();
       const panel = page.locator('details.ht-compose--popover .ht-material').first();
       // 🔴 把锚点那一行滚到可视区中部再量：这一族的锚点任务落在列表末尾，而
       //   `position: absolute` 的行尾面板开在**滚动容器**里 ⇒ 朝下开就被容器底裁掉。

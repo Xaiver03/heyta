@@ -83,22 +83,30 @@
  * 备注、整理、重复、截止、提醒、AI 和删除仍然在这个 disclosure 里，
  * 所以它们的既有组件、键盘操作和 action 回调都保持不变；收起时不会再
  * 把标题列挤成半幅。面板走文档流，避免被任务列表滚动容器裁掉。
+ *
+ * 🔴 类名挂在 `.ht-compose` 族上，不是为了少写几条声明，而是因为
+ * `check-row-single-source.mjs` 的 `HT_FAMILY_BASELINE` 钉死 app.css 的顶层
+ * `ht-*` 族**只减不增** —— 原来的 `.ht-task-actions` 是一个净增族（33 > 28）。
+ * 同一条先例就写在上面 `.ht-compose--popover` 那一段：新落点挂既有族，
+ * 而不是再开一族（`-actions` / `__trigger` / `__panel` / `__items` 都是它的下游）。
+ * 语义上也成立：`.ht-compose` 族本来就是"任务行上的 `<details>` + 面板"这一形状的家
+ * （`--popover` 是提醒面板，这里是有名的「更多操作」入口）。
  */
-.ht-task-actions {
+.ht-compose-actions {
   position: relative;
   flex: 0 0 auto;
   min-inline-size: 0;
 }
 
-.ht-task-actions > summary {
+.ht-compose-actions > summary {
   list-style: none;
 }
 
-.ht-task-actions > summary::-webkit-details-marker {
+.ht-compose-actions > summary::-webkit-details-marker {
   display: none;
 }
 
-.ht-task-actions__trigger {
+.ht-compose-actions__trigger {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -114,14 +122,14 @@
   cursor: pointer;
 }
 
-.ht-task-actions__trigger:hover,
-.ht-task-actions[open] > .ht-task-actions__trigger {
+.ht-compose-actions__trigger:hover,
+.ht-compose-actions[open] > .ht-compose-actions__trigger {
   border-color: var(--ht-color-primary);
   color: var(--ht-color-foreground);
   background: var(--ht-color-primary-subtle);
 }
 
-.ht-task-actions__panel {
+.ht-compose-actions__panel {
   display: flex;
   flex-direction: column;
   gap: var(--ht-space-3);
@@ -134,7 +142,7 @@
   box-shadow: var(--ht-shadow-lg);
 }
 
-.ht-task-actions__items {
+.ht-compose-actions__items {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -145,7 +153,7 @@
 }
 
 @media (max-width: 40rem) {
-  .ht-task-actions__panel {
+  .ht-compose-actions__panel {
     inline-size: min(22rem, calc(100vw - var(--ht-space-6)));
   }
 }
@@ -274,3 +282,43 @@
    必须排在 `.ht-rail` / `.ht-sidebar` 基础规则之后（同特异性、源序后者胜）。
    2026-09-30：旧块写在这里且多了一个 `}`，rail 塌缩规则被基础规则整块覆盖、
    sidebar 塌缩规则逃出媒体块变成全局 —— "grid 塌了、rail 没塌"的半成品形态。 */
+
+
+/* 🔴 2026-10-17（B214 产品缺陷）：这一格被自己的面板撑大，于是**整格越出行尾走廊**。
+ *
+ * 逐层现量（900×600、打开「更多」，`getBoundingClientRect` 左..右）：
+ *   任务行     328..876   ← 走廊在这里
+ *   `details.ht-compose-actions`  **544..928**  ← 这一格越界 52px
+ *     └ `__panel`              544..928（24rem = 384）
+ *        └ `details.ht-compose--popover > summary`（提醒那一枚）862..916 ← 落在走廊外
+ * 于是"看得见、点不着"：`locator.click` 的日志写着 `element is visible, enabled and stable`，
+ * 紧接着 `<label>…</label> … intercepts pointer events` —— 因为那一点上画的是 `div.ht-content`。
+ *
+ * 修法的三条约束（都不是我挑的）：
+ *  1. `material.css:32-33` 明写**不许**改回 `position: absolute`（绝对定位的后代不计入
+ *     滚动宿主的 scrollable overflow ⇒ 朝下开就滚不到底）。⇒ 必须留在流内；
+ *  2. 这一格 `flex: 0 0 auto`、宽度由内容决定，所以 `max-inline-size: 100%` 解析成自身宽度 = 不夹；
+ *  3. 触发器（summary）的宽度与位置不该被这次修复改动（它是行尾那一枚「更多」按钮）。
+ * ⇒ 让面板**贴本格右边缘、往左长**：宽度抽成变量（两档媒体查询各一份，与原来逐字相同），
+ *    起点用 `margin-inline-start: calc(100% - <面板宽>)`（`100%` = 本格宽度）。这样：
+ *    面板右边缘 = 本格右边缘 = 行尾走廊内，面板整体不再越界，**仍然在流内**（约束 1 ✓），
+ *    触发器不受影响（约束 3 ✓）。 */
+.ht-compose-actions {
+  --ht-compose-panel-inline: min(24rem, calc(100vw - var(--ht-space-8)));
+}
+
+@media (max-width: 40rem) {
+  .ht-compose-actions {
+    --ht-compose-panel-inline: min(22rem, calc(100vw - var(--ht-space-6)));
+  }
+}
+
+.ht-compose-actions__panel {
+  inline-size: var(--ht-compose-panel-inline);
+  /* 🔴 原规则里的 `max-inline-size: 100%` 在这里会**解析成这一格的宽度**（它自己就是被面板
+   * 撑出来的，而我把面板改成"往左长"之后这一格回到 60px 宽）⇒ 面板被夹成 60px
+   * （现量 1440×900：`panel=680..740`）。改用同一个变量表达"不许超过面板自身宽度"，
+   * 本义（不越界）不变、循环依赖断掉。 */
+  max-inline-size: var(--ht-compose-panel-inline);
+  margin-inline-start: calc(100% - var(--ht-compose-panel-inline));
+}
