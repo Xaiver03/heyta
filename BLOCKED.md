@@ -11499,7 +11499,7 @@ PROBE hitChain div.ht-content → main.ht-main → div.ht-app → …
 **B224（01:5x，本会话 · 产品体验线）B222 那枚 iOS 键盘步红：两处剩下的差别各自作用完，都不是原因；同一枚 bundle 上整条旅程在两台载体（含 B222 点名的旧载体）各 14/14 绿 ⇒ 状态改成"复现不出来 + 成因未定"**
 
 B222 收在"剩下的未分开差别只有两处"。这一趟（r126）把这两处各自作用一次，装置与读数在
-`apps/mobile/evidence/ux-final-20261017/ios-keyboard-attribution-r126/`（`RESULT.md` §2/§3/§5）。
+`apps/mobile/evidence/ux-final-20261017/ios-keyboard-attribution-r126/RESULT.md`（§2/§3/§5）。
 
 - **2×2 四格全绿**（每格 `keyboardTop=545`、详情仍在场、留图）：清单行±展开排期→收起排期、时间线行±同一处 toggle。
   臂 4 就是旅程原形。⇒ **A（排期折叠把详情面滚走）与 B（详情从时间线行开）都不是原因，合起来也不是。**
