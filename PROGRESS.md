@@ -5586,6 +5586,8 @@ AC 已勾数仍为 **0**（`verify-inbound-ac-ticks.py`：`AC 行=8　已勾=0�
 
 62. 🟡 **给今晚新写的那两句各找回已有的尺，免得下一位重复造轮子**（01:1x）。判"这句要不要配一把新尺"的取法是**先数已有消费者**：接收面那句（"接收路径自带权益闸门"）在本线电池里有 **3 枚腿**（现量 `NO_COLOR=1 python3 research/tools/verify-inbound-ac-battery.py --list` 里名字含 `quota`/`entitlement` 的行 = `AC1-quota-http`、`AC1-entitlement3`、`AC1-offline11`，腿总数只从末行 `legs=` 读）；售卖面那句（"这一档已经能下单"）在电池里 **0 枚腿**，但**两名目都是仓里常驻消费者**：① `pnpm check` 链里就有 `pnpm check:ai-quota` 那一道（现量 `node -e 'const s=require("./package.json").scripts;console.log((s.check||"").split("&&").filter(x=>x.includes("ai-quota")).length)'` 回 **1**），臂 A/臂 B 已被我今晚实测成两头能红；② `server/tests/billing-checkout.routes.spec.ts` 不在 `server/vitest.config.ts` 的排除表里（现量 `grep -c billing-checkout server/vitest.config.ts` 回 **0**）⇒ 它随 `pnpm -r test` 收集。🔴 **结论：两面都不缺尺，本线不加第三把**（加一把只盯着"文档里某句还在不在"的人工尺，正是 10-18 那条"先查现成腿再造尺"要避免的形状）。
 
+63. 🔴 **一枚探针差点把"别线已经修好了"写成台账事实，另一把尺把它否掉了**（01:2x，写前先跑 `date`）。形状：判"两枚生产件进 HEAD 了没有"的循环里写成 `git cat-file -e HEAD:$f 2>/dev/null; echo "$(basename $f) rc=$?"` ⇒ 两枚都打 **rc=0**，读起来像缺口已从三处降到一处，我据此准备改台账、并准备起跑那条整链。**救我的是独立尺不是我自己**：同一条线上的生产者缝对账装置 `python3 research/tools/verify-inbound-producer-seam.py` 回 **rc=1 / 2 条红**，两条都按 HEAD 的树判「`packages/app-host/src/index.ts` import 了 `./ai-managed-transport.js` / `./managed-ai-usage.js`，而这枚文件在任何提交里都不存在」。改成正确形状（取码句独占一行：`git cat-file -e HEAD:$f; rc=$?`，打印句里不出现 `$(`）重取，两枚各回 **128** ⇒ **三处缺口一处没少**（第 3 处 `packages/domain/src/index.ts` 那行 comments 导出仍只在别人工作树里：`git show HEAD:packages/domain/src/index.ts | grep -c comments` 回 **0**）。⚠️ 同一枚失法 10-14 已经记过一次（那次把"两枚文件不同"读成"相同"），这次的差别是**错的方向正好是乐观那一侧**，所以它不会让我觉得奇怪，只会让我往前走一步错动作。硬形状：**凡用来判「在不在／通不通／红不红」的行，取码必须独占一句 `rc=$?`，打印句里连一个 `$(` 都不许有**；细则与两次读数在记忆 `feedback-rc-after-command-substitution.md` 的 2026-10-18 追加。另一格顺手钉住：那 2 条红**逐枚点名就是 B221 已登记的那两枚**（现量 `grep -c '^RED' ` 打在装置输出上回 **2**）⇒ 没有新缝，本线不加登记项。
+
 
 
 
@@ -6525,3 +6527,21 @@ ai-tool-run.spec.ts:99    （1.0m = 超时）
 **装置侧一条自我教训（记下）**：我用 `ps | grep playwright | kill` 清残留时，
 **把自己的 shell 也杀了**（那条 `bash -c` 的命令行里含 "playwright"）⇒ 重启那一步整段没执行。
 以后按"**排除自身命令行**"的方式定位（`grep -v "bash -c"` 或按 PID 白名单），或直接用 `job_kill`。
+
+### 2026-10-17 4-worker 那趟**印证了 phantom 陷阱**（已停、不作读数）+ 改跑 1-worker 的"非 ai"全集
+
+**4-worker 枚举（`--retries=0`，22 过 / 7 败）**——它在 1-worker 下**通过**的几份都报了红：
+```
+ai-prioritize 1 · ai-duration 1 · ai-capture 1 · ai-breakdown 1 · ai-assistant 1   ← 1-worker 下这 5 份是绿的（本会话都跑过）
+ai-row-layout 2                                                                    ← 真红（同前）
+```
+⇒ 与仓里那条现量一致（高负载会让整串多报 phantom 失败）⇒ **这一趟不作读数**（我事先就写明"只为枚举、不用于认证"），已停。
+**这一条也再次说明**：`ai-*` 那族对负载/时序敏感，任何"并行加速"都会把读数弄脏 —— 收口那一趟必须 1 worker。
+
+**改跑**：`tests/*.spec.ts` 里**除 `ai-*` 之外的 104 份**，1 worker、`--retries=0`，日志 `/tmp/nonai.log`。
+（`ai-*` 那族已有 1-worker 读数：`ai-breakdown`/`ai-prioritize`/`ai-capture`/`ai-duration` 全绿、
+`ai-row-layout` 2 红、`ai-tool-run` 1 红；`ai-assistant` 的 1-worker 状态**尚未单独复核**，列进下一轮。）
+
+**装置教训（同类第二次）**：我按 `grep playwright`/`grep heyta-frozen3` 找残留进程时，
+**又匹配到自己的 `bash -c` 命令行**（它整条都含这两个词）⇒ 读数上多出两条"残留"。
+判据要写成"**排除自身**"（`grep -v "bash -c"`，或先记下自己的 PID/PPID）。
