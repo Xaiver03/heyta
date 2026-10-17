@@ -5584,6 +5584,8 @@ AC 已勾数仍为 **0**（`verify-inbound-ac-ticks.py`：`AC 行=8　已勾=0�
 
 61. 🟡 **第 3 腿的挡路清单更新成「两处已进索引、一处还没」**（01:0x–01:1x 现量；跑前必重取）。`git diff --cached --name-status HEAD -- packages/app-host/src` 回两枚 **A**（`ai-managed-transport.ts`、`managed-ai-usage.ts`）⇒ B221 那两枚已被它的主人 `git add`，但仍不在 HEAD（`git cat-file -e HEAD:<路径>` 各回 **128**）；而 `packages/domain/src/index.ts` 那行 comments 的导出只在工作树里：`git show HEAD:packages/domain/src/index.ts | grep -c comments` 回 **0**，且 `git diff --cached --name-status HEAD -- packages/domain/src/index.ts` **无输出**＝连索引都没进 ⇒ B216 那一枚比另两枚慢一步。解阻在即但还没到，本线照旧不修补载具。完成条件 2 那两枚在本次交付戳上重取过：`node research/tools/license-inventory.mjs` **rc=0**、`pnpm check:migrations` **rc=0**（⚠️ 真名带冒号，任务书写的 `check-migrations` 在本仓不存在）。
 
+62. 🟡 **给今晚新写的那两句各找回已有的尺，免得下一位重复造轮子**（01:1x）。判"这句要不要配一把新尺"的取法是**先数已有消费者**：接收面那句（"接收路径自带权益闸门"）在本线电池里有 **3 枚腿**（现量 `NO_COLOR=1 python3 research/tools/verify-inbound-ac-battery.py --list` 里名字含 `quota`/`entitlement` 的行 = `AC1-quota-http`、`AC1-entitlement3`、`AC1-offline11`，腿总数只从末行 `legs=` 读）；售卖面那句（"这一档已经能下单"）在电池里 **0 枚腿**，但**两名目都是仓里常驻消费者**：① `pnpm check` 链里就有 `pnpm check:ai-quota` 那一道（现量 `node -e 'const s=require("./package.json").scripts;console.log((s.check||"").split("&&").filter(x=>x.includes("ai-quota")).length)'` 回 **1**），臂 A/臂 B 已被我今晚实测成两头能红；② `server/tests/billing-checkout.routes.spec.ts` 不在 `server/vitest.config.ts` 的排除表里（现量 `grep -c billing-checkout server/vitest.config.ts` 回 **0**）⇒ 它随 `pnpm -r test` 收集。🔴 **结论：两面都不缺尺，本线不加第三把**（加一把只盯着"文档里某句还在不在"的人工尺，正是 10-18 那条"先查现成腿再造尺"要避免的形状）。
+
 
 
 
