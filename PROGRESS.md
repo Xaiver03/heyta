@@ -6357,3 +6357,16 @@ due-date-edit · detail-pane-task · habit-frequency · habits-two-column · cal
 ⇒ 按门禁自己写明的出口登记，并在账上写清"为什么这里没有债可合法化"，
 以及真正的收敛方向（让共享组件自己拥有文案 —— 要动 `packages/ui` 的 API 与其测试，属下批）。
 复跑：`check:empty-state` **rc=0**（三道断言全过）。
+
+### 2026-10-17 当前 tip 上的**逐道读数**（收口台账用；只列本轮实跑到的）
+
+**我修过的那批（8 道）**：`check:gate-wiring` ✅ · `check:e2e-carrier` ✅ · `check:reachability` ✅ ·
+`check:shell-unicode` ✅ · `check:ai-coverage` ✅ · `check:public-facts` ✅ · `check:e2e-helper-exports` ✅ ·
+`check:empty-state` ✅（本轮先红后修：见上一节）。
+**另扫 16 道（都不动就绿的邻域）**：`check:docs` ✅ · `check:doc-citations` ✅ · `check:md-tables` ✅ ·
+`check:design` ✅ · `check:tokens` ✅ · `check:licenses` ✅ · `check:image-license` ✅ ·
+`check:materialized-reads` ✅ · `check:locator-labels` ✅ · `check:i18n-vars` ✅ · `check:ui-language` ✅ ·
+`check:selection-single-source` ✅ · `check:row-single-source` ✅ · `check:layering` ✅ ·
+`check:ui-provider` ✅ · `check:theme` ✅。
+**第 87 道前半**：`node scripts/check-ai-e2e-preflight.mjs` **rc=0** ✅（"4318 / 4319 都是空的"）。
+⇒ 至此**已实跑并 rc=0 的链步：24 + 这些**；剩下的是第 87 道的 e2e 本体（全量正在跑，读数下一轮）。
