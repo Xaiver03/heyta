@@ -6167,3 +6167,28 @@ rc=0
 - `packages/sync-client/src/index.ts` 补出 `share-payload-cipher`（`exports` 只登记了 `.`，子路径进不来）；
 - `packages/app-host/src/index.ts` 补出四枚新模块，并**重建 dist**（`@heyta/web` 的类型检查读的是 dist）。
 重建后：`--filter @heyta/app-host typecheck` 0 错、`--filter @heyta/web typecheck` 0 错、`check:reachability` rc=0。
+
+### 2026-10-17 W4 第一块：评论区**真的画出来了**（`CommentThread` 全仓从 0 处渲染 → 1 处）
+
+**为什么这一步必须单独做**：`check:reachability` 的断言 C 回答的是「宿主调用得到」，而「用户点得到」
+要另一步 —— 把 `@heyta/ui` 的 `CommentThread` 真渲染出去。此前全仓 **0 处渲染**它。
+
+**落点**：`apps/web/src/features/tasks/TaskDetailCard.tsx`（详情栏）→ 新增
+`apps/web/src/features/share/ShareCommentsSection.tsx`（取值 + 画图；判断仍在 `packages/app-host`）：
+会话（baseUrl / token / accountId）从 `useSyncStore` 取，vault 载荷密钥走
+`getWebVaultSession(...).getPayloadCipher()`（**是异步的**，第一版漏了 `await` 被类型检查抓住），
+`clientId` 取 `requireEngine().getClientId()`（与 `sync-wiring.ts:119` 同一来源，不另造）。
+
+**一条判据当场把我拦下，而且它是对的**：`tests/task-detail-groups.spec.tsx` 钉死详情栏
+**四枚属性分组**（基本 / 时间 / 组织 / 自动化，审计 §4.6）。我第一版给评论区挂了
+`data-testid="task-detail-group"` ⇒ 变成"第五个分组"，判据红。**按产品定义推导**：评论不是任务属性，
+是**协作线索**（只存在于共享清单）⇒ 属性分组之下另起一块区域，视觉同款、**不冒充分组**
+（testid 用 `task-detail-collaboration` / `task-detail-comments`）。改完四分组判据照旧绿（4 passed）。
+「要不要给协作单独立区」的口径记在这里，等审计更新时一并收。
+
+**两处如实登记的边界**（写在组件文件头）：① **没有实时订阅** —— 提交后靠一次重读，远端新评论要等下次进入/提交
+（WS `new_share_ops` 接线属 W4 通知那档）；② **vault 未解锁就整节不画**（不留一个"发不出去"的输入框）。
+
+**读数**：`--filter @heyta/web test` **180 文件 / 2307 枚通过**（另 2 文件 13 枚 skipped）、`typecheck` 0 错、
+`check:i18n-vars` rc=0、`check:ui-language` rc=0、`check:reachability` rc=0。
+（i18n 补了三枚 key × 中英，并**重建 `@heyta/i18n` 的 dist** —— `t()` 的键联合类型是生成的，不重建就编不过。）
