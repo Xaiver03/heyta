@@ -6494,3 +6494,17 @@ button.duration-run(99x44) → span.ht-ai → …__items → …__panel(op=0.68)
 75 public-facts · 85 gate-ssh · 86 e2e-helper-exports · 87 ai-e2e · 89 landing-e2e · 90 shell-unicode ·
 100 verify-script-copy · 102 apk-freshness · 106 -r test · 109 app-version · 110 version-declarations ·
 111 checkpoint-cadence。**除 106（重步）与 87（本体含 C 表那 6 份）外，其余 24 道在本会话内都已实跑 rc=0。**
+
+### 2026-10-17 收口那一趟的**准确配方**（读装置本体得到，不用猜）
+
+`research/tools/verify-inbound-check-chain.py` **自己就是执行器**：它按 `package.json` 的 `check` 链
+逐步跑、把每一步的输出落成 `<logs>/NNN.log`，再写 `chain.tsv` / `chain.json`，最后打印
+`CHAIN ran=<跑了>/<选中> of <总步数>  RED=<红数>  steps=[…]`。要点：
+- `--logs <dir>` **必填**（装置自己会拒："readings must be on disk, not stdout only"）；
+- 支持 **`--from N --to N` 分段** ⇒ 收口可以分段取权威读数（不必一口气跑完整链）；
+- 因此"最终 RED=0"的正确收口命令是：`python3 research/tools/verify-inbound-check-chain.py --logs <dir>`
+  （或在范围内分段），而不是我手工逐个 `pnpm <step>`（手工那份只作交叉核对）。
+**当前状态下它会报红的地方**：第 87 道（`check:ai-e2e` 的 e2e 本体仍含收口台账 C 表里那 6 份）；
+范围里若含重步（`build` / `typecheck` / 截图 / `pnpm -r test` / 镜像几条）耗时会很长。
+⚠️ **不要与正在跑的 e2e 并行**：仓里那条"高负载会让 `pnpm -r test` 多报 phantom 失败"的现量
+（loadavg 152→6 枚、532→43 枚）就是这条纪律的来路。
