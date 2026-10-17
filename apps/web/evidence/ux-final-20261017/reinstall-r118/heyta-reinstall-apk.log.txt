@@ -1,0 +1,468 @@
+$ pnpm --filter @heyta/mobile run build:android
+$ node ../../scripts/run-gradle.mjs assembleRelease
+═══ Android 构建走远程主机（AGENTS §6.1 的规则）════════════════════
+   构建主机   = windows-pc
+   远端仓库根 = C:\src\heyta
+   gradle 任务= assembleRelease
+   回传产物   = apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+  步骤 0：本机构建输入前置（packages/*/dist 必须已经生成）
+  ✅ 13 个 workspace 依赖的 dist 都在（清单从 apps/mobile/package.json 推导）
+  步骤 1：远端可达性 / 依赖 / local.properties 前置（只读探测）
+  ✅ 远端依赖在位（声明的 22 个逐包解析得到）；local.properties=absent
+  步骤 2：同步当前工作树 + packages/*/dist → 远端（tar sha256 对账）
+  ✅ 源码包  44M（清单 3940 条，含工作树未提交改动 + 构建输入）
+  ✅ 远端收到的是这一包（tar sha256=59f0a400f479c0cc… 逐字相同）
+  ✅ Android 构建输入已同步（15 个 packages/*/dist，远端已先清后解）
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+  步骤 2.5：源码同步后在远端执行 pnpm install --frozen-lockfile
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+Scope: all 22 workspace projects
+Already up to date
+Done in 634ms using pnpm v11.8.0
+  ✅ 远端 workspace 依赖与当前同步源码一致
+  步骤 3：清掉远端上一轮的产物，并用**远端时钟**记构建起点
+  ✅ 1 个产物路径已在远端清除；构建起点（远端 UTC）= 2026-10-17T05:26:28.000Z
+  步骤 4：在远端执行 gradle 任务（输出直通本机终端，退出码原样透传）
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+Starting a Gradle Daemon, 1 incompatible and 1 stopped Daemons could not be reused, use --status for details
+[heyta-mirror] MavenRepo -> https://maven.aliyun.com/repository/public
+[heyta-mirror] Google -> https://maven.aliyun.com/repository/google
+[heyta-mirror] Gradle Central Plugin Repository -> https://maven.aliyun.com/repository/gradle-plugin
+[heyta-mirror] Google -> https://maven.aliyun.com/repository/google
+[heyta-mirror] MavenRepo -> https://maven.aliyun.com/repository/public
+[heyta-mirror] Google -> https://maven.aliyun.com/repository/google
+[heyta-mirror] MavenRepo -> https://maven.aliyun.com/repository/public
+[heyta-mirror] MavenRepo -> https://maven.aliyun.com/repository/public
+[heyta-mirror] MavenRepo -> https://maven.aliyun.com/repository/public
+> Task :gradle-plugin:settings-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :gradle-plugin:shared:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :gradle-plugin:shared:compileKotlin UP-TO-DATE
+> Task :gradle-plugin:shared:compileJava NO-SOURCE
+> Task :gradle-plugin:shared:processResources NO-SOURCE
+> Task :gradle-plugin:shared:classes UP-TO-DATE
+> Task :gradle-plugin:shared:jar UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:compileKotlin UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:compileJava NO-SOURCE
+> Task :gradle-plugin:settings-plugin:pluginDescriptors UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:processResources UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:classes UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:jar UP-TO-DATE
+> Task :gradle-plugin:react-native-gradle-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :gradle-plugin:react-native-gradle-plugin:compileKotlin UP-TO-DATE
+> Task :gradle-plugin:react-native-gradle-plugin:compileJava NO-SOURCE
+> Task :gradle-plugin:react-native-gradle-plugin:pluginDescriptors UP-TO-DATE
+> Task :gradle-plugin:react-native-gradle-plugin:processResources UP-TO-DATE
+> Task :gradle-plugin:react-native-gradle-plugin:classes UP-TO-DATE
+> Task :gradle-plugin:react-native-gradle-plugin:jar UP-TO-DATE
+
+> Configure project :app
+[heyta] 发布签名：已配置（keystore = C:/Users/41478/.heyta-signing/heyta-release.keystore）
+[heyta-mirror] maven -> https://maven.aliyun.com/repository/public
+[heyta-mirror] MavenRepo -> https://maven.aliyun.com/repository/public
+[heyta-mirror] Google -> https://maven.aliyun.com/repository/google
+[heyta-mirror] Google -> https://maven.aliyun.com/repository/google
+[heyta-mirror] MavenRepo -> https://maven.aliyun.com/repository/public
+[heyta-mirror] maven -> https://maven.aliyun.com/repository/public
+[heyta-mirror] MavenRepo -> https://maven.aliyun.com/repository/public
+[heyta-mirror] Google -> https://maven.aliyun.com/repository/google
+[heyta-mirror] maven -> https://maven.aliyun.com/repository/public
+[heyta-mirror] MavenRepo -> https://maven.aliyun.com/repository/public
+[heyta-mirror] Google -> https://maven.aliyun.com/repository/google
+[heyta-mirror] MavenRepo2 -> https://maven.aliyun.com/repository/public
+[heyta-mirror] Google2 -> https://maven.aliyun.com/repository/google
+[heyta-mirror] Google -> https://maven.aliyun.com/repository/google
+[heyta-mirror] MavenRepo -> https://maven.aliyun.com/repository/public
+[heyta-mirror] maven -> https://maven.aliyun.com/repository/public
+[heyta-mirror] MavenRepo -> https://maven.aliyun.com/repository/public
+[heyta-mirror] Google -> https://maven.aliyun.com/repository/google
+[heyta-mirror] Google2 -> https://maven.aliyun.com/repository/google
+[heyta-mirror] MavenRepo2 -> https://maven.aliyun.com/repository/public
+[heyta-mirror] Google -> https://maven.aliyun.com/repository/google
+[heyta-mirror] MavenRepo -> https://maven.aliyun.com/repository/public
+[heyta-mirror] maven -> https://maven.aliyun.com/repository/public
+[heyta-mirror] MavenRepo -> https://maven.aliyun.com/repository/public
+[heyta-mirror] Google -> https://maven.aliyun.com/repository/google
+[heyta-mirror] MavenRepo2 -> https://maven.aliyun.com/repository/public
+[heyta-mirror] Google2 -> https://maven.aliyun.com/repository/google
+[heyta-mirror] Google -> https://maven.aliyun.com/repository/google
+[heyta-mirror] MavenRepo -> https://maven.aliyun.com/repository/public
+[heyta-mirror] maven -> https://maven.aliyun.com/repository/public
+[heyta-mirror] MavenRepo -> https://maven.aliyun.com/repository/public
+[heyta-mirror] Google -> https://maven.aliyun.com/repository/google
+[heyta-mirror] Google2 -> https://maven.aliyun.com/repository/google
+[heyta-mirror] MavenRepo2 -> https://maven.aliyun.com/repository/public
+[heyta-mirror] MavenRepo -> https://maven.aliyun.com/repository/public
+[heyta-mirror] Google -> https://maven.aliyun.com/repository/google
+[heyta-mirror] maven -> https://maven.aliyun.com/repository/public
+[heyta-mirror] MavenRepo -> https://maven.aliyun.com/repository/public
+[heyta-mirror] Google -> https://maven.aliyun.com/repository/google
+[heyta-mirror] MavenRepo2 -> https://maven.aliyun.com/repository/public
+[heyta-mirror] Google2 -> https://maven.aliyun.com/repository/google
+Warning: SDK processing. This version only understands SDK XML versions up to 3 but an SDK XML file of version 4 was encountered. This can happen if you use versions of Android Studio and the command-line tools that were released at different times.
+Observed package id 'platform-tools' in inconsistent location 'C:\Users\41478\AppData\Local\Android\Sdk\platform-tools-2' (Expected 'C:\Users\41478\AppData\Local\Android\Sdk\platform-tools')
+[=========                              ] 25%                                   [=========                              ] 25%                                   
+> Task :app:generateAutolinkingNewArchitectureFiles UP-TO-DATE
+> Task :app:generateAutolinkingPackageList UP-TO-DATE
+> Task :app:generateCodegenSchemaFromJavaScript SKIPPED
+> Task :app:generateCodegenArtifactsFromSchema SKIPPED
+> Task :app:generateReactNativeEntryPoint UP-TO-DATE
+> Task :op-engineering_op-sqlite:generateCodegenSchemaFromJavaScript UP-TO-DATE
+> Task :op-engineering_op-sqlite:generateCodegenArtifactsFromSchema UP-TO-DATE
+> Task :op-engineering_op-sqlite:prepareHeaders UP-TO-DATE
+> Task :op-engineering_op-sqlite:preBuild UP-TO-DATE
+> Task :react-native-documents_picker:generateCodegenSchemaFromJavaScript UP-TO-DATE
+> Task :react-native-documents_picker:generateCodegenArtifactsFromSchema UP-TO-DATE
+> Task :react-native-documents_picker:preBuild UP-TO-DATE
+> Task :react-native-get-random-values:generateCodegenSchemaFromJavaScript UP-TO-DATE
+> Task :react-native-get-random-values:generateCodegenArtifactsFromSchema UP-TO-DATE
+> Task :react-native-get-random-values:preBuild UP-TO-DATE
+> Task :react-native-safe-area-context:generateCodegenSchemaFromJavaScript UP-TO-DATE
+> Task :react-native-safe-area-context:generateCodegenArtifactsFromSchema UP-TO-DATE
+> Task :react-native-safe-area-context:preBuild UP-TO-DATE
+> Task :react-native-svg:generateCodegenSchemaFromJavaScript UP-TO-DATE
+> Task :react-native-svg:generateCodegenArtifactsFromSchema UP-TO-DATE
+> Task :react-native-svg:preBuild UP-TO-DATE
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preReleaseBuild UP-TO-DATE
+> Task :op-engineering_op-sqlite:preReleaseBuild UP-TO-DATE
+> Task :op-engineering_op-sqlite:configureCMakeRelWithDebInfo[arm64-v8a]
+> Task :op-engineering_op-sqlite:configureCMakeRelWithDebInfo[armeabi-v7a]
+> Task :op-engineering_op-sqlite:configureCMakeRelWithDebInfo[x86]
+> Task :op-engineering_op-sqlite:configureCMakeRelWithDebInfo[x86_64]
+> Task :op-engineering_op-sqlite:generateJsonModelRelease
+> Task :op-engineering_op-sqlite:prefabReleaseConfigurePackage UP-TO-DATE
+> Task :app:configureCMakeRelWithDebInfo[arm64-v8a]
+> Task :op-engineering_op-sqlite:buildCMakeRelWithDebInfo[arm64-v8a]
+> Task :op-engineering_op-sqlite:buildCMakeRelWithDebInfo[armeabi-v7a]
+> Task :op-engineering_op-sqlite:buildCMakeRelWithDebInfo[x86]
+> Task :op-engineering_op-sqlite:buildCMakeRelWithDebInfo[x86_64]
+> Task :op-engineering_op-sqlite:externalNativeBuildRelease
+> Task :op-engineering_op-sqlite:prefabReleasePackage UP-TO-DATE
+> Task :app:buildCMakeRelWithDebInfo[arm64-v8a]
+> Task :app:configureCMakeRelWithDebInfo[armeabi-v7a]
+> Task :app:buildCMakeRelWithDebInfo[armeabi-v7a]
+> Task :app:configureCMakeRelWithDebInfo[x86]
+> Task :app:buildCMakeRelWithDebInfo[x86]
+> Task :app:configureCMakeRelWithDebInfo[x86_64]
+> Task :app:buildCMakeRelWithDebInfo[x86_64]
+> Task :app:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :op-engineering_op-sqlite:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :op-engineering_op-sqlite:mergeReleaseNativeLibs UP-TO-DATE
+> Task :op-engineering_op-sqlite:copyReleaseJniLibsProjectOnly UP-TO-DATE
+> Task :react-native-documents_picker:preReleaseBuild UP-TO-DATE
+> Task :react-native-documents_picker:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :react-native-documents_picker:mergeReleaseNativeLibs NO-SOURCE
+> Task :react-native-documents_picker:copyReleaseJniLibsProjectOnly UP-TO-DATE
+> Task :react-native-get-random-values:preReleaseBuild UP-TO-DATE
+> Task :react-native-get-random-values:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :react-native-get-random-values:mergeReleaseNativeLibs NO-SOURCE
+> Task :react-native-get-random-values:copyReleaseJniLibsProjectOnly UP-TO-DATE
+> Task :react-native-safe-area-context:preReleaseBuild UP-TO-DATE
+> Task :react-native-safe-area-context:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :react-native-safe-area-context:mergeReleaseNativeLibs NO-SOURCE
+> Task :react-native-safe-area-context:copyReleaseJniLibsProjectOnly UP-TO-DATE
+> Task :react-native-svg:preReleaseBuild UP-TO-DATE
+> Task :react-native-svg:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :react-native-svg:mergeReleaseNativeLibs NO-SOURCE
+> Task :react-native-svg:copyReleaseJniLibsProjectOnly UP-TO-DATE
+> Task :app:mergeReleaseNativeLibs UP-TO-DATE
+> Task :app:stripReleaseDebugSymbols UP-TO-DATE
+> Task :app:extractReleaseNativeSymbolTables UP-TO-DATE
+> Task :app:mergeReleaseNativeDebugMetadata UP-TO-DATE
+> Task :op-engineering_op-sqlite:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :op-engineering_op-sqlite:generateReleaseBuildConfig UP-TO-DATE
+> Task :op-engineering_op-sqlite:generateReleaseResValues UP-TO-DATE
+> Task :op-engineering_op-sqlite:generateReleaseResources UP-TO-DATE
+> Task :op-engineering_op-sqlite:packageReleaseResources UP-TO-DATE
+> Task :op-engineering_op-sqlite:parseReleaseLocalResources UP-TO-DATE
+> Task :op-engineering_op-sqlite:generateReleaseRFile UP-TO-DATE
+> Task :op-engineering_op-sqlite:compileReleaseKotlin UP-TO-DATE
+> Task :op-engineering_op-sqlite:javaPreCompileRelease UP-TO-DATE
+> Task :op-engineering_op-sqlite:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :op-engineering_op-sqlite:bundleLibRuntimeToDirRelease UP-TO-DATE
+> Task :react-native-documents_picker:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :react-native-documents_picker:generateReleaseBuildConfig UP-TO-DATE
+> Task :react-native-documents_picker:generateReleaseResValues UP-TO-DATE
+> Task :react-native-documents_picker:generateReleaseResources UP-TO-DATE
+> Task :react-native-documents_picker:packageReleaseResources UP-TO-DATE
+> Task :react-native-documents_picker:parseReleaseLocalResources UP-TO-DATE
+> Task :react-native-documents_picker:generateReleaseRFile UP-TO-DATE
+> Task :react-native-documents_picker:compileReleaseKotlin UP-TO-DATE
+> Task :react-native-documents_picker:javaPreCompileRelease UP-TO-DATE
+> Task :react-native-documents_picker:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :react-native-documents_picker:bundleLibRuntimeToDirRelease UP-TO-DATE
+> Task :react-native-safe-area-context:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :react-native-safe-area-context:generateReleaseBuildConfig UP-TO-DATE
+> Task :react-native-safe-area-context:generateReleaseResValues UP-TO-DATE
+> Task :react-native-safe-area-context:generateReleaseResources UP-TO-DATE
+> Task :react-native-safe-area-context:packageReleaseResources UP-TO-DATE
+> Task :react-native-safe-area-context:parseReleaseLocalResources UP-TO-DATE
+> Task :react-native-safe-area-context:generateReleaseRFile UP-TO-DATE
+> Task :react-native-safe-area-context:compileReleaseKotlin UP-TO-DATE
+> Task :react-native-safe-area-context:javaPreCompileRelease UP-TO-DATE
+> Task :react-native-safe-area-context:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :react-native-safe-area-context:bundleLibRuntimeToDirRelease UP-TO-DATE
+> Task :react-native-get-random-values:generateReleaseBuildConfig UP-TO-DATE
+> Task :react-native-get-random-values:generateReleaseResValues UP-TO-DATE
+> Task :react-native-get-random-values:generateReleaseResources UP-TO-DATE
+> Task :react-native-get-random-values:packageReleaseResources UP-TO-DATE
+> Task :react-native-get-random-values:parseReleaseLocalResources UP-TO-DATE
+> Task :react-native-get-random-values:generateReleaseRFile UP-TO-DATE
+> Task :react-native-get-random-values:javaPreCompileRelease UP-TO-DATE
+> Task :react-native-get-random-values:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :react-native-get-random-values:bundleLibRuntimeToDirRelease UP-TO-DATE
+> Task :react-native-svg:generateReleaseBuildConfig UP-TO-DATE
+> Task :react-native-svg:generateReleaseResValues UP-TO-DATE
+> Task :react-native-svg:generateReleaseResources UP-TO-DATE
+> Task :react-native-svg:packageReleaseResources UP-TO-DATE
+> Task :react-native-svg:parseReleaseLocalResources UP-TO-DATE
+> Task :react-native-svg:generateReleaseRFile UP-TO-DATE
+> Task :react-native-svg:javaPreCompileRelease UP-TO-DATE
+> Task :react-native-svg:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :react-native-svg:bundleLibRuntimeToDirRelease UP-TO-DATE
+> Task :app:checkReleaseDuplicateClasses UP-TO-DATE
+> Task :app:buildKotlinToolingMetadata UP-TO-DATE
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:generateReleaseBuildConfig UP-TO-DATE
+> Task :op-engineering_op-sqlite:writeReleaseAarMetadata UP-TO-DATE
+> Task :react-native-documents_picker:writeReleaseAarMetadata UP-TO-DATE
+> Task :react-native-get-random-values:writeReleaseAarMetadata UP-TO-DATE
+> Task :react-native-safe-area-context:writeReleaseAarMetadata UP-TO-DATE
+> Task :react-native-svg:writeReleaseAarMetadata UP-TO-DATE
+> Task :app:checkReleaseAarMetadata UP-TO-DATE
+> Task :app:createBundleReleaseJsAndAssets UP-TO-DATE
+> Task :app:generateReleaseResValues UP-TO-DATE
+> Task :app:mapReleaseSourceSetPaths UP-TO-DATE
+> Task :app:generateReleaseResources UP-TO-DATE
+> Task :app:mergeReleaseResources UP-TO-DATE
+> Task :app:packageReleaseResources UP-TO-DATE
+> Task :app:parseReleaseLocalResources UP-TO-DATE
+> Task :app:createReleaseCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksRelease UP-TO-DATE
+> Task :op-engineering_op-sqlite:extractDeepLinksRelease UP-TO-DATE
+> Task :op-engineering_op-sqlite:processReleaseManifest UP-TO-DATE
+> Task :react-native-documents_picker:extractDeepLinksRelease UP-TO-DATE
+> Task :react-native-documents_picker:processReleaseManifest UP-TO-DATE
+> Task :react-native-get-random-values:extractDeepLinksRelease UP-TO-DATE
+> Task :react-native-get-random-values:processReleaseManifest UP-TO-DATE
+> Task :react-native-safe-area-context:extractDeepLinksRelease UP-TO-DATE
+> Task :react-native-safe-area-context:processReleaseManifest UP-TO-DATE
+> Task :react-native-svg:extractDeepLinksRelease UP-TO-DATE
+> Task :react-native-svg:processReleaseManifest UP-TO-DATE
+> Task :app:processReleaseMainManifest UP-TO-DATE
+> Task :app:processReleaseManifest UP-TO-DATE
+> Task :app:processReleaseManifestForPackage UP-TO-DATE
+> Task :op-engineering_op-sqlite:compileReleaseLibraryResources UP-TO-DATE
+> Task :react-native-documents_picker:compileReleaseLibraryResources UP-TO-DATE
+> Task :react-native-get-random-values:compileReleaseLibraryResources UP-TO-DATE
+> Task :react-native-safe-area-context:compileReleaseLibraryResources UP-TO-DATE
+> Task :react-native-svg:compileReleaseLibraryResources UP-TO-DATE
+> Task :app:processReleaseResources UP-TO-DATE
+> Task :op-engineering_op-sqlite:bundleLibCompileToJarRelease UP-TO-DATE
+> Task :react-native-documents_picker:bundleLibCompileToJarRelease UP-TO-DATE
+> Task :react-native-get-random-values:bundleLibCompileToJarRelease UP-TO-DATE
+> Task :react-native-safe-area-context:bundleLibCompileToJarRelease UP-TO-DATE
+> Task :react-native-svg:bundleLibCompileToJarRelease UP-TO-DATE
+> Task :app:compileReleaseKotlin UP-TO-DATE
+> Task :app:javaPreCompileRelease UP-TO-DATE
+> Task :app:compileReleaseJavaWithJavac UP-TO-DATE
+> Task :app:dexBuilderRelease UP-TO-DATE
+> Task :app:desugarReleaseFileDependencies UP-TO-DATE
+> Task :app:mergeReleaseStartupProfile UP-TO-DATE
+> Task :app:mergeExtDexRelease UP-TO-DATE
+> Task :app:mergeDexRelease UP-TO-DATE
+> Task :op-engineering_op-sqlite:prepareReleaseArtProfile UP-TO-DATE
+> Task :react-native-documents_picker:prepareReleaseArtProfile UP-TO-DATE
+> Task :react-native-get-random-values:prepareReleaseArtProfile UP-TO-DATE
+> Task :react-native-safe-area-context:prepareReleaseArtProfile UP-TO-DATE
+> Task :react-native-svg:prepareReleaseArtProfile UP-TO-DATE
+> Task :app:mergeReleaseArtProfile UP-TO-DATE
+> Task :op-engineering_op-sqlite:bundleLibRuntimeToJarRelease UP-TO-DATE
+> Task :react-native-documents_picker:bundleLibRuntimeToJarRelease UP-TO-DATE
+> Task :react-native-safe-area-context:bundleLibRuntimeToJarRelease UP-TO-DATE
+> Task :react-native-get-random-values:bundleLibRuntimeToJarRelease UP-TO-DATE
+> Task :react-native-svg:bundleLibRuntimeToJarRelease UP-TO-DATE
+> Task :app:mergeReleaseShaders UP-TO-DATE
+> Task :app:compileReleaseShaders NO-SOURCE
+> Task :app:generateReleaseAssets UP-TO-DATE
+> Task :op-engineering_op-sqlite:mergeReleaseShaders UP-TO-DATE
+> Task :op-engineering_op-sqlite:compileReleaseShaders NO-SOURCE
+> Task :op-engineering_op-sqlite:generateReleaseAssets UP-TO-DATE
+> Task :app:mergeReleaseGlobalSynthetics UP-TO-DATE
+> Task :app:compileReleaseArtProfile UP-TO-DATE
+> Task :op-engineering_op-sqlite:mergeReleaseAssets UP-TO-DATE
+> Task :react-native-documents_picker:mergeReleaseShaders UP-TO-DATE
+> Task :react-native-documents_picker:compileReleaseShaders NO-SOURCE
+> Task :react-native-documents_picker:generateReleaseAssets UP-TO-DATE
+> Task :react-native-documents_picker:mergeReleaseAssets UP-TO-DATE
+> Task :react-native-get-random-values:mergeReleaseShaders UP-TO-DATE
+> Task :react-native-get-random-values:compileReleaseShaders NO-SOURCE
+> Task :react-native-get-random-values:generateReleaseAssets UP-TO-DATE
+> Task :react-native-get-random-values:mergeReleaseAssets UP-TO-DATE
+> Task :react-native-safe-area-context:mergeReleaseShaders UP-TO-DATE
+> Task :react-native-safe-area-context:compileReleaseShaders NO-SOURCE
+> Task :react-native-safe-area-context:generateReleaseAssets UP-TO-DATE
+> Task :react-native-safe-area-context:mergeReleaseAssets UP-TO-DATE
+> Task :react-native-svg:mergeReleaseShaders UP-TO-DATE
+> Task :react-native-svg:compileReleaseShaders NO-SOURCE
+> Task :react-native-svg:generateReleaseAssets UP-TO-DATE
+> Task :react-native-svg:mergeReleaseAssets UP-TO-DATE
+> Task :app:mergeReleaseAssets UP-TO-DATE
+> Task :app:compressReleaseAssets UP-TO-DATE
+> Task :app:extractReleaseVersionControlInfo UP-TO-DATE
+> Task :app:extractProguardFiles UP-TO-DATE
+> Task :op-engineering_op-sqlite:processReleaseJavaRes UP-TO-DATE
+> Task :op-engineering_op-sqlite:createFullJarRelease UP-TO-DATE
+> Task :op-engineering_op-sqlite:extractProguardFiles UP-TO-DATE
+> Task :op-engineering_op-sqlite:generateReleaseLintModel UP-TO-DATE
+> Task :op-engineering_op-sqlite:prepareLintJarForPublish UP-TO-DATE
+> Task :react-native-documents_picker:processReleaseJavaRes UP-TO-DATE
+> Task :react-native-documents_picker:createFullJarRelease UP-TO-DATE
+> Task :react-native-documents_picker:extractProguardFiles UP-TO-DATE
+> Task :react-native-documents_picker:generateReleaseLintModel UP-TO-DATE
+> Task :react-native-documents_picker:prepareLintJarForPublish UP-TO-DATE
+> Task :react-native-get-random-values:processReleaseJavaRes NO-SOURCE
+> Task :react-native-get-random-values:createFullJarRelease UP-TO-DATE
+> Task :react-native-get-random-values:extractProguardFiles UP-TO-DATE
+> Task :react-native-get-random-values:generateReleaseLintModel UP-TO-DATE
+> Task :react-native-get-random-values:prepareLintJarForPublish UP-TO-DATE
+> Task :react-native-safe-area-context:processReleaseJavaRes UP-TO-DATE
+> Task :react-native-safe-area-context:createFullJarRelease UP-TO-DATE
+> Task :react-native-safe-area-context:extractProguardFiles UP-TO-DATE
+> Task :react-native-safe-area-context:generateReleaseLintModel UP-TO-DATE
+> Task :react-native-safe-area-context:prepareLintJarForPublish UP-TO-DATE
+> Task :react-native-svg:processReleaseJavaRes NO-SOURCE
+> Task :react-native-svg:createFullJarRelease UP-TO-DATE
+> Task :react-native-svg:extractProguardFiles UP-TO-DATE
+> Task :react-native-svg:generateReleaseLintModel UP-TO-DATE
+> Task :react-native-svg:prepareLintJarForPublish UP-TO-DATE
+> Task :app:generateReleaseLintVitalReportModel UP-TO-DATE
+> Task :op-engineering_op-sqlite:stripReleaseDebugSymbols UP-TO-DATE
+> Task :op-engineering_op-sqlite:copyReleaseJniLibsProjectAndLocalJars UP-TO-DATE
+> Task :op-engineering_op-sqlite:extractDeepLinksForAarRelease UP-TO-DATE
+> Task :op-engineering_op-sqlite:extractReleaseAnnotations UP-TO-DATE
+> Task :op-engineering_op-sqlite:mergeReleaseGeneratedProguardFiles UP-TO-DATE
+> Task :op-engineering_op-sqlite:mergeReleaseConsumerProguardFiles UP-TO-DATE
+> Task :op-engineering_op-sqlite:mergeReleaseJavaResource UP-TO-DATE
+> Task :op-engineering_op-sqlite:syncReleaseLibJars UP-TO-DATE
+> Task :op-engineering_op-sqlite:bundleReleaseLocalLintAar UP-TO-DATE
+> Task :react-native-documents_picker:stripReleaseDebugSymbols NO-SOURCE
+> Task :react-native-documents_picker:copyReleaseJniLibsProjectAndLocalJars UP-TO-DATE
+> Task :react-native-documents_picker:extractDeepLinksForAarRelease UP-TO-DATE
+> Task :react-native-documents_picker:extractReleaseAnnotations UP-TO-DATE
+> Task :react-native-documents_picker:mergeReleaseGeneratedProguardFiles UP-TO-DATE
+> Task :react-native-documents_picker:mergeReleaseConsumerProguardFiles UP-TO-DATE
+> Task :react-native-documents_picker:mergeReleaseJavaResource UP-TO-DATE
+> Task :react-native-documents_picker:syncReleaseLibJars UP-TO-DATE
+> Task :react-native-documents_picker:bundleReleaseLocalLintAar UP-TO-DATE
+> Task :react-native-safe-area-context:stripReleaseDebugSymbols NO-SOURCE
+> Task :react-native-safe-area-context:copyReleaseJniLibsProjectAndLocalJars UP-TO-DATE
+> Task :react-native-safe-area-context:extractDeepLinksForAarRelease UP-TO-DATE
+> Task :react-native-safe-area-context:extractReleaseAnnotations UP-TO-DATE
+> Task :react-native-safe-area-context:mergeReleaseGeneratedProguardFiles UP-TO-DATE
+> Task :react-native-safe-area-context:mergeReleaseConsumerProguardFiles UP-TO-DATE
+> Task :react-native-safe-area-context:mergeReleaseJavaResource UP-TO-DATE
+> Task :react-native-safe-area-context:syncReleaseLibJars UP-TO-DATE
+> Task :react-native-safe-area-context:bundleReleaseLocalLintAar UP-TO-DATE
+> Task :react-native-get-random-values:stripReleaseDebugSymbols NO-SOURCE
+> Task :react-native-get-random-values:copyReleaseJniLibsProjectAndLocalJars UP-TO-DATE
+> Task :react-native-get-random-values:extractDeepLinksForAarRelease UP-TO-DATE
+> Task :react-native-get-random-values:extractReleaseAnnotations UP-TO-DATE
+> Task :react-native-get-random-values:mergeReleaseGeneratedProguardFiles UP-TO-DATE
+> Task :react-native-get-random-values:mergeReleaseConsumerProguardFiles UP-TO-DATE
+> Task :react-native-get-random-values:mergeReleaseJavaResource UP-TO-DATE
+> Task :react-native-get-random-values:syncReleaseLibJars UP-TO-DATE
+> Task :react-native-get-random-values:bundleReleaseLocalLintAar UP-TO-DATE
+> Task :react-native-svg:stripReleaseDebugSymbols NO-SOURCE
+> Task :react-native-svg:copyReleaseJniLibsProjectAndLocalJars UP-TO-DATE
+> Task :react-native-svg:extractDeepLinksForAarRelease UP-TO-DATE
+> Task :react-native-svg:extractReleaseAnnotations UP-TO-DATE
+> Task :react-native-svg:mergeReleaseGeneratedProguardFiles UP-TO-DATE
+> Task :react-native-svg:mergeReleaseConsumerProguardFiles UP-TO-DATE
+> Task :react-native-svg:mergeReleaseJavaResource UP-TO-DATE
+> Task :react-native-svg:syncReleaseLibJars UP-TO-DATE
+> Task :react-native-svg:bundleReleaseLocalLintAar UP-TO-DATE
+> Task :op-engineering_op-sqlite:lintVitalAnalyzeRelease UP-TO-DATE
+> Task :op-engineering_op-sqlite:writeReleaseLintModelMetadata UP-TO-DATE
+> Task :react-native-documents_picker:lintVitalAnalyzeRelease UP-TO-DATE
+> Task :react-native-documents_picker:writeReleaseLintModelMetadata UP-TO-DATE
+> Task :react-native-get-random-values:lintVitalAnalyzeRelease UP-TO-DATE
+> Task :react-native-get-random-values:writeReleaseLintModelMetadata UP-TO-DATE
+> Task :react-native-safe-area-context:lintVitalAnalyzeRelease UP-TO-DATE
+> Task :react-native-safe-area-context:writeReleaseLintModelMetadata UP-TO-DATE
+> Task :react-native-svg:lintVitalAnalyzeRelease UP-TO-DATE
+> Task :react-native-svg:writeReleaseLintModelMetadata UP-TO-DATE
+> Task :app:lintVitalAnalyzeRelease UP-TO-DATE
+> Task :op-engineering_op-sqlite:generateReleaseLintVitalModel UP-TO-DATE
+> Task :react-native-documents_picker:generateReleaseLintVitalModel UP-TO-DATE
+> Task :react-native-get-random-values:generateReleaseLintVitalModel UP-TO-DATE
+> Task :react-native-safe-area-context:generateReleaseLintVitalModel UP-TO-DATE
+> Task :react-native-svg:generateReleaseLintVitalModel UP-TO-DATE
+> Task :app:lintVitalReportRelease UP-TO-DATE
+> Task :app:lintVitalRelease
+> Task :app:processReleaseJavaRes UP-TO-DATE
+> Task :app:mergeReleaseJavaResource UP-TO-DATE
+> Task :app:optimizeReleaseResources UP-TO-DATE
+> Task :app:collectReleaseDependencies UP-TO-DATE
+> Task :app:sdkReleaseDependencyData UP-TO-DATE
+> Task :app:validateSigningRelease UP-TO-DATE
+> Task :app:writeReleaseAppMetadata UP-TO-DATE
+> Task :app:writeReleaseSigningConfigVersions UP-TO-DATE
+> Task :op-engineering_op-sqlite:bundleReleaseAar UP-TO-DATE
+> Task :op-engineering_op-sqlite:mapReleaseSourceSetPaths UP-TO-DATE
+> Task :op-engineering_op-sqlite:mergeReleaseResources UP-TO-DATE
+> Task :op-engineering_op-sqlite:verifyReleaseResources UP-TO-DATE
+> Task :op-engineering_op-sqlite:assembleRelease UP-TO-DATE
+> Task :react-native-documents_picker:bundleReleaseAar UP-TO-DATE
+> Task :react-native-documents_picker:mapReleaseSourceSetPaths UP-TO-DATE
+> Task :react-native-documents_picker:mergeReleaseResources UP-TO-DATE
+> Task :react-native-documents_picker:verifyReleaseResources UP-TO-DATE
+> Task :react-native-documents_picker:assembleRelease UP-TO-DATE
+> Task :react-native-get-random-values:bundleReleaseAar UP-TO-DATE
+> Task :react-native-get-random-values:mapReleaseSourceSetPaths UP-TO-DATE
+> Task :react-native-get-random-values:mergeReleaseResources UP-TO-DATE
+> Task :react-native-get-random-values:verifyReleaseResources UP-TO-DATE
+> Task :react-native-get-random-values:assembleRelease UP-TO-DATE
+> Task :react-native-safe-area-context:bundleReleaseAar UP-TO-DATE
+> Task :react-native-safe-area-context:mapReleaseSourceSetPaths UP-TO-DATE
+> Task :react-native-safe-area-context:mergeReleaseResources UP-TO-DATE
+> Task :react-native-safe-area-context:verifyReleaseResources UP-TO-DATE
+> Task :react-native-safe-area-context:assembleRelease UP-TO-DATE
+> Task :react-native-svg:bundleReleaseAar UP-TO-DATE
+> Task :react-native-svg:mapReleaseSourceSetPaths UP-TO-DATE
+> Task :react-native-svg:mergeReleaseResources UP-TO-DATE
+> Task :react-native-svg:verifyReleaseResources UP-TO-DATE
+> Task :react-native-svg:assembleRelease UP-TO-DATE
+> Task :app:packageRelease
+> Task :app:createReleaseApkListingFileRedirect UP-TO-DATE
+> Task :app:assembleRelease
+
+[Incubating] Problems report is available at: file:///C:/src/heyta/apps/mobile/android/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.0.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 37s
+298 actionable tasks: 19 executed, 279 up-to-date
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.0.0/userguide/configuration_cache_enabling.html
+  步骤 5：远端产物身份（第 1/1 枚）
+   远端：size=69,480,720 B  sha256=16032ccee5bed301…  完成时刻(UTC)=2026-10-17T05:27:06.000Z
+  步骤 6：scp 回本地**消费者原本期望的路径** apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+  步骤 7：本地哈希与远端逐字对账 + 把本地 mtime 回写成远端构建完成时刻
+   ✅ apps/mobile/android/app/build/outputs/apk/release/app-release.apk：size=69,480,720 B  sha256=16032ccee5bed301…（与远端逐字相同）  本地 mtime=2026-10-17T05:27:06.000Z
+
+✅ 远程 Android 构建完成
+   构建主机 = windows-pc（规则要求的默认）
+   产物     = apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+   身份     = size=69,480,720 B / sha256=16032ccee5bed301… / 远端完成(UTC)=2026-10-17T05:27:06.000Z
+   四条判据 = ① 工作树 tar sha256 对账 ② 远端旧产物已清除 ③ 产物 mtime ≥ 本次构建起点（远端时钟）
+             ④ 拉回后本地 sha256 与远端逐字相同，且本地 mtime 回写为远端构建完成时刻

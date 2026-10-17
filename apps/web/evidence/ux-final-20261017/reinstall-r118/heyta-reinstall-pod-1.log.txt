@@ -1,0 +1,207 @@
+Ignoring digest-crc-0.7.0 because its extensions are not built. Try: gem pristine digest-crc --version 0.7.0
+Ignoring digest-crc-0.7.0 because its extensions are not built. Try: gem pristine digest-crc --version 0.7.0
+Ignoring digest-crc-0.7.0 because its extensions are not built. Try: gem pristine digest-crc --version 0.7.0
+[34m[OP-SQLITE] Configuration found at /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/mobile/package.json[0m
+[34m[OP-SQLITE] using pure SQLite[0m
+Found 5 modules for target `Heyta`
+link_native_modules! {ios_packages: [{configurations: [], name: "@op-engineering/op-sqlite", root: "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/mobile/node_modules/@op-engineering/op-sqlite", path: "../node_modules/@op-engineering/op-sqlite", podspec_path: "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/mobile/node_modules/@op-engineering/op-sqlite/op-sqlite.podspec", script_phases: []}, {configurations: [], name: "@react-native-documents/picker", root: "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/mobile/node_modules/@react-native-documents/picker", path: "../node_modules/@react-native-documents/picker", podspec_path: "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/mobile/node_modules/@react-native-documents/picker/react-native-document-picker.podspec", script_phases: []}, {configurations: [], name: "react-native-get-random-values", root: "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/mobile/node_modules/react-native-get-random-values", path: "../node_modules/react-native-get-random-values", podspec_path: "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/mobile/node_modules/react-native-get-random-values/react-native-get-random-values.podspec", script_phases: []}, {configurations: [], name: "react-native-safe-area-context", root: "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/mobile/node_modules/react-native-safe-area-context", path: "../node_modules/react-native-safe-area-context", podspec_path: "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/mobile/node_modules/react-native-safe-area-context/react-native-safe-area-context.podspec", script_phases: []}, {configurations: [], name: "react-native-svg", root: "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/mobile/node_modules/react-native-svg", path: "../node_modules/react-native-svg", podspec_path: "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/mobile/node_modules/react-native-svg/RNSVG.podspec", script_phases: []}], ios_project_root_path: "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/mobile/ios", react_native_path: "../node_modules/react-native"}
+[34m[OP-SQLITE] Configuration found at /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/mobile/package.json[0m
+[34m[OP-SQLITE] using pure SQLite[0m
+Auto-linking React Native modules for target `Heyta`: RNSVG, op-sqlite, react-native-document-picker, react-native-get-random-values, and react-native-safe-area-context
+Framework build type is static library
+[ReactNativeDependencies] Setting up ReactNativeDependencies...
+[ReactNativeDependencies] No prebuilt artifacts found, reverting to building from source.
+[ReactNativeDependencies] Building from source: true
+[ReactNativeDependencies] Source: 
+[ReactNativeCore] Setting up ReactNativeCore...
+[ReactNativeCore] No prebuilt artifacts found, reverting to building from source.
+[ReactNativeCore] Building from source: true
+Configuring the target with the New Architecture
+[36m[1m[Codegen][0m Analyzing /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/mobile/package.json[0m
+[36m[1m[Codegen][0m [33mSearching for codegen-enabled libraries in the app.[0m
+[36m[1m[Codegen][0m [33mThe "codegenConfig" field is not defined in package.json. Assuming there is nothing to generate at the app level.[0m
+[36m[1m[Codegen][0m [33mSearching for codegen-enabled libraries in react-native.config.js[0m
+[36m[1m[Codegen][0m Found @op-engineering/op-sqlite[0m
+[36m[1m[Codegen][0m Found @react-native-documents/picker[0m
+[36m[1m[Codegen][0m Found react-native-get-random-values[0m
+[36m[1m[Codegen][0m Found react-native-safe-area-context[0m
+[36m[1m[Codegen][0m Found react-native-svg[0m
+[36m[1m[Codegen][0m Processing OPSQLiteSpec[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios, macos, tvos, visionos for OPSQLiteSpec[0m
+[36m[1m[Codegen][0m Processing rndocumentpickerCGen[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios for rndocumentpickerCGen[0m
+[36m[1m[Codegen][0m Processing RNGetRandomValuesSpec[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios, macos, tvos, visionos for RNGetRandomValuesSpec[0m
+[36m[1m[Codegen][0m Processing safeareacontext[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios, macos, tvos, visionos for safeareacontext[0m
+[36m[1m[Codegen][0m Processing rnsvg[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios, macos, tvos, visionos for rnsvg[0m
+[36m[1m[Codegen][0m Generating Native Code for OPSQLiteSpec - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/mobile/ios/build/generated/ios/ReactCodegen[0m
+[36m[1m[Codegen][0m Generating Native Code for rndocumentpickerCGen - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/mobile/ios/build/generated/ios/ReactCodegen[0m
+[36m[1m[Codegen][0m Generating Native Code for RNGetRandomValuesSpec - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/mobile/ios/build/generated/ios/ReactCodegen[0m
+[36m[1m[Codegen][0m Generating Native Code for safeareacontext - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/mobile/ios/build/generated/ios/ReactCodegen[0m
+[36m[1m[Codegen][0m Generating Native Code for rnsvg - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/mobile/ios/build/generated/ios/ReactCodegen[0m
+[36m[1m[Codegen][0m Generating RCTThirdPartyComponentsProvider.h[0m
+[36m[1m[Codegen][0m Generated artifact: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/mobile/ios/build/generated/ios/ReactCodegen/RCTThirdPartyComponentsProvider.h[0m
+[36m[1m[Codegen][0m Generating RCTThirdPartyComponentsProvider.mm[0m
+[36m[1m[Codegen][0m Generated artifact: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/mobile/ios/build/generated/ios/ReactCodegen/RCTThirdPartyComponentsProvider.mm[0m
+[36m[1m[Codegen][0m Generating RCTModulesProvider.h[0m
+[36m[1m[Codegen][0m Generated artifact: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/mobile/ios/build/generated/ios/ReactCodegen/RCTModuleProviders.h[0m
+[36m[1m[Codegen][0m Generating RCTModuleProviders.mm[0m
+[36m[1m[Codegen][0m Generated artifact: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/mobile/ios/build/generated/ios/ReactCodegen/RCTModuleProviders.mm[0m
+[36m[1m[Codegen][0m Generating RCTAppDependencyProvider[0m
+[36m[1m[Codegen][0m Generated artifact: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/mobile/ios/build/generated/ios/ReactAppDependencyProvider/RCTAppDependencyProvider.h[0m
+[36m[1m[Codegen][0m Generated artifact: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/mobile/ios/build/generated/ios/ReactAppDependencyProvider/RCTAppDependencyProvider.mm[0m
+[36m[1m[Codegen][0m Generated podspec: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/mobile/ios/build/generated/ios/ReactAppDependencyProvider/ReactAppDependencyProvider.podspec[0m
+[36m[1m[Codegen][0m Generated podspec: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/mobile/ios/build/generated/ios/ReactCodegen/ReactCodegen.podspec[0m
+[36m[1m[Codegen][0m Generating Package.swift[0m
+[36m[1m[Codegen][0m Generated artifact: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/mobile/ios/build/generated/ios/Package.swift[0m
+[36m[1m[Codegen][0m [33mDone.[0m
+Analyzing dependencies
+Fetching podspec for `DoubleConversion` from `../node_modules/react-native/third-party-podspecs/DoubleConversion.podspec`
+Fetching podspec for `RCT-Folly` from `../node_modules/react-native/third-party-podspecs/RCT-Folly.podspec`
+Fetching podspec for `boost` from `../node_modules/react-native/third-party-podspecs/boost.podspec`
+Fetching podspec for `fast_float` from `../node_modules/react-native/third-party-podspecs/fast_float.podspec`
+Fetching podspec for `fmt` from `../node_modules/react-native/third-party-podspecs/fmt.podspec`
+Fetching podspec for `glog` from `../node_modules/react-native/third-party-podspecs/glog.podspec`
+Fetching podspec for `hermes-engine` from `../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`
+[Hermes] Using release tarball from URL: https://repo1.maven.org/maven2/com/facebook/hermes/hermes-ios/250829098.0.9/hermes-ios-250829098.0.9-hermes-ios-debug.tar.gz
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0100   167    0   167    0     0     82      0 --:--:--  0:00:02 --:--:--    82
+  0     0    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:03 --:--:--     0  0 28.4M    0  109k    0     0  24635      0  0:20:12  0:00:04  0:20:08 53962  1 28.4M    1  551k    0     0    99k      0  0:04:52  0:00:05  0:04:47  180k  3 28.4M    3 1047k    0     0   159k      0  0:03:02  0:00:06  0:02:56  257k 18 28.4M   18 5299k    0     0   708k      0  0:00:41  0:00:07  0:00:34 1060k 25 28.4M   25 7359k    0     0   870k      0  0:00:33  0:00:08  0:00:25 1539k 39 28.4M   39 11.3M    0     0  1191k      0  0:00:24  0:00:09  0:00:15 2211k 54 28.4M   54 15.4M    0     0  1478k      0  0:00:19  0:00:10  0:00:09 2963k 67 28.4M   67 19.3M    0     0  1697k      0  0:00:17  0:00:11  0:00:06 3666k 74 28.4M   74 21.2M    0     0  1674k      0  0:00:17  0:00:12  0:00:05 2989k 84 28.4M   84 24.0M    0     0  1793k      0  0:00:16  0:00:13  0:00:03 3271k 93 28.4M   93 26.6M    0     0  1880k      0  0:00:15  0:00:14  0:00:01 3313k100 28.4M  100 28.4M    0     0  1989k      0  0:00:14  0:00:14 --:--:-- 3363k
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0100   167    0   167    0     0    112      0 --:--:--  0:00:01 --:--:--   112
+  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0  0 22.3M    0 20495    0     0   6285      0  1:02:12  0:00:03  1:02:09 14433  0 22.3M    0  208k    0     0  54025      0  0:07:14  0:00:03  0:07:11   98k  1 22.3M    1  455k    0     0  90482      0  0:04:19  0:00:05  0:04:14  137k  3 22.3M    3  775k    0     0   133k      0  0:02:51  0:00:05  0:02:46  195k  4 22.3M    4  951k    0     0   136k      0  0:02:47  0:00:06  0:02:41  185k  6 22.3M    6 1511k    0     0   194k      0  0:01:58  0:00:07  0:01:51  329k  9 22.3M    9 2259k    0     0   251k      0  0:01:31  0:00:08  0:01:23  408k  9 22.3M    9 2275k    0     0   234k      0  0:01:37  0:00:09  0:01:28  399k 13 22.3M   13 3011k    0     0   278k      0  0:01:22  0:00:10  0:01:12  446k 14 22.3M   14 3315k    0     0   282k      0  0:01:21  0:00:11  0:01:10  495k 16 22.3M   16 3811k    0     0   296k      0  0:01:17  0:00:12  0:01:05  454k 17 22.3M   17 4115k    0     0   293k      0  0:01:17  0:00:14  0:01:03  369k 18 22.3M   18 4259k    0     0   287k      0  0:01:19  0:00:14  0:01:05  388k 19 22.3M   19 4499k    0     0   283k      0  0:01:20  0:00:15  0:01:05  292k 22 22.3M   22 5171k    0     0   308k      0  0:01:14  0:00:16  0:00:58  369k 25 22.3M   25 5859k    0     0   323k      0  0:01:10  0:00:18  0:00:52  389k 27 22.3M   27 6323k    0     0   337k      0  0:01:07  0:00:18  0:00:49  466k 29 22.3M   29 6675k    0     0   337k      0  0:01:07  0:00:19  0:00:48  487k 30 22.3M   30 7091k    0     0   338k      0  0:01:07  0:00:20  0:00:47  514k 34 22.3M   34 7843k    0     0   360k      0  0:01:03  0:00:21  0:00:42  534k 35 22.3M   35 8243k    0     0   360k      0  0:01:03  0:00:22  0:00:41  502k 38 22.3M   38 8707k    0     0   366k      0  0:01:02  0:00:23  0:00:39  474k 40 22.3M   40 9379k    0     0   378k      0  0:01:00  0:00:24  0:00:36  540k 43 22.3M   43 9955k    0     0   387k      0  0:00:59  0:00:25  0:00:34  597k 46 22.3M   46 10.3M    0     0   396k      0  0:00:57  0:00:26  0:00:31  553k 47 22.3M   47 10.6M    0     0   390k      0  0:00:58  0:00:28  0:00:30  521k 50 22.3M   50 11.3M    0     0   400k      0  0:00:57  0:00:29  0:00:28  555k 54 22.3M   54 12.1M    0     0   418k      0  0:00:54  0:00:29  0:00:25  620k 55 22.3M   55 12.4M    0     0   413k      0  0:00:55  0:00:30  0:00:25  543k 59 22.3M   59 13.2M    0     0   426k      0  0:00:53  0:00:31  0:00:22  580k 62 22.3M   62 13.9M    0     0   430k      0  0:00:53  0:00:33  0:00:20  645k 65 22.3M   65 14.7M    0     0   445k      0  0:00:51  0:00:33  0:00:18  717k 69 22.3M   69 15.4M    0     0   454k      0  0:00:50  0:00:34  0:00:16  662k 73 22.3M   73 16.3M    0     0   467k      0  0:00:49  0:00:35  0:00:14  806k 74 22.3M   74 16.7M    0     0   466k      0  0:00:49  0:00:36  0:00:13  726k 80 22.3M   80 17.9M    0     0   487k      0  0:00:46  0:00:37  0:00:09  906k 82 22.3M   82 18.3M    0     0   480k      0  0:00:47  0:00:39  0:00:08  697k 85 22.3M   85 19.2M    0     0   495k      0  0:00:46  0:00:39  0:00:07  787k 90 22.3M   90 20.2M    0     0   508k      0  0:00:45  0:00:40  0:00:05  802k 94 22.3M   94 21.0M    0     0   514k      0  0:00:44  0:00:41  0:00:03  864k 95 22.3M   95 21.4M    0     0   512k      0  0:00:44  0:00:42  0:00:02  694k 97 22.3M   97 21.8M    0     0   509k      0  0:00:44  0:00:43  0:00:01  762k100 22.3M  100 22.3M    0     0   518k      0  0:00:44  0:00:44 --:--:--  719k
+[34m[OP-SQLITE] Configuration found at /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/mobile/package.json[0m
+[34m[OP-SQLITE] using pure SQLite[0m
+Downloading dependencies
+Installing DoubleConversion (1.1.6)
+Installing FBLazyVector (0.84.1)
+Installing RCT-Folly (2024.11.18.00)
+Installing RCTDeprecation (0.84.1)
+Installing RCTRequired (0.84.1)
+Installing RCTSwiftUI (0.84.1)
+Installing RCTSwiftUIWrapper (0.84.1)
+Installing RCTTypeSafety (0.84.1)
+Installing RNSVG (15.15.5)
+Installing React (0.84.1)
+Installing React-Core (0.84.1)
+Installing React-CoreModules (0.84.1)
+Installing React-Fabric (0.84.1)
+Installing React-FabricComponents (0.84.1)
+Installing React-FabricImage (0.84.1)
+Installing React-ImageManager (0.84.1)
+Installing React-Mapbuffer (0.84.1)
+Installing React-NativeModulesApple (0.84.1)
+Installing React-RCTActionSheet (0.84.1)
+Installing React-RCTAnimation (0.84.1)
+Installing React-RCTAppDelegate (0.84.1)
+Installing React-RCTBlob (0.84.1)
+Installing React-RCTFBReactNativeSpec (0.84.1)
+Installing React-RCTFabric (0.84.1)
+Installing React-RCTImage (0.84.1)
+Installing React-RCTLinking (0.84.1)
+Installing React-RCTNetwork (0.84.1)
+Installing React-RCTRuntime (0.84.1)
+Installing React-RCTSettings (0.84.1)
+Installing React-RCTText (0.84.1)
+Installing React-RCTVibration (0.84.1)
+Installing React-RuntimeApple (0.84.1)
+Installing React-RuntimeCore (0.84.1)
+Installing React-RuntimeHermes (0.84.1)
+Installing React-callinvoker (0.84.1)
+Installing React-cxxreact (0.84.1)
+Installing React-debug (0.84.1)
+Installing React-defaultsnativemodule (0.84.1)
+Installing React-domnativemodule (0.84.1)
+Installing React-featureflags (0.84.1)
+Installing React-featureflagsnativemodule (0.84.1)
+Installing React-graphics (0.84.1)
+Installing React-hermes (0.84.1)
+Installing React-idlecallbacksnativemodule (0.84.1)
+Installing React-intersectionobservernativemodule (0.84.1)
+Installing React-jserrorhandler (0.84.1)
+Installing React-jsi (0.84.1)
+Installing React-jsiexecutor (0.84.1)
+Installing React-jsinspector (0.84.1)
+Installing React-jsinspectorcdp (0.84.1)
+Installing React-jsinspectornetwork (0.84.1)
+Installing React-jsinspectortracing (0.84.1)
+Installing React-jsitooling (0.84.1)
+Installing React-jsitracing (0.84.1)
+Installing React-logger (0.84.1)
+Installing React-microtasksnativemodule (0.84.1)
+Installing React-networking (0.84.1)
+Installing React-oscompat (0.84.1)
+Installing React-perflogger (0.84.1)
+Installing React-performancecdpmetrics (0.84.1)
+Installing React-performancetimeline (0.84.1)
+Installing React-rendererconsistency (0.84.1)
+Installing React-renderercss (0.84.1)
+Installing React-rendererdebug (0.84.1)
+Installing React-runtimeexecutor (0.84.1)
+Installing React-runtimescheduler (0.84.1)
+Installing React-timing (0.84.1)
+Installing React-utils (0.84.1)
+Installing React-webperformancenativemodule (0.84.1)
+Installing ReactAppDependencyProvider (0.84.1)
+Installing ReactCodegen (0.84.1)
+Installing ReactCommon (0.84.1)
+Installing SocketRocket (0.7.1)
+Installing Yoga (0.0.0)
+Installing boost (1.84.0)
+Installing fast_float (8.0.0)
+Installing fmt (11.0.2)
+Installing glog (0.3.5)
+Installing hermes-engine (250829098.0.9)
+Ignoring digest-crc-0.7.0 because its extensions are not built. Try: gem pristine digest-crc --version 0.7.0
+Ignoring digest-crc-0.7.0 because its extensions are not built. Try: gem pristine digest-crc --version 0.7.0
+Installing op-sqlite (18.2.5)
+Installing react-native-document-picker (12.0.2)
+Installing react-native-get-random-values (2.0.0)
+Installing react-native-safe-area-context (5.10.0)
+Generating Pods project
+Setting USE_HERMES build settings
+Setting REACT_NATIVE_PATH build settings
+Setting SWIFT_ACTIVE_COMPILATION_CONDITIONS build settings
+[Ccache]: Removing Ccache from CC, LD, CXX & LDPLUSPLUS build settings
+[SPM] Cleaning old SPM dependencies from Pods project
+[SPM] Adding SPM dependencies to Pods project
+[Privacy Manifest Aggregation] Appending aggregated reasons to existing PrivacyInfo.xcprivacy file.
+[Privacy Manifest Aggregation] Reading .xcprivacy files to aggregate all used Required Reason APIs.
+Setting CLANG_CXX_LANGUAGE_STANDARD to c++20 on /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/mobile/ios/Heyta.xcodeproj
+find: /Users/rocalight/Desktop/All: No such file or directory
+find: in: No such file or directory
+find: one: No such file or directory
+find: Data/01_PROJECTS/heyta-wt-r111/apps/mobile/ios: No such file or directory
+
+==================== DEPRECATION NOTICE =====================
+Calling `pod install` directly is deprecated in React Native
+because we are moving away from Cocoapods toward alternative
+solutions to build the project.
+* If you are using Expo, please run:
+`npx expo run:ios`
+* If you are using the Community CLI, please run:
+`yarn ios`
+=============================================================
+
+Pod install took 88 [s] to run
+[heyta] 已对 fmt 关闭 consteval（Apple clang 21 兼容）
+Integrating client project
+
+[!] Please close any current Xcode sessions and use `Heyta.xcworkspace` for this project from now on.
+Pod installation complete! There are 84 dependencies from the Podfile and 83 total pods installed.
+
+[!] hermes-engine has added 1 script phase. Please inspect before executing a build. See `https://guides.cocoapods.org/syntax/podspec.html#script_phases` for more information.

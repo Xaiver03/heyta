@@ -1,0 +1,64 @@
+r118 · 第七趟四端重装的出处（每一行都是现量命令 + 那一刻的读数）
+
+载体（隔离 worktree，不是主检出）
+  命令：git -C "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111" rev-parse HEAD
+  读数：25f544bd1096ac48c73c57e38b8a9889bd30da14
+  起跑脏项：0（`git checkout --detach 25f544bd` 之后 `git status --porcelain` 无输出）
+  收尾脏项：1 枚 —— ` M apps/mobile/ios/Podfile.lock`（本趟 `pod install` 自己写脏的，见下）
+  体积：du -sh 现量 2.3G
+
+主检出（写这份证据包时所在的那一棵）
+  命令：cd <主检出> && git rev-parse HEAD
+  读数：031cf5bcdc48a2f5ecc770c3f44adac247f76e67
+  它与载体那一戳的差集（`git diff --name-only 25f544bd..HEAD`，5 个文件）：
+    BLOCKED.md
+    PROGRESS.md
+    docs/plans/inbound-automation.md
+    research/tools/verify-inbound-chain-ownership.py
+    server/tests/inbound-lane-rigs-consumers.spec.ts
+  这 5 枚是不是构建输入（`grep -rIl --include=*.ts --include=*.tsx --include=*.js --include=*.mjs --include=*.json <basename> apps packages`）：
+    BLOCKED.md -> 20 个文件命中，其中**只有** `apps/desktop/vite.config.ts` 是构建配置，
+                   而那一处是第 16 行的一句**注释**（`… 见 BLOCKED.md 里登记的收尾项`），不是 import；
+    其余 4 枚 -> apps/packages 命中 0。
+  ⇒ "四端仍等于当前产物"这句在收尾这一刻成立（差集里没有构建输入），**但它是这一格的读数，不是常驻状态**。
+
+跑法（一条命令可复跑，逐字见 run-r118.sh）
+  C="…/heyta-wt-r111" RT="$HOME/heyta-r118-reinstall"
+  git -C "$C" checkout --detach 25f544bd && mkdir -p "$RT" && cd "$C" && \
+    NO_COLOR=1 HEYTA_REINSTALL_TMP_DIR="$RT" IOS_DEVICE_NAME=heyta-iphone-17pro \
+    bash scripts/reinstall-all.sh > "$RT/reinstall.txt" 2>&1
+  旋钮：**不带 --only**（四端全跑）
+  落点必须先 mkdir，路径不许含空格（不给目录它 RC=4）。
+
+起跑时的机器状态（没为了让谁过去而调任何阈值）
+  load: 9.23 12.01 17.44（13:17 现量 `sysctl -n vm.loadavg` 那一刻）
+  磁盘余量：64Gi（起跑前 `df -g / | tail -1`）
+
+产物身份（新鲜度对账，逐字在 reinstall.txt / 各端日志）
+  mac：.app 内 web-dist 与本机 apps/web/dist 是同一次构建 —— 9 个 chunk 逐字对账
+  windows：远端收到 tar sha256=3ccb640fb5e481b9… 与本机逐字相同；
+           远端新鲜度对账 web-dist/index.html=a0225ebc55fc5c81… bridge=4dfc0d2f46524aa7… assets/*.js 7 枚一致；
+           install-capture.txt 里 PAYLOAD_INDEX_SHA=A0225EBC55FC5C81…（与本机 index.html 同一枚）
+  android：release APK 重打 80M → emulator-5554 全新安装（不保留数据）
+  ios：xcodebuild Release 重打 JS bundle → 模拟器全新安装 → 「✅ 已装的包比源码新」
+
+两处偏离（不藏）
+  1) ios 那一腿用的模拟器**不是** `IOS_DEVICE_NAME=heyta-iphone-17pro` 点名的那一枚。
+     日志原话：「⚠️ 名字含 "heyta-iphone-17pro" 的模拟器没有已启动的，但**只有一台**已启动 ⇒ 用它：
+     heyta-multiend-reinstall (EAAD1B66-80A3-4A51-957C-298DAF22F057)」。
+     ⇒ 这是脚本的兜底行为（只有一台在跑就用它），读数落在**另一台设备标识**上。
+  2) `pod install` 把载体的 `apps/mobile/ios/Podfile.lock` 写脏了 1 行（1 增 1 删，逐字见
+     podfile-lock-delta.txt）。⇒ 这一腿**不是**"只含已提交内容的隔离检出"那一档；
+     跑完之后那棵树 `git status --porcelain` 只剩这一枚文件。
+
+界面判据（每条都能红；数的是哪张图写在判据里）
+  mac：窗口 2318x1508；内容判据数的是壳自己 takeSnapshot 那张
+       （heyta-reinstall-mac-installed.png.webview.png）：内容 74.6%、主蓝命中 997
+  windows：1440x734、内容 69.0%、色阶 247、边缘 0.382；
+           install-capture.txt 判据 5 条全在位（ADD_APPX=OK / RESULT=OK / SHORTCUT_RESOLVES=True /
+           WINDOW_TITLE=heyta / PNG_SAVED=True bytes=198010）
+  android：1080x2400、内容 55.9%、主蓝 4042；前台由 `am start -W` 显式确认
+           （mCurrentFocus=Window{c4692cf u0 com.heyta/com.heytamobile.MainActivity}）
+  ios：1206x2622、内容 58.8%、主蓝 4091
+
+结果：REINSTALL_RC=0，汇总四行全 ✅（清旧包、重打、重装、有当前产物判据）

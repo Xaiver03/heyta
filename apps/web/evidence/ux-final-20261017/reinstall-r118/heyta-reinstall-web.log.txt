@@ -1,0 +1,39 @@
+$ tsc -b && vite build
+vite v7.3.6 building client environment for production...
+transforming...
+../../node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/regexes.js (74:0): A comment
+
+"/** Anchors a pattern source. The interpolation lives here rather than at the call site because
+ * esbuild will not drop a `@__PURE__` call whose own argument interpolates a variable, but it
+ * will drop `anchor(dateSource)`. Keeping it inline pinned `date` into every bundle. */"
+
+in "../../node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/regexes.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+../../node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/regexes.js (74:0): A comment
+
+"/** Anchors a pattern source. The interpolation lives here rather than at the call site because
+ * esbuild will not drop a `@__PURE__` call whose own argument interpolates a variable, but it
+ * will drop `anchor(dateSource)`. Keeping it inline pinned `date` into every bundle. */"
+
+in "../../node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/regexes.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+✓ 4263 modules transformed.
+rendering chunks...
+[plugin vite:reporter] 
+(!) /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/web/src/lib/native-widgets.ts is dynamically imported by /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/web/src/lib/local-data-destruction.ts but also statically imported by /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/web/src/features/settings/WidgetJourneyPanel.tsx, /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/web/src/main.tsx, dynamic import will not move module into another chunk.
+
+computing gzip size...
+dist/index.html                                       7.67 kB │ gzip:     3.69 kB
+dist/assets/sqlite3-opfs-async-proxy-Ck-yCayi.js     32.51 kB
+dist/assets/sqlite3-worker1-DdwV2TBQ.js             213.12 kB
+dist/assets/index-CYIBHm27.js                       215.10 kB
+dist/assets/storage.worker-C7krYGrE.js              242.14 kB
+dist/assets/sqlite3-Con_VOcu.wasm                   868.91 kB │ gzip:   403.57 kB
+dist/assets/index-4bg1EG-P.css                      147.86 kB │ gzip:    20.33 kB
+dist/assets/universal-slice-DcxF8XGw.js               1.05 kB │ gzip:     0.70 kB
+dist/assets/shell-host-Bc9iRaLu.js                    1.60 kB │ gzip:     0.84 kB
+dist/assets/index-B_MuE_qL.js                     4,080.54 kB │ gzip: 1,507.99 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 4.99s

@@ -1,0 +1,7 @@
+载体 = /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111
+载体 HEAD = 25f544bd1096ac48c73c57e38b8a9889bd30da14
+起跑脏项数 = 0（checkout --detach 25f544bd 之后现量）
+落点 = /Users/rocalight/heyta-r118-reinstall（不含空格）
+开关 = NO_COLOR=1 HEYTA_REINSTALL_TMP_DIR=/Users/rocalight/heyta-r118-reinstall IOS_DEVICE_NAME=heyta-iphone-17pro，**不带 --only**
+起跑 load = 9.23 12.01 17.44（13:17，未调任何阈值）
+磁盘余量（起跑前）= 64Gi

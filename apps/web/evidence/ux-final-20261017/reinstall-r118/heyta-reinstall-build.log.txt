@@ -1,0 +1,560 @@
+Scope: 21 of 22 workspace projects
+packages/ai build$ tsup
+packages/design-system build$ tsup
+packages/i18n build$ tsup
+packages/local-api build$ tsup
+packages/ai build: CLI Building entry: src/index.ts
+packages/ai build: CLI Using tsconfig: tsconfig.build.json
+packages/ai build: CLI tsup v8.5.1
+packages/ai build: CLI Using tsup config: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/packages/ai/tsup.config.ts
+packages/local-api build: CLI Building entry: src/index.ts
+packages/local-api build: CLI Using tsconfig: tsconfig.build.json
+packages/local-api build: CLI tsup v8.5.1
+packages/local-api build: CLI Using tsup config: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/packages/local-api/tsup.config.ts
+packages/i18n build: CLI Building entry: src/index.ts, src/provider.tsx, src/locales/en.ts, src/locales/zh-CN.ts
+packages/i18n build: CLI Using tsconfig: tsconfig.build.json
+packages/i18n build: CLI tsup v8.5.1
+packages/i18n build: CLI Using tsup config: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/packages/i18n/tsup.config.ts
+packages/design-system build: CLI Building entry: src/generate-cli.ts, src/index.ts, src/native.ts
+packages/design-system build: CLI Using tsconfig: tsconfig.build.json
+packages/ai build: CLI Target: es2022
+packages/design-system build: CLI tsup v8.5.1
+packages/design-system build: CLI Using tsup config: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/packages/design-system/tsup.config.ts
+packages/local-api build: CLI Target: es2022
+packages/local-api build: CLI Cleaning output folder
+packages/local-api build: ESM Build start
+packages/ai build: CLI Cleaning output folder
+packages/local-api build: CJS Build start
+packages/ai build: ESM Build start
+packages/ai build: CJS Build start
+packages/design-system build: CLI Target: es2022
+packages/i18n build: CLI Target: es2022
+packages/design-system build: CLI Cleaning output folder
+packages/design-system build: ESM Build start
+packages/design-system build: CJS Build start
+packages/i18n build: CLI Cleaning output folder
+packages/i18n build: ESM Build start
+packages/ai build: ESM dist/index.js     47.66 KB
+packages/ai build: ESM dist/index.js.map 134.83 KB
+packages/ai build: ESM ⚡️ Build success in 260ms
+packages/ai build: CJS dist/index.cjs     51.94 KB
+packages/ai build: CJS dist/index.cjs.map 140.41 KB
+packages/ai build: CJS ⚡️ Build success in 276ms
+packages/design-system build:  WARN  [33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1m"import.meta" is not available with the "cjs" output format and will be empty[0m [empty-import-meta]
+packages/design-system build:     src/generate-cli.ts:28:35:
+packages/design-system build: [37m      28 │ const HERE = dirname(fileURLToPath([32mimport.meta[37m.url));
+packages/design-system build:          ╵                                    [32m~~~~~~~~~~~[0m
+packages/design-system build:   You need to set the output format to "esm" for "import.meta" to work correctly.
+packages/local-api build: ESM dist/index.js     79.69 KB
+packages/local-api build: ESM dist/index.js.map 167.82 KB
+packages/local-api build: ESM ⚡️ Build success in 315ms
+packages/local-api build: CJS dist/index.cjs     82.78 KB
+packages/local-api build: CJS dist/index.cjs.map 171.76 KB
+packages/local-api build: CJS ⚡️ Build success in 313ms
+packages/design-system build: ESM dist/generate-cli.js       26.90 KB
+packages/design-system build: ESM dist/index.js              5.13 KB
+packages/design-system build: ESM dist/chunk-MZEZQK26.js     24.28 KB
+packages/design-system build: ESM dist/native.js             473.00 B
+packages/design-system build: ESM dist/chunk-RYDORZFH.js     14.69 KB
+packages/design-system build: ESM dist/generate-cli.js.map   47.79 KB
+packages/design-system build: ESM dist/index.js.map          11.47 KB
+packages/design-system build: ESM dist/native.js.map         71.00 B
+packages/design-system build: ESM dist/chunk-MZEZQK26.js.map 54.67 KB
+packages/design-system build: ESM dist/chunk-RYDORZFH.js.map 36.73 KB
+packages/design-system build: ESM ⚡️ Build success in 329ms
+packages/design-system build: CJS dist/index.cjs            43.83 KB
+packages/design-system build: CJS dist/native.cjs           16.08 KB
+packages/design-system build: CJS dist/generate-cli.cjs     42.49 KB
+packages/design-system build: CJS dist/native.cjs.map       36.82 KB
+packages/design-system build: CJS dist/generate-cli.cjs.map 89.32 KB
+packages/design-system build: CJS dist/index.cjs.map        104.93 KB
+packages/design-system build: CJS ⚡️ Build success in 330ms
+packages/i18n build: ESM dist/index.js              1.92 KB
+packages/i18n build: ESM dist/provider.js           335.00 B
+packages/i18n build: ESM dist/chunk-6ZDM2JGK.js     2.12 KB
+packages/i18n build: ESM dist/locales/en.js         92.00 B
+packages/i18n build: ESM dist/locales/zh-CN.js      99.00 B
+packages/i18n build: ESM dist/chunk-NT5WRSTL.js     419.43 KB
+packages/i18n build: ESM dist/chunk-DHF2BQXM.js     573.76 KB
+packages/i18n build: ESM dist/index.js.map          6.67 KB
+packages/i18n build: ESM dist/locales/en.js.map     71.00 B
+packages/i18n build: ESM dist/chunk-6ZDM2JGK.js.map 8.36 KB
+packages/i18n build: ESM dist/locales/zh-CN.js.map  71.00 B
+packages/i18n build: ESM dist/provider.js.map       71.00 B
+packages/i18n build: ESM dist/chunk-NT5WRSTL.js.map 500.30 KB
+packages/i18n build: ESM dist/chunk-DHF2BQXM.js.map 356.28 KB
+packages/i18n build: ESM ⚡️ Build success in 394ms
+packages/local-api build: DTS Build start
+packages/i18n build: DTS Build start
+packages/design-system build: DTS Build start
+packages/ai build: DTS Build start
+packages/ai build: DTS ⚡️ Build success in 3240ms
+packages/ai build: DTS dist/index.d.ts  57.63 KB
+packages/ai build: DTS dist/index.d.cts 57.63 KB
+packages/ai build: Done
+packages/shared-schema build$ tsup
+packages/local-api build: DTS ⚡️ Build success in 3320ms
+packages/local-api build: DTS dist/index.d.ts  44.01 KB
+packages/local-api build: DTS dist/index.d.cts 44.01 KB
+packages/local-api build: Done
+packages/sync-core build$ tsup
+packages/sync-core build: CLI Building entry: src/index.ts
+packages/sync-core build: CLI Using tsconfig: tsconfig.build.json
+packages/sync-core build: CLI tsup v8.5.1
+packages/sync-core build: CLI Using tsup config: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/packages/sync-core/tsup.config.ts
+packages/shared-schema build: CLI Building entry: src/index.ts
+packages/shared-schema build: CLI Using tsconfig: tsconfig.json
+packages/shared-schema build: CLI tsup v8.5.1
+packages/shared-schema build: CLI Using tsup config: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/packages/shared-schema/tsup.config.ts
+packages/sync-core build: CLI Target: es2022
+packages/shared-schema build: CLI Target: es2022
+packages/shared-schema build: CLI Cleaning output folder
+packages/shared-schema build: ESM Build start
+packages/shared-schema build: CJS Build start
+packages/design-system build: DTS ⚡️ Build success in 4072ms
+packages/design-system build: DTS dist/generate-cli.d.ts  13.00 B
+packages/design-system build: DTS dist/native.d.ts        13.35 KB
+packages/design-system build: DTS dist/index.d.ts         28.74 KB
+packages/design-system build: DTS dist/generate-cli.d.cts 13.00 B
+packages/design-system build: DTS dist/native.d.cts       13.35 KB
+packages/design-system build: DTS dist/index.d.cts        28.74 KB
+packages/sync-core build: CLI Cleaning output folder
+packages/sync-core build: ESM Build start
+packages/sync-core build: CJS Build start
+packages/sync-core build: ESM dist/index.mjs     90.07 KB
+packages/sync-core build: ESM dist/index.mjs.map 240.20 KB
+packages/sync-core build: ESM ⚡️ Build success in 71ms
+packages/sync-core build: CJS dist/index.js     97.31 KB
+packages/sync-core build: CJS dist/index.js.map 248.62 KB
+packages/sync-core build: CJS ⚡️ Build success in 91ms
+packages/shared-schema build: ESM dist/index.mjs     60.76 KB
+packages/shared-schema build: ESM dist/index.mjs.map 134.83 KB
+packages/shared-schema build: ESM ⚡️ Build success in 121ms
+packages/shared-schema build: CJS dist/index.js     75.26 KB
+packages/shared-schema build: CJS dist/index.js.map 145.83 KB
+packages/shared-schema build: CJS ⚡️ Build success in 128ms
+packages/design-system build: Done
+packages/shared-schema build: DTS Build start
+packages/sync-core build: DTS Build start
+packages/i18n build: DTS ⚡️ Build success in 4928ms
+packages/i18n build: DTS dist/index.d.ts         468.50 KB
+packages/i18n build: DTS dist/locales/en.d.ts    170.76 KB
+packages/i18n build: DTS dist/provider.d.ts      4.03 KB
+packages/i18n build: DTS dist/locales/zh-CN.d.ts 267.30 KB
+packages/i18n build: Done
+packages/shared-schema build: DTS ⚡️ Build success in 1451ms
+packages/shared-schema build: DTS dist/index.d.mts 84.32 KB
+packages/shared-schema build: DTS dist/index.d.ts  84.32 KB
+packages/shared-schema build: Done
+packages/sync-core build: DTS ⚡️ Build success in 1686ms
+packages/sync-core build: DTS dist/index.d.mts 75.55 KB
+packages/sync-core build: DTS dist/index.d.ts  75.55 KB
+packages/sync-core build: Done
+packages/domain build$ tsup
+packages/inbound-core build$ tsup
+packages/legal build$ tsup
+packages/storage build$ tsup
+packages/storage build: CLI Building entry: src/index.ts, src/sqlite/node-sqlite-driver.ts, src/sqlite/sqlite-wasm-driver.ts
+packages/storage build: CLI Using tsconfig: tsconfig.build.json
+packages/storage build: CLI tsup v8.5.1
+packages/storage build: CLI Using tsup config: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/packages/storage/tsup.config.ts
+packages/inbound-core build: CLI Building entry: src/index.ts
+packages/inbound-core build: CLI Using tsconfig: tsconfig.build.json
+packages/inbound-core build: CLI tsup v8.5.1
+packages/inbound-core build: CLI Using tsup config: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/packages/inbound-core/tsup.config.ts
+packages/domain build: CLI Building entry: src/index.ts
+packages/domain build: CLI Using tsconfig: tsconfig.build.json
+packages/domain build: CLI tsup v8.5.1
+packages/domain build: CLI Using tsup config: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/packages/domain/tsup.config.ts
+packages/legal build: CLI Building entry: src/index.ts
+packages/storage build: CLI Target: node22
+packages/legal build: CLI Using tsconfig: tsconfig.build.json
+packages/legal build: CLI tsup v8.5.1
+packages/legal build: CLI Using tsup config: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/packages/legal/tsup.config.ts
+packages/inbound-core build: CLI Target: es2022
+packages/storage build: CLI Cleaning output folder
+packages/domain build: CLI Target: es2022
+packages/storage build: ESM Build start
+packages/storage build: CJS Build start
+packages/domain build: CLI Cleaning output folder
+packages/inbound-core build: CLI Cleaning output folder
+packages/domain build: ESM Build start
+packages/domain build: CJS Build start
+packages/legal build: CLI Target: es2022
+packages/inbound-core build: ESM Build start
+packages/inbound-core build: CJS Build start
+packages/legal build: CLI Cleaning output folder
+packages/legal build: ESM Build start
+packages/legal build: CJS Build start
+packages/inbound-core build: ESM dist/index.js     23.24 KB
+packages/inbound-core build: ESM dist/index.js.map 43.86 KB
+packages/inbound-core build: ESM ⚡️ Build success in 79ms
+packages/inbound-core build: CJS dist/index.cjs     26.98 KB
+packages/inbound-core build: CJS dist/index.cjs.map 45.35 KB
+packages/inbound-core build: CJS ⚡️ Build success in 79ms
+packages/storage build: ESM dist/sqlite/node-sqlite-driver.js     1.71 KB
+packages/storage build: ESM dist/index.js                         87.82 KB
+packages/storage build: ESM dist/sqlite/sqlite-wasm-driver.js     5.08 KB
+packages/storage build: ESM dist/sqlite/node-sqlite-driver.js.map 3.53 KB
+packages/storage build: ESM dist/index.js.map                     212.25 KB
+packages/storage build: ESM dist/sqlite/sqlite-wasm-driver.js.map 14.46 KB
+packages/storage build: ESM ⚡️ Build success in 152ms
+packages/storage build: CJS dist/sqlite/sqlite-wasm-driver.cjs     6.87 KB
+packages/storage build: CJS dist/sqlite/node-sqlite-driver.cjs     2.79 KB
+packages/storage build: CJS dist/index.cjs                         90.22 KB
+packages/storage build: CJS dist/sqlite/sqlite-wasm-driver.cjs.map 14.53 KB
+packages/storage build: CJS dist/sqlite/node-sqlite-driver.cjs.map 3.56 KB
+packages/storage build: CJS dist/index.cjs.map                     213.17 KB
+packages/storage build: CJS ⚡️ Build success in 159ms
+packages/legal build: CJS dist/index.cjs     820.88 KB
+packages/legal build: CJS dist/index.cjs.map 578.01 KB
+packages/legal build: CJS ⚡️ Build success in 170ms
+packages/legal build: ESM dist/index.js     819.62 KB
+packages/legal build: ESM dist/index.js.map 577.93 KB
+packages/legal build: ESM ⚡️ Build success in 170ms
+packages/domain build: ESM dist/index.js     195.05 KB
+packages/domain build: ESM dist/index.js.map 570.63 KB
+packages/domain build: ESM ⚡️ Build success in 303ms
+packages/domain build: CJS dist/index.cjs     212.27 KB
+packages/domain build: CJS dist/index.cjs.map 574.54 KB
+packages/domain build: CJS ⚡️ Build success in 305ms
+packages/storage build: DTS Build start
+packages/inbound-core build: DTS Build start
+packages/legal build: DTS Build start
+packages/domain build: DTS Build start
+packages/inbound-core build: DTS ⚡️ Build success in 2056ms
+packages/inbound-core build: DTS dist/index.d.ts  9.06 KB
+packages/inbound-core build: DTS dist/index.d.cts 9.06 KB
+packages/inbound-core build: Done
+packages/legal build: DTS ⚡️ Build success in 2086ms
+packages/legal build: DTS dist/index.d.ts  6.87 KB
+packages/legal build: DTS dist/index.d.cts 6.87 KB
+packages/sync-client build$ tsup
+packages/legal build: Done
+packages/sync-client build: CLI Building entry: src/index.ts
+packages/sync-client build: CLI Using tsconfig: tsconfig.build.json
+packages/sync-client build: CLI tsup v8.5.1
+packages/sync-client build: CLI Using tsup config: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/packages/sync-client/tsup.config.ts
+packages/sync-client build: CLI Target: es2022
+packages/sync-client build: CLI Cleaning output folder
+packages/sync-client build: ESM Build start
+packages/sync-client build: CJS Build start
+packages/sync-client build: CJS dist/index.cjs     51.52 KB
+packages/sync-client build: CJS dist/index.cjs.map 132.16 KB
+packages/sync-client build: CJS ⚡️ Build success in 85ms
+packages/sync-client build: ESM dist/index.js     49.07 KB
+packages/sync-client build: ESM dist/index.js.map 131.45 KB
+packages/sync-client build: ESM ⚡️ Build success in 85ms
+packages/domain build: DTS ⚡️ Build success in 2849ms
+packages/domain build: DTS dist/index.d.ts  210.10 KB
+packages/domain build: DTS dist/index.d.cts 210.10 KB
+packages/storage build: DTS ⚡️ Build success in 2872ms
+packages/storage build: DTS dist/index.d.ts                      53.70 KB
+packages/storage build: DTS dist/sqlite/node-sqlite-driver.d.ts  1.17 KB
+packages/storage build: DTS dist/sqlite/sqlite-wasm-driver.d.ts  7.10 KB
+packages/storage build: DTS dist/sqlite-driver-DBOWTgRZ.d.ts     2.86 KB
+packages/storage build: DTS dist/index.d.cts                     53.70 KB
+packages/storage build: DTS dist/sqlite/node-sqlite-driver.d.cts 1.17 KB
+packages/storage build: DTS dist/sqlite/sqlite-wasm-driver.d.cts 7.10 KB
+packages/storage build: DTS dist/sqlite-driver-DBOWTgRZ.d.cts    2.86 KB
+packages/domain build: Done
+packages/storage build: Done
+packages/sync-client build: DTS Build start
+packages/sync-client build: DTS ⚡️ Build success in 1186ms
+packages/sync-client build: DTS dist/index.d.ts  35.10 KB
+packages/sync-client build: DTS dist/index.d.cts 35.10 KB
+packages/sync-client build: Done
+apps/landing build$ node scripts/gen-entries.mjs && tsc -b && vite build
+packages/op-log build$ tsup
+packages/widget-core build$ tsup
+packages/ui build$ tsup
+apps/landing build: (node:10792) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+apps/landing build: (Use `node --trace-warnings ...` to show where the warning was created)
+packages/op-log build: CLI Building entry: src/index.ts
+packages/op-log build: CLI Using tsconfig: tsconfig.build.json
+packages/op-log build: CLI tsup v8.5.1
+packages/op-log build: CLI Using tsup config: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/packages/op-log/tsup.config.ts
+packages/op-log build: CLI Target: es2022
+packages/op-log build: CLI Cleaning output folder
+packages/widget-core build: CLI Building entry: src/index.ts
+packages/op-log build: ESM Build start
+packages/op-log build: CJS Build start
+packages/widget-core build: CLI Using tsconfig: tsconfig.build.json
+packages/widget-core build: CLI tsup v8.5.1
+packages/widget-core build: CLI Using tsup config: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/packages/widget-core/tsup.config.ts
+packages/widget-core build: CLI Target: es2022
+packages/widget-core build: CLI Cleaning output folder
+packages/widget-core build: ESM Build start
+packages/widget-core build: CJS Build start
+packages/ui build: CLI Building entry: src/index.ts, src/node.ts
+packages/ui build: CLI Using tsconfig: tsconfig.build.json
+packages/ui build: CLI tsup v8.5.1
+packages/ui build: CLI Using tsup config: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/packages/ui/tsup.config.ts
+packages/ui build: CLI Target: es2022
+packages/ui build: CLI Cleaning output folder
+packages/ui build: ESM Build start
+packages/ui build: CJS Build start
+packages/op-log build: ESM dist/index.js     38.61 KB
+packages/op-log build: ESM dist/index.js.map 83.10 KB
+packages/op-log build: ESM ⚡️ Build success in 91ms
+packages/op-log build: CJS dist/index.cjs     40.46 KB
+packages/op-log build: CJS dist/index.cjs.map 82.80 KB
+packages/op-log build: CJS ⚡️ Build success in 95ms
+packages/widget-core build: CJS dist/index.cjs     31.71 KB
+packages/widget-core build: CJS dist/index.cjs.map 84.58 KB
+packages/widget-core build: CJS ⚡️ Build success in 102ms
+packages/widget-core build: ESM dist/index.js     28.83 KB
+packages/widget-core build: ESM dist/index.js.map 82.19 KB
+packages/widget-core build: ESM ⚡️ Build success in 107ms
+packages/ui build: CJS dist/node.cjs      11.22 KB
+packages/ui build: CJS dist/index.cjs     924.57 KB
+packages/ui build: CJS dist/node.cjs.map  82.65 KB
+packages/ui build: CJS dist/index.cjs.map 1.62 MB
+packages/ui build: CJS ⚡️ Build success in 254ms
+packages/ui build: ESM dist/node.js               737.00 B
+packages/ui build: ESM dist/chunk-R7WO5HZZ.js     28.80 KB
+packages/ui build: ESM dist/index.js              835.53 KB
+packages/ui build: ESM dist/chunk-R7WO5HZZ.js.map 94.12 KB
+packages/ui build: ESM dist/node.js.map           71.00 B
+packages/ui build: ESM dist/index.js.map          1.51 MB
+packages/ui build: ESM ⚡️ Build success in 322ms
+packages/op-log build: DTS Build start
+packages/widget-core build: DTS Build start
+packages/ui build: DTS Build start
+apps/landing build: vite v7.3.6 building client environment for production...
+apps/landing build: transforming...
+packages/widget-core build: DTS ⚡️ Build success in 1532ms
+packages/widget-core build: DTS dist/index.d.ts  31.07 KB
+packages/widget-core build: DTS dist/index.d.cts 31.07 KB
+packages/widget-core build: Done
+packages/op-log build: DTS ⚡️ Build success in 1848ms
+packages/op-log build: DTS dist/index.d.ts  16.28 KB
+packages/op-log build: DTS dist/index.d.cts 16.28 KB
+packages/op-log build: Done
+apps/landing build: ✓ 2234 modules transformed.
+apps/landing build: rendering chunks...
+apps/landing build: computing gzip size...
+apps/landing build: dist/en/docs/how/index.html                       6.54 kB │ gzip:   3.21 kB
+apps/landing build: dist/docs/how/index.html                          6.55 kB │ gzip:   3.21 kB
+apps/landing build: dist/docs/account/index.html                      6.56 kB │ gzip:   3.20 kB
+apps/landing build: dist/en/docs/conflict/index.html                  6.58 kB │ gzip:   3.21 kB
+apps/landing build: dist/docs/conflict/index.html                     6.59 kB │ gzip:   3.20 kB
+apps/landing build: dist/docs/reminders/index.html                    6.59 kB │ gzip:   3.22 kB
+apps/landing build: dist/docs/selfhost/index.html                     6.59 kB │ gzip:   3.21 kB
+apps/landing build: dist/docs/passphrase/index.html                   6.59 kB │ gzip:   3.21 kB
+apps/landing build: dist/docs/privacy/index.html                      6.60 kB │ gzip:   3.21 kB
+apps/landing build: dist/docs/first-run/index.html                    6.60 kB │ gzip:   3.21 kB
+apps/landing build: dist/docs/repeat/index.html                       6.60 kB │ gzip:   3.22 kB
+apps/landing build: dist/en/docs/first-run/index.html                 6.60 kB │ gzip:   3.21 kB
+apps/landing build: dist/en/docs/privacy/index.html                   6.61 kB │ gzip:   3.22 kB
+apps/landing build: dist/en/docs/account/index.html                   6.61 kB │ gzip:   3.22 kB
+apps/landing build: dist/en/docs/concepts/index.html                  6.62 kB │ gzip:   3.22 kB
+apps/landing build: dist/signin/index.html                            6.62 kB │ gzip:   3.22 kB
+apps/landing build: dist/docs/concepts/index.html                     6.63 kB │ gzip:   3.22 kB
+apps/landing build: dist/docs/trash/index.html                        6.64 kB │ gzip:   3.22 kB
+apps/landing build: dist/en/signin/index.html                         6.65 kB │ gzip:   3.22 kB
+apps/landing build: dist/en/docs/selfhost/index.html                  6.65 kB │ gzip:   3.22 kB
+apps/landing build: dist/en/changelog/index.html                      6.65 kB │ gzip:   3.23 kB
+apps/landing build: dist/en/docs/repeat/index.html                    6.66 kB │ gzip:   3.22 kB
+apps/landing build: dist/en/docs/reminders/index.html                 6.67 kB │ gzip:   3.23 kB
+apps/landing build: dist/en/docs/passphrase/index.html                6.69 kB │ gzip:   3.22 kB
+apps/landing build: dist/docs/loss/index.html                         6.69 kB │ gzip:   3.24 kB
+apps/landing build: dist/en/docs/trash/index.html                     6.70 kB │ gzip:   3.23 kB
+apps/landing build: dist/en/docs/loss/index.html                      6.70 kB │ gzip:   3.23 kB
+apps/landing build: dist/en/docs/views/index.html                     6.71 kB │ gzip:   3.23 kB
+apps/landing build: dist/en/docs/automation/index.html                6.73 kB │ gzip:   3.24 kB
+apps/landing build: dist/docs/views/index.html                        6.74 kB │ gzip:   3.23 kB
+apps/landing build: dist/changelog/index.html                         6.74 kB │ gzip:   3.24 kB
+apps/landing build: dist/docs/automation/index.html                   6.78 kB │ gzip:   3.25 kB
+apps/landing build: dist/en/docs/trust/index.html                     6.83 kB │ gzip:   3.26 kB
+apps/landing build: dist/docs/trust/index.html                        6.86 kB │ gzip:   3.27 kB
+apps/landing build: dist/docs/start/index.html                        6.86 kB │ gzip:   3.29 kB
+apps/landing build: dist/docs/data/index.html                         6.86 kB │ gzip:   3.27 kB
+apps/landing build: dist/docs/sync/index.html                         6.88 kB │ gzip:   3.28 kB
+apps/landing build: dist/en/features/index.html                       6.90 kB │ gzip:   3.26 kB
+apps/landing build: dist/docs/transfer/index.html                     6.90 kB │ gzip:   3.27 kB
+apps/landing build: dist/integrations/index.html                      6.91 kB │ gzip:   3.23 kB
+apps/landing build: dist/docs/organize/index.html                     6.94 kB │ gzip:   3.29 kB
+apps/landing build: dist/features/index.html                          6.94 kB │ gzip:   3.27 kB
+apps/landing build: dist/en/integrations/index.html                   6.96 kB │ gzip:   3.25 kB
+apps/landing build: dist/en/index.html                                6.98 kB │ gzip:   3.23 kB
+apps/landing build: dist/en/docs/transfer/index.html                  7.00 kB │ gzip:   3.29 kB
+apps/landing build: dist/legal/permissions/index.html                 7.01 kB │ gzip:   3.27 kB
+apps/landing build: dist/index.html                                   7.02 kB │ gzip:   3.23 kB
+apps/landing build: dist/download/index.html                          7.04 kB │ gzip:   3.27 kB
+apps/landing build: dist/en/docs/start/index.html                     7.05 kB │ gzip:   3.33 kB
+apps/landing build: dist/en/legal/permissions/index.html              7.06 kB │ gzip:   3.30 kB
+apps/landing build: dist/en/docs/data/index.html                      7.06 kB │ gzip:   3.30 kB
+apps/landing build: dist/en/docs/sync/index.html                      7.06 kB │ gzip:   3.29 kB
+apps/landing build: dist/en/download/index.html                       7.08 kB │ gzip:   3.27 kB
+apps/landing build: dist/legal/terms/index.html                       7.12 kB │ gzip:   3.31 kB
+apps/landing build: dist/en/docs/organize/index.html                  7.17 kB │ gzip:   3.34 kB
+apps/landing build: dist/legal/ai-and-transfer/index.html             7.17 kB │ gzip:   3.31 kB
+apps/landing build: dist/legal/minors/index.html                      7.22 kB │ gzip:   3.33 kB
+apps/landing build: dist/legal/data-rights/index.html                 7.26 kB │ gzip:   3.36 kB
+apps/landing build: dist/en/legal/data-rights/index.html              7.33 kB │ gzip:   3.35 kB
+apps/landing build: dist/legal/third-parties/index.html               7.38 kB │ gzip:   3.35 kB
+apps/landing build: dist/en/legal/minors/index.html                   7.38 kB │ gzip:   3.35 kB
+apps/landing build: dist/en/legal/terms/index.html                    7.41 kB │ gzip:   3.34 kB
+apps/landing build: dist/legal/personal-info-list/index.html          7.41 kB │ gzip:   3.36 kB
+apps/landing build: dist/en/legal/ai-and-transfer/index.html          7.42 kB │ gzip:   3.36 kB
+apps/landing build: dist/legal/subscription-refund/index.html         7.43 kB │ gzip:   3.35 kB
+apps/landing build: dist/en/legal/third-parties/index.html            7.50 kB │ gzip:   3.37 kB
+apps/landing build: dist/en/legal/personal-info-list/index.html       7.50 kB │ gzip:   3.37 kB
+apps/landing build: dist/en/legal/privacy/index.html                  7.55 kB │ gzip:   3.37 kB
+apps/landing build: dist/legal/privacy/index.html                     7.59 kB │ gzip:   3.38 kB
+apps/landing build: dist/en/legal/subscription-refund/index.html      7.60 kB │ gzip:   3.37 kB
+apps/landing build: dist/platforms/index.html                         7.63 kB │ gzip:   3.41 kB
+apps/landing build: dist/en/platforms/index.html                      7.72 kB │ gzip:   3.41 kB
+apps/landing build: dist/pricing/index.html                           8.40 kB │ gzip:   3.78 kB
+apps/landing build: dist/en/pricing/index.html                        8.53 kB │ gzip:   3.79 kB
+apps/landing build: dist/docs/index.html                             13.15 kB │ gzip:   5.53 kB
+apps/landing build: dist/en/docs/index.html                          13.59 kB │ gzip:   5.51 kB
+apps/landing build: dist/assets/main-D-cYP4h_.css                    97.57 kB │ gzip:  13.90 kB
+apps/landing build: dist/assets/SyncScene-DN6BvVUf.js                 4.87 kB │ gzip:   2.21 kB
+apps/landing build: dist/assets/zh-CN-DqPCLIi3.js                   332.15 kB │ gzip: 106.43 kB
+apps/landing build: dist/assets/en-VT0Cu1gf.js                      346.84 kB │ gzip:  98.78 kB
+apps/landing build: dist/assets/three-E1hU0WNZ.js                   525.04 kB │ gzip: 130.95 kB
+apps/landing build: dist/assets/main-_iKWRW7l.js                  1,033.22 kB │ gzip: 363.50 kB
+apps/landing build: ✓ built in 4.39s
+apps/landing build: (!) Some chunks are larger than 500 kB after minification. Consider:
+apps/landing build: - Using dynamic import() to code-split the application
+apps/landing build: - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+apps/landing build: - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+apps/landing build: Done
+packages/ui build: DTS ⚡️ Build success in 6093ms
+packages/ui build: DTS dist/index.d.ts          320.92 KB
+packages/ui build: DTS dist/node.d.ts           779.00 B
+packages/ui build: DTS dist/node-DhrvxEhv.d.ts  55.01 KB
+packages/ui build: DTS dist/index.d.cts         320.92 KB
+packages/ui build: DTS dist/node.d.cts          780.00 B
+packages/ui build: DTS dist/node-DhrvxEhv.d.cts 55.01 KB
+packages/ui build: Done
+packages/app-host build$ tsup
+packages/app-host build: CLI Building entry: src/index.ts
+packages/app-host build: CLI Using tsconfig: tsconfig.build.json
+packages/app-host build: CLI tsup v8.5.1
+packages/app-host build: CLI Using tsup config: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/packages/app-host/tsup.config.ts
+packages/app-host build: CLI Target: es2022
+packages/app-host build: CLI Cleaning output folder
+packages/app-host build: ESM Build start
+packages/app-host build: ESM dist/index.js     462.16 KB
+packages/app-host build: ESM dist/index.js.map 1.13 MB
+packages/app-host build: ESM ⚡️ Build success in 68ms
+packages/app-host build: DTS Build start
+packages/app-host build: DTS ⚡️ Build success in 1840ms
+packages/app-host build: DTS dist/index.d.ts 319.16 KB
+packages/app-host build: Done
+server build$ prisma generate && tsc
+apps/node-host build$ tsup
+apps/web build$ tsc -b && vite build
+apps/node-host build: CLI Building entry: src/cli-ai.ts, src/cli-local-api.ts, src/cli-mcp.ts, src/cli.ts, src/index.ts
+apps/node-host build: CLI Using tsconfig: tsconfig.build.json
+apps/node-host build: CLI tsup v8.5.1
+apps/node-host build: CLI Using tsup config: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/node-host/tsup.config.ts
+apps/node-host build: CLI Target: node22
+apps/node-host build: CLI Cleaning output folder
+apps/node-host build: ESM Build start
+apps/node-host build: ESM dist/cli-ai.js             197.00 B
+apps/node-host build: ESM dist/index.js              4.03 KB
+apps/node-host build: ESM dist/cli-local-api.js      5.98 KB
+apps/node-host build: ESM dist/cli-mcp.js            3.50 KB
+apps/node-host build: ESM dist/cli.js                56.88 KB
+apps/node-host build: ESM dist/chunk-Y5ZOT2U5.js     4.01 KB
+apps/node-host build: ESM dist/chunk-ZT5GTVLQ.js     6.10 KB
+apps/node-host build: ESM dist/chunk-NOLVH4SK.js     3.57 KB
+apps/node-host build: ESM dist/chunk-IYOPULWP.js     3.08 KB
+apps/node-host build: ESM dist/index.js.map          8.49 KB
+apps/node-host build: ESM dist/cli-ai.js.map         71.00 B
+apps/node-host build: ESM dist/chunk-Y5ZOT2U5.js.map 9.23 KB
+apps/node-host build: ESM dist/cli-mcp.js.map        6.23 KB
+apps/node-host build: ESM dist/cli-local-api.js.map  11.14 KB
+apps/node-host build: ESM dist/chunk-ZT5GTVLQ.js.map 21.02 KB
+apps/node-host build: ESM dist/cli.js.map            77.37 KB
+apps/node-host build: ESM dist/chunk-NOLVH4SK.js.map 7.08 KB
+apps/node-host build: ESM dist/chunk-IYOPULWP.js.map 8.04 KB
+apps/node-host build: ESM ⚡️ Build success in 35ms
+server build: Prisma schema loaded from prisma/schema.prisma
+apps/node-host build: DTS Build start
+server build: ✔ Generated Prisma Client (v5.22.0) to ./../node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0/node_modules/@prisma/client in 642ms
+server build: Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+server build: Tip: Need your database queries to be 1000x faster? Accelerate offers you that and more: https://pris.ly/tip-2-accelerate
+apps/node-host build: DTS ⚡️ Build success in 2168ms
+apps/node-host build: DTS dist/cli.d.ts                            13.00 B
+apps/node-host build: DTS dist/cli-ai.d.ts                         1.85 KB
+apps/node-host build: DTS dist/cli-local-api.d.ts                  1.88 KB
+apps/node-host build: DTS dist/cli-mcp.d.ts                        877.00 B
+apps/node-host build: DTS dist/index.d.ts                          14.67 KB
+apps/node-host build: DTS dist/keychain-secret-store-H9U9PyLy.d.ts 3.15 KB
+apps/node-host build: Done
+apps/web build: vite v7.3.6 building client environment for production...
+apps/web build: transforming...
+apps/web build: ../../node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/regexes.js (74:0): A comment
+apps/web build: "/** Anchors a pattern source. The interpolation lives here rather than at the call site because
+apps/web build:  * esbuild will not drop a `@__PURE__` call whose own argument interpolates a variable, but it
+apps/web build:  * will drop `anchor(dateSource)`. Keeping it inline pinned `date` into every bundle. */"
+apps/web build: in "../../node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/regexes.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+server build: Done
+apps/web build: ../../node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/regexes.js (74:0): A comment
+apps/web build: "/** Anchors a pattern source. The interpolation lives here rather than at the call site because
+apps/web build:  * esbuild will not drop a `@__PURE__` call whose own argument interpolates a variable, but it
+apps/web build:  * will drop `anchor(dateSource)`. Keeping it inline pinned `date` into every bundle. */"
+apps/web build: in "../../node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/regexes.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+apps/web build: ✓ 4263 modules transformed.
+apps/web build: rendering chunks...
+apps/web build: [plugin vite:reporter] 
+apps/web build: (!) /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/web/src/lib/native-widgets.ts is dynamically imported by /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/web/src/lib/local-data-destruction.ts but also statically imported by /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/web/src/features/settings/WidgetJourneyPanel.tsx, /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/web/src/main.tsx, dynamic import will not move module into another chunk.
+apps/web build: computing gzip size...
+apps/web build: dist/index.html                                       7.67 kB │ gzip:     3.69 kB
+apps/web build: dist/assets/sqlite3-opfs-async-proxy-Ck-yCayi.js     32.51 kB
+apps/web build: dist/assets/sqlite3-worker1-DdwV2TBQ.js             213.12 kB
+apps/web build: dist/assets/index-CYIBHm27.js                       215.10 kB
+apps/web build: dist/assets/storage.worker-C7krYGrE.js              242.14 kB
+apps/web build: dist/assets/sqlite3-Con_VOcu.wasm                   868.91 kB │ gzip:   403.57 kB
+apps/web build: dist/assets/index-4bg1EG-P.css                      147.86 kB │ gzip:    20.33 kB
+apps/web build: dist/assets/universal-slice-DcxF8XGw.js               1.05 kB │ gzip:     0.70 kB
+apps/web build: dist/assets/shell-host-Bc9iRaLu.js                    1.60 kB │ gzip:     0.84 kB
+apps/web build: dist/assets/index-B_MuE_qL.js                     4,080.54 kB │ gzip: 1,507.99 kB
+apps/web build: ✓ built in 6.83s
+apps/web build: (!) Some chunks are larger than 500 kB after minification. Consider:
+apps/web build: - Using dynamic import() to code-split the application
+apps/web build: - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+apps/web build: - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+apps/web build: Done
+apps/desktop build$ tsup && vite build
+apps/desktop build: CLI Building entry: {"main":"src/main.ts","preload":"src/preload.ts","smoke":"src/smoke.ts"}
+apps/desktop build: CLI Using tsconfig: tsconfig.json
+apps/desktop build: CLI tsup v8.5.1
+apps/desktop build: CLI Using tsup config: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r111/apps/desktop/tsup.config.ts
+apps/desktop build: CLI Target: node22
+apps/desktop build: CLI Cleaning output folder
+apps/desktop build: CJS Build start
+apps/desktop build: CJS dist/preload.cjs     1.44 KB
+apps/desktop build: CJS dist/main.cjs        1.59 MB
+apps/desktop build: CJS dist/smoke.cjs       1.59 MB
+apps/desktop build: CJS dist/preload.cjs.map 3.77 KB
+apps/desktop build: CJS dist/main.cjs.map    4.86 MB
+apps/desktop build: CJS dist/smoke.cjs.map   4.86 MB
+apps/desktop build: CJS ⚡️ Build success in 431ms
+apps/desktop build: vite v7.3.6 building client environment for production...
+apps/desktop build: transforming...
+apps/desktop build: ../../node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/util.js (400:0): A comment
+apps/desktop build: "// Wrapped in a `@__PURE__` IIFE: esbuild never tree-shakes a top-level initializer that contains a member access on `Number`, so the bare object literal survived into every bundle."
+apps/desktop build: in "../../node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/util.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+apps/desktop build: ../../node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/regexes.js (74:0): A comment
+apps/desktop build: "/** Anchors a pattern source. The interpolation lives here rather than at the call site because
+apps/desktop build:  * esbuild will not drop a `@__PURE__` call whose own argument interpolates a variable, but it
+apps/desktop build:  * will drop `anchor(dateSource)`. Keeping it inline pinned `date` into every bundle. */"
+apps/desktop build: in "../../node_modules/.pnpm/zod@4.6.5/node_modules/zod/v4/core/regexes.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+apps/desktop build: ✓ 2358 modules transformed.
+apps/desktop build: rendering chunks...
+apps/desktop build: computing gzip size...
+apps/desktop build: ../renderer-dist/index.html                     1.37 kB │ gzip:   0.94 kB
+apps/desktop build: ../renderer-dist/assets/index-CW1iJB56.css     12.49 kB │ gzip:   3.13 kB
+apps/desktop build: ../renderer-dist/assets/index-DlL_AieS.js   1,079.40 kB │ gzip: 422.72 kB
+apps/desktop build: (!) Some chunks are larger than 500 kB after minification. Consider:
+apps/desktop build: - Using dynamic import() to code-split the application
+apps/desktop build: - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+apps/desktop build: - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+apps/desktop build: ✓ built in 1.77s
+apps/desktop build: Done
