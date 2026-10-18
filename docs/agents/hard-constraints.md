@@ -56,7 +56,7 @@ node research/tools/license-inventory.mjs      # 非零退出 = 有不合格依�
 
 - **一个用户意图 = 一个 op。**
 - **被回放/来自远端的 op 不得再次触发副作用。** 否则会出现"同步回来又写一遍"的双向灾难。
-- **op-log 是唯一写入口**：UI 不得绕开它直接改状态。详见 [`P1 计划`](../../docs/plans/phase-1-single-client-loop.md) 的 D4。
+- **op-log 是唯一写入口**：UI 不得绕开它直接改状态。详见 [`P1 计划`](../../docs/plans/archive/phase-1-single-client-loop.md) 的 D4。
 - 多实体变更要**在一次操作里完成**，不要 fan-out 成多个 op。
 
 > 依据：上游 `src/app/op-log/` 那 5 万行是**用真实故障换来的规格书**。改动同步逻辑前先读它，
