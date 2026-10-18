@@ -331,6 +331,14 @@ PY
   `pnpm check:mobile-settings` ⇒ **rc=0**，`pnpm check:mobile-ai-anchors` ⇒ **rc=2**。最后那枚**不归本趟那笔改动**：
   把 `scripts/verify-mobile-ai.sh` 换成 `HEAD` 那一版复跑同一道门，`SUMMARY … 脚本锚点=19 按字面命中=9 按模式命中=4 未匹配=6`
   与改后**逐字相同**、退出码同为 2，六枚未匹配全在 1678–2078 行（`tool-input / ai-tool-send / breakdown-*`），没一枚在本趟动过的那一段。
+- 🔴 **10-18 05:1x 交接时的验证状态（本轮最后两趟 r126 / r127）**：r126 那批读数（2×2 四格 + 两台载体各 14/14 绿）已入库，
+  它照出来的那枚假绿形状落进环境陷阱 **#463**；`NO_COLOR=1 pnpm check:docs` 当时**红过一次、按链接形状修好后 rc=0**
+  （红因是 `BLOCKED.md` 里把"目录 + 文件名"拆开写的那条链接，**没有放宽判据**）。
+  🔴 **r127 那一趟没有任何读数** —— 它阻塞在取证装置自己的依赖上（§三 那一格），所以"哪些门绿"这句话**不覆盖**批量操作条那一格：
+  那一格现在是**未裁决**，既不是绿也不是红。
+  ⚠️ 两句仍然成立、别被复述成新结论：**整条 `pnpm check` 本轮没有在合并态载体上重跑**；
+  `pnpm -r build` 在当前 HEAD **判红**（两条别线根因，§四 第 34 行）⇒ "从最终源码四端构建重装"那一格现在是**可判且判红**，
+  不许被读成"那一格只是没验"。
 - 在册红：#39（`check:image-license`，不在本线射程）、`packages/i18n` 那枚"中文表每条都含汉字"对专名（`macOS`/`iOS`/`Android`）的红、
   根 `package.json` 那对重复 `"check"` 键（口径归所有者）、`check:mobile-ai-anchors` rc=2（那六枚未匹配 + `AssistantScreen` 取不到发送锚点，归对话式 AI 助手那一线）、
   `check:verify-script-copy` 剩下的那枚 `verify-mobile-ai.sh:1666`（`c8f63370` 改了语义，判据口径不代改）；
