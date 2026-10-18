@@ -301,7 +301,7 @@ ADR-0020 §4.1 要 `check-pricing-consistency.mjs` 把「恰好一个 priceId」
 
 具体清单：
 
-1. `curl -sL https://heyta.finlaw.cloud/` → 200，且 HTML 里能数到**两个付费项的价格**
+1. `curl -sL https://heyta.waytofuture.cn/` → 200，且 HTML 里能数到**两个付费项的价格**
    （`¥5 / 月` 与 `¥12 / 月`）与「自建永久免费（全部功能）」的说法。
 2. 从 HTML 里抽出所有 `src=` / `href=` 的**根绝对路径**，逐个请求：
    `.css` → `text/css`、`.js` → `application/javascript`、`favicon.svg` → `image/svg+xml`。
@@ -330,7 +330,7 @@ ADR-0020 §4.1 要 `check-pricing-consistency.mjs` 把「恰好一个 priceId」
 | 新增 AI 条款里的价格没被扫（`LEGAL` 只读一份） | §4.1 第 4 条：`LEGAL` 改成读两份 |
 | 注入式反例变成"永远绿"（假通过） | §2 第 5 步：**先看每个变异红**，再看整体绿 |
 | 落地页部署后又出现"资源 404" | §5 的判据 2 就是专门防这个的 |
-| 线上要回滚 | nginx 配置已在 `ubuntu-jcli:~/heyta-tmp.nginx.orig-20260927-114609`；落地页产物有 `~/heyta-landing-backup-*.tgz`。⚠️ **2026-09-27 之后**：域名已迁到 `heyta.finlaw.cloud`，回滚要同时换 `~/heyta/server/.env` 与两份站点文件（清单见 [deployment.md §7.1](../runbooks/deployment.md)） |
+| 线上要回滚 | nginx 配置已在 `ubuntu-jcli:~/heyta-tmp.nginx.orig-20260927-114609`；落地页产物有 `~/heyta-landing-backup-*.tgz`。⚠️ **2026-09-30 起**：入口已迁到 `heyta.waytofuture.cn`（旧域名 `heyta.finlaw.cloud` **仍在服务**，见 [deployment.md §3.3.1](../runbooks/deployment.md)），回滚要同时换 `~/heyta/server/.env` 与两份站点文件（清单见 [deployment.md §7.1](../runbooks/deployment.md)） |
 
 ---
 

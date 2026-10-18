@@ -56,16 +56,20 @@
    只证到代码层。**仍然没上过真机**（需要签名）。
 
 **应用本体的部署**（在此之前它**从来没有被部署过**）：
-`https://heyta.finlaw.cloud/app/`。方式与两个必须记住的坑见
-[`deployment.md §3.7`](../../docs/runbooks/deployment.md)。两个要点：
+`https://heyta.waytofuture.cn/app/`（2026-09-30 从 `heyta.finlaw.cloud` 迁来）。方式与
+两个必须记住的坑见 [`deployment.md §3.7`](../../docs/runbooks/deployment.md)。两个要点：
 
 - 🔴 **`vite build --base=/app/` 不能省** —— 默认 `base` 的资源是根绝对路径，
   挂在 `/app/` 下会去请求落地页的路径、拿回 HTML 而不是样式表，现象是控制台报
   **样式表 MIME 是 `text/html`**。
-- 🔴 **测试阶段唯一的域名是 `heyta.finlaw.cloud`**（2026-09-27 从
-  `heyta-tmp.litopia.space` 完整迁来，见 deployment §3.7.1）：落地页（`/`）、
-  应用（`/app/`）、同步 API（`/api/`）、三张凭据页都在它下面。
-  旧域名只保留同步服务端（`/api/`、`/health`、Connect 页）与**入口的 301** ——
+- 🔴 **当前入口是 `heyta.waytofuture.cn`**（2026-09-30 从 `heyta.finlaw.cloud` 迁来，
+  见 deployment §3.7.2）：落地页（`/`）、应用（`/app/`）、同步 API（`/api/`）、
+  三张凭据页都在它下面。
+  ⚠️ **但旧域名 `heyta.finlaw.cloud` 没有退场** —— 2026-10-18 实测它 `/`、`/en/`、
+  `/app/`、`/health` **全部 200**（**不是** 301）。⇒ 迁移只做完了「入口的选择」，
+  没做完「旧入口的收口」；停在旧域名上的访客**能打开应用、但 passkey 登录不了**。
+  更早的 `heyta-tmp.litopia.space` 只保留同步服务端（`/api/`、`/health`、Connect 页）
+  与**入口的 301**（🔴 那条 301 今天仍写死指向 `heyta.finlaw.cloud`）——
   API 端点刻意不做重定向，301 会把 POST 改写成 GET、无声打断正在同步的客户端。
 
 **服务端镜像没有重建**：`server/` 里的品牌改动（SuperSync / Super Productivity → heyta）

@@ -27,16 +27,24 @@
 
 | 文件 | 线上路径 |
 |---|---|
-| `heyta.finlaw.cloud.conf` | `/etc/nginx/sites-available/heyta.finlaw.cloud` |
-| `heyta.waytofuture.cn.conf` | `/etc/nginx/sites-available/heyta.waytofuture.cn` |
+| `heyta.waytofuture.cn.conf` | `/etc/nginx/sites-available/heyta.waytofuture.cn` ← 🔴 **脚本默认比对的就是这一份** |
+| `heyta.finlaw.cloud.conf` | `/etc/nginx/sites-available/heyta.finlaw.cloud` —— ⚠️ **正在退役**（见下） |
 
-⚠️ **脚本的默认值是 `heyta.finlaw.cloud`**（那台机器上先有的域名）。要核对/应用**当前
-面向用户的那个域名**，必须显式给远端路径，否则比对的是旧域名那份：
+🔴 **2026-10-18：脚本的默认远端路径已从 `heyta.finlaw.cloud` 改成 `heyta.waytofuture.cn`。**
+`finlaw.cloud` 只是本产品的**过渡域名**，业主已决定**直接删掉、不做 301 重定向**
+（见 [`deployment.md` §3.3.1](../../../docs/runbooks/deployment.md)）。改默认值之前默认指向的是
+那台机器上先有的域名 —— 那时要核对**当前**域名必须显式给路径；现在**反过来了**，
+要比对即将退役的那一份才需要显式给：
 
 ```bash
-HEYTA_NGINX_REMOTE_PATH=/etc/nginx/sites-available/heyta.waytofuture.cn \
+HEYTA_NGINX_REMOTE_PATH=/etc/nginx/sites-available/heyta.finlaw.cloud \
   server/scripts/nginx-sync.sh --check
 ```
+
+⚠️ **还有一份没纳管**：`/etc/nginx/sites-available/apiheyta.waytofuture.cn`
+（对外 API 域名，2026-09-30 新建）**不在仓库里** —— 也就是说「线上到底有哪些 location
+可被 diff」这个目录存在的理由，在那个域名上**仍然是失效的**（与 `heyta.waytofuture.cn`
+在 2026-10-02 之前的状态一样）。
 
 ⚠️ **`heyta.waytofuture.cn.conf` 是 2026-10-02 才纳管的**：域名迁移那轮（2026-09-30）
 把配置直接改在服务器上，仓库副本一直没进库 —— 也就是说这个目录存在的理由（"让线上

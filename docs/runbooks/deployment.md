@@ -1,9 +1,34 @@
 # 运维与部署现状
 
-> **最后实测：2026-09-30（CST）对 §3.7.2 与线上入口（`heyta.waytofuture.cn`）；
-> §3.7.1 仍是 2026-09-27 的实测；其余章节仍为 2026-09-26 的实测。**
-> 🔴 **对外入口自 2026-09-30 起是 `https://heyta.waytofuture.cn/`**，
-> `heyta.finlaw.cloud` 只作回滚路径（不是入口）。
+> **最后实测：2026-10-18（CST）对「两个域名今天各自还在不在服务」那一格（§3.1、§3.6）；
+> 2026-09-30 对 §3.7.2 与线上入口；§3.7.1 仍是 2026-09-27 的实测；其余章节仍为 2026-09-26 的实测。**
+> 🔴 **对外入口自 2026-09-30 起是 `https://heyta.waytofuture.cn/`**。
+> ⚠️ **但"旧域名只作回滚路径"这句是错的** —— 2026-10-18 实测 `heyta.finlaw.cloud`
+> 仍是**一个完整在服务的第二入口**（`/`、`/en/`、`/app/`、`/health` 全部 **200**，
+> 证书 `CN=heyta.finlaw.cloud` 有效至 2026-12-25），且 `heyta-tmp.litopia.space`
+> 的入口 301 **仍指向它、不是新域名**。⇒ **域名收口没做完**：
+> ① 旧域名没有 301 到新域名（它在**自己服务**，不是回滚路径）；
+> ② `heyta-tmp` 的 301 目标没改（实测 `→ https://heyta.finlaw.cloud/…`）；
+> ③ 旧域名下的 passkey 已不可用（`WEBAUTHN_RP_ID` 只能有一个，已是新域名），
+> 所以停在这个域名上的访客会撞上一个**能打开、但登录不了**的应用。
+> 三条的判据与实测命令见 §3.6。
+>
+> 🔴 **2026-10-18 业主裁决：不做 301 重定向，直接删掉。** `finlaw.cloud` 只是本产品的
+> **过渡域名**，**不需要**搬进 waytofuture 账号（DNSPod 里域名归属不能就地改账号）。
+> 删除清单（**待确认后执行**）：
+> ① nginx：`nginx.conf` 第 68 行那条 include + `sites-enabled/heyta.finlaw.cloud` 软链 +
+> `sites-available/heyta.finlaw.cloud`（删前先备份）；② 证书 `certbot delete --cert-name heyta.finlaw.cloud`；
+> ③ DNS：`finlaw.cloud` 区里的 `heyta` A 记录（**default 账号**，RecordId `2419295096`）；
+> ④ 仓库：删 `server/deploy/nginx/heyta.finlaw.cloud.conf`
+> （`server/scripts/nginx-sync.sh` 的默认远端路径**已改成当前域名**）。
+>
+> ⚠️ **删之前必须先处理两条依赖**（都已实测，不是推测）：
+> ㈠ `e2e/legal-links`（`pnpm verify:legal-links`）拿旧域名当「另一台真服务端」的靶子
+> （`legal-links.spec.ts` 的 `OTHER_SERVER`）—— 已实测 `heyta-tmp.litopia.space` 在它那两条
+> 判据上**行为逐字相同**（`/terms.html` → `404` JSON 82 B、`/privacy.html` → `404` JSON 84 B），
+> 所以换靶子是一行的事，**但忘了换这套判据会红**；
+> ㈡ `heyta-tmp` 的 301 目标**写死**指向旧域名（服务器上 `heyta-tmp` 第 32/33/38/39 行），
+> 旧域名一删，那条 301 就是死链 ⇒ `heyta-tmp` 要么一起删、要么把目标改成当前入口。
 > 本文只讲「哪台机器、跑什么、对外地址、怎么核实」，**不讲 heyta 的应用源码**。
 > 应用怎么构建、怎么本地跑，见 [`local-server-verification.md`](local-server-verification.md)；
 > 多端产物见 [`../reference/build-matrix.md`](../reference/build-matrix.md)。
@@ -154,21 +179,26 @@
 ### 3.1 拓扑
 
 ```
-                     DNS: heyta.finlaw.cloud      A 124.223.13.226  (RecordId 2419295096)  ← 唯一域名
+                     DNS: heyta.waytofuture.cn   A 124.223.13.226  (RecordId 2421537933)  ← 当前入口
+                          heyta.finlaw.cloud     A 124.223.13.226  (RecordId 2419295096)  ← ⚠️ 仍在服务
                           heyta-tmp.litopia.space A 124.223.13.226  (RecordId 2419225598)  ← 已弃用
                                         │
                                         ▼
         ┌──────────────────────── ubuntu-jcli  124.223.13.226 ────────────────────────┐
         │  宿主机 nginx 1.18.0   :443 (TLS, certbot)  ──►  :80 → 301 https              │
         │      │                                                                        │
-        │      ├── sites-enabled/heyta.finlaw.cloud   ← **唯一域名**（2026-09-27 起）      │
+        │      ├── sites-enabled/heyta.waytofuture.cn  ← **当前入口**（2026-09-30 起）    │
         │      │     ├── /               → 落地页 root /var/www/heyta-landing/           │
         │      │     ├── /app/           → alias /var/www/heyta-app/   (apps/web 产物)   │
         │      │     ├── /api/           → proxy_pass 127.0.0.1:1900 （含 WS 升级头）     │
         │      │     └── /verify-email · /recover-passkey · /magic-login → 同一 proxy    │
         │      │                                                                        │
+        │      ├── sites-enabled/heyta.finlaw.cloud  ← ⚠️ **不是回滚路径，仍在完整服务**   │
+        │      │     └── 与当前入口同构，只差 server_name 与证书路径（§3.3.1）             │
+        │      │           🔴 停在这里的访客能打开应用、**但 passkey 登录不了**            │
+        │      │                                                                        │
         │      └── sites-enabled/heyta-tmp   ← **已弃用**（留作回滚路径）                  │
-        │            ├── /app* /landing* → 301 → https://heyta.finlaw.cloud/            │
+        │            ├── /app* /landing* → 301 → https://heyta.finlaw.cloud/ ← 🔴 未收口 │
         │            └── / · /api/ · /health → proxy_pass 127.0.0.1:1900 （端点，不 301） │
         │                                    │                                           │
         │                          docker: supersync-server  (supersync:local, healthy)  │
@@ -213,15 +243,29 @@
 
 **机器上有两个 heyta 站点**（✅ 实测）：
 
-| `/etc/nginx/nginx.conf` 行 | include | 角色（2026-09-27 起） |
+| `/etc/nginx/nginx.conf` 行 | include | 角色 |
 |---|---|---|
 | 67 | `sites-enabled/heyta-tmp;` | **已弃用** —— 只留同步端点 + 入口 301（§3.3.2） |
-| 68 | `sites-enabled/heyta.finlaw.cloud;` | **唯一域名** —— 落地页 + 应用 + API + 凭据页（§3.3.1） |
+| 68 | `sites-enabled/heyta.finlaw.cloud;` | ⚠️ **旧域名，但今天仍在完整服务**（**不是**回滚路径）—— 见 §3.3.1 |
+| 69 | `sites-enabled/heyta.waytofuture.cn;` | 🔴 **当前入口**（2026-09-30 起）—— 落地页 + 应用 + 应用自用的 `/api/` |
+| 70 | `sites-enabled/apiheyta.waytofuture.cn;` | `apiheyta.waytofuture.cn` —— **对外**的 API 地址（2026-09-30 新建） |
+
+> 🔴 **行号已按 2026-10-18 实测更新**：原表写「角色（2026-09-27 起）」且只有 67/68 两行 ——
+> **漏了 69/70**，而这两行正是 2026-09-30 迁域名时加的。实测：
+> `ssh ubuntu-jcli 'grep -n include /etc/nginx/nginx.conf'`。
 
 🔴 这个 include **不是 `sites-enabled/*` 通配**，是逐行手写的白名单（60–68 行）：
 新增站点必须手动加一行，否则 `nginx -t` 照样通过、站点却根本不生效。
 
-#### 3.3.1 `heyta.finlaw.cloud`（唯一域名）
+#### 3.3.1 `heyta.finlaw.cloud` —— ⚠️ **旧域名，2026-10-18 实测仍在完整服务**
+
+> 🔴 **本节标题原写「（唯一域名）」，那是 2026-09-27 → 09-30 的事实，已过期。**
+> 2026-10-18 实测：`https://heyta.finlaw.cloud/`、`/en/`、`/app/`、`/health` **全部 200**
+> （证书 `CN=heyta.finlaw.cloud`，有效至 **2026-12-25**）—— 它**不是**回滚路径，
+> 是一个**完整在服务的第二入口**。**当前入口**是 `heyta.waytofuture.cn`（§3.7.2）。
+> ⚠️ 停在这个域名上的访客**能打开应用、但 passkey 登录不了**：`WEBAUTHN_RP_ID`
+> 只能取一个值，现在取的是新域名（§3.7.1 解释了为什么不能两边兼容）。
+> 判据与复跑命令见 §3.6。
 
 - ✅ `server_name heyta.finlaw.cloud;`、`client_max_body_size 64m;`
 - ✅ `location /` → `root /var/www/heyta-landing;` + SPA 兜底 `try_files $uri $uri/ /index.html`
@@ -402,7 +446,7 @@ compose 里还有一批**未在 `.env` 中设置、走默认值**的键（`HOST`
 
 ### 3.6 公网实测结果
 
-**唯一域名 `heyta.waytofuture.cn`（2026-09-30 起）：**
+**旧域名 `heyta.finlaw.cloud`（下表是 2026-09-27 的实测；⚠️ 它今天仍在服务，见 §3.3.1）：**
 
 | 请求 | 结果 | 来源 |
 |---|---|---|
@@ -416,7 +460,37 @@ compose 里还有一批**未在 `.env` 中设置、走默认值**的键（`HOST`
 | `GET https://heyta.finlaw.cloud/health` | `200` `application/json` + `{"status":"ok","db":"connected",…}` | ✅ 2026-09-27（当天补的，见下） |
 | `GET https://heyta.finlaw.cloud/live` | `200` `application/json` + `{"status":"ok"}` | ✅ 2026-09-27（当天补的，见下） |
 
-🔴 **`/health` 和 `/live` 是 2026-09-27 补上的 —— 在那之前它们在唯一域名上是坏的。**
+**两个域名今天（2026-10-18）各自的状态 —— 逐条实测：**
+
+| 请求 | `heyta.waytofuture.cn`（🔴 当前入口） | `heyta.finlaw.cloud`（⚠️ 旧域名） |
+|---|---|---|
+| `GET /` | `200` `text/html` | `200` `text/html` |
+| `GET /en/` | `200` | `200` |
+| `GET /app/` | `200` `text/html` | `200` `text/html` |
+| `GET /app` | `301` → `/app/` | `301` → `/app/` |
+| `GET /health` | `200` `application/json` | `200` `application/json` |
+| 证书 | `CN=heyta.waytofuture.cn`，至 **2026-12-29** | `CN=heyta.finlaw.cloud`，至 **2026-12-25** |
+
+> 🔴 **结论：旧域名不是"回滚路径"，是第二个完整在服务的入口。** 所以"域名已迁完"
+> 这个说法只对**入口的选择**成立（应用/服务端的 `WEBAUTHN_RP_ID`、canonical 都指新域名），
+> 对**旧域名本身**不成立。复跑（本机必须带 `--noproxy '*'`）：
+> `curl -s --noproxy '*' -o /dev/null -w '%{http_code}\n' https://heyta.finlaw.cloud/app/`
+> ⇒ 今天是 **200**；**哪天变成 `301` 才说明收口做完了。**
+
+**`heyta-tmp.litopia.space` 的入口 301 目标（2026-10-18 实测）—— 🔴 仍指向旧域名：**
+
+| 请求 | 结果 |
+|---|---|
+| `GET /app/` | `301` → `https://heyta.finlaw.cloud/app/` |
+| `GET /app?lang=en` | `301` → `https://heyta.finlaw.cloud/app?lang=en` |
+| `GET /landing/` | `301` → `https://heyta.finlaw.cloud/` |
+| `GET /` | `200`（同步服务端 Connect 页 —— 端点，刻意不 301） |
+
+> 🔴 服务器上 `/etc/nginx/sites-available/heyta-tmp` 第 **32/33/38/39** 行**写死了**
+> `https://heyta.finlaw.cloud…`（2026-10-18 `sudo -n grep` 实测）。⇒ 弃用链把人送到的
+> **不是**当前入口。这是域名收口的三条待办之一（另两条见本文档头与 §3.3.1）。
+
+🔴 **`/health` 和 `/live` 是 2026-09-27 补上的 —— 在那之前它们在当轮那个唯一域名上是坏的。**
 
 新域名的 `location /` 属于落地页（`try_files ... /index.html`），而服务端只在根路径暴露
 两个健康入口（`server/src/server.ts:460` 的 `/health`、`:483` 的 `/live`）。**这两个
@@ -477,7 +551,7 @@ location ~ ^/(health|live)$ {
 | 静态根目录 | `/var/www/heyta-app/`（`ubuntu:ubuntu`）—— 两次迁移**都没动**这个目录，换的只是它挂在哪个域名下 |
 | 为什么放这个域名 | 与同步服务端**同源**：`WEBAUTHN_RP_ID` / `WEBAUTHN_ORIGIN` / `CORS_ORIGINS` 都指向它，passkey 才能用（§3.7.1 解释了为什么不能再挂第二个域名） |
 | nginx 片段 | `/etc/nginx/sites-available/heyta.waytofuture.cn` —— 应用（`/app/`）、同步 API（`/api/`）与三张凭据页都在这里；`heyta.finlaw.cloud` 那份保留但**不是入口** |
-| 旧地址 | `https://heyta-tmp.litopia.space/app/` 与 `https://heyta.finlaw.cloud/app/` 都**不再提供服务**（两者都留作回滚路径，passkey 均不可用：RP ID 只能有一个，见 §3.7.1） |
+| 旧地址 | `https://heyta-tmp.litopia.space/app/` 现在 **301 到旧域名**；而 `https://heyta.finlaw.cloud/app/` ⚠️ **2026-10-18 实测仍是 `200` —— 它还在服务**（原文写"不再提供服务"是错的）。两者都**不是**当前入口，且 **passkey 均不可用**（RP ID 只能有一个，见 §3.7.1） |
 
 #### 重新发布的三条命令
 
@@ -558,8 +632,8 @@ rsync -az --delete apps/landing/dist/ ubuntu-jcli:/var/www/heyta-landing/
 （同步出错时的「查看帮助」、托管到期提示里的「价格与订阅」）。它们指向站点 ——
 判据在 `apps/web/src/lib/site-url.ts`。
 
-那个文件**默认取应用自己的来源**（`window.location.origin`），因为 §3.3.1 定的是
-**唯一域名**：站点住 `/`、应用住 `/app/`。所以"站点在应用所在来源的根上"是一个
+那个文件**默认取应用自己的来源**（`window.location.origin`），因为当前入口是
+**单域名**：站点住 `/`、应用住 `/app/`。所以"站点在应用所在来源的根上"是一个
 已知事实，不是猜一个域名。`VITE_SITE_URL` 只给**分域名部署**那种形态留口子：
 
 ```bash
@@ -917,7 +991,7 @@ rsync -az --delete apps/web/dist/ ubuntu-jcli:/var/www/heyta-app/
 
 **为什么迁。** 测试阶段要有**一个**固定域名，不能把入口挂在一个被文档标成"临时资产"
 的域名上。迁完 `heyta.finlaw.cloud` 同时提供落地页（`/`）、应用（`/app/`）、
-同步 API（`/api/`）和三张凭据页，是测试阶段唯一的域名。
+同步 API（`/api/`）和三张凭据页，是**当轮**（2026-09-27）测试阶段唯一的域名。
 
 **为什么不能只把应用挂过去、API 留在 tmp。** 🔴 应用与同步服务端做 WebAuthn
 时**必须同源**：`WEBAUTHN_RP_ID` 只能取一个值，而 `finlaw.cloud` 与 `litopia.space`
@@ -1960,10 +2034,15 @@ server/scripts/nginx-sync.sh --apply    # 仓库 → 线上（先备份、先 ng
 | **`heyta-tmp`** | A | **`124.223.13.226`**（ubuntu-jcli） | **2419225598** | 2026-09-26 12:29:39 | ⚠️ **已弃用**（§7.1）—— 入口已 301 到 `heyta.finlaw.cloud` |
 | `@` ×2 | NS | `library.dnspod.net.` / `fair.dnspod.net.` | — | — |
 
-> ✅ **唯一域名的 A 记录在另一个区**（`finlaw.cloud`，DomainId `98829969`）：
-> `heyta` A `124.223.13.226`，RecordId **`2419295096`**，TTL 600。
-> 它与 `heyta-tmp` **指向同一个 IP**，所以 2026-09-27 的域名迁移
-> **一条 DNS 记录都没改** —— 卡点自始至终在 nginx 与 `.env`（§3.7.1）。
+> 🔴 **`heyta` 的 A 记录现在有两条，落在两个不同的腾讯云账号里**（2026-10-18 实测）：
+> · `waytofuture.cn`（**waytofuture 账号** `100050005585`）：`heyta` A `124.223.13.226`，
+>   RecordId **`2421537933`**，TTL 600 —— **当前入口**；
+> · `finlaw.cloud`（**default 账号** `100044381704`，DomainId `98829969`）：
+>   `heyta` A `124.223.13.226`，RecordId **`2419295096`**，TTL 600 —— 旧域名，**仍在服务**。
+> 它们与 `heyta-tmp` **指向同一个 IP**，所以 2026-09-27 与 2026-09-30 两次域名迁移
+> **都一条 A 记录都没改** —— 卡点自始至终在 nginx 与 `.env`（§3.7.1 / §3.7.2）。
+> ⚠️ 所以「DNS 已经在 waytofuture 名下了」这句话**只对当前入口成立**：
+> 旧域名的解析仍由 **default 账号**的 `finlaw.cloud` 区管着。
 
 🔴 **与旧线索的关键差异**：旧记录说 `@`/`api`/`dev`/`staging`/`studio`/`docs` 都指向 OPP（`121.4.24.238`）。
 **现在不是了** —— 这 6 条在 **2026-09-26 13:39** 已经被改到 sanjiaozhou（`101.34.250.109`）。
@@ -2031,7 +2110,7 @@ server/scripts/nginx-sync.sh --apply    # 仓库 → 线上（先备份、先 ng
 
 ### 7.1 `heyta-tmp.litopia.space` 已弃用（2026-09-27）
 
-**它不再是任何东西的入口。** 测试阶段唯一的域名是 `https://heyta.finlaw.cloud/`
+**它不再是任何东西的入口。** ⚠️ 但它今天的 301 目标**仍写死旧域名**（实测 `→ https://heyta.finlaw.cloud/…`，见 §3.6）。当前入口是 `https://heyta.waytofuture.cn/`
 （落地页 + 应用 + 同步 API + 三张凭据页，§3.7.1）。旧域名现在的角色只有两个：
 `/app*` 与 `/landing*` 做 **301** 跳过去；`/`、`/api/`、`/health` 仍直连同步服务端
 （刻意**不** 301 —— 301 会把 POST 改写成 GET，见 §3.3.2）。
@@ -2176,7 +2255,9 @@ ssh ubuntu-jcli 'docker inspect supersync-postgres --format "{{.Config.Image}} {
 ssh ubuntu-jcli 'docker ps -a --format "{{.Names}} {{.Status}}" | grep -i caddy || echo "no caddy container"'
 
 # nginx 片段与 include 位置
-ssh ubuntu-jcli 'cat /etc/nginx/sites-available/heyta.finlaw.cloud'   # 唯一域名
+ssh ubuntu-jcli 'cat /etc/nginx/sites-available/heyta.waytofuture.cn'   # 🔴 当前入口
+ssh ubuntu-jcli 'cat /etc/nginx/sites-available/heyta.finlaw.cloud'     # ⚠️ 旧域名，仍在服务（§3.3.1）
+ssh ubuntu-jcli 'cat /etc/nginx/sites-available/apiheyta.waytofuture.cn' # 对外 API 域名
 ssh ubuntu-jcli 'cat /etc/nginx/sites-available/heyta-tmp'            # 已弃用（端点 + 入口 301）
 ssh ubuntu-jcli 'grep -n include /etc/nginx/nginx.conf'
 ssh ubuntu-jcli 'sudo -n nginx -t'
@@ -2192,14 +2273,18 @@ ssh ubuntu-jcli 'sed -E "s/=.*/=<REDACTED>/" ~/heyta/server/.env'
 ### 8.4 公网端点（**必须 `--noproxy '*'`**）
 
 ```bash
-# ── 唯一域名 heyta.finlaw.cloud：落地页 / 应用 / API / 凭据页 ──────────
-curl --noproxy '*' -sS -m 15 -w '\nHTTP %{http_code}\n' https://heyta.finlaw.cloud/health
-curl --noproxy '*' -sS -m 15 -o /dev/null -w 'HTTP %{http_code}\n' https://heyta.finlaw.cloud/app/
-curl --noproxy '*' -sS -m 15 -o /dev/null -D - https://heyta.finlaw.cloud/app     # 期望 301 → /app/（带 $is_args$args）
+# ── 🔴 当前入口 heyta.waytofuture.cn：落地页 / 应用 / API / 凭据页 ──────
+curl --noproxy '*' -sS -m 15 -w '\nHTTP %{http_code}\n' https://heyta.waytofuture.cn/health
+curl --noproxy '*' -sS -m 15 -o /dev/null -w 'HTTP %{http_code}\n' https://heyta.waytofuture.cn/app/
+curl --noproxy '*' -sS -m 15 -o /dev/null -D - https://heyta.waytofuture.cn/app     # 期望 301 → /app/（带 $is_args$args）
 # 凭据页必须是**服务端**响应（400 Token is required），不是落地页的 HTML
-curl --noproxy '*' -sS -m 15 -w '\nHTTP %{http_code}\n' https://heyta.finlaw.cloud/recover-passkey
+curl --noproxy '*' -sS -m 15 -w '\nHTTP %{http_code}\n' https://heyta.waytofuture.cn/recover-passkey
 
-# ── 旧域名 heyta-tmp.litopia.space：入口 301、端点直连 ─────────────────
+# ── ⚠️ 旧域名 heyta.finlaw.cloud：2026-10-18 实测**仍在完整服务**（不是回滚路径）──
+#    这组是**收口回归判据**：等它开始 301 到当前入口，才说明收口做完了。
+curl --noproxy '*' -sS -m 15 -o /dev/null -w 'HTTP %{http_code}\n' https://heyta.finlaw.cloud/app/   # 当日 200
+
+# ── 已弃用 heyta-tmp.litopia.space：入口 301（🔴 目标仍是旧域名）、端点直连 ─
 curl --noproxy '*' -sS -m 15 -o /dev/null -D - https://heyta-tmp.litopia.space/app/    # 期望 301
 curl --noproxy '*' -sS -m 15 -w '\nHTTP %{http_code}\n' https://heyta-tmp.litopia.space/health  # 期望 200，**不能**是 301
 curl --noproxy '*' -sS -m 15 -o /dev/null -D - http://124.223.13.226/health            # 期望 404
@@ -2221,8 +2306,12 @@ tccli dnspod DescribeRecordList --Domain litopia.space --output json
 tccli dnspod DescribeRecordList --Domain litopia.space --output json \
   | python3 -c 'import json,sys;[print(f"{r[\"Name\"]:<20}{r[\"Type\"]:<6}{r[\"Value\"]:<45}id={r[\"RecordId\"]}upd={r[\"UpdatedOn\"]}") for r in json.load(sys.stdin)["RecordList"]]'
 
-# 唯一域名的 A 记录在**另一个区**（finlaw.cloud，DomainId 98829969）
-tccli dnspod DescribeRecordList --Domain finlaw.cloud --output json \
+# 🔴 两个区各有一条 heyta 的 A 记录，而且在**不同账号**里：
+#    当前入口 waytofuture.cn 在 waytofuture 账号；旧域名 finlaw.cloud 在 default 账号
+tccli dnspod DescribeRecordList --Domain waytofuture.cn --profile waytofuture --output json \
+  | python3 -c 'import json,sys;[print(f"{r[\"Name\"]:<20}{r[\"Type\"]:<6}{r[\"Value\"]:<30}id={r[\"RecordId\"]}") for r in json.load(sys.stdin)["RecordList"] if r["Name"]=="heyta"]'
+# 旧域名那份：
+tccli dnspod DescribeRecordList --Domain finlaw.cloud --profile default --output json \
   | python3 -c 'import json,sys;[print(f"{r[\"Name\"]:<20}{r[\"Type\"]:<6}{r[\"Value\"]:<30}id={r[\"RecordId\"]}") for r in json.load(sys.stdin)["RecordList"] if r["Name"]=="heyta"]'
 
 # 判断域名到底解析到哪台机器：在远端查，别在本机 dig
