@@ -54,6 +54,31 @@ export function formalizeLegalText(value: string): string {
   return FORMAL_WORDING.reduce((current, [from, to]) => current.replaceAll(from, to), value);
 }
 
+/**
+ * 「关于」页那一行：**运营者主体名 · ICP 备案号 ·（核准后）App 备案号**。
+ *
+ * 🔴 它是**一处实现、两个壳共用**（web 的 `HelpPanel` 与移动端的 `SettingsScreen`）。
+ * 各写一遍的话，最可能漂移的恰恰是那个**空值分支** —— 而它正是法务管着的地方。
+ *
+ * 🔴 **为什么它必须是纯函数**：隐私政策承诺「App 备案号**以应用内「关于」页与服务端
+ * 对外页公布者为准**」，而 2026-10-16 查实该字段在这之前 **UI 侧零消费者** ——
+ * 核准那天光填字段，它不会出现在任何地方。把它抽成纯函数，这条"会不会漏显示"
+ * 才有**可离线复跑**的判据（移动端 `tests/` 下没有 RN 渲染设施，组件本身测不了）。
+ *
+ * ⚠️ `appFilingNumber` 为 `null` 时**只少一段，绝不放占位**：
+ * 法务明文"不印任何号码，也不编一个看起来合理的占位"，
+ * 而 `structure.spec.ts` 有一条双向判据同时禁占位与漂移。
+ */
+export function operatorFilingLine(operator: {
+  readonly name: string;
+  readonly icpNumber: string;
+  readonly appFilingNumber: string | null;
+}): string {
+  return [operator.name, operator.icpNumber, operator.appFilingNumber]
+    .filter((part): part is string => typeof part === 'string' && part !== '')
+    .join(' · ');
+}
+
 function sectionNumbers(sections: readonly LegalSection[]): ReadonlyMap<string, string> {
   const numbers = new Map<string, string>();
   const walk = (items: readonly LegalSection[], prefix = ''): void => {

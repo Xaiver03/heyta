@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { LEGAL_DOCUMENTS, legalDocumentById, legalDocumentPresentation, legalSetVersion } from '../src/index.js';
-import { formalizeLegalText } from '../src/presentation.js';
+import { formalizeLegalText, operatorFilingLine } from '../src/presentation.js';
 import type { LegalSection } from '../src/types.js';
 
 const ids = (sections: readonly LegalSection[]): string[] => sections.flatMap((s) => [s.id, ...ids(s.subsections ?? [])]);
@@ -113,5 +113,41 @@ describe('法律文本展示与同意事实分离', () => {
         }
       }
     }
+  });
+});
+
+/**
+ * `operatorFilingLine` —— 「关于」页那一行（两个壳共用同一份实现）。
+ *
+ * 🔴 这一组钉的是**空值分支**，因为它是法务管着的那一格：
+ * 隐私政策承诺「App 备案号以应用内「关于」页与服务端对外页公布者为准」，
+ * 而未核准时明文要求「不印任何号码，也不编一个看起来合理的占位」。
+ * 各壳各拼一遍的话，最先漂的就是这里 —— 所以它必须是**一处实现**。
+ */
+describe('operatorFilingLine', () => {
+  const base = { name: '某公司', icpNumber: '浙ICP备2026081423号' };
+
+  it('🔴 未核准 ⇒ 只剩主体名与 ICP 号，**不出现占位、也不多一个分隔符**', () => {
+    const line = operatorFilingLine({ ...base, appFilingNumber: null });
+
+    expect(line).toBe('某公司 · 浙ICP备2026081423号');
+    // 空值不许变成 "null" / "undefined" / " · " 这类占位
+    expect(line).not.toContain('null');
+    expect(line).not.toContain('undefined');
+    expect(line.endsWith(' · ')).toBe(false);
+    expect(line.split(' · ')).toHaveLength(2);
+  });
+
+  it('✅ 已核准 ⇒ 三段齐了，顺序是 主体 · ICP · App', () => {
+    const line = operatorFilingLine({ ...base, appFilingNumber: '浙ICP备2026081423号-2A' });
+
+    expect(line).toBe('某公司 · 浙ICP备2026081423号 · 浙ICP备2026081423号-2A');
+    expect(line.split(' · ')).toHaveLength(3);
+  });
+
+  it('⚠️ 空串按"没有"处理（配置写了个空串不该在界面上多一个分隔符）', () => {
+    expect(operatorFilingLine({ ...base, appFilingNumber: '' })).toBe(
+      '某公司 · 浙ICP备2026081423号',
+    );
   });
 });
