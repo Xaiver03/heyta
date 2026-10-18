@@ -55,6 +55,91 @@ import {
   wrapAndStoreShareKey,
 } from './share-key-store.js';
 
+/**
+ * 本视图的样式：**模块级常量**，不再写成 `style={{…}}` 内联对象。
+ *
+ * 🔴 依据 `scripts/check-l4-no-style.mjs` 的断言 C：L4 视图
+ * （`apps/web/src/features/**`，除 `shell`）的内联样式**只减不增**。
+ * 内联对象每次渲染都新建、也拿不到浏览器对静态样式的缓存；而这些取值全部
+ * 是常量（`cssVar()` / `text()` 都是模块加载期可求值的纯函数），没有任何
+ * 依赖 props/state 的项 —— 所以它们本来就该住在模块级。
+ *
+ * ⚠️ 取值仍然是 `cssVar('…')`，**没有引入任何裸值**：断言 A/B
+ * （`check:l4`）与 `check:design` 照旧盯着这些行（搬位置不改变字面量）。
+ */
+const styles = {
+  /** 遮罩：铺满视口、居中卡片、吃掉所有点击（点空白处关闭）。 */
+  overlay: {
+    position: 'fixed',
+    inset: 0,
+    background: cssVar('color.overlay'),
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: cssVar('space.4'),
+    zIndex: cssVar('z.modal'),
+  },
+  dialog: {
+    width: '100%',
+    maxWidth: cssVar('layout.modal-max'),
+    maxHeight: '90vh',
+    overflowY: 'auto',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cssVar('space.4'),
+    background: cssVar('color.surface-raised'),
+    borderRadius: cssVar('radius.lg'),
+    boxShadow: cssVar('shadow.lg'),
+    padding: cssVar('space.6'),
+    color: cssVar('color.foreground'),
+  },
+  headRow: { display: 'flex', alignItems: 'flex-start', gap: cssVar('space.3') },
+  headText: { flex: 1, minWidth: 0 },
+  /** 对话框自己的页标题（不是整页标题，所以走 `section-title`）。 */
+  dialogTitle: { margin: 0, ...text('section-title') },
+  dialogSubtitle: {
+    margin: `${cssVar('space.1')} 0 0`,
+    ...text('row-meta'),
+    color: cssVar('color.foreground-muted'),
+  },
+  /** `<p>` 的默认外边距必须抹掉 —— 否则每一条状态句都会把卡片撑开一段。 */
+  resetTitle: { margin: 0, ...text('row-title') },
+  resetTitleDanger: { margin: 0, ...text('row-title'), color: cssVar('color.danger') },
+  inviteForm: { display: 'flex', flexDirection: 'column', gap: cssVar('space.2') },
+  labelTitle: { ...text('row-title') },
+  input: {
+    padding: cssVar('space.2'),
+    borderRadius: cssVar('radius.md'),
+    border: `${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
+    background: cssVar('color.surface'),
+    color: cssVar('color.foreground'),
+  },
+  /** 邀请票据块：与成员面板同一个表面，包一圈边框。 */
+  ticket: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cssVar('space.2'),
+    padding: cssVar('space.3'),
+    borderRadius: cssVar('radius.md'),
+    background: cssVar('color.surface'),
+    border: `${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
+  },
+  /**
+   * token / 链接的等宽展示块。`break-all` 是必须的：那串 token 没有空格，
+   * 不换行就会把对话框撑出横向滚动条（用户根本复制不到尾部）。
+   */
+  code: {
+    ...text('row-meta'),
+    wordBreak: 'break-all',
+    padding: cssVar('space.2'),
+    background: cssVar('color.surface-subtle'),
+    borderRadius: cssVar('radius.sm'),
+  },
+  resetMeta: { margin: 0, ...text('row-meta'), color: cssVar('color.foreground-muted') },
+  actionsRow: { display: 'flex', gap: cssVar('space.2'), flexWrap: 'wrap' },
+  dangerText: { color: cssVar('color.danger') },
+} as const;
+
 const CONSENT_STORAGE_KEY = 'heyta.share-consent.v1';
 
 const toBase64 = (bytes: Uint8Array): string => {
@@ -298,16 +383,7 @@ export function ShareFeature(props: ShareFeatureProps) {
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: cssVar('color.overlay'),
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: cssVar('space.4'),
-        zIndex: cssVar('z.modal'),
-      }}
+      style={styles.overlay}
       data-testid="share-dialog-overlay"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
@@ -316,27 +392,14 @@ export function ShareFeature(props: ShareFeatureProps) {
         aria-modal="true"
         aria-labelledby="ht-share-title"
         data-testid="share-dialog"
-        style={{
-          width: '100%',
-          maxWidth: cssVar('layout.modal-max'),
-          maxHeight: '90vh',
-          overflowY: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: cssVar('space.4'),
-          background: cssVar('color.surface-raised'),
-          borderRadius: cssVar('radius.lg'),
-          boxShadow: cssVar('shadow.lg'),
-          padding: cssVar('space.6'),
-          color: cssVar('color.foreground'),
-        }}
+        style={styles.dialog}
       >
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: cssVar('space.3') }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <h2 id="ht-share-title" style={{ margin: 0, ...text('section-title') }}>
+        <div style={styles.headRow}>
+          <div style={styles.headText}>
+            <h2 id="ht-share-title" style={styles.dialogTitle}>
               {t('web.share.dialog.title')}
             </h2>
-            <p style={{ margin: `${cssVar('space.1')} 0 0`, ...text('row-meta'), color: cssVar('color.foreground-muted') }}>
+            <p style={styles.dialogSubtitle}>
               {t('web.share.dialog.subtitle')}
             </p>
           </div>
@@ -352,7 +415,7 @@ export function ShareFeature(props: ShareFeatureProps) {
         </div>
 
         {needsUnlock ? (
-          <p role="status" data-testid="share-needs-unlock" style={{ margin: 0, ...text('row-title') }}>
+          <p role="status" data-testid="share-needs-unlock" style={styles.resetTitle}>
             {t('web.share.needUnlock')}
           </p>
         ) : null}
@@ -360,12 +423,12 @@ export function ShareFeature(props: ShareFeatureProps) {
         {phase.kind === 'consent' ? (
           <>
             {creatingError !== undefined ? (
-              <p role="alert" data-testid="share-create-error" style={{ margin: 0, ...text('row-title'), color: cssVar('color.danger') }}>
+              <p role="alert" data-testid="share-create-error" style={styles.resetTitleDanger}>
                 {t('web.share.error.create', { message: creatingError })}
               </p>
             ) : null}
             {api === undefined ? (
-              <p role="alert" data-testid="share-offline" style={{ margin: 0, ...text('row-title') }}>
+              <p role="alert" data-testid="share-offline" style={styles.resetTitle}>
                 {t('web.share.error.offline')}
               </p>
             ) : (
@@ -388,13 +451,13 @@ export function ShareFeature(props: ShareFeatureProps) {
         ) : null}
 
         {phase.kind === 'creating' ? (
-          <p role="status" data-testid="share-creating" style={{ margin: 0, ...text('row-title') }}>
+          <p role="status" data-testid="share-creating" style={styles.resetTitle}>
             {t('web.share.creating')}
           </p>
         ) : null}
 
         {phase.kind === 'not-a-member' ? (
-          <p role="status" data-testid="share-not-member" style={{ margin: 0, ...text('row-title') }}>
+          <p role="status" data-testid="share-not-member" style={styles.resetTitle}>
             {t('web.share.notMember')}
           </p>
         ) : null}
@@ -404,10 +467,10 @@ export function ShareFeature(props: ShareFeatureProps) {
             {detail.yourRole === 'owner' ? (
               <form
                 data-testid="share-invite-form"
-                style={{ display: 'flex', flexDirection: 'column', gap: cssVar('space.2') }}
+                style={styles.inviteForm}
                 onSubmit={(e) => { e.preventDefault(); void submitInvite(); }}
               >
-                <label htmlFor="ht-share-invite-email" style={{ ...text('row-title') }}>
+                <label htmlFor="ht-share-invite-email" style={styles.labelTitle}>
                   {t('web.share.invite.emailLabel')}
                 </label>
                 <input
@@ -417,13 +480,7 @@ export function ShareFeature(props: ShareFeatureProps) {
                   placeholder={t('web.share.invite.emailPlaceholder')}
                   onChange={(e) => setInviteEmail(e.target.value)}
                   data-testid="share-invite-email"
-                  style={{
-                    padding: cssVar('space.2'),
-                    borderRadius: cssVar('radius.md'),
-                    border: `${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
-                    background: cssVar('color.surface'),
-                    color: cssVar('color.foreground'),
-                  }}
+                  style={styles.input}
                 />
                 <button type="submit" className="ht-btn ht-btn--primary" disabled={inviteBusy} data-testid="share-invite-submit">
                   {inviteBusy ? t('web.share.invite.busy') : t('web.share.invite.submit')}
@@ -434,35 +491,27 @@ export function ShareFeature(props: ShareFeatureProps) {
             {ticket !== undefined ? (
               <div
                 data-testid="share-invite-ticket"
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: cssVar('space.2'),
-                  padding: cssVar('space.3'),
-                  borderRadius: cssVar('radius.md'),
-                  background: cssVar('color.surface'),
-                  border: `${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
-                }}
+                style={styles.ticket}
               >
-                <p style={{ margin: 0, ...text('row-title') }}>{t('web.share.invite.ticketTitle')}</p>
+                <p style={styles.resetTitle}>{t('web.share.invite.ticketTitle')}</p>
                 <code
                   data-testid="share-invite-token"
-                  style={{ ...text('row-meta'), wordBreak: 'break-all', padding: cssVar('space.2'), background: cssVar('color.surface-subtle'), borderRadius: cssVar('radius.sm') }}
+                  style={styles.code}
                 >
                   {ticket.token}
                 </code>
                 {/* 链接与 token 同样明文展示（W6 落点）：剪贴板被拒/接收方要手动转发时，
                     用户要能看见并选中这条链接本身 —— 与 token 的处理同一条理由。 */}
-                <p style={{ margin: 0, ...text('row-meta'), color: cssVar('color.foreground-muted') }}>
+                <p style={styles.resetMeta}>
                   {t('web.share.invite.linkTitle')}
                 </p>
                 <code
                   data-testid="share-invite-link"
-                  style={{ ...text('row-meta'), wordBreak: 'break-all', padding: cssVar('space.2'), background: cssVar('color.surface-subtle'), borderRadius: cssVar('radius.sm') }}
+                  style={styles.code}
                 >
                   {ticket.link}
                 </code>
-                <div style={{ display: 'flex', gap: cssVar('space.2'), flexWrap: 'wrap' }}>
+                <div style={styles.actionsRow}>
                   <button type="button" className="ht-btn ht-btn--ghost" data-testid="share-invite-copy-token" onClick={() => { void copyText(ticket.token, 'token'); }}>
                     {copied === 'token' ? t('web.share.invite.copied') : t('web.share.invite.copyToken')}
                   </button>
@@ -470,7 +519,7 @@ export function ShareFeature(props: ShareFeatureProps) {
                     {copied === 'link' ? t('web.share.invite.copied') : t('web.share.invite.copyLink')}
                   </button>
                 </div>
-                <p style={{ margin: 0, ...text('row-meta'), color: cssVar('color.foreground-muted') }}>
+                <p style={styles.resetMeta}>
                   {t('web.share.invite.ticketNote')}
                 </p>
               </div>
@@ -514,7 +563,7 @@ export function ShareFeature(props: ShareFeatureProps) {
                 type="button"
                 className="ht-btn ht-btn--ghost"
                 data-testid="share-leave"
-                style={{ color: cssVar('color.danger') }}
+                style={styles.dangerText}
                 onClick={() => {
                   void (async () => {
                     await api.leaveShare(phase.shareId);

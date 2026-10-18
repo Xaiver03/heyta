@@ -12,11 +12,27 @@
  * 🔴 编辑器**没有 `maxLength`**（NIST 禁止静默截断；同 `AuthForm` 的口令框）——
  * 超长由 `validateCommentDraft` 在提交前校验并给出错误句子，界面自己截掉是
  * 数据丢失。错误是文字（WCAG SC 3.3.1），`aria-live` 播报。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 文字层级（2026-10-16 补齐，同 `ShareConsentModal` 那一次的理由）
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * 这里此前**一条文字样式都没有**：所有 `<Text>` 都走 RN 的默认色（**纯黑**，
+ * 不是"继承容器色"）—— 暗色下就是近黑字压近黑底。所以按角色接语义样式：
+ *
+ * - 作者行 / 空线程提示 = `row-meta`；评论正文 = `row-title`；发送按钮 = `headline`
+ * - 校验错误 = `caption` + **`color.danger`**：它是错误，不能只靠 `aria-live`
+ *   表意（WCAG 1.4.1 不许只用颜色，反过来颜色也不该缺 —— 与 `EmptyState`
+ *   的 `detailDanger` 同一条判据）。
+ *
+ * ⚠️ 错误那一条是本文件里唯一一处**显式覆盖**语义样式的默认色，
+ * 覆盖用的仍是语义 token，不是裸值。
  */
 
 import { useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
+import { useHeytaText, useHeytaTokens } from '../theme.js';
 import {
   commentAuthorFallbackVars,
   commentsForTask,
@@ -42,6 +58,8 @@ export interface CommentThreadProps {
 }
 
 export function CommentThread(props: CommentThreadProps) {
+  const text = useHeytaText();
+  const tokens = useHeytaTokens();
   const [draft, setDraft] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const thread = commentsForTask(props.comments, props.taskId);
@@ -60,13 +78,13 @@ export function CommentThread(props: CommentThreadProps) {
 
   return (
     <View testID="comment-thread">
-      {thread.length === 0 && <Text>{props.labels.emptyThread}</Text>}
+      {thread.length === 0 && <Text style={text['row-meta']}>{props.labels.emptyThread}</Text>}
       {thread.map((c) => {
         const fallback = commentAuthorFallbackVars(c.authorUserId);
         return (
           <View key={c.id} testID={`comment-${c.id}`}>
-            <Text>{props.labels.fallbackAuthor(fallback.vars.id)}</Text>
-            <Text>{c.body}</Text>
+            <Text style={text['row-meta']}>{props.labels.fallbackAuthor(fallback.vars.id)}</Text>
+            <Text style={text['row-title']}>{c.body}</Text>
           </View>
         );
       })}
@@ -79,7 +97,11 @@ export function CommentThread(props: CommentThreadProps) {
         testID="comment-composer-input"
       />
       {draftError !== undefined && (
-        <Text accessibilityLiveRegion="polite" testID="comment-draft-error">
+        <Text
+          accessibilityLiveRegion="polite"
+          testID="comment-draft-error"
+          style={[text['caption'], { color: tokens['color.danger'] }]}
+        >
           {draftError === 'common.share.comment.empty' ? props.labels.errorEmpty : props.labels.errorTooLong}
         </Text>
       )}
@@ -88,7 +110,7 @@ export function CommentThread(props: CommentThreadProps) {
         accessibilityRole="button"
         testID="comment-send"
       >
-        <Text>{props.labels.sendButton}</Text>
+        <Text style={text['headline']}>{props.labels.sendButton}</Text>
       </Pressable>
     </View>
   );
