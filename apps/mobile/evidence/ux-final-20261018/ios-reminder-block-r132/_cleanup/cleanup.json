@@ -1,0 +1,273 @@
+{
+  "prefix": "Rem132",
+  "openLabelShape": "打开任务：{title}",
+  "titlesCollected": [
+    "Rem1321792324983",
+    "Rem1321792325211",
+    "Rem1321792325425",
+    "Rem1321792325944",
+    "Rem1321792326162",
+    "Rem1321792326499",
+    "Rem1321792326697"
+  ],
+  "tasks": [
+    {
+      "title": "Rem1321792324983",
+      "verdict": "row-not-tappable: open Rem1321792324983 is not in the tappable viewport: {'found': 'True', 'x': '64', 'y': '783', 'width': '274', 'height': '65', 'visible': 'False', 'scrollRc': "
+    },
+    {
+      "title": "Rem1321792325211",
+      "sheetOpen": false,
+      "verdict": "sheet-did-not-open"
+    },
+    {
+      "title": "Rem1321792325425",
+      "sheetOpen": false,
+      "verdict": "sheet-did-not-open"
+    },
+    {
+      "title": "Rem1321792325944",
+      "sheetOpen": true,
+      "reminderSectionFound": true,
+      "scrolledIntoView": true,
+      "before": [
+        {
+          "label": "还没有提醒",
+          "present": false
+        },
+        {
+          "label": "待触发",
+          "matchedLabel": "待触发",
+          "match": "exact",
+          "present": true,
+          "frame": [
+            24,
+            369,
+            33,
+            14
+          ],
+          "right": 57,
+          "bottom": 383,
+          "insideViewport": true
+        },
+        {
+          "label": "删除提醒",
+          "matchedLabel": "删除 10-18 21:19 的提醒",
+          "match": "matcher",
+          "present": true,
+          "frame": [
+            304,
+            339,
+            82,
+            44
+          ],
+          "right": 386,
+          "bottom": 383,
+          "insideViewport": true
+        }
+      ],
+      "hadReminder": true,
+      "taps": [
+        {
+          "description": "remove on Rem1321792325944",
+          "label": "删除 10-18 21:19 的提醒",
+          "frame": [
+            304,
+            339,
+            82,
+            44
+          ],
+          "tappedAt": [
+            345,
+            361
+          ],
+          "screen": [
+            402,
+            874
+          ],
+          "scrolledIntoView": true
+        }
+      ],
+      "after": [
+        {
+          "label": "还没有提醒",
+          "matchedLabel": "还没有提醒",
+          "match": "exact",
+          "present": true,
+          "frame": [
+            16,
+            338,
+            370,
+            18
+          ],
+          "right": 386,
+          "bottom": 356,
+          "insideViewport": true
+        },
+        {
+          "label": "待触发",
+          "present": false
+        },
+        {
+          "label": "删除提醒",
+          "present": false
+        }
+      ],
+      "backToEmpty": true
+    },
+    {
+      "title": "Rem1321792326162",
+      "sheetOpen": true,
+      "reminderSectionFound": true,
+      "scrolledIntoView": true,
+      "before": [
+        {
+          "label": "还没有提醒",
+          "present": false
+        },
+        {
+          "label": "待触发",
+          "matchedLabel": "待触发",
+          "match": "exact",
+          "present": true,
+          "frame": [
+            24,
+            347,
+            33,
+            14
+          ],
+          "right": 57,
+          "bottom": 361,
+          "insideViewport": true
+        },
+        {
+          "label": "删除提醒",
+          "matchedLabel": "删除 10-18 21:23 的提醒",
+          "match": "matcher",
+          "present": true,
+          "frame": [
+            304,
+            318,
+            82,
+            44
+          ],
+          "right": 386,
+          "bottom": 362,
+          "insideViewport": true
+        }
+      ],
+      "hadReminder": true,
+      "taps": [
+        {
+          "description": "remove on Rem1321792326162",
+          "label": "删除 10-18 21:23 的提醒",
+          "frame": [
+            304,
+            318,
+            82,
+            44
+          ],
+          "tappedAt": [
+            345,
+            340
+          ],
+          "screen": [
+            402,
+            874
+          ],
+          "scrolledIntoView": true
+        }
+      ],
+      "after": [
+        {
+          "label": "还没有提醒",
+          "matchedLabel": "还没有提醒",
+          "match": "exact",
+          "present": true,
+          "frame": [
+            16,
+            330,
+            370,
+            18
+          ],
+          "right": 386,
+          "bottom": 348,
+          "insideViewport": true
+        },
+        {
+          "label": "待触发",
+          "present": false
+        },
+        {
+          "label": "删除提醒",
+          "present": false
+        }
+      ],
+      "backToEmpty": true
+    },
+    {
+      "title": "Rem1321792326499",
+      "sheetOpen": true,
+      "reminderSectionFound": true,
+      "scrolledIntoView": true,
+      "before": [
+        {
+          "label": "还没有提醒",
+          "matchedLabel": "还没有提醒",
+          "match": "exact",
+          "present": true,
+          "frame": [
+            16,
+            358,
+            370,
+            18
+          ],
+          "right": 386,
+          "bottom": 376,
+          "insideViewport": true
+        },
+        {
+          "label": "待触发",
+          "present": false
+        },
+        {
+          "label": "删除提醒",
+          "present": false
+        }
+      ],
+      "hadReminder": false
+    },
+    {
+      "title": "Rem1321792326697",
+      "sheetOpen": true,
+      "reminderSectionFound": true,
+      "scrolledIntoView": true,
+      "before": [
+        {
+          "label": "还没有提醒",
+          "matchedLabel": "还没有提醒",
+          "match": "exact",
+          "present": true,
+          "frame": [
+            16,
+            330,
+            370,
+            18
+          ],
+          "right": 386,
+          "bottom": 348,
+          "insideViewport": true
+        },
+        {
+          "label": "待触发",
+          "present": false
+        },
+        {
+          "label": "删除提醒",
+          "present": false
+        }
+      ],
+      "hadReminder": false
+    }
+  ]
+}

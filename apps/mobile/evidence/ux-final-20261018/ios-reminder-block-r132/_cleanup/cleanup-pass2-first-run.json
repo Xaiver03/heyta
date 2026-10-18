@@ -1,0 +1,261 @@
+{
+  "tasks": [
+    {
+      "title": "Rem1321792324983",
+      "beforeNodes": {
+        "nodes": 68,
+        "close": [],
+        "due": []
+      },
+      "open": {
+        "found": true,
+        "swipes": 1,
+        "tappedAt": [
+          201,
+          342
+        ],
+        "log": [
+          {
+            "swipe": 0,
+            "center": [
+              201,
+              815
+            ],
+            "screen": [
+              402,
+              874
+            ],
+            "insideSafeBand": false
+          },
+          {
+            "swipe": 1,
+            "center": [
+              201,
+              342
+            ],
+            "screen": [
+              402,
+              874
+            ],
+            "insideSafeBand": true
+          }
+        ]
+      },
+      "afterTap": {
+        "nodes": 116,
+        "close": [
+          "关闭任务详情"
+        ],
+        "due": [
+          "截止日期",
+          "任务「Rem1321792324983」的截止时刻（留空表示全天）",
+          "这个任务没有截止时间，只能按绝对时刻提醒",
+          "紧急程度由截止时间推导，不由你填。"
+        ]
+      },
+      "reminderSectionFound": true,
+      "before": [
+        {
+          "label": "还没有提醒",
+          "matchedLabel": "还没有提醒",
+          "match": "exact",
+          "present": true,
+          "frame": [
+            16,
+            330,
+            370,
+            18
+          ],
+          "right": 386,
+          "bottom": 348,
+          "insideViewport": true
+        },
+        {
+          "label": "待触发",
+          "present": false
+        },
+        {
+          "label": "稍后提醒",
+          "present": false
+        },
+        {
+          "label": "关闭提醒",
+          "present": false
+        },
+        {
+          "label": "删除提醒",
+          "present": false
+        }
+      ],
+      "hadReminder": false,
+      "shots": [
+        "cleanup-Rem1321792324983"
+      ],
+      "verdict": "no-reminder"
+    },
+    {
+      "title": "Rem1321792325211",
+      "beforeNodes": {
+        "nodes": 1,
+        "close": [],
+        "due": []
+      },
+      "open": {
+        "found": false,
+        "swipes": 0,
+        "log": []
+      },
+      "verdict": "row-never-in-safe-band"
+    },
+    {
+      "title": "Rem1321792325425",
+      "beforeNodes": {
+        "nodes": 68,
+        "close": [],
+        "due": []
+      },
+      "open": {
+        "found": true,
+        "swipes": 0,
+        "tappedAt": [
+          201,
+          204
+        ],
+        "log": [
+          {
+            "swipe": 0,
+            "center": [
+              201,
+              204
+            ],
+            "screen": [
+              402,
+              874
+            ],
+            "insideSafeBand": true
+          }
+        ]
+      },
+      "afterTap": {
+        "nodes": 120,
+        "close": [
+          "关闭任务详情"
+        ],
+        "due": [
+          "截止日期",
+          "任务「Rem1321792325425」的截止时刻（留空表示全天）",
+          "这个任务没有截止时间，只能按绝对时刻提醒",
+          "紧急程度由截止时间推导，不由你填。"
+        ]
+      },
+      "reminderSectionFound": true,
+      "before": [
+        {
+          "label": "还没有提醒",
+          "present": false
+        },
+        {
+          "label": "待触发",
+          "present": false
+        },
+        {
+          "label": "稍后提醒",
+          "matchedLabel": "把 10-18 21:10 的提醒推迟 10 分钟",
+          "match": "matcher",
+          "present": true,
+          "frame": [
+            132,
+            323,
+            82,
+            44
+          ],
+          "right": 214,
+          "bottom": 367,
+          "insideViewport": true
+        },
+        {
+          "label": "关闭提醒",
+          "matchedLabel": "关闭 10-18 21:10 的提醒",
+          "match": "matcher",
+          "present": true,
+          "frame": [
+            218,
+            323,
+            82,
+            44
+          ],
+          "right": 300,
+          "bottom": 367,
+          "insideViewport": true
+        },
+        {
+          "label": "删除提醒",
+          "matchedLabel": "删除 10-18 21:10 的提醒",
+          "match": "matcher",
+          "present": true,
+          "frame": [
+            304,
+            323,
+            82,
+            44
+          ],
+          "right": 386,
+          "bottom": 367,
+          "insideViewport": true
+        }
+      ],
+      "hadReminder": true,
+      "taps": [
+        {
+          "description": "remove on Rem1321792325425",
+          "label": "删除 10-18 21:10 的提醒",
+          "frame": [
+            304,
+            323,
+            82,
+            44
+          ],
+          "tappedAt": [
+            345,
+            345
+          ],
+          "screen": [
+            402,
+            874
+          ],
+          "scrolledIntoView": true
+        }
+      ],
+      "after": [
+        {
+          "label": "还没有提醒",
+          "matchedLabel": "还没有提醒",
+          "match": "exact",
+          "present": true,
+          "frame": [
+            16,
+            330,
+            370,
+            18
+          ],
+          "right": 386,
+          "bottom": 348,
+          "insideViewport": true
+        },
+        {
+          "label": "待触发",
+          "present": false
+        },
+        {
+          "label": "删除提醒",
+          "present": false
+        }
+      ],
+      "backToEmpty": true,
+      "shots": [
+        "cleanup-Rem1321792325425"
+      ],
+      "verdict": "cleaned"
+    }
+  ]
+}

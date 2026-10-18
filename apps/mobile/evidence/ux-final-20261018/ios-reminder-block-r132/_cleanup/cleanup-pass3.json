@@ -1,0 +1,67 @@
+{
+  "tabBarTopSource": "AX 节点 任务/日历/专注/分类/我的 的 frame.y",
+  "tasks": [
+    {
+      "title": "Rem1321792325211",
+      "log": [
+        {
+          "step": 0,
+          "frame": [
+            64,
+            714,
+            274,
+            65
+          ],
+          "tabBarTop": 776,
+          "fullyAboveTabBar": false
+        },
+        {
+          "step": 1,
+          "frame": [
+            64,
+            256,
+            274,
+            65
+          ],
+          "tabBarTop": 776,
+          "fullyAboveTabBar": true
+        }
+      ],
+      "before": [
+        {
+          "label": "还没有提醒",
+          "matchedLabel": "还没有提醒",
+          "match": "exact",
+          "present": true,
+          "frame": [
+            16,
+            451,
+            370,
+            18
+          ],
+          "right": 386,
+          "bottom": 469,
+          "insideViewport": true
+        },
+        {
+          "label": "待触发",
+          "present": false
+        },
+        {
+          "label": "稍后提醒",
+          "present": false
+        },
+        {
+          "label": "关闭提醒",
+          "present": false
+        },
+        {
+          "label": "删除提醒",
+          "present": false
+        }
+      ],
+      "hadReminder": false,
+      "verdict": "no-reminder"
+    }
+  ]
+}

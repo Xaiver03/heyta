@@ -1,0 +1,41 @@
+{
+  "tasks": [
+    {
+      "title": "Rem1321792325211",
+      "beforeNodes": {
+        "nodes": 68,
+        "close": [],
+        "due": []
+      },
+      "open": {
+        "found": true,
+        "swipes": 0,
+        "tappedAt": [
+          201,
+          746
+        ],
+        "log": [
+          {
+            "swipe": 0,
+            "center": [
+              201,
+              746
+            ],
+            "screen": [
+              402,
+              874
+            ],
+            "insideSafeBand": true
+          }
+        ],
+        "attempt": 2
+      },
+      "afterTap": {
+        "nodes": 68,
+        "close": [],
+        "due": []
+      },
+      "verdict": "detail-did-not-open-after-3-tries"
+    }
+  ]
+}

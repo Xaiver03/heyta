@@ -1,0 +1,169 @@
+{
+  "startedAt": 1792326162.7555041,
+  "taskTitle": "Rem1321792326162",
+  "uiLocale": "zh-CN",
+  "appearance": "light",
+  "taps": [
+    {
+      "description": "add reminder",
+      "label": "1 小时后提醒",
+      "frame": [
+        16,
+        391,
+        111,
+        44
+      ],
+      "tappedAt": [
+        71,
+        413
+      ],
+      "screen": [
+        402,
+        874
+      ],
+      "scrolledIntoView": true
+    },
+    {
+      "description": "close detail",
+      "label": "关闭任务详情",
+      "frame": [
+        342,
+        103,
+        44,
+        43
+      ],
+      "tappedAt": [
+        364,
+        124
+      ],
+      "screen": [
+        402,
+        874
+      ],
+      "scrolledIntoView": true
+    }
+  ],
+  "shots": [
+    "01-reminder-empty",
+    "02-reminder-added",
+    "03-reminder-removed"
+  ],
+  "privacyResetBefore": "rc=1 An error was encountered processing the command (domain=NSPOSIXErrorDomain, code=1):\nSimulator device failed to complete",
+  "reminderSectionFound": true,
+  "reminderSectionScrolledIntoView": true,
+  "emptyState": [
+    {
+      "label": "提醒",
+      "matchedLabel": "提醒",
+      "match": "exact",
+      "present": true,
+      "frame": [
+        16,
+        326,
+        370,
+        23
+      ],
+      "right": 386,
+      "bottom": 349,
+      "insideViewport": true
+    },
+    {
+      "label": "还没有提醒",
+      "matchedLabel": "还没有提醒",
+      "match": "exact",
+      "present": true,
+      "frame": [
+        16,
+        361,
+        370,
+        18
+      ],
+      "right": 386,
+      "bottom": 379,
+      "insideViewport": true
+    },
+    {
+      "label": "添加提醒",
+      "present": false
+    },
+    {
+      "label": "1 小时后提醒",
+      "matchedLabel": "1 小时后提醒",
+      "match": "exact",
+      "present": true,
+      "frame": [
+        16,
+        391,
+        111,
+        44
+      ],
+      "right": 127,
+      "bottom": 435,
+      "insideViewport": true
+    },
+    {
+      "label": "这个任务没有截止时间，只能按绝对时刻提醒",
+      "matchedLabel": "这个任务没有截止时间，只能按绝对时刻提醒",
+      "match": "exact",
+      "present": true,
+      "frame": [
+        16,
+        447,
+        370,
+        18
+      ],
+      "right": 386,
+      "bottom": 465,
+      "insideViewport": true
+    }
+  ],
+  "notifyPrompt": {
+    "present": false,
+    "labels": [
+      "heyta",
+      "关闭任务详情",
+      "任务详情",
+      "标题",
+      "标题",
+      "备注",
+      "离开输入框或关闭面板时保存",
+      "清单",
+      "收集箱",
+      "新建清单",
+      "上级任务",
+      "（顶级任务）"
+    ]
+  },
+  "afterAdd": [
+    {
+      "label": "待触发",
+      "matchedLabel": "待触发",
+      "match": "exact",
+      "present": true,
+      "frame": [
+        24,
+        392,
+        33,
+        14
+      ],
+      "right": 57,
+      "bottom": 406,
+      "insideViewport": true
+    },
+    {
+      "label": "稍后提醒",
+      "present": false
+    },
+    {
+      "label": "关闭提醒",
+      "present": false
+    },
+    {
+      "label": "删除提醒",
+      "present": false
+    }
+  ],
+  "removedBackToEmpty": false,
+  "privacyResetAfter": "rc=1 An error was encountered processing the command (domain=NSPOSIXErrorDomain, code=1):\nSimulator device failed to complete",
+  "finishedAt": 1792326192.553866
+}
