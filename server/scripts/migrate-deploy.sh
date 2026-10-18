@@ -627,12 +627,7 @@ run_migrate_deploy() {
   # disable EVERY recovery path at once — and would also poison
   # parse_failing_migration, whose charset check rejects a name with escapes.
   # ESC is built with printf because `\x1b` is a GNU sed extension BusyBox lacks.
-  # 🔴 No `sed -i`: BSD sed (macOS dev boxes) requires a suffix argument, so `-i` eats
-  #    the script as that suffix and then parses the log path as a script — it aborts
-  #    *before* the `cat` below, which swallows every prisma diagnostic on that host.
-  #    Rewriting through a sibling file is the shape both seds agree on.
-  sed "s/$(printf '\033')\[[0-9;]*m//g" "$MIGRATE_LOG" > "$MIGRATE_LOG.plain"
-  mv "$MIGRATE_LOG.plain" "$MIGRATE_LOG"
+  sed -i "s/$(printf '\033')\[[0-9;]*m//g" "$MIGRATE_LOG"
   cat "$MIGRATE_LOG"
 }
 

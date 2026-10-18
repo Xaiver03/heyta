@@ -1,4 +1,5 @@
 # 激励与成长体系（设计）
+> 📦 **已归档（2026-10-16）** —— 本文件是历史记录，**不要照它开工**；现役口径见 [计划层索引](../README.md) 与 [总路线图](../roadmap.md)。
 
 > 状态：**L1 / L2 / L3 三层已实现，并已合并进 main**（merge commit `84cc7f5`；
 > 分支侧 `0560e82` 是"把 main 并入本分支"那一步，**两者不是同一次合并**，见 §12.2）。
@@ -8,16 +9,16 @@
 > ✅ **§12.1 的三条前置门已全开**；§12.5 那条"消费者已提交、生产者还在工作树里"的断裂
 > **也已由它的作者收口**（四个缺失的生产者现已全部在 `main` 里，见 §12.5 的收口记录）。
 > §10 的 5 项开放问题**已附建议**，等拍板。
-> 心理学证据：[`../research/motivation-psychology.md`](../research/motivation-psychology.md)
-> 竞品机制事实：[`../research/competitor-incentive-teardown.md`](../research/competitor-incentive-teardown.md)
-> 硬约束来源：[ADR-0005](../adr/0005-ai-data-path.md)、[ADR-0006](../adr/0006-supply-modes.md)、
-> [`../research/feature-matrix.md`](../research/feature-matrix.md) §11 反需求、[`../reference/architecture.md`](../reference/architecture.md)
+> 心理学证据：[`../research/motivation-psychology.md`](../../research/motivation-psychology.md)
+> 竞品机制事实：[`../research/competitor-incentive-teardown.md`](../../research/competitor-incentive-teardown.md)
+> 硬约束来源：[ADR-0005](../../adr/0005-ai-data-path.md)、[ADR-0006](../../adr/0006-supply-modes.md)、
+> [`../research/feature-matrix.md`](../../research/feature-matrix.md) §11 反需求、[`../reference/architecture.md`](../../reference/architecture.md)
 
 ---
 
 ## 0. 诊断：缺的不是功能，是**回路**
 
-把现有能力放进 Hook 模型（[证据 §1.2](../research/motivation-psychology.md)）里对照，问题一眼可见：
+把现有能力放进 Hook 模型（[证据 §1.2](../../research/motivation-psychology.md)）里对照，问题一眼可见：
 
 | Hook 四步 | heyta 现在 | 直接后果 |
 |---|---|---|
@@ -120,7 +121,7 @@ Nunes & Drèze 证明"预先赠送 2 格"能显著提升完成率。但 heyta �
 
 ### 4.1 现状盘点（已经做对的）
 
-[`packages/domain/src/habit-streak.ts`](../../packages/domain/src/habit-streak.ts) 已经处理了三件最容易错的事：
+[`packages/domain/src/habit-streak.ts`](../../../packages/domain/src/habit-streak.ts) 已经处理了三件最容易错的事：
 今天没打不断链、非每日习惯按频率判定、补打卡有上限。**这套逻辑是资产，不要重写**，
 本设计只在它之上加"韧性"和"多指标"。
 
@@ -150,7 +151,7 @@ Nunes & Drèze 证明"预先赠送 2 格"能显著提升完成率。但 heyta �
 - Apple/Habitica 的连续断了就"记录结束"。heyta 的 `longest` 只增不减，断签不销毁任何东西（P2）。
 
 > 冻结上限为什么是 2：Duolingo 官方曾公布"允许同时装备 2 个"后 DAU +0.38%，是同类机制里少数
-> 有公开数据的参数（[证据 §6](../research/competitor-incentive-teardown.md)）。上限存在的意义是
+> 有公开数据的参数（[证据 §6](../../research/competitor-incentive-teardown.md)）。上限存在的意义是
 > 让冻结是"保险"而不是"免打卡通行证"。
 
 ### 4.4 "绝不错过两次"的显式实现
@@ -232,7 +233,7 @@ heyta 的里程碑采用**累计制**（不要求连续）：
 
 | 机制 | 为什么不做 | 依据 |
 |---|---|---|
-| 排行榜 / 联赛 / 段位晋级 | 需要跨用户可信聚合；会激励一部分人、赶走最需要帮助的另一部分人 | [证据 §4.1](../research/motivation-psychology.md) |
+| 排行榜 / 联赛 / 段位晋级 | 需要跨用户可信聚合；会激励一部分人、赶走最需要帮助的另一部分人 | [证据 §4.1](../../research/motivation-psychology.md) |
 | 自习室（看见他人时长） | 同上，且制造羞耻源 | 番茄Todo 教训 |
 | 组队 Boss / 连坐惩罚 | 把"我想做"替换成"我不能害别人"，摧毁自主 | Habitica 教训 |
 | 金币 / 积分经济、内购变现损失厌恶 | 过度理由效应，且与"不为订阅费买单"的定位冲突 | Deci 1999 元分析 |
@@ -259,7 +260,7 @@ heyta 的里程碑采用**累计制**（不要求连续）：
 | 分享卡 | 本地渲染导出 | ❌ 不需要 |
 
 ⚠️ **唯一需要决策的是冻结余额**：它有一个"已消耗"状态需要持久化。
-按 [ADR-0014](../adr/0014-memory-switch-and-corrections.md) 的教训（跨设备状态必须进 op-log，且新增实体类型会被
+按 [ADR-0014](../../adr/0014-memory-switch-and-corrections.md) 的教训（跨设备状态必须进 op-log，且新增实体类型会被
 `applyOperation` 静默忽略），这里有两条路，**留给实现前拍板**：
 
 1. **纯派生**（推荐）：冻结余额 = `f(连续记录, 已断签日期, 本地配置)`。
@@ -407,7 +408,7 @@ heyta 的里程碑采用**累计制**（不要求连续）：
 
 ## 10. 开放问题（需要人拍板）
 
-1. ~~冻结余额走**纯派生**还是新增 schema 字段？~~ → **已拍板：派生，且余额不上界面**，见 [ADR-0022](../adr/0022-resilience-state-stays-derived.md) 与 §11
+1. ~~冻结余额走**纯派生**还是新增 schema 字段？~~ → **已拍板：派生，且余额不上界面**，见 [ADR-0022](../../adr/0022-resilience-state-stays-derived.md) 与 §11
 2. 是否保留 `prefers-reduced-motion` 之外的"极简模式"（关闭所有动效与庆祝）？
    **建议：不加。** `prefers-reduced-motion` 已覆盖唯一有医学依据的场景（前庭功能障碍 / 晕动症），
    而且它是**系统级、零配置、被中央 token 处理**（`tokens.css` 把所有 `--ht-duration-*` 压到 1ms）。
@@ -450,7 +451,7 @@ heyta 的里程碑采用**累计制**（不要求连续）：
 ## 11. 已收口的决策
 
 1. **冻结余额走纯派生，且不上界面。** 完整决策记录见
-   [ADR-0022](../adr/0022-resilience-state-stays-derived.md) —— 含被否决的三个选项、
+   [ADR-0022](../../adr/0022-resilience-state-stays-derived.md) —— 含被否决的三个选项、
    竞品一手证据、以及"**冻结参数只能放宽、不能收紧**"这条配套纪律。
    ⚠️ 这里不再复述论证：**结论只应有一份**，两处各写一次就一定会漂移。
 2. **进度卡的负数文案已修**（`done > total`，见 §8.4），并留了一条能失败、
@@ -466,7 +467,7 @@ heyta 的里程碑采用**累计制**（不要求连续）：
    `streakDays` 身份标签（阈值 30），于是"六周没打卡还算连着"会发出一枚不该发的身份标签。
    已删掉 `grace`，只留一条判据（扫 `(lastDate, today)`、**不含今天**，
    遇到该打卡却空着的计划日就断），并补了先跑红、再修绿的守卫 + 一条防修过头的对照组。
-   完整复盘见 [`AGENTS.md`](../../AGENTS.md) §7 第 38 条。
+   完整复盘见 [`AGENTS.md`](../../../AGENTS.md) §7 第 38 条。
    ⚠️ 这也**直接回答了 §10 第 5 项的一半**：领域层已经有稳定的「计划日」口径
    （`isScheduledOn`），要做"启动期"就该复用它，**不要再引入一套日历日阈值** ——
    上面这个错误就是"同一个概念两套单位"的现成样本。

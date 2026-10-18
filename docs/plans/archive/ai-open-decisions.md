@@ -1,4 +1,5 @@
 # AI 功能：决策清单（**已由产品决策，非等待中**）
+> 📦 **已归档（2026-10-16）** —— 本文件是历史记录，**不要照它开工**；现役口径见 [计划层索引](../README.md) 与 [总路线图](../roadmap.md)。
 
 > 状态：**已决策** ✅ —— 见下方「决策记录」。
 >
@@ -20,7 +21,7 @@
 | # | 决策 | 定案 | 复议条件 |
 |---|---|---|---|
 | 1 | 「受保护条目」产品机制 | **不做**（`readable: false` 只在真的解不开时出现），但界面上把话说清楚 | 有真实用户提出"想让某些条目对 AI 不可见"时 |
-| 2 | 托管 AI 的保留策略 | 🔴 **已推翻** —— 见 [ADR-0013](../adr/0013-cloud-ai-and-maas.md)：heyta **会**提供云端 AI 并按此收费，后续有 MaaS。**方向与档位已定**（[ADR-0020](../adr/0020-ai-subscription-two-tiers.md) / [ADR-0021](../adr/0021-managed-ai-model-deepseek-flash.md)），但 [ADR-0023](../adr/0023-managed-ai-quota-not-implemented.md) 判定**本轮不实现**（云端端点 / 计量 / 收银台都不存在，保留策略仍未定，`assertEnableable` 继续挡着） | — |
+| 2 | 托管 AI 的保留策略 | 🔴 **已推翻** —— 见 [ADR-0013](../../adr/0013-cloud-ai-and-maas.md)：heyta **会**提供云端 AI 并按此收费，后续有 MaaS。**方向与档位已定**（[ADR-0020](../../adr/0020-ai-subscription-two-tiers.md) / [ADR-0021](../../adr/0021-managed-ai-model-deepseek-flash.md)），但 [ADR-0023](../../adr/0023-managed-ai-quota-not-implemented.md) 判定**本轮不实现**（云端端点 / 计量 / 收银台都不存在，保留策略仍未定，`assertEnableable` 继续挡着） | — |
 | 3 | Windows / Linux / 移动端钥匙串 | **等真要发布那个平台时再做**，每平台都要真跑通 keychain | 该平台进入发布计划 |
 | 4 | 能力声明的默认值 | **C（提示 + 一键补上）** ✅ 已实现 | — |
 | 5 | AI 设置多端同步 | **不同步** | 若托管 AI 落地，同步的意义会大很多，届时重议 |
@@ -94,7 +95,7 @@ ADR-0011 已经定义了 MCP 的隐私契约：**加密的条目可以被列举�
 
 ## 决策 2 🔴 托管 AI（heyta 统一提供云服务）的保留策略
 
-> ⚠️ **这一条的结论已被 [ADR-0013](../adr/0013-cloud-ai-and-maas.md) 推翻。**
+> ⚠️ **这一条的结论已被 [ADR-0013](../../adr/0013-cloud-ai-and-maas.md) 推翻。**
 > 我原来按自己的建议定案为"暂不提供托管 AI"，产品负责人随后明确
 > **heyta 会提供云端统一 AI 服务并按此收费，后续提供 MaaS**。
 >

@@ -101,7 +101,19 @@ for entry in "${FILES[@]}"; do
   esac
   # 只有 android 走这一道；其它端不碰 apksigner（这台机可能根本没装 SDK）。
   if [ "$platform" = android ] && [ "$ext" = apk ]; then
+    # 🔴 **两道**，各挡一半（2026-10-16 加第二道）：
+    #   ① `assert_android_release_signature` 挡"**忘了配发布签名**"（DN 里出现 `Android Debug`）；
+    #   ② `verify-android-signing-identity.mjs` 挡"**签的不是我们那张**" —— 任何非调试证书
+    #      都能过第一道，而换一张的症状与调试签名**一模一样**：已装用户升级要先卸载 ⇒ 丢数据。
+    #      它比对的是**证书 SHA-256**（不是 DN），期望值取自这台机上那张发布 keystore
+    #      （`HEYTA_RELEASE_STORE_FILE`，与 `build.gradle` 同源，刻意不进仓库）。
     assert_android_release_signature "$src"
+    if ! node scripts/verify-android-signing-identity.mjs "$src"; then
+      echo "  🔴 这枚 APK 的签名身份不是我们那张发布证书 —— **拒绝发布**这一枚。"
+      echo "     读不出身份（没有 apksigner / 读不到发布 keystore）同样按拒绝处理："
+      echo "     **证明不了**不是**通过**（见对账件 B14：'跳过 = 退出 0'那一族坑）。"
+      exit 1
+    fi
   fi
   name="heyta-${VERSION}-${platform}.${ext}"
   cp "$src" "$STAGE/$name"
@@ -132,6 +144,10 @@ def fetch_existing():
         return {}
 
 doc = fetch_existing()
+# 把**桶里那一刻**的清单落一份到暂存区：下面由 bash 调 `check-release-version-guard.mjs`
+# 拿它做"不许倒号"的对账。判据本体住在那份 Node 脚本里（可离线逐臂自检），
+# 这里只负责把活数据喂给它 —— **判据只有一份**。
+(pathlib.Path(stage) / ".published.json").write_text(json.dumps(doc, ensure_ascii=False))
 files = dict(doc.get("files") or {})
 
 def backfill(platform, entry):
@@ -152,6 +168,10 @@ def backfill(platform, entry):
     return entry
 
 files = {k: backfill(k, v) for k, v in files.items()}
+
+# 🔴 **"不许倒号"不在这里判** —— 判据本体在 `scripts/check-release-version-guard.mjs`
+# （那里能**离线逐臂自检**，而且门禁 `check:release-version-guard` 会断言本脚本**真的调了它**）。
+# 见下面 heredoc 之后那一段：本脚本只负责把**桶里那一刻**的清单喂给它。
 now = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
 for p in platforms:
     matches = list(pathlib.Path(stage).glob(f"heyta-{version}-{p}.*"))
@@ -175,20 +195,67 @@ print(f"  latest.json：本轮 {len(platforms)} 端，合并后共 {len(files)} 
       + (f"，保留通道 {len(out['channels'])} 枚" if out.get('channels') else ""))
 PYJSON
 
+# ---- 🔴 版本守卫：**上传之前**拦倒号 ----------------------------------------
+#
+# 判据本体在 `check-release-version-guard.mjs`（可离线逐臂自检；门禁
+# `check:release-version-guard` 会断言这一行**存在**）。这里只把桶里那一刻的
+# 清单喂给它 —— **判据只有一份**。
+#
+# 来历（2026-10-16 实测）：根 `package.json` 是 `0.1.0`，而桶里已发出
+# `1.0.1-test.20261008.4`。照根取号的下一批会让 `latest.json` 的顶层版本
+# **往回走**，而没有任何一层会报错 —— 落地页按钮指向更小的版本，用户装到旧字节。
+GUARD_PLATFORM_ARGS=()
+for p in "${UPLOADED_PLATFORM[@]}"; do GUARD_PLATFORM_ARGS+=(--platform "$p"); done
+node "$(dirname "$0")/check-release-version-guard.mjs" \
+  --version "$VERSION" \
+  --manifest "$STAGE/.published.json" \
+  "${GUARD_PLATFORM_ARGS[@]}"
+
 # ---- 上传（版本目录 + latest 目录）----
 upload_one() {
   local name="$1" dest="$2" cache="$3"
   coscli cp "$STAGE/$name" "cos://${BUCKET}/${PREFIX}/${dest}/${name}" \
     --meta "Cache-Control:${cache}" -e "cos.${REGION}.myqcloud.com" >/dev/null
-  # 🔴 用**匿名** HEAD 验证 —— 带授权的成功证明不了公开读。
-  local len size
-  len=$(curl -sI "${BASE_URL}/${PREFIX}/${dest}/${name}" | tr -d '\r' | awk 'tolower($1)=="content-length:"{print $2}' | tail -1)
+  # 🔴🔴 用**匿名 GET（只取 1 字节）**验证，**不能用 HEAD**。带授权的成功证明不了公开读，
+  # 而 HEAD 的成功**同样**证明不了 —— 这是实测过的，不是洁癖：
+  #
+  #   2026-10-16 实测，同一个 URL（COS **默认域名**上的 APK）：
+  #     HEAD → 200 + 正确的 `Content-Length`
+  #     GET  → **403** `<Code>DownloadForbidden</Code>`
+  #            （"The APK/IPA file is not allowed to be distributed in a public
+  #              network using COS default domain, please use custom domain instead."）
+  #
+  # 本脚本原来的回读正是 `curl -sI`（HEAD）⇒ **这条判据对 APK 恒绿**，
+  # 于是"公开可读"这件事在最需要它的时候是假的，而**没有任何一层会说话**。
+  #
+  # `-r 0-0` 拿回一个字节：`Content-Range` 里带着**对象总大小**，
+  # 既证明"匿名真的读得到正文"，又能拿它与本地逐字节对账。
+  local url headers code total size
+  url="${BASE_URL}/${PREFIX}/${dest}/${name}"
   size=$(file_size "$STAGE/$name")
-  if [ -z "$len" ] || [ "$len" != "$size" ]; then
-    echo "🔴 匿名回读失败：${dest}/${name}（HEAD content-length='${len}'，本地=${size}）"
+  headers=$(curl -s -D - -o /dev/null -r 0-0 "$url" | tr -d '\r')
+  code=$(printf '%s\n' "$headers" | awk 'tolower($1) ~ /^http\// {print $2; exit}')
+  # ⚠️ 整行按 `/` 切，**不能**用 `$2` —— `Content-Range: bytes 0-0/2958227` 的
+  # `$2` 是 `bytes` 而不是范围；那样切出来是空的，于是回退到分片响应的
+  # `Content-Length: 1`，**每个健康对象都会被判成"大小不符"**。
+  # （这条是 2026-10-16 拿活的 dmg 实测出来的：错版本会把门禁从"永远绿"翻成"永远红"。）
+  total=$(printf '%s\n' "$headers" | awk 'tolower($1)=="content-range:" {n=split($0,a,"/"); gsub(/[ \t\r]/,"",a[n]); print a[n]; exit}')
+  if [ -z "$total" ]; then
+    # 服务端忽略了 Range（回 200 全量）—— 退回 Content-Length；**仍然是 GET**。
+    total=$(printf '%s\n' "$headers" | awk 'tolower($1)=="content-length:" {print $2}' | tail -1)
+  fi
+
+  if [ "$code" != "200" ] && [ "$code" != "206" ]; then
+    echo "🔴 匿名 GET 回读失败：${dest}/${name}（HTTP ${code:-<无响应>}）"
+    printf '%s\n' "$headers" | sed -n '1,8p'
+    echo "   （HEAD 可能仍是 200 —— 那是这条判据存在的全部理由）"
     exit 1
   fi
-  echo "  ✅ ${dest}/${name}（${size} 字节，匿名可读）"
+  if [ -z "$total" ] || [ "$total" != "$size" ]; then
+    echo "🔴 匿名回读大小不符：${dest}/${name}（远端=${total:-<无>}，本地=${size}）"
+    exit 1
+  fi
+  echo "  ✅ ${dest}/${name}（${size} 字节，匿名 GET 可读，HTTP ${code}）"
 }
 
 echo "=== 上传（版本 ${VERSION}）==="
@@ -215,5 +282,24 @@ if node apps/landing/scripts/gen-downloads.mjs && node scripts/check-downloads.m
   echo "  ✅ 快照已对齐；记得把 apps/landing/src/site/release-manifest.json 与生成的入口一起入库"
 else
   echo "  🔴 快照刷新或下载面门禁失败 —— 包已经在桶里了，但页面还不知道。先修这一步再宣布发布完成。"
+  exit 1
+fi
+
+# ---- 收尾：**页面现在会给的那一整批**，真的都下得到吗 ----------------------
+#
+# ⚠️ 上面 `upload_one` 的回读只管**这一轮刚上传的那几枚**。而 `latest.json` 是**按端合并**的
+# （见 `app-distribution.md` §3 的"两处与直觉不同的形状"第 1 条），所以页面同时还会给
+# **别端更早几轮的条目** —— 那些没人再看一眼，而桶上的策略**可以在上传之后才变**。
+# A1 正是这个形状：字节在、`HEAD` 还 200、而 `GET` 403，于是页面上留着一个点了下不动的按钮。
+#
+# 这一行读的是**落地页依赖的那份清单**（不是本轮的上传列表），所以它管的是访客会撞上的那一批。
+# 失败**不拦发布**（包已经在桶里、快照也已经对齐），但必须**响亮**：它是一条要人去处理的读数，
+# 不是可以静默收工的收尾。
+echo "=== 页面当前会给的那一批，逐条验可取性 ==="
+if node scripts/verify-downloads-servable.mjs; then
+  echo "  ✅ 页面上每一枚产物都匿名可取"
+else
+  echo "  🔴 页面上有下不动的产物 —— **发布不算完成**：要么把它放到能公开读的地方，"
+  echo "     要么把那一端从清单里拿掉。⚠️ 别拿 HEAD 复核（这个桶上 HEAD 与 GET 会给不同答案）。"
   exit 1
 fi

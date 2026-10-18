@@ -66,14 +66,21 @@ if (treeArgIdx >= 0 && !INSTALLED_TREE) {
 }
 const sha256 = (s) => createHash('sha256').update(s).digest('hex');
 
-// 本仓库自己的包会被打进镜像（`pnpm pack` 出来的三枚 tgz）。它们不可能出现在
+// 本仓库自己的包会被打进镜像（`pnpm pack` 出来的四枚 tgz）。它们不可能出现在
 // "扫第三方依赖"的集合里，但**不等于免检**：判定要求镜像里那个包自己声明的 license
 // 与 `packages/<name>/package.json` 里的声明**逐字相同**，两边都必须宽松。
 // 少任何一边 ⇒ 红（"产物里没声明"正是 2026-10-04 量到的那两枚 sync-core / shared-schema 的形状）。
+//
+// 🔴 2026-10-16：第四枚 `@heyta/inbound-core` 进镜像（它是 `server` 的**运行时**依赖，
+// `server/dist/src/**` 里 8 个文件 `require("@heyta/inbound-core")`）。
+// ⚠️ 它该登记在**这里**，不是 `IMAGE_ONLY_PACKAGES` —— 后者是"第三方、结构上不可能出现在
+// pnpm 扫描集里"那一档，登记进去就**跳过**了下面那条"产物自己声明的 license 必须与源码侧
+// 逐字相同"的判定。自家包走这条路才对（现量：两处都是 MIT）。
 const FIRST_PARTY_IN_IMAGE = {
   '@heyta/sync-core': 'packages/sync-core',
   '@heyta/shared-schema': 'packages/shared-schema',
   '@heyta/domain': 'packages/domain',
+  '@heyta/inbound-core': 'packages/inbound-core',
 };
 
 

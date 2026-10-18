@@ -1,10 +1,11 @@
 # 活动分类与分类着色（增量计划）
+> 📦 **已归档（2026-10-16）** —— 本文件是历史记录，**不要照它开工**；现役口径见 [计划层索引](../README.md) 与 [总路线图](../roadmap.md)。
 
 > 状态：**已实现，并已合并进 main**（merge commit `84cc7f5`；落地提交 `38cf3a5` 分类时长 + 用户赋义色槽、
 > `ea48ef6` 移动端分类时长屏、`6d4ba1d` 时长分档与分类报告上移为共享实现）。
 > **§8 是实现实录**（含实测数字与逐条注入证据）。本行原写"设计已拍板，代码未开始"，已按代码更正。
 > 前置依赖：时间必须先能**归到分类上**，颜色只是最后 10%（见 §4）。
-> 相关：[roadmap.md](roadmap.md) §1.2 激励与成长体系 · [`../research/competitor-incentive-teardown.md`](../research/competitor-incentive-teardown.md)（伤害模式）
+> 相关：[roadmap.md](../roadmap.md) §1.2 激励与成长体系 · [`../research/competitor-incentive-teardown.md`](../../research/competitor-incentive-teardown.md)（伤害模式）
 
 ---
 
@@ -57,7 +58,7 @@ D1 + D2 合起来是一句话：**调色板由我们给，褒贬由用户自己�
 2. **对"戒不掉"的活动，内疚框架的预测是「不记录了」，不是「改了」。**
    看报告会难受 → 少看报告 → 数据没了 → **连"一周 12 小时"这个事实都看不见了**。
    这正是仓库已引过的 abstinence-violation 效应的近亲。
-3. **仓库自己已经踩过这个形状。** [`../research/competitor-incentive-teardown.md`](../research/competitor-incentive-teardown.md)
+3. **仓库自己已经踩过这个形状。** [`../research/competitor-incentive-teardown.md`](../../research/competitor-incentive-teardown.md)
    里「羞耻／内疚」作为**伤害模式**出现了三次：
 
    | 产品 | 伤害机制（原文） |
@@ -142,7 +143,7 @@ HABIT.target + unit   →  HABIT.color
 - **它用位置表达类别、用文字标签命名，颜色只编码强度** ——
   天然满足仓库那条硬规则「**不许只用颜色表达信息**」（已写进
   `apps/web/src/features/timeline/GanttChart.tsx:36`、`features/settings/AiSettings.tsx:17`、
-  [`ai-capability-branches.md`](ai-capability-branches.md)）。
+  [`ai-capability-branches.md`](../ai-capability-branches.md)）。
   **不需要为这条规则做任何妥协。**
 
 ### 5.3 辅形状：周堆叠条
@@ -491,7 +492,7 @@ error Unable to resolve module ./ListsSection from …/apps/mobile/src/screens/P
 
 本节把本计划中的分类色决策与全产品颜色规范接起来。颜色不是装饰层的自由变量：
 状态、交互、数据分类和信息层级必须分别使用各自的 token 家族。完整规则见
-[`design-system/heyta/MASTER.md`](../../design-system/heyta/MASTER.md) §3.1–3.2。
+[`design-system/heyta/MASTER.md`](../../../design-system/heyta/MASTER.md) §3.1–3.2。
 
 ### 9.1 已确定的语义边界
 

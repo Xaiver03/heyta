@@ -1,4 +1,5 @@
 # 三个 AI 模块**并行开工** runbook
+> 📦 **已归档（2026-10-16）** —— 本文件是历史记录，**不要照它开工**；现役口径见 [计划层索引](../README.md) 与 [总路线图](../roadmap.md)。
 
 > 适用：[模块 1 引擎](ai-remediation-module-1-engine.md)、[模块 2 旅程](ai-remediation-module-2-journey.md)、
 > [模块 3 记忆护城河](ai-remediation-module-3-memory-moat.md)

@@ -20,6 +20,7 @@ import {
   DOWNLOAD_ROWS,
   OFFICIAL_STORE_HOSTS,
   detectRow,
+  isStableChannel,
   releaseManifest,
   resolveRows,
   type ReleaseFile,
@@ -171,6 +172,48 @@ describe('清单决定出口：三种状态，同一把尺', () => {
     expect(view.querySelector('#dl-android a.lp-btn')).toBeNull();
     // 正向对照：另一端的按钮真的画出来了 —— 否则"只有一条"会因为整页没按钮而恒绿。
     expect(view.querySelector('#dl-macos a.lp-btn')).not.toBeNull();
+  });
+
+  /**
+   * 🔴 这条钉的是 `file.version ?? manifest.version` 里**回退那一半**。
+   *
+   * 上面那条"各端可以不同轮"用到的每个文件**都带自己的 `version`**，所以从来没走到回退。
+   * 而**桶里 `latest.json` 今天的真实形状恰恰是回退**：`files.<端>.version` **一个都没有**
+   * （2026-10-16 实测：macos / windows / android / linux 四端全缺）。
+   * ⇒ 页面那一格此时**读的是批次号**，而批次号是 `1.0.1-test.20261008.4` ⇒ 按
+   * "非正式通道不算有产物"那条规则，**一整批全都不出按钮**。
+   * 这与仓库快照（四端 `version: '1.0.0'` ⇒ 全出按钮）**给出的是相反的一页**，
+   * 而两份清单都"看起来正常" —— 对账件 A3 记的就是这件事。
+   */
+  it('每一枚都没有自己的 version 时按批次号判：试传批次全不出按钮，正式批次才出', () => {
+    const bare = (version: string): ReleaseManifest => {
+      const files: Record<string, ReleaseFile> = {};
+      for (const platform of Object.keys(PUBLISHED.files)) {
+        // 刻意**不带** `version` —— 这就是桶里那份清单的形状。
+        const { version: _dropped, ...rest } = publishedFile(platform);
+        files[platform] = rest;
+      }
+      return { version, releasedAt: '2026-10-08T02:00:00+00:00', files };
+    };
+
+    // 预发布批次（`-test` 后缀不匹配 `/^\d+\.\d+\.\d+$/`）⇒ 一行都不算有产物。
+    const dev = resolveRows(bare('1.0.1-test.20261008.4'));
+    expect(dev.filter((entry) => entry.state === 'file-ready')).toEqual([]);
+
+    // 正向对照：同一份"没有 per-file version"的清单，批次号是正式版时**就**出按钮 ——
+    // 否则上一条会因为"回退根本没读批次号"而恒绿（那是本仓反复记过的假绿）。
+    const stable = resolveRows(bare('1.0.0'));
+    expect(stable.filter((entry) => entry.state === 'file-ready').length).toBeGreaterThan(0);
+  });
+
+  it('正式通道只认三段式版本号：`1.0` 不算（两段），带后缀也不算', () => {
+    // `isStableChannel` 是那一整页"出不出按钮"的闸门；它的三段式要求不是随手写的 ——
+    // Android / iOS 的**壳声明**就是 `1.0`（见 `check:version-declarations`），
+    // 所以"两段算不算正式"这件事必须钉住，否则哪一天它会悄悄变宽。
+    expect(isStableChannel('1.0.0')).toBe(true);
+    expect(isStableChannel('1.0')).toBe(false);
+    expect(isStableChannel('1.0.1-test.20261008.4')).toBe(false);
+    expect(isStableChannel('1.0.0-rc.1')).toBe(false);
   });
 
   it('真源此刻是什么状态，页面就是什么状态（这一条会随发布而变，变之前它拦住手改）', () => {

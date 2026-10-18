@@ -12,7 +12,7 @@
  * 这道门禁只做五件**可失败**的事（每一件都能被一次故意的改动弄红）：
  *
  *   1. `ai-quota-ssot` 块存在且能解析 —— 唯一数字源被删掉就是红；
- *   2. 五处承诺里的额度数字**全部等于** ssot —— 只改一处就是红；
+ *   2. **五处**承诺里的额度数字**全部等于** ssot —— 只改一处就是红；
  *   3. `enforcement` 只能是 `not-implemented` / `enforced` 两个值之一；
  *   4. 声明 `enforced` 时，**计量实现必须真的存在** —— 空喊一声就是红；
  *   5. 声明 `not-implemented` 时，决定记录（ADR）必须存在，
@@ -125,6 +125,13 @@ const claimSites = [
   ['英词条（落地页）', CATALOG_EN, /'landing\.pricing\.hostedAi\.feature2':\s*'[^']*?(\d+)\s*actions?/g],
   ['法务（AI 服务条款）', LEGAL_AI, /每个计费周期\s*\*{0,2}\s*(\d+)\s*次/g],
   ['参考文档正文', QUOTA_DOC, /(\d+)\s*次\s*\/\s*月/g],
+  // 🔴 **2026-10-16 补的第五处**：九份**对外正文**里的额度。
+  //    此前四处都不含 `packages/legal/src/documents/*.ts` —— 而它是**对外承诺的本体**
+  //    （落地页、应用内、以及监管与法院读到的就是它），当日实测那份退款正文里有
+  //    **5 处** `300 次`。⇒ 改额度时"词条表与 server/legal 改了、九份正文没改"会留下
+  //    两份互相冲突的额度承诺，而**此前没有任何一层会说话**（与 B18 那条价格缺口同族）。
+  //    ⚠️ 该文件里除额度外**没有**别的 `N 次`写法（当日逐条量过），所以这条宽正则不会误抓。
+  ['法务正文（退款与定价）', 'packages/legal/src/documents/subscription-refund.ts', /(\d+)\s*次/g],
 ];
 
 for (const [label, file, re] of claimSites) {
