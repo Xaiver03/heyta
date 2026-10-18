@@ -1273,7 +1273,7 @@ rsync -az --delete --itemize-changes apps/landing/dist/ ubuntu-jcli:/var/www/hey
 本地 DNS 会返回代理假 IP，所以必须 `--resolve` + `--noproxy`：
 
 ```bash
-curl -s --noproxy '*' --resolve heyta.finlaw.cloud:443:124.223.13.226 https://heyta.finlaw.cloud/en/ \
+curl -s --noproxy '*' --resolve heyta.waytofuture.cn:443:124.223.13.226 https://heyta.waytofuture.cn/en/ \
   | grep -oE '<html lang="[^"]*"|<title>[^<]*</title>'
 ```
 
@@ -1284,8 +1284,8 @@ curl -s --noproxy '*' --resolve heyta.finlaw.cloud:443:124.223.13.226 https://he
 地址有没有真的从 bundle 里消失 —— 这些只能在线上查。所以发布后除了 head，还要查产物内容：
 
 ```bash
-curl -s https://heyta.finlaw.cloud/ | grep -oE 'assets/main-[A-Za-z0-9_-]+\.js'
-curl -s https://heyta.finlaw.cloud/assets/main-<上面那个 hash>.js -o live.js
+curl -s https://heyta.waytofuture.cn/ | grep -oE 'assets/main-[A-Za-z0-9_-]+\.js'
+curl -s https://heyta.waytofuture.cn/assets/main-<上面那个 hash>.js -o live.js
 grep -c 'github\.com' live.js        # 🔴 必须是 0：仓库私有，任何源码入口都是 404
 grep -c '只收一台服务器的钱' live.js    # 1 = 新文案真的上线了
 ```

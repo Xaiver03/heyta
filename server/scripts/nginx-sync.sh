@@ -19,7 +19,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SSH_HOST="${HEYTA_NGINX_SSH_HOST:-finlaw}"
-REMOTE_PATH="${HEYTA_NGINX_REMOTE_PATH:-/etc/nginx/sites-available/heyta.finlaw.cloud}"
+REMOTE_PATH="${HEYTA_NGINX_REMOTE_PATH:-/etc/nginx/sites-available/heyta.waytofuture.cn}"
 # 仓库里带 `.conf` 后缀（编辑器与语法高亮认它），线上文件不带。名字故意不同，
 # 所以这里显式映射，而不是靠 basename 撞运气。
 LOCAL_NAME="${HEYTA_NGINX_LOCAL_NAME:-$(basename "$REMOTE_PATH").conf}"
