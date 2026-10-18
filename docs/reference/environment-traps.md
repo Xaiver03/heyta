@@ -10309,3 +10309,36 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     ⑵ 数失败的行要按日志真实形状数（` build: Failed$`），不是 `^Failed` —— 后者在这份日志上恒为 0，
     是一枚"永远不红"的判据；⑶ 见到一批包**同时**红且报错是"某个参数不认识"，先查自己的命令行，
     别去查那几枚包（AGENTS §7 元规则一在本轮的第四次命中；与 #465 同一族的另一种失法：装置自己造红）。
+
+467. 🔴 **判"这一步是瞬时失败"的证据不是"我单独试一次能过"，而是"失败的对象在两趟之间换了、而输入没换"**。
+    2026-10-18 本机实测（第八趟四端重装的 mac 腿）：第 1 趟停在
+    `…/HeytaMacWidget.appex: A timestamp was expected but was not found.`；我当场在一枚**副本**上做 A/B
+    （`codesign --force --timestamp --sign "<Developer ID …>"` ⇒ rc=0，`codesign -dvvv` 读到真 `Timestamp`，
+    `--verify --strict` 过），据此写了"TSA 当下是通的，重跑即可"。**这句话当时是弱的**：
+    A/B 只证"此刻手动签一个东西能拿到时间戳"，它和"打包链里那条路径真的坏了"并不互斥
+    （打包链签的是另一枚对象、另一个时点）。第 2 趟同一条命令、同一棵载体、`dirty=0`，
+    `.app` 那半一路绿到"打包后的 .app 能起来"，却停在**另一枚对象**上
+    （`Heyta-1.0.0.dmg: A timestamp was expected but was not found.`）；第 3 趟全绿并过公证。
+    ⇒ 三条：⑴ 见到 `A timestamp was expected…` 这类**外部服务取值失败**，先重跑一趟看**红的位置会不会移动**，
+    移动的才是"瞬时/网络"，固定在同一枚对象上的才要去查那枚对象；把 A/B 当结论写进台账要标它只证"当下能用"。
+    ⑵ **同一枚私有落点重跑会吃掉上一趟的产物**：`reinstall-all.sh` 的 mac 段进 ① 步前清空 `HEYTA_MACOS_DIST_DIR`，
+    所以两趟红趟只留下了日志、没留下当时的 `.app`/`.dmg`。要留红趟现场，给每趟一个独立
+    `HEYTA_MACOS_DIST_DIR`（现量：`grep -n '清空前' scripts/reinstall-all.sh`）。
+    ⑶ 与 #466 同一族的另一种失法，方向相反：#466 是装置自己造红，这条是**把真红过早判成瞬时**
+    —— 差别在于第 2 趟那次我拿到的"绿了一半"（`.app` 全签过）本身就是"对象在换"的证据，只是当时没去读它。
+
+468. 🔴 **判"Apple 的 TestFlight 公开链接通没通"，不能用带撇号的字面串去 grep；而浏览器/HTML 里的撇号是 `&#39;`**（2026-10-18 实测，误报过一次"已批准"）
+
+    **现象**：写守望脚本时用 `curl … | grep -c "isn't accepting any new testers"` 判"链接还在拒绝新测试者"。结果**第一次就返回 0** ⇒ 脚本据此打了 `IOS_APPROVED` —— 而同一分钟的权威 API 读数是 `externalBuildState: WAITING_FOR_BETA_REVIEW`（**还在审**）。
+
+    **真因**：Apple 那个页面里的撇号是 HTML 实体 `&#39;`，原文是
+    `<…>This beta isn&#39;t accepting any new testers right now.<…>`
+    ⇒ **字面 `isn't` 永远匹配不上** ⇒ `grep -c` 恒为 0 ⇒ "0 命中"被我的脚本读成"不再拒绝" ✅。
+
+    **How to apply**：
+    1. **判活优先用 API 的枚举值**（`asc testflight distribution view --build-id <id>` 的 `externalBuildState`：`READY_FOR_BETA_SUBMISSION` → `WAITING_FOR_BETA_REVIEW` → `IN_BETA_REVIEW` → `BETA_APPROVED`），
+       **HTML 文字只当旁证** —— 它的编码、语言、A/B 都可能变。
+    2. 一定要用文字判时，**grep 不带标点的长片段**（这里用 `accepting any new testers`），或先做 HTML 实体解码再匹配。
+    3. 🔴 **"0 命中"是一个方向不明的读数**：它既可能是"条件不成立"，也可能是"我的探针压根匹配不上"。
+       凡把 `grep -c` 的 0 当作**肯定结论**（"已通""没有违规""不存在"）的判据，都必须配一个**阳性对照** ——
+       拿一段**确定含该串**的文本跑一次，证明这条 grep 真的能命中。这一条与 §7 的元规则「先怀疑探针」是同一条。

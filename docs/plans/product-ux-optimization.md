@@ -4339,3 +4339,29 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
       这趟在共享载体 `EAAD1B66` 上留下 `BulkA/B<stamp>` 残迹，与之前每趟任务旅程同形状、本线不代删；
       本线上一趟收尾收掉的那枚 `idb_companion` 已补拉并**留在册**（#462）。全部读数
       [`apps/mobile/evidence/ux-final-20261017/ios-bulk-bar-r127/RESULT.md`](../../apps/mobile/evidence/ux-final-20261017/ios-bulk-bar-r127/RESULT.md)。
+
+- [x] ✅ **10-18 18:2x 第八趟四端重装跑完（r128）—— 本线第一次"两端从只含已提交内容的干净载体装到当前产物"，而且 `pnpm -r build` 那格从判红翻成判绿**。
+      载体 `/Users/rocalight/heyta-carriers/head-r128`（detached worktree）钉在 `f8d7155e`、`dirty=0` 起跑与 install 后各量一次；
+      全仓构建 `NO_COLOR=1 pnpm -r --no-bail build` ⇒ **`BUILD_RC=0`、起数 20 / `build: Failed` 0 / `build: Done` 20**（两把尺一起取）。
+      ⇒ 上一格那句"`pnpm -r build` 在当前 HEAD 判红，两条根因都在别线名下"**已作废**：那两条（`app-host` 只进索引未提交的模块、
+      `CommentView` 缺 `id`）都由各自的线自己落地了，本线一个字没代改。**读法**：判绿的是"从最终源码构建"这一格，不是"整条 `pnpm check` 绿"。
+      **mac 腿**：第 1 趟红在 `HeytaMacWidget.appex: A timestamp …`、第 2 趟红在**另一枚对象** `Heyta-1.0.0.dmg: A timestamp …`
+      （而 `.app` 那半一路绿到"打包后的 .app 能起来"）、第 3 趟全绿 ⇒ 判"瞬时"的证据是**失败对象在两趟之间移动而输入零变化**，
+      不是"我在副本上手动签一次能过"（那句只证当下能用）。正文进环境陷阱 **#467**，含第二条装置事实：
+      同一枚私有落点重跑会清空 `HEYTA_MACOS_DIST_DIR` ⇒ 两趟红趟只留下日志、没留下当时的产物。
+      绿趟读数：9 个 chunk 的**安装对账**通过 + `窗口 2318x1508、webview 内容占比 100.0%、主蓝 997` + 公证 `Accepted` 且票据装订校验过 +
+      装机件 `CDHash=18bbf00e…`／`Timestamp=18:17:22`（接手时那枚是别线 11:23 装的 `11677d3e…`）。
+      **ios 腿**：`已装的包比源码新` + `窗口 1206x2622、内容占比 58.8%、主蓝 4091`；pod 第 1 趟 `[!] Error installing hermes-engine`
+      第 2 趟成功（与 r108/r110 那条非确定性记录一致），同趟 `pod install` 改了 `Podfile.lock` **2 行** ⇒ 这一腿带一枚**已登记的偏离**，
+      不属"只含已提交内容"那一档。⚠️ 别拿主检出的 `Pods/` 复用给载体：两棵树 `Podfile.lock` 不同（md5 前 8 `108e1a02` vs `c8391ea4`）。
+      🔴 **windows / android 两腿没跑**：四枚 ssh 别名逐枚现量全不可达（打包机电源不在本线可及范围，仓内无经授权的唤醒配方）。
+      脚本汇总段自己会写「不在 `--only` 范围 —— 这端**没有**验证当前产物」⇒ **这趟不叫四端全过**。
+      ✅ **深浅两档新增的那格**：iOS 装机态用 `xcrun simctl ui <UDID> appearance` 取了**控制配对**两档
+      （浅色 `内容 58.65%／主蓝 4091`、暗色 `内容 99.84%／主蓝 4093`，两张都人眼看过 = 同一张联网同意面板，无截断、无白压白），
+      取完还原成接手时的浅色基线。mac 装机态那张落在**暗档**，但那是宿主"按时间自动切外观"自己切的
+      （现量 `defaults read -g AppleInterfaceStyleSwitchesAutomatically` ⇒ `1`）⇒ 只能说"这趟落在暗档"，
+      **不是**"同一趟内取了明暗配对"（浅色档的 mac 装机态读数在 r110）。⚠️ 配对尺那句：`内容占比` **不能跨档比大小**
+      （它量的是偏离主色的像素比例，暗档整屏近黑、卡片与背景互偏 ⇒ 占比自然高），两档都远高于 0.05 下界才是信息量。
+      ⚠️ 两枚旧限定语按本趟现量重读：⑴ "不证 `origin/main`（本地未 push）"已过期 —— `git rev-list --count origin/main..HEAD` 与反向**都是 0**；
+      ⑵ 上一格那句"本会话没有跑第八趟"就是本格。全部读数与出处
+      [`apps/web/evidence/ux-final-20261018/reinstall-r128/RESULT.md`](../../apps/web/evidence/ux-final-20261018/reinstall-r128/RESULT.md)（另有 `provenance.txt` 七条前置/偏离现量）。

@@ -2069,7 +2069,7 @@ node research/tools/blocker-evidence-audit.mjs --distribution
 | **5** | `… --five-readings` | **`null` · `9` · `2` · `links` · `1`**（🔴 **2026-10-18 变了**：那 275 条已全部按逻辑分组入库并推送 ✅；现在这 **1** 条是**另一条线的未跟踪目录** `apps/web/evidence/ux-final-20261018/`（工具的回显自己写着「其中 `apps/landing` **0**」）⇒ 不属于本线、也没碰它） |
 | **6** | `… --unrunnable` | **31 条**不能靠跑命令更新（§0.2 的 4 个 ✅、§9.10 的 10 个 ✅ 两条子集都成立）⚠️ **这个数会随我加行而涨**，不是"进度"|
 | **7** | `… --self-test` | **40 臂 / 0 失败** |
-| **8** | `check:docs` · `check:md-tables` · `check:doc-citations` · `check:gate-wiring` | **0 · 0 · 0 · 0** ✅（🔴 **2026-10-17 变了**：`check:docs` 那 1 是并行线的，他们修好了 ⇒ 四条全绿）（⚠️ `check:docs` 那 1 是**并行线的**：`product-ux-optimization.md` 链到一个**未跟踪**的 `RESULT.md`）|
+| **8** | `check:docs` · `check:md-tables` · `check:doc-citations` · `check:gate-wiring` | **1 · 0 · 0 · 0**（🔴 **2026-10-18 变了**：那 1 是**并行线的未跟踪证据文件** `apps/web/evidence/ux-final-20261018/reinstall-r128/RESULT.md` 里的链接指向未入库路径 —— 不是本线改的，也没动它；本线当日四次门禁都跑过 `0 0 0 0`）（🔴 **2026-10-17 变了**：`check:docs` 那 1 是并行线的，他们修好了 ⇒ 四条全绿）（⚠️ `check:docs` 那 1 是**并行线的**：`product-ux-optimization.md` 链到一个**未跟踪**的 `RESULT.md`）|
 | **附** | `node scripts/safe-table-row.mjs --self-test` | **15 臂 / 0 失败**（2026-10-17 加了 4 条 `--line` 臂） |
 
 > ⚠️ **这张表的数字是 2026-10-17 的快照** —— 而它**上一版就已经全错**（写着 `--all` **15 项**、`--self-test` **38 臂**、门禁"四条全 rc=0"），因为那一版之后**又加了 11 项判据、2 条臂、并多了一条并行线的死链**（`B172`）。

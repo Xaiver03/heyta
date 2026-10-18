@@ -44,7 +44,7 @@
 | #27 macOS 空窗定性 | ✅ **不再是"间歇未裁决"**：同实例、同瞬间两张分读第三次量到（r110：窗口那张 content 0.0%／`looksBlank=true`，壳自己 `takeSnapshot` 那张 74.6%／主蓝 997）⇒ 装出来的壳画了，缺的是窗口服务器那张里的 WebView 层。判据一直数的是快照，**没有一行判据依赖窗口图** | 台账「2026-10-15 05:3x」那一格（含三张表的逐枚读数与现量命令，末尾那张**两轴表**把"窗口图为什么有时像空窗"讲死了）。✅ `check:macos-window` 本机实跑 **RC=0**，它自己那张窗口图人已看：**近白空窗 + 三个红绿灯点 + 底部一行诊断标签**，`内容 5.4%` ⇒ 那条 `looksBlank` 的绿是壳自己的 `webNote` 托着的，**不是应用**（所以它判的是"壳连自己的标签都没画"，不是"UI 画出来了"）|
 | #34 探针改进 | ✅ 两枚：按 pid 锁死寻址 + 窗口数为 0 时分辨两种成因；顺带去掉一处会冷启动 Safari 抢焦点的写法 | `scripts/qa/macos-installed-widget-help.sh`，提交 `630fb57e` `1f00bb59` |
 | #34 壳级两格 | ✅ **闭了**（后台诊断链，零前台激活、零录屏权限） | 提交 `91c6da3a`；读数 `apps/desktop-macos/evidence/widget-help-dom-20261011-r92.txt`；复跑 `bash scripts/verify-macos-widget-help.sh` |
-| 第 4 步 四端重装 | ✅ **第六趟（r110）跑完，`REINSTALL_RC=0`**，而且是**本线第一次带着"真的会进包的产品改动"跑**（载体 `../heyta-wt-r110` @ `fd5c2fb1`、起跑 `dirty=0`、`load1=42.18` 没调阈值）。第五趟 r108（`769e6258`）那批读数仍在库。⚠️ r110 的三处偏离必须一起读：**ios 那腿被 `pod install` 改了一行 `Podfile.lock`**、**四端跑出来全是浅色**（"深浅两档都装过"仍不成立）、与 `fd5c2fb1` 的差集是 3 枚非构建输入的台账件 | 台账「2026-10-15 05:5x」那一格；证据包 [`apps/web/evidence/ux-final-20261015/reinstall-r110/`](../../apps/web/evidence/ux-final-20261015/reinstall-r110/RESULT.md)（逐端判据 + 五张人看过的图 + 包内名册）。🔴 全部**不证 `origin/main`**（本地未 push）、**不证小组件卡片在桌面里换了字**。🔴 **10-16 15:3x 第八趟没跑，因为现量证明"跑了也不会改变被测物"**：`git diff --name-only fd5c2fb1..HEAD -- packages apps/mobile/android apps/mobile/src apps/desktop-macos apps/desktop-windows/src apps/desktop-windows/app apps/web/src apps/web/app server/src`⇒ **枚数 0**（同一件事的另一种问法也现量过：`git log --name-only --format= fd5c2fb1..HEAD` 里碰这些路径的提交 **0 枚**，`fd5c2fb1` 是 `HEAD` 的祖先 yes）。也就是说 r110 那一趟装上四端的**打包输入源码**逐字等于当前 HEAD，再跑一趟只能换一枚"由本线命名的载体出处"，换不掉任何一端的被测物。⚠️ 这条差集**只覆盖 git 跟踪的打包源码**：它不证"产物字节等于用 HEAD 重建的字节"（构建工具链、`bridge-bundle/` 与 `Generated/HeytaTokens.swift` 那两枚派生输入、lockfile 之外的隐式输入都不在这把尺的范围里），也不证装机态那枚包就是 r110 那一趟的产物 ——Android 那端磁盘上现在这枚是**别线 10-15 13:39 那一趟**装进去的（`lastUpdateTime` 现量），本线没核过它的载体。⇒ 判据形状：**"要不要再跑一趟重装"先算打包输入差集，别按"距离上一次过了几天"排**（同一族见环境陷阱 #171/#178） |
+| 第 4 步 四端重装 | ✅ **第六趟（r110）跑完，`REINSTALL_RC=0`**，而且是**本线第一次带着"真的会进包的产品改动"跑**（载体 `../heyta-wt-r110` @ `fd5c2fb1`、起跑 `dirty=0`、`load1=42.18` 没调阈值）。第五趟 r108（`769e6258`）那批读数仍在库。⚠️ r110 的三处偏离必须一起读：**ios 那腿被 `pod install` 改了一行 `Podfile.lock`**、**四端跑出来全是浅色**（"深浅两档都装过"仍不成立）、与 `fd5c2fb1` 的差集是 3 枚非构建输入的台账件 | 台账「2026-10-15 05:5x」那一格；证据包 [`apps/web/evidence/ux-final-20261015/reinstall-r110/`](../../apps/web/evidence/ux-final-20261015/reinstall-r110/RESULT.md)（逐端判据 + 五张人看过的图 + 包内名册）。🔴 全部**不证 `origin/main`**（本地未 push）、**不证小组件卡片在桌面里换了字**。🔴 **10-16 15:3x 第八趟没跑，因为现量证明"跑了也不会改变被测物"**：`git diff --name-only fd5c2fb1..HEAD -- packages apps/mobile/android apps/mobile/src apps/desktop-macos apps/desktop-windows/src apps/desktop-windows/app apps/web/src apps/web/app server/src`⇒ **枚数 0**（同一件事的另一种问法也现量过：`git log --name-only --format= fd5c2fb1..HEAD` 里碰这些路径的提交 **0 枚**，`fd5c2fb1` 是 `HEAD` 的祖先 yes）。也就是说 r110 那一趟装上四端的**打包输入源码**逐字等于当前 HEAD，再跑一趟只能换一枚"由本线命名的载体出处"，换不掉任何一端的被测物。⚠️ 这条差集**只覆盖 git 跟踪的打包源码**：它不证"产物字节等于用 HEAD 重建的字节"（构建工具链、`bridge-bundle/` 与 `Generated/HeytaTokens.swift` 那两枚派生输入、lockfile 之外的隐式输入都不在这把尺的范围里），也不证装机态那枚包就是 r110 那一趟的产物 ——Android 那端磁盘上现在这枚是**别线 10-15 13:39 那一趟**装进去的（`lastUpdateTime` 现量），本线没核过它的载体。⇒ 判据形状：**"要不要再跑一趟重装"先算打包输入差集，别按"距离上一次过了几天"排**（同一族见环境陷阱 #171/#178）。🔴 **上面那句"第八趟没跑"到 10-18 已被它自己的判据翻案**：同一把尺在 `25f544bd..f8d7155e` 上量到 **98 枚**打包输入差集 ⇒ 这一趟换得掉被测物，于是跑了 **r128（第八趟）**：载体 `head-r128` @ `f8d7155e`、`dirty=0`、`BUILD_RC=0`（起数 20／`Failed` 0／`Done` 20）、**mac 腿第 3 趟全绿**（9 chunk 安装对账 + 装机态 `内容 100.0%／主蓝 997` + 公证 `Accepted` + 装机件 `CDHash=18bbf00e…`）、**ios 腿绿**（`已装的包比源码新` + `内容 58.8%／主蓝 4091`，带 `pod install` 改 2 行 `Podfile.lock` 那枚已登记偏离）、**windows/android 两腿仍没跑**（打包机四枚别名逐枚现量不可达）⇒ **这趟不叫四端全过**。✅ 另补上一格欠的深浅两档：iOS 装机态取了**控制配对**两档（浅色 58.65%／4091、暗色 99.84%／4093，两张人眼看过，取完还原浅色基线），mac 装机态那张落在暗档但那是宿主"按时间自动切外观"自己切的（`AppleInterfaceStyleSwitchesAutomatically=1`）⇒ 只能说"这趟落在暗档"，不是"同一趟内配对"。证据包 [`apps/web/evidence/ux-final-20261018/reinstall-r128/RESULT.md`](../../apps/web/evidence/ux-final-20261018/reinstall-r128/RESULT.md)（另有 `provenance.txt` 七条前置/偏离现量；"A/B 只证当下能用、失败对象会移动才是瞬时的证据"那条形状进环境陷阱 #467） |
 
 | 逃生门那一格（§8.2 前提） | ✅ **macOS 半已有真壳读数**（r96 关臂 + r97 默认臂配对，两臂都 `DIRTY_PATHS=clean`）：门关掉后 `storagePort` 与 `heytaStorage` 双双为 false，而 `heytaWidget` 仍在 ⇒ 面板仍是原生形状、0 行安装引导 | 台账「逃生门关掉后还认得壳」那格；两臂各一条命令：`HEYTA_SHELL_STORAGE=0 …` 与去掉前缀的同一句。⚠️ **Windows 真实 WebView2 那一半仍开**（那条 e2e 注入的是合成信号） |
 | 第 5 步 归属对账 | ✅ #26/#29/#31 已闭合、#28 留口径、#39 归 inbound-core；🔴 **#35 那句"归 apps/web 在飞那批"已被 10-13 05:1x 的现量取代**（那批落地后按台账指定动作闭合，见第五节第 4 行），第 5 步到这里**没有"仍挂在别人未提交批次上"的欠项** | 台账「第 5 步跑完」「check:image-license」「W5 那格 05:1x 闭合」三格 |
@@ -149,7 +149,7 @@ PY
       （现量 `git grep -n -A6 'interface CommentLike' HEAD -- packages`）⇒ `CommentThread.tsx` 那处 `c.id` 不再对不上。
       先导读数：主检出 `NO_COLOR=1 pnpm -r typecheck` **rc=0**（⚠️ 那一趟的工作树另有三枚**在飞的 `.md`**：
       `git status --porcelain` 回 `BLOCKED.md`／`PROGRESS.md`／`docs/runbooks/deployment.md`，三枚都不在打包输入里 ⇒ 不影响这条 typecheck 的结论）。
-      🔴 **但 typecheck 过不等于 build 过**（r125 就是 install 绿、build 红的形状），所以本格仍按 `Failed==0 且起数==20` 那把尺判 —— 第八趟已在新载体 `head-r128` 起跑 |
+      🔴 **但 typecheck 过不等于 build 过**（r125 就是 install 绿、build 红的形状），所以本格仍按 `Failed==0 且起数==20` 那把尺判 —— 第八趟已在新载体 `head-r128` 起跑，**10-18 18:2x 跑完：那把尺取到 `BUILD_RC=0`／起数 20／`Failed` 0／`Done` 20**，逐端读数见 §四 第 4 步那一行的末尾 |
 | 35 | ✅ **r126：把 r124 留下的「两处未分开差别」各自作用完 —— 两处都不是原因，那枚键盘步红现在复现不出来**（`apps/mobile/evidence/ux-final-20261017/ios-keyboard-attribution-r126/RESULT.md`）。2×2 四格全绿（清单行/时间线行 × 有无「展开排期→收起排期」，每格 `keyboardTop=545`、详情在场、留图），臂 4 就是旅程原形；两处前置都被**真作用过**有几何为证（收起排期后两枚「标题」的 y 到 -579~-618，`recover_detail_title` 的反向滑动带回 `[16,184,370,44]`）。整条旅程又在**两台载体**上各 14/14 绿 —— 一台是共享 reinstall 载体 `EAAD1B66`，另一台正是 r124 那批红点名的旧载体 `FE195661`（boot + 装同一枚 bundle + 全新安装态，跑完还原 `Shutdown`），被测包与 r124 同一枚（包内 mtime 13:39:12 / 提交 `25f544bd` / 落后 HEAD 72 笔）⇒ 「差在包」从一开始就不成立。🔴 **这一趟自己踩掉两枚探针坑，前两批读数改名留档、不作数**：① 当前视图名硬写成「四象限」而载体实际是「列表」；② 更贵的——拿「任务标题在树里」当「已在时间线视图」的证据，而它在列表视图里也在 ⇒ 那两臂其实没换视图却给了绿，第三批换成移动端独有表头 `未排期（4）` 才钉住。⚠️ **成因那一档不许被写成结论**：唯一还站得住的方向是「那一批的运行条件」，但 r124 几臂没把 `loadavg` 入册（现量 `grep -n "load\|负载" bilingual-locators-ios-r124/{RESULT.md,closeout.txt,setup.log}` 输出为空）⇒ 无法从既有记录判真假；本线不写「已修」也不写「环境抖动」，判据原样保留（它能红，r124 就是它红的）。🔴 另登记一条**别线名下**的空断言（不改）：`tasks-ux-ios.py:75` 的 `timeline_group_label` 取的是 web 的 aria 键 `web.timeline.aria.group`，移动端表头其实是 `web.board.unscheduledLane`（`timeline-labels.ts:97`），而它只在 `:467` 的 ANY-of `wait_labels` 里 ⇒ 永不成立也不影响那一步过，「已在时间线视图」在 iOS 旅程里没有任何一层在断。`BLOCKED.md` 记在 B224（B222 的续）。 |
 | 36 | ✅ **10-18 17:2x r127 已裁决：那一横条本来就是 `ScrollView horizontal`，滑一下第三枚整枚进屏 ⇒「可滚」，不是真溢出**（本格原先登记的是"未裁决"）：iOS 批量选择操作条**第三枚按钮被右边缘切掉**（待办 #83，本线名下）。人看图那一层量到的形状：中文两格看得见「批量删」半截（已选 1 项 / 已选 2 项各一格），英文同一位置只剩一条红边残片 ⇒ **两语态同形，不是翻译宽度问题**。判据是**先分「可滚 vs 真溢出」再决定修布局还是加滚动指示**，不许一上来就"修"（同族见第 14 格与 §四 第 17 格那两格的做法） | **本线**（装置已就位、阻塞已清） | 装置 `apps/mobile/evidence/ux-final-20261017/ios-bulk-bar-r127/probe5-bulk-bar-scroll.py` —— 行为判据，不看像素：进选择态 → 在批量条的 y 带内左滑 → 再读一次各按钮的 x，**有位移 ⇒ 可滚**；一动没动而仍有按钮 `right > 屏宽` ⇒ **真溢出**；两种都不是就照实登记"这趟没复现出裁切"。跑法 `python3 <那枚路径> --udid EAAD1B66-80A3-4A51-957C-298DAF22F057`。⚠️ 10-18 第一趟红在 `ensure_on_tasks()`，**根因不是产品**（companion 被上一趟收尾收掉 ⇒ 静默空树，见 §三 那一格与环境陷阱 **#462**；现已重拉、量到 `nodes=11`）。🔴 两条读法边界：库里那枚 `probe5-bulk-bar.json` 是**失败趟的部分写出**（只有 `startedAt` + `udid`，一条读数都没有），它被 `b31ad37e` 那笔"213 件"顺手收进了 `main` ⇒ **别读成结果**；同趟的 `probe5.log` 不在库里，因为 `apps/mobile/.gitignore` 的 `*.log`（现量 `git check-ignore -v <那枚 log>`）。 **裁决读数**：屏宽 402 下「批量删除」`x=293 right=412 inside=False`；在**按钮那一行** y=208 左滑之后三枚各位移 -34/-35、 被裁那枚 `right=377` 整枚进屏、两张截图 sha 不等 ⇒ `verdict=可滚`（逐枚 frame 与位移表在 `apps/mobile/evidence/ux-final-20261017/ios-bulk-bar-r127/RESULT.md`）。 🔴 **第一趟那句"真溢出"是探针自己造的**：滑动的 y 取成了上一条计数行的 145，那一滑根本没打在可滚容器上， 而两张图逐字节相同 —— 传输层 `rc=0` 不等于"作用到了被测容器"（正文在环境陷阱 **#465**， 失败趟改名留档 `probe5-bulk-bar-run2-SWIPE-MISSED-THE-ROW.json`）。 ⚠️ **残留一格登记、未改代码**：`showsHorizontalScrollIndicator={false}` ⇒ 静止态没有任何"还能滚"提示， 被裁的第三枚看起来就像画到屏外（r124 正是这样误登记的，本格的代价就是这一趟）；按 §四 第 14 格同族口径 降级成**可发现性**问题 —— 加哪种提示（边缘渐隐／滚动条／换行）属界面那一线的设计取向，本线不代改。 ⚠️ 射程三句：只在 `zh-CN` 一档取帧读数（英文／Android／深色未测）；被测包是设备上那枚（mtime 10-18 11:29， **本线没核它的构建载体**）⇒ 不证 `HEAD`；这趟在共享载体上留了 `BulkA/B<stamp>` 残迹，本线不代删。 |
 
@@ -241,19 +241,28 @@ PY
    同一趟清掉了本线自己造的一枚探针缺陷（滑动 y 打在上一条计数行 ⇒ 假"真溢出"，环境陷阱 **#465**）。
    🔴 这一族留给下一位的只剩两样：① 静止态**没有"还能滚"提示**（`showsHorizontalScrollIndicator={false}`）——
    那是界面那一线的设计取向，本线按 §四 第 14 格同族口径只登记不改；② 英文／Android／深色三档的帧读数没取。
-2. 🔄 **Goal 第 4 步「从最终源码四端构建重装」第八趟：前置已清、正在跑**（10-18 17:4x）→ §四 第 34 行末尾那条复量。
+2. ✅ **Goal 第 4 步「从最终源码四端构建重装」第八趟跑完（10-18 18:2x，r128）** → 逐端读数在 §四 第 4 步那一行末尾，出处与偏离在 `provenance.txt`。
    r125 登记的两条根因**都由各自的线自己解决了**（两枚 `app-host` 模块已进 HEAD、`CommentView extends CommentLike` 且 `CommentLike` 有 `id`），
-   主检出 `pnpm -r typecheck` rc=0 是先导读数。载体 `~/heyta-carriers/head-r128` @ `f8d7155e`、`dirty=0`、
-   `pnpm install --frozen-lockfile` **RC=0**（暖 store，6.1 秒；r125 那一趟冷 store 是 1h11m ⇒ 别拿时长判装置对不对）。
-   差集现量支持"这一趟有意义"：`git diff --name-only 25f544bd..HEAD -- <打包输入路径>` 回 **98 枚**（其中 `apps/mobile/` 13 枚）。
-   判据仍是 `Failed==0 且起数==20`，随后 `HEYTA_REINSTALL_TMP_DIR`（**要先 `mkdir`，否则 RC=4**）跑四端。
-3. **深浅两档的「装机态」那一半仍没读数**：六趟重装里四端**跑出来全是浅色** ⇒ "深浅两档都装过"这句今天不成立
-   （这条偏离写在 §二 第 4 步那一格，别被"重装绿了"盖过去）。要闭它得让重装那趟带上暗档读数 ——
-   现有判据只判浅色，**这是本线名下、能自决但要动装置的一条**。
+   本线一个字没代改。这一趟实际取到：`BUILD_RC=0`（起数 20／`Failed` 0／`Done` 20）、**mac 腿第 3 趟全绿**（前两趟红在**不同对象**上，
+   那条形状进环境陷阱 **#467**）、**ios 腿绿**（带 `pod install` 改 2 行 `Podfile.lock` 那枚已登记偏离）。
+   🔴 **仍然欠的只有两腿**：windows / android 要在打包机上打，四枚 ssh 别名逐枚现量全不可达（那台机器的电源不在本线可及范围）
+   ⇒ **别把 r128 读成"四端全过"**，脚本汇总段自己会写那两行「不在 `--only` 范围」。
+3. ✅ **深浅两档的「装机态」那一半：iOS 已有控制配对，mac 落在暗档**（10-18 18:2x）。
+   本线用 `xcrun simctl ui <UDID> appearance dark|light` 在同一枚新装的包上取了两档（浅色 `58.65%／主蓝 4091`、暗色 `99.84%／4093`，
+   两张都人眼看过：同一张联网同意面板，无截断、无白压白），取完**还原成接手时的浅色基线**。
+   🔴 **本格同时更正本文件先前两句**：① "六趟重装里四端跑出来全是浅色"是**当时那几趟的读数**，不是宿主行为 ——
+   现量 `defaults read -g AppleInterfaceStyleSwitchesAutomatically` ⇒ `1`，宿主按时间自动切档，所以傍晚那趟的 mac 装机态自然落在暗档；
+   ② 那句「现有判据只判浅色」**不成立**：`scripts/reinstall-all.sh` 的 `shot_ok` 走的是 `countBrandBlue`（两套主题相加，
+   注释里明写"只数浅色 `#2563EB` 会把正确的安装判成红的"）⇒ **判据本来就认两档**，缺的一直是"装机态有没有第二档的读数"，不是判据。
+   ⚠️ 读法边界：`内容占比` 那枚数**不能跨档比大小**（它量偏离主色的像素比例，暗档整屏近黑 ⇒ 占比自然高），
+   两档都远高于 0.05 下界才是信息量。剩下没做的只有 windows/android 两端的装机态两档 —— 与第 2 枚同一前提。
 4. **#85 iOS 旅程"已在时间线视图"那一步断的键永不成立**（**别线名下**，判据口径不代改）→ §四 第 35 行末尾 + `BLOCKED.md` B224。
    环境陷阱 **#463** 已经把形状与"反臂怎么写"落好了，行主要落笔时可直接抄。
-5. **#84 main 今天打不出包的两条新根因**（**别线名下**）：就是上面第 2 枚的前置，单独立一枚待办是为了别让"重装"这句话
-   把它的可复现读数丢掉。
+5. ✅ **#84「main 今天打不出包的两条新根因」已由各自的线自己解决**（10-18 18:2x 现量）：`head-r128` 上
+   `NO_COLOR=1 pnpm -r --no-bail build` ⇒ `BUILD_RC=0`、起数 20／`Failed` 0／`Done` 20。
+   单独立那一枚待办的目的（别让"重装"这句话把可复现读数丢掉）已达到，读数就在 §四 第 34 行末尾与本文件第 2 枚。
+   ⚠️ 本格**不判**"以后也不会红"：那两枚根因的形状（只进索引未提交的模块 / 两笔提交各自成立但类型对不上）都在别线名下，
+   下一次 `main` 红不红要重取那把尺，不按本格的绿推。
 6. **三枚早就在册、归属未变的红**：#39 `check:image-license`（归 `packages/inbound-core` 所有者）、
    #42 `check:integration-coverage`（归自动收集线）、#59 macOS 上"真的调用了 `NSWorkspace.open`"那一步仍未观测
    （那需要前台激活，AGENTS §6.2 规定二禁着）→ 分别见 §四 第 5、6、2 行，各带一条现量命令。
