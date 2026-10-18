@@ -796,8 +796,13 @@ export async function fiveReadings(root) {
   } catch { out.push({ k: 'B8 支付适配器', v: '（读不到 server/src/billing）' }); }
   // ④ A4 提审
   try {
-    const g = execSync('grep -rho \'"betaAppReviewSubmission":{"[a-z]*"\' apps/web/evidence/ 2>/dev/null | sort -u', { cwd: root, encoding: 'utf8' }).trim();
-    out.push({ k: 'A4 iOS 提审', v: g.includes('data') ? '有 data（去看它是什么）' : 'links（= 0 次提交）' });
+    // 🔴 **2026-10-18 换口径**：旧式子是 grep `"betaAppReviewSubmission":{"[a-z]*"` 再判 `includes('data')` ——
+    //    而**原始响应里的 `links` 关系字段**也会命中那个形状 ⇒ "有留档"与"没留档"读出来一样。改读**审核状态本身**：
+    //    值域是 Apple 的枚举（`WAITING_FOR_REVIEW` / `IN_BETA_REVIEW` / `BETA_APPROVED`…）；没有留档就没有值 ⇒
+    //    当场验过它会失败：对没有该字段的目录跑同一条 grep ⇒ 无命中 ⇒ 落回 `links（= 0 次提交）` 分支。
+    const g = execSync('grep -rho \'"betaReviewState" *: *"[A-Z_]*"\' apps/web/evidence/ 2>/dev/null | sort -u', { cwd: root, encoding: 'utf8' }).trim();
+    const m = /"betaReviewState" *: *"([A-Z_]+)"/.exec(g);
+    out.push({ k: 'A4 iOS 提审', v: m ? `${m[1]}（有留档）` : 'links（= 0 次提交）' });
   } catch { out.push({ k: 'A4 iOS 提审', v: '（grep 失败）' }); }
   // ⑤ A2 /download 还差几个文件
   try {
