@@ -34,6 +34,23 @@
  * 反过来，**没有订单号**的到账（旧兼容路径：adapter 自己声明 `oneTimeGrant`）
  * 在库里没有可对账的那一行 —— 那种事件一律拒退（`NOT_CHECKOUT_ORDER`）。
  * 这不是"实现得糙一点"，而是**只在能算对的地方动手**。
+ *
+ * ## 🔴 公开页那句话与这里**不一致**（2026-10-16 查实，两处）
+ *
+ * 由 [ADR-0053](../../../docs/adr/0053-refunds-only-for-countable-segments.md) §1 那张表
+ * 第 44 行定下的是：**支付成功起 `7×24h` 内 —— 或运营带理由批了例外 —— 才退**，
+ * 否则 `WINDOW_PASSED`。**本文件与 ADR 一致**；**是对外正文越界了**：
+ *
+ * 1. [`packages/legal/src/documents/subscription-refund.ts`](../../../packages/legal/src/documents/subscription-refund.ts)
+ *    写「支付 **7 日之后**提出：按**剩余未使用天数**的比例退款」——
+ *    这比已接受的决策**更宽**。用户据此主张、而服务端只会拒。
+ *    这正是本文件抬头点名的同一类事故（"界面说能退、服务端拒"）。
+ * 2. 同一份正文写 7 日内「**且未实际使用**」才全额退，而 `RefundDenialReason`
+ *    里**没有任何"用过"这一条** ⇒ 这个窗口**不看使用**。
+ *
+ * ⚠️ **改哪一边要产品拍板**（不是本文件的作者能定的）。
+ * 在这两条对齐之前，别把这里改成"比例退"去迁就文案 —— 那会推翻 ADR-0053。
+ * 对账与两个待决项见 `docs/plans/launch-blockers.md` 的 **B9**。
  */
 import { SUBSCRIPTION_PERIOD_DAYS } from '@heyta/domain';
 
