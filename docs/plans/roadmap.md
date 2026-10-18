@@ -2,8 +2,8 @@
 
 > 状态：**进行中** —— P0、P1 已完成，P2 进行中
 > 前置决策见 `docs/reference/architecture.md` §0；复用依据见 `docs/research/reuse-plan.md`。
-> P1 的详细计划见 `docs/plans/phase-1-single-client-loop.md`。
-> P2 的详细计划见 `docs/plans/phase-2-multi-platform.md`。
+> P1 的详细计划见 `docs/plans/archive/phase-1-single-client-loop.md`。
+> P2 的详细计划见 `docs/plans/archive/phase-2-multi-platform.md`。⚠️ **2026-10-16 更正：那一份已作废** —— 它被 `multi-platform-adaptation.md` 与 `desktop-native-migration.md` 取代，后两者又由 [`multi-end-unified-strategy.md`](multi-end-unified-strategy.md) 收敛（见 [计划层索引](README.md) §二）。**当前唯一权威主计划是 `multi-end-unified-strategy.md`，本文件 §5「下一步动作」已由它 §11 取代。**
 > **AI 能力线与开发分支策略见 `docs/plans/ai-capability-branches.md`**（与 P2/P3 **并行**，不是下一个阶段）。
 > AI 的数据路径决策见 [ADR-0005](../adr/0005-ai-data-path.md)（✅ 已接受）。
 
@@ -25,8 +25,8 @@
 | 阶段 | 目标 | 交付判据 | 状态 |
 |---|---|---|---|
 | **P0 奠基** | 工程骨架 + 实体模型 + 服务端跑通 | 能在 Docker 上完成一次真实的「A 端写入 → B 端同步可见」 | ✅ **已完成**（2026-09-25） |
-| **P1 单端闭环** | 1 个端（Web）跑通核心功能 | 任务/清单/四象限/习惯/番茄钟可用，能同步 | ✅ **已完成**（`pnpm verify:p1` 自带真实服务端，跑 11 条零 mock E2E，含"真实点击 `ConflictDialog` → 双端收敛"两条）→ [详细计划](phase-1-single-client-loop.md) |
-| **P2 多端补齐** | 桌面 + 移动 | 存储可替换（同一套契约跑遍所有实现）+ 原生端 SQLite，共享同一套核心 | 🔄 **进行中** → [详细计划](phase-2-multi-platform.md) |
+| **P1 单端闭环** | 1 个端（Web）跑通核心功能 | 任务/清单/四象限/习惯/番茄钟可用，能同步 | ✅ **已完成**（`pnpm verify:p1` 自带真实服务端，跑 11 条零 mock E2E，含"真实点击 `ConflictDialog` → 双端收敛"两条）→ [详细计划](archive/phase-1-single-client-loop.md) |
+| **P2 多端补齐** | 桌面 + 移动 | 存储可替换（同一套契约跑遍所有实现）+ 原生端 SQLite，共享同一套核心 | 🔄 **进行中** → [详细计划](archive/phase-2-multi-platform.md) |
 | **P3 平台特有能力** | 小组件、通知、CalDAV 双向同步 | 依赖前两阶段 | ⏸ |
 
 ### 1.1 并行轨道：AI 能力线
@@ -58,7 +58,7 @@ API 数据出口），已刻意放在**非 AI 分支** —— 理由见该计划
 
 它的起点是一个诊断：heyta 缺的不是功能，是**回路** —— 打卡之后界面只把按钮从
 「打卡」变成「已打卡」，然后什么都没有，用户收不到任何"我做了一件有用的事"的信号。
-心理学证据、竞品拆解与反需求见 [激励与成长体系设计](motivation-and-progression.md)。
+心理学证据、竞品拆解与反需求见 [激励与成长体系设计](archive/motivation-and-progression.md)。
 
 | 层 | 内容 | 状态 |
 |---|---|---|
@@ -84,7 +84,7 @@ API 数据出口），已刻意放在**非 AI 分支** —— 理由见该计划
 | 真浏览器契约 | `e2e/tests/categories.spec.ts` 4 条（赋色**刷新后仍在**、真实专注进「未归类」、反需求扫描） | ✅ **已实现**（逐条注入验证会红） |
 
 ⚠️ 落地状态与实测数字见
-[活动分类与分类着色](activity-categories-and-colors.md) §8
+[活动分类与分类着色](archive/activity-categories-and-colors.md) §8
 （§8.6 真浏览器通道**已恢复**；§8.6 与 §8.7 里各有一段"仍然没有被覆盖的东西"，
 是留给下一个人的话，不是可以默认忽略的细节）。
 
@@ -160,7 +160,7 @@ worktree `.worktrees/motivation` **已删除**（相关提交仍是 `main` 的�
 > 📜 **本节是历史记录**：P0 已于 2026-09-25 完成（证据见 §1）。它保留下来是因为
 > §2.3 的实体清单决策、§2.5 的迁移纪律和 §2.6 的验收口径**至今仍是现役约束**，
 > 而 §2.1/§2.2/§2.4 描述的是"当时怎么做成的"，**不要照它重新开工**。
-> 现在的活在哪：见 §5 与 [`phase-2-multi-platform.md`](phase-2-multi-platform.md)。
+> 现在的活在哪：见 §5 与 [`phase-2-multi-platform.md`](archive/phase-2-multi-platform.md)。
 
 ### 2.1 工程骨架
 
@@ -420,9 +420,9 @@ Web 设置页有「导出数据」（JSON 完整保真 / 任务清单 Markdown�
 
 | # | 断点 | 状态 |
 |---|---|---|
-| ④⑤ | 收银台 | ✅ **服务端已通**：`POST /api/billing/checkout`（报价 → 冻结 → `createCheckout` 一条链，不可交付的档在报价前回 `409`，12 例真 SQL 测试）。❌ **客户端「付款」按钮仍缺**，且**应当与支付通道一起落地** —— 现在加必然回 `503 BILLING_PROVIDER_NOT_CONFIGURED`，正好造出落地页明确反对的那个东西。所以这一步卡在**外部资质**，不在我们这边 |
+| ④⑤ | 收银台 | ✅ **服务端已通**：`POST /api/billing/checkout`（报价 → 冻结 → `createCheckout` 一条链，不可交付的档在报价前回 `409`，12 例真 SQL 测试）。~~❌ **客户端「付款」按钮仍缺**~~ → ⚠️ **2026-10-16 更正：付款入口已存在两处且是活路径**（[`RenewPanel.tsx`](../../apps/web/src/features/subscription/RenewPanel.tsx) 挂在 `App.tsx:3281`、[`RenewSection.tsx`](../../apps/mobile/src/screens/RenewSection.tsx) 挂在 `ProfileScreen.tsx:1358`），**但两处都只买 ¥5 续费**（`checkout.ts` 的 `RENEWAL_PRICE_ID` 写死 `hosted-monthly`、不传 `priceId`），**首次购买入口仍无**（落地页 `Pricing.tsx` 刻意零按钮）。入口**应当与支付通道一起落地** —— 现在加必然回 `503 BILLING_PROVIDER_NOT_CONFIGURED`，正好造出落地页明确反对的那个东西。所以这一步卡在**外部资质**，不在我们这边 |
 | 交付半段 | ✅ **已修（2026-09-27）** | webhook 现在在**同一个事务**里：占位 `paymentEvent`（唯一约束=幂等闸）→ `settleOrderPaidInTransaction`（比**订单冻结的** `final_amount_minor`、`pending→paid`、券 `reserved→applied`）→ 用**订单冻结的 `price_id`** 覆盖 adapter 的金额启发式 → `applyPaymentEvent` → 标记 `processedAt`。`unknown-order` 回落 legacy 声明；`already-paid` 不重复授予。<br>**退款/拒付侧：曾"有意不接"**（ADR-0026 已接受 —— `reverseOrderOnRefund` 零调用方、退款事件在 `unsupported-event-type` 被拒，两条都是显式决定，不是遗漏；理由是只接订单侧会造成"账本说退款了、权益还在"的半真状态）。**这一格 2026-10-05 由 [ADR-0053](../adr/0053-refunds-only-for-countable-segments.md) 收窄**：不推翻 ADR-0026 的理由，而是把"能退的域"限到**能精确回收那一段**的订单形状，其余照旧拒发。ADR-0026 正文一字未改，只在文末追加了勘误指针。<br>**存量回填**✅ **已做（2026-09-27）**（接线前已付款但未结算的订单，重投会被幂等挡住，现在由对账补结算）—— 见下方"存量回填"条目 |
-| ⑦⑧ | ¥12 档能不能交付 | 已由 [ADR-0023](../adr/0023-managed-ai-quota-not-implemented.md) 显式判定：**计量存在之前不得被售卖**。云端 AI 端点 / 计量 / 设置页的「本周期已用 X / 300 次」**仍未做** |
+| ⑦⑧ | ¥12 档能不能交付 | ~~已由 [ADR-0023](../adr/0023-managed-ai-quota-not-implemented.md) 显式判定：**计量存在之前不得被售卖**。云端 AI 端点 / 计量 / 设置页的「本周期已用 X / 300 次」**仍未做**~~ → ⚠️ **2026-10-16 更正（本条两半都变了）**：① ADR-0023 的**结论已被 [ADR-0054](../adr/0054-managed-ai-retention-and-selling-preconditions.md) 取代**，禁售已按 0023 自己写的顺序解除（`server/src/billing/price-book.ts` 的 `NOT_YET_DELIVERABLE_SKUS = {}`；`hosted-ai-monthly` 下单返 200，由 `server/tests/billing-checkout.routes.spec.ts` 钉住）；② **端点与计量都已实现**（`server/src/ai/managed-proxy.routes.ts`、`server/src/ai/metering.ts`，`pnpm check:ai-quota` rc=0）。**真正仍未做的只剩**：客户端托管 AI 开关与 `/api/ai/managed/chat` 的调用点（`AiSupplyMode` 在 `packages/ai` 之外零引用）、法务已承诺的「本周期已用 X / 300」（`peekManagedAiUsage` 零生产调用方、服务端无读用量路由）、以及 ¥12 的客户端下单入口。🔴 **后果：¥12 档今天在服务端已可被卖出，而买到的东西在任何客户端都打不开** —— 这是本项目当前唯一"收钱不交付"的形状，见 [进度](../agents/progress-log.md) |
 | ⑨⑪ | 续费 / 退款 | ✅ **两条都有临时方案在跑（2026-10-05），都是"可改的临时态"，不是终态设计**。<br>**续费**= 再次下单顺延：`packages/app-host` 一份接线（报价 → 冻结 → 下单）被 **web 与移动壳**复用（桌面/ node-host 没有续费界面，别把这句读成"三端都有"），web 设置页 `RenewPanel` + 移动壳「我的」页的 `RenewSection`（`Linking` 打开支付串 / `Clipboard` 复制）；`SubscriptionNotice.tsx` 那句"现在不存在可跳转的续费地址"已随这次接线改掉。<br>**退款**= 单一政策常量（`7×24h` 内全额、超期默认不退、例外只走运营后台且**必须带理由**）+ `refunds` 表（迁移 `20261014000000`，三条手写 CHECK）+ adapter 退款调用 + 后台 approve/reject + 回调按 `out_refund_no + 状态` 幂等 + 权益**只回收"这一单授予的那一段"**。它如何在 ADR-0026 的硬约束下不制造半真状态（只允许能精确回收的域，其余拒发）记在 **[ADR-0053](../adr/0053-refunds-only-for-countable-segments.md)**。<br>🔴 ~~**后台的退款 tab 还没接**：今天能批准一条退款的，只有拿管理员令牌直接敲 `/api/admin/refunds*` 的人（缺口与补齐要哪五件见 ADR-0053 §5 第 10、11 条）。这一格不许读成"后台已可用"。~~ → ✅ **2026-10-05 那五件做完了**：`admin-client` 四条传输函数 + web store 一片 + 后台第八个 tab「退款」+ 中英各 36 条 + 四张真浏览器图（人都看过，见 [`pricing-coupons-handoff.md`](pricing-coupons-handoff.md) §12.8）。批准是两步、驳回一步、只有 `requested` 给按钮，而 409 的原因码现在一路走到界面（`WINDOW_PASSED` 不再被折叠成"请求无效"）。<br>🔴 **仍然不许读成"运营已经能退款"**：这台实例没配真实通道 ⇒ 批准在"发通道"那一步如实失败，界面把它如实报成没发出去。<br>🔴 **仍然卡在同一条外部资质上**：这台实例没配真实通道 ⇒ 退款在"批准 → 发通道"那一步得到 `BILLING_PROVIDER_NOT_CONFIGURED`，那是如实上报，不是静默成功。对外文案（把 7×24 写进法务条款）**未改**，属业主决定（ADR-0053 §5 第 7 条） |
 | 海外 | $5 / $12 | 🔴 **决定（2026-10-05 产品负责人）：整条海外线延后**，本轮不接 USD 通道。**币种这一头已经不是敞口**（此前本行写"缺币种断言、USD 单会被按 CNY 发出去"——那是修之前的状态，现在以代码为准）：收银台在**冻结金额之前**连拦两道，词表不认 → 400 `UNSUPPORTED_CURRENCY`（`server/src/billing/checkout.routes.ts:146`），这台实例没有该币种的通道 → 409 `PROVIDER_CURRENCY_UNSUPPORTED`（`:166-173`，注释写明了为什么必须先于冻结）；`currency` 在下单契约里**必填、无默认值**（`server/src/billing/types.ts:219-232`），微信 adapter 自己声明 `supportedCurrencies = ['CNY']`（`server/src/billing/wechat.adapter.ts:85`）。⇒ 今天不存在"按错币种收钱"这条路。<br>延后期**仍敞着的一格是对外呈现**：落地页把 `$5 / $12` 印成档位（`apps/landing/src/components/Pricing.tsx:83`，词条 `landing.pricing.hosted{,Ai}.priceUsd`），而点了只会拿到 409 —— 撤下还是标"暂未开放购买"属对外承诺，等产品负责人定措辞（本行只登记，不代拍）。<br>**真开 USD 之前必须补的最小清单**：① 一个 `supportedCurrencies` 含 `USD` 的 adapter；② 报价/冻结/回调三处金额与币种**同源**（`amountMinor` 不带币种，见 `types.ts:224`）；③ 定价 SSOT 把该通道登记成"已开"再改文案。 |
 
@@ -430,7 +430,7 @@ Web 设置页有「导出数据」（JSON 完整保真 / 任务清单 Markdown�
 
 > 🔴 **本节的原「按轨道下一步」口径已于 2026-09-29 收敛** ——
 > 它部分已过期（例如"P2 多端"轨道仍在指向已被收敛的
-> [`phase-2-multi-platform.md`](phase-2-multi-platform.md)）。
+> [`phase-2-multi-platform.md`](archive/phase-2-multi-platform.md)）。
 > **当前下一步只在 [`multi-end-unified-strategy.md`](multi-end-unified-strategy.md) §11 维护，本节不复述。**
 > 被替代的表格见本文件的 git 历史；各轨道的当前状态见 [`README.md`](README.md) 索引。
 >

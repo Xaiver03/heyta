@@ -1,5 +1,6 @@
 # 跨端交互 UX 优化计划
 
+> 状态：**进行中**（A/C/D/E 的代码与 Web 取证已落，B/F 真机读屏与四端重装待收口）
 > 对应审计：[`../research/cross-platform-interaction-ux-audit.md`](../research/cross-platform-interaction-ux-audit.md)
 > 目标：让 Web、移动端和桌面壳共享同一套任务语义，同时按输入能力提供不同的直接操控方式。
 

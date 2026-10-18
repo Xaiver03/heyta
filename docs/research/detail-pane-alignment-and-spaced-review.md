@@ -139,7 +139,7 @@
 ⇒ 这就是 **W6**，落在 `ca2cf606`（本篇后面那句"W6 落在 `ca2cf606`：`onCheckIn` 现在带 `value`"已把这件事更正过一次，
 但**上面这句"界面不可达"当时没跟着改** —— 于是先读到 ❌ 那半句的人，要往下翻很远才撞见已修）。
 
-**补打卡**：滴答是点月历任意某天；我们只有"昨天"，且要同时满足 `REPAIR_WINDOW_DAYS = 1` 与 `current === 0` 两道闸（`HabitBoard.tsx:564-592`；[`habit-resilience.ts:58`](../../packages/domain/src/habit-resilience.ts)、`:226-250`）。🔴 且 `Habit.backfillDays`（`entities.ts:300`）是**死字段**：全仓只有两处声明、**零读取方** —— 而 [phase-1-single-client-loop.md:194](../plans/phase-1-single-client-loop.md) 写着"补打卡上限由 `Habit.backfillDays` 控制"。**那句承诺从未兑现。**
+**补打卡**：滴答是点月历任意某天；我们只有"昨天"，且要同时满足 `REPAIR_WINDOW_DAYS = 1` 与 `current === 0` 两道闸（`HabitBoard.tsx:564-592`；[`habit-resilience.ts:58`](../../packages/domain/src/habit-resilience.ts)、`:226-250`）。🔴 且 `Habit.backfillDays`（`entities.ts:300`）是**死字段**：全仓只有两处声明、**零读取方** —— 而 [phase-1-single-client-loop.md:194](../plans/archive/phase-1-single-client-loop.md) 写着"补打卡上限由 `Habit.backfillDays` 控制"。**那句承诺从未兑现。**
 
 ⚠️ 归属提示：本次审计读到 `HabitsView.tsx` / `store.ts` / `HabitsScreen.tsx` / `habit-actions.ts` 是**未提交状态**（改名与删除入口刚接上）。凡涉及"改名/删除有没有入口"，以提交后的 HEAD 再核一遍。
 

@@ -1,4 +1,5 @@
 # 001 — 给 `revealVariants` 补上 transition，让入场回到设计系统的物理
+> 状态：**已完成**（已提交 18b34ce，判据见文末 Verification）
 
 - **Status**: DONE
 - **Commit**: 18b34ce

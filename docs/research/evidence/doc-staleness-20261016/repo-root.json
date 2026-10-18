@@ -1,0 +1,96 @@
+[
+  {
+    "path": "AGENTS.md",
+    "verdict": "现行",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "",
+    "summary": "AI agent 规则入口，逐节指向 docs/agents/ 分册，抽查无不符",
+    "stale_claims": [],
+    "evidence": "wc -c=13948<24KiB；§4 表 14 份 docs/agents 全在册；§6「25 条」现量=25；§8 131843B/sha 9ab3b872 均对",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "CLAUDE.md",
+    "verdict": "部分失效",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "现在 `AGENTS.md` 是**入口与索引**（13.6 KiB，现量 `wc -c AGENTS.md`），全文在 `docs/agents/`。",
+    "summary": "指向 AGENTS.md 的薄入口；仅一处体积数字过期",
+    "stale_claims": [
+      "「AGENTS.md 是入口与索引（10.9 KiB）」——现量 13948 B = 13.6 KiB"
+    ],
+    "evidence": "CLAUDE.md:8；wc -c AGENTS.md = 13948；两文件 HEAD 同为 5082fcad 且工作树干净",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "README.md",
+    "verdict": "部分失效",
+    "status_line": "> **当前状态：P0 奠基 ✅ · P1 单端闭环 ✅ · P2 多端补齐 🔄 进行中（2026-09-27）。**",
+    "suggested_status_line": "> **当前状态：P0 ✅ · P1 ✅ · P2 多端补齐 🔄 进行中。** 进度权威 = docs/plans/multi-end-unified-strategy.md（roadmap.md 已降为历史阶段账）",
+    "summary": "项目介绍/原则/快速开始；目录树与进度指向已过期",
+    "stale_claims": [
+      "`apps/web/` 注「产品主入口」；主计划已定 Web 不是主战场，移动端+macOS+Windows 才是",
+      "目录结构漏列 4 个 desktop 壳与 sync-client/ui/widget-core/legal 等包",
+      "进度指向 roadmap.md；权威已改指 multi-end-unified-strategy.md",
+      "「16 个工作区项目」现量 21 个带 package.json 的 packages/*+apps/*+server"
+    ],
+    "evidence": "multi-end-unified-strategy.md:23/48「Web 不再是功能首发地」；ls apps/ 有 desktop/desktop-{macos,windows,linux}；README.md:71,9,43",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "CONTRIBUTING.md",
+    "verdict": "现行",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "",
+    "summary": "面向人的贡献流程/门禁/评审纪律，抽查仍对得上现状",
+    "stale_claims": [],
+    "evidence": "engines node>=22、packageManager pnpm@11.8.0 均对；ci.yml:101 跑 pnpm check；刻意不写门禁条数",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "PROGRESS.md",
+    "verdict": "部分失效",
+    "status_line": "# PROGRESS — AI 审计 + 域名迁移到 waytofuture.cn + 管理后台 ／ > 上一轮（补隐私闸门缺口）的记录在 git 历史里，已被本轮取代。",
+    "suggested_status_line": "> 状态：**流水台账（多轮追加，最新在文末）** —— 开头标题只描述 2026-09-30 首轮，勿据它判断当前状态",
+    "summary": "多轮追加的流水台账（619KB），开头仍只描述首轮",
+    "stale_claims": [
+      "标题只写「AI 审计+域名迁移+管理后台」；台账已追加到 2026-10-16 自动收集线 T1–T8",
+      "开头「已被本轮取代」把文件定格为一轮记录；正文 20+ 节跨 09-30→10-16",
+      "14:5x 节开头「移动两端没跑到」被 16:57 节顶掉，仅靠后文追加改口"
+    ],
+    "evidence": "grep -n '^## ' PROGRESS.md | tail：末节「2026-10-16 16:57–17:5x · T7 第三条腿整条跑完了」；git status = M",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "BLOCKED.md",
+    "verdict": "部分失效",
+    "status_line": "**第 1、2 项已于 2026-09-30 的收尾轮解决并落地**（各自保留原文以便读推理，下面写清了\"当时的假设哪里错了\"）。第 3 项**已于 2026-09-30 当场定案并落地了第一半**（见文末）。 ／ 所以这一节**下面原来写的\"还剩两项待裁决\"已经不成立**：~~待裁决的只剩 **§3 的第二半**（四条平台门禁\"响亮跳过 ⇒ 退出 0\"要不要改成判红）、~~ **§5**（`§7 第 N 条`编号体系对不上，修它必须动 `AGENTS.md`）和 **§6**（落在别人线上）。",
+    "suggested_status_line": "> 状态：**台账（首轮 §1–§6 收尾于 2026-09-30，其后为 B1–B207）；当前待裁决以文末 B207 表为准**",
+    "summary": "待裁决台账（1MB，§1–§6 加 B1–B207），开头只管首轮",
+    "stale_claims": [
+      "开头称待裁决只剩 §5、§6；文末 B207 表另列 8 项待点头（B196/B201/B205 等）",
+      "开头只覆盖 2026-09-30 首轮 §1–§6；正文已到 B207、跨到 2026-10-16"
+    ],
+    "evidence": "BLOCKED.md:3-10 与 :11148「仍等点头的是 B196、B201、B140、B110、B202、B199 与 AC-7 那句对外措辞」",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "THIRD_PARTY_LICENSES.md",
+    "verdict": "部分失效",
+    "status_line": "> heyta 自身的许可证尚未确定，见 `docs/adr/0001-license-decision.md`（ADR-0001）。",
+    "suggested_status_line": "> heyta 自身的许可证 = **MIT**（[ADR-0001](docs/adr/0001-license-decision.md)，已接受；根 `LICENSE` 即全文）。本文件只处理第三方代码的合规义务。",
+    "summary": "第三方归属登记（vendored + 依赖清单），许可证状态行过期",
+    "stale_claims": [
+      "「heyta 自身的许可证尚未确定」——ADR-0001 2026-09-25 已定 MIT，根 LICENSE 即全文",
+      "docs/README.md:87 记 0001 =「heyta 自身的许可证选择 = MIT ✅ 已接受」"
+    ],
+    "evidence": "THIRD_PARTY_LICENSES.md:6；docs/adr/0001-license-decision.md:3「> 状态：**已接受**」；LICENSE 首行 MIT",
+    "archive_candidate": false,
+    "superseded_by": ""
+  }
+]

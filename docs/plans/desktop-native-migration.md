@@ -10,8 +10,8 @@
 > UI 由共享产物渲染。本文件保留为当时的实测证据，**不要按它去手写第二份 UI**。
 > 索引见 [`README.md`](README.md)。
 
-> 状态：**规划中**
-> 决策依据：[ADR-0034](../adr/0034-windows-native-winui3-not-rnw.md)（Windows 走 WinUI 3 / Windows App SDK 原生）
+> 状态：**部分已取代**（⚠️ **2026-10-16 更正**：原写「规划中」，与本文件上方第 3–10 行的收敛说明**自相矛盾** —— "UI 形态"部分已被 [`multi-end-unified-strategy.md`](multi-end-unified-strategy.md) §3.3/§4.3 与 [ADR-0037](../adr/0037-desktop-ui-falls-back-to-webview.md) 取代；**W0/W1 的实测结论仍然有效**，**不要按它去手写第二份 UI**）
+> 决策依据：[ADR-0034](../adr/0034-windows-native-winui3-not-rnw.md)（Windows 走 WinUI 3 / Windows App SDK 原生，⚠️ 该 ADR 自身已被 ADR-0036 取代）
 > 上位计划：[多端适配实施计划](multi-platform-adaptation.md) M2
 > 素材：[桌面端选型调研](../research/desktop-shell-selection.md)（含全部一手数字 + §8 的 2026-09-28 复核）
 

@@ -1,5 +1,6 @@
 # Goal · 多端入口覆盖 · P0+P1 补齐（2026-10-02 审计立项）
 
+> 状态：**进行中**（批一、二、四、五已落，批三 C 仍在真实边界续验；以 §4 与 ADR-0051 为准）
 > 立项依据：[`docs/research/multi-end-entry-coverage-audit.md`](../research/multi-end-entry-coverage-audit.md)（2026-10-02）。
 > 该审计清出 3 条 P0、3 条 P1、7 条 P2。本 goal 实施 **P0 全部 + P1 中可零产品裁决落地的两条**；
 > P1-3（AI 上移动端）与全部 P2 **不在本 goal**（见 §6 排除项）。

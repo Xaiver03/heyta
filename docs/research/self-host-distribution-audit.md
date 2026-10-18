@@ -371,6 +371,18 @@ G-40⑤（版本来源约定）与 G-40⑥（兼容矩阵）**仍未关** ——
 `npm install`（三条都带 `--omit=dev --ignore-scripts`），依赖的
 `@heyta/{sync-core,shared-schema,domain}` 由 `pnpm pack` 出来的三枚 tgz 就地满足；
 builder / web 两个阶段用 pnpm + `--frozen-lockfile`。
+
+> 🔴 **2026-10-16 现量更正这条清单：是四枚，不是三枚。**
+> `server/Dockerfile` 生产阶段那条 install 现在是
+> `npm install ./sync-core.tgz ./shared-schema.tgz ./domain.tgz ./inbound-core.tgz`。
+> `@heyta/inbound-core` 是**运行时**依赖（`server/dist/src/**` 里 8 个文件
+> `require("@heyta/inbound-core")`），而它此前在两个阶段都没被 COPY 过：
+> builder 阶段缺 ⇒ `server` 的 `tsc` 报 **17 处** `TS2307: Cannot find module '@heyta/inbound-core'`
+> （落在 8 个文件：`api.ts` / `automation/{ai-metering,entitlement-issuer,entitlement-ticket,events,inbound.routes,rules}.ts` / `entitlement.ts`）
+> （镜像**构建不出来**）；web 阶段缺 ⇒ `@heyta/app-host` 的 DTS 构建报同一条
+> （`packages/app-host/src/index.ts` 有一行 `export { generateInboundKeyPair, inboundPublicKey } from '@heyta/inbound-core'`）。
+> 两处都补上才建得出镜像。形状与实测读数见本节末尾的追加，以及 `server/Dockerfile` 里
+> `inbound-core` 那两段注释（builder 的 build+pack、生产阶段的 tgz）。
 ~~仓库里 `package-lock.json` / `npm-shrinkwrap.json` / `server/package-lock.json`
 **一个都不存在**（实测 `existsSync` 三发全 false）。~~
 
@@ -458,6 +470,36 @@ builder / web 两个阶段用 pnpm + `--frozen-lockfile`。
   它换了职责：从"记录 npm 这次解出什么"变成**锁↔声明的防腐烂判据** + **两种载体互证**。
 
 G-47 已按这个形状关闭（2026-10-04），不在本批做的理由是当时给的，现在已不成立。
+
+**本节末尾的追加：上面前言里那条"四枚"更正的真构建读数（2026-10-16 重取）**
+
+三趟都是真 docker（OrbStack 29.6.1 / node:24-alpine），日志在 `/tmp/heyta-head-repro.log`、
+`/tmp/heyta-head-builder.log`、`/tmp/heyta-fixed-build.log`：
+
+| 趟 | 造什么 | 读数 |
+|---|---|---|
+| HEAD 的 Dockerfile（全跑） | `git show HEAD:server/Dockerfile \| docker build -f - .` | **rc=1**，先死在 **web 阶段**：`packages/app-host build: src/index.ts(982,58): error TS2307: Cannot find module '@heyta/inbound-core'` ⇒ `ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL`（`Dockerfile:221`）。builder 阶段同批被 CANCELED，所以它的读数要走下一趟 |
+| HEAD 的 Dockerfile（`--target builder`） | 只跑 builder 阶段，避开 web 那条提前死 | **rc=1**，死在 `Dockerfile:129 RUN rm -rf dist && pnpm run build`：**17 处** `TS2307`，落在 8 个文件（上面前言里已逐条列名）⇒ 与 domain 那次**逐字同形**，是同一族的第三次现形 |
+| 这一棵树（补了 builder 的 build+pack、生产阶段的 tgz、以及 web 阶段的闭包两枚） | `docker build -f server/Dockerfile --build-arg VCS_REF=$(git rev-parse HEAD) .` | **rc=0**；构建层产物自洽那条 RUN 印出 `✅ 产物自洽：挂载 /app/ …`；生产阶段 `added 141 packages` + `added 6 packages`（prisma） |
+
+补完之后的**运行期**读数（同一个镜像里量的，镜像是 `supersync:inbound-fix-verify`，
+OCI revision = 当时 HEAD `30397e71`）：
+
+- `require.resolve('@heyta/inbound-core')` ⇒ `/app/node_modules/@heyta/inbound-core/dist/index.cjs`；
+- `dist/**` 里 4 枚 `@heyta/*` require **全部可解析**（unresolvable 0），
+  其中 `require('/app/dist/src/automation/entitlement-ticket.js')` 当场跑通 —— 这就是"runtime
+  Cannot find module"那一半的否证；
+- 四枚 tgz 装完全被 `rm -f` 掉（`/app/{sync-core,shared-schema,domain,inbound-core}.tgz` 四发 `existsSync` 全 false）；
+- 真镜像里那棵树 × 许可证门禁：`--installed-tree` 读到 **147 条 = 扫描集 127 + 镜像独有 16 + 自家包 4**，rc=0
+  （登记表**没变**：第四枚自家包走的是 `FIRST_PARTY_IN_IMAGE`，`IMAGE_ONLY_PACKAGES` 一条都没加 ——
+  `@noble/curves@2.4.0` 是 registry 层的新依赖，本来就在扫描集里，不需要登记）。
+
+锁这一层同时被重新量了一次：从这枚镜像取出 `/app/package-lock.json`，**落成** `server/package-lock.json`
+（`cp` 落盘、逐字节 `cmp` 相同，不是手改）。它与落地前那份提交物锁的差集**只有一行** ——
+`node_modules/@heyta/domain` 的 `file:` integrity（`sha512-biqGrJq8…` ← `sha512-VILYCdc+…`），
+registry 层 160 条版本与 integrity **逐条相同**。那一行是**设计上的易变部分**（§8.46 结论四：
+`npm install` 不验 `file:` 的 integrity、装当前字节），本次变的成因是并行会话当时对
+`packages/domain/src` 有未提交改动（`src/index.ts` + 新增 `src/comments.ts`）⇒ 重打出来的 tarball 字节不同。
 
 ### 8.9 台阶 0：四条对外错话——最后只有**一条**归本批，而这本身就是发现
 

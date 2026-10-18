@@ -1,0 +1,264 @@
+[
+  {
+    "path": "docs/plans/product-ux-optimization.md",
+    "verdict": "部分失效",
+    "status_line": "> 状态：**已公开分发第五批测试版 B5，协议阅读已部署 Web 并在 Android 安装包点验；完整跨端交互验收仍未完成。**（2026-10-08）",
+    "suggested_status_line": "> 状态：**进行中**（2026-10-08 起为 B5 分发；正文持续到 10-16，最新验收条已到 UX-S9-153）",
+    "summary": "产品 UI/UX/IA 优化主台账，仍进行中，正文已到 10-16",
+    "stale_claims": [
+      "状态行称「最新协议验收见 UX-S9-148」，但同文件 UX-S9-149—153 是 10-08/10-09 的后续验收条目",
+      "状态行定稿 2026-10-08，正文最新条目为 2026-10-16（四端重装、Android 组件暗色档等）"
+    ],
+    "evidence": "product-ux-optimization.md:4（指 UX-S9-148）vs :1167/:1215（UX-S9-149/153 已在文件内）；:4045「2026-10-16 00:5x」；plans/README.md:14 标「进行中」",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/goal-multi-end-coverage.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**进行中**（批一、二、四、五已落，批三 C 仍在真实边界续验；以 §4 与 ADR-0051 为准）",
+    "suggested_status_line": "",
+    "summary": "多端入口覆盖 P0+P1 goal，批一二四五已落，批三续验",
+    "stale_claims": [],
+    "evidence": "goal-multi-end-coverage.md:3 与 plans/README.md:24 状态逐字一致；§7 批三行 113 仍如实列未完成项（iOS 64 条窗口、四端当前产物收尾）",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/ai-event-tool-contract.md",
+    "verdict": "部分失效",
+    "status_line": "> 状态：**EVENT 契约已定死（实现等倒数日那条线）；覆盖面门禁 ✅ 已落地，且覆盖面已跑满**\n> （现量 **8/8**，见 §5.1）。",
+    "suggested_status_line": "> 状态：**EVENT 契约已定死；覆盖面门禁 ✅ 已落地，现量 9/10（已登记缺口 COMMENT=AI-COV-8）**",
+    "summary": "EVENT 的 AI 工具契约与覆盖面门禁；覆盖面数字已过时",
+    "stale_claims": [
+      "状态行「覆盖面已跑满（现量 8/8）」已过期：现量 9/10，且已登记缺口 1 项 COMMENT=AI-COV-8",
+      "状态行未反映目录工具数已从正文的 26 涨到 30、台账已不再为空"
+    ],
+    "evidence": "`node scripts/check-ai-coverage.mjs` → 「实体覆盖面 9/10…已登记缺口 1 项：COMMENT=AI-COV-8」「目录 30 个工具」；文件:4（8/8）vs :202（10-08 台账不再为空）",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/phase-2-multi-platform.md",
+    "verdict": "已失效",
+    "status_line": "- **状态**：🔴 **已被取代**（原文误写为\"进行中\"）",
+    "suggested_status_line": "> 状态：**已取代** → [multi-end-unified-strategy.md](multi-end-unified-strategy.md)（本文件只作历史，不要照它开工）",
+    "summary": "P2 多端补齐旧阶段计划，已被取代，只作历史",
+    "stale_claims": [
+      "整篇结论已被取代：文件自写「本文件只作历史，不要照它开工」，§2.x 的完成状态不再维护",
+      "文件内没有 `> 状态：` 形式的状态行，plans/README 记为「无有效状态行」"
+    ],
+    "evidence": "文件:2-5 自写「已被 multi-platform-adaptation 与 desktop-native-migration 取代…只作历史」；:12「已被取代」；plans/README.md:52「🔴 已被上面两份取代，只作历史」",
+    "archive_candidate": true,
+    "superseded_by": "docs/plans/multi-end-unified-strategy.md"
+  },
+  {
+    "path": "docs/plans/i18n-multilingual.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**进行中**",
+    "suggested_status_line": "",
+    "summary": "中英双语实施计划，三壳已迁完，仍有已登记盲区",
+    "stale_claims": [],
+    "evidence": "文件:224-226 三壳均 migrated:true；§7 第 3/4/5/9/10 条（meta 手写、无复数能力、展厅重影未修、跨包中文）仍开着；plans/README.md:123 同为「进行中」",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/countdown-batch2-handoff.md",
+    "verdict": "部分失效",
+    "status_line": "> 状态：**批次二 10 张工单里 6 张闭合**（W0 / W0b①② / W2 / W5 / W9 web 半 / W10 / L'）。",
+    "suggested_status_line": "> 状态：**批次二进行中**（W0/W0b/W2/W5/W6/W7/W9-web/W10 已闭合；W8 mac 装机与收尾四项在排队），以 §0.5 为准",
+    "summary": "倒数日批次二交接台账，正文已多次就地更正",
+    "stale_claims": [
+      "状态行「10 张工单里 6 张闭合」被正文更正顶掉：W6 已闭合、W7 两端设备读数均已到手",
+      "状态行未收录 W8 windows 栏已有真实读数、W4b 客户端半已落地这两笔增量"
+    ],
+    "evidence": "文件:3（6/10）vs :154（「W6 ✅ 已闭合 e2def90f」）、:155（Android 04 07:41 与 iOS 04 17:13 设备读数到手）",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/pricing-coupons-handoff.md",
+    "verdict": "部分失效",
+    "status_line": "> 状态：**已完成**（交接文档；§5.1–§5.4 四件事已落地并有判据，仅「真实商户凭证 E2E」未做 —— 微信支付按用户指示搁置，卡点在商户号 KYC，属外部流程）。",
+    "suggested_status_line": "> 状态：**已完成**（§5.1–§5.4 已落地；§11.2/§11.5 与 §12 关于云端 AI 的旧结论已由 ADR-0054 取代，逐处就地更正）",
+    "summary": "可调价+优惠券交接，主体已完成，末表残留旧 AI 结论",
+    "stale_claims": [
+      "§12 表仍写「云端 AI 端点 / 300 次计量 ⛔ 按 ADR-0023 本轮不实现」，而端点与计量已实现、结论已被 ADR-0054 取代",
+      "状态行自认 §11.2/§11.5 各有一处过期陈述（该两处已就地更正，§12 那行未更正）"
+    ],
+    "evidence": "文件:690（未更正的 ⛔ 行）vs :341-345（10-16 更正：端点与计量已实现、ADR-0054 取代 ADR-0023）；docs/adr/0023 开头亦写「结论已被 ADR-0054 取代」",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/multi-end-unified-strategy-handoff.md",
+    "verdict": "部分失效",
+    "status_line": "> 状态：**方案编号项 ①–⑩ + G0/G4 全部做完并验证（14 门禁 + 3989 测试 + e2e 9 + 实时入站 7/7）**；\n> `verify:mobile-ios` 真机 **50 通过 / 5 失败** —— 而**那 5 项不是产品判决**（见 §5.1n）；",
+    "suggested_status_line": "> 状态：**交接（iOS 真机验收未绿）** —— 数字以 §1.1 那次实跑为准，勿抄本行",
+    "summary": "多端统一主计划交接，iOS 验收数字自相矛盾",
+    "stale_claims": [
+      "状态行写 `verify:mobile-ios` 真机 50 通过 / 5 失败，正文 §0 与 §1.1 表却写 34 通过 / 9 失败、exit 1",
+      "plans/README.md:50 仍按 34/9 登记，与状态行的 50/5 两边不一致"
+    ],
+    "evidence": "文件:4（50/5）vs :28 与 :46（34/9、exit 1）；plans/README.md:50 记「iOS 真机验收（34/9），根因已钉死」",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/desktop-storage-host-handoff.md",
+    "verdict": "部分失效",
+    "status_line": "> 状态：**A 已完成**（⚠️ 它的判据只覆盖**链接/锚点**一致性 —— 见 §1 的边界）；**B 已完成（两个桌面端）** —— Windows 已全绿并翻成默认；\n> macOS 的 WKWebView 接线也做完了，真应用确实走壳的 SQLite，且**从壳外读到那条数据**。",
+    "suggested_status_line": "> 状态：**交接（A/B/C/D 四件全部交付）**；macOS 窗口门禁缺陷已修；邮箱+密码认证后续已落地（见 email-password-auth.md）",
+    "summary": "桌面存储接壳 SQLite 交接；A/B/C/D 已交付",
+    "stale_claims": [
+      "状态行同段自相矛盾：一处写「macOS 窗口门禁那条缺陷也修好了」，另一处仍写「另有一条顺带发现的缺陷待修」",
+      "§6.6 的「邮箱+密码这条路目前不存在」已过期：server/src/password/ 已有 hash/service/concurrency"
+    ],
+    "evidence": "文件:11（缺陷已修）vs :22（仍待修）；plans/README.md:55 亦记「macOS 窗口门禁那条缺陷已修」；server/src/password/{hash,service,concurrency}.ts 存在",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/activity-categories-and-colors.md",
+    "verdict": "已归档冻结",
+    "status_line": "> 状态：**已实现，并已合并进 main**（merge commit `84cc7f5`；落地提交 `38cf3a5` 分类时长 + 用户赋义色槽、\n> `ea48ef6` 移动端分类时长屏、`6d4ba1d` 时长分档与分类报告上移为共享实现）。",
+    "suggested_status_line": "> 状态：**已归档（历史）** —— 已实现并入 main，只作记录，不要照它再开工",
+    "summary": "活动分类与着色增量计划，已实现并入 main，属历史账",
+    "stale_claims": [],
+    "evidence": "文件:3 自写「已实现，并已合并进 main（84cc7f5 / 38cf3a5）」；plans/README.md:104 列在「三、已完成 —— 只作历史，不要照它再开工」",
+    "archive_candidate": true,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/multi-platform-widgets.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**规划中**",
+    "suggested_status_line": "",
+    "summary": "多端小组件执行计划，仍是小组件线的入口",
+    "stale_claims": [],
+    "evidence": "文件:3「规划中」；plans/README.md:58「🟢 仍是小组件线的入口（与主计划正交）」；正文 §6 待拍决策与 §7 未核实项仍成立",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/trash-and-archive-execution-brief.md",
+    "verdict": "部分失效",
+    "status_line": "> 状态：🔴 **批次 A 已由本仓会话执行完毕**（2026-10-03）—— 读数、变异验证、没跑的部分都在\n> [计划 §9](trash-and-archive.md)。**不要再把批次 A 交出去**；批次 B/C/D 仍可交，其开工判据照旧。",
+    "suggested_status_line": "> 状态：**批次 A/B 已执行完毕（历史）**；批次 C/D 仍挂在裁决上，进度一律以 [trash-and-archive.md](trash-and-archive.md) 为准",
+    "summary": "回收站/归档执行交接书；批次 A 已完成",
+    "stale_claims": [
+      "状态行称「批次 B/C/D 仍可交」，但批次 B 的工单已全部落地并有读数",
+      "全部 `文件:行号` 锚在 2026-10-03 工作树，文件自己要求开工前逐条 grep 复跑"
+    ],
+    "evidence": "文件:3-4 vs 计划 trash-and-archive.md:4626「## 11. 批次 B 执行账（2026-10-03，本会话亲跑）」与 :15004「批次 E 与批次 B 的全部工单都落了地」",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/countdown-w8-shell-gate.md",
+    "verdict": "部分失效",
+    "status_line": "> 状态：**已完成**（W8 落地结论；Linux web-dist 通道与移动端产物取证仍登记为缺口）",
+    "suggested_status_line": "> 状态：**已完成**（W8 落地结论；相关提交已在 main，Linux web-dist 通道与移动端产物取证仍登记为缺口）",
+    "summary": "W8 三端接线与壳级门禁的落地结论",
+    "stale_claims": [
+      "「载体：分支 feat/countdown-w8（worktree heyta-wt-w8），未 push、未 merge」已过期：关键提交已在 HEAD 历史里，该分支已不存在"
+    ],
+    "evidence": "文件:6 该句；`git merge-base --is-ancestor b8f39cae HEAD`→YES（a9529a59 同）；`git branch -a --list '*countdown*'` 无输出",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/ai-remediation-parallel-runbook.md",
+    "verdict": "已归档冻结",
+    "status_line": "> 状态：已落地（`scripts/check-module-boundaries.mjs` 是这一节的可执行版本）",
+    "suggested_status_line": "> 状态：**已归档（历史）** —— 已落地，可执行版本是 scripts/check-module-boundaries.mjs",
+    "summary": "AI 三模块并行开工 runbook，已落地为门禁脚本",
+    "stale_claims": [],
+    "evidence": "文件:6「已落地」；scripts/check-module-boundaries.mjs 存在（Sep 27 15KB）；plans/README.md:110 列在「三、已完成 —— 只作历史」",
+    "archive_candidate": true,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/remote-linux-host-and-disk-reclaim.md",
+    "verdict": "部分失效",
+    "status_line": "> 状态：**只读调查**（2026-10-11；不含代码改动，A 级 ≈3.1 GiB 已回收，B 级 ≈26 G 等业主拍板）",
+    "suggested_status_line": "> 状态：**只读调查（A 级回收已执行）**（2026-10-11；实测回收 3.1 GiB，B 级 ≈26 G 等业主拍板）",
+    "summary": "远程 Linux 与磁盘回收只读调查；A 级已实际回收",
+    "stale_claims": [
+      "「结论先说」仍写本机能立刻零风险回收 ≈4.4 G，与 §4 已执行、实测只回收 3.1 GiB 冲突",
+      "§5 仍问「A 级那 4.4 G 要不要我现在就清？」，而 A 级在 06:5x 已清完"
+    ],
+    "evidence": "文件:8、:187 vs :139/:143（「已于 2026-10-11 06:5x 执行，实测回收 3194 MiB」「88 Gi → 91 Gi」）；plans/README.md 仍写可回收 ≈4.4 G",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/ai-remediation-module-1-engine.md",
+    "verdict": "已归档冻结",
+    "status_line": "> 状态：✅ **已执行**（2026-09-27）—— ⚠️ **不要再照这份任务书做一遍。**",
+    "suggested_status_line": "> 状态：**已归档（历史）** —— ✅ 已执行，不要再照这份任务书做一遍",
+    "summary": "AI 模块 1 任务书，已执行，明写不要再照做",
+    "stale_claims": [],
+    "evidence": "文件:3「✅ 已执行…不要再照这份任务书做一遍」；plans/README.md:106 列在「三、已完成 —— 只作历史，不要照它再开工」",
+    "archive_candidate": true,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/ai-open-decisions.md",
+    "verdict": "已归档冻结",
+    "status_line": "> 状态：**已决策** ✅ —— 见下方「决策记录」。",
+    "suggested_status_line": "> 状态：**已归档（历史）** —— 五条已决策，见「决策记录」",
+    "summary": "AI 五条待决问题的决策记录，已定案",
+    "stale_claims": [],
+    "evidence": "文件:3「已决策 ✅ —— 见下方决策记录」；§「原始清单（保留，供追溯）」自述其历史定位；plans/README.md:74 标「已决策」",
+    "archive_candidate": true,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/subscription-wechat-handoff.md",
+    "verdict": "部分失效",
+    "status_line": "> 状态：**已完成**（交接文档；adapter 已落地并有测试，仅真实商户凭证 E2E 未做，微信支付已搁置）",
+    "suggested_status_line": "> 状态：**已完成**（adapter 与 webhook 结算均已接线；仅真实商户凭证 E2E 未做，微信支付搁置）",
+    "summary": "微信支付 adapter 交接；已完成，残留一条旧待办",
+    "stale_claims": [
+      "§0 后补仍把「② settleOrderPaid 在 webhook 路径上的接线」列为没做，该断言已被定价线判为过期"
+    ],
+    "evidence": "文件:15 该句 vs pricing-coupons-handoff.md:324（该格「已过期：结算在同一个事务里走 settleOrderPaid」）；server/tests/billing-webhook-settlement.pglite.spec.ts 已存在",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/waytofuture-reflection.md",
+    "verdict": "已归档冻结",
+    "status_line": "> 状态：**已完成**（复盘文档，记 2026-09-30 那轮 4 次判断失败，勿当现状读）",
+    "suggested_status_line": "",
+    "summary": "2026-09-30 那轮域名迁移中 4 次判断失败的复盘",
+    "stale_claims": [],
+    "evidence": "文件:3 自写「已完成（复盘文档…勿当现状读）」；:8「本文件回答的是『为什么当时那样判断』，不是『现在是什么状态』」；plans/README.md:56 归类「复盘」",
+    "archive_candidate": true,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/landing-motion-audit/003-showcase-scroll-transform.md",
+    "verdict": "已归档冻结",
+    "status_line": "> 状态：**已完成**（历史整改单，5 项已全部实施并验证；勿照它再开工）",
+    "suggested_status_line": "",
+    "summary": "展厅 coverflow 动效整改单，已实施完成",
+    "stale_claims": [],
+    "evidence": "文件:3「已完成（历史整改单…勿照它再开工）」；同目录 README 计划表 003 = DONE、并写「全部 5 项已实施并通过验证（本目录保留作为可追溯记录）」",
+    "archive_candidate": true,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/cross-platform-ux-optimization.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**进行中**（A/C/D/E 的代码与 Web 取证已落，B/F 真机读屏与四端重装待收口）",
+    "suggested_status_line": "",
+    "summary": "跨端交互 UX 优化计划，A/C/D/E 已落，B/F 待收口",
+    "stale_claims": [],
+    "evidence": "文件:3「进行中」；批次表 A–F 逐行状态（A 代码完成/C 待端侧验收/B、F 真机待验）与正文一致；product-ux-optimization.md:8 仍以它为本计划的跨端专项",
+    "archive_candidate": false,
+    "superseded_by": ""
+  }
+]

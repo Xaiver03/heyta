@@ -1,6 +1,9 @@
 # ADR-0062：共享清单走密钥分发型协作（per-list key + 成员公钥信封）
 
-> 状态：**已接受（产品决策 2026-10-08；实施未开始）**。证据见[共享清单调研](../research/collaboration-shared-lists.md)，落地计划（W0–W6）见 [collaboration-shared-lists.md](../plans/collaboration-shared-lists.md)。本 ADR 只记裁决，不代表任何代码已存在。
+> 状态：**已接受（产品决策 2026-10-08）；实施进行中（2026-10-16 更正原来的「实施未开始」）**。
+> 已落地：服务端 shares 表与端点族 + role 硬门、listKey 与成员公钥信封、Web 宿主的创建共享 / 邀请 / 成员角色 / 所有权转让 / 入群链接落点。
+> 🔴 **未落地**：客户端 share op-log 引擎与多写者写路径路由**从未接线** —— `uploadOps`/`downloadOps` 零生产消费者、`listKey` 解出后不喂给任何解密引擎，所以**共享清单在成员眼里仍是一条空清单**（逐条证据见[进度](../agents/progress-log.md)的「协作与共享清单」一节）。
+> 证据见[共享清单调研](../research/collaboration-shared-lists.md)，落地计划（W0–W6）见 [collaboration-shared-lists.md](../plans/collaboration-shared-lists.md)。本 ADR 只记裁决。
 
 ## 背景：两类「协作」必须拆开
 

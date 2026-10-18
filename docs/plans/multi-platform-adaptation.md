@@ -5,12 +5,12 @@
 > **已过期**：§「现状」里的剩余量数字（"8 个特性 / 11,100 行"是 09-28 晚快照，之后又落了多刀）。
 > 索引见 [`README.md`](README.md)。
 
-> 状态：**规划中**
+> 状态：**部分已取代**（⚠️ **2026-10-16 更正**：原写「规划中」，与本文件第 3–5 行**自相矛盾** —— **桌面 UI 路线**已被 [`multi-end-unified-strategy.md`](multi-end-unified-strategy.md) 取代；**M0/M1 已完成的结论、M3 的判据 A + B1–B7、门禁 G1–G5 仍然有效**）
 > 依据：[多端「一套代码」融合调研](../research/multi-platform-ui-fusion.md) ·
 > **形状依据（2026-09-28 融入 M3）：[滴答清单的视图统一机制](../research/dida-view-unification.md)** ——
 > M3 的「目标形状 / 排序修正（landing）/ 判据 B / 门禁 G1–G5」来自它
 > 选型：[ADR-0024](../adr/0024-desktop-shell-and-ui-convergence.md)（⚠️ **待确认**）
-> 关系：本计划是 [P2 多端补齐](phase-2-multi-platform.md) 的**主体执行计划**，
+> 关系：本计划是 [P2 多端补齐](archive/phase-2-multi-platform.md) 的**主体执行计划**，
 > 不是 P3（平台特有能力）。**P3 中除去系统小组件的部分**依赖本计划产出的"一套 UI"；
 > **系统小组件不依赖它**（见 §6.2）—— 组件是该平台的**原生 UI**，用不了这套 RN 组件，
 > 所以[小组件计划](multi-platform-widgets.md)与 M0/M1 **并行不冲突**，

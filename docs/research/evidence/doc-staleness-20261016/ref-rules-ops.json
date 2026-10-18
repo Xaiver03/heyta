@@ -1,0 +1,492 @@
+[
+  {
+    "path": "docs/reference/account-information-architecture.md",
+    "verdict": "现行",
+    "status_line": "> 状态：本轮产品裁决，实施状态见[优化计划](../plans/profile-center-optimization.md)。",
+    "suggested_status_line": "",
+    "summary": "账号/个人中心/设置的信息架构裁决，实施计划仍在进行",
+    "stale_claims": [],
+    "evidence": "account-information-architecture.md:3；plans/README.md 记 profile-center-optimization 🔄 进行中",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/reference/ai-architecture.md",
+    "verdict": "现行",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "",
+    "summary": "AI 结构性事实的唯一事实源，随代码演进",
+    "stale_claims": [],
+    "evidence": "文件头自述'描述代码现在长什么样'；git log -1=2026-10-13；docs/README.md:213 索引一致",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/reference/architecture.md",
+    "verdict": "部分失效",
+    "status_line": "> **状态：技术栈层已定**（2026-09-25）。剩余待决项见 §7。",
+    "suggested_status_line": "> **状态：技术栈层已定**（2026-09-25）；⚠️ 部分结论已被后续 ADR 取代（ADR-0001 许可证=MIT、ADR-0004 UI=React Native、ADR-0024 桌面=Electron），§3 同步层与 §5 服务端基座仍有效。",
+    "summary": "技术栈/架构决策记录，同步层有效但多处已过时",
+    "stale_claims": [
+      "§7 许可证'倾向 AGPL-3.0'已被 ADR-0001（MIT，已接受）取代",
+      "§7 'React vs Vue vs Angular 待定'已被 ADR-0004（RN）取代",
+      "§5 '服务端从未真实跑起来过/本机没装 Docker'已被线上部署与 self-host 推翻",
+      "§1 '移动端是 WebView 套壳'已被 ADR-0003/0004 的 RN 壳取代"
+    ],
+    "evidence": "architecture.md:184-190、40、35；ADR-0001/0004 已接受；deployment.md:54 线上入口在线",
+    "archive_candidate": false,
+    "superseded_by": "ADR-0001 / ADR-0004 / ADR-0024"
+  },
+  {
+    "path": "docs/reference/build-matrix.md",
+    "verdict": "部分失效",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**长期参考**（多端构建条件唯一事实源）；⚠️ §2.4 的 Android 发布签名状态已过时——signingConfigs.release 已接线。",
+    "summary": "多端构建矩阵，§2.4 的 Android 签名状态已过时",
+    "stale_claims": [
+      "§2.4 称 release 仍用 debug keystore、未接 release 签名（已接）"
+    ],
+    "evidence": "build-matrix.md:282-292 对 apps/mobile/android/app/build.gradle:182-237（heytaHasReleaseSigning）",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/reference/design-system-behavior.md",
+    "verdict": "现行",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "",
+    "summary": "设计系统行为规范（list/board/pane/sheet）",
+    "stale_claims": [],
+    "evidence": "plans/product-ux-optimization.md:50 记 DS-1 完成；tokens.css / typography.ts 均存在",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/reference/environment-traps.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**长期参考**（`AGENTS.md` §7 的正文在这里；本文件是唯一全文，**编号只增不改**）。",
+    "suggested_status_line": "",
+    "summary": "环境陷阱唯一全文，长期参考，仍在追加",
+    "stale_claims": [],
+    "evidence": "environment-traps.md:2；现量最大号 447；git log -1=2026-10-16",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/reference/inbound-automation-protocol.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**技术基线；2026-10-08 已接线并测试公网接收切片，但完整生产接线与运行验收未完成。** 实施顺序、未完成项与证据由[唯一计划](../plans/inbound-automation.md)维护。复审依据见[第二轮审计](../research/inbound-automation-review.md)。本文规定完整契约；已接线切片不代表整体接口可对外使用。",
+    "suggested_status_line": "",
+    "summary": "自动收集 v1 技术协议，实施中未上线",
+    "stale_claims": [],
+    "evidence": "plans/README.md:17 记 inbound-automation '实施中，未上线'，与状态行一致",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/reference/native-library-licenses.md",
+    "verdict": "现行",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "",
+    "summary": "原生壳系统库许可登记册，与 .deb Depends 双向对账",
+    "stale_claims": [],
+    "evidence": "research/tools/check-native-lib-registry.mjs 存在；ADR-0057 在册；check:linux-shell 存在",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/reference/pricing-and-coupons.md",
+    "verdict": "现行",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "",
+    "summary": "价格可调与优惠券工程参考，旧价格已声明作废",
+    "stale_claims": [],
+    "evidence": "pricing-and-coupons.md:9 明写 annual/¥99/$49 全部作废；DEFAULT_PRICE_BOOK 与 price-book.ts 一致",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/reference/pricing-and-entitlements.md",
+    "verdict": "现行",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "",
+    "summary": "价格与权益工程参考，两档月付且当前还不能买",
+    "stale_claims": [],
+    "evidence": "文件 §1 为两档，与 ADR-0020 一致；⚠️ docs/README.md:211 索引仍写'唯一付费档'，是索引过期而文件正确",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/reference/product-ux-performance-baseline.md",
+    "verdict": "现行",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "",
+    "summary": "任务列表与同步恢复性能基线读数（2026-10-06）",
+    "stale_claims": [],
+    "evidence": "plans/product-ux-optimization.md:52 记 PERF-1 完成；scripts/measure-product-ux.mjs、measure-hydration.mjs 均存在",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/runbooks/ai-acceptance.md",
+    "verdict": "现行",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "",
+    "summary": "AI 验收门禁说明，引用的门禁命令均存在",
+    "stale_claims": [],
+    "evidence": "check:ai-coverage / check:ai-e2e / check:ai-tools / check:ai-quota 均在 package.json；docs/README.md:230 索引一致",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/runbooks/android-build-on-windows.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**进行中**（分流已落进唯一收口点并有门禁；**远程真构建尚未跑过一次**）",
+    "suggested_status_line": "",
+    "summary": "Android 构建统一到 windows-pc 手册，远程真构建未跑",
+    "stale_claims": [],
+    "evidence": "plans/README.md:225 同记'验收判据 0/3'；scripts/run-gradle.mjs、check:android-gradle-remote 存在",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/runbooks/app-distribution.md",
+    "verdict": "现行",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "",
+    "summary": "安装包分发手册（COS/GitHub 渠道），逐批记录",
+    "stale_claims": [],
+    "evidence": "scripts/upload-dist.sh、scripts/tools/cos-api.mjs 存在；docs/README.md:231 索引一致",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/runbooks/ci-and-runner.md",
+    "verdict": "现行",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "",
+    "summary": "CI 载体手册，当前答案是 gate-ssh，旧节已标注",
+    "stale_claims": [],
+    "evidence": "scripts/gate-ssh.mjs、check:gate-ssh 存在；docs/README.md:228 索引一致",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/runbooks/deployment.md",
+    "verdict": "部分失效",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**运维现状（最后实测 2026-09-30）**；⚠️ §3.1 拓扑图与旧域名 301 目标仍写 heyta.finlaw.cloud，需按 §3.7.2 改为 heyta.waytofuture.cn。",
+    "summary": "运维部署现状，§3.1 未跟上 09-30 的入口迁移",
+    "stale_claims": [
+      "§3.1 拓扑图称 finlaw.cloud 是'唯一域名'，与 §3.7.2 迁往 waytofuture.cn 矛盾",
+      "§4 旧域名 301 目标仍写 heyta.finlaw.cloud，应为 waytofuture.cn"
+    ],
+    "evidence": "deployment.md:3、154、171、455 对 1035（§3.7.2 迁移）",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/runbooks/desktop.md",
+    "verdict": "部分失效",
+    "status_line": "> 状态：**骨架已在 macOS 与 Windows 上双双验证通过；GUI 窗口本身仍未真机冒烟**。",
+    "suggested_status_line": "> 状态：**Electron 过渡壳操作手册**（构建、Electron 运行时冒烟与开窗冒烟均已实测；🔴 退役时点见多端主计划 §6.3⑨，产物已不由 `release/` 产出）。",
+    "summary": "Electron 桌面壳手册，状态行与 §4.3 已过期",
+    "stale_claims": [
+      "状态行称'GUI 窗口本身仍未真机冒烟'，而 §6 与 §5.5/§5.6 记已实测通过",
+      "§4.3 称产物在 release/ 下，release/ 已删、Electron 产物已被原生包取代"
+    ],
+    "evidence": "desktop.md:3 对 440、361；ls release 不存在；multi-end-unified-strategy.md:938",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/runbooks/finlaw-cleanup-candidates.md",
+    "verdict": "部分失效",
+    "status_line": "> 状态：**盘点完成，等待拍板**。本文**不含任何已执行的变更**——从盘点到成文全程只读。",
+    "suggested_status_line": "> 状态：**盘点完成，等待拍板**（2026-09-26 只读盘点）；⚠️ 文中'deployment.md 已过期'的判断已被 deployment.md 自身更新反转。",
+    "summary": "finlaw 回收候选清单，对 deployment 的过期判断已反转",
+    "stale_claims": [
+      "称 deployment.md 仍写 litopia.space 指向 OPP，实际已列 sanjiaozhou"
+    ],
+    "evidence": "finlaw-cleanup-candidates.md:516、540 对 deployment.md:55、1944",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/runbooks/icp-app-filing.md",
+    "verdict": "现行",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "",
+    "summary": "APP 备案取值方法与进度手册，三端取值齐备待填表",
+    "stale_claims": [],
+    "evidence": "runbooks/icp-app-filing.md:12-16 与 operations 填报单互指且一致；未发现新进展",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/runbooks/linux-dev-box.md",
+    "verdict": "现行",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "",
+    "summary": "Ubuntu 24.04 载体操作手册，逐轮门禁读数",
+    "stale_claims": [],
+    "evidence": "docs/README.md:227 索引一致；apps/desktop-linux、scripts/check-shell-surfaces.mjs 存在",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/runbooks/local-server-verification.md",
+    "verdict": "现行",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "",
+    "summary": "不依赖 Docker 跑通服务端 + 内部机器表（P0 记录）",
+    "stale_claims": [],
+    "evidence": "local-server-verification.md:21-23 已更新 12km 失联状态；docs/README.md:222 索引一致",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/runbooks/multi-platform-build.md",
+    "verdict": "现行",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "",
+    "summary": "各端打包操作手册，含桌面原生壳安装包",
+    "stale_claims": [],
+    "evidence": "docs/README.md:224 索引一致；§6 与 plans/desktop-packaging-handoff.md 状态一致",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/runbooks/self-host.md",
+    "verdict": "现行",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "",
+    "summary": "面向陌生人的自建服务端指南",
+    "stale_claims": [],
+    "evidence": "self-host.md:278 §8'还没做到的'表仍在；server/README.md、server/env.example 存在",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/agents/commands.md",
+    "verdict": "现行",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "",
+    "summary": "常用命令全集，刻意不写会漂的测试条数",
+    "stale_claims": [],
+    "evidence": "抽样 verify:mobile-organizer-confirm / check:native-deps / check:tokens 等均在 package.json",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/agents/db-migrations.md",
+    "verdict": "现行",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "",
+    "summary": "迁移纪律摘要，权威规范在 migrations/README.md",
+    "stale_claims": [],
+    "evidence": "server/scripts/migrate-deploy.sh 与 server/prisma/migrations/README.md 均存在",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/agents/design-system.md",
+    "verdict": "现行",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "",
+    "summary": "设计系统三条硬规则，唯一事实源为 tokens.css",
+    "stale_claims": [],
+    "evidence": "tokens.css 含 --ht-blue-600:#2563eb、--ht-slate-50:#f8fafc；design-system/heyta/MASTER.md 存在",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/agents/environment-traps-index.md",
+    "verdict": "部分失效",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**长期参考**（号段索引）；⚠️ 80–83 号段描述已与正文不符，查号请直接读 reference/environment-traps.md。",
+    "summary": "环境陷阱号段索引，80–83 号段与正文不符",
+    "stale_claims": [
+      "80–83 号段写 #80 RNW 吞 keydown、#82 错误屏假绿，与正文实际条目不符"
+    ],
+    "evidence": "environment-traps-index.md:19 对 environment-traps.md:1930、1940 与 #82(aka.ms Bing 回退)",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/agents/hard-constraints.md",
+    "verdict": "现行",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "",
+    "summary": "硬性约束：依赖门槛/许可/schema/op-log/宿主边界",
+    "stale_claims": [],
+    "evidence": "research/tools/ghinfo.py、license-inventory.mjs（含 REVIEWED_OTHER）均存在",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/agents/history-a-2026-10-03.md",
+    "verdict": "已归档冻结",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**历史记录**（2026-10-03 倒数纪念日批次二交付账，仅供考古，不代表现状）。",
+    "summary": "2026-10-03 批次二历史交付记录",
+    "stale_claims": [],
+    "evidence": "history-a-2026-10-03.md:8 标题自述'已完成质量审计、合并，并已进 main'；AGENTS.md §4 已登记为历史交付记录",
+    "archive_candidate": true,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/agents/history-b-2026-09-30.md",
+    "verdict": "已归档冻结",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**历史记录**（2026-09-27 – 09-30 交付账：中文化/管理后台/域名迁移/身份入口/通知中心/Windows 旅程）。",
+    "summary": "2026-09-27–09-30 历史交付记录",
+    "stale_claims": [],
+    "evidence": "history-b-2026-09-30.md:8；AGENTS.md §4 登记为'历史交付记录 · 下半'",
+    "archive_candidate": true,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/agents/key-decisions.md",
+    "verdict": "部分失效",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**决策摘要（随 ADR 更新）**；⚠️ ADR-0008 已被 ADR-0046 取代、ADR-0023 的结论已被 ADR-0054 取代，本节未记。",
+    "summary": "关键决策 ADR 摘要，两处取代关系未更新",
+    "stale_claims": [
+      "ADR-0008（向量时钟上限=100）条目未记它已被 ADR-0046 取代",
+      "ADR-0023（300 次/月本轮不实现）条目未记结论已被 ADR-0054 取代（计量已实现、禁售解除）"
+    ],
+    "evidence": "key-decisions.md:87、125 对 docs/README.md §五'0046 取代 0008'、'0023 结论已被 0054 取代'",
+    "archive_candidate": false,
+    "superseded_by": "ADR-0046 / ADR-0054"
+  },
+  {
+    "path": "docs/agents/legacy-traps-80-83.md",
+    "verdict": "已归档冻结",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**历史遗留条目**（2026-10-12 从 AGENTS.md 拆出）；⚠️ 编号 #80–#83 已被 reference/environment-traps.md 的后续条目复用，引用勿按号。",
+    "summary": "AGENTS.md 遗留陷阱 #80–#83，编号已被复用",
+    "stale_claims": [
+      "#80–#83 与 environment-traps.md 现号（am start / pwsh）冲突",
+      "文件自身有两个 #83（探针污染、MSIX ASCII）"
+    ],
+    "evidence": "legacy-traps-80-83.md:52、118 双 #83；environment-traps.md:1930、1940",
+    "archive_candidate": true,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/agents/multi-end-build.md",
+    "verdict": "现行",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "",
+    "summary": "多端构建与四端重装固定收尾流程",
+    "stale_claims": [],
+    "evidence": "scripts/reinstall-all.sh、scripts/windows/setup-build-host.ps1、check:android-gradle-remote 均存在",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/agents/progress-log.md",
+    "verdict": "部分失效",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**当前进度**（阶段表仍有效）；⚠️ P2 详细计划请指向 plans/multi-end-unified-strategy.md，鸿蒙条数已过时。",
+    "summary": "当前进度与阶段表，P2 指针与鸿蒙数字过期",
+    "stale_claims": [
+      "P2'详细计划'指向 phase-2-multi-platform.md，已被主计划取代",
+      "称 verify:harmony-rnoh-js 13/13，主计划与多端计划均为 29/29"
+    ],
+    "evidence": "progress-log.md:11 对 plans/README.md §二、multi-end-unified-strategy.md:801、1605",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/agents/repo-map.md",
+    "verdict": "部分失效",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**仓库地图（随代码更新）**；⚠️ apps/desktop-linux 的 .deb 对账缺口已由 linux-adaptation P4 关闭。",
+    "summary": "仓库地图，Linux .deb 缺口描述已过时",
+    "stale_claims": [
+      "称装出来的 .deb 里共享 UI 产物'还没有对账判据'（P4），而 P4 已✅两道字节对账落地"
+    ],
+    "evidence": "repo-map.md:28 对 plans/linux-adaptation.md:129（P4 ✅ 三格全落）",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/agents/ui-acceptance.md",
+    "verdict": "现行",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "",
+    "summary": "界面验收两条硬性规定：真截图人看 / 不抢前台",
+    "stale_claims": [],
+    "evidence": "引用的 scripts/check-macos-window.mjs 与 apps/desktop/src/main.ts 均存在；AGENTS.md §4 登记一致",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/agents/workflow-rules.md",
+    "verdict": "现行",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "",
+    "summary": "工作流 25 条，条数与入口文档一致",
+    "stale_claims": [],
+    "evidence": "grep -cE '^[0-9]+\\. ' = 25，与 AGENTS.md §6'25 条工作流纪律'一致",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/operations/cac-algorithm-filing/材料包_2026-10-08/04_对外公示页草稿_未发布/落点与前置.md",
+    "verdict": "现行",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "",
+    "summary": "算法公示页落点草稿，未发布，路径仍 404",
+    "stale_claims": [],
+    "evidence": "grep algorithm-disclosure/算法机制机理 在 packages/legal/src 与 apps/landing/src 均 0 命中，未发布状态成立",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/operations/cac-algorithm-filing/材料包_2026-10-08/README.md",
+    "verdict": "现行",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "",
+    "summary": "算法备案材料包，主体待初审，材料已备齐",
+    "stale_claims": [],
+    "evidence": "README 记主体信息 2026-09-28 提交、待初审；公示页仍 404，与'材料已当前版本'一致",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/operations/icp-app-filing.md",
+    "verdict": "现行",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "",
+    "summary": "APP 备案填报单（本次记录），已填到预览页待提交",
+    "stale_claims": [],
+    "evidence": "runbooks/icp-app-filing.md:16 指其为本次填报记录；scripts/icp-app-filing-values.mjs 存在",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/operations/icp-app-filing.values.local.md",
+    "verdict": "现行",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "",
+    "summary": "备案真实填报值本地留存（被 .gitignore 忽略）",
+    "stale_claims": [],
+    "evidence": "文件自述被 .gitignore 忽略；git log 无记录（未跟踪），无失效迹象",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/standards/legal-language.md",
+    "verdict": "现行",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "",
+    "summary": "对外协议语言规范，适用九份中英文协议",
+    "stale_claims": [],
+    "evidence": "packages/legal/src/documents 现量 9 份文件，与文中'九份'一致",
+    "archive_candidate": false,
+    "superseded_by": ""
+  }
+]

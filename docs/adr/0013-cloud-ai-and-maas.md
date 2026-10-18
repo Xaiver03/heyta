@@ -7,13 +7,13 @@
 
 - **状态**：已接受（2026-09-26）
 - **相关**：[ADR-0006](0006-supply-modes.md)（供给模式）、[ADR-0010](0010-ai-config-routing.md)（配置路由）、[ADR-0011](0011-local-api-mcp.md)（本机 API / MCP）
-- **取代**：[`docs/plans/ai-open-decisions.md`](../plans/ai-open-decisions.md) 决策 2 的**结论**（原为"暂不提供托管 AI"）
+- **取代**：[`docs/plans/ai-open-decisions.md`](../plans/archive/ai-open-decisions.md) 决策 2 的**结论**（原为"暂不提供托管 AI"）
 
 ---
 
 ## 1. 背景：产品方向由产品负责人明确
 
-在此之前，我在 [`ai-open-decisions.md`](../plans/ai-open-decisions.md) 的决策 2 里
+在此之前，我在 [`ai-open-decisions.md`](../plans/archive/ai-open-decisions.md) 的决策 2 里
 按自己的建议**定案为"暂不提供托管 AI"**，并写进了界面文案
 （`data-testid="managed-ai-note"`）。
 

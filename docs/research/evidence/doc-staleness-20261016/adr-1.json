@@ -1,0 +1,384 @@
+[
+  {
+    "path": "docs/adr/0050-e2ee-key-lifecycle-and-recovery.md",
+    "verdict": "现行",
+    "status_line": "> 状态：已接受（2026-10-03）",
+    "suggested_status_line": "",
+    "summary": "E2EE 密钥三层模型、恢复码与迁移的现行裁决",
+    "stale_claims": [],
+    "evidence": "0050:3 状态行；docs/README.md 索引标『实施中』，文末逐项待验矩阵与之一致",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/adr/0010-ai-config-routing.md",
+    "verdict": "现行",
+    "status_line": "- **状态**：已接受（2026-09-26）",
+    "suggested_status_line": "",
+    "summary": "AI 配置路由三道闸与回退纪律，仍在生效",
+    "stale_claims": [],
+    "evidence": "0010:547-550 已就地更正 2026-10-05：0054 定案后 undecided 分支已被删除",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/adr/0034-windows-native-winui3-not-rnw.md",
+    "verdict": "已失效",
+    "status_line": "> 状态：**已被取代** → 🔴 由 [ADR-0036](0036-main-battlefield-and-rn-single-source-ui.md) **全部取代**",
+    "suggested_status_line": "",
+    "summary": "选 WinUI3 弃 RNW 的裁决，已被 ADR-0036 取代",
+    "stale_claims": [
+      "中心结论『Windows 走 WinUI 3、不用 RNW』已被 ADR-0036 全部取代",
+      "§3.2『在那之前 RNW 不进入候选』已作废（0034:396）"
+    ],
+    "evidence": "0034:3 自写『已被取代 → 0036』；docs/README.md 索引同标 ⚪已被取代",
+    "archive_candidate": false,
+    "superseded_by": "docs/adr/0036-main-battlefield-and-rn-single-source-ui.md"
+  },
+  {
+    "path": "docs/adr/0006-supply-modes.md",
+    "verdict": "现行",
+    "status_line": "- **状态**：已接受（2026-09-26 由产品负责人确认：自备与托管都提供）",
+    "suggested_status_line": "",
+    "summary": "自备与托管两种供给模式的现行裁决",
+    "stale_claims": [],
+    "evidence": "0006:239-308 已就地回填 0054/0056 的更正与托管档现状",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/adr/0048-deletion-four-states-and-the-no-physical-erase-boundary.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**已接受**（P-1…P-9 由产品负责人于 2026-10-03 拍板，记录见 [落地计划 §7.1](../plans/trash-and-archive.md)）",
+    "suggested_status_line": "",
+    "summary": "删除四态语义与不变量 I1–I5 的现行根源",
+    "stale_claims": [],
+    "evidence": "0048:231 起就地更正『DbAdapter 无 destroy』旧读数；索引 ✅已接受",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/adr/0011-local-api-mcp.md",
+    "verdict": "部分失效",
+    "status_line": "- **状态**：已接受（2026-09-26）",
+    "suggested_status_line": "",
+    "summary": "本机 API/MCP 契约仍现行，仅登记状态过期",
+    "stale_claims": [
+      "0011:441『packages/local-api 尚未登记进 AGENTS.md §2 仓库地图』已不成立"
+    ],
+    "evidence": "0011:441 vs AGENTS.md:41 已列 packages/{…,local-api}；check:layering 那条仍缺（未过期）",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/adr/0063-email-rebinding-and-per-session-revocation.md",
+    "verdict": "现行",
+    "status_line": "> 状态：已接受（2026-10-08）",
+    "suggested_status_line": "",
+    "summary": "邮箱换绑与会话 jti 撤销的现行裁决",
+    "stale_claims": [],
+    "evidence": "0063:198 已就地更正『八封→十封』；索引 ✅已接受（2026-10-08）",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/adr/0039-email-first-auth-and-desktop-reverse-authorization.md",
+    "verdict": "部分失效",
+    "status_line": "> 状态：**已接受**",
+    "suggested_status_line": "",
+    "summary": "邮箱链接鉴权仍现行；『无密码』一节已被 0040 取代",
+    "stale_claims": [
+      "§1.4『密码这条路不存在』与 §2.5『不引入密码』已被 ADR-0040 取代",
+      "0039:143『若将来要加是新决定』—— 该决定已由 ADR-0040 做出并落码"
+    ],
+    "evidence": "0039:42-49,141-143 vs ADR-0040；代码 server/src/password/service.ts:314 loginWithEmailPassword",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/adr/0044-countdown-anniversary-entity-calendar-data-and-image-tiers.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**已接受**（2026-10-03）",
+    "suggested_status_line": "",
+    "summary": "EVENT 实体、历法分发与图片双档的现行裁决",
+    "stale_claims": [],
+    "evidence": "0044:111/131/146 三段勘误已就地更正农历数据源与取证边界；索引一致",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/adr/0020-ai-subscription-two-tiers.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**已接受**",
+    "suggested_status_line": "",
+    "summary": "两档月付（¥5/¥12）定价的现行裁决",
+    "stale_claims": [],
+    "evidence": "0020:6,75 已记 ¥99/年作废；索引 ✅已接受，与 0021 一致",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/adr/0052-public-facts-are-deployer-supplied.md",
+    "verdict": "现行",
+    "status_line": "> 状态：已接受（2026-10-03）",
+    "suggested_status_line": "",
+    "summary": "公共事实由部署方下发的内容通道裁决",
+    "stale_claims": [],
+    "evidence": "0052 文末已就地更正 W4b 两半；package.json:155 check:public-facts 仍在链上",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/adr/0007-transport-security.md",
+    "verdict": "现行",
+    "status_line": "- **状态**：已接受（**iOS 一节已实测**：私有 IP 字面量明文可用，**与 ATS 无关** —— 归因曾被反证推翻，见 §6）",
+    "suggested_status_line": "",
+    "summary": "传输安全：允许明文但不静默的现行裁决",
+    "stale_claims": [],
+    "evidence": "0007:3 自写『iOS 一节已实测』；docs/README.md 索引仍写『iOS 待实测』（索引滞后）",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/adr/0002-migration-tooling.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**已接受**",
+    "suggested_status_line": "",
+    "summary": "继续用 Prisma、不引入 Flyway 的现行裁决",
+    "stale_claims": [],
+    "evidence": "server/scripts/migrate-deploy.sh 存在(50,554B)；server/prisma/migrations 76 项，Prisma 仍在用",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/adr/0004-ui-stack.md",
+    "verdict": "部分失效",
+    "status_line": "- **状态**：已接受",
+    "suggested_status_line": "",
+    "summary": "RN 作跨平台 UI 栈仍成立，两处断言过期",
+    "stale_claims": [
+      "0004:107『check:design 目前只扫 Web，mobile 落地时才扩展』：现已在扫",
+      "0004:27『WebView 容器全部排除』：ADR-0037 已决定桌面用原生壳+共享 Web UI"
+    ],
+    "evidence": "design-system/heyta/check-hardcoded.mjs:43-45 扫 apps/mobile/src、packages/ui/src、apps/desktop/renderer",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/adr/0055-account-tombstones-and-restore-gate.md",
+    "verdict": "现行",
+    "status_line": "> 状态：已接受（2026-10-05）",
+    "suggested_status_line": "",
+    "summary": "注销墓碑与恢复闸门的现行裁决",
+    "stale_claims": [],
+    "evidence": "0055:99 §5 两块已拍并落码；索引仍写『三块板仍要拍』（索引滞后）",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/adr/0031-native-apps-everywhere-not-pwa.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**已接受**（2026-09-29 确认；依据见文末 §6）",
+    "suggested_status_line": "",
+    "summary": "每端交原生应用、PWA 不作交付形态",
+    "stale_claims": [],
+    "evidence": "0031:147-160 §6 把 Windows 行指向 ADR-0036 并作废代码量论据，自洽",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/adr/0027-unified-client-storage-sqlite-everywhere.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**已接受**",
+    "suggested_status_line": "",
+    "summary": "客户端存储统一 SQLite 的现行裁决",
+    "stale_claims": [],
+    "evidence": "0027 文末『已由后续 ADR 修正的条目』指向 0028；storage/package.json:32 用 @sqlite.org/sqlite-wasm",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/adr/0008-vector-clock-limit.md",
+    "verdict": "已失效",
+    "status_line": "> 状态：**已被 [ADR-0046](0046-lossless-vector-clock-frontiers.md) 取代**",
+    "suggested_status_line": "",
+    "summary": "向量时钟上限 20→100，已被 0046 取代",
+    "stale_claims": [
+      "整篇决策（上限 100 与 top-K 裁剪）已被 ADR-0046 无损前沿取代",
+      "docs/README.md 索引仍把 0008 标成 ✅已接受，与文件自写状态矛盾"
+    ],
+    "evidence": "0008:3 自写『已被 ADR-0046 取代』；索引 0008 行仍 ✅已接受、仅 0046 行提取代",
+    "archive_candidate": false,
+    "superseded_by": "docs/adr/0046-lossless-vector-clock-frontiers.md"
+  },
+  {
+    "path": "docs/adr/0057-native-system-library-linking.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**已接受**",
+    "suggested_status_line": "",
+    "summary": "系统运行时库动态链接的许可立场",
+    "stale_claims": [],
+    "evidence": "scripts/check-linux-shell.mjs:42-47 确实调用 check-native-lib-registry.mjs，与 §6 一致",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/adr/0023-managed-ai-quota-not-implemented.md",
+    "verdict": "已失效",
+    "status_line": "> 状态：**已接受**",
+    "suggested_status_line": "> 状态：**已取代** → [ADR-0054](0054-managed-ai-retention-and-selling-preconditions.md)（结论被取代，正文留作历史）",
+    "summary": "『计量前不得售卖』的结论已被 0054 取代",
+    "stale_claims": [
+      "结论『计量存在之前 hosted-ai-monthly 不得被售卖』已按序被 ADR-0054 解除",
+      "正文『端点/计量/调用一个都不存在』已被现量推翻（禁售表已空）"
+    ],
+    "evidence": "0023:5-12 自写『结论已被 0054 取代』；server/src/billing/price-book.ts:120 禁售表 = {}",
+    "archive_candidate": false,
+    "superseded_by": "docs/adr/0054-managed-ai-retention-and-selling-preconditions.md"
+  },
+  {
+    "path": "docs/adr/0022-resilience-state-stays-derived.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**已接受**",
+    "suggested_status_line": "",
+    "summary": "习惯韧性冻结余额纯派生、不加字段",
+    "stale_claims": [],
+    "evidence": "0022:81 规则仍在；索引 ✅已接受且无取代关系",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/adr/0062-shared-list-key-distribution.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**已接受（产品决策 2026-10-08）；实施进行中（2026-10-16 更正原来的「实施未开始」）**。",
+    "suggested_status_line": "",
+    "summary": "共享清单密钥分发型协作的现行裁决",
+    "stale_claims": [],
+    "evidence": "0062:3 自写『实施进行中（2026-10-16 更正）』；git status 显示该文件工作树已改，索引仍写未开始",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/adr/0058-download-page-and-manifest-single-source.md",
+    "verdict": "现行",
+    "status_line": "- 状态：已接受（2026-10-07）",
+    "suggested_status_line": "",
+    "summary": "下载面与状态面分家的现行裁决",
+    "stale_claims": [],
+    "evidence": "0058 文末就地改写 Linux caveat/gap 口径；索引 ✅已接受（2026-10-07）",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/adr/0021-managed-ai-model-deepseek-flash.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**已接受**",
+    "suggested_status_line": "",
+    "summary": "托管 AI 选 DeepSeek V4.1 Flash 的现行裁决",
+    "stale_claims": [],
+    "evidence": "0021:89-91 三处 2026-10-05 就地更正；模型与单位经济结论未变",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/adr/0029-refuse-to-delete-last-passkey.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**已接受**（取舍不变；**判据**于 2026-10-01 被 [ADR-0041](0041-last-passkey-guard-keys-on-any-usable-entry.md) 修订 —— 从\"是不是最后一条\"改成\"账号还有没有能用的入口\"，因为邮箱 + 口令登录之后 这两件事不再等价。§3 那段代码里的谓词形状因此已经过期，见该 ADR §4。）",
+    "suggested_status_line": "",
+    "summary": "最后一条通行密钥守卫（判据已由 0041 修订）",
+    "stale_claims": [],
+    "evidence": "0029:3-7 自写判据被 0041 修订；索引 ✅已接受（判据已被 0041 修订）",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/adr/0042-glass-material-boundary.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**已接受**",
+    "suggested_status_line": "",
+    "summary": "玻璃材质边界六条决策，仍全部成立",
+    "stale_claims": [],
+    "evidence": "0042:71-73 §6 明说『六条结论一条都没改』，只改第 5 条理由的主语",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/adr/0012-self-host-transport-policy.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**已接受**",
+    "suggested_status_line": "",
+    "summary": "自托管：私网明文放行、公网仍要 HTTPS",
+    "stale_claims": [],
+    "evidence": "server/src/config.ts:515-527 已实现 §4.2；server/tests/config-public-url.spec.ts:93 有 evil.com 负例（§6 待办①实际已完成）",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/adr/0028-web-sqlite-must-run-in-worker.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**已接受**",
+    "suggested_status_line": "",
+    "summary": "web SQLite 必须跑在 DedicatedWorker",
+    "stale_claims": [],
+    "evidence": "apps/web/src/worker/storage.worker.ts:9 复述 [Exposed=DedicatedWorker]；oplog.ts:220 起 worker",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/adr/0047-checkpointed-incremental-hydration.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**已接受**",
+    "suggested_status_line": "",
+    "summary": "checkpoint 驱动增量水合的现行裁决",
+    "stale_claims": [],
+    "evidence": "0047 §5 记 2026-10-04 复跑读数（10,790.9ms/40.1ms）；写路径缺口另记在性能审计",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/adr/0030-passkey-not-found-existence-oracle.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**已接受**",
+    "suggested_status_line": "",
+    "summary": "通行密钥存在性预言机的有意接受",
+    "stale_claims": [],
+    "evidence": "server/src/api.ts:1769-1771 仍按两个 code 实现，与 ADR 与索引一致",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/adr/0043-timeline-p2-task-start-date-duration.md",
+    "verdict": "部分失效",
+    "status_line": "> 状态：**已接受**（2026-10-02）",
+    "suggested_status_line": "> 状态：**已接受**（2026-10-02；P2 实现进度见 §7 与计划，§7 标题不再写『未开工』）",
+    "summary": "时间线 P2 数据模型现行，§7 标题过期",
+    "stale_claims": [
+      "0043:86 §7 标题『剩余实现清单（P2 代码，未开工）』已不成立：第1/2/4/5档已落，第3档 web 半已落"
+    ],
+    "evidence": "0043:86 vs docs/README.md 索引 0043 行（2026-10-04 逐档现量『第1/2/4/5档已落』）",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/adr/0061-owner-held-inbound-commit-receipt.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**已接受（技术裁定，2026-10-08）**。补全 [ADR-0064](0064-inbound-automation-commit-and-task-batch.md) 的许可后不转派与 [ADR-0060](0060-automation-entitlement-and-retention.md) 的删除保留边界；未代表整条功能已开放。",
+    "suggested_status_line": "",
+    "summary": "规则删除后凭回执迟到同步的技术裁定",
+    "stale_claims": [],
+    "evidence": "0061 文末『验证和剩余接线』如实列未实现项；索引 ✅已接受（技术裁定，2026-10-08）",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/adr/0064-inbound-automation-commit-and-task-batch.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**已接受（技术方案，2026-10-07）**。实施状态见[计划](../plans/inbound-automation.md)，线形状见[协议](../reference/inbound-automation-protocol.md)。本 ADR 不批准价格、套餐和保留期，也不声明功能上线。",
+    "suggested_status_line": "",
+    "summary": "自动收集提交与任务批的技术方案",
+    "stale_claims": [],
+    "evidence": "0064 文末明说不构成开放功能依据；索引『技术方案已接受，实施中』一致",
+    "archive_candidate": false,
+    "superseded_by": ""
+  }
+]

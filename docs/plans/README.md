@@ -27,7 +27,7 @@
 | **详情面（三栏第四段）与复习面：工单分解** | [`detail-pane-alignment.md`](detail-pane-alignment.md) | 🟡 **规划中（2026-10-03 立）**。**是 [`ui-review-fill-zh-timeline.md`](ui-review-fill-zh-timeline.md) 的下游工单，不取代它**，也不取代主计划。补的是 `dida-view-unification.md` §1.3 四段骨架里**早就写着但从没做的第 ④ 段（详情）**。✅ 成本重估：`TaskActions` 16 个写动作已齐、`startDate`/`durationMinutes` 已在模型 ⇒ **缺的是 web 那一栏 + "选中态"这个概念**。W0–W8 **不依赖任何拍板可直接开工**（W1 选中态 → W2 第四列槽位是硬顺序；W6 计数型习惯那一米必须先于 W8 两张完成量卡），W9 起挂在待拍值上，**W10 复习面不在本篇开工**。含四道前置闸门（两道**余量为 0 的棘轮** + 归属门 + 干净检出复现）、六条**明文"不做"**（emoji 图标 / 空态插画 / 侧栏引导卡 / 不许把番茄塞进列表模型 / 不许把设置搜索改路由 / 不许调高棘轮基线）、以及 §7 的**撞车面现量清单**（四条未合并分支 + 正在被整片重写的日历） |
 | **本轮 goal：帮助中心扩成 SSOS 式文档中心** | [`help-center-docs-expansion.md`](help-center-docs-expansion.md) | 🔴 进行中（2026-09-30）。**规格真身**：SSOS 八项结构对照（四项已有、四项缺口）、五个分类的内容配额、§4 正面能力（逐条带代码证据）与 §5 **25 条公开文案负面清单**、截图方式（复用 `scripts/screenshots/`，不新造流水线）＋图号与注入器约定、双语沿用现有 i18n 机制、门禁与共享工作树碰撞面 |
 | **用户旅程与注册/登录放哪、每端怎么落** |  [`user-journey-and-auth.md`](user-journey-and-auth.md) | 🔴 **各端认证与旅程的唯一事实源**。含"前置"的定义与**为什么不做硬登录墙**、认证的 8 条真实形状（A1–A8，服务端语义与直觉不同）、逐端实施顺序 W0–W8、判据 J1–J7、以及 §10 **认证 UI 共享化的必做收口** |
-| **邮箱 + 密码登录（第 3 条认证方法）** | [`email-password-auth.md`](email-password-auth.md) | 🟡 规划中（2026-10-01 立）。**是上一行的下游工单，不取代它** —— A1–A8 语义、宿主形态、J1–J7 仍以 `user-journey-and-auth.md` 为准。本篇只加"密码"这一条：5 条架构裁决（登录密码与 E2EE 口令**解耦**、Argon2id+pepper、令牌只存哈希、爆破禁用的是"密码认证器"而非账号、`tokenVersion` 全设备撤销）、线协议表、UI/UX 规范（含 **passkey 大按钮降级**）、W0 五个探针、本轮会撞红的 8 处既有断言。需新增 **ADR-0040** |
+| **邮箱 + 密码登录（第 3 条认证方法）** | [`email-password-auth.md`](email-password-auth.md) | ⚠️ ~~🟡 规划中（2026-10-01 立）~~ → **2026-10-16 更正：该文件自称「进行中」，W1–W5 与 W6a–W6c 已落地；本行原写「需新增 ADR-0040」，而 [ADR-0040](../adr/0040-email-password-auth-decoupled-from-e2ee.md) 早已接受**。**是上一行的下游工单，不取代它** —— A1–A8 语义、宿主形态、J1–J7 仍以 `user-journey-and-auth.md` 为准。本篇只加"密码"这一条：5 条架构裁决（登录密码与 E2EE 口令**解耦**、Argon2id+pepper、令牌只存哈希、爆破禁用的是"密码认证器"而非账号、`tokenVersion` 全设备撤销）、线协议表、UI/UX 规范（含 **passkey 大按钮降级**）、W0 五个探针、本轮会撞红的 8 处既有断言。需新增 **ADR-0040** |
 | **注册登录标准套件：换绑邮箱 / 会话撤销 / 补齐账号面** | [`account-standard-suite.md`](account-standard-suite.md) | 🔄 进行中（2026-10-08 立）。**同上游两张工单都不取代** —— 它补的是那张对照表量出来的**真缺口**：换绑邮箱（三层零实现，且 `data-rights.ts:352` 早已预登记触发条件）、`jti` 让「退出登录」真的撤销一枚令牌（今天只清本机，服务端令牌仍有效 365 天）、把早已存在的 `/replace-token` 暴露成「登出所有设备」、移动端三块纯 UI 缺口、新增认证器发告知信（兑现 `email-password-auth.md` 缺口 13）。裁决在 [ADR-0063](../adr/0063-email-rebinding-and-per-session-revocation.md)。🔴 **代码与 `packages/legal` 必须同批**，否则 `check:legal-closure-truth` 判红 |
 | **备案前要补哪些协议、文本住在哪、还缺什么** | [`legal-compliance-before-filing.md`](legal-compliance-before-filing.md) | 🔴 进行中（2026-10-01 立）。**一句话结论：工信部 APP 备案一个文本字段都不缺，缺文本卡的是备案之后的两道门**（隐私政策 URL 不是备案表单字段，要求它的是 PIPL + 四部门《认定方法》+ Apple 中国区提审）。九份对外文本的唯一事实源是 `packages/legal`（🔴 不在 i18n 里，理由见其 `src/types.ts`）；四条接线 / 缺口登记 G-01–G-20 在本文件 |
 | **桌面 UI 走哪条机制、为什么** | 同上 §3.2 / §3.3 / §4.3 / §10-Q1 | 🔴 **2026-09-28 修订过**：由"原生壳 + 内嵌 WebView"改为 **RN 全端（`react-native-windows` 立即 + `react-native-macos` 等 0.84）**。依据是 [`../research/multi-platform-best-practice.md`](../research/multi-platform-best-practice.md)（补上了仓库此前缺失的联网检索） |
@@ -44,7 +44,7 @@
 |---|---|---|---|
 | [`multi-platform-adaptation.md`](multi-platform-adaptation.md) | 3,584 | 规划中 | 🟡 **判据仍有效**（M0/M1 已完成的结论、M3 的 A+B1–B7 判据、门禁 G1–G5）；**M2 的桌面路线被主计划 §3.3 修订**。剩余量数字（"8 个特性 / 11,100 行"）**已过期** |
 | [`desktop-native-migration.md`](desktop-native-migration.md) | 398 | 规划中 | 🟡 **W0/W1 的实测结论保留**（跨语言通道、Jint/JSC 陷阱、编组开销）；**"UI 形态"被主计划 §4.3 取代** |
-| [`phase-2-multi-platform.md`](phase-2-multi-platform.md) | 3,715 | ⚠️ 无有效状态行 | 🔴 **已被上面两份取代**，只作历史。⚠️ 其状态行是解不开的口令噪音，不是计划状态 |
+| [`phase-2-multi-platform.md`](archive/phase-2-multi-platform.md) | 3,715 | ⚠️ 无有效状态行 | 🔴 **已被上面两份取代**，只作历史。⚠️ 其状态行是解不开的口令噪音，不是计划状态 |
 | [`site-and-parity-alignment.md`](site-and-parity-alignment.md) | 1,739 | 规划中 | 🟡 **A 轨（站点）已交付**；**B 轨（能力 gap）按主计划 §5.5 重排** —— 原排序是 Web 优先的，与"Web 不是主战场"矛盾 |
 | [`desktop-packaging-handoff.md`](desktop-packaging-handoff.md) | 307 | 已交付 | ✅ 三端安装包已交付且实测"装完能起来"；剩余空白见其 §4 |
 | [`multi-end-unified-strategy-handoff.md`](multi-end-unified-strategy-handoff.md) | 257 | 交接 | 🔴 **主计划 ①–⑩ + G0/G4 全部做完并验证**；**唯一没绿的是 iOS 真机验收（34/9）**，根因已钉死（兜底凭据路径的自动化走不通）＋已排除的假设清单。**接手先读它 §5** |
@@ -62,18 +62,20 @@
 
 ## 三、已完成 —— 只作历史，**不要照它再开工**
 
+> 📦 **本表这 11 篇已搬迁到 `archive/`**，见 [archive/README.md](archive/README.md)（每篇的「现役替代品」都列在那里）。
+
 | 文件 | 完成依据 |
 |---|---|
-| [`phase-1-single-client-loop.md`](phase-1-single-client-loop.md) | `pnpm verify:p1` 11 条零 mock E2E 通过 |
-| [`activity-categories-and-colors.md`](activity-categories-and-colors.md) | 已并入 `main`（`84cc7f5` / `38cf3a5`） |
-| [`motivation-and-progression.md`](motivation-and-progression.md) | L1/L2/L3 三层已实现并并入 `main` |
-| [`ai-remediation-module-1-engine.md`](ai-remediation-module-1-engine.md) | ✅ 已执行（文件自己写着"不要再照这份任务书做一遍"） |
-| [`ai-remediation-module-2-journey.md`](ai-remediation-module-2-journey.md) | 已并入 `main`（`0614475`） |
-| [`ai-remediation-module-3-memory-moat.md`](ai-remediation-module-3-memory-moat.md) | 已并入 `main`（`73b13b2`） |
-| [`ai-gap-audit-and-remediation.md`](ai-gap-audit-and-remediation.md) | 三个整改模块均已并入 `main` |
-| [`ai-open-decisions.md`](ai-open-decisions.md) | 已决策 |
-| [`ai-tool-calling.md`](ai-tool-calling.md) | 🟢 P0–P2 已落地（P3–P4 未开工，见该文件） |
-| [`ai-remediation-parallel-runbook.md`](ai-remediation-parallel-runbook.md) | 已落地（`scripts/check-module-boundaries.mjs` 是它的可执行版本） |
+| [`phase-1-single-client-loop.md`](archive/phase-1-single-client-loop.md) | `pnpm verify:p1` 11 条零 mock E2E 通过 |
+| [`activity-categories-and-colors.md`](archive/activity-categories-and-colors.md) | 已并入 `main`（`84cc7f5` / `38cf3a5`） |
+| [`motivation-and-progression.md`](archive/motivation-and-progression.md) | L1/L2/L3 三层已实现并并入 `main` |
+| [`ai-remediation-module-1-engine.md`](archive/ai-remediation-module-1-engine.md) | ✅ 已执行（文件自己写着"不要再照这份任务书做一遍"） |
+| [`ai-remediation-module-2-journey.md`](archive/ai-remediation-module-2-journey.md) | 已并入 `main`（`0614475`） |
+| [`ai-remediation-module-3-memory-moat.md`](archive/ai-remediation-module-3-memory-moat.md) | 已并入 `main`（`73b13b2`） |
+| [`ai-gap-audit-and-remediation.md`](archive/ai-gap-audit-and-remediation.md) | 三个整改模块均已并入 `main` |
+| [`ai-open-decisions.md`](archive/ai-open-decisions.md) | 已决策 |
+| [`ai-tool-calling.md`](archive/ai-tool-calling.md) | 🟢 P0–P2 已落地（P3–P4 未开工，见该文件） |
+| [`ai-remediation-parallel-runbook.md`](archive/ai-remediation-parallel-runbook.md) | 已落地（`scripts/check-module-boundaries.mjs` 是它的可执行版本） |
 
 ---
 

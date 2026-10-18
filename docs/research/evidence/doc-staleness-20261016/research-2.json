@@ -1,0 +1,282 @@
+[
+  {
+    "path": "docs/research/performance-hotpaths-audit.md",
+    "verdict": "现行",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**进行中**（§8 十七步已落 8 / 未落 9；所有计数与行号一律现量，不引用本文数字）",
+    "summary": "性能热路径审计台账：11 条 P0，§8 已落 8 步、9 步待开工",
+    "stale_claims": [],
+    "evidence": "grep -rlE '(React\\.)?memo\\(' apps/web/src packages/ui/src apps/mobile/src → 0；§8.1 台账 8 已落/9 未落（:44-61）；文件头自述计数会漂、须重跑 §1 命令",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/research/legal-consumer-contract-terms.md",
+    "verdict": "部分失效",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**历史调研**（2026-10-01；条款已进 packages/legal，本文件只保留当时的缺口取证）",
+    "summary": "消费者条款前置法务调研：发布链路与同意留痕缺口取证",
+    "stale_claims": [
+      "「仓库内已有两份条款草稿」已过期 —— packages/legal 九份对外文本已是唯一事实源",
+      "「草稿不是发布源」一节完全未提 packages/legal 与三条法务门禁"
+    ],
+    "evidence": "legal-consumer-contract-terms.md:10,16；grep -rn packages/legal 该文 → 0 命中；ls packages/legal/src/documents/ → 9 份；docs/plans/README.md 记该目录为唯一事实源",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/research/legal-gdpr-alignment.md",
+    "verdict": "已归档冻结",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**历史调研**（2026-10-03 的 GDPR 对齐输入；九份文本已按此改写）",
+    "summary": "GDPR 对齐调研与逐段改写建议，已作为九份法务文本的输入",
+    "stale_claims": [],
+    "evidence": "grep -rln 'GDPR|欧盟' packages/legal/src/ → 8 份命中（privacy/third-parties/data-rights 等）；docs/plans/legal-compliance-before-filing.md 承接",
+    "archive_candidate": true,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/research/legal-dataflow-server.md",
+    "verdict": "部分失效",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**部分过期**（schema 现量 1878 行 / 51 model；本文是 2026-10-01 的 795 行 / 17 model 快照）",
+    "summary": "服务端数据流考古（隐私政策事实源）；schema 规模已翻倍",
+    "stale_claims": [
+      "「schema.prisma（795 行、17 个 model）」已过期：现量 1878 行 / 51 model",
+      "自述「隐私政策唯一事实来源」不再成立，模型与字段已大幅扩增"
+    ],
+    "evidence": "legal-dataflow-server.md:14；wc -l server/prisma/schema.prisma → 1878；grep -c '^model ' → 51",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/research/trash-and-archive-best-practice.md",
+    "verdict": "部分失效",
+    "status_line": "> 状态：**已成稿**（2026-10-03；§3.2 外部一手已回填，§3.3 如实列出取不到的项；",
+    "suggested_status_line": "> 状态：**历史勘察**（2026-10-03 快照；缺陷闭合状态以 [plans/trash-and-archive.md](../plans/trash-and-archive.md) §8.4/§10.x 现量为准）",
+    "summary": "回收站与归档现状勘察 + 14 条缺陷；部分缺陷此后已修",
+    "stale_claims": [
+      "D14「markReminderFired 生产代码零调用点」已过期：投递侧已接上 firedAt 落库"
+    ],
+    "evidence": "trash-and-archive-best-practice.md:538；grep -rn markReminderFired packages/ → reminder-delivery.ts:67、use-reminder-notifications.ts:81",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/research/dida365-help-center-ia.md",
+    "verdict": "已归档冻结",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**调研快照**（2026-09-28 抓取；竞品站点结构会变，引用前先重抓）",
+    "summary": "滴答清单帮助中心/官网 IA 抓取快照（97 篇 + FAQ 67 问 + 定价表）",
+    "stale_claims": [],
+    "evidence": "文件头 §0 抓取来源清单与「调研日期：2026-09-28」；docs/README.md:243 索引同述",
+    "archive_candidate": true,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/research/dida365-feature-benchmark.md",
+    "verdict": "已归档冻结",
+    "status_line": "> 状态：**调研记录**（归档层，结论有变时新增勘误、不改原文）",
+    "suggested_status_line": "",
+    "summary": "滴答功能对标 + 13 项「看起来有、其实没有」的 heyta 侧缺口审计",
+    "stale_claims": [],
+    "evidence": "docs/README.md:239 索引；:280 自述勘误规则；多端入口覆盖审计已实测其 13 项的此后变化",
+    "archive_candidate": true,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/research/legal-dataflow-client.md",
+    "verdict": "部分失效",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**部分过期**（向量时钟上限一句已失效；其余以 packages/legal 现量为准）",
+    "summary": "客户端数据流/权限/第三方清单取证（隐私政策事实源）",
+    "stale_claims": [
+      "「向量时钟累积历史 clientId，上限 100（ADR-0008）」已过期：limitVectorClockSize 生产调用点为 0，现行闸门是服务端 4096"
+    ],
+    "evidence": "legal-dataflow-client.md:26；grep -rn limitVectorClockSize packages/ --exclude-dir=dist → 仅测试与注释；docs/README.md 索引记 4096 为现量闸门",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/research/countdown-anniversary-data-and-images.md",
+    "verdict": "已归档冻结",
+    "status_line": "> 状态：**调研记录（证据）** —— 结论已下：[ADR-0044](../adr/0044-countdown-anniversary-entity-calendar-data-and-image-tiers.md)（2026-10-03 已接受）。落地在 [`countdown-anniversary.md`](../plans/countdown-anniversary.md)。",
+    "suggested_status_line": "",
+    "summary": "倒数纪念日历法/节假日分发/图片通道调研，结论已成 ADR-0044",
+    "stale_claims": [],
+    "evidence": "文件头状态行指向已接受的 ADR-0044；plans/countdown-anniversary.md 批次二已落地（状态行自述）",
+    "archive_candidate": true,
+    "superseded_by": "docs/adr/0044-countdown-anniversary-entity-calendar-data-and-image-tiers.md"
+  },
+  {
+    "path": "docs/research/inbound-automation-plan-audit.md",
+    "verdict": "已归档冻结",
+    "status_line": "> 审计日期：2026-10-07。对象：[唯一实施计划](../plans/inbound-automation.md)。结论：**方向可继续，不能原样交接实施；先补协议与状态机，再按 AC 分工。** 本次只审计划与现有源码，不实施、部署或证明功能上线。",
+    "suggested_status_line": "> 状态：**历史审计**（基线是 65 行版计划，该版已不存在；协议/状态机已成 ADR-0059–0064）",
+    "summary": "对 65 行自动收集计划的独立审计；其基线计划已被取代",
+    "stale_claims": [
+      "「计划共 65 行、SHA-256 7b7fea0a…」已过期：现量 4191 行 / sha256 0a049944…",
+      "「先补协议与状态机」已被兑现：ADR-0059/0060/0061/0064 已落地"
+    ],
+    "evidence": "inbound-automation-plan-audit.md:5；wc -l docs/plans/inbound-automation.md → 4191；shasum → 0a049944…；ls docs/adr/0059-0064",
+    "archive_candidate": true,
+    "superseded_by": "docs/plans/inbound-automation.md"
+  },
+  {
+    "path": "docs/research/spikes/rnw-content-island/README.md",
+    "verdict": "已归档冻结",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**已归档（spike 结束）**：结论 = RNW 原生侧不成立，桌面端走壳内 WebView（ADR-0037）",
+    "summary": "react-native-windows 内容岛 spike 记录；结论导向 ADR-0037",
+    "stale_claims": [],
+    "evidence": "README 结论段「S1-1/S1-5 未通过」；docs/adr/0037-desktop-ui-falls-back-to-webview.md 存在；docs/plans/README.md:33 记 2026-09-28 修订",
+    "archive_candidate": true,
+    "superseded_by": "docs/adr/0037-desktop-ui-falls-back-to-webview.md"
+  },
+  {
+    "path": "docs/research/multi-platform-best-practice.md",
+    "verdict": "已归档冻结",
+    "status_line": "> 状态：**调研结论**（只读调研，未改动任何产品代码）",
+    "suggested_status_line": "> 状态：**调研结论 · 已被实测推翻（历史）**：§2/§3.2/§4 的「桌面 → RN 平台实现」不算现行目标态，现行见 ADR-0037 与主计划 §4.2/§4.3",
+    "summary": "多端共享 UI 业界最佳实践调研；其桌面推荐已被自身追注推翻",
+    "stale_claims": [
+      "§2/§3.2/§4 的「桌面走 RN 平台实现」已被 RNW 0xC0000409 / RN-macOS 版本冲突推翻"
+    ],
+    "evidence": "文件头 2026-09-30 追注（:3-18）逐条撤回；docs/plans/README.md:33 记该修订；ADR-0037 已存在",
+    "archive_candidate": true,
+    "superseded_by": "docs/adr/0037-desktop-ui-falls-back-to-webview.md"
+  },
+  {
+    "path": "docs/research/showcase-fidelity-audit.md",
+    "verdict": "已归档冻结",
+    "status_line": "> 状态：**调研记录**（归档层，结论有变时新增勘误、不改原文）",
+    "suggested_status_line": "",
+    "summary": "展厅 mockup 与真应用保真度审计；已按归档规则留勘误",
+    "stale_claims": [],
+    "evidence": "文件头状态行自标归档层；:324 有 2026-09-28 勘误节（不改原文）",
+    "archive_candidate": true,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/research/landing-page-ia-ux-audit.md",
+    "verdict": "已归档冻结",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**历史审计**（2026-10-07 抓取；保留改造前的 300vh/coverflow 作为基线）",
+    "summary": "Landing 与帮助中心 IA/动效竞品审计（已提出并落地改造方向）",
+    "stale_claims": [],
+    "evidence": "文末 §6「本报告保留了改造前的 300vh / coverflow 作为审计基线；当前实现已改为 tab 选择式预览」；plans/landing-page-optimization.md 承接且状态已完成",
+    "archive_candidate": true,
+    "superseded_by": "docs/plans/landing-page-optimization.md"
+  },
+  {
+    "path": "docs/research/ai-memory-necessity.md",
+    "verdict": "已归档冻结",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**调研记录（结论已采纳）**：不引入向量库；结论支撑 ADR-0005 与 ai-strategy §4",
+    "summary": "用召回实验回答「要不要向量数据库」，结论为不需要",
+    "stale_claims": [],
+    "evidence": "实验与代码产物均在：packages/domain/tests/recall-experiment.spec.ts、src/memory.ts、src/recall.ts；无 pgvector/embedding 依赖",
+    "archive_candidate": true,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/research/reuse-plan.md",
+    "verdict": "部分失效",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**历史决策文档**（2026-09-25 的分层账本；行数已漂、服务端路径现为 `server/`，引用前现量）",
+    "summary": "上游复用方案分层账本（内核复用 / 外壳重写）",
+    "stale_claims": [
+      "「sync-core 4,240 行」已过期：现量 5,727 行",
+      "「shared-schema 952 行」已过期：现量 3,276 行",
+      "「服务端 packages/super-sync-server（148 个 ts 文件）」路径不存在：现为 server/"
+    ],
+    "evidence": "reuse-plan.md:16-18；结合 wc -l 现量（sync-core 5727 / shared-schema 3276）；ls packages/super-sync-server → No such file",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/research/visual-taste-sweep-2026-10-07.md",
+    "verdict": "已归档冻结",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**历史审计**（2026-10-07 的只读视觉复核；执行状态见 plans/product-ux-optimization.md）",
+    "summary": "全项目视觉 Taste 只读复核与逐页缺陷清单",
+    "stale_claims": [],
+    "evidence": "标题自标「只读复核」，日期 2026-10-07；文末有后续更新节；docs/plans/product-ux-optimization.md 为现行为承接计划",
+    "archive_candidate": true,
+    "superseded_by": "docs/plans/product-ux-optimization.md"
+  },
+  {
+    "path": "docs/research/reusable-components.md",
+    "verdict": "部分失效",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**历史决策表**（2026-09-25；多行决策实际未采纳，现量实现见 packages/domain 与 apps/web）",
+    "summary": "外部组件「用现成的还是自研」决策表；多行已被实际实现否证",
+    "stale_claims": [
+      "「自然语言日期解析 ✅ 直接用 chrono-node」未采纳：无任何 package.json 依赖 chrono-node",
+      "「RRULE ✅ 直接用 rrule.js」未采纳：实际用 ical.js（packages/domain/src/recurrence.ts）",
+      "「日历视图 ✅ 直接用 fullcalendar / schedule-x」未采纳：apps/web 自研 calendar 目录"
+    ],
+    "evidence": "reusable-components.md:14-19；grep '\"ical.js\"' packages/domain/package.json → ^2.2.1；grep chrono-node/rrule/fullcalendar 各 package.json → 0；ls apps/web/src/features/calendar/",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/research/global-responsive-audit-2026-10-07.md",
+    "verdict": "已归档冻结",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**历史审计**（2026-10-07 的浏览器响应式读数快照；复跑命令见文内）",
+    "summary": "全页面响应式 UX 浏览器审计（含复现命令与证据目录）",
+    "stale_claims": [],
+    "evidence": "文内证据目录 apps/web/evidence/global-responsive-ux 与 e2e/playwright.global-responsive.config.ts 均存在（ls 实测）",
+    "archive_candidate": true,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/research/e2ee-key-lifecycle-threat-model.md",
+    "verdict": "现行",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**现行**（ADR-0050 的威胁模型，随 ADR 的边界表更新，不单独改结论）",
+    "summary": "E2EE 密钥生命周期威胁模型，支撑在实施中的 ADR-0050",
+    "stale_claims": [],
+    "evidence": "docs/README.md:97 AC 条目仍以本文为该 ADR 威胁模型且状态 🔄 实施中；所述判据文件均存在（key-lifecycle.spec.ts / vault-key-package.routes.spec.ts / scripts/mutate-e2ee-key-lifecycle.mjs）",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/research/aed-implementation-evidence.md",
+    "verdict": "已归档冻结",
+    "status_line": "> 状态：**A/E/D 实施与验收完成**",
+    "suggested_status_line": "> 状态：**已完成阶段账（历史）**：仅覆盖 A/E/D 当轮源码，不能代表 B/C 已验收",
+    "summary": "A/E/D 范围的实施与验收证据记录，已完成阶段账",
+    "stale_claims": [],
+    "evidence": "文件头状态行与 docs/plans/README.md:19「A/E/D 已按各自证据入口闭合」一致；docs/README.md:99 索引记其为原 A/E/D 记录",
+    "archive_candidate": true,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/research/vector-clock-a1-evidence.md",
+    "verdict": "部分失效",
+    "status_line": "> 状态：**阶段证据与 Android Hermes 实测已完成；最终全仓验收待补**",
+    "suggested_status_line": "> 状态：**历史阶段证据（已完成）**：A 已按 [aed-implementation-evidence.md](aed-implementation-evidence.md) 闭合，本节留作旧故障基线",
+    "summary": "向量时钟 100/101 旧故障与存量自愈证据；状态行已落后",
+    "stale_claims": [
+      "状态行「最终全仓验收待补」与索引矛盾：docs/plans/README.md 记 A/E/D 已按各自证据入口闭合"
+    ],
+    "evidence": "vector-clock-a1-evidence.md:3；docs/plans/README.md:19「🔴 进行中：A/E/D 已按各自证据入口闭合」；docs/research/aed-implementation-evidence.md:3「A/E/D 实施与验收完成」",
+    "archive_candidate": false,
+    "superseded_by": "docs/research/aed-implementation-evidence.md"
+  },
+  {
+    "path": "docs/research/vector-clock-a2-frontier.md",
+    "verdict": "部分失效",
+    "status_line": "> 状态：**实现与真实链路证据已完成；最终仓库/多端门禁待补**",
+    "suggested_status_line": "> 状态：**历史阶段证据（已完成）**：A 已按 [aed-implementation-evidence.md](aed-implementation-evidence.md) 闭合",
+    "summary": "A2/A3 稳定前沿、持久观察与安全压缩的实现证据；状态行已落后",
+    "stale_claims": [
+      "状态行「最终仓库/多端门禁待补」与索引矛盾：A/E/D 已被记为按各自证据入口闭合"
+    ],
+    "evidence": "vector-clock-a2-frontier.md:3；docs/plans/README.md:19 记 A/E/D 已闭合；docs/README.md:99 索引",
+    "archive_candidate": false,
+    "superseded_by": "docs/research/aed-implementation-evidence.md"
+  }
+]

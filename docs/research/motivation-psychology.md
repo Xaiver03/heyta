@@ -2,10 +2,10 @@
 
 > 调研日期：**2026-09-26**。检索工具：AnySearch 实时检索（结果附 URL）。
 > **本文只给证据，不下设计结论。** 设计结论落在
-> [`motivation-and-progression.md`](../plans/motivation-and-progression.md)（**已撰写、已实现、已合并进 main**）。
+> [`motivation-and-progression.md`](../plans/archive/motivation-and-progression.md)（**已撰写、已实现、已合并进 main**）。
 > ⚠️ 本行原写"**该文档尚未撰写** —— 截至 2026-09-26，`docs/plans/` 只有
 > [`roadmap.md`](../plans/roadmap.md)、AI 线与两个阶段计划"：那句在写作当日属实，
-> 但设计文档随后已写成（`docs/plans/motivation-and-progression.md`，merge commit `84cc7f5`），
+> 但设计文档随后已写成（`docs/plans/archive/motivation-and-progression.md`，merge commit `84cc7f5`），
 > **此处已更正**。本文的证据现在有对应的设计落点。
 > 竞品机制事实见本文 §6；若 §6 与结论层冲突，**以 §6 的事实与来源为准**。
 
@@ -265,4 +265,4 @@ heyta 没有服务端行为数据（E2EE），这些指标不能直接采集（�
 
 反过来看，这三条约束**恰好排除了所有被证据质疑的机制**（排行榜、积分经济、云端推送轰炸），
 留下的是：**反馈即时性、连续性韧性、身份叙事、自愿分享**。
-设计结论已展开在 [`../plans/motivation-and-progression.md`](../plans/motivation-and-progression.md)（见文首说明）。
+设计结论已展开在 [`../plans/motivation-and-progression.md`](../plans/archive/motivation-and-progression.md)（见文首说明）。

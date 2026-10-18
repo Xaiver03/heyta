@@ -1,0 +1,252 @@
+[
+  {
+    "path": "docs/plans/detail-pane-alignment.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**进行中**（2026-10-03 立；W0–W8a 已落地并合进 main，W9–W12 未开工 —— 原写「规划中」，**2026-10-16 更正**）",
+    "suggested_status_line": "",
+    "summary": "详情面第四列与键盘光标工单；W0–W8a 已落地，W9–W12 未开工",
+    "stale_claims": [],
+    "evidence": "detail-pane-alignment.md:3 工作树已改成「进行中…原写『规划中』，2026-10-16 更正」，与 :153-167 的 W 表一致；plans/README.md:27 仍写「规划中」（索引侧未 sweep）",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/countdown-anniversary.md",
+    "verdict": "现行",
+    "status_line": "> 状态：🔄 **批次一已落地**（2026-10-03，`a29881e9` 已合进 main）：W1 历法层 / W3「每年」预设 / W4 节假日随包数据 + bundle 体积闸门，落地记录与本批欠账见 **§3.5**。",
+    "suggested_status_line": "",
+    "summary": "倒数纪念日批次一/二计划：EVENT 实体、农历、节假日、纪念卡片",
+    "stale_claims": [],
+    "evidence": "entity-types.ts:40 已列 'EVENT'、capability-manifest.generated.ts:119 已含 EVENT ⇒ 文中 W2/W10 结论现量成立；plans/README.md:22 的「W0/W2/W5/W6 未开工」才是过期方",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/multi-end-coverage-handoff.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**进行中**（交接文档，记录的是当时停点；Goal 未完成，勿当已完成接手）",
+    "suggested_status_line": "",
+    "summary": "多端补齐 goal 交接：停在条件 2 未闭合 + 四端重装未跑",
+    "stale_claims": [],
+    "evidence": "工作树新增状态行「进行中（…Goal 未完成，勿当已完成接手）」；:5 自标 57/62 为旧读数并给出现量命令；plans/README.md:15 仍记 goal「进行中」",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/multi-platform-adaptation.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**部分已取代**（⚠️ **2026-10-16 更正**：原写「规划中」，与本文件第 3–5 行**自相矛盾** —— **桌面 UI 路线**已被 [`multi-end-unified-strategy.md`](multi-end-unified-strategy.md) 取代；**M0/M1 已完成的结论、M3 的判据 A + B1–B7、门禁 G1–G5 仍然有效**）",
+    "suggested_status_line": "",
+    "summary": "多端一套代码实施计划；桌面路线部分已被主计划取代",
+    "stale_claims": [],
+    "evidence": "multi-platform-adaptation.md:3 工作树已改成「部分已取代（2026-10-16 更正…桌面 UI 路线已被取代；M0/M1 结论与 M3 判据仍有效）」，与 :4-5 自泄的过期数字一致",
+    "archive_candidate": false,
+    "superseded_by": "docs/plans/multi-end-unified-strategy.md"
+  },
+  {
+    "path": "docs/plans/multi-end-unified-strategy.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**已定案（Q1 已于 2026-09-28 按最佳实践修订，见 §10）；T1/T2 与计划层收敛已执行（见 §11）**",
+    "suggested_status_line": "",
+    "summary": "多端统一权威主计划：UI 单源、桌面壳、计划层收敛",
+    "stale_claims": [],
+    "evidence": "plans/README.md:14 标「唯一权威主计划」；本文:3 状态「已定案」；:670/:789 已就地标注旧文档的过期断言",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/goal-collaboration-shared-lists.md",
+    "verdict": "现行",
+    "status_line": "> 状态：🟡 **本地成笔（2026-10-11），全链门禁被别线绊线挡着、push 押在跨线协调** —— W0+W1 ✅ / W2 服务端核心 ✅ / W3 纯层+格式统一 ✅ / 法务 ✅ / W4 已接线、W6 已落地、journey 全绿且链接落点断言已补（`RESULT=OK steps=3`）/ **④ 门禁：`pnpm -r typecheck` 全仓绿 + 本线两枚红（`check:layering`、`check:ui-language`）当场修绿；no-bail 全量 test 已做对数审计（**条数不写在这里，会漂**；现量：逐包 `Tests` 汇总行相加，并核「有 test 脚本的包数 == 打了汇总行的包数」），本线自己那枚下游红（landing `mockup-shell-shape` #7，因 a923f7fa 给页头加了 `share-open-button`）本会话当场修绿销账；整链仍红在三枚别线判断绊线**（`packages/ai`「分母 9→10」= 给 COMMENT 配不配 AI 工具的产品判断；`shared-schema` `AUTH_PASSWORD_PATHS` 9→12 = auth 线口径；`domain subscription.spec` 权益拒绝理由契约 = 计费线，**都不代改**）+ 一枚先前登记的载体抖动（`mobile` Rolldown `RTEST-UNHANDLED-01`）本轮**不摘层重跑未复现**（958 全过、rc=0），已从本线边界里销掉；全量 test 的对数审计分母**含 `server`** —— AGENTS §6 那句\"沙箱跑不了 sync-server\"是瞬时属性，沿用它会把自己的分母算错（→ §7 第 408 条）/ **⑤ 文档写回已按内容复账并补齐**（benchmark §2.6 的 6.1+6.7、matrix §6（6.2/6.3 按现量更正为「已建模≠可达」）、**roadmap.md 新增 §1.3 并行轨道**、**docs/plans/README.md 索引行**、AGENTS §9、P2-10，均带边界如实登记）/ **⑥ 本线已本地提交（见交接·三），push 未独做**（本地 main 领先 origin 的笔多为别线未公开，`git push` 会一起公开）/ **停止点 ①（同意面视觉层级）已于 2026-10-12 按最佳实践落地并配 8 条判据 + 六臂变异**（见文末那一节），②（owner 转让语义）仍待产品负责人追认。逐项读数与执行序见文末「2026-10-11 交接·三」；每步现量——共享检出在动。DoD 全清单见 [collaboration-shared-lists.md](collaboration-shared-lists.md) §7。",
+    "suggested_status_line": "",
+    "summary": "共享清单 goal 执行记录：W0–W6 已落，停止点②待产品追认",
+    "stale_claims": [],
+    "evidence": "本文:3 记「本地成笔（2026-10-11）」；plans/README.md:16 记「Goal 进行中」；server/src/shares/share.routes.ts 现量 8 个 /shares 端点",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/roadmap.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**进行中** —— P0、P1 已完成，P2 进行中",
+    "suggested_status_line": "",
+    "summary": "总路线图/阶段总览；§5 已交主计划，2026-10-16 已补三处更正",
+    "stale_claims": [],
+    "evidence": "roadmap.md:345-351 自述 §5 由主计划接管；工作树 diff 在 :6/:423/:425 补了 2026-10-16 更正（phase-2 作废、付款入口已存在、¥12 档结论被 ADR-0054 取代）",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/user-journey-and-auth.md",
+    "verdict": "部分失效",
+    "status_line": "> 状态：**已定案并开始实施**（2026-09-28）",
+    "suggested_status_line": "> 状态：**已定案并实施中**（2026-09-28；§10 W8 的 Web 半已由共享 AuthForm 落地，正文待 sweep）",
+    "summary": "各端认证与旅程唯一事实源；§10 的「表单仍两遍」已过期",
+    "stale_claims": [
+      "§10.1(:567) 说 Web/Mobile 各写一遍表单「887 行，两遍」，而 web 已改用共享 AuthForm（AuthPanel.tsx:528）",
+      "§10/:561 写「组件部分仍未共享」，与 packages/ui/src/auth/AuthForm.tsx（2026-10-10）已存在不符（移动端尚未接）"
+    ],
+    "evidence": "user-journey-and-auth.md:561/:567 vs packages/ui/src/auth/AuthForm.tsx（git 2026-10-10 a63aa9e9）+ apps/web/src/features/auth/AuthPanel.tsx:528 渲染 <AuthForm>",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/account-standard-suite-handoff.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**进行中**（交接文档；代码与判据侧已闭合，剩 #22 法务欠账（三个 codemod 未跑）与关闭 goal 待负责人点头）",
+    "suggested_status_line": "",
+    "summary": "注册登录标准套件交接：代码判据闭合，剩 #22 法务 codemod 未跑",
+    "stale_claims": [],
+    "evidence": "工作树新增状态行「进行中…剩 #22 法务欠账（三个 codemod 未跑）」，与 :291-297、:507 自洽；docs/README.md:200 同登记",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/desktop-native-migration.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**部分已取代**（⚠️ **2026-10-16 更正**：原写「规划中」，与本文件上方第 3–10 行的收敛说明**自相矛盾** —— \"UI 形态\"部分已被 [`multi-end-unified-strategy.md`](multi-end-unified-strategy.md) §3.3/§4.3 与 [ADR-0037](../adr/0037-desktop-ui-falls-back-to-webview.md) 取代；**W0/W1 的实测结论仍然有效**，**不要按它去手写第二份 UI**）",
+    "suggested_status_line": "",
+    "summary": "原生优先迁移计划；UI 形态部分已被主计划与 ADR-0037 取代",
+    "stale_claims": [],
+    "evidence": "desktop-native-migration.md:3 工作树已改成「部分已取代（2026-10-16 更正…W0/W1 结论仍有效，不要按它手写第二份 UI）」，与 :4-10 一致",
+    "archive_candidate": false,
+    "superseded_by": "docs/plans/multi-end-unified-strategy.md"
+  },
+  {
+    "path": "docs/plans/collaboration-shared-lists.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**进行中**（2026-10-08 立；W0–W3 已落地，逐条见 §3 —— 原写「规划中」，**2026-10-16 更正**）",
+    "suggested_status_line": "",
+    "summary": "共享清单权威计划；W0–W3 已落地，余下见各节状态行",
+    "stale_claims": [],
+    "evidence": "collaboration-shared-lists.md:3 工作树已改成「进行中（…W0–W3 已落地…原写『规划中』，2026-10-16 更正）」，与 :130/:138/:147 一致；plans/README.md:16 同记进行中",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/help-center-docs-expansion.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**进行中**",
+    "suggested_status_line": "",
+    "summary": "帮助中心扩成 SSOS 式文档中心：结构、内容配额、双语、截图",
+    "stale_claims": [],
+    "evidence": "本文:3 与 plans/README.md:28 同记「进行中」；交付面 apps/landing/src/pages/HelpPage.tsx 与 e2e/landing/docs-centre.spec.ts 均存在",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/subscription-boundary.md",
+    "verdict": "部分失效",
+    "status_line": "> 状态：**产品决定（PM 定稿，待实施）**。价格与周期已按",
+    "suggested_status_line": "> 状态：**产品决定（PM 定稿；价格已由 ADR-0020 落地，可售卖前置见 ADR-0054；正文两处旧句待 sweep）**",
+    "summary": "免费/付费边界定义；正文残留「两个付费项都还不能卖」",
+    "stale_claims": [
+      ":154 写「服务本体仍未完成，所以两个付费项现在都还不能卖」，与同文 :58-60 的 2026-10-16 更正自相矛盾",
+      ":54「两个付费项现在都还不能卖」未改口，而现量 NOT_YET_DELIVERABLE_SKUS = {} 已可售卖"
+    ],
+    "evidence": "subscription-boundary.md:154/:54 vs 同文 :58-62（ADR-0054 更正）+ server/src/billing/price-book.ts:120 `NOT_YET_DELIVERABLE_SKUS = {}`",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/ai-remediation-module-3-memory-moat.md",
+    "verdict": "已归档冻结",
+    "status_line": "> 状态：✅ **已执行并并入 `main`**（merge commit `73b13b2`，1 文件 / +90，2026-09-27）。",
+    "suggested_status_line": "",
+    "summary": "已执行并入 main 的 AI 模块 3 任务书（历史记录）",
+    "stale_claims": [],
+    "evidence": "本文:3「✅ 已执行并并入 main（73b13b2）」+:6「不要再照它重做一遍」；plans/README.md:72 同",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/gate-blindspot-handoff.md",
+    "verdict": "已归档冻结",
+    "status_line": "> 状态：🟢 **本轮四项交付全部处理完**（第 4 项两端因**环境**如实报红，见 §4 —— 那两件要用户本人做）",
+    "suggested_status_line": "",
+    "summary": "已闭合的 check:docs 死角交接，正文自述转为历史",
+    "stale_claims": [],
+    "evidence": "本文:1 标题「已闭合，本文件转为历史」+:3「本轮四项交付全部处理完」；plans/README.md:57 同",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/ai-remediation-module-2-journey.md",
+    "verdict": "已归档冻结",
+    "status_line": "> 状态：✅ **已执行并并入 `main`**（merge commit `0614475`，8 文件 / +489，2026-09-27）。",
+    "suggested_status_line": "",
+    "summary": "已执行并入 main 的 AI 模块 2 任务书（历史记录）",
+    "stale_claims": [],
+    "evidence": "本文:3「✅ 已执行并并入 main（0614475）」+:4「不要再照它重做一遍」；plans/README.md:71 同",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/phase-1-single-client-loop.md",
+    "verdict": "已归档冻结",
+    "status_line": "> 状态：**已完成** —— `pnpm verify:p1` 自带真实服务端，跑 11 条零 mock E2E，含两条真实点击 `ConflictDialog` 的双端收敛（与 [总路线图](roadmap.md) 的 P1 行一致）",
+    "suggested_status_line": "",
+    "summary": "P1 单端闭环详细计划，已完成阶段账",
+    "stale_claims": [],
+    "evidence": "本文:3「已完成 —— pnpm verify:p1…11 条零 mock E2E」；AGENTS.md §7 P1 ✅；plans/README.md:67 登记同一判据",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/goal-landing-and-quality-audit.md",
+    "verdict": "已归档冻结",
+    "status_line": "> 状态：**已完成（2026-10-03）**。`2ed84122..0c171df1` 共 82 个提交已推送 `origin/main`",
+    "suggested_status_line": "",
+    "summary": "已完成 goal 账：82 提交落账 + 分支合并 + 质量审计",
+    "stale_claims": [],
+    "evidence": "本文:3「已完成（2026-10-03）」；plans/README.md:13 同（82 提交、feat/countdown-anniversary 合并）",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/landing-motion-audit/005-css-motion-polish.md",
+    "verdict": "已归档冻结",
+    "status_line": "> 状态：**已完成**（历史整改单，5 项已全部实施并验证；勿照它再开工）",
+    "suggested_status_line": "",
+    "summary": "落地页动效审计 005 整改单，5 项已实施并验证",
+    "stale_claims": [],
+    "evidence": "本文:3 状态「已完成（历史整改单…勿照它再开工）」；docs/README.md:186「5 条发现全部 DONE」",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/goal-settings-ia.md",
+    "verdict": "已归档冻结",
+    "status_line": "> 状态：✅ **完成（2026-09-29）** —— ①②③ 判据全绿，证据如下；",
+    "suggested_status_line": "",
+    "summary": "设置 IA（移动端优先）执行 goal，判据全绿已收口",
+    "stale_claims": [],
+    "evidence": "本文:3「完成（2026-09-29）」；plans/README.md:20「✅ 已完成」",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/landing-page-optimization.md",
+    "verdict": "已归档冻结",
+    "status_line": "> 状态：**本轮目标已完成；WebGL 按需加载与隐私减动效路径已落地并验收**",
+    "suggested_status_line": "",
+    "summary": "落地页优化计划；本轮目标已完成，未登记进任一索引",
+    "stale_claims": [],
+    "evidence": "本文:3「本轮目标已完成」；对应验证件 e2e/landing/homepage-ux.spec.ts、docs-centre.spec.ts 现量存在；docs/README.md 与 plans/README.md 均未登记它",
+    "archive_candidate": true,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/plans/paid-automatic-capture.md",
+    "verdict": "部分失效",
+    "status_line": "> 状态：**规划中**",
+    "suggested_status_line": "> 状态：**入口**（状态以 [inbound-automation.md](inbound-automation.md) 为准）",
+    "summary": "付费自动收集入口文件，全部内容已并入入站自动化计划",
+    "stale_claims": [
+      "状态行「规划中」与它指向的唯一实施计划「实施中（2026-10-12）」不一致"
+    ],
+    "evidence": "paid-automatic-capture.md:3「规划中」 vs :5「已合并到入站自动化唯一实施计划」；inbound-automation.md:3「实施中」",
+    "archive_candidate": false,
+    "superseded_by": ""
+  }
+]

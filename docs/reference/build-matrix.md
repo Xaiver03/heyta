@@ -449,7 +449,7 @@ pnpm build:ios                     # Release, iphonesimulator
 
 ⚠️ **产物不在仓库里**（脚本把工程建在 `/tmp/heyta-harmony-*` 下），所以这里的状态
 **无法靠 `ls` 二次复核** —— 要复核就重跑上面三条命令。过程与证据见
-[`../plans/phase-2-multi-platform.md`](../plans/phase-2-multi-platform.md) §3.24、§3.25。
+[`../plans/phase-2-multi-platform.md`](../plans/archive/phase-2-multi-platform.md) §3.24、§3.25。
 
 **仍然没做的是"跑起来"**，缺三样且都不是写代码能补的：模拟器系统镜像（本机 `~/.Huawei`
 不存在）、签名（产物 `*-unsigned.hap`）、真机/模拟器。所以**不要**把上面读成

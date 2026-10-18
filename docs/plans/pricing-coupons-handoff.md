@@ -1,5 +1,8 @@
 # 交接：可调价 + 优惠券 —— 从「领域层已落地」到「收银台真的能用」
 
+> 状态：**已完成**（交接文档；§5.1–§5.4 四件事已落地并有判据，仅「真实商户凭证 E2E」未做 —— 微信支付按用户指示搁置，卡点在商户号 KYC，属外部流程）。
+> ⚠️ **2026-10-16 复读提示**：本文 §11.5 与 §11.2 各有一处关于「云端 AI 端点 / 计量」与 ADR-0023 的**过期陈述，已就地加更正**；现役结论以 [ADR-0054](../adr/0054-managed-ai-retention-and-selling-preconditions.md) 与 [roadmap](roadmap.md) §5.2 为准。
+
 > **给全新会话的完整任务书。** 你不需要重新调研 —— 调研结论、产品决定、技术事实
 > 都在下面和引用的文档里。**先读完本文再动手。**
 >
@@ -226,7 +229,7 @@ amount: { total: price.totalFen, currency: 'CNY' },
   `packages/storage/**`、`packages/i18n/**`、`apps/web/**`、
   `docs/adr/0015`、`docs/adr/0016`、**`docs/adr/0019-upload-rejection-does-not-block-download.md`**、
   `docs/runbooks/deployment.md`、`docs/runbooks/finlaw-cleanup-candidates.md`、
-  `docs/plans/phase-2-multi-platform.md`、`docs/reference/architecture.md`、
+  `docs/plans/archive/phase-2-multi-platform.md`、`docs/reference/architecture.md`、
   `pnpm-lock.yaml`。
 - **ADR 编号**：0018 是本文这套（已提交），0019 是别人的（未提交）。
   你再写 ADR 就用 **0020**。
@@ -332,10 +335,16 @@ cd apps/landing && npx vitest run              # 期望 71 passed
    所以"用户在界面上想付钱"这一步**仍然撞墙**，但原因从"我们没接线"
    变成了"支付商资质 + 客户端未做"。
 2. ~~**¥12 那一档在代码里无法表达**~~ ✅ **已可表达**（`subscriptions.price_id` +
-   `grants`，`9684d2a`）；**但"无法交付、无法计量"仍然成立** —— 服务端**没有**云端 AI
+   `grants`，`9684d2a`）；~~**但"无法交付、无法计量"仍然成立** —— 服务端**没有**云端 AI
    端点、**没有**计量、**没有**一处 `deepseek` 调用（实测：`grep deepseek server/src
    packages/ai/src` 为空），所以 `hosted-ai-monthly` 被 `NOT_YET_DELIVERABLE_SKUS`
-   在收银台**挡住不卖**（ADR-0023）。这一条现在是**有终点的决定**，不再是静默。
+   在收银台**挡住不卖**（ADR-0023）。这一条现在是**有终点的决定**，不再是静默。~~
+   🔴 **2026-10-16 更正：上面这一整段已过期** —— 云端 AI 端点
+   （`server/src/ai/managed-proxy.routes.ts`）与计量（`server/src/ai/metering.ts`）**都已实现**，
+   `NOT_YET_DELIVERABLE_SKUS` 已清空，ADR-0023 的结论由
+   [ADR-0054](../adr/0054-managed-ai-retention-and-selling-preconditions.md) 取代
+   ⇒ **收银台今天不再挡住 ¥12**（下单返 200 + 1200 分）。
+   真正拦住它的换成了**客户端**：无托管 AI 开关、无 `/api/ai/managed/chat` 调用点、无「已用 X / 300」界面。
 3. **从落地页到账户没有路（③）** —— 🔴 **仍然没做**：落地页 `Footer.tsx` 全是 `#`
    锚点、**0 条外链**；`apps/web/src/features/` 下**没有 auth 目录**，无注册/登录界面，
    只有 `SyncBar.tsx` 三个手填框。服务端收银台再通，新用户也到不了应用、建不了账号。
@@ -447,12 +456,23 @@ cd apps/landing && npx vitest run              # 期望 71 passed
      `20260929000000_add_subscription_grants`（含 `['hosting']` 回填，否则开关一打开
      已付费用户会被当场拒绝）+ 权益按 `grants` 分支（`evaluateCapability`）。
      `¥5` 与 `¥12` 从此在代码里真的可分。
-   - ✅ **已做（决定）**：云端 AI 端点 + 300 次/月 计量**本轮不实现**，
+   - ~~✅ **已做（决定）**：云端 AI 端点 + 300 次/月 计量**本轮不实现**，
      由 [ADR-0023](../adr/0023-managed-ai-quota-not-implemented.md) 记录，
      含**最小实现清单**与硬约束「计量存在之前 `hosted-ai-monthly` 不得被售卖」；
      `pnpm check:ai-quota` 把承诺的数字与状态绑起来。
    - ❌ **仍缺**：端点、计量、设置页的「本周期已用 X / 300 次」（法务 §5.3 承诺了它）。
-   **在计量落地之前不要放开 ¥12 的售卖**：收了钱交付不了。
+   **在计量落地之前不要放开 ¥12 的售卖**：收了钱交付不了。~~
+   - 🔴 **2026-10-16 更正（上面两行已过期）**：**端点与计量都已实现** ——
+     `server/src/ai/managed-proxy.routes.ts` 的 `/managed/chat`、
+     `server/src/ai/metering.ts` 的原子计量与过期清理；`NOT_YET_DELIVERABLE_SKUS` 已清空，
+     ADR-0023 的结论由 [ADR-0054](../adr/0054-managed-ai-retention-and-selling-preconditions.md) 取代。
+     ⇒ **服务端今天会卖 ¥12**（下单返 200 + 1200 分，`server/tests/billing-checkout.routes.spec.ts` 钉住）。
+   - ❌ **仍缺（换了位置，不是消失了）**：客户端托管 AI 开关与 `/api/ai/managed/chat` 调用点
+     （`AiSupplyMode` 在 `packages/ai` 之外零引用）、设置页的「本周期已用 X / 300 次」
+     （`peekManagedAiUsage` 零生产调用方、服务端无读用量路由）、¥12 的客户端下单入口
+     （`RENEWAL_PRICE_ID` 写死 `hosted-monthly`）。
+     🔴 **所以那句警告今天仍然成立，只是主语变了**：不是"计量没落地"，而是"**客户端打不开**"——
+     `hosted-ai-monthly` 现在**已经是可以被卖出的**，而买到的东西在任何客户端都用不了。
 3. **落地页 → 应用 → 账户的路**（③）—— 落地页外链 + web 注册/登录。
 4. **运营身份与鉴权**（§11.3）—— 目前改价 = 服务器 shell 权限，审计不绑定已认证身份。
    **唯一管理入口**是 `server/scripts/pricing.ts`（`pnpm --filter server pricing`），

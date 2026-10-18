@@ -1,5 +1,6 @@
 # 复盘：日历（R13/R14/R14c/R17）与 Profile（R15a/R15b）+ 取证（R16）这一轮的判断失败
 
+> 状态：**已完成**（复盘文档，记录的是 2026-10-03 当时的判断；要现状请看交接件）
 > 交接文档：[`calendar-profile-handoff.md`](calendar-profile-handoff.md)；过程账：
 > [`calendar-year-time-and-mobile-profile.md`](calendar-year-time-and-mobile-profile.md)
 > 范围：2026-10-03 那一轮（年视图 / 时刻输入侧 / 移动端 Profile / 日档英文取证 / 收口后追加的档位表单一事实源 R17）

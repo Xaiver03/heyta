@@ -1,0 +1,309 @@
+[
+  {
+    "path": "docs/research/legal-pipl-baseline.md",
+    "verdict": "已归档冻结",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**调研记录**（归档层，2026-10-01 快照；§8–§11 为后续补写与勘误，缺口 G-1/G-4/G-7 仍未关闭，正式对外引用前须回官方原文复核）",
+    "summary": "PIPL/数据出境/App 专项治理法务合规基线，法条转述+工程清单",
+    "stale_claims": [
+      "G-1 缺口仍开着：仓库仍有文件按旧《网络安全法》条号引用，本文只登记未复核"
+    ],
+    "evidence": "docs/research/legal-pipl-baseline.md:1394 §11 勘误；:1587 附F 自认『不能作为对外引用的成品』、复核周期每季度；git log -1 = 2026-10-10",
+    "archive_candidate": true,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/research/ai-feature-landscape.md",
+    "verdict": "已归档冻结",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**调研记录**（归档层，2026-09-25 快照；§0 勘误已作废『四家零材料』结论；§1 价格/上架状态随时漂）",
+    "summary": "13 个非滴答待办类产品 AI 功能格局调研",
+    "stale_claims": [
+      "§0『最大缺口：四家 E2EE 产品零材料』已被 e2ee-apps-ai.md 补齐，靠文内勘误兜住",
+      "§1 价格与 shipped/beta 状态是 2026-09-25 实测，无复核机制"
+    ],
+    "evidence": "docs/research/ai-feature-landscape.md:9 勘误原文『本节列的最大缺口已被后续调研补齐，请勿再引用四家零材料』",
+    "archive_candidate": true,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/research/e2ee-apps-ai.md",
+    "verdict": "已归档冻结",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**调研记录**（归档层，2026-09-27 快照；§1/§9.1 的产品建议已被 ADR-0013 推翻，竞品事实不受影响）",
+    "summary": "E2EE/本地优先产品怎么做 AI 的定向调研",
+    "stale_claims": [
+      "『heyta 不要走 R4 厂商托管 AI』已作废——ADR-0013 决定做托管 AI，仅文内勘误更正",
+      "§11.1 指向别的文档要同步的 3 条已落实，本节只剩过程记录价值"
+    ],
+    "evidence": "docs/research/e2ee-apps-ai.md:72 与 :960 两处勘误自述『第 1 行已作废』→ ADR-0013；:1093『不要照它去改别的文件』",
+    "archive_candidate": true,
+    "superseded_by": "docs/adr/0013-cloud-ai-and-maas.md"
+  },
+  {
+    "path": "docs/research/ai-competitive-and-architecture.md",
+    "verdict": "已归档冻结",
+    "status_line": "> ⚠️ 本文件是**归档**。结论有变时**新增勘误**，不改原文（`docs/README.md` §一）。",
+    "suggested_status_line": "",
+    "summary": "滴答竞品 AI 做法 + E2EE 下可用推理架构的归档调研",
+    "stale_claims": [
+      "§2『不做官方云中转』末句已作废——ADR-0013 决定提供托管 AI，靠文内勘误覆盖"
+    ],
+    "evidence": "docs/research/ai-competitive-and-architecture.md:478 勘误『末句已作废』并指向 ADR-0013；:6 自声明归档",
+    "archive_candidate": false,
+    "superseded_by": "docs/adr/0013-cloud-ai-and-maas.md"
+  },
+  {
+    "path": "docs/research/licensing-and-compliance.md",
+    "verdict": "已归档冻结",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**调研记录**（归档层，2026-09-25 快照；§6.2 定价与商店成本会漂，§1/§2 许可证结论仍可用）",
+    "summary": "开源许可证/上架门槛/变现定价的商业化事实调研",
+    "stale_claims": [
+      "§6.2 直接对标产品定价为 2026 年读数，无复核；§2.1 Vikunja 事实基线未复验"
+    ],
+    "evidence": "docs/research/licensing-and-compliance.md:1-6 自标调研时间与 web_fetch 局限；:269 自列『翻脸条件』；无勘误节、无状态行",
+    "archive_candidate": true,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/research/dida-view-unification.md",
+    "verdict": "已归档冻结",
+    "status_line": "> 状态：**调研记录**（归档层，结论有变时新增勘误、不改原文）",
+    "suggested_status_line": "",
+    "summary": "滴答视图/导航分层与 heyta 视图统一的归档调研",
+    "stale_claims": [
+      "§5/§8.4 记的 ht-* 前缀基线 30 已过期（实测 30→31→29），靠 §9.2 勘误补正"
+    ],
+    "evidence": "docs/research/dida-view-unification.md:3 状态行；:58 与 :519 两处勘误；:548 §9.2『记的 30 已过期』",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/research/multi-platform-selection-evidence.md",
+    "verdict": "部分失效",
+    "status_line": "> 状态：**调研结论，未拍板**（选型决策本身应由产品负责人拍板并落 ADR）",
+    "suggested_status_line": "> 状态：**调研结论，未拍板**（归档层）；⚠️ 文中引用的 ADR-0024 状态已由『待确认』变为『已接受』，桌面 UI 形态另见 ADR-0036/0037",
+    "summary": "小组件需求是否改变多端壳体选型的证据调研",
+    "stale_claims": [
+      "开头『ADR-0024…状态：待确认』过期，该 ADR 现已是『已接受』",
+      "桌面路线后由 ADR-0036/0037 改为原生壳+内嵌 Web UI，本文仍按 Electron 论证"
+    ],
+    "evidence": "本文:7『状态：待确认』；docs/adr/0024:3『状态：**已接受**』（2026-09-27）",
+    "archive_candidate": false,
+    "superseded_by": "docs/adr/0037-desktop-ui-falls-back-to-webview.md"
+  },
+  {
+    "path": "docs/research/competitor-incentive-teardown.md",
+    "verdict": "已归档冻结",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**调研记录**（归档层，2026-09-27 快照；竞品事实冻结，§9 与货币有关的三行须按红线重读）",
+    "summary": "Forest/Duolingo/Habitica 等竞品激励与留存机制拆解",
+    "stale_claims": [
+      "§9 汇总表三行『虚拟货币/宝石经济/金币换奖励』对 heyta 的可用性已作废，靠开头勘误改写"
+    ],
+    "evidence": "docs/research/competitor-incentive-teardown.md:9 勘误逐条改写三行并写明红线；竞品事实声明不变",
+    "archive_candidate": true,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/research/dida-capture/INTERFACE-NOTES.md",
+    "verdict": "已归档冻结",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**调研记录 · 历史取证**（归档层，对象为 TickTick.app v8.2.03 / macOS 暗色；竞品版本升级后不得当现状）",
+    "summary": "TickTick v8.2.03 macOS 界面取证笔记（读图实测）",
+    "stale_claims": [
+      "取证对象是 v8.2.03 与当时暗色主题，竞品升级后界面事实随时失效"
+    ],
+    "evidence": "docs/research/dida-capture/INTERFACE-NOTES.md:1-5 自标版本 v8.2.03、全部来自 12 张原图；git log -1 = 2026-09-30",
+    "archive_candidate": true,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/research/native-widgets.md",
+    "verdict": "已归档冻结",
+    "status_line": "> **状态**：**调研结论，未拍板。** 按 [`docs/README.md`](../README.md) 的分工，本文只给证据；要固化的决策见 §7，须新开 ADR。",
+    "suggested_status_line": "",
+    "summary": "原生小组件平台事实与 heyta 实现路径调研（未拍板）",
+    "stale_claims": [
+      "§0『macOS/Windows 做不了』已被同日勘误推翻（Continuity / PWA provider）"
+    ],
+    "evidence": "docs/research/native-widgets.md:9 勘误『§0 对 macOS / Windows 的做不了已被推翻』；:4 状态行写未拍板",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/research/timeline-view-deep-dive.md",
+    "verdict": "部分失效",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**调研记录**（归档层，2026-10-01 快照）；⚠️ §1/§3 的『现状』已过期——P1/P2 均已按 ADR-0043 落地",
+    "summary": "时间线视图现状/业界/三阶段方案调研",
+    "stale_claims": [
+      "§1 与 §3.1 称 Task 无任何时间字段、只能编时长：现已加 startDate/durationMinutes",
+      "§4 P1『把 UI 修诚实』与 P2『拍板数据模型』均已完成，原文仍写成待办"
+    ],
+    "evidence": "entities.ts:280 `startDate?`、:291 `durationMinutes?`；plans/README.md:23『已完成（P1+P2）』",
+    "archive_candidate": true,
+    "superseded_by": "docs/adr/0043-timeline-p2-task-start-date-duration.md"
+  },
+  {
+    "path": "docs/research/site-ia-and-landing-audit.md",
+    "verdict": "部分失效",
+    "status_line": "> 状态：**调研记录**（归档层，结论有变时新增勘误、不改原文）",
+    "suggested_status_line": "> 状态：**调研记录**（归档层，2026-09-28 快照）；⚠️ §1/§2 的落地页现状已过期——多页站点（定价/下载/帮助/登录/更新动态）此后已建",
+    "summary": "heyta 落地页现状审计与与滴答站点的双向对齐矩阵",
+    "stale_claims": [
+      "§1/§2『无路由库、整站一页』『没有定价页/下载页/帮助中心/登录入口』已过期",
+      "§4 同表一行关于 macOS 未签名未公证的说法，2026-10-07 文内已自行更正"
+    ],
+    "evidence": "apps/landing/src/pages 现有 Pricing/Signin/Help/Download/Platforms/Changelog 多页；文档 :224 与 :262 自查更正",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/research/ai-feature-completeness-audit.md",
+    "verdict": "已归档冻结",
+    "status_line": "> 状态：**调研记录**（归档层，结论有变时新增勘误、不改原文）",
+    "suggested_status_line": "",
+    "summary": "AI 功能完整度审计：本地 BYO-key 完整、托管刻意受阻",
+    "stale_claims": [
+      "§0『own 端到端完整』漏了 Ollama Origin 403 阻塞，靠 §8 勘误降级排序",
+      "§4.3『工具调用 P3/P4 未开始』误判：那 3 个工具已实现、只是不可达"
+    ],
+    "evidence": "docs/research/ai-feature-completeness-audit.md:190 §8 勘误表逐行更正；docs/plans/README.md:93-96 引用该 §8 勘误",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/research/motivation-psychology.md",
+    "verdict": "已归档冻结",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**调研记录 · 激励设计证据**（归档层，2026-09-26 检索快照；设计结论以 plans/motivation-and-progression.md 为准）",
+    "summary": "习惯养成与激励机制的心理学证据调研（只给证据）",
+    "stale_claims": [
+      "§7 表格引用 ADR-0005/0006 论证『服务端看不到明文』，结论未变但未随 AI 架构更新复核"
+    ],
+    "evidence": "docs/research/motivation-psychology.md:5-10 文内自更正『设计文档尚未撰写』一句已作废（merge 84cc7f5）；:256 设计落点",
+    "archive_candidate": true,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/research/ci-proxy-traffic-attribution.md",
+    "verdict": "已归档冻结",
+    "status_line": "> 状态：**已完成**（只读测量 + 一次约 2 分钟的载体容器启停，启停对象是本项目自己的容器）",
+    "suggested_status_line": "",
+    "summary": "CI/CD 代理流量归因的一次性实测（含推翻旧结论的记录）",
+    "stale_claims": [
+      "§0/§3 的字节数与速率是 2026-10-06 当日读数，文内已声明会随网络漂，须按 §6 复跑"
+    ],
+    "evidence": "docs/research/ci-proxy-traffic-attribution.md:3 状态『已完成』；:110-121 §5 明列它推翻的旧话并自述读数带保质期",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/research/collaboration-shared-lists.md",
+    "verdict": "部分失效",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**调研记录**（归档层，2026-10-08 快照）；⚠️ §3 的『缺失零件』已由 ADR-0062 实施推翻，法务同步仍欠",
+    "summary": "共享清单（多人协作）的滴答对标与 E2EE 方案调研",
+    "stale_claims": [
+      "§3.4『缺失：per-list key / share op-log / 邀请 API / assignee』均已落地",
+      "§3.3 预言 privacy.ts『没有共享清单』会变假：已落地而法务句未改"
+    ],
+    "evidence": "share-keys.ts 存在；share.routes.ts 8 条 /shares 端点；entities.ts:245 assigneeUserId；privacy.ts:481 仍写『没有共享清单』",
+    "archive_candidate": true,
+    "superseded_by": "docs/adr/0062-shared-list-key-distribution.md"
+  },
+  {
+    "path": "docs/research/product-ux-ia-aesthetic-audit.md",
+    "verdict": "部分失效",
+    "status_line": "> 状态：**当前产品方向基线**（2026-10-06）  ",
+    "suggested_status_line": "> 状态：**调研记录**（归档层，2026-10-06 整改前基线 + §7 整改后复核）；当前产品方向以 plans/product-ux-optimization.md 为准",
+    "summary": "产品 UI/UX/IA/设计系统审计与设置专项整改基线",
+    "stale_claims": [
+      "状态行自称『当前产品方向基线』与 docs/README §一『research 是归档层』矛盾",
+      "§2–§6 是整改前基线，所记 P0/P1 问题多数已落地，原文未改口"
+    ],
+    "evidence": "docs/research/product-ux-ia-aesthetic-audit.md:3 状态行；:120 §7『第 2–6 节是整改前的审美与交互基线』；docs/README.md:17 research=归档",
+    "archive_candidate": true,
+    "superseded_by": "docs/plans/product-ux-optimization.md"
+  },
+  {
+    "path": "docs/research/dida-capture/CAPTURE-LOG.md",
+    "verdict": "已归档冻结",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**后续取证台账 · 历史记录**（归档层，TickTick v8.2.03 macOS 暗色；含已知偏差与未采集项）",
+    "summary": "滴答清单只读取证台账：12 张原图 + 点击坐标 + effect 回显",
+    "stale_claims": [
+      "§四-4 自记 01-main-window.png 来源存疑、与本轮实测不一致；取证对象 v8.2.03 已非当前版本"
+    ],
+    "evidence": "docs/research/dida-capture/CAPTURE-LOG.md:2-9 自标对象与规格；:74 跳过项；末尾 §四-4『来源存疑』",
+    "archive_candidate": true,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/research/codebase-assessment.md",
+    "verdict": "已归档冻结",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**调研记录 · 选型证据**（归档层，2026-09-25 本机实测快照；结论已被 ADR-0001 及 vendored 落地吸收）",
+    "summary": "四个候选仓库的许可证/体量实测与复用路线建议",
+    "stale_claims": [
+      "§4『立即可执行的下一步』清单仍作待办样式挂在文末，实际多数已执行完毕",
+      "§5 自述依赖结论未递归核对许可证原文，AGPL 进产物只有源码推断"
+    ],
+    "evidence": "packages/sync-core/PROVENANCE.md 记 vendored 自 Super Productivity；docs/adr/0001-license-decision.md 已接受 MIT",
+    "archive_candidate": true,
+    "superseded_by": "docs/adr/0001-license-decision.md"
+  },
+  {
+    "path": "docs/research/cross-platform-interaction-ux-audit.md",
+    "verdict": "已归档冻结",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**调研记录 · 交互审计快照**（归档层，2026-10-07；多条已修复状态与代码行号以当日工作树为准）",
+    "summary": "跨端拖拽/长按/四象限/栏宽/时间线/视口交互审计",
+    "stale_claims": [
+      "§优先级表的『已修复/需真机回归』是 2026-10-07 快照，此后代码与产物已变动，未复核"
+    ],
+    "evidence": "docs/research/cross-platform-interaction-ux-audit.md:1-5 自标日期与『静态风险不会被描述成真机已复现』；无状态行无勘误",
+    "archive_candidate": true,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/research/auth-dialog-ux-audit.md",
+    "verdict": "部分失效",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**调研记录**（归档层，2026-10-07 快照）；⚠️ 文末『没有验证码流程』已被 2026-10-10 落地的注册/登录 OTP 推翻",
+    "summary": "认证入口 UX 对照、设计决策与验证码缺口登记",
+    "stale_claims": [
+      "文末称『服务端发的是验证链接、注册界面没有验证码输入步骤』：现已实现注册/登录邮箱验证码",
+      "『本次按用户明确要求保留注册二次确认』的实施边界未标注是否已落地"
+    ],
+    "evidence": "文末『目前服务端发的是验证链接』；server/src/password/registration-otp.ts（git log 2026-10-10）已存在",
+    "archive_candidate": true,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/research/op-log-e2-conflict-taxonomy.md",
+    "verdict": "现行",
+    "status_line": "> 状态：**已实现并由客户端/服务端共享测试约束**",
+    "suggested_status_line": "> 状态：**现行工程参考**（内容为当前实现契约；按 docs/README §一宜置于 reference/，research/ 只是落点）",
+    "summary": "E2 冲突分类学：五类向量关系与跨层判据",
+    "stale_claims": [],
+    "evidence": "packages/sync-core/src/conflict-classification.ts、其 tests/*.spec.ts、server/tests/conflict-detection.spec.ts 均存在",
+    "archive_candidate": false,
+    "superseded_by": ""
+  },
+  {
+    "path": "docs/research/evidence/inbound-automation-review/ui-retry/README.md",
+    "verdict": "已归档冻结",
+    "status_line": "(无状态行)",
+    "suggested_status_line": "> 状态：**取证产物说明 · 历史记录**（归档层，2026-10-11 12:39–12:40 单次运行，8 张图 + sha256；复跑会变字节）",
+    "summary": "自动收集规则界面『显式重试』真浏览器取证八张图的说明",
+    "stale_claims": [
+      "附图 sha256 只在入库那一刻成立；复跑会因渲染时序变字节"
+    ],
+    "evidence": "文件头自记出处 worktree `1c16642`、命令与运行时刻、『复跑会因渲染时序变字节』；正文列出八枚 sha256 与已知裁切偏差",
+    "archive_candidate": true,
+    "superseded_by": ""
+  }
+]

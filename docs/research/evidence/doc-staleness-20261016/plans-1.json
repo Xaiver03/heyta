@@ -1,0 +1,263 @@
+[
+ {
+  "path": "docs/plans/trash-and-archive.md",
+  "verdict": "现行",
+  "status_line": "> 状态：**执行到批次 E 的收尾格**（2026-10-03 立项，批次 A / W / E 已在 10-03→10-05 逐项落地）。🔴 **本行原写「规划中」，10-05 14:2x 就地更正** —— 它比实际状态落后两天，而文档第一行就是别人会照着行动的那一句（\"规划中\"会把一个已经在交付的计划读成\"还没开工\"）。",
+  "suggested_status_line": "",
+  "summary": "回收站/归档落地台账；四类未闭合，正文已记到 §10.266",
+  "stale_claims": [],
+  "evidence": "本文:4 四类未闭合 与 :18247 §10.266 ⑥「整条 pnpm check rc=0 未做／等外部」一致；plans/README.md:125 状态只在本文件维护",
+  "archive_candidate": false,
+  "superseded_by": ""
+ },
+ {
+  "path": "docs/plans/inbound-automation.md",
+  "verdict": "现行",
+  "status_line": "> 状态：**实施中（2026-10-12 改写这一行；它原先还停在\"第二轮复审完成、基础批语义切片进行中\"，那份摘要已经落后六个任务）**：",
+  "suggested_status_line": "",
+  "summary": "付费自动收集实施计划；AC-1–8 未勾、公网与售卖未开",
+  "stale_claims": [],
+  "evidence": "状态行自带的现量命令复跑：grep -c '^- \\[ \\] \\*\\*AC-' = 8、已勾 = 0；文末 10-16 20:23 读数与 plans/README.md:17 同口径",
+  "archive_candidate": false,
+  "superseded_by": ""
+ },
+ {
+  "path": "docs/plans/account-standard-suite.md",
+  "verdict": "现行",
+  "status_line": "> 状态：**代码与判据侧已闭合；剩下的格要么有外部前提，要么是本线在案的对外欠账**（2026-10-08 立，10-10 12:2x 现量刷新）",
+  "suggested_status_line": "",
+  "summary": "注册登录标准套件台账；代码与判据侧闭合，余格等外部",
+  "stale_claims": [],
+  "evidence": "头部状态与 §6.88 末节（10-10/10-11 读数、B161）自洽；plans/README.md:31 与 docs/README.md:199 同口径",
+  "archive_candidate": false,
+  "superseded_by": ""
+ },
+ {
+  "path": "docs/plans/ui-review-fill-zh-timeline.md",
+  "verdict": "部分失效",
+  "status_line": "> 状态：**进行中**（2026-10-01 立；R1–R6 为前六轮，R7–R8 为 2026-10-02 侧栏层级与认证第一屏， > **R9–R12 为 2026-10-02 第七轮看图**：页头标题卡住 / Profile 资料页缺失 / 日历对标滴答 / 象限图标）",
+  "suggested_status_line": "",
+  "summary": "看图问题台账 R1–R12；R12 等看图定，其余多条已交付",
+  "stale_claims": [
+   "R4 行称 ADR-0043 的 P2 数据模型「代码未开工」，P2 已于 2026-10-02 全落地",
+   "索引行还写「剩下的缺口是清单归属只在 web」，而 R6 已两端同一份共享实现"
+  ],
+  "evidence": "ui-review-fill-zh-timeline.md:44（P2 代码未开工）vs docs/README.md:136「P2 代码到 2026-10-04 已落第 1/2/4/5 档」",
+  "archive_candidate": false,
+  "superseded_by": ""
+ },
+ {
+  "path": "docs/plans/ai-assistant-closure.md",
+  "verdict": "现行",
+  "status_line": "> 状态：**以 §7 那张逐条表为准，本行不维护结论**。🔴 原句\"W1–W4、W7–W9、W12 已落地；",
+  "suggested_status_line": "",
+  "summary": "AI 能力面补齐执行工单；结论只在 §7 逐条表",
+  "stale_claims": [],
+  "evidence": "本文:2 明写以 §7 表为准；§7 表 W5/W10/W11 ✅（含 a0df705e），过期的是 plans/README.md:85 仍写「剩 W5/W10/W11」",
+  "archive_candidate": false,
+  "superseded_by": ""
+ },
+ {
+  "path": "docs/plans/legal-compliance-before-filing.md",
+  "verdict": "现行",
+  "status_line": "> 状态：**进行中**（2026-10-01 立）",
+  "suggested_status_line": "",
+  "summary": "备案前法务文本与接线台账；缺口记到 G-37，主链已上线",
+  "stale_claims": [],
+  "evidence": "状态行「进行中」与 §4 缺口表（末号 G-37、含 10-09 条目）一致；plans/README.md:32 只写到 G-20（索引旧）",
+  "archive_candidate": false,
+  "superseded_by": ""
+ },
+ {
+  "path": "docs/plans/ai-capability-branches.md",
+  "verdict": "部分失效",
+  "status_line": "- **状态**：**已落地**（AI-0 基座 / AI-1 捕获 / AI-2 拆解·优先级·估时 / AI-5 本机接口 与记忆层都已实现且端到端可达；AI-3 规划、AI-4 复盘**有意推迟**。见 §9 的实施记录）",
+  "suggested_status_line": "> 状态：**已落地**（AI-0/1/2/5 已实现，AI-3/AI-4 有意推迟；⚠️ §5.1 的「Task 无 startDate/duration」已被 ADR-0043 推翻，见勘误）",
+  "summary": "AI 能力分支与裁决；分支策略仍有效，§5.1 前提已被 ADR-0043 推翻",
+  "stale_claims": [
+   "§5.1 称 Task「无 startDate、无 duration」，ADR-0043 落地后两者都已存在",
+   "§5.1 的开工前置「先确认是否真做时间线」已于 2026-10-01 拍板，正文未标已满足"
+  ],
+  "evidence": "ai-capability-branches.md:272-273 vs packages/domain/src/entities.ts:280 startDate、:291 durationMinutes（ADR-0043 已落）",
+  "archive_candidate": false,
+  "superseded_by": ""
+ },
+ {
+  "path": "docs/plans/product-ux-optimization-handoff.md",
+  "verdict": "现行",
+  "status_line": "> 状态：**本轮目标五步都交完，且第四那步已重做到第六趟（r110，`REINSTALL_RC=0`；\"四端各装的是哪一枚提交\"见 §四 第 4 步那一行，它指向台账那张表 —— 趟号会随下一笔漂，所以这里不写）；图与判据同批入库；全部只在本地、未 push。**",
+  "suggested_status_line": "",
+  "summary": "产品体验线交接；五步已交，欠项逐格带现量命令",
+  "stale_claims": [],
+  "evidence": "状态行 10-15/10-16 条目与文末 10-16 00:5x 读数一致；mtime 2026-10-16 21:5x，属在写文档",
+  "archive_candidate": false,
+  "superseded_by": ""
+ },
+ {
+  "path": "docs/plans/linux-adaptation.md",
+  "verdict": "现行",
+  "status_line": "> 状态：**进行中**（批一/批二主体已落，E7 对齐项与\"装进系统\"取证未收）",
+  "suggested_status_line": "",
+  "summary": "Linux 端适配计划；两批主体已落，E7 等别线对齐",
+  "stale_claims": [],
+  "evidence": "状态行称 E7 未收：scripts/reinstall-all.sh 现量无 deb/linux 段；check-shell-surfaces.mjs:132 仍写 Linux 保持 gap（P2 台账未翻）",
+  "archive_candidate": false,
+  "superseded_by": ""
+ },
+ {
+  "path": "docs/plans/countdown-w7-device-export.md",
+  "verdict": "部分失效",
+  "status_line": "> 状态：**进行中**（W7 主体与两端设备读数已到齐；§7 仍登记 iOS pbxproj 构建级验证与合流后四端重装，§2.4 有 W7-G8 等缺口未闭）",
+  "suggested_status_line": "> 状态：**进行中**（W7 主体与两端设备读数已到齐；合流与四端重装已闭合，只剩 §7 第 3 条 iOS pbxproj 构建级验证）",
+  "summary": "W7 纪念卡片导出；设备读数到齐，§7 第 4 条合流已过期",
+  "stale_claims": [
+   "§7 第 4 条称「与 feat/countdown-batch2 合流 + 合流后四端重装」未做，实际已并入 main"
+  ],
+  "evidence": "countdown-w7-device-export.md:384；git branch -a 无 feat/countdown-*；countdown-batch2-handoff.md:111 称三线已是 origin/main 祖先",
+  "archive_candidate": false,
+  "superseded_by": ""
+ },
+ {
+  "path": "docs/plans/ai-handoff.md",
+  "verdict": "已归档冻结",
+  "status_line": "(无状态行)",
+  "suggested_status_line": "> 状态：**已清算**（2026-09-27）—— 历史交接记录；§3/§5.1/§10 的待办均已完成，勿照它开工",
+  "summary": "已清算的 AI 交接单（2026-09-27），保留作当时实测记录",
+  "stale_claims": [
+   "§10 仍要求接手人「先补隐私闸门、再把护城河接上界面」，两件均已于 2026-09-27 完成"
+  ],
+  "evidence": "ai-handoff.md:3「> ## ✅ 本交接单已被清算（2026-09-27）…不要照着 §3/§5.1 去重做」；plans/README.md:90 标「⚠️ 无状态行」",
+  "archive_candidate": true,
+  "superseded_by": ""
+ },
+ {
+  "path": "docs/plans/ai-tier-pricing-rollout.md",
+  "verdict": "已归档冻结",
+  "status_line": "> 状态：**已完成**（执行记录：2026-09-27 已落地，勿当待办读；现役价格以 ADR-0020 与 pricing-and-entitlements 为准）",
+  "suggested_status_line": "",
+  "summary": "定价分档推进计划执行记录（已完成 2026-09-27）",
+  "stale_claims": [
+   "文内 `文件:行号` 是 2026-09-27 工作区读数，之后已漂（价格本身未变）"
+  ],
+  "evidence": "pricing-and-entitlements.md:20/22 现量仍是 ¥5/¥12，与本文一致；状态行自写「勿当待办读」",
+  "archive_candidate": false,
+  "superseded_by": ""
+ },
+ {
+  "path": "docs/plans/admin-console.md",
+  "verdict": "已归档冻结",
+  "status_line": "> 状态：**已完成**（首版，2026-09-30）",
+  "suggested_status_line": "",
+  "summary": "运营管理后台首版落地记录（已完成 2026-09-30）",
+  "stale_claims": [],
+  "evidence": "server/src/admin/{admins,middleware,routes}.ts 现量在场；plans/README.md:112 记「✅ 已完成（首版）」",
+  "archive_candidate": false,
+  "superseded_by": ""
+ },
+ {
+  "path": "docs/plans/waytofuture-handoff.md",
+  "verdict": "部分失效",
+  "status_line": "> 状态：**全部已上线可用**（交还用户的三件事在 §3）",
+  "suggested_status_line": "> 状态：**已完成（2026-09-30）**—— 历史交接；§3 第 2、3 条已由 BLOCKED §1/§2 解决",
+  "summary": "域名迁移+后台+中文化交接；§3 两条卡点已解决",
+  "stale_claims": [
+   "§3 第 2 条把 motivation 2 红列为当前卡点，BLOCKED §1 已记 09-30 解决",
+   "§3 第 3 条把 i18n-failures 4/91 红列为当前卡点，BLOCKED §2 已记解决",
+   "§7 的「工作区 417 个未提交改动」是 2026-09-30 瞬时读数"
+  ],
+  "evidence": "waytofuture-handoff.md:83-84 vs BLOCKED.md:28「## 1. ✅ 已解决（2026-09-30 收尾轮）」、:103「## 2. ✅ 已解决」",
+  "archive_candidate": false,
+  "superseded_by": ""
+ },
+ {
+  "path": "docs/plans/notification-and-activity.md",
+  "verdict": "已归档冻结",
+  "status_line": "> 状态：**已完成**（2026-09-29）",
+  "suggested_status_line": "",
+  "summary": "通知中心+邀请活动落地记录（已完成 2026-09-29）",
+  "stale_claims": [],
+  "evidence": "迁移 20261002000000_add_invites_and_notifications、server/src/activity/invite.ts、evaluateCapabilityAcross 现量在场",
+  "archive_candidate": false,
+  "superseded_by": ""
+ },
+ {
+  "path": "docs/plans/account-standard-suite-reflection.md",
+  "verdict": "已归档冻结",
+  "status_line": "> 状态：**已完成**（复盘文档，记录的是 2026-10-10 当时的判断；要现状请看交接件）",
+  "suggested_status_line": "",
+  "summary": "注册登录套件线复盘（2026-10-10 的判断失败记录）",
+  "stale_claims": [],
+  "evidence": "状态行自写「复盘文档，记录的是 2026-10-10 当时的判断」；plans/README.md:202 列复盘",
+  "archive_candidate": false,
+  "superseded_by": ""
+ },
+ {
+  "path": "docs/plans/goal-p0-ux-remediation.md",
+  "verdict": "部分失效",
+  "status_line": "> 状态：**进行中 → 收尾**（2026-10-06 立项，同日实现完毕；整族 e2e 终验在跑）",
+  "suggested_status_line": "> 状态：**已完成**（2026-10-06 立项，同日实现完毕；整族 e2e 与四端重装当晚收口，见 §2/§4）",
+  "summary": "P0 体验整改执行账；§2/§4 已收口，状态行仍说在跑",
+  "stale_claims": [
+   "状态行称「整族 e2e 终验在跑」，同文 §2 已记「整族分批跑毕（10-06 深夜）」",
+   "状态行「进行中 → 收尾」与 §4「这一定义本轮闭合」矛盾"
+  ],
+  "evidence": "goal-p0-ux-remediation.md:3 vs :40「整族分批跑毕（2026-10-06 深夜）」、:54「本轮闭合」",
+  "archive_candidate": false,
+  "superseded_by": ""
+ },
+ {
+  "path": "docs/plans/calendar-profile-reflection.md",
+  "verdict": "已归档冻结",
+  "status_line": "> 状态：**已完成**（复盘文档，记录的是 2026-10-03 当时的判断；要现状请看交接件）",
+  "suggested_status_line": "",
+  "summary": "日历/Profile 一轮复盘（2026-10-03 判断失败记录）",
+  "stale_claims": [],
+  "evidence": "状态行「已完成（复盘文档，记录的是 2026-10-03 当时的判断；要现状请看交接件）」；plans/README.md:53 复盘行",
+  "archive_candidate": false,
+  "superseded_by": ""
+ },
+ {
+  "path": "docs/plans/multi-end-unified-strategy-reflection.md",
+  "verdict": "已归档冻结",
+  "status_line": "> 状态：**复盘**（记录**判断为何失效**，不改代码）",
+  "suggested_status_line": "",
+  "summary": "多端统一第 27–32 轮复盘（判据空转的成因）",
+  "stale_claims": [],
+  "evidence": "状态行「复盘（记录判断为何失效，不改代码）」；plans/README.md:54 复盘行；git 最后改动 2026-09-30",
+  "archive_candidate": false,
+  "superseded_by": ""
+ },
+ {
+  "path": "docs/plans/ai-tool-calling.md",
+  "verdict": "现行",
+  "status_line": "> 状态：🟢 **P0–P2 已落地**（2026-09-28）。P3–P4 未开工。",
+  "suggested_status_line": "",
+  "summary": "AI 工具调用分期计划；P0–P2 已落地，P3–P4 未开工",
+  "stale_claims": [],
+  "evidence": "packages/app-host/src/ai-tool-{selection,run}.ts 在场；ai-strategy.md:308「agent 多步自主仍未开始」；plans/README.md:75 同口径",
+  "archive_candidate": false,
+  "superseded_by": ""
+ },
+ {
+  "path": "docs/plans/landing-motion-audit/001-reveal-transition.md",
+  "verdict": "已归档冻结",
+  "status_line": "> 状态：**已完成**（已提交 18b34ce，判据见文末 Verification）",
+  "suggested_status_line": "",
+  "summary": "落地页动效 001 号工单完成记录（DONE，18b34ce）",
+  "stale_claims": [],
+  "evidence": "文件头「Status: DONE / Commit: 18b34ce」；landing-motion-audit/README.md 计划表 001 行 DONE",
+  "archive_candidate": false,
+  "superseded_by": ""
+ },
+ {
+  "path": "docs/plans/landing-motion-audit/README.md",
+  "verdict": "已归档冻结",
+  "status_line": "(无状态行)",
+  "suggested_status_line": "> 状态：**已完成**（5 条发现全部 DONE，本目录保留作可追溯记录）",
+  "summary": "落地页动效审计与整改目录索引；5 条全部 DONE",
+  "stale_claims": [],
+  "evidence": "README「全部 5 项已实施并通过验证（本目录保留作为可追溯记录）」；开头无 `> 状态：` 行；docs/README.md:186 记 5 条全 DONE",
+  "archive_candidate": true,
+  "superseded_by": ""
+ }
+]

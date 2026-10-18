@@ -5,7 +5,7 @@
 > 相关：[ADR-0005](0005-ai-data-path.md)（AI 不写 op）、[ADR-0006](0006-supply-modes.md)（供给与出境）、
 > [ADR-0010](0010-ai-config-routing.md)（配置路由）、[ADR-0011](0011-local-api-mcp.md)（本机 API / MCP）、
 > [ADR-0013](0013-cloud-ai-and-maas.md)（云端 AI）
-> 落地计划：[`../plans/ai-tool-calling.md`](../plans/ai-tool-calling.md)
+> 落地计划：[`../plans/ai-tool-calling.md`](../plans/archive/ai-tool-calling.md)
 
 ---
 
@@ -136,7 +136,7 @@ P0 只覆盖**生态内部**的工具（不接外部第三方工具生态），�
 
 ## 8. 相关文档
 
-- [`../plans/ai-tool-calling.md`](../plans/ai-tool-calling.md) —— 分阶段计划与状态
+- [`../plans/ai-tool-calling.md`](../plans/archive/ai-tool-calling.md) —— 分阶段计划与状态
 - [`../reference/ai-architecture.md`](../reference/ai-architecture.md) —— 结构与不变量事实源
 - [`../plans/ai-strategy.md`](../plans/ai-strategy.md) —— 信任阶梯（agent 多步是最后一步）
 - 门禁：`scripts/check-ai-tools.mjs`（`pnpm check:ai-tools`）
