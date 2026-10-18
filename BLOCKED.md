@@ -11498,6 +11498,8 @@ PROBE hitChain div.ht-content → main.ht-main → div.ht-app → …
 
 🔴 **B216 追记二（2026-10-18 04:5x，本会话 · 那一行的状态由"从未入库"改成"别线已写好、还没入库"）**：两把尺一起拿才看得出差别 —— 工作树尺 `grep -c comments packages/domain/src/index.ts` 回 **1**，提交态尺 `git show HEAD:packages/domain/src/index.ts | grep -c comments` 回 **0**，而 `git diff -- packages/domain/src/index.ts` 回 **3 行新增**（那一行连同 ADR-0062 W3 的两行注释已在盘上，写法与上面追记一给的修法逐字相同）。⇒ **本线不代提交**：那是别线正在写的在途件，替他们提交＝把尚未定稿的那一笔署名到本线头上（同一根问题的反向事故见台账第 64 条），而任务书那条"顺手修别线的红进 BLOCKED.md，不混进本线提交"在这里同样生效。**转绿条件与复刷命令都不变**：那一行进 `main` 之后照追记一末行那条命令起跑即可，本线不预先在载具里补那一行（补进去跑出的 exit 0 在任何提交态复现不出来）。⚠️ 顺带登记一格**别线资产**的盘上事实（本线不改、不判定）：`git show HEAD:packages/domain/src/index.ts | grep '^export' | sort | uniq -d` 回三枚重复的 `export *` 行（`./events.js`、`./feature-modules.js`、`./trash-rows.js`），看着像 merge 重排放进去的；今晚那枚 ui 构建红的成因不是它（成因是上面那条 barrel 缺导出），所以这里只留线索，归 domain 那条线自己看。
 
+🟢 **B216 追记三（2026-10-18 12:5x，本会话 · 那一行进库了，本线随即在新载具整条跑第 3 腿）**：现量两条 —— `git show HEAD:packages/domain/src/index.ts` 的输出交给 `grep -c comments` 回 **1**（提交态尺），工作树里那份也回 **1**；同戳 `git log -1 --format='%h %ad %s' --date=format:'%m-%d %H:%M' -- packages/domain/src/index.ts` 指到它的主人那一笔。⚠️ **旧载具 `.worktrees/inb-t9` 已不在盘上**（现量 `git worktree list` 只剩主检出），而它正是任务书里那条"待处置"，别人按删除处置了 ⇒ 本线新建隔离载具 `.worktrees/inb-t10`（`git worktree add --detach .worktrees/inb-t10 <当时的 tip>`），`pnpm install --frozen-lockfile` 回 **install_rc=0**（原件 `~/.heyta-evidence/inb-t7-1017-0902/leg3-t10-1116/install.log`）。跑法逐字照 B216 追记一那一条（只把载具名换成 inb-t10），结果与残余那一枚红归到下面 **B225** —— **B216 这一格到此闭合**：它欠的那一行进了库，构建不再被它挡。
+
 **B224（01:5x，本会话 · 产品体验线）B222 那枚 iOS 键盘步红：两处剩下的差别各自作用完，都不是原因；同一枚 bundle 上整条旅程在两台载体（含 B222 点名的旧载体）各 14/14 绿 ⇒ 状态改成"复现不出来 + 成因未定"**
 
 B222 收在"剩下的未分开差别只有两处"。这一趟（r126）把这两处各自作用一次，装置与读数在
@@ -11527,3 +11529,17 @@ B222 收在"剩下的未分开差别只有两处"。这一趟（r126）把这两
   而 `wait_labels` 是 ANY-of、同列表里两枚任务标题本来就在树里
   ⇒ 这一枚候选在 iOS 上**永不成立也不影响那一步过**，"已经切到时间线视图"在 iOS 旅程里没有任何一层在断。
   改法两条（换成移动端那枚表头 / 从 ANY-of 挪成独立断言）都是**任务旅程线的判据口径**，本线不代改。
+
+## B225（2026-10-18 12:5x，本会话 · T7 第 3 腿整条跑完：mac 与 ios 绿，windows 与 android 两端红在打包主机不可达）
+
+B216 那一行进库之后，本线在新隔离载具 `.worktrees/inb-t10`（`git worktree add --detach .worktrees/inb-t10 c8622701`，`pnpm install --frozen-lockfile` 回 `install_rc=0`）逐字跑了配方那条：`IOS_DEVICE_NAME=heyta-multiend-reinstall pnpm reinstall:all`（11:21:54 起、11:29:36 止，首尾 HEAD 同为 `c8622701`；原件 `~/.heyta-evidence/inb-t7-1017-0902/leg3-t10-1116/reinstall.log` 与同目录 `runmeta.txt`，两份都不入库）。**整条跑，没有 `--only`、没有 `--skip`、没有中途停** —— 这一点要紧，因为半跑会让装机态里新旧产物混着而没有一层会红。
+
+- 汇总四行（现量：`grep -A4 '═══ 重装汇总 ═══' <那枚 reinstall.log>`）：`✅ mac` ／ `🔴 windows：失败` ／ `🔴 android：失败` ／ `✅ ios` ⇒ 脚本自报 **`REINSTALL_RC=1`**（这一格故意把退出码单独接出来再打印，没跟在命令替换后面）。
+- **绿的两端有判据，不只是"跑过去了"**：mac —— `.app` 里的 web-dist 与本机 `apps/web/dist` 是同一次构建（9 个 chunk），装机自截屏 `heyta-reinstall-mac-installed.png.webview.png` 内容占比 74.6%、主蓝命中 997；ios —— 已装的 `main.jsbundle` 比源码新（新鲜度判据）、`heyta-reinstall-ios.png` 内容占比 58.8%、主蓝命中 4091。⚠️ mac 那条窗口截图内容 0.0% 是本机常态（WebView 没合成进窗口），脚本自己就不据此判红。
+- **红的那两端是同一个成因，而且不是代码**：windows 段 `scp: Connection closed` 后脚本当场分诊成"连 ssh 都建不起来"；android 段更直白 —— `ssh: connect to host 10.111.127.237 port 22: Host is down`，因为按 §6.1 新规，Android 的 gradle 就是在那台打包机上跑的（收口点 `scripts/run-gradle.mjs`）。**两台端红在同一条 ssh 通道上，不在本线源码上。**
+- 可达性本线逐枚现量过（`ssh -o ConnectTimeout=8 -o BatchMode=yes <别名> 'echo OK'`，12:5x 那一戳）：`windows-pc` rc=**255** `Operation timed out`（10.111.127.237）、`windows-codex` rc=**255** `Operation timed out`（10.111.127.151）、`laptop-5ueuu7ps` rc=**255** `Host is down`（同一台 151）、`windows-pc-lan` rc=**255** `Connection refused`（192.168.1.2:22 —— 有人应答但没 sshd，不等于打包机活着）；`ping -c 2 -t 5 10.111.127.237` rc=**2**。对照：`linux-dev`／`linux-dev-lan`／`linux-dev-mdns` 三枚各 rc=**0**，所以不是本机网络断了。**仓里没有把这台机唤醒的通道**（现量：`docs/runbooks/` 里 `唤醒|wake on lan|power on` 只命中 `self-host.md` 一句无关的"第一次开机迁移"）⇒ **这一格要人的动作**：把打包机开机/接回网络。
+- 🔴 **本线没有自决那条逃生门**：`HEYTA_ANDROID_LOCAL_GRADLE=1` 确实能把 Android 拉回本机 gradle，而 §6.1 写清了它存在的理由（"远程主机正在重装"这类场景）与它的代价（headless 模拟器 3.6G+ 常驻、SDK+AVD+Gradle 缓存 20G+ 磁盘，且这条分流就是为了不在 Mac 上跑才立的）。它是**单动作授权**的形状，不是可自动启用的兜底 ⇒ 要本线用，需要负责人当轮点一句；不点就等机器回来整条重跑（重跑命令逐字不变，载具换成 `.worktrees/inb-t10`）。
+- **Linux 那一格不在这一串的射程里**，本线另跑并绿了：`bash apps/desktop-linux/scripts/package-deb.sh linux-dev-lan` ⇒ **`LINUX_DEB_RC=0`／`PKG_RESULT=OK`**（原件同目录 `linux-deb.log`，包体字节数与"解出来的那棵树"自截屏的主蓝读数都写在那份日志里；判据行落在载具 `dist/linux/package-facts.txt`）。脚本自己指定取证载体用 `linux-dev-lan`，`sanjiaozhou` 是生产机、只借编译不装包。
+- ⚠️ 载具残留一格，本线不提交：iOS 段第 3 趟 `pod install` 改了载具里的 `apps/mobile/ios/Podfile.lock`（`git status --porcelain` 在载具只回这一行）—— 与 **B206** 记的那条非确定性同源；那是载具态，不是 HEAD 的改动。
+
+**结论口径（要说全）**：T7 第 3 腿**这一趟是整条跑完的**，四端里两端装上的是当前产物并有判据，另两端卡在打包主机不可达这一条环境事实上；因此**不能**把这轮报成"四端当前产物齐了"。要齐，缺的只有"那台机回来 + 同命令重跑"，不缺代码。
