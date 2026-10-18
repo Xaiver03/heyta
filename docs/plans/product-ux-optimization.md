@@ -4487,3 +4487,36 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
       逐条删除，删前用白名单核对过「树里 `打开任务：*` 全集 ⊆ 白名单」，外来任务 **0 条**；删后 `remainingAfter: []`，收尾截图人眼看过是
       「还没有任务 / 今天还没有安排」空态、中文、浅色（`modalLum` 回 252）；**没收任何 companion**（pid 31182 全程在册）。
       读数与 6 张图、四份清理 JSON [`apps/mobile/evidence/ux-final-20261018/ios-reminder-block-r132/RESULT.md`](../../apps/mobile/evidence/ux-final-20261018/ios-reminder-block-r132/RESULT.md)。
+- [x] ✅ **10-19 01:4x r133 iOS「AI 面 + 帮助面」装机态深浅两档（10 张逐张人眼看过）—— 台账那句"…/AI/帮助"里最后两面第一次有装机态读数**（新常驻装置 `scripts/qa/ai-face-ios.py`，复用 `scripts/qa/profile-settings-ios.py` 的 `Probe`/AX shim，共享装置零改动；两档各 **20 步全 passed**，起跳 01:30:38 / 01:31:59）。
+      **射程**：① 「我的」→ **AI 助手**入口 → 助手页（未配置态）；② 助手页 `配置 AI` → AI 设置面板；③ 退出面板 → 回「我的」→ 设置 → **AI 与集成**段 → 同一个面板；
+      ④ 设置 › 常规 滚到底 → **「帮助与反馈」节**。装置**只读**：不点开关、不发消息、不建任务，也**没有**按 `投诉与举报`（那一下唤起系统邮件撰写页 = 跳出本 app 的状态改动）。
+      **读数（两档 × 五屏）**：`profile / assistant / ai-settings-via-assistant / ai-settings-group / help-feedback`；
+      尺一 `modalLuminance` 亮档五张全 **252**、暗档 **28 / 12 / 28 / 28 / 28**（助手页整屏深底，其余卡片底）⇒ 无"半暗"痕迹；
+      尺二 **两条入口到的是同一屏** —— 同档内两张面板图 **sha256 相同**（亮档 `e6657591…`，暗档差字节数 `0`），而 `Probe.screenshot` 每调一次起一个独立 `idb screenshot` 进程
+      ⇒ 不是同一份文件写两遍，是"两个入口渲染同一屏"的证据。`help section` 那一步的 frame 两档**逐位相同** `[32, 797, 338, 44]`。
+      🔴 **一条范围事实先纠正**：iOS **有**帮助面，它是 设置 › 常规 › 「帮助与反馈」（键 `mobile.settings.feedback.section`），我一度判成"没有" ——
+      成因是 zsh 里未加引号的 `--include=*.tsx` 让整条 grep **根本没执行**而管道仍回 `rc=0`、`wc -l` 打 `0`（**#479**）。
+      现量真答案：`apps/mobile/src` 里 2 条命中，全是英文注释里的 "helper" 一词；界面文案的唯一真源在 `packages/i18n/src/locales/`，壳只读键
+      ⇒ 判"某一面不存在"必须**键与词条两头各查一次**。
+      🔴 **一枚候选缺陷（已量化，本线不裁决）**：未选中的 `Checkbox` 圆环用的是 `color.border-strong` ⇒ 对卡片底 **亮 1.48:1 / 暗 1.63:1**，
+      两档都不达 `MASTER.md` §3 那条「大字/图形 ≥ 3:1」；而这枚控件**就是任务行勾选框**（`apps/mobile/src/ui/kit.tsx:488`），不是 AI 面独有。
+      现有门看不见它：`GRAPHIC_PAIRS`（`packages/design-system/src/tokens.ts:451`）只有 `border/surface`（下限 **1.2**，注释明写"分隔线，非 3:1"）、`ring/background`（3）、分类色槽位，
+      `border-strong` 一处都不在 ⇒ 一枚**承担"这里有个控件"这一信息**的边界按分隔线标准放行。两把尺同值：暗档截图圆环像素 `rgb(43,59,92)` = `#2b3b5c` = 暗值 token，
+      卡片底 `rgb(13,21,38)` = `#0d1526` = `color.surface`，算出来也是 1.63:1。**没有当场改**：要动 `GRAPHIC_PAIRS`（判据口径，本轮明写不代改）与/或唯一事实源的 token 取值，
+      而 `border-strong` 真消费方有 **9 处**（mobile 2 / `packages/ui` 3 / web 2 / landing 2）⇒ 提亮一档会改到四端所有强边框，这是设计决定。
+      建议（留给设计侧）：单开一枚"未选中控制件边界"语义 token，两档各配 3:1 的值，`GRAPHIC_PAIRS` 加这一对、门槛 3。
+      **顺带把 r131 §四.2 那枚"只登记不裁决"的观察量完了**：常规页 `如何添加` 的分隔线走 `Divider` → `color.border`（`kit.tsx:853`）= **亮 1.23 / 暗 1.29**，
+      而设计系统给分隔线**声明的下限就是 1.2** ⇒ 那条**不是违例**，是"下限取值本身合不合适"的问题，归设计侧。r131 说"要判它得另开一把尺"，那把尺现在在 `_measure/token-contrast.mjs`
+      （带**正对照**：`color.foreground-subtle on color.surface` 必须回暗档 **7.11** —— 那正是 `tokens.css` 注释自己公布的数，对不上就说明这份解析坏了）。
+      ⚠️ 四枚装置坑各钉一枚陷阱：**#476** 设置**目录层**的退出键是「关闭」（模态的根），「返回」只在**段内** ⇒ 第一版 14 步全绿死在最后一步；
+      **#477** `Probe.scroll_to` 瞄不准非交互节标题（`found: False / element-left-tree`）与整句无障碍名的行（`found: True / visible: False / swipes: 10` 而位置不动 ——
+      后者不是新机制，是 **#273** 那条 `中心 y < 屏高-120` 定义的直接推论：`764+22=786 > 874-120=754` ⇒ `scroll_to` 天生够不到屏幕最下 120pt），
+      且设置面那些模态**没有 tab 栏** ⇒ 视口下界不许写死 776，改成"有 tab 栏用 tab 顶 − 4、没有用屏高 − 8"，屏高从树里 `Application` 节点现量（写死 776 的旧版把整枚在屏上的 `投诉与举报` 判成看不见，实测红过一次）；
+      **#478** `check-locator-labels` 只跳**含换行**的字符串 ⇒ 单行 docstring 被当界面标签、整道门红（改 `#` 注释后绿）；
+      **#479** 见上面那条范围纠正。**另把 #472 补上第二半**：`--evidence-dir` 末级名是 `light`/`dark` 时装置先比 `simctl ui … appearance`，不符就**拒写** ——
+      这一趟真的先污染过一次（暗档跑完没还原就重跑"亮档"，两趟都失败没落图，所以入库的 10 张里没有暗档混件），守卫的**变异验证**已取：设备 dark 时往 `light/` 跑 ⇒ `rc=1` + 原文 `refusing to write: evidence dir says 'light' but the device is 'dark' …`。
+      **不证**：英文装机态这一趟（定位符双语、`check:locator-labels` 绿，但没在英文档真跑）、**已配置态**（这台无端点，只走 `mobile.ai.notConfigured` 那一支；`hostFailed`/`privacyBlocked` 两张卡、端点表单、能力清单、托管档订阅入口一律没进）、
+      发送链路与 `执行` 档的实际写入（只读装置）、`投诉与举报` 那一下真的拉起邮件页（故意没按）、windows/android 的 AI 面与帮助面（打包机四枚别名逐枚现量仍全不可达）。
+      ✅ **设备态**：外观档是本趟改的（light→dark→light，中间各重启一次），跑完**已还原 light** 并回读；语言/数据/任务列表（r132 清完为空）未动；
+      **通知授权仍是「不允许」**（r132 那处未还原状态，本趟没改变它）；**没收任何 companion**（pid 31182 全程在册）。
+      读数与 10 张图、对比度那把尺 [`apps/mobile/evidence/ux-final-20261018/ios-ai-face-r133/RESULT.md`](../../apps/mobile/evidence/ux-final-20261018/ios-ai-face-r133/RESULT.md)。
