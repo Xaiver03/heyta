@@ -11,31 +11,28 @@
 # 每一步都会验证：上传后用**匿名** HEAD 回读（公开读是分发的前提，
 # 授权态下的成功不算数）；content-length 与本地不一致直接退出 1。
 #
-# 依赖：coscli（~/.coscli/config.yaml 已含 heyta-dist bucket）、shasum、python3、curl。
+# 依赖：coscli（🔴 分发桶在**另一个账号**里，要用第二份配置 —— 见下面 COSCLI_CONFIG）、shasum、python3、curl。
 set -euo pipefail
 
-BUCKET="heyta-dist-1380503169"
+BUCKET="heyta-dist-1445543984"
 REGION="ap-guangzhou"
 # 🔴 **分发必须走自定义域名，不走桶默认域名**（2026-10-18）：
 #   COS 对默认域名上的 .apk/.ipa 直接回 `403 DownloadForbidden`
 #   （"not allowed to be distributed in a public network using COS default domain"）。
 #   `dl.waytofuture.cn` 已 CNAME 到本桶并在桶上绑定为自定义域名 —— 同一条字节，
 #   换主机名就能公开下发。改这里一处，`latest.json` 里所有平台的 URL 一起跟着走。
-# 🔴 **这里现在是桶默认域名 —— 而它有一个已知的硬限制**（2026-10-18 实测）：
-#   COS 对默认域名上的 `.apk` 回 `403 DownloadForbidden`
-#   （"not allowed to be distributed in a public network using COS default domain,
-#     please use custom domain instead"），**带签名的 GET 也一样封**（`HEAD` 放行）。
-#   正解是自定义域名，而实测下来它卡在一条**行政**条件上：
-#   COS 要求「域名 + 该域名的 ICP 备案 + 桶」**在同一账号**。
-#   现状：`waytofuture.cn` 的备案与 DNS 在账号 100050005585，桶在账号 100044381704
-#   ⇒ `dl.waytofuture.cn` 已 CNAME 到桶、已在桶上绑定、证书也已签发，
-#      但 COS 仍回 `UserCnameInvalid`（同账号的 finlaw.cloud / openpenpal.com 同样如此，
-#      因为它们没有备案）。
-#   ⚠️ 所以在"桶搬到有备案的那个账号"或"给域名补一次备案"之前，
-#      **这里不能改成自定义域名** —— 改了就是往清单里写一条打不开的 URL。
-BASE_URL="https://${BUCKET}.cos.${REGION}.myqcloud.com"
+# 🔴 **分发走自定义域名**（2026-10-18 打通）：
+#   COS 对**默认域名**上的 `.apk` 回 `403 DownloadForbidden`（连带签名的 GET 也封），
+#   正解是自定义域名 —— 而它有一条行政前提：**「域名 + 该域名的 ICP 备案 + 桶」必须同一账号**。
+#   当日的做法：把分发桶从账号 100044381704 **搬到**拥有 `waytofuture.cn` 与其备案的
+#   账号 100050005585（`heyta-dist-1445543984`），再绑 `dl.waytofuture.cn` + 证书。
+#   ⇒ 实测：`http(s)://dl.waytofuture.cn/...apk` 回 **206**，默认域名仍 403。
+#   判据见 `pnpm verify:downloads-servable`（它真发 GET，不认 HEAD）。
+BASE_URL="https://dl.waytofuture.cn"
 PREFIX="app-releases/heyta"
 STAGE="$(mktemp -d /tmp/heyta-dist.XXXXXX)"
+# 🔴 分发桶属于账号 100050005585，而默认的 ~/.cos.yaml 是另一个账号的 ⇒ 必须显式给配置
+COSCLI_CONFIG="${HEYTA_COSCLI_CONFIG:-$HOME/.config/heyta/coscli-waytofuture.yaml}"
 trap 'rm -rf "$STAGE"' EXIT
 
 VERSION=""
@@ -231,7 +228,7 @@ node "$(dirname "$0")/check-release-version-guard.mjs" \
 # ---- 上传（版本目录 + latest 目录）----
 upload_one() {
   local name="$1" dest="$2" cache="$3"
-  coscli cp "$STAGE/$name" "cos://${BUCKET}/${PREFIX}/${dest}/${name}" \
+  coscli -c "$COSCLI_CONFIG" cp "$STAGE/$name" "cos://${BUCKET}/${PREFIX}/${dest}/${name}" \
     --meta "Cache-Control:${cache}" -e "cos.${REGION}.myqcloud.com" >/dev/null
   # 🔴🔴 用**匿名 GET（只取 1 字节）**验证，**不能用 HEAD**。带授权的成功证明不了公开读，
   # 而 HEAD 的成功**同样**证明不了 —— 这是实测过的，不是洁癖：

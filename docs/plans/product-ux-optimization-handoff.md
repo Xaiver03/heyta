@@ -1,5 +1,11 @@
 # 交接：产品体验线（本轮 UX 优化 Goal）
 
+> 🔴 **10-18 03:5x 本次交接的停点（会话收线，Goal 仍开着、没点"完成"）**：本轮最后两趟是 r126（iOS 键盘步归因，已交，见 §四 第 35 行）
+> 与 r127（批量操作条第三枚按钮裁切，**装置已就位、裁决没拿到**，见 §四 第 36 行）。
+> **交接时仍未闭合的格子逐枚列在 §五 第 7 步**（含每枚"在谁手里 + 一条命令"）；未打勾总数每次现量：`grep -c '^- \[ \]' docs/plans/product-ux-optimization.md`。
+> ⚠️ **本文旧格子里那句"🔴 全部不证 `origin/main`（本地未 push）"的前提已经过期**：10-18 03:5x 现量
+> `git rev-list --count origin/main..HEAD` 与 `git rev-list --count HEAD..origin/main` **都回 0** ⇒ 本地 `main` 与 `origin/main` 是同一枚，
+> 本线那批已被别的会话顺手公开。**本线自己仍然不 `push`**（§六 第 7 条不改），但下一位不必再把那些设备/构建读数读成"只证本地"。
 > 状态：**本轮目标五步都交完，且第四那步已重做到第六趟（r110，`REINSTALL_RC=0`；"四端各装的是哪一枚提交"见 §四 第 4 步那一行，它指向台账那张表 —— 趟号会随下一笔漂，所以这里不写）；图与判据同批入库；全部只在本地、未 push。**
 > ⚠️ 10-15 06:0x 给"五步都交完"补一句它**不覆盖**什么：§四 末尾那几格是本线可自决、但**要设备或要真壳**的欠项（「拉起 ≠ 在前台」还剩 15 个开火点、21 处写死的 tab 坐标、windows 右栏标题疑似被截；第 18 格那条 mac 窗口图的成因已在 06:1x 量掉并结案）。**每格都带一条现量命令**；欠项枚数现量：`grep -c '^| 1[6-9] |' docs/plans/product-ux-optimization-handoff.md`。**"五步交完"不等于"设备腿与壳级取证没有欠项"。**
 > ⚠️ 10-11 19:1x 增一条**本线自造并已自修**的红：整族 e2e 在窄屏那一档红三条，根子是共享装置 `switchView` 只认窄屏 rail 的「更多」面板那一段、不认它的常驻段（产品一行没动）。修完复跑绿，成因/两版修法/读数在台账「窄屏那一档的「更多」换了形状」那一串格子。**它不改 §四 任何一行的归属**，只把「8/19 基线」那一格拆成两半读：工作树上跑过了，干净树上还是没有。（2026-10-11 19:1x 更新）
@@ -56,8 +62,25 @@ git -C heyta rev-list --count origin/main..HEAD         # 本地领先 origin �
 git -C heyta status --porcelain | head -30              # 别人的在飞文件——本线不代提交
 ps -eo pid,etime,command | grep -E 'reinstall-all\.sh|b-window-keeper' | grep -v grep   # 有人在做同一件事就别起
 xcrun simctl list devices booted                        # 现在有几台模拟器、分别是谁的
+ls /tmp/idb/                                            # 每台在跑的模拟器都要有一枚 <UDID>_companion.sock，缺了先补（见下）
+ps -eo pid,command | grep idb_companion | grep -v grep   # 谁的 companion 在跑（按 --udid 认人，别按名字 kill）
 adb devices                                             # emulator-5554 在不在
 df -h /System/Volumes/Data                              # 要不要新开一棵载体
+```
+
+🔴 **接手 iOS 腿之前先量这一格**（10-18 03:5x 实测的形状）：`simctl list devices booted` 里 `heyta-multiend-reinstall`
+（`EAAD1B66-80A3-4A51-957C-298DAF22F057`）**还在 `Booted`**，但 `/tmp/idb/` 里**没有它那枚 socket**、`ps` 里也没有它的 companion
+—— 因为 r126 收尾把本线自己拉起的那一枚按 `--udid` 认人收掉了。后果不是报错而是**静默空树**：`dump_nodes` 返回 0 枚节点，
+旅程探针把它写成 `workspace did not open after onboarding`（`scripts/qa/tasks-ux-ios.py` 的 `ensure_on_tasks()`），
+看起来完全像产品起不来。正文与三条处置写在环境陷阱 **#462**；补它的命令照现存那三枚逐字抄，不要自己发明形状：
+
+```bash
+U=EAAD1B66-80A3-4A51-957C-298DAF22F057
+nohup /Users/rocalight/.heyta-tools/idb/idb_companion --udid "$U" \
+  --grpc-domain-sock "/tmp/idb/${U}_companion.sock" --only simulator >/dev/null 2>&1 &
+# 起来之后必须先证树不是空的，再跑任何旅程：
+python3 -c "import sys; sys.path.insert(0,'scripts/tools'); import importlib; m=importlib.import_module('ios-ax-shim'); \
+print(len(m.dump_nodes(m.companion_args('$U'))))"    # 回 0 就别往下跑
 ```
 
 ⚠️ **本轮量到的形状，写给下一个人省一趟**：

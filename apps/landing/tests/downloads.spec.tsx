@@ -32,6 +32,8 @@ installPageRenderer();
 
 /** 分发桶的域名。**这一条字符串只许出现在测试里**：源码里出现就意味着有人手写了直链。 */
 const BUCKET = 'heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com';
+/** 产物直链的路径前缀（与主机无关；主机为什么换过见 bucketLinks 的注释）。 */
+const ARTIFACT_PATH = '/app-releases/heyta/latest/';
 
 function fileAt(platform: string, version: string) {
   const name = `heyta-${version}-${platform}.bin`;
@@ -89,10 +91,17 @@ const EMPTY: ReleaseManifest = {
   files: {},
 };
 
+/**
+ * 页面上的**产物直链** —— 按**路径前缀**认，不按主机认。
+ *
+ * 🔴 2026-10-18：产物主机从桶默认域名换成 `dl.waytofuture.cn`（COS 默认域名不许公开分发 `.apk`）。
+ * 判据若写死主机，换域名那天会**空集相等 ⇒ 假装通过**（同一族洞已在
+ * `e2e/landing/download.spec.ts` 与 `e2e/live-site/live-downloads.spec.ts` 修过）。
+ */
 function bucketLinks(view: HTMLElement): string[] {
   return [...view.querySelectorAll<HTMLAnchorElement>('a[href]')]
     .map((a) => a.getAttribute('href') ?? '')
-    .filter((href) => href.includes(BUCKET));
+    .filter((href) => href.includes(ARTIFACT_PATH));
 }
 
 function cardCount(view: HTMLElement): number {

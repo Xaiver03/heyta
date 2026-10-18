@@ -39,7 +39,7 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const BUCKET_MANIFEST =
-  'https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/latest.json';
+  'https://heyta-dist-1445543984.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/latest.json';
 
 /** 只有这两端能被本脚本读出版本；其余**明确列为未覆盖**。 */
 export const COVERED = {

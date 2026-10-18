@@ -48,7 +48,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 export const ROOT = dirname(HERE);
 const SNAPSHOT = join(ROOT, 'apps/landing/src/site/release-manifest.json');
 const BUCKET_MANIFEST =
-  'https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/latest.json';
+  'https://heyta-dist-1445543984.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/latest.json';
 
 /**
  * 找 esbuild 的**平台原生二进制**。

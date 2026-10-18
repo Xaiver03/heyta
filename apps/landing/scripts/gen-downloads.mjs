@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SNAPSHOT = join(HERE, '../src/site/release-manifest.json');
 const URL_ =
-  'https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/latest.json';
+  'https://heyta-dist-1445543984.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/latest.json';
 
 async function fetchManifest() {
   const res = await fetch(URL_, { headers: { 'Cache-Control': 'no-cache' } });
