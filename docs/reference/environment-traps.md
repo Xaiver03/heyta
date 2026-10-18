@@ -10295,3 +10295,17 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     ⑵ 读数里要把**作用点自己**记进去（本趟加了 `swipeY.y` 与 `swipeY.row`），否则下一位无法判断这一滑打在哪；
     ⑶ "滑动前后两张图像素相同"这种**反直觉读数不许当支持证据** —— 它是"手势没作用上"的信号，
     先怀疑探针再说容器。与 #63/#462 同族（症状在产品形状上、真因在装置），这一枚的区别是**装置能连、能读、能滑，只是滑错了行**。
+
+466. 🔴 **`pnpm -r build --no-bail` 与 `pnpm -r --no-bail build` 不是同一件事：前者把 `--no-bail` 塞给每一枚子脚本，
+    于是 `tsup` 报 `CACError: Unknown option \`--bail\``，四枚包"红"在装置自己写的参数上**。2026-10-18 本机实测：
+    在全新载体上跑 `NO_COLOR=1 pnpm -r build --no-bail` ⇒ `BUILD_RC=1`，
+    `packages/{i18n,ai,design-system,local-api}` 各打一行 `build: Failed`，原文栈顶是
+    `CACError: Unknown option --bail at .../cac/dist/index.js`；而**同一棵载体、同一份源码**换成
+    仓里那格的写法 `NO_COLOR=1 pnpm -r --no-bail build` 就不再出现这四枚。
+    第二个症状更阴：旗标放错位置时 pnpm 自己仍在 bail —— 日志只起了 **6** 枚包就收摊，
+    于是"失败清单看着小、起数也变小"，两把尺同时被喂假数（关闭判据要的是 `Failed=0` **且** 起数=20）。
+    ⇒ 三条：⑴ **本仓那条全量构建的固定写法是 `pnpm -r --no-bail build`**（`--no-bail` 在子命令名**之前**，
+    现量 `grep -n 'pnpm -r --no-bail build' docs/plans/product-ux-optimization.md`）；
+    ⑵ 数失败的行要按日志真实形状数（` build: Failed$`），不是 `^Failed` —— 后者在这份日志上恒为 0，
+    是一枚"永远不红"的判据；⑶ 见到一批包**同时**红且报错是"某个参数不认识"，先查自己的命令行，
+    别去查那几枚包（AGENTS §7 元规则一在本轮的第四次命中；与 #465 同一族的另一种失法：装置自己造红）。
