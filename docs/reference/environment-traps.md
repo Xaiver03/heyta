@@ -10240,3 +10240,33 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     要换自定义域名，**先核「域名 + 备案 + 桶」是否同账号**（`tccli sts GetCallerIdentity --profile <p>`
     逐个 profile 量，别假设），再动手做 DNS 与证书。
     相关：`docs/agents/commands.md`「腾讯云账号与凭据」那一节（本机有哪些 profile、各属哪个账号、各自能做什么）。
+
+462. 🔴 **上一趟收尾时按 `--udid` 认人收掉自己拉起的 `idb_companion`，下一趟在同一台模拟器上读到的是"静默空树"，
+    而探针把它写成产品没起来**。2026-10-18 r127 实测：r126 收尾把 pid `90435`（`--udid EAAD1B66-80A3-4A51-957C-298DAF22F057`）
+    收掉后，下一趟 `ensure_on_tasks()` 抛 `workspace did not open after onboarding`（现量
+    `grep -n 'workspace did not open after onboarding' scripts/qa/tasks-ux-ios.py`），而三条都指向"设备好好的"：
+    `xcrun simctl launch <UDID> com.heyta` 回 rc=0 且有 pid、`xcrun simctl list devices booted` 里那台还在 `Booted`、
+    `load1` 只有个位数。真因要直接问 `idb` 才露出来：`Failed to connect to companion at address
+    DomainSocketAddress(path='/tmp/idb/<UDID>_companion.sock'): [Errno 2] No such file or directory` —— socket 文件根本不在。
+    🔴 与 **#63** 同族但**触发相反**：那一条是"模拟器跑久了 AX 注册卡死"，这一条是**取证装置自己的依赖被上一次收尾合法删掉了**
+    （#63 末段那句"推论：`idb` 不会自己拉 companion"在这里原样成立，而收尾清单里没人想到它会被带走）。
+    ⇒ 三条：⑴ **每台在跑的模拟器那枚 companion 是下一趟的输入**，收它之前先问"本线还有没有腿要在这台上跑"，
+    有就别收、把收尾挪到最后一趟；⑵ 探针读 AX 之前先查 socket 在不在，缺就报"装置缺依赖"而不是往下走 ——
+    `scripts/tools/ios-ax-shim.py` 只有 `companion_args()`（现量 `grep -n 'def companion_args' scripts/tools/ios-ax-shim.py` 只回一枚），
+    **没有任何自动拉起**，所以它把连接失败**转换成**空树；⑶ 判据不许把"空树"读成"产品没画"，按 #63 那条的判据写法（问的是树里有没有内容，不是连不连得上）。
+    起法照现存那几枚逐字抄，别自己发明：`ps -eo pid,command | grep idb_companion | grep -v grep` ⇒
+    `idb_companion --udid <UDID> --grpc-domain-sock /tmp/idb/<UDID>_companion.sock --only simulator`。
+
+463. 🔴 **"我已经切到 X 视图"这种前置条件，判据必须用 X 独有的标记 —— 拿"两种状态都有的东西还在场"当证据，
+    装置没切成功时照样给绿**。2026-10-18 r126 实测：臂 3/4 原先拿「任务标题还在 AX 树里」当「已在时间线视图」的证据，
+    而列表视图里标题**也在** ⇒ 那两臂其实停在「列表」（探针后来读到当前视图就是它）却照样跑完、照样绿。
+    两批读数已改名留档、不作数：
+    `apps/mobile/evidence/ux-final-20261017/ios-keyboard-attribution-r126/probe4-3-4-run1-VIEW-NOT-ASSERTED.json` 与
+    同目录 `probe4-3-4-run2-WEB-ARIA-MARKER-NEVER-MATCHES.json`；第三批换成移动端独有的分组表头 `未排期（4）` 才钉住。
+    同一条规矩的第二种失法是**marker 选错了层**：旅程里那枚 `timeline_group_label` 取的是 web 的 aria 键
+    `web.timeline.aria.group`，而移动端表头实际读 `web.board.unscheduledLane`
+    （现量 `grep -n 'unscheduledLane' apps/mobile/src/lib/timeline-labels.ts`）⇒ 它在 iOS 上**永不成立**，
+    只因它待在 ANY-of 的 `wait_labels` 里才没把任何一步拖红（登记在 `BLOCKED.md` B224，判据口径归那条线）。
+    ⇒ 写前置条件判据时先做一次**反臂**：故意不切视图，看这枚 marker 会不会照样命中；会命中就不是证据。
+    与 #227/#228 同族（"计数为 0"和"一条都没跑"在输出上长得一样），补一枚方向：那一族管"这趟跑没跑"，
+    这一条管"跑的那条路是不是你以为的那条"。

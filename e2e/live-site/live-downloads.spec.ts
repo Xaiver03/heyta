@@ -38,7 +38,7 @@ const ORIGIN = process.env['HEYTA_LIVE_ORIGIN'] ?? 'https://heyta.waytofuture.cn
  * ⚠️ 这里**故意还是默认域名** —— `.json` 不受"APK 不许公开分发"那条限制，
  * 清单本身仍然从桶读；产物直链才走自定义域名。
  */
-const MANIFEST_HOST = 'heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com';
+const MANIFEST_HOST = 'heyta-dist-1445543984.cos.ap-guangzhou.myqcloud.com';
 /**
  * 产物直链的**路径前缀** —— 按路径匹配，**不按主机**。
  *

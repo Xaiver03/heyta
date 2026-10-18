@@ -201,7 +201,7 @@ function fixtureTree(mutate) {
     files: {
       macos: {
         name: 'heyta-1.0.0-macos.dmg',
-        url: 'https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/heyta-1.0.0-macos.dmg',
+        url: 'https://heyta-dist-1445543984.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/heyta-1.0.0-macos.dmg',
         versionedUrl: 'x',
         sha256: 'b'.repeat(64),
         size: 2362276,
@@ -220,7 +220,7 @@ function fixtureTree(mutate) {
 const ARMS = [
   ['A 手写直链', (doc) => doc, (dir) =>
     writeFileSync(join(dir, 'apps/landing/src/pages/DownloadPage.tsx'),
-      'const href = "https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/a.bin";\n')],
+      'const href = "https://heyta-dist-1445543984.cos.ap-guangzhou.myqcloud.com/a.bin";\n')],
   ['B 通道白名单', (doc) => { doc.channels.ios.url = 'https://download.example.com/ios'; return doc; }],
   ['C 未登记产物', (doc) => { doc.files.watchos = { ...doc.files.macos, name: 'heyta-1.0.0-watchos.bin', url: `${'https://x/'}heyta-1.0.0-watchos.bin` }; return doc; }],
   ['D 同轮性', (doc) => { doc.files.macos.name = 'heyta-0.9.0-macos.dmg'; return doc; }],
