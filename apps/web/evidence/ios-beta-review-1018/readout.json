@@ -1,0 +1,28 @@
+{
+  "what": "iOS TestFlight 外部测试审核的提审留档（2026-10-18）",
+  "why": "对账件 A4 那一格的读数靠 grep 本目录；今天真的提交了，就要有据可查。原始响应另存两个 *.raw.json。",
+  "app": {
+    "id": "6817635248",
+    "bundleId": "com.heyta"
+  },
+  "build": {
+    "id": "8b857f09-de7b-4bb9-83ae-e6b9fac196fb",
+    "version": "7",
+    "expirationDate": "2027-01-06T02:16:17-08:00"
+  },
+  "publicJoinLink": "https://testflight.apple.com/join/hmMPsDdc",
+  "publicGroup": "公开内测",
+  "betaReviewState": "WAITING_FOR_REVIEW",
+  "submittedDate": "2026-10-18T03:20:21-07:00",
+  "externalBuildState": "WAITING_FOR_BETA_REVIEW",
+  "internalBuildState": "IN_BETA_TESTING",
+  "reviewContact": {
+    "firstName": "湘雷",
+    "lastName": "邓",
+    "phone": "+8613077328906",
+    "email": "xaiverlight@163.com",
+    "demoAccountRequired": false
+  },
+  "note": "审核通过后由 research/tools/flip-ios-channel.mjs 翻牌（双信号 fail-closed）并重发。",
+  "capturedAt": "2026-10-18T18:38:50"
+}

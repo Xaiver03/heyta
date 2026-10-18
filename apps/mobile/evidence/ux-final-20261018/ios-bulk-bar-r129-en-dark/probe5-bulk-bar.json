@@ -1,0 +1,215 @@
+{
+  "startedAt": 1792319772.075979,
+  "udid": "FE195661-B021-4A71-AAD1-1F2F7AE3A102",
+  "uiLocale": "zh-CN",
+  "selectionMode": true,
+  "screen": [
+    402,
+    874
+  ],
+  "anchorXY": [
+    24,
+    145
+  ],
+  "before": [
+    {
+      "label": "任务",
+      "frame": [
+        16,
+        80,
+        266,
+        20
+      ],
+      "x": 16,
+      "right": 282,
+      "pressable": false,
+      "insideViewport": true
+    },
+    {
+      "label": "退出选择",
+      "frame": [
+        283,
+        134,
+        95,
+        44
+      ],
+      "x": 283,
+      "right": 378,
+      "pressable": true,
+      "insideViewport": true
+    },
+    {
+      "label": "已选 2 项",
+      "frame": [
+        24,
+        145,
+        251,
+        21
+      ],
+      "x": 24,
+      "right": 275,
+      "pressable": false,
+      "insideViewport": true
+    },
+    {
+      "label": "批量完成",
+      "frame": [
+        24,
+        186,
+        119,
+        44
+      ],
+      "x": 24,
+      "right": 143,
+      "pressable": true,
+      "insideViewport": true
+    },
+    {
+      "label": "移动到清单",
+      "frame": [
+        151,
+        186,
+        134,
+        44
+      ],
+      "x": 151,
+      "right": 285,
+      "pressable": true,
+      "insideViewport": true
+    },
+    {
+      "label": "批量删除",
+      "frame": [
+        293,
+        186,
+        119,
+        44
+      ],
+      "x": 293,
+      "right": 412,
+      "pressable": true,
+      "insideViewport": false
+    }
+  ],
+  "clippedBefore": [
+    "批量删除"
+  ],
+  "swipeY": {
+    "y": 208,
+    "row": "批量删除",
+    "anchorY": 145
+  },
+  "swipe": {
+    "rc": 0,
+    "detail": ""
+  },
+  "after": [
+    {
+      "label": "任务",
+      "frame": [
+        16,
+        80,
+        266,
+        20
+      ],
+      "x": 16,
+      "right": 282,
+      "pressable": false,
+      "insideViewport": true
+    },
+    {
+      "label": "退出选择",
+      "frame": [
+        283,
+        134,
+        95,
+        44
+      ],
+      "x": 283,
+      "right": 378,
+      "pressable": true,
+      "insideViewport": true
+    },
+    {
+      "label": "已选 2 项",
+      "frame": [
+        24,
+        145,
+        251,
+        21
+      ],
+      "x": 24,
+      "right": 275,
+      "pressable": false,
+      "insideViewport": true
+    },
+    {
+      "label": "批量完成",
+      "frame": [
+        -10,
+        186,
+        119,
+        44
+      ],
+      "x": -10,
+      "right": 109,
+      "pressable": true,
+      "insideViewport": false
+    },
+    {
+      "label": "移动到清单",
+      "frame": [
+        116,
+        186,
+        134,
+        44
+      ],
+      "x": 116,
+      "right": 250,
+      "pressable": true,
+      "insideViewport": true
+    },
+    {
+      "label": "批量删除",
+      "frame": [
+        258,
+        186,
+        119,
+        44
+      ],
+      "x": 258,
+      "right": 377,
+      "pressable": true,
+      "insideViewport": true
+    }
+  ],
+  "shifts": [
+    {
+      "label": "任务",
+      "dx": 0
+    },
+    {
+      "label": "退出选择",
+      "dx": 0
+    },
+    {
+      "label": "已选 2 项",
+      "dx": 0
+    },
+    {
+      "label": "批量完成",
+      "dx": -34
+    },
+    {
+      "label": "移动到清单",
+      "dx": -35
+    },
+    {
+      "label": "批量删除",
+      "dx": -35
+    }
+  ],
+  "verdict": "可滚（滑动后 x 位移，图上位置只是滚到当前项）",
+  "clippedAfter": [],
+  "finishedAt": 1792319824.164694
+}
