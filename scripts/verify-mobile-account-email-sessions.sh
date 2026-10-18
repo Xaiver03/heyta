@@ -144,7 +144,7 @@ for p in account/email/change/status auth/sessions; do
   C=$(curl -s --noproxy '*' -m 5 -o /dev/null -w '%{http_code}' "$API/api/$p")
   # 🔴 期望 401，不是 404：404 意味着这台服务端**没有本线的路由**（跑的是旧 dist），
   #    那时整轮结论都不可信 —— 这正是 AGENTS §7 第 27/82 条的形状。
-  [ "$C" = "401" ] || { echo "❌ $API/api/$p 回 $C（期望 401）。404 = 这台跑的不是当前源码：先 pnpm --filter @heyta/sync-server build 再起栈"; exit 1; }
+  [ "$C" = "401" ] || { echo "❌ $API/api/$p 回 ${C}（期望 401）。404 = 这台跑的不是当前源码：先 pnpm --filter @heyta/sync-server build 再起栈"; exit 1; }
 done
 ok "两条路由都在，未登录各回 401"
 
@@ -312,7 +312,7 @@ CODE=$(curl -s --noproxy '*' -m 20 -o /tmp/acc-confirm-old.json -w '%{http_code}
 if [ "$CODE" = "200" ]; then
   ok "旧侧确认 HTTP 200（**不带会话**也能点 —— 点链接的人手上没有会话）"
 else
-  bad "旧侧确认 HTTP $CODE：$(head -c 200 /tmp/acc-confirm-old.json)"
+  bad "旧侧确认 HTTP ${CODE}：$(head -c 200 /tmp/acc-confirm-old.json)"
 fi
 # 切走再回来：Modal 卸载重挂 ⇒ 组件只能重新读服务端（本地压根没有「阶段」可留）。
 # 🔴 目录层那一刀之后**一发返回只退到目录**，面并没有关（`SettingsScreen.tsx:364-373`
@@ -338,13 +338,13 @@ shot "03-awaiting-new.png"
 step "9. 点新那半：换绑生效、库里地址改了、换绑前那枚令牌全局失效"
 CODE=$(curl -s --noproxy '*' -m 20 -o /tmp/acc-confirm-new.json -w '%{http_code}' -X POST "$API/api/account/email/change/confirm" \
   -H 'content-type: application/json' -d "{\"token\":\"${NEW_TOK}\"}")
-[ "$CODE" = "200" ] && ok "新侧确认 HTTP 200" || bad "新侧确认 HTTP $CODE：$(head -c 200 /tmp/acc-confirm-new.json)"
+[ "$CODE" = "200" ] && ok "新侧确认 HTTP 200" || bad "新侧确认 HTTP ${CODE}：$(head -c 200 /tmp/acc-confirm-new.json)"
 EMAIL_NOW=$(db "select email from users where email in ('${NEW_EMAIL}','${OLD_EMAIL}')")
 [ "$EMAIL_NOW" = "$NEW_EMAIL" ] && ok "库里邮箱已经是新地址" || bad "库里邮箱还是 $EMAIL_NOW"
 LEFT_REQ=$(db "select count(*) from email_change_requests r join users u on u.id=r.user_id where u.email in ('${NEW_EMAIL}','${OLD_EMAIL}')")
 [ "$LEFT_REQ" = "0" ] && ok "生效即删 —— 那张活请求没有留下" || bad "还留着 $LEFT_REQ 张活请求"
 OLDHTTP=$(curl -s --noproxy '*' -m 10 -o /dev/null -w '%{http_code}' "$API/api/notifications" -H "authorization: Bearer $TOKEN")
-[ "$OLDHTTP" = "401" ] && ok "换绑前那枚旧令牌 401（tokenVersion 递增 —— ADR-0063 §2.2：JWT 的 payload 里就带着邮箱）" || bad "旧令牌 HTTP $OLDHTTP（期望 401）"
+[ "$OLDHTTP" = "401" ] && ok "换绑前那枚旧令牌 401（tokenVersion 递增 —— ADR-0063 §2.2：JWT 的 payload 里就带着邮箱）" || bad "旧令牌 HTTP ${OLDHTTP}（期望 401）"
 
 step "10. 界面上的当前邮箱必须变成新地址（这才是「改成功了」的真界面证据）"
 NEWTOKEN=$(curl -s --noproxy '*' -m 20 -X POST "$API/api/login/email-password" \
@@ -405,12 +405,12 @@ else
       [ "$AFTER" = "$((TARGET - 1))" ] && break
     done
     if [ "$AFTER" = "$((TARGET - 1))" ]; then
-      ok "库里确实少了一枚（$TARGET → $AFTER）—— 撤销=删行，「存在即有效」"
+      ok "库里确实少了一枚（$TARGET → ${AFTER}）—— 撤销=删行，「存在即有效」"
     else
-      bad "库里会话数 $AFTER（期望 $((TARGET - 1))）"
+      bad "库里会话数 ${AFTER}（期望 $((TARGET - 1))）"
     fi
     STILL3=$(curl -s --noproxy '*' -m 10 -o /dev/null -w '%{http_code}' "$API/api/notifications" -H "authorization: Bearer $TOKEN3")
-    [ "$STILL3" = "401" ] && ok "被撤那枚真 401（不是只从列表里藏起来）" || bad "被撤那枚仍回 $STILL3（撤销没落到认证边界？）"
+    [ "$STILL3" = "401" ] && ok "被撤那枚真 401（不是只从列表里藏起来）" || bad "被撤那枚仍回 ${STILL3}（撤销没落到认证边界？）"
     NOW=$(curl -s --noproxy '*' -m 10 -o /dev/null -w '%{http_code}' "$API/api/notifications" -H "authorization: Bearer $NEWTOKEN")
     [ "$NOW" = "200" ] && ok "手上这枚仍 200（撤的是另一台，没把自己踢出去）" || bad "本机令牌也被撤了 HTTP $NOW"
     # 列表自己的行数也要落下来 —— 只看库会把「界面没刷新」读成成功。
@@ -422,9 +422,9 @@ else
       sleep 2
     done
     if [ "$GONE" = "1" ]; then
-      ok "界面上可撤的行也跟着少了（$ROWS → $ROWS2）"
+      ok "界面上可撤的行也跟着少了（$ROWS → ${ROWS2}）"
     else
-      bad "界面没跟着刷新（撤前 $ROWS，现在 ${ROWS2:-读不到}）"; screen_txt
+      bad "界面没跟着刷新（撤前 ${ROWS}，现在 ${ROWS2:-读不到}）"; screen_txt
     fi
     shot "06-after-revoking-one.png"
   fi
@@ -445,7 +445,7 @@ else
     LEFT=$(db "select count(*) from access_sessions s join users u on u.id=s.user_id where u.email='${NEW_EMAIL}'")
     [ "$LEFT" = "0" ] && break
   done
-  [ "$LEFT" = "0" ] && ok "库里 0 枚（原来是 $BEFORE）—— 手上这枚也一起死了" || bad "还剩 $LEFT 枚（期望 0）"
+  [ "$LEFT" = "0" ] && ok "库里 0 枚（原来是 ${BEFORE}）—— 手上这枚也一起死了" || bad "还剩 $LEFT 枚（期望 0）"
   HTTP=$(curl -s --noproxy '*' -m 10 -o /dev/null -w '%{http_code}' "$API/api/notifications" -H "authorization: Bearer $NEWTOKEN")
   [ "$HTTP" = "401" ] && ok "本机那枚同样 401（「包括这台」不是话术）" || bad "本机令牌 HTTP $HTTP"
   shot "07-logged-out-everywhere.png"

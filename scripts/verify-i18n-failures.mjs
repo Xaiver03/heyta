@@ -382,6 +382,30 @@ function withMutation(file, from, to, body) {
   if (!before.includes(from)) {
     throw new Error(`注入失败（锚点不存在）：${label(file)}\n  锚点：${from}`);
   }
+  /**
+   * 🔴 **锚点必须唯一** —— 2026-10-16 加，起因是一次**假 ❌**。
+   *
+   * `recurrence` 组有一条用例「中文列举分隔符换成英文逗号」，锚点是
+   * `"'zh-CN': '、',"`。而 `recurrence-display.ts` 里**注释**也写着
+   * `` `{ 'zh-CN': '、', en: ', ' }` ``（就在那张表上面 3 行）——
+   * `String.prototype.replace` 只替**第一处**，于是变异改的是**注释**，
+   * 真表一字未动、测试当然绿，探针便报了一条 ❌「检查没有在保护它声称保护的」。
+   * **实测反证**：手工把表里那一行改掉 ⇒ 同一个 spec **8 条红**（含
+   * 「中文用顿号，且**不是**英文逗号」）⇒ 检查是好的，**是探针空转了**。
+   *
+   * 这正是本仓库最忌讳的形状（"空转的注入比没有更坏"）——
+   * 而且它与 `check-mobile-ai-anchors` 判据 ㉕ 记的那次同族：
+   * **拿注释当代码**。所以这里把"锚点唯一"变成硬要求：
+   * 不唯一就**响亮地失败**，由人去把锚点写具体（而不是让探针挑一处随便改）。
+   */
+  const occurrences = before.split(from).length - 1;
+  if (occurrences !== 1) {
+    throw new Error(
+      `注入失败（锚点不唯一，出现 ${occurrences} 次）：${label(file)}\n` +
+        `  锚点：${from}\n` +
+        `  ⇒ 字符串替换只会改**第一处**，而那可能是**注释**。请把锚点写具体到只有它能匹配。`,
+    );
+  }
   const mutated = before.replace(from, to);
   if (mutated === before) throw new Error(`注入失败（内容没变）：${from}`);
   // 先落日志再改文件：顺序反过来的话，"改完还没记"的那一瞬间被强杀就丢线索了。
@@ -528,11 +552,27 @@ function groupRecurrence() {
 
   const mapping = [
     ['把 `interval === 1` 判反', 'parts.interval === 1', 'parts.interval === 0'],
-    ["删掉「最后一天」分支", "if (day === -1) return t('mobile.recurrence.day.last');", ''],
+    [
+      '删掉「最后一天」分支',
+      // 这行在 monthDayText 与 yearDayText 各出现一次（见 withMutation 的唯一性断言）。
+      // 带上后两行（key 不同）才唯一；本次只删 monthDayText 那一支。
+      "if (day === -1) return t('mobile.recurrence.day.last');\n" +
+        "  if (day < 0) return t('mobile.recurrence.day.beforeEnd', { n: -day });\n" +
+        "  return t('mobile.recurrence.monthDay.n', { n: day });",
+      "if (day < 0) return t('mobile.recurrence.day.beforeEnd', { n: -day });\n" +
+        "  return t('mobile.recurrence.monthDay.n', { n: day });",
+    ],
     ['序数恒用 ordinal.n（second → 2th）', 'ORDINAL_KEYS[n] === undefined', 'true'],
     ['描述不了时返回空串而不是原始规则串', 'if (parts === null) return rule;', "if (parts === null) return '';"],
     ['剥掉 BYDAY 的序数（第 2 个周三 → 周三）', 'const nth = match?.[1];', 'const nth = undefined;'],
-    ['中文列举分隔符换成英文逗号', "'zh-CN': '、',", "'zh-CN': ', ',"],
+    [
+      '中文列举分隔符换成英文逗号',
+      // 🔴 锚点必须**唯一**（见 `withMutation` 里那段）：表上面 3 行的注释里
+      // 也写着同样的片段，只写 `'zh-CN': '、',` 会改到注释、真表一字未动 ⇒ 假 ❌。
+      // 带上导出那一行才唯一。
+      "export const LIST_SEPARATOR: Record<Locale, string> = {\n  'zh-CN': '、',",
+      "export const LIST_SEPARATOR: Record<Locale, string> = {\n  'zh-CN': ', ',",
+    ],
   ];
   for (const [name, from, to] of mapping) {
     expectRed('recurrence', name, () => withMutation(display, from, to, mobileRun));
@@ -619,8 +659,10 @@ function groupDisclosure() {
   expectRed('disclosure', '让兼容句里的保留天数不再来自常量', () =>
     withMutation(
       AI_SUPPLY,
-      '自最后一次使用起保留 ${String(metadataDays)} 天，',
-      '自最后一次使用起保留 30 天，',
+      // ⚠️ 锚点跟的是**现文**（2026-10-16 更新）：这句话被改写过一次，
+      // 旧锚点失效 ⇒ 这一条**没有被证明**（退出码 -1），不是"检查坏了"。
+      '自最后一次使用起保留 ${String(metadataDays)} 天且该计费周期结束后删除；',
+      '自最后一次使用起保留 30 天且该计费周期结束后删除；',
       aiRun,
     ),
   );
@@ -1273,7 +1315,14 @@ function groupPricing() {
   // ⑤c 🔴 把第二档的 `ai` 去掉 —— 两档就变成一样了，"多花 ¥7"没了对应物。
   //     门禁断言"恰好一个 SKU 含 ai"。
   expectRed('pricing', '两档的 grants 变成一样（第二档的 ai 被去掉）', () =>
-    withMutation(DOC, '"grants": ["hosting", "ai"],', '"grants": ["hosting"],', pricingRun),
+    withMutation(
+      DOC,
+      // ⚠️ 锚点跟的是**现文**（2026-10-16 更新）：第二档的 grants 后来加了 `automation`，
+      // 旧锚点失效 ⇒ 这一条**没有被证明**（退出码 -1），不是"检查坏了"。
+      '"grants": ["hosting", "ai", "automation"],',
+      '"grants": ["hosting"],',
+      pricingRun,
+    ),
   );
 
   // ⑤d 代码基线里也偷偷加第三个档 —— 并且给一个**不在 ssot 里**的 priceId，
@@ -1871,6 +1920,6 @@ const bad = results.filter((r) => !r.ok).length;
 console.log(
   bad === 0
     ? `\n✅ ${String(results.length)} 个用例全部符合预期：该绿的绿、该红的红。`
-    : `\n🔴 ${String(bad)}/${String(results.length)} 个用例不符合预期 —— 上面每一条 ❌ 都意味着对应的检查**没有在保护它声称保护的东西**。`,
+    : `\n🔴 ${String(bad)}/${String(results.length)} 个用例不符合预期。\n   ⚠️ 两种 ❌ 不是一回事，别混读：\n   · 退出码 0 ⇒ 变异注进去了、检查照样绿 ⇒ 这条检查没有在保护它声称保护的东西（危险）。\n   · 退出码 -1 ⇒ 探针自己抛了异常（锚点失效 / 锚点不唯一）⇒ 这一条没有被证明，但不能读成「检查坏了」。`,
 );
 process.exitCode = bad === 0 ? 0 : 1;

@@ -64,11 +64,11 @@ while [ $# -gt 0 ]; do
 done
 
 case "$AGE_HOURS" in
-  ''|*[!0-9]*) echo "🔴 --age-hours 要是非负整数（读到：$AGE_HOURS）" >&2; exit 2 ;;
+  ''|*[!0-9]*) echo "🔴 --age-hours 要是非负整数（读到：${AGE_HOURS}）" >&2; exit 2 ;;
 esac
 # 落点目录带空格会把下面所有路径拆成两个词 —— 那是"跑绿了但清错了地方"的形状。
 case "$TMP_DIR" in
-  *[[:space:]]*) echo "🔴 落点目录不能含空格（读到：$TMP_DIR）" >&2; exit 4 ;;
+  *[[:space:]]*) echo "🔴 落点目录不能含空格（读到：${TMP_DIR}）" >&2; exit 4 ;;
 esac
 [ -d "$TMP_DIR" ] || { echo "🔴 落点目录不存在：$TMP_DIR" >&2; exit 4; }
 

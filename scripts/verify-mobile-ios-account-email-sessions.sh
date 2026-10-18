@@ -1110,11 +1110,11 @@ sign_in_with_password() {
   fi
   needle_state "$mail" >/dev/null 2>&1; rc=$?
   if [ "$rc" != "0" ]; then
-    bad "会话卡那句里的邮箱不是本轮那个（树上数不到 $mail，rc=${rc}）"
+    bad "会话卡那句里的邮箱不是本轮那个（树上数不到 ${mail}，rc=${rc}）"
     dump_screen_text; shot "02-session-wrong-email.png"
     return 1
   fi
-  ok "登录成功，会话卡显示的就是本轮邮箱：$mail（合成测试地址，可以打；令牌与口令不行）"
+  ok "登录成功，会话卡显示的就是本轮邮箱：${mail}（合成测试地址，可以打；令牌与口令不行）"
 
   # ── 规范 §3.2 第④步：现在才有「加密口令」那一栏 ─────────────────────────
   fc=$(field_count "加密口令")
@@ -1187,7 +1187,7 @@ sign_in_with_password() {
     dump_screen_text; shot "02-current-email-missing.png"
     return 1
   fi
-  ok "「当前邮箱」那一行的值就是登录邮箱：$mail（合成测试地址，可以打）⇒ 换绑区块从这一趟起才可达"
+  ok "「当前邮箱」那一行的值就是登录邮箱：${mail}（合成测试地址，可以打）⇒ 换绑区块从这一趟起才可达"
   leave_settings_sheet || echo "     [note] 设置面没能自己关干净 —— 步骤 3 会重新一路开进去"
   return 0
 }
@@ -1421,7 +1421,7 @@ shot() {  # <文件名> [<这一张在证什么>]
   idb_current screenshot --udid "$UDID" "$path" >/dev/null 2>&1 || true
   [ -s "$path" ] || xcrun simctl io "$UDID" screenshot --display "$IOS_DISPLAY" "$path" >/dev/null 2>&1 || true
   if [ ! -s "$path" ]; then
-    bad "截图失败：$name（idb 与 simctl 都没出图，display=${IOS_DISPLAY}）"
+    bad "截图失败：${name}（idb 与 simctl 都没出图，display=${IOS_DISPLAY}）"
     return 1
   fi
   read=$(png_judge "$path")
@@ -1442,7 +1442,7 @@ shot() {  # <文件名> [<这一张在证什么>]
     echo "     （主蓝按**禁用态**命中：启用态 ${blue} < ${BLUE_MIN}，禁用态混合色 ${bdisabled} ≥ ${BLUE_DISABLED_MIN}）"
     return 0
   fi
-  bad "截图判据红（主蓝那一半）：$name 里既数不出启用态主蓝（${blue} < ${BLUE_MIN}），也数不出禁用态主蓝（${bdisabled} < ${BLUE_DISABLED_MIN}）${why:+（$why）} —— 非空白只回答「有没有东西」，回答不了「是不是这个界面」（§7 第 82 条）"
+  bad "截图判据红（主蓝那一半）：$name 里既数不出启用态主蓝（${blue} < ${BLUE_MIN}），也数不出禁用态主蓝（${bdisabled} < ${BLUE_DISABLED_MIN}）${why:+（${why}）} —— 非空白只回答「有没有东西」，回答不了「是不是这个界面」（§7 第 82 条）"
   return 1
 }
 
@@ -1638,7 +1638,7 @@ fi
 for pe in "GET account/email/change/status" "GET auth/sessions" "POST password/change"; do
   p_m=${pe%% *}; p_path=${pe#* }
   C=$(curl -s --noproxy '*' -m 5 -o /dev/null -w '%{http_code}' -X "$p_m" "$API/api/$p_path")
-  [ "$C" = "401" ] || { echo "   ❌ $p_m $API/api/$p_path 回 $C（期望 401）。404 = 这台跑的不是当前源码（或方法写错了）：先 pnpm --filter @heyta/sync-server build 再起栈 ⇒ exit 3"; exit 3; }
+  [ "$C" = "401" ] || { echo "   ❌ $p_m $API/api/$p_path 回 ${C}（期望 401）。404 = 这台跑的不是当前源码（或方法写错了）：先 pnpm --filter @heyta/sync-server build 再起栈 ⇒ exit 3"; exit 3; }
 done
 ok "本线三条路由都在（换绑状态 / 会话列表 / 改密），未登录各回 401"
 SRV_PID=$(lsof -ti "tcp:${E2E_PORT}" -sTCP:LISTEN 2>/dev/null | head -1)
@@ -2024,7 +2024,7 @@ CODE=$(curl -s --noproxy '*' -m 20 -o /tmp/heyta-ios-accmail-confirm-old-${STAMP
 if [ "$CODE" = "200" ]; then
   ok "旧侧确认 HTTP 200（**不带会话**也能点 —— 点链接的人手上没有会话）"
 else
-  bad "旧侧确认 HTTP $CODE：$(redact "$(head -c 200 /tmp/heyta-ios-accmail-confirm-old-${STAMP}.json 2>/dev/null)")"
+  bad "旧侧确认 HTTP ${CODE}：$(redact "$(head -c 200 /tmp/heyta-ios-accmail-confirm-old-${STAMP}.json 2>/dev/null)")"
 fi
 # 🔴 切走再回来 = RN Modal 卸载重挂（Android 用 BACK 键，iOS 上没有那个键，
 #    所以这里点界面上的「关闭」把整个设置面关掉，再一路重新打开）。
@@ -2056,14 +2056,14 @@ shot "08-awaiting-new.png" "判据 E：重挂之后读回来的实话（取景�
 step "9. 判据 F：点新那半 → 库里地址改了、活请求没留下、换绑前那枚令牌全局失效"
 CODE=$(curl -s --noproxy '*' -m 20 -o /tmp/heyta-ios-accmail-confirm-new-${STAMP}.json -w '%{http_code}' \
   -X POST "$API/api/account/email/change/confirm" -H 'content-type: application/json' -d "{\"token\":\"${NEW_TOK}\"}")
-[ "$CODE" = "200" ] && ok "新侧确认 HTTP 200" || bad "新侧确认 HTTP $CODE：$(redact "$(head -c 200 /tmp/heyta-ios-accmail-confirm-new-${STAMP}.json 2>/dev/null)")"
+[ "$CODE" = "200" ] && ok "新侧确认 HTTP 200" || bad "新侧确认 HTTP ${CODE}：$(redact "$(head -c 200 /tmp/heyta-ios-accmail-confirm-new-${STAMP}.json 2>/dev/null)")"
 EMAIL_NOW=$(db "select email from users where email in ('${NEW_EMAIL}','${OLD_EMAIL}')")
 [ "$EMAIL_NOW" = "$NEW_EMAIL" ] && ok "库里邮箱已经是新地址" || bad "库里邮箱还是 ${EMAIL_NOW}"
 LEFT_REQ=$(db "select count(*) from email_change_requests r join users u on u.id=r.user_id where u.email in ('${NEW_EMAIL}','${OLD_EMAIL}')")
 [ "$LEFT_REQ" = "0" ] && ok "生效即删 —— 那张活请求没有留下" || bad "还留着 $LEFT_REQ 张活请求"
 OLDHTTP=$(curl -s --noproxy '*' -m 10 -o /dev/null -w '%{http_code}' "$API/api/notifications" -H "authorization: Bearer $TOKEN")
 [ "$OLDHTTP" = "401" ] && ok "换绑前那枚旧令牌 401（tokenVersion 递增 —— ADR-0063 §2.2：JWT 的 payload 里就带着邮箱）" \
-  || bad "旧令牌 HTTP $OLDHTTP（期望 401）"
+  || bad "旧令牌 HTTP ${OLDHTTP}（期望 401）"
 # 本地优先那一半：换绑**不许**销毁本机明文库（销毁只有「注销账号」那一条路，
 # 由 verify-mobile-ios-account-erasure.sh 证）。这里只量"还在盘上"，不发明阈值。
 DATA_CONTAINER=$(xcrun simctl get_app_container "$UDID" "$BID" data 2>/dev/null)
@@ -2235,15 +2235,15 @@ else
         [ "$AFTER" = "$((TARGET - 1))" ] && break
       done
       if [ "$AFTER" = "$((TARGET - 1))" ]; then
-        ok "库里确实少了一枚（$TARGET → $AFTER）—— 撤销=删行，「存在即有效」"
+        ok "库里确实少了一枚（$TARGET → ${AFTER}）—— 撤销=删行，「存在即有效」"
       else
-        bad "库里会话数 $AFTER（期望 $((TARGET - 1))）"
+        bad "库里会话数 ${AFTER}（期望 $((TARGET - 1))）"
       fi
       # 🔴 这三发各挡一种"假绿"：被撤那枚必须 401（不是只从列表里藏起来）、
       #      手上那枚必须 200（撤的是另一台，没把自己踢出去）、对照那枚必须仍 200。
       STILL=$(curl -s --noproxy '*' -m 10 -o /dev/null -w '%{http_code}' "$API/api/notifications" -H "authorization: Bearer $TARGET_TOKEN")
       [ "$STILL" = "401" ] && ok "被撤那枚真 401（撤的就是它 —— 不是只从列表里藏起来）" \
-        || bad "被撤那枚仍回 $STILL（撤销没落到认证边界？）"
+        || bad "被撤那枚仍回 ${STILL}（撤销没落到认证边界？）"
       NOW=$(curl -s --noproxy '*' -m 10 -o /dev/null -w '%{http_code}' "$API/api/notifications" -H "authorization: Bearer $NEWTOKEN")
       [ "$NOW" = "200" ] && ok "手上这枚仍 200（本机没被连带踢出去）" || bad "本机令牌也被撤了 HTTP $NOW"
       KEEP=$(curl -s --noproxy '*' -m 10 -o /dev/null -w '%{http_code}' "$API/api/notifications" -H "authorization: Bearer $EXTRA_TOKEN")
@@ -2258,9 +2258,9 @@ else
         sleep 2
       done
       if [ "$GONE" = "1" ]; then
-        ok "界面上可撤的行也跟着少了（$ROWS → $ROWS2）"
+        ok "界面上可撤的行也跟着少了（$ROWS → ${ROWS2}）"
       else
-        bad "界面没跟着刷新（撤前 $ROWS，现在 ${ROWS2:-读不到}）"; dump_screen_text
+        bad "界面没跟着刷新（撤前 ${ROWS}，现在 ${ROWS2:-读不到}）"; dump_screen_text
       fi
       shot "12-after-revoking-one.png" "判据 I：撤掉的就是点名那一台"
     fi
@@ -2305,10 +2305,10 @@ else
     LEFT=$(db "select count(*) from access_sessions s join users u on u.id=s.user_id where u.email='${NEW_EMAIL}'")
     [ "$LEFT" = "0" ] && break
   done
-  [ "$LEFT" = "0" ] && ok "库里 0 枚（原来是 $BEFORE）—— 手上这枚也一起死了" || bad "还剩 $LEFT 枚（期望 0）"
+  [ "$LEFT" = "0" ] && ok "库里 0 枚（原来是 ${BEFORE}）—— 手上这枚也一起死了" || bad "还剩 $LEFT 枚（期望 0）"
   HTTP=$(curl -s --noproxy '*' -m 10 -o /dev/null -w '%{http_code}' "$API/api/notifications" -H "authorization: Bearer $EXTRA_TOKEN")
   [ "$HTTP" = "401" ] && ok "对照那枚同样 401（「包括这台」不是话术，也不是只撤这一台）" \
-    || bad "对照令牌 HTTP $HTTP（按下之前它是 ${EXTRA_PRE}）"
+    || bad "对照令牌 HTTP ${HTTP}（按下之前它是 ${EXTRA_PRE}）"
   # 🔴 本机凭据真的被清了没有？Android 那份没有这一格（它只看库与 HTTP）。`account-security.ts`
   #    的 `planSignOut` 要求的正是"清本机凭据"，少了这一发就只证了服务端那一半。
   #    ⚠️ 这一句**不能**在「我的」根层读（第 11 趟实测：根层读不到 ⇒ 判红，而凭据其实清了）：
@@ -2467,7 +2467,7 @@ shot "15-password-changed.png" "判据 L：改密成功态"
 # ── 协议级后果（判据 M）────────────────────────────────────────────────────
 OLDP=$(curl -s --noproxy '*' -m 10 -o /dev/null -w '%{http_code}' "$API/api/notifications" -H "authorization: Bearer $P_TOKEN")
 [ "$OLDP" = "401" ] && ok "🔴 改密**之前**那枚令牌 401（tokenVersion 全局失效，其余设备掉线的语义）" \
-  || bad "改密前的令牌仍回 $OLDP（期望 401）⇒ 这一发没落到认证边界"
+  || bad "改密前的令牌仍回 ${OLDP}（期望 401）⇒ 这一发没落到认证边界"
 NEWPTCODE=$(curl -s --noproxy '*' -m 20 -o /tmp/heyta-ios-accmail-login-${STAMP}.json -w '%{http_code}' \
   -X POST "$API/api/login/email-password" -H 'content-type: application/json' -H 'user-agent: verify-ios-after-change' \
   -d "{\"email\":\"${NEW_EMAIL}\",\"password\":\"${NEW_PASS}\"}")
@@ -2479,7 +2479,7 @@ except Exception: print('')" /tmp/heyta-ios-accmail-login-${STAMP}.json 2>/dev/n
 if [ -n "$NEWPT" ]; then
   ok "新密码能换到新会话（HTTP ${NEWPTCODE}），指纹 $(tok_fp "$NEWPT")"
   NEWPH=$(curl -s --noproxy '*' -m 10 -o /dev/null -w '%{http_code}' "$API/api/notifications" -H "authorization: Bearer $NEWPT")
-  [ "$NEWPH" = "200" ] && ok "新令牌回 200（新凭据在这台服务端上真的有效）" || bad "新令牌回 $NEWPH（期望 200）"
+  [ "$NEWPH" = "200" ] && ok "新令牌回 200（新凭据在这台服务端上真的有效）" || bad "新令牌回 ${NEWPH}（期望 200）"
 else
   bad "新密码换不到会话（HTTP ${NEWPTCODE}）：$(redact "$(head -c 160 /tmp/heyta-ios-accmail-login-${STAMP}.json 2>/dev/null)")"
   echo "      ⚠️ 429/403 是频率或风控，不是「口令没换掉」—— 这一档判红，但归因要看上面那个码"
@@ -2487,7 +2487,7 @@ fi
 TOKEN_VERSION1=$(db "select token_version from users where email='${NEW_EMAIL}'")
 printf '   改密**之后**的 token_version: %s（之前 %s）\n' "$TOKEN_VERSION1" "$TOKEN_VERSION0"
 if printf '%s' "$TOKEN_VERSION1" | grep -qE '^[0-9]+$' && [ "$TOKEN_VERSION1" -gt "$TOKEN_VERSION0" ]; then
-  ok "库里 token_version 真的涨了（$TOKEN_VERSION0 → $TOKEN_VERSION1）"
+  ok "库里 token_version 真的涨了（$TOKEN_VERSION0 → ${TOKEN_VERSION1}）"
 else
   bad "库里 token_version 没涨（'$TOKEN_VERSION0' → '$TOKEN_VERSION1'）⇒ 界面那句话与认证边界不是一回事"
 fi
@@ -2499,7 +2499,7 @@ OLDLOGIN=$(curl -s --noproxy '*' -m 20 -o /dev/null -w '%{http_code}' -X POST "$
 case "$OLDLOGIN" in
   401|400|403|429) ok "旧口令换不到会话（HTTP ${OLDLOGIN}）" ;;
   200) bad "🔴 旧口令仍能登录（HTTP 200）—— 口令没真的换掉，而界面已经说过「已修改」" ;;
-  *) bad "旧口令登录得到 HTTP $OLDLOGIN（既不是拒绝、也不是成功 ⇒ 这一发没法裁决）" ;;
+  *) bad "旧口令登录得到 HTTP ${OLDLOGIN}（既不是拒绝、也不是成功 ⇒ 这一发没法裁决）" ;;
 esac
 # ── 设备侧那一腿（判据 N：变异靶 M5 正面）──────────────────────────────────
 # 🔴 web 上没有这一步（浏览器里"落盘新令牌"不是同一条路），所以它是**移动端独有**的

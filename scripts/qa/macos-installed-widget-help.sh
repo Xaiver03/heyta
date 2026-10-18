@@ -20,7 +20,7 @@ APP_PROCESS="${HEYTA_MAC_PROCESS:-HeytaMac}"
 # 而按 pid 精确去问同一时刻新起的那个实例会读到 1。给了 HEYTA_MAC_PID 就按 unix id 锁死。
 APP_PID="${HEYTA_MAC_PID:-}"
 if [ -n "$APP_PID" ] && [ "${APP_PID//[0-9]/}" != "" ]; then
-  echo "PROBE=UNAVAILABLE"; echo "REASON=HEYTA_MAC_PID 必须是纯数字（读到 $APP_PID）"; exit 4
+  echo "PROBE=UNAVAILABLE"; echo "REASON=HEYTA_MAC_PID 必须是纯数字（读到 ${APP_PID}）"; exit 4
 fi
 EXPECTED="${HEYTA_HELP_EXTERNAL_URL:-https://heyta.waytofuture.cn/docs}"
 OUT="${HEYTA_MAC_WIDGET_HELP_EVIDENCE:-apps/desktop-macos/evidence/widget-help-ax.txt}"
@@ -77,7 +77,7 @@ if [ "$WINDOWS" -eq 0 ]; then
   fi
   echo "PROBE=UNAVAILABLE"
   if [ -n "$CG_WINDOWS" ]; then
-    echo "REASON=AX 报 0 个窗口，但窗口服务器看得见 pid $CROSSCHECK_PID 的窗口（$CG_WINDOWS）"
+    echo "REASON=AX 报 0 个窗口，但窗口服务器看得见 pid $CROSSCHECK_PID 的窗口（${CG_WINDOWS}）"
     echo "CAUSE=该实例没被激活过：未激活的 App 不向辅助功能暴露窗口列表，这不是"没有窗口""
     echo "NEXT=本探针只能在**前台**实例上跑 —— 先 open -a /Applications/Heyta.app（会抢一次焦点，与 §6.2 规定二冲突，需负责人显式允许），再带 HEYTA_MAC_PID 重跑"
   else

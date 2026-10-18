@@ -91,8 +91,8 @@ bad()  { printf '   🔴 %s\n' "$1"; fails=$((fails + 1)); }
 env_invalid() { printf '\n🔴 环境无效：%s\n' "$1"; printf 'RESULT=INVALID_ENV（不是产品失败，也不许算通过）\n'; exit 3; }
 step() { printf '\n── %s ──\n' "$1"; }
 
-[ -f "$JUDGE" ] || env_invalid "判据文件不在（$JUDGE）"
-mkdir -p "$RUN_DIR" "$DB_DIR" || env_invalid "建不出私有落点（$RUN_DIR）"
+[ -f "$JUDGE" ] || env_invalid "判据文件不在（${JUDGE}）"
+mkdir -p "$RUN_DIR" "$DB_DIR" || env_invalid "建不出私有落点（${RUN_DIR}）"
 
 step "1. 从当前源码构建壳（增量；编不过是**源码缺陷**，按红算不按环境算）"
 ( cd "$SHELL_DIR" && swift build --product HeytaMac ) >"$BUILD_LOG" 2>&1
@@ -104,8 +104,8 @@ if [ "$BUILD_RC" -ne 0 ]; then
   exit 1
 fi
 BIN="$SHELL_DIR/.build/out/Products/Debug/HeytaMac"
-[ -x "$BIN" ] || env_invalid "构建说成功了，可壳二进制不在（$BIN）—— 这个症状和「压根没构建」逐字一样，所以这一档必须查"
-ok "壳已构建（rc=0，二进制 $BIN）"
+[ -x "$BIN" ] || env_invalid "构建说成功了，可壳二进制不在（${BIN}）—— 这个症状和「压根没构建」逐字一样，所以这一档必须查"
+ok "壳已构建（rc=0，二进制 ${BIN}）"
 
 # 🔴 新鲜度按**内容**量，不按 mtime：mtime 在共享工作树里天天因为别人的改动漂移，
 #    而它真正要挡的是"跑的是改动之前的旧构建"。这一趟新加的那枚 env 常量
@@ -126,12 +126,12 @@ fi
 ok "壳产物含诊断链（HEYTA_WIDGET_HELP_PROBE 命中 $PROBE_HITS 处）"
 
 step "2. 页侧产物是当前的（判据按内容，不按 mtime）"
-[ -f "$WEB_DIST/index.html" ] || env_invalid "共享 UI 产物不在（$WEB_DIST）—— 先 pnpm --filter @heyta/web build"
+[ -f "$WEB_DIST/index.html" ] || env_invalid "共享 UI 产物不在（${WEB_DIST}）—— 先 pnpm --filter @heyta/web build"
 if ! grep -rq "widget-journey-panel" "$WEB_DIST"/assets/*.js 2>/dev/null; then
   env_invalid "apps/web/dist 里读不到 widget-journey-panel ⇒ 打的是小组件面板之前的旧构建，先重建页侧产物"
 fi
 ok "页侧产物含小组件面板"
-[ -f "$BRIDGE" ] || env_invalid "原生桥产物不在（$BRIDGE）—— 先跑 node packages/app-host/scripts/build-native-bridge.mjs"
+[ -f "$BRIDGE" ] || env_invalid "原生桥产物不在（${BRIDGE}）—— 先跑 node packages/app-host/scripts/build-native-bridge.mjs"
 ok "原生桥产物在"
 
 step "3. 没有别的同形状会话在跑（共享载体独占）"
@@ -171,7 +171,7 @@ step "4. 后台起壳跑诊断链（HEYTA_NO_FOCUS=1，不激活、不抢键盘�
 #    而按名字的并发守卫与 WebKit 落点都要靠这枚唯一名字才认得出"这一发是本趟造的"。
 #    只清自己造的那一份，不动别人的进程。
 EXEC="$RUN_DIR/$EXEC_NAME"
-cp "$BIN" "$EXEC" || env_invalid "复制不出改名副本（$EXEC）"
+cp "$BIN" "$EXEC" || env_invalid "复制不出改名副本（${EXEC}）"
 chmod +x "$EXEC"
 rm -f "$EV_PREFIX.txt"
 env HEYTA_NO_FOCUS=1 \
@@ -185,7 +185,7 @@ env HEYTA_NO_FOCUS=1 \
 SHELL_PID=$!
 # 证明它真的在跑（macOS 没有 setsid；先拿 pid 说话，别让"后台"变成一个断言）。
 if ! kill -0 "$SHELL_PID" 2>/dev/null; then
-  bad "壳进程起来就没了（pid $SHELL_PID）—— 读 $RUN_LOG"
+  bad "壳进程起来就没了（pid ${SHELL_PID}）—— 读 $RUN_LOG"
   head -20 "$RUN_LOG" | sed 's/^/     | /'
   printf '\nRESULT=FAIL\n'
   exit 1
@@ -234,7 +234,7 @@ else
   JUDGE_RC=$?
   sed 's/^/   /' "$JUDGE_OUT"
   if [ "$JUDGE_RC" -ne 0 ]; then
-    bad "判据 rc=$JUDGE_RC（读数：$EV_PREFIX.txt；判据：$JUDGE）"
+    bad "判据 rc=${JUDGE_RC}（读数：$EV_PREFIX.txt；判据：${JUDGE}）"
   fi
 fi
 
@@ -286,7 +286,7 @@ if [ -n "${HEYTA_WIDGET_HELP_EVIDENCE_OUT:-}" ]; then
     } >>"$HEYTA_WIDGET_HELP_EVIDENCE_OUT" || true
     printf '   📷 证据入库：%s\n' "$HEYTA_WIDGET_HELP_EVIDENCE_OUT"
   else
-    bad "证据没能收到 $HEYTA_WIDGET_HELP_EVIDENCE_OUT（读原始落点：$EV_PREFIX.txt）"
+    bad "证据没能收到 ${HEYTA_WIDGET_HELP_EVIDENCE_OUT}（读原始落点：$EV_PREFIX.txt）"
   fi
 fi
 
