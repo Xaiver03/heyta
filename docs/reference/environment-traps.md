@@ -10371,3 +10371,18 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     （"隔几分钟重 dump 一次"这一步成本是一行命令，它同时否证了我前一条和第⑵条解释）。
     ⑷ 收尾要把动过的东西逐件还原并**现量给"已无"的证据**：`defaults delete com.heyta AppleLanguages` 之后
     `defaults read com.heyta AppleLanguages` 应回 `Could not find key`（回空值不等于删掉）。
+470. 🔴 **zsh 的循环里 `$c` 不拆词 ⇒ 一整套彼此独立的门在同一戳齐刷刷回 `rc=127`，长得像"九道门同时翻红"**。
+    2026-10-18 本机 19:2x 实测（自动收集线，HEAD `9fc27b43`）：把本线九枚尺（`verify-inbound-doc-tables.py`／
+    `verify-inbound-doc-endpoints.py`／`verify-inbound-ac-ticks.py`／`verify-inbound-ac8-matrix.py`／
+    `verify-inbound-producer-seam.py`／`check-docs-voice.mjs`／`docs-link-check.mjs`／`license-inventory.mjs`／
+    `check-migrations.mjs`）第一次写成 `for c in "python3 …" "node …"; do $c >/dev/null 2>&1; echo "RC=$?"; done`
+    ⇒ **九枚各回 rc=127**。当场两头对照臂（同一个 shell、同样两条命令）：坏形状下
+    `python3 research/tools/verify-inbound-ac-ticks.py` 与 `node scripts/check-docs-voice.mjs` 各 **127**；
+    换成 `sh -c "$c"` 或 zsh 的显式拆词 `${=c}` ⇒ **同一批各回 rc=0**，结论行与 18:4x 那戳逐字相同；
+    `which python3 node` 回 `/opt/homebrew/bin/python3`、`/usr/local/bin/node` ⇒ 解释器在册。
+    ⇒ 四条：⑴ **成因是 shell 语义，不是被测物**：zsh 默认**不对未加引号的展开做词分割**（整串变成一枚命令名），
+    而 bash 会话里同一条循环是好的 —— 这枚坑只命中换 shell 的人；要么逐条单独一行，要么 `sh -c "$c"`／`${=c}`。
+    ⑵ **一整套互不依赖的门在同一戳全部回同一个非 0 码，第一假设就是探针**（§7 元规则一）：真红通常逐枚不同码、
+    不同结论行，而 `127` 只说明"那条命令没被找到"。
+    ⑶ **不许拿 `rc=127` 登记成"门翻红了"**：那一戳差点在 B230 之外又编出一枚"文档九道门同红"的假项。
+    ⑷ 改写法要留**反向证据**：同一批必须看到从 127 翻回 0，且绿的那批结论行与旧戳逐字相同（只证"能绿"的臂等于没测）。
