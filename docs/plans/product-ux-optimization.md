@@ -4520,3 +4520,36 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
       ✅ **设备态**：外观档是本趟改的（light→dark→light，中间各重启一次），跑完**已还原 light** 并回读；语言/数据/任务列表（r132 清完为空）未动；
       **通知授权仍是「不允许」**（r132 那处未还原状态，本趟没改变它）；**没收任何 companion**（pid 31182 全程在册）。
       读数与 10 张图、对比度那把尺 [`apps/mobile/evidence/ux-final-20261018/ios-ai-face-r133/RESULT.md`](../../apps/mobile/evidence/ux-final-20261018/ios-ai-face-r133/RESULT.md)。
+
+- [x] ✅ **10-19 02:1x r134 iOS「账号面」装机态深浅两档（只读，4 张逐张人眼看过）—— 台账那句"…/账号/AI/帮助"四面里最后一面第一次有装机态读数**（新常驻装置 `scripts/qa/account-face-ios.py`，复用 `scripts/qa/ai-face-ios.py` 已量好的 `tap_in_viewport`/`reveal_in_viewport`/`require_appearance`，共享装置零改动；两档各 **11 步全 passed**，起跳 02:17:59 / 02:20:34）。
+      **这一格判什么**：从「我的」进「注册 / 登录」这条路在装机件上走不走得通，以及登录表单**收起 / 展开**两态在深浅两档下渲染出什么。
+      **出处**：取数时 tip `601ae89f`（共享树，取数期间仍在被别人推进），而**装机件**是载体 `head-r128` @ `f8d7155e` 那一枚
+      （`Heyta.app/Info.plist` mtime `2026-10-18 18:11`、`CFBundleShortVersionString` `1.0` —— 与 r131/r132/r133 逐字同一枚件）
+      ⇒ 这一趟**不主张**"当前源码的账号面"，只主张"这台机上那枚件的账号面"；**本趟没有重装任何端**。
+      **读数**：入口 CTA 帧 `[16, 283, 370, 44]`、展开开关帧 `[16, 612, 370, 31]`（两档逐字相同）、顶栏「返回」帧 `[342, 68, 44, 44]`；
+      收起态在场 = 邮箱框 + 登录密码 + 服务器地址（预填 `https://heyta.waytofuture.cn`）+「用邮箱和密码登录」+「还没有这个邮箱的账号？创建一个」+「忘记密码？」+「或者用别的方式」；
+      展开态新增 =「用邮件链接登录」「用通行密钥登录」「用通行密钥注册」「粘贴邮件里的链接或令牌」「验证并登录」，并读到
+      `这台设备暂不支持通行密钥，请使用账号密码或邮件链接登录。`（`apps/mobile/src/screens/AuthScreen.tsx:901`–`:905` 那一支，与"按钮不禁用"配套）。
+      🔴 **到达判据有一处必须配反判**：登录页顶栏标题与「我的」里那枚入口按钮**同字**（都叫「注册 / 登录」）⇒ 用段内独有的
+      「用邮箱和密码登录」并配 `absent=PROFILE_ROWS`，否则"还停在「我的」"也能判过。
+      **三条读数不是缺陷**：⑴ 条款勾选在装机态登录档**本就不渲染**（`AuthScreen.tsx:782` 整块包在 `mode === 'register' ?` 里，
+      要证它得点「创建一个」= 会真发请求，按只读纪律没点）；⑵ 「其他登录方式 / 收起其他登录方式」两枚标题在整棵 AX 树里 **0 命中**，
+      但**这不是一条无障碍缺陷** —— 视觉两态确实换了字（两张截图为证），代码把它做成带 `accessibilityLabel` 的 `Pressable` 的子 `Text`
+      （`AuthScreen.tsx:865`–`:872`）⇒ 被父节点合成掉；把**整份节点字典**记进读数才看到 `aria-expanded` 落成 `AXValue: null → "expanded"`
+      （两档 × 两态四份读数一致）⇒ 状态**有**出口。这条差点被登记成缺陷，见 **#481**；
+      ⑶ 展开区那三枚按钮**看着**比上面的卡片缩进 ⇒ 用像素尺量了（`decodePng` 逐行取白/蓝卡片左右边界）：
+      `y=700/1400/1560/1980/2100/2300` 六行全部 `run=[48..1157]` ⇒ **对齐一致，不是缺陷**（人眼印象被否证一次）。
+      **两把尺**：`modalLuminance` 两档 252 / 28（4 张全对档）；同趟内两条路径同屏的两张图逐字节相同。
+      **顺带闭掉本线自己欠的一处回归义务**：`scripts/qa/ai-face-ios.py` 在 r133 提交后又改过（抽出 `require_appearance()` 复用），
+      本趟在新落点 `ios-ai-face-r133-verify/{light,dark}/` 复跑 ⇒ 两档各 **20 步全 passed**、`scroll to help section` 帧 `[32, 797, 338, 44]`
+      与已入库那趟**逐字相同**。跨趟 sha256 10/10 张全 DIFF 曾看着像"改动改变了渲染"，把差异按行投影后**全部落在 `y=0`–`152`**
+      （状态栏时钟/电量：`light/profile.png` 差 1944 px、`dark/help-feedback.png` 差 41950 px，内容区零差异）⇒ 见 **#482**。
+      **门的牙**：`CJK_GROUP_FLOOR["account-face-ios.py"]` 抬到 23 ⇒ `check:locator-labels` `rc=1`（报「从基线 23 掉到 22」），改回 22 ⇒ `rc=0`。
+      ⚠️ **本线自造的一处事故（当场还原，见 #483）**：为给 `package.json` 那一行追加脚本跑了 `node -e` 的 JSON parse→改→stringify 往返，
+      它把 210 个 `scripts` 键摊到顶层并抹掉 `name`/`version`/`packageManager`/`engines`/`devDependencies`（`git diff --stat` 现量 `+210 / −229`）；
+      已 `git show HEAD:package.json` 还原（坏件另存）后改用逐行编辑，现量 `package.json | 2 +-`。
+      **不证**：任何登录/注册**成功**路径（没输入没提交没联网）、魔法链接收信与「粘贴…→验证并登录」出口、通行密钥真实可用性、
+      注册档的条款勾选与两份法务文档、**英文装机态**这一面（定位符双语且门绿，但没在英文档跑）、iPad/窄屏/大字体、当前源码那一面。
+      ✅ **设备态**：外观档是本趟改的（light→dark→light，中间各重启一次），跑完**已还原 light** 并回读；登录面板已退回「我的」；
+      **通知授权仍是「不允许」**（r132 那处未还原状态，本趟没改变它）；**没收任何 companion**（pid 31182 全程在册）。
+      读数与 4 张图见 [`apps/mobile/evidence/ux-final-20261018/ios-account-face-r134/RESULT.md`](../../apps/mobile/evidence/ux-final-20261018/ios-account-face-r134/RESULT.md)。

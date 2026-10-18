@@ -10501,3 +10501,41 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
       登记成三件别人的缺陷；
       ⑶ 这一族与台账里 B231 那句"设备面/套件在负载高的时候会间歇红"同形 —— 要定它的成因而非猜，办法是在安静窗单跑这一道
       （`python3 research/tools/verify-inbound-check-chain.py --only macos-window`），**不调阈值、不改它的判卷形状**。
+
+481. 🔴 **iOS 上「这句文案不在 AX 标签集合里」≠「这个状态没暴露给读屏」—— 带 `accessibilityLabel` 的父节点会把子 `Text` 合成掉，而状态另有出口（`AXValue`）**
+    （2026-10-19 实测，产品体验线 r134 账号面那一趟）。`apps/mobile/src/screens/AuthScreen.tsx:865`–`:872` 那枚「或者用别的方式」开关，
+    展开时**视觉上**标题从「其他登录方式」换成「收起其他登录方式」（两张截图为证，`ios-account-face-r134/{light,dark}/`），
+    但整棵 AX 树里这两个串**一次都没出现**：`present()` 的精确 + 子串两把同时 0 命中，而**同一棵树、同一次调用**里父标签
+    「或者用别的方式」命中 ⇒ 不是探针坏（对照臂就在同一份读数里）。
+    我据此差点登记成一条无障碍缺陷："展开态对读屏没有信号"。**回源码 + 回读数把它否证了**：把开关那一条节点的
+    **整份字典**记进读数（`scripts/qa/account-face-ios.py` 的 `toggle_node()`），看到 `aria-expanded` 在 iOS 侧落成了
+    `AXValue: null → "expanded"` —— 状态**有**出口，标题文字只是给明眼人的冗余。两档 × 两态四份读数一致。
+    ⇒ ⑴ 判"某状态/某文案没暴露给无障碍"要**三层各查一次**才许报：标签集合 → 同一枚节点的 `AXValue`/`traits`/`role` → 截图（视觉变没变）。
+      只查第一层就会报出一条不存在的缺陷，而这条缺陷会被端给决策者；
+    ⑵ 写旅程脚本时**别把 `Pressable` 内子 `Text`（本项目即 `SectionHeader` 的 title）当到达判据** —— 它进不了 AX 树，
+      症状是"点了没反应/页面没到"的假 absent。到达判据要么用父标签，要么用展开后**新增的兄弟控件**（这趟用的是
+      「用邮件链接登录」∨「用通行密钥登录」那对 OR）；
+    ⑶ 与 #468（撇号是实体 ⇒ 字面串 grep 恒 0 命中）同族：**第一层读数缺席时，先问"这层是不是根本没有出口"，再问"东西是不是不存在"**。
+
+482. ⚠️ **跨趟截图的 sha256 必然不同（状态栏时钟/电量）—— "哈希相同"只能当**同趟内**同屏判据，跨趟要比**逐行差异带****
+    （2026-10-19 实测，产品体验线 r134）。装置在提交后又改过（抽出 `require_appearance()` 复用），复跑一趟做回归时，
+    先按 r133 那把尺比 sha256 ⇒ 新跑的 10 张与已入库的 10 张**两两 DIFF（10/10）**，看起来像"装置改动改变了渲染"。
+    把差异按行投影才发现全部落在顶部 `y=0`–`152`（图高 2622，即状态栏那 ~50pt）：`light/profile.png` 差 1944 px、
+    `dark/help-feedback.png` 差 41950 px，**内容区零差异**；而同趟内两条路径到达同一屏的那两张仍然逐字节相同。
+    ⇒ 现量办法（不需要重跑设备）：
+      `node --input-type=module -e "import {decodePng} from './scripts/screenshots/png-stats.mjs'; …"` 逐行比两图，
+      把有差异的行收成带（`y0-y1`），再判这一带是不是状态栏。**跨趟比同屏用差异带，同趟比同屏用哈希** —— 拿错那把尺
+      会把一次时钟跳动读成一次渲染回归。
+
+483. 🔴 **用 `node -e` 对 `package.json` 做 `JSON.parse`→改一个键→`stringify` 往返，会把整份文件重排并毁掉结构；改一行必须用逐行编辑**
+    （2026-10-19 实测，产品体验线 r134，自己造的事故）。要给 `check:locator-labels` 那行追加一枚脚本，图省事跑了
+    一条"读 JSON、改 `scripts['check:locator-labels']`、写回"的 one-liner。`git diff --stat` 现量：
+    **`package.json | 439 ++++----`（+210 / −229）**，而 `node -e` 打印顶层键才发现它把 `scripts` 的 210 个键**摊平到了顶层**，
+    `name` / `version` / `private` / `description` / `packageManager` / `engines` / `devDependencies` / `license` **全部消失** ——
+    那不是"重排"，是一份能让 `pnpm install` 直接废掉的坏文件，而且它躺在**共享工作树**里，别的会话下一次提交就可能把它带走。
+    ⇒ ⑴ 改 JSON 里的一行就用**逐行文本编辑**（Edit 工具 / 精确 `old_string`），不要 JSON 往返 —— 往返保住的是"它解析出来的那部分"，
+      保不住注释、键序、缩进与它自己没读到的字段；
+    ⑵ 任何**整文件重写**之后必须立刻 `git diff --stat <该文件>` 看规模：一行改动就该是 `1 insertion(+), 1 deletion(-)`，
+      报出三位数插入就是事故而不是改动；
+    ⑶ 恢复办法是 `git show HEAD:package.json > package.json` 再补那一行（**先把坏件另存**再覆盖，别 `git checkout --`
+      直接冲掉 —— 共享树里那一步同时会冲掉别人未提交的行）。
