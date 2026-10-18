@@ -17,13 +17,18 @@
  * 所以这里管的是**源码形状**，测试管的是**行为**，两者不重叠。
  * 同族的既有判据：`check:legal-tools`（文档表格 ↔ 目录对账）、`check:server-copy`（生成物 ↔ 真源）。
  *
- * ## 四臂（`--self-test` 逐臂证明会红；臂数由它自己打印）
+ * ## 五臂（`--self-test` 逐臂证明会红；臂数由它自己打印）
  *
  *   A  手写直链：`apps/landing/src` 里除清单快照外，任何文件出现分发桶域名 ⇒ 红。
  *   B  通道白名单：`channels` 里的 host 不在官方域名表内 ⇒ 红（那一处**是**手写的，所以必须有闸门）。
  *   C  未登记的产物/通道：清单里的键在下载面注册表里没有对应行 ⇒ 红。
  *   D  同轮性：`files.<平台>.name` 必须等于 `heyta-<version>-<平台>.<ext>` ⇒ 红
  *      （防的是 `latest/` 里混进上一轮字节：URL 与版本号都好看，但那不是同一个构建）。
+ *   E  发布脚本的匿名回读**必须是范围 GET**（`-r 0-0`），不许用 HEAD ⇒ 红。
+ *      🔴 它挡的是一个**已经发生过**的形状（2026-10-16 实测）：腾讯云对 COS **默认域名**
+ *      上的 APK 是 `HEAD → 200` / `GET → 403 DownloadForbidden`。发布脚本原来的回读
+ *      正是 `curl -sI`（HEAD）⇒ 那条"公开可读"的判据**对 APK 恒绿**：
+ *      包实际上发不出去，而门禁全绿、没有任何一层会说话。
  *
  * ## 为什么 D 不由 `upload-dist.sh` 自己保证
  *
@@ -132,6 +137,43 @@ export function checkLanding(root) {
     }
   }
 
+  // 臂 E
+  //
+  // ⚠️ 扫的是**整份脚本**而不是 `upload_one()` 那一段：切片靠字符串定位，
+  // 改一次注释就可能把判据切到空、于是**静默失效**（本仓对"判据悄悄不生效"
+  // 有账）。代价是将来若在别处合法地用 HEAD，这里会红 —— 那是个响亮、
+  // 且当场能解释的信号，比一条悄悄空转的判据好。
+  const uploadScript = join(root, 'scripts/upload-dist.sh');
+  if (!existsSync(uploadScript)) {
+    problems.push('E 找不到发布脚本 scripts/upload-dist.sh（臂 E 靠它判"回读用的是 GET 还是 HEAD"）');
+  } else {
+    const source = readFileSync(uploadScript, 'utf8');
+    /**
+     * 🔴 **先去掉整行注释再扫。**
+     *
+     * 不是为了好看：这条判据要挡的正是"HEAD 回读"，而**解释它为什么错**的那段注释
+     * 必然写着 `curl -sI`。不去注释，判据就会因为"文档写得太清楚"而红 ——
+     * 实测过：第一版就是这么把**阳性对照**弄红的（合法脚本被报 1 条）。
+     *
+     * ⚠️ 只去**整行**注释（`^\s*#`）。行尾 `#` 也可能是 URL 片段或字符串里的字符，
+     * 按它切会在别的地方切错。这条判据要的是"执行的那几行用的是 HEAD 吗"。
+     */
+    const code = source
+      .split('\n')
+      .filter((line) => !/^\s*#/.test(line))
+      .join('\n');
+    if (/curl\s+-[A-Za-z]*I/.test(code)) {
+      problems.push(
+        'E 发布脚本的匿名回读用了 HEAD（curl -sI）—— 它对 COS 默认域名上的 APK 恒 200，而真正的 GET 是 403',
+      );
+    }
+    if (!/-r\s+0-0/.test(code)) {
+      problems.push(
+        'E 发布脚本的匿名回读没有用范围 GET（-r 0-0）—— 那就证明不了"正文真的读得到"',
+      );
+    }
+  }
+
   return { problems, filesChecked: files.length };
 }
 
@@ -145,6 +187,13 @@ function fixtureTree(mutate) {
   writeFileSync(
     join(dir, 'apps/landing/src/site/downloads.ts'),
     readFileSync(join(ROOT, 'apps/landing/src/site/downloads.ts'), 'utf8'),
+  );
+  // 发布脚本也按原样带过去：臂 E 从它读"回读用的是 GET 还是 HEAD"，
+  // 而**阳**性对照必须拿到一份健康的那一份（否则"合法清单零报红"这条会假红）。
+  mkdirSync(join(dir, 'scripts'), { recursive: true });
+  writeFileSync(
+    join(dir, 'scripts/upload-dist.sh'),
+    readFileSync(join(ROOT, 'scripts/upload-dist.sh'), 'utf8'),
   );
   const good = {
     version: '1.0.0',
@@ -175,6 +224,10 @@ const ARMS = [
   ['B 通道白名单', (doc) => { doc.channels.ios.url = 'https://download.example.com/ios'; return doc; }],
   ['C 未登记产物', (doc) => { doc.files.watchos = { ...doc.files.macos, name: 'heyta-1.0.0-watchos.bin', url: `${'https://x/'}heyta-1.0.0-watchos.bin` }; return doc; }],
   ['D 同轮性', (doc) => { doc.files.macos.name = 'heyta-0.9.0-macos.dmg'; return doc; }],
+  // 臂 E 的夹具：把发布脚本换成"用 HEAD 回读"的那一版 —— 正是 2026-10-16 修掉的那份形状。
+  ['E 回读用 HEAD', (doc) => doc, (dir) =>
+    writeFileSync(join(dir, 'scripts/upload-dist.sh'),
+      'len=$(curl -sI "https://example.invalid/a.apk" | tr -d "\\r")\n')],
 ];
 
 function selfTest() {
