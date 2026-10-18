@@ -41,19 +41,25 @@
 只有它为空/不识别才退到 `deviceLocale`，再往下才是 `SettingsManager.settings.AppleLocale` → `AppleLanguages[0]`。
 ⇒ 这台模拟器上那枚开关已经持久化成中文（与「语言开关实测是持久的」那条一致），**系统语言整条路被它挡在门外**。
 
-🔴 **正路只有一条**：走应用内开关 —— 设置 → 常规 → 语言（`scripts/qa/profile-settings-ios.py:312` 那一步就是走到这一屏）。
-本趟试到那一屏之前停了：`tap(("我的","Profile"))` 报
-`open profile tab is not in the tappable viewport: {'found': True, 'x': 321, 'y': 776, 'visible': False, 'scrollRc': '', 'swipes': 10}`，
-而同一次 `dump_nodes` 只回 **29 枚节点**、底部 tab 栏整条不在树里（截图上明明画着五枚 tab）
-⇒ 这是 companion 返回**部分树**那一族（#462 的邻居），不是产品缺陷；本趟没有把它当缺陷登记。
-`lang-probe.py` 留在那个目录里，下一位可以直接改造成"走应用内开关"的那一趟。
+🔴 **正路只有一条**：走应用内开关 —— 我的 → 设置 → 常规 里**内联**的「中文 / English」两行
+（`语言` 是那一组的标题、不是一屏可点的行；`scripts/qa/profile-settings-ios.py:312` 那一步按"点 语言"写，
+r130 实测它会 `timed out waiting for labels ('语言','Language')` —— 归那一步的所有者，本线不代改）。
+本趟当时停在更早一步，**而当时给的两条解释都已作废**：`tap(("我的","Profile"))` 报
+`open profile tab is not in the tappable viewport: {'found': True, 'x': 321, 'y': 776, 'visible': False, 'swipes': 10}`，
+我先解释成"那一帧的树不含 tab 栏（部分树，#462 的邻居）"、又改口成"冷启动时序、等一拍就好"，
+**两条都被 r130 那趟否证**（几分钟后重 dump 五枚 tab 全在，守卫照样红）。
+真因在装置自己的可见性公式里：`scripts/tools/ios-ax-shim.py` 的 `vis_limit = h - 120`（注释原话"留出底部标签栏"），
+本机 `h=874` ⇒ 界限 754，而「我的」那枚中心 `y=808` **按设计落在那条被扣掉的带里** ⇒ 任何 tab 栏节点都永远 `visible=False`。
+不是设备缺陷、不是产品缺陷、也不是部分树。正解见 [`../ios-bulk-bar-r130-en/switch-lang-inapp.py`](../ios-bulk-bar-r130-en/switch-lang-inapp.py)
+（那一枚按节点自己的 frame 中心直接 `idb ui tap`，脚本头写了为什么绕开守卫）。
 
 失败趟的图与读数**不作数**，已改名留在 `../ios-bulk-bar-r129-EN-ATTEMPT-LOCALE-NOT-SWITCHED/NOT-EN-*`：
 它的 `uiLocale` 字段自己写着 `zh-CN`，是一份**中文×暗档的重复样本**，不是英文档。
 
 ## 四、这一趟不证什么
 
-1. **不证英文档的批量操作条** —— 那一格仍开，且已写明正路（应用内开关）与挡路的原因（`preferredLocale` 优先级 + 部分树）。
+1. **不证英文档的批量操作条**（本趟）—— 那一格由 r130 接走：**英文×亮已取**、英文×暗仍未取且成因未定，
+   见 [`../ios-bulk-bar-r130-en/RESULT.md`](../ios-bulk-bar-r130-en/RESULT.md)。
 2. **不证 Android** —— 本趟只在 iOS 模拟器上。
 3. **不证"静止态有可见的还能滚提示"** —— 恰恰相反，`showsHorizontalScrollIndicator={false}` 这条残留观察照旧（属界面那一线的设计取向，本线只登记不改）。
 4. **不证真机** —— 全部读数在模拟器。

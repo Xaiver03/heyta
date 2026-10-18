@@ -1,0 +1,39 @@
+{
+  "to": "中文",
+  "at": "2026-10-18 19:08:30",
+  "afterTabTap": [
+    "heyta",
+    "Profile",
+    "Account",
+    "Not signed in",
+    "Use tasks, focus and local activity without an account.",
+    "Sign in or register",
+    "Settings, Profile, preferences, sync and security",
+    "Recent activity",
+    "Tasks completed this week",
+    "0",
+    "Focus minutes this week",
+    "0"
+  ],
+  "generalHasLanguageRows": [
+    "中文",
+    "English"
+  ],
+  "afterChoose": [
+    "heyta",
+    "返回",
+    "关闭",
+    "常规",
+    "桌面小组件",
+    "今日任务、四象限、习惯、专注 —— 四张卡片可以把它们放在桌面上。",
+    "今日任务 · 四象限 · 今日习惯 · 今日专注",
+    "如何添加",
+    "长按桌面空白处，直到图标开始抖动",
+    "点左上角的「+」",
+    "搜索「Heyta」，选一种尺寸",
+    "点「添加小组件」",
+    "系统不允许应用替你把小组件放上桌面，所以只能按下面的步骤自己加一次。",
+    "添加后如果卡片显示「打开 Heyta 以显示小组件」，打开一次 Heyta 就会填充内容。"
+  ],
+  "ok": true
+}

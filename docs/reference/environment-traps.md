@@ -10357,9 +10357,17 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     `probe.tap("open general", ("常规", "General"), ("语言", "Language"))` 就是走到这一屏），别再写系统 defaults；
     ⑵ 判"某个语言/外观开关是不是被系统设置驱动"，**先去读那段解析函数的优先级顺序**，不要在设备侧连开三条通道试
     —— AGENTS §7 元规则一「先怀疑探针」这次的形状不是探针坏了，是**探针接错了口**；
-    ⑶ 与 #462 相邻的另一条本趟读数：`dump_nodes` 只回 **29 枚节点**、底部 tab 栏整条不在树里，而截图上明明画着五枚 tab
-    ⇒ "部分树"不止"整棵空"一种失法；它的下游症状是 `tap_node` 的视口守卫报
-    `open profile tab is not in the tappable viewport: {'found': True, 'x': 321, 'y': 776, 'visible': False, 'swipes': 10}`
-    —— `found=True` 与 `visible=False` 同时出现时，**先怀疑树不完整**，不要去改定位符；
+    ⑶ **底部 tab 栏过不了那枚"在可点视口内"的守卫，而且这是守卫的设计、不是设备的缺陷**：
+    `tap_node` 报 `open profile tab is not in the tappable viewport: {'found': True, 'x': 321, 'y': 776,
+    'visible': False, 'swipes': 10}`。我先后把它读成过两种**都错**的解释 —— 先是"那一帧的树不含 tab 栏"，
+    后是"冷启动时序、等一拍就好"；第二条被同机重测否证（几分钟后 dump 五枚 tab 全在，守卫照样红）。
+    真因在装置自己的代码里：`scripts/tools/ios-ax-shim.py` 的可见判据是
+    `vis_limit = h - 120`（注释原话"留出底部标签栏"，本机 `h=874` ⇒ 界限 754），
+    而「我的」那枚的中心 `y=808` **按设计落在被扣掉的这条带里** ⇒ **任何 tab 栏节点都永远 `visible=False`**。
+    ⇒ 三条：⑴ 守卫报"不可点"时先去看**守卫自己的可见性公式**，不要先归因设备或产品；
+    ⑵ 要落点在底部带里的节点（tab 栏、底部浮层），**按节点 frame 中心直接 `idb ui tap`**，
+    并在脚本里写一句为什么绕开守卫 —— 这不是放宽判据，是那条判据的射程本来不含这枚节点；
+    ⑶ 一条我当场犯了两次记的规矩：**同一现象第二次给出新解释之前，先重测第一次那批读数**
+    （"隔几分钟重 dump 一次"这一步成本是一行命令，它同时否证了我前一条和第⑵条解释）。
     ⑷ 收尾要把动过的东西逐件还原并**现量给"已无"的证据**：`defaults delete com.heyta AppleLanguages` 之后
     `defaults read com.heyta AppleLanguages` 应回 `Could not find key`（回空值不等于删掉）。

@@ -4387,3 +4387,28 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
       本机残留：设备上多了 `BulkA/BulkB<两枚时间戳>` 四行测试任务（与 r127 同形状，属这台验收机的既有残留族）。
       读数与两张图 [`apps/mobile/evidence/ux-final-20261018/ios-bulk-bar-r129/RESULT.md`](../../apps/mobile/evidence/ux-final-20261018/ios-bulk-bar-r129/RESULT.md)。
       🔴 **仍开的只剩两档**：英文档（要走应用内开关）与 Android 档 —— 后者与 §四 第 21 行那台打包机同一前提。
+
+- [x] ✅ **10-18 19:1x r130 把批量操作条的英文档取到了（亮档），并且这一档不该沿用中文档那句"降级成美观问题"**。
+      走的是**应用内**那枚语言开关（我的 → 设置 → 常规 里内联的「中文 / English」两行，`switch-lang-inapp.py`）：
+      点「English」后**界面立刻全英文、不需要重启**，换回「中文」同样立刻生效 —— 系统语言那三条通道（`-g AppleLanguages` /
+      app 域 / `-g AppleLocale`）各配冷启动都动不了它，成因在 `apps/mobile/src/i18n/locale.ts` 里
+      `resolveNativeLocale()` 的第一优先级是 `HeytaWidget.preferredLocale`（环境陷阱 **#469** 已把这条死路关掉）。
+      **读数**（402×874，被测物 = 第八趟 r128 那枚新产物）：静止时 `Delete selected` 在 `[376,186,171,44]`
+      ⇒ **屏内只剩 26px = 自身宽度的 15%**；左滑一次（作用点仍取在被裁那一行 y=208）三枚分别位移 **-169/-170/-170**，
+      它变成 `[206..377]` 整枚进屏、`Complete selected` 反过来只剩一个 `d` 出左沿，`clippedAfter=[]` ⇒ **仍是「可滚」**。
+      🔴 **这一格的新结论是量级，不是裁决**：中文档（r127/r129）同一枚尺量到的是"切掉 10px、92% 在屏内"，
+      英文档是"只剩一条红边、15% 在屏内" —— 而这一横条 `showsHorizontalScrollIndicator={false}`，静止态没有任何"还能滚"提示。
+      ⇒ 本线把残留观察**按语态拆成两格**：中文档照旧"美观问题"，**英文档不替界面那一线判成美观问题**；
+      怎么改（缩略文案 / 换图标按钮 / 露出滚动指示）属界面那一线的设计取向，本线只把 15% 与 92% 这两个数钉在台账里。
+      🔴 **英文×暗那一档本趟没取到，且成因未定**：两次独立设深都失败 ——
+      ① `simctl ui <U> appearance dark` 回读 `dark` 而截图浅色；② 改用权威那把 `defaults write -g AppleInterfaceStyle -string Dark`
+      并**验证过冷启动**（`terminate_rc=0`、`launchctl list | grep -c heyta` 回 `0`、新 pid），截图仍浅色。
+      而同一台机、同一枚包，**18:30 那一趟（r129）用①同样的设法量到的是真深色**（两张图本趟都重新打开确认过）。
+      ⇒ 这不是"设深方法一直无效"，是"它在 18:30 之后不再有效"，本线没量出为什么；
+      两种都没被排除的解释（模拟器侧 trait 不再下发 / 运行期把 style 钉住了）**不挑一个写进结论**。
+      那三件产物改名 `NOT-DARK-*` 留档不作数；补这一档前先跑 RESULT.md 第五节那把尺（**判据是图，不是命令回读**）。
+      ⚠️ 读法一句：`xcrun simctl ui <U> appearance` 的**回读不是外观档的判据** —— 本趟它两次说 `dark`、两张图都是浅色。
+      ✅ 设备已还原：`AppleInterfaceStyle` 键 `delete` 后 `defaults read` 回 `Could not find key`、`appearance` 回 `light`、
+      语言回「中文」、系统 `AppleLanguages`/`AppleLocale` 在 r129 那趟已还原；**没收任何 companion**。
+      读数与图（英文×亮两张有效 + 三件 `NOT-DARK-*` 不作数）
+      [`apps/mobile/evidence/ux-final-20261018/ios-bulk-bar-r130-en/RESULT.md`](../../apps/mobile/evidence/ux-final-20261018/ios-bulk-bar-r130-en/RESULT.md)。

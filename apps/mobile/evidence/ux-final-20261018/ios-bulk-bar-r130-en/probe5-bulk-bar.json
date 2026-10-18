@@ -1,0 +1,215 @@
+{
+  "startedAt": 1792321481.95969,
+  "udid": "FE195661-B021-4A71-AAD1-1F2F7AE3A102",
+  "uiLocale": "en",
+  "selectionMode": true,
+  "screen": [
+    402,
+    874
+  ],
+  "anchorXY": [
+    24,
+    145
+  ],
+  "before": [
+    {
+      "label": "Tasks",
+      "frame": [
+        16,
+        80,
+        266,
+        20
+      ],
+      "x": 16,
+      "right": 282,
+      "pressable": false,
+      "insideViewport": true
+    },
+    {
+      "label": "Exit selection",
+      "frame": [
+        247,
+        134,
+        130,
+        44
+      ],
+      "x": 247,
+      "right": 377,
+      "pressable": true,
+      "insideViewport": true
+    },
+    {
+      "label": "2 selected",
+      "frame": [
+        24,
+        145,
+        215,
+        21
+      ],
+      "x": 24,
+      "right": 239,
+      "pressable": false,
+      "insideViewport": true
+    },
+    {
+      "label": "Complete selected",
+      "frame": [
+        24,
+        186,
+        195,
+        44
+      ],
+      "x": 24,
+      "right": 219,
+      "pressable": true,
+      "insideViewport": true
+    },
+    {
+      "label": "Move to list",
+      "frame": [
+        227,
+        186,
+        140,
+        44
+      ],
+      "x": 227,
+      "right": 367,
+      "pressable": true,
+      "insideViewport": true
+    },
+    {
+      "label": "Delete selected",
+      "frame": [
+        376,
+        186,
+        171,
+        44
+      ],
+      "x": 376,
+      "right": 547,
+      "pressable": true,
+      "insideViewport": false
+    }
+  ],
+  "clippedBefore": [
+    "Delete selected"
+  ],
+  "swipeY": {
+    "y": 208,
+    "row": "Delete selected",
+    "anchorY": 145
+  },
+  "swipe": {
+    "rc": 0,
+    "detail": ""
+  },
+  "after": [
+    {
+      "label": "Tasks",
+      "frame": [
+        16,
+        80,
+        266,
+        20
+      ],
+      "x": 16,
+      "right": 282,
+      "pressable": false,
+      "insideViewport": true
+    },
+    {
+      "label": "Exit selection",
+      "frame": [
+        247,
+        134,
+        130,
+        44
+      ],
+      "x": 247,
+      "right": 377,
+      "pressable": true,
+      "insideViewport": true
+    },
+    {
+      "label": "2 selected",
+      "frame": [
+        24,
+        145,
+        215,
+        21
+      ],
+      "x": 24,
+      "right": 239,
+      "pressable": false,
+      "insideViewport": true
+    },
+    {
+      "label": "Complete selected",
+      "frame": [
+        -145,
+        186,
+        195,
+        44
+      ],
+      "x": -145,
+      "right": 50,
+      "pressable": true,
+      "insideViewport": false
+    },
+    {
+      "label": "Move to list",
+      "frame": [
+        57,
+        186,
+        140,
+        44
+      ],
+      "x": 57,
+      "right": 197,
+      "pressable": true,
+      "insideViewport": true
+    },
+    {
+      "label": "Delete selected",
+      "frame": [
+        206,
+        186,
+        171,
+        44
+      ],
+      "x": 206,
+      "right": 377,
+      "pressable": true,
+      "insideViewport": true
+    }
+  ],
+  "shifts": [
+    {
+      "label": "Tasks",
+      "dx": 0
+    },
+    {
+      "label": "Exit selection",
+      "dx": 0
+    },
+    {
+      "label": "2 selected",
+      "dx": 0
+    },
+    {
+      "label": "Complete selected",
+      "dx": -169
+    },
+    {
+      "label": "Move to list",
+      "dx": -170
+    },
+    {
+      "label": "Delete selected",
+      "dx": -170
+    }
+  ],
+  "verdict": "可滚（滑动后 x 位移，图上位置只是滚到当前项）",
+  "clippedAfter": [],
+  "finishedAt": 1792321546.618592
+}

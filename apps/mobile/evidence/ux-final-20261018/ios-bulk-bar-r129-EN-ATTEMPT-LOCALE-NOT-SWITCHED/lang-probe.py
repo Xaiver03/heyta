@@ -17,7 +17,16 @@ p.add_argument("--choose", default=None, help="要点的选项标签；不给就
 a = p.parse_args()
 probe = JU.Probe(argparse.Namespace(idb=a.idb, companion=a.companion, udid=a.udid, timeout=15.0, evidence_dir=str(HERE)))
 probe.ensure_on_tasks()
-probe.tap(("我的", "Profile"), "open profile tab")
+# 🔴 底部 tab 不能走 probe.tap：共享装置 `ios-ax-shim.py` 的可见判据是 `vis_limit = h - 120`
+# （注释原话"留出底部标签栏"）⇒ tab 栏那五枚的中心 y 按设计落在被扣掉的带里，守卫恒报 visible=False。
+# 绕开它不是放宽判据：那条判据的射程本来不含这枚节点。落点仍取节点自己的 frame 中心。
+tab = probe.node(("我的", "Profile"), pressable=True)
+tx, ty = AX.center(tab)
+AX.idb_tap(probe.idb, probe.companion, probe.udid, tx, ty) if hasattr(AX, "idb_tap") else __import__("subprocess").run(
+    [probe.idb, *AX.companion_args(probe.companion), "ui", "tap", str(tx), str(ty), "--udid", probe.udid],
+    capture_output=True, text=True, timeout=60)
+print("tapped tab at", tx, ty)
+import time as _t; _t.sleep(2.5)
 probe.tap(("设置, 个人资料、偏好、同步与安全", "设置", "Settings"), "open settings")
 probe.tap(("常规", "General"), "open general group")
 probe.tap(("语言", "Language"), "open language screen")
