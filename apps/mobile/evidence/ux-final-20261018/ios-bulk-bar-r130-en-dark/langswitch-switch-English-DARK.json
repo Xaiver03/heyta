@@ -1,0 +1,40 @@
+{
+  "to": "English",
+  "at": "2026-10-18 19:26:11",
+  "afterTabTap": [
+    "heyta",
+    "我的",
+    "账号",
+    "还没登录",
+    "不登录也能使用任务、专注和本地回顾。",
+    "注册 / 登录",
+    "设置, 个人资料、偏好、同步与安全",
+    "近期状态",
+    "本周完成任务",
+    "0",
+    "本周专注分钟",
+    "0"
+  ],
+  "generalHasLanguageRows": [
+    "语言",
+    "中文",
+    "English"
+  ],
+  "afterChoose": [
+    "heyta",
+    "Back",
+    "Close",
+    "General",
+    "Home screen widgets",
+    "Today's tasks, quadrants, habits and focus — four cards you can keep on your home screen.",
+    "Today's tasks · Quadrants · Today's habits · Today's focus",
+    "How to add",
+    "Touch and hold an empty spot on the home screen until the icons jiggle",
+    "Tap the “+” in the top-left corner",
+    "Search for “Heyta” and pick a size",
+    "Tap “Add Widget”",
+    "The system does not let an app place a widget for you, so you add it once by hand.",
+    "If the card says “Open Heyta to show your widget” after adding it, opening Heyta once fills it in."
+  ],
+  "ok": true
+}
