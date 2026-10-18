@@ -66,6 +66,12 @@ CJK_GROUP_FLOOR = {
     "tasks-ux-android.py": 58,
     "tasks-ux-ios.py": 67,
     "ai-assistant-atomic-android.py": 14,
+    # 这枚脚本的定位符全部取自**移动端代码真的读走的键**：三枚看着像、其实移动端一处
+    # 都不读的键（`mobile.ai.section.mode` / `.task.none` / `.notConfigured.title`）被
+    # 这一维抓出来过，别按屏上的字往回加。
+    # ⚠️ 这里只登记**下限**，不抄现量 —— 要读数就跑
+    # `python3 scripts/qa/check-locator-labels.py scripts/qa/ai-face-ios.py` 看「含中文」那一栏。
+    "ai-face-ios.py": 26,
 }
 # TS 源码不是 Python，不能用 ast 扫；这里抓所有引号里的"像键名"的串，再和真源的键集合取交集。
 ANY_QUOTED = re.compile(r"""['"]([A-Za-z0-9_.-]{3,})['"]""")
