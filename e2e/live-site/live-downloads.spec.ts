@@ -32,10 +32,26 @@
 import { expect, test } from '@playwright/test';
 
 const ORIGIN = process.env['HEYTA_LIVE_ORIGIN'] ?? 'https://heyta.waytofuture.cn';
-const BUCKET = 'heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com';
+/**
+ * 清单的**来源主机**：桶默认域名。
+ *
+ * ⚠️ 这里**故意还是默认域名** —— `.json` 不受"APK 不许公开分发"那条限制，
+ * 清单本身仍然从桶读；产物直链才走自定义域名。
+ */
+const MANIFEST_HOST = 'heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com';
+/**
+ * 产物直链的**路径前缀** —— 按路径匹配，**不按主机**。
+ *
+ * 🔴 2026-10-18：产物主机从桶默认域名换成 `dl.waytofuture.cn`（同一批字节、换主机名），
+ * 因为 COS 对默认域名上的 `.apk` 直接回 `403 DownloadForbidden`
+ * （"not allowed to be distributed in a public network using COS default domain"）。
+ * ⇒ 判据若写死主机，换域名那天会**假装通过**（定位器找不到任何链接 ⇒ 空集相等 ⇒ 绿）。
+ * 按路径匹配，**换哪个主机都要求链接在同一条目录下**。
+ */
+const ARTIFACT_PATH = '/app-releases/heyta/latest/';
 const TRUTH_URL =
   process.env['HEYTA_LIVE_MANIFEST_URL'] ??
-  `https://${BUCKET}/app-releases/heyta/latest/latest.json`;
+  `https://${MANIFEST_HOST}${ARTIFACT_PATH}latest.json`;
 const ROW_IDS = ['web', 'macos', 'ios', 'android', 'windows', 'linux', 'harmony', 'selfhost'];
 /** 注册表里 `via: 'file'` 的那几行；行 id 与清单 key 同名（臂 C 钉住登记）。 */
 const FILE_ROWS = ['macos', 'android', 'windows', 'linux'];
@@ -70,7 +86,7 @@ test('线上 /download 的直链集合等于桶里 latest.json 的正式通道�
 
   const expected = publishedRows(truth);
   const expectedHrefs = expected.map((id) => truth.files[id]!.url).sort();
-  const actualHrefs = (await page.locator(`a[href*="${BUCKET}"]`).evaluateAll((els) =>
+  const actualHrefs = (await page.locator(`a[href*="${ARTIFACT_PATH}"]`).evaluateAll((els) =>
     els.map((el) => (el as HTMLAnchorElement).href),
   )).sort();
 

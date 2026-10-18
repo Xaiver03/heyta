@@ -16,7 +16,13 @@ import { waitHeadRevealed } from './head-reveal';
  *   3. **截图先于断言**（§6.2 规定一第 1 条），且人在看这两张图之后才宣布这一页做完了。
  */
 
-const BUCKET = 'heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com';
+/**
+ * 产物直链的**路径前缀** —— 按路径匹配，不按主机。
+ *
+ * 🔴 2026-10-18：产物主机改成 `dl.waytofuture.cn`（COS 默认域名不许公开分发 .apk）。
+ * 判据写死主机的话，换域名那天会**假装通过**（定位器空集）。按路径匹配就没有这个洞。
+ */
+const ARTIFACT_PATH = '/app-releases/heyta/latest/';
 const ROW_IDS = ['web', 'macos', 'ios', 'android', 'windows', 'linux', 'harmony', 'selfhost'];
 
 function attachConsole(page: Page): string[] {
@@ -43,7 +49,7 @@ test('中文 /download：八端全画、直链只来自清单、拿不到的那�
   // 判据推自快照，而不是写死数字。
   const manifest = await readSnapshot();
   const expectLinks = stablePublishedCount(manifest);
-  const bucketLinks = page.locator(`a[href*="${BUCKET}"]`);
+  const bucketLinks = page.locator(`a[href*="${ARTIFACT_PATH}"]`);
   await expect(bucketLinks, `清单里正式通道的产物是 ${expectLinks} 枚，页面就应当恰好这么多直链`)
     .toHaveCount(expectLinks);
 
@@ -112,7 +118,7 @@ test('识别按 UA 走：Mac 只能"请你确认"，Android 可以直接挑定',
 test('/platforms 上不许出现下载直链（下载动作只住在一页）', async ({page}) => {
   await page.goto('/platforms/');
   await page.locator('#main').screenshot({path: 'landing-results/platforms-no-links.png'});
-  await expect(page.locator(`a[href*="${BUCKET}"]`)).toHaveCount(0);
+  await expect(page.locator(`a[href*="${ARTIFACT_PATH}"]`)).toHaveCount(0);
   // 阳性对照：这一页不是空的。
   await expect(page.locator('section#web')).toBeVisible();
 });
