@@ -1,0 +1,60 @@
+第八趟四端重装（r128）· 出处与前置现量
+=================================================
+起跑时间        2026-10-18 17:52–（本机时区）
+载体            /Users/rocalight/heyta-carriers/head-r128  （git worktree，detached）
+钉的提交        f8d7155eb9e9bd8b62b5c087ac5edaa5f6858a96  ← 本线自己那笔 r127 裁决
+起跑脏度        dirty=0（现量 `git -C <载体> status --porcelain | wc -l` ⇒ 0；install 之后复量仍是 0）
+落点            HEYTA_REINSTALL_TMP_DIR=$HOME/heyta-r128-reinstall（先 mkdir，否则脚本 RC=4）
+跑的端          --only mac,ios（windows/android 见文末"没跑的两端"）
+
+1) 装：pnpm install --frozen-lockfile ⇒ INSTALL_RC=0，6.1 秒（暖 store）
+   ⚠️ 别拿时长判装置：r125 同一件事冷 store 是 1h11m。
+
+2) 打：NO_COLOR=1 pnpm -r --no-bail build ⇒ BUILD_RC=0
+   两把尺一起取（缺一把就是假绿）：
+     起数  grep -cE ' build\$'            = 20
+     失败  grep -cE ' build: Failed$'     = 0
+     成功  grep -cE ' build: Done$'       = 20
+   🔴 第一次跑我写成了 `pnpm -r build --no-bail`（旗标在子命令名**之后**）⇒ 旗标被塞给每一枚子脚本，
+      `packages/{i18n,ai,design-system,local-api}` 各红在 `CACError: Unknown option \`--bail\`` 上，
+      且 pnpm 自己照旧 bail、日志只起了 6 枚。形状进环境陷阱 #466。
+   ✅ 这一条把台账里"从最终源码构建"那格从**判红**翻成**判绿**：r125 那两条根因（`app-host` 两枚只进索引未提交的模块、
+      `CommentView` 缺 `id`）都由各自的线自己落地了（现量见交接 §四 第 34 行末尾那条复量）。
+
+3) 打包输入差集（决定"这一趟值不值得跑"）：
+   `git diff --name-only 25f544bd..f8d7155e -- packages apps/mobile/android apps/mobile/src apps/mobile/ios
+    apps/desktop-macos apps/desktop-windows/src apps/desktop-windows/app apps/desktop-linux/src
+    apps/web/src apps/web/app server/src` ⇒ **98 枚**（其中 `apps/mobile/` 13 枚）
+   ⇒ r118 那趟装上四端的源码**不等于**当前 HEAD，这一趟换得掉被测物。
+
+4) 设备侧前置（两条都现量过）：
+   - 模拟器：`heyta-iphone-17pro` = FE195661-B021-4A71-AAD1-1F2F7AE3A102，本趟**显式启动**它
+     （r118 那趟没启动它、脚本兜底用了另一台在跑的 ⇒ 读数落在别的设备标识上；这趟把那条偏离消掉）。
+     跑完要还原成接手时的状态：接手时它是 `Shutdown`。
+   - 外观基线：模拟器与宿主 macOS 都是**浅色**（现量 `xcrun simctl spawn <UDID> defaults read -g AppleInterfaceStyle`
+     与 `defaults read -g AppleInterfaceStyle` 都回 "Could not find key" ⇒ 无该键 = 浅色）。
+
+5) macOS 腿第一次红在哪（已定性，不是产品/脚本问题）：
+   日志停在 `…/HeytaMacWidget.appex: A timestamp was expected but was not found.`
+   ⇒ 同一枚 appex 的**副本**上做 A/B：`codesign --force --timestamp --sign "<Developer ID …(V5S2LT9YV8)>"`
+   回 rc=0，且 `codesign -dvvv` 读到 `Timestamp=Oct 18, 2026 at 18:07:59`、`--verify --strict` 过 ⇒
+   时间戳链路**当下是通的**，腿里那次是取时间戳的瞬时失败 ⇒ 单独重跑 `--only mac` 即可。
+   ⚠️ 诊断副本在 `~/heyta-r128-diag/`（本线自建，跑完删）。
+
+6) iOS 腿的 pod 非确定性（与 r108/r110 同记录）：
+   第 1 趟 `[!] Error installing hermes-engine` ⇒ 第 2 趟成功（脚本自己写着"与上面那条非确定性记录一致"）。
+   同趟 `pod install` 把 `apps/mobile/ios/Podfile.lock` 改了 2 行 ⇒ 这一腿**不是**"只含已提交内容"那一档（登记为偏离）。
+   外网现量：`curl -sS -m 10 https://github.com` ⇒ `http_code=000`（不可达，重试同值）；
+   `timestamp.apple.com` 302、`www.apple.com` 200 ⇒ 不是整机断网。
+   ⚠️ 别拿主检出的 `Pods/` 复用给载体：两棵树的 `Podfile.lock` 不是同一枚
+   （md5 前 8 主检出 `108e1a02` vs 载体 `c8391ea4`）。
+
+7) 没跑的两端（不是本线能自决的）：
+   windows / android 两腿要在打包机上打。四枚 ssh 别名逐枚现量全不可达：
+     windows-pc        10.111.127.237:22  Operation timed out
+     windows-pc-lan    192.168.1.2:22     Connection refused
+     windows-codex     10.111.127.151:22  Operation timed out
+     laptop-5ueuu7ps   10.111.127.151:22  Host is down
+   ⇒ 那一台机器的电源不在本线可及范围（仓里没有经授权的唤醒配方：现量
+     `grep -rniE 'wake-?on-?lan|wol |ipmitool' docs scripts research/tools` 无命中）。
+     脚本的汇总段会自己写「⏭ …：不在 --only 范围 —— 这端**没有**验证当前产物」，别把它读成四端全过。
