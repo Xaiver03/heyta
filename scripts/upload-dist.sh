@@ -16,6 +16,23 @@ set -euo pipefail
 
 BUCKET="heyta-dist-1380503169"
 REGION="ap-guangzhou"
+# 🔴 **分发必须走自定义域名，不走桶默认域名**（2026-10-18）：
+#   COS 对默认域名上的 .apk/.ipa 直接回 `403 DownloadForbidden`
+#   （"not allowed to be distributed in a public network using COS default domain"）。
+#   `dl.waytofuture.cn` 已 CNAME 到本桶并在桶上绑定为自定义域名 —— 同一条字节，
+#   换主机名就能公开下发。改这里一处，`latest.json` 里所有平台的 URL 一起跟着走。
+# 🔴 **这里现在是桶默认域名 —— 而它有一个已知的硬限制**（2026-10-18 实测）：
+#   COS 对默认域名上的 `.apk` 回 `403 DownloadForbidden`
+#   （"not allowed to be distributed in a public network using COS default domain,
+#     please use custom domain instead"），**带签名的 GET 也一样封**（`HEAD` 放行）。
+#   正解是自定义域名，而实测下来它卡在一条**行政**条件上：
+#   COS 要求「域名 + 该域名的 ICP 备案 + 桶」**在同一账号**。
+#   现状：`waytofuture.cn` 的备案与 DNS 在账号 100050005585，桶在账号 100044381704
+#   ⇒ `dl.waytofuture.cn` 已 CNAME 到桶、已在桶上绑定、证书也已签发，
+#      但 COS 仍回 `UserCnameInvalid`（同账号的 finlaw.cloud / openpenpal.com 同样如此，
+#      因为它们没有备案）。
+#   ⚠️ 所以在"桶搬到有备案的那个账号"或"给域名补一次备案"之前，
+#      **这里不能改成自定义域名** —— 改了就是往清单里写一条打不开的 URL。
 BASE_URL="https://${BUCKET}.cos.${REGION}.myqcloud.com"
 PREFIX="app-releases/heyta"
 STAGE="$(mktemp -d /tmp/heyta-dist.XXXXXX)"
