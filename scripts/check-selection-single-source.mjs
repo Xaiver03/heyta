@@ -512,6 +512,25 @@ const ROW_ID_EXEMPT = [
   ['apps/mobile/src/screens/TasksScreen.tsx', 'busyId', 'in-flight'],
   ['apps/mobile/src/screens/TrashScreen.tsx', 'busyId', 'in-flight'],
   ['apps/mobile/src/screens/TrashScreen.tsx', 'confirmingId', 'confirm-gate'],
+  // ── 2026-10-16 逐处读代码补登的 6 处（此前未登记 ⇒ 断言 G 红）──────────────
+  // 收集箱自动化表单那四处：**没有一处是"当前看的是哪一条"**，逐条按代码形状归类。
+  // ① 第一下只记下"待重试的是哪一条"（`setRetryEventId(event.eventId)`），
+  //    确认框里那枚「确认重试」才发请求、旁边「取消重试」把它清掉
+  //    ⇒ 与上面 `AdminPanel.pendingApproveId` 同一形状（两步式），不是"重试在途"。
+  ['apps/web/src/features/settings/InboundAutomationSettings.tsx', 'retryEventId', 'confirm-gate'],
+  // ② 它标记"这份规则表单草稿作用在哪一条规则上"：`beginEdit()` 把那条规则的字段灌进
+  //    表单、`saveEdit()` 拿它当更新目标。行本身没有可就地编辑的东西 ⇒ 不是 inline-rename。
+  ['apps/web/src/features/settings/InboundAutomationSettings.tsx', 'editingRuleId', 'form-draft'],
+  // ③④ 表单里那两个输入框的值（key 名初值 `'default'`；目标清单落库时 `'' → null`）——
+  //    它们是草稿的字段，不是"哪一条"。
+  ['apps/web/src/features/settings/InboundAutomationSettings.tsx', 'keyId', 'form-draft'],
+  ['apps/web/src/features/settings/InboundAutomationSettings.tsx', 'targetProjectId', 'form-draft'],
+  // 成长页：`runHabitAction` 在途的那条习惯 id（同步锁是 ref，它是给共享按钮的渲染信号）。
+  ['apps/mobile/src/screens/GrowthScreen.tsx', 'busyHabitId', 'in-flight'],
+  // 触屏任务屏：行上那颗「移动到象限」只记下"要移动的是哪一条"（`setQuadrantMoveTaskId(row.id)`）
+  // 并开一个面板，第二下（在面板里选象限）才真的发 op，面板那枚取消只清它。
+  // ⇒ 与确认框同形（两步式），**不是拖拽**：这一屏没有拖拽实现，`activeId` 那种才是 dragging。
+  ['apps/mobile/src/screens/TasksScreen.tsx', 'quadrantMoveTaskId', 'confirm-gate'],
 ];
 
 /** 只看**单数** `…Id`：复数 `…Ids` 是筛选范围（"当前看哪几条"），不是"当前看的是哪一条"。 */
@@ -960,7 +979,7 @@ if (readsSeen.length === 0) {
  *   `selects` —— 这一面把选中接进共享 store（必须报是哪几类，且证据文件里真有那一类的消费形状）
  *   `filters` —— 点这一面的行改的是**筛选**而不是选中（必须点名哪一类实体，且该类不许在词表里）
  *   `row-actions-only` —— 有实体行，但行上没有"看哪一条"这回事（回收站：恢复 / 彻底删除）
- *   `no-rows` —— 这一面没有"某一条实体"的概念（日历的"当前"是一天，专注页是计时状态机）
+ *   `no-rows` —— 这一面没有"某一条实体"的概念（日历的"当前"是一天，成长页是图与卡）
  *   `not-a-route` —— 它是浮层，`contentView` 根本不落在这里
  *   `pending-decision` —— 等拍板（必须带 C1 编号，否则等于用"待定"绕过这条）
  *
@@ -1031,10 +1050,18 @@ const VIEW_STANCES = [
   },
   {
     view: 'focus',
-    stance: 'no-rows',
-    locus: 'apps/web/src/features/focus/store.ts',
-    needle: 'state: FocusState;',
-    because: '计时状态机，没有"哪一项"；关联任务只由 start(taskId?) 带进来（工单 §6 明文不许把番茄页塞进列表模型）。',
+    stance: 'selects',
+    kinds: ['task'],
+    locus: 'apps/web/src/features/focus/FocusTimer.tsx',
+    needle: "const selectedTaskId = useSelected('task');",
+    because:
+      '🔴 2026-10-16 由 no-rows 改成 selects：关联任务下拉过去是 `FocusTimer` 自己的 ' +
+      '`const [selectedTaskId, setSelectedTaskId] = useState(…)`（断言 B 点名的那一处），' +
+      '现在读/写共享选中 —— "下一轮记到哪条任务上"就是"当前选中的是哪一条"，' +
+      '而"那条任务被删掉怎么办"这份回落因此只有一处（`pruneSelectionFromEntities`）。' +
+      '计时进行中下拉显示的是领域状态里冻结的那一轮归属、落盘读的也始终是它，' +
+      '所以这个 stance 说的是"这一面把选中接进共享 store"，不是"番茄页变成了列表"' +
+      '（§6 那条"不许把番茄页塞进列表模型"讲的是别复用 `TaskList` 的行，与本条无关）。',
   },
   {
     view: 'growth',
