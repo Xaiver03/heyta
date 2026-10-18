@@ -10,12 +10,31 @@
  * 文案由宿主 `t()` 解析后传入（labels），本包不 import `@heyta/i18n`
  * （AuthForm 同一条纪律）。被移除者不在成员表里——他们的呈现走
  * `GET /api/shares` 的 `removedMemberships`，由宿主在别的入口展示。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 文字层级（2026-10-16 补齐，同 `ShareConsentModal` 那一次的理由）
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * 这一层面此前**一条文字样式都没有**：所有 `<Text>` 都走 RN 的默认色
+ * （**纯黑**，不是"继承容器色"）—— 亮色下看不出来，暗色下是近黑字压近黑底。
+ * `scripts/check-text-color.mjs` 判的是这个**结构性缺陷**，不是审美。
+ * 修法按角色接语义文字样式（`useHeytaText()`），而不是逐个 `<Text>` 补色值：
+ *
+ * - 面板标题 = `section-title`；成员行主文字 = `row-title`
+ * - 次要事实（名额已满 / 等待密钥分发 / 转让后果句）= `row-meta`
+ * - 动作按**权重**分两档，不按外观分：邀请与「确认转让」是这一步的主操作
+ *   （`headline`），角色切换 / 移除 / 取消 / 第一次按的「转让所有权」是
+ *   行内动作（`row-title`）。与 `ShareConsentModal` 的"两个动作不等权"
+ *   同一条理由 —— 等权会把"拒绝"画成"另一个主操作"。
+ *
+ * ⚠️ 语义样式**自带默认前景色**，所以这一层不需要任何 `color:` 覆盖。
  */
 
 import { Pressable, Text, View } from 'react-native';
 
 import { useState } from 'react';
 
+import { useHeytaText } from '../theme.js';
 import {
   canInviteMembers,
   canManageMembers,
@@ -82,6 +101,7 @@ export interface SharePanelProps {
 }
 
 export function SharePanel(props: SharePanelProps) {
+  const text = useHeytaText();
   const views = projectMembersFor(props.data, props.selfUserId);
   const myRole = views.find((v) => v.isSelf)?.role ?? props.data.myRole;
   const manage = canManageMembers(myRole);
@@ -94,27 +114,29 @@ export function SharePanel(props: SharePanelProps) {
 
   return (
     <View testID="share-panel">
-      <Text>{props.labels.membersTitle}</Text>
+      <Text style={text['section-title']}>{props.labels.membersTitle}</Text>
       {!limit.full && invite && (
         <Pressable
           onPress={props.callbacks.onInvite}
           accessibilityRole="button"
           testID="share-invite-button"
         >
-          <Text>{`${props.labels.inviteButton}（${props.labels.slotsLeft(limit.slotsLeft)}）`}</Text>
+          <Text style={text['headline']}>
+            {`${props.labels.inviteButton}（${props.labels.slotsLeft(limit.slotsLeft)}）`}
+          </Text>
         </Pressable>
       )}
-      {limit.full && <Text>{props.labels.limitReached}</Text>}
+      {limit.full && <Text style={text['row-meta']}>{props.labels.limitReached}</Text>}
       {views.map((view: ShareMemberView) => {
         const label = view.displayName
           ?? props.labels.fallbackMember(view.userId.toString().slice(0, 6));
         return (
           <View key={view.memberId} testID={`share-member-${view.memberId}`}>
-            <Text>
+            <Text style={text['row-title']}>
               {`${label} · ${props.labels.member.roleByRole[view.role]}${view.isSelf ? '（我）' : ''}`}
             </Text>
             {view.keyEpochLag > 0 && (
-              <Text>{props.labels.member.waitingForEnvelope}</Text>
+              <Text style={text['row-meta']}>{props.labels.member.waitingForEnvelope}</Text>
             )}
             {manage && !view.isOwner && (
               <View testID={`share-member-actions-${view.memberId}`}>
@@ -132,7 +154,7 @@ export function SharePanel(props: SharePanelProps) {
                     accessibilityRole="button"
                     testID={`share-role-${role}-${view.memberId}`}
                   >
-                    <Text>{props.labels.member.roleByRole[role]}</Text>
+                    <Text style={text['row-title']}>{props.labels.member.roleByRole[role]}</Text>
                   </Pressable>
                 ))}
                 <Pressable
@@ -140,11 +162,11 @@ export function SharePanel(props: SharePanelProps) {
                   accessibilityRole="button"
                   testID={`share-remove-${view.memberId}`}
                 >
-                  <Text>{props.labels.removeButton}</Text>
+                  <Text style={text['row-title']}>{props.labels.removeButton}</Text>
                 </Pressable>
                 {transferArmed === view.memberId ? (
                   <View testID={`share-transfer-confirm-${view.memberId}`}>
-                    <Text>{props.labels.transfer.confirmHint}</Text>
+                    <Text style={text['row-meta']}>{props.labels.transfer.confirmHint}</Text>
                     <Pressable
                       onPress={() => {
                         setTransferArmed(undefined);
@@ -153,14 +175,14 @@ export function SharePanel(props: SharePanelProps) {
                       accessibilityRole="button"
                       testID={`share-transfer-accept-${view.memberId}`}
                     >
-                      <Text>{props.labels.transfer.confirm}</Text>
+                      <Text style={text['headline']}>{props.labels.transfer.confirm}</Text>
                     </Pressable>
                     <Pressable
                       onPress={() => setTransferArmed(undefined)}
                       accessibilityRole="button"
                       testID={`share-transfer-cancel-${view.memberId}`}
                     >
-                      <Text>{props.labels.transfer.cancel}</Text>
+                      <Text style={text['row-title']}>{props.labels.transfer.cancel}</Text>
                     </Pressable>
                   </View>
                 ) : (
@@ -169,7 +191,7 @@ export function SharePanel(props: SharePanelProps) {
                     accessibilityRole="button"
                     testID={`share-transfer-${view.memberId}`}
                   >
-                    <Text>{props.labels.transfer.button}</Text>
+                    <Text style={text['row-title']}>{props.labels.transfer.button}</Text>
                   </Pressable>
                 )}
               </View>

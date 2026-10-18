@@ -37,6 +37,65 @@ import {
   wrapAndStoreShareKey,
 } from './share-key-store.js';
 
+/**
+ * 本视图的样式：**模块级常量**，不再写成 `style={{…}}` 内联对象。
+ *
+ * 🔴 依据 `scripts/check-l4-no-style.mjs` 的断言 C：L4 视图
+ * （`apps/web/src/features/**`，除 `shell`）的内联样式**只减不增**。
+ * 这里每一处取值都是常量（`cssVar()` / `text()` 都是模块加载期可求值的
+ * 纯函数），没有任何依赖 props/state 的项 —— 内联对象只会让它们每次渲染
+ * 重建一遍，所以本来就该住在模块级。
+ *
+ * ⚠️ 取值仍是 `cssVar('…')` / `text('…')`，**没有引入任何裸值**：
+ * `check:l4` 的断言 A/B 与 `check:design` 照旧盯着这些行（搬位置不改字面量）。
+ */
+const styles = {
+  overlay: {
+    position: 'fixed',
+    inset: 0,
+    background: cssVar('color.overlay'),
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: cssVar('space.4'),
+    zIndex: cssVar('z.modal'),
+  },
+  dialog: {
+    width: '100%',
+    maxWidth: cssVar('layout.modal-max'),
+    maxHeight: '90vh',
+    overflowY: 'auto',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: cssVar('space.4'),
+    background: cssVar('color.surface-raised'),
+    borderRadius: cssVar('radius.lg'),
+    boxShadow: cssVar('shadow.lg'),
+    padding: cssVar('space.6'),
+    color: cssVar('color.foreground'),
+  },
+  headRow: { display: 'flex', alignItems: 'flex-start', gap: cssVar('space.3') },
+  headText: { flex: 1, minWidth: 0 },
+  dialogTitle: { margin: 0, ...text('section-title') },
+  dialogSubtitle: {
+    margin: `${cssVar('space.1')} 0 0`,
+    ...text('row-meta'),
+    color: cssVar('color.foreground-muted'),
+  },
+  /** `<p>` 的默认外边距必须抹掉 —— 否则每一条状态句都会把卡片撑开一段。 */
+  resetTitle: { margin: 0, ...text('row-title') },
+  resetTitleDanger: { margin: 0, ...text('row-title'), color: cssVar('color.danger') },
+  form: { display: 'flex', flexDirection: 'column', gap: cssVar('space.2') },
+  labelTitle: { ...text('row-title') },
+  input: {
+    padding: cssVar('space.2'),
+    borderRadius: cssVar('radius.md'),
+    border: `${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
+    background: cssVar('color.surface'),
+    color: cssVar('color.foreground'),
+  },
+} as const;
+
 const toBase64 = (bytes: Uint8Array): string => {
   let binary = '';
   for (const b of bytes) binary += String.fromCharCode(b);
@@ -180,16 +239,7 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
   // 模态是应用级表面，出口与 App 根部的 ShareFeature 同层（2026-10-10 旅程首跑实测）。
   return createPortal(
     <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: cssVar('color.overlay'),
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: cssVar('space.4'),
-        zIndex: cssVar('z.modal'),
-      }}
+      style={styles.overlay}
       data-testid="share-join-overlay"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
@@ -198,27 +248,14 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
         aria-modal="true"
         aria-labelledby="ht-share-join-title"
         data-testid="share-join-dialog"
-        style={{
-          width: '100%',
-          maxWidth: cssVar('layout.modal-max'),
-          maxHeight: '90vh',
-          overflowY: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: cssVar('space.4'),
-          background: cssVar('color.surface-raised'),
-          borderRadius: cssVar('radius.lg'),
-          boxShadow: cssVar('shadow.lg'),
-          padding: cssVar('space.6'),
-          color: cssVar('color.foreground'),
-        }}
+        style={styles.dialog}
       >
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: cssVar('space.3') }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <h2 id="ht-share-join-title" style={{ margin: 0, ...text('section-title') }}>
+        <div style={styles.headRow}>
+          <div style={styles.headText}>
+            <h2 id="ht-share-join-title" style={styles.dialogTitle}>
               {t('web.share.join.title')}
             </h2>
-            <p style={{ margin: `${cssVar('space.1')} 0 0`, ...text('row-meta'), color: cssVar('color.foreground-muted') }}>
+            <p style={styles.dialogSubtitle}>
               {t('web.share.join.subtitle')}
             </p>
           </div>
@@ -234,7 +271,7 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
         </div>
 
         {needsUnlock ? (
-          <p role="status" data-testid="share-join-needs-unlock" style={{ margin: 0, ...text('row-title') }}>
+          <p role="status" data-testid="share-join-needs-unlock" style={styles.resetTitle}>
             {t('web.share.needUnlock')}
           </p>
         ) : null}
@@ -242,15 +279,15 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
         {phase.kind === 'input' || phase.kind === 'error' ? (
           <form
             data-testid="share-join-form"
-            style={{ display: 'flex', flexDirection: 'column', gap: cssVar('space.2') }}
+            style={styles.form}
             onSubmit={(e) => { e.preventDefault(); void submit(); }}
           >
             {phase.kind === 'error' ? (
-              <p role="alert" data-testid="share-join-error" style={{ margin: 0, ...text('row-title'), color: cssVar('color.danger') }}>
+              <p role="alert" data-testid="share-join-error" style={styles.resetTitleDanger}>
                 {phase.message}
               </p>
             ) : null}
-            <label htmlFor="ht-share-join-token" style={{ ...text('row-title') }}>
+            <label htmlFor="ht-share-join-token" style={styles.labelTitle}>
               {t('web.share.join.tokenLabel')}
             </label>
             <input
@@ -259,15 +296,9 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
               placeholder={t('web.share.join.tokenPlaceholder')}
               onChange={(e) => setInputValue(e.target.value)}
               data-testid="share-join-token"
-              style={{
-                padding: cssVar('space.2'),
-                borderRadius: cssVar('radius.md'),
-                border: `${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
-                background: cssVar('color.surface'),
-                color: cssVar('color.foreground'),
-              }}
+              style={styles.input}
             />
-            <label htmlFor="ht-share-join-name" style={{ ...text('row-title') }}>
+            <label htmlFor="ht-share-join-name" style={styles.labelTitle}>
               {t('web.share.join.nameLabel')}
             </label>
             <input
@@ -276,13 +307,7 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
               placeholder={t('web.share.join.namePlaceholder')}
               onChange={(e) => setListName(e.target.value)}
               data-testid="share-join-name"
-              style={{
-                padding: cssVar('space.2'),
-                borderRadius: cssVar('radius.md'),
-                border: `${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
-                background: cssVar('color.surface'),
-                color: cssVar('color.foreground'),
-              }}
+              style={styles.input}
             />
             <button type="submit" className="ht-btn ht-btn--primary" data-testid="share-join-submit">
               {t('web.share.join.submit')}
@@ -291,20 +316,20 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
         ) : null}
 
         {phase.kind === 'accepting' ? (
-          <p role="status" data-testid="share-join-accepting" style={{ margin: 0, ...text('row-title') }}>
+          <p role="status" data-testid="share-join-accepting" style={styles.resetTitle}>
             {t('web.share.join.accepting')}
           </p>
         ) : null}
 
         {phase.kind === 'waiting-key' ? (
-          <p role="status" data-testid="share-join-waiting" style={{ margin: 0, ...text('row-title') }}>
+          <p role="status" data-testid="share-join-waiting" style={styles.resetTitle}>
             {t('web.share.join.waitingKey')}
           </p>
         ) : null}
 
         {phase.kind === 'done' ? (
           <>
-            <p role="status" data-testid="share-join-done" style={{ margin: 0, ...text('row-title') }}>
+            <p role="status" data-testid="share-join-done" style={styles.resetTitle}>
               {t('web.share.join.done')}
             </p>
             <button type="button" className="ht-btn ht-btn--primary" data-testid="share-join-close-final" onClick={onClose}>

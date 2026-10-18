@@ -14,10 +14,28 @@
  * 🔴 「自动接受已知合作者」的开关与三类活动开关**视觉分层**：前者改变
  * 的是"要不要不经确认就入群"（安全相关），后三类只改变"响不响"。
  * 分层是为了让审阅者一眼看出哪一个是安全决策。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 文字层级（2026-10-16 补齐，同 `ShareConsentModal` 那一次的理由）
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * 这一层面此前**一条文字样式都没有**：所有 `<Text>` 都是 RN 的默认色
+ * （**纯黑**，不是"继承容器色"），暗色下就是近黑字压近黑底。
+ * `scripts/check-text-color.mjs` 抓到的正是这一档 —— 它判的是结构缺陷，不是审美。
+ *
+ * 所以这里按**角色**接语义文字样式（`useHeytaText()`），而不是给每个 `<Text>` 补一枚色值：
+ *
+ * - 面板标题 = `section-title`（区块标题；设置面里"一屏一个"的那一级）
+ * - 三个分组标签（活动 / 任务范围 / 自动接受）= `group-label`
+ * - 可点的行（三个活动开关、四档范围、自动接受）= `row-title`
+ *
+ * ⚠️ 语义样式**自带默认前景色**，所以这一层不再需要任何 `color:` 覆盖；
+ * 需要别的色在消费点用样式数组覆盖（后面的胜出）。
  */
 
 import { Pressable, Text, View } from 'react-native';
 
+import { useHeytaText } from '../theme.js';
 import {
   isActivityEnabled,
   type ShareActivityKind,
@@ -61,6 +79,7 @@ const ACTIVITIES: ReadonlyArray<{ kind: ShareActivityKind; key: keyof Notificati
 
 export function NotificationPrefsPanel(props: NotificationPrefsPanelProps) {
   const { prefs, labels, onChange } = props;
+  const text = useHeytaText();
 
   const toggleActivity = (kind: ShareActivityKind) => {
     onChange({
@@ -75,9 +94,9 @@ export function NotificationPrefsPanel(props: NotificationPrefsPanelProps) {
 
   return (
     <View testID="notification-prefs-panel">
-      <Text>{labels.sectionTitle}</Text>
+      <Text style={text['section-title']}>{labels.sectionTitle}</Text>
 
-      <Text>{labels.activitiesTitle}</Text>
+      <Text style={text['group-label']}>{labels.activitiesTitle}</Text>
       {ACTIVITIES.map(({ kind, key }) => (
         <Pressable
           key={kind}
@@ -86,11 +105,11 @@ export function NotificationPrefsPanel(props: NotificationPrefsPanelProps) {
           aria-checked={isActivityEnabled(prefs, kind)}
           testID={`share-notif-activity-${kind}`}
         >
-          <Text>{labels[key]}</Text>
+          <Text style={text['row-title']}>{labels[key]}</Text>
         </Pressable>
       ))}
 
-      <Text>{labels.taskScopeTitle}</Text>
+      <Text style={text['group-label']}>{labels.taskScopeTitle}</Text>
       <View accessibilityRole="radiogroup" testID="share-notif-task-scope">
         {TASK_SCOPES.map(({ scope, key }) => (
           <Pressable
@@ -100,19 +119,21 @@ export function NotificationPrefsPanel(props: NotificationPrefsPanelProps) {
             aria-checked={prefs.taskScope === scope}
             testID={`share-notif-scope-${scope}`}
           >
-            <Text>{prefs.taskScope === scope ? '◉ ' : '○ '}{labels[key]}</Text>
+            <Text style={text['row-title']}>
+              {prefs.taskScope === scope ? '◉ ' : '○ '}{labels[key]}
+            </Text>
           </Pressable>
         ))}
       </View>
 
-      <Text>{labels.autoAcceptTitle}</Text>
+      <Text style={text['group-label']}>{labels.autoAcceptTitle}</Text>
       <Pressable
         onPress={() => onChange({ ...prefs, autoAcceptKnownCollaborators: !prefs.autoAcceptKnownCollaborators })}
         accessibilityRole="checkbox"
         aria-checked={prefs.autoAcceptKnownCollaborators}
         testID="share-notif-auto-accept"
       >
-        <Text>{labels.autoAcceptTitle}</Text>
+        <Text style={text['row-title']}>{labels.autoAcceptTitle}</Text>
       </Pressable>
     </View>
   );
