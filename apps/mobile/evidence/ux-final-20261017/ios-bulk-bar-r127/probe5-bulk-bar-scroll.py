@@ -110,7 +110,17 @@ def main() -> int:
     probe.screenshot("01-before-swipe")
     save()
 
-    bar_y = anchor_xy[1] if anchor_xy else int((height or 800) * 0.5)
+    # 🔴 滑动必须打在**按钮那一行**上。第一版拿锚点「已选 N 项」的 y 当操作条 y，
+    # 而锚点在上一条（计数行），三枚按钮在下一条 —— 那一滑根本没碰到可滚容器，
+    # 于是"一动没动"被读成了"真溢出"（读数留档在 probe5-bulk-bar-run2-SWIPE-MISSED-THE-ROW.json）。
+    clipped_rows = [r for r in before if r["right"] > (width or 0)] or before
+    swipe_row = max(clipped_rows, key=lambda r: r["frame"][1])
+    bar_y = swipe_row["frame"][1] + swipe_row["frame"][3] // 2
+    out["swipeY"] = {
+        "y": bar_y,
+        "row": swipe_row["label"],
+        "anchorY": anchor_xy[1] if anchor_xy else None,
+    }
     rc, detail = AX.idb_swipe(probe.idb, probe.companion, probe.udid,
                               (width or 400) - 40, bar_y, 40, bar_y, 0.6)
     out["swipe"] = {"rc": rc, "detail": str(detail)[:200]}

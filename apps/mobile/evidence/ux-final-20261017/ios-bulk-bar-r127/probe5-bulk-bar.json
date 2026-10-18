@@ -1,5 +1,5 @@
 {
-  "startedAt": 1792303979.722744,
+  "startedAt": 1792315313.410151,
   "udid": "EAAD1B66-80A3-4A51-957C-298DAF22F057",
   "uiLocale": "zh-CN",
   "selectionMode": true,
@@ -94,6 +94,11 @@
   "clippedBefore": [
     "批量删除"
   ],
+  "swipeY": {
+    "y": 208,
+    "row": "批量删除",
+    "anchorY": 145
+  },
   "swipe": {
     "rc": 0,
     "detail": ""
@@ -141,41 +146,41 @@
     {
       "label": "批量完成",
       "frame": [
-        24,
+        -10,
         186,
         119,
         44
       ],
-      "x": 24,
-      "right": 143,
+      "x": -10,
+      "right": 109,
       "pressable": true,
-      "insideViewport": true
+      "insideViewport": false
     },
     {
       "label": "移动到清单",
       "frame": [
-        151,
+        116,
         186,
         134,
         44
       ],
-      "x": 151,
-      "right": 285,
+      "x": 116,
+      "right": 250,
       "pressable": true,
       "insideViewport": true
     },
     {
       "label": "批量删除",
       "frame": [
-        293,
+        258,
         186,
         119,
         44
       ],
-      "x": 293,
-      "right": 412,
+      "x": 258,
+      "right": 377,
       "pressable": true,
-      "insideViewport": false
+      "insideViewport": true
     }
   ],
   "shifts": [
@@ -193,20 +198,18 @@
     },
     {
       "label": "批量完成",
-      "dx": 0
+      "dx": -34
     },
     {
       "label": "移动到清单",
-      "dx": 0
+      "dx": -35
     },
     {
       "label": "批量删除",
-      "dx": 0
+      "dx": -35
     }
   ],
-  "verdict": "真溢出：滑动后 x 一动没动，且仍有按钮画到视口外 批量删除",
-  "clippedAfter": [
-    "批量删除"
-  ],
-  "finishedAt": 1792304008.02413
+  "verdict": "可滚（滑动后 x 位移，图上位置只是滚到当前项）",
+  "clippedAfter": [],
+  "finishedAt": 1792315347.635999
 }
