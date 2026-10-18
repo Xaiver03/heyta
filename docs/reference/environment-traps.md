@@ -10270,3 +10270,17 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     ⇒ 写前置条件判据时先做一次**反臂**：故意不切视图，看这枚 marker 会不会照样命中；会命中就不是证据。
     与 #227/#228 同族（"计数为 0"和"一条都没跑"在输出上长得一样），补一枚方向：那一族管"这趟跑没跑"，
     这一条管"跑的那条路是不是你以为的那条"。
+
+464. 🔴 **用 plumbing 在共享工作树里造提交，`commit-tree` 漏掉 `-p <OLD>` 会造出一枚无父根提交 —— 而 `update-ref` 照样退 0，
+    分支历史当场被切掉**。2026-10-18 本机实测（本线自己踩，已当场还原）：`read-tree --reset HEAD` + `update-index --cacheinfo` +
+    `write-tree` 都正常，`commit-tree "$TREE" -F msg`（**没有 `-p`**）产出的是一枚 root commit；
+    `update-ref refs/heads/main <NEW> <OLD>` 的 CAS 只校验"当前等于 OLD"，**它不看新提交有没有父**，所以整条链退 0、看起来成功。
+    症状第一跳就响：`git show --name-only HEAD` 打印**整个仓库的文件清单**（根提交相对空树 ⇒ 每枚文件都算"新增"），
+    而不是本批那两三枚。⇒ 三条：
+    ⑴ **复验要盯 `parent=` 非空**：`git log --format='%h parent=%p %s' -1`，`parent=` 后面是空的就是根提交；
+    ⑵ 还原用 CAS 反向写回去，别用 `reset --hard`（共享树里那会连别人的在飞改动一起动）：
+    `git update-ref refs/heads/main <OLD> <那枚坏提交>`（现量：坏提交与 OLD 的 `git diff --name-only` 只差本批文件 ⇒ 证明内容没丢，
+    丢的只是"从 main 能不能走到旧历史"）；
+    ⑶ 索引干净（`git diff --cached --name-only` 为空）时，**普通 `git commit -F msg -- <逐枚路径>` 就够了**，
+    它自带 parent、pathspec 放最后同样不会夹带别人的文件 —— plumbing 只在"索引里有别人 staged 的东西"才需要，
+    而那种时候要照 #459 收尾对账（`git diff --cached --name-only HEAD -- <本批路径>` 回空才叫索引跟上）。
