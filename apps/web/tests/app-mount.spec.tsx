@@ -31,7 +31,8 @@ import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { OPERATOR } from '@heyta/legal';
+import { OFFICIAL_SITE_ORIGIN } from '@heyta/app-host';
+import { OPERATOR, operatorFilingLine } from '@heyta/legal';
 
 import { __resetOpLogForTests, initOpLog } from '../src/lib/oplog.js';
 import { openSettingsViaAvatar } from './open-settings-via-avatar.js';
@@ -41,6 +42,7 @@ import { emptyState } from '@heyta/op-log';
 import { useTaskStore } from '../src/features/tasks/store.js';
 import { useProjectStore } from '../src/features/projects/store.js';
 import { usePrivacyStore } from '../src/features/privacy/store.js';
+import { useSyncStore } from '../src/features/sync/store.js';
 
 (globalThis as unknown as { indexedDB: IDBFactory }).indexedDB = new IDBFactory();
 (globalThis as unknown as { IDBKeyRange: typeof IDBKeyRange }).IDBKeyRange = IDBKeyRange;
@@ -821,6 +823,45 @@ describe('应用 → 站点：孤岛的另一半', () => {
     // 一个点了不会生效的按钮比没有按钮更坏（同 `Pricing.tsx` 不放"立即购买"）。
     const buttons = [...(panel?.querySelectorAll('button') ?? [])];
     expect(buttons.map((b) => b.textContent?.trim())).toEqual([]);
+  });
+
+  /**
+   * 🔴 「关于」页要**真的**把备案号渲染出去。
+   *
+   * 隐私政策里有一句承诺：「App 备案号以**应用内「关于」页**与服务端对外页
+   * 公布者为准」。2026-10-16 查实：在那之前 `OPERATOR.appFilingNumber`
+   * **UI 侧零消费者** ⇒ 核准那天光把字段填上，它**不会出现在任何地方**，
+   * 而那正是我们对外说过要公布的地方（应用商店提审也会看这一行）。
+   *
+   * ⚠️ 这一条钉的是**接线**（面板读的确实是 `OPERATOR`），不是数字本身：
+   * 数字由 `packages/legal` 的 `structure.spec.ts` 那条双向判据管着
+   * （未核准不许出现编号、核准后必须等于字段值）。
+   */
+  it('🔴 运营者与备案号：官方实例才印；自建实例上**一个字都不印**', async () => {
+    try {
+      // ① 官方托管实例 —— 运营者是我们，备案号该在这里公布
+      useSyncStore.setState({ baseUrl: OFFICIAL_SITE_ORIGIN });
+      await openSettings();
+      const line = container!.querySelector('[data-testid="about-operator"]');
+      expect(line).not.toBeNull();
+      expect(line!.textContent).toContain(OPERATOR.name);
+      expect(line!.textContent).toContain(OPERATOR.icpNumber);
+      // 🔴 身份相等：这一行**就是**共享实现吐出来的那一串，不是壳里另拼的一份。
+      expect(line!.textContent).toBe(operatorFilingLine(OPERATOR));
+
+      // ② 自建实例 —— 运营者是**架它的那个人**，不是我们。
+      //    印我们的主体与备案号，与把**我们的**隐私政策挂到自建实例上是同一种错
+      //    （`resolveLegalLinks` 对非官方 host 刻意指向运营者自己的 /terms.html）。
+      await act(async () => {
+        root?.unmount();
+      });
+      useSyncStore.setState({ baseUrl: 'https://sync.example.com' });
+      await openSettings();
+      expect(container!.querySelector('[data-testid="about-operator"]')).toBeNull();
+    } finally {
+      // 别把服务器地址漏给后面的用例（那是"单跑绿、全跑红"那一类污染）
+      useSyncStore.setState({ baseUrl: '' });
+    }
   });
 
   /**

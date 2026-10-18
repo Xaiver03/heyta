@@ -253,7 +253,7 @@ export function HabitsView({ paneInColumn }: { paneInColumn: boolean }): React.J
 
   const headerControls = headerSlot
     ? createPortal(
-        <div className="ht-habits-header-controls">
+        <div className="ht-header__habits-controls">
           <button
             type="button"
             className="ht-btn ht-btn--ghost"
@@ -266,7 +266,7 @@ export function HabitsView({ paneInColumn }: { paneInColumn: boolean }): React.J
           >
             <Plus size={ICON_SIZE.md} aria-hidden="true" />
           </button>
-          <span className="ht-habits-header-controls__menu-wrap">
+          <span className="ht-header__habits-menu-wrap">
             <button
               type="button"
               className="ht-btn ht-btn--ghost"
@@ -279,7 +279,7 @@ export function HabitsView({ paneInColumn }: { paneInColumn: boolean }): React.J
               <MoreHorizontal size={ICON_SIZE.md} aria-hidden="true" />
             </button>
             {menuOpen ? (
-              <div className="ht-habits-header-menu" role="menu" data-testid="habits-menu">
+              <div className="ht-header__habits-menu" role="menu" data-testid="habits-menu">
                 <button type="button" role="menuitem" onClick={exportCheckins}>
                   <Download size={ICON_SIZE.sm} aria-hidden="true" />
                   {t('web.habits.export.action')}

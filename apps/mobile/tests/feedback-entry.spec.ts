@@ -42,7 +42,12 @@ describe('入口在，且指向法律文本公示的那一枚邮箱', () => {
   });
 
   it('🔴 地址取 `OPERATOR.contactEmail`，文件里**没有**第二份邮箱字面量', () => {
-    expect(SETTINGS).toContain("import { OPERATOR } from '@heyta/legal'");
+    // ⚠️ 断言"从 `@heyta/legal` 引进了 `OPERATOR`"，**不是**把整行 import 抄下来比对。
+    // 2026-10-16 实测：这条原来写的是 `toContain("import { OPERATOR } from '@heyta/legal'")`，
+    // 而同一天"关于"页那一行也从这个包取东西（多引进一个符号）⇒ 它红了，
+    // 而它真正要守的那件事（地址取 `OPERATOR.contactEmail`、不写死字面量）一个字都没变。
+    // 钉死一行 import 的原文会让**任何**合法的追加都变成"回归"，那是假红。
+    expect(SETTINGS).toMatch(/import \{[^}]*\bOPERATOR\b[^}]*\} from '@heyta\/legal'/);
     expect(SETTINGS).toMatch(/mailto:\$\{OPERATOR\.contactEmail\}/);
     // 变异：把 `OPERATOR.contactEmail` 换成写死的 `heyta@waytofuture.cn` ⇒ 本条红。
     // 这一条挡的是"两份事实源"，不是"格式不对" —— 所以它数的是**出现次数**，

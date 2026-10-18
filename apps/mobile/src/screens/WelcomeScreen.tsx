@@ -34,14 +34,40 @@
  * 这是对的：用户此时既没登录也没接受离线，什么都不记才是诚实的。
  */
 
-import React, { useState } from 'react';
-import { View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { HeytaNativeTokens } from '@heyta/design-system';
 import { useI18n } from '@heyta/i18n';
 
 import { Button, Text } from '../ui/kit';
 import { AuthScreen, type SavedAuthSession } from './AuthScreen';
 import { useTokens } from '../theme';
+
+/**
+ * 本屏样式：模块级工厂 + `useMemo`（与 `PrivacyConsentSheet` /
+ * `AccountClosureScreen` 同一惯用法）。
+ *
+ * 🔴 L4 视图（`apps/mobile/src/screens`）的内联样式**只减不增**
+ * （`scripts/check-l4-no-style.mjs` 断言 C）。原先这三处是 `style={{…}}`：
+ * 对象每次渲染都新建，也进不了 `StyleSheet` 的 ID 引用路径；搬进来顺手把
+ * 账还上。取值一律经 tokens 表，不写裸值（`check:design` / `check:l4` 双盯）。
+ * ⚠️ 安全区那两条（`insets.top` / `insets.bottom`）是**运行时输入**，不搬 ——
+ * 它们在调用点用 `style={[styles.root, {…}]}` 合并。
+ */
+function makeStyles(tokens: HeytaNativeTokens) {
+  return StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: tokens['color.background'],
+      paddingHorizontal: tokens['screen.gutter'],
+      justifyContent: 'center',
+    },
+    gap4: { gap: tokens['space.4'] },
+    /** 主/次按钮之间一个空档（不是间距属性，所以不能靠 `gap` 表达层次）。 */
+    spacer: { height: tokens['space.4'] },
+  });
+}
 
 export interface WelcomeScreenProps {
   /** 同步设置里已有的服务端地址（一般还没有，回落到默认值）。 */
@@ -59,6 +85,7 @@ export function WelcomeScreen({
 }: WelcomeScreenProps): React.JSX.Element {
   const { t } = useI18n();
   const tokens = useTokens();
+  const styles = useMemo(() => makeStyles(tokens), [tokens]);
   const insets = useSafeAreaInsets();
   /**
    * 认证面板在这一屏里是**替换**而不是叠加。
@@ -83,27 +110,20 @@ export function WelcomeScreen({
 
   return (
     <View
-      style={{
-        flex: 1,
-        backgroundColor: tokens['color.background'],
-        paddingTop: insets.top,
-        paddingBottom: insets.bottom,
-        paddingHorizontal: tokens['screen.gutter'],
-        justifyContent: 'center',
-      }}
+      style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom }]}
     >
       {/*
         🔴 主按钮与次按钮之间**必须留出层次**：主按钮在上面、用 primary 色，
         次按钮用 ghost。两个都做成 primary 的话，"先离线使用"就不再是出口，
         而变成一个看起来同样重要的推荐路径 —— 那与"本地优先"的定位不符。
       */}
-      <View style={{ gap: tokens['space.4'] }}>
+      <View style={styles.gap4}>
         <Text variant="screen-title">{t('mobile.welcome.title')}</Text>
         <Text variant="row-title" tone="muted">
           {t('mobile.welcome.tagline')}
         </Text>
 
-        <View style={{ height: tokens['space.4'] }} />
+        <View style={styles.spacer} />
 
         <Button
           label={t('mobile.welcome.signIn')}

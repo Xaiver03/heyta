@@ -14,21 +14,15 @@
 
    修法：标签不折行、tab 不被压窄，放不下就让**这一条**横向滚动。
    隐藏滚动条是刻意的 —— 否则滚动条会占掉高度，header 会随视口宽跳一下
-   （那是 CLS）；tab 在获得焦点时浏览器会自动把它滚进视野。 */
-.ht-viewtabs {
-  display: flex;
-  gap: var(--ht-space-1);
-  padding: var(--ht-space-1);
-  border-radius: var(--ht-radius-md);
-  background: var(--ht-color-surface-sunken);
-  margin-right: auto;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
+   （那是 CLS）；tab 在获得焦点时浏览器会自动把它滚进视野。
 
-.ht-viewtabs::-webkit-scrollbar {
-  display: none;
-}
+   🔴 2026-10-16：上面这段历史留档，`.ht-viewtabs` / `.ht-viewtab` 这两族
+   规则**已删**。理由是现量：全仓零消费者（`git grep ht-viewtabs` 只剩本文件与
+   调研文档；`git grep ht-viewtab` 只剩调研文档，外加
+   `design-system/heyta/check-hardcoded.mjs` 自己那行登记写着"全仓当前零消费者
+   （疑似 IA 重构遗留），迁移无 JSX 可配"）。rail 的 tab 现在挂 `.ht-rail__tabs` /
+   `.ht-rail__tab`，inbox 的 tab 挂 `.ht-inbox__tab` —— 两族都是那次 IA 重构的遗留账，
+   留着只会让 `check:row-single-source` 的顶层 `ht-*` 族记账虚高。 */
 
 /*
  * ═══════════════════════════════════════════════════════════════════════════

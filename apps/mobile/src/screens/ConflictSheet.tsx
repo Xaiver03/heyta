@@ -44,9 +44,10 @@
  * 「我的」屏仍会提示还有几处待处理，用户随时能回来继续。
  */
 
-import React, { useState } from 'react';
-import { Modal, ScrollView, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Modal, ScrollView, StyleSheet, View } from 'react-native';
 
+import type { HeytaNativeTokens } from '@heyta/design-system';
 import { useI18n } from '@heyta/i18n';
 import type { ConflictInfo } from '@heyta/sync-client';
 import { compareConflictFreshness, summarizeConflictPayload } from '@heyta/sync-client';
@@ -67,6 +68,41 @@ import { IconButton, Text } from '../ui/kit';
 // kit 只是**内部**用它，没有把它再导出。
 import { Icon } from '../ui/icons';
 
+/**
+ * 弹层外壳的样式：模块级工厂 + `useMemo`（与 `PrivacyConsentSheet` /
+ * `AccountClosureScreen` 同一惯用法）。
+ *
+ * 🔴 L4 视图（`apps/mobile/src/screens`）的内联样式**只减不增**
+ * （`scripts/check-l4-no-style.mjs` 断言 C）。原先这几处是 `style={{…}}`：
+ * 对象每次渲染都新建，也进不了 `StyleSheet` 的 ID 引用路径。取值一律经
+ * tokens 表，不写裸值（`check:design` / `check:l4` 双盯）。
+ * ⚠️ `shadow` 是 `useTheme().native.shadow(...)` 的运行时结果，所以卡片那一处
+ * 仍是 `style={[styles.card, shadow ?? undefined]}` —— 数组形态不被断言 C 计数。
+ */
+function makeStyles(tokens: HeytaNativeTokens) {
+  return StyleSheet.create({
+    scrim: {
+      flex: 1,
+      justifyContent: 'center',
+      padding: tokens['screen.gutter'],
+      backgroundColor: tokens['color.overlay'],
+    },
+    card: {
+      maxHeight: '90%',
+      gap: tokens['space.4'],
+      padding: tokens['space.5'],
+      borderRadius: tokens['radius.lg'],
+      backgroundColor: tokens['color.surface-raised'],
+    },
+    headRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: tokens['space.2'],
+    },
+    headText: { flex: 1, minWidth: 0, gap: tokens['space.1'] },
+  });
+}
+
 export function ConflictSheet({
   visible,
   onClose,
@@ -75,6 +111,7 @@ export function ConflictSheet({
   onClose: () => void;
 }): React.JSX.Element | null {
   const tokens = useTokens();
+  const styles = useMemo(() => makeStyles(tokens), [tokens]);
   const { t } = useI18n();
   // 🔴 `shadow.lg` 在 token 里是 **CSS 字符串**（`0 8px 24px rgb(...)`），
   // RN 不认，展开它也不是对象。必须经 `native.shadow()` 归一化成 RN 的
@@ -147,29 +184,18 @@ export function ConflictSheet({
       accessibilityViewIsModal
     >
       <View
-        style={{
-          flex: 1,
-          justifyContent: 'center',
-          padding: tokens['screen.gutter'],
-          backgroundColor: tokens['color.overlay'],
-        }}
+        style={styles.scrim}
       >
         <View
           style={[
-            {
-              maxHeight: '90%',
-              gap: tokens['space.4'],
-              padding: tokens['space.5'],
-              borderRadius: tokens['radius.lg'],
-              backgroundColor: tokens['color.surface-raised'],
-            },
+            styles.card,
             // 阴影只给真正的浮层（AGENTS.md §5），而对话框就是浮层。
             shadow ?? undefined,
           ]}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: tokens['space.2'] }}>
+          <View style={styles.headRow}>
             <Icon name="conflict.warning" size="md" color={tokens['color.warning-strong']} />
-            <View style={{ flex: 1, minWidth: 0, gap: tokens['space.1'] }}>
+            <View style={styles.headText}>
               <Text variant="section-title">
                 {/* 英文单复数：只有 1 处时走单数兄弟词条（词条表没有 ICU）。
                     只在 JSX 子节点里分支，不放进属性 —— 属性里门禁只认

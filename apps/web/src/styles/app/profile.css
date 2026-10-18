@@ -1,5 +1,5 @@
 /* 个人中心：低密度的身份与回顾 surface。设置表单不在这里重复。 */
-.ht-profile-overview {
+.ht-settings__profile {
   display: flex;
   flex-direction: column;
   gap: var(--ht-space-6);
@@ -13,7 +13,7 @@
   margin-inline: auto;
 }
 
-.ht-profile-overview__identity {
+.ht-settings__profile-identity {
   display: flex;
   align-items: center;
   gap: var(--ht-space-4);
@@ -23,7 +23,7 @@
   background: var(--ht-color-surface);
 }
 
-.ht-profile-overview__avatar {
+.ht-settings__profile-avatar {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -37,26 +37,26 @@
   font-weight: var(--ht-font-weight-semibold);
 }
 
-.ht-profile-overview__identity-copy {
+.ht-settings__profile-identity-copy {
   min-inline-size: 0;
   flex: 1 1 auto;
 }
 
-.ht-profile-overview__avatar img {
+.ht-settings__profile-avatar img {
   inline-size: 100%;
   block-size: 100%;
   object-fit: cover;
   border-radius: inherit;
 }
 
-.ht-profile-overview__identity-copy h2,
-.ht-profile-overview__section h2 {
+.ht-settings__profile-identity-copy h2,
+.ht-settings__profile-section h2 {
   margin: 0;
   overflow-wrap: anywhere;
 }
 
-.ht-profile-overview__status,
-.ht-profile-overview__note {
+.ht-settings__profile-status,
+.ht-settings__profile-note {
   display: flex;
   align-items: center;
   gap: var(--ht-space-1);
@@ -67,40 +67,40 @@
   overflow-wrap: anywhere;
 }
 
-.ht-profile-overview__section {
+.ht-settings__profile-section {
   display: flex;
   flex-direction: column;
   gap: var(--ht-space-3);
 }
 
-.ht-profile-overview__section-heading {
+.ht-settings__profile-section-heading {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--ht-space-3);
 }
 
-.ht-profile-overview__section-heading > :first-child {
+.ht-settings__profile-section-heading > :first-child {
   min-inline-size: 0;
 }
 
-.ht-profile-overview__achievement-action {
+.ht-settings__profile-achievement-action {
   flex: 0 0 auto;
   white-space: nowrap;
 }
 
-.ht-profile-overview__accent {
+.ht-settings__profile-accent {
   color: var(--ht-color-primary);
 }
 
-.ht-profile-overview__stats {
+.ht-settings__profile-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--ht-space-2);
   border-block: 0;
 }
 
-.ht-profile-overview__stat {
+.ht-settings__profile-stat {
   display: flex;
   flex-direction: column;
   gap: var(--ht-space-1);
@@ -108,20 +108,20 @@
   padding-block: var(--ht-space-4);
 }
 
-.ht-profile-overview__value {
+.ht-settings__profile-value {
   font-variant-numeric: tabular-nums;
   color: var(--ht-color-foreground);
   font-size: var(--ht-font-size-xl);
   font-weight: var(--ht-font-weight-semibold);
 }
 
-.ht-profile-overview__label {
+.ht-settings__profile-label {
   color: var(--ht-color-foreground-muted);
   font-size: var(--ht-font-size-xs);
   line-height: var(--ht-line-height-normal);
 }
 
-.ht-profile-overview__achievement {
+.ht-settings__profile-achievement {
   display: flex;
   align-items: center;
   gap: var(--ht-space-4);
@@ -131,14 +131,14 @@
   background: var(--ht-color-surface);
 }
 
-.ht-profile-overview__achievement-copy {
+.ht-settings__profile-achievement-copy {
   display: flex;
   flex-direction: column;
   gap: var(--ht-space-1);
   min-inline-size: 0;
 }
 
-.ht-profile-overview__actions {
+.ht-settings__profile-actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--ht-space-2);
@@ -147,24 +147,24 @@
 }
 
 @media (max-width: 30rem) {
-  .ht-profile-overview__section-heading {
+  .ht-settings__profile-section-heading {
     flex-wrap: wrap;
   }
 
-  .ht-profile-overview__achievement-action {
+  .ht-settings__profile-achievement-action {
     margin-inline-start: auto;
   }
 
-  .ht-profile-overview__identity {
+  .ht-settings__profile-identity {
     align-items: flex-start;
     flex-wrap: wrap;
   }
 
-  .ht-profile-overview__identity .ht-btn {
+  .ht-settings__profile-identity .ht-btn {
     inline-size: 100%;
   }
 
-  .ht-profile-overview__actions .ht-btn {
+  .ht-settings__profile-actions .ht-btn {
     flex: 1 1 100%;
   }
 }

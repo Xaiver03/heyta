@@ -204,7 +204,7 @@ describe('设置浮层的落位与焦点', () => {
     click(el.querySelector('[data-testid="account-menu-avatar"]')!);
     // 资料入口已经收敛为「个人中心 → 编辑资料」；头像菜单不再复制一个直达设置动作。
     click(document.querySelector('[data-testid="account-menu-profile-center"]')!);
-    click(el.querySelector('.ht-profile-overview__identity .ht-btn')!);
+    click(el.querySelector('.ht-settings__profile-identity .ht-btn')!);
 
     expect(scrolledTo).toContain('settings-profile');
     // 这条钉的是"焦点也要一起给"那句话**现在**才成立 ——

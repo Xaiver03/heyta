@@ -1,5 +1,6 @@
 import { defineConfig } from '@playwright/test';
 import base from './playwright.config';
+import { STUB_ORIGIN, STUB_PORT } from './ports';
 
 const port = Number(process.env['HEYTA_RAIL_PORT'] ?? 4357);
 
@@ -10,8 +11,8 @@ export default defineConfig({
   use: { ...base.use, baseURL: `http://127.0.0.1:${port}` },
   webServer: [
     {
-      command: 'node stub-provider.mjs',
-      url: 'http://127.0.0.1:4319/__requests',
+      command: `STUB_PORT=${String(STUB_PORT)} node stub-provider.mjs`,
+      url: `${STUB_ORIGIN}/__requests`,
       reuseExistingServer: false,
       stdout: 'pipe',
       stderr: 'pipe',
