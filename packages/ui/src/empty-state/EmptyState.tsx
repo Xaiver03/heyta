@@ -141,16 +141,6 @@ export function EmptyState(props: EmptyStateProps): React.JSX.Element {
   const size = view.size;
   const rootStyle =
     size === 'line' ? styles.rootLine : size === 'section' ? styles.rootSection : styles.root;
-  const titleStyle =
-    size === 'line'
-      ? [text['row-meta'], styles.titleLine]
-      : size === 'section'
-        ? [text['row-title'], styles.titleSection]
-        : [text['section-title'], styles.centered, styles.title];
-  const hintStyle =
-    size === 'page'
-      ? [text['row-meta'], styles.centered, styles.hint]
-      : [text['row-meta'], styles.hint];
 
   return (
     <View style={rootStyle} accessibilityRole={view.a11yRole} testID={testID}>
@@ -175,10 +165,34 @@ export function EmptyState(props: EmptyStateProps): React.JSX.Element {
         />
       )}
 
-      <Text style={titleStyle}>{view.title}</Text>
+      {/* 🔴 档位样式写在**调用点**，不先收进 `const titleStyle`：
+          `scripts/check-text-color.mjs` 是**结构判据**,它只认开标签里直接出现的
+          `text['…']` / `styles.x`，跟着局部变量走不到 —— 收进变量会让这一行
+          在门禁里永远算"没有前景色"（而它其实有）。别为了好看把它提上去。 */}
+      <Text
+        style={
+          size === 'line'
+            ? [text['row-meta'], styles.titleLine]
+            : size === 'section'
+              ? [text['row-title'], styles.titleSection]
+              : [text['section-title'], styles.centered, styles.title]
+        }
+      >
+        {view.title}
+      </Text>
 
       {/* `hint` 可以整个省略 —— §1.6 的实测形状就是"居中一句"。 */}
-      {view.hint === undefined ? null : <Text style={hintStyle}>{view.hint}</Text>}
+      {view.hint === undefined ? null : (
+        <Text
+          style={
+            size === 'page'
+              ? [text['row-meta'], styles.centered, styles.hint]
+              : [text['row-meta'], styles.hint]
+          }
+        >
+          {view.hint}
+        </Text>
+      )}
 
       {view.detail === undefined ? null : (
         <Text

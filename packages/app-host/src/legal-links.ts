@@ -86,6 +86,26 @@ export interface LegalLinks {
 }
 
 /** 用户还没填地址（或填成全空白）时没有"该服务端"可指 —— 返回 `null`，界面不渲染链接。 */
+/**
+ * 这台设备接的是不是**官方托管实例**（按服务器地址的主机名判）。
+ *
+ * 🔴 它存在的理由是**同一句隐私纪律的另一面**：`resolveLegalLinks` 已经写明
+ * 非官方 host 下"链接打不开时得到的是一个诚实的 404，**不是一份别人的政策**"。
+ * 那么 **运营者是谁、备案号是多少** 也必须受同一条约束 ——
+ * 在自建实例的「关于」页上印「晓黎（杭州）人工智能科技有限公司 · 浙ICP备…」，
+ * 与把我们的隐私政策挂到自建实例上，是**同一种错**（把责任指向一个不相干的主体）。
+ *
+ * ⚠️ 它**不判断"是不是我们公司的部署"**，只判断"服务器地址的主机名是不是官方那个" ——
+ * 与 `resolveLegalLinks` 用**同一次**比较，两处各写一遍就会漂。
+ * 地址为空（还没配同步）时返回 `false`：不知道就不冒充。
+ */
+export function isOfficialHostedInstance(serverUrl: string): boolean {
+  const trimmed = serverUrl.trim();
+  if (trimmed === '') return false;
+  const host = hostFromServerUrl(trimmed);
+  return host !== '' && host === hostFromServerUrl(OFFICIAL_SITE_ORIGIN);
+}
+
 export function resolveLegalLinks(baseUrl: string, locale?: string): LegalLinks | null {
   const trimmed = baseUrl.trim();
   if (trimmed === '') return null;
