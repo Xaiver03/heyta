@@ -48,6 +48,7 @@
 import {
   classifyDestination,
   describeDestination,
+  type AiSupplyMode,
   type EgressDestination,
 } from './supply.js';
 import {
@@ -58,13 +59,17 @@ import {
 } from './egress.js';
 import {
   buildChatRequestBody,
+  buildManagedChatRequestBody,
   chatCompletionsUrl,
   chatRequestHeaders,
   isEmptyModelResponse,
+  managedChatUrl,
+  sameHost,
 } from './wire.js';
 import {
   extractContent,
   extractToolCalls,
+  readServerCode,
   type AiFailure,
   type AiInvocation,
   type AiResult,
@@ -209,6 +214,35 @@ export interface AiRouteTarget {
  * 而不是"回退到默认模型" —— 后者会让一个没打算启用 AI 的功能悄悄跑起来。
  */
 export interface AiRoutingConfig {
+  /**
+   * 供给模式 —— [ADR-0056](../../../docs/adr/0056-endpoint-address-class-and-domestic-managed-allowlist.md)
+   * §5 第 1 条点名要求补的那一格（原文：「`AiRoutingConfig` 没有 `mode` 字段…**下一单必须处理的事**」）。
+   *
+   * 🔴 **为什么它必须在这里**：候选的目的地是
+   * `classifyDestination({ mode, endpoint })` 推出来的，而解析候选时过去把它
+   * **写死成 `'own'`** ⇒ 自家那台托管端点（`heyta.waytofuture.cn`，在境内白名单上、
+   * `jurisdiction: 'cn'`）会被推成 `user-endpoint`，于是披露那句
+   * 「该端点由你提供、heyta 不参与」**是一句假话** ——
+   * 而明文实际上到了我们的服务器（ADR-0006 §3 的例外正是为它写的）。
+   *
+   * 🔴 **它声明意图，不决定事实**：`classifyDestination` 对 `'managed'` 仍然要查端点
+   * 落不落在境内白名单上。端点一旦离开白名单，目的地照样回到 `user-endpoint`，
+   * **不会撒谎说"数据在我们手里"**。所以这个字段**放宽不了任何授权** ——
+   * 它只让"我们知道的真话"能说出口。
+   *
+   * 缺省（不写）等价于 `'own'`，与引入本字段之前的行为逐字相同。
+   *
+   * 🔴🔴 **`'off'` 被**类型上**排除，这不是洁癖，是堵一个会静默拆掉出境闸门的洞**：
+   * `classifyDestination({ mode: 'off' })` 对**任何**端点都返回 `'none'`，
+   * 而路由里 `'none'` 表示"本机目的地、免授权" —— 于是 `resolveRoute` 的第 2 道闸
+   * （`destination !== 'none' && !allowRemote` ⇒ 排除）**整条失效**，
+   * `authorizeEgress` 也不再索要同意。**用户会以为一切照旧，而闸门已经不在了。**
+   *
+   * "AI 关掉"这件事由 `enabled: false` 表达（它在解析候选**之前**就返回 `not-configured`），
+   * 不需要、也不允许第二个"关"的写法。`AiSupplyMode` 的 `'off'` 仍然有效 ——
+   * 那是 `AiProviderConfig`（单端点/历史路径）与 `assertEnableable` 的词。
+   */
+  mode?: Exclude<AiSupplyMode, 'off'>;
   /** 第 1 道闸：总开关。**默认必须是 false。** */
   enabled: boolean;
   /** 第 2 道闸：允许远程。**默认必须是 false**（照抄 Joplin 的 `Allow remote AI providers`）。 */
@@ -447,7 +481,15 @@ export type EndpointUrlVerdict =
  * 而 heyta 的同步通道是端到端加密的 —— 在 AI 这条路上退化成明文 HTTP
  * 会让整个产品的隐私承诺自相矛盾。要发到远端就必须是 https。
  */
-export function validateEndpointUrl(raw: string): EndpointUrlVerdict {
+export function validateEndpointUrl(
+  raw: string,
+  /**
+   * ⚠️ 缺省 `{ mode: 'own' }` —— **与引入这个参数之前的行为逐字相同**，
+   * 所以设置页那几处单参调用点不需要改。
+   * 🔴 路由解析与发送点复算必须传**配置里的那一个 mode**（见 `AiRoutingConfig.mode`）。
+   */
+  options: { readonly mode?: AiSupplyMode } = {},
+): EndpointUrlVerdict {
   let url: URL;
   try {
     url = new URL(raw);
@@ -476,7 +518,10 @@ export function validateEndpointUrl(raw: string): EndpointUrlVerdict {
     };
   }
 
-  const destination = classifyDestination({ mode: 'own', endpoint: raw });
+  // 🔴 `mode` 由调用方给，缺省 `'own'`（= 引入这个参数之前的行为）。
+  // 解析候选与发送点复算都从 `AiRoutingConfig.mode` 取，见 `AiRoutingConfig.mode` 的注释：
+  // 写死 `'own'` 会把自家托管端点说成"用户自己的端点"，而那就是一句假披露。
+  const destination = classifyDestination({ mode: options.mode ?? 'own', endpoint: raw });
 
   if (url.protocol === 'http:' && destination !== 'none') {
     return {
@@ -546,6 +591,25 @@ export interface RouteResolution {
  * 所以它被排除在候选之外、不产生授权询问。这个区别很重要：
  * **不想用云的人不该被反复弹"要不要授权云"。**
  */
+
+/**
+ * 路由配置的供给模式 —— **白名单，只认 `'managed'`，其余一律 `'own'`**。
+ *
+ * 🔴 为什么要有这个函数（而不是直接 `config.mode ?? 'own'`）：
+ * 类型上 `AiRoutingConfig.mode` 已经排除了 `'off'`，但配置可能来自
+ * **持久化 JSON / 导入 / 手工改文件** —— 那些路径里没有类型系统。
+ * 而 `'off'` 在**路由**里是危险值：`classifyDestination({ mode: 'off' })`
+ * 对**任何**端点都返回 `'none'`，而 `'none'` = 本机目的地、**免授权** ⇒
+ * 第 2 道闸（`destination !== 'none'` 那一条）与出境授权**整条失效**，
+ * 而用户看不出任何变化。
+ *
+ * 所以这里把"不是 `'managed'`"的一切都归到 `'own'`：
+ * **只可能更严，不可能更松。**（`enabled: false` 才是"关掉 AI"的表达。）
+ */
+function routingMode(config: AiRoutingConfig): AiSupplyMode {
+  return config.mode === 'managed' ? 'managed' : 'own';
+}
+
 export function resolveRoute(
   config: AiRoutingConfig,
   feature: AiFeature,
@@ -575,7 +639,9 @@ export function resolveRoute(
     }
 
     // ① URL 校验（第一次：解析候选时）
-    const verdict = validateEndpointUrl(endpointConfig.endpoint);
+    // 🔴 带上 `config.mode` —— 这一处过去写死 `'own'`，于是自家托管端点被推成
+    // `user-endpoint`、披露里那句"该端点由你提供"是假的（ADR-0056 §5 第 1 条）。
+    const verdict = validateEndpointUrl(endpointConfig.endpoint, { mode: routingMode(config) });
     if (!verdict.ok) {
       excluded.push({ target, reason: 'endpoint-url-rejected' });
       continue;
@@ -629,6 +695,14 @@ export function requiredCapabilities(feature: AiFeature): readonly AiCapability[
 export interface RoutedDeps {
   secretStore?: SecretStore;
   fetchImpl?: typeof fetch;
+  /**
+   * 托管档的**宿主通道**（基址 + 一枚可用令牌）。形状与 `ProviderDeps.managedTransport` 一致。
+   *
+   * 🔴 只在 `config.mode === 'managed'` 时被读；拿不到就**响亮失败**（`not-configured`），
+   * **绝不回退**到"照 OpenAI 契约打 `candidate.endpoint`" ——
+   * 那条路会把请求发到一个不是我们代理的地方，而披露还写着 `heyta-cloud`。
+   */
+  managedTransport?: () => Promise<{ readonly baseUrl: string; readonly token: string } | undefined>;
   /** 时钟。**注入是为了测试能确定性地验证跳闸与冷却**（AGENTS.md §7 #25）。 */
   now?: () => number;
   /**
@@ -785,6 +859,8 @@ export async function invokeRouted(
       invocation,
       doFetch,
       policy.timeoutMs,
+      routingMode(config),
+      deps.managedTransport,
     );
 
     if (!failure.ok) {
@@ -861,9 +937,19 @@ export async function invokeRouted(
 async function attemptOnce(
   candidate: ResolvedCandidate,
   apiKey: string | undefined,
-  invocation: Pick<AiInvocation, 'system' | 'user' | 'tools'>,
+  // ⚠️ `feature` 与 `messages` 是**托管档要的**：服务端契约是 `{feature, messages}`，
+  // 而不是 OpenAI 的 `{model, messages}`。自备档用不到它们，但传进来是同一份 `AiInvocation`。
+  invocation: Pick<AiInvocation, 'feature' | 'system' | 'user' | 'tools' | 'messages'>,
   doFetch: typeof fetch,
   timeoutMs: number,
+  /**
+   * 供给模式。**必须与 `resolveRoute` 用的是同一个值** ——
+   * 发送点的目的地复算若与解析时候分叉，就会出现
+   * "披露按 A 说、发送点按 B 判"，而 ADR-0056 §3.3 那条纪律针对的正是这个分叉。
+   */
+  mode: AiSupplyMode,
+  /** 托管档的宿主通道。只在 `mode === 'managed'` 时被读；见 `RoutedDeps.managedTransport`。 */
+  managedTransport?: () => Promise<{ readonly baseUrl: string; readonly token: string } | undefined>,
 ): Promise<{ ok: true; text: string; toolCalls?: readonly AiToolCall[] } | AiFailure> {
   // 🔴🔴 第二次 URL 校验 —— **在真正要发的那一刻**。
   //
@@ -877,7 +963,9 @@ async function attemptOnce(
   // 把控制放在这里，就等于"无论配置从哪来，出去的东西都得先过这一关"。
   //
   // ⚠️ 这不是重复代码，是**纵深防御**。删掉它，校验就退化成"只防君子"。
-  const verdict = validateEndpointUrl(candidate.endpointConfig.endpoint);
+  // 🔴 与解析候选那一次**用同一个 mode**（含缺省）：两次的目的地判定一旦分叉，
+  // 就成了"披露按 A 说、发送点按 B 判"。
+  const verdict = validateEndpointUrl(candidate.endpointConfig.endpoint, { mode });
   if (!verdict.ok) {
     return {
       ok: false,
@@ -886,27 +974,84 @@ async function attemptOnce(
     };
   }
 
+  // ── 托管档：另一份契约 + 一条主机一致性守卫 ─────────────────────────────
+  //
+  // 🔴 **为什么要有"主机必须相等"那一条**：披露说 `heyta-cloud` 是**按
+  // `candidate.endpointConfig.endpoint` 推出来的**，而请求实际会打到
+  // `transport.baseUrl`。两者若不等于同一台主机，就成了
+  // **"披露按 A 说、字节发到 B"** —— 那比"没有披露"更坏，因为用户以为自己知道。
+  // 宿主给错基址（配置串了、登录到了另一台实例）时，这里**一个请求都不发**。
+  let requestUrl: string;
+  let requestHeaders: Record<string, string>;
+  let requestBody: unknown;
+
+  if (mode === 'managed') {
+    // 托管档不转发 `tools`（服务端行为，见 `docs/plans/launch-blockers.md` §3.2）⇒ 响亮拒绝
+    if (invocation.tools !== undefined && invocation.tools.length > 0) {
+      return {
+        ok: false,
+        reason: 'no-route',
+        message:
+          '托管 AI 暂不支持工具调用：我们的服务端不会把工具目录转发给模型。' +
+          '要用工具，请在设置里改选"使用自己的 AI 端点"。',
+      };
+    }
+    const transport = await (managedTransport?.() ?? Promise.resolve(undefined));
+    if (transport === undefined) {
+      return {
+        ok: false,
+        reason: 'not-configured',
+        message:
+          '托管 AI 现在走不了：这台设备还没有可用的托管通道（未登录，或这台服务器没有开通托管 AI）。',
+      };
+    }
+    // 🔴 守卫：宿主给的基址必须与**已被披露、已过白名单的那个端点**同一台主机。
+    if (!sameHost(candidate.endpointConfig.endpoint, transport.baseUrl)) {
+      return {
+        ok: false,
+        reason: 'http-error',
+        message:
+          '托管通道的地址与这次披露的端点不是同一台主机，因此**一个请求都不发**：' +
+          `披露的是「${candidate.endpointConfig.endpoint}」，通道给的是「${transport.baseUrl}」。`,
+      };
+    }
+    requestUrl = managedChatUrl(transport.baseUrl);
+    requestHeaders = {
+      'content-type': 'application/json',
+      authorization: `Bearer ${transport.token}`,
+    };
+    requestBody = buildManagedChatRequestBody(invocation.feature, invocation);
+  } else {
+    requestUrl = chatCompletionsUrl(candidate.endpointConfig.endpoint);
+    requestHeaders = chatRequestHeaders(apiKey);
+    // 🔴 数据面**恰好**是披露出去的那几项，没有别的字段；线格式与
+    // `createProvider()` 共用同一个组装点（`wire.ts`，工单 W7）——
+    // 以前两边各拼一遍、互相用注释要求一致，那是没有要求。
+    requestBody = buildChatRequestBody(candidate.model, invocation);
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => {
     controller.abort();
   }, timeoutMs);
 
   try {
-    const res = await doFetch(chatCompletionsUrl(candidate.endpointConfig.endpoint), {
+    const res = await doFetch(requestUrl, {
       method: 'POST',
-      headers: chatRequestHeaders(apiKey),
-      // 🔴 数据面**恰好**是披露出去的那几项，没有别的字段；线格式与
-      // `createProvider()` 共用同一个组装点（`wire.ts`，工单 W7）——
-      // 以前两边各拼一遍、互相用注释要求一致，那是没有要求。
-      body: JSON.stringify(buildChatRequestBody(candidate.model, invocation)),
+      headers: requestHeaders,
+      body: JSON.stringify(requestBody),
       signal: controller.signal,
     });
 
     if (!res.ok) {
+      // 🔴 与 `createProvider` 同一处置：托管档的 `402` / `409` 也落在 `http-error`，
+      // 而"没订阅"与"额度用尽"的修复动作相反 —— 把服务端稳定码一并带出去。
+      const serverCode = await readServerCode(res);
       return {
         ok: false,
         reason: 'http-error',
         status: res.status,
+        ...(serverCode === undefined ? {} : { serverCode }),
         message: `端点「${candidate.endpointConfig.label}」返回 ${String(res.status)}。`,
       };
     }

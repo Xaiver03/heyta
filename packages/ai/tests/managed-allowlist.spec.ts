@@ -20,14 +20,19 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   AiConfigError,
+  DEFAULT_ROUTING_POLICY,
   MANAGED_MODEL_HOSTS,
   assertEnableable,
   classifyDestination,
   createProvider,
+  extractServerCode,
+  invokeRouted,
   isDomesticManagedEndpoint,
   managedEndpointVerdict,
   managedEndpointVerdictAgainst,
   requiresEgressConsent,
+  resolveRoute,
+  type AiRoutingConfig,
   type ManagedModelHost,
 } from '../src/index.js';
 
@@ -306,5 +311,361 @@ describe('⑤ 发送点复算：托管端点在构造之后被换成境外 ⇒ �
     expect(classifyDestination({ mode: 'managed', endpoint: config.endpoint })).not.toBe(
       'heyta-cloud',
     );
+  });
+});
+
+/**
+ * ⑥ `AiRoutingConfig.mode` —— [ADR-0056](../../../docs/adr/0056-endpoint-address-class-and-domestic-managed-allowlist.md)
+ * §5 第 1 条点名的那一格（原文：「`AiRoutingConfig` 没有 `mode` 字段，所以自家服务器上的
+ * 托管端点会被推导成 `user-endpoint`，于是披露变成"该端点由你提供、heyta 不参与"——**那句是假的**」）。
+ *
+ * 🔴 这一组钉的是**两件相反方向的事**，缺一条都会出事：
+ * 1. `mode: 'managed'` 时白名单端点**必须**说成 `heyta-cloud`（否则披露在撒谎）；
+ * 2. 但它**不能**把任何端点都说成 `heyta-cloud`（否则这个字段就成了一个"说好话的开关"）。
+ */
+describe('⑥ 路由配置必须知道供给模式（ADR-0056 §5 第 1 条那格已补）', () => {
+  // ⚠️ 只有两档：`'off'` 已被 `AiRoutingConfig.mode` 的类型排除（见那条注释 ——
+  // 它在路由里会把每个端点都变成免授权的 `'none'`）。运行时的兜底另有一段 ⑨。
+  const managedRouting = (mode?: 'own' | 'managed') => ({
+    ...(mode === undefined ? {} : { mode }),
+    enabled: true,
+    allowRemote: true,
+    endpoints: [
+      { id: 'managed', label: 'heyta 托管', endpoint: ALLOWLISTED_ENDPOINT, model: 'deepseek' },
+    ],
+    routes: { capture: [{ endpointId: 'managed' }] },
+  });
+
+  it('🔴 `mode: managed` + 白名单端点 ⇒ 目的地是 `heyta-cloud`（过去这里恒为 `user-endpoint`）', () => {
+    const { candidates } = resolveRoute(managedRouting('managed'), 'capture', { now: 0 });
+
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]?.destination).toBe('heyta-cloud');
+  });
+
+  it('⚠️ 不写 `mode` ⇒ 与引入这个字段之前**逐字相同**（`user-endpoint`），没有静默行为变更', () => {
+    const { candidates } = resolveRoute(managedRouting(), 'capture', { now: 0 });
+
+    expect(candidates[0]?.destination).toBe('user-endpoint');
+  });
+
+  it('🔴 `mode: managed` 但端点**不在白名单** ⇒ 仍推 `user-endpoint`（这个字段放宽不了任何东西）', () => {
+    const routing = managedRouting('managed');
+    const { candidates } = resolveRoute(
+      {
+        ...routing,
+        endpoints: [
+          { ...routing.endpoints[0]!, endpoint: 'https://api.example.com/v1' },
+        ],
+      },
+      'capture',
+      { now: 0 },
+    );
+
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]?.destination).toBe('user-endpoint');
+  });
+
+  it('🔴 发送点复算与解析候选**用同一个 mode**：端点换成境外之后，同一份 mode 下推不出 `heyta-cloud`', () => {
+    // 解析候选那一侧（`resolveRoute` → `validateEndpointUrl`）
+    const { candidates } = resolveRoute(managedRouting('managed'), 'capture', { now: 0 });
+    expect(candidates[0]?.destination).toBe('heyta-cloud');
+
+    // 发送点那一侧（`attemptOnce` → `validateEndpointUrl`，同一个函数、同一个 mode）
+    // 端点一旦离开白名单，两处都必须推不出 `heyta-cloud` —— 否则就是"披露按 A 说、发送点按 B 判"。
+    expect(
+      classifyDestination({ mode: 'managed', endpoint: 'https://api.example.com/v1' }),
+    ).not.toBe('heyta-cloud');
+  });
+});
+
+/**
+ * ⑦ 托管档的**传输**：打到的是我们自己的服务端代理，不是 OpenAI 兼容端点。
+ *
+ * 🔴 三条判据，对应三个各自能出事的形状：
+ * 1. 契约：URL 是 `/api/ai/managed/chat`、body **恰好** `{feature, messages}`
+ *    （多一个 `model` 就意味着客户端能选我们倒贴多少钱，ADR-0021）；
+ * 2. 拿不到托管通道时**不许回退**到自备端点那条路（"你以为发给了托管、实际发给了别处"）；
+ * 3. 带工具时**响亮拒绝**（服务端不转发 `tools`，静默降级=纯文本回答）。
+ */
+describe('⑦ 托管档的传输：打到我们自己的代理，而不是 OpenAI 兼容端点', () => {
+  const consent = (feature: 'capture' | 'tool-calling') => [
+    { feature, destination: 'heyta-cloud' as const, grantedAt: 0 },
+  ];
+  const okResponse = () =>
+    new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  const managedConfig = () => ({
+    mode: 'managed' as const,
+    endpoint: ALLOWLISTED_ENDPOINT,
+    model: 'm',
+  });
+
+  it('✅ 有托管通道 ⇒ 打到 `<基址>/api/ai/managed/chat`，body 只有 `{feature, messages}`，带 Bearer', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(okResponse());
+    const provider = createProvider(managedConfig(), {
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      // 尾斜杠必须归一化：同一个服务器两种写法不该拼出两个不同的串
+      managedTransport: async () => ({ baseUrl: 'https://heyta.example.cn/', token: 'T0K' }),
+    });
+
+    const result = await provider.invoke(
+      { feature: 'capture', system: 'sys', user: 'usr', fields: ['title'] },
+      consent('capture'),
+    );
+
+    expect(result.ok).toBe(true);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('https://heyta.example.cn/api/ai/managed/chat');
+    const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+    // 🔴 键集**恰好**两项：没有 `model`（服务端定），也没有 `tools`（服务端不转发）
+    expect(Object.keys(body).sort()).toEqual(['feature', 'messages']);
+    expect(body.feature).toBe('capture');
+    expect(init.headers).toMatchObject({ authorization: 'Bearer T0K' });
+  });
+
+  it('🔴 没有托管通道 ⇒ `not-configured`，且**零请求**（不许回退到自备端点那条路）', async () => {
+    const fetchImpl = vi.fn();
+    const provider = createProvider(managedConfig(), {
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      managedTransport: async () => undefined,
+    });
+
+    const result = await provider.invoke(
+      { feature: 'capture', system: 's', user: 'u', fields: ['title'] },
+      consent('capture'),
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('unreachable');
+    expect(result.reason).toBe('not-configured');
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('🔴 带工具 ⇒ `no-route` 且**零请求**（托管档不转发 tools，不许静默降级成纯文本）', async () => {
+    const fetchImpl = vi.fn();
+    const provider = createProvider(managedConfig(), {
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      managedTransport: async () => ({ baseUrl: 'https://heyta.example.cn', token: 'T' }),
+    });
+
+    const result = await provider.invoke(
+      {
+        feature: 'tool-calling',
+        system: 's',
+        user: 'u',
+        fields: ['title'],
+        tools: [{ name: 'get_task', description: 'd', parameters: {} }],
+      },
+      consent('tool-calling'),
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('unreachable');
+    expect(result.reason).toBe('no-route');
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * ⑧ **生产路径**（`invokeRouted`）上的托管档 —— 这是真正被宿主调用的那条。
+ *
+ * 🔴 为什么单开一段：`createProvider()`（⑦ 那段）是**历史/测试路径**，
+ * `packages/app-host` 的注释逐字写着"新增出境功能请接 `invokeRouted`，不要接这里"。
+ * 只在 ⑦ 上接线等于**没接生产**。
+ *
+ * 🔴 本段最值钱的一条是**主机一致性守卫**：披露说 `heyta-cloud` 是按
+ * `candidate.endpoint` 推的，而字节实际打到 `transport.baseUrl`。
+ * 两者不同主机时**必须一个请求都不发** —— 否则就是"披露按 A 说、字节发到 B"。
+ */
+describe('⑧ 生产路径 invokeRouted 上的托管档', () => {
+  const routing = () => ({
+    mode: 'managed' as const,
+    enabled: true,
+    allowRemote: true,
+    endpoints: [
+      { id: 'managed', label: 'heyta 托管', endpoint: ALLOWLISTED_ENDPOINT, model: 'deepseek' },
+    ],
+    routes: { capture: [{ endpointId: 'managed' }] },
+  });
+  const invocation = { feature: 'capture' as const, system: 's', user: 'u', fields: ['title'] };
+  const consents = [{ feature: 'capture' as const, destination: 'heyta-cloud' as const, grantedAt: 0 }];
+  const okResponse = () =>
+    new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  /** 白名单端点的主机名 —— 用它拼出一个"同一台主机、不同写法"的基址。 */
+  const MANAGED_HOST = MANAGED_MODEL_HOSTS[0]!.host;
+
+  it('✅ 打到 `<基址>/api/ai/managed/chat`，body 恰好 `{feature, messages}`', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(okResponse());
+
+    const out = await invokeRouted(routing(), invocation, consents, DEFAULT_ROUTING_POLICY, {
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      managedTransport: async () => ({ baseUrl: `https://${MANAGED_HOST}`, token: 'T0K' }),
+    });
+
+    expect(out.result.ok).toBe(true);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(`https://${MANAGED_HOST}/api/ai/managed/chat`);
+    const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+    expect(Object.keys(body).sort()).toEqual(['feature', 'messages']);
+  });
+
+  it('🔴 宿主给的基址与披露的端点**不是同一台主机** ⇒ 拒发，零请求', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(okResponse());
+
+    const out = await invokeRouted(routing(), invocation, consents, DEFAULT_ROUTING_POLICY, {
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      // 披露的是白名单上那台；通道却指到别处 —— 这正是"发到 B"的形状
+      managedTransport: async () => ({ baseUrl: 'https://evil.example.com', token: 'T' }),
+    });
+
+    expect(out.result.ok).toBe(false);
+    if (out.result.ok) throw new Error('unreachable');
+    expect(out.result.message).toContain('不是同一台主机');
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('🔴 有托管路由但拿不到通道 ⇒ `not-configured`，零请求（不回退到 OpenAI 契约）', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(okResponse());
+
+    const out = await invokeRouted(routing(), invocation, consents, DEFAULT_ROUTING_POLICY, {
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      managedTransport: async () => undefined,
+    });
+
+    expect(out.result.ok).toBe(false);
+    if (out.result.ok) throw new Error('unreachable');
+    expect(out.result.reason).toBe('not-configured');
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * ⑨ **运行时兜底**：`mode: 'off'` 不许拆掉出境闸门。
+ *
+ * 🔴 类型上 `AiRoutingConfig.mode` 已经排除 `'off'`，但配置可能来自
+ * **持久化 JSON / 导入 / 手工改文件** —— 那些路径里没有类型系统。
+ * 而 `'off'` 在路由里是危险值：`classifyDestination({ mode: 'off' })` 对**任何**端点
+ * 都返回 `'none'`，而 `'none'` = 本机目的地、**免授权**
+ * ⇒ `resolveRoute` 的第 2 道闸（`destination !== 'none' && !allowRemote`）**整条失效**，
+ * 一个远端端点会被当成"本机"放行。用户看不出任何变化。
+ */
+describe("⑨ 运行时兜底：磁盘上的 `mode: 'off'` 不许拆掉出境闸门", () => {
+  it("🔴 `mode: 'off'` 被归一到 `'own'` ⇒ 远端端点仍被第 2 道闸排除（不是免授权放行）", () => {
+    // 故意绕过类型：模拟"磁盘上就是这串"这条真实路径
+    const routing = {
+      mode: 'off',
+      enabled: true,
+      allowRemote: false,
+      endpoints: [{ id: 'r', label: 'R', endpoint: 'https://api.example.com/v1', model: 'm' }],
+      routes: { capture: [{ endpointId: 'r' }] },
+    } as unknown as AiRoutingConfig;
+
+    const { candidates, excluded } = resolveRoute(routing, 'capture', { now: 0 });
+
+    // 若 `'off'` 生效：目的地会是 `'none'` ⇒ 不被 `allowRemote` 排除 ⇒ candidates 有 1 条
+    expect(candidates).toHaveLength(0);
+    expect(excluded.map((e) => e.reason)).toContain('remote-not-allowed');
+  });
+});
+
+/**
+ * ⑩ 托管档**被拒时的稳定码**：`402 SUBSCRIPTION_REQUIRED` / `409 AI_QUOTA_EXCEEDED`。
+ *
+ * 🔴 这两件事都落在失败词表的 `http-error` 一档里，只靠状态码界面分不清 ——
+ * 而它们的**修复动作完全相反**：一个是"去买"，一个是"等下一周期"。
+ * 所以服务端那个 UPPER_SNAKE 必须一路带到壳里（`packages/ai` 只带码，不决定措辞）。
+ */
+describe('⑩ 托管档被拒：服务端稳定码要一路带出来', () => {
+  /** 与 ⑧ 同源：白名单端点的主机名（不抄第二份白名单）。 */
+  const MANAGED_HOST = MANAGED_MODEL_HOSTS[0]!.host;
+  const managedRouting = () => ({
+    mode: 'managed' as const,
+    enabled: true,
+    allowRemote: true,
+    endpoints: [
+      { id: 'managed', label: 'heyta 托管', endpoint: ALLOWLISTED_ENDPOINT, model: 'm' },
+    ],
+    routes: { capture: [{ endpointId: 'managed' }] },
+  });
+  const invocation = { feature: 'capture' as const, system: 's', user: 'u', fields: ['title'] };
+  const consents = [
+    { feature: 'capture' as const, destination: 'heyta-cloud' as const, grantedAt: 0 },
+  ];
+  const refuse = (status: number, code: string) =>
+    new Response(JSON.stringify({ code, message: 'x', reason: 'y' }), {
+      status,
+      headers: { 'content-type': 'application/json' },
+    });
+
+  it('🔴 `402 SUBSCRIPTION_REQUIRED` ⇒ `http-error` + `status:402` + `serverCode` 原样带出', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(refuse(402, 'SUBSCRIPTION_REQUIRED'));
+
+    const out = await invokeRouted(managedRouting(), invocation, consents, DEFAULT_ROUTING_POLICY, {
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      managedTransport: async () => ({ baseUrl: `https://${MANAGED_HOST}`, token: 'T' }),
+    });
+
+    expect(out.result.ok).toBe(false);
+    if (out.result.ok) throw new Error('unreachable');
+    expect(out.result.reason).toBe('http-error');
+    expect(out.result.status).toBe(402);
+    expect(out.result.serverCode).toBe('SUBSCRIPTION_REQUIRED');
+  });
+
+  it('🔴 `409 AI_QUOTA_EXCEEDED` ⇒ 同一个 `http-error` 档，但码不同（界面据此分开说话）', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(refuse(409, 'AI_QUOTA_EXCEEDED'));
+
+    const out = await invokeRouted(managedRouting(), invocation, consents, DEFAULT_ROUTING_POLICY, {
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      managedTransport: async () => ({ baseUrl: `https://${MANAGED_HOST}`, token: 'T' }),
+    });
+
+    expect(out.result.ok).toBe(false);
+    if (out.result.ok) throw new Error('unreachable');
+    expect(out.result.serverCode).toBe('AI_QUOTA_EXCEEDED');
+  });
+
+  it('✅ 成功响应**不碰** body：`serverCode` 不出现，正文照常解析出来', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+
+    const out = await invokeRouted(managedRouting(), invocation, consents, DEFAULT_ROUTING_POLICY, {
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      managedTransport: async () => ({ baseUrl: `https://${MANAGED_HOST}`, token: 'T' }),
+    });
+
+    expect(out.result.ok).toBe(true);
+    if (!out.result.ok) throw new Error('unreachable');
+    expect(out.result.suggestion.text).toBe('ok');
+  });
+
+  it('⚠️ `extractServerCode` 只认非空字符串：`null` / 数字 / 空串 / 数组一律 `undefined`', () => {
+    // 一个空串进了界面会命中一张取不到词条的表，看起来像"未知错误"——
+    // 比 `undefined`（壳知道"服务端没给码"）更难查。
+    for (const [input, expected] of [
+      [{ code: 'X' }, 'X'],
+      [{ code: '' }, undefined],
+      [{ code: '   ' }, undefined],
+      [{ code: 1 }, undefined],
+      [{ code: null }, undefined],
+      [{}, undefined],
+      [null, undefined],
+      [[], undefined],
+      ['{"code":"X"}', undefined],
+    ] as const) {
+      expect(extractServerCode(input), JSON.stringify(input)).toBe(expected);
+    }
   });
 });

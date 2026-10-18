@@ -96,9 +96,11 @@ import {
   ASSISTANT_TIER_EXECUTE,
   ASSISTANT_TIER_READ_ONLY,
   destinationForFeature,
+  fetchManagedAiUsage,
   planAssistantEgress,
   recomputeConsents,
   type AssistantTier,
+  type ManagedAiUsageReading,
 } from '@heyta/app-host';
 import {
   AlertTriangle,
@@ -372,10 +374,47 @@ export interface AiSettingsProps {
    * 授权仍然只能由用户在这里按"我同意"完成。
    */
   focusTarget?: SettingsTarget | undefined;
+  /**
+   * 这台设备**有没有可打的同步服务器**（`baseUrl` 非空）。
+   *
+   * 🔴 只用于托管档那句"还差什么"：托管档的端点来自同步服务器，
+   * 没配服务器时它**选不了也不该装作能选** —— 与其等用户按下 AI 再拿一句
+   * "AI 不可用"，不如在这里就说清下一步去「同步」。
+   *
+   * ⚠️ 它**不是**判据本身（"能不能真的打通"由路由层在发送那一刻判）；
+   * 它只决定要不要多显示一句指引。缺省 `false` = 不知道就按"还没配"处理。
+   */
+  managedServerReady?: boolean;
+  /**
+   * 拉「本周期已用 X / 300」要用的两样（与托管通道同一对：服务器地址 + 活令牌）。
+   *
+   * ⚠️ **不给就不显示读数**（而不是显示 0 / 300）—— 那是法务承诺的那个数，
+   * 编一个出来比不显示更坏。
+   */
+  managedUsage?: {
+    baseUrl: string;
+    getToken: () => Promise<string | undefined>;
+  };
 }
 
-export function AiSettings({ active = true, initial, secrets, onChange, memorySlot, focusTarget }: AiSettingsProps) {
+export function AiSettings({
+  active = true,
+  initial,
+  secrets,
+  onChange,
+  memorySlot,
+  focusTarget,
+  managedServerReady = false,
+  managedUsage,
+}: AiSettingsProps) {
   const [settings, setSettings] = useState<PersistedAiSettings>(initial);
+  /**
+   * 托管档的用量读数（法务 §5.3 那句承诺）。
+   *
+   * 🔴 `undefined`（还没拉 / 不给拉）与 `unavailable`（拉了没读到）**不是一回事**：
+   * 前者不渲染任何东西，后者要如实说"读不到"。两者都不能渲染成 `0 / 300`。
+   */
+  const [usage, setUsage] = useState<ManagedAiUsageReading | undefined>(undefined);
   const [keyDraft, setKeyDraft] = useState<Record<string, string>>({});
   const [localTokenVisible, setLocalTokenVisible] = useState(false);
   const [localTokenCopied, setLocalTokenCopied] = useState(false);
@@ -439,6 +478,29 @@ export function AiSettings({ active = true, initial, secrets, onChange, memorySl
 
   const { routing, localApi } = settings;
   const localApiVerdict = validateLocalApiConfig(localApi);
+
+  /**
+   * 拉一次托管档的用量读数。
+   *
+   * 🔴 只在 `mode === 'managed'` 且宿主给了那两样时拉 —— 自备档不该因为
+   * 打开设置页就向我们的服务器发一次请求（那是"顺手收集"，与本地优先冲突）。
+   *
+   * ⚠️ `alive` 守卫是必需的：面板在设置浮层里来回切时可能会卸载，
+   * 而迟到的 `setUsage` 会作用在一个已经卸载的组件上。
+   */
+  useEffect(() => {
+    if (routing.mode !== 'managed' || managedUsage === undefined) {
+      setUsage(undefined);
+      return;
+    }
+    let alive = true;
+    void fetchManagedAiUsage(managedUsage).then((reading) => {
+      if (alive) setUsage(reading);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [routing.mode, managedUsage]);
 
   /**
    * 🔴 「去设置」的落点。
@@ -677,6 +739,79 @@ export function AiSettings({ active = true, initial, secrets, onChange, memorySl
               </span>
             </p>
           )}
+
+          {/* ── 供给模式：我自己的端点 / heyta 托管 ──────────────────
+              🔴 它**必须在端点列表之前**：这是"请求发给谁"的第一层选择，
+              而下面的端点列表只在"我自己的端点"那一档才有意义。
+
+              🔴 托管档的地址**不在这里配** —— 它来自「同步」里那台服务器
+              （`withManagedEndpoint` 在构造路由配置那一刻合成）。
+              在这里再让用户填一次地址，就会出现"两个地址、谁生效取决于哪一层"
+              的形状；而换服务器时这一档应当**跟着换**，不需要用户记得回来改。
+          */}
+          <fieldset
+            className="ht-settings__options"
+            data-testid="ai-supply-mode"
+            style={{ border: 0, padding: 0, margin: 0 }}
+          >
+            <legend className="ht-settings__h3 ht-type-headline">
+              {t('web.ai.settings.supply.title')}
+            </legend>
+            {(
+              [
+                { key: 'own' as const, labelKey: 'web.ai.settings.supply.own' },
+                { key: 'managed' as const, labelKey: 'web.ai.settings.supply.managed' },
+              ] as const
+            ).map((option) => (
+              <label key={option.key} className="ht-settings__option">
+                <input
+                  type="radio"
+                  name="ai-supply-mode"
+                  checked={(routing.mode ?? 'own') === option.key}
+                  onChange={() => updateRouting({ ...routing, mode: option.key })}
+                />
+                <span>{t(option.labelKey)}</span>
+              </label>
+            ))}
+            <p className="ht-settings__hint">{t('web.ai.settings.supply.note')}</p>
+            {routing.mode === 'managed' && !managedServerReady && (
+              /* 选了托管但**没有可打的服务器** —— 与其让用户按下 AI 再拿一句
+                 "AI 不可用"，不如在这里就说清下一步该去哪（「同步」）。 */
+              <p className="ht-settings__danger" role="note" data-testid="ai-supply-managed-pending">
+                <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" />
+                <span>{t('web.ai.settings.supply.managedPending')}</span>
+              </p>
+            )}
+
+            {/*
+              「本周期已用 X / 300」—— **法务 §5.3 承诺的那个读数**，不是可选 UI。
+
+              🔴 三种状态**必须分开说**，它们的修复动作完全不同：
+                · `ok + entitled`  ⇒ 报数（这就是承诺的那句话）
+                · `ok + !entitled` ⇒ **不是 0/300**！那是"没有这一期"（没订阅 / 已到期）
+                · `unavailable`    ⇒ 如实说"读不到"，不许拿 0 顶上
+              `unconfigured` 不渲染 —— 上面那条 pending 提示已经说清该去哪了。
+            */}
+            {usage !== undefined && usage.kind !== 'unconfigured' && (
+              <p
+                className="ht-settings__hint"
+                data-testid="ai-managed-usage"
+                data-usage-state={
+                  usage.kind === 'unavailable'
+                    ? 'unavailable'
+                    : usage.entitled
+                      ? 'entitled'
+                      : 'not-entitled'
+                }
+              >
+                {usage.kind === 'unavailable'
+                  ? t('web.ai.settings.usage.unavailable')
+                  : usage.entitled
+                    ? t('web.ai.settings.usage.used', { used: usage.used, limit: usage.limit })
+                    : t('web.ai.settings.usage.notEntitled')}
+              </p>
+            )}
+          </fieldset>
 
           {/* ── 端点列表 ─────────────────────────────────────────── */}
           <section

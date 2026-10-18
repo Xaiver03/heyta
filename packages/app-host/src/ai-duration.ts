@@ -432,6 +432,13 @@ export type DurationOutcome =
        * （ADR-0045 §4）。**原样透传，不在这里判断。**
        */
       endpointUrl?: string;
+      /**
+       * 服务端**稳定码**（`AiFailure.serverCode` 原样透传）。
+       * 🔴 托管档的"没订阅"（`SUBSCRIPTION_REQUIRED`）与"额度用尽"（`AI_QUOTA_EXCEEDED`）
+       * 都落在 `http-error` 一档里，而两者的**修复动作相反**（去买 / 等下一周期）——
+       * 少了这个字段，界面就只能把这两件事说成同一句。
+       */
+      serverCode?: string;
       message: string;
       /**
        * 🔴 **失败分支也要带 health。** 这正是最需要它的地方 ——
@@ -492,6 +499,7 @@ export async function requestDuration(
       reason: 'ai-unavailable',
       cause: result.reason,
       endpointUrl: result.endpointUrl,
+      ...(result.serverCode === undefined ? {} : { serverCode: result.serverCode }),
       message: specific === '' ? describeRoutedFailure(result.reason) : specific,
       // 🔴 失败也要落盘 —— 这通常正是熔断计数器刚 +1 的那一次。
       health: outcome.health,

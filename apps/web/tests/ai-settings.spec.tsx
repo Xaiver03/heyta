@@ -15,7 +15,7 @@
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AI_ENDPOINT_PRESETS } from '@heyta/ai';
 import { I18nProvider } from '@heyta/i18n';
@@ -1060,5 +1060,170 @@ describe('🔴🔴 必须说清"我们只提供两种供给方式中的哪一种
   it('🔴 AI 总开关关着时不显示（那是"还没启用"，不是"缺功能"）', () => {
     const el = render({ initial: defaultAiSettings(), secrets: createSessionSecretStore() });
     expect(el.querySelector('[data-testid="managed-ai-note"]')).toBeNull();
+  });
+});
+
+/**
+ * 供给模式开关：`own`（我自己配的端点）/ `managed`（heyta 托管）。
+ *
+ * 🔴 这一组钉的是"开关**真的存在**"以及它的**两种副作用**：
+ * 1. 选托管会回传 `routing.mode = 'managed'` —— 少了这一步就是"选了不生效"，
+ *    而界面**不会**有任何异常表现（`mode` 缺省等于自备档）；
+ * 2. 托管档的端点来自**同步服务器**，所以没配服务器时要在**这里**就说清下一步去哪。
+ *    否则用户按下 AI 只会拿到一句"AI 不可用"，而他能做的其实是去「同步」填地址。
+ */
+describe('AI 供给模式开关（我自己的端点 / heyta 托管）', () => {
+  const enabledSettings = (mode?: 'own' | 'managed') => {
+    const base = defaultAiSettings();
+    return {
+      ...base,
+      routing: { ...base.routing, enabled: true, ...(mode === undefined ? {} : { mode }) },
+    };
+  };
+
+  it('默认（没写过 mode）⇒「我自己的端点」选中', () => {
+    const c = render({ initial: enabledSettings(), secrets: createSessionSecretStore() });
+
+    const group = c.querySelector('[data-testid="ai-supply-mode"]');
+    expect(group).not.toBeNull();
+    const checked = group!.querySelector('input[type="radio"]:checked');
+    expect(checked?.closest('label')?.textContent).toContain('我自己配置的端点');
+  });
+
+  it('🔴 选「heyta 托管」⇒ 回传 `routing.mode = managed`（否则选了不生效）', () => {
+    const seen: (string | undefined)[] = [];
+    const c = render({
+      initial: enabledSettings(),
+      secrets: createSessionSecretStore(),
+      managedServerReady: true,
+      onChange: (next) => seen.push(next.routing.mode),
+    });
+
+    const radios = [
+      ...c.querySelectorAll('[data-testid="ai-supply-mode"] input[type="radio"]'),
+    ];
+    const managed = radios.find((r) =>
+      r.closest('label')?.textContent?.includes('heyta 托管'),
+    );
+    expect(managed).toBeTruthy();
+    act(() => {
+      (managed as HTMLInputElement).click();
+    });
+
+    expect(seen.at(-1)).toBe('managed');
+  });
+
+  it('🔴 选了托管但**没有可用的同步服务器** ⇒ 当场说清下一步（不是等按下 AI 才失败）', () => {
+    const c = render({
+      initial: enabledSettings('managed'),
+      secrets: createSessionSecretStore(),
+      managedServerReady: false,
+    });
+
+    expect(c.querySelector('[data-testid="ai-supply-managed-pending"]')).not.toBeNull();
+  });
+
+  it('有服务器时那条提示**不**出现（别把正常状态也说成缺东西）', () => {
+    const c = render({
+      initial: enabledSettings('managed'),
+      secrets: createSessionSecretStore(),
+      managedServerReady: true,
+    });
+
+    expect(c.querySelector('[data-testid="ai-supply-managed-pending"]')).toBeNull();
+  });
+});
+
+/**
+ * 「本周期已用 X / 300」—— **法务 §5.3 承诺的那个读数**。
+ *
+ * 🔴 这一组钉的是**三种状态不许被混成一种**：
+ * `ok + entitled` / `ok + !entitled` / `unavailable`。
+ * 把第二、三种渲染成「已用 0 / 300」就是在说反话 —— 前者是"没有这一期"，
+ * 后者是"读不到"，而它们的修复动作与"还没开始用"完全不同。
+ */
+describe('托管档的用量读数（已用 X / limit）', () => {
+  const enabledSettings = (mode?: 'own' | 'managed') => {
+    const base = defaultAiSettings();
+    return {
+      ...base,
+      routing: { ...base.routing, enabled: true, ...(mode === undefined ? {} : { mode }) },
+    };
+  };
+  const usageProps = { baseUrl: 'https://heyta.waytofuture.cn', getToken: async () => 'T' };
+  const stubFetch = (body: unknown, status = 200) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify(body), {
+          status,
+          headers: { 'content-type': 'application/json' },
+        }),
+      ),
+    );
+  };
+  /** 等组件里那次 `await fetchManagedAiUsage(...)` 落地。 */
+  const flush = () => act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('🔴 有权益 ⇒ 报出「已用 X / limit」（这就是承诺的那句话）', async () => {
+    stubFetch({ used: 7, limit: 300, periodAnchor: 1, entitled: true });
+    const c = render({
+      initial: enabledSettings('managed'),
+      secrets: createSessionSecretStore(),
+      managedUsage: usageProps,
+    });
+    await flush();
+
+    const el = c.querySelector('[data-testid="ai-managed-usage"]');
+    expect(el?.getAttribute('data-usage-state')).toBe('entitled');
+    expect(el?.textContent).toContain('7');
+    expect(el?.textContent).toContain('300');
+  });
+
+  it('🔴 没权益 ⇒ 说"没有权益"，**不许**渲染成「已用 0 / 300」', async () => {
+    stubFetch({ used: 0, limit: 300, periodAnchor: null, entitled: false });
+    const c = render({
+      initial: enabledSettings('managed'),
+      secrets: createSessionSecretStore(),
+      managedUsage: usageProps,
+    });
+    await flush();
+
+    const el = c.querySelector('[data-testid="ai-managed-usage"]');
+    expect(el?.getAttribute('data-usage-state')).toBe('not-entitled');
+    expect(el?.textContent).toContain('没有托管 AI 权益');
+    expect(el?.textContent).not.toContain('300');
+  });
+
+  it('🔴 读不到 ⇒ 如实说"读不到"，**不许**拿 0 顶上', async () => {
+    stubFetch({ error: 'nope' }, 503);
+    const c = render({
+      initial: enabledSettings('managed'),
+      secrets: createSessionSecretStore(),
+      managedUsage: usageProps,
+    });
+    await flush();
+
+    const el = c.querySelector('[data-testid="ai-managed-usage"]');
+    expect(el?.getAttribute('data-usage-state')).toBe('unavailable');
+    expect(el?.textContent).toContain('读不到用量');
+  });
+
+  it('🔴 自备档 ⇒ **一个请求都不发**（本地优先：打开设置页不该顺手问我们的服务器）', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const c = render({
+      initial: enabledSettings('own'),
+      secrets: createSessionSecretStore(),
+      managedUsage: usageProps,
+    });
+    await flush();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(c.querySelector('[data-testid="ai-managed-usage"]')).toBeNull();
   });
 });

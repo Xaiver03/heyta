@@ -85,6 +85,7 @@ import {
   type DurationHistoryRow,
   type DurationProposal,
 } from '@heyta/app-host';
+import { webManagedTransport } from './managed-transport.js';
 import { durationFailureCopy, type AiFailureCopy } from './ai-failure-copy.js';
 import type { Task } from '@heyta/domain';
 
@@ -254,6 +255,7 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
       preferences: hints,
       routed: {
         secretStore: secrets,
+        managedTransport: webManagedTransport,
         // 🔴 **发送那一刻**才解析快照 —— 冷却期是对着"现在"算的。
         healthSeed: fromHealthSnapshot(props.healthSnapshot ?? {}, Date.now()),
         ...(props.fetchImpl === undefined ? {} : { fetchImpl: props.fetchImpl }),
@@ -272,6 +274,7 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
       durationFailureCopy(outcome.reason, outcome.message, {
         cause: outcome.cause,
         endpointUrl: outcome.endpointUrl,
+        serverCode: outcome.serverCode,
       }),
     );
     setPhase('failed');

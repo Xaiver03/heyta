@@ -88,8 +88,10 @@ const TASK = {
 function ctx(
   cause: AiFailureReason | undefined,
   endpointUrl: string | undefined,
+  /** 服务端稳定码 —— 这个文件里的用例都不涉及托管档，缺省 `undefined`。 */
+  serverCode: string | undefined = undefined,
 ): AiFailureContext {
-  return { cause, endpointUrl };
+  return { cause, endpointUrl, serverCode };
 }
 
 /**

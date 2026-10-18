@@ -658,3 +658,69 @@ describe('响应透传', () => {
     expect('stream' in JSON.parse(String(upstream.hits()[0]?.body))).toBe(false);
   });
 });
+
+/**
+ * `GET /api/ai/managed/usage` —— 法务 §5.3 那句「设置页可以查到本周期已用 X / 300 次」。
+ *
+ * 这一组钉的是**四条不变量**，每一条都能红：
+ * 1. 数字与裁决同源（用掉几次就报几次）；
+ * 2. `entitled:false` 与「这一期还没用过」**不是同一件事** —— 前者报 `used:0` 会被界面
+ *    读成"还剩 300 次"，而那正是法务那句承诺反过来说的样子；
+ * 3. **只读**：连查多次不得消耗额度（把查询写成扣费，用户点开设置页就掉一次额度）；
+ * 4. 它不是匿名下行（插件级 preHandler 必须覆盖到新路由）。
+ */
+describe('读用量路由：GET /api/ai/managed/usage', () => {
+  const get = (headers: Record<string, string> = {}) =>
+    app!.inject({ method: 'GET', url: '/api/ai/managed/usage', headers });
+
+  it('已订阅且用过 3 次 ⇒ 200 `used:3 / limit:300 / entitled:true`', async () => {
+    // 用掉装置注入的**整个**额度（`TEST_LIMIT`，不是生产那 300）——
+    // 于是这条用例同时钉住"读数与裁决同源"：它报的 limit 必须是裁决用的那一把尺。
+    for (let i = 0; i < TEST_LIMIT; i += 1) {
+      expect((await post(chatBody())).statusCode, `第 ${i + 1} 次应当放行`).toBe(200);
+    }
+    // 额度用尽之后再打一次：确认真的是"用满了"，而不是"只成功了一次"。
+    expect((await post(chatBody())).statusCode).toBe(409);
+
+    const res = await get({ authorization: 'Bearer mock-token' });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { used: number; limit: number; entitled: boolean };
+    expect(body.used).toBe(TEST_LIMIT);
+    expect(body.limit).toBe(TEST_LIMIT);
+    expect(body.entitled).toBe(true);
+  });
+
+  it('🔴 没有 `ai` 权益 ⇒ `entitled:false` + `used:0` + `periodAnchor:null`，且一行计数都不建', async () => {
+    await pglite.exec('DELETE FROM subscriptions;');
+    await seedEntitlement(['hosting']);
+
+    const res = await get({ authorization: 'Bearer mock-token' });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { used: number; periodAnchor: number | null; entitled: boolean };
+    expect(body.entitled).toBe(false);
+    expect(body.used).toBe(0);
+    expect(body.periodAnchor).toBeNull();
+    expect(await counterRow()).toBeNull();
+  });
+
+  it('🔴 只读：连查 5 次，计数器一字未动（查询不得变成扣费）', async () => {
+    await post(chatBody());
+    const before = await counterRow();
+    expect(before?.requests).toBe(1);
+
+    for (let i = 0; i < 5; i += 1) {
+      expect((await get({ authorization: 'Bearer mock-token' })).statusCode).toBe(200);
+    }
+
+    expect(await counterRow()).toEqual(before);
+    const body = (await get({ authorization: 'Bearer mock-token' })).json() as { used: number };
+    expect(body.used).toBe(1);
+  });
+
+  it('🔴 无令牌 ⇒ 401（插件级 preHandler 覆盖新路由，它不是匿名下行）', async () => {
+    const res = await get();
+    expect(res.statusCode).toBe(401);
+  });
+});

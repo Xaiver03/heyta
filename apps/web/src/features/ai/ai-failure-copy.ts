@@ -88,6 +88,19 @@ export interface AiFailureContext {
    * **最没用**的一句话。
    */
   readonly endpointUrl: string | undefined;
+  /**
+   * 服务端**稳定码**（来自 `AiFailure.serverCode`，托管档才有）。
+   *
+   * 🔴 为什么它非有不可：`402 SUBSCRIPTION_REQUIRED`（去买）与
+   * `409 AI_QUOTA_EXCEEDED`（等下一周期）的**修复动作相反**，
+   * 而在失败词表里它们**都落进 `http-error`** —— 只按 `cause` 取词条，
+   * 这两件事会被说成同一句"端点返回了错误"，指不出该做什么。
+   *
+   * ⚠️ **必填**（可以是 `undefined`）：加一个*可选*字段，六个入口会各自决定要不要传，
+   * 而"漏传"的表现只是**那个面板退回笼统说法**、其余照常 —— 没有任何一层会报错。
+   * 必填字段让编译器当场把六个入口全指出来。
+   */
+  readonly serverCode: string | undefined;
 }
 
 /** 一条失败态要渲染的东西：词条 + （可选）技术详情 + （可选）下一步。 */
@@ -258,8 +271,34 @@ function causeSettingsTarget(cause: AiFailureReason | undefined): SettingsTarget
   return cause === undefined ? undefined : CAUSE_SETTINGS_TARGET[cause];
 }
 
+/**
+ * 服务端稳定码 → 词条。**只登记"有下一步"的那两个**。
+ *
+ * 其余码（`AI_UPSTREAM_NOT_DOMESTIC` / `MANAGED_AI_NOT_CONFIGURED` …）没有对应的
+ * 用户动作时**不登记**，于是落回按 `cause` 取词条 —— 给一个没有下一步的错误
+ * 硬配一句话，等于教用户去一个没有答案的地方找答案。
+ */
+const SERVER_CODE_KEY: Readonly<Record<string, MessageKey>> = {
+  SUBSCRIPTION_REQUIRED: 'web.ai.failure.serverCode.subscriptionRequired',
+  AI_QUOTA_EXCEEDED: 'web.ai.failure.serverCode.quotaExceeded',
+};
+
+/**
+ * 服务端稳定码 → 词条。没登记（含 `undefined`）就返回 `undefined`，
+ * 调用方**落回按 `cause` 取**。
+ *
+ * ⚠️ 导出它只为一件事：让"登记了哪些码"成为**可断言**的（判据里两句话必须不同）。
+ */
+export function serverCodeKey(serverCode: string | undefined): MessageKey | undefined {
+  return serverCode === undefined ? undefined : SERVER_CODE_KEY[serverCode];
+}
+
 /** 原因码 → 词条；诊断出"来源被拒"时**换掉** `network` 那句泛泛的"检查网络"。 */
 function failureKey(ctx: AiFailureContext): MessageKey {
+  // 🔴 排在最前：服务端既然给了码，就**按码说话**。
+  // `402` 与 `409` 都落在 `http-error` 里，按 `cause` 取到的会是同一句。
+  const byServer = serverCodeKey(ctx.serverCode);
+  if (byServer !== undefined) return byServer;
   if (ctx.cause === 'network') {
     const diagnosisKey = DIAGNOSIS_KEY[networkDiagnosis(ctx)];
     if (diagnosisKey !== undefined) return diagnosisKey;

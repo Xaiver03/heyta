@@ -146,6 +146,81 @@ function codeOf(text) {
 }
 
 /**
+ * 去掉 TS/TSX 的注释与字符串**字面量**，只留可执行代码。
+ *
+ * 🔴 为什么必须去掉（判据 ㉕ 的第一版就栽在这里，2026-10-16）：那一版的函数头注释里写着
+ *    "修法是 cause 优先：`AI_CAUSE_KEY[entry.cause]`"，与故障标题那一行相距不到 600 字符
+ *    ⇒ 把真的 cause 分支变异掉之后，窗口里**仍然搜得到** `AI_CAUSE_KEY[`，判据照样报绿。
+ *    与本文件 臂 36/38/39 当年空的形状一模一样（注释把每条变异都洗成绿，§7 #191 那一族），
+ *    所以与 `codeOf()` 同源：**判形状只许拿可执行代码去比**。
+ *    字符串字面量一并抹掉：`t('AI_CAUSE_KEY[…]')` 那种写法不是消费者。
+ *    ⚠️ 模板串里的 `${…}` 表达式也会被抹掉；本判据看的是"那一处查询之前有没有原因码判定"，
+ *    不把"写在模板串里"当消费者（要那种写法就得改这条判据的覆盖面，而不是放宽这一条）。
+ */
+function stripTsComments(text) {
+  let out = '';
+  let state = 'code'; // code | line | block | single | double | template
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text[i];
+    const n = text[i + 1];
+    if (state === 'code') {
+      if (c === '/' && n === '/') {
+        state = 'line';
+        continue;
+      }
+      if (c === '/' && n === '*') {
+        state = 'block';
+        continue;
+      }
+      if (c === "'") {
+        state = 'single';
+        out += "''";
+        continue;
+      }
+      if (c === '"') {
+        state = 'double';
+        out += '""';
+        continue;
+      }
+      if (c === '`') {
+        state = 'template';
+        out += '``';
+        continue;
+      }
+      out += c;
+      continue;
+    }
+    if (state === 'line') {
+      if (c === '\n') {
+        state = 'code';
+        out += c;
+      }
+      continue;
+    }
+    if (state === 'block') {
+      if (c === '*' && n === '/') {
+        state = 'code';
+        i += 1;
+      } else if (c === '\n') out += c; // 行号保持可读
+      continue;
+    }
+    // 串里：抹掉内容，只保留换行（行号可读），收尾引号处回到代码态
+    if (c === '\\') {
+      i += 1;
+      continue;
+    }
+    if (c === '\n') {
+      out += c;
+      continue;
+    }
+    if ((state === 'single' && c === "'") || (state === 'double' && c === '"') || (state === 'template' && c === '`')) {
+      state = 'code';
+    }
+  }
+  return out;
+}
+
+/**
  * 源码侧的 testID 声明：字面量 + 模板（模板里的 `${…}` 段变成 `.*`）。
  * 返回 `{ literal:Set<string>, patterns:[{source, regex}] }`。
  */
@@ -707,76 +782,105 @@ function iosReaderShape(scriptRel) {
   return { red, n };
 }
 
-// 判据 ㉔：移动壳的工具/助手面板**不许无条件弹出境披露**（rig51 现量长出来的形状）。
+// 判据 ㉔：移动壳的出境披露必须过一次**共享**规则判定（rig51 现量长出来的形状；2026-10-16 换载体）。
 //
 // `packages/app-host/src/ai-assistant.ts` 里那段注释把这件事讲得很死：面板无条件弹披露
 // 的症状是"一句本机就答得出的话，先向用户承诺『这些话要离开本机』，用户点了发送却一个字
 // 都没出去"，而代价不是白点一次，是**下一次真需要出境时用户已经不信这条提示**。
-// web 的对话面板消费 `assistantNeedsEgressDisclosure()` 收掉了它；移动壳的两个发送按钮
-// （`tool-start-single` / `tool-start-assistant`）原先是**无条件** `setPhase('disclose')`
+// web 的对话面板消费 `assistantNeedsEgressDisclosure()` 收掉了它；移动壳当时的两个发送按钮
+// （`tool-start-single` / `tool-start-assistant`）则是**无条件** `setPhase('disclose')`
 // —— 同一个缺陷的第二个壳，而 iOS 设备载体只有走到这一支才能读"规则命中⇒零外发"。
 //
+// 🔴 **2026-10-16 换锚点（本判据唯一一次改动，只换载体、不放宽它判的东西）**：
+//   那两枚按钮住在**旧多模式助手面**里（`AssistantScreen.tsx` 在 merge `18efc229` 之前是
+//   branch 侧 1564 行那一版），而 main 侧的重写 `d49f77e3` 把它换成了 **325 行的单一对话面**
+//   （现量：`git show 18efc229^1:apps/mobile/src/ai/AssistantScreen.tsx | wc -l` = 325；
+//   `…^2:…` = 1564）。那两枚 testID 在新面上不存在，于是本判据原先以"取不到锚点"**退 2**
+//   —— 一条退 2 的判据在这条链上等于没有输入。
+//   **但那条不变量没有退休，它只是换了载体**：决定权现在住在
+//   `apps/mobile/src/ai/chat-controller.ts` 的 `send()` —— 共享函数
+//   `assistantNeedsEgressDisclosure(...)` 说"不用出境"⇒ 直接 `runTurn`（零披露、零外发）；
+//   说"要出境"且用户还没看过披露 ⇒ 才进 `phase: 'disclose'`。
+//   ⇒ 锚点从"两枚 testID"换成"`send()` 里那一问 + 它的负向对照"。三根牙一根没少：
+//     ① 判定必须来自 `@heyta/app-host`（不许壳里自己判）；② 壳里不许自造规则匹配（正则/中文串）；
+//     ③ 必须有"规则说本机 ⇒ 直接 runTurn"的负向对照（否则"受管"与"每句话都先弹披露"分不清）。
+//   ⚠️ 载体**文件**也跟着换了：本判据现在读 `chat-controller.ts`（旋钮
+//   `HEYTA_MOBILE_AI_CONTROLLER`）；`AssistantScreen.tsx` 那一份由判据 ㉕ 继续读。
+//
 // 四半（全是离线形状判据，不占设备）：
-//  a) 那两个按压点各自必须在 `setPhase('disclose')` **之前**过一次共享判据；
-//  b) 共享判据只能是从 `@heyta/app-host` 引进的那两枚函数（不许壳里再写一份规则匹配）；
-//  c) 分母：这个文件里还有别的面板**应当**无条件披露（捕获/拆解/排序/估时那条链压根没有
-//     规则前门）—— 没有这一条，(a) 会被"把全文件的披露都删掉"这种变异糊过去；
-//  d) 阳性对照：文件确实存在这两枚锚点（锚点改名了就要响亮地报"本判据没有输入"）。
+//  a) `send()` 里必须在进入 `phase: 'disclose'` **之前**问一次共享判据；
+//  b) 那一问只能是从 `@heyta/app-host` 引进的那枚函数；
+//  c) 分母：`phase: 'disclose'` 的转换点必须**恰好一处**、且就是 `send()` 里那一处
+//     —— 0 处 = 披露被整块删掉（或相位常量改名）；多一处 = 多了一条**没有共享判据**的披露路径；
+//  d) 阳性对照：文件里确实取得到 `send(): void {` 这个锚点，否则响亮地报"本判据没有输入"（退 2）。
 const MOBILE_AI_SCREEN = 'apps/mobile/src/ai/AssistantScreen.tsx';
+/** 判据 ㉔ 的载体：单一对话面的**出境判定**（2026-10-16 由 `AssistantScreen.tsx` 换到这里）。 */
+const MOBILE_AI_CONTROLLER = 'apps/mobile/src/ai/chat-controller.ts';
 
-/** 从 testID 那行往后找 `setPhase('disclose')`，中间必须出现一次 `willStayLocal(`。 */
-function pressGuarded(text, anchor) {
-  const at = text.indexOf(`testID="${anchor}"`);
-  if (at === -1) return 'missing';
-  const after = text.slice(at, at + 1200);
-  const disclose = after.indexOf("setPhase('disclose')");
-  if (disclose === -1) return 'missing';
-  const guard = after.indexOf('willStayLocal(');
-  return guard !== -1 && guard < disclose ? 'guarded' : 'unguarded';
-}
 
 /**
  * 判据 ㉕：移动壳每一处「失败面标题」都必须**先过原因码**（`AI_CAUSE_KEY`），
- * 面板级那张粗码表（`*_FAILURE_KEY[outcome.reason]`）只能在**没有原因码**时兜底。
+ * 面板级那张粗码表（`*_FAILURE_KEY[reason]`）只能在**没有原因码**时兜底。
  *
  * 长出来的形状（rig45 现量，2026-10-06）：Android 上「只用本机」档发送之后，
  * 助手（多轮）那一面印的是「AI 服务暂时不可用。」，而技术详情那行一直是对的
  * （`privacy-consent-not-granted: …`）。同一个壳里六处失败落点，**五处**写了
- * `outcome.cause !== undefined ? AI_CAUSE_KEY[...] : 面板表[...]`，只有助手那一处
- * 直接查了面板表 —— 于是 `cause='consent-not-granted'` 被丢掉，标题说的是
- * "我们的服务不可用"，而 heyta 的 AI 是用户自己填端点（BYOK），没有这么一回事。
- * 这与 traps #353 是同一条缺陷的**第二个消费者**（第一次是捕获面）。
+ * `outcome.cause !== undefined ? AI_CAUSE_KEY[...] : 面板表[...]`，只有助手那一处直接查了
+ * 面板表 —— 于是 `cause='consent-not-granted'` 被丢掉，标题说的是"我们的服务不可用"，
+ * 而 heyta 的 AI 是用户自己填端点（BYOK），没有这么一回事。
  *
- * 🔴 为什么钉在"每一处"而不是"助手那一处"：漏接的从来不是规则本身，而是**新长出来的消费者**。
- * 所以判据写成逐处过一遍 + 一条分母自检（`setFailure({` 的处数只许涨不许跌 ——
- * 摘掉一处会让这条判据没有输入，那是 §7 #191 那一族"门禁安静地不执行还照样打印通过"）。
+ * 🔴 **为什么钉在"每一处"而不是"助手那一处"**：漏接的从来不是规则本身，
+ * 而是**新长出来的消费者**。所以判据写成逐处过一遍 + 一条分母自检。
+ *
+ * 🔴 **2026-10-16 换锚点 + 把重写丢掉的那处修复搬回来**（与判据 ㉔ 同一个根因）：
+ *   · 旧载体是**六处 `setFailure({`**（每一处自己算标题），而 main 侧重写 `d49f77e3`
+ *     把界面换成单一对话面（325 行）之后，故障条目的标题只剩**一处**：
+ *     `AssistantScreen.tsx` 的 `renderItems` 里那条 `text:` 表达式。
+ *     ⇒ 分母口径从"处数 ≥6"改成"**每一处面板级粗码表查询都必须先过原因码**"。
+ *   · 那处修复本身也被换掉了：`AI_CAUSE_KEY` 一度在 `apps/mobile/src` 里**零消费者**
+ *     （`git grep -n AI_CAUSE_KEY` 只剩它的定义）⇒ 按 rig45 的老口径搬回来
+ *     （cause 优先、粗码表兜底）。**判据不因此放宽**：搬回来之前这一格是**红的**
+ *     （那一处直接查粗码表），臂里那两条也逐条证明它今天仍然会红（见 SELFTEST）。
+ *
+ * 判据（三半，全是离线形状判据，不占设备）：
+ *  a) 载体里每一处 `*_FAILURE_KEY[` 查询，都必须在**它之前**出现一次 `AI_CAUSE_KEY[`；
+ *  b) 分母：这类查询**至少一处**，且窗口**不许借用邻处的判定**（起点是上一处查询的结尾，
+ *     终点是下一处查询的开头，再夹一个 600 字符的近距上限）—— 一处新长出来的、没过原因码的
+ *     查询不会被别人的判定救活；
+ *  c) `*_FAILURE_KEY[` 一处都没有 ⇒ **退 2**，不是放行：标题不再经过这张表，要么有人把故障
+ *     标题搬走了、要么粗码表换了名字，两种都要人重新给这条判据定位。"0 处也算通过"那种
+ *     恒真形状不许有（§7 元规则二）。这是**新口径会红的第一条**（臂里逐条证明）。
  */
 function mobileFailureCauseGuard(rel) {
   const abs = join(ROOT, rel);
   if (!existsSync(abs)) return null;
-  const src = readFileSync(abs, 'utf8');
-  const sites = [...src.matchAll(/setFailure\(\{/g)];
+  // 🔴 只读**可执行代码**（注释与字符串字面量先抹掉）：注释里写一句 `AI_CAUSE_KEY[…]`
+  //    会把变异洗成绿 —— 本判据第一版就是这么空的，见 `stripTsComments` 的注释。
+  const src = stripTsComments(readFileSync(abs, 'utf8'));
+  const sites = [...src.matchAll(/[A-Z][A-Z0-9_]*_FAILURE_KEY\[/g)];
+  if (sites.length === 0) {
+    console.error(
+      `🔴 ${rel} 里一处面板级粗码表查询（*_FAILURE_KEY[…]）都没有 —— 判据 ㉕ 没有输入，` +
+        '不报"标题都先过了原因码"（退 2；"0 处也算通过"那种恒真形状不许有）',
+    );
+    process.exit(2);
+  }
   const red = [];
   let guarded = 0;
   for (const [index, hit] of sites.entries()) {
-    const tail = src.slice(hit.index, hit.index + 900);
-    const end = tail.indexOf('});');
-    const body = end === -1 ? tail : tail.slice(0, end + 3);
-    const usesPanelTable = /[A-Z_]+_FAILURE_KEY\[/.test(body);
-    const consultsCause = body.includes('AI_CAUSE_KEY[');
-    if (consultsCause) guarded += 1;
-    if (usesPanelTable && !consultsCause) {
-      const line = src.slice(0, hit.index).split('\n').length;
-      red.push(
-        `第 ${String(index + 1)} 处（:${String(line)}）只查了面板级粗码表，没有先过原因码 ` +
-          `⇒ 闸门拒绝这类"我们自己的错"会被印成「AI 服务暂时不可用。」：界面在说谎`,
-      );
+    const previousEnd =
+      index === 0 ? 0 : sites[index - 1].index + sites[index - 1][0].length;
+    const from = Math.max(previousEnd, hit.index - 600);
+    const before = src.slice(from, hit.index);
+    if (before.includes('AI_CAUSE_KEY[')) {
+      guarded += 1;
+      continue;
     }
-  }
-  if (sites.length < 6) {
+    const line = src.slice(0, hit.index).split('\n').length;
     red.push(
-      `失败落点分母只剩 ${String(sites.length)}（现量基线 6 处）—— 有一处被摘掉或改名了，` +
-        `这条判据会**安静地不执行**，那比红更糟`,
+      `第 ${String(index + 1)} 处（:${String(line)}）直接查了面板级粗码表 ${hit[0]}，它之前没有 ` +
+        `AI_CAUSE_KEY[…] ⇒ 闸门拒绝这类"我们自己的错"会被印成面板那张粗表里的句子（rig45：界面在说谎）。` +
+        `修法是 cause 优先：\`… entry.cause !== undefined ? AI_CAUSE_KEY[entry.cause] : ${hit[0]}…\`。`,
     );
   }
   return { red, n: { sites: sites.length, guarded } };
@@ -788,64 +892,71 @@ function mobileDisclosureGuard(rel) {
   const text = readScript(file);
   const red = [];
 
-  const single = pressGuarded(text, 'tool-start-single');
-  const assist = pressGuarded(text, 'tool-start-assistant');
-  if (single === 'missing' || assist === 'missing') {
+  // d) 锚点：`send()` 这个方法的定义。它改名/被删 ⇒ 本判据没有输入（不许报"披露都受管"）。
+  const sendAt = text.indexOf('send(): void {');
+  if (sendAt === -1) {
     console.error(
-      `🔴 ${rel} 里取不到那两枚发送锚点（single=${single} assistant=${assist}）—— 本判据没有输入，` +
+      `🔴 ${rel} 里取不到 send(): void { 这个锚点 —— 判据 ㉔ 没有输入，` +
         '不报"披露都受共享判据管"（退 2）',
     );
     process.exit(2);
   }
-  for (const [anchor, state] of [
-    ['tool-start-single', single],
-    ['tool-start-assistant', assist],
-  ]) {
-    if (state !== 'guarded') {
-      red.push(
-        `${rel}:1  [${anchor}] 这枚发送按钮**无条件**进入出境披露（setPhase('disclose') 之前没有 willStayLocal 那一问）。` +
-          `症状：一句本机规则就答得出的话，界面先承诺"这些内容要离开本机"，而这一条路径一个字节都不发 —— ` +
-          `假承诺。修法是把决定权交回 app-host 的规则判定（assistantNeedsEgressDisclosure / resolveToolSelection），` +
-          `不是在这里再写一份匹配。`,
-      );
-    }
-  }
+  // 方法体：到类里第一个两空格缩进的收尾括号为止（与 `helperBody` 同一条取法）。
+  const bodyEnd = text.indexOf('\n  }', sendAt);
+  const body = bodyEnd === -1 ? text.slice(sendAt, sendAt + 2000) : text.slice(sendAt, bodyEnd + 4);
 
-  // b) 那一问只能走共享函数，不许壳里长出第二套规则
-  const gw = text.indexOf('function willStayLocal');
-  if (gw === -1) {
-    red.push(
-      `${rel}:1  取不到 willStayLocal() 的定义 —— 上面两条"受共享判据管"里没有可核对的实现，` +
-        '本判据不接受只换了个调用的空壳。',
-    );
-  } else {
-    const body = text.slice(gw, text.indexOf('\n  }', gw) === -1 ? gw + 900 : text.indexOf('\n  }', gw) + 4);
-    for (const shared of ['assistantNeedsEgressDisclosure(', 'resolveToolSelection(']) {
-      if (!body.includes(shared)) {
-        red.push(
-          `${rel}:1  willStayLocal() 没调用共享的 ${shared.replace('(', '')} —— 壳里自己判"` +
-            '这一句要不要出境"就是第二套口径，两份口径迟早分叉（§3.5 抽出来的那类重复）。',
-        );
-      }
-    }
-    if (/new RegExp|\.match\(|\.search\(|includes\('[^']*[\u4e00-\u9fff]/.test(body)) {
-      red.push(
-        `${rel}:1  willStayLocal() 里出现了本地规则匹配（正则/中文串包含）—— 规则表的唯一事实源在 ` +
-          'packages/app-host/src/ai-tool-selection.ts，抄一份在这里必然漂。',
-      );
-    }
-  }
+  const sharedAt = body.indexOf('assistantNeedsEgressDisclosure(');
+  const discloseAt = body.indexOf("phase: 'disclose'");
+  const runTurnAt = body.indexOf('runTurn(');
+  const guarded = sharedAt !== -1 && discloseAt !== -1 && sharedAt < discloseAt ? 1 : 0;
+  const bypass = guarded === 1 && runTurnAt > sharedAt && runTurnAt < discloseAt ? 1 : 0;
 
-  // c) 分母：别的面板**应当**无条件披露，所以文件里的披露点总数必须明显大于 2
-  const disclosures = [...text.matchAll(/setPhase\('disclose'\)/g)].length;
-  const n = { guarded: (single === 'guarded' ? 1 : 0) + (assist === 'guarded' ? 1 : 0), disclosures };
-  if (disclosures <= 2) {
+  // a) 那一问必须排在披露**之前** —— 否则就是原缺陷（无条件披露）。
+  if (guarded === 0) {
     red.push(
-      `${rel}:1  全文件只有 ${String(disclosures)} 处 setPhase('disclose') —— 捕获/拆解/排序/估时那四条链` +
-        '本来就该无条件披露（它们没有规则前门）。分母没了，上面那两条"受管"就分不清是修对了还是把披露删光了。',
+      `${rel}:1  [send()] 这一趟发送在进入披露相位（phase: 'disclose'）之前**没有**问过共享判定 ` +
+        'assistantNeedsEgressDisclosure —— 症状：一句本机规则就答得出的话，界面先承诺' +
+        '"这些内容要离开本机"，而这一条路径一个字节都不发：**假承诺**。修法是把决定权交回 ' +
+        'app-host 的规则判定，不是在这里再写一份匹配。',
     );
   }
-  return { red, n };
+  // ③ 负向对照：规则说本机 ⇒ 直接跑那一趟，一个披露面都不弹。
+  if (bypass === 0) {
+    red.push(
+      `${rel}:1  [send()] 取不到"规则说本机 ⇒ 直接 runTurn"那一支（共享判定与披露相位之间没有 runTurn 调用）` +
+        ' —— 没有这一支，上面那条"受管"就分不清是"问过了"还是"每一句都先弹披露"（元规则二：' +
+        '一条永远弹披露的路径与一条受管的路径在读数上长得一样）。',
+    );
+  }
+  // b) 那一问只能走共享函数：它必须是从 @heyta/app-host 引进的，且 send() 里不许自造规则。
+  const importBlocks = [...text.matchAll(/import\s*\{([\s\S]*?)\}\s*from\s*'@heyta\/app-host'/g)];
+  if (!importBlocks.some((m) => m[1].includes('assistantNeedsEgressDisclosure'))) {
+    red.push(
+      `${rel}:1  assistantNeedsEgressDisclosure 不是从 @heyta/app-host 引进的（import 块里没有它）` +
+        ' —— 规则表的唯一事实源在 packages/app-host/src/ai-tool-selection.ts，抄一份在这里必然漂。',
+    );
+  }
+  if (/new RegExp|\.match\(|\.search\(|includes\('[^']*[\u4e00-\u9fff]/.test(body)) {
+    red.push(
+      `${rel}:1  send() 里出现了本地规则匹配（正则 / 中文串包含）—— 壳里自己判"这一句要不要出境"` +
+        '就是**第二套口径**，两份口径迟早分叉（§3.5 抽出来的那类重复）。',
+    );
+  }
+  // c) 分母：披露转换点恰好一处、且就是 send() 里那一处。
+  const discloses = [...text.matchAll(/phase: 'disclose'/g)].length;
+  if (discloses === 0) {
+    red.push(
+      `${rel}:1  全文件一处 phase: 'disclose' 都没有（` +
+        `${/'disclose'/.test(text) ? "'disclose' 只剩在相位类型里" : "连 'disclose' 这个字面量都没了"}` +
+        '）⇒ 要么披露被整块删掉、要么相位常量改了名：两种情况都让上面那两条"受管"没有分母。',
+    );
+  } else if (discloses > 1) {
+    red.push(
+      `${rel}:1  披露相位的转换点有 ${String(discloses)} 处（期望恰好 1，就是 send() 里那一处）` +
+        ' ⇒ 多出来的那些**没有共享判据**：新长一条无条件弹披露的路径，读数上看不出它没受管。',
+    );
+  }
+  return { red, n: { guarded, bypass, discloses } };
 }
 
 // 判据 ⑧：双引号**文案**里不许出现反引号。
@@ -1062,6 +1173,14 @@ function revealDirection(scriptRel) {
  */
 const TOOL_RULES_SRC = 'packages/app-host/src/ai-tool-selection.ts';
 const RULE_UNCOVERED_MARKER = '设备侧未覆盖';
+/**
+ * 判据 ⑮② 的"没有输入"登记标记：**一处发送点都没有**的载体必须显式写下它，
+ * 否则这一半就是"安静地不执行"（做法与判据 ⑬ 的 `RULE_UNCOVERED_MARKER` 同源）。
+ * 现量用它的是 `scripts/verify-mobile-ai.sh`：那一份载体的发送相位机（第 5/7/8/9/10 步）
+ * 随多模式助手面整体退役，所以"每一发发送前证通道"在它上面没有对象 —— 那是**未覆盖**，
+ * 不是"通道都证过了"。
+ */
+const SEND_UNCOVERED_MARKER = 'SEND-UNCOVERED';
 
 function toolRulePatterns(text) {
   const out = [];
@@ -1185,7 +1304,8 @@ function consentExpectation(scriptRel) {
  * 所以 `ensure_tunnel` 自己不许调 `summary`（子 shell 里 exit 等于没 exit）。
  */
 function tunnelInvariant(scriptRel) {
-  const full = codeOf(readFileSync(join(ROOT, scriptRel), 'utf8'));
+  const raw = readFileSync(join(ROOT, scriptRel), 'utf8');
+  const full = codeOf(raw);
   const ensure = helperBody(scriptRel, 'ensure_tunnel');
   const runner = helperBody(scriptRel, 'tunnel_or_environment_fail');
   if (ensure === null || runner === null) return null;
@@ -1215,12 +1335,18 @@ function tunnelInvariant(scriptRel) {
   // ② **每一步的第一发**发送之前都要有一次通道断言（按步骤分段判，不是"整份文件里出现过"）。
   //    分段而不是逐发：同一趟里 `breakdown-start` 与紧随的 `ai-send` 之间隔几秒，
   //    再插一次不增加任何信息，只会把"要不要证"这件事磨成"反正每次都证"的形式主义。
-  const sendRe = /tap_rid (ai-send|ai-tool-send|breakdown-start|tool-start-assistant)/;
+  // 🔴 2026-10-16：发送锚点换成了当前单一对话面的两枚（`assistant-disclosure-send` /
+  //   `ai-assistant-send-button`，见判据 ㉔ 那一段），**两侧都认**是有意的：
+  //   只认旧名 ⇒ 换成新锚点的发送点从此不在账上（这一半悄悄失去输入）；
+  //   只认新名 ⇒ Android 那份载体的历史读数失去可追溯。
+  const sendRe = /tap_rid (ai-send|ai-tool-send|breakdown-start|tool-start-assistant|assistant-disclosure-send|ai-assistant-send-button)/;
   const stepSplit = full.split(/\n(?=step ")/);
   const naked = [];
+  let sendSteps = 0;
   for (const seg of stepSplit) {
     const firstSend = seg.search(sendRe);
     if (firstSend === -1) continue;
+    sendSteps += 1;
     const sendName = seg.match(sendRe)[1];
     if (!seg.slice(0, firstSend).includes('tunnel_or_environment_fail')) naked.push(sendName);
   }
@@ -1228,6 +1354,15 @@ function tunnelInvariant(scriptRel) {
     red.push(
       `有 ${String(naked.length)} 个步骤的第一发发送（${naked.join(' ')}）前面没有 tunnel_or_environment_fail ⇒ ` +
         `起跑那一次正向对照证明不了**这一发**通着，"计数没动"于是有两种读数一样的解释（真没发／通道断了）。`,
+    );
+  } else if (sendSteps === 0 && !raw.includes(SEND_UNCOVERED_MARKER)) {
+    // 分母：一处发送点都没有 ⇒ 这一半在读数上永远不会出声（元规则二）。要么这一份载体的
+    // 发送相位机被整体退役 —— 那就在脚本里写一行 `SEND-UNCOVERED` 显式登记（**注释**即可，
+    // 所以这里读的是 `raw` 而不是剔掉注释的 `full`；登记本身是给人看的账，不是代码）；
+    // 要么发送锚点换了名字而这里没跟着改。两种情况都不许静默。
+    red.push(
+      '整份脚本里一处发送点（' + sendRe.source + '）都没有 ⇒ 这一半（"每一步第一发发送前证通道"）' +
+        '没有输入，而现在它是**静默**的：' + SEND_UNCOVERED_MARKER + ' 这行登记与发送锚点总得有一个。',
     );
   }
 
@@ -1739,16 +1874,17 @@ function run() {
       `登记通道=${String(shape.n.helpers)} 真有定义=${String(shape.n.defined)} 红=${String(shape.red.length)}`,
   );
 
-  // ── 判据 ㉔：移动壳的出境披露必须过一次共享规则判定 ──
-  const guard = mobileDisclosureGuard(process.env.HEYTA_MOBILE_AI_SCREEN ?? MOBILE_AI_SCREEN);
+  // ── 判据 ㉔：移动壳的出境披露必须过一次共享规则判定（载体 = chat-controller.ts 的 send()）──
+  const guard = mobileDisclosureGuard(process.env.HEYTA_MOBILE_AI_CONTROLLER ?? MOBILE_AI_CONTROLLER);
   if (guard === null) {
-    console.error(`🔴 取不到 ${MOBILE_AI_SCREEN} —— 判据 ㉔ 没有输入，不报"披露都受管"`);
+    console.error(`🔴 取不到 ${MOBILE_AI_CONTROLLER} —— 判据 ㉔ 没有输入，不报"披露都受管"`);
     process.exit(2);
   }
   for (const line of guard.red) console.log(`披露判据\t${line}`);
   console.log(
-    `IOS_DISCLOSE_SUMMARY 受共享判据管的按压点=${String(guard.n.guarded)} ` +
-      `文件内无条件披露点=${String(guard.n.disclosures)} 红=${String(guard.red.length)}`,
+    `IOS_DISCLOSE_SUMMARY 共享判据在披露之前=${String(guard.n.guarded)} ` +
+      `规则说本机直接跑=${String(guard.n.bypass)} 披露转换点=${String(guard.n.discloses)} ` +
+      `红=${String(guard.red.length)}`,
   );
 
   // ── 判据 ㉕：移动壳的失败面标题必须先过原因码 ──
@@ -1759,7 +1895,7 @@ function run() {
   }
   for (const line of causeGuard.red) console.log(`失败标题判据\t${line}`);
   console.log(
-    `FAILURE_CAUSE_SUMMARY 失败落点=${String(causeGuard.n.sites)} ` +
+    `FAILURE_CAUSE_SUMMARY 失败标题落点=${String(causeGuard.n.sites)} ` +
       `先过原因码=${String(causeGuard.n.guarded)} 红=${String(causeGuard.red.length)}`,
   );
   const causeRed = causeGuard.red;
@@ -2141,11 +2277,33 @@ if (process.argv.includes('--self-test')) {
   arms.push(['臂 41 的变异确实摘掉了一处补修（前置）', mutTun41 !== baseTun && (mutTun41.match(/ensure_tunnel >\/dev\/null/g) || []).length === 1]);
   const m41 = runMutantFile(mutTun41, 'root-no-repair');
   arms.push(['臂 41 root 站点没补隧道 ⇒ 非零退出且点名', m41.code !== 0 && m41.out.includes('没补 adb reverse 隧道')]);
-  // 臂 42：摘掉第 9 步第一发之前的断言 ⇒ 必须红（顺序判据，不是"整份文件出现过"）。
-  const mutTun42 = baseTun.replace('tunnel_or_environment_fail "第 9 步发送前"\n', '');
-  arms.push(['臂 42 的变异确实摘掉了第 9 步那句断言（前置）', mutTun42 !== baseTun && !mutTun42.includes('第 9 步发送前')]);
+  // 臂 42：把一发**没有通道断言**的发送塞进一个新步骤 ⇒ 必须红（顺序判据，而不是"整份文件出现过"）。
+  //   🔴 2026-10-16 换变异形状：这一臂原先摘的是「第 9 步发送前」那句断言，而本载体的发送点
+  //   （旧多模式面那一批 `tap_rid ai-send/…`）整体退役之后，"摘掉断言"不再有任何可观察效果
+  //   —— 臂自己失去输入。现在改成**新长出来一发发送**（判据该拦的那个形状），
+  //   并另开一臂（42b）把"分母登记"本身钉住。
+  const mutTun42 = `${baseTun}\nstep "99. 变异：新长出来的一发发送"\ntap_rid assistant-disclosure-send || true\n`;
+  arms.push([
+    '臂 42 的变异确实塞进了一发没有断言的发送（前置）',
+    mutTun42 !== baseTun && mutTun42.includes('step "99.'),
+  ]);
   const m42 = runMutantFile(mutTun42, 'send-no-tunnel-assert');
-  arms.push(['臂 42 第一发发送前没证通道 ⇒ 非零退出且点名', m42.code !== 0 && m42.out.includes('前面没有 tunnel_or_environment_fail')]);
+  arms.push([
+    '臂 42 第一发发送前没证通道 ⇒ 非零退出且点名',
+    m42.code !== 0 && m42.out.includes('前面没有 tunnel_or_environment_fail'),
+  ]);
+  // 臂 42b（分母的新口径会红）：把那一行显式登记摘掉（而这份载体确实**一处发送点都没有**）
+  //   ⇒ 必须红且点名那条登记。这一臂就是"0 处也算通过"那条恒真形状的反面。
+  const mutTun42b = baseTun.replace(/^# SEND-UNCOVERED.*$/m, '');
+  arms.push([
+    '臂 42b 的变异确实摘掉了 SEND-UNCOVERED 登记（前置）',
+    mutTun42b !== baseTun && !mutTun42b.includes('SEND-UNCOVERED'),
+  ]);
+  const m42b = runMutantFile(mutTun42b, 'send-coverage-unregistered');
+  arms.push([
+    '臂 42b 没有发送点又没有登记 ⇒ 非零退出且点名 SEND-UNCOVERED',
+    m42b.code !== 0 && m42b.out.includes('SEND-UNCOVERED'),
+  ]);
   // 臂 43：把断言退化成"只下命令不证明"（摘掉设备侧那一发）⇒ 必须红。
   const mutTun43 = baseTun.replace('toybox nc -w 4 127.0.0.1', 'true # 变异：设备里那一发没了');
   arms.push(['臂 43 的变异确实摘掉了设备侧那一发（前置）', mutTun43 !== baseTun]);
@@ -2702,8 +2860,123 @@ ${body}
   ]);
 
   // ── 判据 ㉔（移动壳的出境披露要过一次共享规则判定）的臂 ──
-  //   变异打在**源码的副本**上（env 重定向），真树的 mtime 一个都不动 ——
-  //   这条门禁不占设备，也不该碰别人正在写的文件。
+  //   🔴 2026-10-16：载体从 `AssistantScreen.tsx` 的两枚 testID 换成 `chat-controller.ts`
+  //   的 `send()`（理由写在判据那一段）。变异因此打在**控制器源码的副本**上（env 重定向），
+  //   真树的 mtime 一个都不动 —— 这条门禁不占设备，也不该碰别人正在写的文件。
+  const controllerBase = readFileSync(join(ROOT, MOBILE_AI_CONTROLLER), 'utf8');
+  const runControllerMutant = (text, tag) => {
+    const dir = join(ROOT, 'tmp');
+    mkdirSync(dir, { recursive: true });
+    const file = join(dir, `.mut-controller-${tag}.ts`);
+    writeFileSync(file, text);
+    let code = -1;
+    let out = '';
+    try {
+      const kid = spawnSync(process.execPath, [join(ROOT, 'scripts/check-mobile-ai-anchors.mjs')], {
+        encoding: 'utf8',
+        cwd: ROOT,
+        env: { ...process.env, HEYTA_MOBILE_AI_CONTROLLER: `tmp/.mut-controller-${tag}.ts` },
+      });
+      code = kid.status ?? -1;
+      out = `${kid.stdout ?? ''}${kid.stderr ?? ''}`;
+    } finally {
+      rmSync(file, { force: true });
+    }
+    return { code, out };
+  };
+
+  // 臂 90（阳性对照）：当前源码整链过，且四格读数都是 1（三根牙 + 分母各自都有输入）。
+  arms.push([
+    '臂 90 真源码 IOS_DISCLOSE_SUMMARY 共享判据在披露之前=1 规则说本机直接跑=1 披露转换点=1 红=0',
+    base.status === 0 &&
+      /IOS_DISCLOSE_SUMMARY 共享判据在披露之前=1 规则说本机直接跑=1 披露转换点=1 红=0/.test(
+        `${base.stdout ?? ''}`,
+      ),
+  ]);
+
+  const SHARED_GUARD =
+    '    if (!assistantNeedsEgressDisclosure(text, { tier, now: routeTime })) {\n' +
+    '      void this.runTurn(text, history, routeTime);\n' +
+    '      return;\n' +
+    '    }\n';
+  if (!controllerBase.includes(SHARED_GUARD)) {
+    console.log('SELFTEST 臂（㉔）的变异锚点 SHARED_GUARD 在控制器源码里取不到 —— 这几臂现在等于没有');
+    process.exit(1);
+  }
+
+  // 臂（㉔ 原缺陷那一版）：整块摘掉那一问 ⇒ 无条件进披露 ⇒ 非零退出且点名"假承诺"。
+  const mutUncond = controllerBase.replace(SHARED_GUARD, '');
+  arms.push([
+    '臂（㉔ 无条件披露）的变异确实摘掉了那一问（前置）',
+    mutUncond !== controllerBase && !mutUncond.includes('assistantNeedsEgressDisclosure(text'),
+  ]);
+  const mUncond = runControllerMutant(mutUncond, 'disclose-unconditional');
+  arms.push([
+    '臂（㉔ 无条件披露）面板不再问共享判据 ⇒ 非零退出且点名"假承诺"',
+    mUncond.code !== 0 && mUncond.out.includes('假承诺'),
+  ]);
+
+  // 臂（㉔ 负向对照）：那一问留着，但把"规则说本机 ⇒ 直接跑"那一支摘成空壳 ⇒ 必须红。
+  const mutBypass = controllerBase.replace(
+    SHARED_GUARD,
+    '    if (!assistantNeedsEgressDisclosure(text, { tier, now: routeTime })) {\n' +
+      '      // 变异：把「直接跑那一趟」摘掉\n' +
+      '    }\n',
+  );
+  arms.push([
+    '臂（㉔ 负向对照）的变异确实摘掉了那一支 runTurn（前置）',
+    mutBypass !== controllerBase && !mutBypass.includes('void this.runTurn(text, history, routeTime)'),
+  ]);
+  const mBypass = runControllerMutant(mutBypass, 'disclose-no-bypass');
+  arms.push([
+    '臂（㉔ 负向对照）规则说本机却不直接跑 ⇒ 非零退出且点名',
+    mBypass.code !== 0 && mBypass.out.includes('直接 runTurn'),
+  ]);
+
+  // 臂（㉔ 第二套口径）：把那一问换成壳里自己的字符串匹配 ⇒ 红（规则表的唯一事实源不许被抄）。
+  const mutLocal = controllerBase.replace(
+    'if (!assistantNeedsEgressDisclosure(text, { tier, now: routeTime })) {',
+    "if (!text.includes('列出')) {",
+  );
+  arms.push([
+    '臂（㉔ 第二套口径）的变异确实换掉了那枚共享调用（前置）',
+    mutLocal !== controllerBase && mutLocal.includes("text.includes('列出')"),
+  ]);
+  const mLocal = runControllerMutant(mutLocal, 'disclose-local-rule');
+  arms.push([
+    '臂（㉔ 第二套口径）壳里自造规则匹配 ⇒ 非零退出且点名"第二套口径"或"本地规则匹配"',
+    mLocal.code !== 0 && (mLocal.out.includes('第二套口径') || mLocal.out.includes('本地规则匹配')),
+  ]);
+
+  // 臂（㉔ 共享来源那一根牙）：把导入摘掉、调用点留着 ⇒ 必须点名"不是从 @heyta/app-host 引进的"。
+  const mutImport = controllerBase.replace('  assistantNeedsEgressDisclosure,\n', '');
+  arms.push([
+    '臂（㉔ 共享来源）的变异确实把那枚导入摘掉了（前置）',
+    mutImport !== controllerBase && !mutImport.includes('  assistantNeedsEgressDisclosure,\n'),
+  ]);
+  const mImport = runControllerMutant(mutImport, 'disclose-import-gone');
+  arms.push([
+    '臂（㉔ 共享来源）判定函数不是从 @heyta/app-host 引进的 ⇒ 非零退出且点名',
+    mImport.code !== 0 && mImport.out.includes('不是从 @heyta/app-host 引进的'),
+  ]);
+
+  // 臂（㉔ 分母）：多长出一处**没有共享判据**的披露转换点 ⇒ 必须红（新路径也要过同一本账）。
+  const mutExtra = `${controllerBase}\nfunction zzExtraDisclose(): void { this.update({ phase: 'disclose' }); }\n`;
+  arms.push([
+    '臂（㉔ 分母）的变异确实多了一处披露转换点（前置）',
+    (mutExtra.match(/phase: 'disclose'/g) ?? []).length === 2,
+  ]);
+  const mExtra = runControllerMutant(mutExtra, 'disclose-two-sites');
+  arms.push([
+    '臂（㉔ 分母）披露转换点多出一处 ⇒ 非零退出且点名',
+    mExtra.code !== 0 && mExtra.out.includes('披露相位的转换点有 2 处'),
+  ]);
+  // ── 判据 ㉕（移动壳的失败面标题必须先过原因码）的臂 ──
+  //   rig45 在 Android 当前产物上照出来的那条红（助手面标题印「AI 服务暂时不可用。」）
+  //   就是这一格的输入；源码修完后必须有臂**把它修回去再红一次**，
+  //   否则这条判据只是"今天绿着"，下一个新长出来的消费者照样漏。
+  //   🔴 2026-10-16：载体换成当前单一对话面的那一处标题表达式；变异打在**源码副本**上
+  //   （env 重定向），真树 mtime 不动。
   const screenBase = readFileSync(join(ROOT, MOBILE_AI_SCREEN), 'utf8');
   const runScreenMutant = (text, tag) => {
     const dir = join(ROOT, 'tmp');
@@ -2726,104 +2999,74 @@ ${body}
     return { code, out };
   };
 
-  // 臂 90（阳性对照）：当前源码整链过，且那一格**有分母**（两处按压点受管、别的面板照常披露）。
   arms.push([
-    '臂 90 真源码 IOS_DISCLOSE_SUMMARY 受管按压点=2 且红=0，文件里还有别处该披露的面板',
+    '臂（㉕ 阳性对照）真源码 FAILURE_CAUSE_SUMMARY 失败标题落点=1 先过原因码=1 红=0',
     base.status === 0 &&
-      /IOS_DISCLOSE_SUMMARY 受共享判据管的按压点=2 /.test(`${base.stdout ?? ''}`) &&
-      /IOS_DISCLOSE_SUMMARY[^\n]*无条件披露点=(?:[3-9]|[1-9][0-9]{1,})/.test(`${base.stdout ?? ''}`) &&
-      /IOS_DISCLOSE_SUMMARY[^\n]*红=0/.test(`${base.stdout ?? ''}`),
+      /FAILURE_CAUSE_SUMMARY 失败标题落点=1 先过原因码=1 红=0/.test(`${base.stdout ?? ''}`),
   ]);
 
-  const GUARD_SINGLE =
-    '              if (willStayLocal(text, false)) {\n' +
-    '                void send(text, false);\n' +
-    '                return;\n' +
-    '              }\n';
-  const GUARD_ASSIST =
-    '              if (willStayLocal(text, true)) {\n' +
-    '                void send(text, true);\n' +
-    '                return;\n' +
-    '              }\n';
-  for (const [tag, anchor, block] of [
-    ['single', 'tool-start-single', GUARD_SINGLE],
-    ['assistant', 'tool-start-assistant', GUARD_ASSIST],
-  ]) {
-    const cut = screenBase.replace(block, '');
-    arms.push([`臂（${tag}）的变异确实摘掉了那一支共享判据（前置）`, cut !== screenBase && !cut.includes(block)]);
-    const m = runScreenMutant(cut, `disclose-${tag}`);
-    arms.push([
-      `臂（${tag}）无条件弹出境披露 ⇒ 非零退出且点名 ${anchor}`,
-      m.code !== 0 && m.out.includes(`[${anchor}]`) && m.out.includes('假承诺'),
-    ]);
-  }
-
-  // 臂（第二套口径）：把那一问换成壳里自己的字符串匹配 ⇒ 红（规则表的唯一事实源不许被抄）。
-  const SHARED_TAIL =
-    '    return asAssistant\n' +
-    '      ? !assistantNeedsEgressDisclosure(nextText, { tier: props.tier })\n' +
-    '      : resolveToolSelection(nextText, { grants }).kind === \'tool\';\n';
-  const localRule = screenBase.replace(SHARED_TAIL, "    return nextText.includes('列出');\n");
-  arms.push(['臂（第二套口径）的变异确实换掉了那两枚共享调用（前置）', localRule !== screenBase && localRule.includes("nextText.includes('列出')")]);
-  const mLocal = runScreenMutant(localRule, 'disclose-local-rule');
+  // 臂（把那处产品修复变异回去 = rig45 跑过的那一版）：摘掉 cause 分支 ⇒ 非零退出且点名那一处。
+  const CAUSE_FIRST = 'entry.cause !== undefined ? AI_CAUSE_KEY[entry.cause] : ';
+  const mutCause = screenBase.replace(CAUSE_FIRST, '');
   arms.push([
-    '臂（第二套口径）壳里自造规则匹配 ⇒ 非零退出且点名"第二套口径"或"本地规则匹配"',
-    mLocal.code !== 0 && (mLocal.out.includes('第二套口径') || mLocal.out.includes('本地规则匹配')),
+    '臂（㉕ 退回粗码表）的变异确实摘掉了 cause 分支（前置）',
+    mutCause !== screenBase && !mutCause.includes(CAUSE_FIRST) && mutCause.includes('ASSISTANT_FAILURE_KEY['),
+  ]);
+  const mCause = runScreenMutant(mutCause, 'cause-title-dropped');
+  arms.push([
+    '臂（㉕ 退回粗码表）标题只查面板级粗码 ⇒ 非零退出且点名那一处',
+    mCause.code !== 0 && mCause.out.includes('它之前没有') && mCause.out.includes('先过原因码=0'),
   ]);
 
-  // ── 判据 ㉕（移动壳的失败面标题必须先过原因码）的臂 ──
-  //   rig45 在 Android 当前产物上照出来的那条红（助手面标题印「AI 服务暂时不可用。」）
-  //   就是这一格的输入；源码修完后必须有臂**把它修回去再红一次**，
-  //   否则这条判据只是"今天绿着"，下一个新长出来的消费者照样漏。
+  // 臂（㉕ 注释不算消费者）：把 cause 分支变异掉，**但在同一处写一句提到 `AI_CAUSE_KEY[` 的注释**
+  //   ⇒ 仍然必须红。这一臂钉的是本判据第一次实现栽的那个坑：注释把变异洗成绿
+  //   （§7 #191 那一族），所以它只读 `stripTsComments()` 之后的代码。
+  const mutCauseComment = screenBase
+    .replace(CAUSE_FIRST, '')
+    .replace(
+      '      text: entry.role',
+      '      // 修法是 cause 优先：AI_CAUSE_KEY[entry.cause]\n      text: entry.role',
+    );
   arms.push([
-    '臂（㉕ 阳性对照）真源码 FAILURE_CAUSE_SUMMARY 失败落点=6 先过原因码=6 红=0',
-    base.status === 0 &&
-      /FAILURE_CAUSE_SUMMARY 失败落点=6 先过原因码=6 红=0/.test(`${base.stdout ?? ''}`),
+    '臂（㉕ 注释不算消费者）的变异确实摘了 cause 分支又加了一句提到它的注释（前置）',
+    mutCauseComment !== screenBase &&
+      mutCauseComment.includes('AI_CAUSE_KEY[entry.cause]') &&
+      !mutCauseComment.includes(CAUSE_FIRST),
+  ]);
+  const mCauseComment = runScreenMutant(mutCauseComment, 'cause-comment-only');
+  arms.push([
+    '臂（㉕ 注释不算消费者）只在注释里出现 AI_CAUSE_KEY[ ⇒ 仍然非零退出且点名',
+    mCauseComment.code !== 0 && mCauseComment.out.includes('它之前没有'),
   ]);
 
-  // 臂（助手那一处退回旧口径）：摘掉 cause 分支 ⇒ 非零退出且点名那一处。
-  const ASSIST_CAUSED =
-    '        setFailure({\n' +
-    '          key:\n' +
-    '            outcome.cause !== undefined\n' +
-    '              ? AI_CAUSE_KEY[outcome.cause]\n' +
-    '              : ASSISTANT_FAILURE_KEY[outcome.reason],\n' +
-    '          detail: outcome.message,\n' +
-    '        });\n';
-  const ASSIST_UNCAUSED =
-    '        setFailure({\n' +
-    '          key: ASSISTANT_FAILURE_KEY[outcome.reason],\n' +
-    '          detail: outcome.message,\n' +
-    '        });\n';
-  const mutAssist = screenBase.replace(ASSIST_CAUSED, ASSIST_UNCAUSED);
+  // 臂（新长出来的消费者）：在同一个文件里再加一处**没过原因码**的粗码表查询 ⇒ 必须红
+  //   （把"钉在每一处"这件事本身钉住：只守"助手那一处"的写法会放它过）。
+  const mutNewSite =
+    `${screenBase}\nfunction zzExtraTitle(reason: AssistantFailureReason): unknown {\n` +
+    '  return ASSISTANT_FAILURE_KEY[reason];\n' +
+    '}\n';
   arms.push([
-    '臂（助手）的变异确实摘掉了那一支原因码（前置）',
-    mutAssist !== screenBase && !mutAssist.includes(ASSIST_CAUSED),
+    '臂（㉕ 新消费者）的变异确实多了一处没过原因码的粗码表查询（前置）',
+    (mutNewSite.match(/_FAILURE_KEY\[/g) ?? []).length === 2,
   ]);
-  const mAssist = runScreenMutant(mutAssist, 'cause-assistant');
+  const mNewSite = runScreenMutant(mutNewSite, 'cause-new-consumer');
   arms.push([
-    '臂（助手）标题只查面板级粗码 ⇒ 非零退出且点名"先过原因码"与「AI 服务暂时不可用。」',
-      mAssist.code !== 0 &&
-      mAssist.out.includes('没有先过原因码') &&
-      mAssist.out.includes('AI 服务暂时不可用。') &&
-      mAssist.out.includes('先过原因码=5'),
+    '臂（㉕ 新消费者）第 2 处没过原因码 ⇒ 非零退出且点名"第 2 处"',
+    mNewSite.code !== 0 && mNewSite.out.includes('第 2 处') && mNewSite.out.includes('先过原因码=1'),
   ]);
 
-  // 臂（分母自检）：摘掉一整处失败落点 ⇒ 判据**不许安静地不执行**（§7 #191 那一族）。
-  const mutSite = screenBase.replace(
-    '      setFailure({\n        key: outcome.cause !== undefined ? AI_CAUSE_KEY[outcome.cause] : TOOL_CALL_FAILURE_KEY[outcome.reason],',
-    '      markFailure({\n        key: outcome.cause !== undefined ? AI_CAUSE_KEY[outcome.cause] : TOOL_CALL_FAILURE_KEY[outcome.reason],',
-  );
+  // 臂（分母新口径会红的第二条）：把唯一那一处查询摘掉（标题改走别的通道）⇒ **退 2**（响亮），
+  //   不是静默通过 —— 这一臂就是"0 处也算通过"那条恒真形状的反面。
+  const mutNoSite = screenBase.replace(' : ASSISTANT_FAILURE_KEY[entry.reason]', '');
   arms.push([
-    '臂（分母）的变异确实摘掉了一整处失败落点（前置）',
-    mutSite !== screenBase && mutSite.includes('markFailure({'),
+    '臂（㉕ 分母）的变异确实摘掉了唯一一处粗码表查询（前置）',
+    mutNoSite !== screenBase && !/_FAILURE_KEY\[/.test(mutNoSite),
   ]);
-  const mSite = runScreenMutant(mutSite, 'cause-denominator');
+  const mNoSite = runScreenMutant(mutNoSite, 'cause-denominator');
   arms.push([
-    '臂（分母）失败落点只剩 5 处 ⇒ 非零退出且点名"安静地不执行"',
-    mSite.code !== 0 && mSite.out.includes('失败落点分母只剩 5') && mSite.out.includes('安静地不执行'),
+    '臂（㉕ 分母）0 处粗码表查询 ⇒ 退 2 并说明"没有输入"（不是恒真通过）',
+    mNoSite.code === 2 && mNoSite.out.includes('判据 ㉕ 没有输入'),
   ]);
-
   let fail = 0;
   arms.forEach(([name, ok]) => {
     console.log(`SELFTEST ${name}：${ok ? 'OK' : 'FAIL'}`);

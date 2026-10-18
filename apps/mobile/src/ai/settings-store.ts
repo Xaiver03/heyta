@@ -32,10 +32,12 @@ import type { SecretStore } from '@heyta/ai';
 import {
   createAiSettingsStore,
   defaultAiSettingsState,
+  isAiSupplyUsable,
   type AiSettingsState,
   type AiSettingsStorePort,
 } from '@heyta/app-host';
 import { readDevicePref, writeDevicePref } from '../prefs/device-prefs';
+import { readSyncConfig } from '../sync/config';
 
 /** 设备偏好库里的键名。与 web 的 `heyta.ai.settings` 同名，跨端读得出同一件事。 */
 export const AI_SETTINGS_PREF_KEY = 'heyta.ai.settings';
@@ -98,13 +100,19 @@ export function reloadAiSettings(): AiSettingsState {
 }
 
 /**
- * 这台设备**有没有**配 AI：总开关开 + 至少一个端点。
+ * 这台设备**有没有一条能用的 AI 供给**。
  *
  * 只决定助手里的配置提示，不控制入口是否可见。
  * 未配置端点仍可查询本机任务；模型请求继续经过出境与联网授权。
+ *
+ * 🔴 **判断本身不在这里**，在 `@heyta/app-host` 的 `isAiSupplyUsable` ——
+ * 托管档**没有**用户自己的端点（那条端点由同步服务器在构造 routing 时合成），
+ * 所以"数端点"会把托管用户判成"没配 AI"，于是他看到"去添加一个端点"，
+ * 而他要做的事是登录 / 换档：**两种人看到同一句话，修复动作相反。**
+ * 这里只负责把移动端的服务器地址喂给它（本文件抬头那条"只有通道、没有判断"）。
  */
 export function isAiConfiguredOnThisDevice(settings: AiSettingsState = current): boolean {
-  return settings.routing.enabled && settings.routing.endpoints.length > 0;
+  return isAiSupplyUsable(settings.routing, readSyncConfig()?.serverUrl);
 }
 
 // ─────────────────────────────────────────────────────────────────────────

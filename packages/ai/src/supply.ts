@@ -367,16 +367,22 @@ export class AiConfigError extends Error {
  * 也就是说：**它现在的生产可达性依赖第 2 类**，而删除它等于拆掉一扇门
  * （"托管的明文只能交给我们自己、且只能交给境内的模型供应商"）。
  *
- * ⚠️ 顺带说清一件容易被误读的事：`invokeRouted` 走的是 `AiRoutingConfig`，
- * 而那份配置**没有 `mode` 字段** —— 目的地由端点地址推导
- * （`classifyDestination({ mode: 'own', ... })`），只可能是 `none` /
- * `user-endpoint`，**推不出 `heyta-cloud`**。所以"托管云到不了"是**结构上**成立的，
- * 而不是靠这个函数拦住的；本函数拦的是"把 `mode` 写成 `managed`"那条入口。
+ * ⚠️ **这一段在 2026-10-16 被改过，原文留着给人看它怎么错的**：
  *
- * 🔴 结构上到不了 ≠ 那条路是对的：如果将来把托管档接到 `invokeRouted` 上，
- * 我们的自建端点会被推导成 `user-endpoint`，于是披露变成"该端点由你提供、heyta 不参与"
- * —— **那句是假的**。那一档必须先为新 ADR 把目的地词表与路由配置对齐，
- * 见 ADR-0056 §5 第 1 条登记的边界。
+ * ~~`invokeRouted` 走的是 `AiRoutingConfig`，而那份配置**没有 `mode` 字段** ——
+ * 目的地由端点地址推导（`classifyDestination({ mode: 'own', ... })`），只可能是
+ * `none` / `user-endpoint`，**推不出 `heyta-cloud`**。所以"托管云到不了"是**结构上**成立的。~~
+ *
+ * 🔴 **那半句今天不成立了**：ADR-0056 §5 第 1 条要的就是把这一格补上，已于 2026-10-16 落地 ——
+ * `AiRoutingConfig` 现在**有** `mode?: AiSupplyMode`，`validateEndpointUrl` 也接受它，
+ * 解析候选与发送点复算**用同一个 mode**。所以"托管云到不了"这条**结构性**保证**已经不存在**了，
+ * 现在挡住越界的只有**那张境内白名单**（端点逐字匹配 + `jurisdiction: 'cn'`）。
+ * 这是**放宽**（一条原本不可能的事现在可能了），代价换来的是一句真话
+ * （见下一段：写死 `'own'` 会让披露撒谎）。判据在 `managed-allowlist.spec.ts` 第 ⑥ 段。
+ *
+ * 🔴 **`mode` 声明意图，不决定事实**：`classifyDestination` 对 `'managed'` 仍要查端点。
+ * 端点不在白名单上时目的地照样回到 `user-endpoint` —— **它放宽不了任何授权**。
+ * 本函数拦的仍然是"把 `mode` 写成 `managed`"那条入口。
  *
  * 🟢 **`managed` 从 2026-10-05 起可以启用了**，条件是端点落在境内白名单上。
  * 挡着它的那条"保留策略未定案"已由 ADR-0054 定案（正文不保留、元数据 45 天），

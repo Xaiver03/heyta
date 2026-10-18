@@ -86,3 +86,25 @@ export function recomputeConsents(
   return kept;
 }
 
+/**
+ * 这台设备**有没有一条能用的 AI 供给** —— 总开关开着，且这个档位有东西可打。
+ *
+ * 🔴 **必须分档判断，不能只数端点**：托管档没有"用户自己的端点"
+ * （那条端点由同步服务器在构造 routing 时合成，见 `@heyta/ai` 的 `withManagedEndpoint`），
+ * 所以 `endpoints.length > 0` 会把**托管用户判成"没配 AI"** ——
+ * 于是他看到的是"去添加一个端点"，而他真正要做的是登录 / 换档。
+ * 两种人看到同一句话，而**修复动作相反**。
+ *
+ * ⚠️ 判据是"**有没有服务器可打**"（`serverUrl`）而不是"托管档能不能真的通"：
+ * 后者要等一次网络往返，而这是一个同步的界面提示。真通不通由
+ * `RoutedDeps.managedTransport` 与路由层在发送那一刻判。
+ */
+export function isAiSupplyUsable(
+  routing: AiRoutingConfig,
+  serverUrl: string | undefined,
+): boolean {
+  if (!routing.enabled) return false;
+  if (routing.mode === 'managed') return (serverUrl ?? '').trim() !== '';
+  return routing.endpoints.length > 0;
+}
+

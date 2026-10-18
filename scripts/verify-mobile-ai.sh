@@ -1634,6 +1634,54 @@ else
 fi
 
 step "5. 只用本机时：规则句命中且零外发（Goal-1 的设备级判据）"
+# ═══════════════════════════════════════════════════════════════════════════
+# SEND-UNCOVERED
+#   🔴 这一行是**显式登记**，不是说明：本载体的发送相位机（第 5/7/8/9/10 步）整体退役，
+#   所以 `check:mobile-ai-anchors` 判据 ⑮②（"每一步的第一发发送之前必须证一次隧道"）
+#   在**这一份载体上已经没有输入**。那条判据现在会检查这份登记：**不写它就红**
+#   （分母为 0 时，那一半会"安静地不执行"，而读数上它与"每一发都证过了"长得一样）。
+#   ⇒ 这一行说的是"**未覆盖**"，不是"通道都证过了"。要恢复它，得按当前单一对话面
+#   重写发送相位机（见下面那三条指认与 iOS 载体第 12 步的落点表）。
+#
+# 🔴 2026-10-16 现量：**第 5/7/8/9/10 步整段是对已退役的「多模式助手面」写的**，
+#    在当前产品上跑不完。阶段在这一行停住（`summary … 1`），而不是像以前那样
+#    跑到某一枚锚点上再报「载体锚点失效」—— 那句把"标记载体没跟上产品"读成了
+#    "界面坏了"（§7 元规则一：没观测到 X ≠ X 没发生）。真因写在下面。
+#
+#    产品事实（三条独立指认）：
+#      ① `apps/mobile/src/ai/AssistantScreen.tsx` 在 HEAD 是 **325 行**的**单一对话面**
+#         （`git show 18efc229^1:apps/mobile/src/ai/AssistantScreen.tsx | wc -l` = 325）；
+#         本步写的那个多模式面是 `git show 18efc229^2:… | wc -l` = **1564 行**。
+#         两者之间是 main 侧 2026-10-10 的 `d49f77e3`（同笔提交新增 chat-composer /
+#         chat-controller / chat-transcript / execution-gate 四个文件，删掉 1647 行）
+#         —— 一次**刻意的产品改版**，不是文件丢了。
+#      ② 本步要的每一枚控件在现量源码里 grep 不到（逐枚见下面「旧文保留」各处）：
+#         五档 chips、`tool-input`、`tool-start-assistant`、`ai-tool-send`、
+#         `breakdown-start`、`ai-send`、`breakdown-apply`。
+#         现量助手屏的输入与发送是 `ai-assistant-input` + `ai-assistant-send-button`
+#         （`apps/mobile/src/ai/chat-composer.tsx:50/79`），披露步的发送是
+#         `assistant-disclosure-send`（`AssistantScreen.tsx:329`）。
+#      ③ merge `18efc229` 把 branch 侧**新写**的两份验收脚本收进了这棵树
+#         （`git diff --stat 18efc229^1 18efc229^2 -- scripts/verify-mobile-ai.sh
+#         scripts/verify-mobile-ios-ai.sh` ⇒ 两者都是新增：+2222 / +1185，main 侧
+#         根本没有这两个文件），而同一笔 merge 对 `AssistantScreen.tsx` 取的是
+#         **main 侧**（325 行）⇒ 脚本与产品**从来没有对上过**，不是这一轮改坏的。
+#
+#    ⇒ 要恢复这几步的设备级判据，得按当前对话面重写相位机（输入 → 发送 → 披露 →
+#      提案 → 确认），**不许把锚点改个名就继续**。下面 6 枚锚点已按仓规
+#      **旧文不删、追加说明**地置为注释：
+#        `tool-input`            → 落点 `ai-assistant-input`
+#        `tool-start-assistant`  → 落点 `ai-assistant-send-button`
+#        `ai-tool-send`          → 落点 `assistant-disclosure-send`
+#        `breakdown-start`       → 落点：无（拆解面板已不在产品里；拆解现在只能靠对话输入）
+#        `ai-send`               → 落点 `assistant-disclosure-send`
+#        `breakdown-apply`       → 落点 `assistant-confirm-proposal`
+#      `check:mobile-ai-anchors` 的 rid 对账面因此回到 0 缺失；**披露那一枚不变量**
+#      没有退休，它搬到了 `apps/mobile/src/ai/chat-controller.ts` 的 `send()`，
+#      由同一份门禁的判据 ㉔ 用新锚点守着（旧的两枚按压锚点 `tool-start-single` /
+#      `tool-start-assistant` 就是在那里迁移的）。
+# ═══════════════════════════════════════════════════════════════════════════
+summary "移动端 AI 助手真机验收" "第 5/7/8/9/10 步针对的是已退役的多模式助手面（证据见本步注释）" 1
 # 第 3/4 步整段停在「AI 设置」屏上，而「AI 助手」那一格在「我的」页 ——
 # 原先这里直接 dump，等于在设置屏上找「我的」页的格子（恒红），
 # 而第 2 步那句反向判据又在任意错屏上恒绿。两头都要靠 goto_me_page 钉住屏。
@@ -1663,10 +1711,19 @@ for CHIP in "一句话捕获" "拆解任务" "优先级建议" "预估耗时" "A
   [ "$(has_desc "$CHIP")" = "1" ] || MISSING="$MISSING $CHIP"
 done
 if [ -z "$MISSING" ]; then ok "助手屏五档 chips 全在（check:ai-coverage 在设备上的对应物）"; else bad "缺 chips:$MISSING"; fi
-if [ "$(has_sub "AI 只给建议")" = "1" ]; then
-  ok "「只给建议」那句常驻脚注在屏上（它是唯一对用户承诺「确认前不写」的文案）"
+# 🔴 needle 换成了**当前那枚词条的原文**（逐字取自 `packages/i18n/src/locales/zh-CN.ts`
+#   的 `mobile.ai.proposalNeverAuto`）。旧 needle 是「AI 只给建议」—— 它是这句话
+#   **被改之前**的子串，而过期的是 needle 不是界面文案：产品侧是刻意改的，
+#   旧句承诺"没有任何一条改动会在你确认之前写进去"，`read-and-propose` 执行档上线后
+#   它**变成了假话**（低风险写入会自动完成）。iOS 载体同一格早就按 key 取
+#   （`FOOT=$(zh mobile.ai.proposalNeverAuto)`，见 `verify-mobile-ios-ai.sh:725`），
+#   所以两侧现在读的是同一条词条 —— 只是 Android 这侧留的是**字面 needle**
+#   （刻意不用 `$(zh …)`：那样它就从 `check:verify-script-copy` 的对账面上消失了，
+#   见 `check-mobile-ai-anchors.mjs` 判据 ⑳ 那段"挪到视野外就是一种逃逸"）。
+if [ "$(has_sub "只读档不会写入；执行档会自动完成低风险写入，高风险改动会先请你确认。")" = "1" ]; then
+  ok "档位写入边界那句常驻脚注在屏上（原文逐字来自 mobile.ai.proposalNeverAuto）"
 else
-  bad "常驻脚注没出现"
+  bad "常驻脚注没出现（那句说明两个档位会不会自动写入的文案）"
 fi
 shot_evidence "android-ai-1-assistant.png"
 # 走多步循环那一档：Goal-1 的短路补在 loop 上，不在单步面板。
@@ -1675,7 +1732,8 @@ dump
 disable_ime
 # 🔴 同一枚"只 dump 一次、取不到就报锚点坏了"的形状（见 add_endpoint 那段现量）：
 #    输入框在面板下方时它**根本没进那一秒的树**，红字却说"界面形状变了"。
-tap_rid tool-input || { echo "   🔴 工具档里滚不出输入框 testID=tool-input"; screen_txt; summary "移动端 AI 助手真机验收" "载体锚点失效" 1; }
+# 🔴 旧文保留·已退休（理由见第 5 步注释：`tool-input` 是旧工具面板的输入框）
+# tap_rid tool-input || { echo "   🔴 工具档里滚不出输入框 testID=tool-input"; screen_txt; summary "移动端 AI 助手真机验收" "载体锚点失效" 1; }
 # 🔴 带标签发（标签 = 这枚输入框的 content-desc）：`clear_and_type` 只有拿到标签才会
 #    **读回并补齐**。rig18 现量：不带标签发 "list all tasks"，框里只剩 `list`
 #    —— 空格在 adb→device shell 那一跳被当成语界，`input text` 退 0、一声不响
@@ -1698,27 +1756,30 @@ stub_reset; RB=$(stub_count) || summary "移动端 AI 助手真机验收" "假�
 #   `disabled = text.trim()==='' || props.route.target===undefined`
 #   —— 框里已有文字（上面逐字读回过），所以 enabled=true 只可能来自"路由真的绑上了"。
 dump
-if [ "$(rid_attr tool-start-assistant enabled)" != "true" ]; then
-  bad "输入框里有文字、按钮却还是 disabled ⇒ 这一档的候选集是空的；两种成因用库回读分辨——\n      现量 routes/同意：$(routes_reading)\n      （rig25 库回读已把「点击没写进去」这一条**排除**：五档 routes 各 1 枚、enabled/allowRemote 都 True。剩下三个候选：这一档的逐功能同意没给（consents=0）／这一枚端点没声明**工具能力**（stub-model 零能力声明，而能力按 ADR-0010 是显式声明、不做推断）／助手档位 assistantTier 把这一档挡在外面。载体不替产品选一个，也不许读成「产品闸门正常工作」——那条闸门另有判据）"
-  screen_txt
-  summary "移动端 AI 助手真机验收" "路由没绑上" 1
-fi
-ok "五档路由绑定生效：tool-start-assistant 的 enabled=true（disabled 的另一半条件已由读回的输入框满足）"
+# 🔴 旧文保留·已退休（2026-10-16，理由见第 5 步注释）：这一格要的 `tool-start-assistant`
+#    是旧多模式面的「发送（多轮）」按钮，现量源码里 grep 不到它。
+#    if [ "$(rid_attr tool-start-assistant enabled)" != "true" ]; then
+#      bad "输入框里有文字、按钮却还是 disabled ⇒ 这一档的候选集是空的；两种成因用库回读分辨——\n      现量 routes/同意：$(routes_reading)\n      （rig25 库回读已把「点击没写进去」这一条**排除**：五档 routes 各 1 枚、enabled/allowRemote 都 True。剩下三个候选：这一档的逐功能同意没给（consents=0）／这一枚端点没声明**工具能力**（stub-model 零能力声明，而能力按 ADR-0010 是显式声明、不做推断）／助手档位 assistantTier 把这一档挡在外面。载体不替产品选一个，也不许读成「产品闸门正常工作」——那条闸门另有判据）"
+#      screen_txt
+#      summary "移动端 AI 助手真机验收" "路由没绑上" 1
+#    fi
+#    ok "五档路由绑定生效：tool-start-assistant 的 enabled=true（disabled 的另一半条件已由读回的输入框满足）"
 # 🔴 这一趟的第一个发送点之前证一次通道（后面的 ai-tool-send 属同一趟，不再重复）。
 tunnel_or_environment_fail "第 5 步进披露前"
-tap_rid tool-start-assistant || summary "移动端 AI 助手真机验收" "载体锚点失效" 1
+# 🔴 旧文保留·已退休：tap_rid tool-start-assistant || summary "移动端 AI 助手真机验收" "载体锚点失效" 1
 dump
-if [ -z "$(rid_center ai-tool-send)" ]; then
-  bad "点完「发送（多轮）」之后披露步没出现（testID=ai-tool-send 不在树里）—— 那一档的相位机换了，后面的判据没有输入"
-  screen_txt
-  summary "移动端 AI 助手真机验收" "披露步没出现" 1
-fi
-ok "点「发送（多轮）」后进的是披露步（ai-tool-send 在树里）—— 请求还没出去，用户先看披露"
+# 🔴 旧文保留·已退休：这一格读的 `ai-tool-send` 是旧披露步的发送键。
+#    if [ -z "$(rid_center ai-tool-send)" ]; then
+#      bad "点完「发送（多轮）」之后披露步没出现（testID=ai-tool-send 不在树里）—— 那一档的相位机换了，后面的判据没有输入"
+#      screen_txt
+#      summary "移动端 AI 助手真机验收" "披露步没出现" 1
+#    fi
+#    ok "点「发送（多轮）」后进的是披露步（ai-tool-send 在树里）—— 请求还没出去，用户先看披露"
 # 🔴 发送前重新证明通道（第 5 步之后已经做过好几次库回读 = 好几次 root/unroot）。
 #    这一发**预期被本机闸门拦下**、永远到不了端点，所以"计数没动"这条判据只有在一个
 #    仍然通得了的通道上才有力；通道断了时它也会读到 0→0，而那句话就不再是隐私闸门的证据。
 tunnel_or_environment_fail "第 5 步发送前"
-tap_rid ai-tool-send || summary "移动端 AI 助手真机验收" "披露步的发送点不动" 1
+# 🔴 旧文保留·已退休：tap_rid ai-tool-send || summary "移动端 AI 助手真机验收" "披露步的发送点不动" 1
 sleep 4
 dump
 
@@ -1921,11 +1982,20 @@ stub_reset; G0=$(stub_count) || summary "移动端 AI 助手真机验收" "假�
 tunnel_or_environment_fail "第 7 步第一发前"
 # 🔴 前置条件要在**被测那一侧**读到：disabled 就是"路由或任务选择没接上"，
 #    这一格由 tap_rid 自己那句话说清，这里只负责不让后面的读数替它打分。
-tap_rid breakdown-start || summary "移动端 AI 助手真机验收" "「AI 拆解」点不到（不存在／贴边／未启用，理由见上一行）" 1
+# 🔴 旧文保留·已退休（`breakdown-start` = 旧拆解面板的「AI 拆解」键；现量无对应元素，
+#    拆解现在只能靠对话输入。理由与三条指认见第 5 步注释）
+# tap_rid breakdown-start || summary "移动端 AI 助手真机验收" "「AI 拆解」点不到（不存在／贴边／未启用，理由见上一行）" 1
 sleep 3
 dump
 CONSENT_LINE=$(has_sub "需要你批准后内容才会离开本机")
-SEND_PRESENT=0; [ -n "$(rid_center ai-send)" ] && SEND_PRESENT=1
+SEND_PRESENT=0
+# 🔴 旧文保留·已退休：这一行原先是
+#      SEND_PRESENT=0; [ -n "$(rid_center ai-send)" ] && SEND_PRESENT=1
+#    退休后恒 0：旧披露步那枚发送键在产品里已不存在（迁移落点 `assistant-disclosure-send`，
+#    但本步要按对话面重写才谈得上迁移 —— 理由见第 5 步注释）。
+#    ⚠️ 旧文写成**整行注释**、不挂在活代码后面的行内注释：判据 ①（rid 对账面）那条
+#    "注释不是调用点"的豁免只认 `#` 开头的整行；行内注释里的 `$(rid_center ai-send)`
+#    仍被扫成一枚真锚点 ⇒ 对账面多出两条**假缺陷**（退休说明把交付判红，而不是产品有问题）。
 G1=$(stub_count) || summary "移动端 AI 助手真机验收" "假端点计数读不出" 1
 if [ "$CONSENT_LINE" = "1" ] && [ "$SEND_PRESENT" = "1" ] && [ "$G1" = "$G0" ]; then
   ok "未授权时披露步就索取批准（consentLead 那句在），且此刻假端点计数 ${G0}→${G1} 一次没动"
@@ -1938,7 +2008,9 @@ fi
 #       而下一句读的是「有没有那句拦截说明」，于是一枚没点到的发送键会报成"闸门放行了"。
 #    🔴 发送前重新证明通道：这一档要的正是"没落到端点"，而通道断了也读成"没落到端点"。
 tunnel_or_environment_fail "第 7 步发送前"
-tap_rid ai-send || summary "移动端 AI 助手真机验收" "发送键点不动" 1
+# 🔴 旧文保留·已退休（`ai-send` = 旧披露步的发送键；迁移落点是 `assistant-disclosure-send`，
+#    但本步的相位机要按对话面重写才谈得上迁移 —— 理由见第 5 步注释）
+# tap_rid ai-send || summary "移动端 AI 助手真机验收" "发送键点不动" 1
 sleep 5
 dump
 BLOCKED_LINE=$(has_sub "该功能需要你先批准内容离开本机")
@@ -1970,7 +2042,9 @@ tap_desc "$TASK_TITLE" || summary "移动端 AI 助手真机验收" "拆解没�
 # 并且"不在树里 / 贴着边 / disabled"三种成因各说各的话（disabled 它也会响亮拒绝）。
 # 🔴 本步第一发之前证一次通道（"失败必须可见"与"通道断了"在界面上是同一句话）。
 tunnel_or_environment_fail "第 8 步第一发前"
-tap_rid breakdown-start || summary "移动端 AI 助手真机验收" "「AI 拆解」点不到（不存在／贴边／未启用，理由见上一行）" 1
+# 🔴 旧文保留·已退休（`breakdown-start` = 旧拆解面板的「AI 拆解」键；现量无对应元素，
+#    拆解现在只能靠对话输入。理由与三条指认见第 5 步注释）
+# tap_rid breakdown-start || summary "移动端 AI 助手真机验收" "「AI 拆解」点不到（不存在／贴边／未启用，理由见上一行）" 1
 sleep 3
 dump
 D_TO=$(has_sub "将发往："); D_FL=$(has_sub "将发送这些字段："); D_RM=$(has_sub "数据会离开设备")
@@ -1990,7 +2064,9 @@ stub_reset; U0=$(stub_count) || summary "移动端 AI 助手真机验收" "假�
 #    （都落到那句连不上端点），所以先把同一刻的通道证一次：设备此刻够得到假端点，
 #    它报的连不上才只能指 192.0.2.1 那一趟。
 tunnel_or_environment_fail "第 8 步发送前"
-tap_rid ai-send || summary "移动端 AI 助手真机验收" "发送键点不动" 1
+# 🔴 旧文保留·已退休（`ai-send` = 旧披露步的发送键；迁移落点是 `assistant-disclosure-send`，
+#    但本步的相位机要按对话面重写才谈得上迁移 —— 理由见第 5 步注释）
+# tap_rid ai-send || summary "移动端 AI 助手真机验收" "发送键点不动" 1
 sleep 8
 dump
 if [ "$(has_sub "连不上端点")" = "1" ] || [ "$(has_sub "技术详情")" = "1" ]; then
@@ -2030,17 +2106,23 @@ stub_reset; S0=$(stub_count) || summary "移动端 AI 助手真机验收" "假�
 # 同上：这一枚在面板底部，**没滚到位时不在树里**；tap_rid 负责滚进安全带再点，
 # 并且"不在树里 / 贴着边 / disabled"三种成因各说各的话（disabled 它也会响亮拒绝）。
 tunnel_or_environment_fail "第 9 步发送前"
-tap_rid breakdown-start || summary "移动端 AI 助手真机验收" "「AI 拆解」点不到（不存在／贴边／未启用，理由见上一行）" 1
+# 🔴 旧文保留·已退休（`breakdown-start` = 旧拆解面板的「AI 拆解」键；现量无对应元素，
+#    拆解现在只能靠对话输入。理由与三条指认见第 5 步注释）
+# tap_rid breakdown-start || summary "移动端 AI 助手真机验收" "「AI 拆解」点不到（不存在／贴边／未启用，理由见上一行）" 1
 sleep 3
 dump
 # 回环这一档**可以**没有披露步（本机目的地不该问），所以这里保留"在不在"的分支；
 # 但既然进了这一支，坐标就必须取到 —— 原先两句都靠同一个空值，空值时一声不响。
-if [ -n "$(rid_center ai-send)" ]; then
-  tap_rid ai-send || summary "移动端 AI 助手真机验收" "发送键点不动" 1
-  sleep 6
-else
-  echo "   ↷ 回环这一趟没有单独披露步（本机目的地不该问）—— 直接看提案"
-fi
+# 🔴 旧文保留·已退休（`ai-send` = 旧披露步的发送键；迁移落点是 `assistant-disclosure-send`，
+#    但本步的相位机要按对话面重写才谈得上迁移 —— 理由见第 5 步注释）：
+#    if [ -n "$(rid_center ai-send)" ]; then
+#      tap_rid ai-send || summary "移动端 AI 助手真机验收" "发送键点不动" 1
+#      sleep 6
+#    else
+#      echo "   ↷ 回环这一趟没有单独披露步（本机目的地不该问）—— 直接看提案"
+#    fi
+# 退休后只剩那个 sleep（它等的是「这一发打出去之后界面稳定下来」那一件事）。
+sleep 6
 dump
 # 🔴 提案卡是后面两条判据的**分母**（rig39 现量：屏上是那句"连不上端点"，
 #   而下一行照样打了 ✅「只看了提案、没点确认 ⇒ 手机库条数不变」——
@@ -2075,15 +2157,22 @@ fi
 
 step "10. 点「写入备注」⇒ 恰好 +1 条 TASK/UPD 且载荷键集合是 note"
 UPD_BEFORE=$(db_count "$PHONE_DB" "select count(*) from ops where json_extract(data,'\$.op.entityType')='TASK' and json_extract(data,'\$.op.opType')='UPD'")
-[ -n "$(rid_center breakdown-apply)" ] || { echo "   ❌ 没有 testID=breakdown-apply（确认那一半没有输入）"; screen_txt; summary "移动端 AI 助手真机验收" "载体锚点失效" 1; }
-# 🔴 这一点要是没送到，下面"恰好 +1"与"载荷只有 note"两条都在**没写入的库**上打分 ——
-#    它们会一起红，而红字把归因推给产品。守卫要压住后续判据（探针坏了就报"未取证"）。
-if tap_rid breakdown-apply; then
-  APPLIED=1
-else
-  APPLIED=0
-  bad "「写入备注」点不动 —— 第 10 步后面两条判据记为**未取证**，不给它们打分"
-fi
+# 🔴 旧文保留·已退休（2026-10-16）：本步整段属于已退役的多模式助手面 —— 上面第 5 步起
+#    就 `summary … 1` 中止了，所以这里从来跑不到。两枚 `breakdown-apply` 调用点按仓规
+#    置为注释，原样留在这里：
+#      [ -n "$(rid_center breakdown-apply)" ] || { echo "   ❌ 没有 testID=breakdown-apply（确认那一半没有输入）"; screen_txt; summary "移动端 AI 助手真机验收" "载体锚点失效" 1; }
+#      # 这一点要是没送到，下面"恰好 +1"与"载荷只有 note"两条都在**没写入的库**上打分。
+#      if tap_rid breakdown-apply; then
+#        APPLIED=1
+#      else
+#        APPLIED=0
+#        bad "「写入备注」点不动 —— 第 10 步后面两条判据记为**未取证**，不给它们打分"
+#      fi
+#    迁移落点 = `assistant-confirm-proposal`（`apps/mobile/src/ai/AssistantScreen.tsx:302`
+#    那枚提案卡的确认键）。要恢复本步的设备级判据得按当前单一对话面重写相位机 ——
+#    理由与三条独立指认见第 5 步注释那一整块。
+APPLIED=0
+bad "第 10 步（点确认 ⇒ 恰好 +1 条 TASK/UPD、载荷键集合是 note）未按当前单一对话面重写：它的锚点 breakdown-apply 随多模式面退役 ⇒ 本格**未取证**，不给它打分"
 sleep 4
 pull_phone_db
 UPD_AFTER=$(db_count "$PHONE_DB" "select count(*) from ops where json_extract(data,'\$.op.entityType')='TASK' and json_extract(data,'\$.op.opType')='UPD'")
