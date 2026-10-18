@@ -76,6 +76,7 @@ import {
   requestBreakdown,
   type BreakdownProposal,
 } from '@heyta/app-host';
+import { webManagedTransport } from './managed-transport.js';
 import type { Task } from '@heyta/domain';
 
 /**
@@ -271,6 +272,7 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
         preferences: hints,
         routed: {
           secretStore: secrets,
+          managedTransport: webManagedTransport,
           // 🔴 **发送那一刻**才解析快照 —— 冷却期是对着"现在"算的。
           // 用 `fromHealthSnapshot` 而不是直接丢进去：它不抛错、会封顶跳闸、
           // 会丢掉坏条目（见 `packages/ai/src/health-store.ts`）。
@@ -293,6 +295,7 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
       breakdownFailureCopy(outcome.reason, outcome.message, {
         cause: outcome.cause,
         endpointUrl: outcome.endpointUrl,
+        serverCode: outcome.serverCode,
       }),
     );
     setPhase('failed');

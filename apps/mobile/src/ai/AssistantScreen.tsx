@@ -17,8 +17,17 @@ import {
   type AiToolProposal,
   type ChatItem,
   type AppHost,
+  createManagedTransport,
 } from '@heyta/app-host';
-import { authorizeEgress, buildDisclosure, fromHealthSnapshot, toHealthSnapshot, type HealthMap } from '@heyta/ai';
+import {
+  authorizeEgress,
+  buildDisclosure,
+  fromHealthSnapshot,
+  toHealthSnapshot,
+  withManagedEndpoint,
+  type AiRoutingConfig,
+  type HealthMap,
+} from '@heyta/ai';
 import type { LocalApiHost, LocalApiWriteResult } from '@heyta/local-api';
 import { useI18n, type MessageKey } from '@heyta/i18n';
 
@@ -28,7 +37,7 @@ import { openTaskHost } from '../db/open-host';
 import { useMobileNavigation } from '../nav/navigation';
 import { readSyncConfig } from '../sync/config';
 import { AiDisclosureBlock } from './disclosure';
-import { ASSISTANT_FAILURE_KEY } from './copy';
+import { ASSISTANT_FAILURE_KEY, AI_CAUSE_KEY, AI_FEATURE_LABEL_KEY, SERVER_CODE_KEY } from './copy';
 import { ChatComposer } from './chat-composer';
 import {
   createChatController,
@@ -39,8 +48,32 @@ import {
 import { ChatTranscript, type ChatTranscriptItem } from './chat-transcript';
 import { intentText } from './intent-copy';
 import { getAiSettings, isAiConfiguredOnThisDevice, saveAiSettings, useAiSettings, aiSecrets } from './settings-store';
+import { useMobileSync } from '../sync/store';
 
 const resolveHistoryAccount = createAssistantHistoryAccountResolver();
+
+/**
+ * 托管档的宿主通道 —— **组装只有一份**（`packages/app-host` 的 `createManagedTransport`），
+ * 这里只负责接上移动端的同步配置。两个取值器都是**活取值器**
+ * （照 `legal-recheck/gate.ts` 那条先例：用户是应用起来之后才填地址/令牌的）。
+ */
+const managedTransport = createManagedTransport({
+  getServerUrl: () => readSyncConfig()?.serverUrl,
+  getToken: async () => readSyncConfig()?.token,
+});
+
+/**
+ * **发送那一刻**现算的路由配置（见 `ChatRuntime.resolveRouting` 的注释）。
+ *
+ * 🔴 它与 `settings.routing` 的区别就是托管档能不能用：落盘的那一份里
+ * **没有**托管端点（那条端点由 `withManagedEndpoint` 从同步服务器合成），
+ * 所以拿落盘那份去调 `invokeRouted`，选托管的人只会得到 `no-route`。
+ *
+ * ⚠️ 每次调用都读一次同步配置 —— 那是**同步的本地存储读**，而这一次调用的
+ * 代价远小于一次网络往返；缓存它反而会让"刚登录完就用"落进旧值。
+ */
+const resolveRouting = (): AiRoutingConfig =>
+  withManagedEndpoint(getAiSettings().routing, readSyncConfig()?.serverUrl);
 
 export function AssistantScreen({
   onBack,
@@ -98,6 +131,13 @@ export function AssistantScreen({
     };
   }, []);
 
+  /**
+   * 同步状态 —— 只为了**在服务器地址变化后重新算一次披露**。
+   * 见下面 `route` 那条 memo 的依赖注释：AI 设置不会因为登录而变，
+   * 不挂这个订阅，刚登录完回到助手会拿到一份"按没配服务器算"的预览。
+   */
+  const sync = useMobileSync();
+
   const toolHost = useMemo<LocalApiHost | null>(
     () => (host === null ? null : createToolHost(host, settings.memoryEnabled)),
     [host, settings.memoryEnabled],
@@ -111,6 +151,9 @@ export function AssistantScreen({
       settings,
       host: toolHost,
       secretStore: aiSecrets,
+      managedTransport,
+      // 🔴 现算的那一份（不是 `settings.routing`）—— 见模块顶部 `resolveRouting` 的注释。
+      resolveRouting,
       localize: (key, vars) => t(key as MessageKey, vars),
       onHealth: persistHealth,
       onTierChange: (tier) => saveAiSettings({ ...getAiSettings(), assistantTier: tier }),
@@ -137,9 +180,22 @@ export function AssistantScreen({
     return () => navigation.setBackHandler(null);
   }, [controller, navigation, onBack, snapshot.phase, visible]);
 
+  /**
+   * 披露预览读的也必须是**现算的那一份**。
+   *
+   * 🔴 用落盘的 `settings.routing` 会造出一种最坏的错位：**界面说"没有可用的路"，
+   * 而实际发送能成功**（或反过来）。用户纠正不了 —— 他看不到任何配置能改。
+   *
+   * ⚠️ `sync.status` 进依赖是必需的：服务器地址是用户**应用起来之后**才填的，
+   * 而 AI 设置那一刻不会变。不挂这个依赖，刚登录完回到助手，
+   * 预览仍然按"没配服务器"算 —— 而 `resolveRouting()` 明明已经能拿到地址。
+   */
   const route = useMemo(
-    () => resolveAiRoute(settings.routing, 'tool-calling', { health: fromHealthSnapshot(settings.health, snapshot.routeTime) }),
-    [settings.health, settings.routing, snapshot.routeTime],
+    () =>
+      resolveAiRoute(resolveRouting(), 'tool-calling', {
+        health: fromHealthSnapshot(settings.health, snapshot.routeTime),
+      }),
+    [settings.health, settings.routing, snapshot.routeTime, sync.status],
   );
   const plan = useMemo(() => planAssistantEgress(settings.assistantTier), [settings.assistantTier]);
   const configured = isAiConfiguredOnThisDevice(settings);
@@ -155,7 +211,31 @@ export function AssistantScreen({
     return {
       id: entry.id,
       role: entry.role,
-      text: entry.role === 'error' ? t(privacyBlocked ? 'mobile.ai.privacyBlocked.title' : ASSISTANT_FAILURE_KEY[entry.reason]) : entry.text,
+      // 🔴 **原因码优先**（`AI_CAUSE_KEY`），面板级那张粗码表只在**没有原因码**时兜底。
+      //    这是 rig45 那条修复（2026-10-06）：旧多模式面的六处失败落点里五处写了
+      //    `outcome.cause !== undefined ? AI_CAUSE_KEY[cause] : 面板表[reason]`，只有助手那
+      //    一处直接查了面板表 —— 于是闸门拒绝（`cause='consent-not-granted'`）被印成
+      //    「AI 服务暂时不可用。」，而 heyta 的 AI 是用户自己填端点（BYOK），没有这么一回事：
+      //    **界面在说谎**。
+      //    ⚠️ main 侧重写 `d49f77e3` 把那一代界面连同这处修复一起换掉了，于是这一处又退回成
+      //    "直接查粗码表"（`AI_CAUSE_KEY` 在 `apps/mobile/src` 里一度**零消费者**）——
+      //    2026-10-16 按老口径搬回来。判据 = `check:mobile-ai-anchors` 的 ㉕。
+      text:
+        entry.role === 'error'
+          ? t(
+              privacyBlocked
+                ? 'mobile.ai.privacyBlocked.title'
+                : // 🔴 **服务端稳定码最优先**：`402 SUBSCRIPTION_REQUIRED`（去买）与
+                  // `409 AI_QUOTA_EXCEEDED`（等下一周期）在失败词表里**都落进 `http-error`**，
+                  // 按下面那条 `cause` 取词条会把这两件事说成同一句 —— 而修复动作相反。
+                  // 服务端既然给了码，就按码说话。
+                  entry.serverCode !== undefined && SERVER_CODE_KEY[entry.serverCode] !== undefined
+                  ? (SERVER_CODE_KEY[entry.serverCode] as MessageKey)
+                  : entry.cause !== undefined
+                    ? AI_CAUSE_KEY[entry.cause]
+                    : ASSISTANT_FAILURE_KEY[entry.reason],
+            )
+          : entry.text,
       detail,
       proposal: entry.role === 'proposal' ? (
         <ProposalCard
@@ -319,7 +399,10 @@ function DisclosureCard({ target, plan, consents, onConfirm, onCancel, onOpenSet
     );
   }
   const fields = assistantEgressFields(plan.tier);
-  const disclosure = buildDisclosure({ feature: 'tool-calling', destination: target.destination, fields });
-  const decision = authorizeEgress({ feature: 'tool-calling', destination: target.destination, fields }, consents as Parameters<typeof authorizeEgress>[1]);
-  return <Stack gap="tight" testID="assistant-disclosure"><AiDisclosureBlock testIdPrefix="assistant-" target={target} fields={fields} retentionDisclosure={disclosure.retentionDisclosure}><Text variant="caption" tone="subtle">{t('web.ai.chat.limits', { requests: plan.maxRequests, messages: plan.maxMessages, bytes: plan.maxBytesPerRequest })}</Text></AiDisclosureBlock>{!decision.allowed ? <Text variant="caption" tone="warning">{t('web.ai.settings.consentLead')}</Text> : null}<HStack gap="tight"><Button label={t('web.ai.action.send')} tone="primary" onPress={onConfirm} testID="assistant-disclosure-send" /><Button label={t('web.ai.action.cancel')} tone="ghost" onPress={onCancel} /></HStack></Stack>;
+  // 🔴 「出境的是哪个功能」只在这一处取字面量：闸门、披露块与同意提示**同源**。
+  //    三处各写一遍 `'tool-calling'` 的话，改了一处就会让提示念着别的功能。
+  const feature = 'tool-calling' as const;
+  const disclosure = buildDisclosure({ feature, destination: target.destination, fields });
+  const decision = authorizeEgress({ feature, destination: target.destination, fields }, consents as Parameters<typeof authorizeEgress>[1]);
+  return <Stack gap="tight" testID="assistant-disclosure"><AiDisclosureBlock testIdPrefix="assistant-" target={target} fields={fields} retentionDisclosure={disclosure.retentionDisclosure}><Text variant="caption" tone="subtle">{t('web.ai.chat.limits', { requests: plan.maxRequests, messages: plan.maxMessages, bytes: plan.maxBytesPerRequest })}</Text></AiDisclosureBlock>{!decision.allowed ? <Text variant="caption" tone="warning">{t('web.ai.settings.consentLead', { feature: t(AI_FEATURE_LABEL_KEY[feature]) })}</Text> : null}<HStack gap="tight"><Button label={t('web.ai.action.send')} tone="primary" onPress={onConfirm} testID="assistant-disclosure-send" /><Button label={t('web.ai.action.cancel')} tone="ghost" onPress={onCancel} /></HStack></Stack>;
 }

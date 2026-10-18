@@ -376,11 +376,14 @@ PYC
 # 回环端点也不例外），所以"计数会涨"这一条在闸门关着时**结构上取不到**。
 # rig52 现量：第 10 步那两条红（回环这一趟 0→0、等 40 秒没有提案卡）就是这个 sequencing
 # 问题，不是产品问题 —— 而它同时让第 7 步那条"0→0 没动"失去分母（traps #335 那一族）。
+# ⚠️ 2026-10-16 更正：引的这两步（原第 7/10 步）已随多模式助手面退役、整块注释保留，
+#    见第 12 步。下面这几句留作**为什么这个 helper 必须走 `open_ai_settings`** 的由来。
 # 这一格没有 testID 锚点：`privacy-consent-section` 是裸 `<Stack>`，iOS 不发节点（#348），
 # 而「重新选择」那颗按钮是共享 `Button` ⇒ 按可见标签点。
 flip_consent_to_network() {
   # 🔴 走既有的 `open_ai_settings`，不许自己拼"点「我的」再点「设置」"：rig54 现量就是这么拼的，
   # 而第 8 步结束时屏幕上立着的是**助手层**（失败面）—— 它立着时底部标签整条不在 AX 树里
+  # （那一步也已退役，见第 12 步；这条几何事实与它退不退役无关：助手层立着时标签栏不在树上）
   # （#348 那一族的同源事实），于是 `profile-entry-settings` 滚不进可见区
   # （`scrollRc=element-left-tree`），读起来像"合规区块被摘掉了"。
   # `open_ai_settings` 里那两条 `leave_assistant` / `leave_settings` 才是这一格的必要前置。
@@ -709,24 +712,49 @@ press_id "profile-entry-assistant" || { bad "点不进助手屏"; summary "iOS �
 wait_id "assistant-back" 12 || { bad "助手屏没起来（它自己的出口按钮不在树里）"; summary "iOS 助手真机验收"; }
 shot "ios-ai-1-assistant.png" "assistant-back"
 
-step "5. 判据②③：五档 chips 与「只给建议」常驻脚注"
-# 🔴 逐枚读 id（ai-mode-<功能>），不读标签：`Chip` 是无障碍名 = 标签唯一稳定的那一层，
-#   而标签字符串在两端的合成规则不同（#345），换措辞就会把这条判据读成"界面缺那一档"。
-#   id 这一层的正确性由门禁 ㉑ 的字面臂在无设备时守着。
-MISS=""
-for f in capture breakdown prioritize duration-estimate tool-calling; do
-  found_id "ai-mode-$f" || MISS="$MISS ai-mode-$f"
+step "5. 判据②③：单一对话面的两个控件 + 写入边界那句承诺"
+# 🔴 **2026-10-16 收窄**（旧文见下面那段注释）：这一格原先逐枚读 `ai-mode-<功能>`
+#   （branch 侧 `testID={`ai-mode-${feature}`}`，旧多模式助手面的**模式切换 chip**）。
+#   那枚控件随产品改版退役（三条独立指认 + 逐枚落点见第 12 步），于是"逐枚 found_id"
+#   必然恒红，而红字会说成"助手屏缺这几档"—— 把"标记载体没跟上产品"读成"界面坏了"
+#   （§7 元规则一：没观测到 X ≠ X 没发生）。
+#   当前载体是**单一对话面**：输入 `ai-assistant-input` + 发送 `ai-assistant-send-button`
+#   （`apps/mobile/src/ai/chat-composer.tsx:50/79`）。它俩**同时**是旧锚点 `tool-input`
+#   （旧工具面板输入）/ `tool-start-single`（旧「运行」键）/ `capture-input` /
+#   `capture-start` / `breakdown-start` 的迁移落点。五档功能**没有**面板 chip 了 ——
+#   它们现在只在设置面的路由表里逐档出现（`ai-route-<功能>-<下标>`），那一格由第 6 步守着。
+#   旧文（原第 5 步正文，逐行保留）：
+#     MISS=""
+#     for f in capture breakdown prioritize duration-estimate tool-calling; do
+#       found_id "ai-mode-$f" || MISS="$MISS ai-mode-$f"
+#     done
+#     if [ -n "$MISS" ]; then
+#       bad "这几档 chip 的锚点不在树里：$MISS"
+#     else
+#       ok "助手屏五档 chips 全在（逐枚 id 现读；check:ai-coverage 在 iOS 设备上的对应物）"
+#     fi
+MISS_CTL=""
+for rid in ai-assistant-input ai-assistant-send-button; do
+  found_id "$rid" || MISS_CTL="$MISS_CTL $rid"
 done
-if [ -n "$MISS" ]; then
-  bad "这几档 chip 的锚点不在树里：$MISS"
+if [ -n "$MISS_CTL" ]; then
+  bad "单一对话面这两个控件不在树里：$MISS_CTL"
 else
-  ok "助手屏五档 chips 全在（逐枚 id 现读；check:ai-coverage 在 iOS 设备上的对应物）"
+  ok "单一对话面的输入与发送都在树里（逐枚 id 现读：ai-assistant-input / ai-assistant-send-button）"
 fi
+# 🔴 needle 按**词条键**取（`zh mobile.ai.proposalNeverAuto`），不写字面串：iOS 这一侧
+#   本来就走 key（判据 ㉑b 会在无设备时判它有没有、空不空）。
+#   ⚠️ **2026-10-16 现量：这枚词条在当前源码里没有消费者** ——
+#     `git grep -n proposalNeverAuto HEAD -- apps/mobile/src` 为空；渲染点原本在
+#     `18efc229^2:apps/mobile/src/ai/AssistantScreen.tsx:323`，被 main 侧重写 `d49f77e3`
+#     连同整块界面一起换掉。⇒ **本格在当前产物上预期红，而那是产品缺陷**（读只读档 /
+#     执行档的写入边界承诺不再出现在界面上），不是载体问题、也不是措辞过期。
+#     **不许**把它改成别的文案糊过去（那就是拿一个错串替换另一个错串）。
 FOOT=$(zh mobile.ai.proposalNeverAuto)
 if found_label "$FOOT"; then
-  ok "「只给建议」那句常驻脚注在屏上（它是唯一对用户承诺「确认前不写」的文案）"
+  ok "写入边界那句常驻承诺在屏上（原文逐字来自 mobile.ai.proposalNeverAuto）"
 else
-  bad "常驻脚注不在屏上（那句承诺消失了，而它是这套体系的免责基础）"
+  bad "常驻承诺不在屏上（那枚词条的原文不在树里）—— 它是这套体系对用户的免责基础：说清读只读档 / 执行档的写入边界。现量成因见本步注释（渲染点在 d49f77e3 里丢了）"
 fi
 
 step "6. 五档路由绑到回环端点（每档点名它自己那一枚 chip）"
@@ -773,7 +801,10 @@ step "6b. 逐工具授权（规则前门的必要输入）"
 #   一枚都没勾时 `resolveToolSelection` 得到 `no-tool-granted`，任何句子都到不了规则那一支
 #   —— rig51 第 7 步那两条红就是这个形状（界面报"还没有授权任何工具"，载体把它读成
 #   "规则没有先跑"）。授权位从库里回读，不拿"勾过了"当数。
-press_id "ai-tool-grant-list_tasks" || bad "勾不上逐工具授权 ai-tool-grant-list_tasks ⇒ 第 7 步没有输入"
+# ⚠️ 2026-10-16：消费这个授权位的设备级判据（原第 7 步「规则命中 ⇒ 零外发」）已随多模式
+#    助手面退役、整块注释保留（见第 12 步）。本步仍然独立成立：它读的是**库里被写的那一侧**
+#    （`localApi.grants`），不依赖任何已退役的界面锚点。
+press_id "ai-tool-grant-list_tasks" || bad "勾不上逐工具授权 ai-tool-grant-list_tasks ⇒ 库里那枚授权位没有输入"
 sleep 1
 GR=$(grants_reading)
 case "$GR" in
@@ -784,19 +815,25 @@ case "$GR" in
     echo "   · 设备库回读（localApi.grants）：$GR"
     case "$GR" in
       *'list_tasks=1'*) ok "库里 list_tasks 的授权位 = 1（读的是被写那一侧）" ;;
-      *) bad "库里 list_tasks 仍是未授权（${GR}）⇒ 第 7 步的规则前门没有候选集" ;;
+      *) bad "库里 list_tasks 仍是未授权（${GR}）⇒ 规则前门没有候选集（原第 7 步那一格用它，已退役）" ;;
     esac
     ;;
 esac
 
-step "6c. 种一条真任务（第 9/10 步的输入：拆解那一档从任务列表里选一条）"
+step "6c. 种一条真任务（原为第 9/10 步的输入；那两步已退役，本步按独立判据保留）"
+# ⚠️ 2026-10-16：这一步当初是为了给「拆解」那一档喂一条任务。消费者（原第 9/10 步）已随
+#    多模式助手面退役（见第 12 步），所以本步现在在本载体里**没有下游**。仍然留在活的路径上
+#    是有意的：它自己那两条判据（真 UI 建任务 → 「添加」由禁用转启用 → op-log 长一条）
+#    与多模式面无关、现在也成立。它其实是 `verify-mobile-ios.sh` 那一族的判据，留在这里是
+#    **冗余而不是错**；等按当前对话面重写第 7–10 步时再决定它的归属。
 # 🔴 `breakdown-start` 的 disabled 表达式是 `pickedTask === undefined || props.route.target === undefined`
 #   —— 拆解的对象是**已存在的任务**，全新安装的设备上列表是空的 ⇒ 恒禁用。
 #   rig51 第 9/10 步那三条红（按钮禁用 / 计数不动 / 没有提案卡）都是这一个原因，
 #   不是产品缺功能。种任务走真 UI（FAB → 输入 → 「添加」），与 verify-mobile-ios 同一条通道。
 #   ⚠️ 2026-10-06 起 `pickedTask` 来自**全壳那一份**选中（`useSelected('task')`，见门禁
 #   `check:selection-single-source`），不是面板里自己的 `useState`。对本载体是**中性**的：
-#   助手屏退出时收回那一格选中 ⇒ 每次进助手屏都从"没选中"开始，第 9/10 步仍然必须自己按一次 chip。
+#   助手屏退出时收回那一格选中 ⇒ 每次进助手屏都从"没选中"开始（原第 9/10 步要靠它，
+#   那两步已退役）。
 leave_settings || { bad "设置面收不掉 ⇒ 种任务没有屏"; summary "iOS 助手真机验收"; }
 press_tab "$(zh mobile.tab.tasks)" || bad "切不到「任务」那一页 ⇒ 种任务没有屏"
 sleep 2
@@ -838,320 +875,332 @@ else
   summary "iOS 助手真机验收"
 fi
 
-step "7. 判据⑦（Goal-D 那一格）：本机规则命中 ⇒ 零外发"
-open_assistant || { bad "回不到助手屏 ⇒ 这一格没有输入"; summary "iOS 助手真机验收"; }
-# 切到「AI 工具调用」那一档：规则前门只在这条链路上跑。
-press_id "ai-mode-tool-calling" || bad "切不到「AI 工具调用」那一档"
-sleep 2
-# 🔴 Goal-D 的全部内容在这一行：规则表 12 条的**谓词头全是中文**，所以这一格在 Android
-#   载体上是不可达的（三条输入通道都送不进中文，记在 verify-mobile-ai.sh 第 5 步 5d）。
-#   iOS 这一侧中文走 **AXSetValue**（rig49 现量否证了"HID 是唯一路"那句假设：
-#   `idb ui text` 按 HID 键码表逐字符查码，非 ASCII 直接抛 "No keycode found for 列"），
-#   而"中文经 set-value 真进了 RN 状态"在 verify-mobile-ios.sh 里早已被**库级**判据证过
-#   （它按逐字去 ops 表里找那条中文标题的 op）。⇒ 这一格第一次有设备读数。
-RULE_PROMPT="列出我的任务"
-set_id "tool-input" "$RULE_PROMPT" || summary "iOS 助手真机验收"
-ax --dismiss-keyboard --json >/dev/null 2>&1
-sleep 1
-stub_reset
-BEFORE=$(stub_count)
-if enabled_id "tool-start-single"; then
-  press_id "tool-start-single" || bad "「运行」点不动"
-  sleep 2
-  # 🔴 规则命中时**不该有披露步**（披露讲的是"哪些字段要出门"，而这一趟压根不出门），
-  #   所以"没看到 ai-tool-send"不能当失败 —— 上一次这里写的是"既没披露也没结果"，
-  #   那条会把正确行为读成屏上什么都没有。出现披露步仍然按下发送，让闸门那一侧的读数也取到。
-  if found_id "ai-tool-send"; then
-    echo "   · 出现了披露步（这一发准备出门）⇒ 仍按发送，让界面对它做一次判断"
-    press_id "ai-tool-send" || bad "披露步的「发送」点不动"
-  else
-    echo "   · 没有披露步：本机规则直接给答案（这正是零外发该有的形状）"
-  fi
-  sleep 6
-  AFTER=$(stub_count)
-  # 🔴 界面自己盖的章：结果卡上那行脚注在 `via==='rule'` 时是「本机规则命中 —— 没有联网」，
-  #   走模型时是「由模型选择」（AssistantScreen.tsx:1448）。**这条才是这一格的正向对照**：
-  #   没有它，"计数没动"与"那一发压根没打出去（输入没落地 / 按钮没按动）"在输出上长得一模一样
-  #   （§7 元规则一），而第 8 步那句 ASCII 句子 misses 规则后的 0→0 也与这一格无法区分。
-  if found_label "$(zh web.ai.tools.viaRule)"; then
-    ok "结果卡上盖着「本机规则命中 —— 没有联网」⇒ 本机路径真的跑到了头，答案落地了"
-  else
-    bad "结果卡没有那句规则章 —— 这一格的零外发无从归因（没发？发了没回来？还是走了模型？）"
-  fi
-  if found_label "$(zh web.ai.tools.viaModel)"; then
-    bad "同一张卡上出现「由模型选择」—— 规则命中的那一发其实出门了"
-  fi
-  if [ "$BEFORE" = "$AFTER" ]; then
-    ok "本机规则命中那一趟：假端点计数 ${BEFORE}→${AFTER} 一次没动"
-  else
-    bad "本机规则该零外发，而假端点计数 ${BEFORE}→${AFTER} 动了 —— 短路没生效"
-  fi
-  # 🔴 命中之后界面上应当是**答案**，不是那句闸门拒绝。
-  #    失败面/披露面那两个 `<Stack testID>` 容器在 iOS 上不发节点，所以读它们各自内部
-  #    那枚按钮：失败面 = 「重试」（ai-tool-retry），披露面 = 「发送」（ai-tool-send）。
-  if absent_id "ai-tool-retry"; then
-    ok "那一趟没落到失败面（没有 privacy-consent-not-granted 那一屏）"
-  else
-    bad "规则命中却被闸门拦下（失败面的「重试」在树里）⇒ 规则没有先跑，短路是假的"
-  fi
-  if found_id "ai-tool-send"; then
-    bad "规则命中之后还停在披露步 —— 本机答案没有直接落地"
-  else
-    ok "规则命中后披露步已收掉（走的是本机执行，不是\"先看一眼再发\"）"
-  fi
-else
-  bad "「运行」按钮是禁用态（输入框没写进去 / 路由没绑上）⇒ 这一格没有读数"
-fi
-
-step "8. 判据④：只用本机档 —— 闸门拒绝原文 + 点名端点 + 计数不动"
-press_id "ai-mode-capture" || bad "切不回「一句话捕获」"
-sleep 2
-set_id "capture-input" "buy milk" || summary "iOS 助手真机验收"
-stub_reset
-B4=$(stub_count)
-press_id "capture-start" || bad "「AI 捕获」点不动"
-sleep 2
-if found_id "capture-send"; then
-  press_id "capture-send" || bad "披露步的「发送」点不动"
-fi
-sleep 5
-AF=$(stub_count)
-# 🔴 rig51 现量更正：这一格读的是**失败面**上那句拒绝（`web.ai.failure.cause.egressNotAuthorized`
-#   —— Android rig46 那张 `android-ai-2-egress-blocked.png` 上的红字逐字就是它），
-#   不是披露步里的 consentLead。目的地是回环时 consentLead **按设计不渲染**（与第 6 步
-#   "回环端点不索取逐功能授权"同一个口径），拿它当"拒绝原文"就是一条恒不成立的判据 ——
-#   而恒红比恒绿更贵：它把载体的期望错拼进产品结论里（rig51 那条红就是这么来的）。
-# 🔴 rig52 现量更正（这一条把一条真缺陷照了出来）：闸门拒绝原先在界面上渲染的是
-#   `web.ai.failure.cause.network` 那句「连不上端点。检查网络，以及端点地址是否可达。」，
-#   而真相是设备级同意没给、一个字都没发。根因在 `packages/ai` 的 catch 一律归成
-#   `network`（见 `egress.ts` 末尾那段与 `routing.ts` 的 `attemptOnce`），
-#   副作用还包括给没被访问过的端点记熔断锅（设备库实测 consecutiveFailures=2 /
-#   lastError=network）。现在归 `consent-not-granted`，判据读的就是那句新词条。
-REJECT=$(zh web.ai.failure.cause.consentNotGranted)
-if found_label "$REJECT"; then
-  ok "只用本机档：发送在本机闸门处被拦下，界面给出拒绝原文（逐字取自词条表）"
-else
-  bad "没看到那句拒绝原文（「${REJECT}」不在树里）—— 静默失败或静默成功都算这一条红"
-  # 取证：把"界面上到底是哪一句"带进日志，下一轮不必再靠猜（§7 元规则一：先修探针）。
-  echo "   · 取证：树里含「同意并联网」=$(found_label "同意并联网" && echo 是 || echo 否) 含「检查网络」=$(found_label "检查网络" && echo 是 || echo 否) 含「只用本机」=$(found_label "只用本机" && echo 是 || echo 否)"
-fi
-if found_label "127.0.0.1"; then
-  ok "那句拒绝点名了它本来要去哪个端点（含 127.0.0.1 的 URL）⇒ 下面那条「计数没动」不是压根没走传输边界"
-else
-  bad "拒绝没有点名端点（界面上读不到 127.0.0.1）—— 用户无从知道被拦下的是哪一发"
-fi
-if [ "$B4" = "$AF" ]; then
-  ok "假端点计数 ${B4}→${AF} 一次没动（只用本机档：任何一次 AI 发送都不会打到端点）"
-else
-  bad "「只用本机」档下假端点计数动了（${B4}→${AF}）—— 这是隐私边界的红线，不是措辞问题"
-fi
-if found_id "capture-retry"; then
-  ok "失败面给出「重试」—— 不确定态可重试，不是把用户钉死在一屏"
-  # 截图挂在**判据成立之后**：锚点没成立就拍一张，等于给一张不知道对应哪条判据的图。
-  shot "ios-ai-2-local-only-blocked.png" "capture-retry"
-else
-  bad "失败面没有「重试」出口（capture-retry 不在树里）"
-fi
-
-step "9. 判据⑤：非回环目的地 ⇒ 授权入口出现、逐字段披露点名"
-# 🔴 先开设备级同意闸，**再**做这一格。它是绝对的（`consent-gate.ts`：没有同意一个字节
-#   都不出这台设备，回环也不例外），闸门关着时下面那句"未授权就发出去 ⇒ 计数会涨"
-#   恒不成立、而"零外发"那条恒成立 —— 两条都会被读成"授权面在起作用"，其实读到的是
-#   另一道闸。第 8 步必须在**关着**的时候跑（它判的就是那道闸），所以翻转放在这里。
-CONSENT_BEFORE=$(consent_reading)
-flip_consent_to_network || { bad "改不成「同意并联网」（改之前 = ${CONSENT_BEFORE}）⇒ 判据⑤⑥与 Goal-D 那一格都没有分母"; summary "iOS 助手真机验收"; }
-ok "设备级同意已改成「同意并联网」（库里回读 = $(consent_reading)，读的是被写那一侧）"
-# 先开「允许远程端点」，再存一枚 https 的非回环端点，然后把「拆解任务」那档指过去。
-open_ai_settings || { bad "进不去设置面的 AI 段 ⇒ 这一格没有输入"; summary "iOS 助手真机验收"; }
-press_id "ai-gate-remote" || bad "开不了「允许远程端点」"
-sleep 1
-set_id "ai-endpoint-label" "$EP_REMOTE" || summary "iOS 助手真机验收"
-set_id "ai-endpoint-url" "$DEVICE_REMOTE_URL" || summary "iOS 助手真机验收"
-set_id "ai-endpoint-model" "stub-model" || summary "iOS 助手真机验收"
-# 🔴 能力必须**声明**，否则这一枚端点永远进不了「拆解任务」的候选集：
-#   `requiredCapabilities.breakdown = ['structured_output','long_context']`（`routing.ts`），
-#   而"没声明"按 ADR-0010 等于保守 = 没能力。rig52 那两条红（「拆解」禁用态 ⇒
-#   判据⑤⑥没有读数）根因就在这里，不在产品 —— 第 3 步那枚回环端点勾了三档，
-#   这一枚一枚都没勾。
-for cap in structured_output long_context; do
-  press_id "ai-endpoint-cap-$cap" || bad "勾不上能力 chip ai-endpoint-cap-${cap}（非回环那枚）"
-done
-ax --dismiss-keyboard --json >/dev/null 2>&1
-press_id "ai-endpoint-add" || bad "远程端点存不下去"
-sleep 2
-EP_N2=$(endpoint_count)
-if [ "$EP_N2" = "2" ]; then
-  ok "非回环 https 端点已落进设备库（端点条数 1→2）"
-else
-  bad "端点条数读成 ${EP_N2}（期望 2）—— 新增那枚没存进去，后面的判据都没有输入"
-  summary "iOS 助手真机验收"
-fi
-# 第 6 步之后有两枚端点：下标 0 = 回环、下标 1 = 这一轮新存的 https 端点。
-press_id "ai-route-breakdown-1" || bad "把「拆解任务」指向远程端点这一指没落地"
-sleep 1
-if found_id "ai-consent-breakdown"; then
-  ok "路由指向非回环地址时，「拆解任务」这一档出现逐功能授权入口（ai-consent-breakdown 在树里）"
-else
-  bad "非回环目的地却没有授权入口 —— 这一档永远无法被点亮，那是产品的洞"
-fi
-if found_id "ai-consent-capture"; then
-  bad "对照失败：目的地是回环的「一句话捕获」那一档也在索取授权"
-else
-  ok "对照成立：目的地是回环的那一档**没有**索取授权（挡的是「授权面永远显示」）"
-fi
-# 未授权时披露步就该索取批准，而**此刻一发都不该出去**（这一条与第 7 步共用同一枚计数尺）。
-# 🔴 上一段是在**设置面（RN Modal）**里点的，此刻底部标签根本不在树里 —— 直接
-#   `press_label "$TAB_ME"` 会得到"按压失败"，而那既不是产品红也不是导航红。
-open_assistant || { bad "点不进助手屏"; summary "iOS 助手真机验收"; }
-press_id "ai-mode-breakdown" || bad "切不到「拆解任务」"
-sleep 2
-# 🔴 拆解的对象是从任务列表里**选**的一条（`breakdown-start` 的 disabled =
-#   `pickedTask === undefined || props.route.target === undefined`）。rig51 那两条红
-#   不是产品缺功能，是载体没选行、而 6c 之前列表压根是空的。
-press_label "$TASK_TITLE" || bad "选不中第 6c 步种下的那条任务（「${TASK_TITLE}」）⇒ 拆解那一档没有输入"
-sleep 1
-stub_reset
-B4=$(stub_count)
-if enabled_id "breakdown-start"; then
-  press_id "breakdown-start" || bad "「拆解」点不动"
-  sleep 2
-  # 🔴 披露面那个 `<Stack testID>` 容器在 iOS 不发节点 ⇒ 读它内部那枚「发送」（ai-send）。
-  if found_id "ai-send"; then
-    DEST=$(zh web.ai.disclosure.destinationLead)
-    FLD=$(zh web.ai.disclosure.fieldsLead)
-    REM=$(zh web.ai.disclosure.remote)
-    MISSD=""
-    found_label "$DEST" || MISSD="$MISSD 目的地行"
-    found_label "$FLD" || MISSD="$MISSD 字段清单"
-    found_label "$REM" || MISSD="$MISSD 性质行「数据会离开设备」"
-    if [ -n "$MISSD" ]; then
-      bad "披露步缺这些元素：${MISSD}（逐字段披露是红线，不是形容词）"
-    else
-      ok "披露步元素齐：目的地行 + 字段清单 + 性质行"
-    fi
-    if found_label "192.0.2.1"; then
-      ok "目的地那行点名的是那条非回环地址（192.0.2.1），不是悄悄换成别的"
-    else
-      bad "披露没点名端点地址 ⇒ 用户看不出这一发要去哪"
-    fi
-    shot "ios-ai-3-disclosure.png" "ai-send"
-    press_id "ai-send" || bad "披露步的「发送」点不动"
-    sleep 6
-    AF=$(stub_count)
-    if [ "$B4" = "$AF" ]; then
-      ok "未授权时点发送仍然零外发（计数 ${B4}→${AF}），界面给的是 egressNotAuthorized 那一族"
-    else
-      bad "没给逐功能授权就发出去了（计数 ${B4}→${AF}）—— 授权面形同虚设"
-    fi
-  else
-    bad "按了「拆解」之后没有披露步（ai-send 不在树里）⇒ 判据⑤没有输入"
-  fi
-else
-  bad "「拆解」按钮是禁用态（路由没绑上 / 输入没写进去）⇒ 判据⑤没有读数"
-fi
-# 逐功能授权点下去。
-# 🔴 rig55 唯一那条红的定源（**载体时序，不是产品**）：这一指原先写在上面那段
-#   「未授权 ⇒ 零外发」**之后**，而那段早已把界面切到助手屏的失败面 ——
-#   `ai-consent-breakdown` 住在**设置面**（`AiSettingsSection.tsx:448`），此刻不在树上，
-#   `press_id` 的 scroll-into-view 报 `found=False / element-left-tree`。
-#   "点不动"与"界面把入口摘掉了"在探针输出上长得一样（§7 元规则一），而后者才是
-#   这句 bad 文案说的意思 —— 它会把人引向一条不存在的产品缺陷。
-#   修法不是放宽判据，是**回到它住的那个面**再点；点后还要从库里回读授权位：
-#   按到了 ≠ 存住了（§7 第 25 条那一族，读的是被写那一侧）。
-#   放在零外发那段**之后**是有意的：先证明没授权时一发都不出去，再给授权。
-#   换回回环那一档时它不影响 —— `needs = requiresEgressConsent(destination)` 只看地址类别，
-#   授权位只翻转按钮文案（「授权」↔「撤回」），所以下一步那条"入口消失"的成对判据照旧成立。
-open_ai_settings || bad "回不进设置面 ⇒ 这一档「点得动」没有读数"
-press_id "ai-consent-breakdown" || bad "非回环那档的授权入口点不动（此刻设置面开着、地址仍是非回环 ⇒ 这一回才是真红）"
-sleep 1
-READ_GRANT=$(routes_reading)
-if printf '%s' "$READ_GRANT" | grep -q 'breakdown=1/1'; then
-  ok "逐功能授权点下去并落进设备库（库里回读：breakdown 那一档 路由=1 / 同意=1）"
-else
-  bad "按了授权位而库里读到的不是「已授权」（${READ_GRANT}）⇒ 点住了没存住"
-fi
-sleep 1
-
-step "10. 判据⑥：提案卡出现，且没点确认 ⇒ 本机库一条都不多（同趟带正向对照）"
-# 10b：闸门**开着**再跑一遍第 7 句那条规则句。第 7 步那一趟闸门还关着，它的 0→0 与
-#      "压根发不出去"在输出上长得一样；这一趟才是 Goal-D 那一格要的读数。
-open_assistant || { bad "回不到助手屏 ⇒ Goal-D 那一格没有读数"; summary "iOS 助手真机验收"; }
-press_id "ai-mode-tool-calling" || bad "切不到「AI 工具调用」那一档"
-sleep 2
-set_id "tool-input" "$RULE_PROMPT" || summary "iOS 助手真机验收"
-ax --dismiss-keyboard --json >/dev/null 2>&1
-sleep 1
-stub_reset
-B_RULE=$(stub_count)
-if enabled_id "tool-start-single"; then
-  press_id "tool-start-single" || bad "「运行」点不动（联网开着也一样）"
-  sleep 6
-  A_RULE=$(stub_count)
-  if found_label "$(zh web.ai.tools.viaRule)"; then
-    ok "联网开着时结果卡上仍是规则章 ⇒ 下面那条 0→0 归因给规则短路，而不是归因给闸门"
-  else
-    bad "联网开着时结果卡没有规则章 ⇒ 这一趟的 0→0 无法归因给规则短路"
-  fi
-  if [ "$B_RULE" = "$A_RULE" ]; then
-    ok "🔴 Goal-D 那一格（闸门开着的版本）：规则命中 ⇒ 假端点计数 ${B_RULE}→${A_RULE} 一次没动"
-  else
-    bad "联网开着而规则命中那一趟计数动了（${B_RULE}→${A_RULE}）—— 短路没生效"
-  fi
-else
-  bad "「运行」按钮是禁用态（联网开着也一样）⇒ Goal-D 那一格没有读数"
-fi
-# 把「拆解任务」换回**回环**假端点：这一发该真打出去，而假端点返回确定内容 ⇒ 提案卡出得来。
-# 🔴 这一趟同时是第 7/9 步那句「计数没动」的**分母**：同一次运行里计数会 +1，
-#   说明那两条 0→0 不是"压根没人数"（traps #335 那一族：否定判据必须出示分母）。
-open_ai_settings || { bad "进不去设置面"; summary "iOS 助手真机验收"; }
-press_id "ai-route-breakdown-0" || bad "把「拆解任务」换回回环这一指没落地"
-sleep 1
-if found_id "ai-consent-breakdown"; then
-  bad "路由换回回环后那一档的授权入口还在 —— 与第 9 步的「出现」配不成对"
-else
-  ok "路由换回回环后，那一档的授权入口**消失**（成对的另一半）"
-fi
-open_assistant || { bad "点不进助手屏"; summary "iOS 助手真机验收"; }
-press_id "ai-mode-breakdown" || bad "切不到「拆解任务」"
-sleep 2
-# 这里再选一次。⚠️ 2026-10-06 起理由变了，措辞跟着变：选中现在住在**全壳那一份** store 里，
-# 所以"切个档"不会再把它丢掉（同一屏内换面板是保留的）；丢掉它的时机是**退出助手屏**
-# （`AssistantScreen` 的卸载清理，与任务屏那条同一个理由），而第 10 步正好绕道设置面改过端点 ⇒ 仍然要重按。
-# 结论不变，但"别假设它跨挂载"这句现在只对**跨屏**成立 —— 留着不更正就是两套说法。
-press_label "$TASK_TITLE" || bad "第 10 步选不中那条任务 ⇒ 提案卡判据没有输入"
-sleep 1
-BASE=$(ops_count)
-case "$BASE" in (''|*[!0-9]*) bad "op-log 基线读不出（${BASE}）⇒ \"不写库\"这一条没有输入"; summary "iOS 助手真机验收" ;; esac
-stub_reset
-B5=$(stub_count)
-press_id "breakdown-start" || bad "「拆解」点不动"
-sleep 2
-if found_id "ai-send"; then
-  press_id "ai-send" || bad "披露步的「发送」点不动"
-fi
-PROP=0
-for _i in $(seq 1 20); do
-  sleep 2
-  if found_id "breakdown-apply"; then PROP=1; break; fi
-done
-AFTER5=$(stub_count)
-if [ "$B5" != "$AFTER5" ]; then
-  ok "回环这一趟确实打到了假端点（计数 ${B5}→${AFTER5}）—— 下面那条「没点确认不写库」有分母"
-else
-  bad "回环这一趟没打到假端点（计数 ${B5}→${AFTER5}）⇒ 提案卡无从谈起，而第 7/9 步那两条 0→0 也失去了分母"
-fi
-if [ "$PROP" = 1 ]; then
-  ok "提案卡出来（breakdown-apply 在树里）"
-  shot "ios-ai-4-proposal.png" "breakdown-apply"
-  AFTER=$(ops_count)
-  if [ "$BASE" = "$AFTER" ]; then
-    ok "只看了提案、没点确认 ⇒ 本机库条数不变（${BASE}→${AFTER}）—— 这是「只产出提案」的 iOS 设备级判据"
-  else
-    bad "没点确认而库里多了 op（${BASE}→${AFTER}）—— AI 在类型上产不出 op 这条红线破了"
-  fi
-else
-  bad "等 40 秒没有提案卡（breakdown-apply 不在树里）⇒ 判据⑥没有读数"
-fi
+# ═══════════════════════════════════════════════════════════════════════════
+# 🔴 **旧文保留 · 已退役（2026-10-16）**：下面这一整块是**原第 7–10 步**
+#    （判据④⑤⑥⑦ 与 Goal-D 那一格）。它们写的是**旧多模式助手面**的相位机
+#    （模式 chip 切档 → 面板输入 → 面板「运行」→ 披露步 → 提案卡），而那条相位机
+#    在当前产品里**不存在**。整块按仓规置为注释：留下的活代码只会打出"界面坏了"的
+#    假红，而真因是"标记载体没跟上产品改版"。
+#    ⚠️ 块里的 `step "7."`…`step "10."` 是**退役前的编号**，与现在活着的第 7/8/11/12 步
+#    不是同一件事。退役证据、逐枚锚点落点与"为什么不许改名继续"写在**第 12 步**那一段。
+# ═══════════════════════════════════════════════════════════════════════════
+# step "7. 判据⑦（Goal-D 那一格）：本机规则命中 ⇒ 零外发"
+# open_assistant || { bad "回不到助手屏 ⇒ 这一格没有输入"; summary "iOS 助手真机验收"; }
+# # 切到「AI 工具调用」那一档：规则前门只在这条链路上跑。
+# press_id "ai-mode-tool-calling" || bad "切不到「AI 工具调用」那一档"
+# sleep 2
+# # 🔴 Goal-D 的全部内容在这一行：规则表 12 条的**谓词头全是中文**，所以这一格在 Android
+# #   载体上是不可达的（三条输入通道都送不进中文，记在 verify-mobile-ai.sh 第 5 步 5d）。
+# #   iOS 这一侧中文走 **AXSetValue**（rig49 现量否证了"HID 是唯一路"那句假设：
+# #   `idb ui text` 按 HID 键码表逐字符查码，非 ASCII 直接抛 "No keycode found for 列"），
+# #   而"中文经 set-value 真进了 RN 状态"在 verify-mobile-ios.sh 里早已被**库级**判据证过
+# #   （它按逐字去 ops 表里找那条中文标题的 op）。⇒ 这一格第一次有设备读数。
+# RULE_PROMPT="列出我的任务"
+# set_id "tool-input" "$RULE_PROMPT" || summary "iOS 助手真机验收"
+# ax --dismiss-keyboard --json >/dev/null 2>&1
+# sleep 1
+# stub_reset
+# BEFORE=$(stub_count)
+# if enabled_id "tool-start-single"; then
+#   press_id "tool-start-single" || bad "「运行」点不动"
+#   sleep 2
+#   # 🔴 规则命中时**不该有披露步**（披露讲的是"哪些字段要出门"，而这一趟压根不出门），
+#   #   所以"没看到 ai-tool-send"不能当失败 —— 上一次这里写的是"既没披露也没结果"，
+#   #   那条会把正确行为读成屏上什么都没有。出现披露步仍然按下发送，让闸门那一侧的读数也取到。
+#   if found_id "ai-tool-send"; then
+#     echo "   · 出现了披露步（这一发准备出门）⇒ 仍按发送，让界面对它做一次判断"
+#     press_id "ai-tool-send" || bad "披露步的「发送」点不动"
+#   else
+#     echo "   · 没有披露步：本机规则直接给答案（这正是零外发该有的形状）"
+#   fi
+#   sleep 6
+#   AFTER=$(stub_count)
+#   # 🔴 界面自己盖的章：结果卡上那行脚注在 `via==='rule'` 时是「本机规则命中 —— 没有联网」，
+#   #   走模型时是「由模型选择」（AssistantScreen.tsx:1448）。**这条才是这一格的正向对照**：
+#   #   没有它，"计数没动"与"那一发压根没打出去（输入没落地 / 按钮没按动）"在输出上长得一模一样
+#   #   （§7 元规则一），而第 8 步那句 ASCII 句子 misses 规则后的 0→0 也与这一格无法区分。
+#   if found_label "$(zh web.ai.tools.viaRule)"; then
+#     ok "结果卡上盖着「本机规则命中 —— 没有联网」⇒ 本机路径真的跑到了头，答案落地了"
+#   else
+#     bad "结果卡没有那句规则章 —— 这一格的零外发无从归因（没发？发了没回来？还是走了模型？）"
+#   fi
+#   if found_label "$(zh web.ai.tools.viaModel)"; then
+#     bad "同一张卡上出现「由模型选择」—— 规则命中的那一发其实出门了"
+#   fi
+#   if [ "$BEFORE" = "$AFTER" ]; then
+#     ok "本机规则命中那一趟：假端点计数 ${BEFORE}→${AFTER} 一次没动"
+#   else
+#     bad "本机规则该零外发，而假端点计数 ${BEFORE}→${AFTER} 动了 —— 短路没生效"
+#   fi
+#   # 🔴 命中之后界面上应当是**答案**，不是那句闸门拒绝。
+#   #    失败面/披露面那两个 `<Stack testID>` 容器在 iOS 上不发节点，所以读它们各自内部
+#   #    那枚按钮：失败面 = 「重试」（ai-tool-retry），披露面 = 「发送」（ai-tool-send）。
+#   if absent_id "ai-tool-retry"; then
+#     ok "那一趟没落到失败面（没有 privacy-consent-not-granted 那一屏）"
+#   else
+#     bad "规则命中却被闸门拦下（失败面的「重试」在树里）⇒ 规则没有先跑，短路是假的"
+#   fi
+#   if found_id "ai-tool-send"; then
+#     bad "规则命中之后还停在披露步 —— 本机答案没有直接落地"
+#   else
+#     ok "规则命中后披露步已收掉（走的是本机执行，不是\"先看一眼再发\"）"
+#   fi
+# else
+#   bad "「运行」按钮是禁用态（输入框没写进去 / 路由没绑上）⇒ 这一格没有读数"
+# fi
+#
+# step "8. 判据④：只用本机档 —— 闸门拒绝原文 + 点名端点 + 计数不动"
+# press_id "ai-mode-capture" || bad "切不回「一句话捕获」"
+# sleep 2
+# set_id "capture-input" "buy milk" || summary "iOS 助手真机验收"
+# stub_reset
+# B4=$(stub_count)
+# press_id "capture-start" || bad "「AI 捕获」点不动"
+# sleep 2
+# if found_id "capture-send"; then
+#   press_id "capture-send" || bad "披露步的「发送」点不动"
+# fi
+# sleep 5
+# AF=$(stub_count)
+# # 🔴 rig51 现量更正：这一格读的是**失败面**上那句拒绝（`web.ai.failure.cause.egressNotAuthorized`
+# #   —— Android rig46 那张 `android-ai-2-egress-blocked.png` 上的红字逐字就是它），
+# #   不是披露步里的 consentLead。目的地是回环时 consentLead **按设计不渲染**（与第 6 步
+# #   "回环端点不索取逐功能授权"同一个口径），拿它当"拒绝原文"就是一条恒不成立的判据 ——
+# #   而恒红比恒绿更贵：它把载体的期望错拼进产品结论里（rig51 那条红就是这么来的）。
+# # 🔴 rig52 现量更正（这一条把一条真缺陷照了出来）：闸门拒绝原先在界面上渲染的是
+# #   `web.ai.failure.cause.network` 那句「连不上端点。检查网络，以及端点地址是否可达。」，
+# #   而真相是设备级同意没给、一个字都没发。根因在 `packages/ai` 的 catch 一律归成
+# #   `network`（见 `egress.ts` 末尾那段与 `routing.ts` 的 `attemptOnce`），
+# #   副作用还包括给没被访问过的端点记熔断锅（设备库实测 consecutiveFailures=2 /
+# #   lastError=network）。现在归 `consent-not-granted`，判据读的就是那句新词条。
+# REJECT=$(zh web.ai.failure.cause.consentNotGranted)
+# if found_label "$REJECT"; then
+#   ok "只用本机档：发送在本机闸门处被拦下，界面给出拒绝原文（逐字取自词条表）"
+# else
+#   bad "没看到那句拒绝原文（「${REJECT}」不在树里）—— 静默失败或静默成功都算这一条红"
+#   # 取证：把"界面上到底是哪一句"带进日志，下一轮不必再靠猜（§7 元规则一：先修探针）。
+#   echo "   · 取证：树里含「同意并联网」=$(found_label "同意并联网" && echo 是 || echo 否) 含「检查网络」=$(found_label "检查网络" && echo 是 || echo 否) 含「只用本机」=$(found_label "只用本机" && echo 是 || echo 否)"
+# fi
+# if found_label "127.0.0.1"; then
+#   ok "那句拒绝点名了它本来要去哪个端点（含 127.0.0.1 的 URL）⇒ 下面那条「计数没动」不是压根没走传输边界"
+# else
+#   bad "拒绝没有点名端点（界面上读不到 127.0.0.1）—— 用户无从知道被拦下的是哪一发"
+# fi
+# if [ "$B4" = "$AF" ]; then
+#   ok "假端点计数 ${B4}→${AF} 一次没动（只用本机档：任何一次 AI 发送都不会打到端点）"
+# else
+#   bad "「只用本机」档下假端点计数动了（${B4}→${AF}）—— 这是隐私边界的红线，不是措辞问题"
+# fi
+# if found_id "capture-retry"; then
+#   ok "失败面给出「重试」—— 不确定态可重试，不是把用户钉死在一屏"
+#   # 截图挂在**判据成立之后**：锚点没成立就拍一张，等于给一张不知道对应哪条判据的图。
+#   shot "ios-ai-2-local-only-blocked.png" "capture-retry"
+# else
+#   bad "失败面没有「重试」出口（capture-retry 不在树里）"
+# fi
+#
+# step "9. 判据⑤：非回环目的地 ⇒ 授权入口出现、逐字段披露点名"
+# # 🔴 先开设备级同意闸，**再**做这一格。它是绝对的（`consent-gate.ts`：没有同意一个字节
+# #   都不出这台设备，回环也不例外），闸门关着时下面那句"未授权就发出去 ⇒ 计数会涨"
+# #   恒不成立、而"零外发"那条恒成立 —— 两条都会被读成"授权面在起作用"，其实读到的是
+# #   另一道闸。第 8 步必须在**关着**的时候跑（它判的就是那道闸），所以翻转放在这里。
+# CONSENT_BEFORE=$(consent_reading)
+# flip_consent_to_network || { bad "改不成「同意并联网」（改之前 = ${CONSENT_BEFORE}）⇒ 判据⑤⑥与 Goal-D 那一格都没有分母"; summary "iOS 助手真机验收"; }
+# ok "设备级同意已改成「同意并联网」（库里回读 = $(consent_reading)，读的是被写那一侧）"
+# # 先开「允许远程端点」，再存一枚 https 的非回环端点，然后把「拆解任务」那档指过去。
+# open_ai_settings || { bad "进不去设置面的 AI 段 ⇒ 这一格没有输入"; summary "iOS 助手真机验收"; }
+# press_id "ai-gate-remote" || bad "开不了「允许远程端点」"
+# sleep 1
+# set_id "ai-endpoint-label" "$EP_REMOTE" || summary "iOS 助手真机验收"
+# set_id "ai-endpoint-url" "$DEVICE_REMOTE_URL" || summary "iOS 助手真机验收"
+# set_id "ai-endpoint-model" "stub-model" || summary "iOS 助手真机验收"
+# # 🔴 能力必须**声明**，否则这一枚端点永远进不了「拆解任务」的候选集：
+# #   `requiredCapabilities.breakdown = ['structured_output','long_context']`（`routing.ts`），
+# #   而"没声明"按 ADR-0010 等于保守 = 没能力。rig52 那两条红（「拆解」禁用态 ⇒
+# #   判据⑤⑥没有读数）根因就在这里，不在产品 —— 第 3 步那枚回环端点勾了三档，
+# #   这一枚一枚都没勾。
+# for cap in structured_output long_context; do
+#   press_id "ai-endpoint-cap-$cap" || bad "勾不上能力 chip ai-endpoint-cap-${cap}（非回环那枚）"
+# done
+# ax --dismiss-keyboard --json >/dev/null 2>&1
+# press_id "ai-endpoint-add" || bad "远程端点存不下去"
+# sleep 2
+# EP_N2=$(endpoint_count)
+# if [ "$EP_N2" = "2" ]; then
+#   ok "非回环 https 端点已落进设备库（端点条数 1→2）"
+# else
+#   bad "端点条数读成 ${EP_N2}（期望 2）—— 新增那枚没存进去，后面的判据都没有输入"
+#   summary "iOS 助手真机验收"
+# fi
+# # 第 6 步之后有两枚端点：下标 0 = 回环、下标 1 = 这一轮新存的 https 端点。
+# press_id "ai-route-breakdown-1" || bad "把「拆解任务」指向远程端点这一指没落地"
+# sleep 1
+# if found_id "ai-consent-breakdown"; then
+#   ok "路由指向非回环地址时，「拆解任务」这一档出现逐功能授权入口（ai-consent-breakdown 在树里）"
+# else
+#   bad "非回环目的地却没有授权入口 —— 这一档永远无法被点亮，那是产品的洞"
+# fi
+# if found_id "ai-consent-capture"; then
+#   bad "对照失败：目的地是回环的「一句话捕获」那一档也在索取授权"
+# else
+#   ok "对照成立：目的地是回环的那一档**没有**索取授权（挡的是「授权面永远显示」）"
+# fi
+# # 未授权时披露步就该索取批准，而**此刻一发都不该出去**（这一条与第 7 步共用同一枚计数尺）。
+# # 🔴 上一段是在**设置面（RN Modal）**里点的，此刻底部标签根本不在树里 —— 直接
+# #   `press_label "$TAB_ME"` 会得到"按压失败"，而那既不是产品红也不是导航红。
+# open_assistant || { bad "点不进助手屏"; summary "iOS 助手真机验收"; }
+# press_id "ai-mode-breakdown" || bad "切不到「拆解任务」"
+# sleep 2
+# # 🔴 拆解的对象是从任务列表里**选**的一条（`breakdown-start` 的 disabled =
+# #   `pickedTask === undefined || props.route.target === undefined`）。rig51 那两条红
+# #   不是产品缺功能，是载体没选行、而 6c 之前列表压根是空的。
+# press_label "$TASK_TITLE" || bad "选不中第 6c 步种下的那条任务（「${TASK_TITLE}」）⇒ 拆解那一档没有输入"
+# sleep 1
+# stub_reset
+# B4=$(stub_count)
+# if enabled_id "breakdown-start"; then
+#   press_id "breakdown-start" || bad "「拆解」点不动"
+#   sleep 2
+#   # 🔴 披露面那个 `<Stack testID>` 容器在 iOS 不发节点 ⇒ 读它内部那枚「发送」（ai-send）。
+#   if found_id "ai-send"; then
+#     DEST=$(zh web.ai.disclosure.destinationLead)
+#     FLD=$(zh web.ai.disclosure.fieldsLead)
+#     REM=$(zh web.ai.disclosure.remote)
+#     MISSD=""
+#     found_label "$DEST" || MISSD="$MISSD 目的地行"
+#     found_label "$FLD" || MISSD="$MISSD 字段清单"
+#     found_label "$REM" || MISSD="$MISSD 性质行「数据会离开设备」"
+#     if [ -n "$MISSD" ]; then
+#       bad "披露步缺这些元素：${MISSD}（逐字段披露是红线，不是形容词）"
+#     else
+#       ok "披露步元素齐：目的地行 + 字段清单 + 性质行"
+#     fi
+#     if found_label "192.0.2.1"; then
+#       ok "目的地那行点名的是那条非回环地址（192.0.2.1），不是悄悄换成别的"
+#     else
+#       bad "披露没点名端点地址 ⇒ 用户看不出这一发要去哪"
+#     fi
+#     shot "ios-ai-3-disclosure.png" "ai-send"
+#     press_id "ai-send" || bad "披露步的「发送」点不动"
+#     sleep 6
+#     AF=$(stub_count)
+#     if [ "$B4" = "$AF" ]; then
+#       ok "未授权时点发送仍然零外发（计数 ${B4}→${AF}），界面给的是 egressNotAuthorized 那一族"
+#     else
+#       bad "没给逐功能授权就发出去了（计数 ${B4}→${AF}）—— 授权面形同虚设"
+#     fi
+#   else
+#     bad "按了「拆解」之后没有披露步（ai-send 不在树里）⇒ 判据⑤没有输入"
+#   fi
+# else
+#   bad "「拆解」按钮是禁用态（路由没绑上 / 输入没写进去）⇒ 判据⑤没有读数"
+# fi
+# # 逐功能授权点下去。
+# # 🔴 rig55 唯一那条红的定源（**载体时序，不是产品**）：这一指原先写在上面那段
+# #   「未授权 ⇒ 零外发」**之后**，而那段早已把界面切到助手屏的失败面 ——
+# #   `ai-consent-breakdown` 住在**设置面**（`AiSettingsSection.tsx:448`），此刻不在树上，
+# #   `press_id` 的 scroll-into-view 报 `found=False / element-left-tree`。
+# #   "点不动"与"界面把入口摘掉了"在探针输出上长得一样（§7 元规则一），而后者才是
+# #   这句 bad 文案说的意思 —— 它会把人引向一条不存在的产品缺陷。
+# #   修法不是放宽判据，是**回到它住的那个面**再点；点后还要从库里回读授权位：
+# #   按到了 ≠ 存住了（§7 第 25 条那一族，读的是被写那一侧）。
+# #   放在零外发那段**之后**是有意的：先证明没授权时一发都不出去，再给授权。
+# #   换回回环那一档时它不影响 —— `needs = requiresEgressConsent(destination)` 只看地址类别，
+# #   授权位只翻转按钮文案（「授权」↔「撤回」），所以下一步那条"入口消失"的成对判据照旧成立。
+# open_ai_settings || bad "回不进设置面 ⇒ 这一档「点得动」没有读数"
+# press_id "ai-consent-breakdown" || bad "非回环那档的授权入口点不动（此刻设置面开着、地址仍是非回环 ⇒ 这一回才是真红）"
+# sleep 1
+# READ_GRANT=$(routes_reading)
+# if printf '%s' "$READ_GRANT" | grep -q 'breakdown=1/1'; then
+#   ok "逐功能授权点下去并落进设备库（库里回读：breakdown 那一档 路由=1 / 同意=1）"
+# else
+#   bad "按了授权位而库里读到的不是「已授权」（${READ_GRANT}）⇒ 点住了没存住"
+# fi
+# sleep 1
+#
+# step "10. 判据⑥：提案卡出现，且没点确认 ⇒ 本机库一条都不多（同趟带正向对照）"
+# # 10b：闸门**开着**再跑一遍第 7 句那条规则句。第 7 步那一趟闸门还关着，它的 0→0 与
+# #      "压根发不出去"在输出上长得一样；这一趟才是 Goal-D 那一格要的读数。
+# open_assistant || { bad "回不到助手屏 ⇒ Goal-D 那一格没有读数"; summary "iOS 助手真机验收"; }
+# press_id "ai-mode-tool-calling" || bad "切不到「AI 工具调用」那一档"
+# sleep 2
+# set_id "tool-input" "$RULE_PROMPT" || summary "iOS 助手真机验收"
+# ax --dismiss-keyboard --json >/dev/null 2>&1
+# sleep 1
+# stub_reset
+# B_RULE=$(stub_count)
+# if enabled_id "tool-start-single"; then
+#   press_id "tool-start-single" || bad "「运行」点不动（联网开着也一样）"
+#   sleep 6
+#   A_RULE=$(stub_count)
+#   if found_label "$(zh web.ai.tools.viaRule)"; then
+#     ok "联网开着时结果卡上仍是规则章 ⇒ 下面那条 0→0 归因给规则短路，而不是归因给闸门"
+#   else
+#     bad "联网开着时结果卡没有规则章 ⇒ 这一趟的 0→0 无法归因给规则短路"
+#   fi
+#   if [ "$B_RULE" = "$A_RULE" ]; then
+#     ok "🔴 Goal-D 那一格（闸门开着的版本）：规则命中 ⇒ 假端点计数 ${B_RULE}→${A_RULE} 一次没动"
+#   else
+#     bad "联网开着而规则命中那一趟计数动了（${B_RULE}→${A_RULE}）—— 短路没生效"
+#   fi
+# else
+#   bad "「运行」按钮是禁用态（联网开着也一样）⇒ Goal-D 那一格没有读数"
+# fi
+# # 把「拆解任务」换回**回环**假端点：这一发该真打出去，而假端点返回确定内容 ⇒ 提案卡出得来。
+# # 🔴 这一趟同时是第 7/9 步那句「计数没动」的**分母**：同一次运行里计数会 +1，
+# #   说明那两条 0→0 不是"压根没人数"（traps #335 那一族：否定判据必须出示分母）。
+# open_ai_settings || { bad "进不去设置面"; summary "iOS 助手真机验收"; }
+# press_id "ai-route-breakdown-0" || bad "把「拆解任务」换回回环这一指没落地"
+# sleep 1
+# if found_id "ai-consent-breakdown"; then
+#   bad "路由换回回环后那一档的授权入口还在 —— 与第 9 步的「出现」配不成对"
+# else
+#   ok "路由换回回环后，那一档的授权入口**消失**（成对的另一半）"
+# fi
+# open_assistant || { bad "点不进助手屏"; summary "iOS 助手真机验收"; }
+# press_id "ai-mode-breakdown" || bad "切不到「拆解任务」"
+# sleep 2
+# # 这里再选一次。⚠️ 2026-10-06 起理由变了，措辞跟着变：选中现在住在**全壳那一份** store 里，
+# # 所以"切个档"不会再把它丢掉（同一屏内换面板是保留的）；丢掉它的时机是**退出助手屏**
+# # （`AssistantScreen` 的卸载清理，与任务屏那条同一个理由），而第 10 步正好绕道设置面改过端点 ⇒ 仍然要重按。
+# # 结论不变，但"别假设它跨挂载"这句现在只对**跨屏**成立 —— 留着不更正就是两套说法。
+# press_label "$TASK_TITLE" || bad "第 10 步选不中那条任务 ⇒ 提案卡判据没有输入"
+# sleep 1
+# BASE=$(ops_count)
+# case "$BASE" in (''|*[!0-9]*) bad "op-log 基线读不出（${BASE}）⇒ \"不写库\"这一条没有输入"; summary "iOS 助手真机验收" ;; esac
+# stub_reset
+# B5=$(stub_count)
+# press_id "breakdown-start" || bad "「拆解」点不动"
+# sleep 2
+# if found_id "ai-send"; then
+#   press_id "ai-send" || bad "披露步的「发送」点不动"
+# fi
+# PROP=0
+# for _i in $(seq 1 20); do
+#   sleep 2
+#   if found_id "breakdown-apply"; then PROP=1; break; fi
+# done
+# AFTER5=$(stub_count)
+# if [ "$B5" != "$AFTER5" ]; then
+#   ok "回环这一趟确实打到了假端点（计数 ${B5}→${AFTER5}）—— 下面那条「没点确认不写库」有分母"
+# else
+#   bad "回环这一趟没打到假端点（计数 ${B5}→${AFTER5}）⇒ 提案卡无从谈起，而第 7/9 步那两条 0→0 也失去了分母"
+# fi
+# if [ "$PROP" = 1 ]; then
+#   ok "提案卡出来（breakdown-apply 在树里）"
+#   shot "ios-ai-4-proposal.png" "breakdown-apply"
+#   AFTER=$(ops_count)
+#   if [ "$BASE" = "$AFTER" ]; then
+#     ok "只看了提案、没点确认 ⇒ 本机库条数不变（${BASE}→${AFTER}）—— 这是「只产出提案」的 iOS 设备级判据"
+#   else
+#     bad "没点确认而库里多了 op（${BASE}→${AFTER}）—— AI 在类型上产不出 op 这条红线破了"
+#   fi
+# else
+#   bad "等 40 秒没有提案卡（breakdown-apply 不在树里）⇒ 判据⑥没有读数"
+# fi
+# ═══════════════════════════════════════════════════════════════════════════
+# 旧文结束（原第 7–10 步）。
+# ═══════════════════════════════════════════════════════════════════════════
 
 step "11. 取证对账：截图必须属于本轮"
 SHOTS_LIST="/tmp/heyta-ios-ai-shots.$$.list"
@@ -1185,4 +1234,55 @@ if [ "$SHOT_BAD" = 0 ] && [ "$SHOT_N" -gt 0 ]; then
 fi
 echo "   ↷ 图在这里，**人要打开看**（AGENTS §6.2 规定一）：$EVIDENCE/ios-ai-*.png"
 
+step "12. 已退役批次（原第 7–10 步）：本载体在那几格上**未覆盖**"
+# ═══════════════════════════════════════════════════════════════════════════
+# 🔴 2026-10-16：原第 7–10 步（判据④⑤⑥⑦ 与 Goal-D 那一格）整段是给**旧多模式助手面**
+#    写的，那条相位机在当前产品上不存在。它们已按仓规「旧文不删」整块注释保留（就在上面），
+#    不留一行活代码。
+#
+#    产品事实（三条独立指认，逐条可在本仓现量复算）：
+#      ① `git show 18efc229^1:apps/mobile/src/ai/AssistantScreen.tsx | wc -l` = **325**
+#         （main 侧的单一对话面）；`git show 18efc229^2:apps/mobile/src/ai/AssistantScreen.tsx
+#         | wc -l` = **1564**（branch 侧的多模式面）。本载体第 7–10 步写的每一枚锚点
+#         都只属于后者。
+#      ② 那一代是被 `d49f77e3`（main 侧 2026-10-10「桌面小组件 + 移动端 + 落地页文档 +
+#         证据」）整块换掉的：同一笔新增 chat-composer / chat-controller / chat-transcript
+#         与 execution-gate，并删掉 1647 行 —— 一次**刻意的产品改版**，不是文件丢了。
+#      ③ 两份 AI 设备腿脚本是 merge `18efc229` 从 branch 侧收进来的
+#         （`git diff --stat 18efc229^1 18efc229^2 -- scripts/verify-mobile-ai.sh
+#         scripts/verify-mobile-ios-ai.sh` ⇒ 两者都是**新增**：+2222 / +1185），而同一笔
+#         merge 对 `AssistantScreen.tsx` 取的是 main 侧（325 行）⇒ 脚本与产品
+#         **从来没有对上过**，不是这一轮改坏的。
+#
+#    逐枚锚点的处置（3 枚退休 / 11 枚有落点；落点逐条现量自 HEAD 的源码）：
+#      退休（控件本体在产品里确实没了）：
+#        `ai-mode-tool-calling` / `ai-mode-capture` / `ai-mode-breakdown`
+#            = 旧多模式面的**模式切换 chip**（branch 侧 `testID={`ai-mode-${feature}`}`
+#              @ `18efc229^2:apps/mobile/src/ai/AssistantScreen.tsx:288`）。单一对话面
+#              没有"模式"这一档；逐功能的路由改在**设置面**上按 `ai-route-<功能>-<下标>`
+#              选 —— 那是另一个控件，第 6 步已经逐档守着，不在这里重复。
+#      有落点（控件本体仍在，换的是 id 通道 / 名字）：
+#        `tool-input`          -> `ai-assistant-input`         （chat-composer.tsx:50；第 5 步现读）
+#        `capture-input`       -> `ai-assistant-input`         （同上；捕捉现在就是往对话里打字）
+#        `tool-start-single`   -> `ai-assistant-send-button`   （chat-composer.tsx:79；第 5 步现读）
+#        `capture-start`       -> `ai-assistant-send-button`   （同上）
+#        `breakdown-start`     -> `ai-assistant-send-button`   （同上；拆解现在靠对话输入触发）
+#        `ai-tool-send`        -> `assistant-disclosure-send`  （AssistantScreen.tsx:327）
+#        `capture-send`        -> `assistant-disclosure-send`  （同上）
+#        `ai-send`             -> `assistant-disclosure-send`  （同上）
+#        `breakdown-apply`     -> `assistant-confirm-proposal` （AssistantScreen.tsx:302）
+#        `ai-tool-retry`       -> **无 id 通道**：失败面那枚「重试」按钮仍在
+#                                 （AssistantScreen.tsx:177），但它没有 testID，而本轮授权
+#                                 只允许给 `Chip` 补 testID ⇒ 按"没有通道"记，不在这里
+#                                 新增 testID 去凑判据。
+#        `capture-retry`       -> 同 `ai-tool-retry`（同一枚按钮）
+#
+#    ⇒ 要恢复第 7–10 步的设备级判据，得**按当前单一对话面重写相位机**
+#      （输入 → 发送 → `assistantNeedsEgressDisclosure` 那一问 → 披露步 → 提案 → 确认），
+#      **不许把锚点改个名就继续**：那会让红字把"载体没跟上产品"说成"界面坏了"。
+#      本轮不冒充已验 —— 这一格以**响亮中止**结束（不是静默跳过，见下面那一发终判）。
+#      披露那一份不变量**没有退休**：它搬到了 `apps/mobile/src/ai/chat-controller.ts` 的
+#      `send()`（`assistantNeedsEgressDisclosure` 那一问），由同一份门禁的判据 ㉔ 守着。
+# ═══════════════════════════════════════════════════════════════════════════
+summary "iOS 助手真机验收" "原第 7–10 步（旧多模式助手面的相位机）已随产品改版退役、尚未按当前单一对话面重写 ⇒ 本载体在那几格上未覆盖（三条独立指认与 11 枚落点见本步注释）" 1
 summary "iOS 助手真机验收"

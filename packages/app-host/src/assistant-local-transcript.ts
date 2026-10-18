@@ -50,6 +50,15 @@ export type ChatItem =
       readonly message: string;
       readonly cause: AiFailureReason | undefined;
       readonly endpointUrl: string | undefined;
+      /**
+       * 服务端**稳定码**（托管档才有）—— `402 SUBSCRIPTION_REQUIRED` 与
+       * `409 AI_QUOTA_EXCEEDED` 靠它分开说话（修复动作相反）。
+       *
+       * ⚠️ 与 `cause` / `endpointUrl` 同一条处置：**随转录落盘**。
+       * 不落盘的话，切走再切回来这条错误就退回笼统说法 —— 同一个失败，
+       * 重载一次前后说的话不一样。
+       */
+      readonly serverCode: string | undefined;
       readonly outsideFields: readonly string[] | undefined;
     };
 

@@ -79,6 +79,7 @@ import {
   requestCapture,
   type CaptureProposal,
 } from '@heyta/app-host';
+import { webManagedTransport } from './managed-transport.js';
 import { captureFailureCopy, type AiFailureCopy } from './ai-failure-copy.js';
 
 /** 路由解析结果里"这个功能会走到哪个端点"。形状定义在 `route-explanation.ts`。 */
@@ -336,6 +337,7 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
         preferences: hints,
         routed: {
           secretStore: secrets,
+          managedTransport: webManagedTransport,
           // 🔴 **发送那一刻**才解析快照 —— 冷却期是对着"现在"算的。
           healthSeed: fromHealthSnapshot(props.healthSnapshot ?? {}, Date.now()),
           ...(props.fetchImpl === undefined ? {} : { fetchImpl: props.fetchImpl }),
@@ -363,6 +365,7 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
       captureFailureCopy(outcome.reason, outcome.message, {
         cause: outcome.cause,
         endpointUrl: outcome.endpointUrl,
+        serverCode: outcome.serverCode,
       }),
     );
     setPhase('failed');

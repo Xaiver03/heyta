@@ -21,6 +21,7 @@ import {
   LEGAL_SITE_PATHS,
   OFFICIAL_SITE_ORIGIN,
   OPERATOR_LEGAL_PATHS,
+  isOfficialHostedInstance,
   resolveLegalLinks,
 } from '../src/legal-links.js';
 
@@ -104,5 +105,63 @@ describe('resolveLegalLinks：没有服务端就没有"该服务端"', () => {
   it('空串与全空白返回 `null`（界面因此**不渲染**链接，而不是渲染一条坏链接）', () => {
     expect(resolveLegalLinks('')).toBeNull();
     expect(resolveLegalLinks('   ')).toBeNull();
+  });
+});
+
+
+/**
+ * `isOfficialHostedInstance` —— **同一句隐私纪律的另一面**。
+ *
+ * `resolveLegalLinks` 管的是"条款链接指向谁"，这一条管的是
+ * **"运营者是谁、备案号是多少"** —— 两件事必须用同一次比较。
+ * 在自建实例的「关于」页印「晓黎（杭州）人工智能科技有限公司 · 浙ICP备…」，
+ * 与把**我们的**隐私政策挂到自建实例上，是同一种错
+ * （把责任指向一个不相干的主体）。
+ *
+ * 🔴 所以这里有一条**交叉判据**：本函数说"是官方"的那些输入，
+ * `resolveLegalLinks` 必须同时给出落地页地址 —— 两处各写一次比较就会漂，
+ * 而漂移的症状正是上面那两种错之一。
+ */
+describe('isOfficialHostedInstance', () => {
+  it('官方域（含大小写 / 路径 / 端口写法）⇒ true', () => {
+    for (const url of [
+      OFFICIAL_SITE_ORIGIN,
+      `${OFFICIAL_SITE_ORIGIN}/`,
+      'https://HEYTA.WAYTOFUTURE.CN',
+      'https://heyta.waytofuture.cn:443',
+    ]) {
+      expect(isOfficialHostedInstance(url), url).toBe(true);
+    }
+  });
+
+  it('🔴 非官方域 ⇒ false（自建实例的运营者是架它的那个人）', () => {
+    for (const url of [
+      'https://sync.example.com',
+      'http://127.0.0.1:3000',
+      'https://waytofuture.cn',        // **父域不是子域**：少了 heyta. 这一层
+      'https://heyta.waytofuture.cn.evil.example',
+    ]) {
+      expect(isOfficialHostedInstance(url), url).toBe(false);
+    }
+  });
+
+  it('⚠️ 地址为空 / 全空白 ⇒ false（还没配同步 —— **不知道就不冒充**）', () => {
+    expect(isOfficialHostedInstance('')).toBe(false);
+    expect(isOfficialHostedInstance('   ')).toBe(false);
+  });
+
+  it('🔴 交叉：本函数说"是官方"的输入，`resolveLegalLinks` 必须也按官方给地址', () => {
+    const official = isOfficialHostedInstance(OFFICIAL_SITE_ORIGIN);
+    expect(official).toBe(true);
+    expect(resolveLegalLinks(OFFICIAL_SITE_ORIGIN)?.privacy).toBe(
+      `${OFFICIAL_SITE_ORIGIN}${LEGAL_SITE_PATHS.privacy}`,
+    );
+
+    // 反向：非官方 ⇒ 链接指向**运营者自己的**那两条路径，而不是我们的落地页
+    const selfHosted = 'https://sync.example.com';
+    expect(isOfficialHostedInstance(selfHosted)).toBe(false);
+    expect(resolveLegalLinks(selfHosted)?.privacy).toBe(
+      `${selfHosted}${OPERATOR_LEGAL_PATHS.privacy}`,
+    );
   });
 });

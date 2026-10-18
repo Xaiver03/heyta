@@ -17,7 +17,7 @@ import { describe, expect, it } from 'vitest';
 import { createProvider, type AiFailureReason } from '@heyta/ai';
 import { translate } from '@heyta/i18n';
 
-import { causeKey } from '../src/features/ai/ai-failure-copy.js';
+import { captureFailureCopy, causeKey, serverCodeKey } from '../src/features/ai/ai-failure-copy.js';
 
 /** 有没有汉字。 */
 const CJK = /[\u3400-\u4DBF\u4E00-\u9FFF]/;
@@ -85,5 +85,54 @@ describe('路由层失败原因 → 词条', () => {
         const firstLine = outcome.message.split('\n')[0] ?? '';
         expect(translate('zh-CN', causeKey(outcome.reason))).toBe(firstLine);
       });
+  });
+});
+
+/**
+ * 🔴 服务端稳定码：`402 SUBSCRIPTION_REQUIRED` 与 `409 AI_QUOTA_EXCEEDED`
+ * 在失败词表里**都落进 `http-error`**，而修复动作相反（去买 / 等下一周期）。
+ *
+ * 这一组钉的就是"**它们必须说出不同的话**"——只按 `cause` 取词条，
+ * 两件事会被印成同一句"端点返回了错误"，而用户据此做的事会是错的。
+ */
+describe('托管档被拒：两个稳定码要说两句不同的话', () => {
+  it('两个码各自登记，且**指向不同的词条**', () => {
+    const subscription = serverCodeKey('SUBSCRIPTION_REQUIRED');
+    const quota = serverCodeKey('AI_QUOTA_EXCEEDED');
+
+    expect(subscription).toBeDefined();
+    expect(quota).toBeDefined();
+    expect(subscription).not.toBe(quota);
+    // 而且两句都真的能在词条表里翻出来（不是登记了一个不存在的 key）
+    expect(translate('zh-CN', subscription!)).not.toBe('');
+    expect(translate('zh-CN', quota!)).not.toBe('');
+    expect(translate('zh-CN', subscription!)).not.toBe(translate('zh-CN', quota!));
+  });
+
+  it('⚠️ 没登记的码（含 `undefined`）返回 `undefined` ⇒ 落回按 `cause` 取，不许硬配一句', () => {
+    expect(serverCodeKey(undefined)).toBeUndefined();
+    expect(serverCodeKey('AI_UPSTREAM_NOT_DOMESTIC')).toBeUndefined();
+    expect(serverCodeKey('')).toBeUndefined();
+  });
+
+  it('🔴 同一次 `http-error`：带不同码时，`captureFailureCopy` 给出的主文案不同', () => {
+    const ctx = (serverCode: string) => ({
+      cause: 'http-error' as const,
+      endpointUrl: 'https://heyta.waytofuture.cn',
+      serverCode,
+    });
+
+    const a = captureFailureCopy('ai-unavailable', 'raw', ctx('SUBSCRIPTION_REQUIRED'));
+    const b = captureFailureCopy('ai-unavailable', 'raw', ctx('AI_QUOTA_EXCEEDED'));
+    const plain = captureFailureCopy('ai-unavailable', 'raw', {
+      cause: 'http-error',
+      endpointUrl: undefined,
+      serverCode: undefined,
+    });
+
+    expect(a.key).not.toBe(b.key);
+    // 而且**都不是**没有码时那一句泛泛的
+    expect(a.key).not.toBe(plain.key);
+    expect(b.key).not.toBe(plain.key);
   });
 });

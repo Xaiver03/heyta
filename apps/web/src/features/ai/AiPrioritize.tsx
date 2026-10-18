@@ -66,6 +66,7 @@ import {
   type PrioritizeProposal,
   type PrioritizeTaskInput,
 } from '@heyta/app-host';
+import { webManagedTransport } from './managed-transport.js';
 import { prioritizeFailureCopy, type AiFailureCopy } from './ai-failure-copy.js';
 import { FailureSettingsAction, RouteUnavailable } from './RouteUnavailable.js';
 import { useAiSettingsNavigation } from './ai-settings-navigation.js';
@@ -239,6 +240,7 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
       preferences: hints,
       routed: {
         secretStore: secrets,
+        managedTransport: webManagedTransport,
         // 🔴 **发送那一刻**才解析快照 —— 冷却期是对着"现在"算的。
         healthSeed: fromHealthSnapshot(props.healthSnapshot ?? {}, Date.now()),
         ...(props.fetchImpl === undefined ? {} : { fetchImpl: props.fetchImpl }),
@@ -258,6 +260,7 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
       prioritizeFailureCopy(outcome.reason, outcome.message, {
         cause: outcome.cause,
         endpointUrl: outcome.endpointUrl,
+        serverCode: outcome.serverCode,
       }),
     );
     setPhase('failed');

@@ -329,6 +329,8 @@ function reviveItem(entry: unknown, id: number): ChatItem | undefined {
         message,
         cause: typeof raw['cause'] === 'string' ? (raw['cause'] as never) : undefined,
         endpointUrl: typeof raw['endpointUrl'] === 'string' ? raw['endpointUrl'] : undefined,
+        // 与 `cause` / `endpointUrl` 同一条：读回时**只认字符串**，别的形状一律丢。
+        serverCode: typeof raw['serverCode'] === 'string' ? raw['serverCode'] : undefined,
         outsideFields: Array.isArray(raw['outsideFields'])
           ? (raw['outsideFields'] as never[])
           : undefined,

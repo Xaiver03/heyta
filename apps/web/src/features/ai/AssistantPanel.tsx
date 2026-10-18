@@ -76,6 +76,7 @@ import {
   type AssistantStep,
   type AssistantTier,
 } from '@heyta/app-host';
+import { webManagedTransport } from './managed-transport.js';
 import type { LocalApiHost } from '@heyta/local-api';
 
 import { AiDisclosureHost } from './AiDisclosureHost.js';
@@ -344,6 +345,7 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
         history,
         routed: {
           secretStore: props.secrets,
+          managedTransport: webManagedTransport,
           ...(props.fetchImpl === undefined ? {} : { fetchImpl: props.fetchImpl }),
         },
       },
@@ -362,6 +364,7 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
         message: outcome.message,
         cause: outcome.cause,
         endpointUrl: outcome.endpointUrl,
+        serverCode: outcome.serverCode,
         outsideFields: outcome.outsideFields,
       });
       return;
@@ -714,6 +717,7 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
                   message={item.message}
                   cause={item.cause}
                   endpointUrl={item.endpointUrl}
+                  serverCode={item.serverCode}
                   outsideFields={item.outsideFields}
                   onOpenSettings={onOpenSettings}
                 />
@@ -894,6 +898,8 @@ function ChatFailure(props: {
   message: string;
   cause: AiFailureReason | undefined;
   endpointUrl: string | undefined;
+  /** 服务端稳定码（见 `AiFailureContext.serverCode`）—— 402 与 409 靠它分开说话。 */
+  serverCode: string | undefined;
   outsideFields: readonly string[] | undefined;
   onOpenSettings?: ((target: SettingsTarget) => void) | undefined;
 }): React.JSX.Element {
@@ -901,6 +907,7 @@ function ChatFailure(props: {
   const failure = assistantFailureCopy(props.reason, props.message, {
     cause: props.cause,
     endpointUrl: props.endpointUrl,
+    serverCode: props.serverCode,
   });
   return (
     <>

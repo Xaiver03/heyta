@@ -66,7 +66,11 @@ import { Logger } from '../logger';
 import { authenticate, getAuthUser } from '../middleware';
 import { loadConfigFromEnv, type ManagedAiConfig } from '../config';
 import { createPrismaSqlExecutor, type SqlExecutor } from '../billing/pricing-store';
-import { MANAGED_AI_REQUESTS_PER_PERIOD, consumeManagedAiRequest } from './metering';
+import {
+  MANAGED_AI_REQUESTS_PER_PERIOD,
+  consumeManagedAiRequest,
+  peekManagedAiUsage,
+} from './metering';
 import {
   SERVER_MANAGED_AI_FEATURES,
   SERVER_MANAGED_MODEL_HOSTS,
@@ -559,4 +563,37 @@ export const managedAiProxyRoutes: FastifyPluginAsync<ManagedAiProxyRoutesOption
       return reply.type(upstreamResponse.contentType).send(payload);
     },
   );
+
+  /**
+   * `GET /api/ai/managed/usage` —— 「本周期已用 X / 300」的那个读数。
+   *
+   * ## 它兑现的是哪句话
+   *
+   * 法务 §5.3 承诺「设置页可以查到本周期已用 X / 300 次」。`peekManagedAiUsage`
+   * 早就实现了，但**此前零调用方、也没有任何读用量的路由** ⇒ 那句承诺在界面上兑现不了。
+   * 这条路由就是它的出口。
+   *
+   * ## 🔴 三个不能改的形状
+   *
+   * 1. **只读，不消耗额度**：走 `peekManagedAiUsage`，它一行都不写。做成"顺手 `consume`
+   *    一次好让数字更新"就是把查询变成扣费 —— 用户点开设置页会掉一次额度。
+   * 2. **与裁决同源**：`peekManagedAiUsage` 复用同一个 `SELECT_SUBSCRIPTION_PROJECTION`
+   *    与同一个 `managedAiPeriodAnchor`。自己在这里算周期边界 = 第二套锚点规则，
+   *    结果是"界面显示还剩 3 次"而第 4 次已经被拒（界面与实际用的是两个"本周期"）。
+   * 3. **鉴权靠插件级 `preHandler`**（本文件 :304 那一行），不在这里另写一遍 ——
+   *    `check:public-facts` 判据 4 认的正是插件级 `addHook('preHandler', authenticate)`。
+   *    写成匿名 GET 它会红，而且那本来就意味着"任何人可以读别人的额度"。
+   *
+   * ## ⚠️ 客户端读法（这一条是给界面的）
+   *
+   * `entitled: false` 时 `used` 恒为 `0`，而它**不是**"这一期还没用过"，
+   * 是"根本没有这一期"（没买这一档 / 已到期）。界面把它渲染成「已用 0 / 300」
+   * 就是在说反话，正确渲染是"未订阅"那一档。
+   */
+  fastify.get('/managed/usage', async (request, reply) => {
+    const userId = getAuthUser(request).userId;
+    const usage = await peekManagedAiUsage({ userId, now: now(), limit, sql });
+    reply.status(200);
+    return reply.send(usage);
+  });
 };

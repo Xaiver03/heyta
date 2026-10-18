@@ -51,6 +51,7 @@ import {
   type AiToolRunOutcome,
   type ToolCallOutcome,
 } from '@heyta/app-host';
+import { webManagedTransport } from './managed-transport.js';
 import type {
   LocalApiConfig,
   LocalApiHost,
@@ -304,6 +305,7 @@ export function AiToolRun(props: AiToolRunProps): React.JSX.Element {
         host,
         routed: {
           secretStore: props.secrets,
+          managedTransport: webManagedTransport,
           ...(props.fetchImpl === undefined ? {} : { fetchImpl: props.fetchImpl }),
         },
       },
@@ -482,6 +484,7 @@ function ToolResult(props: {
     const failure = toolRunFailureCopy(outcome.reason, outcome.message, {
       cause: outcome.cause,
       endpointUrl: outcome.endpointUrl,
+      serverCode: outcome.serverCode,
     });
     return (
             <AiPanelHost

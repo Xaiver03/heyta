@@ -84,6 +84,8 @@ export {
   type ManagedModelHost,
 } from './managed-endpoints.js';
 
+export { MANAGED_ENDPOINT_ID, withManagedEndpoint } from './managed-routing.js';
+
 export {
   diagnoseNetworkFailure,
   originToWhitelist,
@@ -110,8 +112,10 @@ export {
   EGRESS_ORDER_NOTE,
   createProvider,
   extractContent,
+  extractServerCode,
   extractToolCalls,
   previewDisclosure,
+  readServerCode,
   type AiFailure,
   type AiFailureReason,
   type AiInvocation,

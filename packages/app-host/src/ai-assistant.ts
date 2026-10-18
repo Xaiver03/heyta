@@ -277,6 +277,13 @@ export type AssistantOutcome =
       readonly cause?: AiFailureReason;
       /** 这次实际打到的端点 —— 本机端点拒绝来源的诊断要靠它（ADR-0045 §4）。 */
       readonly endpointUrl?: string;
+      /**
+       * 服务端**稳定码**（`AiFailure.serverCode` 原样透传）。
+       * 🔴 托管档的"没订阅"（`SUBSCRIPTION_REQUIRED`）与"额度用尽"（`AI_QUOTA_EXCEEDED`）
+       * 都落在 `http-error` 一档里，而两者的**修复动作相反**（去买 / 等下一周期）——
+       * 少了这个字段，界面就只能把这两件事说成同一句。
+       */
+      serverCode?: string;
       readonly outsideFields?: readonly string[];
       readonly health: HealthMap;
     };
@@ -777,6 +784,7 @@ export async function requestAssistantTurn(
         reason: 'routing-failed',
         cause: result.reason,
         endpointUrl: result.endpointUrl,
+        ...(result.serverCode === undefined ? {} : { serverCode: result.serverCode }),
         message: result.message,
         steps,
         health,

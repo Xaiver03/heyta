@@ -23,7 +23,11 @@
 import { describe, expect, it } from 'vitest';
 import type { AiEndpointConfig, AiFeature, AiRoutingConfig, EgressConsent } from '@heyta/ai';
 
-import { destinationForFeature, recomputeConsents } from '../src/ai-settings-shared.js';
+import {
+  destinationForFeature,
+  isAiSupplyUsable,
+  recomputeConsents,
+} from '../src/ai-settings-shared.js';
 
 const LOOPBACK: AiEndpointConfig = {
   id: 'ollama',
@@ -124,5 +128,36 @@ describe('recomputeConsents —— 换端点必须让旧授权作废', () => {
   it('授权里出现了一个路由表根本没有的功能时不崩（存储是磁盘上的旧数据）', () => {
     const before = [consent('duration-estimate', 'user-endpoint')];
     expect(recomputeConsents(before, routing([LOOPBACK], {}))).toEqual([]);
+  });
+});
+
+/**
+ * `isAiSupplyUsable` —— "这台设备有没有一条能用的 AI 供给"。
+ *
+ * 🔴 它存在的唯一理由是**托管档没有用户自己的端点**（那条端点由同步服务器
+ * 在构造 routing 时合成）。只数 `endpoints.length` 会把托管用户判成"没配 AI"，
+ * 于是他看到"去添加一个端点" —— 而他要做的事是登录 / 换档。
+ * **两种人看到同一句话，修复动作相反。**
+ */
+describe('isAiSupplyUsable —— 分档判断，不只是数端点', () => {
+  it('总开关关着 ⇒ false（哪一档都一样）', () => {
+    expect(isAiSupplyUsable({ ...routing([LOOPBACK]), enabled: false }, 'https://h.cn')).toBe(false);
+  });
+
+  it('自备档：有端点 ⇒ true；没端点 ⇒ false', () => {
+    expect(isAiSupplyUsable(routing([LOOPBACK]), undefined)).toBe(true);
+    expect(isAiSupplyUsable(routing([]), undefined)).toBe(false);
+  });
+
+  it('🔴 托管档：**不数端点**，看有没有服务器可打', () => {
+    const managed = { ...routing([]), mode: 'managed' as const };
+    expect(isAiSupplyUsable(managed, 'https://heyta.waytofuture.cn')).toBe(true);
+    expect(isAiSupplyUsable(managed, '   ')).toBe(false);
+    expect(isAiSupplyUsable(managed, undefined)).toBe(false);
+  });
+
+  it('🔴 托管档 + 有端点但**没有服务器** ⇒ 仍然 false（不许退回"数端点"那条判据）', () => {
+    const managed = { ...routing([LOOPBACK]), mode: 'managed' as const };
+    expect(isAiSupplyUsable(managed, undefined)).toBe(false);
   });
 });

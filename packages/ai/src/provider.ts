@@ -48,9 +48,11 @@ import {
 } from './egress.js';
 import {
   buildChatRequestBody,
+  buildManagedChatRequestBody,
   chatCompletionsUrl,
   chatRequestHeaders,
   isEmptyModelResponse,
+  managedChatUrl,
   type ChatMessage,
 } from './wire.js';
 
@@ -192,6 +194,19 @@ export interface AiFailure {
    * 见 [ADR-0045](../../../docs/adr/0045-conversational-assistant-split-authorization-from-catalog.md) §4。
    */
   endpointUrl?: string;
+  /**
+   * 服务端**稳定码**（`{"code":"AI_QUOTA_EXCEEDED", …}` 里那个 UPPER_SNAKE）。
+   *
+   * 🔴 为什么需要它：托管档把"没订阅"（`402 SUBSCRIPTION_REQUIRED`）与
+   * "这一周期的额度用完了"（`409 AI_QUOTA_EXCEEDED`）**分成了两个码**，
+   * 而这两件事对用户的**修复动作完全相反**（去买 / 等下一周期）。
+   * 可在失败词表里它们都落进 `http-error`（配一个状态码）——
+   * 界面于是只能说一句"端点返回了 402"，指不出该做什么。
+   *
+   * ⚠️ 它**是数据不是文案**：`packages/ai` 不替界面决定怎么措辞，
+   * 只把这个码原样带出去，由壳按它取词条。取不到就是 `undefined`，**绝不编一个**。
+   */
+  serverCode?: string;
 }
 
 export type AiResult = { ok: true; suggestion: AiSuggestion } | AiFailure;
@@ -216,6 +231,20 @@ export interface ProviderDeps {
   fetchImpl?: typeof fetch;
   /** 超时（ms）。默认 30 秒 —— 任务管理的交互等不了更久。 */
   timeoutMs?: number;
+  /**
+   * 托管档的**宿主通道**：同步服务器的基址 + 一枚可用的访问令牌。
+   *
+   * 🔴 为什么是端口注入、而不是让 `packages/ai` 去读配置：
+   * 令牌与服务器地址都归**宿主**（同步会话那一层），这个包刻意不知道它们。
+   * 宿主在这里给出一份"**此刻**可用的托管通道" —— 每次调用现取，
+   * 因为令牌会轮换、服务器地址会随登录状态变。
+   *
+   * 拿不到（返回 `undefined`）时 `invoke` **响亮失败**（`not-configured`），
+   * **绝不**回退到自备端点那条路 —— "你以为是托管、实际发给了别处"是最坏的一种分叉。
+   *
+   * ⚠️ 只在 `mode === 'managed'` 时被读；自备档不碰它。
+   */
+  managedTransport?: () => Promise<{ readonly baseUrl: string; readonly token: string } | undefined>;
 }
 
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -347,7 +376,54 @@ export function createProvider(config: AiProviderConfig, deps: ProviderDeps = {}
       // 并且用注释要求"与 `invokeRouted()` 保持同一形状" —— 用注释要求两边一致
       // 就是没有要求。工单 W7 把两份删成一份，判据见 `packages/ai/tests/wire.spec.ts`
       // （两条路打出去的字节必须逐字相同）。
-      const body = buildChatRequestBody(config.model ?? 'default', invocation);
+      //
+      // 🔴 **托管档走的是另一份契约**：打到的是我们自己的服务端代理
+      // （`/api/ai/managed/chat`），请求体是 `{ feature, messages }` ——
+      // **没有 `model`**（模型由服务端配置决定，ADR-0021「换模型就是改价」），
+      // **也没有 `tools`**（见下）。
+      let requestUrl: string;
+      let requestHeaders: Record<string, string>;
+      let requestBody: unknown;
+
+      if (config.mode === 'managed') {
+        // 🔴 托管档**今天不支持工具调用**，而且不许静默降级：
+        // 服务端（`managed-proxy.routes.ts`）不转发 `tools`，发出去也只会得到一段
+        // 纯文本回答 —— 那正是本仓最忌讳的"看起来有、其实没有"。
+        // 发现与要拍的板登记在 `docs/plans/launch-blockers.md` §3.2。
+        // 用 `no-route`（"AI 开着，但这个功能没有路走"）而不是编一个新原因：
+        // 失败词表是封闭的，加一档要同时动 i18n 的穷尽映射。
+        if (invocation.tools !== undefined && invocation.tools.length > 0) {
+          return {
+            ok: false,
+            reason: 'no-route',
+            message:
+              '托管 AI 暂不支持工具调用：我们的服务端不会把工具目录转发给模型，' +
+              '所以这次请求发出去也只会得到一段纯文本回答。' +
+              '要用工具，请在设置里改选"使用自己的 AI 端点"。',
+          };
+        }
+
+        const transport = await (deps.managedTransport?.() ?? Promise.resolve(undefined));
+        if (transport === undefined) {
+          return {
+            ok: false,
+            reason: 'not-configured',
+            message:
+              '托管 AI 现在走不了：这台设备还没有可用的托管通道（未登录，或这台服务器没有开通托管 AI）。',
+          };
+        }
+
+        requestUrl = managedChatUrl(transport.baseUrl);
+        requestHeaders = {
+          'content-type': 'application/json',
+          authorization: `Bearer ${transport.token}`,
+        };
+        requestBody = buildManagedChatRequestBody(invocation.feature, invocation);
+      } else {
+        requestUrl = chatCompletionsUrl(config.endpoint ?? '');
+        requestHeaders = chatRequestHeaders(config.apiKey);
+        requestBody = buildChatRequestBody(config.model ?? 'default', invocation);
+      }
 
       // ── 3. 网络。超时用 AbortController，**不能只靠 fetch 的默认行为**。 ─
       const controller = new AbortController();
@@ -356,18 +432,23 @@ export function createProvider(config: AiProviderConfig, deps: ProviderDeps = {}
       }, timeoutMs);
 
       try {
-        const res = await doFetch(chatCompletionsUrl(config.endpoint ?? ''), {
+        const res = await doFetch(requestUrl, {
           method: 'POST',
-          headers: chatRequestHeaders(config.apiKey),
-          body: JSON.stringify(body),
+          headers: requestHeaders,
+          body: JSON.stringify(requestBody),
           signal: controller.signal,
         });
 
         if (!res.ok) {
+          // 🔴 托管档的 `402 SUBSCRIPTION_REQUIRED` / `409 AI_QUOTA_EXCEEDED`
+          // 都落在 `http-error` 这一档里，只靠状态码界面分不清"去买"与"等下一周期"。
+          // 把服务端的稳定码一并带出去（取不到就是 undefined）。
+          const serverCode = await readServerCode(res);
           return {
             ok: false,
             reason: 'http-error',
             status: res.status,
+            ...(serverCode === undefined ? {} : { serverCode }),
             message: `端点返回 ${String(res.status)}。检查端点地址、模型名与凭据。`,
           };
         }
@@ -426,6 +507,36 @@ export function createProvider(config: AiProviderConfig, deps: ProviderDeps = {}
  * 这是本项目有测试钉住的一条：**不要用类型断言去相信外部输入**。
  * 对照 AGENTS.md §7 #14：`as SomeInterface & {...}` 会让编译器彻底静音。
  */
+/**
+ * 从**失败响应体**里取服务端的稳定码（`{"code":"AI_QUOTA_EXCEEDED", …}`）。
+ *
+ * 与 `extractContent` 同一条纪律：**不信任响应形状**（服务端可能没配、
+ * 可能回 HTML、可能是别人冒充的代理）。拿不到就是 `undefined`，**绝不编一个**。
+ *
+ * ⚠️ 只认**非空字符串**：服务端把 `code` 写成 `null` / `{}` / `' '` 都不算数 ——
+ * 一个空串进了界面会命中一张取不到词条的表，而那看起来像"未知错误"，
+ * 比 `undefined`（壳知道"服务端没给码"）更难查。
+ */
+export function extractServerCode(json: unknown): string | undefined {
+  if (typeof json !== 'object' || json === null || Array.isArray(json)) return undefined;
+  const code = (json as { code?: unknown }).code;
+  return typeof code === 'string' && code.trim() !== '' ? code : undefined;
+}
+
+/**
+ * 从一次 HTTP 失败响应里读那个码。**永不抛**：读不出来就当没有。
+ *
+ * ⚠️ 它会**消费 response 的 body**。只许在"这次响应已经确定不用了"的路径上调用
+ * （即 `!res.ok` 那几支）—— 在成功路径上调它会把正文吃掉。
+ */
+export async function readServerCode(response: Response): Promise<string | undefined> {
+  try {
+    return extractServerCode(await response.json());
+  } catch {
+    return undefined;
+  }
+}
+
 export function extractContent(json: unknown): string | undefined {
   if (typeof json !== 'object' || json === null) return undefined;
   const choices = (json as { choices?: unknown }).choices;

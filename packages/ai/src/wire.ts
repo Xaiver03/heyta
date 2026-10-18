@@ -24,6 +24,7 @@
  * 与"组装出的结构"这两件事仍然可以分别被观测。
  */
 
+import type { AiFeature } from './egress.js';
 import type { AiInvocation } from './provider.js';
 
 /**
@@ -117,6 +118,70 @@ export function buildChatRequestBody(
           tool_choice: 'auto',
         }
       : {}),
+  };
+}
+
+/**
+ * 托管档的入口 URL —— **不是** OpenAI 兼容端点，是我们自己的服务端代理。
+ *
+ * 契约在 `server/src/ai/managed-proxy.routes.ts` 的 `ChatBodySchema`：
+ * `{ feature, messages, stream? }`，**没有 `model`** ——
+ * 模型由服务端配置决定（客户端能选模型 = 客户端能选我们倒贴多少钱，ADR-0021）。
+ */
+export function managedChatUrl(baseUrl: string): string {
+  // 去掉尾斜杠再拼：`https://h.cn/` 与 `https://h.cn` 必须得到同一个串。
+  return `${baseUrl.replace(/\/+$/, '')}/api/ai/managed/chat`;
+}
+
+/**
+ * 两个地址是不是**同一台主机**（比主机名，忽略协议、端口、路径与尾斜杠）。
+ *
+ * 🔴 用途只有一个，但它是承重的：托管档的**披露**按 `candidate.endpoint` 推导，
+ * 而**请求**打到宿主给的 `transport.baseUrl`。两者若不同主机，就是
+ * **"披露按 A 说、字节发到 B"** —— 比没有披露更坏，因为用户以为自己知道。
+ *
+ * ⚠️ 解析不出主机名的（相对串、垃圾串）一律判 `false`：
+ * **宁可拒发，也不放行一个说不清的目的地。**
+ */
+export function sameHost(a: string, b: string): boolean {
+  const hostOf = (raw: string): string | undefined => {
+    try {
+      const host = new URL(raw).hostname.toLowerCase();
+      return host === '' ? undefined : host;
+    } catch {
+      return undefined;
+    }
+  };
+  const left = hostOf(a);
+  return left !== undefined && left === hostOf(b);
+}
+
+/**
+ * 组装**托管档**的请求体（我们自己的服务端代理）。
+ *
+ * 🔴 它 **不接受 `tools`**，而且这是**类型上的**不接受，不是注释要求 ——
+ * 因为服务端今天**根本不转发工具**：`managed-proxy.routes.ts` 里
+ * `grep -n "tools\|tool_choice"` **零命中**，发出去的上游请求体只有
+ * `{ model, messages, stream? }`。而 `SERVER_MANAGED_AI_FEATURES` 里**却列着
+ * `'tool-calling'`** ⇒ 真把工具发过去，得到的是**静默降级成纯文本回答**。
+ *
+ * 所以调用方（`provider.invoke`）在托管档遇到带工具的功能时**必须响亮拒绝**，
+ * 而不是让请求发出去、让模型收不到工具再编一句话回来。
+ * 那条发现登记在 [`docs/plans/launch-blockers.md`](../../../docs/plans/launch-blockers.md) §3.2。
+ *
+ * ⚠️ `messages` 仍走**同一个** `toWireMessage` 归一化，与 OpenAI 那条路逐字共用 ——
+ * 托管档与自备档的对话形状不许分叉。
+ */
+export function buildManagedChatRequestBody(
+  feature: AiFeature,
+  invocation: Pick<AiInvocation, 'system' | 'user' | 'messages'>,
+): { feature: AiFeature; messages: readonly Record<string, unknown>[] } {
+  return {
+    feature,
+    messages: (invocation.messages ?? [
+      { role: 'system', content: invocation.system },
+      { role: 'user', content: invocation.user },
+    ]).map(toWireMessage),
   };
 }
 

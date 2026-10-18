@@ -163,6 +163,13 @@ export type ToolCallOutcome =
        * （ADR-0045 §4）。**原样透传，不在这里判断。**
        */
       endpointUrl?: string;
+      /**
+       * 服务端**稳定码**（`AiFailure.serverCode` 原样透传）。
+       * 🔴 托管档的"没订阅"（`SUBSCRIPTION_REQUIRED`）与"额度用尽"（`AI_QUOTA_EXCEEDED`）
+       * 都落在 `http-error` 一档里，而两者的**修复动作相反**（去买 / 等下一周期）——
+       * 少了这个字段，界面就只能把这两件事说成同一句。
+       */
+      serverCode?: string;
       /** 模型只回了话时，把它带出来（界面可以照原样显示）。 */
       text?: string;
       health: HealthMap;
@@ -289,6 +296,7 @@ export async function requestToolCall(
       reason: 'ai-unavailable',
       cause: result.reason,
       endpointUrl: result.endpointUrl,
+      ...(result.serverCode === undefined ? {} : { serverCode: result.serverCode }),
       message: result.message,
       health: outcome.health,
     };

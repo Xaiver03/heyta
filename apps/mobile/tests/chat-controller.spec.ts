@@ -50,15 +50,27 @@ function runtime(overrides: Partial<ChatRuntime> = {}): ChatRuntime {
     ...defaultAiSettingsState(),
     assistantTier: 'read-only',
   };
-  return {
+  const base = {
     settings,
     host: {} as LocalApiHost,
-    localize: (key) => key,
+    localize: (key: string) => key,
     secretStore: { get: async () => undefined },
+    managedTransport: async () => undefined,
     onHealth: vi.fn(),
     onTierChange: vi.fn(),
     ...overrides,
   };
+  return {
+    ...base,
+    /**
+     * 缺省等价于"现算的就是落盘那一份"（测试里没有同步服务器这一层）。
+     * 🔴 它从 `base.settings` 取，**不是**从上面那个 `settings` 常量 ——
+     * 用例通过 `overrides.settings` 换掉设置时，闭包必须跟着换，
+     * 否则"换了设置"的用例会拿旧配置去走路由（那正是本仓记过的"闭包捕获旧值"形状）。
+     * 要验托管档的用例自己 override 它。
+     */
+    resolveRouting: overrides.resolveRouting ?? (() => base.settings.routing),
+  } as ChatRuntime;
 }
 
 function routedSettings(
@@ -483,4 +495,45 @@ describe('移动端 Chatbot controller 行为', () => {
     });
     expect(storage.raw()).toBeNull();
   });
+});
+
+/**
+ * 🔴 送出去的路由配置必须是 `resolveRouting()` 的返回值，**不是落盘那份**。
+ *
+ * 这一条钉的是托管档在移动端能不能用：托管端点来自**同步服务器**
+ * （`withManagedEndpoint` 合成），而服务器地址是用户应用起来之后才填的 ——
+ * 落盘的 `settings.routing` 里**没有**托管端点。读错了，
+ * 选托管的人按下去只会得到 `no-route`，而界面刚告诉过他"走托管"。
+ *
+ * ⚠️ 断言用**身份相等**（`toBe`）而不是深比较：契约是"把那个对象原样送出去"，
+ * 深比较会放过"又克隆了一份、且克隆时丢了字段"这种形状。
+ */
+it('🔴 路由**现算**：送出的是 `resolveRouting()` 返回的那个对象，不是落盘那份', async () => {
+  const storage = memoryStorage();
+  seedDisclosed(storage);
+  appHostMocks.requestAssistantTurn.mockResolvedValueOnce(answer('好'));
+
+  const live = {
+    enabled: true,
+    allowRemote: true,
+    endpoints: [],
+    routes: {},
+    mode: 'managed' as const,
+  };
+  const stale = { enabled: true, allowRemote: true, endpoints: [], routes: {} };
+  const controller = controllerWith(storage, 'alice@example.com', {
+    settings: { ...defaultAiSettingsState(), assistantTier: 'read-only', routing: stale },
+    resolveRouting: () => live,
+  });
+
+  controller.setDraft('你好');
+  controller.send();
+  controller.confirmDisclosure();
+  await flush();
+
+  const call = appHostMocks.requestAssistantTurn.mock.calls.at(-1);
+  expect(call).toBeDefined();
+  const options = call![1] as { routing: unknown };
+  expect(options.routing).toBe(live);
+  expect(options.routing).not.toBe(stale);
 });

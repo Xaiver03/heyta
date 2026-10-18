@@ -13,13 +13,19 @@ import {
   type ChatItem,
   type HistoryStorage,
   type LocalObservationTranslate,
+  type ManagedTransport,
   type WithoutId,
   clearAssistantHistory,
   loadAssistantHistory,
   saveAssistantHistory,
   scopeAssistantHistoryStorage,
 } from '@heyta/app-host';
-import { fromHealthSnapshot, type HealthMap, type SecretStore } from '@heyta/ai';
+import {
+  fromHealthSnapshot,
+  type AiRoutingConfig,
+  type HealthMap,
+  type SecretStore,
+} from '@heyta/ai';
 import type { LocalApiHost } from '@heyta/local-api';
 import { deleteDevicePref, readDevicePref, writeDevicePref } from '../prefs/device-prefs';
 
@@ -30,6 +36,25 @@ export interface ChatRuntime {
   readonly host: LocalApiHost | null;
   readonly localize: LocalObservationTranslate;
   readonly secretStore: SecretStore;
+  /**
+   * 托管档的宿主通道（服务器基址 + 活令牌）。
+   *
+   * 🔴 它**必须**由壳提供、且只有 `packages/app-host` 那一份组装
+   * （`createManagedTransport`）—— web 那 6 处也是同一个函数。
+   * 漏接一处的表现是：那个面板在托管档上不走代理，用户只看到"AI 不可用"。
+   */
+  readonly managedTransport: ManagedTransport;
+  /**
+   * **求助时现算**的那一份路由配置。
+   *
+   * 🔴 为什么不是直接读 `settings.routing`：托管档的端点来自**同步服务器**
+   * （`withManagedEndpoint` 合成），而服务器地址是用户**应用起来之后**才填的。
+   * 读 `settings.routing` 会拿到"落盘的那一份"——里面**没有托管端点**，
+   * 于是选托管的人按下去只会得到 `no-route`，而界面刚告诉过他"走托管"。
+   *
+   * ⚠️ 每次调用都重新算：这是**发送那一刻的事实**，不是渲染那一刻的快照。
+   */
+  readonly resolveRouting: () => AiRoutingConfig;
   readonly onHealth: (health: HealthMap) => void;
   readonly onTierChange: (tier: AiSettingsState['assistantTier']) => void;
 }
@@ -303,7 +328,7 @@ class MobileChatController implements ChatController {
       const outcome = await requestAssistantTurn(
         { text },
         {
-          routing: runtime.settings.routing,
+          routing: runtime.resolveRouting(),
           consents: runtime.settings.consents,
           tier: runtime.settings.assistantTier,
           getGrants: () =>
@@ -317,6 +342,7 @@ class MobileChatController implements ChatController {
           now: routeTime,
           routed: {
             secretStore: runtime.secretStore,
+            managedTransport: runtime.managedTransport,
             now: () => routeTime,
             healthSeed: fromHealthSnapshot(runtime.settings.health, routeTime),
           },
@@ -333,6 +359,8 @@ class MobileChatController implements ChatController {
         reason: 'routing-failed',
         cause: undefined,
         endpointUrl: undefined,
+        // 这一支是"调用本身抛了"（不是一次 HTTP 失败），所以没有服务端码。
+        serverCode: undefined,
         outsideFields: undefined,
       });
     } finally {
@@ -349,6 +377,7 @@ class MobileChatController implements ChatController {
         reason: outcome.reason,
         cause: outcome.cause,
         endpointUrl: outcome.endpointUrl,
+        serverCode: outcome.serverCode,
         outsideFields: outcome.outsideFields,
       });
       return;
@@ -430,7 +459,7 @@ class MobileChatController implements ChatController {
 
 function createDisclosureFingerprint(runtime: ChatRuntime, routeTime: number): string {
   const route = resolveAiRoute(
-    runtime.settings.routing,
+    runtime.resolveRouting(),
     'tool-calling',
     { health: fromHealthSnapshot(runtime.settings.health, routeTime) },
   );
@@ -438,7 +467,7 @@ function createDisclosureFingerprint(runtime: ChatRuntime, routeTime: number): s
     tier: runtime.settings.assistantTier,
     fields: assistantEgressFields(runtime.settings.assistantTier),
     target: route.target,
-    routing: runtime.settings.routing,
+    routing: runtime.resolveRouting(),
   });
 }
 
