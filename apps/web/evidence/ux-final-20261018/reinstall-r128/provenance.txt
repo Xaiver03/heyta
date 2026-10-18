@@ -34,12 +34,22 @@
    - 外观基线：模拟器与宿主 macOS 都是**浅色**（现量 `xcrun simctl spawn <UDID> defaults read -g AppleInterfaceStyle`
      与 `defaults read -g AppleInterfaceStyle` 都回 "Could not find key" ⇒ 无该键 = 浅色）。
 
-5) macOS 腿第一次红在哪（已定性，不是产品/脚本问题）：
-   日志停在 `…/HeytaMacWidget.appex: A timestamp was expected but was not found.`
+5) macOS 腿红了两趟、第三趟绿（定性：取时间戳的瞬时失败，不是产品也不是打包脚本）：
+   第 1 趟停在 `…/HeytaMacWidget.appex: A timestamp was expected but was not found.`
    ⇒ 同一枚 appex 的**副本**上做 A/B：`codesign --force --timestamp --sign "<Developer ID …(V5S2LT9YV8)>"`
    回 rc=0，且 `codesign -dvvv` 读到 `Timestamp=Oct 18, 2026 at 18:07:59`、`--verify --strict` 过 ⇒
-   时间戳链路**当下是通的**，腿里那次是取时间戳的瞬时失败 ⇒ 单独重跑 `--only mac` 即可。
+   时间戳链路**当下是通的**。
+   第 2 趟（`--only mac`）红在**另一枚对象**上：`.app` 全程签过、④ 步"打包后的 .app 能起来"绿
+   （WebView 快照 内容 100.0% / 主蓝 997），停在 ⑤ 生成 .dmg 之后的 `Heyta-1.0.0.dmg: A timestamp …`。
+   ⇒ 红的位置在 appex → dmg 之间**移动**，而两趟之间没有任何输入变化 ⇒ 判据形状是"TSA 取不到"，
+      不是某枚产物缺时间戳。这条"失败对象会换"才是把"瞬时"和"产物坏"分开的证据（A/B 只证"当下能用"）。
+   第 3 趟（同一条命令）✅ 全绿：打包 + 卸旧装新 + 公证 `status: Accepted` + `staple and validate worked`，
+   装机件现量 `codesign -dvvv /Applications/Heyta.app` ⇒ `Identifier=cloud.finlaw.heyta.desktop`、
+   `CDHash=18bbf00ea8f3a6bb146eb24ed4fbacf472859f0c`（接手时那枚是 `11677d3e…`，11:23 由别线装的）、
+   `Timestamp=Oct 18, 2026 at 18:17:22`。
    ⚠️ 诊断副本在 `~/heyta-r128-diag/`（本线自建，跑完删）。
+   ⚠️ 三趟都用同一枚私有落点，前两趟的 dist 目录被第三趟自己清空重打 ⇒ 上面那些红趟的**日志**留着，
+      **产物**没留（要留产物得给每趟一个独立 `HEYTA_MACOS_DIST_DIR`）。
 
 6) iOS 腿的 pod 非确定性（与 r108/r110 同记录）：
    第 1 趟 `[!] Error installing hermes-engine` ⇒ 第 2 趟成功（脚本自己写着"与上面那条非确定性记录一致"）。
