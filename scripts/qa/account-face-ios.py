@@ -73,7 +73,13 @@ def toggle_node(tree):
     # 把「或者用别的方式」这枚开关的**整条 AX 节点**记进读数：`SectionHeader` 的标题
     # （其他登录方式 / 收起其他登录方式）在装机态读不到，要判断这是"整棵树上没有"还是
     # "被父节点的 accessibilityLabel 合成掉了"，就得看这枚节点自己带不带状态/值。
-    return PS.AX.find(tree, OTHER_WAYS[0], False, False, None, False, 0)
+    # 🔴 两枚候选都要试：只按中文那枚找，英文档会回 `None`，而那个 `None` 长得和
+    # "这枚开关没有无障碍状态"一模一样（2026-10-19 英文腿实测）。
+    for candidate in OTHER_WAYS:
+        node = PS.AX.find(tree, candidate, False, False, None, False, 0)
+        if node is not None:
+            return node
+    return None
 
 
 ACTIVE: list[tuple] = []

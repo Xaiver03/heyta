@@ -74,7 +74,9 @@
 2. **魔法链接**收信与「粘贴邮件里的链接或令牌 → 验证并登录」那条出口：按只读纪律没按。
 3. **通行密钥**真实可用性：只读到"这台设备不支持"那句提示。
 4. **注册档**的条款勾选与两份法务文档链接：需要切档（会发请求），未做。
-5. **英文语态**下的这一面：设备是中文，装置里定位符虽已中英成对（门现量 22 组含中文 / 20 处 `T()`），但本趟没取英文读数。
+5. ~~**英文语态**下的这一面~~ —— **本文件 §10（r135 追加）已把它从"不证"里划掉**：应用内语言开关那条通道现在有装置了
+   （`scripts/qa/ios-app-language.py`），账号面英文档 11 步全绿，双语定位符第一次在装机件上被**跑**过
+   （此前只被 `check:locator-labels` 对过词条表；组数现量 `python3 scripts/qa/check-locator-labels.py scripts/qa/account-face-ios.py`）。
 6. **iPad / 窄屏 / 大字体**下的账号面：只有 iPhone 17 Pro 一档。
 7. **当前源码**的账号面：装机件是 `head-r128` 那一枚，`601ae89f` 之后若有界面改动不在这张图里。
 
@@ -100,3 +102,32 @@ python3 scripts/qa/account-face-ios.py --udid $U \
 # 门的变异臂：把 CJK_GROUP_FLOOR 里那行抬 1 ⇒ rc=1；改回 ⇒ rc=0
 python3 scripts/qa/check-locator-labels.py scripts/qa/account-face-ios.py
 ```
+
+---
+
+## 10. 追加（r135）· 英文档 —— 把上面第 5 条"不证"划掉的那一趟
+
+**为什么能划掉**：这台机上应用内语言开关此前没有任何装置走过（陷阱 #469 说清了三条系统语言通道都动不了这枚包），
+本趟补了 `scripts/qa/ios-app-language.py`（「我的」→ 设置 → 常规 → 语言那两枚 chip），于是双语定位符第一次被**跑**而不是被**对表**。
+
+| 步 | 读数 |
+|---|---|
+| 切到 en（9 步全 passed） | 到达判据用**目标档独有**的目录层标签；`otherLanguageMarksLeft: []` ⇒ 整片界面跟着翻了，不只是那一栏标题 |
+| 账号面英文档（11 步全 passed） | 每一枚定位符都在英文档命中：入口 `Sign in or register` 帧 `[16, 283, 370, 44]`（与中文档**同帧**），开关 `Or use another way` 帧 `[16, 648, 370, 31]`（比中文档低 36pt —— 英文那段说明多折了一行，不是裁切） |
+| 切回 zh（8 步全 passed） | `常规` 那组标签回到树上，`otherLanguageMarksLeft: []`；**设备已还原中文** |
+
+**英文档整屏渲染逐张人眼看过**（`english/language-en.png`、`english/auth-sign-in.png`、`english/auth-other-ways-expanded.png`）：
+无截断、无中英混排残留（唯一保留的 CJK 是那枚 `中文` chip —— 两份词条表里同字，`en.ts` 的注释自己写明它是英文表里唯一合法的 CJK 值）。
+读到的英文件包括 `This device does not support passkeys yet. Sign in with your password or an email link.` 与
+`On an emulator use 10.0.2.2 (pointing at this computer); on a real device use your LAN address.`（第 5 节第 4 条那句文案候选在英文档同样在场）。
+
+**这一趟换来的两枚探针坑（不是产品坑）**：
+
+* **#484** —— 语言那两枚 chip 的**选中态住在 `traits` 里**（`"Selected"` 会跟着切换从一枚挪到另一枚，四份读数两向一致），
+  而 `AXValue` 恒 `null`。第一版装置只记 `AXValue`，四份读数正好是"选中态对读屏没有信号"这条**假缺陷**的形状。
+  改成记整条节点后与截图（实心蓝底那枚 = 选中）三层对上 ⇒ **不是缺陷**。
+* **#485** —— 第 5 节第 2 条那枚 `AXValue="expanded"` 在英文档第一次读回 `null`，成因是我自己的 `toggle_node()`
+  写成 `AX.find(tree, OTHER_WAYS[0])`（只拿中文那枚）。改成遍历两枚候选后英文档同样读到 `"expanded"`。
+  ⇒ 双语装置的**读数**路径没有 `wait_for(candidates)` 那种兜底，`X[0]` 会悄悄把"我这把尺没量到"写成"产品没有"。
+
+**仍然不证**（英文档这一趟没扩到的）：注册档、任何凭证流转、iPad/窄屏/大字体、以及**当前源码**（装机件仍是 `head-r128` 那一枚）。

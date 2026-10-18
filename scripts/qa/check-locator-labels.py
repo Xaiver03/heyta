@@ -76,6 +76,10 @@ CJK_GROUP_FLOOR = {
     # ⚠️ 同样只登记**下限**，不抄现量：要读数就跑
     # `python3 scripts/qa/check-locator-labels.py scripts/qa/account-face-ios.py`。
     "account-face-ios.py": 22,
+    # 应用内语言开关那一枚装置：它的 `DIRECTORY_MARKS` 两档各写**一种**语态是刻意的
+    # （到达断言位双语会让"界面根本没翻"也判过），所以这枚脚本的"组内整片单语"披露
+    # 不是欠项 —— 别按披露去补成对，要按它自己的注释判。
+    "ios-app-language.py": 13,
 }
 # TS 源码不是 Python，不能用 ast 扫；这里抓所有引号里的"像键名"的串，再和真源的键集合取交集。
 ANY_QUOTED = re.compile(r"""['"]([A-Za-z0-9_.-]{3,})['"]""")
