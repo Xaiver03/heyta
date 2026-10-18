@@ -72,6 +72,10 @@ CJK_GROUP_FLOOR = {
     # ⚠️ 这里只登记**下限**，不抄现量 —— 要读数就跑
     # `python3 scripts/qa/check-locator-labels.py scripts/qa/ai-face-ios.py` 看「含中文」那一栏。
     "ai-face-ios.py": 26,
+    # 账号面只读旅程（「我的」→ 注册 / 登录 → 展开/收起「或者用别的方式」→ 返回）。
+    # ⚠️ 同样只登记**下限**，不抄现量：要读数就跑
+    # `python3 scripts/qa/check-locator-labels.py scripts/qa/account-face-ios.py`。
+    "account-face-ios.py": 22,
 }
 # TS 源码不是 Python，不能用 ast 扫；这里抓所有引号里的"像键名"的串，再和真源的键集合取交集。
 ANY_QUOTED = re.compile(r"""['"]([A-Za-z0-9_.-]{3,})['"]""")
