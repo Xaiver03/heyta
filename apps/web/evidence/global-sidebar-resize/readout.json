@@ -131,7 +131,7 @@
       {
         "selector": ".ht-sidebar__calendar-body",
         "visible": true,
-        "width": 208,
+        "width": 160,
         "horizontalOverflow": 0,
         "spill": []
       },
@@ -146,7 +146,7 @@
       {
         "selector": ".ht-content",
         "visible": true,
-        "width": 1136,
+        "width": 1184,
         "horizontalOverflow": 0,
         "spill": []
       }
@@ -167,7 +167,7 @@
       {
         "selector": ".ht-sidebar__calendar-body",
         "visible": true,
-        "width": 208,
+        "width": 384,
         "horizontalOverflow": 0,
         "spill": []
       },
@@ -182,7 +182,7 @@
       {
         "selector": ".ht-content",
         "visible": true,
-        "width": 1136,
+        "width": 960,
         "horizontalOverflow": 0,
         "spill": []
       }
@@ -203,7 +203,7 @@
       {
         "selector": ".ht-sidebar__calendar-body",
         "visible": true,
-        "width": 208,
+        "width": 284,
         "horizontalOverflow": 0,
         "spill": []
       },
@@ -218,7 +218,7 @@
       {
         "selector": ".ht-content",
         "visible": true,
-        "width": 1136,
+        "width": 1060,
         "horizontalOverflow": 0,
         "spill": []
       }
@@ -784,7 +784,7 @@
       {
         "selector": ".ht-sidebar__body",
         "visible": true,
-        "width": 208,
+        "width": 284,
         "horizontalOverflow": 0,
         "spill": []
       },
@@ -806,7 +806,7 @@
       {
         "selector": ".ht-content",
         "visible": true,
-        "width": 848,
+        "width": 772,
         "horizontalOverflow": 0,
         "spill": []
       }
@@ -823,7 +823,7 @@
       {
         "selector": ".ht-sidebar__body",
         "visible": true,
-        "width": 208,
+        "width": 284,
         "horizontalOverflow": 0,
         "spill": []
       },
@@ -845,7 +845,7 @@
       {
         "selector": ".ht-content",
         "visible": true,
-        "width": 656,
+        "width": 580,
         "horizontalOverflow": 0,
         "spill": []
       }
@@ -862,7 +862,7 @@
       {
         "selector": ".ht-sidebar__body",
         "visible": true,
-        "width": 208,
+        "width": 284,
         "horizontalOverflow": 0,
         "spill": []
       },
@@ -884,7 +884,7 @@
       {
         "selector": ".ht-content",
         "visible": true,
-        "width": 756,
+        "width": 680,
         "horizontalOverflow": 0,
         "spill": []
       }
@@ -905,7 +905,7 @@
       {
         "selector": ".ht-sidebar__calendar-body",
         "visible": true,
-        "width": 208,
+        "width": 160,
         "horizontalOverflow": 0,
         "spill": []
       },
@@ -920,7 +920,7 @@
       {
         "selector": ".ht-content",
         "visible": true,
-        "width": 1136,
+        "width": 1184,
         "horizontalOverflow": 0,
         "spill": []
       }
@@ -941,7 +941,7 @@
       {
         "selector": ".ht-sidebar__calendar-body",
         "visible": true,
-        "width": 208,
+        "width": 384,
         "horizontalOverflow": 0,
         "spill": []
       },
@@ -956,7 +956,7 @@
       {
         "selector": ".ht-content",
         "visible": true,
-        "width": 1136,
+        "width": 960,
         "horizontalOverflow": 0,
         "spill": []
       }
@@ -977,7 +977,7 @@
       {
         "selector": ".ht-sidebar__calendar-body",
         "visible": true,
-        "width": 208,
+        "width": 284,
         "horizontalOverflow": 0,
         "spill": []
       },
@@ -992,7 +992,7 @@
       {
         "selector": ".ht-content",
         "visible": true,
-        "width": 1136,
+        "width": 1060,
         "horizontalOverflow": 0,
         "spill": []
       }

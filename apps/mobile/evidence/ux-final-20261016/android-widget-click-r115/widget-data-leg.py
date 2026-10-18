@@ -1223,6 +1223,31 @@ try:
         with open(f"{OUT}/lang.json", "w", encoding="utf-8") as fh:
             json.dump({"serial": SERIAL, "device": info, "log": log, **lang}, fh,
                       ensure_ascii=False, indent=2)
+    if "bind" in PHASES:
+        adb("input", "keyevent", "KEYCODE_HOME")
+        time.sleep(2)
+        size, cmps, _aw = bound_provider()
+        if any("TodayWidgetProvider" in c for c in cmps):
+            note(f"[绑卡] 桌面上已有 Today 实例，不重复绑：{bound_provider()}")
+        else:
+            ids = bind_one("今天的任务")
+            note(f"[绑卡] 新绑一枚 Today：fav 行={ids} 现在={bound_provider()}")
+    if "readcard" in PHASES:
+        # 只读：把桌面上落在组件矩形里的文字打出来 + 存一份 JSON。
+        # 用在"登录 → 造数据 → 退出登录"这类**跨趟**的读数之间，
+        # 每一档用 CARD_TAG 区分，免得后一档覆盖前一档（陷阱 #275 那一族）。
+        tag = os.environ.get("CARD_TAG", "now")
+        adb("input", "keyevent", "KEYCODE_HOME")
+        time.sleep(2)
+        texts = card_area_texts(f"card-{tag}")
+        size, cmps, aw_ids = bound_provider()
+        payload = {"serial": SERIAL, "device": info, "log": log, "tag": tag,
+                   "card_texts": texts, "card_cjk": has_cjk(texts),
+                   "bound": {"size": size, "providers": cmps, "appwidget_ids": aw_ids}}
+        with open(f"{OUT}/card-{tag}.json", "w", encoding="utf-8") as fh:
+            json.dump(payload, fh, ensure_ascii=False, indent=2)
+        note(f"[读卡 {tag}] 卡上文字={texts} 在场实例={size} {cmps}")
+        shot(f"card-{tag}.png")
     if "simult" in PHASES:
         adb("input", "keyevent", "KEYCODE_HOME")
         time.sleep(2)
