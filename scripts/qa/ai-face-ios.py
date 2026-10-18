@@ -160,6 +160,23 @@ class TracingProbe(Probe):
 ACTIVE: list[tuple] = []
 
 
+def require_appearance(udid: str, evidence_dir: str) -> str:
+    """#472 的第二半：`--evidence-dir` 末级目录名是 `light`/`dark` 时，
+    先拿设备的当前外观档比对，**不符就拒写**。
+    本线实测踩过 —— 暗档跑完没还原就重跑"亮档"，两趟失败读数都落进了 `light/`，
+    而 JSON 里那枚 `appearance` 一直诚实地写着 `dark`，只是没人拿它跟目录名比。
+    返回读到的档名，调用方可以直接存进读数里。"""
+    claimed = Path(evidence_dir).resolve().name
+    actual = subprocess.run(["xcrun", "simctl", "ui", udid, "appearance"],
+                            capture_output=True, text=True).stdout.strip()
+    if claimed in ("light", "dark") and actual != claimed:
+        raise SystemExit(
+            f"refusing to write: evidence dir says '{claimed}' but the device is '{actual}' "
+            f"(switch it with: xcrun simctl ui {udid} appearance {claimed}; "
+            f"after 'dark' a shutdown+boot is required — trap #471)")
+    return actual
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--udid", default="")
@@ -172,18 +189,8 @@ def main() -> int:
         # 落点必须按档分开目录，否则后一趟静默吃掉前一档证据（环境陷阱 #472）。
         raise SystemExit("both --udid and --evidence-dir are required (one directory per appearance mode)")
 
-    # 🔴 #472 的第二半：光分目录还不够，**目录名说的档要和设备现在的档对上**才让写。
-    # 本枚脚本实测踩过 —— 暗档跑完没还原就重跑"亮档"，两趟失败读数都落进了 `light/`，
-    # 而 JSON 里那枚 `appearance` 一直诚实地写着 `dark`，只是没人拿它跟目录名比。
-    claimed = Path(a.evidence_dir).resolve().name
-    if claimed in ("light", "dark"):
-        actual = subprocess.run(["xcrun", "simctl", "ui", a.udid, "appearance"],
-                                capture_output=True, text=True).stdout.strip()
-        if actual != claimed:
-            raise SystemExit(
-                f"refusing to write: evidence dir says '{claimed}' but the device is '{actual}' "
-                f"(switch it with: xcrun simctl ui {a.udid} appearance {claimed}; "
-                f"after 'dark' a shutdown+boot is required — trap #471)")
+    # 🔴 #472 的第二半：目录名说的档要和设备现在的档对上才让写（详见 `require_appearance`）。
+    appearance = require_appearance(a.udid, a.evidence_dir)
 
     probe = TracingProbe(argparse.Namespace(
         idb=a.idb, companion=a.companion, udid=a.udid, timeout=a.timeout, evidence_dir=a.evidence_dir))
@@ -269,8 +276,7 @@ def main() -> int:
     out = Path(a.evidence_dir) / "ai-face-journey.json"
     out.write_text(json.dumps({
         "startedAt": time.time(),
-        "appearance": subprocess.run(["xcrun", "simctl", "ui", a.udid, "appearance"],
-                                     capture_output=True, text=True).stdout.strip(),
+        "appearance": appearance,
         "steps": probe.steps,
     }, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps({"status": "passed", "steps": len(probe.steps), "evidence": str(out)},

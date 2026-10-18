@@ -55,7 +55,7 @@
     "check:egress-wording": "node scripts/mutate-egress-wording.mjs",
     "check:script-snapshot": "node scripts/check-script-snapshot.mjs",
     "check:ios-ax-shim": "python3 scripts/tools/ios-ax-shim.test.py",
-    "check:locator-labels": "python3 scripts/qa/check-locator-labels.py scripts/qa/profile-settings-android.py scripts/qa/profile-settings-ios.py scripts/qa/tasks-ux-android.py scripts/qa/tasks-ux-ios.py scripts/qa/ai-assistant-atomic-android.py scripts/qa/ai-face-ios.py",
+    "check:locator-labels": "python3 scripts/qa/check-locator-labels.py scripts/qa/profile-settings-android.py scripts/qa/profile-settings-ios.py scripts/qa/tasks-ux-android.py scripts/qa/tasks-ux-ios.py scripts/qa/ai-assistant-atomic-android.py scripts/qa/ai-face-ios.py scripts/qa/account-face-ios.py",
     "check:site-control-names": "python3 scripts/qa/check-site-control-names.py && python3 scripts/qa/check-site-control-names.py --self-test",
     "check:verify-script-copy": "node scripts/check-verify-script-copy.mjs",
     "check:mobile-ai-anchors": "node scripts/check-mobile-ai-anchors.mjs",
