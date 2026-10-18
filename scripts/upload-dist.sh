@@ -28,6 +28,13 @@ REGION="ap-guangzhou"
 #   账号 100050005585（`heyta-dist-1445543984`），再绑 `dl.waytofuture.cn` + 证书。
 #   ⇒ 实测：`http(s)://dl.waytofuture.cn/...apk` 回 **206**，默认域名仍 403。
 #   判据见 `pnpm verify:downloads-servable`（它真发 GET，不认 HEAD）。
+# ⚠️ **2026-10-18 的状态**：域名绑定与证书（CertId bf4wtvOI）都已就位，`http` 实测 206，
+#   而 **COS 侧的 TLS 还没下发**（`openssl s_client -servername dl.waytofuture.cn` 拿到的仍是
+#   COS 通配证书 ⇒ https 回 000）。跑之前先验一次：
+#     curl -s -o /dev/null -w '%{http_code}\n' -r 0-0 \
+#       http://dl.waytofuture.cn/app-releases/heyta/latest/heyta-1.0.1-test.20261008.4-android.apk
+#   ⚠️ 不要把 scheme 降成 http —— `releaseManifest()`（apps/landing/src/site/downloads.ts）
+#   在 url 不是 https 时**直接抛错**，落地页会整页炸（实测 15 项测试红）。
 BASE_URL="https://dl.waytofuture.cn"
 PREFIX="app-releases/heyta"
 STAGE="$(mktemp -d /tmp/heyta-dist.XXXXXX)"
