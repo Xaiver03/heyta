@@ -29,6 +29,25 @@
  *    它们**不碰网络、不读环境变量**，可以脱离 adapter 单独测。
  * 2. **adapter 层**（`createWechatBillingAdapter`）：把上面这些拼成
  *    `BillingAdapter` 的四个方法。
+ *
+ * ## 🔴 它的地位：ADR-0017 §4 明写「这份 adapter 还有用吗？」—— 今天的答案是
+ *
+ * **它仍然是唯一被验证过的微信路径，所以不许删。**
+ *
+ * 现量事实（2026-10-16，本条与判据一起复核）：
+ * 1. ADR-0017 §3.3 的结论是「复用同公司晓黎支付中心」，而**全仓没有一行支付中心
+ *    client 代码** —— `xiaoli-platform-core` / `paycenter` / `payment-center`
+ *    在 `server/src`、`packages/<pkg>/src`、`apps/<app>/src` 里**零命中**。
+ * 2. [`registry.ts`](./registry.ts) 是 fail-closed 的：没注册的 provider 解析不到
+ *    adapter、路由回 404、**不落 `PaymentEvent`**。今天注册的真实 provider
+ *    **只有 `wechat`**（另一个是自托管用的 `noop`）。
+ *
+ * ⇒ 本文件**没有**被弃用，也**没有**降级成"支付中心的下游"—— **那条路还没开始**。
+ *    这是 ADR-0017 §4 留下的**未决问题**，不是本文件的遗漏；在它被回答之前删掉
+ *    这个文件，会同时失去价格校验与履约的那条链（ADR-0017 §4 原文）。
+ *    ⚠️ 于是"通道形态"这件事今天的状态是：**文档说走支付中心，代码只有微信直连，
+ *    而支付中心那一侧尚未开工** —— 上线前必须由产品方在两条路里选一条，
+ *    见 `docs/plans/launch-blockers.md` 的通道形态那条。
  */
 import {
   createDecipheriv,
@@ -470,10 +489,16 @@ export interface WechatPrice {
 /**
  * 默认价目表 —— **由代码基线价目表投影出来，不是又一个字面量**。
  *
- * ✅ **已定价**（一次性年付 ¥99 = 9900 分）。价格结论见 ADR-0017 / ADR-0018，
+ * ✅ **已定价**：**按月两档** —— `hosted-monthly` ¥5/$5、
+ * `hosted-ai-monthly` ¥12/$12（差的是"含不含我们的云端 AI"）。
+ * 结论见 [ADR-0020](../../../docs/adr/0020-ai-subscription-two-tiers.md)；
  * 价格表见 `docs/reference/pricing-and-entitlements.md`。
  *
- * 🔴 **这里刻意没有 `totalFen: 9_900` 这样的字面量。** 在有这一版之前，
+ * 📌 **2026-10-16 更正一句过期陈述**：这里原先写「一次性年付 ¥99 = 9900 分」——
+ * 那是 ADR-0017/0018 的结论，**已被 ADR-0020 作废**（年付整个模型没了）。
+ * 真源是 `price-book.ts` 的 `DEFAULT_PRICE_BOOK`，而它写着 ¥5 / ¥12 月付。
+ *
+ * 🔴 **这里刻意没有任何 `totalFen: <字面量>`。** 在有这一版之前，
  * 同一个数字住在三个地方（这个文件、词条表、法务文本），靠
  * `scripts/check-pricing-consistency.mjs` 事后比对来维持一致；而门禁的比对
  * 本身也可能失效。现在**同一个数字只写一次**（`price-book.ts` 的

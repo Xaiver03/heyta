@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { STUB_ORIGIN, STUB_PORT } from '../ports';
 import { openApp, openSettingsView, stubLegalRecheck } from './helpers';
 
 /**
@@ -18,8 +19,8 @@ import { openApp, openSettingsView, stubLegalRecheck } from './helpers';
  * 真实微信商户不在本仓库、也不该在 CI 里被调用。
  */
 
-const SERVER = 'http://127.0.0.1:4319';
-const REALTIME_WS_GLOB = 'ws://127.0.0.1:4319/api/sync/ws*';
+const SERVER = STUB_ORIGIN;
+const REALTIME_WS_GLOB = `ws://127.0.0.1:${String(STUB_PORT)}/api/sync/ws*`;
 
 const ORDER_BODY = {
   orderId: 21,

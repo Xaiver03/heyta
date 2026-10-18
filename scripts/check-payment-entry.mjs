@@ -25,7 +25,10 @@
  * 于是"入口与渠道一起落地"不再是约定，而是**红的或绿的**。
  */
 
-import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { join, relative } from 'node:path';
 
 const ROOT = process.env.HEYTA_CHECK_ROOT ?? process.cwd();
@@ -161,13 +164,66 @@ const environmentSection = (compose) => {
 };
 
 // ── 生产渠道是否配置 ────────────────────────────────────────────────
+
+/**
+ * 把 compose 里 `- VAR=值` 右边那一段解析成**它实际传进去的值**。
+ *
+ * 🔴 这个函数是为一次实测事故写的（2026-10-16）。原判据是
+ * `/^\s*-\s*WECHAT_[A-Z_]+=\S/m` —— 只看"等号右边非空白"。而 compose 里那行是
+ *
+ *     - WECHAT_PAY_ENABLED=${WECHAT_PAY_ENABLED:-false}
+ *
+ * `${…:-false}` 非空白 ⇒ `channelConfigured` 变成 **true**。可那一行的语义**恰恰相反**：
+ * 没人设这个环境变量时它是 `false` ⇒ 线上**只有 noop**。于是这半条门禁
+ * （"没渠道就不许有付款入口"）**恒不生效** —— 而它守的正是"点了没反应的按钮"。
+ *
+ * ⚠️ 同一个文件上面还记着一次**同族**事故：`split(/^ {2}environment:/)` 假设了缩进，
+ * 让 `channelConfigured` **恒为 false**。两次都出在同一件事上：
+ * **这条判据到底在断言什么**（"有这一行" ≠ "线上真的有渠道"）。
+ */
+function resolvedValue(raw) {
+  const m = /^\$\{[A-Z_][A-Z0-9_]*(?::-([^}]*))?\}$/.exec(raw);
+  if (m === null) return raw; // 字面量：原样
+  return m[1] ?? ''; // `${VAR}` / `${VAR:-默认}` ⇒ 取默认；没有默认就是空串
+}
+
+/** 布尔型开关：只有真值才算"开"。`false`/空/`0` 都不算。 */
+const isEnabled = (value) => /^(1|true|yes|on)$/i.test(value.trim());
+
+const COMPOSE_ENV_LINE = /^\s*-\s*(WECHAT_[A-Z0-9_]+)=(.*)$/;
+
 let channelConfigured = false;
 if (!existsSync(COMPOSE)) {
   problems.push(`找不到 ${relative(ROOT, COMPOSE)} —— 无法判断支付渠道是否接通`);
 } else {
   const envSection = environmentSection(readFileSync(COMPOSE, 'utf8'));
-  // 只认"确实传了值"的行，避免把注释里提到 WECHAT 也算成"配了"。
-  channelConfigured = /^\s*-\s*WECHAT_[A-Z_]+=\S/m.test(envSection);
+  // 注释行不算（`environmentSection` 取的已经是 environment 段，但 `#` 开头的说明仍可能在里面）。
+  const assignments = envSection
+    .split('\n')
+    .filter((line) => !/^\s*#/.test(line))
+    .map((line) => COMPOSE_ENV_LINE.exec(line))
+    .filter((m) => m !== null)
+    .map((m) => ({ key: m[1], value: resolvedValue(m[2].trim()) }));
+
+  /**
+   * 🔴 **总闸管辖其余字段**，不是"任一字段有值就算通"。
+   *
+   * 第一版写成 `assignments.some(key === 'WECHAT_PAY_ENABLED' ? isEnabled : isPresent)` ——
+   * 于是 `WECHAT_PAY_ENABLED=${…:-false}` 配上 `WECHAT_MCH_ID=123` 又被判成"已配渠道"。
+   * **是自检的臂 D 在同一轮里当场把这条抓出来的**，不是靠人再看一遍。
+   * 服务端也是这个语义：`createBillingAdaptersFromConfig` 只在总闸开时才追加真通道。
+   */
+  const master = assignments.find(({ key }) => key === 'WECHAT_PAY_ENABLED');
+  channelConfigured = master !== undefined && isEnabled(master.value);
+  const others = assignments.filter(({ key }) => key !== 'WECHAT_PAY_ENABLED');
+
+  // 🔴 总闸为假时**不许**因为"别的 WECHAT_* 有值"就说渠道通了 —— 那正是 noop 的情形。
+  if (!channelConfigured && others.length > 0) {
+    problems.push(
+      '🔴 compose 里填了 WECHAT_* 的其他字段，但 `WECHAT_PAY_ENABLED` 解析出来是假（或没给默认值）。\n' +
+        '     总闸为假时线上仍然只有 noop 通道 —— 结账会返回 503，别把"填了商户号"当成"能收钱"。',
+    );
+  }
 }
 
 // ── 客户端里有哪些付款入口 ──────────────────────────────────────────
@@ -189,6 +245,83 @@ if (!channelConfigured) {
       '     不要让"能收钱但买不了"成为新的半截状态。',
   );
 }
+
+/* ── 自检：四臂各自必须能红，另有一条阳性对照 ─────────────────────────────
+ *
+ * 🔴 **这条门禁此前一条自检都没有** —— 而它已经以**同一种方式**坏过两次
+ * （缩进假设 ⇒ `channelConfigured` 恒 false；`${VAR:-false}` 被当成"传了值" ⇒ 恒 true）。
+ * 两次都不是"判据想法错了"，是"这条判据到底在断言什么"没被钉住。
+ * ⇒ 下面四臂钉的就是那一刻：**compose 里怎么写，才算"线上真的有渠道"**。
+ */
+const ARMS = [
+  ['A `${VAR:-false}` 不算配了渠道',
+    '      - WECHAT_PAY_ENABLED=${WECHAT_PAY_ENABLED:-false}\n', 'entry', 'seen'],
+  ['B `${VAR:-true}` 算配了渠道',
+    '      - WECHAT_PAY_ENABLED=${WECHAT_PAY_ENABLED:-true}\n', 'entry', 'ok'],
+  ['C 字面量 `=true` 算配了渠道',
+    '      - WECHAT_PAY_ENABLED=true\n', 'entry', 'ok'],
+  ['D 只填了别的 WECHAT_* 而总闸为假 ⇒ 额外报一条',
+    '      - WECHAT_PAY_ENABLED=${WECHAT_PAY_ENABLED:-false}\n      - WECHAT_MCH_ID=123\n',
+    'entry', 'gate-off'],
+];
+
+function fixtureRoot(envLines, withEntry) {
+  const dir = mkdtempSync(join(tmpdir(), 'heyta-pay-'));
+  mkdirSync(join(dir, 'server'), { recursive: true });
+  writeFileSync(join(dir, 'server/docker-compose.yml'),
+    `services:\n  app:\n    environment:\n${envLines}`);
+  for (const d of CLIENT_DIRS) mkdirSync(join(dir, d), { recursive: true });
+  if (withEntry) {
+    writeFileSync(join(dir, CLIENT_DIRS[0], 'x.ts'), 'await startCheckout({});\n');
+  }
+  return dir;
+}
+
+function runGate(root) {
+  const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url)], {
+    env: { ...process.env, HEYTA_CHECK_ROOT: root },
+    encoding: 'utf8',
+  });
+  return (r.stdout ?? '') + (r.stderr ?? '');
+}
+
+function selfTest() {
+  let failures = 0;
+  for (const [label, envLines, mode, expect] of ARMS) {
+    const dir = fixtureRoot(envLines, mode === 'entry');
+    let out;
+    try {
+      out = runGate(dir);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+    const red = out.includes('❌');
+    const hit =
+      expect === 'ok' ? !red
+      : expect === 'seen' ? red && out.includes('没配支付渠道，但客户端出现了付款入口')
+      : red && out.includes('WECHAT_PAY_ENABLED` 解析出来是假');
+    console.log(`${hit ? '✅' : '❌'} 臂 ${label}${hit ? '' : ` —— 实际输出：${out.trim().slice(0, 160)}`}`);
+    if (!hit) failures += 1;
+  }
+  // 阳性对照：总闸为假 + 客户端没有入口 ⇒ 一个字都不报
+  const clean = fixtureRoot('      - WECHAT_PAY_ENABLED=${WECHAT_PAY_ENABLED:-false}\n', false);
+  let cleanOut;
+  try {
+    cleanOut = runGate(clean);
+  } finally {
+    rmSync(clean, { recursive: true, force: true });
+  }
+  if (cleanOut.includes('❌')) {
+    console.log(`❌ 阳性对照失败：合法组合被报红\n${cleanOut.slice(0, 200)}`);
+    failures += 1;
+  } else {
+    console.log('✅ 阳性对照：总闸为假且无入口 ⇒ 零报红');
+  }
+  console.log(`\n臂数 ${ARMS.length}（由本脚本自己打印），失败 ${failures}`);
+  process.exit(failures === 0 ? 0 : 1);
+}
+
+if (process.argv.includes('--self-test')) selfTest();
 
 if (problems.length > 0) {
   console.error('❌ 付款入口与支付渠道不一致：\n');
