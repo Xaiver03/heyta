@@ -730,44 +730,11 @@
   outline-offset: var(--ht-space-1);
 }
 
-.ht-viewtab {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ht-space-1);
-  /* 44px 最小点击目标（UIX Pro 硬规则 2） */
-  min-height: var(--ht-touch-target-min);
-  padding: 0 var(--ht-space-3);
-  /* 🔴 与上面那段注释成对：不折行、不被压窄 */
-  white-space: nowrap;
-  flex: 0 0 auto;
-  cursor: pointer;
-  border: var(--ht-border-width-thin) solid transparent;
-  border-radius: var(--ht-radius-sm);
-  background: transparent;
-  color: var(--ht-color-foreground-muted);
-  font-family: var(--ht-font-sans);
-  font-size: var(--ht-font-size-xs);
-  font-weight: var(--ht-font-weight-medium);
-  transition:
-    background var(--ht-duration-fast) var(--ht-ease-standard),
-    color var(--ht-duration-fast) var(--ht-ease-standard);
-}
-
-.ht-viewtab:hover {
-  color: var(--ht-color-foreground);
-}
-
-.ht-viewtab--active {
-  background: var(--ht-color-surface);
-  color: var(--ht-color-primary);
-  border-color: var(--ht-color-border);
-}
-
-/* 焦点环必须可见 —— 抹掉它是最常见的可访问性回归 */
-.ht-viewtab:focus-visible {
-  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
-}
+/* 🔴 2026-10-16：`.ht-viewtab` / `--active` / `:hover` / `:focus-visible` 四条规则
+   已删 —— 全仓零消费者（`git grep ht-viewtab` 只剩调研文档；`check-hardcoded.mjs`
+   自己那行登记也写着"全仓当前零消费者（疑似 IA 重构遗留），迁移无 JSX 可配"）。
+   这一块的 tab 现在挂 `.ht-inbox__tab`（见本文件上面那一段），rail 的挂
+   `.ht-rail__tab`。它们留着只会让 `check:row-single-source` 的顶层 `ht-*` 族记账虚高。 */
 
 /* ⚠️ 这里**不要**再写 prefers-reduced-motion 覆盖。
    设计系统已在 tokens.css 的媒体查询里把所有 --ht-duration-* 压成 1ms，

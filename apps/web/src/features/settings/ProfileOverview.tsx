@@ -42,30 +42,30 @@ export function ProfileOverview({
   const signedIn = token !== undefined && token !== '';
 
   return (
-    <div className="ht-profile-overview" data-testid="profile-center">
-      <section className="ht-profile-overview__identity" aria-labelledby="profile-center-identity-title">
-        <div className="ht-profile-overview__avatar" aria-hidden="true">
+    <div className="ht-settings__profile" data-testid="profile-center">
+      <section className="ht-settings__profile-identity" aria-labelledby="profile-center-identity-title">
+        <div className="ht-settings__profile-avatar" aria-hidden="true">
           {identity.avatarDataUri === undefined
             ? identity.initial ?? <UserRoundPen size={ICON_SIZE.lg} />
             : <img src={identity.avatarDataUri} alt="" />}
         </div>
-        <div className="ht-profile-overview__identity-copy">
+        <div className="ht-settings__profile-identity-copy">
           <h2 className="ht-type-section-title" id="profile-center-identity-title">
             {identity.displayName ?? identity.email ?? t('web.profile.overview.local')}
           </h2>
           {identity.displayName && identity.email ? (
-            <p className="ht-profile-overview__note">{identity.email}</p>
+            <p className="ht-settings__profile-note">{identity.email}</p>
           ) : null}
-          <p className="ht-profile-overview__status">
+          <p className="ht-settings__profile-status">
             <LockKeyhole size={ICON_SIZE.xs} aria-hidden="true" />
             {signedIn ? t('web.profile.overview.signedIn') : t('web.profile.overview.local')}
           </p>
           {identity.status === 'loading' ? (
-            <p className="ht-profile-overview__note" role="status">
+            <p className="ht-settings__profile-note" role="status">
               {t('web.profile.overview.identityLoading')}
             </p>
           ) : identity.status === 'error' ? (
-            <div className="ht-profile-overview__note" role="status">
+            <div className="ht-settings__profile-note" role="status">
               <span>{t('web.profile.overview.identityUnavailable')}</span>{' '}
               <button
                 type="button"
@@ -77,11 +77,11 @@ export function ProfileOverview({
               </button>
             </div>
           ) : null}
-          <p className="ht-profile-overview__note">{t('web.profile.overview.localOnly')}</p>
+          <p className="ht-settings__profile-note">{t('web.profile.overview.localOnly')}</p>
           {identity.avatarState === 'needs-password' ? (
-            <p className="ht-profile-overview__note">{t('common.profile.avatar.needPassword')}</p>
+            <p className="ht-settings__profile-note">{t('common.profile.avatar.needPassword')}</p>
           ) : identity.avatarState === 'undecryptable' || identity.avatarState === 'unreadable' ? (
-            <p className="ht-profile-overview__note">{t('common.profile.avatar.unreadable')}</p>
+            <p className="ht-settings__profile-note">{t('common.profile.avatar.unreadable')}</p>
           ) : null}
         </div>
         {signedIn ? (
@@ -92,40 +92,40 @@ export function ProfileOverview({
         ) : null}
       </section>
 
-      <section className="ht-profile-overview__section" aria-labelledby="profile-center-recent-title">
-        <div className="ht-profile-overview__section-heading">
+      <section className="ht-settings__profile-section" aria-labelledby="profile-center-recent-title">
+        <div className="ht-settings__profile-section-heading">
           <h2 className="ht-type-section-title" id="profile-center-recent-title">
             {t('web.profile.overview.recent')}
           </h2>
         </div>
-        <div className="ht-profile-overview__stats">
-          <div className="ht-profile-overview__stat">
-            <span className="ht-profile-overview__value">{review.tasksCompleted}</span>
-            <span className="ht-profile-overview__label">{t('web.profile.overview.tasks')}</span>
+        <div className="ht-settings__profile-stats">
+          <div className="ht-settings__profile-stat">
+            <span className="ht-settings__profile-value">{review.tasksCompleted}</span>
+            <span className="ht-settings__profile-label">{t('web.profile.overview.tasks')}</span>
           </div>
-          <div className="ht-profile-overview__stat">
-            <span className="ht-profile-overview__value">{review.focusMinutes}</span>
-            <span className="ht-profile-overview__label">{t('web.profile.overview.focus')}</span>
+          <div className="ht-settings__profile-stat">
+            <span className="ht-settings__profile-value">{review.focusMinutes}</span>
+            <span className="ht-settings__profile-label">{t('web.profile.overview.focus')}</span>
           </div>
-          <div className="ht-profile-overview__stat">
-            <span className="ht-profile-overview__value">{review.checkIns}</span>
-            <span className="ht-profile-overview__label">{t('web.profile.overview.checkIns')}</span>
+          <div className="ht-settings__profile-stat">
+            <span className="ht-settings__profile-value">{review.checkIns}</span>
+            <span className="ht-settings__profile-label">{t('web.profile.overview.checkIns')}</span>
           </div>
         </div>
       </section>
 
       {growthEnabled ? (
-        <section className="ht-profile-overview__section" aria-labelledby="profile-center-achievements-title">
-          <div className="ht-profile-overview__section-heading">
+        <section className="ht-settings__profile-section" aria-labelledby="profile-center-achievements-title">
+          <div className="ht-settings__profile-section-heading">
             <div>
               <h2 className="ht-type-section-title" id="profile-center-achievements-title">
                 {t('web.profile.overview.achievements')}
               </h2>
-              <p className="ht-profile-overview__note">{t('web.profile.overview.achievementsHint')}</p>
+              <p className="ht-settings__profile-note">{t('web.profile.overview.achievementsHint')}</p>
             </div>
             <button
               type="button"
-              className="ht-btn ht-btn--ghost ht-profile-overview__achievement-action"
+              className="ht-btn ht-btn--ghost ht-settings__profile-achievement-action"
               data-testid="profile-center-growth"
               onClick={onOpenGrowth}
             >
@@ -133,12 +133,12 @@ export function ProfileOverview({
               {t('web.profile.overview.growth')}
             </button>
           </div>
-          <div className="ht-profile-overview__achievement" data-testid="profile-achievements">
-            <span className="ht-profile-overview__value">
+          <div className="ht-settings__profile-achievement" data-testid="profile-achievements">
+            <span className="ht-settings__profile-value">
               {reachedMilestones}/{milestones.length}
             </span>
-            <div className="ht-profile-overview__achievement-copy">
-              <span className="ht-profile-overview__label">
+            <div className="ht-settings__profile-achievement-copy">
+              <span className="ht-settings__profile-label">
                 {nextMilestone === undefined
                   ? labels.milestones.maxed
                   : labels.milestones.next({
@@ -147,7 +147,7 @@ export function ProfileOverview({
                       gap: Math.max(0, nextMilestone.threshold - nextMilestone.value),
                     })}
               </span>
-              <span className="ht-profile-overview__note">
+              <span className="ht-settings__profile-note">
                 {nextMilestone === undefined
                   ? t('web.profile.overview.achievements')
                   : labels.milestones.kindName(nextMilestone.kind)}
@@ -157,7 +157,7 @@ export function ProfileOverview({
         </section>
       ) : null}
 
-      <nav className="ht-profile-overview__actions" aria-label={t('web.profile.overview.title')}>
+      <nav className="ht-settings__profile-actions" aria-label={t('web.profile.overview.title')}>
         <button
           type="button"
           className="ht-btn ht-btn--ghost"

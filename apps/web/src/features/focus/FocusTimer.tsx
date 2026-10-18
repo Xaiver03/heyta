@@ -27,6 +27,7 @@ import {
   draftToFocusConfig,
   type FocusConfigDraft,
 } from '../../lib/focus-config.js';
+import { selection, useSelected } from '../../lib/selection.js';
 import { useFocusStore } from './store.js';
 
 /**
@@ -185,12 +186,26 @@ export function FocusTimer() {
   const focus = useFocusStore();
   const tasks = useTaskStore();
   const [now, setNow] = useState(() => Date.now());
-  // 关联任务是开始前的草稿选择。选择本身不应启动计时；只有点击共享面板的
-  // 开始按钮时，才把这份选择交给领域状态机。中止/完成后也保留它，方便用户
-  // 连续记录同一个任务。
-  const [selectedTaskId, setSelectedTaskId] = useState<string | undefined>(
-    () => focus.state.taskId,
-  );
+  /**
+   * 关联任务 = **共享选中里那一条任务**（`../../lib/selection.js`），
+   * 不是这个组件的第二份 `useState`。
+   *
+   * 🔴 这一行以前是 `const [selectedTaskId, setSelectedTaskId] = useState(…)`，
+   * 被 `check:selection-single-source` 的断言 B 点名（"宿主里不许再长出本地选中态"）。
+   * 它答的恰好就是那条判据最在意的那个问题 ——「选中的实体没了怎么办」：
+   * 被关联的那条任务在别处删掉之后，本地那份值还停在原来的 id 上，
+   * `<select>` 找不到对应项就把第一项（「不关联」）画出来，于是**界面说没关联、
+   * 按开始却仍把这一段记到那条已经不存在的任务上**。共享选中由
+   * `pruneSelectionFromEntities` 在实体消失时清掉 —— 这份回落只有一处。
+   *
+   * 🔴 中途不换：计时进行中下拉是灰的，而且显示的是**这一轮的归属**
+   * （领域状态里的 `taskId`，`start()` 那一刻就冻结了）。跟着共享选中走会让
+   * "跑着的这一段记在谁头上"在界面上变脸，而落盘读的始终是领域状态。
+   *
+   * 选择本身不启动计时（与 mobile 的"选中即开始"不同）：只有点共享面板的开始
+   * 按钮时才把这份值交给领域状态机。
+   */
+  const selectedTaskId = useSelected('task');
 
   // 本地重绘节拍。**不参与计时计算** —— 剩余量永远由领域层重算。
   useEffect(() => {
@@ -266,7 +281,7 @@ export function FocusTimer() {
             : { error: t(saveFailedKey, { reason: focus.error.reason }) }),
         }}
         onStart={() => {
-          focus.start(selectedTaskId);
+          focus.start(selectedTaskId ?? undefined);
           setNow(Date.now());
         }}
         onPause={focus.pause}
@@ -289,10 +304,17 @@ export function FocusTimer() {
         >
           {t('web.focus.task.label')}
           <select
-            value={selectedTaskId ?? ''}
+            /* idle 时显示"下一轮要关联哪条"（共享选中）；跑起来之后显示**这一轮的**
+               归属（领域状态），那一轮开始时就冻结了。 */
+            value={(focus.state.phase === 'idle' ? selectedTaskId : focus.state.taskId) ?? ''}
             disabled={focus.state.phase !== 'idle'}
             onChange={(e) => {
-              setSelectedTaskId(e.target.value === '' ? undefined : e.target.value);
+              const next = e.target.value === '' ? null : e.target.value;
+              selection.select('task', next);
+              /* 「不关联」必须真的解除：领域层的 `start()` 是 `taskId ?? state.taskId`
+                 （保留上一轮的归属），只传 undefined 清不掉它 —— 不在这里调
+                 `clearLinkedTask()`，下拉说"没关联"而落盘仍记在旧任务上，就是界面在说谎。 */
+              if (next === null) focus.clearLinkedTask();
             }}
             style={{
               minHeight: cssVar('touch-target.min'),

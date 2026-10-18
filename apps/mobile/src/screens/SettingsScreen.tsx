@@ -25,19 +25,22 @@
  * 而 Modal 里没有标签栏）；头部骨架照 `TaskDetailSheet` 的手写先例。
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Linking,
   Modal,
   Platform,
   ScrollView,
+  StyleSheet,
   View,
   useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { HeytaNativeTokens } from '@heyta/design-system';
 import { LOCALES, useI18n } from '@heyta/i18n';
-import { OPERATOR } from '@heyta/legal';
+import { isOfficialHostedInstance } from '@heyta/app-host';
+import { OPERATOR, operatorFilingLine } from '@heyta/legal';
 import {
   SettingsSection,
   resolveSettingAvailability,
@@ -60,7 +63,7 @@ import { useLocalePreference } from '../i18n/locale-preference';
 import { useTokens } from '../theme';
 import { useMobileNavigation } from '../nav/navigation';
 import type { SyncCredentialForm } from '../sync/credential-form';
-import { DEFAULT_SERVER_URL } from '../sync/config';
+import { DEFAULT_SERVER_URL, readSyncConfig } from '../sync/config';
 import { VaultSettingsSection } from './VaultSettingsSection';
 import { AiSettingsSection } from '../ai/AiSettingsSection';
 import {
@@ -88,6 +91,47 @@ import {
  * ⚠️ **在模块级算一次**，不在渲染里算：`Platform.OS` 在一次进程生命周期内不会变。
  */
 const WIDGET_ADD_STEPS = widgetAddSteps(resolveWidgetPlatform(Platform.OS));
+
+/**
+ * 面板样式：模块级工厂 + `useMemo`（与 `PrivacyConsentSheet` /
+ * `AccountClosureScreen` / `packages/ui/src/settings/Settings.tsx` 同一惯用法）。
+ *
+ * 🔴 L4 视图（`apps/mobile/src/screens`）内联样式**只减不增**
+ * （`scripts/check-l4-no-style.mjs` 断言 C）。下面这些原本是 `style={{…}}`：
+ * 对象每次渲染都新建，而且不被 `StyleSheet` 的 ID 引用路径优化 —— 搬进这里
+ * 顺手把"只减不增"的账还上。取值一律经 tokens 表，**不写裸数字/裸色**
+ * （`check:design` 与 `check:l4` 的断言 A/B 双盯）。
+ *
+ * ⚠️ 带运行时输入（`insets.top` 之类）的那几处**不搬**：它们在调用点用
+ * `style={[styles.x, {…}]}` 合并 —— 数组形态不会被断言 C 的
+ * `style={{…}}` 字面形态计数，那也是本门禁刻意收窄的口径。
+ */
+function makeStyles(tokens: HeytaNativeTokens) {
+  return StyleSheet.create({
+    /** 弹层根：铺满 + 主题底色。`paddingTop` 来自安全区，留在调用点。 */
+    sheetRoot: {
+      flex: 1,
+      backgroundColor: tokens['color.background'],
+    },
+    /** 弹层自己的页头（`Screen`/`AppBar` 是给整页的，Modal 里没有标签栏）。 */
+    appBar: {
+      height: tokens['nav.app-bar-height'],
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: tokens['screen.gutter'],
+      gap: tokens['space.2'],
+      backgroundColor: tokens['color.surface'],
+    },
+    flex1: { flex: 1 },
+    gap4: { gap: tokens['space.4'] },
+    /** 语言胶囊一行：换行铺满。 */
+    chipRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: tokens['space.3'],
+    },
+  });
+}
 
 /** 一级目录的稳定语义 key。父屏可以用它把“从哪一组进入”传回设置面。 */
 export type SettingsSectionKey = 'profile' | 'general' | 'sync' | 'ai' | 'data' | 'security';
@@ -143,6 +187,7 @@ export function SettingsScreen({
 }): React.JSX.Element {
   const { t } = useI18n();
   const tokens = useTokens();
+  const styles = useMemo(() => makeStyles(tokens), [tokens]);
   const insets = useSafeAreaInsets();
   const { locale, setLocale } = useLocalePreference();
   const navigation = useMobileNavigation();
@@ -464,7 +509,7 @@ export function SettingsScreen({
       <SectionHeader icon="action.sync" title={t('mobile.profile.section.sync')} />
       <Card>
         {advancedSync ? (
-          <View ref={syncFormRef} style={{ gap: tokens['space.4'] }}>
+          <View ref={syncFormRef} style={styles.gap4}>
             <Stack>
               <Text variant="row-title">{t('mobile.profile.sync.advancedTitle')}</Text>
               <Text variant="caption" tone="subtle">
@@ -577,7 +622,7 @@ export function SettingsScreen({
         note={t('mobile.profile.language.hint')}
         leading={<Icon name="action.settings" size="sm" color={tokens['color.foreground-muted']} />}
       >
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens['space.3'] }}>
+        <View style={styles.chipRow}>
           {LOCALES.map((code) => (
             <Chip
               key={code}
@@ -610,6 +655,28 @@ export function SettingsScreen({
                     testID: 'settings-feedback-failed',
                     text: t('mobile.settings.feedback.failed', { email: OPERATOR.contactEmail }),
                     tone: 'warning' as const,
+                  },
+                ]
+              : []),
+            /*
+              运营者与备案号。
+
+              🔴 **它是隐私政策里一句承诺在移动端的兑现**：政策写着
+              「App 备案号**以应用内「关于」页与服务端对外页公布者为准**」——
+              而移动端才是要提审的那个壳，应用商店会看这一行。
+              2026-10-16 查实：在那之前 `OPERATOR.appFilingNumber` **UI 侧零消费者**，
+              核准那天光填字段，它不会出现在任何地方。
+
+              ⚠️ 文本由 `@heyta/legal` 的 `operatorFilingLine` 生成，**与 web 的「关于」页同一份实现**
+              —— 各写一遍的话，最可能漂移的恰恰是"未核准"那个空值分支，
+              而它正是法务管着的地方（不印任何号码、也不放占位）。
+            */
+            ...(isOfficialHostedInstance(readSyncConfig()?.serverUrl ?? '')
+              ? [
+                  {
+                    kind: 'note' as const,
+                    testID: 'settings-operator',
+                    text: operatorFilingLine(OPERATOR),
                   },
                 ]
               : []),
@@ -711,21 +778,10 @@ export function SettingsScreen({
       testID="settings-sheet"
     >
       <View
-        style={{
-          flex: 1,
-          backgroundColor: tokens['color.background'],
-          paddingTop: insets.top,
-        }}
+        style={[styles.sheetRoot, { paddingTop: insets.top }]}
       >
         <View
-          style={{
-            height: tokens['nav.app-bar-height'],
-            flexDirection: 'row',
-            alignItems: 'center',
-            paddingHorizontal: tokens['screen.gutter'],
-            gap: tokens['space.2'],
-            backgroundColor: tokens['color.surface'],
-          }}
+          style={styles.appBar}
         >
           <IconButton
             icon={section === undefined ? 'action.close' : 'action.back'}
@@ -733,7 +789,7 @@ export function SettingsScreen({
             color={tokens['color.foreground-muted']}
             onPress={handleRequestClose}
           />
-          <View style={{ flex: 1 }}>
+          <View style={styles.flex1}>
             <Text variant="headline" numberOfLines={1}>
               {section === undefined ? t('mobile.settings.title') : sectionLabels[section]}
             </Text>
@@ -743,11 +799,11 @@ export function SettingsScreen({
           )}
         </View>
 
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex1}>
           <ScrollView
             ref={sheetScrollRef}
             key={section ?? 'directory'}
-            style={{ flex: 1 }}
+            style={styles.flex1}
             keyboardShouldPersistTaps="handled"
             onScroll={(event) => {
               sheetOffsetRef.current = event.nativeEvent.contentOffset.y;

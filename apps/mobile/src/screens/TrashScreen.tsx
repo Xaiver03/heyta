@@ -35,7 +35,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Modal, View } from 'react-native';
+import { Modal, StyleSheet, View } from 'react-native';
 
 import {
   createHabitActions,
@@ -54,6 +54,7 @@ import {
   type TrashItem,
   type TrashKind,
 } from '@heyta/domain';
+import type { HeytaNativeTokens } from '@heyta/design-system';
 import { useI18n } from '@heyta/i18n';
 import {
   directChildCountsByProject,
@@ -76,6 +77,43 @@ import { useMobileSync } from '../sync/store';
 import { useTheme, useTokens } from '../theme';
 import { Button, Screen, Text } from '../ui/kit';
 import { Icon } from '../ui/icons';
+
+/**
+ * 确认对话框的样式：模块级工厂 + `useMemo`（与 `PrivacyConsentSheet` /
+ * `AccountClosureScreen` 同一惯用法）。
+ *
+ * 🔴 L4 视图（`apps/mobile/src/screens`）的内联样式**只减不增**
+ * （`scripts/check-l4-no-style.mjs` 断言 C）。原先这几处是 `style={{…}}`：
+ * 对象每次渲染都新建，也进不了 `StyleSheet` 的 ID 引用路径。取值一律经
+ * tokens 表，不写裸值（`check:design` / `check:l4` 双盯）。
+ * ⚠️ `shadow` 是 `useTheme().native.shadow(...)` 的运行时结果，所以卡片那一处
+ * 仍是 `style={[styles.dialog, shadow ?? undefined]}` —— 数组形态不被断言 C 计数。
+ */
+function makeConfirmStyles(tokens: HeytaNativeTokens) {
+  return StyleSheet.create({
+    scrim: {
+      flex: 1,
+      justifyContent: 'center',
+      padding: tokens['screen.gutter'],
+      backgroundColor: tokens['color.overlay'],
+    },
+    dialog: {
+      gap: tokens['space.4'],
+      padding: tokens['space.5'],
+      borderRadius: tokens['radius.lg'],
+      backgroundColor: tokens['color.surface-raised'],
+    },
+    headRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: tokens['space.2'],
+    },
+    headText: { flex: 1, minWidth: 0, gap: tokens['space.2'] },
+    actionsRow: { flexDirection: 'row', gap: tokens['space.3'] },
+    /** 取消与确认等宽（与 `AccountClosureScreen` 的 `dialogAction` 同一裁决）。 */
+    flex1: { flex: 1 },
+  });
+}
 
 export function TrashScreen({ onBack }: { onBack: () => void }): React.JSX.Element {
   const { t } = useI18n();
@@ -325,33 +363,21 @@ function ConfirmPurge({
   onConfirm: () => void;
 }): React.JSX.Element {
   const tokens = useTokens();
+  const styles = useMemo(() => makeConfirmStyles(tokens), [tokens]);
   const { native } = useTheme();
   const shadow = native.shadow('shadow.lg');
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onCancel} accessibilityViewIsModal>
       <View
-        style={{
-          flex: 1,
-          justifyContent: 'center',
-          padding: tokens['screen.gutter'],
-          backgroundColor: tokens['color.overlay'],
-        }}
+        style={styles.scrim}
       >
         <View
-          style={[
-            {
-              gap: tokens['space.4'],
-              padding: tokens['space.5'],
-              borderRadius: tokens['radius.lg'],
-              backgroundColor: tokens['color.surface-raised'],
-            },
-            shadow ?? undefined,
-          ]}
+          style={[styles.dialog, shadow ?? undefined]}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: tokens['space.2'] }}>
+          <View style={styles.headRow}>
             <Icon name="conflict.warning" size="md" color={tokens['color.warning-strong']} />
-            <View style={{ flex: 1, minWidth: 0, gap: tokens['space.2'] }}>
+            <View style={styles.headText}>
               <Text variant="section-title">{copy.title}</Text>
               <Text variant="caption" tone="muted">
                 {copy.body}
@@ -383,14 +409,14 @@ function ConfirmPurge({
             </View>
           </View>
 
-          <View style={{ flexDirection: 'row', gap: tokens['space.3'] }}>
-            <Button label={copy.cancel} tone="secondary" onPress={onCancel} style={{ flex: 1 }} />
+          <View style={styles.actionsRow}>
+            <Button label={copy.cancel} tone="secondary" onPress={onCancel} style={styles.flex1} />
             <Button
               label={copy.submit}
               tone="danger"
               disabled={busy}
               onPress={onConfirm}
-              style={{ flex: 1 }}
+              style={styles.flex1}
             />
           </View>
         </View>

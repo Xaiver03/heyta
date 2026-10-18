@@ -14,6 +14,7 @@ import {
 } from '@heyta/app-host';
 import type { AiRoutingConfig, EgressConsent, SecretStore } from '@heyta/ai';
 import { useI18n, type MessageKey } from '@heyta/i18n';
+import { EmptyState, HeytaUiProvider } from '@heyta/ui';
 import { useSyncStore } from '../sync/store.js';
 import { consentFetch } from '../privacy/consent-gate.js';
 import { ensureWebInboundRecipientKey, hasWebInboundWorker, processWebInboundOnce, registerWebInboundWorker, rotateWebInboundRecipientKey, webInboundDraftReviewer } from './inbound-runtime.js';
@@ -433,14 +434,46 @@ export function InboundAutomationSettings({ active = true, routing, consents, se
                 </> : null}
               </div>
             </article>)}
-            {!loading && rules.length === 0 ? <p className="ht-settings__hint">{t('web.ai.inbound.empty')}</p> : null}
+            {/*
+              规则列表为空。🔴 空态走**共享那一个实现**（`packages/ui` 的
+              `EmptyState`，`scripts/check-empty-state.mjs` 的断言 B/C 指着它），
+              不在视图里手写骨架或直接渲染空态词条 —— 文案仍旧由本宿主从
+              `@heyta/i18n` 取（共享层不许 import i18n，会拖进第二份 React）。
+              `size="line"`：这是设置面板里的一行占位（原来就是
+              `ht-settings__hint` 的单行），不是页面级空态 —— 页面档会在这里
+              撑出一大块居中的空白（`empty-state/model.ts` 的档位说明）。
+              `HeytaUiProvider` 就地包一层：共享组件从 context 取 token，
+              缺了会**运行时抛错**（`App.tsx` 里虽然已经有一层，但本面板
+              的单测是直接渲染的，不经过 `App`）。
+              ⚠️ 这一处原本就**没有** `data-testid`（e2e 与单测都没有按它定位），
+              所以没有可转交给 `testID` 的定位钩子；刻意也不新造一个 ——
+              断言 B 用 `*empty*` 的 testid 字面形态识别手写站点。
+            */}
+            {!loading && rules.length === 0 ? (
+              <HeytaUiProvider>
+                <EmptyState title={t('web.ai.inbound.empty')} size="line" />
+              </HeytaUiProvider>
+            ) : null}
             {editingRuleId !== undefined ? <div className="ht-settings__actions">
               <button type="button" className="ht-btn ht-btn--ghost" disabled={busy !== undefined} onClick={() => setEditingRuleId(undefined)}>{t('web.ai.inbound.cancelEdit')}</button>
             </div> : null}
             {processState === 'idle' ? null : <p className="ht-settings__hint" role="status" data-inbound-cycle-state={processState}>{processCopyKey === undefined ? null : t(processCopyKey)}</p>}
             <div className="ht-inbound__events">
               <h4 className="ht-settings__h3 ht-type-group-label">{t('web.ai.inbound.events.title')}</h4>
-              {events.length === 0 ? <p className="ht-settings__hint">{t('web.ai.inbound.events.empty')}</p> : null}
+              {/*
+                接收记录为空。同上：共享 `EmptyState`，文案由宿主注入。
+                这里 `size="line"` 更是量出来的形状 —— 它住在
+                「接收记录」这个 `ht-type-group-label` 分组标签**下面**，
+                `empty-state/model.ts` 对 `line` 档的定义逐字就是
+                "分组标签下面那一行辅助文字"（`section` 档的 `row-title` +
+                foreground 会盖过分组标签，层级倒置）。
+                ⚠️ 同样没有原有的 `data-testid` 可转交。
+              */}
+              {events.length === 0 ? (
+                <HeytaUiProvider>
+                  <EmptyState title={t('web.ai.inbound.events.empty')} size="line" />
+                </HeytaUiProvider>
+              ) : null}
               {events.map((event) => {
                 const status = ['queued', 'leased', 'prepared', 'completed', 'needs-confirmation', 'expired', 'cancelled'].includes(event.status) ? event.status : 'waiting';
                 const canRetry = event.status === 'needs-confirmation' && event.reasonCode === 'model-result-uncertain';

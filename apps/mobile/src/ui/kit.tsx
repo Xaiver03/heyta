@@ -1071,6 +1071,7 @@ export function Chip({
   icon,
   color,
   tone = 'filled',
+  testID,
 }: {
   label: string;
   selected?: boolean;
@@ -1078,6 +1079,14 @@ export function Chip({
   icon?: IconName;
   color?: string;
   tone?: 'filled' | 'quiet';
+  /**
+   * 定位钩子。🔴 它必须**透到 Pressable 那一层**，不能留在包装节点上：
+   * 真机载体是按无障碍节点找 id 的（iOS 走 `AXUniqueId`），挂在非可点的那一层
+   * 会得到"元素在树里、按下去什么都不发生"。`verify-mobile-ios-ai.sh:185` 早就
+   * 按这条通道写了 `ai-route-<功能>-<下标>`，而本组件当时**根本没有这个 prop**
+   * （2026-10-16 现量：载体注释承诺的通道与实现不一致）—— 补的是实现，不是注释。
+   */
+  testID?: string;
 }): React.JSX.Element {
   const t = useTokens();
 
@@ -1085,6 +1094,7 @@ export function Chip({
 
   return (
     <Pressable
+      testID={testID}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected }}

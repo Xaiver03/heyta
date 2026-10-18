@@ -42,11 +42,12 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { Note, Task } from '@heyta/domain';
 import { searchNotes, searchTasks } from '@heyta/domain';
+import type { HeytaNativeTokens } from '@heyta/design-system';
 import { useI18n } from '@heyta/i18n';
 import { createNoteActions, type AppHost, type NoteActions } from '@heyta/app-host';
 import { SearchPanel, type SearchPanelLabels } from '@heyta/ui';
@@ -57,6 +58,43 @@ import { pruneSelectionAgainst } from '../lib/selection';
 import { useMobileSync } from '../sync/store';
 import { useTheme, useTokens } from '../theme';
 import { Button, Text } from '../ui/kit';
+
+/**
+ * 本屏样式：模块级工厂 + `useMemo`（与 `PrivacyConsentSheet` /
+ * `AccountClosureScreen` 同一惯用法）。
+ *
+ * 🔴 L4 视图（`apps/mobile/src/screens`）的内联样式**只减不增**
+ * （`scripts/check-l4-no-style.mjs` 断言 C）。原先这几处是 `style={{…}}`：
+ * 对象每次渲染都新建，也进不了 `StyleSheet` 的 ID 引用路径。取值一律经
+ * tokens 表，不写裸值（`check:design` / `check:l4` 双盯）。
+ * ⚠️ 安全区那两条（`insets.top` / `insets.bottom`）是**运行时输入**，不搬 ——
+ * 它们在调用点用 `style={[styles.overlay, {…}]}` 合并。
+ */
+function makeStyles(tokens: HeytaNativeTokens) {
+  return StyleSheet.create({
+    /** 遮罩：铺满、只做"点空白处关掉"。 */
+    scrim: {
+      flex: 1,
+      backgroundColor: tokens['material.scrim'],
+    },
+    /** 结果层：绝对定位铺满 + 屏幕排水沟。上下留白由安全区在调用点补。 */
+    overlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      paddingHorizontal: tokens['screen.gutter'],
+    },
+    errorText: { paddingBottom: tokens['space.2'] },
+    /** 出口行：靠右，不占满宽。 */
+    actions: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      paddingTop: tokens['space.2'],
+    },
+  });
+}
 
 export interface SearchScreenProps {
   visible: boolean;
@@ -85,6 +123,7 @@ export function SearchScreen({
 }: SearchScreenProps): React.JSX.Element {
   const t = useI18n().t;
   const tokens = useTokens();
+  const styles = useMemo(() => makeStyles(tokens), [tokens]);
   const { reducedMotion } = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -159,27 +198,24 @@ export function SearchScreen({
        * 两个控件共用一个可访问名，念两遍，做的却是同一件事。
        */}
       <Pressable
-        style={{ flex: 1, backgroundColor: tokens['material.scrim'] }}
+        style={styles.scrim}
         onPress={close}
         accessible={false}
         importantForAccessibility="no"
         accessibilityElementsHidden
       />
       <View
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          paddingTop: insets.top + tokens['space.3'],
-          paddingBottom: insets.bottom + tokens['space.3'],
-          paddingHorizontal: tokens['screen.gutter'],
-        }}
+        style={[
+          styles.overlay,
+          {
+            paddingTop: insets.top + tokens['space.3'],
+            paddingBottom: insets.bottom + tokens['space.3'],
+          },
+        ]}
         pointerEvents="box-none"
       >
         {error !== null ? (
-          <Text variant="row-meta" tone="danger" selectable style={{ paddingBottom: tokens['space.2'] }}>
+          <Text variant="row-meta" tone="danger" selectable style={styles.errorText}>
             {error}
           </Text>
         ) : null}
@@ -208,11 +244,7 @@ export function SearchScreen({
          * 而这一层唯一可取消的事就是这次搜索。
          */}
         <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'flex-end',
-            paddingTop: tokens['space.2'],
-          }}
+          style={styles.actions}
         >
           <Button
             tone="ghost"

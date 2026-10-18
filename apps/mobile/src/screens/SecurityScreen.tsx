@@ -60,7 +60,8 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
+import type { HeytaNativeTokens } from '@heyta/design-system';
 import { formatCompactDate } from '@heyta/domain';
 import { useI18n, type MessageKey } from '@heyta/i18n';
 import { EmptyState, authFailureMessage, SettingsRow } from '@heyta/ui';
@@ -82,6 +83,26 @@ import { Button, Card, Chip, Divider, HStack, Screen, Stack, Text, TextField } f
 import { describePasskeyError, resolvePasskeyProvider } from '../auth/passkey-host';
 import { SessionsSection } from './SessionsSection';
 import { useTokens } from '../theme';
+
+/**
+ * 通行密钥行那枚卡片的样式：模块级工厂 + `useMemo`（与 `PrivacyConsentSheet` /
+ * `AccountClosureScreen` 同一惯用法）。
+ *
+ * 🔴 L4 视图（`apps/mobile/src/screens`）的内联样式**只减不增**
+ * （`scripts/check-l4-no-style.mjs` 断言 C）。原先它是 `style={{…}}`：
+ * 对象每次渲染、每一行都新建一遍（这里在 `.map()` 里，代价 ×N），也进不了
+ * `StyleSheet` 的 ID 引用路径。取值一律经 tokens 表，不写裸值。
+ */
+function makeStyles(tokens: HeytaNativeTokens) {
+  return StyleSheet.create({
+    passkeyRow: {
+      gap: tokens['space.2'],
+      backgroundColor: tokens['color.surface-sunken'],
+      borderRadius: tokens['radius.md'],
+      padding: tokens['space.3'],
+    },
+  });
+}
 
 interface FailureMessage {
   readonly key: MessageKey;
@@ -124,6 +145,7 @@ export function SecurityScreen({
 }): React.JSX.Element {
   const { t, locale } = useI18n();
   const tokens = useTokens();
+  const styles = useMemo(() => makeStyles(tokens), [tokens]);
 
   // 🔴 `useMemo` 不是优化，是**正确性**：这个对象进了下面每一个 `useCallback` 的
   // 依赖表，每次渲染都新建的话 `loadPasskeys` 就每渲染变一次，而那个 effect
@@ -530,12 +552,7 @@ export function SecurityScreen({
                 return (
                   <View
                     key={passkey.id}
-                    style={{
-                      gap: tokens['space.2'],
-                      backgroundColor: tokens['color.surface-sunken'],
-                      borderRadius: tokens['radius.md'],
-                      padding: tokens['space.3'],
-                    }}
+                    style={styles.passkeyRow}
                   >
                     <HStack align="center">
                       <Text variant="row-meta" tone="default" grow={true}>

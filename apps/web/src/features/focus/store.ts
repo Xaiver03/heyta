@@ -39,6 +39,7 @@ import {
   DEFAULT_FOCUS_CONFIG,
   abort as abortFn,
   advance,
+  clearTask,
   initialFocusState,
   isFinished,
   pause as pauseFn,
@@ -99,6 +100,17 @@ interface FocusStoreState {
   error?: { code?: FocusLogFailureCode; reason: string };
 
   start: (taskId?: string) => void;
+  /**
+   * 解除关联任务（`FocusTimer` 下拉里的「不关联」）。
+   *
+   * 🔴 为什么不能靠 `start(undefined)` 代替：领域层的 `start()` 写的是
+   * `taskId: taskId ?? state.taskId` —— 那是**刻意的**（不传就保留上一轮的归属，
+   * 用户连续记录同一个任务时不必每次重选）。所以"解除"必须走领域层那条
+   * 专用函数 `clearTask()`，否则下拉说"没关联"、落盘仍记在旧任务上。
+   * 与移动端 `apps/mobile/src/lib/focus-timer.ts` 的 `clearFocusTask()` 同一件事。
+   * 规则（**只在 idle 时生效**）在 `@heyta/domain`，这里不重答一遍。
+   */
+  clearLinkedTask: () => void;
   pause: () => void;
   resume: () => void;
   /** 中止并落盘（记为未自然完成）。 */
@@ -172,6 +184,14 @@ export const useFocusStore = create<FocusStoreState>((set, get) => ({
       tick: get().tick + 1,
     });
     ensureTicking(get, set);
+  },
+
+  clearLinkedTask: () => {
+    // 只在 idle 时生效由领域层的 `clearTask()` 判（进行中的那一轮归属已经定了）。
+    // 值没变时不 `set` —— 免得为一个空操作白白重渲染一次。
+    const next = clearTask(get().state);
+    if (next === get().state) return;
+    set({ state: next, tick: get().tick + 1 });
   },
 
   pause: () => {

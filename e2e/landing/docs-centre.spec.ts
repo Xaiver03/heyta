@@ -81,9 +81,16 @@ const NEW_ARTICLE_IDS = [
 /** 有文章、因此有分类页的五个模块（与 `content.ts` 的 `HELP_MODULES` 同序）。 */
 const CATEGORY_IDS = ['start', 'sync', 'organize', 'data', 'trust'];
 
-/** 帮助中心此刻应有的分类与速答条数（`content.ts` 的 `HELP_MODULES`）。 */
+/**
+ * 帮助中心此刻应有的分类与速答条数（`content.ts` 的 `HELP_MODULES`）。
+ *
+ * ⚠️ `FAQ_COUNT` 是**独立重述**的旧值，`2026-10-16` 按产品侧现量改成 12：
+ * 「换绑邮箱 / 登录设备」两条速答是**有意**加进来的（`d49f77e3`，依据
+ * `docs/plans/account-standard-suite.md` §W7 第 8 行"速答与深读同一份分类词表，
+ * 不能只加一处"，内容点数见该计划 §6.78），`HELP_MODULES` 因此从 10 对变 12 对。
+ */
 const MODULE_COUNT = 5;
-const FAQ_COUNT = 10;
+const FAQ_COUNT = 12;
 
 type Hit = { kind: string; text: string };
 
@@ -119,7 +126,7 @@ function articleIdOf(href: string): string {
   return segments[segments.length - 1] ?? '';
 }
 
-test('帮助中心是两层的共同入口：五个分类、十条速答、文章卡片', async ({ page }) => {
+test('帮助中心是两层的共同入口：五个分类、十二条速答、文章卡片', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   const hits = watchConsole(page);
 
@@ -844,7 +851,7 @@ test('五个分类页都真的可达：卡片恰好是这一组的文章，侧�
  * 文档中心此刻应有的五张配图：**`图 <文章注册序>-<该篇第几张>` + 文件名 + 挂在哪个分区**。
  *
  * 🔴 这张表与 `ARTICLE_IDS` 同理，是**独立重述**的：图号由 `docs.ts` 的 `docsFiguresOf()`
- * 从 `pages.ts` 的注册表顺序现算（`first-run` 是第 14 个页面 ⇒ `图 14-1`），
+ * 从 `pages.ts` 的注册表顺序现算（`first-run` 是第 15 个页面 ⇒ `图 15-1`），
  * 测试里再 import 一遍就成了自我印证。加一篇没配图的文章、或把某篇在注册表里挪个位置，
  * 这张表必须跟着改 —— 而浏览器里那行字面必须对上，对不上就红。
  *
@@ -852,6 +859,13 @@ test('五个分类页都真的可达：卡片恰好是这一组的文章，侧�
  *    于是每一篇文章的注册序整体 +1，`first-run` 从 `图 14-1` 变 `图 15-1`。
  *    这一批编号因此**按新顺序重述**，而不是把注册表挪回去 —— 规则本身没改：
  *    图号仍然由注册表顺序现算，挪动任何一页仍然会让这一条红。
+ *
+ * 🔴 **2026-10-16 同一张表的第二次重述，形状不同**：`8bbc50b1`（"跨会话 union 合流 —— 追加型文件两侧都保留"）
+ *    把两个分支各自的这张表**都留了下来** —— 一侧按"没有 `/download`、有 `/docs/automation`"算
+ *    （`图 14/15/20/20/26`），另一侧按"有 `/download`、没有 automation"算（`图 15/16/21/21/26`）。
+ *    合流后的注册表**两页都有**，于是同一张图同时被写成 `图 14-1` 与 `图 15-1`，而两个号都不对（`trash` 也从 26 变 27）。
+ *    这里按现注册表逐页现量（`first-run` 15 / `concepts` 16 / `views` 21 / `trash` 27）重述一次，
+ *    并删掉被 union 抄成两份的那一半。规则与 `2026-10-07` 那次一个字没变：**编号是派生的，注册表动了就重述**。
  *
  * ⚠️ `file` 不是装饰：它是 `gen-help-figures.mjs` 落盘的复制品名。
  * 渲染器与生成器共用 `helpFigures.ts` 那一条命名规则，这里第三个视图对不上，
@@ -864,30 +878,18 @@ const FIGURES: readonly {
   readonly number: string;
   readonly file: string;
 }[] = [
-  { article: 'first-run', locale: 'zh-CN', sectionId: 'first-screen', number: '图 14-1', file: 'W01-tasks.png' },
-  { article: 'concepts', locale: 'zh-CN', sectionId: 'habits', number: '图 15-1', file: 'W03-habits.png' },
-  { article: 'views', locale: 'zh-CN', sectionId: 'quadrant', number: '图 20-1', file: 'W02-quadrant.png' },
-  { article: 'views', locale: 'zh-CN', sectionId: 'timeline', number: '图 20-2', file: 'W05-timeline.png' },
-  { article: 'trash', locale: 'zh-CN', sectionId: 'what-the-trash-holds', number: '图 26-1', file: 'W07-trash.png' },
-  // 🔴 英文版挂**英文界面**的截图（B1 解决后的新产品事实）：同一节、同一图号，
-  //    文件是 `*-en-*.png` 那一批 —— 与 zh 行逐行成对，顺序也一致。
-  { article: 'first-run', locale: 'en', sectionId: 'first-screen', number: 'Figure 14-1', file: 'W01-en-tasks.png' },
-  { article: 'concepts', locale: 'en', sectionId: 'habits', number: 'Figure 15-1', file: 'W03-en-habits.png' },
-  { article: 'views', locale: 'en', sectionId: 'quadrant', number: 'Figure 20-1', file: 'W02-en-quadrant.png' },
-  { article: 'views', locale: 'en', sectionId: 'timeline', number: 'Figure 20-2', file: 'W05-en-timeline.png' },
-
   { article: 'first-run', locale: 'zh-CN', sectionId: 'first-screen', number: '图 15-1', file: 'W01-tasks.png' },
   { article: 'concepts', locale: 'zh-CN', sectionId: 'habits', number: '图 16-1', file: 'W03-habits.png' },
   { article: 'views', locale: 'zh-CN', sectionId: 'quadrant', number: '图 21-1', file: 'W02-quadrant.png' },
   { article: 'views', locale: 'zh-CN', sectionId: 'timeline', number: '图 21-2', file: 'W05-timeline.png' },
-  { article: 'trash', locale: 'zh-CN', sectionId: 'what-the-trash-holds', number: '图 26-1', file: 'W07-trash.png' },
+  { article: 'trash', locale: 'zh-CN', sectionId: 'what-the-trash-holds', number: '图 27-1', file: 'W07-trash.png' },
   // 🔴 英文版挂**英文界面**的截图（B1 解决后的新产品事实）：同一节、同一图号，
   //    文件是 `*-en-*.png` 那一批 —— 与 zh 行逐行成对，顺序也一致。
   { article: 'first-run', locale: 'en', sectionId: 'first-screen', number: 'Figure 15-1', file: 'W01-en-tasks.png' },
   { article: 'concepts', locale: 'en', sectionId: 'habits', number: 'Figure 16-1', file: 'W03-en-habits.png' },
   { article: 'views', locale: 'en', sectionId: 'quadrant', number: 'Figure 21-1', file: 'W02-en-quadrant.png' },
   { article: 'views', locale: 'en', sectionId: 'timeline', number: 'Figure 21-2', file: 'W05-en-timeline.png' },
-  { article: 'trash', locale: 'en', sectionId: 'what-the-trash-holds', number: 'Figure 26-1', file: 'W07-en-trash.png' },
+  { article: 'trash', locale: 'en', sectionId: 'what-the-trash-holds', number: 'Figure 27-1', file: 'W07-en-trash.png' },
 ];
 
 const FIGURED_ARTICLE_IDS = [...new Set(FIGURES.map((figure) => figure.article))];
@@ -1284,8 +1286,52 @@ test('窄屏上搜索框不靠抽屉就能用，且全页只有一个', async ({
   await page.fill('.lp-docs-topnav .lp-docs__search-input', '口令');
   await page.locator('.lp-docs-topnav .lp-docs__search-link').first().waitFor();
   await page.screenshot({ path: 'landing-results/landing-docs-search-narrow.png', fullPage: true });
-  const rows = await readSearchRows(page);
-  expect(rows.rows.every((r) => r.title.includes('口令')), '窄屏出的是同一份结果').toBe(true);
+  const narrowRows = await readSearchRows(page);
+
+  // 宽屏基准：同一条查询在 1280 上现量一次，拿它当"同一份结果"的对照物。
+  await page.setViewportSize({ width: 1280, height: 844 });
+  await page.goto('/docs/sync/');
+  await page.locator('.lp-docs-topnav .lp-docs__search-input').first().waitFor();
+  await page.fill('.lp-docs-topnav .lp-docs__search-input', '口令');
+  await page.locator('.lp-docs-topnav .lp-docs__search-link').first().waitFor();
+  const wideRows = await readSearchRows(page);
+
+  // 🔴 「窄屏出的是同一份结果」= **两套视口逐条等值**（顺序 + 标题 + 地址 + 类型），
+  //    而不是"每行标题都含查询词"：`help-search.tsx` 的契约是 FAQ 的**答案**也参与匹配、
+  //    结果仍显示问题标题，所以速答命中的标题本来就可以不含这个词 ——
+  //    桌面那条（上面 `搜索搜的是当前语言的标题…`）正是按这个契约写的
+  //    （`kind !== 'faq'` 豁免 + 逐条落到真 FAQ 锚点）。这里与它**同一口径**，
+  //    以下面这几条断言为准，不比桌面那条更宽。
+  expect(
+    narrowRows.rows.length,
+    `窄屏与宽屏的命中条数：窄屏 ${narrowRows.rows.length} / 宽屏 ${wideRows.rows.length}`,
+  ).toBe(wideRows.rows.length);
+  wideRows.rows.forEach((want, i) => {
+    const got = narrowRows.rows[i];
+    expect(got?.title, `第 ${i + 1} 行的标题与宽屏一致`).toBe(want.title);
+    expect(got?.href, `第 ${i + 1} 行的地址与宽屏一致`).toBe(want.href);
+    expect(got?.kind, `第 ${i + 1} 行的类型与宽屏一致`).toBe(want.kind);
+  });
+
+  // 桌面那条的两条性质，在窄屏这份上再量一次（同一口径，不是放宽）：
+  expect(
+    narrowRows.rows.filter((r) => r.kind !== 'faq').every((r) => r.title.includes('口令')),
+    `窄屏的非速答命中标题都该含查询词：${narrowRows.rows.map((r) => `${r.kind}:${r.title}`).join(' / ')}`,
+  ).toBe(true);
+  expect(
+    narrowRows.rows.some((r) => r.kind === 'faq'),
+    '窄屏结果里也该有速答命中（答案参与匹配）',
+  ).toBe(true);
+  expect(
+    narrowRows.rows.filter((r) => r.section).every((r) => r.href.includes('#') && r.from.length > 0),
+    '窄屏的分区命中同样要带锚点与出处',
+  ).toBe(true);
+
+  // 速答行必须落到**真锚点**上（与桌面那条同一个判据形状）。
+  for (const row of narrowRows.rows.filter((r) => r.kind === 'faq')) {
+    await page.goto(row.href);
+    await expect(page.locator(`.lp-faq__q[id="${anchorOfHref(row.href)}"]`)).toHaveText(row.title);
+  }
 
   expectCleanConsole(hits);
 });

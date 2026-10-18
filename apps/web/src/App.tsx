@@ -56,6 +56,7 @@ import {
  * 这里只负责把结果交给 `store.setNote`。壳不做业务判断 —— 见 AGENTS.md §3.5。
  */
 import { writeDurationIntoNote } from '@heyta/app-host';
+import { withManagedEndpoint } from '@heyta/ai';
 
 /**
  * 🔴 任务行的**机制**现在来自共享层（M3 第一刀）。
@@ -342,6 +343,11 @@ export function App(): React.JSX.Element {
   const accountNeedsSignIn = useSyncStore(
     useShallow((s) => typeof s.token !== 'string' || s.token.trim() === ''),
   );
+  /**
+   * 同步服务器地址 —— **托管 AI 的端点从它派生**（不落盘，见 `withManagedEndpoint`）。
+   * 与上面三条同一条纪律：`useShallow` 只订这一个字段。
+   */
+  const syncBaseUrl = useSyncStore(useShallow((s) => s.baseUrl));
 
   /**
    * 范围列的**计数**（滴答同款：今天 13 / 收集箱 17）。
@@ -620,6 +626,21 @@ export function App(): React.JSX.Element {
   }, []);
 
   const [aiSettings, setAiSettings] = useState(loadAiSettings);
+  /**
+   * 🔴 **交给各 AI 面板的是"生效的那一份" routing，不是落盘那一份。**
+   *
+   * `mode === 'managed'` 时它会在**构造这一刻**把当前同步服务器合成成托管端点
+   * （`withManagedEndpoint` 的文件头说了端点为什么不落盘：用户会换服务器）。
+   * 五个面板全从这一个变量拿，所以托管端点只可能有一处被注入 ——
+   * 漏掉一处不会报错，只会让那个面板在托管档上不走代理。
+   *
+   * ⚠️ 非托管档时它是**同一个引用**（`withManagedEndpoint` 原样返回），
+   * 自备档逐字不受影响。
+   */
+  const aiRouting = useMemo(
+    () => withManagedEndpoint(aiSettings.routing, syncBaseUrl),
+    [aiSettings.routing, syncBaseUrl],
+  );
   /**
    * AI 面板的「去设置」请求：切到设置页并**落在哪一块**。
    *
@@ -1305,23 +1326,23 @@ export function App(): React.JSX.Element {
     (row: SharedTaskRow): React.ReactNode => {
       const task = row.source;
       return (
-        <details className="ht-task-actions">
+        <details className="ht-compose-actions">
           <summary
-            className="ht-task-actions__trigger"
+            className="ht-compose-actions__trigger"
             aria-label={t('web.shell.tasks.more', { title: task.title })}
             data-testid={`task-actions-summary-${task.id}`}
           >
             <MoreHorizontal size={ICON_SIZE.sm} aria-hidden="true" />
             <span>{t('web.shell.tasks.moreLabel')}</span>
           </summary>
-          <div className="ht-task-actions__panel ht-material">
+          <div className="ht-compose-actions__panel ht-material">
             {/*
              * 这些是渐进披露的次级编辑入口：默认行只保留勾选、标题与元信息，
              * 打开「更多操作」后仍复用原来的控件与 action 回调，不减少能力。
              */}
             {bulkSelecting ? null : (
               <div
-                className="ht-task-actions__items"
+                className="ht-compose-actions__items"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -1473,7 +1494,7 @@ export function App(): React.JSX.Element {
               而不是消失（"找不到入口"和"入口说为什么不可用"是两件事）。 */}
           <AiBreakdown
             task={task}
-            routing={aiSettings.routing}
+            routing={aiRouting}
             consents={aiSettings.consents}
             secrets={aiSecrets}
             // 🔴 把上次落盘的熔断状态传回去 —— 否则落盘没有意义。
@@ -1512,7 +1533,7 @@ export function App(): React.JSX.Element {
               等专注历史接出来再传，不要在这里编一份假的。 */}
           <AiDuration
             task={task}
-            routing={aiSettings.routing}
+            routing={aiRouting}
             consents={aiSettings.consents}
             secrets={aiSecrets}
             healthSnapshot={aiSettings.health}
@@ -2058,7 +2079,7 @@ export function App(): React.JSX.Element {
             expanded={assistantWorkspace}
             onToggleExpanded={() => { setCompactAssistantOpen(false); setAssistantExpanded((value) => !value); }}
             onClose={assistantOverlay ? () => setCompactAssistantOpen(false) : undefined}
-            routing={aiSettings.routing}
+            routing={aiRouting}
             consents={aiSettings.consents}
             tier={aiSettings.assistantTier}
             onTierChange={(assistantTier) => setAiSettings((previous) => {
@@ -2632,7 +2653,7 @@ export function App(): React.JSX.Element {
           {contentView === 'tasks' && (
             <CaptureComposer
               destination={captureDestination}
-              routing={aiSettings.routing}
+              routing={aiRouting}
               consents={aiSettings.consents}
               secrets={aiSecrets}
               // 🔴 把上次落盘的熔断状态传回去 —— 否则落盘没有意义。
@@ -2666,7 +2687,7 @@ export function App(): React.JSX.Element {
           {contentView === 'tasks' && visible.length > 0 && (
             <AiPrioritize
               tasks={visible}
-              routing={aiSettings.routing}
+              routing={aiRouting}
               consents={aiSettings.consents}
               secrets={aiSecrets}
               // 🔴 把上次落盘的熔断状态传回去 —— 否则落盘没有意义。
@@ -3230,6 +3251,13 @@ export function App(): React.JSX.Element {
                 initial={aiSettings}
                 secrets={aiSecrets}
                 focusTarget={settingsFocus}
+                // 托管档的端点来自同步服务器 ⇒ 没配就选不了（见该 prop 的注释）。
+                managedServerReady={syncBaseUrl.trim() !== ''}
+                // 「本周期已用 X / 300」—— 与托管通道同一对（地址 + **活**令牌）。
+                managedUsage={{
+                  baseUrl: syncBaseUrl,
+                  getToken: async () => useSyncStore.getState().token,
+                }}
                 memorySlot={
                   <MemoryPanel
                     memoryEnabled={aiSettings.memoryEnabled}
