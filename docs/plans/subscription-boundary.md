@@ -54,7 +54,13 @@
 ⚠️ **两个付费项现在都还不能卖**：收银台路由已经接通（`POST /api/billing/checkout`），
 但这台实例**没有配真实支付通道**（只有 `noop` 时回 `503`）—— 卡在
 [ADR-0017](../adr/0017-single-paid-tier-and-payment-channel.md) §5 的支付商资质 / 凭证上；
-我们的云端 AI 服务本体还不存在（[ADR-0013](../adr/0013-cloud-ai-and-maas.md) §4 第 1 条）。
+~~我们的云端 AI 服务本体还不存在（[ADR-0013](../adr/0013-cloud-ai-and-maas.md) §4 第 1 条）~~ →
+⚠️ **2026-10-16 更正**：**服务端本体已存在**（`server/src/ai/managed-proxy.routes.ts` 的 `/managed/chat`、
+计量在 `server/src/ai/metering.ts`，两者都已实现且 `pnpm check:ai-quota` rc=0；ADR-0013 §4 第 1 条那半由
+[ADR-0054](../adr/0054-managed-ai-retention-and-selling-preconditions.md) 取代）。
+🔴 **但这一档在任何客户端仍然打不开** —— 客户端零调用点、`AiSupplyMode` 在 `packages/ai` 之外零引用、
+`MANAGED_AI_ENABLED` 在 compose 里没有转发。⚠️ 而且**服务端今天已经可以把它卖出去**（`NOT_YET_DELIVERABLE_SKUS = {}`，
+下单返 200 + 1200 分），所以"收钱不交付"的风险从"闸门挡不挡"挪到了"客户端能不能用"。
 所以落地页上两档都必须是"**即将开放**"，**不许出现点了没反应的购买按钮**（ADR-0020 §4.3）。
 
 ### 为什么必须是这个切法

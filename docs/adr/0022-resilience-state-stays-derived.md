@@ -9,7 +9,7 @@
 激励体系引入了「冻结」：每连续 **7 个计划日**积攒 **1 个**冻结（上限 **2 个**），
 用来吸收一次中断而**不清零**连续；另有「续接」（仅昨天、1 天窗口）与
 「重新开始」（≥7 天没记录后保留最长与累计）。设计见
-[`docs/plans/motivation-and-progression.md`](../plans/motivation-and-progression.md)。
+[`docs/plans/motivation-and-progression.md`](../plans/archive/motivation-and-progression.md)。
 
 于是有一个必须回答的问题：**「冻结余额」要不要成为一个持久化字段？**
 上一版界面上是把它显示出来的（「还剩 N 个冻结」），所以这个问题当时是真的。

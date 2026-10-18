@@ -1,5 +1,6 @@
 # W7 · 纪念卡片导出为成品图 —— 设备渲染与零出网判据
 
+> 状态：**进行中**（W7 主体与两端设备读数已到齐；§7 仍登记 iOS pbxproj 构建级验证与合流后四端重装，§2.4 有 W7-G8 等缺口未闭）
 > 工单定义在 [`countdown-anniversary.md`](countdown-anniversary.md) §3 的
 > `#### ⏹ W7 · 纪念卡片导出为成品图`；交接状态在
 > [`countdown-batch2-handoff.md`](countdown-batch2-handoff.md) §0.5 的 W7 那一行。

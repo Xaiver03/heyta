@@ -162,13 +162,29 @@
 | 四个 widget `<receiver>` `android:exported="false"` | `:77/:88/:99/:110`（Today/Quadrant/Habits/Focus） | 桌面小组件，**均不导出**（安全要求，防第三方伪造 `ACTION_TOGGLE` 广播，`:32-37`）；无 widget 专用权限 |
 | **未声明** `POST_NOTIFICATIONS` | — | 🔴 全 manifest **无通知权限** —— 印证 B14：原生端不使用系统通知 |
 
-### iOS — `apps/mobile/ios/HeytaMobile/Info.plist`
-🔴 **没有任何 `NS*UsageDescription` 键**（不申请相机/麦克风/通讯录/位置/相册/健康等任何隐私权限；grep 全 plist 零命中）。相关的只有：
+### iOS — `apps/mobile/ios/Heyta/Info.plist`
+📌 **2026-10-16 更正本表两处过期**（当日逐行复核 `apps/mobile/ios/Heyta/Info.plist`，81 行）：
+① 本节的路径原文写的 `ios/**HeytaMobile**/Info.plist` **不存在**（`ls` 实测无此目录），真实路径是 `ios/**Heyta**/Info.plist`；
+② 原文写「**没有任何 `NS*UsageDescription` 键**（grep 全 plist 零命中）」—— **不成立**：
+plist 里有 **`NSUserNotificationsUsageDescription`**（`:39-40`，值「heyta 需要通知权限来按时提醒你的任务。」）。
+⇒ **不申请**相机/麦克风/通讯录/位置/相册/健康 这半句仍然成立；**"一个都没有"那半句是错的**。
+（法律台账里"一个都没有"与"有一个"是不同的申报内容，所以这不是措辞问题。）
+
 | 声明 | 位置 | 用途 |
 |---|---|---|
-| `NSAppTransportSecurity` → `NSAllowsArbitraryLoads=false`, `NSAllowsLocalNetworking=true` | `Info.plist:29-36` | 默认强制 HTTPS，仅**放行本地网络明文 HTTP**（自托管；`:31` 注释「不要改成 true，否则有被拒风险」） |
-| `ITSAppUsesNonExemptEncryption=false` | `Info.plist:38-39` | 声明只用标准加密（TLS + AES-GCM）属**豁免类**，免出口合规逐构建问询 |
-| `UIRequiredDeviceCapabilities=[arm64]` | `:42-45` | 仅架构要求，非隐私权限 |
+| `NSAppTransportSecurity` → `NSAllowsArbitraryLoads=false`, `NSAllowsLocalNetworking=true` | `Info.plist:31-37` | 默认强制 HTTPS，仅**放行本地网络明文 HTTP**（自托管；`:33` 注释「不要改成 true，否则有被拒风险」） |
+| `NSUserNotificationsUsageDescription` | `Info.plist:39-40` | 通知权限的用途说明（**本节原文漏了它**） |
+| `ITSAppUsesNonExemptEncryption=false` | `Info.plist:42-43` | 声明只用标准加密（TLS + AES-GCM）属**豁免类**，免出口合规逐构建问询 |
+| `UIRequiredDeviceCapabilities=[arm64]` | `Info.plist:63-66` | 仅架构要求，非隐私权限 |
+
+🔴 **同日另查出一条本节没登记的缺口**：plist **没有 `NSLocalNetworkUsageDescription`**（也没有 `NSBonjourServices`）。
+而本仓自己的 PiPL 底稿（[`legal-pipl-baseline.md`](legal-pipl-baseline.md) 第三节第 3 行）把「**本地网络**」
+明确列进"必须做用途说明"的权限之一，并标注它是「通报里最高频的红线之一」；
+ADR-0007 §6.1 与 ADR-0012 又都以"iOS 只放行**本地网络**明文"作为自建的可行性依据。
+⇒ 两边对不上：**代码依赖本地网络访问，却没有任何用途说明键**。
+⚠️ **本轮无法定论它的运行时后果**：iOS 14+ 的本地网络权限**在模拟器上不出现**，
+所以本仓唯一的 ATS/明文验证脚本（`verify:ios-lan-http`）**看不到这条路** ——
+而"没在真机上装过"正是对账件 **B7** 那半条未验的内容。⇒ 定论方式只有一个：**装到实体 iPhone 上连一次局域网服务端**。
 
 **iOS entitlements**（`HeytaMobile.entitlements` 与 `HeytaWidgetExtension.entitlements`，两份内容相同）：
 | entitlement | 位置 | 用途 |

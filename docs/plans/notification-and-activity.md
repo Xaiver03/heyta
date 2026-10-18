@@ -3,7 +3,7 @@
 > 状态：**已完成**（2026-09-29）
 > 依据：[`pricing-and-entitlements.md`](../reference/pricing-and-entitlements.md)（权益词表）、
 > [`subscription-boundary.md`](subscription-boundary.md) §2（只限制托管同步，不锁数据）、
-> [`motivation-and-progression.md`](motivation-and-progression.md)（激励体系的回路诊断）。
+> [`motivation-and-progression.md`](archive/motivation-and-progression.md)（激励体系的回路诊断）。
 
 ---
 

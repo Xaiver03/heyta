@@ -490,7 +490,7 @@ heyta 客户端从不产生这类 op（§4.3）⇒ 账号不进候选集 ⇒ **`
 要改哪条，就为新语义写 ADR，而不是让代码各自漂移。
 
 1. **一切处置只能走 op-log**（`OpType.Delete` 或 `UPD`），UI 不许直接改状态 ——
-   [phase-1 §D4](../plans/phase-1-single-client-loop.md)。
+   [phase-1 §D4](../plans/archive/phase-1-single-client-loop.md)。
 2. **删除 = `DEL` op → `deletedAt` 墓碑**；不用 `UPD` 写布尔删除位（理由见 §2.3 引用段）。
 3. **还原 = `UPD { deletedAt: null }`**；已 purge 者拒绝；未删除者不发 op。
 4. **彻底删除 = `UPD { purgedAt }`，永不清 `deletedAt`**（清了离线端会复活它）。

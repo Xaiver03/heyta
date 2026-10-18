@@ -1,5 +1,6 @@
 # 003 — 展厅 coverflow：合成单条 transform，并把 `will-change` 收进视口
 
+> 状态：**已完成**（历史整改单，5 项已全部实施并验证；勿照它再开工）
 - **Status**: DONE
 - **Commit**: 18b34ce
 - **Severity**: HIGH

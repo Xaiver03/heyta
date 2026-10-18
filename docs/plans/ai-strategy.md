@@ -216,7 +216,7 @@ heyta 手里有一份**别人拿不到的数据**：`MaterializedState` 里的 `
 | **反馈偏好 P6/P7** | 从处置推断粒度与保留率；P6 **MAE 0.167 vs 基线 1.000**；噪声上零误报 | `packages/domain/tests/ai-feedback.spec.ts` | 见上 |
 | **偏好可见可纠正** | `MemoryPanel`：依据原文、单条忘掉、**可恢复**的「你已忘记」 | `apps/web/src/features/settings/MemoryPanel.tsx` | **29 测试** |
 | **偏好纠正持久化** | `PREFERENCE_CORRECTION`（走 op-log，跨设备同步） | `packages/domain/src/preference-corrections.ts` | 17 测试 |
-| **AI 工具调用 P0–P2** | 复用既有工具目录/授权/执行器（不新建）：规则选择（零出境）→ 模型路径（`tools`/`tool_calls`，新 `AiFeature` `'tool-calling'`）→ 读即执行、写只提案、确认才落库 | `packages/app-host/src/ai-tool-{selection,run,call}.ts`、`apps/web/src/features/ai/AiToolRun.tsx`、`packages/ai` 工具线格式 | 见 [ADR-0035](../adr/0035-ai-tool-calling-reuses-local-api.md) 与 [计划](ai-tool-calling.md) |
+| **AI 工具调用 P0–P2** | 复用既有工具目录/授权/执行器（不新建）：规则选择（零出境）→ 模型路径（`tools`/`tool_calls`，新 `AiFeature` `'tool-calling'`）→ 读即执行、写只提案、确认才落库 | `packages/app-host/src/ai-tool-{selection,run,call}.ts`、`apps/web/src/features/ai/AiToolRun.tsx`、`packages/ai` 工具线格式 | 见 [ADR-0035](../adr/0035-ai-tool-calling-reuses-local-api.md) 与 [计划](archive/ai-tool-calling.md) |
 
 | **工具目录按实体拆包 + 覆盖面门禁** | ~~8 个用户可操作实体各一组工具（读 10 / 写 12，合计 **22**，上限"每实体 5 × 8 = 40 席"）~~ —— **10-04 现量更正**：**9 个实体**（批次二加了 `EVENT`）、**读 12 / 写 14 合计 26**，上限"每实体 5 × 分母 9 = **45 席**（已用 26，剩 19）"；MCP 与内置 AI **共用同一份目录**（不另建）；🔴 `check:ai-coverage` 已进 `pnpm check` 链 —— "覆盖面"从一句主张变成**会红的判据**，且分子分母都由门自己打印（不再手抄） | `packages/local-api/src/tools/`（**9 个实体 pack** + `pack.ts`/`shared.ts`/`registry.ts`）、`scripts/check-ai-coverage.mjs` | `node scripts/check-ai-coverage.mjs` 打印「实体覆盖面 9/9 … 已登记缺口 0 项 … 目录 26 个工具 ≤ 每实体 5 × 分母 9 = 45 席」；细节见 [EVENT 工具契约](ai-event-tool-contract.md) §15 |
 | **批量写入做成一个提案** | 「把这 3 个都完成」= **一个提案 N 条 op**（不是 N 个提案，也不是 N 次确认）；确认前零写入 | `packages/app-host/src/ai-tool-run.ts` | `packages/app-host/tests/ai-tool-run.spec.ts`、`apps/web/tests/ai-tool-run.spec.tsx` |
@@ -329,7 +329,7 @@ heyta 手里有一份**别人拿不到的数据**：`MaterializedState` 里的 `
 |---|---|
 | **AI 做成什么样（本文）** | `docs/plans/ai-strategy.md` |
 | 能力怎么拆、怎么排期、git 分支怎么分 | [ai-capability-branches.md](ai-capability-branches.md)（大而全） |
-| 哪些决策已定 / 被推翻 | [ai-open-decisions.md](ai-open-decisions.md) |
+| 哪些决策已定 / 被推翻 | [ai-open-decisions.md](archive/ai-open-decisions.md) |
 | 滴答清单怎么做的 + 我们能用的推理架构 | [ai-competitive-and-architecture.md](../research/ai-competitive-and-architecture.md) |
 | 13 个产品的横向对比 | [ai-feature-landscape.md](../research/ai-feature-landscape.md) |
 | E2EE 产品怎么处理 AI（Bear / Joplin） | [e2ee-apps-ai.md](../research/e2ee-apps-ai.md) |

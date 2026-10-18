@@ -40,17 +40,31 @@
 打包（[`multi-platform-build.md`](multi-platform-build.md) / `pnpm reinstall:all`）完成后：
 
 ```bash
-scripts/upload-dist.sh --version 0.1.0 \
+# ⚠️ 版本号**写成你要发的那个批次号**（示例用 `<batch>`，不是某个具体值）。
+#    🔴 不要照抄 `0.1.0` —— 那是仓库根 `package.json` 里的占位值，
+#    而脚本**从 2026-10-16 起会拒绝"比已发布版本更低"的批次**（`check-release-version-guard.mjs`）。
+#    照抄它会被当场拒掉：`latest.json` 的顶层版本会**往回改**，而没有任何一层会报错。
+scripts/upload-dist.sh --version <batch> \
   --file macos=/tmp/heyta-macos-dist/Heyta.dmg \
   --file android=apps/mobile/android/app/build/outputs/apk/release/app-release.apk \
   --file windows=dist/windows/Heyta.msix \
   --file linux=apps/desktop-linux/dist/heyta.deb
 ```
 
-脚本做六件事：规范化命名（`heyta-<version>-<platform>.<ext>`）→ 算 sha256 →
+脚本做八件事：规范化命名（`heyta-<version>-<platform>.<ext>`）→ 算 sha256 →
 生成 `latest.json` → 上传到 `app-releases/heyta/<version>/` 与 `…/latest/` →
-**匿名** HEAD 回读校验（content-length 对不上就退出 1；带授权的成功证明不了公开读）→
+🔴 **版本守卫**（比已发布版本低就退出 1）→
+**匿名范围 GET 回读**（`-r 0-0`；状态不是 200/206、或 `Content-Range` 的总长对不上就退出 1）→
 **刷新落地页那份快照**（`gen-downloads.mjs` + `check-downloads.mjs`，任一失败就退出 1）。
+
+🔴 **回读为什么必须是范围 GET、不能是 HEAD**（2026-10-16 实测，本条原写作"匿名 HEAD"）：
+同一个 URL 在腾讯云 **默认域名**上 `HEAD → 200`（连 `content-length` 都对）而 `GET → 403`。
+⇒ 用 HEAD 的那一版判据**对 APK 恒绿**，"公开可读"在最需要它的时候是假的。
+`check:downloads` 的**臂 E** 会把"回读换回 HEAD"这个动作直接判红。
+
+⚠️ **发布完成后仍建议跑一次 `pnpm verify:downloads-servable`**：`upload-dist.sh` 的回读只管
+**这一轮刚上传的那几枚**，而"页面当前展示的那一批"可能因为桶上的策略**后来变了**而失效
+（A1 就是这种形状：字节在、域名策略不允许发）。那条判据读的就是落地页依赖的那份清单。
 
 🔴 两处与直觉不同的形状（[ADR-0058](../adr/0058-download-page-and-manifest-single-source.md) §4 第 5 条）：
 

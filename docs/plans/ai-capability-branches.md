@@ -576,7 +576,7 @@ Hermes 的正则能力**落后且有版本差异**，而 lookbehind 正是其中
 | 27 | **通知不得有响应**（`JsonRpcResponse \| undefined`）—— 见 ADR-0011 §3.8 | ✅ 6 核心 + 3 真实子进程 + 2 HTTP |
 | 26 | `capabilityGaps()` + 设置面板的能力缺口提示与**一键补上** | ✅ 10 条测试 |
 | 24 | `apps/node-host/src/cli-ai.ts` —— **AI 端点密钥的运维命令**（密钥只从 stdin 进） | ✅ 12 单元 + 10 真实子进程 |
-| 25 | `docs/plans/ai-open-decisions.md` —— **需要拍板的决策清单** | ✅ 已登记 |
+| 25 | `docs/plans/archive/ai-open-decisions.md` —— **需要拍板的决策清单** | ✅ 已登记 |
 | 21 | `packages/ai/src/health-store.ts` —— **熔断状态落盘**（封顶 + 坏数据退化） | ✅ 35 条测试 |
 | 22 | 失败分支带上 `health`（此前只在成功分支，最该记的那次反而丢了） | ✅ 4 条测试 |
 | 23 | Web：熔断状态经 `aiStore` 落盘（**不进 op-log**） | ✅ 类型检查 + 往返测试 |
@@ -1065,7 +1065,7 @@ http://127.0.0.1:80@evil.com/v1
    `pnpm verify:mcp-real`。自发 JSON-RPC 之外，"Claude Desktop 真的能连上吗"已有一层证据。
 2. 🔴 **"受保护条目"没有产品机制**：`readable: false` 目前只能靠"解密失败"置位。
    要做"用户手动标记为受保护"需要一次产品决策（见 ADR-0011 §6.1）。
-   决策 1 已定为"先不做，但界面上把话说清楚"（[ai-open-decisions.md](ai-open-decisions.md)）。
+   决策 1 已定为"先不做，但界面上把话说清楚"（[ai-open-decisions.md](archive/ai-open-decisions.md)）。
 3. ✅ **四个功能都已接到用户手指上**：任务行有「AI 拆解」，捕获/优先级/估时各有入口；
    流程是**披露 → 发送 → 提议 → 用户确认才写入**。
    计划 §5 验收判据 ④「发送前显示发给哪个端点 + 发哪几个字段」已落地并有测试钉住。

@@ -144,7 +144,7 @@ upload → 服务端在同一个响应里搭车返回 newOps
 - `packages/sync-client/tests/sync.spec.ts` 新增 2 条：混合搭车页、整批解不开；
 - **变异验证**：把搭车段改回无保护的 `Promise.all` → **恰好这 2 条红**（30 通过 / 2 失败），
   恢复后 32/32；
-- 真机复验见 `docs/plans/phase-2-multi-platform.md` §3.19。
+- 真机复验见 `docs/plans/archive/phase-2-multi-platform.md` §3.19。
 
 ### 教训（已记入 `AGENTS.md` §7 第 46 条）
 

@@ -2,7 +2,7 @@
 
 > 状态：**规划中**
 > 证据与平台事实见 [native-widgets.md](../research/native-widgets.md)（调研结论层，本文件是**执行层**）。
-> 与 [phase-2-multi-platform.md](phase-2-multi-platform.md) 的关系：**这份计划是它的一个输出形态，不是它的后续阶段。**
+> 与 [phase-2-multi-platform.md](archive/phase-2-multi-platform.md) 的关系：**这份计划是它的一个输出形态，不是它的后续阶段。**
 
 ---
 

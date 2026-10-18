@@ -175,3 +175,39 @@ ADR-0005 那条在托管档一字不改：**托管 AI 与端到端加密在定�
   上浮（进同意指纹）：本批已在同一分支里做（`packages/legal` 各文档版本 + `updatedDate`，
   生成物 `server/src/legal.generated.ts` 的 `LEGAL_SET_VERSION` 随之重跑）。
   ⚠️ **生成物重跑 ≠ 线上生效**：线上法务页要等部署，见上条同一条顺序约束。
+
+---
+
+## 9. 勘误（2026-10-16）：上面第二条那三句"今天打不开"的话，**半句已经过期、结论仍然成立**
+
+> 按本仓对 ADR 的处置：**正文一字不改**，变化写在这里。ADR-0056 §5 第 1 条当初把
+> "托管档接进 `invokeRouted`"登记成"**下一单必须处理的事**"，这一节就是那一单的回执。
+
+### 9.1 逐句对账（三句里两句已变）
+
+| §8 第二条原文 | 2026-10-16 现量 |
+|---|---|
+| 「`AiSupplyMode` 只在 `packages/ai`」 | 🔴 **已变**：`AiRoutingConfig.mode`（路由配置）与 `RoutedDeps.managedTransport` / `ProviderDeps.managedTransport` 都已经是生产面；ADR-0056 §5 第 1 条那格**已闭合**（解析候选与发送点复算用同一个 mode） |
+| 「`/api/ai/managed/chat` 在全仓**零调用点**」 | 🔴 **已变**：`provider.invoke`（历史路径）与 `attemptOnce`（**生产路径** `invokeRouted`）都已在 `mode === 'managed'` 时打到该路由，并带一条**主机一致性守卫**（宿主基址必须与披露的端点同一台主机，否则零请求） |
+| 「界面没有那个开关」 | ✅ **仍然成立** —— `AiSupplyMode` 在生产里**依旧没有任何构造点**。设置页只能加用户**自己的**端点 |
+
+### 9.2 🔴 所以：结论**照旧**，对外文案**仍然**按"这一档打不开"写
+
+**"可以下单"与"下单后能不能真用上"仍然是两件事** —— 今天点开设置页，
+用户**选不到托管档**。§8 那条"不许写成已上线可用"的约束**一字不放松**。
+
+### 9.3 开关真正落地时，**必须同批**做完的三件
+
+1. 设置页的 `own / managed` 选择（`'off'` 不另设一档：总开关关着就是关着，
+   而 `mode: 'off'` 进路由会把每个端点变成**免授权**的 `'none'` ⇒ 已在
+   `packages/ai` 用类型 + 运行时白名单两层挡住，见 `launch-blockers.md` §3.1 第 0 条）；
+2. 法务已承诺的「本周期已用 X / 300」界面（服务端读路由 `GET /api/ai/managed/usage` 已就位）；
+3. **本 ADR §8 与对外法务文案的改写** —— 在 1、2 完成之前改这句，就是提前许诺一个用不上的东西。
+
+### 9.4 同日新登记的一条限制（不是本 ADR 的范围，但影响"能不能宣传助手"）
+
+🔴 **托管档不转发 `tools`**：`managed-proxy.routes.ts` 里 `grep -n "tools\|tool_choice"` **零命中**，
+发出去的上游请求体只有 `{ model, messages, stream? }`；而 `SERVER_MANAGED_AI_FEATURES` 里
+**却列着 `'tool-calling'`** ⇒ 助手在托管档上会**静默降级成纯文本回答**。
+客户端已按"响亮拒绝"处理（`packages/ai` 在托管档遇到带工具的调用直接返回 `no-route`，零请求）。
+发现、复现命令与要拍的板在 [`../plans/launch-blockers.md`](../plans/launch-blockers.md) §3.2。
