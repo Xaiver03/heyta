@@ -485,7 +485,11 @@ const NON_COPIES = [
     reason: '这道门禁自己：它带着这个形状是因为它是**判据本体**（规则说明 + COPY_SHAPE 常量），不是抄件。',
   },
   {
-    file: 'docs/plans/phase-2-multi-platform.md',
+    // 🔴 **2026-10-16 更新路径**：这份计划被**移进 `archive/`** 了（文档治理那一轮），
+    //    而豁免表还指着旧路径 ⇒ 一次移动产生**两个**红：新路径"漏登记"、旧豁免"没有对象"。
+    //    ⚠️ 教训（与对账件 A3 的"两条线索"同族）：**移动一个被登记的文件时，
+    //    登记处不会自己跟着走** —— 而这条门禁自己是红的，所以链停在别处时它也不会说话。
+    file: 'docs/plans/archive/phase-2-multi-platform.md',
     needle: 'docker-compose.build.yml build',
     reason: '计划表里的**构建**命令（`… build`），不是外人起全套那条 `up`；它不需要 migrate-once。',
   },

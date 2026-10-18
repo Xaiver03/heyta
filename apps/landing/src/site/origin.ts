@@ -26,9 +26,21 @@
 /**
  * 当前真实部署地址（2026-09-30 起 `https://heyta.waytofuture.cn`）。
  *
- * 🔴 换域名时**两件事必须一起做**，只做一件都会留下一个自己声明旧地址的站点：
+ * 🔴 换域名时**这些事必须一起做**，只做一件都会留下一个自己声明旧地址的地方：
  *   ① 部署构建传 `VITE_SITE_URL`（这一条是原设计的"一次构建参数"）；
- *   ② **改这里并重跑 `pnpm --filter @heyta/landing gen:entries`**。
+ *   ② **改这里并重跑 `pnpm --filter @heyta/landing gen:entries`**；
+ *   ③ 另外四处**定义**同一个域名的地方（2026-10-16 逐处实测列出）：
+ *      `packages/legal/src/index.ts` 的 `hostedDomain`、
+ *      `packages/app-host/src/legal-links.ts` 的 `OFFICIAL_SITE_ORIGIN`、
+ *      `server/src/legal.generated.ts` 的 `OFFICIAL_HOSTED_DOMAIN`（**生成物**，
+ *      由 `node server/scripts/gen-server-legal.mjs` 产出）、
+ *      以及两份**托管 AI 端点白名单** `packages/ai/src/managed-endpoints.ts` 与
+ *      `server/src/ai/managed-upstream.ts` 里的 `host:` 条目；
+ *   ④ `research/tools/publish-public-sites.mjs` 里 `HEYTA_SITE_DOMAIN` 的兜底值（决定**发到哪台机器**）。
+ *
+ * ⚠️ 本注释原来写的是"**两件事**"—— 而实测这个事实住在**六处定义点 + 一处工具默认值**。
+ * `pnpm check:legal-host` 现在**逐处守着**（它的第 2/3/4 条判据就是为这几处加的），
+ * 所以**改漏了会红**；但那段话留在代码里会让人以为"只有两件事"。
  *
  * 为什么②不能省：`index.html` 与各入口页是**已提交的生成物**，而
  * `pnpm check` 的第一道门禁 `check:entries` 会用**本常量的默认值**重新生成

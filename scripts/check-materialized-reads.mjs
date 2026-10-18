@@ -295,6 +295,48 @@ if (feedProblems.length > 0) {
  * `docs/plans/countdown-anniversary.md` W6 那一节末尾。
  */
 
+
+/*
+ * 🔴 **规则四（2026-10-16 加）：扫描面必须等于全集。**
+ *
+ * 上面那个循环用的是 `readdirSync(SCREENS_DIR)` —— **非递归**。今天 33 个屏全平铺在这一层，
+ * 所以它扫到了全部；但只要有人建出 `screens/<子目录>/FooScreen.tsx`，
+ * **那个屏就永远不会被扫**，而判据照样报绿 —— 与它文件头记的那条
+ * "注释里写着 dataRevision ⇒ 门禁报绿"是**同一种失效**：不是判错，是**没看见**。
+ *
+ * ⇒ 所以这里不重写扫描逻辑（那会让交集与全集两套算法有各自的 bug），
+ *    只断言一件事：**扫到的文件数 = 该目录下 .tsx 的全集**。不等就响亮失败，
+ *    并把没扫到的那些**列出来**。
+ */
+function walkTsx(dir) {
+  const out = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const p = join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...walkTsx(p));
+    else if (entry.name.endsWith('.tsx')) out.push(p);
+  }
+  return out;
+}
+
+const allTsx = walkTsx(SCREENS_DIR);
+if (allTsx.length !== scanned) {
+  const scannedNames = new Set(
+    readdirSync(SCREENS_DIR)
+      .filter((f) => f.endsWith('.tsx'))
+      .map((f) => join(SCREENS_DIR, f)),
+  );
+  const missed = allTsx.filter((p) => !scannedNames.has(p));
+  console.error(
+    `❌ 扫描面不等于全集：目录下有 ${allTsx.length} 个 .tsx，本判据只扫了 ${scanned} 个。\n` +
+      '   没被扫到的（**它们读不读物化状态都没人知道**）：\n' +
+      missed.map((p) => `     ${relative(ROOT, p)}`).join('\n') +
+      '\n\n   修法：把上面那个 `readdirSync(SCREENS_DIR)` 换成递归遍历（`walkTsx` 就是现成的）。\n' +
+      '   ⚠️ 不要为了让它绿而把这个断言删掉 —— 它挡的是"新屏悄悄不在保护范围内"。\n',
+  );
+  process.exit(1);
+}
+
+
 console.log(
   `✅ ${scanned} 个屏：读物化状态的那些都订阅了 dataRevision；` +
     `${boardHosts} 个渲染共享日历板的宿主都读了并喂进了倒数日。`,

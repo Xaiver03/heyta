@@ -43,7 +43,7 @@
  * 历史背景见 `docs/adr/0017-single-paid-tier-and-payment-channel.md` §3.2。
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -491,6 +491,26 @@ for (const [label, file] of [
   ['en catalog', CATALOG_EN],
 ]) {
   sweepNoUnapproved(read(file), `${label}（${file}）全表`, problems);
+}
+
+
+// 层 2c：🔴 **九份对外正文**（`packages/legal/src/documents/*.ts`）也要扫（2026-10-16 加）。
+//
+// 为什么必须加：那九份是**对外承诺的本体** —— 落地页与应用内渲染的就是它们，
+// 而 `subscription-refund.ts` 里有 `¥5` / `¥12` / `$12` 以及"300 次"这类字面量。
+// 当日实测：**此前没有任何一层扫过它们**（本判据只读中英词条表与 `server/legal/` 那两份 md；
+// `check-legal-gdpr` 读这份文件但只看 GDPR 指针，不看金额）。
+// ⇒ 改价时"词条表改了、法务正文没改"会留下**两个价格的对外承诺**，而那正是本判据文件头
+// 点名的最坏事故。今天两组数字一致，所以这条是**潜伏缺口**（不是当前缺陷）。
+const LEGAL_DOCS_DIR = 'packages/legal/src/documents';
+const legalDocFiles = readdirSync(`${ROOT}/${LEGAL_DOCS_DIR}`).filter((f) => f.endsWith('.ts'));
+if (legalDocFiles.length === 0) {
+  problems.push(
+    `读不到 ${LEGAL_DOCS_DIR} 下的任何 .ts —— 目录换了形状，层 2c 正在空转（宁可报红也不静默通过）`,
+  );
+}
+for (const file of legalDocFiles) {
+  sweepNoUnapproved(read(`${LEGAL_DOCS_DIR}/${file}`), `法务正文 ${file}`, problems);
 }
 
 // 层 3：对外怎么承诺（两份都扫）

@@ -80,6 +80,75 @@ if (serverHost !== legalHost) {
 }
 
 // 2) 落地页那两条路径必须真的注册过（注册表是站点结构的唯一来源，ADR-0033）。
+
+// 3) 🔴 **落地页自己的部署地址常量也必须一致**（2026-10-16 加）。
+//
+// `apps/landing/src/site/origin.ts` 的 `DEFAULT_SITE_ORIGIN` 是**第七处**（算上下面那个工具就是第八处）
+// 写死这个域名的地方，而它决定的是落地页**自我声明**的绝对地址（canonical / hreflang / sitemap），
+// 以及 `check:entries` 逐字节比对的基准。它的文件头写着"换域名时**两件事**必须一起做"——
+// 而实测这个事实住在**六处**，那句"两件事"漏了另外四处（其中就有它自己）。
+const landingOriginFile = 'apps/landing/src/site/origin.ts';
+const landingOrigin = /DEFAULT_SITE_ORIGIN\s*=\s*'([^']+)'/.exec(
+  readFileSync(`${ROOT}/${landingOriginFile}`, 'utf8'),
+);
+if (landingOrigin === null) {
+  problems.push(`${landingOriginFile} 里读不到 DEFAULT_SITE_ORIGIN —— 形状变了，这条对账正在空转`);
+} else if (landingOrigin[1] !== `https://${legalHost}`) {
+  problems.push(
+    `落地页自我声明的地址与官方域名不一致：${landingOriginFile} 说 ${landingOrigin[1]}，` +
+      `而官方域名是 https://${legalHost} —— ` +
+      'canonical / sitemap / 入口生成物会一起声明一个不是官方的地址。',
+  );
+}
+
+// 4) 发布工具里那个默认域名（`HEYTA_SITE_DOMAIN` 的兜底）也不能漂 ——
+//    它决定**往哪台机器发布**，漂了就是把站点发到别处。
+const publishToolFile = 'research/tools/publish-public-sites.mjs';
+const publishDefault = /HEYTA_SITE_DOMAIN\s*\|\|\s*'([^']+)'/.exec(
+  readFileSync(`${ROOT}/${publishToolFile}`, 'utf8'),
+);
+if (publishDefault === null) {
+  problems.push(`${publishToolFile} 里读不到 HEYTA_SITE_DOMAIN 的兜底值 —— 形状变了，这条对账正在空转`);
+} else if (publishDefault[1] !== legalHost) {
+  problems.push(
+    `发布工具的兜底域名与官方域名不一致：${publishToolFile} 说 ${publishDefault[1]}，` +
+      `而官方域名是 ${legalHost} —— 不带参数发布会发到另一个主机。`,
+  );
+}
+
+// 2) 🔴 **官方域名必须也出现在两份"托管端点主机白名单"里**（2026-10-16 加）。
+//
+// "官方域名"这个事实在这套代码里**有五份拷贝**：@heyta/legal 的 `hostedDomain`、
+// app-host 的 `OFFICIAL_SITE_ORIGIN`、服务端生成物 `OFFICIAL_HOSTED_DOMAIN`，
+// 以及两份**托管 AI 端点白名单**（`MANAGED_MODEL_HOSTS` / `SERVER_MANAGED_MODEL_HOSTS`）。
+//
+// 上面 1)/1b) 连的是前三条；`managed-upstream-drift.spec.ts` 连的是后两条。
+// 🔴 **但"前三条 ↔ 后两条"之间那条线**此前**没有任何判据** ——
+// 于是域名一旦变更，可能只改了法务那三条，而两份 AI 白名单**继续指着旧域名**为"我们自己的服务器"
+// （那两行带着 `jurisdiction: 'cn'` 与"heyta 自建"的定性）。
+// 后果不是死链，而是**数据出境定性对着一个不再属于我们的主机名**——
+// 与 1b) 那句"读的是 A、记的是 B"是同一条错误，只不过这次错在 AI 那条线上。
+for (const [file, name] of [
+  ['packages/ai/src/managed-endpoints.ts', 'MANAGED_MODEL_HOSTS'],
+  ['server/src/ai/managed-upstream.ts', 'SERVER_MANAGED_MODEL_HOSTS'],
+]) {
+  const src = readFileSync(`${ROOT}/${file}`, 'utf8');
+  const hosts = [...src.matchAll(/^\s*host:\s*'([^']+)'/gm)].map((m) => m[1]);
+  if (hosts.length === 0) {
+    problems.push(
+      `${file} 里读不到任何 \`host: '…'\` —— 白名单换了形状，这条对账正在空转（判据 ${name}）`,
+    );
+    continue;
+  }
+  if (!hosts.includes(legalHost)) {
+    problems.push(
+      `托管 AI 端点白名单里没有官方域名：${file} 的 ${name} 是 [${hosts.join(', ')}]，` +
+        `而不含 ${legalHost} —— 法务那三条改了、这条没跟上（或者反过来）。` +
+        '⚠️ 那两行带着 `jurisdiction` 与"自建"的定性，指错主机名等于对着一个不再属于我们的域名做出境定性。',
+    );
+  }
+}
+
 const pages = readFileSync(`${ROOT}/apps/landing/src/site/pages.ts`, 'utf8');
 for (const path of ['/legal/terms', '/legal/privacy']) {
   if (!pages.includes(`path: '${path}',`)) {
@@ -102,6 +171,6 @@ if (problems.length > 0) {
 }
 
 console.log(
-  `✅ 官方托管域名三方对账一致：${legalHost} ↔ ${appHostOrigin} ↔ ${serverHost}` +
+  `✅ 官方托管域名三方对账一致（并已连上两份托管 AI 端点白名单）：${legalHost} ↔ ${appHostOrigin} ↔ ${serverHost}` +
     '（+ 落地页与服务端四条路径都在）',
 );

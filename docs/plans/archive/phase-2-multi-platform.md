@@ -1,16 +1,17 @@
 # P2：多端补齐
+> 📦 **已归档（2026-10-16）** —— 本文件是历史记录，**不要照它开工**；现役口径见 [计划层索引](../README.md) 与 [总路线图](../roadmap.md)。
 
-> 🔴 **2026-09-28 收敛：本文件已被 [`multi-platform-adaptation.md`](multi-platform-adaptation.md) 与
-> [`desktop-native-migration.md`](desktop-native-migration.md) 取代，二者又由
-> [`multi-end-unified-strategy.md`](multi-end-unified-strategy.md) 收敛。本文件只作历史，不要照它开工。**
+> 🔴 **2026-09-28 收敛：本文件已被 [`multi-platform-adaptation.md`](../multi-platform-adaptation.md) 与
+> [`desktop-native-migration.md`](../desktop-native-migration.md) 取代，二者又由
+> [`multi-end-unified-strategy.md`](../multi-end-unified-strategy.md) 收敛。本文件只作历史，不要照它开工。**
 > 🔴 **2026-09-29 追加口径收敛：「下一步」只在
-> [`multi-end-unified-strategy.md`](multi-end-unified-strategy.md) §11 维护** ——
+> [`multi-end-unified-strategy.md`](../multi-end-unified-strategy.md) §11 维护** ——
 > 本文件（及 roadmap §5）都不再作为待办入口，也不复述下一步。
 > ⚠️ 本文件的状态行是解不开的口令噪音（不是计划状态）—— 这也是它该被归档的信号。
-> 索引见 [`README.md`](README.md)。
+> 索引见 [`README.md`](../README.md)。
 
 - **状态**：🔴 **已被取代**（原文误写为"进行中"）
-- **上游决策**：[ADR-0003 多端策略](../adr/0003-multi-platform-strategy.md)
+- **上游决策**：[ADR-0003 多端策略](../../adr/0003-multi-platform-strategy.md)
 - **前置**：P1 单端闭环 ✅
 
 ---
@@ -889,7 +890,7 @@ iOS 模拟器把「模拟设备里那个 App」的无障碍节点**桥接进了�
 
 ### 2.13 修 P0：精确重复的 op 回幂等成功（✅ 已完成并四层验收）
 
-**决策**：[ADR-0009](../adr/0009-duplicate-op-idempotent-success.md)（已接受）。
+**决策**：[ADR-0009](../../adr/0009-duplicate-op-idempotent-success.md)（已接受）。
 
 #### 改了什么（服务端 + 客户端各一半）
 
@@ -1109,7 +1110,7 @@ NSURLErrorDomain Code=-1022
 > ⚠️ **本节是历史记录（2026-09-26 那次实测），其中的域名部分已被取代。**
 > 测试阶段的域名自 **2026-09-27** 起固定为 `https://heyta.finlaw.cloud/`
 > （落地页 + 应用 + 同步 API + 三张凭据页），旧的 `heyta-tmp.litopia.space` 已弃用。
-> 迁移动机、代价与验收见 [`deployment.md` §3.7.1](../runbooks/deployment.md)。
+> 迁移动机、代价与验收见 [`deployment.md` §3.7.1](../../runbooks/deployment.md)。
 > 下面正文里的域名、`PUBLIC_URL`、证书名都按**当时**写，不要照着配。
 
 用 `tccli` 建了 `heyta-tmp.litopia.space` → `124.223.13.226`，`certbot --nginx` 签了
@@ -1204,7 +1205,7 @@ meta:   lastServerSeq = 1
 - **真机**仍未测。
 - 这次实测用的域名（`heyta-tmp.litopia.space`）与证书都是**临时资产**，
   用完应当删记录 + 撤容器；**不能当成正式环境**。
-  → **2026-09-27 更新**：域名已换成 `heyta.finlaw.cloud`（[deployment.md §3.7.1](../runbooks/deployment.md)），
+  → **2026-09-27 更新**：域名已换成 `heyta.finlaw.cloud`（[deployment.md §3.7.1](../../runbooks/deployment.md)），
   但**后半句仍然成立** —— 服务端至今还是 `TEST_MODE=true` 的本地镜像，没变正式环境。换域名不等于转生产。
 - **`litopia.space` 自身几乎全部记录都指向 `121.4.24.238`（= OPP/12km，09-27 00:00 停服）** ——
   这次顺带发现的，与 heyta 无关但会一起下线。
@@ -1677,7 +1678,7 @@ Web 端有，但带着三个缺陷（详见 ADR-0015 §7）。
 ### 3.1 跨平台 UI 技术栈 —— ✅ **已决定：React Native**
 
 产品负责人指示"用跨平台 UI 技术栈"。结论与完整论证见
-**[ADR-0004](../adr/0004-ui-stack.md)**（本表仅作摘要）。
+**[ADR-0004](../../adr/0004-ui-stack.md)**（本表仅作摘要）。
 
 | 选项 | 逻辑复用 | UI 复用 | 结论 |
 |---|---|---|---|
@@ -1744,7 +1745,7 @@ ADR-0003 §2.4 表里那条"P2 要做 tokens → JS 对象导出"**其实已经�
 
 P1 计划 §7 留下、尚未回答的：
 
-- ~~四象限自动归类规则~~ → **已回答**：[ADR-0015](../adr/0015-four-quadrant-as-derived-view.md)。
+- ~~四象限自动归类规则~~ → **已回答**：[ADR-0015](../../adr/0015-four-quadrant-as-derived-view.md)。
   结论：**不做"自动"归类**。紧急由 `dueDate` 推导（客观），重要必须由用户回答（主观，
   任何算法都猜不对）；象限是**派生视图**，不建实体。派生层 `packages/domain/src/quadrant.ts` 已完成。
 - 习惯连续天数算法（跨时区、补打卡怎么算）

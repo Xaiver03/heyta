@@ -290,7 +290,7 @@ export interface HelpModule {
 }
 
 /**
- * `/docs`：用户最会撞到的十个问题（依据 A4-2），按功能模块组织（A4-1）。
+ * `/docs`：用户最会撞到的十二个问题（依据 A4-2），按功能模块组织（A4-1）。
  *
  * 🔴 **这里是问答清单的唯一事实源**：`HELP_QUESTIONS` 由它 `flatMap` 出来，
  * 而 `gen-entries.mjs` 的 `FAQPage` JSON-LD 与 `render.spec.tsx` 都读那一份 ——

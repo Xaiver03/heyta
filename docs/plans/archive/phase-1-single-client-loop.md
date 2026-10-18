@@ -1,8 +1,9 @@
 # P1 详细计划：单端闭环
+> 📦 **已归档（2026-10-16）** —— 本文件是历史记录，**不要照它开工**；现役口径见 [计划层索引](../README.md) 与 [总路线图](../roadmap.md)。
 
-> 状态：**已完成** —— `pnpm verify:p1` 自带真实服务端，跑 11 条零 mock E2E，含两条真实点击 `ConflictDialog` 的双端收敛（与 [总路线图](roadmap.md) 的 P1 行一致）
-> 上级：[总路线图](roadmap.md) ｜ 依据：[复用方案](../research/reuse-plan.md)、[组件决策](../research/reusable-components.md)、[功能矩阵](../research/feature-matrix.md)
-> 前置：P0 已完成（协议通了，见 [roadmap](roadmap.md#p0-完成证据2026-09-25)）
+> 状态：**已完成** —— `pnpm verify:p1` 自带真实服务端，跑 11 条零 mock E2E，含两条真实点击 `ConflictDialog` 的双端收敛（与 [总路线图](../roadmap.md) 的 P1 行一致）
+> 上级：[总路线图](../roadmap.md) ｜ 依据：[复用方案](../../research/reuse-plan.md)、[组件决策](../../research/reusable-components.md)、[功能矩阵](../../research/feature-matrix.md)
+> 前置：P0 已完成（协议通了，见 [roadmap](../roadmap.md#p0-完成证据2026-09-25)）
 
 ---
 
@@ -96,7 +97,7 @@ P0 定的是**不可逆层**（协议、实体、服务端）。P1 定的是**�
 | 同步状态 | 界面能看出"已同步 / 同步中 / 冲突 / 离线" | 用户可感知 ✅（`SyncBar`，图标+文字，不只靠颜色） |
 | 离线队列 | 断网时排队，恢复后重放 | 断网→联网→数据一致 ✅（`uploadStatus` 索引，非内存列表） |
 
-> ⚠️ **实测发现必须落到实现里**（见 [runbook](../runbooks/local-server-verification.md)）：
+> ⚠️ **实测发现必须落到实现里**（见 [runbook](../../runbooks/local-server-verification.md)）：
 > 1. 服务端**强制 E2EE 且无开关**，明文上传一律 400
 > 2. 线协议 schema **不校验实体成员**，客户端必须先用 `isEntityType()` 自查，否则要到上传后才发现拼错
 >

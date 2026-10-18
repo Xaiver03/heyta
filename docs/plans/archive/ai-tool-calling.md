@@ -1,8 +1,9 @@
 # AI 工具调用 —— 分阶段计划
+> 📦 **已归档（2026-10-16）** —— 本文件是历史记录，**不要照它开工**；现役口径见 [计划层索引](../README.md) 与 [总路线图](../roadmap.md)。
 
 > 状态：🟢 **P0–P2 已落地**（2026-09-28）。P3–P4 未开工。
-> 决策与不变量见 [ADR-0035](../adr/0035-ai-tool-calling-reuses-local-api.md)。
-> 进度数字的唯一事实源仍是 [`ai-strategy.md`](ai-strategy.md) §7；本文只记这条线的分阶段内容。
+> 决策与不变量见 [ADR-0035](../../adr/0035-ai-tool-calling-reuses-local-api.md)。
+> 进度数字的唯一事实源仍是 [`ai-strategy.md`](../ai-strategy.md) §7；本文只记这条线的分阶段内容。
 
 ---
 
