@@ -84,12 +84,34 @@ function writeManifest(tmp, manifest) {
   run('coscli', ['-c', COSCLI_CONFIG, 'cp', tmp, `cos://${BUCKET}/${MANIFEST_KEY}`, '-e', 'cos.ap-guangzhou.myqcloud.com']);
 }
 
+/**
+ * 🔴 **第三道闸（2026-10-19 加）**：**不许在别的线还没推的提交上发布**。
+ *
+ * 翻牌要 `git push` + 重发，而重发的守卫要求 `HEAD == origin/main` ⇒
+ * 如果本地领先 origin（另一条线在途、还没推），那么翻牌一旦 push 就会**替他们把在途提交一起推上线并发布**。
+ * 那不是本线能拍的板 ⇒ 这里直接拒绝并打印该跑什么。
+ */
+function aheadOfOrigin() {
+  try {
+    return Number(run('git', ['rev-list', '--count', 'origin/main..HEAD'])) || 0;
+  } catch {
+    return -1;
+  }
+}
+
 const state = externalBuildState();
 const refuses = linkStillRefuses();
+const ahead = aheadOfOrigin();
 console.log(`  信号 ① externalBuildState = ${state ?? '（读不到）'}`);
 console.log(`  信号 ② 链接仍在拒绝新测试者 = ${refuses === undefined ? '（读不到）' : refuses}`);
+console.log(`  闸 ③ 本地领先 origin/main = ${ahead === -1 ? '（读不到）' : ahead} 笔${ahead === 0 ? '（齐平 ⇒ 可发）' : '（不齐平 ⇒ 不许发布）'}`);
 
-if (checkOnly) process.exit(0);
+if (checkOnly) {
+  // 只报不判：三闸各自的结论都列出来，供人复核（零副作用）
+  const verdicts = [state === 'BETA_APPROVED', refuses === false, ahead === 0];
+  console.log(`  ⇒ 三闸结论：① ${verdicts[0] ? '过' : '不过'} · ② ${verdicts[1] ? '过' : '不过'} · ③ ${verdicts[2] ? '过' : '不过'}`);
+  process.exit(verdicts.every(Boolean) ? 0 : 3);
+}
 
 // 🔴 两个信号都要明确成立才动手；任何一个"读不到"都算不成立（fail-closed）。
 const approved = state === 'BETA_APPROVED' && refuses === false;
@@ -97,6 +119,14 @@ if (!approved) {
   console.log('  ⏸️  还没通过外部审核 ⇒ 零改动。这一页此刻**不该**有 iOS 入口。');
   process.exit(3);
 }
+
+if (ahead !== 0) {
+  console.log(`  ⏸️  本地比 origin/main 领先 ${ahead === -1 ? '（读不到）' : ahead} 笔 ⇒ **不动手**。`);
+  console.log('     理由：翻牌会 push + 重发，那会把别的线还没推的在途提交一起推上线并发布 —— 那不是本线能拍的板。');
+  console.log('     该做的：等那条线推完（或由他们确认可以一起发），再跑一次本脚本。');
+  process.exit(4);
+}
+console.log('  ✅ 本地与 origin/main 齐平 ⇒ 可以动手');
 
 console.log('  ✅ 两个信号都说通过了 ⇒ 开始翻牌');
 const { tmp, manifest } = readManifest();
