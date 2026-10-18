@@ -129,3 +129,46 @@ bash scripts/clean-build-tmp.sh --self-test        # 分类器 + **端到端**�
                                 #   证据类 `*.png` 默认保留（界面验收的唯一证据载体，§6.2 规定一）
                                 #   ⚠️ 见 §7 第 434 条：macOS 上 `find` 有两个会**安静**出错的地方
 ```
+
+---
+
+## 6.1 腾讯云账号与凭据（**多个账号，别假设是同一个**）
+
+🔴 **本机 `tccli` 同时登着三个账号，而它们不是同一个账号。** 涉及腾讯云的操作（DNS / 证书 / COS / CDN）
+**先问"这件事属于哪个账号"**，再选 profile。选错的症状不是报错，而是**接口回 200 而事情没生效**
+（例如把自定义域名绑到另一个账号的桶上 —— 详见 §7 第 461 条）。
+
+| profile | 账号（UIN） | 这台机器上它管着什么 | 凭据形态 |
+|---|---|---|---|
+| `waytofuture` | **100050005585** | `waytofuture.cn` 的 DNS（DNSPod）· 该域的证书 | OAuth |
+| `default` | **100044381704** | `finlaw.cloud` · `litopia.space` · `openpenpal.com` · `x-creative.team` · `xiaolihub.team` 的 DNS；**分发桶 `heyta-dist-1380503169` 也在这个账号** | OAuth |
+| `opp` | （另有账号） | 见 `~/.tccli/opp.credential` | OAuth |
+
+⚠️ **`sanjiaozhou`（`root@VM-0-14-ubuntu`）上还有一个 `tccli`，profile `ssos-distribution` = 账号 `100050003573`**。
+那台机器上有 `coscli` 但**未配置**。
+
+### 凭据形态决定"能做什么"
+
+* `~/.tccli/<profile>.credential` 在本机是 **OAuth 型**（`type: oauth`、带 `token`、`secretId` 68 字符）
+  ⇒ **能调 tccli 的云 API，但签不了 COS**（会回 `SignatureDoesNotMatch`）。
+* 能签 COS 的是 **36 字符的 AKID**，住在 `~/.cos.yaml`（`cos.base.secretID/secretKey`）与 `~/.coscli/config.yaml`。
+* ⇒ **"换个域名就能下发 APK"这类事，卡的不是命令，是"那个账号有没有 COS 密钥"**。
+
+### 量账号（别猜）
+
+```bash
+# 每个 profile 各属哪个账号
+for p in default waytofuture opp; do printf '%s → ' "$p"; tccli sts GetCallerIdentity --profile "$p" \
+  | python3 -c 'import json,sys;print(json.load(sys.stdin)["AccountId"])'; done
+
+# COS 桶属于哪个账号（用 COS 密钥，经环境变量传给 tccli）
+TENCENTCLOUD_SECRET_ID=<cos.yaml 里的 secretID> TENCENTCLOUD_SECRET_KEY=<...> \
+  tccli sts GetCallerIdentity
+```
+
+### 已知边界（省下重新踩的时间）
+
+* `tccli` **没有 `cos` service**；`coscli` **没有域名子命令**（只有 `bucket-acl/policy/tagging/versioning/encryption`）
+  ⇒ 绑自定义域名要自己签 COS XML API（签名四步写在 §7 第 461 条）。
+* `tccli ssl ApplyCertificate --DvAuthMethod DNS_AUTO` **不保证**自动写验证 TXT ⇒ 手动补 `_dnsauth.<子域>`。
+* 免费 DV 证书本次是 **TrustAsia DV Free，3 个月**（`CertId bf4wtvOI`，`dl.waytofuture.cn`，2026-10-18 → 2027-01-16）。

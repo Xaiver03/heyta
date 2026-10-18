@@ -10199,3 +10199,44 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     要跑 `git diff --cached --name-only HEAD -- <本批路径>`：**空**才叫索引跟上了提交态。
 
 460. **变异对照的锚点若是别的串的片段，它会一次改掉两处，而报告照样像有牙**。`research/tools/verify-inbound-ac-battery-negctl.py` 给电池 `--self-test` 的七臂造八处失法，其中"通配针下无件"那一枚原先把锚点写成裸串 `tests/inbound-*.spec.ts` 并要求"出现 1 次"，但它是同仓另一条腿里 `tests/inbound-*.spec.tsx` 的**子串** ⇒ 真实命中 2 次（现量 `grep -n 'tests/inbound-\*' research/tools/verify-inbound-ac-battery.py` 回 2 行）。按 `str.replace(old, new, 1)` 的写法它只会改掉**第一处**，于是那处对照测的并不是它声称的那件事；按"枚数≠预期即作废"的规则它又必然报废。两种写法都会咬人，区别只在症状是"假有牙"还是"假作废"。⇒ **三条一起做**：⑴ 锚点要选**唯一命中**的形状（这里换成带结尾引号的正则 `tests/inbound-\*\.spec\.ts"`，现量 `grep -c 'tests/inbound-\*\.spec\.ts"' research/tools/verify-inbound-ac-battery.py` 回 1）；⑵ **替换前当场数一遍命中次数**，不符就记"对照作废"并让整枚装置退非 0，不许静默继续；⑶ 报告要把三种结局分开 —— 臂红（有牙）／`rc=0`（这臂对这处失法是盲的）／装置崩或对照作废（**这不算有牙，也不许算过**）。同一族的元规则见 `AGENTS.md` §6 第 3 条与 §7 那三条（一条永远通过的判据比没有判据更糟；先怀疑探针）。
+
+461. 🔴 **COS 的"默认域名不许公开下发 .apk/.ipa"是一条域名级策略：它连带签名的 `GET` 也封，而 `HEAD` 却回 200；换自定义域名的真正条件是「域名 + 该域名的 ICP 备案 + 桶」在同一账号**（2026-10-18 实测，为 heyta 的 Android 403 追到底）
+
+    **现象**：`curl` 桶默认域名上的 `.apk` 得 `403`，正文是
+    `<Code>DownloadForbidden</Code> … not allowed to be distributed in a public network using COS default domain, please use custom domain instead.`
+
+    **四条当场会把人带偏的读数**（每条都实测过）：
+
+    1. **`HEAD` 与 `GET` 不同答**：同一个对象、同一把密钥 —— `HEAD` → **200**，`GET` → **403**。
+       ⇒ 拿 `HEAD` 复核"能不能下"会**读成没问题**。仓库里那条判据早就写明"不要拿 HEAD 复核"。
+    2. **带签名的 `GET` 照样封** ⇒ "**用自己的密钥把它拉下来再换地方**"这条路**不成立**。
+       走不通的不是权限，是那条域名策略。
+    3. **自定义域名绑定会"看起来成功"**：`PUT /?domain=` 回 **200**、`GET /?domain` 能读回规则、
+       CNAME 也解析到桶 —— 而实际请求仍回 `400 UserCnameInvalid`
+       （`Your cname does not exist or format illegal.`），TLS 握手上呈现的还是 COS 通配证书。
+    4. `PUT /?domain=` 是**整体替换而不是追加**：连绑两个域名，只有最后一个留下（回读只剩一条）。
+
+    **真正的条件是账号归属**（本次的根因）：`sts GetCallerIdentity` 量出 ——
+    `waytofuture.cn` 的 DNS 与证书在账号 **100050005585**，而桶 `heyta-dist-1380503169` 在账号
+    **100044381704**；为排除"只是跨账号"，在**桶自己那个账号**里另建 `dl.openpenpal.com` 与
+    `dl.finlaw.cloud` 并绑到桶上 ⇒ **同样 `UserCnameInvalid`**（那两个域名没有备案）。
+    ⇒ **COS 要求「域名 + 该域名的 ICP 备案 + 桶」在同一账号**；备案在 A 账号、桶在 B 账号时，绑定**永远不会生效**。
+
+    **工具侧的三个缺口**（会浪费很多时间去找"命令写错了"）：
+    * `tccli` **没有 `cos` service**；`coscli` **没有域名子命令**（`bucket-acl/policy/tagging/versioning/encryption` 之外没有 domain）
+      ⇒ 绑自定义域名只能**自己签 COS XML API**（`q-sign-algorithm=sha1`：`SignKey=HMAC-SHA1(SecretKey, q-key-time)`、
+      `StringToSign=sha1\n<q-sign-time>\n<sha1(HttpString)>\n`）。
+    * `tccli` 的 `~/.tccli/<profile>.credential` **可能是 OAuth 型**（`type: oauth` + `token`，`secretId` 68 字符）
+      ⇒ **它签不了 COS**（会回 `SignatureDoesNotMatch`，即使把 `x-cos-security-token` 加进 `q-header-list` 也一样）。
+      能签 COS 的是 **36 字符的 AKID**（本次在 `~/.cos.yaml` / `~/.coscli/config.yaml` 里）。
+    * `tccli ssl ApplyCertificate --DvAuthMethod DNS_AUTO` **不保证**自动写验证 TXT
+      ⇒ 手动补 `_dnsauth.<子域>` 才会通过（值取 `DvAuthDetail.DvAuthValue`）。
+
+    **Why**：这条线表面是"改个域名"，实际会卡在一条**行政条件**（备案与桶的账号归属）上；
+    而中间那四个"看起来成功"的读数，会让排查方向一直停在"命令参数写错了"。
+
+    **How to apply**：拿到"某端下不了"的报障时，**先分清是权限问题还是域名策略问题** ——
+    看 `HEAD` 与 `GET` 是否同答、正文里有没有 `DownloadForbidden`；
+    要换自定义域名，**先核「域名 + 备案 + 桶」是否同账号**（`tccli sts GetCallerIdentity --profile <p>`
+    逐个 profile 量，别假设），再动手做 DNS 与证书。
+    相关：`docs/agents/commands.md`「腾讯云账号与凭据」那一节（本机有哪些 profile、各属哪个账号、各自能做什么）。
