@@ -242,8 +242,12 @@ PY
 
 1. ✅ **已做完（10-18 17:2x）：#83 iOS 批量操作条那一格的裁决是「可滚」，不是真溢出** —— 逐枚 frame 与位移在 §四 第 36 行末尾。
    同一趟清掉了本线自己造的一枚探针缺陷（滑动 y 打在上一条计数行 ⇒ 假"真溢出"，环境陷阱 **#465**）。
-   🔴 这一族留给下一位的只剩两样：① 静止态**没有"还能滚"提示**（`showsHorizontalScrollIndicator={false}`）——
-   那是界面那一线的设计取向，本线按 §四 第 14 格同族口径只登记不改；② 英文／Android／深色三档的帧读数没取。
+   🔴 这一族留给下一位的只剩两样（**深色已于 10-18 18:5x 补掉**，见 §五 第 7 步 r129 那段）：① 静止态**没有"还能滚"提示**（`showsHorizontalScrollIndicator={false}`）——
+   那是界面那一线的设计取向，本线按 §四 第 14 格同族口径只登记不改；② **英文档与 Android 档的帧读数仍未取** ——
+   英文档这条本线已经把死路走穿并定位到代码：改系统语言（`-g AppleLanguages` / app 域 / `-g AppleLocale`）三条通道
+   各配冷启动都**不会**改这枚包的界面语言，因为 `apps/mobile/src/i18n/locale.ts` 的 `resolveNativeLocale()`
+   第一优先级是应用内开关持久化的 `HeytaWidget.preferredLocale` ⇒ **正路是设置 → 常规 → 语言那一屏**
+   （形状进环境陷阱 **#469**）；Android 档与 §四 第 21 行那台打包机同一前提。
 2. ✅ **Goal 第 4 步「从最终源码四端构建重装」第八趟跑完（10-18 18:2x，r128）** → 逐端读数在 §四 第 4 步那一行末尾，出处与偏离在 `provenance.txt`。
    r125 登记的两条根因**都由各自的线自己解决了**（两枚 `app-host` 模块已进 HEAD、`CommentView extends CommentLike` 且 `CommentLike` 有 `id`），
    本线一个字没代改。这一趟实际取到：`BUILD_RC=0`（起数 20／`Failed` 0／`Done` 20）、**mac 腿第 3 趟全绿**（前两趟红在**不同对象**上，

@@ -10342,3 +10342,24 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     3. 🔴 **"0 命中"是一个方向不明的读数**：它既可能是"条件不成立"，也可能是"我的探针压根匹配不上"。
        凡把 `grep -c` 的 0 当作**肯定结论**（"已通""没有违规""不存在"）的判据，都必须配一个**阳性对照** ——
        拿一段**确定含该串**的文本跑一次，证明这条 grep 真的能命中。这一条与 §7 的元规则「先怀疑探针」是同一条。
+
+
+469. 🔴 **改 iOS 模拟器的系统语言不会改变 heyta 这一枚包的界面语言 —— 优先级写死在代码里，不在缓存里**。
+    2026-10-18 本机实测（模拟器 `FE195661`，装的是第八趟 r128 那枚新产物）：冷启动（`terminate` + `launch`）前后逐条试过
+    `defaults write -g AppleLanguages -array en "zh-Hans-CN"`、`defaults write com.heyta AppleLanguages -array en`、
+    `defaults write -g AppleLocale -string en_US`，界面**始终中文**。中途按"cfprefsd 缓存"去 `killall cfprefsd` ——
+    那条命令在 iOS 27 模拟器上直接 `No such file or directory`，而且**根本不是成因**。真因在
+    `apps/mobile/src/i18n/locale.ts` 的 `resolveNativeLocale()`：它**第一眼看原生模块 `HeytaWidget.preferredLocale`**
+    （文件里那句注释原话是"已选设备偏好优先于系统语言"），只有它为空/不识别才退 `deviceLocale`，
+    再往下才轮到 `SettingsManager.settings.AppleLocale` → `AppleLanguages[0]`。这台机子上那枚应用内开关
+    早已持久化成中文 ⇒ 系统语言那条路整条被挡在门外。
+    ⇒ 四条：⑴ **要英文档就走应用内开关**（设置 → 常规 → 语言；`scripts/qa/profile-settings-ios.py` 里那句
+    `probe.tap("open general", ("常规", "General"), ("语言", "Language"))` 就是走到这一屏），别再写系统 defaults；
+    ⑵ 判"某个语言/外观开关是不是被系统设置驱动"，**先去读那段解析函数的优先级顺序**，不要在设备侧连开三条通道试
+    —— AGENTS §7 元规则一「先怀疑探针」这次的形状不是探针坏了，是**探针接错了口**；
+    ⑶ 与 #462 相邻的另一条本趟读数：`dump_nodes` 只回 **29 枚节点**、底部 tab 栏整条不在树里，而截图上明明画着五枚 tab
+    ⇒ "部分树"不止"整棵空"一种失法；它的下游症状是 `tap_node` 的视口守卫报
+    `open profile tab is not in the tappable viewport: {'found': True, 'x': 321, 'y': 776, 'visible': False, 'swipes': 10}`
+    —— `found=True` 与 `visible=False` 同时出现时，**先怀疑树不完整**，不要去改定位符；
+    ⑷ 收尾要把动过的东西逐件还原并**现量给"已无"的证据**：`defaults delete com.heyta AppleLanguages` 之后
+    `defaults read com.heyta AppleLanguages` 应回 `Could not find key`（回空值不等于删掉）。

@@ -4365,3 +4365,25 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
       ⚠️ 两枚旧限定语按本趟现量重读：⑴ "不证 `origin/main`（本地未 push）"已过期 —— `git rev-list --count origin/main..HEAD` 与反向**都是 0**；
       ⑵ 上一格那句"本会话没有跑第八趟"就是本格。全部读数与出处
       [`apps/web/evidence/ux-final-20261018/reinstall-r128/RESULT.md`](../../apps/web/evidence/ux-final-20261018/reinstall-r128/RESULT.md)（另有 `provenance.txt` 七条前置/偏离现量）。
+
+- [x] ✅ **10-18 18:5x r129 把批量操作条那一格补到暗档，并把英文档那条死路的成因落到代码那一行**。
+      **暗档复验**（被测物换成第八趟 r128 装进 `FE195661` 的那枚新产物，载体 `head-r128` @ `f8d7155e`）：同一枚判据、
+      滑动作用点仍取在被裁那一行自己的 y（`y=208`，锚点「已选 2 项」在 `y=145`），三枚按钮位移
+      `-34 / -35 / -35`，`批量删除` 从 `right=412 > 402` 滚成 `[258..377]` 整枚进屏，`clippedAfter=[]`
+      ⇒ **verdict 与 r127 浅色趟逐枚相同** ⇒ 那一格的"可滚"与主题无关。两张图都人眼看过（暗档无白压白）。
+      🔴 **英文档没取到，但不是"做不到"，是"这条路本来不通"**：`-g AppleLanguages`、`com.heyta AppleLanguages`、
+      `-g AppleLocale` 三条各配一次冷启动，界面始终中文；成因在 `apps/mobile/src/i18n/locale.ts` 的
+      `resolveNativeLocale()` —— 它**第一优先级是原生模块 `HeytaWidget.preferredLocale`**（应用内开关持久化的值，
+      文件注释原话"已选设备偏好优先于系统语言"），系统语言只是它的兜底。⇒ **正路只有应用内开关那一屏**
+      （设置 → 常规 → 语言，`scripts/qa/profile-settings-ios.py` 里已有走到那一屏的那一步）。
+      本趟走到那一屏之前停下：`tap(("我的","Profile"))` 报 `found=True` 同时 `visible=False`、`swipes=10`，
+      同一次 `dump_nodes` 只回 **29 枚节点**而底部 tab 栏整条不在树里（截图上明明画着五枚）
+      ⇒ 这是 #462 那一族的**部分树**失法，不是产品缺陷，本线不据此改定位符。
+      形状进环境陷阱 **#469**（含"判某个开关是不是系统驱动，先读解析函数的优先级顺序，别在设备侧连开三条通道"）。
+      ⚠️ 失败趟的读数**不作数**、已改名留档：`ios-bulk-bar-r129-EN-ATTEMPT-LOCALE-NOT-SWITCHED/NOT-EN-*`
+      （它的 `uiLocale` 字段自己写着 `zh-CN` ⇒ 是一份中文×暗档的重复样本）。
+      ✅ **设备逐件还原并现量给"已无"**：`AppleLanguages=("zh-Hans-CN")`、`AppleLocale=zh_CN`、
+      `com.heyta` 域那枚已 `delete`（`defaults read` 回 `Could not find key`）、外观回 `light`；**没收任何 companion**。
+      本机残留：设备上多了 `BulkA/BulkB<两枚时间戳>` 四行测试任务（与 r127 同形状，属这台验收机的既有残留族）。
+      读数与两张图 [`apps/mobile/evidence/ux-final-20261018/ios-bulk-bar-r129/RESULT.md`](../../apps/mobile/evidence/ux-final-20261018/ios-bulk-bar-r129/RESULT.md)。
+      🔴 **仍开的只剩两档**：英文档（要走应用内开关）与 Android 档 —— 后者与 §四 第 21 行那台打包机同一前提。
