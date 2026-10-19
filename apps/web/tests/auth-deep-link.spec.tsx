@@ -32,7 +32,12 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { IDBFactory } from 'fake-indexeddb';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('../src/features/privacy/consent-gate.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../src/features/privacy/consent-gate.js')>(),
+  consentFetch: (input: RequestInfo | URL, init?: RequestInit) => globalThis.fetch(input, init),
+}));
 
 import { emptyState } from '@heyta/op-log';
 
@@ -75,10 +80,17 @@ async function mountApp(search: string): Promise<HTMLDivElement> {
 
 /** 登录表单**真在屏幕上**：共享 `AuthForm` 的邮箱字段（四端共用的契约）。 */
 function signInFormVisible(view: HTMLElement): boolean {
-  return view.querySelector('[data-testid="auth-form-email"]') !== null;
+  return view.querySelector('[data-testid="auth-form-email"], [data-testid="central-auth-panel"]') !== null;
 }
 
 beforeEach(async () => {
+  const originalFetch = globalThis.fetch;
+  vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init?: RequestInit) =>
+    String(input).endsWith('/api/auth/central/config')
+      ? Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({
+        mode: 'oidc', loginPath: '/api/auth/oidc/start', documentVersion: 'v1',
+      }) } as Response)
+      : originalFetch(input, init)));
   __resetAuthForTests();
   // 🔴 每条用例**自己的库**：App 挂的是真 op-log，不换库会互相污染
   //（J1 与 app-mount.spec.tsx 的 `freshDb` 各记过同一条教训）。
@@ -107,6 +119,7 @@ afterEach(() => {
   root = undefined;
   container = undefined;
   window.history.replaceState({}, '', '/');
+  vi.unstubAllGlobals();
 });
 
 describe('🔴 带 `?signin` 冷启动 = 登录界面直接出现', () => {
