@@ -83,6 +83,11 @@
 它披露的那 1 条"组内整片单语"就是 `DIRECTORY_GROUPS["zh"]` 那一组：门把每枚元组当一个组，
 两档**必须**分开写（合写会让「常规」去配 "Sync and privacy" 而红），所以这条披露是形状不是欠项，已写在代码注释里。
 
+🔴 **共享代码改完的回归**（`Probe`、`require_appearance` 与 `scroll_to` 都被另两枚装置复用）：
+同族两枚装置各重跑一趟 —— `account-face-ios.py` 11 步 `rc=0`、`ai-face-ios.py` 20 步 `rc=0`。
+那两趟的读数落在仓外 `/Users/rocalight/heyta-r140-rig-regression/`，**不入库**：它们只是"改坏没有"的证据，
+不是这一面的取证，混进 `ux-final` 目录会被下一位读成又一格读数。
+
 ## 6. 人看图（20 张里看 5 张，其余按像素）
 
 | 图 | 看到什么 |
