@@ -28,7 +28,7 @@
  * 因为"只改了主入口"正是这类站点最容易发生的一类漂移。
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -390,6 +390,30 @@ describe('平台验证文件：BingSiteAuth.xml', () => {
     const tokens = [...xml.matchAll(/<user>([^<]*)<\/user>/g)].map((m) => m[1]);
     expect(tokens.length, 'BingSiteAuth.xml 里必须恰好一个 <user>').toBe(1);
     expect(tokens[0], 'token 形状不对（Bing 给的是 32 位大写十六进制）').toMatch(/^[0-9A-F]{32}$/);
+  });
+});
+
+describe('平台验证文件：google*.html（Search Console 的 HTML 文件验证）', () => {
+  /**
+   * GSC 的 HTML 文件验证有一个**协议自洽**的形状：文件名是 `google<token>.html`，
+   * 而文件内容**恰好是** `google-site-verification: <文件名>` 这一行（不带别的、不带结尾换行）。
+   *
+   * 🔴 判据直接从"文件内容必须由它自己的文件名推出"这一点来写 —— 与 IndexNow 那条同一个手法：
+   * 线上那条判据比的是"本机 ↔ 线上"，两边一起改坏时它照样绿；只有**离线按协议形状**判才补得上。
+   *
+   * ⚠️ 实测来源（2026-10-19）：内容不是猜的 —— GSC 页面上那个下载按钮点不动（Wiz 控件），
+   * 但 `~/Downloads/google927ee7a197e8bc34.html` **早就存在**（7 月下的，同一 token），
+   * `cmp` 与该 token 对应的 GSC 页面文件名逐字吻合，才落成这一份。
+   */
+  it('形状正确：内容恰为 `google-site-verification: <文件名>`，且无结尾换行', () => {
+    const files = readdirSync(resolve(APP, 'public')).filter(
+      (f) => /^google[0-9a-f]+\.html$/.test(f),
+    );
+    expect(files.length, `public/ 下的 google*.html 应当恰好一枚，实际：[${files.join(', ')}]`).toBe(1);
+    const name = files[0] ?? '';
+    const content = readFileSync(resolve(APP, 'public', name), 'utf8');
+    expect(content).toBe(`google-site-verification: ${name}`);
+    expect(content.endsWith('\n'), '这枚文件不许有结尾换行').toBe(false);
   });
 });
 
