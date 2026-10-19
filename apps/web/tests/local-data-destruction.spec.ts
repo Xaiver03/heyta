@@ -20,6 +20,7 @@ import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { IndexedDbAdapter } from '@heyta/storage';
+import { CENTRAL_ACCOUNT_BINDING_KEY } from '../src/lib/central-account-binding.js';
 
 import {
   WEB_DATABASE_NAMES,
@@ -309,6 +310,7 @@ describe('E2 —— 逐类真的清掉', () => {
     localStorage.setItem('heyta.locale', 'zh-CN');
     // 一条**从未在任何人清单里**的 heyta 键：点名清单漏的就是它。
     localStorage.setItem('heyta.brand-new-module', 'x');
+    localStorage.setItem(CENTRAL_ACCOUNT_BINDING_KEY, '{"origin":"https://heyta.example","subject":"12"}');
     localStorage.setItem('other-app:key', '不能碰');
     sessionStorage.setItem('loginToken', 'one-time-token');
     sessionStorage.setItem('loginEmail', 'someone@example.test');
@@ -326,6 +328,7 @@ describe('E2 —— 逐类真的清掉', () => {
     }
     expect(localStorage.getItem('heyta.theme')).toBeNull();
     expect(localStorage.getItem('heyta.brand-new-module')).toBeNull();
+    expect(localStorage.getItem(CENTRAL_ACCOUNT_BINDING_KEY)).toBeNull();
     // 前缀扫只扫自己的东西：别的应用的键不许动。
     expect(localStorage.getItem('other-app:key')).toBe('不能碰');
     expect(sessionStorage.getItem('loginToken')).toBeNull();
@@ -380,6 +383,40 @@ describe('E2 —— 逐类真的清掉', () => {
     // 后面几类真的做了，不是被 catch 顺手跳过的。
     expect(localStorage.getItem('heyta.theme')).toBeNull();
     expect(sessionStorage.getItem('loginEmail')).toBeNull();
+  });
+
+  it('主库销毁失败时保留中央 subject 绑定，避免残留数据下次被新账号接走', async () => {
+    vi.spyOn(IndexedDbAdapter.prototype, 'destroy').mockRejectedValue(new Error('database-busy'));
+    localStorage.setItem(CENTRAL_ACCOUNT_BINDING_KEY, '{"origin":"https://heyta.example","subject":"12"}');
+    localStorage.setItem('heyta.theme', 'dark');
+    installOpfs();
+    installServiceWorkerLayer();
+
+    const reports = await eraseWebLocalData();
+
+    expect(localStorage.getItem(CENTRAL_ACCOUNT_BINDING_KEY)).not.toBeNull();
+    expect(localStorage.getItem('heyta.theme')).toBeNull();
+    expect(reports.find((item) => item.target === 'localStorage')?.containerRemoved).toBe(false);
+  });
+
+  it('清除期间另一标签页改变绑定时，不抹掉新绑定或报告完整清除', async () => {
+    const original = '{"origin":"https://heyta.example","subject":"12"}';
+    const changed = '{"origin":"https://heyta.example","subject":"13"}';
+    localStorage.setItem(CENTRAL_ACCOUNT_BINDING_KEY, original);
+    installOpfs();
+    installServiceWorkerLayer();
+    override(globalThis, 'caches', {
+      keys: async () => ['app-shell'],
+      delete: async () => {
+        localStorage.setItem(CENTRAL_ACCOUNT_BINDING_KEY, changed);
+        return true;
+      },
+    });
+
+    const reports = await eraseWebLocalData(original);
+
+    expect(localStorage.getItem(CENTRAL_ACCOUNT_BINDING_KEY)).toBe(changed);
+    expect(reports.find((item) => item.target === 'localStorage')?.containerRemoved).toBe(false);
   });
 
   it('OPFS 不可用（没有 getDirectory）⇒ 如实报 false，不抛、不假装删了', async () => {

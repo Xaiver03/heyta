@@ -35,6 +35,7 @@ import { IndexedDbAdapter, type DbDestroyReport } from '@heyta/storage';
 
 // 🔴 销毁 OPFS 之前要能关掉那个持句柄的 worker（为什么必须，见 `removeOpfsDirectory` 上面那段实测）。
 import { destroyLiveStorage, releaseStorageWorker } from './oplog.js';
+import { CENTRAL_ACCOUNT_BINDING_KEY, centralAccountBindingExists, centralAccountBindingSnapshot } from './central-account-binding.js';
 
 /**
  * 这个宿主管辖的 IndexedDB 数据库名。
@@ -174,7 +175,7 @@ async function removeOpfsDirectory(): Promise<DbDestroyReport> {
 }
 
 /** 前缀扫掉一个 Storage 上属于本应用的键。返回删掉的个数。 */
-function wipePrefixedKeys(store: Storage | undefined): number {
+function wipePrefixedKeys(store: Storage | undefined, protectedKey?: string): number {
   if (store === undefined) return 0;
   let removed = 0;
   try {
@@ -183,7 +184,7 @@ function wipePrefixedKeys(store: Storage | undefined): number {
     const keys: string[] = [];
     for (let i = 0; i < store.length; i++) {
       const key = store.key(i);
-      if (key !== null && key.startsWith(WEB_STORAGE_PREFIX)) keys.push(key);
+      if (key !== null && key.startsWith(WEB_STORAGE_PREFIX) && key !== protectedKey) keys.push(key);
     }
     for (const key of keys) {
       store.removeItem(key);
@@ -254,7 +255,7 @@ async function clearServiceWorkerLayer(): Promise<DbDestroyReport> {
  *
  * 🔴 返回的数组**长度是判据**：少于 4 类就是有代码没跑到。
  */
-export async function eraseWebLocalData(): Promise<DbDestroyReport[]> {
+export async function eraseWebLocalData(expectedCentralBinding?: string): Promise<DbDestroyReport[]> {
   const reports: DbDestroyReport[] = [];
   // Stop native widget writers before destroying the database; report a failure honestly.
   try {
@@ -292,7 +293,11 @@ export async function eraseWebLocalData(): Promise<DbDestroyReport[]> {
 
   reports.push(await removeOpfsDirectory());
 
-  const local = wipePrefixedKeys(globalThis.localStorage);
+  // Keep the ownership binding until every durable data layer reports success.
+  // A blocked IndexedDB/OPFS deletion followed by an unbound next login could
+  // upload the remaining old account data to a new central subject.
+  const local = wipePrefixedKeys(globalThis.localStorage, CENTRAL_ACCOUNT_BINDING_KEY);
+  const localReportIndex = reports.length;
   reports.push(
     local < 0
       ? report('localStorage', false, { reason: 'local-storage-unavailable' })
@@ -313,6 +318,22 @@ export async function eraseWebLocalData(): Promise<DbDestroyReport[]> {
   );
 
   reports.push(await clearServiceWorkerLayer());
+
+  if (centralAccountBindingExists()) {
+    if (reports.every((item) => item.containerRemoved)) {
+      try {
+        if (expectedCentralBinding !== undefined && centralAccountBindingSnapshot() !== expectedCentralBinding) {
+          throw new Error('central-binding-changed');
+        }
+        globalThis.localStorage.removeItem(CENTRAL_ACCOUNT_BINDING_KEY);
+        if (centralAccountBindingExists()) throw new Error('binding-still-present');
+      } catch {
+        reports[localReportIndex] = report('localStorage', false, { reason: 'central-binding-removal-failed' });
+      }
+    } else if (reports[localReportIndex]?.containerRemoved) {
+      reports[localReportIndex] = report('localStorage', false, { reason: 'central-binding-retained-after-partial-erasure' });
+    }
+  }
 
   return reports;
 }
