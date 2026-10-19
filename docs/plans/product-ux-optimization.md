@@ -4666,3 +4666,13 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
       教训不是"内存不够"，是**动手前先读那条链的收口点自己怎么写它的边界**（这条在记忆里有条目，我没去查它）。
       **所以本轮四端的真实状态**：iOS ✅（上一格）· mac ✅（本格）· windows ⛔ 主机不可达 · android ⛔ 同一枚主机不可达 ⇒ **两趟覆盖两端，不叫四端全过**，
       脚本汇总段自己就逐端写着"不在 `--only` 范围 —— 这端**没有**验证当前产物"。
+      **两枚新鲜度读数（11:57，当前 HEAD 上重量，不是抄上一格的数）**：`npx vitest run` ⇒ `Tests 987 passed (987)`／`Test Files 78 passed (78)`、
+      `npx tsc --noEmit -p tsconfig.json` ⇒ `rc=0` ⇒ **r138 那两枚源码判据到这一戳仍会红会绿**（其间 main 已被别的会话推过）。
+      ⚠️ 顺手记一条我自己的调用错：第一次跑成 `VITEST_RC=1` 是 `--reporter=basic` 这枚参数在 vitest 5 已不存在 ⇒ **Startup Error**，
+      不是套件红 —— 读 `rc` 之前先看日志第一行是"启动错"还是"断言失败"。
+      ⚠️ **一条覆盖缺口登记（不修，交下一趟）**：`AuthScreen` 是 iOS/Android 共用的 RN 代码，所以 r138 那枚可及名称修复
+      **在 Android 上同样生效**，但本线**没有任何一枚 Android 装置覆盖那枚开关** —— 现量：
+      `grep -l "其他登录方式\|Other ways" scripts/qa/*android*` 零命中，仓内 Android 只读旅程只有
+      `profile-settings-android.py` / `tasks-ux-android.py` / `ai-assistant-atomic-android.py` 三枚。
+      ⇒ 本趟的"真包复验"只覆盖 iOS 一档；Android 那一档既缺装置、又缺出包载体（`windows-pc` 不可达），
+      **别把 iOS 的读数外推成"两端都验过"**。
