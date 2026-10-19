@@ -268,8 +268,11 @@
 > 判据与复跑命令见 §3.6。
 
 - ✅ `server_name heyta.finlaw.cloud;`、`client_max_body_size 64m;`
-- ✅ `location /` → `root /var/www/heyta-landing;` + SPA 兜底 `try_files $uri $uri/ /index.html`
-  （落地页本身也是 SPA；`/en/` 走同一段）。`/assets/` 单独一段长缓存。
+- ✅ `location /` → `root /var/www/heyta-landing;` + **`try_files $uri $uri/ =404`**
+  （`/en/` 同一段形状，另带 `error_page 404 /en/404.html`）。
+  ⚠️ **2026-10-19 起这里不再是 SPA 兜底**（原为 `… /index.html`）—— 理由、实测判据与
+  回滚见 §3.11「同一类坑的第七次：整站软 404」。`/assets/` 单独一段长缓存。
+  🔴 `$uri/` **不能删**（那条红不会报错，见 §3.7）。
 - ✅ `location /app/` → `alias /var/www/heyta-app/;` + `try_files $uri $uri/index.html /app/index.html`，
   `Cache-Control: no-cache`；`/app/assets/` 单独一段长缓存。
 - 🔴 **`location /app/` 与 `location /app/assets/` 都必须 `include /etc/nginx/mime.types;` 之后再补自己的 `types {}`。**
@@ -663,11 +666,18 @@ cd apps/web && VITE_SITE_URL=https://site.example.com pnpm exec tsc -b && \
 #### 🔴 站点与应用要**一起**发布，而且站点先发
 
 应用里的那三条链接指向站点的 `/help`、`/changelog`、`/pricing`。
-先发应用、后发站点，用户点到的就是一个 **200 + 首页**（SPA 兜底，同上表）——
-不是 404，但也不是他要的那一页。
+先发应用、后发站点，用户点到的那三条会落空。
+
+⚠️ **2026-10-19 起"落空"的形态变了，判断也跟着变**：以前是 **200 + 首页**
+（SPA 兜底，同上表）—— "不是 404，但也不是他要的那一页"，属于**看起来像成功**。
+整站兜底换成 `=404` 之后（§3.11），落空变成**诚实的 404 + 品牌 404 页**。
+⇒ 这条纪律的理由从"别让用户看到骗人的首页"变成"**别让帮助入口直接 404**"：
+危害小了（不再伪装），但**依然要照旧先发站点** —— 404 也是坏的。
 
 **发布顺序**：站点（`VITE_APP_URL=… pnpm --filter @heyta/landing build` → rsync）
 → 再发应用。反过来做的那段时间里，帮助入口是坏的。
+🔴 顺序本身**已经固化成脚本**（`publish-public-sites.mjs` 的 7/9 先于 8/9），
+不要手敲成反过来的两条 rsync。
 
 ⚠️ 生成物必须与站点结构一致。CI 里的 `pnpm --filter @heyta/landing check:entries`
 会拦住"改了注册表忘了重新生成"（`gen-entries.mjs --check`）。
@@ -752,8 +762,11 @@ location /en/legal/ {
 
 ⚠️ 最后一行才是这条改动的**风险所在**：`/app/` 与 `/app/nope-route` 依赖的正是 SPA 兜底，
 深链刷新必须仍然 200，所以"没牵连前端路由"要和"未命中变 404"**同时**验，缺一条都不算过。
-常驻判据：`e2e/live-site/live-legal.spec.ts` 第 12 条（含阳性对照：同层未知路径
-`/not-a-page-xyz/` 仍须 200 —— 否则那两条 404 可能只是"整站都在 404"）。
+常驻判据：`e2e/live-site/live-legal.spec.ts` 第 12 条。
+🔴 **2026-10-19 起那条的阳性对照换了形状**：原本探"同层未知路径 `/not-a-page-xyz/` 仍须 200"，
+而那**把整站兜底当成了被测对象的前提** —— 于是本轮修好整站软 404 时它按设计假红。
+现在探的是**已注册的真实页面 `/features/`**（须 200、且字节里不含 404 页的标记），
+这个形状在"有兜底"和"没兜底"两个架构下都成立，才配当对照。
 ⚠️ 那条判据是在页面里 `fetch` 相对路径，**必须先 `page.goto(origin)`**：新开的 page 停在
 `about:blank`，相对 URL 没有 base 可解析，报的是 `TypeError: Failed to parse URL from /` ——
 长得像"服务器坏了"，其实是探针没落到目标域。
@@ -774,6 +787,63 @@ location /en/legal/ {
 - 页面本身是**构建产物**，不在这里手改：`apps/landing/public/404.html` 由 `gen-entries.mjs` 生成，改文案去 `packages/i18n`、改样式去 design token。
 
 判据、实测取值与回滚备份路径以台账为准：[`legal-compliance-before-filing.md`](../plans/legal-compliance-before-filing.md) §4 **G-35**（不在这里复述，避免两处漂）。
+
+#### 同一类坑的第七次：**整站**软 404（2026-10-19 改，SEO 审计逼出）
+
+上面那条修的是 `/legal/*` **这一个前缀**。第七次的形状是同一个机制，只是范围是**整站**：
+`location /` 与 `location /en/` 当时是 `try_files $uri $uri/ /index.html`，于是
+**任意**不存在的路径都回 `HTTP 200 + 落地页完整字节`（实测 `/no-such-page-xyz/` 与
+`/docs/no-such/` 都是 7022 B、`<title>heyta：本地优先的任务管理…`）。
+
+对搜索引擎那叫**可以无限生成的软 404**：每个拼错/瞎猜的路径都是一个"存在的、与首页重复的
+页面"，都声明 canonical 指向 `/` ⇒ 搜索控制台里"重复网页，Google 选择了不同的规范网址"
+堆积 + 抓取预算被浪费。**而站内没有任何一处会因此报错** —— 这正是这一族坑七次都靠人肉发现的原因。
+
+修法把 G-25b 那条规则从 `/legal/*` 推广到整站（`location /` 与 `location /en/` 各一条）：
+
+```nginx
+location /en/ {
+    add_header Cache-Control "no-cache" always;
+    try_files $uri $uri/ =404;
+    error_page 404 /en/404.html;   # error_page 按 location 继承，漏了会挂中文 404
+}
+location / {
+    add_header Cache-Control "no-cache" always;
+    try_files $uri $uri/ =404;
+}
+```
+
+🔴 **`$uri/` 一个字都不能少**（同 §3.7 那条红线）。`error_page 404 /404.html` 是 server 级的，
+所以 `location /` 不必再写一条；`location /en/` **必须**写，否则英文访客拿到中文 404 页。
+
+**实测读数（2026-10-19，`--apply` 之后立刻复验）**：
+
+| 地址 | 改前 | 改后 |
+|---|---|---|
+| `/no-such-page-xyz/` · `/docs/no-such/` | **200** + 7022 B（= 首页） | **404** + 5764 B（中文品牌 404 页） |
+| `/en/no-such-page-xyz/` | **200** + 6976 B（= 英文首页） | **404** + 5786 B（英文品牌 404 页） |
+| **sitemap 里的 76 条** | 全 200 | **仍全 200**（逐条真取过） |
+| `/`、`/en/` | 200 | **逐字节未变**（7022 / 6976 B） |
+| `/features`（无尾斜杠） | 301 | **301 → `/features/`**（行为未变） |
+| `/app/`、`/app/nope-route` | 200 | **200**（前端路由未受牵连） |
+| `/legal/nope-not-a-doc/` | 404 | **404**（G-25b 未被回滚） |
+| `/api/nope` | 404 JSON | **404 JSON**（`proxy_intercept_errors` 仍 off） |
+| `/health` | 200 JSON | **200 JSON** |
+
+⚠️ **为什么"76 条 sitemap 全量遍历"和"`/` 仍 200"必须各占一行**：这次改动最容易的坏法是
+**把真页面一起 404 掉**，而 §3.7 那张表说明那种坏法在别处看起来像成功。另外本机是在
+`nginx:alpine` 的容器里先验过语义的，线上是 `nginx/1.18.0 (Ubuntu)` —— **`$uri/` 落到目录首页
+这一条线上有先例（`/legal/` 一直在用），但根路径 `/` 没有**，所以那一条必须有在线读数。
+
+常驻判据：`e2e/live-site/live-seo.spec.ts`（未注册路径 → 404、已注册页面 → 200、
+无尾斜杠 → 301、head 契约、sitemap 逐条 200、robots 指路）。
+🔴 **那份文件里有一条按设计会红**：`og:locale:alternate` 要**重新发布落地页**才会到线上
+（见下方「重新发布的三条命令」）。它的红是"部署没跟上"的信号，不是缺陷。
+
+回滚：`cp /etc/nginx/sites-available/heyta.waytofuture.cn.bak-20261019T040234Z \
+/etc/nginx/sites-available/heyta.waytofuture.cn` → `nginx -t` → `systemctl reload nginx`。
+日常对账与安装改用 `server/scripts/nginx-sync.sh --check` / `--apply`（先 `--check` 再 `--apply`，
+理由见 `server/deploy/nginx/README.md` 的纪律 2）。
 
 #### 同意留痕到底生效了没有：`pnpm verify:consent-trail`（2026-10-02 增）
 
