@@ -292,6 +292,14 @@ Android 有当前产物的 Profile/Settings 与 habits 腿读数（r85/r86/r109�
      🔴 别只试 `windows-pc` 一枚就下结论，这台机有**三枚**别名，逐枚现量：
      `for h in $(grep -iE "^Host " ~/.ssh/config | tr ' ' '\n' | grep -i win); do ssh -o ConnectTimeout=5 -o BatchMode=yes $h true >/dev/null 2>&1; echo "$h rc=$?"; done`；
      三枚全非 0 就别把这趟排进计划（01:5x 现量三枚全 `rc=255`，且其中一枚是过期配置，见 §一 Q2 那一层分法）。
+     🔴 **10-20 02:5x 这一桶要拆成两半，"android 腿只能等 windows-pc"是窄了的**（逐条现量在台账 r161 那一格）：
+     **windows 腿**（MSIX）确实只有那两台 Windows 宿主，都不通就是不通；
+     **android 腿**另有第三枚宿主可指 —— `scripts/run-gradle.mjs:89` 是 `process.env.HEYTA_ANDROID_HOST || 'windows-pc'`，
+     而 `linux-dev` 四枚别名现量**全通**、JDK 21 + `ANDROID_HOME` + node/pnpm + 2.7G gradle 缓存 + `android-32/36` 系统镜像 + `/dev/kvm` 带 ACL 可读写（起模拟器没问题）。
+     它缺的是两样硬的：**当前锁文件对不上**（本机 `pnpm-lock.yaml` sha12 `38f1a91713a0` vs 远端 `a60c9f81c96f`，而那台机没有 npm 出站）
+     与**只有 `app/debug.keystore`**（生产钥没搬）⇒ 它只能出 **debug 签名件**。
+     所以这一格现在卡的不是通道，是**判据口径**："Android 装机态那几格允不允许拿 debug 件当验收对象"。
+     本线没代改（也没擅自搬 node_modules 过去造一条新通道），**推荐不允许**——小组件那一族在 debug/release 上不是同一件事。
    · **要真 iPhone 或系统 GUI**（实体机验收、macOS Gallery 添加、Windows Widgets Board）—— 模拟器与探针不能替代，这是台账自己写的口径；
    · **要负责人**（法务审阅 / 主体资质 / 协议生效那两格，加上刚登记的「先离线使用」那一枚取向题）；
    · **在别线名下**（sweep 定位符漂移那格、`e6058120` 夹带归属那格、证据写回被跟踪目录那一格）——

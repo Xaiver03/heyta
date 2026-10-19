@@ -5155,6 +5155,27 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
         ⇒ 读数 **`以后再说`**、框 **88×44**、`textContent === aria-label` 同样成立 ⇒ **web × 中文这一格已取**，不在不证里。
         每档都回读 `navigator.language` 写进 `report.json`，所以"我要的语言"与"它真渲染的语言"是两枚可对账的读数，不是一句声明。
 
+- [ ] 🔴 **Android 那一腿"没有第三枚可指"这句被 02:5x 的现量否证了：`linux-dev` 活着、工具链齐，但它只能出 **debug 签名**的件——"debug 件算不算装机态验收对象"是判据口径，不由本线代改**（10-20 r161 建）。
+    先说清这一格**推翻的是哪半句**：上面 r159 那格里"三枚在册别名各不通"讲的是 **Windows 那两枚宿主 + 一枚过期 LAN 别名**，那句仍然真；
+    被推翻的是另一句更常见的读法——"Android 出包只能等 windows-pc，旋钮没有第三枚可指"。现量：
+    `grep -n 'HEYTA_ANDROID_HOST' scripts/run-gradle.mjs` ⇒ `:61` 写着"远程构建主机，默认 `windows-pc`"、`:89` 是 `process.env.HEYTA_ANDROID_HOST || 'windows-pc'`
+    ⇒ **宿主是可覆盖的**，而覆盖得到的那一枚 `linux-dev` 此刻是通的。
+    · **可达性**：`linux-dev` / `-lan` / `-mdns` / `-oob` 四枚别名各一次 `ssh -o ConnectTimeout=6 -o BatchMode=yes <别名> 'echo OK $(hostname)'` ⇒ **四枚全回 `OK Xaiver-linux`**（这台机的四枚别名是同一枚实体，与 Windows 那族"两枚地址一种 ICMP 一种 tcp"的坏法不同）。
+    · **它有什么**（逐条现量，全部只读）：`Linux 7.0.0-38-generic` · `openjdk 21.0.12.1` · `ANDROID_HOME=/home/xaiver/.local/opt/android-sdk`（含 `emulator/emulator`）·
+      `node v24.9.0` + `pnpm 11.8.0` · `~/.gradle` 缓存 **2.7G** · `system-images` 有 `android-32` 与 `android-36` · `/dev/kvm` 带 ACL 且 **`test -r`/`test -w` 双双 rc=0**（不在 `kvm` 组也能用）·
+      在册 heyta 树三枚：`~/heyta`（HEAD `c84e09a9`，10-07 01:28，**脏 194**）、`~/heyta-f97013de`（10-07 12:16，脏 0）、`~/heyta-carrier`（非 git 树）。
+    · **它缺什么**（这三条才是这一格真正卡住的地方，不是"机不可达"）：
+      ① **依赖集不同且那台机没有 npm 出站**：本机 `pnpm-lock.yaml` sha256 前 12 位 **`38f1a91713a0`** vs 远端 `~/heyta/pnpm-lock.yaml` **`a60c9f81c96f`** ⇒ 它那 1.1G `node_modules` 对不上当前锁文件，
+        而"在那台机上重装依赖"这条路是死的（`registry.npmjs.org` 与 `services.gradle.org` 都不通，见项目记忆那条 Ubuntu 出包记录）⇒ 要出当前源码的件，得**新搭一条把 node_modules 从 Mac 搬过去的通道**，那条通道没人对账过。
+      ② **只有 debug 钥**：`find ~/heyta/apps/mobile/android -maxdepth 2 -name '*.keystore' -o -name 'keystore.properties'` 只回 **`app/debug.keystore`**，没有 `keystore.properties`（只报存在，没读内容）
+        ⇒ 生产 release 钥仍在 windows-pc 那侧没搬过来（项目记忆同一条写明），所以这台机能出的是 **debug 签名件**，不是发布件。
+      ③ **装机态那一族判据按发布件写的**：`docs/agents/multi-end-build.md:24` 那句「**不静默降级**：远端不可达就红」给"换一条来源"定性的就是这一格；
+        把"当前产物"从 release 件换成 debug 件，改的是**验收对象本身**，属判据口径。
+    ⇒ **本线这一趟没动它**：不擅自换宿主、不搬 node_modules、不把 debug 件的读数记成"Android 当前产物已验收"。
+    要解这一格，最小那一步是给一句拍板：**Android 装机态那几格允许不允许拿 debug 签名件当验收对象**（允许 ⇒ 本线可以立刻在 `linux-dev` 上起模拟器跑设备腿，读数旁边会印"debug · 来源 linux-dev · 非发布件"；
+    不允许 ⇒ 这一格与 windows/android 两端那几格一起，等 windows-pc 回来）。**推荐不允许**：小组件那一族读数（`widget_*`、系统面板拖放、签名相关的 Keychain/Keystore 通路）在 debug 与 release 上不是同一件事，
+    拿它替一次就会留下"看起来过了但其实换过尺"的那类账。
+
 - [x] ✅ **10-20 02:1x r159 iOS 端第十趟重装（本机就能打，此前被当成"等打包机"）：装机件从 `ca3a09257bdfba19` 换成 `928e8050693d3d19`，首屏隐私卡那条出口在新件上复验通过**
       🔴 **起因是一句我自己写下的话**：r155 那格写的是"iOS 此刻装的确实是含 r153 的件"。今天不照它行动，先量：
       `stat` 容器里的 `main.jsbundle` ⇒ mtime **10-20 01:02:15**；而最后一笔**会进包的**源码提交是
