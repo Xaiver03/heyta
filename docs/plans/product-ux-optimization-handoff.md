@@ -119,6 +119,18 @@
 > 不再是 r132 留下的「不允许」。改回来的路仍然堵着（`simctl privacy reset notifications` 回 `rc=1`，#475），
 > 但**重装 app 会把它回到未决态**（r139 那次重装之后本趟又见到弹窗 = 现量证据）⇒ 想要「弹窗那一支」的读数，下一位靠重装拿，别去找 reset。
 > 设备收笔（现量）：`appearance = light`、`com.heyta` 已 terminate、任务列表为空（本趟建的两条各自删掉，另清掉 r132/反臂留的两条）。
+> ✅ **10-19 18:1x r142 把提醒块那一趟从三步扩成五步 —— 「推迟」「关闭」两态第一次有装机态读数，并且照出一枚真缺陷**
+> （同一枚件 `997a1935` / bundle mtime `11:23:59`；两档各 `rc=0`，**逐枚 frame 两档完全相同**，新扩的四张逐张人眼看过）：
+> 🔴 **缺陷是「按『推迟 10 分钟』反而把一条未来的提醒提前了 50 分钟」** —— 按钮念 `把 10-19 18:44 的提醒推迟 10 分钟`，
+> 按下去之后屏幕上那一行写着 `17:54`（dark 档同形 18:47→17:57）。成因链、web 端同一形状、两个改法方向与一条复现命令都在 **§四 第 37 行**；
+> **本线不代改**（这是行为口径，归提醒那一线裁决）。**为什么浏览器五态覆盖照不出来**：单测把"从现在起算"钉成了契约（`reminders-notes-display.spec.ts:133`）。
+> 🔧 顺手把共享守卫补成对称：`ai-face-ios.require_appearance` 的"声称"从 `*-dark` 扩到 `*-light`（r140 只补了一侧 ⇒ `english-light/` 这种名字没牙）。
+> 反臂现量 `rc=1` 且**目录没被创建**（原文 `…/ios-reminder-block-r141/arm-light-claim-refused.txt`）。
+> ⚠️ **两支废臂的形状写给下一个写臂的人**：`arm-claim-light-while-dark/`（以 `-dark` 结尾 ⇒ 守卫读成"声称暗档"、相符、放行）与
+> `…-r2/`（以 `-r2` 结尾 ⇒ **根本不声称任何档**、放行）—— 两趟都 `rc=0` 跑成完整暗档旅程。⇒ 那枚守卫读的是**末级名的后缀**，臂名要恰好以要声称那一档结尾。
+> 🔴 **上一格那句"设备收笔 `appearance = light`"已被本趟现量否证**（起跳前回 `dark`，是那两枚废臂留的）⇒ 别把上一行的收笔态抄进计划。
+> 本趟按 #471 还原并**双确**：回读 `light` + 装机面一张 `modalLuminance = 252`；收工 `com.heyta` 已 terminate、列表为空、**没收任何 companion**。
+> **提醒块这一格仍不证英文语态**（装置双语可定位，两档都在 zh-CN）—— 这是四面里最后一枚"不证英文"，见 §五 第 7 步第 8 枚。
 > 本线那批已被别的会话顺手公开。**本线自己仍然不 `push`**（§六 第 7 条不改），但下一位不必再把那些设备/构建读数读成"只证本地"。
 > 状态：**本轮目标五步都交完，且第四那步已重做到第六趟（r110，`REINSTALL_RC=0`；"四端各装的是哪一枚提交"见 §四 第 4 步那一行，它指向台账那张表 —— 趟号会随下一笔漂，所以这里不写）；图与判据同批入库；全部只在本地、未 push。**
 > ⚠️ 10-15 06:0x 给"五步都交完"补一句它**不覆盖**什么：§四 末尾那几格是本线可自决、但**要设备或要真壳**的欠项（「拉起 ≠ 在前台」还剩 15 个开火点、21 处写死的 tab 坐标、windows 右栏标题疑似被截；第 18 格那条 mac 窗口图的成因已在 06:1x 量掉并结案）。**每格都带一条现量命令**；欠项枚数现量：`grep -c '^| 1[6-9] |' docs/plans/product-ux-optimization-handoff.md`。**"五步交完"不等于"设备腿与壳级取证没有欠项"。**
@@ -130,6 +142,61 @@
 > 本文件只记「现在停在哪、下一步按什么顺序做、哪些手别再碰」。
 > 🔴 **逐格读数与判据形状的事实源**是 [`product-ux-optimization.md`](product-ux-optimization.md) 文末那一串台账格子
 > （取最新几格：`tail -60 docs/plans/product-ux-optimization.md`）。这里**不复制数字** —— 抄件一定会漂。
+
+---
+
+## 〇、这四问先答完（给零上下文的下一位 · 大白话版）
+
+### Q1 · 产品意义上做到了哪些？
+
+一句话：**这台 iPhone 上装的那个 `.app`，界面长什么样、读屏念什么、按下去会发生什么，现在有一份能重跑的凭据了 —— 而且它照出了两个真问题。**
+
+分三层看：
+
+1. **四面 + 一块补齐"装机态"读数**：个人资料/设置、账号（登录面板）、AI 助手、帮助，加上任务详情里的提醒块。
+   在这之前这些面只有浏览器里的读数（web 端渲染），**"装到手机上对不对"没有人证过**。
+2. **两维各自独立立住**：浅/深 × 中/英。三面已取满 2×2 四格（`profile-settings-ios.py` / `account-face-ios.py` / `ai-face-ios.py`），
+   提醒块取了中文×浅、中文×暗两格。**深浅靠每张图的像素尺**（`modalLuminance` 252 / 28），不靠"我设过了"那句命令回读；
+   **语言靠无障碍树里回读到的标签**，不靠系统设置（`#488`：那枚包的界面语言由应用内开关决定，系统域说了不算）。
+3. **五枚常驻装置**（`scripts/qa/{profile-settings,account-face,ai-face,reminder-block,ios-app-language}-ios.py`）替掉一次性探针：
+   下一位一条命令能重跑，读数自带出处（哪棵树、哪一枚包、哪一档外观、哪一语态），**跑错档会拒写**。
+
+**照出来的两个真问题**（都不由本线改，各带归属）：
+
+* **读屏念的那句 ≠ 屏幕上那行字**（r137 量到 → r138 修 → r139 在真包上四格复验）。登录面板那枚展开按钮，
+  屏上写 `Hide other ways to sign in`，可及名称一直是 `Or use another way`，收起/展开两态都不换。
+  ⇒ 看得见的人和看不见的人拿到两条不同信息。这一类只有拿真包按一遍才现形，浏览器那套覆盖照不到。
+* **「推迟 10 分钟」会把一条还没到的提醒提前**（r142 量到，**未裁决**）。提醒排在 18:44，按下去之后这一行写着 17:54 ——
+  实现算的是"现在 + 10 分钟"，跟那条提醒原本几点**无关**；iOS 与 web 两端同一形状。
+  ⇒ 用户以为往后挪，实际往前推了 50 分钟。单测把"从现在起算"钉成了契约，所以它永远不会红。
+
+### Q2 · 现在停在哪？
+
+本轮 Goal 那五步：第 1/2/3/5 步各自已翻状态，**第 4 步（四端重装）跑到第九趟仍只覆盖 iOS + mac 两端** ——
+windows/android 那台打包主机 ssh 不可达，而规则明令不许退回本机跑 Gradle（`scripts/run-gradle.mjs:29` 是负责人拍过的原文）。
+⇒ **"四端全过"这句现在不成立**，谁写谁负责；四端真实状态逐枚在 §四 第 4 步那一行末尾。
+设备腿这一侧：iOS 四面 + 提醒块都有**当前源码件**（载体 `head-r128` @ `997a1935`、bundle `Info.plist` mtime `11:23:59`）的读数；
+Android 有当前产物的 Profile/Settings 与 habits 腿读数（r85/r86/r109），但**提醒块那一枚没有 Android 档**。
+
+### Q3 · 下一步做什么？
+
+顺序与前置命令在 §五 第 7 步，这里只点最值的三枚：
+
+1. **提醒块英文那一档** —— 四面里只剩这一格还挂着"不证英文语态"。装置已经双语可定位，
+   差的是 `ios-app-language.py --to en` → 跑 → **`--to zh` 还原并看它的回读步** 这一趟（约 3 分钟）。
+2. **把「推迟反而提前」交出去裁决** —— 两个改法方向、成因链逐枚行号、一条复现命令都在 §四 第 37 行。
+3. **windows / android 两腿** —— 动手前先现量打包机在不在（`ssh -o ConnectTimeout=6 -o BatchMode=yes windows-pc true; echo $?`），
+   回非 0 就别把这趟排进计划。
+
+### Q4 · 做的这些对产品有什么意义？
+
+* heyta 的卖点是"本地优先、可自建自托管"。这类产品的通病是**只在浏览器里演示过，装到手机上到处是缝**。
+  这一轮做的事就是把缝照出来：上面那两枚缺陷，一枚是"读屏的人和看的人拿到不同信息"，一枚是"按钮上的动词和它做的事相反"。
+  **这两类不崩、不报错、类型检查和单测全绿**，拿真包按一遍才看得见。
+* 装置留下来 ⇒ 这些判据从"某人跑过一次并写了篇记录"变成"谁都能重跑、跑错档会拒写、按空了就红"。
+  能长期维持体验的是这个，不是那几十张截图。
+* **诚实边界本身就是交付的一部分**：四端里两端没跑、通知弹窗那一支只能取一次、提醒块英文没取 —— 全写在格子里，
+  下一位不必重新踩一遍，也不必把"绿"读成"全对"。
 
 ---
 
@@ -160,6 +227,8 @@
 | #34 壳级两格 | ✅ **闭了**（后台诊断链，零前台激活、零录屏权限） | 提交 `91c6da3a`；读数 `apps/desktop-macos/evidence/widget-help-dom-20261011-r92.txt`；复跑 `bash scripts/verify-macos-widget-help.sh` |
 | 第 4 步 四端重装 | ✅ **第六趟（r110）跑完，`REINSTALL_RC=0`**，而且是**本线第一次带着"真的会进包的产品改动"跑**（载体 `../heyta-wt-r110` @ `fd5c2fb1`、起跑 `dirty=0`、`load1=42.18` 没调阈值）。第五趟 r108（`769e6258`）那批读数仍在库。⚠️ r110 的三处偏离必须一起读：**ios 那腿被 `pod install` 改了一行 `Podfile.lock`**、**四端跑出来全是浅色**（"深浅两档都装过"仍不成立）、与 `fd5c2fb1` 的差集是 3 枚非构建输入的台账件 | 台账「2026-10-15 05:5x」那一格；证据包 [`apps/web/evidence/ux-final-20261015/reinstall-r110/`](../../apps/web/evidence/ux-final-20261015/reinstall-r110/RESULT.md)（逐端判据 + 五张人看过的图 + 包内名册）。🔴 全部**不证 `origin/main`**（本地未 push）、**不证小组件卡片在桌面里换了字**。🔴 **10-16 15:3x 第八趟没跑，因为现量证明"跑了也不会改变被测物"**：`git diff --name-only fd5c2fb1..HEAD -- packages apps/mobile/android apps/mobile/src apps/desktop-macos apps/desktop-windows/src apps/desktop-windows/app apps/web/src apps/web/app server/src`⇒ **枚数 0**（同一件事的另一种问法也现量过：`git log --name-only --format= fd5c2fb1..HEAD` 里碰这些路径的提交 **0 枚**，`fd5c2fb1` 是 `HEAD` 的祖先 yes）。也就是说 r110 那一趟装上四端的**打包输入源码**逐字等于当前 HEAD，再跑一趟只能换一枚"由本线命名的载体出处"，换不掉任何一端的被测物。⚠️ 这条差集**只覆盖 git 跟踪的打包源码**：它不证"产物字节等于用 HEAD 重建的字节"（构建工具链、`bridge-bundle/` 与 `Generated/HeytaTokens.swift` 那两枚派生输入、lockfile 之外的隐式输入都不在这把尺的范围里），也不证装机态那枚包就是 r110 那一趟的产物 ——Android 那端磁盘上现在这枚是**别线 10-15 13:39 那一趟**装进去的（`lastUpdateTime` 现量），本线没核过它的载体。⇒ 判据形状：**"要不要再跑一趟重装"先算打包输入差集，别按"距离上一次过了几天"排**（同一族见环境陷阱 #171/#178）。🔴 **上面那句"第八趟没跑"到 10-18 已被它自己的判据翻案**：同一把尺在 `25f544bd..f8d7155e` 上量到 **98 枚**打包输入差集 ⇒ 这一趟换得掉被测物，于是跑了 **r128（第八趟）**：载体 `head-r128` @ `f8d7155e`、`dirty=0`、`BUILD_RC=0`（起数 20／`Failed` 0／`Done` 20）、**mac 腿第 3 趟全绿**（9 chunk 安装对账 + 装机态 `内容 100.0%／主蓝 997` + 公证 `Accepted` + 装机件 `CDHash=18bbf00e…`）、**ios 腿绿**（`已装的包比源码新` + `内容 58.8%／主蓝 4091`，带 `pod install` 改 2 行 `Podfile.lock` 那枚已登记偏离）、**windows/android 两腿仍没跑**（打包机四枚别名逐枚现量不可达）⇒ **这趟不叫四端全过**。✅ 另补上一格欠的深浅两档：iOS 装机态取了**控制配对**两档（浅色 58.65%／4091、暗色 99.84%／4093，两张人眼看过，取完还原浅色基线），mac 装机态那张落在暗档但那是宿主"按时间自动切外观"自己切的（`AppleInterfaceStyleSwitchesAutomatically=1`）⇒ 只能说"这趟落在暗档"，不是"同一趟内配对"。证据包 [`apps/web/evidence/ux-final-20261018/reinstall-r128/RESULT.md`](../../apps/web/evidence/ux-final-20261018/reinstall-r128/RESULT.md)（另有 `provenance.txt` 七条前置/偏离现量；"A/B 只证当下能用、失败对象会移动才是瞬时的证据"那条形状进环境陷阱 #467） |
 
+| 目标里点名的"提醒状态"这一面 · iOS 设备腿 | ✅ **五步旅程有常驻装置 + 两档读数（r141 转正、r142 扩程）**：空态 → 加一条 → **按「推迟」** → **按「关闭」** → 删回空态 → 删掉自己建的那条。两档逐枚 frame 全等、像素尺 light 252 / dark 28、四张新图逐张人眼看过。**照出 §四 第 37 行那枚真缺陷** | `scripts/qa/reminder-block-ios.py`；取证包 [`apps/mobile/evidence/ux-final-20261018/ios-reminder-block-r141/RESULT.md`](../../apps/mobile/evidence/ux-final-20261018/ios-reminder-block-r141/RESULT.md)（含两支反臂与一支拒写臂的原文）|
+| 四面装机态 × 深浅 × 中英（个人资料 / 账号 / AI+帮助 / 提醒块） | ✅ **三面各取满 2×2 四格，提醒块取中×浅 · 中×暗两格**，全部跑在**同一枚当前源码件**上（载体 `head-r128` @ `997a1935`、bundle mtime `11:23:59`）。交付物是**五枚常驻装置**，不是一批截图：跑错外观档会**拒写**、按空了就**红**、语言档只认无障碍树回读（#488） | 台账 r131 / r133 / r134 / r136 / r137 / r139 / r140 / r141 / r142 各格；各包 `apps/mobile/evidence/ux-final-20261018/ios-*-r1xx/RESULT.md`。🔴 **仍不证**：提醒块英文档、任何写入型交互（导出/清理/注销）、iPad / 窄屏 / 大字体 |
 | 逃生门那一格（§8.2 前提） | ✅ **macOS 半已有真壳读数**（r96 关臂 + r97 默认臂配对，两臂都 `DIRTY_PATHS=clean`）：门关掉后 `storagePort` 与 `heytaStorage` 双双为 false，而 `heytaWidget` 仍在 ⇒ 面板仍是原生形状、0 行安装引导 | 台账「逃生门关掉后还认得壳」那格；两臂各一条命令：`HEYTA_SHELL_STORAGE=0 …` 与去掉前缀的同一句。⚠️ **Windows 真实 WebView2 那一半仍开**（那条 e2e 注入的是合成信号） |
 | 第 5 步 归属对账 | ✅ #26/#29/#31 已闭合、#28 留口径、#39 归 inbound-core；🔴 **#35 那句"归 apps/web 在飞那批"已被 10-13 05:1x 的现量取代**（那批落地后按台账指定动作闭合，见第五节第 4 行），第 5 步到这里**没有"仍挂在别人未提交批次上"的欠项** | 台账「第 5 步跑完」「check:image-license」「W5 那格 05:1x 闭合」三格 |
 
@@ -266,6 +335,7 @@ PY
       🔴 **但 typecheck 过不等于 build 过**（r125 就是 install 绿、build 红的形状），所以本格仍按 `Failed==0 且起数==20` 那把尺判 —— 第八趟已在新载体 `head-r128` 起跑，**10-18 18:2x 跑完：那把尺取到 `BUILD_RC=0`／起数 20／`Failed` 0／`Done` 20**，逐端读数见 §四 第 4 步那一行的末尾 |
 | 35 | ✅ **r126：把 r124 留下的「两处未分开差别」各自作用完 —— 两处都不是原因，那枚键盘步红现在复现不出来**（`apps/mobile/evidence/ux-final-20261017/ios-keyboard-attribution-r126/RESULT.md`）。2×2 四格全绿（清单行/时间线行 × 有无「展开排期→收起排期」，每格 `keyboardTop=545`、详情在场、留图），臂 4 就是旅程原形；两处前置都被**真作用过**有几何为证（收起排期后两枚「标题」的 y 到 -579~-618，`recover_detail_title` 的反向滑动带回 `[16,184,370,44]`）。整条旅程又在**两台载体**上各 14/14 绿 —— 一台是共享 reinstall 载体 `EAAD1B66`，另一台正是 r124 那批红点名的旧载体 `FE195661`（boot + 装同一枚 bundle + 全新安装态，跑完还原 `Shutdown`），被测包与 r124 同一枚（包内 mtime 13:39:12 / 提交 `25f544bd` / 落后 HEAD 72 笔）⇒ 「差在包」从一开始就不成立。🔴 **这一趟自己踩掉两枚探针坑，前两批读数改名留档、不作数**：① 当前视图名硬写成「四象限」而载体实际是「列表」；② 更贵的——拿「任务标题在树里」当「已在时间线视图」的证据，而它在列表视图里也在 ⇒ 那两臂其实没换视图却给了绿，第三批换成移动端独有表头 `未排期（4）` 才钉住。⚠️ **成因那一档不许被写成结论**：唯一还站得住的方向是「那一批的运行条件」，但 r124 几臂没把 `loadavg` 入册（现量 `grep -n "load\|负载" bilingual-locators-ios-r124/{RESULT.md,closeout.txt,setup.log}` 输出为空）⇒ 无法从既有记录判真假；本线不写「已修」也不写「环境抖动」，判据原样保留（它能红，r124 就是它红的）。🔴 另登记一条**别线名下**的空断言（不改）：`tasks-ux-ios.py:75` 的 `timeline_group_label` 取的是 web 的 aria 键 `web.timeline.aria.group`，移动端表头其实是 `web.board.unscheduledLane`（`timeline-labels.ts:97`），而它只在 `:467` 的 ANY-of `wait_labels` 里 ⇒ 永不成立也不影响那一步过，「已在时间线视图」在 iOS 旅程里没有任何一层在断。`BLOCKED.md` 记在 B224（B222 的续）。 |
 | 36 | ✅ **10-18 17:2x r127 已裁决：那一横条本来就是 `ScrollView horizontal`，滑一下第三枚整枚进屏 ⇒「可滚」，不是真溢出**（本格原先登记的是"未裁决"）：iOS 批量选择操作条**第三枚按钮被右边缘切掉**（待办 #83，本线名下）。人看图那一层量到的形状：中文两格看得见「批量删」半截（已选 1 项 / 已选 2 项各一格），英文同一位置只剩一条红边残片 ⇒ **两语态同形，不是翻译宽度问题**。判据是**先分「可滚 vs 真溢出」再决定修布局还是加滚动指示**，不许一上来就"修"（同族见第 14 格与 §四 第 17 格那两格的做法） | **本线**（装置已就位、阻塞已清） | 装置 `apps/mobile/evidence/ux-final-20261017/ios-bulk-bar-r127/probe5-bulk-bar-scroll.py` —— 行为判据，不看像素：进选择态 → 在批量条的 y 带内左滑 → 再读一次各按钮的 x，**有位移 ⇒ 可滚**；一动没动而仍有按钮 `right > 屏宽` ⇒ **真溢出**；两种都不是就照实登记"这趟没复现出裁切"。跑法 `python3 <那枚路径> --udid EAAD1B66-80A3-4A51-957C-298DAF22F057`。⚠️ 10-18 第一趟红在 `ensure_on_tasks()`，**根因不是产品**（companion 被上一趟收尾收掉 ⇒ 静默空树，见 §三 那一格与环境陷阱 **#462**；现已重拉、量到 `nodes=11`）。🔴 两条读法边界：库里那枚 `probe5-bulk-bar.json` 是**失败趟的部分写出**（只有 `startedAt` + `udid`，一条读数都没有），它被 `b31ad37e` 那笔"213 件"顺手收进了 `main` ⇒ **别读成结果**；同趟的 `probe5.log` 不在库里，因为 `apps/mobile/.gitignore` 的 `*.log`（现量 `git check-ignore -v <那枚 log>`）。 **裁决读数**：屏宽 402 下「批量删除」`x=293 right=412 inside=False`；在**按钮那一行** y=208 左滑之后三枚各位移 -34/-35、 被裁那枚 `right=377` 整枚进屏、两张截图 sha 不等 ⇒ `verdict=可滚`（逐枚 frame 与位移表在 `apps/mobile/evidence/ux-final-20261017/ios-bulk-bar-r127/RESULT.md`）。 🔴 **第一趟那句"真溢出"是探针自己造的**：滑动的 y 取成了上一条计数行的 145，那一滑根本没打在可滚容器上， 而两张图逐字节相同 —— 传输层 `rc=0` 不等于"作用到了被测容器"（正文在环境陷阱 **#465**， 失败趟改名留档 `probe5-bulk-bar-run2-SWIPE-MISSED-THE-ROW.json`）。 ⚠️ **残留一格登记、未改代码**：`showsHorizontalScrollIndicator={false}` ⇒ 静止态没有任何"还能滚"提示， 被裁的第三枚看起来就像画到屏外（r124 正是这样误登记的，本格的代价就是这一趟）；按 §四 第 14 格同族口径 降级成**可发现性**问题 —— 加哪种提示（边缘渐隐／滚动条／换行）属界面那一线的设计取向，本线不代改。 ⚠️ 射程三句：只在 `zh-CN` 一档取帧读数（英文／Android／深色未测）；被测包是设备上那枚（mtime 10-18 11:29， **本线没核它的构建载体**）⇒ 不证 `HEAD`；这趟在共享载体上留了 `BulkA/B<stamp>` 残迹，本线不代删。 |
+| 37 | 🔴 **真产品缺陷（r142 量到，未裁决）：按「推迟 10 分钟」会把一条**还没到**的提醒往前挪**。读数（同一趟内，`light`/`dark` 各一份）：按钮念 `把 10-19 18:44 的提醒推迟 10 分钟`，按下去之后屏幕上那一行写着 `17:54` ⇒ **提前 50 分钟**（dark 档同形 18:47→17:57）。成因链逐枚行号可点开：`apps/mobile/src/lib/reminders.ts:171` → `reminders-display.ts:67` → `packages/domain/src/reminders.ts:336`（`snoozeDeadline(at, 10) = at + 10min`，而传进去的 `at` 是 `Date.now()` 不是那条提醒自己的时刻）；**web 端同一形状** `apps/web/src/features/reminders/store.ts:135` ⇒ 不是 iOS 独有。名称由 `packages/ui/src/reminders/ReminderList.tsx:345` 用 `row.when` 生成 ⇒ "念 18:44、做 17:54"这一对矛盾在树里同时在场 | 🔴 **归提醒那一线裁决**（本线不代改：这是行为口径，两个方向都要动 `packages/domain` 那条收口函数 + 两端调用点 + 重取五态覆盖）。**①** 「推迟」= 相对**原时刻**推 10 分钟；**②** 保持"从现在起算"但把文案改成「10 分钟后提醒」。**为什么到现在没人发现**：`apps/mobile/tests/reminders-notes-display.spec.ts:133-134` 把契约钉成 `snoozeTargetAt(NOW) === NOW + 10min` —— 它只会把"从现在起算"钉牢，不会去比"相对原时刻" | 复现（两档各一趟、约 35 s，装置自己造起始态、收工自己删掉建的那条）：`python3 scripts/qa/reminder-block-ios.py --udid FE195661-B021-4A71-AAD1-1F2F7AE3A102 --evidence-dir <分档目录>`；原始读数与四张图在 [`…/ios-reminder-block-r141/RESULT.md`](../../apps/mobile/evidence/ux-final-20261018/ios-reminder-block-r141/RESULT.md) 第四节。**仍不证**：它会不会真按新时刻发通知（要等）、其它端同步回来后这一行的表现 |
 
 
 第 4、5 格都做过**同一枚 A/B**：在只含已提交内容的载体上照样红 ⇒ 是 `main` 上的既有红，不是共享检出被写脏的假红。
@@ -398,6 +468,21 @@ PY
    （那需要前台激活，AGENTS §6.2 规定二禁着）→ 分别见 §四 第 5、6、2 行，各带一条现量命令。
 7. **台账那几格**：未打勾枚数每次现量 `grep -c '^- \[ \]' docs/plans/product-ux-optimization.md`（本文件不抄数）；
    本轮收口状态在台账文末几格 + `BLOCKED.md` B222/B224。
+8. ✅ **10-19 18:1x 已做完（r142）：提醒块那一枚装置从三步扩成五步** —— 「推迟」「关闭」两枚动作现在**各自按下去**、
+   到达该态写成硬断言，两档各 `rc=0`、逐枚 frame 全等、四张新图逐张人眼看过。**这一趟照出 §四 第 37 行那枚真缺陷**（推迟反而提前）。
+   顺带把共享守卫 `require_appearance` 的"声称"补成 `*-light` 对称，反臂现量 `rc=1` 且目录没被创建。
+   🔴 **只剩一枚"不证英文"挂在四面里**：提醒块的**英文档**没取（装置双语可定位，两档都在 zh-CN）。下一位要接就接这一枚：
+   ```bash
+   U=FE195661-B021-4A71-AAD1-1F2F7AE3A102
+   python3 scripts/qa/ios-app-language.py --udid $U --to en          # 跑完必须回读它自己那一步，别按命令退出码推定
+   python3 scripts/qa/reminder-block-ios.py --udid $U \
+     --evidence-dir apps/mobile/evidence/ux-final-20261018/ios-reminder-block-r141/english-light
+   python3 scripts/qa/ios-app-language.py --udid $U --to zh          # 还原；#488：判语言只看 AX 树回读
+   ```
+   ⚠️ 落点末级名**必须恰好以 `-light` / `-dark` 结尾**才会被那枚守卫对账（`arm-claim-light-while-dark-r2/` 那种名字不声称任何档 ⇒ 没牙，见 §四 第 37 行上方 r142 那段）。
+   ⚠️ 英文档那一趟如果 `添加提醒` / 三枚动作有任一枚没命中，**先怀疑装置的双语候选**（#485：读数路径没有 `wait_for(candidates)` 兜底时，`None` 与"产品没暴露"同形），别直接写缺陷。
+9. 🔴 **§四 第 37 行那枚缺陷要有人裁决**（归提醒那一线）。本线的动作已经做完：读数、成因链、两个方向、一条复现命令都在那一行里。
+   **别把它读成"本线会顺手修"** —— 它要动 `packages/domain` 那条收口函数与两端调用点，还要重取五态覆盖的读数。
 
 ⚠️ 这一段只收**本轮 Goal 那五步**还挂着的部分 —— 其余欠项照 §四 逐行读，那里每一行都写了"在谁手里 + 一条命令"。
 🔴 延续 §一 那两条负责人指令：**不许向负责人发任何表单/确认动作、汇报不许以问句收尾**；Goal 保持开着（到 100 轮由系统自动暂停），
@@ -507,5 +592,10 @@ PY
 - 跨端交互专项：[`cross-platform-ux-optimization.md`](cross-platform-ux-optimization.md)
 - 装置：`scripts/reinstall-all.sh`、`scripts/qa/macos-installed-widget-help.sh`、
   `scripts/qa/profile-settings-android.py`、`scripts/qa/profile-settings-ios.py`、`scripts/verify-web-ui-sweep.mjs`
+- **iOS 装机态那五枚常驻装置**（本轮交付物，全部中英双语可定位 + 外观档对账 + 自造起始态 + 收工自清）：
+  `scripts/qa/profile-settings-ios.py`（个人资料/设置面）· `scripts/qa/account-face-ios.py`（账号面）·
+  `scripts/qa/ai-face-ios.py`（AI + 帮助面，`require_appearance` / `tab_top` / `settle_in_viewport` 这几把尺的**共享出处**）·
+  `scripts/qa/reminder-block-ios.py`（提醒块五步旅程）· `scripts/qa/ios-app-language.py`（应用内语言开关，切档与还原都走它）
+- 取证包根目录：`apps/mobile/evidence/ux-final-20261018/`（每格一个 `ios-<面>-r1xx/<档>/`，各带 `RESULT.md`）
 - 四端重装规则与判据：`AGENTS.md` §6.1.1；产物身份对账：`docs/runbooks/multi-platform-build.md`
 - 同类交接的写法参照：[`account-standard-suite-handoff.md`](account-standard-suite-handoff.md)

@@ -17,7 +17,7 @@
       `ai-face-ios.settle_in_viewport` 的注释里写的就是这一条）。⇒ 这一枚连读两遍、frame 相近才交回。
    并把"加完看不到那四条 / 删完回不到空态"写成**红**，不再让打空只留下一条读数被读成"通过"。
 
-射程：空态 → 加一条 → 删回空态 → **删掉自己建的那条任务**（旧探针建完任务不管，
+射程：空态 → 加一条 → **推迟** → **关闭** → 删回空态 → **删掉自己建的那条任务**（旧探针建完任务不管，
 所以 r132 那趟之后要另跑一枚 `_cleanup/clean-own-tasks.py` 手工收 17 条）。
 只按**本次建的这一条标题**删，标题对不上就不删。
 """
@@ -64,6 +64,8 @@ LABELS = {
     "add": ("添加提醒", "Add reminder"),
     "absolute1h": ("1 小时后提醒", "Remind me in 1 hour"),
     "scheduled": ("待触发", "Scheduled"),
+    "snoozed": ("已推迟", "Snoozed"),
+    "dismissed": ("已关闭", "Dismissed"),
     "snooze": ("稍后提醒", "Snooze"),
     "dismiss": ("关闭提醒", "Dismiss"),
     "remove": ("删除提醒", "Delete reminder"),
@@ -83,8 +85,12 @@ A11Y = {
     "reminder.a11y.dismiss": ("关闭 {when} 的提醒", "Dismiss the reminder at {when}"),
     "reminder.a11y.remove": ("删除 {when} 的提醒", "Delete the reminder at {when}"),
 }
+SNOOZE = "reminder.a11y.snooze"
+DISMISS = "reminder.a11y.dismiss"
 REMOVE = "reminder.a11y.remove"
-AFTER_ADD = ["scheduled", "reminder.a11y.snooze", "reminder.a11y.dismiss", REMOVE]
+AFTER_ADD = ["scheduled", SNOOZE, DISMISS, REMOVE]
+AFTER_SNOOZE = ["snoozed", "scheduled", SNOOZE, DISMISS, REMOVE]
+AFTER_DISMISS = ["dismissed", "scheduled", "snoozed", REMOVE]
 
 
 def label(key: str) -> str:
@@ -343,6 +349,30 @@ def main() -> int:
     res["shots"].append("02-reminder-added")
     dump(res, out)
 
+    # 🔴 「推迟」「关闭」这两步是**断言**，不是"看得见就按、看不见就跳"：跳过去就等于把
+    #    "设备上的已推迟 / 已关闭两态长什么样"这一格又留成没有读数（红一次是有读数的红）。
+    for want, phase, reading, shot in ((SNOOZE, "snoozed", AFTER_SNOOZE, "03-reminder-snoozed"),
+                                       (DISMISS, "dismissed", AFTER_DISMISS, "04-reminder-dismissed")):
+        node, guard = settle(probe, (want,), clamp)
+        if node is None:
+            dump(res, out)
+            raise ProbeError(f"the {want} action never settled fully above the tab bar: {guard}")
+        bx, by, bw, bh = guard["frame"]
+        raw_tap(probe, bx + bw // 2, by + bh // 2)
+        res["taps"].append({"description": f"reminder action {want}", "label": AX.label_of(node), **guard})
+        key = "afterSnooze" if phase == "snoozed" else "afterDismiss"
+        if wait_present(probe, phase) is None:
+            res[key] = rows_for(probe, reading, clamp)
+            probe.screenshot(f"{shot}-not-reached")
+            res["shots"].append(f"{shot}-not-reached")
+            dump(res, out)
+            raise ProbeError(f"tapping {AX.label_of(node)!r} did not move the block into phase "
+                             f"{phase!r}: {res[key]}")
+        res[key] = rows_for(probe, reading, clamp)
+        probe.screenshot(shot)
+        res["shots"].append(shot)
+        dump(res, out)
+
     # 加完必删 —— 不删的话这条 +1h 的提醒会真的发一条本地通知。
     rm_node, rm_guard = settle(probe, (REMOVE,), clamp)
     if rm_node is None:
@@ -359,8 +389,8 @@ def main() -> int:
             removed = wait_present(probe, "empty") is not None
     res["removedBackToEmpty"] = removed
     res["afterRemove"] = rows_for(probe, ["scheduled", "empty"], clamp)
-    probe.screenshot("03-reminder-removed")
-    res["shots"].append("03-reminder-removed")
+    probe.screenshot("05-reminder-removed")
+    res["shots"].append("05-reminder-removed")
     dump(res, out)
     if not removed:
         raise ProbeError(f"deleting the reminder did not bring the block back to its empty state: "
@@ -385,6 +415,7 @@ def main() -> int:
     print(json.dumps({"status": "passed", "appearance": appearance, "uiLocale": res["uiLocale"],
                       "tabBarTopOnListScreen": bar_top, "reminderSection": res["reminderSection"],
                       "emptyState": res["emptyState"], "afterAdd": res["afterAdd"],
+                      "afterSnooze": res.get("afterSnooze"), "afterDismiss": res.get("afterDismiss"),
                       "removedBackToEmpty": removed, "taskDeleted": res.get("taskDeleted"),
                       "report": str(out / "reminder-block.json")}, ensure_ascii=False, indent=2))
     return 0

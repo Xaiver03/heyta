@@ -168,11 +168,13 @@ def require_appearance(udid: str, evidence_dir: str) -> str:
 
     🔴 "声称"的形状 2026-10-19 扩了一次：原先只有末级名**恰好**等于 `light`/`dark` 才算声称，
     于是 `english-dark/` 这种"二维合一"的目录名（语言×暗档）没有牙，暗档没设上也能写进去。
-    现在 `*-dark` 结尾也算声称暗档；`current-source/`、`english/` 这种不点档的名字仍然不判
+    现在 `*-dark` / `*-light` 结尾都算声称那一档（r141 补的对称：`english-light/` 这种"语言×亮档"的名字
+    原先没有牙，而 `english-dark/` 有 —— 同一族目录名只有一侧被守，比两侧都不守更容易骗人）。`current-source/`、`english/` 这种不点档的名字仍然不判
     —— 那两档要靠独立的像素尺（`scripts/screenshots/png-stats.mjs` 的 `modalLuminance`）立。
     返回读到的档名，调用方可以直接存进读数里。"""
     name = Path(evidence_dir).resolve().name
-    claimed = name if name in ("light", "dark") else ("dark" if name.endswith("-dark") else "")
+    suffix = "dark" if name.endswith("-dark") else ("light" if name.endswith("-light") else "")
+    claimed = name if name in ("light", "dark") else suffix
     actual = subprocess.run(["xcrun", "simctl", "ui", udid, "appearance"],
                             capture_output=True, text=True).stdout.strip()
     if claimed and actual != claimed:
