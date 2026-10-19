@@ -150,3 +150,17 @@ malformed requests cannot bypass the proxy filter through application logs.
 Set `JWT_SECRET` to a strong random value of at least 32 characters. WebAuthn
 deployment identity is controlled by `WEBAUTHN_RP_NAME`, `WEBAUTHN_RP_ID`, and
 `WEBAUTHN_ORIGIN`; production origins must use HTTPS.
+
+## 中央认证模式准备（P5.0）
+
+当前可运行模式仍为自托管 local。HEYTA_AUTH_DEPLOYMENT=official 必须同时显式
+HEYTA_AUTH_MODE=oidc；未知/空值、local 混入 HEYTA_OIDC_* 均启动失败。
+OIDC 需 HEYTA_OIDC_ISSUER、HEYTA_OIDC_CLIENT_ID、HEYTA_OIDC_CLIENT_SECRET、
+HEYTA_OIDC_REDIRECT_URI、HEYTA_OIDC_SESSION_ENCRYPTION_KEY。回调固定为 HTTPS
+PUBLIC_URL origin 的 /api/auth/oidc/callback，加密 key 为独立 32 字节 hex。
+**本阶段 OIDC 配置完整仍拒绝启动**，直到授权、会话、撤销完整实现；无 fallback 开关。
+
+标准库加载验收：npm run verify:oidc-runtime（ts-node）和构建后
+npm run verify:oidc-runtime:built。OIDC 模块需要 Node >=22.12；探针离线，仅验真实标准库
+与 RFC7636 PKCE 已知答案，不表示已完成登录。实施状态见
+[统一认证计划](../../docs/plans/unified-central-auth.md)。

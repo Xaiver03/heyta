@@ -1,3 +1,4 @@
+import { loadAuthenticationConfig, type AuthenticationConfig } from './central-auth/config';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Logger } from './logger';
@@ -237,6 +238,8 @@ export interface ManagedAiConfig {
 }
 
 export interface ServerConfig {
+  /** Resolved from operator environment; optional only for existing typed config fixtures. */
+  authentication?: AuthenticationConfig;
   port: number;
   host: string;
   dataDir: string;
@@ -885,5 +888,6 @@ export const loadConfigFromEnv = (
     };
   }
 
+  config.authentication = loadAuthenticationConfig(process.env, config.publicUrl);
   return config;
 };

@@ -84,6 +84,7 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 
 | 编号 | 决策 | 状态 |
 |---|---|---|
+| [0066](adr/0066-official-central-identity-and-self-hosted-auth.md) | 官方中央身份、自托管认证与 E2EE 边界 | 已接受；[实施状态](plans/unified-central-auth.md) |
 | [0001](adr/0001-license-decision.md) | heyta 自身的许可证选择 = **MIT** | ✅ **已接受** |
 | [0002](adr/0002-migration-tooling.md) | 数据库迁移方案：继续用 Prisma，不引入 Flyway | ✅ **已接受** |
 | [0003](adr/0003-multi-platform-strategy.md) | 多端策略：业务逻辑全在 `packages/`，`apps/*` 只做壳 | ✅ **已接受** |

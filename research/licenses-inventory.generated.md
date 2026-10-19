@@ -4,12 +4,12 @@
 > 重新生成：`node research/tools/render-license-inventory.mjs`
 > 数据来源：**实际安装的依赖树**（pnpm store），不是 lockfile 的声明。
 > 去重口径：`包名@版本`（同名多版本分别登记）。
-> lockfile 指纹：`38f1a91713a08222`（清单在这把指纹下渲染；对账：`node research/tools/render-license-inventory.mjs --check-stamp`）
-> 渲染输入集：pnpm store 去重后 **964** 枚，逐枚都能在当前 lockfile 里查到（对账：`node research/tools/license-inventory.mjs`，它同时是 `pnpm check:licenses`）。
+> lockfile 指纹：`6e609a8bdb17637d`（清单在这把指纹下渲染；对账：`node research/tools/render-license-inventory.mjs --check-stamp`）
+> 渲染输入集：pnpm store 去重后 **967** 枚，逐枚都能在当前 lockfile 里查到（对账：`node research/tools/license-inventory.mjs`，它同时是 `pnpm check:licenses`）。
 
-生成时间：2026-10-16
+生成时间：2026-10-19
 
-**总计 964 个包** —— 宽松许可 963，受限 0，无许可证 0，白名单外已登记 1。
+**总计 967 个包** —— 宽松许可 966，受限 0，无许可证 0，白名单外已登记 1。
 
 准入门槛（见 THIRD_PARTY_LICENSES.md）：许可允许闭源商用；且 2021 年后仍在更新。
 
@@ -28,7 +28,7 @@
 
 - **CC-BY-4.0**（`caniuse-lite@1.0.30001812`）：caniuse-lite@1.0.30001812：browserslist 的**构建期数据包**，不进入运行时产物；CC-BY 是署名许可（不是禁用的 CC-BY-NC），归属已在 THIRD_PARTY_LICENSES.md §2 登记。
 
-### 📋 全部依赖（964 个）
+### 📋 全部依赖（967 个）
 
 这一段是**全量底稿**：上面两节的所有结论都能在这里逐行核到。严格按包名排序（`localeCompare`），同名多版本分行列出。
 
@@ -630,6 +630,7 @@
 | `jest-validate` | 29.7.0 | MIT |
 | `jest-worker` | 29.7.0 | MIT |
 | `joi` | 17.13.8 | BSD-3-Clause |
+| `jose` | 6.2.12 | MIT |
 | `joycon` | 3.1.1 | MIT |
 | `js-tokens` | 4.0.0 | MIT |
 | `js-yaml` | 3.15.2 | MIT |
@@ -740,6 +741,7 @@
 | `npm-run-path` | 4.0.1 | MIT |
 | `nth-check` | 2.1.1 | BSD-2-Clause |
 | `nullthrows` | 1.1.1 | MIT |
+| `oauth4webapi` | 3.8.8 | MIT |
 | `ob1` | 0.83.8 | MIT |
 | `object-assign` | 4.1.1 | MIT |
 | `object-inspect` | 1.13.4 | MIT |
@@ -752,6 +754,7 @@
 | `onetime` | 5.1.2 | MIT |
 | `open` | 7.4.2 | MIT |
 | `open` | 6.4.0 | MIT |
+| `openid-client` | 6.8.8 | MIT |
 | `ora` | 5.4.1 | MIT |
 | `p-limit` | 2.3.0 | MIT |
 | `p-limit` | 3.1.0 | MIT |

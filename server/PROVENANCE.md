@@ -131,3 +131,10 @@ git -C /tmp/sp log --oneline aa9690ca..HEAD -- packages/super-sync-server/
 
 搬改动时注意：上游的 `packages/super-sync-server/` 用的是它自己的实体清单，
 我们已经分叉了 `ENTITY_TYPES`，**合并时不要覆盖掉 heyta 的清单**。
+
+## 中央认证基础（2026-10-19）
+
+新增 central-auth/config.ts 与 oidc-runtime.ts，config.ts 解析严格运维模式，server.ts 在
+任何服务初始化之前拒绝尚未接线的 OIDC 模式；local 自托管保持原行为。
+标准 MIT openid-client 独立适配，无 AGPL 源码移植。此包不改变 JWT、数据库与同步协议。
+设计与验收见[唯一计划](../docs/plans/unified-central-auth.md)。
