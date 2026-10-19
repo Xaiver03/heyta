@@ -244,9 +244,18 @@ describe('🔴 关掉不等于同意（不许把"没选"记成"选了"）', () =
     expect(storedRecord(), '关掉被写进了磁盘').toBeNull();
   });
 
-  it('点 X 关掉：同样不是同意', async () => {
+  it('点「以后再说」关掉：同样不是同意，而且那句话在屏幕上看得见', async () => {
     const el = await openSheet();
-    await click(el.querySelector(CLOSE));
+    const close = el.querySelector<HTMLButtonElement>(CLOSE);
+    expect(close, '取不到「以后再说」那枚出口 ⇒ 本条的锚点坏了').not.toBeNull();
+    // 🔴 这条判据盯的是"看得见的人和读屏的人拿到同一句话"。
+    // r150 装机态量到的是：可及名称一直是「以后再说」/ `Decide later`，而屏幕上只有一枚 ✕
+    // —— 叉在那个位置的通用含义是"关掉这张卡"，可按下去既不落盘也不关闭决定，
+    // 下次冷启动还会再问。把它改回图标按钮，这一条就红。
+    expect(close!.textContent?.trim(), '出口在屏幕上没有可见文字（只剩一枚图标）')
+      .toBe(close!.getAttribute('aria-label'));
+
+    await click(close);
 
     expect(privacyConsent.networkAllowed()).toBe(false);
     expect(privacyConsent.undecided()).toBe(true);

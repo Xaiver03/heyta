@@ -636,6 +636,21 @@ describe('首启面板的界面纪律（不同意必须是同等可达的一条�
     expect(/tone="danger"/.test(own), '「只用本机」用了 danger 色').toBe(false);
   });
 
+  it('🔴 「以后再说」这条出口**屏幕上写的就是它那三个字**（只剩一枚 ✕ = 看得见的人只能猜）', () => {
+    // r150 装机态量到的形状：可及名称一直是「以后再说」/ `Decide later`，屏幕上却只有一个叉，
+    // 而叉在这张卡的右上角的通用含义是"关掉它"—— 可按下去既不落盘也没有关闭任何决定，
+    // 下次冷启动还会再问一遍。两枚真决定都有可见文字，第三条不该没有。
+    // 改回 icon-only（`IconButton` 只给 `label` 属性）时第一条就红。
+    expect(
+      /<Text[^>]*>\s*\{t\('common\.privacy\.consent\.close'\)\}\s*<\/Text>/.test(code),
+      '「以后再说」没有渲染成可见文字',
+    ).toBe(true);
+    expect(
+      /accessibilityLabel=\{t\('common\.privacy\.consent\.close'\)\}/.test(code),
+      '「以后再说」的可及名称没了（读屏的人拿不到那句话）',
+    ).toBe(true);
+  });
+
   it('🔴 系统返回手势（`onRequestClose`）接的是**关闭**，不是同意', () => {
     // 行为那半边在上面的「以后再说」用例里已经钉死了（关闭之后仍然是"没问过"）；
     // 这一条只补它够不着的那一段：**面板真的接的是那个函数**。
