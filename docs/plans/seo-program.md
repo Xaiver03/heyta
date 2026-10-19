@@ -816,3 +816,42 @@ xml.etree.ElementTree.ParseError: not well-formed (invalid token): line 12, colu
 （百度通常给 **文件验证** `baidu_verify_codeva-XXXX.html` / meta 标签 / CNAME）→
 按 §8.7 的纪律**逐字节**落进 `apps/landing/public/`（这类文件不许加注释头、不许补换行）
 → 提交 → `publish-public-sites.mjs --confirm` → 点验证 → 提交 sitemap。
+
+### 8.16 ✅ 百度：**所有权验证通过**；主动推送用了今日 10 条配额；sitemap 通道今日配额为 0
+
+**用户拖完滑块之后**（我那次误报"验证码还在"，见 §8.13 的探针坑），向导进到第三步「验证网站」：
+
+| 环节 | 读数 |
+|---|---|
+| 验证方式 | **文件验证**；文件名 `baidu_verify_codeva-ILIskRL7IN.html` |
+| 🔴 文件**内容** | **`371216421af42f3c60f2e107ea3323fd`**（32 位小写十六进制、**无结尾换行**）—— **不是**文件名里那个 `codeva-ILIskRL7IN` 短码。真值取自页面内 `fetch('/site/verifyfile?id=1431838956')`（同源带 cookie）拿到的下载件本身。按"众所周知"猜短码的话，百度必然验不过，而**两边都不会报错** |
+| 落盘 + 发布 | `public/baidu_verify_codeva-ILIskRL7IN.html`（32 字节）→ 提交 `9d36c4601` → 发布**九步全过、线上验收 45 项全绿** |
+| 线上可取 | `GET /baidu_verify_codeva-ILIskRL7IN.html` → **200 / 32 字节 / 逐字一致** |
+| 点「完成验证」 | ✅ **验证成功** —— 且按新纪律**严格确认过**（不是凭文字）：`DIV.verify-success`、`visibility: visible`、`opacity: 1`、在视口内 448×28 |
+
+#### 主动推送（API 提交）：一手读数与**真实配额**
+
+接口（页面上给的原文）：`http://data.zz.baidu.com/urls?site=https://heyta.waytofuture.cn&token=HkmKPp9gWgb6bdfY`
+
+| 请求 | 响应 |
+|---|---|
+| **76 条**一次推 | `{"error":400,"message":"over quota"}` |
+| **1 条** | `{"remain":9,"success":1}` **200** ⇒ **当日配额 = 10 条** |
+| 再推 **9 条** | `{"remain":0,"success":9}` **200** |
+| 复探 1 条 | `{"error":400,"message":"over quota"}` ⇒ 配额确实归零（1+9=10，账对得上） |
+| 🔴 **对照：错 token** | `{"error":401,"message":"token is not valid"}` ⇒ 证明 400 是**配额**问题，不是我的请求格式问题 |
+
+⇒ 今日已推送 **10 条**（首页 + `/features/ /download/ /platforms/ /pricing/ /integrations/ /docs/ /docs/selfhost/ /changelog/ /en/`）。
+**没有**硬推剩下的 66 条：配额是硬的（不可累计、当日有效），再推只会拿同一个 400。
+
+#### sitemap 通道：**今日配额 0**（不是我们这边的问题）
+
+页面原文：**「今日提交上限：0条　今日提交余额：0条」**（另：`存量文件上限：1条 存量文件余额：1条`）。
+百度说 sitemap 配额与 API/手动**不共享**，且给出提高办法：
+**「填写站点的主体备案号，可以提高每日提交上限。去填写」**。
+
+🔴 **我没有填那个备案号** —— 理由是事实性的：本仓库里**没有** `waytofuture.cn` 的备案号
+（`server/deploy/nginx/heyta.waytofuture.cn.conf` 的文件头只写了"本主体**已备案主域** `waytofuture.cn`"），
+而隔壁 SSOS 仓里那些 `京ICP备2024086174号-5/-9` 是**它自己那几个域名**的 —— **备案号按域名区分**。
+把不确定的值填进搜索平台是一次**假声明**，宁可留给用户一句话。
+⇒ **需要你给一句准确的备案号**（`waytofuture.cn` 的主体备案号），我填上之后配额会提高，再提交 sitemap。
