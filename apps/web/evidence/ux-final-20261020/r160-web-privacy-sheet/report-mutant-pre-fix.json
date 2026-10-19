@@ -1,0 +1,65 @@
+{
+  "carrier": {
+    "tree": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta",
+    "headSha": "31da1a9553d6f63bbd28805c121a060a10f55e5f",
+    "servedBy": "vite dev（本机、自要空端口、只关自己那枚 pid）",
+    "headless": true
+  },
+  "gate": "出口 textContent 逐字等于 aria-label，且框宽 > 只装图标那一档",
+  "cases": [
+    {
+      "name": "1440-light",
+      "width": 1440,
+      "height": 900,
+      "scheme": "light",
+      "text": "",
+      "aria": "Decide later",
+      "box": {
+        "x": 968,
+        "y": 273,
+        "width": 48,
+        "height": 44
+      },
+      "shot": "privacy-sheet-1440-light.png",
+      "textEqualsAria": false,
+      "widerThanIconSquare": true,
+      "pass": false
+    },
+    {
+      "name": "1440-dark",
+      "width": 1440,
+      "height": 900,
+      "scheme": "dark",
+      "text": "",
+      "aria": "Decide later",
+      "box": {
+        "x": 968,
+        "y": 273,
+        "width": 48,
+        "height": 44
+      },
+      "shot": "privacy-sheet-1440-dark.png",
+      "textEqualsAria": false,
+      "widerThanIconSquare": true,
+      "pass": false
+    },
+    {
+      "name": "375-light",
+      "width": 375,
+      "height": 812,
+      "scheme": "light",
+      "text": "",
+      "aria": "Decide later",
+      "box": {
+        "x": 287,
+        "y": 101,
+        "width": 48,
+        "height": 44
+      },
+      "shot": "privacy-sheet-375-light.png",
+      "textEqualsAria": false,
+      "widerThanIconSquare": true,
+      "pass": false
+    }
+  ]
+}

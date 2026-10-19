@@ -5134,6 +5134,25 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
       它比 HEAD 少一笔 `f21dc1d39`。少的那一笔不在四面 + 提醒块的路径上（见 r159 那一格），
       所以这三批读数**不因此作废**；作废的是"当前源码件"这个称呼本身。
 
+- [x] ✅ **10-20 02:3x–02:5x r160 web 首屏隐私卡补上"真浏览器 + 人眼"那一层，并给这条判据配了一枚会红的臂**
+      起因是自查 `f21dc1d39` 那笔修复在 web 面的证据形状：它有永久判据（`apps/web/tests/privacy-consent-sheet.spec.tsx`
+      断言 `close.textContent === close.getAttribute('aria-label')`，提交信息里写明"臂 = 换成 `git show HEAD:` 那份改前件，改前红"），
+      **但那条判据从没在浏览器里跑过** —— 而本仓界面验收的规矩是真跑 Playwright ＋ 真看图。jsdom 过 ≠ 屏幕上看得见。
+      · 新装置 `apps/web/evidence/ux-final-20261020/r160-web-privacy-sheet/capture.mjs`（一条命令复跑：`node <该文件>`）：
+        自要一枚空端口起 vite、headless 开三档（1440×900 浅 · **1440×900 暗** · 375×812 浅）、每档量同一件事
+        （那枚出口的 `textContent` 逐字等于 `aria-label` ＋ 框宽 > 框高），退出码三档分开 **0 判了且合格 / 1 判了且不合格 / 2 没干活**
+        （服务起不来与"待验档位为空"都走 2，不许挤进 0）。现量 **3/3 pass**，`text="Decide later"`、框 **112×44**。
+      · 🔴 **变异臂现跑过，这条判据会红**：把 `apps/web/src/features/privacy/PrivacyConsentSheet.tsx` 换成 `f21dc1d39^` 那份改前件重跑同一趟 ⇒
+        **`MUTANT_RC=1`、3/3 全不合格**，读数 `text=""`、框 **48×44**（就是一枚图标方块）⇒ 改前那枚"屏幕上没有字"的形状被这把尺抓得住。
+        还原只从 `*.mut-bak`（不从 `git checkout`），跑完 `git diff --quiet -- apps/web/src` 回 **rc=0**（源码与 HEAD 逐字一致）；
+        改前那份读数**留在库里**当正对照：`report-mutant-pre-fix.json` + `privacy-sheet-1440-light-mutant-pre-fix.png`。
+      · ⚠️ **第一版拍出来是一张淡入中途的图**（卡片半透明、中间还压着一枚加载指示）—— 判据照样绿，但人眼层废了。
+        补了一条"等 `getComputedStyle(dialog).opacity >= 0.99` 再拍"（上限 40×250 ms）。这条形状与"截图取在过渡层"同族，不另开陷阱条目。
+      · 人眼层：**看过 2 张**（`privacy-sheet-1440-dark.png`、`privacy-sheet-375-light.png`：三条出口都有可见文字、375 档标题折三行而 `Decide later` 不折不断）。
+        ⚠️ `privacy-sheet-1440-light.png` 重拍后**没再看**，只有前两枚算人眼读数。
+      · 🔴 **射程边界（别把这一格读成"web 中文档也验过"）**：这三档跑在浏览器默认语境的**英文**下（读数是 `Decide later` 而不是「以后再说」）；
+        中文那一档在 **iOS 装机态**已取（r159），**web × 中文这一格仍没取**，要补就在同一装置上带一次 `locale: 'zh-CN'` 的 context。
+
 - [x] ✅ **10-20 02:1x r159 iOS 端第十趟重装（本机就能打，此前被当成"等打包机"）：装机件从 `ca3a09257bdfba19` 换成 `928e8050693d3d19`，首屏隐私卡那条出口在新件上复验通过**
       🔴 **起因是一句我自己写下的话**：r155 那格写的是"iOS 此刻装的确实是含 r153 的件"。今天不照它行动，先量：
       `stat` 容器里的 `main.jsbundle` ⇒ mtime **10-20 01:02:15**；而最后一笔**会进包的**源码提交是
