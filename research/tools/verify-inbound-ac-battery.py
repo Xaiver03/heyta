@@ -21,10 +21,16 @@
   `panel-layout/`、`date-consistency/`；现量 `python3 research/tools/verify-inbound-ac-battery.py --self-test` 的臂 8 会打印派生清单）。
   本电池因此自报副作用：跑前跑后各数一次、并打印逐枚差异条数（`PNG_BEFORE/PNG_AFTER/PNG_DIFF_LINES`），
   差异逐枚点名（`PNG_CHANGED=<仓内相对路径>`）、分母自报（`PNG_DENOM=… 派生自 spec 的 N 枚证据目录`），
-  还打印跑完那一刻的载具脏条目数（`EVIDENCE_DIRTY`）。看见一片 ` M` 而不知道是谁写的，就是没这条读数。
+  跑完那一刻还打**两枚不同的脏数**：`EVIDENCE_DIRTY=` 只数派生证据目录里的脏条目，
+  `CARRIER_DIRTY=` 数整棵载具的 `git status --porcelain` 条目（含未跟踪）。
+  ⚠️ 这两枚此前合成一行、写成 `EVIDENCE_DIRTY` 却按整棵树计数 —— 10-19 12:31 那趟摘掉 `App.tsx` 一行做反向证据时
+  量出 `PNG_DIFF_LINES=3` 而 `EVIDENCE_DIRTY=4`，差的那一枚正是 `App.tsx`，**不是证据件**：一个名字两件事，
+  读的人会把"清单与脏数对上"当成两把独立的交叉验证，而那其实是包含关系的两端。分开设名就是这个原因。
   🔴 **B236 那一格**：分母原先手抄成只盖 `inbound-recovery/` 一枚、且按**裸文件名**做键，于是那条腿写在
-  `panel-layout/` 里的图这条尺看不见（10-19 10:2x 现量 `PNG_DIFF_LINES=4` 而 `EVIDENCE_DIRTY=6`），
-  而两枚目录里若出现同名文件会被并成一格。三半分别由臂 8（派生打空/指错）、臂 9（并格）、臂 10（点名）兜住。
+  `panel-layout/` 里的图这条尺看不见（10-19 10:2x 现量 `PNG_DIFF_LINES=4` 而当时那枚脏数=6），
+  而两枚目录里若出现同名文件会被并成一格。三半分别由臂 8（派生打空/指错）、臂 9（并格）、臂 10（点名）、
+  臂 11（脏数按目录筛）兜住。⚠️ 那句"4 与 6 的差就是并格"**不是已证的归因**：那批跑在合成一行的旧装置上，
+  差值既可能来自没抄进去的目录，也可能来自非证据件的脏条目 —— 要分辨就得同时看 `PNG_CHANGED` 点名与两枚脏数（今天才有）。
 - 默认只对 `<root>` 只读；日志一律落 `<root>/.run-logs/…`（`.gitignore` 里那条），不进提交。
 - `--root` 指到别的检出（例如隔离载具）时，读的是**那棵树的工作树**，不是 HEAD。
 """
@@ -127,6 +133,25 @@ def png_manifest(root: Path, dirs: list[str] | None = None) -> dict[str, str]:
     return out
 
 
+def dirty_paths(porcelain: list[str]) -> list[str]:
+    """从 `git status --porcelain` 的行里取出路径：重命名取 `->` 右边，未跟踪与已改都算一枚，带引号的去掉引号。"""
+    out: list[str] = []
+    for line in porcelain:
+        if not line.strip():
+            continue
+        p = line[3:]
+        if "->" in p:
+            p = p.split("->")[-1]
+        out.append(p.strip().strip('"'))
+    return out
+
+
+def evidence_dirty_count(porcelain: list[str], dirs: list[str]) -> int:
+    """只数落在派生证据目录里的脏条目。整棵树的脏数另有一行（`CARRIER_DIRTY`），两件事不许合成一个名字。"""
+    return sum(1 for p in dirty_paths(porcelain)
+               if any(p == d or p.startswith(d.rstrip("/") + "/") for d in dirs))
+
+
 def run_leg(root: Path, ev: Path, tag: str, rel_dir: str, cmd: str) -> int:
     workdir = root if rel_dir == "." else root / rel_dir
     log = ev / f"{tag}.log"
@@ -179,11 +204,14 @@ def battery(root: Path, ev: Path, legs: list[tuple[str, str, str]]) -> int:
     changed = sorted(name for name in set(before) | set(after) if before.get(name) != after.get(name))
     diff = len(changed)
     dirty2 = subprocess.run(["git", "-C", str(root), "status", "--porcelain"], capture_output=True, text=True)
+    dirty_lines = [x for x in dirty2.stdout.splitlines() if x]
+    ev_dirty = evidence_dirty_count(dirty_lines, dirs)
     append_rc(ev, f"{time.strftime('%F %T')} PNG_AFTER={len(after)} 枚")
     append_rc(ev, f"{time.strftime('%F %T')} PNG_DIFF_LINES={diff}")
     for name in changed[:40]:
         append_rc(ev, f"{time.strftime('%F %T')} PNG_CHANGED={name}")
-    append_rc(ev, f"{time.strftime('%F %T')} EVIDENCE_DIRTY={len([x for x in dirty2.stdout.splitlines() if x])}")
+    append_rc(ev, f"{time.strftime('%F %T')} EVIDENCE_DIRTY={ev_dirty} 枚（只数派生证据目录里的脏条目）")
+    append_rc(ev, f"{time.strftime('%F %T')} CARRIER_DIRTY={len(dirty_lines)} 枚（整棵载具 git status --porcelain，含未跟踪）")
     append_rc(ev, f"{time.strftime('%F %T')} legs={len(legs)} rc0={sum(1 for v in rcs.values() if v == 0)} rc_nonzero={sum(1 for v in rcs.values() if v != 0)}")
     print(f"legs={len(legs)} rc0={sum(1 for v in rcs.values() if v == 0)} rc_nonzero={sum(1 for v in rcs.values() if v != 0)}", flush=True)
     for tag, code in rcs.items():
@@ -232,7 +260,7 @@ def self_test(root: Path) -> int:
     line = (ev / "rc.txt").read_text(encoding="utf-8") if (ev / "rc.txt").exists() else ""
     check("5 端到端：假腿能跑通且摘要针真取到读数", brc == 0 and "Test Files" in line and "legs=1 rc0=1 rc_nonzero=0" in line,
           f"brc={brc} 摘要针打空就会把'没判'读成'判过'")
-    needles = ("PNG_BEFORE", "PNG_AFTER", "PNG_DIFF_LINES", "EVIDENCE_DIRTY")
+    needles = ("PNG_BEFORE", "PNG_AFTER", "PNG_DIFF_LINES", "EVIDENCE_DIRTY", "CARRIER_DIRTY")
     missing = [n for n in needles if n not in line]
     check("6 副作用自报四行齐（浏览器腿会重写取证图）", not missing, str(missing))
     doc = root / JUDGING_DOC
@@ -277,6 +305,19 @@ def self_test(root: Path) -> int:
         check("10 差异点名要点到被改的那一枚全路径", moved == [target], f"moved={moved}")
     finally:
         shutil.rmtree(sd, ignore_errors=True)
+
+    # 臂 11：脏数那两行各数各的 —— 整棵树的脏条目里混着非证据件时，EVIDENCE_DIRTY 不许把它们算进去
+    #（10-19 12:31 那趟摘掉 App.tsx 做反向证据，旧装置把两件事写成一个名字，读数就成了 3 对 4）。
+    fake_dirty = [
+        " M apps/web/evidence/probe-a/probe.png",
+        " M apps/web/src/App.tsx",
+        "?? docs/research/evidence/probe-b/new.png",
+        "R  apps/web/evidence/probe-a/old.png -> apps/web/evidence/probe-a/renamed.png",
+    ]
+    got_ev = evidence_dirty_count(fake_dirty, probe_dirs)
+    got_all = len(dirty_paths(fake_dirty))
+    check("11 脏数分两行：只数派生证据目录那一枚不许把非证据件算进来", got_ev == 3 and got_all == 4,
+          f"EVIDENCE_DIRTY={got_ev}（该 3：一枚改、一枚未跟踪、一枚改名后在证据目录里）CARRIER_DIRTY={got_all}（该 4）")
 
     # 一条臂都没跑过的尺不算量过：否则"把 check 全删掉"这种失法会留下 arms=0 failed=0 的假绿。
     if arms == 0:
