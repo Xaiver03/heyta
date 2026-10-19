@@ -77,7 +77,10 @@ git -C .worktrees/inb-t10 status --porcelain | wc -l   # 载具应为 0
   （旋钮存在由 `python3 research/tools/verify-inbound-check-chain.py --help` 现量）；续跑前把目录里已脏的证据件先整片存档再逐名 `git checkout --`
   （形状照 `PROGRESS.md` 第 104 条 ⑧ 与第 108 条 ⑦：先 `ls` 出枚数、存档、逐名还原、再验载具脏数回 0），别在跑批中途还原。
   🔴 **并且：还原之前先把名下未入库的文档笔提交掉** —— 本会话就是没做到这一步，`git checkout --` 把自己那几行没入库的交接书改动一起还原了（见 §9 最后一条）。
-- **AC 那半**：28 枚腿逐腿有读数（计划文末台账），代码自那片戳以来没变（`git log --oneline 36214e3a..refs/heads/main` 只回本线 docs 笔）。
+- **AC 那半**：28 枚腿逐腿有读数（计划文末台账），且**代码自那片戳以来一字未变 —— 这句现在是量出来的**：
+  `git diff --name-only 36214e3a refs/heads/main | wc -l` 回 **7**（全是文档），
+  `git diff --name-only 36214e3a refs/heads/main | grep -vcE '^(docs/|PROGRESS\.md|BLOCKED\.md|AGENTS\.md|README)'` 回 **0**
+  （读数写在 `PROGRESS.md` 末节那片 ①）。⇒ 不必重跑电池；要重跑也只用按 §5 那把三层筛子判。
 - **完成条件 1**：AC 那半＝达成（每格有命令 + 输出）；"T7 三条命令在隔离副本 exit 0"＝**未达成，且不由本线闭合**
   （链上本戳三枚红 `steps=[63, 87, 106]` 全在他线地界，第 49 道那枚缺陷只是被装机语言被改而暂时盖住 —— 见 §5；外加打包机不通）。
 - **完成条件 2**：`node research/tools/license-inventory.mjs` 与 `node scripts/check-migrations.mjs` 各 rc=0；
@@ -90,7 +93,7 @@ git -C .worktrees/inb-t10 status --porcelain | wc -l   # 载具应为 0
 | 格 | 现量形状 | 谁能解 |
 |---|---|---|
 | 腿 3：打包机不通 | `for a in windows-pc laptop-5ueuu7ps windows-codex windows-pc-lan; do ssh -o ConnectTimeout=8 -o BatchMode=yes "$a" true; echo "$a RC=$?"; done` ⇒ 四枚各 **rc=255**（17:44:53 与 18:18:35 两戳同形：`windows-pc`→`10.111.127.237` Operation timed out、`windows-pc-lan`→`192.168.1.2` Connection refused、`windows-codex`／`laptop-5ueuu7ps`→`10.111.127.151` 一次超时一次 Host is down）。四枚别名其实只指**两台** Windows 宿主（`ssh -G` 取证见 B225 追记五），`scripts/reinstall-all.sh` 的 `HEYTA_WIN_HOST` 旋钮没有第三枚可指 | **只有负责人**能开机；本线按已定口径不自决退回本机出包 |
-| 腿 3：设备面 | `adb devices` 回 **0 台**（17:47 戳；昨天 20:32 那戳 `emulator-5554 device` 已在册）、`xcrun simctl list` 里 `heyta-multiend-reinstall` 是 **Shutdown** ⇒ 机器通了还得先把这两面起起来 | 本线能起模拟器／模拟器，但要在打包机通之后一次做完 |
+| 腿 3：设备面 | `adb devices` 回 **0 台**、`xcrun simctl list devices` 里 `heyta-multiend-reinstall` 回 **Shutdown**（18:32:09 戳；昨天 20:32 那戳 `emulator-5554 device` 已在册）⇒ 机器通了还得先把这两面起起来。本线**能**起模拟器，但在打包机通之前不起 —— 免得留下"半跑"那种形状 | 本线能起模拟器，但要在打包机通之后一次做完 |
 | 链第 49 道 `check:macos-window` | 探针 `HeytaMacApp.swift:625` 用 `input[placeholder^="添加任务"]` 数采集框，界面是英文时恒 0，三条 `NEEDED` 同时判缺（B238，形状见环境陷阱 #480）。⚠️ **本戳那趟它是 `RC=0`（18:21:43 收尾那片，`STEP= 49/116 RC=0 SEC=20.7`）—— 因为 `defaults read -g AppleLanguages` 首项已被改成 `zh-Hans-CN`**（上午 11:08 那戳是 `en`，第 104 条 ⑤），语言写盘时间 `stat -f '%Sm' ~/Library/Preferences/.GlobalPreferences.plist` 回 `Oct 19 18:12:41`。⇒ **别把这次绿读成修好了**：这是一枚同机同探针、只换装机语言的天然对照，门仍随语言翻（判据不该依赖语言），归属仍是 macOS 壳线 | macOS 壳线 |
 | 链第 63 道 `check:payment-entry` | `现状：生产 compose 未配支付渠道；客户端里找到 2 处付款入口。`（尺有牙：`--self-test` 四臂全过） | 收款面（B226／B223 同源） |
 | 链第 87 道 `check:ai-e2e` | `detail-pane-task.spec.ts` 里 5 枚用例等不到行尾字段控件（窄档收进了「… 更多」）——安静窗内复现同一批、三倍时限对照臂也证明不是超时 | 三栏详情面线（B237） |
