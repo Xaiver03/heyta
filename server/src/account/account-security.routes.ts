@@ -1,3 +1,5 @@
+import { centralRuntime } from '../central-auth/runtime';
+import { clearCentralSession } from '../central-auth/http-security';
 /**
  * 账号安全面（换绑登录邮箱 + 登录会话）的 HTTP 路由。工单 W1 / W2 / W3。
  *
@@ -33,7 +35,7 @@ import { z } from 'zod';
 import { EMAIL_CHANGE_PATHS, SESSION_PATHS } from '@heyta/shared-schema';
 
 import { Logger } from '../logger';
-import { authenticate, getAuthUser } from '../middleware';
+import { authenticate, authenticateRevocation, getAuthUser } from '../middleware';
 import { authCache } from '../auth-cache';
 import { revokeAllTokens } from '../auth';
 import { localeFromRequest } from '../request-locale.js';
@@ -166,7 +168,7 @@ export async function accountSecurityRoutes(fastify: FastifyInstance): Promise<v
   fastify.delete<{ Params: { sessionId: string } }>(
     `/${SESSION_PATHS.list}/:sessionId`,
     {
-      preHandler: authenticate,
+      preHandler: authenticateRevocation,
       config: { rateLimit: { max: 20, timeWindow: '15 minutes' } },
     },
     async (req, reply) => {
@@ -177,7 +179,9 @@ export async function accountSecurityRoutes(fastify: FastifyInstance): Promise<v
           .send({ code: 'unknown_session', message: 'That session is not valid.' });
       }
       const user = getAuthUser(req);
-      const revoked = await revokeSession(user.userId, parsed.data.sessionId);
+      const central = centralRuntime();
+      const revoked = central ? await central.coordinator.logout(user.userId, parsed.data.sessionId) : await revokeSession(user.userId, parsed.data.sessionId);
+      if (central && parsed.data.sessionId === user.sessionId) clearCentralSession(reply);
       // AUTH_CACHE_INVALIDATION: 撤销**一枚**也要失效缓存，否则那一枚在 30 s 内还能用，
       // 而"我点了退出，它还在"正是本笔要修的那句话。
       authCache.invalidate(user.userId);
@@ -204,15 +208,17 @@ export async function accountSecurityRoutes(fastify: FastifyInstance): Promise<v
   fastify.post(
     `/${SESSION_PATHS.revokeAll}`,
     {
-      preHandler: authenticate,
+      preHandler: authenticateRevocation,
       config: { rateLimit: { max: 5, timeWindow: '15 minutes' } },
     },
-    async (req) => {
+    async (req, reply) => {
       const user = getAuthUser(req);
       // 行删掉只让**带 jti 的**令牌失效；本轮之前那些没有 jti 的只能靠计数器（ADR-0063 §4 第 1 条）。
-      await revokeAllTokens(user.userId);
+      const central = centralRuntime();
+      if (!central) await revokeAllTokens(user.userId);
       // 行 + 通道是一个助手（`revokeAllDeviceSessions`）：两半分开写就是这一族漏东西的形状。
-      const count = await revokeAllDeviceSessions(user.userId);
+      const count = central ? await central.coordinator.logoutProduct(user.userId) : await revokeAllDeviceSessions(user.userId);
+      if (central) clearCentralSession(reply);
       Logger.audit({ event: 'SESSIONS_REVOKED_ALL', userId: user.userId });
       return { success: true, count };
     },
@@ -231,14 +237,16 @@ export async function accountSecurityRoutes(fastify: FastifyInstance): Promise<v
   fastify.post(
     `/${SESSION_PATHS.logout}`,
     {
-      preHandler: authenticate,
+      preHandler: authenticateRevocation,
       config: { rateLimit: { max: 20, timeWindow: '15 minutes' } },
     },
-    async (req) => {
+    async (req, reply) => {
       const user = getAuthUser(req);
       const sessionId = user.sessionId ?? null;
+      const central = centralRuntime();
       if (sessionId !== null) {
-        await revokeSession(user.userId, sessionId);
+        if (central) await central.coordinator.logout(user.userId, sessionId);
+        else await revokeSession(user.userId, sessionId);
         authCache.invalidate(user.userId);
         // 本机这一枚的通道由 `revokeSession` 关掉（按 session id 精确匹配），
         // 这里同样**不**关整个账号 —— 别的设备不该为"这一台退出登录"买单。
@@ -246,6 +254,7 @@ export async function accountSecurityRoutes(fastify: FastifyInstance): Promise<v
       } else {
         Logger.info(`Legacy token without jti logged out locally (ID: ${user.userId})`);
       }
+      if (central) clearCentralSession(reply);
       return { message: 'Signed out.' };
     },
   );

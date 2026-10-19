@@ -419,7 +419,7 @@ describe('WebSocket Route Validation', () => {
 
     it('upgrade 成功那一步调 addConnection 时带上 result.sessionId', () => {
       expect(source).toMatch(
-        /addConnection\(\s*result\.userId,\s*clientId,\s*socket,\s*result\.sessionId\s*\)/,
+        /addConnection\(\s*result\.userId,\s*clientId,\s*socket,\s*result\.sessionId\s*(?:,|\))/,
       );
     });
 

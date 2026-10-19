@@ -33,7 +33,8 @@ const { centralSessionIssuer } = require('../dist/src/central-auth/session-issue
 const { createCentralAuthCoordinator } = require('../dist/src/central-auth/coordinator.js');
 const { createCentralAuthWorker } = require('../dist/src/central-auth/worker.js');
 const repo = new CentralAuthRepository(productDb, new CredentialCipher('55'.repeat(32)), centralSessionIssuer());
-let identity, account;
+let identity, account, productApp, productRuntime;
+const productSockets = new Set();
 const listener = createServer({ key: readFileSync(process.env.HEYTA_OIDC_TEST_KEY), cert: readFileSync(process.env.HEYTA_OIDC_TEST_CERT) }, (req, res) => {
   if (!identity) { res.writeHead(503); res.end(); return; }
   // Use the real central request listener on an encrypted socket with its exact Host.
@@ -60,11 +61,9 @@ try {
   identity = await createIdentityServer({ db: centralDb, config });
   const oidc = await createCentralOidcClient({ mode: 'oidc', deployment: 'official', issuer, clientId, clientSecret,
     redirectUri, sessionEncryptionKey: '55'.repeat(32) }, repo);
-  async function authorize() {
-    const browser = randomSecret();
-    const pending = await oidc.begin({ browser });
+  async function centralCallback(authorizationUrl) {
     const cookies = new Map([[CREDENTIAL_COOKIE, account.credentialValue]]);
-    let next = pending.authorizationUrl;
+    let next = authorizationUrl;
     for (let step = 0; step < 12; step++) {
       const response = await fetch(next, { redirect: 'manual', headers: { cookie: [...cookies].map(([k, v]) => `${k}=${v}`).join('; ') } });
       for (const cookie of response.headers.getSetCookie()) {
@@ -87,16 +86,20 @@ try {
         next = response.headers.get('location');
       }
       assert.ok(next, 'authorization location');
-      if (next.startsWith(`${redirectUri}?`)) {
-        const result = await oidc.exchange({ browser, callbackUrl: next });
-        const { grantId } = await repo.completeAuthorization({ attemptId: result.attemptId, accessExpiresAt: result.accessExpiresAt, subject: result.subject,
-          rootSid: result.rootSid, expiresAt: Date.now() + 3600_000,
-          newUser: { email: account.account.primaryEmail, termsAcceptedAt: Date.now(), termsDocumentVersion: 'test@1' } });
-        return { result, grantId, browser, callbackUrl: next };
-      }
+      if (next.startsWith(`${redirectUri}?`)) return next;
       assert.equal(new URL(next).origin, origin, 'redirect stays on the trusted central issuer');
     }
     throw new Error('real central authorization exceeded step bound');
+  }
+  async function authorize() {
+    const browser = randomSecret();
+    const pending = await oidc.begin({ browser });
+    const callbackUrl = await centralCallback(pending.authorizationUrl);
+    const result = await oidc.exchange({ browser, callbackUrl });
+    const { grantId } = await repo.completeAuthorization({ attemptId: result.attemptId, accessExpiresAt: result.accessExpiresAt, subject: result.subject,
+      rootSid: result.rootSid, expiresAt: Date.now() + 3600_000,
+      newUser: { email: account.account.primaryEmail, termsAcceptedAt: Date.now(), termsDocumentVersion: 'test@1' } });
+    return { result, grantId, browser, callbackUrl };
   }
   const a = await authorize(), b = await authorize();
   check('real ES256 discovery/code/PKCE/JWKS flow', a.result.subject === account.subject);
@@ -148,8 +151,84 @@ try {
   const renewedTokens = cipher.open(`grant:${renewed.id}:${renewed.version}`, renewed.tokensCipher);
   await assert.rejects(oidc.introspect(renewedTokens.accessToken, b.result.subject));
   check('real central access is inactive after outbox worker completes', true);
+  // Exercise actual product HTTP/Cookie/WS boundaries, rather than only coordinator calls.
+  const tlsKey = readFileSync(process.env.HEYTA_OIDC_TEST_KEY), tlsCert = readFileSync(process.env.HEYTA_OIDC_TEST_CERT);
+  delete process.env.HEYTA_OIDC_TEST_KEY; delete process.env.HEYTA_OIDC_TEST_CERT;
+  const publicOrigin = new URL(redirectUri).origin;
+  Object.assign(process.env, { PUBLIC_URL: publicOrigin, HEYTA_AUTH_MODE: 'oidc', HEYTA_AUTH_DEPLOYMENT: 'official',
+    HEYTA_OIDC_ISSUER: issuer, HEYTA_OIDC_CLIENT_ID: clientId, HEYTA_OIDC_CLIENT_SECRET: clientSecret,
+    HEYTA_OIDC_REDIRECT_URI: redirectUri, HEYTA_OIDC_SESSION_ENCRYPTION_KEY: '55'.repeat(32) });
+  const { acquireAuthenticationRuntime } = require('../dist/src/central-auth/runtime.js');
+  const { centralAuthRoutes } = require('../dist/src/central-auth/routes.js');
+  const { installCentralRoutePolicy } = require('../dist/src/central-auth/route-policy.js');
+  const { accountSecurityRoutes } = require('../dist/src/account/account-security.routes.js');
+  const { authenticate } = require('../dist/src/middleware.js');
+  const { wsRoutes } = require('../dist/src/sync/websocket.routes.js');
+  const { getWsConnectionService } = require('../dist/src/sync/services/websocket-connection.service.js');
+  const { CENTRAL_COOKIES } = require('../dist/src/central-auth/http-security.js');
+  const { SESSION_PATHS } = require('@heyta/shared-schema');
+  const { WebSocket } = require('ws');
+  productRuntime = await acquireAuthenticationRuntime({ mode: 'oidc', deployment: 'official', issuer, clientId, clientSecret,
+    redirectUri, sessionEncryptionKey: '55'.repeat(32) });
+  productApp = require('fastify')({ https: { key: tlsKey, cert: tlsCert } });
+  installCentralRoutePolicy(productApp);
+  await productApp.register(require('@fastify/websocket'));
+  await centralAuthRoutes(productApp, productRuntime.runtime);
+  await productApp.register(accountSecurityRoutes, { prefix: '/api' });
+  await productApp.register(wsRoutes, { prefix: '/api/sync' });
+  productApp.get('/private', { preHandler: authenticate }, async (req) => ({ userId: req.user.userId }));
+  const network = await productApp.listen({ host: '127.0.0.1', port: 0 });
+  function browser() {
+    const cookies = new Map();
+    const cookie = () => [...cookies].map(([k,v]) => `${k}=${v}`).join('; ');
+    const request = async (path, method = 'GET', body) => {
+      const response = await fetch(network + path, { method, redirect: 'manual', headers: { cookie: cookie(), origin: publicOrigin,
+        ...(body !== undefined ? { 'content-type': 'application/json', 'x-csrf-token': cookies.get(CENTRAL_COOKIES.csrf) } : {}) },
+        ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
+      for (const value of response.headers.getSetCookie()) { const pair=value.split(';')[0], i=pair.indexOf('='); cookies.set(pair.slice(0,i),pair.slice(i+1)); }
+      return response;
+    };
+    return { cookies, cookie, request };
+  }
+  async function loginHttp(client) {
+    assert.equal((await client.request('/api/auth/central/session')).status, 200);
+    const start = await client.request('/api/auth/oidc/start', 'POST', {}); assert.equal(start.status,200);
+    const callback = await centralCallback((await start.json()).authorizationUrl);
+    const url = new URL(callback), response = await client.request(url.pathname + url.search);
+    assert.equal(response.status,303); assert.equal(response.headers.get('location'), publicOrigin + '/app/');
+    const jwtCookie = response.headers.getSetCookie().find((value) => value.startsWith(CENTRAL_COOKIES.session + '='));
+    assert.ok(jwtCookie.includes('Secure') && jwtCookie.includes('HttpOnly') && !jwtCookie.includes('Domain='));
+    assert.ok(!(await response.text()).includes(client.cookies.get(CENTRAL_COOKIES.session)));
+    const projection = await (await client.request('/api/auth/central/session')).text();
+    assert.ok(!projection.includes(client.cookies.get(CENTRAL_COOKIES.session)));
+    assert.equal((await client.request('/private')).status,200);
+    return productDb.centralGrant.findFirstOrThrow({ where: { userId: second.userId, revokedAt: null }, orderBy: { createdAt: 'desc' } });
+  }
+  const httpA = browser(), grantHttpA = await loginHttp(httpA);
+  const httpB = browser(), grantHttpB = await loginHttp(httpB);
+  check('real central code returns product host-only Cookie through HTTPS callback without JWT JSON', grantHttpA.id !== grantHttpB.id);
+  const ws = new WebSocket(network.replace('https:', 'wss:') + '/api/sync/ws?clientId=Ecentral', { headers: { cookie: httpA.cookie(), origin: publicOrigin } });
+  productSockets.add(ws);
+  const firstMessage = new Promise((resolve,reject) => { ws.once('message',resolve); ws.once('error',reject); });
+  const closed = new Promise((resolve) => ws.once('close',resolve));
+  await firstMessage;
+  const material = cipher.open(`grant:${grantHttpA.id}:${grantHttpA.version}`, grantHttpA.tokensCipher);
+  await oidc.revoke(material.refreshToken,'refresh_token');
+  getWsConnectionService().notifyNewOps(second.userId,'another-device',999);
+  const closeCode = await Promise.race([closed, new Promise((_,reject) => { const timer=setTimeout(() => reject(new Error('Real WS revocation deadline exceeded')), 5000); timer.unref(); })]);
+  check('real central revocation closes already connected product WS', closeCode === 4003);
+  check('real HTTP auth rejects revoked grant and preserves sibling', (await httpA.request('/private')).status === 401 && (await httpB.request('/private')).status === 200);
+  assert.equal((await httpB.request(`/api/${SESSION_PATHS.logout}`, 'POST', {})).status,200);
+  check('real HTTP logout deletes local session before asynchronous revoke', await productDb.accessSession.findUnique({ where: { jtiHash: grantHttpB.sessionHash } }) === null);
+  for (let i=0;i<3;i++) await productRuntime.runtime.worker.tick();
+  const tokensB = cipher.open(`grant:${grantHttpB.id}:${grantHttpB.version}`, grantHttpB.tokensCipher);
+  await assert.rejects(oidc.introspect(tokensB.accessToken,grantHttpB.subject));
+  check('HTTP logout worker revokes real central RT and AT', true);
   process.stdout.write(JSON.stringify({ ok: true, assertions: audit, tlsVerification: true, service: 'external central identity-server', databases: 'two isolated PostgreSQL stores' }, null, 2) + '\n');
 } finally {
+  for (const ws of productSockets) ws.terminate();
+  if (productApp) await productApp.close();
+  if (productRuntime) await productRuntime.stop();
   listener.closeAllConnections();
   await new Promise((done) => listener.close(done));
   if (account) {

@@ -176,3 +176,15 @@ OIDC启动门禁保持。真实PG+TLS与原持久层测试使用实际唯一JWT�
 P5.2B1独立期限反例修复：授权/刷新应用要求显式传入已验证中央内省的有限AT期限，
 用户锁后、唯一签发后及最终写入后按数据库时钟重核；过期整体回滚并保留RESULT所有权。
 不使用未验证token响应expires_in补齐证据，纯持久层夹具使用显式有限合成期限。
+
+
+## 中央认证服务端接线（P5.2B2，2026-10-19）
+
+新增central-auth/runtime、http-security、routes、route-policy及共享纯HTTP契约；
+auth/middleware/server与API/账号安全/admin/device/WS接入同一中央grant生命周期。
+Cookie、CSRF、回调交付和旧身份入口封闭独立实现；官方模式的全部HTTP与已建立WS
+都检查中央live，unknown不触发本地销毁。退出、设备封锁、销户及outbox原子收敛。
+服务生命周期持有唯一runtime并等待WS/worker停止；local自托管保留。
+新增真实TLS+PG+WS测试、扩大真实中央双PG脚本，并增加可信签发边界反例门禁。
+没有新增第三方依赖、数据库迁移、E2EE/op-log或客户端UI改动；没有复制AGPL代码。
+当前验收证据、未完成客户端/部署边界只维护在[唯一计划](../docs/plans/unified-central-auth.md)。

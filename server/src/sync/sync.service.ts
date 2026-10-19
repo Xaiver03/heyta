@@ -1052,6 +1052,10 @@ export class SyncService {
     return this.deviceService.listDevices(userId);
   }
 
+  async revokeDeviceInTransaction(tx: Prisma.TransactionClient, userId: number, clientId: string): Promise<void> {
+    await this.deviceService.revokeDeviceInTransaction(tx, userId, clientId);
+  }
+
   async revokeDevice(userId: number, clientId: string): Promise<void> {
     await this.deviceService.revokeDevice(userId, clientId);
   }

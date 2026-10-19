@@ -1,3 +1,5 @@
+import { centralRuntime } from './central-auth/runtime';
+import { CentralSessionError } from './central-auth/coordinator';
 import { prisma } from './db';
 import { SESSION_MAX_AGE_MS } from './central-auth/session-policy';
 import * as jwt from 'jsonwebtoken';
@@ -271,7 +273,8 @@ export type TokenFailureCode =
   | 'ACCOUNT_CLOSED'
   | 'ACCOUNT_UNVERIFIED'
   | 'TOKEN_REVOKED'
-  | 'TOKEN_INVALID';
+  | 'TOKEN_INVALID'
+  | 'CENTRAL_UNAVAILABLE';
 
 export type TokenVerificationResult =
   /**
@@ -281,7 +284,7 @@ export type TokenVerificationResult =
    * 而那个判断只能由服务端从**自己验出来的** payload 里取（信客户端传来的标记 = 用户会在
    * 别的设备上把"退出登录"点成撤销自己的）。
    */
-  | { valid: true; userId: number; email: string; tokenVersion: number; sessionId: string | null }
+  | { valid: true; userId: number; email: string; tokenVersion: number; sessionId: string | null; expiresAt?: number }
   | { valid: false; reason: string; code: TokenFailureCode };
 
 /**
@@ -314,7 +317,10 @@ function isParseableJwt(token: string): boolean {
   }
 }
 
-export const verifyToken = async (token: string): Promise<TokenVerificationResult> => {
+export const verifyToken = (token: string): Promise<TokenVerificationResult> => verifyTokenInternal(token, false);
+/** Restricted to explicit session revocation routes; never use for business authorization. */
+export const verifyRevocationToken = (token: string): Promise<TokenVerificationResult> => verifyTokenInternal(token, true);
+const verifyTokenInternal = async (token: string, revocationOnly: boolean): Promise<TokenVerificationResult> => {
   if (!isParseableJwt(token)) {
     return { valid: false, reason: 'Invalid token', code: 'TOKEN_INVALID' };
   }
@@ -324,6 +330,7 @@ export const verifyToken = async (token: string): Promise<TokenVerificationResul
       email: string;
       tokenVersion?: number;
       jti?: string;
+      exp?: number;
     }>((resolve, reject) => {
       jwt.verify(token, JWT_SECRET, (err, decoded) => {
         if (err) return reject(err);
@@ -333,6 +340,12 @@ export const verifyToken = async (token: string): Promise<TokenVerificationResul
       });
     });
 
+    const central = centralRuntime();
+    if (!Number.isSafeInteger(payload.userId) || payload.userId <= 0 || typeof payload.email !== 'string')
+      return { valid: false, reason: 'Invalid token', code: 'TOKEN_INVALID' };
+    if (central && (!Number.isSafeInteger(payload.tokenVersion) || payload.tokenVersion! < 0 ||
+        typeof payload.jti !== 'string' || !/^[a-f0-9]{32}$/.test(payload.jti) || !Number.isSafeInteger(payload.exp)))
+      return { valid: false, reason: 'Token was revoked', code: 'TOKEN_REVOKED' };
     const tokenVersion = payload.tokenVersion ?? 0;
     // 🔴 这一枚是哪一次登录：只从**自己验过的** payload 里算，且 `jti` 缺失 ⇒ `null`
     // （本轮之前签的令牌不可单独撤销，见 `TokenVerificationResult` 上那段与 ADR-0063 §4）。
@@ -340,7 +353,7 @@ export const verifyToken = async (token: string): Promise<TokenVerificationResul
       ? sessionIdOf(payload.jti)
       : null;
     const cachedSession = authCache.get(payload.userId, sessionId);
-    if (cachedSession && cachedSession.isVerified && cachedSession.tokenVersion === tokenVersion) {
+    if (!central && cachedSession && cachedSession.isVerified && cachedSession.tokenVersion === tokenVersion) {
       return {
         valid: true,
         userId: payload.userId,
@@ -419,6 +432,7 @@ export const verifyToken = async (token: string): Promise<TokenVerificationResul
       };
     }
 
+    if (central && !revocationOnly) await central.coordinator.live({ userId: payload.userId, sessionHash: sessionId!, tokenVersion });
     authCache.setIfCurrent(payload.userId, sessionId, currentVersion, true, cacheVersionBeforeRead);
     return {
       valid: true,
@@ -426,8 +440,12 @@ export const verifyToken = async (token: string): Promise<TokenVerificationResul
       email: payload.email,
       tokenVersion,
       sessionId,
+      ...(central ? { expiresAt: payload.exp! * 1000 } : {}),
     };
   } catch (err) {
+    if (err instanceof CentralSessionError) return { valid: false,
+      reason: err.code === 'central_unavailable' ? 'Central authentication temporarily unavailable' : 'Token was revoked',
+      code: err.code === 'central_unavailable' ? 'CENTRAL_UNAVAILABLE' : 'TOKEN_REVOKED' };
     if (err instanceof TokenExpiredError) {
       return {
         valid: false,
@@ -571,11 +589,13 @@ export const requestLoginMagicLink = async (
  * 而这在界面上与密码错长得一模一样。改由这里读之后，"签名值 = 库里那格 = 会话行那一格"
  * 是同一次读出来的三样东西，写不出不一致。
  */
+const CENTRAL_ISSUANCE = Symbol('central-issuance');
 export const issueSession = async (
   user: { id: number },
   meta: SessionMeta = {},
-  transaction?: { tx: Prisma.TransactionClient; jti: string; expiresAt: number },
+  transaction?: { tx: Prisma.TransactionClient; jti: string; expiresAt: number; capability?: symbol },
 ): Promise<string> => {
+  if (centralRuntime() && transaction?.capability !== CENTRAL_ISSUANCE) throw new Error('central_authentication_required');
   const db = transaction?.tx ?? prisma;
   const row = await db.user.findUniqueOrThrow({
     where: { id: user.id },
@@ -597,6 +617,11 @@ export const issueSession = async (
     { expiresIn: expiresIn ?? JWT_EXPIRY },
   );
 };
+
+/** Trusted central repository adapter only; transaction and freshness are established there. */
+export const issueCentralSession = (user: { id: number }, meta: SessionMeta,
+  transaction: { tx: Prisma.TransactionClient; jti: string; expiresAt: number }) =>
+  issueSession(user, meta, { ...transaction, capability: CENTRAL_ISSUANCE });
 
 export const verifyLoginMagicLink = async (
   token: string,

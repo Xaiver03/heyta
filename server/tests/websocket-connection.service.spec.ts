@@ -678,3 +678,55 @@ describe('WebSocketConnectionService', () => {
     });
   });
 });
+
+
+describe('central session checks on established sockets', () => {
+  it('checks every outgoing message and drops a late active result after explicit revocation', async () => {
+    const service = new WebSocketConnectionService(), ws = createMockWs();
+    let resolve!: () => void;
+    const authorize = vi.fn(() => new Promise<void>((done) => { resolve = done; }));
+    service.addConnection(1, 'client-a', ws as any, 'a'.repeat(64), authorize);
+    expect(ws.send).not.toHaveBeenCalled();
+    service.closeForSession(1, 'a'.repeat(64)); resolve(); await service.drainAuthorization();
+    expect(ws.send).not.toHaveBeenCalled(); expect(service.getConnectionCount()).toBe(0);
+  });
+  it.each([['session_inactive', 4003], ['central_unavailable', 1013]] as const)('closes %s without relaying inbound presence', async (code, closeCode) => {
+    const service = new WebSocketConnectionService(), a = createMockWs(), b = createMockWs();
+    let live = true;
+    service.addConnection(1, 'client-a', a as any, 'a'.repeat(64), async () => { if (!live) throw { code }; });
+    service.addConnection(1, 'client-b', b as any, 'b'.repeat(64));
+    await service.drainAuthorization(); a.send.mockClear(); b.send.mockClear(); live = false;
+    a._emitMessage(JSON.stringify({ type: 'presence_state', payload: 'opaque' }));
+    await service.drainAuthorization();
+    expect(a.close).toHaveBeenCalledWith(closeCode, expect.any(String));
+    expect(b.send).not.toHaveBeenCalled(); service.closeAll();
+  });
+  it('bounds queued authorization work and never dispatches it after overload', async () => {
+    const service = new WebSocketConnectionService(), ws = createMockWs();
+    let resolve!: () => void;
+    service.addConnection(1, 'client-a', ws as any, 'a'.repeat(64), () => new Promise<void>((done) => { resolve = done; }));
+    for (let i = 0; i < 40; i++) ws._emitMessage(JSON.stringify({ type: 'presence_state', payload: 'opaque' }));
+    expect(ws.close).toHaveBeenCalledWith(1013, expect.any(String));
+    resolve(); await service.drainAuthorization(); expect(ws.send).not.toHaveBeenCalled();
+  });
+  it('does not retain oversized payloads behind a slow central check and bounds raw frame bytes', async () => {
+    const service = new WebSocketConnectionService(), ws = createMockWs();
+    let resolve!: () => void;
+    const authorize = vi.fn(() => new Promise<void>((done) => { resolve = done; }));
+    service.addConnection(1, 'client-a', ws as any, 'a'.repeat(64), authorize);
+    for (let i=0;i<40;i++) ws._emitMessage(JSON.stringify({ type: 'presence_state', payload: 'x'.repeat(8193) }));
+    expect(ws.close).not.toHaveBeenCalled(); expect(authorize).toHaveBeenCalledTimes(1);
+    ws._emitMessage('x'.repeat(65537)); expect(ws.close).toHaveBeenCalledWith(1009, 'Message too large');
+    resolve(); await service.drainAuthorization(); expect(ws.send).not.toHaveBeenCalled();
+  });
+  it('rechecks idle sockets before device touches and drains on shutdown', async () => {
+    vi.useFakeTimers();
+    const service = new WebSocketConnectionService(), ws = createMockWs(), touch = vi.fn();
+    let live = true;
+    service.addConnection(1, 'client-a', ws as any, 'a'.repeat(64), async () => { if (!live) throw { code: 'central_unavailable' }; });
+    await service.drainAuthorization(); live = false;
+    service.startHeartbeat(touch); await vi.advanceTimersByTimeAsync(30_000);
+    await service.drainAuthorization(); expect(touch).not.toHaveBeenCalled(); expect(ws.close).toHaveBeenCalledWith(1013, expect.any(String));
+    service.stopHeartbeat(); service.closeAll(); vi.useRealTimers();
+  });
+});
