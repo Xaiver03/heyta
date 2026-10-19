@@ -1560,6 +1560,10 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
     （10-18 r125 复量时读到 rc=2，原因可点名）**已经被后续提交修掉，别再按它行动**。
     ⚠️ **本格继续开着的那一半不是本线的**：42 枚夹带的归属要**协作/共享那条线**在后续提交里说明（修复选项 (甲)），
     而 (乙)「改写历史拆回去」自 `e6058120` 进入 `origin/main` 那刻起就不可选 —— 今天做它等于改写已公开历史。
+      - 🔴 **10-20 01:5x r158 按这一格自己的规矩现量复量"那一半到没到"**：`git log --since=2026-10-17 -- packages/sync-core/src/share-keys.ts packages/ui/src/sync packages/sync-client/src packages/op-log/src/state.ts scripts/verify-collab-share-routes.mjs`
+        只回两枚功能提交（`418ab88ff` 共享清单评论线程、`2be51be18` COMMENT 领域层），而 `git log --grep='归属\|夹带\|e6058120'` 里
+        **没有一枚是协作线替那 42 枚写的说明** ⇒ **(甲) 仍未发生，本格继续开着**，本线不代写别人的归属。
+        （这一读是瞬时的：下一位要动这一格，逐字重跑那两条 `git log`，别抄这一句。）
     🔴 这一格留给本线自己的那条规矩仍然有效并已钉死：**提交一律 `git commit -F msg -- <明确路径>`，且未跟踪文件要先 `git add` 再逐笔带 pathspec**
     （本轮 r149/r150 两笔就是这么跑的：`git status --porcelain` 先核在飞、提交后按真实 parent 复验）。
     **成因不是知识缺失**：项目记忆里 **5b** 那条早就写着安全写法是 `git commit -F msg -- <明确路径>`，而我跑的是 `git add <我的路径> && git commit -m …`（**无 pathspec**）⇒ 把别人的暂存集整个卷进我这一笔。同族第三次命中（前两次记在 `project-shared-worktree-sessions.md` 第 227–229 行，结论都是"提交那一刻没做预检"）。⇒ 规矩要换成**命令模板本身**：这一棵树上 `git commit` 一律带 pathspec，"记得预检"不作为独立步骤。
