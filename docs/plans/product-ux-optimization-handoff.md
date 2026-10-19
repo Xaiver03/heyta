@@ -566,6 +566,19 @@ PY
     而"在飞"是一枚**瞬时读数**（`git status --porcelain -- <那个文件>`），10-20 现量回空 ⇒ 前提早就不成立了。
     凡是写着"等别人提交完再改"的格子，动手前先重跑那一枚现量，别沿用它上次成立的理由。
     同类实例现量只有一枚（全仓 `.tsx` 扫 `disabled={…token === ''…}` 命中 1 处），已随这格一起改。
+12. ✅ **10-20 00:4x（r150）台账那格"iOS 旅程假通过形状"复核闭合，并补上「以后再说」那枚 ✕ 的设备腿**
+    （`apps/mobile/evidence/ux-final-20261020/ios-privacy-decide-later-r150/RESULT.md`）。三件事留给下一位：
+    · 那格的①②两半都已落地（现量：`grep -nE 'absent=\("[^"]*"\)' scripts/qa/profile-settings-ios.py` 回空、
+      `probe.tap(...)` 的 `then` 槽单语 0 处；英文两趟各 23 步 `passed` 在 r140 那包里）
+      ⇒ **别再按"断言位照旧单语是刻意的判据口径"行动**，那句已被 r140 换成的形状是
+      "整组五枚分组标题必须齐"（写在 `assert_directory_language` 的注释里）。
+    · 「以后再说」那枚 ✕ 的行为证对了：按下去 = 什么都没决定（`device_pref` 三趟现读 **0 行**）、
+      杀掉再开那张卡原样回来、落点是欢迎页（离线那条当场可走）不是墙。
+      顺带照出一条**新的候选缺陷（未裁决，已另立一格）**：那枚 ✕ 屏幕上只有叉、没有可见文字 ⇒ 归设计口径。
+    · 🔴 **造"全新安装态"只能在自建一次性载体上做**（本趟 `heyta-r150-privacy-later`，跑完 `shutdown` + `delete`，
+      现量 `xcrun simctl list devices | grep -c heyta-r150` = 0）。⚠️ 共享那台 `heyta-iphone-17pro` 上 `uninstall`
+      会毁掉别线的装机现场。另记一枚装置事实：**iOS 的 `device_pref` 住 `…/Library/heyta-device-prefs.sqlite`，
+      不是 Android 那个 `…/databases/`** —— 只按 Android 形状找会回 `not-found`，而"读不到"不等于"没有那一行"。
 
 ⚠️ 这一段只收**本轮 Goal 那五步**还挂着的部分 —— 其余欠项照 §四 逐行读，那里每一行都写了"在谁手里 + 一条命令"。
 🔴 延续 §一 那两条负责人指令：**不许向负责人发任何表单/确认动作、汇报不许以问句收尾**；Goal 保持开着（到 100 轮由系统自动暂停），
