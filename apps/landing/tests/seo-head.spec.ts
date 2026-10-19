@@ -458,6 +458,25 @@ describe('生成的 XML 必须是合法 XML —— 用**真解析器**，不用�
   });
 });
 
+describe('平台验证文件：baidu_verify_*.html（百度文件验证）', () => {
+  /**
+   * 🔴 **内容不是文件名里那个 `codeva-…` 短码** —— 百度给的文件里实际是一个 **32 位小写十六进制**串。
+   * 这是"从真东西取、别按众所周知猜"那条纪律救下来的一次：我原本会写成 `codeva-ILIskRL7IN`，
+   * 那样百度必然验不过，而两边都不会报错。真值取自页面内 `fetch('/site/verifyfile?id=…')`
+   * （同源、带 cookie）拿到的下载件本身。
+   */
+  it('形状正确：恰好一枚、内容为 32 位小写十六进制、无结尾换行', () => {
+    const files = readdirSync(resolve(APP, 'public')).filter((f) =>
+      /^baidu_verify_[A-Za-z0-9-]+\.html$/.test(f),
+    );
+    expect(files.length, `public/ 下的 baidu_verify_*.html 应当恰好一枚，实际：[${files.join(', ')}]`).toBe(1);
+    const name = files[0] ?? '';
+    const content = readFileSync(resolve(APP, 'public', name), 'utf8');
+    expect(content, '百度验证文件的内容是 32 位小写十六进制，不是 codeva 短码').toMatch(/^[0-9a-f]{32}$/);
+    expect(content.endsWith('\n'), '这枚文件不许有结尾换行').toBe(false);
+  });
+});
+
 describe('Open Graph / Twitter 卡片', () => {
   it.each(ENTRIES)('$label：必需的 meta 都在', ({ page, locale }) => {
     const { meta } = readHead(page, locale);
