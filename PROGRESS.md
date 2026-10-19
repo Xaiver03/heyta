@@ -5745,7 +5745,7 @@ AC 已勾数仍为 **0**（`verify-inbound-ac-ticks.py`：`AC 行=8　已勾=0�
 ② **成立范围当场量**：`git diff --name-only 528b4115c refs/heads/main > /tmp/d.txt; grep -vcE '^(docs/|PROGRESS\.md|BLOCKED\.md|AGENTS\.md|README)' < /tmp/d.txt` 回 **0**（总改动 7 枚，全是台账／文档）⇒ 表里"最近一次当日读数"那一列对**当前已入库代码**成立。⚠️ 表底一并写了一句：下一位若在这之后动了代码，按环境陷阱 **#494** 那三层筛子判要不要重跑，别照抄本表第三列。
 ③ **两格旁边的提醒是内容不是装饰**：`AC-6` 那行写着 `AC6-browser` 会逐名覆写那批待拍取证图（处置＝§7 第 4 格）；`SCOPE-commit-scope` 单列一行并标 **不是 AC 格** —— 它 rc=1（B205，越界笔名归别线），但谁都不能把它读成"AC 面有一格红"。
 ④ **表的自查与门的覆盖范围要分清**：新增 11 行表格每行都是 4 枚竖线（3 列，现量 `awk '/^## 4a\./,/^## 5\./' docs/plans/inbound-automation-handoff.md | grep '^|' | awk '{n=gsub(/\|/,"|"); print n}' | sort -u` 只回一个值）；而 `verify-inbound-doc-tables.py`、`docs-link-check.mjs`、`check-docs-voice.mjs` 三把门在提交前各回 rc=**0**，⚠️ **但这把表尺的文件清单里没有交接书**（现量 `grep -c 'handoff' research/tools/verify-inbound-doc-tables.py` 回 **0**）⇒ 交接书里的表靠的是上面那条自查，不是靠门。要不要把它纳进表尺清单属于新增判据，本线不代做。
-⑤ **完成条件对照**：这条动 `docs/plans/inbound-automation-handoff.md` 与 `PROGRESS.md` 两枚；判卷口径零处、`packages/i18n` 零处、迁移零处、不新增依赖。AC 勾数现量 `grep -c '^[-] \[[x]\] \*\*AC-' docs/plans/inbound-automation.md` 回 **0**。腿 3 本条未重探（最近一戳 19:03:30 四枚别名各 rc=255、`adb` 0 台、模拟器未 Booted）。本线不 push、不自标完成。
+⑤ **完成条件对照**：这条动 `docs/plans/inbound-automation-handoff.md` 与 `PROGRESS.md` 两枚；判卷口径零处、`packages/i18n` 零处、迁移零处、不新增依赖。AC 勾数现量 `grep -c '^[-] \[[x]\] \*\*AC-' docs/plans/inbound-automation.md` 回 **0**。腿 3 在这条写完之后又复探了一次（现量命令在交接书 §5 那一格）：**20:35:26 四枚别名各 rc=255、`adb devices` 0 台、`heyta-multiend-reinstall` 仍 Shutdown ⇒ 形状未变**，前一戳是 19:03:30。本线不 push、不自标完成。
 
 
 
