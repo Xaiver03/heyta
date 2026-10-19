@@ -4303,3 +4303,12 @@ AC-8：`python3 research/tools/verify-inbound-ac8-matrix.py` rc=**0**（`读数�
 | （对照，不是 AC 格）范围尺 | `SCOPE-commit-scope` | 那批这行 `rc=1`，首行是 `79e8ede1 命中段=desc 带本线独占路径=0 主题「docs(协作 push 格): …」` ⇒ **越界笔名归别线**（B205），谁都不能把它读成"验收面红了一格" | 15:52:11，同一戳 |
 
 **这一节不改任何东西的结论**：判卷口径零处、AC 勾数现量 `grep -c '^[-] \[[x]\] \*\*AC-' docs/plans/inbound-automation.md` 回 **0**（这一节本身不是勾格动作）。它只把"贴出的输出"从仓外搬进仓内 —— 搬完之后，完成条件 1 里凡是本线能证的那几格，读者在仓库内就能同时看到命令和输出，不再需要我这台机器。
+
+## 2026-10-19 23:4x · 三枚旧载具（inb-t7／t8／t9）现在都不在盘上：把"复跑入口"和"历史执行记录"再普查一次（自动收集线）
+
+1. 盘上事实（23:45:59 现量 `git worktree list` 与 `ls .git/worktrees/`）：这棵仓在本目录下的载具只剩 `.worktrees/inb-t10`（与 `refs/heads/main` 同戳），管理目录只剩 `head-r128`／`heyta`／`inb-t10` 三枚 ⇒ `inb-t9` 是被连根去掉的（不是"留着但断开"）。谁删的、几点删的本仓不可证，本线也没执行过删除（本轮只读写 inb-t10）⇒ **只按盘上事实登记，不归因**。
+2. 因此任务书"待拍板"里那一枚 `.worktrees/inb-t9 的处置`**已经没有可拍的对象** —— 既不是"留着占不占空间"，也不是"要不要删"。⇒ 交接书 §7 那一格按这条重写，不留成"等他答"。
+3. 分母与形状（算法先写出来，否则枚数没人能复查）：按正则 `(?:cd|git -C|--root|-C)[[:space:]]+\.worktrees/<名>` 判"命令行形状"。`docs/plans/inbound-automation.md`＝inb-t7 总 39／命令行 14、inb-t8 12／1、inb-t9 37／5；`PROGRESS.md`＝18／4、11／1、48／11；`BLOCKED.md`＝16／3、3／0、28／8；**交接书＝0／0**（它只指 inb-t10）。三枚台账文档合计 **212** 处提及、**47** 处命令行形状。
+4. ⚠️ **这一档只出清单与判法，不出判决**：同一个命令行形状里混着两种东西——"那一趟的取数命令"（历史叙述，照不照抄都不影响已入库结论）与"给下一位的重跑入口"。真入口那三行用可反查的短语定位：`grep -n '重跑命令仍挂在台账' docs/plans/inbound-automation.md`（1 行）、`grep -n '重取命令挂在台账' PROGRESS.md`（1 行）、`grep -n 'rerun-rigs-1015d' docs/plans/inbound-automation.md PROGRESS.md`（1 行）。
+5. 那三行现在**两层都断**：载具目录没了；而 `.run-logs/` 本身是载具本地、被 git 忽略的（现量 `git ls-files | grep -c '^\.run-logs'` 回 **0**、`git check-ignore -q .run-logs` 成立），驱动脚本没入库，家目录证据包里也没有（现量 `ls ~/.heyta-evidence/inb-t7-1017-0902 | grep -c 'chain.sh\|rerun-rigs'` 回 **0**）。⇒ 历史行不删、旧号不改（本仓纪律：编号只增不改，历史叙述留在原处）；替代入口只有一句：**链与电池的真身在仓里** —— 逐道用 `python3 research/tools/verify-inbound-check-chain.py`，八格复跑用交接书 §4a 那张表（`python3 research/tools/verify-inbound-ac-battery.py --root .worktrees/inb-t10 --ev <新目录> --quiet-gate --only <串>`）。
+6. 这一节不改任何结论：判卷口径零处、代码零处、不新增依赖、不 push；AC 勾数现量 `grep -c '^[-] \[[x]\] \*\*AC-' docs/plans/inbound-automation.md` 回 **0**。写前先跑 `date`（本机 2026-10-19 23:4x）。

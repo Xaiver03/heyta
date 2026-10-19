@@ -5776,6 +5776,13 @@ AC 已勾数仍为 **0**（`verify-inbound-ac-ticks.py`：`AC 行=8　已勾=0�
 ① 现量：`git diff --name-only 528b4115c refs/heads/main > /tmp/d127.txt; grep -vcE '^(docs/|PROGRESS\.md|BLOCKED\.md|AGENTS\.md|README)' < /tmp/d127.txt` 在交付 tip `5c274f496` 上回 **0**（总改动 7 枚，其中 5 枚在 `docs/` 下：现量 `grep -oE '^[a-z-]+/' /tmp/d127.txt | sort | uniq -c`）。⇒ 交接书 §4a 那两批 AC 读数的成立范围**此刻仍成立**。
 ② 改的就是那一行措辞：原来只写"是 **0** 枚 + 现量命令"，读起来像"这条永远成立"；现在把**戳**（tip + 时刻）和**翻案条件**（再动代码就按 `#494` 重判）写进同一句。⚠️ `/tmp/d127.txt` 是一次性暂存，不在仓里 —— 要复现就照句子里那条命令自己跑，别去找这枚文件。
 ③ 这条动 `docs/plans/inbound-automation-handoff.md` 与 `PROGRESS.md` 两枚；判卷口径零处、`packages/i18n` 零处、迁移零处、不新增依赖；AC 勾数 `grep -c '^[-] \[[x]\] \*\*AC-' docs/plans/inbound-automation.md` 回 **0**。腿 3 未重探（最近 23:32:20 同形）。本线不 push、不自标完成。
+129. 🟢 **三枚旧载具（inb-t7／t8／t9）现在都不在盘上 ⇒ 任务书里「`.worktrees/inb-t9` 的处置」那一格按盘上事实作废；台账 212 处旧载具提及逐枚普查完，47 处命令行形状只出清单与判法、不出判决**（写前先跑 `date`，本机 2026-10-19 23:4x）
+① **盘上事实**（23:45:59）：`git worktree list` 在本目录下只剩 `.worktrees/inb-t10`（与 `refs/heads/main` 同戳），`ls .git/worktrees/` 只剩 `head-r128`／`heyta`／`inb-t10` 三枚 ⇒ `inb-t9` 是**连根去掉**的，不是"留着但断开"。
+② **为什么这一格不算"我在替他答"也不算"他没答"**：那一格问的动作是"留不留／删不删"，对象已不存在 ⇒ 没有可拍的动作。归因只按盘上事实：谁删的、几点删的本仓不可证，**本线没执行过删除**（本轮读写只在 inb-t10：现量 `pwd` 取 `.worktrees/inb-t10`，`git -C .worktrees/inb-t10 status --porcelain | wc -l` 回 **0**）。
+③ **分母先把算法写出来**（否则 212 这个数字没人能复查）：按正则 `(?:cd|git -C|--root|-C)[[:space:]]+\.worktrees/<名>` 判"命令行形状"⇒ 计划＝inb-t7 总 39／命令行 14、inb-t8 12／1、inb-t9 37／5；`PROGRESS.md`＝18／4、11／1、48／11；`BLOCKED.md`＝16／3、3／0、28／8；**交接书＝0／0**（它只指 inb-t10）⇒ 三枚台账文档合计 **212** 处提及、**47** 处命令行形状。
+④ ⚠️ **这一档只出清单与判法，不出判决**（第 123 条 ④ 那枚规矩的又一次应用）：同一个命令行形状里混着两种东西——"那一趟的取数命令"（历史叙述，照不照抄都不影响已入库结论）与"给下一位的重跑入口"。真入口那三行用可反查短语定位：`grep -n '重跑命令仍挂在台账' docs/plans/inbound-automation.md`、`grep -n '重取命令挂在台账' PROGRESS.md`、`grep -n 'rerun-rigs-1015d' docs/plans/inbound-automation.md PROGRESS.md` 各回 **1** 行；它们现在**两层都断**——载具没了，且 `.run-logs/` 本就被 git 忽略（现量 `git ls-files | grep -c '^\.run-logs'` 回 **0**），驱动脚本既没入库也不在家目录证据包里（现量 `ls ~/.heyta-evidence/inb-t7-1017-0902 | grep -c 'chain.sh\|rerun-rigs'` 回 **0**）。
+⑤ **替代入口只给一句**：链与电池的真身在仓里 —— 逐道 `python3 research/tools/verify-inbound-check-chain.py`，八格复跑用交接书 §4a 那张表（`--root .worktrees/inb-t10`）。历史行一枚未删、旧号未改（编号只增不改是本仓纪律）。普查结论落在计划文末新增那一节「2026-10-19 23:4x · 三枚旧载具…」，交接书 §7 那一格加了指向它的两句。
+⑥ 这条动 `docs/plans/inbound-automation.md`、`docs/plans/inbound-automation-handoff.md`、`PROGRESS.md` 三枚；判卷口径零处、代码零处、`packages/i18n` 零处、迁移零处、不新增依赖；AC 勾数现量 `grep -c '^[-] \[[x]\] \*\*AC-' docs/plans/inbound-automation.md` 回 **0**。腿 3 本条未重探（最近 23:32:20，形状未变）。本线不 push、不自标完成。
 
 
 
