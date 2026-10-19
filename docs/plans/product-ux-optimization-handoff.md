@@ -88,6 +88,8 @@
 > （起因：headless 模拟器常驻 3.6G 内存 + 90% CPU）。本线这一趟只查了"本机工具链在不在"就冷启了一枚 `heyta-w3-yearly`（14 秒起完），
 > **没跑任何读数**，收工前已 `adb -s emulator-5554 emu kill`、`adb devices` 现量为空。⇒ 教训是动手前先读那条链的收口点自己怎么写它的边界。
 > ⛔ **本轮四端的真实状态**：iOS ✅ · mac ✅ · windows ⛔ 主机不可达 · android ⛔ 同一枚主机不可达 ⇒ **两趟覆盖两端，不叫四端全过**。
+> ⚠️ 10-19 r145/r146 之后这一句要按**两批件**读：iOS 与 mac 已各自在含 `snoozeByMinutes` 的新 HEAD 上重打重装（mac 那趟 `REINSTALL_RC=0`，
+> 且**直接查了装进包的 JS** 里有那枚符号），windows / android 两端产物对新 HEAD 仍是旧的 —— 别把上面两个 ✅ 读成"四端都跟上了最新一笔"。
 > ⚠️ **11:45 那趟逐枚现量（给下一趟省一次探测，但它是瞬时读数、别当状态抄）**：
 > `windows-pc` → `Host is down`、`windows-pc-lan` → 超时；`linux-dev`/`-mdns`/`-oob` → `Xaiver-linux` 可达、`ubuntu-jcli`/`finlaw` → `VM-0-17-ubuntu` 可达、
 > `linux-dev-lan` 超时（那台活着、LAN 别名不通）。⇒ 早上 03:23 那句"四枚别名全不可达"已被否证，**只有 windows 那一族真的下不去**。
@@ -215,10 +217,11 @@ Android 有当前产物的 Profile/Settings 与 habits 腿读数（r85/r86/r109�
    ⇒ 修它的人要在**两语态**各验一次，不必在四档分别验。
 2. **只剩一枚未裁决的缺陷要交出去** —— "英文单词被劈开"在 §四 第 38 行（成因链逐枚行号、两个改法方向与一条复现命令都在那一行）。
    §四 第 37 行那枚「推迟反而提前」**已在 r145 由本线改掉并两语态复验**，那一行现在写的是它的现状与剩下的边界。
-3. 🔴 **r145 让四端产物又落后了一枚进包的改动**：`snoozeByMinutes` 在 `packages/app-host`（四端共用的 `dist`）里
-   ⇒ §四 第 4 步那张表里"装的是当前产物"那几行**对这枚改动全部过期**。iOS 已经在 r145 里从当前 HEAD 重打重装过，
-   **mac / windows / android 三端没有**。下一趟重装的现量前提先跑：`ssh -o ConnectTimeout=6 -o BatchMode=yes windows-pc true; echo $?`
-   （回非 0 就只补 mac 那一端，别把"四端"写进结论）。
+3. 🔴 **r145 那枚进包的改动，四端里两端已补装、两端仍过期**：`snoozeByMinutes` 在 `packages/app-host`（四端共用的 `dist`）里
+   ⇒ §四 第 4 步那张表里"装的是当前产物"那几行**对这枚改动全部过期**。**iOS（r145）与 mac（r146）已各自从含这枚改动的当前 HEAD 重打重装**，
+   装机态读数都是**直接查包里的 JS**（iOS `main.jsbundle` / mac `Contents/Resources/web-dist/assets/index-*.js` 里 `snoozeByMinutes` 在场），
+   不是"源码改了所以产物一定改了"。**windows / android 两端没有** —— 同一前提：先跑
+   `ssh -o ConnectTimeout=6 -o BatchMode=yes windows-pc true; echo $?`，回非 0 就别把这趟排进计划，更别把"四端"写进结论。
 4. **提醒块 Android 档 + windows/android 两腿** —— 同一前提：先现量打包机在不在
    （`ssh -o ConnectTimeout=6 -o BatchMode=yes windows-pc true; echo $?`），回非 0 就别把这趟排进计划。
 
