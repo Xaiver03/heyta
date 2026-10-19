@@ -131,3 +131,4 @@ python3 scripts/qa/check-locator-labels.py scripts/qa/account-face-ios.py
   ⇒ 双语装置的**读数**路径没有 `wait_for(candidates)` 那种兜底，`X[0]` 会悄悄把"我这把尺没量到"写成"产品没有"。
 
 **仍然不证**（英文档这一趟没扩到的）：注册档、任何凭证流转、iPad/窄屏/大字体、以及**当前源码**（装机件仍是 `head-r128` 那一枚）。
+   ➕ **本节的边界更新（r137）**：§10 那趟英文只跑了浅档；**英文 × 暗档**已由 r137 取到，账号面那两枚图与 11 步读数在 [`../ios-account-face-r137/english-dark/`](../ios-account-face-r137/english-dark/)，口径写在 [`../ios-ai-face-r137/RESULT.md`](../ios-ai-face-r137/RESULT.md)（一趟一份，不抄第二遍）。

@@ -4620,3 +4620,32 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
       **同类未修的 9 枚按分诊交链**（不代改）：多数是"名称比可见文字更具体"的**可辩护扩写**（列表消歧、带上下文），
       其中只有一枚是同型真漂移 —— `apps/mobile/src/screens/SearchScreen.tsx:252` 屏幕上「取消 / Cancel」被念成「关闭搜索 / Close search」，归搜索面那一线收；
       `ExportScreen.tsx:559` 是中文词序不同句而英文两句相同，危害最低，一并登记不修。
+- [x] ✅ **10-19 11:4x–11:4x（r139）第九趟四端重装的 iOS 腿出了当前源码件，r138 那两枚复验判据逐条对上；顺带把 AI 面在当前源码件上重取三格，并否证掉一把用错的尺**。
+      **出包与重装**：隔离载体 `/Users/rocalight/heyta-carriers/head-r128`（检出 `997a1935` = r138 那笔，且它是当前 main 的祖先，
+      `git merge-base --is-ancestor` 现量通过）跑 `HEYTA_REINSTALL_TMP_DIR=/Users/rocalight/heyta-r139-tmp IOS_DEVICE_NAME=heyta-iphone-17pro bash scripts/reinstall-all.sh --only ios`，
+      `pod install` 第 1、2 趟各撞一次 `ArgumentError - path name contains null byte`、第 3 趟成（这条非确定性脚本自己已写明），
+      构建成功 → **全新安装** → 装进模拟器的 `Heyta.app` 目录 mtime 从 `2026-10-18 18:11:07` 变成 **`2026-10-19 11:24:10`**，
+      窗口 1206×2622、内容占比 58.8%、主蓝命中 4091 ⇒ 装的是当前产物且起得来。**mac / win / android 三端本趟没跑**（见下面"还欠的那格"）。
+      **r138 留的那两枚判据（新件上逐条对上）**：① 按 `TOGGLE_NAMES` 取那枚开关的节点 ⇒ 折叠态 `AXLabel = 「其他登录方式」`、
+      展开态 `AXLabel = 「收起其他登录方式」` 且 `AXValue = "expanded"`（旧件上量到的是第三种说法「或者用别的方式」）；
+      ② `headerNow` 从 `[]` 变成非空 ⇒ 中文两格 `["其他登录方式","收起其他登录方式"]`、英文格 `["Hide other ways to sign in"]`。
+      ⚠️ **`headerNow` 中文回两枚不是"屏上有两行"** —— 那把尺是大小写敏感的子串在场判断，「其他登录方式」是「收起其他登录方式」的子串，
+      而英文 `"Other ways…"` 首字母大写、对不上 `"Hide other ways…"` 里的小写 `other`。**名称的判据是 `toggleNode.AXLabel`（节点自己回的那一枚），不是 `headerNow`。**
+      读数（`apps/mobile/evidence/ux-final-20261018/ios-account-face-r139/`，三格 13/11/11 步全 passed）：
+      `current-source/` 中文×浅 · `dark/` 中文×暗 · `english/` 英文×浅，六张图逐张人眼看过 —— **可见文字与 `AXLabel` 逐字相同**。
+      同一枚件上 AI 面 + 帮助面也重取了三格（`ios-ai-face-r139/`，各 20 步 passed），`startedAt`/`finishedAt` 两枚字段第一次被这枚脚本跑到（#486 的复验）。
+      🔴 **本趟否证掉一把我自己伸手就用的尺**：判装机态语言档时我先量了 `simctl spawn … defaults read -g AppleLanguages`，
+      它回 `zh-Hans-CN`，于是把一趟界面全英文的旅程标成了"中文档"。系统确实是中文、界面确实是英文，两件事同时为真 ——
+      这枚包的 `resolveNativeLocale()` 第一优先级是**应用内开关**持久化的 `HeytaWidget.preferredLocale`（#469 早就写明），
+      上一趟 `--to en` 的状态是持久的。处置：把那趟落点改名 `current-source/` → `english/`（它本来就是英文×浅的有效读数，不作废），
+      跑 `ios-app-language.py --to zh`（8 步 `rc=0`、回读步通过）后重跑才拿到中文格。⇒ 进环境陷阱 **#488**；
+      另一条同趟量到的：`pod install` 会把两份 iOS `Info.plist` 重写（删掉文件头那段"键一个都不能少"的事故注释、重排键、补 `RCTNewArchEnabled`），
+      载体收工时必然脏三枚且**不该提交**，而判"少没少键"要逐 key `plutil -extract`（本趟那份 `-21/+5` 的 diff 里 `HeytaWidgetKeychainAccessGroup` 只是挪了位置，
+      `ITSAppUsesNonExemptEncryption` 在 HEAD／工作树／**装进设备的产物**三处都在）⇒ 进 **#489**。
+      ⚠️ **还欠的那格**：英文×暗在当前源码件上没跑（旧件 r137 跑过）；注册档那枚邮件链接按钮设备腿走不到（旅程落的是登录档），
+      那一支只有源码判据在守；**windows 腿仍堵**（`windows-pc` → `Host is down`、`windows-pc-lan` → 超时，11:45 现量）。
+      🔴 **本趟顺手否证了"打包机全不可达"那句**：11:45 逐枚重量 `linux-dev`/`-mdns`/`-oob` → `Xaiver-linux` 可达、`ubuntu-jcli`/`finlaw` → `VM-0-17-ubuntu` 可达，
+      只有 `linux-dev-lan` 超时（那台活着、LAN 别名不通，是已知形状）⇒ 早上 03:23 那一读是**瞬时读数**，不许当状态抄。
+      **android 腿的构建机在**，但本线 `reinstall-all.sh` 的 android 段走的是本机 `pnpm build:android` + 本机 adb 模拟器这条路（本线没在这台机上量过它能不能跑），
+      下一趟要先定走哪条路，别一上来就远程跑。
+      设备收工态：`appearance = light`（回读 `light`）、应用内语言 = 中文、**没收任何 companion**。

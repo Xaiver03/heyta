@@ -10618,3 +10618,30 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
       连带：该脚本的下限 22 → **21** 是主动降的，注释里写了为什么（不写就成了"看起来像漂移"）。
     ⑷ 同类未修的 9 枚已按分诊记在计划台账 r138 那一格（多数是"名称比可见文字更具体"的可辩护扩写，
       其中 `SearchScreen.tsx:252`「取消 / Cancel」被念成「关闭搜索 / Close search」是同型的真漂移，留给那一面收）。
+488. **判 iOS 装机态的语言档，`simctl spawn … defaults read -g AppleLanguages` 是一把会骗人的尺**（2026-10-19 r139 实测）。
+    本线 #469 已经写明这枚包的 `resolveNativeLocale()` 第一优先级是**应用内开关**持久化的
+    `HeytaWidget.preferredLocale`，系统域那三项只是兜底；可是读数时我还是先伸手去量了系统域 ——
+    它回 `zh-Hans-CN`，于是把一趟界面全英文的旅程标成了"中文档"，落点名 `current-source/` 也跟着说谎。
+    两件事同时为真：**系统确实是中文，界面确实是英文**（上一趟 `ios-app-language.py --to en` 的状态是持久的，
+    只有全新安装才清掉）。
+    ⑴ 判据只许有一条：**AX 树里那几枚双语候选谁命中**（`ai-face-ios.py` 的 `assistant state` 那一步就是这把尺）。
+    ⑵ `--evidence-dir` 末级目录名只对 `light`/`dark` 两个名字有牙（`require_appearance`），
+      **它不校验语言维** —— 所以 `english/`、`current-source/`、`zh-dark/` 这类名字全是"约定"，
+      想要这一维有牙就得把双语命中读数写进 JSON（本线三枚脚本已经这么写了），或者按 #472 那条给语言也开一档目录。
+    ⑶ 反过来也别把"全新安装"当成"回到中文"的可靠通道：它恰好这次成立是因为 r139 那次重装清了应用数据，
+      不是设计如此。**要还原语言就显式跑 `ios-app-language.py --to zh` 并看它的回读步。**
+489. **`pod install` 会重写 iOS 两份 `Info.plist`，把文件头的注释块整段删掉**（2026-10-19 r139 载体现量）。
+    第九趟四端重装的 iOS 腿在隔离载体 `/Users/rocalight/heyta-carriers/head-r128`（检出 `997a1935`）跑完之后，
+    `git status` 回三枚脏文件：`apps/mobile/ios/Heyta/Info.plist`、`apps/mobile/ios/HeytaWidgetExtension/Info.plist`、
+    `apps/mobile/ios/Podfile.lock`。两份 plist 的改动形状是
+    **删掉整段解释性注释 + 键重新排序 + 补一枚 `RCTNewArchEnabled`**（RN 的 pod 后处理按 plist 序列化回写，注释不是它的模型里有的东西）。
+    ⑵ 🔴 **别拿 `git diff` 的删除行当"丢键"的证据**：`HeytaWidgetExtension/Info.plist` 那份 diff 显示
+      `-21/+5`，`HeytaWidgetKeychainAccessGroup` 出现在删除行里，看着像被删了 —— 逐键核过才看清它只是被挪了位置，
+      `ITSAppUsesNonExemptEncryption`（出口合规豁免那枚，删掉会让每次构建都弹问询）在 HEAD、工作树
+      **和装进模拟器的产物**三处都在（`plutil -extract … xml1` 回 `<false/>`）。
+      判"少没少键"要按 key 逐个 extract，不能按 diff 的行数。
+    ⑶ 真正丢的是**那段注释承载的事故知识**（"这个文件里的键一个都不能少"、`GENERATE_INFOPLIST_FILE = NO` 的含义、
+      版本号必须与 app 一致否则上架被拒）。它在 HEAD 里，被构建过程从工作树抹掉 ——
+      所以**任何时候都不许把构建后的载体 plist 提交回去**（本线那三枚脏文件没有入库，也不该入）。
+    ⑷ 副作用一条：重装载体会让"载体收工后 `git status` 干净"这条代理尺**必然不成立**，
+      下一趟看到这三枚脏文件不是有人动了产品，是上一趟构建留下的。
