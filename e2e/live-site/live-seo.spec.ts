@@ -256,18 +256,33 @@ test('IndexNow 键文件线上可取，且内容逐字等于本机那一份', as
  * 目前这一条覆盖 `BingSiteAuth.xml`（Bing 站长平台的 XML 文件验证）。
  * 将来百度的 `baidu_verify_*.html` 同一形状，照抄这段即可。
  */
-test('平台验证文件线上可取且逐字一致（BingSiteAuth.xml）', async ({ request }) => {
+test('平台验证文件线上可取且逐字一致（BingSiteAuth.xml / google*.html）', async ({ request }) => {
   const publicDir = fileURLToPath(new URL('../../apps/landing/public/', import.meta.url));
-  const local = readFileSync(`${publicDir}BingSiteAuth.xml`, 'utf8');
-  const response = await request.get(`${ORIGIN}/BingSiteAuth.xml`, {
-    maxRedirects: 0,
-    failOnStatusCode: false,
-  });
+  /**
+   * 遍历**所有**平台验证文件（而不是写死一个名字）：这样将来多一枚就自动被覆盖，
+   * 不会出现"加了文件但判据还在测上一个"。断言 >= 2 是钉住"Bing 与 GSC 两枚都在"。
+   */
+  const names = readdirSync(publicDir).filter(
+    (f) => f === 'BingSiteAuth.xml' || /^google[0-9a-f]+\.html$/.test(f),
+  );
   expect(
-    response.status(),
-    `线上 /BingSiteAuth.xml 是 ${response.status()} —— 它必须是一个真文件（404 = 没发出去，或被路由规则吃掉了）`,
-  ).toBe(200);
-  expect(await response.text()).toBe(local);
+    names.length,
+    `平台验证文件至少要有 Bing 与 GSC 两枚，实际只找到：[${names.join(', ')}]`,
+  ).toBeGreaterThanOrEqual(2);
+
+  for (const name of names) {
+    const local = readFileSync(`${publicDir}${name}`, 'utf8');
+    const response = await request.get(`${ORIGIN}/${name}`, {
+      maxRedirects: 0,
+      failOnStatusCode: false,
+    });
+    expect(
+      response.status(),
+      `线上 /${name} 是 ${response.status()} —— 它必须是一个真文件（404 = 没发出去，或被路由规则吃掉了）`,
+    ).toBe(200);
+    // 校验方普遍 trim()，所以比对用 trim：既容得下"两边都带换行"，也抓得住"内容被换了"。
+    expect((await response.text()).trim(), `/${name} 的线上内容与本机不一致`).toBe(local.trim());
+  }
 });
 
 test('robots.txt 指路正确，且 /app/ 被挡住', async ({ request }) => {
