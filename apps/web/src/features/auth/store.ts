@@ -32,6 +32,7 @@ import { create } from 'zustand';
 import {
   beginPasskeyLogin,
   beginPasskeyRegistration,
+  beginCentralAuth,
   changePassword as changePasswordRequest,
   setInitialPassword as setInitialPasswordRequest,
   completePasskeyLogin,
@@ -51,6 +52,7 @@ import {
   resendEmailPasswordRegistrationCode,
   resetPasswordWithToken,
   verifyMagicLink,
+  getCentralAuthSession,
   type HostedAuthFailure,
   type HostedAuthFailureReason,
   type HostedAuthSession,
@@ -61,7 +63,7 @@ import {
 import { maybeHandOffToShell } from './desktop-handoff.js';
 import { useSyncStore } from '../sync/store.js';
 import { usePrivacyStore } from '../privacy/store.js';
-import { privacyConsent } from '../privacy/consent-gate.js';
+import { consentFetch, privacyConsent } from '../privacy/consent-gate.js';
 import { applyLocale, currentLocale, hasStoredLocalePreference } from '../../lib/locale.js';
 import {
   createPasskeyCredential,
@@ -77,6 +79,7 @@ import {
  * "等待系统弹窗…"，而不是笼统的"正在登录"（用户此刻应该去看系统弹窗）。
  */
 export type AuthBusyAction =
+  | 'central-login'
   | 'login-link'
   | 'login-code'
   | 'register'
@@ -180,6 +183,9 @@ export interface AuthStoreState {
 
   /** Invalidate in-flight work when the selected server/issuer changes. */
   invalidatePendingAuth: () => void;
+
+  /** 使用官方 Web 的中央 OIDC。浏览器只保留服务端 Cookie，不接收产品令牌。 */
+  startCentralLogin: (baseUrl: string, documentVersion: string) => Promise<void>;
 
   /** 发登录链接。`baseUrl` 由壳传入（用户可能刚改过地址但还没保存）。 */
   sendLoginLink: (baseUrl: string, email: string) => Promise<void>;
@@ -464,6 +470,30 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
   status: { kind: 'signed-out' },
   registrationChallenge: undefined,
   loginChallenge: undefined,
+
+  startCentralLogin: async (baseUrl, documentVersion) => {
+    const generation = ++authGeneration;
+    set({ status: { kind: 'busy', action: 'central-login' } });
+    const session = await getCentralAuthSession({ baseUrl, fetchImpl: consentFetch });
+    if (!isCurrentAuthGeneration(generation)) return;
+    if (!session.ok) {
+      set({ status: failed(session.reason === 'network' ? 'network' : session.reason === 'unavailable' ? 'server-error' : session.reason === 'malformed-response' ? 'malformed-response' : 'request-rejected') });
+      return;
+    }
+    const started = await beginCentralAuth({
+      baseUrl,
+      csrfToken: session.value.csrfToken,
+      termsAccepted: true,
+      documentVersion,
+      fetchImpl: consentFetch,
+    });
+    if (!isCurrentAuthGeneration(generation)) return;
+    if (!started.ok) {
+      set({ status: failed(started.reason === 'network' ? 'network' : started.reason === 'unavailable' ? 'server-error' : started.reason === 'malformed-response' ? 'malformed-response' : 'request-rejected') });
+      return;
+    }
+    if (typeof window !== 'undefined') window.location.assign(started.value.authorizationUrl);
+  },
 
   invalidatePendingAuth: () => {
     authGeneration += 1;

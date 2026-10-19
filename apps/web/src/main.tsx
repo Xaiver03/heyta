@@ -91,6 +91,10 @@ const startupNetwork = createStartupNetwork({
   adoptPendingLogin: (held) => {
     void releasePendingLogin(held);
   },
+  // 官方 Web 的中央会话只由同源 HttpOnly Cookie 恢复，不把上游凭据落进浏览器存储。
+  resumeCentralSession: () => {
+    void useSyncStore.getState().resumeCentralSession();
+  },
 });
 
 const container = document.getElementById('root');

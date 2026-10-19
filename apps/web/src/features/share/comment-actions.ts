@@ -23,6 +23,7 @@ import type { CommentLike } from '@heyta/domain';
 import { createSharePayloadCipher, ShareApiClient, type SyncPayloadCipher } from '@heyta/sync-client';
 
 import { currentState, dispatchChecked, dispatchIntent } from '../../lib/oplog.js';
+import { createWebAuthFetch } from '../../lib/central-fetch.js';
 import { getShareKeyEntry, unwrapShareListKey } from './share-key-store.js';
 
 /** share 日志在本地 `Storage` 上的键（一份 share 一条 + 一张索引）。 */
@@ -73,6 +74,7 @@ export interface WebShareCommentsDeps {
   readonly baseUrl: string;
   /** 当前登录令牌（空串 = 未登录 ⇒ 共享写路径会抛 `ShareNotSignedInError`）。 */
   readonly token: string;
+  readonly authTransport?: 'bearer' | 'cookie';
   readonly userId: string;
   readonly clientId: string;
   readonly schemaVersion: number;
@@ -98,7 +100,12 @@ export function createWebShareComments(deps: WebShareCommentsDeps): WebShareComm
   if (deps.vaultCipher === undefined) return undefined;
 
   const vaultCipher = deps.vaultCipher;
-  const api = new ShareApiClient({ baseUrl: deps.baseUrl, getToken: () => deps.token });
+  const api = new ShareApiClient({
+    baseUrl: deps.baseUrl,
+    getToken: () => deps.token,
+    authTransport: deps.authTransport,
+    fetchImpl: createWebAuthFetch(deps.baseUrl, deps.authTransport ?? 'bearer'),
+  });
 
   const dispatch = createShareCommentDispatch({
     api,

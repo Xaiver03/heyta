@@ -39,6 +39,7 @@ export function ShareCommentsSection(props: ShareCommentsSectionProps): React.JS
   const { t } = useI18n();
   const baseUrl = useSyncStore((s) => s.baseUrl);
   const token = useSyncStore((s) => s.token);
+  const authTransport = useSyncStore((s) => s.authTransport);
   const accountId = useSyncStore((s) => s.accountId);
 
   const [vaultCipher, setVaultCipher] = useState<SyncPayloadCipher | undefined>(undefined);
@@ -58,7 +59,7 @@ export function ShareCommentsSection(props: ShareCommentsSectionProps): React.JS
     }
     void (async () => {
       try {
-        const session = await getWebVaultSession(accountId, baseUrl, async () => token);
+        const session = await getWebVaultSession(accountId, baseUrl, async () => token, authTransport);
         const cipher = await session.getPayloadCipher();
         if (alive) setVaultCipher(cipher);
       } catch {
@@ -68,20 +69,21 @@ export function ShareCommentsSection(props: ShareCommentsSectionProps): React.JS
     return () => {
       alive = false;
     };
-  }, [accountId, baseUrl, token]);
+  }, [accountId, authTransport, baseUrl, token]);
 
   const host = useMemo(() => {
     if (vaultCipher === undefined || !hasEngine()) return undefined;
     return createWebShareComments({
       baseUrl,
       token: token ?? '',
+      authTransport,
       userId: accountId ?? '',
       clientId: requireEngine().getClientId(),
       schemaVersion: CURRENT_SCHEMA_VERSION,
       vaultCipher,
       storage: window.localStorage,
     });
-  }, [accountId, baseUrl, token, vaultCipher]);
+  }, [accountId, authTransport, baseUrl, token, vaultCipher]);
 
   const labels = useMemo<CommentThreadLabels>(
     () => ({

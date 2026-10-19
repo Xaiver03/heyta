@@ -21,6 +21,7 @@ import {
   type VaultKeySession,
 } from '@heyta/app-host';
 import type { VaultKeyMigrationResponse } from '@heyta/shared-schema';
+import { createWebAuthFetch } from './central-fetch.js';
 
 const DB_NAME = 'heyta-vault';
 
@@ -78,6 +79,7 @@ export async function getWebVaultSession(
   accountId: string,
   serverUrl: string,
   getToken?: () => Promise<string | undefined>,
+  authTransport: 'bearer' | 'cookie' = 'bearer',
 ): Promise<VaultKeySession> {
   const origin = new URL(serverUrl).origin;
   const normalizedAccountId = accountId.trim();
@@ -117,7 +119,7 @@ export async function getWebVaultSession(
       // Read the authenticated server metadata before the first sync after a
       // reload so a passphrase re-wrap cannot make new uploads use the revision
       // number as its payload generation.
-      await session!.refreshFromRemote(getWebVaultRemote(serverUrl, getToken));
+      await session!.refreshFromRemote(getWebVaultRemote(serverUrl, getToken ?? (async () => undefined), authTransport));
     }
     if (epoch !== sessionEpoch || session === undefined) {
       session?.lock();
@@ -145,8 +147,12 @@ export function invalidateWebVaultSession(): void {
 export function getWebVaultRemote(
   baseUrl: string,
   getToken: () => Promise<string | undefined>,
+  authTransport: 'bearer' | 'cookie' = 'bearer',
 ): VaultKeyPackageRemote {
-  return createVaultKeyPackageRemote({ baseUrl, getToken });
+  return createVaultKeyPackageRemote({ baseUrl, getToken, authTransport,
+    fetchImpl: authTransport === 'cookie'
+      ? createWebAuthFetch(baseUrl, 'cookie')
+      : globalThis.fetch.bind(globalThis) });
 }
 
 export async function confirmWebVaultRootRotation(
@@ -156,6 +162,7 @@ export async function confirmWebVaultRootRotation(
   options: {
     baseUrl: string;
     token: string;
+    authTransport?: 'bearer' | 'cookie';
     password?: string;
     onProgress?: (progress: VaultMigrationProgress) => void;
   },
@@ -166,6 +173,10 @@ export async function confirmWebVaultRootRotation(
     const remoteOptions = {
       baseUrl: options.baseUrl,
       getToken: async () => options.token,
+      authTransport: options.authTransport,
+      fetchImpl: options.authTransport === 'cookie'
+        ? createWebAuthFetch(options.baseUrl, 'cookie')
+        : globalThis.fetch.bind(globalThis),
     };
     const currentPayloadKeyVersion = session.payloadKeyVersion ?? null;
     const targetPayloadKeyVersion = (session.payloadKeyVersion ?? 0) + 1;
@@ -205,7 +216,7 @@ export async function confirmWebVaultRootRotation(
 /** Cancel server staging before dropping the locally encrypted pending draft. */
 export async function cancelWebVaultRootRotation(
   session: VaultKeySession,
-  options: { baseUrl: string; token: string },
+  options: { baseUrl: string; token: string; authTransport?: 'bearer' | 'cookie' },
 ): Promise<void> {
   await withWebSyncMutationExclusive(async () => {
     const adapter = await adapterPromise;
@@ -213,6 +224,10 @@ export async function cancelWebVaultRootRotation(
     const remoteOptions = {
       baseUrl: options.baseUrl,
       getToken: async () => options.token,
+      authTransport: options.authTransport,
+      fetchImpl: options.authTransport === 'cookie'
+        ? createWebAuthFetch(options.baseUrl, 'cookie')
+        : globalThis.fetch.bind(globalThis),
     };
     const journal = createVaultMigrationJournal(adapter);
     const remote = createVaultKeyMigrationRemote(remoteOptions);

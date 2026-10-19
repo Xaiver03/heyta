@@ -860,6 +860,18 @@ export const en = {
   'web.auth.title': 'Sign in or register',
   'web.auth.close': 'Close',
   'web.auth.open': 'Sign in or register',
+  'web.auth.central.kicker': 'heyta official service',
+  'web.auth.central.title': 'Sign in with your central account',
+  'web.auth.central.body': 'heyta uses the central account for sign-in. After you continue, this browser returns to heyta with a secure session; your tasks remain protected by end-to-end encryption.',
+  'web.auth.central.consentPrefix': 'I have read and agree to the',
+  'web.auth.central.consentAnd': 'and',
+  'web.auth.central.button': 'Continue with central sign-in',
+  'web.auth.central.busy': 'Opening central sign-in…',
+  'web.auth.central.note': 'The central identity service provides the sign-in page and returns you to heyta when it is complete.',
+  'web.auth.central.loading': 'Connecting to heyta’s central identity service…',
+  'web.auth.central.unavailableTitle': 'Central sign-in is temporarily unavailable',
+  'web.auth.central.unavailable': 'The heyta official service did not provide a usable central sign-in configuration. Try again later; this page will not switch to another sign-in method.',
+  'web.auth.central.retry': 'Check again',
   'web.auth.tokenHint': 'Access tokens are issued by the server. Sign in or register with the button above and the token is filled in automatically; if you already have one, paste it directly.',
   // 🔴 Reframed 2026-10-02. The product owner's words: "why is the default pasting a server
   // address and a token? … that shuts ordinary users out at the door." Neither old line was
