@@ -455,3 +455,90 @@ describe('payment.refunded', () => {
     expect(refund.event.providerEventId).not.toBe(pay.event.providerEventId);
   });
 });
+
+// =============================================================================
+// 退款**没**成功
+//
+// 只清状态，**绝不**回收权益 —— 钱没退出去。
+// heyta 这边是结构性保证：非成功状态 ⇒ 不写 refunded_at，
+// 而库层 CHECK 钉死了「status='success' ⟺ refunded_at IS NOT NULL」。
+// =============================================================================
+describe('payment.refund_failed', () => {
+  const failBody = (over: Record<string, unknown> = {}) =>
+    eventBody({
+      event_type: 'payment.refund_failed',
+      refund_request_id: 'heyta-refund-77',
+      refund_status: 'abnormal',
+      ...over,
+    });
+
+  const verify = async (raw: string) => {
+    const a = makeAdapter();
+    const ts = '1776000000';
+    const idem = `payment-fulfillment:${CLIENT}:SS-ORDER-1`;
+    return a.verifyWebhook(Buffer.from(raw, 'utf8'), {
+      'x-platform-client': CLIENT,
+      'x-platform-timestamp': ts,
+      'x-platform-signature': canonicalSignature(
+        SECRET, 'POST', DEFAULT_WEBHOOK_PATH, Buffer.from(raw, 'utf8'), ts, idem,
+      ),
+      'idempotency-key': idem,
+    });
+  };
+
+  it('声明成 refundNotice，状态是失败，且**绝不**带授予声明', async () => {
+    const r = await verify(failBody());
+    if (!r.ok) throw new Error(`应通过，实际 ${r.reason}`);
+    expect(r.event.refundNotice).toMatchObject({
+      outRefundNo: 'heyta-refund-77',
+      status: 'abnormal',
+    });
+    expect(r.event.refundNotice?.status).not.toBe('success');
+    expect(r.event.oneTimeGrant).toBeNull();
+  });
+
+  it('closed 也算失败（不必是 abnormal）', async () => {
+    const r = await verify(failBody({ refund_status: 'closed' }));
+    if (!r.ok) throw new Error(`应通过，实际 ${r.reason}`);
+    expect(r.event.refundNotice?.status).toBe('closed');
+  });
+
+  // 🔴 一个自称"退款失败"的事件不可能同时说成功。放过去等于让**失败**
+  // 去写 refunded_at，而那正是回收权益。
+  it('🔴 自称失败却报 success → 拒收', async () => {
+    const r = await verify(failBody({ refund_status: 'success' }));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe('refund-failed-claims-success');
+  });
+
+  // 认不出的状态同样拒：这里需要的是一个**明确的失败**状态。
+  it('🔴 状态缺失或认不出 → 拒收', async () => {
+    for (const st of [undefined, 'weird', 'pending']) {
+      const r = await verify(failBody({ refund_status: st }));
+      expect(r.ok, String(st)).toBe(false);
+      if (!r.ok) {
+        expect(['refund-failure-status-unknown', 'refund-failed-claims-success']).toContain(r.reason);
+      }
+    }
+  });
+
+  it('没有退款单号 → 拒收（认不回是哪一笔）', async () => {
+    const r = await verify(failBody({ refund_request_id: undefined }));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe('refund-without-refund-number');
+  });
+
+  // 幂等键把状态算进去：同一笔退款的不同状态必须是不同的键。
+  it('幂等键与退款成功那条**不同**', async () => {
+    const failed = await verify(failBody());
+    const ok = await verify(eventBody({
+      event_type: 'payment.refunded',
+      refunded_amount: '30.00',
+      refund_request_id: 'heyta-refund-77',
+      refund_status: 'success',
+    }));
+    if (!failed.ok || !ok.ok) throw new Error('两条都应通过');
+    expect(failed.event.providerEventId).toBe('payment.refund_failed:SS-ORDER-1:abnormal');
+    expect(ok.event.providerEventId).toBe('payment.refunded:SS-ORDER-1:success');
+  });
+});

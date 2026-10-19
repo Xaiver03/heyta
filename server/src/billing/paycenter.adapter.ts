@@ -47,10 +47,19 @@ export const PAYCENTER_PROVIDER = 'paycenter';
 /** 中心会投递的事件类型。**白名单**，不是"除了某一种都收"。 */
 export const EVENT_PAYMENT_SUCCEEDED = 'payment.succeeded';
 export const EVENT_PAYMENT_REFUNDED = 'payment.refunded';
+/**
+ * 退款**没成功**。
+ *
+ * 🔴 刻意独立成一种类型，而不是复用 `payment.refunded` 再带一个失败状态：
+ * 那样"退款已到账"这个名字会去表示"没退成"，而通用层看到它就以为该回收权益。
+ * 独立类型让两者在**结构上**不可能混。
+ */
+export const EVENT_PAYMENT_REFUND_FAILED = 'payment.refund_failed';
 
 export const ACCEPTED_EVENT_TYPES: readonly string[] = [
   EVENT_PAYMENT_SUCCEEDED,
   EVENT_PAYMENT_REFUNDED,
+  EVENT_PAYMENT_REFUND_FAILED,
 ];
 
 /**
@@ -409,10 +418,59 @@ export const createPaycenterBillingAdapter = (
       // 退款通知**不读 amount**：那是订单原额，而退款可以只退一部分。
       // 该读的是 refunded_amount —— 读错了会让产品按全额回收权益。
       const isRefund = event.event_type === EVENT_PAYMENT_REFUNDED;
-      const amountField = isRefund ? event.refunded_amount : event.amount;
-      const amountMinor = amountYuanToMinor(amountField);
-      if (amountMinor === null) {
-        return { ok: false, reason: isRefund ? 'malformed-refunded-amount' : 'malformed-amount' };
+      const isRefundFailure = event.event_type === EVENT_PAYMENT_REFUND_FAILED;
+      // 先把金额定成一个确定的数，再往下走。
+      // 写成 `const amountMinor = isRefundFailure ? 0 : parse(...)` 再补一句
+      // `if (... === null)` 是不行的：TypeScript 的收窄跨不过中间那些会返回的
+      // 分支，下面用它的地方仍然是 `number | null`。这个形状让它一开始就是 number。
+      let amountMinor: number;
+      if (isRefundFailure) {
+        // 退款失败的事件**没有金额可核对** —— 那正是"失败"的含义。
+        amountMinor = 0;
+      } else {
+        const amountField = isRefund ? event.refunded_amount : event.amount;
+        const parsed = amountYuanToMinor(amountField);
+        if (parsed === null) {
+          return { ok: false, reason: isRefund ? 'malformed-refunded-amount' : 'malformed-amount' };
+        }
+        amountMinor = parsed;
+      }
+
+      if (isRefundFailure) {
+        // 认不回是哪一笔退款就拒收（与成功路径同一条理由）。
+        const outRefundNo =
+          typeof event.refund_request_id === 'string' ? event.refund_request_id.trim() : '';
+        if (outRefundNo === '') return { ok: false, reason: 'refund-without-refund-number' };
+
+        const status = toProviderRefundStatus(event.refund_status);
+        // 🔴 一个自称"退款失败"的事件不可能同时说成功。这种自相矛盾的载荷
+        // 必须拒 —— 放过去等于让**失败**去写 refunded_at，而那正是回收权益。
+        if (status === 'success') return { ok: false, reason: 'refund-failed-claims-success' };
+        // 认不出的状态同样拒：heyta 对认不出的值归成 processing，
+        // 而这里需要的是一个**明确的失败**状态。
+        if (status === 'processing') return { ok: false, reason: 'refund-failure-status-unknown' };
+
+        return {
+          ok: true,
+          event: {
+            provider: PAYCENTER_PROVIDER,
+            providerEventId: `${event.event_type}:${event.external_order_id}:${status}`,
+            eventType: event.event_type,
+            occurredAt: now(),
+            externalSubscriptionId: null,
+            status: null,
+            currentPeriodEnd: null,
+            userId: null,
+            outTradeNo: event.external_order_id,
+            paidAmountMinor: 0,
+            // 撤销**不是**授予；失败更不是。
+            oneTimeGrant: null,
+            // 非成功状态 ⇒ heyta 只清那一行、不写 refunded_at，
+            // 而库层 CHECK 钉死了「status='success' ⟺ refunded_at 非空」
+            // ⇒ **结构上不可能**因为这条事件回收权益。
+            refundNotice: { outRefundNo, providerRefundId: null, status },
+          },
+        };
       }
 
       if (isRefund) {
