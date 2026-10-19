@@ -100,19 +100,19 @@ python3 research/tools/verify-inbound-ac-battery.py --root .worktrees/inb-t10 --
 
 | 格子 | `--only` 那串（逐字） | 最近一次当日读数在哪 |
 |---|---|---|
-| AC-1 权益与授权 | `AC1-offline11,AC1-entitlement3,AC1-quota-http,AC1-pglite,AC1-worker-identity,AC1-cjs-order` | `PROGRESS.md` 第 111 条那片（15:50 载具 tip `528b4115c`） |
+| AC-1 权益与授权 | `AC1-offline11,AC1-entitlement3,AC1-quota-http,AC1-pglite,AC1-worker-identity,AC1-cjs-order` | 10-20 00:46 整串那趟（载具 tip `0bc4e2733`）：逐腿读数在 `docs/plans/inbound-automation.md` 的 T8 第 32 条＋`~/.heyta-evidence/inb-t7-1017-0902/battery-1020-0046/`（`PROGRESS.md` 第 137 条同戳） |
 | AC-2 接收与队列 | `AC2-inbound-core,AC2-queue-teeth` | 同上 |
 | AC-3 领取与提交 | `AC3-dual-host,AC3-sync-authz` | 同上 |
 | AC-4 解析 | `AC4-local-date,AC4-app-host,AC4-egress-wire` | 同上 |
 | AC-5 批创建与来源记录 | `AC5-shared-schema,AC5-op-log,AC5-batch-actions` | 同上 |
 | AC-6 规则界面 | `AC6-web-specs,AC6-browser` | 同上；⚠️ `AC6-browser` 会逐名覆写那批待拍的取证图 ⇒ 单跑它前先读 §7 第 4 格 |
-| AC-7 文档 | `AC7-doc-tables,AC7-doc-endpoints,AC7-migrations,AC7-license,AC7-docs-voice,AC7-link` | `PROGRESS.md` 第 121 条（18:53 零脏载具、已入库态） |
-| AC-8 验收矩阵 | `AC8-matrix,AC8-producer-seam,AC8-ac-ticks` | 同上 |
+| AC-7 文档 | `AC7-doc-tables,AC7-doc-endpoints,AC7-migrations,AC7-license,AC7-docs-voice,AC7-link` | 同 00:46 那趟（六枚各 rc=0；起跑态载具零脏 —— 现量 `prefix.txt` 里 `dirty 0` 那一行）；更早那批「已入库态」读数在 `PROGRESS.md` 第 121 条 |
+| AC-8 验收矩阵 | `AC8-matrix,AC8-producer-seam,AC8-ac-ticks` | 同上（`已勾=0 未勾=8`） |
 | 范围尺（**不是 AC 格**） | `SCOPE-commit-scope` | 仍 rc=1，越界笔名归别线（B205）⇒ 别把它算进 AC 结论 |
 
-⚠️ **那两批读数凭什么还代表"当前已入库代码"**：从 `528b4115c` 到 `refs/heads/main` 的全部改动里，非文档／非台账的是 **0** 枚（这一枚 0 只代表写下那一刻：`5c274f496` 上 23:40:41 复算仍是 0，交付 tip 再往前动过**代码**就得重跑下面那条并按 `#494` 判要不要重取）——
-现量 `git diff --name-only 528b4115c refs/heads/main > /tmp/d.txt; grep -vcE '^(docs/|PROGRESS\.md|BLOCKED\.md|AGENTS\.md|README)' < /tmp/d.txt`。
-下一位若在这之后又动了代码，就按 #494 那三层筛子判要不要重跑，别照抄本表第三列。
+🟢 **这一格今天被"当场重跑"取代了**：10-20 00:46:43–00:47:49 在交付 tip `0bc4e2733` 上把 28 腿整串重跑了一遍（结论行 `legs=28 rc0=27 rc_nonzero=1`，唯一那枚非 0 是 `SCOPE-commit-scope`，即 B205 那一格，不是 AC 结论）。逐腿读数在 `docs/plans/inbound-automation.md` 的 **T8 第 32 条** 与 `~/.heyta-evidence/inb-t7-1017-0902/battery-1020-0046/`（`PROGRESS.md` 第 137 条同戳）。
+⚠️ **本格以前写的是另一种东西，留在这里当形状示范**：它原先靠一句代理论证（"从 `528b4115c` 到 `refs/heads/main` 的非文档改动 0 枚 ⇒ 旧读数仍代表当前代码"）。那句**只在写下那一刻成立**（当时是 `5c274f496` 上 23:40:41 复算的），tip 一动就得重算 —— 能当场重跑就别用代理。要复算那半边仍然一条命令：`git diff --name-only 24d05137b $(git rev-parse refs/heads/main) > ~/.heyta-evidence/inb-t7-1017-0902/delta-check.txt; grep -c '^server/\|^packages/\|^apps/' <那份文件`（今天这戳回 **0**；⚠️ 别把清单落 `/tmp`）。
+下一位若动了代码，按 **#494** 那三层筛子判要不要重跑整串，别照抄本表第三列。
 
 ---
 
