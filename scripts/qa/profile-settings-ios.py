@@ -270,6 +270,46 @@ class Probe:
                 raise JourneyError(f"could not capture {name} screenshot: {detail}")
         self.record(name + " screenshot", "passed", path=str(path), bytes=path.stat().st_size)
 
+    def assert_enabled(self, name: str, candidates: Iterable[str]) -> None:
+        """要求那一枚控件在 AX 树里 `enabled` 不为 False。
+
+        🔴 判的是 `enabled`，**不是 `pressable`**：iOS 上 RN 那枚 disabled 的 Button
+        在 AX 里照样算 pressable（Android uiautomator 里它照样回 `clickable="true"`，
+        同一件事 —— r117 装置事实 1 就是被这一点骗过一次，把灰掉的按钮报成"可点"）。
+        所以"这一枚够得到"这句话只能由 `enabled` 来说。
+        """
+        wanted = tuple(candidates)
+        deadline = time.monotonic() + self.timeout
+        last: list[dict[str, Any]] = []
+        while True:
+            last = self.tree()
+            for candidate in wanted:
+                node = AX.find(last, candidate, True, False, None, False, 0)
+                if node is None:
+                    continue
+                enabled = AX.is_enabled(node)
+                self.record(
+                    name,
+                    "passed" if enabled else "failed",
+                    target=candidate,
+                    enabled=enabled,
+                    frame=list(AX.frame_of(node)),
+                    labels=labels(last)[:100],
+                )
+                if not enabled:
+                    raise JourneyError(
+                        f"{candidate!r} is rendered disabled: enabled=False in the AX tree, "
+                        f"frame={AX.frame_of(node)}"
+                    )
+                return
+            if time.monotonic() > deadline:
+                self.record(name, "failed", expected=list(wanted), labels=labels(last)[:100])
+                raise JourneyError(
+                    f"timed out looking for {wanted!r} to read its enabled state; "
+                    f"visible labels={labels(last)[:80]!r}"
+                )
+            time.sleep(0.35)
+
     def scroll_to(self, name: str, candidates: Iterable[str]) -> None:
         # 🔴 每一枚候选都要单独试滚：`AX.scroll_into_view` 只吃**一枚**标签，
         # 以前这里传死 `wanted[0]`（中文那枚），所以英文屏上「清单」根本不在树里，
@@ -421,6 +461,23 @@ def run(probe: Probe) -> None:
     )
     probe.tap("export back to data group", ("返回", "Back"), ("数据管理", "Data management", "Data"))
     probe.tap("data group back to directory", ("返回", "Back"), ("常规", "General"))
+
+    # 🔴 「账号安全」那一屏最下面那枚「清除本机保存的凭据」，是冷启动之后**唯一**能把
+    # 小组件快照与设备密钥一起清掉的入口。它以前按"表单里此刻有没有凭据"设闸门，而凭据按设计
+    # 只放内存（`apps/mobile/src/sync/config.ts` 文件头那条取舍）⇒ 这一趟全程没有签入，
+    # 那枚必然灰着，而组件快照、设备密钥、本机任务三样都跨进程活着（装机态读数在台账那一格，
+    # r117 与 r118 两趟同形）。本脚本**不按下去** —— 只判这一枚入口够不够得到。
+    probe.tap(
+        "open account security",
+        ("账号安全", "Account security"),
+        ("加密数据钥匙", "Encrypted data key"),
+    )
+    wipe = ("清除本机保存的凭据", "Clear credentials saved on this device")
+    probe.scroll_to("scroll credential wipe", wipe)
+    probe.assert_enabled("credential wipe entry enabled on a cold start", wipe)
+    probe.screenshot("security")
+    probe.tap("security back to directory", ("返回", "Back"), ("账号安全", "Account security"))
+
     probe.tap("close settings to profile", ("关闭", "Close"), ("我的", "Profile"), absent=("偏好与账号", "Preferences and account"))
 
     probe.tap("open full growth", ("查看完整成长", "View full growth"), ("我的成长", "My growth"))
