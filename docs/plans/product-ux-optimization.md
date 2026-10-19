@@ -4820,3 +4820,13 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
       现在 9 处失败支都先删提醒、再按逐字标题删任务。
       **不证**：暗档没重跑（这枚是时刻算术，r144 已量过外观维不影响这块界面的形状）、Android / 桌面端没重跑（设备腿只有 iOS 这一枚装置）、
       连按两次的累加只在单测里。读数与图在 [`apps/mobile/evidence/ux-final-20261018/ios-reminder-block-r145/RESULT.md`](../../apps/mobile/evidence/ux-final-20261018/ios-reminder-block-r145/RESULT.md)。
+- [x] ✅ **10-19 22:4x r146 mac 端重装：r145 那枚共享层改动补上第三个端**（`bash scripts/reinstall-all.sh --only mac`，`REINSTALL_RC=0`）
+      r145 改的是 `packages/app-host`（四端共用的 `dist`）⇒ 上一格登记时说清"mac / windows / android 三端产物对它过期"，这一格先补 mac。
+      前提现量：跑前跑后工作树 clean、`HEAD` 同一枚（`git log --grep 'r145' --oneline -1` 现取，别抄本页任何 SHA）。
+      **判据不是代理尺**：除链自己那两条（web-dist 与 `apps/web/dist` 同一次构建 9 个 chunk；窗口 2318×1508、webview 内容占比 100.0%、主蓝命中 997），
+      这一格**直接查装进包的 JS** —— `/Applications/Heyta.app/Contents/Resources/web-dist/assets/index-*.js` 里 `snoozeByMinutes` 出现 2 处（定义 + 调用点），
+      iOS 那件的 `main.jsbundle` 同样查到 1 处 ⇒ "产物里有这枚改动"是查产物本身，不是看构建日志说成功。
+      人眼看过 `heyta-reinstall-mac-installed.png.webview.png`：暗档、共享 UI、首屏那枚「在使用联网功能之前」决定态在场（不是空窗）。
+      落点 `~/heyta-reinstall/r146-mac/`（`HEYTA_REINSTALL_TMP_DIR` 指到仓外独立目录，避开固定 `/tmp` 互相覆盖那一枚坑）。
+      **不证**：windows / android 两端产物仍过期（打包机现量：`windows-pc` 连接超时、`windows-pc-lan` 拒绝连接；规则明令不许退回本机跑 Gradle）；
+      mac 端**这枚修复的行为读数**没跑（行为判据在 app-host 单测与 iOS 装机态两语态）；四端汇总里那三行 `⏭` 是脚本自己写的"这端**没有**验证当前产物"。
