@@ -5759,6 +5759,12 @@ AC 已勾数仍为 **0**（`verify-inbound-ac-ticks.py`：`AC 行=8　已勾=0�
 ④ **完成条件 2 四项逐条打勾（都在本会话当场量，不引用旧笔）**（另：本条撰写时又把口音尺打成 `node research/tools/check-docs-voice.mjs` ⇒ rc=1、正文 `Cannot find module` —— 同一枚坑第三 Hit，真路径 `node scripts/check-docs-voice.mjs` 改回后 rc=**0**；坑本身已登记在第 122 条 ③ 与交接书 §9，这里只补"它仍然会咬人"）：`node research/tools/license-inventory.mjs` ⇒ rc=**0**；`pnpm -s check:migrations` ⇒ rc=**0**（两枚都是 22:48:53 那戳、交付 tip `da034f15e`）；AC 勾数现量 `grep -c '^[-] \[[x]\] \*\*AC-' docs/plans/inbound-automation.md` 回 **0**；`BLOCKED.md` 随交付入库 —— 现量 `git log -1 --format='%h' refs/heads/main -- BLOCKED.md` 回 `00c08680b`，B231 追记二／B238 追记／B241 追记三枚都在里面，且工作树零脏（`git -C .worktrees/inb-t10 status --porcelain | wc -l` 回 0，取于 23:25；⚠️ 这一枚在本文入库后**不可复现** —— 载具会带着本行的编辑显示脏，重取时读的是装置自报，不是这句话）。
 ⑤ **完成条件 1 里"T7 三条命令在隔离副本 exit 0"这一格，本线做不到，而且不是差代码**：腿 1 的三枚链红全归他线（收款面／三栏详情面／web 排序与移动载体）；腿 2 的第 106 道三戳排成一条时间线、戳间代码 delta=0 ⇒ 只能记"间歇性 + 链内上下文"，不归因不编原因；腿 3 的打包机 20:35:26 复探四枚别名各 rc=255、`adb devices` 0 台、`heyta-multiend-reinstall` Shutdown ⇒ **只有负责人能让它消失**。这一格不由本线闭合，也**不勾**。
 ⑥ 这条动 `PROGRESS.md` 一枚；代码零处、判卷口径零处、`packages/i18n` 零处、不新增依赖、不 push、不自标完成。
+126. 🟢 **腿 3 在 23:32:20 复探同形（三格一起），并把本会话自己踩到的两枚"探针打空"形状写进交接书 §9 —— 那两枚都会造出与真阻塞逐字同形的读数**（写前先跑 `date`，本机 2026-10-19 23:3x）
+① **复探逐字**：`for a in windows-pc laptop-5ueuu7ps windows-codex windows-pc-lan; do ssh -o ConnectTimeout=8 -o BatchMode=yes "$a" true; echo "$a RC=$?"; done` ⇒ 四枚各 **rc=255**；`adb devices` 表头下**无设备行**；`xcrun simctl list devices` 里 `heyta-multiend-reinstall` **Shutdown** ⇒ 与 19:03:30／20:35:26 两戳同形，本线仍不半跑。
+② **第一枚坑是我自己造的**：这一轮我先拿 `win-pc`／`windows`／`packaging` 三枚**不在册的名字**探了一遍，也回四枚 rc=255，看着"和台账一致"。真相是 ssh 对不认识的别名走 DNS 解析失败，退出码与"机器关机"同一枚。⇒ 在册名单现量 `grep -n '^Host ' ~/.ssh/config`（`windows-pc` 在 87 行、`laptop-5ueuu7ps windows-codex` 同行 102、`windows-pc-lan` 在 187 行）⇒ 腿 3 复探**只能逐字用那四枚**，已写进交接书 §5 那一格与 §9。
+③ **第二枚是数设备的那把尺**：`adb devices | tail -n +2 | wc -l` 在零台时回 **1**（空列表末尾还有一行空行，`wc -l` 把它算进去了），而台账里那条数**非空行**的写法回 **0**（见第 122 条 ⑤）。⇒ 已把这条写进交接书 §5 设备面那一格：读到 1 别当成"有一台"。
+④ **交接书这轮改两格 + 补两枚 §9 探针坑**（`docs/plans/inbound-automation-handoff.md` 一枚）；§5 那两格把戳刷到 23:32:20 并各带上对应探针的形状。⚠️ 表格里不写整条带竖线的命令，是因为**裸竖线会顶掉那一行的列数**、写成 `\|` 又粘不回 shell ⇒ 命令留在 PROGRESS 正文，表格指向条目号。
+⑤ 这条动 `docs/plans/inbound-automation-handoff.md` 与 `PROGRESS.md` 两枚；判卷口径零处、`packages/i18n` 零处、迁移零处、不新增依赖；AC 勾数现量 `grep -c '^[-] \[[x]\] \*\*AC-' docs/plans/inbound-automation.md` 回 **0**。本线不 push、不自标完成。
 
 
 

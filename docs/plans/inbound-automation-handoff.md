@@ -120,8 +120,8 @@ python3 research/tools/verify-inbound-ac-battery.py --root .worktrees/inb-t10 --
 
 | 格 | 现量形状 | 谁能解 |
 |---|---|---|
-| 腿 3：打包机不通 | `for a in windows-pc laptop-5ueuu7ps windows-codex windows-pc-lan; do ssh -o ConnectTimeout=8 -o BatchMode=yes "$a" true; echo "$a RC=$?"; done` ⇒ 四枚各 **rc=255**（本会话最后两戳 19:03:30 与 20:35:26 同形）。17:44:53 与 18:18:35 两戳的形状是（`windows-pc`→`10.111.127.237` Operation timed out、`windows-pc-lan`→`192.168.1.2` Connection refused、`windows-codex`／`laptop-5ueuu7ps`→`10.111.127.151` 一次超时一次 Host is down）。四枚别名其实只指**两台** Windows 宿主（`ssh -G` 取证见 B225 追记五），`scripts/reinstall-all.sh` 的 `HEYTA_WIN_HOST` 旋钮没有第三枚可指 | **只有负责人**能开机；本线按已定口径不自决退回本机出包 |
-| 腿 3：设备面 | `adb devices` 回 **0 台**、`xcrun simctl list devices` 里 `heyta-multiend-reinstall` 回 **Shutdown**（18:32:09 戳；昨天 20:32 那戳 `emulator-5554 device` 已在册）⇒ 机器通了还得先把这两面起起来。本线**能**起模拟器，但在打包机通之前不起 —— 免得留下"半跑"那种形状 | 本线能起模拟器，但要在打包机通之后一次做完 |
+| 腿 3：打包机不通 | `for a in windows-pc laptop-5ueuu7ps windows-codex windows-pc-lan; do ssh -o ConnectTimeout=8 -o BatchMode=yes "$a" true; echo "$a RC=$?"; done` ⇒ 四枚各 **rc=255**（本会话最后三戳 19:03:30、20:35:26、23:32:20 同形）。⚠️ **别名要逐字用这四枚**：随手敲 `win-pc`／`windows`／`packaging` 这种不在册的名字，ssh 会走 DNS 解析失败、同样回 **rc=255**，与"机器关机"逐字同形（在册名单现量 `grep -n '^Host ' ~/.ssh/config` ⇒ 这四枚在 87／102／102／187 行）。17:44:53 与 18:18:35 两戳的形状是（`windows-pc`→`10.111.127.237` Operation timed out、`windows-pc-lan`→`192.168.1.2` Connection refused、`windows-codex`／`laptop-5ueuu7ps`→`10.111.127.151` 一次超时一次 Host is down）。四枚别名其实只指**两台** Windows 宿主（`ssh -G` 取证见 B225 追记五），`scripts/reinstall-all.sh` 的 `HEYTA_WIN_HOST` 旋钮没有第三枚可指 | **只有负责人**能开机；本线按已定口径不自决退回本机出包 |
+| 腿 3：设备面 | `adb devices` 回 **0 台**、`xcrun simctl list devices` 里 `heyta-multiend-reinstall` 回 **Shutdown**（18:32:09 戳，23:32:20 复探同形；昨天 20:32 那戳 `emulator-5554 device` 已在册）。⚠️ **数设备要数"非空行"**（写法见 PROGRESS 第 122 条 ⑤ 那枚命令，本格不整条抄：表格单元里的竖线会顶掉这一行的列数）—— 空列表时 `adb devices` 末尾仍带一行空行，拿 `wc -l` 数会回 **1**，把"零台"读成"有一台"。⇒ 机器通了还得先把这两面起起来。本线**能**起模拟器，但在打包机通之前不起 —— 免得留下"半跑"那种形状 | 本线能起模拟器，但要在打包机通之后一次做完 |
 | 链第 49 道 `check:macos-window` | 探针 `HeytaMacApp.swift:625` 用 `input[placeholder^="添加任务"]` 数采集框，界面是英文时恒 0，三条 `NEEDED` 同时判缺（B238，形状见环境陷阱 #480）。⚠️ **本戳那趟它是 `RC=0`（18:21:43 收尾那片，`STEP= 49/116 RC=0 SEC=20.7`）—— 因为 `defaults read -g AppleLanguages` 首项已被改成 `zh-Hans-CN`**（上午 11:08 那戳是 `en`，第 104 条 ⑤），语言写盘时间 `stat -f '%Sm' ~/Library/Preferences/.GlobalPreferences.plist` 回 `Oct 19 18:12:41`。⇒ **别把这次绿读成修好了**：这是一枚同机同探针、只换装机语言的天然对照，门仍随语言翻（判据不该依赖语言），归属仍是 macOS 壳线 | macOS 壳线 |
 | 链第 63 道 `check:payment-entry` | `现状：生产 compose 未配支付渠道；客户端里找到 2 处付款入口。`（尺有牙：`--self-test` 四臂全过） | 收款面（B226／B223 同源） |
 | 链第 87 道 `check:ai-e2e` | `detail-pane-task.spec.ts` 里 5 枚用例等不到行尾字段控件（窄档收进了「… 更多」）——安静窗内复现同一批、三倍时限对照臂也证明不是超时 | 三栏详情面线（B237） |
@@ -208,6 +208,8 @@ python3 research/tools/verify-inbound-ac-battery.py --root .worktrees/inb-t10 --
 - ⚠️ **门名打错时 `pnpm -s` 是"零输出 + rc=1"，长得像门判红**：本会话拿到过两次 —— `check-docs-voice`（真名 `check:docs-voice`）与 `check-migrations`（真名 `check:migrations`，现量 `grep -n 'check:migrations' package.json`）。⇒ **读到 rc≠0 先看输出是不是空的**，空的先怀疑探针自己。
   ⚠️ 顺带一句：任务书完成条件 2 那格写的就是 `pnpm check-migrations` 这串**仓里不存在的名字** —— 本线不改任务书（同 B241 的原则），接手请照 `pnpm check:migrations` 量，交付 tip 上的量到的是 rc=**0**（见 `PROGRESS.md` 第 122 条 ②）。
 - ⚠️ `git rev-parse --short A B`（一条两个位置）会直接 `fatal: Needed a single revision` —— 想比两枚 ref 就分两条跑。台账里那条"两行同值"的现量命令第一稿就是这么写的，已改。
+- ⚠️ **敲错的 ssh 别名与"机器关机"回同一个 rc**：`ssh -o BatchMode=yes <不在册的名字> true` 走 DNS 解析失败也是 **255**。本会话 23:32:20 那一戳我先用 `win-pc`／`windows`／`packaging` 三枚**不存在的名字**探了一遍，四枚 rc=255 看起来"和记录一致"，其实整批是探针打空 —— ⇒ **腿 3 的复探必须逐字用上面名单里那四枚**（在册证据：`grep -n '^Host ' ~/.ssh/config` 回的四行里有它们）。
+- ⚠️ **数设备要数非空行**：`adb devices` 在无设备时仍输出表头加一行空行，拿 `wc -l` 数会回 **1**（本会话 23:32 实测就是这个形状），会被读成"有一台"；台账里那条写法是数非空行的（见 PROGRESS 第 122 条 ⑤），本格因为**表格单元里不能写裸竖线**（竖线顶掉列数、写成 `\|` 又粘不回 shell）只在 §5 那格指向条目号。
 
 ---
 
