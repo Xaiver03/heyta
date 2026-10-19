@@ -46,7 +46,8 @@
 | 做了什么 | 产品上意味着 | 读数与复跑 |
 |---|---|---|
 | B140 三点接线：`apps/web/src/App.tsx` 把当前设置节名传给 `<AiSettings>`；`apps/web/src/features/settings/AiSettings.tsx` 的 props 增可选 `active`（默认 true）并转发给 `<InboundAutomationSettings>` | 用户没停在那个页面时，这一面板**不再在后台空跑解析/不自称在接收**——"暂停开关"变成真的 | 现量 `git grep -n 'active={activeSettingsSection' HEAD`、`git grep -n 'active?: boolean' HEAD`；反向证据（摘掉传参那行 ⇒ 用例红）在 `~/.heyta-evidence/inb-t7-1017-0902/b140-mutant-1221/` |
-| 28 枚 AC 腿打包成一枚可复跑电池 | 负责人可以**一条命令复量整格验收面**，而不是读一段散文 | `python3 research/tools/verify-inbound-ac-battery.py --root .worktrees/inb-t10 --ev <新目录> --quiet-gate`；逐腿读数在计划文末台账（最新一片戳在 `528b4115`／`36214e3a`，本线之后的提交全是 docs-only） |
+| 28 枚 AC 腿打包成一枚可复跑电池 | 负责人可以**一条命令复量整格验收面**，而不是读一段散文 | `python3 research/tools/verify-inbound-ac-battery.py --root .worktrees/inb-t10 --ev <新目录> --quiet-gate`；逐腿读数在计划文末台账（整片 28 腿最新一戳在 `528b4115`／`36214e3a`，其后至本戳只有台账笔 —— 非文档改动 0 枚的复现命令在 `PROGRESS.md` 第 119 条） |
+| AC-7 六枚 + AC-8 三枚尺的读数对象换成「零脏载具 · 已入库态」 | 这两格的证据从"工作树里恰好那份"升成"已入库的代码"，而跑批现场（那批待他拍的取证图）零覆写 | 同一枚 `--only` 名单跑九枚 ⇒ `legs=9 rc0=9 rc_nonzero=0`，原件 `~/.heyta-evidence/inb-t7-1017-0902/batt-ac78-1843/rc.txt`；逐腿 rc、安静门等待轮数与 png 对账在 `PROGRESS.md` 第 121 条、计划第 31 条 |
 | 电池的副作用计数拆成两枚（`EVIDENCE_DIRTY=` 只数派生证据目录、`CARRIER_DIRTY=` 数整棵载具），并加一枚喂假输入的臂 | "跑批会把入库证据图改脏"这件事第一次变成**能红的判据**而不是口头声称 | 装置 `research/tools/verify-inbound-ac-battery.py`；`--self-test` 现量 `arms=11 failed=0`；口径改口笔 `833991d5` |
 | 链"要不要重跑"这把筛子的分母改成**逐道从被触发物自己的声明现取**，并降到符号级 | 不再出现"筛出一片假空 ⇒ 判不必重跑"这种会把结论建在空读数上的判据 | 环境陷阱 **#494**（含三层规则）；台账 `PROGRESS.md` 第 115／116 条；第 63 道复跑 `STEP= 63/116 RC=1 SEC=1.7`、第 106 道 `STEP=106/116 RC=0 SEC=78.9`（载具 tip `fd46db9ba`／`b29b3f7b6`，原件 `~/.heyta-evidence/inb-t7-1017-0902/step63-1714/`、`…/step106-1726/`） |
 | Linux 交付取证 | 这一端的"当前产物"是真的：装进 `.deb` 的就是这枚 tip 重打的 web 产物 | `bash apps/desktop-linux/scripts/package-deb.sh <linux-dev 别名>` ⇒ `LINUX_DEB_RC=0`／`PKG_RESULT=OK`，包内 `PKG_INDEX_SHA` 与载具 `apps/web/dist/index.html` 全串相等 |
