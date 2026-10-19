@@ -29,6 +29,7 @@ import {
   subscribePrivacyConsent,
 } from './features/privacy/consent-gate.js';
 import { useSyncStore } from './features/sync/store.js';
+import { installCentralSessionRecheck } from './features/sync/central-session-recheck.js';
 // 🔴 G-27：启动那一步要问的"这个账号要不要补签"。装配在 gate.ts，判定在 app-host。
 import { askLegalRecheck } from './features/legal-recheck/gate.js';
 import { ErrorScreen } from './features/shell/ErrorScreen.js';
@@ -95,6 +96,14 @@ const startupNetwork = createStartupNetwork({
   resumeCentralSession: () => {
     void useSyncStore.getState().resumeCentralSession();
   },
+});
+
+// A different tab may revoke or replace the HttpOnly session while this one
+// is backgrounded. Refresh the visible identity only after privacy consent.
+installCentralSessionRecheck({
+  networkAllowed: () => privacyConsent.networkAllowed(),
+  hasCookieSession: () => useSyncStore.getState().authTransport === 'cookie',
+  recheck: () => useSyncStore.getState().resumeCentralSession(),
 });
 
 const container = document.getElementById('root');

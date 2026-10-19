@@ -187,6 +187,9 @@ interface SyncStoreState {
 }
 
 let retry: { start: () => void; stop: () => void } | undefined;
+// A late central-session probe must never reinstate credentials after logout
+// or overwrite a newer login/server choice.
+let credentialRevision = 0;
 
 /**
  * 「没配置同步服务」的**错误码**。
@@ -559,6 +562,7 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
   },
 
   configure: (baseUrl, token, password) => {
+    credentialRevision += 1;
     // A server/token edit changes the authentication binding. Fence any
     // in-flight vault load before the new credentials can be used.
     const previous = get();
@@ -587,6 +591,7 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
   },
 
   applyAuthToken: (baseUrl, token, email, accountId) => {
+    credentialRevision += 1;
     invalidateWebVaultSession();
     const previous = get();
     const sameBinding = previous.baseUrl === baseUrl && previous.token === token;
@@ -627,6 +632,7 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
   },
 
   applyCentralAuth: (baseUrl, email, accountId, csrfToken) => {
+    credentialRevision += 1;
     invalidateWebVaultSession();
     const previous = get();
     set({
@@ -647,16 +653,36 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
   },
 
   resumeCentralSession: async () => {
+    const revision = credentialRevision;
     const current = get();
     const candidate = current.baseUrl.trim() !== ''
       ? current.baseUrl
       : (typeof window === 'undefined' ? '' : window.location.origin);
     if (candidate === '') return;
     const config = await getCentralAuthConfig({ baseUrl: candidate, fetchImpl: consentFetch });
-    if (!config.ok || config.value.mode !== 'oidc') return;
+    if (credentialRevision !== revision) return;
+    if (!config.ok) return;
+    if (config.value.mode !== 'oidc') {
+      if (get().authTransport === 'cookie') get().clearCredentials();
+      return;
+    }
     const session = await getCentralAuthSession({ baseUrl: candidate, fetchImpl: consentFetch });
+    if (credentialRevision !== revision) return;
     if (!session.ok || !session.value.authenticated) {
-      if (session.ok) set({ csrfToken: session.value.csrfToken });
+      if (session.ok) {
+        // An OIDC server has definitively rejected the browser session. A
+        // persisted pre-migration bearer token must not keep the UI signed in.
+        if (get().token !== undefined || get().authTransport === 'cookie') get().clearCredentials();
+        set({ csrfToken: session.value.csrfToken });
+      }
+      return;
+    }
+    const existing = get();
+    if (existing.authTransport === 'cookie' && existing.accountId !== undefined &&
+        existing.accountId !== String(session.value.user.id)) {
+      // A different tab switched central subjects. Do not silently attach
+      // this tab's local op-log and E2EE state to the new account.
+      existing.clearCredentials();
       return;
     }
     get().applyCentralAuth(candidate, session.value.user.email, String(session.value.user.id), session.value.csrfToken);
@@ -667,6 +693,7 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
   },
 
   clearCredentials: () => {
+    credentialRevision += 1;
     // Logout must not await/open the host or let a pending GET/loader install
     // a session after the token has been cleared.
     invalidateWebVaultSession();
