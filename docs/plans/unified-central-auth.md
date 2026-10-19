@@ -14,8 +14,8 @@
 
 | 包 | 范围 | 状态 | 放行判据 |
 |---|---|---|---|
-| P5.0 | 许可/标准库运行时/严格模式 | 实现与作者验证完成，待独立复审 | Node、ts-node、编译产物、容器实跑；配置负例；独立复审 |
-| P5.1 | identity/pending/grant/outbox schema与repository | 待 P5.0 冻结复审 | 真隔离PG、唯一映射/单次消费、无email自动合并 |
+| P5.0 | 许可/标准库运行时/严格模式 | 已独立验收 | Node、ts-node、编译产物、容器实跑；配置负例；独立复审 |
+| P5.1 | identity/pending/grant/outbox schema与repository | 设计与精确写集核对中 | 真隔离PG、唯一映射/单次消费、无email自动合并 |
 | P5.2 | 标准OIDC+所有签发入口+API/WS撤销 | 待实施 | 真中央HTTPS与双PG、A/B授权隔离、失败清理/迟到刷新 |
 | P5.3 | 官方Web Cookie与sync/vault transport | 待实施 | 真浏览器、CSRF、无上游凭据落浏览器、E2EE/离线保持 |
 | P5.4 | 原生和CLI共享handoff | 待实施 | 各端当前安装产物回跳、安全存储、重放/错绑定拒绝 |
@@ -70,4 +70,9 @@ openid-client 6.8.8、jose 6.2.12、oauth4webapi 3.8.8 均 MIT，均 2026-09-05 
 所有构建均为TS/网页依赖产物，无原生壳构建/安装。npm生产锁只新增标准库三项，保留
 既有 Linux Argon2 libc 元数据；pnpm锁其余版本不变。
 
-尚待独立复审。本包不代表实际 OIDC 授权成功、原生兼容或生产已切换；本阶段无真实中央请求。
+独立复审已完成：实现提交 7281d13885848cd8f5f92df049879377c608d9d5 的18路径
+SHA256均一致，完整源码差异审读 High/Medium=0。独立定向85/85、服务端构建、
+ts-node/编译产物实际PKCE探针均 rc=0；真实 createServer 在完整OIDC配置下拒绝启动，
+且未创建data目录。复现命令同表中对应行；本机独立日志为
+/tmp/heyta-p50-independent-tests.log 与 /tmp/heyta-p50-independent-build.log。
+本包不代表实际 OIDC 授权成功、原生兼容或生产已切换；本阶段无真实中央请求。
