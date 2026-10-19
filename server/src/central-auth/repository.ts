@@ -164,6 +164,9 @@ export class CentralAuthRepository {
               authenticatedAt: pending.linkProofAt!.getTime(),
             };
       if (link) await this.localProof(tx, link, now);
+      // Account/session locks can outlive the initial pending check.
+      now = await dbNow(tx);
+      if (pending.expiresAt <= now) fail("pending_unavailable");
       const id = randomUUID(),
         dispatchToken = randomSecret();
       const request: AuthorizationRequest = {
@@ -439,7 +442,8 @@ export class CentralAuthRepository {
       if (!a || a.kind !== "refresh") fail("attempt_unavailable");
       if (a.status === "APPLIED")
         return { grantId: a.grantId!, alreadyApplied: true };
-      if (a.status !== "RESULT" || !a.resultCipher) fail("result_unavailable");
+      if (a.status !== "RESULT" || !a.resultCipher || a.deadline <= now)
+        fail("result_unavailable");
       const grant = await tx.centralGrant.findUnique({
         where: { id: a.grantId! },
       });
@@ -471,6 +475,7 @@ export class CentralAuthRepository {
       );
       if (!tokens.accessToken || date(expiresAt) <= now) fail("invalid_grant");
       now = await dbNow(tx);
+      if (a.deadline <= now) fail("result_unavailable");
       if (date(expiresAt) <= now || grant.expiresAt <= now)
         fail("grant_unavailable");
       const previous = this.cipher.open<TokenMaterial>(
