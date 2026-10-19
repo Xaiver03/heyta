@@ -1,0 +1,13 @@
+{
+  "taskDeleted": {
+    "title": "Rem1411792407981",
+    "frame": [
+      342,
+      379,
+      44,
+      44
+    ],
+    "gone": true
+  },
+  "note": "r145 红臂那一趟半途抛错时留下的任务，按精确标题删除（同一枚 delete_own_task 路径）"
+}
