@@ -1,3 +1,4 @@
+import { sessionIssuer } from "../fixtures/central-session-issuer";
 /** Real PostgreSQL, production repository, only synthetic credentials; no provider mock. */
 import { PrismaClient } from "@prisma/client";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
@@ -25,7 +26,7 @@ if (
   throw new Error("Unsafe test database");
 const db = new PrismaClient({ datasources: { db: { url } } });
 const cipher = new CredentialCipher("33".repeat(32));
-const repo = new CentralAuthRepository(db, cipher);
+const repo = new CentralAuthRepository(db, cipher, sessionIssuer);
 const issuer = "https://identity.example.test",
   clientId = "heyta-test",
   browser = "synthetic-browser-secret";
@@ -60,9 +61,9 @@ async function login(
   const a = await authorization();
   const r = await repo.completeAuthorization({
     attemptId: a.id,
+    accessExpiresAt: Date.now() + 300_000,
     subject,
     rootSid: "shared-root-sid",
-    sessionHash: digest(randomSecret()),
     expiresAt: expires(),
     newUser: {
       email,
@@ -161,8 +162,8 @@ describe("中央身份持久层（真实PG）", () => {
     await expect(
       repo.completeAuthorization({
         attemptId: a.id,
+        accessExpiresAt: Date.now() + 300_000,
         subject: "sub",
-        sessionHash: "hash",
         expiresAt: expires(),
       }),
     ).rejects.toMatchObject({ code: "result_unavailable" });
@@ -200,8 +201,8 @@ describe("中央身份持久层（真实PG）", () => {
     await expect(
       repo.completeAuthorization({
         attemptId: a.id,
+        accessExpiresAt: Date.now() + 300_000,
         subject: "new-subject",
-        sessionHash: digest(randomSecret()),
         expiresAt: expires(),
         newUser: {
           email: u.email,
@@ -213,8 +214,8 @@ describe("中央身份持久层（真实PG）", () => {
     await expect(
       repo.completeAuthorization({
         attemptId: a.id,
+        accessExpiresAt: Date.now() + 300_000,
         subject: "new-subject",
-        sessionHash: digest(randomSecret()),
         expiresAt: expires(),
       }),
     ).rejects.toMatchObject({ code: "onboarding_required" });
@@ -230,8 +231,8 @@ describe("中央身份持久层（真实PG）", () => {
     });
     const r = await repo.completeAuthorization({
       attemptId: a.id,
+      accessExpiresAt: Date.now() + 300_000,
       subject: "linked",
-      sessionHash: digest(randomSecret()),
       expiresAt: expires(),
     });
     expect(
@@ -278,8 +279,8 @@ describe("中央身份持久层（真实PG）", () => {
     await expect(
       repo.completeAuthorization({
         attemptId: a.id,
+        accessExpiresAt: Date.now() + 300_000,
         subject: "linked",
-        sessionHash: digest(randomSecret()),
         expiresAt: expires(),
       }),
     ).rejects.toMatchObject({ code: "local_proof_invalid" });
@@ -296,8 +297,8 @@ describe("中央身份持久层（真实PG）", () => {
     await expect(
       repo.completeAuthorization({
         attemptId: a.id,
+        accessExpiresAt: Date.now() + 300_000,
         subject: "occupied",
-        sessionHash: digest(randomSecret()),
         expiresAt: expires(),
       }),
     ).rejects.toMatchObject({ code: "identity_conflict" });
@@ -360,8 +361,9 @@ describe("中央身份持久层（真实PG）", () => {
         },
       }),
       cipher,
+      sessionIssuer,
     );
-    await expect(lost.completeRefresh(a.id, expires())).rejects.toThrow(
+    await expect(lost.completeRefresh(a.id, expires(), Date.now() + 300_000)).rejects.toThrow(
       "synthetic commit response lost",
     );
     expect((await repo.inspectAttempt(a.id))?.status).toBe("APPLIED");
@@ -370,8 +372,8 @@ describe("中央身份持久层（真实PG）", () => {
       accessToken: "latest-at",
       refreshToken: "latest-rt",
     });
-    await repo.completeRefresh(b.id, expires());
-    expect(await repo.completeRefresh(a.id, expires())).toMatchObject({
+    await repo.completeRefresh(b.id, expires(), Date.now() + 300_000);
+    expect(await repo.completeRefresh(a.id, expires(), Date.now() + 300_000)).toMatchObject({
       alreadyApplied: true,
     });
     await expect(repo.rejectResult(a.id)).rejects.toMatchObject({
@@ -391,7 +393,7 @@ describe("中央身份持久层（真实PG）", () => {
       accessToken: "late-at",
       refreshToken: "late-rt",
     });
-    await expect(repo.completeRefresh(a.id, expires())).rejects.toMatchObject({
+    await expect(repo.completeRefresh(a.id, expires(), Date.now() + 300_000)).rejects.toMatchObject({
       code: "grant_unavailable",
     });
     await repo.rejectResult(a.id);
@@ -422,7 +424,7 @@ describe("中央身份持久层（真实PG）", () => {
       accessToken: "post-close-at",
       refreshToken: "post-close-rt",
     });
-    await expect(repo.completeRefresh(a.id, expires())).rejects.toMatchObject({
+    await expect(repo.completeRefresh(a.id, expires(), Date.now() + 300_000)).rejects.toMatchObject({
       code: "grant_unavailable",
     });
     await repo.rejectResult(a.id);
@@ -503,8 +505,8 @@ describe("中央身份持久层（真实PG）", () => {
       a = await authorization();
     const valid = {
       attemptId: a.id,
+      accessExpiresAt: Date.now() + 300_000,
       subject: "retry-subject",
-      sessionHash: u.sessionHash,
       expiresAt: expires(),
       newUser: {
         email: `${randomSecret()}@central.test`,
@@ -512,14 +514,15 @@ describe("中央身份持久层（真实PG）", () => {
         termsDocumentVersion: "test@1",
       },
     };
-    await expect(repo.completeAuthorization(valid)).rejects.toMatchObject({
-      code: "P2002",
+    const failingIssuer = new CentralAuthRepository(db, cipher, async (tx, userId, expiresAt) => {
+      await sessionIssuer(tx, userId, expiresAt);
+      throw new Error("synthetic issuance failure after inserting session");
     });
+    await expect(failingIssuer.completeAuthorization(valid)).rejects.toThrow("synthetic issuance failure");
     expect((await repo.inspectAttempt(a.id))?.status).toBe("RESULT");
     expect(await db.centralIdentity.count()).toBe(0);
     await repo.completeAuthorization({
       ...valid,
-      sessionHash: digest(randomSecret()),
     });
     const orphan = await authorization();
     await db.centralAttempt.update({
@@ -553,8 +556,8 @@ describe("中央身份持久层（真实PG）", () => {
     await ready;
     const pending = repo.completeAuthorization({
       attemptId: a.id,
+      accessExpiresAt: Date.now() + 300_000,
       subject: "late-proof",
-      sessionHash: digest(randomSecret()),
       expiresAt: expires(),
     });
     const rejection = expect(pending).rejects.toMatchObject({
@@ -589,7 +592,7 @@ describe("中央身份持久层（真实PG）", () => {
       await hold;
     });
     await ready;
-    const result = repo.completeRefresh(a.id, expires()).then(
+    const result = repo.completeRefresh(a.id, expires(), Date.now() + 300_000).then(
       () => ({ applied: true }),
       (error: { code: string }) => ({ applied: false, code: error.code }),
     );
@@ -614,12 +617,12 @@ describe("中央身份持久层（真实PG）", () => {
     await repo.recordResult(a.id, a.dispatchToken, {
       accessToken: "applied-before-deadline",
     });
-    await repo.completeRefresh(a.id, expires());
+    await repo.completeRefresh(a.id, expires(), Date.now() + 300_000);
     await db.centralAttempt.update({
       where: { id: a.id },
       data: { deadline: new Date(0) },
     });
-    expect(await repo.completeRefresh(a.id, expires())).toEqual({
+    expect(await repo.completeRefresh(a.id, expires(), Date.now() + 300_000)).toEqual({
       grantId: grant.id,
       alreadyApplied: true,
     });
@@ -631,7 +634,7 @@ describe("中央身份持久层（真实PG）", () => {
     await repo.recordResult(a.id, a.dispatchToken, {
       accessToken: "only-new-at",
     });
-    await repo.completeRefresh(a.id, expires());
+    await repo.completeRefresh(a.id, expires(), Date.now() + 300_000);
     const b = await repo.beginRefresh(grant.id);
     expect(b.refreshToken).toMatch(/^synthetic-rt-/);
     await repo.recordResult(b.id, b.dispatchToken, {
@@ -641,7 +644,7 @@ describe("中央身份持久层（真实PG）", () => {
       where: { id: grant.userId },
       data: { tokenVersion: { increment: 1 } },
     });
-    await expect(repo.completeRefresh(b.id, expires())).rejects.toMatchObject({
+    await expect(repo.completeRefresh(b.id, expires(), Date.now() + 300_000)).rejects.toMatchObject({
       code: "grant_unavailable",
     });
     await repo.rejectResult(b.id);
@@ -666,6 +669,7 @@ describe("中央身份持久层（真实PG）", () => {
         },
       }),
       cipher,
+      sessionIssuer,
     );
     const tokens = {
       accessToken: "synthetic-already-issued-at",

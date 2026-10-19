@@ -17,7 +17,8 @@
 | P5.0 | 许可/标准库运行时/严格模式 | 已独立验收 | Node、ts-node、编译产物、容器实跑；配置负例；独立复审 |
 | P5.1 | identity/pending/grant/outbox schema与repository | 已独立验收并交付 `0c361789` | 真隔离PG、唯一映射/单次消费、无email自动合并 |
 | P5.2A | 标准OIDC传输与材料持久边界 | 已独立验收 | 真中央HTTPS与双PG、标准验签、单次派发、先持久后验证 |
-| P5.2B | 所有签发入口与API/WS/销户撤销 | 待实施 | 唯一会话铸造、缓存前中央live、已连接WS撤销、清理worker |
+| P5.2B1 | 事务唯一签发、live/refresh/退出销户与worker底座 | 已独立验收 | 真实PG+TLS反例、实际中央联调、local回归 |
+| P5.2B2 | 所有签发入口与API/WS/runtime接线 | 待实施 | 缓存前中央live、已连接WS撤销、定时清理生命周期 |
 | P5.3 | 官方Web Cookie与sync/vault transport | 待实施 | 真浏览器、CSRF、无上游凭据落浏览器、E2EE/离线保持 |
 | P5.4 | 原生和CLI共享handoff | 待实施 | 各端当前安装产物回跳、安全存储、重放/错绑定拒绝 |
 | P5.5 | 文档、全量验收、发布准备 | 待实施 | 独立复审与当前产物；生产另走授权流程 |
@@ -270,3 +271,109 @@ Node22.22.3，隔离heyta_central_auth_oidc_test通过仓migrate-deploy完整应
 `/tmp/heyta-p52a-independent-central-http.log`。交付提交与远端状态以
 `git log -1 --oneline`、`git ls-remote origin refs/heads/codex/unified-auth`现量核验。
 启动门禁保持，P5.2B及后续产品接线未完成，本包没有部署。
+
+
+## P5.2B1 服务端事务协调底座（已独立验收）
+
+本包已获主线程范围批准。B1只提供内部服务端工厂、唯一事务签发、live/refresh、产品
+单会话/全会话退出、销户和撤销worker；B2才接middleware/API/WS/runtime。OIDC启动
+门禁保持，Web/原生正式入口与生产切换仍未完成。
+
+- `issueSession`保持唯一jwt.sign，增加受信事务选项；recordSession使用同一事务。
+  repository构造时必须注入受信session issuer，completeAuthorization不自行插会话，
+  在锁定并核验用户后调用issuer，并核对实际会话行；只有事务COMMIT确认后才能返回JWT。
+  APPLIED重入返回归属回执，不重新签发；丢失原响应需要新独立授权，不能盲撤已拥有grant。
+- grant绝对上限沿既有产品会话策略为365天，授权提交时固定；单一策略常量供JWT与grant
+  使用。refresh只能保持或缩短原期限，不得滑动延长；AT的短期到期不等于grant到期。
+- live读取可信绑定快照，释放PG事务后调用中央，再在短事务里复核grant version、
+  sessionHash、user/tokenVersion、issuer/client/subject；任何未知网络结果只拒绝准入，
+  不注销、不清E2EE；明确inactive才按版本撤销，不能用旧网络答复撤掉新轮换grant。
+- refresh只派发一次持久attempt；提交回执未知不得重派或catch撤销。单会话退出只操作
+  该user/session；产品全退出同tx撤所有grant和tokenVersion递增；销户复用原墓碑函数
+  与prepareUserClosure，outbox无User依赖继续保存。
+- worker只消费匹配固定issuer/client的outbox，RT后AT，成功才确认lease；部分失败可
+  幂等重试。cleanup有防重入和停止入口，EXPIRED_UNCONFIRMED单独上报，不当作已撤销。
+
+精确写集：server/src/auth.ts、account/access-sessions.ts、central-auth/{repository,
+oidc-client,session-policy,session-issuer,coordinator,worker}.ts；server/tests/integration
+下central-auth的persistence、independent、oidc既有用例和新增coordinator用例；
+server/scripts/verify-central-oidc-http.mjs、server/package.json、server/PROVENANCE.md
+及本计划。必要测试fixture只使用MIT独立实现，不复制中央AGPL源码。
+
+授权和刷新应用还持久化已验证的内省AT到期时间；live最终复核再次用数据库时钟确认
+该次中央证据未过期。单次会话元数据经可信工厂传至唯一铸造口。全设备退出的方法要求
+显式提交后closeForUser回调，避免只有tokenVersion递增而未关闭实时通道；门禁不加豁免。
+
+### P5.2B1 作者验收
+
+| 项目 | 结果 | 复现/证据 |
+|---|---|---|
+| 协调器真PG+TLS | 25/25，rc=0（期限修复后） | test:integration:central-coordinator；/tmp/heyta-p52b1-expiry-coordinator.log |
+| 标准协议真PG+TLS | 46/46，rc=0 | test:integration:central-oidc；/tmp/heyta-p52b1-expiry-protocol.log |
+| 实际中央HTTPS双PG | 17条，rc=0 | test:integration:central-oidc:http；/tmp/heyta-p52b1-expiry-central-http.log |
+| 原持久层/独立期限反例 | 23/23、2/2，均rc=0 | test:integration:central-auth及:review；/tmp/heyta-p52b1-expiry-persistence.log、/tmp/heyta-p52b1-expiry-old-review.log |
+| 服务端全套（本包初轮） | 164文件，2881通过/1既有跳过，rc=0 | pnpm --filter @heyta/sync-server test --maxWorkers=2；/tmp/heyta-p52b1-server-full.log |
+| local/密码/缓存/会话/模式 | 8文件203/203，rc=0 | /tmp/heyta-p52b1-local.log |
+| 全工作区typecheck | rc=0 | pnpm -r typecheck；/tmp/heyta-p52b1-workspace-types.log |
+| server build / 本包测试strict类型 | 均rc=0 | /tmp/heyta-p52b1-expiry-build.log、/tmp/heyta-p52b1-expiry-types.log |
+| 唯一签发/撤销/集成覆盖/文档/diff | 均rc=0 | check:token-minting、check:session-revocation、check:integration-coverage、research/tools/docs-link-check.mjs、git diff --check |
+
+协调器反例覆盖真实JWT行绑定、超长寿命压顶、APPLIED不重签、真实签发后事务失败、
+COMMIT已提交但回执丢失、未验证邮箱与旧邮箱不合并、AT过期刷新不延寿、并发只一次
+派发、响应未知不重派、不持锁网络、退出后的在途active答复拒绝、迟到inactive不撤新
+版本、中央网络失败不删账号、单/全会话退出、墓碑销户事务失败与迟到refresh材料、
+worker部分RT成功后AT失败重试、失租不能确认、固定issuer/client、防重入和停止、
+EXPIRED_UNCONFIRMED上报。真实中央另外通过coordinator.live、refresh、logout和worker
+核验实际opaque凭据撤销；未复制中央AGPL源码。
+
+全工作区测试不能写成全绿：默认并发pnpm -r test在Web的calendar-sidebar、nav-next7-days
+和reminder-wake发生3个超时及1个真时钟断言失败；限定并发重跑工作区又在mobile
+auth-flow出现React Native Flow解析未处理错误（该轮断言987通过但rc=1）。相关源码本包
+未改，单独单worker重跑Web三文件29/29、mobile auth-flow17/17均rc=0。首轮与重跑日志
+分别为/tmp/heyta-p52b1-workspace-tests.log、/tmp/heyta-p52b1-workspace-tests-serial.log、
+/tmp/heyta-p52b1-web-failures-rerun.log、/tmp/heyta-p52b1-mobile-failure-rerun.log。
+这些结果仅说明失败未在定向重跑复现，不声称已修复全仓测试稳定性。
+
+最初测试类型命令遗漏--strict导致既有判别联合无法收窄，按仓strict配置重跑通过；
+文档脚本最初路径写错，改用实际research/tools入口通过。最初会话撤销门禁发现新
+repository的tokenVersion路径缺同文件关闭接缝，已改为必需的提交后关闭回调，未豁免。
+旧持久层的任意sessionHash参数已移除，原冲突回滚测试改为真实唯一签发后抛错，保留
+RESULT/identity/session事务原子性判据；独立期限反例只适配可信签发依赖，不改失败断言。
+
+B1仍是内部服务底座，正式middleware/API/WS/runtime、旧登录入口关闭、Web/原生
+认证UI与生产切换均未完成。OIDC启动门禁继续拒绝启动。本包已独立验收，未部署。
+
+
+### P5.2B1 独立期限反例与修复
+
+主线程独立真实TLS+PG发现Medium：中央introspection给出短期有效证据后，UserInfo延迟
+可耗尽其有效期，原completeAuthorization仍交付JWT。原反例日志
+`/tmp/heyta-p52b1-independent-expiry.log`；主线程所有的临时expiry-review文件保持原文
+原断言，作者复跑修复后rc=0，`/tmp/heyta-p52b1-expiry-author-review-rerun.log`。随后
+主线程按原反例完成独立复验并确认该Medium已关闭，结论见下段独立验收记录。
+
+修复将completeAuthorization/completeRefresh的accessExpiresAt改为必需有限数值，来源
+必须是成功中央内省的验证结果；协议调用点明确传递result.accessExpiresAt，不能从
+令牌响应expires_in补齐，也无缺省无限期限。仅纯持久层夹具显式提供有限合成证据。
+授权在事务初检、取得用户锁后、实际唯一签发后、最终写入后重新读取数据库时钟裁决；
+刷新在初检、用户锁后和最终写入后同样核验。证据过期整事务回滚，attempt保留RESULT
+归属及材料供原状态机清理，不把过期证据当成功，不盲目撤销或重派。APPLIED重入仍
+只读既有归属而不签发，期限已过不能据此撤掉早先成功拥有的grant。
+
+新增四个作者反例：真实UserInfo延迟过期；真实issueSession后延迟过期而用户/身份/会话/
+grant整体回滚；真实refresh内省通过后等待User行锁跨期限、版本与旧密文均不变化；
+缺失可信证据即使token材料有expiresAt也拒绝。25项协调器、46项协议、17条真实中央
+HTTPS、23项持久层和2项原独立期限回归均通过，build及strict测试类型通过。
+本轮没有再次宣称整个workspace测试成功；初轮aggregate限制保留。
+
+
+### P5.2B1 独立验收结果
+
+主线程逐一核对v2的17路径SHA一致，完整复审High/Medium=0。独立重跑协调器25项、
+原期限反例1项、标准协议46项及重新构建后的真实中央HTTPS双PG17条，全部通过。
+报告`/tmp/heyta-p52b1-independent-result.json`。原独立临时用例在核对内容SHA后移出
+源码树，正文保留于/tmp；作者四个期限反例正式留在已登记协调器套件中。
+
+本结论限B1内部底座。B2正式接线、原生/Web入口和生产部署仍未完成；全工作区测试
+初轮失败与定向重跑的限制保持，不作全仓全绿承诺。交付提交与现有远端可用
+`git log -1 --oneline`、`git ls-remote origin refs/heads/codex/unified-auth`重新核验。

@@ -30,6 +30,7 @@
  */
 import { createHash, randomBytes } from 'node:crypto';
 import { prisma } from '../db';
+import type { Prisma } from '@prisma/client';
 import { Logger } from '../logger';
 import { getWsConnectionService } from '../sync/services/websocket-connection.service';
 
@@ -95,10 +96,10 @@ export const recordSession = async (input: {
   tokenVersion: number;
   userAgent?: string | null;
   deviceName?: string | null;
-}): Promise<string> => {
+}, tx?: Prisma.TransactionClient): Promise<string> => {
   const now = BigInt(Date.now());
   const sessionId = sessionIdOf(input.jti);
-  await prisma.accessSession.create({
+  await (tx ?? prisma).accessSession.create({
     data: {
       jtiHash: sessionId,
       userId: input.userId,
