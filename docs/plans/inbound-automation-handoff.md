@@ -54,8 +54,9 @@
 | apps/web 单测锚从子集升成**全量 rc=0** | 交付树上"web 面没红"这句有全量支撑 | `cd .worktrees/inb-t10/apps/web && npx --no-install vitest run` ⇒ `180 passed \| 2 skipped (182)`／`2307 passed \| 13 skipped (2320)`（`…/webfull-1705/`） |
 | 六格待拍板逐格把**正文**（选项 + 后果 + 推荐）贴给负责人 | 负责人不需要翻文件就能拍板 | 见 §7；正文真身在 `BLOCKED.md` 对应节 |
 
-本轮入库的提交（全部本地、未 push）：`833991d5`、`528b4115`、`36214e3a`、`8bb12a37`、`95e8cb75`、`c0dbd925`、`fd46db9ba`、`b29b3f7b6`。
-⚠️ 引用这些读数**必须连着当时的 tip 念**——本仓 HEAD 每小时都在被别人推。
+本轮入库的提交**不在这份文里列清单**（那份清单会漂）——现量取：
+`git log refs/heads/main --format='%h %ad %s' --date=format:'%m-%d %H:%M' --grep='自动收集' | head -15`（本线笔的标题都带「自动收集」）。
+⚠️ 引用任何一枚读数**必须连着它当时那枚 tip 念**——本仓 `refs/heads/main` 每小时都在被别人推。
 
 ---
 
