@@ -195,6 +195,7 @@ export class CentralAuthRepository {
         dispatchToken,
         issuer: pending.issuer,
         clientId: pending.clientId,
+        startedAt: pending.createdAt.getTime(),
         request,
       };
     });
@@ -259,6 +260,7 @@ export class CentralAuthRepository {
         dispatchToken,
         issuer: grant.issuer,
         clientId: grant.clientId,
+        subject: grant.subject,
         refreshToken: tokens.refreshToken,
       };
     });

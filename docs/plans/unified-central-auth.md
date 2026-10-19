@@ -15,8 +15,9 @@
 | 包 | 范围 | 状态 | 放行判据 |
 |---|---|---|---|
 | P5.0 | 许可/标准库运行时/严格模式 | 已独立验收 | Node、ts-node、编译产物、容器实跑；配置负例；独立复审 |
-| P5.1 | identity/pending/grant/outbox schema与repository | 实现与作者验证完成，待独立复审 | 真隔离PG、唯一映射/单次消费、无email自动合并 |
-| P5.2 | 标准OIDC+所有签发入口+API/WS撤销 | 待实施 | 真中央HTTPS与双PG、A/B授权隔离、失败清理/迟到刷新 |
+| P5.1 | identity/pending/grant/outbox schema与repository | 已独立验收并交付 `0c361789` | 真隔离PG、唯一映射/单次消费、无email自动合并 |
+| P5.2A | 标准OIDC传输与材料持久边界 | 已独立验收 | 真中央HTTPS与双PG、标准验签、单次派发、先持久后验证 |
+| P5.2B | 所有签发入口与API/WS/销户撤销 | 待实施 | 唯一会话铸造、缓存前中央live、已连接WS撤销、清理worker |
 | P5.3 | 官方Web Cookie与sync/vault transport | 待实施 | 真浏览器、CSRF、无上游凭据落浏览器、E2EE/离线保持 |
 | P5.4 | 原生和CLI共享handoff | 待实施 | 各端当前安装产物回跳、安全存储、重放/错绑定拒绝 |
 | P5.5 | 文档、全量验收、发布准备 | 待实施 | 独立复审与当前产物；生产另走授权流程 |
@@ -196,3 +197,76 @@ P5.2接定时调度、报告未确认撤销，正式上线前不得跳过。隐�
 `pnpm --filter @heyta/sync-server test:integration:central-auth:review` 可复现。
 日志 `/tmp/heyta-p51-independent-final.log` 与 `/tmp/heyta-p51-independent-author-regression.log`。
 这是持久层候选验收，HTTP/OIDC/JWKS/原生/定时任务仍在后续包，正式OIDC启动门禁继续关闭。
+
+
+## P5.2A 标准协议边界
+
+本包只实现服务端受信协调器接口，不提供浏览器HTTP入口，不签发产品JWT、不应用attempt，
+不开放OIDC启动门禁。普通SSO接受已有中央会话的真实auth_time；旧账号绑定发起login与
+max_age=0，并核验签名auth_time不早于本次pending，不用iat冒充重新认证时间。
+
+- `createCentralOidcClient` 固定配置与发现metadata的精确issuer；授权、token、userinfo、
+  introspection、revocation、JWKS均为同源HTTPS、无用户信息/query/fragment。
+  每次实际出站再次约束端点和method、拒绝重定向。只接受ES256并显式启用标准库
+  `enableNonRepudiationChecks`。每次兑换/刷新独立Configuration和捕获器，禁止跨账号共享。
+- `begin` 持久state/browser绑定、nonce与S256；`exchange` 在请求上游前原子消费pending；
+  `refresh` 只能领取repository里的grant与subject。单次attempt最多一次token POST，任何
+  网络/响应/数据库回执未知均不得重派。repository仅新增startedAt/subject两个返回投影。
+- token响应最多64 KiB，单token最多16 KiB；提取到的可撤销材料先await recordResult，之后
+  才交标准库验签和claims。坏签名、错误HTTP状态仍保留材料；坏JSON/无法完整读取的响应
+  保持派发未知。COMMIT回执丢失或总期限15秒到达都不在catch中撤销；晚提交仍归同一attempt。
+- 内省严格检查active/client_id/sub/Bearer/exp；中央AT是opaque身份凭据且未声明资源aud，
+  不从client登记字段猜aud。现有严格配置没有可选resource audience；以后若引入必须另行
+  显式契约与验证。userinfo仅返回绑定sub和已验证邮箱，不按email自动关联旧账号。
+  refresh允许无ID；存在ID时照常验签并绑定原subject。
+- `introspect`、`userInfo`、`revoke` 仅供后续服务端协调器调用，不能直接挂浏览器可传任意
+  token的路由。错误只返回固定代码，不反射SDK cause、响应正文或凭据。
+
+测试由独立MIT HTTPS fixture与真PG验证；临时CA由openssl生成，子进程仅通过
+NODE_EXTRA_CA_CERTS信任该CA，不关闭TLS验证，不读取.env。真实中央服务由独立runner动态
+调用外部identity-server启动/fixture导出，双PG隔离，未复制AGPL实现或测试源码。
+
+可复现入口：先将HEYTA_CENTRAL_TEST_DATABASE_URL设为本机独立的
+`heyta_central_auth_oidc_test`并运行 `node server/scripts/prepare-central-auth-postgres.mjs`；
+`pnpm --filter @heyta/sync-server test:integration:central-oidc`。
+真实中央联调另需HEYTA_CENTRAL_SERVER_ROOT指向中央源码根和OIDC_TEST_DATABASE_URL
+指向该服务校验允许的本机测试库；先server build，再运行
+`pnpm --filter @heyta/sync-server test:integration:central-oidc:http`。
+两命令按顺序运行，禁止共享同一测试库并发清理。
+
+P5.2B仍须接入issueSession唯一铸造口、现存登录旁路、缓存命中前central live校验、
+已连接WebSocket撤销、各退出范围、销户同事务outbox、定时清理与EXPIRED_UNCONFIRMED报告。
+本包协议通过不能代替这些产品闭环，也不代表原生、Web UI或生产认证切换。
+
+
+### P5.2A 作者验收（2026-10-19）
+
+Node22.22.3，隔离heyta_central_auth_oidc_test通过仓migrate-deploy完整应用74迁移。
+首轮在迁移尚未结束时误启动测试而失败；等待完整成功后重新执行，未改迁移或降低断言。
+独立fixture最初未按OAuth规则解码Basic中的百分号字符，修正测试协议实现；适配器按
+标准库GET userinfo传入的null body修正空体兼容。最初integration覆盖门禁要求package
+命令直接点名文件，已让TLS runner接收该显式路径，未豁免门禁。
+
+| 项目 | 实测结果 | 复现/证据 |
+|---|---|---|
+| HTTPS协议与真PG | 46/46，rc=0 | test:integration:central-oidc；/tmp/heyta-p52a-protocol-registered.log |
+| 实际中央服务HTTPS与双PG | 11条判据，rc=0 | test:integration:central-oidc:http；/tmp/heyta-p52a-central-http-registered.log |
+| 既有持久层 | 23/23，rc=0 | test:integration:central-auth；/tmp/heyta-p52a-persistence-regression.log |
+| local/配置/运行时/密码/缓存/会话 | 8文件160/160，rc=0 | /tmp/heyta-p52a-local-regression-final.log |
+| 服务端构建与新测试独立类型检查 | 均rc=0 | /tmp/heyta-p52a-build-final.log、/tmp/heyta-p52a-test-types.log |
+| 文档链接、集成脚本覆盖、唯一签发与会话撤销门禁、diff | 均rc=0 | docs-link-check.mjs、check:integration-coverage、check:token-minting、check:session-revocation、git diff --check |
+
+协议负例含坏签名/alg/issuer/aud/nonce/state/时效、端点跨源与重定向、响应过大与读体
+超时、重复callback、并发多账号捕获隔离、非200仍先存材料、坏JSON不重派、COMMIT已提交
+但回执丢失、总期限到达后晚提交仍归原attempt、绑定旧账号拒绝旧auth_time、刷新无ID与
+换subject拒绝、userinfo绑定与未验证邮箱、撤销后内省失败。真实中央11条覆盖标准
+授权/PKCE/ES256/JWKS、独立A/B grant、真实auth_time、userinfo验证邮箱、跨client opaque
+内省拒绝、刷新持久/轮换、重复callback与撤销A不影响B。无生产数据或生产凭据请求。
+
+主线程独立复审已通过：冻结9路径SHA全部一致，完整协议与持久所有权边界审读High/Medium=0。
+独立HTTPS+PG 46/46、重新server build、实际中央HTTPS双PG 11条均rc=0；证据
+`/tmp/heyta-p52a-independent-result.json`，日志分别为
+`/tmp/heyta-p52a-independent-protocol.log`、`/tmp/heyta-p52a-independent-build.log`、
+`/tmp/heyta-p52a-independent-central-http.log`。交付提交与远端状态以
+`git log -1 --oneline`、`git ls-remote origin refs/heads/codex/unified-auth`现量核验。
+启动门禁保持，P5.2B及后续产品接线未完成，本包没有部署。
