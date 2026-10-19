@@ -89,6 +89,32 @@ git -C .worktrees/inb-t10 status --porcelain | wc -l   # 载具应为 0
 
 ---
 
+## 4a. 八格复跑入口（一格一条命令，给负责人也给下一个接手人）
+
+整串前缀固定为下面这行，表里只写要替换的 `--only` 那串（腿标签现量：`python3 research/tools/verify-inbound-ac-battery.py --list` ⇒ `legs=28`）：
+
+```bash
+python3 research/tools/verify-inbound-ac-battery.py --root .worktrees/inb-t10 --ev <新目录> --quiet-gate --only <下面那串>
+```
+
+| 格子 | `--only` 那串（逐字） | 最近一次当日读数在哪 |
+|---|---|---|
+| AC-1 权益与授权 | `AC1-offline11,AC1-entitlement3,AC1-quota-http,AC1-pglite,AC1-worker-identity,AC1-cjs-order` | `PROGRESS.md` 第 111 条那片（15:50 载具 tip `528b4115c`） |
+| AC-2 接收与队列 | `AC2-inbound-core,AC2-queue-teeth` | 同上 |
+| AC-3 领取与提交 | `AC3-dual-host,AC3-sync-authz` | 同上 |
+| AC-4 解析 | `AC4-local-date,AC4-app-host,AC4-egress-wire` | 同上 |
+| AC-5 批创建与来源记录 | `AC5-shared-schema,AC5-op-log,AC5-batch-actions` | 同上 |
+| AC-6 规则界面 | `AC6-web-specs,AC6-browser` | 同上；⚠️ `AC6-browser` 会逐名覆写那批待拍的取证图 ⇒ 单跑它前先读 §7 第 4 格 |
+| AC-7 文档 | `AC7-doc-tables,AC7-doc-endpoints,AC7-migrations,AC7-license,AC7-docs-voice,AC7-link` | `PROGRESS.md` 第 121 条（18:53 零脏载具、已入库态） |
+| AC-8 验收矩阵 | `AC8-matrix,AC8-producer-seam,AC8-ac-ticks` | 同上 |
+| 范围尺（**不是 AC 格**） | `SCOPE-commit-scope` | 仍 rc=1，越界笔名归别线（B205）⇒ 别把它算进 AC 结论 |
+
+⚠️ **那两批读数凭什么还代表"当前已入库代码"**：从 `528b4115c` 到 `refs/heads/main` 的全部改动里，非文档／非台账的是 **0** 枚 ——
+现量 `git diff --name-only 528b4115c refs/heads/main > /tmp/d.txt; grep -vcE '^(docs/|PROGRESS\.md|BLOCKED\.md|AGENTS\.md|README)' < /tmp/d.txt`。
+下一位若在这之后又动了代码，就按 #494 那三层筛子判要不要重跑，别照抄本表第三列。
+
+---
+
 ## 5. 阻塞与风险（每条都写"谁能让它消失"）
 
 | 格 | 现量形状 | 谁能解 |
