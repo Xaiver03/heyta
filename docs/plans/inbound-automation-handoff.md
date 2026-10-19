@@ -102,15 +102,15 @@ python3 research/tools/verify-inbound-ac-battery.py --root .worktrees/inb-t10 --
 
 | 格子 | `--only` 那串（逐字） | 最近一次当日读数在哪 |
 |---|---|---|
-| AC-1 权益与授权 | `AC1-offline11,AC1-entitlement3,AC1-quota-http,AC1-pglite,AC1-worker-identity,AC1-cjs-order` | 10-20 00:46 整串那趟（载具 tip `0bc4e2733`）：逐腿读数在 `docs/plans/inbound-automation.md` 的 T8 第 32 条＋`~/.heyta-evidence/inb-t7-1017-0902/battery-1020-0046/`（`PROGRESS.md` 第 137 条同戳） |
+| AC-1 权益与授权 | `AC1-offline11,AC1-entitlement3,AC1-quota-http,AC1-pglite,AC1-worker-identity,AC1-cjs-order` | **10-20 05:09 整串那趟（载具 tip `dd91d1927`，零脏起跑、`sysctl -n vm.loadavg` 回 `{ 5.70 8.72 9.89 }`）：结论行 `legs=28 rc0=27 rc_nonzero=1`**，逐腿读数抄在 `PROGRESS.md` 第 150 条，原件 `~/.heyta-evidence/inb-t7-1017-0902/batt-tip-1020/{batt.txt,batt.rc}`、逐腿日志 `<载具>/.run-logs/inb-ac-battery-1020-0509/`（现量 `ls -1 … | wc -l` 回 **29**＝28 腿＋`rc.txt`）。⚠️ 这一戳**没带 `--ev`**，所以装置自己的日志落在它默认的 `.run-logs/…`，上面那两件是我另指的重定向——两种落点都合法，别以为它们该在同一处。上一戳（10-20 00:46 @ `0bc4e2733`）的读数仍在 `~/.heyta-evidence/inb-t7-1017-0902/battery-1020-0046/`，逐腿抄件在 `docs/plans/inbound-automation.md` 的 T8 那一节与第 137 条 |
 | AC-2 接收与队列 | `AC2-inbound-core,AC2-queue-teeth` | 同上 |
 | AC-3 领取与提交 | `AC3-dual-host,AC3-sync-authz` | 同上 |
 | AC-4 解析 | `AC4-local-date,AC4-app-host,AC4-egress-wire` | 同上 |
 | AC-5 批创建与来源记录 | `AC5-shared-schema,AC5-op-log,AC5-batch-actions` | 同上 |
 | AC-6 规则界面 | `AC6-web-specs,AC6-browser` | 同上；⚠️ `AC6-browser` 会逐名覆写那批待拍的取证图 ⇒ 单跑它前先读 §7 第 4 格 |
-| AC-7 文档 | `AC7-doc-tables,AC7-doc-endpoints,AC7-migrations,AC7-license,AC7-docs-voice,AC7-link` | 同 00:46 那趟（六枚各 rc=0；起跑态载具零脏 —— 现量 `prefix.txt` 里 `dirty 0` 那一行）；更早那批「已入库态」读数在 `PROGRESS.md` 第 121 条 |
-| AC-8 验收矩阵 | `AC8-matrix,AC8-producer-seam,AC8-ac-ticks` | 同上（`已勾=0 未勾=8`） |
-| 范围尺（**不是 AC 格**） | `SCOPE-commit-scope` | 仍 rc=1，越界笔名归别线（B205）⇒ 别把它算进 AC 结论 |
+| AC-7 文档 | `AC7-doc-tables,AC7-doc-endpoints,AC7-migrations,AC7-license,AC7-docs-voice,AC7-link` | 同 05:09 那趟（六枚各 rc=0）；⚠️ **这一格就是"为什么必须重跑"的那一格**：AC7 六枚与 `AC8-matrix`／`AC8-ac-ticks` 读的输入里含本文件、`inbound-automation.md`、`PROGRESS.md` ⇒ 第 149 条那笔**只改文档**也构成判卷输入变化。这与"八枚构建输入 delta=0 所以 Linux 取证不必重跑"那把尺**射程不同**，两把尺不许互相顶替。更早那批「已入库态」读数在 `PROGRESS.md` 第 121 条（00:46 那戳的零脏起跑态凭证是同目录 `prefix.txt` 里 `dirty 0` 那一行） |
+| AC-8 验收矩阵 | `AC8-matrix,AC8-producer-seam,AC8-ac-ticks` | 同上（05:09 那戳逐枚：`尺枚=67 有尺行=27 无尺行=7 窗=13/13 平台=10/10 权益=9/9 设备状态=9/9`、`相对导入=237 模块在HEAD=237 尺瞎了=0`、`已勾=0 未勾=8`） |
+| 范围尺（**不是 AC 格**） | `SCOPE-commit-scope` | 仍 rc=1，越界笔名归别线（B205）；05:09 同戳现量 `python3 research/tools/verify-inbound-commit-scope.py` 首行 `本线笔数=346　仅正文提及=16　涉及路径=203　越界=96` ⇒ 别把它算进 AC 结论 |
 
 🟢 **这一格今天被"当场重跑"取代了**：10-20 00:46:43–00:47:49 在交付 tip `0bc4e2733` 上把 28 腿整串重跑了一遍（结论行 `legs=28 rc0=27 rc_nonzero=1`，唯一那枚非 0 是 `SCOPE-commit-scope`，即 B205 那一格，不是 AC 结论）。逐腿读数在 `docs/plans/inbound-automation.md` 的 **T8 第 32 条** 与 `~/.heyta-evidence/inb-t7-1017-0902/battery-1020-0046/`（`PROGRESS.md` 第 137 条同戳）。
 ⚠️ **本格以前写的是另一种东西，留在这里当形状示范**：它原先靠一句代理论证（"从 `528b4115c` 到 `refs/heads/main` 的非文档改动 0 枚 ⇒ 旧读数仍代表当前代码"）。那句**只在写下那一刻成立**（当时是 `5c274f496` 上 23:40:41 复算的），tip 一动就得重算 —— 能当场重跑就别用代理。要复算那半边仍然一条命令：`git diff --name-only 24d05137b $(git rev-parse refs/heads/main) > ~/.heyta-evidence/inb-t7-1017-0902/delta-check.txt; grep -c '^server/\|^packages/\|^apps/' <那份文件`（今天这戳回 **0**；⚠️ 别把清单落 `/tmp`）。
