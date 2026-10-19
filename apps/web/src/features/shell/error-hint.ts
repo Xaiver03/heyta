@@ -46,6 +46,13 @@ const HINT_KEY: Record<StorageFailure['kind'], MessageKey> = {
  *
  * @param failure 结构化原因；`undefined` 表示拿不到（不是 `StorageError`）。
  */
-export function storageHintKey(failure: StorageFailure | undefined): MessageKey {
+export function storageHintKey(failure: StorageFailure | undefined, error?: unknown): MessageKey {
+  // The OPFS SAH pool may throw a DOMException before SqliteAdapter can wrap
+  // it as StorageError. Chromium's measured cross-tab failure has this exact
+  // message; closing the old tab and reloading succeeds without data loss.
+  if (failure === undefined && error instanceof Error &&
+      error.message.includes('Access Handles cannot be created if there is another open Access Handle')) {
+    return 'web.error.storage.blockedHint';
+  }
   return failure === undefined ? 'web.error.storage.hint' : HINT_KEY[failure.kind];
 }
