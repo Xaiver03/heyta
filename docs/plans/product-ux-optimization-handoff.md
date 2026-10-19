@@ -63,9 +63,9 @@
 > ⚠️ **上一行里那句「companion pid 31182 未收」已过期**：本趟起跳前现量 `ps` 为空、那台模拟器被**别处**关机过一次 ⇒ 本趟是自己 `boot` 起来的，装置各自另起了 companion；**没有按名字收任何进程**（`idb_companion` 一律不动）。
 > ✅ **10-19 11:2x–11:4x r139 第九趟四端重装（先只跑 iOS 腿）出了当前源码件，r138 那两枚复验判据逐条对上**：
 > 载体 `/Users/rocalight/heyta-carriers/head-r128` @ `997a1935`（= r138 那笔，`git merge-base --is-ancestor` 现量确认它是当前 main 的祖先）→ 全新安装 →
-> 装进模拟器的 `Heyta.app` mtime `2026-10-18 18:11:07` ⇒ **`2026-10-19 11:24:10`**。账号面三格全 passed
-> （`current-source/` 中文×浅 13 步 · `dark/` 中文×暗 11 步 · `english/` 英文×浅 11 步）：折叠 `AXLabel=「其他登录方式」`、
-> 展开 `AXLabel=「收起其他登录方式」` 且 `AXValue=expanded`、`expandedGone=true`，六张图逐张人眼看过 ⇒ **屏幕上那行 = 读屏念的那句，在真包上成立**。
+> 装进模拟器的 `Heyta.app` mtime `2026-10-18 18:11:07` ⇒ **`2026-10-19 11:24:10`**。账号面**四格**全 passed
+> （`current-source/` 中文×浅 13 步 · `dark/` 中文×暗 11 步 · `english/` 英文×浅 11 步 · `english-dark/` 英文×暗 11 步，12:0x 补上最后一格 ⇒ **深浅×中英这一枚控件四格齐**）：折叠 `AXLabel=「其他登录方式」`、
+> 展开 `AXLabel=「收起其他登录方式」` 且 `AXValue=expanded`、`expandedGone=true`，八张图逐张人眼看过 ⇒ **屏幕上那行 = 读屏念的那句，在真包上成立**。
 > ⚠️ **读 `headerNow` 那格别当"屏上有几行"**：中文格回两枚、英文格回一枚，差的是那把尺大小写敏感（`"Other ways…"` 对不上 `"Hide other ways…"` 里的小写 `other`）。
 > **名称判据只认 `toggleNode.AXLabel`**（节点自己回的那一枚）。同一枚件上 AI 面 + 帮助面重取三格（各 20 步 passed，`startedAt`/`finishedAt` 第一次被这枚脚本跑到 = #486 复验），
 > 15 张图里人眼只看了 3 张，其余 12 张只有像素尺 —— **别读成"逐张看过"**。
