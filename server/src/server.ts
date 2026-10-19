@@ -1,3 +1,4 @@
+import { assertAuthenticationModeAvailable } from './central-auth/config';
 import * as fs from 'fs';
 import Fastify, { FastifyError, FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
@@ -346,6 +347,8 @@ export const createServer = (
   stop: () => Promise<void>;
 } => {
   const fullConfig = loadConfigFromEnv(config);
+  // Config loading always resolves authentication, even when an override omits it.
+  assertAuthenticationModeAvailable(fullConfig.authentication!);
   initSyncService();
 
   // Ensure data directory exists
