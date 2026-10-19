@@ -137,8 +137,11 @@ dark   profile / assistant / ai-settings-via-assistant / ai-settings-group / hel
 
 ## 七、这一趟**不证**什么
 
-1. **不证英文档** —— 两档都在中文下跑。定位符是双语的（`check:locator-labels` 守），
-   但**没有真的在英文装机态跑过这一趟**。
+1. ~~**不证英文档**~~ —— 本趟两档都在中文下跑。**这一条已被 r136 部分划掉**：
+   应用内语言开关的通道在 r135 补上（`scripts/qa/ios-app-language.py`）后，同一枚装置在**英文 × 浅档**跑过一趟 20 步全绿、
+   每枚双语定位符都在英文档命中过（见 `../ios-ai-face-r136/RESULT.md`）。
+   **仍然不证的是"英文 × 暗档"那一格** —— 外观与语态是两维，r136 只取了浅档那一行。
+   （本条原文那句"定位符是双语的（`check:locator-labels` 守）但没真的在英文装机态跑过"在 r133 当时是准确的。）
 2. **不证已配置态** —— 这台模拟器没有 AI 端点，助手页走的是 `mobile.ai.notConfigured` 那一支。
    `hostFailed` / `privacyBlocked` 两张卡、端点表单、能力清单、托管档的订阅入口**一律没进**。
 3. **不证发送链路** —— 只读装置，没输入过一句话，`执行` 档的实际写入没验。

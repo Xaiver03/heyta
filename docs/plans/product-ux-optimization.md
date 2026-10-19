@@ -4569,3 +4569,19 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
       **设备态**：语言已**还原中文**（`常规` 组标签回读命中）；外观仍是 light（本趟没动外观档）；通知授权仍是「不允许」（r132 那处未还原状态，本趟没改变它）；companion pid 31182 未收。
       **仍不证**：注册档（切档会真发请求）、任何凭证流转、iPad/窄屏/大字体、**当前源码**那一面（装机件仍是载体 `head-r128` 那一枚）。
       读数与 3 张图见同一份 RESULT.md 的 §10。
+
+- [x] ✅ **10-19 06:3x r136 AI 面 + 帮助面英文装机态（浅档一趟，20 步全绿，5 张逐张人眼看过）—— 把 r133 那格不证清单第 1 条划掉**（用的就是 r135 那枚新通道 `scripts/qa/ios-app-language.py`；`scripts/qa/ai-face-ios.py` **未改动**）。
+      三趟同一分钟起跳（06:33）：切 en 9 步 `rc=0` → 本旅程 **20 步全 passed**（与中文档同一步数、同一枚装置）→ 切回 zh 8 步 `rc=0`。
+      **每一枚双语定位符都在英文档命中过**：入口 `AI assistant, Ask one assistant to capture, plan, break down, or review your tasks` 帧 `[16, 446, 370, 60]`、
+      `Set up AI` `[287, 134, 98, 44]`、`Settings, Profile, preferences, sync and security` `[16, 343, 370, 44]`、`Complaints and reports` `[32, 748, 338, 60]`。
+      **助手屏状态卡那 8 枚 marks 里恰两枚为真**（`What would you like to finish today?` + 那行英文副标题），其余六枚两档全 false
+      —— 与代码那句"同一时刻只会渲染一枚状态卡"对得上，**不是**"英文档少两张卡"。
+      **有界滚动在英文档同样到位**：那行落到 `[32,748,338,60]`、底边 `808 ≤ 866`（这一屏是模态、没有 tab 栏 ⇒ 视口下界取屏高 − 8，见 #477）；
+      行高从中文档的 44 变 60 是英文 hint 多折一行，**内容高度变化不是裁切**。
+      **两条入口到同一屏这把尺在英文档同样成立**：`ai-settings-group.png` 与 `ai-settings-via-assistant.png` **sha256 逐字节相同**（`67e33ebf…`）；
+      五张 `modalLuminance` 全 252 ⇒ 没有把暗档混进来（#472 那一族的自检）。
+      ⚠️ **与 r133 那枚候选缺陷的关系只有一句**：未选中 `Checkbox` 圆环的对比度问题在英文档同样在场 —— 它是 token 层的（`color.border-strong` on `color.surface`）、**与语态无关** ⇒ **不新增缺陷**，量化仍在 r133 的 RESULT.md §六。
+      **本趟没有新增环境陷阱**（用的通道与尺都是 r133/r135 已登记的那几枚）。
+      **不证**：**暗档 × 英文**这一维组合没取（外观与语态是两维）、任何写入（三枚闸门 / 端点新增 / 真的拉起邮件页）、注册档与凭证流转、iPad/窄屏/大字体、**当前源码**那一面（装机件仍是载体 `head-r128` 那一枚）。
+      ✅ **设备态**：语言已**还原中文**（回读命中）、外观未动（light）、通知授权仍是「不允许」（r132 那处未还原状态）、companion pid 31182 未收。
+      读数与 5 张图见 [`apps/mobile/evidence/ux-final-20261018/ios-ai-face-r136/RESULT.md`](../../apps/mobile/evidence/ux-final-20261018/ios-ai-face-r136/RESULT.md)。
