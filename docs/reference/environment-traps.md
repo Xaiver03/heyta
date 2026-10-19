@@ -10665,3 +10665,20 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
       本线 ⑴ 那条两版都回空、结论没变，但**留在台账里的必须是换成真路径的那一条**（可复问）。
     ⑷ 同族而机制不同，别混着引：退出码被尾巴吃掉是 **#45**（`cmd | tail; echo $?`）、**#179**（`tee`）、**#184**（zsh `${PIPESTATUS[0]}` 空值）；
       "查不到 ≠ 不存在"那族读法有 **#46**／**#67**，讲的却是运行时与界面层 —— 这一枚是 **git 的过滤器层**。
+
+491. 🔴 **`tab_inventory.applescript` 打印的第二列是「窗口序号」，而 `run_in_tab.mjs` 的第一个参数要的是「窗口 id」—— 照抄前者喂后者，报的是 `-1719 Invalid index`，长得像"那枚标签不存在"**（2026-10-19 12:2x 本线现量；两枚文件同属 `~/.agents/skills/portal-form-filling/scripts/`）。
+    ⑴ 现场形状：按 `tab_inventory` 的回读拿了 `win=1`，接着
+      `node scripts/run_in_tab.mjs 1 7 /tmp/x.js` ⇒
+      `152:175: execution error: Google Chrome got an error: Can't get window 1 whose id = 1. Invalid index. (-1719)`。
+      机制在源码里一眼可查：`tab_inventory.applescript` 打的是循环计数 `wi`（**序号**），
+      而 `run_in_tab.mjs` 拼的是 `first window whose id = (theWin as integer)`（**id**）。
+      ⇒ 报错说"没有 id 为 1 的窗口"是**真的**，但它与"我要的那枚标签不存在"是两件事 —— 这正是元规则 1
+      （"没观测到 X" ≠ "X 没发生"）：**探针给的坐标用错了单位**。
+    ⑵ 一眼可判别的形状：Chrome 的窗口 id 是十位数（同一趟现量：`osascript -e 'tell application "Google Chrome" to get id of every window'` 回 `1403923025`），
+      **永远不可能是 1**。看到传进去的是个小整数，先怀疑单位而不是怀疑标签页。
+    ⑶ **处置**：需要按标签定位时优先用 `run_in_tab_by_url.applescript <完整URL> <js文件>`（按完整 URL 精确匹配，
+      顺便免疫"用户点页面导致标签序号漂"那件事，见 SKILL.md 脚本索引里那条 2026-10-02 的实测）；
+      非要用 id 定位就先现取窗口 id，不要用 inventory 的第二列。
+    ⑷ 本条的元教训对**所有**"读一个装置的输出、喂给另一个装置"都成立：两枚文件同目录、同一份 SKILL.md
+      的表格统称那一列为「窗口」，**列名对了不等于单位对了**。喂之前先造一个必然不成立的样本
+      （像这里的小整数 id）看它报什么 —— 报出来的那句"不存在"极可能是探针的，不是被测对象的。

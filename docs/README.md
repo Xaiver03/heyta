@@ -149,6 +149,7 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | [0062](adr/0062-shared-list-key-distribution.md) | 🔴 **共享清单走密钥分发型协作**：把「聚合型协作不可做」（排行榜/组队需要可信跨用户聚合，**红线不动**）与「分发型协作可做」（per-list key + 成员公钥信封 + 移除即 rekey，服务端仍只见密文）正式拆开，收窄 4 处在册「E2EE 下协作结构上不可能」断言的适用范围；share op-log 独立分区（个人 op-log 不动）、逐 op Ed25519 签名（「谁改的」可信）、服务端 role 硬门、通知盲推+本地过滤（偏好存本地）；清单级共享、29 成员、owner hosting 有效即可共享。落地计划见 [collaboration-shared-lists.md](plans/collaboration-shared-lists.md)，证据见 [调研](research/collaboration-shared-lists.md) | ✅ **已接受（2026-10-08）；实施未开始** |
 | 🔴 [0063](adr/0063-email-rebinding-and-per-session-revocation.md) | **邮箱换绑走双侧确认；会话带上 `jti`，让「退出登录」真的撤销这一枚**：换绑不是改字段 —— 旧邮箱与新邮箱各发一封、两边都点才算，生效那刻旧邮箱不能再登录；`jti` 补上「退出登录」此前只清本机、服务端那枚令牌仍有效 365 天的那一格，「登出所有设备」= 删该账号全部会话行；新增认证器必须发告知信（兑现 [email-password-auth.md](plans/email-password-auth.md) 缺口 13）。逐趟设备读数在 [account-standard-suite.md](plans/account-standard-suite.md) §6（末节号现量：`grep -oE '^### 6\.[0-9]+' docs/plans/account-standard-suite.md \| tail -1`） | ✅ **已接受**（2026-10-08；Web 面板挂载那一格见该计划的状态表） |
 | [0064](adr/0064-inbound-automation-commit-and-task-batch.md) | 自动收集：许可前可转派、许可后绑定唯一设备；版本化异构任务批一次 op | ✅ 技术方案已接受，实施中 |
+| 🔎 [0065](adr/0065-prerender-for-non-js-crawlers.md) | **为不执行 JS 的爬虫预渲染站点正文**：把 ADR-0033 §7.1 亲口留白的"预渲染或 SSR 是另一份决策"补上。实测非 JS 取 `/features/` **只有 title、正文 0 字节** ⇒ 百度/搜狗/360 看到的是空页（Google/Bing 会执行 JS，影响有限）。推荐**构建后 Playwright 快照**（零新增依赖：`@playwright/test@1.63.0` 已在仓库且已过两道门；复用 `publish-public-sites.mjs` 那条既有接缝）。🔴 明确**否决按 UA 分流**；§3 列了五条硬约束，其中承重的是"**`check:entries` 的覆盖范围必须一起改**，否则门禁会绿着一份过期快照" | ⏳ **待确认**（草案；要不要做见 [SEO 计划](plans/seo-program.md) §6.1） |
 
 ### 计划
 
@@ -200,6 +201,7 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | [account-standard-suite-handoff.md](plans/account-standard-suite-handoff.md) | **交接：注册登录标准套件** —— 只记「现在停在哪、下一步按什么顺序做」：设备腿是收口条件、载体与跑法、已排除的死胡同 |
 | [product-ux-optimization-handoff.md](plans/product-ux-optimization-handoff.md) | **交接：产品体验线（本轮 UX Goal）** —— 五步各自交到哪一格、四端重装跑在哪棵树上、还欠的四格各在谁手里（每格一条复现命令）、本轮实测过的六条死胡同 |
 | [account-standard-suite-reflection.md](plans/account-standard-suite-reflection.md) | **复盘：注册登录标准套件** —— 纠正表（修改内容/错误归因/证据/下次开头指令建议）＋可长期记忆候选 |
+| 🔎 [seo-program.md](plans/seo-program.md) | **落地站点的 SEO 台账**（2026-10-19 立项）：§1 实测基线（76 条 sitemap 全 200、头部契约、**正文 0 字节**、站长平台**一个都没接**）· §2 已落地项（整站**软 404 → 诚实 404** 的线上读数表、`og:locale:alternate`、三个页面的 meta 标题、三类"仓库里已在说谎的话"）· §3 **明确不做**的八件事逐条附理由（结构化数据四条否决 / `lastmod` / 价格不进 head / IndexNow）· 🔴 §4 **证据强度声明**（`web_search` 401 + 我自己复现了 Bing CN 分词退化 ⇒ 关键词部分**不能当结论**）· §5 关键词方向与三个**缺页** · §6 要人拍的五件事 · §7 未闭合读数 |
 
 ### 工程参考
 
