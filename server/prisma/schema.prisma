@@ -129,6 +129,8 @@ model User {
   emailChangeRequest                   EmailChangeRequest?
   // 已签发的访问令牌（一枚一行，见下面 `AccessSession`）。
   accessSessions                       AccessSession[]
+  centralIdentities                    CentralIdentity[]
+  centralGrants                        CentralGrant[]
 
   @@index([verificationToken])
   @@index([resetPasswordToken])
@@ -674,6 +676,8 @@ model AccessSession {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, tokenVersion])
+  centralGrant CentralGrant?
+
   @@map("access_sessions")
 }
 
@@ -1875,4 +1879,106 @@ model AutomationEntitlementRevocation {
   manifestExpiresAt DateTime? @map("manifest_expires_at")
   updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at")
   @@map("automation_entitlement_revocations")
+}
+
+
+/// Official identity only. Email is never an identity lookup or merge key.
+model CentralIdentity {
+  id        String @id
+  issuer    String
+  subject   String
+  userId    Int @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([issuer, subject])
+  @@unique([issuer, userId])
+  @@map("central_identities")
+}
+
+/// Ten-minute, browser-bound single-use authorization. Secrets clear on dispatch.
+model CentralPending {
+  id String @id
+  stateHash String @unique @map("state_hash")
+  browserHash String @map("browser_hash")
+  issuer String
+  clientId String @map("client_id")
+  redirectUri String @map("redirect_uri")
+  secretsCipher String? @map("secrets_cipher")
+  linkUserId Int? @map("link_user_id")
+  linkSessionHash String? @map("link_session_hash")
+  linkTokenVersion Int? @map("link_token_version")
+  linkProofAt DateTime? @map("link_proof_at")
+  expiresAt DateTime @map("expires_at")
+  consumedAt DateTime? @map("consumed_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  @@index([expiresAt])
+  @@map("central_pending")
+}
+
+/// Every external token request has an immutable identity and durable outcome.
+/// No FK to pending/grant: deletion must never erase ownership evidence.
+model CentralAttempt {
+  id String @id
+  kind String
+  pendingId String? @unique @map("pending_id")
+  grantId String? @map("grant_id")
+  expectedVersion Int? @map("expected_version")
+  issuer String
+  clientId String @map("client_id")
+  status String @default("DISPATCHED")
+  dispatchHash String @map("dispatch_hash")
+  requestCipher String? @map("request_cipher")
+  resultCipher String? @map("result_cipher")
+  resultHash String? @map("result_hash")
+  deadline DateTime
+  finishedAt DateTime? @map("finished_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  @@index([grantId])
+  @@index([status, deadline])
+  @@map("central_attempts")
+}
+
+/// An independent authorization grant, never keyed by the shared provider root sid.
+/// RESTRICT protects logout/closure from silently destroying revocation material.
+model CentralGrant {
+  id String @id
+  userId Int @map("user_id")
+  sessionHash String? @unique @map("session_hash")
+  tokenVersion Int @map("token_version")
+  issuer String
+  subject String
+  clientId String @map("client_id")
+  rootSid String? @map("root_sid")
+  authorizationAttemptId String @unique @map("authorization_attempt_id")
+  version Int @default(1)
+  activeAttemptId String? @unique @map("active_attempt_id")
+  tokensCipher String? @map("tokens_cipher")
+  expiresAt DateTime @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  session AccessSession? @relation(fields: [sessionHash], references: [jtiHash], onDelete: Restrict)
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("central_grants")
+}
+
+/// Independent of user/session FKs so cleanup survives local account deletion.
+model CentralRevocation {
+  id String @id
+  dedupeKey String @unique @map("dedupe_key")
+  issuer String
+  clientId String @map("client_id")
+  grantId String? @map("grant_id")
+  tokensCipher String? @map("tokens_cipher")
+  status String @default("PENDING")
+  leaseHash String? @map("lease_hash")
+  leaseUntil DateTime? @map("lease_until")
+  attempts Int @default(0)
+  nextAttemptAt DateTime @map("next_attempt_at")
+  expiresAt DateTime @map("expires_at")
+  finishedAt DateTime? @map("finished_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  @@index([status, nextAttemptAt])
+  @@map("central_revocations")
 }

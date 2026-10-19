@@ -138,3 +138,11 @@ git -C /tmp/sp log --oneline aa9690ca..HEAD -- packages/super-sync-server/
 任何服务初始化之前拒绝尚未接线的 OIDC 模式；local 自托管保持原行为。
 标准 MIT openid-client 独立适配，无 AGPL 源码移植。此包不改变 JWT、数据库与同步协议。
 设计与验收见[唯一计划](../docs/plans/unified-central-auth.md)。
+
+## 中央身份持久层（2026-10-19）
+
+新增 central-auth/crypto.ts、repository.ts 与增量 Prisma 表/迁移，分别保存身份映射、
+单次待授权、外部请求attempt所有权、独立grant及撤销队列。所有上游材料使用独立服务端
+密钥封装，与用户E2EE无关。真实PG验证包含COMMIT成功回执丢失、后次刷新与旧attempt判定、
+注销事务回滚和队列独立留存。OIDC启动门禁仍关闭，HTTP/实际OIDC验证/WS/销户调度仍待P5.2。
+这是MIT独立实现；没有从内部AGPL中央客户端移植代码或测试。设计与判据见唯一计划。
