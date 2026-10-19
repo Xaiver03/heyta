@@ -110,7 +110,7 @@ python3 research/tools/verify-inbound-ac-battery.py --root .worktrees/inb-t10 --
 | AC-8 验收矩阵 | `AC8-matrix,AC8-producer-seam,AC8-ac-ticks` | 同上 |
 | 范围尺（**不是 AC 格**） | `SCOPE-commit-scope` | 仍 rc=1，越界笔名归别线（B205）⇒ 别把它算进 AC 结论 |
 
-⚠️ **那两批读数凭什么还代表"当前已入库代码"**：从 `528b4115c` 到 `refs/heads/main` 的全部改动里，非文档／非台账的是 **0** 枚 ——
+⚠️ **那两批读数凭什么还代表"当前已入库代码"**：从 `528b4115c` 到 `refs/heads/main` 的全部改动里，非文档／非台账的是 **0** 枚（这一枚 0 只代表写下那一刻：`5c274f496` 上 23:40:41 复算仍是 0，交付 tip 再往前动过**代码**就得重跑下面那条并按 `#494` 判要不要重取）——
 现量 `git diff --name-only 528b4115c refs/heads/main > /tmp/d.txt; grep -vcE '^(docs/|PROGRESS\.md|BLOCKED\.md|AGENTS\.md|README)' < /tmp/d.txt`。
 下一位若在这之后又动了代码，就按 #494 那三层筛子判要不要重跑，别照抄本表第三列。
 
