@@ -5896,6 +5896,12 @@ AC 已勾数仍为 **0**（`verify-inbound-ac-ticks.py`：`AC 行=8　已勾=0�
     ⑤ **这一改没有动脚本**：加那条身份判据是**改验收脚本的判据**，按"改判卷口径要记 `BLOCKED.md`"归 B164 的所有者，本线只把"照抄就会越界"的这条路堵掉。⚠️ 另记一枚形状：旧 runbook 里那句 boot 的 `|| true` 与"判据只写 rc"两处，都是**写给下一位的命令自己没有跑过**——本条之所以抓得到，只是因为逐行去读了被引用脚本的真源码，不是靠记忆。
     ⑥ **现量与尺**（02:11–02:15 那几戳；原件逐枚在 `~/.heyta-evidence/inb-t7-1017-0902/evpointers-10arms-0143/`：`devices-preflight-0211.txt`、`doctables-runbook.txt`、`battery-runbook.txt`、`checkdocs-runbook.txt`、`audit-runbook.txt`）：`verify-inbound-doc-tables.py` rc=**0**（§5 那一行动前后各测一次，裸竖线仍 **6** 枚——列数由这把尺判，不靠自己数）；5 腿电池 `legs=5 rc0=5 rc_nonzero=0`；`pnpm -s check:docs` rc=**0**；指针尺 rc=**0**（本条新点名的原件都在盘上，分母按那行现量读）。
     ⑦ **本条动两枚文件**：`docs/plans/inbound-automation-handoff.md`（§5 设备面一格＋§8 第 3 项整段）＋`PROGRESS.md`；AC 已勾数须仍 **0**、不 push、`scripts/reinstall-all.sh` 零改动。
+147. 🟢 **计划里那两行 `⏭` 引文查出是"只有抄件在仓里、原件已消失"——就地标注并给了能在册回读的替代取法**（2026-10-20 02:1x，写前先跑 `date`）
+    ① **起因**：第 146 条要把"绿着退出但端没点全"钉成可查判据时，去找那趟的汇总原件，`~/.heyta-evidence/…` 里没有——它当时落在 `/tmp/heyta-reinstall-desktop.log`。现量 `test -e /tmp/heyta-reinstall-desktop.log; echo $?` 回 **1**（重启就没了；交接书 §9 那枚「可复现物不要住 `/tmp`」讲的正是这一族，两条失法里这条撞上的是前一半——后一半"复用同名会让提交吃进陈件"本轮没踩到）。
+    ② **为什么第 141 条那把尺没抓到它**：`grep -n DEFAULT_PATTERN research/tools/verify-inbound-evidence-pointers.py` 逐字回那只尺的默认 pattern 就是 `~/\.heyta-evidence/…` 这一枚前缀 ⇒ **`/tmp` 那一层它一根都不扫**。⇒ **尺有牙，但只咬它被教过的那段路**：登记"某类缺失已被装置覆盖"时，要连**它的覆盖面边界**一起写，否则下一位会把"这把尺绿"读成"所有引用都可回读"。本条就把这一格边界落到台账。
+    ③ **处置（旧句一字未改，只在那两行下面追加一段）**：标注"这两行是抄件、原件已不在盘上（带上那条 `test -e` 现量）；要现量这个形状就按交接书 §8 第 3 项那三枚计数在**在册日志**上重取"，并把在册那枚连同读数一起写上（`~/.heyta-evidence/inb-t7-1017-0902/leg3-t10-1116/reinstall.log` ⇒ `✅=2 ⏭=0 🔴=2`）——⚠️ 那是**另一趟**（10-19 那趟 mac＋ios 过、windows＋android 红），标注里就写明"另一趟"，免得被当成本节那趟的原件用。被标注的那一节按标题自定位：`docs/plans/inbound-automation.md` 的「### 腿 3：`pnpm reinstall:all` ＋ Linux 交付取证…」（别按行号找，行号会随追加漂）。
+    ④ **现量与尺**（02:17–02:18 那戳；原件 `~/.heyta-evidence/inb-t7-1017-0902/evpointers-10arms-0143/`）：`verify-inbound-doc-tables.py` rc=**0**、5 腿电池 `legs=5 rc0=5 rc_nonzero=0`、`pnpm -s check:docs` rc=**0**、指针尺 rc=**0**（新点名那枚 `reinstall.log` 在盘上）。
+    ⑤ **本条动两枚文件**：`docs/plans/inbound-automation.md`（`git diff --numstat` 回 `2 0`＝纯追加）＋`PROGRESS.md`；AC 已勾数 `grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` 须仍 **0**、不 push、不改任何在册读数。
 
 
 

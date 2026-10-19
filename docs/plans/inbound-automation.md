@@ -2249,6 +2249,8 @@ $ cd .worktrees/inb-t7 && HEYTA_MACOS_DIST_DIR=/tmp/heyta-macos-dist-inbt7 \
 ⏭ ios：不在 --only 范围 —— 这端**没有**验证当前产物
 ```
 
+🔴 **上面那两行是抄件，不是可回读原件**（2026-10-20 02:1x 现量）：那一趟的汇总件当时落在 `/tmp/heyta-reinstall-desktop.log`，而 `test -e /tmp/heyta-reinstall-desktop.log; echo $?` 现在回 **1**（重启就没了，正是交接书 §9 那枚"可复现物不要住 `/tmp`"的同族）。⇒ 要**现量**这个形状别回读这里，按交接书 §8 第 3 项那三枚计数在一份在册日志上跑：`awk '/重装汇总/{f=1;next} f' ~/.heyta-evidence/inb-t7-1017-0902/leg3-t10-1116/reinstall.log | grep -c '^  ✅'` 回 **2**、同段 `grep -c '^  ⏭'` 回 **0**、`grep -c '^  🔴'` 回 **2** —— **那份在册件是另一趟**（10-19 那趟：mac＋ios 两腿过、windows 与 android 两腿红），所以"绿着退出但端没点全"这一形今天只能由脚本源码自证（汇总段对被跳过的端不置 FAIL）。
+
 不点的理由 + "那条窗口门禁看的是进程不是设备归属"这个缺陷，记在 **B164**（含建议的那条机械判据，改的是别人的脚本判卷口径，不代做）。
 🟡 **收口时的状态更新**：别线随后落了 `63f93a90 fix(四端重装 落点)`，把 ios/windows/android 三段那批固定 `/tmp` 路径
 换成带默认值的旋钮（`HEYTA_REINSTALL_TMP_DIR`，默认逐字不变）—— 那是 B164 **旁边**的另一格（现场互相覆盖），
