@@ -1643,7 +1643,7 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
 - [x] ✅ **12:0x 第三次复量：两格红都还在，但这次量出了"最新一棵能装能建的树"到底是哪一笔，而它正是本线那枚载体的基线**（读数全部现取，不沿用 08:1x / 08:5x 那两批）
     `git rev-parse --short 9fa53ab9^` = **`b081811c`** —— 也就是那棵跑了整族 289 条的隔离载体的基线。三条判据把它钉成"最新可用"：**①** `git show 9fa53ab9^:packages/shared-schema/src/index.ts` 里那两行坏 re-export 命中 **0**（`9fa53ab9` 自己命中 2）；**②** `git log -S"task-batch-contract" --oneline 9fa53ab9..HEAD -- packages/shared-schema/src/index.ts` **输出为空** ⇒ HEAD 之前那 87 笔里没有任何一笔把它修回去（`git rev-list --count 9fa53ab9..HEAD` = **87**）；**③** 那四枚被指的模块此刻仍是 `??`（`git status --porcelain -- packages/shared-schema/src` = 4 枚 `??` + `auth-http-contract.ts` 一枚 ` M`）。⇒ 结论对下一位有用而不只是"还红着"：**要取"能装能建"的读数，基线只能往 `b081811c` 或更早挑，HEAD 那一整段 87 笔都在红区里**；本线那两枚隔离副本读数因此不是"随手挑的一棵旧树"，而是这条线上最后一棵可用的。
     🔴 **这一趟自己差点被一把坏尺骗过去，记下来**：判"锁文件跑在清单前面"我第一版写的是 `git show <ref>:pnpm-lock.yaml | grep -c zxcvbn`，读数 `HEAD=10 / b081811c=6` —— 那看起来像"连可用基线都有 6 处，这条判据根本不成立"。**错在分母**：锁文件里 zxcvbn 会出现在别的 importer 与 `snapshots:` 段。正确形状是**先按 importer 切块再数**（`  packages/ui:` 起、到下一个两空格缩进的 importer 键或顶层键止）：切块后 `HEAD` 的 `packages/ui` 块命中 **2**（`@zxcvbn-ts/core`、`@zxcvbn-ts/language-common`）而 `HEAD:packages/ui/package.json` 命中 **0** ⇒ 不匹配成立；`b081811c` 与 `9fa53ab9` 同一块命中 **0** ⇒ 那两棵干净，`fee83a90` 命中 2 ⇒ 引入点仍是原来归属的那一笔。⇒ 口径钉成一句：**判锁与清单是否错位，只许读"该 importer 那一段"，全文计数一律不算读数**。
-- [ ] 🔴 **10-09 23:3x 在 `d5d49540` 上把"main 从干净检出击不出包"这一格重新量了一遍：上面那两条红的归属换了一处，而第一条仍然真**。全部读数来自真跑（新建一棵钉到 `d5d49540` 的隔离工作树、`cp -al node_modules`、跑 `pnpm`），不是从 08:1x 那批沿用：
+- [x] 🔴 **10-09 23:3x 在 `d5d49540` 上把"main 从干净检出击不出包"这一格重新量了一遍：上面那两条红的归属换了一处，而第一条仍然真**。全部读数来自真跑（新建一棵钉到 `d5d49540` 的隔离工作树、`cp -al node_modules`、跑 `pnpm`），不是从 08:1x 那批沿用：
     ⚠️ **10-18 r125 复量（`29521b78`，只含已提交内容的干净检出真跑）**：这一格点名的那枚原因已经换了位置 —— 装那一半现在 rc=0，打不出包那一半**当时**换成两条新原因（`packages/app-host` 的两枚生产者还停在索引里没提交、`packages/ui` 的 `CommentView` 少 `id`）。逐条读数与归属见下面「r125」那一格。
         🔴 **10-20 00:5x r151 再复量：连"打不出包"那一半也关了** —— 当前 `HEAD` 上 `NO_COLOR=1 pnpm -r --no-bail build` ⇒ **`BUILD_RC=0` / `Done` 20 / `Failed` 0**
         ⇒ 这几格题面里"HEAD/main 打不出包"那句**现在谁写谁错**（当时的两条新原因与归属照旧留在 r125 那格里，是考古不是现状）。
@@ -1656,7 +1656,13 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
       ⚠️ 这**不是**"别线在飞所以等他们"那一档：**是本线那笔代提交把 main 弄成自相矛盾的**（消费侧已提交、生产者未提交）。11 枚生产者里最新一枚 mtime 是 10-09 10:43（其余 10-07 19:29–23:21），起跑那一刻（23:3x）没人正在写它们。
     - 🔴 **于是"补上那 11 枚就能打出包"这句话是错的 —— 实测否证它**（同一棵隔离工作树，把 11 枚生产者 `cp -p` 进去再 `pnpm -r build`）：`RBUILD_FIXPROBE_RC=1`，12 条错降到 **5 条**（7 条 `Cannot find module` 全消），剩下的是 `./calendar/model.js` 缺 `calendarTaskSpan` / `CalendarTaskSpan` / `groupTasksByCalendarDate`、`./theme.js` 缺 `useHeytaUiLocale`、`./ai/AiDisclosure.js` 缺 `AI_DISCLOSURE_FIELD_GROUPS`。而这三个模块文件在工作树里**逐个是 ` M`**（`git status --porcelain -- packages/ui/src/calendar/model.ts packages/ui/src/theme.tsx packages/ui/src/ai/AiDisclosure.tsx` 三行全命中）⇒ 缺的是**未提交那批里的导出**，不是缺文件。
       ⚠️ 同一条命令复跑：新建一棵钉到 `d5d49540` 的 `git worktree` → `cp -al node_modules` → 把 `git status --porcelain -- packages/ui/src | grep '^??'` 那 11 枚 `cp -p` 进去 → `pnpm -r build`。
-- [ ] 🔴 **10-09 23:4x 在 `61126d7d` 上把本线登记过的四条"等别人落地"逐条重量**（四条都是现取，不沿用上午那批；`HEAD` 从 `3c5a3be2` 走到这里只多了本线三笔 + 账号线三笔）：
+    ✅ **10-20 01:2x r155 复量：这一格的两条声称现在都不成立，本格打勾**（载体 = 主检出，`git status --porcelain | wc -l` = **0** ⇒ 整棵树零脏）。
+    ① "锁跑在清单前面"那一半：同 ref 两侧现量都是 **2**（`git show <HEAD>:pnpm-lock.yaml` 按 importer 切段数 zxcvbn ↔ `git show <HEAD>:packages/ui/package.json`）
+       ⇒ `ERR_PNPM_OUTDATED_LOCKFILE` 那个报错的谓词不再成立，而 r125 已在只含已提交内容的干净检出上真跑 `--frozen-lockfile` **rc=0**。
+    ② "那 11 枚生产者至今是 `??`"那一半：`git status --porcelain -- packages/ui/src` 现在 **0 行**（这一格当时记的是 42 ` M` + 11 `??`）⇒ 那批已随后续提交落地；
+       构建侧另有 r151 的 `BUILD_RC=0` / `Done` 20 / `Failed` 0 直接读数。
+    ⚠️ 这一枚勾只作废"这一格当时量到的两条红"；**那批是谁提交的不由本线记**（同 r125 那句"本线不替那条线记它是怎么收的"）。
+- [x] 🔴 **10-09 23:4x 在 `61126d7d` 上把本线登记过的四条"等别人落地"逐条重量**（四条都是现取，不沿用上午那批；`HEAD` 从 `3c5a3be2` 走到这里只多了本线三笔 + 账号线三笔）：
     ⚠️ **10-18 r125 复量（`29521b78`，只含已提交内容的干净检出真跑）**：这一格点名的那枚原因已经换了位置 —— 装那一半现在 rc=0，打不出包那一半**当时**换成两条新原因（`packages/app-host` 的两枚生产者还停在索引里没提交、`packages/ui` 的 `CommentView` 少 `id`）。逐条读数与归属见下面「r125」那一格。
         🔴 **10-20 00:5x r151 再复量：连"打不出包"那一半也关了** —— 当前 `HEAD` 上 `NO_COLOR=1 pnpm -r --no-bail build` ⇒ **`BUILD_RC=0` / `Done` 20 / `Failed` 0**
         ⇒ 这几格题面里"HEAD/main 打不出包"那句**现在谁写谁错**（当时的两条新原因与归属照旧留在 r125 那格里，是考古不是现状）。
@@ -1688,6 +1694,15 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
               🔴 **这一趟是上一格那条口径教训的第二次命中，而且这次错在我自己手上**：第一版把 ③ 的那条尺跑成了 `git status --porcelain -- packages/app-host/src` ⇒ 读出 **26**，与账里记的 **44** 差 18。差的不是世界，是**路径射程**（账里那把尺量的是 `packages/app-host` 整枚目录，含 `package.json`、`tsup.config.ts`、`dist` 之外的未跟踪件）。我**当场没有把它写成"拦路变轻了"**，而是回去读了 21:3x 那格的命令原文才重跑 —— 这一步是本账那条"读数旁边必须连着命令"第一次被**后来者**（就是我，隔了 45 分钟）用上。⇒ 规矩再加半句：**复量别人的谓词时，先读那一格的命令原文再敲，不许按"名字像"重造一把**；两把尺的差值（这里 18 枚）会被下一位读成"那一线落了 18 枚"，而它是 0。
               📌 `635c015b..HEAD` = **5 笔**，"全是本线"这句是**逐笔查出来的**不是看标题猜的：`git show --name-only --format= <sha>` 五笔**每笔都只 1 枚文件、且都是本台账**（`4a1dacd9`/`3fbe3fb2`/`b22f156d`/`dfc6d11e`/`1d609587`），净 diff 也是 **1 枚**，命中那四组路径 **0 枚** —— 六条纹丝不动是**第四次**同一条实证，且④⑥的字节数与第六趟**逐字相同**（40,131 / 184,705），这一趟没有"量具差异"要解释。
               🔴 **10-10 02:1x 第八次重量：六条逐条同值（② 现量 `git status --porcelain -- packages/ui/src` = 53 行 = **42 ` M` + 11 `??`**，与上面第四趟那条逐字相同），但这一趟又撞上上面那条口径规矩的第三种面目，而且它比前两错得更贵**：我想"顺手核一下 barrel 那 11 枚"，没有抄账里那把尺，而是自己造了一枚——从 `git show HEAD:packages/ui/src/index.ts` 抽相对说明符，逐枚 `git cat-file -e HEAD:packages/ui/src/<那串>`。它一口气报出 **90 / 93 枚"不在 `HEAD`"**（`git show HEAD:packages/ui/src/index.ts` 抽相对说明符去重得 **93** 条，逐枚 `git cat-file -e` 现量缺 **90**），看着像一条**新的拦路事实**——而 **96% 报缺**正是恒假尺的签名，只是我当时没先看这个数。真相是尺的病：TS 源码里的说明符写作 `./ai/AiPanel.js`（`.js` 是 ESM 写法），盘上与库里那枚文件叫 `AiPanel.tsx`／`model.ts` ⇒ 按字面问 `.js` 恒无。**已提交态真正的拦路枚数仍按账里那把尺的口径（53 = 42 + 11）**，本格不采纳我这枚自造尺的任何数。⇒ 那条规矩补严一档：**"指向不在 HEAD 的文件"这类谓词，说明符→实体名的映射必须由被审代码自己给**（这里就是 tsup/tsc 的解析规则），不许按字面猜扩展名；而"顺手多核一层"造出来的新尺，在写进账之前先问它能不能在自己不该红的地方红（我这枚对 `./calendar/CalendarBoard.js` 这类**早已入库**的件同样报"缺"——那一枚才是它的阳性对照，跑一次就看得出恒假）。
+    ✅ **10-20 01:2x r155 逐条复量：这四条没有一条仍然真，本格打勾**（载体 = 主检出，`git status --porcelain | wc -l` = **0** ⇒ 整棵树零脏；读数与上一条同批取的）。
+    ① `check:layering` 现跑 **rc=0**（`✅ apps/* 分层边界完好（扫描 445 个文件，10 条规则）`）—— 那处违规走的是本格当时写的"提到共享层"那条出路，
+       `packages/app-host/src/share-key-identity.ts` 现在**在 `HEAD` 里**（`git cat-file -e` 现量 YES），与上面 12:5x 那格 r122 的读数同向。
+    ② `packages/app-host` 从 **44 枚 → 0 枚**脏、barrel `src/index.ts` 也干净 ⇒ 那格第三/四/五次"同值"的读数到此为止，"那笔 AAD 迁移不能由本线做"这条裁决**不再需要**（它已由那条线自己落地）。
+    ③ 提醒腿：`reminder-notify-request-failed` 在 `HEAD` 的 `apps/web/src` 命中 **1 枚文件**（这一格当时是 0 个文件）⇒ 那条腿在只含已提交内容的树上不再结构上跑不动。
+    ④ 🔴 **但 `dispatchChecked` 这把尺今天答不出原问题**：needle 在 `HEAD` 与工作树里**都是 0 枚命中**（两边同值 ⇒ 它不再判事，正是本仓那条"命中 0 与一条没跑长得一样"的姊妹形状），
+       而提醒投递在 `HEAD` 里换成了 `packages/app-host/src/reminder-delivery.ts` 的 `reconcileReminderDelivery` / `createReminderReconciler`（**对账式**，不是"完成时派发一次"那个符号）
+       ⇒ 那句"提醒那一半仍未入库"按**符号**已经不成立、按**语义**已经以另一种形状入库；要重判得按新符号另立判据，**本线不替那条线造尺**。
+    ⑤ 账号线那枚 helper：`selectSettingsSection` 在 `HEAD:e2e/tests/helpers.ts` 命中 **4**（这一格当时是 0）⇒ 那份已提交的 spec 在干净检出上不再编译不过。
 
             - 🔴 **21:5x 第一次真跑 `pnpm -r build` 取直接读数（此前四格都是拿脏文件数当代理尺）：构建确实红，但红的位置和因果都不是代理尺说的那一档**（起跑 1 分钟负载 6.68、全仓无并发构建、HEAD = `882fb2da`）：
               **原文**：`apps/node-host build: src/host.ts(422,5): error TS2322: Type '(input: InboundAutomationHostOptions) => Promise<InboundAutomationCycleResult>' is not assignable to type '(options: …) => Promise<{ state: "empty"|"submitted"|"needs-confirmation"; eventId?; itemCount? }>'` → `Error: error occurred in dts build` → `DTS Build error` → `ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL @heyta/node-host@0.0.0 build: tsup`（约 20 秒就停，`-r` 到第一枚失败包为止）。
@@ -1710,7 +1725,7 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
               📌 **这一格把"从最终源码四端构建重装"那条关闭判据从模糊变成可判**：它原先写的是"那两处对齐提交后重跑 `pnpm -r --no-bail build`，读到'失败包清单为空'才算这格关"，而**"空"此前没有基线**（没人知道除这两枚外还有没有第三枚在 bail 后面）。现在基线是 **2**，所以关闭判据可以机械写成：**`--no-bail` 那趟的 `Failed` 行数 = 0，且起数仍是 20**（= 工作区内有 `build` 脚本的包数）—— 起数那一半是防"清单变空其实是因为根本没跑"（§7 那条"作用域打空照样 rc=0"同型）。⚠️ 边界照旧：这一趟证的是**当前工作树**打不出两枚包，**不是** `HEAD` 打不出（`HEAD` 那格另有它的六条谓词，23:1x 第七趟同值）；也不等于重装 —— 负责人那句「先只做不需要设备的」仍然盖着 `pnpm reinstall:all`。
               **对"从最终源码四端构建重装"那一格的结论（不变，但理由更硬）**：两枚红的文件**都不在本线**（`apps/node-host/src/host.ts` = ` M`、`apps/web/src/features/settings/inbound-runtime.ts` = `??` 未跟踪的新文件），而 `packages/app-host/src/inbound-process.ts` 此刻**已经不脏**（已提交）、只剩 barrel `packages/app-host/src/index.ts` 仍 ` M` ⇒ 那一线把接缝推进了**一半**，两端还没对上。本线不摘别人的未跟踪文件来压红、也不替它改类型。**闭合判据**：那两处对齐提交后重跑 `pnpm -r --no-bail build`，读到"失败包清单为空"才算这一格关；`apps/web` 那枚红不关，`tsc -b` 就走不到 `vite build` ⇒ `apps/web/dist` 打不出来，四端里"把共享 UI 产物装进各端包"那一档**结构上做不了**（与"设备搁置"是两条独立的挡路，别合成一条）。
 
-- [ ] 🔴 **10-09 15:5x 在 `08d67071` 上把上面那四条逐条重量**（`git rev-list --count 61126d7d..HEAD` = **4**：本线 1 笔 + 别线 3 笔）—— 四条**全部仍然真**，而第三条今天多量出了三件事，使它的修法从"等那条线拍"变成"照着做就行"：
+- [x] 🔴 **10-09 15:5x 在 `08d67071` 上把上面那四条逐条重量**（`git rev-list --count 61126d7d..HEAD` = **4**：本线 1 笔 + 别线 3 笔）—— 四条**全部仍然真**，而第三条今天多量出了三件事，使它的修法从"等那条线拍"变成"照着做就行"：
     ⚠️ **10-18 r125 复量（`29521b78`，只含已提交内容的干净检出真跑）**：这一格点名的那枚原因已经换了位置 —— 装那一半现在 rc=0，打不出包那一半**当时**换成两条新原因（`packages/app-host` 的两枚生产者还停在索引里没提交、`packages/ui` 的 `CommentView` 少 `id`）。逐条读数与归属见下面「r125」那一格。
         🔴 **10-20 00:5x r151 再复量：连"打不出包"那一半也关了** —— 当前 `HEAD` 上 `NO_COLOR=1 pnpm -r --no-bail build` ⇒ **`BUILD_RC=0` / `Done` 20 / `Failed` 0**
         ⇒ 这几格题面里"HEAD/main 打不出包"那句**现在谁写谁错**（当时的两条新原因与归属照旧留在 r125 那格里，是考古不是现状）。
@@ -1722,6 +1737,11 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
       - **(b) 那格要求的前置判据（"动手前要先有一条 AAD 字节对账判据"），现量确认它现在不存在**：`apps/web/tests/share-key-store.spec.ts` 在 `HEAD` 里已入库、82 行 / **5 条用例**，逐条枚举过（wrap→unwrap 往返、落盘是密文、rekey 覆盖同 shareId、错口令解不开、removeShareKey 与坏 JSON）—— 五条全是**同一个 builder 自己往返**，没有一条写死密文常量，`git grep -n entityType -- apps/web/tests/share-key-store.spec.ts | wc -l` = **0**（⚠️ 别写成 `git grep -c entityType`：无命中时它**打印空并 rc=1**，"0"与"这条命令根本没跑"在输出上长得一样 —— §7 那条"计数为 0 与一条没跑长得一样"的同一族，这一格就是它的新实例）⇒ 把 `entityType` 改成别的值，这五条照样全绿，而本机已存的共享信封从此解不开（该文件注释自己写明它只用于本地自洽校验、不参与线上协议，坏的正是**存量本地数据**）。⇒ 出路（甲）动手的人必须先补这一条，否则就是那格警告过的"改一个字段名 = 让存量密文永久解不开"。
     - ④ 提醒那一半仍未入库，⚠️ **但我 23:4x 记下的那条命令现在会给出假读数，当场撤回它的形状**：`git grep -c dispatchChecked HEAD` 现量 **6**，`git grep -l dispatchChecked HEAD` 只回 **1 枚文件** —— 就是这份台账自己；打到代码路径才作数：`git grep -c dispatchChecked 08d67071 -- 'packages/*/src' 'apps/*/src' 'server/src'` = **0** ⇒ 代码里仍然没有。⇒ **一条"代码里有没有 X"的判据，一旦这个 X 被写进文档，无路径计数就变成自我污染的尺**（上面那条「判"代码里有没有"必须打到 `-- apps/web/src`」从今天起不是建议而是必须，而**这一格就是它的新证据** —— 我 23:4x 记的就是无路径形式，它现在会报 6）。取现量的正确形式：`git grep -c dispatchChecked <ref> -- 'packages/*/src' 'apps/*/src' 'server/src'`。
     - ⑤（与 `61126d7d` 那格同形状的第 2 条）`git show 08d67071:e2e/tests/helpers.ts | grep -c selectSettingsSection` 仍 **0** ⇒ 账号线那份**已提交**的 spec 在干净检出上仍然编译不过。这一格与 ② 一起构成"main 现在不可用"的全部内容，都不是本线能落的。
+    ✅ **10-20 01:2x r155 复量：这五条里四条作废、第五条那把尺失效，本格打勾**（载体 = 主检出、整树零脏；读数与上面两格同批取的）。
+    ① 锁 ↔ 清单同 ref 两侧都是 **2** ⇒ 一致（这一格当时是 2 ↔ 0）；② `git status --porcelain -- packages/ui/src` **0 行**（当时 42 ` M` + 11 `??`）；
+    ③ `check:layering` 现跑 **rc=0**，其 (a) 那半"app-host 44 枚含 barrel"→ **0 枚**；⑤ `selectSettingsSection` 在 `HEAD` 命中 **4**（当时 0）。
+    ④ 🔴 唯一那条**不能读成"仍然真"**的是 `dispatchChecked`：needle 在 `HEAD` 与工作树**都是 0** ⇒ 两边同值、这把尺不再判事，
+    而提醒投递在 `HEAD` 里是 `reminder-delivery.ts` 的 `reconcileReminderDelivery`（对账式）。这一件上面 `61126d7d` 那格已写全，本格不重述。
 
 - [x] ✅ **10-18 r125：上面那一族六格第一次拿到"只含已提交内容 + `--frozen-lockfile`"的直接读数 —— 装那一格作废，打不出包那一格仍然真，但两条原因都换了**（本线名下第一枚这样的读数；之前每一格都是带限定词的：要么钉在旧提交、要么 `cp -al node_modules`、要么改用不带 `--frozen-lockfile` 的装法）
     - **载体**：`/Users/rocalight/heyta-carriers/head-r123`（`git worktree add --detach`，跑完留作复用，**没有** `cp -al` 硬链别人的 `node_modules`，是这棵自己 `pnpm install --frozen-lockfile` 装出来的 1.1 G）。基线先钉在 `8aa2bd53`（装完 1 h 11 m 时 main 已经走了 29 笔），随后 `git checkout --detach 29521b78` —— ⚠️ **这一步不需要重装**，因为现量 `git diff --stat 8aa2bd53..29521b78 -- pnpm-lock.yaml package.json pnpm-workspace.yaml` **输出为空**，29 笔里没有任何一笔动依赖图。
@@ -4935,6 +4955,17 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
       现在 9 处失败支都先删提醒、再按逐字标题删任务。
       **不证**：暗档没重跑（这枚是时刻算术，r144 已量过外观维不影响这块界面的形状）、Android / 桌面端没重跑（设备腿只有 iOS 这一枚装置）、
       连按两次的累加只在单测里。读数与图在 [`apps/mobile/evidence/ux-final-20261018/ios-reminder-block-r145/RESULT.md`](../../apps/mobile/evidence/ux-final-20261018/ios-reminder-block-r145/RESULT.md)。
+- [x] ✅ **10-20 01:2x r155 第九趟四端重装：mac 端从含 r153 那枚改动的源码重打重装，`REINSTALL_RC=0`**
+    （`HEYTA_REINSTALL_TMP_DIR=~/heyta-reinstall/r155-mac NO_COLOR=1 bash scripts/reinstall-all.sh --only mac`；落点在仓外独立目录，同 r146/r148 那两趟避开固定 `/tmp` 互相覆盖那一枚坑）。
+    逐条判据读数（都来自这趟真跑，不是"源码改了所以产物一定改了"）：前置 `pnpm -r build` ✅ → `@heyta/web` build ✅（web-dist 晚于 workspace dist）→
+    清旧包（该输出目录**首次运行、清空前不存在**，如实记着）→ 打 `.app` + `.dmg`（含"打包即启动"的自截屏验证）→ 装进 `/Applications/Heyta.app` →
+    **安装对账**：`.app` 里的 web-dist 与本机 `apps/web/dist` 是**同一次构建**（9 个 chunk）→
+    窗口 **2318×1508**、共享 UI 内容占比 **100.0%**、**heyta 主蓝命中 997**（两把尺分别打在 `heyta-reinstall-mac-installed.png` 与 `.webview.png` 上）。
+    ⚠️ **这一趟只覆盖 mac 一端**：`--only mac` 的汇总里 windows / android / ios 三端各自写着"**没有**验证当前产物"—— 那三端**没有**走这趟的判据。
+    iOS 那一端此刻装的**确实**是含 r153 改动的件（01:0x 从当前工作树重打、`main.jsbundle` sha256 前 16 = `ca3a09257bdfba19`、升级式重装进共享载体），
+    但那是**装机态那一腿**顺手带出的读数，不是这趟 `reinstall-all` 的判据 ⇒ 两件事不许并成一条，也不许由 mac 这一枚绿推成"三端里两端已过"。
+    🔴 windows / android 两端仍堵在打包机不可达（10-20 01:0x 现量 `ssh -o ConnectTimeout=6 -o BatchMode=yes windows-pc true` ⇒ **rc=255**、`adb devices` 空），
+    规则不许退回本机跑 Gradle ⇒ **"四端全过"这句现在仍然不成立**。
 - [x] ✅ **10-19 22:4x r146 mac 端重装：r145 那枚共享层改动补上第三个端**（`bash scripts/reinstall-all.sh --only mac`，`REINSTALL_RC=0`）
       r145 改的是 `packages/app-host`（四端共用的 `dist`）⇒ 上一格登记时说清"mac / windows / android 三端产物对它过期"，这一格先补 mac。
       前提现量：跑前跑后工作树 clean、`HEAD` 同一枚（`git log --grep 'r145' --oneline -1` 现取，别抄本页任何 SHA）。

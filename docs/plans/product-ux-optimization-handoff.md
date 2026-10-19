@@ -614,6 +614,17 @@ PY
     · 🔴 那一趟顺带量出一枚**新的候选缺陷（未裁决，台账已另立一格）**：欢迎页那枚「先离线使用」/ `Use offline for now` 字面读起来像"先看看"，
       做的却是"把这台只用本机记成已作过的选择"（从此首屏那张卡不再出现，只能去设置面「重新作出选择」）。
       与 r153 那枚的区别：✕ 什么都不记（已证），这一枚记了但话听起来像没记 —— **这一枚是产品取向题，要负责人拍**，本线不代裁。
+14. ✅ **10-20 01:2x（r155）两件收口：mac 端第九趟重装绿了，那三格"等别人落地"的考古项全部作废并打勾**。
+    · mac：`HEYTA_REINSTALL_TMP_DIR=~/heyta-reinstall/r155-mac bash scripts/reinstall-all.sh --only mac` ⇒ `REINSTALL_RC=0`，
+      判据是"`.app` 里的 web-dist 与本机 `apps/web/dist` 同一次构建（9 个 chunk）"+ 窗口 2318×1508 + 内容占比 100.0% + **主蓝命中 997**。
+      ⚠️ 汇总里 windows / android / ios 三端各写着"**没有**验证当前产物"—— iOS 此刻装的确实是含 r153 的件，但那是装机态那一腿顺手带的读数，不是这趟的判据。
+    · 🔴 **一条对下一位最省时间的现量**：整棵工作树此刻**零脏**（`git status --porcelain | wc -l` = **0**）。
+      那三格（`d5d49540` / `61126d7d` / `08d67071` 上量的）点名的每一半都已经换了世界：`packages/ui/src` 从 42 ` M` + 11 `??` → **0**、
+      `packages/app-host` 从 44 枚（含 barrel）→ **0**、`check:layering` 现跑 **rc=0**（AAD 已搬进 `packages/app-host/src/share-key-identity.ts`，在 `HEAD` 里）、
+      `selectSettingsSection` 在 `HEAD:e2e/tests/helpers.ts` 命中 **4**、锁与清单同 ref 两侧都是 **2**、`reminder-notify-request-failed` 在 `HEAD` 命中 **1 枚文件**。
+      ⇒ **以后谁再引用"别线在飞所以本线做不了"，必须先重跑 `git status`** —— 这一族第三次命中（前两次记在 r149 那一格与 §7）。
+      ⚠️ 唯一一条**不能读成"仍然真"也不能读成"已入库"**的是 `dispatchChecked`：needle 在 `HEAD` 与工作树**都是 0**（两边同值 = 这把尺不再判事），
+      而提醒投递在 `HEAD` 里换成了 `reminder-delivery.ts` 的 `reconcileReminderDelivery`（对账式）。要重判得按新符号另立判据，本线不替那条线造尺。
 
 ⚠️ 这一段只收**本轮 Goal 那五步**还挂着的部分 —— 其余欠项照 §四 逐行读，那里每一行都写了"在谁手里 + 一条命令"。
 🔴 延续 §一 那两条负责人指令：**不许向负责人发任何表单/确认动作、汇报不许以问句收尾**；Goal 保持开着（到 100 轮由系统自动暂停），
