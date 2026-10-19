@@ -518,3 +518,44 @@ performance.getEntriesByType('resource').filter(n => !window.__netBefore.include
 **反哺**：这一条已写进 skill 的通道能力边界
 （`portal-form-filling/references/chrome-applescript-channel.md` 的
 「2026-10-19 补测」小节）—— 那里原先把这类控件标成"**仍属未测，别外推**"，现在成了**已证实**。
+
+### 8.9 Bing 站长平台：站点**已添加**，验证**待重试**（附一条通道族对照）
+
+**这趟是"能做"的**：Bing 的 Fluent UI 按钮是普通 `<button>`，**裸 `.click()` 就打动了** ——
+与 GSC 的 Wiz `div[role="button"]`（§8.8：连完整指针序列 + 时间间隔都不行）形成直接对照。
+⇒ 印证 §8.8 的结论：卡点从来不是"能不能发合成事件"，而是**控件族**。
+
+**做成的三步（全部后台，未抢前台）**：
+
+| 步 | 动作 | 读数 |
+|---|---|---|
+| 1 | 填 `#TextField30`（"Enter your site URL"）→ 点 `Add` | 应用进到 `?siteUrl=https://heyta.waytofuture.cn/&state=verifySite`（**点击生效**） |
+| 2 | 取 token：**页面内 `fetch`** Bing 自己的下载地址 `https://www.bing.com/webmaster/BingSiteAuth.xml?url=…`（同源、带 cookie） | 回 `<?xml …?><users><user>8028DC89…BAAF</user></users>`（**没有落任何文件到磁盘**） |
+| 3 | 逐字节落成 `apps/landing/public/BingSiteAuth.xml`（85 字节、含制表符、**无结尾换行**）→ 提交 → 发布 | `check:entries` 不受影响（它不是生成物，见 §8.7 的纪律）；发布 **九步全过、线上验收 45 项全绿**；线上 `GET /BingSiteAuth.xml` **200 / 85 字节 / 内容一致** |
+
+📌 取 token 的手法值得复用：`execute javascript` **不能 await Promise**，所以分两步 ——
+先投递 `fetch` 并把结果写进 `window.__bingXml`，**下一轮**再回读那个变量（同一次调用里拿不到）。
+
+**🔴 验证状态：`Not verified`，需重试。** 点 `Verify`（`button[data-tag="xmlVerifyButton"]`）后，
+应用回到站点列表，那一行显示：
+
+```
+https://heyta.waytofuture.cn/   |   4 minutes ago   |   Not verified   |   Verify now
+```
+
+最可能是**竞态/缓存**：Bing 早先探过一次那时文件还不存在，验证请求可能吃到了缓存的 404
+（我点 Verify 之前已 `curl` 确认文件 200，所以不是"文件没发出去"）。⇒ 重试即可。
+
+⚠️ **我在这里误报过一次成功**：判据写成 `/verified/i.test(body)` 会命中 **"Not verified"** 与
+内联资源包里的 `UserMgmt_VerifiedAdminTitle` 之类字面量。判状态要读**那一格**，
+并且**带否定前缀一起断言**（`/Not verified/` 与 `/(?<!Not )verified/` 两头都要看）。
+
+**为什么此刻停手**：Bing 的 React 根 `.appRoot` 在**隐藏标签页里 `children.length === 0`、
+`innerHTML` 0 字节** —— 它的应用**确实**按可见性门控渲染（⚠️ 与 GSC/Wiz **相反**，
+Wiz 浮层在隐藏标签里照样完整渲染；所以"后台标签不渲染"**不能一刀切**）。
+⇒ 继续只能在窗口可见时做。
+
+**等你的一个动作（任一即可）**：
+- 把 Chrome 切到前台一会儿（哪怕几秒）——我会**立刻后台**点 `Verify now` 并读状态；
+- 或者你自己点一下那一行的 **`Verify now`**。
+之后我做：提交 sitemap（Bing 的「Sitemaps → 提交」）、开启 IndexNow 联动（键已注册、提交已通，见 §8.5）。
