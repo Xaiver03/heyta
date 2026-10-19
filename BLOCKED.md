@@ -11500,6 +11500,12 @@ PROBE hitChain div.ht-content → main.ht-main → div.ht-app → …
 
 ⑤ **对甲/乙/丙三选一的影响**：乙（"这档此刻在生产上真收到钱了，所以要么补交付要么先禁售"）**今天拿不出证据** —— 配置层已证未接通，而"真接通"那一层没查。但"未接通"不等于"已禁售"：仓内禁售清单是空的（现量 `sed -n '120p' server/src/billing/price-book.ts` ⇒ `export const NOT_YET_DELIVERABLE_SKUS: Readonly<Record<string, string>> = {};`；ADR-0054 摘掉了那一条，机制与调用点仍在），价目表两枚条目都还在（现量 `grep -c "priceId: 'hosted-ai-monthly'" server/src/billing/price-book.ts` ⇒ **2**，即 CNY 与 USD 各一枚 `amountMinor: 1_200` ⇒ ¥12 档）。⇒ 甲（撤掉那两枚按钮）与丙（保持现状、把对外口径写成"支付暂未开放"）**仍要负责人拍**；本格新增的事实只有一条：**今天不存在"收钱不交付"的活路径，存在的是一条"点了没结果"的路径** —— 而那正是这把尺自己报出来的形状：尺正文那句「不放按钮比放一个没反应的按钮好」在 `scripts/check-payment-entry.mjs:238`（现量 `grep -n 不放按钮比放一个没反应的按钮好 scripts/check-payment-entry.mjs`），文件头第 8 行还有一句同义的话「一个点了没反应的购买按钮，比没有按钮更坏」，并注明它当时「只是**一句注释**」—— 这把尺就是那句注释后来的强制版。
 
+**B223 追记四（2026-10-20 00:1x，本会话 · 更正：上一格 ⑤ 把「甲／乙／丙」三个选项名接错了，这格把定义改回 B223 本体的原文）**：
+① 三档的原定义逐字在 **B223 本体与追记二**（现量 `grep -n '\*\*B223' BLOCKED.md` 定位这几格）：**甲 = 把 `'hosted-ai-monthly'` 放回 `NOT_YET_DELIVERABLE_SKUS`**（只动售卖面，与接收面无关 —— 追记①末段已把两面分开），**代价 = 追记二 臂 C 量出来的那两条**：只放回清单不够，还要把 `docs/reference/pricing-and-entitlements.md` 里的 `"enforcement"` 从 `enforced` 改回 `not-implemented` 门才回 rc=0，而那枚声明与代码相反（`server/src/ai/metering.ts` 在场）；**乙 = 接受"卖得出，但交付证据按戳念"**；**丙 = 另给口径**。
+② 上一格 ⑤ 写成的"甲（撤按钮）／丙（保持现状＋对外写'支付暂未开放'）"**不是这三档里的任何一档**：撤那两枚付款入口件属 **B226** 那一格（第 1 腿链里 `check:payment-entry` 那枚红，归支付线，本线只登记）；"对外口径怎么写"属 **AC-7 对外措辞**那一格（本线没拍、也不该顺手替它定）。⇒ 读 ⑤ 请按本条 ① 替换，旧句留着当样本（同第 76 条 ④ 那条纪律）。
+③ **失法形状（不作读数）**：⑤ 之所以错，是因为落笔前我只回读了交接书 §7 那一行的**缩写**（那行印的是「甲 放回禁售清单／乙 接受…／丙 另给口径」），我抓了"甲/乙/丙"三个字母就当选项内容用了，没回读 B223 本体与追记二原文。⇒ **引用别人给的选项名，必须回读定义所在那一格原文**；把缩写当内容正是 **B224** 那一族（"结论句被抄成现状"）的正身。
+④ 上一格的 ①②③④ 四段（今日尺读数、逐枚归因、这把尺能证到哪层、证不到哪层）与本条无关，**仍然成立**；本条只换掉 ⑤ 里那三个字母所指的东西。
+
 🟡 **B224（2026-10-18 01:1x，本会话 · B223 顺链查出的"结论句被抄成现状"一族，逐枚清单与归属已取齐；那一族此刻正被别线重扫，本线不代改）**：ADR-0023 那句硬约束 `计量存在之前 hosted-ai-monthly 不得被售卖` 在 HEAD 上散成多枚，而**判据真身在代码里且方向已经翻了**：`docs/reference/pricing-and-entitlements.md` 的 `"enforcement": "enforced"`，`scripts/check-ai-quota-consistency.mjs` 只在 `not-implemented` 时才要求文档含"不得被售卖"（第 211 行那把锚），反过来在 `enforced` 下**清单里还留着这一档就判红**。取法（枚数只从这条读，别抄任何一句话里的数）：`grep -rn '不得被售卖\|收钱不交付' --include='*.md' --include='*.mjs' --include='*.ts' . | grep -v '/node_modules/' | grep -v AGENTS.md.bak | grep -v '^\./\.worktrees/'`。
 
 **逐枚分档（只三档，档内逐枚点名）**：
