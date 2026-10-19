@@ -218,10 +218,21 @@ test('sitemap 里**每一条**都真的 200（改了兜底最容易在这里漏�
  */
 test('IndexNow 键文件线上可取，且内容逐字等于本机那一份', async ({ request }) => {
   const publicDir = fileURLToPath(new URL('../../apps/landing/public/', import.meta.url));
-  const keyFiles = readdirSync(publicDir).filter((f) => f.endsWith('.txt'));
+  /**
+   * 🔴 挑出键文件**用它自己的协议性质**，不靠"排除 robots.txt"这类白名单：
+   * IndexNow 的键文件按定义就是「一个 `.txt`，其内容等于它自己去掉后缀的文件名」。
+   *
+   * ⚠️ 我第一版写的是 `filter(f => f.endsWith('.txt'))` —— 于是 `robots.txt`
+   * 也被收了进来，判据因为**自己的探针**变红，而站点其实是好的
+   * （同一时刻 `curl` 那枚键文件回 200 / 32 字节 / 内容逐字一致）。
+   * 这类"红的不是被测对象"的假红，正是本仓库元规则 1 的那一格。
+   */
+  const keyFiles = readdirSync(publicDir)
+    .filter((f) => f.endsWith('.txt'))
+    .filter((f) => readFileSync(`${publicDir}${f}`, 'utf8').trim() === f.replace(/\.txt$/, ''));
   expect(
     keyFiles.length,
-    `apps/landing/public/ 下的 .txt 应当恰好是那一枚 IndexNow 键文件，实际：[${keyFiles.join(', ')}]`,
+    `apps/landing/public/ 下"内容等于自己文件名"的 .txt 应当恰好一枚（那就是 IndexNow 键文件），实际：[${keyFiles.join(', ')}]`,
   ).toBe(1);
   const name = keyFiles[0] ?? '';
   const localContent = readFileSync(`${publicDir}${name}`, 'utf8');
