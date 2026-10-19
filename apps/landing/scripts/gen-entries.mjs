@@ -144,6 +144,39 @@ function ogImageFor(locale) {
 }
 
 /**
+ * 站点用的 BCP-47 标签（`zh-CN` / `en`）→ Open Graph 的 `language_TERRITORY` 形状。
+ *
+ * 🔴 **这份映射此前是入口生成里的一句内联三元表达式**；加上
+ * `og:locale:alternate` 之后就出现了第二个调用点 —— 于是抽成这一份，
+ * 并让它**对没登记过的语言响亮失败**（与 404 页那条换语言链接同一条纪律）：
+ * 内联三元遇到第三种语言会安静地把它当成中文，症状是那一页的 OG 卡片
+ * 声称自己是 `zh_CN` —— 而 OG 只被分享卡片的抓取器读到，人工几乎发现不了。
+ */
+function ogLocale(locale) {
+  if (locale === 'zh-CN') return 'zh_CN';
+  if (locale === 'en') return 'en_US';
+  throw new Error(`没有 ${locale} 对应的 og:locale —— 加语言时 ogLocale() 必须一起加`);
+}
+
+/**
+ * **恰好另一种**语言的 `og:locale`。
+ *
+ * 与 hreflang 说的是同一件事，但出口不同：hreflang 只给搜索引擎，而
+ * `og:locale:alternate` 给分享卡片的抓取器（Facebook / Slack / 微信读 OG）。
+ * 语言数不是 2 时直接炸，理由同 `ogLocale()` —— 安静地选中"第一种"会生成
+ * 一句在三种语言下都不对的话。
+ */
+function ogLocaleAlternateFor(locale) {
+  const others = LOCALES.filter((entry) => entry !== locale);
+  if (others.length !== 1) {
+    throw new Error(
+      `og:locale:alternate 只在恰好两种语言时成立，现在是 ${LOCALES.length} 种（${LOCALES.join(', ')}）`,
+    );
+  }
+  return ogLocale(others[0]);
+}
+
+/**
  * 一个页面的结构化数据（JSON-LD）。
  *
  * 两个类型，都只写**能被核对的事实**：
@@ -202,7 +235,8 @@ for (const page of SITE_PAGES) {
       .replaceAll('{{DESCRIPTION}}', escapeHtml(table[page.descriptionKey]))
       .replaceAll('{{CANONICAL}}', urlFor(page, locale))
       .replaceAll('{{ALTERNATES}}', alternatesFor(page))
-      .replaceAll('{{OG_LOCALE}}', locale === 'en' ? 'en_US' : 'zh_CN')
+      .replaceAll('{{OG_LOCALE}}', ogLocale(locale))
+      .replaceAll('{{OG_LOCALE_ALTERNATE}}', ogLocaleAlternateFor(locale))
       .replaceAll('{{OG_IMAGE}}', ogImageFor(locale))
       .replaceAll('{{OG_IMAGE_ALT}}', escapeHtml(table['site.og.imageAlt']))
       .replaceAll('{{JSONLD}}', jsonLdFor(page, locale, table));
@@ -372,6 +406,19 @@ artifacts.set(
     '',
     '  刻意**不列** `/app/`：它需要登录，见 robots.txt 的 Disallow。',
     '  也**不列**锚点（`#pricing` 之类）：锚点不是独立 URL。',
+    '',
+    '  🔴 **刻意不写 `<lastmod>`（2026-10-19 SEO 审计的结论）。** 不是忘了 ——',
+    '  这份文件是**签进仓库的生成物**，而 `gen-entries.mjs --check` 对它做',
+    '  **逐字节**对账。lastmod 只有两个可能的来源，两个都会把这条对账变成噪音：',
+    '    · 构建时刻 → 同一个 commit 在不同机器/不同时间生成出不同字节，',
+    '      `--check` 立刻红，而红的原因与"站点结构漂了"毫无关系；',
+    '    · `git log -1` 的提交时间 → 在浅克隆、无 `.git` 的容器、`git archive`',
+    '      送出的树上取不到或取到不同的值（同一类坑见 AGENTS §7 那条',
+    '      "送源码必须带 .git"）。',
+    '  而 Google 对 lastmod 的口径是"**持续且可核实地准确**才用"：',
+    '  不准的 lastmod 会被忽略，等于白写；把全站盖同一个日期尤其不准。',
+    '  ⇒ 要加它，先为"每一页的内容版本"定一个**单一事实源**（而不是从构建',
+    '  环境里现取），那是一件独立的事，不在生成器里顺手做。',
     '-->',
     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"',
     '        xmlns:xhtml="http://www.w3.org/1999/xhtml">',
@@ -394,11 +441,16 @@ artifacts.set(
     '# 推出来的 —— 手写它等于留一份"换域名时不会跟着变、也没有门禁会报"的抄件，',
     '# 而 `check:entries` 现在把它当生成物逐字节对账。',
     '#',
-    '# 为什么这个文件非有不可：`location /` 有 SPA 兜底（try_files … /index.html），',
-    '# 所以**任何不存在的路径都会返回 HTTP 200 + 落地页 HTML**。',
-    '# /robots.txt 也在此列 —— 爬虫拿到的是一份 HTML，而不是"没有 robots"。',
+    '# 为什么这个文件非有不可：**历史形状**下 `location /` 有 SPA 兜底',
+    '# （`try_files … /index.html`），于是任何不存在的路径都返回 HTTP 200 + 落地页 HTML ——',
+    '# /robots.txt 也在此列，爬虫拿到的是一份 HTML，而不是"没有 robots"。',
     '# 那比没有 robots.txt 更坏：没有文件时爬虫用默认全站可抓，给它 HTML 反而是一次解析失败。',
-    '# （站点文件里已加 `location = /robots.txt { try_files $uri =404; }` 兜住这种情况。）',
+    '#',
+    '# ⚠️ 2026-10-19 SEO 审计之后，整站兜底已改成诚实 404（`server/deploy/nginx/',
+    '# heyta.waytofuture.cn.conf` 的「站点兜底」段），所以上面那段说的是**当时的形状**：',
+    '# 现在这个文件的必要性不再依赖"兜底存在"，而是因为它**必须存在**才谈得上给爬虫',
+    '# 一条 Sitemap 指路；站点文件里那条 `location = /robots.txt { try_files $uri =404; }`',
+    '# 仍然保留，用来把"这两个文件不许被任何兜底接管"钉成一条局部规则。',
     '',
     'User-agent: *',
     'Allow: /',

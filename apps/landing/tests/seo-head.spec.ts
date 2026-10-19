@@ -2,8 +2,10 @@
  * 全部入口的「头部契约」
  * ========================
  *
- * 站点是"多 HTML 入口"架构：每个页面 × 每种语言 = 一份真静态 HTML，
- * 现在 7 × 2 = 14 份。它们的 `<head>` **全部由 `scripts/gen-entries.mjs`
+ * 站点是"多 HTML 入口"架构：每个页面 × 每种语言 = 一份真静态 HTML。
+ * **份数刻意不写在这里** —— 这条注释曾经写"现在 7 × 2 = 14 份"，
+ * 而注册表涨到 38 页 / 76 份之后它就成了假话（要现量：条目数从 `SITE_PAGES`
+ * 与 `LOCALES` 算，见下面的 `ENTRIES`）。它们的 `<head>` **全部由 `scripts/gen-entries.mjs`
  * 从 `entry-template.html` + `src/site/pages.ts` 生成**，所以这里查的不是
  * "有没有写对"，而是**"生成器有没有把该派生的东西派生出去"**：
  *
@@ -22,7 +24,7 @@
  * `SITE_PAGES` 读，于是"加了第八页忘了补测试"不可能发生。
  *
  * ⚠️ 与 `theme-contract.spec.ts` 的分工：那个只管主题引导脚本要同步执行、
- * 且不依赖样式表。本文件补的是"**14 份入口的引导脚本逐字相同**"——
+ * 且不依赖样式表。本文件补的是"**全部入口的引导脚本逐字相同**"——
  * 因为"只改了主入口"正是这类站点最容易发生的一类漂移。
  */
 
@@ -313,6 +315,37 @@ describe('入口文件是生成物，不是手抄的', () => {
       expect(html).toContain('gen:entries');
     }
   });
+
+  it('🔴 生成物里不许残留**没被替换**的占位符', () => {
+    /**
+     * 这是本生成器最安静的一种坏法：给 `entry-template.html` 加一个
+     * `{{SOMETHING}}`，却忘了在 `gen-entries.mjs` 里 `.replaceAll()` 它 ——
+     * 于是那个字面量原样发到线上，出现在 `<meta>` 里、`og:title` 里，
+     * 或者 76 份入口的注释里。**没有任何一道既有闸会因为这件事变红**：
+     * HTML 合法、JSON-LD 合法、类型系统看不到它（它是一串字符串）。
+     *
+     * 判据的形状是**大写加下划线**（`{{OG_LOCALE_ALTERNATE}}` 这种），
+     * 而不是笼统的 `{{`：404 模板的说明注释里**故意**写着 `{{T:color.*}}`
+     * 这种形状（它讲的是另一个替换器 `fillTokens`），笼统匹配会对着注释变红 ——
+     * 而那种红会逼着下一个人把注释删掉，等于用假红换掉一条真判据。
+     */
+    const PLACEHOLDER = /\{\{[A-Z_]+\}\}/;
+    const targets = [
+      ...ENTRIES.map(({ page, locale }) => entryPath(page, locale)),
+      'public/404.html',
+      'public/en/404.html',
+      'public/sitemap.xml',
+      'public/robots.txt',
+    ];
+    for (const relativePath of targets) {
+      const text = readFileSync(resolve(APP, relativePath), 'utf8');
+      const leftover = PLACEHOLDER.exec(text);
+      expect(
+        leftover?.[0] ?? null,
+        `${relativePath} 里有没被替换的占位符 —— 往 entry-template.html 加了它，就要在 gen-entries.mjs 里 replaceAll 它`,
+      ).toBeNull();
+    }
+  });
 });
 
 describe('Open Graph / Twitter 卡片', () => {
@@ -351,6 +384,28 @@ describe('Open Graph / Twitter 卡片', () => {
   it('og:locale 与语言一致', () => {
     expect(readHead(SITE_PAGES[0], 'zh-CN').meta.get('og:locale')).toBe('zh_CN');
     expect(readHead(SITE_PAGES[0], 'en').meta.get('og:locale')).toBe('en_US');
+  });
+
+  it('🔴 og:locale:alternate 指向**另一种**语言，而不是把自己再写一遍', () => {
+    /**
+     * 这条与 hreflang 守的是同一件事，但**出口不同**：hreflang 给搜索引擎，
+     * `og:locale:alternate` 给分享卡片的抓取器（Facebook / Slack / 微信读 OG）。
+     *
+     * ⚠️ 断言必须落在**全部入口**上，不能只查首页：这七个 meta 是模板里
+     * 一行、由生成器逐页替换的，而"只替换对了一页"这种漂移在首页上永远看不到。
+     * 另有一条**反向**判据（alternate ≠ 自己那一页的 og:locale）：
+     * 写反了不会报错，卡片只是对英文语境宣称"这里只有中文"。
+     */
+    for (const { page, locale, label } of ENTRIES) {
+      const { meta } = readHead(page, locale);
+      const alternate = meta.get('og:locale:alternate');
+      expect(alternate, `${label} 缺少 og:locale:alternate`).toBeTruthy();
+      expect(alternate, `${label} 的 alternate 与自己的 og:locale 相同`).not.toBe(
+        meta.get('og:locale'),
+      );
+    }
+    expect(readHead(SITE_PAGES[0], 'zh-CN').meta.get('og:locale:alternate')).toBe('en_US');
+    expect(readHead(SITE_PAGES[0], 'en').meta.get('og:locale:alternate')).toBe('zh_CN');
   });
 
   it('🔴 og:image 是绝对地址、分语言，而且**那张图真的存在**', () => {

@@ -92,8 +92,10 @@ describe('pageFromPath', () => {
   });
 
   it('🔴 认不出的路径回落到首页，而不是抛错', () => {
-    // 旧链接、拼错的地址、将来被删掉的页面 —— 那时应当渲染首页
-    // （nginx 的 SPA 兜底本来也是这样），白屏是最坏的答案。
+    // 旧链接、拼错的地址、将来被删掉的页面 —— 那时应当渲染首页，白屏是最坏的答案。
+    // ⚠️ 这里的理由**不再是**"nginx 的 SPA 兜底本来也是这样"：2026-10-19 起整站兜底
+    //    改成了诚实 404（见 `src/site/paths.ts` 与 nginx「站点兜底」段）。
+    //    这个回落守的是**渲染树不白屏**，与"服务端同款"无关。
     expect(pageFromPath('/deleted-page').id).toBe('home');
     expect(pageFromPath('/featuresx').id).toBe('home');
     expect(pageFromPath('/feature').id).toBe('home');

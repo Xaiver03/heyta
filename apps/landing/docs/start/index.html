@@ -7,11 +7,14 @@
       pnpm --filter @heyta/landing gen:entries
 
   🔴 为什么是"生成"而不是"每页手写一份 HTML"：
-  站点有 7 个页面 × 2 种语言 = 14 份入口。手写的话，每一份都要自己写对
-  `<html lang>`、`<title>`、`<meta description>`、canonical、hreflang 三件套、
-  主题引导脚本 —— 六处 × 14 份 = 84 处可以漂移的地方，而**任何一处漂移都不是
-  报错，是静默地少收一份流量**（比如某页忘了 hreflang，那页的中英两版就会
-  互相抢排名）。生成之后这些地方各自只有一份，且 `seo-head.spec.ts` 会逐入口查。
+  站点是「每个页面 × 每种语言 = 一份入口」，**现量多少份由 `src/site/pages.ts`
+  与 `@heyta/i18n` 的 `LOCALES` 决定** —— 这里刻意不写数字：写过一次
+  "7 个页面 × 2 种语言 = 14 份"，而注册表涨到 38 页之后它就成了假话。
+  手写的话，每一份都要自己写对 `<html lang>`、`<title>`、`<meta description>`、
+  canonical、hreflang 三件套、`og:*`、结构化数据与主题引导脚本 ——
+  每一处 × 每一份都是可以漂移的地方，而**任何一处漂移都不是报错，
+  是静默地少收一份流量**（比如某页忘了 hreflang，那页的中英两版就会互相抢排名）。
+  生成之后这些地方各自只有一份，且 `seo-head.spec.ts` 会逐入口查。
 -->
 <html lang="zh-CN">
   <head>
@@ -57,6 +60,13 @@
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="heyta" />
     <meta property="og:locale" content="zh_CN" />
+    <!--
+      `og:locale:alternate` 与 hreflang 说的是**同一件事**（这一页还有另一种语言），
+      但出口不同：hreflang 给搜索引擎，这一条给**分享卡片的抓取器**
+      （Facebook / Slack / 微信读 OG，不读 hreflang）。少了它，中文页被分享到
+      英文语境里时，平台不知道还有一份英文版可挑。
+    -->
+    <meta property="og:locale:alternate" content="en_US" />
     <meta property="og:title" content="文档中心 · 开始使用 —— heyta" />
     <meta property="og:description" content="这一组回答两件事：装完不注册能不能直接用，以及任务·清单·标签·习惯这几个词在数据上各指什么。" />
     <meta property="og:url" content="https://heyta.waytofuture.cn/docs/start/" />
@@ -77,6 +87,17 @@
       🔴 **没有价格**：价格只在词条表里写一次，而 `check:pricing` 核对的是那四处。
       在 JSON-LD 里再写一遍价格，就是第五处 —— 而它在生成的 HTML 里，
       门禁扫不到，漂移了也没人知道。
+
+      🔴 **2026-10-19 SEO 审计逐条否决了下面四种"看起来该有"的节点**，
+      理由是同一个：**结构化数据必须与页面上可见的事实一致**（说了的要能核对）。
+      不要因为它们"常见"就顺手加回来 —— 每一条的否决理由都不同：
+
+      | 没加的 | 为什么不能加 |
+      |---|---|
+      | `BreadcrumbList` | 文档页**没有可见面包屑**（`DocsShell` 只有顶栏 logo→枢纽与一个首页链接）。给一个页面上不存在的层级做标记，属于"给搜索引擎看、给用户看不了" |
+      | `Organization` | 没有 ≥112×112 的方形位图商标（仓库里只有 SVG favicon 与 1200×630 分享卡），而 `logo` 缺了会报错、乱写会显示破图位；且 heyta 目前**不是一个已登记的组织实体** |
+      | `WebSite.potentialAction`（SearchAction） | 站内搜索是**纯前端**的（`DocsSearch`），没有可被抓取的搜索 URL 形状（没有 `?q=` 这类路由契约）。声明一个不存在的搜索端点就是编数据 |
+      | `Article` / `TechArticle` | 帮助文章**没有逐篇的发布/更新时间**，而这两个字段是这两个类型的承重字段 |
     -->
     <script type="application/ld+json">[
   {
