@@ -44,6 +44,15 @@ import type {
 /** 本 adapter 的 provider 名（与 `NormalizedPaymentEvent.provider` 同值）。 */
 export const PAYCENTER_PROVIDER = 'paycenter';
 
+/** 中心会投递的事件类型。**白名单**，不是"除了某一种都收"。 */
+export const EVENT_PAYMENT_SUCCEEDED = 'payment.succeeded';
+export const EVENT_PAYMENT_REFUNDED = 'payment.refunded';
+
+export const ACCEPTED_EVENT_TYPES: readonly string[] = [
+  EVENT_PAYMENT_SUCCEEDED,
+  EVENT_PAYMENT_REFUNDED,
+];
+
 /**
  * 汇付聚合收人民币。
  *
@@ -216,6 +225,17 @@ interface FulfillmentEvent {
   currency?: string;
   paid_at?: string;
   metadata?: Record<string, unknown>;
+  /**
+   * 只在 `payment.refunded` 上：**这一笔实际退回去多少**。
+   *
+   * ⚠️ 与 `amount` 不是一回事：`amount` 是**订单原额**，而退款可以只退一部分。
+   * 拿 `amount` 当退款金额会让产品按全额回收权益。
+   */
+  refunded_amount?: string;
+  /** 发起退款那方的退款单号 —— 认回本地退款行的唯一依据。 */
+  refund_request_id?: string;
+  /** 渠道给的退款状态。**由中心显式给**，不从事件类型假定成功。 */
+  refund_status?: string;
 }
 
 /** 元 → 分。中心发的是两位小数的字符串。 */
@@ -369,8 +389,14 @@ export const createPaycenterBillingAdapter = (
       } catch {
         return { ok: false, reason: 'malformed-body' };
       }
+      // 🔴 事件类型**白名单**：只列出来的这两种被处理，其余一律拒。
+      // 写成一个宽松条件是错的 —— 那等于让任何**还没人想过业务含义**的新事件
+      // 自动获得通过校验的资格。
+      // 显式的类型判定，不是装饰：它是下面 `event.event_type` 能被当作
+      // `string` 用的**唯一**依据（靠与字面量比较来收窄在改写成白名单后失效了）。
       if (
-        event.event_type !== 'payment.succeeded' ||
+        typeof event.event_type !== 'string' ||
+        !ACCEPTED_EVENT_TYPES.includes(event.event_type) ||
         event.source_system !== config.clientId ||
         typeof event.external_order_id !== 'string' ||
         event.external_order_id === '' ||
@@ -380,8 +406,59 @@ export const createPaycenterBillingAdapter = (
         return { ok: false, reason: 'unsupported-event' };
       }
 
-      const amountMinor = amountYuanToMinor(event.amount);
-      if (amountMinor === null) return { ok: false, reason: 'malformed-amount' };
+      // 退款通知**不读 amount**：那是订单原额，而退款可以只退一部分。
+      // 该读的是 refunded_amount —— 读错了会让产品按全额回收权益。
+      const isRefund = event.event_type === EVENT_PAYMENT_REFUNDED;
+      const amountField = isRefund ? event.refunded_amount : event.amount;
+      const amountMinor = amountYuanToMinor(amountField);
+      if (amountMinor === null) {
+        return { ok: false, reason: isRefund ? 'malformed-refunded-amount' : 'malformed-amount' };
+      }
+
+      if (isRefund) {
+        // 🔴 认不回是哪一笔退款就**拒收**。
+        //
+        // 一个订单可以有多笔退款，只给订单号认不出来；而 heyta 的退款行正是
+        // 按这个号索引的。编一个号去匹配等于把通知丢进一个不存在的位置。
+        const outRefundNo = typeof event.refund_request_id === 'string' ? event.refund_request_id.trim() : '';
+        if (outRefundNo === '') return { ok: false, reason: 'refund-without-refund-number' };
+
+        // 🔴 状态**由中心显式给**，不从"事件类型是 refunded"假定成功。
+        // toProviderRefundStatus 对认不出来的值回 'processing' —— 那是 fail-safe，
+        // 而 heyta 的纪律是"只有 success 才允许回收权益"，所以这里必须拒。
+        const status = toProviderRefundStatus(event.refund_status);
+        if (status !== 'success') return { ok: false, reason: 'refund-not-confirmed' };
+
+        return {
+          ok: true,
+          event: {
+            provider: PAYCENTER_PROVIDER,
+            // 同一笔退款的**不同状态**必须给出不同的键，否则后一个状态会被
+            // 前一个挡掉（heyta 的回调契约明写这条）。本仓目前只在确认成功后
+            // 投递，所以只有一个状态；把状态放进键里是为了那一天仍然是安全的。
+            providerEventId: `${event.event_type}:${event.external_order_id}:${status}`,
+            eventType: event.event_type,
+            occurredAt: now(),
+            externalSubscriptionId: null,
+            status: null,
+            currentPeriodEnd: null,
+            userId: null,
+            outTradeNo: event.external_order_id,
+            // 这一笔实际退回去多少（不是订单原额）。
+            paidAmountMinor: amountMinor,
+            // 🔴 退款通知**绝不带授予声明**：它是撤销，不是又一次授予。
+            // heyta 的契约也写着：有 refundNotice ⇒ 只更新退款行与权益。
+            oneTimeGrant: null,
+            refundNotice: {
+              outRefundNo,
+              // 中心这次不带通道退款 id；heyta 落库用 COALESCE，
+              // 所以给 null 不会把发起退款时存下的那个值抹掉。
+              providerRefundId: null,
+              status,
+            },
+          },
+        };
+      }
 
       // 用户 id 由下单时写进 metadata，中心原样回传
       const rawUserId = event.metadata?.user_id;

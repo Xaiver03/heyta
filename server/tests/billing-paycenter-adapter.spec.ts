@@ -357,3 +357,101 @@ describe('默认投影器（不注入也能工作）', () => {
     expect(r.event.paidAmountMinor).toBe(7);
   });
 });
+
+// =============================================================================
+// 退款已到账
+//
+// heyta 的契约（types.ts）写着：退款必须是**显式声明字段**，
+// 不能让通用层从"eventType 里有 REFUND"推断 —— 反过来的推断同样坏：
+// 任何一条我们没打算动的通知（撤销、对账、将来的争议）都会被误认成一次退款回收。
+// =============================================================================
+describe('payment.refunded', () => {
+  const refundBody = (over: Record<string, unknown> = {}) =>
+    eventBody({
+      event_type: 'payment.refunded',
+      refunded_amount: '30.00',
+      refund_request_id: 'heyta-refund-77',
+      refund_status: 'success',
+      ...over,
+    });
+
+  const verify = async (raw: string) => {
+    const a = makeAdapter();
+    const ts = '1776000000';
+    const idem = `payment-fulfillment:${CLIENT}:SS-ORDER-1`;
+    return a.verifyWebhook(Buffer.from(raw, 'utf8'), {
+      'x-platform-client': CLIENT,
+      'x-platform-timestamp': ts,
+      'x-platform-signature': canonicalSignature(
+        SECRET, 'POST', DEFAULT_WEBHOOK_PATH, Buffer.from(raw, 'utf8'), ts, idem,
+      ),
+      'idempotency-key': idem,
+    });
+  };
+
+  it('声明成 refundNotice，且**绝不**带授予声明', async () => {
+    const r = await verify(refundBody());
+    if (!r.ok) throw new Error(`应通过，实际 ${r.reason}`);
+    expect(r.event.refundNotice).toEqual({
+      outRefundNo: 'heyta-refund-77',
+      providerRefundId: null,
+      status: 'success',
+    });
+    // 🔴 带授予 ⇒ webhook 路由会再授予一次，而这是撤销
+    expect(r.event.oneTimeGrant).toBeNull();
+    expect(r.event.eventType).toBe('payment.refunded');
+  });
+
+  // 🔴 读错金额字段会让产品按**订单原额**回收权益。
+  // 订单 30 元、只退 3 元时，那意味着"用户只拿回一部分、东西却全没了"。
+  it('🔴 用 refunded_amount 而不是 amount（部分退款）', async () => {
+    const r = await verify(refundBody({ refunded_amount: '3.00' }));
+    if (!r.ok) throw new Error(`应通过，实际 ${r.reason}`);
+    expect(r.event.paidAmountMinor).toBe(300);
+  });
+
+  // 🔴 认不回是哪一笔退款就拒收。一个订单可以有多笔退款，只给订单号认不出来；
+  // 编一个号去匹配等于把通知丢进一个不存在的位置。
+  it('🔴 没有退款单号 → 拒收', async () => {
+    for (const bad of [undefined, '', '   ']) {
+      const r = await verify(refundBody({ refund_request_id: bad }));
+      expect(r.ok, String(bad)).toBe(false);
+      if (!r.ok) expect(r.reason).toBe('refund-without-refund-number');
+    }
+  });
+
+  // 🔴 状态**由中心显式给**，不从"事件类型是 refunded"假定成功 ——
+  // heyta 对认不出来的状态一律归成 processing，而只有 success 才允许回收权益。
+  it('🔴 状态不是 success（或缺失/认不出）→ 拒收', async () => {
+    for (const st of [undefined, 'pending', 'processing', 'weird']) {
+      const r = await verify(refundBody({ refund_status: st }));
+      expect(r.ok, String(st)).toBe(false);
+      if (!r.ok) expect(r.reason).toBe('refund-not-confirmed');
+    }
+  });
+
+  it('退款金额格式不对 → 拒收（错误码与支付侧分开）', async () => {
+    const r = await verify(refundBody({ refunded_amount: 'abc' }));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe('malformed-refunded-amount');
+  });
+
+  // 🔴 白名单：其余一律拒，不是"放宽成什么都收"。
+  it('🔴 未知事件类型 → 拒收', async () => {
+    for (const t of ['payment.disputed', 'payment.chargeback', 'refund.succeeded', '']) {
+      const r = await verify(refundBody({ event_type: t }));
+      expect(r.ok, t).toBe(false);
+      if (!r.ok) expect(r.reason).toBe('unsupported-event');
+    }
+  });
+
+  // 同一笔退款的**不同状态**必须给出不同的键，否则后一个状态会被前一个挡掉。
+  it('退款事件的幂等键把状态算进去（与支付事件的键不同）', async () => {
+    const refund = await verify(refundBody());
+    const pay = await verify(eventBody());
+    if (!refund.ok || !pay.ok) throw new Error('两条都应通过');
+    expect(refund.event.providerEventId).toBe('payment.refunded:SS-ORDER-1:success');
+    expect(pay.event.providerEventId).toBe('payment.succeeded:SS-ORDER-1');
+    expect(refund.event.providerEventId).not.toBe(pay.event.providerEventId);
+  });
+});
