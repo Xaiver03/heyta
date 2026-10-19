@@ -92,6 +92,8 @@ REMOVE = "reminder.a11y.remove"
 AFTER_ADD = ["scheduled", SNOOZE, DISMISS, REMOVE]
 AFTER_SNOOZE = ["snoozed", "scheduled", SNOOZE, DISMISS, REMOVE]
 AFTER_DISMISS = ["dismissed", "scheduled", "snoozed", REMOVE]
+# 这三 `want` 选中的是**状态徽标**那一枚节点（不是动作按钮），它们的 frame 高就是"单行还是被劈成两行"。
+PHASE_BADGES = ("scheduled", "snoozed", "dismissed")
 
 
 def label(key: str) -> str:
@@ -318,7 +320,7 @@ def main() -> int:
                                         timeout=a.timeout, evidence_dir=str(out)))
     title = f"Rem141{int(time.time())}"
     res: dict = {"startedAt": time.time(), "taskTitle": title, "appearance": appearance,
-                 "uiLocale": None, "taps": [], "shots": []}
+                 "uiLocale": None, "taps": [], "shots": [], "badgeShapes": []}
     dump(res, out)
 
     prompts_at_start = []
@@ -362,6 +364,29 @@ def main() -> int:
         dump(res, out)
         return ProbeError(message)
 
+    def check_badges(rows: list[dict], shot: str) -> None:
+        """状态徽标只许单行 —— 同一趟里各相徽标的 frame 高**只许有一种**。
+
+        r143 装机态英文档量到 `Scheduled` 是 `[24,380,53,28]`（一个词被逐字打断成
+        `Schedule` / `d` ⇒ 高 14→28），而同趟 `Snoozed` 是 `[24,382,47,14]` ⇒ 两种高度 ⇒ 红。
+
+        🔴 这把尺的射程要说清楚：它判的是**这一趟内**徽标行高是否一致，单趟里全部徽标
+        同时变两行的形状它照不出来 —— 那一维由中文档那一趟补（中文徽标本就单行，
+        跨档对账见证据目录的 RESULT）。字宽量不到是 jsdom 的天花板，不是这里的。
+        """
+        for r in rows:
+            if r.get("want") in PHASE_BADGES and r.get("present") and r.get("frame"):
+                res["badgeShapes"].append({"want": r["want"], "label": r.get("matchedLabel"),
+                                           "frame": r["frame"]})
+        heights = {b["frame"][3] for b in res["badgeShapes"]}
+        if len(heights) > 1:
+            probe.screenshot(shot)
+            res["shots"].append(shot)
+            dump(res, out)
+            raise fail(f"提醒状态徽标在一趟里量出两种行高 {sorted(heights)} ⇒ 有徽标把单词逐字劈开"
+                       f"（台账 r143 那格：英文 `Scheduled` 53×28 vs `Snoozed` 47×14）: "
+                       f"{res['badgeShapes']}")
+
     probe.tap((JU.open_task_label(title),), "open task detail")
     res["uiLocale"] = probe.ui_locale
 
@@ -395,6 +420,7 @@ def main() -> int:
                          f"{ax + aw // 2},{ay + ah // 2}, bound {add_guard.get('visibleBottom')}): "
                          f"{res['afterAdd']}")
     res["afterAdd"] = rows_for(probe, AFTER_ADD, clamp)
+    check_badges(res["afterAdd"], "02-badge-split")
     probe.screenshot("02-reminder-added")
     res["shots"].append("02-reminder-added")
     dump(res, out)
@@ -420,6 +446,7 @@ def main() -> int:
             raise fail(f"tapping {AX.label_of(node)!r} did not move the block into phase "
                              f"{phase!r}: {res[key]}")
         res[key] = rows_for(probe, reading, clamp)
+        check_badges(res[key], f"{shot}-badge-split")
         if want == SNOOZE:
             # 🔴 「推迟 10 分钟」不许把提醒往**过去**挪。按钮自己念出的时刻就是基准
             #    （`把 10-19 18:44 的提醒推迟 10 分钟`），按完之后那一行念的时刻必须更晚。
@@ -489,7 +516,7 @@ def main() -> int:
                       "tabBarTopOnListScreen": bar_top, "reminderSection": res["reminderSection"],
                       "emptyState": res["emptyState"], "afterAdd": res["afterAdd"],
                       "afterSnooze": res.get("afterSnooze"), "afterDismiss": res.get("afterDismiss"),
-                      "snoozeMove": res.get("snoozeMove"),
+                      "snoozeMove": res.get("snoozeMove"), "badgeShapes": res["badgeShapes"],
                       "removedBackToEmpty": removed, "taskDeleted": res.get("taskDeleted"),
                       "report": str(out / "reminder-block.json")}, ensure_ascii=False, indent=2))
     return 0
