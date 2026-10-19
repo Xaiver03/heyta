@@ -10690,3 +10690,22 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
       要么**一律改用 `run_in_tab_by_url.applescript`**（按完整 URL 定位，从形状上就没有这个单位问题）。
       这条与 §1 那条元规则同源：报错说"没有 id 为 1 的窗口"是真的，但它证明的是**我给的坐标不对**，
       不是"目标不存在"。
+
+492. 🔴 **「双语候选」是列表的形状，不是函数的形状 —— 装置里任何一枚只吃 `candidates[0]` 的调用，会让整条旅程在英文档静默退回单语**（2026-10-19 05:1x 本线现量，`scripts/qa/profile-settings-ios.py`）。
+    ⑴ 现场形状：那枚脚本的定位符早已中英成对（`("清单", "Lists")`），`check:locator-labels` 也绿，
+      但英文档跑到最后一步红：`could not scroll ('清单','Lists') into view: {'found':'False','scrollRc':'element-left-tree'}`，
+      而**前 22 步全绿**。机制在 `scroll_to` 里一行：`AX.scroll_into_view(..., wanted[0], ...)` —— 滚动那一枚调用只喂第一枚候选，
+      于是英文屏上它查的是树里**根本不存在**的「清单」。⇒ 红的是量具，不是被测对象。
+      同族第二处：`absent=("整理与记录",)`（禁的那行在英文屏上是 "Organize and capture"）—— 那是**永远不咬的空判据**，
+      它当时安全的前提是"英文档走不到这一行"；前提一取消，空判据就现形。
+    ⑵ **判据**：给旅程装置补双语时，逐枚函数问"它吃几枚候选"。`wait_for`/`tap`/`present` 吃整列表（会逐枚试），
+      `scroll_into_view` 吃一枚。改完要在**报告字段里留证**：`scroll lists entry` 现在记
+      `target=['Lists'] tried=['清单','Lists']` —— 只写 `target=['清单','Lists']` 就分不出"两枚都试了"与"只试了第一枚"。
+    ⑶ 同趟第二件事：**同一族三枚装置里只有一枚不起跳点**（`ai-face-ios.py`／`account-face-ios.py` 都 `terminate`+`launch`，
+      `profile-settings-ios.py` 没有）。后果不是"这一趟红"，而是**上一趟红在哪一屏，下一趟就从那一屏开始**：
+      反臂那趟红在设置模态里，紧接着的正常趟就死在"等首屏标签"，失败文本里可见 `'关闭','设置','偏好与账号'`。
+      ⇒ 无人值守连跑多趟时，每枚旅程装置必须自己造起跳点；靠"上一趟收在首页"是拿别人的收笔当自己的前置。
+    ⑷ 这一趟顺手把 `require_appearance` 的"声称"扩到 `*-dark` 结尾（原先只有末级名**恰好**等于 `light`/`dark` 才有牙，
+      所以 `english-dark/` 这种语言×档合一的目录名没有判据）。反臂现量：设备 light 时
+      `--evidence-dir .../mutation-arm-claim-dark` 回 `refusing to write…` 且**目录没被创建** —— 这种"红在没有落点"
+      的取证只能把命令本身记进 RESULT，别指望有 JSON 可看。

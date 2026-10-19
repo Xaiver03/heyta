@@ -4678,3 +4678,35 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
       `profile-settings-android.py` / `tasks-ux-android.py` / `ai-assistant-atomic-android.py` 三枚。
       ⇒ 本趟的"真包复验"只覆盖 iOS 一档；Android 那一档既缺装置、又缺出包载体（`windows-pc` 不可达），
       **别把 iOS 的读数外推成"两端都验过"**。
+
+- [x] ✅ **10-19 14:4x r140 个人资料/设置面装机态四格（中文×浅 · 中文×暗 · 英文×浅 · 英文×暗）—— 这一面第一次有英文档读数，而且是先把语言维判据补进装置之后取的**（台账那句「个人资料/账号/AI/帮助的剩余交互回归」里，个人资料这一面此前只有 r131 的中文两档，且拿的是旧件）
+      取证在 [`apps/mobile/evidence/ux-final-20261018/ios-profile-face-r140/`](../../apps/mobile/evidence/ux-final-20261018/ios-profile-face-r140/RESULT.md)（四格 20 张图 + 6 份 JSON + 两枚反臂）。
+      被测物与 r139 两面**同一枚件**：装进设备的 `Info.plist` mtime `2026-10-19 11:23:59`（载体 `head-r128` @ `997a1935`）；
+      装置 `scripts/qa/profile-settings-ios.py`（**本趟改过之后**的版本才跑出这四格）。四格各 23 步 `rc=0`，
+      `startedAt`→`finishedAt`：`current-source/` 1792388810.70→1792388846.18 · `dark/` 1792388749.75→1792388777.39 ·
+      `english/` 1792387235.99→1792387266.00 · `english-dark/` 1792388251.23→1792388285.60。
+      🔴 **这一格真正的交付是那枚装置，不是那四张图**：`settings directory` 那一步以前是**写死的中文候选**
+      （注释的理由是"单语才 fail-closed，语言不对不能伪装成 IA 通过"），后果不是英文档判得松，而是
+      **英文档整条旅程在设置目录那一步就断** ⇒ 这一面从来没有装机态英文读数。现在改成
+      `--language` 声明哪一档，就要求那一档**五枚分组标题整组在场**，不齐就红并回读"屏幕上哪一档整组在场"。
+      fail-closed 的性质由"整组齐"继承，不再由"只认中文"继承。**两枚反臂证明这把尺两头都能红**：
+      中文屏声明 en ⇒ `rc=1`、`visible on screen=['zh']`；英文屏声明 zh ⇒ `rc=1`、`visible on screen=['en']`
+      （两趟各 5 步后红，落点在 `mutation-arm-*/`）。这条是 #488 的续 —— 判语言档只看 AX 树里的标签，
+      系统域 `AppleLanguages` 不参与判定，而现在这件事**钉在装置里**，不再靠人记得去读树。
+      ⚠️ **同趟量出三处装置的病，都当场修了**（正文与复现都在 #492）：① `scroll_to` 把 `wanted[0]` 喂给
+      `scroll_into_view` ⇒ 双语候选在滚动那一位静默退回单语，英文档 22 步全绿只红在最后一步；
+      ② 这一面是三枚 iOS 旅程装置里**唯一不做 `terminate`+`launch`** 的 ⇒ 上一趟红在哪一屏，下一趟就从那一屏开始
+      （实测红过一次，失败文本里可见「关闭」「设置」）；③ `absent=("整理与记录",)` 在英文屏上是**永远不咬的空判据**，
+      它当时安全的前提就是①②那件"英文档走不到这一行"——前提取消后必须补。
+      **深浅档两把尺**：`require_appearance` 的"声称"从末级名恰好等于 `light`/`dark` 扩到 `*-dark`
+      （`english-dark/` 这类语言×档合一的名字以前没有牙），拒写臂现量 `rc=1` 且**目录没被创建**；
+      独立的像素尺逐张对：两格 light 全 252，两格 dark 为 28/12/28/12/12（五张按文件名 general/growth/my/settings-directory/sync）
+      ⇒ 两把尺同向。人看图 20 张里看 5 张（中英两档的设置目录、英文×暗的「我的」、英文的成长页），其余按像素。
+      门现量：`check:locator-labels` `rc=0`（`profile-settings-ios.py` 读到 90 组、含中文 51 ≥ 基线 44），
+      它披露的那 1 条"组内整片单语"是 `DIRECTORY_GROUPS["zh"]` —— 两档**必须**分开写（合写会让「常规」去配
+      "Sync and privacy" 而红），已把这条写进代码注释，别按披露去"补成对"。
+      ⚠️ **一条未裁决登记（本线名下，没顺手改）**：设备上英文 tab 栏渲染的是 `Categories`/`Profile`，
+      而 `ai-face-ios.py` 的 `TABS` 常量写的是 `Lists`/`Me` —— 两枚死字。今天不影响 `tab_top()` 的 `min()`
+      （同一行里 `Tasks`/`Calendar`/`Focus` 三枚命中），但那是候选表与真源的漂移；改它要重跑 AI 面四格才不算
+      "改了判据没取读数"，本趟只登记。
+      **不证**：这一面只读（不改设置、不导出、不清理、不登录）；四端仍不等于四端（windows/android 仍堵在打包主机）。
