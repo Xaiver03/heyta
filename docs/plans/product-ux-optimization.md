@@ -4631,8 +4631,9 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
       ② `headerNow` 从 `[]` 变成非空 ⇒ 中文两格 `["其他登录方式","收起其他登录方式"]`、英文格 `["Hide other ways to sign in"]`。
       ⚠️ **`headerNow` 中文回两枚不是"屏上有两行"** —— 那把尺是大小写敏感的子串在场判断，「其他登录方式」是「收起其他登录方式」的子串，
       而英文 `"Other ways…"` 首字母大写、对不上 `"Hide other ways…"` 里的小写 `other`。**名称的判据是 `toggleNode.AXLabel`（节点自己回的那一枚），不是 `headerNow`。**
-      读数（`apps/mobile/evidence/ux-final-20261018/ios-account-face-r139/`，三格 13/11/11 步全 passed）：
-      `current-source/` 中文×浅 · `dark/` 中文×暗 · `english/` 英文×浅，六张图逐张人眼看过 —— **可见文字与 `AXLabel` 逐字相同**。
+      读数（`apps/mobile/evidence/ux-final-20261018/ios-account-face-r139/`，**四格 13/11/11/11 步全 passed**）：
+      `current-source/` 中文×浅 · `dark/` 中文×暗 · `english/` 英文×浅 · `english-dark/` 英文×暗 ⇒ **深浅 × 中英这一枚控件的四格齐了**，
+      八张图逐张人眼看过 —— **可见文字与 `AXLabel` 逐字相同**。
       同一枚件上 AI 面 + 帮助面也重取了三格（`ios-ai-face-r139/`，各 20 步 passed），`startedAt`/`finishedAt` 两枚字段第一次被这枚脚本跑到（#486 的复验）。
       🔴 **本趟否证掉一把我自己伸手就用的尺**：判装机态语言档时我先量了 `simctl spawn … defaults read -g AppleLanguages`，
       它回 `zh-Hans-CN`，于是把一趟界面全英文的旅程标成了"中文档"。系统确实是中文、界面确实是英文，两件事同时为真 ——
@@ -4642,7 +4643,7 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
       另一条同趟量到的：`pod install` 会把两份 iOS `Info.plist` 重写（删掉文件头那段"键一个都不能少"的事故注释、重排键、补 `RCTNewArchEnabled`），
       载体收工时必然脏三枚且**不该提交**，而判"少没少键"要逐 key `plutil -extract`（本趟那份 `-21/+5` 的 diff 里 `HeytaWidgetKeychainAccessGroup` 只是挪了位置，
       `ITSAppUsesNonExemptEncryption` 在 HEAD／工作树／**装进设备的产物**三处都在）⇒ 进 **#489**。
-      ⚠️ **还欠的那格**：英文×暗在当前源码件上没跑（旧件 r137 跑过）；注册档那枚邮件链接按钮设备腿走不到（旅程落的是登录档），
+      ⚠️ **还欠的那格**（英文×暗已在 12:0x 补上，那一档不再是欠项）：注册档那枚邮件链接按钮设备腿走不到（旅程落的是登录档），
       那一支只有源码判据在守；**windows 腿仍堵**（`windows-pc` → `Host is down`、`windows-pc-lan` → 超时，11:45 现量）。
       🔴 **本趟顺手否证了"打包机全不可达"那句**：11:45 逐枚重量 `linux-dev`/`-mdns`/`-oob` → `Xaiver-linux` 可达、`ubuntu-jcli`/`finlaw` → `VM-0-17-ubuntu` 可达，
       只有 `linux-dev-lan` 超时（那台活着、LAN 别名不通，是已知形状）⇒ 早上 03:23 那一读是**瞬时读数**，不许当状态抄。
