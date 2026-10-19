@@ -113,6 +113,22 @@ python3 research/tools/verify-inbound-ac-battery.py --root .worktrees/inb-t10 --
 🟢 **这一格今天被"当场重跑"取代了**：10-20 00:46:43–00:47:49 在交付 tip `0bc4e2733` 上把 28 腿整串重跑了一遍（结论行 `legs=28 rc0=27 rc_nonzero=1`，唯一那枚非 0 是 `SCOPE-commit-scope`，即 B205 那一格，不是 AC 结论）。逐腿读数在 `docs/plans/inbound-automation.md` 的 **T8 第 32 条** 与 `~/.heyta-evidence/inb-t7-1017-0902/battery-1020-0046/`（`PROGRESS.md` 第 137 条同戳）。
 ⚠️ **本格以前写的是另一种东西，留在这里当形状示范**：它原先靠一句代理论证（"从 `528b4115c` 到 `refs/heads/main` 的非文档改动 0 枚 ⇒ 旧读数仍代表当前代码"）。那句**只在写下那一刻成立**（当时是 `5c274f496` 上 23:40:41 复算的），tip 一动就得重算 —— 能当场重跑就别用代理。要复算那半边仍然一条命令：`git diff --name-only 24d05137b $(git rev-parse refs/heads/main) > ~/.heyta-evidence/inb-t7-1017-0902/delta-check.txt; grep -c '^server/\|^packages/\|^apps/' <那份文件`（今天这戳回 **0**；⚠️ 别把清单落 `/tmp`）。
 下一位若动了代码，按 **#494** 那三层筛子判要不要重跑整串，别照抄本表第三列。
+🟢 **本表第二格那八串与装置在册名逐格对账成立**（10-20 01:22:42 现量：两侧集合各 **28** 枚、`comm -3` 回**空**；分桶 `AC1..AC8` ＝ 6/2/2/3/3/2/6/3，另加 `SCOPE` 1 枚＝28）。
+复账三条（**零执行，只比名单**；清单别落 `/tmp`）：
+
+```
+python3 research/tools/verify-inbound-ac-battery.py --root . --list | awk -F'\t' '$1 ~ /^(AC[1-8]|SCOPE)-/{print $1}' | sort > ~/.heyta-evidence/inb-t7-1017-0902/legs-register.txt
+awk -F'|' '/^\| (AC-[1-8] |范围尺)/{gsub(/[ `*_（]/,"",$3); n=split($3,a,","); for(i=1;i<=n;i++) if (a[i] ~ /^(AC[1-8]|SCOPE)-[A-Za-z0-9-]+$/) print a[i]}' docs/plans/inbound-automation-handoff.md | sort -u > ~/.heyta-evidence/inb-t7-1017-0902/legs-in-handoff.txt
+comm -3 ~/.heyta-evidence/inb-t7-1017-0902/legs-register.txt ~/.heyta-evidence/inb-t7-1017-0902/legs-in-handoff.txt
+```
+
+两向都可能差，含义不同：**少一枚＝那一格的复跑串漏了一腿**（静默少跑，装置自己不会报），**多一枚＝串里写了不在册的名**（那种串真去跑会 `rc=2`，见下面第三段）。
+⚠️ **第二行必须按逗号拆，不许按反引号拆**：那一格正文是**一枚 code span 整包着逗号清单**（`` `AC1-offline11,AC1-entitlement3,…` ``），
+拿 `` `名` `` 去 grep 只会命中首尾两枚 ⇒ 本会话 01:2x 第一稿就是这么抽的，抽出 **2** 枚、`comm` 报 **26** 枚"缺失"——
+**红的是抽法，不是台账**（与 #499 ⑤ 那把按行尾锚的尺同族，第三枚失法）。
+🔴 **换好的抽法有两臂**（01:22:42 现量）：从抽出的名单删一枚 ⇒ `comm` 回 **1** 行并点名 `AC7-license`；再补一枚假名 ⇒ 回 **2** 行、两向各点名；未变异 ⇒ 回 **0** 行。
+🟢 **串写错时装置自己拦得住**：`--only` 里给一枚不在册的标签 ⇒ **rc=2** ＋ `❌ --only 里这些标签不在册：['AC1-does-not-exist']`（01:20:42 实测；
+真名与假名混在同一串也回 **2**、一条都不跑）。⇒ 这八串不存在"拼错名字还静默少跑"的失法，会静默的只有"整腿漏在串外"那一形，所以上面那条集合对账才是有用的。
 
 ---
 
