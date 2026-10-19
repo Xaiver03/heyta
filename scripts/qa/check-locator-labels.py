@@ -72,10 +72,13 @@ CJK_GROUP_FLOOR = {
     # ⚠️ 这里只登记**下限**，不抄现量 —— 要读数就跑
     # `python3 scripts/qa/check-locator-labels.py scripts/qa/ai-face-ios.py` 看「含中文」那一栏。
     "ai-face-ios.py": 26,
-    # 账号面只读旅程（「我的」→ 注册 / 登录 → 展开/收起「或者用别的方式」→ 返回）。
+    # 账号面只读旅程（「我的」→ 注册 / 登录 → 展开/收起「其他登录方式」→ 返回）。
     # ⚠️ 同样只登记**下限**，不抄现量：要读数就跑
     # `python3 scripts/qa/check-locator-labels.py scripts/qa/account-face-ios.py`。
-    "account-face-ios.py": 22,
+    # 22 → 21 这一格的下限是 10-19 主动降的：那枚展开开关的 `accessibilityLabel` 原先钉死
+    # 「或者用别的方式」（与屏幕上那行不同句，环境陷阱 #487），改成跟着可见文字走之后
+    # 那枚键移动端不再读 ⇒ 装置里那组候选**必须**删掉（留着就是让同一份装置在两种件上都绿）。
+    "account-face-ios.py": 21,
     # 应用内语言开关那一枚装置：它的 `DIRECTORY_MARKS` 两档各写**一种**语态是刻意的
     # （到达断言位双语会让"界面根本没翻"也判过），所以这枚脚本的"组内整片单语"披露
     # 不是欠项 —— 别按披露去补成对，要按它自己的注释判。

@@ -23,6 +23,10 @@
  *      原样印在屏幕上（`translateIn` 对缺省的 vars 保留占位符），不报错。
  *   6. **口令不做客户端组成规则**：不 `trim()`、无 `maxLength`、不提前按长度拒绝。
  *      NIST SP 800-63B 明确禁止；静默截断比拒绝更糟。
+ *   7. **读屏念的就是屏幕上那行** —— RN 里容器带上 `accessibilityLabel` 会把子节点的可见
+ *      文字挤出无障碍树，所以名称写错第三种说法**不会有任何报错**，只有 VoiceOver 用户
+ *      听到的是另一句（注册档还会被告知"用邮件链接登录"而按钮做的是注册）。web 端不写
+ *      这个属性，两端不同形也是这一条在管。
  *
  * ⚠️ 判据一律先去掉注释再匹配（`codeOf`）：把一句调用**注释掉**来糊过判据，
  *    是这个仓库记过的第一种假绿（§7 第 50 条）。
@@ -306,10 +310,29 @@ describe('口令是主路，邮件链接与通行密钥退到「或者用别的�
   it('🔴 「或者用别的方式」这一组标题排在邮件链接按钮之前', () => {
     assertOrdered(
       code,
-      /t\('common\.auth\.form\.otherWays'\)/,
+      /t\('common\.auth\.form\.otherWays(?:Open|Close)'\)/,
       /t\('mobile\.auth\.magicLink\.login'\)/,
       '魔法链接仍和口令并排 —— 主路与第二条路在界面上没有区别',
     );
+  });
+
+  // 🔴 下面两条钉的是**读屏念到的是哪一句**。RN 里容器一旦带 `accessibilityLabel`，
+  // 子节点的可见文字就不再进无障碍树（真机实测：屏幕上「其他登录方式」，VoiceOver 念
+  // 「或者用别的方式」，展开后屏幕换成「收起其他登录方式」而名字一动不动）。
+  // web 端同一份表单不写这个属性，念的就是可见文字 ⇒ 两端不同形。
+  it('🔴 展开开关：无障碍名称与屏幕上那行取同一个表达式（钉死第三种说法就会红）', () => {
+    const label = /accessibilityLabel=\{([^{}]+)\}\n\s*aria-expanded=\{otherWaysOpen\}/.exec(code);
+    const title = /<SectionHeader icon="action\.more" title=\{([^{}]+)\}/.exec(code);
+    expect(label, '找不到那枚带 aria-expanded 的展开开关的 accessibilityLabel').not.toBeNull();
+    expect(title, '找不到那枚 `action.more` 段头的 title 表达式').not.toBeNull();
+    expect(label![1].replace(/\s+/g, ' ').trim()).toBe(title![1].replace(/\s+/g, ' ').trim());
+  });
+
+  it('🔴 邮件链接那枚按钮不许把名称钉死在登录那枚键上（注册档会说错动作）', () => {
+    // `label` 按 `mode` 切两枚键，而 kit 的默认就是 `accessibilityLabel ?? label`
+    // ⇒ 不写这一行才是对的；写了就把「注册新账号」念成「用邮件链接登录」。
+    expect(code).not.toMatch(/accessibilityLabel=\{t\('mobile\.auth\.magicLink\.login'\)\}/);
+    expect(/label=\{mode === 'sign-in' \? t\('mobile\.auth\.magicLink\.login'\) : t\('mobile\.auth\.magicLink\.register'\)\}/.test(code)).toBe(true);
   });
 });
 

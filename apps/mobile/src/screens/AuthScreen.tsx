@@ -864,7 +864,10 @@ export function AuthScreen({
       {/* 邮件链接与通行密钥现在明确是**第二条路**（规范 §3.2 ②a / ②b）。 */}
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={t('common.auth.form.otherWays')}
+        // 🔴 名称必须等于屏幕上那行：这枚 Pressable 一旦带 `accessibilityLabel`，子 `SectionHeader`
+        // 的可见文字就**不会**进无障碍树（真机实测：屏幕上写「其他登录方式」，读屏念「或者用别的方式」，
+        // 两态皆然，而 web 端同一份表单念的就是可见文字）。所以这里跟着 `otherWaysOpen` 换。
+        accessibilityLabel={otherWaysOpen ? t('common.auth.form.otherWaysClose') : t('common.auth.form.otherWaysOpen')}
         aria-expanded={otherWaysOpen}
         onPress={() => setOtherWaysOpen((open) => !open)}
       >
@@ -873,7 +876,9 @@ export function AuthScreen({
       {otherWaysOpen ? <>
       <Button
         label={mode === 'sign-in' ? t('mobile.auth.magicLink.login') : t('mobile.auth.magicLink.register')}
-        accessibilityLabel={t('mobile.auth.magicLink.login')}
+        // 不写 `accessibilityLabel`：kit 默认取 `label`（`ui/kit.tsx` 的 `accessibilityLabel ?? label`）。
+        // 原先这里硬写登录那枚键，于是**注册档**下屏幕上写「注册新账号」而读屏念「用邮件链接登录」——
+        // 说错的正是"按下去会发生什么账号动作"。
         onPress={() => {
           void (mode === 'sign-in' ? sendLoginLink() : register());
         }}
