@@ -613,3 +613,80 @@ GSC 那枚仍停在 `/welcome`（资源类型选择层还开着）；Bing 那枚
    读状态 → 提交 sitemap；
 2. 或你自己点那一行的 `Verify now`；
 3. GSC 二选一：Chrome 带 `--remote-debugging-port=9222` 重启，或点 3 下把 token 给我。
+
+### 8.11 用户授权切前台之后：**Bing 那一格做完了**；GSC 撞到 TCC 权限
+
+用户 2026-10-19 显式授权"直接切到前台来弄"，于是这一轮把 Chrome 顶到前台（收工时前台仍是 Chrome）。
+**结论先行**：切前台解决了 Bing，但**解决不了 GSC** —— 后者要的不是可见性，而是**可信事件**，
+而"发真实鼠标点击"需要一样我没有的东西：辅助功能（Accessibility）权限。
+
+#### 8.11.1 ✅ Bing：ownership 与 sitemap 两件都落地了
+
+**同一件事的四个一致信号**（⚠️ 诚实标注：**没有**任何一个页面直接印出过 "Verified" 这个词，
+所以下面是我能拿到的最强证据组合，而不是一句官方回执）：
+
+1. **Sitemaps 页接受并记录了我们的 sitemap**（Bing 只对已验证站点开放这个功能）：
+
+   ```
+   Sitemap URL                                  Last submit   Last crawl   Status      URLs discovered
+   https://heyta.waytofuture.cn/sitemap.xml     10/19/2026    -            Submitted   -   Processing
+   Known sitemaps 1 · Sitemaps with errors 0 · Sitemaps with warnings 0 · Total URLs discovered 0（处理中）
+   ```
+
+2. `?siteUrl=…&state=verifySite` **不再显示验证选择层**，而是完整站点面板（第 2 轮同一 URL 显示的是
+   `Not verified | Verify now`）。
+3. 站点切换器里列出 `heyta.waytofuture.cn`，**没有** `(Not verified)` 后缀
+   （资源包里那个模板串是 `"{0} (Not verified)"`）。
+4. 导航已是站点级完整工具集（Home / Search Performance / URL Inspection / Site Explorer / Sitemaps /
+   IndexNow / Backlinks / Keyword Research / Recommendations / Site Scan / User management …），
+   并出现"数据最长 48 小时处理完"的横幅。
+
+#### 8.11.2 ✅ 首轮一手数据：URL Inspection 读了 `/features/`
+
+```
+Bing Index:  Discovered but not crawled        （URL cannot appear on Bing）
+Discovered:  19 Oct 2026                        ← 就是今天
+Crawl:       "The inspected URL is known to Bing but has some issues which are preventing
+              indexation… If you think this URL should be indexed, click on Request indexing."
+Index:       "SEO/GEO processing can be done only on indexed URLs."
+```
+
+⇒ **Bing 今天已经发现了这个 URL**（与 sitemap 提交 / IndexNow 76 条提交同一时间线），
+**但还没抓取**。页面提供 `Request indexing` 按钮（**本轮未点** —— 留作下一轮的第一次动作，
+它可能吃每日配额）。这是 objective ④ 要的"首轮读数"。
+
+#### 8.11.3 ⛔ GSC：真实鼠标那条路被 TCC 挡住（`-25211`）
+
+思路是对的、也确实需要它：**让 OS 发真实鼠标事件**（`isTrusted: true`）就能打动 Wiz 那个按钮。
+于是先做**窗口 chrome 偏移的标定**（macOS 上 Chrome 的 `outerHeight === innerHeight === 962`，
+这条已知怪癖使"用 outer-inner 算工具栏高度"**不可用**），办法是：在页面上装一个只读 click 监听，
+用真实点击打一个**惰性文字**，让页面自己回报落点的页面坐标，反解偏移。
+
+**结果**：
+
+```
+$ osascript -e 'tell application "System Events" to click at {636, 417}'
+36:55: execution error: System Events got an error: DeepSeek Harness is not allowed assistive access. (-25211)
+```
+
+⇒ **DSH 宿主 App 没有"辅助功能"权限**，System Events 拒绝代发 UI 事件。
+这一类 TCC 授权**只能由用户在系统设置里勾**（自动化权限已给，辅助功能是另一档）。
+⚠️ 这也修正了一条容易想当然的结论：**"把窗口切到前台"≠"能以可信事件驱动页面"** ——
+前台解决的是**渲染**（Bing 那格），可信事件解决的是**控件族**（GSC 那格），两者是不同的问题。
+
+**GSC 的三条出路（都要用户）**：
+1. 🔴 **推荐**：让 Chrome 带 `--remote-debugging-port=9222` 重启 ⇒ 走 CDP
+   （`Input.dispatchMouseEvent` 是可信事件，**不需要任何 TCC 权限**，也不需要窗口在前台）；
+2. 在 系统设置 → 隐私与安全性 → **辅助功能** 里给 DeepSeek Harness 打勾 ⇒ 我用 System Events 点；
+3. 你按 §8.7 甲表亲手点 3 下，把 `googleXXXX.html` 的文件名与那一行内容贴给我。
+
+另记一条现场事实：那个资源类型选择层**被关掉两次之后就不肯再开了**
+（合成 `click` 真 `<button>`「添加网站」→ `chooser: false`）。所以第 3 条路更稳，
+或者在第 1/2 条路打通后**趁浮层开着一次做完**。
+
+#### 8.11.4 又一次"探针骗人"，这次是资源包
+
+页面可见时 `innerText` 有 **5225 字符**（隐藏时是 0，§8.9 记过）；而我两次读到的
+`notVerified: true` **全都出自内联资源 JSON 包**里的 `"NotVerified":"Not verified"` 与
+`"UserMgmt_AddedByNotVerified":"{0} (Not verified)"` —— **不是界面**。
+⇒ 判状态必须读**具体那一格**（表格行/切换器条目），不许对整页 `textContent` 做正则。
