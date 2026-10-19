@@ -16,9 +16,15 @@
 边界（连同读数一起读，别只读 rc）：
 - 🔴 **AC-5 那格文档里挂着范围尺**，它 rc=1 的红因在别线那枚借用「自动收集」标题的提交上（B205 追记），
   按"尺在别人名下"记录，不当本线红。所以本电池的 **rc 非 0 条数 ≠ 本线红数**。
-- ⚠️ `AC6-browser` 那腿会**重写** `apps/web/evidence/inbound-recovery/*.png`（提交态取证件）。
+- ⚠️ `AC6-browser` 那腿会**重写**取证 png（提交态取证件）。分母不手抄：`evidence_dirs()` 跟着那条命令的
+  config 的 `testMatch` 找到 spec，再读 spec 自己写的证据目录 ⇒ 现在派生出 **3 枚**（`inbound-recovery/`、
+  `panel-layout/`、`date-consistency/`；现量 `python3 research/tools/verify-inbound-ac-battery.py --self-test` 的臂 8 会打印派生清单）。
   本电池因此自报副作用：跑前跑后各数一次、并打印逐枚差异条数（`PNG_BEFORE/PNG_AFTER/PNG_DIFF_LINES`），
+  差异逐枚点名（`PNG_CHANGED=<仓内相对路径>`）、分母自报（`PNG_DENOM=… 派生自 spec 的 N 枚证据目录`），
   还打印跑完那一刻的载具脏条目数（`EVIDENCE_DIRTY`）。看见一片 ` M` 而不知道是谁写的，就是没这条读数。
+  🔴 **B236 那一格**：分母原先手抄成只盖 `inbound-recovery/` 一枚、且按**裸文件名**做键，于是那条腿写在
+  `panel-layout/` 里的图这条尺看不见（10-19 10:2x 现量 `PNG_DIFF_LINES=4` 而 `EVIDENCE_DIRTY=6`），
+  而两枚目录里若出现同名文件会被并成一格。三半分别由臂 8（派生打空/指错）、臂 9（并格）、臂 10（点名）兜住。
 - 默认只对 `<root>` 只读；日志一律落 `<root>/.run-logs/…`（`.gitignore` 里那条），不进提交。
 - `--root` 指到别的检出（例如隔离载具）时，读的是**那棵树的工作树**，不是 HEAD。
 """
@@ -30,6 +36,7 @@ import glob
 import hashlib
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -75,7 +82,27 @@ AC_IN_DOC_RE = re.compile(r"^- \[.\] \*\*AC-(\d+)\b", re.MULTILINE)
 SUMMARY_RE = re.compile(r"Test Files|^ *Tests |臂数|读数|结论|已勾|passed|failed|Results:")
 # 命令串里出现的仓内路径前缀：臂 A3 拿它们回查文件在不在（改名必红）。
 PATH_TOKEN_RE = re.compile(r"(?:tests|research/tools|scripts|apps/[a-z-]+|packages/[a-z-]+|e2e)/[A-Za-z0-9_./*-]+")
-EVIDENCE_GLOB = "apps/web/evidence/inbound-recovery/*.png"
+# 副作用清单的分母（B236）：**从浏览器腿那条命令选中的 spec 源码里派生，不手抄一份目录清单**。
+# 手抄的那份会窄 —— 10-19 那趟实测 `PNG_DIFF_LINES=4` 而 `EVIDENCE_DIRTY=6`，差的两枚就写在没抄进去的目录里。
+# ⚠️ 边界：spec 若改成用变量拼证据路径，这里的正则就打空 ⇒ 臂 8 红（派生集合为空或指向不存在的目录）。
+SPEC_EVIDENCE_DIR_RE = re.compile(r"""['"]\.\./((?:[A-Za-z0-9_.-]+/)*evidence/[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*)['"]""")
+
+
+def evidence_dirs(root: Path) -> list[str]:
+    """`AC6-browser` 那条命令会写进哪些证据目录 —— 跟着 config 的 testMatch 找 spec，再读 spec 自己写的路径。"""
+    cmd = next(c for t, _, c in LEGS if t == "AC6-browser")
+    cfg = re.search(r"--config\s+(\S+)", cmd)
+    if not cfg:
+        return []
+    cfg_path = root / "e2e" / cfg.group(1)
+    if not cfg_path.is_file():
+        return []
+    tm = re.search(r"testMatch:\s*/([^/]+)/", cfg_path.read_text(encoding="utf-8"))
+    specs = [p for p in sorted((root / "e2e" / "tests").glob("*.spec.ts")) if tm and re.search(tm.group(1), p.name)]
+    dirs: set[str] = set()
+    for p in specs:
+        dirs.update(SPEC_EVIDENCE_DIR_RE.findall(p.read_text(encoding="utf-8")))
+    return sorted(dirs)
 
 
 def repo_root() -> Path:
@@ -88,12 +115,15 @@ def repo_root() -> Path:
     raise SystemExit("verify-inbound-ac-battery: 找不到仓库根（脚本不在被跟踪的仓库里？）")
 
 
-def png_manifest(root: Path) -> dict[str, str]:
+def png_manifest(root: Path, dirs: list[str] | None = None) -> dict[str, str]:
+    """按**仓内相对路径**做键 —— 用裸文件名会把两枚目录里的同名图并成一格（B236）。
+    `dirs` 默认从 spec 派生；臂 8/9/10 传自己造的清单进来，才能在那棵临时树上造失。"""
     out: dict[str, str] = {}
-    for p in sorted(glob.glob(str(root / EVIDENCE_GLOB))):
-        f = Path(p)
-        if f.is_file():
-            out[f.name] = hashlib.md5(f.read_bytes()).hexdigest()
+    for d in evidence_dirs(root) if dirs is None else dirs:
+        for p in sorted(glob.glob(str(root / d / "*.png"))):
+            f = Path(p)
+            if f.is_file():
+                out[str(f.relative_to(root))] = hashlib.md5(f.read_bytes()).hexdigest()
     return out
 
 
@@ -135,19 +165,24 @@ def quiet_gate(root: Path) -> bool:
 
 def battery(root: Path, ev: Path, legs: list[tuple[str, str, str]]) -> int:
     ev.mkdir(parents=True, exist_ok=True)
-    before = png_manifest(root)
+    dirs = evidence_dirs(root)
+    before = png_manifest(root, dirs)
     dirty = subprocess.run(["git", "-C", str(root), "status", "--porcelain"], capture_output=True, text=True)
     n_dirty = len([x for x in dirty.stdout.splitlines() if x])
     append_rc(ev, f"{time.strftime('%F %T')} CARRIER_HEAD={subprocess.run(['git', '-C', str(root), 'rev-parse', '--short', 'HEAD'], capture_output=True, text=True).stdout.strip()} dirty={n_dirty}")
     append_rc(ev, f"{time.strftime('%F %T')} PNG_BEFORE={len(before)} 枚")
+    append_rc(ev, f"{time.strftime('%F %T')} PNG_DENOM={len(before)} 枚（派生自 spec 的 {len(dirs)} 枚证据目录：{' ; '.join(dirs) or '〈派生打空〉'}）")
     rcs: dict[str, int] = {}
     for tag, rel_dir, cmd in legs:
         rcs[tag] = run_leg(root, ev, tag, rel_dir, cmd)
-    after = png_manifest(root)
-    diff = sum(1 for name in set(before) | set(after) if before.get(name) != after.get(name))
+    after = png_manifest(root, dirs)
+    changed = sorted(name for name in set(before) | set(after) if before.get(name) != after.get(name))
+    diff = len(changed)
     dirty2 = subprocess.run(["git", "-C", str(root), "status", "--porcelain"], capture_output=True, text=True)
     append_rc(ev, f"{time.strftime('%F %T')} PNG_AFTER={len(after)} 枚")
     append_rc(ev, f"{time.strftime('%F %T')} PNG_DIFF_LINES={diff}")
+    for name in changed[:40]:
+        append_rc(ev, f"{time.strftime('%F %T')} PNG_CHANGED={name}")
     append_rc(ev, f"{time.strftime('%F %T')} EVIDENCE_DIRTY={len([x for x in dirty2.stdout.splitlines() if x])}")
     append_rc(ev, f"{time.strftime('%F %T')} legs={len(legs)} rc0={sum(1 for v in rcs.values() if v == 0)} rc_nonzero={sum(1 for v in rcs.values() if v != 0)}")
     print(f"legs={len(legs)} rc0={sum(1 for v in rcs.values() if v == 0)} rc_nonzero={sum(1 for v in rcs.values() if v != 0)}", flush=True)
@@ -216,6 +251,32 @@ def self_test(root: Path) -> int:
         if p.is_file():
             p.unlink()
     ev.rmdir()
+
+    # 🔴 臂 8/9/10 兜的是 B236 那几半失法：分母窄（少一枚 spec 实际会写的目录）、按裸文件名做键、
+    # 以及差异点名点不全。分母现在是**从 spec 派生**的，所以臂 8 判"派生本身有没有打空/指错"，
+    # 臂 9/10 在临时树上造失（不碰仓里的证据件），跑完即删。
+    derived = evidence_dirs(root)
+    gone = [d for d in derived if not (root / d).is_dir()]
+    check("8 副作用分母从 spec 派生得出且每枚目录真在场", bool(derived) and not gone,
+          f"派生={derived or '〈打空：spec 里证据路径的写法变了，得改 SPEC_EVIDENCE_DIR_RE〉'} 不在场={gone}")
+    print("  派生的证据目录 " + " ; ".join(derived), flush=True)
+    sd = root / ".run-logs" / f"png-denom-selftest-{time.strftime('%H%M%S')}"
+    try:
+        probe_dirs = ["apps/web/evidence/probe-a", "docs/research/evidence/probe-b"]
+        for d in probe_dirs:
+            (sd / d).mkdir(parents=True, exist_ok=True)
+            (sd / d / "probe.png").write_bytes(b"\x89PNG-" + d.encode() + b"-a")
+        man = png_manifest(sd, probe_dirs)
+        shape = "键法坏（没有一枚键带目录前缀 ⇒ 裸文件名会把两枚目录并成一格）" if man and not any("/" in k for k in man) else ""
+        check("9 两枚目录里的同名图不许并成一格（按裸名做键就会并）", len(man) == 2 and not shape,
+              f"keys={sorted(man)}{'; ' + shape if shape else ''}")
+        target = str(Path(probe_dirs[-1]) / "probe.png")
+        (sd / target).write_bytes(b"\x89PNG-" + probe_dirs[-1].encode() + b"-B")
+        after = png_manifest(sd, probe_dirs)
+        moved = sorted(k for k in set(man) | set(after) if man.get(k) != after.get(k))
+        check("10 差异点名要点到被改的那一枚全路径", moved == [target], f"moved={moved}")
+    finally:
+        shutil.rmtree(sd, ignore_errors=True)
 
     # 一条臂都没跑过的尺不算量过：否则"把 check 全删掉"这种失法会留下 arms=0 failed=0 的假绿。
     if arms == 0:
