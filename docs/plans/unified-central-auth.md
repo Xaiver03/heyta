@@ -23,6 +23,41 @@
 | P5.4 | 原生和CLI共享handoff | 待实施 | 各端当前安装产物回跳、安全存储、重放/错绑定拒绝 |
 | P5.5 | 文档、全量验收、发布准备 | 待实施 | 独立复审与当前产物；生产另走授权流程 |
 
+## P5.4 原生/CLI handoff 实施边界（设计，尚未交付）
+
+设备必须能在**没有既存 Web 会话**时自行发起登录。原生端打开系统浏览器，CLI 输出
+固定 HTTPS 启动链接并轮询；两者共用 `@heyta/app-host` 协议，产品服务端继续使用固定
+OIDC 回调和唯一 `issueSession` 签发口。不能把 Web Cookie 搬给设备，也不能用邮箱、
+中央 sid 或浏览器自报的设备号认领结果。
+
+1. 设备生成高熵 verifier，仅将其 SHA-256 challenge 通过 HTTPS POST 到产品服务端。
+   服务端返回无用户信息的随机 handoff id 和一次性浏览器启动链接；verifier 原文只留
+   在发起设备内存/受保护存储。启动链接不得包含 verifier、产品 JWT 或中央令牌。
+2. 浏览器 GET 启动链接只显示本站的“继续登录”页并设置短时 host-only Cookie；
+   **不能在 GET 消费启动凭据**，避免链接预取/安全扫描器抢先使用户无法登录。用户明确点击
+   后的同源 POST 核对 Cookie、Origin 和页面一次性值，再原子消费启动凭据，设置现有
+   加密 pending Cookie，以 `Referrer-Policy: no-referrer` 跳转到中央 OIDC 授权地址。
+   pending 的浏览器绑定、state、nonce、PKCE 与十分钟时限仍由现有 OIDC 协调器验证。
+   启动链接泄露不构成设备领取证明；启动失败只能重新发起，不能复用已消费的授权码。
+3. 固定回调按 pending id 区分 Web 与 handoff。handoff 完成中央验签、userinfo 和
+   introspection 后，必须在**同一产品数据库事务**里调用唯一会话签发口、建立 grant、
+   加密保存待领取产品 JWT、将 handoff 置为 READY；唯一签发口为本地事务内逻辑，
+   外部 OIDC 网络调用必须在事务外完成。不得先提交产品 grant 再在另一事务
+   中保存待领取凭据。handoff 回调不写 Web session Cookie。若事务失败，不产生可领取
+   会话；外部 token 请求结果仍遵守既有 RESULT/UNKNOWN 所有权规则，绝不重派授权码。
+4. 设备以 handoff id + verifier 通过 POST 领取。持久层在锁内比较 challenge、期限、
+   READY 状态及绑定 grant/session 是否仍有效，一次性原子返回并清除密文；并发领取仅
+   一次成功。错 verifier 不消耗，须限流。响应丢失后不得重发长期令牌，设备重新登录；
+   已签发但未领走的 grant 到期须进入现有撤销 outbox，不能静默留活。
+5. CLI 轮询与原生回前台轮询只读取 PENDING/READY/终态；URL/深链最多携带随机 handoff
+   id 作为回前台提示，**不含** JWT、refresh token、verifier、授权码或用户信息。
+   各端收到产品 bearer 后复用现有会话落点与 E2EE 解锁路径；本地任务无需联网登录。
+
+实施前须再核实迁移及当前平台壳约束。真 PostgreSQL 反例至少覆盖：并发领取、错设备
+verifier、过期与锁等待跨期限、回调重复/授权码未知结果、回调事务回滚、领取前会话撤销、
+领取响应丢失和未领取 grant 清理。另验系统浏览器当前安装产物回跳、CLI 真实进程轮询、
+原生安全存储与登出删除、Web 既有 Cookie 流程不回归。仅有本设计不改变 P5.4 的待实施状态。
+
 ## 产品登录体验约束
 
 用户明确要求各产品保留特色登录 UI。heyta 保留既有设计语言与本地优先入口；
