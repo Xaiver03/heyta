@@ -10690,3 +10690,38 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
       要么**一律改用 `run_in_tab_by_url.applescript`**（按完整 URL 定位，从形状上就没有这个单位问题）。
       这条与 §1 那条元规则同源：报错说"没有 id 为 1 的窗口"是真的，但它证明的是**我给的坐标不对**，
       不是"目标不存在"。
+
+493. 🔴 **一枚计数器打印的名字写着 A 口径、算法跑的是 B 口径时，「两枚数相等」会被读成交叉验证 —— 而它可能只是包含关系**（2026-10-19 14:3x 本线现量，`research/tools/verify-inbound-ac-battery.py`，改口笔 `833991d5`）。
+    ⑴ 命中形状：那枚电池同时打 `PNG_DIFF_LINES=`（起跑前后两趟 md5 清单作差）与 `EVIDENCE_DIRTY=`，后者代码取的是**整棵载具**
+      `git -C <载具> status --porcelain` 的条目数（没有 pathspec），名字却读作「证据目录里的脏条目」。两枚都回 11 ⇒ 台账当时写成
+      「两把独立的副作用计数器第一次对上」。**这句把包含关系（差异清单 ⊆ 全树脏清单）说成了同口径互证**。
+    ⑵ 怎么暴露的：不是靠读代码，是靠**为别的目的跑的那趟变异取证** —— 摘掉 `apps/web/src/App.tsx` 一行后重跑，量出
+      `PNG_DIFF_LINES=3` 而旧名那行 `=4`，差的那一枚正是源码文件。
+      判据形状：凡把两枚计数器读成「互证」，先各问一句**取数来源与筛选集合是不是同一个**；不同就只能说包含关系、或各自单独成立。
+      一枚名不副实的尺比没有尺更糟（§1 元规则「永远通过的判据比没有判据更糟」的姐妹形：它偶尔会红，红的却不是它声称的那件事）。
+    ⑶ 修法：一枚名字只承担一件事 ⇒ `EVIDENCE_DIRTY=` 只数落在派生证据目录里的条目、整棵树另打 `CARRIER_DIRTY=`；再给装置加一枚
+      **喂假 porcelain** 的臂（改／未跟踪／改名／非证据件四行，断言两枚各为 3 与 4），把「筛掉了什么」变成能红的判据而不是散文。
+    ⑷ 关联：#45/#179/#184（退出码被管道尾巴吃掉）、#46/#67（查不到 ≠ 不存在）、#490（不存在的 pathspec 静默回空）——
+      同一族「尺算的不是它声称的那件事」。
+
+494. 🔴 **「这段时间没人动过」的分母被手抄成一张静态路径清单，而不是从被筛的那道门自己的声明里取 ⇒ 筛出一片假空，据此判「不必重跑」**（2026-10-19 17:1x 本线现量，`PROGRESS.md` 第 106 条 ③ 那把触发器）。
+    ⑴ 命中形状：那条判据把四枚链红（49/63/87/106）的落点列成 5 枚 pathspec，`git log refs/heads/main --since=… -- <那 5 枚>` 回 **0 行**
+      ⇒ 于是写下"重跑只会复现同一批红"。其中第 63 道 `check:payment-entry` 真正读的东西写在自己源码里
+      （现量 `grep -n "^const COMPOSE\|^const CLIENT_DIRS" scripts/check-payment-entry.mjs` ⇒ `server/docker-compose.yml`
+      加 `apps/web/src`、`apps/mobile/src`、`apps/landing/src`），而那 5 枚里没有一个覆盖到这三枚 `…/src` 的其余部分，更没覆盖 compose。
+    ⑵ 量出来的差别（**同一条命令，只换分母**，17:13 现量）：
+      `git log refs/heads/main --since='2026-10-19 11:00' --format='%h %s' --name-only -- <手抄 5 枚> | wc -l` 回 **0**；
+      把 pathspec 换成 `server/docker-compose.yml apps/web/src apps/mobile/src apps/landing/src` 回 **非 0**（本戳 3 枚提交 4 行路径：
+      `96fb5e7b3 apps/landing/src/site/indexnow.ts`、`31b163974 apps/landing/src/main.tsx`+`site/paths.ts`、`997a1935c apps/mobile/src/screens/AuthScreen.tsx`）。
+      ⇒ "不必重跑"是分母漏了造成的，不是因为这批提交恰好无关。
+    ⑶ 与 **#490** 的区别要写清：#490 是 pathspec 指向**不存在**的文件（rc=0、零字节）；这里 5 枚路径全部存在、命令也没坏，
+      **坏在清单不等于被筛物的输入集合**。两种都产出"合法的 0"，所以都只能靠**分母来自声明**这一条来防。
+    ⑷ 修法与便宜验证：触发器的分母**逐道从被触发物自己的常量／清单现取**（那道门就读 `COMPOSE` 与 `CLIENT_DIRS`；
+      e2e 腿就读 config 的 `testMatch` 和 spec 的 `import`），别把上一趟的红落点抄成静态表 —— 抄来的表每加一道门漂一次。
+      重跑只要那一道的代价：`python3 research/tools/verify-inbound-check-chain.py --repo <载具> --logs <目录> --only payment-entry --timeout 180`
+      在 17:13:53 那戳回 `STEP= 63/116 RC= 1 SEC= 1.7`，结论句逐字未变，四枚自测臂在同一条 `&&` 里全过
+      ⇒ 比"押三十分钟整条链"或"留一把没牙的触发器"都便宜。
+    ⑸ 写这段时我自己又踩了一枚同族探针坑（留着，因为它正是这条讲的事）：第一版把牙数写成
+      `grep -c '✅ 臂' run.txt`，那枚文件回 **1** —— `grep -c` 数的是**行数**，而链装置的 `EXCERPT` 把整段输出用 ` | `
+      拼在了**同一行**上。现量 `grep -o '✅ 臂' run.txt | wc -l` 才回 **4**（四枚臂 A/B/C/D 逐条 `✅` 加末行 `臂数 4（…），失败 0`）。
+      ⇒ 对**被拼成一行**的日志，枚数只能 `-o | wc -l`；`-c` 那枚 1 长得像"只有一枚臂过了"，会被读成尺没牙。
