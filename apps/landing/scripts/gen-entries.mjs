@@ -56,6 +56,7 @@ import { fileURLToPath } from 'node:url';
 import { SITE_PAGES, entryDir, hrefPath } from '../src/site/pages.ts';
 import { HELP_QUESTIONS, PRICING_QUESTIONS } from '../src/site/content.ts';
 import { siteOriginFrom } from '../src/site/origin.ts';
+import { INDEXNOW_KEY } from '../src/site/indexnow.ts';
 import { LOCALES } from '../../../packages/i18n/src/types.ts';
 import { en } from '../../../packages/i18n/src/locales/en.ts';
 import { zhCN } from '../../../packages/i18n/src/locales/zh-CN.ts';
@@ -463,6 +464,23 @@ artifacts.set(
     '',
   ].join('\n'),
 );
+
+/* ── IndexNow 键文件 ──────────────────────────────────────── */
+
+/**
+ * `public/<INDEXNOW_KEY>.txt` —— IndexNow 的所有权证明文件。
+ *
+ * 🔴 **内容按协议必须"就是 key 本身"**：不是 JSON、不是带注释的说明文件、
+ * 也不是"key + 换行"。所以这里刻意 **不加结尾换行**（`${KEY}` 而不是 `${KEY}\n`）：
+ * 逐字节对账要的是这一份形状，而校验方大多会 `trim()` —— 精确值在两种校验器下
+ * 都成立，带换行的只在宽容的那种下成立。
+ *
+ * 键值来自 `src/site/indexnow.ts`（**唯一一份定义**，见那个文件的文件头），
+ * 所以它和 sitemap / robots 一样受 `check:entries` 的逐字节对账保护：
+ * 改了 key 却忘了重新生成会当场红，而不是等 IndexNow 回一个
+ * 看起来像"协议不认我"的 403。
+ */
+artifacts.set(`public/${INDEXNOW_KEY}.txt`, INDEXNOW_KEY);
 
 /* ── 落盘 / 校验 ──────────────────────────────────────────── */
 

@@ -35,6 +35,9 @@
  * 与 `research/tools/publish-public-sites.mjs`。
  */
 
+import { readdirSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import { expect, test } from '@playwright/test';
 
 const ORIGIN = process.env['HEYTA_LIVE_ORIGIN'] ?? 'https://heyta.waytofuture.cn';
@@ -197,6 +200,39 @@ test('sitemap 里**每一条**都真的 200（改了兜底最容易在这里漏�
     for (const r of results) if (r.status !== 200) bad.push(`${r.status} ${r.loc}`);
   }
   expect(bad, `sitemap 里列了但线上不是 200 的地址：\n${bad.join('\n')}`).toEqual([]);
+});
+
+/**
+ * IndexNow 的键文件：站点根那个 `<key>.txt` 必须**线上真能取到**。
+ *
+ * 这条不是"再验一遍 404 规则"，它验的是两件只有线上才能判的事：
+ *   · 那个文件**真的发出去了**（生成物在仓库里 ≠ 它在服务器上）；
+ *   · 它**没被任何路由规则吃掉**（本站刚把整站兜底改成 `=404`，而这类
+ *     "站点根下的单个文件"正是最容易被顺手 404 掉的东西）。
+ *
+ * 🔴 key 从**本机生成物**里取名字，不在这里抄一遍：抄件会在轮换 key 那天静默失配，
+ * 而失配的表现是"这条判据测的是上一个 key"。
+ * ⚠️ 路径用 `fileURLToPath` 而不是 `new URL(...).pathname` —— 本仓库根目录名里
+ *    有空格，`.pathname` 会把它变成 `%20`（skill 的 `upload_file_in_tab` 那条注释
+ *    记的就是这个坑）。
+ */
+test('IndexNow 键文件线上可取，且内容逐字等于本机那一份', async ({ request }) => {
+  const publicDir = fileURLToPath(new URL('../../apps/landing/public/', import.meta.url));
+  const keyFiles = readdirSync(publicDir).filter((f) => f.endsWith('.txt'));
+  expect(
+    keyFiles.length,
+    `apps/landing/public/ 下的 .txt 应当恰好是那一枚 IndexNow 键文件，实际：[${keyFiles.join(', ')}]`,
+  ).toBe(1);
+  const name = keyFiles[0] ?? '';
+  const localContent = readFileSync(`${publicDir}${name}`, 'utf8');
+
+  const response = await request.get(`${ORIGIN}/${name}`, { maxRedirects: 0, failOnStatusCode: false });
+  expect(
+    response.status(),
+    `线上 /${name} 是 ${response.status()} —— 它必须是一个真文件：404 意味着没发出去或被路由规则吃掉了`,
+  ).toBe(200);
+  // 校验方普遍 trim()，所以比对用 trim：既容得下"两边都带换行"，也抓得住"内容被换了"。
+  expect((await response.text()).trim()).toBe(localContent.trim());
 });
 
 test('robots.txt 指路正确，且 /app/ 被挡住', async ({ request }) => {
