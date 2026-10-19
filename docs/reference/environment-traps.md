@@ -10726,3 +10726,19 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
         弹窗文案不在本仓词条里，英文那一侧还带弯引号（`Don’t Allow`），按字串会把装置钉死在一种系统语言上。
       ⑸ 取证边界：授权一旦决定就不再弹，而本机 `simctl privacy reset notifications` 回 rc=1（#475）
         ⇒ **这一支只能取一次**。别把"复跑还是绿的"读成"弹窗那一支也复跑过了"。
+494. 🔴 **多档装置的"期望语言"是一个**必须显式传**的输入，不是从设备上读的 —— 漏传时红得像界面坏了**（2026-10-20 01:4x 本线现量，r157）。
+      ⑴ 现象：同一枚件、同一台模拟器，`profile-settings-ios.py` 中文档 28 步全过，换到英文档同一趟脚本报
+        `settings directory is missing 'zh' group labels ['常规','同步与隐私','AI 与集成','数据管理','账号安全']` ——
+        字面读起来是"设置目录少了五枚分组"，看着完全像一处真缺陷。
+      ⑵ 成因：该脚本的 `--language` 默认 `zh`（`scripts/qa/profile-settings-ios.py:345`），
+        而**驱动脚本没传 `en`**。装置按"期望中文"去断言，屏幕上在场的是英文那一整组 ⇒ 红。
+        同批另外三枚装置（`account-face-ios.py` / `ai-face-ios.py` / `reminder-block-ios.py`）用的是双语候选表，
+        所以同一趟里它们英文档全绿 —— **四枚装置只有一枚红**这件事本身就是"红在探针的输入，不在界面"的证据。
+      ⑶ 把它 30 秒定性掉的不是我的推断，是 #488 那枚守卫写进失败原文的东西：它除了列出缺失的中文标签，
+        还列出 `languages whose whole group IS visible on screen=['en']` 与逐枚 `visible labels`
+        （`General / Sync and privacy / AI and integrations / Data management / Account security`）
+        ⇒ 守卫**同时**判"缺什么"和"在场的是什么"，人就不必去猜。少后半句，这枚红会被写成一条界面缺陷。
+      ⑷ 处置形状（两条都要）：驱动脚本**显式传语言**，别依赖默认值；读数落点目录名带档名
+        （`require_appearance` 只看**末级**名，写成 `en-light/settings` 就没有牙）。
+        失败那次的 `run.out` 改名留在同一目录（`failed-default-zh-run.out`）而不是删掉 ——
+        它是"守卫有牙"的正对照，比一张绿图值钱。

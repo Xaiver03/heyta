@@ -1,0 +1,10 @@
+[step] open profile tab: passed
+[step] open settings: passed
+[step] open general: passed
+[step] language before: passed
+[step] choose en: passed
+[step] language after (en): passed
+[step] language-en screenshot: passed
+[step] general back: passed
+[step] close settings: passed
+{"status": "passed", "switchedTo": "en", "steps": 9, "evidence": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/mobile/evidence/ux-final-20261020/r157-en-grid/lang-en-b/language-switch.json"}

@@ -1,0 +1,21 @@
+[step] open profile tab: passed
+[step] profile screenshot: passed
+[step] open assistant: passed
+[step] assistant state: passed
+[step] assistant screenshot: passed
+[step] assistant -> ai settings: passed
+[step] ai-settings-via-assistant screenshot: passed
+[step] close ai settings sheet: passed
+[step] assistant back to profile: passed
+[step] open settings: passed
+[step] open general group: passed
+[step] scroll to help section: passed
+[step] help section: passed
+[step] help-feedback screenshot: passed
+[step] general back: passed
+[step] open ai group: passed
+[step] ai settings group: passed
+[step] ai-settings-group screenshot: passed
+[step] ai group back: passed
+[step] settings back: passed
+{"status": "passed", "steps": 20, "evidence": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/mobile/evidence/ux-final-20261020/r157-en-grid/ai-face-en-dark/ai-face-journey.json"}
