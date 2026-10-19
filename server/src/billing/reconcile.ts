@@ -23,7 +23,7 @@
  *    `settled_at` 对这两种行都非空，它区分不了。
  * 2. **存在**一条 `payment_events` 行，其 `provider_event_id` 以
  *    `payment_succeeded:` 开头、后接本行的 `out_trade_no`
- *    （`WECHAT_PAYMENT_SUCCEEDED_EVENT_PREFIX`，唯一事实源在
+ *    （`PAYMENT_SUCCEEDED_EVENT_PREFIX`，唯一事实源在
  *    `wechat.adapter.ts`）。`payment_events` 表上**没有** `out_trade_no` 列，
  *    这个前缀是库里唯一能从事件找回订单的关联（见 `buildWechatPaymentEventId`
  *    的注释；它是**既有**数据形状，不是本轮新发明的编码）。
@@ -59,7 +59,8 @@ import { toMillis } from './pricing-store';
 import type { SettleOrderOutcome, SqlRunner } from './pricing-store';
 import type { PaymentEventApplyOutcome } from './apply-event';
 import type { NormalizedPaymentEvent } from './types';
-import { WECHAT_PAYMENT_SUCCEEDED_EVENT_PREFIX, WECHAT_PROVIDER } from './wechat.adapter';
+import { PAYMENT_SUCCEEDED_EVENT_PREFIX } from './payment-event-id';
+import { PAYCENTER_PROVIDER } from './paycenter.adapter';
 
 /** 一轮对账最多结算多少张订单。有界是刻意的：日清任务不能被一次积压拖住。 */
 export const DEFAULT_RECONCILE_LIMIT = 500;
@@ -84,7 +85,7 @@ export interface FindUnsettledPaidOrdersInput {
   readonly limit: number;
   /** 默认 `wechat`。 */
   readonly provider?: string;
-  /** 默认 `WECHAT_PAYMENT_SUCCEEDED_EVENT_PREFIX`。 */
+  /** 默认 `PAYMENT_SUCCEEDED_EVENT_PREFIX`。 */
   readonly paymentEventIdPrefix?: string;
 }
 
@@ -109,8 +110,11 @@ export const findUnsettledPaidOrders = async (
   sql: SqlRunner,
   input: FindUnsettledPaidOrdersInput,
 ): Promise<readonly UnsettledPaidOrder[]> => {
-  const provider = input.provider ?? WECHAT_PROVIDER;
-  const prefix = input.paymentEventIdPrefix ?? WECHAT_PAYMENT_SUCCEEDED_EVENT_PREFIX;
+  // 默认渠道从【微信改为中心】：收单已全部走中心，微信那条注册也没了。
+  // 继续默认微信的后果是补结算【一条候选都找不到】，而它不报错、只是安静地
+  // 什么都不做 —— 那正是「补结算」要消除的失效模式。
+  const provider = input.provider ?? PAYCENTER_PROVIDER;
+  const prefix = input.paymentEventIdPrefix ?? PAYMENT_SUCCEEDED_EVENT_PREFIX;
 
   const rows = await sql.query<UnsettledPaidOrderRow>(
     `SELECT o.id            AS order_id,
