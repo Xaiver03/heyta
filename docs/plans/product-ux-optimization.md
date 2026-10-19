@@ -1553,6 +1553,15 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
 - [x] ✅ **这一格在 09:27 兑现了：那一趟真跑了，52.6 分钟，读数在下一格**（原句留着，它写的三条前置里有两条当场用上了）：**整族 `check:ai-e2e` 在隔离副本上的那一趟：载体已备好，欠的是一个安静窗口，不是磁盘也不是"会打死别人"**（2026-10-09 08:3x 现量）。已就绪的三件：`/Users/rocalight/heyta-carriers/heyta-uxhead-1009` 钉在 `b081811c`、`pnpm -r build` rc=0、`e2e/node_modules` 已 `pnpm install`（rc=0，载体里 `git status` 只多出 `pnpm-lock.yaml` 之外的那一枚 `M` 之前已核过）。起跑前置三条，逐条可查：① `sysctl -n vm.loadavg` 的 **load1 回到 12 以下**（08:35 现量 **42.83**，1604 进程 / PhysMem 60G used 只剩 3.1G unused，我那两枚 vite 都是 0.0% CPU —— 这一波不是我造的）；② `lsof -nP -iTCP:4318 -iTCP:4319 -sTCP:LISTEN` 为空（非空时前置门会**退 2 拒绝起跑**，那是"没跑成"独立一档，不许折进"这一族没红"）；③ 读数落点写清是 **`b081811c` 那棵树**，不是 HEAD（HEAD 现在装不上也打不出包，见上面两格）。命令：`cd /Users/rocalight/heyta-carriers/heyta-uxhead-1009 && pnpm check:ai-e2e`。
 - [x] ✅ **这一格的前提在同一小时内翻了两次，最后是靠"复量"而不是沿用翻案的**（09:0x）：登记时写的是「`package.json` 不在暂存集里、但工作树仍是 ` M`（2 行别人未提交的改动）⇒ 整文件提交会把他们那两行算到我头上」——那句话在它写下的那一刻是对的，而**它是瞬时属性**。接线前现量：`git status --porcelain -- package.json` **为空**、`git diff --cached --name-only -- package.json` **为空**，而 HEAD 在这段等待里从 `faab57c4` 一路推进到 `d65b2dd6`（53 笔）⇒ 他们那两行**已经自己落笔了**，拦路条件消失，接线随之落下（上一条 [x] 那格 + 本笔提交）。📌 一般规律，与本仓 §9 那句「`--is-ancestor = YES` 是瞬时属性」同型：**凡登记成"等别人落笔之后再接"的格子，起跑动作前必须重新现量那两行还在不在**，照旧账行动要么白等、要么把别人的改动算到自己头上。本格与上一格是同一件事的两代登记，合并留形是为了让下一位读得到"它曾经真的被挡着"。
 - [ ] 🔴 **本线这一趟犯了一次归属违规，事实、后果与修复选项都记在这里（不包装）**：提交 `e6058120` 的消息写的是「docs(产品体验线 台账 §UX-S9-153)…」，实际含 **43 枚文件，其中只有 1 枚是本线的**（`docs/plans/product-ux-optimization.md`），其余 **42 枚是协作/共享那条线当时暂存在索引里的在制品**（`packages/sync-core/src/share-keys.ts`、`packages/ui/src/sync/*` 十一枚、`packages/sync-client/src/share-*`、`packages/i18n` 两份词条、`packages/op-log/src/state.ts`、`packages/shared-schema/src/entity-types.ts`、`server/tests/share-routes.spec.ts`、`scripts/verify-collab-*.mjs` 四枚、`package.json` 等）。
+    ✅ **10-20 00:5x r152 复量这一格里那枚"已经落地的副作用"：它不成立了**。现量
+    `NO_COLOR=1 pnpm --filter @heyta/web typecheck` ⇒ **rc=0**（载体 = 当前 `HEAD`，工作树只多了本线几行文档改动，
+    它们不进 web 的类型检查）
+    ⇒ 下面那档「`apps/web/tests/share-key-store.spec.ts` 被带进 HEAD 之后 HEAD 自己 typecheck 不过」
+    （10-18 r125 复量时读到 rc=2，原因可点名）**已经被后续提交修掉，别再按它行动**。
+    ⚠️ **本格继续开着的那一半不是本线的**：42 枚夹带的归属要**协作/共享那条线**在后续提交里说明（修复选项 (甲)），
+    而 (乙)「改写历史拆回去」自 `e6058120` 进入 `origin/main` 那刻起就不可选 —— 今天做它等于改写已公开历史。
+    🔴 这一格留给本线自己的那条规矩仍然有效并已钉死：**提交一律 `git commit -F msg -- <明确路径>`，且未跟踪文件要先 `git add` 再逐笔带 pathspec**
+    （本轮 r149/r150 两笔就是这么跑的：`git status --porcelain` 先核在飞、提交后按真实 parent 复验）。
     **成因不是知识缺失**：项目记忆里 **5b** 那条早就写着安全写法是 `git commit -F msg -- <明确路径>`，而我跑的是 `git add <我的路径> && git commit -m …`（**无 pathspec**）⇒ 把别人的暂存集整个卷进我这一笔。同族第三次命中（前两次记在 `project-shared-worktree-sessions.md` 第 227–229 行，结论都是"提交那一刻没做预检"）。⇒ 规矩要换成**命令模板本身**：这一棵树上 `git commit` 一律带 pathspec，"记得预检"不作为独立步骤。
     现状四条，都是现量不是叙述：
     - **没有推送**（🔴 10-10 23:0x 复量，HEAD = `b22f156d`；原记 "44" 已被现量否证并按 §8.8 就地改掉）：`git rev-list --count origin/main..HEAD` = **289**、`git rev-list --count HEAD..origin/main` = **13**、`git merge-base --is-ancestor e6058120 origin/main` = **NO** ⇒ `e6058120` 只存在于本地 `main`。
