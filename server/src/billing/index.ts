@@ -30,7 +30,6 @@ export {
   DEFAULT_BILLING_ADAPTERS,
   createBillingAdapterRegistry,
   createBillingAdaptersFromConfig,
-  isWechatBillingRegistered,
 } from './registry';
 export type { BillingAdapterRegistry } from './registry';
 
