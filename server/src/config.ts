@@ -104,6 +104,37 @@ export interface PrivacyConfig {
 export const isConsentRequired = (config: ServerConfig): boolean => !!config.privacy;
 
 /**
+ * 统一支付中心运营者配置。
+ *
+ * 🔴 **默认不存在**：只有运营者显式设 `PAYCENTER_ENABLED=true` 且**三项凭证
+ * 全部齐全**时才会填出这个对象。少一个是**启动期硬错误**，不是静默降级 ——
+ * 与微信那条同一条纪律：一个"看起来配了但注册不上"的支付通道，
+ * 表现为"用户付了钱但没权益"，而那是最晚才会被发现的失败。
+ *
+ * 环境变量名与另两个产品（Litopia / 创业OS）**保持同一套**，运维只记一套。
+ */
+export interface PaycenterConfig {
+  readonly baseUrl: string;
+  readonly clientId: string;
+  /**
+   * 与中心约定的 HMAC 密钥。**同一把**既用于出站签名、也用于入站履约验签
+   * （中心那边也是同一把）。
+   */
+  readonly clientSecret: string;
+  /**
+   * 履约投递在**本仓的挂载路径**。
+   *
+   * 签名是对中心发往的那个路径算的，而验签的入参拿不到路径 ——
+   * 所以它必须可配：挂载点一改而这里没改，**每条回调都 401**，
+   * 而症状看起来像"密钥配错了"。
+   */
+  readonly webhookPath: string;
+  readonly timeoutMs?: number;
+  /** 下给中心用哪种支付类型。默认 `huifu`（聚合：一个通道出微信 + 支付宝）。 */
+  readonly paymentType?: string;
+}
+
+/**
  * 微信支付（Native 扫码）运营者配置。
  *
  * 🔴 **默认不存在**：只有运营者显式设 `WECHAT_PAY_ENABLED=true` 且**六个凭证
@@ -321,6 +352,10 @@ export interface ServerConfig {
    * 见 `WechatPayConfig` 与 `docs/plans/subscription-boundary.md` §6。
    */
   wechatPay?: WechatPayConfig;
+  /**
+   * 统一支付中心配置。**默认 undefined**（= 不注册中心 adapter，自托管不受影响）。
+   */
+  paycenter?: PaycenterConfig;
   /** Web Push（Windows PWA 小组件的刷新机制）。**默认不存在**，见下面接口的说明。 */
   webPush?: WebPushConfig;
   /** 托管 AI 的上游供应商。**默认不存在**（= 该档在这台实例上不可用）。 */
@@ -784,6 +819,71 @@ export const loadConfigFromEnv = (
         privateKey: credentials.privateKey as string,
         publicKey: credentials.publicKey as string,
         notifyUrl,
+      };
+    }
+  }
+
+  // 🔴 统一支付中心。与微信那条同一条纪律：**全有或全无**，少一个是启动红。
+  //    错拼一个变量名会让 adapter 悄悄不注册，而症状是"用户付了钱没权益" ——
+  //    收钱路径上最坏的一种静默。
+  if (process.env.PAYCENTER_ENABLED !== undefined) {
+    const raw = process.env.PAYCENTER_ENABLED.trim().toLowerCase();
+    if (raw !== 'true' && raw !== 'false') {
+      throw new Error(
+        `Invalid PAYCENTER_ENABLED: ${process.env.PAYCENTER_ENABLED}. Use 'true' or 'false'.`,
+      );
+    }
+
+    if (raw === 'true') {
+      const baseUrl = process.env.PAYCENTER_BASE_URL?.trim().replace(/\/+$/, '') ?? '';
+      const clientId = process.env.PAYCENTER_CLIENT_ID?.trim() ?? '';
+      const clientSecret = process.env.PAYCENTER_CLIENT_SECRET?.trim() ?? '';
+      const missing = [
+        ...(baseUrl ? [] : ['PAYCENTER_BASE_URL']),
+        ...(clientId ? [] : ['PAYCENTER_CLIENT_ID']),
+        ...(clientSecret ? [] : ['PAYCENTER_CLIENT_SECRET']),
+      ];
+      if (missing.length > 0) {
+        throw new Error(
+          'PAYCENTER_ENABLED=true but paycenter credentials are incomplete. Missing: ' +
+            `${missing.join(', ')}. Set all of them, or turn PAYCENTER_ENABLED off.`,
+        );
+      }
+
+      // 与中心约定密钥至少 32 字符。启动期挡掉，而不是等第一条真实回调验签失败。
+      if (Buffer.byteLength(clientSecret, 'utf8') < 32) {
+        throw new Error(
+          `Invalid PAYCENTER_CLIENT_SECRET: must be at least 32 bytes, got ${String(
+            Buffer.byteLength(clientSecret, 'utf8'),
+          )}.`,
+        );
+      }
+
+      // 回跳地址：本仓只用来给收银台一个成功页，具体路径由前端决定。
+      const webhookPath =
+        process.env.PAYCENTER_WEBHOOK_PATH?.trim() || '/api/billing/webhooks/paycenter';
+      if (!webhookPath.startsWith('/')) {
+        throw new Error(
+          `PAYCENTER_WEBHOOK_PATH must start with "/" (got ${webhookPath}). ` +
+            '中心签的是路径，写错会让每条回调都 401。',
+        );
+      }
+
+      const timeoutRaw = process.env.PAYCENTER_TIMEOUT_MS?.trim();
+      const timeoutMs = timeoutRaw ? Number(timeoutRaw) : undefined;
+      if (timeoutMs !== undefined && (!Number.isFinite(timeoutMs) || timeoutMs <= 0)) {
+        throw new Error(`Invalid PAYCENTER_TIMEOUT_MS: ${String(timeoutRaw)}.`);
+      }
+
+      config.paycenter = {
+        baseUrl,
+        clientId,
+        clientSecret,
+        webhookPath,
+        ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+        ...(process.env.PAYCENTER_PAYMENT_TYPE?.trim()
+          ? { paymentType: process.env.PAYCENTER_PAYMENT_TYPE.trim() }
+          : {}),
       };
     }
   }

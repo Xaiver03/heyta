@@ -25,6 +25,7 @@
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { Currency } from './money';
+import { DEFAULT_PRICE_BOOK, grantsForSku, projectPrices } from './price-book';
 import type {
   BillingAdapter,
   CheckoutResult,
@@ -102,8 +103,57 @@ export type GrantProjector = (
   currency: Currency,
 ) => OneTimeGrant | null;
 
+/**
+ * 中心收的是**一次性支付**（与微信直连同形），授予周期取同口径的 30 天。
+ *
+ * ⚠️ 刻意**不**从 `wechat.adapter` 导入它的同名常量：两个平级 adapter 之间
+ * 不该有依赖。两处必须一致，靠这条注释与评审，不靠 import。
+ */
+export const PAYCENTER_ONE_TIME_PERIOD_DAYS = 30;
+
+/**
+ * 默认价目表 —— 由**代码基线价目表投影出来**，不是又一个字面量
+ * （与微信 adapter 取的是同一张 `DEFAULT_PRICE_BOOK`）。
+ */
+export const PAYCENTER_DEFAULT_PRICES = projectPrices(DEFAULT_PRICE_BOOK, 'CNY', 0);
+
+/**
+ * 默认投影器：金额 → 档位 → 能力。
+ *
+ * 🔴 与微信 adapter 的匹配逻辑同形，且**两步都可能落空，落空就不猜**：
+ *   1. 金额不在价目表上 → `null`（典型来源是**用券打折后的实付**）
+ *   2. 档位在价目表上、能力表里没有 → `null`（那说明**两处不同步**，
+ *      不是"这一档确定没有能力"）
+ *
+ * ⚠️ 这里给出的只是**提示**：权威判定仍在 `pricing-store.ts` 的
+ * `settleOrderPaid`（它比的是订单上冻结的 SKU 与实付额，两者都覆盖折扣）。
+ * 本仓既有文档把这条写得很死，这里不重复判据、只做投影。
+ */
+export const createDefaultGrantProjector = (
+  prices: Readonly<Record<string, { readonly totalFen: number }>> = PAYCENTER_DEFAULT_PRICES,
+): GrantProjector => {
+  return (amountMinor: number): OneTimeGrant | null => {
+    const matchedSku =
+      Object.entries(prices).find(([, entry]) => entry.totalFen === amountMinor)?.[0] ?? null;
+    if (matchedSku === null) return null;
+    const matchedGrants = grantsForSku(matchedSku);
+    if (matchedGrants === null) return null;
+    return {
+      periodDays: PAYCENTER_ONE_TIME_PERIOD_DAYS,
+      priceId: matchedSku,
+      grants: matchedGrants,
+    };
+  };
+};
+
 export interface PaycenterAdapterDeps {
-  readonly projectGrant: GrantProjector;
+  /**
+   * 金额 → 档位 → 能力的投影。
+   *
+   * 不传时用 `createDefaultGrantProjector()`（代码基线价目表）。
+   * 传的话是为了注入**运行期**价目表或测试替身。
+   */
+  readonly projectGrant?: GrantProjector;
   readonly fetchImpl?: typeof fetch;
   readonly now?: () => number;
 }
@@ -185,11 +235,16 @@ export const toProviderRefundStatus = (raw: unknown): ProviderRefundStatus => {
 
 export const createPaycenterBillingAdapter = (
   config: PaycenterAdapterConfig,
-  deps: PaycenterAdapterDeps,
+  /**
+   * 可选：`projectGrant` 有默认值（代码基线价目表），其余也有默认值。
+   * 生产路径因此只需给 config；测试与运行期价目表才需要传它。
+   */
+  deps: PaycenterAdapterDeps = {},
 ): BillingAdapter => {
   const base = config.baseUrl.replace(/\/+$/, '');
   const timeoutMs = config.timeoutMs && config.timeoutMs > 0 ? config.timeoutMs : DEFAULT_TIMEOUT_MS;
   const webhookPath = config.webhookPath?.trim() || DEFAULT_WEBHOOK_PATH;
+  const projectGrant = deps.projectGrant ?? createDefaultGrantProjector();
   const doFetch = deps.fetchImpl ?? globalThis.fetch;
   const now = deps.now ?? Date.now;
 
@@ -338,7 +393,7 @@ export const createPaycenterBillingAdapter = (
             : null;
 
       const currency = (typeof event.currency === 'string' ? event.currency : 'CNY') as Currency;
-      const grant = deps.projectGrant(amountMinor, currency);
+      const grant = projectGrant(amountMinor, currency);
 
       const normalized: NormalizedPaymentEvent = {
         provider: PAYCENTER_PROVIDER,

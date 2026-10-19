@@ -12,6 +12,10 @@
 import { createNoopBillingAdapter } from './noop.adapter';
 import type { BillingAdapter } from './types';
 import { createWechatBillingAdapter, WECHAT_PROVIDER } from './wechat.adapter';
+import {
+  createPaycenterBillingAdapter,
+  PAYCENTER_PROVIDER,
+} from './paycenter.adapter';
 import type { ServerConfig } from '../config';
 
 export interface BillingAdapterRegistry {
@@ -76,8 +80,35 @@ export const createBillingAdaptersFromConfig = (
       }),
     );
   }
+  // 中心**仅当 `config.paycenter` 存在时**注册（即 PAYCENTER_ENABLED=true
+  // 且三项凭证齐全，见 config.ts）—— 少一个变量是启动期硬错误，走不到这里，
+  // 所以"注册得上但用不了"这种中间态不存在。
+  //
+  // ⚠️ 中心与微信**同时注册是允许的**：收银台按 `supportedCurrencies` 选通道，
+  // 而两者都只收 CNY。顺序上中心在后、微信在前（保持既有行为不变），
+  // 谁被选中由收银台的既有逻辑决定 —— 这正是 §1.4 的口径：汇付为主、直连兜底。
+  if (config.paycenter !== undefined) {
+    adapters.push(
+      createPaycenterBillingAdapter({
+        baseUrl: config.paycenter.baseUrl,
+        clientId: config.paycenter.clientId,
+        clientSecret: config.paycenter.clientSecret,
+        webhookPath: config.paycenter.webhookPath,
+        ...(config.paycenter.timeoutMs !== undefined ? { timeoutMs: config.paycenter.timeoutMs } : {}),
+        ...(config.paycenter.paymentType !== undefined ? { paymentType: config.paycenter.paymentType } : {}),
+      }),
+    );
+  }
+
   return adapters;
 };
+
+/** 已注册的 provider 名里有没有中心。给日志 / 自检用，判据与注册表一致。 */
+export const isPaycenterBillingRegistered = (config: ServerConfig): boolean =>
+  config.paycenter !== undefined &&
+  createBillingAdaptersFromConfig(config).some(
+    (adapter) => adapter.provider === PAYCENTER_PROVIDER,
+  );
 
 /** 已注册的 provider 名里有没有微信。给日志 / 自检用，判据与注册表一致。 */
 export const isWechatBillingRegistered = (config: ServerConfig): boolean =>
