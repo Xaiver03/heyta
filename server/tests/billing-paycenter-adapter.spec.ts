@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_WEBHOOK_PATH,
+  PAYCENTER_DEFAULT_PRICES,
+  PAYCENTER_ONE_TIME_PERIOD_DAYS,
   PAYCENTER_PROVIDER,
   PAYCENTER_SUPPORTED_CURRENCIES,
   amountYuanToMinor,
@@ -296,5 +298,62 @@ describe('refund', () => {
         new Response(JSON.stringify({ error: 'order not found' }), { status: 404 })) as unknown as typeof fetch,
     });
     await expect(a.refund(input)).rejects.toThrow(/order not found/);
+  });
+});
+
+describe('默认投影器（不注入也能工作）', () => {
+  it('取自**代码基线价目表**（与微信 adapter 同一张）', () => {
+    expect(Object.keys(PAYCENTER_DEFAULT_PRICES).length).toBeGreaterThan(0);
+  });
+
+  it('价目表上的金额 → 匹配到档位与能力', async () => {
+    const [sku, entry] = Object.entries(PAYCENTER_DEFAULT_PRICES)[0];
+    // 不传 deps：走默认投影器
+    const a = createPaycenterBillingAdapter(
+      { baseUrl: 'https://center.test', clientId: CLIENT, clientSecret: SECRET },
+      // ⚠️ 必须注入时钟：不注入时 now() 是真实时间，而用例里的时间戳是固定值，
+      // 会被 ±5 分钟窗口判成过期 —— 看起来像"验签坏了"，其实是夹具自相矛盾。
+      { now: () => 1776000000 * 1000 },
+    );
+    const raw = eventBody({ amount: (entry.totalFen / 100).toFixed(2) });
+    const ts = '1776000000';
+    const idem = `payment-fulfillment:${CLIENT}:SS-ORDER-1`;
+    const r = await a.verifyWebhook(Buffer.from(raw, 'utf8'), {
+      'x-platform-client': CLIENT,
+      'x-platform-timestamp': ts,
+      'x-platform-signature': canonicalSignature(
+        SECRET, 'POST', DEFAULT_WEBHOOK_PATH, Buffer.from(raw, 'utf8'), ts, idem,
+      ),
+      'idempotency-key': idem,
+    });
+    if (!r.ok) throw new Error('unreachable');
+    expect(r.event.oneTimeGrant?.priceId).toBe(sku);
+    expect(r.event.oneTimeGrant?.periodDays).toBe(PAYCENTER_ONE_TIME_PERIOD_DAYS);
+    expect(r.event.oneTimeGrant?.grants.length).toBeGreaterThan(0);
+  });
+
+  // 🔴 金额不在价目表上（典型来源是**用券打折后的实付**）⇒ 不猜档位
+  it('🔴 价目表上没有的金额 → oneTimeGrant 为 null', async () => {
+    const a = createPaycenterBillingAdapter(
+      { baseUrl: 'https://center.test', clientId: CLIENT, clientSecret: SECRET },
+      // ⚠️ 必须注入时钟：不注入时 now() 是真实时间，而用例里的时间戳是固定值，
+      // 会被 ±5 分钟窗口判成过期 —— 看起来像"验签坏了"，其实是夹具自相矛盾。
+      { now: () => 1776000000 * 1000 },
+    );
+    const raw = eventBody({ amount: '0.07' });
+    const ts = '1776000000';
+    const idem = `payment-fulfillment:${CLIENT}:SS-ORDER-1`;
+    const r = await a.verifyWebhook(Buffer.from(raw, 'utf8'), {
+      'x-platform-client': CLIENT,
+      'x-platform-timestamp': ts,
+      'x-platform-signature': canonicalSignature(
+        SECRET, 'POST', DEFAULT_WEBHOOK_PATH, Buffer.from(raw, 'utf8'), ts, idem,
+      ),
+      'idempotency-key': idem,
+    });
+    if (!r.ok) throw new Error('unreachable');
+    expect(r.event.oneTimeGrant).toBeNull();
+    // 但金额本身仍如实带上 —— 那是一笔真钱，只是买的是哪一档不确定
+    expect(r.event.paidAmountMinor).toBe(7);
   });
 });
