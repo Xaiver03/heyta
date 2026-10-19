@@ -760,3 +760,36 @@ Success : URL submitted successfully. We will review the URL for indexation.
 
 **这一条已按用户要求反哺进 skill**（见 `portal-form-filling` 的约束 2 与其 references），
 并写明"把 activate 写进一键脚本"这个具体形态 —— 它比"别忘了不要抢前台"这种提醒更容易拦住下一个人。
+
+### 8.14 🔴 GSC sitemap「无法抓取」的真因：**我们自己把 sitemap 写成了非法 XML**（已修 + 已补门禁）
+
+**发现路径**：GSC 站点地图页把 `/sitemap.xml` 报成 **`无法抓取`**、已发现的网页 **0**
+（Bing 那边同时显示 `Submitted / Processing`、无错）。差异就是线索 ——
+于是用**真解析器**解线上那份：
+
+```
+xml.etree.ElementTree.ParseError: not well-formed (invalid token): line 12, column 41
+```
+
+**真因**：我为"刻意不写 `<lastmod>`"写的那段 XML 注释里，两处写了生成器的开关名
+（**连续两个连字符** + `check`），而 **XML 注释禁止出现连续两个连字符** ⇒ 整份文件不是合法 XML。
+本地与线上 sitemap 的 **sha256 逐字相同**，所以坏的就是发出去的那一份。
+**Bing 没报只是因为宽松**。
+
+🔴 **为什么本仓库当时全绿**：那条"sitemap 里每一条都真的 200"的判据只对 `<loc>` 做**正则**
+匹配，**从来没把这当 XML 解析过**。（"测试全绿 ≠ 这是当前产物"的又一实例。）
+
+**修法 + 门禁**（提交 `dde260aa0`，已发布：九步全过、线上验收 45 项）：
+
+| 落点 | 内容 |
+|---|---|
+| `gen-entries.mjs` 的 sitemap 注释 | 改成不含连续连字符的说法，并**就地写明这条硬规则**与本次症状（Google 报无法抓取、Bing 照收），防止下一个人再把开关名原样写进去 |
+| `tests/seo-head.spec.ts` ①| 用 **`DOMParser`**（jsdom 现成，**零新依赖**）解析 `public/sitemap.xml`：断言无 `parsererror`、根元素是 `urlset`、`<loc>` 非空 |
+| `tests/seo-head.spec.ts` ②| 扫 `public/` 下所有 `.xml` 的注释块，断言不含连续两个连字符（解析失败时点不出行号，这条会点名文件） |
+
+**变异验证**：往注释注入一个连续连字符 → 两条都精确变红（`malformed comment`）；回滚 → 绿。
+读数：落地页测试 **1419 条全绿**；线上 `GET /sitemap.xml` 经真解析器验证 **合法 XML（76 条 url）**。
+
+**状态**：GSC 已重新提交（`已成功提交站点地图`），但表格里那一行**仍是修复前的上次读取**
+（`上次读取时间 2026年10月19日` ⇒ `无法抓取`）。Google 说"会定期处理"，
+所以**这条要等它下次读取才翻**——不是我现在能催的，也不要把它读成"修复没用"。
