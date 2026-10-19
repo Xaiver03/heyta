@@ -76,3 +76,67 @@ ts-node/编译产物实际PKCE探针均 rc=0；真实 createServer 在完整OIDC
 且未创建data目录。复现命令同表中对应行；本机独立日志为
 /tmp/heyta-p50-independent-tests.log 与 /tmp/heyta-p50-independent-build.log。
 本包不代表实际 OIDC 授权成功、原生兼容或生产已切换；本阶段无真实中央请求。
+
+## P5.1 持久化设计（实现前固定）
+
+范围仅服务端持久层与独立加密封装，不开放OIDC启动门禁，也不接HTTP、UI或op-log。
+代码完全独立按MIT标准实现；不引用内部AGPL客户端或测试。
+
+### 身份与旧账号
+
+新增唯一 `(issuer, subject)` 身份映射至现有 numeric User.id，同一issuer的一个本地账号
+最多一个身份。首次建号由受信OIDC协调器给出已经验证的身份及邮箱，并显式收集产品条款；
+邮箱冲突返回需绑定，不按邮箱查找并接管旧账号，缺邮箱返回补录，不构造假邮箱。
+绑定旧账号必须有当前本地会话及新鲜本地重新认证证明，并有本次OIDC验证结果；
+持久层复查同一session、tokenVersion、证明时效和待授权绑定。P5.1不提供这些证明的HTTP
+签发入口，不能把“持久层接收受信输入”写成“双证明登录已交付”。不改isAdmin和旧条款。
+
+### 授权尝试与所有权
+
+Pending保存state与浏览器随机绑定的摘要，nonce/PKCE verifier用AES-256-GCM加密；
+绑定固定issuer/client/redirect及可选旧账号证明。十分钟过期，原子消费后只产生一次attempt。
+外部token请求之前必须持久记录DISPATCHED。崩溃/未知结果不得重新派发；即使租约超时也
+不能把这次授权码/刷新令牌重用。网络未知必须保持UNKNOWN，后续只能核实/清理。
+
+authorization和refresh共用持久attempt所有权台账。上游成功返回材料先落加密RESULT，
+随后验证并原子应用为grant；回执丢失时查同一attempt。APPLIED是不可逆结论，下一次
+refresh不能覆写前次attempt；发现旧attempt已应用，绝不能catch里撤销其材料。
+没有记录也不等于失败；仅明确REJECTED或已撤销grant的结果可进入撤销队列。
+HTTP协调器必须在P5.2证明token成功但验证/数据库失败、COMMIT回执丢失的实际路径。
+
+### 会话、刷新与撤销
+
+Grant按独立随机id和authorization attempt登记，不以中央root sid作主键；两次授权
+即便sid相同仍分开。Grant与AccessSession精确对应并检查同一userId/tokenVersion；
+上游AT/RT仅加密保存，AAD绑定purpose/id/version，防止跨行或跨用途替换。
+刷新以grant版本和活动attempt串行；迟到结果不能越过撤销或版本边界恢复会话。
+
+删除会话/账号前先原子落outbox、关闭grant并删会话；outbox没有指向待删除user/session的
+CASCADE外键。活grant对user使用RESTRICT，未经撤销编排的销户失败关闭，避免吞掉上游
+材料；P5.2须接入既有销户事务，不能把该拒绝当作已完成用户注销。
+撤销队列只持内部issuer/client、授权id、加密材料和最少重试元数据；不接受动态端点。
+租约和CAS确保并发worker不能互相确认；网络撤销可幂等重试，完成即清密文。
+
+### 留存与清理
+
+Pending有效期十分钟，消费/过期清PKCE密文；已派发UNKNOWN保留不含凭据的attempt判断，
+不因清理重新可用。Grant及身份映射随用户显式注销处理，过期grant先排撤销再清理。
+撤销密文最长保留七日用于重试；到期清密文并将结果标为EXPIRED_UNCONFIRMED，不能记成
+“中央已撤销”，记录须由发布前运维处置并保持本地拒绝。完成/终止attempt与outbox元数据
+保留24小时后可清，缺失记录永远不得授权或触发补偿撤销。P5.1提供清理方法并测边界；
+P5.2接定时调度、报告未确认撤销，正式上线前不得跳过。隐私政策中英同步说明类别、用途、
+密文边界与这两个期限；E2EE密钥、同步内容不进入上述表。
+
+### 精确写集和判据
+
+- `server/prisma/schema.prisma`：新增Identity/Pending/Attempt/Grant/Outbox及关系。
+- 新迁移 `server/prisma/migrations/20261019000000_central_auth_persistence/migration.sql`；不改历史迁移。
+- `server/src/central-auth/crypto.ts`、`repository.ts`。
+- `server/tests/central-auth-crypto.spec.ts`、`tests/integration/central-auth-persistence.integration.spec.ts`。
+- `server/scripts/prepare-central-auth-postgres.mjs`：仅本机隔离测试库，迁移走仓库脚本。
+- `server/PROVENANCE.md`、本计划、ADR-0066、`packages/legal/src/documents/privacy.ts`中英版本。
+
+真PG测试覆盖唯一映射、邮箱冲突、双证明绑定条件、pending并发单次/过期/错浏览器、
+共享sid的A/B独立、refresh串行/迟到/commit后回执重读、grant撤销后结果不可复活、
+账号删除受限且outbox可存活、队列租约错配、加密AAD/篡改/清理期限。构建、迁移检查、
+既有local认证回归与独立复审必须通过；本包仍不代表真实中央联调或生产切换。
