@@ -340,12 +340,34 @@ def main() -> int:
     dump(res, out)
 
     probe.create_task(title)
+
+    def fail(message: str) -> ProbeError:
+        """抛错前先把**本次建的这条**收掉。
+
+        🔴 「加完必删」对失败支同样成立：r145 新加的「推迟不许提前」那枚断言会在旅程半途红，
+        不清的话每条红的一趟都在设备上留一条会真的发通知的任务（这一枚装置跑过一次红的，
+        就留过一条 `Rem141…`）。收尾自己炸了也只登记原因，不掩盖真正那条红。
+        """
+        if not a.keep_task:
+            try:
+                rm, rm_guard = settle(probe, (REMOVE,), clamp)
+                if rm is not None:
+                    x, y, w, h = rm_guard["frame"]
+                    raw_tap(probe, x + w // 2, y + h // 2)
+                    wait_present(probe, "empty", 6.0)
+                delete_own_task(probe, title, res, clamp)
+            except Exception as e:
+                res["cleanupAfterFailure"] = f"{type(e).__name__}: {e}"
+        res["abortedWith"] = message
+        dump(res, out)
+        return ProbeError(message)
+
     probe.tap((JU.open_task_label(title),), "open task detail")
     res["uiLocale"] = probe.ui_locale
 
     node, guard = settle(probe, ("section",), clamp)
     if node is None:
-        raise ProbeError(f"reminder section never settled fully above the tab bar: {guard}")
+        raise fail(f"reminder section never settled fully above the tab bar: {guard}")
     res["reminderSection"] = guard
     res["emptyState"] = rows_for(probe, ["section", "empty", "add", "absolute1h", "noDue"], clamp)
     probe.screenshot("01-reminder-empty")
@@ -354,7 +376,7 @@ def main() -> int:
 
     add_node, add_guard = settle(probe, ("add", "absolute1h"), clamp)
     if add_node is None:
-        raise ProbeError(f"no add-reminder control ever settled fully above the tab bar: {add_guard}")
+        raise fail(f"no add-reminder control ever settled fully above the tab bar: {add_guard}")
     ax, ay, aw, ah = add_guard["frame"]
     raw_tap(probe, ax + aw // 2, ay + ah // 2)
     res["taps"].append({"description": "add reminder", "label": AX.label_of(add_node), **add_guard})
@@ -369,7 +391,7 @@ def main() -> int:
         probe.screenshot("02-add-did-not-land")
         res["shots"].append("02-add-did-not-land")
         dump(res, out)
-        raise ProbeError(f"adding a reminder changed nothing on screen (tap landed at "
+        raise fail(f"adding a reminder changed nothing on screen (tap landed at "
                          f"{ax + aw // 2},{ay + ah // 2}, bound {add_guard.get('visibleBottom')}): "
                          f"{res['afterAdd']}")
     res["afterAdd"] = rows_for(probe, AFTER_ADD, clamp)
@@ -384,7 +406,7 @@ def main() -> int:
         node, guard = settle(probe, (want,), clamp)
         if node is None:
             dump(res, out)
-            raise ProbeError(f"the {want} action never settled fully above the tab bar: {guard}")
+            raise fail(f"the {want} action never settled fully above the tab bar: {guard}")
         bx, by, bw, bh = guard["frame"]
         tapped_label = AX.label_of(node)
         raw_tap(probe, bx + bw // 2, by + bh // 2)
@@ -395,7 +417,7 @@ def main() -> int:
             probe.screenshot(f"{shot}-not-reached")
             res["shots"].append(f"{shot}-not-reached")
             dump(res, out)
-            raise ProbeError(f"tapping {AX.label_of(node)!r} did not move the block into phase "
+            raise fail(f"tapping {AX.label_of(node)!r} did not move the block into phase "
                              f"{phase!r}: {res[key]}")
         res[key] = rows_for(probe, reading, clamp)
         if want == SNOOZE:
@@ -412,13 +434,13 @@ def main() -> int:
                 probe.screenshot(f"{shot}-time-unreadable")
                 res["shots"].append(f"{shot}-time-unreadable")
                 dump(res, out)
-                raise ProbeError(f"cannot read the reminder's own time across the snooze tap "
+                raise fail(f"cannot read the reminder's own time across the snooze tap "
                                  f"(before {tapped_label!r}, after rows {res[key]}) — 这条判据没有读数")
             if after <= before:
                 probe.screenshot("03-snooze-moved-earlier")
                 res["shots"].append("03-snooze-moved-earlier")
                 dump(res, out)
-                raise ProbeError(f"「推迟」 moved the reminder EARLIER: {before.isoformat()} -> "
+                raise fail(f"「推迟」 moved the reminder EARLIER: {before.isoformat()} -> "
                                  f"{after.isoformat()}（装机态那条仍在按墙钟算推迟）")
         probe.screenshot(shot)
         res["shots"].append(shot)
@@ -429,7 +451,7 @@ def main() -> int:
     if rm_node is None:
         res["removeReminderGuard"] = rm_guard
         dump(res, out)
-        raise ProbeError(f"the delete-reminder action never settled fully above the tab bar: {rm_guard}")
+        raise fail(f"the delete-reminder action never settled fully above the tab bar: {rm_guard}")
     rx, ry, rw, rh = rm_guard["frame"]
     raw_tap(probe, rx + rw // 2, ry + rh // 2)
     res["taps"].append({"description": "remove reminder", "label": AX.label_of(rm_node), **rm_guard})
@@ -444,7 +466,7 @@ def main() -> int:
     res["shots"].append("05-reminder-removed")
     dump(res, out)
     if not removed:
-        raise ProbeError(f"deleting the reminder did not bring the block back to its empty state: "
+        raise fail(f"deleting the reminder did not bring the block back to its empty state: "
                          f"{res['afterRemove']}")
 
     try:
