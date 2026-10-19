@@ -4649,3 +4649,20 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
       **android 腿的构建机在**，但本线 `reinstall-all.sh` 的 android 段走的是本机 `pnpm build:android` + 本机 adb 模拟器这条路（本线没在这台机上量过它能不能跑），
       下一趟要先定走哪条路，别一上来就远程跑。
       设备收工态：`appearance = light`（回读 `light`）、应用内语言 = 中文、**没收任何 companion**。
+- [x] ✅ **10-19 11:4x–11:5x（r139 续）同一枚当前源码载体上补跑 mac 腿（绿）与 android 腿（红，红在规则不在代码）**。
+      **mac 腿一趟就绿**：载体 `head-r128` @ `997a1935`、`HEYTA_REINSTALL_TMP_DIR=/Users/rocalight/heyta-r139-mac-tmp NO_COLOR=1 bash scripts/reinstall-all.sh --only mac` ⇒ `MAC_RC=0`；
+      全仓构建 ✅ → web 产物刷新 ✅ → 打包（`.app` + `.dmg`）✅ → **公证通过并装订票据**（`The staple and validate action worked!`）→ 装到 `/Applications/Heyta.app`（mtime `2026-10-19 11:49:16`、`Timestamp=Oct 19 11:47:47`，
+      接手时那枚是 r128 趟的 `Timestamp=Oct 18 18:17:22`）⇒ **装的是当前产物**；对账 `9 个 chunk 与本机 apps/web/dist 同一次构建`；
+      窗口 `2318x1508`、内容占比 `54.8%`、主蓝命中 `983`。截图 `heyta-r139-mac-installed.png` 人眼看过：
+      Inbox 之上叠着「Sign in or register」认证面板（邮箱 / 登录密码 / `Sign in` / `Other ways to sign in`），不是纯色空窗。
+      ⚠️ 上一格那两次红在公证时间戳（#467）本趟没复现 —— **没量到为什么**，只记"这一趟一次就过"，不许读成"那条根因已修"。
+      🔴 **android 腿红，且红得对**：`ANDROID_RC=1`，`run-gradle.mjs` 在步骤 1 就拒了 —— `ssh: connect to host 10.111.127.237 port 22: Operation timed out`（`windows-pc` 不可达），
+      而它**明写不会自动退回本机**："规则要求 Android 构建在远程主机上跑，而'远程不行就本机'正是它要挡的形状"。
+      **我没有用那枚逃生门**（`HEYTA_ANDROID_LOCAL_GRADLE=1`）—— 用了就等于把一条产品负责人拍过的边界读成建议。
+      ⚠️ **本线这一趟自己踩了一脚，照实记**：我判断"android 腿许可跑"时只看了本机工具链在不在（`adb` 在、AVD `heyta-w3-yearly` 在、内存 86% 空闲），
+      就冷启了一枚 headless 模拟器（14 秒起完）—— 而 `scripts/run-gradle.mjs:29` 那句产品负责人拍板的原文是
+      **"之后 Android 任务一律 ssh windows-pc，不要再在 Mac 起新的 Gradle 构建或模拟器"**（起因：headless 模拟器常驻 3.6G 内存 + 90% CPU）。
+      ⇒ 那枚模拟器**没有跑过任何读数**，本趟收工前已 `adb -s emulator-5554 emu kill`、`adb devices` 现量为空。
+      教训不是"内存不够"，是**动手前先读那条链的收口点自己怎么写它的边界**（这条在记忆里有条目，我没去查它）。
+      **所以本轮四端的真实状态**：iOS ✅（上一格）· mac ✅（本格）· windows ⛔ 主机不可达 · android ⛔ 同一枚主机不可达 ⇒ **两趟覆盖两端，不叫四端全过**，
+      脚本汇总段自己就逐端写着"不在 `--only` 范围 —— 这端**没有**验证当前产物"。
