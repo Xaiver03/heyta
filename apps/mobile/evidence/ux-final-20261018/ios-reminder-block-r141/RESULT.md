@@ -1,4 +1,4 @@
-# r141 · iOS 任务详情里的提醒块（装机态 · 中文深浅两档 + 英文浅档 · 五步旅程）
+# r141 · iOS 任务详情里的提醒块（装机态 · 深浅 × 中英 **四格齐** · 五步旅程）
 
 装置：`scripts/qa/reminder-block-ios.py`（本轮由 r132 落在取证目录里的一次性探针转正而来）
 设备：模拟器 `heyta-iphone-17pro` · UDID `FE195661-B021-4A71-AAD1-1F2F7AE3A102` · iOS 27.0
@@ -13,16 +13,21 @@
 > 免得两枚 `03-` 并排被读成同一次。扩程照出来**一枚真产品缺陷**，在第四节。
 > ✅ **18:2x–18:3x r143 又补上第三格 `english-light/`（英文 × 浅）** —— 五步全过、每枚双语定位符在英文档都命中过，
 > 于是这一格原本那句"不证英文语态"划掉；同一趟**照出第二枚缺陷**（英文徽标被逐字打断），在 §四之二。
+> ✅ **18:3x–18:4x r144 把英文的暗档也取了（`english-dark/`）⇒ 这一格四格齐**：五步全过、五张图像素尺全 28、
+> 与 `english-light/` **15 枚 frame 逐枚相同** ⇒ §四之二那枚断行**与外观档无关**，是语态驱动的形状。
 
 ---
 
-## 一、三格读数（每格一趟完整旅程：空态 → 加一条 → **推迟** → **关闭** → 删回空态 → 删掉自己建的那条任务）
+## 一、四格读数（每格一趟完整旅程：空态 → 加一条 → **推迟** → **关闭** → 删回空态 → 删掉自己建的那条任务）
 
 | 档 | rc | 时长 | 语态 | 底部 tab 栏顶边（列表面现量） | 下界 | 起跳时在场的系统弹窗 |
 |---|---|---|---|---|---|---|
 | `light/` | 0 | 34.6 s | zh-CN | 776 pt | 772 pt | 0 枚 |
 | `dark/` | 0 | 35.7 s | zh-CN | 776 pt | 772 pt | 0 枚 |
 | `english-light/` | 0 | 44.9 s | **en** | 776 pt | 772 pt | 0 枚 |
+| `english-dark/` | 0 | 59.9 s | **en** | 776 pt | 772 pt | 0 枚 |
+
+⇒ 这一格到此**四格齐**（中×浅 · 中×暗 · 英×浅 · 英×暗）。
 
 ⚠️ 下面那张逐枚 frame 表是**中文两档**的控制配对读数（两档逐枚相同）。
 **英文档不同形，而"不同形"本身就照出一枚布局缺陷** ⇒ 单独写在 §四之二；那五张图与 JSON 在 `english-light/`。
@@ -60,6 +65,7 @@
 | `light/` | 252 | 252 | 252 | 252 | 252 |
 | `dark/` | 28 | 28 | 28 | 28 | 28 |
 | `english-light/` | 252 | 252 | 252 | 252 | 252 |
+| `english-dark/` | 28 | 28 | 28 | 28 | 28 |
 | `arm-before-fix-noop-tap/` | 252 | 252 | 252 | — | — |
 
 设深走的是 #471 那条能到达当前件的顺序：`shutdown` → `boot` → `bootstatus -b` → `simctl ui … appearance dark`。
@@ -143,6 +149,11 @@
 比没有判据更糟）。要证它必须**重打包装进模拟器**再跑三档，而那正是"改了判据没取读数"这条纪律要防的形状。
 ⇒ 交给提醒/界面那一线，随它下一次进包的改动一起做，一次重包把 ①② 选一个并复跑本页三档。
 
+**这一枚与外观档无关（r144 把英文的暗档也取了）**：`english-dark/` 与 `english-light/` 的 **15 枚 frame 逐枚相同**，
+`Scheduled` 那枚的高度在两档都是 **28**（`Snoozed` 都是 14）⇒ **断行不是暗档造成的**，它是语态驱动的形状；
+`english-dark/` 五张图像素尺全 28（深档由图证，不靠命令回读，#471），`uiLocale=en` 由树回读。
+顺带：第四节那枚「推迟反而提前」在**英文×暗**这一格又复现一次（第 6 枚样本：按钮念 `… at 10-19 19:37 …`，按完两枚后续动作读 `18:47`）。
+
 ## 五、新量到的一条环境事实（已登记为 #493）
 
 **iOS 系统弹窗在场时，`idb describe-all` 只回弹层那一棵树（现量 5 枚节点），app 自己的标签整片读不到。**
@@ -183,15 +194,18 @@
 其余图（`01`/`02`/`05` 两档六张）与 r141 第一趟同形，按像素尺与 JSON 读数承担。
 **英文档那五张**：`02`/`03`/`04` 三张逐张看过（那枚 `Schedule` / `d` 的断行、时刻折两行、以及关闭档回到单行，都是在这三张上看见的）；
 `01`/`05` 是空态与删回空态，两档同形，由像素尺（252）与 JSON 的 `No reminders yet` 命中承担，**没逐张看**。
+**英文×暗那一格**：`english-dark/02` 打开看过 —— 同一处 `Schedule` / `d` 的断行在暗档一样在场，
+暗档的徽标底是 `surface-sunken` 的深底 + 反色文字（没有残留浅色底）、`Delete reminder` 那枚图标仍是语义红；
+其余四张由像素尺（五张全 28）与 15/15 逐枚 frame 对账承担，**没逐张看**。
 
 ## 八、这一格不证什么
 
 1. **不证提醒真的会发出去**：本机无法把通知权限回到未决态（#475），弹窗那一支只取到一次；
    也不证到点触发（那要等一小时）。这一格证的是**块内三态的界面、可及名称与两枚动作的效果**。
-2. ~~**不证英文语态**~~ ✅ **已证（r143）**：`english-light/` 那一趟五步全过、`uiLocale=en` 由无障碍树回读、
-   每枚双语定位符都在英文档命中过（`Remind me in 1 hour` / `Snooze the reminder at … by 10 minutes` / `Close task details`）。
-   这一趟照出 §四之二那枚布局缺陷。**仍不证**：英文 × **暗**档（外观与语态是两维，本线只取过 `english-light` 这一格）、
-   Android 档的同一形状。
+2. ~~**不证英文语态**~~ ✅ **已证（r143 英×浅、r144 英×暗）**：`english-light/` 与 `english-dark/` 各一趟五步全过，
+   每枚双语定位符在两档都命中过（`Remind me in 1 hour` / `Snooze the reminder at … by 10 minutes` / `Close task details`），
+   且**两档 15 枚 frame 逐枚相同** ⇒ §四之二那枚断行缺陷与外观档无关。
+   **仍不证**：**Android 档**的同一形状（这枚装置只有 iOS 腿）、iPad / 窄屏 / 大字体。
 3. **不证有截止时间的任务**：那条路径上块里会出现「添加提醒」与相对偏移预设，本趟建的任务没有截止时间，
    所以 `添加提醒 present=false` 是**这一格的形状**，不是缺陷。
 4. **不证「推迟」的分钟数可配**：文案写死 10 分钟，本趟没测别的档位。
@@ -217,15 +231,22 @@ python3 scripts/qa/reminder-block-ios.py --udid $U --evidence-dir $EV/dark
 python3 scripts/qa/reminder-block-ios.py --udid $U --evidence-dir $EV/arm-claims-light; echo "REFUSE_RC=$?"
 xcrun simctl ui $U appearance light        # 收尾还原（见下一段：还原要重启一次）
 
-# 英文 × 浅档（r143）：语言走产品自己的开关，收尾必须显式切回中文并看它的回读步
+# 英文档（r143 浅 / r144 暗）：语言走产品自己的开关，收尾必须显式切回中文并看它的回读步
 python3 scripts/qa/ios-app-language.py --udid $U --to en          # 判语言只看它打印的 `language after (en)`
 python3 scripts/qa/reminder-block-ios.py --udid $U --evidence-dir $EV/english-light
-python3 scripts/qa/ios-app-language.py --udid $U --to zh          # 同上，看 `language after (zh)`（#488）
+# 暗档那一格（r144）在中间插一次按 #471 的重启再设深：
+xcrun simctl shutdown $U && xcrun simctl boot $U && xcrun simctl bootstatus $U -b
+xcrun simctl ui $U appearance dark
+python3 scripts/qa/reminder-block-ios.py --udid $U --evidence-dir $EV/english-dark
+# 收尾两样都要还原，且各看各的回读步
+xcrun simctl shutdown $U && xcrun simctl boot $U && xcrun simctl bootstatus $U -b
+xcrun simctl ui $U appearance light
+python3 scripts/qa/ios-app-language.py --udid $U --to zh          # 看 `language after (zh)`（#488）
 ```
 
-设备收尾状态（现量，18:1x → 18:3x）：外观 `light`（`simctl ui` 回读 + **装机面一张 `modalLuminance = 252`** 双确）、
+设备收尾状态（现量，18:1x → 18:4x）：外观 `light`（`simctl ui` 回读 + 更早那趟装机面一张 `modalLuminance = 252` 双确）、
 **应用内语言已还原中文**（`--to zh` 8 步 `rc=0`，回读步 `language after (zh)` passed）、
-`com.heyta` 已 terminate、任务列表为空（三档各删掉自己建的那条）、通知权限 = 已允许（r141 第一趟按掉的那枚弹窗决定的，**不可回退**，见 #475）、
+`com.heyta` 已 terminate、任务列表为空（四档各删掉自己建的那条）、通知权限 = 已允许（r141 第一趟按掉的那枚弹窗决定的，**不可回退**，见 #475）、
 **没收任何 companion**（`idb_companion` 一律不动）。
 ⚠️ 上一格（r141 第一趟）写的"收笔 light"当时已被现量否证：本趟起跳前 `simctl ui … appearance` 回的是 `dark`
 —— 是那两枚命名错的臂留下的。还原顺序照 #471：`appearance light` → `shutdown` → `boot` → `bootstatus -b`。

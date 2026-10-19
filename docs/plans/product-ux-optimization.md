@@ -4797,4 +4797,11 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
       `com.heyta` 已 terminate、列表为空、**没收任何 companion**。门现量 `check:locator-labels` / `check:md-tables` / `check:docs` 各 `rc=0`。
       **不证**：⑴ 英文 × **暗**档（外观与语态是两维，本线只取过 `english-light` 这一格）；⑵ Android 档的同一形状；
       ⑶ 大字体档下这枚徽标会不会更早开火（没测）；⑷ 那两枚改法的任何一种效果（本线一个字没改）。
-      读数与十五张图在 [`apps/mobile/evidence/ux-final-20261018/ios-reminder-block-r141/RESULT.md`](../../apps/mobile/evidence/ux-final-20261018/ios-reminder-block-r141/RESULT.md)（§一 三格表、§四之二）。
+      读数与图在 [`apps/mobile/evidence/ux-final-20261018/ios-reminder-block-r141/RESULT.md`](../../apps/mobile/evidence/ux-final-20261018/ios-reminder-block-r141/RESULT.md)（§一 四格表、§四之二）。
+- [x] ✅ **10-19 18:4x 提醒块第四格「英文 × 暗」取到 ⇒ 这一格 2×2 齐了**（r144，同一枚件；四趟全部落在 `…/ios-reminder-block-r141/`）
+      `--to en` → 按 #471 重启设深 → `reminder-block-ios.py --evidence-dir …/english-dark` ⇒ **五步全过、`rc=0`、59.9 s、`uiLocale=en`、五张图像素尺全 28**；
+      收尾两样都还原并各看各的回读（`appearance light` 回读 + `--to zh` 8 步 `language after (zh)` passed）、`com.heyta` 已 terminate、本次建的那条已删。
+      🔴 **这一格的价值是那把对账尺，不是第五张图**：`english-dark` 与 `english-light` 的 **15 枚 frame 逐枚相同**（含 `Scheduled` 徽标高 **28 = 28**、`Snoozed` 14 = 14）
+      ⇒ r143 那枚"英文徽标被逐字打断"**与外观档无关**，是语态驱动的形状 ⇒ 修它的人不必在四档里分别验证，但**要在两语态里都验**。
+      顺带：第四节「推迟反而提前」在这一格又复现一次（第 6 枚样本：按钮念 `… at 10-19 19:37 …`、按完两枚后续动作读 `18:47`）⇒ 四格齐 + 六枚样本，两枚缺陷都不依赖单档。
+      **不证**：Android 档的同一形状（这枚装置只有 iOS 腿）、iPad / 窄屏 / 大字体、那两枚改法任何一种的效果（本线一个字没改）。
