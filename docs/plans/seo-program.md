@@ -196,7 +196,7 @@ for(const [id,z,e] of rows.sort((a,b)=>b[1]-a[1]))console.log(String(z).padStart
 | sitemap 的 `<lastmod>` | 这份 sitemap 是**签进仓库的生成物**、由 `--check` **逐字节**对账。lastmod 只有两个来源，都会把对账变噪音：构建时刻（同 commit 不同机器不同字节）与 `git log`（浅克隆/无 `.git` 取不到）。而 Google 只采信"可核实的准确"lastmod |
 | 在**生成的 HTML** 里写价格（JSON-LD 那处） | 价格只在词条表里写一次，`check:pricing` 核对那几处。写进生成物就是**又一处**，而**门禁扫不到生成的 HTML** |
 | ~~在 `pricing` 的 meta 描述里写价格~~ | 🔴 **这一条是我写错了，已撤回。** 我按"meta 在生成的 HTML 里 ⇒ 扫不到"推理，但**它的源在 `packages/i18n/src/locales/*.ts`，而那整张表是被扫的**（`check-pricing-consistency.mjs` 的 `sweepNoUnapproved(read(file), '全表')`）。用变异证实：把 meta 描述里的托管价 `¥5` 改成 `¥9`（四处事实源一字未动），门禁立刻红在「zh catalog 全表 里有 ¥9」。⇒ 价格写进 i18n 词条可以（现存的 `site.pricing.seo.description` 本来就写着 ¥5/¥12 并通过），**写进 JSON-LD 不行** |
-| IndexNow key + 推送脚本 | 现阶段价值低（IndexNow 覆盖 Bing/Yandex 系，接不住百度），而**新建一条没人跑的自动化**违背"不能失败的检查没有价值"。命令写进 §6.2 的待办即可 |
+| ~~IndexNow key + 推送脚本~~ | 🔴 **已撤回（2026-10-19 当天就做了，读数见 §8.5）。** 原判断是"现阶段价值低 + 不建没人跑的自动化"。撤回的理由不是"价值变高了"，而是那个前提**被证伪**：它零账号、零登录、零前台，是 objective ② 里唯一不需要人介入的一格 ⇒ "没人跑的自动化"不成立。⚠️ 但它**不是 Google 的通道**（Google 不参与 IndexNow），**不能替代** GSC / Bing 的所有权验证 —— 那两件事仍然要做 |
 | 给 `/signin/` 加 `noindex` | 它是真页面、用户会搜"heyta 登录"；"页面短"不是 noindex 的理由（移出 sitemap 也不等于禁止索引） |
 
 ---
@@ -339,3 +339,40 @@ for(const [id,z,e] of rows.sort((a,b)=>b[1]-a[1]))console.log(String(z).padStart
   `curl -x http://127.0.0.1:7890 https://www.google.com/` 回 **302**（通），
   直连则是 connection reset（大陆常态）。⇒ 那次是抖动，不是配置错；标签已恢复。
   系统代理是 `127.0.0.1:7890`（iKuuuVPNC 在听）。
+
+### 8.5 ✅ IndexNow 已接入（objective ② 里第一格真正闭合的，也是唯一不需要人介入的一格）
+
+IndexNow 是**不需要账号**的索引提交协议：站点根放一枚 `<key>.txt`（内容就是 key 本身），
+之后把 URL POST 给 `https://api.indexnow.org/indexnow` 即可。它覆盖 **Bing / Yandex /
+Seznam / Naver**；🔴 **Google 不参与 IndexNow**，所以它不替代 GSC/Bing 的所有权验证。
+
+**做法**（按仓库纪律做成生成物，而不是 `public/` 下手写一份）：
+
+| 落点 | 作用 |
+|---|---|
+| `apps/landing/src/site/indexnow.ts` | 键值的**唯一一份定义点**（含"为什么可以签进仓库"：按协议它必须公开可取） |
+| `gen-entries.mjs` 生成 `public/<key>.txt` | 与 sitemap / robots 走**同一条** `check:entries` 逐字节对账；内容**刻意不加结尾换行**（精确值在"会 trim"与"逐字节比"两种校验器下都成立） |
+| `tests/seo-head.spec.ts` | 离线判据：内容逐字等于 key 且符合协议字符集/长度。⚠️ 它与 `--check` **管的不是同一件事** —— 有人给它包 JSON 或补换行时，生成器与生成物一起变、`--check` 照样绿，而协议就不认了 |
+| `e2e/live-site/live-seo.spec.ts` | 线上判据：键文件真能取到且内容一致（**刚把整站兜底改成 `=404`，"站点根下的单个文件"正是最容易被顺手 404 掉的东西**） |
+
+**读数（全部实测）**：
+
+| 项 | 值 |
+|---|---|
+| `check:entries` | 81 份（加这一枚键文件） |
+| 落地页测试 | **1415 条全绿** |
+| 线上 `GET /5df57f5b75d4db6e6aaa93c188a4f9b9.txt` | **200**、**32 字节**、内容逐字一致 |
+| 发布链 | `publish-public-sites.mjs --confirm` **九步全过**、线上验收 **44 项全绿** |
+| **IndexNow 提交** | `POST https://api.indexnow.org/indexnow`，**76 条 URL**（取自 sitemap），**HTTP 202 Accepted** |
+
+⚠️ **202 的含义**：URL 已接收，key 校验随后生效（不是 200，也不是失败；403 = key 找不到、
+422 = URL 不属于该 host）。**「已提交」不等于「已收录」** —— 收录要等，且只能从
+Bing 站长平台的覆盖率报告里读，那一格仍属于 §6.2。
+
+#### 这一格顺带留了一个值得复用的判据形状
+
+我第一版线上判据用 `filter(f => f.endsWith('.txt'))` 挑键文件 ⇒ **`robots.txt` 也被收进来**，
+判据因为**自己的探针**变红、发布链卡在第 9 步，而同一时刻 `curl` 那枚键文件回
+200 / 32 字节 / 内容逐字一致 —— **红的不是被测对象**（元规则 1 的又一实例）。
+改用**协议自身的性质**当判据：键文件按定义就是「一个 `.txt`，其内容等于它自己去掉后缀的文件名」。
+既不靠"排除 robots.txt"这类会漂的白名单，也能在未来往 `public/` 加别的 `.txt` 时保持正确。
