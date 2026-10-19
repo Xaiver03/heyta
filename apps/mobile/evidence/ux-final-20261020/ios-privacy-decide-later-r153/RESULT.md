@@ -52,12 +52,45 @@ web 那条的形状是 `textContent === aria-label` —— 不写死中文串，
 
 ## 四、这一格不证的四件事
 
-1. **不证英文档**（`Decide later` 那一格）：这台一次性载体第一次起来界面就是中文，本趟没切语言。
+1. ~~不证英文档~~ ✅ **10-20 01:1x 已补，见下面第六节** —— 英文档那枚出口同样取到了装机态读数。
 2. **不证 Android**：Android 那腿照旧欠着（`grep -rn "以后再说\|Decide later" scripts/qa/` 现量仍为空），
    而且 Android 出包仍堵在打包机不可达（10-20 01:0x 现量 `ssh -o ConnectTimeout=6 -o BatchMode=yes windows-pc true` ⇒ **rc=255 / Host is down**，
    `adb devices` 空）。⚠️ 本枚改的是 `apps/mobile/src` ⇒ **Android 产物会因此落后一枚**。
-3. **不证暗档**：这台一次性载体是默认浅档。
+3. **不证暗档**：两台一次性载体都是默认浅档。
 4. **不证"按 ✕ 之后一个请求都不发"**：本趟没有请求计数器（同 r150 第 4 节口径）。
+
+## 六、英文档那一腿（同一枚件，01:1x 补跑）
+
+载体 `heyta-r154-privacy-later-en`（同一枚 `main.jsbundle`，跑完 `shutdown` + `delete`，现量 `xcrun simctl list devices | grep -c heyta-r15` = **0**）。
+语言走 `scripts/qa/ios-app-language.py --to en`（应用内开关，11 步全过，读数在 `en-lang/language-switch.json`）⇒ 判据仍是 AX 树里回读到的标签（陷阱 #488）。
+
+| 读数 | 值 |
+|---|---|
+| 带着那句话的节点 | **1 枚**，label `Decide later`，frame `[271, 192, 95, 44]`，`pressable=true`、`enabled=true` |
+| 装置自判 | `visible-text（触控区宽 95 pt > 图标方块 44 pt）`；`en/01-first-launch.png` 逐张看过 —— 那句话在标题同一行，没折行也没被截 |
+| 按掉之后 | `sheetStillPresent=[]` ⇒ 卡收（行为与中文档同形） |
+| 杀掉再开 | `sheetBack=['Agree and connect','This device only']` ⇒ 卡原样回来 |
+| `device_pref` 三趟 | 三趟都只有 `welcome.hasSeen=1`，**`privacy.consent` 一枚都没有** ⇒ "以后再说"仍然什么都不决定 |
+
+🔴 **两枚装置事实，下一位会撞上**：
+① **`ios-app-language.py` 走的是「先离线使用」那一枚，而那一枚会记一次决定** ——
+   第一次英文跑因此读回空卡（`verdict: close-button-not-found`），现量库里被写下
+   `privacy.consent = {"decision":"local-only","decidedAt":"2026-10-19T17:12:45.633Z"}`（那次跑的记录还在 `en/probe.json` 的上一版里，本目录保留的是重跑后的）。
+   ⇒ **顺序必须是**：先 `probe.py --dismiss-only`（按「以后再说」，不落盘）→ 再切语言 → 再重启读卡。
+   ⚠️ 切语言那一步仍会经过欢迎页并点「先离线使用」，所以本趟在切完之后**只删掉那一行 `privacy.consent`**
+   （`sqlite3 <那枚库> "delete from device_pref where key='privacy.consent'"`，设备此刻是 terminate 态）把机器放回"没决定"的状态再重启读卡。
+   🔴 这是**装置手法不是产品行为**：它证的只有"英文档那张卡上那句话看得见、按下去不落盘"，
+   不证"真机上用户会怎样走到这一步"。写在这是因为不写就会被下一位读成"英文档天然如此"。
+② **中文档那次 `--dismiss-only` 的读数在 `zh-dismiss/`**（同一枚件、同一次开机，只为把卡收掉好走设置面）。
+
+## 七、顺带量到的一条**新的候选缺陷**（未裁决）
+
+欢迎页那枚 **「先离线使用」/ `Use offline for now` 按下去会记一次决定**：
+库里落 `privacy.consent = {"decision":"local-only", …}`，从此首屏那张卡不再出现（只能去设置面「重新作出选择」才回得来）。
+⇒ 措辞里的"先 / for now"读起来是"先看看、待会儿再说"，而它实际做的是**把"这台只用本机"记成已作过的选择**。
+这**可能**正是产品想要的（本地优先不是降级，那条路本来就是完整产品），所以本线不判它错；
+登记的是**形状 + 两条读数**，与 r153 那枚的区别写清：✕ 什么都不记（已证），这一枚记了但字面读起来像没记。
+台账另立一格跟这条。
 
 ## 五、下一位怎么重跑
 

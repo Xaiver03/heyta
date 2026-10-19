@@ -116,6 +116,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--udid", required=True)
     ap.add_argument("--out", default=str(HERE))
+    ap.add_argument("--dismiss-only", action="store_true",
+                    help="只读到卡、取一次读数、按掉那句话就退出（英文档那一腿要先把卡收掉才走得到设置面）")
     args = ap.parse_args()
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -172,6 +174,14 @@ def main() -> int:
         "shot": shot(args.udid, out, "02-after-tap-close"),
     })
     res["consent"]["afterTap"] = consent_rows(args.udid)
+
+    if args.dismiss_only:
+        # 英文档那一腿：卡必须先收掉才走得到设置面（切语言），但**不许**在这一步判收尾
+        # —— 收尾（重启看卡回不回）由后面那次完整跑做，这里只交"按掉了"这一件。
+        (out / "probe-dismiss.json").write_text(json.dumps(res, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        print(json.dumps({"status": "dismissed", "visibleLabel": res["steps"][0]["visibleLabel"],
+                          "sheetAfterTap": res["steps"][1]["sheetStillPresent"]}, ensure_ascii=False))
+        return 0
 
     simctl("terminate", args.udid, "com.heyta")
     time.sleep(1.5)
