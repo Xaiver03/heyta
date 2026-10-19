@@ -11,10 +11,15 @@
 }
 
 /* rail 是认证弹窗的宿主节点；只隐藏它的导航内容，不能隐藏整个 rail。 */
-.ht-rail:has(.ht-sheet__auth) > .ht-rail__top,
-.ht-rail:has(.ht-sheet__auth) > .ht-rail__tabs,
-.ht-rail:has(.ht-sheet__auth) > .ht-rail__more {
+body:has(.ht-sheet__auth) .ht-rail__top,
+body:has(.ht-sheet__auth) .ht-rail__tabs,
+body:has(.ht-sheet__auth) .ht-rail__tab,
+body:has(.ht-sheet__auth) .ht-rail__more {
   visibility: hidden;
+}
+
+body:has(.ht-sheet__auth) .ht-compact-rail {
+  background: transparent;
 }
 
 .ht-sheet__auth-dialog {
@@ -228,6 +233,10 @@
   font: inherit;
   text-decoration: underline;
   cursor: pointer;
+}
+
+.ht-auth-central__close {
+  justify-self: end;
 }
 
 .ht-auth-central__button {
