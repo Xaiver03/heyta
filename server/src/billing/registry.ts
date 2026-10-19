@@ -11,7 +11,6 @@
  */
 import { createNoopBillingAdapter } from './noop.adapter';
 import type { BillingAdapter } from './types';
-import { createWechatBillingAdapter, WECHAT_PROVIDER } from './wechat.adapter';
 import {
   createPaycenterBillingAdapter,
   PAYCENTER_PROVIDER,
@@ -67,19 +66,14 @@ export const createBillingAdaptersFromConfig = (
   config: ServerConfig,
 ): readonly BillingAdapter[] => {
   const adapters: BillingAdapter[] = [createNoopBillingAdapter()];
-  if (config.wechatPay !== undefined) {
-    adapters.push(
-      createWechatBillingAdapter({
-        appId: config.wechatPay.appId,
-        mchId: config.wechatPay.mchId,
-        serialNo: config.wechatPay.serialNo,
-        apiV3Key: config.wechatPay.apiV3Key,
-        privateKey: config.wechatPay.privateKey,
-        publicKey: config.wechatPay.publicKey,
-        notifyUrl: config.wechatPay.notifyUrl,
-      }),
-    );
-  }
+  // 🔴 **微信直连不再注册** —— 收单与退款统一走支付中心。
+  //
+  // 这不是"默认关着"，是**没有这条注册**：即使运营者设了 WECHAT_PAY_ENABLED，
+  // 也走不到这里（config 会在启动期直接拒，见 config.ts）——
+  // 所以不存在"看起来配了但注册不上"那个中间态。
+  //
+  // 那个 adapter 文件本身还在（它的单元测试也还在），删它是机械的第二步；
+  // 但**路由层面它已经不可达**：未注册的 provider 一律 404（fail-closed）。
   // 中心**仅当 `config.paycenter` 存在时**注册（即 PAYCENTER_ENABLED=true
   // 且三项凭证齐全，见 config.ts）—— 少一个变量是启动期硬错误，走不到这里，
   // 所以"注册得上但用不了"这种中间态不存在。
@@ -110,9 +104,3 @@ export const isPaycenterBillingRegistered = (config: ServerConfig): boolean =>
     (adapter) => adapter.provider === PAYCENTER_PROVIDER,
   );
 
-/** 已注册的 provider 名里有没有微信。给日志 / 自检用，判据与注册表一致。 */
-export const isWechatBillingRegistered = (config: ServerConfig): boolean =>
-  config.wechatPay !== undefined &&
-  createBillingAdaptersFromConfig(config).some(
-    (adapter) => adapter.provider === WECHAT_PROVIDER,
-  );

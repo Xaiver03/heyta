@@ -737,6 +737,11 @@ export const loadConfigFromEnv = (
   // 🔴 取值严格：写错在这里**报错**，不静默落到"关"。
   // 🔴 凭证不全也是**报错**：错拼一个变量名会让 adapter 悄悄不注册，
   //    而症状是"用户付了钱没权益" —— 那是收钱路径上最坏的一种静默。
+  // 🔴 微信直连**已经去掉**：收单与退款统一走支付中心。
+  //
+  // 这里刻意**不是**"静默忽略"：运营者若还开着 WECHAT_PAY_ENABLED=true，
+  // 说明他以为那条路还在 —— 而它的症状是"用户付了钱没权益"，
+  // 是收钱路径上最坏的一种静默。所以直接启动红，并指出该换什么。
   if (process.env.WECHAT_PAY_ENABLED !== undefined) {
     const raw = process.env.WECHAT_PAY_ENABLED.trim().toLowerCase();
     if (raw !== 'true' && raw !== 'false') {
@@ -744,82 +749,14 @@ export const loadConfigFromEnv = (
         `Invalid WECHAT_PAY_ENABLED: ${process.env.WECHAT_PAY_ENABLED}. Use 'true' or 'false'.`,
       );
     }
-
     if (raw === 'true') {
-      const credentials = {
-        appId: process.env.WX_APP_ID,
-        mchId: process.env.WX_MCH_ID,
-        serialNo: process.env.WX_SERIAL_NO,
-        apiV3Key: process.env.WX_API_V3_KEY,
-        privateKey: resolveWechatKey('WX_PRIVATE_KEY', 'WX_PRIVATE_KEY_PATH'),
-        publicKey: resolveWechatKey('WX_PUBLIC_KEY', 'WX_PUBLIC_KEY_PATH'),
-      };
-      const credentialKeys = Object.keys(credentials) as (keyof typeof credentials)[];
-      const missing = credentialKeys.filter((key) => !credentials[key]?.trim());
-      if (missing.length > 0) {
-        throw new Error(
-          'WECHAT_PAY_ENABLED=true but wechat pay credentials are incomplete. Missing: ' +
-            `${missing.map((key) => `WX_${key.replace(/[A-Z]/g, (c) => `_${c}`).toUpperCase()}`).join(', ')}. ` +
-            'Set all of them (私钥/平台公钥也可改用 `WX_PRIVATE_KEY_PATH` / `WX_PUBLIC_KEY_PATH` ' +
-            '指向磁盘上的 PEM 文件), or turn WECHAT_PAY_ENABLED off.',
-        );
-      }
-
-      // APIv3 密钥必须是 32 个字节：在启动期挡掉，而不是等第一条真实回调验签失败。
-      const apiV3Key = credentials.apiV3Key as string;
-      if (Buffer.byteLength(apiV3Key, 'utf8') !== 32) {
-        throw new Error(
-          `Invalid WX_API_V3_KEY: must be exactly 32 bytes, got ${String(Buffer.byteLength(apiV3Key, 'utf8'))}.`,
-        );
-      }
-
-      // 回调地址默认由 PUBLIC_URL 推导 —— 它必须是**微信能访问到**的公网地址。
-      const notifyUrl =
-        process.env.WX_NOTIFY_URL?.trim() ||
-        `${config.publicUrl}/api/billing/webhooks/wechat`;
-      if (!/^https:\/\//i.test(notifyUrl)) {
-        throw new Error(
-          `WX_NOTIFY_URL must be an absolute https:// URL (got ${notifyUrl}). ` +
-            'WeChat Pay refuses non-HTTPS notify URLs.',
-        );
-      }
-
-      // 🔴 **回调送到别的 host 时要显式确认。** 复用另一套部署的配置时，
-      // 运维会顺手把对面的 `PAY_NOTIFY_URL` 字面值抄过来 —— 那意味着"钱到账了"
-      // 这条消息进了**另一个实例的库**：那边没有这些订单号，授予不出去，
-      // 而微信看到的是 200、我们这边连一条日志都没有。**收了钱不发货，且两边都不报错。**
-      // 所以 host 不一致默认启动红，只有显式声明"这就是有意的"才放行。
-      if (process.env.WX_NOTIFY_URL?.trim()) {
-        const hostOf = (value: string, label: string): string => {
-          try {
-            return new URL(value).host;
-          } catch {
-            throw new Error(`${label} 不是可解析的绝对 URL：${value}`);
-          }
-        };
-        const notifyHost = hostOf(notifyUrl, 'WX_NOTIFY_URL');
-        const publicHost = hostOf(config.publicUrl, 'PUBLIC_URL');
-        if (notifyHost !== publicHost) {
-          const confirm = process.env.WX_NOTIFY_URL_CONFIRM?.trim();
-          if (confirm !== 'host-mismatch-is-intentional') {
-            throw new Error(
-              `WX_NOTIFY_URL 的 host（${notifyHost}）与 PUBLIC_URL 的 host（${publicHost}）不一致。` +
-                '到账回调会送进另一台实例的库 ⇒ 那边的订单号查不到、这边收了钱不发权益。' +
-                '确实要跨 host 就设 WX_NOTIFY_URL_CONFIRM=host-mismatch-is-intentional。',
-            );
-          }
-        }
-      }
-
-      config.wechatPay = {
-        appId: credentials.appId as string,
-        mchId: credentials.mchId as string,
-        serialNo: credentials.serialNo as string,
-        apiV3Key,
-        privateKey: credentials.privateKey as string,
-        publicKey: credentials.publicKey as string,
-        notifyUrl,
-      };
+      throw new Error(
+        'WECHAT_PAY_ENABLED=true is no longer supported: the direct WeChat Pay ' +
+          'integration has been removed and all payments now go through the payment ' +
+          'center. Unset WECHAT_PAY_ENABLED (or set it to false) and use ' +
+          'PAYCENTER_ENABLED=true with PAYCENTER_BASE_URL / PAYCENTER_CLIENT_ID / ' +
+          'PAYCENTER_CLIENT_SECRET instead.',
+      );
     }
   }
 
