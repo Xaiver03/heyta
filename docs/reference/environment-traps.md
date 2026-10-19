@@ -10709,3 +10709,20 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
       所以 `english-dark/` 这种语言×档合一的目录名没有判据）。反臂现量：设备 light 时
       `--evidence-dir .../mutation-arm-claim-dark` 回 `refusing to write…` 且**目录没被创建** —— 这种"红在没有落点"
       的取证只能把命令本身记进 RESULT，别指望有 JSON 可看。
+
+493. 🔴 **iOS 系统弹窗在场时 `idb describe-all` 只回弹层那一棵树（现量 5 枚节点）——app 自己的标签整片读成 absent，"那一下没生效"是假读数；而且这棵树活得过 `simctl terminate` + `launch`**（2026-10-19 17:1x–17:3x 本线现量，`scripts/qa/reminder-block-ios.py` / r141）。
+      ⑴ 现象：点「1 小时后提醒」之后，`afterAdd` 四枚（`待触发` + 三枚动作）全 `present:false`，
+        看着完全像"提醒没加上"。逐字符现量的另一条通道（截图）里那一行**已经在**（`10-19 18:15` + 三枚动作）
+        ⇒ 图与树互相否证，先怀疑探针（§7 元规则一）。
+      ⑵ 成因：那一枚是 iOS 的通知授权弹窗，由**另一个进程**渲染。现量：弹窗在场时整棵树只有 5 枚
+        （`Application` + 两行正文 + `不允许`/`允许` 两枚按钮），每枚的 `pid=11428`，而前台 app 的 pid 是 `40365`。
+        ⇒ `describe-all` 交回的是**弹层那棵树**，不是"app 少了几个节点"。
+      ⑶ 它**不随 app 死掉**：`simctl terminate` + `launch` 之后弹窗还在，于是下一趟直接死在
+        `ensure_on_tasks()`，报 `workspace did not open after onboarding` —— 这条文本会把人往"首屏没起来"那个方向带，
+        真因在上一趟留了一枚没按掉的系统弹窗。
+      ⑷ 装置形状（两条都必要，少一条就只剩一半）：起跳时把在场的弹窗**逐枚按掉并记进读数**
+        （`systemPromptsAtStart`），不按掉就红；"按掉"认的是**形状**（树 ≤12 枚且含 ≥2 枚 Button）+ 取**右边那枚**
+        （Apple 的默认动作排版契约，现量 `不允许` x=57 / `允许` x=205），**不是**按字符串匹配 ——
+        弹窗文案不在本仓词条里，英文那一侧还带弯引号（`Don’t Allow`），按字串会把装置钉死在一种系统语言上。
+      ⑸ 取证边界：授权一旦决定就不再弹，而本机 `simctl privacy reset notifications` 回 rc=1（#475）
+        ⇒ **这一支只能取一次**。别把"复跑还是绿的"读成"弹窗那一支也复跑过了"。

@@ -4710,3 +4710,42 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
       （同一行里 `Tasks`/`Calendar`/`Focus` 三枚命中），但那是候选表与真源的漂移；改它要重跑 AI 面四格才不算
       "改了判据没取读数"，本趟只登记。
       **不证**：这一面只读（不改设置、不导出、不清理、不登录）；四端仍不等于四端（windows/android 仍堵在打包主机）。
+- [x] ✅ **10-19 17:3x 提醒块那一枚一次性探针转正成常驻装置，并在当前源码件上重跑深浅两档 —— 这一趟修的是探针，不是产品**（r141，`scripts/qa/reminder-block-ios.py`，图与读数同批入库）
+      前身是 r132 落在取证目录里的一次性探针（`apps/mobile/evidence/…/ios-reminder-block-r132/probe-reminder-block.py`）。
+      目标里点名"提醒状态"，而这一格此前只有那一趟读数、且它拿的是旧件，一次性探针也没有"下一位怎么重跑"的位置。
+      **旧探针在当前源码件上重跑时把那一下打在底部 tab 栏上**（`01`/`02` 同一张画面、`afterAdd` 四枚全 `present:false`、
+      却 `rc=0` 交回"取到读数"）⇒ 逐字符现量到的是**两重**失效，两支反臂各留了目录：
+      ① 射程不含底部 tab 栏：守卫写的是 `0 < cy < 屏高−40`（874 pt 屏 ⇒ 834），那枚按钮中心在 796；
+        而详情面板开着时**树里没有 tab 栏那几枚节点**（`viewport_bottom` 自己退到屏高−8=866）
+        ⇒ 光换 `viewport_bottom()` 不够，必须在**列表面**先把顶边量下来（现量 776 pt ⇒ 下界 772）再取小。
+        读数里 `tabBarTopOnListScreen` / `viewportBottomClamp` 两栏分开写，下一位能看出这个数是量来的还是猜的。
+      ② 惯性没停就按：守卫读到「提醒」在 y=720，紧接着的截图里它在 ~553 —— 中间画面又自己滚了 167 pt，
+        校验用的 frame 与按下去时的 frame 不是同一帧（#474 那一族的第二种失效）。⇒ 借 `ai-face-ios.settle_in_viewport`
+        那半把尺：隔 1.2 s 连读两遍、容差 12 pt 才交回。
+      🔴 **③ 修完①②之后它红了一次，而这一支红得假**（`prompt-first-run/`）：那一下打在 settled frame 正中
+        （71,382）却仍报"什么都没变"——真因是**iOS 通知授权弹窗整片顶掉了 app 的 AX 树**：现量那一刻整棵树只有 5 枚节点、
+        每枚 `pid=11428` 而前台 app 是 `40365` ⇒ `describe-all` 交回的是弹层那棵树；截图里那一行提醒**已经加好了**。
+        它还**活得过** `simctl terminate`+`launch`（不先按掉，下一趟直接死在 `ensure_on_tasks()`，报
+        `workspace did not open after onboarding`）。登记为 **#493**。装置因此起跳时逐枚按掉在场弹窗并记进读数
+        （`systemPromptsAtStart`），按哪一枚认**形状**（树 ≤12 枚且含 ≥2 枚 Button）+ 取右边那枚，
+        **不按字符串** —— 弹窗文案不在本仓词条里、英文那侧带弯引号，按字串会把装置钉死在一种系统语言上。
+      顺带把三枚动作按钮改按**词条模板**匹配（`reminder.a11y.snooze|dismiss|remove`，把 `{when}` 通配）而不是在探针里
+      自拼动词表：`check:locator-labels` 当场把四枚"没人守的英文抄件"判红（`'reminder'`、`'Close task detail'`、
+      `'Open task: '`、`noDueDate` 的英文整句都不在 `en.ts`）——真值是 `Close task details`（`mobile.detail.close`）
+      与 `…so only an absolute time can be set`。同趟把标签一律改成**函数内求值**（`JU.ENGLISH` 是探针读到第一帧树之后
+      才翻的旗，模块顶层常量会把英文态永远锁成中文），并把加完/删完从"记一条读数"改成**硬断言**、收工删掉本次建的那条任务。
+      **两格读数（zh-CN，同一枚件 `997a1935` / bundle `Info.plist` mtime `11:23:59`，与 r139/r140 同件）**：
+      `light/` rc=0（38.7 s，起跳时在场 1 枚弹窗、按掉「允许」）、`dark/` rc=0（51.1 s，0 枚）；
+      两档**逐枚 frame 完全相同**（节标题 `[16,295,370,23]`、空态行 `[16,330,370,18]`、快捷按钮 `[16,360,111,44]`、
+      加完后徽标 `[24,361,33,14]` 与三枚动作 `[132,332,82,44]`/`[218,332,82,44]`/`[304,332,82,44]`），
+      命中的整句可及名称逐字记进读数（`把 10-19 18:25 的提醒推迟 10 分钟` 等）；`removedBackToEmpty=true`、
+      两趟各自 `taskDeleted.gone=true`，设备现量任务列表为空。**深浅那把尺是图不是命令回读**（#471）：
+      独立像素尺逐张现量 `light` 三张 252、`dark` 三张 28；设深走 `shutdown`→`boot`→`bootstatus -b`→`simctl ui … dark`。
+      人看图：七张里逐张看五张（两档的空态/加完/删完 + 弹窗那张），其余按像素尺。
+      门现量：`check:locator-labels` 全清单 `rc=0`（新脚本 `读到 50 组、含中文 14` = 它自己的基线）。
+      **不证**：⑴ 不证提醒真的会发出去（到点要等一小时），也**不证弹窗那一支可复现** —— 授权一旦决定就不再弹，
+      而本机 `simctl privacy reset notifications` 回 rc=1（#475）⇒ 那一支整趟只取到一次，别把"复跑还是绿"读成它也被复跑过；
+      ⑵ 不证英文语态（装置现在双语可定位，但本趟两档都在 zh-CN，英文那一档没有本趟读数）；
+      ⑶ 不证有截止时间的任务（那条路径上块里才有「添加提醒」与相对偏移预设，本趟 `添加提醒 present=false` 是这一格的形状、不是缺陷）；
+      ⑷ 不证「推迟」「关闭」两枚按下去的效果（只取到它们的可及名称与 frame，没按）。
+      复跑命令与设备收尾状态在 [`apps/mobile/evidence/ux-final-20261018/ios-reminder-block-r141/RESULT.md`](../../apps/mobile/evidence/ux-final-20261018/ios-reminder-block-r141/RESULT.md)。

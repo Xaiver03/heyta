@@ -1,0 +1,13 @@
+{
+  "how": "在弹窗仍然盖住提醒块的那一刻，用同一枚 idb 通道现量 `describe-all`（不是截图反推）",
+  "nodes": 5,
+  "appLabelsReadable": "none —— 提醒块那一族标签整片读不到，这就是旧探针把'已经加上'读成'什么都没发生'的机制",
+  "tree": [
+    {"type": "Application", "pid": 11428, "label": null},
+    {"type": "StaticText", "pid": 11428, "label": "“heyta”想给你发送通知", "frame": [71, 387, 260, 20]},
+    {"type": "StaticText", "pid": 11428, "label": "heyta 需要通知权限来按时提醒你的任务。", "frame": [71, 414, 260, 38]},
+    {"type": "Button", "pid": 11428, "label": "不允许", "frame": [57, 473, 140, 48]},
+    {"type": "Button", "pid": 11428, "label": "允许", "frame": [205, 473, 140, 48]}
+  ],
+  "note": "pid 11428 ≠ 当时前台 app 的 pid（现量 40365）⇒ 这一棵树不属于 app 进程；它活得过 `simctl terminate`+`launch`（r141 实测：不先按掉，下一趟死在 `ensure_on_tasks()`）。"
+}
