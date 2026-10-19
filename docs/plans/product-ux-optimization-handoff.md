@@ -229,6 +229,13 @@
 
 本轮 Goal 那五步：第 1/2/3/5 步各自已翻状态，**第 4 步（四端重装）跑到第九趟仍只覆盖 iOS + mac 两端** ——
 windows/android 那台打包主机 ssh 不可达，而规则明令不许退回本机跑 Gradle（`scripts/run-gradle.mjs:29` 是负责人拍过的原文）。
+🔴 **01:5x 把"不可达"这条否定的分母补齐**：这台机在本机 `~/.ssh/config` 里其实有**三枚**别名（台账以前只数过两枚），
+现量命令 `grep -iE "^Host " ~/.ssh/config | tr ' ' '\n' | grep -i win` ⇒ `windows-pc` / `windows-pc-lan` / **`windows-codex`**，
+逐枚 `ssh -o ConnectTimeout=5 -o BatchMode=yes <别名> true` 三枚**全 `rc=255`**。再往下分一层（这一层决定下一步该找谁）：
+`ssh -G <别名> | awk '/^hostname /{print $2}'` 取到 `10.111.127.237` / `10.111.127.151` / `192.168.1.2`，
+前两枚 **ping 不通 + 22 端口关**（网络层就到不了 ⇒ 机子没开或不在网上），
+第三枚 **ping 得通但 22 关、`arp -n` 无表项**，而本机默认网关是 `10.246.153.46`（en0）⇒ 那枚 LAN 别名对当前这张网是**过期配置**，回它的不是打包机。
+⇒ 出路只有两条，**都不在本线手里**：把那台机开起来 / 更新它现在的地址，或删掉那枚只会误导人的 LAN 别名（别人的配置）。
 ⇒ **"四端全过"这句现在不成立**，谁写谁负责；四端真实状态逐枚在 §四 第 4 步那一行末尾。
 ⚠️ 但**别把"HEAD 变了"当成"四端都过期"**：过期的判据是"这枚改动会不会进那一端的产物"。
 r149 / r150 两笔动的是 `apps/mobile/src`、`apps/mobile/tests`、`scripts/qa` 与文档 —— 那三端**不需要为这两笔重跑**，
@@ -282,7 +289,9 @@ Android 有当前产物的 Profile/Settings 与 habits 腿读数（r85/r86/r109�
    未打勾枚数每次现量：`grep -c '^- \[ \]' docs/plans/product-ux-optimization.md`。
 6. 📊 **10-20 01:3x（r156 之后）未打勾格按"谁动得了"分好桶了**（枚数每次现量：`grep -c '^- \[ \]' docs/plans/product-ux-optimization.md`；逐格都在台账原文里，这里只给桶与一条判据）：
    · **要那台打包机**（四端系统小组件矩阵 / Android 档 / windows 腿 / 崩溃恢复新包那一格）——
-     先跑 `ssh -o ConnectTimeout=6 -o BatchMode=yes windows-pc true; echo $?`，回非 0 就别排进计划；
+     🔴 别只试 `windows-pc` 一枚就下结论，这台机有**三枚**别名，逐枚现量：
+     `for h in $(grep -iE "^Host " ~/.ssh/config | tr ' ' '\n' | grep -i win); do ssh -o ConnectTimeout=5 -o BatchMode=yes $h true >/dev/null 2>&1; echo "$h rc=$?"; done`；
+     三枚全非 0 就别把这趟排进计划（01:5x 现量三枚全 `rc=255`，且其中一枚是过期配置，见 §一 Q2 那一层分法）。
    · **要真 iPhone 或系统 GUI**（实体机验收、macOS Gallery 添加、Windows Widgets Board）—— 模拟器与探针不能替代，这是台账自己写的口径；
    · **要负责人**（法务审阅 / 主体资质 / 协议生效那两格，加上刚登记的「先离线使用」那一枚取向题）；
    · **在别线名下**（sweep 定位符漂移那格、`e6058120` 夹带归属那格、证据写回被跟踪目录那一格）——
