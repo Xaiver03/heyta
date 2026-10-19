@@ -368,6 +368,31 @@ describe('IndexNow 键文件（生成物）', () => {
   });
 });
 
+describe('平台验证文件：BingSiteAuth.xml', () => {
+  /**
+   * 🔴 这条**不能**只靠线上那条"与本机逐字比对"的判据（`e2e/live-site/live-seo.spec.ts`）：
+   * 那条比的是**本机文件 ↔ 线上文件**，所以有人把本机文件改坏（补个结尾换行、加一层包装、
+   * 把 token 换掉）时，两边**一起变**，它照样绿。同一族的教训见 IndexNow 那条。
+   *
+   * 这条判的是**形状就是平台要的形状** —— 事实源是 Bing 给的下载文件，
+   * 而我取它的那一刻看到的就是这些性质（`<?xml version="1.0"?>` 开头、单个 `<user>`、
+   * 32 位**大写**十六进制、**无结尾换行**）。
+   */
+  it('形状正确：单个 <user>、token 是 32 位大写十六进制、无结尾换行', () => {
+    const onDisk = resolve(APP, 'public/BingSiteAuth.xml');
+    expect(existsSync(onDisk), 'public/BingSiteAuth.xml 不存在').toBe(true);
+    const xml = readFileSync(onDisk, 'utf8');
+
+    expect(xml.startsWith('<?xml version="1.0"?>')).toBe(true);
+    // 无结尾换行：校验器多半会 trim，但精确值在"会 trim"与"逐字节比"两种下都成立。
+    expect(xml.endsWith('\n'), 'BingSiteAuth.xml 不许有结尾换行').toBe(false);
+
+    const tokens = [...xml.matchAll(/<user>([^<]*)<\/user>/g)].map((m) => m[1]);
+    expect(tokens.length, 'BingSiteAuth.xml 里必须恰好一个 <user>').toBe(1);
+    expect(tokens[0], 'token 形状不对（Bing 给的是 32 位大写十六进制）').toMatch(/^[0-9A-F]{32}$/);
+  });
+});
+
 describe('Open Graph / Twitter 卡片', () => {
   it.each(ENTRIES)('$label：必需的 meta 都在', ({ page, locale }) => {
     const { meta } = readHead(page, locale);
