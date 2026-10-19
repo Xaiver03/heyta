@@ -970,7 +970,10 @@ UX-S9-138 接续验收清单（未完成项不得随构建成功关闭）：
 
 UX-S9-138 后续核对（2026-10-08）：Apple 20 个有界文件已逐文件 SHA-256 对账，主树与受控树一致；共享 Swift 测试 108 项、macOS 宿主构建与两端 WidgetKit 扩展 Release 编译通过。这不代表系统组件库验收通过。Android/iOS 移动桥另发现清理错误被转换为成功的问题，现已传播原生 reject/false 给清理结果；Android 清理后主动刷新系统缓存。移动桥、凭据清理、意图消费与快照规划定向 4 文件/45 项通过。Apple/Windows 清理后的系统缓存刷新另行核对。
 
-- [ ] 清理数据后系统小组件不继续展示旧任务；验证原生拒绝/刷新失败有真实失败结果。
+- [x] 清理数据后系统小组件不继续展示旧任务；验证原生拒绝/刷新失败有真实失败结果。
+      ✅ **10-20 00:3x r149 收口**：三条腿的装机态读数都取到了（清凭据 r117 / 注销擦库 r119 / 原生拒绝 r120），
+      而当时挡着这一格的那条缺陷（冷启动后那枚入口灰着、够不到）已由本线改掉并有 iOS 装机态对照读数 ——
+      逐字见本节末的 r149 那一段与 `apps/mobile/evidence/ux-final-20261020/ios-credential-wipe-r149/RESULT.md`。
       ✅ **10-17 10:2x r117 装机态设备腿取到了（`apps/mobile/evidence/ux-final-20261017/android-widget-erase-r117/RESULT.md`）**：
       这一格原先缺的那一样东西（"一个能真的登录的本地服务端"）已经造出来了 ——
       本机隔离栈 `PORT=4520` + 库 `heyta_uxr117` + TEST_MODE 账号，装的是**装机包**
@@ -989,7 +992,7 @@ UX-S9-138 后续核对（2026-10-08）：Apple 20 个有界文件已逐文件 SH
         把 `privacy.consent` 写成了 `accepted`，事后已删行恢复并量到同意卡重新立起
         （`consent-side-effect.txt`）。⇒ 结论不变，但"这一档要负责人点头"那句得留给**下一次真提交注销**，
         不是留给"把决定改回来"。
-      ⚠️ **格不打勾，因为量出来一条要报的缺陷**：那一枚的闸门是
+      ⚠️ **当时格不打勾，因为量出来一条要报的缺陷**（✅ 那条缺陷 10-20 r149 已改掉，见本节末）：那一枚的闸门是
       `disabled={form.token === '' && form.password === ''}`（按代码形状 grep，别按行号 ——
       `SettingsScreen.tsx` 现在有别的会话在飞），而凭据**按设计只放内存、不落盘**
       （`apps/mobile/src/sync/config.ts` 文件头那条取舍）⇒ **冷启动之后它必然是灰的**，
@@ -1019,8 +1022,9 @@ UX-S9-138 后续核对（2026-10-08）：Apple 20 个有界文件已逐文件 SH
       附带三条：注销**不撤回**设备级隐私同意（`privacy.consent` 擦除后原样在 —— 是不是缺陷属产品口径，只登记形状）；
       「我的」那行在已同步态下仍写「还没登录」（待查，本趟没证）；
       以及 `configure_sync_credentials` 那句「✅ 界面认为已配置」被现量否证成**假绿**（判据已换到服务端数 op，见 §7 #452）。
-      ⚠️ **格仍不打勾**，但欠的两样只剩一样：① 上面那条"冷启动态够不到"的缺陷要有人改
-      （改点在别人在飞的 `SettingsScreen.tsx` 里，本线不代做）。
+      ⚠️ 当时格仍不打勾，欠的两样只剩一样：① 上面那条"冷启动态够不到"的缺陷要有人改
+      （那句"改点在别人在飞的 `SettingsScreen.tsx` 里，本线不代做"的**前提**已经不成立：
+      10-20 现量 `git status --porcelain -- apps/mobile/src/screens/SettingsScreen.tsx` 回空 ⇒ 本线自己改了，见本节末 r149）。
       ~~② 后半句"原生拒绝 / 刷新失败有真实失败结果"仍只有 vitest + Kotlin/TS 链，
       `widget-cleanup-pending` 那一枚到 r119 为止**从未在装机态被触发过**~~
       ⇒ ✅ **10-17 18:2x 这一半也跑完了**（`apps/mobile/evidence/ux-final-20261017/android-widget-cleanup-fail-r120/RESULT.md`）：
@@ -1030,6 +1034,27 @@ UX-S9-138 后续核对（2026-10-08）：Apple 20 个有界文件已逐文件 SH
       不是"其实成功了却喊失败"）；把权限改回 `771` 再点重试 ⇒ 锚点消失、存储变 **`65 B / 键=（空）`**。
       跑完设备侧净改动 = 0（权限、`device_pref` 同意行、桌面绑定、栈与库五条读数各自复量）。
       这趟另否证掉两枚自己的探针（`has_text` 是整值匹配不是子串；一条打了 ❌ 却不计 FAIL 的分支），见 §7 #456 #457。
+      ✅ **10-20 00:3x r149 把①改掉了，并取到装机态对照读数**（`apps/mobile/evidence/ux-final-20261020/ios-credential-wipe-r149/RESULT.md`）：
+      · **改法**：那枚 Button 不再按"表单里此刻有没有凭据"设闸门（`SettingsScreen.tsx` 里 `disabled={form.token === '' && form.password === ''}` 整行去掉）。
+        方向不是随手挑的，是 `credential-wipe.ts` 文件头已经写明的那条不对称 —— "多清一次"最坏是用户重开应用，
+        "没清成"是数据留在别人看的屏幕上，差一个数量级；而清理动作本身幂等、永不抛 ⇒ 没东西可清时按下去是一次空操作。
+        另一条更"精确"的路（先探设备上有没有东西再决定开不开）要**在四端各加一次异步原生读**，
+        而组件那三格（iOS 其余模板 / macOS Gallery / Windows host）本来就各自欠着装机态矩阵，本线不为省一个 `disabled` 去开那四端口子。
+      · **读数**：同一枚模拟器（`heyta-iphone-17pro`）、同一份装置（`profile-settings-ios.py` 现量同一枚哈希）、
+        只换被测件 ⇒ 改前件 `enabled=False`、改后件 `enabled=True`，**frame 两趟逐位相同** `[16,434,370,44]`
+        ⇒ 是同一枚控件的两种状态，不是"画不出来 vs 画出来了"的假对照。浅档 × 中文那一格；人眼看过 `after-light/security.png`
+        （那行字是深色不是灰）。
+      · **判据转正**：装置里新增 `Probe.assert_enabled`，读 AX 的 `enabled` 而**不是** `pressable` ——
+        iOS 上 RN 的 disabled Button 照样算 pressable（与 r117 装置事实 1 那条 Android `clickable="true"` 同一件事），
+        按 `pressable` 判"够得到"会把灰掉的按钮报成可点。node 腿同形状：`apps/mobile/tests/device-revocation-behavior.spec.ts`
+        新增一项，变异臂实测两头都有牙（加回闸门 ⇒ 红在 `not to match /disabled=/u`；去掉 ⇒ 5 项绿）。
+        同类实例现量只有一枚：全仓 `.tsx` 里 `disabled={…token === ''…}` 形状命中 1 处，就是这一处。
+      · **不证的四件**（逐字在 RESULT.md 第四节）：按下之后 iOS 组件真的退回空态（那一半的装机态在 Android r117/r120）、
+        Android 上闸门改后翻成 `enabled=true`（打包机现量 `ssh windows-pc` 回 `Host is down`、`adb devices` 空 ⇒ 待办 #96 同一条，
+        ⚠️ 不许用 `HEYTA_ANDROID_LOCAL_GRADLE=1` 绕）、暗档、以及"清凭据会把本机任务一起清掉"（它不会也不该 ——
+        那枚动作的范围是凭据 + 组件快照 + 设备密钥；要让本机数据消失是「注销账号」那一枚，r119 已证）。
+        ⚠️ 顺带把一条误记成缺陷的说法按回去：**冷启动后组件仍会从本机库重新发布一次快照**，
+        这是本地优先 +「只用本机」那条路径的设计行为，不是这一格的欠项 —— 把它当缺陷会顺手废掉离线模式。
 - [x] 重复任务与相对提醒同一枚总 op；新增范围契约，跨任务/多 scope 新写入落盘前拒绝，旧日志与 checkpoint 恢复不产生毒丸，独立复审已通过。
 
 Apple 清理刷新补验：共享清理服务在密钥及容器成功清理后发起系统 timeline reload，macOS 删除重复刷新；Swift 最新 109 项通过，主/受控树有界文件 SHA 一致。macOS 系统 Gallery 验收收到操作系统“电脑已锁定，自动解锁失败”；已请求手动解锁，未标记通过。Windows 新探针验证 DPAPI 加解密、非破坏读取与精确 ack，Provider 增加快照文件监听以刷新清理后的卡片；官方 Widgets host 获取仍在排查网络通道。
