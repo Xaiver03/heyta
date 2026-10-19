@@ -275,3 +275,67 @@ for(const [id,z,e] of rows.sort((a,b)=>b[1]-a[1]))console.log(String(z).padStart
 | 7.3 | `og:locale:alternate` 的**线上**读数 | 落地页**未发布**（发布脚本 `publish-public-sites.mjs` 拒绝发"不是正好 `main` 那一笔"的字节） | 提交后跑 `node research/tools/publish-public-sites.mjs --confirm`；`live-seo.spec.ts` 里那条会随之转绿 |
 | 7.4 | §5 的关键词方向 | 单一引擎 + 分词退化 | 修好 `web_search`，在百度/Google 侧复核 |
 | 7.5 | 结构化数据的效果 | 无数据源 | 与 7.3 同批 |
+
+---
+
+## §8 2026-10-19 第二轮：落地页已发布；站长平台卡在一个可复现的技术点上
+
+### 8.1 §7.3 已闭合：落地页发布了，那条"按设计红"的判据转绿
+
+`node research/tools/publish-public-sites.mjs --confirm` **九步全过**（守卫读数：`HEAD=main=8f1b6b87`、
+构建输入脏条目 0 条），第 9 步线上验收 **43 项全过**（含 `live-seo.spec.ts` 里原来那条
+`og:locale:alternate`）。独立复验（`curl --noproxy '*' --resolve …`）：
+
+| 读数 | 值 |
+|---|---|
+| `/features/` 的 `<title>` | heyta 功能：任务管理、四象限、番茄钟与习惯打卡 |
+| `og:locale:alternate` | `en_US`（中文页） |
+| `/platforms/` 描述长度 | **67 字符**（改前 163） |
+| `/app/` 的 asset | `index-98hf1W_J.js` —— **与发布前逐字相同** |
+| `/`、`/features`、`/nope-xyz/` | 200 / **301** / **404**（软 404 修复未回退） |
+
+🔴 **发布前我先证明了"这次发布对应用是空操作"**：从 HEAD 构建 `apps/web` 得到的 asset 是
+`index-98hf1W_J.js`，与线上正在服务的那一枚逐字相同 ⇒ 发布只会更新落地页。
+这条判据值得复用 —— 发布脚本会**同时**发两个站点，而"应用会不会被顺带换掉"是个必须回答的问题。
+
+### 8.2 站长平台：卡在"Wiz 浮层在隐藏标签页里不生成"
+
+取证（每一步都是回读，不是推断）：
+
+1. 登录态**一直是好的**：页面里 `accounts.google.com/RotateCookiesPage` iframe 在、顶栏有
+   `manage_accounts` 用户设置入口。⚠️ 我先前两次凭 **URL 没变** 报"你还没登录"是**错的**
+   （`/search-console/welcome` 登录前后同一条 URL，它就是登录后的「添加资源」页）。
+   这条教训已反哺进 `portal-form-filling` skill。
+2. 点「添加网站」会弹出**资源类型选择层**（网域 / 网址前缀）—— 我在 Chrome 处于前台时
+   成功弹出过一次，并读到了两张卡与两个输入框（`aria-label` 分别是 `example.com` 与
+   `https://www.example.com`）。
+3. 🔴 **但在隐藏标签页里，同一个点击不再生成那个浮层**：`vis: hidden`、`hasFocus: false`、
+   `chooserVisible: false`、`[role=dialog]` 数量不变。GSC 用的是 Google 内部的 **Wiz**
+   （`ng-version` 为 null、类名形如 `whsOnd zHQkBf`／`RveJvd snByac`），
+   与 `portal-form-filling/references/antd-controls.md` §2 记的机制同族：**后台标签页 rAF 冻结，
+   浮层动画进不到完成态**。打 rAF 补丁（该节给出的配方）**不够** —— 这一层仍然不生成。
+4. 而用户的规则（也已写进 skill）是：**只有登录/验证码才抢前台，代理填表必须后台运行。**
+   ⇒ 两条约束在这一点上直接冲突，所以**我不猜、不抢，交给用户**。
+
+### 8.3 两个都不需要我抢前台的出路（任选一条，我立刻继续）
+
+1. **把 Chrome 窗口挪到屏幕一角/缩小，让它在你的 App 旁边"不全被遮挡"**，然后你回到原来的
+   App 继续干活。Chrome 判断 `visibilityState` 看的是**窗口是否被完全遮挡**，不是"哪个 App 在前台"
+   —— 只要它不被完全盖住，那个标签就变 `visible`，**我就能全程在后台把对话框开出来**。
+   ⚠️ 这一条是我的推断（机制层面），**尚未实测**：它成立与否，我用一次 `visibilityState` 回读就能判定。
+2. 或者你亲手做 3 下（你已在登录态，10 秒）：点「添加网站」→ 在**右边那张「网址前缀」卡**里
+   输入 `https://heyta.waytofuture.cn/` → 点该卡的「继续」。然后把验证方式那一步的
+   **HTML 文件内容**（形如 `google-site-verification: googleXXXX.html`）贴给我，
+   **剩下全是我做**：写进 `apps/landing/public/`、提交、一条命令发布、点验证。
+
+### 8.4 本轮顺带查实的环境事实（会复现，值得记）
+
+- 🔴 **`tccli` 对 `waytofuture.cn` 无权限**：`DescribeRecordList` 回
+  `OperationDenied.NoPermissionToOperateDomain`，而本机只有一套凭据（带 STS token 的临时凭据）。
+  ⇒ **GSC/百度若要 DNS TXT 验证，得先换成拥有 `waytofuture.cn` 的那个腾讯云账号**；
+  也正因如此，§8.3 走的是 **HTML 文件**验证而不是 DNS。
+- ⚠️ **代理会瞬时抖**：`location.reload()` 曾把 GSC 标签打成
+  `chrome-error://chromewebdata/` + `ERR_PROXY_CONNECTION_FAILED`；同一分钟内复测
+  `curl -x http://127.0.0.1:7890 https://www.google.com/` 回 **302**（通），
+  直连则是 connection reset（大陆常态）。⇒ 那次是抖动，不是配置错；标签已恢复。
+  系统代理是 `127.0.0.1:7890`（iKuuuVPNC 在听）。
