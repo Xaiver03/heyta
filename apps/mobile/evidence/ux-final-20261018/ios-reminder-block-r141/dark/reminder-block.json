@@ -1,6 +1,6 @@
 {
-  "startedAt": 1792401977.618689,
-  "taskTitle": "Rem1411792401977",
+  "startedAt": 1792403246.819363,
+  "taskTitle": "Rem1411792403246",
   "appearance": "dark",
   "uiLocale": "zh-CN",
   "taps": [
@@ -19,13 +19,41 @@
       "tabBarTopFromListScreen": 772
     },
     {
+      "description": "reminder action reminder.a11y.snooze",
+      "label": "把 10-19 18:47 的提醒推迟 10 分钟",
+      "want": "reminder.a11y.snooze",
+      "match": "a11y-template",
+      "frame": [
+        132,
+        332,
+        82,
+        44
+      ],
+      "visibleBottom": 772,
+      "tabBarTopFromListScreen": 772
+    },
+    {
+      "description": "reminder action reminder.a11y.dismiss",
+      "label": "关闭 10-19 17:57 的提醒",
+      "want": "reminder.a11y.dismiss",
+      "match": "a11y-template",
+      "frame": [
+        218,
+        332,
+        82,
+        44
+      ],
+      "visibleBottom": 772,
+      "tabBarTopFromListScreen": 772
+    },
+    {
       "description": "remove reminder",
-      "label": "删除 10-19 18:26 的提醒",
+      "label": "删除 10-19 17:57 的提醒",
       "want": "reminder.a11y.remove",
       "match": "a11y-template",
       "frame": [
         304,
-        332,
+        330,
         82,
         44
       ],
@@ -40,7 +68,9 @@
   "shots": [
     "01-reminder-empty",
     "02-reminder-added",
-    "03-reminder-removed"
+    "03-reminder-snoozed",
+    "04-reminder-dismissed",
+    "05-reminder-removed"
   ],
   "systemPromptsAtStart": [],
   "tabBarTopOnListScreen": 776,
@@ -149,7 +179,7 @@
     {
       "want": "reminder.a11y.snooze",
       "label": "reminder.a11y.snooze",
-      "matchedLabel": "把 10-19 18:26 的提醒推迟 10 分钟",
+      "matchedLabel": "把 10-19 18:47 的提醒推迟 10 分钟",
       "match": "a11y-template",
       "present": true,
       "frame": [
@@ -165,7 +195,7 @@
     {
       "want": "reminder.a11y.dismiss",
       "label": "reminder.a11y.dismiss",
-      "matchedLabel": "关闭 10-19 18:26 的提醒",
+      "matchedLabel": "关闭 10-19 18:47 的提醒",
       "match": "a11y-template",
       "present": true,
       "frame": [
@@ -181,7 +211,7 @@
     {
       "want": "reminder.a11y.remove",
       "label": "reminder.a11y.remove",
-      "matchedLabel": "删除 10-19 18:26 的提醒",
+      "matchedLabel": "删除 10-19 18:47 的提醒",
       "match": "a11y-template",
       "present": true,
       "frame": [
@@ -191,6 +221,124 @@
         44
       ],
       "bottom": 376,
+      "visibleBottom": 772,
+      "tappableAboveTabBar": true
+    }
+  ],
+  "afterSnooze": [
+    {
+      "want": "snoozed",
+      "label": "已推迟",
+      "matchedLabel": "已推迟",
+      "match": "exact",
+      "present": true,
+      "frame": [
+        24,
+        361,
+        33,
+        14
+      ],
+      "bottom": 375,
+      "visibleBottom": 772,
+      "tappableAboveTabBar": true
+    },
+    {
+      "want": "scheduled",
+      "label": "待触发",
+      "present": false,
+      "visibleBottom": 772
+    },
+    {
+      "want": "reminder.a11y.snooze",
+      "label": "reminder.a11y.snooze",
+      "matchedLabel": "把 10-19 17:57 的提醒推迟 10 分钟",
+      "match": "a11y-template",
+      "present": true,
+      "frame": [
+        132,
+        332,
+        82,
+        44
+      ],
+      "bottom": 376,
+      "visibleBottom": 772,
+      "tappableAboveTabBar": true
+    },
+    {
+      "want": "reminder.a11y.dismiss",
+      "label": "reminder.a11y.dismiss",
+      "matchedLabel": "关闭 10-19 17:57 的提醒",
+      "match": "a11y-template",
+      "present": true,
+      "frame": [
+        218,
+        332,
+        82,
+        44
+      ],
+      "bottom": 376,
+      "visibleBottom": 772,
+      "tappableAboveTabBar": true
+    },
+    {
+      "want": "reminder.a11y.remove",
+      "label": "reminder.a11y.remove",
+      "matchedLabel": "删除 10-19 17:57 的提醒",
+      "match": "a11y-template",
+      "present": true,
+      "frame": [
+        304,
+        332,
+        82,
+        44
+      ],
+      "bottom": 376,
+      "visibleBottom": 772,
+      "tappableAboveTabBar": true
+    }
+  ],
+  "afterDismiss": [
+    {
+      "want": "dismissed",
+      "label": "已关闭",
+      "matchedLabel": "已关闭",
+      "match": "exact",
+      "present": true,
+      "frame": [
+        114,
+        345,
+        33,
+        14
+      ],
+      "bottom": 359,
+      "visibleBottom": 772,
+      "tappableAboveTabBar": true
+    },
+    {
+      "want": "scheduled",
+      "label": "待触发",
+      "present": false,
+      "visibleBottom": 772
+    },
+    {
+      "want": "snoozed",
+      "label": "已推迟",
+      "present": false,
+      "visibleBottom": 772
+    },
+    {
+      "want": "reminder.a11y.remove",
+      "label": "reminder.a11y.remove",
+      "matchedLabel": "删除 10-19 17:57 的提醒",
+      "match": "a11y-template",
+      "present": true,
+      "frame": [
+        304,
+        330,
+        82,
+        44
+      ],
+      "bottom": 374,
       "visibleBottom": 772,
       "tappableAboveTabBar": true
     }
@@ -221,7 +369,7 @@
     }
   ],
   "taskDeleted": {
-    "title": "Rem1411792401977",
+    "title": "Rem1411792403246",
     "frame": [
       342,
       379,
@@ -230,5 +378,5 @@
     ],
     "gone": true
   },
-  "finishedAt": 1792402028.706153
+  "finishedAt": 1792403292.191303
 }
