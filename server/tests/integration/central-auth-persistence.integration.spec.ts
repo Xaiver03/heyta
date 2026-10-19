@@ -566,6 +566,65 @@ describe("中央身份持久层（真实PG）", () => {
     await rejection;
     expect(await db.centralIdentity.count()).toBe(0);
   });
+  it("刷新结果等待用户锁跨过派发期限后不能应用，材料留给清理", async () => {
+    const { grant } = await login();
+    const a = await repo.beginRefresh(grant.id);
+    await repo.recordResult(a.id, a.dispatchToken, {
+      accessToken: "late-after-lock",
+    });
+    await db.centralAttempt.update({
+      where: { id: a.id },
+      data: { deadline: new Date(Date.now() + 800) },
+    });
+    let locked!: () => void, release!: () => void;
+    const ready = new Promise<void>((resolve) => {
+      locked = resolve;
+    });
+    const hold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const blocker = db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM users WHERE id = ${grant.userId} FOR UPDATE`;
+      locked();
+      await hold;
+    });
+    await ready;
+    const result = repo.completeRefresh(a.id, expires()).then(
+      () => ({ applied: true }),
+      (error: { code: string }) => ({ applied: false, code: error.code }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    release();
+    await blocker;
+    expect(await result).toEqual({
+      applied: false,
+      code: "result_unavailable",
+    });
+    expect((await repo.inspectAttempt(a.id))?.status).toBe("RESULT");
+    expect(
+      (await db.centralGrant.findUniqueOrThrow({ where: { id: grant.id } }))
+        .version,
+    ).toBe(grant.version);
+    await repo.rejectResult(a.id);
+    expect(await db.centralRevocation.count()).toBeGreaterThan(0);
+  });
+  it("已应用刷新跨过期限仍保持永久归属，不因重读而撤销", async () => {
+    const { grant } = await login();
+    const a = await repo.beginRefresh(grant.id);
+    await repo.recordResult(a.id, a.dispatchToken, {
+      accessToken: "applied-before-deadline",
+    });
+    await repo.completeRefresh(a.id, expires());
+    await db.centralAttempt.update({
+      where: { id: a.id },
+      data: { deadline: new Date(0) },
+    });
+    expect(await repo.completeRefresh(a.id, expires())).toEqual({
+      grantId: grant.id,
+      alreadyApplied: true,
+    });
+    expect(await db.centralRevocation.count()).toBe(0);
+  });
   it("刷新时用户版本改变不能应用结果，缺省RT保留前次RT但不复制旧AT", async () => {
     const { grant } = await login();
     const a = await repo.beginRefresh(grant.id);

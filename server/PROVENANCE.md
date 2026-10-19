@@ -146,3 +146,6 @@ git -C /tmp/sp log --oneline aa9690ca..HEAD -- packages/super-sync-server/
 密钥封装，与用户E2EE无关。真实PG验证包含COMMIT成功回执丢失、后次刷新与旧attempt判定、
 注销事务回滚和队列独立留存。OIDC启动门禁仍关闭，HTTP/实际OIDC验证/WS/销户调度仍待P5.2。
 这是MIT独立实现；没有从内部AGPL中央客户端移植代码或测试。设计与判据见唯一计划。
+
+P5.1 独立复审修复：授权派发等待本地证明行锁后重读数据库时钟；刷新应用在初检与
+行锁等待后都检查attempt期限。已APPLIED归属保持幂等，不受后续期限影响。
