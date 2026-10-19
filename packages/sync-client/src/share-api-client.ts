@@ -52,6 +52,8 @@ export interface ShareApiClientOptions {
   baseUrl: string;
   /** 返回当前账号的访问令牌（JWT）；调用方负责令牌刷新。 */
   getToken: () => string;
+  /** Official Web uses the host-only session cookie instead of a bearer token. */
+  authTransport?: 'bearer' | 'cookie';
   /** 网络实现，便于测试注入。默认用 globalThis.fetch。 */
   fetchImpl?: typeof fetch;
 }
@@ -108,6 +110,7 @@ async function request<T>(
   fetchImpl: typeof fetch,
   baseUrl: string,
   token: string,
+  authTransport: 'bearer' | 'cookie',
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   path: string,
   body?: unknown,
@@ -118,8 +121,9 @@ async function request<T>(
       method,
       headers: {
         ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
-        authorization: `Bearer ${token}`,
+        ...(authTransport === 'bearer' ? { authorization: `Bearer ${token}` } : {}),
       },
+      ...(authTransport === 'cookie' ? { credentials: 'include' as const } : {}),
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
@@ -145,7 +149,7 @@ export class ShareApiClient {
   }
 
   private call<T>(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', path: string, body?: unknown): Promise<T> {
-    return request<T>(this.fetchImpl, this.options.baseUrl, this.options.getToken(), method, path, body);
+    return request<T>(this.fetchImpl, this.options.baseUrl, this.options.getToken(), this.options.authTransport ?? 'bearer', method, path, body);
   }
 
   createShare(): Promise<{ shareId: string; keyEpoch: number; memberId: string; role: 'owner'; createdAt: number }> {

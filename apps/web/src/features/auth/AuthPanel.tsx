@@ -81,7 +81,13 @@ import {
 } from '@heyta/domain';
 import { useI18n, type MessageKey } from '@heyta/i18n';
 import { legalDocumentById, legalDocumentPresentation } from '@heyta/legal';
-import { OFFICIAL_SITE_ORIGIN, resolveLegalLinks, type HostedAuthSession } from '@heyta/app-host';
+import {
+  getCentralAuthConfig,
+  OFFICIAL_SITE_ORIGIN,
+  resolveLegalLinks,
+  type CentralAuthConfig,
+  type HostedAuthSession,
+} from '@heyta/app-host';
 import {
   AuthForm,
   LegalDocumentSheet,
@@ -95,6 +101,7 @@ import { detectPasskeyBrowser } from './passkey-browser.js';
 import { readRememberedCredentials, rememberCredentials } from './remembered-credentials.js';
 import { useAuthStore, type AuthBusyAction } from './store.js';
 import { authBaseUrl, isUnconfigured } from '../../lib/auth-endpoint.js';
+import { consentFetch } from '../privacy/consent-gate.js';
 import { useModalDismiss } from '../../lib/use-modal-dismiss.js';
 import './auth-dialog.css';
 
@@ -123,6 +130,7 @@ export interface AuthPanelProps {
  * 会在编译期红 —— 那正是"界面对着一个进行中的请求说不出话"的形状。
  */
 const BUSY_MESSAGE_KEY: Record<AuthBusyAction, MessageKey> = {
+  'central-login': 'web.auth.central.busy',
   'login-link': 'common.auth.busy.link',
   register: 'common.auth.busy.register',
   verify: 'common.auth.busy.verify',
@@ -178,6 +186,7 @@ export function AuthPanel({
   const resendLoginCode = useAuthStore((s) => s.resendLoginCode);
   const cancelLoginCode = useAuthStore((s) => s.cancelLoginCode);
   const forgotPassword = useAuthStore((s) => s.forgotPassword);
+  const startCentralLogin = useAuthStore((s) => s.startCentralLogin);
   const invalidatePendingAuth = useAuthStore((s) => s.invalidatePendingAuth);
 
   /**
@@ -262,6 +271,24 @@ export function AuthPanel({
   // equivalent official URL gets the same official/custom treatment.
   const isOfficialService = legalLinks?.terms.startsWith(`${OFFICIAL_SITE_ORIGIN}/`) === true;
 
+  /** 官方站点只显示 heyta 的品牌壳，认证能力由中央 OIDC 提供。 */
+  const [centralConfig, setCentralConfig] = useState<CentralAuthConfig | null | undefined>(undefined);
+  const [centralProbe, setCentralProbe] = useState(0);
+  const [centralTermsAccepted, setCentralTermsAccepted] = useState(false);
+  useEffect(() => {
+    if (!isOfficialService) {
+      setCentralConfig(null);
+      return;
+    }
+    let active = true;
+    setCentralConfig(undefined);
+    void getCentralAuthConfig({ baseUrl: effectiveBaseUrl, fetchImpl: consentFetch }).then((result) => {
+      if (!active) return;
+      setCentralConfig(result.ok ? result.value : null);
+    });
+    return () => { active = false; };
+  }, [effectiveBaseUrl, isOfficialService, centralProbe]);
+
   // 每次渲染都重新探测。缓存成模块级常量会把**第一次**的结果永久钉住，
   // 而它在 jsdom 与真实浏览器里不同，用户中途接上安全密钥时也会变。
   const passkeySupported = detectPasskeyBrowser() !== undefined;
@@ -304,6 +331,10 @@ export function AuthPanel({
   const busy = status.kind === 'busy';
   const waitingForPasskey =
     busy && (status.action === 'passkey-register' || status.action === 'passkey-login');
+
+  const centralMode = isOfficialService && centralConfig?.mode === 'oidc' && centralConfig.documentVersion !== null;
+  const centralLoading = isOfficialService && centralConfig === undefined;
+  const centralBlocked = isOfficialService && centralConfig !== undefined && !centralMode;
 
   const labels: AuthFormLabels & {
     readonly otherWaysToggle: { readonly open: string; readonly close: string };
@@ -525,6 +556,61 @@ export function AuthPanel({
           这一层（`AuthForm` 已在登记清单里）。
         */}
         <HeytaUiProvider>
+          {centralMode ? (
+            <section className="ht-auth-central" data-testid="central-auth-panel" aria-labelledby="central-auth-title">
+              <p className="ht-auth-central__eyebrow ht-type-caption">{t('web.auth.central.kicker')}</p>
+              <h2 id="central-auth-title" className="ht-type-section-title">{t('web.auth.central.title')}</h2>
+              <p className="ht-auth-central__body">{t('web.auth.central.body')}</p>
+              <div className="ht-auth-central__consent">
+                <input
+                  id="central-auth-consent"
+                  data-testid="central-auth-consent"
+                  type="checkbox"
+                  checked={centralTermsAccepted}
+                  onChange={(event) => setCentralTermsAccepted(event.currentTarget.checked)}
+                />
+                <span>
+                  <label htmlFor="central-auth-consent">{t('web.auth.central.consentPrefix')}</label>{' '}
+                  <button type="button" className="ht-auth-central__link" data-testid="central-auth-terms" onClick={() => setOpenLegalDocument('terms')}>
+                    {t('common.legal.termsDoc')}
+                  </button>{' '}
+                  {t('web.auth.central.consentAnd')}{' '}
+                  <button type="button" className="ht-auth-central__link" data-testid="central-auth-privacy" onClick={() => setOpenLegalDocument('privacy')}>
+                    {t('common.legal.privacyDoc')}
+                  </button>
+                </span>
+              </div>
+              {status.kind === 'failed' ? (
+                <p className="ht-auth-central__error" role="alert">{formStatus()?.message}</p>
+              ) : null}
+              <button
+                type="button"
+                className="ht-auth-central__button"
+                data-testid="central-auth-submit"
+                disabled={!centralTermsAccepted || busy}
+                onClick={() => {
+                  if (centralConfig.documentVersion !== null) {
+                    void startCentralLogin(effectiveBaseUrl, centralConfig.documentVersion);
+                  }
+                }}
+              >
+                {busy ? t('web.auth.central.busy') : t('web.auth.central.button')}
+              </button>
+              <p className="ht-auth-central__note">{t('web.auth.central.note')}</p>
+            </section>
+          ) : centralLoading ? (
+            <section className="ht-auth-central" data-testid="central-auth-loading" aria-busy="true">
+              <p className="ht-auth-central__body">{t('web.auth.central.loading')}</p>
+            </section>
+          ) : centralBlocked ? (
+            <section className="ht-auth-central" data-testid="central-auth-unavailable" aria-live="polite">
+              <h2 className="ht-type-section-title">{t('web.auth.central.unavailableTitle')}</h2>
+              <p className="ht-auth-central__body">{t('web.auth.central.unavailable')}</p>
+              <button type="button" className="ht-auth-central__button" onClick={() => setCentralProbe((value) => value + 1)}>
+                {t('web.auth.central.retry')}
+              </button>
+            </section>
+          ) : (
           <AuthForm
             labels={labels}
             onClose={onClose}
@@ -637,6 +723,7 @@ export function AuthPanel({
             }}
             testID="auth-form"
           />
+          )}
           <LegalDocumentSheet
             document={legalDocumentPresentation(legalDocumentById(openLegalDocument ?? 'terms'))}
             locale={locale}

@@ -116,6 +116,8 @@ export interface RealtimeClientOptions {
   baseUrl: string;
   /** 每次连接时重新取令牌。返回 undefined/空串表示"未登录"。 */
   getToken: TokenGetter;
+  /** Cookie sessions authenticate the same-origin WebSocket by browser cookie. */
+  authTransport?: 'bearer' | 'cookie';
   /** 本设备 clientId（与服务端 `isValidClientId` 的口径一致）。 */
   clientId: string;
   /** 收到"有新 op"信号时调用，参数是服务端当前的 `latestSeq`。宿主据此触发一次同步。 */
@@ -156,7 +158,8 @@ export interface RealtimeClient {
  *
  * 规则：去掉尾部斜杠；`https` → `wss`、`http` → `ws`（保留原样大小写之外的主机）；
  * 无 scheme 时按明文 `ws://` 处理（与 `classifyTransportSecurity` 把无 scheme 视为
- * 明文的口径一致）。返回 `ws(s)://host/api/sync/ws?token=…&clientId=…`。
+ * 明文的口径一致）。Bearer 返回 `ws(s)://host/api/sync/ws?token=…&clientId=…`，
+ * Cookie transport 只返回 `clientId`，会话由同源浏览器 Cookie 携带。
  *
  * ## 🔴 路径是 `/api/sync/ws`，不是 `/ws`（2026-09-29 实测修）
  *
@@ -179,7 +182,7 @@ export interface RealtimeClient {
  *
  * 🔴 token **必须 URL 编码**：它是任意字符串，`+` `/` `=` `&` `?` `#` 都会改变 query 的含义。
  */
-export function buildRealtimeUrl(baseUrl: string, token: string, clientId: string): string {
+export function buildRealtimeUrl(baseUrl: string, token: string | undefined, clientId: string, authTransport: 'bearer' | 'cookie' = 'bearer'): string {
   const trimmed = baseUrl.trim().replace(/\/+$/, '');
   if (trimmed === '') {
     // 空地址连不出有意义的东西；抛出让调用方当成"不可连接"，而不是拼出 `ws:///ws`。
@@ -197,7 +200,8 @@ export function buildRealtimeUrl(baseUrl: string, token: string, clientId: strin
     origin = `ws://${trimmed}`;
   }
 
-  return `${origin}/api/sync/ws?token=${encodeURIComponent(token)}&clientId=${encodeURIComponent(clientId)}`;
+  const query = `clientId=${encodeURIComponent(clientId)}`;
+  return `${origin}/api/sync/ws?${authTransport === 'cookie' ? query : `token=${encodeURIComponent(token ?? '')}&${query}`}`;
 }
 
 /** 这些关闭码代表"同样的输入再来一次还是这个结果"，不重连。 */
@@ -224,6 +228,7 @@ const DEFAULT_BACKOFF_FACTOR = 2;
 class RealtimeClientImpl implements RealtimeClient {
   private readonly baseUrl: string;
   private readonly getToken: TokenGetter;
+  private readonly authTransport: 'bearer' | 'cookie';
   private readonly clientId: string;
   private readonly onNewOps: (latestSeq: number) => void;
   private readonly WebSocketImpl: WebSocketFactory | undefined;
@@ -251,6 +256,7 @@ class RealtimeClientImpl implements RealtimeClient {
   constructor(options: RealtimeClientOptions) {
     this.baseUrl = options.baseUrl;
     this.getToken = options.getToken;
+    this.authTransport = options.authTransport ?? 'bearer';
     this.clientId = options.clientId;
     this.onNewOps = options.onNewOps;
     this.WebSocketImpl = options.WebSocketImpl;
@@ -326,7 +332,7 @@ class RealtimeClientImpl implements RealtimeClient {
 
     if (this.disposed) return false;
     // 未登录：不连、也不重连。重连会变成无凭据空转（且每次都要打一次升级请求）。
-    if (token === undefined || token === '') return false;
+    if (this.authTransport !== 'cookie' && (token === undefined || token === '')) return false;
 
     const Impl = this.WebSocketImpl ?? (globalThis as { WebSocket?: WebSocketFactory }).WebSocket;
     if (Impl === undefined) {
@@ -336,7 +342,7 @@ class RealtimeClientImpl implements RealtimeClient {
 
     let url: string;
     try {
-      url = buildRealtimeUrl(this.baseUrl, token, this.clientId);
+      url = buildRealtimeUrl(this.baseUrl, token, this.clientId, this.authTransport);
     } catch {
       // baseUrl 不可用（例如空串）：等宿主改配置，重连没意义。
       return false;

@@ -26,6 +26,21 @@ export {
   type VaultRootRotationOptions,
 } from './host.js';
 
+export {
+  beginCentralAuth,
+  CENTRAL_COOKIE_SESSION_MARKER,
+  createCentralCookieFetch,
+  getCentralAuthConfig,
+  getCentralAuthSession,
+  type CentralAuthConfig,
+  type CentralAuthFailure,
+  type CentralAuthFailureReason,
+  type CentralAuthOptions,
+  type CentralAuthOutcome,
+  type CentralAuthSession,
+  type CentralAuthUser,
+} from './central-auth.js';
+
 export { type InboundAutomationHostOptions } from './inbound-host-options.js';
 
 export {

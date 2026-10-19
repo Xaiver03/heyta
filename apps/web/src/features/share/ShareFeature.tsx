@@ -47,6 +47,7 @@ import {
 import { useSyncStore } from '../sync/store.js';
 import { useProjectStore } from '../projects/store.js';
 import { getWebVaultSession } from '../../lib/vault-session.js';
+import { createWebAuthFetch } from '../../lib/central-fetch.js';
 import { text } from '../../lib/text.js';
 import {
   getShareKeyEntry,
@@ -190,6 +191,7 @@ export function ShareFeature(props: ShareFeatureProps) {
 
   const baseUrl = useSyncStore((s) => s.baseUrl);
   const token = useSyncStore((s) => s.token);
+  const authTransport = useSyncStore((s) => s.authTransport);
   const accountId = useSyncStore((s) => s.accountId);
   const setProjectShare = useProjectStore((s) => s.setProjectShare);
 
@@ -211,14 +213,14 @@ export function ShareFeature(props: ShareFeatureProps) {
 
   const api = useMemo(() => {
     if (baseUrl.trim() === '' || token === undefined || token.trim() === '') return undefined;
-    return new ShareApiClient({ baseUrl, getToken: () => token });
-  }, [baseUrl, token]);
+    return new ShareApiClient({ baseUrl, getToken: () => token, authTransport, fetchImpl: createWebAuthFetch(baseUrl, authTransport) });
+  }, [authTransport, baseUrl, token]);
 
   const getPayloadCipher = useCallback(async (): Promise<SyncPayloadCipher | undefined> => {
     if (accountId === undefined || accountId === '') return undefined;
-    const session = await getWebVaultSession(accountId, baseUrl, async () => token);
+    const session = await getWebVaultSession(accountId, baseUrl, async () => token, authTransport);
     return session.getPayloadCipher();
-  }, [accountId, baseUrl, token]);
+  }, [accountId, authTransport, baseUrl, token]);
 
   // ── 创建共享（owner 侧一次性动作：建 share + 钥匙 + 自封信封 + 回写清单） ──
   const createShare = useCallback(async () => {

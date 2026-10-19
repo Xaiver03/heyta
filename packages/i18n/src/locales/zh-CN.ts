@@ -931,6 +931,18 @@ export const zhCN = {
   'web.auth.title': '登录 / 注册',
   'web.auth.close': '关闭',
   'web.auth.open': '登录 / 注册',
+  'web.auth.central.kicker': 'heyta 官方服务',
+  'web.auth.central.title': '使用统一账号登录',
+  'web.auth.central.body': 'heyta 使用中央账号完成登录。登录后，当前浏览器会通过安全会话回到 heyta；你的任务数据仍由端到端加密保护。',
+  'web.auth.central.consentPrefix': '我已阅读并同意',
+  'web.auth.central.consentAnd': '和',
+  'web.auth.central.button': '继续统一登录',
+  'web.auth.central.busy': '正在打开统一登录…',
+  'web.auth.central.note': '登录页面由中央身份服务提供，完成后会自动回到 heyta。',
+  'web.auth.central.loading': '正在连接 heyta 的统一身份服务…',
+  'web.auth.central.unavailableTitle': '统一登录暂时不可用',
+  'web.auth.central.unavailable': 'heyta 官方服务当前没有提供可用的中央登录配置。请稍后重试；本页不会改用另一套登录方式。',
+  'web.auth.central.retry': '重新检查',
   // 同步设置里令牌字段下面的指路句 —— 它回答的正是"令牌从哪来"。
   'web.auth.tokenHint': '访问令牌由服务端签发。点上面的按钮登录或注册，令牌会自动填进来；已经有令牌的可以直接粘贴填写。',
   /*
