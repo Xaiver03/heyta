@@ -113,6 +113,7 @@ python3 research/tools/verify-inbound-ac-battery.py --root .worktrees/inb-t10 --
 🟢 **这一格今天被"当场重跑"取代了**：10-20 00:46:43–00:47:49 在交付 tip `0bc4e2733` 上把 28 腿整串重跑了一遍（结论行 `legs=28 rc0=27 rc_nonzero=1`，唯一那枚非 0 是 `SCOPE-commit-scope`，即 B205 那一格，不是 AC 结论）。逐腿读数在 `docs/plans/inbound-automation.md` 的 **T8 第 32 条** 与 `~/.heyta-evidence/inb-t7-1017-0902/battery-1020-0046/`（`PROGRESS.md` 第 137 条同戳）。
 ⚠️ **本格以前写的是另一种东西，留在这里当形状示范**：它原先靠一句代理论证（"从 `528b4115c` 到 `refs/heads/main` 的非文档改动 0 枚 ⇒ 旧读数仍代表当前代码"）。那句**只在写下那一刻成立**（当时是 `5c274f496` 上 23:40:41 复算的），tip 一动就得重算 —— 能当场重跑就别用代理。要复算那半边仍然一条命令：`git diff --name-only 24d05137b $(git rev-parse refs/heads/main) > ~/.heyta-evidence/inb-t7-1017-0902/delta-check.txt; grep -c '^server/\|^packages/\|^apps/' <那份文件`（今天这戳回 **0**；⚠️ 别把清单落 `/tmp`）。
 下一位若动了代码，按 **#494** 那三层筛子判要不要重跑整串，别照抄本表第三列。
+🟢 **本格又被"当场重跑"顶了一次（10-20 01:51:41–01:52:54，交付 tip `b8d3df1d4`，载具起跑 `dirty=0`）**：结论行仍是 `legs=28 rc0=27 rc_nonzero=1`、唯一非 0 仍是 `SCOPE-commit-scope`（B205），二十七枚 AC 腿逐枚 rc=0；逐腿读数与副作用两枚计数器在 `~/.heyta-evidence/inb-t7-1017-0902/batt-b8d3df1d4-0151/`，正文写在 `docs/plans/inbound-automation.md` 文末那节（`grep -n '^## 2026-10-20' docs/plans/inbound-automation.md` 现量定位，别按行号引）。**为什么这串读数今天还代表当前 tip**：文末那节第 5 条给了三条对账（主力那条数"整棵树里除 `PROGRESS.md`／`BLOCKED.md`／`docs/` 外还有几枚路径被动过"，本戳回 0），引用本格读数请连着它一起引用。
 🟢 **本表第二格那八串与装置在册名逐格对账成立**（10-20 01:22:42 现量：两侧集合各 **28** 枚、`comm -3` 回**空**；分桶 `AC1..AC8` ＝ 6/2/2/3/3/2/6/3，另加 `SCOPE` 1 枚＝28）。
 复账三条（**零执行，只比名单**；清单别落 `/tmp`）：
 
