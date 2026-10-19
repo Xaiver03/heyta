@@ -4334,3 +4334,27 @@ AC-8：`python3 research/tools/verify-inbound-ac8-matrix.py` rc=**0**（`读数�
    - ⓑ **打包与判卷输入面零改动**（窄口径，用来点名"哪一类输入"没动）：`git diff --name-only b8d3df1d4 refs/heads/main -- server/src server/tests packages apps/web/src apps/mobile/src e2e research/tools scripts | grep -c .` ⇒ **0**；
    - ⓒ **区间内没有一枚非本线文档笔**：`git log --format=%s b8d3df1d4..refs/heads/main | grep -vc '^docs(自动收集'` ⇒ **0**，同戳 `git diff --name-only b8d3df1d4 refs/heads/main` 逐字回 `PROGRESS.md`、`docs/plans/inbound-automation.md` 两枚。
    ⚠️ **三枚各有各的漏法，别只跑一枚**：只跑 ⓑ 会漏"改动落在我那串 pathspec 之外"（根目录的 `pnpm-lock.yaml`／`package.json` 就是现成的例子——01:56:17 另跑 `git diff --name-only b8d3df1d4 refs/heads/main -- pnpm-lock.yaml package.json | grep -c .` 回 **0**，靠的是"这一枚恰好也被 ⓐ 拦住"）；只跑 ⓒ 会漏"标题写着文档、正文里却动了代码"（标题不是内容证据）；只跑 ⓐ 会漏"没动文件但文件内容变了"？不会——`--name-only` 报的就是内容差集，但**它看不见未跟踪文件**，所以载具起跑时的 `dirty=0` 那一格（第 1 条开头）不能省。**引用第 1 条那 28 枚读数时连着 ⓐ 与载具 `dirty=0` 一起引用**；任一枚非 0，第 1 条立刻退回"上一枚 tip 的读数"，不是当前交付 tip 的。本条动 `docs/plans/inbound-automation.md` 一枚；判卷口径零处、代码零处、AC 勾数 `grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` 现量 **0**、不 push、不勾格。
+
+## 2026-10-20 01:5x · 完成条件 1 里"贴出的输出"那一半，八格整张刷到交付 tip（自动收集线）
+
+**为什么要再刷这张表**：上一张同类的表（本文 10-19 21:3x 那节）自己写着「每格都是那一戳的贴出件，不是现在的值」。01:51 那趟整串重跑之后，"现在的值"有了新的戳，而完成条件 1 要的是**每条 AC 都有可复跑命令 + 贴出的输出**——命令一直在仓里，贴出的件却还停在 15:51 那一戳，这就是"半张表新鲜、半张表是代理"。下面这张整张来自同一趟、同一枚载具、同一起跑态。
+
+起跑态现量（01:51:41，逐字在 `~/.heyta-evidence/inb-t7-1017-0902/batt-b8d3df1d4-0151/rc.txt` 头三行）：`CARRIER_HEAD=b8d3df1d4 dirty=0`、`PNG_BEFORE=22 枚`、`PNG_DENOM=22 枚（派生自 spec）`。收尾态：`PNG_AFTER=22 枚`、`PNG_DIFF_LINES=4`、`EVIDENCE_DIRTY=4`、`CARRIER_DIRTY=4`，按名还原后 `dirty=0`、tip 未动。
+
+| 格子 | 本戳 `--only` 段 | 本戳逐字贴出的输出（腿名 ⇒ 输出） | 逐腿正文在哪 |
+|---|---|---|---|
+| **AC-1 权益与授权** | `AC1-offline11,AC1-entitlement3,AC1-quota-http,AC1-pglite,AC1-worker-identity,AC1-cjs-order` | `AC1-offline11` ⇒ `Test Files  11 passed (11)`＋`Tests  103 passed (103)`；`AC1-entitlement3` ⇒ `Tests  56 passed (56)`；`AC1-quota-http` ⇒ `Tests  3 passed (3)`；`AC1-pglite` ⇒ `Tests  17 passed (17)`；`AC1-worker-identity` ⇒ 装置只自报日志路径（判据是 rc，rc=0）；`AC1-cjs-order` ⇒ `扫过的产物=119　命中=0` | 同目录 `AC1-*.log` 六枚 |
+| **AC-2 接收与队列** | `AC2-inbound-core,AC2-queue-teeth` | `AC2-inbound-core` ⇒ `Test Files  3 passed (3)`＋`Tests  47 passed (47)`；`AC2-queue-teeth` ⇒ `臂数=6　不成立=0　末次 sha256=52c3fd707977a03e（须等于开局那枚）` | 同目录 `AC2-*.log` 两枚 |
+| **AC-3 领取与提交** | `AC3-dual-host,AC3-sync-authz` | `AC3-dual-host` ⇒ `WINDOW=8   PASS 六档都有读数：①a 派发前权益到期 ⇒ waiting-entitlement、真模型 0 次、A 零 op（恢复后同一事件补跑得 submitted、1 op）…`（六档逐档正文在那枚 log 里，这张表只贴头档）；`AC3-sync-authz` ⇒ `Tests  6 passed (6)` | 同目录 `AC3-dual-host.log`（六档全文）与 `AC3-sync-authz.log` |
+| **AC-4 解析** | `AC4-local-date,AC4-app-host,AC4-egress-wire` | `AC4-local-date` ⇒ `Tests  1 passed (1)`；`AC4-app-host` ⇒ `Test Files  15 passed (15)`＋`Tests  112 passed (112)`；`AC4-egress-wire` ⇒ `Tests  4 passed (4)` | 同目录 `AC4-*.log` 三枚 |
+| **AC-5 批创建与来源记录** | `AC5-shared-schema,AC5-op-log,AC5-batch-actions` | 三枚分别 ⇒ `Tests  15 passed (15)`、`Tests  16 passed (16)`、`Tests  9 passed (9)` | 同目录 `AC5-*.log` 三枚 |
+| **AC-6 规则界面** | `AC6-web-specs,AC6-browser` | `AC6-web-specs` ⇒ `Test Files  8 passed (8)`＋`Tests  19 passed (19)`；`AC6-browser` ⇒ `8 passed (15.8s)` ⚠️ 这枚腿按 spec 落点逐名覆写待拍的那批取证图（本戳覆写 4 枚、已按名还原），单跑它前先读 §7 第 4 格 | 同目录 `AC6-web-specs.log` 与 `AC6-browser.log` |
+| **AC-7 文档** | `AC7-doc-tables,AC7-doc-endpoints,AC7-migrations,AC7-license,AC7-docs-voice,AC7-link` | `AC7-doc-endpoints` ⇒ `结论：文档里每一枚端点都落在按挂载前缀算出的可达集合上，方法也对得上（成立）`；`AC7-license` ⇒ `结论：全部依赖均为宽松许可（含已登记的例外），且清点输入集对得上当前 lockfile ✅`；其余四枚装置把读数写在自己的 log 里、对电池只交 rc（四枚全 rc=0） | 同目录 `AC7-*.log` 六枚 |
+| **AC-8 验收矩阵** | `AC8-matrix,AC8-producer-seam,AC8-ac-ticks` | `AC8-matrix` ⇒ `读数　表头行=1098　行数=34　有尺行=27　无尺行=7　尺枚=67　窗=13/13　平台=10/10　权益=9/9　设备状态=9/9~结论：矩阵与 HEAD 逐格对账成立`；`AC8-producer-seam` ⇒ `相对导入=237　模块在 HEAD=237　登记模块缝=0　新模块缝=0　尺瞎了=0`；`AC8-ac-ticks` ⇒ `AC 行=8　已勾=0　未勾=8　状态位未分类=0` | 同目录 `AC8-*.log` 三枚 |
+| 范围尺（**不是 AC 格**） | `SCOPE-commit-scope` | 仍 rc=1，本戳首行 `本线笔数=333　涉及路径=203　越界=96`（口径与逐笔归因在 B205；`越界` 这格从 01:44 到 01:45 两戳逐字相同 ⇒ 本线新落的那枚装置没加一枚） | 同目录 `SCOPE-commit-scope.log` |
+
+**这张表凭什么还代表当前 tip**（三枚 0，命令与各自的漏法都写在上一节第 5 条）：ⓐ 整棵树里除台账/文档外的路径变更枚数 = `git diff --name-only b8d3df1d4 refs/heads/main | grep -vcE '^(PROGRESS\.md|BLOCKED\.md|docs/)'`；ⓑ 打包与判卷输入面 = 同一条命令带那八段 pathspec；ⓒ 区间内非本线文档笔 = `git log --format=%s b8d3df1d4..refs/heads/main | grep -vc '^docs(自动收集'`。**本戳三枚都回 0**（01:57:47 现量），但它每落一笔就会重算——引用这张表就是引用这三枚 0，不是引用这一句话。
+
+⚠️ **上一张表不作废、也不许被这张顶掉**：10-19 21:3x 那节贴的是**那一戳**的贴出件（含 `8 passed (18.1s)` 这类同集合不同秒的读数），它是那一批结论的证据；本节只多给了 01:51 这一戳的一套。两格时长不一样（18.1s／15.8s）不是"变快了"，是两趟各自的墙钟，**不许拿来当性能读数**。
+
+本节动 `docs/plans/inbound-automation.md` 一枚；判卷口径零处、代码零处、不新增依赖、AC 勾数现量 `grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` 回 **0**、不 push、不勾格。
