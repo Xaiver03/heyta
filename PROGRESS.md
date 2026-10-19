@@ -5825,6 +5825,10 @@ AC 已勾数仍为 **0**（`verify-inbound-ac-ticks.py`：`AC 行=8　已勾=0�
 ③ **交接书改的三格**（都是为了让下一个接手不重走我今天走的死路）：§5 腿 3 那格补 00:30:01 第五戳并把「最后四戳」标成已漂（第 134 条 ① 那枚坑是本线自己踩的，不是历史事件）；§7 第 6 格换成按戳取数 ＋ 把 **B205 追记三**（仓规指定要写的 traps 正文与交接书不在范围尺白名单里）与那句"AGENTS §4 与索引末行的歧义"并进去；§8 第 3/4 格把 **Linux 交付取证从"等腿 3"里拆出来**（它不等那台机，本会话已复上；腿 3 跑完仍需再取一次），并加一条"探之前先核别名在册"的前置。§9 那枚 ssh 别名子弹补上第二次命中与"留 stderr"这条。
 ④ **本条动两枚文件**：`PROGRESS.md`＋`docs/plans/inbound-automation-handoff.md`。提交点名这两枚，入库后现量 `git show --name-only --format= <本条 sha> | grep -c .` 应回 **2**；三把文档尺（表格行／链接／口音）逐条 rc=**0**、`docs/plans/inbound-automation.md` 的 AC 已勾数 **0**（取法见 #498，别用 zsh 变量循环跑门）。
 ⑤ **还剩什么**：腿 3 前半只剩"负责人开机"这一格（唯一解他的人是他）；其余全部落在交接书 §7 那五格待拍板 + B224 那两个 owner。本线能自己做的格到此为止没有待补项了。
+136. 🟢 **Linux 那枚"人打开看过"的图从远端 `/tmp` 收回本地证据件，交接书 §5 那一格从模糊指针换成具名路径**（写前先跑 `date`，本机 2026-10-20 00:4x）
+① **为什么要收回来**：`apps/desktop-linux/scripts/package-deb.sh:277` 把截屏钉在 `SHOT=/tmp/heyta-deb-window.png`，而那台是**远端** Linux 载体 —— `/tmp` 里的东西重启就没有，把"负责人要打开看的那张图"寄在可回收目录＝迟早拿不到。00:41:24 用 `timeout 25 scp -q -o BatchMode=yes linux-dev:/tmp/heyta-deb-window.png <证据目录>/heyta-deb-window-0018.png` 取回（这枚 png 是本线 00:18 那一趟自己产的东西，取回不动别人的件），现量 `sips -g pixelWidth -g pixelHeight <那枚>` ⇒ **900 × 523**、`ls -l` 字节数 **108216**（现量 `wc -c < <那枚>`），尺寸与第 133 条 ① 那戳的 `PKG_SNAPSHOT=900x523` **逐字对上** ⇒ 这就是像素尺打分的那一枚，不是另一张。原件路径 `~/.heyta-evidence/inb-t7-1017-0902/leg3-1020-0018/heyta-deb-window-0018.png`。
+② **"人打开看过"这一格现在的形状**：Linux 这一端有具名图可看了（路径写进交接书 §5 那一行）；四端装机件那批仍要等腿 3 前半（那台打包机）跑完才有。本线仍然**不替他勾**。
+③ **本条动两枚文件**：`PROGRESS.md`＋`docs/plans/inbound-automation-handoff.md`；提交点名这两枚，入库后现量 `git show --name-only --format= <本条 sha> | grep -c .` 应回 **2**（⚠️ 这枚 png 只在证据目录，**不进仓** —— 仓里那批入库 png 每次跑会被覆写、没有门为它红，就是 B194／B239 那一格待拍的事，本线不顺手新增一枚）。
 
 
 
