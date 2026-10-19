@@ -309,20 +309,28 @@ for(const [id,z,e] of rows.sort((a,b)=>b[1]-a[1]))console.log(String(z).padStart
 2. 点「添加网站」会弹出**资源类型选择层**（网域 / 网址前缀）—— 我在 Chrome 处于前台时
    成功弹出过一次，并读到了两张卡与两个输入框（`aria-label` 分别是 `example.com` 与
    `https://www.example.com`）。
-3. 🔴 **但在隐藏标签页里，同一个点击不再生成那个浮层**：`vis: hidden`、`hasFocus: false`、
-   `chooserVisible: false`、`[role=dialog]` 数量不变。GSC 用的是 Google 内部的 **Wiz**
-   （`ng-version` 为 null、类名形如 `whsOnd zHQkBf`／`RveJvd snByac`），
-   与 `portal-form-filling/references/antd-controls.md` §2 记的机制同族：**后台标签页 rAF 冻结，
-   浮层动画进不到完成态**。打 rAF 补丁（该节给出的配方）**不够** —— 这一层仍然不生成。
-4. 而用户的规则（也已写进 skill）是：**只有登录/验证码才抢前台，代理填表必须后台运行。**
-   ⇒ 两条约束在这一点上直接冲突，所以**我不猜、不抢，交给用户**。
+3. 🔴 **⚠️ 这一条我最初判错了，已于 2026-10-19 当天证伪并重写。** 我先据两次观察认为
+   "后台标签页里浮层不生成"，并据此给了用户一条**错误的出路**（见 §8.3，已撤回）。
+   **实测证伪**：浮层在 `document.visibilityState === 'hidden'` 的标签页里**照样完整渲染** ——
+   链上每层 `visibility:visible`、`opacity:1`、`transform:none`。**窗口可见性从来不是成因。**
+4. **真正的成因**：那个「继续」是 Wiz 的 `div[role="button"] jsaction="click:cOuCgd; …"`，
+   **不吃合成事件**（`isTrusted:false` 改不了）。证据链见 §8.8 —— 其中决定性的一条是
+   **点击后 `performance` 零新请求**，证明处理器根本没被调用。
+   ⚠️ 注意区分控件族：同一页上的真 `<button>`（「添加网站」）用 `.click()` **是打得动的**
+   （浮层就是它打开的）。
+5. 而用户的规则（也已写进 skill）是：**只有登录/验证码才抢前台，代理填表必须后台运行。**
+   ⇒ 在"合成事件无效"这一格上，规则与能力**并不冲突**（冲突是我误判出来的），
+   真正需要的是**换通道**（CDP）或**交还用户**。
 
 ### 8.3 两个都不需要我抢前台的出路（任选一条，我立刻继续）
 
-1. **把 Chrome 窗口挪到屏幕一角/缩小，让它在你的 App 旁边"不全被遮挡"**，然后你回到原来的
-   App 继续干活。Chrome 判断 `visibilityState` 看的是**窗口是否被完全遮挡**，不是"哪个 App 在前台"
-   —— 只要它不被完全盖住，那个标签就变 `visible`，**我就能全程在后台把对话框开出来**。
-   ⚠️ 这一条是我的推断（机制层面），**尚未实测**：它成立与否，我用一次 `visibilityState` 回读就能判定。
+1. ~~**把 Chrome 窗口挪到屏幕一角/缩小，让它在你的 App 旁边"不全被遮挡"**~~
+   🔴 **已撤回（2026-10-19 当天证伪）**：挪窗口**没有用**。它当初基于的机制判断
+   （"隐藏标签页不生成浮层"）是错的；实测浮层在隐藏标签页里照样完整渲染（§8.2 第 3 条），
+   而卡点是**控件不吃合成事件**（§8.2 第 4 条 / §8.8）—— 与窗口位置、与前台都无关。
+   **替代出路**：让 Chrome 用 `--remote-debugging-port=9222` 重启（C2/CDP；
+   `Input.dispatchMouseEvent` 是可信事件，且 CDP **不需要窗口在前台**）。
+   代价：需要你重启一次 Chrome（标签会被 Chrome 自己恢复），且这是**你**的动作。
 2. 或者你亲手做 3 下（你已在登录态，10 秒）：点「添加网站」→ 在**右边那张「网址前缀」卡**里
    输入 `https://heyta.waytofuture.cn/` → 点该卡的「继续」。然后把验证方式那一步的
    **HTML 文件内容**（形如 `google-site-verification: googleXXXX.html`）贴给我，
@@ -333,7 +341,7 @@ for(const [id,z,e] of rows.sort((a,b)=>b[1]-a[1]))console.log(String(z).padStart
 - 🔴 **`tccli` 对 `waytofuture.cn` 无权限**：`DescribeRecordList` 回
   `OperationDenied.NoPermissionToOperateDomain`，而本机只有一套凭据（带 STS token 的临时凭据）。
   ⇒ **GSC/百度若要 DNS TXT 验证，得先换成拥有 `waytofuture.cn` 的那个腾讯云账号**；
-  也正因如此，§8.3 走的是 **HTML 文件**验证而不是 DNS。
+  也正因如此，§8.7 的作战图走的是 **HTML 文件**验证而不是 DNS。
 - ⚠️ **代理会瞬时抖**：`location.reload()` 曾把 GSC 标签打成
   `chrome-error://chromewebdata/` + `ERR_PROXY_CONNECTION_FAILED`；同一分钟内复测
   `curl -x http://127.0.0.1:7890 https://www.google.com/` 回 **302**（通），
@@ -466,3 +474,47 @@ Chrome 已被顶到前台并选中该标签（**登录是唯一允许抢前台�
 - 🔴 **不要删**已生效的验证文件：删了等于撤回所有权，平台会在下次复核时取消已验证状态。
 
 ⏳ **两条路都等你**：甲路你挪一下窗口；乙路你贴 token（Bing 的登录你已经开了头）。我这边随时可以一条命令接着做。
+
+### 8.8 决定性判据：Wiz 的 `jsaction` 按钮**不吃合成事件**（三条排他 + 一条正面证伪）
+
+这一节是上一条结论的证据链。它值得单独留着，因为**三条"看起来像"的成因都被排除了**，
+而排除手法本身可复用。
+
+| 试过的 | 结果 |
+|---|---|
+| 裸 `element.click()` | ❌ 没前进 |
+| `pointerdown→mousedown→pointerup→mouseup→click` 完整序列（带坐标、`composed:true`、`pointerId/isPrimary`） | ❌ 没前进 |
+| `pointerdown+mousedown` 与 `pointerup+mouseup+click` **拆两次投递、中间隔 600ms**（怀疑"按下/抬起要有时间差"） | ❌ 没前进 |
+
+**排他 1 · 不是没渲染**：浮层链上每层 `visibility:visible`、`opacity:1`、`transform:none`；
+按钮矩形正常（`x=1009, y=636, w=90, h=38`）。
+
+**排他 2 · 不是按钮禁用，而且受控输入那一步是成功的**：目标按钮的 `aria-disabled` 已从 `"true"`
+变成 `null`，而同一浮层里**另一张卡**的按钮仍是 `"true"` —— 说明应用确实按我填的值重新校验过。
+输入框的 `data-initial-value` 也已落上 `https://heyta.waytofuture.cn/`。
+⚠️ **别拿 class 里的 `RDPZE` 当禁用判据**：两张卡的按钮**都带它**，它不区分。
+
+**排他 3 · 不是网络失败 —— 判据在这里**：
+
+```js
+window.__netBefore = performance.getEntriesByType('resource').map(e => e.name);
+// …派发点击…
+performance.getEntriesByType('resource').filter(n => !window.__netBefore.includes(n))
+```
+
+实测 **59 → 59、零条新请求** ⇒ **动作处理器根本没有被调用**。
+这条判据把"事件没被接受"与"处理器跑了但请求失败"分开了 —— 两者在界面上**同形**（什么都不发生）。
+
+**正面证伪（同一页、同一刻的对照）**：页面上的**真 `<button>`**（「添加网站」）用裸 `.click()`
+**就打开了浮层**。⇒ 差别在**控件族**，不在"能不能发事件"：真 `<button>` 有原生 click，
+而 Wiz 的 `div[role="button"]`（`jsaction="click:cOuCgd; mousedown:UX7yZ; mouseup:lbsD7e"`）不接受
+`isTrusted:false` 的事件。
+
+🔴 **连带撤回我自己的一条机制判断**：我先前据两次观察认为"后台标签页不生成浮层"，
+并据此把"挪窗口"当成出路（§8.3 第 1 条，已撤回）。**实测证伪**：浮层在
+`document.visibilityState === 'hidden'` 的标签页里照样完整渲染，`raf` 补丁也不是必需。
+**窗口可见性从来不是成因。**
+
+**反哺**：这一条已写进 skill 的通道能力边界
+（`portal-form-filling/references/chrome-applescript-channel.md` 的
+「2026-10-19 补测」小节）—— 那里原先把这类控件标成"**仍属未测，别外推**"，现在成了**已证实**。
