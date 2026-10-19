@@ -58,7 +58,7 @@ import { resolveLegalLinks } from '@heyta/app-host';
 import type { HeytaNativeTokens } from '@heyta/design-system';
 
 import { useTheme, useTokens } from '../theme';
-import { Button, IconButton, Text } from '../ui/kit';
+import { Button, Text } from '../ui/kit';
 import { Icon } from '../ui/icons';
 import {
   acceptNetworkConsent,
@@ -127,6 +127,16 @@ function makeStyles(tokens: HeytaNativeTokens) {
       flexDirection: 'row',
       flexWrap: 'wrap',
       gap: tokens['space.4'],
+    },
+    later: {
+      minHeight: tokens['touch-target.min'],
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: tokens['space.3'],
+      borderRadius: tokens['radius.sm'],
+    },
+    laterPressed: {
+      backgroundColor: tokens['color.hover'],
     },
     link: {
       minHeight: tokens['touch-target.min'],
@@ -222,11 +232,20 @@ export function PrivacyConsentSheet({
                 </Text>
               )}
             </View>
-            <IconButton
-              icon="action.close"
-              label={t('common.privacy.consent.close')}
+            {/* 🔴 这条出口在屏幕上写的就是它那三个字，不是一枚 ✕。
+                r150 装机态量到：可及名称一直是「以后再说」，看得见的人却只读到一个叉 ——
+                而叉在弹卡右上角的通用含义是"关掉这张卡"，这一下既不落盘也不关闭决定，
+                下次冷启动还会再问（r150 四件读数）。两枚真决定都有可见文字，第三条不该没有。 */}
+            <Pressable
               onPress={closePrivacySheet}
-            />
+              accessibilityRole="button"
+              accessibilityLabel={t('common.privacy.consent.close')}
+              style={({ pressed }) => [styles.later, pressed ? styles.laterPressed : null]}
+            >
+              <Text variant="caption" tone="muted">
+                {t('common.privacy.consent.close')}
+              </Text>
+            </Pressable>
           </View>
 
           <ScrollView contentContainerStyle={styles.scrollContent}>
