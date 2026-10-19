@@ -1,9 +1,8 @@
 # Authentication Architecture
 
-SuperSync's production authentication paths are passkeys and emailed magic
-links. Successful authentication issues the same long-lived JWT regardless of
-the login method. Password creation exists only in the guarded test routes; it
-is not a production registration or login flow.
+当前认证按部署模式选择：官方必须使用中央OIDC；自托管默认local，保留邮件口令、
+验证码、passkey和magic-link。下文英文端点表说明local模式；中央模式的HTTP与生命周期
+边界见文末。执行事实以代码和[统一认证计划](../../docs/plans/unified-central-auth.md)为准。
 
 The executable authorities are [`api.ts`](../src/api.ts) for routes and rate
 limits, [`auth.ts`](../src/auth.ts) for email tokens and JWT verification, and
@@ -87,8 +86,9 @@ revocation. Routing all requests for an account consistently can reduce the
 window but does not replace shared invalidation as a general guarantee.
 
 `POST /api/replace-token` increments `tokenVersion`, invalidating all prior JWTs
-for the account, and returns a new JWT with the new version. Selective
-per-device revocation is not implemented.
+for the account, and returns a new JWT with the new version in local mode.
+Per-session revocation is implemented using the SHA-256 digest of the JWT jti
+in access_sessions; only matching sockets are closed for a single-session logout.
 
 The cache implementation and its single-replica constraint live in
 [`auth-cache.ts`](../src/auth-cache.ts); JWT verification and version writes
@@ -97,12 +97,12 @@ live in [`auth.ts`](../src/auth.ts).
 ## Email Tokens Are Bearer Secrets
 
 Verification, magic-login, and passkey-recovery tokens are random 32-byte values
-stored as plain strings. They are cryptographically unguessable, time-limited,
+stored as SHA-256 digests. They are cryptographically unguessable, time-limited,
 and consumed with guarded database updates so the same token cannot complete
 the flow twice. Current lifetimes are 24 hours for email verification, 15
 minutes for magic login, and one hour for passkey recovery.
 
-Those limits reduce exposure; they do not make plaintext tokens low-value. A
+Those limits reduce exposure; they do not make tokens delivered by email low-value. A
 magic-login token grants a JWT, and a recovery token can replace the account's
 passkeys. Consuming a passkey-registration verification token activates the
 credential already bound to that token, so an attacker who staged a credential
@@ -110,10 +110,9 @@ they control and then obtains the corresponding email token can gain ongoing
 account access. Database dumps, application logs, and proxy logs containing
 unexpired tokens must therefore be treated as credential exposure.
 
-Plaintext storage is a current known limitation. A stronger design would store
-only token digests and compare the digest of a presented token, preserving
-lookup and one-use semantics without leaving usable bearer values in the
-database.
+The database stores token digests through auth-tokens.ts. Raw email links and
+credentials in logs remain sensitive; digest storage does not make a leaked
+email link safe.
 
 ## WebSocket Token Transport
 
@@ -144,23 +143,38 @@ malformed requests cannot bypass the proxy filter through application logs.
 | Email enumeration resistance | Neutral registration/login/recovery responses and dummy passkey options                |
 | Email bearer-token entropy   | 32 random bytes                                                                        |
 | WebAuthn challenge storage   | Five-minute process-local map; not multi-instance-safe without affinity/shared storage |
-| Per-device JWT revocation    | Not implemented                                                                        |
-| Refresh-token separation     | Not implemented                                                                        |
+| Per-device JWT revocation    | access_sessions jti digest with matching WebSocket closure                                                                        |
+| Refresh-token separation     | OIDC AT/RT are server-only encrypted material; local mode has no upstream refresh token                                                                        |
 
 Set `JWT_SECRET` to a strong random value of at least 32 characters. WebAuthn
 deployment identity is controlled by `WEBAUTHN_RP_NAME`, `WEBAUTHN_RP_ID`, and
 `WEBAUTHN_ORIGIN`; production origins must use HTTPS.
 
-## 中央认证模式准备（P5.0）
+## 中央认证模式（P5.2B2）
 
-当前可运行模式仍为自托管 local。HEYTA_AUTH_DEPLOYMENT=official 必须同时显式
-HEYTA_AUTH_MODE=oidc；未知/空值、local 混入 HEYTA_OIDC_* 均启动失败。
-OIDC 需 HEYTA_OIDC_ISSUER、HEYTA_OIDC_CLIENT_ID、HEYTA_OIDC_CLIENT_SECRET、
-HEYTA_OIDC_REDIRECT_URI、HEYTA_OIDC_SESSION_ENCRYPTION_KEY。回调固定为 HTTPS
-PUBLIC_URL origin 的 /api/auth/oidc/callback，加密 key 为独立 32 字节 hex。
-**本阶段 OIDC 配置完整仍拒绝启动**，直到授权、会话、撤销完整实现；无 fallback 开关。
+HEYTA_AUTH_DEPLOYMENT=official 必须同时显式HEYTA_AUTH_MODE=oidc；未知/空值、
+local混入HEYTA_OIDC_*均启动失败。标准库需要Node>=22.12，任何故障不得降级本地认证。
+OIDC需HEYTA_OIDC_ISSUER、HEYTA_OIDC_CLIENT_ID、HEYTA_OIDC_CLIENT_SECRET、
+HEYTA_OIDC_REDIRECT_URI、HEYTA_OIDC_SESSION_ENCRYPTION_KEY。回调固定为HTTPS
+PUBLIC_URL origin的/api/auth/oidc/callback，加密key为独立32字节hex。
 
-标准库加载验收：npm run verify:oidc-runtime（ts-node）和构建后
-npm run verify:oidc-runtime:built。OIDC 模块需要 Node >=22.12；探针离线，仅验真实标准库
-与 RFC7636 PKCE 已知答案，不表示已完成登录。实施状态见
-[统一认证计划](../../docs/plans/unified-central-auth.md)。
+GET /api/auth/central/config提供模式与产品条款版本；GET /api/auth/central/session返回
+账号投影和CSRF；同源POST /api/auth/oidc/start发起登录，GET回调只设置host-only Secure
+HttpOnly Cookie并303至固定/app/。长期JWT与中央AT/RT均不放进URL或JSON。
+Cookie的非安全方法必须通过Origin、Fetch-Metadata和会话绑定CSRF检查。
+Cookie/Bearer不能混用。明确失效的session投影会清HttpOnly Cookie以便重新登录，中央503不清。
+
+官方模式旧身份凭据入口在副作用前409，E2EE vault口令、资料和离线数据不属于该封闭范围。
+所有HTTP鉴权与已建立WS的业务输入/输出及30秒空闲复验都受中央live约束；缓存不能跳过。
+WS拒URL token，使用同源Cookie或native Authorization；local自托管的旧协议保持。
+中央撤销为TOKEN_REVOKED/WS4003，未知为CENTRAL_UNAVAILABLE/503或WS1013；
+只有产品账号实际删除才ACCOUNT_CLOSED，故障和停用不销毁本地E2EE数据。
+
+当前退出、会话删除、产品全退出、管理员强退、设备封锁和产品销户均持久化中央撤销队列。
+产品全退出不等于全平台退出。replace-token在OIDC下返回reauthenticationRequired并要求
+重新OIDC；local仍返回新JWT。中央不可达时显式退出仍可先本地撤销，由worker异步确认。
+worker在成功监听后启动；stop等完HTTP、WS在途校验及worker后断DB。
+
+服务端已完成接线，但Web特色UI/共享transport、原生handoff、旧账号HTTP双证明绑定和
+生产切换仍待后续。自托管OIDC没有可验证运营者条款版本时不自动建新账号，已有映射
+可以登录；local自托管不受影响。状态和验收只记录于[统一认证计划](../../docs/plans/unified-central-auth.md)。

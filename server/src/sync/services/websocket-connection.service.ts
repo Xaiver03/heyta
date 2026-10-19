@@ -16,6 +16,9 @@ interface ConnectedClient {
    * per-session handle at all, so nothing here can match them.
    */
   sessionId: string | null;
+  authorize?: () => Promise<void>;
+  queue: Array<() => void | Promise<void>>;
+  draining: boolean;
   lastPong: number;
   /** Wall-clock ms when this socket was accepted (used for the storm summary). */
   connectedAt: number;
@@ -88,6 +91,8 @@ interface UserPresence {
  */
 export class WebSocketConnectionService {
   private connections = new Map<number, Set<ConnectedClient>>();
+  private bySocket = new WeakMap<WebSocket, ConnectedClient>();
+  private inFlight = new Set<Promise<void>>();
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
   private presenceByUser = new Map<number, UserPresence>();
   /**
@@ -170,6 +175,7 @@ export class WebSocketConnectionService {
     clientId: string,
     ws: WebSocket,
     sessionId: string | null,
+    authorize?: () => Promise<void>,
   ): void {
     // A new socket from the same clientId means the device is reconnecting — the
     // server's old entry is by definition stale (network blip, proxy idle close,
@@ -249,7 +255,7 @@ export class WebSocketConnectionService {
       ws,
       clientId,
       userId,
-      sessionId,
+      sessionId, authorize, queue: [], draining: false,
       lastPong: nowMs,
       connectedAt: nowMs,
       lastTouchedAt: nowMs,
@@ -260,6 +266,7 @@ export class WebSocketConnectionService {
       presenceMsgCount: 0,
     };
     userSet.add(client);
+    this.bySocket.set(ws, client);
 
     const presence = this.presenceByUser.get(userId);
     if (presence && presence.producerClientId === clientId) {
@@ -268,8 +275,10 @@ export class WebSocketConnectionService {
       // its state as stale; the broadcast goes out immediately rather than
       // waiting up to a heartbeat interval for the producer's next state.
       if (!presence.producerConnected) {
-        presence.producerConnected = true;
-        this._relayPresence(userId, clientId, this._presenceStateMsg(presence));
+        this._authorized(client, () => {
+          presence.producerConnected = true;
+          this._relayPresence(userId, clientId, this._presenceStateMsg(presence));
+        });
       }
     }
 
@@ -298,12 +307,18 @@ export class WebSocketConnectionService {
     });
 
     ws.on('message', (data: Buffer) => {
+      // Bound both frame bytes and retained queued payloads while the issuer is slow.
+      if (client.authorize && data.byteLength > WebSocketConnectionService.MAX_PRESENCE_PAYLOAD_BYTES * 8) {
+        this.removeConnection(userId, client, { code: 1009, reason: 'Message too large' }); return;
+      }
       try {
         const msg = JSON.parse(data.toString());
         if (msg.type === 'pong') {
           client.lastPong = Date.now();
         } else if (msg.type === 'presence_state' || msg.type === 'presence_cmd') {
-          this._handlePresenceMessage(client, msg.type, msg.payload);
+          const { type, payload } = msg;
+          if (client.authorize && (typeof payload !== 'string' || Buffer.byteLength(payload, 'utf8') > WebSocketConnectionService.MAX_PRESENCE_PAYLOAD_BYTES)) return;
+          this._authorized(client, () => this._handlePresenceMessage(client, type, payload));
         }
       } catch (err) {
         Logger.debug(`[ws:user:${userId}:${clientId}] Non-JSON message received`, err);
@@ -330,6 +345,7 @@ export class WebSocketConnectionService {
     client: ConnectedClient,
     closeFrame?: { code: number; reason: string },
   ): void {
+    client.queue.length = 0;
     const userSet = this.connections.get(userId);
     if (userSet) {
       userSet.delete(client);
@@ -560,15 +576,10 @@ export class WebSocketConnectionService {
     if (!userSet) {
       return;
     }
-    // Serialized once — the identical string goes to every sibling socket.
-    const str = JSON.stringify(message);
+
     for (const c of userSet) {
       if (c.clientId !== excludeClientId && c.ws.readyState === WebSocket.OPEN) {
-        try {
-          c.ws.send(str);
-        } catch (err) {
-          Logger.debug(`[ws] Failed to send message`, err);
-        }
+        this._sendMessage(c.ws, message);
       }
     }
   }
@@ -637,13 +648,12 @@ export class WebSocketConnectionService {
           // row fresh: a connection held open past the retention window without
           // uploading would otherwise be pruned mid-use. Touching only on accept
           // would not cover that case.
-          if (
-            this.touchDevice &&
-            now - client.lastTouchedAt >= DEVICE_TOUCH_THROTTLE_MS
-          ) {
-            client.lastTouchedAt = now;
-            this.touchDevice(userId, client.clientId);
-          }
+          this._authorized(client, () => {
+            if (this.touchDevice && now - client.lastTouchedAt >= DEVICE_TOUCH_THROTTLE_MS) {
+              client.lastTouchedAt = now;
+              this.touchDevice(userId, client.clientId);
+            }
+          });
 
           // Send app-level ping
           this._sendMessage(client.ws, {
@@ -750,6 +760,7 @@ export class WebSocketConnectionService {
     for (const [, userSet] of this.connections) {
       for (const client of userSet) {
         try {
+          client.queue.length = 0;
           client.ws.close(1001, 'Server shutting down');
         } catch (err) {
           Logger.debug(`[ws] Error closing connection during shutdown`, err);
@@ -769,16 +780,50 @@ export class WebSocketConnectionService {
     return total;
   }
 
-  private _sendMessage(ws: WebSocket, message: Record<string, unknown>): boolean {
-    if (ws.readyState !== WebSocket.OPEN) return false;
-    try {
-      ws.send(JSON.stringify(message));
-      return true;
-    } catch (err) {
-      Logger.debug(`[ws] Failed to send message`, err);
+  /** Drain only trusted work already started; removed sockets cannot dispatch queued work. */
+  async drainAuthorization(): Promise<void> { await Promise.all([...this.inFlight]); }
+
+  private _current(client: ConnectedClient): boolean {
+    return this.connections.get(client.userId)?.has(client) === true && client.ws.readyState === WebSocket.OPEN;
+  }
+  private _authorized(client: ConnectedClient, run: () => void | Promise<void>): boolean {
+    if (!this._current(client)) return false;
+    if (!client.authorize) { void run(); return true; }
+    if (client.queue.length >= 32) {
+      this.removeConnection(client.userId, client, { code: 1013, reason: 'Authentication queue full' });
       return false;
     }
+    client.queue.push(run);
+    if (client.draining) return true;
+    client.draining = true;
+    const pending = (async () => {
+      try {
+        while (client.queue.length && this._current(client)) {
+          const action = client.queue.shift()!;
+          await client.authorize!();
+          if (!this._current(client)) break;
+          await action();
+        }
+      } catch (error) {
+        const inactive = typeof error === 'object' && error !== null && 'code' in error && error.code === 'session_inactive';
+        this.removeConnection(client.userId, client, { code: inactive ? 4003 : 1013,
+          reason: inactive ? 'Session revoked' : 'Authentication temporarily unavailable' });
+      } finally { client.queue.length = 0; client.draining = false; }
+    })();
+    this.inFlight.add(pending);
+    void pending.finally(() => this.inFlight.delete(pending));
+    return true;
   }
+  private _sendMessage(ws: WebSocket, message: Record<string, unknown>): boolean {
+    if (ws.readyState !== WebSocket.OPEN) return false;
+    const client = this.bySocket.get(ws);
+    if (!client) return false;
+    return this._authorized(client, () => {
+      try { ws.send(JSON.stringify(message)); }
+      catch (err) { Logger.debug('[ws] Failed to send message', err); }
+    });
+  }
+
 }
 
 // Singleton instance

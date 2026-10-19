@@ -1,5 +1,9 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { verifyToken } from './auth';
+import { verifyToken, verifyRevocationToken } from './auth';
+import { centralRuntime } from './central-auth/runtime';
+import { CentralSessionError } from './central-auth/coordinator';
+import { CentralHttpError, createHttpSecurity, readCentralCredential } from './central-auth/http-security';
+import { SESSION_PATHS } from '@heyta/shared-schema';
 
 // User payload type
 export interface AuthUser {
@@ -34,17 +38,31 @@ export const getAuthUser = (req: FastifyRequest): AuthUser => {
   return req.user;
 };
 
-export const authenticate = async (
+const authenticateWith = async (
   req: FastifyRequest,
   reply: FastifyReply,
+  revocationOnly = false,
 ): Promise<FastifyReply | void> => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return reply.code(401).send({ code: 'missing_or_invalid_authorization_header', message: 'Missing or invalid Authorization header' });
+  let token: string;
+  try {
+    const central = centralRuntime();
+    if (central) {
+      const credential = readCentralCredential(req);
+      token = credential.token;
+      if (credential.transport === 'cookie' && !['GET', 'HEAD', 'OPTIONS'].includes(req.method))
+        createHttpSecurity(central.cipher, new URL(central.config.redirectUri).origin).verifyCsrf(req, token);
+    } else {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer '))
+        return reply.code(401).send({ code: 'missing_or_invalid_authorization_header', message: 'Missing or invalid Authorization header' });
+      token = authHeader.split(' ')[1];
+    }
+  } catch (error) {
+    if (error instanceof CentralHttpError) return reply.code(error.status).send({ code: error.code, message: error.code });
+    if (error instanceof CentralSessionError) return reply.code(503).send({ code: 'CENTRAL_UNAVAILABLE', message: 'CENTRAL_UNAVAILABLE' });
+    throw error;
   }
-  const token = authHeader.split(' ')[1];
-
-  const result = await verifyToken(token);
+  const result = await (revocationOnly ? verifyRevocationToken(token) : verifyToken(token));
   if (!result.valid) {
     // `code` 是给客户端**机器匹配**的稳定值；`error` 是给人看的自由文本，会漂。
     // 注销后要不要销毁本机数据只认前者 —— 见 auth.ts 的 `TokenFailureCode`。
@@ -60,7 +78,7 @@ export const authenticate = async (
     // （`TOKEN_REVOKED` = 改口令 / 被踢下线）下正确的动作是**什么都不删**。
     // 410 是对外说的"别重试了"，码是对内说的"删不删"。
     return reply
-      .code(result.code === 'ACCOUNT_CLOSED' ? 410 : 401)
+      .code(result.code === 'ACCOUNT_CLOSED' ? 410 : result.code === 'CENTRAL_UNAVAILABLE' ? 503 : 401)
       .send({ code: result.code, message: result.reason });
   }
 
@@ -70,4 +88,13 @@ export const authenticate = async (
     tokenVersion: result.tokenVersion,
     sessionId: result.sessionId,
   };
+};
+
+export const authenticate = (req: FastifyRequest, reply: FastifyReply) => authenticateWith(req, reply);
+export const authenticateRevocation = (req: FastifyRequest, reply: FastifyReply) => {
+  const path = req.routeOptions.url;
+  const allowed = (req.method === 'POST' && [SESSION_PATHS.logout, SESSION_PATHS.revokeAll].some((p) => path === `/api/${p}`)) ||
+    (req.method === 'DELETE' && path === `/api/${SESSION_PATHS.list}/:sessionId`);
+  if (!allowed) throw new Error('Revocation authentication used outside its route boundary');
+  return authenticateWith(req, reply, true);
 };

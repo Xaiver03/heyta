@@ -1,3 +1,4 @@
+import { assertOidcNodeVersion } from './oidc-runtime';
 /** Deployment configuration only; never derive an identity provider from a request. */
 export type AuthenticationConfig =
   | { readonly mode: 'local'; readonly deployment: 'self-hosted' }
@@ -72,9 +73,7 @@ export function loadAuthenticationConfig(env: Environment, publicUrl: string): A
   return { mode, deployment, issuer, clientId, clientSecret, redirectUri, sessionEncryptionKey };
 }
 
-/** Remove only with the complete OIDC/session/revocation implementation, never via an env bypass. */
+/** Full HTTP/WS/revocation runtime is wired; fail before startup on unsupported engines. */
 export function assertAuthenticationModeAvailable(config: AuthenticationConfig): void {
-  if (config.mode === 'oidc') {
-    throw new Error('OIDC authentication is not available yet; refusing to start without complete session and revocation support');
-  }
+  if (config.mode === 'oidc') assertOidcNodeVersion();
 }

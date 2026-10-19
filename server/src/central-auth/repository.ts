@@ -583,16 +583,20 @@ export class CentralAuthRepository {
       return true;
     });
   }
-  async revokeUserSessions(userId: number, closeForUser: (userId: number) => void) {
-    await this.transaction(async (tx, now) => {
+  async revokeUserSessions(userId: number, closeForUser: (userId: number) => void, mutate?: (tx: Tx) => Promise<void>) {
+    const count = await this.transaction(async (tx, now) => {
       await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+      const count = await tx.accessSession.count({ where: { userId } });
+      if (mutate) await mutate(tx);
       for (const grant of await tx.centralGrant.findMany({ where: { userId, revokedAt: null } }))
         await this.revokeIn(tx, now, grant.id);
       await tx.user.update({ where: { id: userId }, data: { tokenVersion: { increment: 1 } } });
       await tx.accessSession.deleteMany({ where: { userId } });
+      return count;
     });
     // Required post-COMMIT invalidation/WS closure supplied by the trusted coordinator.
     closeForUser(userId);
+    return count;
   }
   private async enqueue(
     tx: Tx,

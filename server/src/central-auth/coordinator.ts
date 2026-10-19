@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 /** Internal services only. B2 wires HTTP/WS/auth-cache entry points separately. */
 import type { AuthenticationConfig } from './config';
 import { createCentralOidcClient, CentralOidcError } from './oidc-client';
@@ -90,8 +91,8 @@ class CentralAuthCoordinator {
     this.invalidate(userId, sessionHash);
     return changed;
   }
-  async logoutProduct(userId: number) {
-    await this.repo.revokeUserSessions(userId, (id) => this.invalidate(id));
+  async logoutProduct(userId: number, mutate?: (tx: Prisma.TransactionClient) => Promise<void>) {
+    return this.repo.revokeUserSessions(userId, (id) => this.invalidate(id), mutate);
   }
   async closeProductAccount(userId: number) {
     await this.repo.prepareUserClosure(userId, async (tx) => { await deleteAccountWithTombstone(tx, userId); });

@@ -78,14 +78,14 @@ describe('authentication deployment boundary', () => {
       expect(String(error)).not.toContain(secret.trim());
     }
   });
-  it('keeps OIDC unavailable while handlers and revocation are unimplemented', () => {
-    expect(() => assertAuthenticationModeAvailable(loadAuthenticationConfig(configured(), publicUrl))).toThrow('refusing to start');
+  it('allows the completed OIDC runtime after strict deployment validation', () => {
+    expect(() => assertAuthenticationModeAvailable(loadAuthenticationConfig(configured(), publicUrl))).not.toThrow();
   });
   it('resolves actual server configuration from env, overriding caller supplied local mode', () => {
     for (const [key, value] of Object.entries(configured())) vi.stubEnv(key, value);
     vi.stubEnv('PUBLIC_URL', publicUrl);
     const config = loadConfigFromEnv({ publicUrl, authentication: { mode: 'local', deployment: 'self-hosted' } });
     expect(config.authentication?.mode).toBe('oidc');
-    expect(() => assertAuthenticationModeAvailable(config.authentication!)).toThrow('refusing to start');
+    expect(() => assertAuthenticationModeAvailable(config.authentication!)).not.toThrow();
   });
 });

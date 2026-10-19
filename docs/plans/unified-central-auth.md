@@ -18,8 +18,8 @@
 | P5.1 | identity/pending/grant/outbox schema与repository | 已独立验收并交付 `0c361789` | 真隔离PG、唯一映射/单次消费、无email自动合并 |
 | P5.2A | 标准OIDC传输与材料持久边界 | 已独立验收 | 真中央HTTPS与双PG、标准验签、单次派发、先持久后验证 |
 | P5.2B1 | 事务唯一签发、live/refresh/退出销户与worker底座 | 已独立验收 | 真实PG+TLS反例、实际中央联调、local回归 |
-| P5.2B2 | 所有签发入口与API/WS/runtime接线 | 待实施 | 缓存前中央live、已连接WS撤销、定时清理生命周期 |
-| P5.3 | 官方Web Cookie与sync/vault transport | 待实施 | 真浏览器、CSRF、无上游凭据落浏览器、E2EE/离线保持 |
+| P5.2B2 | Cookie/CSRF、所有签发入口与API/WS/runtime接线 | 作者验收完成，待独立复审 | 缓存前中央live、已连接WS撤销、定时清理生命周期 |
+| P5.3 | 官方Web特色UI与共享Cookie/sync/vault transport适配 | 待实施 | 真浏览器、CSRF、无上游凭据落浏览器、E2EE/离线保持 |
 | P5.4 | 原生和CLI共享handoff | 待实施 | 各端当前安装产物回跳、安全存储、重放/错绑定拒绝 |
 | P5.5 | 文档、全量验收、发布准备 | 待实施 | 独立复审与当前产物；生产另走授权流程 |
 
@@ -377,3 +377,88 @@ HTTPS、23项持久层和2项原独立期限回归均通过，build及strict测�
 本结论限B1内部底座。B2正式接线、原生/Web入口和生产部署仍未完成；全工作区测试
 初轮失败与定向重跑的限制保持，不作全仓全绿承诺。交付提交与现有远端可用
 `git log -1 --oneline`、`git ls-remote origin refs/heads/codex/unified-auth`重新核验。
+
+
+## P5.2B2 服务端完整接线（2026-10-19）
+
+本包基线 `1e03707c86778d10a49f3dcc598087da96beff48`，代码在隔离树完成并通过独立
+审查。无部署、无新增依赖/迁移、不改op-log/E2EE，不复制AGPL中央代码或测试。
+B2提前包含安全Cookie/CSRF和HTTP回调底座；P5.3仍需Web共享transport与特色UI，
+P5.4仍需原生/CLI设备绑定handoff，当前服务端通过不能当成全部统一认证已交付。
+
+### 实际边界
+
+- 共享纯加法契约位于shared-schema/central-auth-contract；配置、预会话/已登录投影、
+  同源POST开始和固定GET回调分别为config/session/start/callback路径。
+  新账号须在start明确接受当前产品文档版本，接受时间由服务端记录并封入pending Cookie；
+  state/iss/PKCE/nonce/ES256仍由标准库与持久pending共同验证。重复query/Cookie、旧浏览器
+  事务、任意returnTo或身份参数均拒绝。回调固定303至配置origin的/app/，不相信Host。
+- JWT只以host-only Secure HttpOnly SameSite=Lax Cookie交付；session响应只给账号投影与
+  CSRF。CSRF使用独立加密上下文、会话摘要绑定、同源Origin与请求头核验，非简单双提交。
+  明确失效会话由session端点清HttpOnly Cookie并发匿名CSRF以便重新登录；503保留会话。
+  官方旧密码/passkey/magic/OTP/邮箱凭据路由及邮件落地页在副作用前409；testRoutes不注册。
+  issueSession仍是唯一jwt.sign，私有能力只由centralSessionIssuer适配接缝使用，门禁有负例。
+- OIDC每次HTTP成功鉴权都检查本地用户/版本/会话及中央live，缓存不跳过该过程；无jti、
+  无grant旧JWT拒绝。中央inactive为TOKEN_REVOKED；未知为CENTRAL_UNAVAILABLE/503；
+  本地确实删户才ACCOUNT_CLOSED/410。退出专用鉴权仅挂当前退出、本人会话删除和产品全退出，
+  在中央故障下仍可本地撤销并落outbox，不能用于业务API或销户。
+- 已连接WS的业务输入、全部输出和30秒heartbeat均复验，设备touch在通过复验后进行。
+  每连接串行队列上限32，迟到active不复活已删除连接；撤销4003，未知/过载1013。
+  官方拒绝URL长期token，只接受同源Cookie或受信native Authorization；local原协议保留。
+- 单次/产品全部退出、管理员强制退出、replace-token、设备撤销及销户收敛到中央事务。
+  设备封锁、automation worker撤销、产品grant/outbox与版本递增同事务；失败全部回滚。
+  replace-token在OIDC下回reauthenticationRequired与固定登录路径，不凭旧证明续签；local原样。
+  产品销户只删产品账号并写墓碑，不注销中央账号。全平台退出没有在本包猜造接口。
+- 单进程运行时有唯一所有者；初始化/监听失败释放自己资源，不覆盖别的server；成功监听后
+  启动worker，关闭等完HTTP、WS在途验证和worker后再断DB。完整服务端接线后已解除历史
+  “尚未实现”启动拒绝；严格环境校验及Node>=22.12门禁仍有效。
+
+自托管OIDC的新账号自动建号仍保守关闭：现有法律模块只为官方法律域名返回文档版本，
+其他实例的运营者文档版本为null，本包不伪造。已映射账号可登录，local自托管不受影响。
+旧账号HTTP双证明绑定和运营者自定义条款版本需后续独立接线，不按邮箱自动合并或认领。
+
+### P5.2B2 验证记录
+
+| 项目 | 结果 | 复跑与日志 |
+|---|---|---|
+| 服务端全套 | 167文件，2898通过、1既有跳过，rc=0 | pnpm --filter @heyta/sync-server test --maxWorkers=2；/tmp/heyta-p52b2-server-all-final.log |
+| 真TLS/PG/HTTP/WS | 13/13，rc=0，含实际30秒空闲复验 | test:integration:central-http-ws；/tmp/heyta-p52b2-http-ws-final.log |
+| 实际中央HTTPS双PG | 22条，rc=0，使用最终编译产物 | test:integration:central-oidc:http；/tmp/heyta-p52b2-real-central-final.log |
+| 原协调器/标准协议 | 25/25、46/46，rc=0 | test:integration:central-coordinator、central-oidc；/tmp/heyta-p52b2-coordinator.log、/tmp/heyta-p52b2-oidc.log |
+| 原持久层/独立期限用例 | 23/23、2/2，rc=0 | test:integration:central-auth及:review；/tmp/heyta-p52b2-persistence.log、/tmp/heyta-p52b2-persistence-review.log |
+| shared-schema / sync-client | 173/173、159/159，rc=0 | 对应包test；/tmp/heyta-p52b2-schema-tests.log、/tmp/heyta-p52b2-sync-client-tests.log |
+| 全workspace类型/server构建/新增测试strict类型 | 均rc=0 | pnpm typecheck、server build；/tmp/heyta-p52b2-typecheck.log、/tmp/heyta-p52b2-build-final.log、/tmp/heyta-p52b2-test-types.log |
+| 唯一签发/撤销/集成覆盖/文档/diff | 均rc=0；签发门禁11个自证反例全通过 | check:token-minting及--self-test、check:session-revocation、check:integration-coverage、docs-link-check.mjs、git diff --check |
+
+本轮初始生命周期夹具缺disconnectDb，修正测试装配后通过；曾在中间全套遇到未改动的
+restore-script错误口令测试随机报ARTIFACT_CORRUPT而非ARTIFACT_UNDECRYPTABLE（依然
+拒绝还原，未碰数据库），日志/tmp/heyta-p52b2-server-all-restore-flake.log。最终当前源码
+全套通过，不据此声称该既有测试的随机性已经修复；本包没有修改还原脚本或该测试。
+没有重跑整个workspace测试，只跑全部服务端、受影响共享包及全workspace类型检查；
+B1记录的Web/mobile aggregate波动仍保留，不写成已消失。HTTP安全反例还量到Fastify
+set-cookie追加造成重复Cookie，已修为先移除旧响应头再一次设置完整列表，实际回调验证
+只有一枚session Cookie。WS队列同时约束32条、帧字节与presence payload，防慢中央积压。
+
+复现脚本已登记 `test:integration:central-http-ws`，与既有
+central-coordinator、central-oidc、central-oidc:http 共用隔离产品库，必须顺序执行。
+测试TLS runner生成临时CA，保持证书校验；真实中央作为外部依赖启动，未复制其实现。
+真实中央HTTP脚本使用其测试fixture的既有中央登录态，只证明服务端OIDC、Cookie和WS
+链路，不代表真实密码/MFA、浏览器SameSite或原生UI端到端验收。
+
+
+### P5.2B2 独立验收结果
+
+独立审查逐一核对36路径SHA无漂移，High/Medium=0；回执
+`/tmp/heyta-p52b2-independent-review.json`。独立复跑真实TLS/PG/HTTP/WS 13项（含
+真实30秒空闲复验）、全部服务端167文件2898通过/1既有跳过、sync-client 159项，
+以及唯一签发、撤销、集成覆盖与diff检查，均rc=0。
+
+另加3个独立反例：已替换WS的迟到授权及旧handler不能转发；PostgreSQL INSERT触发器
+故障使撤销变更、tokenVersion、grant/session及销户全部回滚；去掉故障后同一撤销成功
+且只关闭一次。复跑入口 `/tmp/heyta-p52b2-independent-counterexamples.cjs`，日志
+`/tmp/heyta-p52b2-independent-counterexamples.log`。独立装置初次仅因ts-node模块解析失败，
+启用experimentalResolver后全部通过，未为反例修改产品代码。
+
+此验收没有部署，HTTP/WS独立夹具不等于真实中央密码/MFA或浏览器SameSite验收，
+P5.3/P5.4界面与原生接线仍待完成。独立全服务端未复现前述restore-script波动，
+不据此宣称随机性已修复。提交和远端状态用git log与git ls-remote现查，不手写完成状态。

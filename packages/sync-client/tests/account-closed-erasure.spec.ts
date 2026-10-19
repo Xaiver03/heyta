@@ -151,7 +151,7 @@ describe('E2 —— 码决定动作，状态码不决定', () => {
    * `account-closed-signal.spec.ts` 那边的事）；它是"误删方向"的取样：
    * 每一个码各自走一遍"401 + 文案里带 closed"这个最坏组合。
    */
-  const OTHER_TOKEN_FAILURE_CODES = ['ACCOUNT_UNVERIFIED', 'TOKEN_REVOKED', 'TOKEN_INVALID'];
+  const OTHER_TOKEN_FAILURE_CODES = ['ACCOUNT_UNVERIFIED', 'TOKEN_REVOKED', 'TOKEN_INVALID', 'CENTRAL_UNAVAILABLE'];
 
   it.each(OTHER_TOKEN_FAILURE_CODES)(
     '🔴 401 + %s（文案里还带着 "closed"）⇒ 不算注销、不销毁',
@@ -246,7 +246,7 @@ describe('E2 —— 处置结果必须进诊断，三种结局互相可分', () 
 
   it('其它失败原因不许带销毁语义（message 里不许出现"已清除"）', async () => {
     const eraser = vi.fn(async () => undefined);
-    const { client } = makeClient(() => closed(503, undefined, 'boom'), {
+    const { client } = makeClient(() => closed(503, 'CENTRAL_UNAVAILABLE', 'Central authentication unavailable'), {
       onAccountClosed: eraser,
     });
 
