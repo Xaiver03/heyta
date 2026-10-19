@@ -5071,8 +5071,14 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
       **英文这一维有分母**（照 r137 那把尺重做）：四份 JSON 的中文叶子逐枚点名 —— 账号面 2 枚全在装置自带的双语候选表里、
       AI+帮助面 4 枚里 3 枚是语言 chip 的「中文」（该串两档同字，设计如此）、1 枚是候选表首项
       ⇒ **界面回读零枚中文**；提醒块那两趟更直接，`uiLocale` 字段回的是 `en`。
-      人眼看过 **3 张**（`settings-en-dark/security.png` · `ai-face-en-dark/assistant.png` · `reminder-block-en-light/03-reminder-snoozed.png`），
-      ⚠️ 这一批共 40 张图，其余 **37 张只有 AX 回读与像素尺**，不许读成逐张看过。
+      人眼看过 **5 张**（`settings-en-dark/security.png` · `ai-face-en-dark/assistant.png` · `reminder-block-en-light/03-reminder-snoozed.png` ·
+      `settings-en-dark/settings-directory.png` · `ai-face-en-dark/help-feedback.png`），
+      ⚠️ 这一批共 40 张图，其余 **35 张只有 AX 回读与像素尺**，不许读成逐张看过。
+      📌 逐张那五张里看到一处**没有登记成缺陷**的布局差别，写在这里是为了下一位不必重新疑惑：
+      设置面**目录层**的页眉是「✕ 在左 + 标题在右」，而**子页**（`Account security` / `General`）是「← 在左 + ✕ 在右」。
+      本线没把它开成候选缺陷，理由有两条现量：① 目录层那一屏**没有返回箭头**（它就是这层的根），✕ 放在原本"返回"的位置在 iOS 上不罕见；
+      ② 它的可点性与可及名称都有读数（28 步里 `open settings` / `close settings to profile` 两腿各档都 passed），
+      也就是说这一处**只有视觉一致性这一个维度可疑**，而那需要产品口径判断（要不要与 web 端设置抽屉对齐），不是量出来的缺陷。
       设备收工态：`appearance=light`、应用内语言 `zh`（`restore/` 与 `restore-b/` 各一次 9 步 `passed` 的还原读数）、**没收任何 companion**。
       **不证**：⑴ **中文 × 暗档**这一格仍停在 r140 那件上（这一趟只补英文两格，2×2 的第四格见下一格 r158）；
       ⑵ Android / windows 两端没有这批读数（01:3x 现量 `windows-pc` 与 `windows-pc-lan` 各 `rc=255`、`adb devices` 空）；
