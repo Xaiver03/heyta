@@ -75,12 +75,21 @@
 > ⚠️ **载体收工后必然脏三枚，别提交**：`pod install` 重写了 `apps/mobile/ios/Heyta/Info.plist`、`HeytaWidgetExtension/Info.plist` 与 `Podfile.lock`
 > （删掉文件头那段"键一个都不能少"的事故注释、重排键、补 `RCTNewArchEnabled`）⇒ **#489**。判"少没少键"要逐 key `plutil -extract`：
 > `ITSAppUsesNonExemptEncryption` 在 HEAD／工作树／**装进设备的产物**三处都在（`plutil` 回 `<false/>`），而 diff 看着像删了 21 行。
-> ✅ **10-19 11:45 打包机可达性重量（这推翻了本文件里那句 03:23 的"四枚别名全不可达"——那是瞬时读数）**：
-> `windows-pc` → `Host is down`、`windows-pc-lan` → `Operation timed out` ⇒ **windows 腿仍堵**；
-> `linux-dev` / `linux-dev-mdns` / `linux-dev-oob` → `Xaiver-linux` 可达、`ubuntu-jcli` / `finlaw` → `VM-0-17-ubuntu` 可达、`linux-dev-lan` 超时（这台活着，LAN 那枚不通，见记忆）。
-> ⇒ **android 腿的构建机在**，只是本线的 `reinstall-all.sh` android 段走的是本机 `pnpm build:android` + 本机 adb 模拟器，**下一趟要先定"按脚本这条路还是把那台当构建载体"**（脚本这条路要本机 SDK，那条路本线没量过）。
-> ✅ **mac 腿本趟在跑**（同一枚载体 `997a1935`、`HEYTA_REINSTALL_TMP_DIR=/Users/rocalight/heyta-r139-mac-tmp bash scripts/reinstall-all.sh --only mac`，
-> 脚本第 313 行自己带 `HEYTA_NO_FOCUS=1`，不抢前台）。接手时 `/Applications/Heyta.app` 是 r128 那趟的绿件（`Timestamp=Oct 18 18:17:22`，台账已记 `CDHash=18bbf00e…`）。
+> ✅ **mac 腿绿（一趟就过，`MAC_RC=0`）**：同一枚载体 `997a1935`、`HEYTA_REINSTALL_TMP_DIR=/Users/rocalight/heyta-r139-mac-tmp bash scripts/reinstall-all.sh --only mac`，
+> 脚本第 313 行自己带 `HEYTA_NO_FOCUS=1`（没抢前台）→ 打包 ✅ → **公证通过 + 票据装订 ✅** → 装到 `/Applications/Heyta.app`
+> （mtime `2026-10-19 11:49:16`、`Timestamp=Oct 19 11:47:47`；接手时那枚是 r128 趟的 `Timestamp=Oct 18 18:17:22`）→ 对账 `9 chunk 与本机 apps/web/dist 同一次构建`
+> → 窗口 `2318x1508`／内容占比 `54.8%`／主蓝 `983`，截图人眼看过（Inbox 上叠着「Sign in or register」面板，不是纯色空窗）。
+> ⚠️ 上一轮那两次红在公证时间戳（#467）本趟没复现，**没量到为什么** —— 别读成"根因已修"。
+> 🔴 **android 腿红，红在规则不在代码**：`run-gradle.mjs` 步骤 1 就拒（`ssh … 10.111.127.237 … Operation timed out` = `windows-pc` 不可达），
+> 而它明写"不会自动退回本机 —— '远程不行就本机'正是它要挡的形状" ⇒ **那枚逃生门 `HEYTA_ANDROID_LOCAL_GRADLE=1` 没用，也不该用**。
+> ⚠️ **上一行那句"android 腿的构建机在"是本线写错的一句，就地作废**：Ubuntu 那两台不是 Android 的构建载体 ——
+> `scripts/run-gradle.mjs:29` 是产品负责人拍过的原文：**"之后 Android 任务一律 ssh windows-pc，不要再在 Mac 起新的 Gradle 构建或模拟器"**
+> （起因：headless 模拟器常驻 3.6G 内存 + 90% CPU）。本线这一趟只查了"本机工具链在不在"就冷启了一枚 `heyta-w3-yearly`（14 秒起完），
+> **没跑任何读数**，收工前已 `adb -s emulator-5554 emu kill`、`adb devices` 现量为空。⇒ 教训是动手前先读那条链的收口点自己怎么写它的边界。
+> ⛔ **本轮四端的真实状态**：iOS ✅ · mac ✅ · windows ⛔ 主机不可达 · android ⛔ 同一枚主机不可达 ⇒ **两趟覆盖两端，不叫四端全过**。
+> ⚠️ **11:45 那趟逐枚现量（给下一趟省一次探测，但它是瞬时读数、别当状态抄）**：
+> `windows-pc` → `Host is down`、`windows-pc-lan` → 超时；`linux-dev`/`-mdns`/`-oob` → `Xaiver-linux` 可达、`ubuntu-jcli`/`finlaw` → `VM-0-17-ubuntu` 可达、
+> `linux-dev-lan` 超时（那台活着、LAN 别名不通）。⇒ 早上 03:23 那句"四枚别名全不可达"已被否证，**只有 windows 那一族真的下不去**。
 > **交接时仍未闭合的格子逐枚列在 §五 第 7 步**（含每枚"在谁手里 + 一条命令"）；未打勾总数每次现量：`grep -c '^- \[ \]' docs/plans/product-ux-optimization.md`。
 > ⚠️ **本文旧格子里那句"🔴 全部不证 `origin/main`（本地未 push）"的前提已经过期**：10-18 03:5x 现量
 > `git rev-list --count origin/main..HEAD` 与 `git rev-list --count HEAD..origin/main` **都回 0** ⇒ 本地 `main` 与 `origin/main` 是同一枚，
