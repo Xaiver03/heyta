@@ -46,7 +46,7 @@ const zh = [
         items: [
           '**仅本机**：只在你当前这台设备或这个浏览器里，以可以直接读出来的文字形式存在。我们不接触它，换设备也不会跟过去。',
           '**本机 + 服务器密文**：内容先在你的手机或电脑上加密，服务器收到的是密文。里面的文字我们读不出来，也不提供解密工具。',
-          '**服务器明文**：为了让同步、账号、计费能工作，服务器必须以可读形式保存的少量字段——只有邮箱，以及表 C 那 11 项结构元数据。',
+          '**服务器明文**：为了让同步、账号、计费能工作，服务器必须以可读形式保存的少量字段——包括账户资料及表 C 那 11 项结构元数据，中央认证新增项见表 B。',
         ],
       },
       {
@@ -184,10 +184,17 @@ const zh = [
         head: ['信息项', '使用目的', '收集方式', '存储位置与形态', '是否必要'],
         rows: [
           [
+            '中央身份映射与授权记录（接入中，尚未开放）',
+            '稳定关联原heyta账号、单次登录、刷新所有权与可靠撤销；不按邮箱自动合并',
+            '你选择中央登录后由受信身份方验证，服务端记录授权过程',
+            '身份方/subject/客户端/授权及时间状态为服务器明文元数据；PKCE及身份/访问/刷新令牌以独立服务端密钥加密，服务端可解密，不属于E2EE。类别与留存/注销边界以《隐私政策》第3、7条为准',
+            '仅中央云登录所必需；本地功能不需要',
+          ],
+          [
             '电子邮箱地址',
             '账号唯一标识、登录、发送验证与找回邮件',
             '你输入',
-            '🔴 服务器明文。这是全部账号数据里**唯一的直接标识符**',
+            '🔴 服务器明文。这是本地认证的直接标识符；中央身份映射见本表新增项',
             '同步服务必需',
           ],
           [
@@ -813,10 +820,17 @@ const en = [
         head: ['Item', 'Purpose', 'How collected', 'Where it is stored and in what form', 'Necessary?'],
         rows: [
           [
+            'Central identity bindings and authorization records (being integrated, unavailable)',
+            'Preserve the existing heyta account, single-use login, refresh ownership and reliable revocation; never merge accounts by email',
+            'A trusted identity provider verifies your chosen central login; our server records its authorization lifecycle',
+            'Provider/subject/client/grant/timing state is plaintext server metadata. PKCE and identity/access/refresh tokens use a separate server encryption key; the server can decrypt them, so this is not E2EE. Privacy Policy sections 3 and 7 govern categories, retention and closure',
+            'Required only for central cloud sign-in; not for local features',
+          ],
+          [
             'Email address',
             'Sole account identifier; sign-in, verification and recovery mail',
             'You type it',
-            '🔴 Cleartext on the server. It is **the only direct identifier** in all of your account data',
+            '🔴 Cleartext on the server. It is a direct identifier for local authentication; central identity bindings are listed in this table',
             'Required for sync',
           ],
           [
@@ -1292,9 +1306,9 @@ export const personalInfoList: LegalDocument = {
   // 运维元数据的期限定为 45 天且到期删除尚未实现），并把那段"45 天不是可选项"的说明
   // 补成"表里有两个同值的 45 天，不是同一个旋钮"。版本号进同意指纹（`legalSetVersion()`），
   // 改了期限表述而不 bump = 让旧那枚同意覆盖一段它没见过的话。
-  version: '1.6',
+  version: '1.7',
   status: 'draft',
-  updatedDate: '2026-10-08',
+  updatedDate: '2026-10-19',
   title: {
     'zh-CN': '个人信息收集清单',
     en: 'Personal Information Collection Inventory',

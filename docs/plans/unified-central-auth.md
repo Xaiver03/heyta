@@ -15,7 +15,7 @@
 | 包 | 范围 | 状态 | 放行判据 |
 |---|---|---|---|
 | P5.0 | 许可/标准库运行时/严格模式 | 已独立验收 | Node、ts-node、编译产物、容器实跑；配置负例；独立复审 |
-| P5.1 | identity/pending/grant/outbox schema与repository | 设计与精确写集核对中 | 真隔离PG、唯一映射/单次消费、无email自动合并 |
+| P5.1 | identity/pending/grant/outbox schema与repository | 实现与作者验证完成，待独立复审 | 真隔离PG、唯一映射/单次消费、无email自动合并 |
 | P5.2 | 标准OIDC+所有签发入口+API/WS撤销 | 待实施 | 真中央HTTPS与双PG、A/B授权隔离、失败清理/迟到刷新 |
 | P5.3 | 官方Web Cookie与sync/vault transport | 待实施 | 真浏览器、CSRF、无上游凭据落浏览器、E2EE/离线保持 |
 | P5.4 | 原生和CLI共享handoff | 待实施 | 各端当前安装产物回跳、安全存储、重放/错绑定拒绝 |
@@ -133,10 +133,40 @@ P5.2接定时调度、报告未确认撤销，正式上线前不得跳过。隐�
 - 新迁移 `server/prisma/migrations/20261019000000_central_auth_persistence/migration.sql`；不改历史迁移。
 - `server/src/central-auth/crypto.ts`、`repository.ts`。
 - `server/tests/central-auth-crypto.spec.ts`、`tests/integration/central-auth-persistence.integration.spec.ts`。
-- `server/scripts/prepare-central-auth-postgres.mjs`：仅本机隔离测试库，迁移走仓库脚本。
-- `server/PROVENANCE.md`、本计划、ADR-0066、`packages/legal/src/documents/privacy.ts`中英版本。
+- `server/scripts/prepare-central-auth-postgres.mjs`：仅本机隔离测试库，迁移走仓库脚本；
+  `server/package.json` 登记 `test:integration:central-auth`，防止真库用例脱离运行通道。
+- `server/PROVENANCE.md`、本计划、ADR-0066、`packages/legal/src/documents/{privacy,data-rights,personal-info-list}.ts`中英版本，
+  以及 `packages/legal/tests/structure.spec.ts` 新增类别覆盖；
+  `server/src/legal.generated.ts` 通过既有生成器再生，不手写第二份政策。
 
 真PG测试覆盖唯一映射、邮箱冲突、双证明绑定条件、pending并发单次/过期/错浏览器、
 共享sid的A/B独立、refresh串行/迟到/commit后回执重读、grant撤销后结果不可复活、
 账号删除受限且outbox可存活、队列租约错配、加密AAD/篡改/清理期限。构建、迁移检查、
 既有local认证回归与独立复审必须通过；本包仍不代表真实中央联调或生产切换。
+
+## P5.1 作者验证（2026-10-19，待独立复审）
+
+- 隔离真PG：`HEYTA_CENTRAL_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:32790/heyta_central_auth_test`；
+  `node server/scripts/prepare-central-auth-postgres.mjs` 经仓库migrate-deploy.sh完整应用74个迁移，rc=0。
+  `pnpm --filter @heyta/sync-server test:integration:central-auth`：21/21，rc=0。
+  日志 `/tmp/heyta-p51-fixture.log`、`/tmp/heyta-p51-postgres-final.log`。
+- local与中央定向7文件160/160，rc=0；新测试独立tsc rc=0；server build rc=0。
+  日志 `/tmp/heyta-p51-regression.log`、`/tmp/heyta-p51-test-types.log`、`/tmp/heyta-p51-build.log`。
+- 法律包4文件80/80，build/typecheck rc=0；legal-copy、server-legal、legal-closure-truth、
+  backup-retention、迁移检查、集成用例脚本覆盖、token-minting、session-revocation、email-normalization均rc=0。
+  新类别连同隐私/权利/信息清单中英同步；server法律快照用既有生成器再生。级联数由真PG
+  `pg_constraint WHERE contype='f' AND confrelid='users'::regclass AND confdeltype='c'`
+  的 `count(*)` 与 `count(DISTINCT conrelid)` 重算，法律结构测试亦顺序重放迁移核对。
+- 全服务端首轮164文件：163通过、1失败；2880通过、1失败、1跳过，rc=1。
+  唯一失败为既有大压缩snapshot用例超过自带15秒上限；测试和两条生产路由源码与P5.0基线
+  SHA256一致，单文件复跑40/40、2.71秒、rc=0。没有改超时或删测试。
+  证据 `/tmp/heyta-p51-server-all.log`、`/tmp/heyta-p51-compressed-baseline.json`、
+  `/tmp/heyta-p51-compressed-recheck.log`；全套限制2 worker复跑164文件全部通过，2881通过、1跳过，rc=0（67.51秒），
+  命令 `pnpm --filter @heyta/sync-server exec vitest run --maxWorkers=2`，日志
+  `/tmp/heyta-p51-server-bounded.log`。最后补齐撤销grant元数据24小时清理，由最终真PG21条与
+  server build覆盖；未把首轮全套rc=1改写为0，也不据此宣称既有大压缩用例永不波动。
+
+尚未独立验收。持久层的verified identity与fresh local proof输入仅供未来受信协调器使用，
+本包没有实现HTTP的OIDC/旧账号重新认证验证，不得把真库测试称作真实中央联调。
+`expiresAt` 是产品grant会话的上限，TokenMaterial自身的到期是上游访问令牌时间；P5.2须
+按中央实际契约区分两者，不得把AT短期到期当成拒绝任何refresh的条件。OIDC启动门禁保持。
