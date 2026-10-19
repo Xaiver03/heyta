@@ -5746,6 +5746,12 @@ AC 已勾数仍为 **0**（`verify-inbound-ac-ticks.py`：`AC 行=8　已勾=0�
 ③ **两格旁边的提醒是内容不是装饰**：`AC-6` 那行写着 `AC6-browser` 会逐名覆写那批待拍取证图（处置＝§7 第 4 格）；`SCOPE-commit-scope` 单列一行并标 **不是 AC 格** —— 它 rc=1（B205，越界笔名归别线），但谁都不能把它读成"AC 面有一格红"。
 ④ **表的自查与门的覆盖范围要分清**：新增 11 行表格每行都是 4 枚竖线（3 列，现量 `awk '/^## 4a\./,/^## 5\./' docs/plans/inbound-automation-handoff.md | grep '^|' | awk '{n=gsub(/\|/,"|"); print n}' | sort -u` 只回一个值）；而 `verify-inbound-doc-tables.py`、`docs-link-check.mjs`、`check-docs-voice.mjs` 三把门在提交前各回 rc=**0**，⚠️ **但这把表尺的文件清单里没有交接书**（现量 `grep -c 'handoff' research/tools/verify-inbound-doc-tables.py` 回 **0**）⇒ 交接书里的表靠的是上面那条自查，不是靠门。要不要把它纳进表尺清单属于新增判据，本线不代做。
 ⑤ **完成条件对照**：这条动 `docs/plans/inbound-automation-handoff.md` 与 `PROGRESS.md` 两枚；判卷口径零处、`packages/i18n` 零处、迁移零处、不新增依赖。AC 勾数现量 `grep -c '^[-] \[[x]\] \*\*AC-' docs/plans/inbound-automation.md` 回 **0**。腿 3 在这条写完之后又复探了一次（现量命令在交接书 §5 那一格）：**20:35:26 四枚别名各 rc=255、`adb devices` 0 台、`heyta-multiend-reinstall` 仍 Shutdown ⇒ 形状未变**，前一戳是 19:03:30。本线不 push、不自标完成。
+124. 🟢 **完成条件 1 那句里的"贴出的输出"，此前有一半只存在于家目录 ⇒ 八格逐字输出搬进计划文末一节；搬的时候量出两处"输出栏写的其实是日志路径"**（写前先跑 `date`，本机 2026-10-19 21:36）
+① **先核再搬（不是推断）**：仓内原有的两张逐格表（T8 那两节，现量定位 `grep -n '^## T8' docs/plans/inbound-automation.md` 回「T8 严格复审…」与「T8 终版…」两节）读数戳子是 **10-10／10-11**，比家目录里今天那两批（`battery-1548/` 28 腿、`batt-ac78-1843/` 9 腿）旧 8~9 天 —— 例如旧表 AC-8 那格写 `表头行=1084`，今天同格是 `1098`。⇒ **"命令和输出在仓库内同时可见"这件事此前不成立**，这一节把它补上：逐字输出搬进文末新节「2026-10-19 21:3x · 完成条件 1 里"贴出的输出"那一半，从家目录搬进仓里」。
+② **两处"输出栏其实是路径"是搬的时候才发现的**：`AC1-worker-identity` 那行只到 `Results: <日志路径>` 就断了，判据行在日志里（`Tests  46 passed (46)`；⚠️ 那枚日志在载具 `.run-logs/` 里、不入库，本仓读者拿不到它的全文 —— 副本躺在家目录 `battery-1548/AC1-worker-identity.log`（还是仓外），要当前值就重跑那一枚腿）；`AC3-dual-host` 同理（`WINDOW=8   PASS 六档都有读数：…` 才是判据那行）。⇒ 新表贴的是**判据行**，不是路径；路径另放在"那一戳的形状"列里当原件地址。
+③ **防漂两句写在表里**：每格标的是"那一戳的贴出件"而非现在的值；成立范围给了现量命令（`528b4115c` → 主线非文档改动 **0** 枚）。要现在的值就按交接书 §4a 那条重跑，判要不要重跑按 **#494**。
+④ **门禁**：`verify-inbound-doc-tables.py` rc=**0** —— 这枚新表**在这把尺覆盖的 16 枚文件内**（与交接书那张相反：那把尺不覆盖交接书，故第 123 条 ④ 只能自查）；自查列数现量 `awk '/^## 2026-10-19 21:3x/,0' docs/plans/inbound-automation.md | grep '^|' | awk '{print gsub(/\|/,"|")}' | sort | uniq -c` 回 11 行同一值（4 列）。另三把 `docs-link-check`、`check-docs-voice`、`verify-inbound-ac-ticks` 各 rc=**0**。
+⑤ **完成条件对照**：这条动 `docs/plans/inbound-automation.md` 与 `PROGRESS.md` 两枚；判卷口径零处、AC 勾数现量 `grep -c '^[-] \[[x]\] \*\*AC-' docs/plans/inbound-automation.md` 回 **0**、`packages/i18n` 零处、不新增依赖。腿 3 本条未重探（最近一戳 20:35:26，形状未变）。本线不 push、不自标完成。
 
 
 
