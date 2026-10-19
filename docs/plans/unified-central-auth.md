@@ -1,6 +1,6 @@
 # heyta 统一中央认证实施计划
 
-> 状态：**进行中**（2026-10-19）
+> 状态：**进行中**（2026-10-20）
 > 决策：[ADR-0066](../adr/0066-official-central-identity-and-self-hosted-auth.md)。
 
 ## 范围与基线
@@ -19,7 +19,7 @@
 | P5.2A | 标准OIDC传输与材料持久边界 | 已独立验收 | 真中央HTTPS与双PG、标准验签、单次派发、先持久后验证 |
 | P5.2B1 | 事务唯一签发、live/refresh/退出销户与worker底座 | 已独立验收 | 真实PG+TLS反例、实际中央联调、local回归 |
 | P5.2B2 | Cookie/CSRF、所有签发入口与API/WS/runtime接线 | 作者验收完成，待独立复审 | 缓存前中央live、已连接WS撤销、定时清理生命周期 |
-| P5.3 | 官方Web特色UI与共享Cookie/sync/vault transport适配 | 待实施 | 真浏览器、CSRF、无上游凭据落浏览器、E2EE/离线保持 |
+| P5.3 | 官方Web特色UI与共享Cookie/sync/vault transport适配 | 候选已提交，待独立复审与真实中央浏览器联调 | 真浏览器、CSRF、无上游凭据落浏览器、E2EE/离线保持 |
 | P5.4 | 原生和CLI共享handoff | 待实施 | 各端当前安装产物回跳、安全存储、重放/错绑定拒绝 |
 | P5.5 | 文档、全量验收、发布准备 | 待实施 | 独立复审与当前产物；生产另走授权流程 |
 
@@ -462,3 +462,17 @@ central-coordinator、central-oidc、central-oidc:http 共用隔离产品库，�
 此验收没有部署，HTTP/WS独立夹具不等于真实中央密码/MFA或浏览器SameSite验收，
 P5.3/P5.4界面与原生接线仍待完成。独立全服务端未复现前述restore-script波动，
 不据此宣称随机性已修复。提交和远端状态用git log与git ls-remote现查，不手写完成状态。
+
+### 2026-10-20：P5.3 Web 候选现量核对
+
+`git log -8 --oneline` 可重取 P5.3 候选：`0afb0359c` 接通官方中央登录 UI、
+Cookie 请求封装、sync/vault 传输；`9bf4ce280` 保留自托管高级入口；
+`4e7aee9a6` 修复弹层关闭；`9b36df989` 收紧浏览器错误验收。
+本轮从干净工作树复跑 `pnpm --filter @heyta/web test`：180 文件通过、2 跳过，
+2308 项通过、13 跳过，rc=0；`pnpm --filter @heyta/web build` rc=0。
+`cd e2e && pnpm exec playwright test --config playwright.auth-simple.config.ts
+tests/auth-simple-ux.spec.ts`：5/5 通过，检查了移动和桌面、亮暗主题、
+高级自托管入口及中央配置不可用时的关闭行为；移动亮暗截图已人工查看。
+Playwright 生成的 5 个已跟踪证据图差异已在确认原工作树干净后恢复；写本文档前
+`git status --short` 为干净。此轮未部署，也未完成真实中央密码/MFA浏览器联调、
+Cookie跨站行为和独立安全复审，因此不把 P5.3 标为放行完成。
