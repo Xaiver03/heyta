@@ -161,7 +161,7 @@ python3 research/tools/verify-inbound-ac-battery.py --root .worktrees/inb-t10 --
 3. **B110** 界面那格对外措辞（中英两份 locale 都缺 `web.ai.inbound.process.waiting-entitlement`）；也可授权本线按 locale 风格出中英各一枚。
 4. **B194／B239** 那批会随机变脏的已入库证据 png：(a) 原样留／(b) 落点改到不入库／(c) 用 `scripts/screenshots/png-diff.mjs` 的形状加一枚像素容差判据。**推荐 (c)，其次 (b)**。
 5. **B199** 完成条件里"开工快照"那一格的口径（没开工基线 ⇒ 只能按集合判不能按计数判）。判卷口径，本线不代拍。
-6. **B205** 范围尺 `越界=92`：①「自动收集」这个标题词是不是本线独占归属凭据；② 白名单收不收本线授权过的路径。**推荐**：不收路径，给装置加显式**授权登记表**。另附：载具 `.worktrees/inb-t10` 留不留（删除不可逆，`git worktree remove .worktrees/inb-t10`）。
+6. **B205** 范围尺（读数按戳取，别抄这行的数：`python3 research/tools/verify-inbound-commit-scope.py > 文件 2>&1; echo rc=$?` 再看首行 ⇒ 10-20 00:37:46 那戳是 **rc=1、`越界=96`、本线笔数=326**，OOB 行数现量 `grep -c '^  OOB ' <原件>`）：①「自动收集」这个标题词是不是本线独占归属凭据；② 白名单收不收本线授权过的路径。**推荐**：不收路径，给装置加显式**授权登记表**。⚠️ **这一格今天多了一枚必须一起拍的内容（B205 追记三）**：尺的允许文档清单（`research/tools/verify-inbound-commit-scope.py:56-63`）**没有** `docs/reference/environment-traps.md`（那是 `AGENTS.md` §5 指定的唯一事故落点）与 `docs/plans/inbound-automation-handoff.md`（负责人 10-19 点名要的交接物）—— 照仓规写就得 rc=1，不写就违反 AGENTS，加正则就是改判卷口径（本线不许）。同批还牵出一句**不需要改判据**的歧义：`AGENTS.md` §4「新增子文件后必须回本表登记」讲的是 AGENTS.md 自己的规则地图，而 `docs/agents/environment-traps-index.md` 末行明文「不要写回本文件」——本线 00:14 按前者加了一行、00:21 按后者撤回（`7d76e762`），一句话就能定死。另附：载具 `.worktrees/inb-t10` 留不留（删除不可逆，`git worktree remove .worktrees/inb-t10`）。
    ⚠️ 同一份任务书还列过一枚 `.worktrees/inb-t9 的处置` —— **那格已被盘上事实作废**：23:45:59 现量 `git worktree list` 只剩 inb-t10，`ls .git/worktrees/` 里也没有 `inb-t9` 那枚管理目录 ⇒ 不是"留着但断开"，是连根没了，没有可拍的对象。台账里 212 处旧载具提及逐枚普查过（47 处是命令行形状），判法与替代入口写在计划文末「2026-10-19 23:4x · 三枚旧载具…」那一节，历史行一枚未删。
 
 ---
@@ -176,8 +176,8 @@ python3 research/tools/verify-inbound-ac-battery.py --root .worktrees/inb-t10 --
    IOS_DEVICE_NAME=heyta-multiend-reinstall pnpm reinstall:all                      # 在 .worktrees/inb-t10 里，整条
    ```
    判据：`REINSTALL_RC=0` 且四端各自带"当前产物"判据；随后把截图**绝对路径**列给负责人（"人打开看过"那格归他）。
-   失败形状：ssh rc=255 ⇒ 还是那台机器，不要改成"只跑绿的两端"。
-4. **Linux 交付取证在腿 3 完成后重取一次**（`bash apps/desktop-linux/scripts/package-deb.sh <别名>`），
+   失败形状：ssh rc=255 ⇒ 还是那台机器，不要改成"只跑绿的两端"。⚠️ **探之前先核名字**（本线 00:29 因敲了三枚不在册的别名白跑一批，见 #499 与 §9 那一枚子弹）：`grep -cE '^Host .*\b<名>$' ~/.ssh/config` 必须回 **1** 才拿去探。
+4. **Linux 交付取证**：这一半**不等打包机**，本会话 10-20 00:18 已在交付 tip 复过一次（`DEB_RC=0`、`PKG_RESULT=OK`、`PKG_FRESHNESS=OK files=26`，逐枚读数与原件路径在 `PROGRESS.md` 第 133 条 ①）。腿 3 整条跑完之后**还要再取一次**（`bash apps/desktop-linux/scripts/package-deb.sh <别名>`），
    把包内 `PKG_INDEX_SHA` 与载具 `apps/web/dist/index.html` 现量比对（相等才算"装进去的是这枚 tip 的产物"）。
 5. **任何"要不要重跑那道门"的判断**按 **#494 的三层规则**做：声明层取分母 → 路径层筛候选 → 符号层问被读的东西变没变；
    做不了第三层就老实只重跑那一道（`python3 research/tools/verify-inbound-check-chain.py --repo .worktrees/inb-t10 --logs <新目录> --only <命令子串> --timeout 1800`），别整条。
@@ -210,7 +210,7 @@ python3 research/tools/verify-inbound-ac-battery.py --root .worktrees/inb-t10 --
 - ⚠️ **门名打错时 `pnpm -s` 是"零输出 + rc=1"，长得像门判红**：本会话拿到过两次 —— `check-docs-voice`（真名 `check:docs-voice`）与 `check-migrations`（真名 `check:migrations`，现量 `grep -n 'check:migrations' package.json`）。⇒ **读到 rc≠0 先看输出是不是空的**，空的先怀疑探针自己。
   ⚠️ 顺带一句：任务书完成条件 2 那格写的就是 `pnpm check-migrations` 这串**仓里不存在的名字** —— 本线不改任务书（同 B241 的原则），接手请照 `pnpm check:migrations` 量，交付 tip 上的量到的是 rc=**0**（见 `PROGRESS.md` 第 122 条 ②）。
 - ⚠️ `git rev-parse --short A B`（一条两个位置）会直接 `fatal: Needed a single revision` —— 想比两枚 ref 就分两条跑。台账里那条"两行同值"的现量命令第一稿就是这么写的，已改。
-- ⚠️ **敲错的 ssh 别名与"机器关机"回同一个 rc**：`ssh -o BatchMode=yes <不在册的名字> true` 走 DNS 解析失败也是 **255**。本会话 23:32:20 那一戳我先用 `win-pc`／`windows`／`packaging` 三枚**不存在的名字**探了一遍，四枚 rc=255 看起来"和记录一致"，其实整批是探针打空 —— ⇒ **腿 3 的复探必须逐字用上面名单里那四枚**（在册证据：`grep -n '^Host ' ~/.ssh/config` 回的四行里有它们）。
+- ⚠️ **敲错的 ssh 别名与"机器关机"回同一个 rc**：`ssh -o BatchMode=yes <不在册的名字> true` 走 DNS 解析失败也是 **255**。本会话 23:32:20 那一戳我先用 `win-pc`／`windows`／`packaging` 三枚**不存在的名字**探了一遍，四枚 rc=255 看起来"和记录一致"，其实整批是探针打空 —— ⇒ **腿 3 的复探必须逐字用上面名单里那四枚**（在册证据：`grep -n '^Host ' ~/.ssh/config` 回的四行里有它们）。⚠️ **同一枚坑本会话 10-20 00:29 又踩了一次**（这回是 `windows-lan`／`windows-mdns`／`windows-oob`，逐枚 `grep -cE '^Host .*\b<名>$' ~/.ssh/config` 现量回 **0**，而在册的 `windows-pc`／`windows-pc-lan` 各回 **1**）⇒ 光把名单写在文件里拦不住，**探之前先把名字过一遍那把尺**。升成环境陷阱 **#499**，里头还有一条本线以前没写的：**rc 相同而正文不同是四件不同的事**（timed out／Host is down／Connection refused／Could not resolve hostname），所以探测命令要 `2>&1` 收 stderr 进证据件，别 `>/dev/null 2>&1` 把它扔掉（00:30:01 那批四枚逐枚正文在 `~/.heyta-evidence/inb-t7-1017-0902/leg3-1020-0030/ssh-probe.txt`）。
 - ⚠️ **数设备要数非空行**：`adb devices` 在无设备时仍输出表头加一行空行，拿 `wc -l` 数会回 **1**（本会话 23:32 实测就是这个形状），会被读成"有一台"；台账里那条写法是数非空行的（见 PROGRESS 第 122 条 ⑤），本格因为**表格单元里不能写裸竖线**（竖线顶掉列数、写成 `\|` 又粘不回 shell）只在 §5 那格指向条目号。
 - ⚠️ **`git log -1` 一次给多枚路径只回其中最新那一枚**（本会话 10-20 00:01 实测：三枚路径一起给，只出 `b56c09357`，另两枚静默消失）⇒ 做"这几个文件各属哪线"的归因必须**一枚一条**，不然归因会少算而看起来"跑成功了"。第 130 条 ② 记了这枚自曝。
 - ⚠️ **grep 类分母要把构建产物剔出去**：同一棵树 `grep -rlI hosted-ai-monthly server packages/app-host` 回 **22**，加上 `git ls-files … | grep -vE '/dist/|node_modules'` 那条口径回 **16**，差的 6 枚全在 `server/dist` 与 `packages/app-host/dist`。⇒ 写"这档在哪写了"这类分母时**先声明口径**（在册源件 / 整棵工作树），两个数不是互相打脸。
