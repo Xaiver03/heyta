@@ -4634,7 +4634,8 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
       读数（`apps/mobile/evidence/ux-final-20261018/ios-account-face-r139/`，**四格 13/11/11/11 步全 passed**）：
       `current-source/` 中文×浅 · `dark/` 中文×暗 · `english/` 英文×浅 · `english-dark/` 英文×暗 ⇒ **深浅 × 中英这一枚控件的四格齐了**，
       八张图逐张人眼看过 —— **可见文字与 `AXLabel` 逐字相同**。
-      同一枚件上 AI 面 + 帮助面也重取了三格（`ios-ai-face-r139/`，各 20 步 passed），`startedAt`/`finishedAt` 两枚字段第一次被这枚脚本跑到（#486 的复验）。
+      同一枚件上 AI 面 + 帮助面也重取了**四格**（`ios-ai-face-r139/`，各 20 步 passed；12:0x 补上英文×暗那一格），
+      `startedAt`/`finishedAt` 两枚字段第一次被这枚脚本跑到（#486 的复验）。20 张图里人眼看了 4 张，其余 16 张只有像素尺与 AX 回读 —— 这一句写在 RESULT 里，别读成逐张看过。
       🔴 **本趟否证掉一把我自己伸手就用的尺**：判装机态语言档时我先量了 `simctl spawn … defaults read -g AppleLanguages`，
       它回 `zh-Hans-CN`，于是把一趟界面全英文的旅程标成了"中文档"。系统确实是中文、界面确实是英文，两件事同时为真 ——
       这枚包的 `resolveNativeLocale()` 第一优先级是**应用内开关**持久化的 `HeytaWidget.preferredLocale`（#469 早就写明），

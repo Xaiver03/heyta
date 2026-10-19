@@ -67,8 +67,8 @@
 > （`current-source/` 中文×浅 13 步 · `dark/` 中文×暗 11 步 · `english/` 英文×浅 11 步 · `english-dark/` 英文×暗 11 步，12:0x 补上最后一格 ⇒ **深浅×中英这一枚控件四格齐**）：折叠 `AXLabel=「其他登录方式」`、
 > 展开 `AXLabel=「收起其他登录方式」` 且 `AXValue=expanded`、`expandedGone=true`，八张图逐张人眼看过 ⇒ **屏幕上那行 = 读屏念的那句，在真包上成立**。
 > ⚠️ **读 `headerNow` 那格别当"屏上有几行"**：中文格回两枚、英文格回一枚，差的是那把尺大小写敏感（`"Other ways…"` 对不上 `"Hide other ways…"` 里的小写 `other`）。
-> **名称判据只认 `toggleNode.AXLabel`**（节点自己回的那一枚）。同一枚件上 AI 面 + 帮助面重取三格（各 20 步 passed，`startedAt`/`finishedAt` 第一次被这枚脚本跑到 = #486 复验），
-> 15 张图里人眼只看了 3 张，其余 12 张只有像素尺 —— **别读成"逐张看过"**。
+> **名称判据只认 `toggleNode.AXLabel`**（节点自己回的那一枚）。同一枚件上 AI 面 + 帮助面重取**四格**（各 20 步 passed，含 12:0x 补的英文×暗；`startedAt`/`finishedAt` 第一次被这枚脚本跑到 = #486 复验），
+> 20 张图里人眼只看了 4 张，其余 16 张只有像素尺与 AX 回读 —— **别读成"逐张看过"**。
 > 🔴 **本趟否证了一把我自己伸手就用的尺**：判装机态语言档时先量 `simctl spawn … defaults read -g AppleLanguages`，它回 `zh-Hans-CN` **而界面全英文**
 > （#469 那条应用内开关持久化的续文 ⇒ 系统域不是这枚包界面语言的判据）。那趟落点被误标成中文档，已改名 `current-source/`→`english/` 并重跑；
 > **要还原语言只能显式 `ios-app-language.py --to zh` 并看它的回读步**。进环境陷阱 **#488**。
