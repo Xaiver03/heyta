@@ -793,3 +793,26 @@ xml.etree.ElementTree.ParseError: not well-formed (invalid token): line 12, colu
 **状态**：GSC 已重新提交（`已成功提交站点地图`），但表格里那一行**仍是修复前的上次读取**
 （`上次读取时间 2026年10月19日` ⇒ `无法抓取`）。Google 说"会定期处理"，
 所以**这条要等它下次读取才翻**——不是我现在能催的，也不要把它读成"修复没用"。
+
+### 8.15 百度搜索资源平台：已进到添加向导，**卡在滑块验证码（交还用户）**
+
+**不需要登录** —— 打开 `https://ziyuan.baidu.com/site/index` 时已是登录态
+（账号「灯下灯耶」，站点管理里已有 finlaw.cloud / lead-tron.com / litopia.space / wunoos… 等）。
+
+做到哪一步（全部实测）：
+
+| 步 | 动作 | 读数 |
+|---|---|---|
+| 1 | 点「添加网站」 | 进三步向导（第一步输入网站 / 第二步站点属性 / 第三步验证网站），到 `siteadd#/` |
+| 2 | 协议头下拉：对 `.item`（内容是 `https://`）发一次 `.click()` | readonly 输入框变成 **`https://`**（下拉本身是隐藏的，点选项比展开下拉更省事） |
+| 3 | 域名框 `input.add-site-input` 填 | **`heyta.waytofuture.cn`** |
+| 4 | 点「下一步」（`div.add-site-btn` 与真 `<button class="btn-mid-blue">` 都试过） | 🔴 触发 **百度安全验证**：`拖动左侧滑块使图片为正` ⇒ **交还用户**（滑块/点选验证码属 skill 的"只有用户能做"清单） |
+
+⚠️ 同一页还出现 **「网络不给力，请刷新重试」**。一个很可能的原因：**系统代理把全部流量走 VPN**
+（`scutil --proxy` 三个协议都指向 `127.0.0.1:7890`），而百度是**境内**站 ——
+境内资源经代理往返，验证码图片/接口容易失败。若滑块图刷不出来，**先把这一枚标签的代理绕开或停掉系统代理再刷新**。
+
+**用户做完滑块后我要接着做的**（已备好）：第二步「站点属性」→ 第三步「验证网站」取 token
+（百度通常给 **文件验证** `baidu_verify_codeva-XXXX.html` / meta 标签 / CNAME）→
+按 §8.7 的纪律**逐字节**落进 `apps/landing/public/`（这类文件不许加注释头、不许补换行）
+→ 提交 → `publish-public-sites.mjs --confirm` → 点验证 → 提交 sitemap。
