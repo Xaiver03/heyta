@@ -5798,6 +5798,12 @@ AC 已勾数仍为 **0**（`verify-inbound-ac-ticks.py`：`AC 行=8　已勾=0�
 ③ **失法形状**：落笔前我只回读了交接书 §7 那一行的**缩写**（那行印「甲 放回禁售清单…／乙 接受…／丙 另给口径」），抓了三个字母就当选项内容用了。⇒ **引用别人给的选项名要回读定义所在那一格原文**；把缩写当内容正是 **B224** 那一族（"结论句被抄成现状"）的正身 —— 我这趟是当事人才看见的。
 ④ **不受影响的部分**：第 130 条 ①②③④⑤⑥ 六段（今日尺读数、逐枚归因、这把尺能证到哪层、证不到哪层、SKU 分母普查、入库与门禁）与本条无关，仍然成立；本条只换掉那三个字母所指的东西。
 ⑤ **对三选一的实际影响 = 一处削弱、一处没变**：削弱的是**乙的前提**（今天量到配置层未接通 ⇒ "卖得出"这句现在拿不出证据）；没变的是**甲的代价**（仍按臂 C 那两条念，今天这枚读数**没有**让它变便宜或变贵）。⇒ 要负责人拍的仍然是甲／丙那一格。
+132. 🟢 **三枚探针形状入环境陷阱（#495／#496／#497，含同一趟第二次命中的 ④）、索引补 `493–497` 那一行，腿 3 在 00:07 那一戳复探仍只差环境**（写前先跑 `date`，本机 2026-10-20 00:1x）
+① **腿 3 复探（00:07:29–00:07:55）**：逐字用在册那四枚别名跑 `for a in windows-pc laptop-5ueuu7ps windows-codex windows-pc-lan; do timeout 8 ssh -o BatchMode=yes -o ConnectTimeout=5 "$a" true; echo "$a rc=$?"; done` ⇒ **四枚各 rc=255**（与 19:03:30／20:35:26／23:32:20 三戳同形）；`adb devices | tail -n +2 | grep -c .` ⇒ **0** 台；本线那台 `heyta-multiend-reinstall` 存在且 `(Shutdown)`；⚠️ 全机 `booted` 数到 **1** 枚，但那一枚是**别线的** `heyta-iphone-17pro` —— 本线不起它、也不关它（只对自己创建的对象动手）。⇒ 这一腿**仍然只有负责人开机这一步**，本线没新增任何等待项。
+② **#495／#496／#497 三枚落 `docs/reference/environment-traps.md`**（追加在末尾，编号只增）：#495 `git log -1` 多路径只回最新那一枚（两臂都在正文里：测试臂三枚一起给回一枚、对照臂逐枚给回三枚）；#496 模拟器"存在"与"已启动"两问别用一条 grep 同数；#497 台账插入按字符下标会命中行中锚点（②给的是"整行边界 + 插完看删列"的规矩，③点到第 76 条 ④ 与第 128 条的同族）。
+③ **#497 的 ④ 是同一趟里第二次命中，病相同、形状不同**：给 `docs/agents/environment-traps-index.md` 加一行时，`old_string` 取自 `cut -c1-200` 的**截断读数** ⇒ 只替换掉那个前缀，原行尾巴粘到了新行末尾（当场 `git diff --numstat` 显 `2 1`，删列 1）。回退用 `git checkout -- <那一枚文件>`（起跑态 clean，`git status --porcelain | wc -l` 先回 0），改成 python 按整行边界插 + 先断言锚行 `startswith("| 491 | ")`，重插后 `1 0`，并逐字节确认 491 那行的尾巴还在原位（现量 `python3 -c "…lines[33].endswith(...)"` 回 `True`）。⇒ **锚点不许从截断的输出里抄**，这条同时写进了 #497 ④ 与本条。
+④ **索引那一行补的是 `493–497`**（`docs/agents/environment-traps-index.md` 表里新增一行，⚠️ 同格写明 **#492 在 main 上不存在**，别去别处找它 —— 号段缺枚的普查在第 127 条）。列数与相邻行一致：`row.count("|") == 4`，三条门禁各 rc=**0**（`node research/tools/docs-link-check.mjs`／`node scripts/check-docs-voice.mjs`／`node scripts/check-md-table-rows.mjs`，原件 `~/.heyta-evidence/inb-t7-1017-0902/gate-0014-*.txt`）。
+⑤ **本条动三枚文档件**（`PROGRESS.md`＋`docs/reference/environment-traps.md`＋`docs/agents/environment-traps-index.md`），提交点名这三枚；`grep -cE '^[0-9]+\. ' docs/reference/environment-traps.md` 在追加前后分别回 **493**／**496**（现量可复跑），判卷文档 AC 已勾仍 **0**。
 
 
 
