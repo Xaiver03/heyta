@@ -416,3 +416,53 @@ Chrome 已被顶到前台并选中该标签（**登录是唯一允许抢前台�
 按协议其它取值：400 = 请求格式错、**403 = key 找不到**（键文件没发出去或被路由吃掉）、
 422 = URL 不属于该 host / key 与 host 不匹配、429 = 提交过频。
 ⇒ 所以"提交成功"的正确判据是 **200**，不是"请求没报错"。
+
+### 8.7 逐字段作战图（通道推不动门户时的规定交付，按 skill 的 `field-evidence-template.md` 形状）
+
+**为什么要有它**：GSC 的浮层在**隐藏标签页里不生成**（§8.2 第 3 条），而规则不允许我为了填表抢前台。
+所以这里有两条路，任选：
+**(甲) 你把 Chrome 窗口挪到不完全被遮挡 ⇒ 我全程后台自己做完**（§8.3 出路 1，机制已确认、仍待实测）；
+**(乙) 你按下面这张表点几下，把平台给的 token 贴给我 ⇒ 剩下全是我做**（写文件、提交、发布、点验证）。
+
+#### 甲表 · Google Search Console（目标：**网址前缀**资源 + **HTML 文件**验证）
+
+| # | 你做什么 | 值 / 形状 | 证据来源与备注 |
+|---|---|---|---|
+| 1 | 在 `search.google.com/search-console/welcome` 点 **「添加网站」** | — | 会弹出「请选择资源类型」两张卡 |
+| 2 | 在**右侧那张「网址前缀」卡**的输入框里填 | `https://heyta.waytofuture.cn/` | 🔴 **不要用左侧「网域」**——那条**必须 DNS 验证**，而本机 `tccli` 对 `waytofuture.cn` **无权限**（§8.4，实测 `OperationDenied.NoPermissionToOperateDomain`） |
+| 3 | 点**该卡**的「继续」 | — | ⚠️ 两张卡**各有一个「继续」**，位置分别约在 x=674 / x=1054（2026-10-19 实测坐标，会随窗口大小变）；点错就走到网域那条路 |
+| 4 | 验证方式选 **「HTML 文件」** | 会给你形如 `googleXXXXXXXX.html` 的文件，内容一行 `google-site-verification: googleXXXXXXXX.html` | **把文件名 + 那一行内容原样贴给我** |
+| 5 | 剩下我来 | — | 写进 `apps/landing/public/<文件名>` → 提交 → `node research/tools/publish-public-sites.mjs --confirm` → 我点「验证」→ 提交 sitemap |
+
+#### 乙表 · Bing Webmaster Tools（目标：`BingSiteAuth.xml` 验证）
+
+| # | 你做什么 | 值 / 形状 | 备注 |
+|---|---|---|---|
+| 1 | 登录（**进行中**：微软在请你创建通行密钥，见 §8.6） | 可用 **Google 账号**一键登录（你的 Google 已登录） | 通行密钥属**只有你能做**的动作，我不代做 |
+| 2 | 「添加网站」→ 填 | `https://heyta.waytofuture.cn/` | 也可只填域名，但与我们 canonical 一致更省事 |
+| 3 | 验证方式选 **「XML 文件」** | 会给你 `BingSiteAuth.xml` 与一个 `<user>` token | **把 token 贴给我**（形状：`<users><user>TOKEN</user></users>`） |
+| 4 | 剩下我来 | — | 生成 `public/BingSiteAuth.xml` → 提交 → 发布 → 我点验证 → 提交 sitemap（Bing 也吃 IndexNow，那半边已通，见 §8.5） |
+
+#### 丙表 · 百度搜索资源平台（可选，但中文市场主要入口）
+
+| # | 你做什么 | 值 / 形状 | 备注 |
+|---|---|---|---|
+| 1 | 登录 `ziyuan.baidu.com` → 添加站点 | `https://heyta.waytofuture.cn` | 需要百度账号 |
+| 2 | 验证方式选 **「文件验证」** | 会给你 `baidu_verify_codeva-XXXXXX.html`，内容一行 `codeva-XXXXXX` | 把文件名 + 内容贴给我（也可选 CNAME 或 meta 标签，那两种要么要 DNS 权限、要么要改模板） |
+| 3 | 剩下我来 | — | 同上 |
+| 4 | 之后（需要你） | 「普通收录 → sitemap」提交 `https://heyta.waytofuture.cn/sitemap.xml`；若要「API 提交」需在平台上取 token | 主动推送是**需要账号**的动作，§6.2 |
+
+**搜狗 / 360**：同样是登录 + meta/文件验证，形态与上面一致。**建议等 GSC/Bing/百度三家跑通再开**，
+避免同时维护四个平台的验证状态（这不是技术限制，是注意力成本）。
+
+#### 🔴 这些验证文件与仓库其他生成物**形状不同**，别套用
+
+- **必须逐字节等于平台给的内容**：`BingSiteAuth.xml`、`baidu_verify_codeva-*.html`、
+  `google*.html` 都不许加注释头、不许加结尾换行、不许"顺手格式化"。它们的**事实源是平台**，
+  不是仓库里的某个常量 —— 所以它们**不进** `gen-entries.mjs` 的生成集，也不受 `--check` 保护。
+- 代价是它们**没有逐字节对账**：所以每加一枚，就同时加一条 `e2e/live-site/live-seo.spec.ts` 判据
+  「线上可取 + 内容逐字相等」（形状照 §8.5 那条 IndexNow 判据抄，**挑文件要用协议自身的性质，
+  别用白名单** —— 我第一版就是死在 `endsWith('.txt')` 收进 `robots.txt`）。
+- 🔴 **不要删**已生效的验证文件：删了等于撤回所有权，平台会在下次复核时取消已验证状态。
+
+⏳ **两条路都等你**：甲路你挪一下窗口；乙路你贴 token（Bing 的登录你已经开了头）。我这边随时可以一条命令接着做。
