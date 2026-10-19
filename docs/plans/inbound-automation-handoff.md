@@ -178,7 +178,8 @@ git -C .worktrees/inb-t10 status --porcelain | wc -l   # 载具应为 0
 - ⚠️ 可复现物不要住 `/tmp`（重启就没了，而且复用同名会让提交吃进陈件）：臂、驱动、原件一律落 `~/.heyta-evidence/inb-t7-1017-0902/`。
 - 🔴 **整片存档那份名单是"载具当时脏着的全部文件"，不是"跑批弄脏的文件"** —— 本会话 18:23:44 逐名 `git checkout --` 时把**自己名下还没入库的交接书改动**一起还原了（那批名单里既有链覆写的证据件，也有我 18:19–18:20 写下去、当时尚未提交的几处文档笔）。救回来只因为存档 tar 里有它（`tar -tf …/files.tar | grep inbound-automation-handoff` ⇒ 命中，`tar -xf files.tar <路径>` 取回）。**下次顺序必须是：先提交名下文档笔 → 再存档 → 再还原**；只在这三件事都按名点名时才做得动。
 
-- ⚠️ **门名打错时 `pnpm -s` 是"零输出 + rc=1"，长得像门判红**：本会话把 `check:docs-voice` 打成 `check-docs-voice` 就拿到过一次空输出 rc=1。判据真身是 `node scripts/check-docs-voice.mjs`（现量 `grep -n 'docs-voice' package.json`）⇒ **读到 rc≠0 先看输出是不是空的**，空的先怀疑探针自己。
+- ⚠️ **门名打错时 `pnpm -s` 是"零输出 + rc=1"，长得像门判红**：本会话拿到过两次 —— `check-docs-voice`（真名 `check:docs-voice`）与 `check-migrations`（真名 `check:migrations`，现量 `grep -n 'check:migrations' package.json`）。⇒ **读到 rc≠0 先看输出是不是空的**，空的先怀疑探针自己。
+  ⚠️ 顺带一句：任务书完成条件 2 那格写的就是 `pnpm check-migrations` 这串**仓里不存在的名字** —— 本线不改任务书（同 B241 的原则），接手请照 `pnpm check:migrations` 量，交付 tip 上的量到的是 rc=**0**（见 `PROGRESS.md` 第 122 条 ②）。
 - ⚠️ `git rev-parse --short A B`（一条两个位置）会直接 `fatal: Needed a single revision` —— 想比两枚 ref 就分两条跑。台账里那条"两行同值"的现量命令第一稿就是这么写的，已改。
 
 ---

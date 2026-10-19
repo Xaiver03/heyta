@@ -5734,6 +5734,12 @@ AC 已勾数仍为 **0**（`verify-inbound-ac-ticks.py`：`AC 行=8　已勾=0�
 ⑤ **现场没被改（装置自报，非我推断）**：`rc.txt` 首尾四行 `PNG_BEFORE=22` → `PNG_AFTER=22`、`PNG_DIFF_LINES=0`、`EVIDENCE_DIRTY=0`、`CARRIER_DIRTY=0`；分母那句由装置自己印派生来源（spec 的 3 枚证据目录）。⇒ 待他点头的 B194／B239 那批取证件一个字节没动。
 ⑥ **这一格现在敢说什么、不敢说什么**：敢说 —— AC-7 那六枚尺与 AC-8 那三枚尺的**当前**读数对象是已入库代码（在 `00c08680b` 这枚 tip 上）。不敢说 —— 这不等于 AC-7／AC-8 可以勾：勾的条件是负责人对整格点头，且 AC-7 那句对外措辞（B110）与 AC-6 那批 png 的处置（B194／B239）仍在他手上。本条不勾格。
 ⑦ **完成条件对照**：这条动 `PROGRESS.md`、`docs/plans/inbound-automation.md`、`docs/plans/inbound-automation-handoff.md` 三枚；判卷口径零处、`packages/i18n` 零处、迁移零处。AC 勾数现量 `grep -c '^[-] \[[x]\] \*\*AC-' docs/plans/inbound-automation.md` 回 **0**。T7 第三条腿仍欠那台打包机（本条未重探，最近一戳见第 120 条）。本线不 push、不自标完成。
+122. 🟢 **完成条件 2 的两把尺在交付 tip 上各重取一次（都 rc=0），顺带量出一枚会误判成"门红"的探针形状：门名打错时 `pnpm -s` 回 rc=1 且输出 0 字节**（写前先跑 `date`，本机 2026-10-19 19:08；原件 `/tmp/lic.txt` 只一行结论、`/tmp/mig2.txt` 101 B）
+① **交付 tip 现量**：`git -C .worktrees/inb-t10 rev-parse --short refs/heads/main` ⇒ `b6fe19f89`；非文档改动枚数 `git diff --name-only 00c08680b refs/heads/main > /tmp/n.txt; grep -vcE '^(docs/|PROGRESS\.md|BLOCKED\.md|AGENTS\.md|README)' < /tmp/n.txt` 回 **0** ⇒ 第 121 条那九枚读数的对象到这一戳没变（变的只有台账与文档）。
+② **两把尺**（19:06–19:08，各自单独跑、不带管道尾巴取 rc）：`node research/tools/license-inventory.mjs` ⇒ **rc=0**；`pnpm -s check:migrations` ⇒ **rc=0**，末行 `✅ 迁移文件全部符合规范。`
+③ 🔴 **同一枚坑本轮踩到两次，形状是"空输出 + rc=1"**：`pnpm -s check-docs-voice`（真名 `check:docs-voice`）与 `pnpm -s check-migrations`（真名 `check:migrations`，现量 `grep -n 'check:migrations' package.json` 命中第 19 行）都回 rc=**1**、输出 **0 字节**。⇒ **读到 rc≠0 先看输出是不是空的**，空的先怀疑探针自己，别把它登记成门判红。⚠️ 而任务书完成条件 2 那句写的正是 `pnpm check-migrations` —— 这串名字在本仓 `package.json` 里**不存在**；**本线不改任务书**（与 B241 那条"判卷口径不动"同一原则），只在台账留这一句：读那一格请按 `pnpm check:migrations` 的量，量到的是 rc=0。
+④ **本轮入库笔**（现量 `git log --oneline -3 refs/heads/main`）：`78688c36d`（`PROGRESS.md`＋计划＋交接书，3 枚）与 `b6fe19f89`（交接书 §8 第 1 步标已收完 + §9 两枚探针坑，1 枚）；两笔都非文档改动 **0** 枚（命令同 ①，把区间换成各自 parent）。
+⑤ **腿 3 复探**（19:03:30，现量 `for a in windows-pc laptop-5ueuu7ps windows-codex windows-pc-lan; do ssh -o ConnectTimeout=8 -o BatchMode=yes "$a" true; echo "$a RC=$?"; done`）⇒ 四枚别名仍各 **rc=255**；`adb devices | tail -n +2 | grep -c .` 回 **0** 台；`xcrun simctl list devices | grep -c 'heyta-multiend-reinstall.*Booted'` 回 **0** ⇒ **仍欠环境、不欠代码**，且不起"只补设备面先跑一半"那种形状。AC 勾数 `grep -c '^[-] \[[x]\] \*\*AC-' docs/plans/inbound-automation.md` 回 **0**。判卷口径零处、`packages/i18n` 零处、迁移零处、不新增依赖。本线不 push、不自标完成。
 
 
 
