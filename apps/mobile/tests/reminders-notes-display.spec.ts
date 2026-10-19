@@ -15,7 +15,7 @@
  *      （手法与 `tests/habits-display.spec.ts` 读 `packages/ui/src/habits/model.ts`
  *      完全一致 —— 本仓库既有的、对共享层漂移的守卫方式）。
  *   3. **文案与数字的一对**：`reminder.absolute.1h` ↔ `现在 + 1 小时`、
- *      `reminder.a11y.snooze` 里的"10 分钟" ↔ `snoozeDeadline(now, 10)`。
+ *      `reminder.a11y.snooze` 里的"10 分钟" ↔ `SNOOZE_MINUTES`。
  *      这两处字面上分居两文件，改一处不报错。
  *   4. 便签的四个 `a11y*` 名的占位符变量名必须与词条逐字相同 ——
  *      `translate()` 对认不出的占位符会**原样保留**，拼错只会把 `{excerpt}`
@@ -34,10 +34,10 @@ import { formatStamp } from '../src/lib/date';
 import { notesBoardLabels } from '../src/lib/notes-display';
 import {
   ABSOLUTE_REMINDER_LEAD_MS,
+  SNOOZE_MINUTES,
   absoluteReminderTriggerAt,
   reminderListLabels,
   reminderOffsetKeys,
-  snoozeTargetAt,
 } from '../src/lib/reminders-display';
 
 /** 与界面同一条路：走真的词条表（缺 key 会**抛**，不是返回空串）。 */
@@ -128,10 +128,20 @@ describe('没有截止时间时的入口：文案与"现在 + 1 小时"绑在一
 });
 
 describe('稍后提醒：读屏说 10 分钟，实际就必须推迟 10 分钟', () => {
-  it('`snoozeTargetAt` 走领域层 `snoozeDeadline`，与 a11y 文案里的数字一致', () => {
+  it('文案里的数字 = `SNOOZE_MINUTES`，推迟量走领域层 `snoozeDeadline`', () => {
     expect(reminderListLabels(zh).a11ySnooze(NOW)).toContain('10 分钟');
-    expect(snoozeTargetAt(NOW)).toBe(snoozeDeadline(NOW, 10));
-    expect(snoozeTargetAt(NOW)).toBe(NOW + 10 * MINUTE);
+    expect(reminderListLabels(en).a11ySnooze(NOW)).toContain('by 10 minutes');
+    expect(SNOOZE_MINUTES).toBe(10);
+    expect(snoozeDeadline(NOW, SNOOZE_MINUTES)).toBe(NOW + 10 * MINUTE);
+  });
+
+  it('🔴 文案念出的时刻是**传进去的那一行此刻的时刻**，不是"现在"', () => {
+    // 这句是**给动作层的借条**：按钮念「把 18:44 的提醒推迟 10 分钟」，
+    // 推迟就必须落在 18:44 之后。落在墙钟上会把提醒往过去挪（装机态四档实测，
+    // 台账 r142），兑现这张借条的是 app-host 的 `snoozeByMinutes`。
+    const when = NOW + HOUR;
+    expect(reminderListLabels(zh).a11ySnooze(when)).toContain(formatStamp(when));
+    expect(reminderListLabels(zh).a11ySnooze(when)).not.toContain(formatStamp(NOW));
   });
 });
 

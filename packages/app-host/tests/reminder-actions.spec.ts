@@ -274,6 +274,54 @@ describe('到点判定（due）', () => {
   });
 });
 
+describe('「推迟」落在哪个时刻上（snoozeByMinutes）', () => {
+  it('🔴 还没到点的提醒：往后推，绝不往前挪', async () => {
+    const taskId = await makeTask();
+    const trigger = clock + HOUR;
+    const id = await actions.createReminder(taskId, trigger);
+
+    expect(await actions.snoozeByMinutes(id, 10)).toBe(true);
+    expect(state().reminders[id]?.snoozedUntil).toBe(trigger + 10 * MINUTE);
+  });
+
+  it('已过点、还没投递的提醒：从现在起算', async () => {
+    const taskId = await makeTask();
+    const id = await actions.createReminder(taskId, clock + MINUTE);
+    clock += 10 * MINUTE; // 已过期 9 分钟
+
+    expect(await actions.snoozeByMinutes(id, 10)).toBe(true);
+    expect(state().reminders[id]?.snoozedUntil).toBe(clock + 10 * MINUTE);
+  });
+
+  it('连按两次是累加（基准永远是那一行此刻显示的时刻）', async () => {
+    const taskId = await makeTask();
+    const trigger = clock + HOUR;
+    const id = await actions.createReminder(taskId, trigger);
+
+    await actions.snoozeByMinutes(id, 10);
+    await actions.snoozeByMinutes(id, 10);
+    expect(state().reminders[id]?.snoozedUntil).toBe(trigger + 20 * MINUTE);
+  });
+
+  it('推迟量走领域层的分钟数语义：非正数抛错、超过上限钳到 7 天', async () => {
+    const taskId = await makeTask();
+    const id = await actions.createReminder(taskId, clock + HOUR);
+
+    await expect(actions.snoozeByMinutes(id, 0)).rejects.toThrow(/分钟/);
+    await actions.snoozeByMinutes(id, 60 * 24 * 30);
+    expect(state().reminders[id]?.snoozedUntil).toBe(clock + HOUR + 7 * DAY);
+  });
+
+  it('已投递 / 已关闭的不写 op，返回 false（与 snoozeReminder 同一判定顺序）', async () => {
+    const taskId = await makeTask();
+    const id = await actions.createReminder(taskId, clock + MINUTE);
+    await actions.markReminderFired(id);
+
+    expect(await actions.snoozeByMinutes(id, 10)).toBe(false);
+    expect(await opCount(id)).toBe(2);
+  });
+});
+
 describe('投递 / 关闭', () => {
   it('🔴 markReminderFired 幂等：第二次不写 op', async () => {
     const taskId = await makeTask();
