@@ -197,6 +197,7 @@ python3 research/tools/verify-inbound-ac-battery.py --root .worktrees/inb-t10 --
 - 🔴 **"独立跑绿"≠"链内跑绿"**：两个口径，台账里必须分开引用（本轮第 106 道就是这么处理的）。
 - 🔴 **别线那 19 行未提交的 #492 曾与本线条目撞号**：共享检出上写同一枚文件时，先 `git log -1 -- <文件>` 与 `git status --porcelain -- <文件>`，
   号只增不改 ⇒ 宁可留"main 上 491→493 的瞬时空档"（两线合并即连续），也别占别人的号或把别人的活折进自己那笔。
+  ⚠️ 读到这里的 `#492` **别去 main 里找**：那枚正文此刻只在共享检出的未提交态里。现量 `grep -c '^492\. ' docs/reference/environment-traps.md` 在**共享检出**回 **1**、在 `refs/heads/main` 那份里回 **0**（两枚读数 23:39 取）。⇒ 交接书里那七枚 `#N` 引用逐枚核过（`#179 #184 #480 #490 #492 #493 #494`），除这一枚外其余六枚都能在 main 那份里查到。
 - 🔴 **`pnpm check-migrations` 不存在**（真名 `check:migrations` = `node scripts/check-migrations.mjs`）、
   **`check-docs-voice.mjs` 在 `scripts/` 不在 `research/tools/`**（照裸名拼路径会得到 MODULE_NOT_FOUND + rc=1，形状与"门判红"逐字同形）。
   散文里的工具名会漂，引用前先 `find`/`grep -n package.json`。
