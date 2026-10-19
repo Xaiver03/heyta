@@ -27,6 +27,9 @@ const CASES = [
   { name: '1440-light', width: 1440, height: 900, scheme: 'light' },
   { name: '1440-dark', width: 1440, height: 900, scheme: 'dark' },
   { name: '375-light', width: 375, height: 812, scheme: 'light' },
+  // 前三档跑在浏览器默认语境的英文下；这一枚把语言维也取上，
+  // 否则"web × 中文那一格没取"会一直留在不证里。
+  { name: '1440-light-zh', width: 1440, height: 900, scheme: 'light', locale: 'zh-CN' },
 ];
 if (CASES.length === 0) {
   console.error('拒绝执行：待验档位为空 —— 空分母会伪装成 PASS');
@@ -80,7 +83,11 @@ let red = 0;
 const browser = await chromium.launch({ headless: true });
 try {
   for (const c of CASES) {
-    const ctx = await browser.newContext({ viewport: { width: c.width, height: c.height }, colorScheme: c.scheme });
+    const ctx = await browser.newContext({
+      viewport: { width: c.width, height: c.height },
+      colorScheme: c.scheme,
+      ...(c.locale ? { locale: c.locale } : {}),
+    });
     const page = await ctx.newPage();
     await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
     const dialog = page.getByTestId('privacy-consent-dialog');
@@ -96,6 +103,7 @@ try {
       }
       const close = page.getByTestId('privacy-consent-close');
       row = await close.evaluate((el) => ({
+        navLang: navigator.language,
         text: el.textContent?.trim() ?? '',
         aria: el.getAttribute('aria-label') ?? '',
         box: (({ x, y, width, height }) => ({ x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) }))(el.getBoundingClientRect()),
