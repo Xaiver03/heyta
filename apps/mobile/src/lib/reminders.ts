@@ -51,7 +51,7 @@ import { createReminderActions, type AppHost, type ReminderActions } from '@heyt
 import { openTaskHost } from '../db/open-host';
 import { useMobileSync } from '../sync/store';
 import { onLocalWrite } from '../sync/write-signal';
-import { absoluteReminderTriggerAt, snoozeTargetAt } from './reminders-display';
+import { SNOOZE_MINUTES, absoluteReminderTriggerAt } from './reminders-display';
 import { authorizeNativeReminders, getUncertainReminderOccurrences, subscribeReminderDelivery } from './native-reminder-scheduler';
 
 /** 提醒面板要用的全部东西 —— 界面不需要（也不该）知道下面还有没有别的。 */
@@ -70,7 +70,7 @@ export interface TaskReminderWiring {
   readonly addBeforeDue: (offsetMs: number) => void;
   /** 建一条绝对时刻提醒：**现在 + 1 小时**（文案是 `reminder.absolute.1h`）。 */
   readonly addAbsoluteInOneHour: () => void;
-  /** 稍后提醒（10 分钟，来自领域层 `snoozeDeadline`）。收**提醒自己的 id**。 */
+  /** 稍后提醒 `SNOOZE_MINUTES` 分钟；基准与推迟量都由动作层定（见 `snoozeByMinutes`）。 */
   readonly snooze: (entityId: string) => void;
   /** 关闭这条提醒。收**提醒自己的 id**。 */
   readonly dismiss: (entityId: string) => void;
@@ -168,7 +168,7 @@ export function useTaskReminders(taskId: string | undefined): TaskReminderWiring
   const snooze = useCallback(
     (entityId: string): void => {
       if (actions === null) return;
-      run(actions.snoozeReminder(entityId, snoozeTargetAt(Date.now())));
+      run(actions.snoozeByMinutes(entityId, SNOOZE_MINUTES));
     },
     [actions, run],
   );
