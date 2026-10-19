@@ -943,6 +943,16 @@ export const zhCN = {
   'web.auth.central.unavailableTitle': '统一登录暂时不可用',
   'web.auth.central.unavailable': 'heyta 官方服务当前没有提供可用的中央登录配置。请稍后重试；本页不会改用另一套登录方式。',
   'web.auth.central.retry': '重新检查',
+  'web.auth.central.accountConflictTitle': '本机数据属于另一个账号',
+  'web.auth.central.accountConflict': '当前统一登录账号与这台设备上的数据不一致。数据仍在本机，不会自动同步到新账号。请先下载可还原的 JSON 备份，再决定是否清除本机数据并切换。',
+  'web.auth.central.storageUnavailableTitle': '无法确认本机数据归属',
+  'web.auth.central.storageUnavailable': '浏览器无法持久保存账号绑定。为避免下次打开时把本机数据接到错误账号，当前不会自动登录。请检查浏览器存储权限后重试。',
+  'web.auth.central.switchLater': '稍后处理',
+  'web.auth.central.switchConfirm': '我已确认 JSON 备份保存成功，理解清除本机数据后才能切换账号。',
+  'web.auth.central.switchClear': '清除本机数据并切换账号',
+  'web.auth.central.switchClearing': '正在清除本机数据…',
+  'web.auth.central.switchSessionChanged': '统一登录状态已变化，本机数据未清除。请重新打开此页面确认。',
+  'web.auth.central.switchEraseFailed': '部分本机数据未能清除，账号绑定已保留。请关闭其他标签页后重试；不要把残留数据接到新账号。',
   // 同步设置里令牌字段下面的指路句 —— 它回答的正是"令牌从哪来"。
   'web.auth.tokenHint': '访问令牌由服务端签发。点上面的按钮登录或注册，令牌会自动填进来；已经有令牌的可以直接粘贴填写。',
   /*

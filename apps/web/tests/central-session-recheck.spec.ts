@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const central = vi.hoisted(() => ({
   config: vi.fn(),
@@ -12,6 +12,7 @@ vi.mock('@heyta/app-host', async (importOriginal) => ({
 }));
 
 import { CENTRAL_COOKIE_SESSION_MARKER } from '@heyta/app-host';
+import { CENTRAL_ACCOUNT_BINDING_KEY } from '../src/lib/central-account-binding.js';
 import { installCentralSessionRecheck } from '../src/features/sync/central-session-recheck.js';
 import { useSyncStore } from '../src/features/sync/store.js';
 
@@ -22,14 +23,20 @@ const authenticated = { ok: true, value: {
 } };
 
 beforeEach(() => {
+  vi.stubGlobal('navigator', Object.assign(Object.create(navigator) as Navigator, {
+    locks: { request: async (_name: string, _options: unknown, work: () => unknown) => work() },
+  }));
+  localStorage.removeItem(CENTRAL_ACCOUNT_BINDING_KEY);
   central.config.mockReset().mockResolvedValue(oidcConfig);
   central.session.mockReset();
   useSyncStore.setState({
     baseUrl: BASE_URL, token: undefined, authTransport: 'bearer', csrfToken: undefined,
-    email: undefined, accountId: undefined, password: undefined,
+    email: undefined, accountId: undefined, password: undefined, centralBindingConflict: undefined,
     syncDraft: { baseUrl: BASE_URL, token: '', password: '' },
   });
 });
+
+afterEach(() => { vi.unstubAllGlobals(); });
 
 describe('中央浏览器会话复查', () => {
   it('服务端确认会话已失效后，清除旧 Cookie 身份标签并保留新 CSRF', async () => {
@@ -99,7 +106,7 @@ describe('中央浏览器会话复查', () => {
     resolveSession(authenticated);
     await pending;
 
-    expect(useSyncStore.getState()).toMatchObject({ token: undefined, email: undefined, accountId: undefined });
+    expect(useSyncStore.getState()).toMatchObject({ token: undefined, email: undefined, accountId: undefined, centralBindingConflict: undefined });
   });
 
   it('退出后晚到的配置结果也不能继续探测或重签入', async () => {
@@ -123,7 +130,50 @@ describe('中央浏览器会话复查', () => {
 
     await useSyncStore.getState().resumeCentralSession();
 
-    expect(useSyncStore.getState()).toMatchObject({ token: undefined, email: undefined, accountId: undefined });
+    expect(useSyncStore.getState()).toMatchObject({ token: undefined, email: undefined, accountId: undefined, centralBindingConflict: 'mismatch' });
+    expect(localStorage.getItem(CENTRAL_ACCOUNT_BINDING_KEY)).toBe(JSON.stringify({ origin: BASE_URL, subject: '9' }));
+  });
+
+  it('刷新后仍用持久服务源和 subject 绑定拦住另一账号', async () => {
+    central.session.mockResolvedValue(authenticated);
+    await useSyncStore.getState().resumeCentralSession();
+    expect(useSyncStore.getState().accountId).toBe('12');
+    expect(localStorage.getItem(CENTRAL_ACCOUNT_BINDING_KEY)).toBe(JSON.stringify({ origin: BASE_URL, subject: '12' }));
+
+    useSyncStore.getState().clearCredentials();
+    central.session.mockResolvedValue({ ok: true, value: {
+      authenticated: true, user: { id: 13, email: 'other@example.test' }, csrfToken: 'csrf-other',
+    } });
+    await useSyncStore.getState().resumeCentralSession();
+    expect(useSyncStore.getState()).toMatchObject({ token: undefined, accountId: undefined, centralBindingConflict: 'mismatch' });
+    expect(localStorage.getItem(CENTRAL_ACCOUNT_BINDING_KEY)).toBe(JSON.stringify({ origin: BASE_URL, subject: '12' }));
+  });
+
+  it('同号 subject 的另一服务源不能复用本机绑定', async () => {
+    central.session.mockResolvedValue(authenticated);
+    await useSyncStore.getState().resumeCentralSession();
+    useSyncStore.getState().clearCredentials();
+    useSyncStore.setState({ baseUrl: 'https://other.example.test' });
+    await useSyncStore.getState().resumeCentralSession();
+    expect(useSyncStore.getState().centralBindingConflict).toBe('mismatch');
+  });
+
+  it('无法持久保存绑定时拒绝自动采用会话', async () => {
+    central.session.mockResolvedValue(authenticated);
+    vi.stubGlobal('localStorage', {
+      getItem: () => { throw new Error('storage unavailable'); },
+      setItem: () => { throw new Error('storage unavailable'); },
+    });
+    await useSyncStore.getState().resumeCentralSession();
+    expect(useSyncStore.getState()).toMatchObject({ token: undefined, centralBindingConflict: 'unavailable' });
+  });
+
+  it('浏览器没有跨标签互斥能力时拒绝自动采用会话', async () => {
+    central.session.mockResolvedValue(authenticated);
+    vi.stubGlobal('navigator', Object.assign(Object.create(navigator) as Navigator, { locks: undefined }));
+    await useSyncStore.getState().resumeCentralSession();
+    expect(useSyncStore.getState()).toMatchObject({ token: undefined, centralBindingConflict: 'unavailable' });
+    expect(localStorage.getItem(CENTRAL_ACCOUNT_BINDING_KEY)).toBeNull();
   });
 
 });

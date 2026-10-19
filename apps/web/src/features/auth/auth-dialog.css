@@ -192,6 +192,14 @@ body:has(.ht-sheet__auth) .ht-compact-rail {
   align-content: center;
 }
 
+.ht-auth-central--conflict {
+  align-content: start;
+}
+
+.ht-auth-central--conflict .ht-settings {
+  min-inline-size: 0;
+}
+
 .ht-auth-central h2,
 .ht-auth-central p {
   margin: 0;

@@ -17,13 +17,18 @@ import { openApp, openAuthPanel } from '../auth-journey/helpers.js';
 import {
   addTask,
   configureEndpoint,
+  decidePrivacyConsent,
+  enableAllModules,
   expectNoStubCall,
   openSettingsSheet,
+  pinChineseUi,
   resetStub,
   rowFor,
   selectSettingsSection,
   switchView,
+  waitForBootSplashGone,
 } from './helpers.js';
+import { installMissingProducerShims } from './shims.js';
 
 const STUB_ORIGIN = 'http://127.0.0.1:4342';
 const STUB_ENDPOINT = `${STUB_ORIGIN}/v1`;
@@ -161,6 +166,60 @@ test.describe('认证页：默认信息层级与响应式审美', () => {
     await expect(dialog.getByTestId('central-auth-unavailable')).toBeVisible();
     await expect(dialog.getByTestId('central-auth-close')).toBeVisible();
     await closeAuth(page);
+  });
+
+  test('不同中央账号时先导出并确认，本机数据不会被自动接入', async ({ page }, testInfo) => {
+    const captureConflict = async (name: string): Promise<void> => {
+      await page.locator('.ht-sheet__auth').evaluate(async (element) => {
+        await Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished.catch(() => undefined)));
+      });
+      await page.screenshot({ path: testInfo.outputPath(name), fullPage: true });
+    };
+    await page.route('**/api/auth/central/config', (route) => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ mode: 'oidc', loginPath: '/api/auth/oidc/start', documentVersion: 'v1' }),
+    }));
+    await page.route('**/api/auth/central/session', (route) => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ authenticated: true, user: { id: 13, email: 'new@example.test' }, csrfToken: 'csrf-test' }),
+    }));
+    await page.addInitScript(() => {
+      localStorage.setItem('heyta.central.account-binding', JSON.stringify({
+        origin: window.location.origin, subject: '12',
+      }));
+    });
+    await enableAllModules(page);
+    await pinChineseUi(page);
+    await installMissingProducerShims(page);
+    await page.goto('/');
+    await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible();
+    await decidePrivacyConsent(page, 'accepted');
+    await waitForBootSplashGone(page);
+
+    const dialog = await openAuthPanel(page);
+    const conflict = dialog.getByTestId('central-account-conflict');
+    await expect(conflict).toBeVisible();
+    await captureConflict('central-conflict-desktop-light.png');
+    await expect(conflict.getByTestId('central-switch-confirm')).toBeDisabled();
+    await expect(conflict.getByTestId('central-switch-clear')).toBeDisabled();
+    expect(await page.evaluate(() => localStorage.getItem('heyta.central.account-binding')))
+      .toBe(JSON.stringify({ origin: 'http://127.0.0.1:4341', subject: '12' }));
+
+    await conflict.getByRole('button', { name: '稍后处理' }).click();
+    await openSettingsSheet(page);
+    await selectSettingsSection(page, 'appearance');
+    await page.getByTestId('theme-toggle').click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await page.getByTestId('settings-sheet-close').click();
+    await page.setViewportSize({ width: 375, height: 812 });
+    const mobileDialog = await openAuthPanel(page);
+    await expect(mobileDialog.getByTestId('central-account-conflict')).toBeVisible();
+    await captureConflict('central-conflict-mobile-dark.png');
+    await expect
+      .poll(async () => mobileDialog.evaluate((element) => element.scrollWidth <= element.clientWidth))
+      .toBe(true);
+    await mobileDialog.getByTestId('central-switch-clear').scrollIntoViewIfNeeded();
+    await captureConflict('central-conflict-mobile-dark-actions.png');
   });
 
   test('自托管口令入口只在设置的高级路径出现', async ({ page }) => {

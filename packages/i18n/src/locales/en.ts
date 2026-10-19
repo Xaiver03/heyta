@@ -872,6 +872,16 @@ export const en = {
   'web.auth.central.unavailableTitle': 'Central sign-in is temporarily unavailable',
   'web.auth.central.unavailable': 'The heyta official service did not provide a usable central sign-in configuration. Try again later; this page will not switch to another sign-in method.',
   'web.auth.central.retry': 'Check again',
+  'web.auth.central.accountConflictTitle': 'Local data belongs to another account',
+  'web.auth.central.accountConflict': 'The current central account differs from the account bound to this device. Your local data remains here and will not sync to the new account. Download a restorable JSON backup before deciding whether to clear this device and switch.',
+  'web.auth.central.storageUnavailableTitle': 'Cannot verify local data ownership',
+  'web.auth.central.storageUnavailable': 'The browser cannot persist an account binding. To avoid attaching local data to the wrong account after a restart, sign-in will not continue. Check browser storage permissions and try again.',
+  'web.auth.central.switchLater': 'Decide later',
+  'web.auth.central.switchConfirm': 'I have confirmed that the JSON backup was saved, and I understand that local data must be cleared before switching accounts.',
+  'web.auth.central.switchClear': 'Clear local data and switch accounts',
+  'web.auth.central.switchClearing': 'Clearing local data…',
+  'web.auth.central.switchSessionChanged': 'The central session changed. Local data was not cleared. Reopen this page to confirm.',
+  'web.auth.central.switchEraseFailed': 'Some local data could not be cleared, so the account binding was kept. Close other tabs and try again; do not attach remaining data to the new account.',
   'web.auth.tokenHint': 'Access tokens are issued by the server. Sign in or register with the button above and the token is filled in automatically; if you already have one, paste it directly.',
   // 🔴 Reframed 2026-10-02. The product owner's words: "why is the default pasting a server
   // address and a token? … that shuts ordinary users out at the door." Neither old line was

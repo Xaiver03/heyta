@@ -98,10 +98,12 @@ import {
 } from '@heyta/ui';
 
 import { detectPasskeyBrowser } from './passkey-browser.js';
+import { CentralAccountConflictPanel } from './CentralAccountConflictPanel.js';
 import { readRememberedCredentials, rememberCredentials } from './remembered-credentials.js';
 import { useAuthStore, type AuthBusyAction } from './store.js';
 import { authBaseUrl, isUnconfigured } from '../../lib/auth-endpoint.js';
 import { consentFetch } from '../privacy/consent-gate.js';
+import { useSyncStore } from '../sync/store.js';
 import { useModalDismiss } from '../../lib/use-modal-dismiss.js';
 import './auth-dialog.css';
 
@@ -188,6 +190,7 @@ export function AuthPanel({
   const forgotPassword = useAuthStore((s) => s.forgotPassword);
   const startCentralLogin = useAuthStore((s) => s.startCentralLogin);
   const invalidatePendingAuth = useAuthStore((s) => s.invalidatePendingAuth);
+  const centralBindingConflict = useSyncStore((s) => s.centralBindingConflict);
 
   /**
    * 服务端地址草稿。
@@ -567,7 +570,9 @@ export function AuthPanel({
           这一层（`AuthForm` 已在登记清单里）。
         */}
         <HeytaUiProvider>
-          {centralMode && !selfHostedMode ? (
+          {centralBindingConflict && !selfHostedMode ? (
+            <CentralAccountConflictPanel baseUrl={effectiveBaseUrl} onClose={onClose} />
+          ) : centralMode && !selfHostedMode ? (
             <section className="ht-auth-central" data-testid="central-auth-panel" aria-labelledby="central-auth-title">
               {centralClose}
               <p className="ht-auth-central__eyebrow ht-type-caption">{t('web.auth.central.kicker')}</p>

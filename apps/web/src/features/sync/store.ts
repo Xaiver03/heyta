@@ -40,6 +40,7 @@ import {
   createSyncClient,
 } from '@heyta/app-host';
 import { getWebInboundUploadAuthorization } from '../settings/inbound-runtime.js';
+import { bindCentralAccount, withCentralAccountBindingLock, type CentralBindingResult } from '../../lib/central-account-binding.js';
 
 // W4：凭据持久化。**只存 baseUrl 与 token，绝不存口令** —— 见该文件头。
 import { clearStoredCredentials, loadCredentials, saveCredentials } from './credential-storage.js';
@@ -71,6 +72,9 @@ interface SyncStoreState {
   token?: string;
   /** bearer for self-hosted/native-compatible credentials; cookie for official Web OIDC. */
   authTransport: 'bearer' | 'cookie';
+  centralBindingConflict?: Exclude<CentralBindingResult, 'bound'>;
+  centralBindingTarget?: { origin: string; subject: string };
+  centralAccountSwitching: boolean;
   csrfToken?: string;
   /**
    * 账号邮箱（头像的首字母靠它）。
@@ -154,6 +158,8 @@ interface SyncStoreState {
   applyAuthToken: (baseUrl: string, token: string, email?: string, accountId?: string) => void;
   applyCentralAuth: (baseUrl: string, email: string, accountId: string, csrfToken: string) => void;
   resumeCentralSession: () => Promise<void>;
+  beginCentralAccountSwitch: () => void;
+  finishCentralAccountSwitch: () => void;
   clearCredentials: () => void;
   syncNow: () => Promise<SyncStatus>;
   /**
@@ -506,6 +512,9 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
   baseUrl: persisted?.baseUrl ?? '',
   token: persisted?.token,
   authTransport: 'bearer',
+  centralBindingConflict: undefined,
+  centralBindingTarget: undefined,
+  centralAccountSwitching: false,
   csrfToken: undefined,
   email: persisted?.email,
   accountId: persisted?.accountId,
@@ -578,7 +587,7 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     // 🔴 草稿跟着走：「保存并同步」之后，那一节的输入框与配置**必须是同一份值**。
     // 不写这一半的话，症状是配置已经生效、框里还留着上一次的内容 ——
     // 那是 2026-09-30 那条"框与配置两套真相"缺陷的镜像版本。
-    set({ baseUrl, token, authTransport: 'bearer', csrfToken: undefined, password, accountId, email, status: { kind: 'idle' }, syncDraft: { baseUrl, token, password } });
+    set({ baseUrl, token, authTransport: 'bearer', centralBindingConflict: undefined, centralBindingTarget: undefined, csrfToken: undefined, password, accountId, email, status: { kind: 'idle' }, syncDraft: { baseUrl, token, password } });
     // 🔴 W4：口令**不进** saveCredentials 的参数 —— 它只在内存。
     // 手填新凭据没有核验账号身份，不能继承上一枚令牌的邮箱标签。
     if (baseUrl !== '' && token !== '') {
@@ -605,6 +614,8 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
       baseUrl,
       token,
       authTransport: 'bearer',
+      centralBindingConflict: undefined,
+      centralBindingTarget: undefined,
       csrfToken: undefined,
       email: nextEmail,
       accountId: nextAccountId,
@@ -639,6 +650,8 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
       baseUrl,
       token: CENTRAL_COOKIE_SESSION_MARKER,
       authTransport: 'cookie',
+      centralBindingConflict: undefined,
+      centralBindingTarget: undefined,
       csrfToken,
       email,
       accountId,
@@ -653,6 +666,7 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
   },
 
   resumeCentralSession: async () => {
+    if (get().centralAccountSwitching) return;
     const revision = credentialRevision;
     const current = get();
     const candidate = current.baseUrl.trim() !== ''
@@ -664,6 +678,7 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     if (!config.ok) return;
     if (config.value.mode !== 'oidc') {
       if (get().authTransport === 'cookie') get().clearCredentials();
+      set({ centralBindingConflict: undefined, centralBindingTarget: undefined });
       return;
     }
     const session = await getCentralAuthSession({ baseUrl: candidate, fetchImpl: consentFetch });
@@ -673,19 +688,50 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
         // An OIDC server has definitively rejected the browser session. A
         // persisted pre-migration bearer token must not keep the UI signed in.
         if (get().token !== undefined || get().authTransport === 'cookie') get().clearCredentials();
-        set({ csrfToken: session.value.csrfToken });
+        set({ csrfToken: session.value.csrfToken, centralBindingConflict: undefined, centralBindingTarget: undefined });
       }
       return;
     }
-    const existing = get();
-    if (existing.authTransport === 'cookie' && existing.accountId !== undefined &&
-        existing.accountId !== String(session.value.user.id)) {
-      // A different tab switched central subjects. Do not silently attach
-      // this tab's local op-log and E2EE state to the new account.
-      existing.clearCredentials();
-      return;
+    const centralUser = session.value.user;
+    const centralCsrfToken = session.value.csrfToken;
+    const subject = String(centralUser.id);
+    const locked = await withCentralAccountBindingLock(() => {
+      if (credentialRevision !== revision || get().centralAccountSwitching) return false;
+      const existing = get();
+      const priorSubject = existing.accountId;
+      // Persist a live pre-binding owner's identity before offering erasure.
+      // Otherwise a partial erase followed by reload leaves old ops unowned.
+      const priorBinding = priorSubject !== undefined && priorSubject !== subject
+        ? bindCentralAccount(candidate, priorSubject)
+        : undefined;
+      const binding: CentralBindingResult = priorBinding === undefined
+        ? bindCentralAccount(candidate, subject)
+        : priorBinding === 'unavailable' ? 'unavailable' : 'mismatch';
+      if (binding !== 'bound') {
+        if (existing.token !== undefined || existing.authTransport === 'cookie') existing.clearCredentials();
+        set({ centralBindingConflict: binding,
+          centralBindingTarget: binding === 'mismatch' ? { origin: new URL(candidate).origin, subject } : undefined });
+      } else {
+        get().applyCentralAuth(candidate, centralUser.email, subject, centralCsrfToken);
+      }
+      return true;
+    });
+    if (locked === undefined && credentialRevision === revision) {
+      if (get().token !== undefined || get().authTransport === 'cookie') get().clearCredentials();
+      set({ centralBindingConflict: 'unavailable', centralBindingTarget: undefined });
     }
-    get().applyCentralAuth(candidate, session.value.user.email, String(session.value.user.id), session.value.csrfToken);
+  },
+
+  beginCentralAccountSwitch: () => {
+    const conflict = get().centralBindingConflict;
+    const target = get().centralBindingTarget;
+    if (conflict !== 'mismatch') return;
+    get().clearCredentials();
+    set({ centralBindingConflict: conflict, centralBindingTarget: target, centralAccountSwitching: true });
+  },
+
+  finishCentralAccountSwitch: () => {
+    set({ centralAccountSwitching: false });
   },
 
   startRealtime: () => {
@@ -709,6 +755,9 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     set({
       token: undefined,
       authTransport: 'bearer',
+      centralBindingConflict: undefined,
+      centralBindingTarget: undefined,
+      centralAccountSwitching: false,
       csrfToken: undefined,
       email: undefined,
       accountId: undefined,

@@ -39,7 +39,10 @@ import { tasksMarkdownCopy } from './export-copy.js';
 import { downloadTextFile } from './export-download.js';
 import { SettingsNotice } from './SettingsNotice.js';
 
-export function ExportPanel(): React.JSX.Element {
+export function ExportPanel({
+  onlyJson = false,
+  onJsonExported,
+}: { onlyJson?: boolean; onJsonExported?: () => void } = {}): React.JSX.Element {
   const { t } = useI18n();
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -66,6 +69,7 @@ export function ExportPanel(): React.JSX.Element {
           serializeExportDocument(doc),
           'application/json',
         );
+        onJsonExported?.();
       } else {
         const markdown = renderTasksMarkdown(
           buildTaskExportRows(state),
@@ -106,7 +110,7 @@ export function ExportPanel(): React.JSX.Element {
         </div>
       </section>
 
-      <section className="ht-settings__section">
+      {!onlyJson && <section className="ht-settings__section">
         <h3 className="ht-settings__h3 ht-type-headline">
           <FileText size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.export.markdown.label')}
         </h3>
@@ -122,7 +126,7 @@ export function ExportPanel(): React.JSX.Element {
             <Download size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.export.markdown.button')}
           </button>
         </div>
-      </section>
+      </section>}
 
       {counts !== undefined && (
         <p className="ht-settings__hint" data-testid="export-counts">
