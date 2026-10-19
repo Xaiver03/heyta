@@ -4793,6 +4793,7 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
       两个方向（① `badge` 加 `flexShrink:0`，代价是要重看右缘；② `row` 加 `flexWrap` 让动作整排换行，更像那行注释的本意，但行高会变、中文两档那五行 frame 全要重取）
       **本线不代改**：这枚症状只在**真实文字测量**下存在，jsdom 量不到文字宽度 ⇒ 造不出会红的离线判据（造出来就是恒绿判据，比没有判据更糟），
       要证它必须重打包装进模拟器再跑三档 ⇒ 交给提醒/界面那一线，随它下一次进包的改动一起做。
+      ⚠️ 这句到 **r147** 为止：那三档本线自己跑了（改前的件红、最终件中英各绿），缺陷已在本线改掉 —— 交链那句当时把"要跑装机态"错读成"归别人"。
       ⚠️ 三档收笔现量：外观 `light`（回读 + 装机面像素 252 双确）、**应用内语言已还原中文**（`--to zh` 8 步、回读步 passed）、
       `com.heyta` 已 terminate、列表为空、**没收任何 companion**。门现量 `check:locator-labels` / `check:md-tables` / `check:docs` 各 `rc=0`。
       **不证**：⑴ 英文 × **暗**档（外观与语态是两维，本线只取过 `english-light` 这一格）；⑵ Android 档的同一形状；
@@ -4830,3 +4831,43 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
       落点 `~/heyta-reinstall/r146-mac/`（`HEYTA_REINSTALL_TMP_DIR` 指到仓外独立目录，避开固定 `/tmp` 互相覆盖那一枚坑）。
       **不证**：windows / android 两端产物仍过期（打包机现量：`windows-pc` 连接超时、`windows-pc-lan` 拒绝连接；规则明令不许退回本机跑 Gradle）；
       mac 端**这枚修复的行为读数**没跑（行为判据在 app-host 单测与 iOS 装机态两语态）；四端汇总里那三行 `⏭` 是脚本自己写的"这端**没有**验证当前产物"。
+- [x] ✅ **10-20 00:0x r147 改掉 r143 那枚「英文徽标被逐字劈开」：提醒行不再让时刻+徽标与三枚动作抢同一行**（`packages/ui/src/reminders/ReminderList.tsx`）
+      **上一格那句「本线不代改」由这一格作废**，作废的理由也要留下：当时写的是"造不出会红的离线判据 ⇒ 要证就得重打包装进模拟器再跑三档"，
+      前半句成立（jsdom 量不到字宽），后半句把"要跑一趟装机态"读成了"归别人" —— 而这枚装置、这台模拟器、这条打包链本线手里都有。
+      **改的是构造，不是阈值**：`row` 由一行改成列（第一段时刻+徽标、第二段动作，`actions` 靠右守住原来的视觉语法）。
+      依据是装机态那三个数：三枚英文动作要 293 pt、行宽 370 pt ⇒ `main` 只剩 53 pt，而 `Scheduled` 那一行字要 76 pt
+      ⇒ **容器比词还窄，任何内部换行都救不回来**。代价如实登记：中文档那几行也变成两段（比原来高一行）。
+      🔴 **第一枚改法实测零效果，而且是被帧逐位相同证出来的**：`row: flexWrap` + `main: flexBasis 'auto'`（想让动作整排换行）
+      重打重装后跑同一枚装置，`Scheduled` 仍是 `[24,380,53,28]` —— 与改前**逐位相同**。成因写进样式注释了：
+      Yoga 的换行判定按子节点上一趟解析出来的宽度累加，`flex-grow` 那枚在判定里只占它被挤出来的 53 pt ⇒ 永远判成"装得下"。
+      **判据（新的、常驻在装置里）**：`reminder-block-ios.py` 加 `badgeShapes` 读数 + "同一趟里每枚状态徽标的帧高只许有一种"。
+      四趟装机态（同机 `FE195661…A102`、外观 `light`、件与产物按 `main.jsbundle` 同哈希对账）：
+      改前的件英文 **`rc=1`**（`[14, 28]`）· 第一枚改法的件英文 **`rc=1`**（帧逐位相同）· 最终件英文 **`rc=0`**（三枚徽标全 14）·
+      最终件中文 **`rc=0`**（三枚徽标 `[114,334,33,14]`）⇒ **两语态各验一次**，正是 r144 那格给下一个人的口径。
+      两趟绿读数顺带复验 r145：`snoozeMove` 英文 `00:48→00:58`、中文 `00:50→01:00`，`movedLater: true`。
+      离线侧：`packages/ui` 673 测试 + typecheck、`apps/web` 2307 测试、`apps/mobile` 988 测试 + 两端 typecheck 全 `rc=0`，
+      门现量 `check:design` / `check:layering` / `check:locator-labels` / `check:script-snapshot` / `check:verify-script-copy` 各 `rc=0`。
+      DOM 那一侧只跑到"没被碰坏"：本线 `verify:web-ui-sweep` 的 `reminders` 腿（30 格 40 断言 `rc=0`）渲染的是**通知授权面板**、不含带徽标的提醒行；
+      别线在册的 `e2e/tests/detail-pane-task.spec.ts` T10/T11 也过了（`-g "T1[01]"` 2 passed），但它判的是"列表整页只有一份 / 徽标里没长出第二个编辑器 / 无控制台错误"，
+      那张 `t10-reminder-field-in-column.png` 里**提醒块根本没进画面** ⇒ **DOM 侧没有带徽标那一行的行形状读数**（要取就得让谁把提醒块滚进画面再截）。
+      ⚠️ 那枚 spec 的图写死落在 `apps/web/evidence/detail-pane-task/`（三枚已跟踪件），本趟跑完已 `git checkout --` 还原成 HEAD 版、没替那条线提交
+      —— 那三枚图现在对新源码是旧的，归下一次跑那条旅程的人。
+      **不证**：⑴ 暗档没重跑（依据是 r144 的 15 枚帧逐枚相同 ⇒ 这枚缺陷与外观档无关）；⑵ **Android 装机态没有读数**
+      （同一枚共享组件结构上同样受益，但出包要 ssh `windows-pc`，10-20 00:0x 现量 `Host is down` / `Connection refused`，规则不许退回本机跑 Gradle）；
+      ⑶ mac / windows 产物因这一枚改动**再次过期**（mac 补装见下一格）；⑷ 大字体档 / iPad / 更窄视口没测；
+      ⑸ DOM 侧没有"英文档带徽标提醒行"的专属读数（CSS 本来也不在词中间断行，它溢出）。
+      读数、四趟的图与"下一位怎么重跑 / 别再试哪个方向"在
+      [`apps/mobile/evidence/ux-final-20261018/ios-reminder-block-r147/RESULT.md`](../../apps/mobile/evidence/ux-final-20261018/ios-reminder-block-r147/RESULT.md)。
+- [x] ✅ **10-20 00:1x r148 mac 端补装：r147 那枚 `packages/ui` 改动补上第三个端**（`bash scripts/reinstall-all.sh --only mac`，`REINSTALL_RC=0`）
+      链的四条读数：全仓构建 ✅ → web 产物在 workspace 构建之后刷新 ✅ → `.app` + `.dmg` 打包（含打包即启动的自截屏）✅ →
+      安装对账「.app 里的 web-dist 与本机 `apps/web/dist` 是同一次构建（9 个 chunk）」✅ → 窗口 2318×1508、webview 内容占比 100.0%、主蓝命中 997 ✅。
+      **判据不是代理尺**：这一格查的是**装进包的那份 JS 里有没有这枚布局** ——
+      以 `flexDirection:"column",alignItems:"stretch",gap:…,minHeight:…` 这段序列化后的样式形状为针，
+      `/Applications/Heyta.app/Contents/Resources/web-dist/assets/index-Cy6qOldq.js` 与 `apps/web/dist/assets/` 同名件**各命中 1 处**（改前那件里不存在这段）。
+      人眼看过 `heyta-reinstall-mac-installed.png.webview.png`：共享 UI 在场，但**首屏是联网同意那一屏 ⇒ 这张图看不到提醒行**（它只证"装起来的壳画得出共享 UI、不是空窗"）。
+      落点 `~/heyta-reinstall/r148-mac/`（`HEYTA_REINSTALL_TMP_DIR` 指仓外独立目录，同 r146 那条理由）。
+      ⚠️ 这一趟跑在**含 r147 未提交改动的工作树**上（跑前 `git status --porcelain` 现量只有那一枚组件 + 装置 + 证据目录），
+      所以"产物等于当前源码"里的"当前源码"是**这一笔提交的内容**，不是上一枚 HEAD。
+      **不证**：windows / android 两端产物仍过期（现量 `windows-pc` → `Host is down`、`windows-pc-lan` → `Connection refused`；规则明令不许退回本机跑 Gradle）；
+      mac 壳里**没量提醒行的帧**（DOM 侧那两格读数来自别线在册的 `e2e/tests/detail-pane-task.spec.ts` T10/T11，2 passed）；
+      四端汇总里那三行 `⏭` 是脚本自己写的"这端**没有**验证当前产物"。
