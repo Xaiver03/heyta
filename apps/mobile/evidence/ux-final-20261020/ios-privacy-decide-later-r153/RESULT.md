@@ -40,7 +40,7 @@ r150 在这枚控件上量到的形状是：可及名称一直是「以后再说
 * `apps/web/src/features/privacy/PrivacyConsentSheet.tsx`：`<button>` 里的 `<X>` 换成同一句可见文字，
   `aria-label` 与 `data-testid` 原样留着（既有 5 处脚本/用例按 testid 定位，不扩射程）。
 
-永久判据两条，各带变异臂（臂 = 把源码文件换成 `git show HEAD:` 那一份改前件）：
+永久判据两条，各带变异臂（臂 = 把源码文件换成改前那一笔 `git show bd10a50c:<那个文件>`）：
 
 | 判据 | 改前件 | 改后 |
 |---|---|---|

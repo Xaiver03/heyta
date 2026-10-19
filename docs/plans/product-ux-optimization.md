@@ -1622,16 +1622,32 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
     修法照做就行那档）**不因这一枚绿而闭合** —— 那四格逐格自判，别按这一格的勾推过去。
     原始读数与归属逐条照旧留在下面几段，是考古用的，不是现状。
     在 `faab57c4` 那棵只含已提交内容的载体里 `pnpm -r build` ⇒ **`BUILD_RC=1`**，停在 `@heyta/shared-schema`：tsup 报 `Could not resolve "./task-batch-contract"`、`"./task-priority-batch-contract"`、`"./task-repeat-completion-contract"`、`"./reminder-owner-contract"` 各两次，`tsc` 的 DTS 阶段另报 `src/index.ts(151..153): error TS2305: Module "./auth-http-contract" has no exported member 'EmailPasswordRegistration*'`，收尾是 `DTS Build error / Failed`（五枚 `packages/*/dist` 之后就断了）。 ⚠️ **10-09 23:3x 在 `d5d49540` 上复量：这一格换了位置，见下面那条「main 现在打不出包缺的是哪 11 枚」。**
-    ⚠️ **10-18 r125 复量（`29521b78`，只含已提交内容的干净检出真跑）**：这一格点名的那枚原因已经换了位置 —— 装那一半现在 rc=0，打不出包那一半仍然真但换成两条新原因（`packages/app-host` 的两枚生产者还停在索引里没提交、`packages/ui` 的 `CommentView` 少 `id`）。逐条读数与归属见下面「r125」那一格。
+    ⚠️ **10-18 r125 复量（`29521b78`，只含已提交内容的干净检出真跑）**：这一格点名的那枚原因已经换了位置 —— 装那一半现在 rc=0，打不出包那一半**当时**换成两条新原因（`packages/app-host` 的两枚生产者还停在索引里没提交、`packages/ui` 的 `CommentView` 少 `id`）。逐条读数与归属见下面「r125」那一格。
+        🔴 **10-20 00:5x r151 再复量：连"打不出包"那一半也关了** —— 当前 `HEAD` 上 `NO_COLOR=1 pnpm -r --no-bail build` ⇒ **`BUILD_RC=0` / `Done` 20 / `Failed` 0**
+        ⇒ 这几格题面里"HEAD/main 打不出包"那句**现在谁写谁错**（当时的两条新原因与归属照旧留在 r125 那格里，是考古不是现状）。
+        ⚠️ 但这一枚绿**只关构建**：这几格各自还夹着别线名下的欠项（哪枚 `??` 该谁提交、`check:layering` 那一处…），那些要**逐格自判**，不许按这一句推成"那几格也好了"。
     **归属可以点到具体那一笔**：把四行 re-export 写进 `packages/shared-schema/src/index.ts` 的是 **`9fa53ab9`（2026-10-08，标题写的是「docs(账号面): 立 ADR-0063 与标准套件工单…」，但它的 diff 里有 `packages/shared-schema/src/index.ts`）**；而那四个被指的模块在 HEAD 里**不存在**、在工作树里是 **`??` 未跟踪**（`git status --porcelain -- packages/shared-schema/src/` 逐条列出），`auth-http-contract.ts` 是 **` M`**（HEAD 那份没有 index.ts 要的那三个导出）。姊妹格 `343ffc8a`（「feat(账号面 共享契约)…」）是同一条线的正确做法：`email-change-contract.ts` + `session-contract.ts` + `index.ts` **同一笔一起落**。
     ⇒ 三条后果按档写清，不并档：① **CI 形态（干净检出）现在既装不起来（上一格那条 lock 跑在清单前面）也打不出包** —— 两格都不是本线写的，也不由本线代改（那是账号面那一线把 `??`/` M` 那五枚文件与其导出一起提交的决定）；② 本线那两枚"隔离副本读数"因此**在 HEAD 上结构上取不到**，本线改把载体钉到 `9fa53ab9^`（同一棵树的导航也是锚点形状：`className="ht-settings__nav-link"` 命中 1、`aria-controls` 命中 0，且那一档的 lock 里没有 zxcvbn ⇒ `--frozen-lockfile` 可装）；③ ⚠️ 于是取到的读数**只支持这句话**："装置与整族套件在 `9fa53ab9^` 这棵只含已提交内容、能装能建的树上跑得通"，**不支持**"HEAD 可用"。拿旧提交凑新提交的读数，就是 §7 那条"旧产物伪装成真缺陷"的反方向版本。
-- [ ] 🔴 **08:5x 在新 HEAD 上复量那两格红：两条都还在，而载体比 HEAD 落后 53 笔**（读数现取，不沿用 08:1x 那一批）。`git log --oneline -1` = **`d65b2dd6`**（「feat(账号标准套件 移动端组件一笔)…」，`git rev-list --count b081811c..HEAD` = **53** —— 另一条线又落了这么多）：① `git show d65b2dd6:pnpm-lock.yaml` 的 `packages/ui` 段仍记 `@zxcvbn-ts/core`（第 697 行起），而 `git show d65b2dd6:packages/ui/package.json | grep -c zxcvbn` = **0** ⇒ 上一格那个 `--frozen-lockfile` 现在仍然红；② `git show d65b2dd6:packages/shared-schema/src/index.ts` 第 22 行仍 `from './task-batch-contract'`、第 36 行仍 `from './reminder-owner-contract'`，而那四枚模块 `git cat-file -e d65b2dd6:…` **逐个 NO**、在工作树里仍是 `??`（`auth-http-contract.ts` 仍是 ` M`）⇒ 上一格那个 `pnpm -r build` 现在仍然打不出包。⇒ **本线那两枚"要落在只含已提交内容的树上"的读数（整族套件、以及把已提交证据批次复现一遍）结构上仍只能在 `b081811c` 那棵取，并因此必须带着"它不是 HEAD"这句限定**；把载体改钉到新 HEAD 要等那五枚文件落地，那是账号面那一线的动作，本线不代改、也不替它把 `??` 提交掉。 ⚠️ **10-09 23:3x 在 `d5d49540` 上复量：这一格换了位置，见下面那条「main 现在打不出包缺的是哪 11 枚」。**
-    ⚠️ **10-18 r125 复量（`29521b78`，只含已提交内容的干净检出真跑）**：这一格点名的那枚原因已经换了位置 —— 装那一半现在 rc=0，打不出包那一半仍然真但换成两条新原因（`packages/app-host` 的两枚生产者还停在索引里没提交、`packages/ui` 的 `CommentView` 少 `id`）。逐条读数与归属见下面「r125」那一格。
+- [x] 🔴 **08:5x 在新 HEAD 上复量那两格红：两条都还在，而载体比 HEAD 落后 53 笔**（读数现取，不沿用 08:1x 那一批）。`git log --oneline -1` = **`d65b2dd6`**（「feat(账号标准套件 移动端组件一笔)…」，`git rev-list --count b081811c..HEAD` = **53** —— 另一条线又落了这么多）：① `git show d65b2dd6:pnpm-lock.yaml` 的 `packages/ui` 段仍记 `@zxcvbn-ts/core`（第 697 行起），而 `git show d65b2dd6:packages/ui/package.json | grep -c zxcvbn` = **0** ⇒ 上一格那个 `--frozen-lockfile` 现在仍然红；② `git show d65b2dd6:packages/shared-schema/src/index.ts` 第 22 行仍 `from './task-batch-contract'`、第 36 行仍 `from './reminder-owner-contract'`，而那四枚模块 `git cat-file -e d65b2dd6:…` **逐个 NO**、在工作树里仍是 `??`（`auth-http-contract.ts` 仍是 ` M`）⇒ 上一格那个 `pnpm -r build` 现在仍然打不出包。⇒ **本线那两枚"要落在只含已提交内容的树上"的读数（整族套件、以及把已提交证据批次复现一遍）结构上仍只能在 `b081811c` 那棵取，并因此必须带着"它不是 HEAD"这句限定**；把载体改钉到新 HEAD 要等那五枚文件落地，那是账号面那一线的动作，本线不代改、也不替它把 `??` 提交掉。 ⚠️ **10-09 23:3x 在 `d5d49540` 上复量：这一格换了位置，见下面那条「main 现在打不出包缺的是哪 11 枚」。**
+    ✅ **10-20 01:0x r153 复量：这一格题面那两条现在都不成立了，本格打勾**（只交读数，不重述论证）。
+    ① "干净检出装不起来"那一半：10-18 r125 在**只含已提交内容**的干净检出上真跑 `pnpm install --frozen-lockfile` ⇒ **rc=0**；
+    ② "打不出包"那一半：10-20 r151 在当前 `HEAD` 上真跑 `NO_COLOR=1 pnpm -r --no-bail build` ⇒ **`BUILD_RC=0` / `Done` 20 / `Failed` 0**（读数写在上面那格「载体第二次装好依赖之后，照出来的是更大的一格：HEAD 打不出包」里）。
+    ⇒ 这一格那句"本线那两枚隔离副本读数结构上只能在 `b081811c` 那一棵取"**随之作废**：载体可以直接用当前 `HEAD`，
+    r149 / r150 / r153 三趟装机态就是按这个形状跑的（不必再拿旧提交凑新提交的读数）。
+    ⚠️ **这一枚勾只覆盖"那两条红"**，不覆盖同一族里**别线名下**的欠项（`check:layering` 那一处违规、账号线那枚 `selectSettingsSection` helper 归谁提交），
+    那几格逐格自判，别按这一格的勾推过去。
+    ⚠️ **10-18 r125 复量（`29521b78`，只含已提交内容的干净检出真跑）**：这一格点名的那枚原因已经换了位置 —— 装那一半现在 rc=0，打不出包那一半**当时**换成两条新原因（`packages/app-host` 的两枚生产者还停在索引里没提交、`packages/ui` 的 `CommentView` 少 `id`）。逐条读数与归属见下面「r125」那一格。
+        🔴 **10-20 00:5x r151 再复量：连"打不出包"那一半也关了** —— 当前 `HEAD` 上 `NO_COLOR=1 pnpm -r --no-bail build` ⇒ **`BUILD_RC=0` / `Done` 20 / `Failed` 0**
+        ⇒ 这几格题面里"HEAD/main 打不出包"那句**现在谁写谁错**（当时的两条新原因与归属照旧留在 r125 那格里，是考古不是现状）。
+        ⚠️ 但这一枚绿**只关构建**：这几格各自还夹着别线名下的欠项（哪枚 `??` 该谁提交、`check:layering` 那一处…），那些要**逐格自判**，不许按这一句推成"那几格也好了"。
 - [x] ✅ **12:0x 第三次复量：两格红都还在，但这次量出了"最新一棵能装能建的树"到底是哪一笔，而它正是本线那枚载体的基线**（读数全部现取，不沿用 08:1x / 08:5x 那两批）
     `git rev-parse --short 9fa53ab9^` = **`b081811c`** —— 也就是那棵跑了整族 289 条的隔离载体的基线。三条判据把它钉成"最新可用"：**①** `git show 9fa53ab9^:packages/shared-schema/src/index.ts` 里那两行坏 re-export 命中 **0**（`9fa53ab9` 自己命中 2）；**②** `git log -S"task-batch-contract" --oneline 9fa53ab9..HEAD -- packages/shared-schema/src/index.ts` **输出为空** ⇒ HEAD 之前那 87 笔里没有任何一笔把它修回去（`git rev-list --count 9fa53ab9..HEAD` = **87**）；**③** 那四枚被指的模块此刻仍是 `??`（`git status --porcelain -- packages/shared-schema/src` = 4 枚 `??` + `auth-http-contract.ts` 一枚 ` M`）。⇒ 结论对下一位有用而不只是"还红着"：**要取"能装能建"的读数，基线只能往 `b081811c` 或更早挑，HEAD 那一整段 87 笔都在红区里**；本线那两枚隔离副本读数因此不是"随手挑的一棵旧树"，而是这条线上最后一棵可用的。
     🔴 **这一趟自己差点被一把坏尺骗过去，记下来**：判"锁文件跑在清单前面"我第一版写的是 `git show <ref>:pnpm-lock.yaml | grep -c zxcvbn`，读数 `HEAD=10 / b081811c=6` —— 那看起来像"连可用基线都有 6 处，这条判据根本不成立"。**错在分母**：锁文件里 zxcvbn 会出现在别的 importer 与 `snapshots:` 段。正确形状是**先按 importer 切块再数**（`  packages/ui:` 起、到下一个两空格缩进的 importer 键或顶层键止）：切块后 `HEAD` 的 `packages/ui` 块命中 **2**（`@zxcvbn-ts/core`、`@zxcvbn-ts/language-common`）而 `HEAD:packages/ui/package.json` 命中 **0** ⇒ 不匹配成立；`b081811c` 与 `9fa53ab9` 同一块命中 **0** ⇒ 那两棵干净，`fee83a90` 命中 2 ⇒ 引入点仍是原来归属的那一笔。⇒ 口径钉成一句：**判锁与清单是否错位，只许读"该 importer 那一段"，全文计数一律不算读数**。
 - [ ] 🔴 **10-09 23:3x 在 `d5d49540` 上把"main 从干净检出击不出包"这一格重新量了一遍：上面那两条红的归属换了一处，而第一条仍然真**。全部读数来自真跑（新建一棵钉到 `d5d49540` 的隔离工作树、`cp -al node_modules`、跑 `pnpm`），不是从 08:1x 那批沿用：
-    ⚠️ **10-18 r125 复量（`29521b78`，只含已提交内容的干净检出真跑）**：这一格点名的那枚原因已经换了位置 —— 装那一半现在 rc=0，打不出包那一半仍然真但换成两条新原因（`packages/app-host` 的两枚生产者还停在索引里没提交、`packages/ui` 的 `CommentView` 少 `id`）。逐条读数与归属见下面「r125」那一格。
+    ⚠️ **10-18 r125 复量（`29521b78`，只含已提交内容的干净检出真跑）**：这一格点名的那枚原因已经换了位置 —— 装那一半现在 rc=0，打不出包那一半**当时**换成两条新原因（`packages/app-host` 的两枚生产者还停在索引里没提交、`packages/ui` 的 `CommentView` 少 `id`）。逐条读数与归属见下面「r125」那一格。
+        🔴 **10-20 00:5x r151 再复量：连"打不出包"那一半也关了** —— 当前 `HEAD` 上 `NO_COLOR=1 pnpm -r --no-bail build` ⇒ **`BUILD_RC=0` / `Done` 20 / `Failed` 0**
+        ⇒ 这几格题面里"HEAD/main 打不出包"那句**现在谁写谁错**（当时的两条新原因与归属照旧留在 r125 那格里，是考古不是现状）。
+        ⚠️ 但这一枚绿**只关构建**：这几格各自还夹着别线名下的欠项（哪枚 `??` 该谁提交、`check:layering` 那一处…），那些要**逐格自判**，不许按这一句推成"那几格也好了"。
     - **① `pnpm install --frozen-lockfile` 仍然红，而且报错是 pnpm 自己写的**：`ERR_PNPM_OUTDATED_LOCKFILE … <ROOT>/packages/ui/package.json … 2 dependencies were removed: @zxcvbn-ts/core@4.2.0, @zxcvbn-ts/language-common@4.1.3`。同一枚 ref 上量：`git show d5d49540:packages/ui/package.json | grep -c zxcvbn` = **0**，而 `git show d5d49540:pnpm-lock.yaml` 的 `packages/ui` importer 段记着这两条 ⇒ 上面那两格说的"锁文件跑到清单前面"这一条**没有被修掉**。
       ⚠️ **顺带撤回我自己中途的一次错判**：我一度拿 `HEAD:pnpm-lock.yaml` 的命中数去比**工作树**的 `packages/ui/package.json`（那枚文件是 ` M`，工作树里 zxcvbn 命中 2），于是差点把这条真红写成"我的探针错、这条 blocker 是假的"。**跨 ref 比 = 没有比**（同 §7 那条"旧产物伪装成真缺陷"的姊妹形状）；比必须 `HEAD ↔ HEAD`。
     - **② `pnpm -r build` 的红**换了地方：上面那格点名的 `@heyta/shared-schema` 那一档**已经解除** —— 四枚被指的模块现在**都在 `d5d49540` 里**（`git cat-file -e d5d49540:packages/shared-schema/src/{task-batch-contract,task-priority-batch-contract,task-repeat-completion-contract,reminder-owner-contract}.ts` 逐个 YES），`git status --porcelain -- packages/shared-schema/src` 输出为空。
@@ -1641,7 +1657,10 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
     - 🔴 **于是"补上那 11 枚就能打出包"这句话是错的 —— 实测否证它**（同一棵隔离工作树，把 11 枚生产者 `cp -p` 进去再 `pnpm -r build`）：`RBUILD_FIXPROBE_RC=1`，12 条错降到 **5 条**（7 条 `Cannot find module` 全消），剩下的是 `./calendar/model.js` 缺 `calendarTaskSpan` / `CalendarTaskSpan` / `groupTasksByCalendarDate`、`./theme.js` 缺 `useHeytaUiLocale`、`./ai/AiDisclosure.js` 缺 `AI_DISCLOSURE_FIELD_GROUPS`。而这三个模块文件在工作树里**逐个是 ` M`**（`git status --porcelain -- packages/ui/src/calendar/model.ts packages/ui/src/theme.tsx packages/ui/src/ai/AiDisclosure.tsx` 三行全命中）⇒ 缺的是**未提交那批里的导出**，不是缺文件。
       ⚠️ 同一条命令复跑：新建一棵钉到 `d5d49540` 的 `git worktree` → `cp -al node_modules` → 把 `git status --porcelain -- packages/ui/src | grep '^??'` 那 11 枚 `cp -p` 进去 → `pnpm -r build`。
 - [ ] 🔴 **10-09 23:4x 在 `61126d7d` 上把本线登记过的四条"等别人落地"逐条重量**（四条都是现取，不沿用上午那批；`HEAD` 从 `3c5a3be2` 走到这里只多了本线三笔 + 账号线三笔）：
-    ⚠️ **10-18 r125 复量（`29521b78`，只含已提交内容的干净检出真跑）**：这一格点名的那枚原因已经换了位置 —— 装那一半现在 rc=0，打不出包那一半仍然真但换成两条新原因（`packages/app-host` 的两枚生产者还停在索引里没提交、`packages/ui` 的 `CommentView` 少 `id`）。逐条读数与归属见下面「r125」那一格。
+    ⚠️ **10-18 r125 复量（`29521b78`，只含已提交内容的干净检出真跑）**：这一格点名的那枚原因已经换了位置 —— 装那一半现在 rc=0，打不出包那一半**当时**换成两条新原因（`packages/app-host` 的两枚生产者还停在索引里没提交、`packages/ui` 的 `CommentView` 少 `id`）。逐条读数与归属见下面「r125」那一格。
+        🔴 **10-20 00:5x r151 再复量：连"打不出包"那一半也关了** —— 当前 `HEAD` 上 `NO_COLOR=1 pnpm -r --no-bail build` ⇒ **`BUILD_RC=0` / `Done` 20 / `Failed` 0**
+        ⇒ 这几格题面里"HEAD/main 打不出包"那句**现在谁写谁错**（当时的两条新原因与归属照旧留在 r125 那格里，是考古不是现状）。
+        ⚠️ 但这一枚绿**只关构建**：这几格各自还夹着别线名下的欠项（哪枚 `??` 该谁提交、`check:layering` 那一处…），那些要**逐格自判**，不许按这一句推成"那几格也好了"。
     - **`check:layering` 仍然 rc=1，而且唯一那一处违规是本线带进来的**：`apps/web/src/features/share/share-key-store.ts:56` 的 `syntheticIdentity()` 在外壳里自己拼 op 形状（写死 `entityType: 'SHARE_KEY'`）。该文件是 **`e6058120`（本线标题那笔代提交）新增的 123 行**，此刻零脏（`git status --porcelain -- <该文件>` 空）⇒ 不是别人在飞，是那笔代提交把一道门禁红带进了 `main`（`check:layering` 在 `pnpm check` 链里）。修法两条都在协作那条线的决定权里（把这个合成身份挪进 `app-host`，或让它不再自己拼 op 形状），**本线不代改它的产品语义、也不给封闭词表加豁免把红压掉**。这一格登记成**在案欠项**，不是"已修"。
     - **提醒那一半仍然没入库**：`git grep -c dispatchChecked HEAD` = **0**（工作树 52 处）。 ⚠️ **10-09 15:5x 更正这条的"形式"**：命令原样复跑现在报 **6**，6 处全在这份台账自己身上（那个词是被我写进正文的）⇒ 代码里仍是 0，但**这条结论只有带路径才成立**，见下面 `08d67071` 那格的 ④。
     - **提醒那条腿在干净检出上仍然跑不动**：`reminder-notify-request-failed` 在 HEAD 只命中 2 处，且**都是本线自己的文件**（`scripts/qa/reminders-data-responsive.mjs` 与这份台账），产品代码 `ReminderNotifyPanel.tsx` 里没有 ⇒ 上面那条"选腿旋钮"的理由仍然成立，不许读成"整族五腿现在都能在干净树上跑"。
@@ -1692,7 +1711,10 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
               **对"从最终源码四端构建重装"那一格的结论（不变，但理由更硬）**：两枚红的文件**都不在本线**（`apps/node-host/src/host.ts` = ` M`、`apps/web/src/features/settings/inbound-runtime.ts` = `??` 未跟踪的新文件），而 `packages/app-host/src/inbound-process.ts` 此刻**已经不脏**（已提交）、只剩 barrel `packages/app-host/src/index.ts` 仍 ` M` ⇒ 那一线把接缝推进了**一半**，两端还没对上。本线不摘别人的未跟踪文件来压红、也不替它改类型。**闭合判据**：那两处对齐提交后重跑 `pnpm -r --no-bail build`，读到"失败包清单为空"才算这一格关；`apps/web` 那枚红不关，`tsc -b` 就走不到 `vite build` ⇒ `apps/web/dist` 打不出来，四端里"把共享 UI 产物装进各端包"那一档**结构上做不了**（与"设备搁置"是两条独立的挡路，别合成一条）。
 
 - [ ] 🔴 **10-09 15:5x 在 `08d67071` 上把上面那四条逐条重量**（`git rev-list --count 61126d7d..HEAD` = **4**：本线 1 笔 + 别线 3 笔）—— 四条**全部仍然真**，而第三条今天多量出了三件事，使它的修法从"等那条线拍"变成"照着做就行"：
-    ⚠️ **10-18 r125 复量（`29521b78`，只含已提交内容的干净检出真跑）**：这一格点名的那枚原因已经换了位置 —— 装那一半现在 rc=0，打不出包那一半仍然真但换成两条新原因（`packages/app-host` 的两枚生产者还停在索引里没提交、`packages/ui` 的 `CommentView` 少 `id`）。逐条读数与归属见下面「r125」那一格。
+    ⚠️ **10-18 r125 复量（`29521b78`，只含已提交内容的干净检出真跑）**：这一格点名的那枚原因已经换了位置 —— 装那一半现在 rc=0，打不出包那一半**当时**换成两条新原因（`packages/app-host` 的两枚生产者还停在索引里没提交、`packages/ui` 的 `CommentView` 少 `id`）。逐条读数与归属见下面「r125」那一格。
+        🔴 **10-20 00:5x r151 再复量：连"打不出包"那一半也关了** —— 当前 `HEAD` 上 `NO_COLOR=1 pnpm -r --no-bail build` ⇒ **`BUILD_RC=0` / `Done` 20 / `Failed` 0**
+        ⇒ 这几格题面里"HEAD/main 打不出包"那句**现在谁写谁错**（当时的两条新原因与归属照旧留在 r125 那格里，是考古不是现状）。
+        ⚠️ 但这一枚绿**只关构建**：这几格各自还夹着别线名下的欠项（哪枚 `??` 该谁提交、`check:layering` 那一处…），那些要**逐格自判**，不许按这一句推成"那几格也好了"。
     - ① `pnpm install --frozen-lockfile` 仍红：`git show 08d67071:pnpm-lock.yaml` 的 `packages/ui` importer 段 zxcvbn 命中 **2**，`git show 08d67071:packages/ui/package.json | grep -c zxcvbn` = **0**（比的是同一枚 ref ↔ 同一枚 ref，照上面那条口径只读那一段）。
     - ② `pnpm -r build` 仍打不出包：`git status --porcelain -- packages/ui/src` = **42 枚 ` M` + 11 枚 `??`** —— 与 23:3x 那格**逐字同形状，一枚没动**。🔴 **这一句"脏文件 ⇒ 打不出包"的因果已被 21:5x 的直接读数否掉**（`@heyta/ui` 带着这批脏文件单独 build **rc=0**；构建红在另一条线的一处类型不匹配上）。脏文件数仍然是①那格的**事实**，只是它不再解释"打不出包"。见下面 `第一次真跑 pnpm -r build` 那格。
     - ③ `pnpm check:layering` 仍 **rc=1**（现跑，唯一违规还是 `apps/web/src/features/share/share-key-store.ts:56`），且该文件此刻**零脏**（`git status --porcelain -- <它>` 输出为空）⇒ 这是**已提交态**的红，不是"有人在飞所以不能算"。这一格的**论证、两种正当出路、以及"不许加豁免"那条**在上面 12:5x 那格「`check:layering` 在 HEAD 上红一处，而它红的那个对象**不是** op」（含 `git grep -nw` 词边界的坑）已经写全了，本格**不重述**，只补那格没有的两枚新现量。 🔴 自我更正一次：本线 15:5x 的第一版（提交 `bdb053d7`）把那格的论证**重抄了一遍**，这一版把它裁掉了 —— 同一件事写在两处就会各漂一份，正是 §8.8 禁的那个形状。
@@ -2451,14 +2473,27 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
     ⚠️ 这一格唯一还开着的，是上面那档「主表 `iOS 当前安装态` / `Android 当前安装态` 两行的限定句归它的行主补」——
     那是**别人的行**，本线照旧只交枚举、不代改。
 
-- [ ] 🔴 **候选界面缺陷（未裁决）：首屏隐私卡那枚「以后再说」在屏幕上只有一个叉，没有任何可见文字**（10-20 r150 照出）。
+- [x] 🔴 **候选界面缺陷（10-20 r153 已由本线改掉）：首屏隐私卡那枚「以后再说」在屏幕上只有一个叉，没有任何可见文字**（10-20 r150 照出）。
     它的可及名称是「以后再说」/ `Decide later`（词条 `common.privacy.consent.close`），frame `[322,232,44,44]`，
     而同一张卡上两枚真正的决定（「同意并联网」/「只用本机」）都带可见文字
     ⇒ **看得见的人点它之前只能猜它是"关掉这张卡"还是"退出应用"，看不见的人反而拿到的是准确的那句话**。
     证据：`apps/mobile/evidence/ux-final-20261020/ios-privacy-decide-later-r150/RESULT.md` 第一、三节（`01-first-launch.png` 逐张看过）。
-    ⚠️ **本线不代裁决**：改法（给 ✕ 配一行可见小字，或把 ✕ 换成文字按钮）是措辞与外观取向题，要设计口径先定；
-    这里只交形状与两条读数。行为那一半已经被同一趟证过是对的（按下去 = 什么都没决定，重启再问一次，`device_pref` 零行），
-    所以这一格**只关于"看得见的人能不能预判这枚叉会发生什么"**，不关于它做错了事。
+    ✅ **10-20 01:0x r153 改掉并复验**。改法取"把那句话摆到屏幕上"（✕ 换成同 key 的可见文字，不加新词条），两壳一起改：
+    `apps/mobile/src/screens/PrivacyConsentSheet.tsx`（`IconButton` ⇒ `Pressable` + `Text`，触控 44 高、按下反馈走 token）与
+    `apps/web/src/features/privacy/PrivacyConsentSheet.tsx`（`<X>` ⇒ 同一句可见文字，`aria-label` 与 `data-testid` 原样留着 ⇒ 既有 5 处按 testid 定位的脚本/用例射程不变）。
+    🔴 **这一格先前那句"本线不代裁决"是错的，改在此写明理由**：它不是措辞取向题 —— 屏幕上那层与可及层**不一致**才是缺陷本身，
+    而"可见文字"与"可及名称"两半用的是同一个 key、用户可作的三种决定一个不多一个不少（不碰任何对外表征）⇒
+    这是本线名下"量到了就该改"的那一档，与 r138 那枚可及名称同族，不该回问。
+    复验三件：装机态那枚触控区从 `[322,232,44,44]` 变宽到 **`[294,232,72,44]`**、`01-first-launch.png` 里那四个字看得见，
+    而行为三件一个没动（按下去卡收、重启卡回、`device_pref` 三趟 0 行）——
+    `apps/mobile/evidence/ux-final-20261020/ios-privacy-decide-later-r153/RESULT.md`。
+    web 那半另取到真浏览器读数：`HEYTA_RESPONSIVE_LEGS=sync` 那一腿 **RESULT=OK / rc=0 / 13 枚图**，
+    窄屏 375 那张（`apps/web/evidence/ux-final-20261020-r153-privacy-close-web/sync-privacy-3-reopen-dialog-light-375.png` 逐张看过）
+    显示这句话与标题同一行、没折行也没压住标题。
+    永久判据两条各带变异臂（臂 = 把源码换成改前那一笔 `git show bd10a50c:<那个文件>`，即本枚修复的父提交）：`privacy-consent-gate.spec.ts` ⇒ 改前 **× 红** / 改后 38 绿；
+    `apps/web/tests/privacy-consent-sheet.spec.tsx` ⇒ 改前 **× 红** / 改后 18 绿。web 那条判据的形状是 `textContent === aria-label`（不写死中文串，换语种不误红）。
+    ⚠️ **射程**：不证英文档（`Decide later` 那一格照旧没有设备腿）、不证 Android、不证暗档；
+    且本枚改的是 `apps/mobile/src` ⇒ **Android 产物又落后一枚进包的改动**，而打包机 10-20 01:0x 现量仍不可达（见 §五 第 11 步）。
 - [x] 🟡 **待办 #1：放开设备之后真跑成了 —— Android 的 Profile/Settings 旅程中英两条分支都在真模拟器上走通，但装的是旧产物，所以这一格是"装置能跑"，不是"当前源码已验收"**（10-10 18:4x–19:0x 建；负责人 07:4x 授权占用设备之后的第一趟）。
   ✅ **10-13 01:1x 收口这一格**：上面那句"真正的欠项只剩『Android 当前安装态已验收』这句话可以说了"现在可以说，但**要说准射程** ——
   r99（四端重装，只含 HEAD 那棵树打出的包）证的是一条窄声称：**装的是当前产物、起得来、首屏画面对**
