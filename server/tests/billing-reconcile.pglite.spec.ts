@@ -185,7 +185,7 @@ const insertOrder = async (input: InsertOrderInput): Promise<number> => {
         original_amount_minor, discount_minor, final_amount_minor,
         coupon_id, status, quoted_at, expires_at, rejected_coupons_json,
         paid_at, settled_at, created_at, updated_at)
-     VALUES ($1, $2, 'wechat', $3, 'CNY', 'CN', $4, $5, $6, $7, $8, $9, $10, NULL,
+     VALUES ($1, $2, 'paycenter', $3, 'CNY', 'CN', $4, $5, $6, $7, $8, $9, $10, NULL,
              $11, $11, $9, $9)
      RETURNING id`,
     [
@@ -215,7 +215,7 @@ const insertPaymentEvent = async (input: {
     `INSERT INTO payment_events (provider, provider_event_id, event_type, occurred_at, received_at)
      VALUES ($1, $2, $3, $4, $5)`,
     [
-      input.provider ?? 'wechat',
+      input.provider ?? 'paycenter',
       input.providerEventId,
       input.eventType ?? 'payment_succeeded',
       input.occurredAt === undefined ? NOW : input.occurredAt,
@@ -455,7 +455,7 @@ describe('对账：已付款但未结算的订单', () => {
       orderId,
       outTradeNo: 'hy-read',
       userId,
-      provider: 'wechat',
+      provider: 'paycenter',
       priceId: 'hosted-monthly',
       finalAmountMinor: 500,
       providerEventId: 'payment_succeeded:hy-read',

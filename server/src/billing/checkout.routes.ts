@@ -56,7 +56,7 @@ import {
   loadPriceOverrides,
 } from './pricing-store';
 import { QuotePricingError, isSellableCurrency, quoteOrder } from './quote';
-import { buildWechatOutTradeNo } from './wechat.adapter';
+import { buildOutTradeNo } from './out-trade-no';
 import type { BillingAdapter } from './types';
 import type { SqlExecutor } from './pricing-store';
 
@@ -249,7 +249,7 @@ export const checkoutRoutes: FastifyPluginAsync<CheckoutRoutesOptions> = async (
       // 格式，而它的形状由微信 adapter 的 `OUT_TRADE_NO_PATTERN` 校验。
       // 有第二个 provider 时，正确做法是把生成器提升成 provider 无关的工具函数，
       // 而不是在这里再抄一份格式（两份格式一定会漂移）。
-      const outTradeNo = buildWechatOutTradeNo(
+      const outTradeNo = buildOutTradeNo(
         userId,
         nowMs,
         randomBytes(8).toString('hex'),
