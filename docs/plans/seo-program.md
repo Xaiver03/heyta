@@ -559,3 +559,29 @@ Wiz 浮层在隐藏标签里照样完整渲染；所以"后台标签不渲染"**
 - 把 Chrome 切到前台一会儿（哪怕几秒）——我会**立刻后台**点 `Verify now` 并读状态；
 - 或者你自己点一下那一行的 **`Verify now`**。
 之后我做：提交 sitemap（Bing 的「Sitemaps → 提交」）、开启 IndexNow 联动（键已注册、提交已通，见 §8.5）。
+
+#### 8.9.1 外侧诊断：**我方没有任何东西在挡 Bing 的抓取**（所以 Not verified 就是竞态）
+
+以 **Bingbot 的 UA**（`Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)`）
+从外部逐条量过：
+
+| 检查 | 读数 |
+|---|---|
+| `https://…/BingSiteAuth.xml`（Bingbot UA） | **200**、`text/xml`、**85 字节**、内容正确 |
+| `http://…/BingSiteAuth.xml` | **301** → https（未跟随跳转时也看得到 301，不是 404） |
+| `https://…/robots.txt` | 200；`User-agent: * / Allow: / / Disallow: /app/` —— **不挡这个文件** |
+| `https://…/` 首页（Bingbot UA） | 200 |
+
+⇒ 文件形状、协议、跳转、robots 四条全对。**"Not verified" 与我们的配置无关**，
+最可能就是 Bing 早先探过一次（那时文件还不存在）后的**竞态/缓存**，重试即可。
+
+#### 8.9.2 这一轮补的判据：验证文件的**形状**（线上那条抓不住它）
+
+`apps/landing/tests/seo-head.spec.ts` 新增：`<?xml version="1.0"?>` 开头、恰好一个 `<user>`、
+token 为 **32 位大写十六进制**、**无结尾换行**。
+
+🔴 **为什么不能只靠线上那条**：线上比的是"本机文件 ↔ 线上文件"，有人把两边一起改坏时它照样绿 ——
+与 IndexNow 那条完全同族的盲区（§8.5）。只有在**离线**判"形状就是平台要的形状"才补得上。
+**变异验证过**：给文件补一个结尾换行 → 精确报红；回滚 → 绿（文件仍 85 字节）。
+
+读数：落地页测试 **1416 条全绿**、`check:entries` **81 份**（这枚不是生成物，不受影响）。
