@@ -417,6 +417,47 @@ describe('平台验证文件：google*.html（Search Console 的 HTML 文件验�
   });
 });
 
+describe('生成的 XML 必须是合法 XML —— 用**真解析器**，不用正则', () => {
+  /**
+   * 🔴 这条判据的来历是一次真实事故（2026-10-19，本仓库自己引进的）：
+   * `public/sitemap.xml` 的注释里出现了**连续两个连字符** —— 那是 XML 注释的硬规则禁止的，
+   * 于是**整份文件不是合法 XML**。症状全在**搜索端侧**：
+   * Google Search Console 把它报成「**无法抓取**」（`0` 个已发现的网页），
+   * 而 Bing 照收（后者宽松）—— 于是"我们这边一切正常"。
+   *
+   * 更值得记的是**为什么当时全绿**：本仓库有一条"sitemap 里每一条都真的 200"的判据，
+   * 但它只对 `<loc>` 做**正则**匹配，**从来没把这当 XML 解析过**。
+   * ⇒ 判"这是不是一份能被消费的 XML"，只能用**真解析器**。
+   * 本套件跑在 jsdom 里，`DOMParser` 现成可用，**不需要引入任何依赖**。
+   */
+  it('public/sitemap.xml 能被 DOMParser 解析，根元素是 urlset，且条目非空', () => {
+    const xml = readFileSync(resolve(APP, 'public/sitemap.xml'), 'utf8');
+    const doc = new DOMParser().parseFromString(xml, 'application/xml');
+    const parseError = doc.querySelector('parsererror');
+    expect(
+      parseError,
+      `sitemap.xml 不是合法 XML：${(parseError?.textContent ?? '').slice(0, 200)}`,
+    ).toBeNull();
+    expect(doc.documentElement.tagName).toBe('urlset');
+    expect(doc.getElementsByTagName('loc').length, 'sitemap 解析成功但一条 <loc> 都没有').toBeGreaterThan(0);
+  });
+
+  it('生成物里凡是 .xml 的都不能带**连续两个连字符**（XML 注释的硬规则）', () => {
+    // 直接扫一遍更容易定位：解析失败时不知道是哪一行，这条会点名文件。
+    const files = readdirSync(resolve(APP, 'public')).filter((f) => f.endsWith('.xml'));
+    for (const f of files) {
+      const text = readFileSync(resolve(APP, 'public', f), 'utf8');
+      const commentBodies = [...text.matchAll(/<!--([\s\S]*?)-->/g)].map((m) => m[1] ?? '');
+      for (const body of commentBodies) {
+        expect(
+          body.includes('--'),
+          `public/${f} 的注释里出现了连续两个连字符 —— XML 注释禁止它，整份文件会变成非法 XML`,
+        ).toBe(false);
+      }
+    }
+  });
+});
+
 describe('Open Graph / Twitter 卡片', () => {
   it.each(ENTRIES)('$label：必需的 meta 都在', ({ page, locale }) => {
     const { meta } = readHead(page, locale);
