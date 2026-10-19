@@ -5025,3 +5025,26 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
       **不证**：windows / android 两端产物仍过期（现量 `windows-pc` → `Host is down`、`windows-pc-lan` → `Connection refused`；规则明令不许退回本机跑 Gradle）；
       mac 壳里**没量提醒行的帧**（DOM 侧那两格读数来自别线在册的 `e2e/tests/detail-pane-task.spec.ts` T10/T11，2 passed）；
       四端汇总里那三行 `⏭` 是脚本自己写的"这端**没有**验证当前产物"。
+- [x] ✅ **10-20 01:3x r156 四面装机态搬到最新那枚件上重跑（中文 × 浅档）：四枚装置 59 步 + 提醒块五格全过**
+      这一格收的是交接 Q2 那句「🔴 r153 那一件上重跑的只有首屏隐私卡那一腿 ⇒ 四面 + 提醒块那批读数**仍然停在各自那一件上**」——
+      按老规矩不在旧件上读旧账，而是把装置重跑一遍。载体 = 共享模拟器 `FE195661-B021-4A71-AAD1-1F2F7AE3A102`，
+      **件身份两头发**：四趟之前现量 `Heyta.app/main.jsbundle` sha256 前 16 = `ca3a09257bdfba19`、mtime `10-20 01:02:15`，
+      四趟之后重量**仍是同一枚** ⇒ 这五份读数出自同一件产物，不是"中间有人换过包"。四趟**串行**跑，外观 `light`、应用内语言中文（各 JSON 的 `appearance` / `uiLocale` 字段回读）。
+      **逐枚读数**（`apps/mobile/evidence/ux-final-20261020/` 下四个新目录，各带 `RIG_RC=0`）：
+      ① `ios-settings-face-r156-light/` **28 步全 passed**，含 r149 那枚新腿 `credential wipe entry enabled on a cold start` ⇒ **冷启动后「清除本机保存的凭据」可用**在含 r153 改动的件上仍然成立；
+      ② `ios-account-face-r156/` **11 步全 passed**（「其他登录方式」展开 / 收起两态各一次）；
+      ③ `ios-ai-face-r156-light/` **20 步全 passed**（AI 面与帮助面在同一条旅程里，`help section` / `ai settings group` 两腿都在）；
+      ④ `ios-reminder-block-r156-light/` 五格走完：`snoozeMove` = `02:34 → 02:44`、`movedLater: true`（**r145 那枚"推迟不许提前"在新件上复验**）、
+      `badgeShapes` 三枚 `[114,334,33,14]` 帧高只有一种（**r147 那枚布局判据在新件上复验**）、`removedBackToEmpty: true`、`taskDeleted.gone: true`（自建任务收笔删掉）。
+      人眼看过 **5 张**：`security.png`（「清除本机保存的凭据」是深色可读态不是灰）· `auth-sign-in.png` · `help-feedback.png`（语言 chip 中文/English 在场）· `assistant.png` · `03-reminder-snoozed.png`（时刻 + 「已推迟」一枚徽标一行、三枚动作完整）。
+      ⚠️ 这批共 18 张图，其余 **13 张只有 AX 回读与像素尺**，不许读成逐张看过。
+      **重跑这四趟要的四条命令**（同一台模拟器换机就先把 `--udid` 改掉；跑前后各现量一次 `shasum -a 256` 于
+      `$(xcrun simctl get_app_container <UDID> com.heyta)/main.jsbundle`，两次数不一样就说明这件不是这一格的件）：
+      `python3 scripts/qa/profile-settings-ios.py` / `account-face-ios.py` / `ai-face-ios.py` / `reminder-block-ios.py`，
+      四枚都收 `--udid` 与 `--evidence-dir`，后两枚**目录名里必须带档名**（`require_appearance` 拿设备当前档比对，不符就拒写）。
+      🔴 **同趟现量的射程边界**：`ssh -o ConnectTimeout=6 -o BatchMode=yes windows-pc true` 与 `windows-pc-lan` **各 rc=255**、`adb devices` 空 ⇒
+      windows / android 两端产物对 r153 仍过期，"四端全过"这句**仍不成立**（这一读是瞬时的，下一位要重跑）。
+      **不证**：⑴ 只补了**中文 × 浅档**这一格 —— 英文两格与暗档两格仍停在 r140 / r139 / r147 / r149 那几件上，
+      要取就得 `ios-app-language.py --to en` 加一次 `shutdown`+`boot`（#471 / #472），那是另一批；
+      ⑵ Android 装机态**没有**这批读数（同一批装置没有 Android 档）；⑶ 这一格只覆盖 iOS 一枚件，**不是**"四端产物等于当前源码"的证据；
+      ⑷ 首屏隐私卡那一腿不在这四枚装置里（它由 r153 那趟的 `ios-privacy-decide-later-r153` 覆盖，同一枚件）。
