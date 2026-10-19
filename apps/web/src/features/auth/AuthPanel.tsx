@@ -208,6 +208,7 @@ export function AuthPanel({
    * 一个 effect 会多渲染一帧，而那一帧里用户看到的还是旧地址。
    */
   const [addressDraft, setAddressDraft] = useState(() => authBaseUrl(baseUrl));
+  const [showSelfHostedForm, setShowSelfHostedForm] = useState(false);
   const [openLegalDocument, setOpenLegalDocument] = useState<string | null>(null);
   /**
    * 键盘出口（§8.2 第 6 条）：这一层自报 `aria-modal="true"`，此前**没有 Esc、
@@ -255,7 +256,9 @@ export function AuthPanel({
    * 草稿被清空时**回到默认值**而不是发一个空地址 —— 空地址在服务端那边
    * 是一个请求都不发 + `unconfigured`，对用户来说那是"按钮坏了"。
    */
-  const effectiveBaseUrl = addressDraft.trim() === '' ? authBaseUrl(baseUrl) : addressDraft.trim();
+  const effectiveBaseUrl = addressDraft.trim() === ''
+    ? (allowAdvanced && showSelfHostedForm ? '' : authBaseUrl(baseUrl))
+    : addressDraft.trim();
 
   /**
    * 两条条款链接的**落点**（规则与理由在 `@heyta/app-host` 的 `legal-links.ts`）。
@@ -335,6 +338,9 @@ export function AuthPanel({
   const centralMode = isOfficialService && centralConfig?.mode === 'oidc' && centralConfig.documentVersion !== null;
   const centralLoading = isOfficialService && centralConfig === undefined;
   const centralBlocked = isOfficialService && centralConfig !== undefined && !centralMode;
+  // Typing the official origin into the self-hosted form returns to central
+  // auth rather than exposing the retired hosted password endpoints.
+  const selfHostedMode = allowAdvanced && showSelfHostedForm && !isOfficialService;
 
   const labels: AuthFormLabels & {
     readonly otherWaysToggle: { readonly open: string; readonly close: string };
@@ -416,7 +422,7 @@ export function AuthPanel({
     },
     // 地址这一栏**只在同步设置显式进入且未配置时给**（两个来源 = 漂移），而且给的是配好的 label ——
     // 少一边就整栏不渲染，"只传一半"不会留下一个没有标题的空框。
-    ...(allowAdvanced && isUnconfigured(baseUrl)
+    ...(allowAdvanced && (isUnconfigured(baseUrl) || selfHostedMode)
       ? {
           serverUrl: {
             label: t('web.auth.server.label'),
@@ -556,7 +562,7 @@ export function AuthPanel({
           这一层（`AuthForm` 已在登记清单里）。
         */}
         <HeytaUiProvider>
-          {centralMode ? (
+          {centralMode && !selfHostedMode ? (
             <section className="ht-auth-central" data-testid="central-auth-panel" aria-labelledby="central-auth-title">
               <p className="ht-auth-central__eyebrow ht-type-caption">{t('web.auth.central.kicker')}</p>
               <h2 id="central-auth-title" className="ht-type-section-title">{t('web.auth.central.title')}</h2>
@@ -597,12 +603,21 @@ export function AuthPanel({
                 {busy ? t('web.auth.central.busy') : t('web.auth.central.button')}
               </button>
               <p className="ht-auth-central__note">{t('web.auth.central.note')}</p>
+              {allowAdvanced ? (
+                <button type="button" className="ht-auth-central__link" data-testid="central-auth-self-hosted" onClick={() => {
+                  invalidatePendingAuth();
+                  setAddressDraft('');
+                  setShowSelfHostedForm(true);
+                }}>
+                  {t('web.auth.server.custom')}
+                </button>
+              ) : null}
             </section>
-          ) : centralLoading ? (
+          ) : centralLoading && !selfHostedMode ? (
             <section className="ht-auth-central" data-testid="central-auth-loading" aria-busy="true">
               <p className="ht-auth-central__body">{t('web.auth.central.loading')}</p>
             </section>
-          ) : centralBlocked ? (
+          ) : centralBlocked && !selfHostedMode ? (
             <section className="ht-auth-central" data-testid="central-auth-unavailable" aria-live="polite">
               <h2 className="ht-type-section-title">{t('web.auth.central.unavailableTitle')}</h2>
               <p className="ht-auth-central__body">{t('web.auth.central.unavailable')}</p>
@@ -611,6 +626,21 @@ export function AuthPanel({
               </button>
             </section>
           ) : (
+          <>
+          {selfHostedMode ? (
+            <button
+              type="button"
+              className="ht-auth-central__link"
+              data-testid="central-auth-return"
+              onClick={() => {
+                invalidatePendingAuth();
+                setAddressDraft(authBaseUrl(baseUrl));
+                setShowSelfHostedForm(false);
+              }}
+            >
+              {t('web.auth.server.official')}
+            </button>
+          ) : null}
           <AuthForm
             labels={labels}
             onClose={onClose}
@@ -626,7 +656,7 @@ export function AuthPanel({
             onInviteCodeChange={setInviteMirror}
             inviteCodeLength={INVITE_CODE_LENGTH}
             inviteInvalid={inviteInvalid}
-            {...(allowAdvanced && isUnconfigured(baseUrl)
+            {...(allowAdvanced && (isUnconfigured(baseUrl) || selfHostedMode)
               ? { serverUrl: { value: addressDraft, onChange: changeAddress } }
               : {})}
             onSignIn={({ email, password, rememberPassword }) => {
@@ -723,6 +753,7 @@ export function AuthPanel({
             }}
             testID="auth-form"
           />
+          </>
           )}
           <LegalDocumentSheet
             document={legalDocumentPresentation(legalDocumentById(openLegalDocument ?? 'terms'))}

@@ -48,11 +48,15 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('../src/features/privacy/consent-gate.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../src/features/privacy/consent-gate.js')>(),
+  consentFetch: (input: RequestInfo | URL, init?: RequestInit) => globalThis.fetch(input, init),
+}));
+
 import { I18nProvider, translate, type Locale, type MessageKey } from '@heyta/i18n';
-import { OFFICIAL_SITE_ORIGIN } from '@heyta/app-host';
 
 import { AuthPanel } from '../src/features/auth/AuthPanel.js';
-import { __resetAuthForTests, useAuthStore } from '../src/features/auth/store.js';
+import { __resetAuthForTests } from '../src/features/auth/store.js';
 import { useSyncStore } from '../src/features/sync/store.js';
 
 const BASE_URL = 'https://sync.example.com';
@@ -71,6 +75,11 @@ function stubFetch(): void {
   calls = [];
   const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
+    if (url.endsWith('/api/auth/central/config')) {
+      return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({
+        mode: 'oidc', loginPath: '/api/auth/oidc/start', documentVersion: 'v1',
+      }) } as Response);
+    }
     calls.push({ url, method: String(init?.method ?? 'GET') });
     const body = url.endsWith('/register/email-password/request') ? REGISTRATION_CHALLENGE : { message: 'ok' };
     return Promise.resolve({
@@ -173,18 +182,17 @@ afterEach(() => {
 });
 
 describe('墙一：注册不许依赖"你知道自己的同步域名吗"', () => {
-  it('🔴 什么都没配置时走完注册，请求**真的发出去**，目标就是本机来源', async () => {
+  it('🔴 什么都没配置时默认进入官方中央登录，不触发旧口令注册', async () => {
     const el = await renderPanelAtBaseUrl('');
-    await toRegisterAndSubmit(el, 'me@example.com', 'correct horse battery');
-
-    // 主路是邮箱 + 口令，不是"先发一封魔法链接"（那已经降级成二级链）。
-    expect(calls.map((c) => c.url)).toContain(`${OFFICIAL_SITE_ORIGIN}/api/register/email-password/request`);
-    // 而且**不是**以 `unconfigured` 收场 —— 那正是旧代码的形态。
-    expect(useAuthStore.getState().status.kind).toBe('registration-code');
+    expect(el.querySelector('[data-testid="central-auth-panel"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="central-auth-submit"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="auth-form-email"]')).toBeNull();
+    expect(calls).toEqual([]);
   });
 
   it('🔴 地址是**最后一栏**，不是第一栏（那句原话最直接的钉法）', async () => {
     const el = await renderPanelAtBaseUrl('', 'zh-CN', true);
+    await tap(el, 'central-auth-self-hosted');
     // 自托管入口只由同步设置显式打开；展开后再判它在哪一栏。
     await tap(el, 'auth-form-advanced-toggle');
     const inputs = [...el.querySelectorAll('input')] as HTMLInputElement[];
@@ -198,8 +206,8 @@ describe('墙一：注册不许依赖"你知道自己的同步域名吗"', () =>
     expect(addressIndex!).toBeGreaterThan(emailIndex!);
 
     const address = byTestId(el, 'auth-form-server-url') as HTMLInputElement;
-    // 预填与空框是两种产品：少了值，这一栏就重新变成"你先写出域名"。
-    expect(address.value).toBe(OFFICIAL_SITE_ORIGIN);
+    // 自托管是显式高级路径，不能把官方域预填进去后把旧口令送回官方服务。
+    expect(address.value).toBe('');
   });
 
   it('默认登录不展示自托管 / 粘贴令牌入口', async () => {
@@ -221,6 +229,7 @@ describe('墙一：注册不许依赖"你知道自己的同步域名吗"', () =>
 
   it('改过地址之后，注册就发往改后的那台（自建部署是一条真的走得通的路）', async () => {
     const el = await renderPanelAtBaseUrl('', 'zh-CN', true);
+    await tap(el, 'central-auth-self-hosted');
     // 自建这条路必须先从同步设置显式进入，再展开备用入口。
     await tap(el, 'auth-form-advanced-toggle');
     await typeById(el, 'auth-form-server-url', `${BASE_URL}/`);
