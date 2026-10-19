@@ -36,6 +36,7 @@ import { describe, expect, it } from 'vitest';
 
 import { LOCALES, type Locale } from '@heyta/i18n';
 
+import { INDEXNOW_KEY } from '../src/site/indexnow.js';
 import { SITE_PAGES, entryDir, hrefPath, type SitePage } from '../src/site/pages.js';
 import { siteOriginFrom } from '../src/site/origin.js';
 
@@ -345,6 +346,25 @@ describe('入口文件是生成物，不是手抄的', () => {
         `${relativePath} 里有没被替换的占位符 —— 往 entry-template.html 加了它，就要在 gen-entries.mjs 里 replaceAll 它`,
       ).toBeNull();
     }
+  });
+});
+
+describe('IndexNow 键文件（生成物）', () => {
+  /**
+   * IndexNow 的协议要求站点根那个 `<key>.txt` 的**内容就是 key 本身**：
+   * 不是 JSON、不带注释、不带引号。
+   *
+   * 🔴 这条判据与 `gen-entries.mjs --check` 管的**不是同一件事**，两条都要：
+   *   · `--check` 管"生成物与生成器一致"；
+   *   · 这条管"生成器写出来的**形状**就是协议要的形状"。
+   * 有人给内容包一层 JSON 或补一个换行时，生成器与生成物**一起变**，`--check`
+   * 照样绿 —— 而 IndexNow 会回 403（看着像"协议不认这个站点"）。这里把它钉住。
+   */
+  it('🔴 内容逐字等于 key 本身（无换行、无包装），且 key 符合协议字符集与长度', () => {
+    expect(INDEXNOW_KEY, 'key 必须是 8–128 位的 a-z A-Z 0-9 -').toMatch(/^[a-zA-Z0-9-]{8,128}$/);
+    const onDisk = resolve(APP, `public/${INDEXNOW_KEY}.txt`);
+    expect(existsSync(onDisk), `public/${INDEXNOW_KEY}.txt 不存在：跑 pnpm gen:entries`).toBe(true);
+    expect(readFileSync(onDisk, 'utf8')).toBe(INDEXNOW_KEY);
   });
 });
 
