@@ -80,10 +80,11 @@ test.describe('认证页：默认信息层级与响应式审美', () => {
     if (testInfo.status !== testInfo.expectedStatus && errors.length > 0) {
       console.error('浏览器错误：', errors.join('\n'));
     }
-    if (testInfo.status === testInfo.expectedStatus && testInfo.title !== '中央配置不可用时仍能关闭登录面板') {
-      // This offline Vite suite has no identity server; the startup session
-      // probe is expected to return 404. Other browser errors remain failures.
-      const actionable = errors.filter((error) => !error.includes('404 (Not Found) @ http://127.0.0.1:4341/api/auth/central/session'));
+    if (testInfo.status === testInfo.expectedStatus) {
+      // This offline Vite suite has no identity server. Only the startup
+      // session probe may return 404; the config probe is intercepted below.
+      const expected404s = new Set(['http://127.0.0.1:4341/api/auth/central/session']);
+      const actionable = errors.filter((error) => ![...expected404s].some((url) => error === `Failed to load resource: the server responded with a status of 404 (Not Found) @ ${url}`));
       expect(actionable, '认证界面不应产生意外浏览器错误').toEqual([]);
     }
   });
@@ -150,7 +151,12 @@ test.describe('认证页：默认信息层级与响应式审美', () => {
   });
 
   test('中央配置不可用时仍能关闭登录面板', async ({ page }) => {
-    await openApp(page, '/');
+    await page.route('**/api/auth/central/config', (route) => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: '{}',
+    }));
+    await openApp(page, '/', 'accepted');
     const dialog = await openAuthPanel(page);
     await expect(dialog.getByTestId('central-auth-unavailable')).toBeVisible();
     await expect(dialog.getByTestId('central-auth-close')).toBeVisible();
