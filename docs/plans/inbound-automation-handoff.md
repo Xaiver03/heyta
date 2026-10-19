@@ -126,7 +126,7 @@ python3 research/tools/verify-inbound-ac-battery.py --root .worktrees/inb-t10 --
 | 链第 63 道 `check:payment-entry` | `现状：生产 compose 未配支付渠道；客户端里找到 2 处付款入口。`（尺有牙：`--self-test` 四臂全过；10-19 23:57:23 在本载具独立跑 `node scripts/check-payment-entry.mjs` ⇒ rc=**1**、末行同句，23:52 与 23:57 两跑逐字相同，原件 `~/.heyta-evidence/inb-t7-1017-0902/payentry-2357.txt`） | 收款面（B226／B223 同源） |
 | 链第 87 道 `check:ai-e2e` | `detail-pane-task.spec.ts` 里 5 枚用例等不到行尾字段控件（窄档收进了「… 更多」）——安静窗内复现同一批、三倍时限对照臂也证明不是超时 | 三栏详情面线（B237） |
 | 链第 106 道 `pnpm -r test` | **三枚读数排成一条线**：17:26 独立口径绿（载具 tip `fd46db9ba`）→ 18:21 链内红（先红的包是 `@heyta/mobile`，`ERR_MODULE_NOT_FOUND` 三枚 + `RolldownError`）→ 18:35 独立口径又红（**先红的包换成 `@heyta/web`**，`tests/task-sort.spec.tsx` 那一枚，`SEC=93.5`，原件 `~/.heyta-evidence/inb-t7-1017-0902/step106-1835/106.log`）。三戳之间 `git diff --name-only fd46db9ba 7024e6882` 的非文档改动 **0** 枚 ⇒ 代码没变 ⇒ 仍记"间歇性 + 链内上下文"，**不归因、不许编原因**（逐枚形状在 `BLOCKED.md` 的 B231 追记二） | web 排序那一族 / 移动载体（B229／B231） |
-| 「人真打开看过截图」 | 只能由负责人做；截图绝对路径清单已交（`~/.heyta-evidence/…` 下各批，以及四端那批装机件） | 负责人 |
+| 「人真打开看过截图」 | 只能由负责人做。**Linux 这一端现在有一枚具名图可看**：`~/.heyta-evidence/inb-t7-1017-0902/leg3-1020-0018/heyta-deb-window-0018.png`（10-20 00:18 那一趟 `.deb` 装进沙箱后启动截的窗口，现量 `sips -g pixelWidth -g pixelHeight <那枚>` ⇒ 900 × 523、`wc -c < <那枚>` ⇒ 108216 字节，与同一趟日志里 `PKG_SNAPSHOT=900x523` 逐字对上；原来只躺在远端 `/tmp/heyta-deb-window.png`，00:41:24 用 `scp linux-dev:… ` 收回本地 —— 见 PROGRESS 第 136 条）。四端装机件那批仍要等腿 3 前半跑完才有（各批仍在 `~/.heyta-evidence/…` 下）。**本线不替他勾** | 负责人 |
 
 **风险**：证据目录里的入库 png 每次跑 AC-6 会被逐名覆写（±1~4 通道抖动、肉眼不可见、没有任何门为它红）⇒
 谁在工作树脏着的时候提交，就会把不可见的字节改动一起带进去。**处置是 §7 的第 4 格**，别自己顺手改。
