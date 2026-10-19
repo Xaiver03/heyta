@@ -47,6 +47,7 @@
     "verify:oidc-runtime:built": "node dist/scripts/verify-oidc-runtime.js",
     "test:integration:central-auth": "vitest run --config vitest.integration.config.ts tests/integration/central-auth-persistence.integration.spec.ts",
     "test:integration:central-auth:review": "vitest run --config vitest.integration.config.ts tests/integration/central-auth-independent.integration.spec.ts",
+    "test:integration:central-device": "vitest run --config vitest.integration.config.ts tests/integration/central-device-handoff.integration.spec.ts",
     "test:integration:central-oidc": "node scripts/verify-central-oidc.mjs tests/integration/central-auth-oidc.integration.spec.ts",
     "test:integration:central-oidc:http": "node scripts/verify-central-oidc.mjs --central",
     "test:integration:central-coordinator": "node scripts/verify-central-oidc.mjs tests/integration/central-auth-coordinator.integration.spec.ts",

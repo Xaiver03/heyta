@@ -43,6 +43,28 @@ describe('central HTTP credential binding', () => {
     expect(() => security.verifyCsrf({ headers: headers(value) })).toThrow(CentralHttpError);
     expect(() => security.readPending({ headers: { cookie: `${CENTRAL_COOKIES.pending}=${value}` } })).toThrow(CentralHttpError);
   });
+  it('requires a same-origin launch confirmation bound to its cookie and page secret', async () => {
+    const launchSecret = 'a'.repeat(43);
+    const app = Fastify();
+    app.get('/', async (_req, reply) => ({ page: security.writeLaunchPage(reply, launchSecret) }));
+    const response = await app.inject('/'); await app.close();
+    const page = response.json().page as string;
+    const launchCookie = (response.headers['set-cookie'] as string[])[0]!.split(';')[0]!;
+    expect(launchCookie).toContain(`${CENTRAL_COOKIES.launch}=`);
+    expect((response.headers['set-cookie'] as string[])[0]).toContain('HttpOnly');
+    expect(() => security.verifyLaunchPage({ headers: { origin, cookie: launchCookie } }, launchSecret, page)).not.toThrow();
+    for (const headers of [
+      { origin: 'https://evil.example', cookie: launchCookie },
+      { origin, cookie: `${launchCookie}; ${launchCookie}` },
+      { origin, cookie: `${CENTRAL_COOKIES.launch}=invalid` },
+      { origin, cookie: launchCookie, 'sec-fetch-site': 'cross-site' },
+    ]) expect(() => security.verifyLaunchPage({ headers }, launchSecret, page)).toThrow(CentralHttpError);
+    expect(() => security.verifyLaunchPage({ headers: { origin, cookie: launchCookie } }, 'b'.repeat(43), page)).toThrow();
+    expect(() => security.verifyLaunchPage({ headers: { origin, cookie: launchCookie } }, launchSecret, 'b'.repeat(43))).toThrow();
+    vi.useFakeTimers();
+    vi.advanceTimersByTime(600_001);
+    expect(() => security.verifyLaunchPage({ headers: { origin, cookie: launchCookie } }, launchSecret, page)).toThrow(CentralHttpError);
+  });
   it('rejects duplicate, oversized, empty and ambiguous credentials; never falls back', () => {
     expect(() => uniqueCookie(`${CENTRAL_COOKIES.session}=a; ${CENTRAL_COOKIES.session}=b`, CENTRAL_COOKIES.session)).toThrow();
     expect(() => uniqueCookie('x'.repeat(16385), CENTRAL_COOKIES.session)).toThrow();

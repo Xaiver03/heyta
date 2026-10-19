@@ -1915,6 +1915,30 @@ model CentralPending {
   @@map("central_pending")
 }
 
+/// Device-initiated OIDC handoff. The bearer is encrypted only until one device claim.
+/// No FK: cleanup and grant revocation must not erase ownership evidence prematurely.
+model CentralHandoff {
+  id String @id
+  pendingId String @unique @map("pending_id")
+  deviceChallenge String @map("device_challenge")
+  launchHash String @unique @map("launch_hash")
+  pairingHash String @map("pairing_hash")
+  launchCipher String? @map("launch_cipher")
+  tokenCipher String? @map("token_cipher")
+  status String @default("PENDING")
+  grantId String? @map("grant_id")
+  sessionHash String? @map("session_hash")
+  userId Int? @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  launchedAt DateTime? @map("launched_at")
+  readyAt DateTime? @map("ready_at")
+  claimedAt DateTime? @map("claimed_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  @@index([status, expiresAt])
+  @@index([grantId])
+  @@map("central_handoffs")
+}
+
 /// Every external token request has an immutable identity and durable outcome.
 /// No FK to pending/grant: deletion must never erase ownership evidence.
 model CentralAttempt {

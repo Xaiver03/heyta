@@ -2,7 +2,8 @@ import { timingSafeEqual } from 'node:crypto';
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { CredentialCipher, digest, randomSecret } from './crypto';
 
-export const CENTRAL_COOKIES = { session: '__Host-heyta-session', csrf: '__Host-heyta-csrf', pending: '__Host-heyta-oidc' } as const;
+export const CENTRAL_COOKIES = { session: '__Host-heyta-session', csrf: '__Host-heyta-csrf',
+  pending: '__Host-heyta-oidc', launch: '__Host-heyta-launch' } as const;
 const TEN_MINUTES = 600_000;
 export class CentralHttpError extends Error {
   constructor(readonly status: number, readonly code: string) { super(code); }
@@ -48,6 +49,27 @@ export function createHttpSecurity(cipher: CredentialCipher, origin: string) {
     } catch { throw new CentralHttpError(403, 'forbidden'); }
   }
   return { csrf, verifyCsrf,
+    writeLaunchPage(reply: FastifyReply, launchSecret: string) {
+      const page = randomSecret();
+      setCentralCookie(reply, 'launch', cipher.seal('http-launch', {
+        launchHash: digest(launchSecret), pageHash: digest(page), expires: Date.now() + TEN_MINUTES,
+      }), TEN_MINUTES / 1000);
+      return page;
+    },
+    verifyLaunchPage(req: Pick<FastifyRequest, 'headers'>, launchSecret: string, page: string) {
+      requireSameOrigin(req, origin);
+      try {
+        if (!/^[A-Za-z0-9_-]{43}$/.test(launchSecret) || !/^[A-Za-z0-9_-]{43}$/.test(page)) throw new Error();
+        const cookie = uniqueCookie(req.headers.cookie, CENTRAL_COOKIES.launch);
+        if (!cookie) throw new Error();
+        const data = cipher.open<{ launchHash: string; pageHash: string; expires: number }>('http-launch', cookie);
+        const launch = Buffer.from(digest(launchSecret), 'hex'), expectedLaunch = Buffer.from(data.launchHash, 'hex');
+        const actualPage = Buffer.from(digest(page), 'hex'), expectedPage = Buffer.from(data.pageHash, 'hex');
+        if (launch.length !== expectedLaunch.length || actualPage.length !== expectedPage.length ||
+            !timingSafeEqual(launch, expectedLaunch) || !timingSafeEqual(actualPage, expectedPage) ||
+            !Number.isSafeInteger(data.expires) || data.expires <= Date.now()) throw new Error();
+      } catch { throw new CentralHttpError(403, 'forbidden'); }
+    },
     writePending(reply: FastifyReply, data: { browser: string; pendingId: string; terms?: { acceptedAt: number; documentVersion: string } }) {
       setCentralCookie(reply, 'pending', cipher.seal('http-pending', { ...data, expires: Date.now() + TEN_MINUTES }), TEN_MINUTES / 1000);
     },

@@ -187,7 +187,7 @@ const zh = [
             '中央身份映射与授权记录（接入中，尚未开放）',
             '稳定关联原heyta账号、单次登录、刷新所有权与可靠撤销；不按邮箱自动合并',
             '你选择中央登录后由受信身份方验证，服务端记录授权过程',
-            '身份方/subject/客户端/授权及时间状态为服务器明文元数据；PKCE及身份/访问/刷新令牌以独立服务端密钥加密，服务端可解密，不属于E2EE。类别与留存/注销边界以《隐私政策》第3、7条为准',
+            '身份方/subject/客户端/授权及时间状态、设备交接挑战与配对码的摘要为服务器明文元数据；PKCE、身份/访问/刷新令牌及待领取的产品会话令牌以独立服务端密钥加密，服务端可解密，不属于E2EE。类别与留存/注销边界以《隐私政策》第3、7条为准',
             '仅中央云登录所必需；本地功能不需要',
           ],
           [
@@ -823,7 +823,7 @@ const en = [
             'Central identity bindings and authorization records (being integrated, unavailable)',
             'Preserve the existing heyta account, single-use login, refresh ownership and reliable revocation; never merge accounts by email',
             'A trusted identity provider verifies your chosen central login; our server records its authorization lifecycle',
-            'Provider/subject/client/grant/timing state is plaintext server metadata. PKCE and identity/access/refresh tokens use a separate server encryption key; the server can decrypt them, so this is not E2EE. Privacy Policy sections 3 and 7 govern categories, retention and closure',
+            'Provider/subject/client/grant/timing state and digests of the device handoff challenge and pairing code are plaintext server metadata. PKCE, identity/access/refresh tokens and a product session token awaiting collection use a separate server encryption key; the server can decrypt them, so this is not E2EE. Privacy Policy sections 3 and 7 govern categories, retention and closure',
             'Required only for central cloud sign-in; not for local features',
           ],
           [
@@ -1306,7 +1306,7 @@ export const personalInfoList: LegalDocument = {
   // 运维元数据的期限定为 45 天且到期删除尚未实现），并把那段"45 天不是可选项"的说明
   // 补成"表里有两个同值的 45 天，不是同一个旋钮"。版本号进同意指纹（`legalSetVersion()`），
   // 改了期限表述而不 bump = 让旧那枚同意覆盖一段它没见过的话。
-  version: '1.7',
+  version: '1.8',
   status: 'draft',
   updatedDate: '2026-10-19',
   title: {
