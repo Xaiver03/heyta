@@ -341,6 +341,11 @@ export function AuthPanel({
   // Typing the official origin into the self-hosted form returns to central
   // auth rather than exposing the retired hosted password endpoints.
   const selfHostedMode = allowAdvanced && showSelfHostedForm && !isOfficialService;
+  const centralClose = (
+    <button type="button" className="ht-auth-central__link ht-auth-central__close" data-testid="central-auth-close" onClick={onClose}>
+      {t('web.auth.close')}
+    </button>
+  );
 
   const labels: AuthFormLabels & {
     readonly otherWaysToggle: { readonly open: string; readonly close: string };
@@ -564,6 +569,7 @@ export function AuthPanel({
         <HeytaUiProvider>
           {centralMode && !selfHostedMode ? (
             <section className="ht-auth-central" data-testid="central-auth-panel" aria-labelledby="central-auth-title">
+              {centralClose}
               <p className="ht-auth-central__eyebrow ht-type-caption">{t('web.auth.central.kicker')}</p>
               <h2 id="central-auth-title" className="ht-type-section-title">{t('web.auth.central.title')}</h2>
               <p className="ht-auth-central__body">{t('web.auth.central.body')}</p>
@@ -615,10 +621,12 @@ export function AuthPanel({
             </section>
           ) : centralLoading && !selfHostedMode ? (
             <section className="ht-auth-central" data-testid="central-auth-loading" aria-busy="true">
+              {centralClose}
               <p className="ht-auth-central__body">{t('web.auth.central.loading')}</p>
             </section>
           ) : centralBlocked && !selfHostedMode ? (
             <section className="ht-auth-central" data-testid="central-auth-unavailable" aria-live="polite">
+              {centralClose}
               <h2 className="ht-type-section-title">{t('web.auth.central.unavailableTitle')}</h2>
               <p className="ht-auth-central__body">{t('web.auth.central.unavailable')}</p>
               <button type="button" className="ht-auth-central__button" onClick={() => setCentralProbe((value) => value + 1)}>
