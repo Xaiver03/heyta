@@ -690,3 +690,26 @@ $ osascript -e 'tell application "System Events" to click at {636, 417}'
 `notVerified: true` **全都出自内联资源 JSON 包**里的 `"NotVerified":"Not verified"` 与
 `"UserMgmt_AddedByNotVerified":"{0} (Not verified)"` —— **不是界面**。
 ⇒ 判状态必须读**具体那一格**（表格行/切换器条目），不许对整页 `textContent` 做正则。
+
+#### 8.11.5 ✅ 追加动作与读数：Bing `Request indexing` 已提交
+
+在 URL Inspection 页对 `/features/` 点了 `Request indexing` → 弹确认框 → 点 `Submit`：
+
+```
+Quota left for today : 100 URLs                       ← 点击前，确认框里的一手配额读数
+Indexing requested.                                   ← 提交后
+Success : URL submitted successfully. We will review the URL for indexation.
+```
+
+⇒ 现在这一格是"**Bing 已发现（19 Oct 2026）→ 已请求索引 → 等它来抓**"。
+**没有再批量提交 76 条**：IndexNow 那条通道已经把 76 条送进去了（§8.5），
+而 URL Submission 吃每日配额（今天剩 100），重复消耗没有收益。
+
+**Bing 这一格至此可以算收口**：
+- ownership：四个一致信号（§8.11.1，诚实标注"没有页面直接印 Verified"）；
+- **sitemap**：`Submitted / Processing`，errors 0 / warnings 0；
+- **索引请求**：`Success`；
+- **首轮读数**：`Discovered but not crawled`（今天被发现）。
+
+仍未拿到的是**覆盖率与展现数据**（Search Performance）—— 页面自己写着 "up to 48 hours to reflect"，
+所以那要靠后续再读，不是现在能取的。
