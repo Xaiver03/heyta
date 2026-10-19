@@ -149,3 +149,13 @@ git -C /tmp/sp log --oneline aa9690ca..HEAD -- packages/super-sync-server/
 
 P5.1 独立复审修复：授权派发等待本地证明行锁后重读数据库时钟；刷新应用在初检与
 行锁等待后都检查attempt期限。已APPLIED归属保持幂等，不受后续期限影响。
+
+
+## 中央OIDC标准传输（2026-10-19）
+
+新增central-auth/oidc-client.ts，使用已准入MIT openid-client实现独立HTTPS协议适配。
+每次派发独立Configuration；令牌材料先由既有repository持久，再标准ES256验签；
+回执未知不重派、不盲撤。repository仅增加发起时间及grant subject返回投影。
+新增独立HTTPS/真实PG测试与临时CA runner；外部中央联调只调用其导出启动接口，
+没有将AGPL中央实现或测试复制进本仓。OIDC启动门禁、JWT/UI/WS均未变。
+设计、复现入口和当前验收状态见[唯一计划](../docs/plans/unified-central-auth.md)。
