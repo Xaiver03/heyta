@@ -69,7 +69,11 @@ const locale: Locale = localeFromPath(window.location.pathname);
 /**
  * 当前页面。**认不出就回落到首页**（`pageFromPath` 的契约）——
  * 访客可能访问了一个旧链接、拼错的地址，或将来某个被删掉的页面，
- * 那时应当渲染首页（nginx 的 SPA 兜底本来也是这样），而不是白屏。
+ * 那时应当渲染首页，而不是白屏。
+ *
+ * ⚠️ **2026-10-19 起这个回落与 nginx 的行为不再一致**：整站兜底已改成诚实 404
+ * （见 `src/site/paths.ts` 的 `pageFromPath` 注释）。所以它现在的职责只有
+ * "渲染树不许白屏"，不再是"跟服务端兜底一样"。
  */
 const page = pageFromPath(window.location.pathname);
 const Page = PAGE_COMPONENTS[page.id];

@@ -3967,7 +3967,12 @@ export const zhCN = {
   'site.home.seo.description': 'heyta 是一个本地优先的任务管理应用：任务、清单、习惯与专注。数据先存在你自己的设备上，端到端加密同步，还能用自己的服务器。',
 
   // ── 功能介绍 ──
-  'site.features.seo.title': '功能介绍 —— heyta',
+  // ⚠️ 2026-10-19 SEO 审计改的标题（只动 `seo.title`，**不动可见文案** `site.features.title`）：
+  //    原标题「功能介绍 —— heyta」是**泛名词**，一个真实查询词都不含，于是这一页只能靠
+  //    品牌被搜到。现在的标题把这一页真正讲的东西写成查询词形状
+  //    （任务管理 / 四象限 / 番茄钟 / 习惯打卡）。
+  //    🔴 描述**没改**：原文已经逐项列全了模块名，比新写一句更容易核对。
+  'site.features.seo.title': 'heyta 功能：任务管理、四象限、番茄钟与习惯打卡',
   'site.features.seo.description': 'heyta 能做什么：任务与清单、四象限、习惯打卡、番茄专注、时间线、成长体系、加密同步、AI 助手接入。只列已经上线的功能。',
   'site.features.title': '功能介绍',
   'site.features.lede': 'heyta **已经上线**的功能，按模块一览。想看最新进展与下一步，去「更新动态」。',
@@ -4071,8 +4076,18 @@ export const zhCN = {
   'site.download.row.harmony.gap': '卡在模拟器系统镜像与签名 —— 这两样不在我们手里。',
   'site.download.row.selfhost.name': '自己架一套',
 'site.download.row.selfhost.body': '把同步服务与网页版跑在自己的机器上，数据不出门。每一步都有指南。',
-  'site.platforms.seo.title': '平台状态 —— heyta',
-  'site.platforms.seo.description': 'heyta 各平台的真实进度：Web 已上线；Android 实机可用、安装包已发布；iOS 到模拟器级、TestFlight 内测已出包；桌面三端都能下载（macOS 已签名并公证，只有 Apple Silicon；Windows 是免安装便携包；Linux 的 .deb 还差一次装进系统的实测）；鸿蒙能出包但还跑不起来。',
+  // ⚠️ 2026-10-19 SEO 审计改的标题（理由同 `site.features.seo.title`）：
+  //    原标题「平台状态 —— heyta」把六个平台名全丢了，而"电脑版 / 手机版 / 多端同步"
+  //    正是这个页面唯一能接住的那类查询。**描述没改**：它就是各端真实进度本身。
+  'site.platforms.seo.title': 'heyta 支持的平台：Web、Windows、macOS、Linux、Android、iOS 的真实进度',
+  // ⚠️ 2026-10-19 SEO 审计把这条**缩短**了（163 → 63 字符）。理由不是"越长越差"，
+  //    而是它**在两种语言里都是唯一离群值**：同级九个页面中文描述的中位数是 63 字符，
+  //    次长的一条 85，而它是 163 —— 逾出搜索结果摘要能显示的长度，
+  //    于是被截断掉的恰恰是后半句那些**如实标注**（"Linux 还差一次实测""鸿蒙还跑不起来"）。
+  //    ⇒ 被截断的是最该被看到的那半边。逐端细节**没有丢**：它们本来就在这一页的
+  //    状态表里逐条列着（这一页的存在意义就是那张表），meta 只负责把人带过去。
+  //    复量命令见 `docs/plans/seo-program.md` §2.6。
+  'site.platforms.seo.description': 'heyta 各平台的真实进度：Web 已上线，Android 实机可用，iOS 在内测，桌面三端可下载，鸿蒙还跑不起来。逐端如实标注。',
   'site.platforms.title': '平台状态',
   'site.platforms.lede': '每个平台现在到哪了，如实说：能用就说能用，没好就说没好。',
   'site.platforms.status.available': '可用',
@@ -4129,7 +4144,10 @@ export const zhCN = {
   // ── 独有能力（数据主权 + 对照滴答清单，A7）──
   //    素材来自 dida365-feature-benchmark §5 的九条，按 A7 的三条判据重组：
   //    数据主权 / 对照滴答 / 其余两条。每条都要给可复现的验证方式。
-  'site.integrations.seo.title': '数据在你手里 —— heyta',
+  // ⚠️ 2026-10-19 SEO 审计改的标题（理由同 `site.features.seo.title`）：
+  //    原标题「数据在你手里 —— heyta」是**主张**不是**查询词**：没有人搜"数据在你手里"。
+  //    描述里本来就有的两个真词（端到端加密 / 可自建服务器）提到了标题上。
+  'site.integrations.seo.title': 'heyta 的差别：端到端加密、可自建服务器、数据在你手里',
   'site.integrations.seo.description': 'heyta 与众不同的地方：端到端加密同步、可自建服务器、AI 助手接入、自带 AI 端点、完整导出，以及不按功能收费。',
   'site.integrations.title': '数据在你手里',
   'site.integrations.lede': '多数工具默认把你的数据存在他们的服务器上。heyta 反过来：**数据在你手里**，我们只在你允许时碰它。这一页讲这种差别具体落在哪。',

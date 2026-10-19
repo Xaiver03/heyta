@@ -3741,7 +3741,10 @@ export const en = {
   'site.home.seo.description': 'heyta is a local-first task manager for tasks, lists, habits and focus. Your data stays on your device first, syncs end-to-end encrypted, and can run on your own server.',
 
   // ── Features ──
-  'site.features.seo.title': 'Features — heyta',
+  // ⚠️ SEO audit 2026-10-19: `seo.title` only — the visible copy (`site.features.title`) is
+  //    untouched. "Features — heyta" carried no query term at all; the words a reader would
+  //    actually search for are the modules this page documents.
+  'site.features.seo.title': 'heyta features: task management, four quadrants, focus timer and habits',
   'site.features.seo.description': 'What heyta can do: tasks and lists, four quadrants, habits, a focus timer, timeline, growth system, encrypted sync, and AI assistant access. Shipped features only.',
   'site.features.title': 'Features',
   'site.features.lede': 'What heyta can **already do**, module by module. For the latest progress, see the changelog.',
@@ -3841,8 +3844,17 @@ export const en = {
 'site.download.row.harmony.gap': 'Blocked on the emulator system image and signing — neither of which is in our hands.',
   'site.download.row.selfhost.name': 'Self-hosted',
 'site.download.row.selfhost.body': 'Run the sync service and the web app on your own machine, so your data never leaves it. Every step is written down.',
-  'site.platforms.seo.title': 'Platform status — heyta',
-  'site.platforms.seo.description': 'Where heyta really stands: web is live, Android works on a real device and its package is published, iOS is simulator-level with a TestFlight build uploaded, all three desktop ends are downloadable (macOS signed and notarised, Apple Silicon only; Windows is a portable zip; the Linux .deb still needs one real dpkg install), HarmonyOS builds but does not run yet.',
+  // ⚠️ SEO audit 2026-10-19: `seo.title` only, same reason as `site.features.seo.title`.
+  //    "Platform status — heyta" dropped all six platform names, which are the only queries
+  //    this page can realistically answer. The description is untouched.
+  'site.platforms.seo.title': 'Platforms heyta runs on: web, Windows, macOS, Linux, Android, iOS',
+  // ⚠️ SEO audit 2026-10-19 shortened this one (363 → 168 characters) for the same reason as
+  //    the Chinese side: it is the sole outlier among nine sibling pages in **both** languages
+  //    (zh median 63, this one 163), so the truncation lands exactly on the honest half —
+  //    "the Linux .deb still needs one real install", "HarmonyOS does not run yet".
+  //    Per-end detail is not lost: it is in this page's own status table, which is what the
+  //    page exists for. Re-measure with the command in `docs/plans/seo-program.md` §2.6.
+  'site.platforms.seo.description': 'Where heyta really stands, end by end: web is live, Android works on a real device, iOS is in TestFlight, the desktop builds are downloadable, HarmonyOS does not run yet.',
   'site.platforms.title': 'Platform status',
   'site.platforms.lede': 'Where each platform really stands, stated plainly: working is working, not ready is not ready.',
   'site.platforms.status.available': 'Available',
@@ -3900,7 +3912,9 @@ export const en = {
   //    Material: dida365-feature-benchmark §5's nine capabilities, regrouped by
   //    A7's three criteria: sovereignty / contrast / the other two. Every claim
   //    carries a reproducible verification.
-  'site.integrations.seo.title': 'Your data, in your hands — heyta',
+  // ⚠️ SEO audit 2026-10-19: `seo.title` only. "Your data, in your hands" is a claim, not a
+  //    query; the two real terms already used in the description moved up into the title.
+  'site.integrations.seo.title': 'What sets heyta apart: end-to-end encryption and self-hosting',
   'site.integrations.seo.description': 'What sets heyta apart: end-to-end encrypted sync, a self-hostable server, AI assistant access, bring-your-own AI endpoints, complete export, and no feature gating.',
   'site.integrations.title': 'Your data, in your hands',
   'site.integrations.lede': 'Most tools keep your data on their servers by default. heyta is the other way round: **your data stays in your hands**, and it is only touched when you allow it. This page is where that difference becomes concrete.',
