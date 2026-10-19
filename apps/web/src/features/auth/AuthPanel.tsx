@@ -191,6 +191,7 @@ export function AuthPanel({
   const startCentralLogin = useAuthStore((s) => s.startCentralLogin);
   const invalidatePendingAuth = useAuthStore((s) => s.invalidatePendingAuth);
   const centralBindingConflict = useSyncStore((s) => s.centralBindingConflict);
+  const centralBindingTarget = useSyncStore((s) => s.centralBindingTarget);
 
   /**
    * 服务端地址草稿。
@@ -571,7 +572,7 @@ export function AuthPanel({
         */}
         <HeytaUiProvider>
           {centralBindingConflict && !selfHostedMode ? (
-            <CentralAccountConflictPanel baseUrl={effectiveBaseUrl} onClose={onClose} />
+            <CentralAccountConflictPanel baseUrl={centralBindingTarget?.origin ?? effectiveBaseUrl} onClose={onClose} />
           ) : centralMode && !selfHostedMode ? (
             <section className="ht-auth-central" data-testid="central-auth-panel" aria-labelledby="central-auth-title">
               {centralClose}

@@ -272,7 +272,7 @@ if (new URLSearchParams(window.location.search).has('shell')) {
             <ErrorScreen
               titleKey="web.error.storage.title"
               message={message}
-              hintKey={storageHintKey(failure)}
+              hintKey={storageHintKey(failure, error)}
             />
           </LocaleHost>
         </StrictMode>,

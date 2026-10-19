@@ -8,7 +8,7 @@
  */
 
 import path from 'node:path';
-import { mkdir, rm } from 'node:fs/promises';
+import { mkdir, readFile, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 import { expect, test, type Page } from '@playwright/test';
@@ -247,6 +247,56 @@ test.describe('认证页：默认信息层级与响应式审美', () => {
     await expect(dialog.getByTestId('auth-form-password')).toHaveCount(0);
     await closeAuth(page);
   });
+});
+
+test('关闭旧账号标签页后才能导出、清除并接入新中央账号', async ({ page, context }, testInfo) => {
+  test.setTimeout(90_000);
+  const routeCentral = async (target: Page, id: number): Promise<void> => {
+    await target.route('**/api/auth/central/config', (route) => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ mode: 'oidc', loginPath: '/api/auth/oidc/start', documentVersion: 'v1' }),
+    }));
+    await target.route('**/api/auth/central/session', (route) => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ authenticated: true, user: { id, email: `${String(id)}@example.test` }, csrfToken: 'csrf-test' }),
+    }));
+  };
+
+  await routeCentral(page, 12);
+  await openApp(page, '/', 'accepted');
+  await expect.poll(async () => page.evaluate(() => localStorage.getItem('heyta.central.account-binding')))
+    .toBe(JSON.stringify({ origin: 'http://127.0.0.1:4341', subject: '12' }));
+  await addTask(page, '旧账号本地任务');
+
+  const other = await context.newPage();
+  await routeCentral(other, 13);
+  await enableAllModules(other);
+  await pinChineseUi(other);
+  await installMissingProducerShims(other);
+  await other.goto('/');
+  await expect(other.getByRole('alert').getByRole('heading', { name: '无法初始化本地存储' })).toBeVisible();
+  await other.screenshot({ path: testInfo.outputPath('multi-tab-storage-in-use.png'), fullPage: true });
+  await expect(other.getByTestId('error-hint')).toContainText('其它窗口');
+  expect(await other.evaluate(() => localStorage.getItem('heyta.central.account-binding')))
+    .toBe(JSON.stringify({ origin: 'http://127.0.0.1:4341', subject: '12' }));
+
+  await page.close();
+  await other.reload();
+  await expect(other.locator('input[placeholder^="添加任务"]')).toBeVisible();
+  await waitForBootSplashGone(other);
+  const conflict = (await openAuthPanel(other)).getByTestId('central-account-conflict');
+  await expect(conflict).toBeVisible();
+
+  const downloaded = other.waitForEvent('download');
+  await conflict.getByTestId('export-json').click();
+  const backup = await downloaded;
+  expect(await readFile(await backup.path(), 'utf8')).toContain('旧账号本地任务');
+  await conflict.getByTestId('central-switch-confirm').check();
+  await conflict.getByTestId('central-switch-clear').click();
+  await expect.poll(async () => other.evaluate(() => localStorage.getItem('heyta.central.account-binding')))
+    .toBe(JSON.stringify({ origin: 'http://127.0.0.1:4341', subject: '13' }));
+  await expect(rowFor(other, '旧账号本地任务')).toHaveCount(0);
+  await other.close();
 });
 
 test.describe('Chatbot：执行、只读与批量确认是真实写入语义', () => {
