@@ -170,6 +170,7 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | [subscription-provider-selection.md](plans/subscription-provider-selection.md) | **支付商选型**：阶段一 = **只做国内市场**（跨境方案 Paddle / Stripe / Paddle 等一律不适用） |
 | [subscription-handoff.md](plans/subscription-handoff.md) | **会员订阅交接**：只记「当前停在哪」，不重复决策 |
 | [multi-end-coverage-handoff.md](plans/multi-end-coverage-handoff.md) | **交接：多端补齐（重点移动端）** —— 只记当前停在哪：条件 1 已 3 ✅/3 🟡、条件 2 未闭合（⚠️ **2026-10-16 更正**：原文抄的「`pnpm check` 57/62」是**旧载体读数**，而且**段数总数是活数** —— 别抄，现量 `node -e 'console.log(require("./package.json").scripts.check.split(" && ").length)'`；**四端重装那一半已经不再是缺口** —— 它已在隔离副本 `.worktrees/inb-t9` 整条跑到固定收尾（`REINSTALL_RC=0`，2026-10-16 17:5x），当前欠的是**人工打开那五枚截图**，见 [PROGRESS.md](../PROGRESS.md) 那一节），下一步顺序与死胡同警告在文内 |
+| [inbound-automation-handoff.md](plans/inbound-automation-handoff.md) | **交接：付费自动收集（inbound automation）交付收尾** —— 只记当前停在哪：这一档**敢说 / 不敢说**哪几句话（逐句带可复跑命令）、已完成、在途那趟 116 道链的落点与读回办法、四枚链红逐枚归属（全在他线）、腿 3 卡在打包机与设备面的现量、六格待拍板、下一步顺序与死胡同（手抄分母造假空、`grep -c` 数行数不是枚数、独立绿≠链内绿、裸工具名会漂） |
 | [subscription-wechat-handoff.md](plans/subscription-wechat-handoff.md) | **交接：微信支付 adapter + 真实支付 E2E 门禁**（给全新会话的完整任务书） |
 | [pricing-coupons-handoff.md](plans/pricing-coupons-handoff.md) | **交接：可调价 + 优惠券** —— 从「领域层已落地」到「收银台真的能用」 |
 | [ai-tier-pricing-rollout.md](plans/ai-tier-pricing-rollout.md) | **推进计划：把定价故事换成「自建永久免费 + 月付 ¥5 / ¥12」** —— 执行清单，决策看 ADR-0020 |
