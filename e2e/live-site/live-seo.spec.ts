@@ -256,19 +256,22 @@ test('IndexNow 键文件线上可取，且内容逐字等于本机那一份', as
  * 目前这一条覆盖 `BingSiteAuth.xml`（Bing 站长平台的 XML 文件验证）。
  * 将来百度的 `baidu_verify_*.html` 同一形状，照抄这段即可。
  */
-test('平台验证文件线上可取且逐字一致（BingSiteAuth.xml / google*.html）', async ({ request }) => {
+test('平台验证文件线上可取且逐字一致（Bing / GSC / 百度）', async ({ request }) => {
   const publicDir = fileURLToPath(new URL('../../apps/landing/public/', import.meta.url));
   /**
    * 遍历**所有**平台验证文件（而不是写死一个名字）：这样将来多一枚就自动被覆盖，
-   * 不会出现"加了文件但判据还在测上一个"。断言 >= 2 是钉住"Bing 与 GSC 两枚都在"。
+   * 不会出现"加了文件但判据还在测上一个"。断言 >= 3 是钉住"Bing / GSC / 百度三家都在"。
    */
   const names = readdirSync(publicDir).filter(
-    (f) => f === 'BingSiteAuth.xml' || /^google[0-9a-f]+\.html$/.test(f),
+    (f) =>
+      f === 'BingSiteAuth.xml' ||
+      /^google[0-9a-f]+\.html$/.test(f) ||
+      /^baidu_verify_[A-Za-z0-9-]+\.html$/.test(f),
   );
   expect(
     names.length,
-    `平台验证文件至少要有 Bing 与 GSC 两枚，实际只找到：[${names.join(', ')}]`,
-  ).toBeGreaterThanOrEqual(2);
+    `平台验证文件至少要有 Bing / GSC / 百度三枚，实际只找到：[${names.join(', ')}]`,
+  ).toBeGreaterThanOrEqual(3);
 
   for (const name of names) {
     const local = readFileSync(`${publicDir}${name}`, 'utf8');
