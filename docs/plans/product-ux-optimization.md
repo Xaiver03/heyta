@@ -964,7 +964,30 @@ UX-S9-138 接续验收清单（未完成项不得随构建成功关闭）：
 - [x] 共享 session 改为非破坏读与成功项精确 ack；查找状态/写入/ack 失败保留队列，错误上报异常不拒绝后台任务。原 drain/merge 恢复设计已替换。
 - [ ] 跨进程崩溃恢复最终安装态：四端已实现非破坏读取与精确 ack，尚须新包验证“落 op 后、ack 前退出”重投不重复。
 - [x] 重复任务跨 drain 幂等：receipt 与任务/相对提醒同枚 op；SQLite、重复回放、重启与乱序覆盖。最终系统点击新包仍在各端矩阵中单独验收。
-- [ ] Apple 显式共享 Keychain group 与可报告失败的清理路径修复/验证。当前 iOS entitlement 的首组就是共享组，不能把 Info.plist 未指定 group 直接写成“已经发生解密失败”；需核验签名运行结果。
+- [ ] Apple 显式共享 Keychain group 与可报告失败的清理路径修复/验证。当前 iOS entitlement 的首组就是共享组，不能把 Info.plist 未指定 group 直接写成"已经发生解密失败"；需核验签名运行结果。
+    - 🔴 **10-20 02:2x 按本格自己的规矩现量"哪一消费者依赖那个隐式默认"**（三处 `SecItem` 调用点全枚举，命令附在下面，别抄本格的行号）：
+      `grep -rln 'SecItem' apps/mobile/ios --include='*.swift' | grep -v /Pods/` ⇒ **恰好三枚文件**，逐枚读原文后分两档：
+      ① **显式带组、且拿不到就失败关闭**：`HeytaWidgetCore/Sources/HeytaWidgetCore/WidgetSharedStore.swift:106` 与
+      `HeytaWidgetCore/Sources/HeytaWidgetBridge/WidgetDeviceKeyStore.swift:72/104/124`，两枚都走
+      `WidgetSharedConstants.resolvedKeychainAccessGroup()`（构建期展开完整值），前者注释明写"**绝不能退回 target 的默认 Keychain 组**"、
+      解析不到时 `guard` 直接返回空 ⇒ **本格标题里"显式共享 Keychain group"那一半，小组件这条链上已经实现了**，不是待修项。
+      ② **依赖隐式默认**：`apps/mobile/ios/Heyta/HeytaVaultSecureStorage.swift`（保险库根密钥）的 `baseQuery` 只带
+      `kSecClass/kSecAttrService/kSecAttrAccount`，**不带 `kSecAttrAccessGroup`** ⇒ 它落在**默认组**上，
+      而两枚 entitlements（`Heyta/Heyta.entitlements`、`HeytaWidgetExtension/HeytaWidgetExtension.entitlements`）各自**只列一枚**
+      `$(AppIdentifierPrefix)com.heyta.shared` ⇒ 默认组 == 共享组 == 扩展可读的那个组。
+      service 是分开的（`com.heyta.vault.secure-storage.v1` vs `com.heyta.widget-key`，文件头那句"never writes … to the widget's keychain service"属实），
+      **但"分开的是 service，不是访问组"这一点此前没写在任何一格上** —— 这才是本格剩下的真问题。
+    - ⚠️ **为什么这一格仍然只能开着，而且不是因为"没人能做"**：把保险库挪出共享组需要**在 `keychain-access-groups` 里加第二枚组**，
+      而那要先在 App ID capability 上登记，**没登记的话签名件会以 `errSecMissingEntitlement` 起不来**；
+      模拟器是 ad-hoc 签名、这一层根本不强制 ⇒ 我在这台机上**跑它既不红也不绿**，任何"改完验证通过"都会是假读数。
+      真机那一档的外部前提也按**整表**数过（不是 `head` 前几行）：
+      `xcrun devicectl list devices` 共 **15 枚在册设备，`simulated` 15 枚、非 simulated **0** 枚**
+      （现量：`xcrun devicectl list devices | grep 'UDID)' | grep -vc simulated`）⇒ 实体 iPhone 这一档**此刻确实要人**，
+      而且缺的是物理设备，不是通道、不是权限。
+    - 下一位要做的两件事都写了命令：① 重跑上面那两条 `grep` 确认还是三枚调用点、② 若决定加第二枚组，
+      先改 App ID capability 再改 entitlements，**并且必须同时给 `HeytaVaultSecureStorage` 显式带上那一枚**（隐式默认一旦被第二枚组顶掉，
+      现有已落盘的保险库条目会读不回来 —— 那是"升级即丢密钥"那一族，属不可逆层，动手前先读 ADR）。
+
 - [ ] 最终冻结源码四端重建、重装与测试版上传；本轮未发布。
 
 
