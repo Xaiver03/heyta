@@ -71,6 +71,10 @@ git -C .worktrees/inb-t10 status --porcelain | wc -l   # 载具应为 0
 - **在途**：116 道整条链在隔离载具复跑，驱动日志 `~/.heyta-evidence/inb-t7-1017-0902/chain-t10-1746-run.txt`
   与逐道 `…/chain-t10-1746/{chain.txt,logs/NNN.log}`；18:06 那一戳读到第 86 道，**第 87 道（`check:ai-e2e`，预算 1800 s）正在跑**。
   跑完要做的：把末行 `CHAIN ran=… RED=… steps=[…]` 与逐枚 RC 读回 `PROGRESS.md` 追加一条（纯追加、判卷口径零处），点名提交。
+  🔴 **它挂在本会话的后台进程上，会话一结束就可能被带走** ⇒ 接手先现量 `pgrep -f verify-inbound-check-chain`：
+  回空就说明断了，**不要整条重来**，用 `python3 research/tools/verify-inbound-check-chain.py --repo .worktrees/inb-t10 --logs ~/.heyta-evidence/inb-t7-1017-0902/chain-t10-1746 --from <最后一道+1> --to 116` 续跑同一枚日志目录
+  （装置支持 `--from/--to`，现量 `python3 research/tools/verify-inbound-check-chain.py --help`）；
+  续跑前先把目录里已脏的证据图**先整片存档再逐名 `git checkout --`**（形状照 `PROGRESS.md` 第 104 条 ⑧ 与第 108 条 ⑦：先 `ls` 出枚数、存档、逐名还原、再验载具脏数回 0），别在跑批中途还原。
 - **AC 那半**：28 枚腿逐腿有读数（计划文末台账），代码自那片戳以来没变（`git log --oneline 36214e3a..refs/heads/main` 只回本线 docs 笔）。
 - **完成条件 1**：AC 那半＝达成（每格有命令 + 输出）；"T7 三条命令在隔离副本 exit 0"＝**未达成，且不由本线闭合**
   （四枚链红全在他线地界 + 打包机不通）。
