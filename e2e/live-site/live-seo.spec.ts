@@ -246,6 +246,30 @@ test('IndexNow 键文件线上可取，且内容逐字等于本机那一份', as
   expect((await response.text()).trim()).toBe(localContent.trim());
 });
 
+/**
+ * 平台给的**验证文件**必须线上可取，且**逐字**等于本机那一份。
+ *
+ * 🔴 这一类文件与仓库其他生成物**形状相反**：它们的**事实源是平台**，不是仓库里的常量。
+ * ⇒ 不许加注释头、不许补结尾换行、不许"顺手格式化"；也**不进** `gen-entries.mjs` 的生成集，
+ * 因此**没有** `check:entries` 的逐字节对账保护。代价就是每加一枚都要配一条判据 —— 这就是那条。
+ *
+ * 目前这一条覆盖 `BingSiteAuth.xml`（Bing 站长平台的 XML 文件验证）。
+ * 将来百度的 `baidu_verify_*.html` 同一形状，照抄这段即可。
+ */
+test('平台验证文件线上可取且逐字一致（BingSiteAuth.xml）', async ({ request }) => {
+  const publicDir = fileURLToPath(new URL('../../apps/landing/public/', import.meta.url));
+  const local = readFileSync(`${publicDir}BingSiteAuth.xml`, 'utf8');
+  const response = await request.get(`${ORIGIN}/BingSiteAuth.xml`, {
+    maxRedirects: 0,
+    failOnStatusCode: false,
+  });
+  expect(
+    response.status(),
+    `线上 /BingSiteAuth.xml 是 ${response.status()} —— 它必须是一个真文件（404 = 没发出去，或被路由规则吃掉了）`,
+  ).toBe(200);
+  expect(await response.text()).toBe(local);
+});
+
 test('robots.txt 指路正确，且 /app/ 被挡住', async ({ request }) => {
   const robots = await raw(request, '/robots.txt');
   expect(robots.status).toBe(200);
