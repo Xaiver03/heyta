@@ -726,11 +726,19 @@ export function SettingsScreen({
           </Card>
         </View>
       ) : null}
+      {/*
+        🔴 这枚的闸门不许按"表单里此刻有没有凭据"判。凭据按设计只放内存
+        （`apps/mobile/src/sync/config.ts` 文件头那条取舍）⇒ 冷启动后它必然为空，
+        而这一步要连带清掉的小组件快照与设备密钥**跨进程活着**。装机态实测到的是：
+        闸门灰着 ⇒ 想"把手机给别人前把屏幕上的数据清掉"的用户在这台设备上没有任何入口，
+        主屏继续显示上一个账号的任务而且没有任何报错。
+        清理动作幂等、永不抛（`credential-wipe.ts`），而那里已经写明不对称的方向是
+        "宁可多清一次" —— 没有东西可清时按下去就是一次无副作用的空操作。
+      */}
       <Button
         label={t('mobile.profile.clearCredentials')}
         onPress={onClearCredentials}
         tone="ghost"
-        disabled={form.token === '' && form.password === ''}
       />
     </>
   );
