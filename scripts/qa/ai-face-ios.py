@@ -161,15 +161,21 @@ ACTIVE: list[tuple] = []
 
 
 def require_appearance(udid: str, evidence_dir: str) -> str:
-    """#472 的第二半：`--evidence-dir` 末级目录名是 `light`/`dark` 时，
+    """#472 的第二半：`--evidence-dir` 末级目录名**声称**了某一档时，
     先拿设备的当前外观档比对，**不符就拒写**。
     本线实测踩过 —— 暗档跑完没还原就重跑"亮档"，两趟失败读数都落进了 `light/`，
     而 JSON 里那枚 `appearance` 一直诚实地写着 `dark`，只是没人拿它跟目录名比。
+
+    🔴 "声称"的形状 2026-10-19 扩了一次：原先只有末级名**恰好**等于 `light`/`dark` 才算声称，
+    于是 `english-dark/` 这种"二维合一"的目录名（语言×暗档）没有牙，暗档没设上也能写进去。
+    现在 `*-dark` 结尾也算声称暗档；`current-source/`、`english/` 这种不点档的名字仍然不判
+    —— 那两档要靠独立的像素尺（`scripts/screenshots/png-stats.mjs` 的 `modalLuminance`）立。
     返回读到的档名，调用方可以直接存进读数里。"""
-    claimed = Path(evidence_dir).resolve().name
+    name = Path(evidence_dir).resolve().name
+    claimed = name if name in ("light", "dark") else ("dark" if name.endswith("-dark") else "")
     actual = subprocess.run(["xcrun", "simctl", "ui", udid, "appearance"],
                             capture_output=True, text=True).stdout.strip()
-    if claimed in ("light", "dark") and actual != claimed:
+    if claimed and actual != claimed:
         raise SystemExit(
             f"refusing to write: evidence dir says '{claimed}' but the device is '{actual}' "
             f"(switch it with: xcrun simctl ui {udid} appearance {claimed}; "
