@@ -30,6 +30,7 @@ import re
 import subprocess
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -199,6 +200,33 @@ def rows_for(probe, wanted: list[str], clamp: int | None) -> list[dict]:
     return out
 
 
+# 界面上的时刻长这样：`10-19 18:44`（`MM-DD HH:MM`，中英两语态同一个格式）。
+STAMP = re.compile(r"\b(\d{1,2})-(\d{2})\s+(\d{1,2}):(\d{2})\b")
+
+
+def stamp_of(label: str | None) -> datetime | None:
+    """把一行可及名称里那个 `MM-DD HH:MM` 读成 datetime。
+
+    词条没写年份，所以按"离此刻最近"补 —— 跨年的那一格不会因此翻掉比较的符号。
+    """
+    if not label:
+        return None
+    match = STAMP.search(label)
+    if match is None:
+        return None
+    month, day, hour, minute = (int(group) for group in match.groups())
+    now = datetime.now()
+    best: datetime | None = None
+    for year in (now.year - 1, now.year, now.year + 1):
+        try:
+            candidate = datetime(year, month, day, hour, minute)
+        except ValueError:
+            continue
+        if best is None or abs((candidate - now).total_seconds()) < abs((best - now).total_seconds()):
+            best = candidate
+    return best
+
+
 # 按下去之后等那一枚**出现** —— 不等 = 把"这条没加上"读成"这一格通过了"。
 def wait_present(probe, want: str, seconds: float = 8.0):
     deadline = time.monotonic() + seconds
@@ -358,8 +386,9 @@ def main() -> int:
             dump(res, out)
             raise ProbeError(f"the {want} action never settled fully above the tab bar: {guard}")
         bx, by, bw, bh = guard["frame"]
+        tapped_label = AX.label_of(node)
         raw_tap(probe, bx + bw // 2, by + bh // 2)
-        res["taps"].append({"description": f"reminder action {want}", "label": AX.label_of(node), **guard})
+        res["taps"].append({"description": f"reminder action {want}", "label": tapped_label, **guard})
         key = "afterSnooze" if phase == "snoozed" else "afterDismiss"
         if wait_present(probe, phase) is None:
             res[key] = rows_for(probe, reading, clamp)
@@ -369,6 +398,28 @@ def main() -> int:
             raise ProbeError(f"tapping {AX.label_of(node)!r} did not move the block into phase "
                              f"{phase!r}: {res[key]}")
         res[key] = rows_for(probe, reading, clamp)
+        if want == SNOOZE:
+            # 🔴 「推迟 10 分钟」不许把提醒往**过去**挪。按钮自己念出的时刻就是基准
+            #    （`把 10-19 18:44 的提醒推迟 10 分钟`），按完之后那一行念的时刻必须更晚。
+            #    r142 装机态四档实测的是**提前 50 分钟** —— 那时实现按墙钟算（台账 r142 那格）。
+            before = stamp_of(tapped_label)
+            after = next((stamp_of(row.get("matchedLabel")) for row in res[key]
+                          if row.get("present") and stamp_of(row.get("matchedLabel")) is not None), None)
+            res["snoozeMove"] = {"before": None if before is None else before.isoformat(),
+                                 "after": None if after is None else after.isoformat(),
+                                 "movedLater": None if (before is None or after is None) else after > before}
+            if before is None or after is None:
+                probe.screenshot(f"{shot}-time-unreadable")
+                res["shots"].append(f"{shot}-time-unreadable")
+                dump(res, out)
+                raise ProbeError(f"cannot read the reminder's own time across the snooze tap "
+                                 f"(before {tapped_label!r}, after rows {res[key]}) — 这条判据没有读数")
+            if after <= before:
+                probe.screenshot("03-snooze-moved-earlier")
+                res["shots"].append("03-snooze-moved-earlier")
+                dump(res, out)
+                raise ProbeError(f"「推迟」 moved the reminder EARLIER: {before.isoformat()} -> "
+                                 f"{after.isoformat()}（装机态那条仍在按墙钟算推迟）")
         probe.screenshot(shot)
         res["shots"].append(shot)
         dump(res, out)
@@ -416,6 +467,7 @@ def main() -> int:
                       "tabBarTopOnListScreen": bar_top, "reminderSection": res["reminderSection"],
                       "emptyState": res["emptyState"], "afterAdd": res["afterAdd"],
                       "afterSnooze": res.get("afterSnooze"), "afterDismiss": res.get("afterDismiss"),
+                      "snoozeMove": res.get("snoozeMove"),
                       "removedBackToEmpty": removed, "taskDeleted": res.get("taskDeleted"),
                       "report": str(out / "reminder-block.json")}, ensure_ascii=False, indent=2))
     return 0
