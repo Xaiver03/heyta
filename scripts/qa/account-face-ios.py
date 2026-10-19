@@ -55,7 +55,6 @@ PROFILE_ROWS, BACK = AIF.PROFILE_ROWS, AIF.BACK
 SIGNIN_CTA = T("注册 / 登录", "Sign in or register")        # 面板入口（「我的」那一枚主按钮）
 AUTH_TITLE = T("注册 / 登录", "Sign in or register")        # ⚠️ 与上面**同字**，所以不能当到达判据
 PASSWORD_LOGIN = T("用邮箱和密码登录", "Sign in with email and password")
-OTHER_WAYS = T("或者用别的方式", "Or use another way")       # Pressable 的 accessibilityLabel，展开后不变
 OTHER_WAYS_OPEN = T("其他登录方式", "Other ways to sign in")
 OTHER_WAYS_CLOSE = T("收起其他登录方式", "Hide other ways to sign in")
 MAGIC_LINK = T("用邮件链接登录", "Sign in with an email link")
@@ -68,6 +67,13 @@ TERMS = T("我同意服务条款与隐私政策，并允许本机联网",
 # 展开之后才会出现的两枚 ⇒ 到达判据用它们的 OR。
 EXPANDED_MARKS = any_of(MAGIC_LINK, PASSKEY)
 
+# 🔴 这枚开关的可及名称**只认屏幕上那两枚键**（展开态「其他登录方式」/ 收起态「收起其他登录方式」）。
+# 改之前那枚钉死的名字（「或者用别的方式」，键 `common.auth.form.otherWays`）**故意不收进来**：`check:locator-labels` 会判红
+# 「只挂在移动端从不读的键上」，而它判得对 —— 装置跟着源码走，装了旧件的那台机就会在
+# `reveal other-ways toggle` 这一步**响亮地红**，那正是"件与源码不同步"的信号；
+# 把它当候选收下，等于让同一份装置在两种件上都绿，读数就不再说明自己量的是哪一枚件。
+TOGGLE_NAMES = any_of(OTHER_WAYS_CLOSE, OTHER_WAYS_OPEN)
+
 
 def toggle_node(tree):
     # 把「或者用别的方式」这枚开关的**整条 AX 节点**记进读数：`SectionHeader` 的标题
@@ -75,7 +81,7 @@ def toggle_node(tree):
     # "被父节点的 accessibilityLabel 合成掉了"，就得看这枚节点自己带不带状态/值。
     # 🔴 两枚候选都要试：只按中文那枚找，英文档会回 `None`，而那个 `None` 长得和
     # "这枚开关没有无障碍状态"一模一样（2026-10-19 英文腿实测）。
-    for candidate in OTHER_WAYS:
+    for candidate in TOGGLE_NAMES:
         node = PS.AX.find(tree, candidate, False, False, None, False, 0)
         if node is not None:
             return node
@@ -97,6 +103,8 @@ def main() -> int:
         raise SystemExit("both --udid and --evidence-dir are required (one directory per appearance mode)")
 
     appearance = require_appearance(a.udid, a.evidence_dir)
+    # 同 `ai-face-ios.py`：起跳点必须在起跳之前取（写在收笔那一行里量到的是收笔时刻）。
+    started_at = time.time()
     probe = TracingProbe(argparse.Namespace(
         udid=a.udid, idb=a.idb, companion=a.companion, evidence_dir=a.evidence_dir, timeout=a.timeout))
     ACTIVE.append((probe, Path(a.evidence_dir) / "account-face-journey.json", a.udid))
@@ -130,13 +138,13 @@ def main() -> int:
                  marks={m: present(tree, (m,), pressable=True) is not None
                         for pair in (PASSWORD_LOGIN, MAGIC_LINK, PASSKEY, TERMS) for m in pair},
                  emailField=present(tree, EMAIL_LABEL) is not None or present(tree, EMAIL_PLACEHOLDER) is not None,
-                 collapsedToggle=present(tree, OTHER_WAYS, pressable=True) is not None,
+                 collapsedToggle=present(tree, TOGGLE_NAMES, pressable=True) is not None,
                  toggleNode=toggle_node(tree),
                  labels=labels(tree)[:140])
     probe.screenshot("auth-sign-in")
 
-    reveal_in_viewport(probe, "reveal other-ways toggle", OTHER_WAYS)
-    probe.tap("expand other ways", OTHER_WAYS, EXPANDED_MARKS)
+    reveal_in_viewport(probe, "reveal other-ways toggle", TOGGLE_NAMES)
+    probe.tap("expand other ways", TOGGLE_NAMES, EXPANDED_MARKS)
     tree = probe.tree()
     probe.record("expanded state", "passed",
                  headerNow=[m for m in (OTHER_WAYS_OPEN[0], OTHER_WAYS_OPEN[1],
@@ -148,9 +156,10 @@ def main() -> int:
                  labels=labels(tree)[:140])
     probe.screenshot("auth-other-ways-expanded")
 
-    # 同一枚 Pressable（`accessibilityLabel` 始终是「或者用别的方式」），再按一次收起。
+    # 同一枚 Pressable 再按一次收起。它的名字在改前是钉死的「或者用别的方式」、改后跟着屏幕那行
+    # （收起态=「收起其他登录方式」），所以按的也是那三枚候选 —— 见 `TOGGLE_NAMES` 那段。
     # 到达判据反过来：展开那两枚**消失**才算收回去。
-    probe.tap("collapse other ways", OTHER_WAYS, PASSWORD_LOGIN, absent=EXPANDED_MARKS)
+    probe.tap("collapse other ways", TOGGLE_NAMES, PASSWORD_LOGIN, absent=EXPANDED_MARKS)
     probe.record("collapsed again", "passed",
                  expandedGone=present(probe.tree(), MAGIC_LINK, pressable=True) is None)
 
@@ -158,7 +167,8 @@ def main() -> int:
 
     out = Path(a.evidence_dir) / "account-face-journey.json"
     out.write_text(json.dumps({
-        "startedAt": time.time(),
+        "startedAt": started_at,
+        "finishedAt": time.time(),
         "appearance": appearance,
         "steps": probe.steps,
     }, ensure_ascii=False, indent=2), encoding="utf-8")

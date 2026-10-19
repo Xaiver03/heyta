@@ -191,6 +191,9 @@ def main() -> int:
 
     # 🔴 #472 的第二半：目录名说的档要和设备现在的档对上才让写（详见 `require_appearance`）。
     appearance = require_appearance(a.udid, a.evidence_dir)
+    # `startedAt` 早先写在收笔那一行里，量到的是**收笔时刻**（比所有 `step.at` 都晚）。
+    # 起跳点要在起跳之前取。
+    started_at = time.time()
 
     probe = TracingProbe(argparse.Namespace(
         idb=a.idb, companion=a.companion, udid=a.udid, timeout=a.timeout, evidence_dir=a.evidence_dir))
@@ -275,7 +278,8 @@ def main() -> int:
 
     out = Path(a.evidence_dir) / "ai-face-journey.json"
     out.write_text(json.dumps({
-        "startedAt": time.time(),
+        "startedAt": started_at,
+        "finishedAt": time.time(),
         "appearance": appearance,
         "steps": probe.steps,
     }, ensure_ascii=False, indent=2), encoding="utf-8")

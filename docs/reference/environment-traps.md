@@ -10560,3 +10560,61 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
       它不在 `tap()` 的判据里，所以旅程**照样绿**，只有读数会悄悄变成 `null`；
     ⑵ 判据形状：任何 `X[0]` / `candidates[0]` 出现在**读数**路径上（不是定位路径上）都要停下来问一句
       "另一枚语态呢"。定位路径有 `wait_for(candidates)` 兜着，读数路径没有兜底。
+
+486. ⚠️ **装置里 `"startedAt": time.time()` 写在收笔那个 dict 字面量里 ⇒ 它量到的是**收笔时刻**，比自己的每一步都晚**
+    （2026-10-19 实测，r137 英文×暗档那趟读数里自己露出来的）
+
+    症状：`ai-face-journey.json` 顶层 `startedAt` = `10:40:32`，而 `steps[12].at`（中间一步）= `10:40:21`。
+    一个"起跳时间"晚于它自己的第 13 步 —— 只要拿它跟步内时间比一次就能看见，但**没有任何一层在比**。
+
+    成因：字段名和取值点分家了。写的时候是"报告里要有个 startedAt"，于是就近在 `out.write_text(json.dumps({...}))`
+    那个字面量里塞了 `time.time()` —— 那一行执行于整条旅程跑完**之后**。
+
+    ⇒ ⑴ **凡名字带时间方向的字段（`startedAt` / `finishedAt` / `generatedAt` / `asOf`），落笔时问一句
+      "这行代码执行于它所命名的那个时刻吗"**。取值要放在被命名的那个时刻，不是放在写报告的地方。
+    ⑵ 这类谎**只在读数内部自相矛盾**，所以收笔加一条**序判据**（`startedAt ≤ min(step.at)` 且
+      `finishedAt ≥ max(step.at)`）比加注释有用 —— 本条修完就是拿这条判据在真跑上验的
+      （`1792378337.94 ≤ 1792378346.78`、`1792378359.23 ≥ 1792378359.23`）。
+    ⑶ **已落盘的证据件不回写**：r137 那两枚 JSON 里的 `startedAt` 仍是旧口径，真实时间线以 PNG 的 mtime 为准。
+      改装置只改未来那几趟，历史读数按旧口径标注 —— 否则"修好了"会顺手把当时的谎也抹平。
+
+487. 🔴 **RN 里容器上的 `accessibilityLabel` 会把子节点的可见文字挤出无障碍树 —— 名称写死第三种说法，读屏念的就不是屏幕上那行，而且没有任何一层会红**
+    （2026-10-19 实测，账号面那枚「其他登录方式」展开开关；缺陷类共 11 枚命中，本条只修在验收面上的 2 枚）
+
+    形状（`apps/mobile/src/screens/AuthScreen.tsx` 改前）：
+
+    ```tsx
+    <Pressable accessibilityRole="button"
+      accessibilityLabel={t('common.auth.form.otherWays')}        // 钉死「或者用别的方式」
+      aria-expanded={otherWaysOpen}>
+      <SectionHeader title={open ? t('…otherWaysClose') : t('…otherWaysOpen')} />  // 屏幕上是另外两句
+    </Pressable>
+    ```
+
+    真机读数（四格全中：中英 × 浅暗）：屏幕上 `Other ways to sign in` → 展开后 `Hide other ways to sign in`，
+    而 `AXLabel` 两态恒为 `Or use another way`。同一份表单在 web 端（`packages/ui/src/auth/AuthForm.tsx`）
+    **不写** `accessibilityLabel`，按钮文字即可及名称 ⇒ 两端不同形。违背 WCAG 2.5.3「Label in Name」。
+
+    同批第二枚更坏：`Button label={mode === 'sign-in' ? t('…login') : t('…register')}` 却写死
+    `accessibilityLabel={t('…login')}` ⇒ **注册档下屏幕上写「注册新账号」，读屏念「用邮件链接登录」** ——
+    说错的正是"按下去会发生哪个账号动作"，而 `ui/kit.tsx` 的默认本来就是 `accessibilityLabel ?? label`，
+    那一行**删掉**就对了。
+
+    ⇒ ⑴ 这是 #481 的**反面**：#481 教"别把'标签不在场'读成'状态没暴露'"（那次否证了一条假缺陷），
+      这一次同一枚节点合成**确实**造成了一条真缺陷。区别只在**有没有第二个出口**：
+      展开态有 `aria-expanded → AXValue` 出口 ⇒ 状态没丢；名称没有第二个出口 ⇒ 念错就是念错。
+      所以判"是不是缺陷"要问的是**"念错的那一格有没有别的字段替它说话"**，不是"树里有没有这句可见文字"。
+    ⑵ 这类坏法**不抛异常、不影响点击、不影响截图**（截图上那行字是对的），所以只可能由一条**源码级**判据抓到：
+      钉"名称表达式 == 可见文字表达式"（`auth-screen-password.spec.ts` 新增两条），
+      两头各跑过一枚变异臂（arm1 把名称钉回第三种说法 ⇒ 红 1 条；arm2 把 `accessibilityLabel` 加回那枚按钮 ⇒ 红 1 条，
+      `Tests 1 failed | 42 passed`）。
+    ⑶ **改可及名称会连带改装置，而装置该跟源码、不该跟旧件**：`scripts/qa/account-face-ios.py` 原来按
+      `OTHER_WAYS` 一枚键找开关。我第一版把它改成 `any_of(旧名, 收起名, 展开名)` 三枚候选，理由是
+      "装机件与源码之间必然有一段时间两种件并存" —— **`check:locator-labels` 把这一版判红了**：
+      「'或者用别的方式' 只挂在移动端从不读的键上」。它判得对：收下旧名等于让同一份装置在两种件上都绿，
+      于是读数不再说明自己量的是哪一枚件。终版是**只认屏幕上那两枚键**，装了旧件的那台机会在
+      `reveal other-ways toggle` 那一步响亮地红 —— 那正是"件与源码不同步"该有的形状。
+      ⇒ 与 #485 的区别要写清：那条管**同一枚件上的两种语态**（都该收），这条是**跨版本同名不同件**（该换不该并）。
+      连带：该脚本的下限 22 → **21** 是主动降的，注释里写了为什么（不写就成了"看起来像漂移"）。
+    ⑷ 同类未修的 9 枚已按分诊记在计划台账 r138 那一格（多数是"名称比可见文字更具体"的可辩护扩写，
+      其中 `SearchScreen.tsx:252`「取消 / Cancel」被念成「关闭搜索 / Close search」是同型的真漂移，留给那一面收）。

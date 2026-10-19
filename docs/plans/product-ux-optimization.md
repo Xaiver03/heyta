@@ -4585,3 +4585,38 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
       **不证**：**暗档 × 英文**这一维组合没取（外观与语态是两维）、任何写入（三枚闸门 / 端点新增 / 真的拉起邮件页）、注册档与凭证流转、iPad/窄屏/大字体、**当前源码**那一面（装机件仍是载体 `head-r128` 那一枚）。
       ✅ **设备态**：语言已**还原中文**（回读命中）、外观未动（light）、通知授权仍是「不允许」（r132 那处未还原状态）、companion pid 31182 未收。
       读数与 5 张图见 [`apps/mobile/evidence/ux-final-20261018/ios-ai-face-r136/RESULT.md`](../../apps/mobile/evidence/ux-final-20261018/ios-ai-face-r136/RESULT.md)。
+
+- [x] ✅ **10-19 10:4x r137「英文 × 暗档」那一格取到了 —— AI 面 / 帮助面 / 账号面同一趟开机里跑完（7 张逐张人眼看过）**（把 r136 §5 第 1 条与 r134 对应的"英文只跑了浅档"一起划掉）。
+      两维各自立起来再取数：`ios-app-language.py --to en`（9 步 `rc=0`）→ `simctl ui … appearance dark` → **`shutdown` + `boot`**（#471 那条重启纪律）→ 两条只读旅程 → 还原 `light` + `--to zh`。
+      起跳 tip `2080cef1`、收笔时别线已推到 `b612ba36`（共享工作树，读数只属于起跳那一枚）；装机件 bundle mtime `2026-10-18 18:11:07` ⇒ 与 r131–r136 **同一枚件**，本趟没重装。
+      **读数**：AI/帮助面 **20 步全 passed**、账号面 **11 步全 passed**（两枚装置**未改动**，与 r133/r134/r136 同一版本）。
+      **暗档那一维不靠目录名**：`require_appearance` 只在末级目录名**恰好**是 `light`/`dark` 时对账，本趟落点末级是 `english-dark` ⇒ 它不判；改由像素层量 —— **7/7 张 `modalLuminance` 全 dark**（`28` 六张、助手屏 `12`），两枚 JSON 的 `appearance` 也都是 `dark`。
+      **英文那一维逐枚点名 CJK**：两枚 JSON 里中文叶子一共 5 枚，`中文` 那三枚是语言 chip（该串在两档目录里同字，设计如此）、另两枚是装置自带的**双语候选列表第一项**（不是界面回读）⇒ 界面回读**零枚**中文；账号面那一步 8 枚 marks 更直接（四枚中文键全 false、`Sign in with email and password` true）。
+      **两条入口到同一屏这把尺在交叉格里同样成立**：`ai-settings-group.png` 与 `ai-settings-via-assistant.png` **sha256 逐字节相同**（`7e8958d0001b…`）；帧位与浅档英文趟逐字相同（`Set up AI` `[287,134,98,44]`、`Complaints and reports` `[32,748,338,60]` 底边 `808 ≤ 866`）。
+      **人眼层新量到一枚真缺陷**（不是 r134 那两枚假缺陷的复发）：展开态屏幕上写 `Hide other ways to sign in`，而同一步 `toggleNode.AXLabel` 恒为 `Or use another way` ⇒ **可及名称与可见文字不同句，且两态都不换**。回源码定性、与 web 端不同形、修法与同类分诊见下一格 r138 与环境陷阱 **#487**。
+      ⚠️ **本趟读数件里 `startedAt` 比自己的第 13 步还晚** —— 那是装置自己的命名谎（写在收笔那个 dict 字面量里），已单独修并验序 ⇒ 环境陷阱 **#486**；两枚已落盘 JSON 不回写，真实时间线以 PNG mtime `10:39:56 → 10:41:12` 为准。
+      ✅ **设备态**：`appearance` 回读 `light`（还原前照 #471 重启过一次）、语态回读中文（`常规/同步与隐私/数据管理/账号安全` 四枚命中）；通知授权仍是「不允许」（r132 那处未还原状态）。
+      **载体状态变化记一笔**：本趟起跳前发现上一会话那台模拟器**已被别处关机**、companion pid 31182 不在了（`ps` 现量为空）⇒ 本趟是自己 `boot` 起来的，装置各自另起 companion，**没有按名字收任何进程**。
+      **不证**：已配置态（这台模拟器没端点也没登录）、注册档那枚条款勾选（切档会真发请求）、任何写入、iPad/窄屏/大字体、**iOS 系统英文**（本趟翻的是应用内语态）、**当前源码**那一面。
+      读数与 7 张图见 [`apps/mobile/evidence/ux-final-20261018/ios-ai-face-r137/RESULT.md`](../../apps/mobile/evidence/ux-final-20261018/ios-ai-face-r137/RESULT.md)（账号面那两枚图在同批的 `ios-account-face-r137/english-dark/`）。
+
+- [x] ✅ **10-19 11:0x r138 把 r137 量到的那枚可及性缺陷修在本线验收的两枚控件上，并给"名称==可见文字"补了两枚有牙的源码判据**（环境陷阱 **#487**；缺陷是**一类不是一个**，所以先扫类再动手）。
+      **类有多大**：`apps/mobile/src/` 下带 `accessibilityLabel` 的控件现量 **39 枚**，命中"名称与可见文字取不同表达式"的 **11 枚**（其中 2 枚是"可见文字随状态切换而名称钉死"）。
+      **只修本线这两格正在验收的那一面**（账号面 `AuthScreen.tsx`）：
+      ⑴ 展开开关的名称改成与 `SectionHeader title` **同一个三元表达式**（收起/展开两态各一枚键）；
+      ⑵ 邮件链接那枚 `Button` **删掉** `accessibilityLabel` —— 它原来钉死登录那枚键，于是**注册档下屏幕写「注册新账号」而读屏念「用邮件链接登录」**，
+         说错的正是"按下去会发生哪个账号动作"；`ui/kit.tsx` 的默认本来就是 `accessibilityLabel ?? label`，删掉就不会再漂。
+      **判据**：`apps/mobile/tests/auth-screen-password.spec.ts` 新增两条源码级断言（名称表达式与 title 表达式逐字相等 / 那枚按钮不再带钉死的 `accessibilityLabel`），
+      文件头那份"钉住的六件事"随之补成**七件**。两枚变异臂各红**恰好 1 条**（`arm1` → 相等那条，`AssertionError: expected 't(…otherWays)' to be 'otherWaysOpen ? …'`；
+      `arm2` → 那枚按钮那条，`Tests 1 failed | 42 passed`），改完 `npx vitest run` 全绿 **987 passed (78 files)**、`pnpm --filter @heyta/mobile typecheck` `rc=0`。
+      **连带改装置**：`scripts/qa/account-face-ios.py` 取那枚开关的节点与按它的三处从 `OTHER_WAYS` 改成 `TOGGLE_NAMES`。
+      ⚠️ 这里我**先想错了一次**：第一版把旧名也收进候选（"两种件并存期不让它红"），`check:locator-labels` 当场判红
+      「'或者用别的方式' 只挂在移动端从不读的键上」—— 它判得对，收下旧名等于让同一份装置在两种件上都绿、读数就不再说明量的是哪一枚件。
+      终版只认屏幕上那两枚键 ⇒ **装了旧件（`2026-10-18 18:11` 那枚）的那台机跑这条旅程会在 `reveal other-ways toggle` 一步响亮地红**，
+      那是"件与源码不同步"该有的形状（与 #485 的区别：那条是同一枚件上的两种语态都要收，这条是跨版本不该并）。
+      该脚本下限 **22 → 21** 是主动降的，`check-locator-labels.py` 注释里写了理由。
+      ⚠️ **装机态未复验**（诚实边界）：这一格改的是源码，模拟器上那枚件仍是 `2026-10-18 18:11` 的旧件 ⇒ **"念的就是屏幕上那行"目前只有源码判据 + 两枚变异臂，没有真机读数**。
+      复验要等下一趟能出包的 iOS 重装机（`build:ios` 那条），届时按 `TOGGLE_NAMES` 取节点应命中**新名**、且 `headerNow` 那格会从 `[]` 变成非空 —— 这两条就是复验的判据，已写在这里防下一趟"顺手改成别的"。
+      **同类未修的 9 枚按分诊交链**（不代改）：多数是"名称比可见文字更具体"的**可辩护扩写**（列表消歧、带上下文），
+      其中只有一枚是同型真漂移 —— `apps/mobile/src/screens/SearchScreen.tsx:252` 屏幕上「取消 / Cancel」被念成「关闭搜索 / Close search」，归搜索面那一线收；
+      `ExportScreen.tsx:559` 是中文词序不同句而英文两句相同，危害最低，一并登记不修。
