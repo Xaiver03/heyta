@@ -10645,3 +10645,23 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
       所以**任何时候都不许把构建后的载体 plist 提交回去**（本线那三枚脏文件没有入库，也不该入）。
     ⑷ 副作用一条：重装载体会让"载体收工后 `git status` 干净"这条代理尺**必然不成立**，
       下一趟看到这三枚脏文件不是有人动了产品，是上一趟构建留下的。
+
+490. 🔴 **`git log -- <不存在的 pathspec>` 静默回空（rc=0、stdout 0 字节、stderr 0 字节）——"筛不到东西"与"确实没东西"逐字同形，用它筛"这段时间没被动过"会筛出一片假空**（2026-10-19 11:5x 本线现量）。
+    ⑴ 现场形状：要用一条命令证明"某四枚红的落点自 11:00 起没被任何人动过"，写了
+      `git log --since='2026-10-19 11:00' --format='%h %s' --name-only -- <5 枚路径>`，回空 ⇒ 结论"零改动"。
+      那 5 枚的第一版里有一枚 `apps/web/src/features/detail` **在仓里不存在**（`ls apps/web/src/features | grep -c '^detail$'` 回 `0`），
+      而 git 对这种 pathspec **不报错、只是筛不到东西**：
+      ```bash
+      git log --since='2026-10-19 11:00' --format='%h %s' -- apps/web/src/features/detail > /tmp/a.out 2> /tmp/a.err
+      echo "rc=$? out=$(wc -c </tmp/a.out) err=$(wc -c </tmp/a.err)"   # rc=0 out=0 err=0 —— 与"真没动过"同形
+      ```
+    ⑵ 🔴 **`git ls-files` 也不是存在性证据**（同一趟现量）：它对**不存在的路径**与**存在但整目录未跟踪的路径**都回空、都 rc=0
+      —— 现造一枚空目录 `apps/web/src/features/__probe_untracked__` 后 `test -d` 回 yes、`git ls-files <那枚>` 回空；
+      `git ls-files apps/web/src/features/detail`（根本不存在）同样回空。
+      ⇒ 存在性只能用 `test -e <path>` / `ls -d <path>` 这类**直接问盘**的形状，`git ls-files` 只回答"有没有已跟踪文件"。
+    ⑶ **正确修法不是"少写一枚 pathspec"，是把假空与真空分开**：先用 ⑵ 证明每枚 pathspec 在盘上存在，再跑筛子；
+      或者反过来——**先不带 pathspec 跑一次**看这个时间窗里到底入库了什么
+      （`git log --since=… --format='%h %ad %s' --date=format:'%H:%M'`），再逐枚比对落点。
+      本线 ⑴ 那条两版都回空、结论没变，但**留在台账里的必须是换成真路径的那一条**（可复问）。
+    ⑷ 同族而机制不同，别混着引：退出码被尾巴吃掉是 **#45**（`cmd | tail; echo $?`）、**#179**（`tee`）、**#184**（zsh `${PIPESTATUS[0]}` 空值）；
+      "查不到 ≠ 不存在"那族读法有 **#46**／**#67**，讲的却是运行时与界面层 —— 这一枚是 **git 的过滤器层**。
