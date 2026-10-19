@@ -98,6 +98,8 @@ git -C .worktrees/inb-t10 status --porcelain | wc -l   # 载具应为 0
 python3 research/tools/verify-inbound-ac-battery.py --root .worktrees/inb-t10 --ev <新目录> --quiet-gate --only <下面那串>
 ```
 
+🔴 **这一串要落在哪枚目录里跑，先前这里没写**（本轮逐格读 runbook 时查出来的）：`--root .worktrees/inb-t10` 这一族的 cwd 是**主检出根**，而仓里另有几处写的是 `--root .`（cwd＝载具里）。两种落点不用记，一条命令分开：`test -d .worktrees/inb-t10 && echo 主检出根 || echo 载具里`（两头现量：主检出那侧回「主检出根」，inb-t10 里回「载具里」）。两头都拿同一枚腿 `AC8-ac-ticks` 真跑过：从主检出根跑 `--root .worktrees/inb-t10` ⇒ **rc=0**，逐腿行读的就是 `docs/plans/inbound-automation.md` 那枚在册文档（原件 `~/.heyta-evidence/inb-t7-1017-0902/evpointers-10arms-0143/from-mainroot.txt`）；坐在 inb-t10 里再抄同一串 ⇒ **rc=1**，traceback 点名那条被拼重复的路径 `…/.worktrees/inb-t10/.worktrees/inb-t10`（原件 `~/.heyta-evidence/inb-t7-1017-0902/evpointers-10arms-0143/wrongroot/run.txt`，`grep -c FileNotFoundError` 回 **1**）⇒ **响亮失败，不会假绿**，这一形本身不危险。⚠️ **真会骗人的是 `--list`**：`--root <不存在的路径> --list` 回 **rc=0** 且照样打出 28 枚在册腿——`--list` 走的是脚本里那张静态 `LEGS` 表，**根本不碰 `--root` 那棵树**（现量 `grep -n 'args.root' research/tools/verify-inbound-ac-battery.py` 只有解析那一行命中，`--list` 分支不读盘）⇒ **「`--list` 绿」不证明 `--root` 选对了**；要证选对，只能看真跑那几腿的 rc 与逐腿行里那个文件路径。
+
 | 格子 | `--only` 那串（逐字） | 最近一次当日读数在哪 |
 |---|---|---|
 | AC-1 权益与授权 | `AC1-offline11,AC1-entitlement3,AC1-quota-http,AC1-pglite,AC1-worker-identity,AC1-cjs-order` | 10-20 00:46 整串那趟（载具 tip `0bc4e2733`）：逐腿读数在 `docs/plans/inbound-automation.md` 的 T8 第 32 条＋`~/.heyta-evidence/inb-t7-1017-0902/battery-1020-0046/`（`PROGRESS.md` 第 137 条同戳） |
@@ -237,6 +239,8 @@ comm -3 ~/.heyta-evidence/inb-t7-1017-0902/legs-register.txt ~/.heyta-evidence/i
 - ⚠️ **`git log -1` 一次给多枚路径只回其中最新那一枚**（本会话 10-20 00:01 实测：三枚路径一起给，只出 `b56c09357`，另两枚静默消失）⇒ 做"这几个文件各属哪线"的归因必须**一枚一条**，不然归因会少算而看起来"跑成功了"。第 130 条 ② 记了这枚自曝。
 - ⚠️ **grep 类分母要把构建产物剔出去**：同一棵树 `grep -rlI hosted-ai-monthly server packages/app-host` 回 **22**，加上 `git ls-files … | grep -vE '/dist/|node_modules'` 那条口径回 **16**，差的 6 枚全在 `server/dist` 与 `packages/app-host/dist`。⇒ 写"这档在哪写了"这类分母时**先声明口径**（在册源件 / 整棵工作树），两个数不是互相打脸。
 - ⚠️ **往台账插一格只按整行边界，插完立刻看删列**：本会话第一稿按**字符下标** splice，正则 `\*\*B(?!223)[0-9]{3}[ 追]` 命中的是 `🟢 **B221 闭合…` 那种**行中**形状，把别人那格的标题前缀整片顶掉 —— `git diff --numstat` 当场显出删列 **1**（纯追加应当是 `N 0`）。回退用 `git checkout -- BLOCKED.md` 的前提是**起跑态 clean**（`git status --porcelain | wc -l` 先回 0），且内容能从草稿重放。
+
+- ⚠️ **别拿 `--list` 当 `--root` 的校验**（10-20 02:2x 现量）：`python3 research/tools/verify-inbound-ac-battery.py --root <不存在的路径> --list` 回 **rc=0**、照样打出那 28 枚在册腿——`--list` 只读脚本里那张静态 `LEGS` 表，**不碰 `--root` 那棵树**。同一枚错 root 拿去**真跑**才响亮：`--only AC8-ac-ticks` 那趟回 **rc=1** ＋ `FileNotFoundError` 点名被拼重复的 `…/.worktrees/inb-t10/.worktrees/inb-t10`（原件 `~/.heyta-evidence/inb-t7-1017-0902/evpointers-10arms-0143/wrongroot/run.txt`）。⇒ 判落点用那条零副作用的 `test -d .worktrees/inb-t10 && echo 主检出根 || echo 载具里`，再对照 §4a 里那两族写法。这一形属于「探针自己会造绿」那一族：**装置没判错，是它的某条分支压根不看那个输入**，于是「绿」被下游读成「这个输入已经被检查过」。
 
 ---
 
