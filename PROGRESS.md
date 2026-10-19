@@ -5772,6 +5772,10 @@ AC 已勾数仍为 **0**（`verify-inbound-ac-ticks.py`：`AC 行=8　已勾=0�
 ④ **命令名那一层**：从两枚文档抽 `pnpm …` 后面那个名字 ⇒ 23 枚不同写法，逐枚对照**根 + 全部 workspace 的 `scripts` 键集合**。标红的 4 枚里 3 枚是 pnpm **内建子命令**（`exec`／`install`／`list`，不在 scripts 里是应该的），第 4 枚 `check-migrations` 是**引用式写法** —— 那几行本来就在说"这名字仓里不存在"（现量 `grep -n 'check-migrations' docs/plans/inbound-automation-handoff.md` 四行全是这个用途，无一行把它当指令给下一位）。⇒ **没有一枚假命令被写成指令**；第 122 条 ③ 那枚坑登记后，同类假名在交付件里已清零。
 ⑤ **编号引用那一层（唯一有产出的一层）**：交接书里 `第 N 条` 共 8 枚 ⇒ 全部能在 `PROGRESS.md` 的 `^N. ` 里查到号；自引 `§N` 共 8 枚 ⇒ 全部对得上本文标题；`#N` 环境陷阱引用 7 枚（`#179 #184 #480 #490 #492 #493 #494`）⇒ **6 枚在 main 那份里查得到，`#492` 查不到**。它不是笔误：那枚正文此刻只在**共享检出的未提交态**里（别线那 19 行，见交接书 §9 撞号那一格），本线有意留 main 上 491→493 的空档。⇒ **就地补两句可查的现量**（同一命令在共享检出回 **1**、在 `git show refs/heads/main:docs/reference/environment-traps.md` 那份回 **0**，23:39 取），下一位不会再拿着 `#492` 去 main 里翻一圈。
 ⑥ 这条动 `docs/plans/inbound-automation-handoff.md` 与 `PROGRESS.md` 两枚；判卷口径零处、`packages/i18n` 零处、迁移零处、不新增依赖；AC 勾数现量 `grep -c '^[-] \[[x]\] \*\*AC-' docs/plans/inbound-automation.md` 回 **0**；四把文档门在含本条的载具上各 rc=**0**。腿 3 本条未重探（最近一戳 23:32:20，形状未变）。本线不 push、不自标完成。
+128. 🟢 **§4a 那句「非文档改动 0 枚」补上它自己的戳：数旁边有现量命令还不够，还得写这数是哪一刻量的，否则它读起来像一条永久性质**（写前先跑 `date`，本机 2026-10-19 23:4x）
+① 现量：`git diff --name-only 528b4115c refs/heads/main > /tmp/d127.txt; grep -vcE '^(docs/|PROGRESS\.md|BLOCKED\.md|AGENTS\.md|README)' < /tmp/d127.txt` 在交付 tip `5c274f496` 上回 **0**（总改动 7 枚，其中 5 枚在 `docs/` 下：现量 `grep -oE '^[a-z-]+/' /tmp/d127.txt | sort | uniq -c`）。⇒ 交接书 §4a 那两批 AC 读数的成立范围**此刻仍成立**。
+② 改的就是那一行措辞：原来只写"是 **0** 枚 + 现量命令"，读起来像"这条永远成立"；现在把**戳**（tip + 时刻）和**翻案条件**（再动代码就按 `#494` 重判）写进同一句。⚠️ `/tmp/d127.txt` 是一次性暂存，不在仓里 —— 要复现就照句子里那条命令自己跑，别去找这枚文件。
+③ 这条动 `docs/plans/inbound-automation-handoff.md` 与 `PROGRESS.md` 两枚；判卷口径零处、`packages/i18n` 零处、迁移零处、不新增依赖；AC 勾数 `grep -c '^[-] \[[x]\] \*\*AC-' docs/plans/inbound-automation.md` 回 **0**。腿 3 未重探（最近 23:32:20 同形）。本线不 push、不自标完成。
 
 
 
