@@ -1,3 +1,4 @@
+import { sessionIssuer } from "../fixtures/central-session-issuer";
 /** Real TLS, standard client, real PostgreSQL ownership. All credentials synthetic. */
 import { PrismaClient } from '@prisma/client';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -10,7 +11,7 @@ if (!url) throw new Error('Explicit isolated PostgreSQL URL required');
 const target = new URL(url);
 if (!['127.0.0.1', 'localhost'].includes(target.hostname) || !/^\/heyta_central_auth_oidc[a-z0-9_]*test$/.test(target.pathname) || target.search || target.hash) throw new Error('Unsafe test database');
 const db = new PrismaClient({ datasources: { db: { url } } });
-const repo = new CentralAuthRepository(db, new CredentialCipher('44'.repeat(32)));
+const repo = new CentralAuthRepository(db, new CredentialCipher('44'.repeat(32)), sessionIssuer);
 let provider: CentralOidcProvider;
 beforeEach(async () => {
   await db.centralRevocation.deleteMany(); await db.centralGrant.deleteMany(); await db.centralAttempt.deleteMany();
@@ -31,8 +32,8 @@ async function setup(mode: Mode = 'good', port: Parameters<typeof createCentralO
 async function applied() {
   const session = await setup();
   const result = await session.client.exchange(session);
-  const { grantId } = await repo.completeAuthorization({ attemptId: result.attemptId, subject: result.subject,
-    rootSid: result.rootSid, sessionHash: digest(randomSecret()), expiresAt: Date.now() + 3600_000,
+  const { grantId } = await repo.completeAuthorization({ attemptId: result.attemptId, accessExpiresAt: result.accessExpiresAt, subject: result.subject,
+    rootSid: result.rootSid, expiresAt: Date.now() + 3600_000,
     newUser: { email: `${randomSecret()}@central.test`, termsAcceptedAt: Date.now(), termsDocumentVersion: 'test@1' } });
   return { ...session, result, grantId };
 }

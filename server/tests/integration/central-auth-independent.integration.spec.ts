@@ -1,3 +1,4 @@
+import { sessionIssuer } from "../fixtures/central-session-issuer";
 /** Independent lock/expiry counterexamples against real PostgreSQL. */
 import { PrismaClient } from "@prisma/client";
 import { afterAll, describe, it, expect } from "vitest";
@@ -19,6 +20,7 @@ const db = new PrismaClient({ datasources: { db: { url } } });
 const repo = new CentralAuthRepository(
   db,
   new CredentialCipher("51".repeat(32)),
+  sessionIssuer,
 );
 const input = () => ({
   issuer: "https://identity.example.test",
@@ -40,8 +42,8 @@ describe("独立持久层期限反例", () => {
     });
     const r = await repo.completeAuthorization({
       attemptId: a.id,
+      accessExpiresAt: Date.now() + 300_000,
       subject: randomSecret(),
-      sessionHash: digest(randomSecret()),
       expiresAt: Date.now() + 3600000,
       newUser: {
         email: randomSecret() + "@independent.test",
@@ -58,7 +60,7 @@ describe("独立持久层期限反例", () => {
       accessToken: "synthetic-late-at",
     });
     await expect(
-      repo.completeRefresh(f.id, Date.now() + 3600000),
+      repo.completeRefresh(f.id, Date.now() + 3600000, Date.now() + 300_000),
     ).rejects.toMatchObject({ code: "result_unavailable" });
     expect((await repo.inspectAttempt(f.id))?.status).toBe("RESULT");
     await repo.rejectResult(f.id);

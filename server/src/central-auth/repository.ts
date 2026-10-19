@@ -9,6 +9,8 @@
 import { randomUUID } from "node:crypto";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { CredentialCipher, digest, randomSecret } from "./crypto";
+import { SESSION_MAX_AGE_MS } from "./session-policy";
+import type { SessionMeta } from "../account/access-sessions";
 
 export const PENDING_TTL_MS = 10 * 60_000;
 export const LOCAL_PROOF_TTL_MS = 5 * 60_000;
@@ -16,6 +18,12 @@ export const DISPATCH_TTL_MS = 60_000;
 export const REVOCATION_RETENTION_MS = 7 * 86400_000;
 export const TERMINAL_RETENTION_MS = 86400_000;
 type Tx = Prisma.TransactionClient;
+export type CentralSessionIssuer = (tx: Tx, userId: number, expiresAt: number, meta?: SessionMeta) =>
+  Promise<{ token: string; sessionHash: string }>;
+export type CentralSessionBinding = { userId: number; sessionHash: string; tokenVersion: number; issuer: string; clientId: string };
+export type CentralLiveSnapshot = CentralSessionBinding & {
+  grantId: string; subject: string; version: number; expiresAt: number; tokens: TokenMaterial;
+};
 async function dbNow(tx: Tx): Promise<Date> {
   const [clock] = await tx.$queryRaw<
     { now: Date }[]
@@ -69,6 +77,7 @@ export class CentralAuthRepository {
   constructor(
     private readonly db: PrismaClient,
     private readonly cipher: CredentialCipher,
+    private readonly issue: CentralSessionIssuer,
   ) {}
   private async transaction<T>(
     run: (tx: Tx, now: Date) => Promise<T>,
@@ -318,8 +327,10 @@ export class CentralAuthRepository {
     attemptId: string;
     subject: string;
     rootSid?: string;
-    sessionHash: string;
     expiresAt: number;
+    /** Required result of successful central introspection, never token-response expires_in. */
+    accessExpiresAt: number;
+    meta?: SessionMeta;
     newUser?: {
       email: string;
       termsAcceptedAt: number;
@@ -348,6 +359,9 @@ export class CentralAuthRepository {
         `result:${a.id}`,
         a.resultCipher,
       );
+      const accessExpiresAt = date(input.accessExpiresAt).getTime();
+      if (accessExpiresAt <= now.getTime()) fail("access_evidence_expired");
+      tokens.expiresAt = accessExpiresAt;
       if (!tokens.accessToken || date(input.expiresAt) <= now)
         fail("invalid_grant");
       const subject = text(input.subject);
@@ -394,25 +408,27 @@ export class CentralAuthRepository {
       now = await dbNow(tx);
       if (a.deadline <= now || date(input.expiresAt) <= now)
         fail("result_unavailable");
+      if (accessExpiresAt <= now.getTime()) fail("access_evidence_expired");
       if (!identity)
         await tx.centralIdentity.create({
           data: { id: randomUUID(), issuer: a.issuer, subject, userId },
         });
       const grantId = randomUUID();
-      await tx.accessSession.create({
-        data: {
-          jtiHash: sessionId(input.sessionHash),
-          userId,
-          tokenVersion: user.tokenVersion,
-          createdAt: BigInt(now.getTime()),
-          lastSeenAt: BigInt(now.getTime()),
-        },
-      });
+      const expiresAt = Math.min(input.expiresAt, now.getTime() + SESSION_MAX_AGE_MS);
+      // The trusted factory uses the sole issueSession mint, in this same transaction.
+      // This JWT cannot escape until the outer transaction has acknowledged COMMIT.
+      const issued = await this.issue(tx, userId, expiresAt, input.meta);
+      const stored = await tx.accessSession.findUnique({ where: { jtiHash: sessionId(issued.sessionHash) } });
+      if (!issued.token || !stored || stored.userId !== userId || stored.tokenVersion !== user.tokenVersion)
+        fail("session_issuer_invalid");
+      now = await dbNow(tx);
+      if (a.deadline <= now || date(expiresAt) <= now) fail("result_unavailable");
+      if (accessExpiresAt <= now.getTime()) fail("access_evidence_expired");
       await tx.centralGrant.create({
         data: {
           id: grantId,
           userId,
-          sessionHash: input.sessionHash,
+          sessionHash: issued.sessionHash,
           tokenVersion: user.tokenVersion,
           issuer: a.issuer,
           subject,
@@ -420,7 +436,7 @@ export class CentralAuthRepository {
           rootSid: input.rootSid === undefined ? null : text(input.rootSid),
           authorizationAttemptId: a.id,
           tokensCipher: this.cipher.seal(`grant:${grantId}:1`, tokens),
-          expiresAt: date(input.expiresAt),
+          expiresAt: date(expiresAt),
         },
       });
       await tx.centralAttempt.update({
@@ -433,10 +449,11 @@ export class CentralAuthRepository {
           finishedAt: now,
         },
       });
-      return { grantId, alreadyApplied: false };
+      if (accessExpiresAt <= (await dbNow(tx)).getTime()) fail("access_evidence_expired");
+      return { grantId, alreadyApplied: false, token: issued.token, userId, sessionHash: issued.sessionHash, expiresAt };
     });
   }
-  async completeRefresh(attemptId: string, expiresAt: number) {
+  async completeRefresh(attemptId: string, expiresAt: number, accessExpiresAt: number) {
     return this.transaction(async (tx, now) => {
       const a = await tx.centralAttempt.findUnique({
         where: { id: attemptId },
@@ -446,6 +463,9 @@ export class CentralAuthRepository {
         return { grantId: a.grantId!, alreadyApplied: true };
       if (a.status !== "RESULT" || !a.resultCipher || a.deadline <= now)
         fail("result_unavailable");
+      // Only the verified protocol result may supply this required finite deadline.
+      const evidenceExpiresAt = date(accessExpiresAt).getTime();
+      if (evidenceExpiresAt <= now.getTime()) fail("access_evidence_expired");
       const grant = await tx.centralGrant.findUnique({
         where: { id: a.grantId! },
       });
@@ -475,11 +495,13 @@ export class CentralAuthRepository {
         `result:${a.id}`,
         a.resultCipher,
       );
+      tokens.expiresAt = evidenceExpiresAt;
       if (!tokens.accessToken || date(expiresAt) <= now) fail("invalid_grant");
       now = await dbNow(tx);
       if (a.deadline <= now) fail("result_unavailable");
       if (date(expiresAt) <= now || grant.expiresAt <= now)
         fail("grant_unavailable");
+      if (evidenceExpiresAt <= now.getTime()) fail("access_evidence_expired");
       const previous = this.cipher.open<TokenMaterial>(
         `grant:${grant.id}:${grant.version}`,
         grant.tokensCipher!,
@@ -497,7 +519,7 @@ export class CentralAuthRepository {
             `grant:${grant.id}:${grant.version + 1}`,
             next,
           ),
-          expiresAt: date(expiresAt),
+          expiresAt: date(Math.min(expiresAt, grant.expiresAt.getTime())),
         },
       });
       await tx.centralAttempt.update({
@@ -509,8 +531,68 @@ export class CentralAuthRepository {
           finishedAt: now,
         },
       });
+      if (evidenceExpiresAt <= (await dbNow(tx)).getTime()) fail("access_evidence_expired");
       return { grantId: grant.id, alreadyApplied: false };
     });
+  }
+  private async liveIn(tx: Tx, now: Date, binding: CentralSessionBinding): Promise<CentralLiveSnapshot> {
+    const grant = await tx.centralGrant.findFirst({ where: {
+      userId: binding.userId, sessionHash: sessionId(binding.sessionHash),
+      issuer: binding.issuer, clientId: binding.clientId,
+    } });
+    if (!grant || grant.revokedAt || !grant.tokensCipher || grant.expiresAt <= now ||
+        grant.tokenVersion !== binding.tokenVersion) fail("session_inactive");
+    if (grant.activeAttemptId) fail("session_changed");
+    await tx.$queryRaw`SELECT id FROM users WHERE id = ${binding.userId} FOR UPDATE`;
+    const user = await tx.user.findUnique({ where: { id: binding.userId } });
+    const session = await tx.accessSession.findUnique({ where: { jtiHash: binding.sessionHash } });
+    now = await dbNow(tx);
+    if (!user || user.tokenVersion !== binding.tokenVersion || !session || session.userId !== user.id ||
+        session.tokenVersion !== binding.tokenVersion || grant.expiresAt <= now) fail("session_inactive");
+    return { ...binding, grantId: grant.id, subject: grant.subject, version: grant.version,
+      expiresAt: grant.expiresAt.getTime(),
+      tokens: this.cipher.open<TokenMaterial>(`grant:${grant.id}:${grant.version}`, grant.tokensCipher) };
+  }
+  readLive(binding: CentralSessionBinding) {
+    return this.transaction((tx, now) => this.liveIn(tx, now, binding));
+  }
+  confirmLive(snapshot: CentralLiveSnapshot, accessExpiresAt: number) {
+    return this.transaction(async (tx, now) => {
+      const current = await this.liveIn(tx, now, snapshot);
+      if (current.grantId !== snapshot.grantId || current.version !== snapshot.version ||
+          current.subject !== snapshot.subject || date(accessExpiresAt) <= await dbNow(tx)) fail("session_changed");
+      return { userId: current.userId, sessionHash: current.sessionHash, tokenVersion: current.tokenVersion };
+    });
+  }
+  /** A late provider rejection must never revoke a newer rotation. */
+  revokeSnapshot(snapshot: CentralLiveSnapshot) {
+    return this.transaction(async (tx, now) => {
+      const grant = await tx.centralGrant.findUnique({ where: { id: snapshot.grantId } });
+      if (!grant || grant.revokedAt || grant.version !== snapshot.version || grant.userId !== snapshot.userId ||
+          grant.sessionHash !== snapshot.sessionHash || grant.subject !== snapshot.subject ||
+          grant.issuer !== snapshot.issuer || grant.clientId !== snapshot.clientId) return false;
+      await this.revokeIn(tx, now, grant.id);
+      return true;
+    });
+  }
+  revokeSession(userId: number, sessionHash: string) {
+    return this.transaction(async (tx, now) => {
+      const grant = await tx.centralGrant.findFirst({ where: { userId, sessionHash: sessionId(sessionHash) } });
+      if (!grant) return false;
+      await this.revokeIn(tx, now, grant.id);
+      return true;
+    });
+  }
+  async revokeUserSessions(userId: number, closeForUser: (userId: number) => void) {
+    await this.transaction(async (tx, now) => {
+      await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+      for (const grant of await tx.centralGrant.findMany({ where: { userId, revokedAt: null } }))
+        await this.revokeIn(tx, now, grant.id);
+      await tx.user.update({ where: { id: userId }, data: { tokenVersion: { increment: 1 } } });
+      await tx.accessSession.deleteMany({ where: { userId } });
+    });
+    // Required post-COMMIT invalidation/WS closure supplied by the trusted coordinator.
+    closeForUser(userId);
   }
   private async enqueue(
     tx: Tx,

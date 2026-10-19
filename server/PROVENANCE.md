@@ -159,3 +159,20 @@ P5.1 独立复审修复：授权派发等待本地证明行锁后重读数据库
 新增独立HTTPS/真实PG测试与临时CA runner；外部中央联调只调用其导出启动接口，
 没有将AGPL中央实现或测试复制进本仓。OIDC启动门禁、JWT/UI/WS均未变。
 设计、复现入口和当前验收状态见[唯一计划](../docs/plans/unified-central-auth.md)。
+
+
+## 中央事务协调底座（2026-10-19）
+
+新增central-auth/session-policy、session-issuer、coordinator、worker。auth.ts唯一
+issueSession支持受信事务，access-sessions.ts使用同一tx；repository不再自行插会话，
+强制注入可信签发工厂，APPLIED重入不签发。绝对365天策略共用，refresh不滑动延长，
+live在中央网络前后复核持久绑定；退出、销户墓碑与outbox原子。全设备退出必须提供
+提交后缓存/WS关闭回调，未放宽会话撤销门禁。标准传输单独标注明确inactive，网络未知
+不销户。worker固定issuer/client，租约确认和未确认过期可观测。没有接HTTP/WS/runtime，
+OIDC启动门禁保持。真实PG+TLS与原持久层测试使用实际唯一JWT铸造，旧sessionHash冲突
+夹具改为真实签发后失败注入来验证同一事务回滚。均为MIT独立实现，无新增依赖或迁移，
+验收与后续边界见[唯一计划](../docs/plans/unified-central-auth.md)。
+
+P5.2B1独立期限反例修复：授权/刷新应用要求显式传入已验证中央内省的有限AT期限，
+用户锁后、唯一签发后及最终写入后按数据库时钟重核；过期整体回滚并保留RESULT所有权。
+不使用未验证token响应expires_in补齐证据，纯持久层夹具使用显式有限合成期限。

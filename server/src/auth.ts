@@ -1,4 +1,5 @@
 import { prisma } from './db';
+import { SESSION_MAX_AGE_MS } from './central-auth/session-policy';
 import * as jwt from 'jsonwebtoken';
 const { JsonWebTokenError, TokenExpiredError } = jwt;
 import { Logger } from './logger';
@@ -27,7 +28,7 @@ const MIN_JWT_SECRET_LENGTH = 32;
 // All JWT tokens live for 365 days regardless of authentication method.
 // The auth method (passkey, magic link) only matters during login —
 // once a JWT is issued, it represents a verified session.
-export const JWT_EXPIRY = '365d';
+export const JWT_EXPIRY = `${SESSION_MAX_AGE_MS / 86400_000}d` as const;
 
 export const VERIFICATION_TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
 export const MAX_VERIFICATION_RESEND_COUNT = 20;
@@ -573,18 +574,27 @@ export const requestLoginMagicLink = async (
 export const issueSession = async (
   user: { id: number },
   meta: SessionMeta = {},
+  transaction?: { tx: Prisma.TransactionClient; jti: string; expiresAt: number },
 ): Promise<string> => {
-  const row = await prisma.user.findUniqueOrThrow({
+  const db = transaction?.tx ?? prisma;
+  const row = await db.user.findUniqueOrThrow({
     where: { id: user.id },
     select: { email: true, tokenVersion: true },
   });
   const tokenVersion = row.tokenVersion ?? 0;
-  const jti = newJti();
-  await recordSession({ jti, userId: user.id, tokenVersion, ...meta });
+  const jti = transaction?.jti ?? newJti();
+  const expiresIn = transaction
+    ? Math.floor(transaction.expiresAt / 1000) - Math.floor(Date.now() / 1000)
+    : undefined;
+  if (transaction && (!/^[a-f0-9]{32}$/.test(jti) || !Number.isSafeInteger(transaction.expiresAt) ||
+      expiresIn! <= 0 || expiresIn! > SESSION_MAX_AGE_MS / 1000)) {
+    throw new Error('Invalid transactional session policy');
+  }
+  await recordSession({ jti, userId: user.id, tokenVersion, ...meta }, transaction?.tx);
   return jwt.sign(
     { userId: user.id, email: row.email, tokenVersion, jti },
     JWT_SECRET,
-    { expiresIn: JWT_EXPIRY },
+    { expiresIn: expiresIn ?? JWT_EXPIRY },
   );
 };
 

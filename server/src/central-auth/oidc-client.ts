@@ -19,7 +19,7 @@ const endpointMethods = {
 } as const;
 
 export class CentralOidcError extends Error {
-  constructor(readonly code: 'central_unavailable' | 'central_invalid' | 'central_timeout') {
+  constructor(readonly code: 'central_unavailable' | 'central_invalid' | 'central_timeout' | 'central_inactive') {
     super(code);
     this.name = 'CentralOidcError';
   }
@@ -162,6 +162,7 @@ export async function createCentralOidcClient(config: OidcConfig, repository: Re
   async function introspection(cfg: Configuration, accessToken: string, subject: string) {
     if (!text(accessToken) || !text(subject, 4096)) invalid();
     const data = await client.tokenIntrospection(cfg, accessToken);
+    if (data.active === false) throw new CentralOidcError('central_inactive');
     if (data.active !== true || data.client_id !== config.clientId || data.sub !== subject ||
         typeof data.token_type !== 'string' || data.token_type.toLowerCase() !== 'bearer' ||
         !Number.isSafeInteger(data.exp) || data.exp! <= Math.floor(Date.now() / 1000)) invalid();
