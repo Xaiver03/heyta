@@ -45,7 +45,8 @@
     "gen:server-legal": "node scripts/gen-server-legal.mjs",
     "verify:oidc-runtime": "ts-node scripts/verify-oidc-runtime.ts",
     "verify:oidc-runtime:built": "node dist/scripts/verify-oidc-runtime.js",
-    "test:integration:central-auth": "vitest run --config vitest.integration.config.ts tests/integration/central-auth-persistence.integration.spec.ts"
+    "test:integration:central-auth": "vitest run --config vitest.integration.config.ts tests/integration/central-auth-persistence.integration.spec.ts",
+    "test:integration:central-auth:review": "vitest run --config vitest.integration.config.ts tests/integration/central-auth-independent.integration.spec.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.1.0",

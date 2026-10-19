@@ -144,7 +144,7 @@ P5.2接定时调度、报告未确认撤销，正式上线前不得跳过。隐�
 账号删除受限且outbox可存活、队列租约错配、加密AAD/篡改/清理期限。构建、迁移检查、
 既有local认证回归与独立复审必须通过；本包仍不代表真实中央联调或生产切换。
 
-## P5.1 作者验证（2026-10-19，独立发现已修，待复验）
+## P5.1 作者验证（2026-10-19，独立发现已修并复验）
 
 - 隔离真PG：`HEYTA_CENTRAL_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:32790/heyta_central_auth_test`；
   `node server/scripts/prepare-central-auth-postgres.mjs` 经仓库migrate-deploy.sh完整应用74个迁移，rc=0。
@@ -166,7 +166,7 @@ P5.2接定时调度、报告未确认撤销，正式上线前不得跳过。隐�
   `/tmp/heyta-p51-server-bounded.log`。最后补齐撤销grant元数据24小时清理，由最终真PG21条与
   server build覆盖；未把首轮全套rc=1改写为0，也不据此宣称既有大压缩用例永不波动。
 
-独立复审发现两个期限边界，修复后的验收尚待独立复验。持久层的verified identity与fresh local proof输入仅供未来受信协调器使用，
+独立复审发现两个期限边界，修复后主线程复验通过，剩余High/Medium为零。持久层的verified identity与fresh local proof输入仅供未来受信协调器使用，
 本包没有实现HTTP的OIDC/旧账号重新认证验证，不得把真库测试称作真实中央联调。
 `expiresAt` 是产品grant会话的上限，TokenMaterial自身的到期是上游访问令牌时间；P5.2须
 按中央实际契约区分两者，不得把AT短期到期当成拒绝任何refresh的条件。OIDC启动门禁保持。
@@ -185,3 +185,14 @@ P5.2接定时调度、报告未确认撤销，正式上线前不得跳过。隐�
 - 作者真PG补充“刷新等待用户锁跨期限拒绝且材料可清理”“APPLIED跨期限仍保持归属”
   两项，`test:integration:central-auth`：23/23，rc=0，`/tmp/heyta-p51-expiry-author.log`。
 - 服务端build rc=0，`/tmp/heyta-p51-expiry-build.log`。
+
+### P5.1 独立验收结果
+
+主线程逐文件核对最终16路径SHA，阅读持久层、迁移、加密和留存契约，并复跑作者真实PG23项及
+独立真实PG2项，全部通过（零跳过）。原两个失败反例在修复后转绿，未修改断言。
+独立用例在 `server/tests/integration/central-auth-independent.integration.spec.ts`；
+将 `HEYTA_CENTRAL_TEST_DATABASE_URL` 指向本机 `heyta_central_auth_review_test`，先运行
+`node server/scripts/prepare-central-auth-postgres.mjs`，再运行
+`pnpm --filter @heyta/sync-server test:integration:central-auth:review` 可复现。
+日志 `/tmp/heyta-p51-independent-final.log` 与 `/tmp/heyta-p51-independent-author-regression.log`。
+这是持久层候选验收，HTTP/OIDC/JWKS/原生/定时任务仍在后续包，正式OIDC启动门禁继续关闭。
