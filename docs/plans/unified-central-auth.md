@@ -20,7 +20,7 @@
 | P5.2B1 | 事务唯一签发、live/refresh/退出销户与worker底座 | 已独立验收 | 真实PG+TLS反例、实际中央联调、local回归 |
 | P5.2B2 | Cookie/CSRF、所有签发入口与API/WS/runtime接线 | 作者验收完成，待独立复审 | 缓存前中央live、已连接WS撤销、定时清理生命周期 |
 | P5.3 | 官方Web特色UI与共享Cookie/sync/vault transport适配 | 候选已提交，待独立复审与真实中央浏览器联调 | 真浏览器、CSRF、无上游凭据落浏览器、E2EE/离线保持 |
-| P5.4 | 原生和CLI共享handoff | 待实施 | 各端当前安装产物回跳、安全存储、重放/错绑定拒绝 |
+| P5.4 | 原生和CLI共享handoff | 服务端与CLI候选已接线；移动壳、当前安装产物及独立复审待完成 | 各端当前安装产物回跳、安全存储、重放/错绑定拒绝 |
 | P5.5 | 文档、全量验收、发布准备 | 待实施 | 独立复审与当前产物；生产另走授权流程 |
 
 ## P5.4 原生/CLI handoff 实施边界（设计，尚未交付）
@@ -56,7 +56,26 @@ OIDC 回调和唯一 `issueSession` 签发口。不能把 Web Cookie 搬给设�
 实施前须再核实迁移及当前平台壳约束。真 PostgreSQL 反例至少覆盖：并发领取、错设备
 verifier、过期与锁等待跨期限、回调重复/授权码未知结果、回调事务回滚、领取前会话撤销、
 领取响应丢失和未领取 grant 清理。另验系统浏览器当前安装产物回跳、CLI 真实进程轮询、
-原生安全存储与登出删除、Web 既有 Cookie 流程不回归。仅有本设计不改变 P5.4 的待实施状态。
+原生安全存储与登出删除、Web 既有 Cookie 流程不回归。当前候选不等于 P5.4 完成。
+
+### P5.4 服务端与 CLI 候选验证（2026-10-20）
+
+新迁移 `20261020010000_central_device_handoff` 仅应用于本机隔离测试库，未触及生产。
+客户端 verifier 原文只在设备内存，服务端持 SHA-256 challenge；浏览器启动链接需在
+同源页面输入设备另行展示的 12 位配对码并点击确认，GET 预取不消费。回调只把产品 JWT
+以独立服务端密钥封装到 handoff 行，和唯一签发、grant、attempt APPLIED 同一事务；
+领取清密文，错 verifier 不消耗，并发只一次成功。未领走的 grant 到期入撤销队列。
+
+已实跑：迁移脚本在本机 `heyta_central_auth_device2_test` 与
+`heyta_central_auth_oidc_device_test` 两个隔离 PostgreSQL 库成功（75 个迁移）；持久层
+6/6 真库反例通过（含用户行锁跨 handoff 到期），HTTPS/OIDC/HTTP/WS 集成 14/14 通过，
+原 Web Cookie 回归在同组；启动页 Cookie 的同源、重复、错绑定与过期定向反例 6/6 通过。
+共享 `app-host` 1854/1854、`sync-core` 318/318、`shared-schema` 173/173、Node CLI
+200/200 均通过；这四组未覆盖移动端当前安装产物。`node scripts/check-migrations.mjs` 和
+涉及包的构建通过。补测后服务端全量 2899 通过、1 跳过，迁移规范与文档链接检查 rc=0。
+4.1 Flash 读取服务端与CLI实际 diff 的独立审阅没有确证 High/Medium，
+但其部分“High/Medium”条目本身写着无问题、另有刷新会轮换本地会话的推测；主线按源码
+复核，没有把模型回报当验收。正式独立复审和移动端现场验收仍未完成。
 
 ## 产品登录体验约束
 

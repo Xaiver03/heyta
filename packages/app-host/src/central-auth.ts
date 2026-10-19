@@ -6,6 +6,7 @@
  * HttpOnly cookie issued by the product server.
  */
 import { CENTRAL_AUTH_PATHS } from '@heyta/shared-schema';
+import { getRandomBytes, sha256TextHex } from '@heyta/sync-core';
 import { joinEndpointUrl } from './endpoint-url.js';
 
 export type CentralAuthUser = { id: number; email: string };
@@ -144,4 +145,84 @@ export function createCentralCookieFetch(
     }
     return fetchImpl(url.href, { ...init, headers, credentials: 'include' });
   };
+}
+
+export type CentralDeviceStart = { handoffId: string; verifier: string; launchUrl: string;
+  pairingCode: string; expiresAt: number };
+export type CentralDeviceClaim = { status: 'pending' } | { status: 'claimed'; token: string;
+  user: CentralAuthUser; expiresAt: number };
+
+/** Fail closed if the host has no cryptographically secure random source. */
+function deviceVerifier(): string {
+  const bytes = getRandomBytes(32);
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+  let result = '';
+  for (let i = 0; i < bytes.length; i += 3) {
+    const a = bytes[i]!, b = bytes[i + 1], c = bytes[i + 2];
+    result += alphabet[a >>> 2]! + alphabet[((a & 3) << 4) | ((b ?? 0) >>> 4)]!;
+    if (b !== undefined) result += alphabet[((b & 15) << 2) | ((c ?? 0) >>> 6)]!;
+    if (c !== undefined) result += alphabet[c & 63]!;
+  }
+  return result;
+}
+
+export async function beginCentralDeviceAuth(options: CentralAuthOptions & {
+  termsAccepted?: boolean; documentVersion?: string;
+}): Promise<CentralAuthOutcome<CentralDeviceStart>> {
+  const fetchImpl = fetchFor(options);
+  if (!fetchImpl || !options.baseUrl.trim()) return { ok: false, reason: 'network' };
+  let verifier: string;
+  try { verifier = deviceVerifier(); } catch { return { ok: false, reason: 'unavailable' }; }
+  try {
+    const response = await fetchImpl(originUrl(options.baseUrl, CENTRAL_AUTH_PATHS.deviceStart), {
+      method: 'POST', credentials: 'omit', redirect: 'error',
+      headers: { accept: 'application/json', 'content-type': 'application/json' },
+      body: JSON.stringify({ deviceChallenge: sha256TextHex(verifier),
+        ...(options.termsAccepted === true ? { termsAccepted: true, documentVersion: options.documentVersion } : {}) }),
+    });
+    const value = await parseJson(response);
+    if (!response.ok) return { ok: false, reason: response.status === 409 ? 'unavailable' : 'rejected', status: response.status };
+    if (!record(value) || typeof value.handoffId !== 'string' || !/^[0-9a-f-]{36}$/.test(value.handoffId) ||
+        typeof value.launchUrl !== 'string' || typeof value.pairingCode !== 'string' ||
+        !/^[A-F0-9]{12}$/.test(value.pairingCode) || typeof value.expiresAt !== 'number' ||
+        !Number.isSafeInteger(value.expiresAt))
+      return { ok: false, reason: 'malformed-response', status: response.status };
+    let launch: URL, base: URL;
+    try { launch = new URL(value.launchUrl); base = new URL(options.baseUrl); }
+    catch { return { ok: false, reason: 'malformed-response', status: response.status }; }
+    if (launch.origin !== base.origin || !launch.pathname.startsWith(`${CENTRAL_AUTH_PATHS.deviceLaunch}/`) ||
+        !/^[A-Za-z0-9_-]{43}$/.test(launch.pathname.slice(CENTRAL_AUTH_PATHS.deviceLaunch.length + 1)) ||
+        launch.search || launch.hash || launch.username || launch.password)
+      return { ok: false, reason: 'malformed-response', status: response.status };
+    return { ok: true, value: { handoffId: value.handoffId, verifier, launchUrl: launch.href,
+      pairingCode: value.pairingCode, expiresAt: value.expiresAt } };
+  } catch { return { ok: false, reason: 'network' }; }
+}
+
+export async function claimCentralDeviceAuth(options: CentralAuthOptions, handoffId: string,
+  verifier: string): Promise<CentralAuthOutcome<CentralDeviceClaim>> {
+  const fetchImpl = fetchFor(options);
+  if (!fetchImpl || !options.baseUrl.trim()) return { ok: false, reason: 'network' };
+  if (!/^[0-9a-f-]{36}$/.test(handoffId) || !/^[A-Za-z0-9_-]{43}$/.test(verifier))
+    return { ok: false, reason: 'rejected' };
+  try {
+    const response = await fetchImpl(originUrl(options.baseUrl, CENTRAL_AUTH_PATHS.deviceClaim), {
+      method: 'POST', credentials: 'omit', redirect: 'error',
+      headers: { accept: 'application/json', 'content-type': 'application/json' },
+      body: JSON.stringify({ handoffId, verifier }),
+    });
+    const value = await parseJson(response);
+    if (response.status === 202) {
+      if (!record(value) || value.status !== 'pending') return { ok: false, reason: 'malformed-response', status: response.status };
+      return { ok: true, value: { status: 'pending' } };
+    }
+    if (!response.ok) return { ok: false, reason: response.status === 409 || response.status === 503 ? 'unavailable' : 'rejected', status: response.status };
+    if (!record(value) || value.status !== 'claimed' || typeof value.token !== 'string' || !value.token ||
+        !record(value.user) || typeof value.user.id !== 'number' || !Number.isSafeInteger(value.user.id) ||
+        value.user.id <= 0 || typeof value.user.email !== 'string' || !value.user.email ||
+        typeof value.expiresAt !== 'number' || !Number.isSafeInteger(value.expiresAt))
+      return { ok: false, reason: 'malformed-response', status: response.status };
+    return { ok: true, value: { status: 'claimed', token: value.token,
+      user: { id: value.user.id, email: value.user.email }, expiresAt: value.expiresAt } };
+  } catch { return { ok: false, reason: 'network' }; }
 }

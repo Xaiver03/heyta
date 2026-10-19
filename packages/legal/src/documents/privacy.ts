@@ -391,8 +391,8 @@ const zh = [
         rows: [
           [
             '中央身份、授权尝试与撤销材料（尚未开放）',
-            '身份映射保留至产品注销。登录待办十分钟到期；派发后或到期清PKCE秘密。授权凭据保留至撤销/过期/注销，结束后的最少元数据保留24小时。撤销材料为最多七日重试而加密保存，完成即清；终态最少元数据保留24小时。结果仍未知的尝试仅保留最少所有权判断至核实处置，不能把未知当作失败重发。',
-            '持久层已提供清理方法，但定时调度与中央注销接线须在开放前完成。七日未确认即清密文并标记“撤销未确认”，不声称中央已经撤销，本地仍拒绝该授权。注销先排队撤销再删本地账号；队列不被级联吞掉。该材料不含任务或E2EE密钥，中央停用也不代表删除本地内容。',
+            '身份映射保留至产品注销。登录待办及原生设备交接十分钟到期；派发后或到期清PKCE秘密。原生交接期间，待领取的产品会话令牌以服务端密钥加密暂存，领取即清密文，未领取则十分钟到期清除并安排撤销。授权凭据保留至撤销/过期/注销，结束后的最少元数据保留24小时。撤销材料为最多七日重试而加密保存，完成即清；终态最少元数据保留24小时。结果仍未知的尝试仅保留最少所有权判断至核实处置，不能把未知当作失败重发。',
+            '定时清理及产品注销前的撤销队列已接线；全平台注销及原生当前安装产物验收仍是开放前条件。七日未确认即清密文并标记“撤销未确认”，不声称中央已经撤销，本地仍拒绝该授权。注销先排队撤销再删本地账号；队列不被级联吞掉。该材料不含任务或E2EE密钥，中央停用也不代表删除本地内容。',
           ],
           [
             '同步事件（密文内容 + 那 11 项明文形状）',
@@ -663,6 +663,7 @@ const zh = [
         kind: 'table',
         head: ['版本', '日期与变更摘要'],
         rows: [
+          ['1.12', '`2026-10-20` 补充原生设备登录交接：待领产品会话密文最多十分钟，领取即清，未领取转撤销；同步更新定时清理和产品注销接线状态。尚未开放，中英同步，仍为草案。'],
           ['1.11', '`2026-10-19` 中央认证持久层新增身份映射、授权尝试、会话及撤销队列；同步披露类别、服务端加密边界、用途、期限和注销例外。功能尚未开放，定时清理与中央接线仍是开放前条件。中英同步，仍为草案。'],
           ['1.9', "`2026-10-08` **注册登录标准套件（ADR-0063）落地后的联动改写**：第 2 条那句「端到端加密覆盖内容、不覆盖元数据」补了一处**内容级**例外 —— 一次换绑在途时那个新邮箱地址是明文；第 3 条把功能邮件从「五封」改成**十封**并逐类点名（换绑的两封、完成通知、认证器告知与注册验证码邮件此前都不在那份封闭词表里），同时写明「唯一的直接标识符」只有那一个例外；第 6 条「更正与补充」由 ❌邮箱不可更换 改成 ✅双侧确认的自助换绑；第 7 条的一次性凭据时长表补上注册验证码（10 分钟）与换绑的两枚（各 24 小时），并把「换绑生效即全设备登出」写进去；注销那一格按迁移终态重算级联数字 —— 旧数里含一张早已被 `DROP TABLE` 的表，而「墓碑随注销级联删除」这句对两张表都不成立，改为**故意保留的注销标记**。中英同步，仍为待审核草案。"],
           ['1.10', "`2026-10-10` 补披露**登录验证码**这一封：第 3 条的封闭清单从十封改成十一封（中英同步）。起因是 `check:legal-email-claims` 把『漏披露』从提示升成判红之后第一次真跑，数出代码真会发 11 封而文本只点名 10 封 —— 少的那封是邮箱验证码登录（`sendLoginCodeEmail`）。少披露比多披露危险，所以方向是补进去，不是把代码里那封删掉。"],
@@ -998,8 +999,8 @@ const en = [
         rows: [
           [
             'Central identity, attempts and revocation material (unavailable)',
-            'Identity bindings last until product account closure. Login pending records expire after ten minutes; PKCE secrets clear on dispatch or expiry. Grant credentials last until revocation, expiry or closure, with minimal terminal metadata retained for 24 hours. Revocation material is encrypted for retries for at most seven days and cleared on confirmation; minimal terminal metadata lasts 24 hours. Unresolved attempts retain only minimal ownership evidence until investigated, and an unknown outcome never permits redispatch.',
-            'Persistence cleanup methods exist; scheduled cleanup and central account-closure integration must be wired before release. After seven days without confirmation, ciphertext is cleared and the outcome marked revocation unconfirmed, never represented as centrally revoked; local access remains denied. Closure queues revocation before deleting the local account, and cascading deletion cannot swallow the queue. No tasks or E2EE keys enter these records; central disabling does not delete local content.',
+            'Identity bindings last until product account closure. Login pending and native device handoff records expire after ten minutes; PKCE secrets clear on dispatch or expiry. During native handoff, the product session token awaiting collection is encrypted under a server key; its ciphertext clears on collection or after ten minutes, when an unclaimed grant is queued for revocation. Grant credentials last until revocation, expiry or closure, with minimal terminal metadata retained for 24 hours. Revocation material is encrypted for retries for at most seven days and cleared on confirmation; minimal terminal metadata lasts 24 hours. Unresolved attempts retain only minimal ownership evidence until investigated, and an unknown outcome never permits redispatch.',
+            'Scheduled cleanup and the product account-closure revocation queue are wired; platform-wide logout and verification of the current native builds remain release conditions. After seven days without confirmation, ciphertext is cleared and the outcome marked revocation unconfirmed, never represented as centrally revoked; local access remains denied. Closure queues revocation before deleting the local account, and cascading deletion cannot swallow the queue. No tasks or E2EE keys enter these records; central disabling does not delete local content.',
           ],
           [
             'Sync events (ciphertext content plus those 11 plaintext shape fields)',
@@ -1270,6 +1271,7 @@ const en = [
         kind: 'table',
         head: ['Version', 'Date and summary of changes'],
         rows: [
+          ['1.12', '`2026-10-20` Adds native-device login handoff: a product session awaiting collection is encrypted for at most ten minutes, cleared on collection, and an unclaimed grant is queued for revocation. Updates cleanup and product-closure wiring status. Unavailable; both languages remain draft.'],
           ['1.11', '`2026-10-19` Central identity persistence adds bindings, request attempts, grants and revocation queues. Both languages disclose categories, server-side encryption, purposes, retention and closure exceptions. Authentication remains unavailable; scheduling and provider integration remain release requirements. Still a draft.'],
           ['1.9', "`2026-10-08` Follow-up rewrite after the **standard account flow shipped (ADR-0063)**: the sentence in section 2 about end-to-end encryption covering content but not metadata now also names a **content-level** exception - the new address of an in-flight rebinding is stored in cleartext; section 3 changes the five functional emails to **ten** and lists every one by name (the two rebinding letters, the completion notice, the authenticator-added notice and the registration code were all outside the old closed list), and states the single exception to the only-direct-identifier claim; the correction row in section 6 moves from ❌ the address cannot be changed to ✅ self-service rebinding with two-sided confirmation; the one-time-credential lifetimes in section 7 gain the registration code (10 minutes) and both rebinding tokens (24 hours each) and record that a completed rebinding signs every other device out; the closure cell is recomputed from the final migration state - the old figure counted a table that was `DROP TABLE`d long ago, and the claim that tombstones cascade away was untrue for both tombstone tables, so it now states the **closure marker we deliberately keep**. Both language columns updated together; remains a draft awaiting review."],
           ['1.10', "`2026-10-10` Disclose the **sign-in code** e-mail: the closed list in clause 3 goes from ten to eleven (Chinese and English together). Trigger: after `check:legal-email-claims` promoted the 'undisclosed' tier from advisory to failing, its first real run counted 11 senders against 10 named kinds - the missing one being e-mail code sign-in (`sendLoginCodeEmail`). Under-disclosure is the riskier direction, so the fix is to name it, not to delete the sender."],
@@ -1302,7 +1304,7 @@ export const privacy: LegalDocument = {
   // 45 天必须分开写，否则第 7 条那段限定会被读成也管着托管那一档。
   // 版本号进同意指纹（`legalSetVersion()` 把每张文档拼成 `id@version`），
   // 改了对外承诺而不 bump，等于让旧那枚同意去覆盖一段它没见过的话。
-  version: '1.11',
+  version: '1.12',
   status: 'draft',
   updatedDate: '2026-10-19',
   title: {

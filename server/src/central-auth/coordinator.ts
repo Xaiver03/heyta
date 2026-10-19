@@ -1,4 +1,5 @@
 import type { Prisma } from '@prisma/client';
+import { randomBytes } from 'node:crypto';
 /** Internal services only. B2 wires HTTP/WS/auth-cache entry points separately. */
 import type { AuthenticationConfig } from './config';
 import { createCentralOidcClient, CentralOidcError } from './oidc-client';
@@ -8,6 +9,7 @@ import { deleteAccountWithTombstone } from '../account/account-tombstones';
 import { authCache } from '../auth-cache';
 import type { SessionMeta } from '../account/access-sessions';
 import { getWsConnectionService } from '../sync/services/websocket-connection.service';
+import { randomSecret } from './crypto';
 
 type OidcConfig = Extract<AuthenticationConfig, { mode: 'oidc' }>;
 type Oidc = Awaited<ReturnType<typeof createCentralOidcClient>>;
@@ -22,7 +24,21 @@ class CentralAuthCoordinator {
   private readonly refreshing = new Map<string, Promise<void>>();
   constructor(private readonly config: OidcConfig, private readonly repo: CentralAuthRepository, private readonly oidc: Oidc) {}
   begin(input: { browser: string; link?: LocalProof }) { return this.oidc.begin(input); }
-  async authorize(input: { callbackUrl: string; browser: string; meta?: SessionMeta; terms?: { acceptedAt: number; documentVersion: string } }) {
+  async beginDevice(input: { deviceChallenge: string; terms?: { acceptedAt: number; documentVersion: string } }) {
+    const browser = randomSecret(), launchSecret = randomSecret();
+    const pairingCode = randomBytes(6).toString('hex').toUpperCase();
+    const pending = await this.oidc.begin({ browser });
+    const handoff = await this.repo.createHandoff({ pendingId: pending.pendingId, browser,
+      deviceChallenge: input.deviceChallenge, launchSecret, pairingCode,
+      authorizationUrl: pending.authorizationUrl, terms: input.terms });
+    return { handoffId: handoff.id, launchSecret, pairingCode, expiresAt: handoff.expiresAt };
+  }
+  inspectDeviceLaunch(secret: string) { return this.repo.inspectHandoffLaunch(secret); }
+  launchDevice(secret: string, pairingCode: string) { return this.repo.launchHandoff(secret, pairingCode); }
+  claimDevice(id: string, verifier: string) { return this.repo.claimHandoff(id, verifier); }
+  handoffForPending(id: string) { return this.repo.handoffForPending(id); }
+  async authorize(input: { callbackUrl: string; browser: string; meta?: SessionMeta;
+    terms?: { acceptedAt: number; documentVersion: string }; handoffId?: string }) {
     const verified = await this.oidc.exchange(input);
     const result = await this.repo.readResult(verified.attemptId);
     if (result.issuer !== this.config.issuer || result.clientId !== this.config.clientId || !result.tokens.accessToken)
@@ -30,6 +46,7 @@ class CentralAuthCoordinator {
     const info = await this.oidc.userInfo(result.tokens.accessToken, verified.subject);
     return this.repo.completeAuthorization({ attemptId: verified.attemptId, subject: verified.subject, rootSid: verified.rootSid,
       expiresAt: Date.now() + SESSION_MAX_AGE_MS, accessExpiresAt: verified.accessExpiresAt, meta: input.meta,
+      handoffId: input.handoffId,
       ...(info.verifiedEmail && input.terms ? { newUser: { email: info.verifiedEmail,
         termsAcceptedAt: input.terms.acceptedAt, termsDocumentVersion: input.terms.documentVersion } } : {}) });
   }

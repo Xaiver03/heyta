@@ -13,6 +13,7 @@ import { acquireAuthenticationRuntime } from '../../src/central-auth/runtime';
 import { centralAuthRoutes } from '../../src/central-auth/routes';
 import { installCentralRoutePolicy } from '../../src/central-auth/route-policy';
 import { CENTRAL_COOKIES } from '../../src/central-auth/http-security';
+import { digest, randomSecret } from '../../src/central-auth/crypto';
 import { authenticate } from '../../src/middleware';
 import { apiRoutes } from '../../src/api';
 import { accountSecurityRoutes } from '../../src/account/account-security.routes';
@@ -35,6 +36,7 @@ delete process.env.HEYTA_OIDC_TEST_KEY; delete process.env.HEYTA_OIDC_TEST_CERT;
 let app: FastifyInstance, provider: CentralOidcProvider, owner: Awaited<ReturnType<typeof acquireAuthenticationRuntime>>, network: string;
 const sockets = new Set<WebSocket>();
 beforeEach(async () => {
+  await prisma.centralHandoff.deleteMany();
   await prisma.centralRevocation.deleteMany(); await prisma.centralGrant.deleteMany(); await prisma.centralAttempt.deleteMany();
   await prisma.centralPending.deleteMany(); await prisma.centralIdentity.deleteMany(); await prisma.user.deleteMany(); await prisma.accountTombstone.deleteMany();
   process.env.HEYTA_OIDC_TEST_KEY = fixturePaths.key;
@@ -70,11 +72,20 @@ afterAll(async () => prisma.$disconnect());
 class Browser {
   cookies = new Map<string, string>();
   cookie() { return [...this.cookies].map(([k,v]) => `${k}=${v}`).join('; '); }
+  remember(response: Response) {
+    for (const cookie of response.headers.getSetCookie()) { const pair = cookie.split(';')[0], split = pair.indexOf('='); if (cookie.includes('Max-Age=0')) this.cookies.delete(pair.slice(0,split)); else this.cookies.set(pair.slice(0,split),pair.slice(split+1)); }
+  }
   async request(path: string, method = 'GET', body?: unknown, headers: Record<string, string> = {}) {
     const response = await fetch(`${network}${path}`, { method, redirect: 'manual', headers: {
       cookie: this.cookie(), origin, ...(body !== undefined ? { 'content-type': 'application/json' } : {}), ...headers,
     }, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
-    for (const cookie of response.headers.getSetCookie()) { const pair = cookie.split(';')[0], split = pair.indexOf('='); if (cookie.includes('Max-Age=0')) this.cookies.delete(pair.slice(0,split)); else this.cookies.set(pair.slice(0,split),pair.slice(split+1)); }
+    this.remember(response);
+    return response;
+  }
+  async form(path: string, body: string) {
+    const response = await fetch(`${network}${path}`, { method: 'POST', redirect: 'manual',
+      headers: { cookie: this.cookie(), origin, 'content-type': 'text/plain' }, body });
+    this.remember(response);
     return response;
   }
   async start(terms = true) {
@@ -107,6 +118,43 @@ async function settled(predicate: () => boolean) {
   throw new Error('Timed out waiting for bounded socket condition');
 }
 describe('central HTTP and established WS', () => {
+  it('lets a device initiate OIDC without a Web session and claims only once after browser pairing', async () => {
+    const verifier = randomSecret();
+    const start = await fetch(`${network}/api/auth/oidc/device/start`, { method: 'POST',
+      headers: { 'content-type': 'application/json' }, body: JSON.stringify({ deviceChallenge: digest(verifier),
+        termsAccepted: true, documentVersion: LEGAL_SET_VERSION }) });
+    expect(start.status, await start.clone().text()).toBe(200);
+    const initiated = await start.json() as { handoffId: string; launchUrl: string; pairingCode: string };
+    expect(initiated.launchUrl).not.toContain(verifier);
+    const browser = new Browser(), path = new URL(initiated.launchUrl).pathname;
+    const first = await browser.request(path), second = await browser.request(path);
+    expect(first.status).toBe(200); expect(second.status).toBe(200);
+    const page = /name="page" value="([A-Za-z0-9_-]{43})"/.exec(await second.text())?.[1];
+    expect(page).toBeTruthy();
+    const secret = path.slice(path.lastIndexOf('/') + 1);
+    const wrong = await browser.form('/api/auth/oidc/device/launch',
+      `launch=${secret}\r\npage=${page}\r\ncode=000000000000\r\n`);
+    expect(wrong.status).toBe(410);
+    const launched = await browser.form('/api/auth/oidc/device/launch',
+      `launch=${secret}\r\npage=${page}\r\ncode=${initiated.pairingCode}\r\n`);
+    expect(launched.status, await launched.clone().text()).toBe(303);
+    const authorizationUrl = launched.headers.get('location')!;
+    expect(authorizationUrl).not.toContain(verifier);
+    const callback = await provider.callback(authorizationUrl);
+    const result = await browser.request(new URL(callback).pathname + new URL(callback).search);
+    expect(result.status, await result.clone().text()).toBe(200);
+    expect(browser.cookies.has(CENTRAL_COOKIES.session)).toBe(false);
+    const claim = async (value: string) => fetch(`${network}/api/auth/oidc/device/claim`, { method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ handoffId: initiated.handoffId, verifier: value }) });
+    expect((await claim(randomSecret())).status).toBe(410);
+    const delivered = await claim(verifier);
+    expect(delivered.status, await delivered.clone().text()).toBe(200);
+    const session = await delivered.json() as { token: string; status: string };
+    expect(session.status).toBe('claimed'); expect(session.token).toBeTruthy();
+    expect((await claim(verifier)).status).toBe(410);
+    expect((await fetch(`${network}/private`, { headers: { authorization: `Bearer ${session.token}` } })).status).toBe(200);
+  });
   it('completes a real callback with host-only cookie, verified consent and CSRF-protected API; rejects local mint', async () => {
     const browser = new Browser(), response = await browser.login();
     const cookies = response.headers.getSetCookie();

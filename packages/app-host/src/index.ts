@@ -394,6 +394,12 @@ export {
  * 症状是"服务端收了、客户端拒显示"。宿主直接从 shared-schema 取。
  */
 export {
+  beginCentralDeviceAuth,
+  claimCentralDeviceAuth,
+} from './central-auth.js';
+export type { CentralDeviceStart, CentralDeviceClaim } from './central-auth.js';
+
+export {
   HOSTED_AUTH_PATHS,
   HOSTED_PASSKEY_NAME_MAX_LENGTH,
   beginPasskeyEnrollment,

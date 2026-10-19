@@ -44,6 +44,9 @@
  */
 
 import {
+  beginCentralDeviceAuth,
+  claimCentralDeviceAuth,
+  getCentralAuthConfig,
   loginWithEmailPassword,
   registerWithEmailPassword,
   type HostedAuthFailure,
@@ -65,6 +68,10 @@ export interface AuthCommandDeps {
   fetchImpl?: typeof fetch;
   /** 环境变量来源，默认 `process.env`。 */
   env?: Readonly<Record<string, string | undefined>>;
+  /** Human-only progress; token is returned through AuthCommandResult, never this callback. */
+  onProgress?: (message: string) => void;
+  sleep?: (milliseconds: number) => Promise<void>;
+  now?: () => number;
 }
 
 const VALUE_OPTIONS = new Set(['server', 'email', 'invite']);
@@ -72,10 +79,11 @@ const BOOL_OPTIONS = new Set(['terms', 'json']);
 
 const AUTH_USAGE =
   '用法：\n' +
+  '  node dist/cli.js auth login --server <url> [--terms] [--json]  # 官方统一身份：浏览器确认\n' +
   "  printf '%s' \"$口令\" | node dist/cli.js auth register --server <url> --email <邮箱> --terms [--invite <码>]\n" +
   "  printf '%s' \"$口令\" | node dist/cli.js auth login    --server <url> --email <邮箱>\n" +
   '\n' +
-  '🔴 口令只从 stdin 读，不写在命令行上（那会留在 ps 输出与 shell 历史里）。\n';
+  '🔴 自托管本地口令只从 stdin 读，不写在命令行上（那会留在 ps 输出与 shell 历史里）。\n';
 
 interface ParsedAuthArgs {
   values: Record<string, string>;
@@ -271,6 +279,43 @@ export async function runAuthCommand(
   if (serverUrl === undefined || serverUrl === '') {
     return fail('缺 --server <url>（或 HEYTA_SERVER_URL）—— 一个请求都没发。\n');
   }
+  const options: HostedAuthOptions = { baseUrl: serverUrl };
+  if (deps.fetchImpl !== undefined) options.fetchImpl = deps.fetchImpl;
+  const config = await getCentralAuthConfig(options);
+  if (!config.ok) return fail(config.reason === 'network'
+    ? '连不上服务端或认证配置不可用（reason=network）；没有改用本地口令。\n'
+    : `认证配置不可用（${config.reason}）；没有改用本地口令。\n`);
+  if (config.value.mode === 'oidc') {
+    if (parsed.values['email'] !== undefined || parsed.values['invite'] !== undefined)
+      return fail('统一身份由中央认证页收集账号；这里不接受 --email 或 --invite。\n');
+    if (sub === 'register' && !parsed.bools.has('terms'))
+      return fail('新账号须显式同意条款：加 --terms；一个登录请求都没发。\n');
+    if (parsed.bools.has('terms') && !config.value.documentVersion)
+      return fail('此实例没有可核实的条款版本，不能代替运营者记录同意。\n');
+    const started = await beginCentralDeviceAuth({ ...options,
+      ...(parsed.bools.has('terms') ? { termsAccepted: true, documentVersion: config.value.documentVersion! } : {}) });
+    if (!started.ok) return fail(`统一身份登录未发起（${started.reason}）。\n`);
+    const progress = deps.onProgress ?? ((message: string) => process.stderr.write(message));
+    progress(`请在本机浏览器打开：${started.value.launchUrl}\n` +
+      `确认码：${started.value.pairingCode}（只在该页面输入，核对设备上显示的一致）\n` +
+      '等待浏览器完成统一身份登录…\n');
+    const now = deps.now ?? Date.now;
+    const sleep = deps.sleep ?? ((milliseconds: number) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds)));
+    while (now() < started.value.expiresAt) {
+      const claimed = await claimCentralDeviceAuth(options, started.value.handoffId, started.value.verifier);
+      if (!claimed.ok) return fail(`统一身份领取失败或状态不确定（${claimed.reason}）；请重新发起登录。\n`);
+      if (claimed.value.status === 'claimed') {
+        const { token, user } = claimed.value;
+        return { code: 0,
+          stdout: json
+            ? `${JSON.stringify({ ok: true, command: 'auth', action: sub, token, userId: user.id, email: user.email })}\n`
+            : `已登录（${user.email}）。\n令牌：${token}\n🔴 同步仍需独立的端到端加密口令，它不进入中央身份。\n`,
+          stderr: '' };
+      }
+      await sleep(Math.min(5000, Math.max(0, started.value.expiresAt - now())));
+    }
+    return fail('统一身份登录已过期，请重新发起。\n');
+  }
   if (email === undefined || email === '') {
     return fail('缺 --email <邮箱>（或 HEYTA_EMAIL）—— 一个请求都没发。\n');
   }
@@ -285,9 +330,6 @@ export async function runAuthCommand(
   if (password === '') {
     return fail('从 stdin 读到的是空口令，一个请求都没发。\n');
   }
-
-  const options: HostedAuthOptions = { baseUrl: serverUrl };
-  if (deps.fetchImpl !== undefined) options.fetchImpl = deps.fetchImpl;
 
   if (sub === 'register') {
     const result = await registerWithEmailPassword(options, {
