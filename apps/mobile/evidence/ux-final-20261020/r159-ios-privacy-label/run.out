@@ -1,0 +1,1 @@
+{"status": "done", "probe": "apps/mobile/evidence/ux-final-20261020/r159-ios-privacy-label/probe.json", "visibleLabel": "visible-text（触控区宽 72 pt > 图标方块 44 pt）", "wordNodes": [{"label": "以后再说", "frame": [294, 232, 72, 44], "pressable": true}], "sheetAfterTap": [], "sheetBackOnRelaunch": ["同意并联网", "只用本机"], "consentRows": [0, 0, 0]}

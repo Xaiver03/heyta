@@ -5106,3 +5106,45 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
       🔴 **合起来这三格（r156 / r157 / r158）交的是同一句话**：四面 + 提醒块这一族装机态读数，
       现在**四格全部指同一枚件**，"当前源码件"不再是一个模糊说法。仍不证的只剩端：
       Android / windows 两端的装机态（打包机不可达）、真机 iPhone、大字体档、macOS Gallery 那几格。
+      ⚠️ **上面那句"当前源码件不再是一个模糊说法"被 r159 否证了一半，按新落点更正（原句留在上面不删）**：
+      那枚件 `ca3a09257bdfba19` 是**同一枚**没错（三批共用、哈希两侧都量过），但它**不等于当前源码** ——
+      它比 HEAD 少一笔 `f21dc1d39`。少的那一笔不在四面 + 提醒块的路径上（见 r159 那一格），
+      所以这三批读数**不因此作废**；作废的是"当前源码件"这个称呼本身。
+
+- [x] ✅ **10-20 02:1x r159 iOS 端第十趟重装（本机就能打，此前被当成"等打包机"）：装机件从 `ca3a09257bdfba19` 换成 `928e8050693d3d19`，首屏隐私卡那条出口在新件上复验通过**
+      🔴 **起因是一句我自己写下的话**：r155 那格写的是"iOS 此刻装的确实是含 r153 的件"。今天不照它行动，先量：
+      `stat` 容器里的 `main.jsbundle` ⇒ mtime **10-20 01:02:15**；而最后一笔**会进包的**源码提交是
+      `f21dc1d39`（**01:09:27**，`fix(隐私同意): 「以后再说」在屏幕上摆出那句话，不再只留一枚叉`）
+      ⇒ 件**早于**那笔修复 7 分钟。那句"含 r153"混的是 **r153 = 缺陷登记**与 **f21dc1d39 = 修复**两件事：
+      件里有那枚缺陷（r153 的 ✕ 截图正是从这枚件上取的），**没有**它的修复。
+      - 判据尺（下一位照跑，别抄本格的数）：
+        `paths=(packages apps/mobile/android apps/mobile/src apps/mobile/ios apps/desktop-macos apps/desktop-windows/src apps/desktop-windows/app apps/web/src apps/web/app server/src)`
+        `LAST=$(git log -1 --format=%H -- $paths)` ⇒ 这一枚就是"最后一笔进包的改动"；`git diff --name-only ${LAST}..HEAD -- $paths` 的枚数就是**要不要重装的差集**。
+        🔴 **zsh 不分词，这一枪本趟我自己中了一次**：把路径写成普通字符串 `$PKG` 传进去，`git log -- "<整串>"` 回**空**，
+        于是 `${LAST}..HEAD` 变成 `HEAD..HEAD` ⇒ 打出"差集 **0** 枚"的**假绿**。
+        打掉它的是一枚阳性对照：`git diff --name-only ${LAST}~1..${LAST} -- $paths` 回 **2** ⇒ 尺子当时是瞎的。**用数组、并且每次都带一枚"预期非 0"的对照**。
+      - **这一端根本不需要打包机**：`scripts/reinstall-all.sh` 的 ios 段是**本机** `xcodebuild -workspace Heyta.xcworkspace -destination id=<UDID>`（iphonesimulator），
+        只有 windows / android 两段吃 `HEYTA_WIN_HOST`。所以"iOS 装机态等打包机回来"这句**从来没成立过**，等的是一枚我误当成别人手里的旋钮。
+        现跑：`IOS_DEVICE_NAME="heyta-iphone-17pro" HEYTA_REINSTALL_TMP_DIR=~/heyta-reinstall/r159-ios bash scripts/reinstall-all.sh --only ios` ⇒ **`REINSTALL_RC=0`**，
+        判据三件齐：`已装的包比源码新 —— 这一轮装的是当前产物` + 窗口 **1206×2622** + `heyta-reinstall-ios.png` 内容占比 **58.9%**、主蓝命中 **4091**。
+        ⚠️ 汇总里 mac / windows / android 三端各写"这端**没有**验证当前产物"（mac 那端 r155 已取到，只是不在本趟 `--only` 范围）。
+      - **增量只有一笔，所以复验只复验那一笔**：`f21dc1d39` 里进 iOS 包的只有 `apps/mobile/src/screens/PrivacyConsentSheet.tsx`。
+        用 r153 那枚探针在新件上重跑（`r159-ios-privacy-label/`）⇒ 那条出口的节点从改前的**图标方块 `[322,232,44,44]`** 变成
+        **`[294,232,72,44]`（装了文字）**，`label` 仍是 `以后再说`（可及名称没动，走的是同一个 key）；
+        行为三档 `device_pref` rows = **0 / 0 / 0**（按掉不落盘），杀掉重开 `sheetBack=['同意并联网','只用本机']`（卡回得来）⇒ r150 那两条正面结论没被这笔改坏。
+        人眼层：**看过 `01-first-launch.png` 一张**（三条出口都有可见文字，右上角那枚是「以后再说」而不是叉），另两张只有 AX 回读。
+      - 🔴 **顺手修掉探针两处会造假日月的毛病**（`ios-privacy-decide-later-r153/probe.py`，本线名下）：
+        ① 它给自己贴的 `jsbundleSha256` 读的是**本地构建目录** `apps/mobile/ios/build/…`，而重装脚本的 derivedData 在别处 ——
+        现量两侧：容器里 `928e8050693d3d19` vs 那目录 **仍是 `ca3a09257bdfba19`** ⇒ **旧写法会把一枚没在跑的件的哈希贴进取证**。改成读**装机容器**（取不到容器就 `SystemExit` 响亮失败，不退化成空），本地那枚只作 `buildDirSha256` 并列打印。
+        ② 它的 `--out` 默认值就是**自己的证据目录**（里面有 15 枚已跟踪文件）⇒ 不带参数重跑会盖掉入库的那批。补成与 `reminders-data-responsive.mjs` 同一道闸门：**落点含已跟踪文件 ⇒ 拒绝起跑**，臂现量 **rc=1** 且自报枚数。
+      - **新件上重跑一条设备腿**（证"起得来、走得通"，不是重取 2×2）：`profile-settings-ios.py`（默认 zh、装机态 light）⇒ **`rc=0`、29 步**，
+        `settings-ia-journey.json` 里 `language:zh` / `appearance:light` 两枚回读在案。
+        🔴 **为什么这三批读数不必在新件上重跑**（这条是**查过路径**才写的，不是推理）：四面 + 提醒块收那张隐私卡用的是**「只用本机」**那一枚
+        （`profile-settings-ios.py:378`、`account-face-ios.py:127` 现量），`f21dc1d39` 改的是**第三条出口**的可见层 ⇒ 不在它们的路径上。
+      - 设备收工态：`appearance=light`、语言 `zh`（本趟没动语言维）、**没收任何 companion**；app 停在**未决**态（rows 0，探针按的是「以后再说」）。
+      **不证**：⑴ 本趟只重装 **ios 一端**，windows / android 仍堵在打包机 —— 现量分母是**三枚别名**：
+      `windows-pc`→`41478@10.111.127.237`（ping FAIL、tcp/22 NO）、`windows-pc-lan`→`41478@192.168.1.2`（**ping OK 但 tcp/22 NO、`arp -n` 里 0 条**）、
+      `windows-codex`→`rayne@10.111.127.151`（ping FAIL、tcp/22 NO），本机在 `10.246.153.139`／网关 `10.246.153.46` ⇒ 三个地址**没有一条给过应用层读数**；
+      ⚠️ 台账此前只数过两枚别名，而且把"同一个 `41478`"读成了"同一台的两条路"——那是**从用户名推的**，不是量到的。
+      ⑵ 真机 iPhone、macOS Gallery、大字体档那几格照旧不证。
+

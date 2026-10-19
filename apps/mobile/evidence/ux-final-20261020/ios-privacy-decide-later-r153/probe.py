@@ -53,6 +53,25 @@ def simctl(*args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(["xcrun", "simctl", *args], capture_output=True, text=True, timeout=120)
 
 
+def sha256_of(path: Path) -> str:
+    fields = subprocess.run(["shasum", "-a", "256", str(path)], capture_output=True, text=True).stdout.split()
+    if not fields:
+        raise SystemExit(f"拒绝执行：算不出 {path} 的 sha256")
+    return fields[0]
+
+
+def installed_bundle(udid: str) -> Path:
+    """🔴 出处只认装机那枚。原来这里读 `BUNDLE`（本地构建目录），而重装脚本的 derivedData
+    落在别处，于是读数会给自己贴上一枚**没在跑的件**的哈希。取不到就响亮失败，不退化成空。"""
+    container = simctl("get_app_container", udid, "com.heyta").stdout.strip()
+    if not container:
+        raise SystemExit(f"拒绝执行：读不到 {udid} 上 com.heyta 的容器 —— 没装还是没启动？")
+    js = Path(container) / "main.jsbundle"
+    if not js.is_file():
+        raise SystemExit(f"拒绝执行：容器里没有 {js}")
+    return js
+
+
 def tree(udid: str) -> list[dict[str, Any]]:
     return AX.dump_nodes(str(IDB), str(COMPANION), udid, attempts=4)
 
@@ -120,12 +139,25 @@ def main() -> int:
                     help="只读到卡、取一次读数、按掉那句话就退出（英文档那一腿要先把卡收掉才走得到设置面）")
     args = ap.parse_args()
     out = Path(args.out)
+    tracked = subprocess.run(["git", "-C", str(ROOT), "ls-files", "--", str(out)],
+                             capture_output=True, text=True).stdout.splitlines()
+    if tracked and os.environ.get("HEYTA_ALLOW_TRACKED_EVIDENCE") != "1":
+        raise SystemExit(
+            f"拒绝执行：落点 {out} 里有 {len(tracked)} 枚**已跟踪**的证据，重跑会盖掉入库的那批。\n"
+            "  例行复跑请指到一个未跟踪目录（--out apps/mobile/evidence/<新趟号>）；\n"
+            "  确实要刷新入库那批，才显式 HEYTA_ALLOW_TRACKED_EVIDENCE=1，并在提交信息里写明哪一趟、哪棵树。"
+        )
     out.mkdir(parents=True, exist_ok=True)
+    installed = installed_bundle(args.udid)
+    build_js = BUNDLE / "main.jsbundle"
     res: dict[str, Any] = {
         "udid": args.udid,
-        "artifact": {"bundle": str(BUNDLE),
-                     "jsbundleSha256": subprocess.run(["shasum", "-a", "256", str(BUNDLE / "main.jsbundle")],
-                                                      capture_output=True, text=True).stdout.split()[0]},
+        "artifact": {
+            "installedBundle": str(installed.parent),
+            "jsbundleSha256": sha256_of(installed),
+            "buildDirBundle": str(BUNDLE),
+            "buildDirSha256": sha256_of(build_js) if build_js.is_file() else None,
+        },
         "iconSquarePt": ICON_SQUARE,
         "steps": [],
     }
