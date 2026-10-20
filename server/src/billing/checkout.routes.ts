@@ -28,6 +28,15 @@
  *    一个**数值对得上、币种对不上、没有一层会报错**的分叉 —— 结算也只比
  *    `final_amount_minor`，照样授予权益。这里按 `currency` 选通道，
  *    选不到就 409，一张订单都不落；adapter 自己也必须拒（声明与执行同源）。
+ * 6. 🔴 **②′ 这一档要交付的能力，这台实例**有**吗**（`managedAiConfigured`）。
+ *    `NOT_YET_DELIVERABLE_SKUS` 回答的是"这一档在全仓库今天能不能交付"，
+ *    而云端 AI 那一档的交付与否是**逐台实例**的事实：同一个镜像，官方配了
+ *    `MANAGED_AI_*`、自托管没配。没配时那条代理路由对每个请求回 503，
+ *    收 ¥12 就是收钱不交付。默认**拒**（忘了传选项的症状是"卖不出去"，不是"卖了不交付"）。
+ * 7. 🔴 **④′ 收了钱不许把已经付费的能力判小**（`PRICE_TIER_LOSES_GRANTS`）。
+ *    收银台有了两枚按钮之后，"高档用户点低档"是一条**用户自己走得通**的路径，
+ *    而授予那侧是整行替换 `grants`：时长照加、能力缩回。判在冻结之前，
+ *    拒掉而不是"折价"—— 一行只有一个 `currentPeriodEnd`，折算没有数据形状可依。
  *
  * ## 不在这里做的事
  *
@@ -57,12 +66,30 @@ import {
 } from './pricing-store';
 import { QuotePricingError, isSellableCurrency, quoteOrder } from './quote';
 import { buildOutTradeNo } from './out-trade-no';
+import { evaluateEntitlement } from '../entitlement';
+import { MANAGED_AI_CAPABILITY } from '../ai/metering';
 import type { BillingAdapter } from './types';
 import type { SqlExecutor } from './pricing-store';
 
 /** 默认收什么钱 / 在哪个法域。与 `quote.ts` / `coupon.ts` 的词表同源，不另起一套。 */
 const DEFAULT_CURRENCY = 'CNY';
 const DEFAULT_REGION = 'CN';
+
+/**
+ * ②′ 拒单时给**运营者**看的那句理由。
+ *
+ * 客户端渲染的是 `PRICE_NOT_SELLABLE` 对应的那条词条（"这一档现在买不了"），
+ * 不是这一句 —— 它不进界面，只进响应体与日志，回答的是"我该去配哪一枚旋钮"。
+ */
+const MANAGED_AI_NOT_DELIVERABLE_REASON =
+  '这台实例没有配置托管 AI 的上游（`MANAGED_AI_ENABLED` 与三项 `MANAGED_AI_UPSTREAM_*`），'
+  + '而这一档买的就是它：现在卖出去，用户拿到的是每次请求一个 503。';
+
+/** ④′ 的理由，同上：给运营者看的，不进界面。 */
+const TIER_LOSSES_GRANTS_REASON =
+  '这一档的能力集合不包含该账号当前已付费那一行的全部能力，而一次性支付是**整行替换** '
+  + '`priceId` / `grants`（`apply-event.ts` 的 `applyOneTimeGrant`）：'
+  + '收这一单会让用户付了钱却**少**拿到原来有的能力。';
 
 /**
  * 🔴 请求体**故意**只有"买哪一档"与"用哪个码"。
@@ -101,7 +128,70 @@ export interface CheckoutRoutesOptions {
   /** 支付成功 / 取消后的回跳地址。默认 `${publicUrl}/`。 */
   readonly successUrl?: string;
   readonly cancelUrl?: string;
+  /**
+   * 🔴 这台实例**能不能交付**「我们的云端 AI」—— 即 `config.ts` 的 `managedAi`
+   * 是否配齐（`MANAGED_AI_ENABLED=true` 且三项上游凭证齐全）。
+   *
+   * **默认 `false` = 这一档不卖**。这不是保守，是这条线上唯一的 fail-closed 位置：
+   * 上游没配时 `POST /api/ai/managed/chat` 对每个请求回
+   * `503 MANAGED_AI_NOT_CONFIGURED`（闸门 ③ 在额度 ⑤ 之前，所以它不白扣次数），
+   * 于是"收 ¥12、交付 0 次"是一个**配置就能造出来**的状态。
+   * `NOT_YET_DELIVERABLE_SKUS` 挡不住它 —— 那张表是**全局静态**的，
+   * 而这件事是**这一台实例**的事实（同一个镜像，官方开着、自托管没开）。
+   *
+   * ⚠️ 值在**注册插件时**取一次，与 `adapters` 同一姿态（两者都来自
+   * `loadConfigFromEnv()`，运行期不会变）。不要在这里再 `loadConfigFromEnv()` 一次：
+   * 那会造出第二个配置源，而"两处读同一枚 env、一处为空"正是本仓反复登记过的分叉形状。
+   */
+  readonly managedAiConfigured?: boolean;
 }
+
+/**
+ * 读"这一行订阅此刻实际授予的能力"，只为 ④′ 服务。
+ *
+ * 为什么按 `(userId, provider)` 取**一行**而不是取全部：
+ * 一次性支付的授予路径就是按这个键复用一行的（`apply-event.ts` 的
+ * `applyOneTimeGrant`），而 ④′ 判的正是"这一单会不会把**那一行**判小"。
+ * 跨行的并集（付费行 + 邀请行）由 `evaluateCapabilityAcross` 在守卫那侧管，
+ * 在这里读并集会拒掉根本不会被覆盖的行 —— 那是把别人的权益当成要保护的东西。
+ *
+ * 三种返回值，含义不同，不许合并：
+ * - `null`：库里没有这一行（第一次买），谈不上"判小"；
+ * - `[]`：有这一行，但**此刻没有授予任何能力**（已到期 / 状态不算有效 / grants 列形状不对）。
+ *   最后一项刻意落到 `[]` 而不是抛：grants 不是数组时 `evaluateCapability` 本来就会
+ *   `MISSING_GRANTS` 拒绝，用户在那一行上**没有**任何能力可丢。
+ * - 数组：这一行此刻授予的能力。
+ */
+const readEntitledGrantsForProvider = async (
+  runner: SqlExecutor,
+  userId: number,
+  provider: string,
+  nowMs: number,
+): Promise<readonly string[] | null> => {
+  const rows = await runner.query<{
+    status: unknown;
+    current_period_end: unknown;
+    grants: unknown;
+  }>(
+    'SELECT status, current_period_end, grants FROM subscriptions WHERE user_id = $1 AND provider = $2 LIMIT 1',
+    [userId, provider],
+  );
+  const row = rows[0];
+  if (row === undefined) return null;
+
+  const decision = evaluateEntitlement(
+    {
+      status: typeof row.status === 'string' ? row.status : null,
+      currentPeriodEnd: row.current_period_end as number | bigint | null,
+    },
+    nowMs,
+  );
+  if (!decision.allowed) return [];
+
+  // 🔴 数组才是集合。字符串**也有** `includes`，`'hosting,ai'` 会被当成集合用，
+  // 而子串匹配让 `includes('ai')` 返回 true —— 同 `entitlement.ts` 里那条理由。
+  return Array.isArray(row.grants) ? (row.grants as readonly string[]) : [];
+};
 
 export const checkoutRoutes: FastifyPluginAsync<CheckoutRoutesOptions> = async (
   fastify,
@@ -112,6 +202,9 @@ export const checkoutRoutes: FastifyPluginAsync<CheckoutRoutesOptions> = async (
   const cancelUrl = options.cancelUrl ?? `${base}/`;
   const now = options.now ?? Date.now;
   const sql = options.sql ?? createPrismaSqlExecutor(prisma);
+  // 🔴 默认**拒**（见 `managedAiConfigured` 的注释）：忘了传这个选项的症状是
+  // "这一档卖不出去"，而不是"卖了但交付不了"。前者会被立刻发现，后者是收钱不交付。
+  const managedAiConfigured = options.managedAiConfigured ?? false;
 
   fastify.post<{ Body: unknown }>(
     '/checkout',
@@ -142,8 +235,34 @@ export const checkoutRoutes: FastifyPluginAsync<CheckoutRoutesOptions> = async (
       // ── ② 是我们认识的档吗 ────────────────────────────────────────────
       // 不认识的档**不报价**：`resolveEffectivePrice` 会抛，但那时错误形状
       // 已经变成"价目表坏了"，而真实原因是"客户端给了个不存在的 priceId"。
-      if (grantsForSku(body.priceId) === null) {
+      const requestedGrants = grantsForSku(body.priceId);
+      if (requestedGrants === null) {
         return reply.code(400).send({ code: 'UNKNOWN_PRICE', message: 'UNKNOWN_PRICE', priceId: body.priceId });
+      }
+      // ── ②′ 这一档要交付的那项能力，这台实例真的有吗 ─────────────────────
+      //
+      // 🔴 这是 `NOT_YET_DELIVERABLE_SKUS` **结构上做不到**的那一半：那张表回答
+      // "这一档在全仓库今天能不能交付"（一个静态、全局的事实），而这里回答的是
+      // "**这一台**实例能不能"。同一个镜像，官方托管配了上游、自托管没配 ——
+      // 把这一格写进那张表就会变成"为了我这台没配，把所有人那一档下架"。
+      //
+      // 判据只有一条：这一档授予 `ai`（云端 AI 能力）而 `config.ts` 的 `managedAi` 不存在。
+      // 那时 `POST /api/ai/managed/chat` 对**每个**请求回 `503 MANAGED_AI_NOT_CONFIGURED`，
+      // 用户付 ¥12 拿到 0 次。额度也白扣不了（闸门 ③ 在 ⑤ 之前），但钱已经收了。
+      //
+      // ⚠️ 复用 `PRICE_NOT_SELLABLE` 而**不**新造一个码：对用户这句话就是对的
+      // （"这一档现在买不了"），而两种成因的区分归运营 —— 走 `reason` 与下面那条日志。
+      if (requestedGrants.includes(MANAGED_AI_CAPABILITY) && !managedAiConfigured) {
+        Logger.warn('收银台：这一档授予云端 AI，但本实例未配置托管上游，已拒单', {
+          priceId: body.priceId,
+          userId,
+        });
+        return reply.code(409).send({
+          code: 'PRICE_NOT_SELLABLE',
+          message: 'PRICE_NOT_SELLABLE',
+          priceId: body.priceId,
+          reason: MANAGED_AI_NOT_DELIVERABLE_REASON,
+        });
       }
       // ── ③ 币种与区域只能来自词表 ──────────────────────────────────────
       const currency = body.currency ?? DEFAULT_CURRENCY;
@@ -178,6 +297,38 @@ export const checkoutRoutes: FastifyPluginAsync<CheckoutRoutesOptions> = async (
       }
 
       const nowMs = now();
+
+      // ── ④′ 这一单会不会把已经付过钱的能力判小 ───────────────────────────
+      //
+      // 🔴 起因是把 ¥12 档做成可点的那一瞬间就出现的新状态：收银台有了两枚按钮。
+      // 一次性支付的授予**整行替换** `priceId` 与 `grants`
+      // （`apply-event.ts` 的 `applyOneTimeGrant`，注释里那句"档位与能力必须一起写"），
+      // 于是"¥12 的用户点 ¥5 续费"得到的是：**时长 +30 天、能力缩回 `hosting`**。
+      // 用户付了钱、时间没丢，云端 AI 却当场没了 —— 没有任何一层会报错。
+      //
+      // 为什么拒而不做"按比例折算"：那需要"每一笔支付各自到哪一天结束"的数据形状，
+      // 而这一行只有**一个** `currentPeriodEnd`（schema 里那一列，本文件不碰）。
+      // 在没有那个形状之前，"补差价升档"与"降档保留高档到期末"都是编出来的语义。
+      //
+      // 顺序仍然守本文件第 1 条：**在冻结之前**。这里已经知道 `adapter.provider`，
+      // 而那张订阅行的键正是 `(userId, provider)`。
+      const entitledGrants = await readEntitledGrantsForProvider(sql, userId, adapter.provider, nowMs);
+      const lostGrants = (entitledGrants ?? []).filter((g) => !requestedGrants.includes(g));
+      if (entitledGrants !== null && lostGrants.length > 0) {
+        Logger.warn('收银台：这一单会把该账号已付费的能力判小，已拒单（未冻结订单）', {
+          userId,
+          provider: adapter.provider,
+          priceId: body.priceId,
+          lostGrants,
+        });
+        return reply.code(409).send({
+          code: 'PRICE_TIER_LOSES_GRANTS',
+          message: 'PRICE_TIER_LOSES_GRANTS',
+          priceId: body.priceId,
+          lostGrants,
+          reason: TIER_LOSSES_GRANTS_REASON,
+        });
+      }
 
       // ── ⑤ 报价（读库里的价目覆盖与券）─────────────────────────────────
       // 🔴 这里**不再**自己 `createPrismaSqlExecutor(prisma)` —— 那会**遮蔽**

@@ -42,6 +42,39 @@ export const CHECKOUT_PATH = '/api/billing/checkout';
  */
 export const RENEWAL_PRICE_ID = 'hosted-monthly';
 
+/**
+ * 收银台**有哪几档可以买**，以及它们在界面里的顺序。
+ *
+ * 🔴 这里只有"档位的标识与 priceId"，**没有金额、也没有文案**：
+ * - 金额的唯一事实源是服务端价目表（`price-book.ts`）。客户端一抄金额，
+ *   就多出一份会漂的抄件，而"界面写 ¥10、报价冻 ¥12"这种分叉没有任何一层会发现。
+ *   界面上那一句金额从**报价响应**里读回来（`CheckoutQr.amountMinor`）。
+ * - 词条 key 留在各壳里：`packages/app-host` 刻意不依赖 `@heyta/i18n`
+ *   （反向依赖界面词表，见 `ai-route-target.ts` 的注释）。
+ *
+ * ⚠️ `hosted-ai-monthly` 在**这台实例没配托管上游**时会被服务端拒
+ * （`checkout.routes.ts` 的 ②′ ⇒ `409 PRICE_NOT_SELLABLE`）。这一条不放在客户端判：
+ * 实例配置只有服务端知道，客户端猜一次就会造出"界面有按钮、点了必 409"那个形状 ——
+ * 而那正是本文件上面那段旧注释曾经说对过的事。
+ */
+export type CheckoutTierId = 'hosted' | 'hostedAi';
+
+/** 收银台里有哪几档、按什么顺序排。 */
+export const CHECKOUT_TIERS: readonly CheckoutTierId[] = ['hosted', 'hostedAi'];
+
+/**
+ * 档位 → `priceId`。用 `Record` 而不是 `find()`：
+ * 查不到的那一种形状在类型上不存在，写成可选就会逼界面加一句"找不到就用默认档"的
+ * 假兜底 —— 而那种兜底一旦触发，用户点的是 A 档、下的是 B 档的单。
+ */
+export const CHECKOUT_TIER_PRICE_IDS: Readonly<Record<CheckoutTierId, string>> = {
+  hosted: 'hosted-monthly',
+  hostedAi: 'hosted-ai-monthly',
+};
+
+/** 界面默认选中哪一档：与 {@link RENEWAL_PRICE_ID} 同一枚，不另发明"默认档"这个概念。 */
+export const DEFAULT_CHECKOUT_TIER_ID: CheckoutTierId = 'hosted';
+
 export type CheckoutFailureCode =
   | 'UNCONFIGURED'
   | 'UNAUTHORIZED'
@@ -51,6 +84,7 @@ export type CheckoutFailureCode =
   | 'UNSUPPORTED_REGION'
   | 'PRICE_NOT_SELLABLE'
   | 'PRICE_NOT_EFFECTIVE'
+  | 'PRICE_TIER_LOSES_GRANTS'
   | 'PROVIDER_CURRENCY_UNSUPPORTED'
   | 'BILLING_PROVIDER_NOT_CONFIGURED'
   | 'CHECKOUT_FAILED'
@@ -125,6 +159,7 @@ const ERROR_CODES: readonly CheckoutFailureCode[] = [
   'UNSUPPORTED_REGION',
   'PRICE_NOT_SELLABLE',
   'PRICE_NOT_EFFECTIVE',
+  'PRICE_TIER_LOSES_GRANTS',
   'PROVIDER_CURRENCY_UNSUPPORTED',
   'BILLING_PROVIDER_NOT_CONFIGURED',
   'CHECKOUT_FAILED',

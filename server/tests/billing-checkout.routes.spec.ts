@@ -42,7 +42,7 @@ import type {
   WebhookVerification,
 } from '../src/billing/types';
 import type { SqlExecutor, SqlRunner } from '../src/billing/pricing-store';
-import { PRICING_SCHEMA_DDL } from './pricing-ddl.helper';
+import { PRICING_SCHEMA_DDL, SUBSCRIPTIONS_FOR_CHECKOUT_STAND_IN_DDL } from './pricing-ddl.helper';
 
 const NOW = 1_800_000_000_000;
 const HOUR = 60 * 60 * 1000;
@@ -100,6 +100,11 @@ const createPgliteExecutor = (pglite: PGlite): SqlExecutor => {
   };
 };
 
+/**
+ * 默认 `managedAiConfigured: true` —— 本 spec 的立场是"这一档买的东西存在"，
+ * 而那件事由 ②′ 判。它**不是**生产的默认值（生产默认拒，见 `checkout.routes.ts`），
+ * 所以专门有一组用例把 `false` 那一支钉住，别让它退化成"忘了传也没事"。
+ */
 const buildApp = async (options: CheckoutRoutesOptions = {}): Promise<FastifyInstance> => {
   const instance = Fastify({ logger: false });
   await instance.register(checkoutRoutes, {
@@ -107,6 +112,7 @@ const buildApp = async (options: CheckoutRoutesOptions = {}): Promise<FastifyIns
     adapters: [fakeAdapter],
     now: () => NOW,
     sql,
+    managedAiConfigured: true,
     successUrl: 'https://example.test/paid',
     cancelUrl: 'https://example.test/cancel',
     ...options,
@@ -161,7 +167,7 @@ const insertCoupon = async (): Promise<void> => {
 
 beforeAll(async () => {
   db = new PGlite();
-  await db.exec(PRICING_SCHEMA_DDL);
+  await db.exec(`${PRICING_SCHEMA_DDL}\n${SUBSCRIPTIONS_FOR_CHECKOUT_STAND_IN_DDL}`);
   sql = createPgliteExecutor(db);
 }, 60_000);
 
@@ -171,7 +177,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await db.exec(
-    'DELETE FROM coupon_redemptions; DELETE FROM checkout_orders; DELETE FROM coupons; DELETE FROM price_versions; DELETE FROM pricing_audit_log; DELETE FROM users;',
+    'DELETE FROM coupon_redemptions; DELETE FROM checkout_orders; DELETE FROM coupons; DELETE FROM price_versions; DELETE FROM pricing_audit_log; DELETE FROM subscriptions; DELETE FROM users;',
   );
   await db.exec(
     `INSERT INTO users (id, email) VALUES (${H.USER_ID}, 'buyer@example.com') ON CONFLICT DO NOTHING`,
@@ -422,5 +428,86 @@ describe('收银台 —— 通道侧失败必须释放名额', () => {
       ['reserved', 'applied', 'reversed'].includes(r.state),
     );
     expect(counted).toHaveLength(0);
+  });
+});
+
+describe('收银台 —— ②′ 这台实例到底交付不交付得了这一档', () => {
+  it('🔴 没配托管上游 ⇒ ¥12 那一档 409 PRICE_NOT_SELLABLE，并且**一张订单都不落**', async () => {
+    // 反臂的形状：把 `checkout.routes.ts` 里 ②′ 那一段删掉，这一条立刻红成 200 ——
+    // 而 200 就是"收了 ¥12、用户每次请求拿一个 503"。
+    app = await buildApp({ managedAiConfigured: false });
+    const res = await post({ priceId: 'hosted-ai-monthly' });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe('PRICE_NOT_SELLABLE');
+    const rows = await sql.query<{ n: unknown }>('SELECT count(*)::int AS n FROM checkout_orders');
+    expect(Number(rows[0]?.n)).toBe(0);
+  });
+
+  it('同一台没配上游的实例，¥5 那一档照卖 —— 判据盯的是"这一档买不买云端 AI"', async () => {
+    // 这一条是上面那条的**对照**：少了它，"②′ 拒掉 ¥12"与"②′ 拒掉所有单"看起来一样绿。
+    app = await buildApp({ managedAiConfigured: false });
+    const res = await post({ priceId: 'hosted-monthly' });
+    expect(res.statusCode).toBe(200);
+  });
+});
+
+describe('收银台 —— ④′ 收了钱不许把已经付费的能力判小', () => {
+  const insertSubscription = async (
+    grants: readonly string[],
+    currentPeriodEnd: number,
+    provider = 'wechat',
+    status = 'active',
+  ): Promise<void> => {
+    await sql.execute(
+      `INSERT INTO subscriptions (user_id, provider, status, current_period_end, grants)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [H.USER_ID, provider, status, currentPeriodEnd, grants],
+    );
+  };
+
+  const orderCount = async (): Promise<number> => {
+    const rows = await sql.query<{ n: unknown }>('SELECT count(*)::int AS n FROM checkout_orders');
+    return Number(rows[0]?.n);
+  };
+
+  it('🔴 ¥12 有效期内点 ¥5 ⇒ 409 PRICE_TIER_LOSES_GRANTS，且没有冻结任何订单', async () => {
+    await insertSubscription(['hosting', 'ai', 'automation'], NOW + 5 * 24 * HOUR);
+
+    const res = await post({ priceId: 'hosted-monthly' });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe('PRICE_TIER_LOSES_GRANTS');
+    expect(res.json().lostGrants).toEqual(['ai', 'automation']);
+    // 🔴 "拒在冻结之前"的证据是**库里没有这一单**，不是响应码。
+    expect(await orderCount()).toBe(0);
+    expect(checkoutCalls).toHaveLength(0);
+  });
+
+  it('同一行有效期内点 ¥12（同档续费）⇒ 200 —— 判据是能力集合的差，不是"价格变低了"', async () => {
+    await insertSubscription(['hosting', 'ai', 'automation'], NOW + 5 * 24 * HOUR);
+    const res = await post({ priceId: 'hosted-ai-monthly' });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('低档用户买低档 ⇒ 200：集合相等就没有"丢"这件事', async () => {
+    await insertSubscription(['hosting'], NOW + 5 * 24 * HOUR);
+    const res = await post({ priceId: 'hosted-monthly' });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('那一行已经到期 ⇒ ¥5 可以买（此刻没有任何可丢的能力）', async () => {
+    await insertSubscription(['hosting', 'ai', 'automation'], NOW - 60_000);
+    const res = await post({ priceId: 'hosted-monthly' });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('🔴 另一家 provider 的那一行**不算**：这一单不会覆盖它，拒它就是凭空挡单', async () => {
+    // 一次性支付的授予按 `(userId, provider)` 复用**一行**（`applyOneTimeGrant`），
+    // 所以只有同一 provider 那一行会被替换。跨行的并集由权益守卫那侧管
+    // （`evaluateCapabilityAcross`），在这里读并集会拒掉根本动不了的行。
+    await insertSubscription(['hosting', 'ai', 'automation'], NOW + 5 * 24 * HOUR, 'invite');
+    const res = await post({ priceId: 'hosted-monthly' });
+    expect(res.statusCode).toBe(200);
   });
 });

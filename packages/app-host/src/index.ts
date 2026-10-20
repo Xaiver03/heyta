@@ -294,6 +294,9 @@ export {
  */
 export {
   CHECKOUT_PATH,
+  CHECKOUT_TIERS,
+  CHECKOUT_TIER_PRICE_IDS,
+  DEFAULT_CHECKOUT_TIER_ID,
   RENEWAL_PRICE_ID,
   startCheckout,
   type CheckoutFailure,
@@ -301,6 +304,7 @@ export {
   type CheckoutOutcome,
   type CheckoutQr,
   type CheckoutRedirect,
+  type CheckoutTierId,
   type RejectedCouponEcho,
   type StartCheckoutOptions,
 } from './checkout.js';
