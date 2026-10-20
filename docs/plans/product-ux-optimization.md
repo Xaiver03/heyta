@@ -5155,26 +5155,29 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
         ⇒ 读数 **`以后再说`**、框 **88×44**、`textContent === aria-label` 同样成立 ⇒ **web × 中文这一格已取**，不在不证里。
         每档都回读 `navigator.language` 写进 `report.json`，所以"我要的语言"与"它真渲染的语言"是两枚可对账的读数，不是一句声明。
 
-- [ ] 🔴 **Android 那一腿"没有第三枚可指"这句被 02:5x 的现量否证了：`linux-dev` 活着、工具链齐，但它只能出 **debug 签名**的件——"debug 件算不算装机态验收对象"是判据口径，不由本线代改**（10-20 r161 建）。
-    先说清这一格**推翻的是哪半句**：上面 r159 那格里"三枚在册别名各不通"讲的是 **Windows 那两枚宿主 + 一枚过期 LAN 别名**，那句仍然真；
+- [ ] 🔴 **Android 那一腿"没有第三枚可指"这句被现量否证了：`linux-dev` 活着、工具链齐、出站也通——但它能换的只有"签名身份"这一维，而"换宿主"要在收口点上新开一枚 POSIX 远程支**（10-20 r161 建，**10-20 10:5x r163 逐条重述**；口径仍不由本线代拍）。
+    先说清这一格**推翻的是哪半句**：上面 r159 那格里"三枚在册别名各不通"讲的是 **Windows 那两枚宿主**，那句仍然真（10:3x 复量见下面 r163 那格的第 ① 条）；
     被推翻的是另一句更常见的读法——"Android 出包只能等 windows-pc，旋钮没有第三枚可指"。现量：
-    `grep -n 'HEYTA_ANDROID_HOST' scripts/run-gradle.mjs` ⇒ `:61` 写着"远程构建主机，默认 `windows-pc`"、`:89` 是 `process.env.HEYTA_ANDROID_HOST || 'windows-pc'`
-    ⇒ **宿主是可覆盖的**，而覆盖得到的那一枚 `linux-dev` 此刻是通的。
+    `grep -n 'HEYTA_ANDROID_HOST' scripts/run-gradle.mjs` ⇒ 默认值是 `windows-pc` 的那一行**是环境变量**（行号会漂，按形状找）
+    ⇒ **主机名是可覆盖的**；⚠️ 但"覆盖到 `linux-dev` 就能构建"**不成立**，见下面第 ③ 条。
     · **可达性**：`linux-dev` / `-lan` / `-mdns` / `-oob` 四枚别名各一次 `ssh -o ConnectTimeout=6 -o BatchMode=yes <别名> 'echo OK $(hostname)'` ⇒ **四枚全回 `OK Xaiver-linux`**（这台机的四枚别名是同一枚实体，与 Windows 那族"两枚地址一种 ICMP 一种 tcp"的坏法不同）。
     · **它有什么**（逐条现量，全部只读）：`Linux 7.0.0-38-generic` · `openjdk 21.0.12.1` · `ANDROID_HOME=/home/xaiver/.local/opt/android-sdk`（含 `emulator/emulator`）·
       `node v24.9.0` + `pnpm 11.8.0` · `~/.gradle` 缓存 **2.7G** · `system-images` 有 `android-32` 与 `android-36` · `/dev/kvm` 带 ACL 且 **`test -r`/`test -w` 双双 rc=0**（不在 `kvm` 组也能用）·
       在册 heyta 树三枚：`~/heyta`（HEAD `c84e09a9`，10-07 01:28，**脏 194**）、`~/heyta-f97013de`（10-07 12:16，脏 0）、`~/heyta-carrier`（非 git 树）。
-    · **它缺什么**（这三条才是这一格真正卡住的地方，不是"机不可达"）：
-      ① **依赖集不同且那台机没有 npm 出站**：本机 `pnpm-lock.yaml` sha256 前 12 位 **`38f1a91713a0`** vs 远端 `~/heyta/pnpm-lock.yaml` **`a60c9f81c96f`** ⇒ 它那 1.1G `node_modules` 对不上当前锁文件，
-        而"在那台机上重装依赖"这条路是死的（`registry.npmjs.org` 与 `services.gradle.org` 都不通，见项目记忆那条 Ubuntu 出包记录）⇒ 要出当前源码的件，得**新搭一条把 node_modules 从 Mac 搬过去的通道**，那条通道没人对账过。
-      ② **只有 debug 钥**：`find ~/heyta/apps/mobile/android -maxdepth 2 -name '*.keystore' -o -name 'keystore.properties'` 只回 **`app/debug.keystore`**，没有 `keystore.properties`（只报存在，没读内容）
-        ⇒ 生产 release 钥仍在 windows-pc 那侧没搬过来（项目记忆同一条写明），所以这台机能出的是 **debug 签名件**，不是发布件。
-      ③ **装机态那一族判据按发布件写的**：`docs/agents/multi-end-build.md:24` 那句「**不静默降级**：远端不可达就红」给"换一条来源"定性的就是这一格；
-        把"当前产物"从 release 件换成 debug 件，改的是**验收对象本身**，属判据口径。
-    ⇒ **本线这一趟没动它**：不擅自换宿主、不搬 node_modules、不把 debug 件的读数记成"Android 当前产物已验收"。
-    要解这一格，最小那一步是给一句拍板：**Android 装机态那几格允许不允许拿 debug 签名件当验收对象**（允许 ⇒ 本线可以立刻在 `linux-dev` 上起模拟器跑设备腿，读数旁边会印"debug · 来源 linux-dev · 非发布件"；
-    不允许 ⇒ 这一格与 windows/android 两端那几格一起，等 windows-pc 回来）。**推荐不允许**：小组件那一族读数（`widget_*`、系统面板拖放、签名相关的 Keychain/Keystore 通路）在 debug 与 release 上不是同一件事，
-    拿它替一次就会留下"看起来过了但其实换过尺"的那类账。
+    · **它缺什么**（这一串在 r163 之后只剩两枚，且都不是"机不可达"）：
+      ① ~~**依赖集不同且那台机没有 npm 出站**~~ ⇒ **10-20 10:5x 现量否证**：锁文件仍对不上（本机 `pnpm-lock.yaml` sha256 前 12 位 vs 远端各取一次，值见 r163 那格），
+        但**"没有出站"那句是旧的**——`registry.npmjs.org` / `registry.npmmirror.com` / `services.gradle.org` / `dl.google.com` 四条**逐条有体**（判法见 r163 第 ② 条），
+        远端另有 1.1G pnpm store ⇒ 对齐当前锁文件是**一条 `pnpm install --frozen-lockfile`** 的事，**不需要"把 node_modules 从 Mac 搬过去"那条没人对账过的通道**。
+      ② **只有 debug 钥**：`find ~/heyta/apps/mobile/android -maxdepth 2 -name '*.keystore'` 只回 **`app/debug.keystore`**，没有 `keystore.properties`（只报存在，没读内容）
+        ⇒ 生产发布钥**不在那台机上**（"没搬过来"是项目记忆里的原话；本线只核到"这台机上没有"这一条）。⚠️ 这一句**要说准**：它缺的是**签名身份**，不是"release 变体"——`assembleRelease` 在没有发布钥的机器上照样出 release 件（换成 debug 钥 + 大声警告，见 `app/build.gradle` 那句三元表达式），
+        而 `assembleDebug` 出的件**里没有 JS bundle**（RN gradle 插件把 debug 排除在打包任务之外），**那一种不是产品，谈不上算不算验收对象**。⇒ 这一格真正的选择只有"换不换签名身份"一枚。
+      ③ **收口点的远程支是 Windows 形状的**：`grep -n 'cd /d' scripts/run-gradle.mjs` 命中的两处真执行（远端 `pnpm install` 与远端 gradle 那两条 `cd /d … && gradlew.bat`），加上 `HEYTA_ANDROID_REMOTE_ROOT` 的默认值是一个盘符路径
+        ⇒ **环境变量只换主机名、不换命令形状**；要用这枚宿主得给收口点开一枚 POSIX 远程支，而它的形状由 `pnpm check:android-gradle-remote` 钉着（新开 `./gradlew` 入口 / 绕开收口点 / 回传路径与 `reinstall-all.sh` 的 `$APK` 对不上 ⇒ 各自会红）。**这是改承重脚本，不是一句拍板。**
+      ④ ~~**装机态那一族判据按发布件写的**（引 `docs/agents/multi-end-build.md` 那句"不静默降级：远端不可达就红"）~~ ⇒ **那句管的是"宿主不可达就红"，不管签名**；仓里对签名的明文口径写在另外两处，方向与 r161 当时的推荐**相反**：
+        `docs/runbooks/multi-platform-build.md`「没配发布钥时不失败、用 debug keystore 签并打警告……**只把它用于内测**」与 `docs/reference/build-matrix.md` §2.4「✅ **可用于内部安装测试** / ❌ 不可用于应用商店」。
+        装机态验收属"内部安装测试"那一支 ⇒ **本线现在的推荐是"允许"**（条件：读数自报 `apksigner verify --print-certs` 的 DN 与 SHA-256 前缀、按内测件入账；"升级连续性 / 换签名后本机数据存活"那一族除外——换身份必然 uninstall，那本身就是被测量）。逐条依据在 r163 那格第 ④ 条。
+    ⇒ **本线这几趟没动它**：不擅自换宿主、不改收口点、不把内测件的读数记成"Android 当前产物已验收"。
+    这一格现在挂在**两枚决定**上（都不是"等 windows-pc 回来"）：A 要不要给收口点加 POSIX 远程支并借用那台机；B 内测件算不算装机态那几格的验收对象。各带一条判据命令，见 r163 那格第 ⑥ 条。
 
 - [x] ✅ **10-20 02:1x r159 iOS 端第十趟重装（本机就能打，此前被当成"等打包机"）：装机件从 `ca3a09257bdfba19` 换成 `928e8050693d3d19`，首屏隐私卡那条出口在新件上复验通过**
       🔴 **起因是一句我自己写下的话**：r155 那格写的是"iOS 此刻装的确实是含 r153 的件"。今天不照它行动，先量：
@@ -5234,3 +5237,78 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
       ⇒ **不许由这一枚 rc=0 推"装机的那份 .app 过了窗口取证"**；`/Applications` 那件的壳二进制本趟没核。
       **不证**：⑴ 暗档不是控制配对（宿主自动切档，浅档那一趟与这趟不同批）；⑵ mac **英文档 × 暗档**没取；⑶ 壳二进制自己的装机件没核；
       ⑷ 只看了两枚图里的一张。
+
+- [ ] 🔴 **r163（10-20 10:3x–10:5x，全程只读）：「要那台打包机」那一桶拆到底了。windows 腿的成因换了一层（不是配置过期，是那台机没接网）；android 那枚口径题里 r161 登记的三条"缺什么"有两条被现量作废，而"debug 件"这个词混着两维、两维结论相反**（本线不代拍，但依据已换）
+
+  **① windows 腿：三枚别名仍全 `rc=255`，"不可达"底下已经换了网络，能解它的人也随之换了。**
+  复现：`for h in $(grep -iE "^Host " ~/.ssh/config | tr ' ' '\n' | grep -i win); do ssh -o ConnectTimeout=5 -o BatchMode=yes $h true >/dev/null 2>&1; echo "$h rc=$?"; done`
+  ⇒ 10:3x 现量 `windows-pc` / `windows-codex` / `windows-pc-lan` **三枚 `rc=255`**（与交接文档 §〇 Q2 那批 01:5x 同判，但下面的分层不一样，别照抄那批的结论）。
+  再往下分三层（前一批只分到"别名全不通"）：
+  · **本机换了网**：`ifconfig en0` ⇒ `192.168.1.7` netmask `/24`、网关 `192.168.1.1`；而交接 §〇 Q2 那批量的是 `10.246.153.139`／网关 `10.246.153.46`
+    ⇒ 同一句"打包机不可达"底下已经换了一张网。**这就是"不可达是瞬时读数"的最新一例**（正文见 §7 **#496**，与 #467 那条"A/B 只证当下能用"同族）。
+  · **两枚 ZeroTier 别名（`ssh -G` 解出 `10.111.127.237` / `.151`）ARP incomplete** ⇒ 那条按设计"打包机换网/换地方后依然可用"的路径上**没人接**（不是路由丢了）。
+  · **`windows-pc-lan` 那枚 HostName（`192.168.1.2`）在这张网上 L2 活着**（`arp -n 192.168.1.2` 回 MAC），
+    但 **ICMP 两枚读数不一致**：同一小时内第一次 `ping -c 2 -t 3` FAIL、第二次 OK ⇒ 别把"ping 得通"当稳定属性写；
+    而 `22 / 445 / 139 / 135 / 5357 / 80` **逐枚 NO** ⇒ 无论哪种读数，它都给不出应用层通道；
+    而 `~/.ssh/config` 里 `windows-pc` 段自己的注释记着那台机重装后的局域网地址是 **`192.168.1.3`**（现量 `grep -nE '^Host |HostName|局域网' ~/.ssh/config`），
+    那一枚**无 ARP 表项** ⇒ 不在这张网上。
+  ⇒ 三合读法：**"LAN 别名指错机"与"机器开着但 sshd 坏了"两种形状都被排掉**，剩下的是那台机没开机 / 没接这张网 / ZeroTier 客户端没跑。
+  本线这一腿写不了下一步，只写得动一句判据：**`ssh -o ConnectTimeout=6 -o BatchMode=yes windows-pc true` 回 0 ⇒ 这腿重开**。
+  ⚠️ 别把这条写成"等负责人"：拦路的是那台机的电源与网线，不是一个人的决定。
+
+  **② android 腿：r161 那三条"缺什么"里有两条现在不成立。**
+  r161 的 ①（"那台机没有 npm 出站…要出当前源码的件得**新搭一条搬 node_modules 的通道**"）**已被否证**：
+  现量 `ssh linux-dev 'env | grep -i proxy; curl -s -m 8 https://registry.npmjs.org/-/ping; curl -s -m 12 -H "Accept: application/json" https://registry.npmjs.org/react-native | head -c 90'`
+  ⇒ **无 proxy env**，`/-/ping` 回 `{}`、包元数据回**真 JSON**（`"_id":"react-native"`）；另 `registry.npmmirror.com/-/ping` 回 `{"pong":true}`、
+  `services.gradle.org/distributions/gradle-8.14-bin.zip` 回 `307`、`dl.google.com/android/repository/repository2-1.xml` 回 `200`。
+  远端另有 `1.1G` 的 pnpm store（`pnpm store path` ⇒ `…/store/v11`）与两棵 heyta 树。
+  ⇒ **对齐当前锁文件是一条命令的事**（远端 `pnpm install --frozen-lockfile`），不需要那条"没人对账过的搬 node_modules 通道"。
+  ⚠️ 取法留给下一位：**状态码 `200` 不是凭据**（截获式门户也给 200）——要 `/-/ping` 的体、要包元数据的体。
+
+  **③ 但 r161 少读了一层：`HEYTA_ANDROID_HOST` 只是主机名旋钮，"宿主可指"不等于"通道可用"。**
+  现量 `grep -n 'cd /d' scripts/run-gradle.mjs` ⇒ **五处命中**，其中两处在远程支里真执行（远端 `pnpm install` 那一条、远端 gradle 那一条 `cd /d … && gradlew.bat --no-build-cache`），
+  另三处是给读者看的修法的句子；`grep -n 'HEYTA_ANDROID_REMOTE_ROOT' scripts/run-gradle.mjs` ⇒ 默认值仍是 `C:\src\heyta`。
+  ⇒ **远程支的命令形状是 Windows 的**（`cd /d` 是 cmd 内建、POSIX shell 没有；`gradlew.bat` 在 Linux 上不是可执行入口）。
+  所以"把 android 腿指到 `linux-dev`"不是一句拍板，是**给收口点加一枚 POSIX 远程支**——而那枚脚本的形状由 `pnpm check:android-gradle-remote` 钉着
+  （它钉的正是"新开一条 `./gradlew` 入口 / 绕开收口点 / 回传路径与 `reinstall-all.sh` 的 `$APK` 对不上" ⇒ 各自会红）。**本线没动它**：改承重收口点 + 借用别项目的机，两样都不在本线名下。
+
+  **④ "debug 件"混着两维，而这两维的结论相反 ⇒ 口径题要重述。**
+  · **变体维（`assembleDebug`）不是口径题，是事实题**：RN 的 gradle 插件默认 `debuggableVariants = ['debug','debugOptimized']`，
+    注释原话是"Variants in this list will **not** be bundled"，而注册 bundle 任务的那句是 `if (!isDebuggableVariant) { register("createBundle${targetName}JsAndAssets"…) }`
+    （现量：`grep -rn 'debuggableVariants\|isDebuggableVariant' node_modules/.pnpm/@react-native+gradle-plugin@*/node_modules/@react-native/gradle-plugin/react-native-gradle-plugin/src/main/kotlin/com/facebook/react/`；本仓 `app/build.gradle` 没覆盖它，只有模板里那行注释）。
+    ⇒ **debug APK 里没有 JS bundle**，起来连的是 Metro。**它不是"另一种签名的产品"，它不是产品**——所以 r161 标题那句"它只能出 **debug 签名**的件"如果被人读成"只能出 debug 变体"，
+    推荐"不允许"的理由会挂错地方（挂在一枚本来就不可能通过的读法上）。
+  · **签名维（`assembleRelease` 但没有发布钥）才是那一问**：`app/build.gradle` 里 `signingConfig heytaHasReleaseSigning ? signingConfigs.release : signingConfigs.debug`
+    且缺钥时**打一大段警告**、不失败。差异实测只有证书身份一枚：`minifyEnabled=false`（`enableProguardInReleaseBuilds = false`）、
+    `ls apps/mobile/android/app/src/*` ⇒ 只有 `main` / `test` / `androidTest`（**没有 `src/debug`、`src/release`**）、
+    本仓 Kotlin/JS 里 `BuildConfig.DEBUG` / `isDebuggable` / `FLAG_DEBUGGABLE` / `__DEV__` / `GET_SIGNATURES` / `signingInfo` / `sharedUserId` **各 0 处命中**
+    （现量：`grep -rn '__DEV__' apps/mobile/src packages --include='*.ts' --include='*.tsx' | grep -v node_modules | wc -l` ⇒ 0）。
+    ⇒ **除证书外没有别的差异**——r161 那句"小组件那一族（`widget_*`、系统面板拖放、签名相关的 Keystore 通路）在 debug 与 release 上不是同一件事"**作为理由站不住**：
+    `widget_*` 与拖放绑的是 provider 组件名（`applicationId` 两变体同值、无 suffix），`WidgetAead` 用的是 `AndroidKeyStore` 里不可导出的 AES key
+    （`setUserAuthenticationRequired(false)`，无 attestation / 无 StrongBox ⇒ 现量 `grep -nE 'setAttestation|StrongBox|setUserAuthentication' apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetAead.kt`），
+    它随**卸载**没，不随**签名换了**没——而换签名身份必然先 uninstall。
+  · **仓里对这一问早有明文口径，方向与 r161 的推荐相反**：`docs/runbooks/multi-platform-build.md` 那一节写的是"没配发布钥时**不失败**、用 debug keystore 签并打警告……**只把它用于内测**"，
+    `docs/reference/build-matrix.md` §2.4 写的是"当前状态：✅ **可用于内部安装测试** / ❌ 不可用于应用商店"。
+    **Android 装机态验收属"内部安装测试"那一支** ⇒ "允许"是有明文依据的那一支；要写"不允许"就得**新立一条口径**，不是沿用 r161 那句推荐。
+    同族的"怎么写才不骗人"已有先例：`scripts/check-windows-signing-posture.mjs` 钉的是**非正式签名的产物必须自报身份**（主体名要写着 local build），
+    ⇒ 落到这里就是：读数旁必须印 `apksigner verify --print-certs <那枚 apk>` 的 DN 与 SHA-256 前缀，并**按"内测件"入账**，不许写成"发布件已验收"。
+
+  **⑤ 顺带照出一条与产物不符的旧句（本线只登记，不改那条线的口径）**：`docs/reference/build-matrix.md` §2.4 那句「release 变体**仍然用 debug keystore 签名**」
+  对**本机库里那枚 release 件不成立**：`apksigner verify --print-certs <android/app/build/outputs/apk/release/app-release.apk>`（磁盘件、不入 git；现量 `git check-ignore -v <那枚路径>` ⇒ `apps/mobile/.gitignore` 里 `android/app/build/` 那条）
+  回的是 `CN=heyta, OU=Mobile, O=Xiaoli Creativity Culture Industry, L=Hangzhou, ST=Zhejiang, C=CN`（SHA-256 前缀 `c46d0386…`，当时读数），
+  而仓库 `apps/mobile/android/app/debug.keystore` 的证书是 `CN=Android Debug … C=US`（SHA-256 前缀 `FAC61745…`，同处现量 `keytool -list -v -keystore … -alias androiddebugkey -storepass android`）
+  ⇒ **构建出这枚件的那台机上配过发布钥**（⚠️ 本线没核它的载体，只按形状指认：重装链里只有远程支会把件落在这枚路径上），所以"换到 linux-dev"确实是**换签名身份**（不是"反正大家都在用公开 debug 钥"），
+  而 §2.4 那句只对**没配 `HEYTA_RELEASE_*` 的机器**成立。已在 §2.4 就地加了一行限定。
+
+  **⑥ 这一格剩下的到底是什么（写成"在谁手里 + 一条命令"，不问负责人）**：
+  · 决定 A（**宿主与收口点**，归负责人／`run-gradle.mjs` 的行主）：要不要给收口点加一枚 POSIX 远程支、把 android 构建指到 `linux-dev`（那是别项目的机，10-20 现量：`ssh linux-dev 'nproc; df -h ~ | tail -1'` ⇒ 12 核 / 776G 空闲；AVD 只有 `litopia_*` 两枚，heyta 的要新建）。
+    判据：`HEYTA_ANDROID_HOST=linux-dev pnpm build:android --dry-run` 现在会**红在命令形状**，不红在可达性。
+  · 决定 B（**验收对象口径**，归负责人）：`release 变体 + 非发布钥` 的件算不算 Android 装机态那几格的验收对象。
+    **本线推荐允许**（依据见上面第 ④ 条那两句明文），条件是每份读数自报证书 DN + SHA-256 前缀、按"内测件"入账；
+    **例外那几格**是"升级连续性 / 换签名后本机数据与组件绑定存活"那一族——换身份必然 uninstall，那本身就是被测量，不能用它当替身。
+  · 两枚决定都没落地前，这一格与 windows 腿一起挂着：**"Android 装机态当前产物"这句仍然不成立**，而它现在**不成立的理由只剩一枚**（那台机没接网），
+    r161 登记的两条（npm 出站、搬 node_modules）**不再是理由**。
+
+  **不证 / 射程**：本格**一个字节没写进任何产物与设备**，全部是源码级与只读网络读数；没有跑过任何一趟 Android 腿，也没在那台 Ubuntu 上建目录、装依赖或起过模拟器；
+  那台机的 heyta 树 `HEAD` 落后当前 HEAD（现量 `ssh linux-dev 'git -C ~/heyta rev-parse --short HEAD'` 对 `git rev-parse --short HEAD`），**这格不判"在那台上重建一条通道要花多久"**；
+  `services.gradle.org` 回 `307` 是重定向、真正的下载还没试过（只有元数据级证据说它可达）。

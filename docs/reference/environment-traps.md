@@ -10742,3 +10742,34 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
         （`require_appearance` 只看**末级**名，写成 `en-light/settings` 就没有牙）。
         失败那次的 `run.out` 改名留在同一目录（`failed-default-zh-run.out`）而不是删掉 ——
         它是"守卫有牙"的正对照，比一张绿图值钱。
+
+495. 🔴 **「宿主是环境变量旋钮」被读成「换一枚宿主就能构建」——旋钮换的是主机名，不换**命令形状**；远程支里写死的是另一套 OS，认证与连通全过、命令照样炸**（2026-10-20 10:5x 本线现量，r163）。
+    ⑴ 现场形状：`scripts/run-gradle.mjs` 里 `HEYTA_ANDROID_HOST` 有默认值 ⇒ 记下"android 腿另有第三枚宿主可指"。
+      真去数那条路要走几步时才发现，同一枚文件里远程支发出去的是 `cd /d <远端根> && pnpm install …` 与 `cd /d <远端 android 目录> && gradlew.bat --no-build-cache …`，
+      而 `HEYTA_ANDROID_REMOTE_ROOT` 的默认值是一个**盘符路径**。`cd /d` 是 cmd 内建、POSIX shell 没有；`gradlew.bat` 在 Linux 上不是入口（同目录那枚无扩展名的 `gradlew` 才是）。
+      现量：`grep -n 'cd /d' scripts/run-gradle.mjs`、`grep -n 'HEYTA_ANDROID_REMOTE_ROOT' scripts/run-gradle.mjs`。
+    ⑵ 为什么这枚坑值钱：它把"做不到"挂错了人。**可达性、JDK、SDK、KVM、出站全现量通过**之后，
+      剩下的其实是一枚**代码改动**（给收口点开一条 POSIX 远程支，且形状由 `pnpm check:android-gradle-remote` 钉着），
+      而不是"等一句拍板"。登记成拍板 ⇒ 没人去改那枚脚本，这一格就永远停在"等人"那一栏。
+    ⑶ 通用形状：**判断一条通道能不能用，要读到它最后发出的那条命令**，不是读到"入口有没有旋钮"。
+      同一个旋钮后面可能挂着两套餐时（`isWindows ? 'gradlew.bat' : './gradlew'` 这种分流常见于**本地**支，
+      而**远程**支常常只写了发起方自己那台机的 OS）。
+    ⑷ 处置：宿主候选清单要逐枚记"这台机上那条命令会长成什么形状"，写不出这条命令的宿主**不算一条出路**；
+      改收口点前先 `pnpm check:android-gradle-remote --self-test` 看它钉了哪几条形状（臂数由它自己打印，文档里不许抄）。
+
+496. 🔴 **「那台机没有 npm 出站」这类基础设施否定句是瞬时读数，八小时就能翻；而判"通不通"要取**响应体**，`200` 不是凭据**（2026-10-20 10:5x 本线现量，r163）。
+    ⑴ 现场形状：台账 02:5x 那格写着"远端 `registry.npmjs.org` 与 `services.gradle.org` 都不通 ⇒ 要出当前源码的件得**把 node_modules 从 Mac 搬过去**"。
+      10:5x 同一条 ssh 复量：npm 官方源、npmmirror、`services.gradle.org`、`dl.google.com` **四条逐条有体**，那台机上还躺着 1.1G 的 pnpm store。
+      ⇒ "搬依赖"那条没人对账过的通道**根本不是必需的**，而它是那一格"做不到"三条件里的头一条。
+      同一小时另一条同类翻案：本机换了一张网（`ifconfig en0` 的 /24 与前一批不同），于是前一批"那枚 LAN 别名是过期配置"的成因整层作废。
+    ⑵ **`200` 为什么不算凭据**：截获式门户、代理与 captive portal 都回 200 + 一枚 HTML。取体的形状：
+      `curl -s https://registry.npmjs.org/-/ping` 要看到 `{}`（或 `{"ok":true}`），
+      `curl -s -H 'Accept: application/json' https://registry.npmjs.org/react-native | head -c 90` 要看到真元数据（`"_id":"react-native"`），
+      `curl -sI https://services.gradle.org/distributions/gradle-8.14-bin.zip` 看到 `307` 是**正常重定向**不是拒绝；
+      另附一条 `env | grep -i proxy`——有透明代理时上面几条都可能作假。
+    ⑶ 处置形状：**基础设施否定句要么写成带日期的现量读数、要么在正文附一条复现命令**，别写成永久属性；
+      依赖它做"做不到"的结论之前，同一趟重跑那条命令（与本文件元规则"瞬时读数不许当状态"同族，
+      也同于 #467 那条"文档里那句『这层跑不了』是当时一趟的读数"）。
+      ⚠️ 同一趟还量到 **ICMP 自己就不稳定**：对 `192.168.1.2` 第一次 `ping -c 2 -t 3` FAIL、第二次 OK，
+      而 `arp -n` 一直有 MAC ⇒ 可达性判据要**同趟跑两次并都记进读数**，单枚 `ping` 既不充分也不稳定；
+      真正承重的是"有没有应用层端口给回读数"那一层（那一层六枚端口全 NO，结论就不受 ICMP 抖动影响）。
