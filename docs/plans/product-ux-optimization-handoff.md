@@ -256,6 +256,9 @@ r149 / r150 两笔动的是 `apps/mobile/src`、`apps/mobile/tests`、`scripts/q
 "只有 Android 过期"那句作废。**10-20 05:4x 逐端现状**（哈希一律现量，别抄本节任何一枚值）：
 iOS 装的是 **r159 那一趟**从含 `f21dc1d39` 的源码在本机重打的件（上一件 `ca3a09257bdfba19` 已被 r159 否证为"早于修复七分钟"），
 现读法 `B=$(xcrun simctl get_app_container <UDID> com.heyta)/main.jsbundle; stat -f "%Sm" "$B"; shasum -a 256 "$B"`；
+🔴 **10-20 10:5x 用这条现读法复量：上面那句已经不成立** —— 回 mtime `08:12:46`、sha256 前缀 `9dc687d4…`（既不是 r159 那枚也不是 `ca3a0925…` 那枚）
+⇒ 共享那台模拟器在 08:1x 被别的会话重装过，**那枚件的构建载体本线没核**。这不等于"要再跑一趟"：两问都现量过，读法与数在台账 r163 那格第 ⑦ 条
+（⚠️ 那把差集尺的粗 pathspec 会把 `apps/*/evidence/**` 当成打包输入 ⇒ 上一批 `LAST` 取到的是 10:23 那笔纯文档+证据的提交，**两问都要按剔掉 evidence 的那一枚算**）；
 mac 由 r155 那趟重装过判据，**05:4x 又补了一把更硬的尺**：`/Applications/Heyta.app/Contents/Resources/web-dist` 与本机 `apps/web/dist`
 **逐文件 sha256 全等** ⇒ mac 装机件里的 web 产物**就是当前源码那份构建**，不再靠 mtime 推（读数与命令在 §五 第 18 条）；
 **windows / android 两端没有** —— 10-20 10:3x 逐枚现量：`ssh windows-pc` / `windows-codex` / `windows-pc-lan` **三枚全 `rc=255`**（windows 腿：那台机既不在本机现在这张 `192.168.1.0/24` 上、ZeroTier 那两枚也没人接）；
@@ -321,6 +324,9 @@ Android 有当前产物的 Profile/Settings 与 habits 腿读数（r85/r86/r109�
      （现量 `grep -n 'cd /d' scripts/run-gradle.mjs` ⇒ 两处真执行：远端 `pnpm install` 与远端 `gradlew.bat`；`HEYTA_ANDROID_REMOTE_ROOT` 默认还是个盘符路径），
      而 `pnpm check:android-gradle-remote` 钉的正是"不许绕开收口点 / 不许新开 `./gradlew` 入口"
      ⇒ **要用 `linux-dev` 得先给收口点加一枚 POSIX 远程支**，那是改承重脚本（且那是别项目的机），不是一句拍板。
+     🔴 这条 10:5x 用收口点自己验过：`NO_COLOR=1 HEYTA_ANDROID_HOST=linux-dev node scripts/run-gradle.mjs assembleRelease --dry-run` ⇒ **rc=0**，
+     打印出的远程形状是**三层**（预检发 `powershell -NoProfile -Command "Test-Path 'C:\src\…'"`、install 发 `cd /d C:\src\heyta && pnpm install`、构建发 `cd /d … && gradlew.bat`），
+     而那趟照样打了一行 **`✅ 远端 workspace 依赖与当前同步源码一致`**——它紧跟在"将执行（未执行）"后面 ⇒ **dry-run 的 ✅ 是"计划里有这步"，不是"这步会通过"**（正文见 §7 #495 ⑸⑹）。
      r161 记的两条硬缺口现在**只剩一条**：~~没有 npm 出站、得搬 node_modules~~ ⇒ 10:5x 现量四条 URL **逐条有体**（判法：取 `/-/ping` 与包元数据的**体**，`200` 不算凭据），
      对齐锁文件是一条 `pnpm install --frozen-lockfile` 的事；**只剩"那台机没有发布钥"这一条**。
      而这一条要说准：它缺的是**签名身份**，不是"release 变体"——`assembleRelease` 没配发布钥照样出 release 件（换 debug 钥 + 大声警告），

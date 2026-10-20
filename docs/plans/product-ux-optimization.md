@@ -5269,6 +5269,15 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
   现量 `grep -n 'cd /d' scripts/run-gradle.mjs` ⇒ **五处命中**，其中两处在远程支里真执行（远端 `pnpm install` 那一条、远端 gradle 那一条 `cd /d … && gradlew.bat --no-build-cache`），
   另三处是给读者看的修法的句子；`grep -n 'HEYTA_ANDROID_REMOTE_ROOT' scripts/run-gradle.mjs` ⇒ 默认值仍是 `C:\src\heyta`。
   ⇒ **远程支的命令形状是 Windows 的**（`cd /d` 是 cmd 内建、POSIX shell 没有；`gradlew.bat` 在 Linux 上不是可执行入口）。
+  🔴 **这条不靠推断，10:5x 把收口点本身跑了一趟 dry-run**（它只打印计划：`NO_COLOR=1 HEYTA_ANDROID_HOST=linux-dev node scripts/run-gradle.mjs assembleRelease --dry-run` ⇒ **rc=0**、自报"0 次网络写操作、0 个本地字节被写"）：
+    打印出来的远程形状是**三层**，不止命令那两层 ——
+    ⑴ 步骤 1 那枚**只读预检**发的是 `ssh linux-dev "powershell -NoProfile -Command \"Test-Path 'C:\\src\\heyta\\...'…"`（PowerShell + 反斜杠路径），
+      在那台 Linux 上回的是 **`RNDEPS=（无） ROOTDEPS=（无） LOCALPROPS=（无） DEPCHECK=（无） DEPMISS=（无）`**（五个字段一个都没值，而它照样往下走）；
+    ⑵ 步骤 2.5 是 `cd /d C:\src\heyta && pnpm install --frozen-lockfile`；⑶ 步骤 4 是 `cd /d …\apps\mobile\android && gradlew.bat --no-build-cache assembleRelease`。
+    ⚠️ **最贵的一枚形状在这里**：dry-run 那趟照样打印了一行 **`✅ 远端 workspace 依赖与当前同步源码一致`**，
+    而紧挨着上面那句写着"将执行（**未执行**）"⇒ **计划打印里的 ✅ 是"这一步在计划里"，不是"这一步会通过"**；
+    拿 `--dry-run` 的 rc=0 + 那串 ✅ 当"这枚宿主可用"的证据，就会把一条三层都不匹配的通道判成通了。真跑会在 ⑵/⑶ 响亮地红（`cd /d` 与 `gradlew.bat` 都过不去），
+    但**预检那一层（⑴）读到全空却不红**——这是收口点自己的一处形状，登记不改（它归 `check:android-gradle-remote` 的行主）。
   所以"把 android 腿指到 `linux-dev`"不是一句拍板，是**给收口点加一枚 POSIX 远程支**——而那枚脚本的形状由 `pnpm check:android-gradle-remote` 钉着
   （它钉的正是"新开一条 `./gradlew` 入口 / 绕开收口点 / 回传路径与 `reinstall-all.sh` 的 `$APK` 对不上" ⇒ 各自会红）。**本线没动它**：改承重收口点 + 借用别项目的机，两样都不在本线名下。
 
@@ -5302,12 +5311,24 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
 
   **⑥ 这一格剩下的到底是什么（写成"在谁手里 + 一条命令"，不问负责人）**：
   · 决定 A（**宿主与收口点**，归负责人／`run-gradle.mjs` 的行主）：要不要给收口点加一枚 POSIX 远程支、把 android 构建指到 `linux-dev`（那是别项目的机，10-20 现量：`ssh linux-dev 'nproc; df -h ~ | tail -1'` ⇒ 12 核 / 776G 空闲；AVD 只有 `litopia_*` 两枚，heyta 的要新建）。
-    判据：`HEYTA_ANDROID_HOST=linux-dev pnpm build:android --dry-run` 现在会**红在命令形状**，不红在可达性。
+    判据（已现量）：`NO_COLOR=1 HEYTA_ANDROID_HOST=linux-dev node scripts/run-gradle.mjs assembleRelease --dry-run` ⇒ **rc=0**（dry-run 不判事，见第 ③ 条那三层形状与那行假 ✅）；
+    **真跑会红在远程命令形状**（`cd /d` + `gradlew.bat`），不红在可达性。别拿 dry-run 的绿当通道通过。
   · 决定 B（**验收对象口径**，归负责人）：`release 变体 + 非发布钥` 的件算不算 Android 装机态那几格的验收对象。
     **本线推荐允许**（依据见上面第 ④ 条那两句明文），条件是每份读数自报证书 DN + SHA-256 前缀、按"内测件"入账；
     **例外那几格**是"升级连续性 / 换签名后本机数据与组件绑定存活"那一族——换身份必然 uninstall，那本身就是被测量，不能用它当替身。
   · 两枚决定都没落地前，这一格与 windows 腿一起挂着：**"Android 装机态当前产物"这句仍然不成立**，而它现在**不成立的理由只剩一枚**（那台机没接网），
     r161 登记的两条（npm 出站、搬 node_modules）**不再是理由**。
+
+  **⑦ 顺手把那把"要不要再跑一趟重装"的尺复量了，两问的答案都变了形**（10:5x 现量，全部只读）：
+  · 第一问（HEAD 之后有没有新打包输入）：`paths=(packages apps/mobile/android apps/mobile/src apps/mobile/ios apps/desktop-macos apps/desktop-windows/src apps/desktop-windows/app apps/web/src apps/web/app server/src)`；
+    `git diff --name-only ${L}..HEAD -- $paths ':(exclude)**/evidence/**'` ⇒ **0 枚**（阳性对照 `${L}~1..${L}` 回 **2** ⇒ 尺不瞎）。
+    🔴 **不加那条 exclude 会取到错的 `L`**：不带 exclude 时 `git log -1 -- … -- $paths` 回的是 **10:23 那笔纯文档 + 证据**的提交（r162 往 `apps/desktop-macos/evidence/` 里放了图），
+    粗 pathspec 把证据目录当打包输入 ⇒ 这正是项目记忆里那条"系统性高估"的又一次命中，**两问都要按剔掉 evidence 的那一枚算**。剔完，最后一笔真进包的源码提交仍是 `f21dc1d39`（01:09:27）。
+  · 第二问（此刻装机的件等不等于 HEAD）：**这句翻案了** —— 共享那台 `heyta-iphone-17pro` 上
+    `main.jsbundle` 现读 mtime **10-20 08:12:46**、sha256 前缀 **`9dc687d4…`**，**既不是 r159 那枚 `928e8050…`、也不是 `ca3a0925…`**
+    ⇒ 08:1x 有别的会话往这台上重装过一件，**本线没核它的构建载体**（`~/heyta-reinstall/` 里最新的落点停在 02:15 的 r159-ios，08:12 那趟不落在这线命名的目录里）。
+    合起来读：**不必为这几笔文档重跑**（第一问 0 枚），但交接 §〇 Q2 那句"iOS 装的是 r159 那一趟"**作为对当前状态的断言已经不成立**，已在原句就地补限定。
+    ⚠️ 两枚件的产品内容差异**没法从哈希判**，只能从载体判；第一问那 0 枚说的是 git 跟踪的打包源码，不证字节（同 §四 第 4 步末尾那条边界）。
 
   **不证 / 射程**：本格**一个字节没写进任何产物与设备**，全部是源码级与只读网络读数；没有跑过任何一趟 Android 腿，也没在那台 Ubuntu 上建目录、装依赖或起过模拟器；
   那台机的 heyta 树 `HEAD` 落后当前 HEAD（现量 `ssh linux-dev 'git -C ~/heyta rev-parse --short HEAD'` 对 `git rev-parse --short HEAD`），**这格不判"在那台上重建一条通道要花多久"**；
