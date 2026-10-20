@@ -62,6 +62,15 @@ const CHANGELOG_HEADS = new Set([
 const LANGS = ['zh-CN', 'en'];
 
 /**
+ * 🔴 本门禁的**唯一**枚数常量：词表与豁免表是按这一套文档调出来的，所以"文档有几份"
+ * 在这里是**前提**，不是读数。加一份文本时必须同时改这里 —— 下面两处（遍历完整性 +
+ * 结尾读数行）都从这一个数推导，改一处就两处一起红，不会出现"前提更新了、分母还按旧数作证"。
+ * 现量核对：`node -e "import('./packages/legal/dist/index.js').then(m=>console.log(m.LEGAL_DOCUMENTS.length))"`。
+ * 2026-10-21：加备案专用《算法机制机理公示》⇒ 9 → 10。
+ */
+const EXPECTED_DOC_COUNT = 10;
+
+/**
  * 按语言逐栏拍平，并让每一栏都可单独断言。
  *
  * 🔴 这里原来写的是 `doc.sections.zh` —— 那个键**不存在**，`?? []` 把整栏中文
@@ -411,10 +420,12 @@ function checkEnumerations(doc) {
   return { problems, judged };
 }
 
-// —— 前提：九份文档；**每一份的每一个语言栏**都单独断言非空 ——
+// —— 前提：整套文档；**每一份的每一个语言栏**都单独断言非空 ——
 // 只断言总量的话，一栏空、另一栏翻倍也能过 —— 这条门禁的第一版就是这么漏掉整栏中文的。
-if (LEGAL_DOCUMENTS.length !== 9) {
-  console.error(`❌ 文档数 = ${String(LEGAL_DOCUMENTS.length)}，不是 9 —— 词表与文档清单的前提变了`);
+// 🔴 这个枚数是**前提**不是读数：词表是按这一套文档调出来的，加一份就要重新确认
+//    词表覆盖得齐（2026-10-21 加备案公示页时 9 → 10）。
+if (LEGAL_DOCUMENTS.length !== EXPECTED_DOC_COUNT) {
+  console.error(`❌ 文档数 = ${String(LEGAL_DOCUMENTS.length)}，不是 ${String(EXPECTED_DOC_COUNT)} —— 词表与文档清单的前提变了`);
   process.exit(1);
 }
 const texts = [];
@@ -428,8 +439,8 @@ for (const doc of LEGAL_DOCUMENTS) {
     texts.push({ id: doc.id, lang, text: byLang[lang] });
   }
 }
-if (texts.length !== 18) {
-  console.error(`❌ 拍到 ${String(texts.length)} 个（文档 × 语言）栏，期望 18 —— 遍历层坏了`);
+if (texts.length !== EXPECTED_DOC_COUNT * LANGS.length) {
+  console.error(`❌ 拍到 ${String(texts.length)} 个（文档 × 语言）栏，期望 ${String(EXPECTED_DOC_COUNT * LANGS.length)} —— 遍历层坏了`);
   process.exit(1);
 }
 const totalChars = texts.reduce((n, t) => n + t.text.length, 0);
@@ -870,7 +881,7 @@ const shellClaimsJudged = shellClaimReadings.reduce((n, r) => n + r.judged, 0);
 const shellClaimProblems = shellClaimReadings.flatMap((r) => r.problems);
 if (shellClaimsJudged === 0) {
   console.error(
-    '❌ 九份文档里没有一句"某个壳 + 还没接上本机销毁通道"的小句被拍到 —— ' +
+    '❌ 这套文档里没有一句"某个壳 + 还没接上本机销毁通道"的小句被拍到 —— ' +
       '要么政策不再点名任何壳（那这条腿该摘），要么标记词表漂了（那它在替不存在的句子作证）',
   );
   process.exit(1);
@@ -892,7 +903,7 @@ console.log(
 );
 
 console.log(
-  `文档 9 份 × 中英 = 18 栏 / 拍到 ${String(totalChars)} 字符 / 变更表内引用 ${String(naive - hits.length - candidates.length)} 条（那是历史，不算违规）/ 未判定候选 ${String(candidates.length)} 条 / 豁免 ${String(WAIVERS.length)} 条（承重 ${String(WAIVERS.length - danglingWaivers.length)}）/ 封闭计数 ${String(enumPairs)} 对（不符 ${String(enumProblems.length)}）/ 逐壳点名句 ${String(shellClaimsJudged)} 句（不符 ${String(shellClaimProblems.length)}）`,
+  `文档 ${String(EXPECTED_DOC_COUNT)} 份 × ${LANGS.length} 栏 = ${String(EXPECTED_DOC_COUNT * LANGS.length)} 栏 / 拍到 ${String(totalChars)} 字符 / 变更表内引用 ${String(naive - hits.length - candidates.length)} 条（那是历史，不算违规）/ 未判定候选 ${String(candidates.length)} 条 / 豁免 ${String(WAIVERS.length)} 条（承重 ${String(WAIVERS.length - danglingWaivers.length)}）/ 封闭计数 ${String(enumPairs)} 对（不符 ${String(enumProblems.length)}）/ 逐壳点名句 ${String(shellClaimsJudged)} 句（不符 ${String(shellClaimProblems.length)}）`,
 );
 if (naive === hits.length + candidates.length) {
   console.error('❌ 变更表内外命中数相等 —— 排除那条腿没起作用（要么没读到变更表，要么把历史引用当成了违规）');
@@ -936,5 +947,5 @@ if (
 )
   process.exit(1);
 console.log(
-  '✅ 九份文档（版本变更表以外，中英两栏都扫了）没有被批次 E 否证的句子，也没有未判定的共现候选；豁免表条条承重，桌面壳那一档的方向与代码一致，每一句"下面 N 项"都对得上它数的那个集合。',
+  '✅ 整套文档（版本变更表以外，中英两栏都扫了）没有被批次 E 否证的句子，也没有未判定的共现候选；豁免表条条承重，桌面壳那一档的方向与代码一致，每一句"下面 N 项"都对得上它数的那个集合。',
 );

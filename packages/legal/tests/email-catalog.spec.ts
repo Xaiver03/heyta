@@ -20,7 +20,7 @@
  *  ① `server/src/email.ts` 里每一枚 `export const send*Email` 都在登记表里有一个人类可读的名字
  *     —— 新增一封而登记没跟上，红的是"没登记"，而不是"少承诺了一封"。
  *  ② 登记表里的名字一个都不许多于实现（撤掉一封而文案与登记仍留着 = 对外多承诺）。
- *  ③ 九份文档 × 中英两栏里，**每一处**"N 封功能邮件 / N functional emails"形状的数都等于 ① 数到的枚数。
+ *  ③ 整套文档 × 中英两栏里，**每一处"N 封功能邮件 / N functional emails"形状的数都等于 ① 数到的枚数。
  *  ④ 一处单元格若点名了 ≥2 个类别，它就是**枚举**那一格 —— 必须把每一类都点齐（漏一类的枚举
  *     比不写枚举更坏：它看起来是完整的）。
  *  ⑤ 悬空守卫：登记表每个名字都真在语料里出现、`N 封` 那条形状真命中过若干次。
@@ -100,7 +100,7 @@ const COUNT_SHAPES: Record<'zh-CN' | 'en', { re: RegExp; words: Record<string, n
  * 每条修订都会让自己变红。`scripts/check-legal-closure-truth.mjs` 认的是同一件事，
  * 那里也带一条"排除前后命中数必须不等"的承重断言 —— 这里照做（见悬空守卫那条）。
  *
- * 认法取**表头第一格**（`版本` / `Version`）而不是写死整张表头：本仓九份文档的变更表头
+ * 认法取**表头第一格**（`版本` / `Version`）而不是写死整张表头：本仓整套文档的变更表头
  * 已经有三种写法（`[版本, 日期与变更摘要]`、`[版本, 日期, 变化]`、`[Version, Date and summary of the change]`），
  * 写死一张清单就是等着第四种漂过去。
  */
@@ -190,7 +190,7 @@ describe('功能邮件的封闭词表与代码对账', () => {
     ).toEqual([]);
   });
 
-  it('🔴 九份文档 × 中英两栏里每一处"N 封功能邮件"都等于代码数到的枚数，逐类点名的格子点得齐', () => {
+  it('🔴 整套文档 × 中英两栏里每一处"N 封功能邮件"都等于代码数到的枚数，逐类点名的格子点得齐', () => {
     const offenders = auditCorpus(LEGAL_DOCUMENTS as unknown as LegalDocument[], senders.length);
     expect(offenders, '\n' + offenders.join('\n')).toEqual([]);
   });

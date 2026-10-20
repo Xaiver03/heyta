@@ -742,7 +742,7 @@ location /en/legal/ {
 
 三条不能省的细节：
 
-- **`$uri/` 不能删**。那 18 个法务入口在磁盘上是**目录**（`/var/www/heyta-landing/legal/terms/index.html`），
+- **`$uri/` 不能删**。那些法务入口在磁盘上是**目录**（`/var/www/heyta-landing/legal/terms/index.html`），
   只写 `try_files $uri =404` 会把好页一起 404 掉 —— 这是**把修坏的方向**。
   保留 `$uri/` 还顺带留住了 `/legal/terms` → 301 → `/legal/terms/` 的既有行为（与 canonical 一致）。
 - **必须是 prefix location，不是 regex**。nginx 先按 prefix 最长匹配、之后才按文件顺序判 regex；

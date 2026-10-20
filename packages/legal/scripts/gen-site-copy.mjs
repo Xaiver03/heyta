@@ -21,7 +21,7 @@
  *
  * 所以这里走的是本仓库已经用过的另一条路子 —— **生成物 + 门禁**
  * （`server/src/copy.generated.ts` 用 `check:server-copy` 钉住，同一个形状）：
- * 事实源只有 `src/index.ts` 那九份，站点侧要的是它的**投影**。
+ * 事实源只有 `src/index.ts` 的 `LEGAL_DOCUMENTS`，站点侧要的是它的**投影**。
  *
  * ⚠️ 前置：`pnpm --filter @heyta/legal build`。这个脚本读的是 `dist/`
  *（不是 `src/` —— 本包的模块图用了 `./x.js` 这种 Node 的 ESM 解析器

@@ -1,5 +1,5 @@
 /**
- * 线上验收：**九份对外法律文本在中英两侧真的发布出来了**。
+ * 线上验收：**整套对外法律文本在中英两侧真的发布出来了**。
  * ======================================================
  *
  * 分工：`e2e/legal-links/` 验的是**产品代码把点击带到哪**（刻意离线，官方那一侧
@@ -41,7 +41,7 @@
  *   （整句不相等是对的 —— 标签本地化；`structure.spec.ts` 在库里钉的是同一件事，
  *   这里钉的是"线上那份产物也真的对等"）；
  * - 每页恰好一个 `h1`：组件注释写明的层级约定；
- * - 草稿横幅：今天九份的 `status` 全是 `draft`，横幅**必须**在。
+ * - 草稿横幅：今天整套文本的 `status` 全是 `draft`，横幅**必须**在。
  *   ⚠️ 改成 `effective` 那天这条会红 —— 那是提醒"对外文本要生效了，复核一下"，
  *   不是误报，届时连同 §6 那条"律师复核 → 改 status → 发布"一起处理。
  *
@@ -84,7 +84,7 @@ const ORIGIN = process.env['HEYTA_LIVE_ORIGIN'] ?? 'https://heyta.waytofuture.cn
  */
 const SHOT_DIR = 'live-site-results';
 
-/** 九份文本的 id —— 与 `packages/legal` 的注册表同序，也是页脚的展示顺序。 */
+/** 对外法律文本的 id —— 与 `packages/legal` 的注册表同序，也是页脚的展示顺序。 */
 const LEGAL_DOC_IDS = [
   'terms',
   'privacy',
@@ -92,6 +92,7 @@ const LEGAL_DOC_IDS = [
   'permissions',
   'third-parties',
   'ai-and-transfer',
+  'algorithm-disclosure',
   'minors',
   'subscription-refund',
   'data-rights',
@@ -205,7 +206,7 @@ for (const docId of LEGAL_DOC_IDS) {
       ).toBe(render.topLevelSections);
       expect(
         render.hasDraftBanner,
-        `${path} 没有"尚未生效"横幅 —— 九份文本今天全是 draft，缺这条等于把草稿当已生效发布`,
+        `${path} 没有"尚未生效"横幅 —— 这套文本今天全是 draft，缺这条等于把草稿当已生效发布`,
       ).toBe(true);
 
       if (docId === 'terms') {
@@ -254,15 +255,16 @@ for (const docId of LEGAL_DOC_IDS) {
 }
 
 /**
- * 九条都在注册表里 —— 少一份就是"发布漏了一页"，而漏的那页在线上**看起来**
+ * 每一份都在注册表里 —— 少一份就是"发布漏了一页"，而漏的那页在线上**看起来**
  * 只是另一个不存在的链接（兜底首页），没人会去点它。
  *
- * 这条不重新下载九份页面，它只做一件事：数出 `LEGAL_DOC_IDS` 有 9 个。
- * 🔴 数字 9 不是阈值，是 `packages/legal` 注册表的**当前条目数**；
- * 加第十份文本时必须同时改这里，改测试是**预期动作**（与 structure.spec 同批）。
+ * 这条不重新下载那些页面，它只做一件事：数出 `LEGAL_DOC_IDS` 有几枚。
+ * 🔴 那个数字不是阈值，是 `packages/legal` 注册表的**当前条目数**；
+ * 加一份文本时必须同时改这里，改测试是**预期动作**（与 structure.spec 同批）。
+ * 现量口径：`node -e "import('./packages/legal/dist/index.js').then(m=>console.log(m.LEGAL_DOCUMENTS.length))"`。
  */
-test('法务清单仍是九份（与 @heyta/legal 注册表同数）', () => {
-  expect(LEGAL_DOC_IDS.length).toBe(9);
+test('法务清单枚数与 @heyta/legal 注册表同数', () => {
+  expect(LEGAL_DOC_IDS.length).toBe(10);
 });
 
 /**
@@ -349,9 +351,9 @@ test('线上 terms 英文侧 = 本地真源（G-31 的部署级复验）', async
  *     把整站兜底当成了前提，理由与替换过程见正文那段注释）；
  *   · `/app/nope-route` 仍应是 **200**（应用的前端路由没被改坏 —— 这是 G-25b
  *     明确要求"不影响前端路由"的那一半）；
- *   · 18 份**真实入口**逐条 200（改兜底时把真页面一起干掉是最容易犯的错，
- *     而九份 × 中英两侧只有逐条数过才知道都在）。
- * 判据数从 `LEGAL_DOC_IDS`（九）推导，不是抄一个魔数。
+ *   · 每一份 × 中英两侧的**真实入口**逐条 200（改兜底时把真页面一起干掉是最容易犯的错，
+ *     而只有逐条数过才知道都在）。
+ * 判据数从 `LEGAL_DOC_IDS` 推导，不是抄一个魔数。
  */
 test('未命中的 /legal/* 是真 404；首页兜底与 /app/ 前端路由都没被牵连', async ({ page }) => {
   const logs = attachLogs(page);

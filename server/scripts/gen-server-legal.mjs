@@ -13,7 +13,7 @@
  * 同意留痕要往 `users.terms_document_version` 里写**整套对外文本的版本指纹**，
  * 那个指纹的权威在 `@heyta/legal` 的 `legalSetVersion()`。
  * 但 `server/Dockerfile` 只打包 `packages/{sync-core,shared-schema,domain}` ——
- * **镜像里没有 `@heyta/legal`**（它是九份文本的全量 AST，五十余万字节，
+ * **镜像里没有 `@heyta/legal`**（它是整套文本的全量 AST，五十余万字节，
  * 同步服务进程没有理由为了一串版本号把它装进生产镜像）。
  *
  * 所以走仓库里已经用过三次的模式：**生成物 + 门禁**
@@ -63,7 +63,7 @@ const render = (setVersion, hostedDomain) => `/**
  * \`pnpm check:server-legal\` 钉住它与真源一致。
  *
  * 为什么要生成而不是 import：\`server/Dockerfile\` 不打包 \`@heyta/legal\`
- * （九份对外文本的全量 AST，同步服务进程不该为两个字符串装它）。
+ * （整套对外文本的全量 AST，同步服务进程不该为两个字符串装它）。
  * 真源只有一份，理由与写法见 \`server/scripts/gen-server-legal.mjs\` 文件头。
  */
 

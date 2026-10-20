@@ -520,6 +520,20 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/legal/ai-and-transfer/" />
   </url>
   <url>
+    <loc>https://heyta.waytofuture.cn/legal/algorithm-disclosure/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/legal/algorithm-disclosure/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/legal/algorithm-disclosure/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/legal/algorithm-disclosure/" />
+  </url>
+  <url>
+    <loc>https://heyta.waytofuture.cn/en/legal/algorithm-disclosure/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/legal/algorithm-disclosure/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/legal/algorithm-disclosure/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/legal/algorithm-disclosure/" />
+  </url>
+  <url>
     <loc>https://heyta.waytofuture.cn/legal/minors/</loc>
     <changefreq>weekly</changefreq>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/legal/minors/" />

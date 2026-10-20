@@ -123,7 +123,7 @@ function presentBlock(block: LegalBlock, text: (value: string) => string): Legal
   }
 }
 
-/** 九份文档中英同一套编号、引用与文字展示语法，原文与内容块不变。 */
+/** 整套文档中英同一套编号、引用与文字展示语法，原文与内容块不变。 */
 export function legalDocumentPresentation(document: LegalDocument): LegalDocument {
   const presentSections = (locale: Locale): readonly LegalSection[] => {
     const numbers = sectionNumbers(document.sections[locale]);

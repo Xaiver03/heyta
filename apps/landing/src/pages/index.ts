@@ -89,15 +89,16 @@ export const PAGE_COMPONENTS: Record<SitePageId, PageComponent> = {
   data: DocsCategoryPage,
   trust: DocsCategoryPage,
   /**
-   * 九份对外法律文本 → 同一个组件，与上面两批同一个理由：**差异全是数据**。
+   * 对外法律文本 → 同一个组件，与上面两批同一个理由：**差异全是数据**。
    *
    * 🔴 这里比文档中心多担一件事：每份文本的**正文本身**也不在这个仓库里，
    * 它在 `@heyta/legal`（唯一事实源，见那个包的文件头）。所以这一批登记
    * 少写一行的后果不是"空白页"，而是"某个法务承诺在网站上根本不存在" ——
-   * `tests/legal-pages.spec.ts` 因此除了编译期兜底还要**逐份核对九份都挂上了**。
+   * `tests/legal-pages.spec.ts` 因此除了编译期兜底还要**逐份核对注册表里的每一份都挂上了**。
    *
    * ⚠️ 顺序跟着 `@heyta/legal` 的 `LEGAL_DOCUMENTS`（= 页脚 legal 组的展示顺序）：
    * 服务条款在前，隐私政策紧随，因为备案与商店表单要按这个次序引用它们。
+   * 这一份登记表**刻意不数自己有多少行** —— 枚数由注册表决定，数一次就漂一次。
    */
   'legal-terms': LegalDocumentPage,
   'legal-privacy': LegalDocumentPage,
@@ -105,6 +106,7 @@ export const PAGE_COMPONENTS: Record<SitePageId, PageComponent> = {
   'legal-permissions': LegalDocumentPage,
   'legal-third-parties': LegalDocumentPage,
   'legal-ai-and-transfer': LegalDocumentPage,
+  'legal-algorithm-disclosure': LegalDocumentPage,
   'legal-minors': LegalDocumentPage,
   'legal-subscription-refund': LegalDocumentPage,
   'legal-data-rights': LegalDocumentPage,
