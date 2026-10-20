@@ -67,6 +67,12 @@ const DELIBERATELY_NOT_WIRED: Record<string, string> = {
   'verify-inbound-commit-scope.py': 'BLOCKED.md B169：当前 rc=1 且红因在别线的主题提及，接进来会把别人的红写成本线的红',
   'verify-inbound-plan-audit.ts': 'BLOCKED.md B184：前提已被日历线改掉（rc=1），且 .ts 那枚不在本线地界内',
   'verify-inbound-check-chain.py': '它自己就是"逐道跑完整条 check 链"的载体，接进单测会自我递归',
+  // 2026-10-20 合并 feat/paycenter-integration 时补登记：这枚尺在 main 上已存在（PROGRESS 第 141 条）却从没进过任何名单，
+  // 于是这条分母自检把它当成漏网 ⇒ server 单测真红。它读的是仓外本机取证目录（`~/.heyta-evidence/**`，不受 git 管），
+  // 在没有那批件的克隆上会因缺件而红；第 141 条 ⑤ 又明文写着不接进 28 腿电池与 116 道链（两处都会改动已交付的分母）。
+  // 八枚反向验证臂由它自己的 `--self-test` 带（只在临时目录造样本），判据腿留手跑。
+  'verify-inbound-evidence-pointers.py':
+    '判据腿要看仓外本机取证目录，无那批件的机器上必红；PROGRESS 第 141 条 ⑤ 写明不接进电池与链（会改动已交付分母），留手跑',
 };
 
 function runRig(file: string, extraArgs: string[] = []) {
