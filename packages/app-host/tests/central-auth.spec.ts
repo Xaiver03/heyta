@@ -7,6 +7,7 @@ import {
   createCentralCookieFetch,
   getCentralAuthConfig,
   getCentralAuthSession,
+  isOfficialCentralAuthEndpoint,
 } from '../src/central-auth.js';
 import { sha256TextHex } from '@heyta/sync-core';
 
@@ -60,6 +61,19 @@ describe('官方 Web 中央认证客户端', () => {
 });
 
 describe('原生与 CLI 共用的设备 handoff 客户端', () => {
+  it('拒绝明文和带 URL 凭据的设备通道，发送 verifier 前即失败', async () => {
+    const fetchImpl = vi.fn();
+    const id = '12345678-1234-1234-1234-123456789abc';
+    for (const baseUrl of ['http://heyta.example', 'https://user:pass@heyta.example',
+      'https://heyta.example/?token=secret', 'https://heyta.example/other']) {
+      expect(await beginCentralDeviceAuth({ baseUrl, fetchImpl })).toMatchObject({ ok: false });
+      expect(await claimCentralDeviceAuth({ baseUrl, fetchImpl }, id, 'a'.repeat(43))).toMatchObject({ ok: false });
+    }
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(isOfficialCentralAuthEndpoint('https://heyta.waytofuture.cn')).toBe(true);
+    expect(isOfficialCentralAuthEndpoint('http://heyta.waytofuture.cn')).toBe(false);
+    expect(isOfficialCentralAuthEndpoint('https://heyta.waytofuture.cn/other')).toBe(false);
+  });
   it('只送 verifier 的 SHA-256，凭据不经 Cookie，拒绝外域启动链接', async () => {
     const fetchImpl = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => response({
       handoffId: '12345678-1234-1234-1234-123456789abc',

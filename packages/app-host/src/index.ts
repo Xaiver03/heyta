@@ -396,6 +396,7 @@ export {
 export {
   beginCentralDeviceAuth,
   claimCentralDeviceAuth,
+  isOfficialCentralAuthEndpoint,
 } from './central-auth.js';
 export type { CentralDeviceStart, CentralDeviceClaim } from './central-auth.js';
 
