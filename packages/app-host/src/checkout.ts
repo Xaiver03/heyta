@@ -30,9 +30,15 @@ export const CHECKOUT_PATH = '/api/billing/checkout';
 /**
  * 「买哪一档」的唯一标识来自服务端价目表（`price-book.ts` 的 `SKU_GRANTS`）。
  *
- * 🔴 本档**不含** `hosted-ai-monthly`：那一档在 [ADR-0023](../../docs/adr/0023-managed-ai-quota-not-implemented.md)
- * 里被 `NOT_YET_DELIVERABLE_SKUS` 挡在收银台外（计量不存在之前不得售卖），
- * 客户端把它做成可点的按钮就是**诱导用户去买一个 409**。
+ * 这枚常量回答的是**不选档时买哪一档**，不是"只有这一档能买"：
+ * `hosted-ai-monthly`（¥12）自
+ * [ADR-0054](../../../docs/adr/0054-managed-ai-retention-and-selling-preconditions.md)
+ * 起已按顺序解除禁售（计量 `server/src/ai/metering.ts` 与托管代理路由都在了，
+ * `NOT_YET_DELIVERABLE_SKUS` 现为空）。想下另一档传 `options.priceId`。
+ *
+ * ⚠️ 这句在 2026-10-20 之前是反的：那时这里写着"本档**不含** `hosted-ai-monthly`，
+ * 客户端把它做成可点的按钮就是诱导用户去买一个 409"。那句话的依据是 ADR-0023 的禁售，
+ * 而 0023 的结论已被 0054 取代 —— 留着它，下一班会照它把刚做出的档位选择器删掉。
  */
 export const RENEWAL_PRICE_ID = 'hosted-monthly';
 

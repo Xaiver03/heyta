@@ -114,7 +114,9 @@
   保留策略定案、计量与托管代理路由落地、那条 reason 连成员一起删了；
   本 ADR **没有改**的那一条是"托管 AI 与端到端加密互斥，只能作为明确、可撤销、按功能开启的例外"。
   ⚠️ 顺序纪律仍然有效（原句"不许先把计费做了、保留策略以后再说"）：ADR-0054 走的是
-  **先补计量、后解禁售**，不是绕过它。而这一档**今天在客户端仍打不开**（0054 §8）。
+  **先补计量、后解禁售**，不是绕过它。而"这一档在客户端打不开"那句**已过期**（2026-10-20）：
+  设置页已有 `own / managed` 开关（web `data-testid="ai-supply-mode"`、
+  mobile `ai-gate-managed`）与「本周期已用 X / 300」读数 —— 见 0054 的勘误节。
 - **ADR-0014 记忆偏好层的两个闸门** ✅（[`文档`](../../docs/adr/0014-memory-switch-and-corrections.md)）。
   `memoryEnabled` **必填且默认关闭（fail-closed）**；推断结果**不持久化**
   （纯函数，每次从 op-log 重算），只有用户**纠正**进 op-log 跨设备同步；
@@ -130,9 +132,11 @@
   它**不**改动 ADR-0020 / ADR-0021 的价格、额度或模型 —— 判定的是**落地顺序**：
   端点 / 计量 / `deepseek` 调用 / 收银台**一个都不存在**，而承诺已写进文案与法务（5 处）。
   🔴 硬约束：**计量存在之前 `hosted-ai-monthly` 不得被售卖**（违反了就是收钱不交付）。
+  ⚠️ 上面这句与下一条 `check:ai-quota` 的绑定关系**已被 [`ADR-0054`](../../docs/adr/0054-managed-ai-retention-and-selling-preconditions.md) §6
+  按顺序解除**：0054 先补出计量与代理路由，再把这一档从 `NOT_YET_DELIVERABLE_SKUS` 摘出。
+  本节留着 0023 的原句是**历史坐标**（它判的是当时的落地顺序），现状读 0054。
   `pnpm check:ai-quota` 把**唯一数字源**（`docs/reference/pricing-and-entitlements.md` 的
   `ai-quota-ssot` 块）与那 5 处承诺、以及"状态声明 ↔ 实现"绑定起来。
-  ⚠️ 这是**有终点的决定**，不是拖延：清空 ADR §5 的最小清单之日，就是它被取代之日。
 - **AI 的完整架构**见 [`docs/reference/ai-architecture.md`](../../docs/reference/ai-architecture.md)
   （模块地图 / 封闭词表 / 全部具名常量 / 20 条不变量清单）。
   **AI 的入口文档是 [`docs/plans/ai-strategy.md`](../../docs/plans/ai-strategy.md)**，先读那份。
@@ -140,5 +144,5 @@
 **当前没有阻塞性决策**，P2 可以持续推进；P0 / P1 已交付，AI 轨道的 AI-0 / AI-1 / AI-2 与
 本地 API（MCP）也已落地（清单见 [`docs/plans/roadmap.md`](../../docs/plans/roadmap.md) §1.1）。
 
-**唯一一条"已知会收钱不交付"的红线**在 ADR-0023：`hosted-ai-monthly`（¥12 档）
-**计量存在之前不得被售卖**，收银台不许把它变成可支付的订单。
+**"会收钱不交付"这条线唯一的事实源是 [`ADR-0054`](../../docs/adr/0054-managed-ai-retention-and-selling-preconditions.md)
+§6（解除禁售的顺序）与 §8/§9（这一档还没做到的事）** —— 本文件不复述它的状态。
