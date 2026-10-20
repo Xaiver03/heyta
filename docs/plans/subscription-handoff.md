@@ -192,6 +192,13 @@ AI 文件 import `@heyta/i18n`，所以 **`packages/i18n` 必须同一个提交*
 | 部署侧键位与运营者说明 | ✅ `MANAGED_AI_*` 四枚进 compose 白名单，`env.example` 有能照填的一段 | `grep -n "MANAGED_AI_ENABLED" server/docker-compose.yml` |
 | 设置页的 own/managed 开关 + 「本周期已用 X / 300」 | ✅ ADR-0054 §9.3 的前两件 | ADR-0054 §10.1 那张表 |
 | 真浏览器判据 | ✅ `e2e/tests/renew-panel.spec.ts` 五条（档位、换档清旧单、拒降档、503、只用本机零请求），且每条都按 §6.2 规定一第 3 条抓 `console`／`pageerror`／非 2xx | `cd e2e && npx playwright test tests/renew-panel.spec.ts` |
+| 两道闸门有没有**能复跑的反臂** | ✅ `scripts/mutate-checkout-tier-gates.mjs`：逐臂把 `checkout.routes.ts` 改坏，要求具名用例变红；已进 `pnpm check` 链（不进链就是孤儿，`check:gate-wiring` 判这条） | `pnpm check:checkout-tier-gates` |
+
+⚠️ 那套臂里 C3 钉的是**默认值**那一支（`options.managedAiConfigured ?? false`）。
+`billing-checkout.routes.spec.ts` 的 `buildApp` 自带 `managedAiConfigured: true`，所以**每一条**
+既有用用例都不经过那句默认值 —— 没有这一条用例和那条臂，把默认翻成 `?? true`（"忘了传也算配好了"）
+整套件照绿。生产那处注册点**是**传了的（`server.ts` 里 `fullConfig.managedAi !== undefined`），
+现量：`grep -n "managedAiConfigured" server/src/server.ts`。
 
 🔴 两道闸门都**不许**改成"按比例折算"：`applyOneTimeGrant` 是一 `(userId, provider)`
 一行、整行替换 `grants`、只有一枚 `currentPeriodEnd`，那个形状表达不了半程升级。

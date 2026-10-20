@@ -72,14 +72,24 @@ pnpm verify:harmony-rnoh-js     # 鸿蒙 JS 侧全链路（零桩）：真 codeg
                                 #   需要 Node ≥ 20.12（DevEco 自带的 18 会报 styleText，见 §7 第 59 条）
 
 pnpm check                      # 全部门禁 + **全量单元测试**：类型 + 迁移 + 分层 + 界面文案 + 许可证 + 文档 + 设计变量 + iOS 原生依赖 + `pnpm -r test`
-                                # 🔴 **2026-10-16 实测：这条链今天会停在第 6 步**（对账件 **B22**）——
-                                #    `check` 是 **`&&` 串联的 116 步**，遇到第一处红就停；
-                                #    当日停在第 6 步 `check:reachability` ⇒ **第 7–116 步一次都不跑**，
-                                #    其中包含 **`pnpm -r test`（第 106 位）** 与 `check:payment-entry`（第 63 位）。
-                                #    ⇒ **别把 `pnpm check` 绿读成「全部门禁都过了」**：它今天连单测都没跑到。
+                                # 🔴 **2026-10-16 实测：这条链当天停在第 6 步**（对账件 **B22**）——
+                                #    `check` 是 `&&` 串联的一串步骤，**遇到第一处红就停**；
+                                #    当日停在第 6 步 `check:reachability` ⇒ 它后面的每一步一次都不跑，
+                                #    其中包含 `pnpm -r test` 与 `check:payment-entry`。
+                                #    ⇒ **别把 `pnpm check` 绿读成「全部门禁都过了」**：那天它连单测都没跑到。
                                 #    想验某一道：单独敲 `pnpm check:<名字>`；想跑单测：`pnpm -r test`。
+                                # ⚠️ 步数与每一步的**位序**都会随门禁增删漂，所以这里不存数字。
+                                #    要读数就跑：`node -e "const s=require('./package.json').scripts.check.split(' && ');console.log(s.length)"`
+                                #    （`check:gate-wiring` 钉的是"定义过的门禁必须真的在链里"，不是位序。）
                                 # 🔴 末尾的 `pnpm -r test` 是后补的：在此之前 `check` **不跑任何单元测试**，
                                 #    于是 `apps/web` 的测试套件红了很久都没有任何东西会失败（原因见下）。
+pnpm check:checkout-tier-gates  # 收银台两道新闸门（②′ "这台实例交付得了吗"、④′ "不许把已付费的能力判小"）
+                                #   的**变异验证**：逐臂把 `server/src/billing/checkout.routes.ts` 改坏，
+                                #   要求 `server/tests/billing-checkout.routes.spec.ts` 里**具名**用例变红。
+                                #   它存在是因为"拒单"这类判据坏得最安静的形状就是**整段被删掉**：
+                                #   没有一条用例会为"我少了一条判据"报错，只有一批 409 悄悄变成 200。
+                                #   臂数由脚本自己打印；红集合读 vitest 的 json reporter，不解析彩色输出。
+                                #   同族先例：`check:op-log-semantics`、`check:egress-wording`。
 pnpm check:design               # 只跑设计变量硬编码检查
 pnpm check:layering             # 只跑分层边界检查（apps/* 不得重新长出业务/接线）
 pnpm check:ui-language          # 界面文案必须全是中文（见 §5）
