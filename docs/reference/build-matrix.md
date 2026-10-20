@@ -291,6 +291,13 @@ Mac/Linux 调用 ⇒ `ssh windows-pc` 远端构建 + 产物回传；Windows 调�
 
 > 当前状态：✅ 可用于内部安装测试 / ❌ 不可用于应用商店。
 
+🔴 **10-20 10:5x 一条与产物不符的限定（本线只登记，不改这一节的口径）**：上面那句「release 变体**仍然**用 debug keystore 签名」
+只对**没有注入 `HEYTA_RELEASE_*` 那四项的机器**成立。本机库里的 release 件（`apps/mobile/android/app/build/outputs/apk/release/`，磁盘件、不入 git）
+`apksigner verify --print-certs` 回的是 `CN=heyta, OU=Mobile, O=Xiaoli Creativity Culture Industry, L=Hangzhou, ST=Zhejiang, C=CN`，
+而仓库 `app/debug.keystore` 那张是 `CN=Android Debug … C=US`（两枚 SHA-256 逐字不等）⇒ **构建出这枚件的那台机上配过发布钥**（本线没核这枚件的构建载体），
+从它出来的件是发布身份签的。所以别把这一节读成"反正所有件都用公开 debug 钥"——换构建机会**换签名身份**（现量：`apksigner verify --print-certs <apk>`；
+`keytool -list -v -keystore apps/mobile/android/app/debug.keystore -alias androiddebugkey -storepass android`）。
+
 ### 2.5 Windows 打包机实测（2026-09）
 
 **debug 与 release 两个变体都已跑通，产物已逐项验过。**
@@ -472,6 +479,6 @@ pnpm build:ios                     # Release, iphonesimulator
 | Linux 桌面 | Linux（构建在 `linux-dev-lan` 那台 Ubuntu 开发载体；**不是** `sanjiaozhou` —— 那是生产机，只借编译、不装包） | `pnpm build:linux <目标机\|local>` | `heyta_1.0.0_amd64.deb`（包内 `/usr/share/heyta/web-dist`） | ✅ **`.deb` 打过、解包态真窗口取过证**（07 04:4x，runbook §5.9）。⚠️ 未做：装进系统（`dpkg -i`）、签名/更新渠道、`reinstall-all.sh` 第五端 |
 | HarmonyOS | Mac | `pnpm verify:harmony-toolchain` 等三条 | `.hap`（release 20 MB / debug 37 MB，**均未签名**） | ⚠️ 有 HAP，未运行 |
 
-**签名现状**：Android release 用 debug keystore（可测试、不可上架）；
+**签名现状**：Android release 的签名**取决于那台构建机有没有注入 `HEYTA_RELEASE_*`**——注入了是发布身份，没注入回退 debug keystore（可测试、不可上架；见 §2.4 那条 10-20 限定，勿写成"所有件都用公开钥"）；
 iOS 只验到模拟器；**鸿蒙产物是 `*-unsigned.hap`（`signingConfigs: []`，装不进任何设备）**；
 桌面端还没有产物。

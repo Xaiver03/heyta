@@ -241,8 +241,12 @@ windows/android 那台打包主机 ssh 不可达，而规则明令不许退回�
 逐枚 `ssh -o ConnectTimeout=5 -o BatchMode=yes <别名> true` 三枚**全 `rc=255`**。再往下分一层（这一层决定下一步该找谁）：
 `ssh -G <别名> | awk '/^hostname /{print $2}'` 取到 `10.111.127.237` / `10.111.127.151` / `192.168.1.2`，
 前两枚 **ping 不通 + 22 端口关**（网络层就到不了 ⇒ 机子没开或不在网上），
-第三枚 **ping 得通但 22 关、`arp -n` 无表项**，而本机默认网关是 `10.246.153.46`（en0）⇒ 那枚 LAN 别名对当前这张网是**过期配置**，回它的不是打包机。
-⇒ 出路只有两条，**都不在本线手里**：把那台机开起来 / 更新它现在的地址，或删掉那枚只会误导人的 LAN 别名（别人的配置）。
+第三枚 **ping 得通但 22 关、`arp -n` 无表项**，而本机默认网关是 `10.246.153.46`（en0）⇒ 当时据此判"那枚 LAN 别名对当前这张网是过期配置"。
+🔴 **10-20 10:3x 复量把这一层换掉了**：本机已换到 `192.168.1.7/24`（网关 `192.168.1.1`），那张网上 `192.168.1.2` **L2 活着**（`arp -n` 回 MAC），**ICMP 两枚读数不一致**（同一小时内第一次 `ping -c 2 -t 3` FAIL、第二次 OK ⇒ "ping 得通"不是稳定属性）
+但 `22 / 445 / 139 / 135 / 5357 / 80` 逐枚 NO ⇒ 它给不出应用层通道；而 `~/.ssh/config` 里 `windows-pc` 段注释自己记的打包机局域网地址是 **`192.168.1.3`**，那一枚**无 ARP 表项**。
+⇒ **"别名过期"这句不再是有用的那枚解释**：它指的是另一台/另一层设备，而打包机根本不在这张网上（ZeroTier 那两枚也没人接）。
+⇒ 出路只有两条，**都不在本线手里**：把那台机开起来 / 接到网上（或把它的 ZeroTier 客户端拉起来），或删掉那枚只会误导人的 LAN 别名（别人的配置）。
+⚠️ 这一层留给下一位的形状：**"不可达"的成因分三层读（别名→路由→那台机本身），每层都是瞬时读数**——01:5x 那批的结论只活了 8 小时就被自己那张网换掉。
 ⇒ **"四端全过"这句现在不成立**，谁写谁负责；四端真实状态逐枚在 §四 第 4 步那一行末尾。
 ⚠️ 但**别把"HEAD 变了"当成"四端都过期"**：过期的判据是"这枚改动会不会进那一端的产物"。
 r149 / r150 两笔动的是 `apps/mobile/src`、`apps/mobile/tests`、`scripts/qa` 与文档 —— 那三端**不需要为这两笔重跑**，
@@ -254,7 +258,8 @@ iOS 装的是 **r159 那一趟**从含 `f21dc1d39` 的源码在本机重打的�
 现读法 `B=$(xcrun simctl get_app_container <UDID> com.heyta)/main.jsbundle; stat -f "%Sm" "$B"; shasum -a 256 "$B"`；
 mac 由 r155 那趟重装过判据，**05:4x 又补了一把更硬的尺**：`/Applications/Heyta.app/Contents/Resources/web-dist` 与本机 `apps/web/dist`
 **逐文件 sha256 全等** ⇒ mac 装机件里的 web 产物**就是当前源码那份构建**，不再靠 mtime 推（读数与命令在 §五 第 18 条）；
-**windows / android 两端没有** —— windows 堵在那两台 Windows 宿主，android 那一腿的口径题见 §五 第 6 条那一桶。
+**windows / android 两端没有** —— 10-20 10:3x 逐枚现量：`ssh windows-pc` / `windows-codex` / `windows-pc-lan` **三枚全 `rc=255`**（windows 腿：那台机既不在本机现在这张 `192.168.1.0/24` 上、ZeroTier 那两枚也没人接）；
+android 腿**等的不是这台机**，那一桶现在拆成"改收口点"与"签名身份口径"两条，依据与一条判据命令都在 §〇 Q3 那一桶与台账 r163 那一格。
 ✅ **10-20 01:4x r157 用同一把尺量过"还要不要再跑一趟重装"**：`git diff --name-only f21dc1d39..HEAD -- packages apps/mobile/android apps/mobile/src apps/desktop-macos apps/desktop-windows/src apps/desktop-windows/app apps/web/src apps/web/app server/src`
 ⇒ **枚数 0**（r154-r157 这几笔只动文档与 `apps/*/evidence/**`，它们不进任何端的产物）⇒ **iOS 与 mac 此刻仍等于当前 HEAD 的进包源码，不需要为这几笔重跑**；
 windows / android 那两端的"过期"是**没建过**，不是"建过之后输入又变了"。⚠️ 这把尺只覆盖 git 跟踪的打包源码，不证产物字节（同 §四 第 4 步那一行末尾那条边界）。
@@ -288,10 +293,13 @@ Android 有当前产物的 Profile/Settings 与 habits 腿读数（r85/r86/r109�
    剩下的都是射程边界（暗档 / Android / 大字体 / DOM 专属读数）。
 3. 🔴 **r147 又让四端产物落后了一枚进包的改动**：`ReminderList.tsx` 在 `packages/ui`（四端共用的 `dist`）里
    ⇒ §四 第 4 步那张表里"装的是当前产物"那几行**对它再次全部过期**。**iOS（r147 那趟装机态）与 mac（r148 补装）已各自从含这枚改动的源码重打重装**，
-   装机态读数都是**直接查包里的 JS / 直接量帧**，不是"源码改了所以产物一定改了"。**windows / android 两端没有** —— 同一前提：先跑
-   `ssh -o ConnectTimeout=6 -o BatchMode=yes windows-pc true; echo $?`，回非 0 就别把这趟排进计划，更别把"四端"写进结论。
-4. **提醒块 Android 档 + windows/android 两腿** —— 同一前提：先现量打包机在不在
-   （`ssh -o ConnectTimeout=6 -o BatchMode=yes windows-pc true; echo $?`），回非 0 就别把这趟排进计划。
+   装机态读数都是**直接查包里的 JS / 直接量帧**，不是"源码改了所以产物一定改了"。**windows / android 两端没有** ——
+   windows 那端先跑 `ssh -o ConnectTimeout=6 -o BatchMode=yes windows-pc true; echo $?`，回非 0 就别把这趟排进计划，更别把"四端"写进结论
+   （**10-20 10:3x 三枚别名全 `rc=255`**）；android 那端**不是这枚前提**，见下面第 4 枚与 §〇 Q3 那一桶。
+4. **提醒块 Android 档 + windows 腿** —— 🔴 **10-20 10:5x 更正：这两腿不再是同一枚前提**（原来这里写的"先现量打包机在不在"只对 windows 成立）。
+   **windows 腿**照第 3 枚那句 `ssh windows-pc` 判；**android 腿**要的是两枚本线不代做的决定：给 `scripts/run-gradle.mjs` 的远程支加一枚 POSIX 形状
+   （现量 `grep -n 'cd /d' scripts/run-gradle.mjs` ⇒ 两处真执行的都是 cmd 形状），以及"release 变体 + 非发布钥"的内测件算不算装机态验收对象
+   ——本仓明文口径（`docs/runbooks/multi-platform-build.md` 与 `docs/reference/build-matrix.md` §2.4）指向**允许**，逐条依据在台账 r163 那一格。
 5. ✅ **已做完（r149）：台账「清理数据后系统小组件不继续展示旧任务」那一格收口打勾**。挡它的最后一条缺陷
    （冷启动后「清除本机保存的凭据」灰着 ⇒ 组件清理入口在这台设备上够不到）已改，
    iOS 装机态取到同一枚控件的两态对照（`enabled` False→True、frame 两趟逐位相同），
@@ -302,15 +310,28 @@ Android 有当前产物的 Profile/Settings 与 habits 腿读数（r85/r86/r109�
    · **要那台打包机**（四端系统小组件矩阵 / Android 档 / windows 腿 / 崩溃恢复新包那一格）——
      🔴 别只试 `windows-pc` 一枚就下结论，这台机有**三枚**别名，逐枚现量：
      `for h in $(grep -iE "^Host " ~/.ssh/config | tr ' ' '\n' | grep -i win); do ssh -o ConnectTimeout=5 -o BatchMode=yes $h true >/dev/null 2>&1; echo "$h rc=$?"; done`；
-     三枚全非 0 就别把这趟排进计划（01:5x 现量三枚全 `rc=255`，且其中一枚是过期配置，见 §一 Q2 那一层分法）。
-     🔴 **10-20 02:5x 这一桶要拆成两半，"android 腿只能等 windows-pc"是窄了的**（逐条现量在台账 r161 那一格）：
-     **windows 腿**（MSIX）确实只有那两台 Windows 宿主，都不通就是不通；
-     **android 腿**另有第三枚宿主可指 —— `scripts/run-gradle.mjs:89` 是 `process.env.HEYTA_ANDROID_HOST || 'windows-pc'`，
-     而 `linux-dev` 四枚别名现量**全通**、JDK 21 + `ANDROID_HOME` + node/pnpm + 2.7G gradle 缓存 + `android-32/36` 系统镜像 + `/dev/kvm` 带 ACL 可读写（起模拟器没问题）。
-     它缺的是两样硬的：**当前锁文件对不上**（本机 `pnpm-lock.yaml` sha12 `38f1a91713a0` vs 远端 `a60c9f81c96f`，而那台机没有 npm 出站）
-     与**只有 `app/debug.keystore`**（生产钥没搬）⇒ 它只能出 **debug 签名件**。
-     所以这一格现在卡的不是通道，是**判据口径**："Android 装机态那几格允不允许拿 debug 件当验收对象"。
-     本线没代改（也没擅自搬 node_modules 过去造一条新通道），**推荐不允许**——小组件那一族在 debug/release 上不是同一件事。
+     三枚全非 0 就别把这趟排进计划（**10-20 10:3x 复量：三枚仍全 `rc=255`**，但成因换了，见下面第 ① 层——**这句是瞬时读数，每一趟都要重跑**）。
+     🔴 **这一桶拆成两半；而"android 腿=换一枚宿主就能跑"这句在 10:5x 又降了一格**（逐条现量在台账 r163 那一格，它同时重述了 r161 那三条"缺什么"）：
+     **windows 腿**（MSIX）确实只有那两台 Windows 宿主。10:3x 往下多分了一层：**本机已经换了一张网**
+     （`ifconfig en0` ⇒ `192.168.1.7/24`，而 01:5x 那批量的是 `10.246.153.139`），
+     两枚 ZeroTier 别名 ARP incomplete、`windows-pc-lan` 指向的 `192.168.1.2` 在这张网上 L2 活着（ICMP 一次 FAIL 一次 OK），而 `22/445/139/135/5357/80` **逐枚 NO**，
+     而 `~/.ssh/config` 里 `windows-pc` 段注释自己记的地址是 **`192.168.1.3`**、那一枚**无 ARP 表项**
+     ⇒ "别名过期"与"机器开着但 sshd 坏了"两种形状都被排掉，**剩的是那台机没接网**——拦路的是电源/网线，不是一个人的决定。
+     **android 腿**：`HEYTA_ANDROID_HOST` 那枚旋钮换的是**主机名**，`scripts/run-gradle.mjs` 的**远程支命令形状是 Windows 的**
+     （现量 `grep -n 'cd /d' scripts/run-gradle.mjs` ⇒ 两处真执行：远端 `pnpm install` 与远端 `gradlew.bat`；`HEYTA_ANDROID_REMOTE_ROOT` 默认还是个盘符路径），
+     而 `pnpm check:android-gradle-remote` 钉的正是"不许绕开收口点 / 不许新开 `./gradlew` 入口"
+     ⇒ **要用 `linux-dev` 得先给收口点加一枚 POSIX 远程支**，那是改承重脚本（且那是别项目的机），不是一句拍板。
+     r161 记的两条硬缺口现在**只剩一条**：~~没有 npm 出站、得搬 node_modules~~ ⇒ 10:5x 现量四条 URL **逐条有体**（判法：取 `/-/ping` 与包元数据的**体**，`200` 不算凭据），
+     对齐锁文件是一条 `pnpm install --frozen-lockfile` 的事；**只剩"那台机没有发布钥"这一条**。
+     而这一条要说准：它缺的是**签名身份**，不是"release 变体"——`assembleRelease` 没配发布钥照样出 release 件（换 debug 钥 + 大声警告），
+     `assembleDebug` 出的件里**没有 JS bundle**（RN gradle 插件不给 debuggable 变体注册打包任务）⇒ **那不是"另一种签名的产品"，那不是产品**，不参与口径讨论。
+     ⇒ 所以"允不允许拿 debug 件当验收对象"这问混了两维，去掉变体那一维后剩下一问：**内测件（release 变体 + 公开 debug 钥）算不算 Android 装机态那几格的验收对象**。
+     🔴 **本仓已有明文口径，方向与 r161 的"推荐不允许"相反**：`docs/runbooks/multi-platform-build.md`「没配发布钥…只把它用于内测」与
+     `docs/reference/build-matrix.md` §2.4「✅ 可用于内部安装测试 / ❌ 不可用于应用商店」⇒ **本线现在推荐允许**，条件是读数自报
+     `apksigner verify --print-certs` 的 DN + SHA-256 前缀并按内测件入账；例外是"升级连续性 / 换签名后本机数据与组件绑定存活"那一族（换身份必然 uninstall，那本身就是被测量）。
+     🔴 顺带一条与产物不符的旧句：§2.4 那句「release 变体**仍然用 debug keystore 签名**」对本机库里那枚 10-14 的 release 件**不成立**
+     （签名者 DN 是 `CN=heyta, O=Xiaoli …`，与仓库 `debug.keystore` 的 `CN=Android Debug` 两枚 SHA-256 逐字不等）⇒ **出这枚件的那台机构建机上配过发布钥**（本线没核这枚件的载体），
+     所以"换宿主"确实是换签名身份，不是"反正大家都在用公开钥"。
    · **要真 iPhone 或系统 GUI**（实体机验收、macOS Gallery 添加、Windows Widgets Board）—— 模拟器与探针不能替代，这是台账自己写的口径；
    · **要负责人**（法务审阅 / 主体资质 / 协议生效那两格，加上刚登记的「先离线使用」那一枚取向题）；
    · **在别线名下**（sweep 定位符漂移那格、`e6058120` 夹带归属那格、证据写回被跟踪目录那一格）——
@@ -368,7 +389,7 @@ r159 已在**本机**（iOS 腿是 `xcodebuild` iphonesimulator，**不吃打包
 ⚠️ 两问都用**数组**传路径（zsh 不分词，字符串会让 `git log --` 回空、差集读成 0 枚的假绿），并带一枚预期非 0 的阳性对照。
 windows / android 两端 02:0x 再量：三枚在册别名里 `41478@10.111.127.237` 与 `rayne@10.111.127.151` **ping FAIL + tcp/22 NO**、
 `41478@192.168.1.2` **ping OK 但 tcp/22 NO 且 `arp -n` 无表项**（本机在 `10.246.153.139`／网关 `10.246.153.46`）
-⇒ 没有一条给过应用层读数，**"四端全过"这句仍然不成立**（iOS 与 mac 两端各有自己的当前产物判据：r159 与 r155）|
+⇒ 没有一条给过应用层读数，**"四端全过"这句仍然不成立**（iOS 与 mac 两端各有自己的当前产物判据：r159 与 r155）。🔴 **10-20 10:3x 复量：三枚别名仍全 `rc=255`，但那两层读法要换**——本机已换到 `192.168.1.0/24`（`ifconfig en0` ⇒ `192.168.1.7`／网关 `192.168.1.1`），`192.168.1.2` 在这张网上**有 ARP 表项**（ICMP 两枚读数不一致：同小时内一次 FAIL 一次 OK），`22/445/139/135/5357/80` 逐枚 NO ⇒ 无应用层通道，而 `~/.ssh/config` 注释里记的打包机局域网地址 `192.168.1.3` **无 ARP 表项**；⇒ **"那枚 LAN 别名过期"改成"那台机不在这张网上"，能解它的是电源/网线，不是配置**。逐条与 android 那腿的新分法在台账 r163 那一格 |
 
 | 目标里点名的"提醒状态"这一面 · iOS 设备腿 | ✅ **五步旅程有常驻装置 + 两档读数（r141 转正、r142 扩程）**：空态 → 加一条 → **按「推迟」** → **按「关闭」** → 删回空态 → 删掉自己建的那条。两档逐枚 frame 全等、像素尺 light 252 / dark 28、四张新图逐张人眼看过。**照出 §四 第 37 行那枚真缺陷** | `scripts/qa/reminder-block-ios.py`；取证包 [`apps/mobile/evidence/ux-final-20261018/ios-reminder-block-r141/RESULT.md`](../../apps/mobile/evidence/ux-final-20261018/ios-reminder-block-r141/RESULT.md)（含两支反臂与一支拒写臂的原文）|
 | 四面装机态 × 深浅 × 中英（个人资料 / 账号 / AI+帮助 / 提醒块） | ✅ **四面各取满 2×2 四格**（提醒块那一格：中×浅 · 中×暗 · 英×浅 · **英×暗**，r144 补齐），全部跑在**同一枚当前源码件**上（载体 `head-r128` @ `997a1935`、bundle mtime `11:23:59`）。交付物是**五枚常驻装置**，不是一批截图：跑错外观档会**拒写**、按空了就**红**、语言档只认无障碍树回读（#488） | 台账 r131 / r133 / r134 / r136 / r137 / r139 / r140 / r141 / r142 各格；各包 `apps/mobile/evidence/ux-final-20261018/ios-*-r1xx/RESULT.md`。🔴 **仍不证**：提醒块 Android 档的同一形状、任何写入型交互（导出/清理/注销）、iPad / 窄屏 / 大字体 |
@@ -633,10 +654,14 @@ PY
    顺带更正那一格当时的两句预测：改点**没有**落在 `packages/domain` 的收口函数上（那里本来就只算 `snoozeDeadline`，是对的），
    而是落在 `packages/app-host`（新增 `snoozeByMinutes`）与 `packages/ui`（一行改两段）；
    五态覆盖的读数也**不需要重取** —— 两枚改动都不动时刻语义与状态判定，装机态两语态各复验一次已够（r147 那格写清了射程）。
-10. 🔴 **本轮之后只剩一条真拦路的下一步**：windows / android 两端产物对新源码过期，而它们共用那台打包主机 ——
-    现量 `ssh -o ConnectTimeout=6 -o BatchMode=yes windows-pc true; echo $?`，回 0 才谈得上补这两端；回非 0 就把这趟从计划里划掉，
-    **不许**用 `HEYTA_ANDROID_LOCAL_GRADLE=1` 之类绕回本机（负责人拍过的原文在 `scripts/run-gradle.mjs` 顶部注释）。
-    ⚠️ 10-20 00:2x 复量：`ssh windows-pc` 回 `connect to host 10.111.127.237 port 22: Host is down`、`adb devices` 空 ⇒ 这一格照旧。
+10. 🔴 **本轮之后剩的是两条，不是一条（10-20 10:5x 拆开）**：windows 与 android 两端产物对新源码过期，而它们**不再共用同一枚前提**——
+    **windows 腿**：现量 `ssh -o ConnectTimeout=6 -o BatchMode=yes windows-pc true; echo $?`，回 0 才谈得上补这端；
+    **10:3x 三枚别名全 `rc=255`，且这轮回到底层换了一层：本机已换到 `192.168.1.0/24`，那台机既不在这张网上（注释里记的 `.3` 无 ARP 表项）、
+    ZeroTier 那两枚也没人接 ⇒ 拦路的是那台机的电源/网线，不是配置、不是任何人的决定**。
+    ⚠️ **不许**用 `HEYTA_ANDROID_LOCAL_GRADLE=1` 之类绕回本机（负责人拍过的原文在 `scripts/run-gradle.mjs` 顶部注释）。
+    **android 腿**：等的**不是**这台打包机，但也不是"一句拍板"——见 §〇 Q3 那一桶的第 ② 层与台账 r163 那一格：
+    旋钮只换主机名、远程支的命令形状还是 Windows 的（`grep -n 'cd /d' scripts/run-gradle.mjs`），
+    而剩下那一枚真差异只是**签名身份**（`assembleDebug` 不在讨论范围——它里面没有 JS bundle）。⇒ 两枚决定各带一条判据命令，写在 r163 第 ⑥ 条。
 11. ✅ **10-20 00:3x（r149）台账「清理数据后组件不继续展示旧任务」那一格已收口打勾**：挡它的那条缺陷
     （冷启动后「清除本机保存的凭据」灰着 ⇒ 小组件清理入口够不到）由本线改掉，
     iOS 装机态取到同控件两态对照（改前 `enabled=False` / 改后 `enabled=True`，frame 两趟逐位相同）。
