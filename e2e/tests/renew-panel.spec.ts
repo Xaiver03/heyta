@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { STUB_ORIGIN, STUB_PORT } from '../ports';
-import { openApp, openSettingsView, selectSettingsSection, stubLegalRecheck } from './helpers';
+import { openApp, openSettingsView, selectSettingsSection, stubLegalRecheck, stubPublicFacts } from './helpers';
 
 /**
  * 续费面板的**真浏览器**判据（AGENTS §6.2 规定一：界面结论只有截图算）
@@ -55,6 +55,98 @@ async function seedCredentialsAndProbe(page: Page): Promise<void> {
   await page.route(`${SERVER}/api/passkeys**`, async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ passkeys: [] }) });
   });
+  // 🔴 其余几发**开机就会发**的读请求（形状逐条抄自
+  // `account-email-change-and-sessions.spec.ts` 的 `stubUnrelatedStartupCalls`，
+  // 那套桩已被那条 spec 的判据验证过，且都是"空但合法"⇒ 不改变本用例要看的界面）。
+  // 不补位的后果不是"红"，而是**噪声**：非 2xx 会淹掉真正那条判据（同 §7 里 B12 的成因）。
+  await stubPublicFacts(page, SERVER);
+  await page.route(`${SERVER}/api/notifications**`, async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ notifications: [], unreadCount: 0 }) });
+  });
+  await page.route(`${SERVER}/api/activity**`, async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ campaigns: [] }) });
+  });
+  await page.route(`${SERVER}/api/account/profile**`, async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ displayName: null, avatarHash: null }) });
+  });
+  // 入站自动化那两条属于**别人那条线**的面板；空形状的真源见
+  // `packages/app-host/src/inbound-rules-remote.ts`（`{ rules: [] }` / `{ events: [] }`）。
+  await page.route(`${SERVER}/api/automation/rules**`, async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ rules: [] }) });
+  });
+  await page.route(`${SERVER}/api/automation/events**`, async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ events: [] }) });
+  });
+  // 「账号与安全」那一组里的 `SessionsPanel` 一挂载就列会话（本套件现在**会**选中那一组）。
+  await page.route(`${SERVER}/api/auth/sessions**`, async (route) => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ sessions: [] }) });
+  });
+}
+
+/**
+ * 🔴 AGENTS §6.2 规定一第 3 条：抓 `console` 与 `pageerror`，并在断言失败时打印。
+ *
+ * 形状抄 `account-email-change-and-sessions.spec.ts` 的同名件（那条是这套件里
+ * 唯一已经把这三路监听写全的邻居），不是新发明：**白屏与"面板坏了"几乎只在
+ * 这里现形**，而 `toBeVisible()` 那种断言对"React 挂载时抛错"是**哑的** ——
+ * 元素可能压根没画出来，而失败信息只说"没等到"。
+ *
+ * ⚠️ 监听必须在**页面创建时**就挂上（每条用例第一行），挂晚了收不到加载期错误，
+ *    而"控制台无内容"是最误导人的结果。
+ */
+type PageProblems = {
+  readonly consoleErrors: string[];
+  readonly pageErrors: string[];
+  readonly badResponses: string[];
+};
+
+function captureProblems(page: Page): PageProblems {
+  const consoleErrors: string[] = [];
+  const pageErrors: string[] = [];
+  const badResponses: string[] = [];
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') consoleErrors.push(msg.text());
+  });
+  page.on('pageerror', (err) => pageErrors.push(err.message));
+  page.on('response', (res) => {
+    if (res.status() >= 400) badResponses.push(new URL(res.url()).pathname);
+  });
+  return { consoleErrors, pageErrors, badResponses };
+}
+
+/** 本仓库从来没有 favicon（同 `inbox.spec.ts` 的登记）。 */
+const KNOWN_MISSING = ['/favicon.ico'] as const;
+
+/**
+ * 🔴 假服务端**没实现**、而客户端按"这台服务器没有这项能力"正常降级的那一发。
+ *
+ * 刻意**不伪造**它：`GET /api/auth/central/config` 的应答会被
+ * `packages/app-host/src/central-auth.ts:55-67` 逐字段校验（`loginPath` 必须等于
+ * `CENTRAL_AUTH_PATHS.start`），填一个真的 `oidc` 配置会**打开中心认证这条路**，
+ * 于是被测界面本身被测试夹具改了 —— 那正是"为了让判据变绿而改测试环境"的反面。
+ * 它归那条能力自己的判据（`auth-simple-ux.spec.ts` 有自己的路由），不归这一屏。
+ */
+const UNSTUBBED_BUT_HANDLED = ['/api/auth/central/config'] as const;
+
+function assertNoProblems(problems: PageProblems, expectedBad: readonly string[] = []): void {
+  const allowed = [...UNSTUBBED_BUT_HANDLED, ...expectedBad];
+  const unexpected = problems.badResponses.filter(
+    (path) => !KNOWN_MISSING.some((known) => path === known) && !allowed.includes(path),
+  );
+  expect(unexpected, `除已登记缺失与本用例自己造的非 2xx 外不该有非 2xx：${JSON.stringify(unexpected)}`).toEqual([]);
+  const nonResource = problems.consoleErrors.filter(
+    (text) =>
+      !/Failed to load resource/u.test(text) &&
+      !/WebSocket/u.test(text) &&
+      // 🔴 中心认证配置那一发的 CORS 拒绝：客户端**按设计**去问官方站点
+      //    （`packages/app-host/src/legal-links.ts:58` 的 `OFFICIAL_SITE_ORIGIN`），
+      //    它与用户连的那台同步服务器**不是同一个来源**，所以在任何本地夹具里都必然被 CORS 挡下。
+      //    这条与 `UNSTUBBED_BUT_HANDLED` 同族：产品行为没错，错的是让它的报错淹掉本用例的判据。
+      !/Access to fetch at .*\/api\/auth\/central\/config/u.test(text),
+  );
+  expect(nonResource, `不该有 JS 层报错：${JSON.stringify(nonResource)}`).toEqual([]);
+  expect(problems.pageErrors, `不该有未捕获异常：${JSON.stringify(problems.pageErrors)}`).toEqual([]);
 }
 
 /**
@@ -84,6 +176,7 @@ async function openSettings(page: Page, consent: 'accepted' | 'local-only' = 'ac
 
 test('下单成功：屏上是服务端那一单的金额与支付串，不是一句"已到账"', async ({ page }) => {
   test.info().annotations.push({ type: '截图', description: 'test-results/renew-panel-order.png' });
+  const problems = captureProblems(page);
   await openSettings(page);
 
   const bodies: string[] = [];
@@ -115,10 +208,14 @@ test('下单成功：屏上是服务端那一单的金额与支付串，不是�
   expect(JSON.parse(bodies[0] ?? '{}')).toEqual({ priceId: 'hosted-monthly' });
 
   await page.screenshot({ path: 'test-results/renew-panel-order.png' });
+
+  // 🔴 §6.2 规定一第 3 条：这一屏不许有任何"未登记的报错"（本用例自己造的那发非 2xx 已逐条登记）。
+  assertNoProblems(problems, []);
 });
 
 test('这台实例没配收款通道：一句人话，且不留半截付款面板', async ({ page }) => {
   test.info().annotations.push({ type: '截图', description: 'test-results/renew-panel-no-channel.png' });
+  const problems = captureProblems(page);
   await openSettings(page);
 
   await page.route(`${SERVER}/api/billing/checkout**`, async (route) => {
@@ -138,6 +235,9 @@ test('这台实例没配收款通道：一句人话，且不留半截付款面�
   await expect(page.getByTestId('renew-order')).toHaveCount(0);
 
   await page.screenshot({ path: 'test-results/renew-panel-no-channel.png' });
+
+  // 🔴 §6.2 规定一第 3 条：这一屏不许有任何"未登记的报错"（本用例自己造的那发非 2xx 已逐条登记）。
+  assertNoProblems(problems, ['/api/billing/checkout']);
 });
 
 /**
@@ -153,6 +253,7 @@ test('这台实例没配收款通道：一句人话，且不留半截付款面�
  */
 test('只用本机时点下单：零请求，且界面不把"我们自己拒发"说成"连不上服务端"', async ({ page }) => {
   test.info().annotations.push({ type: '截图', description: 'test-results/renew-panel-no-consent.png' });
+  const problems = captureProblems(page);
 
   const checkoutCalls: string[] = [];
   await page.route(`${SERVER}/api/billing/checkout**`, async (route) => {
@@ -172,6 +273,9 @@ test('只用本机时点下单：零请求，且界面不把"我们自己拒发"
   expect(checkoutCalls).toHaveLength(0);
 
   await page.screenshot({ path: 'test-results/renew-panel-no-consent.png' });
+
+  // 🔴 §6.2 规定一第 3 条：这一屏不许有任何"未登记的报错"（本用例自己造的那发非 2xx 已逐条登记）。
+  assertNoProblems(problems, []);
 });
 
 /**
@@ -183,6 +287,7 @@ test('只用本机时点下单：零请求，且界面不把"我们自己拒发"
  */
 test('选 ¥12 那一档：发出去的是 hosted-ai-monthly，而换档把旧的那一单清掉了', async ({ page }) => {
   test.info().annotations.push({ type: '截图', description: 'test-results/renew-panel-tiers.png' });
+  const problems = captureProblems(page);
   await openSettings(page);
 
   const bodies: string[] = [];
@@ -217,10 +322,14 @@ test('选 ¥12 那一档：发出去的是 hosted-ai-monthly，而换档把旧�
   await expect(page.getByTestId('renew-order')).toContainText('4.00 CNY');
 
   await page.screenshot({ path: 'test-results/renew-panel-tiers.png' });
+
+  // 🔴 §6.2 规定一第 3 条：这一屏不许有任何"未登记的报错"（本用例自己造的那发非 2xx 已逐条登记）。
+  assertNoProblems(problems, []);
 });
 
 test('服务端按 ④′ 拒降档：屏上说"这一档不含你当前档的全部能力"，而不是"没有定价"', async ({ page }) => {
   test.info().annotations.push({ type: '截图', description: 'test-results/renew-panel-downgrade.png' });
+  const problems = captureProblems(page);
   await openSettings(page);
 
   await page.route(`${SERVER}/api/billing/checkout**`, async (route) => {
@@ -239,4 +348,7 @@ test('服务端按 ④′ 拒降档：屏上说"这一档不含你当前档的�
   await expect(page.getByTestId('renew-order')).toHaveCount(0);
 
   await page.screenshot({ path: 'test-results/renew-panel-downgrade.png' });
+
+  // 🔴 §6.2 规定一第 3 条：这一屏不许有任何"未登记的报错"（本用例自己造的那发非 2xx 已逐条登记）。
+  assertNoProblems(problems, ['/api/billing/checkout']);
 });

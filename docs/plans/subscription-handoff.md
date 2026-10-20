@@ -191,7 +191,7 @@ AI 文件 import `@heyta/i18n`，所以 **`packages/i18n` 必须同一个提交*
 | 买更低档会不会把已付费能力判小 | ✅ 闸门 ④′：`409 PRICE_TIER_LOSES_GRANTS`，同样在冻结之前 | `grep -n "PRICE_TIER_LOSES_GRANTS" server/src/billing/checkout.routes.ts` |
 | 部署侧键位与运营者说明 | ✅ `MANAGED_AI_*` 四枚进 compose 白名单，`env.example` 有能照填的一段 | `grep -n "MANAGED_AI_ENABLED" server/docker-compose.yml` |
 | 设置页的 own/managed 开关 + 「本周期已用 X / 300」 | ✅ ADR-0054 §9.3 的前两件 | ADR-0054 §10.1 那张表 |
-| 真浏览器判据 | ✅ `e2e/tests/renew-panel.spec.ts` 五条（档位、换档清旧单、拒降档、503、只用本机零请求） | `cd e2e && npx playwright test tests/renew-panel.spec.ts` |
+| 真浏览器判据 | ✅ `e2e/tests/renew-panel.spec.ts` 五条（档位、换档清旧单、拒降档、503、只用本机零请求），且每条都按 §6.2 规定一第 3 条抓 `console`／`pageerror`／非 2xx | `cd e2e && npx playwright test tests/renew-panel.spec.ts` |
 
 🔴 两道闸门都**不许**改成"按比例折算"：`applyOneTimeGrant` 是一 `(userId, provider)`
 一行、整行替换 `grants`、只有一枚 `currentPeriodEnd`，那个形状表达不了半程升级。
