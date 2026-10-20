@@ -66,7 +66,7 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 
 1. **链接用文件相对路径**，不要写仓库根相对路径。
    - ✅ `` [架构](reference/architecture.md) ``
-   - ❌ `` [架构](docs/reference/architecture.md) ``（从 `docs/` 里这样写会解析到 `docs/docs/`）
+   - ❌ `` [架构](reference/architecture.md) ``（从 `docs/` 里这样写会解析到 `docs/docs/`）
    - 在**反引号 code span** 里提及路径时，用仓库根相对路径（不会被解析，只是给人看）。
 2. **提交前跑死链检查**：
    ```bash
@@ -186,7 +186,7 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | [desktop-packaging-handoff.md](plans/desktop-packaging-handoff.md) | **交接：桌面三端安装包** —— macOS（Developer ID 签名 + 公证 + 装订）与 Linux（.deb）已完整交付并实测装完能起来；Windows MSIX 那格本表原先写「`Add-AppxPackage` 被拒，卡在安装」，**正文已改口为已解决**（非提权会话装成功并带截图，见该文 §3.1 之后的闭合记录）——本表只给指针，不在这里复述状态 |
 | [desktop-storage-host-handoff.md](plans/desktop-storage-host-handoff.md) | **交接：桌面端「真应用的存储 → 壳的 SQLite」** —— A（macOS 定案 = **M2** + 可判定的重开条件）已完成；**B 的 Windows 端已验到绿**（页侧 `STORAGE=shell` + 从壳外扫到载荷与 `ops` 表 + **重启之后还在**）。含四件事的顺序、已排除的死路、OPFS→壳导入的判据链与注入验证。**两个桌面端都已验通并翻成默认**；⚠️ **四件事 A/B/C/D 全部交付**（各自有能因注入转红的判据）。唯一待定的是**产品选择**（壳里主鉴权机制）。另记录了顺带修掉的两起产物/门禁缺陷。**接手先读 §6** |
 | [i18n-multilingual.md](plans/i18n-multilingual.md) | 🌐 **中英双语实施计划**：为什么自研零依赖词条表、落地页用 URL 而应用用偏好、`check:ui-language` 契约的**变更与两处按 key 的例外**、分阶段迁移进度、以及**还没解决的域层文案** |
-| [landing-motion-audit/](plans/landing-motion-audit/) | 🎬 **落地页动效审计与整改**（`improve-animations` skill 产出，基线 `18b34ce`）：5 条发现全部 DONE，判据与取值都注明来源，含真实 Chrome 行为断言。原先游离在仓库根 `plans/`，已移入此处 |
+| [landing-motion-audit/](plans/archive/landing-motion-audit/) | 🎬 **落地页动效审计与整改**（`improve-animations` skill 产出，基线 `18b34ce`）：5 条发现全部 DONE，判据与取值都注明来源，含真实 Chrome 行为断言。原先游离在仓库根 `plans/`，已移入此处 |
 | 🔴 [multi-platform-widgets.md](plans/multi-platform-widgets.md) | **多端小组件改造计划**：小组件是**多端适配的输出形态**，不是额外项目。含**必须现在做对的 5 件事**（App Group 定名 / 预留容器 / 不把 SQLite 搬进共享容器）、`packages/widget-core` + golden fixture + 门禁扩展、**Windows 走 PWA provider、macOS 走 Continuity —— 这两端反而不需要壳**、W0–W5 排序与"什么能自动验/什么不能"。支撑 [roadmap](plans/roadmap.md) P3 |
 | ⭐ [multi-platform-widgets-progress.md](plans/multi-platform-widgets-progress.md) | 🔴 **小组件实施进度账本（唯一真源）**：W0–W5 逐任务记录**已完成 / 未完成 / 阻塞**并附可验证证据。含 D1–D6 六个已拍板决策（**D1 = 设备密钥加密快照**）、阻塞登记（鸿蒙镜像/签名、Windows 真机、iOS 账号）、7 条未核实项、以及「下一步」唯一入口。状态只有四种，**不允许"基本完成"** |
 | [motivation-and-progression.md](plans/archive/motivation-and-progression.md) | ⭐ **激励与成长体系设计**：三层架构（即时反馈/连续性/叙事）× 四个循环，含「不改 schema」的落地映射、反需求 2.0、E2EE 下的指标方案 |

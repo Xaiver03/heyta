@@ -25,7 +25,7 @@
 
 - 排版 token 的来源（`check:design` 已经管着，且这一轮没有一条是"值从哪来"的问题）；
 - 认证/设置的信息架构（在 [`user-journey-and-auth.md`](user-journey-and-auth.md) 与
-  [`goal-settings-ia.md`](goal-settings-ia.md)）；
+  [`goal-settings-ia.md`](archive/goal-settings-ia.md)）；
 - 收集箱页头那一刀已交付的部分（见 `git log` 的 `dd2d7d6b` / `b1c40f5a`）。
 
 🔴 **一条前置纪律（本轮拍板）**：主战场是移动端 + macOS/Windows 壳，**web 不是**。
