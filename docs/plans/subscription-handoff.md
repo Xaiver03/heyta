@@ -234,5 +234,9 @@ AI 文件 import `@heyta/i18n`，所以 **`packages/i18n` 必须同一个提交*
 - ⚠️ **两枚远端现在不对称**（不是本线的事，但会影响"以哪枚为准"）：`gitee` 从今天起收不进任何 push
   —— 它的仓库体积过了自家 1024MB 配额。`origin`（GitHub）是**当前**的那一枚。
   现量：`git fetch gitee main && git fetch origin main && git rev-parse --short gitee/main origin/main`。
-  原文证据、分账数字与三条出路在 `BLOCKED.md` 的 **B243**。
+  🔴 **两条便宜路已被现量否证**：GC 没用（`main` 单独打包就 **1094.8 MiB**，gitee 整仓 1108.059 MB ⇒ 不可达的只有约 13 MB）；
+  gitee 上也没有陈旧 ref 可删（`git ls-remote gitee` 只回两行）。
+  **唯一保住这枚镜像且不丢任何当前文件的路**是把两枚全死的前缀请出历史
+  （`.pnpm-store/` 187.3 MB + `research/standalone/.npm-cache/` 130.2 MB = **317.5 MB**，两者在 HEAD 里都是 **0 条路径**），
+  代价是**双端强推**重写所有下游克隆 ⇒ 归负责人拍。证据、分母口径与五步预案在 `BLOCKED.md` 的 **B243 追记**。
 
