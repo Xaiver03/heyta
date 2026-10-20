@@ -564,6 +564,8 @@ export type SyncClientOptions = SyncEncryptionOptions & {
   baseUrl: string;
   /** 取当前访问令牌。返回 undefined 表示未登录。 */
   getToken: () => Promise<string | undefined>;
+  /** Browser hosted sessions authenticate with the host-only HttpOnly cookie. */
+  authTransport?: 'bearer' | 'cookie';
   /** 读取/写入下载游标（serverSeq）。 */
   getLastServerSeq: () => Promise<number>;
   setLastServerSeq: (seq: number) => Promise<void>;
@@ -778,15 +780,16 @@ export class SyncClient {
       return s;
     };
 
-    const token = await this.options.getToken();
+    const token = this.options.authTransport === 'cookie' ? '__cookie__' : await this.options.getToken();
     if (token === undefined) {
       return report({ kind: 'error', reason: 'not-signed-in', retryable: false });
     }
 
     // A transport hint is scoped to this authenticated client instance. Losing
     // it is safe: logs always retain complete clocks, never transport deltas.
-    if (this.frontierSession !== token) this.causalFrontier = undefined;
-    this.frontierSession = token;
+    const frontierSession = this.options.authTransport === 'cookie' ? 'cookie' : token;
+    if (this.frontierSession !== frontierSession) this.causalFrontier = undefined;
+    this.frontierSession = frontierSession;
 
     let payloadCipher: SyncPayloadCipher | undefined;
     try {
@@ -1035,7 +1038,7 @@ export class SyncClient {
       if (batch[0]?.id.startsWith('inbound:')) {
         let candidate: unknown;
         try {
-          candidate = await this.options.getInboundUploadAuthorization?.({
+          candidate = this.options.authTransport === 'cookie' ? undefined : await this.options.getInboundUploadAuthorization?.({
             baseUrl: this.options.baseUrl, clientId: this.options.clientId, token,
             opIds: batch.map((op) => op.id),
           });
@@ -1128,12 +1131,10 @@ export class SyncClient {
 
       const usesDelta = ops.some((op) => op.vectorClockEncoding === 'frontier-delta');
       const lastKnownServerSeq = await this.options.getLastServerSeq();
-      const send = (compact: boolean) => this.fetchImpl(
-        `${this.options.baseUrl}/api/sync/${compact ? 'ops/causal' : 'ops'}`,
-        {
+      const send = (compact: boolean) => this.requestWithAuth(token, `${this.options.baseUrl}/api/sync/${compact ? 'ops/causal' : 'ops'}`, {
           method: 'POST',
           ...(inboundAuthorization ? { redirect: 'error' as const } : {}),
-          headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`,
+          headers: { 'content-type': 'application/json',
             ...(inboundAuthorization ? { 'x-heyta-worker-token': inboundAuthorization.workerToken,
               'x-heyta-database-epoch': inboundAuthorization.databaseEpoch } : {}) },
           body: JSON.stringify({
@@ -1146,8 +1147,7 @@ export class SyncClient {
             lastKnownServerSeq,
             ...(compact ? { causalFrontierToken: this.causalFrontier!.token } : {}),
           }),
-        },
-      );
+        });
       let res = await send(usesDelta);
       // Server downgrade or rotated signing key: retry the SAME operations
       // with their original complete clocks. No extra op or re-encryption.
@@ -1518,7 +1518,7 @@ export class SyncClient {
     conflict: ConflictInfo,
     choice: 'keep-local' | 'keep-remote',
   ): Promise<SyncStatus> {
-    const token = await this.options.getToken();
+    const token = this.options.authTransport === 'cookie' ? '__cookie__' : await this.options.getToken();
     let payloadCipher: SyncPayloadCipher | undefined;
     try {
       payloadCipher = await this.getPayloadCipher();
@@ -1578,6 +1578,19 @@ export class SyncClient {
     }
   }
 
+  private requestWithAuth(token: string, input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+    const headers = new Headers(init.headers);
+    if (this.options.authTransport === 'cookie') {
+      // Cookie sessions are the sole browser credential.  Remove a caller
+      // supplied bearer header as well, so a stale token cannot create a
+      // second authentication path for the same request.
+      headers.delete('authorization');
+      return this.fetchImpl(input, { ...init, credentials: 'include', headers });
+    }
+    headers.set('authorization', `Bearer ${token}`);
+    return this.fetchImpl(input, { ...init, headers });
+  }
+
   private async getPayloadCipher(): Promise<SyncPayloadCipher | undefined> {
     if (this.options.encryptionMode === 'vault') {
       // Runtime guard as well: JS/native callers do not all pass through tsc.
@@ -1610,9 +1623,7 @@ export class SyncClient {
         url.searchParams.set('appVersion', this.options.appVersion);
       }
 
-      const res = await this.fetchImpl(url.toString(), {
-        headers: { authorization: `Bearer ${token}` },
-      });
+      const res = await this.requestWithAuth(token, url.toString());
 
       if (!res.ok) throw await toHttpError(res);
 

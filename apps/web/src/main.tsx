@@ -29,6 +29,7 @@ import {
   subscribePrivacyConsent,
 } from './features/privacy/consent-gate.js';
 import { useSyncStore } from './features/sync/store.js';
+import { installCentralSessionRecheck } from './features/sync/central-session-recheck.js';
 // 🔴 G-27：启动那一步要问的"这个账号要不要补签"。装配在 gate.ts，判定在 app-host。
 import { askLegalRecheck } from './features/legal-recheck/gate.js';
 import { ErrorScreen } from './features/shell/ErrorScreen.js';
@@ -91,6 +92,18 @@ const startupNetwork = createStartupNetwork({
   adoptPendingLogin: (held) => {
     void releasePendingLogin(held);
   },
+  // 官方 Web 的中央会话只由同源 HttpOnly Cookie 恢复，不把上游凭据落进浏览器存储。
+  resumeCentralSession: () => {
+    void useSyncStore.getState().resumeCentralSession();
+  },
+});
+
+// A different tab may revoke or replace the HttpOnly session while this one
+// is backgrounded. Refresh the visible identity only after privacy consent.
+installCentralSessionRecheck({
+  networkAllowed: () => privacyConsent.networkAllowed(),
+  hasCookieSession: () => useSyncStore.getState().authTransport === 'cookie',
+  recheck: () => useSyncStore.getState().resumeCentralSession(),
 });
 
 const container = document.getElementById('root');
@@ -259,7 +272,7 @@ if (new URLSearchParams(window.location.search).has('shell')) {
             <ErrorScreen
               titleKey="web.error.storage.title"
               message={message}
-              hintKey={storageHintKey(failure)}
+              hintKey={storageHintKey(failure, error)}
             />
           </LocaleHost>
         </StrictMode>,

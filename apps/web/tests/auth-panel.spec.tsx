@@ -29,6 +29,11 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('../src/features/privacy/consent-gate.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../src/features/privacy/consent-gate.js')>(),
+  consentFetch: (input: RequestInfo | URL, init?: RequestInit) => globalThis.fetch(input, init),
+}));
+
 import { I18nProvider, translate, type Locale, type MessageKey } from '@heyta/i18n';
 import { OFFICIAL_SITE_ORIGIN, type HostedAuthSession } from '@heyta/app-host';
 import { legalDocumentById, legalDocumentPresentation } from '@heyta/legal';
@@ -117,6 +122,7 @@ const SESSION = { token: 'jwt-abc', user: { id: 3, email: 'me@example.com' } };
 const EMAIL = 'me@example.com';
 /** 一句合规格（≥8 码点）且不泄露的口令；这里的值不参与任何判定，只是别空着。 */
 const PASSWORD = 'correct horse battery';
+const CENTRAL_CONFIG = { mode: 'oidc', loginPath: '/api/auth/oidc/start', documentVersion: 'v1' };
 const REGISTRATION_CHALLENGE = {
   challengeId: 'challenge-1',
   expiresAt: Date.now() + 600_000,
@@ -144,6 +150,9 @@ function stubFetch(
 ): void {
   calls = [];
   fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    if (String(input).endsWith('/api/auth/central/config')) {
+      return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve(CENTRAL_CONFIG) } as Response);
+    }
     calls.push({
       url: String(input),
       init,
@@ -204,7 +213,9 @@ function legalAnchors(el: HTMLElement): HTMLAnchorElement[] {
 }
 
 async function readOfficialLegal(el: HTMLElement, kind: 'terms' | 'privacy', locale: Locale): Promise<HTMLElement> {
-  await tap(el, `auth-form-legal-${kind}`);
+  await tap(el, el.querySelector('[data-testid="central-auth-panel"]') === null
+    ? `auth-form-legal-${kind}`
+    : `central-auth-${kind}`);
   // React Native Web Modal mounts a portal; the reader is outside AuthPanel's container.
   const sheet = byTestId(document.body, 'auth-legal-document');
   const legalDoc = legalDocumentById(kind);
@@ -283,6 +294,7 @@ function termsChecked(el: HTMLElement): string | null {
 }
 
 beforeEach(() => {
+  stubFetch(200, {});
   __resetAuthForTests();
   useSyncStore.setState({
     baseUrl: '',
@@ -311,9 +323,10 @@ describe('未登录 / 未配置时是明确的空状态', () => {
     expect(dialog?.getAttribute('aria-label')).toBe(translate('zh-CN', 'web.auth.title'));
     expect(el.querySelector('.ht-sheet__auth-plan')).not.toBeNull();
     expect(el.textContent).toContain(translate('zh-CN', 'web.auth.plan.title'));
-    expect(el.querySelector('[data-testid="auth-form-email"]')).not.toBeNull();
-    expect(el.querySelector('[data-testid="auth-form-password"]')).not.toBeNull();
-    expect(el.querySelector('[data-testid="auth-form-submit"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="central-auth-panel"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="central-auth-submit"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="auth-form-email"]')).toBeNull();
+    expect(el.querySelector('[data-testid="central-auth-self-hosted"]')).toBeNull();
     expect(el.querySelector('[data-testid="auth-form-advanced-toggle"]')).toBeNull();
     expect(el.querySelector('[data-testid="auth-form-self-host-toggle"]')).toBeNull();
     expect(el.querySelector('[data-testid="auth-form-have-token-toggle"]')).toBeNull();
@@ -323,7 +336,26 @@ describe('未登录 / 未配置时是明确的空状态', () => {
 
   it('设置 → 同步显式进入时才提供高级入口', async () => {
     const el = await renderPanelAtBaseUrl('', 'zh-CN', true);
+    expect(el.querySelector('[data-testid="central-auth-panel"]')).not.toBeNull();
+    await tap(el, 'central-auth-self-hosted');
     expect(el.querySelector('[data-testid="auth-form-advanced-toggle"]')).not.toBeNull();
+    await tap(el, 'central-auth-return');
+    expect(el.querySelector('[data-testid="central-auth-panel"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="auth-form-email"]')).toBeNull();
+  });
+
+  it('自托管入口不向官方域发送旧口令请求，填回官方域即回中央登录', async () => {
+    const el = await renderPanelAtBaseUrl('', 'zh-CN', true);
+    await tap(el, 'central-auth-self-hosted');
+    await tap(el, 'auth-form-advanced-toggle');
+    expect((byTestId(el, 'auth-form-server-url') as HTMLInputElement).value).toBe('');
+    await typeById(el, 'auth-form-email', EMAIL);
+    await typeById(el, 'auth-form-password', PASSWORD);
+    await tap(el, 'auth-form-submit');
+    expect(calls).toEqual([]);
+    await typeById(el, 'auth-form-server-url', OFFICIAL_SITE_ORIGIN);
+    expect(el.querySelector('[data-testid="central-auth-panel"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="auth-form-email"]')).toBeNull();
   });
 
   it('明说"还没有凭据"，并说清凭据怎么来 —— 不是一片空白', async () => {
@@ -370,11 +402,15 @@ describe('🔴 口令这条路在界面上**可达**（此前它是"做了但点
     const pending = new Promise<Response>((resolve) => {
       release = resolve;
     });
-    vi.stubGlobal('fetch', vi.fn(() => pending));
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => String(input).endsWith('/api/auth/central/config')
+      ? Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve(CENTRAL_CONFIG) } as Response)
+      : pending));
     const onSignedIn = vi.fn();
     const el = await renderPanelAtBaseUrl('', 'zh-CN', true, onSignedIn);
 
+    await tap(el, 'central-auth-self-hosted');
     await tap(el, 'auth-form-advanced-toggle');
+    await typeById(el, 'auth-form-server-url', BASE_URL);
     await typeById(el, 'auth-form-email', EMAIL);
     await typeById(el, 'auth-form-password', PASSWORD);
     await tap(el, 'auth-form-submit');
@@ -627,9 +663,9 @@ describe('🔴 拿到令牌之后必须真的接上同步配置', () => {
     });
 
     // 端点、方法、请求体都对。
-    expect(calls).toHaveLength(1);
-    expect(calls[0]!.url).toBe(`${BASE_URL}/api/login/magic-link/verify`);
-    expect(calls[0]!.body).toEqual({ token: 'tok-123' });
+    const verificationCalls = calls.filter((call) => call.url === `${BASE_URL}/api/login/magic-link/verify`);
+    expect(verificationCalls).toHaveLength(1);
+    expect(verificationCalls[0]!.body).toEqual({ token: 'tok-123' });
 
     // 🔴 承重断言：令牌真的进了同步配置。
     // 把 `store.ts` 里的 `applyAuthSession(baseUrl, outcome.session)` 删掉 → 这里红。
@@ -935,13 +971,12 @@ describe('条款链接：按连的那台服务端分流', () => {
   it('连官方域时两份协议在应用内打开完整正文，阅读不代表同意', async () => {
     stubFetch(200, REGISTRATION_CHALLENGE);
     const el = await renderPanelAtBaseUrl(OFFICIAL);
-    await toRegister(el);
     expect(legalAnchors(el)).toEqual([]);
     for (const kind of ['terms', 'privacy'] as const) {
       await readOfficialLegal(el, kind, 'zh-CN');
       await tap(document.body, 'auth-legal-document-close');
       expect(document.body.querySelector('[data-testid="auth-legal-document"]')).toBeNull();
-      expect(termsChecked(el)).toBe('false');
+      expect((byTestId(el, 'central-auth-consent') as HTMLInputElement).checked).toBe(false);
     }
     expect(calls).toEqual([]);
   });
@@ -954,7 +989,6 @@ describe('条款链接：按连的那台服务端分流', () => {
   it('英文界面阅读英文官方正文', async () => {
     stubFetch(200, REGISTRATION_CHALLENGE);
     const el = await renderPanelAtBaseUrl(OFFICIAL, 'en');
-    await toRegister(el);
     await readOfficialLegal(el, 'terms', 'en');
     await tap(document.body, 'auth-legal-document-close');
     expect(calls).toEqual([]);
@@ -974,8 +1008,7 @@ describe('条款链接：按连的那台服务端分流', () => {
   it('未配置地址时可在应用内阅读默认官方协议', async () => {
     stubFetch(200, REGISTRATION_CHALLENGE);
     const el = await renderPanelAtBaseUrl('');
-    await toRegister(el);
-    expect(el.querySelector('[role="checkbox"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="central-auth-consent"]')).not.toBeNull();
     await readOfficialLegal(el, 'privacy', 'zh-CN');
     await tap(document.body, 'auth-legal-document-close');
     expect(calls).toEqual([]);
@@ -984,10 +1017,11 @@ describe('条款链接：按连的那台服务端分流', () => {
   it('在面板里现敲官方地址后切换为应用内官方正文', async () => {
     stubFetch(200, REGISTRATION_CHALLENGE);
     const el = await renderPanelAtBaseUrl('', 'zh-CN', true);
+    await tap(el, 'central-auth-self-hosted');
     await tap(el, 'auth-form-advanced-toggle');
     await typeInto(el, 'input[inputmode="url"]', `${OFFICIAL}/`);
-    await toRegister(el);
 
+    expect(el.querySelector('[data-testid="central-auth-panel"]')).not.toBeNull();
     expect(legalAnchors(el)).toEqual([]);
     await readOfficialLegal(el, 'terms', 'zh-CN');
     await tap(document.body, 'auth-legal-document-close');
@@ -995,13 +1029,10 @@ describe('条款链接：按连的那台服务端分流', () => {
   });
 
   for (const locale of ['zh-CN', 'en'] as const) {
-    it(`${locale} 两协议及文内引用可阅读，关闭保留全部注册草稿且零请求`, async () => {
+    it(`${locale} 两协议及文内引用可阅读，关闭保留中央同意状态且零业务请求`, async () => {
       stubFetch(200, REGISTRATION_CHALLENGE);
       const el = await renderPanelAtBaseUrl(OFFICIAL, locale);
-      await toRegister(el);
-      await typeById(el, 'auth-form-password', PASSWORD);
-      await typeById(el, 'auth-form-password-confirmation', PASSWORD);
-      await tap(el, 'auth-form-terms');
+      await tap(el, 'central-auth-consent');
 
       for (const kind of ['terms', 'privacy'] as const) {
         const sheet = await readOfficialLegal(el, kind, locale);
@@ -1014,10 +1045,7 @@ describe('条款链接：按连的那台服务端分流', () => {
           expect(referenced.textContent).toContain(legalDocumentById('privacy').sections[locale][0]!.title);
         }
         await tap(document.body, 'auth-legal-document-close');
-        expect((byTestId(el, 'auth-form-email') as HTMLInputElement).value).toBe(EMAIL);
-        expect((byTestId(el, 'auth-form-password') as HTMLInputElement).value).toBe(PASSWORD);
-        expect((byTestId(el, 'auth-form-password-confirmation') as HTMLInputElement).value).toBe(PASSWORD);
-        expect(termsChecked(el)).toBe('true');
+        expect((byTestId(el, 'central-auth-consent') as HTMLInputElement).checked).toBe(true);
         expect(calls).toEqual([]);
       }
     });

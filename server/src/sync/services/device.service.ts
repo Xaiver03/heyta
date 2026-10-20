@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 /**
  * DeviceService - Handles device-related queries
  *
@@ -29,8 +30,11 @@ export class DeviceService {
 
   /** Record revocation and remove the advisory live-device row atomically. */
   async revokeDevice(userId: number, clientId: string): Promise<void> {
+    await prisma.$transaction((tx) => this.revokeDeviceInTransaction(tx, userId, clientId));
+  }
+
+  async revokeDeviceInTransaction(tx: Prisma.TransactionClient, userId: number, clientId: string): Promise<void> {
     const now = BigInt(Date.now());
-    await prisma.$transaction(async (tx) => {
       // Same user lock as inbound uploads: revocation and persistence serialize.
       await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
       await tx.$executeRaw`
@@ -43,7 +47,6 @@ export class DeviceService {
         create: { userId, clientId, revokedAt: now },
         update: { revokedAt: now },
       });
-    });
   }
 
   /**

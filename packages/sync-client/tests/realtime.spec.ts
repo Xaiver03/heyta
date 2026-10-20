@@ -125,6 +125,12 @@ describe('buildRealtimeUrl — 端点推导', () => {
     // 断言它**不等于**未编码的拼法 —— 否则上面的 toContain 会因为巧合通过。
     expect(url).not.toContain(`token=${token}`);
   });
+
+  it('官方 Cookie transport 只把 clientId 放进 URL', () => {
+    const url = buildRealtimeUrl('https://s.example.com', '__heyta_cookie_session__', 'client-A', 'cookie');
+    expect(url).toBe('wss://s.example.com/api/sync/ws?clientId=client-A');
+    expect(url).not.toContain('token=');
+  });
 });
 
 describe('createRealtimeClient — 协议', () => {
@@ -143,6 +149,19 @@ describe('createRealtimeClient — 协议', () => {
     expect(FakeWebSocket.instances[0]?.url).toBe(
       `ws://10.0.2.2:3000/api/sync/ws?token=${encodeURIComponent(token)}&clientId=client-A`,
     );
+    client.dispose();
+  });
+
+  it('Cookie transport 不要求 bearer token，也不把 marker 放进 URL', async () => {
+    const client = createRealtimeClient({
+      ...BASE_OPTIONS,
+      getToken: () => undefined,
+      authTransport: 'cookie',
+      WebSocketImpl: FakeWebSocket,
+    });
+    client.connect();
+    await flush();
+    expect(FakeWebSocket.instances[0]?.url).toBe('ws://10.0.2.2:3000/api/sync/ws?clientId=client-A');
     client.dispose();
   });
 

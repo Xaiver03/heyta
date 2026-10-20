@@ -60,6 +60,8 @@ export interface StartupNetworkPorts {
   askLegalRecheck(): void;
   /** 建立/重建实时通道。未配置或未登录时它自己就是空操作。 */
   startRealtime(): void;
+  /** 冷启动时用同源 HttpOnly cookie 恢复官方 Web 会话（没有会话时为空操作）。 */
+  resumeCentralSession?: () => void;
   /** 采用一枚已经收下的登录（**会发请求**，所以必须在同意之后）。 */
   adoptPendingLogin(held: HeldPendingLogin): void;
 }
@@ -105,6 +107,7 @@ export function createStartupNetwork(ports: StartupNetworkPorts): StartupNetwork
       }
 
       ports.askLegalRecheck();
+      ports.resumeCentralSession?.();
       ports.startRealtime();
     },
   };

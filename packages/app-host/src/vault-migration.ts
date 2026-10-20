@@ -563,6 +563,7 @@ export const VAULT_KEY_MIGRATION_PATH = '/api/sync/key-migration';
 export interface VaultKeyMigrationRemoteOptions {
   baseUrl: string;
   getToken: () => Promise<string | undefined>;
+  authTransport?: 'bearer' | 'cookie';
   fetchImpl?: typeof fetch;
 }
 
@@ -573,11 +574,15 @@ const body = async (response: Response): Promise<unknown> => {
 const httpRequest = (options: VaultKeyMigrationRemoteOptions, path: string, init: RequestInit): Promise<Response> => {
   const fetchImpl = options.fetchImpl ?? globalThis.fetch?.bind(globalThis);
   if (!fetchImpl) throw new Error('Vault key migration fetch is unavailable');
-  return options.getToken().then((token) => {
-    if (!token) throw new Error('Vault key migration token is unavailable');
+  return (options.authTransport === 'cookie' ? Promise.resolve(undefined) : options.getToken()).then((token) => {
+    if (options.authTransport !== 'cookie' && !token) throw new Error('Vault key migration token is unavailable');
+    const headers = new Headers(init.headers);
+    if (options.authTransport === 'cookie') headers.delete('authorization');
+    else headers.set('authorization', `Bearer ${token}`);
     return fetchImpl(joinEndpointUrl(options.baseUrl, path), {
       ...init,
-      headers: { authorization: `Bearer ${token}`, ...(init.headers ?? {}) },
+      ...(options.authTransport === 'cookie' ? { credentials: 'include' as const } : {}),
+      headers,
     });
   });
 };

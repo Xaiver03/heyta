@@ -274,9 +274,12 @@ const assess = (reader: TreeReader): Assessment => {
     if (start < 0) {
       fail('C3', `找不到 ${DOWNLOAD_URL_MARKER} 的查询串构造点`);
     } else {
-      const end = lines.findIndex((l, i) => i > start && l.includes('fetchImpl('));
+      // The shared auth transport now owns the actual fetch. Keep the query-key
+      // boundary at the production request call, not a stale direct-fetch spelling.
+      const end = lines.findIndex((l, i) => i > start &&
+        (l.includes('this.requestWithAuth(token, url.toString())') || l.includes('this.fetchImpl(')));
       if (end < 0) {
-        fail('C3', '查询串构造点到 fetchImpl( 之间的边界找不到');
+        fail('C3', '查询串构造点到网络请求之间的边界找不到');
       } else {
         const keys = [...lines.slice(start, end).join('\n').matchAll(/searchParams\.set\(\s*'([^']+)'/g)]
           .map((m) => m[1]);

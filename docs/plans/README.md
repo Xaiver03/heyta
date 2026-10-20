@@ -10,6 +10,7 @@
 
 | 我想知道 | 看这一份 | 说明 |
 |---|---|---|
+| **统一中央认证** | [unified-central-auth.md](unified-central-auth.md) | 官方中央身份、自托管可选；状态与验证唯一入口 |
 | **本轮 goal：全量落账 + 分支合并 + 代码质量审计** | [`goal-landing-and-quality-audit.md`](goal-landing-and-quality-audit.md) | ✅ 已完成（2026-10-03）。82 个提交推送远端、`feat/countdown-anniversary` 合并进 main（四处冲突的产品裁决 + 陷阱编号重排 #137–140→#161–164）、验证矩阵全实跑（隔离 worktree build/typecheck/九道门禁/单测）。含 2 处已修类型潜伤、3 条登记发现，与本轮自己两次「管道吞退出码」假绿的照实记录 |
 | **当前状态 / 下一步做什么** | [`multi-end-unified-strategy.md`](multi-end-unified-strategy.md) | 🔴 **唯一权威主计划**。它同时取代了 roadmap §5 与 4 份多端计划的路线部分 |
 | **本轮 goal：产品 UI / UX / IA / 审美优化** | [`product-ux-optimization.md`](product-ux-optimization.md) | 🔄 **进行中（2026-10-07）**。此前已交付批次不替代新增 UX-S9-63—75 的实施与验收；当前认证、助手执行、全局响应式与四端最新产物收尾仍逐项跟踪 |

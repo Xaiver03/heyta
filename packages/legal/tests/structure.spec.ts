@@ -342,7 +342,7 @@ describe('对外承诺里的主体不许错', () => {
       '45 天': 33,
       '15 个工作日': 16,
       '30 天': 14,
-      '24 小时': 11,
+      '24 小时': 13, // Central-auth terminal metadata retention (privacy §7), unrelated to backup retention.
       '14 天': 5,
       '300 次': 4,
       '15 天': 3,
@@ -554,6 +554,7 @@ describe('对外文本里可复算的数字，回到真源对账', () => {
    * 表名来自上面的推导，而"这一类在中文里叫什么"是人话，只用来检查文案有没有漏掉一类。
    */
   const CATEGORY_NAMES: Array<{ table: string; zh: string; en: string }> = [
+    { table: 'central_identities', zh: '中央身份映射', en: 'central identity binding' },
     { table: 'automation_workers', zh: '自动收集执行身份', en: 'automation worker identit' },
     { table: 'automation_commit_permits', zh: '自动收集提交许可', en: 'automation commit permit' },
     { table: 'email_password_registration_challenges', zh: '邮箱注册验证码挑战', en: 'email registration challenge' },

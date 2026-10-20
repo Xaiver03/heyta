@@ -143,6 +143,19 @@ describe('崩溃屏按失败原因给建议（门禁扫不到的通道）', () =
     expect(el.querySelector('[data-testid="error-hint"]')?.textContent).toContain('无痕模式');
   });
 
+  it('OPFS 跨标签 Access Handle 争用提示关闭旧标签页，不误导为无痕模式', () => {
+    const conflict = new Error(
+      "Failed to execute 'createSyncAccessHandle' on 'FileSystemFileHandle': " +
+      'Access Handles cannot be created if there is another open Access Handle or Writable stream associated with the same file.',
+    );
+    const el = render(
+      <ErrorScreen titleKey="web.error.storage.title" message={conflict.message}
+        hintKey={storageHintKey(undefined, conflict)} />,
+    );
+    expect(el.querySelector('[data-testid="error-hint"]')?.textContent).toContain('其它窗口');
+    expect(el.querySelector('[data-testid="error-hint"]')?.textContent).not.toContain('无痕模式');
+  });
+
   for (const kind of KINDS) {
     it(`英文界面下 ${kind} 的建议全是英文（一个汉字都不许有）`, () => {
       const el = render(

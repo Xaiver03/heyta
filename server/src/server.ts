@@ -1,3 +1,7 @@
+import { acquireAuthenticationRuntime, assertAuthenticationRuntimeUnowned } from './central-auth/runtime';
+import { installCentralRoutePolicy } from './central-auth/route-policy';
+import { centralAuthRoutes } from './central-auth/routes';
+import { assertAuthenticationModeAvailable } from './central-auth/config';
 import * as fs from 'fs';
 import Fastify, { FastifyError, FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
@@ -346,7 +350,9 @@ export const createServer = (
   stop: () => Promise<void>;
 } => {
   const fullConfig = loadConfigFromEnv(config);
-  initSyncService();
+  // Config loading always resolves authentication, even when an override omits it.
+  assertAuthenticationModeAvailable(fullConfig.authentication!);
+  assertAuthenticationRuntimeUnowned();
 
   // Ensure data directory exists
   if (!fs.existsSync(fullConfig.dataDir)) {
@@ -365,12 +371,42 @@ export const createServer = (
   });
 
   let fastifyServer: FastifyInstance | undefined;
+  let authRuntime: Awaited<ReturnType<typeof acquireAuthenticationRuntime>> | undefined;
+  let starting = false;
+  let cleaning: Promise<void> | undefined;
+  const cleanup = (): Promise<void> => {
+    if (cleaning) return cleaning;
+    if (!authRuntime) return Promise.resolve();
+    const runtime = authRuntime;
+    cleaning = (async () => {
+      const ws = getWsConnectionService();
+      ws.stopHeartbeat(); ws.closeAll(); stopCleanupJobs();
+      try { if (fastifyServer) await fastifyServer.close(); }
+      finally {
+        try { await ws.drainAuthorization(); }
+        finally {
+          // Keep ownership until the shared DB/WS resources are fully released.
+          await runtime.stop(async () => {
+            try { await disconnectDb(); }
+            finally { resetWsConnectionService(); fastifyServer = undefined; authRuntime = undefined; }
+          });
+        }
+      }
+    })();
+    void cleaning.finally(() => { cleaning = undefined; }).catch(() => {});
+    return cleaning;
+  };
 
   return {
     get fastifyServer() {
       return fastifyServer;
     },
     start: async (): Promise<string> => {
+      if (starting || authRuntime || cleaning) throw new Error('Server already started');
+      starting = true;
+      try {
+      authRuntime = await acquireAuthenticationRuntime(fullConfig.authentication!);
+      initSyncService();
       fastifyServer = Fastify({
         logger: false, // We use our own logger
         bodyLimit: 20 * 1024 * 1024, // 20MB - needed for large imports
@@ -383,6 +419,7 @@ export const createServer = (
       // 全局错误信封（error handler + not-found handler）—— 实现与注释在
       // `api-error.ts` 的 attachErrorEnvelope，那里也是它的测试锚点。
       attachErrorEnvelope(fastifyServer);
+      if (authRuntime.runtime) installCentralRoutePolicy(fastifyServer);
 
       // Security Headers
       await fastifyServer.register(helmet, SERVER_HELMET_CONFIG);
@@ -404,6 +441,7 @@ export const createServer = (
           methods: ['GET', 'HEAD', 'PUT', 'POST', 'DELETE', 'OPTIONS'],
           allowedHeaders: [
             'Authorization',
+            'X-CSRF-Token',
             'Content-Type',
             'Content-Encoding',
             'Content-Transfer-Encoding', // Used by some HTTP clients for binary/base64 payloads
@@ -419,6 +457,8 @@ export const createServer = (
           preflight: true,
         });
       }
+
+      await centralAuthRoutes(fastifyServer, authRuntime.runtime);
 
       // Serve static files
       await fastifyServer.register(fastifyStatic, {
@@ -605,7 +645,7 @@ export const createServer = (
       await fastifyServer.register(managedAiProxyRoutes, { prefix: '/api/ai' });
 
       // Test Routes (only in test mode)
-      if (fullConfig.testMode?.enabled) {
+      if (fullConfig.testMode?.enabled && fullConfig.authentication!.mode === 'local') {
         await fastifyServer.register(testRoutes, { prefix: '/api/test' });
         Logger.warn('TEST MODE ENABLED - Test routes available at /api/test/*');
       }
@@ -617,33 +657,21 @@ export const createServer = (
       // 但兜底处理在封装作用域内，晚注册可以保证前面任何一条真路由先被匹配。
       await registerWebApp(fastifyServer, resolveWebAppMount(fullConfig));
 
-      // Start cleanup jobs
+      const address = await fastifyServer.listen(createListenOptions(fullConfig));
       startCleanupJobs();
-
-      // Start WebSocket heartbeat. It also refreshes the device row of every live
-      // socket, so a long-lived read-only connection is not pruned as stale.
-      getWsConnectionService().startHeartbeat((userId, clientId) =>
-        getSyncService().touchDevice(userId, clientId),
-      );
-
-      try {
-        const address = await fastifyServer.listen(createListenOptions(fullConfig));
-        Logger.info(`Server started on ${address}`);
-        return address;
+      getWsConnectionService().startHeartbeat((userId, clientId) => getSyncService().touchDevice(userId, clientId));
+      authRuntime.start();
+      Logger.info(`Server started on ${address}`);
+      return address;
       } catch (err) {
-        Logger.error('Failed to start server:', err);
+        await cleanup();
         throw err;
-      }
+      } finally { starting = false; }
     },
     stop: async (): Promise<void> => {
-      // Stop WebSocket connections
-      resetWsConnectionService();
-      stopCleanupJobs();
-      if (fastifyServer) {
-        await fastifyServer.close();
-        fastifyServer = undefined;
-      }
-      await disconnectDb();
+      if (starting) throw new Error('Cannot stop while server is starting');
+      if (!authRuntime) return;
+      await cleanup();
     },
   };
 };

@@ -804,6 +804,9 @@ importers:
       nodemailer:
         specifier: ^9.1.1
         version: 9.1.1
+      openid-client:
+        specifier: 6.8.8
+        version: 6.8.8
       uuidv7:
         specifier: ^1.1.0
         version: 1.2.1
@@ -3810,6 +3813,9 @@ packages:
   joi@17.13.8:
     resolution: {integrity: sha512-iPKOGmiRw1jxf/JOPwxmCcUQAOdF359mdzYiP2DJ+TMX0YK2zjK3D+zYOaGjpumWxOFF/l2xVWjRVK5bGSLdEw==}
 
+  jose@6.2.12:
+    resolution: {integrity: sha512-9NiFmJEex0sy2Dk58j2UGBSHgUs2ypF9eZSu4L6vjOX3Dp96Sw1F3uL+H+D1sx02jZZdzUT0HgvCy59CuvXcWw==}
+
   joycon@3.1.1:
     resolution: {integrity: sha512-34wB/Y7MW7bzjKRjUKTa46I2Z7eV62Rkhva+KkopW7Qvv/OSWBqvkSY7vusOPrNuZcUG3tApvdVgNB8POj3SPw==}
     engines: {node: '>=10'}
@@ -4302,6 +4308,9 @@ packages:
   nullthrows@1.1.1:
     resolution: {integrity: sha512-2vPPEi+Z7WqML2jZYddDIfy5Dqb0r2fze2zTxNNknZaFpVHU3mFB3R+DWeJWGVx0ecvttSGlJTI+WG+8Z4cDWw==}
 
+  oauth4webapi@3.8.8:
+    resolution: {integrity: sha512-8N28E+a/oxfXWBgOMt+ZP/JUf/XR+IFbvkAEPP3gznXOMv9BpAAwiIj0TFNz3tGTPc0ZQ8zmWBNgN1nAys0gng==}
+
   ob1@0.83.8:
     resolution: {integrity: sha512-pk7el+eTOzfSKMAY4QBiiwKzegXn633JQj13y+pW5E5IdS+yV2CfDJ9Hf20K/LKy8nCrP9dAmd7XOk52OJxifA==}
     engines: {node: '>=20.19.4'}
@@ -4348,6 +4357,9 @@ packages:
   open@7.4.2:
     resolution: {integrity: sha512-MVHddDVweXZF3awtlAS+6pgKLlm/JgxZ90+/NBurBoQctVOOB/zDdVjcyPzQ+0laDGbsWgrRkflI65sQeOgT9Q==}
     engines: {node: '>=8'}
+
+  openid-client@6.8.8:
+    resolution: {integrity: sha512-ZsucJA5Ad04Uv7YN4ql+s4GXNmb9uAYQwyJTsJx7CH/MX3JZioLE2pVKi1SC+YrbSLA4Px3Gi30dMjgOZtb6pA==}
 
   ora@5.4.1:
     resolution: {integrity: sha512-5b6Y85tPxZZ7QytO+BQzysW31HJku27cRIlkbAXaNx+BdcVi+LlRFmVXzeF6a7JCwJpyw5c4b+YSVImQIrBpuQ==}
@@ -8829,6 +8841,8 @@ snapshots:
       '@sideway/formula': 3.0.1
       '@sideway/pinpoint': 2.0.0
 
+  jose@6.2.12: {}
+
   joycon@3.1.1: {}
 
   js-tokens@4.0.0: {}
@@ -9378,6 +9392,8 @@ snapshots:
 
   nullthrows@1.1.1: {}
 
+  oauth4webapi@3.8.8: {}
+
   ob1@0.83.8:
     dependencies:
       flow-enums-runtime: 0.0.6
@@ -9416,6 +9432,11 @@ snapshots:
     dependencies:
       is-docker: 2.2.1
       is-wsl: 2.2.0
+
+  openid-client@6.8.8:
+    dependencies:
+      jose: 6.2.12
+      oauth4webapi: 3.8.8
 
   ora@5.4.1:
     dependencies:

@@ -1,3 +1,6 @@
+import { centralRuntime } from './central-auth/runtime';
+import { clearCentralSession } from './central-auth/http-security';
+import { CENTRAL_AUTH_PATHS } from '@heyta/shared-schema';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { AUTH_PASSWORD_PATHS, SuperSyncClientIdSchema, inboundDraftEventIdSchema, inboundDraftDecisionSchema } from '@heyta/shared-schema';
@@ -1340,6 +1343,12 @@ export const apiRoutes = async (
     async (req, reply) => {
       try {
         const user = getAuthUser(req);
+        const central = centralRuntime();
+        if (central) {
+          await central.coordinator.logoutProduct(user.userId);
+          clearCentralSession(reply);
+          return reply.send({ reauthenticationRequired: true, loginPath: CENTRAL_AUTH_PATHS.start });
+        }
         const result = await replaceToken(user.userId, user.email, sessionMetaFromRequest(req));
         // Sockets authenticate only at upgrade, so revoked tokens would keep
         // receiving op notifications through already-open connections — close
@@ -1524,7 +1533,11 @@ export const apiRoutes = async (
         // The tombstone is written in the SAME transaction (ADR-0055): split commits
         // can leave "account gone, no tombstone", which is silent until a restore
         // brings that person back.
-        await prisma.$transaction((tx) => deleteAccountWithTombstone(tx, userId));
+        const central = centralRuntime();
+        if (central) {
+          await central.coordinator.closeProductAccount(userId);
+          clearCentralSession(reply);
+        } else await prisma.$transaction((tx) => deleteAccountWithTombstone(tx, userId));
         // AUTH_CACHE_INVALIDATION: account deletion must not leave a ghost-token window.
         authCache.invalidate(userId);
 

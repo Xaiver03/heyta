@@ -274,3 +274,11 @@ python3 research/tools/ghinfo.py owner/repo   # 最后提交/发版时间（可�
 ---
 
 *本文件随第三方引入更新。任何新依赖在合入前必须同时完成：许可证登记 + 可维护性核实 + 在此处登记归属（如为 vendored）。*
+
+## 中央 OIDC 标准库（2026-10-19）
+
+服务端独立使用 openid-client 6.8.8（MIT，Copyright 2016 Filip Skokan），传递依赖
+jose 6.2.12（MIT，Copyright 2018 Filip Skokan）与 oauth4webapi 3.8.8（MIT，Copyright 2022 Filip Skokan）。
+三包发布归档均含 LICENSE.md，npm registry time 均为 2026-09-05，满足维护性门槛。
+用途是标准 OAuth/OIDC 验证，不引入或复制 AGPL 内部封装及其测试源码。
+准入与实际安装树对账见[统一认证计划](docs/plans/unified-central-auth.md)。

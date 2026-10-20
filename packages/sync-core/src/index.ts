@@ -27,6 +27,7 @@ export {
   MAX_VECTOR_CLOCK_SIZE,
 } from './vector-clock';
 export { VectorClockComparison } from './vector-clock';
+export { sha256TextHex } from './sha256-text';
 export { classifyOperationRelation } from './conflict-classification';
 export type { OperationConflictClassification } from './conflict-classification';
 export {

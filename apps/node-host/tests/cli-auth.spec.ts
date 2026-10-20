@@ -55,6 +55,12 @@ interface Call {
 function fakeFetch(status: number, body: unknown, headers: Record<string, string> = {}) {
   const calls: Call[] = [];
   const impl = (async (input: unknown, init?: RequestInit) => {
+    // Mode discovery is read-only and carries no account/password material.
+    // These legacy cases exercise the self-hosted local-credential branch.
+    if (String(input).endsWith('/api/auth/central/config'))
+      return new Response(JSON.stringify({ mode: 'local', loginPath: '/api/auth/oidc/start', documentVersion: null }), {
+        status: 200, headers: { 'content-type': 'application/json' },
+      });
     calls.push({
       url: String(input),
       body: init?.body === undefined ? {} : (JSON.parse(String(init.body)) as Record<string, unknown>),
@@ -370,6 +376,54 @@ describe('🟡 服务端地址与邮箱可以从环境变量来（脚本用法�
     });
     expect(calls.length).toBe(1);
     expect(result.code).toBe(0);
+  });
+});
+
+describe('官方统一身份 CLI 设备登录', () => {
+  const centralServer = 'https://heyta.waytofuture.cn';
+  it('不读本地口令，展示浏览器链接和配对码，轮询后只把产品令牌写进结果', async () => {
+    const progress: string[] = [], urls: string[] = [];
+    let claims = 0;
+    const impl = (async (input: unknown, init?: RequestInit) => {
+      const url = String(input); urls.push(url);
+      if (url.endsWith('/api/auth/central/config')) return new Response(JSON.stringify({
+        mode: 'oidc', loginPath: '/api/auth/oidc/start', documentVersion: 'test-v1',
+      }), { status: 200 });
+      if (url.endsWith('/api/auth/oidc/device/start')) {
+        const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        expect(body.deviceChallenge).toMatch(/^[a-f0-9]{64}$/);
+        expect(body).not.toHaveProperty('email');
+        return new Response(JSON.stringify({ handoffId: '12345678-1234-1234-1234-123456789abc',
+          launchUrl: `${centralServer}/api/auth/oidc/device/launch/${'a'.repeat(43)}`,
+          pairingCode: 'A1B2C3D4E5F6', expiresAt: Date.now() + 600_000 }), { status: 200 });
+      }
+      if (url.endsWith('/api/auth/oidc/device/claim')) {
+        claims++;
+        return claims === 1
+          ? new Response(JSON.stringify({ status: 'pending' }), { status: 202 })
+          : new Response(JSON.stringify({ status: 'claimed', token: TOKEN,
+            user: { id: 7, email: EMAIL }, expiresAt: Date.now() + 100_000 }), { status: 200 });
+      }
+      throw new Error('Unexpected path');
+    }) as typeof fetch;
+    const result = await runAuthCommand(['login', '--server', centralServer, '--json'], stdinOf(''), {
+      fetchImpl: impl, env: {}, onProgress: (message) => progress.push(message), sleep: async () => {},
+    });
+    expect(result.code).toBe(0); expect(claims).toBe(2);
+    expect(JSON.parse(result.stdout)).toMatchObject({ token: TOKEN, userId: 7, email: EMAIL });
+    expect(progress.join('')).toContain('A1B2C3D4E5F6');
+    expect(progress.join('')).not.toContain(TOKEN);
+    expect(urls).toHaveLength(4);
+  });
+  it('官方注册没有显式同意时不发起设备授权', async () => {
+    const urls: string[] = [];
+    const impl = (async (input: unknown) => {
+      urls.push(String(input));
+      return new Response(JSON.stringify({ mode: 'oidc', loginPath: '/api/auth/oidc/start', documentVersion: 'test-v1' }), { status: 200 });
+    }) as typeof fetch;
+    const result = await runAuthCommand(['register', '--server', SERVER], stdinOf(''), { fetchImpl: impl, env: {} });
+    expect(result.code).toBe(1); expect(result.stderr).toMatch(/显式同意/);
+    expect(urls).toEqual([`${SERVER}/api/auth/central/config`]);
   });
 });
 

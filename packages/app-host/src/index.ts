@@ -26,6 +26,21 @@ export {
   type VaultRootRotationOptions,
 } from './host.js';
 
+export {
+  beginCentralAuth,
+  CENTRAL_COOKIE_SESSION_MARKER,
+  createCentralCookieFetch,
+  getCentralAuthConfig,
+  getCentralAuthSession,
+  type CentralAuthConfig,
+  type CentralAuthFailure,
+  type CentralAuthFailureReason,
+  type CentralAuthOptions,
+  type CentralAuthOutcome,
+  type CentralAuthSession,
+  type CentralAuthUser,
+} from './central-auth.js';
+
 export { type InboundAutomationHostOptions } from './inbound-host-options.js';
 
 export {
@@ -378,6 +393,13 @@ export {
  * 而抄件一定会漂：加一种图片格式时改契约、忘了改这条 re-export，
  * 症状是"服务端收了、客户端拒显示"。宿主直接从 shared-schema 取。
  */
+export {
+  beginCentralDeviceAuth,
+  claimCentralDeviceAuth,
+  isOfficialCentralAuthEndpoint,
+} from './central-auth.js';
+export type { CentralDeviceStart, CentralDeviceClaim } from './central-auth.js';
+
 export {
   HOSTED_AUTH_PATHS,
   HOSTED_PASSKEY_NAME_MAX_LENGTH,
