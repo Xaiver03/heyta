@@ -46,7 +46,7 @@ function canonicalSection(section: LegalSection): unknown {
 }
 
 describe('法律文本展示与同意事实分离', () => {
-  it('九份中英文本原对象、版本和锚点不变，每一种块都仍然存在', () => {
+  it('整套中英文本原对象、版本和锚点不变，每一种块都仍然存在', () => {
     const originals = JSON.stringify(LEGAL_DOCUMENTS);
     const version = legalSetVersion();
     for (const document of LEGAL_DOCUMENTS) {

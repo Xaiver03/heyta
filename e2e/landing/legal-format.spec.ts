@@ -3,7 +3,7 @@ import { LEGAL_DOCUMENTS, legalDocumentPresentation } from '../../packages/legal
 
 for (const viewport of [{ width: 1440, height: 900 }, { width: 320, height: 740 }]) {
   for (const locale of ['zh-CN', 'en'] as const) {
-    test(`九份协议统一长文格式 ${locale} ${viewport.width}`, async ({ page }, testInfo) => {
+    test(`对外法律文本统一长文格式 ${locale} ${viewport.width}`, async ({ page }, testInfo) => {
       await page.setViewportSize(viewport);
       // 深色和英文组合、亮色和中文组合均验；测试不同主题实际token，不做反相。
       await page.addInitScript((theme) => localStorage.setItem('heyta.theme', theme), locale === 'en' ? 'dark' : 'light');

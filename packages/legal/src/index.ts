@@ -47,6 +47,7 @@ import { subscriptionAndRefund } from './documents/subscription-refund.js';
 import { terms } from './documents/terms.js';
 import { thirdParties } from './documents/third-parties.js';
 import { aiAndTransfer } from './documents/ai-and-transfer.js';
+import { algorithmDisclosure } from './documents/algorithm-disclosure.js';
 
 /**
  * 服务提供者 —— **对外承诺里的"我们"是谁**，一份事实源。
@@ -58,7 +59,7 @@ import { aiAndTransfer } from './documents/ai-and-transfer.js';
  *
  * ⚠️ `appFilingNumber` 目前是 `null`：**App 备案号尚未核准**。
  * 文本里凡是要引用它的地方都必须走这个字段，这样核准后**只改一处**，
- * 而不是在九份文件里找"备案号"三个字。
+ * 而不是在整套文件里找"备案号"三个字。
  */
 export const OPERATOR = {
   name: '晓黎（杭州）人工智能科技有限公司',
@@ -81,6 +82,10 @@ export const OPERATOR = {
  *
  * 顺序即页脚与索引页的展示顺序：先"约定的规则"（协议 / 隐私），
  * 再"逐项清单"（收集 / 权限 / 第三方），最后"特定人群与特定功能"与"怎么行使权利"。
+ *
+ * ⚠️ 这份清单的**枚数不进任何注释**：`legalSetVersion()` 遍历它拼同意指纹，
+ * `tests/structure.spec.ts` 拿它的长度当判据，落地页拿它派生导航与 sitemap。
+ * 在这里数一份，下次加一份就开始漂。
  */
 export const LEGAL_DOCUMENTS = [
   terms,
@@ -89,6 +94,7 @@ export const LEGAL_DOCUMENTS = [
   permissions,
   thirdParties,
   aiAndTransfer,
+  algorithmDisclosure,
   minors,
   subscriptionAndRefund,
   dataRights,

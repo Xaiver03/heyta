@@ -150,7 +150,7 @@ export interface SitePage {
    *
    * ⚠️ 所以这条字符串的**正确性有闸门，但不在编译期**：
    * `tests/legal-pages.spec.ts` 对每一个 `legalDocId` 调 `legalDocumentById()`
-   * （取不到就抛），并核对九份文本一份都不许漏挂。
+   * （取不到就抛），并核对注册表里的文本一份都不许漏挂。
    */
   readonly legalDocId?: string;
   /** 导航/页脚里的标签。 */
@@ -757,6 +757,19 @@ export const SITE_PAGES = [
     descriptionKey: 'site.legal.ai-and-transfer.seo.description',
   },
   {
+    id: 'legal-algorithm-disclosure',
+    path: '/legal/algorithm-disclosure',
+    group: 'legal',
+    inNav: false,
+    inFooter: true,
+    legalDocId: 'algorithm-disclosure',
+    labelKey: 'site.footer.legal.algorithm-disclosure',
+    headingKey: 'site.legal.algorithm-disclosure.title',
+    ledeKey: 'site.legal.algorithm-disclosure.lede',
+    titleKey: 'site.legal.algorithm-disclosure.seo.title',
+    descriptionKey: 'site.legal.algorithm-disclosure.seo.description',
+  },
+  {
     id: 'legal-minors',
     path: '/legal/minors',
     group: 'legal',
@@ -798,7 +811,8 @@ export const SITE_PAGES = [
 ] as const satisfies readonly SitePage[];
 
 /**
- * 九份对外法律文本的页面清单（页脚 legal 组与 `docRef` 解析都从这里取）。
+ * 对外法律文本的页面清单（页脚 legal 组与 `docRef` 解析都从这里取；枚数由
+ * `@heyta/legal` 的注册表决定，`tests/legal-pages.spec.ts` 逐份对账）。
  *
  * 🔴 **URL 里那一段就是 `@heyta/legal` 的文档 id，而且它一旦发布就是承诺。**
  * 这些地址会被写进：应用内「设置 → 关于」的链接、注册时勾选条款的那条链接、

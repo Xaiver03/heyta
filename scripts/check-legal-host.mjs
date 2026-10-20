@@ -6,7 +6,7 @@
  * "用户连的这台服务端是不是 heyta 官方托管实例"，靠的是一份**写死的域名**
  * （`OFFICIAL_SITE_ORIGIN`），而域名的权威在 `@heyta/legal` 的 `OPERATOR.hostedDomain`。
  *
- * 为什么两边不能直接 import：`@heyta/legal` 是九份对外文本的全量 AST（六千余行），
+ * 为什么两边不能直接 import：`@heyta/legal` 是整套对外文本的全量 AST（六千余行），
  * 移动端 bundle 只为读一个域名把它整个拖进来是纯粹的负担。
  * 所以这里用仓库既有的取向：**三份拷贝 + 一道会红的对账**。
  *

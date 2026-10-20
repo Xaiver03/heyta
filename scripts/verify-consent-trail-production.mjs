@@ -157,9 +157,9 @@ async function httpGet(url) {
 }
 
 /**
- * 从落地页的 JS 产物里数出九份 `id:"…",version:"…"`。
+ * 从落地页的 JS 产物里数出每一份的 `id:"…",version:"…"`。
  *
- * 🔴 **不能拿页面 HTML 去 grep** —— 那 18 个入口是客户端渲染的外壳（实测 7259 字节、
+ * 🔴 **不能拿页面 HTML 去 grep** —— 那些入口页是客户端渲染的外壳（实测约 7.2 KB、
  * 里面一个版本号都没有）。指纹只住在 JS 产物里。
  */
 function extractPairs(jsText) {
