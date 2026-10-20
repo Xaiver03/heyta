@@ -26,12 +26,35 @@
 import { useState } from 'react';
 import { useI18n, type Locale, type MessageKey } from '@heyta/i18n';
 import { ICON_SIZE } from '@heyta/design-system';
-import { startCheckout, type CheckoutFailureCode, type CheckoutOutcome } from '@heyta/app-host';
+import {
+  CHECKOUT_TIER_PRICE_IDS,
+  CHECKOUT_TIERS,
+  DEFAULT_CHECKOUT_TIER_ID,
+  startCheckout,
+  type CheckoutFailureCode,
+  type CheckoutOutcome,
+  type CheckoutTierId,
+} from '@heyta/app-host';
 import { QrCode } from 'lucide-react';
 
 import { useSyncStore } from '../sync/store.js';
 import { privacyConsent } from '../privacy/consent-gate.js';
 import { SettingsAccountGate } from '../settings/SettingsAccountGate.js';
+
+/**
+ * 档位 → 词条。
+ *
+ * 🔴 这里**不写金额**，也**不新写一句档位说明** —— 名字与那句"这一档给什么"
+ * 复用落地页那两条已被 `check-pricing-consistency` 钉住的词条
+ * （`landing.pricing.hosted.*` / `landing.pricing.hostedAi.*`）。
+ * 在收银台另抄一份价格句子，就是给同一个事实造第二个会漂的副本；
+ * 而 `landing.pricing.hostedAi.body` 自带那句"这一步会把内容发到我们的服务器，
+ * 它不受端到端加密保护" —— 收钱的那一屏正该说这句话（ADR-0054 §7）。
+ */
+const TIER_KEYS: Record<CheckoutTierId, { readonly name: MessageKey; readonly detail: MessageKey }> = {
+  hosted: { name: 'landing.pricing.hosted.name', detail: 'landing.pricing.hosted.body' },
+  hostedAi: { name: 'landing.pricing.hostedAi.name', detail: 'landing.pricing.hostedAi.body' },
+};
 
 /**
  * 失败码 → 词条。用 `Record` 而不是动态拼 key（拼错了没有类型兜底，
@@ -45,6 +68,7 @@ const FAILURE_KEYS: Partial<Record<CheckoutFailureCode, MessageKey>> = {
   UNAUTHORIZED: 'web.subscription.renew.fail.unauthorized',
   BILLING_PROVIDER_NOT_CONFIGURED: 'web.subscription.renew.fail.provider',
   PRICE_NOT_SELLABLE: 'web.subscription.renew.fail.sellable',
+  PRICE_TIER_LOSES_GRANTS: 'web.subscription.renew.fail.downgrade',
   NETWORK_ERROR: 'web.subscription.renew.fail.network',
 };
 
@@ -71,6 +95,7 @@ const expiryLabel = (expiresAt: number, locale: Locale): string =>
 export function RenewPanel(): React.JSX.Element {
   const { t, locale } = useI18n();
   const [couponCode, setCouponCode] = useState('');
+  const [tierId, setTierId] = useState<CheckoutTierId>(DEFAULT_CHECKOUT_TIER_ID);
   const [pending, setPending] = useState(false);
   const [copied, setCopied] = useState(false);
   const [outcome, setOutcome] = useState<CheckoutOutcome | null>(null);
@@ -99,6 +124,7 @@ export function RenewPanel(): React.JSX.Element {
     const next = await startCheckout({
       baseUrl,
       getToken: async () => token,
+      priceId: CHECKOUT_TIER_PRICE_IDS[tierId],
       couponCode: couponCode.trim() === '' ? undefined : couponCode.trim(),
     });
     setOutcome(next);
@@ -133,31 +159,57 @@ export function RenewPanel(): React.JSX.Element {
           testId="renew-needs-sign-in"
         />
       ) : (
-        <div className="ht-settings__field">
-          <label className="ht-settings__item-label" htmlFor="renew-coupon">
-            {t('web.subscription.renew.couponPlaceholder')}
-          </label>
-          <div className="ht-settings__actions">
-            <input
-              id="renew-coupon"
-              type="text"
-              className="ht-input"
-              value={couponCode}
-              placeholder={t('web.subscription.renew.couponPlaceholder')}
-              onChange={(event) => setCouponCode(event.target.value)}
-            />
-            <button
-              type="button"
-              className="ht-btn ht-btn--primary"
-              data-testid="renew-place-order"
-              disabled={pending}
-              onClick={() => void onPlaceOrder()}
-            >
-              <QrCode size={ICON_SIZE.xs} aria-hidden="true" />
-              {pending ? t('web.subscription.renew.busy') : t('web.subscription.renew.action')}
-            </button>
+        <>
+          <fieldset className="ht-settings__field" data-testid="renew-tier">
+            <legend className="ht-settings__item-label">{t('web.subscription.renew.tierTitle')}</legend>
+            {CHECKOUT_TIERS.map((id) => (
+              <label key={id} className="ht-settings__option">
+                <input
+                  type="radio"
+                  name="renew-tier"
+                  data-testid={`renew-tier-${id}`}
+                  checked={tierId === id}
+                  onChange={() => {
+                    setTierId(id);
+                    // 换档之后上一张单不能继续挂着：那张卡写的是**旧档**冻的金额，
+                    // 挂着就会读成"这一单是这么多钱"。
+                    setOutcome(null);
+                    setCopied(false);
+                  }}
+                />
+                <span>
+                  <strong>{t(TIER_KEYS[id].name)}</strong>
+                  <p className="ht-settings__hint">{t(TIER_KEYS[id].detail)}</p>
+                </span>
+              </label>
+            ))}
+          </fieldset>
+          <div className="ht-settings__field">
+            <label className="ht-settings__item-label" htmlFor="renew-coupon">
+              {t('web.subscription.renew.couponPlaceholder')}
+            </label>
+            <div className="ht-settings__actions">
+              <input
+                id="renew-coupon"
+                type="text"
+                className="ht-input"
+                value={couponCode}
+                placeholder={t('web.subscription.renew.couponPlaceholder')}
+                onChange={(event) => setCouponCode(event.target.value)}
+              />
+              <button
+                type="button"
+                className="ht-btn ht-btn--primary"
+                data-testid="renew-place-order"
+                disabled={pending}
+                onClick={() => void onPlaceOrder()}
+              >
+                <QrCode size={ICON_SIZE.xs} aria-hidden="true" />
+                {pending ? t('web.subscription.renew.busy') : t('web.subscription.renew.action')}
+              </button>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {outcome?.kind === 'qr' || outcome?.kind === 'redirect' ? (

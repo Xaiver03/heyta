@@ -26,7 +26,15 @@
  */
 import React, { useState } from 'react';
 import { Clipboard, Linking } from 'react-native';
-import { startCheckout, type CheckoutFailureCode, type CheckoutOutcome } from '@heyta/app-host';
+import {
+  CHECKOUT_TIER_PRICE_IDS,
+  CHECKOUT_TIERS,
+  DEFAULT_CHECKOUT_TIER_ID,
+  startCheckout,
+  type CheckoutFailureCode,
+  type CheckoutOutcome,
+  type CheckoutTierId,
+} from '@heyta/app-host';
 import { useI18n, type MessageKey } from '@heyta/i18n';
 
 import { Button, Card, Text } from '../ui/kit';
@@ -42,12 +50,25 @@ import { privacyConsent } from '../privacy/consent-gate';
 const FAILURE_KEYS: Partial<Record<CheckoutFailureCode, MessageKey>> = {
   UNAUTHORIZED: 'mobile.entitlement.renew.fail.unauthorized',
   BILLING_PROVIDER_NOT_CONFIGURED: 'mobile.entitlement.renew.fail.provider',
+  PRICE_TIER_LOSES_GRANTS: 'mobile.entitlement.renew.fail.downgrade',
   NETWORK_ERROR: 'mobile.entitlement.renew.fail.network',
+};
+
+/**
+ * 档位 → 词条。**不写金额**，也**不另抄一份档位说明**：
+ * 名字与"这一档给什么"复用落地页那两条已被 `check-pricing-consistency` 钉住的词条。
+ * `landing.pricing.hostedAi.body` 自带那句"这一步会把内容发到我们的服务器，
+ * 它不受端到端加密保护" —— 说在按下下单按钮之前，正是 ADR-0054 §7 要的位置。
+ */
+const TIER_KEYS: Record<CheckoutTierId, { readonly name: MessageKey; readonly detail: MessageKey }> = {
+  hosted: { name: 'landing.pricing.hosted.name', detail: 'landing.pricing.hosted.body' },
+  hostedAi: { name: 'landing.pricing.hostedAi.name', detail: 'landing.pricing.hostedAi.body' },
 };
 
 export function RenewSection(): React.JSX.Element | null {
   const { t } = useI18n();
   const [pending, setPending] = useState(false);
+  const [tierId, setTierId] = useState<CheckoutTierId>(DEFAULT_CHECKOUT_TIER_ID);
   const [outcome, setOutcome] = useState<CheckoutOutcome | null>(null);
 
   const payTarget =
@@ -58,7 +79,11 @@ export function RenewSection(): React.JSX.Element | null {
     const config = readSyncConfig();
     if (config === undefined) return;
     setPending(true);
-    const next = await startCheckout({ baseUrl: config.serverUrl, getToken: async () => config.token });
+    const next = await startCheckout({
+      baseUrl: config.serverUrl,
+      getToken: async () => config.token,
+      priceId: CHECKOUT_TIER_PRICE_IDS[tierId],
+    });
     setOutcome(next);
     setPending(false);
     if (next.kind === 'qr' || next.kind === 'redirect') {
@@ -73,6 +98,24 @@ export function RenewSection(): React.JSX.Element | null {
 
   return (
     <Card>
+      <Text variant="row-title">{t('mobile.entitlement.renew.tierTitle')}</Text>
+      {CHECKOUT_TIERS.map((id) => (
+        <Button
+          key={id}
+          label={t(TIER_KEYS[id].name)}
+          accessibilityLabel={t(TIER_KEYS[id].name)}
+          testID={`renew-tier-${id}`}
+          tone={tierId === id ? 'primary' : 'ghost'}
+          onPress={() => {
+            setTierId(id);
+            // 换档之后上一张单不能继续挂着：那张卡写的是**旧档**冻的金额。
+            setOutcome(null);
+          }}
+        />
+      ))}
+      <Text variant="row-meta" tone="subtle">
+        {t(TIER_KEYS[tierId].detail)}
+      </Text>
       <Button
         label={t('mobile.entitlement.renew.action')}
         accessibilityLabel={t('mobile.entitlement.renew.action')}

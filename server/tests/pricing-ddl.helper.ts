@@ -157,3 +157,25 @@ export const SUBSCRIPTIONS_FOR_REFUND_STAND_IN_DDL = `
  * 所以正确用法是 `${PRICING_SCHEMA_DDL}\\n${REFUND_SCHEMA_DDL}`。
  */
 export const REFUND_SCHEMA_DDL = `${refundDdlFromMigration()}\n${SUBSCRIPTIONS_FOR_REFUND_STAND_IN_DDL}`;
+
+/**
+ * 收银台 ④′（"这一单会不会把已付费的能力判小"）需要的 `subscriptions` 替身。
+ *
+ * 只带那一**条读语句**用到的五列。它既不是退款那个替身（那一个不带 `grants`，
+ * 而 `grants` 正是这条判据的全部内容），也不是真表（真表三十多列，与收银台无关）：
+ * "只带自己用到的列"这件事本身就是这些替身不可能与真表漂移的原因。
+ *
+ * ⚠️ `current_period_end` 用 `bigint`，与真表那列（`BigInt?`）同形 ——
+ * 判到期用的是 `toEpochMillis`，它同时收 `number` 与 `bigint`，
+ * 用 `timestamptz` 会测到一条生产上不存在的路径。
+ */
+export const SUBSCRIPTIONS_FOR_CHECKOUT_STAND_IN_DDL = `
+  CREATE TABLE subscriptions (
+    id                 serial PRIMARY KEY,
+    user_id            integer NOT NULL,
+    provider           text,
+    status             text,
+    current_period_end bigint,
+    grants             text[]
+  );
+`;

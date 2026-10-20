@@ -48,6 +48,17 @@ describe('移动端续费入口', () => {
     expect(order).toBeGreaterThan(gate);
   });
 
+  it('🔴 档位只从 @heyta/app-host 那张表取，本屏不写死 priceId、也不写金额', () => {
+    // 收银台有两枚按钮之后，新的假话形状是"壳里自己抄一份档位/价格"。
+    // 判据：源码里既不该出现 `'hosted-monthly'` / `'hosted-ai-monthly'` 这类字面量，
+    // 也不该出现 ¥/$ 加数字的金额串 —— 档位表在 app-host，金额只在报价响应里。
+    const src = codeOnly(renew());
+    expect(src).toMatch(/CHECKOUT_TIER_PRICE_IDS\[/);
+    expect(src).toMatch(/CHECKOUT_TIERS\.map/);
+    expect(src.match(/['"]hosted(?:-ai)?-monthly['"]/gu) ?? [], '壳里写死了 priceId 字面量').toHaveLength(0);
+    expect(src.match(/[¥$]\s?\d/gu) ?? [], '壳里写死了金额').toHaveLength(0);
+  });
+
   it('支付串用 Linking 唤起微信，并用 Clipboard 兜底', () => {
     const src = renew();
     expect(src).toMatch(/Linking\.openURL\(/);

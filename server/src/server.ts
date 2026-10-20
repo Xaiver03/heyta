@@ -539,6 +539,10 @@ export const createServer = (
         prefix: '/api/billing',
         adapters: createBillingAdaptersFromConfig(fullConfig),
         publicUrl: fullConfig.publicUrl,
+        // 🔴 「这一档这台实例交付得了吗」的判据来自**同一份**已加载的配置：
+        //    `managedAi` 不存在 ⇒ 托管代理对每个请求回 503 ⇒ 收银台不许卖 ¥12 那一档。
+        //    不在路由里再 `loadConfigFromEnv()` 一次 —— 第二个配置源就是分叉的第一现场。
+        managedAiConfigured: fullConfig.managedAi !== undefined,
       });
 
       // Web Push 订阅（Windows PWA 小组件的刷新机制）。

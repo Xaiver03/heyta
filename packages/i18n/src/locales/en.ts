@@ -2430,6 +2430,7 @@ export const en = {
   // signing / recurring charge anywhere in this repo.
   'web.subscription.renew.title': 'Renew hosted sync',
   'web.subscription.renew.intro': 'A one-off 30-day purchase, stacked on top of your current expiry date. No automatic charges, and your data stays untouched when a period ends.',
+  'web.subscription.renew.tierTitle': 'Which plan',
   'web.subscription.renew.couponPlaceholder': 'Promo code (optional)',
   'web.subscription.renew.action': 'Place renewal order',
   'web.subscription.renew.busy': 'Creating the order…',
@@ -2444,9 +2445,11 @@ export const en = {
   'web.subscription.renew.fail.unauthorized': 'Sign in to your heyta account before placing an order.',
   'web.subscription.renew.fail.unconfigured': 'No sync server address yet — set one up in the sync settings first.',
   'web.subscription.renew.fail.sellable': 'This plan cannot be sold right now; the server refused the order.',
+  'web.subscription.renew.fail.downgrade': 'This plan does not include everything your current plan covers, so no order was created — keep renewing your current plan, or let it expire first.',
   'web.subscription.renew.fail.network': 'Could not reach the server; the order was not created.',
   'web.subscription.renew.fail.unknown': 'Order failed ({code}).',
   'mobile.entitlement.renew.action': 'Place renewal order',
+  'mobile.entitlement.renew.tierTitle': 'Which plan',
   'mobile.entitlement.renew.busy': 'Creating the order…',
   'mobile.entitlement.renew.opened': 'Payment page opened',
   'mobile.entitlement.renew.payHint': 'If WeChat did not open automatically, copy this link and open it in your phone browser.',
@@ -2456,6 +2459,7 @@ export const en = {
   'mobile.entitlement.renew.fail.provider': 'This instance has no payment channel configured, so nothing can be bought yet.',
   'mobile.entitlement.renew.fail.unauthorized': 'Sign in to your heyta account before placing an order.',
   'mobile.entitlement.renew.fail.network': 'Could not reach the server; the order was not created.',
+  'mobile.entitlement.renew.fail.downgrade': 'This plan does not include everything your current plan covers, so no order was created — keep renewing your current plan, or let it expire first.',
   'mobile.entitlement.renew.fail.unknown': 'Order failed ({code}).',
   // AI panel failure states - see the zh file for why these moved out of app-host.
   'web.ai.failure.breakdown.emptyTitle': 'This task has no title, so there is nothing to break down.',

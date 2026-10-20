@@ -2577,6 +2577,7 @@ export const zhCN = {
   // 与 `wechat.adapter.ts` 都只有单次 Native 支付）。承诺了就是假话。
   'web.subscription.renew.title': '托管同步续费',
   'web.subscription.renew.intro': '一次性购买 30 天，直接叠加在你当前的到期日之后；不会自动扣款，到期了数据也一个字都不动。',
+  'web.subscription.renew.tierTitle': '买哪一档',
   'web.subscription.renew.couponPlaceholder': '促销码（可选）',
   'web.subscription.renew.action': '下单续费',
   'web.subscription.renew.busy': '正在下单…',
@@ -2591,9 +2592,11 @@ export const zhCN = {
   'web.subscription.renew.fail.unauthorized': '先登录你的 heyta 账号，才能下单。',
   'web.subscription.renew.fail.unconfigured': '还没有填写同步服务器地址，先在同步设置里配好。',
   'web.subscription.renew.fail.sellable': '这一档现在还不能卖，服务端拒绝了这笔下单。',
+  'web.subscription.renew.fail.downgrade': '这一档不包含你当前这一档的全部能力，服务端没有下单 —— 先让当前这一档到期，或者继续按它续费。',
   'web.subscription.renew.fail.network': '连不上服务端，这一单没有下成。',
   'web.subscription.renew.fail.unknown': '下单失败（{code}）。',
   'mobile.entitlement.renew.action': '下单续费',
+  'mobile.entitlement.renew.tierTitle': '买哪一档',
   'mobile.entitlement.renew.busy': '正在下单…',
   'mobile.entitlement.renew.opened': '已为你打开付款页',
   'mobile.entitlement.renew.payHint': '如果微信没有自动打开，复制这条链接后用手机浏览器打开它。',
@@ -2603,6 +2606,7 @@ export const zhCN = {
   'mobile.entitlement.renew.fail.provider': '这台实例没有配置收款通道，现在买不了。',
   'mobile.entitlement.renew.fail.unauthorized': '先登录你的 heyta 账号，才能下单。',
   'mobile.entitlement.renew.fail.network': '连不上服务端，这一单没有下成。',
+  'mobile.entitlement.renew.fail.downgrade': '这一档不包含你当前这一档的全部能力，服务端没有下单 —— 先让当前这一档到期，或者继续按它续费。',
   'mobile.entitlement.renew.fail.unknown': '下单失败（{code}）。',
   // ── AI 面板的失败态（第 18 轮）───────────────────────────────
   // 🔴 这 11 条原来住在 `packages/app-host` 里（`*Outcome.message`），

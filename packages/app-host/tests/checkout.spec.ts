@@ -15,6 +15,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   CHECKOUT_PATH,
+  CHECKOUT_TIERS,
+  CHECKOUT_TIER_PRICE_IDS,
+  DEFAULT_CHECKOUT_TIER_ID,
   RENEWAL_PRICE_ID,
   startCheckout,
   type StartCheckoutOptions,
@@ -238,5 +241,34 @@ describe('startCheckout', () => {
         status: 500,
       });
     }
+  });
+
+  it('档位表的两枚 priceId 都真的进得去请求体，而且**依旧只有档位**（没有金额）', async () => {
+    // 这一条钉的是"界面多了一枚按钮"之后**不许变形**的那两件事：
+    // ① 选中的档位确实被发出去了（不是永远发默认档）；
+    // ② 键集合仍然只有 `priceId` —— 加了档位选择就把金额也带上，是本文件头第 1 条。
+    for (const id of CHECKOUT_TIERS) {
+      const { impl, calls } = recordingFetch(() => ({ status: 200, body: SUCCESS_BODY }));
+      await startCheckout(base({ fetchImpl: impl, priceId: CHECKOUT_TIER_PRICE_IDS[id] }));
+      expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
+        priceId: CHECKOUT_TIER_PRICE_IDS[id],
+      });
+    }
+    expect(CHECKOUT_TIER_PRICE_IDS[DEFAULT_CHECKOUT_TIER_ID]).toBe(RENEWAL_PRICE_ID);
+  });
+
+  it('🔴 降档被服务端拒时，客户端认它的码，而不是降级成 409 那句"价格没生效"', async () => {
+    // 409 在 `FAILURE_BY_STATUS` 里默认落 `PRICE_NOT_EFFECTIVE`（"这一刻没有生效价格"），
+    // 而 `PRICE_TIER_LOSES_GRANTS` 讲的是**另一件**事（"你已经有更高的档"）。
+    // 两者混成一句，界面就会对一个已付费的用户说"这一档还没定价"。
+    const { impl } = recordingFetch(() => ({
+      status: 409,
+      body: { code: 'PRICE_TIER_LOSES_GRANTS', message: 'PRICE_TIER_LOSES_GRANTS' },
+    }));
+    expect(await startCheckout(base({ fetchImpl: impl }))).toEqual({
+      kind: 'failed',
+      code: 'PRICE_TIER_LOSES_GRANTS',
+      status: 409,
+    });
   });
 });

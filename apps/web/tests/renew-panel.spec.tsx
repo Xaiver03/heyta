@@ -138,6 +138,74 @@ describe('下单成功', () => {
     expect(JSON.parse(String(init.body))).toEqual({ priceId: 'hosted-monthly' });
   });
 
+  describe('档位选择（¥5 / ¥12 两档）', () => {
+    const pickTier = async (el: HTMLElement, id: 'hosted' | 'hostedAi'): Promise<void> => {
+      const input = el.querySelector<HTMLInputElement>(`[data-testid="renew-tier-${id}"]`);
+      expect(input, `档位控件 renew-tier-${id} 没渲染`).toBeTruthy();
+      await act(async () => {
+        input?.click();
+      });
+    };
+
+    it('两档都渲染出来、默认选中 ¥5，并且**界面里不写金额**', async () => {
+      stubCheckout(() => ({ status: 200, body: ORDER_OK }));
+      const el = await renderPanel();
+      const before = el.textContent ?? '';
+
+      expect(el.querySelector('[data-testid="renew-tier-hosted"]')).toBeTruthy();
+      expect(el.querySelector('[data-testid="renew-tier-hostedAi"]')).toBeTruthy();
+      expect((el.querySelector<HTMLInputElement>('[data-testid="renew-tier-hosted"]'))?.checked).toBe(true);
+      // 🔴 档位名字来自**落地页那两条已被定价门禁钉住的词条**，所以这一屏不该出现任何
+      // 价格字符串 —— 金额只在服务端报价之后才出现（`ORDER_OK.amountMinor` = 400）。
+      expect(before).not.toMatch(/¥|\$|12\.00|5\.00/);
+
+      await act(async () => {
+        await clickPlace(el);
+      });
+      expect(el.textContent ?? '').toContain('4.00 CNY');
+    });
+
+    it('🔴 选 ¥12 之后，发出去的确实是那一档；换档会把上一张单清掉', async () => {
+      stubCheckout(() => ({ status: 200, body: ORDER_OK }));
+      const el = await renderPanel();
+      await clickPlace(el);
+      expect(el.textContent ?? '').toContain('4.00 CNY');
+
+      await pickTier(el, 'hostedAi');
+      // 换档那一刻：旧单那张卡不能还挂着（它写的是**旧档**冻的金额）。
+      expect(el.textContent ?? '').not.toContain('4.00 CNY');
+
+      await act(async () => {
+        await clickPlace(el);
+      });
+      const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
+      expect(JSON.parse(String(init.body))).toEqual({ priceId: 'hosted-ai-monthly' });
+    });
+
+    it('服务端按 ④′ 拒降档时，界面说的是"这一档不含你当前档的全部能力"', async () => {
+      // 混进 `PRICE_NOT_EFFECTIVE`（"这一刻没有生效价格"）就是一句假话：
+      // 用户明明付费有效，只是这一单会把权益判小。
+      stubCheckout(() => ({
+        status: 409,
+        body: { code: 'PRICE_TIER_LOSES_GRANTS', message: 'PRICE_TIER_LOSES_GRANTS' },
+      }));
+      const el = await renderPanel();
+      await clickPlace(el);
+
+      const text = el.textContent ?? '';
+      expect(text).toContain(translate('zh-CN', 'web.subscription.renew.fail.downgrade'));
+      expect(text).not.toContain(translate('zh-CN', 'web.subscription.renew.fail.unknown'));
+    });
+
+    it('英文界面里档位说明不漏中文（词条两侧都有）', async () => {
+      stubCheckout(() => ({ status: 200, body: ORDER_OK }));
+      const el = await renderPanel('en');
+      const text = el.textContent ?? '';
+      expect(text).toContain(translate('en', 'landing.pricing.hosted.name'));
+      expect(text).not.toMatch(CJK);
+    });
+  });
+
   it('🔴 券被拒时只显示"哪个码没生效"，服务端的中文解释一个字都不许漏进界面', async () => {
     stubCheckout(() => ({ status: 200, body: ORDER_OK }));
     const el = await renderPanel('zh-CN');
