@@ -364,10 +364,56 @@ if printf '%s' "$WANT" | grep -q "android"; then
   echo ""
   echo "═══ 3. Android：清旧包 → release APK → 模拟器卸旧装新 ═══"
   APK="$ROOT/apps/mobile/android/app/build/outputs/apk/release/app-release.apk"
-  SERIAL="${HEYTA_E2E_SERIAL:-emulator-5554}"
   PKG=com.heyta
   RESULT_android=FAIL
-  if ! adb -s "$SERIAL" get-state >/dev/null 2>&1; then
+  # 🔴 设备身份判据（2026-10-20 负责人点头落地，形状抄本文件 ios 腿的 `IOS_DEVICE_NAME` 那一段）。
+  #    这一段第二枚动作就是 `adb uninstall com.heyta`，而以前只有
+  #    `SERIAL="${HEYTA_E2E_SERIAL:-emulator-5554}"` 一枚默认值 ⇒ 每次都在**盲选**：
+  #    serial 是"哪台设备"的运行时编号，不是"谁的模拟器"，同机多枚模拟器在跑时
+  #    卸掉的可能是别的会话/别的项目的设备，而脚本一句都不会响亮。
+  #    口径（三条，逐条都能红）：显式 `HEYTA_E2E_SERIAL` = 人已经认领这枚 serial ⇒ 照它走，
+  #    只把 AVD 名打出来留档；给了 `HEYTA_ANDROID_AVD` ⇒ 在**在线**模拟器里按名字找唯一一枚；
+  #    两者都没给 ⇒ 在线只有一枚时用它并打 ⚠️，多于一枚响亮失败并列候选，零枚提示先起。
+  ANDROID_AVD="${HEYTA_ANDROID_AVD:-}"
+  SERIAL="${HEYTA_E2E_SERIAL:-}"
+  AVD_ONLINE="$(adb devices 2>/dev/null | awk 'NR>1 && $2=="device" && $1 ~ /^emulator-[0-9]+$/ {print $1}')"
+  android_avd_of() { adb -s "$1" emu avd name 2>/dev/null | head -1 | tr -d '\r'; }
+  # 候选清单一次建好，后面三条分支都读它（一行一枚 `serial<TAB>avd`）。
+  ANDROID_CANDIDATES=""
+  while IFS= read -r _serial; do
+    [ -z "$_serial" ] && continue
+    ANDROID_CANDIDATES="${ANDROID_CANDIDATES}${_serial}	$(android_avd_of "$_serial")
+"
+  done <<< "$AVD_ONLINE"
+  ANDROID_ONLINE_N=$(printf '%s\n' "$ANDROID_CANDIDATES" | grep -c .)
+  if [ -n "$SERIAL" ]; then
+    echo "  ⚠️ 用显式指定的设备：$SERIAL（AVD 名：$(android_avd_of "$SERIAL")）—— 人已经认领这枚 serial"
+  elif [ -n "$ANDROID_AVD" ]; then
+    _hit=$(printf '%s' "$ANDROID_CANDIDATES" | awk -F'\t' -v n="$ANDROID_AVD" '$2==n {print $1}')
+    _hit_n=$(printf '%s\n' "$_hit" | grep -c .)
+    if [ "$_hit_n" = "1" ]; then
+      SERIAL="$_hit"
+      echo "  按 AVD 名选中：$SERIAL（$ANDROID_AVD）"
+    elif [ "$_hit_n" -gt 1 ]; then
+      echo "  🔴 有 $_hit_n 枚在线模拟器的 AVD 名都是 \"$ANDROID_AVD\" —— **不猜**（这一段会 adb uninstall）"
+    else
+      echo "  🔴 没有在线模拟器的 AVD 名是 \"$ANDROID_AVD\" —— **不猜**（这一段会 adb uninstall）"
+      printf '%s' "$ANDROID_CANDIDATES" | sed 's/^/     候选: /'
+    fi
+  elif [ "$ANDROID_ONLINE_N" = "1" ]; then
+    SERIAL=$(printf '%s\n' "$ANDROID_CANDIDATES" | head -1 | cut -f1)
+    echo "  ⚠️ 没有指定设备，但**只有一枚**在线模拟器 ⇒ 用它：$(printf '%s\n' "$ANDROID_CANDIDATES" | head -1 | tr '\t' ' ')"
+  elif [ "$ANDROID_ONLINE_N" -gt 1 ]; then
+    echo "  🔴 有 $ANDROID_ONLINE_N 枚在线模拟器，而设备身份没被指定 —— **不猜**（这一段会 adb uninstall）"
+    printf '%s' "$ANDROID_CANDIDATES" | sed 's/^/     候选: /'
+    echo "     要跑这一端：HEYTA_ANDROID_AVD=\"<候选里的 AVD 名>\" bash scripts/reinstall-all.sh --only android"
+    echo "     或按 serial 认领：HEYTA_E2E_SERIAL=<serial> bash scripts/reinstall-all.sh --only android"
+  else
+    echo "  🔴 没有在线的 Android 模拟器（adb devices 里没有 emulator-*）—— 先起一台"
+  fi
+  if [ -z "$SERIAL" ]; then
+    :  # 上面已经响亮报过：设备身份没定下来 ⇒ 一行构建都不做，RESULT_android 保持 FAIL
+  elif ! adb -s "$SERIAL" get-state >/dev/null 2>&1; then
     echo "  🔴 模拟器 $SERIAL 不可达（adb devices 里没有/离线）—— 先起模拟器"
   else
     rm -f "$APK"                                      # 清掉旧安装包
