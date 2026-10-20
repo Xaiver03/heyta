@@ -171,6 +171,13 @@
 > ⚠️ 给下一位的口径提醒：那一格登记时写着"归属不在本线"，那是**瞬时前提**（别线那批在飞文件 10-10 18:49 已落进 `HEAD` 且逐枚 clean）。凡读到"归别人"的一格，先按它自己写的重量命令重取一次再决定动不动。
 > 🔴 **10-13 04:1x 给第一句"五步都交完"补一条边界，别按字面读成"四端仍等于当前产物"**：第 4 步那张表是**逐行 pin 提交**的，而 04:0x 详情面那笔 merge（`4c97b9de`）把 6 枚进包文件带进了 HEAD ⇒ 那句"等价"对四行**同时过期**。现量命令、第五趟的固定顺序（含 `HEYTA_REINSTALL_TMP_DIR` 要先 `mkdir` 那个 RC=4 坑）与本线代拍的理由（排在树冻住之后，不在本轮）都在台账 `04:1x` 那一格。
 > ⚠️ 同格还有一条载体事实：今晚设备腿用的隔离副本 `../heyta-wt-r99` **已被别的会话清走**，所以 `--apk ../heyta-wt-r99/…` 那串**不可复跑**；可复跑的是各 `journey.json` 里记下的 `artifact.sha256`。
+> 🔴 **10-20 05:4x 本会话最后一次收线（Goal 仍开着、没点"完成"）**：台账最新四格 r159 / r160 / r161 / r162 已入库并本地提交，
+> 未打勾枚数现量 `grep -c '^- \[ \]' docs/plans/product-ux-optimization.md`（本文件不抄数）。
+> 🔴 **这一轮真正剩下的只有两枚，都不在本线手里**：① windows 腿要那两台 Windows 宿主（逐枚现量命令在 §五 第 6 条那一桶）；
+> ② android 腿卡在一条**判据口径**上——第三枚宿主 `linux-dev` 活着且工具链齐，但它只有 debug 钥，
+> "debug 件算不算装机态验收对象"要负责人拍（本线推荐不允许，逐条现量在台账 r161 那一格）。
+> 其余未打勾格按"谁动得了"分好桶了，见 §五 第 6 条。**下一位不必再为"更新而重跑"任何一腿**：
+> 四面 2×2、web 首屏隐私卡、mac 暗档那三批读数都已各自带件身份对账（r156-r158 / r159 / r160 / r162）。
 > 本文件只记「现在停在哪、下一步按什么顺序做、哪些手别再碰」。
 > 🔴 **逐格读数与判据形状的事实源**是 [`product-ux-optimization.md`](product-ux-optimization.md) 文末那一串台账格子
 > （取最新几格：`tail -60 docs/plans/product-ux-optimization.md`）。这里**不复制数字** —— 抄件一定会漂。
@@ -242,8 +249,12 @@ r149 / r150 两笔动的是 `apps/mobile/src`、`apps/mobile/tests`、`scripts/q
 当时真正因它们过期的只有 Android。
 🔴 **这条判据到 r153 换了答案**：那一枚同时改 `apps/mobile/src/screens/PrivacyConsentSheet.tsx` 与
 `apps/web/src/features/privacy/PrivacyConsentSheet.tsx` ⇒ **移动两端（iOS/Android）与 web 系三端（web/mac/windows）各自都落后一枚**，
-"只有 Android 过期"那句作废。此刻逐端现量：iOS 已重打重装（`ca3a09257bdfba19`）、mac 已由 r155 那趟重装并过判据（同一次构建的 web-dist 对账 + 主蓝命中 997）、
-**web / windows / android 三端没有** —— windows 与 android 堵在同一台打包机上。
+"只有 Android 过期"那句作废。**10-20 05:4x 逐端现状**（哈希一律现量，别抄本节任何一枚值）：
+iOS 装的是 **r159 那一趟**从含 `f21dc1d39` 的源码在本机重打的件（上一件 `ca3a09257bdfba19` 已被 r159 否证为"早于修复七分钟"），
+现读法 `B=$(xcrun simctl get_app_container <UDID> com.heyta)/main.jsbundle; stat -f "%Sm" "$B"; shasum -a 256 "$B"`；
+mac 由 r155 那趟重装过判据，**05:4x 又补了一把更硬的尺**：`/Applications/Heyta.app/Contents/Resources/web-dist` 与本机 `apps/web/dist`
+**逐文件 sha256 全等** ⇒ mac 装机件里的 web 产物**就是当前源码那份构建**，不再靠 mtime 推（读数与命令在 §五 第 18 条）；
+**windows / android 两端没有** —— windows 堵在那两台 Windows 宿主，android 那一腿的口径题见 §五 第 6 条那一桶。
 ✅ **10-20 01:4x r157 用同一把尺量过"还要不要再跑一趟重装"**：`git diff --name-only f21dc1d39..HEAD -- packages apps/mobile/android apps/mobile/src apps/desktop-macos apps/desktop-windows/src apps/desktop-windows/app apps/web/src apps/web/app server/src`
 ⇒ **枚数 0**（r154-r157 这几笔只动文档与 `apps/*/evidence/**`，它们不进任何端的产物）⇒ **iOS 与 mac 此刻仍等于当前 HEAD 的进包源码，不需要为这几笔重跑**；
 windows / android 那两端的"过期"是**没建过**，不是"建过之后输入又变了"。⚠️ 这把尺只覆盖 git 跟踪的打包源码，不证产物字节（同 §四 第 4 步那一行末尾那条边界）。
@@ -719,6 +730,17 @@ PY
     · ⚠️ 一处边界：人眼只看了 **2 张**（1440 暗、375 浅），1440 浅与 1440 浅×中文两张没逐张看过。第一版还拍到过一张**淡入中途**的图（半透明＋加载指示），
       装置里已补"等 `opacity >= 0.99` 再拍"——**判据绿不代表图能看**，这一族下次仍要先看自己的截图。
 
+18. ✅ **10-20 05:4x（r162）mac 端暗档那一腿补上了，顺手把一把代理尺换成字节尺**。
+    · `HEYTA_NO_FOCUS=1 pnpm check:macos-window` 在**宿主暗档**下跑绿（rc=0）⇒ 以前入库的 mac 暗档读数只来自重装链的自截屏，**这枚门本身从没在暗档跑过**。
+      图两枚在 `apps/desktop-macos/evidence/ux-final-20261020/r162-mac-window-dark/`，人眼看过 webview 那张：
+      **首屏隐私卡三条出口都有字，右上角是「以后再说」不是叉** ⇒ r156 那笔修复第一次在 mac 壳里被看见。
+    · ✅ **换掉的那把代理尺**：判"装进 Mac 的那件新不新"以前靠 mtime 先后 ＋ 重装链那句"同一次构建"；
+      这一趟直接比字节 —— `/Applications/Heyta.app/Contents/Resources/web-dist` 与本机 `apps/web/dist` **11 枚产物逐文件 sha256 全等**，
+      且主 chunk 里那枚出口的 children 就是 `t('common.privacy.consent.close')`（改前是 `<X>` 图标）。复跑命令在台账 r162 那一格。
+    · 🔴 **射程（下一位别读过头）**：那枚门跑的是**裸 SwiftPM Debug 可执行文件**（`apps/desktop-macos/scripts/capture-window.sh:94`），
+      **不是** `/Applications/Heyta.app` ⇒ 它的 rc=0 不证装机的那份 .app 过了窗口取证；壳二进制自己这趟没核。
+      暗档也仍是"这趟落在暗档"（宿主 `AppleInterfaceStyleSwitchesAutomatically=1` 自动切档），不是同一趟内的控制配对；mac **英文 × 暗**没取。
+
 ⚠️ 这一段只收**本轮 Goal 那五步**还挂着的部分 —— 其余欠项照 §四 逐行读，那里每一行都写了"在谁手里 + 一条命令"。
 🔴 延续 §一 那两条负责人指令：**不许向负责人发任何表单/确认动作、汇报不许以问句收尾**；Goal 保持开着（到 100 轮由系统自动暂停），
 **不要自判"做完了"去点 complete**。
@@ -754,6 +776,10 @@ PY
    拿「任务标题还在 AX 树里」判「已在时间线视图」，而列表视图里标题也在 ⇒ 那两臂根本没换视图却给了绿。
    写前置条件判据时先做一次**反臂**（故意不切视图，看那枚 marker 会不会照样命中），并留意第二种失法：
    marker 选错层（web 的 aria 键在移动端永不成立）。两批假读数改名留档、不作数，正文在环境陷阱 **#463**。
+10. 🔴 **不要把双引号 ssh 命令里的 `test -r -w <路径>` 当成读数**（10-20 r161 实测，本线自己造的假否证）：
+    那一串在远端 shell 里塌成 `test: -w: 需要二元运算符`，而**报错走 stderr、外层还是回 0**，于是 `/dev/kvm` 被记成"不可用"——
+    差一点就把一条真出路排除掉。判可读可写要**拆成两条各带退出码**：`test -r <p>; echo r=$?` 与 `test -w <p>; echo w=$?`。
+    同一族还有第 11 枚形状：**zsh 不分词**（打包输入清单写成普通字符串传给 `git log --` 会回空 ⇒ 差集读成 0 枚的假绿，见 §五 第 16 条）。
 
 ---
 

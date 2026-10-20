@@ -5213,3 +5213,24 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
       ⚠️ 台账此前只数过两枚别名，而且把"同一个 `41478`"读成了"同一台的两条路"——那是**从用户名推的**，不是量到的。
       ⑵ 真机 iPhone、macOS Gallery、大字体档那几格照旧不证。
 
+- [x] ✅ **10-20 05:4x r162 mac 端暗档那一腿：壳级窗口取证在暗档跑绿，并把"装机件等不等于当前 web 产物"从 mtime 推换成逐文件哈希对账**
+      🔴 **先说这一格补的是哪半句**：§8.2 那一带早就记过"mac 装机态那张落在暗档，但那是宿主自己切的 ⇒ 只能说这趟落在暗档，不是控制配对"。
+      这一格**不推翻那条读法边界**（宿主现量 `defaults read -g AppleInterfaceStyle` ⇒ `Dark`、`AppleInterfaceStyleSwitchesAutomatically` ⇒ `1`，仍是自动切档），
+      它补的是**"暗档这一趟里那枚门到底判没判过"**：以前入库的 mac 暗档读数来自重装链的自截屏，`pnpm check:macos-window` 这枚门本身没在暗档跑过。
+      · **门的读数**（`HEYTA_NO_FOCUS=1 pnpm check:macos-window` ⇒ **rc=0**）：窗口 **1120×720**、标题 `heyta`、`CAPTURE_METHOD=screencapturekit`、
+        `CROSSCHECK=ok(2240x1440)`、窗口图 内容比例 **100.0%**／色阶差 **245**、WebView 快照 **2240×1362**、`contentOnModalRatio` **0.042**（判据阈值 0.02），
+        M2 那三枚（身份入口／菜单／导入面板）断言同趟绿。图入库两枚：`apps/desktop-macos/evidence/ux-final-20261020/r162-mac-window-dark/window-full.png` 与 `window-webview-dark.png`。
+      · **人眼层：看过 webview 那一张** —— 整屏深底、首屏那枚「在使用联网功能之前」在场，**三条出口都有可见文字，右上角是「以后再说」不是一枚叉**
+        ⇒ 这是 r156 那笔修复（`f21dc1d39`）**第一次在 mac 壳里被看见**，不是只有浏览器与 iOS 两腿。`window-full.png` 没逐张看过，只有像素读数。
+      · ✅ **换掉了一把代理尺**：以前判断"装进 Mac 的那件新不新"靠的是重装链那句"web-dist 与本机 `apps/web/dist` 同一次构建"＋ mtime 先后。
+        这一趟直接比字节：`/Applications/Heyta.app/Contents/Resources/web-dist` 与 `apps/web/dist` 里 11 枚 `js/css/html/wasm`
+        **逐文件 sha256 全等**（`diff` 空输出），而那枚主 chunk 里 `privacy-consent-close` 的 children 就是 `e("common.privacy.consent.close")`（改前是 `<X>` 图标）
+        ⇒ **mac 装机件里的 web 产物含那笔修复**是查出来的，不是推出来的。复跑：
+        `(cd /Applications/Heyta.app/Contents/Resources/web-dist && find . \( -name '*.js' -o -name '*.css' -o -name '*.html' -o -name '*.wasm' \) | sort | xargs shasum -a 256) > /tmp/a.sha`
+        对 `apps/web/dist` 跑同一条再 `diff /tmp/a.sha /tmp/b.sha`。
+      ⚠️ **这把尺的范围**：它比的是 **web 产物**那一层。壳自己那半（Swift 侧）这趟量到的是 `.build/out/Products/Debug/HeytaMac` mtime `10-19 10:30`
+      晚于最后一笔 `apps/desktop-macos` 提交 ⇒ 对**当前源码**不过期，但**这枚门跑的是裸 SwiftPM Debug 可执行文件，不是 `/Applications/Heyta.app`**
+      （`apps/desktop-macos/scripts/capture-window.sh:94`；台账「裸 SwiftPM 可执行文件」那一行早就写明）。
+      ⇒ **不许由这一枚 rc=0 推"装机的那份 .app 过了窗口取证"**；`/Applications` 那件的壳二进制本趟没核。
+      **不证**：⑴ 暗档不是控制配对（宿主自动切档，浅档那一趟与这趟不同批）；⑵ mac **英文档 × 暗档**没取；⑶ 壳二进制自己的装机件没核；
+      ⑷ 只看了两枚图里的一张。
