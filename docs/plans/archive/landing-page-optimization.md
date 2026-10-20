@@ -2,7 +2,7 @@
 
 > 状态：**本轮目标已完成；WebGL 按需加载与隐私减动效路径已落地并验收**
 
-本计划承接 [`docs/research/landing-page-ia-ux-audit.md`](../research/landing-page-ia-ux-audit.md)。目标是让 Landing 用一条清晰的产品路径说明 heyta：收集任务、选择处理视图、跨设备完成，并把帮助中心作为问题解决入口。产品 DOM 复现必须与当前 Web 外壳的结构登记和测试保持一致，样例数据只能影响内容，不得伪造真实账户状态。
+本计划承接 [`docs/research/landing-page-ia-ux-audit.md`](../../research/landing-page-ia-ux-audit.md)。目标是让 Landing 用一条清晰的产品路径说明 heyta：收集任务、选择处理视图、跨设备完成，并把帮助中心作为问题解决入口。产品 DOM 复现必须与当前 Web 外壳的结构登记和测试保持一致，样例数据只能影响内容，不得伪造真实账户状态。
 
 ## 产品决策
 

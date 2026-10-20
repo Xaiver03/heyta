@@ -1,9 +1,9 @@
 # 通知中心 + 活动（福利中心）
 
 > 状态：**已完成**（2026-09-29）
-> 依据：[`pricing-and-entitlements.md`](../reference/pricing-and-entitlements.md)（权益词表）、
-> [`subscription-boundary.md`](subscription-boundary.md) §2（只限制托管同步，不锁数据）、
-> [`motivation-and-progression.md`](archive/motivation-and-progression.md)（激励体系的回路诊断）。
+> 依据：[`pricing-and-entitlements.md`](../../reference/pricing-and-entitlements.md)（权益词表）、
+> [`subscription-boundary.md`](../subscription-boundary.md) §2（只限制托管同步，不锁数据）、
+> [`motivation-and-progression.md`](motivation-and-progression.md)（激励体系的回路诊断）。
 
 ---
 
@@ -206,7 +206,7 @@ prisma.subscription.findFirst({ where: { userId }, orderBy: { id: 'desc' } })  /
    没有运营后台时，一张没人能编辑的表比静态配置更会说假话。
    触发改成表的条件写在那个常量上方（限时限量 / 需要不发版下线 / 活动数 > 3）。
 3. **不做系统级通知。** 这一轮做的是**应用内**通知中心；OS 级投递（含移动端通知库依赖）
-   仍属于 [`site-and-parity-alignment.md`](site-and-parity-alignment.md) 的 B1-1，未动。
+   仍属于 [`site-and-parity-alignment.md`](../site-and-parity-alignment.md) 的 B1-1，未动。
 4. **本地事件不进通知中心。** 它只装服务端**本来就知道**的账号级事实；
    "任务到期"这类需要解密用户内容的事件在 E2EE 下不可能由服务端产生。
 5. **被邀请人看不到自己的归因**。按产品规则奖励只发给邀请人，所以被邀请人界面

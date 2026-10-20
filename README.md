@@ -40,7 +40,9 @@
 ```bash
 pnpm install
 pnpm -r build
-pnpm -r test          # 全部单测（2026-09-27 实测：16 个工作区项目 4652 passed / 13 skipped）
+pnpm -r test          # 全部单测。⚠️ 这里**不抄读数**：2026-09-27 那一趟是「16 个工作区项目 4652 passed / 13 skipped」，
+                      #   项目数现量已 21（`find packages apps server -maxdepth 2 -name package.json -not -path '*/node_modules/*' | wc -l`），
+                      #   条数每批都在动 ⇒ 要数字就看这一趟自己的输出尾部。
                       #   那 13 条是 env-gated 的 `describe.skipIf`（web 12 条需要真实服务端
                       #   的 e2e，server 1 条同理），不是失败。`e2e/` 不在根工作区，另跑。
 
@@ -63,6 +65,11 @@ heyta/
 │   ├── op-log/           # op-log 状态机、墓碑、崩溃恢复、实体覆盖门禁
 │   ├── domain/           # 领域规则：四象限派生、习惯连续与韧性、RRULE、番茄钟、时间归因
 │   ├── app-host/         # 宿主外壳：把领域 + 存储 + 同步接成可直接渲染的门面（两端共用）
+│   ├── sync-client/      # 宿主无关的同步编排（上传 / 下载 / 冲突上报）
+│   ├── ui/               # ⭐ **UI 单源**：一份 RN 组件实现，各端渲成该平台原生控件（web 走 react-native-web）
+│   ├── widget-core/      # 系统小组件的共享纯层：快照信封 + 选择器 + 意图队列（类型上产生不了 op）
+│   ├── legal/            # 对外法律文本的唯一事实源（九份，中英结构由测试对账；🔴 不在 i18n 里）
+│   ├── inbound-core/     # 付费自动收集的可移植纯层（信封 / webhook 原语 / 权益契约；不碰 op 与库）
 │   ├── ai/               # AI 出站：provider / routing / egress / presets / supply / health
 │   ├── local-api/        # AI 入站：只监听回环的本地 API / MCP server
 │   ├── design-system/    # 设计 token 与生成物（TS / RN / Swift / ArkTS）+ 对比度实测
