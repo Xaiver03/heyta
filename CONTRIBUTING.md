@@ -22,7 +22,8 @@ pnpm -r test     # 应该全绿
 
 ## 2. 提交前门禁（必须全过）
 
-**唯一权威是 `pnpm check`** —— 它是全部门禁的串联，CI 跑的就是它（`.github/workflows/ci.yml`）。
+**唯一权威是 `pnpm check`** —— 它是全部门禁的串联。⚠️ **它今天没有自动载体**：GitHub 那两枚 workflow（`ci.yml`、`heyta-server-image.yml`）现量都是 `disabled_manually`（`gh api repos/:owner/:repo/actions/workflows --jq '.workflows[]|"\(.name)|\(.state)"'` 可复量），当下走的门禁载体是 `node scripts/gate-ssh.mjs`（见 [`docs/runbooks/ci-and-runner.md`](docs/runbooks/ci-and-runner.md) §12）——
+🔴 所以"CI 绿了"这句话现在**不成立于本仓**，提交前必须自己跑 `pnpm check`。
 ⚠️ 这里**刻意不写门禁条数** —— 这条纪律有来历，见 `AGENTS.md` §7
 里那条「`pnpm <名字>` 找不到脚本时会去跑 PATH 上同名二进制」的陷阱：那句话漂过一次。
 要数就直接读 `package.json` 的 `check` 脚本，那是唯一权威。
