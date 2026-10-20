@@ -7091,3 +7091,14 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
     ⑦ 改动面的两枚门禁复跑：**`check:android-build-host` rc=0**（H1 只扫到 1 处模拟器形状 = 存量基线，新加的文案没有命中 `emulator -avd`／`emulator @`／`avdmanager create avd`／`gradlew` 那四条模式 ⇒ 没有在本机新开模拟器入口）、**`check:android-gradle-remote` rc=0**（G3 那条"远端回传路径 == `reinstall-all.sh` 的 `$APK`"仍然成立，因为那枚 `APK="…"` 行逐字没动）、`check:script-snapshot` rc=0（`bash -n` 也过）。
     ⑧ **甲落地之后仍然没闭合的那一格**：闸门只能**拒绝猜**，变不出一台设备。所以 android 端在合并结果上依旧没有"当前产物"读数，`✅=3 ⏭=1 🔴=0` 那个形状不变，而"四端当前产物齐"这句话仍然不能说（§2 那句照旧）。要出这一端，缺的是**一台身份可指认的模拟器**（负责人起一枚属于本线的 AVD，或给乙一句当轮授权），不是脚本再改一轮。
     ⑨ 本条动 `PROGRESS.md` 一枚（纯追加）。AC 已勾数须仍 **0**。
+
+157. 🟢 **10-21 00:1x–00:5x（¥12 托管 AI 档 · 从"接口在但收不到钱／买了用不上"做到"卖之前先判这台实例交付得了吗"）**（写前先跑 `date`，本机 00:51）
+    ① **部署侧那一半**（`76ad9a08c`）：compose 的 `environment:` 白名单**没列** `MANAGED_AI_*` 四枚 ⇒ 运营者 `.env` 里的值从来进不到容器 ⇒ 每个请求 `503 MANAGED_AI_NOT_CONFIGURED`，症状正是"付了 ¥12 用不上"。与上一线 `PAYCENTER_*` 那一格**同一成因**（白名单不是"透传"，列了才透）。
+    ② **客户端那一半**（`81d4a7044`）：`CHECKOUT_TIERS` 两档 + web `RenewPanel` 与 mobile `RenewSection` 各一枚档位选择。档位名**复用** `landing.pricing.hosted/.hostedAi` 那两枚被门禁钉住的词条 ⇒ 界面里一个金额都不写（下单前屏上没有价格，价格只在服务端报价之后落屏），而 `hostedAi` 那句自带"这一步会把内容发到我们的服务器，它不受端到端加密保护"。发出去的体仍只有 `priceId`。
+    ③ **服务端两道新闸门**（同一笔）：②′ `managedAiConfigured` 默认**拒** —— 为什么不能靠 `NOT_YET_DELIVERABLE_SKUS`：那张表是**全局静态**的，表达不了"这一台部署配了上游没有"，而后者才是真成因。④′ `PRICE_TIER_LOSES_GRANTS` 拒在**冻结之前** —— 为什么是拒单而不是按比例折算：`applyOneTimeGrant` 一 `(userId, provider)` 一行、整行替换 `grants`、只有一枚 `currentPeriodEnd`，那个形状表达不了半程升级。
+    ④ 两道都**能红**：各自造一次违规输入取到红，再从 `.mut-bak` 还原并逐字节对账（不走 git 还原）。
+    ⑤ 门禁与类型现量（同一棵树逐条取 rc）：`check:ai-quota`／`check:payment-entry`／`check:server-env`／`check:docs`／`check:i18n-vars`／`check:pricing`／`check:legal-copy`／`check:legal-tools`／`check:ai-coverage`／`check:ui-language`／`check:egress-wording`／`check:mobile-settings`／`check:e2e-helper-exports`／`check:server-copy`／`check:doc-citations`／`check:md-tables` 全 **rc=0**，`pnpm -s typecheck` **rc=0**。
+    ⑥ **真浏览器**（§6.2 规定一）：`cd e2e && npx playwright test tests/renew-panel.spec.ts` ⇒ **5 passed**。🔴 其中三条**在本轮之前就是红的**（`b20351999` 修掉），成因登记为环境陷阱 **#511**：设置浮层换成「左侧分类 + 右侧内容」的 IA 之后换了挂载点而 helper 没跟上，症状是 locator **解析得到节点却判 `hidden`**，长得像面板坏了。两张新图（`renew-panel-tiers.png`／`renew-panel-downgrade.png`）逐张人眼看过；档位那张第一版拍到按钮上的「正在下单…」过渡帧，已把等待从"请求体计数够数"改落在**结果元素自己**上再重拍。
+    ⑦ **ADR-0054 追加 §10 勘误**（正文与 §9 一字未改）：§9.3 前两件已落地、§9.4 的 `tools` 限制仍成立（现量 `grep -c "tools\|tool_choice" server/src/ai/managed-proxy.routes.ts` 回 `0`）、以及对外法务那句「这一档仍打不开」本轮**不动**的两条理由与翻案条件 —— 它现在是一句**偏保守的过期陈述**，改掉它才是在造没有依据的承诺。
+    ⑧ **交接物**落在 [`docs/plans/subscription-handoff.md`](docs/plans/subscription-handoff.md) **§10**：收款通路现状／¥12 做到哪／仍缺什么（每格归谁 + 现量命令）／§1–§9 里已过期格子的逐格表。
+    ⑨ 本条动 `PROGRESS.md` 一枚（纯追加）。AC 已勾数现量 **0**（`grep -rn "^- \[x\]" docs/plans/inbound-automation*.md | wc -l`）。

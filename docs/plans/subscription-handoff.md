@@ -5,8 +5,12 @@
 > [`subscription-integration.md`](subscription-integration.md) /
 > [`subscription-provider-selection.md`](subscription-provider-selection.md)。
 >
-> 最后更新：会话 `goal-192acbae` 第 13 轮。**这份文件的存在原因是：驱动它的 agent
-> 上下文耗尽了，而后台还有一个 agent 在写未提交的代码。**
+> 🔴 **当前答案在 [§10](#10-当前停在哪2026-10-21)** —— §1–§9 写于 2026-10-16 之前，
+> 里面「选型未定」「只有用户能做的两件事」「ToS 卡住」那几格**已经过期**，
+> 逐格见 §10.4。
+>
+> 最后更新：会话 `goal-192acbae` 第 13 轮（§1–§9）＋ 2026-10-21 的 §10。
+> **§1–§9 那份文件存在的原因是：驱动它的 agent 上下文耗尽了，而后台还有一个 agent 在写未提交的代码。**
 
 ## 1. 已提交（在 `origin/main` 上，可信）
 
@@ -154,4 +158,77 @@ AI 文件 import `@heyta/i18n`，所以 **`packages/i18n` 必须同一个提交*
   > [pricing-and-coupons.md](../reference/pricing-and-coupons.md) §7 第 9 条。
 - ✅ **本地凭证**：`server/.env`（0600、gitignore、git 看不见）已写入借用的
   `WX_*` 六个变量。⚠️ 是**别家公司的**，新凭证到位后替换并**停用旧的**。
+  > 🔴 **本条已过期**：微信直连那一家已经从收款通路里退场（`check:payment-entry`
+  > 的渠道判据改指统一支付中心）。⚠️ 但**那六个值还在本机磁盘上** —— 删除/停用是
+  > 一次运维动作，见 §10.3 第 5 格。
+
+---
+
+## 10. 当前停在哪（2026-10-21）
+
+> 本节由「¥12 托管 AI 档做到真的能收钱且能交付」那一轮写下。**只写现状与现量命令**，
+> 决策一律指向 ADR：收款通道见 [`ADR-0017`](../adr/0017-single-paid-tier-and-payment-channel.md)，
+> 托管 AI 的可售卖前置与最新勘误见 [`ADR-0054`](../adr/0054-managed-ai-retention-and-selling-preconditions.md) §6/§8/§9/§10。
+
+### 10.1 收款通路（¥5 与 ¥12 共用同一条）
+
+- 通道是**同公司的统一支付中心**，不是 Paddle/Creem/微信直连。唯一的真 adapter 是
+  `server/src/billing/paycenter.adapter.ts`；`registry.ts` 默认只注册 noop（fail-closed）。
+  现量：`grep -n "paycenter" server/src/billing/registry.ts`
+- 生产 compose 的白名单里带着那几枚键，**且运营者的 `.env` 真的能透进容器**
+  （这一格以前是坏的：白名单没列 ⇒ 收了钱拿 503）。
+  现量：`grep -n "PAYCENTER_ENABLED" server/docker-compose.yml`
+- 门禁 `pnpm check:payment-entry`：**臂数由脚本自己打印**，判据两头有反臂
+  （"能收钱却买不了"与"总闸开着凭证为空"都会红）。
+- ⚠️ 有意设计成**全有或全无**：`PAYCENTER_ENABLED=true` 而三项凭证缺一 ⇒ 启动期硬错误。
+
+### 10.2 ¥12 那一档做到哪一步
+
+| 环节 | 状态 | 现量命令 |
+|---|---|---|
+| 客户端能不能下这一单 | ✅ 设置页有档位选择（两枚），发出去的体里只有 `priceId`，金额一律来自服务端 | `grep -n "renew-tier" apps/web/src/features/subscription/RenewPanel.tsx` |
+| 会不会"收了钱交付不了" | ✅ 闸门 ②′：这一档授予 `ai` 而**这台实例**没配上游 ⇒ 冻结之前拒（`409 PRICE_NOT_SELLABLE` + `reason`），默认**拒** | `grep -n "managedAiConfigured" server/src/billing/checkout.routes.ts` |
+| 买更低档会不会把已付费能力判小 | ✅ 闸门 ④′：`409 PRICE_TIER_LOSES_GRANTS`，同样在冻结之前 | `grep -n "PRICE_TIER_LOSES_GRANTS" server/src/billing/checkout.routes.ts` |
+| 部署侧键位与运营者说明 | ✅ `MANAGED_AI_*` 四枚进 compose 白名单，`env.example` 有能照填的一段 | `grep -n "MANAGED_AI_ENABLED" server/docker-compose.yml` |
+| 设置页的 own/managed 开关 + 「本周期已用 X / 300」 | ✅ ADR-0054 §9.3 的前两件 | ADR-0054 §10.1 那张表 |
+| 真浏览器判据 | ✅ `e2e/tests/renew-panel.spec.ts` 五条（档位、换档清旧单、拒降档、503、只用本机零请求） | `cd e2e && npx playwright test tests/renew-panel.spec.ts` |
+
+🔴 两道闸门都**不许**改成"按比例折算"：`applyOneTimeGrant` 是一 `(userId, provider)`
+一行、整行替换 `grants`、只有一枚 `currentPeriodEnd`，那个形状表达不了半程升级。
+
+### 10.3 仍缺什么（每格都写了归谁）
+
+1. **真实上游凭据没填 ⇒ 这一档现在**卖不出去**（不是"卖出去用不上"了）** —— 归运营。
+   填了 `MANAGED_AI_*` 三项才算开；没填的现场形状是 ¥5 照卖、¥12 拿 409。
+   现量：`grep -n "MANAGED_AI_UPSTREAM" server/env.example`
+2. **对外法务文案那句「这一档仍打不开」** —— 归法务/负责人点头，**本轮刻意没动**。
+   为什么它现在是一句偏保守的过期陈述、以及翻案条件，写在 ADR-0054 §10.3。
+   现量：`grep -rn "这一档仍打不开" packages/legal/src/documents`
+3. **托管档不转发 `tools`** ⇒ 不许对外宣传"对话式助手"。现量：
+   `grep -c "tools\|tool_choice" server/src/ai/managed-proxy.routes.ts`（回 `0` 即仍未转发）。
+   要拍的板在 [`launch-blockers.md`](launch-blockers.md) §3.2。
+4. **45 天过期清理作业线上是否在跑** —— 代码在（`purgeExpiredAiUsageCounters` 挂 cleanup 第 8 段），
+   生效要服务端镜像重建。⚠️ 这是**部署态**，本机量不到，不许读成"已在保"（ADR-0054 §8 那条部署顺序）。
+5. **本机 `server/.env` 里还躺着别家公司的 `WX_*` 六个值** —— 收款通路已经不用那一支了，
+   凭证该停用并删除。归运维（不在本仓，git 看不见它）。
+6. **管理后台的权益撤销面**：退款那一格**已经有面**（`refunds` tab + `GET/POST /api/admin/refunds`，
+   现量 `grep -n "'refunds'" apps/web/src/features/admin/AdminPanel.tsx`）；
+   缺的是**运营者手工撤销某用户权益**的那一枚控件 —— 归产品，不在本轮范围。
+
+### 10.4 §1–§9 里已经过期的格子（别照它们判断现状）
+
+| 格子 | 为什么过期 |
+|---|---|
+| §1 那张提交表 + 「服务端测试 59 files…」 | 那是 2026-10-16 之前的快照；现量走 `git log` 与 `pnpm -r test`，别抄这里的数 |
+| §4 第 4 条「真实支付测试模式门禁…依赖选型定稿」 | 选型已定（ADR-0017）；Paddle/Creem 只剩注释里的论证理由，代码里没有它们的 adapter |
+| §4 第 5 条「ToS 卡在用户：先得有 heyta 自己的一份法务文本」 | 文本已经有了：`packages/legal` 是对外法律文本唯一事实源。⚠️ 这一格**改成了"等法务复核"**，不是"没有文本" |
+| §5 第 1 条「用中国身份注册 Paddle 卖家账号，走到 Account Verification」 | **作废**：收款走自家支付中心，不再经 Paddle |
+| §5 第 2 条「heyta 自己的法务文本」 | 同上，文本已在，待的是复核与生效 |
+| §9.3 第二条「本地凭证已写入借用的 `WX_*`」 | 见 §10.3 第 5 格：通路已换，值还在盘上 |
+
+### 10.5 本轮之后剩下的动作（按谁能做分）
+
+- **运营/运维**：填 `MANAGED_AI_*`（+ 确认 `PAYCENTER_*`）→ 重建镜像 → 用一次真实小额下单验通路与到账回执；删掉本机旧的 `WX_*`。
+- **法务/负责人**：过一遍 `packages/legal`（含把"这一档仍打不开"按 §10.3 第 1、3 格的前提改掉）。
+- **我方下一轮能自己做**：管理后台权益撤销控件（§10.3 第 6 格）、`tools` 转发的工程侧方案（先出计划，拍板归负责人）。
 

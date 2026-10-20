@@ -797,6 +797,27 @@ pnpm --filter @heyta/server pricing set-price \
    所以它变红**不会**拦住任何人 —— 它属于那条单独跑的 CI 作业。
    也正因如此，`coupon` 的 ⑧ 例失效了那么久才被这次接手会话发现。
 
+22. **¥12 那一档：「收钱不交付」那两条缺口已闭合，代价是它现在**取决于部署**（2026-10-21 已做）。**
+   收银台原来有两条洞，都不是"金额算错"，而是**收了钱之后那一侧没有东西**：
+
+   - **②′ 这一档授予 `ai`，而这台实例没配托管上游** ⇒ 照样冻结、照样出支付串、
+     钱进来之后每个请求 `503`。现在拒在**报价之后、冻结之前**（`409 PRICE_NOT_SELLABLE`
+     + `reason` 点名成因）。为什么不复用 `NOT_YET_DELIVERABLE_SKUS`：那张表是
+     **全局静态**的，表达不了"这一台配了没有" —— 而后者才是真成因
+     （compose 的 `environment:` 白名单没列 `MANAGED_AI_*`，运营者 `.env` 的值从来进不到容器）。
+   - **④′ 买更低档会把已付费能力判小** ⇒ `applyOneTimeGrant` 是**整行替换** `grants`、
+     一 `(userId, provider)` 只有一枚 `currentPeriodEnd`，所以"半程升级"那个形状**表达不了**。
+     处置是**拒单**（`409 PRICE_TIER_LOSES_GRANTS` + `lostGrants`）而不是按比例折算 ——
+     折算需要一个本仓没有的对象，而"收了 ¥5 把云端 AI 判掉"是不可接受的那一侧。
+
+   判据现量：`grep -n "managedAiConfigured\|PRICE_TIER_LOSES_GRANTS" server/src/billing/checkout.routes.ts`；
+   两道的反臂在 `server/tests/billing-checkout.routes.spec.ts`（各自造一次违规输入都真红过）。
+
+   🔴 **由此新增一条运营口径，别读成"这一档永远买不了"**：这台实例没填
+   `MANAGED_AI_*` ⇒ ¥12 拿 409、¥5 照卖。填上并重建镜像 ⇒ 当场放行。
+   现状与翻案条件写在 [`../adr/0054…`](../adr/0054-managed-ai-retention-and-selling-preconditions.md) §10
+   与 [`../plans/subscription-handoff.md`](../plans/subscription-handoff.md) §10.3。
+
 ---
 
 ## 8. 对应的门禁与验证
