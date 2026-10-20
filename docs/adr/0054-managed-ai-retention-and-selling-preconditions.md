@@ -211,3 +211,48 @@ ADR-0005 那条在托管档一字不改：**托管 AI 与端到端加密在定�
 **却列着 `'tool-calling'`** ⇒ 助手在托管档上会**静默降级成纯文本回答**。
 客户端已按"响亮拒绝"处理（`packages/ai` 在托管档遇到带工具的调用直接返回 `no-route`，零请求）。
 发现、复现命令与要拍的板在 [`../plans/launch-blockers.md`](../plans/launch-blockers.md) §3.2。
+
+---
+
+## 10. 勘误（2026-10-21）：§9.3 那三件里的**前两件已经落地**，第三件**刻意没动**
+
+> 处置同 §9：**正文与 §9 一字不改**，变化只写在这一节。
+
+### 10.1 §9.3 逐件对账
+
+| §9.3 那一件 | 2026-10-21 现量 | 怎么自己核 |
+|---|---|---|
+| 1 设置页的 `own / managed` 选择 | ✅ **已落地**：`AiSettings` 渲染两枚 supply 选项，而托管那一枚要求同步服务器地址（`managedServerReady`）——没连服务器就选不到，选到了也不假装可用 | `grep -n "supply.managed" apps/web/src/features/settings/AiSettings.tsx` |
+| 2 「本周期已用 X / 300」界面 | ✅ **已落地**：`mode === 'managed'` 时才拉 `GET /api/ai/managed/usage`，自备档不会因为多一个 prop 就发请求 | `grep -n "fetchManagedAiUsage" apps/web/src/features/settings/AiSettings.tsx` · `pnpm check:ai-quota` |
+| 3 §8 与对外法务文案的改写 | ⚠️ **本轮没做**，理由见 10.3 | `grep -rn "这一档仍打不开" packages/legal/src/documents` |
+
+### 10.2 同一批补上的两道"收钱不交付"闸门
+
+§9.3 只列了"开关落地时要同批做完的三件"，它没覆盖**卖**这一侧的两个洞，本轮一起补了：
+
+- **②′ 这一档要交付的能力，这台实例到底有没有**（`managedAiConfigured`，默认**拒**）。
+  为什么不能靠 `NOT_YET_DELIVERABLE_SKUS`：那张表是**全局静态**的，它表达不了
+  "这一台部署配了上游没有" —— 而后者才是"付了 ¥12 用不上"的真正成因。
+  部署侧那半（`MANAGED_AI_*` 四枚键进 compose 白名单）在同一条线的上一个提交里。
+- **④′ 收了钱不许把已经付费的能力判小**（`PRICE_TIER_LOSES_GRANTS`）。
+  为什么是**拒单**而不是按比例折算：`applyOneTimeGrant` 是**整行替换** `grants`、
+  一 `(userId, provider)` 只有一枚 `currentPeriodEnd`，那个形状表达不了"半程升级"。
+
+现量：`grep -n "managedAiConfigured\|PRICE_TIER_LOSES_GRANTS" server/src/billing/checkout.routes.ts`；
+两道的反臂（少了会红的对照）在 `server/tests/billing-checkout.routes.spec.ts`。
+
+### 10.3 第三件为什么这轮不动
+
+🔴 先说清一件事：**§9.2 那条约束照旧，但它的事实依据已经换了**。
+"界面没有那个开关"这一句**已经不再成立**（见 10.1 第 1 行），所以"不许写成已上线可用"
+现在**不是**因为功能打不开，而是因为下面两条：
+
+1. `packages/legal` 是对外法律文本的唯一事实源，那几份文档自己标着
+   「状态：草案，尚未经法务复核、尚未生效」。改它是**一次法务动作**，
+   不是改一句注释；本轮没有拿到点头。
+2. §9.4 那条限制**仍然成立**（现量：`grep -c "tools\|tool_choice" server/src/ai/managed-proxy.routes.ts` 回 `0`）。
+   把"这一档仍打不开"直接翻成"已上线可用"，会顺带把**助手**也承诺进去 ——
+   而它在托管档上是被响亮拒绝的。
+
+也就是说：现在留着那句"打不开"是一句**偏保守的过期陈述**，改掉它才是在造一个
+没有依据的承诺。要动这一格，前提是先解掉 §9.4，或把"不含对话式助手"写进同一批文案。
