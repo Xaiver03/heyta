@@ -1,3 +1,4 @@
+import { centralRuntime } from '../central-auth/runtime';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import {
   SuperSyncDownloadOpsQuerySchema,
@@ -388,8 +389,12 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
       if (!SUPER_SYNC_CLIENT_ID_REGEX.test(clientId)) {
         return reply.status(400).send({ code: 'invalid_client_id', message: 'invalid_client_id' });
       }
-      await getSyncService().revokeDevice(userId, clientId);
-      await revokeAllTokens(userId);
+      const central = centralRuntime();
+      if (central) await central.coordinator.logoutProduct(userId, (tx) => getSyncService().revokeDeviceInTransaction(tx, userId, clientId));
+      else {
+        await getSyncService().revokeDevice(userId, clientId);
+        await revokeAllTokens(userId);
+      }
       getWsConnectionService().closeForUser(userId);
       Logger.audit({ event: 'SYNC_DEVICE_REVOKED', userId, clientId });
       return reply.send({ success: true, clientId, requiresKeyRotation: true });

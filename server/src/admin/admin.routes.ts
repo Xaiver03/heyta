@@ -1,3 +1,4 @@
+import { centralRuntime } from '../central-auth/runtime';
 /**
  * 运营管理后台的 HTTP 面：`/api/admin/*`。
  * ============================================
@@ -545,10 +546,12 @@ export const adminRoutes = async (
     try {
       // 收口函数：抬版本 + 抬完/抬前各失效一次缓存（那一对 invalidate 是承重的，
       // 不在这里重新抄一遍 —— 抄一份就是给下一次漏一条留位置）。
-      await revokeAllTokens(parsed.data.id);
+      const central = centralRuntime();
+      if (central) await central.coordinator.logoutProduct(parsed.data.id);
+      else await revokeAllTokens(parsed.data.id);
       // 上面那张表的后两件事是一个助手（`revokeAllDeviceSessions` = 删会话行 + 关实时通道）：
       // 两半分开写正是这一族漏掉东西的形状 —— 漏掉的那一半没有任何界面会报出来。
-      await revokeAllDeviceSessions(parsed.data.id);
+      if (!central) await revokeAllDeviceSessions(parsed.data.id);
 
       const user = await prisma.user.findUniqueOrThrow({
         where: { id: parsed.data.id },

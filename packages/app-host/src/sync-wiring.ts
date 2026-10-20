@@ -82,6 +82,7 @@ export type SyncWiringOptions = SyncEncryptionOptions & {
    */
   appVersion?: string;
   getToken: () => Promise<string | undefined>;
+  authTransport?: 'bearer' | 'cookie';
   getPassword: () => Promise<string | undefined>;
   /**
    * 应用一批远端 op。
@@ -119,6 +120,7 @@ export function createSyncClient(options: SyncWiringOptions): SyncClient {
     clientId: engine.getClientId(),
     appVersion: options.appVersion ?? HEYTA_APP_VERSION,
     getToken: options.getToken,
+    ...(options.authTransport !== undefined ? { authTransport: options.authTransport } : {}),
     getPassword: options.getPassword,
     ...(options.encryptionMode === 'vault'
       ? { encryptionMode: 'vault' as const, getPayloadCipher: options.getPayloadCipher }
@@ -181,6 +183,7 @@ export interface RealtimeWiringOptions {
   baseUrl: string;
   /** **活取值器**，不是当下的值：用户是应用起来之后才填地址/令牌的。 */
   getToken: () => Promise<string | undefined>;
+  authTransport?: 'bearer' | 'cookie';
   /** 收到"有新 op"时调用（宿主据此触发一次普通同步）。参数是服务端的 `latestSeq`。 */
   onNewOps: (latestSeq: number) => void;
   /** WebSocket 实现。默认 `globalThis.WebSocket`；原生宿主用它注入平台能力。 */
@@ -201,6 +204,7 @@ export function createHostRealtimeClient(options: RealtimeWiringOptions): Realti
   return createRealtimeClientRaw({
     baseUrl: options.baseUrl,
     getToken: options.getToken,
+    ...(options.authTransport !== undefined ? { authTransport: options.authTransport } : {}),
     clientId: options.engine.getClientId(),
     onNewOps: options.onNewOps,
     ...(options.WebSocketImpl !== undefined ? { WebSocketImpl: options.WebSocketImpl } : {}),

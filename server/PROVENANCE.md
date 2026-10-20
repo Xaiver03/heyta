@@ -131,3 +131,60 @@ git -C /tmp/sp log --oneline aa9690ca..HEAD -- packages/super-sync-server/
 
 搬改动时注意：上游的 `packages/super-sync-server/` 用的是它自己的实体清单，
 我们已经分叉了 `ENTITY_TYPES`，**合并时不要覆盖掉 heyta 的清单**。
+
+## 中央认证基础（2026-10-19）
+
+新增 central-auth/config.ts 与 oidc-runtime.ts，config.ts 解析严格运维模式，server.ts 在
+任何服务初始化之前拒绝尚未接线的 OIDC 模式；local 自托管保持原行为。
+标准 MIT openid-client 独立适配，无 AGPL 源码移植。此包不改变 JWT、数据库与同步协议。
+设计与验收见[唯一计划](../docs/plans/unified-central-auth.md)。
+
+## 中央身份持久层（2026-10-19）
+
+新增 central-auth/crypto.ts、repository.ts 与增量 Prisma 表/迁移，分别保存身份映射、
+单次待授权、外部请求attempt所有权、独立grant及撤销队列。所有上游材料使用独立服务端
+密钥封装，与用户E2EE无关。真实PG验证包含COMMIT成功回执丢失、后次刷新与旧attempt判定、
+注销事务回滚和队列独立留存。OIDC启动门禁仍关闭，HTTP/实际OIDC验证/WS/销户调度仍待P5.2。
+这是MIT独立实现；没有从内部AGPL中央客户端移植代码或测试。设计与判据见唯一计划。
+
+P5.1 独立复审修复：授权派发等待本地证明行锁后重读数据库时钟；刷新应用在初检与
+行锁等待后都检查attempt期限。已APPLIED归属保持幂等，不受后续期限影响。
+
+
+## 中央OIDC标准传输（2026-10-19）
+
+新增central-auth/oidc-client.ts，使用已准入MIT openid-client实现独立HTTPS协议适配。
+每次派发独立Configuration；令牌材料先由既有repository持久，再标准ES256验签；
+回执未知不重派、不盲撤。repository仅增加发起时间及grant subject返回投影。
+新增独立HTTPS/真实PG测试与临时CA runner；外部中央联调只调用其导出启动接口，
+没有将AGPL中央实现或测试复制进本仓。OIDC启动门禁、JWT/UI/WS均未变。
+设计、复现入口和当前验收状态见[唯一计划](../docs/plans/unified-central-auth.md)。
+
+
+## 中央事务协调底座（2026-10-19）
+
+新增central-auth/session-policy、session-issuer、coordinator、worker。auth.ts唯一
+issueSession支持受信事务，access-sessions.ts使用同一tx；repository不再自行插会话，
+强制注入可信签发工厂，APPLIED重入不签发。绝对365天策略共用，refresh不滑动延长，
+live在中央网络前后复核持久绑定；退出、销户墓碑与outbox原子。全设备退出必须提供
+提交后缓存/WS关闭回调，未放宽会话撤销门禁。标准传输单独标注明确inactive，网络未知
+不销户。worker固定issuer/client，租约确认和未确认过期可观测。没有接HTTP/WS/runtime，
+OIDC启动门禁保持。真实PG+TLS与原持久层测试使用实际唯一JWT铸造，旧sessionHash冲突
+夹具改为真实签发后失败注入来验证同一事务回滚。均为MIT独立实现，无新增依赖或迁移，
+验收与后续边界见[唯一计划](../docs/plans/unified-central-auth.md)。
+
+P5.2B1独立期限反例修复：授权/刷新应用要求显式传入已验证中央内省的有限AT期限，
+用户锁后、唯一签发后及最终写入后按数据库时钟重核；过期整体回滚并保留RESULT所有权。
+不使用未验证token响应expires_in补齐证据，纯持久层夹具使用显式有限合成期限。
+
+
+## 中央认证服务端接线（P5.2B2，2026-10-19）
+
+新增central-auth/runtime、http-security、routes、route-policy及共享纯HTTP契约；
+auth/middleware/server与API/账号安全/admin/device/WS接入同一中央grant生命周期。
+Cookie、CSRF、回调交付和旧身份入口封闭独立实现；官方模式的全部HTTP与已建立WS
+都检查中央live，unknown不触发本地销毁。退出、设备封锁、销户及outbox原子收敛。
+服务生命周期持有唯一runtime并等待WS/worker停止；local自托管保留。
+新增真实TLS+PG+WS测试、扩大真实中央双PG脚本，并增加可信签发边界反例门禁。
+没有新增第三方依赖、数据库迁移、E2EE/op-log或客户端UI改动；没有复制AGPL代码。
+当前验收证据、未完成客户端/部署边界只维护在[唯一计划](../docs/plans/unified-central-auth.md)。

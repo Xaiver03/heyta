@@ -11,10 +11,15 @@
 }
 
 /* rail 是认证弹窗的宿主节点；只隐藏它的导航内容，不能隐藏整个 rail。 */
-.ht-rail:has(.ht-sheet__auth) > .ht-rail__top,
-.ht-rail:has(.ht-sheet__auth) > .ht-rail__tabs,
-.ht-rail:has(.ht-sheet__auth) > .ht-rail__more {
+body:has(.ht-sheet__auth) .ht-rail__top,
+body:has(.ht-sheet__auth) .ht-rail__tabs,
+body:has(.ht-sheet__auth) .ht-rail__tab,
+body:has(.ht-sheet__auth) .ht-rail__more {
   visibility: hidden;
+}
+
+body:has(.ht-sheet__auth) .ht-compact-rail {
+  background: transparent;
 }
 
 .ht-sheet__auth-dialog {
@@ -178,6 +183,90 @@
 .ht-sheet__auth-form {
   min-inline-size: 0;
   padding: var(--ht-space-6);
+}
+
+.ht-auth-central {
+  display: grid;
+  gap: var(--ht-space-4);
+  min-block-size: 20rem;
+  align-content: center;
+}
+
+.ht-auth-central--conflict {
+  align-content: start;
+}
+
+.ht-auth-central--conflict .ht-settings {
+  min-inline-size: 0;
+}
+
+.ht-auth-central h2,
+.ht-auth-central p {
+  margin: 0;
+}
+
+.ht-auth-central__eyebrow {
+  color: var(--ht-color-primary);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ht-auth-central__body,
+.ht-auth-central__note {
+  color: var(--ht-color-foreground-muted);
+  line-height: var(--ht-line-height-normal);
+}
+
+.ht-auth-central__consent {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ht-space-2);
+  color: var(--ht-color-foreground-muted);
+  line-height: var(--ht-line-height-normal);
+}
+
+.ht-auth-central__consent input {
+  inline-size: var(--ht-space-4);
+  block-size: var(--ht-space-4);
+  flex: 0 0 auto;
+  margin-block-start: var(--ht-space-1);
+  accent-color: var(--ht-color-primary);
+}
+
+.ht-auth-central__link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ht-color-primary);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.ht-auth-central__close {
+  justify-self: end;
+}
+
+.ht-auth-central__button {
+  inline-size: 100%;
+  min-block-size: var(--ht-size-field-height);
+  padding: var(--ht-space-3) var(--ht-space-4);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-primary);
+  color: var(--ht-color-on-primary);
+  font: inherit;
+  font-weight: var(--ht-font-weight-semibold);
+  cursor: pointer;
+}
+
+.ht-auth-central__button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.ht-auth-central__error {
+  color: var(--ht-color-danger);
 }
 
 .ht-sheet__auth-form a,

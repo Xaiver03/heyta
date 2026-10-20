@@ -423,6 +423,7 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
                   await confirmWebVaultRootRotation(session!, pending, pendingCode, {
                     baseUrl: sync.baseUrl,
                     token: sync.token!,
+                    authTransport: sync.authTransport,
                     ...(legacyPassphrase !== '' ? { password: legacyPassphrase } : {}),
                     onProgress: (progress) => setMigrationProgress({ completed: progress.completed, total: progress.total }),
                   });
@@ -446,7 +447,7 @@ export function VaultSettingsPanel({ active = true }: { active?: boolean }): Rea
             </button>
             <button type="button" className="ht-btn ht-btn--ghost" data-testid="vault-cancel-pending" disabled={busy} onClick={() => void run(async () => {
               if (pendingAction === 'rotate' && session !== undefined && sync.token !== undefined) {
-                await cancelWebVaultRootRotation(session, { baseUrl: sync.baseUrl, token: sync.token });
+                await cancelWebVaultRootRotation(session, { baseUrl: sync.baseUrl, token: sync.token, authTransport: sync.authTransport });
               }
               setPending(undefined);
               setPendingAction(undefined);

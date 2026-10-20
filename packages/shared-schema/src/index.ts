@@ -319,3 +319,5 @@ export type {
   HolidayAdjustmentsResponse,
   HolidayAdjustmentsAdminList,
 } from './holiday-adjustment-contract';
+
+export * from './central-auth-contract.js';

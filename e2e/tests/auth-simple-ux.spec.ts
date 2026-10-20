@@ -8,7 +8,7 @@
  */
 
 import path from 'node:path';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 import { expect, test, type Page } from '@playwright/test';
@@ -17,13 +17,18 @@ import { openApp, openAuthPanel } from '../auth-journey/helpers.js';
 import {
   addTask,
   configureEndpoint,
+  decidePrivacyConsent,
+  enableAllModules,
   expectNoStubCall,
   openSettingsSheet,
+  pinChineseUi,
   resetStub,
   rowFor,
   selectSettingsSection,
   switchView,
+  waitForBootSplashGone,
 } from './helpers.js';
+import { installMissingProducerShims } from './shims.js';
 
 const STUB_ORIGIN = 'http://127.0.0.1:4342';
 const STUB_ENDPOINT = `${STUB_ORIGIN}/v1`;
@@ -33,17 +38,28 @@ const EVIDENCE = path.resolve(
 );
 
 async function screenshot(page: Page, name: string): Promise<void> {
-  // Capture the settled sheet, not a translucent frame during its entrance.
-  await page.locator('.ht-sheet__auth').evaluate(async (element) => {
-    await Promise.all(element.getAnimations().map((animation) => animation.finished.catch(() => undefined)));
-  });
-  await page.screenshot({ path: path.join(EVIDENCE, `${name}.png`), fullPage: true });
+  const target = path.join(EVIDENCE, `${name}.png`);
+  await rm(target, { force: true });
+  // Authentication captures wait for the sheet entrance. Chatbot captures
+  // share this helper but have no authentication sheet.
+  const authSheet = page.locator('.ht-sheet__auth');
+  if (await authSheet.count() > 0) {
+    await authSheet.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished.catch(() => undefined)));
+    });
+  }
+  await page.screenshot({ path: target, fullPage: true });
 }
 
 async function closeAuth(page: Page): Promise<void> {
-  const dialog = page.getByTestId('auth-form');
+  const dialog = page.getByRole('dialog', { name: '登录 / 注册', exact: true });
   if (await dialog.isVisible().catch(() => false)) {
-    await dialog.getByTestId('auth-form-close').click();
+    const centralClose = dialog.getByTestId('central-auth-close');
+    if (await centralClose.count() > 0) {
+      await centralClose.click();
+    } else {
+      await dialog.getByTestId('auth-form-close').click();
+    }
     await expect(dialog).toHaveCount(0);
   }
 }
@@ -57,21 +73,47 @@ async function taskId(page: Page, title: string): Promise<string> {
 }
 
 test.describe('认证页：默认信息层级与响应式审美', () => {
+  const browserErrors = new WeakMap<Page, string[]>();
+  test.beforeEach(async ({ page }) => {
+    const errors: string[] = [];
+    browserErrors.set(page, errors);
+    page.on('console', (message) => { if (message.type() === 'error') errors.push(`${message.text()} @ ${message.location().url}`); });
+    page.on('pageerror', (error) => errors.push(error.message));
+  });
+  test.afterEach(async ({ page }, testInfo) => {
+    const errors = browserErrors.get(page) ?? [];
+    if (testInfo.status !== testInfo.expectedStatus && errors.length > 0) {
+      console.error('浏览器错误：', errors.join('\n'));
+    }
+    if (testInfo.status === testInfo.expectedStatus) {
+      // This offline Vite suite has no identity server. Only the startup
+      // session probe may return 404; the config probe is intercepted below.
+      const expected404s = new Set(['http://127.0.0.1:4341/api/auth/central/session']);
+      const actionable = errors.filter((error) => ![...expected404s].some((url) => error === `Failed to load resource: the server responded with a status of 404 (Not Found) @ ${url}`));
+      expect(actionable, '认证界面不应产生意外浏览器错误').toEqual([]);
+    }
+  });
+
   test('1440/768 与 375/812 的亮暗主题都保持同屏认证、渐进披露和可读布局', async ({ page }) => {
     await mkdir(EVIDENCE, { recursive: true });
-    await openApp(page, '/');
+    await page.route('**/api/auth/central/config', (route) => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ mode: 'oidc', loginPath: '/api/auth/oidc/start', documentVersion: 'v1' }),
+    }));
+    await openApp(page, '/', 'accepted');
     await page.setViewportSize({ width: 1440, height: 768 });
     const dialog = await openAuthPanel(page);
+    await screenshot(page, 'auth-desktop-light');
 
-    await expect(dialog.getByTestId('auth-form-email')).toBeVisible();
-    await expect(dialog.getByTestId('auth-form-password')).toBeVisible();
-    await expect(dialog.getByTestId('auth-form-continue')).toHaveCount(0);
-    await expect(dialog.getByTestId('auth-form-switch-mode')).toBeVisible();
-    await expect(dialog.getByTestId('auth-form-forgot')).toBeVisible();
-    await expect(dialog.getByTestId('auth-form-other-ways-toggle')).toBeVisible();
+    await expect(dialog.getByTestId('central-auth-panel')).toBeVisible();
+    await expect(dialog.getByTestId('central-auth-submit')).toBeDisabled();
+    await expect(dialog.getByTestId('central-auth-consent')).toBeVisible();
+    await expect(dialog.getByTestId('central-auth-close')).toBeVisible();
+    await expect(dialog.getByTestId('central-auth-self-hosted')).toHaveCount(0);
+    await expect(dialog.getByTestId('auth-form-email')).toHaveCount(0);
     await expect(dialog.getByTestId('auth-form-server-url')).toHaveCount(0);
     await expect(dialog.getByTestId('auth-form-paste')).toHaveCount(0);
-    await expect(dialog.getByTestId('auth-form-passkey')).toHaveCount(0);
 
     const previewRows = page.locator('.ht-sheet__auth-preview-row');
     await expect(previewRows).toHaveCount(3);
@@ -79,20 +121,8 @@ test.describe('认证页：默认信息层级与响应式审美', () => {
       .poll(async () => previewRows.first().evaluate((el) => getComputedStyle(el).animationName))
       .not.toBe('none');
 
-    await screenshot(page, 'auth-desktop-light');
-
-    await dialog.getByTestId('auth-form-other-ways-toggle').click();
-    await expect(dialog.getByTestId('auth-form-passkey')).toBeVisible();
-    await expect(dialog.getByTestId('auth-form-magic-link')).toBeVisible();
-    await expect(dialog.getByTestId('auth-form-recovery')).toBeVisible();
-
-    await dialog.getByTestId('auth-form-other-ways-toggle').click();
-    await expect(dialog.getByTestId('auth-form-passkey')).toHaveCount(0);
-    await dialog.getByTestId('auth-form-switch-mode').click();
-    await expect(dialog.getByTestId('auth-form-email')).toBeVisible();
-    await expect(dialog.getByTestId('auth-form-password')).toBeVisible();
-    await expect(dialog.getByTestId('auth-form-terms')).toBeVisible();
-    await expect(dialog.getByTestId('auth-form-submit')).toBeVisible();
+    await dialog.getByTestId('central-auth-consent').check();
+    await expect(dialog.getByTestId('central-auth-submit')).toBeEnabled();
 
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await expect
@@ -104,8 +134,9 @@ test.describe('认证页：默认信息层级与响应式审美', () => {
     await closeAuth(page);
     await page.setViewportSize({ width: 375, height: 812 });
     const mobileDialog = await openAuthPanel(page);
-    await expect(mobileDialog.getByTestId('auth-form-email')).toBeVisible();
-    await expect(mobileDialog.getByTestId('auth-form-password')).toBeVisible();
+    await screenshot(page, 'auth-mobile-light');
+    await expect(mobileDialog.getByTestId('central-auth-panel')).toBeVisible();
+    await expect(page.getByTestId('rail-view-tasks')).toBeHidden();
     await expect
       .poll(async () => page.locator('.ht-sheet__auth-dialog').evaluate((el) => el.getBoundingClientRect().width))
       .toBeGreaterThan(360);
@@ -113,8 +144,6 @@ test.describe('认证页：默认信息层级与响应式审美', () => {
       .poll(async () => page.locator('.ht-sheet__auth-dialog').evaluate((el) => el.getBoundingClientRect().width))
       .toBeLessThanOrEqual(375);
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
-    await screenshot(page, 'auth-mobile-light');
-
     await closeAuth(page);
     await openSettingsSheet(page);
     await selectSettingsSection(page, 'appearance');
@@ -122,10 +151,152 @@ test.describe('认证页：默认信息层级与响应式审美', () => {
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     await page.getByTestId('settings-sheet-close').click();
     const darkDialog = await openAuthPanel(page);
-    await expect(darkDialog.getByTestId('auth-form-email')).toBeVisible();
-    await expect(darkDialog.getByTestId('auth-form-password')).toBeVisible();
     await screenshot(page, 'auth-mobile-dark');
+    await expect(darkDialog.getByTestId('central-auth-panel')).toBeVisible();
   });
+
+  test('中央配置不可用时仍能关闭登录面板', async ({ page }) => {
+    await page.route('**/api/auth/central/config', (route) => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: '{}',
+    }));
+    await openApp(page, '/', 'accepted');
+    const dialog = await openAuthPanel(page);
+    await expect(dialog.getByTestId('central-auth-unavailable')).toBeVisible();
+    await expect(dialog.getByTestId('central-auth-close')).toBeVisible();
+    await closeAuth(page);
+  });
+
+  test('不同中央账号时先导出并确认，本机数据不会被自动接入', async ({ page }, testInfo) => {
+    const captureConflict = async (name: string): Promise<void> => {
+      await page.locator('.ht-sheet__auth').evaluate(async (element) => {
+        await Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished.catch(() => undefined)));
+      });
+      await page.screenshot({ path: testInfo.outputPath(name), fullPage: true });
+    };
+    await page.route('**/api/auth/central/config', (route) => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ mode: 'oidc', loginPath: '/api/auth/oidc/start', documentVersion: 'v1' }),
+    }));
+    await page.route('**/api/auth/central/session', (route) => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ authenticated: true, user: { id: 13, email: 'new@example.test' }, csrfToken: 'csrf-test' }),
+    }));
+    await page.addInitScript(() => {
+      localStorage.setItem('heyta.central.account-binding', JSON.stringify({
+        origin: window.location.origin, subject: '12',
+      }));
+    });
+    await enableAllModules(page);
+    await pinChineseUi(page);
+    await installMissingProducerShims(page);
+    await page.goto('/');
+    await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible();
+    await decidePrivacyConsent(page, 'accepted');
+    await waitForBootSplashGone(page);
+
+    const dialog = await openAuthPanel(page);
+    const conflict = dialog.getByTestId('central-account-conflict');
+    await expect(conflict).toBeVisible();
+    await captureConflict('central-conflict-desktop-light.png');
+    await expect(conflict.getByTestId('central-switch-confirm')).toBeDisabled();
+    await expect(conflict.getByTestId('central-switch-clear')).toBeDisabled();
+    expect(await page.evaluate(() => localStorage.getItem('heyta.central.account-binding')))
+      .toBe(JSON.stringify({ origin: 'http://127.0.0.1:4341', subject: '12' }));
+
+    await conflict.getByRole('button', { name: '稍后处理' }).click();
+    await openSettingsSheet(page);
+    await selectSettingsSection(page, 'appearance');
+    await page.getByTestId('theme-toggle').click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await page.getByTestId('settings-sheet-close').click();
+    await page.setViewportSize({ width: 375, height: 812 });
+    const mobileDialog = await openAuthPanel(page);
+    await expect(mobileDialog.getByTestId('central-account-conflict')).toBeVisible();
+    await captureConflict('central-conflict-mobile-dark.png');
+    await expect
+      .poll(async () => mobileDialog.evaluate((element) => element.scrollWidth <= element.clientWidth))
+      .toBe(true);
+    await mobileDialog.getByTestId('central-switch-clear').scrollIntoViewIfNeeded();
+    await captureConflict('central-conflict-mobile-dark-actions.png');
+  });
+
+  test('自托管口令入口只在设置的高级路径出现', async ({ page }) => {
+    await page.route('**/api/auth/central/config', (route) => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ mode: 'oidc', loginPath: '/api/auth/oidc/start', documentVersion: 'v1' }),
+    }));
+    await openApp(page, '/', 'accepted');
+    await openSettingsSheet(page);
+    await selectSettingsSection(page, 'sync');
+    await page.getByTestId('sync-advanced').locator('summary').click();
+    await page.locator('#settings-sync .sync-settings__fit-button').click();
+    const dialog = page.getByRole('dialog', { name: '登录 / 注册', exact: true });
+    await expect(dialog.getByTestId('central-auth-self-hosted')).toBeVisible();
+    await dialog.getByTestId('central-auth-self-hosted').click();
+    await expect(dialog.getByTestId('auth-form-email')).toBeVisible();
+    await expect(dialog.getByTestId('auth-form-password')).toBeVisible();
+    await dialog.getByTestId('auth-form-advanced-toggle').click();
+    await expect(dialog.getByTestId('auth-form-server-url')).toBeVisible();
+    await expect(dialog.getByTestId('central-auth-return')).toBeVisible();
+    await dialog.getByTestId('central-auth-return').click();
+    await expect(dialog.getByTestId('central-auth-panel')).toBeVisible();
+    await expect(dialog.getByTestId('auth-form-email')).toHaveCount(0);
+    await expect(dialog.getByTestId('auth-form-password')).toHaveCount(0);
+    await closeAuth(page);
+  });
+});
+
+test('关闭旧账号标签页后才能导出、清除并接入新中央账号', async ({ page, context }, testInfo) => {
+  test.setTimeout(90_000);
+  const routeCentral = async (target: Page, id: number): Promise<void> => {
+    await target.route('**/api/auth/central/config', (route) => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ mode: 'oidc', loginPath: '/api/auth/oidc/start', documentVersion: 'v1' }),
+    }));
+    await target.route('**/api/auth/central/session', (route) => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ authenticated: true, user: { id, email: `${String(id)}@example.test` }, csrfToken: 'csrf-test' }),
+    }));
+  };
+
+  await routeCentral(page, 12);
+  await openApp(page, '/', 'accepted');
+  await expect.poll(async () => page.evaluate(() => localStorage.getItem('heyta.central.account-binding')))
+    .toBe(JSON.stringify({ origin: 'http://127.0.0.1:4341', subject: '12' }));
+  await addTask(page, '旧账号本地任务');
+
+  const other = await context.newPage();
+  await routeCentral(other, 13);
+  await enableAllModules(other);
+  await pinChineseUi(other);
+  await installMissingProducerShims(other);
+  await other.goto('/');
+  await expect(other.getByRole('alert').getByRole('heading', { name: '无法初始化本地存储' })).toBeVisible();
+  await other.screenshot({ path: testInfo.outputPath('multi-tab-storage-in-use.png'), fullPage: true });
+  await expect(other.getByTestId('error-hint')).toContainText('其它窗口');
+  expect(await other.evaluate(() => localStorage.getItem('heyta.central.account-binding')))
+    .toBe(JSON.stringify({ origin: 'http://127.0.0.1:4341', subject: '12' }));
+
+  await page.close();
+  await other.reload();
+  await expect(other.locator('input[placeholder^="添加任务"]')).toBeVisible();
+  await waitForBootSplashGone(other);
+  const conflict = (await openAuthPanel(other)).getByTestId('central-account-conflict');
+  await expect(conflict).toBeVisible();
+
+  const downloaded = other.waitForEvent('download');
+  await conflict.getByTestId('export-json').click();
+  const backup = await downloaded;
+  expect(await readFile(await backup.path(), 'utf8')).toContain('旧账号本地任务');
+  await conflict.getByTestId('central-switch-confirm').check();
+  await conflict.getByTestId('central-switch-clear').click();
+  await expect.poll(async () => other.evaluate(() => localStorage.getItem('heyta.central.account-binding')))
+    .toBe(JSON.stringify({ origin: 'http://127.0.0.1:4341', subject: '13' }));
+  await expect(rowFor(other, '旧账号本地任务')).toHaveCount(0);
+  await other.close();
 });
 
 test.describe('Chatbot：执行、只读与批量确认是真实写入语义', () => {

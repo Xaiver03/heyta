@@ -31,8 +31,16 @@ import {
   type SyncStatus,
 } from '@heyta/sync-client';
 // 🔴 接线只有一份。见下方 `buildClient` 的说明。
-import { createHostRealtimeClient, createSyncClient } from '@heyta/app-host';
+import {
+  CENTRAL_COOKIE_SESSION_MARKER,
+  createCentralCookieFetch,
+  getCentralAuthConfig,
+  getCentralAuthSession,
+  createHostRealtimeClient,
+  createSyncClient,
+} from '@heyta/app-host';
 import { getWebInboundUploadAuthorization } from '../settings/inbound-runtime.js';
+import { bindCentralAccount, withCentralAccountBindingLock, type CentralBindingResult } from '../../lib/central-account-binding.js';
 
 // W4：凭据持久化。**只存 baseUrl 与 token，绝不存口令** —— 见该文件头。
 import { clearStoredCredentials, loadCredentials, saveCredentials } from './credential-storage.js';
@@ -62,6 +70,12 @@ interface SyncStoreState {
   baseUrl: string;
   /** 访问令牌。和口令一样只放内存。 */
   token?: string;
+  /** bearer for self-hosted/native-compatible credentials; cookie for official Web OIDC. */
+  authTransport: 'bearer' | 'cookie';
+  centralBindingConflict?: Exclude<CentralBindingResult, 'bound'>;
+  centralBindingTarget?: { origin: string; subject: string };
+  centralAccountSwitching: boolean;
+  csrfToken?: string;
   /**
    * 账号邮箱（头像的首字母靠它）。
    *
@@ -142,6 +156,10 @@ interface SyncStoreState {
    * 而不是复用 `configure(baseUrl, token, '')`。
    */
   applyAuthToken: (baseUrl: string, token: string, email?: string, accountId?: string) => void;
+  applyCentralAuth: (baseUrl: string, email: string, accountId: string, csrfToken: string) => void;
+  resumeCentralSession: () => Promise<void>;
+  beginCentralAccountSwitch: () => void;
+  finishCentralAccountSwitch: () => void;
   clearCredentials: () => void;
   syncNow: () => Promise<SyncStatus>;
   /**
@@ -175,6 +193,9 @@ interface SyncStoreState {
 }
 
 let retry: { start: () => void; stop: () => void } | undefined;
+// A late central-session probe must never reinstate credentials after logout
+// or overwrite a newer login/server choice.
+let credentialRevision = 0;
 
 /**
  * 「没配置同步服务」的**错误码**。
@@ -215,8 +236,12 @@ function buildClient(
   get: () => SyncStoreState,
   _set: (partial: Partial<SyncStoreState>) => void,
 ): SyncClient | undefined {
-  const { baseUrl, token } = get();
-  if (baseUrl.trim() === '' || token === undefined || token.trim() === '') return undefined;
+  const { baseUrl, token, authTransport } = get();
+  if (baseUrl.trim() === '' || (get().authTransport === 'bearer' && (token === undefined || token.trim() === ''))) return undefined;
+
+  const fetchImpl = authTransport === 'cookie'
+    ? createCentralCookieFetch(baseUrl, () => get().csrfToken, consentFetch)
+    : consentFetch;
 
   const accountId = get().accountId;
   if (accountId !== undefined && accountId !== '') {
@@ -225,6 +250,7 @@ function buildClient(
       store: requireStore(),
       baseUrl,
       getToken: async () => get().token,
+      authTransport,
       getPassword: async () => undefined,
       encryptionMode: 'vault',
       getInboundUploadAuthorization: async (input) => {
@@ -239,11 +265,12 @@ function buildClient(
           current.accountId,
           current.baseUrl,
           async () => get().token,
+          current.authTransport,
         );
         return session.getPayloadCipher();
       },
       applyRemote: applyRemoteOps,
-      fetchImpl: consentFetch,
+      fetchImpl,
     });
   }
 
@@ -252,6 +279,7 @@ function buildClient(
     store: requireStore(),
     baseUrl,
     getToken: async () => get().token,
+    authTransport,
     getPassword: async () => get().password,
     // 🔴 Web 宿主特有的那一步：应用完远端 op 必须通知订阅者。
     // 不通知的话数据到了、界面不动 —— 而原生宿主没有这层订阅，
@@ -265,7 +293,7 @@ function buildClient(
      * 只换全局的话这一层就变成"靠装配顺序成立"—— 而那正是本仓库反复记过的
      * "看起来在保护一件事，其实保护的是另一件"。两处都做，判据才能在**这一层**数得出次数。
      */
-    fetchImpl: consentFetch,
+    fetchImpl,
   });
 }
 
@@ -328,10 +356,10 @@ function restartRealtime(get: () => SyncStoreState): void {
   // 补签完成后 `legalRecheck.subscribe()` 那个订阅者会按新状态重建。
   if (!legalRecheck.dataEgressAllowed()) return;
 
-  const { baseUrl, token } = get();
+  const { baseUrl, token, authTransport } = get();
   // 未配置/未登录就**不连**。登录之后再调一次本函数即可 ——
   // 这正是 `configure` / `applyAuthToken` 里两处调用的意义。
-  if (baseUrl.trim() === '' || token === undefined || token.trim() === '') return;
+  if (baseUrl.trim() === '' || (authTransport === 'bearer' && (token === undefined || token.trim() === ''))) return;
 
   /**
    * 🔴 **先问"引擎就绪了吗"，而不是让 `requireEngine()` 抛了再 catch。**
@@ -366,6 +394,7 @@ function restartRealtime(get: () => SyncStoreState): void {
       baseUrl,
       // 🔴 活取值器，不是当下的值。
       getToken: async () => get().token,
+      authTransport,
       onNewOps: () => {
         if (syncInFlight) return;
         syncInFlight = true;
@@ -482,6 +511,11 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
   status: { kind: 'idle' },
   baseUrl: persisted?.baseUrl ?? '',
   token: persisted?.token,
+  authTransport: 'bearer',
+  centralBindingConflict: undefined,
+  centralBindingTarget: undefined,
+  centralAccountSwitching: false,
+  csrfToken: undefined,
   email: persisted?.email,
   accountId: persisted?.accountId,
   conflictDialogOpen: false,
@@ -537,6 +571,7 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
   },
 
   configure: (baseUrl, token, password) => {
+    credentialRevision += 1;
     // A server/token edit changes the authentication binding. Fence any
     // in-flight vault load before the new credentials can be used.
     const previous = get();
@@ -552,7 +587,7 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     // 🔴 草稿跟着走：「保存并同步」之后，那一节的输入框与配置**必须是同一份值**。
     // 不写这一半的话，症状是配置已经生效、框里还留着上一次的内容 ——
     // 那是 2026-09-30 那条"框与配置两套真相"缺陷的镜像版本。
-    set({ baseUrl, token, password, accountId, email, status: { kind: 'idle' }, syncDraft: { baseUrl, token, password } });
+    set({ baseUrl, token, authTransport: 'bearer', centralBindingConflict: undefined, centralBindingTarget: undefined, csrfToken: undefined, password, accountId, email, status: { kind: 'idle' }, syncDraft: { baseUrl, token, password } });
     // 🔴 W4：口令**不进** saveCredentials 的参数 —— 它只在内存。
     // 手填新凭据没有核验账号身份，不能继承上一枚令牌的邮箱标签。
     if (baseUrl !== '' && token !== '') {
@@ -565,6 +600,7 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
   },
 
   applyAuthToken: (baseUrl, token, email, accountId) => {
+    credentialRevision += 1;
     invalidateWebVaultSession();
     const previous = get();
     const sameBinding = previous.baseUrl === baseUrl && previous.token === token;
@@ -577,6 +613,10 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     set({
       baseUrl,
       token,
+      authTransport: 'bearer',
+      centralBindingConflict: undefined,
+      centralBindingTarget: undefined,
+      csrfToken: undefined,
       email: nextEmail,
       accountId: nextAccountId,
       status: { kind: 'idle' },
@@ -602,11 +642,104 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     restartRealtime(get);
   },
 
+  applyCentralAuth: (baseUrl, email, accountId, csrfToken) => {
+    credentialRevision += 1;
+    invalidateWebVaultSession();
+    const previous = get();
+    set({
+      baseUrl,
+      token: CENTRAL_COOKIE_SESSION_MARKER,
+      authTransport: 'cookie',
+      centralBindingConflict: undefined,
+      centralBindingTarget: undefined,
+      csrfToken,
+      email,
+      accountId,
+      status: { kind: 'idle' },
+      syncDraft: { baseUrl, token: '', password: previous.syncDraft.password },
+    });
+    // The HttpOnly cookie is the only durable session credential.  Keep only
+    // the non-secret endpoint/label in local storage for a useful cold start.
+    clearStoredCredentials();
+    syncLegalRecheckCredentials({ token: CENTRAL_COOKIE_SESSION_MARKER, baseUrl });
+    restartRealtime(get);
+  },
+
+  resumeCentralSession: async () => {
+    if (get().centralAccountSwitching) return;
+    const revision = credentialRevision;
+    const current = get();
+    const candidate = current.baseUrl.trim() !== ''
+      ? current.baseUrl
+      : (typeof window === 'undefined' ? '' : window.location.origin);
+    if (candidate === '') return;
+    const config = await getCentralAuthConfig({ baseUrl: candidate, fetchImpl: consentFetch });
+    if (credentialRevision !== revision) return;
+    if (!config.ok) return;
+    if (config.value.mode !== 'oidc') {
+      if (get().authTransport === 'cookie') get().clearCredentials();
+      set({ centralBindingConflict: undefined, centralBindingTarget: undefined });
+      return;
+    }
+    const session = await getCentralAuthSession({ baseUrl: candidate, fetchImpl: consentFetch });
+    if (credentialRevision !== revision) return;
+    if (!session.ok || !session.value.authenticated) {
+      if (session.ok) {
+        // An OIDC server has definitively rejected the browser session. A
+        // persisted pre-migration bearer token must not keep the UI signed in.
+        if (get().token !== undefined || get().authTransport === 'cookie') get().clearCredentials();
+        set({ csrfToken: session.value.csrfToken, centralBindingConflict: undefined, centralBindingTarget: undefined });
+      }
+      return;
+    }
+    const centralUser = session.value.user;
+    const centralCsrfToken = session.value.csrfToken;
+    const subject = String(centralUser.id);
+    const locked = await withCentralAccountBindingLock(() => {
+      if (credentialRevision !== revision || get().centralAccountSwitching) return false;
+      const existing = get();
+      const priorSubject = existing.accountId;
+      // Persist a live pre-binding owner's identity before offering erasure.
+      // Otherwise a partial erase followed by reload leaves old ops unowned.
+      const priorBinding = priorSubject !== undefined && priorSubject !== subject
+        ? bindCentralAccount(candidate, priorSubject)
+        : undefined;
+      const binding: CentralBindingResult = priorBinding === undefined
+        ? bindCentralAccount(candidate, subject)
+        : priorBinding === 'unavailable' ? 'unavailable' : 'mismatch';
+      if (binding !== 'bound') {
+        if (existing.token !== undefined || existing.authTransport === 'cookie') existing.clearCredentials();
+        set({ centralBindingConflict: binding,
+          centralBindingTarget: binding === 'mismatch' ? { origin: new URL(candidate).origin, subject } : undefined });
+      } else {
+        get().applyCentralAuth(candidate, centralUser.email, subject, centralCsrfToken);
+      }
+      return true;
+    });
+    if (locked === undefined && credentialRevision === revision) {
+      if (get().token !== undefined || get().authTransport === 'cookie') get().clearCredentials();
+      set({ centralBindingConflict: 'unavailable', centralBindingTarget: undefined });
+    }
+  },
+
+  beginCentralAccountSwitch: () => {
+    const conflict = get().centralBindingConflict;
+    const target = get().centralBindingTarget;
+    if (conflict !== 'mismatch') return;
+    get().clearCredentials();
+    set({ centralBindingConflict: conflict, centralBindingTarget: target, centralAccountSwitching: true });
+  },
+
+  finishCentralAccountSwitch: () => {
+    set({ centralAccountSwitching: false });
+  },
+
   startRealtime: () => {
     restartRealtime(get);
   },
 
   clearCredentials: () => {
+    credentialRevision += 1;
     // Logout must not await/open the host or let a pending GET/loader install
     // a session after the token has been cleared.
     invalidateWebVaultSession();
@@ -621,6 +754,11 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     clearLegalRecheckCredentials();
     set({
       token: undefined,
+      authTransport: 'bearer',
+      centralBindingConflict: undefined,
+      centralBindingTarget: undefined,
+      centralAccountSwitching: false,
+      csrfToken: undefined,
       email: undefined,
       accountId: undefined,
       password: undefined,
