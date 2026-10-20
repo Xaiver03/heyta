@@ -42,8 +42,13 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Linking, Pressable, View } from 'react-native';
+import { AppState, Linking, Pressable, View } from 'react-native';
 import {
+  beginCentralDeviceAuth,
+  claimCentralDeviceAuth,
+  getCentralAuthConfig,
+  isOfficialCentralAuthEndpoint,
+  type CentralDeviceStart,
   beginPasskeyLogin,
   beginPasskeyRegistration,
   completePasskeyLogin,
@@ -89,6 +94,7 @@ import { acceptNetworkConsent, requireNetworkConsent } from '../privacy/consent-
 
 /** 正在跑的那件事。只为了在按钮上画菊花 + 让"哪一步在忙"可读。 */
 type AuthAction =
+  | 'central-start'
   | 'password-login'
   | 'password-register'
   | 'registration-code'
@@ -209,11 +215,45 @@ export function AuthScreen({
   const [registrationCode, setRegistrationCode] = useState('');
   const [now, setNow] = useState(() => Date.now());
   const [sessionServerUrl, setSessionServerUrl] = useState<string | undefined>(undefined);
+  const [centralAttempt, setCentralAttempt] = useState<(CentralDeviceStart & { generation: number }) | undefined>();
   const authGeneration = useRef(0);
+  const centralClaiming = useRef(false);
+  const centralStarting = useRef(false);
 
   const busy = phase.kind === 'busy';
   const action = phase.kind === 'busy' ? phase.action : undefined;
   const session = phase.kind === 'session' ? phase.session : undefined;
+  const centralMode = isOfficialCentralAuthEndpoint(serverUrl);
+  const termsLabel = t('mobile.auth.terms.label');
+
+  useEffect(() => {
+    if (centralAttempt === undefined) return;
+    let disposed = false;
+    const claim = async (): Promise<void> => {
+      if (disposed || centralClaiming.current || AppState.currentState !== 'active') return;
+      if (Date.now() >= centralAttempt.expiresAt) {
+        setCentralAttempt(undefined);
+        setPhase({ kind: 'failed', key: 'mobile.auth.central.expired' });
+        return;
+      }
+      centralClaiming.current = true;
+      const result = await claimCentralDeviceAuth({ baseUrl: serverUrl }, centralAttempt.handoffId, centralAttempt.verifier);
+      centralClaiming.current = false;
+      if (disposed || centralAttempt.generation !== authGeneration.current) return;
+      if (!result.ok) {
+        // A lost response may already have consumed the one-time bearer. Never retry that claim.
+        setCentralAttempt(undefined);
+        setPhase({ kind: 'failed', key: 'mobile.auth.central.claimFailed' });
+      } else if (result.value.status === 'claimed') {
+        setCentralAttempt(undefined);
+        setSessionServerUrl(serverUrl.trim());
+        setPhase({ kind: 'session', session: { token: result.value.token, user: result.value.user } });
+      }
+    };
+    const timer = setInterval(() => { void claim(); }, 5000);
+    const foreground = AppState.addEventListener('change', (state) => { if (state === 'active') void claim(); });
+    return () => { disposed = true; clearInterval(timer); foreground.remove(); };
+  }, [centralAttempt, serverUrl]);
 
   useEffect(() => {
     if (phase.kind !== 'registration-code') return;
@@ -227,6 +267,7 @@ export function AuthScreen({
       authGeneration.current += 1;
       setPhase({ kind: 'idle' });
       setSessionServerUrl(undefined);
+      setCentralAttempt(undefined);
       setPassword('');
       setLoginPassword('');
       setPasted('');
@@ -250,6 +291,31 @@ export function AuthScreen({
   const enterSession = (next: HostedAuthSession): void => {
     setSessionServerUrl(serverUrl.trim());
     setPhase({ kind: 'session', session: next });
+  };
+
+  const startCentralLogin = async (): Promise<void> => {
+    if (centralStarting.current || centralAttempt !== undefined) return;
+    if (!requireNetworkConsent()) return;
+    if (!termsAccepted) return failWithKey('mobile.auth.central.termsRequired');
+    centralStarting.current = true;
+    try {
+      const generation = beginAuthAction();
+      setPhase({ kind: 'busy', action: 'central-start' });
+      const options = { baseUrl: serverUrl.trim() };
+      const config = await getCentralAuthConfig(options);
+      if (!isCurrentAuthAction(generation)) return;
+      if (!config.ok || config.value.mode !== 'oidc' || !config.value.documentVersion) {
+        return failWithKey('mobile.auth.central.unavailable');
+      }
+      const started = await beginCentralDeviceAuth({ ...options, termsAccepted: true,
+        documentVersion: config.value.documentVersion });
+      if (!isCurrentAuthAction(generation)) return;
+      if (!started.ok) return failWithKey('mobile.auth.central.unavailable');
+      setCentralAttempt({ ...started.value, generation });
+      setPhase({ kind: 'notice', key: 'mobile.auth.central.waiting' });
+    } finally {
+      centralStarting.current = false;
+    }
   };
 
   /** 这台设备有没有通行密钥实现。没有时**如实说**，而不是把按钮藏起来。 */
@@ -612,7 +678,7 @@ export function AuthScreen({
       ]}
     >
       <Text variant="caption" tone="subtle">
-        {t('mobile.auth.intro')}
+        {t(centralMode ? 'mobile.auth.central.intro' : 'mobile.auth.intro')}
       </Text>
 
       {/* 状态区。失败用 danger，中性提示用 muted —— 两者**不能同色**，
@@ -640,7 +706,7 @@ export function AuthScreen({
         </Card>
       ) : null}
 
-      {phase.kind === 'registration-code' ? (
+      {!centralMode && phase.kind === 'registration-code' ? (
         <Card>
           <View style={{ gap: tokens['space.3'] }}>
             <Text variant="section-title">{t('mobile.auth.registrationCode.title')}</Text>
@@ -682,7 +748,7 @@ export function AuthScreen({
         </Card>
       ) : null}
 
-      <View style={phase.kind === 'registration-code' ? { display: 'none' } : undefined}>
+      {!centralMode ? <View style={phase.kind === 'registration-code' ? { display: 'none' } : undefined}>
 
       <SectionHeader icon="action.settings" title={t('mobile.profile.section.account')} />
       <Card>
@@ -789,6 +855,7 @@ export function AuthScreen({
               }}
               label={t('mobile.auth.terms.label')}
             />
+            <Text variant="caption" grow>{termsLabel}</Text>
           </View>
 
           {/* 链接与勾选项保持紧凑，但仍是 checkbox 行的兄弟，避免点链接误触同意。 */}
@@ -942,7 +1009,62 @@ export function AuthScreen({
         />
         </>
       ) : null}
-      </View>
+      </View> : null}
+      {centralMode ? (
+        <Card>
+          <View style={{ gap: tokens['space.3'] }}>
+            {session === undefined ? (
+              <>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.2'] }}>
+                  <Checkbox checked={termsAccepted} onToggle={() => setTermsAccepted((value) => !value)}
+                    label={termsLabel} />
+                  <Text variant="caption" grow>{termsLabel}</Text>
+                </View>
+                {legalLinks !== null ? (
+                  <View style={{ flexDirection: 'row', gap: tokens['space.4'] }}>
+                    <Pressable accessibilityRole="link" onPress={() => openLegalDocumentOrLink('terms')}>
+                      <Text variant="caption" tone="primary">{t('common.legal.termsDoc')}</Text>
+                    </Pressable>
+                    <Pressable accessibilityRole="link" onPress={() => openLegalDocumentOrLink('privacy')}>
+                      <Text variant="caption" tone="primary">{t('common.legal.privacyDoc')}</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+                <Button label={t('mobile.auth.central.start')} tone="primary"
+                  onPress={() => { void startCentralLogin(); }} disabled={busy || centralAttempt !== undefined}
+                  loading={action === 'central-start'} testID="mobile-central-auth-start" />
+                {centralAttempt !== undefined ? (
+                  <>
+                    <Text variant="caption" tone="muted">{t('mobile.auth.central.pairing')}</Text>
+                    <Text variant="row-title">{centralAttempt.pairingCode}</Text>
+                    <Button label={t('mobile.auth.central.openBrowser')}
+                      onPress={() => { void Linking.openURL(centralAttempt.launchUrl).catch(() => {
+                        failWithKey('mobile.auth.link.unopenable');
+                      }); }} testID="mobile-central-auth-browser" />
+                  </>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <TextField label={t(E2EE_PASSPHRASE_LABEL_KEY)} value={password}
+                  onChangeText={setPassword} secure hint={t('mobile.auth.passwordNeeded')} />
+                <Button label={t('mobile.auth.enableSync')} onPress={saveAndSync} tone="primary"
+                  icon="action.sync" disabled={busy} />
+              </>
+            )}
+          </View>
+        </Card>
+      ) : null}
+      {allowServerSelection && session === undefined ? (
+        <Pressable accessibilityRole="button" onPress={() => {
+          updateServerUrl(centralMode ? '' : OFFICIAL_SITE_ORIGIN);
+        }}>
+          <Text variant="caption" tone="primary">
+            {t(centralMode ? 'mobile.auth.selfHost.open' : 'mobile.auth.central.back')}
+          </Text>
+        </Pressable>
+      ) : null}
+
       {openLegalDocument !== null ? (() => {
         const document = legalDocumentPresentation(legalDocumentById(openLegalDocument));
         return (

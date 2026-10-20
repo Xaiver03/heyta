@@ -380,6 +380,7 @@ describe('🟡 服务端地址与邮箱可以从环境变量来（脚本用法�
 });
 
 describe('官方统一身份 CLI 设备登录', () => {
+  const centralServer = 'https://heyta.waytofuture.cn';
   it('不读本地口令，展示浏览器链接和配对码，轮询后只把产品令牌写进结果', async () => {
     const progress: string[] = [], urls: string[] = [];
     let claims = 0;
@@ -393,7 +394,7 @@ describe('官方统一身份 CLI 设备登录', () => {
         expect(body.deviceChallenge).toMatch(/^[a-f0-9]{64}$/);
         expect(body).not.toHaveProperty('email');
         return new Response(JSON.stringify({ handoffId: '12345678-1234-1234-1234-123456789abc',
-          launchUrl: `${SERVER}/api/auth/oidc/device/launch/${'a'.repeat(43)}`,
+          launchUrl: `${centralServer}/api/auth/oidc/device/launch/${'a'.repeat(43)}`,
           pairingCode: 'A1B2C3D4E5F6', expiresAt: Date.now() + 600_000 }), { status: 200 });
       }
       if (url.endsWith('/api/auth/oidc/device/claim')) {
@@ -405,7 +406,7 @@ describe('官方统一身份 CLI 设备登录', () => {
       }
       throw new Error('Unexpected path');
     }) as typeof fetch;
-    const result = await runAuthCommand(['login', '--server', SERVER, '--json'], stdinOf(''), {
+    const result = await runAuthCommand(['login', '--server', centralServer, '--json'], stdinOf(''), {
       fetchImpl: impl, env: {}, onProgress: (message) => progress.push(message), sleep: async () => {},
     });
     expect(result.code).toBe(0); expect(claims).toBe(2);

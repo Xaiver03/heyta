@@ -8,6 +8,7 @@
 import { CENTRAL_AUTH_PATHS } from '@heyta/shared-schema';
 import { getRandomBytes, sha256TextHex } from '@heyta/sync-core';
 import { joinEndpointUrl } from './endpoint-url.js';
+import { OFFICIAL_SITE_ORIGIN } from './legal-links.js';
 
 export type CentralAuthUser = { id: number; email: string };
 /** In-memory UI marker; it is never a credential and must never be persisted or sent. */
@@ -152,6 +153,20 @@ export type CentralDeviceStart = { handoffId: string; verifier: string; launchUr
 export type CentralDeviceClaim = { status: 'pending' } | { status: 'claimed'; token: string;
   user: CentralAuthUser; expiresAt: number };
 
+function secureDeviceBase(baseUrl: string): URL | undefined {
+  try {
+    const url = new URL(baseUrl);
+    if (url.protocol !== 'https:' || url.username || url.password || url.pathname !== '/' ||
+        url.search || url.hash) return undefined;
+    return url;
+  } catch { return undefined; }
+}
+
+/** Official mobile UI must use the exact HTTPS product origin. */
+export function isOfficialCentralAuthEndpoint(baseUrl: string): boolean {
+  return secureDeviceBase(baseUrl)?.origin === OFFICIAL_SITE_ORIGIN;
+}
+
 /** Fail closed if the host has no cryptographically secure random source. */
 function deviceVerifier(): string {
   const bytes = getRandomBytes(32);
@@ -170,7 +185,7 @@ export async function beginCentralDeviceAuth(options: CentralAuthOptions & {
   termsAccepted?: boolean; documentVersion?: string;
 }): Promise<CentralAuthOutcome<CentralDeviceStart>> {
   const fetchImpl = fetchFor(options);
-  if (!fetchImpl || !options.baseUrl.trim()) return { ok: false, reason: 'network' };
+  if (!fetchImpl || !secureDeviceBase(options.baseUrl)) return { ok: false, reason: 'unavailable' };
   let verifier: string;
   try { verifier = deviceVerifier(); } catch { return { ok: false, reason: 'unavailable' }; }
   try {
@@ -190,7 +205,7 @@ export async function beginCentralDeviceAuth(options: CentralAuthOptions & {
     let launch: URL, base: URL;
     try { launch = new URL(value.launchUrl); base = new URL(options.baseUrl); }
     catch { return { ok: false, reason: 'malformed-response', status: response.status }; }
-    if (launch.origin !== base.origin || !launch.pathname.startsWith(`${CENTRAL_AUTH_PATHS.deviceLaunch}/`) ||
+    if (launch.protocol !== 'https:' || launch.origin !== base.origin || !launch.pathname.startsWith(`${CENTRAL_AUTH_PATHS.deviceLaunch}/`) ||
         !/^[A-Za-z0-9_-]{43}$/.test(launch.pathname.slice(CENTRAL_AUTH_PATHS.deviceLaunch.length + 1)) ||
         launch.search || launch.hash || launch.username || launch.password)
       return { ok: false, reason: 'malformed-response', status: response.status };
@@ -202,7 +217,7 @@ export async function beginCentralDeviceAuth(options: CentralAuthOptions & {
 export async function claimCentralDeviceAuth(options: CentralAuthOptions, handoffId: string,
   verifier: string): Promise<CentralAuthOutcome<CentralDeviceClaim>> {
   const fetchImpl = fetchFor(options);
-  if (!fetchImpl || !options.baseUrl.trim()) return { ok: false, reason: 'network' };
+  if (!fetchImpl || !secureDeviceBase(options.baseUrl)) return { ok: false, reason: 'unavailable' };
   if (!/^[0-9a-f-]{36}$/.test(handoffId) || !/^[A-Za-z0-9_-]{43}$/.test(verifier))
     return { ok: false, reason: 'rejected' };
   try {
