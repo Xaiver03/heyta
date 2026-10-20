@@ -1,7 +1,7 @@
 # 复盘：本轮 4 次判断失败
 
 > 状态：**已完成**（复盘文档，记 2026-09-30 那轮 4 次判断失败，勿当现状读）
-> 交接文档：[`waytofuture-handoff.md`](waytofuture-handoff.md)
+> 交接文档：[`waytofuture-handoff.md`](archive/waytofuture-handoff.md)
 > 范围：2026-09-30 那一轮（域名迁移 + 管理后台 + 邮件中文化）
 > 🔴 只记**有证据**的失败 —— 每条都能在对话或产物里指到具体证据。
 
