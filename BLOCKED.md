@@ -9291,6 +9291,10 @@ $ xcrun simctl list devices booted | grep -E '^\s+- (iPhone|iPad)' | wc -l
    gitignore 内的 `Pods/`；而这一格本线不需要它 —— iOS 腿按上面那条判不可点，重装那一趟没有点火，
    `pod install` 只是"想让 iOS 腿可跑"的预备动作，它失败了**不改变任何一格的状态判定**。
 
+**2026-10-20 11:5x 追记（本会话 · 负责人把打包机开了、腿 3 真跑了一趟，本格"要拍的那一格"的分母从"四腿点不动"缩成"只差 android 一腿"）**：写前先 `date`（`11:58:39`），载具 tip `33e814f4e`。三格现量：① `adb devices` 的非空行数回 **0**、`emulator -list-avds` 仍只有 `heyta-w3-yearly` 那一枚（属并行会话，本线没起它、没动它）；② 本条主条要的那枚**设备身份判据今天仍不在脚本里**（现量 `grep -c HEYTA_ANDROID_AVD scripts/reinstall-all.sh` 回 **0**）；③ 负责人 11:0x 开机并让本线接手，**但没有给"这一轮可以动那枚 AVD"的当轮授权**。⇒ 腿 3 于 `11:16:00→11:39:47` 按交接书 §7 第 7 格的**丙**跑完：`REINSTALL_RC=0`，汇总 `✅=3 ⏭=1 🔴=0`（逐腿读数与原件在计划文末「2026-10-20 11:1x–11:4x · 打包机回来了」那一节、`PROGRESS.md` 第 152 条）。
+🔴 **本格的状态字要按这戳重读**：主条那句"本线这一轮的 `pnpm reinstall:all` **只点了桌面两腿**（mac + windows）"是 10-11 那一戳的形状——**从今天起本线点的是三腿（mac／windows／ios），缺的是 android 一腿**，而且那一个缺口的原因**只剩本条主条那一件**（脚本拿默认序列号 `emulator-5554` 动手，第 377 行就 `adb -s "$SERIAL" uninstall com.heyta`，而身份判据不在），**"打包机不通"那层掩盖已经没了**。⚠️ 反方向也别读错：这枚 `✅=3` **不等于**交接书 §8 第 3 项那把尺过了——那把尺写的是 `✅=4 ⏭=0 🔴=0`，**这一趟判据不成立，且甲／乙 一条都不落地就不会成立**。
+要拍的那一格（**逐字不变、地界也不变**）：`scripts/reinstall-all.sh` 的 android 段在 `adb uninstall` 之前应加一条设备身份判据（要求显式 `HEYTA_ANDROID_AVD=<名字>`，不等就**不猜、响亮失败**，照 `IOS_DEVICE_NAME` 那一形）。这是**改验收脚本的判卷口径**，归负责人／脚本所有者落，本线不代改、不代拍。
+
 ## B165（2026-10-11 03:5x，本会话 · T7 的 Linux 交付取证第一次跑就撞上的）：**`package-deb.sh` 的同步集合没带上它自己那条回退分支要跑的生成器 ⇒ 从干净载体跑必然 `MODULE_NOT_FOUND`**
 
 第一跑（载体 `.worktrees/inb-t7` @ `16f72239`，`HEYTA_LINUX_HOST=linux-dev-lan pnpm build:linux linux-dev-lan`）：
