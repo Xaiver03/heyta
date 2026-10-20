@@ -1,6 +1,9 @@
 # 共享清单与协作（清单级多人协作）落地计划
 
 > 状态：**进行中**（2026-10-08 立；W0–W3 已落地，逐条见 §3 —— 原写「规划中」，**2026-10-16 更正**）
+> 🔴 **现状与下一步以 §9 为准（2026-10-20 复账）**：§3 那张 W 表与 §7 的 DoD 是 10-08 立的工单分解，
+> 逐条已落后于代码 —— 尤其 §7 的 DoD 会被"元数据面已通"读成"协作已可用"，而**内容面今天整段是断的**（成员互相看不到任务与评论）。
+> 三条产品拍板（入口先降级、转让语义保留、并发改成按字段胜出）与里程碑顺序都在 §9。
 > 立单：2026-10-08。产品负责人认可调研结论与 UX 十二条裁决（§1）后指令「制定一个完整的计划」。
 > 证据层：[共享清单调研](../research/collaboration-shared-lists.md)（2026-10-08；滴答帮助中心全文一手抓取 + 仓库双路只读调研 + Ink & Switch / RFC 9420 / Etebase）。
 > 决策记录：[ADR-0062](../adr/0062-shared-list-key-distribution.md)（2026-10-08 已立；⚠️ **2026-10-16 更正：那句「实施未开始」已过期** —— 服务端与 Web 宿主已落地，但**客户端 share op-log 引擎与多写者写路径路由未接线**，逐条见该 ADR 的状态行）。
@@ -267,3 +270,105 @@ model ShareOperation   { id, shareId, clientId, serverSeq, …密文列
 - 2026-10-17：本线按 §3 末尾的排期表开工（W2 尾 → W3 → W4）。现量：三枚原语与两条传输均在、消费者为零；`check:reachability` 的 COMMENT 断言 C 的转绿点见上一条更正（**W4-0 端壳接线**），在那之前它保持如实红。
 
 - 2026-10-08：立单。调研见 [research/collaboration-shared-lists.md](../research/collaboration-shared-lists.md)；十二条产品决策（§1）经产品负责人认可；同日 [ADR-0062](../adr/0062-shared-list-key-distribution.md) 立掉。
+
+## 9. 2026-10-20 复账与下一阶段计划：内容面整段断
+
+> 状态：**本节是这一条线当前的权威现状**（§3 那张 W 表与 §7 的 DoD 是 10-08 立的，逐条已落后于代码；
+> 读现状从这里读，别按 §3 推断"接完了"）。
+
+### 9.1 现状（每条都带复量命令；本轮全部亲自跑过，不抄任何文档或子代理的数）
+
+| 那一面 | 代码现量 | 怎么复量 |
+|---|---|---|
+| 元数据面（建共享 / 邀请 / 入群 / 成员 / 角色 / 转让 / 移除 / 退出） | ✅ 服务端与 Web 宿主都在 main 上，role 硬门在上传边界 | `pnpm verify:collab-journey`；`pnpm --filter @heyta/web --silent exec vitest run tests/share-panel-transfer.spec.tsx tests/join-link.spec.ts` |
+| **内容下行** | 🔴 **零实现**。`downloadOps` 只有定义，全仓无生产调用点 ⇒ 客户端回放只吃本机 localStorage 那份 share log | `grep -rn downloadOps --include=*.ts --include=*.tsx apps packages` 去 spec 后只剩定义那一行 |
+| **内容上行** | 🟡 **只有评论**：`uploadOps` 经 `createShareOpDispatcher` 接通，但调用链只从 `share-comments.ts` 进来 | `grep -rn createShareOpDispatcher --include=*.ts packages` ⇒ 生产消费者只有 `share-comments.ts` |
+| **任务 / 清单的写路径** | 🔴 **仍进个人 op-log**。`project-actions.ts` 里唯一与 share 有关的方法是 `setProjectShareId`（挂个 id），没有任何"该进 share log 还是个人 log"的分流 | `grep -n -E "shareId\|share" packages/app-host/src/project-actions.ts` |
+| 服务端可写白名单 vs 客户端实际 | 白名单已经认识 `TASK / PROJECT / TAG / NOTE / COMMENT`，**服务端不拦，是客户端没往那走** | 读 `server/src/shares/share.membership.ts` 的 `SHARE_WRITABLE_ENTITY_TYPES` |
+| 并发判定 | 🔴 share 分区每条 op 的向量时钟被硬编成 `{ clientId: 1 }`（个人引擎那侧会自增自己那一维）⇒ 同设备两 op 恒 EQUAL、跨设备恒 CONCURRENT，判定只剩 timestamp 平局 | 读 `packages/app-host/src/share-client.ts` 里 `vectorClock:` 那一行，对照 `packages/op-log/src/engine.ts` 的自增 |
+| 逐 op 签名 | 🔴 线协议里没有 `signature` 字段，写侧不签、服务端不验；原语在 `sync-core` 里躺着 | `grep -rn signature packages/shared-schema/src/supersync-http-contract.ts` ⇒ 零命中 |
+| 移除即 rekey | 🔴 只有零件：`planShareRekey` / `reencryptShareRecord` 的调用者只有单测与 `verify-collab-*.mjs`；`autoSeal` 复封用的是**同一把 listKey**，`keyEpoch` 不推进 | `grep -rn planShareRekey --include=*.ts apps packages` ⇒ 无生产调用点 |
+| 实时 | 🔴 服务端发 `new_share_ops`，客户端只处理 `connected`；`notification-model` 那三条偏好谓词生产消费者为零 | `grep -rn new_share_ops --include=*.ts packages apps` ⇒ 只有服务端那一处 |
+| 端覆盖 | 🟡 Web 接了；**macOS / Windows / Linux 三枚桌面壳间接有**（包里装的就是 `apps/web/dist`）；**移动端零接入**；node-host/CLI 无 share 工具 | `grep -rn -E "SharePanel\|shareId\|payloadCipher" --include=*.ts --include=*.tsx apps/mobile/src` ⇒ 0 命中；`grep -n web-dist apps/desktop-macos/Sources/HeytaMac/HeytaMacApp.swift` |
+| 常驻判据 | 🔴 本线没有一扇门在链上：`check` 那串里 `verify:*` 引用数为 0；`collab-journey` 被 `e2e/playwright.config.ts` 的 `testIgnore` 摘出主 e2e 载体；证据目录被 gitignore ⇒ 截图不可复核 | `node -e "const c=require('./package.json').scripts.check.split('&&');console.log(c.filter(x=>/verify:/.test(x)).length)"`；`grep -n -A5 testIgnore e2e/playwright.config.ts` |
+
+⇒ **一句话的产品现状**：能邀请人、能管人、能转让，但**成员之间互相看不到任务改动、也看不到对方的评论**。
+"共享清单"今天对用户交付的是**一张空的共享外壳**，不是协作。
+
+### 9.2 三条产品拍板（负责人 2026-10-20 把判定权交下来，按产品视角定，不再回问）
+
+**P-1 先把共享入口从"看起来可用"降级成"明确未开放"。**
+现在页头上 `share-open-button` 是亮的、同意弹窗与邀请全链都在，而对面进来的成员看不到内容 —— 这不是"功能还没做完"，
+**是让用户替我们发现"这功能是假的"**，而且发生在他把清单交出去**之后**（他已经邀请了同事）。
+判定：主界面入口默认隐藏，只留一条带明确措辞的实验开关；配套 M7 的门禁 `check:share-entry-hidden` 钉住"默认态不可达"。
+成本：一处条件渲染 + 一枚词条 + 一条会红的尺；收益：不拿真实用户的信任去测进度。
+翻案条件：M1+M2 落地且两台设备真浏览器"互相看得到"验过 ⇒ 撤掉隐藏，那一枚门禁同时改成钉"可达"。
+
+**P-2 owner 转让语义保留现形状**（两步确认 → 立即生效 → 原 owner 降 `editor`，服务端单事务原子写三处）。
+理由：E2EE 下"对方接受才生效"需要一条待接受的握手状态，而转让最常见恰恰发生在**对方不在线**（离职、换设备、注销前）；
+且服务端已把它写成单事务，"立即生效 + 原子"是同一件事的两面。
+翻案条件：出现"转让后新 owner 拿不到 key 因而打不开清单"这类实测 —— 那说明转让与密钥轮换没做完（属 M3 的缺陷，不是语义错）。
+
+**P-3 并发写语义定为「按字段胜出，不按整条记录胜出」。**
+现状是个人清单那套 LWW：整条记录按 timestamp 比，赢者覆盖。在单人场景它够用（冲突罕见），
+但共享后它会在用户眼前高频发生（两个人各自勾完成、改标题），症状是"我改的没了，而且没有任何提示"。
+定案：share 分区的合并按 **字段级** last-writer-wins，其余字段保留对方那次改动；无共同祖先可判时不猜，落一条"待你定"的可见冲突提示。
+🔴 这条要碰 `packages/op-log` 的 reducer（`applyOperation` / `compareMeta` 那一层）与 `shared-schema` 的线协议（`vectorClock` 必须真自增、加 `signature` 字段）——
+**都在不可逆层**，所以 M2/M4 开工前必须先立一份新 ADR（不改已接受的 0062，新写一份承接它）。
+
+### 9.3 里程碑与顺序（按"用户能感知到什么"排，不按代码难度排）
+
+| # | 交付 | 判据（要能红） | 前置 / 不可逆点 | 归属 |
+|---|---|---|---|---|
+| **M1** | **下行链路接通**：`downloadOps` 接进宿主（游标持久化、分页收敛、解密回放、离线补拉） | 两台**独立**浏览器上下文：A 改一条任务标题 → B 在**不刷新**与**刷新后**两种时机都读到新标题；变异臂：把游标持久去掉 ⇒ 必红 | 只需 `packages/app-host` + `apps/web`，不碰线协议 ⇒ **可以先做** | 工程直接做 |
+| **M2** | **任务/清单的写路径路由**：共享清单里的 `TASK/PROJECT/TAG/NOTE` op 进 share log | 路由判据住在 `packages/app-host`（`shareIdForTask` 那一族的**同源**函数，不许在壳里判）；红形：未共享清单写进 share ⇒ 红 / 共享清单写进个人 log ⇒ 红 | 🔴 碰 op-log 语义与"个人 log 不动"这条 ADR-0062 承诺 ⇒ **先立 ADR**；`Project.shareId` 已在册，不必 bump schema | 工程 + 一份新 ADR |
+| **M3** | **rekey 落地**：移除/退出/撤销 → `keyEpoch` 推进 → 重封给在册成员；撤销后旧成员解不开新内容 | 三步链有真库证据（`verify-collab-revoke` 已有零件，缺生产路径）；红形：`autoSeal` 换 key 那一步被去掉 ⇒ 必红 | 依赖 M1（下行要先能读，否则证不了"读不到"） | 工程直接做 |
+| **M4** | **逐 op 签名**：线协议加 `signature`、写侧签、服务端验、失败按"永久拒绝"处置（对齐 ADR-0019 那条读侧对偶） | 封闭词表 + 一条"改一个字节必被拒"的臂 | 🔴 `shared-schema` 线协议 = 不可逆层，与 M2 同一份 ADR 承接 | 工程 + ADR |
+| **M5** | **实时与偏好接线**：客户端接 `new_share_ops`、三条谓词进通知路径 | 有信号 ⇒ 拉取；无订阅偏好 ⇒ 零打扰；红形：谓词恒 true 的那一臂 | M1 之后才有意义（信号语义是"有东西可拉"） | 工程直接做 |
+| **M6** | **移动端接入**：入口/路由、`setProjectShareId` 调用点、share 密钥落盘端口、`payloadCipher` 接线、同意态存储、`ShareFeature` 那层的 web-only 假设重写 | 与 web 同一条旅程在 iOS 模拟器 + Android 上走一遍（AGENTS §6.2：真跑 + 真看截图） | 六段缺段的现量清单见 9.4；🔴 Android 构建一律走 windows-pc | 工程直接做（体量大，可拆） |
+| **M7** | **把判据变成常驻**：本线 `verify:collab-*` 与 journey 进链或有别的自动载体；`check:share-entry-hidden`（P-1 期间钉"不可达"）；变异臂从散文搬进 `research/tools/mutation-rigs/` | `check:gate-wiring` 那类"链外必须有可验消费方"的尺要能覆盖 `verify:*`（它今天只审 `check:*` ⇒ 本身要扩） | 无 | 工程直接做，**最先做也行** |
+
+**执行序**：M7 → M1 → M3 → M5 → M2（带 ADR）→ M4 → M6。
+理由：先把"没人跑的判据"变成有人跑，再补下行（最快让两台设备互相看见），rekey 与实时依赖下行；
+M2/M4 碰不可逆层，放同一份 ADR 一起做，避免两次线协议变更。
+
+### 9.4 移动端那六段缺什么（逐条命令，别按本节推断"现在还没有"）
+
+组件本身可移植（`packages/ui/src/sync/` 那四枚只用 RN 原语 + `useHeytaText/useHeytaTokens`，
+mobile 已真渲染过同目录的 `ConflictResolutionView`），缺的全在宿主侧：
+
+1. 入口与路由：`apps/mobile/src/nav/feature-entries.ts` 里没有任何共享项。
+2. `setProjectShareId` 的调用点：现在只有 `apps/web/src/features/projects/store.ts` 调它。
+3. share 密钥落盘：`apps/web/src/features/share/share-key-store.ts` 的签名吃 Web `Storage` 与 `btoa/atob`，移动端只有 device-prefs（sqlite）与原生安全存储两个**不同形状**的端口。
+4. vault → `SyncPayloadCipher`：移动端拿得到 session，但 `payloadCipher` 在 `apps/mobile/src` 出现 0 次。
+5. 传输与凭据：`ShareApiClient` 是纯 fetch、宿主无关，包依赖已具备；但移动端凭据只在内存、冷启动重填，面板的轮询/复封依赖它。
+6. `apps/web/.../ShareFeature.tsx` 这一层不可移植（`window.setInterval` / `document.getElementById` / `navigator.clipboard` / `window.location`）——**它是唯一需要重写的一层**，其余是接线。
+
+### 9.5 文档体检剩余队列（本节由 2026-10-20 那趟审计生成，逐条待做，别重做审计）
+
+已完成的那批改口记在提交里（`bb6804bd`）。还没动的：
+
+- `docs/plans/README.md` 详情面那一行仍钉「🟡 规划中（2026-10-03 立）」，正文已写「W0–W8a 已落地并合进 main，W9–W12 未开工」；
+  同族还有 `multi-platform-adaptation` / `desktop-native-migration` 两行 —— 处置同 P：**索引不复述状态**。
+- `docs/plans/ai-strategy.md`、`ai-assistant-closure.md`、`ai-event-tool-contract.md` 里的「覆盖面 9/9 / 26 工具 / `MAX_TOOLS_PER_ENTITY = 5`」：
+  前两份是当日记录（历史坐标，下沉成叙述即可），契约文档那句是**活规范**（现量 `= 7` 且 `TASK` 单独抬高）。
+- `docs/agents/repo-map.md` 漏 `packages/{ui,legal,widget-core,inbound-core}` 四枚真工作区包；根 `README.md` 的"现状"段若还有"web 主入口"残留要一起扫。
+- `docs/agents/environment-traps-index.md` 的 80–83 号段描述的是**另一代**（正文在 `legacy-traps-80-83.md`），要显式标注；
+  索引里那句「见正文 `#462`」指向的其实是 `#468`。
+- `docs/adr/*` 与 `docs/README.md` 的 ADR 状态抄件三处打架：0008（已被 0046 取代但索引仍写"已接受"）、0024（本体已接受、索引写"待确认"）、0062（本节已改口）。
+  ⚠️ ADR 冻结：只动索引那一行，本体不动。
+- `check:doc-citations` **只扫 1 份文档**就退出（它自打印"文档 1 份"）⇒ 全仓行号锚没人核；这是"为什么这批漂移没被门禁抓到"的根因，值得单开一工单。
+- `docs/plans/README.md` §二 那一列"行数"15 格里 10 格已漂 ⇒ 整列删掉或换成 `wc -l` 命令。
+- 归档候选（自declared完结 + 低在途引用）：`landing-page-optimization.md`（0 处引用）、`landing-motion-audit/`、
+  `countdown-w8-shell-gate.md`、`gate-blindspot-handoff.md`、`notification-and-activity.md`、`goal-landing-and-quality-audit.md`、
+  `waytofuture-handoff.md`、`ai-tier-pricing-rollout.md`、`subscription-*-handoff.md`。
+  🔴 其中三份被 `docs/adr/` 以链接指着（0043 / 0014 / 0020）——移动必须改 ADR 里的 href；先例是 10-16 那批"只改 href、显示文本留旧名"。
+  这一批**待做**，处置规则：`grep -rn -F <文件名> --include=*.md .` 现量引用数 ⇒ 0 处才动，ADR 指向的那几份要么不动要么按先例改 href。
+
+### 9.6 风险与不许做的事
+
+- 🔴 **不许用"测试全绿"宣布这一条线做完**：本线的判据今天**没有一条在链上**（9.1 最后一行）。M7 不落地，后面每一格的"绿"都只说明有人手动跑过。
+- 🔴 **不许把 §3 那张 W 表当现状读**（它写的是 10-08 的工单分解）；现状以本节为准。
+- 不许 bump `CURRENT_SCHEMA_VERSION`：M2/M4 需要的字段按 AGENTS §3.3 一律写成可选 + 运行时默认。
+- 不许改已接受的 ADR 结论；M2/M4 走新 ADR。
+- 不可逆层的两处（线协议、op-log reducer）合在**一份** ADR + **一批**提交里，避免两次协议变更让服务端与客户端部署顺序互相踩。
