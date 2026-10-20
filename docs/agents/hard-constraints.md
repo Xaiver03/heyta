@@ -90,7 +90,7 @@ ADR-0003 §2.1 的分界线原来有个说不清的地方：把零件接起来�
 clientId 的回退逻辑还真的漂移了（`randomId()` vs 自己写的 `Math.random()`）。
 clientId 是 LWW 的决胜依据 —— 两份实现 = 两套裁决标准。
 现已抽成 `packages/app-host` 的 `createSyncClient()`，并由
-`pnpm check:layering` 钉住（4 条规则，已用注入违规验证能失败）。
+`pnpm check:layering` 钉住（**规则条数由它自己打印，别在这里抄** —— 这一句原先钉着"4 条"，而现量早已不是那个数；已用注入违规验证能失败）。
 
 > 教训：**"抽出了一个共享实现"不等于"重复被消除了"。** `ids.ts` 抽出来了、
 > 文件头还专门列了一张漂移对照表 —— 但 `apps/web` 那份**从没被删掉**，

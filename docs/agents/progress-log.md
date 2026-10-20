@@ -24,13 +24,15 @@ E2EE 下的**清单共享**基础设施（ADR-0062）已实现并**本地提交*
 `.ht-header__actions` 加了 `share-open-button`，落地页登记处没跟着补 ⇒ 已按既有 `mockedInLanding:false` 约定补登记、
 阳性对照按真源码补项，**不放宽判据**；作用域已穷举，其余钉页头的判据停在不进共享按钮的默认视图）。`pnpm -r typecheck` 全仓绿。
 
-🔴 **不声称全链绿、且未 push**（逐条如实）：
-- **全链 `pnpm check` / `-r test` 仍红，红在四枚别线判断绊线（no-bail 现量）**：`packages/ai` 的「分母恰好 9→10 + 逐条点名」与 `check:reachability` 的「已建模≠可达」——**同源**于 `COMMENT` 实体（由**产品体验线 `e6058120`** 引入域模型/清单并建了 `CommentThread`/`comments-model`，🔴 **不是本线 W4 引入的**，`git log -S` 现量），要给评论配 AI 工具/补写路径都是**别线产品判断**；`packages/shared-schema` 的 `AUTH_PASSWORD_PATHS` 计数 **9→12**（auth 线加了口令路由没同步那条封闭词表）；`packages/domain subscription.spec` 权益**拒绝理由契约**（计费/权益线）。另 `apps/mobile` 958 条全过；此前那条 Rolldown `RTEST-UNHANDLED-01` 非零退在 2026-10-11 的**不摘层**全量重跑里**没有复现**，同趟换成一枚负载抖动（`apps/web` 的 `task-sort.spec.tsx` 单跑两趟各 rc=0，当时 1 分钟负载 46.96 ≫ 阈值 12）⇒ 判「回归 vs 载体抖动」要**单跑对照 + 负载读数**两条一起，缺一条都不许写成结论（→ §7 第 408 条）。**都不是本线代码、本线不代改判据口径**。
-- `capability-manifest.generated.ts` 是**跨线混物**（重生成会同时带本线 `COMMENT` 与 AI 工具线早提交的 4 枚 TASK 工具），按「只提交协作线文件」留在工作树未并进，其落地归属待协调。
-- **push 押在跨线协调**：本地 main 领先 `origin/main` 的笔（`git rev-list --count origin/main..HEAD` 现量）里绝大多数是**别的并行会话未公开的笔**，`git push` 会把它们一起公开，本线不代推。
-- **W4 残余**：评论**已建模但不可达**（`COMMENT` + `CommentThread`/`comments-model` 由产品体验线 `e6058120` 建好并从 ui barrel 导出，但无宿主挂载、零写路径，`check:reachability` 就红在这最后一米 —— 归那一线，非本线）；**指派同一类**（`Task.assigneeUserId` 在 domain 是可选字段、通知过滤层**已经在读**它，但 `app-host` 零个指派 op 构造、`apps/*` 零界面 ⇒ 没人写它。⚠️ `check:reachability` 的分母是**实体**，字段级的"已建模≠可达"它拦不到）；**动态流**确实只有通知偏好开关、无活动流界面；**多人并发写同一条任务的写路径路由**是最大未建架构件；入群链接落点仅 Web 接了，移动端未接。
+🔴 **那一版"仍红四枚 + 未 push"已经过期，按 2026-10-20 现量改写**（红集会被人修掉，所以下面每条都带复量命令，别抄读数）：
 
-状态与逐项读数见 [`docs/plans/goal-collaboration-shared-lists.md`](../../docs/plans/goal-collaboration-shared-lists.md) **文末那几节**（末节号现量：`grep -n '^## ' docs/plans/goal-collaboration-shared-lists.md | tail -2`，本行不写节名因为它会长）；PIPL 同意面的视觉层级（旧停止点 ①）已按最佳实践落地并配判据（`apps/web/tests/share-consent-modal-theme.spec.tsx`）；所有权转让语义（②）仍待产品负责人追认。
+- **那四枚绊线全部闭合，且都不是本线修的**：`packages/ai`（分母那格改成从 `MODELED_ENTITY_TYPES` 派生）、`check:reachability`（评论有了写路径与宿主调用点）、`packages/shared-schema` 的口令路径封闭词表补齐、`packages/domain` 权益拒绝理由契约由自动收集线拆回自己那张表。复量：`cd packages/{ai,shared-schema,domain} && npx vitest run` 各 rc=0 ＋ `pnpm check:reachability` rc=0。
+- **`capability-manifest.generated.ts` 已入库**（`git status --porcelain -- packages/ai/src/capability-manifest.generated.ts` 现量 = 空），"跨线混物留工作树待协调"那一格从此不再有对象；它当初被推迟的理由（重生成会同时带别线的 4 枚 TASK 工具）由别线自己把它们提交掉而消解。
+- **push 已发生**：`git rev-list --left-right --count refs/remotes/origin/main...main` 现量 `0 0`。所以"本线不代推、押在跨线协调"这句不再成立；下一位要推的是**别人新落的笔**，那条边界照旧有效（判据就是上面这条命令）。
+- **W4 残余从三件变两件，但产品定性变坏了**：评论**已挂载并有写路径**（`apps/web/src/features/tasks/TaskDetailCard.tsx` 里 `ShareCommentsSection` 的 import 与渲染两处命中），不再是"已建模不可达"；指派与动态照旧（`Task.assigneeUserId` 全仓零写点、只有通知过滤在读；动态流仍只有通知偏好开关）。
+  🔴 **取而代之的那一格更要紧：共享的"数据面"根本没通** —— `ShareApiClient.downloadOps` 在 `apps/*` 与 `packages/*/src` 里**零消费者**（复量：`grep -rn downloadOps --include=*.ts --include=*.tsx apps packages | grep -v spec`），客户端回放只吃本机 localStorage 那份 share log（`packages/app-host/src/share-comments.ts` 两处 `replayShareOps(..., [log.ops])`），服务端发出的 `new_share_ops` 实时信号客户端也不接；且**任务与清单的写路径仍进个人 op-log**（`packages/app-host/src/project-actions.ts` 里唯一的 share 相关方法是 `setProjectShareId`，没有任何 share 分流）。⇒ 成员之间互相看不到任务改动、也看不到对方的评论：**现在可用的只有"邀请/成员/角色/转让"这条元数据面，内容面是断的**。逐条见本线计划里 2026-10-20 那一节。
+
+状态与逐项读数见 [`docs/plans/goal-collaboration-shared-lists.md`](../../docs/plans/goal-collaboration-shared-lists.md) **文末那几节**（末节号现量：`grep -n '^## ' docs/plans/goal-collaboration-shared-lists.md | tail -2`，本行不写节名因为它会长）；PIPL 同意面的视觉层级（旧停止点 ①）已按最佳实践落地并配判据（`apps/web/tests/share-consent-modal-theme.spec.tsx`）；**所有权转让语义（旧停止点 ②）已由产品负责人把判定权交下来、本轮按产品判断定案保留现语义**（两步确认 → 立即生效 → 原 owner 降 editor，服务端单事务原子），翻案条件写在计划那一节。
 
 
 

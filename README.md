@@ -68,9 +68,13 @@ heyta/
 │   ├── design-system/    # 设计 token 与生成物（TS / RN / Swift / ArkTS）+ 对比度实测
 │   └── i18n/             # 中英词条表（自研零依赖，受 check:ui-language 约束）
 ├── apps/
-│   ├── web/              # Web 客户端（产品主入口）
-│   ├── mobile/           # React Native 移动端（Android / iOS / 鸿蒙）
-│   ├── node-host/        # 笔记本 / 桌面宿主设备
+│   ├── mobile/           # ⭐ **主战场**：React Native 移动端（Android / iOS / 鸿蒙）
+│   ├── desktop-macos/    # macOS 原生壳（Swift + WebView，载共享 web 产物）
+│   ├── desktop-windows/  # Windows 原生壳（WinUI + WebView2，载共享 web 产物）
+│   ├── desktop-linux/    # Linux 原生壳（GTK + WebKitGTK，载共享 web 产物）
+│   ├── desktop/          # ⚠️ 遗留的 Electron 壳（不在验收端清单里）
+│   ├── web/              # Web 客户端（**次要端**：ADR-0036 把主战场定为移动端 + macOS + Windows，Web 不再是功能首发地；它是三枚桌面壳所加载的那份共享 UI）
+│   ├── node-host/        # 笔记本 / 桌面宿主设备（CLI / MCP / local-api，无 UI）
 │   └── landing/          # 落地页
 ├── server/               # 同步服务端 + 计费：Fastify + Prisma + PostgreSQL（vendored, MIT）
 ├── e2e/                  # 真浏览器验收（⚠️ **刻意不在根 pnpm 工作区内**，自己一份 lockfile）
