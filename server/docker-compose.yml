@@ -109,12 +109,39 @@ services:
       - SUPERSYNC_DEFAULT_STORAGE_QUOTA_BYTES=${SUPERSYNC_DEFAULT_STORAGE_QUOTA_BYTES:-}
       - OLD_OPS_CLEANUP_DELETE_BATCH_SIZE=${OLD_OPS_CLEANUP_DELETE_BATCH_SIZE:-5000}
       - OLD_OPS_CLEANUP_MAX_DELETED_PER_RUN=${OLD_OPS_CLEANUP_MAX_DELETED_PER_RUN:-25000}
+      # 🔧 heyta 改动：统一支付中心（同公司晓黎支付中心，heyta 作为又一个 client 接入 —— ADR-0017 §3.3）。
+      #
+      # 🔴 这一组以前**不在 compose 里**：`config.ts` 认这四枚键，而 `environment:` 是白名单，
+      #    运维在 `.env` 里填了也进不了容器 ⇒ 线上永远只有 noop 通道，
+      #    而客户端的续费入口点了必然回 503 BILLING_PROVIDER_NOT_CONFIGURED。
+      #    判据由 `pnpm check:payment-entry` 钉："凭证能进容器 ⟺ 客户端有入口"。
+      #
+      # 总闸默认**假**：不设时行为逐字不变（adapter 不注册、webhook 404、自托管看不到付款入口）。
+      # ⚠️ 不要把默认值写成 `true`：`config.ts` 是**全有或全无**，
+      #    `PAYCENTER_ENABLED=true` 而三项凭证缺一即启动期硬错误（这是收钱路径上的有意设计）。
+      - PAYCENTER_ENABLED=${PAYCENTER_ENABLED:-false}
+      # 三项凭证本身走 `:-`（空串=未设置）：它们在总闸为真时才被要求齐全，
+      # 而"总闸真 + 凭证空"是启动红，不是静默降级。
+      - PAYCENTER_BASE_URL=${PAYCENTER_BASE_URL:-}
+      - PAYCENTER_CLIENT_ID=${PAYCENTER_CLIENT_ID:-}
+      - PAYCENTER_CLIENT_SECRET=${PAYCENTER_CLIENT_SECRET:-}
+      # 履约回调在本仓的挂载路径。中心签的是路径 ⇒ 改了这里不改配置，每条回调都 401。
+      # 留空时 `config.ts` 用 `/api/billing/webhooks/paycenter`（默认值逐字等于不设时）。
+      - PAYCENTER_WEBHOOK_PATH=${PAYCENTER_WEBHOOK_PATH:-}
+      # 出站超时与下给中心的支付类型（默认 `huifu`：一个通道同时出微信 + 支付宝）。
+      - PAYCENTER_TIMEOUT_MS=${PAYCENTER_TIMEOUT_MS:-}
+      - PAYCENTER_PAYMENT_TYPE=${PAYCENTER_PAYMENT_TYPE:-}
       # 🔧 heyta 改动：微信支付（Native 扫码）的整组旋钮。
+      #
+      # 🔴 **这条路已经退场**（`config.ts`：`WECHAT_PAY_ENABLED=true is no longer supported`，
+      #    收单与退款统一走上面的支付中心）。这几行**刻意保留**，因为那句"启动就红"
+      #    依赖它还在被转发：删掉这两行，一个还留着 `WECHAT_PAY_ENABLED=true` 的
+      #    `.env` 会**静默**什么通道都不开，而运维以为自己在收钱。
       #
       # 默认值 `false` 与 `server/src/config.ts` 一致 ⇒ **不设时行为逐字不变**
       # （adapter 不注册、webhook 回 404、自托管看不到任何付款入口）。
       # 这一组必须由 `pnpm check:payment-entry` 与 `check:server-env` 同时守：
-      # 前者钉"渠道接通 ⟺ 客户端有入口"，后者钉"文档化的键必须真能进容器"。
+      # 前者钉"渠道能接通 ⟺ 客户端有入口"，后者钉"文档化的键必须真能进容器"。
       #
       # ⚠️ 六枚凭证都走 `:-`（空串=未设置）：它们在 `config.ts` 里只在
       # `WECHAT_PAY_ENABLED=true` 时才被要求齐全，空串在那里等价于"没填"，
