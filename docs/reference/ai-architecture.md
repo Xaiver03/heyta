@@ -940,6 +940,7 @@ ADR-0011 的实现。让本机其他程序（Claude Code / Cursor / Raycast / �
 >
 > 现量（那条命令打印的三行）：**工具 22（读 10 / 写 12）· 实体 10 · 覆盖面 8/8 · 无工具实体 0**。
 > 🔴 **10-04 现量更新**（同一条命令）：工具 **26（读 12 / 写 14）· 覆盖面 9/9**（批次二把 `EVENT` 纳进分母），上限 **每实体 5 × 分母 9 = 45 席（已用 26，剩 19）**。上面那行 10-03 的读数**原地留着** —— 它存在的意义就是"手抄一定会漂"，而这一节恰恰是讲这件事的。
+> 🔴 **10-21 现量更新**（同一条命令 `node scripts/check-ai-coverage.mjs`）：覆盖面 **9/10**（`COMMENT` 进了分母、工具还没配，登记为缺口 `AI-COV-8`）· 目录 **30 个工具** ≤ **按实体预算 72 席**（已用 30，剩 42）。⚠️ 上面两行里的**容量口径已经换过形状**：默认上限现在是 `shared.ts` 的 `MAX_TOOLS_PER_ENTITY`（**不在文档里抄它的值**），少数实体走同一文件的例外表 `MAX_TOOLS_PER_ENTITY_BY_TYPE`（目前只有 `TASK` 一档被抬高），总预算 = 逐实体预算之和而不是「一个数 × 分母」。**那三行读数都保留，是历史坐标；当前状态只认命令。**
 > 按实体分布：`TASK` 5 / `NOTE` 4 / `TAG` 3 / `PROJECT` `HABIT` `HABIT_LOG` `FOCUS_SESSION` `REMINDER` 各 2。
 > 每个工具**默认全关**（现量：`defaultEnabled === true` 的条目 **0 个**）。
 🔴 **目录顺序是一条判据**，不是聚合的巧合：所有 `read` 排在所有 `write` 之前
@@ -988,8 +989,8 @@ ADR-0011 的实现。让本机其他程序（Claude Code / Cursor / Raycast / �
 `pnpm check` 全绿，当时判成"要产品拍"）。
 ✅ **同日已解除，而且没有拍板这回事 —— 那条上限的单位写错了**：总量从来不是用户要理解的负担，
 **逐工具的授权清单**才是，而清单天然按实体分组。现在判据是**按实体**的
-`MAX_TOOLS_PER_ENTITY = 5`（四档推导在 `packages/local-api/src/tools/shared.ts`：
-列出来 / 按 id 取一条 / 修改字段 / 该实体专属的那一个动作，第五档是余量；要第 6 个先回答它属于哪一档，
+`MAX_TOOLS_PER_ENTITY`（**它的值不抄在这里**：那一天是 5，`shared.ts` 后来把默认档抬到更高并加了逐实体例外表，抄一次就漂一次）。推导住在 `packages/local-api/src/tools/shared.ts`：
+列出来 / 按 id 取一条 / 修改字段 / 该实体专属的那一个动作，最后一档是余量；要再多一个先回答它属于哪一档，
 答不出通常意味着它属于**另一个实体**、或者它只是一个"读法变体"该做成参数），
 `local-api.spec.ts` 逐 pack 断言、`check-ai-coverage.mjs` §10 再钉一遍"读不到这个常量就红"。
 🔴 新判据比旧的**更严**：旧的那条下 `TASK` 一家吃掉 10 席中的 5 席不会响，现在会。
@@ -1246,7 +1247,7 @@ interface SecretStore { get(keyRef: string): Promise<string | undefined>; }
 5. **新增一个偏好** → 四条判据全过（改变行为 / 今天就能推断 / 错了能纠正 /
    **能被证伪**）+ 留出法实验显著优于基线，否则删掉。
 6. **加一个本机工具** → 默认关、只读优先、写必须经 `LocalApiWritePort`；
-   ⚠️ 先问「真的需要吗」——但**问的单位是每个实体**：一个 pack 至多 `MAX_TOOLS_PER_ENTITY = 5` 个。
+   ⚠️ 先问「真的需要吗」——但**问的单位是每个实体**：一个 pack 的上限是 `packages/local-api/src/tools/shared.ts` 的 `MAX_TOOLS_PER_ENTITY`（**值不在这里抄**，它已改过两次；例外表 `MAX_TOOLS_PER_ENTITY_BY_TYPE` 同文件，现量 `grep -n 'MAX_TOOLS_PER_ENTITY' packages/local-api/src/tools/shared.ts`）。
 7. **改隐私相关开关** → 问一句：**它失败时倒向哪一侧**。
    倒向"放开"就是错的，无论代码多干净。
 8. **写完后检查调用点** —— 本项目反复踩的坑是

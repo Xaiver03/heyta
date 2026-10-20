@@ -5,10 +5,10 @@
 > 给**全新会话**用：不从聊天记录继承任何前提。每条都带可复现命令或实测输出。
 >
 > 🔴 本文只记**当前停在哪**，不重复已经定下来的决策与已有知识。那些在
-> [`docs/adr/0038-admin-console-scope.md`](../adr/0038-admin-console-scope.md)、
-> [`docs/plans/admin-console.md`](admin-console.md)、
-> [`docs/runbooks/deployment.md`](../runbooks/deployment.md)（§3.7.2 / §3.9.1 / §3.9.2 / §3.12）、
-> [`docs/research/ai-feature-completeness-audit.md`](../research/ai-feature-completeness-audit.md)
+> [`docs/adr/0038-admin-console-scope.md`](../../adr/0038-admin-console-scope.md)、
+> [`docs/plans/admin-console.md`](../admin-console.md)、
+> [`docs/runbooks/deployment.md`](../../runbooks/deployment.md)（§3.7.2 / §3.9.1 / §3.9.2 / §3.12）、
+> [`docs/research/ai-feature-completeness-audit.md`](../../research/ai-feature-completeness-audit.md)
 > 与 `AGENTS.md §9` 里。
 >
 > ⚠️ **工作区里有 417 个未提交改动，绝大多数不是本轮做的**（见 §7）。
@@ -38,7 +38,7 @@
 | 管理后台 | ✅ 已上线且**锁着** | `GET /api/admin/overview` 无令牌 → **401**；管理员 = 见 `docs/operations/icp-app-filing.values.local.md`（不入库；`admin.js list` 可查） |
 | 邮件 | ✅ 中文优先、按语言切 | 线上日志 `Magic link login email sent [zh-CN]`；SES `DeliverStatus: 1` |
 | 凭据页 | ✅ 三张都中文化 | 默认中文、`?lang=en` 英文、`gradient` 出现 **0** 次 |
-| AI 完整度 | ✅ 审计完成 | [`docs/research/ai-feature-completeness-audit.md`](../research/ai-feature-completeness-audit.md) |
+| AI 完整度 | ✅ 审计完成 | [`docs/research/ai-feature-completeness-audit.md`](../../research/ai-feature-completeness-audit.md) |
 
 **测试与门禁（本轮结束时的实测）**
 
@@ -79,8 +79,8 @@ ssh ubuntu-jcli 'sudo docker exec supersync-server node dist/scripts/admin.js li
 
 | # | 事项 | 为什么卡住 | 怎么继续 |
 |---|---|---|---|
-| 1 | **ICP APP 备案「提交审核」** | 必须本人：勾三个同意项 + 视频核身 | 见 [`icp-app-filing.md`](../runbooks/icp-app-filing.md) §一。域名现在**真的通了**（备案要求填报域名指向已备案服务器 —— 这条已满足） |
-| 2 | **`pnpm check` 的 e2e `motivation.spec.ts` 2 红** | **不是本轮造成**，已用对照实验证明（§6） | 见 [`BLOCKED.md`](../../BLOCKED.md) 第 1 条，里面写了排查顺序 |
+| 1 | **ICP APP 备案「提交审核」** | 必须本人：勾三个同意项 + 视频核身 | 见 [`icp-app-filing.md`](../../runbooks/icp-app-filing.md) §一。域名现在**真的通了**（备案要求填报域名指向已备案服务器 —— 这条已满足） |
+| 2 | **`pnpm check` 的 e2e `motivation.spec.ts` 2 红** | **不是本轮造成**，已用对照实验证明（§6） | 见 [`BLOCKED.md`](../../../BLOCKED.md) 第 1 条，里面写了排查顺序 |
 | 3 | **`pnpm verify:i18n-failures` 4/91 红** | **不是本轮造成**（脚本锚点指向已被移动的文件 / i18n 多入口后 dist 结构变了） | 见 `BLOCKED.md` 第 2 条。⚠️ 那两组涉及的 `apps/web/src/features/sync/*` **当前有别的会话的未提交改动**，动它会撞车 |
 
 **另外两件"已交还但已完成"的**（列在这里是因为下一个会话可能会问）：
@@ -94,7 +94,7 @@ ssh ubuntu-jcli 'sudo docker exec supersync-server node dist/scripts/admin.js li
 ### 4.1 迁到 `heyta.waytofuture.cn`
 
 动因是**备案倒逼**（备案填报的就是这个域名，且要求它真的指向那台服务器），不是运维整洁。
-全过程见 [`deployment.md`](../runbooks/deployment.md) §3.7.2。
+全过程见 [`deployment.md`](../../runbooks/deployment.md) §3.7.2。
 
 顺带修掉一条**错误纪律**：`apps/landing/src/site/origin.ts` 原先写着"换域名时传 `VITE_SITE_URL`，
 **不要改** `DEFAULT_SITE_ORIGIN`" —— **那是错的**。`check:entries`（`pnpm check` 的第一道门禁）
@@ -114,11 +114,11 @@ ssh ubuntu-jcli 'sudo docker exec supersync-server node dist/scripts/admin.js li
 
 ### 4.3 运营管理后台（首版）
 
-决策 [`ADR-0038`](../adr/0038-admin-console-scope.md)：**抄 SSOS 的模式、不抄它的页面**
+决策 [`ADR-0038`](../../adr/0038-admin-console-scope.md)：**抄 SSOS 的模式、不抄它的页面**
 （它那 42 个页面服务的是租户/税务/合规/Mailu，heyta 一个对应模型都没有）。
 范围＝概览/用户/订阅/订单/优惠码/邀请 + **三个不碰钱的动作**（解锁、调配额、强制登出）。
 权限＝单级 `users.is_admin`（默认 false，只能 CLI 授权）。落地清单见
-[`admin-console.md`](admin-console.md)。
+[`admin-console.md`](../admin-console.md)。
 
 **授权命令（只能在容器里跑）**：
 ```bash
@@ -131,7 +131,7 @@ ssh ubuntu-jcli 'sudo docker exec supersync-server node dist/scripts/admin.js gr
 
 改前：三封邮件全英文 + 硬编码 `#3b82f6`；三张凭据页全英文 + **深色主题**（与 heyta 蓝白系完全不是一套）。
 改后：中文默认、按收件人语言切、颜色/间距/字体全部来自设计系统、**零渐变**。
-机制与判据全文见 [`deployment.md`](../runbooks/deployment.md) §3.9.2。
+机制与判据全文见 [`deployment.md`](../../runbooks/deployment.md) §3.9.2。
 
 🔴 **真源只有一份，靠"生成物 + 门禁"搬到服务端**（`server/Dockerfile` 不打包 i18n / design-system）：
 
@@ -142,7 +142,7 @@ ssh ubuntu-jcli 'sudo docker exec supersync-server node dist/scripts/admin.js gr
 
 **语言优先级**：`?lang=`（发信时写进链接）> **默认 `zh-CN`**。
 （2026-10-03 起 `Accept-Language` 不参与 —— 浏览器语言不是用户的选择。见
-[`deployment.md`](../runbooks/deployment.md) §3.9.2「语言怎么定」。）
+[`deployment.md`](../../runbooks/deployment.md) §3.9.2「语言怎么定」。）
 
 ### 4.5 修掉的 4 个真缺陷
 
@@ -169,7 +169,7 @@ ssh ubuntu-jcli 'sudo docker exec supersync-server node dist/scripts/admin.js gr
 
 ---
 
-## 6. 环境陷阱（本轮又踩了，`AGENTS.md §7` / [`environment-traps.md`](../reference/environment-traps.md) 有更全的一份）
+## 6. 环境陷阱（本轮又踩了，`AGENTS.md §7` / [`environment-traps.md`](../../reference/environment-traps.md) 有更全的一份）
 
 ### 6.1 🔴 `tar` 打包工作树会把 `server/.env` 一起带上服务器，覆盖生产配置
 
@@ -280,9 +280,9 @@ cd e2e && npx playwright test --config=playwright.live-site.config.ts
 
 ## 9. 相关资产（别重造）
 
-- **部署与运维**：[`deployment.md`](../runbooks/deployment.md) —— §3.7.2（域名迁移）、§3.9.1（SMTP）、§3.9.2（邮件/页面机制）、§3.12（管理后台运维）、§3.5（生产环境变量清单）
-- **管理后台**：[`ADR-0038`](../adr/0038-admin-console-scope.md)（决策）+ [`admin-console.md`](admin-console.md)（清单/判据/边界）
-- **AI**：[`ai-feature-completeness-audit.md`](../research/ai-feature-completeness-audit.md)
-- **备案**：[`icp-app-filing.md`](../runbooks/icp-app-filing.md)
+- **部署与运维**：[`deployment.md`](../../runbooks/deployment.md) —— §3.7.2（域名迁移）、§3.9.1（SMTP）、§3.9.2（邮件/页面机制）、§3.12（管理后台运维）、§3.5（生产环境变量清单）
+- **管理后台**：[`ADR-0038`](../../adr/0038-admin-console-scope.md)（决策）+ [`admin-console.md`](../admin-console.md)（清单/判据/边界）
+- **AI**：[`ai-feature-completeness-audit.md`](../../research/ai-feature-completeness-audit.md)
+- **备案**：[`icp-app-filing.md`](../../runbooks/icp-app-filing.md)
 - **门禁**：`check:server-design` / `check:server-copy`（本轮新增，已挂进 `pnpm check`）
 - **线上验收套件**：`e2e/playwright.live-site.config.ts` + `e2e/live-site/live-domain.spec.ts`（6 条）

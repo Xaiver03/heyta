@@ -1,8 +1,8 @@
 # Goal：设置的信息架构 —— **移动端优先**，电脑端验证收尾
 
 > 状态：✅ **完成（2026-09-29）** —— ①②③ 判据全绿，证据如下；
-> 权威任务条目：[`multi-end-unified-strategy.md`](multi-end-unified-strategy.md) **§7.1e**（本文件是它的执行 goal；证据不在这里重复）
-> 规律证据：[`../research/dida-capture/INTERFACE-NOTES.md`](../research/dida-capture/INTERFACE-NOTES.md) **§11.5**
+> 权威任务条目：[`multi-end-unified-strategy.md`](../multi-end-unified-strategy.md) **§7.1e**（本文件是它的执行 goal；证据不在这里重复）
+> 规律证据：[`../research/dida-capture/INTERFACE-NOTES.md`](../../research/dida-capture/INTERFACE-NOTES.md) **§11.5**
 > 🔴 **排序由产品负责人 2026-09-29 拍板：主战场是移动端 + 电脑端，web 不是。**
 > 上一轮把 IA 做成"web 先行"——顺序错了，本 goal 改正。
 >

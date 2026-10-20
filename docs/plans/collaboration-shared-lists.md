@@ -344,26 +344,24 @@ mobile 已真渲染过同目录的 `ConflictResolutionView`），缺的全在宿
 5. 传输与凭据：`ShareApiClient` 是纯 fetch、宿主无关，包依赖已具备；但移动端凭据只在内存、冷启动重填，面板的轮询/复封依赖它。
 6. `apps/web/.../ShareFeature.tsx` 这一层不可移植（`window.setInterval` / `document.getElementById` / `navigator.clipboard` / `window.location`）——**它是唯一需要重写的一层**，其余是接线。
 
-### 9.5 文档体检剩余队列（本节由 2026-10-20 那趟审计生成，逐条待做，别重做审计）
+### 9.5 文档体检队列 —— 2026-10-21 这一批把七格做完了，剩下两格是**门禁作用域**问题，不是文案问题
 
-已完成的那批改口记在提交里（`bb6804bd`）。还没动的：
+已改完的（更早那批记在 `bb6804bd`，本批逐条落在下面，读数都是这一趟现量）：
 
-- `docs/plans/README.md` 详情面那一行仍钉「🟡 规划中（2026-10-03 立）」，正文已写「W0–W8a 已落地并合进 main，W9–W12 未开工」；
-  同族还有 `multi-platform-adaptation` / `desktop-native-migration` 两行 —— 处置同 P：**索引不复述状态**。
-- `docs/plans/ai-strategy.md`、`ai-assistant-closure.md`、`ai-event-tool-contract.md` 里的「覆盖面 9/9 / 26 工具 / `MAX_TOOLS_PER_ENTITY = 5`」：
-  前两份是当日记录（历史坐标，下沉成叙述即可），契约文档那句是**活规范**（现量 `= 7` 且 `TASK` 单独抬高）。
-- `docs/agents/repo-map.md` 漏 `packages/{ui,legal,widget-core,inbound-core}` 四枚真工作区包；根 `README.md` 的"现状"段若还有"web 主入口"残留要一起扫。
-- `docs/agents/environment-traps-index.md` 的 80–83 号段描述的是**另一代**（正文在 `legacy-traps-80-83.md`），要显式标注；
-  索引里那句「见正文 `#462`」指向的其实是 `#468`。
-- `docs/adr/*` 与 `docs/README.md` 的 ADR 状态抄件三处打架：0008（已被 0046 取代但索引仍写"已接受"）、0024（本体已接受、索引写"待确认"）、0062（本节已改口）。
-  ⚠️ ADR 冻结：只动索引那一行，本体不动。
-- `check:doc-citations` **只扫 1 份文档**就退出（它自打印"文档 1 份"）⇒ 全仓行号锚没人核；这是"为什么这批漂移没被门禁抓到"的根因，值得单开一工单。
-- `docs/plans/README.md` §二 那一列"行数"15 格里 10 格已漂 ⇒ 整列删掉或换成 `wc -l` 命令。
-- 归档候选（自declared完结 + 低在途引用）：`landing-page-optimization.md`（0 处引用）、`landing-motion-audit/`、
-  `countdown-w8-shell-gate.md`、`gate-blindspot-handoff.md`、`notification-and-activity.md`、`goal-landing-and-quality-audit.md`、
-  `waytofuture-handoff.md`、`ai-tier-pricing-rollout.md`、`subscription-*-handoff.md`。
-  🔴 其中三份被 `docs/adr/` 以链接指着（0043 / 0014 / 0020）——移动必须改 ADR 里的 href；先例是 10-16 那批"只改 href、显示文本留旧名"。
-  这一批**待做**，处置规则：`grep -rn -F <文件名> --include=*.md .` 现量引用数 ⇒ 0 处才动，ADR 指向的那几份要么不动要么按先例改 href。
+| 那一格 | 做完的形状 |
+|---|---|
+| `plans/README` 复述状态 | §一 里 **4 格**改成"状态只在正文"指针（详情面、日历 R13–R16、账号标准套件、本线协作那一格 —— 比我上次估的两格多，因为探针扫了整节）；§二 的「状态」列整列换成**体裁**（计划／交接书／复盘／进度日志／历史），体裁不会漂，状态会 |
+| `plans/README` §二 的「行数」列 | 15 格里 **11 格已漂**（逐格读数写在该节表下的注里）⇒ 整列删掉，只把"这一列反复漂，别引用数字、引用命令"那句留成注。⚠️ 顺带查出该表 `calendar-profile-handoff` 那一行**被自己正文里的裸竖线劈成 5 列**（讲的正是"多写一根竖线会劈表"这件事，句子被自己举的例子劈开）；`check:md-tables` **不扫这份文件**，所以坏了没人报 |
+| AI 的 9/9 / 26 工具 / `= 5` | 活规范四处改口 + 历史读数按该层自己的惯例**加戳不删旧**：`reference/ai-architecture.md`（追加 10-21 现量行、两处 `= 5` 换成指针）、`plans/ai-event-tool-contract.md`（头部状态行那句「覆盖面已跑满」现量已不成立 ⇒ 写明只到 10-04；§5.2 容量段改指针，行号锚 `spec.ts:91-105` 换成符号），`plans/ai-assistant-closure.md`（W10 行、§6 第 3 条、链段号「48/57」→ 现量 83/116 并写明段号是链长的函数），`plans/ai-strategy.md`（两处）与 `plans/roadmap.md`（AI-6 那行的覆盖面、容量、段号）|
+| `repo-map` 漏包 | 补 `ui`／`widget-core`／`legal`／`inbound-core` 四行（描述取自各自 `package.json` 的 description，不自己编）；根 `README.md` 的目录树另补 **5 枚**（那棵树连 `sync-client` 都没有），"现状"段没有"web 主入口"残留（ADR-0036/0037 那两版已改过），但顺手把 `pnpm -r test` 那句「16 个工作区项目 4652 passed」标成当日读数并给现量命令（工作区项目数已 21）|
+| traps 索引 80–83 与 `#462` | 80–83 那一格写明**这一代正文在 `legacy-traps-80-83.md`**，且主台账里 80/81/82 是**同号的另一代**、83–85 在主台账根本不存在（它从 82 跳到 86）、legacy 那本内部 `82`/`83` 各出现两次 ⇒ 引用纪律改成"这一代必须写 legacy 或带文件名"。`#462` 那句指错已改成 `#468` 并解释为什么没人抓到（裸号引用既不是链接也不是 `check:doc-citations` 的默认作用域）。⚠️ 同格还查出**该索引自己的 311–460 那一行被一句带竖线的取数命令劈成 4 列**，已转义修复 |
+| ADR 状态抄件 | **四格**（不是三格）：0008（本体已被 0046 取代、索引写"已接受"）、0024（本体 09-27 就"已接受"、索引写"待确认"）、0050 与 0051（本体"已接受"、索引写"🔄 实施中"——那是**计划层的词**，读起来像决策没拍）。ADR 本体一个字没动。`docs/README.md` §三 新增一条纪律：**两层状态词表不许混，索引那一格只给指针**，并写明为什么只有索引会漂（本体冻结 ⇒ 它是稳定事实，抄件没人比对） |
+| 归档候选那九份 | 上一批（`7dedc97fb`）已归档 8 份；本批复核剩下的 `ai-tier-pricing-rollout` / 两份 `subscription-*-handoff` / `desktop-packaging-handoff` **仍不动** —— 它们各自还有活引用或被 ADR 指着。⚠️ 这批查出归档动作自己的涟漪：**5 份已归档文件的相对链接深度没跟着改**（`archive/` 里 `../` 少一级），它们此刻以修正态在工作树里、由本批一并入库；`docs-link-check` 现量 rc=0 |
+
+🔴 **剩下两格不在文案层，在门禁层，都归 §9.2 的 M7，本线不单方翻口子**：
+
+1. **`check:doc-citations` 的分母是 1 份文档**，而它**在 `pnpm check` 链里** ⇒ 链绿不代表全仓引用被核过。这一趟把作用域放开到全部 `docs/**/*.md` 现量跑了一遍：`文档 266 份 · 反引号 span 163,181 · 「git show HEAD:」行 343 · 锚 104 枚`，报 **878 条**引用问题（其中"路径不存在"846 条）。逐条读后发现**绝大多数不是文档坏了**：远端机器上的路径（`sites-enabled/heyta.finlaw.cloud`、`apps/mobile/node_modules`、`ubuntu-jcli:~/heyta/server/.env`）、示例与占位路径（`docs/plans/a.md`、`mine.md`）、第三方仓的路径（`services/api/src/routes/admin/ai-config.ts`）、URL、以及**历史坐标**（ADR/调研里"当时那个路径"，其中若干已被 10-16 那批"只改 href、显示文本留旧名"的先例正当化）。⇒ 直接把默认作用域改成全仓 = 把链做红 + 逼出一张巨大的豁免表，而豁免表逐条要写理由（那个文件自己就这么要求的）。**要的是作用域规则**（哪一层文档、哪种形状算"当前存在的声称"），这是判据口径，归产品负责人拍。现量复跑：`node scripts/check-doc-citations.mjs $(find docs -name '*.md' -not -path 'docs/plans/archive/landing-motion-audit/*' | sed 's/^/--doc /' | tr '\n' ' ')`。
+2. **全仓 markdown 表格形状**：同一把探针（跳代码围栏）分别跑 `git archive HEAD docs` 那棵树与工作树 —— **HEAD 现量 100 行坏、本批改后 80 行**，即修掉 **20** 行：`plans/README` 12 ／ `ai-event-tool-contract` 3 ／ `docs/README` 2 ／ `repo-map` 1 ／ `ai-assistant-closure` 1 ／ traps 索引 1。余下 80 行散在 21 份**别条线**的台账里，大头逐份现量：`product-ux-optimization` 19、`multi-platform-widgets-progress` 8、`self-host-distribution-audit` 6、`legal-dataflow-ai-rights` 5、`goal-multi-end-coverage` 5、`legal-pipl-baseline` 4、`linux-adaptation` 4、`inbound-automation-handoff` 3（其余各 1–2）。成因两类，都写过在 §7：单元格里放了带竖线的命令，或行尾少一根 `|`。`check:md-tables` 的 `FILES` 只有 **12 份**、`docs/agents/` 下一份都不扫（现量：解析 `scripts/check-md-table-rows.mjs` 里那个数组），所以这些坏行**没有任何常驻判据会报**。⇒ M7 的形状：先把判据扩到 `docs/agents/` 与本线文件（**只加自己那片**），别线的坏行登记不代改。
 
 ### 9.6 风险与不许做的事
 
