@@ -3,7 +3,8 @@
 > 这份只记**当前停在哪、下一步按什么顺序做、哪些路已经走死**。
 > 决策与理由不在这里：计划 [`inbound-automation.md`](inbound-automation.md)（唯一实施计划，文末是逐格台账）、
 > 判据与口径在 `AGENTS.md` 与 [`docs/agents/`](../agents/)、逐条阻塞在 [`../../BLOCKED.md`](../../BLOCKED.md)。
-> 写这份的当刻：**2026-10-19 18:0x**（写前先跑 `date`）。**本线一格都没勾、没 push**（现量见 §6）。
+> 写这份的当刻：**2026-10-19 18:0x**；**本节最后一次刷新：2026-10-20 10:3x**（写前先跑 `date`，本轮交付 tip 现量 `git rev-parse --short refs/heads/main` ⇒ `0520c7904`）。**本线一格都没勾、没 push**（现量见 §6）。
+> 🔴 **这次刷新是因为工作要交出去**：§1／§4／§5／§7 已按 05:09 那趟 28 腿电池的当戳读数重取过（原件 `~/.heyta-evidence/inb-t7-1017-0902/batt-tip-1020/`）。接手人从 §1 第 2 条往下做，**不要重跑电池**，除非 §4a 表里那三份文档又变了——它是文档尺的输入。
 
 ---
 
@@ -12,7 +13,7 @@
 1. **这一档功能在代码层是齐的，缺的全是"证据 + 人 + 机器"**：AC-1～AC-8 每格都有可复跑命令与当日读数，
    而且**命令与逐字输出现在都在仓里**（按格分组的命令见下面 §4a；今天那两批的逐字输出搬进计划文末「2026-10-19 21:3x · 完成条件 1 里"贴出的输出"那一半，从家目录搬进仓里」那一节 —— 此前**当日那批**输出只躺在家目录，clone 的人只能看到 10-10／10-11 那两张旧戳）。
    但**勾选权在负责人**，且"四端当前产物"里 windows／android 两端的当前产物复不出来，因为它依赖的那台打包机不通。
-2. **接手第一件事**：§4 那枚原本"在途"的 116 道链**已跑完并写进台账**（末行 `CHAIN ran=116/116 RED=3 steps=[63, 87, 106]`）⇒ 直接从 §8 的第 2 步往下做：问负责人 §7 还开着的那五格；打包机回来后一次做完腿 3。**别重跑整条链之外的任何重步**，除非 §5 那条分母规则说该跑。
+2. **接手第一件事**：§4 那枚原本"在途"的 116 道链**已跑完并写进台账**（末行 `CHAIN ran=116/116 RED=3 steps=[63, 87, 106]`），28 腿电池也已刷到本轮交付 tip（10-20 05:09，结论行 `legs=28 rc0=27 rc_nonzero=1`，唯一非 0 是 B205 那枚范围尺）⇒ 直接从 §8 的第 2 步往下做：**问负责人 §7 现在开着的那六格**（含今天新增的 android 腿三选一）；打包机回来后按 §8 第 3 项那一段一次做完腿 3。**别重跑电池、别重跑整条链**，除非 §4a／§5 里那两条分母规则说该跑。
 3. **不要碰**：判卷口径（B199／B239 那两格等负责人；**B241 已按负责人自己那条旧令的默认支闭合，见 §7 第 1 格**）、`packages/i18n`、别人的红（本戳链内三枚全归他线）、
    别人的载体与提交。
 
@@ -43,6 +44,10 @@
 ---
 
 ## 3. 已完成（本轮，全部本地入库）
+
+> 🟢 **10-20 10:3x 刷新时补一句"这一轮最后动的是什么"**（免得接手人以为下面那张表就是最新状态——那张表停在 10-19 18:0x）：
+> 之后落了三笔（现量 `git log refs/heads/main --format='%h %ad %s' --date=format:'%m-%d %H:%M' -3`）：**§8 第 3 项那条腿 3 runbook 的两处自纠**（判据那行原本读的是 `tee` 的 rc ⇒ 永远不会红；四端截图原本落脚本默认的 `/tmp` ⇒ 负责人要看的原件第二天就没了，现改成 `HEYTA_REINSTALL_TMP_DIR="$EV"`）＋ 台账第 149 条、**28 腿电池刷到交付 tip**（`legs=28 rc0=27 rc_nonzero=1`，唯一非 0 是 B205 范围尺）＋ §4a 那张表的"最近一次当日读数在哪"整列改指这一戳 ＋ 台账第 150 条、**§8 第 4 项写明 Linux 取证不必为文档提交重跑**（八枚构建输入路径各 0 行，附现量循环）。
+> 交接口径：这三笔之后**本线没有待跑的验证**——剩下的全在 §5（等机器）与 §7（等人拍）。
 
 | 做了什么 | 产品上意味着 | 读数与复跑 |
 |---|---|---|
@@ -79,14 +84,11 @@ git -C .worktrees/inb-t10 status --porcelain | wc -l   # 载具应为 0
   （旋钮存在由 `python3 research/tools/verify-inbound-check-chain.py --help` 现量）；续跑前把目录里已脏的证据件先整片存档再逐名 `git checkout --`
   （形状照 `PROGRESS.md` 第 104 条 ⑧ 与第 108 条 ⑦：先 `ls` 出枚数、存档、逐名还原、再验载具脏数回 0），别在跑批中途还原。
   🔴 **并且：还原之前先把名下未入库的文档笔提交掉** —— 本会话就是没做到这一步，`git checkout --` 把自己那几行没入库的交接书改动一起还原了（见 §9 最后一条）。
-- **AC 那半**：28 枚腿逐腿有读数（计划文末台账），且**代码自那片戳以来一字未变 —— 这句现在是量出来的**：
-  `git diff --name-only 36214e3a refs/heads/main | wc -l` 回 **7**（全是文档），
-  `git diff --name-only 36214e3a refs/heads/main | grep -vcE '^(docs/|PROGRESS\.md|BLOCKED\.md|AGENTS\.md|README)'` 回 **0**
-  （读数写在 `PROGRESS.md` 末节那片 ①）。⇒ 不必重跑电池；要重跑也只用按 §5 那把三层筛子判。
-- **完成条件 1**：AC 那半＝达成（每格有命令 + 输出）；"T7 三条命令在隔离副本 exit 0"＝**未达成，且不由本线闭合**
-  （链上本戳三枚红 `steps=[63, 87, 106]` 全在他线地界，第 49 道那枚缺陷只是被装机语言被改而暂时盖住 —— 见 §5；外加打包机不通）。
+- **AC 那半**：28 枚腿逐腿有读数，且**这一戳是打在交付 tip 上的**（10-20 05:09，载具零脏起跑、`sysctl -n vm.loadavg` 回 `{ 5.70 8.72 9.89 }`）⇒ 结论行逐字 `legs=28 rc0=27 rc_nonzero=1`，原件 `~/.heyta-evidence/inb-t7-1017-0902/batt-tip-1020/{batt.txt,batt.rc}`、逐腿日志 `<载具>/.run-logs/inb-ac-battery-1020-0509/`、逐枚读数抄在 `PROGRESS.md` 第 150 条。**为什么这一趟非跑不可**：AC-7 六道与 `AC8-matrix`／`AC8-ac-ticks` 读的输入里含本文件、`inbound-automation.md`、`PROGRESS.md`，而第 149／150 条那两笔只改文档——**文档维输入变了**，这与"八枚构建输入 delta=0 所以 Linux 取证不必重跑"那把尺射程不同，两把尺不许互相顶替（现量：`git diff --name-only b8d3df1d4 refs/heads/main -- server/src server/tests packages apps/web/src apps/mobile/src e2e research/tools scripts | grep -c .` 回 **0**，`git diff --name-only 24d05137b..refs/heads/main -- packages apps/web/src apps/mobile/src apps/desktop/src apps/desktop-linux/src server/src scripts/reinstall-all.sh pnpm-lock.yaml` 各回 **0 行**）。⚠️ 旧句「不必重跑电池」是那一戳的读数，已按上面这条改口。
+- **完成条件 1**：AC 那半＝达成（每格有命令 + 输出，见 §4a 那张表与第 150 条）；"T7 三条命令在隔离副本 exit 0"＝**未达成，且不由本线闭合**
+  （链上本戳三枚红 `steps=[63, 87, 106]` 全在他线地界，第 49 道那枚绿只是因为装机语言被改；腿 3 还等那台打包机，见 §5 第一格）。
 - **完成条件 2**：`node research/tools/license-inventory.mjs` 与 `node scripts/check-migrations.mjs` 各 rc=0；
-  AC 勾数 0；`BLOCKED.md` 随交付提交。✅ 本戳成立（引用连 tip）。
+  AC 勾数 0；`BLOCKED.md` 随交付提交。✅ **10-20 06:31:53 在交付 tip `0520c7904` 上重取过**（两枚各 `LICENSE=0`／`MIG=0`，现量 `grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` 回 **0**，原件 `~/.heyta-evidence/inb-t7-1017-0902/batt-tip-1020/readback-e150.txt`）。⚠️ 那句 `pnpm check-migrations`（任务书原文）在仓里不存在，真名是 `check:migrations` ⇒ 见 traps #501，别把那条 rc=1 记成门禁红。
 
 ---
 
@@ -139,7 +141,7 @@ comm -3 ~/.heyta-evidence/inb-t7-1017-0902/legs-register.txt ~/.heyta-evidence/i
 
 | 格 | 现量形状 | 谁能解 |
 |---|---|---|
-| 腿 3：打包机不通 | 🔴 **本格此前那句「四枚在册别名各 rc=255」不是四路证据 —— 2026-10-20 01:0x 逐块读 `~/.ssh/config` 后证据重做（`PROGRESS.md` 第 139 条；traps #499 ⑥＋#500；原件 `~/.heyta-evidence/inb-t7-1017-0902/leg3-1020-0103/host-probe.txt` 的 A–H 段）**：探打包机的只有 `windows-pc` 一枚（config:87–88，那块 96 行注释自记「Windows 打包服务器」，且 `scripts/reinstall-all.sh:335` 的默认 `HEYTA_WIN_HOST` 就是它）；`laptop-5ueuu7ps`／`windows-codex`（config:102–104：同一 IP、`User rayne`、101 行注释「LAPTOP-5UEUU7PS」）是**另一台机器**（与 B225 追记五那句「四枚只指两台宿主」一致，但那两台里只有一台是打包机）；`windows-pc-lan`（config:187–188）的 HostName 与打包机那块自己第 99 行记的局域网地址**差一枚**，且本机 `route -n get` 把它从 en0 默认网关送出去（不经那张虚拟网）⇒ 这枚探不到打包机，**无论哪一处地址才是新的**。 **现在判「对端不在线」的只有这两把尺**（都零副作用、都现量过，01:08:03 那趟）：①**本机链路**——`pgrep -fl -i zerotier` 有 `zerotier-one`，且 那枚虚拟口（`feth*`）的地址落在打包机所在网段（逐口取的 awk 在 #500 ③，本格不整条抄：表格单元里的竖线会顶掉这一行的列数）；②**同链路对照臂**——`ssh linux-dev true` 回 **rc=0**、`ping -c 2` 打它的 HostName 有回声（26–57 ms）。两把都绿时 `ssh windows-pc true` 仍 **rc=255** 且 `ping -c 2` 打它的 HostName **0/2 回声** ⇒ **打包机确实不在线**，这一格照旧只能等负责人开机；**结论一格没动，动的是证据**（旧那些「四枚 255」的戳别再当四路证据用）。 ⚠️ 三条分类红线：**别用 ssh 措辞分类**（同一枚死 peer 五分钟内 `Host is down`→`Operation timed out`，`rc` 不变；路由表里那枚 peer 条目 01:05:01 带 `R`＋`!`、01:06:18 不带、01:08:26 又带，随老化漂（命令在 #500 ②））；**别拿「ping 本机自己在 feth\* 上的地址」当对照**（0.2 ms 必回声＝本机自己答，零信息，#500 ④）；**`Connection refused` 不证明对面 sshd 坏**（#500 ⑤）。此前那枚「敲错名字与关机同 rc」的警告仍然有效，见 #499 ①–⑤ 与下面 §9 那一枚子弹。 🟢 **01:51 又跑了一趟，三样观测量都现量了**（正文见 `PROGRESS.md` 第 143 条 ④；原件 `~/.heyta-evidence/inb-t7-1017-0902/retry-leg3-1020-0151/ssh-probe.txt`）：①守护在（现量 `pgrep -fl zerotier-one` 回 pid 625）、②本机在那张网上的地址在（`10.111.127.246`）、③**同通路另一枚对端的阳性对照** `ssh linux-dev true` 回 rc=0，而同一趟 `windows-pc` 回 rc=255 超时。⇒ 本格上面那句「只有这两把尺」与 §8 第 3 项那句「两把尺（本机链路＋同链路对照臂）」**数的是不同的东西**，别按枚数念——按名字念：**守护、本机地址、同通路对端对照**，三样都在才算把"对端不在线"报出去（对照的终点不能落在本机自己，#500 与那条「拿本机自己当对照＝恒答、零信息」的教训）。 | **只有负责人**能开机；本线按已定口径不自决退回本机出包 |
+| 腿 3：打包机不通 | 🔴 **本格此前那句「四枚在册别名各 rc=255」不是四路证据 —— 2026-10-20 01:0x 逐块读 `~/.ssh/config` 后证据重做（`PROGRESS.md` 第 139 条；traps #499 ⑥＋#500；原件 `~/.heyta-evidence/inb-t7-1017-0902/leg3-1020-0103/host-probe.txt` 的 A–H 段）**：探打包机的只有 `windows-pc` 一枚（config:87–88，那块 96 行注释自记「Windows 打包服务器」，且 `scripts/reinstall-all.sh:335` 的默认 `HEYTA_WIN_HOST` 就是它）；`laptop-5ueuu7ps`／`windows-codex`（config:102–104：同一 IP、`User rayne`、101 行注释「LAPTOP-5UEUU7PS」）是**另一台机器**（与 B225 追记五那句「四枚只指两台宿主」一致，但那两台里只有一台是打包机）；`windows-pc-lan`（config:187–188）的 HostName 与打包机那块自己第 99 行记的局域网地址**差一枚**，且本机 `route -n get` 把它从 en0 默认网关送出去（不经那张虚拟网）⇒ 这枚探不到打包机，**无论哪一处地址才是新的**。 **现在判「对端不在线」的只有这两把尺**（都零副作用、都现量过，01:08:03 那趟）：①**本机链路**——`pgrep -fl -i zerotier` 有 `zerotier-one`，且 那枚虚拟口（`feth*`）的地址落在打包机所在网段（逐口取的 awk 在 #500 ③，本格不整条抄：表格单元里的竖线会顶掉这一行的列数）；②**同链路对照臂**——`ssh linux-dev true` 回 **rc=0**、`ping -c 2` 打它的 HostName 有回声（26–57 ms）。两把都绿时 `ssh windows-pc true` 仍 **rc=255** 且 `ping -c 2` 打它的 HostName **0/2 回声** ⇒ **打包机确实不在线**，这一格照旧只能等负责人开机；**结论一格没动，动的是证据**（旧那些「四枚 255」的戳别再当四路证据用）。 ⚠️ 三条分类红线：**别用 ssh 措辞分类**（同一枚死 peer 五分钟内 `Host is down`→`Operation timed out`，`rc` 不变；路由表里那枚 peer 条目 01:05:01 带 `R`＋`!`、01:06:18 不带、01:08:26 又带，随老化漂（命令在 #500 ②））；**别拿「ping 本机自己在 feth\* 上的地址」当对照**（0.2 ms 必回声＝本机自己答，零信息，#500 ④）；**`Connection refused` 不证明对面 sshd 坏**（#500 ⑤）。此前那枚「敲错名字与关机同 rc」的警告仍然有效，见 #499 ①–⑤ 与下面 §9 那一枚子弹。 🟢 **01:51 又跑了一趟，三样观测量都现量了**（正文见 `PROGRESS.md` 第 143 条 ④；原件 `~/.heyta-evidence/inb-t7-1017-0902/retry-leg3-1020-0151/ssh-probe.txt`）：①守护在（现量 `pgrep -fl zerotier-one` 回 pid 625）、②本机在那张网上的地址在（`10.111.127.246`）、③**同通路另一枚对端的阳性对照** `ssh linux-dev true` 回 rc=0，而同一趟 `windows-pc` 回 rc=255 超时。⇒ 本格上面那句「只有这两把尺」与 §8 第 3 项那句「两把尺（本机链路＋同链路对照臂）」**数的是不同的东西**，别按枚数念——按名字念：**守护、本机地址、同通路对端对照**，三样都在才算把"对端不在线"报出去（对照的终点不能落在本机自己，#500 与那条「拿本机自己当对照＝恒答、零信息」的教训）。 🟢 **04:03:33 又取了一戳、形状没变**（原件 `~/.heyta-evidence/inb-t7-1017-0902/cmd-audit-1020/probe-0402.txt`，三样观测量按名字念齐全）：`ssh -o BatchMode=yes -o ConnectTimeout=8 windows-pc true` 回 **255**，同趟对照臂 `ssh … linux-dev true` 回 **0** ⇒ 本格结论照旧：**等负责人开机**，本线不自决退回本机出包。 | **只有负责人**能开机；本线按已定口径不自决退回本机出包 |
 | 腿 3：设备面 | `adb devices` 回 **0 台**、`xcrun simctl list devices` 里 `heyta-multiend-reinstall` 回 **Shutdown**（18:32:09 戳，23:32:20 与 10-20 00:07:48 两戳复探同形；昨天 20:32 那戳 `emulator-5554 device` 已在册）。⚠️ **数设备要数"非空行"**（写法见 PROGRESS 第 122 条 ⑤ 那枚命令，本格不整条抄：表格单元里的竖线会顶掉这一行的列数）—— 空列表时 `adb devices` 末尾仍带一行空行，拿 `wc -l` 数会回 **1**，把"零台"读成"有一台"。⚠️ 第二枚形状（10-20 00:07:48 自曝）：**按「设备名 + Boot」去数会把"存在"与"已启动"混成一格** —— 那台机器上此刻是 `heyta-multiend-reinstall (Shutdown)` 而 `heyta-iphone-17pro (Booted)`（别线的面包器），两种问法要分开：存在性用 `xcrun simctl list devices | grep -c 'heyta-multiend-reinstall'`（回 **1**），启动态用 `xcrun simctl list devices booted | grep -c '('`（回 **1**，但那一枚是别人的）。⇒ 机器通了还得先把这两面起起来。本线**能**起模拟器，但在打包机通之前不起 —— 免得留下"半跑"那种形状，也**不碰别人那枚已启动的**。**02:11:54 又取了一戳**（原件 `~/.heyta-evidence/inb-t7-1017-0902/evpointers-10arms-0143/devices-preflight-0211.txt`）：`adb devices` 的非空行数回 **0**（任务书 10-16 那句「emulator-5554 已在册」是当时的读数，不是现状，别按它点设备）、`emulator -list-avds` 本机仍只有 `heyta-w3-yearly` 这一枚、booted 列表里只有 `heyta-iphone-17pro`（别线的面包器）、`heyta-multiend-reinstall` 存在性回 **1**。⇒ **这一格真正卡着的不只是"没开机"**：起 android 面就等于动那枚并行会话的 AVD，B164 要的脚本内身份判据今天仍不在（取法见 §8 第 3 项）——所以要么等那条判据落地／负责人当轮授权，要么 `--skip android` 并把 `⏭` 原样交下一位，**别让"打包机通了"被读成"四腿都能点了"** | 本线能起模拟器，但要在打包机通之后一次做完；**android 面另需 B164 那一格的处置** |
 | 链第 49 道 `check:macos-window` | 探针 `HeytaMacApp.swift:625` 用 `input[placeholder^="添加任务"]` 数采集框，界面是英文时恒 0，三条 `NEEDED` 同时判缺（B238，形状见环境陷阱 #480）。⚠️ **本戳那趟它是 `RC=0`（18:21:43 收尾那片，`STEP= 49/116 RC=0 SEC=20.7`）—— 因为 `defaults read -g AppleLanguages` 首项已被改成 `zh-Hans-CN`**（上午 11:08 那戳是 `en`，第 104 条 ⑤），语言写盘时间 `stat -f '%Sm' ~/Library/Preferences/.GlobalPreferences.plist` 回 `Oct 19 18:12:41`。⇒ **别把这次绿读成修好了**：这是一枚同机同探针、只换装机语言的天然对照，门仍随语言翻（判据不该依赖语言），归属仍是 macOS 壳线 | macOS 壳线 |
 | 链第 63 道 `check:payment-entry` | `现状：生产 compose 未配支付渠道；客户端里找到 2 处付款入口。`（尺有牙：`--self-test` 四臂全过；10-19 23:57:23 在本载具独立跑 `node scripts/check-payment-entry.mjs` ⇒ rc=**1**、末行同句，23:52 与 23:57 两跑逐字相同，原件 `~/.heyta-evidence/inb-t7-1017-0902/payentry-2357.txt`） | 收款面（B226／B223 同源） |
@@ -149,6 +151,7 @@ comm -3 ~/.heyta-evidence/inb-t7-1017-0902/legs-register.txt ~/.heyta-evidence/i
 
 **风险**：证据目录里的入库 png 每次跑 AC-6 会被逐名覆写（±1~4 通道抖动、肉眼不可见、没有任何门为它红）⇒
 谁在工作树脏着的时候提交，就会把不可见的字节改动一起带进去。**处置是 §7 的第 4 格**，别自己顺手改。
+🔴 **10-20 05:09 那趟又发生了一次，本线照 §7 第 4 格的口径处置，没代拍**：载具脏数从起跑前的 **0** 变 **6**，其中 **5 枚**是被覆写的入库图（现量 `git status --porcelain | wc -l`；名册 `apps/web/evidence/inbound-recovery/{draft-390-dark,form-1280-dark,form-1280-light,retry-1280-dark}.png` ＋ `docs/research/evidence/inbound-automation-review/panel-layout/panel-1280-dark.png`）⇒ 动作两条，顺序别换：先把新字节整片留底 `~/.heyta-evidence/inb-t7-1017-0902/batt-tip-1020/ac6browser-overwrites-0509.tar.gz`（现量 `tar -tzf … | wc -l` 回 **5**），再 `git checkout -- <那两目录>` 把载具恢复到提交态（之后 `git status --porcelain` 只剩当时要提交的那份文档）。**留底不等于入库**：谁拍 §7 第 4 格，这件 tar 就是"该不该让它们继续被覆写"的现场样本。
 
 ---
 
@@ -171,7 +174,7 @@ comm -3 ~/.heyta-evidence/inb-t7-1017-0902/legs-register.txt ~/.heyta-evidence/i
 
 ---
 
-## 7. 待拍板：还开着五格（第 1 格已按负责人自己的旧令默认支闭合）
+## 7. 待拍板：还开着六格（第 1 格已按负责人自己的旧令默认支闭合）
 
 真身在 `BLOCKED.md` 对应节，拍板后**由谁做**也写在那节里。**逐格重问过"旧令有没有给默认支"**（别把它们一律读成"等答复"）：
 
@@ -182,13 +185,19 @@ comm -3 ~/.heyta-evidence/inb-t7-1017-0902/legs-register.txt ~/.heyta-evidence/i
 5. **B199** 完成条件里"开工快照"那一格的口径（没开工基线 ⇒ 只能按集合判不能按计数判）。判卷口径，本线不代拍。
 6. **B205** 范围尺（读数按戳取，别抄这行的数：`python3 research/tools/verify-inbound-commit-scope.py > 文件 2>&1; echo rc=$?` 再看首行 ⇒ 10-20 00:37:46 那戳是 **rc=1、`越界=96`、本线笔数=326**，OOB 行数现量 `grep -c '^  OOB ' <原件>`）：①「自动收集」这个标题词是不是本线独占归属凭据；② 白名单收不收本线授权过的路径。**推荐**：不收路径，给装置加显式**授权登记表**。⚠️ **这一格今天多了一枚必须一起拍的内容（B205 追记三）**：尺的允许文档清单（`research/tools/verify-inbound-commit-scope.py:56-63`）**没有** `docs/reference/environment-traps.md`（那是 `AGENTS.md` §5 指定的唯一事故落点）与 `docs/plans/inbound-automation-handoff.md`（负责人 10-19 点名要的交接物）—— 照仓规写就得 rc=1，不写就违反 AGENTS，加正则就是改判卷口径（本线不许）。同批还牵出一句**不需要改判据**的歧义：`AGENTS.md` §4「新增子文件后必须回本表登记」讲的是 AGENTS.md 自己的规则地图，而 `docs/agents/environment-traps-index.md` 末行明文「不要写回本文件」——本线 00:14 按前者加了一行、00:21 按后者撤回（`7d76e762`），一句话就能定死。另附：载具 `.worktrees/inb-t10` 留不留（删除不可逆，`git worktree remove .worktrees/inb-t10`）。
    ⚠️ 同一份任务书还列过一枚 `.worktrees/inb-t9 的处置` —— **那格已被盘上事实作废**：23:45:59 现量 `git worktree list` 只剩 inb-t10，`ls .git/worktrees/` 里也没有 `inb-t9` 那枚管理目录 ⇒ 不是"留着但断开"，是连根没了，没有可拍的对象。台账里 212 处旧载具提及逐枚普查过（47 处是命令行形状），判法与替代入口写在计划文末「2026-10-19 23:4x · 三枚旧载具…」那一节，历史行一枚未删。
+7. 🔴 **腿 3 的 android 面三选一**（这一格是 10-20 02:1x 现量设备面时新冒出来的，正文在此、不代拍；`BLOCKED.md` 的 **B164** 是它的来路）：
+   现量形状——本机 `adb devices` 的非空行数回 **0**、`emulator -list-avds` 只有 `heyta-w3-yearly` 这一枚 AVD，而那枚**属于并行会话正在用的设备**；脚本拿默认序列号动手（`scripts/reinstall-all.sh:367` 的 `SERIAL="${HEYTA_E2E_SERIAL:-emulator-5554}"`，第 **377** 行 `adb -s "$SERIAL" uninstall com.heyta`），B164 要求的那条"设备身份判据"今天仍不在脚本里（现量 `grep -c HEYTA_ANDROID_AVD scripts/reinstall-all.sh` 回 **0**）。上一次越界就是这形状（B62 的 23:5x 段把"读数有效、动作越界"两条一起记了，按 `grep -n '动作越界' PROGRESS.md` 自定位）。
+   - **甲：脚本所有者／负责人把身份判据落进 `reinstall-all.sh`**（例如要求显式 `HEYTA_ANDROID_AVD=<名字>`，不等就不猜、响亮失败）。后果：android 腿变成"点得动且点不错"的常驻判据，代价是**改别人的验收脚本判卷口径** ⇒ 本线不代做，只能由 owner 落。
+   - **乙：负责人当轮明确授权"这一轮可以动 `heyta-w3-yearly`"**。后果：本轮能出 android 的当前产物，但会 `pm clear`/卸装那台并行会话正在验收的设备；授权必须**逐轮给**，一次授权不扩成下次（同 §6 那条"单次授权不许扩成无人值守重发"）。
+   - **丙（本线推荐）：继续 `--skip android`**，把汇总里那一行的 `⏭` 原样交下一位，并在台账大字写明"这端没有验证当前产物"。后果：四端里少一端的当前产物，但**零越界**、形状诚实；`⏭` 那行不计失败（脚本 `:651`），所以判据要按 §8 第 3 项那三枚计数念，别只看 rc。
+   ⇒ 拍甲或乙之前，腿 3 那一段的写法已经按这个口径改过（§8 第 3 项那段命令块里带 `--skip android` 的注释就是丙的形状）。
 
 ---
 
 ## 8. 下一步（按顺序；每条自带判据与"失败形状"）
 
 1. ~~**收 §4 那枚在途链**~~ 🟢 **已收完，别重做**：那趟 116 道整串跑完，红集与逐道读数在 §4 那一格与 `PROGRESS.md` 第 118 条（⚠️ 日志形状是扁平 `…/chain-t10-1746/NNN.log`，**没有 `chain.txt`** —— 本条旧句那样写过一次，是错的）。⇒ 接手请直接从第 2 步往下做。
-2. **问负责人 §7 还开着的那五格**（在对话里贴正文，不给他勾）。任一格被拍 ⇒ 按那一节里写的那一步做，改完跑对应尺。
+2. **问负责人 §7 现在开着的那六格**（在对话里贴正文，不给他勾；第 7 格是 10-20 新出现的 android 腿三选一）。任一格被拍 ⇒ 按那一节里写的那一步做，改完跑对应尺。
 3. **打包机回来之后一次做完腿 3**（不许半跑、不许只跑一端）：
    ⚠️ **动手前先读这一格，别照下面那两行直接跑**。「机器通了」只解开 **mac + windows** 两腿，**android 腿有一条本线自己登记过的红线**（`BLOCKED.md` B164 主条「要拍的一格」＋那次越界本身记在 B62 的 23:5x 段，本台账里那一行按 `grep -n '动作越界' PROGRESS.md` 自定位，别按行号找）：脚本拿默认序列号 `scripts/reinstall-all.sh:367` 的 `SERIAL="${HEYTA_E2E_SERIAL:-emulator-5554}"`，第 **377** 行就 `adb -s "$SERIAL" uninstall com.heyta`，而**本机唯一那枚 AVD 是并行会话在用的**（现量 `emulator -list-avds` ⇒ `heyta-w3-yearly`；`emulator-5554` 起起来也是它），B164 要的**设备身份判据今天仍不在脚本里**（现量 `grep -c HEYTA_ANDROID_AVD scripts/reinstall-all.sh` 回 **0**）。⇒ 动 android 腿之前只有两条路：**①** 负责人／脚本所有者把那条身份判据落进脚本（这是改验收脚本判据，本线不代改）；**②** 负责人在当轮明确授权"这一轮可以动那枚 AVD"。**两条都没有就先 `--skip android`**，并把汇总里那一行的 `⏭` 原样交给下一位 —— 按 `docs/agents/workflow-rules.md` 第 9 条（旧号 §8.9 共享资源独占验收），不得并行覆盖别人的设备。
    iOS 腿：`xcrun simctl boot` 之后**必须回读**，两问分开（形状见 §5 腿 3 设备面那一格）——存在性 `xcrun simctl list devices | grep -c heyta-multiend-reinstall`、启动态 `xcrun simctl list devices booted | grep '('`；脚本只认 Booted 里的**准确名字**（`scripts/reinstall-all.sh:443`），多台 booted 又没匹配时它**不猜、响亮失败**（同文件 `:457`）。**别用 `|| true` 把 boot 失败盖掉**（本格上一版就是这么写的，已改）。
