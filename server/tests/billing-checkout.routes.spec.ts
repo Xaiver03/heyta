@@ -450,6 +450,27 @@ describe('收银台 —— ②′ 这台实例到底交付不交付得了这一�
     const res = await post({ priceId: 'hosted-monthly' });
     expect(res.statusCode).toBe(200);
   });
+
+  it('🔴 这个选项**根本没传**那一支也拒：默认值必须落在"卖不出去"，不是"卖了交付不了"', async () => {
+    // `buildApp` 把 `managedAiConfigured: true` 写进了自己的默认（本 spec 的立场是
+    // "这一档买的东西存在"），后果是：`checkout.routes.ts` 里那句
+    // `options.managedAiConfigured ?? false` **一次都没被走到** —— 本文件每一条用例
+    // 都从 builder 的那枚 `true` 过去。而那句默认值是给**下一个注册点**兜底的：
+    // 生产这一处传了（`server.ts` 里 `managedAiConfigured: fullConfig.managedAi !== undefined`），
+    // "别的地方忘了传"却没有一层守 —— 这一条就是那一层。
+    // 现量：`node scripts/mutate-checkout-tier-gates.mjs` 的 C3 臂把 `?? false` 翻成
+    // `?? true`，它必须红在这一条上；少了这一条，那一臂会存活。
+    //
+    // ⚠️ 用显式 `undefined` 而不是再造一个"不传选项"的 builder：`??` 判的是**值是不是 nullish**，
+    //    不是键在不在，所以这一支与"键根本没出现"在运行时逐字段同形，而不必复制一份注册代码。
+    app = await buildApp({ managedAiConfigured: undefined });
+    const res = await post({ priceId: 'hosted-ai-monthly' });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe('PRICE_NOT_SELLABLE');
+    const rows = await sql.query<{ n: unknown }>('SELECT count(*)::int AS n FROM checkout_orders');
+    expect(Number(rows[0]?.n)).toBe(0);
+  });
 });
 
 describe('收银台 —— ④′ 收了钱不许把已经付费的能力判小', () => {
