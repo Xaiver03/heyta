@@ -186,15 +186,28 @@ function makeStyles(tokens: HeytaNativeTokens) {
     list: {
       gap: tokens['space.2'],
     },
+    /**
+     * 一条提醒 = **上下两段**：第一行时刻 + 状态徽标，第二行动作。
+     *
+     * 🔴 这里原来是一行（`flexDirection: 'row'`，左边 `main` 吃剩余宽度）。装机态实测证明
+     * 那个形状在英文档必然失败：三枚动作自己就要 293 pt，370 pt 的行宽只给左边留 53 pt，
+     * 而徽标 `Scheduled` 那一行字要 76 pt —— **没有任何内部换行能把 76 装进 53**。
+     * 试过 `row: flexWrap` + `main: flexBasis 'auto'`（想让动作整排换行），
+     * 重打包装进模拟器后各枚 frame 与改前**逐位相同**（`Scheduled` 仍是 `[24,380,53,28]`）：
+     * Yoga 的换行判定按子节点上一趟的解析宽度累加，`flex-grow` 的那一枚在里面只占它被挤出来的
+     * 53 pt ⇒ 永远判成"装得下"。所以只能把"什么时候换行"从测量里拿走，**由构造决定**。
+     *
+     * 代价说清楚：中文档那几行也变成两段（比原来高一行）。换来的是"任何语态、任何外观档、
+     * 任何字号都不会把一个单词劈开"，而不是一条按语种宽度碰运气的气泡线。
+     */
     row: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: tokens['space.2'],
+      flexDirection: 'column',
+      alignItems: 'stretch',
+      gap: tokens['space.1'],
       minHeight: tokens['touch-target.min'],
     },
-    /** 时刻 + 徽标，吃掉剩余宽度（长文案换行而不是挤掉动作按钮）。 */
+    /** 时刻 + 状态徽标：整行宽度，长文案自己换行，动作不参与竞争。 */
     main: {
-      flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
       flexWrap: 'wrap',
@@ -212,9 +225,14 @@ function makeStyles(tokens: HeytaNativeTokens) {
       borderRadius: tokens['radius.full'],
       backgroundColor: tokens['color.surface-sunken'],
     },
+    /**
+     * 动作那一排。它在 `row`（列）里被拉满整宽，所以靠 `flex-end` 守住"按钮在右边"这条
+     * 从一行布局留下来的视觉语法 —— 宽屏（web 详情面）上尤其要看这一枚。
+     */
     actions: {
       flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'flex-end',
       gap: tokens['space.1'],
     },
     /** 行内动作：图标 + 文字，触控目标下限靠 `minHeight`/`minWidth` 保证。 */

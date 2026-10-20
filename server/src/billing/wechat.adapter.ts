@@ -55,6 +55,8 @@ import {
   createVerify,
   randomBytes,
 } from 'node:crypto';
+import { buildPaymentEventId } from './payment-event-id';
+import { buildOutTradeNo, parseUserIdFromOutTradeNo } from './out-trade-no';
 import { MIN_CHARGEABLE_AMOUNT_MINOR, isMinorAmount } from './money';
 import { DEFAULT_PRICE_BOOK, grantsForSku, projectPrices } from './price-book';
 import type { Currency } from './money';
@@ -76,25 +78,6 @@ import type {
 
 /** provider 名。与 `PaymentEvent.provider` / 路由路径 `/webhooks/wechat` 同值。 */
 export const WECHAT_PROVIDER = 'wechat';
-
-/**
- * 支付成功事件的 `providerEventId` **前缀** —— 唯一事实源。
- *
- * 🔴 它有两处消费者，所以绝不能在两个地方各写一份字面量：
- * 1. adapter 用它拼幂等键（`payment_succeeded:<out_trade_no>`）；
- * 2. **对账**（`reconcile.ts`）用它把 `payment_events` 行关联回
- *    `checkout_orders`（`payment_events` 表上没有 `out_trade_no` 列）。
- *
- * 只改一处而不同步另一处，对账会**静默地一条候选都找不到** ——
- * 它不会报错，只会安静地不做任何事，而那正是"补结算"要消除的失效模式。
- * 所以拼装与解析都走下面的两个函数，不在别处出现这个字面量。
- */
-export const WECHAT_PAYMENT_SUCCEEDED_EVENT_PREFIX = 'payment_succeeded:';
-
-/** 支付成功事件的幂等键。**唯一**的拼装点。 */
-export const buildWechatPaymentEventId = (outTradeNo: string): string =>
-  `${WECHAT_PAYMENT_SUCCEEDED_EVENT_PREFIX}${outTradeNo}`;
-
 
 /**
  * 🔴 微信支付能收的币种 —— **唯一一处**，同时喂给
@@ -388,34 +371,6 @@ export const parseWechatTime = (value: unknown): number | undefined => {
   if (typeof value !== 'string' || value.trim() === '') return undefined;
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) ? parsed : undefined;
-};
-
-/**
- * 商户订单号格式：`hy<uid 的 36 进制>x<unix 秒的 36 进制>x<8 字节随机 hex>`。
- *
- * 🔴 为什么把 userId 编进订单号：微信的 `attach` 字段**在回调里可能出现也可能不出现**
- * （它取决于下单时是否带了、以及通知模板）。订单号是我们自己生成的，把它当作
- * **兜底**的用户归属来源，可以让"attach 丢了"从"授予不到用户"降级成"照常授予"。
- * 长度 ~28 字符，在微信 32 字符上限内。
- */
-export const buildWechatOutTradeNo = (
-  userId: number,
-  nowMs: number,
-  randomHex: string,
-): string => {
-  const uid = Math.trunc(userId).toString(36);
-  const ts = Math.floor(nowMs / 1000).toString(36);
-  return `hy${uid}x${ts}x${randomHex}`;
-};
-
-const OUT_TRADE_NO_PATTERN = /^hy([0-9a-z]+)x[0-9a-z]+x[0-9a-f]+$/;
-
-/** 从商户订单号里取回 userId；不符合本 adapter 的格式返回 `null`。 */
-export const parseUserIdFromOutTradeNo = (outTradeNo: string): number | null => {
-  const match = OUT_TRADE_NO_PATTERN.exec(outTradeNo);
-  if (match === null) return null;
-  const id = Number.parseInt(match[1], 36);
-  return Number.isSafeInteger(id) && id > 0 ? id : null;
 };
 
 /** 从 `attach` 字段取 userId（我们下单时写的是十进制字符串）。 */
@@ -751,7 +706,7 @@ export const createWechatBillingAdapter = (
       // 不传时才退回自己生成（向后兼容尚无冻结概念的旧调用方）。
       const outTradeNo =
         input.outTradeNo === undefined
-          ? buildWechatOutTradeNo(input.userId, now(), randomBytes(8).toString('hex'))
+          ? buildOutTradeNo(input.userId, now(), randomBytes(8).toString('hex'))
           : assertUsableOutTradeNo(input.outTradeNo, input.userId);
 
       const payload = {
@@ -1134,7 +1089,7 @@ export const createWechatBillingAdapter = (
           // 🔴 幂等键 = `out_trade_no`（规格 §3.1/§6.2），并带上归一化事件类型，
           // 这样同一订单的**不同事件**（未来的退款）不会和支付事件互相顶掉。
           // 复投的同一通知 → 同一个 out_trade_no → 同一个键 → 唯一约束挡住。
-          providerEventId: buildWechatPaymentEventId(payload.out_trade_no),
+          providerEventId: buildPaymentEventId(payload.out_trade_no),
           // 金额落不到档位时用**不同的事件类型**落审计 —— 能查到"有人付了不对的钱",
           // 而不是悄悄当成一次正常支付。
           eventType: grant === null ? 'payment_amount_mismatch' : 'payment_succeeded',

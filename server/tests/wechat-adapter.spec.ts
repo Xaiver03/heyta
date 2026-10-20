@@ -1,3 +1,4 @@
+import { buildOutTradeNo, parseUserIdFromOutTradeNo } from '../src/billing/out-trade-no';
 import { describe, it, expect } from 'vitest';
 import { createSign, createVerify } from 'node:crypto';
 import {
@@ -15,7 +16,6 @@ import {
   WechatUnsupportedCurrencyError,
   buildRequestSignatureMessage,
   buildWechatAuthorizationHeader,
-  buildWechatOutTradeNo,
   buildWechatRefundEventId,
   buildWebhookSignatureMessage,
   createWechatBillingAdapter,
@@ -23,7 +23,6 @@ import {
   isWechatTimestampFresh,
   normalizePemKey,
   parseUserIdFromAttach,
-  parseUserIdFromOutTradeNo,
   parseWechatTime,
   signWechatRequest,
   verifyWechatSignature,
@@ -103,7 +102,7 @@ const buildPaymentWebhook = (opts: {
     privateKey: opts.signingPrivateKey ?? privateKey,
     timestampSeconds: opts.timestampSeconds,
     outTradeNo:
-      opts.outTradeNo ?? buildWechatOutTradeNo(42, 1_700_000_000_000, 'deadbeef'),
+      opts.outTradeNo ?? buildOutTradeNo(42, 1_700_000_000_000, 'deadbeef'),
     ...(opts.attach === undefined ? {} : { attach: opts.attach }),
     ...(opts.amountFen === undefined ? {} : { amountFen: opts.amountFen }),
     successTime: opts.successTime,
@@ -287,7 +286,7 @@ describe('wechat adapter — 工具纯函数', () => {
   });
 
   it('out_trade_no 编解码往返，且能识别非本格式', () => {
-    const order = buildWechatOutTradeNo(42, 1_700_000_000_000, 'deadbeef');
+    const order = buildOutTradeNo(42, 1_700_000_000_000, 'deadbeef');
     expect(order).toMatch(/^hy[0-9a-z]+x[0-9a-z]+xdeadbeef$/);
     expect(order.length).toBeLessThanOrEqual(32);
     expect(parseUserIdFromOutTradeNo(order)).toBe(42);
@@ -386,7 +385,7 @@ describe('wechat adapter — createCheckout（stub fetch，🔴 没有真网络�
 
     // 调用方（计价层）在 `createOrderWithReservation` 时冻结进
     // `checkout_orders.out_trade_no` 的那个号 —— adapter 必须**原样**使用。
-    const frozenOutTradeNo = buildWechatOutTradeNo(42, NOW, 'a1b2c3d4e5f60718');
+    const frozenOutTradeNo = buildOutTradeNo(42, NOW, 'a1b2c3d4e5f60718');
     const adapter = createAdapter({ fetchImpl, now: () => NOW });
     await adapter.createCheckout({
       userId: 42,
@@ -423,7 +422,7 @@ describe('wechat adapter — createCheckout（stub fetch，🔴 没有真网络�
       ['   ', /不是非空字符串/],
       ['x'.repeat(33), /超过微信上限 32/],
       // 解得出 userId，但是**别人**的（42 的单配了 43 的号）。
-      [buildWechatOutTradeNo(43, NOW, 'deadbeef'), /解不出 userId=42/],
+      [buildOutTradeNo(43, NOW, 'deadbeef'), /解不出 userId=42/],
       // 解不出 userId 的形状：attach 丢失时这一单会归不到人。
       ['order-123', /解不出 userId=42/],
     ];
@@ -720,7 +719,7 @@ describe('wechat adapter — verifyWebhook 的成功路径与归一化', () => {
   const adapter = createAdapter({ now: () => NOW });
 
   it('归一化：无订阅引用 / 无状态 / 无周期，只带 oneTimeGrant', async () => {
-    const outTradeNo = buildWechatOutTradeNo(42, 1_700_000_000_000, 'deadbeef');
+    const outTradeNo = buildOutTradeNo(42, 1_700_000_000_000, 'deadbeef');
     const fixture = buildPaymentWebhook({
       outTradeNo,
       timestampSeconds: Math.floor(NOW / 1000),
@@ -751,7 +750,7 @@ describe('wechat adapter — verifyWebhook 的成功路径与归一化', () => {
   });
 
   it('🔴 金额对不上任何档位时仍然带出**原始金额**（这是回执事实，不是判定）', async () => {
-    const outTradeNo = buildWechatOutTradeNo(42, 1_700_000_000_000, 'deadbeef');
+    const outTradeNo = buildOutTradeNo(42, 1_700_000_000_000, 'deadbeef');
     const fixture = buildPaymentWebhook({
       outTradeNo,
       amountFen: 4321,
@@ -769,7 +768,7 @@ describe('wechat adapter — verifyWebhook 的成功路径与归一化', () => {
   });
 
   it('attach 缺失时从 out_trade_no 兜底取 userId', async () => {
-    const outTradeNo = buildWechatOutTradeNo(42, 1_700_000_000_000, 'deadbeef');
+    const outTradeNo = buildOutTradeNo(42, 1_700_000_000_000, 'deadbeef');
     const fixture = buildPaymentWebhook({
       outTradeNo,
       attach: null,
@@ -858,7 +857,7 @@ describe('wechat adapter — 🔴 金额校验（付的钱必须落在价目表�
     buildWechatPaymentWebhook({
       privateKey,
       timestampSeconds: Math.floor(NOW / 1000),
-      outTradeNo: buildWechatOutTradeNo(42, 1_700_000_000_000, 'deadbeef'),
+      outTradeNo: buildOutTradeNo(42, 1_700_000_000_000, 'deadbeef'),
       ...(amountFen === undefined ? {} : { amountFen }),
       ...opts,
     });
@@ -975,7 +974,7 @@ describe('wechat adapter — 🔴 金额校验（付的钱必须落在价目表�
     // 事件本身照常落库（幂等键还是 out_trade_no）—— 我们要能**查到**这笔异常，
     // 但是不授予权益。把它整个丢掉会让"有人付错价"变成一个看不见的事件。
     expect(r.event.providerEventId).toBe(
-      `payment_succeeded:${buildWechatOutTradeNo(42, 1_700_000_000_000, 'deadbeef')}`,
+      `payment_succeeded:${buildOutTradeNo(42, 1_700_000_000_000, 'deadbeef')}`,
     );
     expect(r.event.userId).toBe(42);
     expect(r.event.provider).toBe('wechat');
@@ -985,7 +984,7 @@ describe('wechat adapter — 🔴 金额校验（付的钱必须落在价目表�
 
 describe('wechat adapter — refund()（stub fetch，🔴 没有真网络）', () => {
   const NOW = 1_700_000_000_000;
-  const OUT_TRADE_NO = buildWechatOutTradeNo(42, 1_700_000_000_000, 'deadbeef');
+  const OUT_TRADE_NO = buildOutTradeNo(42, 1_700_000_000_000, 'deadbeef');
   const OUT_REFUND_NO = 'hyrf7x1700000000xdeadbeef';
 
   const stub = (response: Record<string, unknown>, ok = true) => {
@@ -1132,7 +1131,7 @@ describe('wechat adapter — refund()（stub fetch，🔴 没有真网络）', (
 describe('wechat adapter — 退款通知归一化（ADR-0053）', () => {
   const NOW = 1_700_000_000_000;
   const adapter = createAdapter({ now: () => NOW });
-  const OUT_TRADE_NO = buildWechatOutTradeNo(42, 1_700_000_000_000, 'deadbeef');
+  const OUT_TRADE_NO = buildOutTradeNo(42, 1_700_000_000_000, 'deadbeef');
   const OUT_REFUND_NO = 'hyrf7x1700000000xdeadbeef';
 
   const refundEvent = (over: Partial<WechatRefundWebhookFixtureOptions> = {}) =>

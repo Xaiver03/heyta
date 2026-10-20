@@ -247,7 +247,7 @@ const insertOrder = async (input: InsertOrderInput): Promise<number> => {
     [
       input.outTradeNo,
       input.userId,
-      input.provider ?? 'wechat',
+      input.provider ?? 'paycenter',
       input.priceId ?? 'hosted-monthly',
       amount,
       input.status ?? 'pending',
@@ -267,7 +267,7 @@ const insertPaymentEvent = async (input: {
     `INSERT INTO payment_events (provider, provider_event_id, event_type, occurred_at, received_at)
      VALUES ($1, $2, 'payment_succeeded', $3, $4)`,
     [
-      input.provider ?? 'wechat',
+      input.provider ?? 'paycenter',
       input.providerEventId,
       input.occurredAt === undefined ? NOW : input.occurredAt,
       NOW,
@@ -321,13 +321,13 @@ describe('reconcile-job：把对账接到 Prisma 上的胶水', () => {
       providerEventId: 'payment_succeeded:job-1',
     });
     expect(harness.subscriptions()).toHaveLength(1);
-    expect(harness.subscriptions()[0]).toMatchObject({ provider: 'wechat', priceId: 'hosted-monthly' });
+    expect(harness.subscriptions()[0]).toMatchObject({ provider: 'paycenter', priceId: 'hosted-monthly' });
 
     // 🔴 参数映射：$1 = provider、$2 = 事件前缀、$3 = limit（默认 500）。
     // 顺序对调 / limit 丢失 / 前缀没传，都会在这里露出来。
     const calls = candidateQueryCalls(harness.queryCalls);
     expect(calls).toHaveLength(1);
-    expect(calls[0]!.params).toEqual(['wechat', 'payment_succeeded:', DEFAULT_RECONCILE_LIMIT]);
+    expect(calls[0]!.params).toEqual(['paycenter', 'payment_succeeded:', DEFAULT_RECONCILE_LIMIT]);
     // SQL 文本把参数用在它该在的位置（$2 拼事件 id、$3 限流）。
     expect(calls[0]!.sql).toContain('e.provider_event_id = $2::text || o.out_trade_no');
     expect(calls[0]!.sql).toContain('LIMIT $3');

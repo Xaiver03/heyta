@@ -1,3 +1,4 @@
+import { buildOutTradeNo } from '../src/billing/out-trade-no';
 import { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -27,7 +28,6 @@ import { DEFAULT_PRICE_BOOK, resolveEffectivePrice } from '../src/billing/price-
 import { quoteOrder } from '../src/billing/quote';
 import { normalizeCouponCode, type CouponDefinition } from '../src/billing/coupon';
 import {
-  buildWechatOutTradeNo,
   createWechatBillingAdapter,
 } from '../src/billing/wechat.adapter';
 import {
@@ -877,7 +877,7 @@ describe('🔴 冻结 → 下单 → 结算：三个数必须同源（§5.1）',
     expect(quote.finalAmountMinor).toBe(400);
 
     // ② **先冻结**：订单号由调用方生成，冻进 `checkout_orders`。
-    const outTradeNo = buildWechatOutTradeNo(user, NOW, 'feedfacecafebeef');
+    const outTradeNo = buildOutTradeNo(user, NOW, 'feedfacecafebeef');
     const { orderId } = await reserve(user, quote, { outTradeNo });
 
     // ③ **后下单**：把同一个订单号与冻结后的实付交给 adapter（stub fetch，不连真通道）。

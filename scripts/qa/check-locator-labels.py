@@ -83,6 +83,12 @@ CJK_GROUP_FLOOR = {
     # （到达断言位双语会让"界面根本没翻"也判过），所以这枚脚本的"组内整片单语"披露
     # 不是欠项 —— 别按披露去补成对，要按它自己的注释判。
     "ios-app-language.py": 13,
+    # 提醒块那一枚：标签全部取自移动端代码真的读走的键（`reminder.*` / `mobile.detail.close`）。
+    # 三枚动作按钮按**词条模板**匹配（`reminder.a11y.*` 把 `{when}` 通配），不按屏上那三个字，
+    # 也不在探针里自拼动词表 —— 后者会让英文那一侧成为没人守的抄件（判据四抓的就是这个）。
+    # ⚠️ 只登记**下限**，不抄现量：要读数就跑
+    # `python3 scripts/qa/check-locator-labels.py scripts/qa/reminder-block-ios.py`。
+    "reminder-block-ios.py": 14,
 }
 # TS 源码不是 Python，不能用 ast 扫；这里抓所有引号里的"像键名"的串，再和真源的键集合取交集。
 ANY_QUOTED = re.compile(r"""['"]([A-Za-z0-9_.-]{3,})['"]""")

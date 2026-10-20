@@ -1,3 +1,4 @@
+import { buildOutTradeNo } from '../src/billing/out-trade-no';
 import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from 'vitest';
 import type { MockInstance } from 'vitest';
 import Fastify, { FastifyInstance } from 'fastify';
@@ -59,7 +60,6 @@ vi.mock('../src/db', () => ({ prisma: mocks.prisma }));
 
 import { webhookRoutes, BILLING_AUDIT_EVENTS } from '../src/billing/webhook.routes';
 import {
-  buildWechatOutTradeNo,
   createWechatBillingAdapter,
 } from '../src/billing/wechat.adapter';
 import { createNoopBillingAdapter } from '../src/billing/noop.adapter';
@@ -234,7 +234,7 @@ describe('wechat webhook routes（stub prisma，🔴 没有真网络 / 没有真
 
   it('🔴 同一 out_trade_no 重复回调：只授予一次，两次都回 200', async () => {
     await buildApp([adapter()]);
-    const outTradeNo = buildWechatOutTradeNo(42, NOW, 'deadbeef');
+    const outTradeNo = buildOutTradeNo(42, NOW, 'deadbeef');
     const fixture = payment(outTradeNo, NOW);
 
     const first = await deliver(fixture);
@@ -266,12 +266,12 @@ describe('wechat webhook routes（stub prisma，🔴 没有真网络 / 没有真
   it('🔴 不同 out_trade_no 两次真实购买 = 两次授予（叠加，不覆盖）', async () => {
     await buildApp([adapter()]);
 
-    const first = await deliver(payment(buildWechatOutTradeNo(42, NOW, 'aaaaaaa1'), NOW));
+    const first = await deliver(payment(buildOutTradeNo(42, NOW, 'aaaaaaa1'), NOW));
     expect(first.statusCode).toBe(200);
 
     // 10 天后第二笔（提前续费）。
     clock = NOW + 10 * DAY;
-    const second = await deliver(payment(buildWechatOutTradeNo(42, clock, 'bbbbbb2b'), clock));
+    const second = await deliver(payment(buildOutTradeNo(42, clock, 'bbbbbb2b'), clock));
     expect(second.statusCode).toBe(200);
     expect(second.json()).toEqual({ received: true });
 
@@ -286,7 +286,7 @@ describe('wechat webhook routes（stub prisma，🔴 没有真网络 / 没有真
 
   it('🔴 验签失败 → 401 且**不落 PaymentEvent**（fail-closed）', async () => {
     await buildApp([adapter()]);
-    const fixture = payment(buildWechatOutTradeNo(42, NOW, 'ccccccc3'), NOW);
+    const fixture = payment(buildOutTradeNo(42, NOW, 'ccccccc3'), NOW);
     const tampered = { ...fixture.headers, 'wechatpay-signature': 'AAAA' + fixture.headers['wechatpay-signature'] };
 
     const response = await deliver({ ...fixture, headers: tampered });
@@ -309,7 +309,7 @@ describe('wechat webhook routes（stub prisma，🔴 没有真网络 / 没有真
       privateKey,
       timestampSeconds: Math.floor((NOW - 60 * 60 * 1000) / 1000),
       successTime: new Date(NOW - 60 * 60 * 1000).toISOString(),
-      outTradeNo: buildWechatOutTradeNo(42, NOW, 'ddddddd4'),
+      outTradeNo: buildOutTradeNo(42, NOW, 'ddddddd4'),
       userId: 42,
     });
 
@@ -322,14 +322,14 @@ describe('wechat webhook routes（stub prisma，🔴 没有真网络 / 没有真
 
   it('🔴 周期叠加用 max：提前续费不丢已付时长', async () => {
     await buildApp([adapter()]);
-    const first = await deliver(payment(buildWechatOutTradeNo(42, NOW, 'eeeeeee5'), NOW));
+    const first = await deliver(payment(buildOutTradeNo(42, NOW, 'eeeeeee5'), NOW));
     expect(first.statusCode).toBe(200);
     expect(mocks.state.rows[0].currentPeriodEnd).toBe(NOW + PERIOD);
 
     // 🔴 续费时点必须**落在本期内**，否则测的就不是"提前续费"了。
     // 周期只有 30 天，所以取第 10 天（距到期还有 20 天）。
     clock = NOW + 10 * DAY;
-    const second = await deliver(payment(buildWechatOutTradeNo(42, clock, 'fffffff6'), clock));
+    const second = await deliver(payment(buildOutTradeNo(42, clock, 'fffffff6'), clock));
     expect(second.statusCode).toBe(200);
 
     // 从"原到期日"再叠 30 天；写成 now + 30 天会得到 NOW + 40 天（丢掉已付的 10 天）。
@@ -340,7 +340,7 @@ describe('wechat webhook routes（stub prisma，🔴 没有真网络 / 没有真
   it('未注册 wechat adapter（自托管默认）→ 404，且不落任何行', async () => {
     // 只用默认注册表（noop），不注册微信。
     await buildApp();
-    const response = await deliver(payment(buildWechatOutTradeNo(42, NOW, '99999999'), NOW));
+    const response = await deliver(payment(buildOutTradeNo(42, NOW, '99999999'), NOW));
 
     expect(response.statusCode).toBe(404);
     expect(mocks.prisma.paymentEvent.create).not.toHaveBeenCalled();
@@ -353,7 +353,7 @@ describe('wechat webhook routes（stub prisma，🔴 没有真网络 / 没有真
 
   it('🔴 到期 / 退款只改状态，从不删除任何数据', async () => {
     await buildApp([adapter()]);
-    await deliver(payment(buildWechatOutTradeNo(42, NOW, 'acccccc7'), NOW));
+    await deliver(payment(buildOutTradeNo(42, NOW, 'acccccc7'), NOW));
 
     // 整个 prisma 桩上不存在 delete —— 任何删除调用都会在这里抛。
     const subscriptionMethods = Object.keys(mocks.prisma.subscription);
@@ -374,7 +374,7 @@ describe('wechat webhook routes（stub prisma，🔴 没有真网络 / 没有真
       privateKey,
       timestampSeconds: Math.floor(NOW / 1000),
       successTime: new Date(NOW).toISOString(),
-      outTradeNo: buildWechatOutTradeNo(42, NOW, 'abcdef18'),
+      outTradeNo: buildOutTradeNo(42, NOW, 'abcdef18'),
       attach: null,
       userId: 42,
     });

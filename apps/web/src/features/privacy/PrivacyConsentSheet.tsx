@@ -31,7 +31,7 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { ShieldCheck, X } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 
 import { cssVar } from '@heyta/design-system';
 import { useI18n } from '@heyta/i18n';
@@ -183,6 +183,9 @@ export function PrivacyConsentSheet(): React.JSX.Element | null {
               </p>
             )}
           </div>
+          {/* 🔴 与 RN 那一份同形状：这条出口在屏幕上写的就是它那三个字。
+              一枚 ✕ 在这个位置的通用含义是"关掉这张卡"，可这一下既不落盘也不关闭决定，
+              下次冷启动还会再问 —— 看得见的人只能猜，看不见的人反而拿到准确的那句。 */}
           <button
             type="button"
             data-testid="privacy-consent-close"
@@ -190,7 +193,7 @@ export function PrivacyConsentSheet(): React.JSX.Element | null {
             className="ht-btn ht-btn--ghost"
             onClick={closeSheet}
           >
-            <X size={ICON_SIZE.sm} aria-hidden="true" />
+            {t('common.privacy.consent.close')}
           </button>
         </div>
 

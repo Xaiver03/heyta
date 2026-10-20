@@ -78,4 +78,18 @@ describe('mobile device-revocation behavior', () => {
     expect(events).toEqual(['fence', 'invalidate', 'clear']);
   });
 
+  it('keeps the credential-wipe entry reachable after a cold start', () => {
+    // 🔴 凭据只放内存（`src/sync/config.ts` 文件头那条取舍），所以按表单里的
+    // token/password 判闸门 = 每次冷启动后必然灰着；而那一步要连带清掉的小组件
+    // 快照与设备密钥跨进程活着。装机态读数在台账那一格（r117 / r118 两趟）。
+    const settings = readFileSync(new URL('../src/screens/SettingsScreen.tsx', import.meta.url), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|\s)\/\/[^\n]*/g, '$1');
+    const button = /<Button[^>]*mobile\.profile\.clearCredentials[^>]*\/>/u.exec(settings)?.[0] ?? '';
+    expect(button, '取不到「清除凭据」那一枚 Button ⇒ 本条的锚点坏了').not.toBe('');
+    expect(button).not.toMatch(/disabled=/u);
+    // 正面对照：这条不是"整个文件里不许出现 disabled"——同一面上重试那枚确实有闸门。
+    expect(settings).toMatch(/disabled=\{widgetCleanupRetrying\}/u);
+  });
+
 });
