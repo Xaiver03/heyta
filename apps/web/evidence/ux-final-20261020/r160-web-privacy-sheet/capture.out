@@ -1,0 +1,6 @@
+CASE 1440-light pass=true text="Decide later" aria="Decide later" box={"x":904,"y":273,"width":112,"height":44}
+CASE 1440-dark pass=true text="Decide later" aria="Decide later" box={"x":904,"y":273,"width":112,"height":44}
+CASE 375-light pass=true text="Decide later" aria="Decide later" box={"x":223,"y":89,"width":112,"height":44}
+CASE 1440-light-zh pass=true text="以后再说" aria="以后再说" box={"x":928,"y":283,"width":88,"height":44}
+分母=4 档 ｜ 红=0
+RESULT=PASS 4 档全部「屏幕上的字 == 可及名称」

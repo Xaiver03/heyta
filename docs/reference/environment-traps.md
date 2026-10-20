@@ -10691,6 +10691,25 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
       这条与 §1 那条元规则同源：报错说"没有 id 为 1 的窗口"是真的，但它证明的是**我给的坐标不对**，
       不是"目标不存在"。
 
+492. 🔴 **「双语候选」是列表的形状，不是函数的形状 —— 装置里任何一枚只吃 `candidates[0]` 的调用，会让整条旅程在英文档静默退回单语**（2026-10-19 05:1x 本线现量，`scripts/qa/profile-settings-ios.py`）。
+    ⑴ 现场形状：那枚脚本的定位符早已中英成对（`("清单", "Lists")`），`check:locator-labels` 也绿，
+      但英文档跑到最后一步红：`could not scroll ('清单','Lists') into view: {'found':'False','scrollRc':'element-left-tree'}`，
+      而**前 22 步全绿**。机制在 `scroll_to` 里一行：`AX.scroll_into_view(..., wanted[0], ...)` —— 滚动那一枚调用只喂第一枚候选，
+      于是英文屏上它查的是树里**根本不存在**的「清单」。⇒ 红的是量具，不是被测对象。
+      同族第二处：`absent=("整理与记录",)`（禁的那行在英文屏上是 "Organize and capture"）—— 那是**永远不咬的空判据**，
+      它当时安全的前提是"英文档走不到这一行"；前提一取消，空判据就现形。
+    ⑵ **判据**：给旅程装置补双语时，逐枚函数问"它吃几枚候选"。`wait_for`/`tap`/`present` 吃整列表（会逐枚试），
+      `scroll_into_view` 吃一枚。改完要在**报告字段里留证**：`scroll lists entry` 现在记
+      `target=['Lists'] tried=['清单','Lists']` —— 只写 `target=['清单','Lists']` 就分不出"两枚都试了"与"只试了第一枚"。
+    ⑶ 同趟第二件事：**同一族三枚装置里只有一枚不起跳点**（`ai-face-ios.py`／`account-face-ios.py` 都 `terminate`+`launch`，
+      `profile-settings-ios.py` 没有）。后果不是"这一趟红"，而是**上一趟红在哪一屏，下一趟就从那一屏开始**：
+      反臂那趟红在设置模态里，紧接着的正常趟就死在"等首屏标签"，失败文本里可见 `'关闭','设置','偏好与账号'`。
+      ⇒ 无人值守连跑多趟时，每枚旅程装置必须自己造起跳点；靠"上一趟收在首页"是拿别人的收笔当自己的前置。
+    ⑷ 这一趟顺手把 `require_appearance` 的"声称"扩到 `*-dark` 结尾（原先只有末级名**恰好**等于 `light`/`dark` 才有牙，
+      所以 `english-dark/` 这种语言×档合一的目录名没有判据）。反臂现量：设备 light 时
+      `--evidence-dir .../mutation-arm-claim-dark` 回 `refusing to write…` 且**目录没被创建** —— 这种"红在没有落点"
+      的取证只能把命令本身记进 RESULT，别指望有 JSON 可看。
+
 493. 🔴 **一枚计数器打印的名字写着 A 口径、算法跑的是 B 口径时，「两枚数相等」会被读成交叉验证 —— 而它可能只是包含关系**（2026-10-19 14:3x 本线现量，`research/tools/verify-inbound-ac-battery.py`，改口笔 `833991d5`）。
     ⑴ 命中形状：那枚电池同时打 `PNG_DIFF_LINES=`（起跑前后两趟 md5 清单作差）与 `EVIDENCE_DIRTY=`，后者代码取的是**整棵载具**
       `git -C <载具> status --porcelain` 的条目数（没有 pathspec），名字却读作「证据目录里的脏条目」。两枚都回 11 ⇒ 台账当时写成
@@ -10783,3 +10802,75 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     ③ **守卫与两臂**（修的是装置自己，动 refs 之前拒绝）：`if len(sys.argv) != 3: sys.exit(…)`。失败臂 `… PROGRESS.md 带"引号"的消息 多出来一枚` ⇒ **rc=1**，同趟 `git rev-parse refs/heads/main` 前后逐字相同（**这条才是"没动到 ref"的判据，不是那句拒绝语**）；无参臂零参数 ⇒ 也 rc=1（以前那会抛 `IndexError`，同样不动 ref 但形状难读）。阳性对照＝修完之后真提交的那一笔：`git log -1 --format=%s refs/heads/main | grep -c '台账 154'` 回 **1**。
     ④ **一般规律**：**给任何自家装置传人类正文之前，先看它读几枚 argv**（`grep -n 'sys.argv' <装置>`），并把"正文里没有 ASCII 双引号"当成写消息的硬约束（要引用用「」或全角，或干脆不加引号）；要带引号就走文件通道（`git commit -F <文件>` 那一形）。同族：**#502**（pnpm 把字面 `--` 递给脚本 ⇒ `未知参数：--`，rc 与"门判红"同形）、**#501**（`pnpm -s` 打错门名 ⇒ rc=1 且零字节）、以及"装置有一条分支压根不看那个输入，于是它的绿被下游读成那个输入已经查过"那一整族。
     ⑤ **不许 amend 的口径没变**：`refs/heads/main` 是共享 ref，本仓 §6 明写不 amend ⇒ 处置是**登记＋修装置**，那枚残标题永久留在历史上；本条就是它的可查出处（后来者在 `PROGRESS.md` 第 154 条也能对上）。
+
+
+505. 🔴 **iOS 系统弹窗在场时 `idb describe-all` 只回弹层那一棵树（现量 5 枚节点）——app 自己的标签整片读成 absent，"那一下没生效"是假读数；而且这棵树活得过 `simctl terminate` + `launch`**（2026-10-19 17:1x–17:3x 本线现量，`scripts/qa/reminder-block-ios.py` / r141）。
+      ⑴ 现象：点「1 小时后提醒」之后，`afterAdd` 四枚（`待触发` + 三枚动作）全 `present:false`，
+        看着完全像"提醒没加上"。逐字符现量的另一条通道（截图）里那一行**已经在**（`10-19 18:15` + 三枚动作）
+        ⇒ 图与树互相否证，先怀疑探针（§7 元规则一）。
+      ⑵ 成因：那一枚是 iOS 的通知授权弹窗，由**另一个进程**渲染。现量：弹窗在场时整棵树只有 5 枚
+        （`Application` + 两行正文 + `不允许`/`允许` 两枚按钮），每枚的 `pid=11428`，而前台 app 的 pid 是 `40365`。
+        ⇒ `describe-all` 交回的是**弹层那棵树**，不是"app 少了几个节点"。
+      ⑶ 它**不随 app 死掉**：`simctl terminate` + `launch` 之后弹窗还在，于是下一趟直接死在
+        `ensure_on_tasks()`，报 `workspace did not open after onboarding` —— 这条文本会把人往"首屏没起来"那个方向带，
+        真因在上一趟留了一枚没按掉的系统弹窗。
+      ⑷ 装置形状（两条都必要，少一条就只剩一半）：起跳时把在场的弹窗**逐枚按掉并记进读数**
+        （`systemPromptsAtStart`），不按掉就红；"按掉"认的是**形状**（树 ≤12 枚且含 ≥2 枚 Button）+ 取**右边那枚**
+        （Apple 的默认动作排版契约，现量 `不允许` x=57 / `允许` x=205），**不是**按字符串匹配 ——
+        弹窗文案不在本仓词条里，英文那一侧还带弯引号（`Don’t Allow`），按字串会把装置钉死在一种系统语言上。
+      ⑸ 取证边界：授权一旦决定就不再弹，而本机 `simctl privacy reset notifications` 回 rc=1（#475）
+        ⇒ **这一支只能取一次**。别把"复跑还是绿的"读成"弹窗那一支也复跑过了"。
+506. 🔴 **多档装置的"期望语言"是一个**必须显式传**的输入，不是从设备上读的 —— 漏传时红得像界面坏了**（2026-10-20 01:4x 本线现量，r157）。
+      ⑴ 现象：同一枚件、同一台模拟器，`profile-settings-ios.py` 中文档 28 步全过，换到英文档同一趟脚本报
+        `settings directory is missing 'zh' group labels ['常规','同步与隐私','AI 与集成','数据管理','账号安全']` ——
+        字面读起来是"设置目录少了五枚分组"，看着完全像一处真缺陷。
+      ⑵ 成因：该脚本的 `--language` 默认 `zh`（`scripts/qa/profile-settings-ios.py:345`），
+        而**驱动脚本没传 `en`**。装置按"期望中文"去断言，屏幕上在场的是英文那一整组 ⇒ 红。
+        同批另外三枚装置（`account-face-ios.py` / `ai-face-ios.py` / `reminder-block-ios.py`）用的是双语候选表，
+        所以同一趟里它们英文档全绿 —— **四枚装置只有一枚红**这件事本身就是"红在探针的输入，不在界面"的证据。
+      ⑶ 把它 30 秒定性掉的不是我的推断，是 #488 那枚守卫写进失败原文的东西：它除了列出缺失的中文标签，
+        还列出 `languages whose whole group IS visible on screen=['en']` 与逐枚 `visible labels`
+        （`General / Sync and privacy / AI and integrations / Data management / Account security`）
+        ⇒ 守卫**同时**判"缺什么"和"在场的是什么"，人就不必去猜。少后半句，这枚红会被写成一条界面缺陷。
+      ⑷ 处置形状（两条都要）：驱动脚本**显式传语言**，别依赖默认值；读数落点目录名带档名
+        （`require_appearance` 只看**末级**名，写成 `en-light/settings` 就没有牙）。
+        失败那次的 `run.out` 改名留在同一目录（`failed-default-zh-run.out`）而不是删掉 ——
+        它是"守卫有牙"的正对照，比一张绿图值钱。
+
+507. 🔴 **「宿主是环境变量旋钮」被读成「换一枚宿主就能构建」——旋钮换的是主机名，不换**命令形状**；远程支里写死的是另一套 OS，认证与连通全过、命令照样炸**（2026-10-20 10:5x 本线现量，r163）。
+    ⑴ 现场形状：`scripts/run-gradle.mjs` 里 `HEYTA_ANDROID_HOST` 有默认值 ⇒ 记下"android 腿另有第三枚宿主可指"。
+      真去数那条路要走几步时才发现，同一枚文件里远程支发出去的是 `cd /d <远端根> && pnpm install …` 与 `cd /d <远端 android 目录> && gradlew.bat --no-build-cache …`，
+      而 `HEYTA_ANDROID_REMOTE_ROOT` 的默认值是一个**盘符路径**。`cd /d` 是 cmd 内建、POSIX shell 没有；`gradlew.bat` 在 Linux 上不是入口（同目录那枚无扩展名的 `gradlew` 才是）。
+      现量：`grep -n 'cd /d' scripts/run-gradle.mjs`、`grep -n 'HEYTA_ANDROID_REMOTE_ROOT' scripts/run-gradle.mjs`。
+    ⑵ 为什么这枚坑值钱：它把"做不到"挂错了人。**可达性、JDK、SDK、KVM、出站全现量通过**之后，
+      剩下的其实是一枚**代码改动**（给收口点开一条 POSIX 远程支，且形状由 `pnpm check:android-gradle-remote` 钉着），
+      而不是"等一句拍板"。登记成拍板 ⇒ 没人去改那枚脚本，这一格就永远停在"等人"那一栏。
+    ⑶ 通用形状：**判断一条通道能不能用，要读到它最后发出的那条命令**，不是读到"入口有没有旋钮"。
+      同一个旋钮后面可能挂着两套餐时（`isWindows ? 'gradlew.bat' : './gradlew'` 这种分流常见于**本地**支，
+      而**远程**支常常只写了发起方自己那台机的 OS）。
+    ⑷ 处置：宿主候选清单要逐枚记"这台机上那条命令会长成什么形状"，写不出这条命令的宿主**不算一条出路**；
+      改收口点前先 `pnpm check:android-gradle-remote --self-test` 看它钉了哪几条形状（臂数由它自己打印，文档里不许抄）。
+    ⑸ 🔴 **`--dry-run` 的绿里混着一行会骗人的 ✅**：同一趟 dry-run 打印完"步骤 2.5 … 将执行（**未执行**）"之后，
+      紧接着照样打 **`✅ 远端 workspace 依赖与当前同步源码一致`**，退出码 0
+      ⇒ 那枚 ✅ 说的是"这一步在计划里"，**不是**"这一步会通过"。凡是计划打印模式复用执行模式的输出行，
+      都要问一遍：**这一行的凭据是哪次真实执行**；拿它当"通道可用"的证据会把三层都不匹配的宿主判成通。
+    ⑹ **远程预检自己也是 OS 相关的**：那枚只读预检发的是 `powershell -NoProfile -Command "Test-Path 'C:\src\…'"`，
+      在非 Windows 宿主上五个字段全回"（无）"而脚本**照样往下走**（读不到值 ≠ 判红）。
+      ⇒ 预检读数要**逐字段问"空值是谁"**：空可能是"探测没跑/探测不被支持"，与"依赖确实不齐"同形。
+
+508. 🔴 **「那台机没有 npm 出站」这类基础设施否定句是瞬时读数，八小时就能翻；而判"通不通"要取**响应体**，`200` 不是凭据**（2026-10-20 10:5x 本线现量，r163）。
+    ⑴ 现场形状：台账 02:5x 那格写着"远端 `registry.npmjs.org` 与 `services.gradle.org` 都不通 ⇒ 要出当前源码的件得**把 node_modules 从 Mac 搬过去**"。
+      10:5x 同一条 ssh 复量：npm 官方源、npmmirror、`services.gradle.org`、`dl.google.com` **四条逐条有体**，那台机上还躺着 1.1G 的 pnpm store。
+      ⇒ "搬依赖"那条没人对账过的通道**根本不是必需的**，而它是那一格"做不到"三条件里的头一条。
+      同一小时另一条同类翻案：本机换了一张网（`ifconfig en0` 的 /24 与前一批不同），于是前一批"那枚 LAN 别名是过期配置"的成因整层作废。
+    ⑵ **`200` 为什么不算凭据**：截获式门户、代理与 captive portal 都回 200 + 一枚 HTML。取体的形状：
+      `curl -s https://registry.npmjs.org/-/ping` 要看到 `{}`（或 `{"ok":true}`），
+      `curl -s -H 'Accept: application/json' https://registry.npmjs.org/react-native | head -c 90` 要看到真元数据（`"_id":"react-native"`），
+      `curl -sI https://services.gradle.org/distributions/gradle-8.14-bin.zip` 看到 `307` 是**正常重定向**不是拒绝；
+      另附一条 `env | grep -i proxy`——有透明代理时上面几条都可能作假。
+    ⑶ 处置形状：**基础设施否定句要么写成带日期的现量读数、要么在正文附一条复现命令**，别写成永久属性；
+      依赖它做"做不到"的结论之前，同一趟重跑那条命令（与本文件元规则"瞬时读数不许当状态"同族，
+      也同于 #467 那条"文档里那句『这层跑不了』是当时一趟的读数"）。
+      ⚠️ 同一趟还量到 **ICMP 自己就不稳定**：对 `192.168.1.2` 第一次 `ping -c 2 -t 3` FAIL、第二次 OK，
+      而 `arp -n` 一直有 MAC ⇒ 可达性判据要**同趟跑两次并都记进读数**，单枚 `ping` 既不充分也不稳定；
+      真正承重的是"有没有应用层端口给回读数"那一层（那一层六枚端口全 NO，结论就不受 ICMP 抖动影响）。

@@ -30,7 +30,6 @@ export {
   DEFAULT_BILLING_ADAPTERS,
   createBillingAdapterRegistry,
   createBillingAdaptersFromConfig,
-  isWechatBillingRegistered,
 } from './registry';
 export type { BillingAdapterRegistry } from './registry';
 
@@ -42,7 +41,6 @@ export {
   WECHAT_NOTIFY_PATH,
   WECHAT_ONE_TIME_PERIOD_DAYS,
   WECHAT_OUT_TRADE_NO_MAX_LENGTH,
-  WECHAT_PAYMENT_SUCCEEDED_EVENT_PREFIX,
   WECHAT_PROVIDER,
   WECHAT_SIGNATURE_MAX_AGE_MS,
   WECHAT_SUPPORTED_CURRENCIES,
@@ -55,19 +53,20 @@ export {
   assertUsableOutTradeNo,
   buildRequestSignatureMessage,
   buildWechatAuthorizationHeader,
-  buildWechatOutTradeNo,
-  buildWechatPaymentEventId,
   buildWebhookSignatureMessage,
   createWechatBillingAdapter,
   decryptWechatResource,
   isWechatTimestampFresh,
   normalizePemKey,
   parseUserIdFromAttach,
-  parseUserIdFromOutTradeNo,
   parseWechatTime,
   signWechatRequest,
   verifyWechatSignature,
 } from './wechat.adapter';
+
+// 这两块不是微信的东西 —— 订单号与事件 id 都是本仓自己的格式。
+export { buildOutTradeNo, parseUserIdFromOutTradeNo } from './out-trade-no';
+export { PAYMENT_SUCCEEDED_EVENT_PREFIX, buildPaymentEventId } from './payment-event-id';
 export type {
   WechatPayAdapterOptions,
   WechatPrice,

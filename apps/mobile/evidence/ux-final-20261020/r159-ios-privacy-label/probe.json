@@ -1,0 +1,97 @@
+{
+  "udid": "FE195661-B021-4A71-AAD1-1F2F7AE3A102",
+  "artifact": {
+    "installedBundle": "/Users/rocalight/Library/Developer/CoreSimulator/Devices/FE195661-B021-4A71-AAD1-1F2F7AE3A102/data/Containers/Bundle/Application/573438F5-2850-4864-8EB1-71FD8B76B016/Heyta.app",
+    "jsbundleSha256": "928e8050693d3d1953950eea26c08828b624968d5465864d01abb67ad97ac6b2",
+    "buildDirBundle": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/mobile/ios/build/Build/Products/Release-iphonesimulator/Heyta.app",
+    "buildDirSha256": "ca3a09257bdfba19f1a64c7e4213ec50d201a83ff958c7b76b8b86568612ca9a"
+  },
+  "iconSquarePt": 44.0,
+  "steps": [
+    {
+      "step": "first-launch",
+      "sheetAnchorsPresent": [
+        "同意并联网",
+        "只用本机"
+      ],
+      "wordNodes": [
+        {
+          "label": "以后再说",
+          "frame": [
+            294,
+            232,
+            72,
+            44
+          ],
+          "pressable": true
+        }
+      ],
+      "visibleLabel": "visible-text（触控区宽 72 pt > 图标方块 44 pt）",
+      "closeNode": {
+        "label": "以后再说",
+        "frame": [
+          294,
+          232,
+          72,
+          44
+        ],
+        "pressable": true,
+        "enabled": true
+      },
+      "shot": "apps/mobile/evidence/ux-final-20261020/r159-ios-privacy-label/01-first-launch.png:556057"
+    },
+    {
+      "step": "after-tap-close",
+      "tapRc": 0,
+      "sheetStillPresent": [],
+      "closeStillPresent": [],
+      "labels": [
+        "heyta",
+        "开始安排今天",
+        "本地优先的任务管理：离线照常可用，数据端到端加密，服务器可以是你自己的。",
+        "注册 / 登录",
+        "先离线使用",
+        "不登录也能建任务、打卡、专注；以后随时可以在「我的」页登录。"
+      ],
+      "shot": "apps/mobile/evidence/ux-final-20261020/r159-ios-privacy-label/02-after-tap-close.png:164574"
+    },
+    {
+      "step": "after-relaunch",
+      "sheetBack": [
+        "同意并联网",
+        "只用本机"
+      ],
+      "wordNodesBack": [
+        {
+          "label": "以后再说",
+          "frame": [
+            294,
+            232,
+            72,
+            44
+          ],
+          "pressable": true
+        }
+      ],
+      "shot": "apps/mobile/evidence/ux-final-20261020/r159-ios-privacy-label/03-after-relaunch.png:556880"
+    }
+  ],
+  "launch": {
+    "rc": 0,
+    "stderr": ""
+  },
+  "consent": {
+    "before": {
+      "db": "/Users/rocalight/Library/Developer/CoreSimulator/Devices/FE195661-B021-4A71-AAD1-1F2F7AE3A102/data/Containers/Data/Application/CC730ED3-D036-4901-8AFF-F5DC97F4569A/Library/heyta-device-prefs.sqlite",
+      "rows": []
+    },
+    "afterTap": {
+      "db": "/Users/rocalight/Library/Developer/CoreSimulator/Devices/FE195661-B021-4A71-AAD1-1F2F7AE3A102/data/Containers/Data/Application/CC730ED3-D036-4901-8AFF-F5DC97F4569A/Library/heyta-device-prefs.sqlite",
+      "rows": []
+    },
+    "afterRelaunch": {
+      "db": "/Users/rocalight/Library/Developer/CoreSimulator/Devices/FE195661-B021-4A71-AAD1-1F2F7AE3A102/data/Containers/Data/Application/CC730ED3-D036-4901-8AFF-F5DC97F4569A/Library/heyta-device-prefs.sqlite",
+      "rows": []
+    }
+  }
+}

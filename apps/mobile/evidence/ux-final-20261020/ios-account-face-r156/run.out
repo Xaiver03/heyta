@@ -1,0 +1,13 @@
+[step] open profile tab: passed
+[step] open sign-in: passed
+[step] auth form state: passed
+[step] auth-sign-in screenshot: passed
+[step] reveal other-ways toggle: passed
+[step] expand other ways: passed
+[step] expanded state: passed
+[step] auth-other-ways-expanded screenshot: passed
+[step] collapse other ways: passed
+[step] collapsed again: passed
+[step] auth back to profile: passed
+{"status": "passed", "steps": 11, "evidence": "apps/mobile/evidence/ux-final-20261020/ios-account-face-r156/account-face-journey.json"}
+RIG_RC=0

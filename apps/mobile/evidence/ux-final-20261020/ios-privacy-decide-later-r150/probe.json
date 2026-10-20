@@ -1,0 +1,95 @@
+{
+  "udid": "8386BA4A-9551-49AA-A14C-39AB0A61FC1F",
+  "artifact": {
+    "bundle": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/mobile/ios/build/Build/Products/Release-iphonesimulator/Heyta.app",
+    "jsbundleSha256": "3a5e127a22ddbc75ee598d112543f9e468c43d7598693936708ba6718f37c398"
+  },
+  "steps": [
+    {
+      "step": "first-launch",
+      "sheetAnchorsPresent": [
+        "同意并联网",
+        "只用本机"
+      ],
+      "closeNode": {
+        "label": "以后再说",
+        "frame": [
+          322,
+          232,
+          44,
+          44
+        ],
+        "pressable": true,
+        "enabled": true
+      },
+      "labels": [
+        "heyta",
+        "在使用联网功能之前",
+        "以后再说",
+        "heyta 是本地优先的：你的任务、清单、笔记与历史先写在这台设备上。这个选择只决定一件事 —— 这台设备能不能与服务器通信。",
+        "选「只用本机」时，所有功能照常可用：新建、编辑、日历、四象限、番茄钟、习惯、导出，一个都不少。不会同步、不会登录，也不会接收服务器推送；移动端本地提醒仍可在授予系统通知权限后使用。",
+        "选「同意并联网」后，可以登录 heyta 并跨设备同步。任务数据经端到端加密后才上传，服务器看不到任务明文。",
+        "作出选择前，可以先读完整文本：",
+        "服务条款",
+        "隐私政策",
+        "同意并联网",
+        "只用本机"
+      ],
+      "shot": "01-first-launch.png:552402"
+    },
+    {
+      "step": "after-tap-close",
+      "tapRc": 0,
+      "sheetStillPresent": [],
+      "closeStillPresent": [],
+      "labels": [
+        "heyta",
+        "开始安排今天",
+        "本地优先的任务管理：离线照常可用，数据端到端加密，服务器可以是你自己的。",
+        "注册 / 登录",
+        "先离线使用",
+        "不登录也能建任务、打卡、专注；以后随时可以在「我的」页登录。"
+      ],
+      "shot": "02-after-tap-close.png:164583"
+    },
+    {
+      "step": "after-relaunch",
+      "sheetBack": [
+        "同意并联网",
+        "只用本机"
+      ],
+      "labels": [
+        "heyta",
+        "在使用联网功能之前",
+        "以后再说",
+        "heyta 是本地优先的：你的任务、清单、笔记与历史先写在这台设备上。这个选择只决定一件事 —— 这台设备能不能与服务器通信。",
+        "选「只用本机」时，所有功能照常可用：新建、编辑、日历、四象限、番茄钟、习惯、导出，一个都不少。不会同步、不会登录，也不会接收服务器推送；移动端本地提醒仍可在授予系统通知权限后使用。",
+        "选「同意并联网」后，可以登录 heyta 并跨设备同步。任务数据经端到端加密后才上传，服务器看不到任务明文。",
+        "作出选择前，可以先读完整文本：",
+        "服务条款",
+        "隐私政策",
+        "同意并联网",
+        "只用本机"
+      ],
+      "shot": "03-after-relaunch.png:552402"
+    }
+  ],
+  "launch": {
+    "rc": 0,
+    "stderr": ""
+  },
+  "consent": {
+    "before": {
+      "db": "/Users/rocalight/Library/Developer/CoreSimulator/Devices/8386BA4A-9551-49AA-A14C-39AB0A61FC1F/data/Containers/Data/Application/B99BE436-00E4-47E0-A002-36DF38D410CD/Library/heyta-device-prefs.sqlite",
+      "rows": []
+    },
+    "afterTap": {
+      "db": "/Users/rocalight/Library/Developer/CoreSimulator/Devices/8386BA4A-9551-49AA-A14C-39AB0A61FC1F/data/Containers/Data/Application/B99BE436-00E4-47E0-A002-36DF38D410CD/Library/heyta-device-prefs.sqlite",
+      "rows": []
+    },
+    "afterRelaunch": {
+      "db": "/Users/rocalight/Library/Developer/CoreSimulator/Devices/8386BA4A-9551-49AA-A14C-39AB0A61FC1F/data/Containers/Data/Application/B99BE436-00E4-47E0-A002-36DF38D410CD/Library/heyta-device-prefs.sqlite",
+      "rows": []
+    }
+  }
+}

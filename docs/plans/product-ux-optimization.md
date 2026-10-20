@@ -964,13 +964,39 @@ UX-S9-138 接续验收清单（未完成项不得随构建成功关闭）：
 - [x] 共享 session 改为非破坏读与成功项精确 ack；查找状态/写入/ack 失败保留队列，错误上报异常不拒绝后台任务。原 drain/merge 恢复设计已替换。
 - [ ] 跨进程崩溃恢复最终安装态：四端已实现非破坏读取与精确 ack，尚须新包验证“落 op 后、ack 前退出”重投不重复。
 - [x] 重复任务跨 drain 幂等：receipt 与任务/相对提醒同枚 op；SQLite、重复回放、重启与乱序覆盖。最终系统点击新包仍在各端矩阵中单独验收。
-- [ ] Apple 显式共享 Keychain group 与可报告失败的清理路径修复/验证。当前 iOS entitlement 的首组就是共享组，不能把 Info.plist 未指定 group 直接写成“已经发生解密失败”；需核验签名运行结果。
+- [ ] Apple 显式共享 Keychain group 与可报告失败的清理路径修复/验证。当前 iOS entitlement 的首组就是共享组，不能把 Info.plist 未指定 group 直接写成"已经发生解密失败"；需核验签名运行结果。
+    - 🔴 **10-20 02:2x 按本格自己的规矩现量"哪一消费者依赖那个隐式默认"**（三处 `SecItem` 调用点全枚举，命令附在下面，别抄本格的行号）：
+      `grep -rln 'SecItem' apps/mobile/ios --include='*.swift' | grep -v /Pods/` ⇒ **恰好三枚文件**，逐枚读原文后分两档：
+      ① **显式带组、且拿不到就失败关闭**：`HeytaWidgetCore/Sources/HeytaWidgetCore/WidgetSharedStore.swift:106` 与
+      `HeytaWidgetCore/Sources/HeytaWidgetBridge/WidgetDeviceKeyStore.swift:72/104/124`，两枚都走
+      `WidgetSharedConstants.resolvedKeychainAccessGroup()`（构建期展开完整值），前者注释明写"**绝不能退回 target 的默认 Keychain 组**"、
+      解析不到时 `guard` 直接返回空 ⇒ **本格标题里"显式共享 Keychain group"那一半，小组件这条链上已经实现了**，不是待修项。
+      ② **依赖隐式默认**：`apps/mobile/ios/Heyta/HeytaVaultSecureStorage.swift`（保险库根密钥）的 `baseQuery` 只带
+      `kSecClass/kSecAttrService/kSecAttrAccount`，**不带 `kSecAttrAccessGroup`** ⇒ 它落在**默认组**上，
+      而两枚 entitlements（`Heyta/Heyta.entitlements`、`HeytaWidgetExtension/HeytaWidgetExtension.entitlements`）各自**只列一枚**
+      `$(AppIdentifierPrefix)com.heyta.shared` ⇒ 默认组 == 共享组 == 扩展可读的那个组。
+      service 是分开的（`com.heyta.vault.secure-storage.v1` vs `com.heyta.widget-key`，文件头那句"never writes … to the widget's keychain service"属实），
+      **但"分开的是 service，不是访问组"这一点此前没写在任何一格上** —— 这才是本格剩下的真问题。
+    - ⚠️ **为什么这一格仍然只能开着，而且不是因为"没人能做"**：把保险库挪出共享组需要**在 `keychain-access-groups` 里加第二枚组**，
+      而那要先在 App ID capability 上登记，**没登记的话签名件会以 `errSecMissingEntitlement` 起不来**；
+      模拟器是 ad-hoc 签名、这一层根本不强制 ⇒ 我在这台机上**跑它既不红也不绿**，任何"改完验证通过"都会是假读数。
+      真机那一档的外部前提也按**整表**数过（不是 `head` 前几行）：
+      `xcrun devicectl list devices` 共 **15 枚在册设备，`simulated` 15 枚、非 simulated **0** 枚**
+      （现量：`xcrun devicectl list devices | grep 'UDID)' | grep -vc simulated`）⇒ 实体 iPhone 这一档**此刻确实要人**，
+      而且缺的是物理设备，不是通道、不是权限。
+    - 下一位要做的两件事都写了命令：① 重跑上面那两条 `grep` 确认还是三枚调用点、② 若决定加第二枚组，
+      先改 App ID capability 再改 entitlements，**并且必须同时给 `HeytaVaultSecureStorage` 显式带上那一枚**（隐式默认一旦被第二枚组顶掉，
+      现有已落盘的保险库条目会读不回来 —— 那是"升级即丢密钥"那一族，属不可逆层，动手前先读 ADR）。
+
 - [ ] 最终冻结源码四端重建、重装与测试版上传；本轮未发布。
 
 
 UX-S9-138 后续核对（2026-10-08）：Apple 20 个有界文件已逐文件 SHA-256 对账，主树与受控树一致；共享 Swift 测试 108 项、macOS 宿主构建与两端 WidgetKit 扩展 Release 编译通过。这不代表系统组件库验收通过。Android/iOS 移动桥另发现清理错误被转换为成功的问题，现已传播原生 reject/false 给清理结果；Android 清理后主动刷新系统缓存。移动桥、凭据清理、意图消费与快照规划定向 4 文件/45 项通过。Apple/Windows 清理后的系统缓存刷新另行核对。
 
-- [ ] 清理数据后系统小组件不继续展示旧任务；验证原生拒绝/刷新失败有真实失败结果。
+- [x] 清理数据后系统小组件不继续展示旧任务；验证原生拒绝/刷新失败有真实失败结果。
+      ✅ **10-20 00:3x r149 收口**：三条腿的装机态读数都取到了（清凭据 r117 / 注销擦库 r119 / 原生拒绝 r120），
+      而当时挡着这一格的那条缺陷（冷启动后那枚入口灰着、够不到）已由本线改掉并有 iOS 装机态对照读数 ——
+      逐字见本节末的 r149 那一段与 `apps/mobile/evidence/ux-final-20261020/ios-credential-wipe-r149/RESULT.md`。
       ✅ **10-17 10:2x r117 装机态设备腿取到了（`apps/mobile/evidence/ux-final-20261017/android-widget-erase-r117/RESULT.md`）**：
       这一格原先缺的那一样东西（"一个能真的登录的本地服务端"）已经造出来了 ——
       本机隔离栈 `PORT=4520` + 库 `heyta_uxr117` + TEST_MODE 账号，装的是**装机包**
@@ -989,7 +1015,7 @@ UX-S9-138 后续核对（2026-10-08）：Apple 20 个有界文件已逐文件 SH
         把 `privacy.consent` 写成了 `accepted`，事后已删行恢复并量到同意卡重新立起
         （`consent-side-effect.txt`）。⇒ 结论不变，但"这一档要负责人点头"那句得留给**下一次真提交注销**，
         不是留给"把决定改回来"。
-      ⚠️ **格不打勾，因为量出来一条要报的缺陷**：那一枚的闸门是
+      ⚠️ **当时格不打勾，因为量出来一条要报的缺陷**（✅ 那条缺陷 10-20 r149 已改掉，见本节末）：那一枚的闸门是
       `disabled={form.token === '' && form.password === ''}`（按代码形状 grep，别按行号 ——
       `SettingsScreen.tsx` 现在有别的会话在飞），而凭据**按设计只放内存、不落盘**
       （`apps/mobile/src/sync/config.ts` 文件头那条取舍）⇒ **冷启动之后它必然是灰的**，
@@ -1019,8 +1045,9 @@ UX-S9-138 后续核对（2026-10-08）：Apple 20 个有界文件已逐文件 SH
       附带三条：注销**不撤回**设备级隐私同意（`privacy.consent` 擦除后原样在 —— 是不是缺陷属产品口径，只登记形状）；
       「我的」那行在已同步态下仍写「还没登录」（待查，本趟没证）；
       以及 `configure_sync_credentials` 那句「✅ 界面认为已配置」被现量否证成**假绿**（判据已换到服务端数 op，见 §7 #452）。
-      ⚠️ **格仍不打勾**，但欠的两样只剩一样：① 上面那条"冷启动态够不到"的缺陷要有人改
-      （改点在别人在飞的 `SettingsScreen.tsx` 里，本线不代做）。
+      ⚠️ 当时格仍不打勾，欠的两样只剩一样：① 上面那条"冷启动态够不到"的缺陷要有人改
+      （那句"改点在别人在飞的 `SettingsScreen.tsx` 里，本线不代做"的**前提**已经不成立：
+      10-20 现量 `git status --porcelain -- apps/mobile/src/screens/SettingsScreen.tsx` 回空 ⇒ 本线自己改了，见本节末 r149）。
       ~~② 后半句"原生拒绝 / 刷新失败有真实失败结果"仍只有 vitest + Kotlin/TS 链，
       `widget-cleanup-pending` 那一枚到 r119 为止**从未在装机态被触发过**~~
       ⇒ ✅ **10-17 18:2x 这一半也跑完了**（`apps/mobile/evidence/ux-final-20261017/android-widget-cleanup-fail-r120/RESULT.md`）：
@@ -1030,6 +1057,27 @@ UX-S9-138 后续核对（2026-10-08）：Apple 20 个有界文件已逐文件 SH
       不是"其实成功了却喊失败"）；把权限改回 `771` 再点重试 ⇒ 锚点消失、存储变 **`65 B / 键=（空）`**。
       跑完设备侧净改动 = 0（权限、`device_pref` 同意行、桌面绑定、栈与库五条读数各自复量）。
       这趟另否证掉两枚自己的探针（`has_text` 是整值匹配不是子串；一条打了 ❌ 却不计 FAIL 的分支），见 §7 #456 #457。
+      ✅ **10-20 00:3x r149 把①改掉了，并取到装机态对照读数**（`apps/mobile/evidence/ux-final-20261020/ios-credential-wipe-r149/RESULT.md`）：
+      · **改法**：那枚 Button 不再按"表单里此刻有没有凭据"设闸门（`SettingsScreen.tsx` 里 `disabled={form.token === '' && form.password === ''}` 整行去掉）。
+        方向不是随手挑的，是 `credential-wipe.ts` 文件头已经写明的那条不对称 —— "多清一次"最坏是用户重开应用，
+        "没清成"是数据留在别人看的屏幕上，差一个数量级；而清理动作本身幂等、永不抛 ⇒ 没东西可清时按下去是一次空操作。
+        另一条更"精确"的路（先探设备上有没有东西再决定开不开）要**在四端各加一次异步原生读**，
+        而组件那三格（iOS 其余模板 / macOS Gallery / Windows host）本来就各自欠着装机态矩阵，本线不为省一个 `disabled` 去开那四端口子。
+      · **读数**：同一枚模拟器（`heyta-iphone-17pro`）、同一份装置（`profile-settings-ios.py` 现量同一枚哈希）、
+        只换被测件 ⇒ 改前件 `enabled=False`、改后件 `enabled=True`，**frame 两趟逐位相同** `[16,434,370,44]`
+        ⇒ 是同一枚控件的两种状态，不是"画不出来 vs 画出来了"的假对照。浅档 × 中文那一格；人眼看过 `after-light/security.png`
+        （那行字是深色不是灰）。
+      · **判据转正**：装置里新增 `Probe.assert_enabled`，读 AX 的 `enabled` 而**不是** `pressable` ——
+        iOS 上 RN 的 disabled Button 照样算 pressable（与 r117 装置事实 1 那条 Android `clickable="true"` 同一件事），
+        按 `pressable` 判"够得到"会把灰掉的按钮报成可点。node 腿同形状：`apps/mobile/tests/device-revocation-behavior.spec.ts`
+        新增一项，变异臂实测两头都有牙（加回闸门 ⇒ 红在 `not to match /disabled=/u`；去掉 ⇒ 5 项绿）。
+        同类实例现量只有一枚：全仓 `.tsx` 里 `disabled={…token === ''…}` 形状命中 1 处，就是这一处。
+      · **不证的四件**（逐字在 RESULT.md 第四节）：按下之后 iOS 组件真的退回空态（那一半的装机态在 Android r117/r120）、
+        Android 上闸门改后翻成 `enabled=true`（打包机现量 `ssh windows-pc` 回 `Host is down`、`adb devices` 空 ⇒ 待办 #96 同一条，
+        ⚠️ 不许用 `HEYTA_ANDROID_LOCAL_GRADLE=1` 绕）、暗档、以及"清凭据会把本机任务一起清掉"（它不会也不该 ——
+        那枚动作的范围是凭据 + 组件快照 + 设备密钥；要让本机数据消失是「注销账号」那一枚，r119 已证）。
+        ⚠️ 顺带把一条误记成缺陷的说法按回去：**冷启动后组件仍会从本机库重新发布一次快照**，
+        这是本地优先 +「只用本机」那条路径的设计行为，不是这一格的欠项 —— 把它当缺陷会顺手废掉离线模式。
 - [x] 重复任务与相对提醒同一枚总 op；新增范围契约，跨任务/多 scope 新写入落盘前拒绝，旧日志与 checkpoint 恢复不产生毒丸，独立复审已通过。
 
 Apple 清理刷新补验：共享清理服务在密钥及容器成功清理后发起系统 timeline reload，macOS 删除重复刷新；Swift 最新 109 项通过，主/受控树有界文件 SHA 一致。macOS 系统 Gallery 验收收到操作系统“电脑已锁定，自动解锁失败”；已请求手动解锁，未标记通过。Windows 新探针验证 DPAPI 加解密、非破坏读取与精确 ack，Provider 增加快照文件监听以刷新清理后的卡片；官方 Widgets host 获取仍在排查网络通道。
@@ -1528,6 +1576,19 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
 - [x] ✅ **这一格在 09:27 兑现了：那一趟真跑了，52.6 分钟，读数在下一格**（原句留着，它写的三条前置里有两条当场用上了）：**整族 `check:ai-e2e` 在隔离副本上的那一趟：载体已备好，欠的是一个安静窗口，不是磁盘也不是"会打死别人"**（2026-10-09 08:3x 现量）。已就绪的三件：`/Users/rocalight/heyta-carriers/heyta-uxhead-1009` 钉在 `b081811c`、`pnpm -r build` rc=0、`e2e/node_modules` 已 `pnpm install`（rc=0，载体里 `git status` 只多出 `pnpm-lock.yaml` 之外的那一枚 `M` 之前已核过）。起跑前置三条，逐条可查：① `sysctl -n vm.loadavg` 的 **load1 回到 12 以下**（08:35 现量 **42.83**，1604 进程 / PhysMem 60G used 只剩 3.1G unused，我那两枚 vite 都是 0.0% CPU —— 这一波不是我造的）；② `lsof -nP -iTCP:4318 -iTCP:4319 -sTCP:LISTEN` 为空（非空时前置门会**退 2 拒绝起跑**，那是"没跑成"独立一档，不许折进"这一族没红"）；③ 读数落点写清是 **`b081811c` 那棵树**，不是 HEAD（HEAD 现在装不上也打不出包，见上面两格）。命令：`cd /Users/rocalight/heyta-carriers/heyta-uxhead-1009 && pnpm check:ai-e2e`。
 - [x] ✅ **这一格的前提在同一小时内翻了两次，最后是靠"复量"而不是沿用翻案的**（09:0x）：登记时写的是「`package.json` 不在暂存集里、但工作树仍是 ` M`（2 行别人未提交的改动）⇒ 整文件提交会把他们那两行算到我头上」——那句话在它写下的那一刻是对的，而**它是瞬时属性**。接线前现量：`git status --porcelain -- package.json` **为空**、`git diff --cached --name-only -- package.json` **为空**，而 HEAD 在这段等待里从 `faab57c4` 一路推进到 `d65b2dd6`（53 笔）⇒ 他们那两行**已经自己落笔了**，拦路条件消失，接线随之落下（上一条 [x] 那格 + 本笔提交）。📌 一般规律，与本仓 §9 那句「`--is-ancestor = YES` 是瞬时属性」同型：**凡登记成"等别人落笔之后再接"的格子，起跑动作前必须重新现量那两行还在不在**，照旧账行动要么白等、要么把别人的改动算到自己头上。本格与上一格是同一件事的两代登记，合并留形是为了让下一位读得到"它曾经真的被挡着"。
 - [ ] 🔴 **本线这一趟犯了一次归属违规，事实、后果与修复选项都记在这里（不包装）**：提交 `e6058120` 的消息写的是「docs(产品体验线 台账 §UX-S9-153)…」，实际含 **43 枚文件，其中只有 1 枚是本线的**（`docs/plans/product-ux-optimization.md`），其余 **42 枚是协作/共享那条线当时暂存在索引里的在制品**（`packages/sync-core/src/share-keys.ts`、`packages/ui/src/sync/*` 十一枚、`packages/sync-client/src/share-*`、`packages/i18n` 两份词条、`packages/op-log/src/state.ts`、`packages/shared-schema/src/entity-types.ts`、`server/tests/share-routes.spec.ts`、`scripts/verify-collab-*.mjs` 四枚、`package.json` 等）。
+    ✅ **10-20 00:5x r152 复量这一格里那枚"已经落地的副作用"：它不成立了**。现量
+    `NO_COLOR=1 pnpm --filter @heyta/web typecheck` ⇒ **rc=0**（载体 = 当前 `HEAD`，工作树只多了本线几行文档改动，
+    它们不进 web 的类型检查）
+    ⇒ 下面那档「`apps/web/tests/share-key-store.spec.ts` 被带进 HEAD 之后 HEAD 自己 typecheck 不过」
+    （10-18 r125 复量时读到 rc=2，原因可点名）**已经被后续提交修掉，别再按它行动**。
+    ⚠️ **本格继续开着的那一半不是本线的**：42 枚夹带的归属要**协作/共享那条线**在后续提交里说明（修复选项 (甲)），
+    而 (乙)「改写历史拆回去」自 `e6058120` 进入 `origin/main` 那刻起就不可选 —— 今天做它等于改写已公开历史。
+      - 🔴 **10-20 01:5x r158 按这一格自己的规矩现量复量"那一半到没到"**：`git log --since=2026-10-17 -- packages/sync-core/src/share-keys.ts packages/ui/src/sync packages/sync-client/src packages/op-log/src/state.ts scripts/verify-collab-share-routes.mjs`
+        只回两枚功能提交（`418ab88ff` 共享清单评论线程、`2be51be18` COMMENT 领域层），而 `git log --grep='归属\|夹带\|e6058120'` 里
+        **没有一枚是协作线替那 42 枚写的说明** ⇒ **(甲) 仍未发生，本格继续开着**，本线不代写别人的归属。
+        （这一读是瞬时的：下一位要动这一格，逐字重跑那两条 `git log`，别抄这一句。）
+    🔴 这一格留给本线自己的那条规矩仍然有效并已钉死：**提交一律 `git commit -F msg -- <明确路径>`，且未跟踪文件要先 `git add` 再逐笔带 pathspec**
+    （本轮 r149/r150 两笔就是这么跑的：`git status --porcelain` 先核在飞、提交后按真实 parent 复验）。
     **成因不是知识缺失**：项目记忆里 **5b** 那条早就写着安全写法是 `git commit -F msg -- <明确路径>`，而我跑的是 `git add <我的路径> && git commit -m …`（**无 pathspec**）⇒ 把别人的暂存集整个卷进我这一笔。同族第三次命中（前两次记在 `project-shared-worktree-sessions.md` 第 227–229 行，结论都是"提交那一刻没做预检"）。⇒ 规矩要换成**命令模板本身**：这一棵树上 `git commit` 一律带 pathspec，"记得预检"不作为独立步骤。
     现状四条，都是现量不是叙述：
     - **没有推送**（🔴 10-10 23:0x 复量，HEAD = `b22f156d`；原记 "44" 已被现量否证并按 §8.8 就地改掉）：`git rev-list --count origin/main..HEAD` = **289**、`git rev-list --count HEAD..origin/main` = **13**、`git merge-base --is-ancestor e6058120 origin/main` = **NO** ⇒ `e6058120` 只存在于本地 `main`。
@@ -1578,17 +1639,42 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
     - 把这两条写进 lock 的是 **`fee83a90`（2026-10-09，「feat(自动收集 契约与入站解析核)…」，不是本线）** —— `git log -S "'@zxcvbn-ts/core':" -- pnpm-lock.yaml` 只命中这一笔，而 `git show --name-only fee83a90` 里**只有 `pnpm-lock.yaml`**，没有 `packages/ui/package.json`；
     - 声明那一半与用它的那半都还在共享工作树里没提交：`git status --porcelain -- packages/ui/package.json` = **` M`**，唯一的 import 方 `packages/ui/src/auth/password-strength-model.ts` 在 HEAD 里**不存在**（`git grep -l zxcvbn HEAD -- packages apps` 输出为空）。
     ⇒ 这就是 AGENTS §9 那段"消费者已提交、生产者在路上"的**新一种面目**：这次不是源码缺 helper，是**锁文件跑到了清单前面**。后果分两档写清：① **CI 形态（干净检出 + `--frozen-lockfile`）现在装不起来** —— 这一格红不在本线，也不由本线代改（要么那一线把 `packages/ui/package.json` 与它的源文件一起提交，要么重算 lock，两条都是它的决定）；② 本线要取的那两枚隔离副本读数**不必等它**：~~HEAD 没有任何已提交文件 import zxcvbn ⇒ 在载体里去掉这两条不影响构建~~ 🔴 **这句在 10-10 02:5x 已不成立**（账号线落的 `server/src/password/policy.ts` 真用了 `@zxcvbn-ts/language-common`，且 `server/package.json` 自己声明了它）；**结论不变、理由换了**，逐条现量与命令见下面 02:5x 那格 ①。改用不带 `--frozen-lockfile` 的 `pnpm install --prefer-offline` 即可。⚠️ 但这样取到的读数**必须带着这句限定**："载体的 `pnpm-lock.yaml` 被 pnpm 就地重算成与 HEAD 清单一致（`git status` 只该看到这一枚文件被改），所以它证的是 HEAD 的**源码行为**，不证'干净检出装得起来'—— 后者现在就是红的。"
-- [ ] 🔴 **载体第二次装好依赖之后，照出来的是更大的一格：HEAD 打不出包**（2026-10-09 08:1x，读数来自真跑不是读代码）。在 `faab57c4` 那棵只含已提交内容的载体里 `pnpm -r build` ⇒ **`BUILD_RC=1`**，停在 `@heyta/shared-schema`：tsup 报 `Could not resolve "./task-batch-contract"`、`"./task-priority-batch-contract"`、`"./task-repeat-completion-contract"`、`"./reminder-owner-contract"` 各两次，`tsc` 的 DTS 阶段另报 `src/index.ts(151..153): error TS2305: Module "./auth-http-contract" has no exported member 'EmailPasswordRegistration*'`，收尾是 `DTS Build error / Failed`（五枚 `packages/*/dist` 之后就断了）。 ⚠️ **10-09 23:3x 在 `d5d49540` 上复量：这一格换了位置，见下面那条「main 现在打不出包缺的是哪 11 枚」。**
-    ⚠️ **10-18 r125 复量（`29521b78`，只含已提交内容的干净检出真跑）**：这一格点名的那枚原因已经换了位置 —— 装那一半现在 rc=0，打不出包那一半仍然真但换成两条新原因（`packages/app-host` 的两枚生产者还停在索引里没提交、`packages/ui` 的 `CommentView` 少 `id`）。逐条读数与归属见下面「r125」那一格。
+- [x] 🔴 **载体第二次装好依赖之后，照出来的是更大的一格：HEAD 打不出包**（2026-10-09 08:1x，读数来自真跑不是读代码）。
+    ✅ **10-20 00:5x r151 复量：这一格的题面那句声称现在不成立，本格打勾**。当前 `HEAD` 上
+    `NO_COLOR=1 pnpm -r --no-bail build` ⇒ **`BUILD_RC=0`、`Done` 20、`Failed` 0**
+    （载体 = 主检出，除本线那一行文档改动外与 `HEAD` 逐字相同；跑完 `git status --porcelain` 也只有那一行 ⇒ 这趟没改写任何被跟踪产物）。
+    与 10-18 `head-r128` 那趟同向（两趟之间只落了本线的产品码与装置）⇒ **"HEAD 打不出包"这句现在谁写谁错**。
+    ⚠️ **射程要说死**：这一枚只复量"能不能构建"。下面那三条后果里"隔离副本读数结构上取不到"那半随构建转绿而失效，
+    但**同一批登记在 1610 / 1615 / 1625 / 1676 那四格里的其它子声称**（哪一格归谁落地、哪一枚 `??` 文件该谁提交、
+    修法照做就行那档）**不因这一枚绿而闭合** —— 那四格逐格自判，别按这一格的勾推过去。
+    原始读数与归属逐条照旧留在下面几段，是考古用的，不是现状。
+    在 `faab57c4` 那棵只含已提交内容的载体里 `pnpm -r build` ⇒ **`BUILD_RC=1`**，停在 `@heyta/shared-schema`：tsup 报 `Could not resolve "./task-batch-contract"`、`"./task-priority-batch-contract"`、`"./task-repeat-completion-contract"`、`"./reminder-owner-contract"` 各两次，`tsc` 的 DTS 阶段另报 `src/index.ts(151..153): error TS2305: Module "./auth-http-contract" has no exported member 'EmailPasswordRegistration*'`，收尾是 `DTS Build error / Failed`（五枚 `packages/*/dist` 之后就断了）。 ⚠️ **10-09 23:3x 在 `d5d49540` 上复量：这一格换了位置，见下面那条「main 现在打不出包缺的是哪 11 枚」。**
+    ⚠️ **10-18 r125 复量（`29521b78`，只含已提交内容的干净检出真跑）**：这一格点名的那枚原因已经换了位置 —— 装那一半现在 rc=0，打不出包那一半**当时**换成两条新原因（`packages/app-host` 的两枚生产者还停在索引里没提交、`packages/ui` 的 `CommentView` 少 `id`）。逐条读数与归属见下面「r125」那一格。
+        🔴 **10-20 00:5x r151 再复量：连"打不出包"那一半也关了** —— 当前 `HEAD` 上 `NO_COLOR=1 pnpm -r --no-bail build` ⇒ **`BUILD_RC=0` / `Done` 20 / `Failed` 0**
+        ⇒ 这几格题面里"HEAD/main 打不出包"那句**现在谁写谁错**（当时的两条新原因与归属照旧留在 r125 那格里，是考古不是现状）。
+        ⚠️ 但这一枚绿**只关构建**：这几格各自还夹着别线名下的欠项（哪枚 `??` 该谁提交、`check:layering` 那一处…），那些要**逐格自判**，不许按这一句推成"那几格也好了"。
     **归属可以点到具体那一笔**：把四行 re-export 写进 `packages/shared-schema/src/index.ts` 的是 **`9fa53ab9`（2026-10-08，标题写的是「docs(账号面): 立 ADR-0063 与标准套件工单…」，但它的 diff 里有 `packages/shared-schema/src/index.ts`）**；而那四个被指的模块在 HEAD 里**不存在**、在工作树里是 **`??` 未跟踪**（`git status --porcelain -- packages/shared-schema/src/` 逐条列出），`auth-http-contract.ts` 是 **` M`**（HEAD 那份没有 index.ts 要的那三个导出）。姊妹格 `343ffc8a`（「feat(账号面 共享契约)…」）是同一条线的正确做法：`email-change-contract.ts` + `session-contract.ts` + `index.ts` **同一笔一起落**。
     ⇒ 三条后果按档写清，不并档：① **CI 形态（干净检出）现在既装不起来（上一格那条 lock 跑在清单前面）也打不出包** —— 两格都不是本线写的，也不由本线代改（那是账号面那一线把 `??`/` M` 那五枚文件与其导出一起提交的决定）；② 本线那两枚"隔离副本读数"因此**在 HEAD 上结构上取不到**，本线改把载体钉到 `9fa53ab9^`（同一棵树的导航也是锚点形状：`className="ht-settings__nav-link"` 命中 1、`aria-controls` 命中 0，且那一档的 lock 里没有 zxcvbn ⇒ `--frozen-lockfile` 可装）；③ ⚠️ 于是取到的读数**只支持这句话**："装置与整族套件在 `9fa53ab9^` 这棵只含已提交内容、能装能建的树上跑得通"，**不支持**"HEAD 可用"。拿旧提交凑新提交的读数，就是 §7 那条"旧产物伪装成真缺陷"的反方向版本。
-- [ ] 🔴 **08:5x 在新 HEAD 上复量那两格红：两条都还在，而载体比 HEAD 落后 53 笔**（读数现取，不沿用 08:1x 那一批）。`git log --oneline -1` = **`d65b2dd6`**（「feat(账号标准套件 移动端组件一笔)…」，`git rev-list --count b081811c..HEAD` = **53** —— 另一条线又落了这么多）：① `git show d65b2dd6:pnpm-lock.yaml` 的 `packages/ui` 段仍记 `@zxcvbn-ts/core`（第 697 行起），而 `git show d65b2dd6:packages/ui/package.json | grep -c zxcvbn` = **0** ⇒ 上一格那个 `--frozen-lockfile` 现在仍然红；② `git show d65b2dd6:packages/shared-schema/src/index.ts` 第 22 行仍 `from './task-batch-contract'`、第 36 行仍 `from './reminder-owner-contract'`，而那四枚模块 `git cat-file -e d65b2dd6:…` **逐个 NO**、在工作树里仍是 `??`（`auth-http-contract.ts` 仍是 ` M`）⇒ 上一格那个 `pnpm -r build` 现在仍然打不出包。⇒ **本线那两枚"要落在只含已提交内容的树上"的读数（整族套件、以及把已提交证据批次复现一遍）结构上仍只能在 `b081811c` 那棵取，并因此必须带着"它不是 HEAD"这句限定**；把载体改钉到新 HEAD 要等那五枚文件落地，那是账号面那一线的动作，本线不代改、也不替它把 `??` 提交掉。 ⚠️ **10-09 23:3x 在 `d5d49540` 上复量：这一格换了位置，见下面那条「main 现在打不出包缺的是哪 11 枚」。**
-    ⚠️ **10-18 r125 复量（`29521b78`，只含已提交内容的干净检出真跑）**：这一格点名的那枚原因已经换了位置 —— 装那一半现在 rc=0，打不出包那一半仍然真但换成两条新原因（`packages/app-host` 的两枚生产者还停在索引里没提交、`packages/ui` 的 `CommentView` 少 `id`）。逐条读数与归属见下面「r125」那一格。
+- [x] 🔴 **08:5x 在新 HEAD 上复量那两格红：两条都还在，而载体比 HEAD 落后 53 笔**（读数现取，不沿用 08:1x 那一批）。`git log --oneline -1` = **`d65b2dd6`**（「feat(账号标准套件 移动端组件一笔)…」，`git rev-list --count b081811c..HEAD` = **53** —— 另一条线又落了这么多）：① `git show d65b2dd6:pnpm-lock.yaml` 的 `packages/ui` 段仍记 `@zxcvbn-ts/core`（第 697 行起），而 `git show d65b2dd6:packages/ui/package.json | grep -c zxcvbn` = **0** ⇒ 上一格那个 `--frozen-lockfile` 现在仍然红；② `git show d65b2dd6:packages/shared-schema/src/index.ts` 第 22 行仍 `from './task-batch-contract'`、第 36 行仍 `from './reminder-owner-contract'`，而那四枚模块 `git cat-file -e d65b2dd6:…` **逐个 NO**、在工作树里仍是 `??`（`auth-http-contract.ts` 仍是 ` M`）⇒ 上一格那个 `pnpm -r build` 现在仍然打不出包。⇒ **本线那两枚"要落在只含已提交内容的树上"的读数（整族套件、以及把已提交证据批次复现一遍）结构上仍只能在 `b081811c` 那棵取，并因此必须带着"它不是 HEAD"这句限定**；把载体改钉到新 HEAD 要等那五枚文件落地，那是账号面那一线的动作，本线不代改、也不替它把 `??` 提交掉。 ⚠️ **10-09 23:3x 在 `d5d49540` 上复量：这一格换了位置，见下面那条「main 现在打不出包缺的是哪 11 枚」。**
+    ✅ **10-20 01:0x r153 复量：这一格题面那两条现在都不成立了，本格打勾**（只交读数，不重述论证）。
+    ① "干净检出装不起来"那一半：10-18 r125 在**只含已提交内容**的干净检出上真跑 `pnpm install --frozen-lockfile` ⇒ **rc=0**；
+    ② "打不出包"那一半：10-20 r151 在当前 `HEAD` 上真跑 `NO_COLOR=1 pnpm -r --no-bail build` ⇒ **`BUILD_RC=0` / `Done` 20 / `Failed` 0**（读数写在上面那格「载体第二次装好依赖之后，照出来的是更大的一格：HEAD 打不出包」里）。
+    ⇒ 这一格那句"本线那两枚隔离副本读数结构上只能在 `b081811c` 那一棵取"**随之作废**：载体可以直接用当前 `HEAD`，
+    r149 / r150 / r153 三趟装机态就是按这个形状跑的（不必再拿旧提交凑新提交的读数）。
+    ⚠️ **这一枚勾只覆盖"那两条红"**，不覆盖同一族里**别线名下**的欠项（`check:layering` 那一处违规、账号线那枚 `selectSettingsSection` helper 归谁提交），
+    那几格逐格自判，别按这一格的勾推过去。
+    ⚠️ **10-18 r125 复量（`29521b78`，只含已提交内容的干净检出真跑）**：这一格点名的那枚原因已经换了位置 —— 装那一半现在 rc=0，打不出包那一半**当时**换成两条新原因（`packages/app-host` 的两枚生产者还停在索引里没提交、`packages/ui` 的 `CommentView` 少 `id`）。逐条读数与归属见下面「r125」那一格。
+        🔴 **10-20 00:5x r151 再复量：连"打不出包"那一半也关了** —— 当前 `HEAD` 上 `NO_COLOR=1 pnpm -r --no-bail build` ⇒ **`BUILD_RC=0` / `Done` 20 / `Failed` 0**
+        ⇒ 这几格题面里"HEAD/main 打不出包"那句**现在谁写谁错**（当时的两条新原因与归属照旧留在 r125 那格里，是考古不是现状）。
+        ⚠️ 但这一枚绿**只关构建**：这几格各自还夹着别线名下的欠项（哪枚 `??` 该谁提交、`check:layering` 那一处…），那些要**逐格自判**，不许按这一句推成"那几格也好了"。
 - [x] ✅ **12:0x 第三次复量：两格红都还在，但这次量出了"最新一棵能装能建的树"到底是哪一笔，而它正是本线那枚载体的基线**（读数全部现取，不沿用 08:1x / 08:5x 那两批）
     `git rev-parse --short 9fa53ab9^` = **`b081811c`** —— 也就是那棵跑了整族 289 条的隔离载体的基线。三条判据把它钉成"最新可用"：**①** `git show 9fa53ab9^:packages/shared-schema/src/index.ts` 里那两行坏 re-export 命中 **0**（`9fa53ab9` 自己命中 2）；**②** `git log -S"task-batch-contract" --oneline 9fa53ab9..HEAD -- packages/shared-schema/src/index.ts` **输出为空** ⇒ HEAD 之前那 87 笔里没有任何一笔把它修回去（`git rev-list --count 9fa53ab9..HEAD` = **87**）；**③** 那四枚被指的模块此刻仍是 `??`（`git status --porcelain -- packages/shared-schema/src` = 4 枚 `??` + `auth-http-contract.ts` 一枚 ` M`）。⇒ 结论对下一位有用而不只是"还红着"：**要取"能装能建"的读数，基线只能往 `b081811c` 或更早挑，HEAD 那一整段 87 笔都在红区里**；本线那两枚隔离副本读数因此不是"随手挑的一棵旧树"，而是这条线上最后一棵可用的。
     🔴 **这一趟自己差点被一把坏尺骗过去，记下来**：判"锁文件跑在清单前面"我第一版写的是 `git show <ref>:pnpm-lock.yaml | grep -c zxcvbn`，读数 `HEAD=10 / b081811c=6` —— 那看起来像"连可用基线都有 6 处，这条判据根本不成立"。**错在分母**：锁文件里 zxcvbn 会出现在别的 importer 与 `snapshots:` 段。正确形状是**先按 importer 切块再数**（`  packages/ui:` 起、到下一个两空格缩进的 importer 键或顶层键止）：切块后 `HEAD` 的 `packages/ui` 块命中 **2**（`@zxcvbn-ts/core`、`@zxcvbn-ts/language-common`）而 `HEAD:packages/ui/package.json` 命中 **0** ⇒ 不匹配成立；`b081811c` 与 `9fa53ab9` 同一块命中 **0** ⇒ 那两棵干净，`fee83a90` 命中 2 ⇒ 引入点仍是原来归属的那一笔。⇒ 口径钉成一句：**判锁与清单是否错位，只许读"该 importer 那一段"，全文计数一律不算读数**。
-- [ ] 🔴 **10-09 23:3x 在 `d5d49540` 上把"main 从干净检出击不出包"这一格重新量了一遍：上面那两条红的归属换了一处，而第一条仍然真**。全部读数来自真跑（新建一棵钉到 `d5d49540` 的隔离工作树、`cp -al node_modules`、跑 `pnpm`），不是从 08:1x 那批沿用：
-    ⚠️ **10-18 r125 复量（`29521b78`，只含已提交内容的干净检出真跑）**：这一格点名的那枚原因已经换了位置 —— 装那一半现在 rc=0，打不出包那一半仍然真但换成两条新原因（`packages/app-host` 的两枚生产者还停在索引里没提交、`packages/ui` 的 `CommentView` 少 `id`）。逐条读数与归属见下面「r125」那一格。
+- [x] 🔴 **10-09 23:3x 在 `d5d49540` 上把"main 从干净检出击不出包"这一格重新量了一遍：上面那两条红的归属换了一处，而第一条仍然真**。全部读数来自真跑（新建一棵钉到 `d5d49540` 的隔离工作树、`cp -al node_modules`、跑 `pnpm`），不是从 08:1x 那批沿用：
+    ⚠️ **10-18 r125 复量（`29521b78`，只含已提交内容的干净检出真跑）**：这一格点名的那枚原因已经换了位置 —— 装那一半现在 rc=0，打不出包那一半**当时**换成两条新原因（`packages/app-host` 的两枚生产者还停在索引里没提交、`packages/ui` 的 `CommentView` 少 `id`）。逐条读数与归属见下面「r125」那一格。
+        🔴 **10-20 00:5x r151 再复量：连"打不出包"那一半也关了** —— 当前 `HEAD` 上 `NO_COLOR=1 pnpm -r --no-bail build` ⇒ **`BUILD_RC=0` / `Done` 20 / `Failed` 0**
+        ⇒ 这几格题面里"HEAD/main 打不出包"那句**现在谁写谁错**（当时的两条新原因与归属照旧留在 r125 那格里，是考古不是现状）。
+        ⚠️ 但这一枚绿**只关构建**：这几格各自还夹着别线名下的欠项（哪枚 `??` 该谁提交、`check:layering` 那一处…），那些要**逐格自判**，不许按这一句推成"那几格也好了"。
     - **① `pnpm install --frozen-lockfile` 仍然红，而且报错是 pnpm 自己写的**：`ERR_PNPM_OUTDATED_LOCKFILE … <ROOT>/packages/ui/package.json … 2 dependencies were removed: @zxcvbn-ts/core@4.2.0, @zxcvbn-ts/language-common@4.1.3`。同一枚 ref 上量：`git show d5d49540:packages/ui/package.json | grep -c zxcvbn` = **0**，而 `git show d5d49540:pnpm-lock.yaml` 的 `packages/ui` importer 段记着这两条 ⇒ 上面那两格说的"锁文件跑到清单前面"这一条**没有被修掉**。
       ⚠️ **顺带撤回我自己中途的一次错判**：我一度拿 `HEAD:pnpm-lock.yaml` 的命中数去比**工作树**的 `packages/ui/package.json`（那枚文件是 ` M`，工作树里 zxcvbn 命中 2），于是差点把这条真红写成"我的探针错、这条 blocker 是假的"。**跨 ref 比 = 没有比**（同 §7 那条"旧产物伪装成真缺陷"的姊妹形状）；比必须 `HEAD ↔ HEAD`。
     - **② `pnpm -r build` 的红**换了地方：上面那格点名的 `@heyta/shared-schema` 那一档**已经解除** —— 四枚被指的模块现在**都在 `d5d49540` 里**（`git cat-file -e d5d49540:packages/shared-schema/src/{task-batch-contract,task-priority-batch-contract,task-repeat-completion-contract,reminder-owner-contract}.ts` 逐个 YES），`git status --porcelain -- packages/shared-schema/src` 输出为空。
@@ -1597,8 +1683,17 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
       ⚠️ 这**不是**"别线在飞所以等他们"那一档：**是本线那笔代提交把 main 弄成自相矛盾的**（消费侧已提交、生产者未提交）。11 枚生产者里最新一枚 mtime 是 10-09 10:43（其余 10-07 19:29–23:21），起跑那一刻（23:3x）没人正在写它们。
     - 🔴 **于是"补上那 11 枚就能打出包"这句话是错的 —— 实测否证它**（同一棵隔离工作树，把 11 枚生产者 `cp -p` 进去再 `pnpm -r build`）：`RBUILD_FIXPROBE_RC=1`，12 条错降到 **5 条**（7 条 `Cannot find module` 全消），剩下的是 `./calendar/model.js` 缺 `calendarTaskSpan` / `CalendarTaskSpan` / `groupTasksByCalendarDate`、`./theme.js` 缺 `useHeytaUiLocale`、`./ai/AiDisclosure.js` 缺 `AI_DISCLOSURE_FIELD_GROUPS`。而这三个模块文件在工作树里**逐个是 ` M`**（`git status --porcelain -- packages/ui/src/calendar/model.ts packages/ui/src/theme.tsx packages/ui/src/ai/AiDisclosure.tsx` 三行全命中）⇒ 缺的是**未提交那批里的导出**，不是缺文件。
       ⚠️ 同一条命令复跑：新建一棵钉到 `d5d49540` 的 `git worktree` → `cp -al node_modules` → 把 `git status --porcelain -- packages/ui/src | grep '^??'` 那 11 枚 `cp -p` 进去 → `pnpm -r build`。
-- [ ] 🔴 **10-09 23:4x 在 `61126d7d` 上把本线登记过的四条"等别人落地"逐条重量**（四条都是现取，不沿用上午那批；`HEAD` 从 `3c5a3be2` 走到这里只多了本线三笔 + 账号线三笔）：
-    ⚠️ **10-18 r125 复量（`29521b78`，只含已提交内容的干净检出真跑）**：这一格点名的那枚原因已经换了位置 —— 装那一半现在 rc=0，打不出包那一半仍然真但换成两条新原因（`packages/app-host` 的两枚生产者还停在索引里没提交、`packages/ui` 的 `CommentView` 少 `id`）。逐条读数与归属见下面「r125」那一格。
+    ✅ **10-20 01:2x r155 复量：这一格的两条声称现在都不成立，本格打勾**（载体 = 主检出，`git status --porcelain | wc -l` = **0** ⇒ 整棵树零脏）。
+    ① "锁跑在清单前面"那一半：同 ref 两侧现量都是 **2**（`git show <HEAD>:pnpm-lock.yaml` 按 importer 切段数 zxcvbn ↔ `git show <HEAD>:packages/ui/package.json`）
+       ⇒ `ERR_PNPM_OUTDATED_LOCKFILE` 那个报错的谓词不再成立，而 r125 已在只含已提交内容的干净检出上真跑 `--frozen-lockfile` **rc=0**。
+    ② "那 11 枚生产者至今是 `??`"那一半：`git status --porcelain -- packages/ui/src` 现在 **0 行**（这一格当时记的是 42 ` M` + 11 `??`）⇒ 那批已随后续提交落地；
+       构建侧另有 r151 的 `BUILD_RC=0` / `Done` 20 / `Failed` 0 直接读数。
+    ⚠️ 这一枚勾只作废"这一格当时量到的两条红"；**那批是谁提交的不由本线记**（同 r125 那句"本线不替那条线记它是怎么收的"）。
+- [x] 🔴 **10-09 23:4x 在 `61126d7d` 上把本线登记过的四条"等别人落地"逐条重量**（四条都是现取，不沿用上午那批；`HEAD` 从 `3c5a3be2` 走到这里只多了本线三笔 + 账号线三笔）：
+    ⚠️ **10-18 r125 复量（`29521b78`，只含已提交内容的干净检出真跑）**：这一格点名的那枚原因已经换了位置 —— 装那一半现在 rc=0，打不出包那一半**当时**换成两条新原因（`packages/app-host` 的两枚生产者还停在索引里没提交、`packages/ui` 的 `CommentView` 少 `id`）。逐条读数与归属见下面「r125」那一格。
+        🔴 **10-20 00:5x r151 再复量：连"打不出包"那一半也关了** —— 当前 `HEAD` 上 `NO_COLOR=1 pnpm -r --no-bail build` ⇒ **`BUILD_RC=0` / `Done` 20 / `Failed` 0**
+        ⇒ 这几格题面里"HEAD/main 打不出包"那句**现在谁写谁错**（当时的两条新原因与归属照旧留在 r125 那格里，是考古不是现状）。
+        ⚠️ 但这一枚绿**只关构建**：这几格各自还夹着别线名下的欠项（哪枚 `??` 该谁提交、`check:layering` 那一处…），那些要**逐格自判**，不许按这一句推成"那几格也好了"。
     - **`check:layering` 仍然 rc=1，而且唯一那一处违规是本线带进来的**：`apps/web/src/features/share/share-key-store.ts:56` 的 `syntheticIdentity()` 在外壳里自己拼 op 形状（写死 `entityType: 'SHARE_KEY'`）。该文件是 **`e6058120`（本线标题那笔代提交）新增的 123 行**，此刻零脏（`git status --porcelain -- <该文件>` 空）⇒ 不是别人在飞，是那笔代提交把一道门禁红带进了 `main`（`check:layering` 在 `pnpm check` 链里）。修法两条都在协作那条线的决定权里（把这个合成身份挪进 `app-host`，或让它不再自己拼 op 形状），**本线不代改它的产品语义、也不给封闭词表加豁免把红压掉**。这一格登记成**在案欠项**，不是"已修"。
     - **提醒那一半仍然没入库**：`git grep -c dispatchChecked HEAD` = **0**（工作树 52 处）。 ⚠️ **10-09 15:5x 更正这条的"形式"**：命令原样复跑现在报 **6**，6 处全在这份台账自己身上（那个词是被我写进正文的）⇒ 代码里仍是 0，但**这条结论只有带路径才成立**，见下面 `08d67071` 那格的 ④。
     - **提醒那条腿在干净检出上仍然跑不动**：`reminder-notify-request-failed` 在 HEAD 只命中 2 处，且**都是本线自己的文件**（`scripts/qa/reminders-data-responsive.mjs` 与这份台账），产品代码 `ReminderNotifyPanel.tsx` 里没有 ⇒ 上面那条"选腿旋钮"的理由仍然成立，不许读成"整族五腿现在都能在干净树上跑"。
@@ -1626,6 +1721,15 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
               🔴 **这一趟是上一格那条口径教训的第二次命中，而且这次错在我自己手上**：第一版把 ③ 的那条尺跑成了 `git status --porcelain -- packages/app-host/src` ⇒ 读出 **26**，与账里记的 **44** 差 18。差的不是世界，是**路径射程**（账里那把尺量的是 `packages/app-host` 整枚目录，含 `package.json`、`tsup.config.ts`、`dist` 之外的未跟踪件）。我**当场没有把它写成"拦路变轻了"**，而是回去读了 21:3x 那格的命令原文才重跑 —— 这一步是本账那条"读数旁边必须连着命令"第一次被**后来者**（就是我，隔了 45 分钟）用上。⇒ 规矩再加半句：**复量别人的谓词时，先读那一格的命令原文再敲，不许按"名字像"重造一把**；两把尺的差值（这里 18 枚）会被下一位读成"那一线落了 18 枚"，而它是 0。
               📌 `635c015b..HEAD` = **5 笔**，"全是本线"这句是**逐笔查出来的**不是看标题猜的：`git show --name-only --format= <sha>` 五笔**每笔都只 1 枚文件、且都是本台账**（`4a1dacd9`/`3fbe3fb2`/`b22f156d`/`dfc6d11e`/`1d609587`），净 diff 也是 **1 枚**，命中那四组路径 **0 枚** —— 六条纹丝不动是**第四次**同一条实证，且④⑥的字节数与第六趟**逐字相同**（40,131 / 184,705），这一趟没有"量具差异"要解释。
               🔴 **10-10 02:1x 第八次重量：六条逐条同值（② 现量 `git status --porcelain -- packages/ui/src` = 53 行 = **42 ` M` + 11 `??`**，与上面第四趟那条逐字相同），但这一趟又撞上上面那条口径规矩的第三种面目，而且它比前两错得更贵**：我想"顺手核一下 barrel 那 11 枚"，没有抄账里那把尺，而是自己造了一枚——从 `git show HEAD:packages/ui/src/index.ts` 抽相对说明符，逐枚 `git cat-file -e HEAD:packages/ui/src/<那串>`。它一口气报出 **90 / 93 枚"不在 `HEAD`"**（`git show HEAD:packages/ui/src/index.ts` 抽相对说明符去重得 **93** 条，逐枚 `git cat-file -e` 现量缺 **90**），看着像一条**新的拦路事实**——而 **96% 报缺**正是恒假尺的签名，只是我当时没先看这个数。真相是尺的病：TS 源码里的说明符写作 `./ai/AiPanel.js`（`.js` 是 ESM 写法），盘上与库里那枚文件叫 `AiPanel.tsx`／`model.ts` ⇒ 按字面问 `.js` 恒无。**已提交态真正的拦路枚数仍按账里那把尺的口径（53 = 42 + 11）**，本格不采纳我这枚自造尺的任何数。⇒ 那条规矩补严一档：**"指向不在 HEAD 的文件"这类谓词，说明符→实体名的映射必须由被审代码自己给**（这里就是 tsup/tsc 的解析规则），不许按字面猜扩展名；而"顺手多核一层"造出来的新尺，在写进账之前先问它能不能在自己不该红的地方红（我这枚对 `./calendar/CalendarBoard.js` 这类**早已入库**的件同样报"缺"——那一枚才是它的阳性对照，跑一次就看得出恒假）。
+    ✅ **10-20 01:2x r155 逐条复量：这四条没有一条仍然真，本格打勾**（载体 = 主检出，`git status --porcelain | wc -l` = **0** ⇒ 整棵树零脏；读数与上一条同批取的）。
+    ① `check:layering` 现跑 **rc=0**（`✅ apps/* 分层边界完好（扫描 445 个文件，10 条规则）`）—— 那处违规走的是本格当时写的"提到共享层"那条出路，
+       `packages/app-host/src/share-key-identity.ts` 现在**在 `HEAD` 里**（`git cat-file -e` 现量 YES），与上面 12:5x 那格 r122 的读数同向。
+    ② `packages/app-host` 从 **44 枚 → 0 枚**脏、barrel `src/index.ts` 也干净 ⇒ 那格第三/四/五次"同值"的读数到此为止，"那笔 AAD 迁移不能由本线做"这条裁决**不再需要**（它已由那条线自己落地）。
+    ③ 提醒腿：`reminder-notify-request-failed` 在 `HEAD` 的 `apps/web/src` 命中 **1 枚文件**（这一格当时是 0 个文件）⇒ 那条腿在只含已提交内容的树上不再结构上跑不动。
+    ④ 🔴 **但 `dispatchChecked` 这把尺今天答不出原问题**：needle 在 `HEAD` 与工作树里**都是 0 枚命中**（两边同值 ⇒ 它不再判事，正是本仓那条"命中 0 与一条没跑长得一样"的姊妹形状），
+       而提醒投递在 `HEAD` 里换成了 `packages/app-host/src/reminder-delivery.ts` 的 `reconcileReminderDelivery` / `createReminderReconciler`（**对账式**，不是"完成时派发一次"那个符号）
+       ⇒ 那句"提醒那一半仍未入库"按**符号**已经不成立、按**语义**已经以另一种形状入库；要重判得按新符号另立判据，**本线不替那条线造尺**。
+    ⑤ 账号线那枚 helper：`selectSettingsSection` 在 `HEAD:e2e/tests/helpers.ts` 命中 **4**（这一格当时是 0）⇒ 那份已提交的 spec 在干净检出上不再编译不过。
 
             - 🔴 **21:5x 第一次真跑 `pnpm -r build` 取直接读数（此前四格都是拿脏文件数当代理尺）：构建确实红，但红的位置和因果都不是代理尺说的那一档**（起跑 1 分钟负载 6.68、全仓无并发构建、HEAD = `882fb2da`）：
               **原文**：`apps/node-host build: src/host.ts(422,5): error TS2322: Type '(input: InboundAutomationHostOptions) => Promise<InboundAutomationCycleResult>' is not assignable to type '(options: …) => Promise<{ state: "empty"|"submitted"|"needs-confirmation"; eventId?; itemCount? }>'` → `Error: error occurred in dts build` → `DTS Build error` → `ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL @heyta/node-host@0.0.0 build: tsup`（约 20 秒就停，`-r` 到第一枚失败包为止）。
@@ -1648,8 +1752,11 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
               📌 **这一格把"从最终源码四端构建重装"那条关闭判据从模糊变成可判**：它原先写的是"那两处对齐提交后重跑 `pnpm -r --no-bail build`，读到'失败包清单为空'才算这格关"，而**"空"此前没有基线**（没人知道除这两枚外还有没有第三枚在 bail 后面）。现在基线是 **2**，所以关闭判据可以机械写成：**`--no-bail` 那趟的 `Failed` 行数 = 0，且起数仍是 20**（= 工作区内有 `build` 脚本的包数）—— 起数那一半是防"清单变空其实是因为根本没跑"（§7 那条"作用域打空照样 rc=0"同型）。⚠️ 边界照旧：这一趟证的是**当前工作树**打不出两枚包，**不是** `HEAD` 打不出（`HEAD` 那格另有它的六条谓词，23:1x 第七趟同值）；也不等于重装 —— 负责人那句「先只做不需要设备的」仍然盖着 `pnpm reinstall:all`。
               **对"从最终源码四端构建重装"那一格的结论（不变，但理由更硬）**：两枚红的文件**都不在本线**（`apps/node-host/src/host.ts` = ` M`、`apps/web/src/features/settings/inbound-runtime.ts` = `??` 未跟踪的新文件），而 `packages/app-host/src/inbound-process.ts` 此刻**已经不脏**（已提交）、只剩 barrel `packages/app-host/src/index.ts` 仍 ` M` ⇒ 那一线把接缝推进了**一半**，两端还没对上。本线不摘别人的未跟踪文件来压红、也不替它改类型。**闭合判据**：那两处对齐提交后重跑 `pnpm -r --no-bail build`，读到"失败包清单为空"才算这一格关；`apps/web` 那枚红不关，`tsc -b` 就走不到 `vite build` ⇒ `apps/web/dist` 打不出来，四端里"把共享 UI 产物装进各端包"那一档**结构上做不了**（与"设备搁置"是两条独立的挡路，别合成一条）。
 
-- [ ] 🔴 **10-09 15:5x 在 `08d67071` 上把上面那四条逐条重量**（`git rev-list --count 61126d7d..HEAD` = **4**：本线 1 笔 + 别线 3 笔）—— 四条**全部仍然真**，而第三条今天多量出了三件事，使它的修法从"等那条线拍"变成"照着做就行"：
-    ⚠️ **10-18 r125 复量（`29521b78`，只含已提交内容的干净检出真跑）**：这一格点名的那枚原因已经换了位置 —— 装那一半现在 rc=0，打不出包那一半仍然真但换成两条新原因（`packages/app-host` 的两枚生产者还停在索引里没提交、`packages/ui` 的 `CommentView` 少 `id`）。逐条读数与归属见下面「r125」那一格。
+- [x] 🔴 **10-09 15:5x 在 `08d67071` 上把上面那四条逐条重量**（`git rev-list --count 61126d7d..HEAD` = **4**：本线 1 笔 + 别线 3 笔）—— 四条**全部仍然真**，而第三条今天多量出了三件事，使它的修法从"等那条线拍"变成"照着做就行"：
+    ⚠️ **10-18 r125 复量（`29521b78`，只含已提交内容的干净检出真跑）**：这一格点名的那枚原因已经换了位置 —— 装那一半现在 rc=0，打不出包那一半**当时**换成两条新原因（`packages/app-host` 的两枚生产者还停在索引里没提交、`packages/ui` 的 `CommentView` 少 `id`）。逐条读数与归属见下面「r125」那一格。
+        🔴 **10-20 00:5x r151 再复量：连"打不出包"那一半也关了** —— 当前 `HEAD` 上 `NO_COLOR=1 pnpm -r --no-bail build` ⇒ **`BUILD_RC=0` / `Done` 20 / `Failed` 0**
+        ⇒ 这几格题面里"HEAD/main 打不出包"那句**现在谁写谁错**（当时的两条新原因与归属照旧留在 r125 那格里，是考古不是现状）。
+        ⚠️ 但这一枚绿**只关构建**：这几格各自还夹着别线名下的欠项（哪枚 `??` 该谁提交、`check:layering` 那一处…），那些要**逐格自判**，不许按这一句推成"那几格也好了"。
     - ① `pnpm install --frozen-lockfile` 仍红：`git show 08d67071:pnpm-lock.yaml` 的 `packages/ui` importer 段 zxcvbn 命中 **2**，`git show 08d67071:packages/ui/package.json | grep -c zxcvbn` = **0**（比的是同一枚 ref ↔ 同一枚 ref，照上面那条口径只读那一段）。
     - ② `pnpm -r build` 仍打不出包：`git status --porcelain -- packages/ui/src` = **42 枚 ` M` + 11 枚 `??`** —— 与 23:3x 那格**逐字同形状，一枚没动**。🔴 **这一句"脏文件 ⇒ 打不出包"的因果已被 21:5x 的直接读数否掉**（`@heyta/ui` 带着这批脏文件单独 build **rc=0**；构建红在另一条线的一处类型不匹配上）。脏文件数仍然是①那格的**事实**，只是它不再解释"打不出包"。见下面 `第一次真跑 pnpm -r build` 那格。
     - ③ `pnpm check:layering` 仍 **rc=1**（现跑，唯一违规还是 `apps/web/src/features/share/share-key-store.ts:56`），且该文件此刻**零脏**（`git status --porcelain -- <它>` 输出为空）⇒ 这是**已提交态**的红，不是"有人在飞所以不能算"。这一格的**论证、两种正当出路、以及"不许加豁免"那条**在上面 12:5x 那格「`check:layering` 在 HEAD 上红一处，而它红的那个对象**不是** op」（含 `git grep -nw` 词边界的坑）已经写全了，本格**不重述**，只补那格没有的两枚新现量。 🔴 自我更正一次：本线 15:5x 的第一版（提交 `bdb053d7`）把那格的论证**重抄了一遍**，这一版把它裁掉了 —— 同一件事写在两处就会各漂一份，正是 §8.8 禁的那个形状。
@@ -1657,6 +1764,11 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
       - **(b) 那格要求的前置判据（"动手前要先有一条 AAD 字节对账判据"），现量确认它现在不存在**：`apps/web/tests/share-key-store.spec.ts` 在 `HEAD` 里已入库、82 行 / **5 条用例**，逐条枚举过（wrap→unwrap 往返、落盘是密文、rekey 覆盖同 shareId、错口令解不开、removeShareKey 与坏 JSON）—— 五条全是**同一个 builder 自己往返**，没有一条写死密文常量，`git grep -n entityType -- apps/web/tests/share-key-store.spec.ts | wc -l` = **0**（⚠️ 别写成 `git grep -c entityType`：无命中时它**打印空并 rc=1**，"0"与"这条命令根本没跑"在输出上长得一样 —— §7 那条"计数为 0 与一条没跑长得一样"的同一族，这一格就是它的新实例）⇒ 把 `entityType` 改成别的值，这五条照样全绿，而本机已存的共享信封从此解不开（该文件注释自己写明它只用于本地自洽校验、不参与线上协议，坏的正是**存量本地数据**）。⇒ 出路（甲）动手的人必须先补这一条，否则就是那格警告过的"改一个字段名 = 让存量密文永久解不开"。
     - ④ 提醒那一半仍未入库，⚠️ **但我 23:4x 记下的那条命令现在会给出假读数，当场撤回它的形状**：`git grep -c dispatchChecked HEAD` 现量 **6**，`git grep -l dispatchChecked HEAD` 只回 **1 枚文件** —— 就是这份台账自己；打到代码路径才作数：`git grep -c dispatchChecked 08d67071 -- 'packages/*/src' 'apps/*/src' 'server/src'` = **0** ⇒ 代码里仍然没有。⇒ **一条"代码里有没有 X"的判据，一旦这个 X 被写进文档，无路径计数就变成自我污染的尺**（上面那条「判"代码里有没有"必须打到 `-- apps/web/src`」从今天起不是建议而是必须，而**这一格就是它的新证据** —— 我 23:4x 记的就是无路径形式，它现在会报 6）。取现量的正确形式：`git grep -c dispatchChecked <ref> -- 'packages/*/src' 'apps/*/src' 'server/src'`。
     - ⑤（与 `61126d7d` 那格同形状的第 2 条）`git show 08d67071:e2e/tests/helpers.ts | grep -c selectSettingsSection` 仍 **0** ⇒ 账号线那份**已提交**的 spec 在干净检出上仍然编译不过。这一格与 ② 一起构成"main 现在不可用"的全部内容，都不是本线能落的。
+    ✅ **10-20 01:2x r155 复量：这五条里四条作废、第五条那把尺失效，本格打勾**（载体 = 主检出、整树零脏；读数与上面两格同批取的）。
+    ① 锁 ↔ 清单同 ref 两侧都是 **2** ⇒ 一致（这一格当时是 2 ↔ 0）；② `git status --porcelain -- packages/ui/src` **0 行**（当时 42 ` M` + 11 `??`）；
+    ③ `check:layering` 现跑 **rc=0**，其 (a) 那半"app-host 44 枚含 barrel"→ **0 枚**；⑤ `selectSettingsSection` 在 `HEAD` 命中 **4**（当时 0）。
+    ④ 🔴 唯一那条**不能读成"仍然真"**的是 `dispatchChecked`：needle 在 `HEAD` 与工作树**都是 0** ⇒ 两边同值、这把尺不再判事，
+    而提醒投递在 `HEAD` 里是 `reminder-delivery.ts` 的 `reconcileReminderDelivery`（对账式）。这一件上面 `61126d7d` 那格已写全，本格不重述。
 
 - [x] ✅ **10-18 r125：上面那一族六格第一次拿到"只含已提交内容 + `--frozen-lockfile`"的直接读数 —— 装那一格作废，打不出包那一格仍然真，但两条原因都换了**（本线名下第一枚这样的读数；之前每一格都是带限定词的：要么钉在旧提交、要么 `cp -al node_modules`、要么改用不带 `--frozen-lockfile` 的装法）
     - **载体**：`/Users/rocalight/heyta-carriers/head-r123`（`git worktree add --detach`，跑完留作复用，**没有** `cp -al` 硬链别人的 `node_modules`，是这棵自己 `pnpm install --frozen-lockfile` 装出来的 1.1 G）。基线先钉在 `8aa2bd53`（装完 1 h 11 m 时 main 已经走了 29 笔），随后 `git checkout --detach 29521b78` —— ⚠️ **这一步不需要重装**，因为现量 `git diff --stat 8aa2bd53..29521b78 -- pnpm-lock.yaml package.json pnpm-workspace.yaml` **输出为空**，29 笔里没有任何一笔动依赖图。
@@ -1912,6 +2024,15 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
       🔴 **同一次现量还读出第二维，它比 117 更值得警惕**：`git status --porcelain -- apps/web/evidence | grep -c '^??'` = **236 枚未跟踪**
       （两个数一起看：117 改 + 236 没进过仓库 = **353 枚证据文件与 HEAD 不一致**）。
       ⇒ 上面那句"下一次宽 `git add` 会把这几百枚截图连同别人的改动一起提交"**不是假设，是此刻一次 `git add apps/web/evidence` 就会发生的事**。本格继续开着。
+      - 🔴 **10-20 01:2x r155 复量：那组"此刻多少枚"的数全部换了，而结构那一半不但没修，还长了 3 倍**（载体 = 主检出，全部只读命令）。
+        现量 `git status --porcelain -- apps/web/evidence` 的 `^ M` 与 `^??` **都是 0**、整棵工作树也是 **0** ⇒
+        上面那两格记的 **117 改 / 236 未跟踪** 与 **330 枚** 都是**瞬时读数**，此刻不成立 —— 别按那几个数行动，也别据此判"这格自己好了"：
+        同一把尺现读 `grep -rln "apps/web/evidence" e2e/tests/*.ts | wc -l` = **62 枚 spec**（上面那格记的是"20+ 枚"）⇒
+        **写图进被跟踪证据目录的 spec 从"20+"涨到了 62**，缺陷的射程变大了而不是收了。
+        另一枚能说明"瞬时"的读数：`find apps/web/evidence -type f -newermt 2026-10-19 | wc -l` = **50 枚** mtime 在今天之后，而脏数是 0
+        ⇒ 这 50 枚要么已被某笔提交收走、要么被 `git restore` 抹平 —— **两种落点都正是这一格说的那个形状**：证据只指认最近一次运行，不指认任何一棵树。
+        ⚠️ 处置边界不变，而且这一趟更确定：**改谁的 spec / 要不要给每条 spec 一个 `--evidence-dir` 旋钮 / 加不加那道"跑完整族后证据必须零脏"的门，属判据口径，不由本线代改**。
+        本线能做的只有"自己那几处不写进被跟踪路径"（r153 那趟 web 读数就是落到一个**新建的未跟踪目录**再逐枚点名提交的，`git status` 全程可核）。
     处置边界：载体侧已 `git restore -- apps/web/evidence` 回到 0 枚（那是我这一趟造脏的、我自己建的载体）；**主检出那 330 枚一枚没动** —— 那是别线的运行产物与在飞状态。修法三条方向写在证据 README（运行期只落未跟踪目录 / 给每条 spec 一个 `--evidence-dir` 旋钮 / 加一条"跑完整族后 `git status -- apps/web/evidence` 必须为空"的能红的门，152 与 330 是它的基线，只应减不应增），但**改谁的 spec、证据要不要由运行自动覆盖，属判据口径，不由本线代改**。
 - [x] ✅ **把 `check:locator-labels` 从"只验写了什么"补成"也验少了什么、还验自己看不看得见"**（`scripts/qa/check-locator-labels.py`，五臂变异验证）
     三条现量说明这枚门原来有**两格是空的**：① 它文件头写着要拦"只写一种语态"，实现里配对检查只在**两语态齐**时才有输入 ⇒ 那一档**永远不会红**（AGENTS §7 元规则二：一条永远通过的判据比没有判据更糟）；
@@ -2327,7 +2448,7 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
 | 「数据管理」 | 可 grep：`提醒状态与数据管理在`（当前源码重跑那格）＋整族最新读数那格（原写"现为 r41"，🔴 10-10 23:1x 就地更正为 r48，**01:4x 再更正为 r49**，可 grep：`01:4x r49：整族五条腿在` —— 接替理由不是"又跑一遍"，是 `rigWorktreeMatchesHead` 由 False 变 True；那一格里 r46/r48/r49 三批都含 `data` 腿的三条判据）＋`作用域没命中`（04:2x 那格：数据线也接上两层读数，主检出那棵上它候选恒 0，且这个 0 被 `scopeMatched=true` 兜住 = 真没有） | `DataSettingsPanel` 整枚不在 `HEAD` 且 `HEAD` 的 `App.tsx` 不 import 它 ⇒ **干净检出上这一面还是拆卡前的形状**（04:1x 复量：那两条谓词逐字同值），卡在同样的那一线 |
 | 「提醒状态」 | 可 grep：`把提醒腿在无头下缺的那两态补上了`（注入 + 逐格来源标签 + 钉来源判据与变异）＋`提醒「五态」那一格查出的是设计冲突` | 无头那档只算**卡片渲染**；**真权限管道**只有有头一档与设备端算数，而那两档一个要抢前台、一个要设备 —— 卡负责人的那句「先只做不需要设备的」 |
 | 「原生小组件环境识别」 | 可 grep：`Widget 环境识别`（§8.2 那张指针表第 1 行，两枚文件在 `HEAD` 且零脏）＋`页侧分类的真浏览器取证`（那枚新 spec） | 壳内**真窗口**取证未做（同一句指令搁置）；重取命令：`git cat-file -e HEAD:apps/web/src/pwa/widget-install.ts` 与同形那条 |
-| 「个人资料/账号/AI/帮助的剩余交互回归」 | 可 grep：`目标点名的另外四面在当前源码上跑完`（四面 14 条全绿）＋`长标题自然换行`（帮助那七条判据与三条坏臂）＋`二十四张图与逐格读数入库`（分组走查那 24 格）＋帮助面暗档那一维 `帮助腿补上暗档那一维`（r47：6 张 = 三宽 × 亮暗，分母从"宽度"一档改成"宽度 × 档位"两维）＋整族最新读数那格（现为 r49，接替理由见 `01:4x r49：整族五条腿在`）＋**10-10 凌晨定位那一族四格**：`本线不替自己拍的口径问题`（pair 与 OR 候选之争，两条修法都没动）、`数的是形状不是欠项`（第二维披露的分诊，断言位那几处是判据不是债）、`onboarding already complete`（首屏两下在报告里与"没命中"同形 —— 🔴 **iOS 那一半的码已在 01:4x 关掉**：读不到可点的首页标签就盖 `home-labels-absent` 并抛错，三臂离线读数见 `01:4x 顺手把 iOS 那条旅程的假通过形状关掉了代码这一半`；登记的那条成因同时被否证 —— 英文界面走不到那一支，第 223 行就超时；Android 静默少一步那一半**代码也已盖戳**（两支跳过各带本次 `uiLocale` 与在场 `labels`，ASCII 写所以不动定位符门的读数），两边欠的都只剩设备腿）、`HEAD_TREE_RC=1`（这枚门在干净检出上红，14 条全归任务旅程那两枚脚本） | 浏览器这侧交完了；**"控件本身"那一半**（选中态/`aria-current`/键盘路径/偏好持久化）分布不归本账，写法见合取那格末尾的三条 grep。✅ **10-10 22:1x 就地更正，别照旧句行动**："设备腿放开后还要按当前脚本重跑一次，让 journey 报告带上 `uiLocale`"这一格**已经做完**（Android r63/r64/r65 三份都带 `uiLocale`，iOS r80 那趟 24 步 `passed` 也补上了当前产物的设备读数 —— 见上面「#30 关掉：三种形状现在各有各的读数」那格）。⚠️ 只剩那条 pair/OR 口径要负责人拍（#28）。同表 `HEAD_TREE_RC=1` 那一格也过期了：定位符门现在 `rc=0`，而那枚红是本线自己带进来的，不是任务旅程线 —— 见上面「第 5 步（挂在别人批次上的逐项确认归属）跑完」那格 |
+| 「个人资料/账号/AI/帮助的剩余交互回归」 | 可 grep：`目标点名的另外四面在当前源码上跑完`（四面 14 条全绿）＋`长标题自然换行`（帮助那七条判据与三条坏臂）＋`二十四张图与逐格读数入库`（分组走查那 24 格）＋帮助面暗档那一维 `帮助腿补上暗档那一维`（r47：6 张 = 三宽 × 亮暗，分母从"宽度"一档改成"宽度 × 档位"两维）＋整族最新读数那格（现为 r49，接替理由见 `01:4x r49：整族五条腿在`）＋**10-10 凌晨定位那一族四格**：`本线不替自己拍的口径问题`（pair 与 OR 候选之争，两条修法都没动）、`数的是形状不是欠项`（第二维披露的分诊，断言位那几处是判据不是债）、`onboarding already complete`（首屏两下在报告里与"没命中"同形 —— 🔴 **iOS 那一半的码已在 01:4x 关掉**：读不到可点的首页标签就盖 `home-labels-absent` 并抛错，三臂离线读数见 `01:4x 顺手把 iOS 那条旅程的假通过形状关掉了代码这一半`；登记的那条成因同时被否证 —— 英文界面走不到那一支，第 223 行就超时；Android 静默少一步那一半**代码也已盖戳**（两支跳过各带本次 `uiLocale` 与在场 `labels`，ASCII 写所以不动定位符门的读数），两边欠的都只剩设备腿）、`HEAD_TREE_RC=1`（这枚门在干净检出上红，14 条全归任务旅程那两枚脚本） | 浏览器这侧交完了；**"控件本身"那一半**（选中态/`aria-current`/键盘路径/偏好持久化）分布不归本账，写法见合取那格末尾的三条 grep。✅ **10-10 22:1x 就地更正，别照旧句行动**："设备腿放开后还要按当前脚本重跑一次，让 journey 报告带上 `uiLocale`"这一格**已经做完**（Android r63/r64/r65 三份都带 `uiLocale`，iOS r80 那趟 24 步 `passed` 也补上了当前产物的设备读数 —— 见上面「#30 关掉：三种形状现在各有各的读数」那格）。⚠️ 只剩那条 pair/OR 口径要负责人拍（#28）。同表 `HEAD_TREE_RC=1` 那一格也过期了：定位符门现在 `rc=0`，而那枚红是本线自己带进来的，不是任务旅程线 —— 见上面「第 5 步（挂在别人批次上的逐项确认归属）跑完」那格。🔴 **10-20 r156-r158 这一族四面装机态又补了一层"哪一格在哪枚件上取的"**：设置 / 账号 / AI+帮助 / 提醒块四枚装置在**同一枚件**（`main.jsbundle` sha256 前 16 现量，别抄本页那个数）上把 **2×2 四格（中英 × 浅暗）**跑齐，件身份每批两头发（跑前 / 跑后各一次哈希）⇒ 引用这一行时先读那三格，别把"四面跑过"读成"四面 × 四档都在当前件上跑过"，也别反过来读成"一档都没跑" |
 | 「更新文档逐项收口」 | 「主表那一百多行的『待验收』归了一次堆」＋本轮那三格复量（十枚用例 / `check:docs` / 那两格 HEAD 拦路）＋**「设备窗口一放开」那趟的入口索引** | 归堆口径只看每行最后一格，**不用于数还剩几行**；精确计数要逐行人读（那句边界写在归堆格末尾） |
 | 「实际验收深浅主题和各端交互」 | 「暗色档半暗…」那格（载体改走产品自己的开关 + 两层判据）＋可 grep：`跟档`（02:3x 那格：按节点身份配对的判据，两棵树 + 一发变异）、`配对尺的样本加厚`（03:4x 那格：配对数由"格子"改成"节点"的口径变更 + 专门种在第 2 枚的那发牙）、`作用域没命中`（04:2x 那格：数据线/同步线也接上共享层读数，外加那条"锚点 id 被改掉就会静默"的自证与它的变异臂）、`verify:web-ui-sweep`（04:5x 那格：这装置第一次有了进门禁清单的执行入口，两发牙 + 与手敲读数逐值相同的正对照 r43）、`人打开四张看过`（10-10 那格：视觉抽查由 8 张补到 10 张，其中~~数据面那张"还原被拒"状态卡从此有图能看见~~ 🔴 **这句在 22:1x 被逐张那一格否证了一半**：390 那一档的整页图里根本没有那张卡（`fullPage` 对内层滚动容器是空操作），"有图能看见"只在 375 与 1440 成立；现已由节点级取证补成三档都成立，见 `拒绝卡节点级取证` 那格）、`数据面逐张十八张`（22:1x 那格：数据面三态 × 三宽 × 亮暗逐张，外加"断言的名字比射程宽"那条成因）、`拒绝卡节点级取证`（22:1x 那格 r45：12 枚节点图 + 那条只判"两种理由是否同一句"的新牙与它的变异臂）、`同批看图三张`（21:2x 那格 r44：图 / 读数 / 树三者同批，外加那枚配对尺第一次对上像素）＋整族最新读数那格（现为 r49，可 grep：`01:4x r49：整族五条腿在`；r46 留作"新牙第一次进全绿趟"，r48 留作"分母改成两维那次"） | 深浅这条**在浏览器侧两棵树都判得动，且四面里被量过的对象已经齐**（提醒/分组/数据/同步四条腿都交出共享层读数；主检出那棵上数据面与同步面候选恒 0，是被 `scopeMatched` 兜住的"真没有"）。🔴 **它分两层，别把上面那句读成"看图也齐"**：机读那层已齐（r44 还给它补了一次**两档 × 两宽**的像素级正对照，并把"节点↔色"绑定证到元素截图上），**人眼那层：r44 那批 87 张已整批逐张看完**（提醒 30 + 数据 18 + 分组 24 + 同步与隐私决定态 12 + 帮助 3，可 grep：`r44整批八十七张看完`），另加 r45 的 12 枚节点图与 r47 的 6 张帮助面暗/亮两档图（可 grep：`拒绝卡节点级取证` / `帮助腿补上暗档那一维`）；**10-10 04:2x 再加 r50 的 12 枚同步与隐私决定态图（可 grep：`04:2x 把 r50 那 12 张逐张打开看` —— 暗档四态跟到位、375 标签条仍可滚，并照出一枚"375 亮档页眉那行被右边缘截断"的疑点，因为 `noHorizontalOverflow` 在该腿是未判，所以没登记成缺陷）**；只剩最早那两批（分组 24 里 6 张、提醒与数据那批 4 张）是抽查口径。⚠️ **r51/r52/r53 三批不扩人眼层**：r51 那 43 枚与 r52 那 13 枚一张都没看，而 r52 落在默认目录、把在册 r49 那 54 枚锚点指向的图换成了它自己的（那格末尾有账）。⚠️ **拼图读法的射程**：判得了半亮/缺块/错位/按钮态/折行形状，判不了"某个字糊没糊"。而数据面那 18 张看完换来的最要紧一条是：**"有图能看见"这件事此前在 390 那一档是空的**（成因与修法见 `拒绝卡节点级取证` 那格）。各端里"端上"那一半全在设备/壳，见入口索引格；🔴 **装机态那一半现在有了 Android 读数**（可 grep：`00:5x：装机态 Android 四枚组件的暗色档` —— 四枚逐枚从系统微件面板重绑、两档卡内底色逐枚等于生成 token，`sheet-light/dark.png` 两张都人眼看过；非空数据那一半仍开） |
 | 「从最终源码四端构建重装」 | 可 grep：`这两格每次都要重取`（02:5x 那发四条谓词的复量）、`第四次重量这四条`（04:1x 那次复量：六条谓词逐条同值 + 那枚 `awk` 段宽恒 0 的坏尺与 zsh `$H:e` 修饰符坑）、`第六次重量这六条`（22:4x：六条仍同值，每个 0 都带同命令形状的阳性对照，外加"对照字节数差 1 而文件零提交"那条"读数旁边必须连着命令"的新教训，以及那 12 笔**直接量到**没碰那四组路径）与 `第七次重量这六条`（23:1x：六条第四次同值，且这一趟**自己差点被路径射程造出假读数** —— ③ 按 `packages/app-host/src` 跑回 26，账里那把尺是整枚目录的 44，差值 18 会被读成"那一线落了 18 枚"，而它是 0）与 `10-10 03:0x 复量`（提醒状态那半的三个前提）——⚠️ **这两处读数每次引用前都要重跑那几条谓词，它们是瞬时属性** | ✅ **10-11 18:2x 就地更正：这一列原先那句「两个独立拦路」两半都已经没有内容了，别照旧句行动**。① 负责人那句搁置指令在 10-10 07:4x 解除，四端重装由趟号 r93 一趟跑完（可 grep：`第 4 步第二次跑完：一趟四端全绿`；逐端判据、四张人看过的图与字节对账在 [`apps/web/evidence/ux-final-20261011/reinstall/RESULT.md`](../../apps/web/evidence/ux-final-20261011/reinstall/RESULT.md)）。② 「`HEAD` 现在既装不起来也打不出包」由 18:1x 那格三条静态现量否证（可 grep：`重取"HEAD 拦路"那六条里可以静态量的三条` —— barrel 自洽 0 枚找不到、两枚曾红的对象逐字等于 `HEAD`、那枚"从没进过仓库"的核查方式文件已在 `HEAD`）。🔴 **现在只剩一格，而它不是拦路，是"还没跑"**：r93 证的是**主检出工作树**上那份产物装得上、起得来，**不证干净检出可复现**。把这一格升成那一档缺的是一条命令、不是谁的点头：新载体只含已提交内容 + `pnpm install --frozen-lockfile` + `NO_COLOR=1 pnpm -r --no-bail build`，关闭判据仍是那两条机械式（`Failed` 行数 = 0 **且起数仍等于工作区内有 `build` 脚本的包数** —— 起数由那一趟自己打印，本行不钉它的值）。
@@ -2369,7 +2490,7 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
   🔴 **⑧ 是这轮唯一改变等待内容的一条**：那枚"HEAD 装不起来"的红（`pnpm install --frozen-lockfile` 死在 lockfile 里有 `@zxcvbn-ts/core` 而 `package.json` 没有）**在生产者那一侧已经修好了，只是没入库** ⇒ 这一格现在该等的不是"谁去修"，是**那一笔提交落进来**；落进来之后 `#25`/`#26` 那两格的前置才有意义可谈。
   📌 **一条元教训，它比这八条数值更值得留下**：`selectSettingsSection` 这**一个事实在本账被抄了 15 处**（`grep -c selectSettingsSection docs/plans/product-ux-optimization.md`，现量于本笔），每处都是"当时为真"。⇒ 一个瞬时属性抄 N 遍，重量时就得改 N 处，漏改的那些**不会报错，只会各自漂**——这正是 AGENTS §7 与本页那几格"正文别存会漂的值"的同一件事，只是这次的代价形态是"复量要做 15 次替换"。所以本笔起，**这类批量的复量只写一条带命令的格子**，别往那 15 处各贴一个新数值。
 
-- [ ] 🔴 **分诊那 11 组时顺出来一条本线自己脚本里的假通过形状（iOS Profile/Settings 那条旅程），登记，本线此刻不修**：第 224 与 230 行是 `present(launch_tree, ("只用本机",) / ("先离线使用",), pressable=True)` —— 这两处是**分支条件**，不是断言。
+- [x] 🔴 **分诊那 11 组时顺出来一条本线自己脚本里的假通过形状（iOS Profile/Settings 那条旅程）—— ✅ 10-20 r150 复核：三档闭合步骤与两条"顺带照出"都已落地**（标题末尾那句"本线此刻不修"是登记当天的原话，处置以本节四档追认为准）：第 224 与 230 行是 `present(launch_tree, ("只用本机",) / ("先离线使用",), pressable=True)` —— 这两处是**分支条件**，不是断言。
   它们决定这条旅程要不要点首屏那两下：命中才点，**没命中就走 `else` 记一条 `onboarding already complete / passed`**。
   ⇒ 在英文系统的模拟器上，全新安装的首屏标签是英文，这两个**只写中文**的条件都取不到 ⇒ 脚本**不会失败、也不会点**，而是直接给首屏那一步记一个 `passed`。
   这正是 AGENTS §7 那一族"探针没观测到 X 却报通过"的形状，也和上面那条"断言只验写了什么、不验少了什么"同族：**一个 `else` 记 passing 的分支条件，它单语写死的后果不是红，是假绿**。
@@ -2391,7 +2512,56 @@ Focus第二轮独立复审已关闭两条复现的清理时序缺口：定向5�
     **③ 已闭合**：变异副本只把三枚 `present(...)` 分支条件里的英文摘掉（`wait_for_any_label` 的英文**留着** —— 否则红的是"超时"而不是这一格），全新安装态下跑出来是 `{"name":"onboarding already complete","status":"home-labels-absent"}` 并抛 `JourneyError`，而那一屏明明有一枚可点的「This device only」（`01-mutation-first-run.png` 逐张看过）⇒ 02:0x 那档换过的预期形状被现量证实：**这条判据抓的是语言，不是运气**。
     **② 半开，且原因不是产品**：当前脚本在英文下确实**进了那一支** —— 命中并点了「This device only」、走到了英文欢迎页（错误原文的 `visible labels` 里有 `Use offline for now`），随后红在 `tap("choose local-only privacy", T(中,英), ("先离线使用",))` 的**第三个实参仍是单语中文**。⇒ 本线不动 04:1x 那笔"断言位照旧单语"的判据口径，但把一句可以两边都成立的话交给行主：**要么照 Android 那支的形状把断言位也做成随 `uiLocale` 选语态**（Android 同一位置是 `tap(T('只用本机','This device only'), T('先离线使用','Use offline for now'), …)`，双语），**要么在台账写明 iOS 这条旅程只在中文下可跑** —— 现在"分支条件双语、断言位单语"两头都不落地。
     ⚠️ **顺带照出两条新的**：① `:350` 那枚 `absent=("整理与记录",)` 在英文下**恒真**（读不到中文 ⇒ 永远算"不在场"），这是与假通过同族的另一种形状，现量法 `grep -nE 'absent=\("[^"]*"\)' scripts/qa/profile-settings-ios.py`；② 英文隐私卡右上角那枚 ✕ 在 AX 树里的名字是 **`Decide later`**，**两端脚本的任何候选里都没有它** ⇒ "稍后再说"这条路从未被任何一趟验过。
+  - ✅ **10-20 00:4x r150 复核这一格剩下的两半，都落地了**：
+    ①那半现在现量无命中 —— `grep -nE 'absent=\("[^"]*"\)' scripts/qa/profile-settings-ios.py` 回空，
+      且全脚本 `probe.tap(...)` 的 `then` 槽扫下来**单语 0 处** ⇒ 上面②那句"两头都不落地"里落地的是**双语那一支**。
+      这不是推断：`apps/mobile/evidence/ux-final-20261018/ios-profile-face-r140/` 里 `english/` 与 `english-dark/`
+      两趟各 **23 步 `passed`**（两枚档名反臂各红在第 5 步）⇒ 英文下这条旅程走得通，走错会响亮失败。
+      🔴 上面那句"断言位照旧单语是刻意的判据口径"**也随之过期**：口径没被谁翻，是 r140 那趟把 fail-closed 换成了
+      "整组五枚分组标题必须齐"（写在脚本 `assert_directory_language` 的注释里），单语 `then` 因此不再是唯一的守法。
+    ②那半由 **r150 补上设备腿**（`apps/mobile/evidence/ux-final-20261020/ios-privacy-decide-later-r150/RESULT.md`）：
+      自建一次性载体上的全新安装态 —— ✕ 的 AX 名「以后再说」/ frame `[322,232,44,44]`，点掉之后落到欢迎页（离线那条当场可走），
+      **杀掉再开那张卡原样回来**，而 `device_pref` 三趟现读 **0 行** ⇒ "先不决定"没有被偷偷写成任何一种决定（正面结论）。
+      ⚠️ 那一趟仍欠三样：英文档那枚 ✕ 的读数、Android 侧同一枚（现量 `grep -rn "以后再说\|Decide later" scripts/qa/` 仍为空）、
+      以及"按 ✕ 之后一个请求都不发"这条计数器（本机没起隔离服务端，数不了；最接近的读数是 Android 的 r117 第 4 节）。
+      跑法与那枚装置事实（**iOS 的 `device_pref` 住 `Library/` 不是 Android 那个 `databases/`**，
+      只按 Android 形状找会回 `not-found`，而"读不到"不等于"没有那一行"）都在那页第五节。
+    ⚠️ 这一格唯一还开着的，是上面那档「主表 `iOS 当前安装态` / `Android 当前安装态` 两行的限定句归它的行主补」——
+    那是**别人的行**，本线照旧只交枚举、不代改。
 
+- [x] 🔴 **候选界面缺陷（10-20 r153 已由本线改掉）：首屏隐私卡那枚「以后再说」在屏幕上只有一个叉，没有任何可见文字**（10-20 r150 照出）。
+    它的可及名称是「以后再说」/ `Decide later`（词条 `common.privacy.consent.close`），frame `[322,232,44,44]`，
+    而同一张卡上两枚真正的决定（「同意并联网」/「只用本机」）都带可见文字
+    ⇒ **看得见的人点它之前只能猜它是"关掉这张卡"还是"退出应用"，看不见的人反而拿到的是准确的那句话**。
+    证据：`apps/mobile/evidence/ux-final-20261020/ios-privacy-decide-later-r150/RESULT.md` 第一、三节（`01-first-launch.png` 逐张看过）。
+    ✅ **10-20 01:0x r153 改掉并复验**。改法取"把那句话摆到屏幕上"（✕ 换成同 key 的可见文字，不加新词条），两壳一起改：
+    `apps/mobile/src/screens/PrivacyConsentSheet.tsx`（`IconButton` ⇒ `Pressable` + `Text`，触控 44 高、按下反馈走 token）与
+    `apps/web/src/features/privacy/PrivacyConsentSheet.tsx`（`<X>` ⇒ 同一句可见文字，`aria-label` 与 `data-testid` 原样留着 ⇒ 既有 5 处按 testid 定位的脚本/用例射程不变）。
+    🔴 **这一格先前那句"本线不代裁决"是错的，改在此写明理由**：它不是措辞取向题 —— 屏幕上那层与可及层**不一致**才是缺陷本身，
+    而"可见文字"与"可及名称"两半用的是同一个 key、用户可作的三种决定一个不多一个不少（不碰任何对外表征）⇒
+    这是本线名下"量到了就该改"的那一档，与 r138 那枚可及名称同族，不该回问。
+    复验三件：装机态那枚触控区从 `[322,232,44,44]` 变宽到 **`[294,232,72,44]`**、`01-first-launch.png` 里那四个字看得见，
+    而行为三件一个没动（按下去卡收、重启卡回、`device_pref` 三趟 0 行）——
+    `apps/mobile/evidence/ux-final-20261020/ios-privacy-decide-later-r153/RESULT.md`。
+    web 那半另取到真浏览器读数：`HEYTA_RESPONSIVE_LEGS=sync` 那一腿 **RESULT=OK / rc=0 / 13 枚图**，
+    窄屏 375 那张（`apps/web/evidence/ux-final-20261020-r153-privacy-close-web/sync-privacy-3-reopen-dialog-light-375.png` 逐张看过）
+    显示这句话与标题同一行、没折行也没压住标题。
+    永久判据两条各带变异臂（臂 = 把源码换成改前那一笔 `git show bd10a50c:<那个文件>`，即本枚修复的父提交）：`privacy-consent-gate.spec.ts` ⇒ 改前 **× 红** / 改后 38 绿；
+    `apps/web/tests/privacy-consent-sheet.spec.tsx` ⇒ 改前 **× 红** / 改后 18 绿。web 那条判据的形状是 `textContent === aria-label`（不写死中文串，换语种不误红）。
+    ⚠️ **射程**：~~不证英文档~~ ✅ **同一趟 01:1x 补上了**（`ios-app-language.py --to en` 11 步全过 ⇒ 那枚出口 label `Decide later`、frame `[271,192,95,44]`、
+    `en/01-first-launch.png` 里那句话看得见没折行，三趟库里**没有** `privacy.consent` 行）—— 读数与那两枚装置事实（含"切语言那一步会经过欢迎页并记一次决定"）在
+    同一包 `RESULT.md` 第六节；仍不证 Android、不证暗档；
+    且本枚改的是 `apps/mobile/src` ⇒ **Android 产物又落后一枚进包的改动**，而打包机 10-20 01:0x 现量仍不可达（见 §五 第 11 步）。
+- [ ] 🔴 **候选界面缺陷（未裁决）：欢迎页那枚「先离线使用」/ `Use offline for now` 按下去会记一次决定**（10-20 r153 英文腿顺带量到）。
+    现量：库里落下 `privacy.consent = {"decision":"local-only","decidedAt":"…"}` ⇒ **首屏那张隐私卡从此不再出现**，
+    要回到那张卡只能去设置面「重新作出选择」。而屏幕上那句写的是"**先**离线使用" / "Use offline **for now**"。
+    ⇒ 看得见的人读到的是"先看看、待会儿再定"，它做的却是"把这台只用本机记成已作过的选择"。
+    ⚠️ **本线不判它错，也不代裁决**：本地优先不是降级，"只用本机"本来就是完整产品的另一种用法，
+    把这条当成一次真决定**可能正是产品要的**；而且它可逆（设置面那条入口回得来）。
+    与 r153 那枚的区别写清以便下一位不必重猜：**✕ 那枚什么都不记（已证三趟 0 行），这一枚记了但字面读起来像没记** ——
+    两枚是同一条卡上"话与事对不对得上"的两个方向，改法（措辞改成"就用这台机器"一档，还是让它真的不落盘）是产品取向题，
+    取向题要负责人拍，不像 r153 那枚只是两层不一致。
+    证据：`apps/mobile/evidence/ux-final-20261020/ios-privacy-decide-later-r153/RESULT.md` 第六、七节（含那枚装置手法的说明）。
 - [x] 🟡 **待办 #1：放开设备之后真跑成了 —— Android 的 Profile/Settings 旅程中英两条分支都在真模拟器上走通，但装的是旧产物，所以这一格是"装置能跑"，不是"当前源码已验收"**（10-10 18:4x–19:0x 建；负责人 07:4x 授权占用设备之后的第一趟）。
   ✅ **10-13 01:1x 收口这一格**：上面那句"真正的欠项只剩『Android 当前安装态已验收』这句话可以说了"现在可以说，但**要说准射程** ——
   r99（四端重装，只含 HEAD 那棵树打出的包）证的是一条窄声称：**装的是当前产物、起得来、首屏画面对**
@@ -4678,3 +4848,488 @@ lib 里是 `${CONSENT_GATE_PREFERRED:-同意并联网}`，函数作用域临时�
       `profile-settings-android.py` / `tasks-ux-android.py` / `ai-assistant-atomic-android.py` 三枚。
       ⇒ 本趟的"真包复验"只覆盖 iOS 一档；Android 那一档既缺装置、又缺出包载体（`windows-pc` 不可达），
       **别把 iOS 的读数外推成"两端都验过"**。
+
+- [x] ✅ **10-19 14:4x r140 个人资料/设置面装机态四格（中文×浅 · 中文×暗 · 英文×浅 · 英文×暗）—— 这一面第一次有英文档读数，而且是先把语言维判据补进装置之后取的**（台账那句「个人资料/账号/AI/帮助的剩余交互回归」里，个人资料这一面此前只有 r131 的中文两档，且拿的是旧件）
+      取证在 [`apps/mobile/evidence/ux-final-20261018/ios-profile-face-r140/`](../../apps/mobile/evidence/ux-final-20261018/ios-profile-face-r140/RESULT.md)（四格 20 张图 + 6 份 JSON + 两枚反臂）。
+      被测物与 r139 两面**同一枚件**：装进设备的 `Info.plist` mtime `2026-10-19 11:23:59`（载体 `head-r128` @ `997a1935`）；
+      装置 `scripts/qa/profile-settings-ios.py`（**本趟改过之后**的版本才跑出这四格）。四格各 23 步 `rc=0`，
+      `startedAt`→`finishedAt`：`current-source/` 1792388810.70→1792388846.18 · `dark/` 1792388749.75→1792388777.39 ·
+      `english/` 1792387235.99→1792387266.00 · `english-dark/` 1792388251.23→1792388285.60。
+      🔴 **这一格真正的交付是那枚装置，不是那四张图**：`settings directory` 那一步以前是**写死的中文候选**
+      （注释的理由是"单语才 fail-closed，语言不对不能伪装成 IA 通过"），后果不是英文档判得松，而是
+      **英文档整条旅程在设置目录那一步就断** ⇒ 这一面从来没有装机态英文读数。现在改成
+      `--language` 声明哪一档，就要求那一档**五枚分组标题整组在场**，不齐就红并回读"屏幕上哪一档整组在场"。
+      fail-closed 的性质由"整组齐"继承，不再由"只认中文"继承。**两枚反臂证明这把尺两头都能红**：
+      中文屏声明 en ⇒ `rc=1`、`visible on screen=['zh']`；英文屏声明 zh ⇒ `rc=1`、`visible on screen=['en']`
+      （两趟各 5 步后红，落点在 `mutation-arm-*/`）。这条是 #488 的续 —— 判语言档只看 AX 树里的标签，
+      系统域 `AppleLanguages` 不参与判定，而现在这件事**钉在装置里**，不再靠人记得去读树。
+      ⚠️ **同趟量出三处装置的病，都当场修了**（正文与复现都在 #492）：① `scroll_to` 把 `wanted[0]` 喂给
+      `scroll_into_view` ⇒ 双语候选在滚动那一位静默退回单语，英文档 22 步全绿只红在最后一步；
+      ② 这一面是三枚 iOS 旅程装置里**唯一不做 `terminate`+`launch`** 的 ⇒ 上一趟红在哪一屏，下一趟就从那一屏开始
+      （实测红过一次，失败文本里可见「关闭」「设置」）；③ `absent=("整理与记录",)` 在英文屏上是**永远不咬的空判据**，
+      它当时安全的前提就是①②那件"英文档走不到这一行"——前提取消后必须补。
+      **深浅档两把尺**：`require_appearance` 的"声称"从末级名恰好等于 `light`/`dark` 扩到 `*-dark`
+      （`english-dark/` 这类语言×档合一的名字以前没有牙），拒写臂现量 `rc=1` 且**目录没被创建**；
+      独立的像素尺逐张对：两格 light 全 252，两格 dark 为 28/12/28/12/12（五张按文件名 general/growth/my/settings-directory/sync）
+      ⇒ 两把尺同向。人看图 20 张里看 5 张（中英两档的设置目录、英文×暗的「我的」、英文的成长页），其余按像素。
+      门现量：`check:locator-labels` `rc=0`（`profile-settings-ios.py` 读到 90 组、含中文 51 ≥ 基线 44），
+      它披露的那 1 条"组内整片单语"是 `DIRECTORY_GROUPS["zh"]` —— 两档**必须**分开写（合写会让「常规」去配
+      "Sync and privacy" 而红），已把这条写进代码注释，别按披露去"补成对"。
+      ⚠️ **一条未裁决登记（本线名下，没顺手改）**：设备上英文 tab 栏渲染的是 `Categories`/`Profile`，
+      而 `ai-face-ios.py` 的 `TABS` 常量写的是 `Lists`/`Me` —— 两枚死字。今天不影响 `tab_top()` 的 `min()`
+      （同一行里 `Tasks`/`Calendar`/`Focus` 三枚命中），但那是候选表与真源的漂移；改它要重跑 AI 面四格才不算
+      "改了判据没取读数"，本趟只登记。
+      **不证**：这一面只读（不改设置、不导出、不清理、不登录）；四端仍不等于四端（windows/android 仍堵在打包主机）。
+- [x] ✅ **10-19 17:3x 提醒块那一枚一次性探针转正成常驻装置，并在当前源码件上重跑深浅两档 —— 这一趟修的是探针，不是产品**（r141，`scripts/qa/reminder-block-ios.py`，图与读数同批入库）
+      前身是 r132 落在取证目录里的一次性探针（`apps/mobile/evidence/…/ios-reminder-block-r132/probe-reminder-block.py`）。
+      目标里点名"提醒状态"，而这一格此前只有那一趟读数、且它拿的是旧件，一次性探针也没有"下一位怎么重跑"的位置。
+      **旧探针在当前源码件上重跑时把那一下打在底部 tab 栏上**（`01`/`02` 同一张画面、`afterAdd` 四枚全 `present:false`、
+      却 `rc=0` 交回"取到读数"）⇒ 逐字符现量到的是**两重**失效，两支反臂各留了目录：
+      ① 射程不含底部 tab 栏：守卫写的是 `0 < cy < 屏高−40`（874 pt 屏 ⇒ 834），那枚按钮中心在 796；
+        而详情面板开着时**树里没有 tab 栏那几枚节点**（`viewport_bottom` 自己退到屏高−8=866）
+        ⇒ 光换 `viewport_bottom()` 不够，必须在**列表面**先把顶边量下来（现量 776 pt ⇒ 下界 772）再取小。
+        读数里 `tabBarTopOnListScreen` / `viewportBottomClamp` 两栏分开写，下一位能看出这个数是量来的还是猜的。
+      ② 惯性没停就按：守卫读到「提醒」在 y=720，紧接着的截图里它在 ~553 —— 中间画面又自己滚了 167 pt，
+        校验用的 frame 与按下去时的 frame 不是同一帧（#474 那一族的第二种失效）。⇒ 借 `ai-face-ios.settle_in_viewport`
+        那半把尺：隔 1.2 s 连读两遍、容差 12 pt 才交回。
+      🔴 **③ 修完①②之后它红了一次，而这一支红得假**（`prompt-first-run/`）：那一下打在 settled frame 正中
+        （71,382）却仍报"什么都没变"——真因是**iOS 通知授权弹窗整片顶掉了 app 的 AX 树**：现量那一刻整棵树只有 5 枚节点、
+        每枚 `pid=11428` 而前台 app 是 `40365` ⇒ `describe-all` 交回的是弹层那棵树；截图里那一行提醒**已经加好了**。
+        它还**活得过** `simctl terminate`+`launch`（不先按掉，下一趟直接死在 `ensure_on_tasks()`，报
+        `workspace did not open after onboarding`）。登记为 **#505**。装置因此起跳时逐枚按掉在场弹窗并记进读数
+        （`systemPromptsAtStart`），按哪一枚认**形状**（树 ≤12 枚且含 ≥2 枚 Button）+ 取右边那枚，
+        **不按字符串** —— 弹窗文案不在本仓词条里、英文那侧带弯引号，按字串会把装置钉死在一种系统语言上。
+      顺带把三枚动作按钮改按**词条模板**匹配（`reminder.a11y.snooze|dismiss|remove`，把 `{when}` 通配）而不是在探针里
+      自拼动词表：`check:locator-labels` 当场把四枚"没人守的英文抄件"判红（`'reminder'`、`'Close task detail'`、
+      `'Open task: '`、`noDueDate` 的英文整句都不在 `en.ts`）——真值是 `Close task details`（`mobile.detail.close`）
+      与 `…so only an absolute time can be set`。同趟把标签一律改成**函数内求值**（`JU.ENGLISH` 是探针读到第一帧树之后
+      才翻的旗，模块顶层常量会把英文态永远锁成中文），并把加完/删完从"记一条读数"改成**硬断言**、收工删掉本次建的那条任务。
+      **两格读数（zh-CN，同一枚件 `997a1935` / bundle `Info.plist` mtime `11:23:59`，与 r139/r140 同件）**：
+      `light/` rc=0（38.7 s，起跳时在场 1 枚弹窗、按掉「允许」）、`dark/` rc=0（51.1 s，0 枚）；
+      两档**逐枚 frame 完全相同**（节标题 `[16,295,370,23]`、空态行 `[16,330,370,18]`、快捷按钮 `[16,360,111,44]`、
+      加完后徽标 `[24,361,33,14]` 与三枚动作 `[132,332,82,44]`/`[218,332,82,44]`/`[304,332,82,44]`），
+      命中的整句可及名称逐字记进读数（`把 10-19 18:25 的提醒推迟 10 分钟` 等）；`removedBackToEmpty=true`、
+      两趟各自 `taskDeleted.gone=true`，设备现量任务列表为空。**深浅那把尺是图不是命令回读**（#471）：
+      独立像素尺逐张现量 `light` 三张 252、`dark` 三张 28；设深走 `shutdown`→`boot`→`bootstatus -b`→`simctl ui … dark`。
+      人看图：七张里逐张看五张（两档的空态/加完/删完 + 弹窗那张），其余按像素尺。
+      门现量：`check:locator-labels` 全清单 `rc=0`（新脚本 `读到 50 组、含中文 14` = 它自己的基线）。
+      **不证**：⑴ 不证提醒真的会发出去（到点要等一小时），也**不证弹窗那一支可复现** —— 授权一旦决定就不再弹，
+      而本机 `simctl privacy reset notifications` 回 rc=1（#475）⇒ 那一支整趟只取到一次，别把"复跑还是绿"读成它也被复跑过；
+      ⑵ 不证英文语态（装置现在双语可定位，但本趟两档都在 zh-CN，英文那一档没有本趟读数）；
+      ⑶ 不证有截止时间的任务（那条路径上块里才有「添加提醒」与相对偏移预设，本趟 `添加提醒 present=false` 是这一格的形状、不是缺陷）；
+      ⑷ 不证「推迟」「关闭」两枚按下去的效果（只取到它们的可及名称与 frame，没按）。
+      复跑命令与设备收尾状态在 [`apps/mobile/evidence/ux-final-20261018/ios-reminder-block-r141/RESULT.md`](../../apps/mobile/evidence/ux-final-20261018/ios-reminder-block-r141/RESULT.md)。
+- [x] ✅ **10-19 18:1x 提醒块那一枚装置从三步扩成五步 —— 「推迟」「关闭」两态第一次有装机态读数，并且照出一枚真缺陷**（r142，同一枚件 `997a1935` / bundle mtime `11:23:59`，与 r139/r140/r141 同件）
+      上一格 §七 第 4 条那句"不证推迟 / 关闭两枚动作按下去的效果（没按）"这一趟划掉了：装置现在按**两枚动作各自按下去**，
+      并把到达该态写成**硬断言**（`已推迟` / `已关闭` 徽标 + 该态**应当在场/不在场**的动作集合），没到达就先留 `<shot>-not-reached` 图再红 ——
+      "看得见就按、看不见就跳"那种写法会把"设备上这一态长什么样"永远留成没读数。两档各 `rc=0`（light 34.6 s · dark 35.7 s，zh-CN，起跳时在场弹窗 0 枚），
+      **逐枚 frame 两档完全相同**：`已推迟` 徽标 `[24,361,33,14]`（三枚动作都在 ⇒ 换行到时间下方）、
+      `已关闭` 徽标 `[114,345,33,14]`（只剩一枚「删除提醒」⇒ 回到与时间同行，该枚 `[304,330,82,44]`）。
+      ⚠️ 那处**换行不是裁切**：两档同形，是 flex 自然换行；关闭档 `y` 从 332 变 330 同因。像素尺逐张现量 light 五张 252、dark 五张 28；
+      新扩出来的四张（两档 × 推迟/关闭）**逐张人眼看过**。旧三步留下的 `03-reminder-removed.png` 已从两档目录删掉（同一件事现在叫 `05-`），免得两枚 `03-` 并排被读成同一次。
+      🔴 **照出来的缺陷（本线不代改，是行为口径）**：按钮念的是 `把 10-19 18:44 的提醒推迟 10 分钟`，按下去之后这一行变成 `10-19 17:54`
+      —— **一条未来的提醒被提前了 50 分钟**（dark 档同形：18:47 → 17:57，屏幕时钟 17:47 现量在图上）。
+      成因链逐枚行号可点开：`apps/mobile/src/lib/reminders.ts:171` → `reminders-display.ts:67` → `packages/domain/src/reminders.ts:336`
+      （`snoozeDeadline(at, 10) = at + 10min`，而传进去的 `at` 是 `Date.now()` 不是那条提醒自己的时刻）；
+      **web 端同一形状**：`apps/web/src/features/reminders/store.ts:135` ⇒ 不是 iOS 独有。
+      名称由 `packages/ui/src/reminders/ReminderList.tsx:345` 用 `row.when`（当前时刻）生成 ⇒ "念 18:44、做 17:54"这一对矛盾在树里同时在场。
+      **为什么浏览器那五态覆盖看不见它**：`apps/mobile/tests/reminders-notes-display.spec.ts:133-134` 把契约钉成 `snoozeTargetAt(NOW) === NOW + 10min`，
+      它只会把"从现在起算"钉牢，不会去比"相对原时刻"。设备腿照得出来是因为它读的是**按钮自己念出的那个时刻**。
+      两个改法方向（① 相对**原时刻**推 10 分钟；② 保持从现在起算但文案改「10 分钟后提醒」）都要动 `packages/domain` 那条收口函数 + 两端调用点 + 重取五态读数 ⇒ **归提醒那一线裁决**；原始读数在 `…/ios-reminder-block-r141/RESULT.md` 第四节。
+      🔧 **顺手把共享守卫补成对称**：`ai-face-ios.require_appearance` 的"声称"从 `*-dark` 扩到 `*-light`（r140 只补了一侧 ⇒ `english-light/` 这种名字没牙，比两侧都不守更容易骗人）。
+      反臂现量：设备 `dark` × 落点末级名 `arm-claims-light` ⇒ **`rc=1` 且目录没被创建**（原文在 `…/arm-light-claim-refused.txt`）。
+      ⚠️ **两支废臂的形状写给下一个写臂的人**：`arm-claim-light-while-dark/`（以 `-dark` 结尾 ⇒ 守卫读成"声称暗档"、与设备相符、放行）与
+      `arm-claim-light-while-dark-r2/`（以 `-r2` 结尾 ⇒ **根本不声称任何档**、放行）—— 两趟都 `rc=0` 跑成完整暗档旅程。
+      ⇒ 这枚守卫读的是**末级名的后缀**，臂名要恰好以要声称那一档结尾。两枚目录内容与 `dark/` 同形，已删。
+      ⚠️ 上一格那句"设备收笔 `appearance = light`"被本趟现量否证（起跳前 `simctl ui … appearance` 回 `dark`，是那两枚废臂留的）⇒
+      本趟按 #471 还原（`light` → `shutdown` → `boot` → `bootstatus -b`）并**双确**：回读 `light` + 装机面一张 `modalLuminance = 252`。收工 `com.heyta` 已 terminate、列表为空、**没收任何 companion**。
+      门现量 `check:locator-labels` 全清单 `rc=0`（本脚本扩程后 `读到 59 组、含中文 16`，基线登记值 14 是**下界不是配额**）。
+      **不证**：⑴ 不证英文语态（装置双语可定位，但这一格两档都在 zh-CN）；⑵ 不证提醒到点真的发出（要等一小时）与弹窗那一支可复现（#475）；
+      ⑶ 不证有截止时间的任务那条路径；⑷ 不证「推迟」的分钟数可配；⑸ 第四节的缺陷只到"界面上这一行挪到了过去"，**没证**它按新时刻真发通知、也没证其它端同步回来后的表现。
+      ⚠️ 上面那串里的 **⑴「不证英文语态」已被下一格（r143）作废** —— 英文那一档现在有读数，读那一格即可，别按这行推定"英文没跑过"。
+- [x] ✅ **10-19 18:3x 提醒块补上第三格「英文 × 浅」—— 上一格那句"不证英文语态"到此为止，同一趟照出第二枚缺陷（布局）**（r143，同一枚件 `997a1935` / bundle mtime `11:23:59`）
+      走产品自己的语言开关（`ios-app-language.py --to en`，8 步 `rc=0`，判语言只看它打印的 `language after (en)` ⇒ #488），
+      再跑 `reminder-block-ios.py --evidence-dir …/english-light` ⇒ **五步全过、`rc=0`、44.9 s、`uiLocale=en`、五张图像素尺全 252、本次建的那条已删净**。
+      每枚双语定位符都在英文档命中过：`Remind me in 1 hour` `[16,360,160,44]`、`Snooze the reminder at 10-19 19:24 by 10 minutes`、
+      `Dismiss the reminder at …`、`Delete the reminder at …`、`Close task details`。
+      🔴 **r142 那枚「推迟反而提前」在英文档同样在场**（第 5 枚独立样本：按钮念 19:24，按完两枚后续动作读的是 18:34 ⇒ 提前 50 分钟）
+      ⇒ 它是**与语态无关**的行为口径，不新增缺陷、只加一枚样本。
+      🔴 **新照出的是一枚布局缺陷**：同一行元素中文一行、英文被挤断 —— `Scheduled` 徽标**在单词内打断**成 `Schedule` / `d`
+      （frame 高 **14 → 28**），时刻 `10-19 19:24` 也折成两行；而**关闭档**（只剩一枚动作）英文 `Dismissed` 单行、时刻单行 ⇒
+      **症状只在三枚动作同时在场时开火**，且 `Snoozed`（短一点）不断 ⇒ 有阈值，不是"英文都断"。
+      成因在样式：`packages/ui/src/reminders/ReminderList.tsx:196` 的 `main` 是 `{flex:1, flexWrap:'wrap'}`，它自己那行注释写着
+      **"长文案换行而不是挤掉动作按钮"** ⇒ 换行是设计意图；但 `:207` 的 `badge` **既没有 `flexShrink:0`、文字也没有 `numberOfLines`**
+      ⇒ 三枚英文按钮把 `main` 压到约 66 pt 时徽标只剩 53 pt 宽，单词放不下就被逐字劈开。**"换行"是意图，"把一个单词劈开"不是任何一档意图** —— 这是它算缺陷而非算取向的依据。
+      两个方向（① `badge` 加 `flexShrink:0`，代价是要重看右缘；② `row` 加 `flexWrap` 让动作整排换行，更像那行注释的本意，但行高会变、中文两档那五行 frame 全要重取）
+      **本线不代改**：这枚症状只在**真实文字测量**下存在，jsdom 量不到文字宽度 ⇒ 造不出会红的离线判据（造出来就是恒绿判据，比没有判据更糟），
+      要证它必须重打包装进模拟器再跑三档 ⇒ 交给提醒/界面那一线，随它下一次进包的改动一起做。
+      ⚠️ 这句到 **r147** 为止：那三档本线自己跑了（改前的件红、最终件中英各绿），缺陷已在本线改掉 —— 交链那句当时把"要跑装机态"错读成"归别人"。
+      ⚠️ 三档收笔现量：外观 `light`（回读 + 装机面像素 252 双确）、**应用内语言已还原中文**（`--to zh` 8 步、回读步 passed）、
+      `com.heyta` 已 terminate、列表为空、**没收任何 companion**。门现量 `check:locator-labels` / `check:md-tables` / `check:docs` 各 `rc=0`。
+      **不证**：⑴ 英文 × **暗**档（外观与语态是两维，本线只取过 `english-light` 这一格）；⑵ Android 档的同一形状；
+      ⑶ 大字体档下这枚徽标会不会更早开火（没测）；⑷ 那两枚改法的任何一种效果（本线一个字没改）。
+      读数与图在 [`apps/mobile/evidence/ux-final-20261018/ios-reminder-block-r141/RESULT.md`](../../apps/mobile/evidence/ux-final-20261018/ios-reminder-block-r141/RESULT.md)（§一 四格表、§四之二）。
+- [x] ✅ **10-19 18:4x 提醒块第四格「英文 × 暗」取到 ⇒ 这一格 2×2 齐了**（r144，同一枚件；四趟全部落在 `…/ios-reminder-block-r141/`）
+      `--to en` → 按 #471 重启设深 → `reminder-block-ios.py --evidence-dir …/english-dark` ⇒ **五步全过、`rc=0`、59.9 s、`uiLocale=en`、五张图像素尺全 28**；
+      收尾两样都还原并各看各的回读（`appearance light` 回读 + `--to zh` 8 步 `language after (zh)` passed）、`com.heyta` 已 terminate、本次建的那条已删。
+      🔴 **这一格的价值是那把对账尺，不是第五张图**：`english-dark` 与 `english-light` 的 **15 枚 frame 逐枚相同**（含 `Scheduled` 徽标高 **28 = 28**、`Snoozed` 14 = 14）
+      ⇒ r143 那枚"英文徽标被逐字打断"**与外观档无关**，是语态驱动的形状 ⇒ 修它的人不必在四档里分别验证，但**要在两语态里都验**。
+      顺带：第四节「推迟反而提前」在这一格又复现一次（第 6 枚样本：按钮念 `… at 10-19 19:37 …`、按完两枚后续动作读 `18:47`）⇒ 四格齐 + 六枚样本，两枚缺陷都不依赖单档。
+      **不证**：Android 档的同一形状（这枚装置只有 iOS 腿）、iPad / 窄屏 / 大字体、那两枚改法任何一种的效果（本线一个字没改）。
+      ⚠️ 这句到 **r145** 为止：「推迟反而提前」那枚**已经在本线改掉了**（见下面 r145 那一格）；「英文徽标被逐字打断」仍未改。
+- [x] ✅ **10-19 20:4x 「推迟反而提前」已修并在装机态取回反过来的读数**（r145，落在 `…/ios-reminder-block-r145/`）
+      改法走 r142 登记的**方向 ①**（相对原时刻推）：推迟的基准从墙上时钟换成"这一行此刻的时刻"，
+      收口在 `packages/app-host` 新增的 `snoozeByMinutes`（基准 `max(now, reminderEffectiveAt)`，推迟量仍走领域层 `snoozeDeadline`），
+      两端壳只交分钟数。**这不是口味题**：按钮的可及名称本来就写着「把 10-19 18:44 的提醒推迟 10 分钟」，
+      基准由文案钉死，实现按"现在"算就是代码与已发布文案矛盾。
+      三趟读数（同一台模拟器、同一枚装置，只差装的是哪一件）：旧件 `rc=1`（`20:06 → 19:16`，提前 50 分钟）⇒ **新断言有牙**；
+      新件中文 `rc=0`（`20:44 → 20:54`）、新件英文 `rc=0`（`21:05 → 21:15`）⇒ 两语态都往后推 ✅。
+      离线判据先红后绿：app-host 新增 5 条（实现前 `TypeError … not a function` 全红、实现后整包 1854 条绿），
+      `check:layering` / `check:reachability` / `check:locator-labels` / `check:script-snapshot` / `check:verify-script-copy` 与
+      三包 typecheck 全 `rc=0`（外壳读的是 `dist`，**先重打 app-host 才过**）。
+      顺带修掉装置自己的一枚失效：半途红会把本次建的任务留在设备上（这一趟就留过一条 `Rem141…`，已按精确标题删），
+      现在 9 处失败支都先删提醒、再按逐字标题删任务。
+      **不证**：暗档没重跑（这枚是时刻算术，r144 已量过外观维不影响这块界面的形状）、Android / 桌面端没重跑（设备腿只有 iOS 这一枚装置）、
+      连按两次的累加只在单测里。读数与图在 [`apps/mobile/evidence/ux-final-20261018/ios-reminder-block-r145/RESULT.md`](../../apps/mobile/evidence/ux-final-20261018/ios-reminder-block-r145/RESULT.md)。
+- [x] ✅ **10-20 01:2x r155 第九趟四端重装：mac 端从含 r153 那枚改动的源码重打重装，`REINSTALL_RC=0`**
+    （`HEYTA_REINSTALL_TMP_DIR=~/heyta-reinstall/r155-mac NO_COLOR=1 bash scripts/reinstall-all.sh --only mac`；落点在仓外独立目录，同 r146/r148 那两趟避开固定 `/tmp` 互相覆盖那一枚坑）。
+    逐条判据读数（都来自这趟真跑，不是"源码改了所以产物一定改了"）：前置 `pnpm -r build` ✅ → `@heyta/web` build ✅（web-dist 晚于 workspace dist）→
+    清旧包（该输出目录**首次运行、清空前不存在**，如实记着）→ 打 `.app` + `.dmg`（含"打包即启动"的自截屏验证）→ 装进 `/Applications/Heyta.app` →
+    **安装对账**：`.app` 里的 web-dist 与本机 `apps/web/dist` 是**同一次构建**（9 个 chunk）→
+    窗口 **2318×1508**、共享 UI 内容占比 **100.0%**、**heyta 主蓝命中 997**（两把尺分别打在 `heyta-reinstall-mac-installed.png` 与 `.webview.png` 上）。
+    ⚠️ **这一趟只覆盖 mac 一端**：`--only mac` 的汇总里 windows / android / ios 三端各自写着"**没有**验证当前产物"—— 那三端**没有**走这趟的判据。
+    iOS 那一端此刻装的**确实**是含 r153 改动的件（01:0x 从当前工作树重打、`main.jsbundle` sha256 前 16 = `ca3a09257bdfba19`、升级式重装进共享载体），
+    但那是**装机态那一腿**顺手带出的读数，不是这趟 `reinstall-all` 的判据 ⇒ 两件事不许并成一条，也不许由 mac 这一枚绿推成"三端里两端已过"。
+    🔴 windows / android 两端仍堵在打包机不可达（10-20 01:0x 现量 `ssh -o ConnectTimeout=6 -o BatchMode=yes windows-pc true` ⇒ **rc=255**、`adb devices` 空），
+    规则不许退回本机跑 Gradle ⇒ **"四端全过"这句现在仍然不成立**。
+- [x] ✅ **10-19 22:4x r146 mac 端重装：r145 那枚共享层改动补上第三个端**（`bash scripts/reinstall-all.sh --only mac`，`REINSTALL_RC=0`）
+      r145 改的是 `packages/app-host`（四端共用的 `dist`）⇒ 上一格登记时说清"mac / windows / android 三端产物对它过期"，这一格先补 mac。
+      前提现量：跑前跑后工作树 clean、`HEAD` 同一枚（`git log --grep 'r145' --oneline -1` 现取，别抄本页任何 SHA）。
+      **判据不是代理尺**：除链自己那两条（web-dist 与 `apps/web/dist` 同一次构建 9 个 chunk；窗口 2318×1508、webview 内容占比 100.0%、主蓝命中 997），
+      这一格**直接查装进包的 JS** —— `/Applications/Heyta.app/Contents/Resources/web-dist/assets/index-*.js` 里 `snoozeByMinutes` 出现 2 处（定义 + 调用点），
+      iOS 那件的 `main.jsbundle` 同样查到 1 处 ⇒ "产物里有这枚改动"是查产物本身，不是看构建日志说成功。
+      人眼看过 `heyta-reinstall-mac-installed.png.webview.png`：暗档、共享 UI、首屏那枚「在使用联网功能之前」决定态在场（不是空窗）。
+      落点 `~/heyta-reinstall/r146-mac/`（`HEYTA_REINSTALL_TMP_DIR` 指到仓外独立目录，避开固定 `/tmp` 互相覆盖那一枚坑）。
+      **不证**：windows / android 两端产物仍过期（打包机现量：`windows-pc` 连接超时、`windows-pc-lan` 拒绝连接；规则明令不许退回本机跑 Gradle）；
+      mac 端**这枚修复的行为读数**没跑（行为判据在 app-host 单测与 iOS 装机态两语态）；四端汇总里那三行 `⏭` 是脚本自己写的"这端**没有**验证当前产物"。
+- [x] ✅ **10-20 00:0x r147 改掉 r143 那枚「英文徽标被逐字劈开」：提醒行不再让时刻+徽标与三枚动作抢同一行**（`packages/ui/src/reminders/ReminderList.tsx`）
+      **上一格那句「本线不代改」由这一格作废**，作废的理由也要留下：当时写的是"造不出会红的离线判据 ⇒ 要证就得重打包装进模拟器再跑三档"，
+      前半句成立（jsdom 量不到字宽），后半句把"要跑一趟装机态"读成了"归别人" —— 而这枚装置、这台模拟器、这条打包链本线手里都有。
+      **改的是构造，不是阈值**：`row` 由一行改成列（第一段时刻+徽标、第二段动作，`actions` 靠右守住原来的视觉语法）。
+      依据是装机态那三个数：三枚英文动作要 293 pt、行宽 370 pt ⇒ `main` 只剩 53 pt，而 `Scheduled` 那一行字要 76 pt
+      ⇒ **容器比词还窄，任何内部换行都救不回来**。代价如实登记：中文档那几行也变成两段（比原来高一行）。
+      🔴 **第一枚改法实测零效果，而且是被帧逐位相同证出来的**：`row: flexWrap` + `main: flexBasis 'auto'`（想让动作整排换行）
+      重打重装后跑同一枚装置，`Scheduled` 仍是 `[24,380,53,28]` —— 与改前**逐位相同**。成因写进样式注释了：
+      Yoga 的换行判定按子节点上一趟解析出来的宽度累加，`flex-grow` 那枚在判定里只占它被挤出来的 53 pt ⇒ 永远判成"装得下"。
+      **判据（新的、常驻在装置里）**：`reminder-block-ios.py` 加 `badgeShapes` 读数 + "同一趟里每枚状态徽标的帧高只许有一种"。
+      四趟装机态（同机 `FE195661…A102`、外观 `light`、件与产物按 `main.jsbundle` 同哈希对账）：
+      改前的件英文 **`rc=1`**（`[14, 28]`）· 第一枚改法的件英文 **`rc=1`**（帧逐位相同）· 最终件英文 **`rc=0`**（三枚徽标全 14）·
+      最终件中文 **`rc=0`**（三枚徽标 `[114,334,33,14]`）⇒ **两语态各验一次**，正是 r144 那格给下一个人的口径。
+      两趟绿读数顺带复验 r145：`snoozeMove` 英文 `00:48→00:58`、中文 `00:50→01:00`，`movedLater: true`。
+      离线侧：`packages/ui` 673 测试 + typecheck、`apps/web` 2307 测试、`apps/mobile` 988 测试 + 两端 typecheck 全 `rc=0`，
+      门现量 `check:design` / `check:layering` / `check:locator-labels` / `check:script-snapshot` / `check:verify-script-copy` 各 `rc=0`。
+      DOM 那一侧只跑到"没被碰坏"：本线 `verify:web-ui-sweep` 的 `reminders` 腿（30 格 40 断言 `rc=0`）渲染的是**通知授权面板**、不含带徽标的提醒行；
+      别线在册的 `e2e/tests/detail-pane-task.spec.ts` T10/T11 也过了（`-g "T1[01]"` 2 passed），但它判的是"列表整页只有一份 / 徽标里没长出第二个编辑器 / 无控制台错误"，
+      那张 `t10-reminder-field-in-column.png` 里**提醒块根本没进画面** ⇒ **DOM 侧没有带徽标那一行的行形状读数**（要取就得让谁把提醒块滚进画面再截）。
+      ⚠️ 那枚 spec 的图写死落在 `apps/web/evidence/detail-pane-task/`（三枚已跟踪件），本趟跑完已 `git checkout --` 还原成 HEAD 版、没替那条线提交
+      —— 那三枚图现在对新源码是旧的，归下一次跑那条旅程的人。
+      **不证**：⑴ 暗档没重跑（依据是 r144 的 15 枚帧逐枚相同 ⇒ 这枚缺陷与外观档无关）；⑵ **Android 装机态没有读数**
+      （同一枚共享组件结构上同样受益，但出包要 ssh `windows-pc`，10-20 00:0x 现量 `Host is down` / `Connection refused`，规则不许退回本机跑 Gradle）；
+      ⑶ mac / windows 产物因这一枚改动**再次过期**（mac 补装见下一格）；⑷ 大字体档 / iPad / 更窄视口没测；
+      ⑸ DOM 侧没有"英文档带徽标提醒行"的专属读数（CSS 本来也不在词中间断行，它溢出）。
+      读数、四趟的图与"下一位怎么重跑 / 别再试哪个方向"在
+      [`apps/mobile/evidence/ux-final-20261018/ios-reminder-block-r147/RESULT.md`](../../apps/mobile/evidence/ux-final-20261018/ios-reminder-block-r147/RESULT.md)。
+- [x] ✅ **10-20 00:1x r148 mac 端补装：r147 那枚 `packages/ui` 改动补上第三个端**（`bash scripts/reinstall-all.sh --only mac`，`REINSTALL_RC=0`）
+      链的四条读数：全仓构建 ✅ → web 产物在 workspace 构建之后刷新 ✅ → `.app` + `.dmg` 打包（含打包即启动的自截屏）✅ →
+      安装对账「.app 里的 web-dist 与本机 `apps/web/dist` 是同一次构建（9 个 chunk）」✅ → 窗口 2318×1508、webview 内容占比 100.0%、主蓝命中 997 ✅。
+      **判据不是代理尺**：这一格查的是**装进包的那份 JS 里有没有这枚布局** ——
+      以 `flexDirection:"column",alignItems:"stretch",gap:…,minHeight:…` 这段序列化后的样式形状为针，
+      `/Applications/Heyta.app/Contents/Resources/web-dist/assets/index-Cy6qOldq.js` 与 `apps/web/dist/assets/` 同名件**各命中 1 处**（改前那件里不存在这段）。
+      人眼看过 `heyta-reinstall-mac-installed.png.webview.png`：共享 UI 在场，但**首屏是联网同意那一屏 ⇒ 这张图看不到提醒行**（它只证"装起来的壳画得出共享 UI、不是空窗"）。
+      落点 `~/heyta-reinstall/r148-mac/`（`HEYTA_REINSTALL_TMP_DIR` 指仓外独立目录，同 r146 那条理由）。
+      ⚠️ 这一趟跑在**含 r147 未提交改动的工作树**上（跑前 `git status --porcelain` 现量只有那一枚组件 + 装置 + 证据目录），
+      所以"产物等于当前源码"里的"当前源码"是**这一笔提交的内容**，不是上一枚 HEAD。
+      **不证**：windows / android 两端产物仍过期（现量 `windows-pc` → `Host is down`、`windows-pc-lan` → `Connection refused`；规则明令不许退回本机跑 Gradle）；
+      mac 壳里**没量提醒行的帧**（DOM 侧那两格读数来自别线在册的 `e2e/tests/detail-pane-task.spec.ts` T10/T11，2 passed）；
+      四端汇总里那三行 `⏭` 是脚本自己写的"这端**没有**验证当前产物"。
+- [x] ✅ **10-20 01:3x r156 四面装机态搬到最新那枚件上重跑（中文 × 浅档）：四枚装置 59 步 + 提醒块五格全过**
+      这一格收的是交接 Q2 那句「🔴 r153 那一件上重跑的只有首屏隐私卡那一腿 ⇒ 四面 + 提醒块那批读数**仍然停在各自那一件上**」——
+      按老规矩不在旧件上读旧账，而是把装置重跑一遍。载体 = 共享模拟器 `FE195661-B021-4A71-AAD1-1F2F7AE3A102`，
+      **件身份两头发**：四趟之前现量 `Heyta.app/main.jsbundle` sha256 前 16 = `ca3a09257bdfba19`、mtime `10-20 01:02:15`，
+      四趟之后重量**仍是同一枚** ⇒ 这五份读数出自同一件产物，不是"中间有人换过包"。四趟**串行**跑，外观 `light`、应用内语言中文（各 JSON 的 `appearance` / `uiLocale` 字段回读）。
+      **逐枚读数**（`apps/mobile/evidence/ux-final-20261020/` 下四个新目录，各带 `RIG_RC=0`）：
+      ① `ios-settings-face-r156-light/` **28 步全 passed**，含 r149 那枚新腿 `credential wipe entry enabled on a cold start` ⇒ **冷启动后「清除本机保存的凭据」可用**在含 r153 改动的件上仍然成立；
+      ② `ios-account-face-r156/` **11 步全 passed**（「其他登录方式」展开 / 收起两态各一次）；
+      ③ `ios-ai-face-r156-light/` **20 步全 passed**（AI 面与帮助面在同一条旅程里，`help section` / `ai settings group` 两腿都在）；
+      ④ `ios-reminder-block-r156-light/` 五格走完：`snoozeMove` = `02:34 → 02:44`、`movedLater: true`（**r145 那枚"推迟不许提前"在新件上复验**）、
+      `badgeShapes` 三枚 `[114,334,33,14]` 帧高只有一种（**r147 那枚布局判据在新件上复验**）、`removedBackToEmpty: true`、`taskDeleted.gone: true`（自建任务收笔删掉）。
+      人眼看过 **5 张**：`security.png`（「清除本机保存的凭据」是深色可读态不是灰）· `auth-sign-in.png` · `help-feedback.png`（语言 chip 中文/English 在场）· `assistant.png` · `03-reminder-snoozed.png`（时刻 + 「已推迟」一枚徽标一行、三枚动作完整）。
+      ⚠️ 这批共 18 张图，其余 **13 张只有 AX 回读与像素尺**，不许读成逐张看过。
+      **重跑这四趟要的四条命令**（同一台模拟器换机就先把 `--udid` 改掉；跑前后各现量一次 `shasum -a 256` 于
+      `$(xcrun simctl get_app_container <UDID> com.heyta)/main.jsbundle`，两次数不一样就说明这件不是这一格的件）：
+      `python3 scripts/qa/profile-settings-ios.py` / `account-face-ios.py` / `ai-face-ios.py` / `reminder-block-ios.py`，
+      四枚都收 `--udid` 与 `--evidence-dir`，后两枚**目录名里必须带档名**（`require_appearance` 拿设备当前档比对，不符就拒写）。
+      🔴 **同趟现量的射程边界**：`ssh -o ConnectTimeout=6 -o BatchMode=yes windows-pc true` 与 `windows-pc-lan` **各 rc=255**、`adb devices` 空 ⇒
+      windows / android 两端产物对 r153 仍过期，"四端全过"这句**仍不成立**（这一读是瞬时的，下一位要重跑）。
+      **不证**：⑴ 只补了**中文 × 浅档**这一格 —— 英文两格与暗档两格仍停在 r140 / r139 / r147 / r149 那几件上，
+      要取就得 `ios-app-language.py --to en` 加一次 `shutdown`+`boot`（#471 / #472），那是另一批；
+      ⑵ Android 装机态**没有**这批读数（同一批装置没有 Android 档）；⑶ 这一格只覆盖 iOS 一枚件，**不是**"四端产物等于当前源码"的证据；
+      ⑷ 首屏隐私卡那一腿不在这四枚装置里（它由 r153 那趟的 `ios-privacy-decide-later-r153` 覆盖，同一枚件）。
+      ⇒ **上面那半句"英文两格与暗档两格仍停在旧件"由下一格 r157 作废一半，剩下的那一半写在那一格里。**
+- [x] ✅ **10-20 01:4x–01:5x r157 同一枚件上补齐「英文 × 浅」与「英文 × 暗」两格：四枚装置 × 两档 118 步 + 提醒块两趟全过**
+      件身份仍是**两头发**：`batch.log` 与 `batch-b.log` 里 `HASH_BEFORE` 与 `HASH_AFTER` 四趟全是 `ca3a09257bdfba19`
+      （与 r156 同一枚 ⇒ 这一批与上一批的读数可以按"同一件、不同档"对照）。
+      驱动脚本两份都入库（`r157-en-grid/run-batch.sh` 与 `run-batch-b.sh`），落点末级目录名带档名所以 `require_appearance` 有牙。
+      **逐枚读数**（四档全 `rc=0`）：设置面 **28 步 × 2**（含 `credential wipe entry enabled on a cold start` 两档都 passed，
+      英文 × 暗那张 `settings-en-dark/security.png` 人眼看过：「Clear credentials saved on this device」是亮字可读态，不是灰）·
+      账号面 **11 步 × 2** · AI + 帮助面 **20 步 × 2** · 提醒块 **两趟五格全走完**。
+      **r145 / r147 两枚修复在英文两档同件复验**：`snoozeMove` 浅档 `02:45→02:55`、暗档 `02:47→02:57`，两趟 `movedLater: true`；
+      三枚徽标帧浅暗两趟**逐位相同**（`[114,334,58,14]` / `[114,334,47,14]` / `[114,334,57,14]`，帧高只有一种）
+      ⇒ r144 那句"这枚断行与外观档无关"在同一枚件内又对上一次；`removedBackToEmpty` / `taskDeleted.gone` 两趟都 `true`。
+      🔴 **这一趟先红了一枚，红在探针的输入不在界面**：设置面第一趟两档都 `rc=1`，报的是"缺五枚中文分组标签"，
+      看着像真缺陷 —— 真因是**我这枚驱动脚本没传 `--language en`**（该参数默认 `zh`，`profile-settings-ios.py:345`），
+      而同批另外三枚装置用双语候选表所以同趟全绿 ⇒ "四枚里只有一枚红"本身就是证据。
+      把它 30 秒定性掉的是 #488 那枚守卫写进失败原文的后半句（它同时列出 `languages whose whole group IS visible=['en']`
+      与逐枚 `visible labels`）；失败那次没删，改名留在同目录当**守卫有牙的正对照**（`failed-default-zh-run.out`）。⇒ 进环境陷阱 **#506**。
+      **英文这一维有分母**（照 r137 那把尺重做）：四份 JSON 的中文叶子逐枚点名 —— 账号面 2 枚全在装置自带的双语候选表里、
+      AI+帮助面 4 枚里 3 枚是语言 chip 的「中文」（该串两档同字，设计如此）、1 枚是候选表首项
+      ⇒ **界面回读零枚中文**；提醒块那两趟更直接，`uiLocale` 字段回的是 `en`。
+      人眼看过 **5 张**（`settings-en-dark/security.png` · `ai-face-en-dark/assistant.png` · `reminder-block-en-light/03-reminder-snoozed.png` ·
+      `settings-en-dark/settings-directory.png` · `ai-face-en-dark/help-feedback.png`），
+      ⚠️ 这一批共 40 张图，其余 **35 张只有 AX 回读与像素尺**，不许读成逐张看过。
+      📌 逐张那五张里看到一处**没有登记成缺陷**的布局差别，写在这里是为了下一位不必重新疑惑：
+      设置面**目录层**的页眉是「✕ 在左 + 标题在右」，而**子页**（`Account security` / `General`）是「← 在左 + ✕ 在右」。
+      本线没把它开成候选缺陷，理由有两条现量：① 目录层那一屏**没有返回箭头**（它就是这层的根），✕ 放在原本"返回"的位置在 iOS 上不罕见；
+      ② 它的可点性与可及名称都有读数（28 步里 `open settings` / `close settings to profile` 两腿各档都 passed），
+      也就是说这一处**只有视觉一致性这一个维度可疑**，而那需要产品口径判断（要不要与 web 端设置抽屉对齐），不是量出来的缺陷。
+      设备收工态：`appearance=light`、应用内语言 `zh`（`restore/` 与 `restore-b/` 各一次 9 步 `passed` 的还原读数）、**没收任何 companion**。
+      **不证**：⑴ **中文 × 暗档**这一格仍停在 r140 那件上（这一趟只补英文两格，2×2 的第四格见下一格 r158）；
+      ⑵ Android / windows 两端没有这批读数（01:3x 现量 `windows-pc` 与 `windows-pc-lan` 各 `rc=255`、`adb devices` 空）；
+      🔴 **01:5x 把这台机的通道清单补齐了 —— 台账以前只数过两枚，实际有三枚**：
+      `grep -iE "^Host " ~/.ssh/config | tr ' ' '\n' | grep -i win` ⇒ `windows-pc` / `windows-pc-lan` / **`windows-codex`**（这枚从没被这一族读数点过名）。
+      逐枚现量（`ssh -o ConnectTimeout=5 -o BatchMode=yes <别名> true`）三枚**全 `rc=255`**；再往下分一层，
+      三枚**不全是同一种坏**：`ssh -G` 取到的地址是 `10.111.127.237` / `10.111.127.151` / `192.168.1.2`，
+      前两枚 **ping 不通且 22 端口关**（网络层就到不了，机子没开或不在网上），
+      第三枚 `192.168.1.2` **ping 得通但 22 关、且 `arp -n` 无表项**，而本机默认网关是 `10.246.153.46`（en0，10/8 那侧）
+      ⇒ 那个 LAN 别名对**当前这张网**是**过期配置**，回它的不是那台打包机。
+      这一层分法值钱在哪：它把"打包机不可达"从"再等等看"变成"要么把那台机开起来 / 换回它现在的地址，要么删掉那枚会误导人的 LAN 别名"，
+      而这两件都**不是本线能做的**（动别人的机与配置）。
+      ⑶ 大字体档、iPad、真机 iPhone 都没测；⑷ 帮助面那枚「投诉与举报」按下去真的拉起邮件页这一支**故意没按**（会发外部动作）。
+- [x] ✅ **10-20 01:5x r158 第四格「中文 × 暗」补齐 ⇒ 四面 + 提醒块在同一枚件上的 2×2 四格齐了**
+      同一枚件（`batch.log` 里 `HASH_BEFORE` 与 `HASH_AFTER` 都是 `ca3a09257bdfba19`，与 r156 / r157 同一件）、
+      同一台共享模拟器、四枚装置四档全 `rc=0`：设置面 **28 步**（`language` 字段回读 `zh`、`appearance` 回读 `dark`，
+      含 `credential wipe entry enabled on a cold start` passed）· 账号面 **11 步** · AI + 帮助面 **20 步** ·
+      提醒块五格走完（`uiLocale: zh-CN`、`snoozeMove` `02:53→03:03` 且 `movedLater: true`、
+      三枚徽标帧 `[114,334,33,14]` × 3 ⇒ 帧高只有一种，r147 那枚判据在中文 × 暗也上）。
+      驱动脚本 `r158-zh-dark/run-batch-c.sh` 入库；**这一趟不切语言**（中文档就是那枚 `--language` 的默认值，
+      r157 那枚红正是"默认值不等于已验证"，所以这一趟的中文维由 `settings-ia-journey.json` 的 `language` 字段与
+      提醒块的 `uiLocale` 两枚**回读**自证，账号面与 AI 面那两枚 JSON 没有语言字段 —— 这一维它们只有图与标签回读）。
+      设备收工态：`appearance=light`（`restore/restore.log` 现量回读），语言未动（本就是 `zh`），**没收任何 companion**。
+      ⚠️ 这一批 18 张图**一张都没人眼逐张看过**（只有 AX 回读与像素尺）—— 人眼层停在 r156 那 5 张与 r157 那 3 张。
+      🔴 **合起来这三格（r156 / r157 / r158）交的是同一句话**：四面 + 提醒块这一族装机态读数，
+      现在**四格全部指同一枚件**，"当前源码件"不再是一个模糊说法。仍不证的只剩端：
+      Android / windows 两端的装机态（打包机不可达）、真机 iPhone、大字体档、macOS Gallery 那几格。
+      ⚠️ **上面那句"当前源码件不再是一个模糊说法"被 r159 否证了一半，按新落点更正（原句留在上面不删）**：
+      那枚件 `ca3a09257bdfba19` 是**同一枚**没错（三批共用、哈希两侧都量过），但它**不等于当前源码** ——
+      它比 HEAD 少一笔 `f21dc1d39`。少的那一笔不在四面 + 提醒块的路径上（见 r159 那一格），
+      所以这三批读数**不因此作废**；作废的是"当前源码件"这个称呼本身。
+
+- [x] ✅ **10-20 02:3x–02:5x r160 web 首屏隐私卡补上"真浏览器 + 人眼"那一层，并给这条判据配了一枚会红的臂**
+      起因是自查 `f21dc1d39` 那笔修复在 web 面的证据形状：它有永久判据（`apps/web/tests/privacy-consent-sheet.spec.tsx`
+      断言 `close.textContent === close.getAttribute('aria-label')`，提交信息里写明"臂 = 换成 `git show HEAD:` 那份改前件，改前红"），
+      **但那条判据从没在浏览器里跑过** —— 而本仓界面验收的规矩是真跑 Playwright ＋ 真看图。jsdom 过 ≠ 屏幕上看得见。
+      · 新装置 `apps/web/evidence/ux-final-20261020/r160-web-privacy-sheet/capture.mjs`（一条命令复跑：`node <该文件>`）：
+        自要一枚空端口起 vite、headless 开四档（1440×900 浅 · **1440×900 暗** · 375×812 浅 · 1440×900 浅×中文）、每档量同一件事
+        （那枚出口的 `textContent` 逐字等于 `aria-label` ＋ 框宽 > 框高），退出码三档分开 **0 判了且合格 / 1 判了且不合格 / 2 没干活**
+        （服务起不来与"待验档位为空"都走 2，不许挤进 0）。现量 **4/4 pass**，英文三档 `text="Decide later"`、框 **112×44**。
+      · 🔴 **臂现跑过，这条判据会红**：把 `apps/web/src/features/privacy/PrivacyConsentSheet.tsx` 换成 `f21dc1d39^` 那份改前件重跑同一趟 ⇒
+        **`MUTANT_RC=1`、4/4 全不合格**（含中文那一档：`text=""`、`aria="以后再说"`、框退回 **48×44** 就是一枚图标方块）
+        ⇒ 改前那枚"屏幕上没有字"的形状被这把尺抓得住，且**四档都抓得住**（分母从 3 涨到 4 之后臂重跑过一遍，不是沿用旧读数）。
+        还原只从 `*.mut-bak`（不从 `git checkout`），跑完 `git diff --quiet -- apps/web/src` 回 **rc=0**（源码与 HEAD 逐字一致）；
+        改前那份读数**留在库里**当正对照：`report-mutant-pre-fix.json` + `privacy-sheet-1440-light-mutant-pre-fix.png`。
+      · ⚠️ **第一版拍出来是一张淡入中途的图**（卡片半透明、中间还压着一枚加载指示）—— 判据照样绿，但人眼层废了。
+        补了一条"等 `getComputedStyle(dialog).opacity >= 0.99` 再拍"（上限 40×250 ms）。这条形状与"截图取在过渡层"同族，不另开陷阱条目。
+      · 人眼层：**四张里看过 2 张**（`privacy-sheet-1440-dark.png`、`privacy-sheet-375-light.png`：三条出口都有可见文字、375 档标题折三行而 `Decide later` 不折不断）。
+        ⚠️ `privacy-sheet-1440-light.png` 与 `privacy-sheet-1440-light-zh.png` **没逐张看过**，只有前两枚算人眼读数。
+      · 🔴 **语言维**：前三档跑在浏览器默认语境的**英文**下（读数 `Decide later`），第四档 `1440-light-zh` 显式带 `locale: 'zh-CN'`
+        ⇒ 读数 **`以后再说`**、框 **88×44**、`textContent === aria-label` 同样成立 ⇒ **web × 中文这一格已取**，不在不证里。
+        每档都回读 `navigator.language` 写进 `report.json`，所以"我要的语言"与"它真渲染的语言"是两枚可对账的读数，不是一句声明。
+
+- [ ] 🔴 **Android 那一腿"没有第三枚可指"这句被现量否证了：`linux-dev` 活着、工具链齐、出站也通——但它能换的只有"签名身份"这一维，而"换宿主"要在收口点上新开一枚 POSIX 远程支**（10-20 r161 建，**10-20 10:5x r163 逐条重述**；口径仍不由本线代拍）。
+    先说清这一格**推翻的是哪半句**：上面 r159 那格里"三枚在册别名各不通"讲的是 **Windows 那两枚宿主**，那句仍然真（10:3x 复量见下面 r163 那格的第 ① 条）；
+    被推翻的是另一句更常见的读法——"Android 出包只能等 windows-pc，旋钮没有第三枚可指"。现量：
+    `grep -n 'HEYTA_ANDROID_HOST' scripts/run-gradle.mjs` ⇒ 默认值是 `windows-pc` 的那一行**是环境变量**（行号会漂，按形状找）
+    ⇒ **主机名是可覆盖的**；⚠️ 但"覆盖到 `linux-dev` 就能构建"**不成立**，见下面第 ③ 条。
+    · **可达性**：`linux-dev` / `-lan` / `-mdns` / `-oob` 四枚别名各一次 `ssh -o ConnectTimeout=6 -o BatchMode=yes <别名> 'echo OK $(hostname)'` ⇒ **四枚全回 `OK Xaiver-linux`**（这台机的四枚别名是同一枚实体，与 Windows 那族"两枚地址一种 ICMP 一种 tcp"的坏法不同）。
+    · **它有什么**（逐条现量，全部只读）：`Linux 7.0.0-38-generic` · `openjdk 21.0.12.1` · `ANDROID_HOME=/home/xaiver/.local/opt/android-sdk`（含 `emulator/emulator`）·
+      `node v24.9.0` + `pnpm 11.8.0` · `~/.gradle` 缓存 **2.7G** · `system-images` 有 `android-32` 与 `android-36` · `/dev/kvm` 带 ACL 且 **`test -r`/`test -w` 双双 rc=0**（不在 `kvm` 组也能用）·
+      在册 heyta 树三枚：`~/heyta`（HEAD `c84e09a9`，10-07 01:28，**脏 194**）、`~/heyta-f97013de`（10-07 12:16，脏 0）、`~/heyta-carrier`（非 git 树）。
+    · **它缺什么**（这一串在 r163 之后只剩两枚，且都不是"机不可达"）：
+      ① ~~**依赖集不同且那台机没有 npm 出站**~~ ⇒ **10-20 10:5x 现量否证**：锁文件仍对不上（本机 `pnpm-lock.yaml` sha256 前 12 位 vs 远端各取一次，值见 r163 那格），
+        但**"没有出站"那句是旧的**——`registry.npmjs.org` / `registry.npmmirror.com` / `services.gradle.org` / `dl.google.com` 四条**逐条有体**（判法见 r163 第 ② 条），
+        远端另有 1.1G pnpm store ⇒ 对齐当前锁文件是**一条 `pnpm install --frozen-lockfile`** 的事，**不需要"把 node_modules 从 Mac 搬过去"那条没人对账过的通道**。
+      ② **只有 debug 钥**：`find ~/heyta/apps/mobile/android -maxdepth 2 -name '*.keystore'` 只回 **`app/debug.keystore`**，没有 `keystore.properties`（只报存在，没读内容）
+        ⇒ 生产发布钥**不在那台机上**（"没搬过来"是项目记忆里的原话；本线只核到"这台机上没有"这一条）。⚠️ 这一句**要说准**：它缺的是**签名身份**，不是"release 变体"——`assembleRelease` 在没有发布钥的机器上照样出 release 件（换成 debug 钥 + 大声警告，见 `app/build.gradle` 那句三元表达式），
+        而 `assembleDebug` 出的件**里没有 JS bundle**（RN gradle 插件把 debug 排除在打包任务之外），**那一种不是产品，谈不上算不算验收对象**。⇒ 这一格真正的选择只有"换不换签名身份"一枚。
+      ③ **收口点的远程支是 Windows 形状的**：`grep -n 'cd /d' scripts/run-gradle.mjs` 命中的两处真执行（远端 `pnpm install` 与远端 gradle 那两条 `cd /d … && gradlew.bat`），加上 `HEYTA_ANDROID_REMOTE_ROOT` 的默认值是一个盘符路径
+        ⇒ **环境变量只换主机名、不换命令形状**；要用这枚宿主得给收口点开一枚 POSIX 远程支，而它的形状由 `pnpm check:android-gradle-remote` 钉着（新开 `./gradlew` 入口 / 绕开收口点 / 回传路径与 `reinstall-all.sh` 的 `$APK` 对不上 ⇒ 各自会红）。**这是改承重脚本，不是一句拍板。**
+      ④ ~~**装机态那一族判据按发布件写的**（引 `docs/agents/multi-end-build.md` 那句"不静默降级：远端不可达就红"）~~ ⇒ **那句管的是"宿主不可达就红"，不管签名**；仓里对签名的明文口径写在另外两处，方向与 r161 当时的推荐**相反**：
+        `docs/runbooks/multi-platform-build.md`「没配发布钥时不失败、用 debug keystore 签并打警告……**只把它用于内测**」与 `docs/reference/build-matrix.md` §2.4「✅ **可用于内部安装测试** / ❌ 不可用于应用商店」。
+        装机态验收属"内部安装测试"那一支 ⇒ **本线现在的推荐是"允许"**（条件：读数自报 `apksigner verify --print-certs` 的 DN 与 SHA-256 前缀、按内测件入账；"升级连续性 / 换签名后本机数据存活"那一族除外——换身份必然 uninstall，那本身就是被测量）。逐条依据在 r163 那格第 ④ 条。
+    ⇒ **本线这几趟没动它**：不擅自换宿主、不改收口点、不把内测件的读数记成"Android 当前产物已验收"。
+    这一格现在挂在**两枚决定**上（都不是"等 windows-pc 回来"）：A 要不要给收口点加 POSIX 远程支并借用那台机；B 内测件算不算装机态那几格的验收对象。各带一条判据命令，见 r163 那格第 ⑥ 条。
+
+- [x] ✅ **10-20 02:1x r159 iOS 端第十趟重装（本机就能打，此前被当成"等打包机"）：装机件从 `ca3a09257bdfba19` 换成 `928e8050693d3d19`，首屏隐私卡那条出口在新件上复验通过**
+      🔴 **起因是一句我自己写下的话**：r155 那格写的是"iOS 此刻装的确实是含 r153 的件"。今天不照它行动，先量：
+      `stat` 容器里的 `main.jsbundle` ⇒ mtime **10-20 01:02:15**；而最后一笔**会进包的**源码提交是
+      `f21dc1d39`（**01:09:27**，`fix(隐私同意): 「以后再说」在屏幕上摆出那句话，不再只留一枚叉`）
+      ⇒ 件**早于**那笔修复 7 分钟。那句"含 r153"混的是 **r153 = 缺陷登记**与 **f21dc1d39 = 修复**两件事：
+      件里有那枚缺陷（r153 的 ✕ 截图正是从这枚件上取的），**没有**它的修复。
+      - 判据尺（下一位照跑，别抄本格的数）：
+        `paths=(packages apps/mobile/android apps/mobile/src apps/mobile/ios apps/desktop-macos apps/desktop-windows/src apps/desktop-windows/app apps/web/src apps/web/app server/src)`
+        `LAST=$(git log -1 --format=%H -- $paths)` ⇒ 这一枚就是"最后一笔进包的改动"；`git diff --name-only ${LAST}..HEAD -- $paths` 的枚数就是**要不要重装的差集**。
+        🔴 **zsh 不分词，这一枪本趟我自己中了一次**：把路径写成普通字符串 `$PKG` 传进去，`git log -- "<整串>"` 回**空**，
+        于是 `${LAST}..HEAD` 变成 `HEAD..HEAD` ⇒ 打出"差集 **0** 枚"的**假绿**。
+        打掉它的是一枚阳性对照：`git diff --name-only ${LAST}~1..${LAST} -- $paths` 回 **2** ⇒ 尺子当时是瞎的。**用数组、并且每次都带一枚"预期非 0"的对照**。
+      - **这一端根本不需要打包机**：`scripts/reinstall-all.sh` 的 ios 段是**本机** `xcodebuild -workspace Heyta.xcworkspace -destination id=<UDID>`（iphonesimulator），
+        只有 windows / android 两段吃 `HEYTA_WIN_HOST`。所以"iOS 装机态等打包机回来"这句**从来没成立过**，等的是一枚我误当成别人手里的旋钮。
+        现跑：`IOS_DEVICE_NAME="heyta-iphone-17pro" HEYTA_REINSTALL_TMP_DIR=~/heyta-reinstall/r159-ios bash scripts/reinstall-all.sh --only ios` ⇒ **`REINSTALL_RC=0`**，
+        判据三件齐：`已装的包比源码新 —— 这一轮装的是当前产物` + 窗口 **1206×2622** + `heyta-reinstall-ios.png` 内容占比 **58.9%**、主蓝命中 **4091**。
+        ⚠️ 汇总里 mac / windows / android 三端各写"这端**没有**验证当前产物"（mac 那端 r155 已取到，只是不在本趟 `--only` 范围）。
+      - **增量只有一笔，所以复验只复验那一笔**：`f21dc1d39` 里进 iOS 包的只有 `apps/mobile/src/screens/PrivacyConsentSheet.tsx`。
+        用 r153 那枚探针在新件上重跑（`r159-ios-privacy-label/`）⇒ 那条出口的节点从改前的**图标方块 `[322,232,44,44]`** 变成
+        **`[294,232,72,44]`（装了文字）**，`label` 仍是 `以后再说`（可及名称没动，走的是同一个 key）；
+        行为三档 `device_pref` rows = **0 / 0 / 0**（按掉不落盘），杀掉重开 `sheetBack=['同意并联网','只用本机']`（卡回得来）⇒ r150 那两条正面结论没被这笔改坏。
+        人眼层：**看过 `01-first-launch.png` 一张**（三条出口都有可见文字，右上角那枚是「以后再说」而不是叉），另两张只有 AX 回读。
+      - 🔴 **顺手修掉探针两处会造假日月的毛病**（`ios-privacy-decide-later-r153/probe.py`，本线名下）：
+        ① 它给自己贴的 `jsbundleSha256` 读的是**本地构建目录** `apps/mobile/ios/build/…`，而重装脚本的 derivedData 在别处 ——
+        现量两侧：容器里 `928e8050693d3d19` vs 那目录 **仍是 `ca3a09257bdfba19`** ⇒ **旧写法会把一枚没在跑的件的哈希贴进取证**。改成读**装机容器**（取不到容器就 `SystemExit` 响亮失败，不退化成空），本地那枚只作 `buildDirSha256` 并列打印。
+        ② 它的 `--out` 默认值就是**自己的证据目录**（里面有 15 枚已跟踪文件）⇒ 不带参数重跑会盖掉入库的那批。补成与 `reminders-data-responsive.mjs` 同一道闸门：**落点含已跟踪文件 ⇒ 拒绝起跑**，臂现量 **rc=1** 且自报枚数。
+      - **新件上重跑一条设备腿**（证"起得来、走得通"，不是重取 2×2）：`profile-settings-ios.py`（默认 zh、装机态 light）⇒ **`rc=0`、29 步**，
+        `settings-ia-journey.json` 里 `language:zh` / `appearance:light` 两枚回读在案。
+        🔴 **为什么这三批读数不必在新件上重跑**（这条是**查过路径**才写的，不是推理）：四面 + 提醒块收那张隐私卡用的是**「只用本机」**那一枚
+        （`profile-settings-ios.py:378`、`account-face-ios.py:127` 现量），`f21dc1d39` 改的是**第三条出口**的可见层 ⇒ 不在它们的路径上。
+      - 设备收工态：`appearance=light`、语言 `zh`（本趟没动语言维）、**没收任何 companion**；app 停在**未决**态（rows 0，探针按的是「以后再说」）。
+      **不证**：⑴ 本趟只重装 **ios 一端**，windows / android 仍堵在打包机 —— 现量分母是**三枚别名**：
+      `windows-pc`→`41478@10.111.127.237`（ping FAIL、tcp/22 NO）、`windows-pc-lan`→`41478@192.168.1.2`（**ping OK 但 tcp/22 NO、`arp -n` 里 0 条**）、
+      `windows-codex`→`rayne@10.111.127.151`（ping FAIL、tcp/22 NO），本机在 `10.246.153.139`／网关 `10.246.153.46` ⇒ 三个地址**没有一条给过应用层读数**；
+      ⚠️ 台账此前只数过两枚别名，而且把"同一个 `41478`"读成了"同一台的两条路"——那是**从用户名推的**，不是量到的。
+      ⑵ 真机 iPhone、macOS Gallery、大字体档那几格照旧不证。
+
+- [x] ✅ **10-20 05:4x r162 mac 端暗档那一腿：壳级窗口取证在暗档跑绿，并把"装机件等不等于当前 web 产物"从 mtime 推换成逐文件哈希对账**
+      🔴 **先说这一格补的是哪半句**：§8.2 那一带早就记过"mac 装机态那张落在暗档，但那是宿主自己切的 ⇒ 只能说这趟落在暗档，不是控制配对"。
+      这一格**不推翻那条读法边界**（宿主现量 `defaults read -g AppleInterfaceStyle` ⇒ `Dark`、`AppleInterfaceStyleSwitchesAutomatically` ⇒ `1`，仍是自动切档），
+      它补的是**"暗档这一趟里那枚门到底判没判过"**：以前入库的 mac 暗档读数来自重装链的自截屏，`pnpm check:macos-window` 这枚门本身没在暗档跑过。
+      · **门的读数**（`HEYTA_NO_FOCUS=1 pnpm check:macos-window` ⇒ **rc=0**）：窗口 **1120×720**、标题 `heyta`、`CAPTURE_METHOD=screencapturekit`、
+        `CROSSCHECK=ok(2240x1440)`、窗口图 内容比例 **100.0%**／色阶差 **245**、WebView 快照 **2240×1362**、`contentOnModalRatio` **0.042**（判据阈值 0.02），
+        M2 那三枚（身份入口／菜单／导入面板）断言同趟绿。图入库两枚：`apps/desktop-macos/evidence/ux-final-20261020/r162-mac-window-dark/window-full.png` 与 `window-webview-dark.png`。
+      · **人眼层：看过 webview 那一张** —— 整屏深底、首屏那枚「在使用联网功能之前」在场，**三条出口都有可见文字，右上角是「以后再说」不是一枚叉**
+        ⇒ 这是 r156 那笔修复（`f21dc1d39`）**第一次在 mac 壳里被看见**，不是只有浏览器与 iOS 两腿。`window-full.png` 没逐张看过，只有像素读数。
+      · ✅ **换掉了一把代理尺**：以前判断"装进 Mac 的那件新不新"靠的是重装链那句"web-dist 与本机 `apps/web/dist` 同一次构建"＋ mtime 先后。
+        这一趟直接比字节：`/Applications/Heyta.app/Contents/Resources/web-dist` 与 `apps/web/dist` 里 11 枚 `js/css/html/wasm`
+        **逐文件 sha256 全等**（`diff` 空输出），而那枚主 chunk 里 `privacy-consent-close` 的 children 就是 `e("common.privacy.consent.close")`（改前是 `<X>` 图标）
+        ⇒ **mac 装机件里的 web 产物含那笔修复**是查出来的，不是推出来的。复跑：
+        `(cd /Applications/Heyta.app/Contents/Resources/web-dist && find . \( -name '*.js' -o -name '*.css' -o -name '*.html' -o -name '*.wasm' \) | sort | xargs shasum -a 256) > /tmp/a.sha`
+        对 `apps/web/dist` 跑同一条再 `diff /tmp/a.sha /tmp/b.sha`。
+      ⚠️ **这把尺的范围**：它比的是 **web 产物**那一层。壳自己那半（Swift 侧）这趟量到的是 `.build/out/Products/Debug/HeytaMac` mtime `10-19 10:30`
+      晚于最后一笔 `apps/desktop-macos` 提交 ⇒ 对**当前源码**不过期，但**这枚门跑的是裸 SwiftPM Debug 可执行文件，不是 `/Applications/Heyta.app`**
+      （`apps/desktop-macos/scripts/capture-window.sh:94`；台账「裸 SwiftPM 可执行文件」那一行早就写明）。
+      ⇒ **不许由这一枚 rc=0 推"装机的那份 .app 过了窗口取证"**；`/Applications` 那件的壳二进制本趟没核。
+      **不证**：⑴ 暗档不是控制配对（宿主自动切档，浅档那一趟与这趟不同批）；⑵ mac **英文档 × 暗档**没取；⑶ 壳二进制自己的装机件没核；
+      ⑷ 只看了两枚图里的一张。
+
+- [ ] 🔴 **r163（10-20 10:3x–10:5x，全程只读）：「要那台打包机」那一桶拆到底了。windows 腿的成因换了一层（不是配置过期，是那台机没接网）；android 那枚口径题里 r161 登记的三条"缺什么"有两条被现量作废，而"debug 件"这个词混着两维、两维结论相反**（本线不代拍，但依据已换）
+
+  **① windows 腿：三枚别名仍全 `rc=255`，"不可达"底下已经换了网络，能解它的人也随之换了。**
+  复现：`for h in $(grep -iE "^Host " ~/.ssh/config | tr ' ' '\n' | grep -i win); do ssh -o ConnectTimeout=5 -o BatchMode=yes $h true >/dev/null 2>&1; echo "$h rc=$?"; done`
+  ⇒ 10:3x 现量 `windows-pc` / `windows-codex` / `windows-pc-lan` **三枚 `rc=255`**（与交接文档 §〇 Q2 那批 01:5x 同判，但下面的分层不一样，别照抄那批的结论）。
+  再往下分三层（前一批只分到"别名全不通"）：
+  · **本机换了网**：`ifconfig en0` ⇒ `192.168.1.7` netmask `/24`、网关 `192.168.1.1`；而交接 §〇 Q2 那批量的是 `10.246.153.139`／网关 `10.246.153.46`
+    ⇒ 同一句"打包机不可达"底下已经换了一张网。**这就是"不可达是瞬时读数"的最新一例**（正文见 §7 **#508**，与 #467 那条"A/B 只证当下能用"同族）。
+  · **两枚 ZeroTier 别名（`ssh -G` 解出 `10.111.127.237` / `.151`）ARP incomplete** ⇒ 那条按设计"打包机换网/换地方后依然可用"的路径上**没人接**（不是路由丢了）。
+  · **`windows-pc-lan` 那枚 HostName（`192.168.1.2`）在这张网上 L2 活着**（`arp -n 192.168.1.2` 回 MAC），
+    但 **ICMP 两枚读数不一致**：同一小时内第一次 `ping -c 2 -t 3` FAIL、第二次 OK ⇒ 别把"ping 得通"当稳定属性写；
+    而 `22 / 445 / 139 / 135 / 5357 / 80` **逐枚 NO** ⇒ 无论哪种读数，它都给不出应用层通道；
+    而 `~/.ssh/config` 里 `windows-pc` 段自己的注释记着那台机重装后的局域网地址是 **`192.168.1.3`**（现量 `grep -nE '^Host |HostName|局域网' ~/.ssh/config`），
+    那一枚**无 ARP 表项** ⇒ 不在这张网上。
+  ⇒ 三合读法：**"LAN 别名指错机"与"机器开着但 sshd 坏了"两种形状都被排掉**，剩下的是那台机没开机 / 没接这张网 / ZeroTier 客户端没跑。
+  本线这一腿写不了下一步，只写得动一句判据：**`ssh -o ConnectTimeout=6 -o BatchMode=yes windows-pc true` 回 0 ⇒ 这腿重开**。
+  ⚠️ 别把这条写成"等负责人"：拦路的是那台机的电源与网线，不是一个人的决定。
+
+  **② android 腿：r161 那三条"缺什么"里有两条现在不成立。**
+  r161 的 ①（"那台机没有 npm 出站…要出当前源码的件得**新搭一条搬 node_modules 的通道**"）**已被否证**：
+  现量 `ssh linux-dev 'env | grep -i proxy; curl -s -m 8 https://registry.npmjs.org/-/ping; curl -s -m 12 -H "Accept: application/json" https://registry.npmjs.org/react-native | head -c 90'`
+  ⇒ **无 proxy env**，`/-/ping` 回 `{}`、包元数据回**真 JSON**（`"_id":"react-native"`）；另 `registry.npmmirror.com/-/ping` 回 `{"pong":true}`、
+  `services.gradle.org/distributions/gradle-8.14-bin.zip` 回 `307`、`dl.google.com/android/repository/repository2-1.xml` 回 `200`。
+  远端另有 `1.1G` 的 pnpm store（`pnpm store path` ⇒ `…/store/v11`）与两棵 heyta 树。
+  ⇒ **对齐当前锁文件是一条命令的事**（远端 `pnpm install --frozen-lockfile`），不需要那条"没人对账过的搬 node_modules 通道"。
+  ⚠️ 取法留给下一位：**状态码 `200` 不是凭据**（截获式门户也给 200）——要 `/-/ping` 的体、要包元数据的体。
+
+  **③ 但 r161 少读了一层：`HEYTA_ANDROID_HOST` 只是主机名旋钮，"宿主可指"不等于"通道可用"。**
+  现量 `grep -n 'cd /d' scripts/run-gradle.mjs` ⇒ **五处命中**，其中两处在远程支里真执行（远端 `pnpm install` 那一条、远端 gradle 那一条 `cd /d … && gradlew.bat --no-build-cache`），
+  另三处是给读者看的修法的句子；`grep -n 'HEYTA_ANDROID_REMOTE_ROOT' scripts/run-gradle.mjs` ⇒ 默认值仍是 `C:\src\heyta`。
+  ⇒ **远程支的命令形状是 Windows 的**（`cd /d` 是 cmd 内建、POSIX shell 没有；`gradlew.bat` 在 Linux 上不是可执行入口）。
+  🔴 **这条不靠推断，10:5x 把收口点本身跑了一趟 dry-run**（它只打印计划：`NO_COLOR=1 HEYTA_ANDROID_HOST=linux-dev node scripts/run-gradle.mjs assembleRelease --dry-run` ⇒ **rc=0**、自报"0 次网络写操作、0 个本地字节被写"）：
+    打印出来的远程形状是**三层**，不止命令那两层 ——
+    ⑴ 步骤 1 那枚**只读预检**发的是 `ssh linux-dev "powershell -NoProfile -Command \"Test-Path 'C:\\src\\heyta\\...'…"`（PowerShell + 反斜杠路径），
+      在那台 Linux 上回的是 **`RNDEPS=（无） ROOTDEPS=（无） LOCALPROPS=（无） DEPCHECK=（无） DEPMISS=（无）`**（五个字段一个都没值，而它照样往下走）；
+    ⑵ 步骤 2.5 是 `cd /d C:\src\heyta && pnpm install --frozen-lockfile`；⑶ 步骤 4 是 `cd /d …\apps\mobile\android && gradlew.bat --no-build-cache assembleRelease`。
+    ⚠️ **最贵的一枚形状在这里**：dry-run 那趟照样打印了一行 **`✅ 远端 workspace 依赖与当前同步源码一致`**，
+    而紧挨着上面那句写着"将执行（**未执行**）"⇒ **计划打印里的 ✅ 是"这一步在计划里"，不是"这一步会通过"**；
+    拿 `--dry-run` 的 rc=0 + 那串 ✅ 当"这枚宿主可用"的证据，就会把一条三层都不匹配的通道判成通了。真跑会在 ⑵/⑶ 响亮地红（`cd /d` 与 `gradlew.bat` 都过不去），
+    但**预检那一层（⑴）读到全空却不红**——这是收口点自己的一处形状，登记不改（它归 `check:android-gradle-remote` 的行主）。
+  所以"把 android 腿指到 `linux-dev`"不是一句拍板，是**给收口点加一枚 POSIX 远程支**——而那枚脚本的形状由 `pnpm check:android-gradle-remote` 钉着
+  （它钉的正是"新开一条 `./gradlew` 入口 / 绕开收口点 / 回传路径与 `reinstall-all.sh` 的 `$APK` 对不上" ⇒ 各自会红）。**本线没动它**：改承重收口点 + 借用别项目的机，两样都不在本线名下。
+
+  **④ "debug 件"混着两维，而这两维的结论相反 ⇒ 口径题要重述。**
+  · **变体维（`assembleDebug`）不是口径题，是事实题**：RN 的 gradle 插件默认 `debuggableVariants = ['debug','debugOptimized']`，
+    注释原话是"Variants in this list will **not** be bundled"，而注册 bundle 任务的那句是 `if (!isDebuggableVariant) { register("createBundle${targetName}JsAndAssets"…) }`
+    （现量：`grep -rn 'debuggableVariants\|isDebuggableVariant' node_modules/.pnpm/@react-native+gradle-plugin@*/node_modules/@react-native/gradle-plugin/react-native-gradle-plugin/src/main/kotlin/com/facebook/react/`；本仓 `app/build.gradle` 没覆盖它，只有模板里那行注释）。
+    ⇒ **debug APK 里没有 JS bundle**，起来连的是 Metro。**它不是"另一种签名的产品"，它不是产品**——所以 r161 标题那句"它只能出 **debug 签名**的件"如果被人读成"只能出 debug 变体"，
+    推荐"不允许"的理由会挂错地方（挂在一枚本来就不可能通过的读法上）。
+  · **签名维（`assembleRelease` 但没有发布钥）才是那一问**：`app/build.gradle` 里 `signingConfig heytaHasReleaseSigning ? signingConfigs.release : signingConfigs.debug`
+    且缺钥时**打一大段警告**、不失败。差异实测只有证书身份一枚：`minifyEnabled=false`（`enableProguardInReleaseBuilds = false`）、
+    `ls apps/mobile/android/app/src/*` ⇒ 只有 `main` / `test` / `androidTest`（**没有 `src/debug`、`src/release`**）、
+    本仓 Kotlin/JS 里 `BuildConfig.DEBUG` / `isDebuggable` / `FLAG_DEBUGGABLE` / `__DEV__` / `GET_SIGNATURES` / `signingInfo` / `sharedUserId` **各 0 处命中**
+    （现量：`grep -rn '__DEV__' apps/mobile/src packages --include='*.ts' --include='*.tsx' | grep -v node_modules | wc -l` ⇒ 0）。
+    ⇒ **除证书外没有别的差异**——r161 那句"小组件那一族（`widget_*`、系统面板拖放、签名相关的 Keystore 通路）在 debug 与 release 上不是同一件事"**作为理由站不住**：
+    `widget_*` 与拖放绑的是 provider 组件名（`applicationId` 两变体同值、无 suffix），`WidgetAead` 用的是 `AndroidKeyStore` 里不可导出的 AES key
+    （`setUserAuthenticationRequired(false)`，无 attestation / 无 StrongBox ⇒ 现量 `grep -nE 'setAttestation|StrongBox|setUserAuthentication' apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetAead.kt`），
+    它随**卸载**没，不随**签名换了**没——而换签名身份必然先 uninstall。
+  · **仓里对这一问早有明文口径，方向与 r161 的推荐相反**：`docs/runbooks/multi-platform-build.md` 那一节写的是"没配发布钥时**不失败**、用 debug keystore 签并打警告……**只把它用于内测**"，
+    `docs/reference/build-matrix.md` §2.4 写的是"当前状态：✅ **可用于内部安装测试** / ❌ 不可用于应用商店"。
+    **Android 装机态验收属"内部安装测试"那一支** ⇒ "允许"是有明文依据的那一支；要写"不允许"就得**新立一条口径**，不是沿用 r161 那句推荐。
+    同族的"怎么写才不骗人"已有先例：`scripts/check-windows-signing-posture.mjs` 钉的是**非正式签名的产物必须自报身份**（主体名要写着 local build），
+    ⇒ 落到这里就是：读数旁必须印 `apksigner verify --print-certs <那枚 apk>` 的 DN 与 SHA-256 前缀，并**按"内测件"入账**，不许写成"发布件已验收"。
+
+  **⑤ 顺带照出一条与产物不符的旧句（本线只登记，不改那条线的口径）**：`docs/reference/build-matrix.md` §2.4 那句「release 变体**仍然用 debug keystore 签名**」
+  对**本机库里那枚 release 件不成立**：`apksigner verify --print-certs <android/app/build/outputs/apk/release/app-release.apk>`（磁盘件、不入 git；现量 `git check-ignore -v <那枚路径>` ⇒ `apps/mobile/.gitignore` 里 `android/app/build/` 那条）
+  回的是 `CN=heyta, OU=Mobile, O=Xiaoli Creativity Culture Industry, L=Hangzhou, ST=Zhejiang, C=CN`（SHA-256 前缀 `c46d0386…`，当时读数），
+  而仓库 `apps/mobile/android/app/debug.keystore` 的证书是 `CN=Android Debug … C=US`（SHA-256 前缀 `FAC61745…`，同处现量 `keytool -list -v -keystore … -alias androiddebugkey -storepass android`）
+  ⇒ **构建出这枚件的那台机上配过发布钥**（⚠️ 本线没核它的载体，只按形状指认：重装链里只有远程支会把件落在这枚路径上），所以"换到 linux-dev"确实是**换签名身份**（不是"反正大家都在用公开 debug 钥"），
+  而 §2.4 那句只对**没配 `HEYTA_RELEASE_*` 的机器**成立。已在 §2.4 就地加了一行限定。
+
+  **⑥ 这一格剩下的到底是什么（写成"在谁手里 + 一条命令"，不问负责人）**：
+  · 决定 A（**宿主与收口点**，归负责人／`run-gradle.mjs` 的行主）：要不要给收口点加一枚 POSIX 远程支、把 android 构建指到 `linux-dev`（那是别项目的机，10-20 现量：`ssh linux-dev 'nproc; df -h ~ | tail -1'` ⇒ 12 核 / 776G 空闲；AVD 只有 `litopia_*` 两枚，heyta 的要新建）。
+    判据（已现量）：`NO_COLOR=1 HEYTA_ANDROID_HOST=linux-dev node scripts/run-gradle.mjs assembleRelease --dry-run` ⇒ **rc=0**（dry-run 不判事，见第 ③ 条那三层形状与那行假 ✅）；
+    **真跑会红在远程命令形状**（`cd /d` + `gradlew.bat`），不红在可达性。别拿 dry-run 的绿当通道通过。
+  · 决定 B（**验收对象口径**，归负责人）：`release 变体 + 非发布钥` 的件算不算 Android 装机态那几格的验收对象。
+    **本线推荐允许**（依据见上面第 ④ 条那两句明文），条件是每份读数自报证书 DN + SHA-256 前缀、按"内测件"入账；
+    **例外那几格**是"升级连续性 / 换签名后本机数据与组件绑定存活"那一族——换身份必然 uninstall，那本身就是被测量，不能用它当替身。
+  · 两枚决定都没落地前，这一格与 windows 腿一起挂着：**"Android 装机态当前产物"这句仍然不成立**，而它现在**不成立的理由只剩一枚**（那台机没接网），
+    r161 登记的两条（npm 出站、搬 node_modules）**不再是理由**。
+
+  **⑦ 顺手把那把"要不要再跑一趟重装"的尺复量了，两问的答案都变了形**（10:5x 现量，全部只读）：
+  · 第一问（HEAD 之后有没有新打包输入）：`paths=(packages apps/mobile/android apps/mobile/src apps/mobile/ios apps/desktop-macos apps/desktop-windows/src apps/desktop-windows/app apps/web/src apps/web/app server/src)`；
+    `git diff --name-only ${L}..HEAD -- $paths ':(exclude)**/evidence/**'` ⇒ **0 枚**（阳性对照 `${L}~1..${L}` 回 **2** ⇒ 尺不瞎）。
+    🔴 **不加那条 exclude 会取到错的 `L`**：不带 exclude 时 `git log -1 -- … -- $paths` 回的是 **10:23 那笔纯文档 + 证据**的提交（r162 往 `apps/desktop-macos/evidence/` 里放了图），
+    粗 pathspec 把证据目录当打包输入 ⇒ 这正是项目记忆里那条"系统性高估"的又一次命中，**两问都要按剔掉 evidence 的那一枚算**。剔完，最后一笔真进包的源码提交仍是 `f21dc1d39`（01:09:27）。
+  · 第二问（此刻装机的件等不等于 HEAD）：**这句翻案了** —— 共享那台 `heyta-iphone-17pro` 上
+    `main.jsbundle` 现读 mtime **10-20 08:12:46**、sha256 前缀 **`9dc687d4…`**，**既不是 r159 那枚 `928e8050…`、也不是 `ca3a0925…`**
+    ⇒ 08:1x 有别的会话往这台上重装过一件，**本线没核它的构建载体**（`~/heyta-reinstall/` 里最新的落点停在 02:15 的 r159-ios，08:12 那趟不落在这线命名的目录里）。
+    合起来读：**不必为这几笔文档重跑**（第一问 0 枚），但交接 §〇 Q2 那句"iOS 装的是 r159 那一趟"**作为对当前状态的断言已经不成立**，已在原句就地补限定。
+    ⚠️ 两枚件的产品内容差异**没法从哈希判**，只能从载体判；第一问那 0 枚说的是 git 跟踪的打包源码，不证字节（同 §四 第 4 步末尾那条边界）。
+
+  **不证 / 射程**：本格**一个字节没写进任何产物与设备**，全部是源码级与只读网络读数；没有跑过任何一趟 Android 腿，也没在那台 Ubuntu 上建目录、装依赖或起过模拟器；
+  那台机的 heyta 树 `HEAD` 落后当前 HEAD（现量 `ssh linux-dev 'git -C ~/heyta rev-parse --short HEAD'` 对 `git rev-parse --short HEAD`），**这格不判"在那台上重建一条通道要花多久"**；
+  `services.gradle.org` 回 `307` 是重定向、真正的下载还没试过（只有元数据级证据说它可达）。

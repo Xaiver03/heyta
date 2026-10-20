@@ -26,14 +26,15 @@
  *      `ABSOLUTE_REMINDER_LEAD_MS` 与那条键写在同一个文件里、紧挨着，
  *      并让测试同时断言两者。
  *   2. `reminder.a11y.snooze` 的中文写着"推迟 10 分钟"、英文写着
- *      "by 10 minutes" —— 而真正的推迟量走 `snoozeDeadline`（领域层）。
+ *      "by 10 minutes" —— 而真正的推迟量走 `SNOOZE_MINUTES`，由动作层的
+ *      `snoozeByMinutes` 落在**这一行此刻的时刻**上。
  *      两个人各改一处就会得到"读屏说 10 分钟、实际推迟 1 天"，且**不报错**。
  *      所以 `SNOOZE_MINUTES` 也在这里显式声明，测试拿它和文案对账。
  */
 
 import type { MessageKey } from '@heyta/i18n';
 import type { ReminderListLabels } from '@heyta/ui';
-import { REMINDER_OFFSET_PRESETS_MS, snoozeDeadline } from '@heyta/domain';
+import { REMINDER_OFFSET_PRESETS_MS } from '@heyta/domain';
 
 import type { Translate } from '../i18n/translate';
 import { formatStamp } from './date';
@@ -57,15 +58,6 @@ export const SNOOZE_MINUTES = 10;
 /** 绝对时刻入口要建的时刻：`now + 1 小时`。 */
 export function absoluteReminderTriggerAt(now: number): number {
   return now + ABSOLUTE_REMINDER_LEAD_MS;
-}
-
-/**
- * 「稍后提醒」的目标时刻。**必须走领域层的 `snoozeDeadline`** ——
- * 它内含上限（`MAX_SNOOZE_MS`，7 天）与 `minutes` 缺省值；
- * 自己写 `now + 10 * 60000` 就是第二份定义，将来领域层夹上限时这里不会跟着变。
- */
-export function snoozeTargetAt(now: number): number {
-  return snoozeDeadline(now, SNOOZE_MINUTES);
 }
 
 /**

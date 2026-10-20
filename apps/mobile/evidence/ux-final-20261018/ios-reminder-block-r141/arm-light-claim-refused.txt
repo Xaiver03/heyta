@@ -1,0 +1,1 @@
+refusing to write: evidence dir says 'light' but the device is 'dark' (switch it with: xcrun simctl ui FE195661-B021-4A71-AAD1-1F2F7AE3A102 appearance light; after 'dark' a shutdown+boot is required — trap #471)

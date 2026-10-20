@@ -48,6 +48,7 @@ import {
   reminderIsFired,
   reminderRejection,
   reminderTriggerFromOffset,
+  snoozeDeadline,
   type Reminder,
 } from '@heyta/domain';
 import type { EntityType } from '@heyta/shared-schema';
@@ -93,6 +94,19 @@ export interface ReminderActions {
    * 用户的点击由界面负责提示。
    */
   snoozeReminder(entityId: string, untilMs: number): Promise<boolean>;
+  /**
+   * 「把这一行往后推 `minutes` 分钟」—— 界面按钮要的那个语义。
+   *
+   * 🔴 基准是**这条提醒此刻的时刻**（`reminderEffectiveAt`），不是墙上时钟：
+   * 可及名称念的是「把 10-19 18:44 的提醒推迟 10 分钟」，而按"现在 + 10 分钟"
+   * 算会把一条 18:44 的提醒挪到 17:54 —— 按「推迟」得到**提前 50 分钟**
+   * （装机态 iOS 四档各复现一次，成因见台账 r142 那一格）。
+   * 已过点、还没投递的没有未来时刻可依，仍从现在起算。
+   *
+   * 推迟量与上限走领域层 `snoozeDeadline`：非正的分钟数**抛**，超过
+   * `MAX_SNOOZE_MS` 钳到上限。
+   */
+  snoozeByMinutes(entityId: string, minutes: number): Promise<boolean>;
   /**
    * 标记已投递。**幂等**：已投递返回 `false` 且不写 op
    * （否则每次进前台都会推高 `updatedAt`，在两端制造假冲突）。
@@ -267,6 +281,30 @@ export function createReminderActions(
     }
   };
 
+  /**
+   * 「稍后提醒」。推迟多少由**调用方**决定（分钟数走 `snoozeByMinutes`，
+   * 绝对时刻走 `snoozeReminder`），这一份只负责校验 + 判定顺序 + 写 op。
+   */
+  async function writeSnoozedUntil(entityId: string, untilMs: number): Promise<boolean> {
+    const reminder = reminderOf(entityId);
+    if (reminder === undefined) throw new Error(`找不到提醒「${entityId}」`);
+    if (!Number.isFinite(untilMs) || untilMs <= now()) {
+      throw new Error(`「稍后提醒」的目标时刻必须是未来的有限时间戳（收到 ${String(untilMs)}）`);
+    }
+    // 已投递 / 已关闭 → 不写。判定顺序（fired/dismissed 优先于到点）在领域层，
+    // 这里只是**不为一个必然无效的写入产生 op**。
+    const phase = reminderPhase(reminder, now());
+    if (phase === 'fired' || phase === 'dismissed') return false;
+
+    await ctx.dispatch({
+      entityType: 'REMINDER' as EntityType,
+      entityId,
+      opType: OpType.Update,
+      payload: { snoozedUntil: untilMs },
+    });
+    return true;
+  }
+
   async function writeNew(
     taskId: string,
     triggerAt: number,
@@ -349,23 +387,16 @@ export function createReminderActions(
     },
 
     async snoozeReminder(entityId, untilMs) {
+      return writeSnoozedUntil(entityId, untilMs);
+    },
+
+    async snoozeByMinutes(entityId, minutes) {
       const reminder = reminderOf(entityId);
       if (reminder === undefined) throw new Error(`找不到提醒「${entityId}」`);
-      if (!Number.isFinite(untilMs) || untilMs <= now()) {
-        throw new Error(`「稍后提醒」的目标时刻必须是未来的有限时间戳（收到 ${String(untilMs)}）`);
-      }
-      // 已投递 / 已关闭 → 不写。判定顺序（fired/dismissed 优先于到点）在领域层，
-      // 这里只是**不为一个必然无效的写入产生 op**。
-      const phase = reminderPhase(reminder, now());
-      if (phase === 'fired' || phase === 'dismissed') return false;
-
-      await ctx.dispatch({
-        entityType: 'REMINDER' as EntityType,
+      return writeSnoozedUntil(
         entityId,
-        opType: OpType.Update,
-        payload: { snoozedUntil: untilMs },
-      });
-      return true;
+        snoozeDeadline(Math.max(now(), reminderEffectiveAt(reminder)), minutes),
+      );
     },
 
     async markReminderFired(entityId, expectedTriggerAt) {

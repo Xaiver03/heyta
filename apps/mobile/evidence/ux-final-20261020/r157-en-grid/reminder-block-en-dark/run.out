@@ -1,0 +1,323 @@
+{
+  "status": "passed",
+  "appearance": "dark",
+  "uiLocale": "en",
+  "tabBarTopOnListScreen": 776,
+  "reminderSection": {
+    "want": "section",
+    "match": "exact",
+    "frame": [
+      16,
+      295,
+      370,
+      23
+    ],
+    "visibleBottom": 772,
+    "tabBarTopFromListScreen": 772
+  },
+  "emptyState": [
+    {
+      "want": "section",
+      "label": "Reminders",
+      "matchedLabel": "Reminders",
+      "match": "exact",
+      "present": true,
+      "frame": [
+        16,
+        295,
+        370,
+        23
+      ],
+      "bottom": 318,
+      "visibleBottom": 772,
+      "tappableAboveTabBar": true
+    },
+    {
+      "want": "empty",
+      "label": "No reminders yet",
+      "matchedLabel": "No reminders yet",
+      "match": "exact",
+      "present": true,
+      "frame": [
+        16,
+        330,
+        370,
+        18
+      ],
+      "bottom": 348,
+      "visibleBottom": 772,
+      "tappableAboveTabBar": true
+    },
+    {
+      "want": "add",
+      "label": "Add reminder",
+      "present": false,
+      "visibleBottom": 772
+    },
+    {
+      "want": "absolute1h",
+      "label": "Remind me in 1 hour",
+      "matchedLabel": "Remind me in 1 hour",
+      "match": "exact",
+      "present": true,
+      "frame": [
+        16,
+        360,
+        160,
+        44
+      ],
+      "bottom": 404,
+      "visibleBottom": 772,
+      "tappableAboveTabBar": true
+    },
+    {
+      "want": "noDue",
+      "label": "This task has no due date, so only an absolute time can be set",
+      "matchedLabel": "This task has no due date, so only an absolute time can be set",
+      "match": "exact",
+      "present": true,
+      "frame": [
+        16,
+        416,
+        370,
+        18
+      ],
+      "bottom": 434,
+      "visibleBottom": 772,
+      "tappableAboveTabBar": true
+    }
+  ],
+  "afterAdd": [
+    {
+      "want": "scheduled",
+      "label": "Scheduled",
+      "matchedLabel": "Scheduled",
+      "match": "exact",
+      "present": true,
+      "frame": [
+        114,
+        334,
+        58,
+        14
+      ],
+      "bottom": 348,
+      "visibleBottom": 772,
+      "tappableAboveTabBar": true
+    },
+    {
+      "want": "reminder.a11y.snooze",
+      "label": "reminder.a11y.snooze",
+      "matchedLabel": "Snooze the reminder at 10-20 02:47 by 10 minutes",
+      "match": "a11y-template",
+      "present": true,
+      "frame": [
+        93,
+        355,
+        77,
+        44
+      ],
+      "bottom": 399,
+      "visibleBottom": 772,
+      "tappableAboveTabBar": true
+    },
+    {
+      "want": "reminder.a11y.dismiss",
+      "label": "reminder.a11y.dismiss",
+      "matchedLabel": "Dismiss the reminder at 10-20 02:47",
+      "match": "a11y-template",
+      "present": true,
+      "frame": [
+        174,
+        355,
+        79,
+        44
+      ],
+      "bottom": 399,
+      "visibleBottom": 772,
+      "tappableAboveTabBar": true
+    },
+    {
+      "want": "reminder.a11y.remove",
+      "label": "reminder.a11y.remove",
+      "matchedLabel": "Delete the reminder at 10-20 02:47",
+      "match": "a11y-template",
+      "present": true,
+      "frame": [
+        258,
+        355,
+        128,
+        44
+      ],
+      "bottom": 399,
+      "visibleBottom": 772,
+      "tappableAboveTabBar": true
+    }
+  ],
+  "afterSnooze": [
+    {
+      "want": "snoozed",
+      "label": "Snoozed",
+      "matchedLabel": "Snoozed",
+      "match": "exact",
+      "present": true,
+      "frame": [
+        114,
+        334,
+        47,
+        14
+      ],
+      "bottom": 348,
+      "visibleBottom": 772,
+      "tappableAboveTabBar": true
+    },
+    {
+      "want": "scheduled",
+      "label": "Scheduled",
+      "present": false,
+      "visibleBottom": 772
+    },
+    {
+      "want": "reminder.a11y.snooze",
+      "label": "reminder.a11y.snooze",
+      "matchedLabel": "Snooze the reminder at 10-20 02:57 by 10 minutes",
+      "match": "a11y-template",
+      "present": true,
+      "frame": [
+        93,
+        355,
+        77,
+        44
+      ],
+      "bottom": 399,
+      "visibleBottom": 772,
+      "tappableAboveTabBar": true
+    },
+    {
+      "want": "reminder.a11y.dismiss",
+      "label": "reminder.a11y.dismiss",
+      "matchedLabel": "Dismiss the reminder at 10-20 02:57",
+      "match": "a11y-template",
+      "present": true,
+      "frame": [
+        174,
+        355,
+        79,
+        44
+      ],
+      "bottom": 399,
+      "visibleBottom": 772,
+      "tappableAboveTabBar": true
+    },
+    {
+      "want": "reminder.a11y.remove",
+      "label": "reminder.a11y.remove",
+      "matchedLabel": "Delete the reminder at 10-20 02:57",
+      "match": "a11y-template",
+      "present": true,
+      "frame": [
+        258,
+        355,
+        128,
+        44
+      ],
+      "bottom": 399,
+      "visibleBottom": 772,
+      "tappableAboveTabBar": true
+    }
+  ],
+  "afterDismiss": [
+    {
+      "want": "dismissed",
+      "label": "Dismissed",
+      "matchedLabel": "Dismissed",
+      "match": "exact",
+      "present": true,
+      "frame": [
+        114,
+        334,
+        57,
+        14
+      ],
+      "bottom": 348,
+      "visibleBottom": 772,
+      "tappableAboveTabBar": true
+    },
+    {
+      "want": "scheduled",
+      "label": "Scheduled",
+      "present": false,
+      "visibleBottom": 772
+    },
+    {
+      "want": "snoozed",
+      "label": "Snoozed",
+      "present": false,
+      "visibleBottom": 772
+    },
+    {
+      "want": "reminder.a11y.remove",
+      "label": "reminder.a11y.remove",
+      "matchedLabel": "Delete the reminder at 10-20 02:57",
+      "match": "a11y-template",
+      "present": true,
+      "frame": [
+        258,
+        355,
+        128,
+        44
+      ],
+      "bottom": 399,
+      "visibleBottom": 772,
+      "tappableAboveTabBar": true
+    }
+  ],
+  "snoozeMove": {
+    "before": "2026-10-20T02:47:00",
+    "after": "2026-10-20T02:57:00",
+    "movedLater": true
+  },
+  "badgeShapes": [
+    {
+      "want": "scheduled",
+      "label": "Scheduled",
+      "frame": [
+        114,
+        334,
+        58,
+        14
+      ]
+    },
+    {
+      "want": "snoozed",
+      "label": "Snoozed",
+      "frame": [
+        114,
+        334,
+        47,
+        14
+      ]
+    },
+    {
+      "want": "dismissed",
+      "label": "Dismissed",
+      "frame": [
+        114,
+        334,
+        57,
+        14
+      ]
+    }
+  ],
+  "removedBackToEmpty": true,
+  "taskDeleted": {
+    "title": "Rem1411792432012",
+    "frame": [
+      342,
+      379,
+      44,
+      44
+    ],
+    "gone": true
+  },
+  "report": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/mobile/evidence/ux-final-20261020/r157-en-grid/reminder-block-en-dark/reminder-block.json"
+}

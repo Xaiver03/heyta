@@ -1,0 +1,141 @@
+{
+  "startedAt": 1792400355.920643,
+  "taskTitle": "Rem1411792400355",
+  "appearance": "light",
+  "uiLocale": "zh-CN",
+  "taps": [
+    {
+      "description": "add reminder",
+      "label": "1 小时后提醒",
+      "frame": [
+        16,
+        774,
+        111,
+        44
+      ],
+      "guard": {
+        "label": "1 小时后提醒",
+        "match": "exact",
+        "frame": [
+          16,
+          774,
+          111,
+          44
+        ],
+        "visibleBottom": 866
+      },
+      "scrolledIntoView": true
+    },
+    {
+      "description": "close detail",
+      "label": "关闭任务详情"
+    }
+  ],
+  "shots": [
+    "01-reminder-empty",
+    "02-reminder-added",
+    "03-reminder-removed"
+  ],
+  "emptyState": [
+    {
+      "label": "提醒",
+      "matchedLabel": "提醒",
+      "match": "exact",
+      "present": true,
+      "frame": [
+        16,
+        720,
+        370,
+        23
+      ],
+      "bottom": 743,
+      "visibleBottom": 866,
+      "tappableAboveTabBar": true
+    },
+    {
+      "label": "还没有提醒",
+      "matchedLabel": "还没有提醒",
+      "match": "exact",
+      "present": true,
+      "frame": [
+        16,
+        755,
+        370,
+        18
+      ],
+      "bottom": 773,
+      "visibleBottom": 866,
+      "tappableAboveTabBar": true
+    },
+    {
+      "label": "添加提醒",
+      "present": false,
+      "visibleBottom": 866
+    },
+    {
+      "label": "1 小时后提醒",
+      "matchedLabel": "1 小时后提醒",
+      "match": "exact",
+      "present": true,
+      "frame": [
+        16,
+        785,
+        111,
+        44
+      ],
+      "bottom": 829,
+      "visibleBottom": 866,
+      "tappableAboveTabBar": true
+    },
+    {
+      "label": "这个任务没有截止时间，只能按绝对时刻提醒",
+      "matchedLabel": "这个任务没有截止时间，只能按绝对时刻提醒",
+      "match": "exact",
+      "present": true,
+      "frame": [
+        16,
+        841,
+        370,
+        18
+      ],
+      "bottom": 859,
+      "visibleBottom": 866,
+      "tappableAboveTabBar": true
+    }
+  ],
+  "afterAdd": [
+    {
+      "label": "待触发",
+      "present": false,
+      "visibleBottom": 866
+    },
+    {
+      "label": "稍后提醒",
+      "present": false,
+      "visibleBottom": 866
+    },
+    {
+      "label": "关闭提醒",
+      "present": false,
+      "visibleBottom": 866
+    },
+    {
+      "label": "删除提醒",
+      "present": false,
+      "visibleBottom": 866
+    }
+  ],
+  "removeReminderGuard": {},
+  "removedBackToEmpty": false,
+  "taskDeleted": {
+    "title": "Rem1411792400355",
+    "frame": [
+      342,
+      379,
+      44,
+      44
+    ],
+    "gone": true
+  },
+  "finishedAt": 1792400408.196314
+}

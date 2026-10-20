@@ -22,7 +22,7 @@
  */
 
 import { createReminderActions, type ActionContext } from '@heyta/app-host';
-import { snoozeDeadline, type Reminder } from '@heyta/domain';
+import type { Reminder } from '@heyta/domain';
 import { create } from 'zustand';
 
 import { currentState, dispatchIntent, dispatchChecked, onEngineChange } from '../../lib/oplog.js';
@@ -109,7 +109,8 @@ const actionContext: ActionContext = {
  * `vi.useFakeTimers()` 换掉的 `Date` 对它**不生效** —— 症状是"定时器确实醒了、
  * 但 `due()` 按真实时钟算，于是永远没到点"，四条判据全 0 且没有任何报错
  * （W9 ② 实测踩过）。同一条推理见 AGENTS.md §7 第 176 条"桩在外面预取值"。
- * 本文件里 `snooze` 用的就是晚绑定的 `Date.now()`，这里对齐它。
+ * `snooze` 现在连时刻都不在本文件算了（基准在动作层），但 `due()` / `recheck()`
+ * 仍然直接吃这枚时钟 —— 写死成 `Date.now` 它们就会按真实时钟走。
  */
 const reminderActions = createReminderActions(actionContext, { now: () => Date.now() });
 
@@ -126,14 +127,12 @@ export const useReminderStore = create<ReminderState>((set) => ({
   },
 
   snooze: async (entityId) => {
-    // 🔴 推迟量**必须来自领域层**（`snoozeDeadline`），不许在这里手写
-    // `10 * 60 * 1000`：算错了不会有任何类型或渲染断言变红。
-    // 传 10（分钟）而不是靠默认值，是为了让这个数字与 a11y 文案
+    // 🔴 推迟量走动作层的 `snoozeByMinutes`（它把分钟数交给领域层 `snoozeDeadline`，
+    // 并以**这一行此刻的时刻**为基准 —— 基准不在这里算，见 app-host 那条注释）。
+    // 这里传字面 10 而不是靠默认值，是为了让这个数字与 a11y 文案
     // `reminder.a11y.snooze`（「推迟 10 分钟」）在同一个文件里对得上 ——
     // 领域层默认值和它同值，但那是巧合，不是契约。
-    await attempt(set, taskIdOf(entityId), () =>
-      reminderActions.snoozeReminder(entityId, snoozeDeadline(Date.now(), 10)),
-    );
+    await attempt(set, taskIdOf(entityId), () => reminderActions.snoozeByMinutes(entityId, 10));
   },
 
   dismiss: async (entityId) => {

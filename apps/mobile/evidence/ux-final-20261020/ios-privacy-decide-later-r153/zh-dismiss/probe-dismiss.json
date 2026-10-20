@@ -1,0 +1,71 @@
+{
+  "udid": "81FC6A62-DE80-44F0-A4D9-892A72A123DA",
+  "artifact": {
+    "bundle": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/mobile/ios/build/Build/Products/Release-iphonesimulator/Heyta.app",
+    "jsbundleSha256": "ca3a09257bdfba19f1a64c7e4213ec50d201a83ff958c7b76b8b86568612ca9a"
+  },
+  "iconSquarePt": 44.0,
+  "steps": [
+    {
+      "step": "first-launch",
+      "sheetAnchorsPresent": [
+        "同意并联网",
+        "只用本机"
+      ],
+      "wordNodes": [
+        {
+          "label": "以后再说",
+          "frame": [
+            294,
+            232,
+            72,
+            44
+          ],
+          "pressable": true
+        }
+      ],
+      "visibleLabel": "visible-text（触控区宽 72 pt > 图标方块 44 pt）",
+      "closeNode": {
+        "label": "以后再说",
+        "frame": [
+          294,
+          232,
+          72,
+          44
+        ],
+        "pressable": true,
+        "enabled": true
+      },
+      "shot": "apps/mobile/evidence/ux-final-20261020/ios-privacy-decide-later-r153/zh-dismiss/01-first-launch.png:554341"
+    },
+    {
+      "step": "after-tap-close",
+      "tapRc": 0,
+      "sheetStillPresent": [],
+      "closeStillPresent": [],
+      "labels": [
+        "heyta",
+        "开始安排今天",
+        "本地优先的任务管理：离线照常可用，数据端到端加密，服务器可以是你自己的。",
+        "注册 / 登录",
+        "先离线使用",
+        "不登录也能建任务、打卡、专注；以后随时可以在「我的」页登录。"
+      ],
+      "shot": "apps/mobile/evidence/ux-final-20261020/ios-privacy-decide-later-r153/zh-dismiss/02-after-tap-close.png:162446"
+    }
+  ],
+  "launch": {
+    "rc": 0,
+    "stderr": ""
+  },
+  "consent": {
+    "before": {
+      "db": "/Users/rocalight/Library/Developer/CoreSimulator/Devices/81FC6A62-DE80-44F0-A4D9-892A72A123DA/data/Containers/Data/Application/96E1793B-E128-4F2D-BCE6-BBF61F34ECEF/Library/heyta-device-prefs.sqlite",
+      "rows": []
+    },
+    "afterTap": {
+      "db": "/Users/rocalight/Library/Developer/CoreSimulator/Devices/81FC6A62-DE80-44F0-A4D9-892A72A123DA/data/Containers/Data/Application/96E1793B-E128-4F2D-BCE6-BBF61F34ECEF/Library/heyta-device-prefs.sqlite",
+      "rows": []
+    }
+  }
+}
