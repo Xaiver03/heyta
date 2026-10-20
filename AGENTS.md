@@ -187,8 +187,11 @@ heyta 是一个**本地优先**的任务管理应用，目标是做一个功能�
 **完整阶段表、并行轨道状态与全部已知边界在 [`docs/agents/progress-log.md`](docs/agents/progress-log.md)。**
 总路线图：[`docs/plans/roadmap.md`](docs/plans/roadmap.md)。
 
-🔴 **当前唯一一条"已知会收钱不交付"的红线**在 ADR-0023：`hosted-ai-monthly`（¥12 档）
-**计量存在之前不得被售卖**，收银台不许把它变成可支付的订单。
+🔴 **"会收钱不交付"这条线现在的事实源在
+[`ADR-0054`](docs/adr/0054-managed-ai-retention-and-selling-preconditions.md) §6/§8/§9**：
+旧的"计量存在之前不得售卖 ¥12 档"那条红线（ADR-0023）**已被 0054 按顺序解除** ——
+计量、代理路由、白名单、设置页的托管开关都已落地，`NOT_YET_DELIVERABLE_SKUS` 现为空。
+本文件**不复述它的状态**（那是一份会漂的抄件）；这一档还没做到的事以 0054 那三节为准。
 
 ---
 
