@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { STUB_ORIGIN, STUB_PORT } from '../ports';
-import { openApp, openSettingsView, stubLegalRecheck } from './helpers';
+import { openApp, openSettingsView, selectSettingsSection, stubLegalRecheck } from './helpers';
 
 /**
  * 续费面板的**真浏览器**判据（AGENTS §6.2 规定一：界面结论只有截图算）
@@ -65,6 +65,12 @@ async function seedCredentialsAndProbe(page: Page): Promise<void> {
  * 「连不上服务端，这一单没有下成。」—— 两条用例当时红得像是 `page.route`
  * 没接上，实际是界面在说谎（缺陷已在 `RenewPanel` 里修掉，两条同意闸门用例
  * 住在 `apps/web/tests/renew-panel.spec.tsx`）。
+ *
+ * 🔴 必须显式选中「账号与安全」那一组：设置浮层现在是「左侧分类 + 右侧内容」的
+ * IA（`63e61f237`），`RenewPanel` 住在 `settings-group-account` 里，而其余每一组
+ * 都带 `hidden`。打开浮层只落在默认分类 ⇒ 本套件此前的症状是
+ * `getByTestId('renew-panel')` 解析得到节点却判 `hidden`，五条用例（含三条早已
+ * 存在的）一起红，看起来像面板坏了。这里走的是人真走的那一步，不是放宽判据。
  */
 async function openSettings(page: Page, consent: 'accepted' | 'local-only' = 'accepted'): Promise<void> {
   await openApp(page, '/', consent);
@@ -72,6 +78,7 @@ async function openSettings(page: Page, consent: 'accepted' | 'local-only' = 'ac
   await page.reload();
   await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible();
   await openSettingsView(page);
+  await selectSettingsSection(page, 'account');
   await expect(page.getByTestId('renew-panel')).toBeVisible();
 }
 
@@ -165,4 +172,71 @@ test('只用本机时点下单：零请求，且界面不把"我们自己拒发"
   expect(checkoutCalls).toHaveLength(0);
 
   await page.screenshot({ path: 'test-results/renew-panel-no-consent.png' });
+});
+
+/**
+ * 🔴 档位选择器（¥5 / ¥12）只有真浏览器能证的三件事。
+ *
+ * jsdom 那一组装的是 stub 的 `fetch`，看不见"两枚单选在真实布局里到底渲染成什么"，
+ * 也看不见选完之后**旧的那一单**是否还挂在屏上（那是本条抓出来的真缺陷形状：
+ * 换档之后旧金额还在，读起来就像"¥12 也只要 4.00"）。
+ */
+test('选 ¥12 那一档：发出去的是 hosted-ai-monthly，而换档把旧的那一单清掉了', async ({ page }) => {
+  test.info().annotations.push({ type: '截图', description: 'test-results/renew-panel-tiers.png' });
+  await openSettings(page);
+
+  const bodies: string[] = [];
+  await page.route(`${SERVER}/api/billing/checkout**`, async (route) => {
+    bodies.push(String(route.request().postData()));
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ORDER_BODY) });
+  });
+
+  const hosted = page.getByTestId('renew-tier-hosted');
+  const hostedAi = page.getByTestId('renew-tier-hostedAi');
+  await expect(hosted).toBeVisible();
+  await expect(hostedAi).toBeVisible();
+  await expect(hosted).toBeChecked();
+
+  // 选档那一屏**一个金额都不许出现**：价格只在服务端报价之后才落到屏上。
+  await expect(page.getByTestId('renew-panel')).not.toContainText(/\d+\.\d{2}\s+(CNY|USD)/);
+
+  await hostedAi.click();
+  await page.getByTestId('renew-place-order').click();
+  await expect(page.getByTestId('renew-order')).toContainText('4.00 CNY');
+
+  // 换到另一档：旧单那张卡必须消失，否则屏幕上写的是**上一档**冻的金额。
+  await hosted.click();
+  await expect(page.getByTestId('renew-order')).toHaveCount(0);
+
+  await hostedAi.click();
+  await page.getByTestId('renew-place-order').click();
+  await expect.poll(() => bodies).toHaveLength(2);
+  expect(JSON.parse(bodies[1] ?? '{}')).toEqual({ priceId: 'hosted-ai-monthly' });
+  // 🔴 截图要等**落定那一屏**：`bodies` 在请求发出那一刻就够数了，先拍会拍到
+  //    按钮上的「正在下单…」（实测第一版就是这样，证据图里看不到那一单的金额）。
+  await expect(page.getByTestId('renew-order')).toContainText('4.00 CNY');
+
+  await page.screenshot({ path: 'test-results/renew-panel-tiers.png' });
+});
+
+test('服务端按 ④′ 拒降档：屏上说"这一档不含你当前档的全部能力"，而不是"没有定价"', async ({ page }) => {
+  test.info().annotations.push({ type: '截图', description: 'test-results/renew-panel-downgrade.png' });
+  await openSettings(page);
+
+  await page.route(`${SERVER}/api/billing/checkout**`, async (route) => {
+    await route.fulfill({
+      status: 409,
+      contentType: 'application/json',
+      body: JSON.stringify({ code: 'PRICE_TIER_LOSES_GRANTS', message: 'PRICE_TIER_LOSES_GRANTS' }),
+    });
+  });
+
+  await page.getByTestId('renew-place-order').click();
+
+  const failure = page.getByTestId('renew-failure');
+  await expect(failure).toBeVisible();
+  await expect(failure).toContainText('这一档不包含你当前这一档的全部能力');
+  await expect(page.getByTestId('renew-order')).toHaveCount(0);
+
+  await page.screenshot({ path: 'test-results/renew-panel-downgrade.png' });
 });
