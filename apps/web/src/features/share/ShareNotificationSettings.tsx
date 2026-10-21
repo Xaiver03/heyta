@@ -56,8 +56,16 @@ export function ShareNotificationSettings(): React.JSX.Element {
   }, []);
 
   return (
-    <div className="ht-settings__subsection" data-testid="share-notification-settings">
-      <h3 className="ht-settings__h3">{t('common.share.notif.sectionTitle')}</h3>
+    // 🔴 用 `.ht-settings`（与同一张浮层里 `SyncSettingsPanel` / `PrivacyPanel` 同一块砖），
+    //    而不是自造一枚 `ht-settings__subsection` —— 那个名字**全仓 CSS 里没有定义**，
+    //    于是这一节读起来像"控件全在、整块零样式"（2026-10-21 真浏览器截图里量到的）。
+    <section className="ht-settings" data-testid="share-notification-settings">
+      {/*
+        🔴 标题**只有面板自己那一份**：`NotificationPrefsPanel` 已经把
+        `labels.sectionTitle` 渲染成 `section-title`。这里再放一枚 `<h3>` 就是同一级
+        信息在同一个屏幕上出现两遍（截图里"共享通知"连着两行），而共享组件在移动端
+        也带自己的标题 —— 删谁都不该删它。
+      */}
       <HeytaUiProvider>
         <NotificationPrefsPanel
           prefs={prefs}
@@ -77,6 +85,6 @@ export function ShareNotificationSettings(): React.JSX.Element {
           onChange={onChange}
         />
       </HeytaUiProvider>
-    </div>
+    </section>
   );
 }
