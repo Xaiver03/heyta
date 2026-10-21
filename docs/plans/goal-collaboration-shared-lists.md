@@ -943,6 +943,18 @@ CARRIER=$HOME/heyta-carriers/heyta-wt-collab-m5 bash research/tools/b-reinstall-
 ⇒ 这两句在"四端重装要在这台 Mac 上跑完"这件事上互相拉着。本线按红线停在这里：**判据与拍板口径不代改、那条禁令不自取例外**。
 可拍的两条路：① 给一次**单动作授权**（只允许 `emulator -avd heyta-w3-yearly -no-snapshot-save &` 这一发，随后由裁判 `--confirm` 点火，仍不动 Gradle 通道）；② 判定本轮四端重装不适用（本线这一轮改动面是服务端 + Web + 文档，移动端那一节评论区本来就还没挂 —— 但注意 `packages/ui`、`app-host`、`sync-client` 都被移动端消费，"输入没变"这句并不成立）。
 
+### 本线两条常驻判据在**当前 HEAD** 上复量（02:0x，因为账上先前那批读数是对着旧 HEAD 量的）
+
+main 在推送之后又被别线推进（`git rev-parse --short HEAD` 现量，本线射程内 `packages/{ui,app-host,sync-client}`、`server/src/shares`、`apps/web/src`、`e2e/tests` 在那几笔里 **零改动**：`git diff --stat <上一笔>..HEAD -- <那些路径>` 回空）。仍按"读数只对当刻 HEAD 成立"这条纪律重跑一遍：
+
+| 腿 | 读数 |
+|---|---|
+| `pnpm verify:collab-journey` | `RESULT=OK steps=3`、rc=0（复量就是这一行命令，别去指本轮的临时日志 —— 那类件住 `/tmp`，重启就没） |
+| `pnpm verify:collab-sync` | `RESULT=OK steps=11`、rc=0 |
+| 新截图人工看过 | `e2e/collab-journey-results/04-owner-invite-ticket.png`：入群链接那一栏逐字是 `http://127.0.0.1:4327/?shareToken=<同一枚凭证>`，与上方"邀请凭证"栏**同一串**（这正是第 1 步钉进判据的那格，图与断言两头都对得上）；`02-owner-consent-modal.png` 见下。⚠️ 那批图**不进仓**（现量：`git ls-files e2e/collab-journey-results` 回 0 枚），换台机器照上面那行命令跑一遍就重新落出来 —— 别去仓库里找它们 |
+
+⚠️ 顺带把**停止点 ① 的口味确认**从"读源码"升级成"看图"：`02-owner-consent-modal.png` 这一张是刚跑出来的，画的是三行同意范围做成一块凹陷披露面、"不再提示"带一枚**看得见的空方框**、"取消"是纯文字、"确认共享"是实心主蓝 —— 任务书那句"主按钮无视觉强调、勾选无可见位"在这张图上**逐字不成立**。递给负责人时该给这张，别再给 10-11 那张旧 02 号图。
+
 ### 下一步
 
 计划 §9.10 末节：**M2**（共享任务/清单的写路径路由 —— 要先立一份新 ADR），其后 M4 → M6。
