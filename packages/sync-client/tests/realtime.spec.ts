@@ -474,3 +474,90 @@ describe('createRealtimeClient — 重连纪律', () => {
     client.dispose();
   });
 });
+
+/**
+ * M5：服务端 `new_share_ops`（共享清单有动静）。
+ *
+ * 这一层只做一件事 —— **形状合格就把 `shareId` 与 `latestSeq` 原样交给宿主**。
+ * 要不要去拉、拉到之后响不响都不是这里的事（`@heyta/app-host` 的 `share-signals.ts`）。
+ * 判据按"能不能红"写：合格形状必须收到参数（不是只收到一次），不合格形状必须一次都不叫。
+ */
+describe('createRealtimeClient — new_share_ops', () => {
+  const connect = async (opts: Record<string, unknown>) => {
+    const client = createRealtimeClient({
+      ...BASE_OPTIONS,
+      getToken: () => 't',
+      WebSocketImpl: FakeWebSocket,
+      ...opts,
+    });
+    client.connect();
+    await flush();
+    return { client, ws: FakeWebSocket.instances[0] };
+  };
+
+  it('🔴 合格的信号 ⇒ 把 (shareId, latestSeq) 交给宿主，且**不**串到个人那条 onNewOps', async () => {
+    const seen: Array<[string, number]> = [];
+    let personal = 0;
+    const { client, ws } = await connect({
+      onNewOps: () => {
+        personal += 1;
+      },
+      onNewShareOps: (shareId: string, latestSeq: number) => {
+        seen.push([shareId, latestSeq]);
+      },
+    });
+
+    ws?.emitMessage(JSON.stringify({ type: 'new_share_ops', shareId: 'share-9', latestSeq: 7, timestamp: 1 }));
+    expect(seen).toEqual([['share-9', 7]]);
+    expect(personal, '共享信号不该被当成个人 new_ops 跑一遍全量同步').toBe(0);
+    client.dispose();
+  });
+
+  it('🔴 缺 shareId / latestSeq 不是数 ⇒ 一次都不叫（形状不合格的信号等于没有信号）', async () => {
+    let calls = 0;
+    const { client, ws } = await connect({
+      onNewShareOps: () => {
+        calls += 1;
+      },
+    });
+    expect(() => {
+      ws?.emitMessage(JSON.stringify({ type: 'new_share_ops', latestSeq: 3 }));
+      ws?.emitMessage(JSON.stringify({ type: 'new_share_ops', shareId: 's' }));
+      ws?.emitMessage(JSON.stringify({ type: 'new_share_ops', shareId: 42, latestSeq: 3 }));
+      ws?.emitMessage(JSON.stringify({ type: 'new_share_ops', shareId: 's', latestSeq: '3' }));
+    }).not.toThrow();
+    expect(calls).toBe(0);
+    client.dispose();
+  });
+
+  it('老宿主没传 onNewShareOps ⇒ 收到该类型静默忽略，连接与个人通道照旧', async () => {
+    let personal = 0;
+    const { client, ws } = await connect({
+      onNewOps: () => {
+        personal += 1;
+      },
+    });
+    expect(() => {
+      ws?.emitMessage(JSON.stringify({ type: 'new_share_ops', shareId: 's', latestSeq: 1 }));
+    }).not.toThrow();
+    ws?.emitMessage(JSON.stringify({ type: 'new_ops', latestSeq: 2 }));
+    expect(personal).toBe(1);
+    client.dispose();
+  });
+
+  it('宿主回调抛错 ⇒ 不掀连接（与 onNewOps 同一条契约）', async () => {
+    const { client, ws } = await connect({
+      onNewShareOps: () => {
+        throw new Error('宿主那边挂了');
+      },
+    });
+    expect(() => {
+      ws?.emitMessage(JSON.stringify({ type: 'new_share_ops', shareId: 's', latestSeq: 1 }));
+    }).not.toThrow();
+    // 连接还在：下一条消息仍然进得来（ dispose 之前实例没换）。
+    expect(() => {
+      ws?.emitMessage(JSON.stringify({ type: 'new_share_ops', shareId: 's', latestSeq: 2 }));
+    }).not.toThrow();
+    client.dispose();
+  });
+});

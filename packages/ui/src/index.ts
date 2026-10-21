@@ -256,6 +256,7 @@ export {
 } from './sync/NotificationPrefsPanel.js';
 export {
   DEFAULT_NOTIFICATION_PREFS,
+  selectNotifiedActivities,
   type ShareActivityKind,
   type ShareNotificationPrefs,
   type TaskReminderScope,

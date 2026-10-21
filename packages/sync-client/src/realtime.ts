@@ -120,8 +120,16 @@ export interface RealtimeClientOptions {
   authTransport?: 'bearer' | 'cookie';
   /** 本设备 clientId（与服务端 `isValidClientId` 的口径一致）。 */
   clientId: string;
-  /** 收到"有新 op"信号时调用，参数是服务端当前的 `latestSeq`。宿主据此触发一次同步。 */
+  /** 收到"有新 op"信号时调用，参数是服务端的 `latestSeq`。宿主据此触发一次同步。 */
   onNewOps: (latestSeq: number) => void;
+  /**
+   * 收到"某份共享清单有新 op"时调用（服务端 `new_share_ops`，ADR-0062 决策 7）。
+   *
+   * 参数只有 `shareId` 与服务端那一份的 `latestSeq` —— **没有内容**：服务端看不到明文，
+   * 这条信号也不该看到。要不要真去拉、拉到之后响不响，都不在这里判（那是宿主的事）。
+   * 可选：老宿主不传就等于没接，连接与个人同步不受影响。
+   */
+  onNewShareOps?: (shareId: string, latestSeq: number) => void;
 
   /** WebSocket 实现。默认 `globalThis.WebSocket`。测试注入假实现。 */
   WebSocketImpl?: WebSocketFactory;
@@ -231,6 +239,7 @@ class RealtimeClientImpl implements RealtimeClient {
   private readonly authTransport: 'bearer' | 'cookie';
   private readonly clientId: string;
   private readonly onNewOps: (latestSeq: number) => void;
+  private readonly onNewShareOps: ((shareId: string, latestSeq: number) => void) | undefined;
   private readonly WebSocketImpl: WebSocketFactory | undefined;
   private readonly initialBackoffMs: number;
   private readonly maxBackoffMs: number;
@@ -259,6 +268,7 @@ class RealtimeClientImpl implements RealtimeClient {
     this.authTransport = options.authTransport ?? 'bearer';
     this.clientId = options.clientId;
     this.onNewOps = options.onNewOps;
+    this.onNewShareOps = options.onNewShareOps;
     this.WebSocketImpl = options.WebSocketImpl;
     this.initialBackoffMs = options.initialBackoffMs ?? DEFAULT_INITIAL_BACKOFF_MS;
     this.maxBackoffMs = options.maxBackoffMs ?? DEFAULT_MAX_BACKOFF_MS;
@@ -437,10 +447,23 @@ class RealtimeClientImpl implements RealtimeClient {
     }
     if (typeof parsed !== 'object' || parsed === null) return;
 
-    const message = parsed as { type?: unknown; latestSeq?: unknown };
+    const message = parsed as { type?: unknown; latestSeq?: unknown; shareId?: unknown };
 
     if (message.type === 'connected') {
       onConnected();
+      return;
+    }
+    if (message.type === 'new_share_ops') {
+      // 共享信号（ADR-0062 决策 7）带的只有 `shareId` 与那一份的 `latestSeq`：
+      // 服务端看不到明文，所以它也只能报"哪一份动过"。要不要去拉、拉到之后响不响，
+      // 都由宿主判 —— 这一层只负责把形状合格的信号原样交出去。
+      if (typeof message.latestSeq !== 'number' || typeof message.shareId !== 'string') return;
+      if (this.onNewShareOps === undefined) return;
+      try {
+        this.onNewShareOps(message.shareId, message.latestSeq);
+      } catch {
+        // 与 `onNewOps` 同一条：宿主回调抛错不能掀掉连接。
+      }
       return;
     }
     // presence_state / presence_cmd 及任何未知类型：静默忽略。

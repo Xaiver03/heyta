@@ -186,6 +186,12 @@ export interface RealtimeWiringOptions {
   authTransport?: 'bearer' | 'cookie';
   /** 收到"有新 op"时调用（宿主据此触发一次普通同步）。参数是服务端的 `latestSeq`。 */
   onNewOps: (latestSeq: number) => void;
+  /**
+   * 收到"某份共享清单有新 op"时调用（`new_share_ops`，ADR-0062 决策 7）。
+   * 参数是 `shareId` 与该 share 的 `latestSeq`。可选 —— 不传就是没接，
+   * 个人同步不受影响。
+   */
+  onNewShareOps?: (shareId: string, latestSeq: number) => void;
   /** WebSocket 实现。默认 `globalThis.WebSocket`；原生宿主用它注入平台能力。 */
   WebSocketImpl?: WebSocketFactory;
 }
@@ -207,6 +213,7 @@ export function createHostRealtimeClient(options: RealtimeWiringOptions): Realti
     ...(options.authTransport !== undefined ? { authTransport: options.authTransport } : {}),
     clientId: options.engine.getClientId(),
     onNewOps: options.onNewOps,
+    ...(options.onNewShareOps === undefined ? {} : { onNewShareOps: options.onNewShareOps }),
     ...(options.WebSocketImpl !== undefined ? { WebSocketImpl: options.WebSocketImpl } : {}),
   });
 }
