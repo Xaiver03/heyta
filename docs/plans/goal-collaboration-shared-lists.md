@@ -790,7 +790,11 @@ E 勾选后不切实心→1 红；F 主按钮文字配对坏→1 红。还原后
 
 ## 2026-10-22 交接·四（M5 已上线；任务书第 2 步只剩四端重装那一格，卡在设备面）
 
-### 落地的五笔（判据：`git log --oneline -5`；远端对账 `git rev-list --left-right --count refs/remotes/origin/main...main` 现量 `0 0`）
+### 落地的这些笔（**数目不钉在这里，会漂**；逐笔现量用 `git show --stat <sha>`）
+
+> ⚠️ 别用 `git log --grep '协作'` 当这张表的全集 —— 实测它**抓不到** subject 里没有"协作"二字的 `15ac92f2c fix(收尾装置)` 与 `9fdd2db28 docs(路线图)`，
+> 却会**多抓**一笔 ¥12 档的台账（`04fe42898`，正文里出现过那个词）。按 subject 关键词取集合 = 两头都错。
+> 远端对账判据：`git rev-list --left-right --count refs/remotes/origin/main...main`（2026-10-22 01:00 现量 `0 0`）。
 
 | 笔 | 内容 |
 |---|---|
@@ -799,6 +803,7 @@ E 勾选后不切实心→1 红；F 主按钮文字配对坏→1 红。还原后
 | `test(协作·M5)` | `verify:collab-sync` 第 11 步（真 WS 扇出 + 真宿主 + 作者那一台零活动） |
 | `docs(协作·M5)` | 计划 §9.1/§9.3/§9.10、progress-log 删两条过期抄件、traps #519–#521 |
 | `fix(收尾装置)` | `reinstall-all.sh` 两行 `$VAR（` 补花括号（本仓门禁自己的处方；提交信息里带了一条**否证**：本机 bash 3.2 下两种写法输出逐字相同，所以这格修的是"门禁红"不是"已发生的丢值"） |
+| `docs(路线图)`（同日晚间，`9fdd2db28`） | `roadmap.md` 那节 W4 残余与"尚未 push"两句都被现量否证 ⇒ 改口（评论那一米已接上 = 宿主 `share-comments.ts` + `apps/web` 挂载 + `verify:collab-sync` `steps=11`；push 状态换成一条**可复跑**的 `git rev-list` 判据而不是一句当时的话） |
 
 ### 第 2 步的门禁读数（都是 2026-10-21 深夜在本棵树上现量）
 
@@ -807,6 +812,19 @@ E 勾选后不切实心→1 红；F 主按钮文字配对坏→1 红。还原后
 
 `pnpm check` 那一条 `&&` 链**现量 122 段**（分母现取：`node -e 'console.log(require("./package.json").scripts.check.split(" && ").length)'`），
 它在第 21 段 fail-fast，所以"这条链红"不等于"后面都红"——把第 21 段之后的 101 段逐段单跑，红四格，**逐格归因**：
+> 🔁 **2026-10-22 01:0x 复量**（本线那笔路线图改口落进 `main` 之后又跑了一遍这四格）：**归属一格没变**。
+> 现量：`check:selection-single-source` / `check:image-license` / `check:text-color` 各 rc=1；
+> 前两格的输入文件（`apps/web/src/features/subscription/RenewPanel.tsx`、`apps/mobile/src/screens/RenewSection.tsx`、
+> `server/package.json`、`server/package-lock.json`）对 HEAD **干净** ⇒ 是**已入库的别线状态**，不是谁在飞；
+> `check:text-color` 那一枚 `packages/ui/src/ai/AiGeneratedLabel.tsx` 仍 `M`（AI 线在写）。
+> 本线不代改、不放宽，也不把它们算成自己的边界。
+> ⚠️ **第四格 `check:ai-e2e` 这一趟的复量没有取到，且拿不到**：起跑时它的 preflight 回「✅ 4318 / 4319 都是空的」，
+> 我就当这台机没人 —— **那是把"端口空"读成"独占"，同一族的在册教训见 §7 #329**（名字里带 lock 的装置只承诺"等"，不承诺"占"）。
+> 跑到第 69 行时 `ps` 现量到并行线正在跑 `scripts/verify-mobile-ios-renew-sellable.sh`（两枚 PID，44 秒 / 1 秒）⇒
+> 这一发的红（`account-email-change-and-sessions`、`admin-console` 两组，单发 17s 上下的**超时形状**）**不可归因**，
+> 我按"不作证据"处理：停掉自己那一发、没有把它写成读数，也没据此改动任何判据。停完复量族谱：登记过的 7 枚 PID 全 `GONE`、4318/4319 无监听（这次 `TaskStop` 确实把子树带走了，不是只退包装 —— 但仍要这样复验）。
+> ⇒ **下一位要取这一格，先 `ps -eo pid,etime,command | grep -E 'verify-mobile|reinstall-all|playwright'` 确认没人**，
+> 别只看 preflight 那句端口空。
 
 | 段 | 形状 | 归属与依据 |
 |---|---|---|
@@ -833,6 +851,12 @@ E 勾选后不切实心→1 红；F 主按钮文字配对坏→1 红。还原后
    按 §6.1.1 那条「缺一端设备就别装其余三端（四端不同代比整轮没跑更难收拾）」，**没有**用 `--only` 先装 mac/windows/ios 三端。
 3. 复量时还多了一条会自己消的：`❌ 负载 37 > 12`（同一趟早些时候主检出处是 7.95 —— 那 37 里有我这趟建载体与并发验收造成的份额）。
    **负载这一格按"等几分钟"排队，不登记成阻塞**（见记忆里那条"窗口按分钟级开合"）。
+   ⇒ **它确实自己消了**：2026-10-22 01:00 复量同一道裁判回 `✅ 负载 6 ≤ 12`。**这一格不是阻塞，别为它等人**；
+   现在只剩上面第 2 格（设备面）一项前置不成立，裁判仍 exit 3。
+4. 复量时载体那一条换了形状：裁判报「载体停在 `5ab3dbff3`，主检出 HEAD 是更新的笔 —— 落后 2 个提交 / 超前 0 个，
+   但**打包输入面逐字相同**（全仓差 5 个文件，都在非输入面：docs/research/台账）⇒ 产物同形，本腿判绿」。
+   ⇒ 记下来免得下一位照旧话先 `checkout` 一遍：**载体不要求逐提交追平，只要求打包输入面一致**；
+   真正要追平的判据是 `git diff --name-only <载体sha> <main sha>` 里有没有 `apps/ packages/ server/ e2e/` 这些输入面路径。
 
 其余现场读数（同一趟）：没有别的 `reinstall-all` 在跑；没有 `verify-mobile-*` 在跑；`notarytool` 空；
 已启动模拟器**恰好一台** `heyta-iphone-17pro`；`ssh windows-pc` 回 `SSHECHO=OK`；数据卷余量 68Gi。
