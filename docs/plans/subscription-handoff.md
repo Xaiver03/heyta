@@ -321,7 +321,7 @@ AI 文件 import `@heyta/i18n`，所以 **`packages/i18n` 必须同一个提交*
   ⇒ **10-22 01:1x 补跑完**：真登录那一趟走到 409 并取到像素，腿固化成 `pnpm verify:mobile-ios-renew-sellable`（见 §10.9）。
   iOS 侧这一格**没有欠项了**；剩下的是 Android 侧一张都没有（出包与真机走 `windows-pc`，不在本机跑 Gradle）。
 - **产品/文案**：三枚"真会到达但没映射"的失败码要人话句子（`CHECKOUT_FAILED`／`PRICE_NOT_EFFECTIVE`／`PROVIDER_CURRENCY_UNSUPPORTED`，形状与依据都在 §10.2 那一格）——**本线不代写**，因为那三句是对用户陈述钱的状态。
-- **负责人**：gitee 那四条出路选一条（甲／乙／丙／丁，全文与体积账在 `BLOCKED.md` 的 **B243 追记三 ⑧**；下一格只写今天这条路被拒的读数）。
+- **负责人**：gitee 那四条出路选一条（甲／乙／丙／丁，全文与体积账在 `BLOCKED.md` 的 **B243 追记三 ⑧**；今天这条路被拒的逐字读数、以及"配额只会越来越紧"那句被现量否证，在 **B243 追记四**）。
 - ⚠️ **两枚远端现在不对称**（不是本线的事，但会影响"以哪枚为准"）：`gitee` 从今天起收不进任何 push
   —— 它的仓库体积过了自家 1024MB 配额。`origin`（GitHub）是**当前**的那一枚。
   现量：`git fetch gitee main && git fetch origin main`，两枚 SHA **一枚一条命令**取（`git rev-parse --short gitee/main` 回 `0da2185e4`、`git rev-parse --short origin/main` 回 `c6c7ed8a1`，19:1x）。
