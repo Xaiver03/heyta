@@ -876,6 +876,20 @@ CARRIER=$HOME/heyta-carriers/heyta-wt-collab-m5 bash research/tools/b-reinstall-
 ⚠️ 点火前若 main 已经前进，先把载体追平（`git -C <载体> checkout --detach <main sha>`）；
 `pnpm-lock.yaml` 的 sha256 逐字相同就可以直接沿用载体里那份 `node_modules`（不同就别软链过来，让它自己装）。
 
+### 🔴 停止点 ①（PIPL 同意面视觉）—— 这一条的前提**已被源码与判据否证，不该再拿去问负责人**
+
+任务书与交接·三都写着「主按钮『确认共享』无视觉强调、『不再询问』勾选无可见位（词条存在但视觉层级待追认）」。
+2026-10-22 01:2x 现量三处，那句**不成立**（它是 2026-10-11 视觉层级定稿**之前**那张 02 号图的形状）：
+
+| 层 | 现量 |
+|---|---|
+| 组件 | `packages/ui/src/sync/ShareConsentModal.tsx`：确认那颗是实心 `color.primary`（`styles.primary` + `primaryPressed`），取消走 `ghost` 文字按钮；勾选框有 `size.checkbox` 的方框、选中态实色 + `Check` 图标，`aria-checked` 与图标同时携带状态 |
+| 常驻判据 | `apps/web/tests/share-consent-modal-theme.spec.tsx` 当场跑 ⇒ **8 passed / rc=0**。它不吃快照：拿 RNW 挂在节点上的**原子类**去样式表里取那枚 `background-color`（文件头记着第一版按 `classList` 顺序扫会先撞上复位基底类、六条全红的教训），亮色档与暗色档各一组；其中一枚的用例标题写着它防的是哪一版（把样式整块删回去 = 2026-10-11 之前那一版 ⇒ 这条该红）。⚠️ **那是在册的失法说明，不是我这一趟执行过的变异臂** —— 本轮只跑了"它现在过"这一臂 |
+| 运行时腿 | `e2e/tests/collab-journey.spec.ts` 在真浏览器里取两颗按钮的底色与主蓝比对（`bg('share-consent-accept')`）—— 今天这一趟 `verify:collab-journey` 回 `RESULT=OK steps=3`，就是这条腿过了 |
+
+⇒ 这一格**不再是待追认**：能做的那半早已落地且有牙。留给负责人的只剩一句**口味级确认**（"就按现在这版"），
+不该再让他去修一个不存在缺陷。②（owner 转让语义）仍是待追认，那格是真的没人在语义层点过头。
+
 ### 下一步
 
 计划 §9.10 末节：**M2**（共享任务/清单的写路径路由 —— 要先立一份新 ADR），其后 M4 → M6。
