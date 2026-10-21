@@ -963,6 +963,26 @@ main 在推送之后又被别线推进（`git rev-parse --short HEAD` 现量，�
 「不代公开别人只在本地的笔」这条红线在前的授权是**按次**的（上一趟"整条 main 推"不自动覆盖这一趟），所以本线**停在这里**：
 本地那几枚安全、可复核、可回退，等负责人一句话就推（推之前重复量同一行命令，确认领先集形状没再变）。
 
+### 第 2 步的门禁链：在**一枚干净提交**上把 122 段逐段量完（先前那趟是在 195 枚在途改动的工作树上读的，归不到提交）
+
+主检出此刻有 **195 枚在途改动**（现量 `git status --porcelain | grep -v '^??' | wc -l`，全是别线在写的），所以"在那棵树上跑链"拿到的红**分不清是提交还是半成品**。改成在隔离载体（追平到 `c1e26febc`、工作树干净、`pnpm-lock.yaml` sha 与主检出逐字相同）上跑：
+
+| 段 | 读数 |
+|---|---|
+| `pnpm -r typecheck` | **rc=0**（20 个包打了 typecheck 段） |
+| `pnpm -r --no-bail test` | **rc=0**、**14180 条用例 0 失败**；对数闭合：**有 test 脚本的包 21 == 打 `Tests` 汇总行的包 21**（`comm -23` 取差集为空）。⚠️ 先前那趟"沙箱跑不了 prisma generate ⇒ `--filter '!@heyta/sync-server'"` 分母只有 20"那道边界**这一趟不成立** —— 载体里 prisma client 已生成，`server` 自己也跑了 |
+| `pnpm check`（122 段，`&&` 链，第 22 段短路） | 逐段续跑 23–122（把链按 `&&` 切开逐条 `sh -c`、只剔 `check:ai-e2e`）⇒ **120 段绿、2 段真红、4 段是载体特有** |
+
+🔴 **两枚真红都不是本线的，且各自门里就写着修法**（本线不代改别线判据）：
+
+- **第 22 段 `check:selection-single-source`** —— ¥12 档：`apps/web/src/features/subscription/RenewPanel.tsx` 与 `apps/mobile/src/screens/RenewSection.tsx` 各有一处本地 `…Id` `useState`（`tierId`）没做语义登记。门自己给的两条出路：要么它判的是"当前看的是哪一条"⇒ 那是第二个选中所有者，改用 `@heyta/app-host` 的 selection；要么属五类瞬态之一 ⇒ 进 `ROW_ID_EXEMPT` 登记一行并写明哪一类。
+- **第 45 段 `check:image-license`** —— 自托管线：`server/package-lock.json` 与在册快照的 `packageLockSha256` 分家。门自己分两种情形并给了对应命令（只有锁变了 ⇒ 重跑 `node research/tools/gen-image-npm-tree.mjs`；装法变了 ⇒ 得重新生成锁再更新 `IMAGE_ONLY_PACKAGES`）。**这一枚在主检出上复现同 rc=1，且那两份文件都没在途改动** ⇒ 是提交态的既有红，不是谁写一半。
+
+**四枚"红"是载体的形状，不是产品的形状**（逐枚拿回主检出重量，全 rc=0）：`check:licenses`、`check:privacy-consent-e2e`、`check:landing-e2e` 红在**载体的 `e2e` 独立工作区没装**（门的原文就是"node_modules missing"，它拒绝少算所以不出数），`check:vault-diagnostics` 同样只在载体里红。
+⇒ 记一条给下一位：**这枚载体要当全链裁判用，得先 `cd e2e && pnpm install`**（`pnpm reinstall:all` 不读那棵树，所以重装那一趟不受它影响）。
+
+`check:ai-e2e` 那一枚仍按上面那格的有界分母入账（82/395 行、红全在别线 6 枚 spec、本线 spec 未进分母），不重复跑。
+
 ### 下一步
 计划 §9.10 末节：**M2**（共享任务/清单的写路径路由 —— 要先立一份新 ADR），其后 M4 → M6。
 🔴 **排在 M2 之前先做 §6 B-10**（转让接收方的密钥资格门）：那是一条**已经能走到的**产品路径上的正确性格子
