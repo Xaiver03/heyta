@@ -231,6 +231,12 @@ AI 文件 import `@heyta/i18n`，所以 **`packages/i18n` 必须同一个提交*
    [`docs/plans/product-ux-optimization.md`](product-ux-optimization.md) 的设备腿台账；
    ⚠️ 启动必须带 `HEYTA_NO_FOCUS=1`，不许抢前台）。归我方，工作量在设备那条腿而不是代码。
    ⚠️ 现量（为什么不能拿手边那张旧图交差）：`grep -c "renew-tier-hostedAi" apps/mobile/ios/build/Build/Products/Release-iphonesimulator/Heyta.app/main.jsbundle` 回 **0** —— 那枚 10-20 的包**里根本没有档位选择**，用它拍图就是拿旧产物冒充当前产物。
+   🔧 **这一腿的前置比看上去小，四项都已现量**（写给下一个接手的人，省得重新推）：
+   ① **不需要先造一笔存量订阅** —— 那块整块的唯一渲染闸门是"同意出境"（现量 `grep -n "networkAllowed()) return null" apps/mobile/src/screens/RenewSection.tsx`），所以只要登录进去 + 同意出境就画得出来；
+   ② 挂载点在 Profile 那一屏（现量 `grep -n "<RenewSection" apps/mobile/src/screens/ProfileScreen.tsx`），滚到权益那块下面就是；
+   ③ iOS 那条腿**不走 Android 的 uiautomator**，走 `scripts/tools/ios-ax-shim.py`（现量 `grep -n "IS_AX_SHIM" scripts/verify-mobile-ios.sh`），preflight 照 `scripts/verify-mobile-ios.sh` 抄；
+   ④ 那枚装置开头有一道**新鲜度门**：产物 bundle 的 mtime 必须 ≥ 最新源码 mtime，否则判红（现量 `grep -n "BUNDLE_MTIME" scripts/verify-mobile-ios.sh`）⇒ **先 `pnpm build:ios` 再拍**，别拿旧包凑。
+   ⚠️ 若为这件事新写一枚验收脚本，它**必须有载具**（进 `pnpm check` 链或进四名册），否则 `check:gate-wiring` 判它是孤儿门 —— 设备腿进不了链，那就得同时决定它进哪本名册，别写完就丢。
 8. **未同意出境时，被本机闸门拦下的读请求在界面上写成"没能加载"** —— 归 UX 线，本线只登记不代改。
    证据是一对**只差一个变量**的图（同一套件的 `accepted` 与 `local-only` 两条用例）：
    `apps/web/evidence/renew-panel-no-channel.png` 里通行密钥那块是正常的空态「这个账号还没有注册通行密钥。」，
