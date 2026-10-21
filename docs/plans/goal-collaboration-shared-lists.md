@@ -787,3 +787,60 @@ E 勾选后不切实心→1 红；F 主按钮文字配对坏→1 红。还原后
 `check:ui-language` / `check:rn-aria` / `check:tokens` 各 rc=0；`packages/ui` 665 全过；
 `apps/web` 本线两份用例 18 全过（同意面 8 + 密钥信封 10）；
 `apps/landing` 1409 全过 —— 也就是 `a923f7fa` 欠的那枚页头对账锚点**没有被别人刚改的窄屏导航碰坏**。
+
+## 2026-10-22 交接·四（M5 已上线；任务书第 2 步只剩四端重装那一格，卡在设备面）
+
+### 落地的五笔（判据：`git log --oneline -5`；远端对账 `git rev-list --left-right --count refs/remotes/origin/main...main` 现量 `0 0`）
+
+| 笔 | 内容 |
+|---|---|
+| `feat(协作·M5-ab)` | `sync-client` 认下 `new_share_ops` + `app-host/share-signals.ts`（信号→拉一次→判该不该吵，四条纪律）+ `sync-wiring` 的可选 `onNewShareOps` + `ui` 的 `selectNotifiedActivities` |
+| `feat(协作·M5-c)` | web 接线：根组件注册消费者、评论区**撤掉每 5 秒兜底轮询**、通知按偏好投；两枚 locale 各只落 `common.share.activity.*` 两行 |
+| `test(协作·M5)` | `verify:collab-sync` 第 11 步（真 WS 扇出 + 真宿主 + 作者那一台零活动） |
+| `docs(协作·M5)` | 计划 §9.1/§9.3/§9.10、progress-log 删两条过期抄件、traps #519–#521 |
+| `fix(收尾装置)` | `reinstall-all.sh` 两行 `$VAR（` 补花括号（本仓门禁自己的处方；提交信息里带了一条**否证**：本机 bash 3.2 下两种写法输出逐字相同，所以这格修的是"门禁红"不是"已发生的丢值"） |
+
+### 第 2 步的门禁读数（都是 2026-10-21 深夜在本棵树上现量）
+
+`pnpm -r typecheck` rc=0；`pnpm --filter '!@heyta/sync-server' -r test` rc=0（分母对账：有 `test` 脚本的包数 == 打 `Tests` 汇总行的包数）；
+`pnpm -r build` rc=0；`pnpm verify:collab-sync` ⇒ `RESULT=OK steps=11` rc=0；`pnpm verify:collab-journey` ⇒ `RESULT=OK steps=3` rc=0。
+
+`pnpm check` 那一条 `&&` 链**现量 122 段**（分母现取：`node -e 'console.log(require("./package.json").scripts.check.split(" && ").length)'`），
+它在第 21 段 fail-fast，所以"这条链红"不等于"后面都红"——把第 21 段之后的 101 段逐段单跑，红四格，**逐格归因**：
+
+| 段 | 形状 | 归属与依据 |
+|---|---|---|
+| `check:selection-single-source` | 断言 G 命中 `RenewPanel.tsx` / `RenewSection.tsx` 的 `tierId` | ¥12 档线；两枚文件对 HEAD 干净，本线一个字节没碰 |
+| `check:image-license` | 镜像 npm 树快照三处失真 | **HEAD 内部**：快照末笔 `d0bd83b36`（10-17）晚于 `server/package-lock.json` 末笔 `7281d1388`（10-19），两枚工作树都干净 ⇒ 门自己给的情形 ②，修法要点 `pnpm verify:selfhost-stack`（打镜像），归自托管分发线 |
+| `check:text-color` | `packages/ui/src/ai/AiGeneratedLabel.tsx:81` | AI 线**正在写**（`git status` 该文件 `M`）⇒ 别人的在飞 hunk，登记不代改 |
+| `check:ai-e2e` | rc=160，脚本自己判「这一轮 **作废**，签名 `net::ERR_CONNECTION_REFUSED`」 | **载体**，不是产品：跑时 4318 拒连；跑后现量 4318/4319 都不在听、当时那枚 PID 已消失 ⇒ 那是本轮自带的临时 dev server。同棵树相邻两段 e2e（`privacy-consent-e2e`、`landing-e2e`）当轮 rc=0，`-r test` 也 rc=0 |
+
+⚠️ 这一趟我自己造了三枚假绿并写成了陷阱 **#522**（分段跑链的装置：`mapfile` 在 bash 3.2 不存在、分界变量没 `export` ⇒ 段表空而循环零次仍退 0；`… | tail -4; echo $?` 读的是 `tail`；改标签时把执行那一行一起替换掉 ⇒ 每格都 rc=0）。
+**改完"能失败的装置"，判据是它能不能红，不是它跑过一次。**
+
+### 🔴 四端重装这一格：**没跑**，整轮被就绪裁判判在门外（不是静默跳过）
+
+`bash research/tools/b-reinstall-readiness.sh`（仓里那道默认 dry-run 的就绪裁判）现量 **exit 3，两条前置不成立**：
+
+1. 「目标树里有 **179 枚未提交的打包输入**」—— 是 AI 线正在写的 `apps/*/src` 与 `packages/*`，装进四端就是别人的半成品。
+   门自己给的解法是 `CARRIER=<干净载体>`（隔离检出从 HEAD 打包）。**本线没有起那枚载体**，理由写清楚：
+   它解掉的只是第一条，而另一条不在我手上 ⇒ 起了也跑不完，且 main 一天推进几十笔，现在钉住的载体到点火那天已经漂了。
+2. 「Android 段目标 `emulator-5554` 不可达；当前 adb 在线设备：一个都没有」—— 本线 AVD 是 `heyta-w3-yearly`，
+   裁判明文「环境准备**不在本脚本里代跑**（起 qemu 会把负载顶上去，别人的 adb 因此超时）」，而 AGENTS §6.1 的新规是**别在这台 Mac 上起模拟器**。
+   ⇒ 这一条**归人**：要么起那台 AVD，要么给一台 adb 可达的设备。
+   按 §6.1.1 那条「缺一端设备就别装其余三端（四端不同代比整轮没跑更难收拾）」，**没有**用 `--only` 先装 mac/windows/ios 三端。
+
+其余现场读数（同一趟）：负载 `7.95`（阈值 12，过）；没有别的 `reinstall-all` 在跑；没有 `verify-mobile-*` 在跑；
+`notarytool` 空；已启动模拟器**恰好一台** `heyta-iphone-17pro`；`ssh windows-pc` 回 `SSHECHO=OK`；数据卷余量 68Gi。
+
+**下一位照这两行点火**（先起 AVD，再让就绪裁判自己点头 —— 它的 `--confirm` 分支只在全绿时才执行）：
+
+```bash
+/opt/homebrew/share/android-commandlinetools/emulator/emulator -avd heyta-w3-yearly -no-snapshot-save >/dev/null 2>&1 &
+IOS_DEVICE_NAME="heyta-iphone-17pro" CARRIER=<干净载体> bash scripts/reinstall-all.sh   # 载体配方见记忆 heyta-reinstall-in-isolated-worktree
+```
+
+### 下一步
+
+计划 §9.10 末节：**M2**（共享任务/清单的写路径路由 —— 要先立一份新 ADR），其后 M4 → M6。
+本线在任务书里的五步只剩上面那一格重装；**Goal 没有自标完成**（关闭要先向产品负责人逐条汇报并请示）。
