@@ -259,7 +259,26 @@ AI 文件 import `@heyta/i18n`，所以 **`packages/i18n` 必须同一个提交*
 | §5 第 2 条「heyta 自己的法务文本」 | 同上，文本已在，待的是复核与生效 |
 | §9.3 第二条「本地凭证已写入借用的 `WX_*`」 | 见 §10.3 第 5 格：通路已换，值还在盘上 |
 
-### 10.5 本轮之后剩下的动作（按谁能做分）
+### 10.5 「今天卖不出去」这句话在仓里有几种形状（本轮改了两处，其余**刻意**留着）
+
+⚠️ 这一类**没有任何门禁会红**：`check:pricing` 与 `check:ai-quota` 钉的是**数字与键**
+（价目、`grants`、额度），不钉散文里的通道名与"能不能买"。现量：
+`grep -rl "WECHAT_PAY_ENABLED" scripts research/tools` 只回 **1** 枚（`scripts/check-payment-entry.mjs`，
+它读的是 compose，不是这些文档）。⇒ **同一个结论被抄成几句句子时，每句都要各自维护。**
+
+| 落点 | 本轮怎么处理 | 为什么 |
+|---|---|---|
+| `docs/reference/pricing-and-entitlements.md` §1 那三行「现在能买吗」 | ✅ **已改口**：从「🔴 还不能」改成「代码侧已通，卡在这台实例的**部署态**」（¥5 一件、¥12 两件），并删掉「客户端还没有付款按钮」——那句与**同一文件** §5.1 早在 10-05 划掉的内容自相矛盾 | 它是价目与权益的唯一事实源，别人会照它判断"能不能收钱" |
+| 同文件 §5.1 的通道名 | ✅ **已更正**（加了一段 dated 引用，不删原文）：现在注册的是**支付中心**，微信直连**不再注册**（设 `WECHAT_PAY_ENABLED=true` 是启动期硬错误） | 原文讲的是"这条链什么时候通的"，那是历史；通道名是当下 |
+| `docs/plans/launch-blockers.md` 顶部那句「今天什么都还卖不出去」的归因 | ✅ **已改口**：`WECHAT_PAY_ENABLED` → `PAYCENTER_ENABLED`，并补上 ¥12 那一档**叠着的第二件**部署态（`MANAGED_AI_*`） | 那是一份**待办清单**，读它的人要据此决定下一步 |
+| `docs/adr/0026` §里的「`WECHAT_PAY_ENABLED` 未设 ⇒ 只有 noop」、`docs/adr/0053`:158 同形 | ⏸ **不改** | 已接受 ADR 的正文结论不许单方面改（仓规红线）。要变更就新写一份或加勘误节 |
+| `docs/reference/pricing-and-coupons.md` §7 第 20 条、`docs/plans/pricing-coupons-handoff.md`:605 | ⏸ **不改** | 那是**带证据的当时判定**（"此刻库里 0 行"），改它等于重写取证记录；按日期读 |
+| `docs/research/legal-dataflow-server.md`:519 | ⏸ **不改** | 调研快照，标题带日期；`research/` 不是产品文档 |
+| `server/docker-compose.yml` 里那组 `WECHAT_PAY_ENABLED=${…:-false}` | ⚠️ **别顺手删** | 它是**有意保留**的：删掉之后，一个 `.env` 里还留着 `=true` 的运营者会**静默**什么通道都不开，而运维以为自己在收钱。现量 `sed -n '134,150p' server/docker-compose.yml` 那段注释；守它的是 `check:payment-entry` + `check:server-env` |
+
+
+
+### 10.6 本轮之后剩下的动作（按谁能做分）
 
 - **运营/运维**：填 `MANAGED_AI_*`（+ 确认 `PAYCENTER_*`）→ 重建镜像 → 用一次真实小额下单验通路与到账回执；删掉本机旧的 `WX_*`。
 - **法务/负责人**：过一遍 `packages/legal`（含把"这一档仍打不开"按 §10.3 第 1、3 格的前提改掉）。

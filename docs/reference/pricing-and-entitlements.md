@@ -9,6 +9,9 @@
 >
 > 最后核对：2026-10-10（§1 的 `grants` 与 §6 的 `pricing-ssot` 对账、§2 补自动收集那一行、
 > 新增 §2.2 的计费与保留口径；核对方式与门禁读数见 `PROGRESS.md` 的 T6 那一节）。
+> 2026-10-21 再核对：§1 那三行「现在能买吗」与 §5.1 的**通道名**（微信直连已不注册 ⇒ 支付中心）、
+> 以及"客户端还没有付款按钮"这句在 §1 与 §5.1 里**两处说法不一致**的那格（§5.1 早在 10-05 已划掉，
+> §1 的表格没跟上）。改的是这两处，价格与 `grants` 两列一字未动。
 
 ---
 
@@ -17,9 +20,9 @@
 | 档位 | priceId | 币种 | 价格 | 计费方式 | 授予 | 现在能买吗 |
 |---|---|---|---|---|---|---|
 | **开源档**（自建 / 自托管） | — | — | **免费** | 永久，**且不校验** | **除云端 AI 外**的全部能力 | ✅ 可以 |
-| **官方托管 · 大陆** | `hosted-monthly` | CNY | **¥5 / 月** | 按月付，**不自动续费** | `hosting` | 🔴 **还不能**（见 §5.1） |
+| **官方托管 · 大陆** | `hosted-monthly` | CNY | **¥5 / 月** | 按月付，**不自动续费** | `hosting` | ⚠️ **代码侧已通，卡在这台实例的部署态**：没配支付中心凭证时点下去拿到的是 `503 BILLING_PROVIDER_NOT_CONFIGURED`，配好即放行。现量 `grep -n "PAYCENTER_ENABLED" server/docker-compose.yml`；见 §5.1 |
 | **官方托管 · 海外** | `hosted-monthly` | USD | **$5 / 月** | 按月付，**不自动续费** | `hosting` | 🔴 **还不能**（通道未开） |
-| **官方托管 + 云端 AI · 大陆** | `hosted-ai-monthly` | CNY | **¥12 / 月** | 按月付，**不自动续费** | `hosting` + `ai` + `automation` | 🔴 **还不能收款**（这一台没配真实通道、客户端还没有付款按钮，见 §5.1；**不是**交付不了 —— [ADR-0054](../adr/0054-managed-ai-retention-and-selling-preconditions.md) 已解除禁售。⚠️ `automation` 随这一档授予，但**它自己那一格仍未达可交付**，见 §2.2 —— 解除禁售 ≠ 自动收集可用） |
+| **官方托管 + 云端 AI · 大陆** | `hosted-ai-monthly` | CNY | **¥12 / 月** | 按月付，**不自动续费** | `hosting` + `ai` + `automation` | ⚠️ **代码侧已通**（收银台有两枚档位按钮、下单走同一份 `app-host` 接线），卡在**两件部署态**：①没配支付中心凭证 ⇒ `503`；②这一台没配 `MANAGED_AI_*` ⇒ 冻结之前 `409 PRICE_NOT_SELLABLE`（**不是**交付不了 —— [ADR-0054](../adr/0054-managed-ai-retention-and-selling-preconditions.md) 已解除禁售）。⚠️ `automation` 随这一档授予，但**它自己那一格仍未达可交付**，见 §2.2 —— 解除禁售 ≠ 自动收集可用。现量 `grep -n "MANAGED_AI_ENABLED" server/env.example` |
 | **官方托管 + 云端 AI · 海外** | `hosted-ai-monthly` | USD | **$12 / 月** | 按月付，**不自动续费** | `hosting` + `ai` + `automation` | 🔴 **还不能收款**（海外通道未放行，见 §5.2；**不是**交付不了 —— [ADR-0054](../adr/0054-managed-ai-retention-and-selling-preconditions.md) 已解除禁售。`automation` 的边界同上） |
 
 - **恰好两个 SKU，没有第三个。** 门禁断言"恰好 2 个"（`EXPECTED_SKU_COUNT`），
@@ -224,6 +227,12 @@ SKU 与折扣，实现在 `settleOrderPaid`。
 但用户走不到付钱那一步"。详见
 [pricing-and-coupons.md](pricing-and-coupons.md) §7 第 18 条。
 
+> ⚠️ **2026-10-21 更正这一段的通道名**：上面那句讲的是**链的形状**，而**当前注册的那条通道不是微信直连** ——
+> 收单与退款统一走支付中心（`registry.ts` 里那句"微信直连不再注册"：即使设了
+> `WECHAT_PAY_ENABLED=true` 也是**启动期硬错误**，而中心只在 `PAYCENTER_ENABLED=true` 且三项凭证齐全时注册）。
+> 现量：`grep -n "微信直连不再注册" server/src/billing/registry.ts`。
+> 那段历史文字留着是因为它记的是"这条链什么时候通的"，不是"现在走哪条通道"。
+
 **但用户仍然买不成**，卡在两件与这条路由**无关**的事上：
 
 1. 🔴 **这台实例没有配真实支付通道。** 只有 `noop` 时收银台回
@@ -233,7 +242,8 @@ SKU 与折扣，实现在 `settleOrderPaid`。
    ✅ **2026-10-05 已落地**：web 设置页的 `RenewPanel` 与移动壳「我的」页里的
    `RenewSection`（`apps/mobile/src/screens/RenewSection.tsx`，由「我的」页 `ProfileScreen` 渲染）
    走的是 `packages/app-host` **同一份**接线（报价 → 冻结 → 下单 → 拿支付串）。
-   🔴 它**仍然**受上面第 1 条约束：`WECHAT_PAY_ENABLED=false` 时点下去拿到的是那个 503，
+   ✅ **2026-10-21 这一屏有了两枚档位按钮**（¥5 与 ¥12 可分，金额只从服务端报价来）。
+   🔴 它**仍然**受上面第 1 条约束：`PAYCENTER_ENABLED` 不为 `true` 时点下去拿到的是那个 503，
    而 `check:payment-entry` 钉的就是"按钮存在 ⇔ 开关状态"这一对 ——
    所以这不是"点了没反应的立即购买"（那条立场仍然成立，落地页依旧没有购买按钮）。
 
