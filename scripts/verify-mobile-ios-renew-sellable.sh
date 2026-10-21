@@ -24,6 +24,11 @@
 # describe-all/describe-point/tap/button/text/key/key-sequence/swipe）
 # ⇒ 往输入框写值只能走"聚焦 + 键盘输入"（`--type-text`），`--set` 一律 `setRc=2`。
 # 这条是本腿第一版红在半路的真因（不是产品，是桥）。
+#
+# ⚠️ **这一腿判的是"这一档还没配上游 ⇒ 被拒"，它不是"通路坏了"的探测器**：
+#    它断言的那句 `SELLABLE_NEEDLE` 只在**没填 `MANAGED_AI_*` 的实例**上成立。
+#    运营把上游凭据填好之后，同一条命令会走到"下单成功"那一支并判红 ——
+#    **那正是预期的红**，届时这一腿该改成盯住二维码/跳转，而不是把红读成回归。
 
 set -uo pipefail
 
@@ -247,12 +252,12 @@ main() {
   curl -s -m 5 -o /dev/null "${HOST_SERVER}/health" || { bad "服务端没在 ${HOST_SERVER} 上活着"; exit 1; }
   local mail e2ee rc
   mail="$(tr -d '\n' < "$EMAIL_FILE" 2>/dev/null)"; e2ee="$(tr -d '\n' < "$E2EE_FILE" 2>/dev/null)"
-  [ -n "$mail" ] && [ -n "$e2ee" ] || { bad "读不到邮箱或加密口令（$EMAIL_FILE / $E2EE_FILE）"; exit 1; }
+  [ -n "$mail" ] && [ -n "$e2ee" ] || { bad "读不到邮箱或加密口令（$EMAIL_FILE / ${E2EE_FILE}）"; exit 1; }
   echo "════ 移动端「这一档还不能卖」像素腿 ════"
   echo "   设备 $UDID · 服务端 $HOST_SERVER · 账号 $mail"
 
   xcrun simctl terminate "$UDID" "$BUNDLE" 2>/dev/null
-  xcrun simctl launch "$UDID" "$BUNDLE" >/dev/null 2>&1 || { bad "app 起不来（先装 $BUNDLE）"; exit 1; }
+  xcrun simctl launch "$UDID" "$BUNDLE" >/dev/null 2>&1 || { bad "app 起不来（先装 ${BUNDLE}）"; exit 1; }
   sleep 8
   pass_first_launch || { bad "首启那两枚面板没过去 ⇒ 后面看不到续费那块"; exit 1; }
 
