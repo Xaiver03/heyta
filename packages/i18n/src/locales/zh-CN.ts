@@ -2584,7 +2584,7 @@ export const zhCN = {
   'web.subscription.renew.amount': '应付金额 {amount}',
   'web.subscription.renew.validUntil': '这一单在 {time} 之前有效',
   'web.subscription.renew.payLinkLabel': '支付链接',
-  'web.subscription.renew.payHint': '用手机微信打开这个链接就能完成付款。桌面端的二维码渲染还没接入（零新依赖约束），先用链接这条路。',
+  'web.subscription.renew.payHint': '用手机微信打开这个链接就能完成付款。桌面端这里给的是链接，不显示二维码。',
   'web.subscription.renew.copy': '复制链接',
   'web.subscription.renew.copied': '已复制',
   'web.subscription.renew.rejected': '这个码没有生效：{code}',
