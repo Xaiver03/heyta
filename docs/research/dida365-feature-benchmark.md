@@ -139,10 +139,10 @@ heyta 的核心闭环（任务 / 清单 / 标签 / 四象限 / 习惯 / 专注 /
 
 | # | 能力 | 滴答有 | heyta 状态 | 证据 | 缺口 |
 |---|---|---|---|---|---|
-| 6.1 | 清单共享（邀请成员） | ✅ | ✅ | 邀请凭证 + 成员角色 + 所有权转让：服务端 — `server/src/shares/share.routes.ts`；面板 — `packages/ui/src/sync/SharePanel.tsx`；E2EE 入群信封 — `packages/sync-client/src/share-payload-cipher.ts`；真实旅程 — `pnpm verify:collab-journey`（`RESULT=OK steps=3`） | 🔴 **多人并发写同一条任务的写路径路由**是最大未建架构件；评论**已建模但不可达**（`COMMENT` 实体 + `CommentThread`/`comments-model` 由产品体验线 `e6058120` 建好并从 ui barrel 导出，但没有任何宿主挂载它、零写路径，`check:reachability` 就红在这"最后一米"）；指派 / 动态流 UI 未建（见 6.2 / 6.3） |
+| 6.1 | 清单共享（邀请成员） | ✅ | ✅ | 邀请凭证 + 成员角色 + 所有权转让：服务端 — `server/src/shares/share.routes.ts`；面板 — `packages/ui/src/sync/SharePanel.tsx`；E2EE 入群信封 — `packages/sync-client/src/share-payload-cipher.ts`；真实旅程 — `pnpm verify:collab-journey`（`RESULT=OK steps=3`） | 🔴 **多人并发写同一条任务的写路径路由**是最大未建架构件；评论**在 Web 与桌面壳已经通**（宿主侧有写路径、任务详情里真的挂着评论区，反查 `grep -rln "ShareCommentsSection" apps`），**移动端那一节还没挂**；指派与动态流的界面仍未建（见 6.2） |
 | 6.2 | 任务指派 | ✅ | ❌ | 同上 | — |
-| 6.3 | 评论 | ✅ | ❌ | 同上 | — |
-| 6.4 | 多设备同步 | ✅（实时） | 🟡 | 协议完整 — `server/src/sync/sync.routes.ts:108-415`；客户端 — `packages/sync-client/src/client.ts:824,1246`；真实多端验收 — `e2e/multi-end/*` + `pnpm verify:multi-end`；服务端 WS 广播 — `websocket.routes.ts:39` | 🔴 **没有任何客户端用 WebSocket**（`apps/*`、`packages/*` grep = 0）→ **不是实时**，靠拉取 + 自动同步。**这是"服务端做完了、客户端没接"的典型** |
+| 6.3 | 评论 | ✅ | 🟡 | 共享清单里的评论区：组件 — `packages/ui/src/sync/CommentThread.tsx`；宿主写路径与下行 — `packages/app-host/src/share-comments.ts`；挂载 — `apps/web` 的任务详情（反查 `grep -rln "ShareCommentsSection" apps`）；两台设备互相看得见 — `pnpm verify:collab-sync`（`RESULT=OK steps=11`，第 11 步验的是 WS 扇出） | 移动端还没挂这一节；能搬运的目前只有评论那一族（`TASK` 的 op 还没进 share log，那是 M2） |
+| 6.4 | 多设备同步 | ✅（实时） | 🟡 | 协议完整 — `server/src/sync/sync.routes.ts:108-415`；客户端 — `packages/sync-client/src/client.ts:824,1246`；真实多端验收 — `e2e/multi-end/*` + `pnpm verify:multi-end`；服务端 WS 广播 — `websocket.routes.ts:39` | **两条信号都已经有宿主在接**（反查 `grep -rn "createHostRealtimeClient(" apps packages`）：个人那条 `new_ops` → 跑一次普通同步（Web 与移动端各自接上），共享清单那条 `new_share_ops` → 由宿主判断该不该拉、拉到后由 `@heyta/ui` 那条谓词决定要不要吵（2026-10-21 M5，读数见 [collaboration-shared-lists.md](../plans/collaboration-shared-lists.md) §9.10）。留 🟡 的理由只剩一格：**移动端有信号但没有评论区**，且这条链上"装到四端"还没做过（§6.1.1 那一格本轮没跑）|
 | 6.5 | 离线可用 | ✅ | ✅ | dispatch 先落盘再改内存 — `packages/op-log/src/engine.ts:233-246`；web 默认 SQLite-over-OPFS — `apps/web/src/lib/oplog.ts:66-70` | — |
 | 6.6 | 冲突解决 | ✅ | ✅ | 实体级 LWW + 手动选择；服务端冲突类型 — `sync.types.ts:145-149`；web `ConflictDialog.tsx:190`；mobile `ConflictSheet.tsx` | 非 CRDT、非字段级；同一实体的整字段集被一个 op 覆盖（**这是设计选择，不是缺陷** —— 见 [../adr/0008](../adr/0008-vector-clock-limit.md) 系列） |
 | 6.7 | 分享清单为链接 | ✅ | ✅ | owner 生成入群链接（`?shareToken=`），朋友点开直接进加入流程、消费后把 token 摘出地址栏：构造 — `packages/ui/src/sync/share-link.ts`；落点 — `apps/web/src/features/share/join-link.ts` | 落点仅 Web 已接；移动端入群入口未接 |
@@ -348,7 +348,7 @@ heyta 的核心闭环（任务 / 清单 / 标签 / 四象限 / 习惯 / 专注 /
 | P1-13 | **分享面板接收** | 零 |
 | P1-14 | **Web 看板视图** | 零 |
 | P1-15 | **导出 CSV / ICS** | 只有 JSON + Markdown |
-| P1-16 | **客户端接 WebSocket（实时同步）** | 服务端做完了、客户端没接（§3 #10） |
+| P1-16 | **客户端接 WebSocket（实时同步）** | 已闭合：个人那条 `new_ops` 与共享那条 `new_share_ops` 都有宿主在接（反查 `grep -rn "createHostRealtimeClient(" apps packages`；读数在 [collaboration-shared-lists.md](../plans/collaboration-shared-lists.md) §9.10）。这一格原来的说法是"服务端做完了、客户端没接"，那是接线落地**之前**的实测，留在这里只为了指认它的形状：一条链建好之后，仓里所有按旧形状写的句子都得逐处改口 |
 | P1-17 | **NLP 补齐**：时间点 / `#标签` / `~时长` / 清单名 + 移动端入口 | §2.8 #8.1 |
 | P1-18 | **小组件真机验收** | 代码齐、真机 0 项（§3 #13 的另一半） |
 | P1-19 | **桌面端渲染进程换成共享 UI** | 现在是占位（§3 #11） |
