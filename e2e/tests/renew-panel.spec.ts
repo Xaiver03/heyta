@@ -352,3 +352,48 @@ test('服务端按 ④′ 拒降档：屏上说"这一档不含你当前档的�
   // 🔴 §6.2 规定一第 3 条：这一屏不许有任何"未登记的报错"（本用例自己造的那发非 2xx 已逐条登记）。
   assertNoProblems(problems, ['/api/billing/checkout']);
 });
+
+/**
+ * 🔴 闸门 ①′ 的**界面那一半**此前没人钉：服务端有 `PRICE_NOT_SELLABLE`、app-host 有那个码、
+ * 面板里也写了映射，但**没有任何一条判据跑过这一屏** —— 而它恰恰是这台实例**今天真会返回**的那一支
+ * （托管上游还没配）。少这一条，把映射改成 `…fail.unknown`（给用户看裸码）或改成
+ * 「连不上服务端」（替服务端编造原因）都不会让任何用例变红。
+ */
+test('服务端按 ①′ 拒卖（这台实例没配托管上游）：屏上是"这一档现在还不能卖"，不是裸码也不是"连不上服务端"', async ({ page }) => {
+  test.info().annotations.push({ type: '截图', description: 'test-results/renew-panel-not-sellable.png' });
+  const problems = captureProblems(page);
+  await openSettings(page);
+
+  let sentBody = '';
+  await page.route(`${SERVER}/api/billing/checkout**`, async (route) => {
+    sentBody = String(route.request().postData());
+    await route.fulfill({
+      status: 409,
+      contentType: 'application/json',
+      body: JSON.stringify({ code: 'PRICE_NOT_SELLABLE', message: 'PRICE_NOT_SELLABLE' }),
+    });
+  });
+
+  // 必须真的点的是**含云端 AI 的那一档** —— 闸门 ①′ 只对这一档触发，
+  // 拿默认那一档去跑，这条用例就是在证别的事。
+  await page.getByTestId('renew-tier-hostedAi').click();
+  await page.getByTestId('renew-place-order').click();
+
+  expect(sentBody).toContain('hosted-ai-monthly');
+
+  const failure = page.getByTestId('renew-failure');
+  await expect(failure).toBeVisible();
+  await expect(failure).toHaveText('这一档现在还不能卖，服务端拒绝了这笔下单。');
+  // 裸机器码不许出现在屏幕上（那是把服务端内部标识当文案）。
+  await expect(failure).not.toContainText('PRICE_NOT_SELLABLE');
+  // 也不许替服务端编造原因：这台实例是"没配上游"，不是"连不上"。
+  await expect(failure).not.toContainText('连不上服务端');
+  // 拒卖态下不许留任何付款形状。
+  await expect(page.locator('#renew-pay-url')).toHaveCount(0);
+  await expect(page.getByTestId('renew-order')).toHaveCount(0);
+
+  await page.screenshot({ path: 'test-results/renew-panel-not-sellable.png' });
+
+  // 🔴 §6.2 规定一第 3 条：这一屏不许有任何"未登记的报错"（本用例自己造的那发非 2xx 已逐条登记）。
+  assertNoProblems(problems, ['/api/billing/checkout']);
+});
