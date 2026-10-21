@@ -8,31 +8,37 @@
  * 密码学侧走真实构建产物（`@heyta/sync-core` / `@heyta/sync-client`）。
  *
  * 它与 `verify-collab-sync` 第 8/9 步的分工：那边证明"移除后门关了"（404），
- * 这里证明"移除之后密钥世界也换了"——**移除 → rekey → 历史重加密 → 三面证据**。
+ * 这里证明"移除之后密钥世界也换了"——**移除 → 换钥 → 在册成员收新钥 → 三面证据**。
  *
- * 七步：
- *   1. 两个账号（owner / bob，真实 JWT）。
- *   2. 建共享 → 邀请 → bob 接受 → 信封下发 ⇒ bob 持有 epoch1 清单密钥。
+ * 八步：
+ *   1. 三个账号（owner / bob / carol，真实 JWT）。
+ *   2. 建共享 → 邀请 bob 与 carol → 两人各持 epoch1 清单密钥。
  *   3. 基线：bob 上传 op-1、owner 上传 op-2，bob 下载并读回两条（移除前一切正常）。
- *   4. 🔴 owner 移除 bob ⇒ 上传/下载一律 404（门关了）。
- *   5. owner 下载全部历史 ⇒ `reencryptShareRecord` 逐条迁到 epoch2 ⇒
- *      迁移副本作为**新 op** 上行（真实重加密批次形状）。
- *   6. 🔴 历史对 bob 不可读的**三面证据**：
- *      ① 密码学面：每一条迁移副本，bob 的旧钥解不开、owner 的新钥解得开
- *        （含 bob 自己写的那条——移除后连自己的旧文也换锁）；
- *      ② 存储面：psql 直查 ⇒ 库里**有**迁移副本的密文、也**仍有**旧密文
- *        （迁移是追加新 op，旧行留待压实——诚实模型，不假装消失）；
- *      ③ 访问面：bob 的下载是 404（第 4 步），他连"再下一次试试"都做不到。
- *   7. 🔴 被移除端如实显示：bob 的 GET /shares 出现 removedMemberships。
+ *   4. 🔴 owner 移除 bob —— **走生产函数** `@heyta/app-host` 的 `removeMemberAndRekey`
+ *      （真 `ShareApiClient` + 真 owner 身份 + 内存密钥环）⇒ 库里 `shares.key_epoch` 推进、
+ *      owner 环里那把**换了**、他自己的新信封能解回同一把（换设备也找回得来）。
+ *   5. 🔴 bob 的门关了：上传/下载一律 404，且**他那行的信封当场作废**（库里读）。
+ *   6. 🔴 在册的 carol **收得到新钥**（生产函数 `adoptRotatedShareKey`）并读得到
+ *      换钥之后 owner 写的那条 —— 这一格是"移除不是把所有人都锁外面"的正证。
+ *   7. 🔴 历史对 bob 不可读的三面证据：
+ *      ① 密码学面：epoch2 那条，bob 的旧钥解不开（他手里有密文也没用）；
+ *      ② 存储面：psql 直查 ⇒ 旧密文**仍在**库里（追加模型，不假装消失）；
+ *      ③ 访问面：第 5 步已证他连"再下一次试试"都做不到。
+ *   8. 🔴 被移除端如实显示：bob 的 GET /shares 出现 removedMemberships。
+ *
+ * 🔴 本脚本**不做**历史重加密（把旧 op 逐条迁到新世代）。M3 定的承诺是"旧成员解不开
+ * **新写**的内容"，那条不依赖历史重写；而"迁移副本怎么在追加模型上回放"是 op-log 语义 +
+ * 线协议的事，按计划 §9.6 与 M2/M4 合进同一份 ADR。旧脚本第 5 步那段手搓迁移只是原语演示，
+ * 已随本批移除——它证的不是界面上按下去的那条路。
  *
  * 🔴 边界（不包装）：「WS 已断」这一格**未覆盖**——W2 的移除路由置位
- * `removedAt`，但 WS 连接摘除挂客户端 realtime 接线（被撞车面挡住）；
- * 本脚本没有 WS 客户端可断。接线落地后本脚本补这一格。
+ * `removedAt`，但 WS 连接摘除挂客户端 realtime 接线（那是 M5）；本脚本没有 WS 客户端可断。
+ * 接线落地后本脚本补这一格。
  *
  * 用法：
  *   node scripts/verify-collab-revoke.mjs [--port 3212]
  *
- * 失败退出码 1 并打印 `RESULT=FAIL step=N`；通过打印 `RESULT=OK steps=7`。
+ * 失败退出码 1 并打印 `RESULT=FAIL step=N`；通过打印 `RESULT=OK steps=8`。
  */
 
 import { spawn, spawnSync } from 'node:child_process';
@@ -55,6 +61,8 @@ const PSQL_URL = DB_URL.split('?')[0];
 
 const core = await import(join(ROOT, 'packages/sync-core/dist/index.js'));
 const client = await import(join(ROOT, 'packages/sync-client/dist/index.js'));
+// 🔴 生产路径住在 app-host：换钥那一步必须**由这个包来做**才算"界面上按下去的那条路"。
+const appHost = await import(join(ROOT, 'packages/app-host/dist/index.js'));
 
 let server;
 const cleanup = () => {
@@ -151,7 +159,7 @@ const api = async (method, path, token, body) => {
 const hex = (bytes) => Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 const runId = Date.now();
 
-// ── 1. 两个账号 ────────────────────────────────────────────────────────────
+// ── 1. 三个账号 ────────────────────────────────────────────────────────────
 step = 1;
 const ownerRes = await api('POST', '/api/test/create-user', null, {
   email: `revoke-owner-${runId}@example.test`, password: 'revoke-verify-password',
@@ -159,11 +167,18 @@ const ownerRes = await api('POST', '/api/test/create-user', null, {
 const bobRes = await api('POST', '/api/test/create-user', null, {
   email: `revoke-bob-${runId}@example.test`, password: 'revoke-verify-password',
 });
+// 🔴 第三个成员不是凑数的：第 6 步要证"移除一个人**不是**把所有人都锁外面"，
+// 只有一名在册成员时"重封给在册成员"这一半根本没东西可验。
+const carolRes = await api('POST', '/api/test/create-user', null, {
+  email: `revoke-carol-${runId}@example.test`, password: 'revoke-verify-password',
+});
 if (ownerRes.status !== 201 || !ownerRes.json?.token) fail(`owner 建号失败：${JSON.stringify(ownerRes.json)?.slice(0, 200)}`);
 if (bobRes.status !== 201 || !bobRes.json?.token) fail(`bob 建号失败：${JSON.stringify(bobRes.json)?.slice(0, 200)}`);
+if (carolRes.status !== 201 || !carolRes.json?.token) fail(`carol 建号失败：${JSON.stringify(carolRes.json)?.slice(0, 200)}`);
 const tokenOwner = ownerRes.json.token;
 const tokenBob = bobRes.json.token;
-stepOk('两个账号就绪');
+const tokenCarol = carolRes.json.token;
+stepOk('三个账号就绪');
 
 // ── 2. 建共享 → 邀请 → 接受 → 信封 ─────────────────────────────────────────
 step = 2;
@@ -195,7 +210,32 @@ const bobListKey = await core.openListKeyEnvelope({
   envelope: ownRow.keyEnvelope, recipientX25519SecretKey: bobIdentity.x25519SecretKey,
 });
 if (hex(bobListKey) !== hex(listKeyV1)) fail('bob 解出的清单密钥与 owner 不一致');
-stepOk('共享建立，双方持 epoch1 清单密钥');
+
+// carol 同样入群、同样拿到 epoch1 那把（她是在册的那一位，第 6 步要收新钥）。
+const carolIdentity = core.deriveShareIdentityKeyPair(core.generateShareIdentitySeed());
+const carolInvitation = await api('POST', `/api/shares/${shareId}/invitations`, tokenOwner, {});
+if (carolInvitation.status !== 201 || !carolInvitation.json?.token) fail(`给 carol 发邀请失败：${JSON.stringify(carolInvitation.json)?.slice(0, 200)}`);
+const carolAccepted = await api('POST', '/api/shares/invitations/accept', tokenCarol, {
+  token: carolInvitation.json.token,
+  identityPublicKey: Buffer.from(carolIdentity.x25519PublicKey).toString('base64'),
+});
+if (carolAccepted.status !== 200) fail(`carol 接受邀请失败：${JSON.stringify(carolAccepted.json)?.slice(0, 200)}`);
+const carolMemberId = carolAccepted.json.memberId;
+const carolEnvelope = await core.sealListKeyForRecipient({
+  listKey: listKeyV1, shareId, keyEpoch: 1,
+  recipientX25519PublicKey: carolIdentity.x25519PublicKey,
+});
+const putCarolEnv = await api('PUT', `/api/shares/${shareId}/members/${carolMemberId}/envelope`, tokenOwner, {
+  keyEpoch: 1, keyEnvelope: carolEnvelope,
+});
+if (putCarolEnv.status !== 200) fail(`carol 信封下发失败：${JSON.stringify(putCarolEnv.json)?.slice(0, 200)}`);
+const carolMembersView = await api('GET', `/api/shares/${shareId}/members`, tokenCarol);
+const carolOwnRow = (carolMembersView.json?.members ?? []).find((m) => m.memberId === carolMemberId);
+const carolListKey = await core.openListKeyEnvelope({
+  envelope: carolOwnRow.keyEnvelope, recipientX25519SecretKey: carolIdentity.x25519SecretKey,
+});
+if (hex(carolListKey) !== hex(listKeyV1)) fail('carol 解出的清单密钥与 owner 不一致');
+stepOk('共享建立，bob / carol / owner 三方持 epoch1 清单密钥');
 
 // ── 3. 基线：移除前 bob 正常读写 ────────────────────────────────────────────
 step = 3;
@@ -248,10 +288,71 @@ if (!titles.includes(BOB_TITLE) || !titles.includes(OWNER_TITLE)) {
 }
 stepOk('移除前：双方各一条 op（record 格式），bob 下载并读回原文');
 
-// ── 4. 🔴 owner 移除 bob ⇒ 门关了 ──────────────────────────────────────────
+// ── 4. 🔴 owner 移除 bob —— 走**生产函数**（界面上按下去的那条路）─────────────
+//
+// 这一步以前是手搓的（脚本自己调 `planShareRekey` + 自己 PUT 信封），于是它证的只是
+// "原语能用"。M3 的承诺是关于**那条代码路径**的，所以这里装一个真宿主：
+// 真 `ShareApiClient`（真 HTTP）+ 真 owner 身份 + 一个内存密钥环，
+// 换钥由 `@heyta/app-host` 的 `removeMemberAndRekey` 做——与 web 面板调的是同一个函数。
 step = 4;
-const removeRes = await api('DELETE', `/api/shares/${shareId}/members/${bobMemberId}`, tokenOwner);
-if (removeRes.status !== 200) fail(`移除失败：${JSON.stringify(removeRes.json)?.slice(0, 200)}`);
+const ownerMemberId = created.json.memberId;
+/** 密钥环替身：web 上它是 vault 包裹的 localStorage，这里只要"当前那一把 + 存回去"这个形状。 */
+const makeRing = (memberId, identity, startEpoch, startKey) => {
+  let current = { keyEpoch: startEpoch, listKey: startKey.slice() };
+  return {
+    current: () => current,
+    port: {
+      load: async () => current,
+      save: async (_shareId, next) => { current = { keyEpoch: next.keyEpoch, listKey: next.listKey.slice() }; },
+      ownIdentity: async () => ({
+        memberId,
+        x25519PublicKey: identity.x25519PublicKey,
+        x25519SecretKey: identity.x25519SecretKey,
+      }),
+    },
+  };
+};
+const buildRotation = (token, ring) => appHost.createShareKeyRotation({
+  api: new client.ShareApiClient({ baseUrl: BASE, getToken: () => token }),
+  keys: ring.port,
+  decodeMemberPublicKey: (value) => new Uint8Array(Buffer.from(value, 'base64')),
+  isSignedIn: () => true,
+});
+const ownerRing = makeRing(ownerMemberId, ownerIdentity, 1, listKeyV1);
+const removal = await buildRotation(tokenOwner, ownerRing).removeMemberAndRekey(shareId, bobMemberId);
+if (removal.removed !== true) fail('生产函数没把人移除');
+if (removal.rekeyError !== undefined) fail(`换钥失败：${removal.rekeyError}`);
+const rekeyReading = removal.rekey;
+if (rekeyReading.fromEpoch !== 1 || rekeyReading.toEpoch !== 2) {
+  fail(`世代读数不对：${String(rekeyReading.fromEpoch)} → ${String(rekeyReading.toEpoch)}`);
+}
+// 🔴 收件人 = 移除**之后**仍在册的那两位，且 owner 自己那枚排在最前
+// （那是他换设备后唯一能找回这把钥的通道）。
+if (JSON.stringify(rekeyReading.sealedMemberIds) !== JSON.stringify([ownerMemberId, carolMemberId])) {
+  fail(`新信封收件人不对：${JSON.stringify(rekeyReading.sealedMemberIds)}（应为 owner 在前、carol 在后）`);
+}
+if (JSON.stringify(rekeyReading.failedMemberIds) !== '[]' || JSON.stringify(rekeyReading.skippedMemberIds) !== '[]') {
+  fail(`这一轮不该有失败或跳过：failed=${JSON.stringify(rekeyReading.failedMemberIds)} skipped=${JSON.stringify(rekeyReading.skippedMemberIds)}`);
+}
+if (hex(ownerRing.current().listKey) === hex(listKeyV1)) {
+  fail('换钥之后 owner 环里还是同一把 —— 那"移除"只是改了个数字（§9.1 登记的坏法）');
+}
+if (ownerRing.current().keyEpoch !== 2) fail(`owner 环里的世代没跟上：${String(ownerRing.current().keyEpoch)}`);
+// 真库证据：`shares.key_epoch` 被服务端推进了（不是脚本自己记的数）。
+const epochRow = run('psql', ['-tA', PSQL_URL, '-c', `SELECT key_epoch FROM shares WHERE id = '${shareId}'`]);
+if (!epochRow.ok || epochRow.out.trim() !== '2') fail(`库里 shares.key_epoch 应为 2，实际：${epochRow.out.trim().slice(0, 80)}`);
+// 🔴 owner 自己的新信封确实落在他的行里、且用**他本机没有的那条路**（重新解信封）能取回同一把。
+const ownerMembersView = await api('GET', `/api/shares/${shareId}/members`, tokenOwner);
+const ownerRow = (ownerMembersView.json?.members ?? []).find((m) => m.memberId === ownerMemberId);
+if (ownerRow?.keyEnvelope == null) fail('owner 那一行没有新信封（换设备就找不回这把钥）');
+const reopenedSelf = await core.openListKeyEnvelope({
+  envelope: ownerRow.keyEnvelope, recipientX25519SecretKey: ownerIdentity.x25519SecretKey,
+});
+if (hex(reopenedSelf) !== hex(ownerRing.current().listKey)) fail('owner 自己那枚信封解不出刚换的这把钥');
+stepOk(`生产路径换钥：epoch ${String(rekeyReading.fromEpoch)} → ${String(rekeyReading.toEpoch)}，库里有据，收件人 ${rekeyReading.sealedMemberIds.length} 位`);
+
+// ── 5. 🔴 bob 的门关了：传输面 404 + 他那行的信封当场作废 ─────────────────────
+step = 5;
 const bobRetryWireOp = wireOp(`revoke-bob-op2-${runId}`);
 const bobUpAfter = await api('POST', `/api/shares/${shareId}/ops`, tokenBob, {
   ops: [mkOp(bobRetryWireOp, (await encryptRecord(bobRetryWireOp, '移除后的重试')).ciphertext)],
@@ -259,92 +360,92 @@ const bobUpAfter = await api('POST', `/api/shares/${shareId}/ops`, tokenBob, {
 if (bobUpAfter.status !== 404) fail(`被移除者上传应 404，实际 ${bobUpAfter.status}`);
 const bobDownloadAfter = await api('GET', `/api/shares/${shareId}/ops/causal?after=0`, tokenBob);
 if (bobDownloadAfter.status !== 404) fail(`被移除者下载应 404，实际 ${bobDownloadAfter.status}`);
-stepOk('移除后：bob 上传/下载一律 404');
-
-// ── 5. owner 迁移历史到 epoch2 并作为新 op 上行 ─────────────────────────────
-step = 5;
-const rekey = await core.planShareRekey({
-  shareId, fromEpoch: 1,
-  remainingMemberX25519PublicKeys: [ownerIdentity.x25519PublicKey],
-});
-const ownerDownload = await api('GET', `/api/shares/${shareId}/ops/causal?after=0`, tokenOwner);
-const historyOps = ownerDownload.json.ops;
-if (historyOps.length !== 2) fail(`owner 下载历史应 2 条，实际 ${historyOps.length}`);
-const migrated = [];
-for (let i = 0; i < historyOps.length; i += 1) {
-  const source = historyOps[i];
-  const sourceIdentity = {
-    clientId: source.clientId, actionType: source.actionType, opType: source.opType,
-    entityType: source.entityType, entityId: source.entityId,
-    timestamp: Number(source.clientTimestamp), schemaVersion: source.schemaVersion,
-  };
-  const plaintext = await readRecord(source, listKeyV1);
-  const migratedRecord = await core.reencryptShareRecord({
-    record: { id: source.id, keyEpoch: 1, ciphertext: source.payload },
-    shareId, fromListKey: listKeyV1, toListKey: rekey.newListKey, toEpoch: rekey.toEpoch,
-    identity: sourceIdentity,
-  });
-  // 迁移副本 = 新 op（新 id）+ 迁移身份；**身份单一来源**：上传的线 op 与
-  // 第 6 步的解密对账共用同一个对象。
-  const migrateIdentity = {
-    id: `migrated-${i}-${runId}`, clientId: 'device-A1', actionType: 'migrate history',
-    opType: 'UPD', entityType: source.entityType, entityId: source.entityId,
-    timestamp: Date.now(), schemaVersion: 1,
-  };
-  const rewrapped = await encryptRecord(migrateIdentity, plaintext, rekey.toEpoch, rekey.newListKey);
-  migrated.push({
-    id: migrateIdentity.id, record: rewrapped,
-    sourceCiphertext: source.payload, plaintext,
-    identity: migrateIdentity, sourceIdentity,
-  });
-  const up = await api('POST', `/api/shares/${shareId}/ops`, tokenOwner, {
-    ops: [mkOp(migrateIdentity, rewrapped.ciphertext)],
-  });
-  if (up.status !== 200 || up.json?.accepted?.length !== 1) {
-    fail(`迁移副本上行失败（${migrateIdentity.id}）：${JSON.stringify(up.json)?.slice(0, 200)}`);
-  }
+// 🔴 信封作废这一格是 M3 的另一半：库里还替被踢的人保管着他那把钥，就还不叫收回。
+// 也是"重新邀请会复用同一行"那个坑的堵法——旧信封还在、世代被抬到当前 ⇒
+// 面板以为他密钥已下发，而补封逻辑永远跳过他。
+const bobRowDb = run('psql', ['-tA', PSQL_URL, '-c',
+  `SELECT (key_envelope IS NULL) FROM share_members WHERE id = '${bobMemberId}'`]);
+if (!bobRowDb.ok || bobRowDb.out.trim() !== 't') {
+  fail(`被移除者那行的信封应已作废，库里的读数：${bobRowDb.out.trim().slice(0, 80)}`);
 }
-stepOk('2 条历史全部迁到 epoch2，迁移副本作为新 op 上行');
+stepOk('bob：上传/下载一律 404，且他那行成员的信封在库里已作废');
 
-// ── 6. 🔴 历史对 bob 不可读的三面证据 ────────────────────────────────────────
+// ── 6. 🔴 在册的 carol 收得到新钥，并读得到换钥之后写的内容 ───────────────────
+//
+// 这一格是"移除不是把所有人都锁外面"的正证，也是以前那个手搓版本**没有**的方向：
+// 它只证了旧成员读不到，没证在册成员还读得到。收钥同样走生产函数 `adoptRotatedShareKey`。
 step = 6;
-// ① 密码学面：迁移副本 bob 旧钥解不开、owner 新钥解得开（含 bob 自己写的）。
-const cipherV2 = client.createSharePayloadCipher({ current: { shareId, keyEpoch: rekey.toEpoch, listKey: rekey.newListKey } });
-for (const entry of migrated) {
-  const asRecord = { id: entry.record.id, keyEpoch: rekey.toEpoch, ciphertext: entry.record.ciphertext };
-  let bobStillReads = false;
-  try {
-    // bob 用旧钥 + 他手里的**源行身份**试解（迁移前后身份同源）。
-    await core.decryptShareRecord({ record: asRecord, shareId, listKey: listKeyV1, identity: entry.sourceIdentity });
-    bobStillReads = true;
-  } catch { /* 应当失败 */ }
-  if (bobStillReads) fail(`迁移副本 ${entry.record.id} 竟被 bob 的旧钥解开——rekey 无效`);
-  const ownerReads = new TextDecoder().decode(
-    await core.decryptShareRecord({ record: asRecord, shareId, listKey: rekey.newListKey, identity: entry.identity }),
-  );
-  if (ownerReads !== entry.plaintext) {
-    fail(`迁移副本 ${entry.record.id} owner 新钥读不回原文`);
-  }
+const carolRing = makeRing(carolMemberId, carolIdentity, 1, listKeyV1);
+const adopted = await buildRotation(tokenCarol, carolRing).adoptRotatedShareKey(shareId);
+if (adopted.adopted !== true || adopted.keyEpoch !== 2) fail(`carol 没收到新钥：${JSON.stringify(adopted)}`);
+if (hex(carolRing.current().listKey) !== hex(ownerRing.current().listKey)) {
+  fail('carol 收到的那把与 owner 刚铸的那把不是同一把');
 }
-// ② 存储面：psql 直查——迁移副本在库里（旧密文也仍在：追加模型，不假装消失）。
+
+// owner 用新钥写一条，carol 用收到的那把从**真下载**里读回来。
+const EPOCH2_TITLE = `换钥之后写的任务 ${String(runId)}`;
+const epoch2Identity = {
+  id: `revoke-epoch2-${String(runId)}`, clientId: 'device-shared', actionType: 'add task', opType: 'CRT',
+  entityType: 'TASK', entityId: `revoke-epoch2-${String(runId)}`, timestamp: Date.now(), schemaVersion: 1,
+};
+const epoch2Record = await encryptRecord(epoch2Identity, EPOCH2_TITLE, 2, ownerRing.current().listKey);
+const epoch2Up = await api('POST', `/api/shares/${shareId}/ops`, tokenOwner, {
+  ops: [mkOp(epoch2Identity, epoch2Record.ciphertext)],
+});
+if (epoch2Up.status !== 200 || epoch2Up.json?.accepted?.length !== 1) {
+  fail(`新世代上行失败：${JSON.stringify(epoch2Up.json)?.slice(0, 200)}`);
+}
+const carolApi = new client.ShareApiClient({ baseUrl: BASE, getToken: () => tokenCarol });
+const carolPage = await carolApi.downloadOps(shareId, 0);
+const wireOf = (row) => ({
+  id: row.id, clientId: row.clientId, actionType: row.actionType, opType: row.opType,
+  entityType: row.entityType, entityId: row.entityId,
+  timestamp: Number(row.clientTimestamp), schemaVersion: row.schemaVersion,
+});
+const carolCipher = client.createSharePayloadCipher({
+  current: { shareId, keyEpoch: carolRing.current().keyEpoch, listKey: carolRing.current().listKey },
+  previous: [{ shareId, keyEpoch: 1, listKey: listKeyV1 }],
+});
+const epoch2Row = carolPage.ops.find((op) => op.id === epoch2Identity.id);
+if (epoch2Row === undefined) fail('carol 的下载页里没有那条新世代的 op');
+const epoch2Back = await carolCipher.decrypt(String(epoch2Row.payload), wireOf(epoch2Row));
+if (!epoch2Back.includes(EPOCH2_TITLE)) fail(`carol 读回的正文不对：${epoch2Back.slice(0, 80)}`);
+// 🔴 旧世代也还读得到（环里留着 epoch1 那把）。日志是追加模型，旧密文没消失——
+// 少了这一格就会漏掉"换钥时只留新钥"那种坏法：症状不是少一条，是整个评论区卡死。
+const oldRow = carolPage.ops.find((op) => op.id === bobWireOp.id);
+if (oldRow === undefined) fail('carol 的下载页里没有换钥之前那条');
+const oldBack = await carolCipher.decrypt(String(oldRow.payload), wireOf(oldRow));
+if (!oldBack.includes(BOB_TITLE)) fail(`换钥之后旧世代反而读不到了：${oldBack.slice(0, 80)}`);
+stepOk('carol 走生产函数收到新钥：换钥后写的读得到，换钥前那一代的也读得到');
+
+// ── 7. 🔴 对 bob 不可读的两面证据（密码学面 + 存储面）────────────────────────
+step = 7;
+// ① 密码学面：他手里那份旧钥（epoch1）解不开 epoch2 的载荷——拿到密文也没用。
+let bobStillReads = false;
+try {
+  await core.decryptShareRecord({
+    record: { id: epoch2Record.id, keyEpoch: 2, ciphertext: epoch2Record.ciphertext },
+    shareId, listKey: listKeyV1, identity: epoch2Identity,
+  });
+  bobStillReads = true;
+} catch { /* 应当失败 */ }
+if (bobStillReads) fail('bob 的旧钥竟解得开换钥之后写的内容 —— rekey 无效');
+// ② 存储面：旧密文**仍在**库里。写下来是防止把"移除"演成"历史消失了"——
+//    旧世代只有拿旧钥的人解得开，而那个人已经没有下载通道（第 5 步）。
 const dump = run('psql', ['-tA', PSQL_URL, '-c',
   `SELECT payload::text FROM share_operations WHERE share_id = '${shareId}'`]);
 if (!dump.ok) fail(`搜库失败：${dump.out.slice(-200)}`);
-for (const entry of migrated) {
-  if (!dump.out.includes(entry.record.ciphertext.slice(0, 64))) {
-    fail(`迁移副本 ${entry.record.id} 不在库里`);
-  }
-}
 if (!dump.out.includes(bobRecord.ciphertext.slice(0, 64))) fail('旧密文不在库里——追加模型被破坏');
-// ③ 访问面：第 4 步已证 bob 下载 404——他连"再下一次用旧钥试"都做不到。
-stepOk('三面证据：旧钥解不开迁移副本（含 bob 自己写的）；迁移副本在库；bob 无下载通道');
+if (!dump.out.includes(epoch2Record.ciphertext.slice(0, 64))) fail('新世代那条不在库里');
+// ③ 访问面：第 5 步已证他下载 404——他连"再下一次试试"都做不到。
+stepOk('两面证据：旧钥解不开新内容、库里旧密文仍在（不假装历史消失）；访问面见第 5 步');
 
-// ── 7. 🔴 被移除端如实显示 ──────────────────────────────────────────────────
-step = 7;
+// ── 8. 🔴 被移除端如实显示 ──────────────────────────────────────────────────
+step = 8;
 const bobShareList = await api('GET', '/api/shares', tokenBob);
 const removed = (bobShareList.json?.removedMemberships ?? []).find((m) => m.shareId === shareId);
 if (!removed) fail('removedMemberships 没有出现该 share');
 stepOk('bob 端如实显示已被移出');
 
 cleanup();
-console.log('\nRESULT=OK steps=7');
+console.log('\nRESULT=OK steps=8');
