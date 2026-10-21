@@ -56,7 +56,20 @@ import './sync-settings.css';
  */
 const SERVER_URL_EXAMPLE = 'http://127.0.0.1:3000';
 
-export function SyncSettingsPanel({ active = true }: { active?: boolean }): React.JSX.Element {
+export function SyncSettingsPanel({
+  active = true,
+  shareExperimental = false,
+  onToggleShareExperimental,
+}: {
+  active?: boolean;
+  /**
+   * 🔴 共享入口的**实验开关**状态。默认关是产品裁决 P-1
+   * （`docs/plans/collaboration-shared-lists.md` §9.2），理由与翻案条件写在
+   * `lib/share-experimental.ts` 文件头 —— 那里是唯一一份，这里不复述。
+   */
+  shareExperimental?: boolean;
+  onToggleShareExperimental?: () => void;
+}): React.JSX.Element {
   const { t } = useI18n();
   const sync = useSyncStore();
   const draft = sync.syncDraft;
@@ -238,6 +251,27 @@ export function SyncSettingsPanel({ active = true }: { active?: boolean }): Reac
         </button>
       </div>
         </details>
+
+        <fieldset className="sync-settings__fieldset" aria-labelledby="sync-share-experimental-title">
+          <legend id="sync-share-experimental-title" className="sync-settings__legend">
+            {t('web.share.experimental.label')}
+          </legend>
+          {/*
+            措辞是这枚开关的全部内容 —— 它必须说出"今天还看不到彼此改动"，
+            否则就是在用一行动词把用户推进一个假的完成态。
+            默认关的理由与翻案条件住在 `lib/share-experimental.ts`，这里不放第二份。
+          */}
+          <label className="ht-settings__card">
+            <input
+              type="checkbox"
+              data-testid="share-experimental-toggle"
+              aria-label={t('web.share.experimental.label')}
+              checked={shareExperimental}
+              onChange={() => onToggleShareExperimental?.()}
+            />
+            <span className="sync-settings__section-hint">{t('web.share.experimental.note')}</span>
+          </label>
+        </fieldset>
       </div>
 
     </section>

@@ -144,6 +144,10 @@ import {
   type ShellModuleKey,
 } from './features/shell/modules.js';
 import { DetailColumnResizer, SidebarResizer } from './features/shell/ColumnResizer.js';
+import {
+  loadShareExperimentalEnabled,
+  saveShareExperimentalEnabled,
+} from './lib/share-experimental.js';
 import { useSyncStore } from './features/sync/store.js';
 import { SubscriptionNotice } from './features/subscription/SubscriptionNotice.js';
 import { TaskActionError } from './features/tasks/TaskActionError.js';
@@ -324,6 +328,14 @@ export function App(): React.JSX.Element {
    */
   const [enabledModules, setEnabledModules] = useState<ReadonlySet<ShellModuleKey>>(
     loadEnabledModules,
+  );
+
+  /**
+   * 🔴 共享入口的默认态是**关**（产品裁决 P-1）。理由、翻案条件都只写在
+   * `lib/share-experimental.ts` 文件头那一份里，这里不重复论证。
+   */
+  const [shareExperimental, setShareExperimental] = useState<boolean>(
+    loadShareExperimentalEnabled,
   );
 
   /**
@@ -2061,6 +2073,14 @@ export function App(): React.JSX.Element {
     });
   }, []);
 
+  const onToggleShareExperimental = useCallback(() => {
+    setShareExperimental((current) => {
+      const next = !current;
+      saveShareExperimentalEnabled(next);
+      return next;
+    });
+  }, []);
+
 
   /**
    * AI 面：**一个 Agent，一个聊天入口**。
@@ -2367,8 +2387,15 @@ export function App(): React.JSX.Element {
               智能清单（今天/收集箱…）不是"存放位置"，共享无从谈起。
               已共享的清单换 aria-label（管理共享 vs 共享此清单），图标相同：
               入口稳定、状态用文案说。
+
+              🔴 第三道条件 `shareExperimental` 是产品裁决 P-1：元数据面全在而**内容面整段断**
+              （下行没接、任务写路径仍进个人 op-log ⇒ 成员互相看不到改动），
+              所以入口默认不放出来，只留设置 → 同步里那条措辞明确的实验开关。
+              默认值、理由与**翻案条件**唯一一份在 `lib/share-experimental.ts`。
+              判据：`check:share-entry-hidden`（钉"默认态不可达"）+
+              `apps/web/tests/share-entry-experimental.spec.tsx`（行为层两条）。
             */}
-            {currentProject !== undefined && syncConfigured ? (
+            {currentProject !== undefined && syncConfigured && shareExperimental ? (
               <button
                 type="button"
                 className="ht-btn ht-btn--ghost"
@@ -3226,7 +3253,11 @@ export function App(): React.JSX.Element {
                 决定的是"准不准出门" —— 地址是它们的前提，反过来排会让人在一个
                 永远不可能生效的开关上花时间（同一条理由见下面 `PrivacyPanel` 那段）。
               */}
-              <SyncSettingsPanel active={activeSettingsSection === 'settings-group-sync'} />
+              <SyncSettingsPanel
+                active={activeSettingsSection === 'settings-group-sync'}
+                shareExperimental={shareExperimental}
+                onToggleShareExperimental={onToggleShareExperimental}
+              />
               {/*
                 共享协作的**本地**通知偏好（W5）：跟同步同一组 —— 它是同步的下游
                 偏好（服务端只广播信号，响不响由本机过滤）。没配同步时整节不渲染，
