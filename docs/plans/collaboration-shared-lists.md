@@ -254,6 +254,7 @@ model ShareOperation   { id, shareId, clientId, serverSeq, …密文列
 | B-7 | 撞车面：`PROJECT`/`TASK` 实体与侧栏 UI 正被多条并行线改 | W3/W4 开工前现量 `git status --porcelain` 撞车面（教训：判据是同一文件未提交 diff，不是「某条线在忙」的印象） |
 | B-8 | 跨服务器联邦（自托管 A ↔ 官方 B 共享） | **不做**。成员必须在同一服务器；登记边界 |
 | B-9 | 倒数日（EVENT）共享、日历订阅共享 | **不在本计划范围**；ADR-0044 的排除在 EVENT 域继续有效 |
+| B-10 | 🔴 **转让所有权不校验接收方手里有没有钥**（2026-10-22 01:2x 复核停止点 ② 时发现）：`POST /shares/:id/transfer` 只判"存在 / 不是自己 / 不是 owner"，而 `ShareMember.keyEnvelope` **可为空**（落后世代的成员是常态 —— 面板的 `autoSeal` 就是为它写的）。转给一个信封缺失或世代落后的成员 ⇒ 新 owner 解不开清单钥，**而补发信封是 owner 专属写路径**（`requireShareOwner`）⇒ 刚被降成 editor 的旧 owner 也发不了 ⇒ 客户端没有任何一格能修，服务端还不报错，症状只是"那一台打不开内容"。三处现量：`sed -n '582,620p' server/src/shares/share.routes.ts`（无信封判据）、同文件 `PUT .../envelope` 的 `requireShareOwner`、`grep -n "keyEnvelope" server/prisma/schema.prisma` | **待修（本线，不需要新 ADR）**：路由加一道资格门 —— 接收方 `keyEnvelope` 非空且其世代 `== Share.keyEpoch`，否则打一枚具名错误（别复用 `ROLE_FORBIDDEN`，那是另一种原因）；面板那颗按钮对不合格成员标灰并给一句理由。验收要**能红**：先造一枚信封落后的成员再转让 ⇒ 必须被拒；把信封补齐 ⇒ 必须过。**为什么不今晚顺手改**：它改的是"谁能被转让"这条对外资格语义，且会牵动 `verify:collab-*` 与四端产物 —— 那一趟刚排在重装之前，混进同一晚等于给下一位一份不知道哪代的重装 |
 
 ## 7. 完成定义（DoD）
 

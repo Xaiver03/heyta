@@ -890,6 +890,18 @@ CARRIER=$HOME/heyta-carriers/heyta-wt-collab-m5 bash research/tools/b-reinstall-
 ⇒ 这一格**不再是待追认**：能做的那半早已落地且有牙。留给负责人的只剩一句**口味级确认**（"就按现在这版"），
 不该再让他去修一个不存在缺陷。②（owner 转让语义）仍是待追认，那格是真的没人在语义层点过头。
 
+### 🔴 停止点 ②（owner 转让语义）—— 那四句事实**逐句回源码核过，全部成立**，但核的过程中翻出一格真缺陷
+
+| 句子 | 现量 |
+|---|---|
+| 两步确认 | `packages/ui/src/sync/SharePanel.tsx`：第一下 `setTransferArmed(memberId)` 只把那一行展开成确认块（`share-transfer-confirm-*` 里有「确认转让」与「取消」），第二下才调 `onTransferOwnership` |
+| 立即生效 | `POST /shares/:shareId/transfer` 一次请求里 `$transaction` 改三处（`share.ownerUserId` + 新 owner 角色 + 旧 owner 降 `editor`），没有"对方接受"那一环；确认文案自己就写着「此操作立即生效」 |
+| 原 owner 降 editor | 同一枚事务里 `data: { role: 'editor' }`，回包里 `demotedRole: 'editor'` |
+| 文案键 | `web.share.transfer.confirmHint` 在 `zh-CN` / `en` 两枚 locale 都在，且 `ShareFeature.tsx` 的 labels 真在取它（不是写了没人读的键） |
+
+⚠️ 但同一条路由**没校验接收方手里有没有钥** ⇒ 记成 **§6 B-10**（转让后可能造出"解不开自己清单的 owner"，而补发信封是 owner 专属，客户端无人能修）。
+那格是本线的、不需要新 ADR，但改的是"谁能被转让"这条对外资格 ⇒ 按今晚的排序登记 + 给出验收形状，**没有**混在重装前顺手改。
+
 ### 下一步
 
 计划 §9.10 末节：**M2**（共享任务/清单的写路径路由 —— 要先立一份新 ADR），其后 M4 → M6。
