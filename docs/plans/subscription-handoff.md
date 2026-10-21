@@ -270,6 +270,17 @@ AI 文件 import `@heyta/i18n`，所以 **`packages/i18n` 必须同一个提交*
    同一类还有几处（**别只修通行密钥那一处**）：`common.profile.loadFailed`、`common.emailChange.loadFailed`、
    `web.inbox.error` —— 现量：`grep -rln "networkAllowed" apps/web/src/features` 逐枚判它有没有区分"没问"与"问失败"。
    要拍的板是文案与形状（要不要一句"还没同意，点这里去同意"的出口），不是判据口径。
+9. 🔴 **gitee 那一枚远端推不进（任务书第 6 步的另一半，origin 那一半 02:1x 已收口）** —— 归负责人一句拍板，本线零自执行。
+   逐字形状：`Repo size: …, exceeds quota 1024MB` ⇒ `! [remote rejected] main -> main (pre-receive hook declined)`，`git push gitee refs/heads/main:refs/heads/main` rc=1。
+   ⚠️ **别把这一句读成"等我拍板就没事"**：这一趟已经把要拍的那句话拆到只剩一个「是／否」（`BLOCKED.md` **B243 追记五**）。
+   **乙-1**＝"缓存路径不得再进 HEAD"这道门装不装 —— **不要任何阈值、也不要存量豁免**：本戳现量
+   `git -c core.quotePath=false ls-tree -r --name-only HEAD | grep -cE '^(\.pnpm-store/|research/standalone/\.npm-cache/)'` 回 **0** ⇒ 装上去今天不会红任何一笔存量；
+   它挡的是第二次（`.gitignore:60`/`:65`/`:66`/`:67` 只挡默认 `git add`，挡不住 `git add -f`）。落点是 `package.json` 的 `check:*` 链，
+   **不是** `/Users/Shared/tfa-usb/hooks/pre-push-bytearm` —— 那是另一条线装在本机的资产，本线不改别人的装置。
+   **乙-2**＝按文件尺寸设线 —— **建议先不做**：同一戳现量 `git -c core.quotePath=false ls-tree -r -l HEAD` 的**原始字节**尺下
+   `PROGRESS.md`／`BLOCKED.md` 各约 1.33 MB 且按设计只增，而 **≥3 MB 的 12 枚全落在明文要求提交的 `/evidence/`**
+   （判据在 `.gitignore:95-98`）⇒ 全局线会红在自己的台账上；真要做只能按类分线。**两把尺别混**：`ls-tree -l` 是原始 blob 字节，gitee 配额吃的是落盘（`cat-file --batch-check=%(objectsize:disk)`）。
+   甲／丙／丁 三条的归属与代价没变（全文在追记三 ⑧）。现量：`git rev-list --count gitee/main..HEAD`（非 0 就是没推成）。
 
 ### 10.4 §1–§9 里已经过期的格子（别照它们判断现状）
 
@@ -416,6 +427,6 @@ rc=2 一律判红）。同族规则见 §7 元规则一、二；
 | 2 "两枚 locale 同步"靠什么钉 | **类型**，不靠数键的门：`grep -n "satisfies Record<MessageKey, string>" packages/i18n/src/locales/en.ts` 命中 ⇒ 少一枚 en 键就是 typecheck 红（01:38 `pnpm typecheck` rc=0）。现量键集：两枚 catalog 各 **4011** 枚键，仅 zh **0**、仅 en **0** | 另有 `check:ui-language` 挡硬编码、`check:i18n-vars` 挡占位符漏传 |
 | 3 门禁与验收 | 01:38–01:41 在 tip `b0af438ac` 上逐条串行：五道只读门各 rc=0、`check:mobile-renew-shape` rc=0、typecheck rc=0、四份 spec 23/16/10/19 全绿；界面腿两枚 —— web Playwright（18:4x 6 passed，六张人眼看过）与 iOS `pnpm verify:mobile-ios-renew-sellable`（01:15 与 01:25 两趟 rc=0，图人眼看过） | Android 侧像素一张都没有（§10.3 第 7 格） |
 | 4 ADR-0054 勘误节（正文一字不改） | `grep -n "^## 10" docs/adr/0054-managed-ai-retention-and-selling-preconditions.md` 命中那一节；`pnpm check:docs` rc=0 | 无 |
-| 5 交接文档 + 三本台账 | 本篇 §10.1–§10.9 加本节；`PROGRESS.md` 第 187–191 条；`BLOCKED.md` 的 **B243 追记四** | 无 |
+| 5 交接文档 + 三本台账 | 本篇的分节号与本线的条目号**一律现取**（此处不存它们，那是一份会漂的抄件）：`grep -n "^### 10\." docs/plans/subscription-handoff.md`；`grep -cE "^[0-9]+\. " PROGRESS.md` 取尾号；`grep -n "B243 追记" BLOCKED.md \| tail -1` 取最新追记 | 无 |
 | 6 两枚远端 + 如实报告 | 🔴 **这一格的判据不是"某一戳推成没"，是现取** `git rev-list --count origin/main..HEAD`（非 0 就是没推成）。**以 §10.2 最新一戳为准**：02:0x 那一戳 GitHub 三条通道全断在代理那一跳（SSH 22／官方 443 备用端点／HTTPS，原话见第 6 戳与 `PROGRESS.md` 第 195 条），**02:1x 复推即过**（`dcb7a4eca..f8756bfe3`，计数回 **0**，第 7 戳）⇒ 那三发是瞬时通道读数，别读成仓库属性。第 7 戳射程 4 笔里**有协作线 2 笔**，那一半已在对话里如实报过（第 7 戳 ㈡）。gitee：逐字 `Repo size: 1113.328MB, exceeds quota 1024MB`（02:0x 现取；00:2x 读到过 1113.879 ⇒ **别把体积当单调增长用**，四条出路的否证在 B243 追记四） | 四条出路等负责人拍（甲／乙／丙／丁） |
 
