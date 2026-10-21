@@ -9,10 +9,17 @@
  *
  * ## 为什么需要它，而不是"用例已经写了"
  *
- * `server/tests/billing-checkout.routes.spec.ts` 里那五条用例断言的都是**拒单**。
+ * `server/tests/billing-checkout.routes.spec.ts` 里 ④′ 那组用例断言的是**拒单**（条数由
+ * vitest 自己打印，别在这里抄）。
  * 而"拒单"这件事有一种很难看见的坏法：**整段判断被删掉**。删掉之后不会有任何一条
  * 用例红着报错说"我少了一条判据" —— 只会有一批 409 变成 200。所以每条臂都要
  * 现场把源码改坏一次，并指名**哪几条具名用例**必须因此变红；抓错地方算漏。
+ *
+ * 🔴 还有**第三种坏法只靠拒单用例永远抓不到**：把守卫写得比该拒的更宽。
+ * ④′ 的正确形状是**非对称**的 —— 只有"已有能力被这单判小"才拒，能力**变宽**（¥5 有效期内买 ¥12）
+ * 必须照卖。写成对称差（两个集合不相等就拒）时，上面那些 409 用例**一条都不会红**，
+ * 而 ¥5→¥12 会静默变拒单 —— 这一档明明是最该被升上来的那一档。所以 C6 与那条具名"升档"
+ * 的 200 用例是一对：**一个方向有牙，另一个方向也得有牙**。
  *
  * ## 臂的形状：两道门各三条边
  *
@@ -82,6 +89,14 @@ const ARMS = [
       '    [userId, provider],',
     to: "    'SELECT status, current_period_end, grants FROM subscriptions WHERE user_id = $1 LIMIT 1',\n    [userId],",
     expect: ['另一家 provider 的那一行'],
+  },
+  {
+    name: 'C6 ④′ 写成对称差（能力**变宽**也拒 = ¥5 有效期内买 ¥12 静默变拒单）',
+    from: '      const lostGrants = (entitledGrants ?? []).filter((g) => !requestedGrants.includes(g));',
+    to:
+      '      const allGrants = [...new Set([...(entitledGrants ?? []), ...requestedGrants])];\n' +
+      '      const lostGrants = allGrants.filter((g) => !((entitledGrants ?? []).includes(g) && requestedGrants.includes(g)));',
+    expect: ['升档'],
   },
 ];
 

@@ -517,6 +517,20 @@ describe('收银台 —— ④′ 收了钱不许把已经付费的能力判小'
     expect(res.statusCode).toBe(200);
   });
 
+  it('🔴 ¥5 有效期内点 ¥12（升档）⇒ 200 —— ④′ 只挡能力变窄，不挡变宽', async () => {
+    // 这一条钉的是 ④′ 的**方向性**：`lostGrants` 取的是"已有而这一单不再授予的那几枚"，
+    // 是**差集**不是对称差。少了这一条，把守卫写成"两个集合不相等就拒"（最常见的那种过度收紧）
+    // 不会让任何用例变红 —— 而那样一来 ¥5 的用户就永远升不到 ¥12，且没人会知道。
+    // 反臂：`scripts/mutate-checkout-tier-gates.mjs` 的 **C6** 把它换成对称差，必须红在这一条上。
+    await insertSubscription(['hosting'], NOW + 5 * 24 * HOUR);
+
+    const res = await post({ priceId: 'hosted-ai-monthly' });
+
+    expect(res.statusCode).toBe(200);
+    // 🔴 "放行"的证据是**订单冻上了**，不是响应码本身（本文件第 1 条硬规则的反面）。
+    expect(await orderCount()).toBe(1);
+  });
+
   it('那一行已经到期 ⇒ ¥5 可以买（此刻没有任何可丢的能力）', async () => {
     await insertSubscription(['hosting', 'ai', 'automation'], NOW - 60_000);
     const res = await post({ priceId: 'hosted-monthly' });
