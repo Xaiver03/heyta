@@ -78,6 +78,23 @@ describe('移动端续费入口', () => {
     expect(src).toMatch(/\{\s*code:\s*outcome\.code\s*\}/);
   });
 
+  it('🔴 两道新闸门会返回的码，移动壳各有自己的词条 —— 不许落到"原始码"那一支', () => {
+    // 闸门 ①（这一档在这台实例交付不了 ⇒ `PRICE_NOT_SELLABLE`）是**今天生产上真会触发**的那一支：
+    // 托管上游还没配，用户按下去拿到的就是它。少这一行，界面印的是「下单失败（PRICE_NOT_SELLABLE）。」
+    // —— 把服务端机器码当人话给用户看，而 web 那一侧同一件事是有句子的（`web.subscription.renew.fail.sellable`）。
+    const src = codeOnly(renew());
+    for (const [code, key] of [
+      ['PRICE_NOT_SELLABLE', 'mobile.entitlement.renew.fail.sellable'],
+      ['PRICE_TIER_LOSES_GRANTS', 'mobile.entitlement.renew.fail.downgrade'],
+    ] as const) {
+      expect(src, `移动壳没给 ${code} 配词条`).toContain(`${code}: '${key}'`);
+      for (const locale of ['zh-CN', 'en']) {
+        const table = readFileSync(join(SRC, `../../packages/i18n/src/locales/${locale}.ts`), 'utf8');
+        expect(table, `${locale}.ts 里缺 ${key}`).toContain(`'${key}':`);
+      }
+    }
+  });
+
   it('ProfileScreen 挂上了它，且那两条冻结判据仍然成立', () => {
     const src = profile();
     expect(src).toMatch(/<RenewSection \/>/);

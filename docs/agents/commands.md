@@ -7,7 +7,9 @@
 ```bash
 pnpm install                    # 安装（工作区）
 pnpm -r build                   # 全量构建
-pnpm -r typecheck               # 全量类型检查
+pnpm -r typecheck               # 全量类型检查。⚠️ 它**不会先 build** —— 改过 `packages/i18n` 的词条要先
+                                #    `pnpm --filter @heyta/i18n build`，否则各壳会红在"这个键不存在"
+                                #    （红因是陈旧的 `dist/*.d.ts`，不是代码：见 §7 #514）
 pnpm -r test                    # 全量测试。⚠️ **条数不写在这里**（这里曾写"2592 个通过 + 12 个跳过"，
                                 #    那是会漂的值 —— 与 §7 开头"本文件不写条数"同一个理由）。
                                 #    取现量：逐包的 `Tests  N passed (N)` 汇总行相加；跳过看 `N passed | M skipped`。

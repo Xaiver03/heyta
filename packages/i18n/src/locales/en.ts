@@ -2459,6 +2459,7 @@ export const en = {
   'mobile.entitlement.renew.fail.provider': 'This instance has no payment channel configured, so nothing can be bought yet.',
   'mobile.entitlement.renew.fail.unauthorized': 'Sign in to your heyta account before placing an order.',
   'mobile.entitlement.renew.fail.network': 'Could not reach the server; the order was not created.',
+  'mobile.entitlement.renew.fail.sellable': 'This plan cannot be sold right now; the server refused the order.',
   'mobile.entitlement.renew.fail.downgrade': 'This plan does not include everything your current plan covers, so no order was created — keep renewing your current plan, or let it expire first.',
   'mobile.entitlement.renew.fail.unknown': 'Order failed ({code}).',
   // AI panel failure states - see the zh file for why these moved out of app-host.
