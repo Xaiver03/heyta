@@ -239,6 +239,8 @@ AI 文件 import `@heyta/i18n`，所以 **`packages/i18n` 必须同一个提交*
    ② 挂载点在 Profile 那一屏（现量 `grep -n "<RenewSection" apps/mobile/src/screens/ProfileScreen.tsx`），滚到权益那块下面就是；
    ③ iOS 那条腿**不走 Android 的 uiautomator**，走 `scripts/tools/ios-ax-shim.py`（现量 `grep -n "IS_AX_SHIM" scripts/verify-mobile-ios.sh`），preflight 照 `scripts/verify-mobile-ios.sh` 抄；
    ④ 那枚装置开头有一道**新鲜度门**：产物 bundle 的 mtime 必须 ≥ 最新源码 mtime，否则判红（现量 `grep -n "BUNDLE_MTIME" scripts/verify-mobile-ios.sh`）⇒ **先 `pnpm build:ios` 再拍**，别拿旧包凑。
+   ⑤ **同一棵 build 目录下有两枚形状不同的 jsbundle，计数不许混**（10-21 17:4x 现量）：`apps/mobile/ios/build/Build/Products/Release-iphonesimulator/Heyta.app/main.jsbundle`（**10.4 MB，Hermes 字节码**，`grep` 对它报 "Binary file matches"）与它外面那枚 `Release-iphonesimulator/main.jsbundle`（**16.9 MB，dev JS**，含 `__DEV__`）。同一枚针 `mobile.entitlement.renew.payHint` 在两处分别出现 **1** 次与 **3** 次 ⇒ **报数必须写清是哪一枚**；装置读的是前者（现量 `grep -n "INSTALLED_APP" scripts/verify-mobile-ios.sh`）。
+   ⑥ 🔴 **今天换的那枚新探针，"非零那一支"还欠一次真构建** —— 本会话**没跑**，理由是量出来的不是猜的：17:4x 现量 `vm_stat` 的 free **0.3 GB**、`sysctl vm.swapusage` 全 **0**（连 swap 都没启用），同一时刻另一会话的 `node --test scripts/__tests__/skill-authority-links…`（PID 65672）正在跑 ⇒ 这时起 Metro 要么被本机内存闸门掐掉，要么把那趟吃进去。机器空下来时补这一格只要两行：`cd apps/mobile && npx react-native bundle --platform ios --dev false --entry-file index.js --bundle-output /tmp/current.jsbundle`（**只写临时目录，不碰装机产物**），随后 `grep -o 'mobile.entitlement.renew.tierTitle' /tmp/current.jsbundle | wc -l` ⇒ 回 **≥1** 就把今天那个 0 从"由兄弟键推出来的"升成"实测过的"；回 **0** 就说明打包按可达性剔掉了它，那 §10.3 这格的针还得再换一次。
    ⚠️ 若为这件事新写一枚验收脚本，它**必须有载具**（进 `pnpm check` 链或进四名册），否则 `check:gate-wiring` 判它是孤儿门 —— 设备腿进不了链，那就得同时决定它进哪本名册，别写完就丢。
 8. **未同意出境时，被本机闸门拦下的读请求在界面上写成"没能加载"** —— 归 UX 线，本线只登记不代改。
    证据是一对**只差一个变量**的图（同一套件的 `accepted` 与 `local-only` 两条用例）：
