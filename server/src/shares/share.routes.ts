@@ -19,9 +19,9 @@
  * | GET  | `/shares/:id/members` | 成员 | 成员列表（含 identityPublicKey，owner 封信封要用） |
  * | PATCH | `/shares/:id/members/:memberId` | owner | 改角色 |
  * | PUT | `/shares/:id/members/:memberId/envelope` | owner | 下发/更新密钥信封（rekey 的服务端落点） |
- * | DELETE | `/shares/:id/members/:memberId` | owner | 移除成员（removedAt 置位；rekey 由 owner 客户端执行） |
+ * | DELETE | `/shares/:id/members/:memberId` | owner | 移除成员（`removedAt` 置位 + 信封作废；rekey 由 owner 客户端执行） |
  * | POST | `/shares/:id/transfer` | owner | 转让所有权（换 owner + 原 owner 降 editor，一个事务） |
- * | POST | `/shares/:id/leave` | 非 owner 成员 | 退出 |
+ * | POST | `/shares/:id/leave` | 非 owner 成员 | 退出（自己的信封当场作废） |
  * | POST | `/shares/:id/ops` | 成员 + role 硬门 | share op 上传（独立发号） |
  * | GET  | `/shares/:id/ops/causal` | 成员 | share op 下载（seq 游标） |
  *
@@ -545,9 +545,18 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
       if (target.role === 'owner') {
         return reply.code(400).send({ code: SHARE_ERROR_CODES.ROLE_FORBIDDEN, message: 'Cannot remove owner' });
       }
+      // 🔴 移除必须**同时作废那枚信封**（M3）。留着它有两个后果：
+      // ① 服务端还替一个已被踢的人保管着他的钥匙，"移除"就只是关了一扇门；
+      // ② 重新邀请复用同一行（下面 accept 那条路径），它会把 `memberKeyEpoch`
+      //    抬到当前世代而信封还是旧那一把 ⇒ owner 的补封逻辑
+      //    （`memberKeyEpoch >= keyEpoch` 就跳过）会**永远跳过他**，
+      //    界面显示"密钥已下发"而他解不开任何东西。
+      // 只清信封、不把 `memberKeyEpoch` 归零：库里有 CHECK `share_members_key_epoch_positive`
+      // (`member_key_epoch >= 1`)，写 0 是 500 而不是"没钥"；`keyEnvelope = null`
+      // 已经是"没有钥"的权威形状（`hasEnvelope` 与补封判据都读它）。
       await prisma.shareMember.update({
         where: { id: target.id },
-        data: { removedAt: BigInt(Date.now()) },
+        data: { removedAt: BigInt(Date.now()), keyEnvelope: Prisma.DbNull },
       });
       return reply.send({ removed: true });
     },
@@ -561,9 +570,10 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
     if (lookup.member.role === 'owner') {
       return reply.code(400).send({ code: SHARE_ERROR_CODES.OWNER_CANNOT_LEAVE, message: 'Owner cannot leave' });
     }
+    // 退出与移除同一件事：他那枚信封当场作废（理由见上面 DELETE 成员那段）。
     await prisma.shareMember.update({
       where: { id: lookup.member.id },
-      data: { removedAt: BigInt(Date.now()) },
+      data: { removedAt: BigInt(Date.now()), keyEnvelope: Prisma.DbNull },
     });
     return reply.send({ left: true });
   });
