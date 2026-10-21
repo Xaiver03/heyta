@@ -290,7 +290,7 @@ model ShareOperation   { id, shareId, clientId, serverSeq, …密文列
 | 移除即 rekey | 🔴 只有零件：`planShareRekey` / `reencryptShareRecord` 的调用者只有单测与 `verify-collab-*.mjs`；`autoSeal` 复封用的是**同一把 listKey**，`keyEpoch` 不推进 | `grep -rn planShareRekey --include=*.ts apps packages` ⇒ 无生产调用点 |
 | 实时 | 🔴 服务端发 `new_share_ops`，客户端只处理 `connected`；`notification-model` 那三条偏好谓词生产消费者为零 | `grep -rn new_share_ops --include=*.ts packages apps` ⇒ 只有服务端那一处 |
 | 端覆盖 | 🟡 Web 接了；**macOS / Windows / Linux 三枚桌面壳间接有**（包里装的就是 `apps/web/dist`）；**移动端零接入**；node-host/CLI 无 share 工具 | `grep -rn -E "SharePanel\|shareId\|payloadCipher" --include=*.ts --include=*.tsx apps/mobile/src` ⇒ 0 命中；`grep -n web-dist apps/desktop-macos/Sources/HeytaMac/HeytaMacApp.swift` |
-| 常驻判据 | 🔴 本线没有一扇门在链上：`check` 那串里 `verify:*` 引用数为 0；`collab-journey` 被 `e2e/playwright.config.ts` 的 `testIgnore` 摘出主 e2e 载体；证据目录被 gitignore ⇒ 截图不可复核 | `node -e "const c=require('./package.json').scripts.check.split('&&');console.log(c.filter(x=>/verify:/.test(x)).length)"`；`grep -n -A5 testIgnore e2e/playwright.config.ts` |
+| 常驻判据 | 🔴 **M7 之前**本线没有一扇门在链上（`check` 那串里 `verify:*` 引用数为 0；`collab-journey` 被 `e2e/playwright.config.ts` 的 `testIgnore` 摘出主 e2e 载体；证据目录被 gitignore ⇒ 截图不可复核）。**今天链上有三段**（`check:share-entry-hidden` / `verify:collab-keys` / `check:collab-carrier`），形状与读数见 §9.7；要真 PostgreSQL / 真浏览器的那四腿仍靠人跑 `pnpm verify:collab-suite` | `node -e "console.log(require('./package.json').scripts.check.split('&&').filter(x=>/collab|share-entry/.test(x)).join(' \| '))"`；`grep -n -A5 testIgnore e2e/playwright.config.ts` |
 
 ⇒ **一句话的产品现状**：能邀请人、能管人、能转让，但**成员之间互相看不到任务改动、也看不到对方的评论**。
 "共享清单"今天对用户交付的是**一张空的共享外壳**，不是协作。
@@ -326,7 +326,7 @@ model ShareOperation   { id, shareId, clientId, serverSeq, …密文列
 | **M4** | **逐 op 签名**：线协议加 `signature`、写侧签、服务端验、失败按"永久拒绝"处置（对齐 ADR-0019 那条读侧对偶） | 封闭词表 + 一条"改一个字节必被拒"的臂 | 🔴 `shared-schema` 线协议 = 不可逆层，与 M2 同一份 ADR 承接 | 工程 + ADR |
 | **M5** | **实时与偏好接线**：客户端接 `new_share_ops`、三条谓词进通知路径 | 有信号 ⇒ 拉取；无订阅偏好 ⇒ 零打扰；红形：谓词恒 true 的那一臂 | M1 之后才有意义（信号语义是"有东西可拉"） | 工程直接做 |
 | **M6** | **移动端接入**：入口/路由、`setProjectShareId` 调用点、share 密钥落盘端口、`payloadCipher` 接线、同意态存储、`ShareFeature` 那层的 web-only 假设重写 | 与 web 同一条旅程在 iOS 模拟器 + Android 上走一遍（AGENTS §6.2：真跑 + 真看截图） | 六段缺段的现量清单见 9.4；🔴 Android 构建一律走 windows-pc | 工程直接做（体量大，可拆） |
-| **M7** | **把判据变成常驻**：本线 `verify:collab-*` 与 journey 进链或有别的自动载体；`check:share-entry-hidden`（P-1 期间钉"不可达"）；变异臂从散文搬进 `research/tools/mutation-rigs/` | `check:gate-wiring` 那类"链外必须有可验消费方"的尺要能覆盖 `verify:*`（它今天只审 `check:*` ⇒ 本身要扩） | 无 | 工程直接做，**最先做也行** |
+| **M7 ✅**（2026-10-21 落地，形状与读数见 §9.7） | **把判据变成常驻**：本线 `verify:collab-*` 与 journey 进链或有别的自动载体；`check:share-entry-hidden`（P-1 期间钉"不可达"）；变异臂从散文搬进 `research/tools/mutation-rigs/` | `check:gate-wiring` 那类"链外必须有可验消费方"的尺要能覆盖 `verify:*`（它今天只审 `check:*` ⇒ 本身要扩）—— **本线没替公共那把尺翻口径**，改立窄的 `check:collab-carrier`，理由写在 §9.7 末 | 无 | 工程直接做，**最先做也行** |
 
 **执行序**：M7 → M1 → M3 → M5 → M2（带 ADR）→ M4 → M6。
 理由：先把"没人跑的判据"变成有人跑，再补下行（最快让两台设备互相看见），rekey 与实时依赖下行；
@@ -372,8 +372,38 @@ mobile 已真渲染过同目录的 `ConflictResolutionView`），缺的全在宿
 
 ### 9.6 风险与不许做的事
 
-- 🔴 **不许用"测试全绿"宣布这一条线做完**：本线的判据今天**没有一条在链上**（9.1 最后一行）。M7 不落地，后面每一格的"绿"都只说明有人手动跑过。
+- 🔴 **不许用"测试全绿"宣布这一条线做完**。M7 之后这句话仍然成立，只是**空格换了地方**：
+  链上那三段（§9.7）钉的是"入口默认不可达"和"验收有载具"，而**内容面通不通**仍然只有
+  人跑 `pnpm verify:collab-suite` 那一趟才算数 —— M1–M6 每一格的"绿"都按这个口径读。
 - 🔴 **不许把 §3 那张 W 表当现状读**（它写的是 10-08 的工单分解）；现状以本节为准。
 - 不许 bump `CURRENT_SCHEMA_VERSION`：M2/M4 需要的字段按 AGENTS §3.3 一律写成可选 + 运行时默认。
 - 不许改已接受的 ADR 结论；M2/M4 走新 ADR。
 - 不可逆层的两处（线协议、op-log reducer）合在**一份** ADR + **一批**提交里，避免两次协议变更让服务端与客户端部署顺序互相踩。
+
+### 9.7 M7 落地（2026-10-21）—— 判据从"有人手动跑过"变成常驻
+
+| 件 | 形状 | 这一趟的读数 |
+|---|---|---|
+| **P-1 入口降级** | 新增 `apps/web/src/lib/share-experimental.ts`（设备本地偏好；`const DEFAULT_ENABLED = false;` 那一行**就是**裁决在代码里的形状，翻案条件写在同一枚文件头）；设置 → 同步 里一枚措辞明确的开关 `share-experimental-toggle`；页头入口的渲染条件加第三道 `&& shareExperimental` | 真浏览器两张对照图：`01-owner-list-ready.png`（停在清单上、同步已配好，头部**没有**「共享」）与 `03-owner-panel-created.png`（打开开关之后**有**）；`e2e/tests/collab-journey.spec.ts` 在建好清单之后先断 `toHaveCount(0)` 再往下走 |
+| 行为层 | `apps/web/tests/share-entry-experimental.spec.tsx` 10 条，含**阳性对照**（开关打开 ⇒ 入口在）—— 少了那条对照，"入口不在"会因为 jsdom 里根本没停在清单上而**永远通过** | 10/10 绿。变异读数：摘掉第三道条件 ⇒ 恰好红在 P-1 那一格；把默认值翻成 `true` ⇒ 红 5 条 |
+| 源码层常驻 | `check:share-entry-hidden`（四格判据 + 自带 5 臂 + 阳性对照；臂改的是临时副本，工作树零改动） | `臂数 5，失败 0`。两道坑记在文件头：注释里也写着开关名 ⇒ **必须先剥注释**；词条文案里的 `https://*` 会被当成"开了个块注释"⇒ 整段文件被吞、判据假红 |
+| 载具 | `verify:collab-keys` 进链（零服务端，实测 0.3s）；其余四腿进 `verify-collab-suite.mjs` 的名册、串行跑；`check:collab-carrier` 钉"每套验收必须有载具（进链 或 进名册）"，且套件本身必须在 `docs/agents/commands.md` 有一行 | `SUITE=OK legs=4 failed=0`（sync 9 / revoke 7 / conflict 6 / journey 3 步）；carrier `臂数 5，失败 0` |
+| 散文臂 → 装置 | `research/tools/mutation-rigs/mutate-collab-journey-autoseal.mjs`：① 原样对照 ② 摘掉 owner 的 `autoSeal` ⇒ 必须**同时**出现 `RESULT=FAIL` 与 `share-join-done`（只"红了"不算，编译错也会红）③ 还原 + md5 逐字节比对 | `ARMS=pass (2/2)`、`byte-identical`。它原地改工作树（目标文件归本线），所以先验该文件相对 HEAD 干净，脏就 `ARMS=ENV dirty-worktree` 退 3 |
+| 链长 | 现量 `node -e "console.log(require('./package.json').scripts.check.split('&&').length)"` | 本批 +3 段 ⇒ 121 |
+
+**顺手修掉的一个真缺陷**（在同一张截图里量到的）：设置里「共享通知」那一节外层套的 `ht-settings__subsection`
+**全仓 CSS 没有定义**，而它自己那枚 `<h3>` 与共享面板自带的 `section-title` 是同一句文案的两份显示
+⇒ 换成同浮层兄弟节用的 `.ht-settings`、删掉多余 h3。证据：`01b-owner-experimental-switch.png`（修复后那一节进了卡片）。
+
+🔴 **本批刻意没做的几件**（都在"别的口径"那一侧，不是忘了）：
+
+1. `NotificationPrefsPanel`（`packages/ui`，W5 那节的内容体）**三行活动开关没有任何可见状态** ——
+   只有 `aria-checked`，读屏拿得到、眼睛拿不到；同文件里的四档范围却用 `'◉ '/'○ '` 文本假装有控件。
+   修法要动共享组件的文字层级与 `check:design` / `check:text-color` 两道口径，不在 M7 里顺手做。
+2. `check:doc-citations` 与 `check:md-tables` 的**作用域**（§9.5 第 1、2 条）—— 放开会把别线的台账一次做红。
+3. `check:gate-wiring` 仍只审 `check:*`（现量 `grep -c verify scripts/check-gate-wiring.mjs` = 0）。
+   本线用窄的 `check:collab-carrier` 先把"verify 必须有可验消费方"落地；把公共那把尺扩到全部 `verify:*`
+   要给别的线那几十套验收逐条定载具 —— 那是别的线的判据口径，不替他们拍。
+4. 新查出的一类形状缺陷登记不代改：**22 枚 `ht-settings__*` 类名在 CSS 里没有定义**
+   （现量：把 `apps/web/src/**/*.tsx` 用到的 `ht-settings__*` 与 `apps/web/src/styles/**/*.css` 定义的比对）。
+   它们分属数据管理 / 帮助等**别的面**，本批只修了本线那一枚。
