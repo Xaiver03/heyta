@@ -7272,3 +7272,8 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
     ③ 🔴 **为什么不顺手补这三句（与第 177 条的区别要说清）**：177 那两枚是**本线自己造的码**，不补就是本线的缺陷，句子也已经有一份现成的（web 那句，移动照抄同句）；这三枚早于本线，而它们的句子要**对用户陈述钱的状态**（单在不在、券退没退）——那是产品/文案的口径，不是我找句子。依据我已钉在格子里供谁定谁用：`CHECKOUT_FAILED` 那一支返回前已 `failOrder`（订单判失败、券名额已释放，`server/src/billing/checkout.routes.ts:433`–`:441`），`PRICE_NOT_EFFECTIVE` 那一支**从未向用户报出任何金额**（`:380` 那句 Logger 就是为这件事写的）。
     ④ **两条差集命令与枚数都在入库前原样跑过**（10／11／`:218` 三个读数复现一致）⇒ 这一格不是"我记得有个差集"，是下一位一条命令能重数的。
     ⑤ 本条动 `docs/plans/subscription-handoff.md`（§10.2 新增一格）、`PROGRESS.md` 两枚；代码零处、文案零处、判据零处、他人脏件一枚不 stage。AC 已勾数现量回 **0**。
+180. 🟢 **交接书此前只写了收款侧——把「买了之后真的能用」那一半的判据点名补进 §10.2**（写前先跑 `date`，本机 19:07）。
+    ① **为什么会漏**：任务书第 5 步要的是"收款通路现状 / ¥12 做到哪 / 仍缺什么"，而 §10 那十几格里**没有一格回答"交付侧由谁钉"** —— 读起来像这一档只做了"卖不卖"那一半。审计时按"这条链上还有哪一半没人说"问出来的，不是有人反馈。
+    ② **补的那格点名三条用例**（接缝在 `server/src/ai/metering.ts` 的 `MANAGED_AI_CAPABILITY`）：`server/tests/managed-proxy.routes.spec.ts:363` 放行（上游恰好命中一次、计数器 +1、响应原样透传）、`:381` 只有 `hosting` 没有 ai 能力 ⇒ 402 `SUBSCRIPTION_REQUIRED` + `GRANT_NOT_INCLUDED` 且**连计数器行都不创建**（这一句就是"权益排在额度之前"的证据——写成 check-then-consume 会先插一行再判权益，那条当场红）、`:694` 同一枚权益判据在读侧（entitled false / used 0 / periodAnchor null）。⇒ 本线那道 ④′ 不许降档，保护的正是这条链上"已经付过 ai"那一格。
+    ③ **三条都现量跑过/取过**：`cd server && npx vitest run tests/managed-proxy.routes.spec.ts` ⇒ **26 passed / rc=0**（条数由 vitest 自己打印）；`grep -n "放行：上游命中" …` 命中 `:363`；`grep -c "tools\|tool_choice" server/src/ai/managed-proxy.routes.ts` 回 **0**（= 仍未转发 tools，那一格归 ADR-0054 §9.4，本轮不动，写在新格里当"仍缺"）。
+    ④ 本条动 `docs/plans/subscription-handoff.md`（§10.2 新增一格）、`PROGRESS.md` 两枚；代码零处、判据零处、他人脏件一枚不 stage。AC 已勾数现量回 **0**。
