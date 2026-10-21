@@ -1,0 +1,104 @@
+/**
+ * `useShareActivitySignal` —— 把实时信号（`new_share_ops`）变成"拉一次 + 该响才响"。
+ *
+ * 挂在根组件上（`App.tsx` 里那一行，与 `useReminderNotifications()` 同一处），
+ * 因为信号是**账号级**的：它到达时用户可能正停在任何一屏，而不是共享面板里。
+ *
+ * 三段各归各位，这里只做装配（AGENTS §3.5：壳里不许有业务判断）：
+ *   · 该不该拉、拉到什么活动 —— `@heyta/app-host` 的 `createShareOpsSignalHandler`
+ *   · 这些活动里哪些该吵人 —— `@heyta/ui` 的 `selectNotifiedActivities`（本机偏好）
+ *   · 怎么投递 —— `share-activity-notify.ts`（唯一不纯的那一下）
+ *
+ * 🔴 这一片是**唯一的**信号消费者（垫片里那个单槽 sink）。评论区不自己接 WS：
+ *    拉到内容之后由这里发一次"重画"，正在显示那一节的人**从盘上重放** ——
+ *    游标是全 share 一份的，它们再拉一次只会拿到 `fetched = 0`。
+ */
+
+import { useEffect, useMemo } from 'react';
+
+import { createShareOpsSignalHandler } from '@heyta/app-host';
+import { selectNotifiedActivities } from '@heyta/ui';
+import { useI18n } from '@heyta/i18n';
+import { CURRENT_SCHEMA_VERSION } from '@heyta/shared-schema';
+import type { SyncPayloadCipher } from '@heyta/sync-client';
+
+import { useSyncStore } from '../sync/store.js';
+import { hasEngine, requireEngine } from '../../lib/oplog.js';
+import { getWebVaultSession } from '../../lib/vault-session.js';
+import { emitShareRepaint, setShareSignalSink } from '../../lib/share-signal-sink.js';
+import { createWebShareComments, createStorageShareLog } from './comment-actions.js';
+import { loadShareNotificationPrefs } from './share-notif-prefs.js';
+import { deliverShareActivityNotifications } from './share-activity-notify.js';
+
+export function useShareActivitySignal(): void {
+  const { t } = useI18n();
+  const baseUrl = useSyncStore((s) => s.baseUrl);
+  const token = useSyncStore((s) => s.token);
+  const authTransport = useSyncStore((s) => s.authTransport);
+  const accountId = useSyncStore((s) => s.accountId);
+
+  const labels = useMemo(
+    () => ({
+      title: t('common.brand'),
+      body: (kind: 'added' | 'deleted' | 'completed'): string =>
+        kind === 'added'
+          ? t('common.share.activity.added')
+          : kind === 'deleted'
+            ? t('common.share.activity.deleted')
+            : // "完成"这一档今天到不了这里：共享日志里还没有 TASK 的 op（M2 的路由）。
+              // 留一条兜底文案而不是留白 —— 真到了那一天它会被判据抓到并要求写清楚。
+              t('common.share.notif.activityCompleted'),
+    }),
+    [t],
+  );
+
+  useEffect(() => {
+    if (accountId === undefined || accountId === '' || baseUrl.trim() === '' || token === undefined || token.trim() === '') {
+      return undefined;
+    }
+    // 信号是从同步连接上来的：没有本地引擎就没有那条连接。
+    // 与其把 `myClientId` 退成空串（那样"自己不吵自己"这一条会静默失效），不如不注册。
+    if (!hasEngine()) return undefined;
+    const myClientId = requireEngine().getClientId();
+    const sink = async (shareId: string, latestSeq: number): Promise<void> => {
+      let vaultCipher: SyncPayloadCipher | undefined;
+      try {
+        const session = await getWebVaultSession(accountId, baseUrl, async () => token, authTransport);
+        vaultCipher = await session.getPayloadCipher();
+      } catch {
+        // vault 没解锁 ⇒ 解不开信封也解不开密文。信号丢掉：不响是对的，
+        // 用户解锁之后下一次信号或下一次进评论区都会补上（游标还没推进）。
+        return;
+      }
+      const comments = createWebShareComments({
+        baseUrl,
+        token,
+        ...(authTransport === undefined ? {} : { authTransport }),
+        userId: accountId,
+        clientId: myClientId,
+        schemaVersion: CURRENT_SCHEMA_VERSION,
+        vaultCipher,
+        storage: window.localStorage,
+      });
+      if (comments === undefined) return;
+      const handler = createShareOpsSignalHandler({
+        storage: createStorageShareLog(window.localStorage),
+        pull: comments.pullShareOps,
+        myClientId,
+      });
+      const reading = await handler.onShareOpsSignal(shareId);
+      // 盘上的日志刚被这批新内容写过 —— 正在显示这份共享的那一节得重放一次。
+      // 它**不能**自己去拉：游标已经推进，拉回来是 `fetched = 0`（见垫片那段）。
+      if (reading.pulled && reading.added > 0) emitShareRepaint();
+      const toSurface = selectNotifiedActivities(
+        loadShareNotificationPrefs(window.localStorage),
+        reading.activities,
+      );
+      deliverShareActivityNotifications(toSurface, shareId, latestSeq, labels);
+    };
+    setShareSignalSink((shareId, latestSeq) => {
+      void sink(shareId, latestSeq);
+    });
+    return () => setShareSignalSink(undefined);
+  }, [accountId, authTransport, baseUrl, labels, token]);
+}

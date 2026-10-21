@@ -4585,6 +4585,8 @@ export const en = {
   'common.share.consent.cancel': 'Cancel',
   'common.share.consent.dontAskAgain': 'Don\'t ask again',
   'common.share.notif.sectionTitle': 'Shared-list notifications',
+  'common.share.activity.added': 'Someone added something to a shared list you joined',
+  'common.share.activity.deleted': 'Someone removed something from a shared list you joined',
   'common.share.notif.activitiesTitle': 'Activity notifications',
   'common.share.notif.activityCompleted': 'Task completed/uncompleted',
   'common.share.notif.activityAdded': 'Task/note added',

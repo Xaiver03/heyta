@@ -35,6 +35,7 @@ import { OFFICIAL_SITE_ORIGIN } from '@heyta/app-host';
 import { OPERATOR, operatorFilingLine } from '@heyta/legal';
 
 import { __resetOpLogForTests, initOpLog } from '../src/lib/oplog.js';
+import { hasShareSignalSink } from '../src/lib/share-signal-sink.js';
 import { openSettingsViaAvatar } from './open-settings-via-avatar.js';
 import { LocaleHost } from '../src/lib/locale-host.js';
 import { emptyState } from '@heyta/op-log';
@@ -89,6 +90,30 @@ describe('根组件', () => {
     });
 
     expect(container.textContent ?? '').not.toBe('');
+  });
+
+  it('🔴 配好同步设置之后，根组件必须自己就是共享信号的消费者', async () => {
+    // 钉的是 `App.tsx` 里那一行 `useShareActivitySignal()`：
+    // 评论区与通知都挂在这条唯一的通道上，而通道只有被根组件注册才存在。
+    // 接线细节在 `share-activity-signal.spec.tsx`，这一枚只管"根上有没有装"。
+    useSyncStore.setState({
+      baseUrl: 'https://sync.invalid',
+      token: 'tok-for-registration',
+      accountId: 'acct-for-registration',
+    });
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+    await act(async () => {
+      root?.render(
+        <LocaleHost>
+          <App />
+        </LocaleHost>,
+      );
+    });
+    expect(hasShareSignalSink(), '实时信号没有消费者 ⇒ 评论与动态都不会自己飘过来').toBe(true);
+    // 别把同步设置留给同文件后面的臂（它们判的是"没配服务端"那一面）。
+    useSyncStore.setState({ baseUrl: '', token: undefined, accountId: undefined });
   });
 
   it('🔴 空库也要渲染出视图 tab 与捕获框（不是白屏）', async () => {

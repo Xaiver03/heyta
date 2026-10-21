@@ -12,8 +12,9 @@
  * 建一个 `createWebShareComments`、把重放出来的评论喂给组件。
  *
  * ⚠️ 两处如实登记的边界：
- * 1. **远端的评论靠拉，不靠推**（M1）：进入这一节拉一次、之后每 5s 补一次。
- *    真推（WS `new_share_ops`）在 M5 那一格，接上之后这个定时器就该撤。
+ * 1. **远端的评论靠推不靠轮询**（M5）：WS 的 `new_share_ops` 由根组件那一个消费者拉回
+ *    并落盘，这一节收到"重画"信号后**从盘上重放**（见下面换代那段 —— 它不能再拉一次，
+ *    游标已经被推进）。进入这一节时仍拉一次，那是冷启动补第一屏。
  * 2. **vault 未解锁就整节不画**（不是错误屏）：没解锁时连 keyEpoch 都解不出来，
  *    画一个"发不出去"的输入框只会让人以为坏了。
  */
@@ -27,6 +28,7 @@ import type { SyncPayloadCipher } from '@heyta/sync-client';
 import { CommentThread, type CommentThreadLabels, type CommentThreadProps } from '@heyta/ui';
 
 import { hasEngine, requireEngine } from '../../lib/oplog.js';
+import { subscribeShareRepaint } from '../../lib/share-signal-sink.js';
 import { getWebVaultSession } from '../../lib/vault-session.js';
 import { useSyncStore } from '../sync/store.js';
 import { createWebShareComments } from './comment-actions.js';
@@ -43,7 +45,13 @@ export function ShareCommentsSection(props: ShareCommentsSectionProps): React.JS
   const accountId = useSyncStore((s) => s.accountId);
 
   const [vaultCipher, setVaultCipher] = useState<SyncPayloadCipher | undefined>(undefined);
-  /** 提交后重读一次（本片没有实时订阅，见文件头边界 1）。 */
+  /**
+   * 这一节的"代"：写过内容、或本机刚拉到新内容 ⇒ 涨一格。
+   *
+   * 🔴 它同时是 `host` 的依赖 —— 因为宿主把**重放结果按实例缓存**
+   * （`share-comments.ts` 的 `entryFor`：命中缓存就不再看盘）。不换代就会停在
+   * 打开那一刻的样子：别人写的评论已经在 `localStorage` 里了，而这枚宿主不知道。
+   */
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -83,7 +91,7 @@ export function ShareCommentsSection(props: ShareCommentsSectionProps): React.JS
       vaultCipher,
       storage: window.localStorage,
     });
-  }, [accountId, authTransport, baseUrl, token, vaultCipher]);
+  }, [accountId, authTransport, baseUrl, token, vaultCipher, tick]);
 
   const labels = useMemo<CommentThreadLabels>(
     () => ({
@@ -107,39 +115,35 @@ export function ShareCommentsSection(props: ShareCommentsSectionProps): React.JS
   );
 
   /*
-   * 🔴 M1 下行：进入这一节先拉一次，之后每 5s 补一次。
+   * 🔴 M5：进入这一节拉一次（冷启动那趟），之后**由信号驱动换代**，不再有 5 秒轮询。
    *
-   * 为什么要有这个定时器：别人写的评论**不会自己飘过来** —— 拉取（`pullForTask`）
-   * 之前这一节只能显示本机写过的那几条，症状正是这条线断掉的那一格。
-   * ⚠️ 它是"还没有信号时的兜底"，不是设计目标：WS `new_share_ops` 接上之后（M5）
-   *    这个定时器就该撤掉，改成"收到信号 ⇒ 拉一次"。
+   * 为什么进来还要拉：这一节可能是在还没收到任何信号的时候打开的（离线写过、或在别的
+   * 设备上刚写完）。这一趟之后，新内容一律走 `new_share_ops`（根组件那个唯一的消费者）。
    *
-   * 只有真的拉到新 op 才触发重渲染（`added > 0`）—— 每 5 秒无谓重画一次评论线程，
-   * 会让正在输入的那个人看到光标跳。
+   * 为什么换代而不是"再拉一次"：下行游标是**这份 share 全局一份**，而根消费者已经把这批
+   * op 拉回来落盘并推进了游标 —— 这里再拉只会拿到 `fetched = 0`，界面就停在打开那一刻。
+   * 所以 `subscribeShareRepaint` 那条路是**从盘上重放**（换一枚宿主 = 缓存作废）。
+   *
    * 拉失败**不炸界面也不写 console**：这一节本来就是尽力而为（未登录 / 钥匙没解锁
-   * 都到不了这里，剩下的只有网络与服务端，而它们会下一轮再试）。
+   * 都到不了这里，剩下的只有网络与服务端，而下一条信号会再试）。
    */
   useEffect(() => {
     if (host === undefined) return undefined;
     let alive = true;
-    const pull = (): void => {
-      void host
-        .pullForTask(props.taskId)
-        .then((result) => {
-          if (alive && (result?.added ?? 0) > 0) setTick((n) => n + 1);
-        })
-        .catch(() => undefined);
-    };
-    pull();
-    const timer = window.setInterval(pull, 5_000);
+    void host
+      .pullForTask(props.taskId)
+      .then((result) => {
+        if (alive && (result?.added ?? 0) > 0) setTick((n) => n + 1);
+      })
+      .catch(() => undefined);
     return () => {
       alive = false;
-      window.clearInterval(timer);
     };
   }, [host, props.taskId]);
 
+  useEffect(() => subscribeShareRepaint(() => setTick((n) => n + 1)), []);
+
   if (host === undefined) return null;
-  void tick; // 依赖它触发重渲染，值本身不参与渲染
   const comments = host.commentsForTask(props.taskId) as unknown as CommentThreadProps['comments'];
 
   return <CommentThread taskId={props.taskId} comments={comments} labels={labels} onSubmit={onSubmit} />;

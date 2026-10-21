@@ -15,43 +15,20 @@
 import { useCallback, useState } from 'react';
 
 import { useI18n } from '@heyta/i18n';
-import {
-  DEFAULT_NOTIFICATION_PREFS,
-  NotificationPrefsPanel,
-  type ShareNotificationPrefs,
-} from '@heyta/ui';
+import { NotificationPrefsPanel, type ShareNotificationPrefs } from '@heyta/ui';
 import { HeytaUiProvider } from '@heyta/ui';
 
-const PREFS_STORAGE_KEY = 'heyta.share-notif-prefs.v1';
-
-function loadPrefs(): ShareNotificationPrefs {
-  try {
-    const raw = localStorage.getItem(PREFS_STORAGE_KEY);
-    if (raw === null) return DEFAULT_NOTIFICATION_PREFS;
-    const parsed = JSON.parse(raw) as Partial<ShareNotificationPrefs>;
-    // 逐字段回填而不是整块信任磁盘：坏数据回落默认值，不让一个键拖垮整节。
-    return {
-      activities: {
-        onCompleted: parsed.activities?.onCompleted ?? DEFAULT_NOTIFICATION_PREFS.activities.onCompleted,
-        onAdded: parsed.activities?.onAdded ?? DEFAULT_NOTIFICATION_PREFS.activities.onAdded,
-        onDeleted: parsed.activities?.onDeleted ?? DEFAULT_NOTIFICATION_PREFS.activities.onDeleted,
-      },
-      taskScope: parsed.taskScope ?? DEFAULT_NOTIFICATION_PREFS.taskScope,
-      autoAcceptKnownCollaborators:
-        parsed.autoAcceptKnownCollaborators ?? DEFAULT_NOTIFICATION_PREFS.autoAcceptKnownCollaborators,
-    };
-  } catch {
-    return DEFAULT_NOTIFICATION_PREFS;
-  }
-}
+import { loadShareNotificationPrefs, saveShareNotificationPrefs } from './share-notif-prefs.js';
 
 export function ShareNotificationSettings(): React.JSX.Element {
   const { t } = useI18n();
-  const [prefs, setPrefs] = useState<ShareNotificationPrefs>(() => loadPrefs());
+  const [prefs, setPrefs] = useState<ShareNotificationPrefs>(() =>
+    loadShareNotificationPrefs(localStorage),
+  );
 
   const onChange = useCallback((next: ShareNotificationPrefs) => {
     // 只落本地，不出网（W5 判据：改设置零请求）。
-    localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(next));
+    saveShareNotificationPrefs(localStorage, next);
     setPrefs(next);
   }, []);
 
