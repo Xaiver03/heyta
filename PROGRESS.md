@@ -7277,3 +7277,8 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
     ② **补的那格点名三条用例**（接缝在 `server/src/ai/metering.ts` 的 `MANAGED_AI_CAPABILITY`）：`server/tests/managed-proxy.routes.spec.ts:363` 放行（上游恰好命中一次、计数器 +1、响应原样透传）、`:381` 只有 `hosting` 没有 ai 能力 ⇒ 402 `SUBSCRIPTION_REQUIRED` + `GRANT_NOT_INCLUDED` 且**连计数器行都不创建**（这一句就是"权益排在额度之前"的证据——写成 check-then-consume 会先插一行再判权益，那条当场红）、`:694` 同一枚权益判据在读侧（entitled false / used 0 / periodAnchor null）。⇒ 本线那道 ④′ 不许降档，保护的正是这条链上"已经付过 ai"那一格。
     ③ **三条都现量跑过/取过**：`cd server && npx vitest run tests/managed-proxy.routes.spec.ts` ⇒ **26 passed / rc=0**（条数由 vitest 自己打印）；`grep -n "放行：上游命中" …` 命中 `:363`；`grep -c "tools\|tool_choice" server/src/ai/managed-proxy.routes.ts` 回 **0**（= 仍未转发 tools，那一格归 ADR-0054 §9.4，本轮不动，写在新格里当"仍缺"）。
     ④ 本条动 `docs/plans/subscription-handoff.md`（§10.2 新增一格）、`PROGRESS.md` 两枚；代码零处、判据零处、他人脏件一枚不 stage。AC 已勾数现量回 **0**。
+181. 🟡 **回手核自己这几轮写下的数字，抓到两处被后续改动顶旧的**（写前先跑 `date`，本机 19:09）。
+    ① 第 177 条给移动壳补了一条具名用例，但 §10.2 里还写着"移动 `renew-entry` 8"与"`check:mobile-renew-shape` 四条臂"——**这两处是我自己前几轮改的，没有别人碰过**。正是仓里那条"正文里的值会漂"反过来咬到自己身上。
+    ② **现量重取**：`cd apps/mobile && npx vitest run tests/renew-entry.spec.ts` ⇒ **9 passed**；`cd packages/app-host && npx vitest run tests/checkout.spec.ts` ⇒ **16 passed**（这一枚没变，复量只为确认"没变"这件事不是我假设的）；台架臂数由脚本自己打印（19:0x 是 5 臂、载体 9 条）。两处都按仓里的 `~~原文~~ ⇒ 带戳更正` 形状改口，并把"四条臂"那处换成"臂数与用例数由脚本自己打印"——**会漂的位置本来就不该放数**。
+    ③ **规矩（写给下一位，也写给本线自己）**：**每补一条用例，就把所有引用了这份 spec 计数的格子一起改**；改不动的（臂数、条数）一律换成"由工具自己打印"。这一类格子在本节里还有几处，**不口头保证清零**——取法就是那条 `grep` 清单命令，谁接手谁重数。
+    ④ 本条动 `docs/plans/subscription-handoff.md`（两格改口）、`PROGRESS.md` 两枚；代码零处、判据零处、他人脏件一枚不 stage。AC 已勾数现量回 **0**。
