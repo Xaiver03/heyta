@@ -31,6 +31,14 @@ pnpm verify:sync:dry            # 不需要服务端，只校验 op 形状
 pnpm verify:p1                  # P1 验收：**自带真实服务端**，跑零 mock 的端到端同步（11 条）
 pnpm verify:p2                  # P2 验收：**自带真实服务端**，非 Web 壳（Node+SQLite）真实读写+同步
 
+# 协作 / 共享清单线（ADR-0062）—— 五套验收，两种载具
+pnpm verify:collab-keys         # 密钥协议闭环（真 WebCrypto + 真构建产物，零服务端，实测 0.3s）
+                                #   🔴 它**已在 `pnpm check` 链里**，这里列一次是让人知道它在
+pnpm verify:collab-suite        # 那四套**要真 PostgreSQL / 真浏览器**的按序跑一遍
+                                #   （sync / revoke / conflict / journey；串行，一次一条）
+                                #   每套验收必须有载具（进链 或 进上面那四名册），
+                                #   判据在 scripts/check-collab-carrier.mjs —— 加验收不加载具会红
+
 # 真浏览器验收（Playwright）。⚠️ 它在 `e2e/` 里，**刻意不在根 pnpm 工作区内**
 #   （理由见 `e2e/pnpm-workspace.yaml`，别把它的依赖并回根 lockfile）。
 #   依赖要单独装：`cd e2e && pnpm install`（它自己一份 lockfile）
