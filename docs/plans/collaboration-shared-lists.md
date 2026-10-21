@@ -1,8 +1,10 @@
 # 共享清单与协作（清单级多人协作）落地计划
 
 > 状态：**进行中**（2026-10-08 立；W0–W3 已落地，逐条见 §3 —— 原写「规划中」，**2026-10-16 更正**）
-> 🔴 **现状与下一步以 §9 为准（2026-10-20 复账）**：§3 那张 W 表与 §7 的 DoD 是 10-08 立的工单分解，
-> 逐条已落后于代码 —— 尤其 §7 的 DoD 会被"元数据面已通"读成"协作已可用"，而**内容面今天整段是断的**（成员互相看不到任务与评论）。
+> 🔴 **现状与下一步以 §9 为准（2026-10-20 复账；2026-10-21 M1 落地后本行改口）**：§3 那张 W 表与 §7 的 DoD 是 10-08 立的工单分解，
+> 逐条已落后于代码 —— 尤其 §7 的 DoD 会被"元数据面已通"读成"协作已可用"。**内容面现在断成两半**：
+> 成员之间的**评论**已经能互相看到（下行腿与游标今天接通，§9.8），而**任务/清单改动仍然看不到** ——
+> 因为 `TASK/PROJECT` 的 op 至今进个人 op-log，那是 M2 的路由那一步（要先立 ADR）。
 > 三条产品拍板（入口先降级、转让语义保留、并发改成按字段胜出）与里程碑顺序都在 §9。
 > 立单：2026-10-08。产品负责人认可调研结论与 UX 十二条裁决（§1）后指令「制定一个完整的计划」。
 > 证据层：[共享清单调研](../research/collaboration-shared-lists.md)（2026-10-08；滴答帮助中心全文一手抓取 + 仓库双路只读调研 + Ink & Switch / RFC 9420 / Etebase）。
@@ -271,7 +273,7 @@ model ShareOperation   { id, shareId, clientId, serverSeq, …密文列
 
 - 2026-10-08：立单。调研见 [research/collaboration-shared-lists.md](../research/collaboration-shared-lists.md)；十二条产品决策（§1）经产品负责人认可；同日 [ADR-0062](../adr/0062-shared-list-key-distribution.md) 立掉。
 
-## 9. 2026-10-20 复账与下一阶段计划：内容面整段断
+## 9. 2026-10-20 复账与下一阶段计划（🔴 标题那句"内容面整段断"已被 2026-10-21 的 M1 改掉一半：**下行评论这条腿通了，任务那条仍断**，逐条见 §9.8）
 
 > 状态：**本节是这一条线当前的权威现状**（§3 那张 W 表与 §7 的 DoD 是 10-08 立的，逐条已落后于代码；
 > 读现状从这里读，别按 §3 推断"接完了"）。
@@ -281,7 +283,7 @@ model ShareOperation   { id, shareId, clientId, serverSeq, …密文列
 | 那一面 | 代码现量 | 怎么复量 |
 |---|---|---|
 | 元数据面（建共享 / 邀请 / 入群 / 成员 / 角色 / 转让 / 移除 / 退出） | ✅ 服务端与 Web 宿主都在 main 上，role 硬门在上传边界 | `pnpm verify:collab-journey`；`pnpm --filter @heyta/web --silent exec vitest run tests/share-panel-transfer.spec.tsx tests/join-link.spec.ts` |
-| **内容下行** | 🔴 **零实现**。`downloadOps` 只有定义，全仓无生产调用点 ⇒ 客户端回放只吃本机 localStorage 那份 share log | `grep -rn downloadOps --include=*.ts --include=*.tsx apps packages` 去 spec 后只剩定义那一行 |
+| **内容下行** | 🟡 **评论这条腿已通**（2026-10-21 M1）：`downloadOps` 有生产调用点（`share-comments.ts` 的 `pullShareOps`），游标落盘、分页收敛、解密回放都在；🔴 但它今天**搬运不到用户眼前** —— 成员那边根本看不到这条共享任务（下一行那格），所以点不进评论区。原句"零实现"已过期 | `grep -rn downloadOps packages/app-host/src apps/web/src` 有命中（定义 + 调用两处）；`pnpm verify:collab-sync` 第 10 步 `RESULT=OK steps=10` |
 | **内容上行** | 🟡 **只有评论**：`uploadOps` 经 `createShareOpDispatcher` 接通，但调用链只从 `share-comments.ts` 进来 | `grep -rn createShareOpDispatcher --include=*.ts packages` ⇒ 生产消费者只有 `share-comments.ts` |
 | **任务 / 清单的写路径** | 🔴 **仍进个人 op-log**。`project-actions.ts` 里唯一与 share 有关的方法是 `setProjectShareId`（挂个 id），没有任何"该进 share log 还是个人 log"的分流 | `grep -n -E "shareId\|share" packages/app-host/src/project-actions.ts` |
 | 服务端可写白名单 vs 客户端实际 | 白名单已经认识 `TASK / PROJECT / TAG / NOTE / COMMENT`，**服务端不拦，是客户端没往那走** | 读 `server/src/shares/share.membership.ts` 的 `SHARE_WRITABLE_ENTITY_TYPES` |
@@ -292,8 +294,10 @@ model ShareOperation   { id, shareId, clientId, serverSeq, …密文列
 | 端覆盖 | 🟡 Web 接了；**macOS / Windows / Linux 三枚桌面壳间接有**（包里装的就是 `apps/web/dist`）；**移动端零接入**；node-host/CLI 无 share 工具 | `grep -rn -E "SharePanel\|shareId\|payloadCipher" --include=*.ts --include=*.tsx apps/mobile/src` ⇒ 0 命中；`grep -n web-dist apps/desktop-macos/Sources/HeytaMac/HeytaMacApp.swift` |
 | 常驻判据 | 🔴 **M7 之前**本线没有一扇门在链上（`check` 那串里 `verify:*` 引用数为 0；`collab-journey` 被 `e2e/playwright.config.ts` 的 `testIgnore` 摘出主 e2e 载体；证据目录被 gitignore ⇒ 截图不可复核）。**今天链上有三段**（`check:share-entry-hidden` / `verify:collab-keys` / `check:collab-carrier`），形状与读数见 §9.7；要真 PostgreSQL / 真浏览器的那四腿仍靠人跑 `pnpm verify:collab-suite` | `node -e "const c=require('./package.json').scripts.check.split('&&');console.log(c.filter(x=>['collab','share-entry'].some(k=>x.includes(k))).join(', '))"`；`grep -n -A5 testIgnore e2e/playwright.config.ts` |
 
-⇒ **一句话的产品现状**：能邀请人、能管人、能转让，但**成员之间互相看不到任务改动、也看不到对方的评论**。
-"共享清单"今天对用户交付的是**一张空的共享外壳**，不是协作。
+⇒ **一句话的产品现状**（2026-10-21 M1 之后）：能邀请人、能管人、能转让，**评论已经能互相看到**
+（宿主层与 web 都接通、经真服务端验过），但**任务与清单的改动仍然看不到** ——
+那一半要等 M2 把 `TASK/PROJECT` 的 op 路由进 share 日志。"共享清单"今天交付的是
+**一张只有评论区在动的共享外壳**，还不是协作。
 
 ### 9.2 三条产品拍板（负责人 2026-10-20 把判定权交下来，按产品视角定，不再回问）
 
@@ -320,7 +324,7 @@ model ShareOperation   { id, shareId, clientId, serverSeq, …密文列
 
 | # | 交付 | 判据（要能红） | 前置 / 不可逆点 | 归属 |
 |---|---|---|---|---|
-| **M1** | **下行链路接通**：`downloadOps` 接进宿主（游标持久化、分页收敛、解密回放、离线补拉） | 两台**独立**浏览器上下文：A 改一条任务标题 → B 在**不刷新**与**刷新后**两种时机都读到新标题；变异臂：把游标持久去掉 ⇒ 必红 | 只需 `packages/app-host` + `apps/web`，不碰线协议 ⇒ **可以先做** | 工程直接做 |
+| **M1 🟡**（2026-10-21 宿主层已闭，读数见 §9.8） | **下行链路接通**：`downloadOps` 接进宿主（游标持久化、分页收敛、解密回放、离线补拉） | 🔴 **判据按实测改口**（原句写的是"今天走不通的那一族"）：~~A 改一条任务标题 → B 读到新标题~~ —— `TASK/PROJECT` 的 op 至今仍进**个人** op-log（那是 M2 那一步路由的事），所以下行腿今天能搬运的只有 `COMMENT`。现判据 = **两台独立宿主**：A 发一条评论 → B 拉回并物化、再拉一次零新增、游标落在盘上（`verify:collab-sync` 第 10 步，读数 `RESULT=OK steps=10`）。变异臂三臂见 §9.8，红集精确匹配 | 只需 `packages/app-host` + `apps/web`，不碰线协议 ⇒ **可以先做**；"任务标题那一半"随 M2 一起判 | 工程直接做 |
 | **M2** | **任务/清单的写路径路由**：共享清单里的 `TASK/PROJECT/TAG/NOTE` op 进 share log | 路由判据住在 `packages/app-host`（`shareIdForTask` 那一族的**同源**函数，不许在壳里判）；红形：未共享清单写进 share ⇒ 红 / 共享清单写进个人 log ⇒ 红 | 🔴 碰 op-log 语义与"个人 log 不动"这条 ADR-0062 承诺 ⇒ **先立 ADR**；`Project.shareId` 已在册，不必 bump schema | 工程 + 一份新 ADR |
 | **M3** | **rekey 落地**：移除/退出/撤销 → `keyEpoch` 推进 → 重封给在册成员；撤销后旧成员解不开新内容 | 三步链有真库证据（`verify-collab-revoke` 已有零件，缺生产路径）；红形：`autoSeal` 换 key 那一步被去掉 ⇒ 必红 | 依赖 M1（下行要先能读，否则证不了"读不到"） | 工程直接做 |
 | **M4** | **逐 op 签名**：线协议加 `signature`、写侧签、服务端验、失败按"永久拒绝"处置（对齐 ADR-0019 那条读侧对偶） | 封闭词表 + 一条"改一个字节必被拒"的臂 | 🔴 `shared-schema` 线协议 = 不可逆层，与 M2 同一份 ADR 承接 | 工程 + ADR |
@@ -361,13 +365,13 @@ mobile 已真渲染过同目录的 `ConflictResolutionView`），缺的全在宿
 🔴 **剩下两格不在文案层，在门禁层，都归 §9.2 的 M7，本线不单方翻口子**：
 
 1. **`check:doc-citations` 的分母是 1 份文档**，而它**在 `pnpm check` 链里** ⇒ 链绿不代表全仓引用被核过。这一趟把作用域放开到全部 `docs/**/*.md` 现量跑了一遍：`文档 266 份 · 反引号 span 163,181 · 「git show HEAD:」行 343 · 锚 104 枚`，报 **878 条**引用问题（其中"路径不存在"846 条）。逐条读后发现**绝大多数不是文档坏了**：远端机器上的路径（`sites-enabled/heyta.finlaw.cloud`、`apps/mobile/node_modules`、`ubuntu-jcli:~/heyta/server/.env`）、示例与占位路径（`docs/plans/a.md`、`mine.md`）、第三方仓的路径（`services/api/src/routes/admin/ai-config.ts`）、URL、以及**历史坐标**（ADR/调研里"当时那个路径"，其中若干已被 10-16 那批"只改 href、显示文本留旧名"的先例正当化）。⇒ 直接把默认作用域改成全仓 = 把链做红 + 逼出一张巨大的豁免表，而豁免表逐条要写理由（那个文件自己就这么要求的）。**要的是作用域规则**（哪一层文档、哪种形状算"当前存在的声称"），这是判据口径，归产品负责人拍。现量复跑：`node scripts/check-doc-citations.mjs $(find docs -name '*.md' -not -path 'docs/plans/archive/landing-motion-audit/*' | sed 's/^/--doc /' | tr '\n' ' ')`。
-2. **全仓 markdown 表格形状**：同一把探针（跳代码围栏）分别跑 `git archive HEAD docs` 那棵树与工作树 —— **HEAD 现量 100 行坏、本批改后 80 行**，即修掉 **20** 行：`plans/README` 12 ／ `ai-event-tool-contract` 3 ／ `docs/README` 2 ／ `repo-map` 1 ／ `ai-assistant-closure` 1 ／ traps 索引 1。余下 80 行散在 21 份**别条线**的台账里，大头逐份现量：`product-ux-optimization` 19、`multi-platform-widgets-progress` 8、`self-host-distribution-audit` 6、`legal-dataflow-ai-rights` 5、`goal-multi-end-coverage` 5、`legal-pipl-baseline` 4、`linux-adaptation` 4、`inbound-automation-handoff` 3（其余各 1–2）。成因两类，都写过在 §7：单元格里放了带竖线的命令，或行尾少一根 `|`。`check:md-tables` 的 `FILES` 只有 **12 份**、`docs/agents/` 下一份都不扫（现量：解析 `scripts/check-md-table-rows.mjs` 里那个数组），所以这些坏行**没有任何常驻判据会报**。⇒ M7 的形状：先把判据扩到 `docs/agents/` 与本线文件（**只加自己那片**），别线的坏行登记不代改。
+2. **全仓 markdown 表格形状**：同一把探针（跳代码围栏）分别跑 `git archive HEAD docs` 那棵树与工作树 —— **HEAD 现量 100 行坏、本批改后 80 行**，即修掉 **20** 行：`plans/README` 12 ／ `ai-event-tool-contract` 3 ／ `docs/README` 2 ／ `repo-map` 1 ／ `ai-assistant-closure` 1 ／ traps 索引 1。余下 80 行散在 21 份**别条线**的台账里，大头逐份现量：`product-ux-optimization` 19、`multi-platform-widgets-progress` 8、`self-host-distribution-audit` 6、`legal-dataflow-ai-rights` 5、`goal-multi-end-coverage` 5、`legal-pipl-baseline` 4、`linux-adaptation` 4、`inbound-automation-handoff` 3（其余各 1–2）。成因两类，都写过在 §7：单元格里放了带竖线的命令，或行尾少一根 `|`。`check:md-tables` 的 `FILES` 只有 **12 份**、`docs/agents/` 下一份都不扫（现量：解析 `scripts/check-md-table-rows.mjs` 里那个数组），所以这些坏行**没有任何常驻判据会报**。✅ **这一格 2026-10-21 已收**（形状就是上面那句：12 → 29 份，只加自己那片，别线那枚登记在门禁注释里）。读数与当场照出的 3 枚坏行见 §9.8。
 
 3. 🔴 **「文档里那条命令跑不跑得通」这一维本批逐条查完，结论是干净的**（写下来是防止下一位把这当"还没查"再查一遍）。探针：取全部 md 里 `pnpm <带冒号的脚本名>` 逐枚与**所有工作区**（root + `packages/*` + `apps/*` + `server`，共 278 个脚本名）比对，报 9 种"哪一档都没有"的名字；**逐条读原文后 9 条全是假阳性**，三种形状各占其数：
    · **写着"新增／提案"** —— `check:windows-dotnet`（`desktop-native-migration.md:161` 那格标着「（新增）」）、`verify:mobile-widget`（`research/native-widgets.md:244` 是方案句）。
    · **它自己就在讲"这条命令不存在"** —— `check:l4-no-style`（`multi-end-coverage-handoff.md:681` 明说真键是 `check:l4`，并给了"跑任何门禁前先列一遍键"的判据）、`check:evidence-md5`（`calendar-profile-handoff.md:1668` 讲的是**按唯一针脚把它从链里删掉**那段改写，同句现量 `grep -c evidence package.json` = 0）。
    · **划掉的历史坐标／禁碰件** —— `check:macos-removal`（`trash-and-archive.md:1652` 那格的证据文件名已被删除线否掉，原句留着）、`check:pricing-consistency` 与 `check:inbound-lane`（都在 `BLOCKED.md`，本线禁碰，上下文是提案与追记，不是"跑过"）。
-   ⇒ 别为这一维去"修"那 9 条，它们不需要修。值得建的是**把这条探针常驻**：形状 = 解析工作区脚本名 → 扫 md → 只把"陈述为已执行"的判红，提案／删除线／自曝不存在的句子逐条进豁免表并写理由（这跟 `check:doc-citations` 那张豁免表是同一个纪律）。归 M7。
+   ⇒ 别为这一维去"修"那 9 条，它们不需要修。值得建的是**把这条探针常驻**：形状 = 解析工作区脚本名 → 扫 md → 只把"陈述为已执行"的判红，提案／删除线／自曝不存在的句子逐条进豁免表并写理由（这跟 `check:doc-citations` 那张豁免表是同一个纪律）。✅ **已建**：2026-10-21 的 `check:doc-command-claims` 进链，形状与读数见 §9.8。
 4. ⚠️ 一条**结构层**的、本线不代改的不一致：仓库根 `PROGRESS.md` 的标题还是那一轮的（「AI 审计 + 域名迁移到 waytofuture.cn + 管理后台」），而这枚文件**2026-10-20 还在被追加**（现量 `git log -1 --format='%ad %h' -- PROGRESS.md`）⇒ 标题与用途已不符。它是并行会话共用的台账，**改标题会让按名字引用它的文档读到第二份"当前进度"**（现量 `grep -rl --include='*.md' -F 'PROGRESS.md' docs README.md AGENTS.md CONTRIBUTING.md \| wc -l` = 26 份），所以归属是"谁持有那本台账谁决定"。当前进度入口照旧只有 [`docs/agents/progress-log.md`](../agents/progress-log.md)（AGENTS §4 规则地图里登记着它）；根 `PROGRESS.md` **不在 `docs/README.md` §一 那张分层表里，也不该加进去** —— 它是会话台账，不是产品文档。
 
 ### 9.6 风险与不许做的事
@@ -400,10 +404,42 @@ mobile 已真渲染过同目录的 `ConflictResolutionView`），缺的全在宿
 1. `NotificationPrefsPanel`（`packages/ui`，W5 那节的内容体）**三行活动开关没有任何可见状态** ——
    只有 `aria-checked`，读屏拿得到、眼睛拿不到；同文件里的四档范围却用 `'◉ '/'○ '` 文本假装有控件。
    修法要动共享组件的文字层级与 `check:design` / `check:text-color` 两道口径，不在 M7 里顺手做。
-2. `check:doc-citations` 与 `check:md-tables` 的**作用域**（§9.5 第 1、2 条）—— 放开会把别线的台账一次做红。
+2. `check:doc-citations` 的**作用域**（§9.5 第 1 条）—— 放开会把别线的台账一次做红。
+   ⚠️ 原句里 `check:md-tables` 那一半**已经在 §9.8 做完了**（12 份 → 29 份），别再按原句读。
 3. `check:gate-wiring` 仍只审 `check:*`（现量 `grep -c verify scripts/check-gate-wiring.mjs` = 0）。
    本线用窄的 `check:collab-carrier` 先把"verify 必须有可验消费方"落地；把公共那把尺扩到全部 `verify:*`
    要给别的线那几十套验收逐条定载具 —— 那是别的线的判据口径，不替他们拍。
 4. 新查出的一类形状缺陷登记不代改：**22 枚 `ht-settings__*` 类名在 CSS 里没有定义**
    （现量：把 `apps/web/src/**/*.tsx` 用到的 `ht-settings__*` 与 `apps/web/src/styles/**/*.css` 定义的比对）。
    它们分属数据管理 / 帮助等**别的面**，本批只修了本线那一枚。
+
+### 9.8 M1 落地 + M7 那两格遗留（2026-10-21 第二批）—— 读数
+
+**M1「下行链路接通」**（三笔：宿主层 / web 接线 / 验收与装置）
+
+| 件 | 形状 | 这一趟的读数 |
+|---|---|---|
+| 宿主层 | `ShareOpDownloadPort` + `SharePayloadCodecPort` 两枚可注入端口；游标进 `ShareLogStorage`（`cursor/setCursor`）；分页撞上界**抛错**不返回半截；解不开 / 载荷不是字符串密文 / 线上没有作者时刻 ⇒ **抛错且不推进游标**（跳过 = 那条评论永远不出现，而界面会说"已同步"）；下行解密的 AAD 身份**整份复用线上那份** | `pnpm -r typecheck` rc=0；app-host `1871 passed`，其中新增 `tests/share-comments-pull.spec.ts` 9 条（含阳性对照"服务端头超前 ⇒ 游标只推到已消费那条"与"先落日志再推游标"） |
+| 🔴 真缺陷一枚（被自己的测试照出来） | 第一版把**已消费位置**和**服务端报的头**写成同一个变量 ⇒ "页里给 1、2 而头在 3"时游标被推到 3，第 3 条**永远不会再被拉**（静默丢 op）。拆成 `consumed` / `after` / `head` 三个量，判据与装置都留下来了 | 变异臂 B 红在那一条判据上（`红 2/2 红集精确匹配`） |
+| web 接线 | 游标存 `localStorage`（坏值当 0）；进评论区拉一次、之后每 5s 一轮；只有 `added > 0` 才重渲染；拉失败**不响**（文件头写明代价） | web `2344 passed`；外壳里零业务判断（路由/发不发/落盘都在 `@heyta/app-host`，AGENTS §3.5） |
+| 经真宿主 | `verify-collab-sync.mjs` 加**第 10 步**：真 `ShareApiClient` + 真密码学 + `createShareCommentsHost`，owner 发一条评论 ⇒ 另一台设备的新宿主拉回并物化，再拉一次零新增、游标落在盘上 | `RESULT=OK steps=10`（拉到 4 条是**对的**：那台新设备从游标 0 起，前面 3 条是第 5 步留下的信封与 op） |
+| 装置 | `research/tools/mutation-rigs/mutate-collab-pull-cursor.mjs` 三臂（游标不落盘 / 头当已消费 / 游标先于折叠） | `ARMS=pass (3/3)`、`byte-identical`；红集 4/2/1 条**精确匹配**，多红一条也算漂移 |
+
+🔴 **M1 没做到的那一半，写清楚是谁的**：两台真浏览器"互相看得到任务标题改动"仍然**走不通** ——
+不是下行腿坏了，是 `TASK/PROJECT` 的 op 至今进**个人** op-log，压根没进 share 日志。那是 M2
+（要新立一份 ADR）的路由那一步。所以下一行已按实测改口（§9.3），M1 的"界面那一半"随 M2 一起判。
+本片也没有实时订阅（`new_share_ops` 的接线是 M5），文件头边界里写着。
+
+**M7 那两格遗留**（§9.5 第 2、3 条明写"归 M7"、M7 主体那批漏下的）
+
+| 件 | 形状 | 读数 |
+|---|---|---|
+| `check:md-tables` 扩面 | 作用域 **12 → 29 份**（`docs/agents/` 13 份 + 本线 4 份）。加进来的前提还是"现量干净"，唯一没加的是 `docs/agents/environment-traps-index.md`（今天被并行线追加的那一行有 1 处坏，按"谁写谁收"登记在门禁注释里） | 扩面**当场照出 3 枚真坏行**：本线计划 §9.2 那一格把带竖线的正则写进了表格（列数 4 vs 3）、变异台架 README 里协作线那两枚行前面有一枚空行（在 GFM 里根本不是表格 —— M7-d 自己留下的）、别线那一枚。修完后门禁绿 |
+| `check:doc-command-claims`（新增，进链） | 只判"被陈述为现行可跑"的声称；提案 / 自曝不存在 / 删除线 / 历史戳 / **例子句**五种形状不算。豁免表 7 条逐条带理由 | `扫 250 份 md · 抓到脚本名 1036 处 · 现行声称 773 处 · 越界 0 处`；`SELF=OK arms=11 failed=0`；链 **121 → 122 段** |
+
+⚠️ 这一批两台台架各自的第一版都是坏的，都留成了臂：竖线转义成 `\|` 之后**在 JS 正则里是字面竖线**，
+那条取数命令静默打印空行；`check:doc-command-claims` 第一版的字符类漏了连字符 ⇒ 名字从第一个 `-`
+被截断、全仓假红 **486 处**。**假红比漏红好**：它响得让人去读原文，而"绿得没声音"没人会查。
+
+**下一步**：M3（rekey 落地 —— 把 `planShareRekey` / `reencryptShareRecord` 从"只有单测与验收脚本在调"接进生产路径）。
+判据依赖下行能读，这一趟之后那条依赖已经满足。
