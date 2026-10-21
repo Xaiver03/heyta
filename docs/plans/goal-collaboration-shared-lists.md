@@ -927,6 +927,22 @@ CARRIER=$HOME/heyta-carriers/heyta-wt-collab-m5 bash research/tools/b-reinstall-
 `docs/agents/progress-log.md` 那一节的**标题**到本轮还写着「本地成笔、全链门禁被别线绊线挡着」（2026-10-11）。它和它自己正文里那条 `git rev-list` 现量互相打脸 —— 属于上一轮"COMMENT 零写路径"那一族（同一个结论有好几种句子形状）。现量这一族还剩哪些形状：
 `grep -rn "本地成笔\|push 押在跨线协调\|绊线挡着" docs/plans docs/agents docs/research/*.md README.md` ⇒ 剩下的命中全在**带日期的交接记录**里（交接·三那几段），那是刻意保留的当时状态，不动；活口径只剩标题那一处，本轮改成"已进 `main` 并已 push；只剩四端重装那一格"，并把停止点 ② 那句"语义已定案"旁边补上 **B-10** 的限定（**语义已定 ≠ 这条路径是对的**）。
 
+### 本轮收口读数（01:5x，全部串行走完，不与那条 e2e 链并发）
+
+| 项 | 读数 |
+|---|---|
+| 文档门（六条，一次一条） | `check:md-tables` / `check:docs` / `check:doc-citations` / `check:doc-command-claims` / `check:docs-voice` / `node research/tools/docs-link-check.mjs` ⇒ **各 rc=0**（日志 `/tmp/rl-22/gate-*.out`） |
+| 提交与推送 | 本线那一笔只带本线三个 `.md`（`git commit -F - -- <三路径>`）⇒ push 前现量领先集 `git rev-list --count refs/remotes/origin/main..HEAD` = **1 笔、且那一笔是本线的**（不是替别线公开）⇒ `git push origin HEAD:main` rc=0（pre-push 的字节臂过：射程内 1 笔 / diff 51 行 / 在册值 21 枚 ⇒ 0 命中）⇒ 复量 `git rev-list --left-right --count refs/remotes/origin/main...main` 回 **`0 0`** |
+| `pnpm -r build` 这一格为什么还作数 | 那一笔的 `git show --stat` 只有三份 `.md` ⇒ **打包输入面零变化**，所以"载体里那次 rc=0"对当前 main 仍成立；载体随后被追平到本线那笔并**重跑过 `pnpm -r build` ⇒ rc=0**（`/tmp/rl-22/carrier-build.out`） |
+| 载体前置（本轮做完） | `git -C <载体> status --porcelain` 空 ⇒ `checkout --detach <main sha>` 追平；`pnpm-lock.yaml` 的 sha256 与主检出**逐字相同**（对账命令：`shasum -a 256 <载体>/pnpm-lock.yaml pnpm-lock.yaml \| awk '{print $1}' \| sort -u \| wc -l` 回 `1`）⇒ 沿用载体里那份 `node_modules`，没有软链 |
+| 就绪裁判（复量两趟） | 追平前 rc=3、4 项不成立；追平+重打后 rc=3、**只剩设备两格**：`⚠️ 0 台已启动模拟器且没传 IOS_DEVICE_NAME` + `❌ emulator-5554 不可达（adb 在线设备一个都没有）`。负载 7 ≤ 12、无并发 reinstall、目标树干净 —— 全绿只差设备 |
+
+🔴 **剩下这一格不是"等人有空"，是一条规则冲突，要产品负责人拍**（本线不自决）：
+`docs/agents/multi-end-build.md` §6.1 那条 2026-10-04 拍板写着「不要再在这台 Mac 上起新的 Gradle 构建或**模拟器**」（理由是资源：headless 模拟器 3.6G+ 常驻 / 90% CPU）；
+而同一条 §6.1 的边界又写着「Windows 侧没有 Android 模拟器，所以**设备侧验收目前仍在 Mac**」，且本线那枚就绪裁判自己就把起 AVD 的那一行打印出来当作开窗条件（它明写"环境准备不在本脚本里代跑"）。
+⇒ 这两句在"四端重装要在这台 Mac 上跑完"这件事上互相拉着。本线按红线停在这里：**判据与拍板口径不代改、那条禁令不自取例外**。
+可拍的两条路：① 给一次**单动作授权**（只允许 `emulator -avd heyta-w3-yearly -no-snapshot-save &` 这一发，随后由裁判 `--confirm` 点火，仍不动 Gradle 通道）；② 判定本轮四端重装不适用（本线这一轮改动面是服务端 + Web + 文档，移动端那一节评论区本来就还没挂 —— 但注意 `packages/ui`、`app-host`、`sync-client` 都被移动端消费，"输入没变"这句并不成立）。
+
 ### 下一步
 
 计划 §9.10 末节：**M2**（共享任务/清单的写路径路由 —— 要先立一份新 ADR），其后 M4 → M6。
