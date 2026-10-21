@@ -10,7 +10,8 @@
  * 步骤（由 e2e/tests/collab-journey.spec.ts 驱动 UI，本脚本只负责环境与读数）：
  *   1. 环境：验收库 + 迁移 + 服务端（TEST_MODE）+ vite dev。
  *   2. Playwright 双 context（owner / bob）跑旅程：
- *      owner 建清单 → 头部「共享」→ PIPL 同独同意 → 面板 → 邀请（一次性凭证）；
+ *      owner 建清单 → **断默认态下头部没有共享入口**（P-1）→ 设置里打开「共享清单（实验）」
+ *      → 头部「共享」→ PIPL 同意模态 → 面板 → 邀请（一次性凭证）；
  *      bob vault → 贴 token 入群 → owner 自动封信封 → bob 解钥 → 清单落侧栏；
  *      owner 面板对账出第二个成员。
  *   3. 证据：截图落 `e2e/collab-journey-results/`（固定路径，先截图再断言，

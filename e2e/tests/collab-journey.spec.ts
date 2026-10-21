@@ -109,6 +109,32 @@ async function establishVault(page: Page, passphrase: string): Promise<void> {
   await expect(page.getByTestId('settings-sheet')).toHaveCount(0);
 }
 
+/**
+ * 打开「共享清单（实验）」开关（设置 → 同步）。
+ *
+ * 🔴 这一趟走的是**真实用户路径**，不是往 localStorage 里塞值：入口默认关是产品裁决
+ * P-1（`docs/plans/collaboration-shared-lists.md` §9.2），所以"谁能打开它"本身就是
+ * 今天这条链的一部分，得被验一遍。默认态不可达那一句由
+ * `apps/web/tests/share-entry-experimental.spec.tsx` 在行为层钉，
+ * `check:share-entry-hidden` 在源码层钉。
+ */
+async function enableShareExperimental(page: Page): Promise<void> {
+  await page.getByTestId('account-menu-avatar').click();
+  await page.getByTestId('account-menu-settings').click();
+  await selectSettingsSection(page, 'sync');
+  const toggle = page.getByTestId('share-experimental-toggle');
+  await expect(toggle).toBeVisible();
+  // 先留图再点：这枚开关的**措辞**就是 P-1 的交付内容（"看不到彼此改动"必须写在界面上），
+  // 只断言可点击证不了那句话还在。名字用 01b 是为了不动既有 02–07 的引用。
+  // 🔴 必须先滚到它：这一节比一屏长，第一版留的图里开关和那句话**根本不在画面内**
+  //   （`toBeVisible()` 只要求有盒子，不要求在视口里 —— 一张看不到判据的图等于没取证）。
+  await toggle.scrollIntoViewIfNeeded();
+  await evidenceShot(page, '01b-owner-experimental-switch.png');
+  await toggle.check();
+  await page.getByTestId('settings-sheet-close').click();
+  await expect(page.getByTestId('settings-sheet')).toHaveCount(0);
+}
+
 /** 建清单并停在它上面（侧栏 + → 填名 → 创建 → 点它）。 */
 async function createProjectAndOpen(page: Page, name: string): Promise<void> {
   await page.getByRole('button', { name: '新建清单', exact: true }).click();
@@ -155,6 +181,10 @@ test('共享清单全旅程：owner 建共享 + 邀请 → bob 贴 token 入群 
   await establishVault(ownerPage, OWNER_PASSPHRASE);
   await createProjectAndOpen(ownerPage, '家庭装修');
   await evidenceShot(ownerPage, '01-owner-list-ready.png');
+
+  // 🔴 P-1 的默认态：停在自己的清单上、同步也配好了，入口**仍然不在**（不是隐藏样式，是不进 DOM）。
+  await expect(ownerPage.getByTestId('share-open-button')).toHaveCount(0);
+  await enableShareExperimental(ownerPage);
 
   // 头部「共享」→ PIPL 同意模态（方案 a）→ 确认。
   await ownerPage.getByTestId('share-open-button').click();
