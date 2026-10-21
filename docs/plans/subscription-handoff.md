@@ -191,7 +191,8 @@ AI 文件 import `@heyta/i18n`，所以 **`packages/i18n` 必须同一个提交*
 | 买更低档会不会把已付费能力判小 | ✅ 闸门 ④′：`409 PRICE_TIER_LOSES_GRANTS`，同样在冻结之前 | `grep -n "PRICE_TIER_LOSES_GRANTS" server/src/billing/checkout.routes.ts` |
 | 部署侧键位与运营者说明 | ✅ `MANAGED_AI_*` 四枚进 compose 白名单，`env.example` 有能照填的一段 | `grep -n "MANAGED_AI_ENABLED" server/docker-compose.yml` |
 | 设置页的 own/managed 开关 + 「本周期已用 X / 300」 | ✅ ADR-0054 §9.3 的前两件 | ADR-0054 §10.1 那张表 |
-| 真浏览器判据 | ✅ `e2e/tests/renew-panel.spec.ts` 五条（档位、换档清旧单、拒降档、503、只用本机零请求），且每条都按 §6.2 规定一第 3 条抓 `console`／`pageerror`／非 2xx | `cd e2e && npx playwright test tests/renew-panel.spec.ts` |
+| 真浏览器判据（**只有 web 那一枚**） | ✅ `e2e/tests/renew-panel.spec.ts` 五条（档位、换档清旧单、拒降档、503、只用本机零请求），且每条都按 §6.2 规定一第 3 条抓 `console`／`pageerror`／非 2xx | `cd e2e && npx playwright test tests/renew-panel.spec.ts` |
+| 🔴 **移动端那枚档位选择的证据到哪一步** | ⚠️ **只有形状判据，没有截图腿**。`apps/mobile/tests/renew-entry.spec.ts` 钉的是源码形状（档位取自 `CHECKOUT_TIERS.map`、不写死 priceId、屏上不写 `¥`/`$` 金额、同意闸门排在下单之前），行为那一半在 `packages/app-host/tests/checkout.spec.ts`。形状断言自己的牙已经落成件：`pnpm check:mobile-renew-shape` 四条臂各注入一次真实坏法。所以「移动壳有档位选择」这句话现在**只到"接线在 + 判据能红"，不到"画出来了"** —— §6.2 规定一要的图一张都没有（现量分母：`find . -iname "*renew*" -not -path "*/node_modules/*"` 里**全部**是 web 侧的 png） | `pnpm check:mobile-renew-shape`；`pnpm --filter @heyta/mobile test tests/renew-entry.spec.ts` |
 | 两道闸门有没有**能复跑的反臂** | ✅ `scripts/mutate-checkout-tier-gates.mjs`：逐臂把 `checkout.routes.ts` 改坏，要求具名用例变红；已进 `pnpm check` 链（不进链就是孤儿，`check:gate-wiring` 判这条） | `pnpm check:checkout-tier-gates` |
 
 ⚠️ 那套臂里 C3 钉的是**默认值**那一支（`options.managedAiConfigured ?? false`）。
@@ -221,6 +222,12 @@ AI 文件 import `@heyta/i18n`，所以 **`packages/i18n` 必须同一个提交*
 6. **管理后台的权益撤销面**：退款那一格**已经有面**（`refunds` tab + `GET/POST /api/admin/refunds`，
    现量 `grep -n "'refunds'" apps/web/src/features/admin/AdminPanel.tsx`）；
    缺的是**运营者手工撤销某用户权益**的那一枚控件 —— 归产品，不在本轮范围。
+7. **移动端续费那一屏没有截图腿**（§6.2 规定一那一格）：形状判据与它的臂都在（见 §10.2 那行），
+   但"画出来了"这件事**没有任何一张图证过**。补它要走模拟器那条腿：Metro 打当前源码 → iOS/Android
+   起壳 → ProfileScreen 滚到续费那块 → 截图并**人眼看**（前置与命令见
+   [`docs/agents/ui-acceptance.md`](../agents/ui-acceptance.md) 规定一第 1、2、4 条与
+   [`docs/plans/product-ux-optimization.md`](product-ux-optimization.md) 的设备腿台账；
+   ⚠️ 启动必须带 `HEYTA_NO_FOCUS=1`，不许抢前台）。归我方，工作量在设备那条腿而不是代码。
 
 ### 10.4 §1–§9 里已经过期的格子（别照它们判断现状）
 
