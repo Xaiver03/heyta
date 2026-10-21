@@ -78,7 +78,11 @@ export function RenewSection(): React.JSX.Element | null {
   const onRenew = async (): Promise<void> => {
     if (!privacyConsent.networkAllowed()) return;
     const config = readSyncConfig();
-    if (config === undefined) return;
+    if (config === undefined) {
+      // 这台设备没指向任何服务端 ⇒ 对用户就是"还没登录"这一件事，说同一句话。
+      setOutcome({ kind: 'failed', code: 'UNAUTHORIZED', status: null });
+      return;
+    }
     setPending(true);
     const next = await startCheckout({
       baseUrl: config.serverUrl,
@@ -94,7 +98,8 @@ export function RenewSection(): React.JSX.Element | null {
     }
   };
 
-  // 没同意出境 / 没配服务器时整块不出现 —— 与权益那块同一套"不猜、不难为用户"。
+  // 只有"没同意出境"会让整块不出现；"没配服务器"不是渲染闸门，它由按下之后的那句
+  // 「先登录你的 heyta 账号，才能下单。」来说（见 `onRenew` 里 config 那一支）。
   if (!privacyConsent.networkAllowed()) return null;
 
   return (

@@ -95,6 +95,19 @@ describe('移动端续费入口', () => {
     }
   });
 
+  it('🔴 没配服务器时按下「下单续费」不许静默', () => {
+    // 2026-10-22 iOS 设备腿实测：这台机上该块渲染了（同意过出境）、账号是「还没登录」，
+    // 按下之后**可及树一字未变** —— 没有进度、没有失败句，而 `fail.unauthorized`
+    // 那句「先登录你的 heyta 账号，才能下单。」永远走不到。
+    // 判据写成"两种合法修法任一"：壳里这一支自己报失败，或者把 app-host 的
+    // `UNCONFIGURED` 码接进 FAILURE_KEYS。只挡"什么都不说"这一种形状。
+    const src = codeOnly(renew());
+    const speaks =
+      /if \(config === undefined\)\s*\{[^}]*setOutcome\(/u.test(src) ||
+      /UNCONFIGURED:\s*'mobile\.entitlement\.renew\.fail\./u.test(src);
+    expect(speaks, '按下「下单续费」在没配服务器时不产生任何界面反馈 = 静默空转').toBe(true);
+  });
+
   it('ProfileScreen 挂上了它，且那两条冻结判据仍然成立', () => {
     const src = profile();
     expect(src).toMatch(/<RenewSection \/>/);
