@@ -17,7 +17,7 @@
  * 路由进 share log —— 计划 §9.3 的 M2），所以"两台设备在界面上互相看到同一条任务"
  * 这一腿今天量不到，只能量到宿主层。
  *
- * 十步：
+ * 十一步：
  *   1. 两个账号（owner / bob，TEST_MODE 真实 JWT）。
  *   2. owner 建共享 + 发邀请（裸 token 只出现一次）。
  *   3. bob 凭 token 接受（带封装公钥）→ editor。
@@ -34,11 +34,14 @@
  *  10. 🔴 宿主层闭环（M1 下行）：owner 的宿主写出一条评论 → owner 的第二台设备
  *      （新宿主 + 空日志）经 `pullShareOps` 拉回、解密、物化、读路径取到，
  *      再拉一次零新增且游标落在存储里。
+ *  11. 🔴 实时信号（M5）：真 `createRealtimeClient` 挂在这份共享上 → 有人写评论 ⇒
+ *      服务端经 WS 扇出 `new_share_ops(shareId, latestSeq)` → 宿主拉一次 ⇒
+ *      旁观设备报 `["added"]`，而写它的那一台同样拉到内容却**零活动**。
  *
  * 用法：
  *   node scripts/verify-collab-sync.mjs [--port 3211]
  *
- * 失败退出码 1 并打印 `RESULT=FAIL step=N`；通过打印 `RESULT=OK steps=10`。
+ * 失败退出码 1 并打印 `RESULT=FAIL step=N`；通过打印 `RESULT=OK steps=11`。
  */
 
 import { spawn, spawnSync } from 'node:child_process';
@@ -460,5 +463,92 @@ stepOk(
     `再拉一次零新增，游标落在 ${String(second.cursor)}`,
 );
 
+// ── 11. 🔴 实时信号（M5）：服务端扇出 ⇒ 在线设备收到 ⇒ 宿主拉一次 ⇒ 该响的响、不该响的不响
+//
+// 第 10 步证的是"想去拉就拉得回来"；这一步证的是"**不用人去拉**"—— 也就是撤掉
+// 评论区那枚 5 秒轮询之后，链路仍然成立。三段全是生产件：
+// `createRealtimeClient`（真 WS）、服务端 `notifyShareOps`（按成员账号扇、跳过写入方的
+// clientId）、`createShareOpsSignalHandler`（本机差集 + 活动判定）。零 mock。
+//
+// ⚠️ 两处如实的形状：
+//   · 宿主没有 `onOpen` 回调，连接是异步建立的，所以这里**写一条等一轮**地重试（最多 6 轮）。
+//     每轮都真写一条评论、服务端每次都扇出 ⇒ 最坏情况只是多写几条，而不是把判据放宽。
+//     `rounds` 与 `signals.length` 一起打出来，让下一位看得见花了多少轮。
+//   · 这一腿量不到"浏览器里弹出一条通知"：Notification 属于界面，而共享任务的路由
+//     （TASK op 进 share log）还没做（M2），所以"完成"那一档今天没有输入。
+step = 11;
+const signals = [];
+const signalDevice = client.createRealtimeClient({
+  baseUrl: BASE,
+  getToken: () => tokenOwner,
+  clientId: 'device-C-signal',
+  onNewOps: () => undefined,
+  onNewShareOps: (sid, latestSeq) => signals.push({ shareId: sid, latestSeq }),
+});
+signalDevice.connect();
+
+// （`sleep` 用脚本前面为服务端就绪探针声明的那一枚，不再重复声明）
+let rounds = 0;
+let got;
+while (rounds < 6 && got === undefined) {
+  rounds += 1;
+  const before = signals.length;
+  await writer.actions.addComment(HOST_TASK, `实时信号取证 ${runId} 第 ${rounds} 轮`);
+  for (let tick = 0; tick < 25 && signals.length === before; tick += 1) await sleep(100);
+  if (signals.length > before) got = signals[signals.length - 1];
+}
+if (got === undefined) {
+  signalDevice.dispose();
+  fail(`写了 ${rounds} 条评论，在线设备的一条 WS 里 ${String(signals.length)} 个 new_share_ops 都没收到（服务端扇出或客户端解析断了）`);
+}
+if (got.shareId !== shareId) fail(`信号里的 shareId 不是这一份：${String(got.shareId)}`);
+if (!Number.isInteger(got.latestSeq) || got.latestSeq <= 0) {
+  fail(`信号里的 latestSeq 不是正整数：${String(got.latestSeq)}`);
+}
+
+// 拉之前的日志与游标先留一份，好让"作者那一台"从**同一个起点**起跑
+// （否则它拉到的是零条，"不响"就成了没数据的假绿）。
+const preLog = readerStore.load(shareId);
+const preCursor = readerStore.cursor(shareId);
+
+const watcher = appHost.createShareOpsSignalHandler({
+  storage: readerStore,
+  pull: (sid) => reader.pullShareOps(sid),
+  myClientId: 'device-C-signal',
+});
+const seenByWatcher = await watcher.onShareOpsSignal(got.shareId);
+if (!seenByWatcher.pulled || seenByWatcher.added < 1) {
+  fail(`收到信号却没拉到新东西（pulled=${String(seenByWatcher.pulled)} added=${String(seenByWatcher.added)}）`);
+}
+if (JSON.stringify(seenByWatcher.activities) !== '["added"]') {
+  fail(`别人写的评论应报一条 added，实际 ${JSON.stringify(seenByWatcher.activities)}`);
+}
+
+const selfStore = makeLogStore();
+selfStore.save(shareId, preLog);
+selfStore.setCursor(shareId, preCursor);
+const selfHost = buildHost(selfStore, 'device-B-host');
+const authorView = await appHost
+  .createShareOpsSignalHandler({
+    storage: selfStore,
+    pull: (sid) => selfHost.pullShareOps(sid),
+    // 这批 op 是 device-A-host 写的：写它的那一台不需要被通知自己。
+    myClientId: 'device-A-host',
+  })
+  .onShareOpsSignal(got.shareId);
+if (!authorView.pulled || authorView.added < 1) {
+  fail(`作者那一台同样该真的拉到东西（pulled=${String(authorView.pulled)} added=${String(authorView.added)}）—— 否则"不响"只是没数据`);
+}
+if (authorView.activities.length !== 0) {
+  fail(`自己动手的事不该报活动，实际 ${JSON.stringify(authorView.activities)}`);
+}
+
+signalDevice.dispose();
+stepOk(
+  `WS 扇出：${rounds} 条评论换来 ${String(signals.length)} 个信号（latestSeq=${String(got.latestSeq)}）；` +
+    `旁观设备拉到 ${String(seenByWatcher.added)} 条并报 ["added"]，` +
+    `作者设备同样拉到 ${String(authorView.added)} 条却零活动`,
+);
+
 cleanup();
-console.log('\nRESULT=OK steps=10');
+console.log('\nRESULT=OK steps=11');
