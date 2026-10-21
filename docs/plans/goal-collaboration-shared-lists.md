@@ -823,22 +823,30 @@ E 勾选后不切实心→1 红；F 主按钮文字配对坏→1 红。还原后
 `bash research/tools/b-reinstall-readiness.sh`（仓里那道默认 dry-run 的就绪裁判）现量 **exit 3，两条前置不成立**：
 
 1. 「目标树里有 **179 枚未提交的打包输入**」—— 是 AI 线正在写的 `apps/*/src` 与 `packages/*`，装进四端就是别人的半成品。
-   门自己给的解法是 `CARRIER=<干净载体>`（隔离检出从 HEAD 打包）。**本线没有起那枚载体**，理由写清楚：
-   它解掉的只是第一条，而另一条不在我手上 ⇒ 起了也跑不完，且 main 一天推进几十笔，现在钉住的载体到点火那天已经漂了。
+   门自己给的解法是 `CARRIER=<干净载体>`（隔离检出从 HEAD 打包），**这一条已经解掉了**：
+   载体 `~/heyta-carriers/heyta-wt-collab-m5`（`git worktree add --detach … HEAD`，`pnpm install` 4.7s 装完，
+   软链指本树 —— 反查 `readlink <载体>/apps/web/node_modules/@heyta/domain`），
+   对着它复量就绪裁判 ⇒ `✅ 目标树…没有未提交改动` ＋ `✅ 载体新鲜：… == 主检出 HEAD`。
 2. 「Android 段目标 `emulator-5554` 不可达；当前 adb 在线设备：一个都没有」—— 本线 AVD 是 `heyta-w3-yearly`，
    裁判明文「环境准备**不在本脚本里代跑**（起 qemu 会把负载顶上去，别人的 adb 因此超时）」，而 AGENTS §6.1 的新规是**别在这台 Mac 上起模拟器**。
    ⇒ 这一条**归人**：要么起那台 AVD，要么给一台 adb 可达的设备。
    按 §6.1.1 那条「缺一端设备就别装其余三端（四端不同代比整轮没跑更难收拾）」，**没有**用 `--only` 先装 mac/windows/ios 三端。
+3. 复量时还多了一条会自己消的：`❌ 负载 37 > 12`（同一趟早些时候主检出处是 7.95 —— 那 37 里有我这趟建载体与并发验收造成的份额）。
+   **负载这一格按"等几分钟"排队，不登记成阻塞**（见记忆里那条"窗口按分钟级开合"）。
 
-其余现场读数（同一趟）：负载 `7.95`（阈值 12，过）；没有别的 `reinstall-all` 在跑；没有 `verify-mobile-*` 在跑；
-`notarytool` 空；已启动模拟器**恰好一台** `heyta-iphone-17pro`；`ssh windows-pc` 回 `SSHECHO=OK`；数据卷余量 68Gi。
+其余现场读数（同一趟）：没有别的 `reinstall-all` 在跑；没有 `verify-mobile-*` 在跑；`notarytool` 空；
+已启动模拟器**恰好一台** `heyta-iphone-17pro`；`ssh windows-pc` 回 `SSHECHO=OK`；数据卷余量 68Gi。
 
-**下一位照这两行点火**（先起 AVD，再让就绪裁判自己点头 —— 它的 `--confirm` 分支只在全绿时才执行）：
+**下一位照这两行点火**（先起 AVD，再让就绪裁判自己点头 —— 它的 `--confirm` 分支只在全绿时才执行；
+裁判只认 `CARRIER=` 这个**环境变量**，写成参数会被判「未知参数」退 1）：
 
 ```bash
 /opt/homebrew/share/android-commandlinetools/emulator/emulator -avd heyta-w3-yearly -no-snapshot-save >/dev/null 2>&1 &
-IOS_DEVICE_NAME="heyta-iphone-17pro" CARRIER=<干净载体> bash scripts/reinstall-all.sh   # 载体配方见记忆 heyta-reinstall-in-isolated-worktree
+CARRIER=$HOME/heyta-carriers/heyta-wt-collab-m5 bash research/tools/b-reinstall-readiness.sh          # 全绿才继续
+CARRIER=$HOME/heyta-carriers/heyta-wt-collab-m5 bash research/tools/b-reinstall-readiness.sh --confirm # 点火
 ```
+⚠️ 点火前若 main 已经前进，先把载体追平（`git -C <载体> checkout --detach <main sha>`）；
+`pnpm-lock.yaml` 的 sha256 逐字相同就可以直接沿用载体里那份 `node_modules`（不同就别软链过来，让它自己装）。
 
 ### 下一步
 

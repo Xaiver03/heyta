@@ -35,7 +35,7 @@ E2EE 下的**清单共享**基础设施（ADR-0062）已实现并**本地提交*
   游标落盘、进评论区先拉一次、`verify:collab-sync` 的宿主层那一格经真宿主验过（步数由脚本自己打印，别在这里抄）。
   仍然断的是**任务与清单的写路径**：`packages/app-host/src/project-actions.ts` 里唯一的 share 相关方法照旧只有 `setProjectShareId`，
   没有任何 share 分流 ⇒ 成员互相看得到对方写的评论，**看不到对方改的任务**（那是 M2，要先立 ADR）。
-  实时信号 `new_share_ops` **已经不接了**（2026-10-21 M5：客户端认下、宿主判断该不该拉、`@heyta/ui` 那条谓词决定响不响，5 秒轮询已撤）——
+  实时信号 `new_share_ops` **已经接上了**（2026-10-21 M5：客户端认下、宿主判断该不该拉、`@heyta/ui` 那条谓词决定响不响，5 秒轮询已撤）——
   但它今天搬运得到的仍然只有评论那一族，理由与上面那格同一个：`TASK` 的 op 还没进 share log。
   ⇒ 逐条见本线计划 `docs/plans/collaboration-shared-lists.md` §9.1 那张现状表与 §9.7–§9.10（M7 / M1 / M3 / M5 各一批读数）。
 
