@@ -7165,3 +7165,11 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
     ⑥ 为什么这一类**不会有门禁来报**：`check:pricing`／`check:ai-quota` 钉的是数字与键，不钉散文里的通道名与"能不能买"。现量 `grep -rl "WECHAT_PAY_ENABLED" scripts research/tools` 只回 **1** 枚（那枚读的是 compose）。⇒ 结论：**抄件要各自维护**，能钉的只有"唯一事实源那一格"。
     ⑦ 读数（串行）：`check:docs`／`check:md-tables`／`check:doc-citations`／`check:pricing`／`check:ai-quota`／`check:payment-entry`／`check:server-env` 七道**各 rc=0**。
     ⑧ 本条动 `docs/reference/pricing-and-entitlements.md`、`docs/plans/launch-blockers.md`、`docs/plans/subscription-handoff.md`、`PROGRESS.md` 四枚；代码零处、compose 零处、判卷口径零处。同树他人会话在飞的脏件一枚不 stage。AC 已勾数现量 **0**（`grep -rn "^- \[x\]" docs/plans/inbound-automation*.md | wc -l`）。
+
+165. 🟢 **10-21 11:4x（核"闸门 ① 是不是漏了一枚能力"——结论是没漏，但理由必须写下来，否则下一位会顺手补错）**（写前先跑 `date`，本机 11:49）
+    ① 起因是上一笔那条否证之后剩下的最后一个问题：`hosted-ai-monthly` 的 `grants` 是**三枚**（`hosting`/`ai`/`automation`，现量 `grep -n "hosted-ai-monthly" server/src/billing/price-book.ts`），而闸门 ① 只判 `ai` 那一枚 —— 看起来正是"卖了交付不了"的同一个洞。顺着查到底：`automation` 的**运行时前置**不存在（`inboundAutomationRoutes` 在 `server/src/server.ts` 里是**无条件注册**的，没有 `MANAGED_AI_*` 那种实例级开关），所以它不是一个"这台实例交付不了"的形状，而是"这个能力今天还不许对外承诺"的形状 —— 后者归 [`ADR-0060`](docs/adr/0060-automation-entitlement-and-retention.md) 的发布门槛管，不归收银台。
+    ② 🔴 而那条 ADR 的第一句正好**否证了"因此不许卖 ¥12"这个推论**：「**现有 AI 档的既有购买能力不因本功能开发而关闭**」（现量 `grep -c "既有购买能力不因本功能开发而关闭" docs/adr/0060-…md` 回 1）。它管的是**对外承诺那一层**，而承诺那一层今天是对的：落地页 ¥12 那三条 feature **没有一条提自动收集**（`grep -c "landing.pricing.hostedAi.feature" packages/i18n/src/locales/zh-CN.ts` 回 3，逐条读下来是"上一档全部 / 云端 AI 300 次 / 自带端点免费不限次"），CTA 仍是「即将开放」。⇒ **闸门 ① 只判 `ai` 是正确形状，不是遗漏**；要动的是"这一档给不给 `automation`"，那是**改商业裁决**（负责人 10-07 那句"不新建 SKU、不改售价"），不在本轮。
+    ③ 那六条缺口**仍未闭合**这一事实也现量过，不是照抄 §2.2 那句话：`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` 回 **0**（未勾 8）。⇒ 这一格与任务书"AC 勾选数保持 0"是同一枚读数，本轮没有动它。
+    ④ 判据落点：交接书 §10.2 新增一行「闸门 ① 只看 `ai` 是有意的，别顺手补全」，带两条现量命令与"真要改该改哪一层"。**没有新立门禁**——这一类的正确落点是判据旁边的注释与交接格，而不是一把今天就得为别人的线变红的尺（"不能失败的检查没有价值"，反过来"一出生就红的检查也不是判据，是人质"）。
+    ⑤ 读数（串行）：`check:docs`／`check:md-tables`／`check:doc-citations` **rc=0**（本条只动文档）。
+    ⑥ 本条动 `docs/plans/subscription-handoff.md`、`PROGRESS.md` 两枚；代码零处、grants 表零处、i18n 零处。同树他人会话在飞的脏件一枚不 stage。AC 已勾数现量 **0**（`grep -rn "^- \[x\]" docs/plans/inbound-automation*.md | wc -l`）。
