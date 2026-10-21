@@ -809,6 +809,10 @@ E 勾选后不切实心→1 红；F 主按钮文字配对坏→1 红。还原后
 
 `pnpm -r typecheck` rc=0；`pnpm --filter '!@heyta/sync-server' -r test` rc=0（分母对账：有 `test` 脚本的包数 == 打 `Tests` 汇总行的包数）；
 `pnpm -r build` rc=0；`pnpm verify:collab-sync` ⇒ `RESULT=OK steps=11` rc=0；`pnpm verify:collab-journey` ⇒ `RESULT=OK steps=3` rc=0。
+> 📌 顺带销一格旧账：交接·二/三那两批把 `check:reachability` 的"断言 B ⇒ `COMMENT` 已建模零写路径"记成本线的绊线。
+> 2026-10-22 01:3x 现量它 **rc=0**（`✅ COMMENT 1 处：packages/app-host/src/comment-actions.ts`）—— 那一米 M1/M5 接上之后它就不再红了。
+> 同一句话还留在两处别人的台账里（traps §7 第 407 条那张表的「现量」列、`remote-linux-host-and-disk-reclaim.md` §那张归属表），
+> 两处都已按"这句话现在不成立 + 现量命令"改口，别让人照它等。
 
 `pnpm check` 那一条 `&&` 链**现量 122 段**（分母现取：`node -e 'console.log(require("./package.json").scripts.check.split(" && ").length)'`），
 它在第 21 段 fail-fast，所以"这条链红"不等于"后面都红"——把第 21 段之后的 101 段逐段单跑，红四格，**逐格归因**：

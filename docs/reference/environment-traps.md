@@ -9582,6 +9582,11 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     关联：§7 第 195 条（默认 prop 把"没接"伪装成"做完了"）、第 404 条那族"写法≠语义"、
     以及本线 `docs/plans/goal-collaboration-shared-lists.md` 的「2026-10-11 交接·三」。
 
+    📅 **这张表的「现量」那一列冻在 2026-10-11 那一刻**，别当今天的状态读：2026-10-21 M5 之后评论那一米接上了
+    （挂载 `apps/web/src/features/share/ShareCommentsSection.tsx`、写路径与下行 `packages/app-host/src/share-comments.ts`），
+    2026-10-22 01:3x 现量 `pnpm check:reachability` ⇒ **rc=0**，它给 `COMMENT` 打的是
+    `✅ COMMENT 1 处：packages/app-host/src/comment-actions.ts`。这一格记的是**当时那次 grep 抓到的错法**，不是现在的清单。
+
 408. 🔴 **文档里那句"这一层在本机跑不了"是瞬时读数 —— 沿用它的下一次对数审计，分母自己就是错的。**
 
     `AGENTS.md` §6 长期挂着「沙箱里跑不了 `@heyta/sync-server`（`prisma generate` EPERM），
