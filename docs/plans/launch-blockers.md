@@ -68,7 +68,13 @@ heyta 现在还不能对外发布。挡上线的只剩 4 件 —— 全都只差
 > 要现量：`grep -oE "今天|当日|现在|今日" docs/plans/launch-blockers.md | wc -l`（与 `AGENTS.md` 对 traps 条数的处理同一形状）。
 
 **客户端二进制「发出去过」，但「对外正式发布」一条端都没走完；而且今天什么都还卖不出去**
-（`WECHAT_PAY_ENABLED` 生产没配 ⇒ 结账回 `503 BILLING_PROVIDER_NOT_CONFIGURED`，**没有通道**）。
+（**这台实例没配支付中心凭证** ⇒ 结账回 `503 BILLING_PROVIDER_NOT_CONFIGURED`，**没有通道**。
+现量 `grep -n "PAYCENTER_ENABLED" server/docker-compose.yml`。
+⚠️ 这一句原先写的是 `WECHAT_PAY_ENABLED` —— **那枚开关已经退场**：`config.ts` 现在对
+`=true` 直接启动期硬错误，收单统一走支付中心（`grep -n "微信直连不再注册" server/src/billing/registry.ts`）。
+另：¥12 那一档在这条之上**还叠一件**部署态 —— 没配 `MANAGED_AI_*` 时它在冻结之前就被
+`409 PRICE_NOT_SELLABLE` 拒掉，所以"卖不出去"的原因可能是**两**个开关，见
+[subscription-handoff.md](subscription-handoff.md) §10.2）。
 > 🔴 **⇒ 判断（这才是"还差什么"的答案）**：
 > **差的不是"更多功能"，而是四道外部闸门 + 一次射程决定。**
 > · **四道外部闸门**：备案号（业主勾一个框，`A5`）· 律师说行（`A6`）· 支付通道资质（`B8`）· App Store 点提交（`A4`）—— **没有一条是"写代码"能推的**（§0.2）。
