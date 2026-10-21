@@ -7317,3 +7317,14 @@ python3 research/tools/verify-inbound-check-chain.py --logs <dir> --from 100 --t
     ⑥ 🔴 **本条自己贡献两处过程错，都记下来（这两形的代价不是"难看"，是下一位按错时刻排队 / 按少的条数打勾）**：
         ㈠ **戳号凭"现在几点"写，没按落盘时刻取**：四道门实际跑在 **21:48**（`stat -f '%Sm'` 现取那件 `/tmp` 输出），我落笔已是 22:1x，于是把读数 stamp 成了 22:0x。⇒ 这正是记忆里那条"跨空闲段的读数用 mtime 反取、写的时刻与跑的时刻分两栏"——**规矩在，动作没执行**。⇒ 固化成一步：**凡是隔了一轮以上再落笔的读数，落笔前先 `stat` 那件输出**，别用"我记得刚跑完"。
         ㈡ **编辑分条列表时把 ② 整条吞进 ① 那一行**：我用一次 Edit 替换 ① 的句尾，`old_string` 里带了行尾换行而 `new_string` 没带 ⇒ 两条并成一行，**内容一字没丢、形状坏了**，而 markdown 渲染与"按行打勾"的人都会把 ② 当没登记。⇒ 发现方式不是重读全文，是 `grep -n '^186\.' -A6` **逐条点名 ①②③④⑤ 各占一行**——这一步本该在每次编辑台账分条格之后立刻做（本仓"横切臂另列一张表反查"的同一条道理，用在**自己的正文形状**上）。
+
+187. 🟢 **补上第 3 步欠的那条设备腿：iOS 无头模拟器真跑真看图，并当场抓出一枚在空转的下单按钮**（写前先跑 `date`，本机 00:22）。
+    ① **载体**（复跑前先现量，别照抄）：`xcrun simctl list devices booted` 那枚 `heyta-iphone-17pro` + Release 包（`pnpm --filter @heyta/mobile build:ios`，`** BUILD SUCCEEDED **`／BUILD_RC=0，jsbundle 00:15 落盘）+ 本机 TEST_MODE 服务端 `http://127.0.0.1:3177`。全程无头（`simctl boot`／`simctl io screenshot`），**没抢前台**。
+    ② **三张像素各证一件事**（`apps/mobile/evidence/renew-ios-20261022/`，每张都人眼看过）：档位块渲染 + 两枚 `renew-tier-*` 在可及树上 + **屏幕上没有任何金额**；换档后说明句换成带「这一步会把内容发到我们的服务器，它不受端到端加密保护」那一条 ⇒ ADR-0054 §7 要的位置是**按下下单之前**；未登录按下之后红色失败语「先登录你的 heyta 账号，才能下单。」出现。
+    ③ 🔴 **这一腿真正的收获**：未登录时那块**照样渲染**（唯一渲染闸门是出境同意，`readSyncConfig()` 从来不是），而 `onRenew` 在 `config === undefined` 那一支**直接 return** ⇒ 按下之后可及树一字未变、**两个像素都没动**（证据形状：换档那张与按下后那张 **sha256 逐字节相同**，现量 `shasum -a 256 apps/mobile/evidence/renew-ios-20261022/*.png`）。后果是 `mobile.entitlement.renew.fail.unauthorized` 那句在移动壳里**永远走不到** —— 词条、映射、判据全在，缺的只是一条能到它的路径。
+    ④ **修法**：那一支改报 `UNAUTHORIZED` 失败，复用已入库的那句，**不新增文案、不动 locale**；判据 `apps/mobile/tests/renew-entry.spec.ts` 新增「没配服务器时按下不许静默」，写成"两种合法修法任一"（壳里自己报，或把 app-host 的 `UNCONFIGURED` 接进映射），只挡"什么都不说"这一种形状。**反臂两戳**：00:12 改代码之前红（`AssertionError: … expected false to be true`）／00:13 之后 10/10 绿。
+    ⑤ **同 tip（`c59ccdce2`）上的读数**：`apps/mobile` 全量 `vitest run` 78 个文件全过 · `pnpm check:payment-entry` rc=0（臂数由脚本自己打印，这里不抄）· `pnpm check:i18n-vars` rc=0 · `apps/mobile` typecheck rc=0。
+    ⑥ ⚠️ **这一组截图的载体是工作树，不是 HEAD**：`git status --porcelain -- packages/i18n` 现量到 `{zh-CN,en}.ts` 当时正被另一会话改着（renew 那批键本身已入库且没被它动）。⇒ 下一位要 HEAD 纯的那一张，得在干净载具里重打一次。
+    ⑦ **还欠的两格**（已写进 `subscription-handoff.md` §10.3 第 7 格与 §10.8）：`PRICE_NOT_SELLABLE` 那句要设备上**真登录一次**才拍得到（本轮那台机是「还没登录」态）；Android 侧一张都没有（出包与真机走 `windows-pc`，不在本机跑 Gradle）。
+    ⑧ **本条自己贡献两处过程错**：㈠ 新判据第一版把 `u` 写到正则字面量外（`/…/.u.test`）⇒ `TypeError`，输出长得像"判据抓到了违规"而真因是探针坏（§7 元规则一）——认出来的办法是读失败原因那一行，不是读"它红了"；㈡ **我往 §10.8 表里写的那枚现量针带反引号又套在双引号里**（`"testID={\`renew-tier"`）⇒ 在 shell 里是命令替换，**跑不动**，交文档前把命令逐枚现跑一遍才发现——这正是 §10.6 那一格立的规矩，我第一版又违反了它。
+    ⑨ 本条动 `PROGRESS.md`（纯追加）· `docs/plans/subscription-handoff.md`（§10.3 第 7 格改口 + 新增 §10.8）· `apps/mobile/src/screens/RenewSection.tsx`（行为）· `apps/mobile/tests/renew-entry.spec.ts`（判据）· `apps/mobile/evidence/renew-ios-20261022/`（四张图）；AC 勾选数现量 `grep -c '^- \[x\]' docs/plans/subscription-handoff.md` 保持 **0**。

@@ -233,12 +233,14 @@ AI 文件 import `@heyta/i18n`，所以 **`packages/i18n` 必须同一个提交*
 6. **管理后台的权益撤销面**：退款那一格**已经有面**（`refunds` tab + `GET/POST /api/admin/refunds`，
    现量 `grep -n "'refunds'" apps/web/src/features/admin/AdminPanel.tsx`）；
    缺的是**运营者手工撤销某用户权益**的那一枚控件 —— 归产品，不在本轮范围。
-7. **移动端续费那一屏没有截图腿**（§6.2 规定一那一格）：形状判据与它的臂都在（见 §10.2 那行），
-   但"画出来了"这件事**没有任何一张图证过**。补它要走模拟器那条腿：Metro 打当前源码 → iOS/Android
-   起壳 → ProfileScreen 滚到续费那块 → 截图并**人眼看**（前置与命令见
+7. ~~**移动端续费那一屏没有截图腿**~~ ⇒ **iOS 那一半 10-22 00:1x 已跑掉，见 §10.8**（那一趟还顺手抓出一枚在空转的按钮并修了）。
+   原判据「"画出来了"这件事没有任何一张图证过」现在只对**两件事**：① `PRICE_NOT_SELLABLE` 那句要设备上**真登录一次**才拍得到；
+   ② Android 那一侧一张都没有（出包与真机走 `windows-pc`，不在本机跑 Gradle）。
+   ⚠️ 复现口径与原文不同的一点：本轮用的是 **Release 包内嵌 jsbundle**（`pnpm --filter @heyta/mobile build:ios` 那条 xcodebuild），**没走 Metro**
+   —— 好处是它证的正是用户会拿到的那一枚产物，代价是改一行源码要重打一次包（约 90s）。
+   起壳与截图全程无头（`simctl boot` + `simctl io screenshot`），**没抢前台**；前置与命令见
    [`docs/agents/ui-acceptance.md`](../agents/ui-acceptance.md) 规定一第 1、2、4 条与
-   [`docs/plans/product-ux-optimization.md`](product-ux-optimization.md) 的设备腿台账；
-   ⚠️ 启动必须带 `HEYTA_NO_FOCUS=1`，不许抢前台）。归我方，工作量在设备那条腿而不是代码。
+   [`docs/plans/product-ux-optimization.md`](product-ux-optimization.md) 的设备腿台账。归我方。
    ⚠️ 现量（为什么不能拿手边那张旧图交差）：`grep -o 'mobile.entitlement.renew.tierTitle' apps/mobile/ios/build/Build/Products/Release-iphonesimulator/Heyta.app/main.jsbundle | wc -l` 回 **0** —— 那枚 10-20 的包**里根本没有档位选择**，用它拍图就是拿旧产物冒充当前产物。
    🔴 **这一格原先用的探针被本会话自己否证并换掉了**（10-21 17:3x）：旧写法拿 `renew-tier-hostedAi` 当针，而源码里那枚 `testID` 是**模板拼出来的**（现量 `apps/mobile/src/screens/RenewSection.tsx:108` = `` testID={`renew-tier-${id}`} ``；行号 ~~`:107`~~ ⇒ **19:1x 复取 `:108`**，往下挪一行的成因是本线自己在同一文件上方补了那枚失败码映射，见 §10.2 那格 18:3x 那一趟）⇒ **任何构建都取不到非零**，那是一枚永远 0 的探针，它给的"旧包没有档位"其实没证成任何东西。换的针是**词条字面**：同一枚包里 `mobile.entitlement.renew.payHint`（10-05 进源码）出现 **1** 次，而 `…tierTitle`（10-21 00:31 进源码，`git log -S` 现量）出现 **0** 次 ⇒ 打包确实保留这类键字面，"0"才真的是"这一版没有"。
    🔧 **这一腿的前置比看上去小，四项都已现量**（写给下一个接手的人，省得重新推）：
@@ -308,7 +310,9 @@ AI 文件 import `@heyta/i18n`，所以 **`packages/i18n` 必须同一个提交*
 
 - **运营/运维**：填 `MANAGED_AI_*`（+ 确认 `PAYCENTER_*`）→ 重建镜像 → 用一次真实小额下单验通路与到账回执；删掉本机旧的 `WX_*`。
 - **法务/负责人**：过一遍 `packages/legal`（含把"这一档仍打不开"按 §10.3 第 1、3 格的前提改掉）。
-- **我方下一轮能自己做**：管理后台权益撤销控件（§10.3 第 6 格）、`tools` 转发的工程侧方案（先出计划，拍板归负责人）、**移动端那一屏的截图腿**（§10.3 第 7 格：四项前置都已现量，缺的是模拟器/真机那一趟，不是代码）。
+- **我方下一轮能自己做**：管理后台权益撤销控件（§10.3 第 6 格）、`tools` 转发的工程侧方案（先出计划，拍板归负责人）。
+  ~~**移动端那一屏的截图腿**（§10.3 第 7 格：缺的是模拟器/真机那一趟，不是代码）~~ ⇒ **10-22 00:1x 已跑掉大半**：档位块、换档后的出境警告、未登录按下后的失败语三张像素都取到并人眼看过，
+  而且那一趟抓到并修掉了一枚真缺陷（见 §10.8）。**还欠的那半**：`PRICE_NOT_SELLABLE` 的句子要在设备上**真登录一次**才拍得到（本轮那台机是「还没登录」态）。
 - **产品/文案**：三枚"真会到达但没映射"的失败码要人话句子（`CHECKOUT_FAILED`／`PRICE_NOT_EFFECTIVE`／`PROVIDER_CURRENCY_UNSUPPORTED`，形状与依据都在 §10.2 那一格）——**本线不代写**，因为那三句是对用户陈述钱的状态。
 - **负责人**：gitee 那四条出路选一条（甲／乙／丙／丁，全文与体积账在 `BLOCKED.md` 的 **B243 追记三 ⑧**；下一格只写今天这条路被拒的读数）。
 - ⚠️ **两枚远端现在不对称**（不是本线的事，但会影响"以哪枚为准"）：`gitee` 从今天起收不进任何 push
@@ -322,4 +326,34 @@ AI 文件 import `@heyta/i18n`，所以 **`packages/i18n` 必须同一个提交*
   代价是**双端强推**重写所有下游克隆 ⇒ 归负责人拍。证据、分母口径与五步预案在 `BLOCKED.md` 的 **B243 追记**。
   ⚠️ 负责人 10-21 问过「会不会有些东西不该提交上去」——那一趟的**体积分账**（当前那一屏占多少、只被旧代际需要的有多少、哪两枚是真错提交、哪一类是有意决策）在 **B243 追记三**，
   它同时否证了两条看起来便宜的出路：「重复截图能省」＝**不成立**（同一 sha 对象库只存一份），「按大类看前缀就够」＝**不成立**（那次漏掉了更大的一侧）。
+
+### 10.8 移动端那一屏的像素取证（2026-10-22 00:0x–00:1x），以及它抓到的一枚真缺陷
+
+**载体**（复跑前先 `xcrun simctl list devices booted` 与 `lsof -nP -iTCP:3177 -sTCP:LISTEN` 现量，别照抄下面这组）：
+无头 boot 的 `heyta-iphone-17pro` + `apps/mobile` 的 Release 包重装 + 本机 TEST_MODE 服务端 `http://127.0.0.1:3177`。
+🔴 **这一组截图的载体是工作树，不是 HEAD**：当时 `packages/i18n/src/locales/{zh-CN,en}.ts` 正被另一会话改着（`git status --porcelain -- packages/i18n` 现量），
+而 renew 那批键本身已入库且没被它动过 —— 所以"屏幕上这句话"与"这句话在 HEAD 里"是两件事，下一位要 HEAD 纯的那一张，得在干净载具里重打。
+
+**证到的三件事**（图在 `apps/mobile/evidence/renew-ios-20261022/`，每张都人眼看过）：
+
+| 图 | 证的是 | 怎么自己核 |
+|---|---|---|
+| `1-tier-picker-default-hosted.png` | 档位块出现在「我的」屏，两枚按钮都在可及树上，默认实心在**低档**那一枚，且**屏幕上没有任何金额** | `grep -n 'renew-tier-' apps/mobile/src/screens/RenewSection.tsx`（⚠️ 这枚针**别写成双引号带反引号**：那在 shell 里是命令替换，跑不动 —— 本条刚为此改过一次） |
+| `2-tier-picker-ai-egress-warning.png` | 换档后说明句换成带「这一步会把内容发到我们的服务器，它不受端到端加密保护」的那一条 ⇒ ADR-0054 §7 要的位置是**按下下单之前** | `grep -n "不受端到端加密保护" packages/i18n/src/locales/zh-CN.ts` |
+| `4-AFTER-fix-press-says-login.png` | 未登录时按下「下单续费」，红色失败语「先登录你的 heyta 账号，才能下单。」出现 | `grep -n "renew.fail.unauthorized" apps/mobile/src/screens/RenewSection.tsx` |
+
+🔴 **这一腿真正的收获不是三张图，是抓出一枚在空转的按钮**：未登录时那一块**照样渲染**（唯一的渲染闸门是出境同意，
+`readSyncConfig()` 从来不是渲染闸门 —— 而它上面那句注释一直写着"没配服务器时整块不出现"），
+按下之后 `onRenew` 在 `config === undefined` 那一支**直接 return** ⇒ 可及树一字未变、**两个像素都没动**。
+像素级的对照证据是现成的：`2-…` 与 `3-BEFORE-fix-press-was-silent.png` 的 sha256 **逐字节相同**（`shasum -a 256 apps/mobile/evidence/renew-ios-20261022/*.png` 现量）。
+后果是 `mobile.entitlement.renew.fail.unauthorized` 那句在移动壳里**永远走不到** —— 词条、映射、判据全在，就是没有一条路能到它。
+
+**修法**（一处，`apps/mobile/src/screens/RenewSection.tsx` 的 `config === undefined` 那一支）：改成报 `UNAUTHORIZED` 失败，
+复用已入库的那句，**不新增文案**、不动 locale。判据落在 `apps/mobile/tests/renew-entry.spec.ts`
+（「没配服务器时按下「下单续费」不许静默」，写成"两种合法修法任一"，只挡"什么都不说"这一种形状）。
+**反臂现量**：加判据之后、改代码之前它是红的（`AssertionError: … expected false to be true`，00:12），改完之后 10/10 绿；
+`apps/mobile` 全量 `vitest run` 78 个文件全过，`pnpm check:payment-entry`／`check:i18n-vars` 各 rc=0（00:18–00:19，tip `c59ccdce2`）。
+
+⚠️ **探针自己先红过一次**：那条判据的第一版把 `u` 写到了正则字面量外面（`/…/.u.test(…)`）⇒ `TypeError`，
+输出长得像"判据抓到了违规"，真因却是探针坏了（§7 元规则一）。认出来的办法是读**失败原因那一行**，不是读"它红了"。
 
