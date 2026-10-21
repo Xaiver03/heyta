@@ -3,7 +3,8 @@
  *
  * ⚠️ 移动壳没有组件级测试载体（`apps/mobile/tests/*.spec.ts` 全部是源码正则或
  * 纯函数 import，没有 render/jsdom），所以这里钉的是**结构**，不是行为：
- * 行为由 `packages/app-host/tests/checkout.spec.ts`（14 条，含变异臂）负责 ——
+ * 行为由 `packages/app-host/tests/checkout.spec.ts` 负责（**条数别在这里抄**：它在跟着
+ * 收银台的能力长，要就读 vitest 自己打印的那一行）——
  * 那才是两个壳共用的那一半。分工刻意的：**同一个判断只在一个地方有牙**。
  *
  * 这里要挡的是三种"看起来接上了其实各写一份"的形状：
