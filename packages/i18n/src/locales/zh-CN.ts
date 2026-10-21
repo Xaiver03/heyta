@@ -4835,6 +4835,8 @@ export const zhCN = {
   'common.share.consent.cancel': '取消',
   'common.share.consent.dontAskAgain': '不再提示',
   'common.share.notif.sectionTitle': '共享通知',
+  'common.share.activity.added': '有人在你参与的共享清单里写了新内容',
+  'common.share.activity.deleted': '有人在你参与的共享清单里删掉了内容',
   'common.share.notif.activitiesTitle': '活动通知',
   'common.share.notif.activityCompleted': '完成/取消完成了任务',
   'common.share.notif.activityAdded': '添加了任务/笔记',

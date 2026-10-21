@@ -125,6 +125,11 @@ export interface WebShareComments {
    * 个人清单 ⇒ `undefined`（没有可拉的，不是错误）。
    */
   pullForTask(taskId: string): Promise<SharePullResult | undefined>;
+  /**
+   * 按 **shareId** 拉（M5 的实时信号走这一条：信号里给的就是 shareId）。
+   * 与 `pullForTask` 同一个 dispatch，只是少一次"任务→清单"的解析。
+   */
+  pullShareOps(shareId: string): Promise<SharePullResult>;
 }
 
 /**
@@ -192,5 +197,6 @@ export function createWebShareComments(deps: WebShareCommentsDeps): WebShareComm
       shareIdOfTask: actions.shareIdOfTask,
       pullShareOps: dispatch.pullShareOps,
     }),
+    pullShareOps: dispatch.pullShareOps,
   };
 }
