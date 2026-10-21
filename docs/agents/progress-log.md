@@ -30,7 +30,13 @@ E2EE 下的**清单共享**基础设施（ADR-0062）已实现并**本地提交*
 - **`capability-manifest.generated.ts` 已入库**（`git status --porcelain -- packages/ai/src/capability-manifest.generated.ts` 现量 = 空），"跨线混物留工作树待协调"那一格从此不再有对象；它当初被推迟的理由（重生成会同时带别线的 4 枚 TASK 工具）由别线自己把它们提交掉而消解。
 - **push 已发生**：`git rev-list --left-right --count refs/remotes/origin/main...main` 现量 `0 0`。所以"本线不代推、押在跨线协调"这句不再成立；下一位要推的是**别人新落的笔**，那条边界照旧有效（判据就是上面这条命令）。
 - **W4 残余从三件变两件，但产品定性变坏了**：评论**已挂载并有写路径**（`apps/web/src/features/tasks/TaskDetailCard.tsx` 里 `ShareCommentsSection` 的 import 与渲染两处命中），不再是"已建模不可达"；指派与动态照旧（`Task.assigneeUserId` 全仓零写点、只有通知过滤在读；动态流仍只有通知偏好开关）。
-  🔴 **取而代之的那一格更要紧：共享的"数据面"根本没通** —— `ShareApiClient.downloadOps` 在 `apps/*` 与 `packages/*/src` 里**零消费者**（复量：`grep -rn downloadOps --include=*.ts --include=*.tsx apps packages | grep -v spec`），客户端回放只吃本机 localStorage 那份 share log（`packages/app-host/src/share-comments.ts` 两处 `replayShareOps(..., [log.ops])`），服务端发出的 `new_share_ops` 实时信号客户端也不接；且**任务与清单的写路径仍进个人 op-log**（`packages/app-host/src/project-actions.ts` 里唯一的 share 相关方法是 `setProjectShareId`，没有任何 share 分流）。⇒ 成员之间互相看不到任务改动、也看不到对方的评论：**现在可用的只有"邀请/成员/角色/转让"这条元数据面，内容面是断的**。逐条见本线计划里 2026-10-20 那一节。
+  🔴 **下面那一格到 2026-10-21 已经改了一半，别按原句读**（原句留在这里是因为它还剩另一半是真的）：
+  **评论这条腿通了** —— `downloadOps` 现在有人消费（复量：`grep -rn "downloadOps" --include=*.ts packages/app-host/src apps/web/src | grep -v spec` 有命中），
+  游标落盘、进评论区先拉一次、`verify:collab-sync` 第 10 步经真宿主验过（`RESULT=OK steps=10`）。
+  仍然断的是**任务与清单的写路径**：`packages/app-host/src/project-actions.ts` 里唯一的 share 相关方法照旧只有 `setProjectShareId`，
+  没有任何 share 分流 ⇒ 成员互相看得到对方写的评论，**看不到对方改的任务**（那是 M2，要先立 ADR）。
+  实时信号 `new_share_ops` 客户端也照旧不接（M5）。
+  ⇒ 逐条见本线计划 `docs/plans/collaboration-shared-lists.md` §9.8（M1 落地那一节的读数）。
 
 状态与逐项读数见 [`docs/plans/goal-collaboration-shared-lists.md`](../../docs/plans/goal-collaboration-shared-lists.md) **文末那几节**（末节号现量：`grep -n '^## ' docs/plans/goal-collaboration-shared-lists.md | tail -2`，本行不写节名因为它会长）；PIPL 同意面的视觉层级（旧停止点 ①）已按最佳实践落地并配判据（`apps/web/tests/share-consent-modal-theme.spec.tsx`）；**所有权转让语义（旧停止点 ②）已由产品负责人把判定权交下来、本轮按产品判断定案保留现语义**（两步确认 → 立即生效 → 原 owner 降 editor，服务端单事务原子），翻案条件写在计划那一节。
 

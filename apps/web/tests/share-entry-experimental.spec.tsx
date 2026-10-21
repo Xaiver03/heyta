@@ -5,7 +5,8 @@
  * ## 这文件钉的是什么
  *
  * `docs/plans/collaboration-shared-lists.md` §9.2 P-1：共享清单的**元数据面**（邀请 / 角色 /
- * 转让）今天全链都在，**内容面整段断**（`downloadOps` 零消费者、写路径仍进个人 op-log），
+ * 转让）今天全链都在，而**内容面还没交付到界面上**（下行腿 2026-10-21 的 M1 接上了，
+ * 但任务与清单的写路径仍进个人 op-log ⇒ 成员那边看不到这条共享任务，评论区因此点不进去），
  * 也就是说两个人互相看不到对方的改动。入口因此从"看起来可用"降级成"默认不可达 + 一条措辞
  * 明确的实验开关"。
  *
@@ -227,7 +228,7 @@ describe('整个 App：入口的第三道条件', () => {
     await mountOnProject({ experimental: false });
     expect(
       container?.querySelector('[data-testid="share-open-button"]'),
-      '共享入口又默认放出来了 —— 内容面还没接通（下行链路零消费者），' +
+      '共享入口又默认放出来了 —— 内容面还没交付到界面上（任务/清单的写路径仍进个人 op-log，那是 M2），' +
         '放出来就是拿用户的信任测进度（见 plans/collaboration-shared-lists.md §9.2 P-1）',
     ).toBeNull();
   });

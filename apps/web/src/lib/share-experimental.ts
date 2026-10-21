@@ -5,9 +5,10 @@
  * ## 为什么入口默认是隐藏的（产品裁决 P-1，见 `docs/plans/collaboration-shared-lists.md` §9.2）
  *
  * 元数据面（同意 → 邀请 → 成员 → 角色 → 转让）今天全链都在，页头上那枚入口也是亮的；
- * 而**内容面整段断**：`ShareApiClient.downloadOps` 在任何一端的壳与共享包里零消费者，
+ * 而**内容面还没有交付到界面上**。2026-10-21 的 M1 接上了下行的那条腿
+ * （`downloadOps` 有人调了、游标落盘），但成员那边**看不到这条共享任务本身** ——
  * 任务与清单的写路径仍进个人 op-log（`packages/app-host/src/project-actions.ts` 里唯一与
- * share 有关的方法是 `setProjectShareId`，没有分流）。
+ * share 有关的方法是 `setProjectShareId`，没有分流；那是 M2）。
  * ⇒ 用户能把同事邀请进来、能给角色、能转让，**但两个人互相看不到对方改了什么**。
  *
  * 那不是一个"还没做完的功能"，而是一个**会让用户替我们发现它是假的**的功能 ——

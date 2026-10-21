@@ -4854,7 +4854,7 @@ export const zhCN = {
   'web.share.open.manage': '管理共享成员',
   // 实验开关（设置 → 同步）。措辞必须说实话：成员今天互相看不到内容。
   'web.share.experimental.label': '共享清单（实验）',
-  'web.share.experimental.note': '今天能用的只有邀请、成员角色和转让；成员之间还看不到彼此改动的任务与评论——下行链路尚未接通。打开它只在这台设备上放出入口。',
+  'web.share.experimental.note': '今天能用的只有邀请、成员角色和转让；成员之间还看不到彼此改动的任务与评论——共享的内容面还没有交付到界面。打开它只在这台设备上放出入口。',
   'web.share.dialog.title': '共享清单',
   'web.share.dialog.subtitle': '清单内容端到端加密，服务端不可读；成员关系与角色由服务端记录。',
   'web.share.dialog.close': '关闭',
