@@ -2437,7 +2437,7 @@ export const en = {
   'web.subscription.renew.amount': 'Amount due {amount}',
   'web.subscription.renew.validUntil': 'This order is valid until {time}',
   'web.subscription.renew.payLinkLabel': 'Payment link',
-  'web.subscription.renew.payHint': 'Open this link in WeChat on your phone to pay. Desktop QR rendering is not wired up yet (no new dependencies), so the link is the route for now.',
+  'web.subscription.renew.payHint': 'Open this link in WeChat on your phone to complete the payment. On desktop this shows the link instead of a QR code.',
   'web.subscription.renew.copy': 'Copy link',
   'web.subscription.renew.copied': 'Copied',
   'web.subscription.renew.rejected': 'That code was not applied: {code}',
