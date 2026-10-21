@@ -12,6 +12,7 @@ import {
   type ShareLogStorage,
 } from '../src/share-comments.js';
 import { emptyShareLogState, type ShareLogState } from '../src/share-op-log.js';
+import type { ShareOpDownloadPort } from '../src/share-client.js';
 
 /**
  * W3-T2 判据：三片接起来之后，"用户想对某条任务说一句话"真的**出得去**、
@@ -47,6 +48,7 @@ function makeCtx(): ActionContext {
 
 function makeStorage(): { saved: Map<string, ShareLogState>; storage: ShareLogStorage } {
   const saved = new Map<string, ShareLogState>();
+  const cursors = new Map<string, number>();
   return {
     saved,
     storage: {
@@ -55,11 +57,21 @@ function makeStorage(): { saved: Map<string, ShareLogState>; storage: ShareLogSt
         saved.set(shareId, log);
       },
       list: () => [...saved.keys()],
+      cursor: (shareId) => cursors.get(shareId) ?? 0,
+      setCursor: (shareId, seq) => {
+        cursors.set(shareId, seq);
+      },
     },
   };
 }
 
-function makeApi(): { calls: Array<{ shareId: string; ops: readonly unknown[] }>; api: { uploadOps: (shareId: string, ops: readonly unknown[]) => Promise<unknown> } } {
+function makeApi(): {
+  calls: Array<{ shareId: string; ops: readonly unknown[] }>;
+  api: {
+    uploadOps: (shareId: string, ops: readonly unknown[]) => Promise<unknown>;
+    downloadOps: ShareOpDownloadPort['downloadOps'];
+  };
+} {
   const calls: Array<{ shareId: string; ops: readonly unknown[] }> = [];
   return {
     calls,
@@ -68,9 +80,20 @@ function makeApi(): { calls: Array<{ shareId: string; ops: readonly unknown[] }>
         calls.push({ shareId, ops });
         return { accepted: [shareId], rejected: [] };
       },
+      // 本文件只测**上行**那半边；下行有自己的一套判据（`share-comments-pull.spec.ts`）。
+      downloadOps: async () => ({ ops: [], cursor: { latestServerSeq: 0 } }),
     },
   };
 }
+
+/** 替身编解码器：`ct:` 前缀当密文，解回来就是原来那份 JSON。 */
+const codec = (): {
+  encrypt: (payload: string) => Promise<string>;
+  decrypt: (payload: string) => Promise<string>;
+} => ({
+  encrypt: async (payload: string) => `ct:${payload}`,
+  decrypt: async (payload: string) => payload.replace(/^ct:/, ''),
+});
 
 function makeHost(over: Partial<ShareCommentsHostOptions> = {}): {
   host: ReturnType<typeof createShareCommentsHost>;
@@ -82,7 +105,7 @@ function makeHost(over: Partial<ShareCommentsHostOptions> = {}): {
   const host = createShareCommentsHost({
     ctx: makeCtx(),
     api,
-    cipherFor: async () => ({ encrypt: async (payload: string) => `ct:${payload}` }),
+    cipherFor: async () => codec(),
     storage,
     currentUserId: () => 'u-me',
     clientId: 'device-A',
@@ -150,8 +173,8 @@ describe('share-comments 宿主（W3-T2）', () => {
     const second = createShareCommentsHost({
       ctx: makeCtx(),
       api,
-      cipherFor: async () => ({ encrypt: async (payload: string) => `ct:${payload}` }),
-      storage: { load: () => persisted, save: () => undefined, list: () => ['share-1'] },
+      cipherFor: async () => codec(),
+      storage: { load: () => persisted, save: () => undefined, list: () => ['share-1'], cursor: () => 0, setCursor: () => undefined },
       currentUserId: () => 'u-me',
       clientId: 'device-A',
       schemaVersion: 1,

@@ -171,6 +171,11 @@ export interface CommentActionsOptions {
   newCommentId?: () => string;
 }
 
+/** 两跳解析的结果：要么给出 `shareId`，要么给出**为什么这份清单不算共享**。 */
+type ShareRoute =
+  | { readonly shareId: string }
+  | { readonly blocked: 'task-has-no-project' | 'project-not-shared' };
+
 export interface CommentActions {
   /**
    * 建一条评论，返回新实体 id。
@@ -214,6 +219,15 @@ export interface CommentActions {
    * 界面上要看一条个人清单的任务时，没有任何理由炸。
    */
   commentsForTask(taskId: string): Comment[];
+  /**
+   * 这条任务**属于哪一份共享清单**；不属于任何一份就返回 `undefined`。
+   *
+   * 🔴 它是"两跳解析"的**读侧出口**（`Task.projectId` → `Project.shareId`），
+   * 与写侧的 `shareIdForTask` 共用同一个解析函数 —— 一份路由逻辑、两种错误语义：
+   * 写要告诉用户"这条清单没共享"，读（要不要去拉远端 op）只需要知道"没有可拉的"。
+   * 有了它，宿主就不必自己再去 `getState()` 里翻这两跳（那会长出第二份路由判断）。
+   */
+  shareIdOfTask(taskId: string): string | undefined;
 }
 
 export function createCommentActions(
@@ -239,25 +253,32 @@ export function createCommentActions(
    * `shareId` 空串按"没有"处理：`setProjectShareId` 会拒绝空串，但
    * 物化状态可能来自远端 op，不能假定它守规矩。
    */
-  const shareIdForTask = (taskId: string): string => {
+  /**
+   * 两跳解析（`Task.projectId` → `Project.shareId`）—— 这条线**唯一**的一份。
+   *
+   * 🔴 它只解析、不决定说什么：写侧拿它抛 {@link ListNotSharedError}（要给用户原因），
+   * 读侧（`shareIdOfTask`）拿它返回 `undefined`（"这里没有共享评论可拉"不是错误）。
+   * 分成两份判断的话，两份迟早对"什么算共享"给出不同的答案。
+   */
+  const routeShareId = (taskId: string): ShareRoute => {
     const state = ctx.getState();
     const task = state.tasks[taskId];
     if (task === undefined || task.deletedAt !== undefined) {
       throw new Error(`找不到任务「${taskId}」`);
     }
     const projectId = task.projectId;
-    if (projectId === undefined) {
-      throw new ListNotSharedError(taskId, 'task-has-no-project');
-    }
+    if (projectId === undefined) return { blocked: 'task-has-no-project' };
     const project = state.projects[projectId];
-    if (project === undefined || project.deletedAt !== undefined) {
-      throw new ListNotSharedError(taskId, 'project-not-shared');
-    }
+    if (project === undefined || project.deletedAt !== undefined) return { blocked: 'project-not-shared' };
     const shareId = project.shareId;
-    if (shareId === undefined || shareId.trim() === '') {
-      throw new ListNotSharedError(taskId, 'project-not-shared');
-    }
-    return shareId.trim();
+    if (shareId === undefined || shareId.trim() === '') return { blocked: 'project-not-shared' };
+    return { shareId: shareId.trim() };
+  };
+
+  const shareIdForTask = (taskId: string): string => {
+    const route = routeShareId(taskId);
+    if ('blocked' in route) throw new ListNotSharedError(taskId, route.blocked);
+    return route.shareId;
   };
 
   /** 未删除的评论；不存在或已软删都当"找不到"。 */
@@ -352,6 +373,11 @@ export function createCommentActions(
     commentsForTask(taskId) {
       // 过滤 + 排序都在领域层（单点定义，见 `domain/src/comments.ts`）。
       return aliveCommentsForTask(Object.values(ctx.getState().comments), taskId);
+    },
+    shareIdOfTask(taskId) {
+      // 读侧不抛：个人清单/已删清单只是"没有共享可拉"，不是一个需要用户处理的状态。
+      const route = routeShareId(taskId);
+      return 'blocked' in route ? undefined : route.shareId;
     },
   };
 }

@@ -53,6 +53,12 @@ export interface ShareOpWireIdentity {
   readonly opType: string;
   readonly entityType: string;
   readonly entityId?: string | undefined;
+  /**
+   * 🔴 下行必须带上它：AAD 的数组里**有这一维**（`payload-cipher.ts` 的 `identityAAD`），
+   * 少传就等于换了一份 AAD ⇒ GCM 必拒。上行这一族（评论）今天不填它，
+   * 所以它一直是可选的 —— 但"可选"不等于"解密时可以忽略"。
+   */
+  readonly entityIds?: readonly string[] | undefined;
   readonly timestamp: number;
   readonly schemaVersion: number;
 }
@@ -169,4 +175,72 @@ export function createShareOpDispatcher(options: ShareOpDispatcherOptions): {
       return { opId: identity.id, skipped: false, op };
     },
   };
+}
+
+/* ── 下行（M1）：把别人写进这份 share 的 op 拉回来 ────────────────────
+ *
+ * 🔴 为什么端口声明在这里而不是直接 import `@heyta/sync-client` 的类型：
+ * 这条纪律是本文件一开始就立的（"只声明**真的用到**的字段"）—— 多声明一个字段
+ * 就等于把"线协议里必须有它"写进共享层，而线协议词表的唯一来源是服务端的校验。
+ * `ShareApiClient.downloadOps` 结构上满足下面这两个接口，所以装配点不需要适配器。
+ */
+
+/** 一条**已上线**的 share op（`payload` 是密文；`serverSeq` 是服务端盖的序）。 */
+export interface ShareOpWireRow {
+  readonly id: string;
+  readonly clientId: string;
+  readonly actionType: string;
+  readonly opType: string;
+  readonly entityType: string;
+  readonly entityId?: string | null;
+  readonly entityIds?: readonly string[];
+  readonly schemaVersion: number;
+  /**
+   * 密文。声明成 `unknown` 而不是 `string` 是因为**传输层给的就是 `unknown`**
+   * （`ShareApiClient.ShareOpWire`），而端口骗人说它是字符串，只会把检查推到更远的地方 ——
+   * 拉取那一头必须自己验（不是字符串就抛错、不推进游标）。
+   */
+  readonly payload: unknown;
+  readonly vectorClock?: unknown;
+  readonly serverSeq: number;
+  /**
+   * 服务端盖在 op 上的**作者时刻**（`null` 是传输层允许的：见 `ShareOpWire`）。
+   *
+   * 🔴 重建 AAD 只能用这一个值，不能用 `Date.now()`，也不能用 `serverSeq` 换算 ——
+   * 加密时用的就是作者那一刻的 timestamp，解密方按线上值重建 AAD，
+   * 差一个字节就被 GCM 拒（纪律 1 的反方向；`verify-collab-sync.mjs:228-232` 记着第一次踩）。
+   * 而 `null` **没法**参与 AAD（写侧从来不送空值）⇒ 拉取那一头遇到它就抛错、不推进游标。
+   */
+  readonly clientTimestamp: number | null;
+}
+
+/** 一页的返回：op 列表 + 服务端当前最新序（拉完没有拉完，看这两个）。 */
+export interface ShareOpDownloadBatch {
+  readonly ops: readonly ShareOpWireRow[];
+  readonly cursor: { readonly latestServerSeq: number };
+}
+
+/** 下行需要的最小端口。 */
+export interface ShareOpDownloadPort {
+  downloadOps(shareId: string, after: number, limit?: number): Promise<ShareOpDownloadBatch>;
+}
+
+/** 解一条 share 载荷（与 `SharePayloadCipherPort.encrypt` 同一份实现的两半）。 */
+export interface SharePayloadDecryptPort {
+  decrypt(payload: string, identity: ShareOpWireIdentity): Promise<string>;
+}
+
+/** 装配点给的那种端口：同一枚 `createSharePayloadCipher` 的结果，能封也能解。 */
+export type SharePayloadCodecPort = SharePayloadCipherPort & SharePayloadDecryptPort;
+
+/** 一次拉取的读数（判据要点名它，不接受"函数跑完了"）。 */
+export interface SharePullResult {
+  /** 真的从线上收到的 op 条数（含重复 —— 重复由折叠吃掉）。 */
+  readonly fetched: number;
+  /** 折叠后**新增**的条数（`fetched - 重复`）。 */
+  readonly added: number;
+  /** 拉完之后落盘的游标（服务端 seq）。 */
+  readonly cursor: number;
+  /** 为收敛而翻的页数（>1 说明分页那条路真的被走过）。 */
+  readonly pages: number;
 }
