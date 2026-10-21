@@ -40,7 +40,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
@@ -130,6 +130,14 @@ function runCarrier(label) {
 
 const pristine = readFileSync(SOURCE, 'utf8');
 const pristineDigest = digest(pristine);
+/**
+ * 🔴 **字节还原不等于状态还原**：写回之后文件的 mtime 已经被抬起，而仓里对这件事有一句明话
+ *    （`scripts/check-mobile-ai-anchors.mjs` 的臂注释："动 `apps/«壳»/src` 会把 mtime 抬起来，
+ *    下一趟设备验收会被新鲜度门顶成 rc=3；那是探针自己把路堵死"）。本脚本碰的是 `server/src`，
+ *    当下没有一枚 mtime 尺指着它，但**同一枚副作用不该留给下一位去踩** ⇒ 起跑前取 atime/mtime，
+ *    写回原文之后连时间戳一起还回去，并且**验一遍还得回去没有**（判"没还成"就退 1）。
+ */
+const stamp = statSync(SOURCE);
 
 function restore(mutatedDigest) {
   const now = readFileSync(SOURCE, 'utf8');
@@ -143,6 +151,13 @@ function restore(mutatedDigest) {
   writeFileSync(SOURCE, pristine);
   if (digest(readFileSync(SOURCE, 'utf8')) !== pristineDigest) {
     console.error('❌  写回后 digest 与起跑时不一致 —— 停在这里，别继续跑下一臂。');
+    process.exit(1);
+  }
+  utimesSync(SOURCE, stamp.atime, stamp.mtime);
+  // 比的是 `mtime`（Date，毫秒精度）而不是 `mtimeMs`：`utimesSync` 这条通道能送达的最高精度就是毫秒，
+  // 而 APFS 存的是纳秒 ⇒ 拿 `mtimeMs` 的小数尾去比会**恒判"没还成"**（本脚本第一版就是这么红的）。
+  if (statSync(SOURCE).mtime.getTime() !== stamp.mtime.getTime()) {
+    console.error('❌  mtime 没能还回起跑时的值 —— 抬起的时间戳会顶红下一趟按 mtime 判新鲜度的门。');
     process.exit(1);
   }
 }
@@ -208,6 +223,7 @@ try {
   //    树里**不许**留下被改坏的 `checkout.routes.ts`（下一趟构建打的会是那份字节）。
   if (digest(readFileSync(SOURCE, 'utf8')) !== pristineDigest) {
     writeFileSync(SOURCE, pristine);
+    utimesSync(SOURCE, stamp.atime, stamp.mtime);
   }
   rmSync(temporary, { recursive: true, force: true });
 }
