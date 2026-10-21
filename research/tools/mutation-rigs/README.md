@@ -20,7 +20,8 @@
 | `verify-gate-wiring-candidate.mjs` | §8 第 17 步那道新门禁的**接线补丁** | C0 现状 / C1 进链 / C2 只加定义 / C3 插出 `&&&` —— 🔴 **它不改工作树**：改的是 `/tmp` 下的候选副本（见下面第 4 条） |
 | `mutate-shell-surfaces-anchor.mjs` | `check:shell-surfaces` 断言 A 的**锚点分类**（2026-10-05 把"未跟踪的取证产物"从源码锚点里摘出来那次修法） | A0 原样副本绿 / A1 ps1 改取证文件名红 / A2 sh 的 scp 行改名红 / A3 删一枚**真**源码锚点仍红 / **A4 两半**：产物缺席不再红 + `HEYTA_REQUIRE_PACKAGED_ARTIFACT=1` 照样红。🔴 每台里最值钱的是 A4 那两半——少了 a 就是没修，少了 b 就是借修名的放宽。它同样**只改副本**（`rsync --link-dest` 硬链接 + 先 `rm` 再写，绝不就地 truncate） |
 
-⚠️ 下面这几台**不属于本表那条线**（它们钉的是回收站/批次 E 的工单，见 `docs/plans/trash-and-archive.md`；
+⚠️ 下面这几台**不属于本表那条线**（它们钉的是回收站/批次 E 的工单，见 `docs/plans/trash-and-archive.md`，
+或协作/共享清单线的工单，见 `docs/plans/collaboration-shared-lists.md` §9.3 M7；
 这一族有几台不写死在这里 —— 数一下就行：`ls research/tools/mutation-rigs/*.sh research/tools/mutation-rigs/*.mjs | wc -l`），
 放在这里只是因为它们是同一族形状：**不改工作树、只回答"这条判据能不能失败"**。
 
@@ -32,6 +33,8 @@
 | `ios-erase-verdict-arms.sh` | #76（上面那枚臂的**结论分岔**，§10.155 / traps #288 · #291） | 七条腿全用环境变量注入**六条计数**（不注入 `LEG_TOTAL` —— 求和也在它眼下跑），一台设备都不碰：L1/L2 `rc=3`/`rc=0` 而腿全 0 ⇒ `NO-RUN`｜L3 跑过而 B 全绿 + 完整臂趟 ⇒ `DEAD` 且允许说"关于产品的结论"｜L4 同形状但 `RECOUNT` ⇒ 同一句 `DEAD` **不许**主张装载过｜L5 12:51 现场（B 计数全 0 而 `PREM`/`C` 有读数、summary 报失败）⇒ `NEEDLE-MISMATCH`/3｜L6 只数据腿红 ⇒ `OK` 并写明"文件腿这一枚问不到"｜L7 只文件腿红 ⇒ 也 `OK`（`OK` 不绑死在某一条腿上）。绿读数 `ARMS=pass (7/7)`；**两条变异读数**（都在 13:0x 现量）：① 摘 `NO-RUN` 那一档（6 行）⇒ 只红 L1/L2；② 摘 `NEEDLE-MISMATCH` 那 7 行 ⇒ **只红 L5**，且那一腿的输出逐字复现历史上那句假结论「判据 B 在 iOS 上没有牙」。抽的是臂本体的结论段 ⇒ 载具路径打进输出，两处都没有时报 `ARMS=NO-CARRIER` |
 | `ios-erase-b-fileleg-probe.sh` | #90（iOS 判据 B **文件腿**到底能不能失败） | 五条腿全在临时目录里造盘上形状，**一台设备都不碰**：L1 库在⇒绿｜L2 库被 `unlink`⇒🔴红（承重腿：它区分"坏探针恒绿"与"好探针问不到"）｜L3 只剩 `-wal`/`-shm`⇒红｜L4 同目录只有 `heyta-device-prefs.sqlite`⇒红（证它认整串库名，§10.68.6 那个词干假红的反向）｜L5 有内容的库 vs 销毁后重开的空壳 **两格都绿**而 ops 差一行 ⇒ 当场打印"这一枚问不到，牙齿在数据腿"。绿读数 `FILELEG=RIGID`；**变异读数**：把谓词逐字换成"只数目录在不在"（恒真形状）⇒ `FILELEG=FAIL` rc=1，恰好 L2/L3/L4 三条被抓、L1/L5 不受影响。判据块与谓词都从真身 `scripts/verify-mobile-ios-account-erasure.sh` awk 抽，抽到 >12 行或缺绿/红 needles 即 `EXTRACT=*` 退 1（上一版锚点写成 `(else)?` ⇒ 抽出 188 行 ⇒ 载具里混进 `$UDID`，`set -u` 让**每条腿的 rc 都变成崩溃码 1**，本该绿的 L1 也红） |
 | `rig-step-verbatim-recheck.sh` | #77 的那句断言「HEAD 的 step 5 本体逐字存活」（§10.146，10-05 12:3x 复量） | 按 `step "5`→`step "6` 取块、逐行去缩进成集合，报 `MISSING`（HEAD 有而工作树没有＝被改写的原句）。三档结论：`survives` / `title-only`（只有标题那行改了）/ `rewritten`。自带阳性对照：从工作树块删 1 行公共行 ⇒ `MISSING` 必须恰好 +1，否则整条判 `UNFAIABLE` 不作数。⚠️ **这台自己的第一版是恒真的**（收了输出路径参数却没用，比的是两个不存在的文件）⇒ 修法与教训在 traps **#289** |
+
+| `mutate-collab-journey-autoseal.mjs` | 协作线（ADR-0062）`verify:collab-journey` 的 **bob 入群那一腿能不能红**（计划 §9.3 M7-d） | ① 原样对照必须先绿（不绿就 `ARMS=ABORT reason=baseline-not-green` 响亮退出，不静默记成"问不到"）② 摘掉 owner 面板里 `autoSeal` 那一发调用 ⇒ 要求输出里**同时**出现 `RESULT=FAIL` 与 `share-join-done`（只"红了"不算 —— 编译错也会红）③ 还原 + md5 逐字节比对。🔴 它**原地改工作树**（目标文件归本线），所以动手前先验该文件相对 HEAD 干净，脏就 `ARMS=ENV dirty-worktree` 退 **3**：本仓多会话共用一个检出，不能拿别人未提交的改动当实验台。`--rerun-green` 才跑第三趟复绿（默认不跑：① 已证"这份内容会绿"，③ 已证"文件就是这份内容"） |
 
 跑法（本机有测试内存闸门，别的套件在跑时会拒绝启动）：
 
