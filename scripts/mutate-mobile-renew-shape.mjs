@@ -65,6 +65,14 @@ const ARMS = [
     to: "        label={t('web.entitlement.renew.action')}",
     expect: ['键都不读'],
   },
+  {
+    // 这一臂打的是**闸门 ① 那一支**：这台实例没配托管上游时，`PRICE_NOT_SELLABLE` 是用户**今天真会拿到**的码。
+    // 删掉这一行不会有任何编译错，界面只是把服务端机器码当人话印出去 —— 所以必须有具名用例红在它上面。
+    name: 'R5 闸门 ① 的码没有词条（用户屏幕上出现「下单失败（PRICE_NOT_SELLABLE）。」）',
+    from: "  PRICE_NOT_SELLABLE: 'mobile.entitlement.renew.fail.sellable',\n",
+    to: '',
+    expect: ['各有自己的词条'],
+  },
 ];
 
 const digest = (text) => createHash('sha256').update(text).digest('hex');

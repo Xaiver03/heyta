@@ -50,6 +50,7 @@ import { privacyConsent } from '../privacy/consent-gate';
 const FAILURE_KEYS: Partial<Record<CheckoutFailureCode, MessageKey>> = {
   UNAUTHORIZED: 'mobile.entitlement.renew.fail.unauthorized',
   BILLING_PROVIDER_NOT_CONFIGURED: 'mobile.entitlement.renew.fail.provider',
+  PRICE_NOT_SELLABLE: 'mobile.entitlement.renew.fail.sellable',
   PRICE_TIER_LOSES_GRANTS: 'mobile.entitlement.renew.fail.downgrade',
   NETWORK_ERROR: 'mobile.entitlement.renew.fail.network',
 };

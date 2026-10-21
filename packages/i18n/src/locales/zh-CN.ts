@@ -2606,6 +2606,7 @@ export const zhCN = {
   'mobile.entitlement.renew.fail.provider': '这台实例没有配置收款通道，现在买不了。',
   'mobile.entitlement.renew.fail.unauthorized': '先登录你的 heyta 账号，才能下单。',
   'mobile.entitlement.renew.fail.network': '连不上服务端，这一单没有下成。',
+  'mobile.entitlement.renew.fail.sellable': '这一档现在还不能卖，服务端拒绝了这笔下单。',
   'mobile.entitlement.renew.fail.downgrade': '这一档不包含你当前这一档的全部能力，服务端没有下单 —— 先让当前这一档到期，或者继续按它续费。',
   'mobile.entitlement.renew.fail.unknown': '下单失败（{code}）。',
   // ── AI 面板的失败态（第 18 轮）───────────────────────────────
