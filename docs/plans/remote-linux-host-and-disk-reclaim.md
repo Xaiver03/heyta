@@ -213,7 +213,7 @@ CI 级的 `-r build` / `-r typecheck` / 单测 / `check:linux-shell` / Playwrigh
 
 | # | 步 | 门禁 | 红在哪 | 归属（提交） |
 |---|---|---|---|---|
-| 1 | 6 | `check:reachability` | `COMMENT` 已建模零写路径 | `e6058120` 产品体验线 |
+| 1 | 6 | `check:reachability` | 这一行原来记的是「`COMMENT` 已建模、零写路径」。**那句话现在不成立**：2026-10-22 01:3x 现量 `pnpm check:reachability` ⇒ rc=0，它给 `COMMENT` 打的是 `✅ COMMENT 1 处：packages/app-host/src/comment-actions.ts`（协作线 M1/M5 把那最后一米接上了）。⇒ **别把这一格当还压在路上的前提去等**，它已经不拦任何一条线 | `e6058120` 产品体验线 |
 | 2 | 20 | `check:row-single-source` | `ht-*` 前缀族 33 > 基线 28 | `2485edde` 协作共享清单线 |
 | 3 | 21 | `check:selection-single-source` | 3 处第二选中所有者 + 宿主态 | `d49f77e3` 桌面+移动+落地页线 |
 | 4 | 22 | `check:l4` | web 内联样式 128 > 98；mobile 108 > 90 | `2485edde`（web）/ `d49f77e3`（mobile） |
