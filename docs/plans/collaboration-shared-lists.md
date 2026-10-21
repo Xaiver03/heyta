@@ -289,7 +289,7 @@ model ShareOperation   { id, shareId, clientId, serverSeq, …密文列
 | 服务端可写白名单 vs 客户端实际 | 白名单已经认识 `TASK / PROJECT / TAG / NOTE / COMMENT`，**服务端不拦，是客户端没往那走** | 读 `server/src/shares/share.membership.ts` 的 `SHARE_WRITABLE_ENTITY_TYPES` |
 | 并发判定 | 🔴 share 分区每条 op 的向量时钟被硬编成 `{ clientId: 1 }`（个人引擎那侧会自增自己那一维）⇒ 同设备两 op 恒 EQUAL、跨设备恒 CONCURRENT，判定只剩 timestamp 平局 | 读 `packages/app-host/src/share-client.ts` 里 `vectorClock:` 那一行，对照 `packages/op-log/src/engine.ts` 的自增 |
 | 逐 op 签名 | 🔴 线协议里没有 `signature` 字段，写侧不签、服务端不验；原语在 `sync-core` 里躺着 | `grep -rn signature packages/shared-schema/src/supersync-http-contract.ts` ⇒ 零命中 |
-| 移除即 rekey | 🔴 只有零件：`planShareRekey` / `reencryptShareRecord` 的调用者只有单测与 `verify-collab-*.mjs`；`autoSeal` 复封用的是**同一把 listKey**，`keyEpoch` 不推进 | `grep -rn planShareRekey --include=*.ts apps packages` ⇒ 无生产调用点 |
+| 移除即 rekey | 🟡 **owner 那一次点击这条链已通**（2026-10-21 M3，读数见 §9.9）：`rotateShareKey` / `adoptRotatedShareKey` / `removeMemberAndRekey` 有生产调用点（`apps/web/src/features/share/share-rotation.ts` 装配，`ShareFeature.tsx` 的移除按钮与 reload 收钥两处调用），`keyEpoch` 真推进、新钥只封给在册成员（自己那枚排第一）、被移除那行的信封在库里置 null；成员端换成了**多世代密钥环**，否则换钥后那一屏会整块解不开。🔴 两件没做：库里**旧密文不重加密**（追加模型；重加密等于改 op-log 回放语义，与 M2/M4 同一份 ADR 一起判）；**owner 不在线时没人能触发换钥**（移除仍然生效，只是那一代钥还留着 —— 边界写在 `share-rekey.ts` 文件头） | `grep -rn removeMemberAndRekey apps/web/src packages/app-host/src` ⇒ 编排件 + 壳调用点各有命中；`pnpm verify:collab-revoke` ⇒ `RESULT=OK steps=8` |
 | 实时 | 🔴 服务端发 `new_share_ops`，客户端只处理 `connected`；`notification-model` 那三条偏好谓词生产消费者为零 | `grep -rn new_share_ops --include=*.ts packages apps` ⇒ 只有服务端那一处 |
 | 端覆盖 | 🟡 Web 接了；**macOS / Windows / Linux 三枚桌面壳间接有**（包里装的就是 `apps/web/dist`）；**移动端零接入**；node-host/CLI 无 share 工具 | `grep -rn -E "SharePanel\|shareId\|payloadCipher" --include=*.ts --include=*.tsx apps/mobile/src` ⇒ 0 命中；`grep -n web-dist apps/desktop-macos/Sources/HeytaMac/HeytaMacApp.swift` |
 | 常驻判据 | 🔴 **M7 之前**本线没有一扇门在链上（`check` 那串里 `verify:*` 引用数为 0；`collab-journey` 被 `e2e/playwright.config.ts` 的 `testIgnore` 摘出主 e2e 载体；证据目录被 gitignore ⇒ 截图不可复核）。**今天链上有三段**（`check:share-entry-hidden` / `verify:collab-keys` / `check:collab-carrier`），形状与读数见 §9.7；要真 PostgreSQL / 真浏览器的那四腿仍靠人跑 `pnpm verify:collab-suite` | `node -e "const c=require('./package.json').scripts.check.split('&&');console.log(c.filter(x=>['collab','share-entry'].some(k=>x.includes(k))).join(', '))"`；`grep -n -A5 testIgnore e2e/playwright.config.ts` |
@@ -326,7 +326,7 @@ model ShareOperation   { id, shareId, clientId, serverSeq, …密文列
 |---|---|---|---|---|
 | **M1 🟡**（2026-10-21 宿主层已闭，读数见 §9.8） | **下行链路接通**：`downloadOps` 接进宿主（游标持久化、分页收敛、解密回放、离线补拉） | 🔴 **判据按实测改口**（原句写的是"今天走不通的那一族"）：~~A 改一条任务标题 → B 读到新标题~~ —— `TASK/PROJECT` 的 op 至今仍进**个人** op-log（那是 M2 那一步路由的事），所以下行腿今天能搬运的只有 `COMMENT`。现判据 = **两台独立宿主**：A 发一条评论 → B 拉回并物化、再拉一次零新增、游标落在盘上（`verify:collab-sync` 第 10 步，读数 `RESULT=OK steps=10`）。变异臂三臂见 §9.8，红集精确匹配 | 只需 `packages/app-host` + `apps/web`，不碰线协议 ⇒ **可以先做**；"任务标题那一半"随 M2 一起判 | 工程直接做 |
 | **M2** | **任务/清单的写路径路由**：共享清单里的 `TASK/PROJECT/TAG/NOTE` op 进 share log | 路由判据住在 `packages/app-host`（`shareIdForTask` 那一族的**同源**函数，不许在壳里判）；红形：未共享清单写进 share ⇒ 红 / 共享清单写进个人 log ⇒ 红 | 🔴 碰 op-log 语义与"个人 log 不动"这条 ADR-0062 承诺 ⇒ **先立 ADR**；`Project.shareId` 已在册，不必 bump schema | 工程 + 一份新 ADR |
-| **M3** | **rekey 落地**：移除/退出/撤销 → `keyEpoch` 推进 → 重封给在册成员；撤销后旧成员解不开新内容 | 三步链有真库证据（`verify-collab-revoke` 已有零件，缺生产路径）；红形：`autoSeal` 换 key 那一步被去掉 ⇒ 必红 | 依赖 M1（下行要先能读，否则证不了"读不到"） | 工程直接做 |
+| **M3 🟡**（2026-10-21 落地，读数与两件刻意没做的见 §9.9） | **rekey 落地**：移除/退出/撤销 → `keyEpoch` 推进 → 重封给在册成员；撤销后旧成员解不开新内容 | 实测到的判据形状：`verify:collab-revoke` 从"手搓迁移循环"改成**吃生产函数**（`removeMemberAndRekey` + `adoptRotatedShareKey` + 真 `ShareApiClient`），8 步含 psql 现量（`shares.key_epoch = 2`、他那行 `key_envelope IS NULL`）与"第三个人 carol 换钥后仍读得到新旧两代"；变异臂四臂 `ARMS=pass (4/4)` 红集精确匹配（原句那句"摘掉 `autoSeal` 那一步 ⇒ 必红"已由 `verify:collab-journey` 那条臂覆盖，这一批补的是**换钥编排本身**能不能红） | 依赖 M1（下行要先能读，否则证不了"读不到"）—— 已满足 | 工程直接做 |
 | **M4** | **逐 op 签名**：线协议加 `signature`、写侧签、服务端验、失败按"永久拒绝"处置（对齐 ADR-0019 那条读侧对偶） | 封闭词表 + 一条"改一个字节必被拒"的臂 | 🔴 `shared-schema` 线协议 = 不可逆层，与 M2 同一份 ADR 承接 | 工程 + ADR |
 | **M5** | **实时与偏好接线**：客户端接 `new_share_ops`、三条谓词进通知路径 | 有信号 ⇒ 拉取；无订阅偏好 ⇒ 零打扰；红形：谓词恒 true 的那一臂 | M1 之后才有意义（信号语义是"有东西可拉"） | 工程直接做 |
 | **M6** | **移动端接入**：入口/路由、`setProjectShareId` 调用点、share 密钥落盘端口、`payloadCipher` 接线、同意态存储、`ShareFeature` 那层的 web-only 假设重写 | 与 web 同一条旅程在 iOS 模拟器 + Android 上走一遍（AGENTS §6.2：真跑 + 真看截图） | 六段缺段的现量清单见 9.4；🔴 Android 构建一律走 windows-pc | 工程直接做（体量大，可拆） |
@@ -391,7 +391,7 @@ mobile 已真渲染过同目录的 `ConflictResolutionView`），缺的全在宿
 | **P-1 入口降级** | 新增 `apps/web/src/lib/share-experimental.ts`（设备本地偏好；`const DEFAULT_ENABLED = false;` 那一行**就是**裁决在代码里的形状，翻案条件写在同一枚文件头）；设置 → 同步 里一枚措辞明确的开关 `share-experimental-toggle`；页头入口的渲染条件加第三道 `&& shareExperimental` | 真浏览器两张对照图：`01-owner-list-ready.png`（停在清单上、同步已配好，头部**没有**「共享」）与 `03-owner-panel-created.png`（打开开关之后**有**）；`e2e/tests/collab-journey.spec.ts` 在建好清单之后先断 `toHaveCount(0)` 再往下走 |
 | 行为层 | `apps/web/tests/share-entry-experimental.spec.tsx` 10 条，含**阳性对照**（开关打开 ⇒ 入口在）—— 少了那条对照，"入口不在"会因为 jsdom 里根本没停在清单上而**永远通过** | 10/10 绿。变异读数：摘掉第三道条件 ⇒ 恰好红在 P-1 那一格；把默认值翻成 `true` ⇒ 红 5 条 |
 | 源码层常驻 | `check:share-entry-hidden`（四格判据 + 自带 5 臂 + 阳性对照；臂改的是临时副本，工作树零改动） | `臂数 5，失败 0`。两道坑记在文件头：注释里也写着开关名 ⇒ **必须先剥注释**；词条文案里的 `https://*` 会被当成"开了个块注释"⇒ 整段文件被吞、判据假红 |
-| 载具 | `verify:collab-keys` 进链（零服务端，实测 0.3s）；其余四腿进 `verify-collab-suite.mjs` 的名册、串行跑；`check:collab-carrier` 钉"每套验收必须有载具（进链 或 进名册）"，且套件本身必须在 `docs/agents/commands.md` 有一行 | `SUITE=OK legs=4 failed=0`（sync 9 / revoke 7 / conflict 6 / journey 3 步）；carrier `臂数 5，失败 0` |
+| 载具 | `verify:collab-keys` 进链（零服务端，实测 0.3s）；其余四腿进 `verify-collab-suite.mjs` 的名册、串行跑；`check:collab-carrier` 钉"每套验收必须有载具（进链 或 进名册）"，且套件本身必须在 `docs/agents/commands.md` 有一行 | `SUITE=OK legs=4 failed=0`。⚠️ 每腿步数**不在这里抄**（那是会漂的值：这一趟读到 sync 9 / revoke 7 / conflict 6 / journey 3，而 revoke 在 M3 之后已经是 8 —— 现量看各腿自己那行 `RESULT=OK steps=N`）；carrier `臂数 5，失败 0` |
 | 散文臂 → 装置 | `research/tools/mutation-rigs/mutate-collab-journey-autoseal.mjs`：① 原样对照 ② 摘掉 owner 的 `autoSeal` ⇒ 必须**同时**出现 `RESULT=FAIL` 与 `share-join-done`（只"红了"不算，编译错也会红）③ 还原 + md5 逐字节比对 | `ARMS=pass (2/2)`、`byte-identical`。它原地改工作树（目标文件归本线），所以先验该文件相对 HEAD 干净，脏就 `ARMS=ENV dirty-worktree` 退 3 |
 | 链长 | 现量 `node -e "console.log(require('./package.json').scripts.check.split('&&').length)"` | 本批 +3 段 ⇒ 121 |
 
@@ -441,5 +441,28 @@ mobile 已真渲染过同目录的 `ConflictResolutionView`），缺的全在宿
 那条取数命令静默打印空行；`check:doc-command-claims` 第一版的字符类漏了连字符 ⇒ 名字从第一个 `-`
 被截断、全仓假红 **486 处**。**假红比漏红好**：它响得让人去读原文，而"绿得没声音"没人会查。
 
-**下一步**：M3（rekey 落地 —— 把 `planShareRekey` / `reencryptShareRecord` 从"只有单测与验收脚本在调"接进生产路径）。
-判据依赖下行能读，这一趟之后那条依赖已经满足。
+### 9.9 M3 落地（2026-10-21 第三批）—— 换钥的读数
+
+| 件 | 形状 | 这一趟的读数 |
+|---|---|---|
+| 宿主层 | 新文件 `packages/app-host/src/share-rekey.ts`（305 行）：`rotateShareKey` / `adoptRotatedShareKey` / `removeMemberAndRekey` / `forgetShareLocally`，四枚可注入端口（api、keys、`decodeMemberPublicKey`、`isSignedIn`）。五条纪律各钉一条：信封上的世代=实际封的那把、非 owner 不能轮、顺序=移除→本地落环→给自己封→给别人封、旧世代留在环里、没登录或没解锁 ⇒ 零请求 | `pnpm -r typecheck` rc=0；`cd packages/app-host && npx vitest run tests/share-rekey.spec.ts` ⇒ 19 passed（真 `sync-core` 密码学，没有 mock 加解密对） |
+| web 密钥环 | `share-key-store.ts` 加 `priorKeys` 与 `unwrapShareKeyRing`；`wrapAndStoreShareKey` 换钥时**带回**身份种子与 `ownMemberId`（旧写法不回传 ⇒ 换一次钥就把身份丢了） | `cd apps/web && npx vitest run tests/share-key-store.spec.ts` ⇒ 15 passed。判据里留了一枚**对照臂**：只喂 `current` 那一把必须红 `/epoch/i` —— 少了它，"混合世代"这件事只是注释 |
+| 服务端 | DELETE member 与 POST leave 两处 `data: { removedAt, keyEnvelope: Prisma.DbNull }`；`memberKeyEpoch` **不动**（库上有 CHECK `share_members_key_epoch_positive >= 1`，写 0 是 500 而不是"没钥"） | `pnpm --filter @heyta/sync-server typecheck` rc=0；psql 现量 `key_envelope IS NULL` 为 `t` 在 `verify:collab-revoke` 第 5 步里 |
+| 验收改吃生产路径 | revoke 那套的第 4/5/6 步不再手搓迁移循环，直接调 `removeMemberAndRekey` + `adoptRotatedShareKey`（读 `packages/app-host/dist`）+ 真 `ShareApiClient`；加第三个账号 carol，证"移除不是把所有人锁在门外" | `RESULT=OK steps=8`（这批跑过两趟，读数同） |
+| 装置 | `research/tools/mutation-rigs/mutate-collab-rekey.mjs` 四臂（复封同一把 / 收件人漏自己 / 收钥不验世代 / 新钥只发不落环） | `ARMS=pass (4/4)`、`RECHECK RC=0 Tests=19 passed`、`md5=byte-identical`；红集 3/5/1/5 条**精确匹配** |
+
+🔴 **这一趟顺手照出的三枚潜在缺陷**（不修就会随 M3 变成用户可见的坏，都已修）：
+
+1. 重新邀请复用同一行 ⇒ 上一代的旧信封留着、`memberKeyEpoch` 却写成当前代 ⇒ `autoSeal` 看到"已有信封"就跳过他，**他永远拿不到新钥**（界面表现为"进来了但评论区解不开"，且没有一条日志说得清）。M3-a 那笔治的就是它。
+2. `autoSeal` 原来拿**服务端报的号**当自己那把钥的世代 ⇒ 换钥后会把新钥标成旧世代，对方按信封号取钥就解不开。改成先收钥、再按本地条目的 `keyEpoch` 封。
+3. 成员端只存一把钥 ⇒ 换钥后那个 share 的**整个评论区**卡死：下行解不开就抛、游标不前进（M1 那条"不推进"的纪律在这里第一次咬到自己）。所以密钥环必须是多世代。
+
+**M3 没做到的，写清楚是谁的**：
+
+- **owner 不在线（或 vault 未解锁）时没人能触发换钥**。移除仍然生效（传输面已经关：他的上传/下载一律 404，库里他那行信封已作废），但那一名成员手里的旧 listKey 对他自己那台设备继续有效，要等下一次 owner 在场点移除。边界写在 `share-rekey.ts` 文件头；要做"无 owner 也能轮换"得先立一套成员侧协议 —— 不在 M3 的口径里，也不该顺手做。
+- **库里旧密文不重加密**（`reencryptShareRecord` 仍只有单测与验收脚本调用）。追加模型 + AAD 绑 `shareId`/世代 ⇒ 重写历史等于改 op-log 回放语义，与 M2/M4 同一份 ADR 一起判（§9.6 那条"不许悄悄改历史"仍在）。
+- **吊销未接受的邀请不触发换钥** —— 这条不是漏：`shareInvitations` 与成员行是两张表，接受（`/shares/invitations/accept`）之前没有任何一把 listKey 离开过 owner 的设备，没有要收回的东西。现量：`grep -n keyEnvelope server/src/shares/share.routes.ts` 里**装**信封的只有一处（PUT 那一处），另两处是本批加的**置 null**；吊销邀请那处只动 `shareInvitation`。
+
+**下一步**：M5（实时与偏好接线 —— 客户端接 `new_share_ops`、三条谓词进通知路径）。
+M1 之后"有信号 ⇒ 去拉"这条才有意义，且 M3 已经把"拉回来解得开"补齐。
+M2/M4 那一步仍然排在一份新 ADR 之后。

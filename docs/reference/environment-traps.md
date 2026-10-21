@@ -10912,3 +10912,24 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     ⑵ 为什么会漏：`pnpm typecheck` 展开是 `pnpm -r typecheck`（现量 `node -e "console.log(require('./package.json').scripts.typecheck)"`）—— 它**只按拓扑跑各包自己的 typecheck，不会先 build**。⇒ 同一棵树上，谁手头 `dist` 是新的就看不见这枚红，谁的旧了就看见：**两个结论都"对"**，差的是构建新鲜度。⚠️ 更要紧的是整条链此刻已被别线的在飞件压红（`BLOCKED.md` **B245**），"只有我这一枚包红"这种信号会被一起淹掉。
     ⑶ 正解一条命令：`pnpm --filter @heyta/i18n build`（tsup，秒级）之后重跑那两枚包的 tsc ⇒ rc=0（本会话实测：报错枚数 1 → 0）。判"键是不是真缺"之前先问**自己读的是 `src` 还是 `dist`**。
     ⑷ 这是元规则 1（先怀疑探针）的一次命中：报错行号指着我的新行，读起来像"我的代码坏了"，实际坏的是产物的新鲜度 ⇒ 遇到"刚加的符号说不存在"，第一件事是取**被解析到的那一枚文件**（看 `dist` 的 mtime，或解析包出口），**不是改代码**。
+
+515. **改完哪个包就要把那个包的 gate 跑上，别拿相邻包的绿推它**（2026-10-21 协作线 M3 实测）。
+    ⑴ 现场：`packages/app-host/src/share-rekey.ts` 里三处 `new ShareKeyUnavailableError()`，而那枚 class 的构造器取 `shareId`（TS2554）。那一窗口我只对 `server` 与 `web` 跑过 typecheck，两边都 rc=0。
+    ⑵ 三枚跑法抓到它的时机不同：**vitest 抓不到**（esbuild 只剥类型）；`pnpm --filter @heyta/app-host typecheck`（`tsc -p tsconfig.spec.json`）会抓到；`tsup` 的 **DTS 阶段**也抓到并把它打进 build。所以"全绿 ≠ 类型正确"这句要限定成"**没跑过的那枚包**绿 ≠ 类型正确"。
+    ⑶ 正解：一批改动跨几个包，就把 gate 按**包**跑齐（`pnpm -r typecheck` 是一趟到位的形状），或者至少改完哪个包 `--filter` 哪个；单靠 build 抓到是运气（它恰好是我为了 `dist` 新鲜度才跑的那一枚）。
+
+516. **变异台架对未跟踪的目标文件跑不了，这是护栏不是坏**（2026-10-21 协作线 M3-d）。
+    ⑴ 现象：`research/tools/mutation-rigs/mutate-collab-rekey.mjs` 第一趟 `ARMS=ENV dirty-worktree` 退 **3**，而 `git status` 里那枚目标文件**没有任何已跟踪改动** —— 它是 `??`（untracked）。装置用 `git status --porcelain -- REL` 取脏读数，untracked 也返回非空。
+    ⑵ 为什么不该放宽：这条 guard 的理由是"多会话共用一个检出，不能拿别人未提交的改动当实验台"；把 `??` 当干净就等于允许在别人的新文件上原地注病灶。
+    ⑶ 正解：**先把目标文件提交**（它是本线的文件，本来就要入库），再跑臂。⇒ 排 M3 这类"代码 + 装置"一批交付时，顺序是 提交代码 → 跑臂 → 把臂的读数写进文档，别反过来。
+
+517. **全仓扫那种判据会被并发负载的 5000ms 默认超时打假红**（2026-10-21 实测）。
+    ⑴ 现场：`packages/ui/tests/task-row-priority.spec.ts` 那条「`priorityColorToken` 的定义在 apps/ 与 packages/ 源码里只出现一次」。`pnpm --filter '!@heyta/sync-server' -r test`（与其它包并发）里它跑 **7168ms** 报 `Error: Test timed out in 5000ms`；单独跑 `cd packages/ui && npx vitest run tests/task-row-priority.spec.ts` 同一条 **2338ms 绿**（11/11）。
+    ⑵ 认错代价很高：断言文本长得像"某处有第二份定义"，很容易去改被指的那份代码或给它加豁免 —— 实际一行代码都没变，变的是这台机器的负载。⇒ 收尾取 `-r test` 读数之前**先看错误原文是不是 `Test timed out`**：是，就按探针的时钟处理（复跑单文件），不是才按产品断言处理。
+    ⑶ 口径：这条属于元规则 1（先怀疑探针）；**不去改它的 timeout 让它"过"** —— 那会把一枚真依赖 CPU 的判据改成一枚看不见的判据。
+
+518. **往 GFM 表里插一行，锚点选到邻接整行的前缀 ⇒ 邻接行的身份列被顺手吞掉**（2026-10-21 实测，本会话自己犯的）。
+    ⑴ 现场：`research/tools/mutation-rigs/README.md` 想接着 `mutate-collab-journey-autoseal.mjs` 那行往下加一行，`old_string` 取了**那行的开头三格**、`new_string` 写成"我的新行 + 那三格"。结果两行合成一行、journey 那行失去身份（装置名与"钉的工单"两格没了），尾巴那格还留在合并行里 —— 表看起来仍然是表。
+    ⑵ 门禁抓不住全部：`check:md-tables` 数**列数**，而合并后的行恰好还是 3 格 ⇒ 它照样绿。⇒ 插入要拿**行尾**做锚（选新行自己收尾那一串，把邻接行的起手一起写进 `new_string` 的下一行），或者插完立刻量一次每行 cells：`node -e "…split('|').length-2"`。
+    ⑶ 与 M7-d 那次"新行与表之间留了一枚空行（在 GFM 里根本不成表）"是同一族的两种坏法：**动表格要动两次眼睛**，一次看列数、一次看行的连续性。
+
