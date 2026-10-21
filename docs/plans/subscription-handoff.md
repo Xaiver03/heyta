@@ -232,7 +232,8 @@ AI 文件 import `@heyta/i18n`，所以 **`packages/i18n` 必须同一个提交*
    [`docs/agents/ui-acceptance.md`](../agents/ui-acceptance.md) 规定一第 1、2、4 条与
    [`docs/plans/product-ux-optimization.md`](product-ux-optimization.md) 的设备腿台账；
    ⚠️ 启动必须带 `HEYTA_NO_FOCUS=1`，不许抢前台）。归我方，工作量在设备那条腿而不是代码。
-   ⚠️ 现量（为什么不能拿手边那张旧图交差）：`grep -c "renew-tier-hostedAi" apps/mobile/ios/build/Build/Products/Release-iphonesimulator/Heyta.app/main.jsbundle` 回 **0** —— 那枚 10-20 的包**里根本没有档位选择**，用它拍图就是拿旧产物冒充当前产物。
+   ⚠️ 现量（为什么不能拿手边那张旧图交差）：`grep -o 'mobile.entitlement.renew.tierTitle' apps/mobile/ios/build/Build/Products/Release-iphonesimulator/Heyta.app/main.jsbundle | wc -l` 回 **0** —— 那枚 10-20 的包**里根本没有档位选择**，用它拍图就是拿旧产物冒充当前产物。
+   🔴 **这一格原先用的探针被本会话自己否证并换掉了**（10-21 17:3x）：旧写法拿 `renew-tier-hostedAi` 当针，而源码里那枚 `testID` 是**模板拼出来的**（现量 `apps/mobile/src/screens/RenewSection.tsx:107` = `` testID={`renew-tier-${id}`} ``）⇒ **任何构建都取不到非零**，那是一枚永远 0 的探针，它给的"旧包没有档位"其实没证成任何东西。换的针是**词条字面**：同一枚包里 `mobile.entitlement.renew.payHint`（10-05 进源码）出现 **1** 次，而 `…tierTitle`（10-21 00:31 进源码，`git log -S` 现量）出现 **0** 次 ⇒ 打包确实保留这类键字面，"0"才真的是"这一版没有"。
    🔧 **这一腿的前置比看上去小，四项都已现量**（写给下一个接手的人，省得重新推）：
    ① **不需要先造一笔存量订阅** —— 那块整块的唯一渲染闸门是"同意出境"（现量 `grep -n "networkAllowed()) return null" apps/mobile/src/screens/RenewSection.tsx`），所以只要登录进去 + 同意出境就画得出来；
    ② 挂载点在 Profile 那一屏（现量 `grep -n "<RenewSection" apps/mobile/src/screens/ProfileScreen.tsx`），滚到权益那块下面就是；
@@ -261,7 +262,7 @@ AI 文件 import `@heyta/i18n`，所以 **`packages/i18n` 必须同一个提交*
 | §5 第 2 条「heyta 自己的法务文本」 | 同上，文本已在，待的是复核与生效 |
 | §9.3 第二条「本地凭证已写入借用的 `WX_*`」 | 见 §10.3 第 5 格：通路已换，值还在盘上 |
 
-### 10.5 「今天卖不出去」这句话在仓里有几种形状（本轮改了两处，其余**刻意**留着）
+### 10.5 「今天卖不出去」这句话在仓里有几种形状（改口的与**刻意**留着的全列在下面，条数别在这里抄）
 
 ⚠️ 这一类**没有任何门禁会红**：`check:pricing` 与 `check:ai-quota` 钉的是**数字与键**
 （价目、`grants`、额度），不钉散文里的通道名与"能不能买"。现量：
@@ -279,6 +280,9 @@ AI 文件 import `@heyta/i18n`，所以 **`packages/i18n` 必须同一个提交*
 | `server/docker-compose.yml` 里那组 `WECHAT_PAY_ENABLED=${…:-false}` | ⚠️ **别顺手删** | 它是**有意保留**的：删掉之后，一个 `.env` 里还留着 `=true` 的运营者会**静默**什么通道都不开，而运维以为自己在收钱。现量 `sed -n '134,150p' server/docker-compose.yml` 那段注释；守它的是 `check:payment-entry` + `check:server-env` |
 
 
+
+| `docs/plans/pricing-coupons-handoff.md` 九格表第 **⑧** 行「看『买了什么 / 剩多少 AI』＝❌、没有『本周期已用 X / 300 次』的界面」 | ✅ **已改口**（17:3x 那一趟的第二轮同类扫描捞出，用本篇自己的"~~原文~~ ⇒ dated 更正"体例）：那一屏现在存在 —— `apps/web/src/features/settings/AiSettings.tsx:810` 渲 `t('web.ai.settings.usage.used', …)`，词条「本周期已用 {used} / {limit} 次。」（现量 `grep -n "usage.used" apps/web/src/features/settings/AiSettings.tsx`） | 它读的仍是这台实例自己的计量 ⇒ 改口时**顺带写明它不证明 ¥12 在交付**，免得这一格从"缺界面"翻成"缺界面"的反面误读 |
+| 🔴 **同名词的三种"档位"**（这一条是**防误改**，不是待办） | ⏸ **都不改** | `docs/plans/ui-review-fill-zh-timeline.md:2519` 那句「移动端没有档位入口…那一端仍然只有月档」讲的是**日历视图档**（月/周/日，`view` 那个参数），`docs/plans/calendar-profile-handoff.md:540` 的「档位下拉」同一件事，`docs/reference/environment-traps.md` 里「根本没有档位选择器」讲的是**截图证据的形状**。⇒ 按「客户端有没有档位选择器」这把尺去 grep `档位`，会命中这三处**不是同一件事**的句子；本线那一枚控件在源码里的形状只认词条字面（现量 `grep -c 'renew\.tierTitle' apps/web/src/features/subscription/RenewPanel.tsx` 回 **1**、`…/RenewSection.tsx` 回 **1**；⚠️ **别拿 `renew-tier-hostedAi` 当针**，那枚 `testID` 是模板拼的，见 §10.3 第 7 格那条红字） |
 
 ### 10.6 本轮之后剩下的动作（按谁能做分）
 
