@@ -10900,3 +10900,9 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     ⑵ 🔴 这枚红是**对的设计**，别去动判据：CI 检出的是提交，不是我的工作树 —— 台账链一枚没入库的文件，在干净检出上确实是死链。要修的只有**归因**：那是"还没入库"，不是"没有这个东西"。
     ⑶ 处置：把新件与台账放在**同一笔**提交里，`git add <命名 pathspec>`（不许 `git add .`）之后重跑 `pnpm check:docs` ⇒ rc=0。**不要**为了让判据变绿把链接改成纯文字 —— 那是把判据降级，而它此刻正在做它该做的事。
     ⑷ 给下一位的顺序：要么先 `git add` 再写链接，要么整笔 `git add` 完**再跑一次** `check:docs` 然后提交 —— 提交前跑的门禁读的是索引，索引里没有就等于这道门没跑（同 §7 第 511 条"红要先归因再处置"那一族）。
+
+513. 🔴 **变异台架"把字节还原了"不等于"把状态还原了" —— 写回会抬起文件的 mtime，而仓里明写着抬起 `apps/«壳»/src` 的 mtime 会把下一趟设备验收顶成 `rc=3`；更巧的是**还原校验本身也只能按毫秒做**（比 `mtimeMs` 会恒判"没还成"）**（2026-10-21 本线现量，两枚新台架各红一次）。
+    ⑴ 规则的出处不用猜：`scripts/check-mobile-ai-anchors.mjs` 的臂注释原话是「变异打在 tmp 里的副本上（真树不动 —— 动 `apps/*/src` 会把 mtime 抬起来，下一趟设备验收会被新鲜度门顶成 rc=3；那是探针自己把路堵死）」。**同一枚副作用也适用于 `server/src`**：当下没有 mtime 尺指着它，不代表下一位不会立一把。
+    ⑵ 本线的两枚台架必须碰真树（判据读的就是那个路径，`apps/mobile/tests/renew-entry.spec.ts` 用 `readFileSync(join(SRC,'src/screens/RenewSection.tsx'))`，没有 env 旋钮可指），所以走的是**还时间戳**那一条：起跑前 `statSync` 取 atime/mtime，写回原文之后 `utimesSync` 一并还回去，并当场验一次。现量：改前后 `stat -f "%m"` 两枚文件都逐字相同。
+    ⑶ 🔴 校验只能按**毫秒**比，别拿 `mtimeMs` 的小数尾去比：`utimesSync(path, atime, mtime)` 这条通道能送达的最高精度就是毫秒，而 APFS 存纳秒 ⇒ `statSync(p).mtimeMs !== stamp.mtimeMs` **恒成立**，脚本会在自己已经做对的时候判红（本线第一版就是这么红的，红得很有迷惑性 —— 看着像"文件系统不肯还"）。要比 `mtime.getTime()` 两侧同尺。
+    ⑷ ⚠️ 归因说清、别顺手替别人改：同族的 `scripts/mutate-calendar-event-source.mjs` 与 `scripts/mutate-op-log-semantics.mjs` 也碰真树（前者动 `apps/mobile/src/screens/CalendarScreen.tsx`）而**没有**这一半还原 —— 那是那两条线的臂，一行 `utimesSync` 就能补，本线不代改（代改别线要"一条命令可回退 + 运行时形状逐字段等于改前"，此处只缺一行，不必抢）。现量：`grep -c utimesSync scripts/mutate-*.mjs`。
