@@ -480,6 +480,14 @@ mobile 已真渲染过同目录的 `ConflictResolutionView`），缺的全在宿
 
 **M5 没做到的，写清楚是谁的**：
 
+- ⚠️ **本线还剩一枚轮询，但它不是 M5 撤掉的那一类**：`apps/web/src/features/share/ShareFeature.tsx` 里开着面板时每 3s
+  `reload` 一次（现量 `grep -n "setInterval" apps/web/src/features/share/ShareFeature.tsx`）。
+  它取的是**清单详情与成员**（邀请被接受、成员信封下发都发生在另一端），而 `grep -rn "notifyShareOps" server/src`
+  只回**两行**：一行是 `websocket-connection.service.ts` 里的定义，一行是 `share.routes.ts` 里 share log 追加路径上的调用 ⇒
+  **发信号的只有那一条路径**，成员/信封那一份状态**不在这条信号的覆盖面上**。
+  所以撤掉它会把"邀请被对面接受后面板自己更新"退化成"刷新页面才更新"——**这不是漏撤，是要另立一条**：
+  服务端在成员/信封写路径上也发一条信号，或让面板从本机已知事件重取。归 M4 之后的活，不进 M5 的读数。
+
 - **通知正文只有"有人新增/删除了一条评论"，不含清单名与内容**。端到端加密下本机当然解得开，但把明文写进系统通知中心等于交给操作系统（及其同步）去保管。要带名字得先定一条口径："通知里允许出现什么"—— 这一格归产品负责人拍，不由工程顺手放宽。
 - **`shouldNotifyTaskReminder` 与 `shouldAutoAcceptInvitation` 仍没有数据面**：前者要 `TASK` 的 op 进 share log（M2 的路由），后者要移动端的邀请接受面（§9.4 那六段）。这不是"接了没测"，是**没有输入** —— 给它造一条假输入去点亮判据，量的是夹具不是产品。
 - **`app-mount.spec.tsx` 里的 `act(...)` 警告是预存的**：同一枚文件在 HEAD 上跑就有 28 条（`An update to SubscriptionNotice inside a test was not wrapped in act`），本批那一臂挂上完整 `<App />` 后整文件涨到 45 条。现量：`cd apps/web && npx vitest run tests/app-mount.spec.tsx 2>&1 | grep -c "not wrapped in act"`。这条不是本批的缺陷，也没有被当成判据。
