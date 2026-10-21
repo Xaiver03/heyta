@@ -180,8 +180,17 @@ node scripts/tools/cos-api.mjs --bucket heyta-dist-1380503169 \
 
 ## 6. 留白（有意不做，别当遗漏）
 
-- **自定义域名**（`dl.waytofuture.cn` CNAME 到桶）：默认 `myqcloud.com` 域名直接可用，
-  自定义域名要动 DNS 与证书，等对外域名策略定了再说。
+- **自定义域名**（`dl.waytofuture.cn` CNAME 到桶）：~~默认 `myqcloud.com` 域名直接可用~~
+  ⇒ **这句前提 2026-10-21 被现量否证，只对一半的端成立**：同一只桶、同一批 `latest/` 对象，
+  `macos.dmg` / `windows.zip` / `linux.deb` 匿名 GET 均 200，`android.apk` 匿名 GET **403**，
+  响应体逐字是 `<Code>DownloadForbidden</Code>` + 「The APK/IPA file is not allowed to be
+  distributed in a public network using COS default domain, please use custom domain instead.」
+  （RequestId `NmFkODFmYTJfODdlZTQyMWVfOTU1Yl8zZmFmY2Fi`）。**HEAD 读 200，GET 读 403** ——
+  只探 HEAD 的健康检查会把这件事整个读漏，本仓 §5 那条"四端匿名可读"的旧读数就是这么来的
+  （也可能是策略后来才收紧，两种成因现在都还没法定论）。
+  ⇒ 所以这一格不再是"等对外域名策略定了再说"的留白：**Android 要能从国内桶装到机上，绑自定义域名
+  是前置条件**，不是可选项。要么绑 `dl.waytofuture.cn`，要么让 Android 用户走 GitHub Releases 那条腿
+  （那边五个资产实测可读）。这一步动的是 DNS 与桶配置，属于分发线，不在算法备案这一档里做。
 - **GitHub Releases 镜像**：仓库转公开后，把同一批文件挂到 release 上即可，脚本化
   （`gh release create`）此处不展开。
 - **MSIX / deb 的常规产出**：Windows 包在远端打包机、Linux 包路径见
