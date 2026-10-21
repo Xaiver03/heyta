@@ -857,6 +857,10 @@ E 勾选后不切实心→1 红；F 主按钮文字配对坏→1 红。还原后
    但**打包输入面逐字相同**（全仓差 5 个文件，都在非输入面：docs/research/台账）⇒ 产物同形，本腿判绿」。
    ⇒ 记下来免得下一位照旧话先 `checkout` 一遍：**载体不要求逐提交追平，只要求打包输入面一致**；
    真正要追平的判据是 `git diff --name-only <载体sha> <main sha>` 里有没有 `apps/ packages/ server/ e2e/` 这些输入面路径。
+   ⚠️ **但它会随并线的代码笔重新开**：01:2x 并线落了一笔 `test(¥12 档)`，改到 `package.json` 与 `scripts/` ⇒ 裁判立刻翻成
+   `❌ 打包输入面差 3 个文件`。这一格**归我自己**，不用等人：`git -C <载体> checkout --detach <main sha>` →
+   比 `pnpm-lock.yaml` 的 sha256（相同就直接沿用载体里那份 `node_modules`，别重装）→ 在载体里 `pnpm -r build`（本次 rc=0）→
+   复量裁判回 `✅ 载体新鲜：… == 主检出 HEAD`。**做完之后现量只剩"设备面"这一格不成立**，其余五项全 ✅（负载 9 ≤ 12、无脏打包输入、无软链 node_modules、没有别的 `reinstall-all` 在跑）。
 
 其余现场读数（同一趟）：没有别的 `reinstall-all` 在跑；没有 `verify-mobile-*` 在跑；`notarytool` 空；
 已启动模拟器**恰好一台** `heyta-iphone-17pro`；`ssh windows-pc` 回 `SSHECHO=OK`；数据卷余量 68Gi。
