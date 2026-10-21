@@ -49,6 +49,9 @@ import { useProjectStore } from '../projects/store.js';
 import { getWebVaultSession } from '../../lib/vault-session.js';
 import { createWebAuthFetch } from '../../lib/central-fetch.js';
 import { text } from '../../lib/text.js';
+import { forgetShareLocally } from '@heyta/app-host';
+import { clearStorageShareLog } from './comment-actions.js';
+import { createWebShareKeyRotation } from './share-rotation.js';
 import {
   getShareKeyEntry,
   deleteShareKey,
@@ -274,6 +277,13 @@ export function ShareFeature(props: ShareFeatureProps) {
       setMembers(m.members);
     } catch (err) {
       if (err instanceof ShareApiError && (err.status === 403 || err.status === 404)) {
+        // 🔴 服务端说"你不是这份共享的人了"（被移除 / 被转让后自己不是 owner 了）：
+        // 本机的密钥与那份折叠出来的日志就不该再留着——它们装的是**别人写的评论**。
+        // 只清共享域的数据（密钥 + 日志 + 游标），本地那行清单留给 M2 的路由一起处理。
+        forgetShareLocally(
+          { dropKey: () => { deleteShareKey(localStorage, shareId); }, dropShareData: () => { clearStorageShareLog(localStorage, shareId); } },
+          shareId,
+        );
         setPhase({ kind: 'not-a-member' });
       }
     }
@@ -281,24 +291,38 @@ export function ShareFeature(props: ShareFeatureProps) {
 
   // owner 端自动信封下发：成员已入群但还没钥（hasEnvelope=false / 世代落后）
   // ⇒ 只要我是 owner 且解得出 listKey，就补封。这是"被邀请者无感知拿到密钥"的那一跳。
-  const autoSeal = useCallback(async (shareId: string, keyEpoch: number) => {
+  //
+  // 🔴 信封上的世代 = **本机这把钥自己的世代**，不是服务端那个号（M3 纪律 1）。
+  // 按 `detail.keyEpoch` 贴标在换钥之前看不出错（两者总是相等），换钥之后就变成
+  // "把 epoch2 的钥贴成 epoch1 发给所有人"——全员解不开新内容，而面板显示"密钥已下发"。
+  // 所以本机落后时先**收**（owner 在别的设备上换过钥，他自己的信封就在服务端的行里），
+  // 收到之后再把那把该发的发出去。
+  const autoSeal = useCallback(async (shareId: string) => {
     if (api === undefined || detail?.yourRole !== 'owner') return;
     const cipher = await getPayloadCipher();
     if (cipher === undefined) { setNeedsUnlock(true); return; }
+    const rotation = createWebShareKeyRotation({
+      baseUrl, token: token ?? '', authTransport, vaultCipher: cipher, storage: localStorage,
+    });
+    if (rotation !== undefined) {
+      try { await rotation.adoptRotatedShareKey(shareId); } catch { /* 解不开就照本机这把继续，下一轮再对账 */ }
+    }
+    const entry = getShareKeyEntry(localStorage, shareId);
+    if (entry === undefined || entry.keyEpoch < 1) return;
     const listKey = await unwrapShareListKey({ storage: localStorage, cipher, shareId });
     if (listKey === undefined) { setNeedsUnlock(true); return; }
     for (const m of members) {
-      if (m.keyEnvelope !== null && m.keyEnvelope !== undefined && m.memberKeyEpoch >= keyEpoch) continue;
+      if (m.keyEnvelope !== null && m.keyEnvelope !== undefined && m.memberKeyEpoch >= entry.keyEpoch) continue;
       if (m.identityPublicKey === null || m.identityPublicKey === undefined) continue;
       try {
         const envelope = await sealListKeyForRecipient({
-          listKey, shareId, keyEpoch,
+          listKey, shareId, keyEpoch: entry.keyEpoch,
           recipientX25519PublicKey: fromBase64(m.identityPublicKey),
         });
-        await api.putMemberEnvelope(shareId, m.memberId, { keyEpoch, keyEnvelope: envelope });
+        await api.putMemberEnvelope(shareId, m.memberId, { keyEpoch: entry.keyEpoch, keyEnvelope: envelope });
       } catch { /* 单个成员失败不拖垮整轮；下一轮 reload 再试。 */ }
     }
-  }, [api, detail?.yourRole, getPayloadCipher, members]);
+  }, [api, authTransport, baseUrl, detail?.yourRole, getPayloadCipher, members, token]);
 
   useEffect(() => {
     if (phase.kind !== 'panel') return;
@@ -311,8 +335,29 @@ export function ShareFeature(props: ShareFeatureProps) {
   // members 变化 ⇒ 尝试补发信封（幂等：有信封且世代新的跳过）。
   useEffect(() => {
     if (phase.kind !== 'panel' || detail === undefined) return;
-    void autoSeal(phase.shareId, detail.keyEpoch);
+    void autoSeal(phase.shareId);
   }, [phase, detail, members, autoSeal]);
+
+  // ── 移除成员（owner）：一次点击 = 移除 + 当场换钥（M3 的一个用户意图）────────
+  // 🔴 这两半不能拆开做。只移除不换钥，人走了、他手里那把钥仍然解得开你们以后写的内容；
+  // 判断与顺序都在 `@heyta/app-host` 的 `removeMemberAndRekey` 里，这里只负责"接不上就说是接不上"。
+  const removeMember = useCallback(async (memberId: string) => {
+    if (phase.kind !== 'panel') return;
+    const cipher = await getPayloadCipher();
+    if (cipher === undefined) { setNeedsUnlock(true); return; }
+    const rotation = createWebShareKeyRotation({
+      baseUrl, token: token ?? '', authTransport, vaultCipher: cipher, storage: localStorage,
+    });
+    if (rotation === undefined) { setCreatingError(t('web.share.error.offline')); return; }
+    try {
+      const reading = await rotation.removeMemberAndRekey(phase.shareId, memberId);
+      // 人已经移走了，换钥失败就不能报"移除失败"——但也不能不说（下一轮之前这份清单还在用旧钥写）。
+      if (reading.rekeyError !== undefined) setCreatingError(reading.rekeyError);
+    } catch (err) {
+      setCreatingError(err instanceof ShareApiError ? `${String(err.status)} ${err.code ?? ''}` : String(err));
+    }
+    await reload(phase.shareId);
+  }, [authTransport, baseUrl, getPayloadCipher, phase, reload, t, token]);
 
   // ── 邀请（owner）───────────────────────────────────────────────────────────
   /** 应用自己的可分享地址（W6 链接落点）：朋友点链接该落进**应用**的入群旅程，
@@ -546,9 +591,7 @@ export function ShareFeature(props: ShareFeatureProps) {
               labels={panelLabels}
               callbacks={{
                 onInvite: () => { /* 邀请表单常驻上方；这个入口指向它。 */ const el = document.getElementById('ht-share-invite-email'); el?.focus(); },
-                onRemoveMember: (memberId) => {
-                  void api.removeMember(phase.shareId, memberId).then(() => reload(phase.shareId));
-                },
+                onRemoveMember: (memberId) => { void removeMember(memberId); },
                 onRoleChange: (memberId, role) => {
                   void api.patchMemberRole(phase.shareId, memberId, role).then(() => reload(phase.shareId));
                 },
@@ -569,7 +612,12 @@ export function ShareFeature(props: ShareFeatureProps) {
                 onClick={() => {
                   void (async () => {
                     await api.leaveShare(phase.shareId);
-                    deleteShareKey(localStorage, phase.shareId);
+                    // 🔴 离场要把共享域的三件都清掉（密钥 + 日志 + 游标）。只删钥，
+                    // 本机那份折叠出来的评论日志还留在 localStorage 里读得到。
+                    forgetShareLocally(
+                      { dropKey: () => { deleteShareKey(localStorage, phase.shareId); }, dropShareData: () => { clearStorageShareLog(localStorage, phase.shareId); } },
+                      phase.shareId,
+                    );
                     // 成员端离开：本地的这条清单一并移除（它是加入时建的那行）。
                     await useProjectStore.getState().deleteProject(projectId);
                     onClose();

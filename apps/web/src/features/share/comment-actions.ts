@@ -26,7 +26,8 @@ import { createSharePayloadCipher, ShareApiClient, type SyncPayloadCipher } from
 
 import { currentState, dispatchChecked, dispatchIntent } from '../../lib/oplog.js';
 import { createWebAuthFetch } from '../../lib/central-fetch.js';
-import { getShareKeyEntry, unwrapShareListKey } from './share-key-store.js';
+import { createWebShareKeyRotation } from './share-rotation.js';
+import { unwrapShareKeyRing } from './share-key-store.js';
 
 /** share 日志在本地 `Storage` 上的键（一份 share 一条日志 + 一张索引 + 一份下行游标）。 */
 const LOG_PREFIX = 'heyta.share-log.';
@@ -45,20 +46,36 @@ const CURSOR_PREFIX = 'heyta.share-log.cursor.';
  * 没有这个字段"，拆成两条键则天然向后兼容（读不到 = 0 = 从头拉）。
  * 坏值一律退到 0（退到 0 只会多拉一次，折叠是幂等的；退到别的值会**少拉**）。
  */
+/** 这台设备上落过盘的 share id 索引（读路径要能枚举，见 `ShareLogStorage.list`）。 */
+function readShareIndex(store: Storage): string[] {
+  const raw = store.getItem(LOG_INDEX_KEY);
+  if (raw === null) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeShareIndex(store: Storage, ids: readonly string[]): void {
+  store.setItem(LOG_INDEX_KEY, JSON.stringify([...new Set(ids)]));
+}
+
+/**
+ * 清掉一份共享在本机的**下行数据**：折叠出来的日志 + 下行游标 + 索引里的这一格。
+ *
+ * 🔴 密钥不在这里删（那是 `share-key-store.deleteShareKey` 的账）。两件都做才叫离场：
+ * 只删钥不删日志，界面上别人的评论还在（读的就是这份明文）；只删日志不删钥，
+ * 下一轮拉取会把同一批内容又拉回来。两端一起走 app-host 的 `forgetShareLocally`。
+ */
+export function clearStorageShareLog(store: Storage, shareId: string): void {
+  store.removeItem(`${LOG_PREFIX}${shareId}`);
+  store.removeItem(`${CURSOR_PREFIX}${shareId}`);
+  writeShareIndex(store, readShareIndex(store).filter((id) => id !== shareId));
+}
+
 export function createStorageShareLog(store: Storage): ShareLogStorage {
-  const readIndex = (): string[] => {
-    const raw = store.getItem(LOG_INDEX_KEY);
-    if (raw === null) return [];
-    try {
-      const parsed: unknown = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
-    } catch {
-      return [];
-    }
-  };
-  const writeIndex = (ids: readonly string[]): void => {
-    store.setItem(LOG_INDEX_KEY, JSON.stringify([...new Set(ids)]));
-  };
   return {
     load: (shareId) => {
       const raw = store.getItem(`${LOG_PREFIX}${shareId}`);
@@ -71,9 +88,9 @@ export function createStorageShareLog(store: Storage): ShareLogStorage {
     },
     save: (shareId, log) => {
       store.setItem(`${LOG_PREFIX}${shareId}`, JSON.stringify(log));
-      writeIndex([...readIndex(), shareId]);
+      writeShareIndex(store, [...readShareIndex(store), shareId]);
     },
-    list: () => readIndex(),
+    list: () => readShareIndex(store),
     cursor: (shareId) => {
       const raw = store.getItem(`${CURSOR_PREFIX}${shareId}`);
       const n = raw === null ? Number.NaN : Number(raw);
@@ -131,15 +148,22 @@ export function createWebShareComments(deps: WebShareCommentsDeps): WebShareComm
   const dispatch = createShareCommentDispatch({
     api,
     cipherFor: async (shareId) => {
-      // 钥匙在本地密钥库里（信封由 vault 载荷密钥包着）；没入库或解不开 ⇒ undefined，
-      // 上层会抛 `ShareKeyUnavailableError` 而不是发一条解不开的 op。
-      const entry = getShareKeyEntry(deps.storage, shareId);
-      if (entry === undefined) return undefined;
-      const listKey = await unwrapShareListKey({ storage: deps.storage, cipher: vaultCipher, shareId });
-      if (listKey === undefined) return undefined;
-      return createSharePayloadCipher({
-        current: { shareId, keyEpoch: entry.keyEpoch, listKey },
+      // 🔴 先问一句"这台设备还追得上服务端的世代吗"（M3）。换钥发生在别人的设备上，
+      // 本机唯一的发现途径就是这一问；收不到新信封不算错（owner 还没发到人），
+      // 收不到就把当前环照用——旧世代的密文本来也解得开（`previous` 在环里）。
+      const rotation = createWebShareKeyRotation({
+        baseUrl: deps.baseUrl, token: deps.token, authTransport: deps.authTransport,
+        vaultCipher: deps.vaultCipher, storage: deps.storage,
       });
+      if (rotation !== undefined) {
+        try { await rotation.adoptRotatedShareKey(shareId); } catch { /* 未登录/没解锁：下面读环会给出 undefined */ }
+      }
+      // 🔴 交出去的是**整个密钥环**，不是当前那把（M3）。换钥之后日志里是混合世代的密文：
+      // 只喂当前那把，旧评论会解不开，而按下行纪律"解不开 ⇒ 抛错且不推进游标"，
+      // 症状不是"少一条评论"而是**评论区整块卡死**。
+      const ring = await unwrapShareKeyRing({ storage: deps.storage, cipher: vaultCipher, shareId });
+      if (ring === undefined) return undefined;
+      return createSharePayloadCipher(ring);
     },
     storage: createStorageShareLog(deps.storage),
     currentUserId: () => deps.userId,
