@@ -32,11 +32,12 @@ E2EE 下的**清单共享**基础设施（ADR-0062）已实现并**本地提交*
 - **W4 残余从三件变两件，但产品定性变坏了**：评论**已挂载并有写路径**（`apps/web/src/features/tasks/TaskDetailCard.tsx` 里 `ShareCommentsSection` 的 import 与渲染两处命中），不再是"已建模不可达"；指派与动态照旧（`Task.assigneeUserId` 全仓零写点、只有通知过滤在读；动态流仍只有通知偏好开关）。
   🔴 **下面那一格到 2026-10-21 已经改了一半，别按原句读**（原句留在这里是因为它还剩另一半是真的）：
   **评论这条腿通了** —— `downloadOps` 现在有人消费（复量：`grep -rn "downloadOps" --include=*.ts packages/app-host/src apps/web/src | grep -v spec` 有命中），
-  游标落盘、进评论区先拉一次、`verify:collab-sync` 第 10 步经真宿主验过（`RESULT=OK steps=10`）。
+  游标落盘、进评论区先拉一次、`verify:collab-sync` 的宿主层那一格经真宿主验过（步数由脚本自己打印，别在这里抄）。
   仍然断的是**任务与清单的写路径**：`packages/app-host/src/project-actions.ts` 里唯一的 share 相关方法照旧只有 `setProjectShareId`，
   没有任何 share 分流 ⇒ 成员互相看得到对方写的评论，**看不到对方改的任务**（那是 M2，要先立 ADR）。
-  实时信号 `new_share_ops` 客户端也照旧不接（M5）。
-  ⇒ 逐条见本线计划 `docs/plans/collaboration-shared-lists.md` §9.8（M1 落地那一节的读数）。
+  实时信号 `new_share_ops` **已经不接了**（2026-10-21 M5：客户端认下、宿主判断该不该拉、`@heyta/ui` 那条谓词决定响不响，5 秒轮询已撤）——
+  但它今天搬运得到的仍然只有评论那一族，理由与上面那格同一个：`TASK` 的 op 还没进 share log。
+  ⇒ 逐条见本线计划 `docs/plans/collaboration-shared-lists.md` §9.1 那张现状表与 §9.7–§9.10（M7 / M1 / M3 / M5 各一批读数）。
 
 状态与逐项读数见 [`docs/plans/goal-collaboration-shared-lists.md`](../../docs/plans/goal-collaboration-shared-lists.md) **文末那几节**（末节号现量：`grep -n '^## ' docs/plans/goal-collaboration-shared-lists.md | tail -2`，本行不写节名因为它会长）；PIPL 同意面的视觉层级（旧停止点 ①）已按最佳实践落地并配判据（`apps/web/tests/share-consent-modal-theme.spec.tsx`）；**所有权转让语义（旧停止点 ②）已由产品负责人把判定权交下来、本轮按产品判断定案保留现语义**（两步确认 → 立即生效 → 原 owner 降 editor，服务端单事务原子），翻案条件写在计划那一节。
 

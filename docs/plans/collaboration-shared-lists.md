@@ -283,14 +283,14 @@ model ShareOperation   { id, shareId, clientId, serverSeq, …密文列
 | 那一面 | 代码现量 | 怎么复量 |
 |---|---|---|
 | 元数据面（建共享 / 邀请 / 入群 / 成员 / 角色 / 转让 / 移除 / 退出） | ✅ 服务端与 Web 宿主都在 main 上，role 硬门在上传边界 | `pnpm verify:collab-journey`；`pnpm --filter @heyta/web --silent exec vitest run tests/share-panel-transfer.spec.tsx tests/join-link.spec.ts` |
-| **内容下行** | 🟡 **评论这条腿已通**（2026-10-21 M1）：`downloadOps` 有生产调用点（`share-comments.ts` 的 `pullShareOps`），游标落盘、分页收敛、解密回放都在；🔴 但它今天**搬运不到用户眼前** —— 成员那边根本看不到这条共享任务（下一行那格），所以点不进评论区。原句"零实现"已过期 | `grep -rn downloadOps packages/app-host/src apps/web/src` 有命中（定义 + 调用两处）；`pnpm verify:collab-sync` 第 10 步 `RESULT=OK steps=10` |
+| **内容下行** | 🟡 **评论这条腿已通**（2026-10-21 M1）：`downloadOps` 有生产调用点（`share-comments.ts` 的 `pullShareOps`），游标落盘、分页收敛、解密回放都在；🔴 但它今天**搬运不到用户眼前** —— 成员那边根本看不到这条共享任务（下一行那格），所以点不进评论区。原句"零实现"已过期 | `grep -rn downloadOps packages/app-host/src apps/web/src` 有命中（定义 + 调用两处）；`pnpm verify:collab-sync` 第 10 步（宿主层闭环，步数由脚本自己打印） |
 | **内容上行** | 🟡 **只有评论**：`uploadOps` 经 `createShareOpDispatcher` 接通，但调用链只从 `share-comments.ts` 进来 | `grep -rn createShareOpDispatcher --include=*.ts packages` ⇒ 生产消费者只有 `share-comments.ts` |
 | **任务 / 清单的写路径** | 🔴 **仍进个人 op-log**。`project-actions.ts` 里唯一与 share 有关的方法是 `setProjectShareId`（挂个 id），没有任何"该进 share log 还是个人 log"的分流 | `grep -n -E "shareId\|share" packages/app-host/src/project-actions.ts` |
 | 服务端可写白名单 vs 客户端实际 | 白名单已经认识 `TASK / PROJECT / TAG / NOTE / COMMENT`，**服务端不拦，是客户端没往那走** | 读 `server/src/shares/share.membership.ts` 的 `SHARE_WRITABLE_ENTITY_TYPES` |
 | 并发判定 | 🔴 share 分区每条 op 的向量时钟被硬编成 `{ clientId: 1 }`（个人引擎那侧会自增自己那一维）⇒ 同设备两 op 恒 EQUAL、跨设备恒 CONCURRENT，判定只剩 timestamp 平局 | 读 `packages/app-host/src/share-client.ts` 里 `vectorClock:` 那一行，对照 `packages/op-log/src/engine.ts` 的自增 |
 | 逐 op 签名 | 🔴 线协议里没有 `signature` 字段，写侧不签、服务端不验；原语在 `sync-core` 里躺着 | `grep -rn signature packages/shared-schema/src/supersync-http-contract.ts` ⇒ 零命中 |
 | 移除即 rekey | 🟡 **owner 那一次点击这条链已通**（2026-10-21 M3，读数见 §9.9）：`rotateShareKey` / `adoptRotatedShareKey` / `removeMemberAndRekey` 有生产调用点（`apps/web/src/features/share/share-rotation.ts` 装配，`ShareFeature.tsx` 的移除按钮与 reload 收钥两处调用），`keyEpoch` 真推进、新钥只封给在册成员（自己那枚排第一）、被移除那行的信封在库里置 null；成员端换成了**多世代密钥环**，否则换钥后那一屏会整块解不开。🔴 两件没做：库里**旧密文不重加密**（追加模型；重加密等于改 op-log 回放语义，与 M2/M4 同一份 ADR 一起判）；**owner 不在线时没人能触发换钥**（移除仍然生效，只是那一代钥还留着 —— 边界写在 `share-rekey.ts` 文件头） | `grep -rn removeMemberAndRekey apps/web/src packages/app-host/src` ⇒ 编排件 + 壳调用点各有命中；`pnpm verify:collab-revoke` ⇒ `RESULT=OK steps=8` |
-| 实时 | 🔴 服务端发 `new_share_ops`，客户端只处理 `connected`；`notification-model` 那三条偏好谓词生产消费者为零 | `grep -rn new_share_ops --include=*.ts packages apps` ⇒ 只有服务端那一处 |
+| 实时 | 🟡 **`new_share_ops` 那三段接线已通**（2026-10-21 M5，读数见 §9.10）：客户端认下这条消息、只把 `(shareId, latestSeq)` 交给宿主；"**这台设备认不认得这份 share、要不要拉、拉到算哪类活动**"住 `@heyta/app-host`；"响不响"住 `@heyta/ui` 那条谓词；壳只做装配与投递。评论区那枚 5 秒轮询已撤，改成信号驱动重画。🔴 三条偏好谓词里今天只有**活动那一族**有输入：`shouldNotifyTaskReminder` 要 `TASK` 的 op 进 share log（M2）、`shouldAutoAcceptInvitation` 要移动端的邀请面 ⇒ 这两条不是"接了没测"，是**没有输入** | `grep -rn new_share_ops --include=*.ts packages apps` ⇒ 服务端发 / 客户端认 / 判据三处都有命中；`pnpm verify:collab-sync` ⇒ `RESULT=OK`，步数由脚本自己打印 |
 | 端覆盖 | 🟡 Web 接了；**macOS / Windows / Linux 三枚桌面壳间接有**（包里装的就是 `apps/web/dist`）；**移动端零接入**；node-host/CLI 无 share 工具 | `grep -rn -E "SharePanel\|shareId\|payloadCipher" --include=*.ts --include=*.tsx apps/mobile/src` ⇒ 0 命中；`grep -n web-dist apps/desktop-macos/Sources/HeytaMac/HeytaMacApp.swift` |
 | 常驻判据 | 🔴 **M7 之前**本线没有一扇门在链上（`check` 那串里 `verify:*` 引用数为 0；`collab-journey` 被 `e2e/playwright.config.ts` 的 `testIgnore` 摘出主 e2e 载体；证据目录被 gitignore ⇒ 截图不可复核）。**今天链上有三段**（`check:share-entry-hidden` / `verify:collab-keys` / `check:collab-carrier`），形状与读数见 §9.7；要真 PostgreSQL / 真浏览器的那四腿仍靠人跑 `pnpm verify:collab-suite` | `node -e "const c=require('./package.json').scripts.check.split('&&');console.log(c.filter(x=>['collab','share-entry'].some(k=>x.includes(k))).join(', '))"`；`grep -n -A5 testIgnore e2e/playwright.config.ts` |
 
@@ -328,7 +328,7 @@ model ShareOperation   { id, shareId, clientId, serverSeq, …密文列
 | **M2** | **任务/清单的写路径路由**：共享清单里的 `TASK/PROJECT/TAG/NOTE` op 进 share log | 路由判据住在 `packages/app-host`（`shareIdForTask` 那一族的**同源**函数，不许在壳里判）；红形：未共享清单写进 share ⇒ 红 / 共享清单写进个人 log ⇒ 红 | 🔴 碰 op-log 语义与"个人 log 不动"这条 ADR-0062 承诺 ⇒ **先立 ADR**；`Project.shareId` 已在册，不必 bump schema | 工程 + 一份新 ADR |
 | **M3 🟡**（2026-10-21 落地，读数与两件刻意没做的见 §9.9） | **rekey 落地**：移除/退出/撤销 → `keyEpoch` 推进 → 重封给在册成员；撤销后旧成员解不开新内容 | 实测到的判据形状：`verify:collab-revoke` 从"手搓迁移循环"改成**吃生产函数**（`removeMemberAndRekey` + `adoptRotatedShareKey` + 真 `ShareApiClient`），8 步含 psql 现量（`shares.key_epoch = 2`、他那行 `key_envelope IS NULL`）与"第三个人 carol 换钥后仍读得到新旧两代"；变异臂四臂 `ARMS=pass (4/4)` 红集精确匹配（原句那句"摘掉 `autoSeal` 那一步 ⇒ 必红"已由 `verify:collab-journey` 那条臂覆盖，这一批补的是**换钥编排本身**能不能红） | 依赖 M1（下行要先能读，否则证不了"读不到"）—— 已满足 | 工程直接做 |
 | **M4** | **逐 op 签名**：线协议加 `signature`、写侧签、服务端验、失败按"永久拒绝"处置（对齐 ADR-0019 那条读侧对偶） | 封闭词表 + 一条"改一个字节必被拒"的臂 | 🔴 `shared-schema` 线协议 = 不可逆层，与 M2 同一份 ADR 承接 | 工程 + ADR |
-| **M5** | **实时与偏好接线**：客户端接 `new_share_ops`、三条谓词进通知路径 | 有信号 ⇒ 拉取；无订阅偏好 ⇒ 零打扰；红形：谓词恒 true 的那一臂 | M1 之后才有意义（信号语义是"有东西可拉"） | 工程直接做 |
+| **M5 ✅**（2026-10-21 落地，读数见 §9.10） | **实时与偏好接线**：客户端接 `new_share_ops`、活动谓词进通知路径 | 现量（不是"应该行"）：`verify:collab-sync` 第 11 步走真 WS + 真宿主 ⇒ 有信号就有拉取；`无订阅偏好 ⇒ 零打扰`钉在 `apps/web/tests/share-activity-notify.spec.ts`（10 枚）与 `share-activity-signal.spec.tsx`（6 枚，接线臂）。红形都真红过：谓词恒 true ⇒ 3 枚红；壳跳过闸门 ⇒ 2 枚红；拿掉客户端那条分支 ⇒ `RESULT=FAIL step=11` | M1 之后才有意义（信号语义是"有东西可拉"） | 工程直接做 |
 | **M6** | **移动端接入**：入口/路由、`setProjectShareId` 调用点、share 密钥落盘端口、`payloadCipher` 接线、同意态存储、`ShareFeature` 那层的 web-only 假设重写 | 与 web 同一条旅程在 iOS 模拟器 + Android 上走一遍（AGENTS §6.2：真跑 + 真看截图） | 六段缺段的现量清单见 9.4；🔴 Android 构建一律走 windows-pc | 工程直接做（体量大，可拆） |
 | **M7 ✅**（2026-10-21 落地，形状与读数见 §9.7） | **把判据变成常驻**：本线 `verify:collab-*` 与 journey 进链或有别的自动载体；`check:share-entry-hidden`（P-1 期间钉"不可达"）；变异臂从散文搬进 `research/tools/mutation-rigs/` | `check:gate-wiring` 那类"链外必须有可验消费方"的尺要能覆盖 `verify:*`（它今天只审 `check:*` ⇒ 本身要扩）—— **本线没替公共那把尺翻口径**，改立窄的 `check:collab-carrier`，理由写在 §9.7 末 | 无 | 工程直接做，**最先做也行** |
 
@@ -463,6 +463,25 @@ mobile 已真渲染过同目录的 `ConflictResolutionView`），缺的全在宿
 - **库里旧密文不重加密**（`reencryptShareRecord` 仍只有单测与验收脚本调用）。追加模型 + AAD 绑 `shareId`/世代 ⇒ 重写历史等于改 op-log 回放语义，与 M2/M4 同一份 ADR 一起判（§9.6 那条"不许悄悄改历史"仍在）。
 - **吊销未接受的邀请不触发换钥** —— 这条不是漏：`shareInvitations` 与成员行是两张表，接受（`/shares/invitations/accept`）之前没有任何一把 listKey 离开过 owner 的设备，没有要收回的东西。现量：`grep -n keyEnvelope server/src/shares/share.routes.ts` 里**装**信封的只有一处（PUT 那一处），另两处是本批加的**置 null**；吊销邀请那处只动 `shareInvitation`。
 
-**下一步**：M5（实时与偏好接线 —— 客户端接 `new_share_ops`、三条谓词进通知路径）。
-M1 之后"有信号 ⇒ 去拉"这条才有意义，且 M3 已经把"拉回来解得开"补齐。
-M2/M4 那一步仍然排在一份新 ADR 之后。
+**下一步**：M2（`TASK/PROJECT/TAG/NOTE` 的写路径路由）—— 它排在一份新 ADR 之后（§9.2 P-3、§9.6）。
+
+### 9.10 M5 落地（2026-10-21 第四批）—— 实时的读数
+
+| 件 | 形状 | 这一趟的读数 |
+|---|---|---|
+| 客户端 | `realtime.ts` 认下 `new_share_ops`，只把 `(shareId, latestSeq)` 交给宿主；回调抛错不许掀连接；老宿主不传回调就等于没接，`new_ops` 不受影响 | `pnpm --filter @heyta/sync-client build` rc=0；`cd packages/sync-client && npx vitest run tests/realtime.spec.ts` ⇒ 20 passed（四臂：参数送达且不泄漏进 `onNewOps` / 坏消息零调用 / 老宿主静默 / 回调抛错不断线） |
+| 宿主判断 | 新文件 `packages/app-host/src/share-signals.ts`：三条纪律 —— 本机不认得这份 share ⇒ 零请求；一次信号只吵一次（按**日志差集**而非 `added` 数猜）；自己不吵自己。拉取失败不抛穿，只留在读数里 | `pnpm --filter @heyta/app-host build` rc=0；`cd packages/app-host && npx vitest run tests/share-signals.spec.ts` ⇒ 9 passed |
+| 偏好谓词 | `@heyta/ui` 新增 `selectNotifiedActivities(prefs, kinds)`（去重 + 逐类过闸门 + 按来序）—— ADR-0062 决策 7 那句"响不响由本机偏好决定"的判断本体 | `cd packages/ui && npx vitest run tests/notification-prefs-gate.spec.ts` ⇒ 5 passed |
+| 壳 | `use-share-activity-signal.ts` 挂在 `App.tsx`（信号是账号级的，用户可能停在任何一屏）；垫片 `lib/share-signal-sink.ts` 避开 store↔share 的循环；投递件 `share-activity-notify.ts` 的 ctor 可注入 | `pnpm --filter @heyta/web typecheck` rc=0；`share-activity-notify.spec.ts` ⇒ 10 passed、`share-activity-signal.spec.tsx` ⇒ 6 passed、`app-mount.spec.tsx` ⇒ 26 passed（含新加的"根组件必须是消费者"那一臂） |
+| 常驻载体 | `verify-collab-sync.mjs` 加**第 11 步**：真 `createRealtimeClient` 挂在 WS 上 ⇒ 有人写评论 ⇒ 服务端扇出 ⇒ 宿主拉一次 ⇒ 旁观设备报 `["added"]`、而写它的那一台同样拉到内容却**零活动** | `RESULT=OK steps=11`，那一格打的是「1 条评论换来 1 个信号（latestSeq=5）；旁观设备拉到 1 条并报 `["added"]`，作者设备同样拉到 1 条却零活动」 |
+| 能红的证据 | ① 拿掉客户端那条分支 ⇒ `RESULT=FAIL step=11`，理由可读（"写了 6 条评论…0 个 new_share_ops 都没收到"）② `readFreshOps` 退化成只留基类字段 ⇒ 宿主 9 枚里 3 枚红 ③ `selectNotifiedActivities` 的谓词恒 true ⇒ ui 5 枚里 3 枚红 ④ 壳里跳过闸门直接投 ⇒ 接线 6 枚里 2 枚红。四处都从 `.mut-bak` 还原并核过 md5 | 变异只碰自己线的文件；每一步还原后复跑绿 |
+
+🔴 **撤掉那枚 5 秒轮询之前先量到的一个真事实**：下行游标是**这份 share 全局一份**（`localStorage` 的 `heyta.share-log.cursor.<shareId>`），而宿主的重放结果按**实例**缓存（`share-comments.ts` 的 `entryFor` 命中就不再看盘）。所以正在显示评论区的那一侧**再拉一次只会拿到 `fetched = 0`** —— 症状会是"信号收了、日志落盘了、界面却不动"。因此这一片加了一条内部通道 `subscribeShareRepaint`：根上那个唯一的信号消费者拉到新内容后发一次"重画"，那一节**换代并从盘上重放**，而不是第二次下载。
+
+**M5 没做到的，写清楚是谁的**：
+
+- **通知正文只有"有人新增/删除了一条评论"，不含清单名与内容**。端到端加密下本机当然解得开，但把明文写进系统通知中心等于交给操作系统（及其同步）去保管。要带名字得先定一条口径："通知里允许出现什么"—— 这一格归产品负责人拍，不由工程顺手放宽。
+- **`shouldNotifyTaskReminder` 与 `shouldAutoAcceptInvitation` 仍没有数据面**：前者要 `TASK` 的 op 进 share log（M2 的路由），后者要移动端的邀请接受面（§9.4 那六段）。这不是"接了没测"，是**没有输入** —— 给它造一条假输入去点亮判据，量的是夹具不是产品。
+- **`app-mount.spec.tsx` 里的 `act(...)` 警告是预存的**：同一枚文件在 HEAD 上跑就有 28 条（`An update to SubscriptionNotice inside a test was not wrapped in act`），本批那一臂挂上完整 `<App />` 后整文件涨到 45 条。现量：`cd apps/web && npx vitest run tests/app-mount.spec.tsx 2>&1 | grep -c "not wrapped in act"`。这条不是本批的缺陷，也没有被当成判据。
+- **移动端与三枚桌面壳今天接不到这条信号**：`new_share_ops` 的解析在 `@heyta/sync-client`（共享包）里，判断在 `@heyta/app-host`，而投递面（Notification）与"注册消费者"那一行只在 web 壳里。移动端要等它自己的通知面（§9.4）。
+- **上面那四处变异是一次性手工跑的，没有常驻装置**（M3 那批有 `mutate-collab-rekey.mjs`，M5 这批没有）。欠项写清楚：三枚能在秒级里跑的臂（宿主 3 枚 / ui 3 枚 / 接线 2 枚）可以进 `research/tools/mutation-rigs/`，而**第 11 步那一枚不行** —— 它每跑一臂都要起真服务端，那一臂该由 `verify:collab-suite` 的周期跑承担，不该伪装成秒级装置。
