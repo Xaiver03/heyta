@@ -284,7 +284,17 @@ AI 文件 import `@heyta/i18n`，所以 **`packages/i18n` 必须同一个提交*
 | `docs/plans/pricing-coupons-handoff.md` 九格表第 **⑧** 行「看『买了什么 / 剩多少 AI』＝❌、没有『本周期已用 X / 300 次』的界面」 | ✅ **已改口**（17:3x 那一趟的第二轮同类扫描捞出，用本篇自己的"~~原文~~ ⇒ dated 更正"体例）：那一屏现在存在 —— `apps/web/src/features/settings/AiSettings.tsx:810` 渲 `t('web.ai.settings.usage.used', …)`，词条「本周期已用 {used} / {limit} 次。」（现量 `grep -n "usage.used" apps/web/src/features/settings/AiSettings.tsx`） | 它读的仍是这台实例自己的计量 ⇒ 改口时**顺带写明它不证明 ¥12 在交付**，免得这一格从"缺界面"翻成"缺界面"的反面误读 |
 | 🔴 **同名词的三种"档位"**（这一条是**防误改**，不是待办） | ⏸ **都不改** | `docs/plans/ui-review-fill-zh-timeline.md:2519` 那句「移动端没有档位入口…那一端仍然只有月档」讲的是**日历视图档**（月/周/日，`view` 那个参数），`docs/plans/calendar-profile-handoff.md:540` 的「档位下拉」同一件事，`docs/reference/environment-traps.md` 里「根本没有档位选择器」讲的是**截图证据的形状**。⇒ 按「客户端有没有档位选择器」这把尺去 grep `档位`，会命中这三处**不是同一件事**的句子；本线那一枚控件在源码里的形状只认词条字面（现量 `grep -c 'renew\.tierTitle' apps/web/src/features/subscription/RenewPanel.tsx` 回 **1**、`…/RenewSection.tsx` 回 **1**；⚠️ **别拿 `renew-tier-hostedAi` 当针**，那枚 `testID` 是模板拼的，见 §10.3 第 7 格那条红字） |
 
-### 10.6 本轮之后剩下的动作（按谁能做分）
+### 10.6 本节自己挂的现量命令，有没有在空转（2026-10-21 逐枚验过）
+
+§10 每一格都挂了一条"你自己也跑一遍"的命令，而 17:3x 那一趟发现**其中一条根本没牙**（形状见 §10.3 第 7 格那行红字：按运行时才拼出来的整串去 grep ⇒ 新旧产物都回 0）。⇒ 这一格把同一把尺**对本节全部命令**扫一遍，免得那是一枚个案。
+
+- **清单怎么取**（这条命令本身就是清单，别抄我这里的数）：`sed -n '/^## 10\. /,$p' docs/plans/subscription-handoff.md | grep -oE 'grep [^`|]*' | sort -u`
+- **验法分两种，不能混**：
+  ㈠ **期望非零**的针（"这一件确实在"）⇒ 逐枚跑，取到 0 就说明针或路径已经漂。这一趟这类**全部命中**，包括 `managedAiConfigured`（服务端 5 处、`server.ts` 1 处）、`PRICE_TIER_LOSES_GRANTS`（3 处）、`PAYCENTER_ENABLED`／`MANAGED_AI_ENABLED`（compose 各 2 行）、`renew-tier`（web 面板 3 行）、`usage.used`（1 行）、`refunds`（后台 10 行）。
+  ㈡ **期望为零**的针（"这一件确实还没做"）⇒ **零本身不证明任何事**，必须先证它的**非零那一支存在**，否则它与 §10.3 那枚坏针逐字同形。两枚都补了：`grep -c '^- \[x\] \*\*AC-' docs/plans/inbound-automation.md` 回 **0**，而同文件的未勾形状 `grep -c '^- \[ \] \*\*AC-'` 回 **8** ⇒ 那本账确实有可勾的格；`grep -c 'tools\|tool_choice' server/src/ai/managed-proxy.routes.ts` 回 **0**，而同文件 `grep -ci tool` 回 **2** ⇒ 不是文件为空或针挑错了文件。
+- ⇒ **判"某件还没做"的规矩（写给下一位，也写给本线自己）**：一条回 0 的 grep 只有在"同一目标上有一枚已知能回非零的近邻针"时才算证据。缺了那枚近邻针，0 就只是**搜法的读数**，不是**事实的读数**。
+
+### 10.7 本轮之后剩下的动作（按谁能做分）
 
 - **运营/运维**：填 `MANAGED_AI_*`（+ 确认 `PAYCENTER_*`）→ 重建镜像 → 用一次真实小额下单验通路与到账回执；删掉本机旧的 `WX_*`。
 - **法务/负责人**：过一遍 `packages/legal`（含把"这一档仍打不开"按 §10.3 第 1、3 格的前提改掉）。
