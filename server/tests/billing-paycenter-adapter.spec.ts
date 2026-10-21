@@ -60,6 +60,30 @@ const signedHeaders = (raw: string, over: Record<string, string> = {}) => {
   };
 };
 
+/**
+ * 固定向量：这条用例的期望值是按**中心的契约**（`hex(sha256(body))` 进规范化串）
+ * 独立算出来的，不是用本仓的 canonicalSignature 现算的。
+ *
+ * 为什么必须有它：原来的用例全部拿 canonicalSignature 生成期望签名，签发与验签
+ * 用的是同一个函数，所以算法错了也是绿的 —— 那条错（把 body 摘要写成 HMAC(secret, body)）
+ * 就这样活到联调，表现是"对中心的每一次请求都被判签名无效"。
+ */
+describe('canonicalSignature 与中心契约逐字节一致（固定向量）', () => {
+  it('body 摘要必须是 sha256(body)，不是 HMAC(secret, body)', () => {
+    const secret = 'e2e-fixed-vector-secret';
+    const body = Buffer.from('{"a":1}', 'utf8');
+    const got = canonicalSignature(secret, 'POST', '/api/v1/internal/payments/orders', body, '1700000000', 'fixed-1');
+    // 中心侧 platformauth.Sign 对同一组输入的结果：
+    expect(got).toBe('b572d1f63c8d7b8467af364e7134cb6c533ee3516f244536d72fe732a46bd059');
+  });
+
+  it('换一个 body 就换一个签名（防止退化成常数）', () => {
+    const a = canonicalSignature('s', 'POST', '/p', Buffer.from('{"a":1}'), '1700000000', 'i');
+    const b = canonicalSignature('s', 'POST', '/p', Buffer.from('{"a":2}'), '1700000000', 'i');
+    expect(a).not.toBe(b);
+  });
+});
+
 describe('amountYuanToMinor', () => {
   it('两位小数才认', () => {
     expect(amountYuanToMinor('30.00')).toBe(3000);
@@ -218,7 +242,10 @@ describe('createCheckout', () => {
     expect(await a.createCheckout(base)).toEqual({ qrCode: 'weixin://pay/1' });
     expect(sent.external_order_id).toBe('SS-ORDER-1');
     expect(sent.amount).toBe('30.00');
-    expect(sent.payment_type).toBe('huifu');
+    // 默认值必须是**渠道命名空间**的类型。改成 'huifu' 会得到中心 503
+    // "no enabled instance for payment type huifu"：中心的实例只声明
+    // huifu_wxpay / huifu_alipay / huifu_h5 / huifu_app，基础类型不可路由。
+    expect(sent.payment_type).toBe('huifu_wxpay');
   });
 
   it('跳转通道 → redirectUrl', async () => {
