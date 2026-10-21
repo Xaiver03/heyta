@@ -387,13 +387,13 @@ if printf '%s' "$WANT" | grep -q "android"; then
   done <<< "$AVD_ONLINE"
   ANDROID_ONLINE_N=$(printf '%s\n' "$ANDROID_CANDIDATES" | grep -c .)
   if [ -n "$SERIAL" ]; then
-    echo "  ⚠️ 用显式指定的设备：$SERIAL（AVD 名：$(android_avd_of "$SERIAL")）—— 人已经认领这枚 serial"
+    echo "  ⚠️ 用显式指定的设备：${SERIAL}（AVD 名：$(android_avd_of "$SERIAL")）—— 人已经认领这枚 serial"
   elif [ -n "$ANDROID_AVD" ]; then
     _hit=$(printf '%s' "$ANDROID_CANDIDATES" | awk -F'\t' -v n="$ANDROID_AVD" '$2==n {print $1}')
     _hit_n=$(printf '%s\n' "$_hit" | grep -c .)
     if [ "$_hit_n" = "1" ]; then
       SERIAL="$_hit"
-      echo "  按 AVD 名选中：$SERIAL（$ANDROID_AVD）"
+      echo "  按 AVD 名选中：${SERIAL}（${ANDROID_AVD}）"
     elif [ "$_hit_n" -gt 1 ]; then
       echo "  🔴 有 $_hit_n 枚在线模拟器的 AVD 名都是 \"$ANDROID_AVD\" —— **不猜**（这一段会 adb uninstall）"
     else
