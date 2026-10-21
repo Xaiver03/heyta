@@ -1048,3 +1048,4 @@ export * from './share-op-log.js';
 export * from './share-replay.js';
 export * from './share-comments.js';
 export * from './share-rekey.js';
+export * from './share-signals.js';

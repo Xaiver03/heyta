@@ -60,6 +60,26 @@ export const shouldNotifyActivity = (
   kind: ShareActivityKind,
 ): boolean => ACTIVITY_MATCHERS[kind](prefs);
 
+/**
+ * 一组**到达**的活动里，哪些真的该吵到人：去重 + 逐类过偏好。
+ *
+ * 🔴 这一格必须是纯函数而不是"壳里循环一下"：ADR-0062 决策 7 说的是
+ *    服务端只发信号，**响不响由本机偏好决定** —— 那"由偏好决定"这一步就是业务判断，
+ *    放进端壳就违反 AGENTS §3.5。壳里只做投递：拿到空数组就**一次都不通知**。
+ *    回序按来序（`added` 在前就先响哪一条），这样一次到达多类活动时界面有确定顺序。
+ */
+export const selectNotifiedActivities = (
+  prefs: ShareNotificationPrefs,
+  kinds: readonly ShareActivityKind[],
+): ShareActivityKind[] => {
+  const enabled: ShareActivityKind[] = [];
+  for (const kind of kinds) {
+    if (enabled.includes(kind)) continue;
+    if (shouldNotifyActivity(prefs, kind)) enabled.push(kind);
+  }
+  return enabled;
+};
+
 export interface ShareTaskLike {
   taskId: string;
   /** 加密 payload 里的指派人；undefined = 未指派。 */
