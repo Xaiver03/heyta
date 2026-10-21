@@ -122,20 +122,24 @@ worktree `.worktrees/motivation` **已删除**（相关提交仍是 `main` 的�
 🔴 **这条线真正的最大件还没做**：多人并发写**同一条任务**的写路径路由。服务端与界面已经能
 把"共享"跑起来，但并发裁决仍走既有 LWW —— 它不构成 bug，构成的是**协作产品还没兑现的那半**。
 
-🟡 **W4 残余**（如实登记，不是已完成）—— 三件的形状都是**"零件已建、最后一米没接"**，
+🟡 **W4 残余**（如实登记，不是已完成）—— 三件里**评论那一米已经接上**（2026-10-21 M5），
+剩下两件（指派、动态流）的形状仍是**"零件已建、最后一米没接"**，
 所以下一步是**挂载与补写路径**，不是重画一遍：
 
-- **评论**：`COMMENT` 实体进了清单，且评论组件 `packages/ui/src/sync/{comments-model.ts,CommentThread.tsx}`
-  **已经写好并从包根导出**（由产品体验线 `e6058120` 落，文件头标的就是本线 ADR-0062 的 W3/W4），
-  但 `apps/*` 与 `packages/app-host` 对它**零引用** ⇒ `check:reachability` 红在这一米（归属登记在 `BLOCKED.md`，不属于本线）。
+- **评论** ✅（Web 与桌面壳）：`COMMENT` 实体在清单里，组件 `packages/ui/src/sync/{comments-model.ts,CommentThread.tsx}`
+  由产品体验线 `e6058120` 建好并从包根导出；**宿主写路径与下行**在 `packages/app-host/src/share-comments.ts`，
+  **挂载**在 `apps/web`（反查 `grep -rln "ShareCommentsSection" apps`），两台设备互相看得见 + WS 扇出由
+  `pnpm verify:collab-sync` 验（`RESULT=OK steps=11`）。⚠️ **还剩两格**：移动端没挂这一节；
+  能实时搬运的目前只有评论那一族（`TASK` 的 op 还没进 share log —— 就是上面那个"最大件"）。
 - **指派**：`Task.assigneeUserId` 是 domain 里的**可选字段**（且在加密 payload 内），通知过滤层
   的「指派给我的」那一档**已经在读它** —— 但全仓**没有任何一处写它**（`app-host` 零个指派 op 构造、`apps/*` 零界面）。
   ⚠️ 这一条 `check:reachability` **拦不住**：它只覆盖**实体**，字段级的"已建模≠可达"目前没人守。
 - **动态流**：三类活动语义（`completed` / `added` / `deleted`）建在 `notification-model.ts` 里，
   但只作为**通知偏好的开关**存在（`NotificationPrefsPanel`），没有活动流界面。
 
-🔴 **落地形态**：代码已本地成笔、可复核可回退，**尚未 push** —— 共享检出上还有别线只在本地的笔，
-整条 `main` 一起推会把它们替公开，所以推送押在跨线协调上（现量命令与逐线分割见 goal 计划 push 那一格）。
+✅ **落地形态**：本线那批已入库**并 push**（判据现量：`git rev-list --left-right --count refs/remotes/origin/main...main` ⇒ `0 0`，2026-10-22 00:5x）。
+原先这里写的是"代码已本地成笔、尚未 push，推送押在跨线协调"—— 那是**那一分钟的状态**，不是仓库属性；
+下一位要推的是别人新落的笔，判据仍是上面那条命令。
 
 ### P0 完成证据（2026-09-25）
 
