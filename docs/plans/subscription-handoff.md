@@ -399,3 +399,19 @@ rc=2 一律判红）。同族规则见 §7 元规则一、二；
 **这一格还没证的**（别读成"移动侧全绿"）：Android 侧一张都没有（出包与真机走 `windows-pc`）；这一腿跑的是**本机 TEST_MODE 服务端**，
 不是部署态；真实小额下单与到账回执仍未验（归运营，见 §10.7 第一格）。
 
+### 10.10 任务书六步 ↔ 证据（2026-10-22 01:5x 逐格现取；这一节是**核对**，不是新判据）
+
+⚠️ 每格右侧那条命令就是那一格的**复现腿** —— 跑它就能重判那一格，别把这一节当"已经有人验过了"的抄件。
+
+| 步 / 判据 | 现取的证据 | 还差什么 |
+|---|---|---|
+| 1① 这一档要交付的 `ai` 能力**这台实例真有**才卖，默认拒 | `grep -n "managedAiConfigured = options.managedAiConfigured" server/src/billing/checkout.routes.ts` 回那一行带 `?? false`；`grep -n "requestedGrants.includes(MANAGED_AI_CAPABILITY) && !managedAiConfigured" server/src/billing/checkout.routes.ts` 命中 ⇒ 判拒 | 运营填 `MANAGED_AI_*`（§10.3 第 1 格） |
+| 1② 买更低档会把已有 `grants` 判小的单，**拒在冻结之前** | 次序即证据：拒单那一段的日志针 `grep -n "已拒单（未冻结订单）" server/src/billing/checkout.routes.ts` 命中的行号，**小于** `grep -n "── ⑥ 先冻结" server/src/billing/checkout.routes.ts` 命中的行号 | 无（行为已被用例与臂钉住） |
+| 1 反臂能失败 | `pnpm check:checkout-tier-gates` rc=0（01:38，摘除型臂：把闸门摘掉它必须红）；用例名逐枚 `grep -oE "it\(\s*'[^']+" server/tests/billing-checkout.routes.spec.ts` 里含「没配托管上游 ⇒ …409 PRICE_NOT_SELLABLE，并且一张订单都没落」与「¥12 有效期内点 ¥5 ⇒ …409 PRICE_TIER_LOSES_GRANTS，且没有冻结任何订单」 | 复跑要**私有载具**（见 §10.2 第 21:4x 那格与 189 ②） |
+| 2 两壳档位**只用钉住的词条**、屏上**不写金额** | 裸金额：`grep -nE "¥|[0-9]+ ?元|\$12|[0-9]+/月" apps/web/src/features/subscription/RenewPanel.tsx apps/mobile/src/screens/RenewSection.tsx` 回**空**；档位标题两枚键 `web.subscription.renew.tierTitle` 与 `mobile.entitlement.renew.tierTitle` 在两枚 catalog 各命中 1 | 无 |
+| 2 "两枚 locale 同步"靠什么钉 | **类型**，不靠数键的门：`grep -n "satisfies Record<MessageKey, string>" packages/i18n/src/locales/en.ts` 命中 ⇒ 少一枚 en 键就是 typecheck 红（01:38 `pnpm typecheck` rc=0）。现量键集：两枚 catalog 各 **4011** 枚键，仅 zh **0**、仅 en **0** | 另有 `check:ui-language` 挡硬编码、`check:i18n-vars` 挡占位符漏传 |
+| 3 门禁与验收 | 01:38–01:41 在 tip `b0af438ac` 上逐条串行：五道只读门各 rc=0、`check:mobile-renew-shape` rc=0、typecheck rc=0、四份 spec 23/16/10/19 全绿；界面腿两枚 —— web Playwright（18:4x 6 passed，六张人眼看过）与 iOS `pnpm verify:mobile-ios-renew-sellable`（01:15 与 01:25 两趟 rc=0，图人眼看过） | Android 侧像素一张都没有（§10.3 第 7 格） |
+| 4 ADR-0054 勘误节（正文一字不改） | `grep -n "^## 10" docs/adr/0054-managed-ai-retention-and-selling-preconditions.md` 命中那一节；`pnpm check:docs` rc=0 | 无 |
+| 5 交接文档 + 三本台账 | 本篇 §10.1–§10.9 加本节；`PROGRESS.md` 第 187–191 条；`BLOCKED.md` 的 **B243 追记四** | 无 |
+| 6 两枚远端 + 如实报告 | origin：**推完之后**现取 `git rev-list --count origin/main..HEAD` 回 **0**（本线那几笔全在远端；笔数别在这里抄）；gitee：逐字 `Repo size: 1113.234MB, exceeds quota 1024MB`（全文与"体积不单调"那条否证在 §10.2 第 5 戳与 B243 追记四） | 四条出路等负责人拍（甲／乙／丙／丁） |
+
