@@ -224,6 +224,7 @@ AI 文件 import `@heyta/i18n`，所以 **`packages/i18n` 必须同一个提交*
 1. **真实上游凭据没填 ⇒ 这一档现在**卖不出去**（不是"卖出去用不上"了）** —— 归运营。
    填了 `MANAGED_AI_*` 三项才算开；没填的现场形状是 ¥5 照卖、¥12 拿 409。
    现量：`grep -n "MANAGED_AI_UPSTREAM" server/env.example`
+   🔴 **"填了之后到底交付不交付得出来"不用等运营填完才知道**：这条链已经被一份用**本地假上游**写的行为用例钉住 —— 放行时上游**恰好命中一次**、计数器 +1、响应原样透传；无令牌 401 且**一条 SQL 都没发**；没有 `ai` 权益 402 且**连计数器行都不创建**；额度用满第 N+1 次 409 且计数一字未动、上游不再被命中；上游未配置 503 `MANAGED_AI_NOT_CONFIGURED` 且不消耗额度。现量（2026-10-22 01:43 复取 **rc=0，33 条全过**）：`cd server && npx --no-install vitest run tests/managed-proxy.routes.spec.ts tests/managed-upstream-drift.spec.ts`。⇒ 运营那一格缺的是**真实凭据与部署态**，不是"代码没证过"。
 2. **对外法务文案那句「这一档仍打不开」** —— 归法务/负责人点头，**本轮刻意没动**。
    为什么它现在是一句偏保守的过期陈述、以及翻案条件，写在 ADR-0054 §10.3。
    现量：`grep -rn "这一档仍打不开" packages/legal/src/documents`
