@@ -90,6 +90,11 @@ pnpm check:checkout-tier-gates  # 收银台两道新闸门（②′ "这台实�
                                 #   没有一条用例会为"我少了一条判据"报错，只有一批 409 悄悄变成 200。
                                 #   臂数由脚本自己打印；红集合读 vitest 的 json reporter，不解析彩色输出。
                                 #   同族先例：`check:op-log-semantics`、`check:egress-wording`。
+pnpm check:mobile-renew-shape   # 移动壳续费那一屏的**形状判据**的变异验证（`apps/mobile/tests/renew-entry.spec.ts`
+                                #   全是源码正则，没有 render 载体 —— 这类断言最阴的坏法是被**注释**满足、
+                                #   或写成恒真，所以四条臂各注入一次真实坏法：删同意闸门 / 壳里抄 priceId /
+                                #   屏上写死 `¥` 金额 / 把 `web.*` 键读进移动壳）。
+                                #   与上一条的分工：那套管"服务端该不该卖"，这套管"壳有没有自己抄一份收银台"。
 pnpm check:design               # 只跑设计变量硬编码检查
 pnpm check:layering             # 只跑分层边界检查（apps/* 不得重新长出业务/接线）
 pnpm check:ui-language          # 界面文案必须全是中文（见 §5）
