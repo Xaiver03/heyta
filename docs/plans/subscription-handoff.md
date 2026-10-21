@@ -194,6 +194,7 @@ AI 文件 import `@heyta/i18n`，所以 **`packages/i18n` 必须同一个提交*
 | 真浏览器判据（**只有 web 那一枚**） | ✅ `e2e/tests/renew-panel.spec.ts` 五条（档位、换档清旧单、拒降档、503、只用本机零请求），且每条都按 §6.2 规定一第 3 条抓 `console`／`pageerror`／非 2xx | `cd e2e && npx playwright test tests/renew-panel.spec.ts` |
 | 🔴 **移动端那枚档位选择的证据到哪一步** | ⚠️ **只有形状判据，没有截图腿**。`apps/mobile/tests/renew-entry.spec.ts` 钉的是源码形状（档位取自 `CHECKOUT_TIERS.map`、不写死 priceId、屏上不写 `¥`/`$` 金额、同意闸门排在下单之前），行为那一半在 `packages/app-host/tests/checkout.spec.ts`。形状断言自己的牙已经落成件：`pnpm check:mobile-renew-shape` 四条臂各注入一次真实坏法。所以「移动壳有档位选择」这句话现在**只到"接线在 + 判据能红"，不到"画出来了"** —— §6.2 规定一要的图一张都没有（现量分母：`find . -iname "*renew*" -not -path "*/node_modules/*"` 里**全部**是 web 侧的 png） | `pnpm check:mobile-renew-shape`；`pnpm --filter @heyta/mobile test tests/renew-entry.spec.ts` |
 | 两道闸门有没有**能复跑的反臂** | ✅ `scripts/mutate-checkout-tier-gates.mjs`：逐臂把 `checkout.routes.ts` 改坏，要求具名用例变红；已进 `pnpm check` 链（不进链就是孤儿，`check:gate-wiring` 判这条） | `pnpm check:checkout-tier-gates` |
+| 🔴 **那五张截图在不在仓里**（干净检出看不看得到） | ✅ 2026-10-21 起在 `apps/web/evidence/`（五枚，与 `e2e/test-results/` 的原件逐字节相同）。⚠️ 这一格此前是**空的**：套件的固定落点 `e2e/test-results/` 被 `.gitignore` 的 `test-results/` 那条挡着，而仓里跟踪的那三枚同名图是 **10-05 那一代 —— 屏上根本没有档位选择**，谁按文件名去读都会读到旧产物。现在两边都是 10-21 这一代 | `shasum -a256 apps/web/evidence/renew-panel-*.png`（五枚）与 `e2e/test-results/` 同名件对照 |
 
 ⚠️ 那套臂里 C3 钉的是**默认值**那一支（`options.managedAiConfigured ?? false`）。
 `billing-checkout.routes.spec.ts` 的 `buildApp` 自带 `managedAiConfigured: true`，所以**每一条**
@@ -228,6 +229,17 @@ AI 文件 import `@heyta/i18n`，所以 **`packages/i18n` 必须同一个提交*
    [`docs/agents/ui-acceptance.md`](../agents/ui-acceptance.md) 规定一第 1、2、4 条与
    [`docs/plans/product-ux-optimization.md`](product-ux-optimization.md) 的设备腿台账；
    ⚠️ 启动必须带 `HEYTA_NO_FOCUS=1`，不许抢前台）。归我方，工作量在设备那条腿而不是代码。
+   ⚠️ 现量（为什么不能拿手边那张旧图交差）：`grep -c "renew-tier-hostedAi" apps/mobile/ios/build/Build/Products/Release-iphonesimulator/Heyta.app/main.jsbundle` 回 **0** —— 那枚 10-20 的包**里根本没有档位选择**，用它拍图就是拿旧产物冒充当前产物。
+8. **未同意出境时，被本机闸门拦下的读请求在界面上写成"没能加载"** —— 归 UX 线，本线只登记不代改。
+   证据是一对**只差一个变量**的图（同一套件的 `accepted` 与 `local-only` 两条用例）：
+   `apps/web/evidence/renew-panel-no-channel.png` 里通行密钥那块是正常的空态「这个账号还没有注册通行密钥。」，
+   而 `apps/web/evidence/renew-panel-no-consent.png` 里同一块变成红字「没能加载通行密钥列表。」——
+   真实原因是**根本没发那个请求**（闸门在调用之前，见 `apps/web/src/features/privacy/consent-gate.ts`
+   开头那句"未同意时底层次数必须是 0"，现量 `grep -n "底层次数必须是 0" apps/web/src/features/privacy/consent-gate.ts`），
+   可界面说的是"加载失败"。用户读到的是"这东西坏了"，不是"我还没允许它联网问"。
+   同一类还有几处（**别只修通行密钥那一处**）：`common.profile.loadFailed`、`common.emailChange.loadFailed`、
+   `web.inbox.error` —— 现量：`grep -rln "networkAllowed" apps/web/src/features` 逐枚判它有没有区分"没问"与"问失败"。
+   要拍的板是文案与形状（要不要一句"还没同意，点这里去同意"的出口），不是判据口径。
 
 ### 10.4 §1–§9 里已经过期的格子（别照它们判断现状）
 
