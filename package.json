@@ -135,6 +135,7 @@
     "verify:mobile-account-erasure": "bash scripts/verify-mobile-account-erasure.sh",
     "verify:mobile-account-email": "bash scripts/verify-mobile-account-email-sessions.sh",
     "verify:mobile-ios-account-email": "bash scripts/verify-mobile-ios-account-email-sessions.sh",
+    "verify:mobile-ios-renew-sellable": "bash scripts/verify-mobile-ios-renew-sellable.sh",
     "verify:macos-account-erasure": "bash scripts/verify-macos-account-erasure.sh",
     "verify:mobile-aed": "bash scripts/verify-mobile-aed.sh",
     "verify:mobile-reminder-ring": "bash scripts/verify-mobile-reminder-ring.sh",
