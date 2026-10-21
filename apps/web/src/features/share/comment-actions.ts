@@ -15,9 +15,11 @@
 import {
   createCommentActions,
   createShareCommentDispatch,
+  createShareTaskPuller,
   type ActionContext,
   type CommentActions,
   type ShareLogStorage,
+  type SharePullResult,
 } from '@heyta/app-host';
 import type { CommentLike } from '@heyta/domain';
 import { createSharePayloadCipher, ShareApiClient, type SyncPayloadCipher } from '@heyta/sync-client';
@@ -26,9 +28,10 @@ import { currentState, dispatchChecked, dispatchIntent } from '../../lib/oplog.j
 import { createWebAuthFetch } from '../../lib/central-fetch.js';
 import { getShareKeyEntry, unwrapShareListKey } from './share-key-store.js';
 
-/** share 日志在本地 `Storage` 上的键（一份 share 一条 + 一张索引）。 */
+/** share 日志在本地 `Storage` 上的键（一份 share 一条日志 + 一张索引 + 一份下行游标）。 */
 const LOG_PREFIX = 'heyta.share-log.';
 const LOG_INDEX_KEY = 'heyta.share-log.index';
+const CURSOR_PREFIX = 'heyta.share-log.cursor.';
 
 /**
  * `Storage` 上的 share 日志实现。
@@ -36,6 +39,11 @@ const LOG_INDEX_KEY = 'heyta.share-log.index';
  * ⚠️ 存的是**已解密的 op**（见 `share-comments.ts` 文件头缝②）：
  * 物化不可能拿密文过 reducer。索引单独存是因为读路径要能枚举
  * "这台设备上有哪些 share"（冷启动那条判据钉的就是它）。
+ *
+ * 🔴 游标（M1 下行）单独一条键、**不塞进日志那份 JSON**：日志是 `foldShareOps` 的产物，
+ * 混进传输序就等于让纯核认识 HTTP；而且改一份已有 JSON 的形状要面对"老用户盘上那份
+ * 没有这个字段"，拆成两条键则天然向后兼容（读不到 = 0 = 从头拉）。
+ * 坏值一律退到 0（退到 0 只会多拉一次，折叠是幂等的；退到别的值会**少拉**）。
  */
 export function createStorageShareLog(store: Storage): ShareLogStorage {
   const readIndex = (): string[] => {
@@ -66,6 +74,14 @@ export function createStorageShareLog(store: Storage): ShareLogStorage {
       writeIndex([...readIndex(), shareId]);
     },
     list: () => readIndex(),
+    cursor: (shareId) => {
+      const raw = store.getItem(`${CURSOR_PREFIX}${shareId}`);
+      const n = raw === null ? Number.NaN : Number(raw);
+      return Number.isInteger(n) && n >= 0 ? n : 0;
+    },
+    setCursor: (shareId, seq) => {
+      store.setItem(`${CURSOR_PREFIX}${shareId}`, String(seq));
+    },
   };
 }
 
@@ -87,6 +103,11 @@ export interface WebShareComments {
   readonly actions: CommentActions;
   /** 从重放出来的共享域状态读某条任务的活评论。 */
   commentsForTask(taskId: string): CommentLike[];
+  /**
+   * 把这条任务所属那份 share 的远端评论拉回本地（M1 下行）。
+   * 个人清单 ⇒ `undefined`（没有可拉的，不是错误）。
+   */
+  pullForTask(taskId: string): Promise<SharePullResult | undefined>;
 }
 
 /**
@@ -140,5 +161,12 @@ export function createWebShareComments(deps: WebShareCommentsDeps): WebShareComm
     currentUserId: () => deps.userId,
   });
 
-  return { actions, commentsForTask: dispatch.commentsForTask };
+  return {
+    actions,
+    commentsForTask: dispatch.commentsForTask,
+    pullForTask: createShareTaskPuller({
+      shareIdOfTask: actions.shareIdOfTask,
+      pullShareOps: dispatch.pullShareOps,
+    }),
+  };
 }
