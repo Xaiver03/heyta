@@ -23,7 +23,7 @@
  * 这是接入中心在**代码量**上的直接收益。
  */
 
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import type { Currency } from './money';
 import { DEFAULT_PRICE_BOOK, grantsForSku, projectPrices } from './price-book';
 import type {
@@ -197,9 +197,14 @@ export const canonicalSignature = (
   timestamp: string,
   idempotencyKey: string,
 ): string => {
-  const bodyHash = createHmac('sha256', secret).update(body).digest('hex');
-  // 中心的契约是 sha256(body) 再进规范化串；这里同样先算 sha256 再 HMAC。
-  // ⚠️ 与中心 `platformauth` 的口径必须逐字节一致，否则每条回调都 401。
+  // 中心的契约是 `hex(sha256(body))`，**不是** HMAC(secret, body)。
+  //
+  // 这里曾经写成 createHmac('sha256', secret).update(body)，注释还写着"与中心逐字节一致"——
+  // 那条注释是错的，而因为签发与验签用了同一个函数，两边错得对称，所以单测一路是绿的。
+  // 代价是：对中心的每一次请求都会被判"签名无效"（中心那边的口径是对的）。
+  // 抓到它的是把真实请求打到真中心上，不是读代码。
+  const bodyHash = createHash('sha256').update(body).digest('hex');
+  // ⚠️ 与中心 `platformauth` 的口径必须逐字节一致，否则每条请求与回调都 401。
   const canonical = [
     method.trim().toUpperCase(),
     path.trim(),
@@ -348,7 +353,10 @@ export const createPaycenterBillingAdapter = (
           amount: (input.amountMinor / 100).toFixed(2),
           currency: input.currency,
           subject: input.description ?? input.priceId,
-          payment_type: config.paymentType ?? 'huifu',
+          // 默认必须是**渠道命名空间**的类型（huifu_wxpay），不能是基础类型 huifu。
+          // 中心的实例只声明 huifu_wxpay / huifu_alipay / huifu_h5 / huifu_app，
+          // 基础类型 huifu 不在其中：传 huifu 会得到 503 "no enabled instance"。
+          payment_type: config.paymentType ?? 'huifu_wxpay',
           return_url: input.successUrl,
         },
         `heyta:${outTradeNo}`,
