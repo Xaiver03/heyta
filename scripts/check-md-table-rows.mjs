@@ -93,8 +93,7 @@ const FILES = [
   'docs/plans/calendar-year-time-and-mobile-profile.md',
   'docs/plans/ui-review-fill-zh-timeline.md',
   'docs/plans/calendar-profile-handoff.md',
-  'docs/plans/calendar-profile-reflection.md',
-  // 倒数纪念日这条线的两份台账（04 08:0x 加）。加进来的前提与上面四份一样："归本线写、
+  'docs/plans/calendar-profile-reflection.md',  // 倒数纪念日这条线的两份台账（04 08:0x 加）。加进来的前提与上面四份一样："归本线写、
   // 且现量干净" —— 现量是 `node /tmp/mdg-fixture/probe-countdown.mjs` 那套同样的判据跑出 **rc=0**
   // 之后才加的；加之前它有 **4 处**（三处段落紧贴表尾 + 一处我上轮改表格留下的重复尾巴行）。
   'docs/plans/countdown-anniversary.md',
@@ -110,6 +109,36 @@ const FILES = [
   'docs/research/trash-and-archive-best-practice.md',
   'docs/research/legal-dataflow-client.md',
   'docs/research/legal-dataflow-server.md',
+  // ── 2026-10-21 协作线 M7 扩面（计划 §9.5 第 2 条那句「M7 的形状：先把判据扩到
+  //    docs/agents/ 与本线文件」落在这里）─────────────────────────────────────────
+  // 🔴 加进来的前提还是那一条：**现量干净**。这一趟用同一套判据跑了 22 枚候选
+  //    （下面这些 + `docs/agents/environment-traps-index.md` + ADR 0059–0063），
+  //    照出 **3 枚坏行**：本线 2 枚已在本批修掉（计划 §9.2 那一行把带竖线的正则写进了表格、
+  //    变异台架 README 的两枚行被一枚空行从表里劈出去），并行线 1 枚登记不代改（见下）。
+  //
+  // ⚠️ **`docs/agents/environment-traps-index.md` 刻意不在清单里**，不是漏：
+  //    `:37` 那一行（#511–513 那条索引）第 3/4 格反引号配不成对 —— 它是**今天由并行线
+  //    追加**的（现量 `git log -1 -- docs/agents/environment-traps-index.md`），按
+  //    "谁写谁收"登记给那条线，不在别人的活跃台账里造冲突；一条天生红的门禁等于没门禁
+  //    （AGENTS §8.3）。它收掉之后只需把路径加进本数组，判据不用改。
+  'docs/agents/commands.md',
+  'docs/agents/db-migrations.md',
+  'docs/agents/design-system.md',
+  'docs/agents/hard-constraints.md',
+  'docs/agents/history-a-2026-10-03.md',
+  'docs/agents/history-b-2026-09-30.md',
+  'docs/agents/key-decisions.md',
+  'docs/agents/legacy-traps-80-83.md',
+  'docs/agents/multi-end-build.md',
+  'docs/agents/progress-log.md',
+  'docs/agents/repo-map.md',
+  'docs/agents/ui-acceptance.md',
+  'docs/agents/workflow-rules.md',
+  // 本线（ADR-0062）自己的四份
+  'docs/plans/collaboration-shared-lists.md',
+  'docs/plans/goal-collaboration-shared-lists.md',
+  'docs/adr/0062-shared-list-key-distribution.md',
+  'research/tools/mutation-rigs/README.md',
 ];
 
 /** 未被 `\` 转义的竖线的位置。 */
