@@ -2653,6 +2653,7 @@ export const zhCN = {
   // 而它们的修复动作相反（去买 / 等下一周期）—— 合成一句就指不出该做什么。
   'web.ai.failure.serverCode.subscriptionRequired': '这一档要订阅才能用。你的任务与同步不受影响 —— 只有 heyta 托管 AI 需要订阅。',
   'web.ai.failure.serverCode.quotaExceeded': '这个计费周期的 300 次已经用完，下个周期自动恢复。想现在继续用，可以在设置里改用自己的 AI 端点。',
+  'web.ai.failure.serverCode.notConfigured': '这台实例还没有开启 heyta 托管 AI。你的任务与同步不受影响 —— 想现在就用 AI，可以在设置里改用自己的 AI 端点。',
   // 🔴 这一条与上面那句**共用同一个传输层原因码**（`network`），分开靠的是诊断：
   // 端点在你自己机器上、而它拒绝了当前页面所在的来源。浏览器在这一步只会给
   // `Failed to fetch`，**状态码根本看不见**，所以这句话是推出来的、不是读到的。
