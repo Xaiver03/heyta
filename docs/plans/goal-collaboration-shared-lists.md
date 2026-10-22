@@ -1817,3 +1817,24 @@ cd e2e && npx playwright test tests/auth-login-code.spec.ts --reporter=line
 ⇒ **重装这一格对"当前源码产物"确实过期了，但本线自 15:0x 起只提交文档**；要重跑那一趟的归属是改了打包输入的线（或下一轮开窗：载体 + 两枚在册设备 + 负载 ≤12）。本线不代跑，也不把 15:0x 的绿写成"当前产物"。
 
 ⚠️ **这一格差点被我记成"差集为 0、旧读数仍成立"——假读数的机制要记下来**：把 `INPUT_FACES` 从脚本里 `sed` 出来时只剥了**双引号**，值里残留的单引号让七个 pathspec 粘成**一个不存在的匹配**，`git diff --name-only` 于是安静地回 0 行（rc=0、stderr 空）。**分子分母同时为 0 时"0==0"判成打平**——这是 §7 那一族「空对空比漏数更危险，因为它长得像通过」的新的一形：**变量派生的 pathspec 必须现量它展开成几枚参数**（`set -x` 或先 `printf '%s\n' $FACES`），别只看命令没报错。
+
+## 2026-10-22 22:4x 重装这一格**当场试到窗口**：裁判现量两项前置不成立，点火处方逐字抄在这儿
+
+`bash research/tools/b-reinstall-readiness.sh`（不带 `--confirm`，纯读）在 `主检出 HEAD=78c8dcee1` 的现量：
+
+| 格 | 读数 |
+|---|---|
+| 没有别的 reinstall-all 在跑 | ✅ |
+| 负载 | ✅ `9 ≤ 12`（16 核 × 3/4） |
+| 目标树 `packages/apps/server` 无未提交改动 | ✅ 装的就是它自己的提交 |
+| iOS 设备面 | ⚠️ **0 台已启动模拟器且没传 `IOS_DEVICE_NAME`**（裁判明写"不猜目标"） |
+| Android 设备面 | ❌ **`emulator-5554` 不可达，`adb` 在线设备一个都没有** |
+
+⇒ 裁判判 `exit 3`「窗口没开（2 项前置不成立）。这是环境状态，不是产品失败」，并拒绝代跑环境准备，理由写在它正文里：**起 qemu 会把负载顶上去，别人的 adb 因此超时**。
+
+**为什么这一格本线不自取例外点火**（区别于 15:0x 那趟已跑绿的窗口）：现在这台机器上**有别的会话在跑**（同检出、`pgrep` 当时 0 枚 vitest 但别线刚提交过、负载 9 已用掉四分之三预算），而这一趟的输入收益是**零**——上一节已现量：自 15:0x 载体 sha 起，34 枚真打包输入**没有一枚是本线的**。所以重跑重装是"改了打包输入的那条线的每轮交付义务"，不是本线的收口动作；本线把它的**当前读数与命令**交出来，别替别人消耗设备窗口。
+
+要接着跑的人，三步按序（顺序不能反，两条脚本都只**读**已启动设备名单，读不到就判红）：
+1. `/opt/homebrew/share/android-commandlinetools/emulator/emulator -avd heyta-w3-yearly -no-snapshot-save >/dev/null 2>&1 &`（裁判自己打印的那行）
+2. 起 iOS 那枚在册设备并取名字：`xcrun simctl list devices booted` ⇒ 传 `IOS_DEVICE_NAME="<现取>"`
+3. `IOS_DEVICE_NAME="<现取>" bash "<主检出>/scripts/reinstall-all.sh"`；**读数要两行一起抄**：`B_DONE rc=` 只等于设备段，桌面段在 `B_DESKTOP_DONE`；mac 端判据数的是 `…-mac-installed.png.webview.png`（外层那张单看近乎全白）。
