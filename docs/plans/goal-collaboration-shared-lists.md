@@ -1436,4 +1436,16 @@ git diff --name-only a6662e218..HEAD -- packages apps server | grep -v '/evidenc
 
 先前那句是**逐枚单跑**量出来的，不是链给的。现量：`pnpm check` 是一条串了 **123 项**的 `&&` 链，**第一枚红就中断** —— 这一趟停在第 21 枚 `check:selection-single-source`，它后面那 ~100 枚**根本没跑**，所以链的 `rc=1` 只证明那一枚。逐项循环另量出第三枚红 `check:text-color`，但它**不算存量红**：红在 `packages/ui/src/ai/AiGeneratedLabel.tsx:81`，而那枚文件 `git status` 是 ` M`（AI 线未提交的在途改动）。⇒ **门禁读的是工作树**，共享检出上"某枚门红"必须先问它指的文件在 `HEAD` 上脏不脏，才配说"存量"。
 
-对本线那一格的结论不变、但措辞要准：**`HEAD` 上归别线的存量红是两枚**（`check:selection-single-source`、`check:image-license`），链上另有第三枚是别线在途改动造成的瞬时红。逐项循环还在跑（`build` / `typecheck` 已各自 rc=0），全集跑完再回这一节补一行。
+对本线那一格的结论不变、但措辞要准：**`HEAD` 上归别线的存量红是两枚**（`check:selection-single-source`、`check:image-license`），链上另有第三枚是别线在途改动造成的瞬时红。全集跑完的读数补在下面那一节。
+
+### 2026-10-22 14:0x · 123 项**逐项**跑完的红集（第 94 项除外）· 协作面在这棵树上一枚不占
+
+上一节那句"逐项循环还在跑"欠的账，现在结清。**跑法**：把链的 123 项按原顺序抄成一张清单，逐项 `pnpm <项>` 单跑、每项都记 `rc`（红的记进文件、绿的只留计数），串行、headless、不抢前台。载体 `HEAD = 7395b05af`，工作树带着别线在途改动（下面专门分了一枚）。
+
+- **红集 = 三枚**，与前几节的读数一字不差：`check:selection-single-source`、`check:image-license`（这两枚 `HEAD` 存量，收款线 / 自托管线）、`check:text-color`（别线在途改动造成的瞬时红，红在 `packages/ui/src/ai/AiGeneratedLabel.tsx:81`，那枚文件是 ` M`）。
+- **其余各项单跑全绿**，包括本线会被点名到的那几枚：`check:journey-coverage`、`verify:collab-keys`、`check:e2e-helper-exports`、`check:locator-labels`、`check:i18n-vars`（本线那 8 枚词条带 `{message}` 变量）、`check:e2e-carrier`、`screenshot:verify`、`check:checkpoint-cadence`。`build`、`typecheck` 各自 `rc=0`。
+- **协作面一枚不占，这条是现量不是推断**：`git status --porcelain=v1 | grep -icE 'share|collab'` 回 **0**（工作树上 487 枚 ` M` 里 466 枚是 `apps/web/evidence/**`，即别线的 Playwright 取证图）。
+- ⚠️ **第 94 项 `check:ai-e2e` 没拿到 `rc`** —— 它跑的是整套 `e2e/tests/**`，一枚约 6 秒、串行，我在它跑到约第 224 枚时掐了（回合比墙钟先耗尽，恢复点要落在已推的仓内正文里，不能留在本机 `/tmp`）。掐前它的日志里 17 个 spec 文件有 `✘`（`account-email-change-and-sessions`、`admin-console`、`auth-consent-registration`、`inbox`、`detail-pane-*` 等），**没有一枚是协作面的 spec**，且这套件里根本不含 `collab-journey`（日志里 `grep collab` 回空）⇒ 本线的 e2e 证据仍然只认 `pnpm verify:collab-journey`。
+- **不能把这一趟记成红，也不能记成绿**。它没跑完；而同一棵树、同一台机器上紧接其后单独跑的 `check:privacy-consent-e2e` 与 `check:landing-e2e` 各 `rc=0`（后者也走 `check-ai-e2e-preflight` 同一套装置），所以"整套红"不是载体或预检坏了 —— 那 17 个 spec 的红要归到别线在途改动，得由它们自己的线去量。
+
+**下一会话若要补第 94 项**：`pnpm check:ai-e2e > /tmp/ai-e2e.log 2>&1; echo rc=$?`（一条命令约 40 分钟起，别在等它的时候并跑别的门），拿到 `rc` 后按 `sed 's/\x1b\[[0-9;]*m//g'` 去色再数失败 spec，逐个回 `git status` 查它指的文件在 `HEAD` 上脏不脏 —— 脏就归别线在途改动，不许写成存量红（§7 #532）。
