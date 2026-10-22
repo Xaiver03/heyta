@@ -1142,3 +1142,24 @@ workspace 项目 21 枚**逐枚都有 `test` 脚本**（现重算，缺的 0 枚
 而那一行**没有**转让按钮 —— 也就是"信封还没下发"那一档，面板给提示不给按钮，与单元臂说的是同一件事。
 ⚠️ **这张图只证"未封档那一档"**：它不证"封了档就有按钮"，那一半仍由 `verify:collab-sync` 的 STEP 4（生产路径下发信封）
 加 `share-panel-transfer.spec` 的合格态臂撑着。别把这张图读成两半都验过了。
+
+### 接手点（给下一个会话，2026-10-22 10:5x；本线已 push 到 `origin/main`，载体已就位）
+
+任务书五步里 **1／3／4／5 已逐条核过**（第 1 步那句字面落点是 10:3x 补的，见上面那节）。
+**只剩第 2 步的两格，两格都不归本线自己关**，接手时先读这两条再决定要不要动手：
+
+1. **`pnpm check` 全绿** —— 122 段链上两枚**别线存量红**，逐枚现量：
+   `pnpm check:selection-single-source` rc=1（收款线：两处 `tierId` 未做语义登记；语义结论与可直接粘贴的两行
+   写在上面 10:2x 那一格，**别替他们登记**——那张豁免表是他们的判卷口径）；
+   `pnpm check:image-license` rc=1（自托管线：镜像 npm 树快照与 `server/package-lock.json` 分家，门自己给的情形 ②）。
+   两枚的相关文件对 HEAD 都干净 ⇒ 不是谁写一半。
+2. **`pnpm reinstall:all` 四端** —— 预检 `CARRIER=$HOME/heyta-carriers/heyta-wt-collab-m5 sh research/tools/b-reinstall-readiness.sh`
+   现量 exit 3、三项前置：负载 > 12（外来常驻进程，`pgrep -fl heyta` 回 0 ⇒ 不是等谁交活）、
+   iOS 没有已启动模拟器、Android 没有在线设备。**后两格脚本自己不代起设备**，起不起归产品负责人（停止点 ③）。
+   点头之后一条命令点火：`CARRIER=$HOME/heyta-carriers/heyta-wt-collab-m5 bash research/tools/b-reinstall-readiness.sh --confirm`；
+   载体已追平到本线 tip、`pnpm-lock.yaml` 的 sha256 与主检出逐字相同 ⇒ 不用再补准备。
+   ⚠️ **别在主检出直接跑**：现在盘上有别线的在途改动（`git status --porcelain | wc -l` 一百多行），
+   从主检出打包会把不可归因的字节装进四端（§8.47 那一族 + 预检第 3 格判的就是它）。
+
+里程碑侧下一步仍是 **M2（共享任务写路径路由，要先立一份新 ADR）→ M4 → M6**；
+M4 那格尾巴：`SHARE_TRANSFER_TARGET_UNSEALED` 还没有宿主侧文案映射（面板已提前挡掉，只有面板数据过期那一瞬碰得到）。
