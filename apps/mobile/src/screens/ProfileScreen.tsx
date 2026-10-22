@@ -78,6 +78,7 @@ import { Button, Card, Divider, HStack, Screen, SectionHeader, Stack, Text, Text
 import { Icon, type IconName } from '../ui/icons';
 import { MOBILE_FEATURE_ENTRIES, type MobileFeatureEntryKey } from '../nav/feature-entries';
 import { AssistantScreen } from '../ai/AssistantScreen';
+import { AiToolboxScreen } from '../ai/AiToolboxScreen';
 import { AvatarBadge } from '../ui/avatar';
 import { prepareAvatarFromUri, type AvatarPrepareError } from '../lib/avatar-prepare';
 import { AccountClosureScreen } from './AccountClosureScreen';
@@ -420,6 +421,12 @@ export function ProfileScreen(): React.JSX.Element {
   const assistantOpen = navigation.stacks.profile.at(-1)?.key === 'profile:assistant';
   const setAssistantOpen = (open: boolean): void => {
     if (open) navigation.push('profile:assistant');
+    else navigation.pop();
+  };
+
+  const toolboxOpen = navigation.stacks.profile.at(-1)?.key === 'profile:ai-toolbox';
+  const setToolboxOpen = (open: boolean): void => {
+    if (open) navigation.push('profile:ai-toolbox');
     else navigation.pop();
   };
 
@@ -879,6 +886,14 @@ export function ProfileScreen(): React.JSX.Element {
     },
     {
       kind: 'action',
+      testID: 'profile-entry-ai-toolbox',
+      label: t('mobile.ai.toolbox.entry'),
+      hint: t('mobile.ai.toolbox.entry.hint'),
+      leading: <AssistantMark size={tokens['icon.sm']} color={tokens['color.foreground-muted']} />,
+      onPress: () => setToolboxOpen(true),
+    },
+    {
+      kind: 'action',
       testID: 'profile-entry-trash',
       label: t('mobile.trash.entry'),
       hint: t('mobile.trash.entry.hint'),
@@ -982,6 +997,20 @@ export function ProfileScreen(): React.JSX.Element {
         visible={isProfileAssistantVisible(navigation.tab, navigation.stacks)}
         onBack={() => {
           setAssistantOpen(false);
+        }}
+      />
+    );
+  }
+
+  if (toolboxOpen) {
+    return (
+      <AiToolboxScreen
+        onOpenSettings={() => {
+          setSettingsSection('ai');
+          navigation.push('settings');
+        }}
+        onBack={() => {
+          setToolboxOpen(false);
         }}
       />
     );

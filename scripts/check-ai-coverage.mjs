@@ -124,20 +124,27 @@ const NO_UI_ENTRY = new Set([]);
 /**
  * 端级产品入口裁决。
  *
- * heyta 的移动端只提供一个 Assistant/Chatbot 表面；capture、breakdown、
- * prioritize、duration-estimate 是宿主可复用能力，移动端不再复制四套隐形
- * 页面。入站自动化同样由 Web 设置管理、由宿主 worker 消费，不在移动端直接
- * 发起模型请求。这里按端登记是为了让门禁表达真实 IA，而不是逼出重复 UI。
- * Web 的这些能力仍由各自真实组件继续覆盖。
+ * heyta 移动端提供两个 AI 表面：
+ * - **AssistantScreen**（对话式）覆盖 `tool-calling`；
+ * - **AiToolboxScreen**（结构化四枚：capture/breakdown/prioritize/duration-estimate）
+ *   在 2026-10-23 补齐，用户旅程上"路上的一句话"与"坐下来规划"的两条动作都能直达。
+ * `inbound-automation` 仍只在 web 设置管理、由宿主 worker 消费，不在移动端直接发起模型请求。
+ * Web 的入口由各自真实组件覆盖，本表不参与 web 判定。
  */
 const NO_UI_ENTRY_BY_END = new Map([
   ['web', new Set(['inbound-automation'])],
-  ['mobile', new Set(['capture', 'breakdown', 'prioritize', 'duration-estimate', 'inbound-automation'])],
+  ['mobile', new Set(['inbound-automation'])],
 ]);
 
 /** 复合 UI 的真实挂载组件；实现文件本身是控制器，不是 JSX 组件。 */
 const UI_ENTRY_COMPONENT_BY_END = new Map([
-  ['mobile', new Map([['tool-calling', 'AssistantScreen']])],
+  ['mobile', new Map([
+    ['tool-calling', 'AssistantScreen'],
+    ['capture', 'AiToolboxScreen'],
+    ['breakdown', 'AiToolboxScreen'],
+    ['prioritize', 'AiToolboxScreen'],
+    ['duration-estimate', 'AiToolboxScreen'],
+  ])],
 ]);
 
 /**
