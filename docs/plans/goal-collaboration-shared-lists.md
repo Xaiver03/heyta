@@ -1774,3 +1774,17 @@ cd e2e && npx playwright test tests/auth-login-code.spec.ts --reporter=line
 上面那几节全是文档与门禁注释层的改动，但读数的规矩是"别拿旧趟当这一枚 tip 的证据"。所以在 `HEAD = 14833c9b6` 上重跑了一次本线那条 e2e：
 先逐枚现量四端口全空（`lsof -nP -tiTCP:4318 …4322 -sTCP:LISTEN` 回空，#536 那条前置），再 `pnpm verify:collab-journey` ⇒ **rc=0，`RESULT=OK steps=3`**。
 ⇒ 第 1 步那条判据在今天这枚 tip 上仍然成立，不是沿用 12:0x 那一趟的读数。
+
+## 2026-10-22 20:1x 新 HEAD 复认：本线静态门 6/6 绿；两枚别线红仍在，且 `check:image-license` 自己判的是**情形②**
+
+现量背景：`origin/main` 之后本地又多了 3 枚**别线**提交（`git --no-pager log --oneline refs/remotes/origin/main..HEAD` ⇒ 托管AI·流式 / 托管AI·显式标识与面板布局 / 界面·行内动作条）。
+`git --no-pager diff --name-only d99dcefa3..HEAD | grep -icE 'share|collab'` 回 **0** ⇒ 这 3 枚没碰本线一个字节；但它们动了 `apps/web/src/styles/*.css` 与 `packages/ai`，会撞样式门与 AI 那族门，所以**输入真变了，按新尺子复量而不是沿用 19:2x**：
+
+- **本线六枚静态门在 HEAD `527c198d1` 各 rc=0**：`check:layering`（456 文件／10 规则）、`check:ui-language`（420 文件／672 处文案）、`check:design`（无硬编码变量）、`check:migrations`、`check:adr-numbering`（ADR=66、同号 0、悬空 0）、`check:share-entry-hidden`（臂数 5、失败 0）。
+  复量命令就是这一行：`for s in check:layering check:ui-language check:design check:migrations check:adr-numbering check:share-entry-hidden; do pnpm run $s; echo rc=$?; done`
+- **收款线 `check:selection-single-source` rc=1**：点名面未变，仍是 `apps/web/src/features/subscription/RenewPanel.tsx` 与 `apps/mobile/src/screens/RenewSection.tsx` 两枚 `tierId`。修法要么改 `@heyta/app-host` 的 selection，要么在它自己的 `ROW_ID_EXEMPT` 里登记一行并写明是哪一类瞬态——**两条都是收款线的判据口径，本线不代改**。
+- **自托管线 `check:image-license` rc=1，且这一格 20:1x 把口径钉死了**：门自己打印的是**三处失真**（`serverInstallInputSha256`＝`server/package.json` 里能改变那棵树的档、`packedWorkspaceDeps`＝`@heyta/` 工作区包清单、`packageLockSha256`），也就是它正文里那条**情形②**——「锁本身过期了，重跑生成器**不会**造出新锁，要跑一次 `pnpm verify:selfhost-stack` 从镜像里取 `/app/package-lock.json` 落成提交物，然后按其新差集更新 `IMAGE_ONLY_PACKAGES`」。
+  ⚠️ 别把这条读成形同①：①那半句的前提是「**只有** `server/package-lock.json` 变了」，现量三处失真直接否证它。本机 OrbStack 未起，且收尾那一格（改 `IMAGE_ONLY_PACKAGES`）是**别人线的豁免表**⇒ 这一枚**结构上不由本线清**，处方与判据口径都交回自托管线。
+  取原话：`pnpm run check:image-license` 的前三行失真清单就是情形判别依据，别看尾部那两句并列的"分两种情形"就以为可选便宜的①。
+
+⇒ **第 2 步"全链绿"这一格的状态到 20:1x 没有变好也没有变坏**：HEAD 级红集仍是三枚别线存量（收款线、自托管线、链里那枚跑不到头的浏览器套件门），本线一枚不占；本线按 18:2x 拍板 2 的两把自算尺都是绿的。
