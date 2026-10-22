@@ -71,10 +71,11 @@ export interface ManagedModelHost {
 /**
  * 托管路径**只**允许这些主机名。
  *
- * ⚠️ 今天是两行，而且两行的性质不同：
+ * ⚠️ 今天是三行，三行的性质不同：
  *   - `api.deepseek.com` 是**第三方境内供应商**（ADR-0021 选定的那一家）；
- *   - `heyta.waytofuture.cn` 是**我们自己那台已备案的服务器**（托管档的入口）。
- * 加第三行之前要先想清楚 ADR-0056 §5 那两条边界：机房所在地与"备案 ≠ 境内"的区别。
+ *   - `heyta.waytofuture.cn` 是**我们自己那台已备案的服务器**（托管档的入口）；
+ *   - `x-creative.team` 是**中央 AI 平台**（自建网关，上游链路末端是 DeepSeek 官方）。
+ * 加新行之前要先想清楚 ADR-0056 §5 那两条边界：机房所在地与"备案 ≠ 境内"的区别。
  */
 export const MANAGED_MODEL_HOSTS: readonly ManagedModelHost[] = [
   {
@@ -92,6 +93,15 @@ export const MANAGED_MODEL_HOSTS: readonly ManagedModelHost[] = [
     evidence:
       'docs/runbooks/deployment.md §3.7.2：主域 waytofuture.cn 已完成 ICP 备案，heyta 子域 A 记录指向境内 IP，' +
       '证书由 certbot 签发；同节记录的容器与端口均在同一台境内机器上。',
+  },
+  {
+    host: 'x-creative.team',
+    provider: '中央 AI 平台（x-creative.team，heyta 自建网关）',
+    jurisdiction: 'cn',
+    evidence:
+      '中央 AI 平台由本项目运营方自建，与 heyta 同步服务同一主体；' +
+      '上游链路 MiraclePlus → OpenCode Go → DeepSeek 官方，末端供应商为境内主体（ADR-0021）。' +
+      '⚠️ 中间代理机房所在地未独立核验，见 ADR-0056 §5 第 2 条。',
   },
 ];
 
