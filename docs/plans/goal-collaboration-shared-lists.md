@@ -1296,3 +1296,33 @@ benchmark 64／feature-matrix 15／roadmap 93／progress-log 15／本计划 15�
 **「结论：窗口**没开**（2 项前置不成立）。这是环境状态，不是产品失败（exit 3）」**（先前两趟分别是 4 项与 3 项），
 且 `✅ 载体新鲜：62c0bda8a… == 主检出 HEAD`。也就是说：**"四端装完"与负责人那一句点头之间，现在没有任何其他前提。**
 ⚠️ 但负载那一格是**瞬时的**（它现在 6，别的会话起来就又关上）—— 要推进就得趁这一会儿。
+
+## 接手点 v2（2026-10-22 12:1x；取代上面那份 10:5x 的接手点，那份的读数已被下面这些超过）
+
+**一句话状态**：任务书五步里 1／3／4／5 已逐条核过（且第 3 步是**逐句**核的，见 11:1x–12:0x 那几节），
+第 2 步八格闭合六格，**只剩两格，两格都不归本线关**。本线代码与文档全部在 `origin/main` 上。
+
+### 剩下那两格：归谁、判据是什么、命令是什么
+
+| 格 | 归谁 | 现在拦路的具体东西 | 它自己给的出路 |
+|---|---|---|---|
+| `pnpm check` 全绿 | **两枚别线各自关**（12:0x 复量仍各 rc=1，且相关文件对 HEAD 干净 ⇒ 不是谁写一半） | `check:selection-single-source`：`RenewPanel.tsx`／`RenewSection.tsx` 各一处本地 `tierId` 未做语义登记；`check:image-license`：镜像 npm 树快照三处失真，门自己打**情形 ②**（锁本身过期） | 前者：门自己给两条出路（改用 app-host selection，或在 `ROW_ID_EXEMPT` 登记一行写明属五类瞬态之一）——**那张豁免表是他们的判卷口径，不代改**；后者：要跑一次 `pnpm verify:selfhost-stack` **打镜像**取 `/app/package-lock.json`，再按新差集更新 `IMAGE_ONLY_PACKAGES`——那是自托管线的产物，不代跑 |
+| `pnpm reinstall:all` 四端 | **产品负责人一句话**（停止点 ③） | 预检 12:0x 复量：前置**只剩 2 项**，且两项都是设备 —— iOS 0 台已启动、Android 0 枚在线；两枚脚本都明确不代起（`reinstall-all.sh:412`／`:509`） | 点头后按 11:3x 那三行：先 `xcrun simctl boot heyta-multiend-reinstall`、再起 `emulator -avd heyta-w3-yearly`，然后 `IOS_DEVICE_NAME="heyta-multiend-reinstall" HEYTA_ANDROID_AVD=heyta-w3-yearly bash "$HOME/heyta-carriers/heyta-wt-collab-m5/scripts/reinstall-all.sh"`。判据照 AGENTS §6.1.1：四端各一条「远端字节 == 本地工作树」，任一端红整体红、不静默跳过 |
+
+### 三条防误判（这一轮现量出来的，写在这里是因为每一条都曾把我自己带错方向）
+
+1. **别在主检出重装**：盘上长期挂着别线的在途改动（12:0x 时 `git status --porcelain` 一百多行，含 `packages/ai/src/routing.ts` 257 行级改动）⇒ 从主检出打包会把不可归因的字节装进四端。载体是 `~/heyta-carriers/heyta-wt-collab-m5`。
+2. **载体追平要在点火前一秒做**：那一腿量的是"与主检出的**打包输入面差集**"，而共享检出上别线一直在提交 —— 本会话内它开过又关过两次。
+   两头都有读数：纯文档笔与 `docs/**` 台账笔**不开**这一腿（11:3x 门自己打「落后 2 个提交…但打包输入面逐字相同 ⇒ 产物同形，本腿判绿」），
+   而 `5fae6741a` 动 `apps/web/src/features/subscription/RenewPanel.tsx` 就把它打开了（12:0x 报「差 1 个文件」）。**判据是差集，不是提交数。**
+   追平后若动的是产品源码，还要在载体里重打 `pnpm -r build`。
+3. **"桌面壳"这个词有歧义**：文档里的桌面壳＝ `apps/desktop-{macos,windows,linux}`（装 `apps/web/dist`），**不是** `apps/desktop/`（只挂 `TaskList` 的 Electron 薄壳）。按目录名去核会得出反结论（→ §7 **#530**）。
+
+### 想复算本线状态，按顺序跑这四条（都是只读）
+
+```
+CARRIER=$HOME/heyta-carriers/heyta-wt-collab-m5 sh research/tools/b-reinstall-readiness.sh   # 现在应回 exit 3、只剩两枚设备项
+pnpm check:selection-single-source; pnpm check:image-license                                   # 现在各 rc=1，两枚别线
+git diff --name-only a6662e218..HEAD -- packages apps server | grep -v '/evidence/' | wc -l    # 应回 0 ⇒ typecheck/test/build 那三趟对当前 tip 仍作数
+pnpm verify:collab-journey                                                                     # 应回 RESULT=OK steps=3；⚠️ 它会重刷 e2e/collab-journey-results/
+```
