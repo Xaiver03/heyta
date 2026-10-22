@@ -322,11 +322,16 @@ model ShareOperation   { id, shareId, clientId, serverSeq, …密文列
 翻案条件：出现"转让后新 owner 拿不到 key 因而打不开清单"这类实测 —— 那说明转让与密钥轮换没做完（属 M3 的缺陷，不是语义错）。
 
 **P-3 并发写语义定为「按字段胜出，不按整条记录胜出」。**
-现状是个人清单那套 LWW：整条记录按 timestamp 比，赢者覆盖。在单人场景它够用（冲突罕见），
-但共享后它会在用户眼前高频发生（两个人各自勾完成、改标题），症状是"我改的没了，而且没有任何提示"。
-定案：share 分区的合并按 **字段级** last-writer-wins，其余字段保留对方那次改动；无共同祖先可判时不猜，落一条"待你定"的可见冲突提示。
+~~现状是个人清单那套 LWW：整条记录按 timestamp 比，赢者覆盖。~~ 🔴 **这句前提于 2026-10-22 被源码否证**（改口不改结论）：
+个人 reducer 早就是**字段级**版本化 —— `packages/op-log/src/state.ts:577-596` 对 payload 的每个键各调一次 `addFieldVersion`，
+`:242-253 selectVersion` 先剔掉被因果压着的候选再按 `compareMeta`（`:228-240`：因果 → timestamp → clientId → opId）决胜。
+所以缺的不是"把合并改成字段级"，而是 **share 分区拿不到真实的因果时钟**（`share-client.ts` 里 `vectorClock` 恒为 `{clientId:1}`），
+字段级前沿今天只能靠 timestamp 平局猜。单人场景它够用（冲突罕见），但共享后它会在用户眼前高频发生
+（两个人各自勾完成、改标题），症状是"我改的没了，而且没有任何提示"。
+定案（不变）：share 分区的合并按 **字段级** last-writer-wins，其余字段保留对方那次改动；无共同祖先可判时不猜，落一条"待你定"的可见冲突提示。
 🔴 这条要碰 `packages/op-log` 的 reducer（`applyOperation` / `compareMeta` 那一层）与 `shared-schema` 的线协议（`vectorClock` 必须真自增、加 `signature` 字段）——
 **都在不可逆层**，所以 M2/M4 开工前必须先立一份新 ADR（不改已接受的 0062，新写一份承接它）。
+✅ **已立：[ADR-0067](../adr/0067-shared-list-write-routing-and-merge.md)**（路由判据、因果时钟回流、并发可见性、`signature` 的形状与分期、旧密文不重加密）。
 
 ### 9.3 里程碑与顺序（按"用户能感知到什么"排，不按代码难度排）
 
