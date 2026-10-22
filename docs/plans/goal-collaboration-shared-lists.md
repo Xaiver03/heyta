@@ -1207,3 +1207,15 @@ benchmark 64／feature-matrix 15／roadmap 93／progress-log 15／本计划 15�
   iOS 腿 `xcrun simctl boot heyta-multiend-reinstall`，两枚都起来后
   `CARRIER=$HOME/heyta-carriers/heyta-wt-collab-m5 bash research/tools/b-reinstall-readiness.sh --confirm`，
   它自己会给 `IOS_DEVICE_NAME` 那条；判据照 AGENTS §6.1.1：四端各一条「远端字节 == 本地工作树」，任一端红整体红、不静默跳过。
+
+### 2026-10-22 11:2x · 更正上一条最后一句可能造成的误读：**两枚设备都得人先起，脚本自己不起**
+
+上面那句"它自己会给 `IOS_DEVICE_NAME` 那条"容易被读成"`--confirm` 会把模拟器带起来"。现量两条，把顺序钉死：
+- 预检侧 `research/tools/b-reinstall-readiness.sh:89` 读的是 `xcrun simctl list devices booted`，:165 那句"要跑请显式传"讲的是**给一台已启动的设备点名**，不是让它去启动；
+- 装机侧 `scripts/reinstall-all.sh:489` 同样只从 `grep Booted` 的名单里挑，挑不到时 :509 打的是
+  「🔴 没有已启动的模拟器 —— **先** `xcrun simctl boot "$DEVICE_NAME"`」，Android 段 `:412` 同形（「没有在线的 Android 模拟器 —— 先起一台」）。
+⇒ 点头之后的**动作顺序是三步**：人起 iOS 那枚 → 人起 Android 那枚 → 再 `--confirm` 点火。少任何一步，那一端按 §6.1.1 如实报红，不会"顺手帮你起"。
+
+**负载这一格的方向读数**（同一会话内三趟，不是抄的）：11:0x **35** → 11:1x **23** → 11:2x **17.5**（阈值 12）。
+它在自己往下走，而 `pgrep -fl heyta` 三趟都回 0 ⇒ 抬它的是这台机器上别的东西，落不落回 12 不归本线，也不该由我去猜——
+要点火时现量 `sysctl -n vm.loadavg` 第二个数即可，那一格预检会自己判。
