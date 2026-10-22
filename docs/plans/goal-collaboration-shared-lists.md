@@ -1476,3 +1476,21 @@ Android AVD `heyta-w3-yearly`（`-no-window` headless 起，`emulator-5554` 的 
 `exit 3` 是"预算用尽而窗口一直没开"= 环境状态、不是产品失败；`exit 4` 是装置或闸门用法坏，要人来看。
 日志 `/tmp/ht-b-window.20261022-145337.2087.log`（⚠️ 住 `/tmp` ⇒ 重启就没了：要把哪几行留成证据，就在跑完那一趟当场抄进本节，
 或把图挪到 `apps/*/evidence/` 这类在册落点）。
+
+**15:0x 结清：四端重装整条链绿了，`B_DONE rc=0 … segments=desktop(0)+device(0)`，载体 sha `dd36e346a`。**
+两段的 rc 都在账上（`B_DESKTOP_DONE rc=0 secs=312` + `B_DEVICE_DONE rc=0 secs=545`），四端逐格的判据：
+
+| 端 | 清 → 重打 → 装 → 判据（现量读数） |
+|---|---|
+| mac | `.app`+`.dmg` 重打并自截屏 ⇒ 装进 `/Applications/Heyta.app`；窗口 2318×1508、`…-mac-installed.png.webview.png` 内容占比 **74.6%**、主蓝命中 **997** |
+| windows | 源码包 41M（清单 4070 条）⇒ 远端 tar sha256 `958548c9240b1178…` 逐字相同、新鲜度对账（`index.html=d5283f14957a3486…`、bridge `f40e276da6010c21…`、`assets/*.js` 7 枚一致）⇒ 远端打包+安装+启动截图，看守读数「判据齐了：**5 条全在位**」 |
+| android | release APK 重打 81M ⇒ `emulator-5554`（`heyta-w3-yearly`）全新安装 `Success`、前台 `com.heyta/com.heytamobile.MainActivity`；截图 1080×2400、内容占比 **55.9%**、主蓝 **4042** |
+| ios | `simctl uninstall` → Release 重打 → 全新安装；**新鲜度判据**（已装的 `main.jsbundle` 比源码新）；截图 1206×2622、内容占比 **58.9%**、主蓝 **4091** |
+
+**四张图都人工看过**（不是只看 rc）：三端（android / ios / mac 的 webview 那张）落的都是同一枚「在使用联网功能之前」首启同意卡，主按钮「同意并联网」是**蓝底白字实心态**、两条列表说明与「服务条款 / 隐私政策」链接都在位。⚠️ 但 mac 端**外层**那张 `heyta-reinstall-mac-installed.png` 单独看是**近乎全白**（只有三枚交通灯）——判据数的是它里面嵌的 `.webview.png`，所以外层这张**不能**当"装上了且能起来"的证据；只数 rc 或只看外层图都会读假。
+
+**这一趟在载体里留下的三枚改动，已还原、但事实要留着**：`apps/mobile/ios/Podfile.lock` 被 `pod install` 重写 1 行（`hermes-engine` 的 SPEC CHECKSUM `208b0dcd…` → `d3ea244a…`）+ 两枚 `Info.plist` 被打包脚本改写版本号（共 33 行）。⇒ 这是**装机方**（移动线）要判的"锁文件与 Xcode 27.0 那套 podspec 不同步"，不是本线的东西，所以**不代提交**，只把读数留在这里；载体已 `git checkout --` 回干净（现量 `git status --porcelain | wc -l` = 0），否则下一趟看守会停在"载体脏了就停"那一格。
+
+**收尾**：本趟起的两枚设备都已关掉（`simctl shutdown heyta-multiend-reinstall` + 杀掉自己起的 `heyta-w3-yearly` qemu），`adb devices` 空、`simctl list devices booted` 里 heyta 枚数 0 —— 没给别人留现场。
+
+⇒ **第 2 步现在只剩一格**：`pnpm check` 全链绿，卡在两枚别线 `HEAD` 存量红（`check:selection-single-source` 收款线、`check:image-license` 自托管线），本线一枚不占（上一节逐项账）。
