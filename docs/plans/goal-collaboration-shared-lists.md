@@ -1838,3 +1838,17 @@ cd e2e && npx playwright test tests/auth-login-code.spec.ts --reporter=line
 1. `/opt/homebrew/share/android-commandlinetools/emulator/emulator -avd heyta-w3-yearly -no-snapshot-save >/dev/null 2>&1 &`（裁判自己打印的那行）
 2. 起 iOS 那枚在册设备并取名字：`xcrun simctl list devices booted` ⇒ 传 `IOS_DEVICE_NAME="<现取>"`
 3. `IOS_DEVICE_NAME="<现取>" bash "<主检出>/scripts/reinstall-all.sh"`；**读数要两行一起抄**：`B_DONE rc=` 只等于设备段，桌面段在 `B_DESKTOP_DONE`；mac 端判据数的是 `…-mac-installed.png.webview.png`（外层那张单看近乎全白）。
+
+## 接手点 v4（2026-10-22 22:5x；取代 18:3x 的 v3 —— 第 4 步 push 已完成、四端重装已试到窗口）
+
+**这条线现在的事实**：本线代码面收口并已公开；第 1／3／4／5 步都有当前 HEAD 的绿读数（逐格读数见上面 20:1x／21:1x／21:4x／22:3x／22:4x 五节，**别抄本文任何一句当状态**）。第 2 步只剩两格，两格都不是本线的活：
+
+1. **`pnpm check` 整链绿** — HEAD 级红集是两枚别线存量红（收款线 `check:selection-single-source`、自托管线 `check:image-license`，后者门自己判**情形②**：要真打镜像＋改它自己的 `IMAGE_ONLY_PACKAGES`）+ 链里那枚跑不到头的整套浏览器套件门。复量：`for s in check:selection-single-source check:image-license; do pnpm run $s; echo rc=$?; done`。**别人的判据口径与豁免表不代改**（AGENTS §8）。
+2. **四端重装** — 窗口未开（裁判 `exit 3`：0 台 booted 模拟器 + adb 无在线设备），且自 15:0x 载体 sha 起的 34 枚真打包输入**没有一枚是本线的**。点火三步与"两行读数一起抄"的坑在 22:4x 那节。归属＝改了打包输入的那条线，或下一轮开窗。
+
+**本线能自算的尺，一键复认证**（HEAD 在动时先跑这一屏，别重跑整链）：
+`for s in check:layering check:ui-language check:design check:migrations check:adr-numbering check:share-entry-hidden; do pnpm run $s; done` ＋ `pnpm verify:collab-journey`（判据 `RESULT=OK steps=3`）＋ `pnpm -r typecheck`。
+
+**要不要继续开下一批**：M2（共享任务写路径路由）是这条线唯一还欠的功能面，**动手前要先立一份新 ADR**（它要改写路径路由＝线协议/`shared-schema` 档，AGENTS §3 不可逆层）。M2 的验收按 18:2x 拍板 3 多一格：**两台真浏览器里 B 看得见 A 改的任务**（宿主层绿不等于用户互相看得见，§7 #535）。
+
+**仍挂负责人一句的**：① 这条 goal 按新尺子关掉还是留着等那两条线；② owner 转让语义（两步确认／立即生效／原 owner 降 editor，文案 `web.share.transfer.confirmHint`）的追认。停止点①（同意面视觉层级）**前提已被现量否证**，别再拿它去问。
