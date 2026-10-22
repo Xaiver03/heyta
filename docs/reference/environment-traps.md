@@ -11065,3 +11065,17 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     验证证据（2026-10-22 协作线第 2 步）：这套件跑到约第 224 枚被掐，日志里 17 个 spec 有 `✘`（`account-email-change-and-sessions`、`admin-console`、`auth-consent-registration`、`inbox`、`detail-pane-*` 等），
     而工作树上 `git status --porcelain=v1 | grep -icE 'share|collab'` 回 **0**；同一棵树上紧接其后单跑的 `check:privacy-consent-e2e` 与 `check:landing-e2e` 各 rc=0 ⇒ 不是载体坏了。
 
+534. **未加引号的 heredoc 分隔符会把正文里的反引号当命令执行**（2026-10-22 写台账归因那一节时踩的：整段中文正文里全是 `check:xxx`、`server/package.json` 这类反引号）
+    现象：`python3 - <<PY`（**分隔符没加单引号**）时，shell 先对整段做变量展开与命令替换，
+    于是正文里的 `` `pnpm verify-selfhost-stack.sh` `` **真的被跑了一遍**，其余反引号变成
+    `command not found: check:selection-single-source` / `permission denied: server/package.json` 这类噪声；
+    然后 python 收到的是**已经被改写过**的源码，报 `SyntaxError` 或 `parse error near '>'`，
+    **文件一个字没写**，而外层链上后面跟着的 `git add`/`git commit` 照样执行 ⇒ 现场看起来像"提交失败了"，
+    真实原因是正文被执行过。最坏形状：正文里若含 `` `rm -rf …` `` 就直接落地。
+    可复用规则：**凡是往解释器里喂带反引号/`$` 的正文（中文台账、SQL、markdown），分隔符必须加单引号**
+    （`<<'PY'` / `<<'EOF'`）；需要把 shell 变量传进去时走 **argv 或 env**（`export V=…; os.environ['V']`），
+    绝不为了一处插值去裸分隔符。写完要**复核文件真的变了**（`git diff --cached --name-only` 或再 grep 一次），
+    不能拿"命令没报错"当写成功。
+    验证证据（本条当场）：第一次未加引号 ⇒ 日志出现 `bash scripts/verify-selfhost-stack.sh` 与
+    `❌ docker 守护进程不可用`（那次意外执行自己撞在它的 docker 前置上退了，才没往下走），文件未变；
+    第二次改成"正文写进 `/tmp/stanza.md`（quoted heredoc）+ python 只读文件" ⇒ `written` + `commit rc=0` + `push rc=0`。
