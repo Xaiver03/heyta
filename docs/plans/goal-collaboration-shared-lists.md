@@ -1034,10 +1034,11 @@ main 在推送之后又被别线推进（`git rev-parse --short HEAD` 现量，�
 
 **B-10 之后把任务书第 2 步那几趟重跑了一遍**（改的是产品代码不是文档，旧读数不能沿用）：
 `pnpm -r test` ⇒ rc=0、`Scope: 21 of 22 workspace projects`、21 枚包各打出一条 `Tests … passed`、
-非零 `failed` 行 0 条、合计 **14220 passed**。**对数怎么算才算对**：盘上有 `test` 脚本的包 22 枚，差的那一枚是 `e2e` ——
-它是一棵独立工作区，`pnpm -r` 根本不 traverse（与载体那枚坑 **#523** 同一个根因），
-所以合法说法是 **21 == 21**，`e2e` 那一格由上面那两条常驻链覆盖；
-别把分母写成 22 再留一句"e2e 没跑"当边界，那会把一条结构性边界读成一次漏跑。
+非零 `failed` 行 0 条、合计 **14220 passed**。**对数怎么算才算对**（10:4x 按 `pnpm-workspace.yaml` 里那三条 glob 的现体重算；先前那句"盘上 22 枚、差的一枚是 `e2e`"
+是我把**根包**算进了分母，形状错了而结论碰巧没变）：workspace 项目 **21 枚**（`packages/*` + `apps/*` + `server`），
+逐枚去读各自的 `scripts.test` ⇒ **有该脚本的 21 枚、缺的 0 枚**；根包 `heyta` 也有 `test`，但 `-r run` 默认不含根包，
+而 `e2e` 压根不在那三条 glob 里（它是独立工作区，**#523** 那个根因）。所以合法说法是 **应打 21 行 == 实打 21 行**，
+`e2e` 那一格由上面那两条常驻链覆盖；别把分母写成 22 再留一句"e2e 没跑"当边界，那会把一条结构性边界读成一次漏跑。
 `pnpm -r build` ⇒ rc=0、输出里 `error`/`failed` 0 行（`apps/desktop` 那条 manualChunks 是**警告**，不是红）。
 `pnpm check` 那 122 段链仍是**两枚别线红**：在 tip `a6662e218` 上逐枚复量 `pnpm check:selection-single-source` rc=1、
 `pnpm check:image-license` rc=1，两者相关文件无在途改动 ⇒ 全绿这一格不归本线，也不由我放宽。
