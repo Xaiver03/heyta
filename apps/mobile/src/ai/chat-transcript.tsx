@@ -64,11 +64,15 @@ function ChatMessage({
             {item.detail}
           </Text>
         ) : null}
+        {item.proposal}
+        {item.action}
+        {/*
+          🔴 标识在**内容下方**（备案材料写的是"七类 AI 产出文本的下方"）：
+          提案卡与动作按钮都属于这段推论的呈现，标识是它们的脚注。
+        */}
         {isGenerated ? (
           <AiGeneratedLabel label={generatedLabel} testID={`chat-generated-${String(item.id)}`} />
         ) : null}
-        {item.proposal}
-        {item.action}
       </Card>
     </View>
   );

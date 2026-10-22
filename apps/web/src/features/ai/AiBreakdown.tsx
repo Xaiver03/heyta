@@ -452,8 +452,6 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
           }}
         />
 
-        <AiGeneratedLabel label={t('common.ai.generatedLabel')} testID="ai-proposal-generated" />
-
         {proposal.truncated && (
           <p className="ht-ai__warn" data-testid="ai-truncated">
             <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" />
@@ -483,6 +481,10 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
             </li>
           ))}
         </ul>
+
+        {/* 法定标识在**被标识内容的下方**（备案材料原话），且是灰字 ——
+            理由见 `packages/ui/src/ai/AiGeneratedLabel.tsx` 文件头。 */}
+        <AiGeneratedLabel label={t('common.ai.generatedLabel')} testID="ai-proposal-generated" />
 
         <p className="ht-ai__note">
           {t('web.ai.breakdown.noteLead')} <strong>{t('web.ai.breakdown.noteStrong')}</strong>

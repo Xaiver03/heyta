@@ -541,8 +541,6 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
           }}
         />
 
-        <AiGeneratedLabel label={t('common.ai.generatedLabel')} testID="capture-proposal-generated" />
-
         {proposal.dropped.length > 0 && (
           <p className="ht-ai__warn" data-testid="capture-dropped">
             <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" />
@@ -612,6 +610,10 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
             <option value="high">{t('web.ai.capture.priority.high')}</option>
           </select>
         </label>
+
+        {/* 标识在候选字段**下方**（备案材料原话）—— 字段是 AI 预填的，
+            而它们是可编辑的：标识说的是"这些值的来源"，不是"这个表单不能改"。 */}
+        <AiGeneratedLabel label={t('common.ai.generatedLabel')} testID="capture-proposal-generated" />
 
         <p className="ht-ai__note">
           {t('web.ai.capture.noteLead')}<strong>{t('web.ai.capture.noteStrong')}</strong>{t('web.ai.capture.noteTail')}
