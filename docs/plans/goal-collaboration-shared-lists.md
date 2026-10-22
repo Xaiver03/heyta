@@ -1363,3 +1363,16 @@ git diff --name-only a6662e218..HEAD -- packages apps server | grep -v '/evidenc
 **两枚别线红在 `b25c133f4` 上复量：都还在**，各自给出的出路一字没变，也各自都不归本线代做：
 - `check:selection-single-source` rc=1 ⇒ 出路是"改用 `@heyta/app-host` 的 selection"或"在 `ROW_ID_EXEMPT` 登记一行并写明是哪一类瞬态"。**登记别人的豁免表就是代改别人的判据口径**，本线不碰。
 - `check:image-license` rc=1，门自己判的是**情形 ②**（`server/package.json` / 三枚本地包 / Dockerfile 装法变了 ⇒ 锁本身过期，重跑生成器造不出新锁），处方是一次 `pnpm verify:selfhost-stack` 并把镜像里的 `/app/package-lock.json` 落成提交物。那是自托管线的交付件，动它＝替别线产交付。
+
+### 2026-10-22 11:5x · 载体已追平到 `f9fae456d` 并整树重 build 过（rc=0），重装那一格的**人侧步骤又少了一步**；窗口本身还没开
+
+做了三件事，都有读数：
+1. `git -C $HOME/heyta-carriers/heyta-wt-collab-m5 merge --ff-only f9fae456d` ⇒ 载体 `62c0bda8a → f9fae456d`（快进，零冲突）。这 6 笔里 `pnpm-lock.yaml / package.json / .npmrc / patches/` **一枚都没动**（`git diff --name-only 62c0bda8a..HEAD | grep -E …` 空读数）⇒ 不需要 `pnpm install`。
+2. 载体里 `pnpm -r build` **rc=0**（末行 `apps/desktop build: Done`）。
+3. 就绪裁判复跑：`CARRIER=… sh research/tools/b-reinstall-readiness.sh` ⇒ **exit 3，三项前置不成立**，其中**载体新鲜那格已经变绿**（`✅ 载体新鲜：f9fae456d… == 主检出 HEAD`）。
+
+**剩下三项的形状要说清，别又写成"两枚设备"**：
+- `❌ 负载 13 > 12`。**这一格是我自己那趟 build 顶上去的，且当场已归因**：`vm.loadavg` 现量 `{12.09 12.60 12.99}`（1 分钟档已在阈值线上下），`ps -Ao pcpu,comm -r` 的头几名是 `mds_stores` / `miniconda3/bin/python3` / `WindowServer`，**没有一枚是我的构建进程**（它已退出）。所以这条不是"要谁去做什么"，是一段时间。
+- `⚠️ 有 0 台已启动模拟器且没传 IOS_DEVICE_NAME` 与 `❌ Android 段目标 emulator-5554 不可达；当前 adb 在线设备：一个都没有` —— 这两格才是归人的：裁判与 `reinstall-all.sh` 都明写不代起设备（见 11:2x / 11:3x 那两节的行号现量）。
+
+**于是"点头之后"的步骤从三步压成两步**：起 iOS 模拟器 + 起 AVD，然后照 11:3x 那行点火命令走 —— 载体追平与整树 build 已经不需要人再等一遍。
