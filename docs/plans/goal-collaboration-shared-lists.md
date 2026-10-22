@@ -1494,3 +1494,14 @@ Android AVD `heyta-w3-yearly`（`-no-window` headless 起，`emulator-5554` 的 
 **收尾**：本趟起的两枚设备都已关掉（`simctl shutdown heyta-multiend-reinstall` + 杀掉自己起的 `heyta-w3-yearly` qemu），`adb devices` 空、`simctl list devices booted` 里 heyta 枚数 0 —— 没给别人留现场。
 
 ⇒ **第 2 步现在只剩一格**：`pnpm check` 全链绿，卡在两枚别线 `HEAD` 存量红（`check:selection-single-source` 收款线、`check:image-license` 自托管线），本线一枚不占（上一节逐项账）。
+
+### 2026-10-22 15:4x · 那两枚别线存量红归因到**提交**（把"等别人"写成一句话就能接手的形状）
+
+先前只写到"归别线"，那是半句话——别人拿到也不知道从哪一笔查起。现量到提交级（`HEAD = c13ff1d1c`，两枚门各自重跑过、读的是它们自己打印的差集）：
+
+- **`check:selection-single-source`**：门点名两枚 `tierId` 的本地 `useState` —— `apps/web/src/features/subscription/RenewPanel.tsx` 与 `apps/mobile/src/screens/RenewSection.tsx`，两处都由**同一笔** `81d4a7044 feat(¥12 档·客户端能下单)` 引进来。⇒ 归收款线，两条出路写在它自己的报错里（改成 `@heyta/app-host` 的 selection，或在 `ROW_ID_EXEMPT` 登记一行写明是哪一类瞬态）。**豁免表是它的口径，本线不代改。**
+- **`check:image-license`**：快照 `server/image-npm-tree.json` 最后一次重生成是 `d0bd83b36`（2026-10-17，自托管线），而它之后有两笔改了输入面 —— `7281d1388`（2026-10-19，`feat(auth)` 中央认证模式，改 `server/package-lock.json`）与 `5d58ed332`（2026-10-20，central device handoff，改 `server/package.json`）。⇒ **红是中央认证 / 设备接力那两笔带进来的，快照的归属是自托管线**；因为动的是 `server/package.json`（不只是锁），按门自己打印的分情形判据走 **②**：要跑一次 `pnpm verify:selfhost-stack` 从镜像里取新锁落成提交物，光重跑生成器造不出新锁。
+- **本线在这两枚里零命中**：`git log --grep='协作' -40 --name-only` 里碰 `server/` 或任一 `packages/*/package.json` / `package-lock.json` 的枚数现量 **0**。
+- 第三枚 `check:text-color` 复量仍红、仍**不算存量**：`packages/ui/src/ai/AiGeneratedLabel.tsx` 在 `git status` 里还是 ` M`（AI 线在途未提交），红在它第 81 行那枚既没语义前景色也没颜色的 `<Text>`。
+
+⇒ 这一格本线能做的做完了：链上 123 项逐枚的读数、三枚红的门内原文、以及**归到哪一笔、谁去清、清它要跑哪条命令**都在这一节。要 `pnpm check` 真绿，得收款线与自托管线各自落那一笔。
