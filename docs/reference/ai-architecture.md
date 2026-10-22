@@ -85,6 +85,7 @@ heyta 的 AI 是**双向**的，两个方向**在不同的包里、有不同的�
 | `packages/ai/src/capability-manifest.generated.ts` | 424 | **生成物**：给模型看的"哪个实体、哪些字段、可读还是可写"。手写不可能，`--check` 不一致即红 |
 | `scripts/gen-ai-capability-manifest.mjs` | — | 上面那份的生成器（从工具目录 + `EntityModelMap`）。`check:ai-tools` 规则 7 调它的 `--check` |
 | `packages/ai/src/wire.ts` | — | 请求线格式的**唯一实现**（url / headers / body / 空响应判定），`provider.ts` 与 `routing.ts` 共用。⚠️ **刻意不从 `@heyta/ai` 导出**：导出去等于邀请包外再拼一份 |
+| `packages/ai/src/stream.ts` | 168 | **响应**线格式的唯一实现：SSE 切帧（保留半帧、CRLF）、`data:` 提取、分片累加（文本 / 思考 / 工具调用跨帧装配）。纯字符串、不读流 —— 字节解码留在 `routing.ts`，于是它能在没有 `TextDecoder` 的运行时里也能被单测。⚠️ 同 `wire.ts`：解析器**不导出**，只导出 `StreamDelta` 这个片段词表 |
 | `packages/app-host/src/ai-failure-fallback.ts` | — | `describeRoutedFailure()` 的**唯一**定义点（曾抄了四遍）。入参是封闭词表 `AiFailureReason`，不是 `string` |
 | `packages/ai/src/diagnose.ts` | — | 端点失败的**可诊断性**（W1）：本机端点拒绝来源 vs 其他原因分开，复用 `endpoint-address.ts` 的 `isLoopbackEndpoint`（2026-10-05 前它住在 `supply.ts`） |
 | `packages/local-api/src/tools.ts` | 499 | 工具契约 + 授权判定（**唯一实现点**）。`isToolGranted()` 被 MCP 与内置 AI **共用** |
@@ -99,11 +100,12 @@ heyta 的 AI 是**双向**的，两个方向**在不同的包里、有不同的�
 | `apps/web/src/features/ai/AiPrioritize.tsx` | — | 优先级界面 |
 | `apps/web/src/features/ai/AiDuration.tsx` | — | 估时界面 |
 | `apps/web/src/features/ai/AiToolRun.tsx` | — | **工具调用面板（单步）**：规则命中不出境（并明说）；需模型时先披露再发送；写工具出提案 + 确认。🔴 前门只有 `requestToolCall` 一个 —— 旧的薄壳 `runAiTool()` 已删（W7），`check:ai-tools` 规则 6 拦它回来 |
-| `apps/web/src/features/ai/AssistantPanel.tsx` | — | **对话界面**（W12）：一次性披露块（逐字来自 `planAssistantEgress`）、气泡记录（用户贴右 / 助手贴左）、步数轨迹、提案卡 + 确认、免责声明常驻。🔴 自己**不发请求**，也没有 `fetch` |
+| `apps/web/src/features/ai/AssistantPanel.tsx` | 1035 | **对话界面**（W12）：一次性披露块（逐字来自 `planAssistantEgress`）、气泡记录（用户贴右 / 助手贴左）、**逐行过程开关**（`正在读取 · list_tasks` / 跑完变 `已读取`，默认收起、有 `note` 才可展开）、**流式文本**（`onEvent` 是这一层唯一的流式开关）、提案卡 + 确认、免责声明常驻。`reduceAssistantLive()` 是「事件 → 可见行」的纯函数。🔴 自己**不发请求**，也没有 `fetch` |
 | `apps/web/src/features/settings/AiSettings.tsx` 的 `ai-assistant-section` | — | 助手的**第二个授权前端**：`assistantTier` 两档单选 + 该档的字段并集 / 工具 / 上界预览 + "与本机 API 互不影响"那句 |
 | `apps/web/src/features/ai/RouteUnavailable.tsx` | — | "没有可用端点"时的原因解释 + 下一步 |
 | `apps/web/src/features/ai/route-explanation.ts` | 251 | 壳自己的路由解释（`resolveFeatureRoute()`），消费 `resolution.excluded` |
 | `apps/web/src/features/ai/ai-failure-copy.ts` | — | 失败原因码 → 界面词条 |
+| `packages/ui/src/ai/AiGeneratedLabel.tsx` + `generated-label-style.ts` | 57 + 44 | **法定显式标识的唯一实现**（《标识办法》+ GB 45438-2025，「AI 生成合成内容」）：形状是 `caption`（12px）+ `color.foreground-muted` 的**灰色小字**，**没有**底色/内边距/圆角；位置在**被标识内容的下方**（七类输出面，DOM 顺序有判据）。样式计划是纯模块，所以"它是不是又长回一枚胶囊"在 node 测试里就红（不靠看截图） |
 
 ### 1.2 数据流（出站）
 
@@ -125,6 +127,15 @@ heyta 的 AI 是**双向**的，两个方向**在不同的包里、有不同的�
 ```
 
 🔴 ③ 之前必须过**三道闸 + 出境授权**，顺序是硬的（见 §4、§6）。
+
+③ 有两个形态，**共用同一份闸门与同一个候选循环**：
+
+| 形态 | 谁用 | 响应怎么来 | 结论形状 |
+|---|---|---|---|
+| 整份 | 移动端、五个功能面板、`createProvider()` | 一次 `res.json()` | 同一份 `AiResult` |
+| 流式（SSE） | 对话面板（Web） | `RoutedDeps.onDelta` 逐片回调 | **仍然**是同一份 `AiResult` |
+
+形态由调用方**显式要**：`AssistantTurnDeps.onEvent` 给了才装 `onDelta`。不变量见 §5.8。
 
 ---
 
@@ -415,9 +426,25 @@ EGRESS_ORDER_NOTE = '顺序：先展示会发送哪些字段 → 用户确认 �
                   + '不允许先发再问。'
 ```
 
-🔴 流式输出看起来更流畅，但它意味着**在你决定要不要之前，数据已经在路上了**。
-将来若要加流式，**必须新开一个方法**，而不是给现有方法加参数 ——
-先回答"怎么在第一个字节发出前完成授权"。
+🔴 这句原来的下一行写的是：「将来若要加流式，**必须新开一个方法**，而不是给现有
+方法加参数 —— 先回答'怎么在第一个字节发出前完成授权'。」
+
+**2026-10-21 加了流式，两件事都按当时的意图办了，但形态改了，理由如下。**
+
+1. **那个问题有答案了**：heyta 的授权本来就在第一个字节**之前**，而且不在每一帧之前。
+   对话式助手的披露是**一次性**的（`planAssistantEgress()` 在循环开始前算完，用户点头
+   才进循环），`invokeRouted()` 的第三道闸在**网络动作之前**逐候选判。`stream: true`
+   改的是**响应**到达的形状 —— 请求一个字节都没有因此提前发出去。
+   所以 `EGRESS_ORDER_NOTE` 那句话一个字都没改，变的只是"再显示"从一次性变成逐字。
+2. **为什么没有"新开一个方法"**：那个要求的目的是避免"同一件事两套语义"
+   （ADR-0010 第 7 行：流式与非流式的回退策略不对称，必然漂移）。新开
+   `invokeRoutedStreaming()` 会得到**第二份**候选循环 + 三道闸 + 熔断记账 ——
+   正是 §5.1 与 W7 花两次返工才收敛掉的那种重复，而且两份一定会漂。
+   所以流式做成 `RoutedDeps.onDelta` 一个**显式开关**：同一条发送路径、
+   同一个回退策略，唯一的增量是一条**物理**规则（吐出去字节之后不许换端点，见 §5.8）。
+   ⚠️ 这条改写的**代价**要说清：`attemptOnce` 多了两件事（超时语义、SSE 读取），
+   它已经不是一个"小函数"了。如果将来再要第二种传输形态（例如 WebSocket），
+   那就真的该抽一个传输接口，而不是继续加参数。
 
 ### 4.5 数据面恰好等于披露面
 
@@ -602,6 +629,37 @@ type CandidateExclusionReason =
 自己包了一层。两者是"同一件事的两套实现"；`describeRouteIntent()` 只有一条 3 行实现、
 行为已由测试钉住，保留作为将来壳收掉重复部分时的现成入口，
 **接线时要用它取代那份重复实现，而不是并成第三份**。
+
+### 5.8 流式（SSE）：一条开关、四条不变量
+
+开关只有一个方向：**调用方显式要**。`RoutedDeps.onDelta` 给了才带 `stream: true`，
+不给则请求体与从前**逐字相同**（`packages/ai/tests/stream.spec.ts` 按原始串断言）。
+链路上是两级：
+
+```
+apps/web AssistantPanel 的 onEvent
+   → app-host 的 AssistantTurnDeps.onEvent      （给了才装下一级的 onDelta）
+      → packages/ai 的 RoutedDeps.onDelta        （给了才带 stream: true）
+         → attemptOnce：SSE 逐帧读 + 每片回调
+```
+
+| # | 不变量 | 违反的症状 | 判据 |
+|---|---|---|---|
+| 1 | 🔴 **已经吐出去字节之后，不许换端点** | 前半句被第二个模型重画一遍 | `stream.spec.ts`「中途断流」数请求：只能 1 次 |
+| 2 | **`stream` 不是出境数据** | 披露与数据面对不上 | `wire.ts` 的 `ChatRequestOptions` 只允许这一个键；`fields` 一字不改 |
+| 3 | **读不了流的宿主不许要流** | 请求要流、响应读不回来（卡住） | `invokeRouted` 判 `TextDecoder`；`attemptOnce` 再判 content-type + `body`，任一条不满足就退回整份读取 |
+| 4 | **超时语义按形态分** | 长回答被"整轮预算"误杀 | 非流式：整次请求一个预算；流式：**每收到一片重置**，量的是沉默窗口 |
+
+⚠️ 第 3 条的方向必须是**退化**（拿到完整结果），不是**报错**（说"这个端点不支持流式"）：
+用户层面发生的事就是"这次没有逐字出现"，这比一句关于端点能力的技术报告诚实。
+
+⚠️ 第 1 条与 ADR-0010 第 7 行不冲突：那里禁止的是"同一件事两套语义"。
+这里仍然只有一条语义 —— **只在"一个字节都没发出去"时回退**；
+非流式路径上这个条件永远成立，所以它退化成原来的行为（不是新策略）。
+
+🔴 **事件不是结果。** `AssistantTurnEvent`（`text` / `reasoning` / `tool-started` /
+`tool-finished`）只用于**进行中**的观感；结果仍然只有 `AssistantOutcome` 一份。
+所以移动端不接事件也能拿到同样的回答，而历史里存的永远是 outcome 的 `steps`。
 
 ---
 

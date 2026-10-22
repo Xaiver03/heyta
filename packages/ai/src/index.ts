@@ -134,6 +134,10 @@ export {
 // 导出组装器就等于邀请包外再拼一份请求体（工单 W7 刚删掉过两份）。
 // 但 `AiInvocation.messages` 的类型在包外必须能写，所以类型单独放行。
 export type { ChatMessage } from './wire.js';
+// 流式响应的**片段类型**。它是 app-host 与界面共用的词表（"文本到了" /
+// "思考到了" / "要调工具了"），所以要导出。⚠️ 解析器本身不导出：
+// 与 `buildChatRequestBody` 同一条纪律 —— 导出解析器等于邀请包外再写一份读流的实现。
+export type { StreamDelta } from './stream.js';
 // 只有**测量**函数放行（它不返回请求体，见 `wire.ts` 的注释）。
 export { egressBytesFor } from './wire.js';
 

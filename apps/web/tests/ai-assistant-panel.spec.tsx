@@ -30,7 +30,7 @@ import type { AiRoutingConfig } from '@heyta/ai';
 import type { LocalApiHost, LocalApiItem } from '@heyta/local-api';
 
 import { PanelEphemeralProvider } from '../src/features/ai/panel-ephemeral.js';
-import { AssistantPanel } from '../src/features/ai/AssistantPanel.js';
+import { AssistantPanel, reduceAssistantLive } from '../src/features/ai/AssistantPanel.js';
 
 const ROUTING: AiRoutingConfig = {
   enabled: true,
@@ -317,9 +317,16 @@ describe('🔴 一次性披露在循环之前', () => {
     await click(el, 'ai-assistant-send');
 
     expect(el.querySelector('[data-testid="ai-chat-proposal"]')).toBeTruthy();
-    expect(el.querySelector('[data-testid^="ai-chat-generated-"]')?.textContent).toBe(
-      'AI 生成合成内容',
-    );
+    const label = el.querySelector('[data-testid^="ai-chat-generated-"]');
+    expect(label?.textContent).toBe('AI 生成合成内容');
+    // 🔴 标识必须排在提案卡**之后**（备案材料原话「七类 AI 产出文本的下方」）。
+    // 2026-10-21 自核时这里原来在上方 —— 材料没错，代码错了。
+    const proposalRow = el.querySelector('[data-testid="ai-chat-proposal"]');
+    expect(
+      proposalRow !== null && label !== null
+        && (proposalRow.compareDocumentPosition(label) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+      '标识要排在提案卡之后',
+    ).toBe(true);
   });
 
   it('🔴 规则本机就能答的那一句**不弹披露**，而且零请求', async () => {
@@ -811,5 +818,127 @@ describe('对话记录里"谁说的"看得出来', () => {
     expect(ruleBody('ht-ai__item--user')).toContain('align-self');
     expect(ruleBody('ht-ai__item--assistant')).toContain('align-self');
     expect(ruleBody('ht-ai__items--chat')).toContain('list-style');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// 流式：过程边跑边说
+// ─────────────────────────────────────────────────────────────────────────
+
+/** 一段可由测试**手动喂帧**的 SSE 响应工厂（每来一个请求就开一个新流）。 */
+function streamFetch(): {
+  impl: typeof fetch;
+  controllers: ReadableStreamDefaultController<Uint8Array>[];
+  push: (round: number, payload: string) => void;
+  finish: (round: number) => void;
+} {
+  const encoder = new TextEncoder();
+  const controllers: ReadableStreamDefaultController<Uint8Array>[] = [];
+  const impl = (() => {
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controllers.push(controller);
+      },
+    });
+    return Promise.resolve(
+      new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } }),
+    );
+  }) as unknown as typeof fetch;
+  return {
+    impl,
+    controllers,
+    push: (round, payload) => {
+      controllers[round]?.enqueue(encoder.encode(`data: ${payload}\n\n`));
+    },
+    finish: (round) => {
+      controllers[round]?.close();
+    },
+  };
+}
+
+/** 把已排队的微任务与定时器都跑完（流式路径上每一帧都是一次异步跳）。 */
+async function settle(times = 8): Promise<void> {
+  for (let index = 0; index < times; index += 1) {
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  }
+}
+
+describe('流式：过程边跑边说（这是"过程可见"真正的形态）', () => {
+  it('工具行在跑的时候就出现；文本逐字进同一个气泡；结束后并进历史那一条', async () => {
+    const stream = streamFetch();
+    const el = await render({ host: fakeHost(), fetchImpl: stream.impl });
+
+    await type(el, '我都有些啥？');
+    await click(el, 'ai-assistant-send-button');
+    await click(el, 'ai-assistant-send');
+    await settle();
+
+    expect(stream.controllers, '第一个请求应当已经发出').toHaveLength(1);
+
+    // 第一轮：模型要调 list_tasks
+    stream.push(
+      0,
+      JSON.stringify({
+        choices: [
+          { delta: { tool_calls: [{ index: 0, id: 'c1', function: { name: 'list_tasks', arguments: '{}' } }] } },
+        ],
+      }),
+    );
+    stream.push(0, '[DONE]');
+    stream.finish(0);
+    await settle();
+
+    // 🔴 工具跑完、第二轮已经发出 —— 界面上这一行**在第二轮还没回话时**就在了
+    expect(stream.controllers).toHaveLength(2);
+    expect(el.querySelector('[data-testid="ai-chat-live"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="ai-chat-live"]')?.textContent).toContain('list_tasks');
+
+    // 第二轮：文本逐字到
+    stream.push(1, JSON.stringify({ choices: [{ delta: { content: '你有' } }] }));
+    await settle();
+    expect(el.querySelector('[data-testid="ai-chat-live-text"]')?.textContent).toBe('你有');
+
+    stream.push(1, JSON.stringify({ choices: [{ delta: { content: '一条任务。' } }] }));
+    stream.push(1, '[DONE]');
+    stream.finish(1);
+    await settle();
+
+    // 收尾：进行中那一份消失，最终那条回答带着步骤行与摘要
+    expect(el.querySelector('[data-testid="ai-chat-live"]')).toBeNull();
+    const answer = el.querySelector('[data-testid="ai-chat-assistant"]');
+    expect(answer?.textContent).toContain('你有一条任务。');
+    expect(answer?.querySelector('[data-testid="ai-chat-steps"]')?.textContent).toContain('list_tasks');
+  });
+
+  it('纯函数：增量拼接、同名收行（不再出现"配错行"）', () => {
+    const started = reduceAssistantLive(undefined, { type: 'tool-started', tool: 'list_tasks', kind: 'read' });
+    const text = reduceAssistantLive(
+      reduceAssistantLive(started, { type: 'text', delta: '你' }),
+      { type: 'text', delta: '好' },
+    );
+    expect(text.text).toBe('你好');
+    expect(text.rows).toHaveLength(1);
+    expect(text.rows[0]?.ok).toBeUndefined();
+
+    const finished = reduceAssistantLive(text, {
+      type: 'tool-finished',
+      tool: 'list_tasks',
+      kind: 'read',
+      ok: true,
+    });
+    expect(finished.rows).toHaveLength(1);
+    expect(finished.rows[0]?.ok).toBe(true);
+
+    // 找不到对应行时补一行"已结束"，而不是丢掉
+    const orphan = reduceAssistantLive(undefined, {
+      type: 'tool-finished',
+      tool: 'get_task',
+      kind: 'read',
+      ok: false,
+      note: '缺少参数',
+    });
+    expect(orphan.rows).toEqual([{ tool: 'get_task', kind: 'read', ok: false, note: '缺少参数' }]);
   });
 });

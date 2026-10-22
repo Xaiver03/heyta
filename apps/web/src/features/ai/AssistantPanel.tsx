@@ -75,6 +75,7 @@ import {
   type AssistantMessage,
   type AssistantStep,
   type AssistantTier,
+  type AssistantTurnEvent,
 } from '@heyta/app-host';
 import { webManagedTransport } from './managed-transport.js';
 import type { LocalApiHost } from '@heyta/local-api';
@@ -145,12 +146,71 @@ export interface AssistantPanelProps {
 /** 活会话由 Provider 拥有；页面重挂载只能换视图，不能更换请求的结果接收者。 */
 type AssistantPhase = 'idle' | 'disclose' | 'running';
 
+/**
+ * 一轮进行中的**一行过程**（对应 `AssistantTurnEvent` 的 tool-started / -finished）。
+ *
+ * `ok === undefined` = 还在跑。这一格是**界面自己的**状态，不进历史：
+ * 历史里那一轮最终会落成 `AssistantStep[]`（见 `ChatItem` 的 assistant 分支）。
+ */
+interface LiveRow {
+  readonly tool: string;
+  readonly kind: 'read' | 'write';
+  readonly ok: boolean | undefined;
+  readonly note?: string;
+}
+
+/** 一轮进行中的可见状态。它只活在 `usePanelEphemeral` 里，**不落盘**。 */
+interface LiveTurn {
+  readonly text: string;
+  readonly reasoning: string;
+  readonly rows: readonly LiveRow[];
+}
+
+const EMPTY_LIVE: LiveTurn = { text: '', reasoning: '', rows: [] };
+
+/**
+ * 事件 → 进行中的可见状态。**纯函数**，因为它有两条必须能被单独钉住的规则：
+ *
+ *   1. 文本/思考是**增量拼接**，不是替换（替换的症状是屏幕上只剩最后一个字）；
+ *   2. `tool-finished` 收掉的是**同名且还在跑**的那一行，而不是"最后一行" ——
+ *      事件与渲染是两条异步路径，按位置配会在并发（或重挂载）时配错行。
+ */
+export function reduceAssistantLive(
+  live: LiveTurn | undefined,
+  event: AssistantTurnEvent,
+): LiveTurn {
+  const base = live ?? EMPTY_LIVE;
+  if (event.type === 'text') return { ...base, text: base.text + event.delta };
+  if (event.type === 'reasoning') return { ...base, reasoning: base.reasoning + event.delta };
+  if (event.type === 'tool-started') {
+    return { ...base, rows: [...base.rows, { tool: event.tool, kind: event.kind, ok: undefined }] };
+  }
+  const settled: LiveRow = {
+    tool: event.tool,
+    kind: event.kind,
+    ok: event.ok,
+    ...(event.note === undefined ? {} : { note: event.note }),
+  };
+  const rows = [...base.rows];
+  for (let index = rows.length - 1; index >= 0; index -= 1) {
+    const row = rows[index];
+    if (row === undefined || row.ok !== undefined || row.tool !== event.tool) continue;
+    rows[index] = settled;
+    return { ...base, rows };
+  }
+  // 没找到对应行（事件比这一轮的状态活得更久，例如面板刚重挂载过）：
+  // 补一行「已经结束」的，而不是丢掉 —— 丢掉会让用户看不到刚发生的那一步。
+  return { ...base, rows: [...rows, settled] };
+}
+
 interface AssistantEphemeralShape {
   draft: string;
   pending: string | undefined;
   phase: AssistantPhase;
   confirmationErrors: Readonly<Record<number, string>>;
   items: readonly ChatItem[];
+  /** 这一轮进行中的过程（流式）。`undefined` = 没有在跑的一轮。 */
+  live: LiveTurn | undefined;
   disclosed: boolean;
   /** 同步闸门跟会话一起保存，旧请求和新挂载的面板必须看到同一份。 */
   controls: {
@@ -188,6 +248,7 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
     phase: 'idle',
     confirmationErrors: {},
     items: session.history?.items ?? [],
+    live: undefined,
     disclosed: session.history?.disclosed ?? false,
     controls: {
       phase: 'idle', epoch: 0, nextId: session.history?.items.length ?? 0,
@@ -195,7 +256,7 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
     },
   }));
   const ephemeral = usePanelEphemeral('assistant', session.account, initialSession);
-  const { draft, phase, confirmationErrors, items, disclosed, controls } = ephemeral.value;
+  const { draft, phase, confirmationErrors, items, live, disclosed, controls } = ephemeral.value;
   const setItems = (next: readonly ChatItem[] | ((previous: readonly ChatItem[]) => readonly ChatItem[])): void => {
     ephemeral.write(session.account, (previous) => ({
       items: typeof next === 'function' ? next(previous.items) : next,
@@ -329,6 +390,9 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
   async function turn(text: string, epoch = controls.epoch): Promise<void> {
     if (!ephemeral.isCurrent() || epoch !== controls.epoch) return;
     setPhase('running');
+    // 🔴 这一行是**流式的开关**：`onEvent` 给了，app-host 才会在请求里带 `stream`
+    // 并逐片回调。省略它 = 回到"整段回来再显示"（移动端就是这样）。
+    ephemeral.write(session.account, { live: EMPTY_LIVE });
     const outcome = await requestAssistantTurn(
       { text },
       {
@@ -343,6 +407,14 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
         localize: (key, vars) => t(key as MessageKey, vars),
         executionId: `web:${session.account}:${String(controls.nextId)}`,
         history,
+        // ⚠️ 事件与结果走**同一道闸门**：跨过「新会话」或换了账号之后到的片段
+        // 一个都不许画出来（它属于上一段对话，而界面上已经是另一段）。
+        onEvent: (event) => {
+          if (!ephemeral.isCurrent() || epoch !== controls.epoch || currentAccount() !== session.account) return;
+          ephemeral.write(session.account, (previous) => ({
+            live: reduceAssistantLive(previous.live, event),
+          }));
+        },
         routed: {
           secretStore: props.secrets,
           managedTransport: webManagedTransport,
@@ -356,6 +428,9 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
     // 🔴 熔断状态回写：失败那一次通常正是计数器刚 +1 的时候。
     if (outcome.health !== undefined && props.onHealth !== undefined) props.onHealth(outcome.health);
     setPhase('idle');
+    // 这一轮的过程行收进 `items` 里的最终形状（assistant 的 `steps`）之后，
+    // 进行中那一份就必须消失 —— 两份同时留着会让同一行在屏幕上出现两次。
+    ephemeral.write(session.account, { live: undefined });
 
     if (!outcome.ok) {
       append({
@@ -688,25 +763,38 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
 
               {item.role === 'assistant' && (
                 <>
+                  {/*
+                    🔴 过程在答案**上面**：先说"我做了什么"，再说"结论是什么"。
+                    反过来（答案在上、过程在下）会让那几行读起来像脚注，
+                    而它们恰恰是用户判断"这个结论可不可信"的依据。
+                  */}
+                  <ChatSteps steps={item.steps} t={t} locale={locale} />
                   <span>{item.text}</span>
                   <AiGeneratedLabel
                     label={t('common.ai.generatedLabel')}
                     testID={`ai-chat-generated-${String(item.id)}`}
                   />
-                  <ChatTrace steps={item.steps} stoppedAt={item.stoppedAt} t={t} locale={locale} />
+                  {item.stoppedAt !== undefined && (
+                    <p className="ht-ai__note" data-testid="ai-chat-stopped">
+                      {t('web.ai.chat.stoppedLead')}
+                      {item.stoppedAt}
+                    </p>
+                  )}
                 </>
               )}
 
               {item.role === 'proposal' && (
                 <>
-                  <AiGeneratedLabel
-                    label={t('common.ai.generatedLabel')}
-                    testID={`ai-chat-generated-${String(item.id)}`}
-                  />
                   <ProposalCard
                     item={item}
                     onConfirm={() => void confirm(item)}
                     confirmationError={confirmationErrors[item.id]}
+                  />
+                  {/* 🔴 标识在提案卡**下方**：备案材料写的是"七类 AI 产出文本的下方"，
+                      2026-10-21 自核时发现这一处原来在上面（材料没错，代码错了）。 */}
+                  <AiGeneratedLabel
+                    label={t('common.ai.generatedLabel')}
+                    testID={`ai-chat-generated-${String(item.id)}`}
                   />
                 </>
               )}
@@ -724,6 +812,35 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
               )}
             </li>
           ))}
+          {/*
+            🔴 进行中的那一轮**是列表的最后一个 item**，不是"另一个区块"：
+            它在屏幕上必须与最终那条回答占同一个位置，否则一轮结束时
+            会先"跳走"再"出现"，而用户刚读完的正是被跳走的那段。
+          */}
+          {live !== undefined && (
+            <li
+              className="ht-ai__item ht-ai__item--assistant"
+              data-testid="ai-chat-live"
+              aria-live="polite"
+            >
+              {live.reasoning !== '' && <ReasoningRow text={live.reasoning} t={t} />}
+              <TraceRows rows={live.rows} t={t} live />
+              {live.text !== '' && (
+                <>
+                  <span data-testid="ai-chat-live-text">{live.text}</span>
+                  {/*
+                    🔴 法定标识在**流式的每一刻**都要在：这段字是模型生成的，
+                    而"它生成完了没有"不是用户能判断的事。只在收尾才挂上，
+                    等于在最先被看到的那几秒里让一段合成文本长得像用户自己写的。
+                  */}
+                  <AiGeneratedLabel
+                    label={t('common.ai.generatedLabel')}
+                    testID="ai-chat-generated-live"
+                  />
+                </>
+              )}
+            </li>
+          )}
         </ul>
 
       {phase === 'disclose' && (
@@ -780,7 +897,7 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
       {/* ⚠️ 这个 testid 是给判据用的，不是装饰：`ai-assistant-remount.spec.tsx`
           要靠它区分"请求还在飞"与"阶段被重挂载归零"—— 发送键在两种情况下都是禁用的
           （草稿已被清空），所以拿它当判据会一条都测不出来。 */}
-      {phase === 'running' && (
+      {phase === 'running' && (live === undefined || live.text === '') && (
         <p className="ht-ai__note" data-testid="ai-assistant-waiting">
           {t('web.ai.loading.waiting')}
         </p>
@@ -815,10 +932,103 @@ function AssistantSessionPanel(props: AssistantPanelProps & { account: string | 
   );
 }
 
-/** 「已调用 N 个工具」那一行（ADR-0045 的过程可见）。 */
-function ChatTrace(props: {
+/** 一步（跑完的或正在跑的）在界面上那一行的形状。 */
+function toTraceRow(step: AssistantStep): LiveRow {
+  return {
+    tool: step.tool,
+    kind: step.kind,
+    ok: step.ok,
+    ...(step.note === undefined ? {} : { note: step.note }),
+  };
+}
+
+/**
+ * 一行过程。**动词由状态决定，而不是由工具名决定** ——
+ * 这样界面永远说得出"这一步现在是什么状态"，而不是等它结束才知道。
+ */
+function traceVerb(row: LiveRow, t: I18nValue['t']): string {
+  if (row.ok === undefined) {
+    return t(row.kind === 'write' ? 'web.ai.chat.step.preparing' : 'web.ai.chat.step.reading');
+  }
+  if (!row.ok) {
+    return t(row.kind === 'write' ? 'web.ai.chat.step.writeFailed' : 'web.ai.chat.step.readFailed');
+  }
+  return t(row.kind === 'write' ? 'web.ai.chat.step.written' : 'web.ai.chat.step.read');
+}
+
+/**
+ * 过程开关里的一段：一行一步，**默认收起**。
+ *
+ * 🔴 收起的理由不是"省地方"，是**默认视图要说的是"我在做什么"，不是"我读了什么"**：
+ * 展开的内容是工具层给的原文（可能很长、可能是英文），它属于"要看的时候再看"。
+ *
+ * ⚠️ 没有 `note` 的行**不套 `<details>`**：一个点了什么都看不到的展开器
+ * 比没有更糟（用户会以为界面坏了）。
+ */
+function TraceRows(props: {
+  rows: readonly LiveRow[];
+  t: I18nValue['t'];
+  live?: boolean;
+}): React.JSX.Element | null {
+  const { t } = props;
+  if (props.rows.length === 0) return null;
+  return (
+    <ul
+      className="ht-ai__steps"
+      data-testid={props.live === true ? 'ai-chat-live-steps' : 'ai-chat-steps'}
+    >
+      {props.rows.map((row, index) => {
+        const label = `${traceVerb(row, t)} · ${row.tool}`;
+        return (
+          <li key={`${row.tool}#${String(index)}`} className="ht-ai__step">
+            {row.note === undefined ? (
+              <p className="ht-ai__step-line" data-testid={`ai-chat-step-${row.tool}`}>
+                {label}
+              </p>
+            ) : (
+              <details className="ht-ai__step-body">
+                <summary className="ht-ai__step-line" data-testid={`ai-chat-step-${row.tool}`}>
+                  {label}
+                </summary>
+                <p className="ht-ai__note">{row.note}</p>
+              </details>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/**
+ * 思考那一行：**与答案分开**，而且默认只露第一行。
+ *
+ * 模型想什么不是答案：把它和正文混在一起，用户会把推测当成结论读。
+ * 展开能看全，收起时那半句足够判断"它有没有在瞎想"。
+ */
+function ReasoningRow(props: { text: string; t: I18nValue['t'] }): React.JSX.Element {
+  const firstLine = props.text.split('\n')[0] ?? '';
+  return (
+    <details className="ht-ai__step-body" data-testid="ai-chat-reasoning">
+      <summary className="ht-ai__step-line">
+        <span className="ht-ai__step-verb">{props.t('web.ai.chat.step.thinking')}</span>
+        <span className="ht-ai__step-detail">{firstLine}</span>
+      </summary>
+      <p className="ht-ai__note">{props.text}</p>
+    </details>
+  );
+}
+
+/**
+ * 「用了 N 步工具」那一行 + 逐步的行（ADR-0045 的过程可见）。
+ *
+ * ⚠️ 那段摘要（`ai-chat-trace`）**留着**：它是"这一轮有没有查东西"的一句话结论，
+ * 比逐行更快读；而逐行回答的是"查了什么、成不成"。两者不是重复，
+ * 一个给扫读、一个给核对。停止原因（`stoppedAt`）不在这里 —— 它说的是**答案**
+ * 为什么停在那儿，所以跟着答案走（见气泡里那一段）。
+ */
+function ChatSteps(props: {
   steps: readonly AssistantStep[];
-  stoppedAt: string | undefined;
   t: I18nValue['t'];
   locale: I18nValue['locale'];
 }): React.JSX.Element {
@@ -832,12 +1042,7 @@ function ChatTrace(props: {
           : t('web.ai.chat.trace', { n: props.steps.length })}
         {failed > 0 ? ` · ${props.steps.map((s) => s.tool).join(LIST_SEPARATOR[locale])}` : ''}
       </p>
-      {props.stoppedAt !== undefined && (
-        <p className="ht-ai__note" data-testid="ai-chat-stopped">
-          {t('web.ai.chat.stoppedLead')}
-          {props.stoppedAt}
-        </p>
-      )}
+      <TraceRows rows={props.steps.map(toTraceRow)} t={t} />
     </>
   );
 }

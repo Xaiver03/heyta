@@ -156,8 +156,13 @@ packages/ai/src/routing.ts:873-878
 —— **没有 messages 数组，也没有 history 字段**。
 
 - 全仓唯一的 `for` 循环是**跨端点故障转移**（`routing.ts:706-708`，`maxAttempts: 2`），不是 turn 上限。
-- 零 `response_format`、零 SSE、零 token streaming。
-- 会话历史无处存放。
+- ~~零 `response_format`、零 SSE、零 token streaming。~~ **2026-10-21 带戳更正**：
+  多轮（`AiInvocation.messages`）与 SSE/流式都已落地 —— 见
+  [`../reference/ai-architecture.md`](../reference/ai-architecture.md) §1.2 / §5.8。
+  **`response_format` 仍然是零**（那是刻意的：它属于"悄悄改变发给端点的东西"，
+  见 `wire.ts` 的 `ChatRequestOptions`）。本文 §3.1 其余段落是**当时**的读数，保留原样。
+- ~~会话历史无处存放。~~ **2026-10-21 带戳更正**：本机历史已落地
+  （`apps/web/src/features/ai/assistant-history.ts`），跨设备同步仍**没有**做。
 
 ⚠️ 这不是"忘了做"。`messages` 那行的注释和 `AiInvocation.fields` 的注释说明它是一个**刻意的数据面契约**：
 每次出境必须逐字段声明（`fields` 就是披露依据，工具名本身也算出境数据）。

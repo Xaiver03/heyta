@@ -74,8 +74,21 @@ export interface StubLog {
  * 🔴 **每条用例开头都必须调** —— 计数存在假端点进程里，而那个进程
  * 整个测试运行只启动一次，所以它是**跨用例共享**的。
  */
-export async function resetStub(request: APIRequestContext): Promise<void> {
-  const res = await request.get(`${STUB_ORIGIN}/__reset`);
+/**
+ * `/__reset` 的另一半：**要不要按 SSE 回**。
+ *
+ * 默认关（回整份 JSON）—— 共用这个桩的用例十几条，把所有人都换成流式
+ * 会让"某条断言变化"无法归因。要测流式的用例自己声明。
+ */
+export async function resetStub(
+  request: APIRequestContext,
+  options: { readonly stream?: boolean; readonly hold?: boolean } = {},
+): Promise<void> {
+  const params = new URLSearchParams();
+  if (options.stream === true) params.set('stream', '1');
+  if (options.hold === true) params.set('hold', '1');
+  const query = params.toString() === '' ? '' : `?${params.toString()}`;
+  const res = await request.get(`${STUB_ORIGIN}/__reset${query}`);
   expect(res.ok(), '假端点的 /__reset 应该可用').toBe(true);
 }
 
