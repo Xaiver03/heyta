@@ -38,9 +38,29 @@ export type ShareRouteBlock =
   | 'has-no-project'
   | 'project-not-found'
   | 'project-not-shared'
-  | 'kind-not-routable';
+  | 'kind-not-routable'
+  | 'channel-unavailable';
 
 export type ShareRoute = { readonly shareId: string } | { readonly blocked: ShareRouteBlock };
+
+/**
+ * 实体属于共享清单，但这台设备**没有装上 share 写通道**（未登录、密钥没解锁、
+ * 或该端还没接线）⇒ 具名拒绝。
+ *
+ * 🔴 **不许退回个人 log。** 那正是这条线一直在防的形状：写"成功"了、界面也更新了，
+ * 但对面的成员永远看不到 —— 症状与 M2 之前一模一样，只是这次连错误都没有。
+ *
+ * ⚠️ 已知边界（登记在计划里，不在本批解）：share 通道今天是**先上传再落本地**，
+ * 而个人引擎是先落盘再补传。所以离线时对共享清单的写会撞到这个错误上 ——
+ * 那与"本地优先"是有张力的，因此 M2 期间共享入口仍留在实验开关后面（P-1 不翻案）。
+ */
+export class ShareChannelUnavailableError extends Error {
+  readonly code = 'SHARE_CHANNEL_UNAVAILABLE' as const;
+  constructor(entityType: string, entityId: string, shareId: string) {
+    super(`条目 ${entityType} ${entityId} 属于共享清单 ${shareId}，但这台设备当前用不了共享写通道（未登录或密钥未解锁）`);
+    this.name = 'ShareChannelUnavailableError';
+  }
+}
 
 /** 跨边界移动被拒（ADR-0067 补二）。具名错误：静默忽略会让用户以为"移动成功了"。 */
 export class ShareCrossListMoveError extends Error {
@@ -151,18 +171,29 @@ function tagIdsIn(intent: OpIntent): string[] | undefined {
   return Array.isArray(raw) ? raw.filter((x): x is string => typeof x === 'string') : undefined;
 }
 
+/** 一条已经装好的 share 写通道（`createShareCommentDispatch` 交出来的那两件事）。 */
+export interface ShareWriteChannel {
+  dispatch(shareId: string, intent: ShareOpDispatchIntent): Promise<void>;
+  /** 某份 share **已重放**的物化状态；没加载过时给空状态（`stateFor` 的既有语义）。 */
+  stateFor(shareId: string): MaterializedState;
+}
+
 export interface ShareRoutingPorts {
   /** 个人 op-log 的唯一写入口（引擎的 `dispatch`）。 */
   personalDispatch(intent: OpIntent): Promise<unknown>;
-  /** share 通道的唯一写入口（`createShareCommentDispatch` 交出来的那个）。 */
-  shareDispatch(shareId: string, intent: ShareOpDispatchIntent): Promise<void>;
+  /**
+   * share 通道的**晚绑定**提供者。
+   *
+   * 🔴 为什么不直接把通道函数传进来：动作层在模块加载时就装配好了，而 share 通道
+   * 要等登录、解锁密钥之后才存在。传死值等于"登录前装的动作永远拿不到通道"；
+   * 传提供者则每次派发现问一次"这会儿有没有"。
+   */
+  channel(): ShareWriteChannel | undefined;
   getState(): MaterializedState;
-  /** 某份 share **已重放**的物化状态；没加载过时给空状态（`stateFor` 的既有语义）。 */
-  shareStateFor(shareId: string): MaterializedState;
 }
 
 /**
- * 装配出一个与引擎 `dispatch` 同形状的路由派发器。
+ * 装配出一个与引擎 `dispatch` 同形状的**路由**派发器。
  *
  * 端壳只负责把它交给动作层（装配），**不**在这里之外再判一次"该进哪本 log"。
  */
@@ -188,15 +219,17 @@ export function createShareRoutingDispatcher(ports: ShareRoutingPorts): (intent:
       return;
     }
     const shareId = route.shareId;
+    const channel = ports.channel();
+    if (channel === undefined) throw new ShareChannelUnavailableError(intent.entityType, intent.entityId, shareId);
     // 补一：先把这份清单还解不出名字的标签发进去，再写那条 tagIds。
     const wanted = tagIdsIn(intent);
     if (wanted !== undefined) {
-      const shareState = ports.shareStateFor(shareId);
+      const shareState = channel.stateFor(shareId);
       for (const tagId of wanted) {
         if (live(shareState.tags[tagId])) continue;
         const tag = state.tags[tagId];
         if (!live(tag)) continue; // 个人侧都没有 ⇒ 不猜，交给对面那枚空白自己去显形
-        await ports.shareDispatch(shareId, {
+        await channel.dispatch(shareId, {
           entityType: 'TAG',
           entityId: tagId,
           opType: OpType.Create,
@@ -204,7 +237,7 @@ export function createShareRoutingDispatcher(ports: ShareRoutingPorts): (intent:
         });
       }
     }
-    await ports.shareDispatch(shareId, {
+    await channel.dispatch(shareId, {
       entityType: intent.entityType,
       entityId: intent.entityId,
       opType: intent.opType,

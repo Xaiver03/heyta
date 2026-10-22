@@ -1852,3 +1852,25 @@ cd e2e && npx playwright test tests/auth-login-code.spec.ts --reporter=line
 **要不要继续开下一批**：M2（共享任务写路径路由）是这条线唯一还欠的功能面，**动手前要先立一份新 ADR**（它要改写路径路由＝线协议/`shared-schema` 档，AGENTS §3 不可逆层）。M2 的验收按 18:2x 拍板 3 多一格：**两台真浏览器里 B 看得见 A 改的任务**（宿主层绿不等于用户互相看得见，§7 #535）。
 
 **仍挂负责人一句的**：① 这条 goal 按新尺子关掉还是留着等那两条线；② owner 转让语义（两步确认／立即生效／原 owner 降 editor，文案 `web.share.transfer.confirmHint`）的追认。停止点①（同意面视觉层级）**前提已被现量否证**，别再拿它去问。
+
+## 2026-10-23 07:0x · M2 开工第一批：ADR-0067 落地 + 路由模块 + 一条**耦合**（写侧不能单独接）
+
+- **第 0 步已做完并公开**：`docs/adr/0067-shared-list-write-routing-and-merge.md`（裁决一 + 一·补 + 二~六）。
+  立项时按代码现量**否证了 §9.2 P-3 的前提**：个人 reducer 今天已是字段级版本化（`state.ts:577-596` 逐 payload 键、`:242-253` 先剔因果压住的候选），
+  缺的是 **share 分区拿不到真实因果时钟**（`share-client.ts` 里 `vectorClock` 恒 `{clientId:1}`），不是"把合并改成字段级"。改口已写回 §9.2 P-3 那一格。
+- **两条被代码逼出来的补充裁决**（原 ADR 草稿没穷尽）：
+  ① `Tag` **没有清单归属**（`entities.ts` 只有 name/color），而 `Project.shareId` 的字段文档已承诺"标签走 share op-log"
+  ⇒ 判"把标签发布进这份共享"是**独立意图、独立一条 op、幂等、单向不撤销**，代价是标签名泄露给该清单成员（翻案条件写在 ADR 里）。
+  ② `moveToProject` 跨共享/个人边界 ⇒ **具名拒绝**（`ShareCrossListMoveError`），两条理由：E2EE 追加日志收不回已发出的副本；实体历史会裂成两本 log。
+- **新增 `packages/app-host/src/share-routing.ts`**（一份解析、两种错误语义）+ 17 枚判据；三臂变异实测：
+  ① 摘掉「`shareId` 一律走个人」⇒ **恰好 1 枚具名红**；② 跨边界改静默忽略 ⇒ 2 枚；③ 标签发布去幂等守卫 ⇒ 2 枚；还原后 17 passed。
+  ⚠️ 臂① 第一次跑成"零红"是**臂自己搭错了**（插了一行永不执行的语句，守卫照旧生效）——记下来：造失要改**谓词**，不是加一行死代码。
+- **actionType 登记表改成 `(entityType, opType)` 键**（`SHARE_ACTION_TYPES`）。原表按 opType 单键，M2 之后 `CRT` 同时属于评论与任务，一个键对两个标签；
+  ⚠️ 评论那三个**字符串值逐字保留**——`actionType` 是线 op 身份的一部分（进 AAD），改名等于给服务端已存的那批 op 换身份 ⇒ 下行解密必拒。app-host 全包 111 文件 / **1925 passed**、typecheck 干净。
+- 🔴 **写侧路由今天故意还没接进 `dispatchIntent`**，这不是拖延，是一条耦合：
+  读侧**没有任何 share 状态合并点**（`stateFor` 现量只有 `scripts/verify-collab-sync.mjs` 在用，界面读的是个人引擎状态）。
+  只接送侧的后果是**共享清单连作者自己都看不到自己的改动**（写进了 share log，界面还在读个人 log）——比现状更糟。
+  ⇒ M2 的落地顺序改成 **先建读侧合并（M2-f），再把 `dispatchIntent` 换成路由派发**，两半同批才可交付；判据仍是那一格：两台真浏览器里 B 看得见 A 改的任务。
+- **另一条已拍板并登记的产品边界（本批不撤 P-1 隐藏）**：share 通道今天是**先上传再落本地**，个人引擎是**先落盘再补传**；
+  路由一接，离线时对共享清单的写会撞 `ShareChannelUnavailableError`。这与"本地优先"有张力，
+  ⇒ 本批把入口继续留在实验开关后面（`check:share-entry-hidden` 保持钉"不可达"），"共享清单离线写"登记为下一批第一格。

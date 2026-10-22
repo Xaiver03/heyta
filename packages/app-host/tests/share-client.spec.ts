@@ -126,7 +126,10 @@ describe('share-client（W2-T1）', () => {
   });
 
   it('未登记的 opType ⇒ 写之前就红（不静默造动作名）', () => {
-    expect(() => shareActionTypeFor('CRT')).not.toThrow();
-    expect(() => shareActionTypeFor('LWW_BULK')).toThrow(/Unregistered share actionType/);
+    expect(() => shareActionTypeFor('COMMENT', 'CRT')).not.toThrow();
+    // M2 起任务/清单/便签/标签族也必须登记（评论那三个标签字符串逐字不许改：它进 AAD）。
+    expect(() => shareActionTypeFor('TASK', 'CRT')).not.toThrow();
+    expect(() => shareActionTypeFor('PROJECT', 'UPD')).not.toThrow();
+    expect(() => shareActionTypeFor('COMMENT', 'LWW_BULK')).toThrow(/Unregistered share actionType/);
   });
 });
