@@ -1306,6 +1306,8 @@ benchmark 64／feature-matrix 15／roadmap 93／progress-log 15／本计划 15�
 且 `✅ 载体新鲜：62c0bda8a… == 主检出 HEAD`。也就是说：**"四端装完"与负责人那一句点头之间，现在没有任何其他前提。**
 ⚠️ 但负载那一格是**瞬时的**（它现在 6，别的会话起来就又关上）—— 要推进就得趁这一会儿。
 
+> 🔴 这一份已被文末的**接手点 v3（18:3x）**取代（四端重装、两枚停止点、整链口径那三格都变了）；原文留着只为让下一位看到当时是怎么判的。
+
 ## 接手点 v2（2026-10-22 12:1x；取代上面那份 10:5x 的接手点，那份的读数已被下面这些超过）
 
 🔴 **本节取代的是这三处"活口径表"，不是它们正文里那些带日期的读数**（那些是当天的认知，含当时判错的部分，保留原样）：
@@ -1712,3 +1714,40 @@ cd e2e && npx playwright test tests/auth-login-code.spec.ts --reporter=line
 `grep -B3 'Test timeout of 60000ms exceeded' /tmp/batch.log` ⇒ 落点是 **`ai-tool-run.spec.ts:99` / `:151`（AI 线）与 `auth-panel-esc.spec.ts:37`（注册登录线）**，共三枚。
 ⚠️ 想用干净载体给 AI 线那两枚定 `Error:` 正文这条路今天走不通：现量 `cd /Users/rocalight/heyta-carriers/heyta-wt-collab-m5 && git status --porcelain | wc -l` 回 **119**（那台载体在 15:0x 那趟重装之后已经带上产物/取证脏件），
 要定得先新起一枚载体或把它重追平到现 tip 并把脏件数清到 0 —— 归 M2 那批一起做，不在今天这格上继续烧墙钟。
+
+## 接手点 v3（2026-10-22 18:3x；取代上面 12:1x 那份 v2 —— 那一份的四端重装、停止点与整链口径都已被下面这些超过）
+
+**站在哪儿（一句话）**：任务书五步里四步闭合；两枚停止点都已闭合（① 前提被现量否证、② 负责人交下判定权后定为甲，见 18:2x）；
+唯一没达成的是第 2 步那句"`pnpm check` 全链绿"，而它今天**不是本线的一个属性**（18:2x 拍板 2 已把本线 DoD 换成两把能自算的尺，链本身一个字没动）。
+
+**产品事实（改文档前先信这四行）**
+- 元数据面（建共享 / 邀请 / 角色 / 转让 / 移除 / 退出）Web 可达，但**入口默认隐藏**，只从设置里那枚实验开关放出（P-1 + `check:share-entry-hidden`）。
+- **内容面在界面上零可达**：评论区只挂在任务详情（`grep -rn ShareCommentsSection apps` 一处命中），成员那侧本地只建一行空清单（`JoinSharedListDialog.tsx` 的 `finalize`）。
+- 评论那一族在**宿主层**已通并经真服务端验过（`verify:collab-sync`），别把它抄成"成员互见"（#535）。
+- 任务 / 清单那一族连宿主层都搬不到：`TASK/PROJECT` 的 op 仍进个人 op-log ⇒ M2。
+
+**别线红集（逐枚成因已入库，一律不代改、不加豁免）**
+| 那一枚 | 归属 | 现状 |
+|---|---|---|
+| `check:selection-single-source` | 收款线 | 两处 `tierId` 没做语义登记；处方与判据口径已交回 |
+| `check:image-license` | 自托管线 | 镜像 npm 树快照落后于锁；门自己给的情形 ② 处方是一次 `pnpm verify:selfhost-stack` |
+| `check:ai-e2e` 里 `central/config` 那 8+8 枚 | 注册登录线 + e2e 载具在册缺失表 | 成因＝那条路由不在在册缺失表 |
+| `check:ai-e2e` 里 `auth-form-remember-password` 3 枚 | 注册登录线 | 成因＝真断言不匹配（那枚勾选框界面不渲染，静态与运行时两头都对上） |
+| `ai-tool-run:99/:151`、`auth-panel-esc:37` | AI 线 / 注册登录线 | 60s 交互超时，形状已记，正文要等各自那趟 |
+| `ai-row-layout` / `ai-tool-run` / `ai-assistant` / `assistant-hosted-ux` | AI 线 | 干净载体 0 脏件那趟同样红 ⇒ `HEAD` 级；要 `Error:` 正文得先把载体重追平（现量 119 枚脏件） |
+
+**别再跑第二遍的东西（今天已经拿到的读数）**
+四端重装跑绿的逐格判据与四张人工看过的图在 14:5x / 15:0x；停止点①的否证在 15:5x；界面可达性那批改口在 17:0x（**一类九格**，按结论枚句子形状别按关键词）；
+整套件**别用来拿归因**（两回被墙钟掐，第二回 `rc=124`）——便宜形状见 #536：`--retries=0` 批量 + 按 `Error:` 行聚类；
+跑任何 e2e 之前先现量 `lsof -nP -tiTCP:4318 -sTCP:LISTEN`（被掐掉的趟会留下 `webServer` 子进程占端口，那一发 `rc=1` 是**没有有效读数**的）。
+
+**下一步顺序（照 §9.3，别插队）**
+1. **M2 前先立一份新 ADR**（承接 0062，不改它的结论）：P-3 字段级胜出 + 线协议里 `vectorClock` 真自增 + `signature` —— 两处不可逆层合在**一份 ADR、一批提交**。
+2. M2 落地判据**两格**：`TASK/PROJECT` 进 share log **且** 两台真浏览器里 B 看得见 A 改的任务（AGENTS §6.2：真跑 + 真看截图）。
+3. M4（逐 op 签名）随同一份 ADR 那批；M6 移动端（Android 一律 `ssh windows-pc`，别在这台 Mac 起 Gradle 或模拟器）。
+4. **撤 P-1 那枚默认隐藏**要等第 2 步那一格真绿过，且 `check:share-entry-hidden` 那四格同时翻成钉"可达" —— 别提前拆守卫。
+
+**接手 30 秒自查**（四行都现量，别抄本文任何数）
+`git rev-list --left-right --count refs/remotes/origin/main...main` ⇒ 应为 `0 0`；
+`pnpm verify:collab-journey` ⇒ `RESULT=OK steps=3`；`pnpm check:share-entry-hidden` ⇒ 臂全过；
+`pnpm --filter @heyta/web exec vitest run tests/share-consent-modal-theme.spec.tsx tests/share-entry-experimental.spec.tsx` ⇒ 全绿。
