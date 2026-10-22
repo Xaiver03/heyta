@@ -1164,3 +1164,10 @@ workspace 项目 21 枚**逐枚都有 `test` 脚本**（现重算，缺的 0 枚
 
 里程碑侧下一步仍是 **M2（共享任务写路径路由，要先立一份新 ADR）→ M4 → M6**；
 M4 那格尾巴：`SHARE_TRANSFER_TARGET_UNSEALED` 还没有宿主侧文案映射（面板已提前挡掉，只有面板数据过期那一瞬碰得到）。
+
+**第 3 步那句「跑 docs-link-check 确认无死链」现在是对着**工具本体**核过的，不是对着一个像的名字**（11:0x）：
+现量 `node -e` 读 `package.json` ⇒ `check:docs` 就是 `node research/tools/docs-link-check.mjs`（同一把尺，先前几轮我报的是 `check:docs` rc=0，
+名字没对上任务书那句）；再问"它到底扫不扫我改的那五处"——读脚本：递归 `readdirSync`，豁免只有 `research/upstream` 那三条窄前缀，
+`docs/**` 全程在射程内；然后用 `--verbose` 的**输出**逐枚点名（被检查到的链接行数）：
+benchmark 64／feature-matrix 15／roadmap 93／progress-log 15／本计划 15，`rc=0`，
+结论行「无死链、无'本机有仓库里没有'的链接、无失效章节引用、无失效锚点」。**绿的还不够，得先证明这把尺量到了我改的东西。**
