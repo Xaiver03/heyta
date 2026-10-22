@@ -1129,3 +1129,8 @@ main 在推送之后又被别线推进（`git rev-parse --short HEAD` 现量，�
 且除两枚 locale 外工作树对 HEAD 全部干净。那两枚 locale 现在的脏**不是本线的**：
 在飞 diff 里 `share|transfer|invite` 命中 **0 行**，加进去的是 AI 线的 `web.ai.chat.step.*` 一组键；
 本线那 5 枚键在两枚 locale 各现量 1 处仍在册。⇒ 第 4 步这一格现在是"逐条核过"，不是"扫过文件名"。
+
+**任务书那句 `--filter '!@heyta/sync-server'` 的退路，这一趟没用到**（10:4x 复核时把依据写成两条现量的合取，免得读成"顺手全跑了"）：
+workspace 项目 21 枚**逐枚都有 `test` 脚本**（现重算，缺的 0 枚）＋ 那一趟打出 **21 条** `Tests … passed` 汇总行
+⇒ `@heyta/sync-server` 那条汇总行必在其中。⚠️ 这是**推断不是直接证据**：当时的原始日志在 `/tmp`，早被清走；
+要拿直接证据只能重跑一趟 `pnpm -r test`，而现在负载 23（>12 阈值），不在这种读数上浪费一趟。
