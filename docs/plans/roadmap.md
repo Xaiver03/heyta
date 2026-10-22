@@ -122,14 +122,17 @@ worktree `.worktrees/motivation` **已删除**（相关提交仍是 `main` 的�
 🔴 **这条线真正的最大件还没做**：多人并发写**同一条任务**的写路径路由。服务端与界面已经能
 把"共享"跑起来，但并发裁决仍走既有 LWW —— 它不构成 bug，构成的是**协作产品还没兑现的那半**。
 
-🟡 **W4 残余**（如实登记，不是已完成）—— 三件里**评论那一米已经接上**（2026-10-21 M5），
+🟡 **W4 残余**（如实登记，不是已完成）—— 三件里**评论那一米在宿主层接上了**（2026-10-21 M1/M5），
+**但界面上今天只有 owner 那一侧走得到**（理由见下面评论那一格与本线计划 §9.1）；
 剩下两件（指派、动态流）的形状仍是**"零件已建、最后一米没接"**，
 所以下一步是**挂载与补写路径**，不是重画一遍：
 
-- **评论** ✅（Web 与桌面壳）：`COMMENT` 实体在清单里，组件 `packages/ui/src/sync/{comments-model.ts,CommentThread.tsx}`
+- **评论** 🟡（宿主层通 / 界面只到 owner 那一侧）：`COMMENT` 实体在清单里，组件 `packages/ui/src/sync/{comments-model.ts,CommentThread.tsx}`
   由产品体验线 `e6058120` 建好并从包根导出；**宿主写路径与下行**在 `packages/app-host/src/share-comments.ts`，
-  **挂载**在 `apps/web`（反查 `grep -rln "ShareCommentsSection" apps`），两台设备互相看得见 + WS 扇出由
-  `pnpm verify:collab-sync` 验（`RESULT=OK steps=11`）。⚠️ **还剩两格**：移动端没挂这一节；
+  **挂载**在 `apps/web`（反查 `grep -rln "ShareCommentsSection" apps` ⇒ 只有任务详情一处）。
+  ⚠️ `pnpm verify:collab-sync` 验的是**两个无界面宿主实例**之间的拉取与 WS 扇出（`RESULT=OK steps=11`），
+  **不是**两台开着界面的浏览器：成员那侧的共享清单行只有 `addProject` + `setProjectShare` 两步（无 share 日志拉取），
+  所以那是一条空清单、没有任务可点进评论区。⚠️ **还剩三格**：移动端没挂这一节；成员侧的界面入口（随 M2）；
   能实时搬运的目前只有评论那一族（`TASK` 的 op 还没进 share log —— 就是上面那个"最大件"）。
 - **指派**：`Task.assigneeUserId` 是 domain 里的**可选字段**（且在加密 payload 内），通知过滤层
   的「指派给我的」那一档**已经在读它** —— 但全仓**没有任何一处写它**（`app-host` 零个指派 op 构造、`apps/*` 零界面）。

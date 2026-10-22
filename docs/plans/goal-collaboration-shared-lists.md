@@ -1,9 +1,12 @@
 # Goal：共享清单（多人协作）—— 试实施（W0 + W1）
 
 > 状态：✅ **已在 main 上并已 push**（2026-10-20 现量：`git rev-list --left-right --count refs/remotes/origin/main...main` 回 `0 0`）；这一行原先钉的「本地成笔（2026-10-11），全链门禁被别线绊线挡着、push 押在跨线协调」两半都已过期 —— 那四枚绊线各归其主已被收掉（`cd packages/{ai,shared-schema,domain} && npx vitest run` 与 `pnpm check:reachability` 现量各 rc=0）。
-> 🔴 **但这条 Goal 的第 2 步"全链绿"达成 ≠ 这条线做完**：内容面**今天断成两半** ——
-> 评论那条腿 2026-10-21 已接通（下行 + 游标 + 经真宿主验过），任务那条仍断（`TASK/PROJECT` 的 op 仍进个人 op-log，属 M2），
-> 现状、三条产品拍板与里程碑见 [`collaboration-shared-lists.md`](collaboration-shared-lists.md) **§9**（M1 的读数在 §9.8）。下面这些历史读数保留，是为了让下一位看清当时是怎么判的，不是当前状态。 —— W0+W1 ✅ / W2 服务端核心 ✅ / W3 纯层+格式统一 ✅ / 法务 ✅ / W4 已接线、W6 已落地、journey 全绿且链接落点断言已补（`RESULT=OK steps=3`）/ **④ 门禁：`pnpm -r typecheck` 全仓绿 + 本线两枚红（`check:layering`、`check:ui-language`）当场修绿；no-bail 全量 test 已做对数审计（**条数不写在这里，会漂**；现量：逐包 `Tests` 汇总行相加，并核「有 test 脚本的包数 == 打了汇总行的包数」），本线自己那枚下游红（landing `mockup-shell-shape` #7，因 a923f7fa 给页头加了 `share-open-button`）本会话当场修绿销账；整链当时仍红在三枚别线判断绊线**（`packages/ai`「分母 9→10」= 给 COMMENT 配不配 AI 工具的产品判断；`shared-schema` `AUTH_PASSWORD_PATHS` 9→12 = auth 线口径；`domain subscription.spec` 权益拒绝理由契约 = 计费线，**都不代改**；⚠️ 那三枚其后各归其主已闭合 —— **2026-10-22 现量的红集是另外两枚、同样不归本线**：`check:selection-single-source`（收款线两处 `tierId` 未做语义登记）与 `check:image-license`（自托管线镜像 npm 树快照落后于锁），逐枚读数与"能不能代改"的判据见文末交接·四）+ 一枚先前登记的载体抖动（`mobile` Rolldown `RTEST-UNHANDLED-01`）本轮**不摘层重跑未复现**（958 全过、rc=0），已从本线边界里销掉；全量 test 的对数审计分母**含 `server`** —— AGENTS §6 那句"沙箱跑不了 sync-server"是瞬时属性，沿用它会把自己的分母算错（→ §7 第 408 条）/ **⑤ 文档写回已按内容复账并补齐**（benchmark §2.6 的 6.1+6.7、matrix §6（6.2/6.3 按现量更正为「已建模≠可达」）、**roadmap.md 新增 §1.3 并行轨道**、**docs/plans/README.md 索引行**、AGENTS §9、P2-10，均带边界如实登记）/ **⑥ 本线已提交并 push 到 `origin/main`**（2026-10-22 现量：`git rev-list --left-right --count origin/main...main` 回 `0 0`；那句"本地成笔、push 未独做"是 10-11 的瞬时状态，当时压着的那几枚别线未公开提交其后已各自公开）/ **停止点 ①（同意面视觉层级）已于 2026-10-12 按最佳实践落地并配 8 条判据 + 六臂变异**（见文末那一节）（⚠️ 任务书里那句"无视觉强调／勾选无可见位"是 10-11 的旧读数，2026-10-22 现量截图 + 那 8 条用例逐条否证过 ⇒ **①不是待拍板项**，见文末 15:5x 那节），②（owner 转让语义）仍待产品负责人追认。逐项读数与执行序见文末「2026-10-11 交接·三」；每步现量——共享检出在动。DoD 全清单见 [collaboration-shared-lists.md](collaboration-shared-lists.md) §7。
+> 🔴 **但这条 Goal 的第 2 步"全链绿"达成 ≠ 这条线做完**：内容面**在用户界面上今天仍然零可达** ——
+> 评论那一族 2026-10-21 通的是**宿主层**（`downloadOps` 有消费者、游标落盘、经真服务端两个**无界面宿主实例**验过），
+> 而成员那侧的共享清单是一条**空清单**（本地只写 `addProject` + `setProjectShare`，评论区又只挂在任务详情上）⇒ 点不进去；
+> 任务与清单那一族连宿主层都搬不到（`TASK/PROJECT` 的 op 仍进个人 op-log，属 M2）。
+> 现状、三条产品拍板与里程碑见 [`collaboration-shared-lists.md`](collaboration-shared-lists.md) **§9**（M1 的读数在 §9.8；
+> "成员之间看不到任何东西"这条 2026-10-22 的按界面可达性重锚，见 §9.1 末那一句与本文 17:0x 那节）。下面这些历史读数保留，是为了让下一位看清当时是怎么判的，不是当前状态。 —— W0+W1 ✅ / W2 服务端核心 ✅ / W3 纯层+格式统一 ✅ / 法务 ✅ / W4 已接线、W6 已落地、journey 全绿且链接落点断言已补（`RESULT=OK steps=3`）/ **④ 门禁：`pnpm -r typecheck` 全仓绿 + 本线两枚红（`check:layering`、`check:ui-language`）当场修绿；no-bail 全量 test 已做对数审计（**条数不写在这里，会漂**；现量：逐包 `Tests` 汇总行相加，并核「有 test 脚本的包数 == 打了汇总行的包数」），本线自己那枚下游红（landing `mockup-shell-shape` #7，因 a923f7fa 给页头加了 `share-open-button`）本会话当场修绿销账；整链当时仍红在三枚别线判断绊线**（`packages/ai`「分母 9→10」= 给 COMMENT 配不配 AI 工具的产品判断；`shared-schema` `AUTH_PASSWORD_PATHS` 9→12 = auth 线口径；`domain subscription.spec` 权益拒绝理由契约 = 计费线，**都不代改**；⚠️ 那三枚其后各归其主已闭合 —— **2026-10-22 现量的红集是另外两枚、同样不归本线**：`check:selection-single-source`（收款线两处 `tierId` 未做语义登记）与 `check:image-license`（自托管线镜像 npm 树快照落后于锁），逐枚读数与"能不能代改"的判据见文末交接·四）+ 一枚先前登记的载体抖动（`mobile` Rolldown `RTEST-UNHANDLED-01`）本轮**不摘层重跑未复现**（958 全过、rc=0），已从本线边界里销掉；全量 test 的对数审计分母**含 `server`** —— AGENTS §6 那句"沙箱跑不了 sync-server"是瞬时属性，沿用它会把自己的分母算错（→ §7 第 408 条）/ **⑤ 文档写回已按内容复账并补齐**（benchmark §2.6 的 6.1+6.7、matrix §6（6.2/6.3 按现量更正为「已建模≠可达」）、**roadmap.md 新增 §1.3 并行轨道**、**docs/plans/README.md 索引行**、AGENTS §9、P2-10，均带边界如实登记）/ **⑥ 本线已提交并 push 到 `origin/main`**（2026-10-22 现量：`git rev-list --left-right --count origin/main...main` 回 `0 0`；那句"本地成笔、push 未独做"是 10-11 的瞬时状态，当时压着的那几枚别线未公开提交其后已各自公开）/ **停止点 ①（同意面视觉层级）已于 2026-10-12 按最佳实践落地并配 8 条判据 + 六臂变异**（见文末那一节）（⚠️ 任务书里那句"无视觉强调／勾选无可见位"是 10-11 的旧读数，2026-10-22 现量截图 + 那 8 条用例逐条否证过 ⇒ **①不是待拍板项**，见文末 15:5x 那节），②（owner 转让语义）仍待产品负责人追认。逐项读数与执行序见文末「2026-10-11 交接·三」；每步现量——共享检出在动。DoD 全清单见 [collaboration-shared-lists.md](collaboration-shared-lists.md) §7。
 > 权威计划：[collaboration-shared-lists.md](collaboration-shared-lists.md)（W0–W6 全量分期、判据、验证矩阵、边界登记）
 > 决策：[ADR-0062](../adr/0062-shared-list-key-distribution.md)（密钥分发型协作；聚合型红线不动）
 > 证据层：[共享清单调研](../research/collaboration-shared-lists.md)
@@ -1544,3 +1547,40 @@ Android AVD `heyta-w3-yearly`（`-no-window` headless 起，`emulator-5554` 的 
 **这一格现在的诚实形状**：`pnpm check` 全链在 `HEAD` 上至少红四枚 —— `check:selection-single-source`（收款线）、
 `check:image-license`（自托管线，归因见 15:4x 那节）、以及第 94 项 `check:ai-e2e` 里 **AI 线 + 注册登录线**的存量红（对照臂已证）。
 **没有一枚归本线**：本线自己的 e2e 判据是 `pnpm verify:collab-journey`（`RESULT=OK steps=3`），它不在这套件里（同份日志 `grep collab` 回空）。
+
+## 2026-10-22 17:0x 复核用户可见文案时，反过来查出**文档层**的一处假声称（五处改口）
+
+起因是任务书里那句"写回的是实测读数"：我去核 `web.share.experimental.note` 那句对用户写的
+「成员之间还看不到彼此改动的任务与评论——共享的内容面还没有交付到界面」在 M1 之后是不是已经过时。
+**结论是文案没过时，过时的是我自己条线上那五处文档。**
+
+现量（两条命令就够，都不需要跑测试）：
+1. `grep -rn ShareCommentsSection apps` ⇒ **只回一处**：`apps/web/src/features/tasks/TaskDetailCard.tsx:501`。
+   评论区唯一的挂载点是**任务详情**。
+2. `apps/web/src/features/share/JoinSharedListDialog.tsx` 的 `finalize`（186–201 行）⇒ 成员加入时本地只写
+   `addProject(name)` + `setProjectShare(projectId, shareId)` 两步，**没有任何 share 日志拉取**。
+   ⇒ 成员那侧的共享清单是一条**空清单**：没有任务 ⇒ 点不进详情 ⇒ 没有评论区。
+
+⇒ 所以 `verify:collab-sync` 那"两台"**是两个无界面的 Node 宿主实例**，不是两台开着界面的浏览器；
+「评论已经能互相看到」是**宿主层**的绿被抄成了**产品层**的声称。界面上今天只有 owner 那一侧看得到自己那侧的评论。
+唯一从一开始就写对的格子是 `apps/web/src/lib/share-experimental.ts` 的文件头（"成员那边看不到这条共享任务本身"）——
+它是这次没被抄错的那一份。
+
+**改口的五处**（每处都带复量命令，不删旧读数、只把层次写回去）：
+`docs/plans/collaboration-shared-lists.md` §9 标题那句 + §9.1 末"一句话的产品现状"、
+`docs/agents/progress-log.md`「协作与共享清单」那一节、`docs/research/feature-matrix.md` 6.3、
+`docs/plans/roadmap.md` W4 残余评论那一格、`docs/research/dida365-feature-benchmark.md` 6.3。
+另外两处**注释**同步：`scripts/check-share-entry-hidden.mjs` 文件头那句"`downloadOps` 零消费者"（2026-10-21 起已过期）
+改成"评论那一族在宿主层有消费者，但界面零可达 ⇒ P-1 的降级理由仍然成立"；
+`docs/adr/0062` 的状态横幅按"加戳不删旧"补一行——**只有"零生产消费者"那一小格过期，"成员眼里仍是空清单"这个结论仍然成立**，ADR 的裁决一个字没动。
+
+**门禁读数**（改完当场跑，四枚各 rc=0）：`check:share-entry-hidden`（臂数 5、失败 0；它的格 4 钉的正是那句用户可见文案，
+所以如果我当时"顺手精简"了那句话，链会当场红 —— 这条门禁这次是**防住了自伤**）、`check:md-tables`（29 份文件）、
+`check:docs`（无死链 / 无失效章节引用）、`check:doc-command-claims`（扫 250 份 md、现行声称 811 处、越界 0）。
+
+教训入册：环境陷阱 **#535**（「两台 X 互相看得见」的 X 层次，抄进产品文档会漂成「用户互相看得见」；
+写"用户看得到"必须带一条界面可达性现量，验收脚本 rc 只能当宿主/传输层证据）。
+
+**这件事对本线 DoD 的影响**：任务书第 3 步要求"W4 残余如实登记（评论/指派/动态 UI 未建）"——
+按上面的现量，登记要从"评论已通"改成**"评论宿主层已通、界面只到 owner 那一侧；成员侧入口随 M2"**。
+M2 的定义也因此更准一点：它交付的不只是 `TASK/PROJECT` 进 share log，**还包括成员那侧第一次有东西可点**。

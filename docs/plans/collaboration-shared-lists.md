@@ -274,7 +274,7 @@ model ShareOperation   { id, shareId, clientId, serverSeq, …密文列
 
 - 2026-10-08：立单。调研见 [research/collaboration-shared-lists.md](../research/collaboration-shared-lists.md)；十二条产品决策（§1）经产品负责人认可；同日 [ADR-0062](../adr/0062-shared-list-key-distribution.md) 立掉。
 
-## 9. 2026-10-20 复账与下一阶段计划（🔴 标题那句"内容面整段断"已被 2026-10-21 的 M1 改掉一半：**下行评论这条腿通了，任务那条仍断**，逐条见 §9.8）
+## 9. 2026-10-20 复账与下一阶段计划（🔴 标题那句"内容面整段断"到 2026-10-22 仍然**在用户界面上成立**：M1 通的是评论那条腿的**宿主层**，任务那条连腿都没接 —— 逐条见 §9.8 与 §9.1 那句"产品现状"）
 
 > 状态：**本节是这一条线当前的权威现状**（§3 那张 W 表与 §7 的 DoD 是 10-08 立的，逐条已落后于代码；
 > 读现状从这里读，别按 §3 推断"接完了"）。
@@ -295,10 +295,16 @@ model ShareOperation   { id, shareId, clientId, serverSeq, …密文列
 | 端覆盖 | 🟡 Web 接了；**macOS / Windows / Linux 三枚桌面壳间接有**（包里装的就是 `apps/web/dist`）；**移动端零接入**；node-host/CLI 无 share 工具 | `grep -rn -E "SharePanel\|shareId\|payloadCipher" --include=*.ts --include=*.tsx apps/mobile/src` ⇒ 0 命中；`grep -n web-dist apps/desktop-macos/Sources/HeytaMac/HeytaMacApp.swift` |
 | 常驻判据 | 🔴 **M7 之前**本线没有一扇门在链上（`check` 那串里 `verify:*` 引用数为 0；`collab-journey` 被 `e2e/playwright.config.ts` 的 `testIgnore` 摘出主 e2e 载体；证据目录被 gitignore ⇒ 截图不可复核）。**今天链上有三段**（`check:share-entry-hidden` / `verify:collab-keys` / `check:collab-carrier`），形状与读数见 §9.7；要真 PostgreSQL / 真浏览器的那四腿仍靠人跑 `pnpm verify:collab-suite` | `node -e "const c=require('./package.json').scripts.check.split('&&');console.log(c.filter(x=>['collab','share-entry'].some(k=>x.includes(k))).join(', '))"`；`grep -n -A5 testIgnore e2e/playwright.config.ts` |
 
-⇒ **一句话的产品现状**（2026-10-21 M1 之后）：能邀请人、能管人、能转让，**评论已经能互相看到**
-（宿主层与 web 都接通、经真服务端验过），但**任务与清单的改动仍然看不到** ——
-那一半要等 M2 把 `TASK/PROJECT` 的 op 路由进 share 日志。"共享清单"今天交付的是
-**一张只有评论区在动的共享外壳**，还不是协作。
+⇒ **一句话的产品现状**（2026-10-22 按**界面可达性**重锚，此前那句"评论已经能互相看到"是把宿主层读数抄成了产品能力）：
+能邀请人、能管人、能转让；内容面今天**两侧都到不了用户眼前**。
+· 评论那条腿在**宿主层**已通并经真服务端验过 —— 但 `verify:collab-sync` 那"两台"是**两个无界面的宿主实例**，不是两台开着界面的浏览器；
+· 成员那侧的本地清单行只有 `addProject` + `setProjectShare` 两步，**没有任何 share 日志拉取**（现量：`apps/web/src/features/share/JoinSharedListDialog.tsx` 的 `finalize`）
+  ⇒ 他看到的共享清单是**一条空清单**；
+· 评论区在 web 只有一个挂载点，挂在**任务详情**上（现量：`grep -rn ShareCommentsSection apps` ⇒ 只有 `TaskDetailCard.tsx` 一处）
+  ⇒ 没有任务就没有评论区可点，**成员进不去评论区**。
+⇒ 所以"能看到彼此写的评论"今天只在 owner 那一侧成立（他看得见自己的任务），**成员之间互相看不到任何东西**。
+任务与清单的改动照旧看不到 —— 那一半要等 M2 把 `TASK/PROJECT` 的 op 路由进 share 日志。
+"共享清单"今天交付的是**一张只有外壳在动的共享**，还不是协作。
 
 ### 9.2 三条产品拍板（负责人 2026-10-20 把判定权交下来，按产品视角定，不再回问）
 

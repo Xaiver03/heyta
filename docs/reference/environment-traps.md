@@ -11079,3 +11079,22 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     验证证据（本条当场）：第一次未加引号 ⇒ 日志出现 `bash scripts/verify-selfhost-stack.sh` 与
     `❌ docker 守护进程不可用`（那次意外执行自己撞在它的 docker 前置上退了，才没往下走），文件未变；
     第二次改成"正文写进 `/tmp/stanza.md`（quoted heredoc）+ python 只读文件" ⇒ `written` + `commit rc=0` + `push rc=0`。
+535. **验收读数里那句「两台 X 互相看得见」的 X 是什么层次，抄进产品文档时会漂成"用户互相看得见"**
+    （2026-10-22 复核共享清单内容面时发现的：同一句话在 5 处文档里都写着"评论已经能互相看到 / 两台设备互相看得见"，
+    而它引的证据 `pnpm verify:collab-sync` 验的是**两个无界面的 Node 宿主实例**互拉与 WS 扇出）
+    层次丢失之后，文档说的就是**产品能力**，而真界面是另一件事：成员那侧加入共享只写了 `addProject` + `setProjectShare`
+    两步（本地清单是一条**空清单**），而评论区在 web 只有一个挂载点 —— 挂在任务详情上 ⇒ 没有任务就没有评论区可点。
+    ⇒ **宿主层的绿，界面上是零可达**。这类句子一旦入库，没有任何门禁会再响，下一位（含产品负责人）就按它施工/按它对外说。
+    可复用规则：**写任何"用户能看到/做得到"的声称时，证据必须包含一条界面可达性的现量命令**
+    （挂载点 grep + 那一侧本地写入路径），验收脚本的 rc 只能当**宿主/传输层**的证据；
+    只有 rc 时，句子必须显式写明"宿主层"限定。反向也一样：**代码注释里的正确限定别在摘要时被摘掉**
+    —— `apps/web/src/lib/share-experimental.ts` 文件头一直写着"成员那边看不到这条共享任务本身"，
+    它是这次唯一没有被抄错的格子。
+    验证证据（本条当场）：`grep -rn ShareCommentsSection apps` 只回 `TaskDetailCard.tsx:501` 一处；
+    `JoinSharedListDialog.tsx` 的 `finalize` 里没有任何 share 日志拉取；据此改口的 5 处
+    （本线计划 §9 标题与"产品现状"那句、`docs/agents/progress-log.md`、`feature-matrix` 6.3、`roadmap` W4 残余、
+    `dida365-feature-benchmark` 6.3）跑 `pnpm check:md-tables` / `check:docs` / `check:doc-command-claims` /
+    `check:share-entry-hidden` 各 rc=0。
+    ⚠️ 顺带一条：**用户可见文案反而是对的** —— `web.share.experimental.note` 那句"成员之间还看不到彼此改动的任务与评论"
+    经代码复核成立，而 `check:share-entry-hidden` 的格 4 正是钉这句话的（它把缺陷披露本身当判据）。
+    所以改文档前先跑这类门禁，别凭"这句看起来过时"就精简它。
