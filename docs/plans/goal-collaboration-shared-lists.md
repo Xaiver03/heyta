@@ -833,7 +833,7 @@ E 勾选后不切实心→1 红；F 主按钮文字配对坏→1 红。还原后
 | 段 | 形状 | 归属与依据 |
 |---|---|---|
 | `check:selection-single-source` | 断言 G 命中 `RenewPanel.tsx` / `RenewSection.tsx` 的 `tierId` | ¥12 档线；两枚文件对 HEAD 干净，本线一个字节没碰 |
-| `check:image-license` | 镜像 npm 树快照三处失真 | **HEAD 内部**：快照末笔 `d0bd83b36`（10-17）晚于 `server/package-lock.json` 末笔 `7281d1388`（10-19），两枚工作树都干净 ⇒ 门自己给的情形 ②，修法要点 `pnpm verify:selfhost-stack`（打镜像），归自托管分发线 |
+| `check:image-license` | 镜像 npm 树快照三处失真 | **HEAD 内部**（10:5x 逐枚现量重核；先前那句把"早于"写成了"晚于"、还漏了真正的判据）：快照 `server/image-npm-tree.json` 末笔 `d0bd83b36`（10-17 22:34）**比两枚输入都旧**——`server/package-lock.json` 末笔 `7281d1388`（10-19 13:08）、`server/package.json` 末笔 `5d58ed332`（10-20 07:43）。门自己打的是三处失真（`serverInstallInputSha256`／`packedWorkspaceDeps`／`packageLockSha256`）⇒ 它给的**情形 ②**：锁本身过期，重跑生成器不会造出新锁，要跑一次 `pnpm verify:selfhost-stack` 从镜像里取 `/app/package-lock.json` 落成提交物、再按新差集更新 `IMAGE_ONLY_PACKAGES`。三枚文件工作树都干净 ⇒ 提交态既有红，归自托管分发线；那一手要**打镜像**，本线不代跑 |
 | `check:text-color` | `packages/ui/src/ai/AiGeneratedLabel.tsx:81` | AI 线**正在写**（`git status` 该文件 `M`）⇒ 别人的在飞 hunk，登记不代改 |
 | `check:ai-e2e` | rc=160，脚本自己判「这一轮 **作废**，签名 `net::ERR_CONNECTION_REFUSED`」 | **载体**，不是产品：跑时 4318 拒连；跑后现量 4318/4319 都不在听、当时那枚 PID 已消失 ⇒ 那是本轮自带的临时 dev server。同棵树相邻两段 e2e（`privacy-consent-e2e`、`landing-e2e`）当轮 rc=0，`-r test` 也 rc=0 |
 
