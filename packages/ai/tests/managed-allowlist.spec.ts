@@ -421,7 +421,8 @@ describe('⑦ 托管档的传输：打到我们自己的代理，而不是 OpenA
     const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe('https://heyta.example.cn/api/ai/managed/chat');
     const body = JSON.parse(String(init.body)) as Record<string, unknown>;
-    // 🔴 键集**恰好**两项：没有 `model`（服务端定），也没有 `tools`（服务端不转发）
+    // 🔴 这次调用**没有 `tools`** ⇒ 键集恰好两项：没有 `model`（服务端定），也没有 `tools`
+    // （请求构造器只在 invocation.tools 非空时才加进来；见 `wire.ts` 的 `withTools` 判定）
     expect(Object.keys(body).sort()).toEqual(['feature', 'messages']);
     expect(body.feature).toBe('capture');
     expect(init.headers).toMatchObject({ authorization: 'Bearer T0K' });
