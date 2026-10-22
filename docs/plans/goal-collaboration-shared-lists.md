@@ -1022,3 +1022,12 @@ main 在推送之后又被别线推进（`git rev-parse --short HEAD` 现量，�
 三趟 RECHECK 全 `md5=byte-identical` ⇒ `ARMS=pass (4/4)`，rc=0。
 ⚠️ 这台装置本身踩了一枚新坑并登记为环境陷阱 **#525**：分段写文件把第一段的尾巴覆盖了，顶层少一行常量，
 `node --check` 全绿而一实跑就 `ReferenceError`，而当时 README 已经替它声称"这四臂能红"——顺序应是先跑通一趟再写在册行。
+
+**改完面板渲染条件之后，两条常驻链在本棵树上复跑**（B-10 动的是成员面板那一块 DOM，所以这两趟是必须的回归，不是例行）：
+`pnpm verify:collab-journey` ⇒ `RESULT=OK steps=3`，rc=0（这条链不碰转让那一步，现量 `grep -c transfer e2e/tests/collab-journey.spec.ts` ⇒ 0，
+所以"所有权转让 ✅"从来不是它证的 —— 它证的是邀请凭证 + 链接落点 + 入群）。
+`pnpm verify:collab-sync` ⇒ `RESULT=OK steps=11`，rc=0，其中
+**STEP 4「信封下发 + bob 解出清单密钥（与 owner 一致）」正是上面那道资格门"不是永久挡路"的现成证据** ——
+它是生产路径（不是夹具）：新成员入群后由 owner 侧把当前世代信封发下去，随后 STEP 9 的 rekey 才把世代推进、
+并把被移除者留在门外。也就是说：**合格态是流程会自动到达的那一档，不合格态是"owner 还没开过面板"这一档**，
+面板在那一档只给提示不给按钮，与 STEP 4 之后的行为不矛盾。
