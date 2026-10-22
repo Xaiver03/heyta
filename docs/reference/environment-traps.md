@@ -11102,3 +11102,18 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     ⚠️ 顺带一条：**用户可见文案反而是对的** —— `web.share.experimental.note` 那句"成员之间还看不到彼此改动的任务与评论"
     经代码复核成立，而 `check:share-entry-hidden` 的格 4 正是钉这句话的（它把缺陷披露本身当判据）。
     所以改文档前先跑这类门禁，别凭"这句看起来过时"就精简它。
+536. **一枚判决臂只能否证它自己那一枚的解释；同一批红里几种成因可以并存**（2026-10-22 下午整套 e2e 被墙钟掐两回之后改用的便宜形状，结果自己也被这一条纠正了一次）
+    为了避开 40 分钟那一趟，我拿单条 spec 跑了一发判决臂，读到 `expect(...).toBeVisible / element(s) not found` ⇒
+    当场把"这批红是载体缺服务"判成否证。**这个推广是错的**：把七枚 spec 一次跑完（`--retries=0`，7.3 分钟）后按 `Error:` 行聚类，
+    同一批里同时有 ① `除已登记缺失外不该有非 2xx ["/api/auth/central/config"]` 与
+    ② `不该有 JS 层报错：Access to fetch at …4319/api/auth/central/config` 成对出现 8+8 枚（**这确实是夹具缺那条在册路由**）
+    ③ `toBeVisible`＋`element(s) not found` 3 枚（真断言不匹配）④ 60s 超时 3 枚（成因未定）。
+    ⇒ **缺陷是一类不是一个，成因也是一类不止一种**；单枚读数只能给那一枚定性。
+    可复用形状（比"跑完再读汇总"便宜两个数量级、且给得出定性）：
+    `npx playwright test <A> <B> … --retries=0 --reporter=line` ⇒ `grep -oE 'Error: .{0,90}' 日志 | sort | uniq -c | sort -rn` 先分**成因类**，
+    再逐枚归**归属线**。⚠️ 不关 `retries` 会让墙钟翻倍，那正是整套件两度被掐的原因。
+    另外两条本轮实撞的前置：跑之前逐枚现量 `lsof -nP -tiTCP:4318 …`（**被掐掉的趟会留下 `webServer` 子进程占端口**，
+    `reuseExistingServer: false` 让下一趟直接起不来、且那一发 `rc=1` **没有有效读数**）；
+    在主检出归因前先 `git status` 数一遍该线自己的脏件 —— 有脏件的趟**不能**给那条线的红定性，只能等它自己那趟或干净载体。
+    验证证据（本条当场）：`22 failed / 3 passed` 那一趟的 `Error:` 计数就是上面那四行形状；
+    台账读数见 `docs/plans/goal-collaboration-shared-lists.md` 18:0x 那节（含 17:5x 那句被收窄的原话位置）。
