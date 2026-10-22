@@ -23,6 +23,7 @@ import { emptyState, type MaterializedState, type OpIntent } from '@heyta/op-log
 import { OpType } from '@heyta/sync-core';
 
 import {
+  createShareRoutingCheckedDispatcher,
   crossesShareBoundary,
   routeShareIdForEntity,
   ShareChannelUnavailableError,
@@ -91,6 +92,34 @@ describe('通道没装上 ⇒ 具名拒绝，绝不悄悄退回个人 log', () =
     const { calls, dispatch } = harness(fixture(), undefined, false);
     await dispatch({ entityType: 'TASK', entityId: 'tPersonal', opType: OpType.Update, payload: { title: '看牙' } });
     expect(calls.personal).toHaveLength(1);
+  });
+});
+
+describe('通道可以晚到（端壳的密钥是异步解出来的）', () => {
+  /** 通道在下一拍才出现 —— 与 web 上 `getPayloadCipher()` 那个 await 同形。 */
+  function lateChannelHarness(channelPromise: Promise<ShareWriteChannel | undefined>): (intent: OpIntent) => Promise<void> {
+    return createShareRoutingDispatcher({
+      personalDispatch: async () => { throw new Error('不该写个人 log'); },
+      channel: () => channelPromise,
+      getState: fixture,
+    });
+  }
+
+  it('provider 返回 Promise ⇒ 派发**等**它给出通道，而不是抢在密钥落地前抛错', async () => {
+    const sent: ShareOpDispatchIntent[] = [];
+    const dispatch = lateChannelHarness(Promise.resolve({
+      dispatch: async (_shareId, intent) => { sent.push(intent); },
+      stateFor: () => emptyState(),
+    }));
+    await dispatch({ entityType: 'TASK', entityId: 'tShared', opType: OpType.Update, payload: { title: '买漆两桶' } });
+    expect(sent).toHaveLength(1);
+  });
+
+  it('provider 异步地给出 undefined ⇒ 照样具名拒绝（等一次不等于把"没有"读成"有"）', async () => {
+    const dispatch = lateChannelHarness(Promise.resolve(undefined));
+    await expect(
+      dispatch({ entityType: 'TASK', entityId: 'tShared', opType: OpType.Update, payload: { title: '买漆' } }),
+    ).rejects.toBeInstanceOf(ShareChannelUnavailableError);
   });
 });
 
@@ -205,5 +234,106 @@ describe('标签发布是一条独立意图（补一）', () => {
     const { calls, dispatch } = harness(fixture(), already);
     await dispatch({ entityType: 'TASK', entityId: 'tShared', opType: OpType.Update, payload: { tagIds: ['tagUrgent', 'tagLater'] } });
     expect(calls.share.map((c) => c.intent.entityId)).toEqual(['tagLater', 'tShared']);
+  });
+});
+
+describe('路由版 dispatchChecked：走 CAS 的那两枚动作也必须分流', () => {
+  /**
+   * 判据形状：`setTaskEstimate` / `appendChecklist` 提交 intent 走的是**引擎内部**的
+   * `dispatchLocked`，外面那层 `dispatch` 路由拦不到。不单独给一条路由，
+   * 它们就会把共享清单里一条任务的改动写进个人 log —— 症状与 M2 之前一模一样。
+   */
+  function checkedHarness(opts: {
+    engineState: MaterializedState;
+    view: MaterializedState;
+    shareState?: MaterializedState;
+    withChannel?: boolean;
+  }): { calls: Calls; run: <T>(build: (state: MaterializedState) => { intent?: OpIntent; value: T }) => Promise<T> } {
+    const calls: Calls = { personal: [], share: [] };
+    const channel: ShareWriteChannel | undefined = opts.withChannel === false
+      ? undefined
+      : {
+        dispatch: async (shareId, intent) => { calls.share.push({ shareId, intent }); },
+        stateFor: () => opts.shareState ?? emptyState(),
+      };
+    // 替身引擎：同步跑 build；build 给了 intent 就等于"在写队列里提交了"。
+    const engineDispatchChecked = async <T>(
+      build: (state: MaterializedState) => { intent?: OpIntent; value: T },
+    ): Promise<T> => {
+      const result = build(opts.engineState);
+      if (result.intent !== undefined) calls.personal.push(result.intent);
+      return result.value;
+    };
+    const run = createShareRoutingCheckedDispatcher({
+      personalDispatch: async (intent) => { calls.personal.push(intent); },
+      channel: () => channel,
+      getState: () => opts.view,
+      engineDispatchChecked,
+    });
+    return { calls, run };
+  }
+
+  const estimateIntent: OpIntent = {
+    entityType: 'TASK', entityId: 'tShared', opType: OpType.Update, payload: { note: '⏱ 25m' },
+  };
+
+  it('目标是共享清单的任务 ⇒ 交进 share，个人侧一条都不写，返回值原样透传', async () => {
+    const base = fixture();
+    const { calls, run } = checkedHarness({ engineState: base, view: base });
+    const value = await run(() => ({ value: 'updated' as const, intent: estimateIntent }));
+    expect(value).toBe('updated');
+    expect(calls.share.map((c) => c.shareId)).toEqual([SHARED]);
+    expect(calls.personal).toHaveLength(0);
+  });
+
+  it('目标是个人任务 ⇒ **原样交回引擎**（CAS 仍在写队列里），share 侧零调用', async () => {
+    const base = fixture();
+    const personalIntent: OpIntent = { ...estimateIntent, entityId: 'tPersonal' };
+    const { calls, run } = checkedHarness({ engineState: base, view: base });
+    await run(() => ({ value: 'updated' as const, intent: personalIntent }));
+    expect(calls.share).toHaveLength(0);
+    expect(calls.personal).toEqual([personalIntent]);
+  });
+
+  it('build 没给 intent（没改动 / 找不到条目）⇒ 两侧零调用', async () => {
+    const base = fixture();
+    const { calls, run } = checkedHarness({ engineState: base, view: base });
+    expect(await run(() => ({ value: 'unchanged' as const }))).toBe('unchanged');
+    expect(calls).toEqual({ personal: [], share: [] });
+  });
+
+  it('跨边界移动 ⇒ 抛具名错误，**两侧都零**（不许悄悄只写一半）', async () => {
+    const base = fixture();
+    const { calls, run } = checkedHarness({
+      engineState: base,
+      view: base,
+    });
+    await expect(
+      run(() => ({
+        value: 'moved' as const,
+        intent: { entityType: 'TASK', entityId: 'tShared', opType: OpType.Update, payload: { projectId: 'pPersonal' } },
+      })),
+    ).rejects.toBeInstanceOf(ShareCrossListMoveError);
+    expect(calls).toEqual({ personal: [], share: [] });
+  });
+
+  it('通道没装上 ⇒ 抛 ShareChannelUnavailable，个人侧零（绝不退回个人 log）', async () => {
+    const base = fixture();
+    const { calls, run } = checkedHarness({ engineState: base, view: base, withChannel: false });
+    await expect(run(() => ({ value: 'updated' as const, intent: estimateIntent })))
+      .rejects.toBeInstanceOf(ShareChannelUnavailableError);
+    expect(calls.personal).toHaveLength(0);
+  });
+
+  it('判据读的是**合并视图**：引擎状态里没有、只有共享日志里有的那条任务，也要正确分流', async () => {
+    const engineState = fixture(); // 个人 log：没有 tTheirs
+    const view = fixture();
+    Object.assign(view.tasks as object, { tTheirs: { id: 'tTheirs', title: '买刷子', projectId: 'pShared' } });
+    const theirs: OpIntent = { entityType: 'TASK', entityId: 'tTheirs', opType: OpType.Update, payload: { note: '⏱ 10m' } };
+    const { calls, run } = checkedHarness({ engineState, view });
+    await run(() => ({ value: 'updated' as const, intent: theirs }));
+    expect(calls.share.map((c) => c.intent.entityId)).toEqual(['tTheirs']);
+    // 如果这枚判据读的是引擎给的那份个人状态，tTheirs 解析不出来 ⇒ 会被判成个人 ⇒ 这条必红。
+    expect(calls.personal).toHaveLength(0);
   });
 });

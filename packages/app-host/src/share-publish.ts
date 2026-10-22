@@ -109,8 +109,7 @@ export async function publishSharedListContents(
   queue.sort((a, b) => (a.entityId < b.entityId ? -1 : 1));
 
   let published = 0;
-  for (let i = 0; i < queue.length; i += 1) {
-    const item = queue[i];
+  for (const [index, item] of queue.entries()) {
     try {
       await ports.dispatch({
         entityType: item.entityType,
@@ -121,7 +120,7 @@ export async function publishSharedListContents(
       published += 1;
     } catch (error) {
       throw new SharePublishIncompleteError(
-        { shareId, published, skipped, remaining: queue.length - i, failedEntityId: item.entityId },
+        { shareId, published, skipped, remaining: queue.length - index, failedEntityId: item.entityId },
         error,
       );
     }

@@ -35,6 +35,7 @@ import { askLegalRecheck } from './features/legal-recheck/gate.js';
 import { ErrorScreen } from './features/shell/ErrorScreen.js';
 import { storageHintKey } from './features/shell/error-hint.js';
 import { startPublicFacts } from './features/calendar/public-facts.js';
+import { armWebShareSession } from './features/share/share-session.js';
 import { initOpLog } from './features/tasks/store.js';
 import { LocaleHost } from './lib/locale-host.js';
 import { eraseWebLocalData } from './lib/local-data-destruction.js';
@@ -194,6 +195,16 @@ if (new URLSearchParams(window.location.search).has('shell')) {
        *    这条通道是匿名的，未登录的用户同样该看到部署方录的调休。
        */
       startPublicFacts();
+
+      /**
+       * 共享清单的写路由与合并视图（M2，ADR-0067/0068）。
+       *
+       * 🔴 排在 `initOpLog()` **之后**是硬要求：这一份实例的键里带着本地 `clientId`
+       * （share op 的署名），引擎没就绪时它还不存在。
+       * 它自己判"这一刻有没有共享上下文"（没登录 / 没配服务端 ⇒ 什么都不装），
+       * 所以这里无条件调 —— 让每个入口都记得踢一脚，就是"新加一个入口忘了踢"的开始。
+       */
+      armWebShareSession();
 
       /**
        * W1：消费**邮件登录链接**带回来的令牌。

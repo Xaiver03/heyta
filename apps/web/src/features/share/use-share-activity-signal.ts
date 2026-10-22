@@ -19,14 +19,12 @@ import { useEffect, useMemo } from 'react';
 import { createShareOpsSignalHandler } from '@heyta/app-host';
 import { selectNotifiedActivities } from '@heyta/ui';
 import { useI18n } from '@heyta/i18n';
-import { CURRENT_SCHEMA_VERSION } from '@heyta/shared-schema';
-import type { SyncPayloadCipher } from '@heyta/sync-client';
 
 import { useSyncStore } from '../sync/store.js';
 import { hasEngine, requireEngine } from '../../lib/oplog.js';
-import { getWebVaultSession } from '../../lib/vault-session.js';
 import { emitShareRepaint, setShareSignalSink } from '../../lib/share-signal-sink.js';
-import { createWebShareComments, createStorageShareLog } from './comment-actions.js';
+import { createStorageShareLog } from './comment-actions.js';
+import { ensureWebShareSession } from './share-session.js';
 import { loadShareNotificationPrefs } from './share-notif-prefs.js';
 import { deliverShareActivityNotifications } from './share-activity-notify.js';
 
@@ -34,7 +32,6 @@ export function useShareActivitySignal(): void {
   const { t } = useI18n();
   const baseUrl = useSyncStore((s) => s.baseUrl);
   const token = useSyncStore((s) => s.token);
-  const authTransport = useSyncStore((s) => s.authTransport);
   const accountId = useSyncStore((s) => s.accountId);
 
   const labels = useMemo(
@@ -61,26 +58,14 @@ export function useShareActivitySignal(): void {
     if (!hasEngine()) return undefined;
     const myClientId = requireEngine().getClientId();
     const sink = async (shareId: string, latestSeq: number): Promise<void> => {
-      let vaultCipher: SyncPayloadCipher | undefined;
-      try {
-        const session = await getWebVaultSession(accountId, baseUrl, async () => token, authTransport);
-        vaultCipher = await session.getPayloadCipher();
-      } catch {
+      // 🔴 问 `share-session.ts` 要**那一份**实例，不再自己建：这一趟拉回来的内容
+      // 要落进合并视图读的那份缓存，落进另一份等于"拉到了但没人看得见"。
+      const comments = await ensureWebShareSession();
+      if (comments === undefined) {
         // vault 没解锁 ⇒ 解不开信封也解不开密文。信号丢掉：不响是对的，
         // 用户解锁之后下一次信号或下一次进评论区都会补上（游标还没推进）。
         return;
       }
-      const comments = createWebShareComments({
-        baseUrl,
-        token,
-        ...(authTransport === undefined ? {} : { authTransport }),
-        userId: accountId,
-        clientId: myClientId,
-        schemaVersion: CURRENT_SCHEMA_VERSION,
-        vaultCipher,
-        storage: window.localStorage,
-      });
-      if (comments === undefined) return;
       const handler = createShareOpsSignalHandler({
         storage: createStorageShareLog(window.localStorage),
         pull: comments.pullShareOps,
@@ -100,5 +85,5 @@ export function useShareActivitySignal(): void {
       void sink(shareId, latestSeq);
     });
     return () => setShareSignalSink(undefined);
-  }, [accountId, authTransport, baseUrl, labels, token]);
+  }, [accountId, baseUrl, labels, token]);
 }
