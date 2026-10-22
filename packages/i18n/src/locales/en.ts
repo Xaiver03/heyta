@@ -2490,6 +2490,7 @@ export const en = {
   // `http-error` bucket, yet the repair actions are opposite (subscribe vs wait).
   'web.ai.failure.serverCode.subscriptionRequired': 'The hosted tier needs a subscription. Your tasks and sync are unaffected — only heyta hosted AI requires one.',
   'web.ai.failure.serverCode.quotaExceeded': 'All 300 requests for this billing period are used; it resets next period. To keep going now, switch to your own AI endpoint in settings.',
+  'web.ai.failure.serverCode.notConfigured': 'This instance has not turned on heyta hosted AI yet. Your tasks and sync are unaffected — to use AI now, switch to your own AI endpoint in settings.',
   // Shares the transport-level `network` reason with the line above; the diagnosis is
   // what separates them. The browser only ever surfaces `Failed to fetch` here — the
   // status code is invisible, so this sentence is inferred, not observed.

@@ -272,15 +272,22 @@ function causeSettingsTarget(cause: AiFailureReason | undefined): SettingsTarget
 }
 
 /**
- * 服务端稳定码 → 词条。**只登记"有下一步"的那两个**。
+ * 服务端稳定码 → 词条。**只登记"有下一步"的那三个**。
  *
- * 其余码（`AI_UPSTREAM_NOT_DOMESTIC` / `MANAGED_AI_NOT_CONFIGURED` …）没有对应的
+ * 其余码（`AI_UPSTREAM_NOT_DOMESTIC` …）没有对应的
  * 用户动作时**不登记**，于是落回按 `cause` 取词条 —— 给一个没有下一步的错误
  * 硬配一句话，等于教用户去一个没有答案的地方找答案。
+ *
+ * 🔴 `MANAGED_AI_NOT_CONFIGURED` 是**这一格的反例**，不是例外：它**有**下一步
+ * （切回自备档、填自己的端点），所以它必须登记。让它落回 `http-error` 的话，
+ * 界面会对一个选了托管档、因而**根本没有端点**的人说"多半是密钥 / 余额 / 模型名
+ * —— 都在端点行里"，并把"去设置"指到端点那一节。那正是本文件在
+ * `consent-not-granted` 那格命名的「第二种说谎」。
  */
 const SERVER_CODE_KEY: Readonly<Record<string, MessageKey>> = {
   SUBSCRIPTION_REQUIRED: 'web.ai.failure.serverCode.subscriptionRequired',
   AI_QUOTA_EXCEEDED: 'web.ai.failure.serverCode.quotaExceeded',
+  MANAGED_AI_NOT_CONFIGURED: 'web.ai.failure.serverCode.notConfigured',
 };
 
 /**

@@ -115,6 +115,42 @@ describe('托管档被拒：两个稳定码要说两句不同的话', () => {
     expect(serverCodeKey('')).toBeUndefined();
   });
 
+  /**
+   * 🔴 `MANAGED_AI_NOT_CONFIGURED`（这台实例没开托管上游）**必须登记**。
+   *
+   * 它和上面那条"没登记就不硬配"的纪律不矛盾：`AI_UPSTREAM_NOT_DOMESTIC` 对
+   * 界面这一侧的用户**没有下一步**（那是运营者改白名单的事），而这个码有 ——
+   * 切回自备档、填自己的端点。
+   *
+   * 不登记的代价是实测出来的形状：选「heyta 托管」的人拿到 503 后落回
+   * `http-error`，主文案是"多半是密钥 / 余额 / 模型名 —— 都在端点行里"，
+   * 而导航目标是**端点那一节**。可他正是**没有端点**才选的托管。
+   * 本文件对同一种事有一个名字：`consent-not-granted` 那段写的「第二种说谎」——
+   * 把用户领到一张他点了也没用的表。
+   */
+  it('托管档「这台实例没开」：登记了，且不说那句"检查你的端点"', () => {
+    const notConfigured = serverCodeKey('MANAGED_AI_NOT_CONFIGURED');
+    expect(notConfigured).toBeDefined();
+    expect(notConfigured).not.toBe(serverCodeKey('SUBSCRIPTION_REQUIRED'));
+    expect(notConfigured).not.toBe(serverCodeKey('AI_QUOTA_EXCEEDED'));
+    // 两句 locale 都翻得出来（不是登记了一个不存在的 key）
+    expect(translate('zh-CN', notConfigured!)).not.toBe('');
+    expect(translate('en', notConfigured!)).not.toBe('');
+
+    // 且主文案**不是**没有码时那句泛泛的 http-error
+    const generic = captureFailureCopy('ai-unavailable', 'raw', {
+      cause: 'http-error',
+      endpointUrl: 'https://heyta.waytofuture.cn',
+      serverCode: undefined,
+    });
+    const told = captureFailureCopy('ai-unavailable', 'raw', {
+      cause: 'http-error',
+      endpointUrl: 'https://heyta.waytofuture.cn',
+      serverCode: 'MANAGED_AI_NOT_CONFIGURED',
+    });
+    expect(told.key).not.toBe(generic.key);
+  });
+
   it('🔴 同一次 `http-error`：带不同码时，`captureFailureCopy` 给出的主文案不同', () => {
     const ctx = (serverCode: string) => ({
       cause: 'http-error' as const,
