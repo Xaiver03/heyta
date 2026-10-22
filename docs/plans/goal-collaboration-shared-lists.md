@@ -1059,9 +1059,10 @@ main 在推送之后又被别线推进（`git rev-parse --short HEAD` 现量，�
 `git diff --name-only 915a54252..HEAD` 现量只有 `PROGRESS.md` 与 `docs/plans/subscription-handoff.md` 两枚、
 命中 `^(apps|packages|server|e2e)/` 的**打包输入面文件 0 枚** ⇒ 跑在 `915a54252` 上的那几趟仍归得到当前提交。
 
-- `pnpm -r typecheck` ⇒ **rc=0**、`Scope: 21 of 22 workspace projects`。对数按 **#524⑵** 那把尺走**同一条构造式**：
-  从各 `package.json` 现取"有 `typecheck` 脚本"= 21 枚（含根 `heyta`），剔掉 `-r` 不 traverse 的 `@heyta/e2e`、
-  再剔掉根本没有该脚本的 `@heyta/sync-server` ⇒ 应打 20 行，实打 20 行，两侧差分均为空。
+- `pnpm -r typecheck` ⇒ **rc=0**、`Scope: 21 of 22 workspace projects`。先把这句 scope 拆开再对数（现量 `pnpm list -r --depth -1 --parseable | wc -l` = **22** = 21 枚 `@heyta/*` + 根包 `heyta`；
+  `e2e` 压根不在 pnpm 这份清单里 —— 它是另一棵工作区，即 **#523** 那个根因；而 `-r run` 默认不含根包 ⇒ scope 那 21 枚是命名包）。
+  对数按 **#524⑵** 那把尺走**同一条构造式**：从各 `package.json` 现取"有 `typecheck` 脚本"= 21 枚（含根包），
+  与 scope 求交 ⇒ 应打 **20** 行（差的那一枚是 `@heyta/sync-server`，它压根没有该脚本），实打 **20** 行，两侧差分均为空 —— 这一族见 **#526**。
   🔴 `sync-server` 那一格不由"链子绿"覆盖：它没有 `typecheck` 脚本，`pnpm -r typecheck` 对它一句话都不说，
   所以我另跑 `cd server && npx tsc --noEmit -p tsconfig.json` ⇒ **rc=0**，并把这条命令写进台账，
   别让下一个会话把 21 枚 in-scope 读成 21 枚被检查过。

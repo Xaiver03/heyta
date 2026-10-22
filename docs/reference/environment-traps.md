@@ -10974,3 +10974,8 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     ⑵ 可复用规则：**语法检查只保证能解析，不保证能跑**；ESM 顶层漏常量、漏 import、拼错的标识符全是运行期才炸。"能失败的装置"的第一趟判据是它自己打出来的读数行（那三行 `GUARD / BASELINE / ARMS=`），不是编辑器或 `--check` 的沉默。分段 Write 之后先 `wc -l` + 读尾部确认结构完整，再跑一次**最便宜的冒烟阶段**——把 GUARD（在场 + 相对 HEAD 干净 + 每枚 needle 恰好命中一次）放在任何写动作之前，正是为了让这种死法零成本暴露。
     ⑶ 顺序上欠的那一步补回来很简单：**先跑通一趟，再写在册行**；如果已经先写了（我这趟就是），那 `ARMS=pass (4/4)` 出来之前，那条索引行是一句未兑现的声称，别让人读成"已被验证"。
 
+526. **`pnpm -r <脚本>` 的退出码不携带覆盖信息：混合选择集里"没有该脚本"的包被静默跳过，整组都没有才报错**（2026-10-22，任务书第 2 步取全仓 `typecheck` 那一趟；两条腿都现量过）。
+    ⑴ 读数长这样：`Scope: 21 of 22 workspace projects` + rc=0，很容易被写成"21 枚都过了"。先把 scope 那句拆开：`pnpm list -r --depth -1 --parseable | wc -l` 回 **22** = 21 枚 `@heyta/*` + 根包 `heyta`（`e2e` 不在这份清单里，见 **#523**；`-r run` 默认不含根包），而那 21 枚命名包里 `@heyta/sync-server` **没有 `typecheck` 脚本** ⇒ 实际只有 20 枚被检查。
+    ⑵ 为什么 rc 给不了这个信息（这就是它与"漏跑会红"那类门的分界）：`pnpm -r --filter @heyta/sync-server --filter @heyta/ui typecheck` ⇒ **rc=0**，输出里只有 `packages/ui typecheck$ … Done`，缺脚本那一枚一个字都不说；而 `pnpm --filter @heyta/sync-server typecheck` ⇒ **rc=1** `[ERR_PNPM_RECURSIVE_RUN_NO_SCRIPT] None of the selected packages has a "typecheck" script`。⇒ **"全组都没有"才响，"有一部分没有"完全静默**：拿 rc 当覆盖尺，读到的绿恰好由被漏掉的那些包构成。
+    ⑶ 合法做法与 **#524⑵** 同一把尺：分母与分子用**同一条构造式**生成（从各 `package.json` 现取"有该脚本"的集合 ∩ scope，与输出里真打出该脚本行的集合做双向差集，两侧都空才算闭合），再为漏网那一枚补一条**它自己的命令**并写进台账（这里是 `cd server && npx tsc --noEmit -p tsconfig.json` ⇒ rc=0）。⚠️ 补的那条也要能红：只写"我跑了 tsc"而不给 tsconfig 路径，下一位会拿一份可能不存在的配置当覆盖。
+
