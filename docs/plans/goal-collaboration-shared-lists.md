@@ -1768,3 +1768,9 @@ cd e2e && npx playwright test tests/auth-login-code.spec.ts --reporter=line
 这张表说的是**红集的分母与归属已经穷举到项**，不是链绿。
 **别照抄这张表的枚数**：红集会随别人的提交变；复量 = `node -e` 拆 `scripts.check` 那串逐项跑（`--retries` 与端口那两条前置见 #536/#533），
 再逐枚按"文件对 `HEAD` 脏不脏 + 单跑能不能复现"分瞬时红与存量红。
+
+## 2026-10-10 交接·二 / 任务书第 1 步的**当前 HEAD** 复认（2026-10-22 19:2x）
+
+上面那几节全是文档与门禁注释层的改动，但读数的规矩是"别拿旧趟当这一枚 tip 的证据"。所以在 `HEAD = 14833c9b6` 上重跑了一次本线那条 e2e：
+先逐枚现量四端口全空（`lsof -nP -tiTCP:4318 …4322 -sTCP:LISTEN` 回空，#536 那条前置），再 `pnpm verify:collab-journey` ⇒ **rc=0，`RESULT=OK steps=3`**。
+⇒ 第 1 步那条判据在今天这枚 tip 上仍然成立，不是沿用 12:0x 那一趟的读数。
