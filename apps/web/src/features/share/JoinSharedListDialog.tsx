@@ -135,6 +135,7 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
   const [listName, setListName] = useState('');
   const [needsUnlock, setNeedsUnlock] = useState(false);
   const pollRef = useRef<number | undefined>(undefined);
+  const creatingRef = useRef<Set<string>>(new Set());
 
   const api = useMemo(() => {
     if (baseUrl.trim() === '' || token === undefined || token.trim() === '') return undefined;
@@ -176,14 +177,27 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
         ownMemberId: memberId,
       });
       // 已有挂这条 share 的本地清单（比如以前加入过）就不重复建。
-      const existing = useProjectStore.getState().projects.find((p) => p.shareId === shareId && p.deletedAt === undefined);
-      let projectId = existing?.id;
-      if (projectId === undefined) {
-        const name = listName.trim() === '' ? t('web.share.join.defaultName') : listName.trim();
-        projectId = await useProjectStore.getState().addProject(name) ?? undefined;
-        if (projectId !== undefined) {
-          await useProjectStore.getState().setProjectShare(projectId, shareId);
+      // 🔴 这一段必须对同一条 share 独占：本地清单行是 `addProject` + `setProjectShare`
+      // 两步写，第一步刚写完时那一行还没有 `shareId`，下面的 `existing` 判据看不见它 ⇒
+      // 两个 finalize 同时在跑就会各建一行（2026-10-22 旅程实测：侧栏两行同名清单）。
+      // 为什么会同时在跑：本函数由 `waiting-key` 那个 effect 既**立即调一次**又**每 3 秒调一次**，
+      // 而 effect 依赖里有 `finalize` 自己 —— 它的身份一变（父组件换 `onJoined`、locale 换 `t`）
+      // 就又立即调一次，不排队。
+      if (creatingRef.current.has(shareId)) return;
+      creatingRef.current.add(shareId);
+      let projectId: string | undefined;
+      try {
+        const existing = useProjectStore.getState().projects.find((p) => p.shareId === shareId && p.deletedAt === undefined);
+        projectId = existing?.id;
+        if (projectId === undefined) {
+          const name = listName.trim() === '' ? t('web.share.join.defaultName') : listName.trim();
+          projectId = await useProjectStore.getState().addProject(name) ?? undefined;
+          if (projectId !== undefined) {
+            await useProjectStore.getState().setProjectShare(projectId, shareId);
+          }
         }
+      } finally {
+        creatingRef.current.delete(shareId);
       }
       if (projectId !== undefined) {
         setPhase({ kind: 'done', projectId });

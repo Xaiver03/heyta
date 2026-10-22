@@ -279,6 +279,12 @@ test('共享清单全旅程：owner 建共享 + 邀请 → bob 贴 token 入群 
   await expect(bobPage.getByTestId('share-join-dialog')).toHaveCount(0);
   // 入群即导航：bob 现在就站在那条清单上（标题 = 自己起的本机名）。
   await expect(bobPage.locator('.ht-header__title')).toHaveText('家庭装修（合伙）');
+  // 🔴 一份共享只许在侧栏落**一条**清单行。06 号截图（2026-10-22 10:38 那一趟）里出现过两条
+  // 同名行，而上面那条标题断言抓不到它 —— 标题读的是"当前在看哪条"，两条都叫这个名字。
+  await expect(
+    bobPage.locator('.ht-sidebar').getByText('家庭装修（合伙）', { exact: true }),
+    '侧栏里这条共享清单只许出现一行',
+  ).toHaveCount(1);
 
   // ── owner：面板轮询看到 bob 成员行（信封已发） ──────────────────────────
   // 🔴 成员行的 testID 是 `share-member-<memberId>`，但它下面还挂着

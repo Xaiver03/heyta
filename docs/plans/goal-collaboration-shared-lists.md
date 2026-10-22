@@ -1331,3 +1331,19 @@ pnpm check:selection-single-source; pnpm check:image-license                    
 git diff --name-only a6662e218..HEAD -- packages apps server | grep -v '/evidence/' | wc -l    # 应回 0 ⇒ typecheck/test/build 那三趟对当前 tip 仍作数
 pnpm verify:collab-journey                                                                     # 应回 RESULT=OK steps=3；⚠️ 它会重刷 e2e/collab-journey-results/
 ```
+
+### 2026-10-22 11:4x · 第 1 步那句「新截图人工看过」补成 **8/8**，而这一趟看图抓到一条真缺陷（已修，红→绿两头都有读数）
+
+> ⚠️ 戳记：本机 `date` 现在是 `2026-10-22 11:48 CST`，而上面三戳写的是 12:0x / 12:1x —— 那三个**时刻**是当时记错的（读数本身与时刻无关，不用重取）。本戳起按 `date` 记。
+
+**看图**：先前只看过 `02 / 04 / 07` 三张，判据那句要求的是**新截图**全部。这次把余下五张逐张看过（`01 / 01b / 03 / 05 / 06`，都是 10:38 那一趟的产物）⇒ 8/8。
+
+**`06-bob-joined.png` 读出来的不是"通过"，是一条重复行**：bob 侧栏里 **「家庭装修（合伙）」有两行**，两行各带自己那一排行内操作（色块 / 归档 / 重命名 / 回收站）。而旅程自己的断言抓不到它 —— 入群后判的是 `.ht-header__title` 等于这个名字，**标题读的是"当前在看哪条"，两条同名清单里随便哪一条都能满足它**。
+
+**成因（读源码，不是猜）**：`apps/web/src/features/share/JoinSharedListDialog.tsx` 的 `finalize` 由 `waiting-key` 那个 effect **既立即调一次、又每 3 秒调一次**，而 effect 依赖里带着 `finalize` 自己 —— 它的身份一变（父组件换 `onJoined`、locale 换 `t`）就又立即调一次，**不排队**。两次调用都走到"建本地清单行"那一段时，那一段是 `addProject(name)` 与 `setProjectShare(id, shareId)` **两步写**：第一步刚写完，那一行还没有 `shareId`，于是挡重复的 `existing = projects.find(p => p.shareId === shareId)` **看不见它** ⇒ 各建一行。
+
+**先让判据红，再修**（顺序是有意的：先修后测就永远不知道这把尺有没有牙）：
+1. 只加断言（`.ht-sidebar` 内该名字的行数 `toHaveCount(1)`）→ `pnpm verify:collab-journey` **`RESULT=FAIL step=2`**，读数 `Expected: 1 / Received: 2`，且 14 次轮询全部解析到 2 个元素 ⇒ **不是瞬时状态，这一趟是稳定复现**。
+2. 加 `creatingRef` 按 `shareId` 独占那一段（`try/finally` 释放，失败后下一拍仍可重试）→ `pnpm --filter @heyta/web typecheck` 通过、`pnpm verify:collab-journey` **`RESULT=OK steps=3` / `VERIFY_EXIT=0`**，`06` 复看只剩一行。
+
+**登记口径**：这条缺陷修在代码里、判据钉在旅程里，**不追加环境陷阱条目** —— 它是已消失的实现缺陷，不是一条会复现的探针坑（AGENTS §8 第 4 条里"具体事故"那一档要能复现才配占号）。防它复发的东西有两件，都在册：那枚 `toHaveCount(1)`，和 `finalize` 里写明"这段必须对同一条 share 独占"的注释。
