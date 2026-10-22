@@ -1648,3 +1648,34 @@ cd e2e && npx playwright test tests/auth-login-code.spec.ts --reporter=line
 **这一格现在的形状**：`pnpm check` 全链在 `HEAD` 上红的枚数 ≥ 4（收款线 `check:selection-single-source`、自托管线 `check:image-license`、
 第 94 项 `check:ai-e2e` 里注册登录线那一族已**定案**、AI 线那两枚 `ai-row-layout`/`ai-tool-run` 待同一把尺量）。
 **没有一枚归本线**，本线证据仍以 `pnpm verify:collab-journey`（`RESULT=OK steps=3`）为准。
+
+## 2026-10-22 18:0x 逐枚读正文之后：17:5x 那句"否证了载体缺服务"**只对那一枚成立**——同一批红里两种成因并存
+
+按 17:5x 那条命令把七枚 spec 一次量了（主检出、四枚端口现量全空、`--retries=0`）：
+**22 failed / 3 passed，7.3 分钟**。正文形状是三种，不是一种：
+
+| 形状 | 出现次数（按 error 行计） | 是哪一类 |
+|---|---|---|
+| `除已登记缺失外不该有非 2xx：["/api/auth/central/config"]` + `不该有 JS 层报错：Access to fetch at http://127.0.0.1:4319/api/auth/central/config` | 8 + 8（**成对**出现） | **e2e 载具缺那条路由**：页面在 fetch `/api/auth/central/config`，而 `stub-provider.mjs` 没把它放进在册缺失表 ⇒ 这确实是"服务/夹具缺项"那一类 |
+| `expect(locator).toBeVisible()` failed ＋ `element(s) not found` | 3 | **真断言不匹配**（`auth-form-remember-password` 那枚勾选框，静态与运行时两头都对上，见 17:5x） |
+| `locator.fill / click / check: Test timeout of 60000ms exceeded` | 3 | 界面等不到可交互态，成因要再逐枚读（本轮没定） |
+
+🔴 **所以 17:5x 那节的标题要按这一节读**：一枚判决臂只否证了**它自己那一枚**的"环境"解释；
+把这枚的结论推广到整批红，是同一个老毛病的反向版本 —— 缺陷是一类不是一个，**成因也是一类不止一种**。
+`admin-console` 那一族（本轮 `Error` 里 central/config 那 8+8 对就是它先打的）落在"夹具缺路由"，
+`auth-login-code` 落在"断言不匹配"，两者都**与别线在途脏件无关**（干净载体 0 脏件那一趟报的是同一批 spec）。
+
+**归属（逐枚，都不归本线）**：
+- `/api/auth/central/config` 那一族 ⇒ **注册登录线**（central config 那件）＋ **e2e 载具在册缺失表**的口径；本线不代改别人的缺失表，也不给它加豁免。
+- `auth-form-remember-password` ⇒ **注册登录线**的表单面（断言比的是界面有没有那枚勾选框）。
+- `ai-row-layout` / `ai-tool-run` / `ai-assistant` / `assistant-hosted-ux` ⇒ **AI 线**：这一族在主检出这一趟**不能**归因（工作树里有 12 枚 AI 线在途脏件），
+  但同一批在**干净载体 `dd36e346a`（0 脏件）**那一趟同样红 ⇒ 记 `HEAD` 红；要拿正文定性得等 AI 线自己那趟。
+- 超时那 3 枚：形状记在这里，**成因未定**，别当结论用。
+
+**本线边界不变**：`pnpm check` 第 94 项 `check:ai-e2e` 在 `HEAD` 上红，且红的每一枚都别在注册登录 / AI / 运营后台这几条线上，**一枚不归本线**；
+本线的 e2e 证据仍只认 `pnpm verify:collab-journey`（`RESULT=OK steps=3`）。
+⇒ **任务书第 2 步"全链绿"这一格今天到不了**，且它**不需要本线再做什么**：要清的是别人那三条线上的存量红与本仓 e2e 载具的在册缺失表。
+
+⚠️ 一条装置事实（本轮实撞）：七枚 spec 一次跑要 7.3 分钟且**必须 `--retries=0`**，
+否则默认重试把墙钟翻倍 —— 这就是为什么"整套件跑完再读正文"这条路今天两度被墙钟掐断（17:3x 那次 `rc=124`）。
+便宜且够用的形状是：**按 `Error:` 行的形状聚类**（`grep -oE 'Error: .{0,90}' 日志 | sort | uniq -c`），先分成因再逐枚归属。
