@@ -4883,6 +4883,8 @@ export const zhCN = {
   'web.share.transfer.confirm': '确认转让',
   'web.share.transfer.cancel': '取消',
   'web.share.transfer.error': '转让失败：{message}',
+  'web.share.error.action': '这一步没有完成：{message}',
+  'web.share.error.rekeyAfterRemove': '成员已经移走了，但换钥没有成功：{message}',
   'web.share.invite.linkTitle': '入群链接（打开即进入加入流程，凭证有效期与上面一致）',
   'web.share.join.button': '加入共享清单',
   'web.share.join.title': '加入共享清单',

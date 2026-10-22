@@ -1407,3 +1407,15 @@ git diff --name-only a6662e218..HEAD -- packages apps server | grep -v '/evidenc
 途中一枚**自己踩的门**：只改 locale 源码不重打 `@heyta/i18n` ⇒ `pnpm --filter @heyta/web typecheck` rc=2（新键不在那个 4160 成员的联合类型里）。这条不算新陷阱，是仓里既有的"改完 packages 必须先 build"。
 
 **共享工作树的一枚实况**（提交前逐文件现量抓到的）：`packages/i18n/src/locales/{zh-CN,en}.ts` 与 `packages/app-host/src/index.ts` 里**同时躺着 AI 线未提交的改动**（`web.ai.chat.step.*` 七枚键、`type AssistantTurnEvent`）。所以这一笔**不能整文件 `git add`** —— 用 `git diff -U3` 按 hunk 过滤（每份文件 2 枚 hunk、只留含本线标记的那 1 枚）`git apply --cached`，再**不带 pathspec** 提交索引（带 pathspec 的 `git commit -- <路径>` 取的是工作树内容，会把别线的行一起扫进来）。提交前对索引复量：`git diff --cached | grep -c "别线关键词" = 0`。
+
+### 2026-10-22 12:2x · 顺着转让那一发把**同一类**找齐了：面板阶段先前根本没有错误可见面（邀请 / 改角色 / 移除 / 退出 的失败全部静默）
+
+上一节修的是转让。按"报修的缺陷是一类不是一个"回去数同一类，读到的是：`creatingError` 这块**只画在 `phase.kind === 'consent'` 那一支**（`ShareFeature.tsx:470-476`），而 `removeMember`（含"人已移走但换钥失败"那一格 —— 代码注释明写"不能不说"）、`submitInvite` 都往它里面写；`onRoleChange` 与 `leaveShare` 连 catch 都没有。⇒ **面板阶段任何一发失败都是零反馈**。
+
+**先让它红**（不靠服务端语义，夹具直接让接口失败）：旅程里加一步 —— `ownerPage.route('**/api/shares/*/invitations')` 把 POST 打成 409 `SHARE_MEMBER_LIMIT`，填邮箱点「生成邀请」，判 `[data-testid="share-panel-error"]` 可见。跑 ⇒ **`RESULT=FAIL step=2`，`element(s) not found`**（这一发同时说明：先前它连一次未处理拒绝都不会显示给用户）。
+
+**修**：面板阶段加一枚 `panelError`（存**整句**，因为「成员已移走但换钥失败」和「这一步没成」不是同一句话，共用一个包裹句会说假话）。四个落点各写各的句子，新增两枚词条 `web.share.error.action` 与 `web.share.error.rekeyAfterRemove`（zh/en 各一行 ⇒ **本线在 locale 里现在是 8 枚键**）；`onRoleChange` 补 catch；`consent` 那一支原样不动（那里 `creatingError` 是看得见的）。
+
+**读数**：修后 `verify:collab-journey` **`RESULT=OK steps=3`**，证据从 8 张变 **9 张**，新增的 `08-owner-panel-error-visible.png` 人工看过 —— 面板里红字那句是「这一步没有完成：409 SHARE_MEMBER_LIMIT」，位置在邀请票据块下方、成员列表上方。整树复跑：`-r typecheck` rc=0（20==20）、`-r test` rc=0（跑 test 的包 20 == 打 `Tests` 行的包 20，`failed|FAIL` 0 行）、`-r build` rc=0（20==20）。
+
+**这一趟自己踩到的两枚工具坑**（都当场被守卫拦下，没造成半改）：① 一串 `cmd && cmd2 && cmd3; echo rc=$?` 里，前面任一环节退出非零会让**后面那枚 `echo` 读到的是整条链的码**——本趟有一枚"i18n build rc=1"其实是上游 `node` 失败，构建根本没跑（`/tmp` 里那个输出文件不存在就是证据）；② 按字符串锚做批量替换时，**同一枚锚可能出现两次**（`createShare` 与 `submitInvite` 的 catch 行文本相同），必须先 `count==1` 再改，否则会把 consent 那一支一起换掉——那正是本格**不该动**的一支。

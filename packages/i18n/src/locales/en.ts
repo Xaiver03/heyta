@@ -4633,6 +4633,8 @@ export const en = {
   'web.share.transfer.confirm': 'Transfer',
   'web.share.transfer.cancel': 'Cancel',
   'web.share.transfer.error': 'Transfer failed: {message}',
+  'web.share.error.action': 'This step did not finish: {message}',
+  'web.share.error.rekeyAfterRemove': 'The member was removed, but the key rotation failed: {message}',
   'web.share.invite.linkTitle': 'Join link (opens the join flow; same validity as the ticket above)',
   'web.share.join.button': 'Join a shared list',
   'web.share.join.title': 'Join a shared list',
