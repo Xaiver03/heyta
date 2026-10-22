@@ -25,7 +25,6 @@
  */
 import { useState } from 'react';
 import { useI18n, type Locale, type MessageKey } from '@heyta/i18n';
-import { ICON_SIZE } from '@heyta/design-system';
 import {
   CHECKOUT_TIER_PRICE_IDS,
   CHECKOUT_TIERS,
@@ -35,7 +34,6 @@ import {
   type CheckoutOutcome,
   type CheckoutTierId,
 } from '@heyta/app-host';
-import { QrCode } from 'lucide-react';
 
 import { useSyncStore } from '../sync/store.js';
 import { privacyConsent } from '../privacy/consent-gate.js';
@@ -204,7 +202,6 @@ export function RenewPanel(): React.JSX.Element {
                 disabled={pending}
                 onClick={() => void onPlaceOrder()}
               >
-                <QrCode size={ICON_SIZE.xs} aria-hidden="true" />
                 {pending ? t('web.subscription.renew.busy') : t('web.subscription.renew.action')}
               </button>
             </div>
