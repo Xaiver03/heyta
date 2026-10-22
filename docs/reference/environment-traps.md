@@ -11016,3 +11016,18 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     ⚠️ 反过来的误判也要防：跑一次 `pnpm check:docs` 绿只证**没有死链/没有失效引用**，它不读句子的真假，
     两件事不许互相顶替（本条就是 `check:docs` rc=0 之后才发现那两处）。
 
+530. **仓里有两样东西都叫"桌面壳"，按 `apps/desktop/` 去核"桌面壳有没有 X"会得出反的结论**
+    现场（2026-10-22，核 benchmark/feature-matrix/roadmap 里那句"评论已落地到 Web 与桌面壳"）：
+    我先按目录名去 `apps/desktop/` 找共享面 —— `grep -rni "share\|comment" apps/desktop` 命中 **3 行，全是无关字**
+    （`@heyta/shared-schema` 这个包名、`SharedArrayBuffer`），而它的 renderer 只 `import { HeytaUiProvider, TaskList } from '@heyta/ui'`
+    （`apps/desktop/renderer/main.tsx:25`）⇒ 读数长得像"那三处文档在吹"，我几乎就要去把它们改成"桌面壳没有"。
+    **反的**：文档说的"桌面壳"是 `apps/desktop-{macos,windows,linux}` 这三枚**装 web 产物**的壳 ——
+    `apps/desktop-macos/scripts/package-app.sh:76,84` 明写「🔴 共享 UI 产物必须打进 `.app` 的 `Contents/Resources/web-dist/`」，
+    取的就是 `$REPO/apps/web/dist`；常驻门 `scripts/check-shell-surfaces.mjs` 的分母 `ENDS` 也是
+    `['web','mobile','desktop-macos','desktop-windows','desktop-linux']`（**没有** `apps/desktop`）。
+    可复用规则：**"某端有没有这个面"要问那枚端产物装的是什么**，不是问哪个目录名字像。
+    具体两条把手：① 判壳类问题先看 `scripts/check-shell-surfaces.mjs` 的 `ENDS`（它是门禁自己认的那五端，也是"桌面壳"在册的含义）；
+    ② 再核那枚壳的打包脚本引的是谁的 `dist`（web 产物 = 面在；自带 renderer = 面不一定在）。
+    ⚠️ `apps/desktop/`（Electron 薄壳，只挂任务列表）与 `apps/desktop-*`（原生壳，装 `apps/web/dist`）**不是一回事**，
+    散文里写"桌面壳"时要能从上文看出指哪一类 —— 否则下一位又要拿目录名重推一遍。
+

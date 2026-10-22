@@ -1248,3 +1248,16 @@ benchmark 64／feature-matrix 15／roadmap 93／progress-log 15／本计划 15�
   显式点名重装专用那枚才是不抢设备的那条路。
 - 负载这一格 11:4x 复量 **12.53**（阈值 12）—— 已经贴在门上了，方向仍是往下（35 → 23 → 17.5 → 16 → 12.5）。
   🔴 这一格开了不等于窗口开了：**设备面要两枚同时空**（iOS + Android），而这两枚都得人先起。
+
+### 2026-10-22 11:5x · 第 3 步那三处"评论已落地到 Web 与**桌面壳**"核过了：**是真的，别再去改它**
+
+顺着 #529 那把尺继续逐格问，问到这句时差点把真句子改假。我先按目录名去 `apps/desktop/` 找共享面 ——
+`grep -rni "share\|comment" apps/desktop` 命中 3 行全是无关字（`@heyta/shared-schema` 这个包名、`SharedArrayBuffer`），
+而它的 renderer 只 `import { HeytaUiProvider, TaskList } from '@heyta/ui'`（`apps/desktop/renderer/main.tsx:25`）
+⇒ 读数长得像"benchmark 的 §2.6/P2-10、feature-matrix 的 6.3、roadmap 那三处在吹"。
+**反的**：文档说的"桌面壳"是 `apps/desktop-{macos,windows,linux}` 那三枚**装 web 产物**的壳 ——
+`apps/desktop-macos/scripts/package-app.sh:76,84` 明写共享 UI 产物必须打进 `.app/Contents/Resources/web-dist/`、取的就是 `$REPO/apps/web/dist`；
+常驻门 `scripts/check-shell-surfaces.mjs` 的分母 `ENDS = ['web','mobile','desktop-macos','desktop-windows','desktop-linux']`，**里面没有 `apps/desktop`**
+⇒ 连门禁自己认的"端"都不把那枚 Electron 薄壳算作桌面壳。
+⇒ 三处文档**不动**。这条歧义已写成环境陷阱 **#530**（判壳类问题先看 `ENDS`，再核那枚壳的打包脚本引的是谁的 `dist`），
+防的是下一位（或换个会话的我）拿目录名重推一遍、把真句子改假。
