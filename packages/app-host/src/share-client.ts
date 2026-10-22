@@ -74,21 +74,49 @@ export interface ShareOpDispatchIntent {
 /**
  * 每条动作的可读标签。
  *
- * ⚠️ 词表来源不是猜的：`scripts/verify-collab-sync.mjs:231` 里 TASK 的 `CRT` 用的是
- * `'add task'`，而全仓没有集中登记表（`grep "'add task'" packages/<包>/src` 回 0 处）
- * ⇒ 它是**每条动作自己起的名字**。评论族按同一惯例起名，并且**只**登记这三档
- * （个人偏好类实体不进 share log，见计划 §2.2）。
+ * 🔴 **键是 `entityType:opType`，不是 `opType`。**
+ * 这张表原先只按 `opType` 键（评论族那三档），因为那时 share 通道只有评论一族在走。
+ * M2 把任务/清单/便签/标签也路由进来之后，`CRT` 同时属于"add comment"与"add task"
+ * —— 一个键对两个标签，只能靠"每次调用换一张表"来绕，而那份"现在在用哪张表"的状态
+ * 迟早和实际写出去的 op 漂移。语义键在 ADR-0067 裁决六里已经定死是 `(entityType, opType)`，
+ * 这张表的键就得跟它一致。
+ *
+ * ⚠️ 评论那三个**字符串值逐字不许改**：`actionType` 是线 op 身份的一部分（进 AAD），
+ * 改名等于给已经躺在服务端日志里的那批 op 换了一份身份 ⇒ 下行解密必拒（GCM tag 不匹配），
+ * 症状是评论区整块解不开，不是"标签旧了一点"。
+ *
+ * 未登记的一律**抛错**（`shareActionTypeFor`）：让"新动作没登记标签"在写之前就红，
+ * 而不是悄悄造一个名字上线。
  */
-const COMMENT_ACTION_TYPES: Readonly<Record<string, string>> = {
-  CRT: 'add comment',
-  UPD: 'edit comment',
-  DEL: 'delete comment',
+const SHARE_ACTION_TYPES: Readonly<Record<string, string>> = {
+  'COMMENT:CRT': 'add comment',
+  'COMMENT:UPD': 'edit comment',
+  'COMMENT:DEL': 'delete comment',
+  'TASK:CRT': 'add task',
+  'TASK:UPD': 'edit task',
+  'TASK:DEL': 'delete task',
+  'TASK:MOV': 'move task',
+  'TASK:BATCH': 'batch update task',
+  'PROJECT:CRT': 'add project',
+  'PROJECT:UPD': 'edit project',
+  'PROJECT:DEL': 'delete project',
+  'NOTE:CRT': 'add note',
+  'NOTE:UPD': 'edit note',
+  'NOTE:DEL': 'delete note',
+  'TAG:CRT': 'add tag',
+  'TAG:UPD': 'edit tag',
+  'TAG:DEL': 'delete tag',
 };
 
-/** 未知 `opType` 时不要静默造名字：抛出去，让"新动作没登记标签"在写之前就红。 */
-export function shareActionTypeFor(opType: string, table: Readonly<Record<string, string>> = COMMENT_ACTION_TYPES): string {
-  const name = table[opType];
-  if (name === undefined) throw new Error(`Unregistered share actionType for opType: ${opType}`);
+/** 未知 `(entityType, opType)` 时不要静默造名字：抛出去，让"新动作没登记标签"在写之前就红。 */
+export function shareActionTypeFor(
+  entityType: string,
+  opType: string,
+  table: Readonly<Record<string, string>> = SHARE_ACTION_TYPES,
+): string {
+  const key = `${entityType}:${opType}`;
+  const name = table[key];
+  if (name === undefined) throw new Error(`Unregistered share actionType for ${key}`);
   return name;
 }
 
@@ -155,7 +183,7 @@ export function createShareOpDispatcher(options: ShareOpDispatcherOptions): {
       const identity: ShareOpWireIdentity = {
         id: newId(),
         clientId: options.clientId,
-        actionType: shareActionTypeFor(intent.opType, options.actionTypes ?? COMMENT_ACTION_TYPES),
+        actionType: shareActionTypeFor(intent.entityType, intent.opType, options.actionTypes ?? SHARE_ACTION_TYPES),
         opType: intent.opType,
         entityType: intent.entityType,
         entityId: intent.entityId,

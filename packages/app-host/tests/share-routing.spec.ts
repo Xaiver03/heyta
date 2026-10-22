@@ -25,8 +25,10 @@ import { OpType } from '@heyta/sync-core';
 import {
   crossesShareBoundary,
   routeShareIdForEntity,
+  ShareChannelUnavailableError,
   ShareCrossListMoveError,
   createShareRoutingDispatcher,
+  type ShareWriteChannel,
 } from '../src/share-routing.js';
 import type { ShareOpDispatchIntent } from '../src/share-client.js';
 
@@ -57,19 +59,40 @@ interface Calls {
   readonly share: { shareId: string; intent: ShareOpDispatchIntent }[];
 }
 
-function harness(state: MaterializedState, shareState?: MaterializedState): {
+function harness(state: MaterializedState, shareState?: MaterializedState, withChannel = true): {
   calls: Calls;
   dispatch: (intent: OpIntent) => Promise<void>;
 } {
   const calls: Calls = { personal: [], share: [] };
+  const channel: ShareWriteChannel | undefined = withChannel
+    ? {
+      dispatch: async (shareId, intent) => { calls.share.push({ shareId, intent }); },
+      stateFor: () => shareState ?? emptyState(),
+    }
+    : undefined;
   const dispatch = createShareRoutingDispatcher({
     personalDispatch: async (intent) => { calls.personal.push(intent); },
-    shareDispatch: async (shareId, intent) => { calls.share.push({ shareId, intent }); },
+    channel: () => channel,
     getState: () => state,
-    shareStateFor: () => shareState ?? emptyState(),
   });
   return { calls, dispatch };
 }
+
+describe('通道没装上 ⇒ 具名拒绝，绝不悄悄退回个人 log', () => {
+  it('共享清单里的任务、通道未装 ⇒ 抛 ShareChannelUnavailableError，个人侧零调用', async () => {
+    const { calls, dispatch } = harness(fixture(), undefined, false);
+    await expect(
+      dispatch({ entityType: 'TASK', entityId: 'tShared', opType: OpType.Update, payload: { title: '买漆' } }),
+    ).rejects.toBeInstanceOf(ShareChannelUnavailableError);
+    expect(calls.personal).toHaveLength(0);
+  });
+
+  it('同一份状态下的**个人**任务、通道未装 ⇒ 照常写个人 log（拒绝只针对共享）', async () => {
+    const { calls, dispatch } = harness(fixture(), undefined, false);
+    await dispatch({ entityType: 'TASK', entityId: 'tPersonal', opType: OpType.Update, payload: { title: '看牙' } });
+    expect(calls.personal).toHaveLength(1);
+  });
+});
 
 describe('路由判据：所属清单的 shareId 是否在册', () => {
   it('共享清单里的任务 ⇒ 解析出那份 share', () => {
