@@ -1307,6 +1307,18 @@ benchmark 64／feature-matrix 15／roadmap 93／progress-log 15／本计划 15�
 **一句话状态**：任务书五步里 1／3／4／5 已逐条核过（且第 3 步是**逐句**核的，见 11:1x–12:0x 那几节），
 第 2 步八格闭合六格，**只剩两格，两格都不归本线关**。本线代码与文档全部在 `origin/main` 上。
 
+### v3 刷新（2026-10-22 12:3x；本节上面那段"一句话状态"仍然成立，这里只补它没赶上的三笔修复与一趟复量）
+
+**12:1x 之后本线又落了四笔**，接手时把它们算进"已完成"，别当新发现：
+1. 第 1 步那句「新截图人工看过」补成 8/8，看图抓到**加入流程会建两条同名清单行**（已修，判据钉在旅程里，红→绿两头有读数）。
+2. **B-10 的具名错误码补上了宿主侧消费者** —— 转让失败先前是一次未处理拒绝，界面零反馈。
+3. **面板阶段补了一枚错误可见面** —— 邀请／改角色／移除／退出的失败先前全部静默（`creatingError` 只画在 consent 那一支）。
+4. 上面三笔的整树复跑：`-r typecheck` / `-r test` / `-r build` **各 rc=0，对数 20==20 三趟都对上**，`verify:collab-journey` `RESULT=OK steps=3`（证据现在 **9 张**，不是 8 张）。
+
+**所以本节下面那条"算差集"的复算命令已经作废**：那三趟是**在当前 tip 上整树重跑的**，不再靠 `a6662e218` 那个锚点沿用。要复核有没有漂移，只需 `git log --oneline -1` 对一下 tip 是不是 `d2f5d062d` 之后又落了碰 `packages/** / apps/** / server/**` 的提交；落了就重跑那三趟，没落就不用。
+
+**剩下两格没变，12:3x 复量过**：预检 `exit 3`、前置**只剩那两枚设备**（负载 7 ≤ 12、载体新鲜那格 ✅）；`pnpm check` 上那两枚别线红复量仍在，各自给的出路一字没改。
+
 ### 剩下那两格：归谁、判据是什么、命令是什么
 
 | 格 | 归谁 | 现在拦路的具体东西 | 它自己给的出路 |
@@ -1328,7 +1340,7 @@ benchmark 64／feature-matrix 15／roadmap 93／progress-log 15／本计划 15�
 ```
 CARRIER=$HOME/heyta-carriers/heyta-wt-collab-m5 sh research/tools/b-reinstall-readiness.sh   # 现在应回 exit 3、只剩两枚设备项
 pnpm check:selection-single-source; pnpm check:image-license                                   # 现在各 rc=1，两枚别线
-git diff --name-only a6662e218..HEAD -- packages apps server | grep -v '/evidence/' | wc -l    # 应回 0 ⇒ typecheck/test/build 那三趟对当前 tip 仍作数
+# （已作废）差集那把尺不用了：三趟在 d2f5d062d 上整树重跑过，各 rc=0、对数 20==20。要复核漂移：git log --oneline -1
 pnpm verify:collab-journey                                                                     # 应回 RESULT=OK steps=3；⚠️ 它会重刷 e2e/collab-journey-results/
 ```
 
