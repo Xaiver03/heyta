@@ -1532,7 +1532,7 @@ Android AVD `heyta-w3-yearly`（`-no-window` headless 起，`emulator-5554` 的 
 ⇒ **本线现在真正只剩一个停止点：② owner 转让语义**（两步确认、立即生效、原 owner 降 editor，文案 `web.share.transfer.confirmHint`）。
 ① 若要动，只有一个前提：他看了这张图仍想换更强的视觉——那是新口径，不是补旧账。
 
-### 2026-10-22 16:4x · 对照臂把我先前那句推断**否证**了：`check:ai-e2e` 的红是 HEAD 存量，不是别线在途改动
+### 2026-10-22 16:4x · 对照臂把我先前那句推断**否证**了：`check:ai-e2e` 的红不是别线在途改动（⚠️ 但"是 HEAD 存量"那一半到 17:3x 那节仍未定案：两枚 spec 的对照臂只排除了"脏件"，没排除"载体缺服务"）
 
 14:0x 那节我写过一句"那 17 个 spec 的红要归到别线在途改动，得由它们自己的线去量"。**这句是推断，没做对照，今天做了对照，它错了。**
 
@@ -1595,3 +1595,25 @@ Android AVD `heyta-w3-yearly`（`-no-window` headless 起，`emulator-5554` 的 
 **这件事对本线 DoD 的影响**：任务书第 3 步要求"W4 残余如实登记（评论/指派/动态 UI 未建）"——
 按上面的现量，登记要从"评论已通"改成**"评论宿主层已通、界面只到 owner 那一侧；成员侧入口随 M2"**。
 M2 的定义也因此更准一点：它交付的不只是 `TASK/PROJECT` 进 share log，**还包括成员那侧第一次有东西可点**。
+
+## 2026-10-22 17:3x 整套件在干净载体上的**中途**读数（还在跑，先落已推的恢复点）与一条归因自我更正
+
+跑的是 `dd36e346a`（0 脏件）里 `pnpm exec playwright test` 整套 `e2e/tests/**`，日志在载体外 `/tmp/carrier-e2e.log`。
+**中途现量**（截至第 96 条判决）：通过 29 条；失败 **34 枚不同的 test**（已剔 `retry #1` 重复计数），分属 10 枚 spec ——
+`admin-console` 9 ／ `account-email-change-and-sessions` 7 ／ `auth-consent-registration` 6 ／ `auth-login-code` 3 ／
+`auth-registration-otp` 2 ／ `ai-tool-run` 2 ／ `ai-row-layout` 2 ／ `auth-panel-esc` 1 ／ `assistant-hosted-ux` 1 ／ `ai-assistant` 1。
+🔴 **无一枚是协作面**（这套件结构上不含本线 `collab-journey`，见 #533）。
+
+⚠️ **归因还不能定，这一格要更正 16:4x 那节的说法**：那节写的是"对照臂已证 `check:ai-e2e` 本身是 HEAD 红"。
+两枚 spec 的对照臂（9 failed）能证"与主检出那 8 枚脏件无关"，但**证不了"不是载体缺服务"** ——
+整套件跑到现在这个形状（`admin-console` 每一枚都恰好吃满 ~17.5s、`auth-*` 每一枚 1.0m 超时）长得像**后端/依赖没起来**，
+而不像断言不匹配。Playwright 的 list reporter 把 error 正文留到最后才打，所以两种解释现在**分不开**。
+定案判据（跑完后按这个读，别再猜）：
+1. `grep -n -A12 'Error:' /tmp/carrier-e2e.log | head -60` ⇒ 出现 `ECONNREFUSED` / `net::ERR_CONNECTION_REFUSED` / `404`/`500` 且指向同步服务端口 ⇒ 是**载体缺服务**，那 34 枚**既不能记 HEAD 红也不能记别线红**，只能记"这一趟的前置没满足"；
+2. 出现 `expect(...).toBe/toHaveText` 且实际值是可读的 DOM/字符串 ⇒ 才是**真断言不匹配**，逐枚按 spec 归属别线；
+3. 无论哪种，本线那条 `pnpm verify:collab-journey` 的 `RESULT=OK steps=3` 读数都不受影响，本线证据仍以它为准。
+
+恢复/续看命令（都打在别的机器也能读懂的路径上）：
+`ls /tmp/carrier-e2e-rc.txt`（出现即跑完，内容是退出码）；`tail -40 /tmp/carrier-e2e.log`（汇总行 + error 正文）；
+逐枚红 spec：`grep -E '^\s*✘' /tmp/carrier-e2e.log | grep -v 'retry #1' | grep -oE 'tests/[a-zA-Z0-9._-]+\.spec\.ts' | sort | uniq -c`。
+⚠️ `/tmp` 只活到下次重启 —— 这一节本身就是恢复点（正文在已推的仓里），重启后照 §9.7 的载体那条重跑。
