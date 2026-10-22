@@ -1,5 +1,5 @@
 /**
- * 共享清单的**写路径路由**（ADR-0067 裁决一与其两条补充裁决的唯一实现处）。
+ * 共享清单的**写路径路由**（ADR-0067 裁决一与其两条补充裁决、ADR-0068 裁决一的唯一实现处）。
  *
  * ## 它钉的判断
  *
@@ -14,12 +14,11 @@
  *
  * ## 三条不显然的形状约束
  *
- * 1. **`shareId` 字段本身的写不进 share log**（ADR-0067 裁决一末段）：
- *    挂接/解绑是"这台设备的这条清单绑到哪份共享"，属成员自己的视图状态。
- *    不挡这一格的话，`setProjectShareId` 会解析出 shareId（写后才有？不 —— 解析读的是
- *    **写前**状态，所以解绑那一形会读到在册的 shareId 而被写进 share log，
- *    于是"我取消共享"变成一条共享写，对面每个人都会收到）。
- * 2. **跨边界移动一律具名拒绝**（补二）：`moveToProject` 把 `projectId` 从共享清单改成
+ * 1. **清单这条记录本身不是共享内容**（ADR-0068 裁决一，收窄 0067 裁决一的 PROJECT 那一支）：
+ *    `entityType === 'PROJECT'` 一律 `kind-not-routable` ⇒ 走个人 log，`shareId` 在册也不例外。
+ *    判据只留这一处：挂接（`shareId` 写进去）与解绑都是同一条 PROJECT 规则的形状，
+ *    不再单开一个"这条 intent 在改绑定"的守卫 —— 两处判同一件事，迟早给出两个答案。
+ * 2. **跨边界移动一律具名拒绝**（0067 补二）：`moveToProject` 把 `projectId` 从共享清单改成
  *    个人清单（或反向、或两条共享清单之间）时，一侧回放得到残缺实体，而"移出"在 E2EE
  *    追加日志上**收不回已经复制出去的密文**。宁可拒绝，不许悄悄只写一半。
  * 3. **标签发布是一条独立意图**（补一）：`Tag` 没有清单归属，裁决一解析不出它；
@@ -80,8 +79,6 @@ const live = <T extends { deletedAt?: number | undefined }>(entity: T | undefine
 /** 这条实体挂在**哪条清单**上；`undefined` = 没有清单归属（标签、未归属便签）。 */
 function owningProjectId(state: MaterializedState, entityType: string, entityId: string): string | undefined {
   switch (entityType) {
-    case 'PROJECT':
-      return entityId;
     case 'TASK': {
       const task = state.tasks[entityId];
       return live(task) ? task.projectId : undefined;
@@ -101,66 +98,75 @@ function owningProjectId(state: MaterializedState, entityType: string, entityId:
   }
 }
 
-/** 这条实体的类型**能不能**按清单归属路由（标签不能 —— 它没有清单）。 */
+/**
+ * 这条实体的类型**能不能**按清单归属路由。
+ *
+ * 🔴 没有 `PROJECT`：清单这条记录本身不是共享内容（ADR-0068 裁决一）——
+ * share 域里没有"清单"这个实体，每个成员的那条行是各自设备上各自 id 建的，
+ * 把 A 的 `PROJECT UPD` 发进 share log，对面物化出的是一条本机没有对应行的记录。
+ * 也没有 `TAG`：它没有清单归属（0067 补一），只能靠"发布"那条形进 share log。
+ */
 function isRoutableKind(entityType: string): boolean {
-  return entityType === 'PROJECT' || entityType === 'TASK' || entityType === 'NOTE' || entityType === 'COMMENT';
+  return entityType === 'TASK' || entityType === 'NOTE' || entityType === 'COMMENT';
+}
+
+/**
+ * 某条**清单行**是不是共享的、属于哪份共享；不是 ⇒ `undefined`。
+ *
+ * 这枚是"清单 → shareId"这一跳的**唯一**出处：路由判据与跨边界判定都要读它，
+ * 各写一份就会对"这条清单算不算共享的"给出不同答案。
+ */
+export function shareIdOfProject(state: MaterializedState, projectId: string | undefined): string | undefined {
+  if (projectId === undefined) return undefined;
+  const project = state.projects[projectId];
+  if (!live(project)) return undefined;
+  const shareId = (project as { shareId?: string }).shareId;
+  // 空串按"没有"处理：`setProjectShareId` 会拒绝空串，但物化状态可能来自远端 op，不能假定它守规矩。
+  if (shareId === undefined || shareId.trim() === '') return undefined;
+  return shareId.trim();
 }
 
 /**
  * 两跳解析（实体 → 所属清单 → `shareId`）—— 全仓**唯一**一份。
  *
- * 它只解析、不决定说什么：写侧拿它抛 {@link ShareNotRoutableError}（要给用户原因），
+ * 它只解析、不决定说什么：写侧拿它决定进哪本 log（进 share 时要能说出原因），
  * 读侧拿它返回 `undefined`（"这里没有共享内容可拉"不是错误）。
  */
 export function routeShareIdForEntity(state: MaterializedState, entityType: string, entityId: string): ShareRoute {
   if (!isRoutableKind(entityType)) return { blocked: 'kind-not-routable' };
   const projectId = owningProjectId(state, entityType, entityId);
   if (projectId === undefined) {
-    const exists =
-      entityType === 'PROJECT'
-        ? live(state.projects[entityId])
-        : entityType === 'TASK'
-          ? live(state.tasks[entityId])
-          : entityType === 'NOTE'
-            ? live(state.notes[entityId])
-            : live(state.comments[entityId]);
+    const exists = entityType === 'TASK' ? live(state.tasks[entityId])
+      : entityType === 'NOTE'
+        ? live(state.notes[entityId])
+        : live(state.comments[entityId]);
     return { blocked: exists ? 'has-no-project' : 'entity-not-found' };
   }
-  const project = state.projects[projectId];
-  if (!live(project)) return { blocked: 'project-not-found' };
-  const shareId = project.shareId;
-  // 空串按"没有"处理：`setProjectShareId` 会拒绝空串，但物化状态可能来自远端 op，不能假定它守规矩。
-  if (shareId === undefined || shareId.trim() === '') return { blocked: 'project-not-shared' };
-  return { shareId: shareId.trim() };
+  if (!live(state.projects[projectId])) return { blocked: 'project-not-found' };
+  const shareId = shareIdOfProject(state, projectId);
+  if (shareId === undefined) return { blocked: 'project-not-shared' };
+  return { shareId };
 }
 
 /**
- * 这条意图是不是**跨边界移动**。
+ * 这条意图是不是**跨边界移动**（0067 补二）。
  *
  * 只在 payload 真写了 `projectId` 时判（`undefined` = 这次没碰那一格）。
  * 两端都算：进共享、出共享、两条共享之间 —— 第三形虽然两侧都在 share log 里，
  * 但**两份 share 的密钥不同**，跨过去等于把内容从一把钥后搬到另一把钥后，属 M3/M4 那一族。
+ *
+ * ⚠️ 两跳都走 {@link shareIdOfProject}，**不走** `routeShareIdForEntity`：
+ * 目的地是一个 `projectId`，而 PROJECT 这个类型按裁决一不进共享 —— 拿它去解析会永远
+ * 返回 `kind-not-routable`，于是"移入共享清单"被读成"从共享移到没有"，判据反向失效。
  */
 export function crossesShareBoundary(state: MaterializedState, intent: OpIntent): boolean {
   if (intent.entityType !== 'TASK' && intent.entityType !== 'NOTE') return false;
   const payload = intent.payload as Record<string, unknown> | undefined;
   if (payload === undefined || !('projectId' in payload)) return false;
-  const from = routeShareIdForEntity(state, intent.entityType, intent.entityId);
-  const toProjectId = payload.projectId;
-  const to =
-    typeof toProjectId === 'string' && toProjectId !== ''
-      ? routeShareIdForEntity(state, 'PROJECT', toProjectId)
-      : ({ blocked: 'has-no-project' } as const);
-  const fromShare = 'shareId' in from ? from.shareId : undefined;
-  const toShare = 'shareId' in to ? to.shareId : undefined;
+  const fromShare = shareIdOfProject(state, owningProjectId(state, intent.entityType, intent.entityId));
+  const to = payload.projectId;
+  const toShare = shareIdOfProject(state, typeof to === 'string' && to !== '' ? to : undefined);
   return fromShare !== toShare;
-}
-
-/** 这条意图在**改共享挂接本身**（`shareId` 字段）⇒ 一律走个人 log（裁决一末段）。 */
-function touchesShareBinding(intent: OpIntent): boolean {
-  if (intent.entityType !== 'PROJECT') return false;
-  const payload = intent.payload as Record<string, unknown> | undefined;
-  return payload !== undefined && 'shareId' in payload;
 }
 
 /** 这条意图在写 `tagIds` 吗？是的话返回那组 tagId。 */
@@ -199,10 +205,6 @@ export interface ShareRoutingPorts {
  */
 export function createShareRoutingDispatcher(ports: ShareRoutingPorts): (intent: OpIntent) => Promise<void> {
   return async (intent: OpIntent): Promise<void> => {
-    if (touchesShareBinding(intent)) {
-      await ports.personalDispatch(intent);
-      return;
-    }
     const state = ports.getState();
     if (crossesShareBoundary(state, intent)) {
       const payload = intent.payload as Record<string, unknown>;

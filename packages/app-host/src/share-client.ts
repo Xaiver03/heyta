@@ -76,14 +76,20 @@ export interface ShareOpDispatchIntent {
  *
  * 🔴 **键是 `entityType:opType`，不是 `opType`。**
  * 这张表原先只按 `opType` 键（评论族那三档），因为那时 share 通道只有评论一族在走。
- * M2 把任务/清单/便签/标签也路由进来之后，`CRT` 同时属于"add comment"与"add task"
+ * M2 把任务/便签/标签也路由进来之后，`CRT` 同时属于"add comment"与"add task"
  * —— 一个键对两个标签，只能靠"每次调用换一张表"来绕，而那份"现在在用哪张表"的状态
  * 迟早和实际写出去的 op 漂移。语义键在 ADR-0067 裁决六里已经定死是 `(entityType, opType)`，
  * 这张表的键就得跟它一致。
  *
+ * 🔴 **没有 `PROJECT:*`**：清单这条记录本身不是共享内容（ADR-0068 裁决一 ——
+ * share 域里没有"清单"这个实体，成员各自持有 id 不同的一行）。
+ * 这张表里留着一行没人走的键，等于把"清单可以共享写"这个口径继续摆在协议边上。
+ *
  * ⚠️ 评论那三个**字符串值逐字不许改**：`actionType` 是线 op 身份的一部分（进 AAD），
  * 改名等于给已经躺在服务端日志里的那批 op 换了一份身份 ⇒ 下行解密必拒（GCM tag 不匹配），
  * 症状是评论区整块解不开，不是"标签旧了一点"。
+ * 删掉 `PROJECT:*` 之所以安全，是因为**从来没有一条 PROJECT 族 share op 上过线**
+ * （M2 写侧本批才接线，历史上进过 share log 的只有 COMMENT 族）。
  *
  * 未登记的一律**抛错**（`shareActionTypeFor`）：让"新动作没登记标签"在写之前就红，
  * 而不是悄悄造一个名字上线。
@@ -97,9 +103,6 @@ const SHARE_ACTION_TYPES: Readonly<Record<string, string>> = {
   'TASK:DEL': 'delete task',
   'TASK:MOV': 'move task',
   'TASK:BATCH': 'batch update task',
-  'PROJECT:CRT': 'add project',
-  'PROJECT:UPD': 'edit project',
-  'PROJECT:DEL': 'delete project',
   'NOTE:CRT': 'add note',
   'NOTE:UPD': 'edit note',
   'NOTE:DEL': 'delete note',
