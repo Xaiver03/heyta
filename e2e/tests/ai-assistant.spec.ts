@@ -69,6 +69,17 @@ test.describe('对话助手：真浏览器端到端旅程', () => {
   test('披露前零出境 → 多步读循环 → 第二句不再拦 → 档位刷新后仍在', async ({ page, request }) => {
     const errors = captureConsole(page);
     await resetStub(request);
+    /**
+     * 拦掉"中央登录配置"那一发外部请求。
+     *
+     * ⚠️ 它是**环境噪音**：这台机器上 `heyta.waytofuture.cn` 的 CORS 头不回
+     * `Access-Control-Allow-Origin`，于是末尾那句"控制台必须干净"会红 ——
+     * 而红的东西与本用例测的行为无关（实测过：同一份代码，网络好时绿、断网时红）。
+     * 与 `ai-assistant-stream.spec.ts` / `auth-simple-ux.spec.ts` 同一处置。
+     */
+    await page.route('**/api/auth/central/config', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: '{}' }),
+    );
     await openApp(page, '/', 'accepted');
 
     await configureEndpoint(page, {

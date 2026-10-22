@@ -49,6 +49,27 @@ const ROUTES = [
 const calls = [];
 
 /**
+ * 回 SSE 还是回整份 JSON。
+ *
+ * 🔴 默认**关**，由 `/__reset?stream=1` 显式打开：这个桩被十来个用例共用，
+ * 悄悄把所有人换成流式会让"某条断言变绿/变红"无法归因到它自己那一处改动。
+ * 开着的用例必须自己声明（`resetStub(request, { stream: true })`）。
+ */
+let streamMode = false;
+
+/**
+ * 流到**第一片正文之后停住**，等 `/__barrier/release` 再继续。
+ *
+ * 🔴 这是"逐字出现"唯一能**确定性**断言的办法：不 hold 的话两片之间只隔 20ms，
+ * 断言要么看不见、要么靠运气（§7 元规则 2：「一条永远通过的判据比没有判据更糟」）。
+ * 停住之后，测试看到的是**真的半句**：前半片在屏幕上、后半片还没到。
+ */
+let streamHold = false;
+
+/** 被挂起的流继续函数（与 `heldResponses` 同一用途，只是粒度在"帧"上）。 */
+const heldStreamSteps = [];
+
+/**
  * 可由浏览器验收控制的响应屏障。
  *
  * 运行中状态必须在请求真的飞行时观测，不能用 sleep 猜竞态。验收先打开
@@ -238,8 +259,11 @@ const server = createServer((req, res) => {
   // `/__reset` 让每个用例从干净的计数开始。
   if (url.startsWith('/__reset')) {
     calls.length = 0;
+    streamMode = url.includes('stream=1');
+    streamHold = url.includes('hold=1');
+    heldStreamSteps.length = 0;
     res.writeHead(200, { ...cors, 'content-type': 'application/json' });
-    res.end('{"ok":true}');
+    res.end(JSON.stringify({ ok: true, stream: streamMode }));
     return;
   }
 
@@ -250,6 +274,7 @@ const server = createServer((req, res) => {
     else if (action === 'release') {
       barrierHeld = false;
       releaseHeldResponses();
+      for (const step of heldStreamSteps.splice(0)) step();
     } else if (action === 'reset') {
       barrierHeld = false;
       releaseHeldResponses();
@@ -389,8 +414,93 @@ const server = createServer((req, res) => {
       ],
       usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
     });
+    /**
+     * 真按 SSE 回：`content-type: text/event-stream`，一帧一个 `data: {...}`，
+     * 最后 `data: [DONE]`。
+     *
+     * 🔴 形状必须与 OpenAI 兼容流一致：文本走 `delta.content`，工具调用走
+     * `delta.tool_calls[{index,id,function:{name,arguments}}]`。
+     * 只回 `message`（非流式那种）会让客户端按 SSE 读到零帧 ——
+     * 于是这条用例测的是"退化路径"，而不是流式本身（本仓库对"桩的 bug"有账）。
+     *
+     * ⚠️ 文本刻意切成**两片**：一片就够测"能收到"，两片才测得到"增量拼接"。
+     */
+    const streamFinish = () => {
+      if (res.writableEnded) return;
+      res.writeHead(200, {
+        ...cors,
+        'content-type': 'text/event-stream',
+        'cache-control': 'no-cache',
+        connection: 'keep-alive',
+      });
+      const frames = [];
+      if (Array.isArray(message.tool_calls)) {
+        message.tool_calls.forEach((call, index) => {
+          frames.push({
+            choices: [
+              {
+                index: 0,
+                delta: {
+                  tool_calls: [
+                    {
+                      index,
+                      id: call.id,
+                      type: 'function',
+                      function: { name: call.function.name, arguments: call.function.arguments },
+                    },
+                  ],
+                },
+              },
+            ],
+          });
+        });
+      } else {
+        const text = String(message.content ?? '');
+        const middle = Math.max(1, Math.floor(text.length / 2));
+        for (const part of [text.slice(0, middle), text.slice(middle)]) {
+          if (part === '') continue;
+          frames.push({ choices: [{ index: 0, delta: { content: part } }] });
+        }
+      }
+      frames.push({
+        choices: [
+          {
+            index: 0,
+            delta: {},
+            finish_reason: Array.isArray(message.tool_calls) ? 'tool_calls' : 'stop',
+          },
+        ],
+      });
+
+      let next = 0;
+      let held = false;
+      const tick = () => {
+        const frame = frames[next];
+        next += 1;
+        if (frame === undefined) {
+          res.write('data: [DONE]\n\n');
+          res.end();
+          return;
+        }
+        res.write(`data: ${JSON.stringify(frame)}\n\n`);
+        const isContent = frame.choices?.[0]?.delta?.content !== undefined;
+        // 第一片正文之后停住（只停一次），等测试放开 —— 见 `streamHold` 的注释。
+        if (streamHold && !held && isContent && frames[next] !== undefined) {
+          held = true;
+          heldStreamSteps.push(() => setTimeout(tick, 20));
+          return;
+        }
+        setTimeout(tick, 20);
+      };
+      tick();
+    };
+
     const finish = () => {
       if (res.writableEnded) return;
+      if (streamMode && parsed?.stream === true) {
+        streamFinish();
+        return;
+      }
       res.writeHead(200, { ...cors, 'content-type': 'application/json' });
       res.end(responseBody);
     };

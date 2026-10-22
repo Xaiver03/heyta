@@ -71,6 +71,34 @@ export function chatRequestHeaders(apiKey: string | undefined): Record<string, s
 }
 
 /**
+ * 请求体的**传输选项**。刻意只有一个键，而且刻意不是 `RequestInit`。
+ *
+ * ## 🔴 `stream` 为什么不算出境数据（这条是加流式之前必须先回答的那个问题）
+ *
+ * `provider.ts` 的 `EGRESS_ORDER_NOTE` 写着：「流式输出看起来更流畅，但它意味着
+ * **在你决定要不要之前，数据已经在路上了**。所以如果将来要加流式，必须先回答
+ * '怎么在第一个字节发出前完成授权'。」
+ *
+ * 答案是：**heyta 的授权本来就在第一个字节之前，而且不是在每一帧之前。**
+ * 对话式助手的披露是**一次性**的（`planAssistantEgress()` 在循环开始前算完，
+ * 用户点头才进循环），`invokeRouted()` 的第三道闸在**网络动作之前**逐候选判。
+ * 流式改变的是**响应**到达的形状，不是请求发出前的顺序 —— 一个字节的请求都
+ * 还没有因为 `stream: true` 而提前发出去。
+ *
+ * 反过来说，`stream` 这个键本身**不携带任何用户内容**：它是一个布尔开关。
+ * 所以"数据面恰好等于披露字段集合"这条不变量**没有被放宽**：
+ * 出去的仍然是 `messages` / `tools`，`fields` 一个字都不用改。
+ *
+ * ⚠️ 也正因为如此，`stream` **不许**长成"可以塞任意键的袋子"：
+ * 一旦接受第二个键（`temperature`、`response_format`…），这条回答就失效了
+ * ——那些键会**改变我们发给端点的东西**，而披露里没有它们。
+ */
+export interface ChatRequestOptions {
+  /** 要服务端按 SSE 逐帧回。省略 ⇒ 请求体与加流式之前**逐字相同**。 */
+  readonly stream?: true;
+}
+
+/**
  * 组装 `chat.completions` 的请求体。
  *
  * 🔴 数据面**恰好**是披露出去的那几个字段（`system` + `user`，将来是多轮 `messages`），
@@ -84,15 +112,18 @@ export function chatRequestHeaders(apiKey: string | undefined): Record<string, s
  *
  * @param model 端点上用的模型名
  * @param invocation 这次调用的内容面
+ * @param options 传输选项，**只有 `stream`**。见下面的「`stream` 为什么不算出境数据」。
  */
 export function buildChatRequestBody(
   model: string,
   invocation: Pick<AiInvocation, 'system' | 'user' | 'tools' | 'messages'>,
+  options?: ChatRequestOptions,
 ): {
   model: string;
   messages: readonly Record<string, unknown>[];
   tools?: readonly WireTool[];
   tool_choice?: 'auto';
+  stream?: true;
 } {
   const withTools = invocation.tools !== undefined && invocation.tools.length > 0;
   return {
@@ -118,6 +149,9 @@ export function buildChatRequestBody(
           tool_choice: 'auto',
         }
       : {}),
+    // 🔴 放在**最后**，且只在要求流式时才出现：省略时键的顺序与缺键形态
+    // 与加流式之前逐字相同（`wire.spec.ts` 按原始串比对）。
+    ...(options?.stream === true ? { stream: true as const } : {}),
   };
 }
 
@@ -175,13 +209,17 @@ export function sameHost(a: string, b: string): boolean {
 export function buildManagedChatRequestBody(
   feature: AiFeature,
   invocation: Pick<AiInvocation, 'system' | 'user' | 'messages'>,
-): { feature: AiFeature; messages: readonly Record<string, unknown>[] } {
+  options?: ChatRequestOptions,
+): { feature: AiFeature; messages: readonly Record<string, unknown>[]; stream?: true } {
   return {
     feature,
     messages: (invocation.messages ?? [
       { role: 'system', content: invocation.system },
       { role: 'user', content: invocation.user },
     ]).map(toWireMessage),
+    // 托管代理的 `ChatBodySchema` 里 `stream` 是可选的（见 `managed-proxy.routes.ts`），
+    // 它的流式分支按 SSE 逐字节透传上游 —— 所以这里与服务端契约同形，不是新协议。
+    ...(options?.stream === true ? { stream: true as const } : {}),
   };
 }
 

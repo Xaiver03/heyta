@@ -76,6 +76,13 @@ import {
   type AiSuggestion,
   type AiToolCall,
 } from './provider.js';
+import {
+  SSE_DONE,
+  createCompletionAccumulator,
+  splitSseFrames,
+  sseData,
+  type StreamDelta,
+} from './stream.js';
 
 // ─────────────────────────────────────────────────────────────────────────
 // 配置
@@ -706,6 +713,20 @@ export interface RoutedDeps {
   /** 时钟。**注入是为了测试能确定性地验证跳闸与冷却**（AGENTS.md §7 #25）。 */
   now?: () => number;
   /**
+   * 要求**流式**：给了它，请求带 `stream: true`，响应按 SSE 逐帧解析，
+   * 每到一个片段就回调一次，最终仍然返回一份与非流式**同形**的 `AiResult`。
+   *
+   * 🔴 它**不是**第二个发送点，也不改回退策略（ADR-0010 那条"流式与非流式的回退
+   * 策略不许不对称"）：仍然走下面同一个候选循环、同一道出境闸门、同一个
+   * `shouldTryNextEndpoint()`。唯一的增量是一条**物理**规则 ——
+   * **已经吐出去字节之后禁止换端点**（见 `invokeRouted` 里 `partial` 那一段）：
+   * 那会把前半句重复一遍，而用户看到的是"模型结巴了"。
+   *
+   * ⚠️ 没给回调 ⇒ 走原来的非流式路径，请求体逐字不变。宿主不支持流式
+   * （例如 React Native 的 `fetch` 没有可读 body）时**不要**传它。
+   */
+  onDelta?: (delta: StreamDelta) => void;
+  /**
    * 起始健康状态。
    *
    * ⚠️ 它也可以走 `invokeRouted` 的返回值链（上一次的 `health` 传回来），
@@ -758,6 +779,15 @@ export async function invokeRouted(
   const now = deps.now ?? Date.now;
   const secretStore = deps.secretStore ?? EMPTY_SECRET_STORE;
   const doFetch = deps.fetchImpl ?? globalThis.fetch;
+
+  /**
+   * 🔴 **只有读得了流的宿主才要流**（要了却读不了 = 请求了一半、拿不回来）。
+   *
+   * 判据是 `TextDecoder`：它缺席的运行时（Hermes）连解码 SSE 都做不到。
+   * 这一层不负责猜宿主能力，只负责"没有能力就退回非流式" ——
+   * 退化方向必须是**能出结果**，而不是"接上流然后卡住"。
+   */
+  const onDelta = typeof TextDecoder === 'function' ? deps.onDelta : undefined;
 
   let health = deps.healthSeed ?? EMPTY_HEALTH;
 
@@ -853,7 +883,7 @@ export async function invokeRouted(
       ? undefined
       : await secretStore.get(candidate.endpointConfig.keyRef);
 
-    const failure = await attemptOnce(
+    const attempt = await attemptOnce(
       candidate,
       apiKey,
       invocation,
@@ -861,9 +891,14 @@ export async function invokeRouted(
       policy.timeoutMs,
       routingMode(config),
       deps.managedTransport,
+      onDelta,
     );
 
-    if (!failure.ok) {
+    if (!attempt.ok) {
+      // 🔴 `partial` 是**包内**标记（"已经有片段出去了"），不是给界面的字段：
+      // 解构掉，别让它顺着 `AiResult` 漏到 UI —— 那会让"失败原因"多出一个
+      // 界面不认识、词条表也没有的键。
+      const { partial, ...failure } = attempt;
       attempts.push({
         endpointId: candidate.endpointConfig.id,
         destination: candidate.destination,
@@ -875,6 +910,19 @@ export async function invokeRouted(
       health = recordOutcome(health, candidate.endpointConfig.id, { ok: false, reason: failure.reason }, policy, now());
       lastFailure = failure;
 
+      // 🔴 **已经吐出去字节之后禁止换端点。**
+      //
+      // 这是流式唯一的回退差异，而且它不是"策略不同"，是**物理**不同：
+      // 前半句已经画在屏幕上了，换一个模型接着写会把上下文接错、把前半句
+      // 重复一遍。ADR-0010 那条"流式与非流式的回退策略不许不对称"针对的是
+      // "同一件事两套语义"；这里仍然只有一条语义：
+      // **只在"一个字节都没发出去"时回退** —— 非流式路径上它退化成原来的行为
+      // （非流式的字节是拿到完整回包之后才有的，所以永远满足这个条件）。
+      //
+      // ⚠️ 代价说清：流式中途断掉时这一次调用就是失败，用户得重发。界面上
+      // 此时**屏幕上已经有半句回答**，所以 `partial` 让调用方知道
+      // "别把这次当成完全没发生"。
+      if (partial === true) break;
       if (!shouldTryNextEndpoint(failure)) break;
       continue;
     }
@@ -892,9 +940,9 @@ export async function invokeRouted(
         ok: true,
         suggestion: {
           feature: invocation.feature,
-          text: failure.text,
+          text: attempt.text,
           destination: candidate.destination,
-          ...(failure.toolCalls === undefined ? {} : { toolCalls: failure.toolCalls }),
+          ...(attempt.toolCalls === undefined ? {} : { toolCalls: attempt.toolCalls }),
         },
       },
       attempts,
@@ -950,7 +998,17 @@ async function attemptOnce(
   mode: AiSupplyMode,
   /** 托管档的宿主通道。只在 `mode === 'managed'` 时被读；见 `RoutedDeps.managedTransport`。 */
   managedTransport?: () => Promise<{ readonly baseUrl: string; readonly token: string } | undefined>,
-): Promise<{ ok: true; text: string; toolCalls?: readonly AiToolCall[] } | AiFailure> {
+  /**
+   * 流式回调。给了它 ⇒ 请求带 `stream: true`，响应按 SSE 解析并逐片段回调。
+   *
+   * ⚠️ 失败时多带一个 `partial` 标记：`true` = **已经有片段回调出去过了**，
+   * 所以调用方（`invokeRouted`）不许再换端点重试 —— 那会把前半句重画一遍。
+   */
+  onDelta?: (delta: StreamDelta) => void,
+): Promise<
+  | { ok: true; text: string; toolCalls?: readonly AiToolCall[] }
+  | (AiFailure & { readonly partial?: true })
+> {
   // 🔴🔴 第二次 URL 校验 —— **在真正要发的那一刻**。
   //
   // 移植自 SSOS 最有价值的一条工程实践（原文见 `validateEndpointUrl` 注释）：
@@ -1020,20 +1078,50 @@ async function attemptOnce(
       'content-type': 'application/json',
       authorization: `Bearer ${transport.token}`,
     };
-    requestBody = buildManagedChatRequestBody(invocation.feature, invocation);
+    requestBody = buildManagedChatRequestBody(
+      invocation.feature,
+      invocation,
+      onDelta === undefined ? undefined : { stream: true },
+    );
   } else {
     requestUrl = chatCompletionsUrl(candidate.endpointConfig.endpoint);
     requestHeaders = chatRequestHeaders(apiKey);
     // 🔴 数据面**恰好**是披露出去的那几项，没有别的字段；线格式与
     // `createProvider()` 共用同一个组装点（`wire.ts`，工单 W7）——
     // 以前两边各拼一遍、互相用注释要求一致，那是没有要求。
-    requestBody = buildChatRequestBody(candidate.model, invocation);
+    // ⚠️ `stream` 是**传输开关**，不是出境数据（理由见 `wire.ts` 的 `ChatRequestOptions`）。
+    requestBody = buildChatRequestBody(
+      candidate.model,
+      invocation,
+      onDelta === undefined ? undefined : { stream: true },
+    );
   }
 
   const controller = new AbortController();
-  const timer = setTimeout(() => {
-    controller.abort();
-  }, timeoutMs);
+  /**
+   * 超时计时器。**流式与非流式的语义不同，而且这个不同是对的**：
+   *   · 非流式：`timeoutMs` 是**整次请求**的预算（回包是一次性来的）；
+   *   · 流式：每收到一片就**重置**，于是它量的是**沉默多久算死**。
+   *     整次预算会误杀"说得很慢但一直在说"的长回答 —— 那正是
+   *     SSOS 用 180s **不活动**预算而不是整轮预算换来的那条结论
+   *     （`apps/client/src/lib/agent-stream.ts` 的 `DEFAULT_AGENT_STREAM_TIMEOUT_MS` 注释）。
+   */
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const armTimeout = (): void => {
+    if (timer !== undefined) clearTimeout(timer);
+    timer = setTimeout(() => {
+      controller.abort();
+    }, timeoutMs);
+  };
+  armTimeout();
+
+  /** 已经**交给调用方**的片段数。它决定"失败后还能不能换端点"（见 `invokeRouted`）。 */
+  let emitted = 0;
+  const emit = (delta: StreamDelta): void => {
+    if (onDelta === undefined) return;
+    emitted += 1;
+    onDelta(delta);
+  };
 
   try {
     const res = await doFetch(requestUrl, {
@@ -1053,6 +1141,33 @@ async function attemptOnce(
         status: res.status,
         ...(serverCode === undefined ? {} : { serverCode }),
         message: `端点「${candidate.endpointConfig.label}」返回 ${String(res.status)}。`,
+      };
+    }
+
+    // ── 要了流式、端点也真回了 SSE ⇒ 逐帧读 ─────────────────────────────
+    //
+    // ⚠️ 判据里带 content-type 而不是"要过就一定是流"：有些兼容层会**忽略**
+    // `stream: true` 直接回一整份 JSON。那种情况下按 SSE 解析会得到零帧、
+    // 判成空响应 —— 用户看到的是"端点返回了空内容"，而真正发生的是
+    // "这个端点不支持流式"。所以这里退回下面的 JSON 路径，只是这一次没有
+    // 逐字出现（不影响结果）。
+    if (onDelta !== undefined && isEventStream(res)) {
+      const streamed = await readEventStream(res, emit, armTimeout, candidate.endpointConfig.label, timeoutMs);
+      if (!streamed.ok) {
+        return { ...streamed.failure, ...(emitted > 0 ? { partial: true as const } : {}) };
+      }
+      // 组装完之后与非流式**同一份形状**，所以空响应判据仍然只有一份实现。
+      if (isEmptyModelResponse({ text: streamed.text, toolCalls: streamed.toolCalls })) {
+        return {
+          ok: false,
+          reason: 'empty-response',
+          message: `端点「${candidate.endpointConfig.label}」返回了空内容。`,
+        };
+      }
+      return {
+        ok: true,
+        text: streamed.text,
+        ...(streamed.toolCalls === undefined ? {} : { toolCalls: streamed.toolCalls }),
       };
     }
 
@@ -1101,6 +1216,138 @@ async function attemptOnce(
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * 这个响应能不能按 SSE 读。
+ *
+ * 🔴 判的是**三件事**，一件都不能省：
+ *   1. `content-type` 里真有 `text/event-stream` —— 有些兼容层忽略 `stream: true`
+ *      直接回整份 JSON，那种响应按 SSE 读会得到零帧（症状是"端点返回了空内容"）；
+ *   2. 宿主有 `TextDecoder`（Hermes 上就没有，见 `sync-core/web-crypto.ts` 文件头）；
+ *   3. 响应真有可读 body（React Native 的 `fetch` 这一项常常是 `null`）。
+ *
+ * ⚠️ 任何一条不满足都**不是错误**：退回非流式读取即可。用户得到的是一份
+ * 完整回答，只是没有逐字出现 —— 这比"报错说这个端点不支持流式"诚实得多，
+ * 因为产品层面发生的事就是"这次没有逐字"。
+ */
+interface StreamCapableResponse {
+  readonly body: ReadableStream<Uint8Array> | null;
+  readonly headers: { get(name: string): string | null };
+}
+
+function isEventStream(res: StreamCapableResponse): boolean {
+  if (typeof TextDecoder !== 'function') return false;
+  if (res.body === null || res.body === undefined) return false;
+  const headers = res.headers;
+  if (typeof headers?.get !== 'function') return false;
+  return (headers.get('content-type') ?? '').toLowerCase().includes('text/event-stream');
+}
+
+/** 一次流式读取的结果：成功时与 `extractContent` + `extractToolCalls` 同形。 */
+type StreamReadResult =
+  | {
+      readonly ok: true;
+      readonly text: string;
+      readonly toolCalls: readonly AiToolCall[] | undefined;
+    }
+  | { readonly ok: false; readonly failure: AiFailure };
+
+/**
+ * 逐帧读完一段 SSE，边读边把片段交出去。
+ *
+ * 🔴 三件必须做对的事（每一件都有对应的失败症状）：
+ *   · **保留半帧**（`splitSseFrames`）：一帧跨两个网络分片是常态，
+ *     直接 `JSON.parse` 会把正常流打断；
+ *   · **坏帧跳过而不是整段失败**：一帧解析不出来只该丢这一帧，
+ *     否则一个 keep-alive 的空帧就能把整轮回答打死；
+ *   · **`[DONE]` 是结束哨兵**：它不是 JSON，但它出现之后上游不会再发东西。
+ *
+ * ⚠️ 中途断开**不是**"空响应"：那会把"网断了"说成"模型没说话"，
+ * 而两者的下一步动作完全相反（重试 vs 换个问法）。所以归 `network`，
+ * 并把"已经有片段出去了"这件事留给调用方（`partial`）。
+ */
+async function readEventStream(
+  res: StreamCapableResponse,
+  emit: (delta: StreamDelta) => void,
+  rearm: () => void,
+  label: string,
+  timeoutMs: number,
+): Promise<StreamReadResult> {
+  const body = res.body;
+  if (body === null) {
+    return {
+      ok: false,
+      failure: {
+        ok: false,
+        reason: 'empty-response',
+        message: `端点「${label}」开了流式却没有响应体。`,
+      },
+    };
+  }
+
+  const accumulator = createCompletionAccumulator();
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let finished = false;
+
+  const drain = (frames: readonly string[]): void => {
+    for (const frame of frames) {
+      const data = sseData(frame);
+      if (data === undefined) continue;
+      if (data === SSE_DONE) {
+        finished = true;
+        return;
+      }
+      let payload: unknown;
+      try {
+        payload = JSON.parse(data);
+      } catch {
+        continue;
+      }
+      for (const delta of accumulator.accept(payload)) emit(delta);
+    }
+  };
+
+  try {
+    while (!finished) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      // 每收到一片就重置超时 ⇒ 这个预算量的是**沉默**，不是整轮时长。
+      rearm();
+      buffer += decoder.decode(chunk.value, { stream: true });
+      const split = splitSseFrames(buffer);
+      buffer = split.rest;
+      drain(split.frames);
+    }
+    if (!finished && buffer !== '') {
+      // 有些端点不发收尾的空行；把尾巴当成最后一帧，别丢掉最后几个字。
+      buffer += decoder.decode();
+      drain(splitSseFrames(`${buffer}\n\n`).frames);
+    }
+  } catch (error) {
+    const aborted = error instanceof Error && error.name === 'AbortError';
+    return {
+      ok: false,
+      failure: {
+        ok: false,
+        reason: 'network',
+        message: aborted
+          ? `端点「${label}」的流中断了：超过 ${String(timeoutMs)} 毫秒没有再收到任何内容。`
+          : `端点「${label}」的流中断了：${error instanceof Error ? error.message : String(error)}`,
+      },
+    };
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
+
+  const toolCalls = accumulator.toolCalls;
+  return {
+    ok: true,
+    text: accumulator.text,
+    toolCalls: toolCalls.length === 0 ? undefined : toolCalls,
+  };
 }
 
 /** 把"一个候选都没有"翻译成用户能看懂的一句话。 */

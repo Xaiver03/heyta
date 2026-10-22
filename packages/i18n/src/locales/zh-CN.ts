@@ -2393,6 +2393,15 @@ export const zhCN = {
   'web.ai.chat.limits': '一轮最多 {requests} 次模型调用，单次请求最多 {messages} 条消息、{bytes} 字节。',
   'web.ai.chat.trace': '用了 {n} 步工具',
   'web.ai.chat.noTrace': '没有调用工具',
+  // 过程行（流式）的动词。**状态在前、工具名在后**：用户先要知道"这一步在干什么"，
+  // 再决定要不要看"具体是哪个工具"。`读/写` 两种靠 `AssistantStep.kind` 分，不靠工具名猜。
+  'web.ai.chat.step.reading': '正在读取',
+  'web.ai.chat.step.read': '已读取',
+  'web.ai.chat.step.readFailed': '读取失败',
+  'web.ai.chat.step.preparing': '正在准备改动',
+  'web.ai.chat.step.written': '已准备改动',
+  'web.ai.chat.step.writeFailed': '改动失败',
+  'web.ai.chat.step.thinking': '思考',
   'web.ai.chat.local.empty': '没有符合条件的内容。',
   'web.ai.chat.local.found': '我找到 {count} 项：',
   'web.ai.chat.local.untitled': '（未命名）',

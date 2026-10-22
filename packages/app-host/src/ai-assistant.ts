@@ -206,6 +206,40 @@ export interface AssistantStep {
   readonly note?: string;
 }
 
+/**
+ * 一轮进行中的**过程事件** —— 界面靠它把"机器在做什么"边做边说。
+ *
+ * ## 为什么是这四个，而不是一个 `log(string)`
+ *
+ * 界面要用**四种不同的行**渲染它们（这也是"过程可见"的形状）：
+ *   · `text` / `reasoning` 进气泡（正文与思考分开）；
+ *   · `tool-started` 开一行"正在调用工具 · <名字>"，**在执行之前**；
+ *   · `tool-finished` 把那一行改成"已读取 / 读取失败"，并把失败原因带上。
+ *
+ * 合成一个字符串等于让界面去**解析文案**——那是把展示层的事实源塞进字符串里，
+ * 而字符串会被翻译、会被截断，两个界面各解析一遍就得到两种"过程"。
+ *
+ * 🔴 **这些事件不是结果。** 结果仍然只有 `AssistantOutcome` 那一份：
+ * 事件是**进行中**的观感，丢了它不影响正确性（移动端就不收）。
+ * 所以：不许在事件里做决定，也不许把事件当历史存 —— 历史存的是 outcome 的
+ * `appended` 与 `steps`。
+ *
+ * ⚠️ `tool-started` 只有工具名与读/写，**不含参数**：参数里是用户数据，
+ * 而"屏幕上有这一行"不需要它；需要看具体内容时看执行结果与提案卡。
+ */
+export type AssistantTurnEvent =
+  | { readonly type: 'text'; readonly delta: string }
+  | { readonly type: 'reasoning'; readonly delta: string }
+  | { readonly type: 'tool-started'; readonly tool: string; readonly kind: 'read' | 'write' }
+  | {
+      readonly type: 'tool-finished';
+      readonly tool: string;
+      readonly kind: 'read' | 'write';
+      readonly ok: boolean;
+      /** 失败时工具层给的说明（与 `AssistantStep.note` 同一份原文）。 */
+      readonly note?: string;
+    };
+
 /** 助手层的失败原因。**每个都独立可展示**，不复用 `ai-unavailable`。 */
 export type AssistantFailureReason =
   | 'empty-text'
@@ -300,6 +334,16 @@ export interface AssistantTurnDeps {
   readonly localize: LocalObservationTranslate;
   /** 一次用户发送的稳定标识；执行档以此防止重放产生重复 op。 */
   readonly executionId?: string;
+  /**
+   * 过程事件回调。**给了它这一轮才走流式**（`invokeRouted` 的 `onDelta`）。
+   *
+   * 🔴 省略时行为与从前**逐字相同**：请求体里没有 `stream`，响应按整份 JSON 读。
+   * 这条不是兼容洁癖 —— 移动端的 `fetch` 没有可读 body，那边只能在整段回来之后
+   * 渲染；让它也带 `stream: true` 会得到"请求要流、读不了流"的死路。
+   *
+   * ⚠️ 回调里**不许做决定**（不许写、不许改历史）：它是观感通道。
+   */
+  readonly onEvent?: (event: AssistantTurnEvent) => void;
   /** 已有历史（由壳持久化）。出境的只有这次实际带上消息数组。 */
   readonly history?: readonly AssistantMessage[];
   readonly policy?: AiRoutingPolicy;
@@ -709,6 +753,30 @@ export async function requestAssistantTurn(
   // 一个自相矛盾的上下文，且没有任何一层会报。
   const system = assistantSystemPrompt(anchorNow);
 
+  /**
+   * 这一轮交给 `invokeRouted` 的依赖。
+   *
+   * 🔴 `onDelta` 只在**调用方要了过程事件**时装上 —— 它是这一层唯一的流式开关，
+   * 而且开关的方向必须是"显式要"：没要就一个字节的 `stream` 都不带
+   * （移动端读不了流，见 `AssistantTurnDeps.onEvent`）。
+   *
+   * ⚠️ 片段的**翻译**在这里，不在 `packages/ai`：出境层只知道"文本/思考/工具名到了"，
+   * 它不该知道界面要用哪几种行。工具名片段**不转发**：参数还没装配完，
+   * 这时候开一行"正在调用工具"会让界面先亮一行再改字。
+   */
+  const routedDeps: RoutedDeps =
+    deps.onEvent === undefined
+      ? (deps.routed ?? {})
+      : {
+          ...(deps.routed ?? {}),
+          onDelta: (delta) => {
+            if (delta.type === 'text') deps.onEvent?.({ type: 'text', delta: delta.delta });
+            else if (delta.type === 'reasoning') {
+              deps.onEvent?.({ type: 'reasoning', delta: delta.delta });
+            }
+          },
+        };
+
   const steps: AssistantStep[] = [];
   const toolTranscript: ChatMessage[] = [];
   let health: HealthMap = {};
@@ -773,7 +841,7 @@ export async function requestAssistantTurn(
       invocation,
       deps.consents,
       deps.policy,
-      deps.routed ?? {},
+      routedDeps,
     );
     health = outcome.health;
     const result = outcome.result;
@@ -842,6 +910,11 @@ export async function requestAssistantTurn(
     const spec = findTool(call.name);
     const kind: 'read' | 'write' = spec?.kind === 'write' ? 'write' : 'read';
 
+    // 🔴 这一行在**执行之前**发出去：界面要能在工具跑着的时候就说"正在调用"。
+    // 放在 `runSelectedTool` 之后发，等于承认"过程可见"只在跑完之后成立。
+    const onEvent = deps.onEvent;
+    onEvent?.({ type: 'tool-started', tool: call.name, kind });
+
     const run = await runSelectedTool(
       { kind: 'tool', ruleId: `assistant:${call.name}`, tool: call.name, args: parsed.args },
       runnerDeps,
@@ -849,6 +922,7 @@ export async function requestAssistantTurn(
 
     if (run.kind === 'proposal') {
       steps.push({ tool: run.proposal.tool, kind: 'write', ok: true });
+      onEvent?.({ type: 'tool-finished', tool: run.proposal.tool, kind: 'write', ok: true });
       const note = lastText.trim();
       return finishWrite(run.proposal, note, steps, health, destination);
     }
@@ -869,6 +943,7 @@ export async function requestAssistantTurn(
         };
       }
       steps.push({ tool: run.tool, kind: 'read', ok: true });
+      onEvent?.({ type: 'tool-finished', tool: run.tool, kind: 'read', ok: true });
       toolTranscript.push({
         role: 'tool',
         content: JSON.stringify(run.data),
@@ -879,12 +954,11 @@ export async function requestAssistantTurn(
 
     // denied / failed / none / ambiguous：把**失败本身**回送给模型，让它换一条路。
     // ⚠️ 这一步仍然计入上界 —— 失败不能免费重试到无穷。
-    steps.push({
-      tool: run.kind === 'denied' || run.kind === 'failed' ? run.tool : call.name,
-      kind: 'read',
-      ok: false,
-      ...(run.kind === 'denied' || run.kind === 'failed' ? { note: run.message } : {}),
-    });
+    const failedTool = run.kind === 'denied' || run.kind === 'failed' ? run.tool : call.name;
+    // 同一份原因同时进**事件**与 **steps**：两处各写一遍三元式，迟早会只改一处。
+    const failureNote = run.kind === 'denied' || run.kind === 'failed' ? { note: run.message } : {};
+    onEvent?.({ type: 'tool-finished', tool: failedTool, kind: 'read', ok: false, ...failureNote });
+    steps.push({ tool: failedTool, kind: 'read', ok: false, ...failureNote });
     toolTranscript.push({
       role: 'tool',
       content:

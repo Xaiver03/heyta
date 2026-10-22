@@ -634,6 +634,7 @@ export {
   type AssistantStep,
   type AssistantTier,
   type AssistantTurnDeps,
+  type AssistantTurnEvent,
   type LocalObservationKey,
   type LocalObservationTranslate,
 } from './ai-assistant.js';
