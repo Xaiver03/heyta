@@ -847,6 +847,11 @@ export const zhCN = {
   // 窄屏底部导航那一档给文字的只有 34px（12px 字号 = 两个汉字），整句状态必然被截成
   // 「登…」——那等于没有状态。所以那一档显示稳定的控制名，整句仍走 aria-label 与 live region。
   'web.sync.rail.compact': '同步',
+  // 共享清单里"两个人改了同一处、要你定"的那一句（ADR-0067 裁决三）。
+  // 个人同步状态里没有这一项，所以它必须自己有措辞，否则界面上只剩一个没有解释的警示点。
+  // 中文无单复数，刻意与复数版逐字相同（en 侧才会不同）。
+  'web.sync.shareAttention': '共享清单有 {count} 处改动等你定',
+  'web.sync.shareAttentionOne': '共享清单有 {count} 处改动等你定',
   'web.sync.settings.title': '同步设置',
   'web.sync.settings.close': '关闭同步设置',
   // H9 第 3 刀：这一节说明"同步到底把什么送出去"。原来的「关闭同步设置」随着

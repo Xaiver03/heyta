@@ -141,7 +141,7 @@ describe('写侧：共享清单的改动不再进个人 op-log', () => {
 
 describe('读侧：currentState() 交出的是合并视图', () => {
   it('别人建的那条任务在界面上显形，并挂到本机那条清单行', () => {
-    attach(shareState({ tRemote: { id: 'tRemote', title: '别人买的漆', projectId: 'pAuthorSide' } }));
+    attach(shareState({ tRemote: { id: 'tRemote', title: '别人买的漆', projectId: 'pAuthorSide', createdAt: 0, updatedAt: 0 } }));
     const merged = currentState();
     expect(merged.tasks['tRemote']?.title).toBe('别人买的漆');
     // 🔴 作者本机那条清单 id 在这台设备上不存在；不重定位就落进"未归属"。
@@ -151,7 +151,7 @@ describe('读侧：currentState() 交出的是合并视图', () => {
   });
 
   it('摘掉接线 ⇒ 逐字退回引擎那一份（共享内容随之消失，本机条目一条不少）', () => {
-    attach(shareState({ tRemote: { id: 'tRemote', title: '别人买的漆', projectId: 'pAuthorSide' } }));
+    attach(shareState({ tRemote: { id: 'tRemote', title: '别人买的漆', projectId: 'pAuthorSide', createdAt: 0, updatedAt: 0 } }));
     expect(currentState().tasks['tRemote']).toBeDefined();
     attachShareWiring(undefined);
     expect(currentState()).toBe(requireEngine().getState());
@@ -161,7 +161,7 @@ describe('读侧：currentState() 交出的是合并视图', () => {
 
   it('判据与界面同源：只有共享日志里有的那条任务，路由也认它是共享的', async () => {
     const before = await personalOpCount();
-    attach(shareState({ tRemote: { id: 'tRemote', title: '别人买的漆', projectId: 'pAuthorSide' } }));
+    attach(shareState({ tRemote: { id: 'tRemote', title: '别人买的漆', projectId: 'pAuthorSide', createdAt: 0, updatedAt: 0 } }));
     await dispatchIntent({ entityType: 'TASK', entityId: 'tRemote', opType: OpType.Update, payload: { title: '买漆两桶' } });
     expect(sent.map((c) => c.intent.entityId)).toEqual(['tRemote']);
     expect(await personalOpCount()).toBe(before);
@@ -174,12 +174,12 @@ describe('第二个提交入口：dispatchChecked（CAS）同样分流', () => {
     const before = await personalOpCount();
     const value = await dispatchChecked<string>(() => ({
       value: '估时已写',
-      intent: { entityType: 'TASK', entityId: 'tShared', opType: OpType.Update, payload: { timeEstimate: 3_600_000 } },
+      intent: { entityType: 'TASK', entityId: 'tShared', opType: OpType.Update, payload: { note: '两桶，周末刷' } },
     }));
     expect(value).toBe('估时已写');
     expect(await personalOpCount()).toBe(before);
     expect(sent).toHaveLength(1);
-    expect(sent[0]?.intent).toEqual({ entityType: 'TASK', entityId: 'tShared', opType: OpType.Update, payload: { timeEstimate: 3_600_000 } });
+    expect(sent[0]?.intent).toEqual({ entityType: 'TASK', entityId: 'tShared', opType: OpType.Update, payload: { note: '两桶，周末刷' } });
   });
 
   it('个人条目上的 CAS 动作 ⇒ 仍在引擎写队列里落盘（接路由没让 CAS 退化）', async () => {
@@ -187,13 +187,13 @@ describe('第二个提交入口：dispatchChecked（CAS）同样分流', () => {
     const before = await personalOpCount();
     const value = await dispatchChecked<string>(() => ({
       value: '本地写好了',
-      intent: { entityType: 'TASK', entityId: 'tPersonal', opType: OpType.Update, payload: { timeEstimate: 1_800_000 } },
+      intent: { entityType: 'TASK', entityId: 'tPersonal', opType: OpType.Update, payload: { note: '本机写的备注' } },
     }));
     expect(value).toBe('本地写好了');
     expect(await personalOpCount()).toBe(before + 1);
     expect(sent).toHaveLength(0);
     // 落的是 build 交回的那条 intent，不是被摘走半截的形状。
-    expect(currentState().tasks['tPersonal']?.timeEstimate).toBe(1_800_000);
+    expect(currentState().tasks['tPersonal']?.note).toBe('本机写的备注');
   });
 
   it('CAS 里判定"这次不写" ⇒ 两侧零调用', async () => {

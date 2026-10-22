@@ -45,6 +45,7 @@ import { syncStatusAffordances, syncStatusGlyph, syncStatusSeverity } from '@hey
 import { AlertTriangle, CheckCircle2, CloudOff, RefreshCw } from 'lucide-react';
 
 import { AuthPanel } from '../auth/AuthPanel.js';
+import { useShareConflicts } from '../share/use-share-conflicts.js';
 import { describeSyncStatus } from './status-copy.js';
 
 /**
@@ -73,16 +74,38 @@ export function SyncBar({ compactLabel = false }: { compactLabel?: boolean } = {
   const { t } = useI18n();
   const sync = useSyncStore();
   const affordances = syncStatusAffordances(sync.status);
+  const shareConflicts = useShareConflicts();
   const signedIn = sync.baseUrl.trim() !== '' && sync.token?.trim() !== '';
+  const baseSeverity = syncStatusSeverity(sync.status);
+  /**
+   * 🔴 **第二个"要人来定"的来源**（ADR-0067 裁决三）。
+   *
+   * `syncStatusAffordances` 只看个人同步状态，共享域从 share 日志推出来的那批冲突**不在里面**。
+   * 不并这一源的症状很具体：只有共享冲突时这枚按钮 `disabled`，
+   * 而它是打开冲突对话框的**唯一**入口 —— 对话框列得出来，用户却走不到它。
+   * 那是把"必须可见"重新做成静默，正是这一格要挡的东西。
+   *
+   * 升级只在个人侧本来不催用户时发生（`neutral` / `success`）：
+   * `progress` 是"正在同步"的即时反馈，`failure` 另有更要紧的出路，
+   * 两者都不许被共享冲突盖掉；而 `attention`（个人冲突）本来就与共享冲突说的是同一档事。
+   */
+  const shareAttention =
+    shareConflicts.length > 0 && (baseSeverity === 'neutral' || baseSeverity === 'success');
+  const needsResolution = affordances.needsResolution || shareAttention;
   // Keep an existing error/conflict visible even when credentials are missing:
   // replacing it with a generic sign-in label hides the action the user needs
   // to understand or resolve the current state. Only an idle, unconfigured
   // rail needs the compact sign-in prompt.
-  const statusText = !signedIn && sync.status.kind === 'idle'
-    ? t('common.sync.signIn')
-    : describeSyncStatus(sync.status, t);
-  const severity = syncStatusSeverity(sync.status);
-  const Glyph = GLYPH_COMPONENTS[syncStatusGlyph(sync.status)];
+  const statusText = shareAttention
+    ? t(
+        shareConflicts.length === 1 ? 'web.sync.shareAttentionOne' : 'web.sync.shareAttention',
+        { count: shareConflicts.length },
+      )
+    : !signedIn && sync.status.kind === 'idle'
+      ? t('common.sync.signIn')
+      : describeSyncStatus(sync.status, t);
+  const severity = shareAttention ? 'attention' : baseSeverity;
+  const Glyph = GLYPH_COMPONENTS[shareAttention ? 'alert' : syncStatusGlyph(sync.status)];
   /**
    * 注册 / 登录面板的开合**在 `useSyncStore` 里**，不是这里的局部 state：
    *
@@ -112,6 +135,9 @@ export function SyncBar({ compactLabel = false }: { compactLabel?: boolean } = {
            有冲突时用户下一步要的是"处理"，不是"再同步一次"。原来那颗
            「处理冲突」主按钮因此不再单独存在（48px 里放不下两枚主按钮），
            而"关掉对话框之后还得能再打开它"这条由"同一枚按钮 + 警示态"兑现。
+           ⚠️ M2（ADR-0067 裁决三）之后 `needsResolution` 是**两源合一**：
+           个人同步状态里的那批 + 共享域自己推出来的那批。共享那批不在 `sync.status` 里，
+           所以它不并进来的话，只有共享冲突时这枚是**禁用**的，而它是唯一的入口。
         3. **同步中不可再点**：沿用共享的 `syncStatusAffordances`，不在这里另判一次。
 
         ⚠️ 外层必须是 `<div>` 而不是把按钮直接摊进 `<nav>`：rail 的贴底靠
@@ -132,10 +158,10 @@ export function SyncBar({ compactLabel = false }: { compactLabel?: boolean } = {
           className="ht-rail__tab ht-rail__sync__action"
           aria-label={t('web.sync.rail.aria', { status: statusText })}
           data-testid="sync-rail-action"
-          disabled={signedIn && !affordances.canSyncNow && !affordances.needsResolution}
+          disabled={signedIn && !affordances.canSyncNow && !needsResolution}
           onClick={() => {
             if (!signedIn) { sync.openSignIn(); return; }
-            if (affordances.needsResolution) {
+            if (needsResolution) {
               sync.openConflictDialog();
               return;
             }

@@ -784,6 +784,11 @@ export const en = {
   // ellipsizes into noise there. That tier shows the stable control name instead; the
   // sentence stays in aria-label and the live region.
   'web.sync.rail.compact': 'Sync',
+  // "Two members changed the same field — you decide" (ADR-0067 ruling 3).
+  // Personal sync status has no such item, so it needs its own wording; without it the
+  // rail would show an unexplained warning dot.
+  'web.sync.shareAttention': '{count} shared changes need your decision',
+  'web.sync.shareAttentionOne': 'One shared change needs your decision',
   'web.sync.settings.title': 'Sync settings',
   'web.sync.settings.close': 'Close sync settings',
   // Cut 3 of ticket H9: this section says what sync actually sends out.
