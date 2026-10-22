@@ -1117,3 +1117,5 @@ main 在推送之后又被别线推进（`git rev-parse --short HEAD` 现量，�
 改的是 `e2e/tests/*.spec.ts`，所以把**会解析 spec 文本的静态门**复跑了一遍（不是"应该不受影响"，是量过）：
 `check:locator-labels`／`check:journey-coverage`／`check:integration-coverage`／`check:gate-wiring` 四枚各 **rc=0**。
 其中 `locator-labels` 是这趟真该问的一枚：新断言的 message 是一行中文，而那道门的分母就是"含汉字的字符串字面量"、不区分定位符与日志行（环境陷阱 **#429**）。
+再核一件事，免得下一位以为漏跑：改的是 `e2e/` 那棵**独立工作区**，它压根不在 `pnpm -r test` 的分母里（**#523** 同一根因），
+所以这一趟的复跑口径就是 `verify:collab-journey` 本身（上面那两趟），不是"再跑一遍全仓测试"。
