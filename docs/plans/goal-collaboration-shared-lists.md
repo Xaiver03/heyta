@@ -1154,7 +1154,8 @@ workspace 项目 21 枚**逐枚都有 `test` 脚本**（现重算，缺的 0 枚
    `pnpm check:image-license` rc=1（自托管线：镜像 npm 树快照与 `server/package-lock.json` 分家，门自己给的情形 ②）。
    两枚的相关文件对 HEAD 都干净 ⇒ 不是谁写一半。
 2. **`pnpm reinstall:all` 四端** —— 预检 `CARRIER=$HOME/heyta-carriers/heyta-wt-collab-m5 sh research/tools/b-reinstall-readiness.sh`
-   现量 exit 3、三项前置：负载 > 12（外来常驻进程，`pgrep -fl heyta` 回 0 ⇒ 不是等谁交活）、
+   现量 exit 3、三项前置：负载超阈值（阈值不是拍的数——脚本里 `LOAD_LIMIT = $(sysctl -n hw.ncpu) * 3/4`，本机 16 核 ⇒ 12；
+   读数 23–33 ⇒ 1.4–2 倍超订，而这台机器上还挂着两趟别线的活在跑；`pgrep -fl heyta` 回 0 ⇒ 这负载不是本仓任何一趟造的）、
    iOS 没有已启动模拟器、Android 没有在线设备。**后两格脚本自己不代起设备**，起不起归产品负责人（停止点 ③）。
    点头之后一条命令点火：`CARRIER=$HOME/heyta-carriers/heyta-wt-collab-m5 bash research/tools/b-reinstall-readiness.sh --confirm`；
    载体已追平到本线 tip、`pnpm-lock.yaml` 的 sha256 与主检出逐字相同 ⇒ 不用再补准备。
