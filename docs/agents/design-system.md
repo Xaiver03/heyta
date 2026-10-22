@@ -50,6 +50,26 @@ pnpm check:design     # 非零退出 = 有裸值
 > **这个测试已经抓到过真问题**：`quadrant-3` 原用 amber-600（`3.19:1`）不达正文标准，
 > 已改为 amber-700（`5.02:1`）。写在文档里的"4.5:1"是拦不住的。
 
+### 🔴 行内动作条：每一枚动作都是 `.ht-chip`，不许裸 `<summary>`
+
+`.ht-compose-actions__items` 这一排（备注 / 子任务 / 截止 / 提醒 / AI …）里，
+动作的**字号不属于组件，属于这一排**：`.ht-chip` = `font-size-2xs`（11px）。
+一枚裸 `<summary>` 只写 display/gap/color 时，字号会**回落到从行的 16px** ——
+于是同一排出现 11px 与 16px 两档，而所有测试都是绿的。
+
+2026-10-21 实测（1012×632 打开「更多」）：`备注/子任务/提醒` = 11px，`截止` = **16px**，
+用户一眼看出来（"截止这两个字也太大了吧"）。修法是把它收进 `.ht-chip`，
+判据是 `e2e/tests/ai-panel-layout.spec.ts` 里那条**同一排 font-size 必须只有一档**。
+
+### 🔴 把 RN 组件嵌进 web 的 flex 行：必须显式给它 `flex` / `max-inline-size`
+
+React Native 的 `View` 默认 `flex: 0 0 auto`（与 CSS 的 `0 1 auto` **不同**），
+`width: auto` 于是解析成 **max-content**。嵌进 web 的 flex 行时，它会**既不收缩也不换行**，
+把容器撑破。实测：AI 提案面板（RN `View`）在 384px 的行内浮层里量到 **493px**，
+左溢 121px 压住任务列表 —— 原因是 note 那一整行 469px + 内边距 24px。
+判据与修法都在 `apps/web/src/styles/app/controls.css` 的
+`.ht-compose-actions__items > [role='dialog']` 那一段（`flex: 1 1 100%` + `min-inline-size: 0`）。
+
 ### 容易犯的几个错
 
 - ❌ **用 emoji 当图标** —— 跨平台渲染不一致且不受 token 控制。统一用 **Lucide**。

@@ -308,13 +308,17 @@ export function DueEditor({
         ref={summaryRef}
         aria-label={t('web.due.summaryAria', { title: task.title })}
         data-testid="due-editor-summary"
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: cssVar('space.1'),
-          cursor: 'pointer',
-          color: cssVar('color.foreground-muted'),
-        }}
+        /**
+         * 🔴 这一枚必须**和同一排的兄弟同一档**：备注 / 子任务 / 提醒 都是
+         * `.ht-chip`（11px、`font-size-2xs`），而它原来是一个**裸 `<summary>`**
+         * 只写了 display/gap/color —— 字号于是回落到继承来的 **16px**。
+         * 2026-10-21 实测（1012×632，打开「更多」）：四个动作里 `截止` 是 16px、
+         * 另外三个 11px，同一排三套字号。用户一眼就看出来了（"截止这两个字也太大了吧"）。
+         * ⇒ 收进 `.ht-chip`：字号/内边距/圆角/前景色全部回到设计系统那一份，
+         * 不再在这里手写（手写的那几项与 `.ht-chip` 逐项重复）。
+         */
+        className="ht-chip"
+        style={{ listStyle: 'none' }}
       >
         <Calendar size={TRIGGER_ICON_SIZE} aria-hidden="true" />
         {t('web.due.trigger')}
