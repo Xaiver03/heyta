@@ -412,8 +412,6 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
           }}
         />
 
-        <AiGeneratedLabel label={t('common.ai.generatedLabel')} testID="prioritize-proposal-generated" />
-
         {proposal.truncated && (
           <p className="ht-ai__warn" data-testid="prioritize-truncated">
             <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" />
@@ -451,6 +449,9 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
             </li>
           ))}
         </ul>
+
+        {/* 标识在建议清单**下方**（备案材料原话）。 */}
+        <AiGeneratedLabel label={t('common.ai.generatedLabel')} testID="prioritize-proposal-generated" />
 
         <p className="ht-ai__note">
           {t('web.ai.prioritize.noteLead')}<strong>{t('web.ai.prioritize.noteStrong')}</strong>{t('web.ai.prioritize.noteMid')}{' '}

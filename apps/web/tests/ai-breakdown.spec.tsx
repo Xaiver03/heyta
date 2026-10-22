@@ -309,6 +309,14 @@ describe('🔴🔴 AI 的输出不会自己写进数据', () => {
     click(el.querySelector('[data-testid="ai-breakdown-t1"]'));
     await clickAsync(el.querySelector('[data-testid="ai-send"]'));
     expect(el.querySelector('[data-testid="ai-proposal-generated"]')?.textContent).toBe('AI 生成合成内容');
+    // 材料写的是「下方」：标识必须排在**被标识的那份清单之后**。
+    expect(
+      follows(
+        el.querySelector('[data-testid="ai-items"]'),
+        el.querySelector('[data-testid="ai-proposal-generated"]'),
+      ),
+      '标识要在清单下方（备案材料那句「显示在这段文字的下方」）',
+    ).toBe(true);
   });
 });
 
@@ -871,3 +879,15 @@ describe('🔴 反馈层：处置必须被记录', () => {
     expect(el.querySelector('[data-testid="ai-proposal"]')).toBeNull();
   });
 });
+
+/**
+ * `later` 是否真的排在 `earlier` **之后**（DOM 顺序）。
+ *
+ * 🔴 这条判据来自备案材料自己写的那句：显式标识"展示在七类 AI 产出文本的**下方**"。
+ * 材料说的是位置，而位置只能由 DOM 顺序证明 —— "标签存在"在上方/下方两种排法下
+ * 都是绿的（本仓库对恒真判据有账）。
+ */
+function follows(earlier: Element | null, later: Element | null): boolean {
+  if (earlier === null || later === null) return false;
+  return (earlier.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+}

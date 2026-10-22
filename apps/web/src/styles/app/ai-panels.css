@@ -700,6 +700,66 @@ input[type="radio"] {
   font-size: var(--ht-font-size-2xs);
 }
 
+/* ── 过程行（流式助手一步步在做什么）────────────────────────
+ *
+ * 形状照"一行一句、默认收起"：`动词 · 工具名`，展开才是工具层给的原文。
+ * 🔴 三件事都是**功能**：
+ *   1. `nowrap + ellipsis`：一行一步，换行会让"过程"变成一坨段落，
+ *      而这一步的价值恰恰是"扫一眼就知道它在干什么"；
+ *   2. 收起态与展开态**同一个类**（`.ht-ai__step-line`），因为它们是同一个语义，
+ *      只是挂了 `details` 与不挂的区别 —— 两套样式会让两种行在视觉上不是一类；
+ *   3. 无障碍：`<details>/<summary>` 自带展开语义，不自己造一个 div + 点击事件。
+ */
+.ht-ai__steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ht-ai__step {
+  margin: 0;
+  min-inline-size: 0;
+}
+
+.ht-ai__step-body {
+  min-inline-size: 0;
+}
+
+.ht-ai__step-line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ht-space-1);
+  min-inline-size: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--ht-color-foreground-subtle);
+  /* 12px 是「辅助文字下限」（`tokens.css` 那行的原话）。这一行是**正文的旁证**，
+     不是"极致紧凑标签"（那是 11px 的用途），所以用 xs。 */
+  font-size: var(--ht-font-size-xs);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: default;
+}
+
+/* 展开器的那一行可以点，收起态那一行不能 —— 把"能点"表达出来，别让用户猜。 */
+.ht-ai__step-body > .ht-ai__step-line {
+  cursor: pointer;
+}
+
+.ht-ai__step-verb {
+  flex: none;
+  color: var(--ht-color-foreground-subtle);
+}
+
+.ht-ai__step-detail {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .ht-ai__actions {
   display: flex;
   /* 🔴 窄窗时**整组**换行（输入框收缩到下限后按钮去下一行），

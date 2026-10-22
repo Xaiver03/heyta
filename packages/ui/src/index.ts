@@ -1273,6 +1273,10 @@ export { AssistantMark } from './ai/AssistantMark.js';
    🔴 它透过 useHeytaTokens / useHeytaText 取 token ⇒ 宿主必须挂在
    <HeytaUiProvider> 之内，已登记进 scripts/check-ui-provider.mjs 的 PROVIDER_DEPENDENT。 */
 export { AiGeneratedLabel, type AiGeneratedLabelProps } from './ai/AiGeneratedLabel.js';
+export {
+  aiGeneratedLabelStyle,
+  type AiGeneratedLabelStyle,
+} from './ai/generated-label-style.js';
 
 /* 清单删除确认的第二句后果的取数：删一条**文件夹**时，它底下的子清单会整支
    从侧栏消失（`toOrganizerTree` 的已知取舍，见 `./projects/model.ts` 那里的注释）。

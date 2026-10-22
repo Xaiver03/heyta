@@ -336,3 +336,36 @@
   position: relative;
   z-index: var(--ht-z-popover);
 }
+
+/* ── 行内浮层里的 AI 面板：按容器宽换行，不许把浮层撑宽 ─────────────────
+ *
+ * 2026-10-21 实测（1012×632，打开「更多」→ AI 拆解 → 提案）：
+ *   浮层   `.ht-compose-actions__panel`      x=604  w=384
+ *   AI 面板 `[data-testid="ai-proposal"]`    x=483  **w=493**  ← 左溢 121px
+ *
+ * 原因不是"宽度算错"，而是一枚 **RN 的 View**：RNW 默认 `flex: 0 0 auto`
+ * （现量 `flex = 0 0 auto`），于是它在 flex 行里既不长大也不收缩，宽度取
+ * **max-content**（那句 note 的整行 469 + 内边距 24 = 493）。而浮层起点是
+ * `margin-inline-start: calc(100% - 面板宽)`（B214 那条"往左长"）⇒ 多出来的
+ * 121px 全部长到了**左边**，压住任务列表与侧栏。
+ * ⇒ 在行内浮层这一档里把它变成"占满一行 + 允许收缩"：宽度回到 360，正文换行。
+ */
+.ht-compose-actions__items > [role='dialog'],
+.ht-compose-actions__items > [role='status'] {
+  flex: 1 1 100%;
+  inline-size: 100%;
+  max-inline-size: 100%;
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+/* 🔴 装了 AI 面板的浮层必须是**不透明**面。
+ *
+ * 材质 tint 实测是 `rgba(255,255,255,.78)`，于是底下任务行的字会透上来：
+ * 1080×720 与 1012×632 两档都能量到下层「截止」「AI 估时」以**另一个字号**
+ * 浮在面板里 —— 读起来像排版崩了，实际是"两层字叠在一起"。
+ * ⚠️ 只影响"浮层里装了 AI 面板"这一档，其它菜单仍是材质面。
+ */
+.ht-compose-actions__panel:has([role='dialog']) {
+  background: var(--ht-color-surface);
+}

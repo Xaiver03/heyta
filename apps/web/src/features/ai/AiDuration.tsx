@@ -477,8 +477,6 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
           }}
         />
 
-        <AiGeneratedLabel label={t('common.ai.generatedLabel')} testID="duration-proposal-generated" />
-
         {/* 🔴 夹过就必须说 —— 静默夹取等于让用户以为模型说的就是这个数。 */}
         {proposal.clamped && (
           <p className="ht-ai__warn" data-testid="duration-clamped">
@@ -492,6 +490,9 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
         )}
 
         <div data-testid="duration-proposal-basis">{renderBasis()}</div>
+
+        {/* 标识在估算依据**下方**（备案材料原话）。 */}
+        <AiGeneratedLabel label={t('common.ai.generatedLabel')} testID="duration-proposal-generated" />
 
         <p className="ht-ai__note">
           {t('web.ai.duration.note')}
