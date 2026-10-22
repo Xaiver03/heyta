@@ -127,9 +127,13 @@ describe('share-client（W2-T1）', () => {
 
   it('未登记的 opType ⇒ 写之前就红（不静默造动作名）', () => {
     expect(() => shareActionTypeFor('COMMENT', 'CRT')).not.toThrow();
-    // M2 起任务/清单/便签/标签族也必须登记（评论那三个标签字符串逐字不许改：它进 AAD）。
+    // M2 起任务/便签/标签族也必须登记（评论那三个标签字符串逐字不许改：它进 AAD）。
     expect(() => shareActionTypeFor('TASK', 'CRT')).not.toThrow();
-    expect(() => shareActionTypeFor('PROJECT', 'UPD')).not.toThrow();
+    expect(() => shareActionTypeFor('NOTE', 'UPD')).not.toThrow();
+    expect(() => shareActionTypeFor('TAG', 'CRT')).not.toThrow();
+    // 🔴 清单**不在**这张表里：它不是共享内容（ADR-0068 裁决一）。留一行没人走的键
+    // 等于把"清单可以共享写"这个口径继续摆在协议边上，所以这一枚必须是**抛**。
+    expect(() => shareActionTypeFor('PROJECT', 'UPD')).toThrow(/Unregistered share actionType/);
     expect(() => shareActionTypeFor('COMMENT', 'LWW_BULK')).toThrow(/Unregistered share actionType/);
   });
 });

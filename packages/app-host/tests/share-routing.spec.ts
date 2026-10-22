@@ -7,15 +7,15 @@
  * | 判据 | 坏法（症状） |
  * |---|---|
  * | 共享清单的写进 share、个人的写进个人 | 两边都写 ⇒ 对面看到重复；只写个人 ⇒ 就是 M2 之前那格"互相看不见" |
- * | `shareId` 那一格**一律**走个人 log | 解绑被路由进 share ⇒ "我取消共享"变成一条共享写，每个成员都收到 |
+ * | 清单这条记录本身（含挂接/解绑）**一律**走个人 log | 进 share ⇒ "我取消共享"变成一条共享写，每个成员都收到；而对面物化出一条本机没有对应行的记录 |
  * | 跨边界移动具名拒绝、**两侧零调用** | 悄悄只写一半 ⇒ 实体历史裂成两本 log，任一侧回放都残缺；静默忽略 ⇒ 用户以为移动成功了 |
  * | 写 `tagIds` 前先把标签发布进这份 share | 不发布 ⇒ 对面渲染出一枚解不出名字的空白标签 |
  * | 解析不出来（任务没挂清单）⇒ 走个人、不抛 | 抛错 ⇒ 在个人清单上改一条无归属任务被炸 |
  *
  * 变异验证（一次性臂，做完即还原）：
- * ① 把 `touchesShareBinding` 那个提前 return 摘掉 ⇒ 「解绑走个人 log」那条必红；
- * ② 把 `crossesShareBoundary` 的抛错换成 `return`（静默忽略）⇒ 跨边界那两条必红；
- * ③ 把标签发布那段 `continue` 改成无条件发 ⇒ 「已在册不重发」必红。
+ * ① 把 `isRoutableKind` 里的 `PROJECT` 判断改成"含 PROJECT" ⇒ 那三条 PROJECT 判据红；
+ * ② 把 `crossesShareBoundary` 的抛错换成 `return`（静默忽略）⇒ 跨边界那几条红；
+ * ③ 把标签发布那段 `continue` 改成无条件发 ⇒ 「已在册不重发」红。
  */
 import { describe, expect, it } from 'vitest';
 
@@ -131,7 +131,7 @@ describe('写侧分流：一个意图只进一本 log', () => {
   });
 });
 
-describe('共享挂接本身一律走个人 log（裁决一末段）', () => {
+describe('清单这条记录本身一律走个人 log（ADR-0068 裁决一）', () => {
   it('解绑（清单已在册、payload 把 shareId 置空）⇒ 仍走个人，绝不进 share', async () => {
     const { calls, dispatch } = harness(fixture());
     await dispatch({ entityType: 'PROJECT', entityId: 'pShared', opType: OpType.Update, payload: { shareId: null } });
@@ -139,11 +139,15 @@ describe('共享挂接本身一律走个人 log（裁决一末段）', () => {
     expect(calls.personal).toHaveLength(1);
   });
 
-  it('同一份清单上改名字（不碰 shareId）⇒ 正常进 share', async () => {
+  it('同一份清单上改名字（shareId 在册）⇒ **也走个人**：清单不是共享内容', async () => {
     const { calls, dispatch } = harness(fixture());
     await dispatch({ entityType: 'PROJECT', entityId: 'pShared', opType: OpType.Update, payload: { name: '家庭装修' } });
-    expect(calls.share).toHaveLength(1);
-    expect(calls.personal).toHaveLength(0);
+    expect(calls.share).toHaveLength(0);
+    expect(calls.personal).toHaveLength(1);
+  });
+
+  it('PROJECT 这个类型解析结果 = kind-not-routable（判据只有一处，不留"改绑定"那种特例守卫）', () => {
+    expect(routeShareIdForEntity(fixture(), 'PROJECT', 'pShared')).toEqual({ blocked: 'kind-not-routable' });
   });
 });
 

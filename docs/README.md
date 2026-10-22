@@ -95,6 +95,7 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 |---|---|---|
 | [0066](adr/0066-official-central-identity-and-self-hosted-auth.md) | 官方中央身份、自托管认证与 E2EE 边界 | 已接受；[实施状态](plans/unified-central-auth.md) |
 | [0067](adr/0067-shared-list-write-routing-and-merge.md) | 共享清单的写路径路由与多写者合并语义（承接 0062；线协议一次定，M2 做路由+因果时钟+并发可见，M4 做签名） | 已接受（工程裁决 2026-10-22）；实施见 [协作计划](plans/collaboration-shared-lists.md) §9.3 的 M2/M4 |
+| [0068](adr/0068-share-member-identity-and-content-publication.md) | 共享清单的成员侧身份（收窄 0067 裁决一的 PROJECT 那一支）、读侧按 shareId 归并、存量内容发布快照 | 已接受（工程裁决 2026-10-22）；M2 的读侧合并与发布那两片的判据来源 |
 | [0001](adr/0001-license-decision.md) | heyta 自身的许可证选择 = **MIT** | ✅ **已接受** |
 | [0002](adr/0002-migration-tooling.md) | 数据库迁移方案：继续用 Prisma，不引入 Flyway | ✅ **已接受** |
 | [0003](adr/0003-multi-platform-strategy.md) | 多端策略：业务逻辑全在 `packages/`，`apps/*` 只做壳 | ✅ **已接受** |
