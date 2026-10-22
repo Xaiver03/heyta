@@ -1,14 +1,17 @@
 /**
- * 共享清单的评论 —— **端壳侧装配**（ADR-0062 W4-0；`check:reachability` 断言 C 的转绿点）。
+ * 共享清单的**写通道与评论动作** —— 端壳侧装配（ADR-0062 W4-0；`check:reachability` 断言 C 的转绿点）。
  * =========================================================================
  *
  * 判据 C 只在 `apps/<端>/src/**` 里数 `\b<家族>\s*\(` 的调用面（`check-reachability.mjs:360-361`），
  * 所以"宿主真的调用得到"这句话必须落在这里 —— 而**判断一个字都不在这里**：
- * - 「这条清单是不是共享的、该不该走共享通道」在 `@heyta/app-host` 的
- *   `comment-actions.ts`（`shareIdForTask`）；"发到哪、什么条件下不发、发完怎么落本地"
- *   在 `createShareCommentDispatch`（同一个包）。
+ * - 「这条清单是不是共享的、该不该走共享通道」在 `@heyta/app-host` 的 `share-routing.ts`
+ *   （`decideShareWrite`，M2 起任务/便签/评论三族共用这一份）；"发到哪、什么条件下不发、
+ *   发完怎么落本地"在 `createShareCommentDispatch`（同一个包）。
  * - 本文件只做**注入**：baseUrl/token（同步设置与登录态）、vault 的载荷密钥、
  *   本地 share 密钥库、以及一个 `Storage` 上的 share 日志。
+ * - 交出去的 `channel` 不只给评论用：`lib/oplog.ts` 的路由派发器拿它写共享清单里的任务与便签，
+ *   而 `features/share/share-session.ts` 保证**这台设备上一个会话只有一份**（那份重放缓存
+ *   就是合并视图的数据源，两份实例会各看到一份内容）。
  * 这个形状与 `features/tasks/store.ts:253-259` 的 `createTaskActions(actionContext)` 是同一套。
  */
 
@@ -20,11 +23,12 @@ import {
   type CommentActions,
   type ShareLogStorage,
   type SharePullResult,
+  type ShareWriteChannel,
 } from '@heyta/app-host';
 import type { CommentLike } from '@heyta/domain';
 import { createSharePayloadCipher, ShareApiClient, type SyncPayloadCipher } from '@heyta/sync-client';
 
-import { currentState, dispatchChecked, dispatchIntent } from '../../lib/oplog.js';
+import { emitEngineChange, currentState, dispatchChecked, dispatchIntent } from '../../lib/oplog.js';
 import { createWebAuthFetch } from '../../lib/central-fetch.js';
 import { createWebShareKeyRotation } from './share-rotation.js';
 import { unwrapShareKeyRing } from './share-key-store.js';
@@ -118,6 +122,14 @@ export interface WebShareCommentsDeps {
 
 export interface WebShareComments {
   readonly actions: CommentActions;
+  /**
+   * 共享写通道（ADR-0067 裁决一那本 log 的唯一出口）+ 它的已重放状态。
+   *
+   * 🔴 M2 之后这一枚不只服务于评论：`dispatchIntent` 的路由要把**任务/便签**的写也交给它。
+   * 交出去的是"发到哪、怎么落本地"这件既有实现（`createShareCommentDispatch`），
+   * 端壳不许再写第二份 —— 那正是这条线一直在防的漂移。
+   */
+  readonly channel: ShareWriteChannel;
   /** 从重放出来的共享域状态读某条任务的活评论。 */
   commentsForTask(taskId: string): CommentLike[];
   /**
@@ -178,25 +190,44 @@ export function createWebShareComments(deps: WebShareCommentsDeps): WebShareComm
   });
 
   // 路由数据从 op-log 的当前状态读（任务 → 清单 → shareId），与任务动作同源。
+  // 🔴 交出去的是 `currentState()`（M2 起那是**合并视图**），不是引擎的个人状态：
+  // 判据与界面必须读同一份，两处各读一份就一定会漂（ADR-0068 裁决二）。
   const ctx: ActionContext = {
     dispatch: (intent) => dispatchIntent(intent),
     dispatchChecked: (build) => dispatchChecked(build),
     getState: currentState,
   };
 
+  /*
+   * 共享内容能在**个人 op-log 一动没动**的前提下变：这条写进的是 share log，
+   * 而各 store 是被 op-log 的通知驱动的。不敲这一下，症状是
+   * "评论发出去了 / 别人写的任务拉回来了，界面却停在打开那一刻"。
+   * ⚠️ 拉取只在**真拿到新内容**时敲：`added = 0` 时状态引用没变，敲一次是白重渲染一遍。
+   */
+  const dispatchShareOp = async (shareId: string, intent: Parameters<typeof dispatch.dispatchShareOp>[1]): Promise<void> => {
+    await dispatch.dispatchShareOp(shareId, intent);
+    emitEngineChange();
+  };
+  const pullShareOps = async (shareId: string): Promise<SharePullResult> => {
+    const result = await dispatch.pullShareOps(shareId);
+    if (result.added > 0) emitEngineChange();
+    return result;
+  };
+
   // 🔴 判据 C 数的那一处：端壳里真的构造评论动作（判断全在 app-host 里）。
   const actions = createCommentActions(ctx, {
-    dispatchShareOp: dispatch.dispatchShareOp,
+    dispatchShareOp,
     currentUserId: () => deps.userId,
   });
 
   return {
     actions,
+    channel: { dispatch: dispatchShareOp, stateFor: dispatch.stateFor },
     commentsForTask: dispatch.commentsForTask,
     pullForTask: createShareTaskPuller({
       shareIdOfTask: actions.shareIdOfTask,
-      pullShareOps: dispatch.pullShareOps,
+      pullShareOps,
     }),
-    pullShareOps: dispatch.pullShareOps,
+    pullShareOps,
   };
 }

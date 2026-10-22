@@ -51,6 +51,7 @@ import { createWebAuthFetch } from '../../lib/central-fetch.js';
 import { text } from '../../lib/text.js';
 import { forgetShareLocally, shareTransferFailure, type ShareTransferFailure } from '@heyta/app-host';
 import { clearStorageShareLog } from './comment-actions.js';
+import { resetWebShareSession } from './share-session.js';
 import { createWebShareKeyRotation } from './share-rotation.js';
 import {
   getShareKeyEntry,
@@ -292,6 +293,9 @@ export function ShareFeature(props: ShareFeatureProps) {
           { dropKey: () => { deleteShareKey(localStorage, shareId); }, dropShareData: () => { clearStorageShareLog(localStorage, shareId); } },
           shareId,
         );
+        // 🔴 盘上删了还不够：这台会话那份**已解密**的重放缓存还在内存里，
+        // 而 M2 起合并视图读的就是它 —— 不摘掉，别人写的评论会继续显示在本机界面上。
+        resetWebShareSession();
         setPhase({ kind: 'not-a-member' });
       }
     }
@@ -664,6 +668,9 @@ export function ShareFeature(props: ShareFeatureProps) {
                       { dropKey: () => { deleteShareKey(localStorage, phase.shareId); }, dropShareData: () => { clearStorageShareLog(localStorage, phase.shareId); } },
                       phase.shareId,
                     );
+                    // 🔴 同上：内存里那一份已解密的 replay 缓存也必须掉，
+                    // 否则"离开了这份共享"之后本机界面还读得到别人写的评论。
+                    resetWebShareSession();
                     // 成员端离开：本地的这条清单一并移除（它是加入时建的那行）。
                     await useProjectStore.getState().deleteProject(projectId);
                     onClose();

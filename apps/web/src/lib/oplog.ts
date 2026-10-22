@@ -28,10 +28,13 @@ import type { Operation } from '@heyta/sync-core';
 // 而 `ids.ts` 的文件头那张"漂移对照表"里**已经列过它**。
 // 两份实现的差距不是风格问题 —— clientId 是 LWW 冲突的决胜依据。
 import {
+  createShareRoutingCheckedDispatcher,
+  createShareRoutingDispatcher,
   parseExportDocument,
   resolveClientId,
   restoreIntoEmptyTarget,
   type RestoreExportResult,
+  type ShareWriteChannelProvider,
 } from '@heyta/app-host';
 
 let engine: OpLogEngine | undefined;
@@ -511,7 +514,66 @@ export function requireStore(): OpLogStore<Operation<string>> {
 }
 
 export function currentState(): MaterializedState {
-  return requireEngine().getState();
+  const personal = requireEngine().getState();
+  // 共享写路由没装上（没登录 / 密钥没解锁 / 这台设备没有共享清单）⇒ 个人状态就是全部状态。
+  return shareWiring === undefined ? personal : shareWiring.mergeView(personal);
+}
+
+/**
+ * 让各 store **重读一次状态**（与 `dispatchIntent` 末尾那一下同一件事）。
+ *
+ * 🔴 为什么要有这一枚公开的：共享内容能在**个人 op-log 一动没动**的前提下变化 ——
+ * 别人写的任务由 M5 那条信号拉回本地日志、或本机的共享写落进 share log。
+ * 那些都不走引擎，于是没有任何东西会替界面敲这一下；症状是"数据在盘上、界面不动"。
+ * 只在真的拉到/发出内容之后调用（见 `features/share/share-session.ts`）。
+ */
+export function emitEngineChange(): void {
+  notify();
+}
+
+/**
+ * **共享写路由的接线**（ADR-0067 裁决一 + ADR-0068 裁决二在这一端的落点）。
+ *
+ * 两件事必须由同一处装配，否则"互相看不见"会以另一种形状回来：
+ * 1. **写**：一条意图进个人 log 还是进 share log ⇒ 判据在 app-host（`decideShareWrite`），
+ *    这里只负责"把引擎的写入口和 share 通道递过去"。
+ * 2. **读**：`currentState()` 交出的是**合并视图**。写侧判据读的也是它 ——
+ *    别人建的那条任务只在合并视图里存在；拿个人状态去判会判成"个人"，
+ *    于是改动悄悄只落本机，正好是 M2 要关掉的那一格。
+ *
+ * ⚠️ 这里是**装配**，不是判断：壳里不写"什么算共享的"，一个字都不写（AGENTS §3.5）。
+ */
+export interface ShareWiring {
+  /** share 写通道的晚绑定提供者（密钥是异步解出来的，所以允许返回 Promise）。 */
+  readonly channel: ShareWriteChannelProvider;
+  /** 个人状态 → 合并视图（实现在 app-host 的 `mergeShareView`）。 */
+  readonly mergeView: (personal: MaterializedState) => MaterializedState;
+}
+
+let shareWiring: ShareWiring | undefined;
+let routedDispatch: ((intent: OpIntent) => Promise<void>) | undefined;
+let routedChecked: (<T>(build: CheckedDispatchBuilder<T>) => Promise<T>) | undefined;
+
+export function attachShareWiring(wiring: ShareWiring | undefined): void {
+  shareWiring = wiring;
+  if (wiring === undefined) {
+    routedDispatch = undefined;
+    routedChecked = undefined;
+  } else {
+    const ports = {
+      personalDispatch: async (intent: OpIntent): Promise<unknown> => requireEngine().dispatch(intent),
+      channel: wiring.channel,
+      getState: currentState,
+    };
+    routedDispatch = createShareRoutingDispatcher(ports);
+    routedChecked = createShareRoutingCheckedDispatcher({
+      ...ports,
+      engineDispatchChecked: <T>(build: CheckedDispatchBuilder<T>): Promise<T> =>
+        requireEngine().dispatchChecked(build),
+    });
+  }
+  // 装上/摘掉都改变了 `currentState()` 的答案 ⇒ 界面要重读一次。
+  notify();
 }
 
 /**
@@ -558,17 +620,32 @@ export async function readRecentOps(
  *
  * 任何实体变更都必须经过这里。绕过它 = 改动不进 op-log =
  * 永不同步、无向量时钟记录、崩溃恢复无法重放，而界面看起来完全正常。
+ *
+ * M2 之后它同时是**路由点**：装了共享通道时，判据决定这一条进个人 log 还是进 share log
+ * （见 `attachShareWiring`）。没装时逐字等于引擎的 `dispatch`。
  */
 export async function dispatchIntent(intent: OpIntent): Promise<void> {
-  await requireEngine().dispatch(intent);
-  notify();
+  const routed = routedDispatch;
+  try {
+    if (routed === undefined) await requireEngine().dispatch(intent);
+    else await routed(intent);
+  } finally {
+    // ⚠️ 失败也通知：共享写是"先发几条、再撞墙"的形状（补一那条标签发布成功、
+    // 主 op 失败），而 share 侧的内容变化同样只有靠重读才看得见。
+    // 只成功才 notify 的话，界面会停在"发出去了但没有"。
+    notify();
+  }
 }
 
 /** Serialize a state-dependent action decision with the shared engine queue. */
 export async function dispatchChecked<T>(build: CheckedDispatchBuilder<T>): Promise<T> {
-  const value = await requireEngine().dispatchChecked(build);
-  notify();
-  return value;
+  const routed = routedChecked;
+  try {
+    if (routed === undefined) return await requireEngine().dispatchChecked(build);
+    return await routed(build);
+  } finally {
+    notify();
+  }
 }
 
 /** 应用一批远程 op（3.3 同步客户端会调用）。 */
@@ -615,6 +692,11 @@ export function __resetOpLogForTests(): void {
   initPromise = undefined;
   // 只丢引用，不在这里 terminate（重置是给下一段测试用的，不是销毁路径）。
   storageWorker = undefined;
+  // 共享路由同理：留着它，下一段测试的 `dispatchIntent` 会去问一枚已经不存在的通道。
+  // 这里**不**走 `attachShareWiring(undefined)` —— 那会 notify()，而重置的下一刻引擎是空的。
+  shareWiring = undefined;
+  routedDispatch = undefined;
+  routedChecked = undefined;
   // ⚠️ **不要清空 listeners。**
   // 订阅是模块级注册的（各 store 在模块加载时订阅一次），
   // 清空之后重新 initOpLog() 也不会再注册 —— 于是重置一次之后

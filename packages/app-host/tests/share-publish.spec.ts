@@ -65,6 +65,11 @@ function personal(shareStateTasks: Row = {}): { state: MaterializedState; share:
   return { state, share };
 }
 
+interface ShareCall {
+  shareId: string;
+  intent: { entityType: string; entityId: string; opType: string; payload?: unknown };
+}
+
 function contentIds(
   calls: readonly { shareId: string; intent: { entityType: string; entityId: string; opType: string } }[],
 ): string[] {
@@ -77,10 +82,10 @@ function portsFor(
 ): {
   ports: SharePublishPorts;
   intents: OpIntent[];
-  shareIntents: { shareId: string; intent: { entityType: string; entityId: string; opType: string } }[];
+  shareIntents: ShareCall[];
 } {
   const intents: OpIntent[] = [];
-  const shareIntents: { shareId: string; intent: { entityType: string; entityId: string; opType: string } }[] = [];
+  const shareIntents: ShareCall[] = [];
   const channel: ShareWriteChannel | undefined = opts.channel === false
     ? undefined
     : {

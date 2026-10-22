@@ -11,7 +11,7 @@
  *    在两侧的单测里都是绿的 —— 闸门在 `@heyta/ui` 测过、投递在壳里测过，
  *    **只有接起来那一行**没被任何人测。这正是本仓最高发的失效形状。
  *
- * mock 的只有**边**（vault 会话、共享客户端、本地引擎、盘上的日志），
+ * mock 的只有**边**（那一份共享实例、本地引擎、盘上的日志），
  * 判断本体（`createShareOpsSignalHandler` / `selectNotifiedActivities`）走真实代码。
  */
 
@@ -65,10 +65,6 @@ const rig = vi.hoisted(() => {
   return { log: { ops: [] as unknown[] }, pulled: 0, incoming };
 });
 
-vi.mock('../src/lib/vault-session.js', () => ({
-  getWebVaultSession: async () => ({ getPayloadCipher: async () => ({ fake: 'cipher' }) }),
-}));
-
 vi.mock('../src/features/share/comment-actions.js', () => ({
   createStorageShareLog: () => ({
     load: () => rig.log,
@@ -77,8 +73,18 @@ vi.mock('../src/features/share/comment-actions.js', () => ({
     cursor: () => 0,
     setCursor: () => undefined,
   }),
-  createWebShareComments: () => ({
+}));
+
+/*
+ * M2 起这一片不再自己 `createWebShareComments`，而是问 `share-session.ts` 要那一份
+ * （这台会话里只有一份，合并视图与写路由读的是它的缓存）。
+ * ⚠️ 这里**必须**替身整枚模块而不是让它真跑：真实现会去读同步 store 的登录态并建 vault 会话，
+ * 而那两件事各有自己的判据（`share-session.spec.ts`），混进来就分不清是哪一格坏了。
+ */
+vi.mock('../src/features/share/share-session.js', () => ({
+  ensureWebShareSession: async () => ({
     actions: {},
+    channel: { dispatch: async () => undefined, stateFor: () => ({}) },
     commentsForTask: () => [],
     pullForTask: async () => undefined,
     pullShareOps: async () => {

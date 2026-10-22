@@ -26,7 +26,7 @@
  *    所以写共享任务的 `tagIds` 时，**尚未在这份 share 里**的 tagId 各补一条 TAG 创建 op。
  *    它是另一条 op，因为它是另一个意图（"这份清单里得先有这个名字"），不是同一个意图拆两条。
  */
-import type { MaterializedState, OpIntent } from '@heyta/op-log';
+import type { CheckedDispatchBuilder, MaterializedState, OpIntent } from '@heyta/op-log';
 import { OpType } from '@heyta/sync-core';
 
 import type { ShareOpDispatchIntent } from './share-client.js';
@@ -184,18 +184,95 @@ export interface ShareWriteChannel {
   stateFor(shareId: string): MaterializedState;
 }
 
+export type ShareWriteChannelProvider = () => ShareWriteChannel | undefined | Promise<ShareWriteChannel | undefined>;
+
 export interface ShareRoutingPorts {
   /** 个人 op-log 的唯一写入口（引擎的 `dispatch`）。 */
   personalDispatch(intent: OpIntent): Promise<unknown>;
   /**
-   * share 通道的**晚绑定**提供者。
+   * share 通道的**晚绑定**提供者（允许返回 Promise）。
    *
    * 🔴 为什么不直接把通道函数传进来：动作层在模块加载时就装配好了，而 share 通道
    * 要等登录、解锁密钥之后才存在。传死值等于"登录前装的动作永远拿不到通道"；
    * 传提供者则每次派发现问一次"这会儿有没有"。
+   *
+   * 🔴 为什么这一问**必须是异步的**：端壳那把载荷密钥要等 vault 会话建好才拿得到
+   *   （`getPayloadCipher()` 是 async）。同步版会让"刚开机、密钥还在路上"这几百毫秒
+   *   撞成 `ShareChannelUnavailableError` —— 而那句话是**假**的：用户已登录、钥也在，
+   *   只是这一问来得太早。让它等一次，比让用户对着一条假错误重试要便宜。
    */
-  channel(): ShareWriteChannel | undefined;
+  channel: ShareWriteChannelProvider;
+  /**
+   * 🔴 **合并视图**（ADR-0068 裁决二那一份），不是引擎的个人状态。
+   *
+   * 传个人状态的话，"别人建的那条任务"在这里解析不出来 ⇒ 判成个人 ⇒ 改动悄悄只落本机，
+   * 而这正是 M2 要关掉的那一格。判据与读视图必须同源，两处各读一份就一定会漂。
+   */
   getState(): MaterializedState;
+}
+
+/** 一条意图的路由结论。三形互斥，且**只由 {@link decideShareWrite} 产出**。 */
+export type ShareWriteDecision =
+  | { readonly kind: 'personal' }
+  | { readonly kind: 'reject-move' }
+  | { readonly kind: 'share'; readonly shareId: string };
+
+/**
+ * 这条意图该进哪本 log —— 判据的**唯一**出处。
+ *
+ * 抽出来是因为 `dispatch` 与 `dispatchChecked` 两条路都必须给同一个答案：
+ * 少了一处（比如只在 `dispatch` 上判），另一条路（AI 追加清单、估时那两枚走 CAS 的动作）
+ * 就会把共享清单里一条任务的改动写进个人 log —— 症状和 M2 之前一模一样，只是换了个入口。
+ *
+ * ⚠️ `state` 必须是**合并视图**（ADR-0068 裁决二）。传个人状态的话，
+ * 别人建的那条任务在这里解析不出来 ⇒ 判成 `personal` ⇒ 改动悄悄只落本机。
+ */
+export function decideShareWrite(state: MaterializedState, intent: OpIntent): ShareWriteDecision {
+  if (crossesShareBoundary(state, intent)) return { kind: 'reject-move' };
+  const route = routeShareIdForEntity(state, intent.entityType, intent.entityId);
+  if (!('shareId' in route)) return { kind: 'personal' };
+  return { kind: 'share', shareId: route.shareId };
+}
+
+/** 把一条判定为 `share` 的意图交出去（含 0067 补一的标签发布）。 */
+async function commitShareWrite(
+  intent: OpIntent,
+  shareId: string,
+  state: MaterializedState,
+  channel: ShareWriteChannel,
+): Promise<void> {
+  // 补一：先把这份清单还解不出名字的标签发进去，再写那条 tagIds。
+  const wanted = tagIdsIn(intent);
+  if (wanted !== undefined) {
+    const shareState = channel.stateFor(shareId);
+    for (const tagId of wanted) {
+      if (live(shareState.tags[tagId])) continue;
+      const tag = state.tags[tagId];
+      if (!live(tag)) continue; // 个人侧都没有 ⇒ 不猜，交给对面那枚空白自己去显形
+      await channel.dispatch(shareId, {
+        entityType: 'TAG',
+        entityId: tagId,
+        opType: OpType.Create,
+        payload: { name: tag.name, ...(tag.color === undefined ? {} : { color: tag.color }) },
+      });
+    }
+  }
+  await channel.dispatch(shareId, {
+    entityType: intent.entityType,
+    entityId: intent.entityId,
+    opType: intent.opType,
+    ...(intent.payload === undefined ? {} : { payload: intent.payload }),
+  });
+}
+
+function moveError(state: MaterializedState, intent: OpIntent): ShareCrossListMoveError {
+  const payload = intent.payload as Record<string, unknown>;
+  const from = routeShareIdForEntity(state, intent.entityType, intent.entityId);
+  return new ShareCrossListMoveError(
+    intent.entityId,
+    'shareId' in from ? from.shareId : owningProjectId(state, intent.entityType, intent.entityId),
+    typeof payload.projectId === 'string' ? payload.projectId : undefined,
+  );
 }
 
 /**
@@ -206,44 +283,64 @@ export interface ShareRoutingPorts {
 export function createShareRoutingDispatcher(ports: ShareRoutingPorts): (intent: OpIntent) => Promise<void> {
   return async (intent: OpIntent): Promise<void> => {
     const state = ports.getState();
-    if (crossesShareBoundary(state, intent)) {
-      const payload = intent.payload as Record<string, unknown>;
-      const from = routeShareIdForEntity(state, intent.entityType, intent.entityId);
-      throw new ShareCrossListMoveError(
-        intent.entityId,
-        'shareId' in from ? from.shareId : owningProjectId(state, intent.entityType, intent.entityId),
-        typeof payload.projectId === 'string' ? payload.projectId : undefined,
-      );
-    }
-    const route = routeShareIdForEntity(state, intent.entityType, intent.entityId);
-    if (!('shareId' in route)) {
+    const decision = decideShareWrite(state, intent);
+    if (decision.kind === 'reject-move') throw moveError(state, intent);
+    if (decision.kind === 'personal') {
       await ports.personalDispatch(intent);
       return;
     }
-    const shareId = route.shareId;
-    const channel = ports.channel();
-    if (channel === undefined) throw new ShareChannelUnavailableError(intent.entityType, intent.entityId, shareId);
-    // 补一：先把这份清单还解不出名字的标签发进去，再写那条 tagIds。
-    const wanted = tagIdsIn(intent);
-    if (wanted !== undefined) {
-      const shareState = channel.stateFor(shareId);
-      for (const tagId of wanted) {
-        if (live(shareState.tags[tagId])) continue;
-        const tag = state.tags[tagId];
-        if (!live(tag)) continue; // 个人侧都没有 ⇒ 不猜，交给对面那枚空白自己去显形
-        await channel.dispatch(shareId, {
-          entityType: 'TAG',
-          entityId: tagId,
-          opType: OpType.Create,
-          payload: { name: tag.name, ...(tag.color === undefined ? {} : { color: tag.color }) },
-        });
-      }
+    const channel = await ports.channel();
+    if (channel === undefined) {
+      throw new ShareChannelUnavailableError(intent.entityType, intent.entityId, decision.shareId);
     }
-    await channel.dispatch(shareId, {
-      entityType: intent.entityType,
-      entityId: intent.entityId,
-      opType: intent.opType,
-      ...(intent.payload === undefined ? {} : { payload: intent.payload }),
+    await commitShareWrite(intent, decision.shareId, state, channel);
+  };
+}
+
+/** 路由版 `dispatchChecked` 需要的额外一枚：引擎的 CAS 原语。 */
+export interface ShareRoutingCheckedPorts extends ShareRoutingPorts {
+  engineDispatchChecked<T>(build: CheckedDispatchBuilder<T>): Promise<T>;
+}
+
+/**
+ * 路由版 **`dispatchChecked`**（与引擎那个同形状）。
+ *
+ * 为什么必须单独有一个：`setTaskEstimate` / `appendChecklist` 这两枚走 CAS，
+ * 它们提交 intent 走的是**引擎内部**的 `dispatchLocked`，外面那层路由根本拦不到。
+ *
+ * 两条路的分工（这是本文件最不显然的一处，写清）：
+ * - 判定为 `personal` ⇒ **原样交回引擎**，intent 仍在写队列里提交
+ *   ⇒ 一次都不许多写，CAS 语义与改之前逐字相同。
+ * - 判定为 `share` ⇒ 队列里**只决策不提交**（把 intent 摘出来），队列后再交给 share 通道。
+ *   这里让出一点窗口，换的是"共享改动不会有一条悄悄留在个人 log"。
+ *   代价如实登记：共享条目上这两枚动作的"决策与提交同队列"不再成立；
+ *   而 share 侧本来就没有个人引擎那套队列（它靠 M2-b 的真因果时钟收敛），
+ *   所以没有"退化"，只有"这一格本来就不在同一把锁里"。
+ */
+export function createShareRoutingCheckedDispatcher(
+  ports: ShareRoutingCheckedPorts,
+): <T>(build: CheckedDispatchBuilder<T>) => Promise<T> {
+  return async <T>(build: CheckedDispatchBuilder<T>): Promise<T> => {
+    let toShare: { readonly intent: OpIntent; readonly shareId: string } | undefined;
+    const value = await ports.engineDispatchChecked<T>(() => {
+      const state = ports.getState();
+      const result = build(state);
+      if (result.intent === undefined) return { value: result.value };
+      const decision = decideShareWrite(state, result.intent);
+      if (decision.kind === 'reject-move') throw moveError(state, result.intent);
+      // 个人那一形**原样交回引擎**：intent 仍在写队列里提交，CAS 语义与接路由之前逐字相同。
+      if (decision.kind === 'personal') return { value: result.value, intent: result.intent };
+      // 共享那一形：队列里只决策。引擎拿到的是"这次没有 intent"，于是一条都不写。
+      toShare = { intent: result.intent, shareId: decision.shareId };
+      return { value: result.value };
     });
+    if (toShare === undefined) return value;
+    const channel = await ports.channel();
+    if (channel === undefined) {
+      // 抛出去，**不退回个人 log**：那条写会"成功"、界面会动，而对面的成员永远看不见。
+      throw new ShareChannelUnavailableError(toShare.intent.entityType, toShare.intent.entityId, toShare.shareId);
+    }
+    await commitShareWrite(toShare.intent, toShare.shareId, ports.getState(), channel);
+    return value;
   };
 }

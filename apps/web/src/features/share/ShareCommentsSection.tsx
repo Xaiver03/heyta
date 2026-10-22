@@ -8,8 +8,8 @@
  *
  * 三件事**不在这里**（都在 `@heyta/app-host`）：路由（这条清单是不是共享的）、
  * 什么条件下才发（未登录 / 密钥未解锁 ⇒ 零请求）、发完怎么落本地。
- * 这里只做**取值与画图**：拿会话（baseUrl / token / accountId / vault 载荷密钥）、
- * 建一个 `createWebShareComments`、把重放出来的评论喂给组件。
+ * 这里只做**取值与画图**：问 `share-session.ts` 要那一份共享实例（这台会话里只有一份），
+ * 把重放出来的评论喂给组件。
  *
  * ⚠️ 两处如实登记的边界：
  * 1. **远端的评论靠推不靠轮询**（M5）：WS 的 `new_share_ops` 由根组件那一个消费者拉回
@@ -23,15 +23,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { COMMENT_MAX_LENGTH } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
-import { CURRENT_SCHEMA_VERSION } from '@heyta/shared-schema';
-import type { SyncPayloadCipher } from '@heyta/sync-client';
 import { CommentThread, type CommentThreadLabels, type CommentThreadProps } from '@heyta/ui';
 
-import { hasEngine, requireEngine } from '../../lib/oplog.js';
 import { subscribeShareRepaint } from '../../lib/share-signal-sink.js';
-import { getWebVaultSession } from '../../lib/vault-session.js';
-import { useSyncStore } from '../sync/store.js';
-import { createWebShareComments } from './comment-actions.js';
+import { type WebShareComments } from './comment-actions.js';
+import { ensureWebShareSession, webShareSession } from './share-session.js';
 
 export interface ShareCommentsSectionProps {
   readonly taskId: string;
@@ -39,59 +35,32 @@ export interface ShareCommentsSectionProps {
 
 export function ShareCommentsSection(props: ShareCommentsSectionProps): React.JSX.Element | null {
   const { t } = useI18n();
-  const baseUrl = useSyncStore((s) => s.baseUrl);
-  const token = useSyncStore((s) => s.token);
-  const authTransport = useSyncStore((s) => s.authTransport);
-  const accountId = useSyncStore((s) => s.accountId);
 
-  const [vaultCipher, setVaultCipher] = useState<SyncPayloadCipher | undefined>(undefined);
-  /**
+  /*
    * 这一节的"代"：写过内容、或本机刚拉到新内容 ⇒ 涨一格。
    *
-   * 🔴 它同时是 `host` 的依赖 —— 因为宿主把**重放结果按实例缓存**
-   * （`share-comments.ts` 的 `entryFor`：命中缓存就不再看盘）。不换代就会停在
-   * 打开那一刻的样子：别人写的评论已经在 `localStorage` 里了，而这枚宿主不知道。
+   * 🔴 它**不再**决定宿主是谁：M2 起这一台会话里只有一份共享实例（`share-session.ts`），
+   * 评论区与 M5 信号消费者读同一份缓存。这里要做的只是"重画一次"——
+   * 从那份缓存里重读，而不是重建宿主（重建会把上一次的缓存丢掉、再从盘上整条重放）。
    */
   const [tick, setTick] = useState(0);
+  const [host, setHost] = useState<WebShareComments | undefined>(() => webShareSession());
 
   useEffect(() => {
     let alive = true;
-    if (
-      accountId === undefined ||
-      accountId === '' ||
-      baseUrl.trim() === '' ||
-      token === undefined ||
-      token.trim() === ''
-    ) {
-      return undefined;
-    }
-    void (async () => {
-      try {
-        const session = await getWebVaultSession(accountId, baseUrl, async () => token, authTransport);
-        const cipher = await session.getPayloadCipher();
-        if (alive) setVaultCipher(cipher);
-      } catch {
-        // vault 没解锁：这一节不画（见文件头边界 2）。
-      }
-    })();
+    void ensureWebShareSession()
+      .then((session) => {
+        if (alive) setHost(session);
+      })
+      .catch(() => {
+        // 接不上（没登录 / vault 没解锁）⇒ 整节不画，与下面 `host === undefined` 同一形状。
+        if (alive) setHost(undefined);
+      });
     return () => {
       alive = false;
     };
-  }, [accountId, authTransport, baseUrl, token]);
-
-  const host = useMemo(() => {
-    if (vaultCipher === undefined || !hasEngine()) return undefined;
-    return createWebShareComments({
-      baseUrl,
-      token: token ?? '',
-      authTransport,
-      userId: accountId ?? '',
-      clientId: requireEngine().getClientId(),
-      schemaVersion: CURRENT_SCHEMA_VERSION,
-      vaultCipher,
-      storage: window.localStorage,
-    });
-  }, [accountId, authTransport, baseUrl, token, vaultCipher, tick]);
+    // `tick` 也进依赖：解锁发生在用户点开这一节之后，重进一次才有机会拿到密钥。
+  }, [tick]);
 
   const labels = useMemo<CommentThreadLabels>(
     () => ({
@@ -115,17 +84,16 @@ export function ShareCommentsSection(props: ShareCommentsSectionProps): React.JS
   );
 
   /*
-   * 🔴 M5：进入这一节拉一次（冷启动那趟），之后**由信号驱动换代**，不再有 5 秒轮询。
+   * 🔴 M5：进入这一节拉一次（冷启动那趟），之后**由信号驱动重画**，不再有 5 秒轮询。
    *
    * 为什么进来还要拉：这一节可能是在还没收到任何信号的时候打开的（离线写过、或在别的
    * 设备上刚写完）。这一趟之后，新内容一律走 `new_share_ops`（根组件那个唯一的消费者）。
    *
-   * 为什么换代而不是"再拉一次"：下行游标是**这份 share 全局一份**，而根消费者已经把这批
-   * op 拉回来落盘并推进了游标 —— 这里再拉只会拿到 `fetched = 0`，界面就停在打开那一刻。
-   * 所以 `subscribeShareRepaint` 那条路是**从盘上重放**（换一枚宿主 = 缓存作废）。
+   * 为什么重画而不是"再拉一次"：下行游标是**这份 share 全局一份**，而根消费者已经把这批
+   * op 拉回来落盘并推进了游标 —— 这里再拉只会拿到 `fetched = 0`。
    *
-   * 拉失败**不炸界面也不写 console**：这一节本来就是尽力而为（未登录 / 钥匙没解锁
-   * 都到不了这里，剩下的只有网络与服务端，而下一条信号会再试）。
+   * ⚠️ 拉回来的内容落进的是**那一份共享实例**，所以拉到新内容时 `comment-actions.ts`
+   * 会敲一次 `emitEngineChange()`；这一节自己的 `setTick` 只是让它也重读一遍。
    */
   useEffect(() => {
     if (host === undefined) return undefined;
