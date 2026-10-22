@@ -11056,3 +11056,12 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     验证证据（2026-10-22 本线第 2 步）：链 `rc=1` 停在第 21 枚 `check:selection-single-source`；
     逐项循环另量出 `check:image-license` rc=1（`server/package-lock.json` 镜像快照失真，别线交付件）与
     `check:text-color` rc=1（上面那枚脏文件）；`build` 与 `typecheck` 逐项跑各 rc=0。
+
+533. **整套件门禁与单条验收覆盖不重叠：整套件日志里的红可能一枚不是你的，而它是逐项数链时的墙钟黑洞**（2026-10-22 逐项跑 `pnpm check` 那 123 项时，第 94 项 `check:ai-e2e` 一枚就跑了 40 分钟以上没跑到头）
+    这套件跑的是整套 `e2e/tests/**`，而它**不含**本线那条 `collab-journey`（同一份日志里 `grep collab` 回空）。
+    ⇒ 两件事分开说：① 别把整套件里那些红归到自己线上 —— 先按 spec 文件名枚举一遍再逐枚回 `git status` 查它指的文件在 `HEAD` 上脏不脏（#532）；
+    ② 被掐断、没跑到头的那一枚**既不能记成红也不能记成绿**，只登记"没拿到 rc"，并把恢复命令写进已推的仓内正文（别留在本机 `/tmp`）。
+    怎么避免：逐项数链之前先把"要跑整套件的那几枚"挑出来放到最后，轻量项先出数；重件单独一趟、给足墙钟。
+    验证证据（2026-10-22 协作线第 2 步）：这套件跑到约第 224 枚被掐，日志里 17 个 spec 有 `✘`（`account-email-change-and-sessions`、`admin-console`、`auth-consent-registration`、`inbox`、`detail-pane-*` 等），
+    而工作树上 `git status --porcelain=v1 | grep -icE 'share|collab'` 回 **0**；同一棵树上紧接其后单跑的 `check:privacy-consent-e2e` 与 `check:landing-e2e` 各 rc=0 ⇒ 不是载体坏了。
+
