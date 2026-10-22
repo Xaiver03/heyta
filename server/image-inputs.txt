@@ -36,6 +36,8 @@
 ../packages/design-system
 ../packages/domain
 ../packages/i18n
+../packages/inbound-core
+../packages/legal
 ../packages/local-api
 ../packages/op-log
 ../packages/shared-schema
