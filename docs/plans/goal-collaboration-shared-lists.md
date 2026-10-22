@@ -1052,3 +1052,36 @@ main 在推送之后又被别线推进（`git rev-parse --short HEAD` 现量，�
 而预检脚本明确**不代起 emulator**（起 qemu 会把负载顶上去、别人的 adb 因此超时）——
 这一格与 `docs/agents/multi-end-build.md` §6.1 那句"出包走 windows-pc、设备侧验收目前仍在 Mac"是同一处口径冲突，
 归产品负责人拍。拍之前我不硬装（§6.1.1：环境原因如实报红）。
+
+⚠️ 上面那句「剩下唯一拦路的是 Android」是把 **3 项前置读成了 1 项**：同一次 exit 3 里还有负载与 iOS 目标名两格，我当时没把它们写下来（那两格现在还在，见 10:2x 那一节的逐项清单）。这一条属于"瞬时读数被写成状态"那一族，预检脚本自己打的是 `note` 清单，逐项抄才靠得住。
+
+**2026-10-22 10:2x 复量（tip `2bf6eadcb`）**：本线产品代码自 `bbcdc1ace` 之后没再动，其后落进 `main` 的别线提交
+`git diff --name-only 915a54252..HEAD` 现量只有 `PROGRESS.md` 与 `docs/plans/subscription-handoff.md` 两枚、
+命中 `^(apps|packages|server|e2e)/` 的**打包输入面文件 0 枚** ⇒ 跑在 `915a54252` 上的那几趟仍归得到当前提交。
+
+- `pnpm -r typecheck` ⇒ **rc=0**、`Scope: 21 of 22 workspace projects`。对数按 **#524⑵** 那把尺走**同一条构造式**：
+  从各 `package.json` 现取"有 `typecheck` 脚本"= 21 枚（含根 `heyta`），剔掉 `-r` 不 traverse 的 `@heyta/e2e`、
+  再剔掉根本没有该脚本的 `@heyta/sync-server` ⇒ 应打 20 行，实打 20 行，两侧差分均为空。
+  🔴 `sync-server` 那一格不由"链子绿"覆盖：它没有 `typecheck` 脚本，`pnpm -r typecheck` 对它一句话都不说，
+  所以我另跑 `cd server && npx tsc --noEmit -p tsconfig.json` ⇒ **rc=0**，并把这条命令写进台账，
+  别让下一个会话把 21 枚 in-scope 读成 21 枚被检查过。
+- `pnpm check` 那两枚别线红在新 tip 逐枚复量：`check:selection-single-source` **rc=1**、`check:image-license` **rc=1**。
+  归因现量：相关文件对 HEAD 全部干净 —— `RenewPanel.tsx` 末笔 `81d4a7044`（10-21 收银台给两档）、
+  `RenewSection.tsx` 末笔 `3fa210c5e`（10-22 未登录不静默）、门本体 `scripts/check-selection-single-source.mjs` 末笔 `057ca068a`（10-18）
+  ⇒ 提交态既有红，不是谁写一半，也不是我碰出来的。
+  断言 G 那一枚的语义我读完了：两处 `tierId` 各自只服务一件事 —— 决定**这一单下哪一档**
+  （`apps/web/src/features/subscription/RenewPanel.tsx:127` 与 `apps/mobile/src/screens/RenewSection.tsx:90` 都是
+  `priceId: CHECKOUT_TIER_PRICE_IDS[tierId]`），屏上没有"当前看的是哪一条"那种行列表 ⇒ 按门自己给的第二条出路，
+  它属五类瞬态里的 `form-draft`，最小修法是往 `ROW_ID_EXEMPT` 补两行（文件名 + `'tierId'` + `'form-draft'`）。
+  **我没有代它登记**：那张豁免表能豁免什么，就是这枚门的判据口径；代改别人的口径会把我线的判断写进别人线的裁判里。
+  所以任务书第 2 步那句"`pnpm check` 全绿"到这一格的诚实读数是：**两枚别线存量红，本线不代改、不放宽**（交回内容见上）。
+- `pnpm reinstall:all` 预检（`CARRIER=~/heyta-carriers/heyta-wt-collab-m5 sh research/tools/b-reinstall-readiness.sh`）
+  ⇒ **exit 3、三项前置不成立**，逐项抄脚本自己的输出：
+  ① **负载 28 > 12**；② **iOS 段：0 台已启动模拟器且没传 `IOS_DEVICE_NAME`**（脚本"不猜目标"，因为它下一步就是 `simctl uninstall`）；
+  ③ **Android 段：`adb` 在线设备一个都没有**（本线 AVD = `heyta-w3-yearly`）。载体那一格这次也报"落后 3 枚提交、
+  差异只在非输入面（产物同形，不拦）"⇒ 那一腿判绿，不挡。
+  ① 归因：`pgrep -fl heyta` 回 **0** —— 这负载不是本仓任何一趟跑出来的；短窗/长窗 `30.50 / 28.69 ≈ 1.06` ⇒ 常驻底噪不是突发，
+  `ps -Ao pcpu,comm -r` 第一名是一枚 Xcode 自带的 Python 占满一核。**"等它落回 12"不是等谁交活，是等一个外来进程自己安静**，
+  所以我不守它，也不给它降门槛。②③ 两格脚本都明确不代起设备 ⇒ 起不起 iOS 模拟器 / Android AVD 就是停止点 ③，归产品负责人拍；
+  拍之前我不硬装（§6.1.1：环境原因如实报红）。
+- 远端对账：`git rev-list --left-right --count refs/remotes/origin/main...main` ⇒ **`0 0`**，本线已入库的东西都在公开那侧。
