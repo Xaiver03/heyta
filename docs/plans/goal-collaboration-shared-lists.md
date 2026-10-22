@@ -1261,3 +1261,15 @@ benchmark 64／feature-matrix 15／roadmap 93／progress-log 15／本计划 15�
 ⇒ 连门禁自己认的"端"都不把那枚 Electron 薄壳算作桌面壳。
 ⇒ 三处文档**不动**。这条歧义已写成环境陷阱 **#530**（判壳类问题先看 `ENDS`，再核那枚壳的打包脚本引的是谁的 `dist`），
 防的是下一位（或换个会话的我）拿目录名重推一遍、把真句子改假。
+
+### 2026-10-22 12:0x · 第 3 步那句「W4 残余：指派 / 动态流 UI 未建」的两半也各配了一把尺，**都成立**
+
+这两半都是**负结论**，负结论要带分母（不能只说"没找到"）：
+- **指派**：`grep -rn "assigneeUserId" packages apps server --include=*.ts --include=*.tsx`（剔 `node_modules`/`dist`/`.d.ts`）⇒ 命中 **6 行**，
+  逐行读完分三类：字段声明 `packages/domain/src/entities.ts:245`、**读侧**比较 `packages/ui/src/sync/notification-model.ts:103-104`、测试夹具 `packages/ui/tests/notification-model.spec.ts:29-30`。
+  **写侧零处** ⇒ "全仓零处写 `Task.assigneeUserId`"这句按谓词（谁**写**它）核过，不是按"搜不到"下的。
+- **动态流**：这半差点被我判假 —— `grep ActivityFeed` 命中 5 份文件，看着像"活动流界面早就有了"。
+  读本体：`packages/app-host/src/inbox.ts:366-383` 那个 `fetchActivityFeed` 打的是 `GET /api/activity`，
+  回的是 `{ campaigns: CampaignItem[] }` —— **运营活动目录 + 邀请进度**，跟"共享清单里谁改了什么"不是一回事（同一个 `inbox.ts` 里 `fetchUnreadSummary` 那种才是投递面）。
+  ⇒ 名字撞车，功能没撞：三类协作活动仍只作为**通知偏好**存在（`notification-model.ts`），没有活动流界面。这句**不动**。
+  ⚠️ 给下一位的把手：判"某个功能没建"要落到**它该回的数据形状**上（这里 `campaigns` vs 协作活动条目），别按功能名 grep 就下负结论。
