@@ -1114,3 +1114,6 @@ main 在推送之后又被别线推进（`git rev-parse --short HEAD` 现量，�
 🔴 **同时更正本文件先前那一格的口径**：第 1 步记成"已完成"时，我把 origin 等价断言当成了任务书那句字面要求的兑现。
 两者覆盖不同 —— origin 那三条比的是"页面自身的源"，**对端口号本身不敏感**（换一枚端口它照样绿），
 而任务书要的那半句钉的正是"落点等于这台实例上应用的那个 loopback 地址"。现在两半各有一条能红的判据。
+改的是 `e2e/tests/*.spec.ts`，所以把**会解析 spec 文本的静态门**复跑了一遍（不是"应该不受影响"，是量过）：
+`check:locator-labels`／`check:journey-coverage`／`check:integration-coverage`／`check:gate-wiring` 四枚各 **rc=0**。
+其中 `locator-labels` 是这趟真该问的一枚：新断言的 message 是一行中文，而那道门的分母就是"含汉字的字符串字面量"、不区分定位符与日志行（环境陷阱 **#429**）。
