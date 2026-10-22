@@ -43,7 +43,9 @@ E2EE 下的**清单共享**基础设施（ADR-0062）已实现并**已在 `main`
   **评论这条腿通了** —— `downloadOps` 现在有人消费（复量：`grep -rn "downloadOps" --include=*.ts packages/app-host/src apps/web/src | grep -v spec` 有命中），
   游标落盘、进评论区先拉一次、`verify:collab-sync` 的宿主层那一格经真宿主验过（步数由脚本自己打印，别在这里抄）。
   仍然断的是**任务与清单的写路径**：`packages/app-host/src/project-actions.ts` 里唯一的 share 相关方法照旧只有 `setProjectShareId`，
-  没有任何 share 分流 ⇒ 成员互相看得到对方写的评论，**看不到对方改的任务**（那是 M2，要先立 ADR）。
+  没有任何 share 分流 ⇒ **界面上今天成员之间什么都看不到**：评论那一族在**宿主层**能互拉（`verify:collab-sync` 那"两台"是两个无界面宿主实例），
+  但成员那侧的共享清单行只有 `addProject` + `setProjectShare` 两步 ⇒ 是一条**空清单**，而评论区在 web 只挂在任务详情上
+  （现量：`grep -rn ShareCommentsSection apps` 只回 `TaskDetailCard.tsx` 一处）⇒ 没有任务就没有评论区可点。任务那一族连宿主层都搬不到（那是 M2，要先立 ADR）。
   实时信号 `new_share_ops` **已经接上了**（2026-10-21 M5：客户端认下、宿主判断该不该拉、`@heyta/ui` 那条谓词决定响不响，5 秒轮询已撤）——
   但它今天搬运得到的仍然只有评论那一族，理由与上面那格同一个：`TASK` 的 op 还没进 share log。
   ⇒ 逐条见本线计划 `docs/plans/collaboration-shared-lists.md` §9.1 那张现状表与 §9.7–§9.10（M7 / M1 / M3 / M5 各一批读数）。

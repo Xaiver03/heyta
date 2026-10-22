@@ -3,6 +3,9 @@
 > 状态：**已接受（产品决策 2026-10-08）；实施进行中（2026-10-16 更正原来的「实施未开始」）**。
 > 已落地：服务端 shares 表与端点族 + role 硬门、listKey 与成员公钥信封、Web 宿主的创建共享 / 邀请 / 成员角色 / 所有权转让 / 入群链接落点。
 > 🔴 **未落地**：客户端 share op-log 引擎与多写者写路径路由**从未接线** —— `uploadOps`/`downloadOps` 零生产消费者、`listKey` 解出后不喂给任何解密引擎，所以**共享清单在成员眼里仍是一条空清单**（逐条证据见[进度](../agents/progress-log.md)的「协作与共享清单」一节）。
+> ⚠️ 上面那句里**只有"零生产消费者"这一小格过期了**（2026-10-22 现量）：评论那一族的 `uploadOps`/`downloadOps` 各有一个生产消费者（`packages/app-host/src/share-comments.ts`），
+> 但**「成员眼里仍是一条空清单」这个结论仍然成立** —— 多写者路由（`TASK/PROJECT`）照旧零，而评论区在 web 只挂在任务详情上
+> （现量：`grep -rn ShareCommentsSection apps` 只回 `TaskDetailCard.tsx` 一处）。逐层读数在本线计划 §9.1。本 ADR 的裁决一个字没动。
 > 证据见[共享清单调研](../research/collaboration-shared-lists.md)，落地计划（W0–W6）见 [collaboration-shared-lists.md](../plans/collaboration-shared-lists.md)。本 ADR 只记裁决。
 
 ## 背景：两类「协作」必须拆开
