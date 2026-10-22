@@ -1086,3 +1086,9 @@ main 在推送之后又被别线推进（`git rev-parse --short HEAD` 现量，�
   所以我不守它，也不给它降门槛。②③ 两格脚本都明确不代起设备 ⇒ 起不起 iOS 模拟器 / Android AVD 就是停止点 ③，归产品负责人拍；
   拍之前我不硬装（§6.1.1：环境原因如实报红）。
 - 远端对账：`git rev-list --left-right --count refs/remotes/origin/main...main` ⇒ **`0 0`**，本线已入库的东西都在公开那侧。
+  载体那一格我在 10:3x 已经先**替下一次点火铺平**（这一步不需要任何人点头）：
+  `git -C ~/heyta-carriers/heyta-wt-collab-m5 checkout --detach <main sha>` 追到本线 tip，追之前 `status --porcelain` 回 0 行，
+  追之后仍 0 行；`pnpm-lock.yaml` 的 sha256 两侧**逐字相同**（`6e609a8b…` 前缀一致，全量比在两处各取一次）⇒ 载体里那份 `node_modules` 可以沿用。
+  复量预检 ⇒ 载体新鲜那一格从"落后 3 枚、差异只在非输入面"变成 **`✅ 载体新鲜：<sha> == 主检出 HEAD`**，
+  而 exit 仍是 3、拦路的仍是那三格（负载 23 > 12、iOS 0 台已启动模拟器、Android 0 枚在线设备）。
+  ⇒ 也就是说：**"设备点头"一到，这一趟不需要再补任何准备工作**，直接 `CARRIER=$HOME/heyta-carriers/heyta-wt-collab-m5 bash research/tools/b-reinstall-readiness.sh --confirm` 点火。
