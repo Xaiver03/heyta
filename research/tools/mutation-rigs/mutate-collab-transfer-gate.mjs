@@ -50,6 +50,7 @@ const MARK = 'MUTATED-BY-RIG：这一处是装置注入的病灶，跑完即还�
 const SERVER = 'server/src/shares/share.routes.ts';
 const MODEL = 'packages/ui/src/sync/share-model.ts';
 const PANEL = 'packages/ui/src/sync/SharePanel.tsx';
+const TARGETS = [SERVER, MODEL, PANEL];
 
 /** 每臂：改哪枚文件、在哪枚包跑哪份 spec、预期红哪几条。 */
 const ARMS = [

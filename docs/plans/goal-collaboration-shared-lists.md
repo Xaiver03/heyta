@@ -1014,3 +1014,11 @@ main 在推送之后又被别线推进（`git rev-parse --short HEAD` 现量，�
 剩下的真窗口（owner 从没打开面板／不在线／保险库锁着）那一格按设计给提示不给按钮。
 未做的一条尾巴：`SHARE_TRANSFER_TARGET_UNSEALED` 在宿主侧**没有文案映射**（全仓只有 sync-client 那枚镜像表消费错误码），
 面板数据过期那一瞬走 409 时用户看到通用失败 ⇒ 挂到 M4。
+
+**常驻变异装置**：上面那些"拆一半只红对应那一条"不再靠手工 —— `node research/tools/mutation-rigs/mutate-collab-transfer-gate.mjs`
+把这四臂钉成红集精确匹配（条数 + 缺席 + 多红三条都过），已在 `research/tools/mutation-rigs/README.md` 登记。
+本机首跑读数：`GUARD ✅ 4 臂的 needle 各命中 1 次，且 3 枚目标文件相对 HEAD 干净` ⇒ 三份基线 `35/17/10 passed` ⇒
+`[unsealed-ignored] 红 1/1`、`[epoch-ignored] 红 1/1`、`[predicate-drops-envelope] 红 1/1`、`[panel-always-eligible] 红 3/3` ⇒
+三趟 RECHECK 全 `md5=byte-identical` ⇒ `ARMS=pass (4/4)`，rc=0。
+⚠️ 这台装置本身踩了一枚新坑并登记为环境陷阱 **#525**：分段写文件把第一段的尾巴覆盖了，顶层少一行常量，
+`node --check` 全绿而一实跑就 `ReferenceError`，而当时 README 已经替它声称"这四臂能红"——顺序应是先跑通一趟再写在册行。
