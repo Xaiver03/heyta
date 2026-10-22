@@ -1751,3 +1751,20 @@ cd e2e && npx playwright test tests/auth-login-code.spec.ts --reporter=line
 `git rev-list --left-right --count refs/remotes/origin/main...main` ⇒ 应为 `0 0`；
 `pnpm verify:collab-journey` ⇒ `RESULT=OK steps=3`；`pnpm check:share-entry-hidden` ⇒ 臂全过；
 `pnpm --filter @heyta/web exec vitest run tests/share-consent-modal-theme.spec.tsx tests/share-entry-experimental.spec.tsx` ⇒ 全绿。
+
+## 2026-10-22 19:1x 链逐项再扫一遍（120 项，排除已知三枚别线红）：**红集=2，两枚都不是 HEAD 红**
+
+这一趟是把 18:2x 换的那把尺真正量一遍：从 `package.json` 的 `check` 串里**现量拆出 123 项**、剔掉三枚已知别线 HEAD 红
+（`check:selection-single-source` 收款线、`check:image-license` 自托管线、`check:ai-e2e` 那条浏览器套件），逐项单跑剩下的 120 项。
+**结果：120 项里只有 2 项 rc≠0，而且逐枚回查之后，两枚都不是这条链在 `HEAD` 上的红。**
+
+| 那一枚 | 现量 | 判它的证据 |
+|---|---|---|
+| `check:text-color`（`secs=0`） | 点名 `packages/ui/src/ai/AiGeneratedLabel.tsx:81` | 那枚文件 `git status` 现量是 **` M`**（AI 线另一会话正在写），而 `git grep -n "style={style.label}" HEAD -- packages/ui/src/ai/AiGeneratedLabel.tsx` **零命中** ⇒ 那一行不在 `HEAD` 上 ⇒ **别线在途件的瞬时红**（同 #532 那一族），不是存量红，也不归本线改 |
+| `pnpm -r test`（`secs=35`） | 挂在 `packages/domain`：`lunar.spec.ts` 1 枚失败用了 **10483ms**、`habit-backfill.spec.ts` 1 枚失败 **7837ms** | 单跑这两份文件（机器安静下来、`cd packages/domain && npx vitest run tests/lunar.spec.ts tests/habit-backfill.spec.ts`）⇒ **rc=0，Test Files 2 passed**；`packages/domain` 对 `HEAD` 干净。⇒ 是**负载把计时敏感的断言拖过线**（这一趟整条链连跑 120 项，同批里 `check:mobile-bundle` 70s、`check:landing-e2e` 44s），不是红 |
+
+**所以这条线今天能负责地说**：链上属于 `HEAD` 的红**就是那三枚、且一枚不归本线**；除此之外这一趟 120 项里
+没有第四枚 `HEAD` 级失守。⚠️ 别把这张表读成"链绿了"——`pnpm check` 那三枚照样红，链整体仍不通过；
+这张表说的是**红集的分母与归属已经穷举到项**，不是链绿。
+**别照抄这张表的枚数**：红集会随别人的提交变；复量 = `node -e` 拆 `scripts.check` 那串逐项跑（`--retries` 与端口那两条前置见 #536/#533），
+再逐枚按"文件对 `HEAD` 脏不脏 + 单跑能不能复现"分瞬时红与存量红。
