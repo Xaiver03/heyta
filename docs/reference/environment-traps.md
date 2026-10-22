@@ -11042,3 +11042,17 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     验证证据（2026-10-22 本线第 2 步整趟）：同一份 `/tmp` 日志，未剥色分子 = 0；剥色后
     20 个包各打一行 `Tests N passed`，分子 20 == 分母 20，总用例 11258 passed / 13 skipped，
     `failed|FAIL` 关键字行数 0。
+532. **`pnpm check` 是一条 `&&` 链，量的是工作树不是 HEAD：第一枚红就停，而那一枚红可能是别人没写完的代码**
+    触发信号：想回答"全量门禁是不是全绿"，跑 `pnpm check` 拿到 `rc=1`，日志里只有**一条**子命令的失败正文。
+    两个独立的读数陷阱叠在同一条命令上：
+    ① **链在第一个非零退出就中断** —— 本仓 `check` 串了 123 项（`pnpm check:gate-wiring && pnpm build && … && pnpm check:mobile-ai-anchors`），
+       所以链的 `rc` **只证明第一枚红**，它后面那 ~100 枚这一趟**根本没跑**。把"链上两枚红"当成链的读数是错的：
+       第二枚是**逐枚单跑**才量到的。要拿全集，只能把链拆成逐项循环、各自记 `rc`。
+    ② **门禁读的是工作树** —— 共享检出上并行会话一直在改文件，所以一枚红可能来自**别人未提交的改动**。
+       实测：`check:text-color` 红在 `packages/ui/src/ai/AiGeneratedLabel.tsx:81`，而 `git status --porcelain` 显示那枚文件是 ` M`（脏）。
+       这既不说明 `HEAD` 红，也不说明这格归本线关。
+    可复用规则：报"全量门禁"读数时，三件事要一起报 —— **链停在哪一枚 / 逐项跑出来的红集是哪几枚 / 每一枚红所指的文件在 `HEAD` 上脏不脏**。
+    第三件决定这句话能不能说成"存量红"。
+    验证证据（2026-10-22 本线第 2 步）：链 `rc=1` 停在第 21 枚 `check:selection-single-source`；
+    逐项循环另量出 `check:image-license` rc=1（`server/package-lock.json` 镜像快照失真，别线交付件）与
+    `check:text-color` rc=1（上面那枚脏文件）；`build` 与 `typecheck` 逐项跑各 rc=0。

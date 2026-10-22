@@ -1431,3 +1431,9 @@ git diff --name-only a6662e218..HEAD -- packages apps server | grep -v '/evidenc
 **读数**：修后 `verify:collab-journey` **`RESULT=OK steps=3`**，证据从 8 张变 **9 张**，新增的 `08-owner-panel-error-visible.png` 人工看过 —— 面板里红字那句是「这一步没有完成：409 SHARE_MEMBER_LIMIT」，位置在邀请票据块下方、成员列表上方。整树复跑：`-r typecheck` rc=0（20==20）、`-r test` rc=0（跑 test 的包 20 == 打 `Tests` 行的包 20，`failed|FAIL` 0 行）、`-r build` rc=0（20==20）。
 
 **这一趟自己踩到的两枚工具坑**（都当场被守卫拦下，没造成半改）：① 一串 `cmd && cmd2 && cmd3; echo rc=$?` 里，前面任一环节退出非零会让**后面那枚 `echo` 读到的是整条链的码**——本趟有一枚"i18n build rc=1"其实是上游 `node` 失败，构建根本没跑（`/tmp` 里那个输出文件不存在就是证据）；② 按字符串锚做批量替换时，**同一枚锚可能出现两次**（`createShare` 与 `submitInvite` 的 catch 行文本相同），必须先 `count==1` 再改，否则会把 consent 那一支一起换掉——那正是本格**不该动**的一支。
+
+### 2026-10-22 12:5x · 更正本线先前那句「`pnpm check` 链上两枚别线红」的**读法**（登记 §7 #532）
+
+先前那句是**逐枚单跑**量出来的，不是链给的。现量：`pnpm check` 是一条串了 **123 项**的 `&&` 链，**第一枚红就中断** —— 这一趟停在第 21 枚 `check:selection-single-source`，它后面那 ~100 枚**根本没跑**，所以链的 `rc=1` 只证明那一枚。逐项循环另量出第三枚红 `check:text-color`，但它**不算存量红**：红在 `packages/ui/src/ai/AiGeneratedLabel.tsx:81`，而那枚文件 `git status` 是 ` M`（AI 线未提交的在途改动）。⇒ **门禁读的是工作树**，共享检出上"某枚门红"必须先问它指的文件在 `HEAD` 上脏不脏，才配说"存量"。
+
+对本线那一格的结论不变、但措辞要准：**`HEAD` 上归别线的存量红是两枚**（`check:selection-single-source`、`check:image-license`），链上另有第三枚是别线在途改动造成的瞬时红。逐项循环还在跑（`build` / `typecheck` 已各自 rc=0），全集跑完再回这一节补一行。
