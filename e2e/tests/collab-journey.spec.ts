@@ -298,6 +298,31 @@ test('共享清单全旅程：owner 建共享 + 邀请 → bob 贴 token 入群 
   await expect(ownerPage.getByTestId('share-panel')).toContainText('可编辑');
   await evidenceShot(ownerPage, '07-owner-sees-bob.png');
 
+  // ── 面板阶段的失败**必须看得见** ─────────────────────────────────────────
+  // 为什么钉这一发：面板阶段（`phase.kind === 'panel'`）先前**没有任何错误可见面** ——
+  // 邀请 / 改角色 / 移除 / 转让的失败都往 `creatingError` 里写，而那块只画在 consent 阶段，
+  // 于是"接不上就说是接不上"这句注释在真实面板上等于什么都没说。
+  // 这里用一次确定性的 409（不靠服务端语义）把这条通路钉住：夹具让邀请接口失败，
+  // 判的是界面上出现一句读得到的话，而不是按钮转一圈就完。
+  await ownerPage.route('**/api/shares/*/invitations', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 409,
+      contentType: 'application/json',
+      body: JSON.stringify({ code: 'SHARE_MEMBER_LIMIT', message: 'fixture：故意让邀请失败' }),
+    });
+  });
+  await ownerPage.getByTestId('share-invite-email').fill('carol@example.com');
+  await ownerPage.getByTestId('share-invite-submit').click();
+  await expect(ownerPage.getByTestId('share-panel-error'), '面板阶段的失败要在面板上看得见').toBeVisible({
+    timeout: 15_000,
+  });
+  await evidenceShot(ownerPage, '08-owner-panel-error-visible.png');
+  await ownerPage.unroute('**/api/shares/*/invitations');
+
   // ── 读数收口 ─────────────────────────────────────────────────────────────
   // 服务端事实（真 API，不靠 UI）：两个成员、bob 是 editor、信封已下。
   const sharesRes = await fetch(`${API_BASE}/api/shares`, {

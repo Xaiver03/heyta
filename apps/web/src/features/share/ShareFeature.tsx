@@ -205,6 +205,9 @@ export function ShareFeature(props: ShareFeatureProps) {
   const [creatingError, setCreatingError] = useState<string | undefined>();
   // 转让失败的具名读数（B-10 的宿主侧收口）。面板把不合格接收方灰掉只是第一层，
   // 面板数据落后一拍时那一发仍会打到服务端，所以这里必须有一句话，不能静默。
+  // 面板阶段其余动作（邀请 / 改角色 / 移除 / 退出）的失败读数。存的是**整句**：
+  // 「成员已移走但换钥失败」和「这一步没成」不是同一句话，共用一个包裹句会说假话。
+  const [panelError, setPanelError] = useState<string | undefined>();
   const [transferFailure, setTransferFailure] = useState<
     { kind: ShareTransferFailure; detail: string } | undefined
   >();
@@ -353,13 +356,14 @@ export function ShareFeature(props: ShareFeatureProps) {
     const rotation = createWebShareKeyRotation({
       baseUrl, token: token ?? '', authTransport, vaultCipher: cipher, storage: localStorage,
     });
-    if (rotation === undefined) { setCreatingError(t('web.share.error.offline')); return; }
+    setPanelError(undefined);
+    if (rotation === undefined) { setPanelError(t('web.share.error.offline')); return; }
     try {
       const reading = await rotation.removeMemberAndRekey(phase.shareId, memberId);
       // 人已经移走了，换钥失败就不能报"移除失败"——但也不能不说（下一轮之前这份清单还在用旧钥写）。
-      if (reading.rekeyError !== undefined) setCreatingError(reading.rekeyError);
+      if (reading.rekeyError !== undefined) setPanelError(t('web.share.error.rekeyAfterRemove', { message: reading.rekeyError }));
     } catch (err) {
-      setCreatingError(err instanceof ShareApiError ? `${String(err.status)} ${err.code ?? ''}` : String(err));
+      setPanelError(t('web.share.error.action', { message: err instanceof ShareApiError ? `${String(err.status)} ${err.code ?? ''}` : String(err) }));
     }
     await reload(phase.shareId);
   }, [authTransport, baseUrl, getPayloadCipher, phase, reload, t, token]);
@@ -379,7 +383,7 @@ export function ShareFeature(props: ShareFeatureProps) {
       setTicket({ token: res.token, link: buildShareJoinLink(appBaseUrl, res.token), invitedEmail: email ?? '' });
       setInviteEmail('');
     } catch (err) {
-      setCreatingError(err instanceof ShareApiError ? `${err.status} ${err.code ?? ''}` : String(err));
+      setPanelError(t('web.share.error.action', { message: err instanceof ShareApiError ? `${err.status} ${err.code ?? ''}` : String(err) }));
     } finally {
       setInviteBusy(false);
     }
@@ -586,6 +590,12 @@ export function ShareFeature(props: ShareFeatureProps) {
               </p>
             ) : null}
 
+            {panelError !== undefined ? (
+              <p role="alert" data-testid="share-panel-error" style={styles.resetTitleDanger}>
+                {panelError}
+              </p>
+            ) : null}
+
             <SharePanel
               data={{
                 shareId: phase.shareId,
@@ -607,7 +617,15 @@ export function ShareFeature(props: ShareFeatureProps) {
                 onInvite: () => { /* 邀请表单常驻上方；这个入口指向它。 */ const el = document.getElementById('ht-share-invite-email'); el?.focus(); },
                 onRemoveMember: (memberId) => { void removeMember(memberId); },
                 onRoleChange: (memberId, role) => {
-                  void api.patchMemberRole(phase.shareId, memberId, role).then(() => reload(phase.shareId));
+                  setPanelError(undefined);
+                  void api
+                    .patchMemberRole(phase.shareId, memberId, role)
+                    .then(() => reload(phase.shareId))
+                    .catch((err: unknown) => {
+                      setPanelError(t('web.share.error.action', {
+                        message: err instanceof ShareApiError ? `${String(err.status)} ${err.code ?? ''}` : String(err),
+                      }));
+                    });
                 },
                 // 转让所有权（W6）：服务端事务里 ownerUserId 与两条成员行一起换，
                 // 客户端只管发起 + 对账（reload 后自己的角色就是 editor 了）。
