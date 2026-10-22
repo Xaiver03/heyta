@@ -29,6 +29,14 @@ import { decidePrivacyConsent, selectSettingsSection } from './helpers';
 import { fillVaultSecret } from '../vault/privacy';
 
 const API_BASE = process.env['HEYTA_COLLAB_BASE'] ?? 'http://127.0.0.1:3217';
+// 任务书第 1 步要钉的字面落点：链接文本里必须出现应用自己的 `http://127.0.0.1:<WEB_PORT>`。
+// 靶子由 `scripts/verify-collab-journey.mjs` 注入（它自己就用这个号起 vite），缺省值与它逐字一致。
+// 🔴 这道 fail-fast 不是装饰：靶子若是空串，`toContain('')` 对任何链接都成立 —— 一条永远通过的判据
+//    比没有判据更糟（AGENTS §8.3），所以宁可装置自己在加载期就炸。
+const WEB_URL = process.env['HEYTA_COLLAB_WEB_URL'] ?? 'http://127.0.0.1:4327';
+if (!/^http:\/\/127\.0\.0\.1:\d{4,5}$/.test(WEB_URL)) {
+  throw new Error(`装置坏：HEYTA_COLLAB_WEB_URL 不像应用的 loopback 地址（读到 "${WEB_URL}"）`);
+}
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 /**
  * 固定证据路径（§6.2 规定二）：跑完直接打开同一组文件看。
@@ -241,6 +249,7 @@ test('共享清单全旅程：owner 建共享 + 邀请 → bob 贴 token 入群 
   // 不是同步服务器（ADR-0062 决策 2；`buildShareJoinLink` 用 window.location.origin 拼）。
   const inviteLink = (await ownerPage.getByTestId('share-invite-link').textContent())?.trim() ?? '';
   expect(inviteLink, '邀请链接以查询串形式携带 shareToken').toContain('shareToken=');
+  expect(inviteLink, `邀请链接文本里出现应用自身的 loopback 落点 ${WEB_URL}`).toContain(WEB_URL);
   const parsedLink = new URL(inviteLink);
   const appOrigin = new URL(ownerPage.url()).origin;
   expect(parsedLink.origin, '邀请链接落点是应用自己的源').toBe(appOrigin);
