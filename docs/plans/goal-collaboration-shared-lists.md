@@ -1347,3 +1347,5 @@ pnpm verify:collab-journey                                                      
 2. 加 `creatingRef` 按 `shareId` 独占那一段（`try/finally` 释放，失败后下一拍仍可重试）→ `pnpm --filter @heyta/web typecheck` 通过、`pnpm verify:collab-journey` **`RESULT=OK steps=3` / `VERIFY_EXIT=0`**，`06` 复看只剩一行。
 
 **登记口径**：这条缺陷修在代码里、判据钉在旅程里，**不追加环境陷阱条目** —— 它是已消失的实现缺陷，不是一条会复现的探针坑（AGENTS §8 第 4 条里"具体事故"那一档要能复现才配占号）。防它复发的东西有两件，都在册：那枚 `toHaveCount(1)`，和 `finalize` 里写明"这段必须对同一条 share 独占"的注释。
+
+**⚠️ 这一笔把 11:1x 那节的差集证明吃掉了**（`a6662e218..HEAD` 现在对 `apps/web` 有真实改动，"旧趟 `-r build/test` 仍作数"那句从本戳起不再覆盖 web 包）。当场换成按改动面包一包的重取，全绿：`pnpm --filter @heyta/web typecheck` / `build`（`✓ built in 3.63s`）/ `test`（`Test Files 187 passed | 2 skipped (189)`）各 rc=0，加 `verify:collab-journey` `RESULT=OK steps=3`。其余 20 枚工作区包本笔零改动，那三趟对它们仍成立。
