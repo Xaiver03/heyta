@@ -1809,3 +1809,11 @@ cd e2e && npx playwright test tests/auth-login-code.spec.ts --reporter=line
 ⚠️ **同一把"对数"尺第一次又读出分子 0、总 passed 0，两处成因都不是被测物**（复量同一份日志即可，不必重跑）：
 1. `pnpm -r` 给每行加前缀 `packages/x test:` ⇒ 任何按 `^\s*Tests` 打锚的 needle **永不命中**，且**空对空照样判不出红**（分子分母都 0 时会误读成"打平"）。锚要写成 `test: .*Tests +[0-9]+ passed`。
 2. `grep -icE 'failed|FAIL'` 这种宽 needle 命中的 9 行**全是 ✓ 通过用例的名字**（`fail-closed`、`ai-failure-*.spec.tsx`）⇒ 判"有没有真失败"要锚**汇总行形状**（`Tests +[0-9]+ failed` / `✗` / `FAIL `），不能锚词。
+
+## 2026-10-22 22:3x 第 2 步最后一格（四端重装）按打包输入差集复账：**读数过期，但过期的字节没有一枚是本线的**
+
+15:0x 那趟重装的载体 sha 记的是 `dd36e346a`。按仓内那把差集尺（`research/tools/b-reinstall-readiness.sh` 的 `INPUT_FACES='packages apps server scripts package.json pnpm-workspace.yaml pnpm-lock.yaml'`）现量到 HEAD：
+**总差 506 个文件 = 取证图 472 + 真打包输入 34**，而那 34 枚逐行看全是托管AI线与界面线的（`apps/web/src/features/ai/*`、`apps/web/src/styles/app/{ai-panels,controls}.css`、`apps/mobile/src/ai/chat-transcript.tsx`、`packages/ai/src/*`、`apps/web/tests/ai-*.spec.tsx`）——`grep -icE 'share|collab'` 在这 34 枚上回 **0**。
+⇒ **重装这一格对"当前源码产物"确实过期了，但本线自 15:0x 起只提交文档**；要重跑那一趟的归属是改了打包输入的线（或下一轮开窗：载体 + 两枚在册设备 + 负载 ≤12）。本线不代跑，也不把 15:0x 的绿写成"当前产物"。
+
+⚠️ **这一格差点被我记成"差集为 0、旧读数仍成立"——假读数的机制要记下来**：把 `INPUT_FACES` 从脚本里 `sed` 出来时只剥了**双引号**，值里残留的单引号让七个 pathspec 粘成**一个不存在的匹配**，`git diff --name-only` 于是安静地回 0 行（rc=0、stderr 空）。**分子分母同时为 0 时"0==0"判成打平**——这是 §7 那一族「空对空比漏数更危险，因为它长得像通过」的新的一形：**变量派生的 pathspec 必须现量它展开成几枚参数**（`set -x` 或先 `printf '%s\n' $FACES`），别只看命令没报错。
