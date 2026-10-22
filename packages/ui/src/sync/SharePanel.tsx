@@ -39,6 +39,7 @@ import {
   canInviteMembers,
   canManageMembers,
   decideRoleChange,
+  memberCanHoldOwnership,
   memberFallbackLabel,
   memberLimitState,
   projectMembersFor,
@@ -130,12 +131,17 @@ export function SharePanel(props: SharePanelProps) {
       {views.map((view: ShareMemberView) => {
         const label = view.displayName
           ?? props.labels.fallbackMember(view.userId.toString().slice(0, 6));
+        // B-10：能不能接手所有权（信封非空 **且** 世代与当前对齐）。
+        const canTransfer = memberCanHoldOwnership(view);
         return (
           <View key={view.memberId} testID={`share-member-${view.memberId}`}>
             <Text style={text['row-title']}>
               {`${label} · ${props.labels.member.roleByRole[view.role]}${view.isSelf ? '（我）' : ''}`}
             </Text>
-            {view.keyEpochLag > 0 && (
+            {/* 🔴 「还没拿到钥」有**两种形状**：世代落后，或从没被封过信封（后者的
+                `keyEpochLag` 是 0 —— `memberKeyEpoch` 默认 1 而不是 0）。只看 lag 会让
+                最常见的那一种连一句提示都没有，而转让按钮照给。同一句理由盖住两半。 */}
+            {!canTransfer && !view.isOwner && (
               <Text style={text['row-meta']}>{props.labels.member.waitingForEnvelope}</Text>
             )}
             {manage && !view.isOwner && (
@@ -164,7 +170,9 @@ export function SharePanel(props: SharePanelProps) {
                 >
                   <Text style={text['row-title']}>{props.labels.removeButton}</Text>
                 </Pressable>
-                {transferArmed === view.memberId ? (
+                {/* 🔴 B-10：不合格的成员**不给这颗按钮**（不是给一颗点了才报错的）——
+                    理由已经由上面那行「等待所有者授权」给出。服务端另有一道同判据的硬门。 */}
+                {canTransfer && (transferArmed === view.memberId ? (
                   <View testID={`share-transfer-confirm-${view.memberId}`}>
                     <Text style={text['row-meta']}>{props.labels.transfer.confirmHint}</Text>
                     <Pressable
@@ -193,7 +201,7 @@ export function SharePanel(props: SharePanelProps) {
                   >
                     <Text style={text['row-title']}>{props.labels.transfer.button}</Text>
                   </Pressable>
-                )}
+                ))}
               </View>
             )}
           </View>

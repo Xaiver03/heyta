@@ -177,4 +177,49 @@ describe('SharePanel · 转让所有权（W6 两步确认）', () => {
     expect(byTestId('share-transfer-confirm-m-bob')).not.toBeNull();
     expect(byTestId('share-transfer-confirm-m-carol')).toBeNull();
   });
+
+  // 🔴 B-10：转让入口只给「手里有当前世代钥」的人 —— 两种不合格形状各一臂。
+  // 服务端对同一件事回 409，界面这一层不该先摆出一颗点了必报错的按钮。
+  it('B-10：目标没有信封（刚接受邀请的默认形状）→ 不给转让按钮，但给那句等待提示', () => {
+    const unsealed = {
+      ...OWNER_DATA,
+      members: [
+        OWNER_DATA.members[0]!,
+        { ...OWNER_DATA.members[1]!, hasEnvelope: false },
+      ],
+    };
+    renderPanel(unsealed);
+    expect(byTestId('share-transfer-m-bob')).toBeNull();
+    expect(byTestId('share-member-m-bob')!.textContent).toContain(LABELS.member.waitingForEnvelope);
+    // 其余管理动作不受影响（改角色/移除不需要对方有钥）。
+    expect(byTestId('share-member-actions-m-bob')).not.toBeNull();
+    expect(byTestId('share-remove-m-bob')).not.toBeNull();
+  });
+
+  it('B-10：目标有信封但世代落后 → 同样不给按钮、给提示（这一臂管 lag 那一半）', () => {
+    const lagging = {
+      ...OWNER_DATA,
+      members: [
+        OWNER_DATA.members[0]!,
+        { ...OWNER_DATA.members[1]!, memberKeyEpoch: 0 },
+      ],
+    };
+    renderPanel(lagging);
+    expect(byTestId('share-transfer-m-bob')).toBeNull();
+    expect(byTestId('share-member-m-bob')!.textContent).toContain(LABELS.member.waitingForEnvelope);
+  });
+
+  it('B-10：owner 自己的行不因这一层多出一句提示（合格与否都不给）', () => {
+    const ownerLagging = {
+      ...OWNER_DATA,
+      keyEpoch: 2,
+      members: OWNER_DATA.members.map((m) => ({ ...m, memberKeyEpoch: 1 })),
+    };
+    renderPanel(ownerLagging);
+    expect(byTestId('share-member-m-owner')!.textContent)
+      .not.toContain(LABELS.member.waitingForEnvelope);
+    // 同一条数据里 bob 也落后 ⇒ 他那行给提示、不给按钮（证明上一条不是整屏都不渲染）。
+    expect(byTestId('share-member-m-bob')!.textContent).toContain(LABELS.member.waitingForEnvelope);
+    expect(byTestId('share-transfer-m-bob')).toBeNull();
+  });
 });

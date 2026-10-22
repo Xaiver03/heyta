@@ -498,7 +498,15 @@ describe('owner 专属动作', () => {
 });
 
 describe('转让所有权（POST /shares/:id/transfer，W6）', () => {
-  const targetEditor = { ...memberAs('editor'), id: 'member-2', userId: 2n };
+  // B-10 之后，"合格的接收方"必须是**手里有当前世代信封**的那个人（`activeShare.keyEpoch` = 1）。
+  // 这一行就是那三头验收臂里的"补齐 ⇒ 必须过"。
+  const targetEditor = {
+    ...memberAs('editor'),
+    id: 'member-2',
+    userId: 2n,
+    keyEnvelope: { alg: 'x25519-xsalsa20-poly1305', ct: 'sealed' },
+    memberKeyEpoch: 1,
+  };
 
   beforeEach(() => {
     mocks.share.findFirst.mockResolvedValue(activeShare);
@@ -541,6 +549,39 @@ describe('转让所有权（POST /shares/:id/transfer，W6）', () => {
     expect(mocks.shareMember.update).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 'member-1' }, data: { role: 'editor' } }),
     );
+  });
+
+  // 🔴 B-10 的失法臂①：这是**新成员默认就在的形状** —— 接受邀请那条写路径建成员时
+  // 带 `memberKeyEpoch: share.keyEpoch` 却不带 `keyEnvelope`，所以"世代对齐"单独看
+  // 会放行一个刚接手就解不开自己清单的 owner。这一臂就是为了让"只比世代"的写法红。
+  it('B-10：目标世代对齐但手里没有信封 → 409，一处都不写', async () => {
+    mocks.shareMember.findFirst.mockReset();
+    mocks.shareMember.findFirst
+      .mockResolvedValueOnce(memberAs('owner'))
+      .mockResolvedValueOnce({ ...targetEditor, keyEnvelope: null });
+    const res = await app.inject({
+      method: 'POST', url: '/api/shares/share-1/transfer', headers: AUTH,
+      payload: { memberId: 'member-2' },
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe('SHARE_TRANSFER_TARGET_UNSEALED');
+    expect(mocks.$transaction).not.toHaveBeenCalled();
+    expect(mocks.share.update).not.toHaveBeenCalled();
+    expect(mocks.shareMember.update).not.toHaveBeenCalled();
+  });
+
+  // 🔴 B-10 的失法臂②：信封非空但那是**上一世代**的钥（owner 换过密钥、还没给他重发）。
+  // 这一臂钉住"只看信封非空"的写法 —— 反方向的假绿：臂① 挡不住它，臂② 挡不住臂①。
+  it('B-10：目标有信封但世代落后于当前 share.keyEpoch → 409，一处都不写', async () => {
+    mocks.share.findFirst.mockReset();
+    mocks.share.findFirst.mockResolvedValue({ ...activeShare, keyEpoch: 2 });
+    const res = await app.inject({
+      method: 'POST', url: '/api/shares/share-1/transfer', headers: AUTH,
+      payload: { memberId: 'member-2' },
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe('SHARE_TRANSFER_TARGET_UNSEALED');
+    expect(mocks.$transaction).not.toHaveBeenCalled();
   });
 
   it('editor 调转让 → 403（owner 专属动作）', async () => {
