@@ -11080,7 +11080,8 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     `❌ docker 守护进程不可用`（那次意外执行自己撞在它的 docker 前置上退了，才没往下走），文件未变；
     第二次改成"正文写进 `/tmp/stanza.md`（quoted heredoc）+ python 只读文件" ⇒ `written` + `commit rc=0` + `push rc=0`。
 535. **验收读数里那句「两台 X 互相看得见」的 X 是什么层次，抄进产品文档时会漂成"用户互相看得见"**
-    （2026-10-22 复核共享清单内容面时发现的：同一句话在 5 处文档里都写着"评论已经能互相看到 / 两台设备互相看得见"，
+    （2026-10-22 复核共享清单内容面时发现的：同一个假结论在这仓里至少有四种句子形状
+    （"评论已经能互相看到"／"两台设备互相看得见"／"评论也已落地到 Web 与桌面壳"／"产品现状"那句一句话概括），
     而它引的证据 `pnpm verify:collab-sync` 验的是**两个无界面的 Node 宿主实例**互拉与 WS 扇出）
     层次丢失之后，文档说的就是**产品能力**，而真界面是另一件事：成员那侧加入共享只写了 `addProject` + `setProjectShare`
     两步（本地清单是一条**空清单**），而评论区在 web 只有一个挂载点 —— 挂在任务详情上 ⇒ 没有任务就没有评论区可点。
@@ -11091,10 +11092,13 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     —— `apps/web/src/lib/share-experimental.ts` 文件头一直写着"成员那边看不到这条共享任务本身"，
     它是这次唯一没有被抄错的格子。
     验证证据（本条当场）：`grep -rn ShareCommentsSection apps` 只回 `TaskDetailCard.tsx:501` 一处；
-    `JoinSharedListDialog.tsx` 的 `finalize` 里没有任何 share 日志拉取；据此改口的 5 处
-    （本线计划 §9 标题与"产品现状"那句、`docs/agents/progress-log.md`、`feature-matrix` 6.3、`roadmap` W4 残余、
-    `dida365-feature-benchmark` 6.3）跑 `pnpm check:md-tables` / `check:docs` / `check:doc-command-claims` /
+    `JoinSharedListDialog.tsx` 的 `finalize` 里没有任何 share 日志拉取；据此改口的九格（散在 6 份文档：两份计划各自的文件头状态行、
+    §9 标题、§9.1"产品现状"那句、`docs/agents/progress-log.md`、`feature-matrix` 6.3、`roadmap` W4 残余、
+    `dida365-feature-benchmark` 的 6.3 与 P2-10）跑 `pnpm check:md-tables` / `check:docs` / `check:doc-command-claims` /
     `check:share-entry-hidden` 各 rc=0。
+    ⚠️ **改口本身也差点只做到一半**：第一遍是按"两台浏览器互相看得见"这把**字面针脚**搜的，只命中 5 份文档；
+    第二遍改按**结论**枚句子形状（"已落地到…壳""这条腿通了""产品现状"那句概括）才又抓出 2 格 —— 其中一格正是**那份文件自己的头部状态行**，
+    也就是读得最多、最会被当现状的那一行。**修一类缺陷要按结论枚形状，不按关键词枚。**
     ⚠️ 顺带一条：**用户可见文案反而是对的** —— `web.share.experimental.note` 那句"成员之间还看不到彼此改动的任务与评论"
     经代码复核成立，而 `check:share-entry-hidden` 的格 4 正是钉这句话的（它把缺陷披露本身当判据）。
     所以改文档前先跑这类门禁，别凭"这句看起来过时"就精简它。
