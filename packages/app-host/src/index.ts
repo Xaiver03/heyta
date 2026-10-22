@@ -771,6 +771,7 @@ export {
  * 纯函数、零浏览器依赖，换钥/解锁各宿主共用同一标签约定。
  */
 export { shareKeyStoreIdentity } from './share-key-identity.js';
+export { shareTransferFailure, SHARE_TRANSFER_TARGET_UNSEALED_CODE, type ShareTransferFailure } from './share-transfer-error.js';
 
 /**
  * 导出（**导出自由**，README 设计原则第 5 条）。

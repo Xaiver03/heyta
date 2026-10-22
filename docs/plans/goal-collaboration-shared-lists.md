@@ -1392,3 +1392,18 @@ git diff --name-only a6662e218..HEAD -- packages apps server | grep -v '/evidenc
 **这一趟顺手踩到一枚新的假阴性，已登记 §7 #531**：第一次做"收尾对数"时分子数出 **0**（分母 20），差点读成"这些包根本没打汇总行"。真因是 pnpm 的 `包名 test:` 前缀后面 vitest 是**带色输出**，行首留着转义序列，锚 `^` 的正则一条都不匹配。剥色（`sed 's/\x1b\[[0-9;]*m//g'`）之后同一份日志数出 20 == 20。**教训的形状**：尺子没电时长得跟"被测物真的没有"一模一样，所以分子分母要一起报，只报"对上了"不算。
 
 **载体追平这件事的正确口径（免得下一位每笔提交都去追）**：裁判对"载体停在哪"给的是 **ℹ️ 信息行、不是红格** —— 实测 `ℹ️ 载体停在 <SHA>，主检出 HEAD 是 <SHA>（落后 N 个提交 / 超前 0 个）—— 但打包输入面差集为空 … 差异只在非输入面（产物同形，不拦）`。所以**只有碰 `packages/**`、`apps/**`、`server/**` 的提交才需要重新追平并重 build**；纯文档漂移不拦，别为它跑一趟构建。载体 SHA 与落后枚数都是瞬时读数，要哪个当场跑裁判拿，别从本账里抄。
+
+### 2026-10-22 12:0x · 把 M4 那一格欠的补上：B-10 的具名错误码**现在在宿主侧有消费者了**（先前它一次都读不到话）
+
+**现量到的缺陷**：`ShareFeature` 的 `onTransferOwnership` 是 `void api.transferOwnership(…).then(reload)`，**没有 catch**。服务端那道 B-10 门（接收方没有当前世代钥 ⇒ 409 `SHARE_TRANSFER_TARGET_UNSEALED`）在面板数据落后一拍时仍会被打到（面板把不合格接收方灰掉只是第一层），而那一发落到未处理拒绝上 ⇒ 用户按了「确认转让」，界面**什么都不说**。全仓 `grep SHARE_TRANSFER_TARGET_UNSEALED` 只有 sync-client 那枚常量定义，一处消费者都没有 —— 这就是账上"M4 尾巴：具名码没有宿主侧文案映射"那格。
+
+**做法**（取向判断放进 `app-host`，外壳只翻文案，AGENTS §3.5）：
+- 新增 `packages/app-host/src/share-transfer-error.ts`：`shareTransferFailure({status, code}) → 'target-unsealed' | 'other'`（按原始值比，不为了一个字符串常量把 app-host 挂到传输层的错误类上）。
+- `sync-client` **additive 导出** `SHARE_ERROR_CODES`（原先是模块私有 `const`），让新用例能做**两头对账**：本模块写死的码值必须等于真正上线的那枚常量 —— 改线协议的人不会想起来改这里，让测试去想起来。
+- 外壳：catch 后落进 `data-testid="share-transfer-error"` 的 `role="alert"`；`target-unsealed` 复用面板行内那句 `common.share.member.waitingForEnvelope`（同一件事不许两个说法），其余走新词条 `web.share.transfer.error`。
+- ⚠️ **locale 两文件现在带本线 6 枚键**（原先清单说"5 键"）：多出来的那一枚就是 `web.share.transfer.error`，`zh-CN.ts` 与 `en.ts` 各一行。
+
+**读数**：新用例 5/5 绿；**变异臂**（摘掉 `status === 409` 那半个合取）⇒ **恰好 1 枚具名转红**（"同一个码但状态不是 409 ⇒ other"），还原后 5/5；`pnpm -r typecheck` rc=0（`: Done` 20 == 20）、`-r --filter '!@heyta/sync-server' test` rc=0（跑 test 的包 20 == 打 `Tests` 行的包 20，`failed|FAIL` 0 行）、`-r build` rc=0（20 == 20）、`check:layering` rc=0（456 文件 / 10 规则）、`verify:collab-journey` `RESULT=OK steps=3`。
+途中一枚**自己踩的门**：只改 locale 源码不重打 `@heyta/i18n` ⇒ `pnpm --filter @heyta/web typecheck` rc=2（新键不在那个 4160 成员的联合类型里）。这条不算新陷阱，是仓里既有的"改完 packages 必须先 build"。
+
+**共享工作树的一枚实况**（提交前逐文件现量抓到的）：`packages/i18n/src/locales/{zh-CN,en}.ts` 与 `packages/app-host/src/index.ts` 里**同时躺着 AI 线未提交的改动**（`web.ai.chat.step.*` 七枚键、`type AssistantTurnEvent`）。所以这一笔**不能整文件 `git add`** —— 用 `git diff -U3` 按 hunk 过滤（每份文件 2 枚 hunk、只留含本线标记的那 1 枚）`git apply --cached`，再**不带 pathspec** 提交索引（带 pathspec 的 `git commit -- <路径>` 取的是工作树内容，会把别线的行一起扫进来）。提交前对索引复量：`git diff --cached | grep -c "别线关键词" = 0`。
