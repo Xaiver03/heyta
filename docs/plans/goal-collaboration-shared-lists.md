@@ -1349,3 +1349,17 @@ pnpm verify:collab-journey                                                      
 **登记口径**：这条缺陷修在代码里、判据钉在旅程里，**不追加环境陷阱条目** —— 它是已消失的实现缺陷，不是一条会复现的探针坑（AGENTS §8 第 4 条里"具体事故"那一档要能复现才配占号）。防它复发的东西有两件，都在册：那枚 `toHaveCount(1)`，和 `finalize` 里写明"这段必须对同一条 share 独占"的注释。
 
 **⚠️ 这一笔把 11:1x 那节的差集证明吃掉了**（`a6662e218..HEAD` 现在对 `apps/web` 有真实改动，"旧趟 `-r build/test` 仍作数"那句从本戳起不再覆盖 web 包）。当场换成按改动面包一包的重取，全绿：`pnpm --filter @heyta/web typecheck` / `build`（`✓ built in 3.63s`）/ `test`（`Test Files 187 passed | 2 skipped (189)`）各 rc=0，加 `verify:collab-journey` `RESULT=OK steps=3`。其余 20 枚工作区包本笔零改动，那三趟对它们仍成立。
+
+### 2026-10-22 11:5x · 第 2 步那三趟在**当前 tip** 上的覆盖面重新量过：差集只剩 2 枚、且两枚都在 `apps/web`
+
+`git fetch` 后 `HEAD == origin/main == b25c133f4`（`0 0`）。重取那把尺自己量的差集：
+
+```
+git diff --name-only a6662e218..HEAD -- packages apps server | grep -v '/evidence/'
+```
+
+**读数 = 2 枚**，逐枚归好了属：`apps/web/src/features/share/JoinSharedListDialog.tsx`（本线 `afcfb4fb4`）与 `apps/web/src/features/subscription/RenewPanel.tsx`（收款线 `5fae6741a`，它是我那笔的**祖先** —— `git merge-base --is-ancestor` 现量，所以它已经在我跑 web 那三趟的工作树里）。⇒ 上一节那四枚 rc=0（typecheck / build / test 187 files / journey）**一次同时覆盖了锚点之后改动打包输入面的全部两枚**；其余 19 枚有脚本的包自锚点起零输入变化，仍由差集证明作数。**这一格不需要整趟 `-r` 重跑**，需要的是别把这句话当成"永远不用重跑"—— 任何一笔再碰 `packages/**`、`apps/**`、`server/**` 的提交都会把它吃掉，重取命令就是上面那一行。
+
+**两枚别线红在 `b25c133f4` 上复量：都还在**，各自给出的出路一字没变，也各自都不归本线代做：
+- `check:selection-single-source` rc=1 ⇒ 出路是"改用 `@heyta/app-host` 的 selection"或"在 `ROW_ID_EXEMPT` 登记一行并写明是哪一类瞬态"。**登记别人的豁免表就是代改别人的判据口径**，本线不碰。
+- `check:image-license` rc=1，门自己判的是**情形 ②**（`server/package.json` / 三枚本地包 / Dockerfile 装法变了 ⇒ 锁本身过期，重跑生成器造不出新锁），处方是一次 `pnpm verify:selfhost-stack` 并把镜像里的 `/app/package-lock.json` 落成提交物。那是自托管线的交付件，动它＝替别线产交付。
