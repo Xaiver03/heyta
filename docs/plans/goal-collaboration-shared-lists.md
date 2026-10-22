@@ -1788,3 +1788,14 @@ cd e2e && npx playwright test tests/auth-login-code.spec.ts --reporter=line
   取原话：`pnpm run check:image-license` 的前三行失真清单就是情形判别依据，别看尾部那两句并列的"分两种情形"就以为可选便宜的①。
 
 ⇒ **第 2 步"全链绿"这一格的状态到 20:1x 没有变好也没有变坏**：HEAD 级红集仍是三枚别线存量（收款线、自托管线、链里那枚跑不到头的浏览器套件门），本线一枚不占；本线按 18:2x 拍板 2 的两把自算尺都是绿的。
+
+## 2026-10-22 21:1x 那 3 枚别线提交**动到了本线那把尺的输入**，所以第 1 步与 typecheck 在新 HEAD 重跑
+
+上面 20:1x 说「别线对本线零字节差集」是对的，但**尺子的输入不止本线源码**：`git --no-pager diff --name-only d99dcefa3..HEAD` 里有 `e2e/tests/helpers.ts`（本线 journey 共用的那份夹具）与 `apps/web/src/styles/controls.css`（共享控件样式）。所以这一格不能沿用 19:2x 的读数。
+
+- **夹具那枚改动是 additive 且默认关**：`resetStub(request, {stream?, hold?})` 不传选项时 URL 与改前逐字相同（正文自己写着「默认关（回整份 JSON）——共用这个桩的用例十几条」）。**但这只是"看着不变"，判据要的是跑一遍。**
+- **`pnpm verify:collab-journey` 在 HEAD `a15e5d23d` 重跑：`VERIFY_EXIT=0` / `RESULT=OK steps=3`。** 跑前逐枚现量端口（脚本自己声明的是 `3217` 与 `4327`，`--strictPort`）：两枚 FREE；当时占着的 `4193/4183` 是别的进程，不在射程内。取端口：`grep -nE 'PORT' scripts/verify-collab-journey.mjs`（**别照旧文猜脚本文件名**，`verify:collab-journey` 走的是 `.mjs` 不是 `.sh`）。
+- **新截图人工看过**（9 张都在 21:06 被本次跑重写，按 mtime 现量）：`04-owner-invite-ticket.png` 里入群链接是 `http://127.0.0.1:4327/?shareToken=1cZKMuHvHKqQ2ib2r-UZBThWx1C-fC6oaep46zDYoFQ`，与上方凭证框逐字一致；共享对话框版式没被 `controls.css` 那枚改动带坏；侧栏「家庭装修」只有一行（上次那枚重复行判据仍守得住）。
+- **`pnpm -r typecheck` 在新 HEAD rc=0**，对数 `Done` 20 == 有该脚本的包 20。
+
+⇒ 第 1 步与第 2 步里**本线能自算的那几把尺**（journey、typecheck、六枚静态门、三道文档门）到 21:1x 全绿；第 2 步仍欠的那一格还是 20:1x 那三枚别线红，口径没变。
