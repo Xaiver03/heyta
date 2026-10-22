@@ -1446,7 +1446,7 @@ git diff --name-only a6662e218..HEAD -- packages apps server | grep -v '/evidenc
 - **其余各项单跑全绿**，包括本线会被点名到的那几枚：`check:journey-coverage`、`verify:collab-keys`、`check:e2e-helper-exports`、`check:locator-labels`、`check:i18n-vars`（本线那 8 枚词条带 `{message}` 变量）、`check:e2e-carrier`、`screenshot:verify`、`check:checkpoint-cadence`。`build`、`typecheck` 各自 `rc=0`。
 - **协作面一枚不占，这条是现量不是推断**：`git status --porcelain=v1 | grep -icE 'share|collab'` 回 **0**（工作树上 487 枚 ` M` 里 466 枚是 `apps/web/evidence/**`，即别线的 Playwright 取证图）。
 - ⚠️ **第 94 项 `check:ai-e2e` 没拿到 `rc`** —— 它跑的是整套 `e2e/tests/**`，一枚约 6 秒、串行，我在它跑到约第 224 枚时掐了（回合比墙钟先耗尽，恢复点要落在已推的仓内正文里，不能留在本机 `/tmp`）。掐前它的日志里 17 个 spec 文件有 `✘`（`account-email-change-and-sessions`、`admin-console`、`auth-consent-registration`、`inbox`、`detail-pane-*` 等），**没有一枚是协作面的 spec**，且这套件里根本不含 `collab-journey`（日志里 `grep collab` 回空）⇒ 本线的 e2e 证据仍然只认 `pnpm verify:collab-journey`。
-- **不能把这一趟记成红，也不能记成绿**。它没跑完；而同一棵树、同一台机器上紧接其后单独跑的 `check:privacy-consent-e2e` 与 `check:landing-e2e` 各 `rc=0`（后者也走 `check-ai-e2e-preflight` 同一套装置），所以"整套红"不是载体或预检坏了 —— 那 17 个 spec 的红要归到别线在途改动，得由它们自己的线去量。
+- **不能把这一趟记成红，也不能记成绿**。它没跑完；而同一棵树、同一台机器上紧接其后单独跑的 `check:privacy-consent-e2e` 与 `check:landing-e2e` 各 `rc=0`（后者也走 `check-ai-e2e-preflight` 同一套装置），所以"整套红"不是载体或预检坏了 —— ⚠️ 这句已被 16:4x 那节的对照臂否证（干净提交态载体上同样红）——见文末。原文保留是为了让下一位看到推断是怎么错的：那 17 个 spec 的红要归到别线在途改动，得由它们自己的线去量。
 
 **下一会话若要补第 94 项**：`pnpm check:ai-e2e > /tmp/ai-e2e.log 2>&1; echo rc=$?`（一条命令约 40 分钟起，别在等它的时候并跑别的门），拿到 `rc` 后按 `sed 's/\x1b\[[0-9;]*m//g'` 去色再数失败 spec，逐个回 `git status` 查它指的文件在 `HEAD` 上脏不脏 —— 脏就归别线在途改动，不许写成存量红（§7 #532）。
 
@@ -1523,3 +1523,24 @@ Android AVD `heyta-w3-yearly`（`-no-window` headless 起，`emulator-5554` 的 
 ⇒ **本线现在真正只剩一个停止点：② owner 转让语义**（两步确认、立即生效、原 owner 降 editor，文案 `web.share.transfer.confirmHint`）。
 ① 若要动，只有一个前提：他看了这张图仍想换更强的视觉——那是新口径，不是补旧账。
 
+### 2026-10-22 16:4x · 对照臂把我先前那句推断**否证**了：`check:ai-e2e` 的红是 HEAD 存量，不是别线在途改动
+
+14:0x 那节我写过一句"那 17 个 spec 的红要归到别线在途改动，得由它们自己的线去量"。**这句是推断，没做对照，今天做了对照，它错了。**
+
+**对照臂**（同一台机、同一戳、负载 9.65 ≤ 12）：拿**干净的提交态载体** `heyta-wt-collab-m5`（`dd36e346a`，`git status --porcelain` 现量 **0 枚**）跑主检出里同样在红的两枚 spec ——
+`pnpm --dir e2e exec playwright test tests/account-email-change-and-sessions.spec.ts tests/ai-row-layout.spec.ts`，
+调用形状与门自己的一致（门的 `test` 脚本就是 `playwright test`；`check-ai-e2e-preflight.mjs 4322` 我先单独跑过 rc=0；`webServer` 配的是 `reuseExistingServer:false`，所以这一趟起的是它自己的服务）。
+**读数：`9 failed`**（形状是 `expect(locator).toBeVisible() failed` / `element(s) not found`）。
+
+⇒ 结论换过来：**这两枚 spec 的红在 `HEAD` 上就成立**，与主检出那 8 枚脏源文件（`apps/web/src/features/ai/*`、`DueEditor.tsx`）无关。
+所以 `pnpm check` 的**第 94 项本身也是一枚 HEAD 红**，归 AI 线（`ai-row-layout`）与注册登录线（`account-email-change-and-sessions`）——
+先前那句"整套件的红不是环境/载体坏了"仍然对，但"归别线在途改动"这半句作废。
+
+**顺带一条装置事实**（下次别踩）：掐 `playwright` 的 `cli.js test` **不会**带走它 `webServer` 起的子进程 ——
+`vite --port 4318` 与 `stub-provider.mjs`（4319）在我杀掉主进程后仍在监听，下一趟直接撞
+`http://127.0.0.1:4318 is already used`。认人要按**端口 + `lstart`**（这两枚的启动时刻与我那趟 `15:43:55` 同秒、cwd 在主检出），
+按名字杀会误伤别的会话；逐枚 `kill <pid>` 后四枚端口现量全空，对照臂才跑得起来。
+
+**这一格现在的诚实形状**：`pnpm check` 全链在 `HEAD` 上至少红四枚 —— `check:selection-single-source`（收款线）、
+`check:image-license`（自托管线，归因见 15:4x 那节）、以及第 94 项 `check:ai-e2e` 里 **AI 线 + 注册登录线**的存量红（对照臂已证）。
+**没有一枚归本线**：本线自己的 e2e 判据是 `pnpm verify:collab-journey`（`RESULT=OK steps=3`），它不在这套件里（同份日志 `grep collab` 回空）。
