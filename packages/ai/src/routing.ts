@@ -1044,16 +1044,6 @@ async function attemptOnce(
   let requestBody: unknown;
 
   if (mode === 'managed') {
-    // 托管档不转发 `tools`（服务端行为，见 `docs/plans/launch-blockers.md` §3.2）⇒ 响亮拒绝
-    if (invocation.tools !== undefined && invocation.tools.length > 0) {
-      return {
-        ok: false,
-        reason: 'no-route',
-        message:
-          '托管 AI 暂不支持工具调用：我们的服务端不会把工具目录转发给模型。' +
-          '要用工具，请在设置里改选"使用自己的 AI 端点"。',
-      };
-    }
     const transport = await (managedTransport?.() ?? Promise.resolve(undefined));
     if (transport === undefined) {
       return {

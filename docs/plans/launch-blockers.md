@@ -553,25 +553,31 @@ heyta 现在还不能对外发布。挡上线的只剩 4 件 —— 全都只差
 
 ✅ **2026-10-16 更正**：原文写「`SUBSCRIPTION_REQUIRED` / `AI_QUOTA_EXCEEDED` 的客户端文案（**现量零命中**）」—— **已不成立**：`apps/mobile/src/ai/copy.ts:182-183` 有这两条稳定码到词条的映射，`packages/i18n` 里有对应文案。⚠️ 剩下的**真**那一半是后半句：**线上要转发 `MANAGED_AI_ENABLED`**（那属于部署，见 §7.1 的 A7 一族）。
 
-### 3.2 🔴 新发现（2026-10-16）：托管档的**工具调用是静默失效的**
+### 3.2 ✅ 已按 (a) 落地（2026-10-22）：托管档的**工具调用透传**
 
-| 事实 | 证据 |
+**2026-10-16 记为「静默失效」**：服务端 `SERVER_MANAGED_AI_FEATURES` 声明 `tool-calling`，但
+`managed-proxy.routes.ts` 既不接也不转发 `tools`/`tool_choice`，`outboundBody` 只有 `{model,messages,stream?}`。
+⇒ 助手会退化成一段纯文本回答，而**没有任何一层会报错**（本仓最忌讳的"清单写着支持、实际静默降级"的形状）。
+
+**当日 (a) 或 (b) 二选一的悬案，2026-10-22 按 (a) 落地。**
+
+| 事实 | 落地位置 |
 |---|---|
-| 服务端**声明**支持 `tool-calling` | [`managed-upstream.ts`](../../server/src/ai/managed-upstream.ts) 的 `SERVER_MANAGED_AI_FEATURES` 里**有** `'tool-calling'` |（复核：2026-10-17）
-| 但服务端**从不转发 `tools`** | `grep -n -e tools -e tool_choice server/src/ai/managed-proxy.routes.ts` ⇒ **零命中** |
-| 发出去的上游请求体只有三样 | `{ model, messages, stream? }`（`managed-proxy.routes.ts` 的 `outboundBody`） |
+| 客户端 `buildManagedChatRequestBody` 现在**接 tools** | [`packages/ai/src/wire.ts`](../../packages/ai/src/wire.ts) 与 OpenAI 那条路共用 `toWireTools()` |
+| 路由层的"托管档不转发 tools"那条响亮拒绝已**摘除** | [`packages/ai/src/routing.ts`](../../packages/ai/src/routing.ts) `attemptOnce` 的 managed 分支 |
+| 服务端 `ChatBodySchema` 加 `tools` + `tool_choice:'auto'`，`MessageSchema` 的键改为**下划线** `tool_call_id` | [`server/src/ai/managed-proxy.routes.ts`](../../server/src/ai/managed-proxy.routes.ts) |
+| `outboundBody` 只在真收到 tools 时把它们带上（老契约的字节形状不许漂） | 同上文件 |
+| 4 条判据都能红（含"驼峰 `toolCallId` 会静默剥离 ⇒ 上游 400"这条 bug 的钉子） | [`server/tests/managed-proxy.routes.spec.ts`](../../server/tests/managed-proxy.routes.spec.ts) 「工具透传」那一组 |
 
-⇒ **模型永远收不到工具目录**，于是"只调工具、不说话"那条路在托管档上**走不通**：
-助手会退化成一段纯文本回答，而**没有任何一层会报错**。
+🔴 **同时修掉的隐藏 bug**：原 `MessageSchema.toolCallId` 用驼峰，而 `wire.ts` 的 `toWireMessage`
+把内部 `toolCallId` 归一化成下划线 `tool_call_id` 才发出。zod 会**静默剥离**下划线那个键 ⇒
+上游收到"工具观察结果没带调用 id" ⇒ OpenAI 兼容层 400、界面只说"AI 请求失败"。
+这条 bug 在托管档 + 工具没被路由层放行之前**永远不会被触发**（客户端就拦了），
+所以它以前只存在于自备端点那条直连路径以外的**理论形状**里；(a) 落地同时把它钉死。
 
-这正好是本仓最忌讳的那个形状：**功能清单里写着支持，实际静默降级**。
-它同时是 [ADR-0045](../adr/0045-conversational-assistant-split-authorization-from-catalog.md)
-（对话式多步助手）在 ¥12 档上的**可用性前提** —— 助手靠的就是工具循环。
-
-**要拍的板**（我记在这里、不代拍）：
-- (a) 服务端**补上 `tools` 透传**（要动 `ChatBodySchema` + `outboundBody` + 出境披露面）；或
-- (b) 把 `'tool-calling'` 从 `SERVER_MANAGED_AI_FEATURES` 里**拿掉**，并在客户端把该功能在托管档上**响亮拒绝**（不许静默降级）。
-- 无论选哪条，**"主持久化档支持助手"这句对外话今天都不能说**。
+**对外口径可以更新的那句**：¥12 档"托管"下的**对话式助手不再退化为纯文本**。
+剩下不能说的仍然在 ADR-0054 §8 / §9：助手在托管档的**多步上界**、**流式与工具的相容性**
+（`stream:true` + `tools` 上游是否按 `delta.tool_calls` 回）、以及**长上下文**这一维。
 
 ---
 

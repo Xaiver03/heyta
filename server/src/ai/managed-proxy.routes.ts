@@ -134,20 +134,48 @@ const UPGRADE_REQUIRED_STATUS = 402;
  */
 const MAX_REQUEST_BYTES = 256 * 1024;
 
+/**
+ * OpenAI 兼容线上的**消息形状**。
+ *
+ * 🔴 **`tool_call_id` 用下划线，不用驼峰** —— 客户端 `packages/ai/src/wire.ts`
+ * 的 `toWireMessage()` 把内部的 `toolCallId` 归一化成下划线形式再发出（自备端点
+ * 那条路依赖这个形状，因为 OpenAI 只认下划线）。服务端如果在这一层用驼峰，
+ * zod 会**静默剥离**下划线那个键、发上游时把它丢掉，症状是"工具观察结果没有
+ * 对应上调用 id"—— 上游 400、界面显示"AI 请求失败"，最难归因。
+ *
+ * ⚠️ 这条不是"风格偏好"：`tool_calls` 与 `tool_call_id` 是**供应商契约的一部分**，
+ * 由不得中间层改名。
+ */
 const MessageSchema = z.object({
   role: z.enum(['system', 'user', 'assistant', 'tool']),
   content: z.string(),
-  /** OpenAI 兼容格式要求工具观察结果回填对应的调用 id。 */
-  toolCallId: z.string().max(256).optional(),
+  /** OpenAI 兼容格式要求工具观察结果回填对应的调用 id（线上键名是下划线形式）。 */
+  tool_call_id: z.string().max(256).optional(),
+});
+
+/** OpenAI 兼容线上的**工具声明**形状（客户端 `wire.ts` 的 `WireTool` 一一对应）。 */
+const WireToolSchema = z.object({
+  type: z.literal('function'),
+  function: z.object({
+    name: z.string().min(1).max(128),
+    description: z.string(),
+    parameters: z.unknown(),
+  }),
 });
 
 /**
  * 🔴 没有 `model`、没有 `baseUrl`、没有 `stream` 之外的任何"上游行为"字段。
  * 特别是**没有** `requests` / `used` / `limit`：客户端自报的计数一律不采信（AGENTS §8.10）。
+ *
+ * ⚠️ `tools` 与 `tool_choice` **照原样转发**给上游（launch-blockers §3.2 (a) 方案）：
+ * 托管档的 assistant 需要工具才能"帮用户做决策"。工具目录由**客户端**决定，
+ * 服务端只保证"过了 zod 的形状"，不去解释工具语义。
  */
 const ChatBodySchema = z.object({
   feature: z.enum(SERVER_MANAGED_AI_FEATURES),
   messages: z.array(MessageSchema).min(1),
+  tools: z.array(WireToolSchema).max(64).optional(),
+  tool_choice: z.literal('auto').optional(),
   /** 逐字透传上游的 SSE 流。关闭时整包读完再回。 */
   stream: z.boolean().optional(),
 });
@@ -394,11 +422,19 @@ export const managedAiProxyRoutes: FastifyPluginAsync<ManagedAiProxyRoutesOption
       }
 
       // ── 上游合格之后才组装请求体 ──────────────────────────────────────
-      // 🔴 只有**已校验**的这条消息数组会被序列化并发出去；未声明的键
+      // 🔴 只有**已校验**的这条消息数组与工具目录会被序列化并发出去；未声明的键
       // （`model` / `baseUrl` / `requests`）到这里已经没了。`model` **只**来自服务端配置。
+      // 工具目录按 launch-blockers §3.2 (a) 原样透传，`tool_choice` 只有真给了 `tools` 才带。
+      const withTools = parsed.data.tools !== undefined && parsed.data.tools.length > 0;
       const outboundBody = JSON.stringify({
         model: upstream.modelId,
         messages: parsed.data.messages,
+        ...(withTools
+          ? {
+              tools: parsed.data.tools,
+              ...(parsed.data.tool_choice === undefined ? {} : { tool_choice: parsed.data.tool_choice }),
+            }
+          : {}),
         ...(stream === true ? { stream: true } : {}),
       });
       // 记的是**即将发出去的那个串的字节数**，不是用户请求的字节数 —— 两者差的是

@@ -25,7 +25,7 @@
  */
 
 import type { AiFeature } from './egress.js';
-import type { AiInvocation } from './provider.js';
+import type { AiInvocation, AiToolDescriptor } from './provider.js';
 
 /**
  * 一条对话消息。线格式的形状（`role` + `content`），不是领域概念。
@@ -98,6 +98,27 @@ export interface ChatRequestOptions {
   readonly stream?: true;
 }
 
+/** `tools` → OpenAI 兼容线上的 `{tools, tool_choice}` 形状。
+ *  两条路径共用（自备端点直连 / 托管档经服务端代理），以免两种打包方式各自漂移。 */
+function toWireTools(tools: readonly AiToolDescriptor[]): {
+  tools: readonly WireTool[];
+  tool_choice: 'auto';
+} {
+  return {
+    tools: tools.map(
+      (tool): WireTool => ({
+        type: 'function',
+        function: {
+          name: tool.name,
+          description: tool.description,
+          parameters: tool.parameters,
+        },
+      }),
+    ),
+    tool_choice: 'auto',
+  };
+}
+
 /**
  * 组装 `chat.completions` 的请求体。
  *
@@ -134,21 +155,7 @@ export function buildChatRequestBody(
       { role: 'system', content: invocation.system },
       { role: 'user', content: invocation.user },
     ]).map(toWireMessage),
-    ...(withTools
-      ? {
-          tools: (invocation.tools ?? []).map(
-            (tool): WireTool => ({
-              type: 'function',
-              function: {
-                name: tool.name,
-                description: tool.description,
-                parameters: tool.parameters,
-              },
-            }),
-          ),
-          tool_choice: 'auto',
-        }
-      : {}),
+    ...(withTools ? toWireTools(invocation.tools ?? []) : {}),
     // 🔴 放在**最后**，且只在要求流式时才出现：省略时键的顺序与缺键形态
     // 与加流式之前逐字相同（`wire.spec.ts` 按原始串比对）。
     ...(options?.stream === true ? { stream: true as const } : {}),
@@ -193,30 +200,36 @@ export function sameHost(a: string, b: string): boolean {
 /**
  * 组装**托管档**的请求体（我们自己的服务端代理）。
  *
- * 🔴 它 **不接受 `tools`**，而且这是**类型上的**不接受，不是注释要求 ——
- * 因为服务端今天**根本不转发工具**：`managed-proxy.routes.ts` 里
- * `grep -n "tools\|tool_choice"` **零命中**，发出去的上游请求体只有
- * `{ model, messages, stream? }`。而 `SERVER_MANAGED_AI_FEATURES` 里**却列着
- * `'tool-calling'`** ⇒ 真把工具发过去，得到的是**静默降级成纯文本回答**。
+ * 🔴 **`tools` 与 OpenAI 那条路逐字同源**（同一个 `toWireTools` 打包），
+ * 服务端代理的 `ChatBodySchema` 会**照原样**转发给上游。
+ * 客户端这里不做任何"托管档不支持工具"的判断 —— 那条老规矩在 launch-blockers
+ * §3.2 的 (a) 方案落地时**已经解除**：代理会转发了，所以路由层不再拦。
  *
- * 所以调用方（`provider.invoke`）在托管档遇到带工具的功能时**必须响亮拒绝**，
- * 而不是让请求发出去、让模型收不到工具再编一句话回来。
- * 那条发现登记在 [`docs/plans/launch-blockers.md`](../../../docs/plans/launch-blockers.md) §3.2。
+ * ⚠️ 模型由服务端配置决定（客户端能选模型 = 客户端能选我们倒贴多少钱，ADR-0021），
+ * 所以 `model` **不在**这里出现，也**不在** `ChatBodySchema` 里。
  *
  * ⚠️ `messages` 仍走**同一个** `toWireMessage` 归一化，与 OpenAI 那条路逐字共用 ——
  * 托管档与自备档的对话形状不许分叉。
  */
 export function buildManagedChatRequestBody(
   feature: AiFeature,
-  invocation: Pick<AiInvocation, 'system' | 'user' | 'messages'>,
+  invocation: Pick<AiInvocation, 'system' | 'user' | 'tools' | 'messages'>,
   options?: ChatRequestOptions,
-): { feature: AiFeature; messages: readonly Record<string, unknown>[]; stream?: true } {
+): {
+  feature: AiFeature;
+  messages: readonly Record<string, unknown>[];
+  tools?: readonly WireTool[];
+  tool_choice?: 'auto';
+  stream?: true;
+} {
+  const withTools = invocation.tools !== undefined && invocation.tools.length > 0;
   return {
     feature,
     messages: (invocation.messages ?? [
       { role: 'system', content: invocation.system },
       { role: 'user', content: invocation.user },
     ]).map(toWireMessage),
+    ...(withTools ? toWireTools(invocation.tools ?? []) : {}),
     // 托管代理的 `ChatBodySchema` 里 `stream` 是可选的（见 `managed-proxy.routes.ts`），
     // 它的流式分支按 SSE 逐字节透传上游 —— 所以这里与服务端契约同形，不是新协议。
     ...(options?.stream === true ? { stream: true as const } : {}),

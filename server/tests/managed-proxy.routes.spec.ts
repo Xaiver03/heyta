@@ -660,6 +660,88 @@ describe('响应透传', () => {
 });
 
 /**
+ * 托管档的**工具透传**（launch-blockers §3.2 (a) 方案落地）。
+ *
+ * 这一组钉的是**四条**都能红的不变量：
+ * 1. 客户端 `wire.ts` 的 `toWireMessage` 把 `toolCallId` 归一化成下划线 `tool_call_id`，
+ *    服务端 MessageSchema 必须接住**下划线**那个键 —— 驼峰会被 zod 静默剥离，
+ *    上游拿不到"这条 tool 观察对应哪一次调用"，400；症状是"AI 请求失败"，最难归因。
+ * 2. 客户端**没带 tools** ⇒ 上游请求体也不该出现 `tools` 键（老契约的字节形状不许漂）。
+ * 3. 客户端**带了 tools** ⇒ 上游原样收到，`tool_choice:'auto'` 一并过去。
+ * 4. `tools` 的形状不合（缺 `function.name`）⇒ 400 且假上游零命中、额度一字未动。
+ */
+describe('工具透传（launch-blockers §3.2 (a)）', () => {
+  it('🔴 `tool_call_id` 下划线形状**必须活着**穿过 zod（旧驼峰键会静默丢，那条数据丢失 bug 就红在这里）', async () => {
+    const res = await post(
+      chatBody({
+        messages: [
+          { role: 'user', content: '列一下今天的任务' },
+          {
+            role: 'assistant',
+            content: '',
+          },
+          { role: 'tool', content: '{"tasks":[]}', tool_call_id: 'call_abc' },
+        ],
+      }),
+    );
+    expect(res.statusCode).toBe(200);
+    const hitBody = JSON.parse(String(upstream.hits()[0]?.body)) as {
+      messages: Array<Record<string, unknown>>;
+    };
+    const toolMsg = hitBody.messages.find((m) => m.role === 'tool');
+    // 🔴 若服务端 schema 用的是驼峰 `toolCallId`，zod 会把这条消息里的
+    // 下划线键剥离 ⇒ `tool_call_id` 变成 `undefined`。这条断言就是那把尺。
+    expect(toolMsg?.tool_call_id).toBe('call_abc');
+  });
+
+  it('请求体没有 `tools` ⇒ 上游请求体也**不出现** `tools` 键（老字节形状不许漂）', async () => {
+    await post(chatBody());
+    const hitBody = JSON.parse(String(upstream.hits()[0]?.body)) as Record<string, unknown>;
+    expect('tools' in hitBody).toBe(false);
+    expect('tool_choice' in hitBody).toBe(false);
+  });
+
+  it('客户端带 `tools` + `tool_choice:"auto"` ⇒ 上游原样收到', async () => {
+    const res = await post(
+      chatBody({
+        tools: [
+          {
+            type: 'function',
+            function: {
+              name: 'list_tasks',
+              description: '列出今天的任务',
+              parameters: { type: 'object', properties: {} },
+            },
+          },
+        ],
+        tool_choice: 'auto',
+      }),
+    );
+    expect(res.statusCode).toBe(200);
+    const hitBody = JSON.parse(String(upstream.hits()[0]?.body)) as {
+      tools?: unknown[];
+      tool_choice?: string;
+    };
+    expect(hitBody.tools).toHaveLength(1);
+    expect(hitBody.tool_choice).toBe('auto');
+    expect((hitBody.tools?.[0] as { function: { name: string } }).function.name).toBe('list_tasks');
+  });
+
+  it('🔴 `tools` 形状不合 ⇒ 400 + 假上游零命中 + 计数器一字未动（校验在额度与上游之前）', async () => {
+    const res = await post(
+      chatBody({
+        // 少了 `function.name`，WireToolSchema 会拒
+        tools: [{ type: 'function', function: { description: 'no name', parameters: {} } }],
+      }),
+    );
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toMatchObject({ code: MANAGED_AI_ERROR_CODES.INVALID_BODY });
+    expect(upstream.hits()).toHaveLength(0);
+    expect(await counterRow()).toBeNull();
+  });
+});
+
+/**
  * `GET /api/ai/managed/usage` —— 法务 §5.3 那句「设置页可以查到本周期已用 X / 300 次」。
  *
  * 这一组钉的是**四条不变量**，每一条都能红：
