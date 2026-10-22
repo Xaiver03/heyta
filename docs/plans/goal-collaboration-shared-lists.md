@@ -1219,3 +1219,18 @@ benchmark 64／feature-matrix 15／roadmap 93／progress-log 15／本计划 15�
 **负载这一格的方向读数**（同一会话内三趟，不是抄的）：11:0x **35** → 11:1x **23** → 11:2x **17.5**（阈值 12）。
 它在自己往下走，而 `pgrep -fl heyta` 三趟都回 0 ⇒ 抬它的是这台机器上别的东西，落不落回 12 不归本线，也不该由我去猜——
 要点火时现量 `sysctl -n vm.loadavg` 第二个数即可，那一格预检会自己判。
+
+### 2026-10-22 11:3x · 把"点头之后那三步"写成一条**中途不会红**的命令（现量：预检自己给的点火行没认领 Android）
+
+预检在设备缺席时打印的那行是 `IOS_DEVICE_NAME="<现取>" bash <载体>/scripts/reinstall-all.sh` —— **Android 那一端没被认领**。
+`scripts/reinstall-all.sh:403` 那一支只在"恰好一枚在线模拟器"时才自动用它，而这台机器上现在挂着别线的活、多起一枚 AVD 完全可能
+⇒ 真到 `:406` 会打「有 N 枚在线…不猜」，那一趟要跑到 Android 段才红，而前面三端已经装完 = 白吃一次窗口。
+所以点头之后**按这三行按顺序跑**（两枚 env 都显式钉死；Android 用 AVD 名而不是 serial，换端口不影响）：
+
+1. `xcrun simctl boot heyta-multiend-reinstall` —— 这台在册、名字就是为这一趟起的（`xcrun simctl list devices available` 现量 15 台可用、全 Shutdown）
+2. `/opt/homebrew/share/android-commandlinetools/emulator/emulator -avd heyta-w3-yearly -no-snapshot-save >/dev/null 2>&1 &` —— 这条命令是预检自己给的，AVD 也在册（`emulator -list-avds` 回这一枚）
+3. `IOS_DEVICE_NAME="heyta-multiend-reinstall" HEYTA_ANDROID_AVD=heyta-w3-yearly bash "$HOME/heyta-carriers/heyta-wt-collab-m5/scripts/reinstall-all.sh"`
+
+🔴 第 1、2 行是**人的动作**（两枚脚本都不代起设备，见上一节），第 3 行之前还要负载落回 12 以下（11:3x 复量 **16**，仍差 4）。
+载体那一腿 11:3x 复量**判绿**：脚本自己打的是「落后 2 个提交 / 超前 0 个 —— 但**打包输入面逐字相同**（全仓差 1 个文件，都在非输入面：docs/research/台账）⇒ 产物同形，本腿判绿」
+⇒ 本线后面再补纯文档提交**不会**重新打开这一格，不用每笔都去追平载体（先前那格"载体要追平到 tip"读起来像每笔都要追，那是误读）。
