@@ -1799,3 +1799,13 @@ cd e2e && npx playwright test tests/auth-login-code.spec.ts --reporter=line
 - **`pnpm -r typecheck` 在新 HEAD rc=0**，对数 `Done` 20 == 有该脚本的包 20。
 
 ⇒ 第 1 步与第 2 步里**本线能自算的那几把尺**（journey、typecheck、六枚静态门、三道文档门）到 21:1x 全绿；第 2 步仍欠的那一格还是 20:1x 那三枚别线红，口径没变。
+
+## 2026-10-22 21:4x 全仓单测在新 HEAD 重跑绿；顺手抓到对数尺的**两处**探针 bug
+
+跑前现量：并发测试进程 0、`vm.loadavg` 8.0（阈值 12 以下）⇒ 这一趟归本线跑。
+`pnpm -r --filter '!@heyta/sync-server' test` **`TEST_EXIT=0`**，对数 **分子 20 == 分母 20**（分母＝有 `test` 脚本的包），**总 passed 11263**、真失败行 0。
+比 d99dcefa3 那一趟的 11258 多 5 枚——那是托管AI线新加的流式用例，不是本线的数（本线的用例数由那 20 行逐包读数里 `packages/app-host 1908 / packages/ui 686 / packages/sync-client 165 / packages/i18n 30 / apps/web …` 各格自己管）。
+
+⚠️ **同一把"对数"尺第一次又读出分子 0、总 passed 0，两处成因都不是被测物**（复量同一份日志即可，不必重跑）：
+1. `pnpm -r` 给每行加前缀 `packages/x test:` ⇒ 任何按 `^\s*Tests` 打锚的 needle **永不命中**，且**空对空照样判不出红**（分子分母都 0 时会误读成"打平"）。锚要写成 `test: .*Tests +[0-9]+ passed`。
+2. `grep -icE 'failed|FAIL'` 这种宽 needle 命中的 9 行**全是 ✓ 通过用例的名字**（`fail-closed`、`ai-failure-*.spec.tsx`）⇒ 判"有没有真失败"要锚**汇总行形状**（`Tests +[0-9]+ failed` / `✗` / `FAIL `），不能锚词。
