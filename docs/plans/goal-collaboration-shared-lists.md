@@ -1031,3 +1031,14 @@ main 在推送之后又被别线推进（`git rev-parse --short HEAD` 现量，�
 它是生产路径（不是夹具）：新成员入群后由 owner 侧把当前世代信封发下去，随后 STEP 9 的 rekey 才把世代推进、
 并把被移除者留在门外。也就是说：**合格态是流程会自动到达的那一档，不合格态是"owner 还没开过面板"这一档**，
 面板在那一档只给提示不给按钮，与 STEP 4 之后的行为不矛盾。
+
+**B-10 之后把任务书第 2 步那几趟重跑了一遍**（改的是产品代码不是文档，旧读数不能沿用）：
+`pnpm -r test` ⇒ rc=0、`Scope: 21 of 22 workspace projects`、21 枚包各打出一条 `Tests … passed`、
+非零 `failed` 行 0 条、合计 **14220 passed**。**对数怎么算才算对**：盘上有 `test` 脚本的包 22 枚，差的那一枚是 `e2e` ——
+它是一棵独立工作区，`pnpm -r` 根本不 traverse（与载体那枚坑 **#523** 同一个根因），
+所以合法说法是 **21 == 21**，`e2e` 那一格由上面那两条常驻链覆盖；
+别把分母写成 22 再留一句"e2e 没跑"当边界，那会把一条结构性边界读成一次漏跑。
+`pnpm -r build` ⇒ rc=0、输出里 `error`/`failed` 0 行（`apps/desktop` 那条 manualChunks 是**警告**，不是红）。
+`pnpm check` 那 122 段链仍是**两枚别线红**：在 tip `a6662e218` 上逐枚复量 `pnpm check:selection-single-source` rc=1、
+`pnpm check:image-license` rc=1，两者相关文件无在途改动 ⇒ 全绿这一格不归本线，也不由我放宽。
+`pnpm reinstall:all` 仍停在停止点 ③（Android 设备腿的载体口径冲突，两条路见上面那节）。
