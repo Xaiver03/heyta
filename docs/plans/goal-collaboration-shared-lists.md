@@ -1171,3 +1171,39 @@ M4 那格尾巴：`SHARE_TRANSFER_TARGET_UNSEALED` 还没有宿主侧文案映�
 `docs/**` 全程在射程内；然后用 `--verbose` 的**输出**逐枚点名（被检查到的链接行数）：
 benchmark 64／feature-matrix 15／roadmap 93／progress-log 15／本计划 15，`rc=0`，
 结论行「无死链、无'本机有仓库里没有'的链接、无失效章节引用、无失效锚点」。**绿的还不够，得先证明这把尺量到了我改的东西。**
+
+### 2026-10-22 11:1x · 第 2 步再收一格：`-r build / typecheck / test` 那三枚读数**对当前 tip 仍成立**（这次是差集证明，不是沿用）
+
+先前那格写的是"载体里 rc=0"，读起来像沿用旧账。这次把它换成一条可复算的差集：
+`git diff --name-only a6662e218..HEAD -- packages apps server | grep -v '/evidence/' | wc -l` ⇒ **0**
+（`a6662e218` = 那趟 `-r typecheck` rc=0 / `-r test` rc=0（14220 passed）/ `-r build` rc=0 所在的 tip，含 B-10 全部代码，且它是 HEAD 的祖先：
+`git merge-base --is-ancestor a6662e218 HEAD` ⇒ yes）。
+再看**全仓**非文档差集，只有 3 枚，且没有一枚进 `-r` 的图：`e2e/tests/collab-journey.spec.ts`（独立工作区，压根不在 `-r` 分母里，**#523** 同一根因）、
+根 `package.json`（`-r run` 默认不含根包）、`scripts/check-repo-cache-paths.mjs`（¥12 线新加的门禁脚本，不是任何包的构建输入）。
+⇒ 第 2 步那六条子闸现在的形状是：**typecheck / test / build / journey / 对数 / 边界** 六格闭合，**只剩 `check` 全绿与 `reinstall:all` 两格，两格都不在本线射程**（见下）。
+
+**剩下那两格在 11:1x 逐枚复量过，不是抄上面那几行**（tip `e8a8c4cfe`）：
+- `pnpm check:selection-single-source` **rc=1**、`pnpm check:image-license` **rc=1** —— 两枚别线存量红还在原处，
+  失败原文各指着自己那两份文件（`RenewSection.tsx  tierId` / 快照三处 `…Sha256 与当下不一致`），本线一个字节没碰，也不代改它们的判卷口径。
+- **预检从 4 项降回 3 项**：我能自己关的那一格已经关了 —— 载体先前停在 `3f9de8502`，11:1x 按门自己给的那条命令追平
+  （`git -C "$CARRIER" checkout --detach e8a8c4cfe…`，rc=0、追平后 `status --porcelain` 回 0 行、`pnpm-lock.yaml` 的 sha256 与主检出仍逐字相同 ⇒ 不用重装依赖）。
+  复量：`✅ 载体新鲜：… == 主检出 HEAD`。剩下三项前置 = 负载 / iOS 0 台已启动 / Android 0 台在线。
+- **负载这一格**：同一次会话内两趟读数 **35 → 23**（阈值是脚本里的推导式 `$(sysctl -n hw.ncpu) * 3/4`，本机 16 核 ⇒ 12），
+  `pgrep -fl heyta` 回 0 ⇒ 这不是本仓任何一趟造的，是这台机器的底噪。**这一格不是"等谁来改代码"，是等机器空下来。**
+
+**11:1x 新量到的一条，把停止点 ③ 从"要不要起设备"收窄成一句能答的问题**（原先我登记的是一句抽象冲突，那样负责人没法一句话回答）：
+- 设备**不用新建**，两端的载体都已经在册、只差 boot：iOS `xcrun simctl list devices available` ⇒ 15 枚可用、全 Shutdown（其中一枚现成的就叫 `heyta-multiend-reinstall`）；
+  Android `emulator -list-avds` ⇒ `heyta-w3-yearly` 在册，而 `adb devices` 在线 **0** 枚。
+- 装机腿**只能在 Mac 的设备面上跑**：`scripts/reinstall-all.sh:379` 起的那段只调本机 `adb devices` / `adb -s <serial>`，
+  整条脚本没有远程 adb 口子（全文 `grep -n 'ADB_SERVER_SOCKET\|adb connect'` 命中 0），而 [`android-build-on-windows.md`](../runbooks/android-build-on-windows.md) §五 明写
+  windows-pc **没有 emulator 本体与 system-images**，把模拟器搬过去要 BIOS 虚拟化 + Hyper-V、是管理员 + 重启级人工动作且**未做**。
+- 于是那条 2026-10-04 的令（「之后 Android 任务一律 ssh windows-pc，不要再在 Mac 起新的 Gradle 构建或模拟器」）和本机这条装机腿**不是同一件事的两条规则，是同一条规则的两半**：
+  它禁的是"起**新的**"，而 `heyta-w3-yearly` 是**已存在**的那枚。
+  🔴 我不自己判这一半 —— 起模拟器会把已 1.4 倍超订的机器再顶上去（那台 Mac 曾被 headless 模拟器打到 3.6G 常驻 / 90% CPU，就是这条令的起因），
+  而且这一格还叠在负载那一格后面：**就算点头，也要负载落回 12 以下才点得着火**。
+  要负责人答的是一句：**准不准为本仓 boot 那台已存在的 AVD（外加一台已存在的 iOS 模拟器）来收第 2 步最后一格？**
+  点头之后的命令（一次给全，别拆成四问）：
+  `adb emu` 腿先起 `/opt/homebrew/share/android-commandlinetools/emulator/emulator -avd heyta-w3-yearly -no-snapshot-save >/dev/null 2>&1 &`、
+  iOS 腿 `xcrun simctl boot heyta-multiend-reinstall`，两枚都起来后
+  `CARRIER=$HOME/heyta-carriers/heyta-wt-collab-m5 bash research/tools/b-reinstall-readiness.sh --confirm`，
+  它自己会给 `IOS_DEVICE_NAME` 那条；判据照 AGENTS §6.1.1：四端各一条「远端字节 == 本地工作树」，任一端红整体红、不静默跳过。
