@@ -53,6 +53,7 @@ describe('share-client（W2-T1）', () => {
     const { calls, fetchImpl } = makeFetchRecorder();
     const { seen, cipher } = makeRecordingCipher();
     let idCalls = 0;
+    let clockReads = 0;
     // 用**真客户端** + 替身 fetch：断言对象是"网络边上有没有请求"，不是"函数返回了什么"。
     const api = new ShareApiClient({ baseUrl: 'https://x', getToken: () => '', fetchImpl });
     const dispatcher = createShareOpDispatcher({
@@ -61,6 +62,10 @@ describe('share-client（W2-T1）', () => {
       clientId: 'device-A1',
       schemaVersion: 1,
       isSignedIn: () => false,
+      baseClock: () => {
+        clockReads += 1;
+        return {};
+      },
       now: () => 1_700_000_000_000,
       newId: () => {
         idCalls += 1;
@@ -74,6 +79,7 @@ describe('share-client（W2-T1）', () => {
     expect(calls, '未登录时网络边上一个请求都不许有').toHaveLength(0);
     expect(seen, '未登录时连加密都不该发生（不消耗 id、不碰密钥）').toHaveLength(0);
     expect(idCalls, '未登录时不消耗 op id').toBe(0);
+    expect(clockReads, '未登录时不读因果时钟（读了就等于给一条没发出去的 op 占了一个序）').toBe(0);
   });
 
   it('登录 ⇒ 恰好一次 POST，体里的 op 形状逐字段对，且加密与上线共用同一份 identity', async () => {
@@ -86,6 +92,7 @@ describe('share-client（W2-T1）', () => {
       clientId: 'device-A1',
       schemaVersion: 7,
       isSignedIn: () => true,
+      baseClock: () => ({}),
       now: () => 1_700_000_000_000,
       newId: () => 'op-42',
     });
@@ -123,6 +130,30 @@ describe('share-client（W2-T1）', () => {
     expect(op['payload']).toBe('ct:{"body":"edited"}');
     const { payload: _payload, vectorClock: _clock, isPayloadEncrypted: _flag, ...wireIdentity } = op;
     expect(wireIdentity).toEqual(seen[0]);
+  });
+
+  it('因果时钟 = 基准逐维带过 + 本地那一维自增（ADR-0067 裁决二）', async () => {
+    const { calls, fetchImpl } = makeFetchRecorder();
+    const { cipher } = makeRecordingCipher();
+    const api = new ShareApiClient({ baseUrl: 'https://x', getToken: () => 't', fetchImpl });
+    const dispatcher = createShareOpDispatcher({
+      api: api as never,
+      cipher,
+      clientId: 'device-A1',
+      schemaVersion: 1,
+      isSignedIn: () => true,
+      // 基准里已经有"别人那一维"和"我自己那一维"（真日志折出来就是这形状）。
+      baseClock: () => ({ 'device-B2': 4, 'device-A1': 2 }),
+      now: () => 1_700_000_000_000,
+      newId: () => 'op-77',
+    });
+    await dispatcher.dispatch('share-1', { entityType: 'COMMENT', entityId: 'c-1', opType: 'CRT', payload: { body: 'x' } });
+
+    const body = JSON.parse(calls[0]!.body) as { ops: Array<{ vectorClock: Record<string, number> }> };
+    expect(body.ops[0]!.vectorClock, '别人的维原样带过（那是我看见它的证据），只有本地维 +1').toEqual({
+      'device-B2': 4,
+      'device-A1': 3,
+    });
   });
 
   it('未登记的 opType ⇒ 写之前就红（不静默造动作名）', () => {
