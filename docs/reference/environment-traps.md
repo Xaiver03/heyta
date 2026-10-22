@@ -10979,3 +10979,13 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     ⑵ 为什么 rc 给不了这个信息（这就是它与"漏跑会红"那类门的分界）：`pnpm -r --filter @heyta/sync-server --filter @heyta/ui typecheck` ⇒ **rc=0**，输出里只有 `packages/ui typecheck$ … Done`，缺脚本那一枚一个字都不说；而 `pnpm --filter @heyta/sync-server typecheck` ⇒ **rc=1** `[ERR_PNPM_RECURSIVE_RUN_NO_SCRIPT] None of the selected packages has a "typecheck" script`。⇒ **"全组都没有"才响，"有一部分没有"完全静默**：拿 rc 当覆盖尺，读到的绿恰好由被漏掉的那些包构成。
     ⑶ 合法做法与 **#524⑵** 同一把尺：分母与分子用**同一条构造式**生成（从各 `package.json` 现取"有该脚本"的集合 ∩ scope，与输出里真打出该脚本行的集合做双向差集，两侧都空才算闭合），再为漏网那一枚补一条**它自己的命令**并写进台账（这里是 `cd server && npx tsc --noEmit -p tsconfig.json` ⇒ rc=0）。⚠️ 补的那条也要能红：只写"我跑了 tsc"而不给 tsconfig 路径，下一位会拿一份可能不存在的配置当覆盖。
 
+527. **"这个注入值有人消费"不等于"那句要求有判据"：端口被 config 拿去当 baseURL，而任务书要的是断言里出现它**（2026-10-22，复审计务第 1 步时现读出来的欠账）。
+    ⑴ 形状：验收脚本注入 `HEYTA_COLLAB_WEB_URL`，`playwright.collab.config.ts` 用它拼 `baseURL` ⇒ grep 这个键**有命中**，看起来"这条要求早被实现了"。
+    但 spec 里那句断言只到 `toContain('shareToken=')` 加三条 origin 等价比较（比的是"页面自身的源"），**端口号本身没有任何东西在钉**：换一枚端口，那三条照样绿。
+    ⑵ 可复用规则：核"某句字面要求做没做"，要顺着**要求里的谓词**找断言，不是顺着**那个值**找消费者。值的消费者可能是配置、日志、URL 拼装，与判据无关。
+    grep 命中只证明"这串字符在代码里被读过"，不证明"这句话被断言过"。
+    ⑶ 补这类断言时的自闸：靶子来自环境 ⇒ 先校验靶子形状再用它。`toContain('')` 对任何字符串都真 ——
+    一条永远通过的判据比没有判据更糟（AGENTS §8.3），所以靶子不合形状就让装置在加载期自己炸，别默默产出绿。
+    ⑷ 顺序坑：这一族的验收脚本**每次跑都重刷证据目录**，所以"负臂在前、绿臂在后"不是偏好而是必须 ——
+    反过来跑完留下的是一趟失败现场的半套截图。
+
