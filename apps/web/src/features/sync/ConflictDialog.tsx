@@ -65,8 +65,20 @@ import {
   summarizeConflictPayload,
   type ConflictInfo,
 } from '@heyta/sync-client';
+import { resolveAnyConflict, type ShareConflict } from '@heyta/app-host';
 
+import { resolveShareConflict, useShareConflicts } from '../share/use-share-conflicts.js';
 import { useSyncStore } from './store.js';
+
+/**
+ * 一张清单里的两批东西（ADR-0067 裁决三）：个人同步那侧由服务端报回来的冲突，
+ * 加上共享域自己从 share 日志推出来的那些。
+ *
+ * 🔴 两批**都**进同一个 `ConflictResolutionView` —— 视图与 `keep-local | keep-remote`
+ *    那副词表都不新建（裁决三原话）。新建第二套冲突界面的代价是同一件事在两个地方
+ *    长出不一样的措辞与不一样的按钮，而这正是本仓反复付过学费的形状。
+ */
+type AnyConflict = ConflictInfo | ShareConflict;
 
 /**
  * 时间戳 → 可读时间。冲突界面里"谁更新"是判断依据，必须看得懂。
@@ -106,7 +118,11 @@ export function ConflictDialog(): React.JSX.Element | null {
   const closeConflictDialog = useSyncStore((s) => s.closeConflictDialog);
   const dialogRef = useRef<HTMLDivElement>(null);
 
-  const conflicts: ConflictInfo[] = status.kind === 'conflict' ? status.conflicts : [];
+  const shareConflicts = useShareConflicts();
+  const conflicts: AnyConflict[] = [
+    ...(status.kind === 'conflict' ? status.conflicts : []),
+    ...shareConflicts,
+  ];
   // 两个条件：有冲突可解决，且用户正看着。
   // 关掉窗口**不会**清掉冲突状态 —— SyncBar 仍会提示，用户还能再打开。
   const open = dialogOpen && conflicts.length > 0;
@@ -177,13 +193,32 @@ export function ConflictDialog(): React.JSX.Element | null {
    * 必须真的带 `disabled` 属性" —— 那份测试不在本刀白名单，也不该为迁就让步。
    * 共享层仍然负责**决定**（`blockedReason` / `preferred` 都在入参里）。
    */
-  const renderSideAction = (info: ConflictSideRenderInfo<ConflictInfo>): React.JSX.Element => (
+  /**
+   * 解决一枚冲突 —— 而**分流判定不在这里**（AGENTS §3.5：这段代码里不许有决定
+   * "业务上该怎么做"的一行）。壳只做一件事：把两条通道作为端口递给 app-host 的
+   * `resolveAnyConflict`，由它判这一枚该由个人同步客户端重发、还是往那份 share 日志发。
+   *
+   * 为什么值得为这一行立一份判定：喂错通道 = 解决**必然失败**（那边要的是个人日志里的
+   * `opId`，而 share op 的 id 根本不在那本日志里），而失败在界面上只是一次没有反应的点击。
+   */
+  const decide = (conflict: AnyConflict, choice: 'keep-local' | 'keep-remote'): void => {
+    void resolveAnyConflict<ConflictInfo>(
+      {
+        personal: (item, which) => resolveConflict(item, which),
+        share: (item, which) => resolveShareConflict(item, which),
+      },
+      conflict,
+      choice,
+    );
+  };
+
+  const renderSideAction = (info: ConflictSideRenderInfo<AnyConflict>): React.JSX.Element => (
     <button
       type="button"
       className={info.preferred ? 'ht-btn ht-btn--primary' : 'ht-btn'}
       disabled={info.blockedReason !== undefined || info.busy}
       onClick={() => {
-        void resolveConflict(info.conflict, info.choice);
+        decide(info.conflict, info.choice);
       }}
       style={{ marginTop: 'auto' }}
     >
@@ -286,7 +321,7 @@ export function ConflictDialog(): React.JSX.Element | null {
             busy={status.kind === 'syncing'}
             renderSideAction={renderSideAction}
             onResolve={(conflict, choice) => {
-              void resolveConflict(conflict, choice);
+              decide(conflict, choice);
             }}
             testID="conflict-resolution"
           />

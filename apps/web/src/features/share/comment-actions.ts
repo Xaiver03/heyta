@@ -23,6 +23,7 @@ import {
   type CommentActions,
   type ShareLogStorage,
   type SharePullResult,
+  type ShareConflict,
   type ShareWriteChannel,
 } from '@heyta/app-host';
 import type { CommentLike } from '@heyta/domain';
@@ -130,6 +131,15 @@ export interface WebShareComments {
    * 端壳不许再写第二份 —— 那正是这条线一直在防的漂移。
    */
   readonly channel: ShareWriteChannel;
+  /**
+   * 这台设备上**待用户裁决**的共享冲突（ADR-0067 裁决三"必须可见"那半句的落点）。
+   *
+   * 清单非空时用户不点就等于**静默丢内容**，所以界面上那一枚入口不许留空；
+   * 清单为空时它不该出现 —— 判据在 `tests/share-conflict-wiring.spec.tsx`。
+   */
+  conflicts(): ShareConflict[];
+  /** 用户点完「保留这一版」：往那份 share 日志发**一条** op（一个意图 = 一个 op）。 */
+  resolveConflict(conflict: ShareConflict, choice: 'keep-local' | 'keep-remote'): Promise<void>;
   /** 从重放出来的共享域状态读某条任务的活评论。 */
   commentsForTask(taskId: string): CommentLike[];
   /**
@@ -222,7 +232,21 @@ export function createWebShareComments(deps: WebShareCommentsDeps): WebShareComm
 
   return {
     actions,
-    channel: { dispatch: dispatchShareOp, stateFor: dispatch.stateFor },
+    conflicts: dispatch.conflicts,
+    // 🔴 裁完也敲一下通知：不敲的话用户点完按钮看到的还是自己刚点掉的那个样子。
+    resolveConflict: async (conflict, choice) => {
+      await dispatch.resolveConflict(conflict, choice);
+      emitEngineChange();
+    },
+    channel: {
+      dispatch: dispatchShareOp,
+      stateFor: dispatch.stateFor,
+      conflicts: dispatch.conflicts,
+      resolveConflict: async (conflict, choice) => {
+        await dispatch.resolveConflict(conflict, choice);
+        emitEngineChange();
+      },
+    },
     commentsForTask: dispatch.commentsForTask,
     pullForTask: createShareTaskPuller({
       shareIdOfTask: actions.shareIdOfTask,
