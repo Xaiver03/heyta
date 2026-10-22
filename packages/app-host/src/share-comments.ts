@@ -38,6 +38,7 @@ import {
 } from './comment-actions.js';
 import {
   createShareOpDispatcher,
+  type ShareOpDispatchIntent,
   type ShareOpDownloadPort,
   type ShareOpUploadPort,
   type SharePayloadCodecPort,
@@ -45,6 +46,11 @@ import {
   type ShareOpWireRow,
   type SharePullResult,
 } from './share-client.js';
+import {
+  deriveShareConflicts,
+  shareConflictResolution,
+  type ShareConflict,
+} from './share-conflicts.js';
 import { emptyShareLogState, foldShareOps, type ShareLogState } from './share-op-log.js';
 import { replayShareOps, type DecryptedShareOp } from './share-replay.js';
 
@@ -161,6 +167,10 @@ export interface ShareCommentsHost {
    * 那条"读不抛"同一条纪律）。
    */
   pullForTask(taskId: string): Promise<SharePullResult | undefined>;
+  /** 待用户裁决的共享冲突（ADR-0067 裁决三"必须可见"那半句的落点）。 */
+  conflicts(): ShareConflict[];
+  /** 交还用户的选择：**发一条 op**，别的什么都不做（不写第二份状态、不改历史）。 */
+  resolveConflict(conflict: ShareConflict, choice: 'keep-local' | 'keep-remote'): Promise<void>;
 }
 
 /**
@@ -178,22 +188,49 @@ export function createShareCommentDispatch(
   pullShareOps: (shareId: string) => Promise<SharePullResult>;
   commentsForTask: (taskId: string) => ShareCommentRecord[];
   stateFor: (shareId: string) => MaterializedState;
+  /** 这台设备上**待用户裁决**的共享冲突（所有已加载的 share 合起来，按 id 定序）。 */
+  conflicts: () => ShareConflict[];
+  /** 用户点完之后**要发的那一条**（一个意图 = 一个 op；发完这条冲突自己就消失了）。 */
+  resolveConflict: (conflict: ShareConflict, choice: 'keep-local' | 'keep-remote') => Promise<void>;
 } {
-  const cache = new Map<string, { log: ShareLogState; state: MaterializedState; shareId: string }>();
+  interface Entry {
+    readonly log: ShareLogState;
+    readonly state: MaterializedState;
+    /** 🔴 与 `state` 同源、同一次折叠算出来的那份冲突清单（不是另一份账）。 */
+    readonly conflicts: readonly ShareConflict[];
+  }
+  const cache = new Map<string, Entry & { shareId: string }>();
 
-  const entryFor = (shareId: string): { log: ShareLogState; state: MaterializedState } => {
+  /** 一条日志 → 物化 + 待裁决清单。**两处折叠都走这里**，免得两份推导漂移。 */
+  const foldEntry = (shareId: string, log: ShareLogState): Entry => {
+    const ops = log.ops as readonly DecryptedShareOp[];
+    return {
+      log,
+      state: replayShareOps(emptyState(), [ops]).state,
+      conflicts: deriveShareConflicts(shareId, ops),
+    };
+  };
+
+  const entryFor = (shareId: string): Entry => {
     const cached = cache.get(shareId);
     if (cached !== undefined) return cached;
     // 冷启动：从落盘读回这条 share 的日志，**整条重放**（不是增量）——
     // 全序由 fold+replay 保证，重放整条比维护增量状态更难出错。
     const log = options.storage.load(shareId) ?? emptyShareLogState();
-    const { state } = replayShareOps(emptyState(), [log.ops as readonly DecryptedShareOp[]]);
-    const entry = { log, state };
+    const entry = foldEntry(shareId, log);
     cache.set(shareId, { ...entry, shareId });
     return entry;
   };
 
-  const dispatchShareOp = async (shareId: string, intent: ShareOpIntent): Promise<void> => {
+  /**
+   * 把**一条意图**送上共享通道并折进本地日志。
+   *
+   * 🔴 参数是宽形（`ShareOpDispatchIntent`）而不是评论那一份窄类型：M2 之后
+   *    任务/便签/标签族也从这里走（`share-routing.ts` 判完路由就交过来），
+   *    而"什么条件下才发、发到哪、怎么落本地"这三件事**只许有一份实现** ——
+   *    评论动作与冲突裁决各自再写一遍，就是这条线一直在防的漂移。
+   */
+  const dispatchAny = async (shareId: string, intent: ShareOpDispatchIntent): Promise<void> => {
     if (!options.isSignedIn()) throw new ShareNotSignedInError();
     const cipher = await options.cipherFor(shareId);
     if (cipher === undefined) throw new ShareKeyUnavailableError(shareId);
@@ -213,12 +250,7 @@ export function createShareCommentDispatch(
       ...(options.now === undefined ? {} : { now: options.now }),
       ...(options.newOpId === undefined ? {} : { newId: options.newOpId }),
     });
-    const result = await dispatcher.dispatch(shareId, {
-      entityType: intent.entityType,
-      entityId: intent.entityId,
-      opType: intent.opType,
-      ...(intent.payload === undefined ? {} : { payload: intent.payload }),
-    });
+    const result = await dispatcher.dispatch(shareId, intent);
     if (result.op === undefined) return;
 
     const entry = entryFor(shareId);
@@ -232,10 +264,11 @@ export function createShareCommentDispatch(
       payload: intent.payload,
     };
     const log = foldShareOps(entry.log, [localOp]);
-    const { state } = replayShareOps(emptyState(), [log.ops as readonly DecryptedShareOp[]]);
-    cache.set(shareId, { log, state, shareId });
+    cache.set(shareId, { ...foldEntry(shareId, log), shareId });
     options.storage.save(shareId, log);
   };
+
+  const dispatchShareOp = (shareId: string, intent: ShareOpIntent): Promise<void> => dispatchAny(shareId, intent);
 
   /**
    * 下行（M1）：`downloadOps` → 用**线上那份身份**解密 → 折进本地日志 → 推进游标。
@@ -331,8 +364,7 @@ export function createShareCommentDispatch(
     const entry = entryFor(shareId);
     const before = entry.log.ops.length;
     const log = foldShareOps(entry.log, decrypted);
-    const { state } = replayShareOps(emptyState(), [log.ops as readonly DecryptedShareOp[]]);
-    cache.set(shareId, { log, state, shareId });
+    cache.set(shareId, { ...foldEntry(shareId, log), shareId });
     options.storage.save(shareId, log);
     // 🔴 游标在日志之后（见上面纪律 1），且推的是**已消费**的那条，不是服务端的头。
     options.storage.setCursor(shareId, after);
@@ -353,7 +385,21 @@ export function createShareCommentDispatch(
 
   const stateFor = (shareId: string): MaterializedState => entryFor(shareId).state;
 
-  return { dispatchShareOp, pullShareOps, commentsForTask, stateFor };
+  const conflicts = (): ShareConflict[] => {
+    // 与 `commentsForTask` 同一条纪律：先让**盘上已有的每一份** share 都进缓存，
+    // 否则冷启动之后内存是空的，用户看不见自己上一轮就没裁完的那一处。
+    for (const shareId of options.storage.list()) entryFor(shareId);
+    return [...cache.values()].flatMap((entry) => entry.conflicts);
+  };
+
+  const resolveConflict = async (
+    conflict: ShareConflict,
+    choice: 'keep-local' | 'keep-remote',
+  ): Promise<void> => {
+    await dispatchAny(conflict.shareId, shareConflictResolution(conflict, choice));
+  };
+
+  return { dispatchShareOp, pullShareOps, commentsForTask, stateFor, conflicts, resolveConflict };
 }
 
 /**
@@ -393,5 +439,7 @@ export function createShareCommentsHost(options: ShareCommentsHostOptions): Shar
     }),
     commentsForTask: inner.commentsForTask,
     stateFor: inner.stateFor,
+    conflicts: inner.conflicts,
+    resolveConflict: inner.resolveConflict,
   };
 }

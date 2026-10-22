@@ -30,6 +30,7 @@ import type { CheckedDispatchBuilder, MaterializedState, OpIntent } from '@heyta
 import { OpType } from '@heyta/sync-core';
 
 import type { ShareOpDispatchIntent } from './share-client.js';
+import type { ShareConflict } from './share-conflicts.js';
 
 /** 解析不出 shareId 的原因。读侧只需要"没有可路由的"，写侧要能说出是哪一格。 */
 export type ShareRouteBlock =
@@ -182,6 +183,15 @@ export interface ShareWriteChannel {
   dispatch(shareId: string, intent: ShareOpDispatchIntent): Promise<void>;
   /** 某份 share **已重放**的物化状态；没加载过时给空状态（`stateFor` 的既有语义）。 */
   stateFor(shareId: string): MaterializedState;
+  /**
+   * 这台设备上**待用户裁决**的共享冲突（ADR-0067 裁决三"必须可见"）。
+   *
+   * ⚠️ 声明成**可选**不是留余地给"以后再说"：判据 C 只数 `apps/<端>/src` 里的构造点，
+   * 而替身（测试里那份通道）不必真的会裁冲突。真正的实现（`share-comments.ts`）**一定给**。
+   */
+  conflicts?(): ShareConflict[];
+  /** 用户点完之后的那**一条 op**（发出去即完；不写第二份状态）。 */
+  resolveConflict?(conflict: ShareConflict, choice: 'keep-local' | 'keep-remote'): Promise<void>;
 }
 
 export type ShareWriteChannelProvider = () => ShareWriteChannel | undefined | Promise<ShareWriteChannel | undefined>;

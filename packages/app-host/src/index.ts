@@ -1052,5 +1052,6 @@ export * from './share-comments.js';
 export * from './share-routing.js';
 export * from './share-view.js';
 export * from './share-publish.js';
+export * from './share-conflicts.js';
 export * from './share-rekey.js';
 export * from './share-signals.js';
