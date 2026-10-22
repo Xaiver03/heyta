@@ -4632,6 +4632,7 @@ export const en = {
   'web.share.transfer.confirmHint': 'After the transfer you become an editor: you can still read and edit the list, but inviting, roles and removals belong to the new owner. This takes effect immediately.',
   'web.share.transfer.confirm': 'Transfer',
   'web.share.transfer.cancel': 'Cancel',
+  'web.share.transfer.error': 'Transfer failed: {message}',
   'web.share.invite.linkTitle': 'Join link (opens the join flow; same validity as the ticket above)',
   'web.share.join.button': 'Join a shared list',
   'web.share.join.title': 'Join a shared list',

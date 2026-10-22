@@ -21,3 +21,6 @@ export * from './server-url.js';
 export * from './payload-cipher.js';
 export * from './share-payload-cipher.js';
 export * from './share-api-client.js';
+
+/** B-10 的宿主侧要按具名码分类，所以这份码表是线上契约的一部分（app-host 的 `share-transfer-error` 拿它对账）。 */
+export { SHARE_ERROR_CODES } from './share-api-client.js';

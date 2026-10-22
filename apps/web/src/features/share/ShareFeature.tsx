@@ -49,7 +49,7 @@ import { useProjectStore } from '../projects/store.js';
 import { getWebVaultSession } from '../../lib/vault-session.js';
 import { createWebAuthFetch } from '../../lib/central-fetch.js';
 import { text } from '../../lib/text.js';
-import { forgetShareLocally } from '@heyta/app-host';
+import { forgetShareLocally, shareTransferFailure, type ShareTransferFailure } from '@heyta/app-host';
 import { clearStorageShareLog } from './comment-actions.js';
 import { createWebShareKeyRotation } from './share-rotation.js';
 import {
@@ -203,6 +203,11 @@ export function ShareFeature(props: ShareFeatureProps) {
   );
   const [consentStore, setConsentStore] = useState<ShareConsentStore>(() => loadConsent());
   const [creatingError, setCreatingError] = useState<string | undefined>();
+  // 转让失败的具名读数（B-10 的宿主侧收口）。面板把不合格接收方灰掉只是第一层，
+  // 面板数据落后一拍时那一发仍会打到服务端，所以这里必须有一句话，不能静默。
+  const [transferFailure, setTransferFailure] = useState<
+    { kind: ShareTransferFailure; detail: string } | undefined
+  >();
 
   // 面板数据（phase=panel 时有效）。
   const [members, setMembers] = useState<Awaited<ReturnType<ShareApiClient['listMembers']>>['members']>([]);
@@ -572,6 +577,15 @@ export function ShareFeature(props: ShareFeatureProps) {
               </div>
             ) : null}
 
+            {transferFailure !== undefined ? (
+              <p role="alert" data-testid="share-transfer-error" style={styles.resetTitleDanger}>
+                {transferFailure.kind === 'target-unsealed'
+                  // 与面板行内那句等待提示同一份文案：同一件事不许有两个说法。
+                  ? t('common.share.member.waitingForEnvelope')
+                  : t('web.share.transfer.error', { message: transferFailure.detail })}
+              </p>
+            ) : null}
+
             <SharePanel
               data={{
                 shareId: phase.shareId,
@@ -598,7 +612,21 @@ export function ShareFeature(props: ShareFeatureProps) {
                 // 转让所有权（W6）：服务端事务里 ownerUserId 与两条成员行一起换，
                 // 客户端只管发起 + 对账（reload 后自己的角色就是 editor 了）。
                 onTransferOwnership: (memberId) => {
-                  void api.transferOwnership(phase.shareId, memberId).then(() => reload(phase.shareId));
+                  setTransferFailure(undefined);
+                  void api
+                    .transferOwnership(phase.shareId, memberId)
+                    .then(() => reload(phase.shareId))
+                    // 🔴 没有这一发 catch 时，服务端那道 B-10 门（409 具名码）会变成一次
+                    // 未处理拒绝：用户按了「确认转让」，面板什么都不说。分类在 app-host，
+                    // 这里只把结论翻成文案。
+                    .catch((err: unknown) => {
+                      const status = err instanceof ShareApiError ? err.status : undefined;
+                      const code = err instanceof ShareApiError ? err.code : undefined;
+                      setTransferFailure({
+                        kind: shareTransferFailure({ status, code: code === undefined ? undefined : String(code) }),
+                        detail: err instanceof ShareApiError ? `${String(status)} ${String(code ?? '')}` : String(err),
+                      });
+                    });
                 },
               }}
             />

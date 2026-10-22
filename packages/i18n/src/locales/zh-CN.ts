@@ -4882,6 +4882,7 @@ export const zhCN = {
   'web.share.transfer.confirmHint': '转让后你将成为「可编辑」成员：还能读写清单内容，但邀请、角色与移除都归新所有者管。此操作立即生效。',
   'web.share.transfer.confirm': '确认转让',
   'web.share.transfer.cancel': '取消',
+  'web.share.transfer.error': '转让失败：{message}',
   'web.share.invite.linkTitle': '入群链接（打开即进入加入流程，凭证有效期与上面一致）',
   'web.share.join.button': '加入共享清单',
   'web.share.join.title': '加入共享清单',
