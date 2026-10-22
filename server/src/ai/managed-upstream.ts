@@ -61,8 +61,9 @@ export interface ServerManagedModelHost {
 /**
  * 🔴 与 `packages/ai/src/managed-endpoints.ts` 的 `MANAGED_MODEL_HOSTS` **逐条对应**。
  *
- * 两行的性质不同（同那份表的注释）：`api.deepseek.com` 是第三方境内供应商（ADR-0021 选定），
- * `heyta.waytofuture.cn` 是我们自己那台已备案的服务器。**这里没有回环地址、没有私网地址**，
+ * 三行的性质不同（同那份表的注释）：`api.deepseek.com` 是第三方境内供应商（ADR-0021 选定），
+ * `heyta.waytofuture.cn` 是我们自己那台已备案的服务器，`x-creative.team` 是中央 AI 平台
+ * （自建网关，上游链路末端是 DeepSeek）。**这里没有回环地址、没有私网地址**，
  * 所以"明文不许走 http"这一条在本文件里不需要为"本机模型服务"开口子（下面
  * `plaintextHosts` 那个入参只为**测试的假端点**存在，生产调用点一律不传）。
  */
@@ -82,6 +83,15 @@ export const SERVER_MANAGED_MODEL_HOSTS: readonly ServerManagedModelHost[] = [
     evidence:
       'docs/runbooks/deployment.md §3.7.2：主域 waytofuture.cn 已完成 ICP 备案，heyta 子域 A 记录指向境内 IP，' +
       '证书由 certbot 签发；同节记录的容器与端口均在同一台境内机器上。',
+  },
+  {
+    host: 'x-creative.team',
+    provider: '中央 AI 平台（x-creative.team，heyta 自建网关）',
+    jurisdiction: 'cn',
+    evidence:
+      '中央 AI 平台由本项目运营方自建，与 heyta 同步服务同一主体；' +
+      '上游链路 MiraclePlus → OpenCode Go → DeepSeek 官方，末端供应商为境内主体（ADR-0021）。' +
+      '⚠️ 中间代理机房所在地未独立核验，见 ADR-0056 §5 第 2 条。',
   },
 ];
 
