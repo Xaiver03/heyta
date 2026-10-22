@@ -1449,3 +1449,30 @@ git diff --name-only a6662e218..HEAD -- packages apps server | grep -v '/evidenc
 - **不能把这一趟记成红，也不能记成绿**。它没跑完；而同一棵树、同一台机器上紧接其后单独跑的 `check:privacy-consent-e2e` 与 `check:landing-e2e` 各 `rc=0`（后者也走 `check-ai-e2e-preflight` 同一套装置），所以"整套红"不是载体或预检坏了 —— 那 17 个 spec 的红要归到别线在途改动，得由它们自己的线去量。
 
 **下一会话若要补第 94 项**：`pnpm check:ai-e2e > /tmp/ai-e2e.log 2>&1; echo rc=$?`（一条命令约 40 分钟起，别在等它的时候并跑别的门），拿到 `rc` 后按 `sed 's/\x1b\[[0-9;]*m//g'` 去色再数失败 spec，逐个回 `git status` 查它指的文件在 `HEAD` 上脏不脏 —— 脏就归别线在途改动，不许写成存量红（§7 #532）。
+
+### 2026-10-22 14:5x · 四端重装这一格由「等设备的点头」改成「看守已经在跑」——先把为什么、跑到哪、怎么收账钉住
+
+**先前那句"只剩两枚设备"要更正一处归因**：拦路的从来不是"要不要起设备"这句授权，而是两件可查的事 ——
+① 主检出里有别线未提交的打包输入（现量 487 枚 ` M`，其中 466 枚是 `apps/web/evidence/**`），在这种树上跑固定收尾，
+装进四端的是别人的半成品；② 负载超阈值。看守 `research/tools/b-window-keeper.sh` 对这两件都有现成的解：
+载体那一路**结构性不吃** `src` 那格（日志 `FIRE=src-deferred REDS=src`，14:53:38 现量），负载门则**不降级、只等**。
+⇒ 于是本格不再等人：AGENTS §6.1.1 把"四端都装上当前源码产物"定为每轮交付必须，任务书第 2 步也明文列了它，
+而两枚设备都是本仓在册的 `heyta-*` 设备、起之前 `simctl list devices booted` 与 `adb devices` **都是空的**（没抢别人的现场）。
+
+**本趟起的两枚设备（都可逆，收场 shutdown 即可）**：iOS `heyta-multiend-reinstall`
+（UDID `EAAD1B66-80A3-4A51-957C-298DAF22F057`，挂在 iOS 27.0 那档运行时 —— §7 记过 27.1 只给 iPhone-Duo
+且那一型后台起时整屏画不出来，所以不取 27.1；阳性对照已做：`simctl io … screenshot` 出的桌面 71 KB、不是全黑）；
+Android AVD `heyta-w3-yearly`（`-no-window` headless 起，`emulator-5554` 的 `sys.boot_completed=1`）。
+
+**起跑时的逐格前置**（看守自己的账，载体已追平到 `dd36e346a`）：op-log 构建 `rc=0` 且它依赖的 `@heyta/*`
+在载体里都有 `dist`（`DEPDIST=ok`）；放行那一刻负载 `9.68` ≤ 12（16 核 × 3/4）；目标树 `packages/apps/server`
+无未提交改动；载体里没有软链来的 `node_modules`（0 枚）。
+
+**跑到哪**：14:53 起桌面段 `reinstall-all.sh --only mac,windows`（第 0 步全仓 `pnpm -r build` 已在跑）；
+设备段 `--only android,ios` 要**再过一次负载门**才动 —— 看守刻意拆两段的原因写在它自己注释里：端序把设备面排在最后，
+中间隔着 mac 公证与远端打包 15–25 分钟，"起跑那刻没人在用"满足不了 §8.9 那句"不动别人正在用的设备"。
+
+**收账口径（看守明写"这两行要一起抄"）**：`B_DONE rc=` 只等于**设备段**那一趟，桌面段的 rc 在 `B_DESKTOP_DONE`；
+`exit 3` 是"预算用尽而窗口一直没开"= 环境状态、不是产品失败；`exit 4` 是装置或闸门用法坏，要人来看。
+日志 `/tmp/ht-b-window.20261022-145337.2087.log`（⚠️ 住 `/tmp` ⇒ 重启就没了：要把哪几行留成证据，就在跑完那一趟当场抄进本节，
+或把图挪到 `apps/*/evidence/` 这类在册落点）。
