@@ -985,6 +985,32 @@ main 在推送之后又被别线推进（`git rev-parse --short HEAD` 现量，�
 
 ### 下一步
 计划 §9.10 末节：**M2**（共享任务/清单的写路径路由 —— 要先立一份新 ADR），其后 M4 → M6。
-🔴 **排在 M2 之前先做 §6 B-10**（转让接收方的密钥资格门）：那是一条**已经能走到的**产品路径上的正确性格子
-（转出去的人可能解不开自己刚接手的清单，且客户端无人能修），比新铺一米路由便宜，别被里程碑顺序盖过去。
+~~🔴 排在 M2 之前先做 §6 B-10~~ ⇒ **2026-10-22 04:1x 已做完**，读数写在下面那一节。
 本线在任务书里的五步只剩上面那一格重装；**Goal 没有自标完成**（关闭要先向产品负责人逐条汇报并请示）。
+
+### 2026-10-22 04:1x · §6 B-10 落地（转让接收方的密钥资格门）
+一句话：**转让那一步从前不看接手人手里有没有钥，现在两半都看** —— 服务端对不合格目标回一枚具名 409
+`SHARE_TRANSFER_TARGET_UNSEALED`，成员面板对不合格成员**不给那颗按钮**、只给一句既有的「等待所有者授权」
+（复用词条 `common.share.member.waitingForEnvelope`，所以**没有动 `packages/i18n`**）。
+改动面：`server/src/shares/share.routes.ts`（判据放在自查与"目标已是 owner"之后、`$transaction` 之前 ⇒ 被拒时一处都不写）、
+`packages/sync-client/src/share-api-client.ts`（错误码镜像）、`packages/ui/src/sync/share-model.ts`
+（新导出 `memberCanHoldOwnership`：`hasEnvelope && keyEpochLag === 0`，面板与判据共用同一枚谓词）、`packages/ui/src/sync/SharePanel.tsx`。
+
+判据与归因（都在主检出同一棵树量的，未提交的别线 WIP 也在树里 ⇒ 逐条只看与本格相关的那几条）：
+`cd server && npx vitest run tests/share-routes.spec.ts` ⇒ `Tests 35 passed (35)`，转让那一组由 5 条到 7 条；
+`cd packages/ui && npx vitest run` ⇒ `46 files / 686 passed`；`cd packages/sync-client && npx vitest run` ⇒ `12 files / 165 passed`；
+`cd apps/web && npx vitest run tests/share-panel-transfer.spec.tsx` ⇒ `10 passed`（原 7 + 新 3），
+`cd apps/web && npx vitest run` ⇒ `187 files passed / 2 skipped，2371 passed | 13 skipped`；
+类型：`pnpm --filter @heyta/ui --filter @heyta/sync-client --filter @heyta/web --filter @heyta/sync-server typecheck` ⇒ rc=0、`error TS` 0 条，
+但**`@heyta/sync-server` 没有 `typecheck` 脚本**（现量 `node -e "console.log(require('./server/package.json').scripts.typecheck)"` ⇒ `NONE`）
+⇒ 服务端那格的类型靠 `cd server && npx tsc --noEmit -p tsconfig.json`（rc=0、0 条错）单独补量，别把"四包 typecheck 绿"读成"服务端被覆盖到了"。
+变异台架（每条臂都要能红）：服务端拆掉信封那半 ⇒ 只红「世代对齐但手里没有信封」；拆掉世代那半 ⇒ 只红「有信封但世代落后」；
+面板把 `canTransfer` 钉成恒真并重打 `pnpm --filter @heyta/ui build` ⇒ 新 3 条一起红、原 7 条照绿。
+三处还原后 `shasum -a 256` 与变异前逐字节相同（`server/src/shares/share.routes.ts`、`packages/ui/src/sync/share-model.ts`、`packages/ui/src/sync/SharePanel.tsx`）。
+
+🔴 **落地前必须先量的一格**：这道门会不会把转让变成永远按不到？现量答案是不会 ——
+`apps/web/src/features/share/ShareFeature.tsx` 里 owner 侧的 `autoSeal` 在面板挂载期间随 3s 轮询给不合格成员补封信封，
+而 `PUT /shares/:shareId/members/:memberId/envelope` 把 `memberKeyEpoch` 写成与 `Share.keyEpoch` 同一个号 ⇒ owner 开过面板之后接手人必然合格。
+剩下的真窗口（owner 从没打开面板／不在线／保险库锁着）那一格按设计给提示不给按钮。
+未做的一条尾巴：`SHARE_TRANSFER_TARGET_UNSEALED` 在宿主侧**没有文案映射**（全仓只有 sync-client 那枚镜像表消费错误码），
+面板数据过期那一瞬走 409 时用户看到通用失败 ⇒ 挂到 M4。

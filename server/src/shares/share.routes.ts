@@ -87,6 +87,9 @@ export const SHARE_ERROR_CODES = {
   INVITATION_REVOKED: 'SHARE_INVITATION_REVOKED',
   ALREADY_MEMBER: 'SHARE_ALREADY_MEMBER',
   OWNER_CANNOT_LEAVE: 'SHARE_OWNER_CANNOT_LEAVE',
+  /** B-10：转让的接收方手里没有**当前世代**的清单钥（信封为空，或世代落后）。
+   * 单独一枚码而不是 `ROLE_FORBIDDEN` —— 那是"你没资格操作"，这是"对方现在解不开"。 */
+  TRANSFER_TARGET_UNSEALED: 'SHARE_TRANSFER_TARGET_UNSEALED',
 } as const;
 
 const toMs = (value: unknown): number | null => {
@@ -598,6 +601,18 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
     }
     if (target.role === 'owner') {
       return reply.code(400).send({ code: SHARE_ERROR_CODES.ROLE_FORBIDDEN, message: 'Target is already the owner' });
+    }
+    // 🔴 B-10 资格门，**两半都要过**：信封非空 且 其世代 == 当前 `Share.keyEpoch`。
+    // 只比世代挡不住最常见的那一格：`memberKeyEpoch` 默认是 1 而不是 0，而"接受邀请"
+    // 那条写路径建成员时带的是 `memberKeyEpoch: share.keyEpoch`、**不带 `keyEnvelope`**
+    // ⇒ 刚进来的成员正是"世代对齐 + 信封为空"。放过去就得到一个解不开自己刚接手清单的
+    // owner，而补发信封是 owner 专属写路径（`requireShareOwner`）⇒ 刚被降成 editor 的
+    // 旧 owner 也修不了，服务端不报错、客户端无人能修。
+    if (target.keyEnvelope === null || target.memberKeyEpoch !== lookup.share.keyEpoch) {
+      return reply.code(409).send({
+        code: SHARE_ERROR_CODES.TRANSFER_TARGET_UNSEALED,
+        message: 'Target member does not hold the current share key',
+      });
     }
     // 🔴 三处写必须原子：share.ownerUserId（详情/列表的 ownerId 事实源）、新 owner
     // 角色、旧 owner 降 editor。中途断电留下「双 owner」或「零 owner」都会让

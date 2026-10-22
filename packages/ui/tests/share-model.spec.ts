@@ -5,6 +5,7 @@ import {
   canManageMembers,
   decideRoleChange,
   MAX_SHARE_MEMBERS,
+  memberCanHoldOwnership,
   memberFallbackLabel,
   memberLimitState,
   projectMembersFor,
@@ -74,6 +75,24 @@ describe('projectMembersFor', () => {
       2,
     );
     expect(views[0]!.keyEpochLag).toBe(1);
+  });
+});
+
+describe('memberCanHoldOwnership（B-10：能不能接手所有权）', () => {
+  // 面板拿它决定「转让」这颗按钮给不给。两半各挡一种失法，少一半就有一条假路。
+  const viewOf = (overrides = {}) =>
+    projectMembersFor(panel([member(2, 'editor', 100, overrides)]), 1)[0]!;
+
+  it('信封非空 + 世代对齐 ⇒ 合格（这是唯一该给按钮的形状）', () => {
+    expect(memberCanHoldOwnership(viewOf({ memberKeyEpoch: 2 }))).toBe(true);
+  });
+
+  it('🔴 世代对齐但手里没信封 ⇒ 不合格 —— 这正是刚接受邀请的人的默认形状', () => {
+    expect(memberCanHoldOwnership(viewOf({ memberKeyEpoch: 2, hasEnvelope: false }))).toBe(false);
+  });
+
+  it('🔴 有信封但世代落后 ⇒ 不合格（那是上一把钥，接手后读不到当前内容）', () => {
+    expect(memberCanHoldOwnership(viewOf({ memberKeyEpoch: 1, hasEnvelope: true }))).toBe(false);
   });
 });
 

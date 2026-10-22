@@ -93,6 +93,17 @@ export function projectMembersFor(data: SharePanelData, selfUserId?: number): Sh
 /** 管理动作（移除/改角色/重发信封）只属于 owner；owner 自己的行不可管理。 */
 export const canManageMembers = (role: ShareRole): boolean => role === 'owner';
 
+/**
+ * B-10：这一行**现在**能不能接手所有权 —— 两半都要过：信封非空，且世代与当前对齐。
+ *
+ * 🔴 只比世代不算修好：`memberKeyEpoch` 的默认是 **1 而不是 0**，所以一个从没被封过
+ * 信封的新成员在没换过钥的清单上（`Share.keyEpoch` 也是 1）`keyEpochLag` 就是 0。
+ * 转给这样的人 = 造出一个解不开自己刚接手清单的 owner，而补发信封是 owner 专属写路径
+ * ⇒ 刚被降成 editor 的旧 owner 也修不了（细则 `docs/plans/collaboration-shared-lists.md` §6 B-10）。
+ */
+export const memberCanHoldOwnership = (m: ShareMemberView): boolean =>
+  m.hasEnvelope && m.keyEpochLag === 0;
+
 /** 邀请同属 owner 付费动作（服务端有 entitlement 硬门；UI 只是提前挡）。 */
 export const canInviteMembers = (role: ShareRole): boolean => role === 'owner';
 
