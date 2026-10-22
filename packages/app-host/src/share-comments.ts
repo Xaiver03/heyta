@@ -204,6 +204,12 @@ export function createShareCommentDispatch(
       clientId: options.clientId,
       schemaVersion: options.schemaVersion,
       isSignedIn: options.isSignedIn,
+      // 🔴 因果时钟的基准 = **这条 share 现在折出来的那份钟**（ADR-0067 裁决二"回流"的落点）。
+      // 读的是 `ShareLogState.clock` 而不是另立一份计数器，是因为那份钟已经是
+      // 「本地上行过的每一条 ∪ 下行拉回的远端每一条」的逐维最大（`foldShareOps`），
+      // 再存一份"本地第几条"就是第二条真相来源 —— 而它一旦和日志不同步，
+      // 界面上表现为两条本来有因果边的 op 被判成并发。
+      baseClock: (id) => entryFor(id).log.clock,
       ...(options.now === undefined ? {} : { now: options.now }),
       ...(options.newOpId === undefined ? {} : { newId: options.newOpId }),
     });

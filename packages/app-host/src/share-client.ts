@@ -24,12 +24,17 @@
  *    share log"）是 `comment-actions.ts` 的 `shareIdForTask` 的活（ADR-0062 决策 4 要求
  *    它住 `packages/app-host`）。这里只做"给我一条意图，我把它加密、签名、上行"。
  *
+ * 4. 🔴 **因果时钟的基准由调用方给**（`baseClock`），本文件不自己存一份。
+ *    见下面 `dispatch` 里那段注释。
+ *
  * 签名（W3-T3）**预留但不在这里发明**：`@heyta/sync-core` 已有
  * `buildShareOpSignatureMessage({ opId, clientId, shareId, keyEpoch, ciphertext })`
  * 与 `signShareOperation(secretKey, message)`，接线时把签名放进 op 的 `signature` 字段即可；
  * 本片先不做，是因为线协议里那个字段的服务端校验形状还没读（**线协议词表只有一份定义**，
  * 自造一个字段形状比不做更坏）。
  */
+
+import type { VectorClock } from '@heyta/sync-core';
 
 /** 上行一条 share op 需要的最小端口（`ShareApiClient.uploadOps` 结构上就满足它）。 */
 export interface ShareOpUploadPort {
@@ -135,6 +140,17 @@ export interface ShareOpDispatcherOptions {
   readonly newId?: (() => string) | undefined;
   /** 动作标签表（默认评论族那三档）。 */
   readonly actionTypes?: Readonly<Record<string, string>> | undefined;
+  /**
+   * 🔴 **这条 share 当前的因果时钟**（ADR-0067 裁决二）。
+   *
+   * 必须**按 shareId 现读**，不许在建 dispatcher 时抓一份死值：同一个 dispatcher 会被
+   * 用来写多份清单，而每份清单的时钟各自长。
+   *
+   * 为什么是调用方给而不是这里存：本文件的纪律 3 —— 它不认识日志、不认识存储。
+   * 时钟的真相只有一份，就是 `ShareLogState.clock`（`foldShareOps` 折出来的那份，
+   * 里面已经含本地上行过的每一条 + 下行拉回来的远端每一条）。
+   */
+  readonly baseClock: (shareId: string) => VectorClock;
 }
 
 export interface ShareOpDispatchResult {
@@ -195,11 +211,25 @@ export function createShareOpDispatcher(options: ShareOpDispatcherOptions): {
       };
       const payload = await options.cipher.encrypt(JSON.stringify(intent.payload ?? {}), identity);
 
-      // ③ 线 op = identity + 密文 + 向量时钟（形状照 `verify-collab-sync.mjs` 的 `mkOp`）。
+      /*
+       * ③ 线 op = identity + 密文 + 向量时钟（形状照 `verify-collab-sync.mjs` 的 `mkOp`）。
+       *
+       * 🔴 **时钟是"本地那一维 +1"，不是写死的 `{我:1}`**（ADR-0067 裁决二）。
+       * 基准在**构造 op 之前**读（不是上传之后）：一条 op 的 `vectorClock` 是它的**因果前集**，
+       * 把"我自己这条"算进自己的前集是定义错误。落盘那一步（`foldShareOps`）才把这条推进日志的钟，
+       * 于是本地上行的每一条也会自增本地维 —— 服务端不必 ack 这条 op 才算"我写过"，
+       * 因为 share 日志的唯一所有者就是这台设备。
+       *
+       * ⚠️ 这条链一旦退化（写回 `{我:1}`），`compareVectorClocks` 对**同一设备的两条 op**
+       * 也只能判 `EQUAL`/`CONCURRENT` ⇒ 顺序只能靠 timestamp 平局来猜，
+       * 而"两个人各自的第 2 条改动"会被判成并发。判据在
+       * `tests/share-causal-clock.spec.ts`（"因果边真存在"那一枚会红）。
+       */
+      const base = options.baseClock(shareId);
       const op = {
         ...identity,
         payload,
-        vectorClock: { [options.clientId]: 1 },
+        vectorClock: { ...base, [options.clientId]: (base[options.clientId] ?? 0) + 1 },
         isPayloadEncrypted: true,
       };
       await options.api.uploadOps(shareId, [op]);
