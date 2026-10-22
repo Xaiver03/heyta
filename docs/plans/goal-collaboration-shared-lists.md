@@ -1092,3 +1092,25 @@ main 在推送之后又被别线推进（`git rev-parse --short HEAD` 现量，�
   复量预检 ⇒ 载体新鲜那一格从"落后 3 枚、差异只在非输入面"变成 **`✅ 载体新鲜：<sha> == 主检出 HEAD`**，
   而 exit 仍是 3、拦路的仍是那三格（负载 23 > 12、iOS 0 台已启动模拟器、Android 0 枚在线设备）。
   ⇒ 也就是说：**"设备点头"一到，这一趟不需要再补任何准备工作**，直接 `CARRIER=$HOME/heyta-carriers/heyta-wt-collab-m5 bash research/tools/b-reinstall-readiness.sh --confirm` 点火。
+
+### 2026-10-22 10:3x · 第 1 步的字面落点**其实欠了一半**，补上并做两头对照
+
+复审计务第 1 步那句原文（「断言 `[data-testid="share-invite-link"]` 文本含 `http://127.0.0.1:${WEB_PORT}` 且含 `shareToken=`」）时，
+现读 `e2e/tests/collab-journey.spec.ts` 发现**只有后半句在**：`toContain('shareToken=')` 加三条 origin 级断言
+（落点等于应用页自身的源、不等于同步服务器、链接里的 token 与展示的凭证同一枚）。
+前半句没有任何东西在钉 —— 那个端口号只被 `e2e/playwright.collab.config.ts` 当 `baseURL` 消费，**spec 从不读它**；
+"有一个消费者"不等于"那句要求有判据"（环境陷阱 **#527**）。
+补法：`expect(inviteLink).toContain(WEB_URL)`，靶子取 `HEYTA_COLLAB_WEB_URL`（验收脚本本来就注入它），缺省值与脚本逐字一致，
+并在加载期 fail-fast 校验靶子形状 —— 靶子若是空串，`toContain('')` 对任何链接都成立，那是一条永远通过的判据。
+
+**两头对照（顺序是刻意的：负在前，绿在后，因为这一趟会重刷证据目录）**：
+- 负臂（临时把靶子换成 `http://127.0.0.1:1`）⇒ `RESULT=FAIL step=2`、rc=1，失败原文里读到真链接
+  `http://127.0.0.1:4327/?shareToken=<一枚一次性凭证，不入库>` ⇒ **这条断言能红**。
+- 正臂（改回注入的那个靶子）⇒ `RESULT=OK steps=3`、rc=0、`STEP 3 OK 证据齐（8 张）`。
+- 新截图人工看过：`e2e/collab-journey-results/04-owner-invite-ticket.png`（10:38:49 那一枚）屏上逐字是
+  「入群链接」下方 `http://127.0.0.1:4327/?shareToken=…`，且那串 token 与上方「邀请凭证（只显示这一次）」逐字相同；
+  成员区那行写 `成员 618 · 所有者（我）`。
+
+🔴 **同时更正本文件先前那一格的口径**：第 1 步记成"已完成"时，我把 origin 等价断言当成了任务书那句字面要求的兑现。
+两者覆盖不同 —— origin 那三条比的是"页面自身的源"，**对端口号本身不敏感**（换一枚端口它照样绿），
+而任务书要的那半句钉的正是"落点等于这台实例上应用的那个 loopback 地址"。现在两半各有一条能红的判据。
