@@ -1042,3 +1042,13 @@ main 在推送之后又被别线推进（`git rev-parse --short HEAD` 现量，�
 `pnpm check` 那 122 段链仍是**两枚别线红**：在 tip `a6662e218` 上逐枚复量 `pnpm check:selection-single-source` rc=1、
 `pnpm check:image-license` rc=1，两者相关文件无在途改动 ⇒ 全绿这一格不归本线，也不由我放宽。
 `pnpm reinstall:all` 仍停在停止点 ③（Android 设备腿的载体口径冲突，两条路见上面那节）。
+
+**2026-10-22 04:2x 重装预检复量（只读，不动产物）**：`CARRIER=~/heyta-carriers/heyta-wt-collab-m5 sh research/tools/b-reinstall-readiness.sh`
+⇒ exit 3、**前置从 4 项降到 3 项**。我做掉的那一项：载体原来停在 `c1e26febc`，**打包输入面差 9 个文件**
+（正是 B-10 那 8 枚 + 别线动过的两枚 locale），按 §7 第 178 条那一族"装出来的是旧提交"，所以
+`git checkout --detach` 追到本线 tip（载体当时逐格干净，`status --porcelain` 回 0 行）。
+复量结果：载体与主检出**打包输入面逐字相同**（全仓差 2 个文件，都在非输入面的 `docs/research/台账` ⇒ 那一腿自己判绿，不拦）。
+剩下唯一拦路的是 **Android 段没有可达设备**（`adb` 在线设备一个都没有，本线 AVD = `heyta-w3-yearly`），
+而预检脚本明确**不代起 emulator**（起 qemu 会把负载顶上去、别人的 adb 因此超时）——
+这一格与 `docs/agents/multi-end-build.md` §6.1 那句"出包走 windows-pc、设备侧验收目前仍在 Mac"是同一处口径冲突，
+归产品负责人拍。拍之前我不硬装（§6.1.1：环境原因如实报红）。
