@@ -1234,3 +1234,17 @@ benchmark 64／feature-matrix 15／roadmap 93／progress-log 15／本计划 15�
 🔴 第 1、2 行是**人的动作**（两枚脚本都不代起设备，见上一节），第 3 行之前还要负载落回 12 以下（11:3x 复量 **16**，仍差 4）。
 载体那一腿 11:3x 复量**判绿**：脚本自己打的是「落后 2 个提交 / 超前 0 个 —— 但**打包输入面逐字相同**（全仓差 1 个文件，都在非输入面：docs/research/台账）⇒ 产物同形，本腿判绿」
 ⇒ 本线后面再补纯文档提交**不会**重新打开这一格，不用每笔都去追平载体（先前那格"载体要追平到 tip"读起来像每笔都要追，那是误读）。
+
+### 2026-10-22 11:4x · 起哪台 iOS 模拟器：**不抢别线设备**这件事量过了，不是挑了个名字顺眼的
+
+第 3 步那三行里我点了 `heyta-multiend-reinstall`，理由要能被复核，否则下一位不知道这台是不是别人正在用的：
+- 它是**本仓既有的重装专用载体**，不是我挑了个名字顺眼的：现量 `grep -rl heyta-multiend-reinstall --include='*.md' --include='*.sh' --include='*.mjs' --include='*.ts' . | grep -v node_modules`
+  —— 引用面跨 `PROGRESS.md`、`docs/reference/environment-traps.md`、别线 4 份 iOS 证据 `apps/mobile/evidence/ux-final-20261017/*/RESULT.md`
+  与 1 份重装证据 `apps/web/evidence/ux-final-20261017/reinstall-r118/RESULT.md`，还有并行载体 `.worktrees/inb-t10/` 里的那份拷贝（枚数不写在这里，会漂）。
+  ⇒ 起它 = 沿用大家已经在用的那一枚，不是新开一枚设备面。
+- 它**闲了两天**：`~/Library/Developer/CoreSimulator/Devices/EAAD1B66-…/` 的 mtime 是 `10-20 12:06`。
+- 对照组证明"最近确实有别线在用 iOS 设备面"：`heyta-iphone-17pro`（`FE195661-…`）的 mtime 是 **`10-22 01:32`**（约 1.7 小时前）。
+  ⇒ 如果照默认值 `iPhone 17 Pro`（`reinstall-all.sh:486` 那句 `${IOS_DEVICE_NAME:-iPhone 17 Pro}`）去起，撞的正是别人刚用过的那台；
+  显式点名重装专用那枚才是不抢设备的那条路。
+- 负载这一格 11:4x 复量 **12.53**（阈值 12）—— 已经贴在门上了，方向仍是往下（35 → 23 → 17.5 → 16 → 12.5）。
+  🔴 这一格开了不等于窗口开了：**设备面要两枚同时空**（iOS + Android），而这两枚都得人先起。
