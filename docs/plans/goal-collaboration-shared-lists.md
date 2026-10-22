@@ -1617,3 +1617,34 @@ M2 的定义也因此更准一点：它交付的不只是 `TASK/PROJECT` 进 sha
 `ls /tmp/carrier-e2e-rc.txt`（出现即跑完，内容是退出码）；`tail -40 /tmp/carrier-e2e.log`（汇总行 + error 正文）；
 逐枚红 spec：`grep -E '^\s*✘' /tmp/carrier-e2e.log | grep -v 'retry #1' | grep -oE 'tests/[a-zA-Z0-9._-]+\.spec\.ts' | sort | uniq -c`。
 ⚠️ `/tmp` 只活到下次重启 —— 这一节本身就是恢复点（正文在已推的仓里），重启后照 §9.7 的载体那条重跑。
+
+## 2026-10-22 17:5x 归因定案了一半：拿一条 spec 在主检出做判决臂，**否证了"载体缺服务"**
+
+整套件那一趟也没跑到头 —— 外面那层包装按墙钟掐了它（`/tmp/carrier-e2e-rc.txt` 写的是 `rc=124`，停在第 200 条判决），
+所以等它打 error 正文这条路今天走不通。改走**一条 spec 的判决臂**（几分钟那一档，比整套件便宜两个数量级）：
+
+```
+cd e2e && npx playwright test tests/auth-login-code.spec.ts --reporter=line
+```
+
+读数：`probe rc=1`，3 枚失败，失败正文是 **`Expect "toBeVisible" ... element(s) not found`**
+（等 `[role="dialog"][aria-label="登录 / 注册"]` 里的 `auth-form-remember-password`，15s 超时），
+**不是** `ECONNREFUSED` / `ERR_CONNECTION_REFUSED` / 5xx —— 而弹窗本身开出来了。
+⇒ 按 17:3x 那节写的判据 2，这是**真断言不匹配**：这一族红既不是环境也不是载体，**`HEAD` 上就成立**。
+静态那半边也对得上：`git grep -l auth-form-remember-password HEAD -- packages apps` 只回
+`apps/web/tests/auth-form.spec.tsx` 一处（单测），生产源码里那枚 testid 没有 ⇒ 界面确实不渲染它。
+主检出这次跑之前四枚端口现量全空（`lsof -nP -tiTCP:4318…4322 -sTCP:LISTEN` 回空），所以"抢不到端口"那条排除掉了。
+
+🔴 **归属**：`e2e/tests/auth-login-code.spec.ts` 与那枚勾选框属**注册登录线**（换绑/改密/会话那条），不是本线 ——
+按 §9.6 那条"别人的判据口径不代改"，这里只登记现量与判决形状，**不代改它的断言，也不给它加豁免**。
+同一把尺要逐枚量剩下的：`admin-console`（每枚 ~17.5s）、`account-email-change-and-sessions`、`ai-*` 三枚 —— 命令就是上面那条换个文件名，
+每枚跑一次就有正文，别再拿"整套件的红长得像超时"当结论（我 17:3x 那一格就是把两种解释并存着写的，这次把其中一种**证否**了）。
+
+⚠️ 顺一条装置事实（同 #533 的兄弟形状，这次咬到自己）：**被墙钟掐掉的趟会留下 `webServer` 子进程**——
+载体那趟停了之后 4318/4319 仍被 `cwd` 在载体里的 vite 与 `stub-provider.mjs` 占着（`reuseExistingServer: false` ⇒ 下一趟直接起不来），
+我那发判决臂第一次就是因此 `rc=1` 而**没有有效读数**。认人方式照 #533：`lsof -t` + `ps -o lstart=` + `lsof -a -p <pid> -d cwd`，
+逐枚 `kill` 后四枚端口现量全空，那一发才算跑过。
+
+**这一格现在的形状**：`pnpm check` 全链在 `HEAD` 上红的枚数 ≥ 4（收款线 `check:selection-single-source`、自托管线 `check:image-license`、
+第 94 项 `check:ai-e2e` 里注册登录线那一族已**定案**、AI 线那两枚 `ai-row-layout`/`ai-tool-run` 待同一把尺量）。
+**没有一枚归本线**，本线证据仍以 `pnpm verify:collab-journey`（`RESULT=OK steps=3`）为准。
