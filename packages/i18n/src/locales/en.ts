@@ -4620,8 +4620,6 @@ export const en = {
   'web.share.open.new': 'Share this list',
   'web.share.open.manage': 'Manage sharing',
   // 实验开关（设置 → 同步）。措辞必须说实话：成员今天互相看不到内容。
-  'web.share.experimental.label': 'Shared lists (experimental)',
-  'web.share.experimental.note': 'Today only invites, member roles and ownership transfer work; members still cannot see each other’s task edits or comments — the shared content side is not yet delivered in the interface. Turning this on only reveals the entry point on this device.',
   'web.share.dialog.title': 'Shared list',
   'web.share.dialog.subtitle': 'List content is end-to-end encrypted and unreadable by the server; membership and roles are recorded server-side.',
   'web.share.dialog.close': 'Close',

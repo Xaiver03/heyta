@@ -10,8 +10,9 @@
  * 步骤（由 e2e/tests/collab-journey.spec.ts 驱动 UI，本脚本只负责环境与读数）：
  *   1. 环境：验收库 + 迁移 + 服务端（TEST_MODE）+ vite dev。
  *   2. Playwright 双 context（owner / bob）跑旅程：
- *      owner 建清单 → **断默认态下头部没有共享入口**（P-1）→ 设置里打开「共享清单（实验）」
- *      → 头部「共享」→ PIPL 同意模态 → 面板 → 邀请（一次性凭证）；
+ *      owner 建清单 → **断默认态下头部就有共享入口**（P-1 已于 2026-10-23 翻案，
+ *      翻案条件就是这条旅程的"两台互见"那一格）→ 头部「共享」→ PIPL 同意模态
+ *      → 面板 → 邀请（一次性凭证）；
  *      bob vault → 贴 token 入群 → owner 自动封信封 → bob 解钥 → 清单落侧栏；
  *      owner 面板对账出第二个成员；
  *      🔴 M2 的界面腿：owner 在共享清单里写一条任务 → **bob 那台不刷新就看得见**；
@@ -168,9 +169,6 @@ const evidence = run('ls', ['-1', join(ROOT, 'e2e/collab-journey-results')]);
 const shots = evidence.out.split('\n').filter((l) => l.endsWith('.png'));
 const EXPECTED = [
   '01-owner-list-ready.png',
-  // 01b 曾经不在册：那枚实验开关的**措辞**（"看不到彼此改动"）就是 P-1 的交付内容，
-  // 图不钉进门禁等于那句话可以随时从界面上消失而这一趟照样绿。
-  '01b-owner-experimental-switch.png',
   '02-owner-consent-modal.png',
   '03-owner-panel-created.png',
   '04-owner-invite-ticket.png',
