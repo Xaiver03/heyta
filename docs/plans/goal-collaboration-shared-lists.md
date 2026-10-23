@@ -1698,7 +1698,7 @@ cd e2e && npx playwright test tests/auth-login-code.spec.ts --reporter=line
 
 `pnpm check` 整链绿今天不是这条线的一个属性，而是**三条别线存量红的函数**（收款线 `check:selection-single-source`、自托管线 `check:image-license`、第 94 项 `check:ai-e2e` 里注册登录线 + AI 线那批，逐枚成因见 18:0x 那节）。把这条线的"可交付"押在别人的红什么时候清完，会让账面上一直"没收口"，而实际能做的一件件都做完了——那是把等待伪装成进度。
 ⇒ 本线 DoD 换成两格，都可现量：
-1. **本线自己的判据全绿**：`pnpm verify:collab-journey` ⇒ `RESULT=OK steps=3`；`pnpm check:share-entry-hidden`、`pnpm check:collab-carrier`、`pnpm --filter @heyta/sync-server exec node scripts/…` 之外那三段常驻门各 rc=0；
+1. **本线自己的判据全绿**：`pnpm verify:collab-journey` ⇒ `RESULT=OK steps=3`；`pnpm check:share-entry-visible`、`pnpm check:collab-carrier`、`pnpm --filter @heyta/sync-server exec node scripts/…` 之外那三段常驻门各 rc=0；
 2. **红集逐枚入库**：别线每一枚红都要有"spec 名 + `Error:` 形状 + 归属线"，写在本文 14:0x / 16:4x / 17:3x / 17:5x / 18:0x 五节里，**不代改、不加豁免**。
 🔴 **这不是放宽判据**：`pnpm check` 那串一个字没动，链该红还是红；改的是"这条线的完成定义由谁来算"。
 **翻案条件**：那三枚里任何一枚被它自己的线清掉 ⇒ 重跑逐项那趟（命令在 14:0x 那节）；若发现某一枚红**其实由本线引起**（现在的现量是不成立：`git status --porcelain=v1 | grep -icE 'share|collab'` 回 0）⇒ 这一格立刻收回本线账上。
@@ -1749,8 +1749,9 @@ cd e2e && npx playwright test tests/auth-login-code.spec.ts --reporter=line
 
 **接手 30 秒自查**（四行都现量，别抄本文任何数）
 `git rev-list --left-right --count refs/remotes/origin/main...main` ⇒ 应为 `0 0`；
-`pnpm verify:collab-journey` ⇒ `RESULT=OK steps=3`；`pnpm check:share-entry-hidden` ⇒ 臂全过；
-`pnpm --filter @heyta/web exec vitest run tests/share-consent-modal-theme.spec.tsx tests/share-entry-experimental.spec.tsx` ⇒ 全绿。
+`pnpm verify:collab-journey` ⇒ `RESULT=OK steps=3`；`pnpm check:share-entry-visible` ⇒ 臂全过；
+`pnpm --filter @heyta/web exec vitest run tests/share-consent-modal-theme.spec.tsx tests/share-entry-visible.spec.tsx` ⇒ 全绿。
+（⚠️ 这一节 2026-10-23 跟着 P-1 翻案改过名：那枚入口门从 `check:share-entry-hidden` 翻成 `check:share-entry-visible`，行为层那份 spec 从 `share-entry-experimental.spec.tsx` 换成 `share-entry-visible.spec.tsx` —— 本文其余节是**当时的会话记录**，不改写。）
 
 ## 2026-10-22 19:1x 链逐项再扫一遍（120 项，排除已知三枚别线红）：**红集=2，两枚都不是 HEAD 红**
 

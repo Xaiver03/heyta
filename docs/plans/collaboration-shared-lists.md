@@ -1,11 +1,12 @@
 # 共享清单与协作（清单级多人协作）落地计划
 
 > 状态：**进行中**（2026-10-08 立；W0–W3 已落地，逐条见 §3 —— 原写「规划中」，**2026-10-16 更正**）
-> 🔴 **现状与下一步以 §9 为准（2026-10-20 复账；2026-10-21 M1 落地后本行改口；2026-10-22 再按界面可达性重锚）**：§3 那张 W 表与 §7 的 DoD 是 10-08 立的工单分解，
+> 🔴 **现状与下一步以 §9 为准（2026-10-20 复账；2026-10-21 M1；2026-10-22 按界面可达性重锚；2026-10-23 M2 收尾后再改口）**：§3 那张 W 表与 §7 的 DoD 是 10-08 立的工单分解，
 > 逐条已落后于代码 —— 尤其 §7 的 DoD 会被"元数据面已通"读成"协作已可用"。
-> **内容面在用户界面上今天仍然零可达**（§9.1 末那一句是逐条现量）：评论那一族 2026-10-21 通的是**宿主层**
-> （两个无界面宿主实例互拉、游标落盘、经真服务端验过，§9.8），而成员那侧的共享清单是一条**空清单**（本地只建一行清单、评论区又只挂任务详情）⇒ 点不进去；
-> **任务/清单改动连宿主层都搬不到** —— 因为 `TASK/PROJECT` 的 op 至今进个人 op-log，那是 M2 的路由那一步（要先立 ADR）。
+> **内容面已经到得了用户眼前**（§9.1 末那一句是逐条现量，§9.11 是那一步的读数）：任务/便签/评论三族的写意图
+> 都先过 `packages/app-host` 那**一处**路由判据，读侧是合并视图，而**两台真浏览器互见**由 `verify:collab-journey` 常驻钉着。
+> 上一版那两句"零可达 / 连宿主层都搬不到"是 2026-10-22 的读数，已被 M2 与那条界面腿否证 —— 留在这里只作为
+> "为什么会需要一把量得到界面的尺"的记录。
 > 三条产品拍板（入口先降级、转让语义保留、并发改成按字段胜出）与里程碑顺序都在 §9。
 > 立单：2026-10-08。产品负责人认可调研结论与 UX 十二条裁决（§1）后指令「制定一个完整的计划」。
 > 证据层：[共享清单调研](../research/collaboration-shared-lists.md)（2026-10-08；滴答帮助中心全文一手抓取 + 仓库双路只读调研 + Ink & Switch / RFC 9420 / Etebase）。
@@ -275,7 +276,7 @@ model ShareOperation   { id, shareId, clientId, serverSeq, …密文列
 
 - 2026-10-08：立单。调研见 [research/collaboration-shared-lists.md](../research/collaboration-shared-lists.md)；十二条产品决策（§1）经产品负责人认可；同日 [ADR-0062](../adr/0062-shared-list-key-distribution.md) 立掉。
 
-## 9. 2026-10-20 复账与下一阶段计划（🔴 标题那句"内容面整段断"到 2026-10-22 仍然**在用户界面上成立**：M1 通的是评论那条腿的**宿主层**，任务那条连腿都没接 —— 逐条见 §9.8 与 §9.1 那句"产品现状"）
+## 9. 2026-10-20 复账与下一阶段计划（🔴 "内容面整段断"那句到 2026-10-22 还成立，2026-10-23 起**不再成立**：M2 把任务族接进共享日志，而 `verify:collab-journey` 的界面腿第一次真跑通"两台浏览器互相看得见" —— 现状逐条见 §9.1，那一步的读数见 §9.11）
 
 > 状态：**本节是这一条线当前的权威现状**（§3 那张 W 表与 §7 的 DoD 是 10-08 立的，逐条已落后于代码；
 > 读现状从这里读，别按 §3 推断"接完了"）。
@@ -285,27 +286,34 @@ model ShareOperation   { id, shareId, clientId, serverSeq, …密文列
 | 那一面 | 代码现量 | 怎么复量 |
 |---|---|---|
 | 元数据面（建共享 / 邀请 / 入群 / 成员 / 角色 / 转让 / 移除 / 退出） | ✅ 服务端与 Web 宿主都在 main 上，role 硬门在上传边界 | `pnpm verify:collab-journey`；`pnpm --filter @heyta/web --silent exec vitest run tests/share-panel-transfer.spec.tsx tests/join-link.spec.ts` |
-| **内容下行** | 🟡 **评论这条腿已通**（2026-10-21 M1）：`downloadOps` 有生产调用点（`share-comments.ts` 的 `pullShareOps`），游标落盘、分页收敛、解密回放都在；🔴 但它今天**搬运不到用户眼前** —— 成员那边根本看不到这条共享任务（下一行那格），所以点不进评论区。原句"零实现"已过期 | `grep -rn downloadOps packages/app-host/src apps/web/src` 有命中（定义 + 调用两处）；`pnpm verify:collab-sync` 第 10 步（宿主层闭环，步数由脚本自己打印） |
-| **内容上行** | 🟡 **只有评论**：`uploadOps` 经 `createShareOpDispatcher` 接通，但调用链只从 `share-comments.ts` 进来 | `grep -rn createShareOpDispatcher --include=*.ts packages` ⇒ 生产消费者只有 `share-comments.ts` |
-| **任务 / 清单的写路径** | 🔴 **仍进个人 op-log**。`project-actions.ts` 里唯一与 share 有关的方法是 `setProjectShareId`（挂个 id），没有任何"该进 share log 还是个人 log"的分流 | `grep -n -E "shareId\|share" packages/app-host/src/project-actions.ts` |
+| **内容下行** | ✅ **到得了用户眼前**（2026-10-23 M2 收尾）：`downloadOps` 的生产调用点在 `share-comments.ts` 的 `pullShareOps`，游标落盘、分页收敛、解密回放都在；而**两台真浏览器互见**那一格由 `verify:collab-journey` 常驻钉着（owner 写的任务出现在 bob 那台、反向同一件事）。🔴 这一格第一次跑就是红的，抓出的是 M5 那道信号闸门只认"这份日志在本机落过盘"——刚入群那台设备一次都没拉过 ⇒ 索引空 ⇒ 第一份内容被判"本机不认得"丢掉，而判据自锁（不拉就不进索引）。修法：闸门补上第二条本地途径（本机清单行绑定 `shareIdsOnDevice`），端口改必填 | `pnpm verify:collab-journey` ⇒ `RESULT=OK steps=3`；`pnpm verify:collab-sync` 第 10/12 步；两臂 `node research/tools/mutation-rigs/mutate-collab-signal-known-share.mjs` 与 `…mutate-collab-journey-visible.mjs` |
+| **内容上行** | ✅ **任务 / 便签 / 评论三族都进 share log**（2026-10-23 M2）：`uploadOps` 的生产入口不再只有评论那一族，写意图先过 `createShareRoutingDispatcher` 判"进哪本 log" | `pnpm verify:collab-sync` 第 12 步（任务族走**生产路由**：新建 + 改名跨账号搬运、两台个人 log 零写入）；`grep -rn createShareRoutingDispatcher apps/web/src` ⇒ 装配点在 `lib/oplog.ts` |
+| **任务 / 清单的写路径** | ✅ **分流已落地**（ADR-0067 裁决一 + 补一/补二/补三，2026-10-22/23 分批）：判据"所属清单的 `shareId` 是否在册"唯一一份在 `packages/app-host/src/share-routing.ts`，端壳只装配（`apps/web/src/lib/oplog.ts` 把引擎写入口与 share 通道递进去）。清单这条记录本身按 ADR-0068 裁决一**仍走个人 log** | `cd packages/app-host && npx vitest run tests/share-routing.spec.ts` ⇒ 41 passed；`node research/tools/mutation-rigs/mutate-collab-share-routing.mjs` ⇒ `ARMS=pass (6/6)` |
 | 服务端可写白名单 vs 客户端实际 | 白名单已经认识 `TASK / PROJECT / TAG / NOTE / COMMENT`，**服务端不拦，是客户端没往那走** | 读 `server/src/shares/share.membership.ts` 的 `SHARE_WRITABLE_ENTITY_TYPES` |
-| 并发判定 | 🔴 share 分区每条 op 的向量时钟被硬编成 `{ clientId: 1 }`（个人引擎那侧会自增自己那一维）⇒ 同设备两 op 恒 EQUAL、跨设备恒 CONCURRENT，判定只剩 timestamp 平局 | 读 `packages/app-host/src/share-client.ts` 里 `vectorClock:` 那一行，对照 `packages/op-log/src/engine.ts` 的自增 |
+| 并发判定 | ✅ **share 分区有真实因果时钟**（2026-10-22 M2-b，ADR-0067 裁决二）：本设备一维真自增 + 远端回流合并，同设备先后两条不再判成 EQUAL；并发改同一格 ⇒ **恰好一枚具名冲突**且**在界面上看得见**（裁决三，复用既有 `ConflictResolutionView` 与 `keep-local\|keep-remote` 词表，没新建视图也没新建词表） | `node research/tools/mutation-rigs/mutate-collab-causal-clock.mjs` ⇒ `ARMS=pass (5/5)`；`pnpm verify:collab-sync` 第 12 步含"两台各见 1 枚冲突 + 裁一次归零"；`apps/web/tests/share-conflict-wiring.spec.tsx`（6 枚，含反向臂） |
 | 逐 op 签名 | 🔴 线协议里没有 `signature` 字段，写侧不签、服务端不验；原语在 `sync-core` 里躺着 | `grep -rn signature packages/shared-schema/src/supersync-http-contract.ts` ⇒ 零命中 |
 | 移除即 rekey | 🟡 **owner 那一次点击这条链已通**（2026-10-21 M3，读数见 §9.9）：`rotateShareKey` / `adoptRotatedShareKey` / `removeMemberAndRekey` 有生产调用点（`apps/web/src/features/share/share-rotation.ts` 装配，`ShareFeature.tsx` 的移除按钮与 reload 收钥两处调用），`keyEpoch` 真推进、新钥只封给在册成员（自己那枚排第一）、被移除那行的信封在库里置 null；成员端换成了**多世代密钥环**，否则换钥后那一屏会整块解不开。🔴 两件没做：库里**旧密文不重加密**（追加模型；重加密等于改 op-log 回放语义，与 M2/M4 同一份 ADR 一起判）；**owner 不在线时没人能触发换钥**（移除仍然生效，只是那一代钥还留着 —— 边界写在 `share-rekey.ts` 文件头） | `grep -rn removeMemberAndRekey apps/web/src packages/app-host/src` ⇒ 编排件 + 壳调用点各有命中；`pnpm verify:collab-revoke` ⇒ `RESULT=OK steps=8` |
-| 实时 | 🟡 **`new_share_ops` 那三段接线已通**（2026-10-21 M5，读数见 §9.10）：客户端认下这条消息、只把 `(shareId, latestSeq)` 交给宿主；"**这台设备认不认得这份 share、要不要拉、拉到算哪类活动**"住 `@heyta/app-host`；"响不响"住 `@heyta/ui` 那条谓词；壳只做装配与投递。评论区那枚 5 秒轮询已撤，改成信号驱动重画。🔴 三条偏好谓词里今天只有**活动那一族**有输入：`shouldNotifyTaskReminder` 要 `TASK` 的 op 进 share log（M2）、`shouldAutoAcceptInvitation` 要移动端的邀请面 ⇒ 这两条不是"接了没测"，是**没有输入** | `grep -rn new_share_ops --include=*.ts packages apps` ⇒ 服务端发 / 客户端认 / 判据三处都有命中；`pnpm verify:collab-sync` ⇒ `RESULT=OK`，步数由脚本自己打印 |
+| 实时 | ✅ **三段接线已通并经界面腿验过**（2026-10-21 M5 立，2026-10-23 M2 收尾补上那条自锁的闸门）：客户端认下 `new_share_ops`、只把 `(shareId, latestSeq)` 交给宿主；"这台设备认不认得这份 share、要不要拉、拉到算哪类活动"住 `@heyta/app-host`；"响不响"住 `@heyta/ui` 那条谓词；壳只做装配与投递。评论区那枚 5 秒轮询已撤，改成信号驱动重画。🔴 三条偏好谓词里今天仍只有**活动那一族**有输入：`shouldAutoAcceptInvitation` 要移动端的邀请面 ⇒ 不是"接了没测"，是**没有输入** | `pnpm verify:collab-sync` 第 11 步（真 WS + 真宿主）；两臂见上一行 |
 | 端覆盖 | 🟡 Web 接了；**macOS / Windows / Linux 三枚桌面壳间接有**（包里装的就是 `apps/web/dist`）；**移动端零接入**；node-host/CLI 无 share 工具 | `grep -rn -E "SharePanel\|shareId\|payloadCipher" --include=*.ts --include=*.tsx apps/mobile/src` ⇒ 0 命中；`grep -n web-dist apps/desktop-macos/Sources/HeytaMac/HeytaMacApp.swift` |
-| 常驻判据 | 🔴 **M7 之前**本线没有一扇门在链上（`check` 那串里 `verify:*` 引用数为 0；`collab-journey` 被 `e2e/playwright.config.ts` 的 `testIgnore` 摘出主 e2e 载体；证据目录被 gitignore ⇒ 截图不可复核）。**今天链上有三段**（`check:share-entry-hidden` / `verify:collab-keys` / `check:collab-carrier`），形状与读数见 §9.7；要真 PostgreSQL / 真浏览器的那四腿仍靠人跑 `pnpm verify:collab-suite` | `node -e "const c=require('./package.json').scripts.check.split('&&');console.log(c.filter(x=>['collab','share-entry'].some(k=>x.includes(k))).join(', '))"`；`grep -n -A5 testIgnore e2e/playwright.config.ts` |
+| 常驻判据 | 🔴 **M7 之前**本线没有一扇门在链上（`check` 那串里 `verify:*` 引用数为 0；`collab-journey` 被 `e2e/playwright.config.ts` 的 `testIgnore` 摘出主 e2e 载体；证据目录被 gitignore ⇒ 截图不可复核）。**今天链上有三段**（`check:share-entry-visible` / `verify:collab-keys` / `check:collab-carrier`），形状与读数见 §9.7；P-1 翻案后那枚入口门从钉"默认不可达"翻成钉"默认态可达"（五判 + 阳性对照 + 5 臂自检，2026-10-23）；要真 PostgreSQL / 真浏览器的那四腿仍靠人跑 `pnpm verify:collab-suite` | `node -e "const c=require('./package.json').scripts.check.split('&&');console.log(c.filter(x=>['collab','share-entry'].some(k=>x.includes(k))).join(', '))"`；`grep -n -A5 testIgnore e2e/playwright.config.ts` |
 
-⇒ **一句话的产品现状**（2026-10-22 按**界面可达性**重锚，此前那句"评论已经能互相看到"是把宿主层读数抄成了产品能力）：
-能邀请人、能管人、能转让；内容面今天**两侧都到不了用户眼前**。
-· 评论那条腿在**宿主层**已通并经真服务端验过 —— 但 `verify:collab-sync` 那"两台"是**两个无界面的宿主实例**，不是两台开着界面的浏览器；
-· 成员那侧的本地清单行只有 `addProject` + `setProjectShare` 两步，**没有任何 share 日志拉取**（现量：`apps/web/src/features/share/JoinSharedListDialog.tsx` 的 `finalize`）
-  ⇒ 他看到的共享清单是**一条空清单**；
-· 评论区在 web 只有一个挂载点，挂在**任务详情**上（现量：`grep -rn ShareCommentsSection apps` ⇒ 只有 `TaskDetailCard.tsx` 一处）
-  ⇒ 没有任务就没有评论区可点，**成员进不去评论区**。
-⇒ 所以"能看到彼此写的评论"今天只在 owner 那一侧成立（他看得见自己的任务），**成员之间互相看不到任何东西**。
-任务与清单的改动照旧看不到 —— 那一半要等 M2 把 `TASK/PROJECT` 的 op 路由进 share 日志。
-"共享清单"今天交付的是**一张只有外壳在动的共享**，还不是协作。
+⇒ **一句话的产品现状**（2026-10-23 按**界面可达性**重锚；上一版那句"两侧都到不了用户眼前"是当天上午的读数，
+被下午那台真浏览器否证了 —— 它抓到的那一格见 §9.11）：
+**能邀请人、能管人、能转让，而且两台真浏览器里互相看得见对方写的任务与评论。**
+· 写侧：共享清单里的任务/便签/评论的意图先过 `packages/app-host/src/share-routing.ts` 那**一处**判据，
+  进 share log 的不再只有评论那一族；清单这条记录本身按 ADR-0068 裁决一仍走个人 log。
+· 读侧：`currentState()` 交的是**合并视图**，共享条目挂到**本机**那条清单行上（不是作者本机那个 id），
+  所以对面那台筛得出来、点得进去，评论区也就不再是"没有任务就没有入口"。
+· 并发：同设备先后两条不再判成 EQUAL；同字段并发 ⇒ 恰好一枚具名冲突，并进**现有**那枚冲突界面与 rail。
+· 实时：`new_share_ops` → 闸门 → 拉一次 → 重画，全程无轮询。
+
+🔴 仍然到不了的，别写成"做完了"：
+· **移动端零接入**（M6 那六段，现量见 §9.4）；
+· **逐 op 签名**没有（M4，`shared-schema` 线协议 = 不可逆层）；
+· **跨清单搬迁**仍按补二具名拒绝 —— 界面上那三处"换清单"目的地现在**灰掉并说一句为什么**
+  （2026-10-23 补：以前是把注定失败的动作摆出来，报错文案还是"你的改动还在本地，可以重试"，那句是假的）；
+· **库里旧密文不重加密**（追加模型，M3 就登记过）；
+· 共享任务被勾完成时**没有通知档位**（偏好表里那两句措辞还没有，`ShareSignalActivity` 因此不含 `completed`）。
 
 ### 9.2 三条产品拍板（负责人 2026-10-20 把判定权交下来，按产品视角定，不再回问）
 
@@ -315,6 +323,14 @@ model ShareOperation   { id, shareId, clientId, serverSeq, …密文列
 判定：主界面入口默认隐藏，只留一条带明确措辞的实验开关；配套 M7 的门禁 `check:share-entry-hidden` 钉住"默认态不可达"。
 成本：一处条件渲染 + 一枚词条 + 一条会红的尺；收益：不拿真实用户的信任去测进度。
 翻案条件：M1+M2 落地且两台设备真浏览器"互相看得到"验过 ⇒ 撤掉隐藏，那一枚门禁同时改成钉"可达"。
+
+✅ **翻案已于 2026-10-23 执行**（条件三格都真验过：M1 §9.8、M2 §9.11、两台真浏览器互见 §9.11 那一格）。
+按上面那句写好的动作做，而不是"顺手改亮"：实验开关、那枚设备本地偏好模块、设置里那格措辞与两条词条
+一起退场（留着开关而入口不再读它 = 一枚勾了什么都不放的复选框），门禁从 `check:share-entry-hidden`
+**翻成** `check:share-entry-visible` —— 五判反向钉（入口在 / 条件里不许再有开关 / 条件里必须仍有
+`syncConfigured` / 设置里不许有残留开关 / 词条里不许再出现"看不到彼此改动"），阳性对照 + 5 臂自检。
+🔴 那句"成员之间还看不到彼此改动"的披露被门禁明确禁止回来：它当时是**缺陷披露**，今天留着就是
+**对外谎报"这功能不能用"**。裁决的**理由**留在上面那几行，不删 —— 那是下一次按住的判据。
 
 **P-2 owner 转让语义保留现形状**（两步确认 → 立即生效 → 原 owner 降 `editor`，服务端单事务原子写三处）。
 理由：E2EE 下"对方接受才生效"需要一条待接受的握手状态，而转让最常见恰恰发生在**对方不在线**（离职、换设备、注销前）；
@@ -338,7 +354,7 @@ model ShareOperation   { id, shareId, clientId, serverSeq, …密文列
 | # | 交付 | 判据（要能红） | 前置 / 不可逆点 | 归属 |
 |---|---|---|---|---|
 | **M1 🟡**（2026-10-21 宿主层已闭，读数见 §9.8） | **下行链路接通**：`downloadOps` 接进宿主（游标持久化、分页收敛、解密回放、离线补拉） | 🔴 **判据按实测改口**（原句写的是"今天走不通的那一族"）：~~A 改一条任务标题 → B 读到新标题~~ —— `TASK/PROJECT` 的 op 至今仍进**个人** op-log（那是 M2 那一步路由的事），所以下行腿今天能搬运的只有 `COMMENT`。现判据 = **两台独立宿主**：A 发一条评论 → B 拉回并物化、再拉一次零新增、游标落在盘上（`verify:collab-sync` 第 10 步，读数 `RESULT=OK steps=10`）。变异臂三臂见 §9.8，红集精确匹配 | 只需 `packages/app-host` + `apps/web`，不碰线协议 ⇒ **可以先做**；"任务标题那一半"随 M2 一起判 | 工程直接做 |
-| **M2** | **任务/清单的写路径路由**：共享清单里的 `TASK/PROJECT/TAG/NOTE` op 进 share log | 路由判据住在 `packages/app-host`（`shareIdForTask` 那一族的**同源**函数，不许在壳里判）；红形：未共享清单写进 share ⇒ 红 / 共享清单写进个人 log ⇒ 红 | 🔴 碰 op-log 语义与"个人 log 不动"这条 ADR-0062 承诺 ⇒ **先立 ADR**；`Project.shareId` 已在册，不必 bump schema | 工程 + 一份新 ADR |
+| **M2 ✅**（2026-10-22 立 ADR-0067，2026-10-23 收尾，读数见 §9.11） | **任务/清单的写路径路由**：共享清单里的 `TASK/TAG/NOTE/COMMENT` op 进 share log（**清单这条记录本身按 ADR-0068 裁决一仍走个人 log** —— 原句把 PROJECT 也列进来了，那一句在实施时被推翻并写进 0068） | 判据按实测**加硬**成三层：① 路由判据唯一一份在 `packages/app-host/src/share-routing.ts`，端壳只装配（`check:layering` 拦壳里的业务判断）② 跨账号搬运 + 并发同字段必须可见由 `verify:collab-sync` 第 12 步在**真服务端 + 生产路由**上证 ③ 用户可见那一格由 `verify:collab-journey` 的「两台真浏览器互见」钉。红形都真红过：未共享写进 share / 共享写进个人 log ⇒ 红；新建那一形不回退问载荷 ⇒ 4 枚红；通道没装上退回个人 log ⇒ 普通与 CAS 两条派发器各红一组 | 前置已满足：[ADR-0067](../adr/0067-shared-list-write-routing-and-merge.md) 已立（含一·补三格），`Project.shareId` 已在册，**零 schema bump** | 工程 + 一份新 ADR ✅ |
 | **M3 🟡**（2026-10-21 落地，读数与两件刻意没做的见 §9.9） | **rekey 落地**：移除/退出/撤销 → `keyEpoch` 推进 → 重封给在册成员；撤销后旧成员解不开新内容 | 实测到的判据形状：`verify:collab-revoke` 从"手搓迁移循环"改成**吃生产函数**（`removeMemberAndRekey` + `adoptRotatedShareKey` + 真 `ShareApiClient`），8 步含 psql 现量（`shares.key_epoch = 2`、他那行 `key_envelope IS NULL`）与"第三个人 carol 换钥后仍读得到新旧两代"；变异臂四臂 `ARMS=pass (4/4)` 红集精确匹配（原句那句"摘掉 `autoSeal` 那一步 ⇒ 必红"已由 `verify:collab-journey` 那条臂覆盖，这一批补的是**换钥编排本身**能不能红） | 依赖 M1（下行要先能读，否则证不了"读不到"）—— 已满足 | 工程直接做 |
 | **M4** | **逐 op 签名**：线协议加 `signature`、写侧签、服务端验、失败按"永久拒绝"处置（对齐 ADR-0019 那条读侧对偶） | 封闭词表 + 一条"改一个字节必被拒"的臂 | 🔴 `shared-schema` 线协议 = 不可逆层，与 M2 同一份 ADR 承接 | 工程 + ADR |
 | **M5 ✅**（2026-10-21 落地，读数见 §9.10） | **实时与偏好接线**：客户端接 `new_share_ops`、活动谓词进通知路径 | 现量（不是"应该行"）：`verify:collab-sync` 第 11 步走真 WS + 真宿主 ⇒ 有信号就有拉取；`无订阅偏好 ⇒ 零打扰`钉在 `apps/web/tests/share-activity-notify.spec.ts`（10 枚）与 `share-activity-signal.spec.tsx`（6 枚，接线臂）。红形都真红过：谓词恒 true ⇒ 3 枚红；壳跳过闸门 ⇒ 2 枚红；拿掉客户端那条分支 ⇒ `RESULT=FAIL step=11` | M1 之后才有意义（信号语义是"有东西可拉"） | 工程直接做 |
@@ -505,4 +521,24 @@ mobile 已真渲染过同目录的 `ConflictResolutionView`），缺的全在宿
 - **`shouldNotifyTaskReminder` 与 `shouldAutoAcceptInvitation` 仍没有数据面**：前者要 `TASK` 的 op 进 share log（M2 的路由），后者要移动端的邀请接受面（§9.4 那六段）。这不是"接了没测"，是**没有输入** —— 给它造一条假输入去点亮判据，量的是夹具不是产品。
 - **`app-mount.spec.tsx` 里的 `act(...)` 警告是预存的**：同一枚文件在 HEAD 上跑就有 28 条（`An update to SubscriptionNotice inside a test was not wrapped in act`），本批那一臂挂上完整 `<App />` 后整文件涨到 45 条。现量：`cd apps/web && npx vitest run tests/app-mount.spec.tsx 2>&1 | grep -c "not wrapped in act"`。这条不是本批的缺陷，也没有被当成判据。
 - **移动端与三枚桌面壳今天接不到这条信号**：`new_share_ops` 的解析在 `@heyta/sync-client`（共享包）里，判断在 `@heyta/app-host`，而投递面（Notification）与"注册消费者"那一行只在 web 壳里。移动端要等它自己的通知面（§9.4）。
-- **上面那四处变异是一次性手工跑的，没有常驻装置**（M3 那批有 `mutate-collab-rekey.mjs`，M5 这批没有）。欠项写清楚：三枚能在秒级里跑的臂（宿主 3 枚 / ui 3 枚 / 接线 2 枚）可以进 `research/tools/mutation-rigs/`，而**第 11 步那一枚不行** —— 它每跑一臂都要起真服务端，那一臂该由 `verify:collab-suite` 的周期跑承担，不该伪装成秒级装置。
+- **上面那四处变异当时是一次性手工跑的**（M3 那批有 `mutate-collab-rekey.mjs`，M5 这批没有）。✅ **2026-10-23 那笔欠项已按它自己写的分法还掉**：秒级那两枚进了常驻装置 —— 宿主侧闸门两臂 `research/tools/mutation-rigs/mutate-collab-signal-known-share.mjs`（`ARMS=pass (2/2)`）、接线/界面侧两臂 `mutate-collab-journey-visible.mjs`（`ARMS=pass (2/2)`，它每跑一臂要重打一次 `@heyta/app-host`）；而**真 WS 那一枚（第 11 步）仍按当时的判断不做成秒级装置** —— 它由 `verify:collab-suite` 的周期跑承担。登记在册，不留"下次再说"。
+
+### 9.11 M2 收尾（2026-10-23 第五批）—— 任务族进共享日志、两台真浏览器互见、P-1 翻案的读数
+
+> 本节是 §9.3 那行 M2 从 🟡 变 ✅ 的凭据，也是 §9.2 P-1 那次翻案的凭据。
+> 🔴 每一格右边都是**这一趟亲自跑出来的读数**，不是"应该能跑"。
+
+| 那一格 | 落到哪儿 | 现量读数 |
+|---|---|---|
+| 任务族走**生产路由** | `scripts/verify-collab-sync.mjs` 新增第 12 步：另起一份共享（第 8/9 步已把 bob 移出并换过钥），两台设备各装一份 `createShareCommentDispatch` + `createShareRoutingDispatcher` + `createShareViewMerger`（三件都是生产件，个人那本 log 用计数替身专证"一条都不许多"） | `pnpm verify:collab-sync` ⇒ `RESULT=OK steps=12`；读数含"bob 两次各拉到 1/1 条、两台个人 log 零写入；并发改同一格 ⇒ 两台各见 1 枚具名冲突、两侧内容都在；裁一次 ⇒ 冲突归零且对面读到那一句；第二份 share 全表仍是信封" |
+| 新建那一形的归属解析（ADR-0067 一·补三） | `packages/app-host/src/share-routing.ts` 的 `declaredProjectId` + `routeShareIdForIntent`（回退**只**发生在 `entity-not-found` 那一形） | 修前先写失败用例：`4 failed \| 29 passed` → 修后 `33 passed`（现量 `41 passed` 含后续两批新增）；六臂 `node research/tools/mutation-rigs/mutate-collab-share-routing.mjs` ⇒ `ARMS=pass (6/6)` |
+| 🔴 两台真浏览器互见（这一批真正的新尺子） | `e2e/tests/collab-journey.spec.ts` 第 9 段：owner 在共享清单里写一条 → **bob 那台不刷新**看得见；反向同一件事。判据取的是**界面上真落成的那一行文字**（快速添加会解析日期/标签，拿敲进去的串当期望值会误判） | `pnpm verify:collab-journey` ⇒ `RESULT=OK steps=3`、证据 11 张逐张肉眼看过（`10-bob-sees-owner-task.png` 里 bob 那台确实画出 owner 写的那一行、且只有一行）；一臂 `…mutate-collab-journey-visible.mjs` ⇒ `ARMS=pass (2/2)` |
+| 那一格抓到的真缺陷 | M5 信号闸门只认"这份日志在本机落过盘"，而刚入群那台设备一次都没拉过 ⇒ 索引空 ⇒ 第一份内容被判"本机不认得"丢掉，且判据**自锁**（不拉就不进索引）。修法：闸门补第二条本地途径（本机清单行绑定），端口改**必填** | 界面腿第一趟就是红的（`B 那台看不见 A 写的「…」`）；修后绿；两臂 `…mutate-collab-signal-known-share.mjs` ⇒ `ARMS=pass (2/2)` |
+| 补二的界面那一半 | 三处"换清单"目的地（行尾整理 / 详情栏整理 / 批量工具栏）现在把跨共享边界的目的地**灰掉并说一句为什么**；判据仍只有一处（`isCrossListMoveBlocked` 内部就是派发器那句 `crossesShareBoundary`） | `cd apps/web && npx vitest run tests/share-move-affordance.spec.tsx` ⇒ 3 passed；app-host 侧 7 枚；对拉两臂 `…mutate-collab-move-affordance.mjs` ⇒ `ARMS=pass (2/2)`（"什么都不挡"红 3 / "什么都挡"红 2 —— 只钉一侧会被另一侧混过去） |
+| P-1 翻案（§9.2 那三格条件被上面满足） | 实验开关 + 设备本地偏好模块 + 那格措辞 + 两条词条一起退场；门禁 `check:share-entry-hidden` → **`check:share-entry-visible`**（五判反向钉，含"词条里不许再出现『看不到彼此改动』"） | `pnpm check:share-entry-visible` ⇒ 阳性对照过 + `臂数 5，失败 0`；`apps/web/tests/share-entry-visible.spec.tsx` ⇒ 5 passed（含两条反向臂：未配同步 / 停在收集箱 ⇒ 入口不出现）；旅程里 `toHaveCount(0)` 换成 `toBeVisible()` |
+| 四层门禁与常驻载体 | 新尺子都在**已有**载体上：`verify:collab-sync` / `verify:collab-journey` 属 `verify:collab-suite` 名册（步数不写死，`check:collab-carrier` 只要求有载具）；单测层进 `pnpm -r test`（已在 `check` 链） | `pnpm check:collab-carrier` ⇒ `✅ 协作线 5 套验收全有载具：链内 1 套 / 名册内 4 腿`；`pnpm check:gate-wiring` rc=0（重命名后的门在链上，没有留下"写了没人引用"的实现） |
+
+**这一批还剩什么**（不包装成"协作做完了"）：M4 逐 op 签名（不可逆层）、M6 移动端六段、跨清单搬迁的
+真正语义（密钥世代 + 删除语义那一族）、共享任务完成档的通知措辞。P-1 的**理由**留在 §9.2 ——
+下一次内容面再断，那三格条件就是重新按住它的判据。
+

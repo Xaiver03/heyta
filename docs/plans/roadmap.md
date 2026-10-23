@@ -115,25 +115,29 @@ worktree `.worktrees/motivation` **已删除**（相关提交仍是 `main` 的�
 | 服务端 | 共享四张表 + `/api/shares/*` 端点 + **role 硬门在上传边界** + WS 变更信号 | ✅ 已实现 |
 | 密钥层 | ECIES 邀请凭证与共享密钥分发（`packages/sync-core`） | ✅ 已实现 |
 | Web 界面 | 同意弹窗（PIPL）→ 邀请 → 成员列表 → 转让 → 移除 | ✅ 已实现 |
+| 内容面写路径 | 任务/便签/评论三族的意图按所属清单 `shareId` 是否在册分流进 share log（ADR-0067 裁决一 + 一·补） | ✅ 已实现（2026-10-23 M2），判据在 `packages/app-host/tests/share-routing.spec.ts` |
+| 并发可见 | share 分区用真实因果时钟判并发；并发同字段复用现有冲突界面（ADR-0067 裁决三） | ✅ 已实现，`verify:collab-sync` 里"各见 1 枚冲突 / 裁一次归零"两格常驻钉着 |
+| 用户可见那一格 | 两台**真浏览器**里成员互相看得到对方改的任务 | ✅ 常驻判据（`e2e/tests/collab-journey.spec.ts` 第 9 段；⚠️ 它第一趟就是红的，抓到的自锁闸门见本线计划 §9.11） |
 | 入群链接 | owner 生成 `?shareToken=` 链接，点开进加入流程 | ✅ 已实现，并把落点钉进判据（`e2e/tests/collab-journey.spec.ts`） |
 | 端到端旅程 | `pnpm verify:collab-journey`（真浏览器 + 真服务端，零 mock） | ✅ `RESULT=OK` |
 | 所有权转让 | 两步确认、立即生效、原 owner 降 `editor`（三处写在**一个事务**里，不留双 owner／零 owner） | ✅ 已实现，🔴 **语义待产品负责人追认** |
 
-🔴 **这条线真正的最大件还没做**：多人并发写**同一条任务**的写路径路由。服务端与界面已经能
-把"共享"跑起来，但并发裁决仍走既有 LWW —— 它不构成 bug，构成的是**协作产品还没兑现的那半**。
+🔴 **这条线曾经的"最大件"已经做掉**（2026-10-23 M2，[ADR-0067](../adr/0067-shared-list-write-routing-and-merge.md)）：
+多人并发写**同一条任务**的写路径路由 —— 任务/便签/评论三族的意图先过 `packages/app-host/src/share-routing.ts`
+那**一处**判据进 share log，并发同字段在现有冲突界面里可见。逐格读数在本线计划 §9.11。
+🔴 **还欠两件**：**M4 逐 op 签名**（不可逆层，要先过 ADR）与 **M6 移动端**（六段缺什么见本线计划 §9.4）。
 
-🟡 **W4 残余**（如实登记，不是已完成）—— 三件里**评论那一米在宿主层接上了**（2026-10-21 M1/M5），
-**但界面上今天只有 owner 那一侧走得到**（理由见下面评论那一格与本线计划 §9.1）；
+🟡 **W4 残余**（如实登记，不是已完成）—— 三件里**评论那一米接到界面了**（2026-10-21 M1/M5 宿主层，
+2026-10-23 M2 界面两侧 + 任务族；"两台真浏览器互相看得见"由 `verify:collab-journey` 常驻钉着）；
 剩下两件（指派、动态流）的形状仍是**"零件已建、最后一米没接"**，
 所以下一步是**挂载与补写路径**，不是重画一遍：
 
-- **评论** 🟡（宿主层通 / 界面只到 owner 那一侧）：`COMMENT` 实体在清单里，组件 `packages/ui/src/sync/{comments-model.ts,CommentThread.tsx}`
+- **评论** ✅（Web 两侧到得了）：`COMMENT` 实体在清单里，组件 `packages/ui/src/sync/{comments-model.ts,CommentThread.tsx}`
   由产品体验线 `e6058120` 建好并从包根导出；**宿主写路径与下行**在 `packages/app-host/src/share-comments.ts`，
-  **挂载**在 `apps/web`（反查 `grep -rln "ShareCommentsSection" apps` ⇒ 只有任务详情一处）。
-  ⚠️ `pnpm verify:collab-sync` 验的是**两个无界面宿主实例**之间的拉取与 WS 扇出（`RESULT=OK steps=11`），
-  **不是**两台开着界面的浏览器：成员那侧的共享清单行只有 `addProject` + `setProjectShare` 两步（无 share 日志拉取），
-  所以那是一条空清单、没有任务可点进评论区。⚠️ **还剩三格**：移动端没挂这一节；成员侧的界面入口（随 M2）；
-  能实时搬运的目前只有评论那一族（`TASK` 的 op 还没进 share log —— 就是上面那个"最大件"）。
+  **挂载**在 `apps/web`（反查 `grep -rln "ShareCommentsSection" apps`）。
+  ⚠️ 那一格以前写的是"界面上今天只有 owner 那一侧走得到" —— 那是 2026-10-22 的读数，现在不成立，别照它施工。
+  ⚠️ **仍然只有评论**这一句也不成立：`TASK`/`NOTE` 的 op 已随 M2 进 share log。
+  还剩的：**移动端的评论区**（M6）。
 - **指派**：`Task.assigneeUserId` 是 domain 里的**可选字段**（且在加密 payload 内），通知过滤层
   的「指派给我的」那一档**已经在读它** —— 但全仓**没有任何一处写它**（`app-host` 零个指派 op 构造、`apps/*` 零界面）。
   ⚠️ 这一条 `check:reachability` **拦不住**：它只覆盖**实体**，字段级的"已建模≠可达"目前没人守。
