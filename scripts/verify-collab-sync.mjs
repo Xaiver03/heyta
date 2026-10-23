@@ -16,12 +16,15 @@
  * 第 12 步补的是**内容类型那一半**：任务族的写意图交经**生产路由**
  * （`createShareRoutingDispatcher`）分流，跨账号搬到对面并物化进合并视图，
  * 并发改同一格时两台上都**看得见**那枚冲突（ADR-0067 裁决一 + 补三 + 裁决三）。
+ * 第 13 步补的是**作者那一格**（ADR-0069 / M4）：落库的 op 带一枚能用名册公钥重验的签名，
+ * 而"没签 / 改过 / 别人代签"三种坏法各回一枚具名错误码、**一条都不落库**；再把库里那一枚
+ * 签名字节改掉（服务端或中间人的替身），另一台宿主读到的是**具名拒绝**而不是静默的错数据。
  *
  * ⚠️ 仍然量不到的那一腿，如实说：这一步到**宿主层**为止。
  * "两台真浏览器里 B 看见 A 改的任务"归 `pnpm verify:collab-journey`（界面腿），
  * 因为这里没有 DOM、没有登录面板、也没有那枚共享入口的实验开关。
  *
- * 十二步：
+ * 十三步：
  *   1. 两个账号（owner / bob，TEST_MODE 真实 JWT）。
  *   2. owner 建共享 + 发邀请（裸 token 只出现一次）。
  *   3. bob 凭 token 接受（带封装公钥）→ editor。
@@ -45,17 +48,22 @@
  *      `createShareRoutingDispatcher` 判 ⇒ 个人 log 零写入、bob 拉回并物化、合并视图把它
  *      挂到 **bob 自己**那条清单行；两台各改同一格且都没读过对方 ⇒ 两台各见**恰好一枚**
  *      具名冲突、两侧内容都在；裁一次 ⇒ 冲突归零且对面读到那一句。第二份 share 仍零明文。
+ *  13. 🔴 逐 op 签名（M4 / ADR-0069）：落库那一行带一枚**用名册公钥重验得过**的签名，且作者列
+ *      等于认证上传者；三种坏法各回一枚具名码且**库里查不到这一行**——无签、改一个字节、
+ *      拿别人的私钥签（代签）；最后把库里那一枚签名字节改掉（服务端/中间人的替身）⇒
+ *      另一台宿主读到的是**具名拒绝**（不物化、游标停在那条之前、再拉一次仍然报同一条）。
  *
  * 用法：
  *   node scripts/verify-collab-sync.mjs [--port 3211]
  *
- * 失败退出码 1 并打印 `RESULT=FAIL step=N`；通过打印 `RESULT=OK steps=12`。
+ * 失败退出码 1 并打印 `RESULT=FAIL step=N`；通过打印 `RESULT=OK steps=13`。
  */
 
 import { spawn, spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
+import { publishSigningKey, rosterFromMembers, signWireOp } from './lib/collab-sign.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = (() => {
@@ -193,13 +201,24 @@ step = 2;
 const created = await api('POST', '/api/shares', tokenOwner, {});
 if (created.status !== 201 || !created.json?.shareId) fail(`建共享失败：${JSON.stringify(created.json)?.slice(0, 200)}`);
 const shareId = created.json.shareId;
+const ownerMemberId = created.json.memberId;
 const ownerIdentity = core.deriveShareIdentityKeyPair(core.generateShareIdentitySeed());
 const listKeyV1 = core.generateShareListKey();
+/*
+ * 🔴 owner 那一行**不是**"接受邀请"进来的（建共享时服务端自己造的成员行），所以它自证公钥
+ * 走的是界面上"补发"那同一条腿。服务端不许代填这一格（ADR-0069 裁决二）—— 少了这一步，
+ * 下面每一条 owner 写的 op 都会被上传边界判成 `SHARE_OP_SIGNING_KEY_UNREGISTERED`。
+ */
+const ownerKeyPub = await publishSigningKey(api, {
+  shareId, memberId: ownerMemberId, token: tokenOwner,
+  ed25519PublicKey: ownerIdentity.ed25519PublicKey,
+});
+if (ownerKeyPub.status !== 200) fail(`owner 自证签名公钥失败：${JSON.stringify(ownerKeyPub.json)?.slice(0, 200)}`);
 const invitation = await api('POST', `/api/shares/${shareId}/invitations`, tokenOwner, {
   invitedEmail: `share-bob-${runId}@example.test`,
 });
 if (invitation.status !== 201 || !invitation.json?.token) fail(`发邀请失败：${JSON.stringify(invitation.json)?.slice(0, 200)}`);
-stepOk(`share=${shareId}；裸 token 已签发（只在这一次响应里）`);
+stepOk(`share=${shareId}；裸 token 已签发（只在这一次响应里）；owner 签名公钥已在册`);
 
 // ── 3. bob 接受邀请（带封装公钥） ──────────────────────────────────────────
 step = 3;
@@ -208,6 +227,9 @@ const bobPubB64 = Buffer.from(bobIdentity.x25519PublicKey).toString('base64');
 const accepted = await api('POST', '/api/shares/invitations/accept', tokenBob, {
   token: invitation.json.token,
   identityPublicKey: bobPubB64,
+  // 生产客户端在**同一次**接受里就把 Ed25519 自证公钥带上来（裁决二）：
+  // 分两次发的话，中间那一段这个人写的每一条 op 都会因"查不到登记的签名"被拒。
+  signingPublicKey: Buffer.from(bobIdentity.ed25519PublicKey).toString('base64'),
 });
 if (accepted.status !== 200 || accepted.json?.role !== 'editor') {
   fail(`接受邀请失败：${JSON.stringify(accepted.json)?.slice(0, 200)}`);
@@ -259,11 +281,19 @@ const ownerIdentityOp = mkIdentity(`op-owner-${runId}`, 'device-A1', 'task-owner
 const bobIdentityOp = mkIdentity(`op-bob-${runId}`, 'device-B1', 'task-bob-1');
 const ownerEnvelope = await cipherOwner.encrypt(JSON.stringify({ title: OWNER_TITLE }), ownerIdentityOp);
 const bobEnvelopeOp = await cipherBob.encrypt(JSON.stringify({ title: BOB_TITLE }), bobIdentityOp);
+// 🔴 两条都**带签**上行（M4 裁决六：无签的那一条不是"记一笔"，是永久拒绝）。
+// 签名件由生产装配器 `signShareOpWire` 现签 —— 脚本换的只是"私钥在谁手里"。
 const upOwner = await api('POST', `/api/shares/${shareId}/ops`, tokenOwner, {
-  ops: [mkOp(ownerIdentityOp, ownerEnvelope)],
+  ops: [signWireOp(core, {
+    shareId, memberId: ownerMemberId, ed25519SecretKey: ownerIdentity.ed25519SecretKey,
+    op: mkOp(ownerIdentityOp, ownerEnvelope),
+  })],
 });
 const upBob = await api('POST', `/api/shares/${shareId}/ops`, tokenBob, {
-  ops: [mkOp(bobIdentityOp, bobEnvelopeOp)],
+  ops: [signWireOp(core, {
+    shareId, memberId: bobMemberId, ed25519SecretKey: bobIdentity.ed25519SecretKey,
+    op: mkOp(bobIdentityOp, bobEnvelopeOp),
+  })],
 });
 if (upOwner.status !== 200 || upOwner.json?.accepted?.length !== 1) {
   console.error(`[debug] upOwner HTTP ${upOwner.status} body=${JSON.stringify(upOwner.json)?.slice(0, 300)}`);
@@ -370,7 +400,10 @@ const epoch2Identity = {
 };
 const newOpEnvelope = await cipherEpoch2.encrypt(JSON.stringify({ title: 'rekey 后的新任务' }), epoch2Identity);
 const upEpoch2 = await api('POST', `/api/shares/${shareId}/ops`, tokenOwner, {
-  ops: [mkOp(epoch2Identity, newOpEnvelope)],
+  ops: [signWireOp(core, {
+    shareId, memberId: ownerMemberId, ed25519SecretKey: ownerIdentity.ed25519SecretKey,
+    op: mkOp(epoch2Identity, newOpEnvelope),
+  })],
 });
 if (upEpoch2.status !== 200 || upEpoch2.json?.accepted?.length !== 1) fail('rekey 后 owner 上传失败');
 stepOk('rekey 世代推进；新 op 正常上行；bob 仍在门外');
@@ -431,7 +464,14 @@ const makeLogStore = () => {
   };
 };
 
-/** 真装配：真 `ShareApiClient`（真 HTTP）+ 真清单密钥（rekey 后 epoch2，带 epoch1 历史钥）。 */
+/**
+ * 真装配：真 `ShareApiClient`（真 HTTP）+ 真清单密钥（rekey 后 epoch2，带 epoch1 历史钥）
+ * + 真签名件与真名册（M4）。
+ *
+ * 🔴 名册取 `/signing-keys`（含已移除的人），**不取** `/members`：第 8 步刚把 bob 移出去，
+ * 他那一条 op 还在这本 log 里。用现役名单去验他那一行 ⇒ 读成"查无此人"、游标卡在那条之前，
+ * 于是 owner 这台以后什么都读不到 —— 这一腿正是为了量这件事（第 13.6 步把它写成显式判据）。
+ */
 const buildHost = (logStore, clientId) => appHost.createShareCommentsHost({
   ctx: hostCtx,
   api: new client.ShareApiClient({ baseUrl: BASE, getToken: () => tokenOwner }),
@@ -439,6 +479,11 @@ const buildHost = (logStore, clientId) => appHost.createShareCommentsHost({
     current: { shareId, keyEpoch: rekey.toEpoch, listKey: rekey.newListKey },
     previous: [{ shareId, keyEpoch: 1, listKey: listKeyV1 }],
   }),
+  signerFor: async () => ({ memberId: ownerMemberId, ed25519SecretKey: ownerIdentity.ed25519SecretKey }),
+  verifiersFor: async () => {
+    const res = await api('GET', `/api/shares/${shareId}/signing-keys`, tokenOwner);
+    return res.status === 200 ? rosterFromMembers(res.json) : undefined;
+  },
   storage: logStore,
   currentUserId: () => ownerUserId,
   clientId,
@@ -583,13 +628,20 @@ if (share2Res.status !== 201 || !share2Res.json?.shareId) {
   fail(`第二份共享建不出来：${JSON.stringify(share2Res.json)?.slice(0, 200)}`);
 }
 const share2 = share2Res.json.shareId;
+const ownerMember2 = share2Res.json.memberId;
 const listKey2 = core.generateShareListKey();
+const ownerKey2 = await publishSigningKey(api, {
+  shareId: share2, memberId: ownerMember2, token: tokenOwner,
+  ed25519PublicKey: ownerIdentity.ed25519PublicKey,
+});
+if (ownerKey2.status !== 200) fail(`owner 在第二份自证签名公钥失败：${JSON.stringify(ownerKey2.json)?.slice(0, 200)}`);
 const invite2 = await api('POST', `/api/shares/${share2}/invitations`, tokenOwner, {
   invitedEmail: `share-bob-${runId}@example.test`,
 });
 if (invite2.status !== 201 || !invite2.json?.token) fail(`第二份发邀请失败：${JSON.stringify(invite2.json)?.slice(0, 200)}`);
 const accept2 = await api('POST', '/api/shares/invitations/accept', tokenBob, {
   token: invite2.json.token, identityPublicKey: bobPubB64,
+  signingPublicKey: Buffer.from(bobIdentity.ed25519PublicKey).toString('base64'),
 });
 if (accept2.status !== 200) fail(`bob 加入第二份失败：${JSON.stringify(accept2.json)?.slice(0, 200)}`);
 const env2 = await core.sealListKeyForRecipient({
@@ -615,13 +667,19 @@ const TITLE_A_FINAL = '甲刷的最后一版';
 const TITLE_B_FINAL = '乙刷的最后一版';
 
 /** 一台设备：一份盘 + 一个共享通道 + 一个生产路由派发器 + 一台计数用的个人 log。 */
-function makeM2Device(token, userId, clientId, listKey) {
+function makeM2Device(token, userId, clientId, listKey, signer) {
   const store = makeLogStore();
   const dispatch = appHost.createShareCommentDispatch({
     api: new client.ShareApiClient({ baseUrl: BASE, getToken: () => token }),
     cipherFor: async () => client.createSharePayloadCipher({
       current: { shareId: share2, keyEpoch: 1, listKey },
     }),
+    // M4：写侧真签（同一把 `signShareOpWire`），读侧真名册（含已移除的人）。
+    signerFor: async () => signer,
+    verifiersFor: async () => {
+      const res = await api('GET', `/api/shares/${share2}/signing-keys`, token);
+      return res.status === 200 ? rosterFromMembers(res.json) : undefined;
+    },
     storage: store,
     currentUserId: () => userId,
     clientId,
@@ -651,8 +709,13 @@ function makeM2Device(token, userId, clientId, listKey) {
 }
 
 const bobUserId = jwtSub(tokenBob) ?? `bob-${runId}`;
-const devA = makeM2Device(tokenOwner, ownerUserId, 'device-A-m2', listKey2);
-const devB = makeM2Device(tokenBob, bobUserId, 'device-B-m2', bobListKey2);
+const bobMember2 = accept2.json.memberId;
+const devA = makeM2Device(tokenOwner, ownerUserId, 'device-A-m2', listKey2, {
+  memberId: ownerMember2, ed25519SecretKey: ownerIdentity.ed25519SecretKey,
+});
+const devB = makeM2Device(tokenBob, bobUserId, 'device-B-m2', bobListKey2, {
+  memberId: bobMember2, ed25519SecretKey: bobIdentity.ed25519SecretKey,
+});
 
 // 12.1 新建那一形（补三）：CRT 进 share，个人那本一条都不许多。
 await devA.route({
@@ -730,5 +793,207 @@ stepOk(
     `裁一次（保留「${keptTitle}」）⇒ 冲突归零且对面读到该版本；第二份 share 全表仍是信封`,
 );
 
+// ── 13. 🔴 逐 op 签名（M4 / ADR-0069）：写侧签 → 上传边界验 → 失败永久拒 → 读侧改盘要报得出名字
+//
+// 前面十二步量的是"清单能一起用"；这一步量的是"**这份日志里每一条都说是谁写的，而且改不动**"。
+// 三层各有一枚能红的判据，全部走生产件：签名件 = `signShareOpWire`（与宿主写侧同一个函数），
+// 判定 = `classifyShareOpSignature`（与服务端上传边界、读侧同一个分类器），零 mock、零本地实现。
+//
+// ⚠️ 如实的形状：13.2–13.4 那一发的**码值**就是这一腿的判据 —— 只断"被拒"不断"为什么被拒"
+// 的话，把无签读成改名失败、把代签读成发号冲突，界面都照样绿。
+step = 13;
+
+const cipher2 = client.createSharePayloadCipher({
+  current: { shareId: share2, keyEpoch: 1, listKey: listKey2 },
+});
+/** 一条准备上行的线 identity（op id 每条都不同：它是全局主键，重复 id 走的是另一枚码）。 */
+const m4Identity = (tag, entityId, clientId = 'device-A-m4') => ({
+  id: `op-m4-${tag}-${runId}`, clientId, actionType: 'add task', opType: 'CRT',
+  entityType: 'TASK', entityId, timestamp: Date.now(), schemaVersion: 1,
+});
+/** 库里这一行的条数（'0' 才算"永久拒绝"，不是"记一笔然后丢掉"）。 */
+const dbCount = (opId) => {
+  const r = run('psql', ['-tA', PSQL_URL, '-c', `SELECT count(*) FROM share_operations WHERE id = '${opId}'`]);
+  if (!r.ok) fail(`查库失败：${r.out.slice(-200)}`);
+  return r.out.trim();
+};
+/** 改一个字节（同一长度）—— 与"换一枚完全不同的签名"不同形：后者可能被当成没签。 */
+const flipByte = (b64) => {
+  // 只喂 base64 字母表：这一枚的值要进一条手写的 SQL，而本仓的库是共享的。
+  if (!/^[A-Za-z0-9+/]+=*$/.test(b64)) fail('签名不是 base64，不肯把它拼进 SQL');
+  const raw = Buffer.from(b64, 'base64');
+  raw[0] ^= 0x01;
+  return raw.toString('base64');
+};
+const upload2 = (token, ops) => api('POST', `/api/shares/${share2}/ops`, token, { ops });
+const rejectedCode = (json, opId) => (json?.rejected ?? []).find((r) => r.id === opId)?.code;
+
+// 13.1 落库那一行**带一枚能用名册公钥重验的签名**，且作者列记的是**认证上传者**、
+//      不是载荷里任何自称的字段（裁决四「不许代签」的落点：载荷里先塞一个假作者试试）。
+const aId = m4Identity('a', 'task-m4-a');
+const aEnv = await cipher2.encrypt(JSON.stringify({ title: 'M4 取证：owner 署名的一条' }), aId);
+const aOp = {
+  ...signWireOp(core, {
+    shareId: share2, memberId: ownerMember2, ed25519SecretKey: ownerIdentity.ed25519SecretKey,
+    op: mkOp(aId, aEnv),
+  }),
+  signerMemberId: bobMember2,
+};
+const upA = await upload2(tokenOwner, [aOp]);
+if (upA.status !== 200 || (upA.json?.accepted ?? []).length !== 1) {
+  console.error(`[debug] upA HTTP ${upA.status} body=${JSON.stringify(upA.json)?.slice(0, 300)}`);
+  fail('13.1 owner 那条带签的 op 没能上行');
+}
+const aSeq = Number(upA.json.accepted[0].serverSeq);
+const allOps = async (token) =>
+  (await api('GET', `/api/shares/${share2}/ops/causal?after=0&limit=200`, token)).json?.ops ?? [];
+const rosterRes = await api('GET', `/api/shares/${share2}/signing-keys`, tokenBob);
+if (rosterRes.status !== 200) fail(`签名名册读不到：HTTP ${rosterRes.status}`);
+const roster = rosterFromMembers(rosterRes.json);
+const aRow = (await allOps(tokenBob)).find((o) => o.id === aId.id);
+if (!aRow) fail('13.1 对面下载不到 owner 那条 op');
+if (aRow.signerMemberId !== ownerMember2) {
+  fail(`13.1 作者列不是认证上传者那一行（库里记的是 ${String(aRow.signerMemberId)}）`);
+}
+if (typeof aRow.signature !== 'string' || aRow.signature.length === 0) fail('13.1 落库那一行没有签名');
+const recheck = core.classifyShareOpSignature({
+  signingPublicKey: roster[aRow.signerMemberId], shareId: share2, signerMemberId: aRow.signerMemberId,
+  signature: aRow.signature,
+  wire: {
+    id: aRow.id, clientId: aRow.clientId, actionType: aRow.actionType, opType: aRow.opType,
+    entityType: aRow.entityType, entityId: aRow.entityId ?? null, entityIds: aRow.entityIds ?? null,
+    payload: aRow.payload, vectorClock: aRow.vectorClock ?? null, vectorClockEncoding: null,
+    isPayloadEncrypted: aRow.isPayloadEncrypted ?? null, schemaVersion: aRow.schemaVersion,
+    clientTimestamp: aRow.clientTimestamp,
+  },
+});
+if (recheck !== 'verified') fail(`13.1 用名册公钥重验落库那一行，结局是 ${recheck}（应为 verified）`);
+
+// 13.2 无签上行 ⇒ 具名 `SHARE_OP_UNSIGNED`、零收件、**库里没有这一行**。
+const uId = m4Identity('u', 'task-m4-u');
+const uEnv = await cipher2.encrypt(JSON.stringify({ title: 'M4 取证：无签的那一条' }), uId);
+const upU = await upload2(tokenOwner, [mkOp(uId, uEnv)]);
+if (rejectedCode(upU.json, uId.id) !== 'SHARE_OP_UNSIGNED') {
+  fail(`13.2 无签上传的码不是具名那一枚，实际 ${JSON.stringify(rejectedCode(upU.json, uId.id))}`);
+}
+if ((upU.json?.accepted ?? []).length !== 0 || (await dbCount(uId.id)) !== '0') {
+  fail('13.2 无签那条被收下了（或落库了）—— 无签通道没关严');
+}
+
+// 13.3 改一个字节 ⇒ 具名 `SHARE_OP_SIGNATURE_INVALID`、库里没有这一行。
+const tId = m4Identity('t', 'task-m4-t');
+const tEnv = await cipher2.encrypt(JSON.stringify({ title: 'M4 取证：签名被改过的那一条' }), tId);
+const tSigned = signWireOp(core, {
+  shareId: share2, memberId: ownerMember2, ed25519SecretKey: ownerIdentity.ed25519SecretKey,
+  op: mkOp(tId, tEnv),
+});
+const upT = await upload2(tokenOwner, [{ ...tSigned, signature: flipByte(tSigned.signature) }]);
+if (rejectedCode(upT.json, tId.id) !== 'SHARE_OP_SIGNATURE_INVALID') {
+  fail(`13.3 改一字节的码不是具名那一枚，实际 ${JSON.stringify(rejectedCode(upT.json, tId.id))}`);
+}
+if ((await dbCount(tId.id)) !== '0') fail('13.3 改过字节的那一条落库了');
+
+// 13.4 代签两个方向都进不来：拿**别人的私钥**签（自己这一行的名义），以及拿**自己的钥**签却
+//      冒充别人的成员行 —— 服务端只按认证上传者那一行的公钥验，两边都只对得上一次。
+const xId = m4Identity('x', 'task-m4-x');
+const xEnv = await cipher2.encrypt(JSON.stringify({ title: 'M4 取证：用 bob 的私钥签的' }), xId);
+const upX1 = await upload2(tokenOwner, [signWireOp(core, {
+  shareId: share2, memberId: ownerMember2, ed25519SecretKey: bobIdentity.ed25519SecretKey,
+  op: mkOp(xId, xEnv),
+})]);
+if (rejectedCode(upX1.json, xId.id) !== 'SHARE_OP_SIGNATURE_INVALID') {
+  fail(`13.4 拿别人私钥签（记自己名下）应当验不过，实际 ${JSON.stringify(rejectedCode(upX1.json, xId.id))}`);
+}
+const yId = m4Identity('y', 'task-m4-y');
+const yEnv = await cipher2.encrypt(JSON.stringify({ title: 'M4 取证：以自己的钥冒充别人的成员行' }), yId);
+const upY = await upload2(tokenOwner, [signWireOp(core, {
+  shareId: share2, memberId: bobMember2, ed25519SecretKey: ownerIdentity.ed25519SecretKey,
+  op: mkOp(yId, yEnv),
+})]);
+if (rejectedCode(upY.json, yId.id) !== 'SHARE_OP_SIGNATURE_INVALID') {
+  fail(`13.4 以自己的钥签、却声明别人的成员行应当验不过，实际 ${JSON.stringify(rejectedCode(upY.json, yId.id))}`);
+}
+if ((await dbCount(xId.id)) !== '0' || (await dbCount(yId.id)) !== '0') fail('13.4 代签的那两条落库了');
+
+// 13.5 移除一个人，**不许把他写过的东西一起删掉**：bob 署名写一条 → owner 把他移出去 →
+//      owner 这台新设备仍然要能验过他那一行、物化出来、零拒绝。
+//      （名册因此取 `/signing-keys`（含已移除的人）而不是 `/members` —— 用后者答这个问题，
+//      症状正是从"点移除"那一刻起，他和他**之后**所有人的改动一起读不出来。）
+const bId = m4Identity('b', 'task-m4-b', 'device-B-m4');
+const bEnv = await cipher2.encrypt(JSON.stringify({ title: 'M4 取证：bob 署名的一条' }), bId);
+const upB = await upload2(tokenBob, [signWireOp(core, {
+  shareId: share2, memberId: bobMember2, ed25519SecretKey: bobIdentity.ed25519SecretKey,
+  op: mkOp(bId, bEnv),
+})]);
+if ((upB.json?.accepted ?? []).length !== 1) fail(`13.5 bob 那条带签的没上行：${JSON.stringify(upB.json)?.slice(0, 200)}`);
+const remove2 = await api('DELETE', `/api/shares/${share2}/members/${bobMember2}`, tokenOwner);
+if (remove2.status !== 200) fail(`13.5 移除 bob 失败：${JSON.stringify(remove2.json)?.slice(0, 200)}`);
+const historyReader = makeM2Device(tokenOwner, ownerUserId, 'device-H-m4', listKey2, {
+  memberId: ownerMember2, ed25519SecretKey: ownerIdentity.ed25519SecretKey,
+});
+const historyPull = await historyReader.dispatch.pullShareOps(share2);
+if ((historyPull.rejections ?? []).length !== 0) {
+  fail(`13.5 已移除成员的署名历史读不出来了：${JSON.stringify(historyPull.rejections)}`);
+}
+if (historyReader.channel.stateFor(share2).tasks[bId.entityId] === undefined) {
+  fail('13.5 bob 署名的那条没物化进 owner 这台');
+}
+
+// 13.6 读侧对偶：owner 再写**最后**一条（带签、上得了线），然后把**库里那一枚**签名字节改掉
+//      （这就是"服务端或中间人改了内容"的替身）⇒ 另一台设备读到的必须是**具名失败**：
+//      恰好一条拒绝、outcome 叫得出名字、那条不物化、游标只停在它**之前**（所以每一轮都会再撞上
+//      同一条 ⇒ 报警自己还在），而它**之前**的那些照常可用。
+const zId = m4Identity('z', 'task-m4-z');
+const zEnv = await cipher2.encrypt(JSON.stringify({ title: 'M4 取证：盘上被改过的那一条' }), zId);
+const upZ = await upload2(tokenOwner, [signWireOp(core, {
+  shareId: share2, memberId: ownerMember2, ed25519SecretKey: ownerIdentity.ed25519SecretKey,
+  op: mkOp(zId, zEnv),
+})]);
+if ((upZ.json?.accepted ?? []).length !== 1) fail(`13.6 取证用的那条没上行：${JSON.stringify(upZ.json)?.slice(0, 200)}`);
+const zSeq = Number(upZ.json.accepted[0].serverSeq);
+const beforeTamper = run('psql', ['-tA', PSQL_URL, '-c',
+  `SELECT signature FROM share_operations WHERE id = '${zId.id}'`]).out.trim();
+if (beforeTamper.length === 0) fail('13.6 库里那一行没有签名，改不了');
+const flipped = flipByte(beforeTamper);
+const tampered = run('psql', ['-tA', PSQL_URL, '-c',
+  `UPDATE share_operations SET signature = '${flipped}' WHERE id = '${zId.id}'`]);
+if (!tampered.ok) fail(`13.6 改盘失败：${tampered.out.slice(-200)}`);
+const forgeReader = makeM2Device(tokenOwner, ownerUserId, 'device-F-m4', listKey2, {
+  memberId: ownerMember2, ed25519SecretKey: ownerIdentity.ed25519SecretKey,
+});
+const forged = await forgeReader.dispatch.pullShareOps(share2);
+const forgedRejections = forged.rejections ?? [];
+if (forgedRejections.length !== 1) fail(`13.6 改过的签名应报恰好一条具名拒绝，实际 ${JSON.stringify(forgedRejections)}`);
+if (forgedRejections[0].opId !== zId.id || forgedRejections[0].outcome !== 'invalid') {
+  fail(`13.6 拒绝的名字不对：${JSON.stringify(forgedRejections[0])}`);
+}
+if (forgeReader.channel.stateFor(share2).tasks[zId.entityId] !== undefined) {
+  fail('13.6 验不过的那一条被物化了 —— 那就是"静默的错数据"');
+}
+if (forgeReader.store.cursor(share2) !== zSeq - 1) {
+  fail(`13.6 游标越过了被拒那条（落在 ${String(forgeReader.store.cursor(share2))}，应停在 ${String(zSeq - 1)}）`);
+}
+if (forgeReader.dispatch.signatureRejections().length !== 1) {
+  fail('13.6 宿主给界面的那一份拒绝清单与拉取结果不一致');
+}
+const reforged = await forgeReader.dispatch.pullShareOps(share2);
+if ((reforged.rejections ?? []).length !== 1) {
+  fail('13.6 再拉一次不再报同一条 —— 报警会变成一次性的，而那格还没修');
+}
+if (reforged.added !== 0) fail(`13.6 第二次拉取应当零新增（被拒那条挡在游标前面）：added=${reforged.added}`);
+// 收尾：把改坏的那一行还原成原样，免得"这轮验收留下了一份坏数据"。
+const restored = run('psql', ['-tA', PSQL_URL, '-c',
+  `UPDATE share_operations SET signature = '${beforeTamper}' WHERE id = '${zId.id}'`]);
+if (!restored.ok) fail(`13.6 还原签名失败：${restored.out.slice(-200)}`);
+
+stepOk(
+  `逐 op 签名：落库那一行用名册公钥重验 = verified、作者列 = 认证上传者（载荷自称的那一行不算）；` +
+    `无签 → SHARE_OP_UNSIGNED、改一字节 → SHARE_OP_SIGNATURE_INVALID、` +
+    `代签两个方向 → SHARE_OP_SIGNATURE_INVALID，四条在库里都不存在（永久拒绝，不是记一笔）；` +
+    `已移除成员的署名历史仍读得到（零拒绝）；把盘上那枚签名字节改掉 ⇒ 对面报恰好一条 ` +
+    `outcome=invalid 的具名拒绝、那条不物化、游标停在 ${String(zSeq - 1)}（被拒那条 ${String(zSeq)} 之前）、` +
+    `再拉仍报同一条`,
+);
+
 cleanup();
-console.log('\nRESULT=OK steps=12');
+console.log('\nRESULT=OK steps=13');

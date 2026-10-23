@@ -204,6 +204,11 @@ export function createWebShareComments(deps: WebShareCommentsDeps): WebShareComm
     /*
      * 读侧验签用的名单（ADR-0069 裁决五）：成员行 id → 在册签名公钥。
      *
+     * 🔴 取的是 `signing-keys` 那一枚，**不是** `listMembers`：面板问"现在谁在"，这里问
+     * "这本 log 里那些署名的 op 可能是谁写的"。用后者答前者，症状是**把人移出清单的那一刻起，
+     * 他写过的每一条与其后所有人的改动都读不出来**（游标卡住 + 一句"查不到作者登记的签名"），
+     * 而那句警报会把人往"有人在改我的数据"上引。判据在 `verify:collab-sync` 第 13 步。
+     *
      * 🔴 取不到就交 `undefined`，**不要**退成空对象：空名单会把每一行都读成
      * "查无此人"，那是把一次网络抖动画成一堆伪造警报。宿主那边会抛具名错误、
      * 这一轮不推进游标（判据在 `share-read-verify.spec.ts`）。
@@ -211,7 +216,7 @@ export function createWebShareComments(deps: WebShareCommentsDeps): WebShareComm
      */
     verifiersFor: async (shareId) => {
       try {
-        const { members } = await api.listMembers(shareId);
+        const { members } = await api.listSigningKeys(shareId);
         const roster: Record<string, string> = {};
         for (const m of members) {
           if (typeof m.signingPublicKey === 'string' && m.signingPublicKey.length > 0) roster[m.memberId] = m.signingPublicKey;

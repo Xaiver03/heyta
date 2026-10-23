@@ -17,6 +17,7 @@
  * | DELETE | `/shares/:id/invitations/:invId` | owner | 吊销邀请 |
  * | POST | `/shares/invitations/accept` | 认证 | 凭 token 入群（带封装公钥；29 人上限） |
  * | GET  | `/shares/:id/members` | 成员 | 成员列表（含 identityPublicKey，owner 封信封要用） |
+ * | GET  | `/shares/:id/signing-keys` | 成员 | 签名名册（**含已移除的人**；读侧验签的唯一依据，面板不用它） |
  * | PATCH | `/shares/:id/members/:memberId` | owner | 改角色 |
  * | PUT | `/shares/:id/members/:memberId/envelope` | owner | 下发/更新密钥信封（rekey 的服务端落点） |
  * | PUT | `/shares/:id/members/:memberId/signing-key` | 成员**本人** | 发布逐 op 签名公钥（ADR-0069 裁决二：只补公钥，不动信封、不换世代、不产生 op） |
@@ -556,6 +557,40 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
         // AAD），发给任何人都解不开——成员由此拿到自己的清单密钥，
         // 不需要额外的"取信封"端点。
         keyEnvelope: m.keyEnvelope,
+      })),
+    });
+  });
+
+  /*
+   * ── 签名名册（成员可见；**含已移除的人**） ────────────────────────────────
+   *
+   * 🔴 为什么不复用 `GET /members`：那两个问题的答案不是一张表。
+   * 面板问的是"现在谁在这份清单里"（`removedAt: null`），读侧问的是"这份日志里那些署名的
+   * op **可能**是谁写的" —— 后者必须包含已经被移除的人：日志是追加式的，他写过的每一条
+   * 还在那本 log 里，而签名唯一能证明的正是"这条没被改过、是那一位写的"。
+   * 拿前一张表去答后一个问题，症状是**把人移出清单之后，他写过的东西连同他之后所有人的
+   * 改动一起读不出来**（游标停在第一条验不过的那格之前，界面上报"查不到作者登记的签名"），
+   * 而这条错误会被当成"有人在改我的数据"。判据在第 13 步的 `verify:collab-sync`。
+   *
+   * ⚠️ 这一枚只回公钥，不回信封、不回角色、也不回 userId：名册唯一该外溢的就是"这一行认哪把钥"。
+   * 公钥本来就是公开的（`/members` 早就把 `identityPublicKey` 发给成员了），而没自证的人回 `null`
+   * 是如实的形状 —— 不许拿别人的钥顶上（`share-verify.ts` 纪律 3）。
+   */
+  fastify.get('/shares/:shareId/signing-keys', { preHandler: authenticate }, async (req, reply) => {
+    const { shareId } = req.params as { shareId: string };
+    const lookup = await requireShareMember(req, reply, shareId);
+    if (!lookup.ok) return;
+    const members = await prisma.shareMember.findMany({
+      where: { shareId },
+      select: { id: true, signingPublicKey: true, removedAt: true },
+      orderBy: { addedAt: 'asc' },
+    });
+    return reply.send({
+      members: members.map((m) => ({
+        memberId: m.id,
+        signingPublicKey: m.signingPublicKey,
+        // 界面不画这一列，但诊断要能分清"这个人是现役成员还是已经退出的人"。
+        removed: m.removedAt !== null,
       })),
     });
   });

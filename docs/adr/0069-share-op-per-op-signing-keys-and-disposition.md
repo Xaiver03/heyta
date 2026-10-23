@@ -126,6 +126,18 @@ ADR-0067 裁决四的原话是「逐 op 签名要加 `signature` 字段（写侧
 - 报警落点复用现有那一族（"解不开/读不到"在界面上已有的具名失败位），**不新建第二套语义**。
 - 这条是"签名真正值钱的那一半"：服务端看不到明文，所以它**唯一**能对内容做的破坏就是改密文与改元数据；
   写侧验签挡不住它改自己库里的行，**只有读侧验签能**。（写侧验签的意义是别把伪造件收进日志去污染别人的读侧。）
+- 🔴 **修订（2026-10-23，M4-5 落地时撞到的那一格）：验签名单必须包含已被移除的成员。**
+  上面那句"拿成员表里的公钥验每一条"默认了"成员表 = 写过这条 log 的人"，而两件事并不相等：
+  面板问的是"**现在**谁在这份清单里"（`removedAt: null`），读侧问的是"这本 log 里那些署名的 op **可能**是谁写的"。
+  拿前者答后者 ⇒ 症状是**从"把某人移出清单"那一刻起，他写过的每一条连同其后所有人的改动一起读不出来**
+  （游标停在第一条 `signer-unregistered` 之前，界面上报一句"查不到作者登记的签名"——
+  而那句话会把人往"有人在改我的数据"上引）。这一形不是设想：建第 13 步验收时实测撞到，
+  变异臂 `roster-active-only`（`research/tools/mutation-rigs/mutate-collab-upload-gate.mjs`）就是它的常驻反证。
+  ⇒ 新增一枚**只回公钥**的端点 `GET /shares/:id/signing-keys`（现役 + 已移除，成员可见），读侧名单改取它；
+  `GET /members` 继续只答"现在谁在"。**为什么不给 `/members` 加一个 `includeRemoved` 开关**：那是一条端点答两个问题，
+  面板迟早会把退出的人画成现役成员（那是另一格错误），而这两份答案以后会各自漂移。
+  泄露面为零：公钥本来就是公开的（`/members` 早就把 `identityPublicKey` 发给成员了），
+  而这本 log 的存在与条数本来就可被成员看见。
 
 ### 六、存量不追签，新写入一律带签；无签上传直接永久拒绝
 
@@ -172,3 +184,39 @@ ADR-0067 裁决四的原话是「逐 op 签名要加 `signature` 字段（写侧
 3. 裁决四（服务端验签 + 具名码 + 客户端永久拒绝处置）。
 4. 裁决五（读侧三态 + 不物化 + 具名报警）。
 5. 裁决六（关掉无签通道：服务端拒无签上传 ⇒ 写侧必须真的会签，顺序上它必须在 3 之后、验收之前）。
+
+---
+
+## 实施记录（2026-10-23，M4 五批全部落地）
+
+**上面那五步都做到了，顺序也照走了。** 每层判据现在住在哪里（要复核就打这一列，别信本节的转述）：
+
+| 层 | 落点 | 常驻判据 | 能不能红，谁验过 |
+|---|---|---|---|
+| ① 纯函数（封闭词表 + 改一字节必被拒 + 域内每格各自被改都要红） | `packages/sync-core/src/share-keys.ts`（`buildShareOpSignatureMessage` / `signShareOpWire` / `classifyShareOpSignature`） | `cd packages/sync-core && pnpm test` | 变异臂见 `research/tools/mutation-rigs/README.md` 里 M4 那几行 |
+| ② 服务端上传边界（三种具名结局 + 永久拒绝=不落库） | `server/src/shares/share.routes.ts`（`SHARE_OP_SIGNATURE_CODES` + 逐 op 闸门） | `pnpm verify:collab-sync` 第 13 步（13.1–13.4） | `mutate-collab-upload-gate.mjs` 四臂 `ARMS=pass (4/4)` |
+| ③ 读侧 / 界面（三态、不物化、具名报警、游标不越过被拒那条） | `packages/app-host/src/share-verify.ts` + `apps/web/src/features/share/ShareSignatureNotice.tsx` | `cd packages/app-host && pnpm test`、`cd apps/web && pnpm test`、`pnpm verify:collab-sync` 第 13.5/13.6 步 | `mutate-collab-read-verify.mjs` 七臂 `ARMS=pass (7/7)` |
+| 裁决二那条"补发"腿（owner 那一行） | `PUT /shares/:id/members/:memberId/signing-key` | 第 13 步在建共享后第一件事就是打它 | 不在册 ⇒ 第 5 步立刻红（首跑实测就是这个形状） |
+
+**实施期间改口/新增的三格**（都是裁决文本没覆盖、被验收逼出来的，按"新写不改结论"的规矩登记在这里）：
+
+1. **验签名单必须含已移除成员** —— 见裁决五那条 🔴 修订。新增 `GET /shares/:id/signing-keys`，
+   web 的 `verifiersFor` 改取它；`verify-collab-sync.mjs` 的两处宿主同形。
+2. **签名域不含 `keyEpoch`**（裁决三实施时确认）：它在密文信封头 9 字节里自描述，而信封整体就是域里那枚
+   `payload` ⇒ 改世代必然改被签的字节。签名件因此不需要认识信封格式，替身加密器也签得出来。
+3. **`signature` 必须从**原始请求体**读**：`SuperSyncOperationSchema` 是 strip 的 `z.object`，
+   从校验后的对象读会永远读到 `undefined`，症状是"每一枚合法上传都被判成没签，而服务端一句错都不报"。
+
+**仍未做到的两格（如实，不当已完成）**：
+
+- 服务端可以**同时**抹掉 `signature` 与 `signer_member_id` 再下发 —— 那一行会被读侧读成"存量/未签名"而放过。
+  这一格不是 M4 的范围（它要的是"服务端不能改自己的库"，那落在 TLS/审计/可复现构建那一侧），
+  登记在这里是为了别让第 13 步的绿被读成"服务端作恶也被挡住了"。
+- 读侧拿不到名单时整轮拉取失败（具名抛错），评论区那一层今天把它渲染成"不画"：
+  ⇒ 本轮**只有"验不过"这一档在界面上有一句具名报警**，"取不到名单"那一档只有宿主层的名字，没有文案。
+  补它要连 i18n 两条 key 与那枚通知位一起判，不在 M4 的读数里。
+
+**验收读数**（现量，别抄本节数字）：
+`node scripts/verify-collab-sync.mjs` ⇒ 末行 `RESULT=OK steps=13`；
+`node scripts/verify-collab-revoke.mjs` / `-conflict.mjs` ⇒ `steps=8` / `steps=6`；
+`node research/tools/mutation-rigs/mutate-collab-upload-gate.mjs` ⇒ `ARMS=pass (4/4)`。

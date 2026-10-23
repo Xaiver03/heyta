@@ -34,6 +34,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
+import { publishSigningKey, signWireOp } from './lib/collab-sign.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = (() => {
@@ -164,14 +165,22 @@ step = 2;
 const created = await api('POST', '/api/shares', tokenOwner, {});
 if (created.status !== 201 || !created.json?.shareId) fail(`建共享失败：${JSON.stringify(created.json)?.slice(0, 200)}`);
 const shareId = created.json.shareId;
+const ownerMemberId = created.json.memberId;
 const ownerIdentity = core.deriveShareIdentityKeyPair(core.generateShareIdentitySeed());
 const listKeyV1 = core.generateShareListKey();
+// M4：上传边界只收带签的 op，而 owner 那一行的签名公钥只能由他自己自证（裁决二）。
+const ownerKeyPub = await publishSigningKey(api, {
+  shareId, memberId: ownerMemberId, token: tokenOwner,
+  ed25519PublicKey: ownerIdentity.ed25519PublicKey,
+});
+if (ownerKeyPub.status !== 200) fail(`owner 自证签名公钥失败：${JSON.stringify(ownerKeyPub.json)?.slice(0, 200)}`);
 const invitation = await api('POST', `/api/shares/${shareId}/invitations`, tokenOwner, {});
 if (invitation.status !== 201 || !invitation.json?.token) fail(`发邀请失败：${JSON.stringify(invitation.json)?.slice(0, 200)}`);
 const bobIdentity = core.deriveShareIdentityKeyPair(core.generateShareIdentitySeed());
 const accepted = await api('POST', '/api/shares/invitations/accept', tokenBob, {
   token: invitation.json.token,
   identityPublicKey: Buffer.from(bobIdentity.x25519PublicKey).toString('base64'),
+  signingPublicKey: Buffer.from(bobIdentity.ed25519PublicKey).toString('base64'),
 });
 if (accepted.status !== 200) fail(`接受邀请失败：${JSON.stringify(accepted.json)?.slice(0, 200)}`);
 const bobMemberId = accepted.json.memberId;
@@ -208,11 +217,21 @@ const identityB = {
 const envelopeA = await cipherOwner.encrypt(JSON.stringify({ title: 'A 版本' }), identityA);
 const envelopeB = await cipherBob.encrypt(JSON.stringify({ title: 'B 版本' }), identityB);
 // 同一条任务、两个身份，先后上行——share op-log 追加式，两条都接受。
+// M4：两条都由各自的成员**署名**上行（服务端拒无签，裁决六）——"并发"这件事与签名无关，
+// 两条都该收，所以这里也是"合法签名不会被误拒"的对照臂。
+const OWNER_SIGNER = { memberId: ownerMemberId, ed25519SecretKey: ownerIdentity.ed25519SecretKey };
+const BOB_SIGNER = { memberId: bobMemberId, ed25519SecretKey: bobIdentity.ed25519SecretKey };
 const upA = await api('POST', `/api/shares/${shareId}/ops`, tokenOwner, {
-  ops: [{ ...identityA, payload: envelopeA, vectorClock: { 'device-A1': 1 }, isPayloadEncrypted: true }],
+  ops: [signWireOp(core, {
+    shareId, ...OWNER_SIGNER,
+    op: { ...identityA, payload: envelopeA, vectorClock: { 'device-A1': 1 }, isPayloadEncrypted: true },
+  })],
 });
 const upB = await api('POST', `/api/shares/${shareId}/ops`, tokenBob, {
-  ops: [{ ...identityB, payload: envelopeB, vectorClock: { 'device-B1': 1 }, isPayloadEncrypted: true }],
+  ops: [signWireOp(core, {
+    shareId, ...BOB_SIGNER,
+    op: { ...identityB, payload: envelopeB, vectorClock: { 'device-B1': 1 }, isPayloadEncrypted: true },
+  })],
 });
 if (upA.status !== 200 || upA.json?.accepted?.length !== 1) fail(`owner 并发上行失败：${JSON.stringify(upA.json)?.slice(0, 200)}`);
 if (upB.status !== 200 || upB.json?.accepted?.length !== 1) fail(`bob 并发上行失败：${JSON.stringify(upB.json)?.slice(0, 200)}`);
@@ -274,7 +293,10 @@ const identityRestore = {
 };
 const restoreEnvelope = await cipherOwner.encrypt(JSON.stringify({ title: 'A 版本（已恢复）' }), identityRestore);
 const upRestore = await api('POST', `/api/shares/${shareId}/ops`, tokenOwner, {
-  ops: [{ ...identityRestore, payload: restoreEnvelope, vectorClock: { 'device-A1': 2 }, isPayloadEncrypted: true }],
+  ops: [signWireOp(core, {
+    shareId, ...OWNER_SIGNER,
+    op: { ...identityRestore, payload: restoreEnvelope, vectorClock: { 'device-A1': 2 }, isPayloadEncrypted: true },
+  })],
 });
 if (upRestore.status !== 200 || upRestore.json?.accepted?.length !== 1) fail(`恢复上行失败：${JSON.stringify(upRestore.json)?.slice(0, 200)}`);
 const historyAfter = await download(tokenOwner);
