@@ -106,7 +106,7 @@ afterEach(async () => {
 });
 
 describe('身份：新端点族全部要求令牌', () => {
-  it('没有 Authorization 头 → 401（15 条端点逐一遍历）', async () => {
+  it('没有 Authorization 头 → 401（16 条端点逐一遍历）', async () => {
     for (const [method, url] of [
       ['POST', '/api/shares'],
       ['GET', '/api/shares'],
@@ -118,6 +118,7 @@ describe('身份：新端点族全部要求令牌', () => {
       ['GET', '/api/shares/share-1/members'],
       ['PATCH', '/api/shares/share-1/members/member-1'],
       ['PUT', '/api/shares/share-1/members/member-1/envelope'],
+      ['PUT', '/api/shares/share-1/members/member-1/signing-key'],
       ['DELETE', '/api/shares/share-1/members/member-1'],
       ['POST', '/api/shares/share-1/transfer'],
       ['POST', '/api/shares/share-1/leave'],
@@ -494,6 +495,154 @@ describe('owner 专属动作', () => {
     expect(mocks.share.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { keyEpoch: 2 } }),
     );
+  });
+});
+
+describe('M4 逐 op 签名公钥在册（ADR-0069 裁决二）', () => {
+  const KEY_A = 'B'.repeat(43);
+  const KEY_B = 'C'.repeat(43);
+
+  // ── 接受邀请那一腿 ────────────────────────────────────────────────────────
+  it('接受邀请带签名公钥 ⇒ 新建的成员行把它和封装公钥一起存下', async () => {
+    mocks.shareInvitation.findUnique.mockResolvedValue({
+      id: 'inv-1', shareId: 'share-1', revokedAt: null, expiresAt: 9_999_999_999_999n,
+    });
+    mocks.share.findFirst.mockResolvedValue(activeShare);
+    mocks.shareMember.findFirst.mockResolvedValue(null);
+    mocks.shareMember.create.mockResolvedValue({ id: 'member-9', role: 'editor' });
+    const res = await app.inject({
+      method: 'POST', url: '/api/shares/invitations/accept', headers: AUTH,
+      payload: { token: 'token-abcdefabcdefabcdef', identityPublicKey: 'A'.repeat(43), signingPublicKey: KEY_A },
+    });
+    expect(res.statusCode).toBe(200);
+    const created = mocks.shareMember.create.mock.calls[0]![0].data;
+    expect(created.identityPublicKey).toBe('A'.repeat(43));
+    expect(created.signingPublicKey).toBe(KEY_A);
+  });
+
+  it('接受邀请没带签名公钥 ⇒ 存 null —— 服务端不替谁编一枚公钥', async () => {
+    mocks.shareInvitation.findUnique.mockResolvedValue({
+      id: 'inv-1', shareId: 'share-1', revokedAt: null, expiresAt: 9_999_999_999_999n,
+    });
+    mocks.share.findFirst.mockResolvedValue(activeShare);
+    mocks.shareMember.findFirst.mockResolvedValue(null);
+    mocks.shareMember.create.mockResolvedValue({ id: 'member-9', role: 'editor' });
+    const res = await app.inject({
+      method: 'POST', url: '/api/shares/invitations/accept', headers: AUTH,
+      payload: { token: 'token-abcdefabcdefabcdef', identityPublicKey: 'A'.repeat(43) },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(mocks.shareMember.create.mock.calls[0]![0].data.signingPublicKey).toBeNull();
+  });
+
+  it('老成员复用同一行、这次没带公钥 ⇒ 更新语句里不许出现这一格（清空 = 抹掉他的历史）', async () => {
+    mocks.shareInvitation.findUnique.mockResolvedValue({
+      id: 'inv-1', shareId: 'share-1', revokedAt: null, expiresAt: 9_999_999_999_999n,
+    });
+    mocks.share.findFirst.mockResolvedValue(activeShare);
+    mocks.shareMember.findFirst.mockResolvedValue({ ...memberAs('editor'), removedAt: 1n, signingPublicKey: KEY_A });
+    mocks.shareMember.update.mockResolvedValue({ ...memberAs('editor'), signingPublicKey: KEY_A });
+    const res = await app.inject({
+      method: 'POST', url: '/api/shares/invitations/accept', headers: AUTH,
+      payload: { token: 'token-abcdefabcdefabcdef', identityPublicKey: 'A'.repeat(43) },
+    });
+    expect(res.statusCode).toBe(200);
+    const data = mocks.shareMember.update.mock.calls[0]![0].data;
+    expect('signingPublicKey' in data).toBe(false);
+    expect(data.removedAt).toBeNull();
+  });
+
+  it('老成员复用同一行却带来**另一枚**公钥 ⇒ 409，且成员行一次都不写', async () => {
+    mocks.shareInvitation.findUnique.mockResolvedValue({
+      id: 'inv-1', shareId: 'share-1', revokedAt: null, expiresAt: 9_999_999_999_999n,
+    });
+    mocks.share.findFirst.mockResolvedValue(activeShare);
+    mocks.shareMember.findFirst.mockResolvedValue({ ...memberAs('editor'), removedAt: 1n, signingPublicKey: KEY_A });
+    const res = await app.inject({
+      method: 'POST', url: '/api/shares/invitations/accept', headers: AUTH,
+      payload: { token: 'token-abcdefabcdefabcdef', identityPublicKey: 'A'.repeat(43), signingPublicKey: KEY_B },
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe('SHARE_SIGNING_KEY_CONFLICT');
+    expect(mocks.shareMember.update).not.toHaveBeenCalled();
+    expect(mocks.shareInvitation.update).not.toHaveBeenCalled();
+  });
+
+  // ── 自证发布那一腿（本人、幂等、只补公钥） ────────────────────────────────
+  it('本人 PUT ⇒ 写的是调用者自己那一行，只动 signingPublicKey 一格', async () => {
+    mocks.share.findFirst.mockResolvedValue(activeShare);
+    mocks.shareMember.findFirst.mockResolvedValue(memberAs('owner'));
+    mocks.shareMember.update.mockResolvedValue({});
+    const res = await app.inject({
+      method: 'PUT', url: '/api/shares/share-1/members/member-1/signing-key', headers: AUTH,
+      payload: { signingPublicKey: KEY_A },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(mocks.shareMember.update).toHaveBeenCalledWith({
+      where: { id: 'member-1' }, data: { signingPublicKey: KEY_A },
+    });
+  });
+
+  it('owner 也挡不住：PUT 别人的 memberId ⇒ 404，一次写入都没有', async () => {
+    // 调用者本行是 owner —— 代填别人公钥的那扇门必须由这一条钉死，
+    // 否则「这条 op 是谁写的」的判定权就交给了第三方（服务端自己也算第三方）。
+    mocks.share.findFirst.mockResolvedValue(activeShare);
+    mocks.shareMember.findFirst.mockResolvedValue(memberAs('owner'));
+    const res = await app.inject({
+      method: 'PUT', url: '/api/shares/share-1/members/member-2/signing-key', headers: AUTH,
+      payload: { signingPublicKey: KEY_A },
+    });
+    expect(res.statusCode).toBe(404);
+    expect(mocks.shareMember.update).not.toHaveBeenCalled();
+  });
+
+  it('已在册再 PUT 一枚不同的 ⇒ 409，不覆盖', async () => {
+    mocks.share.findFirst.mockResolvedValue(activeShare);
+    mocks.shareMember.findFirst.mockResolvedValue({ ...memberAs('editor'), signingPublicKey: KEY_A });
+    const res = await app.inject({
+      method: 'PUT', url: '/api/shares/share-1/members/member-1/signing-key', headers: AUTH,
+      payload: { signingPublicKey: KEY_B },
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().code).toBe('SHARE_SIGNING_KEY_CONFLICT');
+    expect(mocks.shareMember.update).not.toHaveBeenCalled();
+  });
+
+  it('同值重发 ⇒ 200（补发失败后的重试走同一条路径，不该要求客户端分辨）', async () => {
+    mocks.share.findFirst.mockResolvedValue(activeShare);
+    mocks.shareMember.findFirst.mockResolvedValue({ ...memberAs('editor'), signingPublicKey: KEY_A });
+    mocks.shareMember.update.mockResolvedValue({});
+    const res = await app.inject({
+      method: 'PUT', url: '/api/shares/share-1/members/member-1/signing-key', headers: AUTH,
+      payload: { signingPublicKey: KEY_A },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().signingPublicKey).toBe(KEY_A);
+  });
+
+  it('公钥形状不对（解不出 32 字节）⇒ 400，不落库', async () => {
+    mocks.share.findFirst.mockResolvedValue(activeShare);
+    mocks.shareMember.findFirst.mockResolvedValue(memberAs('editor'));
+    const res = await app.inject({
+      method: 'PUT', url: '/api/shares/share-1/members/member-1/signing-key', headers: AUTH,
+      payload: { signingPublicKey: 'nope' },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(mocks.shareMember.update).not.toHaveBeenCalled();
+  });
+
+  // ── 读回 ───────────────────────────────────────────────────────────────────
+  it('成员列表把 signingPublicKey 读回来，没在册的那一行如实是 null', async () => {
+    mocks.share.findFirst.mockResolvedValue(activeShare);
+    mocks.shareMember.findFirst.mockResolvedValue(memberAs('editor'));
+    mocks.shareMember.findMany.mockResolvedValue([
+      { ...memberAs('owner'), userId: 1n, addedAt: 1n, keyEnvelope: null, memberKeyEpoch: 1, identityPublicKey: 'pub-A', signingPublicKey: KEY_A },
+      { ...memberAs('editor'), id: 'member-2', userId: 2n, addedAt: 2n, keyEnvelope: null, memberKeyEpoch: 1, identityPublicKey: 'pub-B', signingPublicKey: null },
+    ]);
+    const res = await app.inject({ method: 'GET', url: '/api/shares/share-1/members', headers: AUTH });
+    const body = res.json();
+    expect(body.members[0].signingPublicKey).toBe(KEY_A);
+    expect(body.members[1].signingPublicKey).toBeNull();
   });
 });
 

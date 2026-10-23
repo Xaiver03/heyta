@@ -19,6 +19,7 @@
  * | GET  | `/shares/:id/members` | 成员 | 成员列表（含 identityPublicKey，owner 封信封要用） |
  * | PATCH | `/shares/:id/members/:memberId` | owner | 改角色 |
  * | PUT | `/shares/:id/members/:memberId/envelope` | owner | 下发/更新密钥信封（rekey 的服务端落点） |
+ * | PUT | `/shares/:id/members/:memberId/signing-key` | 成员**本人** | 发布逐 op 签名公钥（ADR-0069 裁决二：只补公钥，不动信封、不换世代、不产生 op） |
  * | DELETE | `/shares/:id/members/:memberId` | owner | 移除成员（`removedAt` 置位 + 信封作废；rekey 由 owner 客户端执行） |
  * | POST | `/shares/:id/transfer` | owner | 转让所有权（换 owner + 原 owner 降 editor，一个事务） |
  * | POST | `/shares/:id/leave` | 非 owner 成员 | 退出（自己的信封当场作废） |
@@ -90,6 +91,10 @@ export const SHARE_ERROR_CODES = {
   /** B-10：转让的接收方手里没有**当前世代**的清单钥（信封为空，或世代落后）。
    * 单独一枚码而不是 `ROLE_FORBIDDEN` —— 那是"你没资格操作"，这是"对方现在解不开"。 */
   TRANSFER_TARGET_UNSEALED: 'SHARE_TRANSFER_TARGET_UNSEALED',
+  /** ADR-0069 裁决二：签名公钥只有「首次发布」这一种写法。已在册且不同 ⇒ 冲突。
+   * 不换签名钥不是偷懒：换钥会让读侧**再也分不出**这个人前后的 op 各是谁的钥验的，
+   * 而"补发公钥"这一格只需要"从没有到有"。 */
+  SIGNING_KEY_CONFLICT: 'SHARE_SIGNING_KEY_CONFLICT',
 } as const;
 
 const toMs = (value: unknown): number | null => {
@@ -104,6 +109,23 @@ const sha256Hex = (value: string): string =>
 const isBase64Url32Bytes = (value: unknown): value is string =>
   typeof value === 'string' && /^[A-Za-z0-9_-]{43}$/.test(value);
 
+/** Curve25519 的两把钥都是 32 字节（X25519 封装钥 / Ed25519 签名钥），编码同为 base64(url)。 */
+const decodesTo32Bytes = (value: string): boolean => {
+  try {
+    const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+    return Buffer.from(normalized, 'base64').length === 32;
+  } catch {
+    return false;
+  }
+};
+
+const publicKey32Schema = (label: string) =>
+  z
+    .string()
+    .min(43)
+    .max(44)
+    .refine(decodesTo32Bytes, `${label} must decode to 32 bytes`);
+
 // ── 请求 schema ────────────────────────────────────────────────────────────
 
 const CreateShareSchema = z.object({}).strict();
@@ -116,18 +138,20 @@ const CreateInvitationSchema = z.object({
 const AcceptInvitationSchema = z.object({
   token: z.string().min(20).max(128),
   /** 成员的 X25519 封装公钥（base64/base64url，解码后 32 字节）—— owner 封信封的唯一依据。 */
-  identityPublicKey: z
-    .string()
-    .min(43)
-    .max(44)
-    .refine((value) => {
-      try {
-        const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
-        return Buffer.from(normalized, 'base64').length === 32;
-      } catch {
-        return false;
-      }
-    }, 'identityPublicKey must decode to 32 bytes'),
+  identityPublicKey: publicKey32Schema('identityPublicKey'),
+  /**
+   * 同一个人的 Ed25519 **签名**公钥（ADR-0069 裁决二）。
+   *
+   * 🔴 可选，因为它是**新加的那一维**：老客户端不带它入群照旧能用，只是它的 op
+   * 从此会被上传边界的验签拒掉（裁决六：不追签、新写入无签 ⇒ 永久拒绝）。
+   * 服务端不许"顺手代填"——公钥只能由持有私钥的那一方发出来。
+   */
+  signingPublicKey: publicKey32Schema('signingPublicKey').optional(),
+});
+
+/** 成员自证发布签名公钥（本人、幂等、只写这一格）。 */
+const PutSigningKeySchema = z.object({
+  signingPublicKey: publicKey32Schema('signingPublicKey'),
 });
 
 const PatchMemberSchema = z.object({ role: z.string().min(1).max(16) });
@@ -157,7 +181,7 @@ const DownloadShareOpsQuerySchema = z.object({
 
 interface ShareMemberContext {
   share: { id: string; ownerUserId: number; keyEpoch: number; lastServerSeq: number };
-  member: { id: string; role: string; userId: number };
+  member: { id: string; role: string; userId: number; signingPublicKey: string | null };
 }
 
 type MemberLookup =
@@ -193,7 +217,7 @@ const requireShareMember = async (
       keyEpoch: share.keyEpoch,
       lastServerSeq: share.lastServerSeq,
     },
-    member: { id: member.id, role: member.role, userId: Number(member.userId) },
+    member: { id: member.id, role: member.role, userId: Number(member.userId), signingPublicKey: member.signingPublicKey },
   };
 };
 
@@ -218,6 +242,23 @@ type ValidatedShareOp = z.infer<typeof SuperSyncOperationSchema>;
 /** 活跃成员计数（含 owner）—— 29 人上限（MAX_SHARE_MEMBERS 含 owner）的依据。 */
 const countActiveMembers = async (shareId: string): Promise<number> =>
   prisma.shareMember.count({ where: { shareId, removedAt: null } });
+
+/**
+ * 签名公钥只有一个合法写法：**从「没有」到「有」**（ADR-0069 裁决二）。
+ *
+ * 已在册且不同 ⇒ 冲突，而不是覆盖。理由不是"谨慎"：读侧拿成员名册里当前那枚公钥
+ * 去验这个人**过去**的每一条 op，静默换钥会把历史全部翻成"验不过"，
+ * 而"这个人换了把钥"这件事在协议上没有任何地方能说出来。
+ * 真到了要换签名钥的那天，得先给读侧一个可判定的世代（翻案条件见 ADR-0069 §六）。
+ * 相同 ⇒ 幂等成功（补发重试是同一条路径）。
+ */
+const writeSigningKey = (
+  current: string | null | undefined,
+  incoming: string,
+): { ok: true; value: string } | { ok: false } => {
+  if (current === null || current === undefined || current === incoming) return { ok: true, value: incoming };
+  return { ok: false };
+};
 
 export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
   // ── 创建共享 ────────────────────────────────────────────────────────────
@@ -405,6 +446,12 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
     if (activeCount >= MAX_SHARE_MEMBERS) {
       return reply.code(403).send({ code: SHARE_ERROR_CODES.MEMBER_LIMIT, message: 'Share is full' });
     }
+    // 复用同一行的老成员带来自证公钥时，走的是「补发」那条规则：已在册且不同 ⇒ 冲突。
+    // 检查放在任何写之前 —— 半写入的成员行比一次 409 难查得多。
+    if (existing && parsed.data.signingPublicKey !== undefined &&
+        !writeSigningKey(existing.signingPublicKey, parsed.data.signingPublicKey).ok) {
+      return reply.code(409).send({ code: SHARE_ERROR_CODES.SIGNING_KEY_CONFLICT, message: 'Signing key already registered' });
+    }
     const now = BigInt(Date.now());
     // 曾经被移除的人经新邀请回来：复用同一行（唯一约束 [shareId,userId]），
     // 清掉移除标记、更新公钥与角色 —— 移除历史保留在 removedAt 之前的值里
@@ -416,6 +463,11 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
             removedAt: null,
             role: 'editor',
             identityPublicKey: parsed.data.identityPublicKey,
+            // 没带签名公钥时**不清空**已有值：这一格是「补发」（裁决二），
+            // 而清空会让读侧再也验不了这个人此前所有 op 的签名。
+            ...(parsed.data.signingPublicKey !== undefined
+              ? { signingPublicKey: parsed.data.signingPublicKey }
+              : {}),
             memberKeyEpoch: share.keyEpoch,
             addedAt: now,
           },
@@ -427,6 +479,7 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
             userId,
             role: 'editor',
             identityPublicKey: parsed.data.identityPublicKey,
+            signingPublicKey: parsed.data.signingPublicKey ?? null,
             memberKeyEpoch: share.keyEpoch,
             addedAt: now,
           },
@@ -462,6 +515,12 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
         memberKeyEpoch: m.memberKeyEpoch,
         // 公钥本来就是公开的；owner 需要它来封信封。
         identityPublicKey: m.identityPublicKey,
+        /**
+         * Ed25519 签名公钥 —— 读侧靠它把「这条 op 是谁写的」钉死（ADR-0069 裁决三/五）。
+         * `null` 是**如实**的形状：这个人还没自证，他此前的 op 一律读成「未签名」，
+         * 不许在这里填个看起来能用的东西把三态压成两态。
+         */
+        signingPublicKey: m.signingPublicKey,
         // 信封本身对成员可见：它是封给**那一行成员**的密文（收方指纹绑进
         // AAD），发给任何人都解不开——成员由此拿到自己的清单密钥，
         // 不需要额外的"取信封"端点。
@@ -528,6 +587,42 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
         await prisma.share.update({ where: { id: shareId }, data: { keyEpoch } });
       }
       return reply.send({ memberId, memberKeyEpoch: keyEpoch });
+    },
+  );
+
+  // ── 签名公钥自证发布（成员**本人**；ADR-0069 裁决二） ──────────────────────
+  fastify.put(
+    '/shares/:shareId/members/:memberId/signing-key',
+    { preHandler: authenticate },
+    async (req, reply) => {
+      const { shareId, memberId } = req.params as { shareId: string; memberId: string };
+      const lookup = await requireShareMember(req, reply, shareId);
+      if (!lookup.ok) return;
+      /*
+       * 🔴 只能写自己那一行，且**不是** owner 的管理腿。
+       * `PATCH role` / `PUT envelope` 是 owner 的（他替别人持信封），但签名公钥代表
+       * "这把私钥的主人是谁" —— 由别人代填等于把「这条 op 是谁写的」的判定权交给第三方，
+       * 而这一枚签名恰恰是用来对抗第三方的（对抗的就是服务端）。
+       * 别人的 memberId 一律 404：与"非成员看不到清单"同形，不泄露这一行存在。
+       */
+      if (memberId !== lookup.member.id) {
+        return reply.code(404).send({ code: SHARE_ERROR_CODES.NOT_FOUND, message: 'Member not found' });
+      }
+      const parsed = PutSigningKeySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ code: 'validation_failed', message: 'Validation failed', details: parsed.error.issues });
+      }
+      const write = writeSigningKey(lookup.member.signingPublicKey, parsed.data.signingPublicKey);
+      if (!write.ok) {
+        return reply.code(409).send({ code: SHARE_ERROR_CODES.SIGNING_KEY_CONFLICT, message: 'Signing key already registered' });
+      }
+      await prisma.shareMember.update({
+        where: { id: lookup.member.id },
+        data: { signingPublicKey: write.value },
+      });
+      // 幂等重试走同一条路径（重发同一枚公钥 ⇒ 同一次 update ⇒ 同一个响应），
+      // 所以这里不需要"已发布就直接返回"的分支——两个分支会各自漂移。
+      return reply.send({ memberId: lookup.member.id, signingPublicKey: write.value });
     },
   );
 

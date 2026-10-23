@@ -286,6 +286,7 @@ describe('op signatures', () => {
     clientId: 'client-1',
     shareId: SHARE_A,
     keyEpoch: 1,
+    signerMemberId: 'member-1',
     actionType: 'edit task',
     opType: 'UPD',
     entityType: 'TASK',
@@ -314,6 +315,7 @@ describe('op signatures', () => {
     ['clientId', { clientId: 'client-9' }],
     ['shareId', { shareId: SHARE_B }],
     ['keyEpoch', { keyEpoch: 2 }],
+    ['signerMemberId', { signerMemberId: 'member-2' }],
     ['actionType', { actionType: 'delete task' }],
     ['opType', { opType: 'DEL' }],
     ['entityType', { entityType: 'NOTE' }],
@@ -361,6 +363,7 @@ describe('op signatures', () => {
     const withNulls = buildShareOpSignatureMessage({
       ...baseParts,
       actionType: null, opType: null, entityType: null, entityId: null,
+      signerMemberId: null,
       entityIds: null, schemaVersion: null, clientTimestamp: null, vectorClock: null,
     });
     expect(hex(withoutOptionals)).toBe(hex(withNulls));

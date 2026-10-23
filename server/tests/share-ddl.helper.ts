@@ -35,7 +35,29 @@ export const shareDdlFromMigration = (): string => {
 };
 
 /**
- * 干净 PGlite 实例里的四张表 + 全部约束。
+ * 逐 op 签名（ADR-0069 / M4）那次迁移的目录名。同一条纪律：只在这里写死一次，
+ * 三枚新列的形状一律从**发布中的迁移文件**读，不手抄。
+ */
+export const SHARE_SIGNATURE_MIGRATION_DIR = '20261023000000_share_op_signatures';
+
+/** 这一批要落地的三枚列，少一枚就是锚点失效（不是"这次测试不需要它"）。 */
+const REQUIRED_SIGNATURE_COLUMNS = ['"signing_public_key"', '"signer_member_id"', '"signature"'] as const;
+
+export const shareSignatureDdlFromMigration = (): string => {
+  const sql = readFileSync(join(migrationsDir, SHARE_SIGNATURE_MIGRATION_DIR, 'migration.sql'), 'utf8');
+  const missing = REQUIRED_SIGNATURE_COLUMNS.filter((c) => !sql.includes(`ADD COLUMN IF NOT EXISTS ${c}`));
+  if (missing.length > 0) {
+    throw new Error(
+      `${SHARE_SIGNATURE_MIGRATION_DIR}/migration.sql 里找不到这些列：${missing.join(', ')}。\n` +
+        '   🔴 同上：更新锚点，不要放宽检查。',
+    );
+  }
+  return sql;
+};
+
+/**
+ * 干净 PGlite 实例里的四张表 + 全部约束 + M4 的三枚签名列。
  * `MINIMAL_USERS_DDL` 是替身不是抄本（外键唯一需要的是 users 主键）。
  */
-export const SHARE_SCHEMA_DDL = `${MINIMAL_USERS_DDL}\n${shareDdlFromMigration()}`;
+export const SHARE_SCHEMA_DDL =
+  `${MINIMAL_USERS_DDL}\n${shareDdlFromMigration()}\n${shareSignatureDdlFromMigration()}`;
