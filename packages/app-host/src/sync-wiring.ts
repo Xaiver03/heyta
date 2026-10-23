@@ -192,6 +192,11 @@ export interface RealtimeWiringOptions {
    * 个人同步不受影响。
    */
   onNewShareOps?: (shareId: string, latestSeq: number) => void;
+  /**
+   * 收到"某份共享清单的成员面变了"时调用（`share_roster_changed`，ADR-0070）。
+   * 参数只有 `shareId`。可选 —— 不传就是没接，其余信号与个人同步不受影响。
+   */
+  onShareRosterChanged?: (shareId: string) => void;
   /** WebSocket 实现。默认 `globalThis.WebSocket`；原生宿主用它注入平台能力。 */
   WebSocketImpl?: WebSocketFactory;
 }
@@ -214,6 +219,9 @@ export function createHostRealtimeClient(options: RealtimeWiringOptions): Realti
     clientId: options.engine.getClientId(),
     onNewOps: options.onNewOps,
     ...(options.onNewShareOps === undefined ? {} : { onNewShareOps: options.onNewShareOps }),
+    ...(options.onShareRosterChanged === undefined
+      ? {}
+      : { onShareRosterChanged: options.onShareRosterChanged }),
     ...(options.WebSocketImpl !== undefined ? { WebSocketImpl: options.WebSocketImpl } : {}),
   });
 }

@@ -149,6 +149,15 @@ export {
   type ReminderDeliveryOptions,
   type ReminderDeliveryPort,
 } from './reminder-delivery.js';
+export {
+  MAX_WAKE_SLEEP_MS,
+  deliverForegroundReminders,
+  startForegroundReminderLoop,
+  type ForegroundDeliveryResult,
+  type ForegroundReminderLabels,
+  type ForegroundReminderLoopOptions,
+  type ReminderForegroundPort,
+} from './reminder-foreground.js';
 
 /**
  * 便签动作（幻觉 #12「笔记模块」的写路径）。
@@ -1058,4 +1067,5 @@ export * from './share-conflicts.js';
 export * from './conflict-routing.js';
 export * from './share-rekey.js';
 export * from './share-signals.js';
+export * from './share-roster-signals.js';
 export * from './share-signing-key.js';

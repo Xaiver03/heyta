@@ -24,7 +24,7 @@
  * 被移除的成员 ⇒ `shareDetail` 403 ⇒ 显示「已不在成员列表」，**不假装还在**。
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 
 import { cssVar, ICON_SIZE } from '@heyta/design-system';
@@ -51,6 +51,7 @@ import { createWebAuthFetch } from '../../lib/central-fetch.js';
 import { text } from '../../lib/text.js';
 import { forgetShareLocally, publishShareSigningKey, shareTransferFailure, type ShareTransferFailure } from '@heyta/app-host';
 import { clearStorageShareLog } from './comment-actions.js';
+import { registerShareRosterTarget } from '../../lib/share-signal-sink.js';
 import { resetWebShareSession } from './share-session.js';
 import { createWebShareKeyRotation } from './share-rotation.js';
 import {
@@ -222,7 +223,6 @@ export function ShareFeature(props: ShareFeatureProps) {
   const [inviteBusy, setInviteBusy] = useState(false);
   const [needsUnlock, setNeedsUnlock] = useState(false);
   const [copied, setCopied] = useState<'token' | 'link' | undefined>();
-  const pollRef = useRef<number | undefined>(undefined);
 
   const api = useMemo(() => {
     if (baseUrl.trim() === '' || token === undefined || token.trim() === '') return undefined;
@@ -344,9 +344,16 @@ export function ShareFeature(props: ShareFeatureProps) {
   useEffect(() => {
     if (phase.kind !== 'panel') return;
     void reload(phase.shareId);
-    // 轮询：邀请接受/信封下发都发生在另一端，面板开着的时候每 3s 对一次账。
-    pollRef.current = window.setInterval(() => { void reload(phase.shareId); }, 3000);
-    return () => { if (pollRef.current !== undefined) window.clearInterval(pollRef.current); };
+    /*
+     * ADR-0070：成员面（邀请被接受、信封下发、角色、签名公钥自证、移除、退出、转让）
+     * 由服务端那条 `share_roster_changed` 驱动重取，**不再有每 3s 一次的 GET**。
+     *
+     * 🔴 撤掉定时器不等于撤掉两条补发链：`autoSeal` 与 `ensureSigningKey` 都挂在 `members`
+     * 上，而 `members` 只由这里的 `reload` 写。所以「信号 → reload → 那两个 effect」
+     * 是它们现在唯一的驱动路径 —— 这一条断了的话，症状是"信封永远补不出去"，
+     * 而界面上完全看不出来（判据：apps/web/tests/share-roster-signal.spec.tsx）。
+     */
+    return registerShareRosterTarget(phase.shareId, async () => { await reload(phase.shareId); });
   }, [phase.kind, phase.kind === 'panel' ? phase.shareId : '', reload]);
 
   // members 变化 ⇒ 尝试补发信封（幂等：有信封且世代新的跳过）。

@@ -454,6 +454,33 @@ export class WebSocketConnectionService {
     }
   }
 
+  /**
+   * 成员名册变化信号（ADR-0070）：share 的**成员可见状态**动过了 —— 有人接受邀请、
+   * 角色被改、信封下发、签名公钥自证、被移除、退出、所有权转让。
+   *
+   * 与 `notifyShareOps` 同一条安全契约：只说「这份清单的成员面动过」，
+   * **永远不带名单、不带内容、不带序号**。客户端收到后自己去重取详情与名册。
+   *
+   * 🔴 不排除发起方（`notifyShareOps` 那条 `excludeClientId` 在这里故意没有对应物）：
+   * 同一账号的**另一台**设备同样需要知道名册变了，而服务端只有 userId 维度的连接表，
+   * 按 clientId 排除会把那台一起排掉。发起方这一台多一次幂等重取，比"只有我操作的这台在动"便宜。
+   */
+  notifyShareRosterChanged(userIds: number[], shareId: string): void {
+    if (userIds.length === 0) return;
+    const message = {
+      type: 'share_roster_changed',
+      shareId,
+      timestamp: Date.now(),
+    };
+    for (const userId of userIds) {
+      const userSet = this.connections.get(userId);
+      if (!userSet) continue;
+      for (const client of userSet) {
+        this._sendMessage(client.ws, message);
+      }
+    }
+  }
+
   private _sendNewOpsNotification(
     userId: number,
     excludeClientId: string | null,

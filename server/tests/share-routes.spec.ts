@@ -48,6 +48,8 @@ const mocks = vi.hoisted(() => ({
     findMany: vi.fn(),
   },
   wsNotifyShareOps: vi.fn(),
+  /** ADR-0070 的成员面信号。与上面那枚**分开数**：两条语义不同，合并成一枚就再也判不出"发错条"。 */
+  wsNotifyShareRoster: vi.fn(),
   // 转让所有权（W6）用数组式事务：mock 只需把操作数组并发跑掉，断言看的是
   // 各 update 的调用参数（含顺序 —— 三处写的先后由路由保证，mock 不改变它）。
   $transaction: vi.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
@@ -56,7 +58,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../src/db', () => ({ prisma: mocks }));
 
 vi.mock('../src/sync/services/websocket-connection.service', () => ({
-  getWsConnectionService: () => ({ notifyShareOps: mocks.wsNotifyShareOps }),
+  getWsConnectionService: () => ({
+    notifyShareOps: mocks.wsNotifyShareOps,
+    notifyShareRosterChanged: mocks.wsNotifyShareRoster,
+  }),
 }));
 
 import { shareRoutes } from '../src/shares/share.routes';
@@ -332,6 +337,9 @@ describe('🔴 role 硬门（POST /shares/:id/ops）', () => {
     expect(inserted.map((r) => r.serverSeq)).toEqual([6, 7]);
     // WS 信号只带 shareId 与序号，不带任何 op 内容。
     expect(mocks.wsNotifyShareOps).toHaveBeenCalledWith([1, 2], 'share-1', 'client-a', 7);
+    // 🔴 ADR-0070：op 上传**不**发成员面信号 —— "日志多了第 N 条内容"与"名册/信封/公钥变了"
+    // 是两条语义，客户端那条闸门各自只认自己那一条；并进一条会让面板为每条评论重取名册。
+    expect(mocks.wsNotifyShareRoster).not.toHaveBeenCalled();
   });
 
   it('同一批里合法与非法混合：各走各的（一条坏的不能拖死一批）', async () => {
@@ -1034,5 +1042,210 @@ describe('GET /api/shares', () => {
       { shareId: 'share-1', ownerId: 1, keyEpoch: 1, role: 'owner', memberKeyEpoch: 1, hasEnvelope: true },
     ]);
     expect(body.removedMemberships).toEqual([{ shareId: 'share-old', removedAt: 5 }]);
+  });
+});
+
+/**
+ * ADR-0070：成员面九条写路径各发一条 `share_roster_changed`，且**只在这九条**上发。
+ *
+ * 判据按"这一条信号有没有人等"写：
+ *  · 每条成功路径都必须发 —— 少任何一条，撤掉面板与入群对话框那两枚轮询之后，
+ *    对应那件事就退化成"刷新页面才看得到"（界面上不报错，纯静默）。
+ *  · op 上传路径**不许**发成员面信号 —— 它有自己的那条（语义是"日志多了第 N 条"）。
+ *  · 失败路径（401/403/404/409/410）一条都不发 —— 名册没变。
+ *  · 名单是**写之后**查的 ⇒ 被移除/退出的人不在扇出里。
+ *  · 扇出炸了不许把写结果一起带走。
+ */
+describe('ADR-0070 成员面信号（share_roster_changed）', () => {
+  const twoMembers = [{ userId: 1n }, { userId: 2n }];
+
+  beforeEach(() => {
+    /*
+     * 🔴 必须先清 `findFirst` 的 Once 链再排自己的：Once 队列**优先于** `mockResolvedValue`，
+     * 而前面那些 describe 的 `beforeEach` 会往里排两三条（转让那一族排的就是 owner + 接收方）。
+     * 不排干净的话，这一组读到的是上一族留下的那"第 N 个人"，
+     * 症状读起来像产品坏了 —— owner 却被判 403（我第一趟就是这么红的）。
+     */
+    mocks.share.findFirst.mockReset();
+    mocks.shareMember.findFirst.mockReset();
+    mocks.shareMember.findMany.mockReset();
+    mocks.shareMember.update.mockReset();
+    mocks.shareMember.count.mockReset();
+    mocks.shareMember.create.mockReset().mockImplementation(
+      async (args: { data: { id: string; role: string } }) => ({ id: args.data.id, role: args.data.role }),
+    );
+    mocks.shareInvitation.create.mockReset();
+    mocks.shareInvitation.update.mockReset();
+    mocks.shareInvitation.updateMany.mockReset();
+    mocks.shareInvitation.findUnique.mockReset();
+  });
+
+  it('发邀请 ⇒ 发给当前成员（owner 另一台设备也在同一 userId 下）', async () => {
+    mocks.share.findFirst.mockResolvedValue(activeShare);
+    mocks.shareMember.findFirst.mockResolvedValue(memberAs('owner'));
+    mocks.shareMember.findMany.mockResolvedValue([{ userId: 1n }]);
+    mocks.shareInvitation.create.mockResolvedValue({ id: 'inv-1', expiresAt: 1n });
+    const res = await app.inject({
+      method: 'POST', url: '/api/shares/share-1/invitations', headers: AUTH, payload: {},
+    });
+    expect(res.statusCode).toBe(201);
+    expect(mocks.wsNotifyShareRoster).toHaveBeenCalledWith([1], 'share-1');
+    expect(mocks.wsNotifyShareOps, '成员面变化不是 op 信号').not.toHaveBeenCalled();
+  });
+
+  it('吊销邀请 ⇒ 发（邀请列表也是面板那一份详情里的东西）', async () => {
+    mocks.share.findFirst.mockResolvedValue(activeShare);
+    mocks.shareMember.findFirst.mockResolvedValue(memberAs('owner'));
+    mocks.shareMember.findMany.mockResolvedValue(twoMembers);
+    mocks.shareInvitation.updateMany.mockResolvedValue({ count: 1 });
+    const res = await app.inject({
+      method: 'DELETE', url: '/api/shares/share-1/invitations/inv-1', headers: AUTH,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(mocks.wsNotifyShareRoster).toHaveBeenCalledWith([1, 2], 'share-1');
+  });
+
+  it('接受邀请 ⇒ 发（owner 那台等着看见新人，新人自己的其余设备也是）', async () => {
+    mocks.shareInvitation.findUnique.mockResolvedValue({
+      id: 'inv-1', shareId: 'share-1', revokedAt: null, expiresAt: 9_999_999_999_999n,
+    });
+    mocks.share.findFirst.mockResolvedValue(activeShare);
+    mocks.shareMember.findFirst.mockResolvedValue(null);
+    mocks.shareMember.count.mockResolvedValue(1);
+    mocks.shareMember.create.mockResolvedValue({ id: 'member-9', role: 'editor' });
+    mocks.shareMember.findMany.mockResolvedValue(twoMembers);
+    const res = await app.inject({
+      method: 'POST', url: '/api/shares/invitations/accept', headers: AUTH,
+      payload: { token: 'token-abcdefabcdefabcdef', identityPublicKey: 'A'.repeat(43) },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(mocks.wsNotifyShareRoster).toHaveBeenCalledWith([1, 2], 'share-1');
+  });
+
+  it('改角色 ⇒ 发（被改者那一台要立刻知道自己的新档位）', async () => {
+    mocks.share.findFirst.mockResolvedValue(activeShare);
+    mocks.shareMember.findFirst
+      .mockResolvedValueOnce(memberAs('owner'))
+      .mockResolvedValueOnce({ ...memberAs('editor'), id: 'member-2' });
+    mocks.shareMember.update.mockResolvedValue({});
+    mocks.shareMember.findMany.mockResolvedValue(twoMembers);
+    const res = await app.inject({
+      method: 'PATCH', url: '/api/shares/share-1/members/member-2', headers: AUTH,
+      payload: { role: 'viewer' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(mocks.wsNotifyShareRoster).toHaveBeenCalledWith([1, 2], 'share-1');
+  });
+
+  it('🔴 信封下发 ⇒ 发。这是入群对话框那枚轮询撤掉后唯一的驱动', async () => {
+    mocks.share.findFirst.mockResolvedValue(activeShare);
+    mocks.shareMember.findFirst
+      .mockResolvedValueOnce(memberAs('owner'))
+      .mockResolvedValueOnce({ ...memberAs('editor'), id: 'member-2' });
+    mocks.shareMember.update.mockResolvedValue({});
+    mocks.share.update.mockResolvedValue({});
+    mocks.shareMember.findMany.mockResolvedValue(twoMembers);
+    const res = await app.inject({
+      method: 'PUT', url: '/api/shares/share-1/members/member-2/envelope', headers: AUTH,
+      payload: { keyEpoch: 2, keyEnvelope: { recipientFingerprint: 'x', ciphertext: 'y' } },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(mocks.wsNotifyShareRoster).toHaveBeenCalledWith([1, 2], 'share-1');
+  });
+
+  it('签名公钥自证 ⇒ 发（别人手里那份验签名册靠它才不是死的）', async () => {
+    mocks.share.findFirst.mockResolvedValue(activeShare);
+    mocks.shareMember.findFirst.mockResolvedValue({ ...memberAs('owner'), signingPublicKey: null });
+    mocks.shareMember.update.mockResolvedValue({});
+    mocks.shareMember.findMany.mockResolvedValue(twoMembers);
+    const res = await app.inject({
+      method: 'PUT', url: '/api/shares/share-1/members/member-1/signing-key', headers: AUTH,
+      payload: { signingPublicKey: 'B'.repeat(43) },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(mocks.wsNotifyShareRoster).toHaveBeenCalledWith([1, 2], 'share-1');
+  });
+
+  it('移除成员 ⇒ 发的名单里**不含**被移除者（名单是写之后查的）', async () => {
+    mocks.share.findFirst.mockResolvedValue(activeShare);
+    mocks.shareMember.findFirst
+      .mockResolvedValueOnce(memberAs('owner'))
+      .mockResolvedValueOnce({ ...memberAs('editor'), id: 'member-2' });
+    mocks.shareMember.update.mockResolvedValue({});
+    mocks.shareMember.findMany.mockResolvedValue([{ userId: 1n }]);
+    const res = await app.inject({
+      method: 'DELETE', url: '/api/shares/share-1/members/member-2', headers: AUTH,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(mocks.wsNotifyShareRoster).toHaveBeenCalledWith([1], 'share-1');
+  });
+
+  it('退出 ⇒ 发给剩下的人（含 owner），退出者自己不在内', async () => {
+    mocks.share.findFirst.mockResolvedValue(activeShare);
+    mocks.shareMember.findFirst.mockResolvedValue({ ...memberAs('editor'), id: 'member-2', userId: 2n });
+    mocks.shareMember.update.mockResolvedValue({});
+    mocks.shareMember.findMany.mockResolvedValue([{ userId: 1n }]);
+    const res = await app.inject({ method: 'POST', url: '/api/shares/share-1/leave', headers: AUTH });
+    expect(res.statusCode).toBe(200);
+    expect(mocks.wsNotifyShareRoster).toHaveBeenCalledWith([1], 'share-1');
+  });
+
+  it('转让 ⇒ 发，且在事务提交之后才发（半途发出去别人会读到双 owner）', async () => {
+    const targetEditor = {
+      ...memberAs('editor'), id: 'member-2', userId: 2n,
+      keyEnvelope: { alg: 'x25519-xsalsa20-poly1305', ct: 'sealed' }, memberKeyEpoch: 1,
+    };
+    mocks.share.findFirst.mockResolvedValue(activeShare);
+    mocks.shareMember.findFirst
+      .mockResolvedValueOnce(memberAs('owner'))
+      .mockResolvedValueOnce(targetEditor);
+    mocks.share.update.mockResolvedValue({});
+    mocks.shareMember.update.mockResolvedValue({});
+    mocks.shareMember.findMany.mockResolvedValue(twoMembers);
+    const res = await app.inject({
+      method: 'POST', url: '/api/shares/share-1/transfer', headers: AUTH, payload: { memberId: 'member-2' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(mocks.$transaction, '信号必须在事务之后').toHaveBeenCalledTimes(1);
+    expect(mocks.wsNotifyShareRoster).toHaveBeenCalledWith([1, 2], 'share-1');
+  });
+
+  it('创建清单只影响本人 ⇒ 不发成员面信号（本人的其余设备走个人 op-log）', async () => {
+    mocks.shareMember.findFirst.mockResolvedValue(null);
+    const created = await app.inject({ method: 'POST', url: '/api/shares', headers: AUTH, payload: {} });
+    expect(created.statusCode).toBe(201);
+    expect(mocks.wsNotifyShareRoster).not.toHaveBeenCalled();
+  });
+
+  it('被拒的写一条都不发：editor 发邀请 403、转让不合格接收方 409', async () => {
+    mocks.share.findFirst.mockResolvedValue(activeShare);
+    mocks.shareMember.findFirst.mockResolvedValue(memberAs('editor'));
+    const forbidden = await app.inject({
+      method: 'POST', url: '/api/shares/share-1/invitations', headers: AUTH, payload: {},
+    });
+    expect(forbidden.statusCode).toBe(403);
+    expect(mocks.wsNotifyShareRoster).not.toHaveBeenCalled();
+
+    mocks.shareMember.findFirst
+      .mockReset()
+      .mockResolvedValueOnce(memberAs('owner'))
+      .mockResolvedValueOnce({ ...memberAs('editor'), id: 'member-2', keyEnvelope: null });
+    const unsealed = await app.inject({
+      method: 'POST', url: '/api/shares/share-1/transfer', headers: AUTH, payload: { memberId: 'member-2' },
+    });
+    expect(unsealed.statusCode).toBe(409);
+    expect(mocks.wsNotifyShareRoster).not.toHaveBeenCalled();
+  });
+
+  it('🔴 扇出炸了（名单查询失败）⇒ 写结果不受影响，也不许把 500 抛给调用方', async () => {
+    mocks.share.findFirst.mockResolvedValue(activeShare);
+    mocks.shareMember.findFirst.mockResolvedValue(memberAs('owner'));
+    mocks.shareInvitation.create.mockResolvedValue({ id: 'inv-1', expiresAt: 1n });
+    mocks.shareMember.findMany.mockRejectedValue(new Error('ws fanout blew up'));
+    const res = await app.inject({
+      method: 'POST', url: '/api/shares/share-1/invitations', headers: AUTH, payload: {},
+    });
+    expect(res.statusCode).toBe(201);
+    expect(mocks.wsNotifyShareRoster).not.toHaveBeenCalled();
   });
 });

@@ -561,3 +561,94 @@ describe('createRealtimeClient — new_share_ops', () => {
     client.dispose();
   });
 });
+
+/**
+ * ADR-0070：服务端 `share_roster_changed`（某份清单的**成员面**变了）。
+ *
+ * 与上面那组同一条纪律：这一层只做"形状合格就把 `shareId` 原样交出去"。
+ * 差别在载荷形状 —— 这条**没有** `latestSeq` 可校验：名册水位不是服务端该替本机记的东西，
+ * 而"成员面变了"这件事本身没有序号语义。所以形状判据只有 `shareId` 一格。
+ *
+ * 四臂各钉一种坏法：并错通道（把成员变化当个人 new_ops 跑一遍全量同步）、
+ * 形状不合格照叫、老宿主被新事件炸、宿主回调抛错掀掉连接。
+ */
+describe('createRealtimeClient — share_roster_changed', () => {
+  const connect = async (opts: Record<string, unknown>) => {
+    const client = createRealtimeClient({
+      ...BASE_OPTIONS,
+      getToken: () => 't',
+      WebSocketImpl: FakeWebSocket,
+      ...opts,
+    });
+    client.connect();
+    await flush();
+    return { client, ws: FakeWebSocket.instances[0] };
+  };
+
+  it('🔴 合格的信号 ⇒ 把 shareId 交给 onShareRosterChanged，且不串到个人通道与 op 通道', async () => {
+    const seen: string[] = [];
+    let personal = 0;
+    let opsSignal = 0;
+    const { client, ws } = await connect({
+      onNewOps: () => { personal += 1; },
+      onNewShareOps: () => { opsSignal += 1; },
+      onShareRosterChanged: (shareId: string) => { seen.push(shareId); },
+    });
+
+    ws?.emitMessage(JSON.stringify({ type: 'share_roster_changed', shareId: 'share-9', timestamp: 1 }));
+    expect(seen).toEqual(['share-9']);
+    expect(personal, '成员面变化不该触发个人全量同步').toBe(0);
+    expect(opsSignal, '名册变了不是日志多了内容 —— 两条通道不许互相顶包').toBe(0);
+    client.dispose();
+  });
+
+  it('🔴 shareId 缺失或不是字符串 ⇒ 一次都不叫（形状不合格的信号等于没有信号）', async () => {
+    let calls = 0;
+    const { client, ws } = await connect({
+      onShareRosterChanged: () => { calls += 1; },
+    });
+    expect(() => {
+      ws?.emitMessage(JSON.stringify({ type: 'share_roster_changed', timestamp: 1 }));
+      ws?.emitMessage(JSON.stringify({ type: 'share_roster_changed', shareId: 42 }));
+      ws?.emitMessage(JSON.stringify({ type: 'share_roster_changed', shareId: null }));
+    }).not.toThrow();
+    expect(calls).toBe(0);
+    client.dispose();
+  });
+
+  it('老宿主没传 onShareRosterChanged ⇒ 静默忽略，连接与另两条通道照旧（降级不是破坏）', async () => {
+    const ops: string[] = [];
+    const personal: number[] = [];
+    const { client, ws } = await connect({
+      onNewOps: (latestSeq: number) => { personal.push(latestSeq); },
+      onNewShareOps: (shareId: string) => { ops.push(shareId); },
+    });
+    expect(() => {
+      ws?.emitMessage(JSON.stringify({ type: 'share_roster_changed', shareId: 'share-1' }));
+    }).not.toThrow();
+    ws?.emitMessage(JSON.stringify({ type: 'new_share_ops', shareId: 'share-1', latestSeq: 3 }));
+    ws?.emitMessage(JSON.stringify({ type: 'new_ops', latestSeq: 11 }));
+    expect(ops).toEqual(['share-1']);
+    expect(personal).toEqual([11]);
+    client.dispose();
+  });
+
+  it('宿主回调抛错 ⇒ 不许掀连接，下一条仍然进得来', async () => {
+    let calls = 0;
+    const { client, ws } = await connect({
+      onShareRosterChanged: () => {
+        calls += 1;
+        throw new Error('宿主自己的渲染炸了');
+      },
+    });
+    expect(() => {
+      ws?.emitMessage(JSON.stringify({ type: 'share_roster_changed', shareId: 'share-1' }));
+    }).not.toThrow();
+    expect(calls).toBe(1);
+    expect(() => {
+      ws?.emitMessage(JSON.stringify({ type: 'share_roster_changed', shareId: 'share-2' }));
+    }).not.toThrow();
+    expect(calls).toBe(2);
+    client.dispose();
+  });
+});
