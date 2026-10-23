@@ -18,16 +18,31 @@
  *   1. 导航那个「登录」的 href 必须**就是**应用地址且带那个参数 —— 参数名不是抄的，
  *      是从**同一页上另一条同源链接**（页头那颗）与 URL 本身推出来的；
  *   2. 点下去之后**先只看到一张浮层**（首启隐私那一层），答完决定之后
- *      **认证表单真的可见**（`auth-form-email` 是四端共用的字段契约，
- *      不是 web 恰好这么写的 DOM）—— 这两步合起来才是用户那句"直接进入到登录界面"，
- *      而第一步单独成判据是因为**叠两层模态**是这次改动自己引入的形状（见下面 ②）；
- *   3. `/signin/` 那一页**没有说明性小节**，但主行动仍然在（防止"删过头"变成空页）；
- *   4. 那段说明在 `/docs/account/` 上**读得到**（needle 来自被搬走的那句话本身）；
- *   5. 出口按钮与页脚那条链接在**同一列**（参照物取自同一页，不引入像素阈值）。
+ *      **中央登录面板真的可见**（central 模式：官方站的认证能力由中央 OIDC 提供，
+ *      `server/docs/authentication.md`「任何故障不得降级本地认证」——
+ *      所以 accept 之后不再是本地邮箱表单，而是 central-auth-panel）；
+ *   3. 条款同意未勾选时，发起登录的按钮必须是**禁用**的（"没同意就发起"没有入口）；
+ *   4. 勾选后点下去**真的离开 heyta、落在中央授权域**（POST start ⇒ 303 ⇒ 中央登录页）——
+ *      这一条钉的是"按钮不是摆设"，也是线上链路端到端活的唯一证据；
+ *   5. `/signin/` 那一页**没有说明性小节**，但主行动仍然在（防止"删过头"变成空页）；
+ *   6. 那段说明在 `/docs/account/` 上**读得到**（needle 来自被搬走的那句话本身）；
+ *   7. 出口按钮与页脚那条链接在**同一列**（参照物取自同一页，不引入像素阈值）。
  *
  * ⚠️ 与 `apps/landing/tests/` 的分工：那边钉"代码会渲染出什么"，
  * 这里钉"线上那份产物渲染出了什么"。两边都要 —— 只有前者会漏"没发布"，
  * 只有后者会漏"根本没做"。
+ *
+ * ## 2026-10-23 修订记录（central 模式上线后）
+ *
+ * 原判据断的是 accept 之后 `auth-form-email` 可见（本地邮箱表单时代的形状）。
+ * 服务端配上 OIDC（`HEYTA_AUTH_*` 七变量，见 `.handoff/2026-10-23-heyta-oidc-wiring.md`）
+ * 之后，官方站 accept 隐私后渲染的是 **central-auth-panel**：本地表单在官方站
+ * 不再出现（服务端启动约束 official ⇒ oidc，local 被禁止）。
+ * 判据按"同一条用户意图"改写，不降低强度：
+ *   · auth-form-email 可见 ⇒ central-auth-panel 可见（官方站的登录界面就是它）；
+ *   · 新增：未勾选条款时提交禁用（防"没同意就发起"）；
+ *   · 新增：点提交后离开 heyta 落在中央授权域（原判据只到"表单可见"，
+ *     这一条把"按钮能走完全程"钉住——2026-10-23 实测 POST start 200 ⇒ 303 中央）。
  */
 
 import { expect, test, type Page } from '@playwright/test';
@@ -41,16 +56,23 @@ const ORIGIN = process.env['HEYTA_LIVE_ORIGIN'] ?? 'https://heyta.waytofuture.cn
  */
 const SHOT_DIR = 'live-signin-results';
 
-/** 控制台与页面错误收集器 —— 必须在 `goto` **之前**挂上（AGENTS §6.2 规定一第 3 条）。 */
-function attachLogs(page: Page): string[] {
-  const logs: string[] = [];
-  page.on('console', (message) => {
-    logs.push(`[console.${message.type()}] ${message.text()}`);
-  });
-  page.on('pageerror', (error) => {
-    logs.push(`[pageerror] ${error.message}`);
-  });
-  return logs;
+/** 控制台与页面错误收集器 —— 必须在 `goto` **之前**挂上（AGENTS §6.2 规定一第 3 条）。
+ *
+ * `stop()` 不是洁癖：点「发起登录」之后浏览器会**主动离开 heyta** 去中央授权域，
+ * 中央登录页自己的请求（未登录会话探测回 401 之类）不是 heyta 的错。
+ * 不摘掉监听器的话，那些错误会算在 heyta 账上 —— 一条永远说不清的冤案。
+ */
+function attachLogs(page: Page): { lines: string[]; stop: () => void } {
+  const lines: string[] = [];
+  const onConsole = (message: { type: () => string; text: () => string }) => {
+    lines.push(`[console.${message.type()}] ${message.text()}`);
+  };
+  const onPageError = (error: Error) => {
+    lines.push(`[pageerror] ${error.message}`);
+  };
+  page.on('console', onConsole);
+  page.on('pageerror', onPageError);
+  return { lines, stop: () => { page.off('console', onConsole); page.off('pageerror', onPageError); } };
 }
 
 /**
@@ -105,22 +127,38 @@ test('线上「登录」：点一次就到登录界面，中途不落在那段�
   await expect(page.locator('[data-testid="auth-form-email"]')).toHaveCount(0);
   await page.screenshot({ path: `${SHOT_DIR}/live-2a-first-visit-consent.png` });
 
-  // 答完之后，登录表单真的出现 —— 而不是永远不兑现。
+  // 答完之后，**官方站的登录界面**真的出现 —— 而不是永远不兑现。
+  // central 模式（2026-10-23 起，见文件头修订记录）：它是 central-auth-panel，
+  // 本地邮箱表单在官方站按设计不再出现。
   await page.locator('[data-testid="privacy-consent-accept"]').first().click();
-  await expect(page.locator('[data-testid="auth-form-email"]').first()).toBeVisible({
-    timeout: 30_000,
-  });
-  await page.waitForTimeout(600);
-  await page.screenshot({ path: `${SHOT_DIR}/live-2b-signin-panel.png` });
+  const panel = page.locator('[data-testid="central-auth-panel"]').first();
+  await expect(panel).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('[data-testid="auth-form-email"]')).toHaveCount(0);
 
-  // 邮箱、密码与登录提交按钮必须真实可见，排除空壳或隐藏表单。
-  await expect(page.locator('[data-testid="auth-form-password"]').first()).toBeVisible();
-  await expect(page.locator('[data-testid="auth-form-submit"]').first()).toBeVisible();
+  // 条款同意与发起按钮：**没勾就不能发**。这一条挡的是"界面画了个勾选器、
+  // 实际上点按钮直接走"的形状 —— 同意必须是发起的前置，不是装饰。
+  const centralConsent = page.locator('[data-testid="central-auth-consent"]').first();
+  await expect(centralConsent).toBeVisible();
+  await expect(centralConsent).not.toBeChecked();
+  const centralSubmit = page.locator('[data-testid="central-auth-submit"]').first();
+  await expect(centralSubmit).toBeDisabled();
+  await centralConsent.check();
+  await expect(centralSubmit).toBeEnabled();
+  await page.screenshot({ path: `${SHOT_DIR}/live-2b-central-panel.png` });
 
   // 地址此刻仍然带着那个参数（说明这不是"跳错了地方恰好有个表单"）。
   expect(new URL(page.url()).searchParams.has('signin')).toBe(true);
 
-  const noisy = logs.filter((line) => line.startsWith('[console.error]') || line.startsWith('[pageerror]'));
+  // 点下去**真的走完全程的第一段**：离开 heyta、落在中央授权域。
+  // （POST /api/auth/oidc/start 200 ⇒ 303 ⇒ 中央登录页；2026-10-23 实测。）
+  // 到中央登录页即证明 heyta 侧链路（config → session → CSRF → start）全程活。
+  await centralSubmit.click();
+  await page.waitForURL(/waytofuture\.cn/, { timeout: 30_000 });
+  await page.screenshot({ path: `${SHOT_DIR}/live-2c-central-authorize.png` });
+
+  // 主动离开 heyta 之前把监听器摘掉：中央域的请求结果不算 heyta 的账（见 attachLogs）。
+  logs.stop();
+  const noisy = logs.lines.filter((line) => line.startsWith('[console.error]') || line.startsWith('[pageerror]'));
   expect(noisy, `控制台有错误：\n${noisy.join('\n')}`).toEqual([]);
 });
 
@@ -146,14 +184,27 @@ test('线上英文页同一条路（语言参数不能把 signin 挤掉）', asy
     timeout: 60_000,
   });
   await page.locator('[data-testid="privacy-consent-accept"]').first().click();
-  await expect(page.locator('[data-testid="auth-form-email"]').first()).toBeVisible({
-    timeout: 30_000,
-  });
+  // central 模式：英文页同样落在中央登录面板（见中文那条的修订记录）。
+  const panel = page.locator('[data-testid="central-auth-panel"]').first();
+  await expect(panel).toBeVisible({ timeout: 30_000 });
   // 界面确实跟着切到英文 —— 否则"参数带上了但语言丢了"这条判据就没牙。
   await expect(page.locator('html')).toHaveAttribute('lang', /^en/);
-  await page.screenshot({ path: `${SHOT_DIR}/live-3-signin-panel-en.png` });
+  // 条款同意未勾选时发起按钮禁用（与中文页同一条判据）。
+  const centralConsent = page.locator('[data-testid="central-auth-consent"]').first();
+  await expect(centralConsent).not.toBeChecked();
+  const centralSubmit = page.locator('[data-testid="central-auth-submit"]').first();
+  await expect(centralSubmit).toBeDisabled();
+  await centralConsent.check();
+  await expect(centralSubmit).toBeEnabled();
+  await page.screenshot({ path: `${SHOT_DIR}/live-3-central-panel-en.png` });
 
-  const noisy = logs.filter((line) => line.startsWith('[console.error]') || line.startsWith('[pageerror]'));
+  // 英文页也真的能发起：离开 heyta 落在中央授权域。
+  await centralSubmit.click();
+  await page.waitForURL(/waytofuture\.cn/, { timeout: 30_000 });
+  await page.screenshot({ path: `${SHOT_DIR}/live-3c-central-authorize-en.png` });
+
+  logs.stop();
+  const noisy = logs.lines.filter((line) => line.startsWith('[console.error]') || line.startsWith('[pageerror]'));
   expect(noisy, `控制台有错误：\n${noisy.join('\n')}`).toEqual([]);
 });
 
@@ -207,6 +258,7 @@ test('线上 /signin/ 只剩出口，那段说明在文档中心读得到', asyn
   await expect(page.locator('#main').getByText('没有密码')).toHaveCount(0);
   await page.screenshot({ path: `${SHOT_DIR}/live-5-docs-account.png` });
 
-  const noisy = logs.filter((line) => line.startsWith('[console.error]') || line.startsWith('[pageerror]'));
+  logs.stop();
+  const noisy = logs.lines.filter((line) => line.startsWith('[console.error]') || line.startsWith('[pageerror]'));
   expect(noisy, `控制台有错误：\n${noisy.join('\n')}`).toEqual([]);
 });

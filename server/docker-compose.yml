@@ -109,6 +109,28 @@ services:
       - SUPERSYNC_DEFAULT_STORAGE_QUOTA_BYTES=${SUPERSYNC_DEFAULT_STORAGE_QUOTA_BYTES:-}
       - OLD_OPS_CLEANUP_DELETE_BATCH_SIZE=${OLD_OPS_CLEANUP_DELETE_BATCH_SIZE:-5000}
       - OLD_OPS_CLEANUP_MAX_DELETED_PER_RUN=${OLD_OPS_CLEANUP_MAX_DELETED_PER_RUN:-25000}
+      # 🔴 中央统一登录（OIDC）—— 官方实例专用，2026-10-23 接入。
+      #
+      # `environment:` 是白名单：这一组七枚键**必须**逐条列在这里，`.env` 里填了
+      # 而这里没列 = 容器一个都看不到（本文件 PASSWORD_PEPPER 那条注释警告过的
+      # 同一形状；check:server-env 钉的就是这条）。
+      #
+      # 不设时回落到自托管默认（self-hosted + local）：官方站不配这一组，
+      # 四端登录入口显示「统一登录暂时不可用」——2026-10-23 线上实测过整整一天。
+      # 全设或全不设：设一半启动期硬错误（server/src/central-auth/config.ts）。
+      #
+      # ⚠️ 用无冒号 `${KEY-default}`：未设置时回落到默认值；`.env` 里显式写成
+      #    空串会**原样传空串**进容器 ⇒ config.ts 抛错（fail-loud，不静默降级）。
+      #    `official` + `local` 组合同样启动失败（官方站不许降级本机口令）。
+      - HEYTA_AUTH_DEPLOYMENT=${HEYTA_AUTH_DEPLOYMENT-self-hosted}
+      - HEYTA_AUTH_MODE=${HEYTA_AUTH_MODE-local}
+      # 下面五枚来自中央身份方的客户端登记；secret 是 43 字符，绝不要提交进仓库。
+      # SESSION_ENCRYPTION_KEY 必须是独立 64-hex（≠ JWT_SECRET）：openssl rand -hex 32
+      - HEYTA_OIDC_ISSUER=${HEYTA_OIDC_ISSUER-}
+      - HEYTA_OIDC_CLIENT_ID=${HEYTA_OIDC_CLIENT_ID-}
+      - HEYTA_OIDC_CLIENT_SECRET=${HEYTA_OIDC_CLIENT_SECRET-}
+      - HEYTA_OIDC_REDIRECT_URI=${HEYTA_OIDC_REDIRECT_URI-}
+      - HEYTA_OIDC_SESSION_ENCRYPTION_KEY=${HEYTA_OIDC_SESSION_ENCRYPTION_KEY-}
       # 🔧 heyta 改动：统一支付中心（同公司晓黎支付中心，heyta 作为又一个 client 接入 —— ADR-0017 §3.3）。
       #
       # 🔴 这一组以前**不在 compose 里**：`config.ts` 认这四枚键，而 `environment:` 是白名单，

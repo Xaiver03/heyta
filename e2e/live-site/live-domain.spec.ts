@@ -185,6 +185,26 @@ test('英文落地页的入口带 ?lang=en（否则英文访客进应用看到�
   expect(hard, `页面抛了未捕获异常：\n${hard.join('\n')}`).toEqual([]);
 });
 
+/**
+ * 🔴 2026-10-23 central 模式修订。
+ *
+ * 原判据（local 时代）：旧本机凭据入口同源活着 —— `/api/login/passkey/options`
+ * 返回 `rpId`，且 RP ID 必须等于当前域名（passkey 的同源前提）。
+ *
+ * 服务端配上中央 OIDC（`HEYTA_AUTH_*` 七变量）之后，官方站的旧身份凭据入口
+ * **按设计在副作用前 409**（`server/docs/authentication.md`：「官方模式旧身份
+ * 凭据入口在副作用前409」，2026-10-23 线上实测）：`/api/login/passkey/options`、
+ * `/verify-email`、`recover-passkey`、`/magic-login` 全部回
+ * `{"code":"central_authentication_required"}`。本地 passkey 在官方站不再存在
+ * （账号归中央管），"RP ID 跟着域名"这条判据失去了对象。
+ *
+ * 新判据钉两件事，合起来才是 central 时代的「同源」：
+ *   ① 旧入口**诚实地关着**：409 + 机器可读 code —— 而不是假页面、假表单、
+ *      「看起来能用的死按钮」；
+ *   ② 中央链路同源活着：页面内 fetch `/api/auth/central/config` 200 且 mode=oidc。
+ * `/verify-email` 的两条原断言保留：409 JSON 同样满足"不是落地页 + 不是 200"，
+ * 而那两条钉的是 nginx 代理形状（被 SPA 兜底吞掉时返回 200 + 落地页 HTML）。
+ */
 test('凭据页与 API 与站点同域（同源是 passkey 的前提）', async ({ page }) => {
   const logs = attachLogs(page);
   await page.goto(`${ORIGIN}/`, { waitUntil: 'domcontentloaded' });
@@ -195,18 +215,24 @@ test('凭据页与 API 与站点同域（同源是 passkey 的前提）', async 
     const health = (await fetch(`${origin}/health`).then((r) => r.json())) as { status?: string };
     const verify = await fetch(`${origin}/verify-email`);
     const verifyText = await verify.text();
-    const options = (await fetch(`${origin}/api/login/passkey/options`, {
+    // 官方模式：旧本机凭据入口按设计关闭（副作用前 409）。
+    const passkey = await fetch(`${origin}/api/login/passkey/options`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'probe@example.com' }),
-    }).then((r) => r.json())) as { rpId?: string };
+    });
+    const passkeyBody = (await passkey.json().catch(() => ({}))) as { code?: string };
+    // central 时代的同源判据本体：中央配置接口从**本站页面内**可取、且是 oidc。
+    const central = (await fetch(`${origin}/api/auth/central/config`).then((r) => r.json())) as { mode?: string };
     return {
       healthStatus: health.status,
       verifyStatus: verify.status,
-      // 凭据页必须是**服务端渲染的页面**。被落地页的 SPA 兜底吞掉时
+      // 凭据页必须是**服务端给出的诚实响应**。被落地页的 SPA 兜底吞掉时
       // 返回的是 200 + 落地页 HTML —— 不报错，只是"点登录打开了官网"。
       verifyIsLandingHtml: verifyText.includes('id="root"'),
-      rpId: options.rpId,
+      passkeyStatus: passkey.status,
+      passkeyCode: passkeyBody.code,
+      centralMode: central.mode,
     };
   }, ORIGIN);
 
@@ -215,7 +241,11 @@ test('凭据页与 API 与站点同域（同源是 passkey 的前提）', async 
   expect(probe.healthStatus, '/health 没代理到同步服务端').toBe('ok');
   expect(probe.verifyIsLandingHtml, '/verify-email 被落地页 SPA 兜底吞了').toBe(false);
   expect(probe.verifyStatus, '/verify-email 应当是服务端的诚实失败').not.toBe(200);
-  expect(probe.rpId, 'WebAuthn RP ID 没跟着域名一起换').toBe(new URL(ORIGIN).host);
+  expect(probe.passkeyStatus, '官方站旧 passkey 入口应按设计 409 关闭').toBe(409);
+  expect(probe.passkeyCode, '409 的 body 必须是机器可读的 central_authentication_required').toBe(
+    'central_authentication_required',
+  );
+  expect(probe.centralMode, '中央登录链路不可用，或不是 oidc 模式').toBe('oidc');
 
   const hard = hardErrors(logs);
   expect(hard, `页面抛了未捕获异常：\n${hard.join('\n')}`).toEqual([]);
@@ -406,47 +436,50 @@ test('PWA 资产在 /app/ 子路径下拿到真身，且 SW 真的注册成功',
 });
 
 /**
- * 🔴 凭据页在真浏览器里**不许有 JS 报错**，按钮必须真的有反应。
+ * 🔴 2026-10-23 central 模式修订。
  *
- * 这条来自一次**真实报障**（2026-09-30）：用户点邮件里的登录链接，
- * 页面出来了、按钮**点了完全没反应**，控制台是
+ * 原判据（local 时代）：`/magic-login?token=…` 渲染一页真实的魔法登录确认页，
+ * body 上带 data-token、`#login-btn` 点了有反应（无效 token ⇒ 显示错误状态）、
+ * 全程无未捕获异常。它来自一次真实报障（2026-09-30：脚本跑在 `<body>` 前，
+ * `document.body.dataset` TypeError，用户看到"按钮点了没反应"）。
  *
- * ```
- * magic-login-confirm.js:15 Uncaught TypeError:
- *   Cannot read properties of null (reading 'dataset')
- * ```
+ * 服务端配上中央 OIDC 之后，官方站**不再渲染这页**：`/magic-login` 直接回
+ * 409 `central_authentication_required`（旧入口按设计关闭，账号归中央管）。
+ * 原判据的三个对象（data-token / #login-btn / 错误状态）在官方站都不存在了。
  *
- * 根因是脚本被渲染在 `<head>` 里且没有 `defer` —— 同步执行时 `<body>` 还没解析，
- * `document.body` 是 `null`。服务端的单测已经钉住了脚本位置（`server-i18n-design.spec.ts`），
- * 但**只有真浏览器能证明"没有报错、按钮确实有反应"** —— 所以这里再验一层。
- *
- * ⚠️ 用**无效 token**：页面照常渲染，点按钮会走一次注定失败的 POST。
- *    我们要的是"它有反应"（显示出错状态），而不是"登录成功"。
+ * 新判据钉 official 模式的诚实形状，并配阳性对照（本仓规矩：负向断言必须配阳性）：
+ *   ① `/magic-login?token=…` ⇒ 409 + 机器可读 code（不是假页面、不是旧表单）；
+ *   ② 页面全程零未捕获异常（原判据第三条，仍然有效且更重要 —— 诚实的 409
+ *      不许以一段 JS 崩掉的方式给出）；
+ *   ③ 阳性对照：中央链路同源活着（`/api/auth/central/config` 200 + oidc）——
+ *      「旧的关了」加上「新的活着」才构成证据，单独一条 409 可以是整站坏掉。
  */
-test('凭据页脚本无 JS 报错，且按钮真的有反应', async ({ page }) => {
+test('官方站旧魔法登录入口按设计关闭（409），中央链路同源活着', async ({ page }) => {
   const logs = attachLogs(page);
 
-  await page.goto(`${ORIGIN}/magic-login?token=definitely-invalid-token`, {
-    waitUntil: 'domcontentloaded',
-  });
+  // 必须先落在**本站页面**上：about:blank 里发出的 fetch 是跨域的，
+  // 会被 CORS 拦掉 —— 那验到的是浏览器策略，不是服务端形状。
+  await page.goto(`${ORIGIN}/`, { waitUntil: 'domcontentloaded' });
 
-  // ① 脚本的启动前提成立：body 上有 data-token（也就是脚本没在 body 之前跑）
-  const hasToken = await page.evaluate(() => document.body?.dataset.token !== undefined);
-  expect(hasToken, 'body.dataset.token 取不到 —— 脚本多半又在 <body> 之前就跑了').toBe(true);
+  const probe = await page.evaluate(async (origin: string) => {
+    const magic = await fetch(`${origin}/magic-login?token=definitely-invalid-token`);
+    const magicBody = (await magic.text()) as string;
+    const central = (await fetch(`${origin}/api/auth/central/config`).then((r) => r.json())) as { mode?: string };
+    return { magicStatus: magic.status, magicCode: magicBody, centralMode: central.mode };
+  }, ORIGIN);
 
-  await page.screenshot({ path: `${SHOT_DIR}/live-magic-login.png` });
-  console.log(`📷 魔法登录页：${SHOT_DIR}/live-magic-login.png`);
+  console.log(`PROBE: ${JSON.stringify({ ...probe, magicCode: probe.magicCode.slice(0, 80) })}`);
 
-  // ② 点按钮：必须真的有反应（无效 token ⇒ 出现错误状态），而不是"点了没反应"
-  await page.locator('#login-btn').click();
-  await expect(page.locator('#error')).toBeVisible({ timeout: 20_000 });
+  expect(probe.magicStatus, '官方站旧魔法登录入口应按设计 409 关闭').toBe(409);
+  expect(probe.magicCode).toContain('central_authentication_required');
+  expect(probe.centralMode, '中央登录链路不可用，或不是 oidc 模式').toBe('oidc');
 
-  // ③ 全程不许有未捕获异常 —— 这一条就是报障里那个 TypeError 的判据
+  // ③ 全程不许有未捕获异常（原报障判据，仍然有效）
   const hard = logs.filter((l) => l.startsWith('[pageerror]'));
   console.log(`控制台共 ${String(logs.length)} 条：\n  ${logs.join('\n  ')}`);
   expect(
     hard,
-    `凭据页抛了未捕获异常（用户看到的就是"按钮点了没反应"）：\n${hard.join('\n')}`,
+    `凭据入口崩了未捕获异常（用户看到的就是"按钮点了没反应"）：\n${hard.join('\n')}`,
   ).toEqual([]);
 });
 
