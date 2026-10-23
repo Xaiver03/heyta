@@ -1,22 +1,24 @@
 {
-  "version": "1.0.0",
-  "releasedAt": "2026-10-07T12:24:21+08:00",
+  "version": "1.0.1-test.20261023.1",
+  "releasedAt": "2026-10-23T12:28:16+00:00",
   "files": {
     "android": {
-      "name": "heyta-1.0.0-android.apk",
-      "url": "https://dl.waytofuture.cn/app-releases/heyta/latest/heyta-1.0.0-android.apk",
-      "versionedUrl": "https://dl.waytofuture.cn/app-releases/heyta/1.0.0/heyta-1.0.0-android.apk",
-      "sha256": "f8c2b40b84615af864f23e68584cc7878dd3d308b5314ad0992bda962a03faea",
-      "size": 67196357,
-      "version": "1.0.0"
+      "name": "heyta-1.0.1-test.20261023.1-android.apk",
+      "url": "https://dl.waytofuture.cn/app-releases/heyta/latest/heyta-1.0.1-test.20261023.1-android.apk",
+      "versionedUrl": "https://dl.waytofuture.cn/app-releases/heyta/1.0.1-test.20261023.1/heyta-1.0.1-test.20261023.1-android.apk",
+      "sha256": "e7235659114452732b5ff254837389700ad3f67952ae7643d1a3b18be03c7a0c",
+      "size": 69649064,
+      "version": "1.0.1-test.20261023.1",
+      "releasedAt": "2026-10-23T12:28:16+00:00"
     },
     "linux": {
-      "name": "heyta-1.0.0-linux.deb",
-      "url": "https://dl.waytofuture.cn/app-releases/heyta/latest/heyta-1.0.0-linux.deb",
-      "versionedUrl": "https://dl.waytofuture.cn/app-releases/heyta/1.0.0/heyta-1.0.0-linux.deb",
-      "sha256": "0d9335ee6600d09a56db061d069d3e095192d75d9188a83359500e0feeced8cc",
-      "size": 1300282,
-      "version": "1.0.0"
+      "name": "heyta-1.0.1-test.20261023.1-linux.deb",
+      "url": "https://dl.waytofuture.cn/app-releases/heyta/latest/heyta-1.0.1-test.20261023.1-linux.deb",
+      "versionedUrl": "https://dl.waytofuture.cn/app-releases/heyta/1.0.1-test.20261023.1/heyta-1.0.1-test.20261023.1-linux.deb",
+      "sha256": "20a57c9b8f4fc26078e00e4f3cfc10a791f995d4d03aaf23f2c4dba56920a416",
+      "size": 2045498,
+      "version": "1.0.1-test.20261023.1",
+      "releasedAt": "2026-10-23T12:28:16+00:00"
     },
     "macos": {
       "name": "heyta-1.0.0-macos.dmg",
@@ -24,15 +26,17 @@
       "versionedUrl": "https://dl.waytofuture.cn/app-releases/heyta/1.0.0/heyta-1.0.0-macos.dmg",
       "sha256": "15ae558303543482cd42e43a986b617a64457a389bef8197966d157cd526fe12",
       "size": 2362276,
-      "version": "1.0.0"
+      "version": "1.0.0",
+      "releasedAt": "2026-10-07T12:24:21+08:00"
     },
     "windows": {
-      "name": "heyta-1.0.0-windows.zip",
-      "url": "https://dl.waytofuture.cn/app-releases/heyta/latest/heyta-1.0.0-windows.zip",
-      "versionedUrl": "https://dl.waytofuture.cn/app-releases/heyta/1.0.0/heyta-1.0.0-windows.zip",
-      "sha256": "f024c228059739a30a092128e272577c9a2e6bc9b956de7473b4612bea45eb20",
-      "size": 96659883,
-      "version": "1.0.0"
+      "name": "heyta-1.0.1-test.20261023.1-windows.zip",
+      "url": "https://dl.waytofuture.cn/app-releases/heyta/latest/heyta-1.0.1-test.20261023.1-windows.zip",
+      "versionedUrl": "https://dl.waytofuture.cn/app-releases/heyta/1.0.1-test.20261023.1/heyta-1.0.1-test.20261023.1-windows.zip",
+      "sha256": "388a26accaf37e75e8c37a6d31edca56c0d9c42fba49238021605c7c55e6cf59",
+      "size": 97640133,
+      "version": "1.0.1-test.20261023.1",
+      "releasedAt": "2026-10-23T12:28:16+00:00"
     }
   }
 }
