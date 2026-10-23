@@ -380,6 +380,13 @@ const PROVIDER_DEPENDENT = [
    */
   'OverlayModal',
   'DangerDialog',
+  /**
+   * T7 的 `BottomSheet`：同样透过 `useHeytaUiTheme` / `useHeytaTokens` /
+   * `useHeytaText` 取 token。🔴 它要覆盖的是移动端任务详情那条最高频的面板 ——
+   * 落在 Provider 之外同样是**整层渲染不出来**。
+   * ⚠️ 同目录 `sheet-detents.ts` 那批函数是纯的、不碰主题，**不登记**。
+   */
+  'BottomSheet',
 ];
 const PROVIDER_DEPENDENT_SET = new Set(PROVIDER_DEPENDENT);
 
