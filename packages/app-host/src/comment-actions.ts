@@ -157,8 +157,9 @@ export interface CommentActionsOptions {
    * 🔴 **把一条 COMMENT op 交给 share op-log 通道**（必需）。
    *
    * 本段只定义这个端口。实现（share 引擎、`uploadOps`、listKey 加密、
-   * 逐 op 签名）是下一段；测试里注入假端口就能把"载荷只有该带的东西"
-   * 与"路由送对了 shareId"两条判据钉死，不需要真的搭起传输。
+   * 逐 op 签名）在同目录的 `share-comments.ts`（装成一条 op）与 `share-client.ts`
+   * （加密 + 签名 + 上行）—— 不是"还没建"，但**也不在这一层**：测试里注入假端口就能把
+   * "载荷只有该带的东西"与"路由送对了 shareId"两条判据钉死，不需要真的搭起传输。
    *
    * `shareId` 由本层解析（文件头第 1 条）——调用方**不需要**、也不该自己算。
    */

@@ -338,13 +338,14 @@ const ACTION_FAMILIES = [
    * `index.ts` 导出 1 处；该文件的 `ctx.dispatch` 出现 **0 次**（评论绝不进个人 op-log，
    * 见 `packages/op-log/src/state.ts:98-101`），四条写动作全部只走注入端口 `dispatchShareOp`。
    *
-   * ⚠️ **这一行只回答"实体有没有写路径"，不回答"用户碰得到吗"** —— 现量：
-   * `--list` 那一行的宿主调用点是 **0 处**，所以判据 C 仍然红（这是**如实**的红，不是假绿）。
-   * 缺的那一半是 `docs/plans/collaboration-shared-lists.md` 的 W4/W5 客户端共享平面：
-   * `packages/sync-core` 已有原语（`deriveShareOperationKey` / `signShareOperation` /
-   * `createSharePayloadCipher`），`packages/sync-client` 已有传输（`uploadOps` / `downloadOps`），
-   * 但**没有任何消费者** —— per-share op-log 引擎、`ShareOperation` 落盘、listKey 解密回放
-   * 一律还没建。⇒ 别把这行读成"评论对用户可用了"，它是"写路径已存在、只等接线"。
+   * ⚠️ **这一行只回答"实体有没有写路径 + 宿主有没有装上它"，不回答"每一端都接了吗"**。
+   * 2026-10-23 现量：`node scripts/check-reachability.mjs --entity=COMMENT` 四条断言全过（判据 C 由红转绿 ——
+   * `apps/web/src/features/share/comment-actions.ts` 构造并注入那三个端口，`verify:collab-journey` 的
+   * 「两台真浏览器互见」把它钉成常驻尺）。中间那段共享平面也已经不是"只有原语没人用"的形状：
+   * `packages/sync-core` 的原语（`deriveShareOperationKey` / `signShareOpWire` / `createSharePayloadCipher`）
+   * 与 `packages/sync-client` 的传输（`uploadOps` / `downloadOps`）都有生产消费者，而自 M4 起
+   * 每条共享 op 落库前都过一遍验签（口径见 ADR-0069，读数见本线计划 §9.12）。
+   * 🔴 仍然不成立的：**移动端一条都签不出来**（M6 那六段没接），所以别把这行读成"评论在所有端可用"。
    */
   { entity: 'COMMENT', family: 'createCommentActions' },
 ];
