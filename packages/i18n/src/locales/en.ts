@@ -3070,6 +3070,10 @@ export const en = {
   // ── Mobile · task detail sheet ────────────────────────────
   'mobile.detail.title': 'Task details',
   'mobile.detail.close': 'Close task details',
+  // Accessible name of the bottom sheet grabber. It says what the panel
+  // becomes, not "grabber" — the latter tells a screen-reader user nothing.
+  'mobile.detail.sheet.expand': 'Expand task details',
+  'mobile.detail.sheet.collapse': 'Collapse task details',
   'mobile.detail.field.title': 'Title',
   // 🔴 Before this there was no note input on mobile either: `Task.note` and
   // `setNote` both existed, but the only callers were AI features — a user
