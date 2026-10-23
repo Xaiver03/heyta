@@ -45,6 +45,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
+import { publishSigningKey, signWireOp } from './lib/collab-sign.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = (() => {
@@ -185,14 +186,23 @@ step = 2;
 const created = await api('POST', '/api/shares', tokenOwner, {});
 if (created.status !== 201 || !created.json?.shareId) fail(`建共享失败：${JSON.stringify(created.json)?.slice(0, 200)}`);
 const shareId = created.json.shareId;
+const ownerMemberId = created.json.memberId;
 const ownerIdentity = core.deriveShareIdentityKeyPair(core.generateShareIdentitySeed());
 const listKeyV1 = core.generateShareListKey();
+// M4：owner 那一行不是"接受邀请"进来的，签名公钥走自证补发那一条腿（裁决二）。
+// 不在册 ⇒ 下面每一条 owner 写的 op 都会被上传边界判成 `SHARE_OP_SIGNING_KEY_UNREGISTERED`。
+const ownerKeyPub = await publishSigningKey(api, {
+  shareId, memberId: ownerMemberId, token: tokenOwner,
+  ed25519PublicKey: ownerIdentity.ed25519PublicKey,
+});
+if (ownerKeyPub.status !== 200) fail(`owner 自证签名公钥失败：${JSON.stringify(ownerKeyPub.json)?.slice(0, 200)}`);
 const invitation = await api('POST', `/api/shares/${shareId}/invitations`, tokenOwner, {});
 if (invitation.status !== 201 || !invitation.json?.token) fail(`发邀请失败：${JSON.stringify(invitation.json)?.slice(0, 200)}`);
 const bobIdentity = core.deriveShareIdentityKeyPair(core.generateShareIdentitySeed());
 const accepted = await api('POST', '/api/shares/invitations/accept', tokenBob, {
   token: invitation.json.token,
   identityPublicKey: Buffer.from(bobIdentity.x25519PublicKey).toString('base64'),
+  signingPublicKey: Buffer.from(bobIdentity.ed25519PublicKey).toString('base64'),
 });
 if (accepted.status !== 200) fail(`接受邀请失败：${JSON.stringify(accepted.json)?.slice(0, 200)}`);
 const bobMemberId = accepted.json.memberId;
@@ -218,6 +228,7 @@ if (carolInvitation.status !== 201 || !carolInvitation.json?.token) fail(`给 ca
 const carolAccepted = await api('POST', '/api/shares/invitations/accept', tokenCarol, {
   token: carolInvitation.json.token,
   identityPublicKey: Buffer.from(carolIdentity.x25519PublicKey).toString('base64'),
+  signingPublicKey: Buffer.from(carolIdentity.ed25519PublicKey).toString('base64'),
 });
 if (carolAccepted.status !== 200) fail(`carol 接受邀请失败：${JSON.stringify(carolAccepted.json)?.slice(0, 200)}`);
 const carolMemberId = carolAccepted.json.memberId;
@@ -258,13 +269,19 @@ const bobWireOp = wireOp(`revoke-bob-op-${runId}`);
 const ownerWireOp = wireOp(`revoke-owner-op-${runId}`);
 const bobRecord = await encryptRecord(bobWireOp, BOB_TITLE);
 const ownerRecord = await encryptRecord(ownerWireOp, OWNER_TITLE);
-const mkOp = (opIdentity, ciphertext) => ({
-  ...opIdentity, payload: ciphertext, vectorClock: { 'device-shared': 1 },
-  isPayloadEncrypted: true,
+const mkOp = (opIdentity, ciphertext, signer) => signWireOp(core, {
+  shareId, memberId: signer.memberId, ed25519SecretKey: signer.ed25519SecretKey,
+  op: {
+    ...opIdentity, payload: ciphertext, vectorClock: { 'device-shared': 1 },
+    isPayloadEncrypted: true,
+  },
 });
-const bobUp = await api('POST', `/api/shares/${shareId}/ops`, tokenBob, { ops: [mkOp(bobWireOp, bobRecord.ciphertext)] });
+// M4：上传边界只收**带签**的那一条（无签 = 永久拒绝），所以每一条都要交代是谁签的。
+const OWNER_SIGNER = { memberId: ownerMemberId, ed25519SecretKey: ownerIdentity.ed25519SecretKey };
+const BOB_SIGNER = { memberId: bobMemberId, ed25519SecretKey: bobIdentity.ed25519SecretKey };
+const bobUp = await api('POST', `/api/shares/${shareId}/ops`, tokenBob, { ops: [mkOp(bobWireOp, bobRecord.ciphertext, BOB_SIGNER)] });
 if (bobUp.status !== 200 || bobUp.json?.accepted?.length !== 1) fail(`bob 基线上传失败：${JSON.stringify(bobUp.json)?.slice(0, 200)}`);
-const ownerUp = await api('POST', `/api/shares/${shareId}/ops`, tokenOwner, { ops: [mkOp(ownerWireOp, ownerRecord.ciphertext)] });
+const ownerUp = await api('POST', `/api/shares/${shareId}/ops`, tokenOwner, { ops: [mkOp(ownerWireOp, ownerRecord.ciphertext, OWNER_SIGNER)] });
 if (ownerUp.status !== 200 || ownerUp.json?.accepted?.length !== 1) fail(`owner 基线上传失败：${JSON.stringify(ownerUp.json)?.slice(0, 200)}`);
 const bobDownload = await api('GET', `/api/shares/${shareId}/ops/causal?after=0`, tokenBob);
 if (bobDownload.json?.ops?.length !== 2) fail(`bob 基线下载应 2 条，实际 ${bobDownload.json?.ops?.length}`);
@@ -295,7 +312,6 @@ stepOk('移除前：双方各一条 op（record 格式），bob 下载并读回�
 // 真 `ShareApiClient`（真 HTTP）+ 真 owner 身份 + 一个内存密钥环，
 // 换钥由 `@heyta/app-host` 的 `removeMemberAndRekey` 做——与 web 面板调的是同一个函数。
 step = 4;
-const ownerMemberId = created.json.memberId;
 /** 密钥环替身：web 上它是 vault 包裹的 localStorage，这里只要"当前那一把 + 存回去"这个形状。 */
 const makeRing = (memberId, identity, startEpoch, startKey) => {
   let current = { keyEpoch: startEpoch, listKey: startKey.slice() };
@@ -355,7 +371,7 @@ stepOk(`生产路径换钥：epoch ${String(rekeyReading.fromEpoch)} → ${Strin
 step = 5;
 const bobRetryWireOp = wireOp(`revoke-bob-op2-${runId}`);
 const bobUpAfter = await api('POST', `/api/shares/${shareId}/ops`, tokenBob, {
-  ops: [mkOp(bobRetryWireOp, (await encryptRecord(bobRetryWireOp, '移除后的重试')).ciphertext)],
+  ops: [mkOp(bobRetryWireOp, (await encryptRecord(bobRetryWireOp, '移除后的重试')).ciphertext, BOB_SIGNER)],
 });
 if (bobUpAfter.status !== 404) fail(`被移除者上传应 404，实际 ${bobUpAfter.status}`);
 const bobDownloadAfter = await api('GET', `/api/shares/${shareId}/ops/causal?after=0`, tokenBob);
@@ -390,7 +406,7 @@ const epoch2Identity = {
 };
 const epoch2Record = await encryptRecord(epoch2Identity, EPOCH2_TITLE, 2, ownerRing.current().listKey);
 const epoch2Up = await api('POST', `/api/shares/${shareId}/ops`, tokenOwner, {
-  ops: [mkOp(epoch2Identity, epoch2Record.ciphertext)],
+  ops: [mkOp(epoch2Identity, epoch2Record.ciphertext, OWNER_SIGNER)],
 });
 if (epoch2Up.status !== 200 || epoch2Up.json?.accepted?.length !== 1) {
   fail(`新世代上行失败：${JSON.stringify(epoch2Up.json)?.slice(0, 200)}`);

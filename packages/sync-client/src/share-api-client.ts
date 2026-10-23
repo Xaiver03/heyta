@@ -214,6 +214,19 @@ export class ShareApiClient {
     return this.call('GET', `/api/shares/${shareId}/members`);
   }
 
+  /**
+   * 签名名册（读侧验签的依据）。与 `listMembers` **不是**同一件事，别合起来用：
+   * 面板要的是"现在谁在"，验签要的是"这本 log 里那些署名的 op 可能是谁写的" ——
+   * 后者必须包含已被移除的人，否则把人移出去的那一刻起，他写过的每一条连同其后的改动
+   * 都会读成"查不到作者登记的签名"（理由与判据见 `server/src/shares/share.routes.ts`
+   * 那一节的注释、以及 `verify:collab-sync` 第 13 步）。
+   */
+  listSigningKeys(shareId: string): Promise<{
+    members: Array<{ memberId: string; signingPublicKey: string | null; removed: boolean }>;
+  }> {
+    return this.call('GET', `/api/shares/${shareId}/signing-keys`);
+  }
+
   patchMemberRole(shareId: string, memberId: string, role: string): Promise<{ memberId: string; role: string }> {
     return this.call('PATCH', `/api/shares/${shareId}/members/${memberId}`, { role });
   }
