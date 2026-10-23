@@ -164,3 +164,25 @@
 1. **M2**：裁决一（路由）+ 裁决二（因果时钟）+ 裁决三（并发可见）+ 裁决六（语义键）⇒ 交付"两台真浏览器里 B 看得见 A 改的任务"。
 2. **M4**：裁决四的 `signature` 落地（写侧签、服务端验、永久拒绝）。
 3. **M6**：移动端接线（不改本 ADR 任何语义）。
+
+## 实施记录（2026-10-23 M2 收口）
+
+逐格读数在 [计划 §9.11](../plans/collaboration-shared-lists.md)，这里只记"每条裁决落在哪一处代码、被哪一把尺钉着"，
+以及**本 ADR 没预料到的那一格**。
+
+| 裁决 | 落点 | 钉住它的尺 |
+|---|---|---|
+| 一 + 一·补（补一标签发布 / 补二跨边界移动具名拒绝且**界面不摆这个动作** / 补三新建问载荷） | `packages/app-host/src/share-routing.ts`（判据**只有一处**：`crossesShareBoundary`；界面侧复用同一处的导出 `isCrossListMoveBlocked`） | `packages/app-host/tests/share-routing.spec.ts`（含一枚"载荷压不过裁决一"）+ `apps/web/tests/share-move-affordance.spec.tsx`；臂 `research/tools/mutation-rigs/mutate-collab-share-routing.mjs`、`mutate-collab-move-affordance.mjs` |
+| 二（share 分区真实因果时钟） | 同包内的时钟自增与远端回流合并 | `pnpm verify:collab-sync` 里"并发同字段各见 1 枚冲突"那一格；臂同上 |
+| 三（并发同字段必须可见） | 复用现有 `ConflictResolutionView` 与 `keep-local\|keep-remote`，未新建第二套语义 | `verify:collab-sync` 的"各见 1 枚 / 裁一次归零"两格 |
+| 四（`signature` 分期） | **未动**（M4） | —— |
+| 六（语义键只认 `(entityType, opType)`） | 路由表按标签构造，未知 `opType` 抛错 | 既有那把"未知 opType 抛错"的尺（本 ADR 未新增） |
+| 后果那一格（P-1 门禁**方向要翻**） | 入口回到默认渲染；`scripts/check-share-entry-hidden.mjs` 换成 `check-share-entry-visible`（五判 + 阳性对照 + 5 臂自检），`apps/web/src/lib/share-experimental.ts` 与其词条一并退场 | `apps/web/tests/share-entry-visible.spec.tsx` + `pnpm check:share-entry-visible` |
+
+🔴 **本 ADR 没预料到的一格**：裁决一落地后，`verify:collab-journey` 那把量界面的尺**第一趟就是红的**，
+抓到的不是路由，而是 M5 那道信号闸门的判据自锁 —— 它只认"这份共享日志在本机落过盘"，
+而刚入群那台**一次都没拉过**（本机有清单行绑着这份 share，索引却是空的）⇒ 第一份内容被丢弃，
+而"落过盘"这个前提只能由被它门住的那条链路自己达成。修法是把本地途径补成两条
+（`knownShareIds` 端口必填 + 本机清单行上的 `shareId`），判定权仍留在 `packages/app-host`。
+⇒ 教训登记为环境陷阱 #538；这条也说明"宿主层的绿"永远不能替代界面腿（#535 的续文）。
+
