@@ -32,16 +32,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Keyboard,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  TextInput,
-  View,
-} from 'react-native';
+import { Keyboard, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -68,6 +59,7 @@ import {
   type TaskActions,
 } from '@heyta/app-host';
 import {
+  BottomSheet,
   ChecklistPlanPreview,
   ReminderList,
   formatDuration,
@@ -413,62 +405,35 @@ export function TaskDetailSheet({
   const customRule = repeat !== undefined && activePreset === undefined ? repeat.rule : undefined;
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={handleRequestClose} statusBarTranslucent>
-      {/* 遮罩。**刻意不进无障碍树。**
-          理由有两条，第二条是实测踩出来的：
-
-          1. 它的作用只是"点空白处关掉"，而读屏用户已经有右上角那个
-             **有名字的**关闭按钮。两个控件共用一个可访问名，读屏会把同一个
-             名字念两遍，而它们做的是同一件事。
-          2. 它的 bounds 覆盖整屏，于是"中心点"落在下半部分 ——
-             而面板从底部升起、最高占 90%，中心点就压在**面板上**。
-             按坐标点"关闭任务详情"会打到面板，面板关不掉
-             （验收脚本实测：连点 5 步都没关掉，后面每一步都在面板还开着的
-             状态下找列表行）。 */}
-      <Pressable
-        style={{ flex: 1, backgroundColor: tokens['material.scrim'] }}
-        onPress={close}
-        accessible={false}
-        importantForAccessibility="no"
-        accessibilityElementsHidden
-      />
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <View
-          style={{
-            backgroundColor: tokens['color.surface'],
-            borderTopLeftRadius: tokens['radius.xl'],
-            borderTopRightRadius: tokens['radius.xl'],
-            // ⚠️ 只给纵向内边距，不给固定 height ——
-            // 同一节点上同时给 height 与 padding 会让内容在被压缩的盒子里居中。
-            paddingTop: tokens['space.4'],
-            paddingBottom: tokens['space.8'] + insets.bottom,
-            gap: tokens['space.3'],
-            maxHeight: '90%',
-          }}
-        >
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingHorizontal: tokens['screen.gutter'],
-            }}
-          >
-            <Text variant="section-title">{t('mobile.detail.title')}</Text>
-            <IconButton
-              icon="action.close"
-              label={t('mobile.detail.close')}
-              color={tokens['color.foreground-muted']}
-              onPress={close}
-            />
-          </View>
-
-          <ScrollView
-            style={{ paddingHorizontal: tokens['screen.gutter'] }}
-            contentContainerStyle={{ gap: tokens['space.4'], paddingBottom: tokens['space.2'] }}
-            // 键盘弹起时，点快捷项/日期格应当直接生效而不是先收键盘
-            keyboardShouldPersistTaps="handled"
-          >
+    /**
+     * 外壳改走共享原语 `BottomSheet`（适配层 §4 **T7**）。
+     *
+     * 迁移前这里是一份自绘的「`Modal` + 遮罩 `Pressable` + `KeyboardAvoidingView`
+     * + 贴底卡片」：单档 `maxHeight:'90%'`、没有把手、没有分档、档位也不记 ——
+     * 名字叫 Sheet，几何上是一块贴底的固定高度卡片。
+     *
+     * 🔴 迁移后**刻意不变**的四条（都是已拍板的行为，不是可以顺手改的）：
+     *   · 压暗用 `material.scrim`（0.32）而不是 `color.overlay`（0.5）：
+     *     这块面板的读数是在真机上量出来的，改深是一次无人要求的视觉变更；
+     *   · 「收起面板也要提交标题与备注」由 `close` 保证 —— 背景 / 下拉 / ×
+     *     三条通道都走它（`BottomSheet` 里它们共用 `onDismiss`）；
+     *   · Android 第一次返回先收键盘、第二次才关 —— 走 `onBack`，它与 ×
+     *     **不是**一回事：键盘开着时点 × 只收起键盘会读成"点了没反应"；
+     *   · 键盘避让的 `behavior` 与原来逐字相同（iOS `padding` / 其余 `height`）。
+     */
+    <BottomSheet
+      visible={visible}
+      title={t('mobile.detail.title')}
+      labels={{
+        close: t('mobile.detail.close'),
+        expand: t('mobile.detail.sheet.expand'),
+        collapse: t('mobile.detail.sheet.collapse'),
+      }}
+      onDismiss={close}
+      onBack={handleRequestClose}
+      bottomInset={insets.bottom}
+      testID="task-detail-sheet"
+    >
             <View style={{ gap: tokens['space.1'] }}>
               <Text variant="row-meta" tone="muted">
                 {t('mobile.detail.field.title')}
@@ -1019,9 +984,6 @@ export function TaskDetailSheet({
                 style={{ flex: 1 }}
               />
             </View>
-          </ScrollView>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
+    </BottomSheet>
   );
 }
