@@ -28,6 +28,7 @@ import { ShareApiClient, ShareApiError, type SyncPayloadCipher } from '@heyta/sy
 import { parseShareJoinLink } from '@heyta/ui';
 
 import { useSyncStore } from '../sync/store.js';
+import { registerShareRosterTarget } from '../../lib/share-signal-sink.js';
 import { useProjectStore } from '../projects/store.js';
 import { getWebVaultSession } from '../../lib/vault-session.js';
 import { createWebAuthFetch } from '../../lib/central-fetch.js';
@@ -134,7 +135,6 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
   const [inputValue, setInputValue] = useState(initialToken ?? '');
   const [listName, setListName] = useState('');
   const [needsUnlock, setNeedsUnlock] = useState(false);
-  const pollRef = useRef<number | undefined>(undefined);
   const creatingRef = useRef<Set<string>>(new Set());
 
   const api = useMemo(() => {
@@ -147,8 +147,6 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
     const session = await getWebVaultSession(accountId, baseUrl, async () => token, authTransport);
     return session.getPayloadCipher();
   }, [accountId, authTransport, baseUrl, token]);
-
-  useEffect(() => () => { if (pollRef.current !== undefined) window.clearInterval(pollRef.current); }, []);
 
   // 拿到信封 ⇒ 解钥 ⇒ 建本地清单行 ⇒ 收口。
   const finalize = useCallback(async (shareId: string, memberId: string) => {
@@ -210,12 +208,14 @@ export function JoinSharedListDialog(props: JoinSharedListDialogProps) {
     }
   }, [api, getPayloadCipher, listName, onJoined, t]);
 
-  // 等待 owner 下发信封（轮询自己的成员行）。
+  // 等待 owner 下发信封：由 `share_roster_changed` 驱动（ADR-0070），不再每 3s 打一次。
+  // 🔴 这一节是**新成员的清单行还没建起来**的那段时间 —— 闸门只认清单行绑定的话
+  // 这条信号会被判成"本机不认得"而丢掉，人永远停在等待页。垫片因此把
+  // "本机登记着的 target"也算进认得的那一集（见 share-signal-sink 第三条通道）。
   useEffect(() => {
     if (phase.kind !== 'waiting-key') return;
     void finalize(phase.shareId, phase.memberId);
-    pollRef.current = window.setInterval(() => { void finalize(phase.shareId, phase.memberId); }, 3000);
-    return () => { if (pollRef.current !== undefined) window.clearInterval(pollRef.current); };
+    return registerShareRosterTarget(phase.shareId, async () => { await finalize(phase.shareId, phase.memberId); });
   }, [phase, finalize]);
 
   const submit = useCallback(async () => {

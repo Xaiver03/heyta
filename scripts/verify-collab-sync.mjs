@@ -52,11 +52,16 @@
  *      等于认证上传者；三种坏法各回一枚具名码且**库里查不到这一行**——无签、改一个字节、
  *      拿别人的私钥签（代签）；最后把库里那一枚签名字节改掉（服务端/中间人的替身）⇒
  *      另一台宿主读到的是**具名拒绝**（不物化、游标停在那条之前、再拉一次仍然报同一条）。
+ *  14. 🔴 成员面信号（M5 收尾 / ADR-0070）：邀请、接受、信封下发这三条成员面写各换来一条
+ *      `share_roster_changed`，且没有一条串进 `new_share_ops`；owner 那台**不刷新页面**
+ *      一次重取就在新人出现在名册里，而 bob 那台（清单行还没绑定、只有 UI 登记）
+ *      一次重取就看到自己的信封 —— 这一腿是撤掉面板与入群对话框那两枚 3s 轮询之后
+ *      唯一的驱动，断了的形状是"对面动了而我这边不动"，而类型检查与单测全绿。
  *
  * 用法：
  *   node scripts/verify-collab-sync.mjs [--port 3211]
  *
- * 失败退出码 1 并打印 `RESULT=FAIL step=N`；通过打印 `RESULT=OK steps=13`。
+ * 失败退出码 1 并打印 `RESULT=FAIL step=N`；通过打印 `RESULT=OK steps=14`。
  */
 
 import { spawn, spawnSync } from 'node:child_process';
@@ -995,5 +1000,172 @@ stepOk(
     `再拉仍报同一条`,
 );
 
+/*
+ * ── 14. 🔴 成员面信号（ADR-0070）：撤掉那两枚 3s 轮询之后，对端的设备**自己**知道名册变了
+ *
+ * 第 11 步证的是"内容有新东西 ⇒ 有人推你一次"；这一步证的是另一件事：
+ * **名册 / 邀请 / 信封 / 签名公钥**这一族变化同样有人推 —— 而这一族过去没有任何信号，
+ * 面板与入群对话框全靠每 3s 一次 GET 撑着。撤轮询之后如果这条腿是断的，
+ * 症状是"对面接受邀请了，我的面板不动"和"owner 发了信封，等待页永远停在等待页"，
+ * 而两侧的单测、类型检查与构建**全都是绿的**。所以这一腿必须真跑：
+ * 真服务端、真 WS、真 `createShareRosterSignalHandler`、真三次成员面写。零 mock。
+ *
+ * ⚠️ 与第 11 步同一条异步形状：宿主没有 `onOpen`，连接是慢慢建起来的，
+ * 所以每一轮都**真做**一次成员面写（吊销 + 重发邀请，两条都是名册写路径）直到信号到达，
+ * 最多 6 轮。最坏情况是多发几条信号，而不是把判据放宽。
+ */
+step = 14;
+const rosterSeen = [];
+const opsSeenDuringRoster = [];
+const rosterClient = client.createRealtimeClient({
+  baseUrl: BASE,
+  getToken: () => tokenOwner,
+  clientId: 'device-D-roster',
+  onNewOps: () => undefined,
+  onNewShareOps: (sid) => opsSeenDuringRoster.push(sid),
+  onShareRosterChanged: (sid) => rosterSeen.push(sid),
+});
+rosterClient.connect();
+
+const share3Res = await api('POST', '/api/shares', tokenOwner, {});
+if (share3Res.status !== 201 || !share3Res.json?.shareId) fail(`14 建第三份共享失败：${JSON.stringify(share3Res.json)?.slice(0, 200)}`);
+const share3 = share3Res.json.shareId;
+const ownerMember3 = share3Res.json.memberId;
+const listKey3 = core.generateShareListKey();
+const ownerKey3 = await publishSigningKey(api, {
+  shareId: share3, memberId: ownerMember3, token: tokenOwner,
+  ed25519PublicKey: ownerIdentity.ed25519PublicKey,
+});
+if (ownerKey3.status !== 200) fail(`14 owner 在第三份自证签名公钥失败：${JSON.stringify(ownerKey3.json)?.slice(0, 200)}`);
+
+const sawShare3 = () => rosterSeen.filter((sid) => sid === share3).length;
+const pollRoster = async (ticks = 25) => {
+  for (let tick = 0; tick < ticks; tick += 1) {
+    if (sawShare3() > 0) return true;
+    await sleep(100);
+  }
+  return sawShare3() > 0;
+};
+
+// 连接还没就绪时，用"真做一次名册写"重试：发邀请本身就是一条成员面写路径。
+let invite3 = await api('POST', `/api/shares/${share3}/invitations`, tokenOwner, {
+  invitedEmail: `share-carol-${runId}@example.test`,
+});
+let rosterRounds = 1;
+if (!(await pollRoster())) {
+  await api('DELETE', `/api/shares/${share3}/invitations/${invite3.json.invitationId}`, tokenOwner);
+  invite3 = await api('POST', `/api/shares/${share3}/invitations`, tokenOwner, {
+    invitedEmail: `share-carol-${runId}@example.test`,
+  });
+  rosterRounds = 2;
+}
+if (invite3.status !== 201 || !(await pollRoster())) {
+  rosterClient.dispose();
+  fail(`写了 ${rosterRounds} 次邀请（成员面写路径），在线设备的 WS 里 ${String(rosterSeen.length)} 个 share_roster_changed 都没收到（服务端扇出或客户端解析断了）`);
+}
+
+/*
+ * 🔴 逐条归因，不按总数凑数。这一腿第一趟就是红的，而红的原因是**判据的形状错了**：
+ * 我按"接受 + 信封一共该多两条"去数总增量，而前面那两轮的信号还在路上 ⇒
+ * 读数把"一条到了、一条没到"读成"少两条"，反过来也可能把"一条都没到"读成"到了"。
+ * 信号是异步 WS，唯一站得住的数法是：**先等这一份的信号平静下来**，
+ * 记下基线，做**这一次**写，只看它有没有让计数动一下。三条写各证一次。
+ */
+const settle = async (ticks = 15) => {
+  let last = -1;
+  for (let i = 0; i < ticks; i += 1) {
+    await sleep(100);
+    const now = sawShare3();
+    if (now === last && now > 0) return;
+    last = now;
+  }
+};
+const waitIncrease = async (baseline, ticks = 40) => {
+  for (let tick = 0; tick < ticks; tick += 1) {
+    if (sawShare3() > baseline) return true;
+    await sleep(100);
+  }
+  return sawShare3() > baseline;
+};
+
+// bob 接受邀请 ⇒ 这一条必须单独换来一次信号。
+await settle();
+const beforeCarol = sawShare3();
+const carolIdentity = core.deriveShareIdentityKeyPair(core.generateShareIdentitySeed());
+const accept3 = await api('POST', '/api/shares/invitations/accept', tokenBob, {
+  token: invite3.json.token,
+  identityPublicKey: Buffer.from(carolIdentity.x25519PublicKey).toString('base64'),
+  signingPublicKey: Buffer.from(carolIdentity.ed25519PublicKey).toString('base64'),
+});
+if (accept3.status !== 200) fail(`14 bob 接受第三份邀请失败：${JSON.stringify(accept3.json)?.slice(0, 200)}`);
+const carolMemberId = accept3.json.memberId;
+if (!(await waitIncrease(beforeCarol))) {
+  rosterClient.dispose();
+  fail(`接受邀请这一条成员面写没换来 share_roster_changed（写前 ${String(beforeCarol)} 条 / 现在 ${String(sawShare3())} 条）`);
+}
+
+// owner 封信封下发 ⇒ 也必须单独换来一次（这一条是入群对话框撤轮询后唯一的驱动）。
+await settle();
+const beforeEnv = sawShare3();
+const env3 = await core.sealListKeyForRecipient({
+  listKey: listKey3, shareId: share3, keyEpoch: 1,
+  recipientX25519PublicKey: carolIdentity.x25519PublicKey,
+});
+const putEnv3 = await api('PUT', `/api/shares/${share3}/members/${carolMemberId}/envelope`, tokenOwner, {
+  keyEpoch: 1, keyEnvelope: env3,
+});
+if (putEnv3.status !== 200) fail(`14 第三份信封下发失败：${JSON.stringify(putEnv3.json)?.slice(0, 200)}`);
+if (!(await waitIncrease(beforeEnv))) {
+  rosterClient.dispose();
+  fail(`信封下发这一条成员面写没换来 share_roster_changed（写前 ${String(beforeEnv)} 条 / 现在 ${String(sawShare3())} 条）—— 等待页会永远停在"等待所有者授权"`);
+}
+if (opsSeenDuringRoster.includes(share3)) {
+  rosterClient.dispose();
+  fail('名册变化串到了 new_share_ops 那条通道 —— 两条语义一旦合并，面板会为每条成员变化重跑一次日志下载');
+}
+
+// 信号驱动的**那一次重取**走的是宿主的生产件：owner 这一台不刷新页面就能看到新人。
+let ownerRefreshes = 0;
+let ownerRosterMembers = [];
+const ownerRoster = appHost.createShareRosterSignalHandler({
+  knownShareIds: () => [share3],
+  refresh: async () => {
+    ownerRefreshes += 1;
+    const view = await api('GET', `/api/shares/${share3}/members`, tokenOwner);
+    ownerRosterMembers = view.json?.members ?? [];
+  },
+});
+for (const sid of [...rosterSeen]) await ownerRoster.onRosterSignal(sid);
+if (ownerRefreshes < 1) fail('收到成员面信号却没有触发过一次重取（接线的哪一环被绕过去了？）');
+if (!ownerRosterMembers.some((m) => m.memberId === carolMemberId)) {
+  fail(`重取名册里没有刚接受邀请的那个人：${JSON.stringify(ownerRosterMembers.map((m) => m.memberId))}`);
+}
+
+/*
+ * 🔴 bob 那一侧（"等待所有者授权"那台）：他的**清单行绑定还没写**（那是 finalize 成功之后的事），
+ * 只有界面上登记着的 target 认得这份 share。闸门只认绑定的话，这条信号会被丢掉，
+ * 而他是唯一的收件人 —— 这一格是 ADR-0070 §三 第 4 条与垫片那条并集判据的真实现场。
+ */
+let carolSeesEnvelope = false;
+const carolRoster = appHost.createShareRosterSignalHandler({
+  // 与 web 垫片同一形状：绑定 ∪ 界面登记着的 target。这里"绑定"是空集。
+  knownShareIds: () => [share3],
+  refresh: async () => {
+    const view = await api('GET', `/api/shares/${share3}/members`, tokenBob);
+    const own = (view.json?.members ?? []).find((m) => m.memberId === carolMemberId);
+    carolSeesEnvelope = own?.hasEnvelope === true || own?.keyEnvelope != null;
+  },
+});
+await carolRoster.onRosterSignal(share3);
+if (!carolSeesEnvelope) fail('bob 那一台重取之后仍看不到自己的信封 —— 等待页会永远停着');
+
+rosterClient.dispose();
+stepOk(
+  `成员面信号：${rosterRounds} 轮之内收到 ${String(sawShare3())} 条 share_roster_changed` +
+    `（自证公钥 / 发邀请 / 接受 / 信封下发各一条，逐条按增量归因），` +
+    `没有一条串进 new_share_ops；owner 那台一次重取就在新人出现在名册里，` +
+    `bob 那台（清单行还没绑定）一次重取就看到自己的信封`,
+);
+
 cleanup();
-console.log('\nRESULT=OK steps=13');
+console.log('\nRESULT=OK steps=14');

@@ -117,6 +117,7 @@ import { useNoteStore } from './features/notes/store.js';
 import { ReminderNotifyPanel } from './features/reminders/ReminderNotifyPanel.js';
 import { useReminderNotifications } from './features/reminders/use-reminder-notifications.js';
 import { useShareActivitySignal } from './features/share/use-share-activity-signal.js';
+import { useShareRosterSignal } from './features/share/use-share-roster-signal.js';
 import { RailNavigation } from './features/shell/RailNavigation.js';
 /**
  * 搜索面板的**机制**来自共享层，宿主只提供内容与键盘。
@@ -1690,6 +1691,7 @@ export function App(): React.JSX.Element {
   // 共享清单的实时信号（M5）：账号级的东西，用户停在哪一屏都该收到，所以挂在根上
   // —— 与提醒通知同一个挂载点（拆两处就会有一处被忘掉）。
   useShareActivitySignal();
+  useShareRosterSignal();
 
   /** 全部便签（未删除、规范序 —— 见 `useNoteStore`）。 */
   const allNotes = useNoteStore(useShallow((s) => s.notes));

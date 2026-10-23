@@ -44,9 +44,11 @@
  *    "实时已连接"。最小一步：加一个 `onStatusChange?: (s) => void` 回调，
  *    在 openOnce/settle 处各发一次。
  *
- * 3. **只处理 `new_ops`**。`connected` 只用来重置退避；`presence_state` /
- *    `presence_cmd` 直接忽略 —— 追踪 presence 是另一个功能（宿主还一行没接），
- *    在这里顺手解析只会制造一份没人消费的解析代码。未知类型**一律不崩**（前向兼容）。
+ * 3. **只处理 `connected` / `new_ops` / `new_share_ops` / `share_roster_changed`**。
+ *    `connected` 只用来重置退避；`presence_state` / `presence_cmd` 直接忽略 ——
+ *    追踪 presence 是另一个功能（宿主还一行没接），在这里顺手解析只会制造一份没人消费的
+ *    解析代码。未知类型**一律不崩**（前向兼容 —— 这条正是 ADR-0070 加一类事件而不动
+ *    `CURRENT_SCHEMA_VERSION` 的依据：老客户端把新事件当未知类型忽略，降级不是破坏）。
  *
  * 4. **没有 import 任何东西**。零依赖、零 DOM/浏览器专有全局：`WebSocket` 由
  *    `WebSocketImpl` 注入，默认取 `globalThis.WebSocket`；定时器用 `setTimeout`。
@@ -130,6 +132,15 @@ export interface RealtimeClientOptions {
    * 可选：老宿主不传就等于没接，连接与个人同步不受影响。
    */
   onNewShareOps?: (shareId: string, latestSeq: number) => void;
+
+  /**
+   * 收到"某份共享清单的**成员面**变了"时调用（服务端 `share_roster_changed`，ADR-0070）。
+   *
+   * 名册、待接受邀请、成员信封与签名公钥这一族状态都走这一条；载荷只有 `shareId` ——
+   * **不带名单、不带内容**。该不该重取、一次变化吵几次由宿主判（`share-signals.ts` 同一条纪律），
+   * 这一层只负责把形状合格的信号原样交出去。可选：老宿主不传就等于没接。
+   */
+  onShareRosterChanged?: (shareId: string) => void;
 
   /** WebSocket 实现。默认 `globalThis.WebSocket`。测试注入假实现。 */
   WebSocketImpl?: WebSocketFactory;
@@ -240,6 +251,7 @@ class RealtimeClientImpl implements RealtimeClient {
   private readonly clientId: string;
   private readonly onNewOps: (latestSeq: number) => void;
   private readonly onNewShareOps: ((shareId: string, latestSeq: number) => void) | undefined;
+  private readonly onShareRosterChanged: ((shareId: string) => void) | undefined;
   private readonly WebSocketImpl: WebSocketFactory | undefined;
   private readonly initialBackoffMs: number;
   private readonly maxBackoffMs: number;
@@ -269,6 +281,7 @@ class RealtimeClientImpl implements RealtimeClient {
     this.clientId = options.clientId;
     this.onNewOps = options.onNewOps;
     this.onNewShareOps = options.onNewShareOps;
+    this.onShareRosterChanged = options.onShareRosterChanged;
     this.WebSocketImpl = options.WebSocketImpl;
     this.initialBackoffMs = options.initialBackoffMs ?? DEFAULT_INITIAL_BACKOFF_MS;
     this.maxBackoffMs = options.maxBackoffMs ?? DEFAULT_MAX_BACKOFF_MS;
@@ -463,6 +476,18 @@ class RealtimeClientImpl implements RealtimeClient {
         this.onNewShareOps(message.shareId, message.latestSeq);
       } catch {
         // 与 `onNewOps` 同一条：宿主回调抛错不能掀掉连接。
+      }
+      return;
+    }
+    if (message.type === 'share_roster_changed') {
+      // ADR-0070：成员面变了。形状合格的只有 `shareId` 一格 —— 没有 `latestSeq` 可校验，
+      // 因为这条信号**故意不带序号**（带了就等于请服务端替我们记一份它不该知道的名册水位）。
+      if (typeof message.shareId !== 'string') return;
+      if (this.onShareRosterChanged === undefined) return;
+      try {
+        this.onShareRosterChanged(message.shareId);
+      } catch {
+        // 与 `onNewShareOps` 同一条：宿主回调抛错不能掀掉连接。
       }
       return;
     }

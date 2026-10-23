@@ -24,7 +24,7 @@ import {
 } from '../../lib/oplog.js';
 
 // 共享清单的实时信号出口（一块垫片：共享侧在这里注册，store 不认识共享侧）。
-import { dispatchShareSignal } from '../../lib/share-signal-sink.js';
+import { dispatchShareRosterSignal, dispatchShareSignal } from '../../lib/share-signal-sink.js';
 
 import {
   createRetryScheduler,
@@ -411,6 +411,9 @@ function restartRealtime(get: () => SyncStoreState): void {
       // 要做的只有按 shareId 去下载那一份（`share-signal-sink` 那边注册消费者）。
       // 把它并进 `onNewOps` 会让一条别人发的评论变成全设备重跑一次同步。
       onNewShareOps: dispatchShareSignal,
+      // 成员面那条（ADR-0070）同样**不触发个人全量同步**，也不下载任何 op：
+      // 它说的只是"名册/邀请/信封/公钥里有一格变了，去重取那份详情"。
+      onShareRosterChanged: dispatchShareRosterSignal,
     });
     realtime.connect();
   } catch (error: unknown) {

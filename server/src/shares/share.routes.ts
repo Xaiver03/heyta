@@ -395,6 +395,7 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
         },
       });
       // 裸 token 只在这一次响应里出现；库里只有它的 sha256。
+      await notifyShareRoster(shareId);
       return reply.code(201).send({
         invitationId: invitation.id,
         token,
@@ -440,6 +441,7 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
       if (result.count === 0) {
         return reply.code(404).send({ code: SHARE_ERROR_CODES.INVITATION_INVALID, message: 'Invitation not revocable' });
       }
+      await notifyShareRoster(shareId);
       return reply.send({ revoked: true });
     },
   );
@@ -520,6 +522,8 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
       where: { id: invitation.id },
       data: { acceptedByUserId: userId, acceptedAt: now },
     });
+    // 名册在这一刻真的多了一个人 —— owner 那台（以及他**另一台**设备）的面板等着这条。
+    await notifyShareRoster(share.id);
     return reply.send({
       shareId: share.id,
       memberId: member.id,
@@ -617,6 +621,7 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
         return reply.code(400).send({ code: SHARE_ERROR_CODES.ROLE_FORBIDDEN, message: 'Cannot change owner role' });
       }
       await prisma.shareMember.update({ where: { id: target.id }, data: { role: parsed.data.role } });
+      await notifyShareRoster(shareId);
       return reply.send({ memberId, role: parsed.data.role });
     },
   );
@@ -652,6 +657,9 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
       if (keyEpoch > lookup.share.keyEpoch) {
         await prisma.share.update({ where: { id: shareId }, data: { keyEpoch } });
       }
+      // 🔴 这条必须有：入群对话框那枚"等 owner 把信封发过来"的 3s 轮询就是为它写的
+      // （ADR-0070 撤的是轮询，撤完就靠这一发信号）。少了它，新成员永远停在"等待所有者授权"。
+      await notifyShareRoster(shareId);
       return reply.send({ memberId, memberKeyEpoch: keyEpoch });
     },
   );
@@ -688,6 +696,8 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
       });
       // 幂等重试走同一条路径（重发同一枚公钥 ⇒ 同一次 update ⇒ 同一个响应），
       // 所以这里不需要"已发布就直接返回"的分支——两个分支会各自漂移。
+      // 别人手里的那份**验签名名册**要靠这条信号才不是死的（ADR-0070）。
+      await notifyShareRoster(shareId);
       return reply.send({ memberId: lookup.member.id, signingPublicKey: write.value });
     },
   );
@@ -722,6 +732,8 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
         where: { id: target.id },
         data: { removedAt: BigInt(Date.now()), keyEnvelope: Prisma.DbNull },
       });
+      // 名单查询在写之后 ⇒ 被移除的人不在扇出里（他知道自己是走查到的，不是推到的）。
+      await notifyShareRoster(shareId);
       return reply.send({ removed: true });
     },
   );
@@ -739,6 +751,7 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
       where: { id: lookup.member.id },
       data: { removedAt: BigInt(Date.now()), keyEnvelope: Prisma.DbNull },
     });
+    await notifyShareRoster(shareId);
     return reply.send({ left: true });
   });
 
@@ -784,6 +797,8 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
       prisma.shareMember.update({ where: { id: target.id }, data: { role: 'owner' } }),
       prisma.shareMember.update({ where: { id: lookup.member.id }, data: { role: 'editor' } }),
     ]);
+    // 事务提交之后才发 —— 半途发出去，别人会重取到一份"双 owner"的中间态。
+    await notifyShareRoster(shareId);
     return reply.send({
       shareId,
       ownerId: Number(targetUserId),
@@ -1010,3 +1025,28 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
 
 const op0ClientId = (accepted: Array<{ op: ValidatedShareOp }>): string | null =>
   accepted[0]?.op.clientId ?? null;
+
+/**
+ * 成员可见状态变了 ⇒ 给这份清单**当前全部成员**发一条 `share_roster_changed`（ADR-0070）。
+ *
+ * 🔴 只带 `shareId`，不带名单、不带内容 —— 与 `notifyShareOps` 同一条安全契约。
+ * 写失败不许影响写结果（信号是提示不是数据通道，丢了的后果只是"对端晚一点才看到"），
+ * 所以这里整块吞掉异常、只留一条 warn，与 share log 追加路径那一块逐字同形。
+ *
+ * 名单在**写之后**查 ⇒ 刚被移除/退出的人收不到（他已不在 `removedAt: null` 那一集里），
+ * 他会从下一次真实读取那里知道自己没了资格 —— 那是 ADR-0068 的既有形状，不是漏发。
+ */
+const notifyShareRoster = async (shareId: string): Promise<void> => {
+  try {
+    const members = await prisma.shareMember.findMany({
+      where: { shareId, removedAt: null },
+      select: { userId: true },
+    });
+    getWsConnectionService().notifyShareRosterChanged(
+      members.map((m) => Number(m.userId)),
+      shareId,
+    );
+  } catch (err) {
+    Logger.warn(`share roster ws notify failed: ${err instanceof Error ? err.message : 'unknown'}`);
+  }
+};
