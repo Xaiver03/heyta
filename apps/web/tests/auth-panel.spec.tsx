@@ -1068,6 +1068,67 @@ describe('条款链接：按连的那台服务端分流', () => {
   });
 });
 
+describe('🔴 壳内（origin ≠ 官方站）中央登录改走 device handoff（P5.4）', () => {
+  // launchUrl 路径尾必须是 43 位 [A-Za-z0-9_-]（app-host 对服务端响应的形状校验）。
+  const DEVICE_START = {
+    handoffId: '01234567-89ab-cdef-0123-456789abcdef',
+    launchUrl: `${OFFICIAL_SITE_ORIGIN}/api/auth/oidc/device/launch/${'a'.repeat(42)}1`,
+    pairingCode: 'AB12CD34EF56',
+    expiresAt: Date.now() + 600_000,
+  };
+
+  /** 渲染官方站面板并等到中央面板可交互（config 探针是异步的）。 */
+  async function renderOfficialPanel(): Promise<HTMLDivElement> {
+    const el = await renderPanelAtBaseUrl(OFFICIAL_SITE_ORIGIN);
+    for (let i = 0; i < 50 && el.querySelector('[data-testid="central-auth-consent"]') === null; i += 1) {
+      await act(async () => { await Promise.resolve(); });
+    }
+    return el;
+  }
+
+  async function consentAndSubmit(el: HTMLElement): Promise<void> {
+    await tap(el, 'central-auth-consent');
+    await tap(el, 'central-auth-submit');
+  }
+
+  it('点提交发的是 device/start（不是 oidc/start），等待视图显示分组配对码并自动开浏览器', async () => {
+    // jsdom 的 origin 永远不是官方站 ⇒ 这个环境**天然就是桌面壳内**的形状；
+    // 真浏览器（同源）那条路由 live-site 验收覆盖（点提交落在中央授权域）。
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    try {
+      stubFetch(200, DEVICE_START);
+      const el = await renderOfficialPanel();
+      await consentAndSubmit(el);
+
+      const startCalls = calls.filter((c) => c.url.endsWith('/api/auth/oidc/device/start'));
+      expect(startCalls, 'device/start 恰好一次').toHaveLength(1);
+      const body = startCalls[0]!.body as Record<string, unknown>;
+      expect(body.termsAccepted).toBe(true);
+      expect(body.documentVersion).toBe('v1');
+      expect(typeof body.deviceChallenge, 'verifier 只以 SHA-256 挑战的形式出现在请求里').toBe('string');
+      // 旧路必须没被走：壳内 POST oidc/start 会被 requireSameOrigin 403（2026-10-24 线上实测）。
+      expect(calls.some((c) => c.url.endsWith('/api/auth/oidc/start'))).toBe(false);
+
+      expect(el.querySelector('[data-testid="central-device-waiting"]')).not.toBeNull();
+      expect(el.textContent).toContain('AB12 CD34 EF56');
+      expect(openSpy).toHaveBeenCalledWith(DEVICE_START.launchUrl, '_blank', 'noopener');
+    } finally {
+      openSpy.mockRestore();
+    }
+  });
+
+  it('等待视图里可以取消：回到明确的空状态，而不是停在等待里', async () => {
+    stubFetch(200, DEVICE_START);
+    const el = await renderOfficialPanel();
+    await consentAndSubmit(el);
+    expect(el.querySelector('[data-testid="central-device-waiting"]')).not.toBeNull();
+
+    await tap(el, 'central-device-cancel');
+    expect(el.querySelector('[data-testid="central-device-waiting"]')).toBeNull();
+    expect(el.querySelector('[data-testid="central-auth-panel"]')).not.toBeNull();
+  });
+});
+
 describe('词条：两种语言都真的翻了', () => {
   it('每一条认证词条在 zh 里含汉字、在 en 里不含汉字', () => {
     for (const key of AUTH_MESSAGE_KEYS) {

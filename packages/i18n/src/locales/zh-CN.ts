@@ -958,6 +958,12 @@ export const zhCN = {
   'web.auth.central.switchClearing': '正在清除本机数据…',
   'web.auth.central.switchSessionChanged': '统一登录状态已变化，本机数据未清除。请重新打开此页面确认。',
   'web.auth.central.switchEraseFailed': '部分本机数据未能清除，账号绑定已保留。请关闭其他标签页后重试；不要把残留数据接到新账号。',
+  // 壳内（桌面应用）中央登录 = device handoff：登录在系统浏览器完成，这里显示配对码等领取。
+  'web.auth.central.device.waitingBody': '系统浏览器窗口应该已经打开。登录在浏览器里完成，完成后会自动回到本应用。',
+  'web.auth.central.device.openBrowser': '在浏览器中打开登录页',
+  'web.auth.central.device.pairingLabel': '如果页面要求配对码，请输入这串数字：',
+  'web.auth.central.device.waitingNote': '等待你在浏览器里完成登录…窗口可以留在这一页。',
+  'web.auth.central.device.cancel': '取消本次登录',
   // 同步设置里令牌字段下面的指路句 —— 它回答的正是"令牌从哪来"。
   'web.auth.tokenHint': '访问令牌由服务端签发。点上面的按钮登录或注册，令牌会自动填进来；已经有令牌的可以直接粘贴填写。',
   /*
@@ -5013,6 +5019,24 @@ export const zhCN = {
   'reminder.phase.snoozed': '已推迟',
   'reminder.phase.due': '已到点',
   'reminder.delivery.uncertain': '无法确认本机是否已提醒。可点“稍后提醒”重新安排。',
+  'reminder.delivery.blockedNotification': '系统通知还没授权，这条提醒到点不会响。提醒本身仍保留在应用里。',
+  'reminder.delivery.blockedExactAlarm': '系统还没允许准点唤醒，这条提醒可能迟到几分钟。',
+  'reminder.delivery.openSettings': '去系统设置',
+  // 设置页的「提醒送达」：三把系统闸门的状态 + 一条回到系统的路。
+  'reminder.settings.section': '提醒送达',
+  'reminder.settings.notification': '系统通知授权',
+  'reminder.settings.exactAlarm': '精确闹钟',
+  'reminder.settings.battery': '提醒不受省电限制',
+  'reminder.settings.allowed': '已允许',
+  'reminder.settings.notAllowed': '未允许',
+  'reminder.settings.notAsked': '还没问过你',
+  'reminder.settings.exempted': '已豁免',
+  'reminder.settings.optimized': '受省电限制',
+  'reminder.settings.note': '这三个开关都在你的系统里，heyta 改不了；点开这一行是让系统把它摊开给你调。拒绝任何一项都不影响创建、编辑和查看任务——提醒仍然在应用里，只是可能不响或迟到。',
+  'reminder.settings.batteryLanding': '这台设备的系统里没有「忽略电池优化」这一页，已为你打开 heyta 的应用信息页。',
+  'reminder.settings.batteryFailed': '系统设置页没能打开。',
+  'reminder.settings.exactAlarmFailed': '系统的「闹钟和提醒」页没能打开（部分机型没有这一页）。',
+  'reminder.settings.notificationFailed': '系统通知设置没能打开。',
   'reminder.phase.fired': '已提醒',
   'reminder.phase.dismissed': '已关闭',
   // 没有截止时间时不能建"提前提醒"——说清原因，不要让按钮静默消失。
@@ -5585,6 +5609,9 @@ export const zhCN = {
   'web.ai.inbound.credential.testSend': '发送测试事件',
   'web.ai.inbound.error.testSend': '测试事件发送失败，请检查凭据和服务端状态。',
   'web.ai.inbound.credential.testSendResult': '测试事件已受理，当前状态：{state}。发送方只会看到这个不透明状态。',
+  // M6-2（移动端协作）：「我的」页第二层的共享入口行。**只追加在表尾**（同 W8 那两条的理由）。
+  'mobile.share.entry': '共享清单',
+  'mobile.share.entry.hint': '和别人共用一份清单，双方的改动都看得见',
 } as const;
 
 /**

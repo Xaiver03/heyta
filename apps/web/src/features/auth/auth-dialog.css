@@ -269,6 +269,17 @@ body:has(.ht-sheet__auth) .ht-compact-rail {
   color: var(--ht-color-danger);
 }
 
+/* device handoff 的 12 位配对码：抄写是这条链路唯一的人工步骤，
+   大号等宽 + 分组间距，别让用户对着小字数错位。 */
+.ht-auth-central__pairing {
+  margin: 0;
+  font-family: var(--ht-font-mono);
+  font-size: var(--ht-font-size-xl);
+  font-weight: var(--ht-font-weight-semibold);
+  letter-spacing: 0.12em;
+  color: var(--ht-color-foreground);
+}
+
 .ht-sheet__auth-form a,
 .ht-sheet__auth-form button {
   text-decoration: none;
