@@ -53,6 +53,9 @@ import {
   resetPasswordWithToken,
   verifyMagicLink,
   getCentralAuthSession,
+  beginCentralDeviceAuth,
+  claimCentralDeviceAuth,
+  type CentralDeviceStart,
   type HostedAuthFailure,
   type HostedAuthFailureReason,
   type HostedAuthSession,
@@ -140,6 +143,18 @@ export type AuthStatus =
   | { kind: 'reset-sent' }
   | { kind: 'signed-in'; email: string }
   /**
+   * 壳内中央登录已发起 device handoff，等待用户在**系统浏览器**里完成
+   * （`docs/plans/unified-central-auth.md` P5.4）。
+   *
+   * 🔴 为什么壳内不能走 `startCentralLogin` 那条：中央登录的 POST start 有
+   * CSRF 同源校验（`requireSameOrigin`），而壳内 WebView 的 origin
+   * （macOS `heyta-local://app`、Windows `https://heyta.local`）**永远不是**
+   * 官方站 origin —— 2026-10-24 线上实测：壳内点「继续统一登录」稳定 403，
+   * 界面显示"这个请求没有被接受"。device handoff 端点按设计**不做**同源
+   * 校验（凭 verifier 知识证明 + 配对码确认），是壳内唯一的中央登录路径。
+   */
+  | { kind: 'central-device-waiting'; attempt: CentralDeviceStart }
+  /**
    * 已登录改口令成功。
    *
    * 🔴 与 `signed-in` **分开**：改密的瞬间 `tokenVersion` 已 bump，
@@ -186,6 +201,16 @@ export interface AuthStoreState {
 
   /** 使用官方 Web 的中央 OIDC。浏览器只保留服务端 Cookie，不接收产品令牌。 */
   startCentralLogin: (baseUrl: string, documentVersion: string) => Promise<void>;
+
+  /**
+   * 壳内的中央登录：device handoff（P5.4）。
+   *
+   * 与 `startCentralLogin` 的差别：不在 WebView 里 POST start（那里有同源
+   * 校验，壳内必然 403），而是 POST device/start 拿一次性启动链接 + 12 位
+   * 配对码，把用户交给**系统浏览器**完成登录，这里轮询 claim 领取产品 JWT。
+   * verifier 原文只存在于 `attempt`（内存），不落盘、不外发。
+   */
+  startCentralDeviceLogin: (baseUrl: string, documentVersion: string) => Promise<void>;
 
   /** 发登录链接。`baseUrl` 由壳传入（用户可能刚改过地址但还没保存）。 */
   sendLoginLink: (baseUrl: string, email: string) => Promise<void>;
@@ -466,6 +491,19 @@ let authGeneration = 0;
 const isCurrentAuthGeneration = (generation: number): boolean =>
   generation === authGeneration;
 
+/**
+ * device handoff 的轮询定时器。**store 层单例**：同一时刻至多一个 handoff 在等，
+ * `invalidatePendingAuth`（用户取消/切服务端）与领取成功都会停它。
+ */
+let devicePollTimer: ReturnType<typeof setInterval> | undefined;
+
+function stopDevicePolling(): void {
+  if (devicePollTimer !== undefined) {
+    clearInterval(devicePollTimer);
+    devicePollTimer = undefined;
+  }
+}
+
 export const useAuthStore = create<AuthStoreState>((set) => ({
   status: { kind: 'signed-out' },
   registrationChallenge: undefined,
@@ -495,13 +533,63 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
     if (typeof window !== 'undefined') window.location.assign(started.value.authorizationUrl);
   },
 
+  startCentralDeviceLogin: async (baseUrl, documentVersion) => {
+    const generation = ++authGeneration;
+    stopDevicePolling();
+    set({ status: { kind: 'busy', action: 'central-login' } });
+    const started = await beginCentralDeviceAuth({ baseUrl, termsAccepted: true, documentVersion });
+    if (!isCurrentAuthGeneration(generation)) return;
+    if (!started.ok) {
+      set({ status: failed(started.reason === 'network' ? 'network' : started.reason === 'unavailable' ? 'server-error' : started.reason === 'malformed-response' ? 'malformed-response' : 'request-rejected') });
+      return;
+    }
+    const attempt = started.value;
+    set({ status: { kind: 'central-device-waiting', attempt } });
+
+    /**
+     * 轮询领取。**与移动端 `AuthScreen.tsx` 同一条规则集**（P5.4 §4-5）：
+     * · 5 秒一询，到 `expiresAt` 即停（启动链接与领取窗口同时限）；
+     * · **claim 响应一旦 !ok 就终止且不重发** —— 一次性 bearer 可能已被
+     *   领走，"响应丢失"是结果不确定，唯一安全的出路是重新发起；
+     * · `pending` ⇒ 继续等；`claimed` ⇒ 走既有 `applyAuthSession` 落点
+     *   （落盘凭据、E2EE 解锁路径与其它登录路共一份实现）。
+     */
+    let claiming = false;
+    const poll = async (): Promise<void> => {
+      if (claiming) return;
+      if (Date.now() >= attempt.expiresAt) {
+        stopDevicePolling();
+        if (isCurrentAuthGeneration(generation)) set({ status: failed('request-rejected') });
+        return;
+      }
+      claiming = true;
+      const result = await claimCentralDeviceAuth({ baseUrl }, attempt.handoffId, attempt.verifier);
+      claiming = false;
+      if (!isCurrentAuthGeneration(generation)) { stopDevicePolling(); return; }
+      if (!result.ok) {
+        stopDevicePolling();
+        set({ status: failed(result.reason === 'network' ? 'network' : result.reason === 'unavailable' ? 'server-error' : result.reason === 'malformed-response' ? 'malformed-response' : 'request-rejected') });
+        return;
+      }
+      if (result.value.status === 'claimed') {
+        stopDevicePolling();
+        applyAuthSession(baseUrl, { token: result.value.token, user: result.value.user });
+        set({ status: { kind: 'signed-in', email: result.value.user.email } });
+      }
+      // pending ⇒ 保持 waiting，下一拍再询。
+    };
+    devicePollTimer = setInterval(() => { void poll(); }, 5000);
+  },
+
   invalidatePendingAuth: () => {
     authGeneration += 1;
+    stopDevicePolling();
     set({ status: { kind: 'signed-out' }, registrationChallenge: undefined, loginChallenge: undefined });
   },
 
   adoptSession: (baseUrl, session) => {
     authGeneration += 1;
+    stopDevicePolling();
     applyAuthSession(baseUrl, session);
     set({ status: { kind: 'signed-in', email: session.user.email } });
   },
@@ -886,5 +974,6 @@ export function __resetAuthForTests(): void {
   // Keep generations monotonic so a deferred response from a prior test can
   // never become current again after the reset.
   authGeneration += 1;
+  stopDevicePolling();
   useAuthStore.setState({ status: { kind: 'signed-out' }, registrationChallenge: undefined });
 }

@@ -189,6 +189,7 @@ export function AuthPanel({
   const cancelLoginCode = useAuthStore((s) => s.cancelLoginCode);
   const forgotPassword = useAuthStore((s) => s.forgotPassword);
   const startCentralLogin = useAuthStore((s) => s.startCentralLogin);
+  const startCentralDeviceLogin = useAuthStore((s) => s.startCentralDeviceLogin);
   const invalidatePendingAuth = useAuthStore((s) => s.invalidatePendingAuth);
   const centralBindingConflict = useSyncStore((s) => s.centralBindingConflict);
   const centralBindingTarget = useSyncStore((s) => s.centralBindingTarget);
@@ -342,6 +343,31 @@ export function AuthPanel({
   const centralMode = isOfficialService && centralConfig?.mode === 'oidc' && centralConfig.documentVersion !== null;
   const centralLoading = isOfficialService && centralConfig === undefined;
   const centralBlocked = isOfficialService && centralConfig !== undefined && !centralMode;
+  /**
+   * 壳内官方站 ⇒ 中央登录改走 device handoff（P5.4）。
+   *
+   * 🔴 判定就是一句话：**当前 origin 不是官方站 origin，但连的是官方站**。
+   * 桌面壳的 WebView 住在 `heyta-local://app`（macOS）/ `https://heyta.local`
+   * （Windows）里，中央登录 POST start 的 CSRF 同源校验必然 403 ——
+   * 2026-10-24 线上实测：壳内点「继续统一登录」稳定红字"这个请求没有被接受"。
+   * device/start、device/claim 两个端点按设计不做同源校验（verifier 知识证明），
+   * 且线上 CORS 白名单已含两个壳 origin —— 这是壳内唯一的中央登录路径。
+   */
+  const centralDeviceHandoff =
+    centralMode &&
+    typeof window !== 'undefined' &&
+    window.location.origin !== OFFICIAL_SITE_ORIGIN;
+  const deviceWaiting = status.kind === 'central-device-waiting' ? status.attempt : undefined;
+  // 拿到启动链接就**自动**交给系统浏览器（壳的导航策略会把 https 外链转出去）。
+  // 只对同一个链接开一次 —— 重开面板/重渲染不许反复弹标签页；被弹窗拦截时
+  // 等待视图里还有可点的手动按钮。
+  const openedDeviceLaunch = useRef('');
+  useEffect(() => {
+    if (deviceWaiting === undefined) return;
+    if (openedDeviceLaunch.current === deviceWaiting.launchUrl) return;
+    openedDeviceLaunch.current = deviceWaiting.launchUrl;
+    window.open(deviceWaiting.launchUrl, '_blank', 'noopener');
+  }, [deviceWaiting]);
   // Typing the official origin into the self-hosted form returns to central
   // auth rather than exposing the retired hosted password endpoints.
   const selfHostedMode = allowAdvanced && showSelfHostedForm && !isOfficialService;
@@ -501,6 +527,8 @@ export function AuthPanel({
       case 'signed-out':
       case 'busy':
       case 'registration-code':
+        // device handoff 的等待视图自己渲染（含配对码），错误消息区不参与。
+      case 'central-device-waiting':
         return null;
       case 'link-sent':
         return { tone: 'info', message: t('web.auth.sent.login') };
@@ -579,6 +607,29 @@ export function AuthPanel({
               <p className="ht-auth-central__eyebrow ht-type-caption">{t('web.auth.central.kicker')}</p>
               <h2 id="central-auth-title" className="ht-type-section-title">{t('web.auth.central.title')}</h2>
               <p className="ht-auth-central__body">{t('web.auth.central.body')}</p>
+              {deviceWaiting !== undefined ? (
+                <div className="ht-auth-central__device" data-testid="central-device-waiting">
+                  <p className="ht-auth-central__body">{t('web.auth.central.device.waitingBody')}</p>
+                  <button
+                    type="button"
+                    className="ht-auth-central__button"
+                    data-testid="central-device-open"
+                    onClick={() => { window.open(deviceWaiting.launchUrl, '_blank', 'noopener'); }}
+                  >
+                    {t('web.auth.central.device.openBrowser')}
+                  </button>
+                  <p className="ht-auth-central__body">{t('web.auth.central.device.pairingLabel')}</p>
+                  {/* 12 位大写十六进制按 4-4-4 分组展示：抄写是这条链路里唯一的人工步骤。 */}
+                  <p className="ht-auth-central__pairing" data-testid="central-device-pairing">
+                    {deviceWaiting.pairingCode.replace(/(.{4})/g, '$1 ').trim()}
+                  </p>
+                  <p className="ht-auth-central__note">{t('web.auth.central.device.waitingNote')}</p>
+                  <button type="button" className="ht-auth-central__link" data-testid="central-device-cancel" onClick={invalidatePendingAuth}>
+                    {t('web.auth.central.device.cancel')}
+                  </button>
+                </div>
+              ) : (
+                <>
               <div className="ht-auth-central__consent">
                 <input
                   id="central-auth-consent"
@@ -608,13 +659,19 @@ export function AuthPanel({
                 disabled={!centralTermsAccepted || busy}
                 onClick={() => {
                   if (centralConfig.documentVersion !== null) {
-                    void startCentralLogin(effectiveBaseUrl, centralConfig.documentVersion);
+                    if (centralDeviceHandoff) {
+                      void startCentralDeviceLogin(effectiveBaseUrl, centralConfig.documentVersion);
+                    } else {
+                      void startCentralLogin(effectiveBaseUrl, centralConfig.documentVersion);
+                    }
                   }
                 }}
               >
                 {busy ? t('web.auth.central.busy') : t('web.auth.central.button')}
               </button>
               <p className="ht-auth-central__note">{t('web.auth.central.note')}</p>
+                </>
+              )}
               {allowAdvanced ? (
                 <button type="button" className="ht-auth-central__link" data-testid="central-auth-self-hosted" onClick={() => {
                   invalidatePendingAuth();
