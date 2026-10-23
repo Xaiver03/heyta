@@ -13,7 +13,10 @@
  *      owner 建清单 → **断默认态下头部没有共享入口**（P-1）→ 设置里打开「共享清单（实验）」
  *      → 头部「共享」→ PIPL 同意模态 → 面板 → 邀请（一次性凭证）；
  *      bob vault → 贴 token 入群 → owner 自动封信封 → bob 解钥 → 清单落侧栏；
- *      owner 面板对账出第二个成员。
+ *      owner 面板对账出第二个成员；
+ *      🔴 M2 的界面腿：owner 在共享清单里写一条任务 → **bob 那台不刷新就看得见**；
+ *      反向同一件事（合并视图挂的那条本机行、这台浏览器收到的 WS 信号、界面重读状态
+ *      三层里断任何一层都红）。
  *   3. 证据：截图落 `e2e/collab-journey-results/`（固定路径，先截图再断言，
  *      console/pageerror 从页面创建起监听）—— **人必须打开看**（AGENTS §6.2 规定一）。
  *
@@ -157,7 +160,7 @@ if (!pw.ok) {
   console.error(pw.out.slice(-4000));
   fail('Playwright 旅程失败（上方是失败用例与断言；证据图在 e2e/collab-journey-results/）');
 }
-console.log('STEP 2 OK 真浏览器旅程通过（owner 邀请 → bob 入群 → 双方成员对账）');
+console.log('STEP 2 OK 真浏览器旅程通过（owner 邀请 → bob 入群 → 双方成员对账 → 两台互见对方写的任务）');
 
 // ── 3. 证据收口 ────────────────────────────────────────────────────────────
 step = 3;
@@ -165,15 +168,27 @@ const evidence = run('ls', ['-1', join(ROOT, 'e2e/collab-journey-results')]);
 const shots = evidence.out.split('\n').filter((l) => l.endsWith('.png'));
 const EXPECTED = [
   '01-owner-list-ready.png',
+  // 01b 曾经不在册：那枚实验开关的**措辞**（"看不到彼此改动"）就是 P-1 的交付内容，
+  // 图不钉进门禁等于那句话可以随时从界面上消失而这一趟照样绿。
+  '01b-owner-experimental-switch.png',
   '02-owner-consent-modal.png',
   '03-owner-panel-created.png',
   '04-owner-invite-ticket.png',
   '05-bob-join-dialog.png',
   '06-bob-joined.png',
   '07-owner-sees-bob.png',
+  '08-owner-panel-error-visible.png',
+  // M2 的界面腿：A 写的任务出现在 B 那台、B 写的出现在 A 那台。两张都要在，
+  // 只钉一张等于另一方向的搬运没人看图。
+  '09-owner-wrote-shared-task.png',
+  '10-bob-sees-owner-task.png',
+  '11-owner-sees-bob-task.png',
 ];
 const missing = EXPECTED.filter((name) => !shots.includes(name));
 if (missing.length > 0) fail(`证据图缺：${missing.join('、')}（拍了才算，路径固定）`);
+if (shots.length !== EXPECTED.length) {
+  fail(`证据图与在册清单不符：拍了 ${shots.length} 张，在册 ${EXPECTED.length} 张（多出来的没人名 = 没人看过的图）`);
+}
 console.log(`STEP 3 OK 证据齐（${shots.length} 张）`);
 console.log(`📸 人要看图：${join(ROOT, 'e2e/collab-journey-results')}`);
 

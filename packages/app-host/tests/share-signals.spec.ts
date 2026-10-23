@@ -72,6 +72,7 @@ const scenario = async (before: readonly DecryptedShareOp[], after: readonly Dec
   let pulls = 0;
   const handler = createShareOpsSignalHandler({
     storage,
+    knownShareIds: () => [SHARE],
     myClientId: ME,
     pull: async () => {
       pulls += 1;
@@ -84,11 +85,12 @@ const scenario = async (before: readonly DecryptedShareOp[], after: readonly Dec
 };
 
 describe('share 信号 · 该不该去拉', () => {
-  it('🔴 这台设备没有这份 share ⇒ 零请求、不响（信号是按账号扇的，不是按设备）', async () => {
+  it('🔴 本机既不认得也没落盘 ⇒ 零请求、不响（信号是按账号扇的，不是按设备）', async () => {
     const storage = makeStorage([['别的share', stateOf([])]]);
     let pulls = 0;
     const handler = createShareOpsSignalHandler({
       storage,
+      knownShareIds: () => ['别的share'],
       myClientId: ME,
       pull: async () => {
         pulls += 1;
@@ -98,6 +100,30 @@ describe('share 信号 · 该不该去拉', () => {
     const reading = await handler.onShareOpsSignal(SHARE);
     expect(pulls, '本机没有的 share 一次都不该去下载').toBe(0);
     expect(reading).toMatchObject({ knownLocally: false, pulled: false, added: 0, activities: [] });
+  });
+
+  it('🔴 刚入群那台设备：本机有清单行绑着这份 share，但**一次都没拉过** ⇒ 照样拉', async () => {
+    // 这一格是 M2 界面腿（`verify:collab-journey` 两台互见）实测抓出来的：
+    // 落盘日志的索引只有**拉过之后**才有内容，所以只认索引的话，第一份别人写的内容
+    // 会因为"本机还不认识它"被丢掉 —— 而这个判据自锁：不拉就永远不进索引。
+    // 症状不是"少一条"而是**新成员永远看不见任何改动**，直到某次手动进评论区。
+    const storage = makeStorage();
+    expect(storage.list(), '前提：这台设备一个字节都还没落过盘').toEqual([]);
+    let pulls = 0;
+    const handler = createShareOpsSignalHandler({
+      storage,
+      knownShareIds: () => [SHARE],
+      myClientId: ME,
+      pull: async () => {
+        pulls += 1;
+        storage.map.set(SHARE, stateOf([op({ id: 'c-1' })]));
+        return okResult(1);
+      },
+    });
+    const reading = await handler.onShareOpsSignal(SHARE);
+    expect(pulls, '本机绑定过 ⇒ 就该去拉').toBe(1);
+    expect(reading).toMatchObject({ knownLocally: true, pulled: true, added: 1 });
+    expect(reading.activities).toEqual(['added']);
   });
 
   it('本机有的 share ⇒ 真的拉一次，并把 added 带回来', async () => {
@@ -118,6 +144,7 @@ describe('share 信号 · 该不该去拉', () => {
     const storage = makeStorage([[SHARE, through([])]]);
     const handler = createShareOpsSignalHandler({
       storage,
+      knownShareIds: () => [SHARE],
       myClientId: ME,
       pull: async () => {
         storage.map.set(SHARE, through([op({ id: 'c-1' })]));
@@ -134,6 +161,7 @@ describe('share 信号 · 该不该去拉', () => {
     let arrived = false;
     const handler = createShareOpsSignalHandler({
       storage,
+      knownShareIds: () => [SHARE],
       myClientId: ME,
       pull: async () => {
         pulls += 1;
@@ -156,6 +184,7 @@ describe('share 信号 · 该不该去拉', () => {
     const boom = new Error('404 not a member');
     const handler = createShareOpsSignalHandler({
       storage,
+      knownShareIds: () => [SHARE],
       myClientId: ME,
       pull: async () => {
         throw boom;
@@ -194,7 +223,11 @@ describe('share 信号 · 什么算一条活动', () => {
     expect(shareActivitiesFromOps([op({ id: 'c-6', opType: OpType.Update })], ME)).toEqual([]);
   });
 
-  it('非 COMMENT 的 op ⇒ 不响（TASK 的 op 今天还不进共享日志，那是 M2 的路由）', () => {
+  it('非 COMMENT 的 op ⇒ 不响（M2 之后 TASK 的 op **已经**在这份日志里，但活动档位今天只映射评论）', () => {
+    // 这一臂钉的是"映射面"，不是"日志里有什么"：M2（ADR-0067 裁决一/补三）之后共享任务的
+    // CRT/UPD/DEL 确实进 share log，而偏好表里没有"有人加了任务 / 有人勾了完成"那一档措辞。
+    // 要给任务族加档位，改的是这一臂 + `ShareSignalActivity` 那个联合 + 通知偏好那一节，
+    // 不是让 `completed` 那一档悄悄长出一个没人判过的输入。
     expect(shareActivitiesFromOps([op({ id: 't-1', entityType: 'TASK' })], ME)).toEqual([]);
   });
 });

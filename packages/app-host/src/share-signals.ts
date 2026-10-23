@@ -10,11 +10,17 @@
  * 三条纪律，每条都有对应判据：
  *
  *  1. **这台设备不认识那份 share ⇒ 零请求。** 信号是按**账号**扇出的，而"这台设备
- *     见过哪些 share"是本地事实（`ShareLogStorage.list()`）。拿一个本地没有的 shareId
- *     去 `downloadOps` 只会 404 ⇒ 抛错 ⇒ 被实时回调吞掉 ⇒ 变成一条永远不会出读数的死路。
- *     更别说不该为一份本机没有的数据出一次网。
- *     ⚠️ 边界：这台设备**从没见过**的 share（在另一台设备上被邀请）不会由这条路径带来 ——
- *        它靠共享面板那趟 `GET /api/shares`。这条handler 只管"本机已有的 share 有新内容"。
+ *     见过哪些 share"是本地事实。拿一个本地没有的 shareId 去 `downloadOps` 只会 404
+ *     ⇒ 抛错 ⇒ 被实时回调吞掉 ⇒ 变成一条永远不会出读数的死路。
+ *     ⚠️ "认得"有**两条**本地途径，两条都算（缺一都会静默不响，而且各对应一种真形状）：
+ *       · `knownShareIds()` —— 这台设备上有清单行绑着这份 share（`shareIdsOnDevice`）。
+ *         🔴 这是**刚入群那台设备**唯一的痕迹：它一条 op 都还没拉过，所以落盘日志的索引
+ *         是空的。只认索引的话，第一份别人写的内容会因为"本机还不认识它"被丢掉，而
+ *         这个判据是自锁的 —— 不拉就永远不进索引，进了索引才允许拉。M2 的界面腿
+ *         （`verify:collab-journey` 两台互见那一格）实测到的就是这一形。
+ *       · `storage.list()` —— 这份日志在本机落过盘（拉过或写过）。
+ *     边界不变的那一半：这台设备**从没绑定过**这份 share（在另一台设备上被邀请）仍不由
+ *     这条路径带来 —— 它靠共享面板那趟 `GET /api/shares`。
  *  2. **一次信号只吵一次。** 活动是从**日志的差集**算出来的（按 op id），不是从
  *     `SharePullResult.added` 猜的：折叠会把重复吃掉，同一条 op 被信号推两次
  *     （服务端不去抖，见 `websocket-connection.service.ts` 那段注释）时
@@ -40,15 +46,16 @@ import type { DecryptedShareOp } from './share-replay.js';
  *   （壳里把这份读数直接喂给 `shouldNotifyActivity` / `selectNotifiedActivities`，
  *   两边一旦分家，web 那一行就编译不过 —— 不需要在这里复制那个联合类型，
  *   也不需要 app-host 反向依赖 ui 包）。
- *   这里刻意**不含** `'completed'`：那是"共享任务被勾完成"，而 `TASK` 的 op 今天
- *   仍然进个人日志（那是 M2 路由那一步），共享日志里根本没有这种 op 可映射 ——
- *   写一条映射就是给拿不到输入的代码做判据。
+ *   这里刻意**不含** `'completed'`：那是"共享任务被勾完成"。M2（ADR-0067 裁决一/补三）之后
+ *   `TASK` 的 op **已经**在这份共享日志里了，缺的不再是输入而是**档位本身** —— 通知偏好表里
+ *   还没有"有人加了任务 / 有人勾了完成"那两句措辞，而给它们造映射属另一件要单独判的事
+ *   （见 `tests/share-signals.spec.ts` 的"非 COMMENT 的 op ⇒ 不响"那一臂）。
  */
 export type ShareSignalActivity = 'added' | 'deleted';
 
 export interface ShareSignalReading {
   readonly shareId: string;
-  /** 这台设备上有没有这一份 share 的落盘痕迹。 */
+  /** 这台设备认不认得这份 share（本机清单行绑定 或 落盘日志索引，两条途径之一）。 */
   readonly knownLocally: boolean;
   /** 这一趟真的发过拉取（`knownLocally` 为假时必定是 `false`）。 */
   readonly pulled: boolean;
@@ -105,8 +112,14 @@ function readFreshOps(
 }
 
 export interface ShareOpsSignalPorts {
-  /** share 日志的本地存储：枚举本机已有的 share、并在拉取前后各读一次差集。 */
+  /** share 日志的本地存储：在拉取前后各读一次差集，并作为"认得"的第二条途径。 */
   readonly storage: ShareLogStorage;
+  /**
+   * 这台设备**绑定着**的 shareId 名单（web 递 `shareIdsOnDevice(currentState())`）。
+   * 🔴 必填而不是可选：漏了它就退回"只认落盘索引"，症状是**刚入群那台设备永远收不到
+   * 第一份内容**，而这条链上除了界面腿没有任何东西会红。
+   */
+  readonly knownShareIds: () => readonly string[];
   /** 真正的拉取（宿主递 `pullShareOps` 进来）。 */
   readonly pull: (shareId: string) => Promise<SharePullResult>;
   readonly myClientId: string;
@@ -124,7 +137,7 @@ export function createShareOpsSignalHandler(
 
   return {
     onShareOpsSignal: async (shareId) => {
-      const knownLocally = ports.storage.list().includes(shareId);
+      const knownLocally = ports.knownShareIds().includes(shareId) || ports.storage.list().includes(shareId);
       if (!knownLocally) {
         return { shareId, knownLocally: false, pulled: false, added: 0, activities: [] };
       }

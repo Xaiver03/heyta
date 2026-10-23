@@ -27,6 +27,7 @@ import {
   createShareRoutingCheckedDispatcher,
   crossesShareBoundary,
   routeShareIdForEntity,
+  routeShareIdForIntent,
   ShareChannelUnavailableError,
   ShareCrossListMoveError,
   createShareRoutingDispatcher,
@@ -135,6 +136,21 @@ describe('路由判据：所属清单的 shareId 是否在册', () => {
 
   it('标签没有清单归属 ⇒ kind-not-routable（这是补一存在的原因）', () => {
     expect(routeShareIdForEntity(fixture(), 'TAG', 'tagUrgent')).toEqual({ blocked: 'kind-not-routable' });
+  });
+
+  it('🔴 载荷里塞一个共享清单的 id **压不过**裁决一：实体已存在时仍按它自己的归属判', () => {
+    // 补三那句"回退只发生在 `entity-not-found` 那一形"的钉子。
+    // 这条判的是**解析器**而不是派发器：派发器上"把个人任务改到共享清单"会先撞上
+    // 补二的 `reject-move`，所以那条路本来就红不了 —— 而解析器这一层要是松了，
+    // 任何一次带 projectId 的写都能把私人条目判成共享（交到别人的钥后面）。
+    expect(
+      routeShareIdForIntent(fixture(), {
+        entityType: 'TASK',
+        entityId: 'tPersonal',
+        opType: OpType.Update,
+        payload: { projectId: 'pShared', title: '看牙' },
+      }),
+    ).toEqual({ blocked: 'project-not-shared' });
   });
 });
 

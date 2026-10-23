@@ -13,6 +13,9 @@
  *   bob：  侧栏「加入共享清单」→ 贴 token → 接受（带公钥）→ 等 owner 自动
  *         下发信封 → 解出同一把密钥 → 清单出现在自己侧栏。
  *   owner：面板轮询看到 bob 成员行（信封已发）。
+ *   互见：owner 在共享清单里写一条任务 → **bob 那台不刷新就看得见**；反向同一件事。
+ *         这一格是 M2 的界面腿（宿主层由 `verify:collab-sync` 第 12 步验，两台浏览器
+ *         里看得见才是用户事实）。
  *
  * §6.2 规定一的四条全做到：截图先落再断言、固定路径、console/pageerror
  * 从窗口创建起监听、人要看图（verify 脚本尾部打印证据路径）。
@@ -21,7 +24,7 @@
  *   HEYTA_COLLAB_BASE=<server> HEYTA_COLLAB_WEB_URL=<vite> npx playwright test \
  *     --config playwright.collab.config.ts tests/collab-journey.spec.ts
  */
-import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+import { expect, test, type BrowserContext, type Locator, type Page } from '@playwright/test';
 import { mkdir, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
@@ -162,7 +165,50 @@ async function evidenceShot(page: Page, filename: string): Promise<void> {
   await page.screenshot({ path: `${EVIDENCE}/${filename}`, fullPage: false });
 }
 
-test('共享清单全旅程：owner 建共享 + 邀请 → bob 贴 token 入群 → 双方成员对账', async ({ browser }) => {
+/**
+ * 按**标题**找一条任务行：`task-title-*` 是行体内唯一只装标题的那一枚。
+ *
+ * 🔴 不许退成整页 `getByText(标题)`，也不许按行体取：窄档下每行里常驻一只
+ * `subtask-select-*`，它把**别的任务**的标题当 `<option>` 写进同一棵子树 —— 实测
+ * `getByTestId('task-list').getByText('量窗台')` 先命中那枚 hidden 的 `<option>`，
+ * 于是"这条搬过来了"被读成"这条没搬过来"（造一个假红）。同一条取数前提写在
+ * `e2e/tests/selection-projections.spec.ts` 文件头与 `packages/ui/src/task-list/TaskRow.tsx` 里。
+ */
+const taskRowByTitle = (page: Page, text: string): Locator =>
+  page.locator('[data-testid^="task-title-"]').filter({ hasText: text });
+
+/** 这一台浏览器里"共享下行落了多少盘"的现场读数（只用于**失败信息**）。
+ *
+ * 为什么要它：两台互见那一腿断了有三种形状 —— ① 信号到不了这台/闸门把它丢了（没拉）
+ * ② 拉到了但没合进视图 ③ 合了但界面没重读。Playwright 的默认报错只会说"元素没出现"，
+ * 三种病灶的修法完全不同，而现场只有跑的时候拿得到（重跑一趟 ≈ 4 分钟）。
+ * `heyta.share-log.*` 是那条唯一的痕迹：索引里没有这份 share = 一次都没落过盘。
+ */
+async function shareLogKeys(page: Page, label: string): Promise<string> {
+  const keys = await page.evaluate(() =>
+    Object.keys(localStorage)
+      .filter((k) => k.startsWith('heyta.share-log'))
+      .map((k) => `${k}=${String(localStorage.getItem(k)).slice(0, 40)}`),
+  );
+  return `[${label}] ${keys.length > 0 ? keys.join(' | ') : '（没有任何 heyta.share-log* 键 ⇒ 这台设备一份共享内容都没落过盘）'}`;
+}
+
+/** 等一条跨设备搬过来的内容；等不到就把两边的现场读数并进报错里。 */
+async function expectVisibleWithShareLogDump(
+  page: Page,
+  locator: Locator,
+  label: string,
+  timeout: number,
+): Promise<void> {
+  try {
+    await expect(locator.first()).toBeVisible({ timeout });
+  } catch (error: unknown) {
+    const dump = await shareLogKeys(page, label);
+    throw new Error(`${String(error)}\n      现场读数：${dump}`);
+  }
+}
+
+test('共享清单全旅程：owner 建共享 + 邀请 → bob 贴 token 入群 → 双方成员对账 → 两台互见对方写的任务', async ({ browser }) => {
   // 固定路径清旧图（规定二：采集失败不得沿用旧图）。
   await rm(EVIDENCE, { recursive: true, force: true });
   await mkdir(EVIDENCE, { recursive: true });
@@ -322,6 +368,64 @@ test('共享清单全旅程：owner 建共享 + 邀请 → bob 贴 token 入群 
   });
   await evidenceShot(ownerPage, '08-owner-panel-error-visible.png');
   await ownerPage.unroute('**/api/shares/*/invitations');
+
+  // ── 9. 🔴 两台真浏览器里互见（M2 的界面腿） ───────────────────────────────
+  //
+  // `verify:collab-sync` 第 12 步在**宿主层**证了任务族的 op 会搬。宿主层两台 Node 互见
+  // ≠ 用户互相看得见：中间还隔着三层，每一层都能单独断掉 ——
+  //   ① 合并视图把它挂到哪条清单行（挂在作者本机那个 id 上的话，对面那台筛不出来）；
+  //   ② `new_share_ops` 到不到**这台浏览器**（WS 是壳里接的，宿主层没有 WS）；
+  //   ③ 界面到底重不重读状态（共享内容能在个人 op-log 一动没动的前提下变）。
+  // 所以这一格判的是那三层合起来的用户可见结果，零 mock。
+  //
+  // ⚠️ 标题只当**锚**用，不当期望值：添加框是快速添加输入框，会解析日期/标签，
+  // 拿"我敲进去的串"去对面找会被解析规则误判。取的是**界面上真落成的那一行**的文字，
+  // 要跨线的就是那一句 —— 判据因此既不受解析器改动影响，也不可能空转。
+  const ownerAnchor = '换窗纱';
+  const bobAnchor = '量窗台';
+
+  // 面板是模态，先关掉才回到清单面；关完仍在共享的那条清单上（写侧路由读的就是这条筛选）。
+  await ownerPage.getByTestId('share-dialog-close').click();
+  await expect(ownerPage.getByTestId('share-dialog')).toHaveCount(0);
+  await expect(ownerPage.locator('.ht-header__title')).toHaveText('家庭装修');
+
+  await ownerPage.locator('input[placeholder^="添加任务"]').fill(`${ownerAnchor}谁来约师傅`);
+  await ownerPage.keyboard.press('Enter');
+  const ownerRow = taskRowByTitle(ownerPage, ownerAnchor).first();
+  await expect(ownerRow, 'owner 自己那台先看得见这条任务').toBeVisible();
+  const titleFromOwner = (await ownerRow.textContent())?.trim() ?? '';
+  expect(titleFromOwner.length, '取到界面上实际落成的那一行文字').toBeGreaterThan(0);
+  await evidenceShot(ownerPage, '09-owner-wrote-shared-task.png');
+
+  // ① + ② + ③：bob 那台**没有做任何刷新**，靠 WS 信号把这条搬过来并画出来。
+  const bobSeesOwner = taskRowByTitle(bobPage, titleFromOwner);
+  await expectVisibleWithShareLogDump(
+    bobPage,
+    bobSeesOwner,
+    `B 那台看不见 A 写的「${titleFromOwner}」（信号/合并/重读三层里断了一层）`,
+    30_000,
+  );
+  // 同一条共享任务在对面那台只许出现一行：挂两处（自己的行 + 共享的行）是这一族最容易
+  // 长出来的形状，而"看得见"这一句对它照样是绿的。
+  await expect(bobSeesOwner, '一条共享任务在对面那台只许出现一行').toHaveCount(1);
+  await expect(bobPage.locator('.ht-header__title'), 'bob 仍站在自己那条清单行上').toHaveText('家庭装修（合伙）');
+  await evidenceShot(bobPage, '10-bob-sees-owner-task.png');
+
+  // 反向那一腿（同一个 seam 的另一半方向）：bob 写一条，owner 那台要看得见。
+  await bobPage.locator('input[placeholder^="添加任务"]').fill(`${bobAnchor}周末去建材城`);
+  await bobPage.keyboard.press('Enter');
+  const bobRow = taskRowByTitle(bobPage, bobAnchor).first();
+  await expect(bobRow, 'bob 自己那台先看得见这条任务').toBeVisible();
+  const titleFromBob = (await bobRow.textContent())?.trim() ?? '';
+  const ownerSeesBob = taskRowByTitle(ownerPage, titleFromBob);
+  await expectVisibleWithShareLogDump(
+    ownerPage,
+    ownerSeesBob,
+    `A 那台看不见 B 写的「${titleFromBob}」（反向那一腿断了）`,
+    30_000,
+  );
+  await expect(ownerSeesBob, '反向：一条共享任务在作者以外那台只许出现一行').toHaveCount(1);
+  await evidenceShot(ownerPage, '11-owner-sees-bob-task.png');
 
   // ── 读数收口 ─────────────────────────────────────────────────────────────
   // 服务端事实（真 API，不靠 UI）：两个成员、bob 是 editor、信封已下。
