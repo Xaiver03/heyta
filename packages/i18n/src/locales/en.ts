@@ -1712,6 +1712,7 @@ export const en = {
   'web.organize.projectLabel': 'List',
   'web.organize.projectSelect': 'List that task "{title}" belongs to',
   'web.organize.inbox': 'Inbox',
+  'web.organize.moveBlockedShared': 'Tasks in a shared list cannot change lists yet',
   'web.organize.tagsLegend': 'Tags',
   'web.organize.tagToggle': 'Add or remove tag "{name}" on task "{title}"',
   'web.organize.noTags': 'No tags yet — create one under "Tags" on the left.',

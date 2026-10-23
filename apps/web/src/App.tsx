@@ -154,6 +154,7 @@ import { SubscriptionNotice } from './features/subscription/SubscriptionNotice.j
 import { TaskActionError } from './features/tasks/TaskActionError.js';
 import { RenewPanel } from './features/subscription/RenewPanel.js';
 import { ProjectsPanel } from './features/projects/ProjectsPanel.js';
+import { moveBlockedForTask } from './features/share/share-move-guards.js';
 import { ShareFeature } from './features/share/ShareFeature.js';
 import { ShareNotificationSettings } from './features/share/ShareNotificationSettings.js';
 import { loadProjectTaskSort, saveProjectTaskSort } from './features/projects/project-sort-pref.js';
@@ -515,6 +516,17 @@ export function App(): React.JSX.Element {
     },
     [clearBulkSelection, selectedTaskIds, t],
   );
+
+  /**
+   * 批量「换清单」的目的地可用性（ADR-0067 补二的**界面那一半**，判据在 app-host）。
+   *
+   * 🔴 只要选中的里面有一条撞门，这个目的地就整批灰掉：批量动作没有"半批成功"这种
+   * 形状（点了之后一半成功一半抛错，等于悄悄丢一半），所以判据是 any 而不是 all。
+   */
+  const bulkMoveBlocked = (destination: string | undefined): boolean =>
+    [...selectedTaskIds].some((taskId) => moveBlockedForTask(taskId, destination));
+  const bulkMoveNowhere =
+    bulkMoveBlocked(undefined) && projects.projects.every((project) => bulkMoveBlocked(project.id));
 
   /**
    * 设置浮层要**落在哪一节**（`help` / `profile` / `sync`），`undefined` = 不定位。
@@ -2456,7 +2468,7 @@ export function App(): React.JSX.Element {
                     ) : null}
                     <select
                       aria-label={t('web.shell.bulk.move')}
-                      disabled={selectedTaskIds.size === 0}
+                      disabled={selectedTaskIds.size === 0 || bulkMoveNowhere}
                       defaultValue=""
                       onChange={(event) => {
                         if (event.target.value === '') return;
@@ -2474,9 +2486,18 @@ export function App(): React.JSX.Element {
                       }}
                     >
                       <option value="">{t('web.shell.bulk.move')}</option>
-                      <option value="__inbox__">{t('web.shell.bulk.moveInbox')}</option>
+                      <option value="__inbox__" disabled={bulkMoveBlocked(undefined)}>
+                        {t('web.shell.bulk.moveInbox')}
+                      </option>
                       {projects.projects.map((project) => (
-                        <option key={project.id} value={project.id}>{project.name}</option>
+                        <option
+                          key={project.id}
+                          value={project.id}
+                          disabled={bulkMoveBlocked(project.id)}
+                          title={bulkMoveBlocked(project.id) ? t('web.organize.moveBlockedShared') : undefined}
+                        >
+                          {project.name}
+                        </option>
                       ))}
                     </select>
                     <button
