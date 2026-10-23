@@ -148,6 +148,7 @@ import { DetailColumnResizer, SidebarResizer } from './features/shell/ColumnResi
 import { useSyncStore } from './features/sync/store.js';
 import { SubscriptionNotice } from './features/subscription/SubscriptionNotice.js';
 import { TaskActionError } from './features/tasks/TaskActionError.js';
+import { ShareSignatureNotice } from './features/share/ShareSignatureNotice.js';
 import { RenewPanel } from './features/subscription/RenewPanel.js';
 import { ProjectsPanel } from './features/projects/ProjectsPanel.js';
 import { moveBlockedForTask } from './features/share/share-move-guards.js';
@@ -2667,6 +2668,11 @@ export function App(): React.JSX.Element {
               六个面，逐面各挂一份就会长成六份各自维护的提示。
               组件自己读 store，所以这里不需要任何条件 —— 没失败时它渲染 `null`。 */}
           <TaskActionError />
+          {/* 🔴 共享内容**验签没过**时被拒了几条，必须说出来（ADR-0069 裁决五的界面落点）。
+              与上面同一位置逻辑：被拒的可能是一条任务、一张便签或一句评论，
+              挂在评论区里就等于"被拦掉的是任务时界面一句都不说"。
+              没拒时它渲染 `null`，所以这里不需要任何条件。 */}
+          <ShareSignatureNotice />
           {/* AI 捕获的接线**留在这个组件内部** —— 输入框的草稿是它的状态，
               而草稿就是 AI 要解析的那句话。把草稿镜像到这里再传回去
               会造出两份状态，且"应用后清空输入框"没法做（清不动上游的 state）。

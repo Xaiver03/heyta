@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { emptyState, type MaterializedState } from '@heyta/op-log';
+import { deriveShareIdentityKeyPair } from '@heyta/sync-core';
 
 import type { ActionContext } from '../src/actions.js';
 import { ListNotSharedError } from '../src/comment-actions.js';
@@ -12,7 +13,7 @@ import {
   type ShareLogStorage,
 } from '../src/share-comments.js';
 import { emptyShareLogState, type ShareLogState } from '../src/share-op-log.js';
-import type { ShareOpDownloadPort } from '../src/share-client.js';
+import type { ShareOpDownloadPort, ShareOpUploadReceipt } from '../src/share-client.js';
 
 /**
  * W3-T2 判据：三片接起来之后，"用户想对某条任务说一句话"真的**出得去**、
@@ -23,6 +24,9 @@ import type { ShareOpDownloadPort } from '../src/share-client.js';
  */
 const SHARED_TASK = 't-shared';
 const PERSONAL_TASK = 't-personal';
+
+/** 固定种子的签名身份：让每条用例签出来的东西可复现。 */
+const author = deriveShareIdentityKeyPair(new Uint8Array(32).fill(21));
 
 function stateWithRouting(): MaterializedState {
   const state = emptyState();
@@ -68,7 +72,7 @@ function makeStorage(): { saved: Map<string, ShareLogState>; storage: ShareLogSt
 function makeApi(): {
   calls: Array<{ shareId: string; ops: readonly unknown[] }>;
   api: {
-    uploadOps: (shareId: string, ops: readonly unknown[]) => Promise<unknown>;
+    uploadOps: (shareId: string, ops: readonly unknown[]) => Promise<ShareOpUploadReceipt>;
     downloadOps: ShareOpDownloadPort['downloadOps'];
   };
 } {
@@ -78,7 +82,14 @@ function makeApi(): {
     api: {
       uploadOps: async (shareId, ops) => {
         calls.push({ shareId, ops });
-        return { accepted: [shareId], rejected: [] };
+        // 回执按**真实线协议形状**给（`accepted: [{id, serverSeq}]`）：dispatcher 判"写成功"
+        // 读的就是这一格，替身给一个别的形状会让判据验的是替身而不是协议。
+        // 这一枚替身 = "全收的假服务端"；要测被拒的臂就在用例里覆盖 uploadOps。
+        return {
+          accepted: ops.map((op, index) => ({ id: (op as { id: string }).id, serverSeq: index + 1 })),
+          rejected: [],
+          latestServerSeq: ops.length,
+        };
       },
       // 本文件只测**上行**那半边；下行有自己的一套判据（`share-comments-pull.spec.ts`）。
       downloadOps: async () => ({ ops: [], cursor: { latestServerSeq: 0 } }),
@@ -106,6 +117,9 @@ function makeHost(over: Partial<ShareCommentsHostOptions> = {}): {
     ctx: makeCtx(),
     api,
     cipherFor: async () => codec(),
+    // 真派生一枚 Ed25519（固定种子）：签名走的是生产原语，替身只做"有没有签名件"这一档。
+    // 签名本身对不对由 `share-client.spec.ts` 那几条读侧判据钉，这里不重复。
+    signerFor: async () => ({ memberId: 'member-1', ed25519SecretKey: author.ed25519SecretKey }),
     storage,
     currentUserId: () => 'u-me',
     clientId: 'device-A',
@@ -174,6 +188,9 @@ describe('share-comments 宿主（W3-T2）', () => {
       ctx: makeCtx(),
       api,
       cipherFor: async () => codec(),
+      // 与 `makeHost` 同一枚签名件：冷启动这一趟只是"重放已经落盘的那条"，一个请求都不发，
+      // 但宿主构造要求签名件在场（缺了它，写侧会在真正要发的时候才具名失败）。
+      signerFor: async () => ({ memberId: 'member-1', ed25519SecretKey: author.ed25519SecretKey }),
       storage: { load: () => persisted, save: () => undefined, list: () => ['share-1'], cursor: () => 0, setCursor: () => undefined },
       currentUserId: () => 'u-me',
       clientId: 'device-A',

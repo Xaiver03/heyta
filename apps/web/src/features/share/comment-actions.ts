@@ -23,6 +23,7 @@ import {
   type CommentActions,
   type ShareLogStorage,
   type SharePullResult,
+  type ShareSignatureRejection,
   type ShareConflict,
   type ShareWriteChannel,
 } from '@heyta/app-host';
@@ -30,9 +31,10 @@ import type { CommentLike } from '@heyta/domain';
 import { createSharePayloadCipher, ShareApiClient, type SyncPayloadCipher } from '@heyta/sync-client';
 
 import { emitEngineChange, currentState, dispatchChecked, dispatchIntent } from '../../lib/oplog.js';
+import { emitShareRepaint } from '../../lib/share-signal-sink.js';
 import { createWebAuthFetch } from '../../lib/central-fetch.js';
 import { createWebShareKeyRotation } from './share-rotation.js';
-import { unwrapShareKeyRing } from './share-key-store.js';
+import { readShareOwnIdentity, unwrapShareKeyRing } from './share-key-store.js';
 
 /** share 日志在本地 `Storage` 上的键（一份 share 一条日志 + 一张索引 + 一份下行游标）。 */
 const LOG_PREFIX = 'heyta.share-log.';
@@ -148,6 +150,13 @@ export interface WebShareComments {
    */
   pullForTask(taskId: string): Promise<SharePullResult | undefined>;
   /**
+   * 最近一轮**验签被拒**的共享 op（ADR-0069 裁决五：具名报警的落点）。
+   *
+   * ⚠️ 空数组只意味着"这一轮没有需要报警的行"，**不**等于"这些都验过了"
+   * （M4 之前的存量行没有作者列，本来就不进这一档）。
+   */
+  signatureRejections(): ShareSignatureRejection[];
+  /**
    * 按 **shareId** 拉（M5 的实时信号走这一条：信号里给的就是 shareId）。
    * 与 `pullForTask` 同一个 dispatch，只是少一次"任务→清单"的解析。
    */
@@ -192,7 +201,40 @@ export function createWebShareComments(deps: WebShareCommentsDeps): WebShareComm
       if (ring === undefined) return undefined;
       return createSharePayloadCipher(ring);
     },
+    /*
+     * 读侧验签用的名单（ADR-0069 裁决五）：成员行 id → 在册签名公钥。
+     *
+     * 🔴 取不到就交 `undefined`，**不要**退成空对象：空名单会把每一行都读成
+     * "查无此人"，那是把一次网络抖动画成一堆伪造警报。宿主那边会抛具名错误、
+     * 这一轮不推进游标（判据在 `share-read-verify.spec.ts`）。
+     * 拉取只发生在真出现署名行时（存量日志不多打这一枪）。
+     */
+    verifiersFor: async (shareId) => {
+      try {
+        const { members } = await api.listMembers(shareId);
+        const roster: Record<string, string> = {};
+        for (const m of members) {
+          if (typeof m.signingPublicKey === 'string' && m.signingPublicKey.length > 0) roster[m.memberId] = m.signingPublicKey;
+        }
+        return roster;
+      } catch {
+        return undefined;
+      }
+    },
     storage: createStorageShareLog(deps.storage),
+    /*
+     * 本机签名件（ADR-0069 裁决一/二）：成员行 id + 那份身份种子派生出的 Ed25519 私钥。
+     *
+     * 🔴 私钥**不出这一层**：它只在 `signShareOpWire` 里被用一次，不上线、不进日志、
+     * 不进任何 store（种子的存储形态是 wrap 过的，见 `share-key-store.ts`）。
+     * 没有身份（未解锁 / 这台设备没有自己的成员行）⇒ `undefined`，
+     * 宿主据此具名失败、一个请求都不发 —— 不是"先发一条无签的试试"。
+     */
+    signerFor: async (shareId) => {
+      const own = await readShareOwnIdentity({ storage: deps.storage, cipher: vaultCipher, shareId });
+      if (own === undefined) return undefined;
+      return { memberId: own.memberId, ed25519SecretKey: own.ed25519SecretKey };
+    },
     currentUserId: () => deps.userId,
     clientId: deps.clientId,
     schemaVersion: deps.schemaVersion,
@@ -221,6 +263,14 @@ export function createWebShareComments(deps: WebShareCommentsDeps): WebShareComm
   const pullShareOps = async (shareId: string): Promise<SharePullResult> => {
     const result = await dispatch.pullShareOps(shareId);
     if (result.added > 0) emitEngineChange();
+    /*
+     * 🔴 验签拒了也要敲重画，而且**不能等 added > 0**：被拒那一条根本没落盘，
+     * `added` 很可能就是 0 —— 只看"有没有新内容"的话，症状恰好是这一整条线要防的静默：
+     * 同事写了东西，这台设备悄悄拒收，界面上什么都没发生。
+     * 这一枚是**所有** web 拉取的唯一出口（评论区那趟与 M5 信号那趟都经过它），
+     * 所以报警的触发条件只有一处，不会分叉。
+     */
+    if ((result.rejections?.length ?? 0) > 0) emitShareRepaint();
     return result;
   };
 
@@ -248,6 +298,7 @@ export function createWebShareComments(deps: WebShareCommentsDeps): WebShareComm
       },
     },
     commentsForTask: dispatch.commentsForTask,
+    signatureRejections: dispatch.signatureRejections,
     pullForTask: createShareTaskPuller({
       shareIdOfTask: actions.shareIdOfTask,
       pullShareOps,

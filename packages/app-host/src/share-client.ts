@@ -27,18 +27,78 @@
  * 4. 🔴 **因果时钟的基准由调用方给**（`baseClock`），本文件不自己存一份。
  *    见下面 `dispatch` 里那段注释。
  *
- * 签名（W3-T3）**预留但不在这里发明**：`@heyta/sync-core` 已有
- * `buildShareOpSignatureMessage({ opId, clientId, shareId, keyEpoch, ciphertext })`
- * 与 `signShareOperation(secretKey, message)`，接线时把签名放进 op 的 `signature` 字段即可；
- * 本片先不做，是因为线协议里那个字段的服务端校验形状还没读（**线协议词表只有一份定义**，
- * 自造一个字段形状比不做更坏）。
+ * 5. 🔴 **每条上行的 op 必须带签名，且必须拿到服务端的收件回执才算写成功**（ADR-0069 裁决四/六）。
+ *    两半都是这条腿的"永久拒绝"落点，缺一半就退化成 M4 之前那一格：
+ *    - 拿不到本机签名件（未解锁 / 没有自己的成员行）⇒ **零请求**并具名抛错。
+ *      发一条无签 op 没有意义：服务端本来就按无签拒（裁决六），发出去只是多一次"看起来写成功了"。
+ *    - 回执里这条 op 没出现在 `accepted` ⇒ 具名抛错，**调用方因此不落本地日志**。
+ *      个人那条腿有 `PERMANENT_REJECTION_CODES` + 待上传队列（`sync-client/src/client.ts`）；
+ *      共享这条腿**没有队列**（一条意图一次上行），所以它的"移出队列"只能是"别落进日志"。
+ *      ⚠️ 这里不列码表：判据是"服务端有没有把它收进日志"，而不是"服务端说的是哪一码"——
+ *      多一份码表就多一份会与词表漂移的抄件（#535 那一族），而 `code` 只作为**读数**带在错误里。
  */
 
-import type { VectorClock } from '@heyta/sync-core';
+import { signShareOpWire, type VectorClock } from '@heyta/sync-core';
 
-/** 上行一条 share op 需要的最小端口（`ShareApiClient.uploadOps` 结构上就满足它）。 */
+import type { ShareSignatureRejection } from './share-verify.js';
+
+/**
+ * 上行一条 share op 需要的最小端口（`ShareApiClient.uploadOps` 结构上就满足它）。
+ *
+ * 🔴 回执必须声明进来：这一枚端口的**返回值**是"服务端到底收没收这条"的唯一读数。
+ * 以前它被丢掉，于是共享那条腿没有任何一格知道自己被拒了 —— 症状是"本地改成功了、
+ * 对面的成员永远看不见"，而界面上没有任何东西说这件事。
+ */
 export interface ShareOpUploadPort {
-  uploadOps(shareId: string, ops: readonly unknown[]): Promise<unknown>;
+  uploadOps(shareId: string, ops: readonly unknown[]): Promise<ShareOpUploadReceipt>;
+}
+
+/** 服务端逐 op 的收件回执（只声明本文件真的读的字段）。 */
+export interface ShareOpUploadReceipt {
+  readonly accepted?: readonly { id: string }[];
+  readonly rejected?: readonly { id: string; code: string }[];
+}
+
+/**
+ * 本机签名件：这份 share 里"我是哪个成员"+"我的 Ed25519 私钥"。
+ *
+ * 🔴 两枚都必要，缺一不可签：私钥签出的东西要由**在册的那把公钥**验，
+ * 而在册公钥挂在成员行上 ⇒ 签名消息里必须写同一个成员行 id（ADR-0069 裁决三）。
+ * 私钥不出本机：它从保险库里的身份种子派生，只用于签，不上线、不备份成第二份。
+ */
+export interface ShareOpSigner {
+  readonly memberId: string;
+  readonly ed25519SecretKey: Uint8Array;
+}
+
+/** 本机签不出条 op（未解锁 / 没有自己的成员行）⇒ 零请求、具名失败。 */
+export class ShareOpUnsignableError extends Error {
+  readonly code = 'share-op-unsignable' as const;
+  constructor(shareId: string) {
+    super(`这份共享清单（${shareId}）本机没有可用的签名身份，改动没有上行`);
+    this.name = 'ShareOpUnsignableError';
+  }
+}
+
+/**
+ * 服务端明确没把这条 op 收进共享日志 ⇒ 具名失败，调用方因此**不落本地日志**。
+ *
+ * ⚠️ `code` 是服务端给的那一枚（`SHARE_OP_SIGNATURE_INVALID` / `SHARE_ROLE_FORBIDDEN` /
+ * 线协议词表里的任何一枚），本文件不解释它、不据它分支 —— 它只是**读数**，
+ * 决定"这条没写进去"的判据是"它不在 accepted 里"。
+ */
+export class ShareOpNotAcceptedError extends Error {
+  readonly code: string;
+  constructor(
+    readonly opId: string,
+    code: string | undefined,
+    /** 服务端没给这一条的收件结果时，这里是一句人话；给了码就以码为准。 */
+    readonly reason: string,
+  ) {
+    super(`共享改动未被服务端接受（${code ?? reason}）：${opId}`);
+    this.name = 'ShareOpNotAcceptedError';
+    this.code = code ?? 'NO_ACK';
+  }
 }
 
 /**
@@ -151,6 +211,18 @@ export interface ShareOpDispatcherOptions {
    * 里面已经含本地上行过的每一条 + 下行拉回来的远端每一条）。
    */
   readonly baseClock: (shareId: string) => VectorClock;
+  /**
+   * 🔴 按 shareId 取本机签名件；拿不到就返回 `undefined`（未解锁、没有自己的成员行）。
+   *
+   * 为什么异步、为什么按 shareId：签名件住在保险库里（解包是异步的），而**每台设备在每份
+   * share 里的成员行各不相同** —— 一个 dispatcher 会服务多份清单，它的成员行 id 不能是
+   * 建 dispatcher 时抓的那一份死值（与 `baseClock` 同一条理由）。
+   *
+   * 为什么必需而不是可选：服务端按 ADR-0069 裁决六拒绝无签上传，所以"没签名"这一档
+   * 在本条腿上没有任何出路 —— 可选就等于允许发一条注定被拒的 op，还顺手把"写成功了"
+   * 画给用户看。
+   */
+  readonly signerFor: (shareId: string) => Promise<ShareOpSigner | undefined>;
 }
 
 export interface ShareOpDispatchResult {
@@ -172,11 +244,19 @@ export interface ShareOpDispatchResult {
   readonly op?: ShareOpWire | undefined;
 }
 
-/** 装配好的线 op（身份 + 密文 + 向量时钟）。 */
+/** 装配好的线 op（身份 + 密文 + 向量时钟 + 逐 op 签名）。 */
 export interface ShareOpWire extends ShareOpWireIdentity {
   readonly payload: string;
   readonly vectorClock: Record<string, number>;
   readonly isPayloadEncrypted: boolean;
+  /**
+   * Ed25519 签名的 base64（签名域 = 线协议里除 `serverSeq`/`receivedAt` 外的全部字段）。
+   *
+   * 🔴 它是**必填**的：这条腿上不再存在"合法的无签 op"。把它声明成可选就等于把
+   * "服务端会拒无签"这件事只写在 ADR 里 —— 类型上谁都能漏一个，而漏掉的那一条
+   * 在服务端是一枚具名拒绝，在本机却已经画成"改好了"。
+   */
+  readonly signature: string;
 }
 
 let fallbackSeq = 0;
@@ -198,7 +278,26 @@ export function createShareOpDispatcher(options: ShareOpDispatcherOptions): {
       // ① 未登录：一个请求都不发，也不构造 op（连 id 都不消耗）。
       if (!options.isSignedIn()) return { opId: '', skipped: true };
 
-      // ② 只取**一次**时间与 id，之后加密与上线共用这同一份 identity（纪律 1）。
+      /*
+       * ② 签名件（ADR-0069 裁决一/二）：**在消耗 id 之前**问一次。
+       *
+       * 拿不到就具名抛错、零请求 —— 这一档不是"暂时没配好可以先发着"：服务端按裁决六
+       * 拒绝无签上传，一条无签 op 的唯一结局是被拒，而本机会把它折进日志画成"改好了"。
+       * 抛在加密之前还有个具体好处：不消耗 op id、不解清单钥、不读因果时钟，
+       * 于是"一条根本没发出去的 op"不会在日志里占下一个序号（与①同一条纪律）。
+       */
+      const signer = await options.signerFor(shareId);
+      if (signer === undefined) throw new ShareOpUnsignableError(shareId);
+
+      /*
+       * ③ 只取**一次**时间与 id，之后加密、签名与上线共用这同一份 identity（纪律 1）。
+       *
+       * ⚠️ `Math.trunc`：服务端把这一枚存成 `client_timestamp`（BigInt）时做的正是截断
+       * （`share.routes.ts` 里那次 `BigInt(Math.trunc(op.timestamp))`）。签的域必须等于
+       * **会被存下来、以后又被下载回来**的那一份，否则读侧重建出来的消息与写侧签的那一份
+       * 差在小数上 ⇒ 每台非签名者的设备把这枚合法签名读成失败。截断放在**加密之前**，
+       * 这样 AAD 里那一份、签名域里那一份、线上那一份是同一个数（纪律 1 的同一条轴）。
+       */
       const identity: ShareOpWireIdentity = {
         id: newId(),
         clientId: options.clientId,
@@ -206,13 +305,13 @@ export function createShareOpDispatcher(options: ShareOpDispatcherOptions): {
         opType: intent.opType,
         entityType: intent.entityType,
         entityId: intent.entityId,
-        timestamp: now(),
+        timestamp: Math.trunc(now()),
         schemaVersion: options.schemaVersion,
       };
       const payload = await options.cipher.encrypt(JSON.stringify(intent.payload ?? {}), identity);
 
       /*
-       * ③ 线 op = identity + 密文 + 向量时钟（形状照 `verify-collab-sync.mjs` 的 `mkOp`）。
+       * ④ 线 op = identity + 密文 + 向量时钟 + 签名（形状照 `verify-collab-sync.mjs` 的 `mkOp`）。
        *
        * 🔴 **时钟是"本地那一维 +1"，不是写死的 `{我:1}`**（ADR-0067 裁决二）。
        * 基准在**构造 op 之前**读（不是上传之后）：一条 op 的 `vectorClock` 是它的**因果前集**，
@@ -224,15 +323,40 @@ export function createShareOpDispatcher(options: ShareOpDispatcherOptions): {
        * 也只能判 `EQUAL`/`CONCURRENT` ⇒ 顺序只能靠 timestamp 平局来猜，
        * 而"两个人各自的第 2 条改动"会被判成并发。判据在
        * `tests/share-causal-clock.spec.ts`（"因果边真存在"那一枚会红）。
+       *
+       * 🔴 签名域里那枚 `signerMemberId` 是**本机以为的自己**（`share-key-store` 里那行成员 id），
+       * 服务端验的却是**认证上传者**那一行（`lookup.member.id`）。两者不一致 ⇒ 验不过，
+       * 于是"替别人签一条"在这条协议上结构性地做不到（ADR-0069 裁决四"不许代签"的落点）。
        */
       const base = options.baseClock(shareId);
-      const op = {
+      const unsigned = {
         ...identity,
         payload,
         vectorClock: { ...base, [options.clientId]: (base[options.clientId] ?? 0) + 1 },
         isPayloadEncrypted: true,
       };
-      await options.api.uploadOps(shareId, [op]);
+      const op: ShareOpWire = {
+        ...unsigned,
+        signature: signShareOpWire(signer.ed25519SecretKey, {
+          shareId,
+          signerMemberId: signer.memberId,
+          wire: { ...unsigned, clientTimestamp: identity.timestamp },
+        }),
+      };
+
+      /*
+       * ⑤ 回执：这条 op **被服务端收进共享日志**才算写成功。
+       *
+       * 判据是"它在不在 `accepted` 里"，不是"服务端报了哪一枚码"—— 多一份码表就多一份
+       * 会与线协议词表漂移的抄件（环境陷阱 #535 那一族：个人那条腿的 `PERMANENT_REJECTION_CODES`
+       * 绿不代表共享这条腿也有同一套处置）。`code` 只作为读数带在错误里，给界面与诊断用。
+       */
+      const receipt = await options.api.uploadOps(shareId, [op]);
+      const acceptedIds = new Set((receipt?.accepted ?? []).map((row) => row.id));
+      if (!acceptedIds.has(identity.id)) {
+        const row = (receipt?.rejected ?? []).find((item) => item.id === identity.id);
+        throw new ShareOpNotAcceptedError(identity.id, row?.code, '服务端没给出这条的收件结果');
+      }
       return { opId: identity.id, skipped: false, op };
     },
   };
@@ -263,6 +387,11 @@ export interface ShareOpWireRow {
    */
   readonly payload: unknown;
   readonly vectorClock?: unknown;
+  /**
+   * 时钟编码（`full` 缺省 / `frontier-delta`）。在签名域里，所以读侧要拿得到才能重建那份字节。
+   */
+  readonly vectorClockEncoding?: string | null;
+  readonly isPayloadEncrypted?: boolean | null;
   readonly serverSeq: number;
   /**
    * 服务端盖在 op 上的**作者时刻**（`null` 是传输层允许的：见 `ShareOpWire`）。
@@ -273,6 +402,15 @@ export interface ShareOpWireRow {
    * 而 `null` **没法**参与 AAD（写侧从来不送空值）⇒ 拉取那一头遇到它就抛错、不推进游标。
    */
   readonly clientTimestamp: number | null;
+  /**
+   * 库里那一格：这条是谁写的（share 作用域的成员行 id）。
+   *
+   * 🔴 `null` 与"没有这一格"都只有一种意思：**这条从来没进过签名协议**（M4 之前的存量行）。
+   * 读侧据此把它归入"未验证但照旧可用"，而不是"伪造"（`share-verify.ts` 纪律 3）。
+   */
+  readonly signerMemberId?: string | null;
+  /** 线协议上那枚 base64 签名。缺 ⇒ 读成"未签名"，不是"已验证"。 */
+  readonly signature?: string | null;
 }
 
 /** 一页的返回：op 列表 + 服务端当前最新序（拉完没有拉完，看这两个）。 */
@@ -304,4 +442,12 @@ export interface SharePullResult {
   readonly cursor: number;
   /** 为收敛而翻的页数（>1 说明分页那条路真的被走过）。 */
   readonly pages: number;
+  /**
+   * 这一轮**验签被拒**的那几条（ADR-0069 裁决五：读侧要能分出"通过/未签名/失败/查无此人"）。
+   *
+   * 🔴 它必须随结果交出去而不是抛：拉取的两个调用点都 `.catch(() => undefined)`
+   * （`ShareCommentsSection.tsx` 与信号垫片），抛进去的名字会被吞掉 ——
+   * 症状正是这一整条线一直在防的"静默"。没有拒的时候是空数组（可选 + 运行时默认，§3.3）。
+   */
+  readonly rejections?: readonly ShareSignatureRejection[];
 }

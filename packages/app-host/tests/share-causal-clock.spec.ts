@@ -23,13 +23,18 @@
  *    所以这枚尺子必须从 `createShareCommentDispatch`（生产路径）进来。
  */
 
-import { compareVectorClocks, OpType, VectorClockComparison } from '@heyta/sync-core';
+import { compareVectorClocks, deriveShareIdentityKeyPair, OpType, VectorClockComparison } from '@heyta/sync-core';
 import { describe, expect, it } from 'vitest';
 
 import type { ShareOpIntent } from '../src/comment-actions.js';
 import type { ShareOpDownloadPort, ShareOpUploadPort, ShareOpWire, ShareOpWireRow } from '../src/share-client.js';
 import { createShareCommentDispatch, type ShareLogStorage } from '../src/share-comments.js';
 import { emptyShareLogState, type ShareLogState } from '../src/share-op-log.js';
+/** 签名件夹具：真派生一枚 Ed25519（固定种子），签的是生产原语。
+ * 签名本身对不对由 `share-client.spec.ts` / sync-core 那两族判据钉，这里只补"有没有签名件"这一档。 */
+const shareAuthorKeyPair = deriveShareIdentityKeyPair(new Uint8Array(32).fill(21));
+const signerFor = async () => ({ memberId: 'member-1', ed25519SecretKey: shareAuthorKeyPair.ed25519SecretKey });
+
 
 const T0 = 1_700_000_000_000;
 const ME = 'device-me';
@@ -69,7 +74,9 @@ function makeServer(seed: readonly ShareOpWireRow[] = []): {
           rows.push(row);
           uploaded.push({ shareId, row });
         }
-        return { accepted: [], rejected: [] };
+        // 假服务端"全收"：回执必须逐条给出 `{id, serverSeq}` —— dispatcher 判"写成功"
+        // 读的就是这一格（ADR-0069 裁决四：共享这条腿没有队列，被拒的 op 不许折进日志）。
+        return { accepted: ops.map((op) => ({ id: (op as ShareOpWire).id })), rejected: [] };
       },
       downloadOps: async (_shareId, after) => ({
         ops: rows.filter((row) => row.serverSeq > after),
@@ -99,6 +106,7 @@ function makeDevice(
   return {
     disk,
     dispatch: createShareCommentDispatch({
+      signerFor,
       api: server.api,
       // `ct:` 前缀当密文（与同族其余判据同一替身形状）。
       cipherFor: async () => ({
@@ -199,6 +207,7 @@ describe('share 因果时钟（ADR-0067 裁决二）', () => {
     let reads = 0;
     const disk = new Map<string, ShareLogState>();
     const dispatch = createShareCommentDispatch({
+      signerFor,
       api: server.api,
       cipherFor: async () => ({
         encrypt: async (payload: string) => `ct:${payload}`,

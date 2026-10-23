@@ -40,6 +40,7 @@ import {
   createShareOpDispatcher,
   type ShareOpDispatchIntent,
   type ShareOpDownloadPort,
+  type ShareOpSigner,
   type ShareOpUploadPort,
   type SharePayloadCodecPort,
   type ShareOpWireIdentity,
@@ -53,6 +54,11 @@ import {
 } from './share-conflicts.js';
 import { emptyShareLogState, foldShareOps, type ShareLogState } from './share-op-log.js';
 import { replayShareOps, type DecryptedShareOp } from './share-replay.js';
+import {
+  decideShareOpVerification,
+  type ShareSignatureRejection,
+  type ShareSigningRosterPort,
+} from './share-verify.js';
 
 /**
  * share 日志的落盘端口（端壳用真 SQLite 实现；测试用内存）。
@@ -105,6 +111,14 @@ export interface ShareCommentsHostOptions {
    * 早先写成同步会把实现逼成"先塞进一个内存缓存再读"，那是第二条真相来源。
    */
   readonly cipherFor: (shareId: string) => Promise<SharePayloadCodecPort | undefined>;
+  /**
+   * 按 shareId 取本机签名件（成员行 id + Ed25519 私钥）；拿不到返回 `undefined` ⇒ 具名失败、零请求。
+   *
+   * 🔴 与 `cipherFor` 同源、同一把保险库：两枚都从那份身份种子派生，只是各用一条曲线
+   * （X25519 管谁能解、Ed25519 管谁改的，ADR-0069 裁决一）。分开注入是因为壳里
+   * 解 listKey 与读身份种子是两次解包，合并成一次会让"锁着"与"没有成员行"两种状态分不开。
+   */
+  readonly signerFor: (shareId: string) => Promise<ShareOpSigner | undefined>;
   readonly storage: ShareLogStorage;
   readonly currentUserId: () => string;
   readonly clientId: string;
@@ -123,6 +137,16 @@ export interface ShareCommentsHostOptions {
    * 撞上界时**抛错**而不是静默返回部分结果 —— 半截结果看起来是绿的。
    */
   readonly pullMaxPages?: number;
+  /**
+   * 读侧验签用的名单：某份 share 的「成员行 id → 在册签名公钥（base64）」（ADR-0069 裁决五）。
+   *
+   * 为什么是**又一份**注入端口，而不是让宿主自己去打 `GET /members`：本文件的纪律 3 ——
+   * 它不认识传输层。与 `cipherFor`/`signerFor` 同一条形状：按 shareId 现取、拿不到就 `undefined`。
+   *
+   * ⚠️ 省略这一枚**不会**悄悄关掉验签：只要日志里出现带作者列的行，取不到名单就整轮拉取失败
+   * （`ShareSignatureRosterUnavailableError`）。存量行（没有作者列）不需要它，所以老清单照常同步。
+   */
+  readonly verifiersFor?: ShareSigningRosterPort;
 }
 
 /**
@@ -169,6 +193,13 @@ export interface ShareCommentsHost {
   pullForTask(taskId: string): Promise<SharePullResult | undefined>;
   /** 待用户裁决的共享冲突（ADR-0067 裁决三"必须可见"那半句的落点）。 */
   conflicts(): ShareConflict[];
+  /**
+   * 最近一轮**验签被拒**的共享 op（ADR-0069 裁决五的落点：界面要能具名报警）。
+   *
+   * ⚠️ 空数组的意思不是"这份日志被验过且都好"，而是"这一轮没有需要报警的行"
+   * （存量行没有作者列，本来就不进报警）。别把两件事混成一句"已验证"。
+   */
+  signatureRejections(): ShareSignatureRejection[];
   /** 交还用户的选择：**发一条 op**，别的什么都不做（不写第二份状态、不改历史）。 */
   resolveConflict(conflict: ShareConflict, choice: 'keep-local' | 'keep-remote'): Promise<void>;
 }
@@ -192,6 +223,8 @@ export function createShareCommentDispatch(
   conflicts: () => ShareConflict[];
   /** 用户点完之后**要发的那一条**（一个意图 = 一个 op；发完这条冲突自己就消失了）。 */
   resolveConflict: (conflict: ShareConflict, choice: 'keep-local' | 'keep-remote') => Promise<void>;
+  /** 最近一轮验签被拒的行（ADR-0069 裁决五：报警要有名字，不要只有一句"没同步"）。 */
+  signatureRejections: () => ShareSignatureRejection[];
 } {
   interface Entry {
     readonly log: ShareLogState;
@@ -200,6 +233,12 @@ export function createShareCommentDispatch(
     readonly conflicts: readonly ShareConflict[];
   }
   const cache = new Map<string, Entry & { shareId: string }>();
+  /**
+   * 最近一轮**验签被拒**的行（按 share）。内存里的，不落盘：
+   * 游标停在被拒那条之前 ⇒ 每一轮拉取都会再撞上同一条，报警因此自己就是"还在"的，
+   * 不需要再造第二份真相（落盘的那份会与日志漂移，环境陷阱 #535 那一族）。
+   */
+  const rejections = new Map<string, ShareSignatureRejection[]>();
 
   /** 一条日志 → 物化 + 待裁决清单。**两处折叠都走这里**，免得两份推导漂移。 */
   const foldEntry = (shareId: string, log: ShareLogState): Entry => {
@@ -247,6 +286,8 @@ export function createShareCommentDispatch(
       // 再存一份"本地第几条"就是第二条真相来源 —— 而它一旦和日志不同步，
       // 界面上表现为两条本来有因果边的 op 被判成并发。
       baseClock: (id) => entryFor(id).log.clock,
+      // 🔴 签名件按 shareId 现取（同一台设备在每份 share 里的成员行各不相同）。
+      signerFor: options.signerFor,
       ...(options.now === undefined ? {} : { now: options.now }),
       ...(options.newOpId === undefined ? {} : { newId: options.newOpId }),
     });
@@ -290,6 +331,8 @@ export function createShareCommentDispatch(
     const maxPages = options.pullMaxPages ?? 25;
 
     let after = options.storage.cursor(shareId);
+    /** 这一轮开始时的游标：验签被拒时，游标最多只能推到**它之后已收下的那一条**（见下面 `cursor`）。 */
+    const startedAt = after;
     /**
      * 🔴 `consumed` 与 `serverLatest` 是两件事，混了就会**静默丢 op**：
      * 游标只能推进到**我已经收下并落盘**的那一条；服务端报的 `latestServerSeq` 是
@@ -320,7 +363,30 @@ export function createShareCommentDispatch(
     }
 
     const decrypted: DecryptedShareOp[] = [];
+    const rejected: ShareSignatureRejection[] = [];
+    /** 名单**只在真需要验的时候**取（存量行没有作者列，用不着它），且一轮只取一次。 */
+    let roster: Record<string, string> | undefined;
+    let rosterFetched = false;
+    /** 🔴 游标只能推到**验过并收下**的那一条为止（见下面 `cursor`）。起点是本轮开始时的游标，不是 `after` —— `after` 已经被分页推到日志头了。 */
+    let acceptedUpTo = startedAt;
     for (const row of rows) {
+      /*
+       * 先验签，再解密（ADR-0069 裁决五）：伪造件不该被解进我的视图，哪怕只是一次。
+       * 被拒 ⇒ **停下来**，但不抛：这一轮已收下的前缀照样落盘、游标推到那一条为止，
+       * 被拒这条留在游标之后，下一轮还会再撞上一次并再报一次。
+       * 为什么不"跳过它继续拉后面的"：那样这条永久消失，而界面会说"已同步" ——
+       * 与上面 payload 那处同一条纪律，只是这里连"这一条我不要了"都不成立，
+       * 因为我不能替用户决定丢掉一条署名对不上的内容。
+       */
+      if (row.signerMemberId !== undefined && row.signerMemberId !== null && !rosterFetched) {
+        roster = await options.verifiersFor?.(shareId);
+        rosterFetched = true;
+      }
+      const verdict = decideShareOpVerification({ shareId, row, roster });
+      if (!verdict.accepted) {
+        rejected.push(verdict.rejection);
+        break;
+      }
       // 边界检查：传输层给的是 `unknown`，而解密只吃字符串密文。
       // 抛在这里 = 游标不推进 = 这一批下一轮还会再试（不是"跳过这一条"）。
       if (typeof row.payload !== 'string') {
@@ -359,6 +425,7 @@ export function createShareCommentDispatch(
         payload: JSON.parse(plaintext) as unknown,
         ...(row.vectorClock === undefined ? {} : { vectorClock: row.vectorClock }),
       });
+      if (row.serverSeq > acceptedUpTo) acceptedUpTo = row.serverSeq;
     }
 
     const entry = entryFor(shareId);
@@ -366,10 +433,23 @@ export function createShareCommentDispatch(
     const log = foldShareOps(entry.log, decrypted);
     cache.set(shareId, { ...foldEntry(shareId, log), shareId });
     options.storage.save(shareId, log);
-    // 🔴 游标在日志之后（见上面纪律 1），且推的是**已消费**的那条，不是服务端的头。
-    options.storage.setCursor(shareId, after);
+    /*
+     * 🔴 游标在日志之后（见上面纪律 1），且推的是**已消费**的那条，不是服务端的头。
+     * 被拒那条存在时，`acceptedUpTo` 就是它前面那一格 ⇒ 那一条**不会**被推过去。
+     */
+    const cursor = rejected.length > 0 ? acceptedUpTo : after;
+    options.storage.setCursor(shareId, cursor);
+    // 报警只在还有未处理的那一条时留着；游标一旦跨过（下一次它不再出现）就该消失。
+    if (rejected.length > 0) rejections.set(shareId, rejected);
+    else rejections.delete(shareId);
 
-    return { fetched: rows.length, added: log.ops.length - before, cursor: after, pages };
+    return {
+      fetched: rows.length,
+      added: log.ops.length - before,
+      cursor,
+      pages,
+      rejections: rejected,
+    };
   };
 
   const commentsForTask = (taskId: string): ShareCommentRecord[] => {
@@ -399,7 +479,10 @@ export function createShareCommentDispatch(
     await dispatchAny(conflict.shareId, shareConflictResolution(conflict, choice));
   };
 
-  return { dispatchShareOp, pullShareOps, commentsForTask, stateFor, conflicts, resolveConflict };
+  const signatureRejections = (): ShareSignatureRejection[] =>
+    [...rejections.values()].flat().sort((a, b) => a.shareId.localeCompare(b.shareId) || a.serverSeq - b.serverSeq);
+
+  return { dispatchShareOp, pullShareOps, commentsForTask, stateFor, conflicts, resolveConflict, signatureRejections };
 }
 
 /**
@@ -440,6 +523,7 @@ export function createShareCommentsHost(options: ShareCommentsHostOptions): Shar
     commentsForTask: inner.commentsForTask,
     stateFor: inner.stateFor,
     conflicts: inner.conflicts,
+    signatureRejections: inner.signatureRejections,
     resolveConflict: inner.resolveConflict,
   };
 }

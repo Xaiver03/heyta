@@ -20,6 +20,7 @@
  */
 
 import { emptyState } from '@heyta/op-log';
+import { deriveShareIdentityKeyPair } from '@heyta/sync-core';
 import { describe, expect, it } from 'vitest';
 
 import type { ShareOpWire, ShareOpWireRow } from '../src/share-client.js';
@@ -33,6 +34,11 @@ import {
 } from '../src/share-conflicts.js';
 import type { DecryptedShareOp } from '../src/share-replay.js';
 import { replayShareOps } from '../src/share-replay.js';
+/** 签名件夹具：真派生一枚 Ed25519（固定种子），签的是生产原语。
+ * 签名本身对不对由 `share-client.spec.ts` / sync-core 那两族判据钉，这里只补"有没有签名件"这一档。 */
+const shareAuthorKeyPair = deriveShareIdentityKeyPair(new Uint8Array(32).fill(21));
+const signerFor = async () => ({ memberId: 'member-1', ed25519SecretKey: shareAuthorKeyPair.ed25519SecretKey });
+
 
 const T0 = 1_700_000_000_000;
 
@@ -204,7 +210,8 @@ describe('冲突清单接在生产路径上（createShareCommentDispatch）', ()
         for (const wire of ops as readonly ShareOpWire[]) {
           rows.push({ ...wire, serverSeq: rows.length + 1, clientTimestamp: wire.timestamp });
         }
-        return { accepted: [], rejected: [] };
+        // 假服务端"全收"：回执逐条给 id（共享腿按"在不在 accepted 里"判写成功）。
+        return { accepted: (ops as readonly ShareOpWire[]).map((op) => ({ id: op.id })), rejected: [] };
       },
       downloadOps: async (_shareId: string, after: number) => ({
         ops: rows.filter((row) => row.serverSeq > after),
@@ -217,6 +224,7 @@ describe('冲突清单接在生产路径上（createShareCommentDispatch）', ()
       const disk = new Map<string, ShareLogState>();
       const cursors = new Map<string, number>();
       return createShareCommentDispatch({
+        signerFor,
         api: api as never,
         cipherFor: async () => ({
           encrypt: async (payload: string) => `ct:${payload}`,

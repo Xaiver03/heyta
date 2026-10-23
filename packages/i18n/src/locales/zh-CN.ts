@@ -4918,6 +4918,9 @@ export const zhCN = {
   'web.share.join.invalidToken': '邀请凭证无效或已被使用。',
   'web.share.join.notMember': '你已不在这份共享清单的成员列表里。',
   'web.share.join.defaultName': '共享清单',
+  'web.share.signature.invalid': '有 {count} 条共享内容对不上作者的签名，这台设备没有接收它们（内容可能被改动过）。',
+  'web.share.signature.signerUnregistered': '有 {count} 条共享内容查不到作者登记的签名，这台设备没有接收它们。',
+  'web.share.signature.dismiss': '知道了',
 
   // 冲突原因。`reason` 的来源有两处：服务端 `errorCode`（`CONFLICT_*`）与
   // `sync-core` 的 LWW 判定编码（`remote-archive` 等），两者共用这一张表。
