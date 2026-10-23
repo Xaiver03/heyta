@@ -1,6 +1,15 @@
 import Fastify, { FastifyInstance } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+// 🔴 夹具用**生产那套签名件**（`signShareOpWire` / `encryptShareRecord`），不在测试里
+// 自己拼一份签名域。理由与本仓所有"夹具照生产"的先例同源：自己拼的那一份会与
+// `share-keys.ts` 同时改错，于是服务端验签的判据永远验不到真签名。
+import {
+  deriveShareIdentityKeyPair,
+  encryptShareRecord,
+  signShareOpWire,
+} from '@heyta/sync-core';
+
 /**
  * `/api/shares/*` 的契约测试（W2 判据，照 admin-console / activity 先例）。
  *
@@ -56,20 +65,89 @@ let app: FastifyInstance;
 
 const AUTH = { authorization: 'Bearer test-token' };
 
-/** 一条能通过线协议 schema 的合法 TASK op（编辑者/所有者可写）。 */
-const taskOp = {
-  id: 'op-1',
-  clientId: 'client-a',
-  actionType: 'add task',
-  opType: 'CRT',
-  entityType: 'TASK',
-  entityId: 'task-1',
-  payload: { title: 'hello' },
-  vectorClock: { 'client-a': 1 },
-  timestamp: 1_700_000_000_000,
-  schemaVersion: 1,
-  isPayloadEncrypted: true,
-};
+/**
+ * 一条**签过名的**合法 TASK op（编辑者/所有者可写）。
+ *
+ * 三个细节都是判据的一部分，不是夹具的讲究：
+ * - 载荷是**真信封**（`encryptShareRecord`）：签名域里的 `keyEpoch` 从信封头读，
+ *   随手编一个字符串会让装配器抛错，症状看起来像"服务端拒签"。
+ * - `timestamp` 与签名域里的 `clientTimestamp` 必须是同一个数（写侧、服务端、读侧三名一号）。
+ * - `tamper` 是**签完之后**再改线上那一份 —— 这就是"有人在动这条 op"的形状。
+ */
+const author = deriveShareIdentityKeyPair(new Uint8Array(32).fill(11));
+const forger = deriveShareIdentityKeyPair(new Uint8Array(32).fill(12));
+const shareListKey = new Uint8Array(32).fill(7);
+const toB64 = (bytes: Uint8Array): string => Buffer.from(bytes).toString('base64');
+
+interface SignedOpOptions {
+  id?: string;
+  entityType?: string;
+  entityId?: string;
+  opType?: string;
+  actionType?: string;
+  timestamp?: number;
+  schemaVersion?: number;
+  vectorClock?: Record<string, number>;
+  payload?: unknown;
+  /** 用谁的私钥签（默认本机那位作者）；`signerMemberId` 声明成谁 ⇒ 由下面那枚单独控。 */
+  signingKey?: Uint8Array;
+  signerMemberId?: string;
+  /** 真在册的那枚 shareId（默认与请求里的 share 一致）。 */
+  shareId?: string;
+  /** 签完之后对线上字段做一次改动（失法臂）。 */
+  tamper?: Record<string, unknown>;
+  /** 干脆不带签名（存量 op 的形状）。 */
+  dropSignature?: boolean;
+}
+
+async function signedOp(options: SignedOpOptions = {}) {
+  const id = options.id ?? 'op-1';
+  const identity = {
+    clientId: 'client-a',
+    actionType: options.actionType ?? 'add task',
+    opType: options.opType ?? 'CRT',
+    entityType: options.entityType ?? 'TASK',
+    entityId: options.entityId ?? 'task-1',
+    timestamp: options.timestamp ?? 1_700_000_000_000,
+    schemaVersion: options.schemaVersion ?? 1,
+  };
+  const record = await encryptShareRecord({
+    id,
+    plaintext: new TextEncoder().encode(JSON.stringify(options.payload ?? { title: 'hello' })),
+    shareId: options.shareId ?? 'share-1',
+    listKey: shareListKey,
+    keyEpoch: 1,
+    identity,
+  });
+  const wire = {
+    id,
+    ...identity,
+    payload: record.ciphertext,
+    vectorClock: options.vectorClock ?? { 'client-a': 1 },
+    isPayloadEncrypted: true,
+    schemaVersion: identity.schemaVersion,
+    clientTimestamp: identity.timestamp,
+  };
+  const signature = signShareOpWire(options.signingKey ?? author.ed25519SecretKey, {
+    shareId: options.shareId ?? 'share-1',
+    signerMemberId: options.signerMemberId ?? 'member-1',
+    wire,
+  });
+  const out: Record<string, unknown> = {
+    ...identity,
+    id,
+    payload: record.ciphertext,
+    vectorClock: options.vectorClock ?? { 'client-a': 1 },
+    isPayloadEncrypted: true,
+  };
+  if (!options.dropSignature) out['signature'] = signature;
+  return { ...out, ...(options.tamper ?? {}) };
+}
+
+/** 上传夹具默认"这个人已经在册"（ADR-0069 裁决二的补发腿走完之后就是这个状态）。 */
+const memberAs = (role: string) => ({
+  id: 'member-1', role, userId: 1n, shareId: 'share-1', signingPublicKey: toB64(author.ed25519PublicKey),
+});
 
 const activeShare = {
   id: 'share-1',
@@ -78,8 +156,6 @@ const activeShare = {
   lastServerSeq: 5,
   deletedAt: null,
 };
-
-const memberAs = (role: string) => ({ id: 'member-1', role, userId: 1n, shareId: 'share-1' });
 
 beforeEach(async () => {
   vi.clearAllMocks();
@@ -169,7 +245,7 @@ describe('🔴 role 硬门（POST /shares/:id/ops）', () => {
     mocks.shareMember.findFirst.mockResolvedValue(memberAs('viewer'));
     const res = await app.inject({
       method: 'POST', url: '/api/shares/share-1/ops', headers: AUTH,
-      payload: { ops: [taskOp] },
+      payload: { ops: [await signedOp()] },
     });
     expect(res.statusCode).toBe(200);
     const body = res.json();
@@ -184,7 +260,7 @@ describe('🔴 role 硬门（POST /shares/:id/ops）', () => {
     mocks.shareMember.findFirst.mockResolvedValue(memberAs('commenter'));
     const res = await app.inject({
       method: 'POST', url: '/api/shares/share-1/ops', headers: AUTH,
-      payload: { ops: [taskOp] },
+      payload: { ops: [await signedOp()] },
     });
     expect(res.json().rejected[0].code).toBe('SHARE_ROLE_FORBIDDEN');
   });
@@ -196,7 +272,7 @@ describe('🔴 role 硬门（POST /shares/:id/ops）', () => {
     mocks.shareMember.findMany.mockResolvedValue([]);
     const res = await app.inject({
       method: 'POST', url: '/api/shares/share-1/ops', headers: AUTH,
-      payload: { ops: [{ ...taskOp, id: 'op-comment', entityType: 'COMMENT', entityId: 'comment-1' }] },
+      payload: { ops: [await signedOp({ id: 'op-comment', entityType: 'COMMENT', entityId: 'comment-1' })] },
     });
     const body = res.json();
     expect(body.accepted).toHaveLength(1);
@@ -208,7 +284,7 @@ describe('🔴 role 硬门（POST /shares/:id/ops）', () => {
     mocks.shareMember.findFirst.mockResolvedValue(memberAs('viewer'));
     const res = await app.inject({
       method: 'POST', url: '/api/shares/share-1/ops', headers: AUTH,
-      payload: { ops: [{ ...taskOp, id: 'op-comment-2', entityType: 'COMMENT', entityId: 'comment-2' }] },
+      payload: { ops: [await signedOp({ id: 'op-comment-2', entityType: 'COMMENT', entityId: 'comment-2' })] },
     });
     expect(res.json().rejected[0].code).toBe('SHARE_ROLE_FORBIDDEN');
   });
@@ -218,7 +294,7 @@ describe('🔴 role 硬门（POST /shares/:id/ops）', () => {
     mocks.shareMember.findFirst.mockResolvedValue(memberAs('editor'));
     const res = await app.inject({
       method: 'POST', url: '/api/shares/share-1/ops', headers: AUTH,
-      payload: { ops: [{ ...taskOp, entityType: 'REMINDER' }] },
+      payload: { ops: [await signedOp({ entityType: 'REMINDER' })] },
     });
     expect(res.json().rejected[0].code).toBe('SHARE_ENTITY_TYPE_NOT_SHAREABLE');
   });
@@ -228,7 +304,7 @@ describe('🔴 role 硬门（POST /shares/:id/ops）', () => {
     mocks.shareMember.findFirst.mockResolvedValue(memberAs('editor'));
     const res = await app.inject({
       method: 'POST', url: '/api/shares/share-1/ops', headers: AUTH,
-      payload: { ops: [{ ...taskOp, entityType: 'GHOST' }] },
+      payload: { ops: [await signedOp({ entityType: 'GHOST' })] },
     });
     expect(res.json().rejected[0].code).toBe('INVALID_ENTITY_TYPE');
   });
@@ -241,7 +317,7 @@ describe('🔴 role 硬门（POST /shares/:id/ops）', () => {
     mocks.shareMember.findMany.mockResolvedValue([{ userId: 1n }, { userId: 2n }]);
     const res = await app.inject({
       method: 'POST', url: '/api/shares/share-1/ops', headers: AUTH,
-      payload: { ops: [taskOp, { ...taskOp, id: 'op-2', entityId: 'task-2' }] },
+      payload: { ops: [await signedOp(), await signedOp({ id: 'op-2', entityId: 'task-2' })] },
     });
     const body = res.json();
     expect(body.accepted).toEqual([
@@ -265,7 +341,7 @@ describe('🔴 role 硬门（POST /shares/:id/ops）', () => {
     mocks.shareMember.findMany.mockResolvedValue([]);
     const res = await app.inject({
       method: 'POST', url: '/api/shares/share-1/ops', headers: AUTH,
-      payload: { ops: [taskOp, { ...taskOp, id: 'op-bad', entityType: 'REMINDER' }] },
+      payload: { ops: [await signedOp(), await signedOp({ id: 'op-bad', entityType: 'REMINDER' })] },
     });
     const body = res.json();
     expect(body.accepted).toHaveLength(1);
@@ -278,7 +354,7 @@ describe('🔴 role 硬门（POST /shares/:id/ops）', () => {
     mocks.shareOperation.findMany.mockResolvedValue([{ id: 'op-1' }]);
     const res = await app.inject({
       method: 'POST', url: '/api/shares/share-1/ops', headers: AUTH,
-      payload: { ops: [taskOp] },
+      payload: { ops: [await signedOp()] },
     });
     expect(res.statusCode).toBe(200);
     const body = res.json();
@@ -296,9 +372,164 @@ describe('🔴 role 硬门（POST /shares/:id/ops）', () => {
     mocks.shareMember.findMany.mockResolvedValue([]);
     const res = await app.inject({
       method: 'POST', url: '/api/shares/share-1/ops', headers: AUTH,
-      payload: { ops: [taskOp] },
+      payload: { ops: [await signedOp()] },
     });
     expect(res.json().accepted).toHaveLength(1);
+  });
+});
+
+describe('🔴 逐 op 签名闸门（POST /shares/:id/ops，ADR-0069 裁决四）', () => {
+  beforeEach(() => {
+    mocks.share.findFirst.mockResolvedValue(activeShare);
+    mocks.shareOperation.findMany.mockResolvedValue([]);
+    mocks.share.update.mockResolvedValue({ lastServerSeq: 6 });
+    mocks.shareMember.findMany.mockResolvedValue([]);
+  });
+
+  it('真签名被接受，且落库那行带着被验过的签名与**认证上传者**的成员行 id', async () => {
+    mocks.shareMember.findFirst.mockResolvedValue(memberAs('editor'));
+    const op = await signedOp();
+    const res = await app.inject({
+      method: 'POST', url: '/api/shares/share-1/ops', headers: AUTH, payload: { ops: [op] },
+    });
+    expect(res.json().accepted).toHaveLength(1);
+    const [row] = mocks.shareOperation.createMany.mock.calls[0]![0].data as Array<{
+      signature: string; signerMemberId: string;
+    }>;
+    // 🔴 存下来的签名必须就是上传那枚（没被改写、没被丢弃），作者是认证出来的那一行。
+    expect(row.signature).toBe(op['signature']);
+    expect(row.signerMemberId).toBe('member-1');
+  });
+
+  it('无签上传 ⇒ SHARE_OP_UNSIGNED，且**一条都没落库**', async () => {
+    mocks.shareMember.findFirst.mockResolvedValue(memberAs('editor'));
+    const res = await app.inject({
+      method: 'POST', url: '/api/shares/share-1/ops', headers: AUTH,
+      payload: { ops: [await signedOp({ dropSignature: true })] },
+    });
+    const body = res.json();
+    expect(body.rejected).toEqual([{ id: 'op-1', code: 'SHARE_OP_UNSIGNED' }]);
+    expect(body.accepted).toHaveLength(0);
+    expect(mocks.shareOperation.createMany).not.toHaveBeenCalled();
+    expect(mocks.share.update).not.toHaveBeenCalled();
+  });
+
+  it('成员行没有登记签名公钥 ⇒ SHARE_OP_SIGNING_KEY_UNREGISTERED（带签也一样拒）', async () => {
+    mocks.shareMember.findFirst.mockResolvedValue({ ...memberAs('editor'), signingPublicKey: null });
+    const res = await app.inject({
+      method: 'POST', url: '/api/shares/share-1/ops', headers: AUTH, payload: { ops: [await signedOp()] },
+    });
+    expect(res.json().rejected).toEqual([{ id: 'op-1', code: 'SHARE_OP_SIGNING_KEY_UNREGISTERED' }]);
+    expect(mocks.shareOperation.createMany).not.toHaveBeenCalled();
+  });
+
+  // 🔴 一枚字段一条失法：域里少钉一枚就是"改它不收钱"的那一格。
+  const tamperTable: Array<[string, Record<string, unknown>]> = [
+    ['entityId（改内容指向）', { entityId: 'task-99' }],
+    ['entityType（改成别的实体族）', { entityType: 'NOTE' }],
+    ['opType（把删除伪装成新增）', { opType: 'DEL' }],
+    ['actionType（换动作标签）', { actionType: 'delete task' }],
+    ['vectorClock（把并发伪装成有先后）', { vectorClock: { 'client-a': 9 } }],
+    ['schemaVersion', { schemaVersion: 2 }],
+    ['timestamp（与签名域里那个数不同）', { timestamp: 1_700_000_000_001 }],
+    ['isPayloadEncrypted（把密文读成明文形状）', { isPayloadEncrypted: false }],
+    ['clientId（换设备署名）', { clientId: 'client-z' }],
+  ];
+  it.each(tamperTable)('签完之后改 %s ⇒ SHARE_OP_SIGNATURE_INVALID，不落库', async (_label, tamper) => {
+    mocks.shareMember.findFirst.mockResolvedValue(memberAs('editor'));
+    const res = await app.inject({
+      method: 'POST', url: '/api/shares/share-1/ops', headers: AUTH,
+      payload: { ops: [await signedOp({ tamper })] },
+    });
+    expect(res.json().rejected).toEqual([{ id: 'op-1', code: 'SHARE_OP_SIGNATURE_INVALID' }]);
+    expect(mocks.shareOperation.createMany).not.toHaveBeenCalled();
+  });
+
+  it('载荷换一条（AAD 会拒，但服务端**没有清单钥**，只有签名能在这里挡）', async () => {
+    mocks.shareMember.findFirst.mockResolvedValue(memberAs('editor'));
+    const res = await app.inject({
+      method: 'POST', url: '/api/shares/share-1/ops', headers: AUTH,
+      payload: { ops: [await signedOp({ tamper: { id: 'op-swapped' } })] },
+    });
+    expect(res.json().rejected[0].code).toBe('SHARE_OP_SIGNATURE_INVALID');
+  });
+
+  it('别人的钥签的合法载荷 ⇒ invalid（在册公钥不认它）', async () => {
+    mocks.shareMember.findFirst.mockResolvedValue(memberAs('editor'));
+    const res = await app.inject({
+      method: 'POST', url: '/api/shares/share-1/ops', headers: AUTH,
+      payload: { ops: [await signedOp({ signingKey: forger.ed25519SecretKey })] },
+    });
+    expect(res.json().rejected[0].code).toBe('SHARE_OP_SIGNATURE_INVALID');
+  });
+
+  it('🔴 不许代签：op 自己声明是别人写的 ⇒ 域对不上，拒（服务端只认认证上传者）', async () => {
+    mocks.shareMember.findFirst.mockResolvedValue(memberAs('editor'));
+    const res = await app.inject({
+      method: 'POST', url: '/api/shares/share-1/ops', headers: AUTH,
+      payload: { ops: [await signedOp({ signerMemberId: 'member-2' })] },
+    });
+    expect(res.json().rejected[0].code).toBe('SHARE_OP_SIGNATURE_INVALID');
+    expect(mocks.shareOperation.createMany).not.toHaveBeenCalled();
+  });
+
+  it('跨清单重放一枚合法签名 ⇒ invalid（shareId 在域里）', async () => {
+    mocks.shareMember.findFirst.mockResolvedValue(memberAs('editor'));
+    const res = await app.inject({
+      method: 'POST', url: '/api/shares/share-1/ops', headers: AUTH,
+      payload: { ops: [await signedOp({ shareId: 'share-other' })] },
+    });
+    expect(res.json().rejected[0].code).toBe('SHARE_OP_SIGNATURE_INVALID');
+  });
+
+  it('同批混合：签名坏的那条拒、合法那条照常落库（不整批 400、也不"记一笔然后收下"）', async () => {
+    mocks.shareMember.findFirst.mockResolvedValue(memberAs('editor'));
+    const res = await app.inject({
+      method: 'POST', url: '/api/shares/share-1/ops', headers: AUTH,
+      payload: {
+        ops: [await signedOp({ id: 'op-ok' }), await signedOp({ id: 'op-bad', dropSignature: true })],
+      },
+    });
+    const body = res.json();
+    expect(body.accepted).toEqual([{ id: 'op-ok', serverSeq: 6 }]);
+    expect(body.rejected).toEqual([{ id: 'op-bad', code: 'SHARE_OP_UNSIGNED' }]);
+    const rows = mocks.shareOperation.createMany.mock.calls[0]![0].data as Array<{ id: string }>;
+    expect(rows.map((r) => r.id)).toEqual(['op-ok']);
+  });
+
+  it('🔴 role 门排在签名门之前：viewer 的坏签名报的是权限，不是签名', async () => {
+    // 顺序不是风格：把签名门放在前面，就等于让 viewer 用一条探测请求读出"这条签名对不对"。
+    mocks.shareMember.findFirst.mockResolvedValue(memberAs('viewer'));
+    const res = await app.inject({
+      method: 'POST', url: '/api/shares/share-1/ops', headers: AUTH,
+      payload: { ops: [await signedOp({ dropSignature: true })] },
+    });
+    expect(res.json().rejected[0].code).toBe('SHARE_ROLE_FORBIDDEN');
+  });
+
+  it('下载把签名与作者带出来（读侧三态判据读的就是这两格）', async () => {
+    mocks.shareMember.findFirst.mockResolvedValue(memberAs('editor'));
+    mocks.shareOperation.findMany.mockResolvedValue([
+      {
+        id: 'op-1', shareId: 'share-1', clientId: 'client-a', serverSeq: 6, actionType: 'add task',
+        opType: 'CRT', entityType: 'TASK', entityId: 'task-1', entityIds: [], payload: 'x',
+        vectorClock: {}, schemaVersion: 1, clientTimestamp: 1n, isPayloadEncrypted: true,
+        signerMemberId: 'member-1', signature: 'sig-b64',
+      },
+      {
+        id: 'op-legacy', shareId: 'share-1', clientId: 'client-b', serverSeq: 7, actionType: 'add task',
+        opType: 'CRT', entityType: 'TASK', entityId: 'task-2', entityIds: [], payload: 'y',
+        vectorClock: {}, schemaVersion: 1, clientTimestamp: 2n, isPayloadEncrypted: true,
+        signerMemberId: null, signature: null,
+      },
+    ]);
+    const res = await app.inject({
+      method: 'GET', url: '/api/shares/share-1/ops/causal?after=0', headers: AUTH,
+    });
+    const rows = res.json().ops as Array<{ id: string; signature: string | null; signerMemberId: string | null }>;
+    expect(rows[0]).toMatchObject({ id: 'op-1', signature: 'sig-b64', signerMemberId: 'member-1' });
+    // 存量：null 是"未签名"，不是"已验证"。
+    expect(rows[1]).toMatchObject({ id: 'op-legacy', signature: null, signerMemberId: null });
   });
 });
 
@@ -571,7 +802,10 @@ describe('M4 逐 op 签名公钥在册（ADR-0069 裁决二）', () => {
   // ── 自证发布那一腿（本人、幂等、只补公钥） ────────────────────────────────
   it('本人 PUT ⇒ 写的是调用者自己那一行，只动 signingPublicKey 一格', async () => {
     mocks.share.findFirst.mockResolvedValue(activeShare);
-    mocks.shareMember.findFirst.mockResolvedValue(memberAs('owner'));
+    // 这一条测的是「首次发布」那一格：库里这行还没有公钥。
+    // memberAs 的默认夹具已预填一枚（签名闸门要用），这里必须显式清空，
+    // 否则先撞上「已有 ≠ 本次 ⇒ 409」，测到的就不是发布腿了。
+    mocks.shareMember.findFirst.mockResolvedValue({ ...memberAs('owner'), signingPublicKey: null });
     mocks.shareMember.update.mockResolvedValue({});
     const res = await app.inject({
       method: 'PUT', url: '/api/shares/share-1/members/member-1/signing-key', headers: AUTH,

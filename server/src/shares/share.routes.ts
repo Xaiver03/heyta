@@ -60,6 +60,15 @@ import {
   SuperSyncUploadOperationSchema,
 } from '@heyta/shared-schema';
 
+// 🔴 判定本体在 `@heyta/sync-core`，服务端只做"结局 → 错误码"的映射（ADR-0069 裁决三/四）。
+// 自己在这儿拼一份签名域 = 第二份"签哪些字节"的定义，而两份迟早漂一点：
+// 漂的那一点在协议上是**每台非签名者的设备把自己人的合法签名读成失败**。
+import {
+  classifyShareOpSignature,
+  type ShareOpSignatureOutcome,
+  type ShareOpWireForSignature,
+} from '@heyta/sync-core';
+
 import { Prisma } from '@prisma/client';
 
 import { createEntitlementGuard } from '../entitlement';
@@ -95,6 +104,15 @@ export const SHARE_ERROR_CODES = {
    * 不换签名钥不是偷懒：换钥会让读侧**再也分不出**这个人前后的 op 各是谁的钥验的，
    * 而"补发公钥"这一格只需要"从没有到有"。 */
   SIGNING_KEY_CONFLICT: 'SHARE_SIGNING_KEY_CONFLICT',
+  /**
+   * ADR-0069 裁决四：上传边界的逐 op 签名判定。三枚各自一格，不许互相顶包 ——
+   * `UNSIGNED`（没签）与 `SIGNATURE_INVALID`（签了但对不上）是两种完全不同的事：
+   * 前者通常是"这台设备的公钥还没补发"，后者意味着**有人在改数据**。
+   * 折叠成一枚，界面就只能报一句"同步失败"，而这两种情况的出路完全不同。
+   */
+  OP_UNSIGNED: 'SHARE_OP_UNSIGNED',
+  OP_SIGNATURE_INVALID: 'SHARE_OP_SIGNATURE_INVALID',
+  OP_SIGNING_KEY_UNREGISTERED: 'SHARE_OP_SIGNING_KEY_UNREGISTERED',
 } as const;
 
 const toMs = (value: unknown): number | null => {
@@ -238,6 +256,19 @@ const requireShareOwner = async (
 /** 严格 schema 的推断类型 —— 别用 Record<string, unknown> 擦掉字段类型，
  * 那会让 createMany 变成一串 unknown（W2 当场踩过）。 */
 type ValidatedShareOp = z.infer<typeof SuperSyncOperationSchema>;
+
+/**
+ * 签名结局 → 错误码（ADR-0069 裁决四的封闭词表）。
+ *
+ * 🔴 这一张表是 `Record<Exclude<..., 'verified'>, ...>`：词表**多一枚结局就编译不过**。
+ * 折叠任何一格（把"没登记公钥"报成"没签"、把"验不过"报成"没签"）都会让界面只能报一句
+ * 通用的"同步失败"，而那三格的出路完全不同 —— 只有编译期拦住才不会某天被顺手合并。
+ */
+const SHARE_OP_SIGNATURE_CODES: Record<Exclude<ShareOpSignatureOutcome, 'verified'>, string> = {
+  unsigned: SHARE_ERROR_CODES.OP_UNSIGNED,
+  invalid: SHARE_ERROR_CODES.OP_SIGNATURE_INVALID,
+  'signer-unregistered': SHARE_ERROR_CODES.OP_SIGNING_KEY_UNREGISTERED,
+};
 
 /** 活跃成员计数（含 owner）—— 29 人上限（MAX_SHARE_MEMBERS 含 owner）的依据。 */
 const countActiveMembers = async (shareId: string): Promise<number> =>
@@ -737,7 +768,13 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
       return reply.code(400).send({ code: 'validation_failed', message: 'Validation failed', details: parsed.error.issues });
     }
     const role = lookup.member.role as ShareMemberRole;
-    const accepted: ValidatedShareOp[] = [];
+    /**
+     * 过了全部闸门的那几条。
+     *
+     * 🔴 op 与**它自己那枚签名**成对走，不是两份并行数组：并行数组迟早错配一位，
+     * 错配的那一条会把 A 的签名落到 B 的行上 —— 那正是这一整个功能在防的事。
+     */
+    const accepted: Array<{ op: ValidatedShareOp; signature: string }> = [];
     const rejected: Array<{ id: string; code: string }> = [];
     for (const raw of parsed.data.ops) {
       // 先传输形状（宽松，坏字段不至于把整批拖死），再严格形状。
@@ -766,23 +803,65 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
         });
         continue;
       }
-      accepted.push(op);
+
+      /*
+       * 🔴 逐 op 签名闸门（ADR-0069 裁决四）。三格顺序都有理由，缺一条就留下要堵的那一格：
+       *
+       * 1. **`signature` 必须从 `raw` 读**。`SuperSyncOperationSchema` 是 `z.object`（strip，
+       *    不是 strict），严格校验会把这一格**静默剥掉** —— 从 `op` 读永远读到 undefined，
+       *    于是每一道合法上传都被判成"没签"，而服务端还一句错都不报。
+       * 2. **验的是将要落库的那一份值**（`op.*`，不是 `raw.*`）。校验器会补默认值
+       *    （`entityIds ?? []`、`vectorClock ?? {}`），签名必须覆盖读侧以后拿到的字节，
+       *    否则"验过的那一份"与"存下来的那一份"可以不同 —— 那一格是假的完整性。
+       * 3. `signerMemberId` 用 `lookup.member.id`（**认证**出来的上传者），不是客户端声明的任何字段。
+       *    「不许代签」不是靠一句规矩成立的：别人的成员行 id 进了域，签名就对不上。
+       *
+       * 失败一律**逐 op 拒**且**不落库**：不许记一笔然后收下（那是把伪造通道改成
+       * "带日志的伪造通道"），也不许整批 400（一条坏 op 拖死同批合法的 199 条）。
+       */
+      const outcome = classifyShareOpSignature({
+        signingPublicKey: lookup.member.signingPublicKey,
+        shareId,
+        signerMemberId: lookup.member.id,
+        wire: {
+          id: op.id,
+          clientId: op.clientId,
+          actionType: op.actionType,
+          opType: op.opType,
+          entityType: op.entityType,
+          entityId: op.entityId ?? null,
+          entityIds: op.entityIds ?? null,
+          payload: op.payload,
+          vectorClock: op.vectorClock ?? null,
+          vectorClockEncoding: op.vectorClockEncoding ?? null,
+          isPayloadEncrypted: op.isPayloadEncrypted ?? null,
+          schemaVersion: op.schemaVersion,
+          // 与下面那次 `BigInt(Math.trunc(op.timestamp))` 同一份截断值：签的必须等于存的。
+          clientTimestamp: Math.trunc(op.timestamp),
+        } satisfies ShareOpWireForSignature,
+        signature: (raw as { signature?: unknown }).signature,
+      });
+      if (outcome !== 'verified') {
+        rejected.push({ id: op.id, code: SHARE_OP_SIGNATURE_CODES[outcome] });
+        continue;
+      }
+      accepted.push({ op, signature: (raw as { signature: string }).signature });
     }
     if (accepted.length > 0) {
       // 重复 id 预检：op id 是全局主键（客户端 UUID，跨 share 唯一）。同一 id
       // 再次上传 = 重复投递，按既有线协议语义逐 op 拒绝（DUPLICATE_OPERATION），
       // 绝不能落成 500——那是把"合法的重试"当成服务器故障。
-      const acceptedIds = accepted.map((op) => op.id);
+      const acceptedIds = accepted.map((entry) => entry.op.id);
       const existing = acceptedIds.length
         ? await prisma.shareOperation.findMany({ where: { id: { in: acceptedIds } }, select: { id: true } })
         : [];
       const existingIds = new Set(existing.map((row) => row.id));
-      const fresh: ValidatedShareOp[] = [];
-      for (const op of accepted) {
-        if (existingIds.has(op.id)) {
-          rejected.push({ id: op.id, code: 'DUPLICATE_OPERATION' });
+      const fresh: Array<{ op: ValidatedShareOp; signature: string }> = [];
+      for (const entry of accepted) {
+        if (existingIds.has(entry.op.id)) {
+          rejected.push({ id: entry.op.id, code: 'DUPLICATE_OPERATION' });
         } else {
-          fresh.push(op);
+          fresh.push(entry);
         }
       }
       accepted.length = 0;
@@ -799,7 +878,7 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
       });
       const baseSeq = updated.lastServerSeq - accepted.length;
       await prisma.shareOperation.createMany({
-        data: accepted.map((op, i) => ({
+        data: accepted.map(({ op, signature }, i) => ({
           id: op.id,
           shareId,
           clientId: op.clientId,
@@ -816,6 +895,10 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
           clientTimestamp: BigInt(Math.trunc(op.timestamp)),
           receivedAt: now,
           isPayloadEncrypted: op.isPayloadEncrypted ?? false,
+          // 🔴 作者是**认证上传者**那一行，不是载荷里任何自称的字段（ADR-0069 事实基线 3）。
+          // 这一格与上面验签用的那一格必须是同一个值 —— 不同就变成"验的是 A、记的是 B"。
+          signerMemberId: lookup.member.id,
+          signature,
         })),
       });
       // WS 信号：只说「有新 op」，永远不带内容 —— 与个人 log 的
@@ -835,7 +918,7 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
         Logger.warn(`share ws notify failed: ${err instanceof Error ? err.message : 'unknown'}`);
       }
       return reply.send({
-        accepted: accepted.map((op, i) => ({ id: op.id, serverSeq: baseSeq + i + 1 })),
+        accepted: accepted.map((entry, i) => ({ id: entry.op.id, serverSeq: baseSeq + i + 1 })),
         rejected,
         latestServerSeq: updated.lastServerSeq,
       });
@@ -876,6 +959,13 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
           schemaVersion: op.schemaVersion,
           clientTimestamp: toMs(op.clientTimestamp),
           isPayloadEncrypted: op.isPayloadEncrypted,
+          /*
+           * 🔴 M4 第三批把这两格带出来：读侧（ADR-0069 裁决五）要分「验得过 / 未签名 /
+           * 验不过」三态，靠的就是"库里那枚签名"加"这条记在谁名下"。
+           * 存量无签 op 这里是 `null` —— 读侧必须把它读成"未签名"，不许读成"已验证"。
+           */
+          signerMemberId: op.signerMemberId,
+          signature: op.signature,
         })),
         cursor: { latestServerSeq: lookup.share.lastServerSeq },
       });
@@ -883,5 +973,5 @@ export async function shareRoutes(fastify: FastifyInstance): Promise<void> {
   );
 }
 
-const op0ClientId = (accepted: ValidatedShareOp[]): string | null =>
-  accepted[0]?.clientId ?? null;
+const op0ClientId = (accepted: Array<{ op: ValidatedShareOp }>): string | null =>
+  accepted[0]?.op.clientId ?? null;
