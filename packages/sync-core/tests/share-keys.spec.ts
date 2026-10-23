@@ -279,26 +279,120 @@ describe('history re-encryption', () => {
 });
 
 describe('op signatures', () => {
-  const message = (ciphertext: string) => buildShareOpSignatureMessage({
-    opId: 'op-1', clientId: 'client-1', shareId: SHARE_A, keyEpoch: 1, ciphertext,
+  // 签名域 = 服务端能看见、读侧会据以判定的一切字段（除 serverSeq / receivedAt）。
+  // 见 ADR-0069 裁决三：vectorClock 今天不被任何完整性机制绑住，而并发判定读的就是它。
+  const baseParts = {
+    opId: 'op-1',
+    clientId: 'client-1',
+    shareId: SHARE_A,
+    keyEpoch: 1,
+    actionType: 'edit task',
+    opType: 'UPD',
+    entityType: 'TASK',
+    entityId: 'task-1',
+    entityIds: ['task-1', 'task-2'],
+    schemaVersion: 7,
+    clientTimestamp: 1_700_000_000_000,
+    vectorClock: { 'client-1': 3, 'client-2': 1 },
+    ciphertext: 'cipher-text-1',
+  };
+  const message = (parts: Partial<typeof baseParts> = {}) =>
+    buildShareOpSignatureMessage({ ...baseParts, ...parts });
+  const author = deriveShareIdentityKeyPair(generateShareIdentitySeed());
+  const signOn = (parts: Partial<typeof baseParts> = {}): Uint8Array =>
+    signShareOperation(author.ed25519SecretKey, message(parts));
+  const verifiesOn = (parts: Partial<typeof baseParts> = {}): boolean =>
+    verifyShareOperationSignature(author.ed25519PublicKey, message(parts), signOn());
+
+  it('a genuine signature verifies over the full field set', () => {
+    expect(verifiesOn()).toBe(true);
   });
 
-  it('verifies a genuine signature and rejects tampering', () => {
-    const author = deriveShareIdentityKeyPair(generateShareIdentitySeed());
-    const sig = signShareOperation(author.ed25519SecretKey, message('cipher-text-1'));
-    expect(verifyShareOperationSignature(author.ed25519PublicKey, message('cipher-text-1'), sig)).toBe(true);
-    // Anyone re-attaching a different ciphertext breaks the binding.
-    expect(verifyShareOperationSignature(author.ed25519PublicKey, message('cipher-text-2'), sig)).toBe(false);
-    // A forged "author" cannot produce a valid signature under the real author's key.
+  // 🔴 一枚字段一条用例：一条用例里塞十二个断言，坏掉的那一枚就没人知道是哪一枚。
+  const tamperTable: Array<[string, Partial<typeof baseParts>]> = [
+    ['opId', { opId: 'op-2' }],
+    ['clientId', { clientId: 'client-9' }],
+    ['shareId', { shareId: SHARE_B }],
+    ['keyEpoch', { keyEpoch: 2 }],
+    ['actionType', { actionType: 'delete task' }],
+    ['opType', { opType: 'DEL' }],
+    ['entityType', { entityType: 'NOTE' }],
+    ['entityId', { entityId: 'task-2' }],
+    ['entityIds', { entityIds: ['task-1', 'task-3'] }],
+    ['schemaVersion', { schemaVersion: 8 }],
+    ['clientTimestamp', { clientTimestamp: 1_700_000_000_001 }],
+    ['vectorClock', { vectorClock: { 'client-1': 4, 'client-2': 1 } }],
+    ['ciphertext', { ciphertext: 'cipher-text-2' }],
+  ];
+
+  it.each(tamperTable)('rejects a one-field rewrite of %s', (_field, parts) => {
+    expect(verifiesOn(parts)).toBe(false);
+  });
+
+  it('binds the causal clock, so a rewritten vectorClock cannot fake an ordering', () => {
+    // 这一枚是 ADR-0069 裁决三存在的全部理由：不签它，服务端就能把两条并发伪装成有先后。
+    expect(verifiesOn({ vectorClock: { 'client-1': 3 } })).toBe(false);
+    expect(verifiesOn({ vectorClock: { 'client-1': 3, 'client-2': 1, 'client-3': 0 } })).toBe(false);
+  });
+
+  it('is stable under jsonb key reordering — the same clock must not read as tampering', () => {
+    // `vector_clock` 在服务端是 jsonb：它不保留键序。签名方与验签方各自 stringify 一份
+    // 逻辑上相同的时钟若拿到不同字节，每一台非签名者的设备都会把这枚合法签名读成失败。
+    const reordered = { 'client-2': 1, 'client-1': 3 };
+    expect(hex(message({ vectorClock: reordered }))).toBe(hex(message()));
+    expect(verifyShareOperationSignature(
+      author.ed25519PublicKey,
+      message({ vectorClock: reordered }),
+      signOn(),
+    )).toBe(true);
+  });
+
+  it('treats entityIds as a set: order is not load-bearing, membership is', () => {
+    expect(hex(message({ entityIds: ['task-2', 'task-1'] }))).toBe(hex(message()));
+    expect(verifiesOn({ entityIds: ['task-2'] })).toBe(false);
+  });
+
+  it('normalises absent metadata to null, so omitting a field cannot fork the message', () => {
+    // 缺省与显式 null 必须同形，否则"这一枚没传"与"这一枚是 null"会签出两个不同的域。
+    const withoutOptionals = buildShareOpSignatureMessage({
+      opId: baseParts.opId, clientId: baseParts.clientId, shareId: baseParts.shareId,
+      keyEpoch: baseParts.keyEpoch, ciphertext: baseParts.ciphertext,
+    });
+    const withNulls = buildShareOpSignatureMessage({
+      ...baseParts,
+      actionType: null, opType: null, entityType: null, entityId: null,
+      entityIds: null, schemaVersion: null, clientTimestamp: null, vectorClock: null,
+    });
+    expect(hex(withoutOptionals)).toBe(hex(withNulls));
+  });
+
+  it('fails loudly on values JSON would silently rewrite, instead of signing a different message', () => {
+    expect(() => message({ clientTimestamp: 1n as unknown as number })).toThrow(
+      'Invalid share op signature clientTimestamp',
+    );
+    expect(() => message({ clientTimestamp: Number.NaN })).toThrow(
+      'Invalid share op signature clientTimestamp',
+    );
+    expect(() => message({ vectorClock: { a: 1n } })).toThrow('Invalid share op signature value');
+    expect(() => message({ vectorClock: { a: Number.POSITIVE_INFINITY } })).toThrow(
+      'Invalid share op signature value',
+    );
+    expect(() => message({ entityIds: ['task-1', ''] })).toThrow(
+      'Invalid share op signature entityIds',
+    );
+    expect(() => message({ schemaVersion: 0 })).toThrow('Invalid share op signature schemaVersion');
+  });
+
+  it('rejects a signature forged under another member key', () => {
     const forger = deriveShareIdentityKeyPair(generateShareIdentitySeed());
-    expect(verifyShareOperationSignature(author.ed25519PublicKey, message('cipher-text-1'), signShareOperation(
-      forger.ed25519SecretKey,
-      message('cipher-text-1'),
-    ))).toBe(false);
+    expect(verifyShareOperationSignature(
+      author.ed25519PublicKey,
+      message(),
+      signShareOperation(forger.ed25519SecretKey, message()),
+    )).toBe(false);
   });
 
   it('never throws on malformed inputs — verification only returns false', () => {
-    const author = deriveShareIdentityKeyPair(generateShareIdentitySeed());
     expect(verifyShareOperationSignature(
       author.ed25519PublicKey,
       new Uint8Array(0),
@@ -306,7 +400,7 @@ describe('op signatures', () => {
     )).toBe(false);
     expect(verifyShareOperationSignature(
       author.ed25519PublicKey,
-      message('x'),
+      message(),
       new Uint8Array([1, 2, 3]),
     )).toBe(false);
   });
