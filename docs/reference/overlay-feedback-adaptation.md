@@ -21,7 +21,7 @@
 | 撤销链路 | **有**：批量删除 / 四象限移动（`App.tsx:493`、`TasksScreen.tsx:1249,1587`）；软删除 `deletedAt`（`packages/op-log/src/state.ts:586-600`）；`purge` 拒绝恢复（`packages/app-host/src/actions.ts:635`） | 成立但有边界，见 §3 |
 | 行内报错 | `aria-invalid` **16 处 / 4 文件**，大头在共享层 `packages/ui/src/auth/AuthForm.tsx`（12） | 有正确样板，覆盖窄 |
 | 危险操作统一入口 | `useConfirm` / `resolveDangerTier` / `DangerZone` **0 处** | 无 |
-| 移动端 sheet 分档 | **无**：`maxHeight:'90%'` 单档 **7 处**、居中 `justifyContent:'center'`（`TrashScreen.tsx:96`、`ConflictSheet.tsx:86`）、把手/拖拽 **0 处**；唯一贴底的是 `SearchScreen.tsx:93` | 居中弹窗冒充 sheet |
+| 移动端 sheet 分档 | **T7 开工后**：把手/拖拽/分档/记忆 **1 处**（共享原语 `packages/ui/src/overlay/BottomSheet.tsx`，已迁 `TaskDetailSheet`）；`maxHeight:'90%'` 单档剩 **5 处**（`TasksScreen.tsx:245,360`、`ConflictSheet.tsx:91`、`PrivacyConsentSheet.tsx:87`、`LegalReconfirmSheet.tsx:61`）；居中 `justifyContent:'center'` 仍在 `TrashScreen.tsx:96`、`ConflictSheet.tsx:86`、两块法律面板 | 已开工，法律闸门**刻意不迁** |
 | 层级档位 | **有 9 档** token（`packages/design-system/src/tokens.ts:122`、`tokens.css:308-319`：base…splash）；裸 `z-index:` 数字 **0 处** | 已达标 |
 | 自绘覆盖层 | CSS `inset: 0` **13 处**（`sheets.css` 5、`auth-dialog.css` 2、trash/habits/base/assistant/category 各 1）+ RN 手工遮罩 `material.scrim` **7 处** + 绕开 React 树的 DOM 浮层 1 枚（`features/auth/desktop-handoff.ts:102-112`，占用 `z.toast` 档） | 债务在遮罩，不在层级 |
 
@@ -91,7 +91,8 @@ rg -o "inset: 0" -g'*.css' apps/web/src packages/design-system/src | wc -l    # 
 | **T4** 行内报错归位 | 以 `AuthForm.tsx` 为样板铺 `CategoryCreateDialog` / `PasswordPanel` / `EmailChangePanel`（现共 4 处 `aria-invalid`）；提交失败的面板级 danger 行不许替字段说话 | 3–5 表单 | 中 |
 | **T5** 关闭策略显式化 | 先解 `use-modal-dismiss.ts` 文件头写明的边界（「面板开在设置浮层里，一次 Esc 连着关两层」），再推给其余 15 个模态层；补 `ShareFeature.tsx` / `JoinSharedListDialog.tsx` 的 Esc；补焦点陷阱与 `inert` | 10 文件 | 中 |
 | **T6** 撤销链路 | 把 bulk 撤销铺到单条删除；5000ms → ≥7000ms 并加 hover/聚焦暂停（`App.tsx:437`、`TasksScreen.tsx:707,715`）；§3 那六格**明确排除**。涉数据模型与文案，是唯一能推翻 §3 判断的一档 | 2 端 + i18n | **高** |
-| **T7** 移动端形态 | 4 个 `*Sheet.tsx` + 13 处 `<Modal`：居中 → 按视口切底部，引入分档（30/60/90）+ 把手 + 记忆档位；返回键已有分层接管可接（`TasksScreen.tsx:733`、`nav/navigation.tsx:59`）。⚠️ 本仓 **Android 构建不在本机跑**，设备验证走 iOS 模拟器或远端打包机 | 10 文件 | 中高 |
+| **T7** 移动端形态 | 4 个 `*Sheet.tsx` + 13 处 `<Modal`：居中 → 按视口切底部，引入分档（30/60/90）+ 把手 + 记忆档位；返回键已有分层接管可接（`TasksScreen.tsx:733`、`nav/navigation.tsx:59`）。⚠️ 本仓 **Android 构建不在本机跑**，设备验证走 iOS 模拟器或远端打包机。**2026-10-23 进度**：`TaskDetailSheet` 已迁（新增 `BottomSheet` + `sheet-detents`，把手 36×5 新进 `size.grabber-*` 两个 token） | 10 文件（已完 1） | 中高 |
+| **T7 例外** | 🔴 **法律闸门不迁**：`PrivacyConsentSheet` / `LegalReconfirmSheet` 保持居中模态 —— 把合规面板变成能一把划走的底部面板，等于给"同意/不同意"旁边加一条"划掉"。理由与"不能照抄"那张表同源 | — | — |
 | **T8** 层级与自绘收敛 | 层级在 heyta **已基本达标**（9 档 token、裸值 0）；剩 13 处 `inset: 0` + 7 处 `material.scrim` 遮罩迁到 T2 原语，以及 `desktop-handoff.ts:102-112` 那枚挂 DOM 的浮层 | ~20 处 | 低中 |
 
 **建议顺序**：T2（原语先存在）→ T1（可机械验证）→ T5 → T4 → T3 → T6 → T7 → T8。每档做完留 §1 同一条命令的读数，别一次改全仓。
@@ -109,7 +110,24 @@ rg -o "inset: 0" -g'*.css' apps/web/src packages/design-system/src | wc -l    # 
 ## 6. 已有资产（不要重复造）
 
 - `packages/ui/src/overlay/model.ts:64` `placeAnchoredPanel()` —— 锚点弹层的宿主无关算术（web 取 rect、RN 取 `measureInWindow`），新 Popover/Menu 直接复用。
-- `apps/web/src/lib/use-modal-dismiss.ts` —— Esc + 焦点入内 + 关闭归还触发者，**已写好但只有 1 个消费者**，是 T5 的现成装置。
+- `apps/web/src/lib/use-modal-dismiss.ts` —— Esc + 焦点入内 + 关闭归还触发者，**已写好但只有 1 个消费者**（`AuthPanel.tsx:224`）。
+  🔴 **T2 之后它不再是"现成装置"，而是待退役的那一份**：`OverlayModal` 地基是 react-native-web 自己的 `Modal`，
+  焦点入内/归还/`role="dialog"`/`aria-modal` 由 `ModalFocusTrap` 与 `ModalContent` 白送，
+  而且它自带模态栈只让最顶层响应 —— 也就是这个 hook 文件头写的那条已知边界
+  （"面板开在设置浮层里时，一次 Esc 会连着关掉两层"）在原语这一侧**由结构消掉**。
+  T5 的动作是把 `AuthPanel` 迁到 `OverlayModal`、随后删掉这个 hook；**不要**再把它推给其余 15 层（那是在固化第二份实现）。
+- `packages/ui/src/auth/LegalDocumentSheet.tsx:350-356` —— ⚠️ **共享层里既存的第二份模态外壳**
+  （RN `Modal` + `transparent` + `onRequestClose` + `accessibilityViewIsModal` + `color.overlay` 遮罩）。
+  它是本文件 §1「浮层底座 = 全自绘」读数的一部分，**归宿是 `OverlayModal`**（T5/T8），不是可照抄的样板。
+  两处几何差异要在迁移时定一个答案：它用 `color.surface` + `maxHeight:'88%'`，`OverlayModal` 用 `color.surface-raised`。
+- 🔴 **`packages/ui` 没有共享 Button** —— 仓内按钮色板目前有四份：`apps/mobile/src/ui/kit.tsx:746-753`（唯一带 `tone` 词表的）、
+  `packages/ui/src/sync/ShareConsentModal.tsx:128-144`、`LegalDocumentSheet` 的 × 、`apps/web/src/styles/app/controls.css` 的 `.ht-btn--*`
+  （⚠️ `.ht-btn--danger` 孤悬在 `trash.css:56-60`，消费方 5+ 处）。
+  `DangerDialog` 那两个动作按钮**是内联的**，tone 口径逐字对齐 `kit.tsx:750`（`color.danger` + `color.foreground-inverse`）
+  与 `:753`（禁用用 `state.disabled-opacity`，不另配灰底灰字）。**缺的是共享 `Button` 这一枚，不是第 5 份 tone 表** ——
+  补它属于独立一档（要同时收 web 的 CSS class 与 mobile 的 kit），不要塞进 T2。
+- ⚠️ 命名陷阱：`packages/ui/src/sync/ShareConsentModal.tsx` 名字叫 Modal，**不含 `Modal`、不含遮罩**，
+  是纯内容块（遮罩与关闭归宿主）。别把它当浮层原语的样板。
 - `apps/web/src/features/privacy/PrivacyConsentSheet.tsx:75-100` —— 全站唯一完整的焦点陷阱 + 强制阅读型浮层样板。
 - `apps/web/src/features/tasks/TaskActionError.tsx` —— 不自消、给重试、不贴内部 `error.message` 的失败行样板。
 - `packages/ui/src/empty-state/` 与 `apps/mobile/src/nav` 的 `BackHandler` 分层接管（`TasksScreen.tsx:733`）。
