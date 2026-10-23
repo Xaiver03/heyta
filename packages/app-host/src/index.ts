@@ -1048,6 +1048,7 @@ export { createNativeWidgetSession, type NativeWidgetBridge } from './native-wid
 export * from './share-client.js';
 export * from './share-op-log.js';
 export * from './share-replay.js';
+export * from './share-verify.js';
 export * from './share-comments.js';
 export * from './share-routing.js';
 export * from './share-view.js';

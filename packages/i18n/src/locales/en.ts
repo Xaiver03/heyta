@@ -4666,6 +4666,9 @@ export const en = {
   'web.share.join.invalidToken': 'The invitation ticket is invalid or already used.',
   'web.share.join.notMember': 'You are no longer a member of this shared list.',
   'web.share.join.defaultName': 'Shared list',
+  'web.share.signature.invalid': '{count} shared change(s) did not match their author’s signature, so this device did not accept them (the content may have been altered).',
+  'web.share.signature.signerUnregistered': '{count} shared change(s) had no signing key on record for their author, so this device did not accept them.',
+  'web.share.signature.dismiss': 'Got it',
 
   'common.conflict.reason.concurrent': 'Two devices changed it without knowing about each other',
   'common.conflict.reason.superseded': 'This change was based on a version that is no longer the latest',

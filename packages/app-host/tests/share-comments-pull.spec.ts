@@ -17,6 +17,7 @@
  * 「冷启动不重拉」与「第二次 pull 从上次的位置继续」两条必须转红。
  */
 import { describe, expect, it } from 'vitest';
+import { deriveShareIdentityKeyPair } from '@heyta/sync-core';
 
 import { emptyState, type MaterializedState } from '@heyta/op-log';
 
@@ -30,6 +31,11 @@ import {
 } from '../src/share-comments.js';
 import type { ShareOpDownloadPort, ShareOpUploadPort, ShareOpWireRow } from '../src/share-client.js';
 import { emptyShareLogState, type ShareLogState } from '../src/share-op-log.js';
+/** 签名件夹具：真派生一枚 Ed25519（固定种子），签的是生产原语。
+ * 签名本身对不对由 `share-client.spec.ts` / sync-core 那两族判据钉，这里只补"有没有签名件"这一档。 */
+const shareAuthorKeyPair = deriveShareIdentityKeyPair(new Uint8Array(32).fill(21));
+const signerFor = async () => ({ memberId: 'member-1', ed25519SecretKey: shareAuthorKeyPair.ed25519SecretKey });
+
 
 const SHARED_TASK = 't-shared';
 const T0 = 1_700_000_000_000;
@@ -148,6 +154,7 @@ function makeHost(
   const storage = makeStorage();
   const server = makeServer([]);
   const host = createShareCommentsHost({
+    signerFor,
     ctx,
     api: server.api,
     cipherFor: async () => ({
@@ -224,6 +231,7 @@ describe('pullShareOps（M1 下行）', () => {
     };
     const build = (api: ShareOpUploadPort & ShareOpDownloadPort): ReturnType<typeof createShareCommentsHost> =>
       createShareCommentsHost({
+        signerFor,
         ctx,
         api,
         cipherFor: async () => codec,
@@ -306,6 +314,7 @@ describe('pullShareOps（M1 下行）', () => {
     const storage = makeStorage();
     let decrypts = 0;
     const host = createShareCommentsHost({
+      signerFor,
       ctx,
       api: server.api,
       cipherFor: async () => ({
