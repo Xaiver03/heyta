@@ -228,6 +228,8 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | [ai-architecture.md](reference/ai-architecture.md) | ⭐ **AI 架构参考**：出站（`packages/ai` 四层收窄）/ 入站（`packages/local-api`）的模块地图、封闭词表、全部具名常量与数值、**20 条不变量清单**、数据流。⚠️ 它描述"代码现在长什么样"，与 ADR 冲突时以 ADR 为准 |
 | [design-system-behavior.md](reference/design-system-behavior.md) | **设计系统行为规范**：list / board / pane / sheet 的选择、状态矩阵、密度与中文排版、详情面分组、响应式导航降级、动效与材质边界 |
 | [product-ux-performance-baseline.md](reference/product-ux-performance-baseline.md) | **产品体验性能基线**：500 / 1000 / 5000 条任务的排序、筛选与 op-log 恢复读数，以及可重复的重测命令 |
+| [overlay-feedback-adaptation.md](reference/overlay-feedback-adaptation.md) | 🫧 **浮层与反馈：本仓适配层**（2026-10-23 基线读数 + 复现命令）：18 类逐类落点、危险动作现状表、T1–T8 分档。**是现状不是规范**；判据正文在仓库外的全局 Skill `overlay-feedback-patterns` |
+| [overlay-feedback.md](agents/overlay-feedback.md) | 🫧 **浮层与反馈：agent 规则（必读）**：提浮层需求的四要素、危险档位怎么判、关闭策略查哪张表、`check:overlay` 债务账本。**规则层在这里**，代码契约在 `packages/ui/src/overlay/` 与 `packages/domain/src/danger-tier.ts` |
 
 ### 操作手册
 
