@@ -3263,6 +3263,10 @@ export const zhCN = {
   // ── 移动端 · 任务详情面板 ─────────────────────────────────
   'mobile.detail.title': '任务详情',
   'mobile.detail.close': '关闭任务详情',
+  // 底部面板把手的可及名称。🔴 说的是**面板会变成什么样**，不是"把手" ——
+  // 读屏用户要的是"点一下我会看到更多/更少"，而"把手"两个字对他没有任何信息。
+  'mobile.detail.sheet.expand': '展开任务详情面板',
+  'mobile.detail.sheet.collapse': '收起任务详情面板',
   'mobile.detail.field.title': '标题',
   // 🔴 在它之前移动端**没有备注输入框**：`Task.note` 与 `setNote` 都在，
   // 但唯一调用点是 AI（拆解 checklist / 估时写时长）—— 用户自己写不了。
