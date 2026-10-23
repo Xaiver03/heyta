@@ -11,6 +11,7 @@
  * | 跨边界移动具名拒绝、**两侧零调用** | 悄悄只写一半 ⇒ 实体历史裂成两本 log，任一侧回放都残缺；静默忽略 ⇒ 用户以为移动成功了 |
  * | 写 `tagIds` 前先把标签发布进这份 share | 不发布 ⇒ 对面渲染出一枚解不出名字的空白标签 |
  * | 解析不出来（任务没挂清单）⇒ 走个人、不抛 | 抛错 ⇒ 在个人清单上改一条无归属任务被炸 |
+ * | **新建**那一形：归属从这次写入声明的 `projectId`/`taskId` 读，且"实体还不存在"不算移动 | 只认已存在的实体 ⇒ 共享清单里加一条任务要么落进个人 log（对面永远看不见），要么当场抛"暂不支持跨清单移动" |
  *
  * 变异验证（一次性臂，做完即还原）：
  * ① 把 `isRoutableKind` 里的 `PROJECT` 判断改成"含 PROJECT" ⇒ 那三条 PROJECT 判据红；
@@ -335,5 +336,93 @@ describe('路由版 dispatchChecked：走 CAS 的那两枚动作也必须分流'
     expect(calls.share.map((c) => c.intent.entityId)).toEqual(['tTheirs']);
     // 如果这枚判据读的是引擎给的那份个人状态，tTheirs 解析不出来 ⇒ 会被判成个人 ⇒ 这条必红。
     expect(calls.personal).toHaveLength(0);
+  });
+});
+
+/**
+ * 🔴 新建那一形：实体**还不在这台设备的状态里**，"所属清单"只能从这次写入声明的归属读。
+ *
+ * 这批是 2026-10-22 做 M2-d 验收臂时发现的洞，不是风格问题：
+ * `routeShareIdForEntity` 只解析"已存在的实体"，于是新建一条共享任务得到
+ * `entity-not-found` ⇒ 判成个人；更糟的是 `crossesShareBoundary` 那两侧里
+ * "源"也是 undefined ⇒ 与目的地的 shareId 不等 ⇒ **在共享清单里新建任务当场抛
+ * "暂不支持跨清单移动"**。用户点的是"加一条任务"，界面报的是一次移动被拒。
+ * 已登记为 ADR-0067「一·补」的第三类，不改上面任何一条裁决。
+ */
+describe('新建（CRT）那一形的归属解析', () => {
+  const NEW = 't-brand-new';
+
+  it('在共享清单里新建一条任务 ⇒ 进 share，个人侧零调用', async () => {
+    const { calls, dispatch } = harness(fixture());
+    await dispatch({
+      entityType: 'TASK',
+      entityId: NEW,
+      opType: OpType.Create,
+      payload: { title: '买滚筒', projectId: 'pShared' },
+    });
+    expect(calls.personal).toHaveLength(0);
+    expect(calls.share).toHaveLength(1);
+    expect(calls.share[0]!.shareId).toBe(SHARED);
+  });
+
+  it('在个人清单里新建 ⇒ 进个人 log，且不抛（新建不是"从 undefined 搬过来"）', async () => {
+    const { calls, dispatch } = harness(fixture());
+    await dispatch({
+      entityType: 'TASK',
+      entityId: NEW,
+      opType: OpType.Create,
+      payload: { title: '约牙医', projectId: 'pPersonal' },
+    });
+    expect(calls.share).toHaveLength(0);
+    expect(calls.personal).toHaveLength(1);
+  });
+
+  it('收集箱里新建（载荷根本没有 projectId）⇒ 走个人 log', async () => {
+    const { calls, dispatch } = harness(fixture());
+    await dispatch({ entityType: 'TASK', entityId: NEW, opType: OpType.Create, payload: { title: '随手一条' } });
+    expect(calls.share).toHaveLength(0);
+    expect(calls.personal).toHaveLength(1);
+  });
+
+  it('在共享清单里新建、通道没装上 ⇒ 具名拒绝，绝不退回个人 log', async () => {
+    const { calls, dispatch } = harness(fixture(), undefined, false);
+    await expect(
+      dispatch({ entityType: 'TASK', entityId: NEW, opType: OpType.Create, payload: { title: '买滚筒', projectId: 'pShared' } }),
+    ).rejects.toBeInstanceOf(ShareChannelUnavailableError);
+    expect(calls.personal).toHaveLength(0);
+  });
+
+  it('便签同形：在共享清单里新建 ⇒ 进 share', async () => {
+    const state = fixture();
+    Object.assign(state.notes as object, {});
+    const { calls, dispatch } = harness(state);
+    await dispatch({
+      entityType: 'NOTE',
+      entityId: 'n-brand-new',
+      opType: OpType.Create,
+      payload: { body: '门要换锁芯', projectId: 'pShared' },
+    });
+    expect(calls.personal).toHaveLength(0);
+    expect(calls.share.map((c) => c.intent.entityType)).toEqual(['NOTE']);
+  });
+
+  it('评论同形：归属由它挂的那条任务决定（那条任务在共享清单里 ⇒ 进 share）', async () => {
+    const { calls, dispatch } = harness(fixture());
+    await dispatch({
+      entityType: 'COMMENT',
+      entityId: 'c-brand-new',
+      opType: OpType.Create,
+      payload: { taskId: 'tShared', body: '要哑光的' },
+    });
+    expect(calls.personal).toHaveLength(0);
+    expect(calls.share[0]!.shareId).toBe(SHARED);
+  });
+
+  it('反向防回归：实体**已存在**时把 projectId 从共享改成个人 ⇒ 仍然具名拒绝', async () => {
+    const { calls, dispatch } = harness(fixture());
+    await expect(
+      dispatch({ entityType: 'TASK', entityId: 'tShared', opType: OpType.Update, payload: { projectId: 'pPersonal' } }),
+    ).rejects.toBeInstanceOf(ShareCrossListMoveError);
+    expect(calls).toEqual({ personal: [], share: [] });
   });
 });

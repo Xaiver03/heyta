@@ -25,6 +25,10 @@
  *    共享任务的 `tagIds` 若不带对应标签进 share log，对面就渲染出一枚解不出名字的空白标签。
  *    所以写共享任务的 `tagIds` 时，**尚未在这份 share 里**的 tagId 各补一条 TAG 创建 op。
  *    它是另一条 op，因为它是另一个意图（"这份清单里得先有这个名字"），不是同一个意图拆两条。
+ * 4. **新建那一条的归属只能问载荷**（见 {@link routeShareIdForIntent}）：实体还不在这台
+ *    设备的状态里时，两跳解析得到 `entity-not-found`。只认"已存在的实体"的话，
+ *    在共享清单里加一条任务要么落进个人 log（对面永远看不见），要么被
+ *    `crossesShareBoundary` 当成一次跨边界移动当场拒掉 —— 2026-10-22 做 M2 任务族验收臂时才暴露。
  */
 import type { CheckedDispatchBuilder, MaterializedState, OpIntent } from '@heyta/op-log';
 import { OpType } from '@heyta/sync-core';
@@ -150,6 +154,52 @@ export function routeShareIdForEntity(state: MaterializedState, entityType: stri
 }
 
 /**
+ * 一条**新建**意图自己声明的清单归属。
+ *
+ * 🔴 为什么需要这一跳（M2-d 验收臂抓到的洞）：裁决一的判据是"这条实体所属清单的
+ * `shareId` 是否在册"，而 {@link routeShareIdForEntity} 只能从**已存在的实体**读那一跳。
+ * 新建那一条此刻还不在这台设备的状态里 ⇒ 解析成 `entity-not-found` ⇒ 判成个人 ⇒
+ * 在共享清单里加的一条任务**永远不会出现在对面那台设备上**；更糟的是
+ * `crossesShareBoundary` 把"从 undefined 搬到 pShared"读成一次跨边界移动，
+ * 用户点"加一条任务"收到的是"暂不支持跨清单移动"。
+ *
+ * 新建那一条的"所属清单"就是这次写入自己声明的那个：TASK/NOTE 载荷里的 `projectId`，
+ * COMMENT 载荷里那条 `taskId` 所属的清单。**判据仍然只有一处** —— 还是那条清单的
+ * `shareId` 在不在册，只是"这条实体属于哪条清单"多了一种来源（实体还不存在时只能问载荷）。
+ */
+function declaredProjectId(state: MaterializedState, intent: OpIntent): string | undefined {
+  const payload = intent.payload as Record<string, unknown> | undefined;
+  if (payload === undefined) return undefined;
+  if (intent.entityType === 'COMMENT') {
+    const taskId = payload['taskId'];
+    if (typeof taskId !== 'string' || taskId.trim() === '') return undefined;
+    const task = state.tasks[taskId];
+    return live(task) ? task.projectId : undefined;
+  }
+  if (intent.entityType !== 'TASK' && intent.entityType !== 'NOTE') return undefined;
+  const projectId = payload['projectId'];
+  return typeof projectId === 'string' && projectId.trim() !== '' ? projectId : undefined;
+}
+
+/**
+ * 意图版的两跳解析：已存在的实体走原路，**新建**那一条走它自己声明的归属。
+ *
+ * ⚠️ 回退只在 `entity-not-found` 这一形上发生。其余阻塞原因（实体在但没有清单归属、
+ * 清单没共享、类型本来就不该进共享）**原样返回** —— 否则载荷里塞一个 `projectId`
+ * 就能绕过裁决一（"把一条个人清单里的任务改写成共享的"正是补二拒绝的那件事）。
+ */
+export function routeShareIdForIntent(state: MaterializedState, intent: OpIntent): ShareRoute {
+  const known = routeShareIdForEntity(state, intent.entityType, intent.entityId);
+  if ('shareId' in known) return known;
+  if (known.blocked !== 'entity-not-found') return known;
+  const projectId = declaredProjectId(state, intent);
+  if (projectId === undefined) return known;
+  if (!live(state.projects[projectId])) return { blocked: 'project-not-found' };
+  const shareId = shareIdOfProject(state, projectId);
+  return shareId === undefined ? { blocked: 'project-not-shared' } : { shareId };
+}
+
+/**
  * 这条意图是不是**跨边界移动**（0067 补二）。
  *
  * 只在 payload 真写了 `projectId` 时判（`undefined` = 这次没碰那一格）。
@@ -164,6 +214,10 @@ export function crossesShareBoundary(state: MaterializedState, intent: OpIntent)
   if (intent.entityType !== 'TASK' && intent.entityType !== 'NOTE') return false;
   const payload = intent.payload as Record<string, unknown> | undefined;
   if (payload === undefined || !('projectId' in payload)) return false;
+  // 🔴 **新建不是一次移动**：源那一侧此刻根本不存在。把"状态里没有"当成"从一个没有
+  // shareId 的地方搬过来"，"在共享清单里加一条任务"就会被读成跨边界移动并当场被拒。
+  const source = intent.entityType === 'TASK' ? state.tasks[intent.entityId] : state.notes[intent.entityId];
+  if (!live(source)) return false;
   const fromShare = shareIdOfProject(state, owningProjectId(state, intent.entityType, intent.entityId));
   const to = payload.projectId;
   const toShare = shareIdOfProject(state, typeof to === 'string' && to !== '' ? to : undefined);
@@ -239,7 +293,7 @@ export type ShareWriteDecision =
  */
 export function decideShareWrite(state: MaterializedState, intent: OpIntent): ShareWriteDecision {
   if (crossesShareBoundary(state, intent)) return { kind: 'reject-move' };
-  const route = routeShareIdForEntity(state, intent.entityType, intent.entityId);
+  const route = routeShareIdForIntent(state, intent);
   if (!('shareId' in route)) return { kind: 'personal' };
   return { kind: 'share', shareId: route.shareId };
 }
