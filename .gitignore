@@ -254,3 +254,6 @@ apps/web/evidence/web-ui-sweep-latest/
 # （如 `apps/web/evidence/<主题>/`），带趟号、md5 与"人看过"的记录。
 # 不忽略它的代价实测过：`git status` 里会持续冒出几十个 `??`，把真正待裁决的改动淹掉。
 .run-logs/
+
+# 中央服务凭据（本地生成，不入库）
+.central/
